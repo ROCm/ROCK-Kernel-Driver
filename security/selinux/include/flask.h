@@ -47,6 +47,15 @@
 #define SECCLASS_XSERVER                                 40
 #define SECCLASS_XEXTENSION                              41
 #define SECCLASS_PAX                                     42
+#define SECCLASS_NETLINK_ROUTE_SOCKET                    43
+#define SECCLASS_NETLINK_FIREWALL_SOCKET                 44
+#define SECCLASS_NETLINK_TCPDIAG_SOCKET                  45
+#define SECCLASS_NETLINK_NFLOG_SOCKET                    46
+#define SECCLASS_NETLINK_XFRM_SOCKET                     47
+#define SECCLASS_NETLINK_SELINUX_SOCKET                  48
+#define SECCLASS_NETLINK_AUDIT_SOCKET                    49
+#define SECCLASS_NETLINK_IP6FW_SOCKET                    50
+#define SECCLASS_NETLINK_DNRT_SOCKET                     51
 
 /*
  * Security identifier indices for initial entities

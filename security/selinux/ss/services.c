@@ -40,6 +40,7 @@
 #include "mls.h"
 
 extern void selnl_notify_policyload(u32 seqno);
+extern int policydb_loaded_version;
 
 static rwlock_t policy_rwlock = RW_LOCK_UNLOCKED;
 #define POLICY_RDLOCK read_lock(&policy_rwlock)
@@ -202,6 +203,17 @@ static int context_struct_compute_av(struct context *scontext,
 	struct avtab_key avkey;
 	struct avtab_datum *avdatum;
 	struct class_datum *tclass_datum;
+
+	/*
+	 * Remap extended Netlink classes for old policy versions.
+	 * Do this here rather than socket_type_to_security_class()
+	 * in case a newer policy version is loaded, allowing sockets
+	 * to remain in the correct class.
+	 */
+	if (policydb_loaded_version < POLICYDB_VERSION_NLCLASS)
+		if (tclass >= SECCLASS_NETLINK_ROUTE_SOCKET &&
+		    tclass <= SECCLASS_NETLINK_DNRT_SOCKET)
+			tclass = SECCLASS_NETLINK_SOCKET;
 
 	if (!tclass || tclass > policydb.p_classes.nprim) {
 		printk(KERN_ERR "security_compute_av:  unrecognized class %d\n",
