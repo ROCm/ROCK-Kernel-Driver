@@ -137,14 +137,18 @@ do {											\
 
 # define local_irq_restore(x)						 \
 do {									 \
-	unsigned long ip, old_psr, psr = (x);				 \
-									 \
-	__asm__ __volatile__ (";;mov %0=psr; mov psr.l=%1;; srlz.d"	 \
-			      : "=&r" (old_psr) : "r" (psr) : "memory"); \
-	if ((old_psr & (1UL << 14)) && !(psr & (1UL << 14))) {		 \
-		__asm__ ("mov %0=ip" : "=r"(ip));			 \
-		last_cli_ip = ip;					 \
-	}								 \
+	unsigned long ip, old_psr, psr = (x);						\
+											\
+	__asm__ __volatile__ ("mov %0=psr;"						\
+			      "cmp.ne p6,p7=%1,r0;;"					\
+			      "(p6) ssm psr.i;"						\
+			      "(p7) rsm psr.i;;"					\
+			      "srlz.d"							\
+			      : "=&r" (old_psr) : "r"((psr) & IA64_PSR_I) : "memory");	\
+	if ((old_psr & IA64_PSR_I) && !(psr & IA64_PSR_I)) {				\
+		__asm__ ("mov %0=ip" : "=r"(ip));					\
+		last_cli_ip = ip;							\
+	}										\
 } while (0)
 
 #else /* !CONFIG_IA64_DEBUG_IRQ */
@@ -153,8 +157,11 @@ do {									 \
 						      : "=r" (x) :: "memory")
 # define local_irq_disable()	__asm__ __volatile__ (";; rsm psr.i;;" ::: "memory")
 /* (potentially) setting psr.i requires data serialization: */
-# define local_irq_restore(x)	__asm__ __volatile__ (";; mov psr.l=%0;; srlz.d"	\
-						      :: "r" (x) : "memory")
+# define local_irq_restore(x)	__asm__ __volatile__ ("cmp.ne p6,p7=%0,r0;;"			\
+						      "(p6) ssm psr.i;"				\
+						      "(p7) rsm psr.i;;"			\
+						      "srlz.d"					\
+						      :: "r"((x) & IA64_PSR_I) : "memory")
 #endif /* !CONFIG_IA64_DEBUG_IRQ */
 
 #define local_irq_enable()	__asm__ __volatile__ (";; ssm psr.i;; srlz.d" ::: "memory")

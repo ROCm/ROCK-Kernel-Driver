@@ -632,14 +632,22 @@ ia64_invala (void)
 	asm volatile ("invala" ::: "memory");
 }
 
+static inline __u64
+ia64_clear_ic (void)
+{
+	__u64 psr;
+	asm volatile ("mov %0=psr;; rsm psr.i | psr.ic;; srlz.i;;" : "=r"(psr) :: "memory");
+	return psr;
+}
+
 /*
- * Save the processor status flags in FLAGS and then clear the interrupt collection and
- * interrupt enable bits.  Don't trigger any mandatory RSE references while this bit is
- * off!
+ * Restore the psr.
  */
-#define ia64_clear_ic(flags)						\
-	asm volatile ("mov %0=psr;; rsm psr.i | psr.ic;; srlz.i;;"	\
-			      : "=r"(flags) :: "memory");
+static inline void
+ia64_set_psr (__u64 psr)
+{
+	asm volatile (";; mov psr.l=%0;; srlz.d" :: "r" (psr) : "memory");
+}
 
 /*
  * Insert a translation into an instruction and/or data translation
