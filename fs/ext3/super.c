@@ -1952,9 +1952,9 @@ int ext3_statfs (struct super_block * sb, struct kstatfs * buf)
 /* Blocks: quota info + (4 pointer blocks + 1 entry block) * (3 indirect + 1 descriptor + 1 bitmap) + superblock */
 #define EXT3_V0_QFMT_BLOCKS 27
 
-static int (*old_sync_dquot)(struct dquot *dquot);
+static int (*old_write_dquot)(struct dquot *dquot);
 
-static int ext3_sync_dquot(struct dquot *dquot)
+static int ext3_write_dquot(struct dquot *dquot)
 {
 	int nblocks;
 	int ret;
@@ -1979,7 +1979,7 @@ static int ext3_sync_dquot(struct dquot *dquot)
 		ret = PTR_ERR(handle);
 		goto out;
 	}
-	ret = old_sync_dquot(dquot);
+	ret = old_write_dquot(dquot);
 	err = ext3_journal_stop(handle);
 	if (ret == 0)
 		ret = err;
@@ -2012,8 +2012,8 @@ static int __init init_ext3_fs(void)
 		goto out1;
 #ifdef CONFIG_QUOTA
 	init_dquot_operations(&ext3_qops);
-	old_sync_dquot = ext3_qops.sync_dquot;
-	ext3_qops.sync_dquot = ext3_sync_dquot;
+	old_write_dquot = ext3_qops.write_dquot;
+	ext3_qops.write_dquot = ext3_write_dquot;
 #endif
         err = register_filesystem(&ext3_fs_type);
 	if (err)
