@@ -7,7 +7,6 @@
  *----------------------------------------------------------------------------*/
 
 #define MAXIMUM_NUM_CONTAINERS	32
-#define MAXIMUM_NUM_ADAPTERS	8
 
 #define AAC_NUM_FIB		(256 + 64)
 #define AAC_NUM_IO_FIB		100
@@ -772,7 +771,7 @@ struct aac_adapter_info
 
 struct aac_dev
 {
-	struct aac_dev		*next;
+	struct list_head	entry;
 	const char		*name;
 	int			id;
 
