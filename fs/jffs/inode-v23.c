@@ -1532,7 +1532,7 @@ jffs_file_write(struct file *filp, const char *buf, size_t count,
 	return err;
 } /* jffs_file_write()  */
 
-static ssize_t
+static int
 jffs_prepare_write(struct file *filp, struct page *page,
                   unsigned from, unsigned to)
 {
@@ -1545,7 +1545,7 @@ jffs_prepare_write(struct file *filp, struct page *page,
 	return 0;
 } /* jffs_prepare_write() */
 
-static ssize_t
+static int
 jffs_commit_write(struct file *filp, struct page *page,
                  unsigned from, unsigned to)
 {
