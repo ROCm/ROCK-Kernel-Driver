@@ -72,10 +72,6 @@ static u64 acpi_lapic_addr __initdata = APIC_DEFAULT_PHYS_BASE;
 #warning ACPI uses CMPXCHG, i486 and later hardware
 #endif
 
-#define MAX_MADT_ENTRIES	256
-u8 x86_acpiid_to_apicid[MAX_MADT_ENTRIES] =
-			{ [0 ... MAX_MADT_ENTRIES-1] = 0xff };
-
 /* --------------------------------------------------------------------------
                               Boot-time Configuration
    -------------------------------------------------------------------------- */
@@ -215,8 +211,6 @@ acpi_parse_lapic (
 	/* no utility in registering a disabled processor */
 	if (processor->flags.enabled == 0)
 		return 0;
-
-	x86_acpiid_to_apicid[processor->acpi_id] = processor->id;
 
 	mp_register_lapic (
 		processor->id,					   /* APIC ID */

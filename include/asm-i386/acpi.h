@@ -163,8 +163,6 @@ extern void acpi_reserve_bootmem(void);
 
 #endif /*CONFIG_ACPI_SLEEP*/
 
-extern u8 x86_acpiid_to_apicid[];
-
 #endif /*__KERNEL__*/
 
 #endif /*_ASM_ACPI_H*/

@@ -31,19 +31,6 @@ config CPU_FREQ_TABLE
 comment "CPUFreq processor drivers"
        depends on CPU_FREQ
 
-config X86_ACPI_CPUFREQ
-	tristate "ACPI Processor P-States driver"
-	depends on CPU_FREQ_TABLE && ACPI_PROCESSOR
-	help
-	  This driver adds a CPUFreq driver which utilizes the ACPI
-	  Processor Performance States. This can work with variety
-	  of platforms and support both Intel Speedstep and Intel Enhanced 
-	  Speedstep, as long as BIOS-ACPI provides the P-state information.
-
-	  For details, take a look at <file:Documentation/cpu-freq/>.
-
-	  If in doubt, say N.
-
 config X86_POWERNOW_K8
 	tristate "AMD Opteron/Athlon64 PowerNow! using PST"
 	depends on CPU_FREQ_TABLE
