@@ -112,13 +112,21 @@ extern int _get_PVR(void);
 extern void giveup_fpu(struct task_struct *);
 extern void disable_kernel_fp(void);
 extern void flush_fp_to_thread(struct task_struct *);
-extern void flush_altivec_to_thread(struct task_struct *);
 extern void enable_kernel_fp(void);
 extern void giveup_altivec(struct task_struct *);
 extern void disable_kernel_altivec(void);
 extern void enable_kernel_altivec(void);
 extern void cvt_fd(float *from, double *to, unsigned long *fpscr);
 extern void cvt_df(double *from, float *to, unsigned long *fpscr);
+
+#ifdef CONFIG_ALTIVEC
+extern void flush_altivec_to_thread(struct task_struct *);
+#else
+static inline void flush_altivec_to_thread(struct task_struct *t)
+{
+}
+#endif
+
 extern int abs(int);
 
 extern struct task_struct *__switch_to(struct task_struct *,
