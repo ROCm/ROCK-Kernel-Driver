@@ -323,8 +323,6 @@ static int DRM(setup)( drm_device_t *dev )
 	dev->last_context = 0;
 	dev->last_switch = 0;
 	dev->last_checked = 0;
-	init_timer( &dev->timer );
-	init_waitqueue_head( &dev->context_wait );
 
 	dev->ctx_start = 0;
 	dev->lck_start = 0;
@@ -580,6 +578,8 @@ static int __init drm_init( void )
 		memset( (void *)dev, 0, sizeof(*dev) );
 		dev->count_lock = SPIN_LOCK_UNLOCKED;
 		sema_init( &dev->struct_sem, 1 );
+		init_timer( &dev->timer );
+		init_waitqueue_head( &dev->context_wait );
 
 		if ((DRM(minor)[i] = DRM(stub_register)(DRIVER_NAME, &DRM(fops),dev)) < 0)
 			return -EPERM;
