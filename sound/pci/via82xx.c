@@ -1975,8 +1975,10 @@ static int __devinit check_dxs_list(struct pci_dev *pci)
 {
 	static struct dxs_whitelist whitelist[] = {
 		{ .vendor = 0x1019, .device = 0x0996, .action = VIA_DXS_48K },
+		{ .vendor = 0x1043, .device = 0x8095, .action = VIA_DXS_ENABLE }, /* ASUS A7V8X */
 		{ .vendor = 0x1043, .device = 0x80a1, .action = VIA_DXS_NO_VRA }, /* ASUS A7V8-X */
 		{ .vendor = 0x1043, .device = 0x80b0, .action = VIA_DXS_ENABLE }, /* ASUS A7V600 */
+		{ .vendor = 0x10cf, .device = 0x118e, .action = VIA_DXS_ENABLE }, /* FSC laptop */
 		{ .vendor = 0x1297, .device = 0xc160, .action = VIA_DXS_ENABLE }, /* Shuttle SK41G */
 		{ .vendor = 0x1458, .device = 0xa002, .action = VIA_DXS_ENABLE }, /* Gigabyte GA-7VAXP */
 		{ .vendor = 0x14ff, .device = 0x0403, .action = VIA_DXS_ENABLE }, /* Twinhead mobo */
