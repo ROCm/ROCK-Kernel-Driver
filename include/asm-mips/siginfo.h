@@ -12,8 +12,8 @@
 #define SIGEV_PAD_SIZE	((SIGEV_MAX_SIZE/sizeof(int)) - 4)
 
 #define HAVE_ARCH_SIGINFO_T
-
 #define HAVE_ARCH_SIGEVENT_T
+#define HAVE_ARCH_COPY_SIGINFO
 
 #include <asm-generic/siginfo.h>
 
@@ -121,5 +121,20 @@ typedef struct sigevent {
 		} _sigev_thread;
 	} _sigev_un;
 } sigevent_t;
+
+#ifdef __KERNEL__
+
+#include <linux/string.h>
+
+static inline void copy_siginfo(struct siginfo *to, struct siginfo *from)
+{
+	if (from->si_code < 0)
+		memcpy(to, from, sizeof(*to));
+	else
+		/* _sigchld is currently the largest know union member */
+		memcpy(to, from, 3*sizeof(int) + sizeof(from->_sifields._sigchld));
+}
+
+#endif
 
 #endif /* _ASM_SIGINFO_H */
