@@ -196,7 +196,7 @@ struct page {
 #if defined(WANT_PAGE_VIRTUAL)
 	void *virtual;			/* Kernel virtual address (NULL if
 					   not kmapped, ie. highmem) */
-#endif /* CONFIG_HIGMEM || WANT_PAGE_VIRTUAL */
+#endif /* CONFIG_HIGHMEM || WANT_PAGE_VIRTUAL */
 };
 
 /*
