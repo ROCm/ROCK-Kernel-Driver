@@ -244,8 +244,7 @@ static void handle_write_error(struct address_space *mapping,
  * shrink_list returns the number of reclaimed pages
  */
 static int
-shrink_list(struct list_head *page_list, unsigned int gfp_mask,
-		int *max_scan, int *nr_mapped)
+shrink_list(struct list_head *page_list, unsigned int gfp_mask, int *nr_scanned)
 {
 	struct address_space *mapping;
 	LIST_HEAD(ret_pages);
@@ -269,7 +268,7 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask,
 
 		/* Double the slab pressure for mapped and swapcache pages */
 		if (page_mapped(page) || PageSwapCache(page))
-			(*nr_mapped)++;
+			(*nr_scanned)++;
 
 		BUG_ON(PageActive(page));
 
@@ -477,7 +476,7 @@ keep:
  */
 static int
 shrink_cache(const int nr_pages, struct zone *zone,
-		unsigned int gfp_mask, int max_scan, int *nr_mapped)
+		unsigned int gfp_mask, int max_scan, int *total_scanned)
 {
 	LIST_HEAD(page_list);
 	struct pagevec pvec;
@@ -534,8 +533,8 @@ shrink_cache(const int nr_pages, struct zone *zone,
 			mod_page_state_zone(zone, pgscan_kswapd, nr_scan);
 		else
 			mod_page_state_zone(zone, pgscan_direct, nr_scan);
-		nr_freed = shrink_list(&page_list, gfp_mask,
-					&max_scan, nr_mapped);
+		nr_freed = shrink_list(&page_list, gfp_mask, total_scanned);
+		*total_scanned += nr_taken;
 		if (current_is_kswapd())
 			mod_page_state(kswapd_steal, nr_freed);
 		mod_page_state_zone(zone, pgsteal, nr_freed);
@@ -749,7 +748,7 @@ refill_inactive_zone(struct zone *zone, const int nr_pages_in,
  */
 static int
 shrink_zone(struct zone *zone, int max_scan, unsigned int gfp_mask,
-	const int nr_pages, int *nr_mapped, struct page_state *ps)
+	const int nr_pages, int *total_scanned, struct page_state *ps)
 {
 	unsigned long ratio;
 
@@ -782,7 +781,7 @@ shrink_zone(struct zone *zone, int max_scan, unsigned int gfp_mask,
 		refill_inactive_zone(zone, count, ps);
 	}
 	return shrink_cache(nr_pages, zone, gfp_mask,
-				max_scan, nr_mapped);
+				max_scan, total_scanned);
 }
 
 /*
@@ -811,7 +810,6 @@ shrink_caches(struct zone **zones, int priority, int *total_scanned,
 	for (i = 0; zones[i] != NULL; i++) {
 		int to_reclaim = max(nr_pages, SWAP_CLUSTER_MAX);
 		struct zone *zone = zones[i];
-		int nr_mapped = 0;
 		int max_scan;
 
 		if (zone->free_pages < zone->pages_high)
@@ -828,8 +826,7 @@ shrink_caches(struct zone **zones, int priority, int *total_scanned,
 		if (max_scan < to_reclaim * 2)
 			max_scan = to_reclaim * 2;
 		ret += shrink_zone(zone, max_scan, gfp_mask,
-				to_reclaim, &nr_mapped, ps);
-		*total_scanned += max_scan + nr_mapped;
+				to_reclaim, total_scanned, ps);
 		if (ret >= nr_pages)
 			break;
 	}
@@ -944,7 +941,7 @@ static int balance_pgdat(pg_data_t *pgdat, int nr_pages, struct page_state *ps)
 
 		for (i = 0; i < pgdat->nr_zones; i++) {
 			struct zone *zone = pgdat->node_zones + i;
-			int nr_mapped = 0;
+			int total_scanned = 0;
 			int max_scan;
 			int to_reclaim;
 			int reclaimed;
@@ -966,10 +963,10 @@ static int balance_pgdat(pg_data_t *pgdat, int nr_pages, struct page_state *ps)
 			if (max_scan < SWAP_CLUSTER_MAX)
 				max_scan = SWAP_CLUSTER_MAX;
 			reclaimed = shrink_zone(zone, max_scan, GFP_KERNEL,
-					to_reclaim, &nr_mapped, ps);
+					to_reclaim, &total_scanned, ps);
 			if (i < ZONE_HIGHMEM) {
 				reclaim_state->reclaimed_slab = 0;
-				shrink_slab(max_scan + nr_mapped, GFP_KERNEL);
+				shrink_slab(total_scanned, GFP_KERNEL);
 				reclaimed += reclaim_state->reclaimed_slab;
 			}
 			to_free -= reclaimed;
