@@ -161,9 +161,6 @@ do_open_fhandle(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_
 }
 
 
-/*
- * nfs4_unlock_state() called in encode
- */
 static inline int
 nfsd4_open(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_open *open)
 {
@@ -182,7 +179,6 @@ nfsd4_open(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_open 
 	if (open->op_create && open->op_claim_type != NFS4_OPEN_CLAIM_NULL)
 		return nfserr_inval;
 
-	open->op_stateowner = NULL;
 	nfs4_lock_state();
 
 	/* check seqid for replay. set nfs4_owner */
@@ -236,6 +232,7 @@ nfsd4_open(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_open 
 out:
 	if (open->op_stateowner)
 		nfs4_get_stateowner(open->op_stateowner);
+	nfs4_unlock_state();
 	return status;
 }
 

@@ -93,9 +93,6 @@ nfs4_lock_state(void)
 	down(&client_sema);
 }
 
-/*
- * nfs4_unlock_state(); called in encode
- */
 void
 nfs4_unlock_state(void)
 {
@@ -1711,9 +1708,6 @@ first_state(struct nfs4_client *clp)
 		clp->cl_first_state = get_seconds();
 }
 
-/*
- * nfs4_unlock_state(); called in encode
- */
 int
 nfsd4_open_confirm(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_open_confirm *oc)
 {
@@ -1728,7 +1722,6 @@ nfsd4_open_confirm(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfs
 	if ((status = fh_verify(rqstp, current_fh, S_IFREG, 0)))
 		goto out;
 
-	oc->oc_stateowner = NULL;
 	nfs4_lock_state();
 
 	if ((status = nfs4_preprocess_seqid_op(current_fh, oc->oc_seqid,
@@ -1752,6 +1745,7 @@ nfsd4_open_confirm(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfs
 out:
 	if (oc->oc_stateowner)
 		nfs4_get_stateowner(oc->oc_stateowner);
+	nfs4_unlock_state();
 	return status;
 }
 
@@ -1780,10 +1774,6 @@ reset_union_bmap_deny(unsigned long deny, unsigned long *bmap)
 	}
 }
 
-/*
- * nfs4_unlock_state(); called in encode
- */
-
 int
 nfsd4_open_downgrade(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_open_downgrade *od)
 {
@@ -1795,10 +1785,8 @@ nfsd4_open_downgrade(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct n
 			(int)current_fh->fh_dentry->d_name.len,
 			current_fh->fh_dentry->d_name.name);
 
-	od->od_stateowner = NULL;
-	status = nfserr_inval;
 	if (!TEST_ACCESS(od->od_share_access) || !TEST_DENY(od->od_share_deny))
-		goto out;
+		return nfserr_inval;
 
 	nfs4_lock_state();
 	if ((status = nfs4_preprocess_seqid_op(current_fh, od->od_seqid, 
@@ -1831,6 +1819,7 @@ nfsd4_open_downgrade(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct n
 out:
 	if (od->od_stateowner)
 		nfs4_get_stateowner(od->od_stateowner);
+	nfs4_unlock_state();
 	return status;
 }
 
@@ -1847,7 +1836,6 @@ nfsd4_close(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_clos
 			(int)current_fh->fh_dentry->d_name.len,
 			current_fh->fh_dentry->d_name.name);
 
-	close->cl_stateowner = NULL;
 	nfs4_lock_state();
 	/* check close_lru for replay */
 	if ((status = nfs4_preprocess_seqid_op(current_fh, close->cl_seqid, 
@@ -1867,6 +1855,7 @@ nfsd4_close(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_clos
 out:
 	if (close->cl_stateowner)
 		nfs4_get_stateowner(close->cl_stateowner);
+	nfs4_unlock_state();
 	return status;
 }
 
@@ -2085,8 +2074,6 @@ check_lock_length(u64 offset, u64 length)
 
 /*
  *  LOCK operation 
- *
- * nfs4_unlock_state(); called in encode
  */
 int
 nfsd4_lock(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_lock *lock)
@@ -2111,7 +2098,6 @@ nfsd4_lock(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_lock 
 	if (check_lock_length(lock->lk_offset, lock->lk_length))
 		 return nfserr_inval;
 
-	lock->lk_stateowner = NULL;
 	nfs4_lock_state();
 
 	if (lock->lk_is_new) {
@@ -2268,6 +2254,7 @@ out_destroy_new_stateid:
 out:
 	if (lock->lk_stateowner)
 		nfs4_get_stateowner(lock->lk_stateowner);
+	nfs4_unlock_state();
 	return status;
 }
 
@@ -2376,7 +2363,6 @@ nfsd4_locku(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_lock
 	if (check_lock_length(locku->lu_offset, locku->lu_length))
 		 return nfserr_inval;
 
-	locku->lu_stateowner = NULL;
 	nfs4_lock_state();
 									        
 	if ((status = nfs4_preprocess_seqid_op(current_fh, 
@@ -2421,6 +2407,7 @@ nfsd4_locku(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_lock
 out:
 	if (locku->lu_stateowner)
 		nfs4_get_stateowner(locku->lu_stateowner);
+	nfs4_unlock_state();
 	return status;
 
 out_nfserr:
