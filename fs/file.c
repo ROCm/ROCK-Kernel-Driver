@@ -1,5 +1,5 @@
 /*
- *  linux/fs/open.c
+ *  linux/fs/file.c
  *
  *  Copyright (C) 1998-1999, Stephen Tweedie and Bill Hawes
  *
