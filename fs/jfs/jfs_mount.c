@@ -197,9 +197,6 @@ int jfs_mount(struct super_block *sb)
 	/*
 	 *      unwind on error
 	 */
-//errout42: /* close fileset inode allocation map */
-	diUnmount(ipimap, 1);
-
       errout41:		/* close fileset inode allocation map inode */
 	diFreeSpecial(ipimap);
 
