@@ -84,7 +84,6 @@ typedef enum page_buf_flags_e {		/* pb_flags values */
 
 	/* flags used only internally */
 	_PBF_PAGECACHE = (1 << 16),	/* backed by pagecache		   */
-	_PBF_ALL_PAGES_MAPPED = (1 << 18), /* all pages in range mapped	   */
 	_PBF_ADDR_ALLOCATED = (1 << 19), /* pb_addr space was allocated	   */
 	_PBF_MEM_ALLOCATED = (1 << 20), /* underlying pages are allocated  */
 	_PBF_MEM_SLAB = (1 << 21), /* underlying pages are slab allocated  */
