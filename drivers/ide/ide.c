@@ -1435,7 +1435,7 @@ repeat:
 				 && 0 < (signed long)(WAKEUP(drive) - (jiffies - best->service_time))
 				 && 0 < (signed long)((jiffies + t) - WAKEUP(drive)))
 				{
-					ide_stall_queue(best, min(t, 10 * WAIT_MIN_SLEEP));
+					ide_stall_queue(best, min(t, 10L * WAIT_MIN_SLEEP));
 					goto repeat;
 				}
 			} while ((drive = drive->next) != best);
