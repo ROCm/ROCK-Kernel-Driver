@@ -15,6 +15,7 @@
 #include <asm/pgtable.h>
 #include <asm/shmparam.h>
 #include <asm/tlbflush.h>
+#include <asm/cacheflush.h>
 
 #if SHMLBA > 16384
 #error FIX ME
