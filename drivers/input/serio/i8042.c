@@ -270,7 +270,9 @@ static int i8042_open(struct serio *port)
  */
 
 	if (request_irq(values->irq, i8042_interrupt, 0, "i8042", NULL)) {
-		printk(KERN_ERR "i8042.c: Can't get irq %d for %s\n", values->irq, values->name);
+		printk(KERN_ERR "i8042.c: Can't get irq %d for %s, unregistering the port.\n", values->irq, values->name);
+		values->exists = 0;
+		serio_unregister_port(port);
 		return -1;
 	}
 
