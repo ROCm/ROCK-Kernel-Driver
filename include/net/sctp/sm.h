@@ -269,6 +269,7 @@ sctp_chunk_t *sctp_make_op_error(const sctp_association_t *,
 				 const void *payload,
 				 size_t paylen);
 void sctp_chunk_assign_tsn(sctp_chunk_t *);
+void sctp_chunk_assign_ssn(sctp_chunk_t *);
 
 
 /* Prototypes for statetable processing. */

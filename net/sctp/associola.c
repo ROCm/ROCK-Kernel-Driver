@@ -1,7 +1,7 @@
 /* SCTP kernel reference Implementation
  * Copyright (c) 1999-2000 Cisco, Inc.
  * Copyright (c) 1999-2001 Motorola, Inc.
- * Copyright (c) 2001-2002 International Business Machines Corp.
+ * Copyright (c) 2001-2003 International Business Machines Corp.
  * Copyright (c) 2001 Intel Corp.
  * Copyright (c) 2001 La Monte H.P. Yarroll
  *
@@ -166,15 +166,10 @@ sctp_association_t *sctp_association_init(sctp_association_t *asoc,
 	asoc->max_init_attempts	= sp->initmsg.sinit_max_attempts;
 	asoc->max_init_timeo    = sp->initmsg.sinit_max_init_timeo * HZ;
 
-	/* RFC 2960 6.5 Stream Identifier and Stream Sequence Number
-	 *
-	 * The stream sequence number in all the streams shall start
-	 * from 0 when the association is established.  Also, when the
-	 * stream sequence number reaches the value 65535 the next
-	 * stream sequence number shall be set to 0.
+	/* Allocate storage for the ssnmap after the inbound and outbound
+	 * streams have been negotiated during Init.
 	 */
-	for (i = 0; i < SCTP_MAX_STREAM; i++)
-		asoc->ssn[i] = 0;
+	asoc->ssnmap = NULL;
 
 	/* Set the local window size for receive.
 	 * This is also the rcvbuf space per association.
@@ -252,15 +247,15 @@ sctp_association_t *sctp_association_init(sctp_association_t *asoc,
 				    asoc);
 
 	/* Create an output queue.  */
-	sctp_outqueue_init(asoc, &asoc->outqueue);
-	sctp_outqueue_set_output_handlers(&asoc->outqueue,
-					  sctp_packet_init,
-					  sctp_packet_config,
-					  sctp_packet_append_chunk,
-					  sctp_packet_transmit_chunk,
-					  sctp_packet_transmit);
+	sctp_outq_init(asoc, &asoc->outqueue);
+	sctp_outq_set_output_handlers(&asoc->outqueue,
+				      sctp_packet_init,
+				      sctp_packet_config,
+				      sctp_packet_append_chunk,
+				      sctp_packet_transmit_chunk,
+				      sctp_packet_transmit);
 
-	if (NULL == sctp_ulpqueue_init(&asoc->ulpq, asoc, SCTP_MAX_STREAM))
+	if (NULL == sctp_ulpq_init(&asoc->ulpq, asoc))
 		goto fail_init;
 
 	/* Set up the tsn tracking. */
@@ -310,13 +305,16 @@ void sctp_association_free(sctp_association_t *asoc)
 	asoc->base.dead = 1;
 
 	/* Dispose of any data lying around in the outqueue. */
-	sctp_outqueue_free(&asoc->outqueue);
+	sctp_outq_free(&asoc->outqueue);
 
 	/* Dispose of any pending messages for the upper layer. */
-	sctp_ulpqueue_free(&asoc->ulpq);
+	sctp_ulpq_free(&asoc->ulpq);
 
 	/* Dispose of any pending chunks on the inqueue. */
 	sctp_inqueue_free(&asoc->base.inqueue);
+
+	/* Free ssnmap storage. */
+	sctp_ssnmap_free(asoc->ssnmap);
 
 	/* Clean up the bound address list. */
 	sctp_bind_addr_free(&asoc->base.bind_addr);
@@ -524,7 +522,7 @@ void sctp_assoc_control_transport(sctp_association_t *asoc,
 		break;
 
 	default:
-		BUG();
+		return;
 	};
 
 	/* Generate and send a SCTP_PEER_ADDR_CHANGE notification to the
@@ -534,7 +532,7 @@ void sctp_assoc_control_transport(sctp_association_t *asoc,
 				(struct sockaddr_storage *) &transport->ipaddr,
 				0, spc_state, error, GFP_ATOMIC);
 	if (event)
-		sctp_ulpqueue_tail_event(&asoc->ulpq, event);
+		sctp_ulpq_tail_event(&asoc->ulpq, event);
 
 	/* Select new active and retran paths. */
 
@@ -634,7 +632,7 @@ __u32 __sctp_association_get_tsn_block(sctp_association_t *asoc, int num)
 /* Fetch the next Stream Sequence Number for stream number 'sid'.  */
 __u16 __sctp_association_get_next_ssn(sctp_association_t *asoc, __u16 sid)
 {
-	return asoc->ssn[sid]++;
+	return sctp_ssn_next(&asoc->ssnmap->out, sid);
 }
 
 /* Compare two addresses to see if they match.  Wildcard addresses
@@ -852,8 +850,6 @@ void sctp_assoc_migrate(sctp_association_t *assoc, struct sock *newsk)
 /* Update an association (possibly from unexpected COOKIE-ECHO processing).  */
 void sctp_assoc_update(sctp_association_t *asoc, sctp_association_t *new)
 {
-	int i;
-
 	/* Copy in new parameters of peer. */
 	asoc->c = new->c;
 	asoc->peer.rwnd = new->peer.rwnd;
@@ -872,23 +868,28 @@ void sctp_assoc_update(sctp_association_t *asoc, sctp_association_t *new)
 
 	/* If the case is A (association restart), use
 	 * initial_tsn as next_tsn. If the case is B, use
-	 * current next_tsn in case there is data sent to peer
+	 * current next_tsn in case data sent to peer
 	 * has been discarded and needs retransmission.
 	 */
 	if (SCTP_STATE_ESTABLISHED == asoc->state) {
+
 		asoc->next_tsn = new->next_tsn;
 		asoc->ctsn_ack_point = new->ctsn_ack_point;
 
 		/* Reinitialize SSN for both local streams
 		 * and peer's streams.
 		 */
-		for (i = 0; i < SCTP_MAX_STREAM; i++) {
-			asoc->ssn[i] = 0;
-			asoc->ulpq.ssn[i] = 0;
-		}
+		sctp_ssnmap_clear(asoc->ssnmap);
+
 	} else {
 		asoc->ctsn_ack_point = asoc->next_tsn - 1;
+		if (!asoc->ssnmap) {
+			/* Move the ssnmap. */
+			asoc->ssnmap = new->ssnmap;
+			new->ssnmap = NULL;
+		}
 	}
+
 }
 
 /* Choose the transport for sending a shutdown packet.

@@ -606,9 +606,9 @@ fail:
 sctp_ulpevent_t *sctp_ulpevent_make_rcvmsg(sctp_association_t *asoc,
 					   sctp_chunk_t *chunk, int priority)
 {
-	sctp_ulpevent_t *event;
+	sctp_ulpevent_t *event, *levent;
 	struct sctp_sndrcvinfo *info;
-	struct sk_buff *skb;
+	struct sk_buff *skb, *list;
 	size_t padding, len;
 
 	/* Clone the original skb, sharing the data.  */
@@ -646,6 +646,16 @@ sctp_ulpevent_t *sctp_ulpevent_make_rcvmsg(sctp_association_t *asoc,
 		goto fail_init;
 
 	event->malloced = 1;
+
+	for (list = skb_shinfo(skb)->frag_list; list; list = list->next) {
+		sctp_ulpevent_set_owner_r(list, asoc);
+		/* Initialize event with flags 0.  */
+		levent = sctp_ulpevent_init(event, skb, 0);
+		if (!levent)
+			goto fail_init;
+
+		levent->malloced = 1;
+	}
 
 	info = (struct sctp_sndrcvinfo *) &event->sndrcvinfo;
 
@@ -764,6 +774,7 @@ static void sctp_rcvmsg_rfree(struct sk_buff *skb)
 	sctp_ulpevent_t *event;
 	sctp_chunk_t *sack;
 	struct timer_list *timer;
+	int skb_len = skb_headlen(skb);
 
 	/* Current stack structures assume that the rcv buffer is
 	 * per socket.   For UDP style sockets this is not true as
@@ -774,23 +785,23 @@ static void sctp_rcvmsg_rfree(struct sk_buff *skb)
 	event = (sctp_ulpevent_t *) skb->cb;
 	asoc = event->asoc;
 	if (asoc->rwnd_over) {
-		if (asoc->rwnd_over >= skb->len) {
-			asoc->rwnd_over -= skb->len;
+		if (asoc->rwnd_over >= skb_len) {
+			asoc->rwnd_over -= skb_len;
 		} else {
-			asoc->rwnd += (skb->len - asoc->rwnd_over);
+			asoc->rwnd += (skb_len - asoc->rwnd_over);
 			asoc->rwnd_over = 0;
 		}
 	} else {
-		asoc->rwnd += skb->len;
+		asoc->rwnd += skb_len;
 	}
 
 	SCTP_DEBUG_PRINTK("rwnd increased by %d to (%u, %u) - %u\n",
-			  skb->len, asoc->rwnd, asoc->rwnd_over, asoc->a_rwnd);
+			  skb_len, asoc->rwnd, asoc->rwnd_over, asoc->a_rwnd);
 
 	/* Send a window update SACK if the rwnd has increased by at least the
 	 * minimum of the association's PMTU and half of the receive buffer.
-	 * The algorithm used is similar to the one described in Section 4.2.3.3
-	 * of RFC 1122.
+	 * The algorithm used is similar to the one described in 
+	 * Section 4.2.3.3 of RFC 1122.
 	 */
 	if ((asoc->state == SCTP_STATE_ESTABLISHED) &&
 	    (asoc->rwnd > asoc->a_rwnd) &&
@@ -808,7 +819,7 @@ static void sctp_rcvmsg_rfree(struct sk_buff *skb)
 		asoc->peer.sack_needed = 0;
 		asoc->peer.next_dup_tsn = 0;
 
-		sctp_push_outqueue(&asoc->outqueue, sack);
+		sctp_outq_tail(&asoc->outqueue, sack);
 
 		/* Stop the SACK timer.  */
 		timer = &asoc->timers[SCTP_EVENT_TIMEOUT_SACK];
@@ -824,6 +835,7 @@ out:
 static void sctp_ulpevent_set_owner_r(struct sk_buff *skb, sctp_association_t *asoc)
 {
 	sctp_ulpevent_t *event;
+	int skb_len = skb_headlen(skb);
 
 	/* The current stack structures assume that the rcv buffer is
 	 * per socket.  For UDP-style sockets this is not true as
@@ -840,14 +852,14 @@ static void sctp_ulpevent_set_owner_r(struct sk_buff *skb, sctp_association_t *a
 
 	SCTP_ASSERT(asoc->rwnd, "rwnd zero", return);
 	SCTP_ASSERT(!asoc->rwnd_over, "rwnd_over not zero", return);
-	if (asoc->rwnd >= skb->len) {
-		asoc->rwnd -= skb->len;
+	if (asoc->rwnd >= skb_len) {
+		asoc->rwnd -= skb_len;
 	} else {
-		asoc->rwnd_over = skb->len - asoc->rwnd;
+		asoc->rwnd_over = skb_len - asoc->rwnd;
 		asoc->rwnd = 0;
 	}
 	SCTP_DEBUG_PRINTK("rwnd decreased by %d to (%u, %u)\n",
-			  skb->len, asoc->rwnd, asoc->rwnd_over);
+			  skb_len, asoc->rwnd, asoc->rwnd_over);
 }
 
 /* A simple destructor to give up the reference to the association. */

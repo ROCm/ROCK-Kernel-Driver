@@ -1,7 +1,7 @@
 /* SCTP kernel reference Implementation
  * Copyright (c) 1999-2000 Cisco, Inc.
  * Copyright (c) 1999-2001 Motorola, Inc.
- * Copyright (c) 2001 International Business Machines, Corp.
+ * Copyright (c) 2001-2003 International Business Machines, Corp.
  *
  * This file is part of the SCTP kernel reference Implementation
  *
@@ -62,7 +62,6 @@
 #include <net/sctp/sm.h>
 
 /* Forward declarations for private helpers. */
-__u32 count_crc(__u8 *ptr, __u16  count);
 static void sctp_packet_reset(sctp_packet_t *packet);
 static sctp_xmit_t sctp_packet_append_data(sctp_packet_t *packet,
 					   sctp_chunk_t *chunk);
@@ -228,7 +227,7 @@ finish:
 }
 
 /* All packets are sent to the network through this function from
- * sctp_push_outqueue().
+ * sctp_outq_tail().
  *
  * The return value is a normal kernel error return value.
  */
@@ -358,7 +357,8 @@ int sctp_packet_transmit(sctp_packet_t *packet)
 	 * Note: Adler-32 is no longer applicable, as has been replaced
 	 * by CRC32-C as described in <draft-ietf-tsvwg-sctpcsum-02.txt>.
 	 */
-	crc32 = count_crc((__u8 *)sh, nskb->len);
+	crc32 = sctp_start_cksum((__u8 *)sh, nskb->len);
+	crc32 = sctp_end_cksum(crc32);
 
 	/* 3) Put the resultant value into the checksum field in the
 	 *    common header, and leave the rest of the bits unchanged.

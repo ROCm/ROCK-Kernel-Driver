@@ -42,6 +42,7 @@
  *    Xingang Guo           <xingang.guo@intel.com>
  *    Hui Huang             <hui.huang@nokia.com>
  *    Sridhar Samudrala	    <sri@us.ibm.com>
+ *    Ardelle Fan	    <ardelle.fan@intel.com>
  *
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
@@ -184,8 +185,9 @@ void sctp_transport_reset_timers(sctp_transport_t *transport)
 	}
 
 	/* When a data chunk is sent, reset the heartbeat interval.  */
-	if (!mod_timer(&transport->hb_timer,
-		       transport->hb_interval + transport->rto + jiffies))
+	if (!mod_timer(&transport->hb_timer, transport->hb_interval +
+			transport->rto  + sctp_jitter(transport->rto) +
+			jiffies))
 		sctp_transport_hold(transport);
 }
 
@@ -202,7 +204,7 @@ void sctp_transport_set_owner(sctp_transport_t *transport,
 
 /* Caches the dst entry for a transport's destination address and an optional
  * souce address.
- */ 
+ */
 void sctp_transport_route(sctp_transport_t *transport, union sctp_addr *saddr,
 			  struct sctp_opt *opt)
 {
@@ -245,10 +247,10 @@ void sctp_transport_route(sctp_transport_t *transport, union sctp_addr *saddr,
 				goto out_unlock;
 		}
 		sctp_read_unlock(addr_lock);
-	
+
 		/* None of the bound addresses match the source address of the
 		 * dst. So release it.
-		 */	
+		 */
 		dst_release(dst);
 	}
 

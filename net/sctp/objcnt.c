@@ -54,6 +54,7 @@ SCTP_DBG_OBJCNT(assoc);
 SCTP_DBG_OBJCNT(bind_addr);
 SCTP_DBG_OBJCNT(chunk);
 SCTP_DBG_OBJCNT(addr);
+SCTP_DBG_OBJCNT(ssnmap);
 
 /* An array to make it easy to pretty print the debug information
  * to the proc fs.
@@ -66,6 +67,7 @@ sctp_dbg_objcnt_entry_t sctp_dbg_objcnt[] = {
 	SCTP_DBG_OBJCNT_ENTRY(chunk),
 	SCTP_DBG_OBJCNT_ENTRY(bind_addr),
 	SCTP_DBG_OBJCNT_ENTRY(addr),
+	SCTP_DBG_OBJCNT_ENTRY(ssnmap),
 };
 
 /* Callback from procfs to read out objcount information.

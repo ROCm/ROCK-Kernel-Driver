@@ -296,7 +296,7 @@ int sctp_cmd_interpreter(sctp_event_t event_type, sctp_subtype_t subtype,
 		       break;
 
 		case SCTP_CMD_PURGE_OUTQUEUE:
-		       sctp_outqueue_teardown(&asoc->outqueue);
+		       sctp_outq_teardown(&asoc->outqueue);
 		       break;
 
 		case SCTP_CMD_DELETE_TCB:
@@ -395,9 +395,9 @@ int sctp_cmd_interpreter(sctp_event_t event_type, sctp_subtype_t subtype,
 					  command->obj.ptr,
 					  "ulpq:",
 					  &asoc->ulpq);
-			sctp_ulpqueue_tail_data(&asoc->ulpq,
-						command->obj.ptr,
-						GFP_ATOMIC);
+			sctp_ulpq_tail_data(&asoc->ulpq,
+					    command->obj.ptr,
+					    GFP_ATOMIC);
 			break;
 
 		case SCTP_CMD_EVENT_ULP:
@@ -407,14 +407,14 @@ int sctp_cmd_interpreter(sctp_event_t event_type, sctp_subtype_t subtype,
 					  command->obj.ptr,
 					  "ulpq:",
 					  &asoc->ulpq);
-			sctp_ulpqueue_tail_event(&asoc->ulpq,
-						 command->obj.ptr);
+			sctp_ulpq_tail_event(&asoc->ulpq,
+					     command->obj.ptr);
 			break;
 
 		case SCTP_CMD_REPLY:
 			/* Send a chunk to our peer.  */
-			error = sctp_push_outqueue(&asoc->outqueue,
-						   command->obj.ptr);
+			error = sctp_outq_tail(&asoc->outqueue,
+					       command->obj.ptr);
 			break;
 
 		case SCTP_CMD_SEND_PKT:
@@ -432,7 +432,7 @@ int sctp_cmd_interpreter(sctp_event_t event_type, sctp_subtype_t subtype,
 
 		case SCTP_CMD_TRANSMIT:
 			/* Kick start transmission. */
-			error = sctp_flush_outqueue(&asoc->outqueue, 0);
+			error = sctp_outq_flush(&asoc->outqueue, 0);
 			break;
 
 		case SCTP_CMD_ECN_CE:
@@ -599,7 +599,7 @@ int sctp_cmd_interpreter(sctp_event_t event_type, sctp_subtype_t subtype,
 
 		case SCTP_CMD_RTO_PENDING:
 			t = command->obj.transport;
-			t->rto_pending = 1;	
+			t->rto_pending = 1;
 			break;
 
 		default:
@@ -743,7 +743,7 @@ int sctp_gen_sack(sctp_association_t *asoc, int force, sctp_cmd_seq_t *commands)
 		asoc->peer.sack_needed = 0;
 		asoc->peer.next_dup_tsn = 0;
 
-		error = sctp_push_outqueue(&asoc->outqueue, sack);
+		error = sctp_outq_tail(&asoc->outqueue, sack);
 
 		/* Stop the SACK timer.  */
 		sctp_add_cmd_sf(commands, SCTP_CMD_TIMER_STOP,
@@ -1095,7 +1095,7 @@ static void sctp_cmd_assoc_failed(sctp_cmd_seq_t *commands,
 /* Process an init chunk (may be real INIT/INIT-ACK or an embedded INIT
  * inside the cookie.  In reality, this is only used for INIT-ACK processing
  * since all other cases use "temporary" associations and can do all
- * their work in statefuns directly. 
+ * their work in statefuns directly.
  */
 static int sctp_cmd_process_init(sctp_cmd_seq_t *commands,
 				 sctp_association_t *asoc,
@@ -1134,8 +1134,8 @@ static void sctp_cmd_hb_timers_start(sctp_cmd_seq_t *cmds,
 	 */
 	list_for_each(pos, &asoc->peer.transport_addr_list) {
 		t = list_entry(pos, sctp_transport_t, transports);
-		if (!mod_timer(&t->hb_timer,
-			       t->hb_interval + t->rto + jiffies)) {
+		if (!mod_timer(&t->hb_timer, t->hb_interval + t->rto + 
+				sctp_jitter(t->rto) + jiffies)) {
 			sctp_transport_hold(t);
 		}
 	}
@@ -1147,7 +1147,8 @@ static void sctp_cmd_hb_timers_update(sctp_cmd_seq_t *cmds,
 				   sctp_transport_t *t)
 {
 	/* Update the heartbeat timer.  */
-	if (!mod_timer(&t->hb_timer, t->hb_interval + t->rto + jiffies))
+	if (!mod_timer(&t->hb_timer, t->hb_interval + t->rto + 
+			sctp_jitter(t->rto) + jiffies))
 		sctp_transport_hold(t);
 }
 
@@ -1218,7 +1219,7 @@ static int sctp_cmd_process_sack(sctp_cmd_seq_t *cmds,
 {
 	int err;
 
-	if (sctp_sack_outqueue(&asoc->outqueue, sackh)) {
+	if (sctp_outq_sack(&asoc->outqueue, sackh)) {
 		/* There are no more TSNs awaiting SACK.  */
 		err = sctp_do_sm(SCTP_EVENT_T_OTHER,
 				 SCTP_ST_OTHER(SCTP_EVENT_NO_PENDING_TSN),
@@ -1228,7 +1229,7 @@ static int sctp_cmd_process_sack(sctp_cmd_seq_t *cmds,
 		/* Windows may have opened, so we need
 		 * to check if we have DATA to transmit
 		 */
-		err = sctp_flush_outqueue(&asoc->outqueue, 0);
+		err = sctp_outq_flush(&asoc->outqueue, 0);
 	}
 
 	return err;

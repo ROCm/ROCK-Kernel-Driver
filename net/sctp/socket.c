@@ -1,7 +1,7 @@
 /* Copyright (c) 1999-2000 Cisco, Inc.
  * Copyright (c) 1999-2001 Motorola, Inc.
- * Copyright (c) 2001-2002 International Business Machines, Corp.
- * Copyright (c) 2001-2002 Intel Corp.
+ * Copyright (c) 2001-2003 International Business Machines, Corp.
+ * Copyright (c) 2001-2003 Intel Corp.
  * Copyright (c) 2001-2002 Nokia, Inc.
  * Copyright (c) 2001 La Monte H.P. Yarroll
  *
@@ -47,6 +47,7 @@
  *    Daisy Chang           <daisyc@us.ibm.com>
  *    Sridhar Samudrala     <samudrala@us.ibm.com>
  *    Inaky Perez-Gonzalez  <inaky.gonzalez@intel.com>
+ *    Ardelle Fan	    <ardelle.fan@intel.com>
  *
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
@@ -131,7 +132,7 @@ int sctp_bind(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 static long sctp_get_port_local(struct sock *, union sctp_addr *);
 
 /* Verify this is a valid sockaddr. */
-static struct sctp_af *sctp_sockaddr_af(struct sctp_opt *opt, 
+static struct sctp_af *sctp_sockaddr_af(struct sctp_opt *opt,
 					union sctp_addr *addr, int len)
 {
 	struct sctp_af *af;
@@ -754,8 +755,8 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 	 */
 	if ((SCTP_SOCKET_UDP_HIGH_BANDWIDTH != sp->type) && msg->msg_name) {
 		int msg_namelen = msg->msg_namelen;
-	
-		err = sctp_verify_addr(sk, (union sctp_addr *)msg->msg_name, 
+
+		err = sctp_verify_addr(sk, (union sctp_addr *)msg->msg_name,
 				       msg_namelen);
 		if (err)
 			return err;
@@ -806,7 +807,7 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 		asoc = sctp_endpoint_lookup_assoc(ep, &to, &transport);
 		if (!asoc) {
 			/* If we could not find a matching association on the
-			 * endpoint, make sure that there is no peeled-off 
+			 * endpoint, make sure that there is no peeled-off
 			 * association on another socket.
 			 */
 			if (sctp_endpoint_is_peeled_off(ep, &to)) {
@@ -868,13 +869,6 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 					goto out_unlock;
 				}
 			} else {
-				/* Check against the defaults.  */
-				if (sinfo->sinfo_stream >=
-				    sp->initmsg.sinit_num_ostreams) {
-					err = -EINVAL;
-					goto out_unlock;
-				}
-
 				/* Check against the requested.  */
 				if (sinfo->sinfo_stream >=
 				    sinit->sinit_num_ostreams) {
@@ -915,14 +909,8 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 					sinit->sinit_num_ostreams;
 			}
 			if (sinit->sinit_max_instreams) {
-				if (sinit->sinit_max_instreams <=
-				    SCTP_MAX_STREAM) {
-					asoc->c.sinit_max_instreams =
-						sinit->sinit_max_instreams;
-				} else {
-					asoc->c.sinit_max_instreams =
-						SCTP_MAX_STREAM;
-				}
+				asoc->c.sinit_max_instreams =
+					sinit->sinit_max_instreams;
 			}
 			if (sinit->sinit_max_attempts) {
 				asoc->max_init_attempts
@@ -1086,23 +1074,30 @@ do_interrupted:
  * frag_list. len specifies the total amount of data that needs to be removed.
  * when 'len' bytes could be removed from the skb, it returns 0.
  * If 'len' exceeds the total skb length,  it returns the no. of bytes that
- * could not be removed. 
- */  
+ * could not be removed.
+ */
 static int sctp_skb_pull(struct sk_buff *skb, int len)
 {
 	struct sk_buff *list;
+	int skb_len = skb_headlen(skb);
+	int rlen;
 
-	if (len <= skb->len) {
+	if (len <= skb_len) {
 		__skb_pull(skb, len);
 		return 0;
 	}
-	len -= skb->len;
-	__skb_pull(skb, skb->len);
+	len -= skb_len;
+	__skb_pull(skb, skb_len);
 
 	for (list = skb_shinfo(skb)->frag_list; list; list = list->next) {
-		len = sctp_skb_pull(list, len);
-		if (!len)
+		rlen = sctp_skb_pull(list, len);
+		skb->len -= (len-rlen);
+		skb->data_len -= (len-rlen);
+
+		if (!rlen)
 			return 0;
+
+		len = rlen;
 	}
 
 	return len;
@@ -1130,7 +1125,7 @@ SCTP_STATIC int sctp_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr 
 {
 	sctp_ulpevent_t *event = NULL;
 	sctp_opt_t *sp = sctp_sk(sk);
-	struct sk_buff *skb, *list;
+	struct sk_buff *skb;
 	int copied;
 	int err = 0;
 	int skb_len;
@@ -1152,10 +1147,8 @@ SCTP_STATIC int sctp_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr 
 
 	/* Get the total length of the skb including any skb's in the
 	 * frag_list.
-	 */ 
+	 */
 	skb_len = skb->len;
-	for (list = skb_shinfo(skb)->frag_list; list; list = list->next)
-		skb_len += list->len;
 
 	copied = skb_len;
 	if (copied > len)
@@ -1190,12 +1183,12 @@ SCTP_STATIC int sctp_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr 
 	/* If skb's length exceeds the user's buffer, update the skb and
 	 * push it back to the receive_queue so that the next call to
 	 * recvmsg() will return the remaining data. Don't set MSG_EOR.
-	 * Otherwise, set MSG_EOR indicating the end of a message. 
+	 * Otherwise, set MSG_EOR indicating the end of a message.
 	 */
 	if (skb_len > copied) {
 		msg->msg_flags &= ~MSG_EOR;
 		if (flags & MSG_PEEK)
-			goto out_free;	
+			goto out_free;
 		sctp_skb_pull(skb, copied);
 		skb_queue_head(&sk->receive_queue, skb);
 		goto out;
@@ -1463,7 +1456,7 @@ SCTP_STATIC int sctp_connect(struct sock *sk, struct sockaddr *uaddr,
 	sp = sctp_sk(sk);
 	ep = sp->ep;
 
-	/* connect() cannot be done on a peeled-off socket. */ 
+	/* connect() cannot be done on a peeled-off socket. */
 	if (SCTP_SOCKET_UDP_HIGH_BANDWIDTH == sp->type) {
 		err = -EISCONN;
 		goto out_unlock;
@@ -1471,7 +1464,7 @@ SCTP_STATIC int sctp_connect(struct sock *sk, struct sockaddr *uaddr,
 
 	err = sctp_verify_addr(sk, (union sctp_addr *)uaddr, addr_len);
 	if (err)
-		goto out_unlock;	
+		goto out_unlock;
 
 	memcpy(&to, uaddr, addr_len);
 	to.v4.sin_port = ntohs(to.v4.sin_port);
@@ -1479,7 +1472,7 @@ SCTP_STATIC int sctp_connect(struct sock *sk, struct sockaddr *uaddr,
 	asoc = sctp_endpoint_lookup_assoc(ep, &to, &transport);
 	if (asoc) {
 		if (asoc->state >= SCTP_STATE_ESTABLISHED)
-			err = -EISCONN;	
+			err = -EISCONN;
 		else
 			err = -EALREADY;
 		goto out_unlock;
@@ -1517,7 +1510,7 @@ SCTP_STATIC int sctp_connect(struct sock *sk, struct sockaddr *uaddr,
 
 	err = sctp_primitive_ASSOCIATE(asoc, NULL);
 	if (err < 0) {
-		sctp_association_free(asoc); 
+		sctp_association_free(asoc);
 		goto out_unlock;
 	}
 
@@ -1915,7 +1908,7 @@ static inline int sctp_getsockopt_get_peer_addr_params(struct sock *sk,
 	 * before this address shall be considered unreachable.
 	 */
 	params.spp_pathmaxrxt = trans->error_threshold;
-	
+
 	if (copy_to_user(optval, &params, len))
 		return -EFAULT;
 	*optlen = len;
@@ -1929,6 +1922,166 @@ static inline int sctp_getsockopt_initmsg(struct sock *sk, int len, char *optval
 		return -EINVAL;
 	if (copy_to_user(optval, &sctp_sk(sk)->initmsg, len))
 		return -EFAULT;
+	return 0;
+}
+
+static inline int sctp_getsockopt_get_peer_addrs_num(struct sock *sk, int len,
+				char *optval, int *optlen)
+{
+	sctp_assoc_t id;
+	sctp_association_t *asoc;
+	struct list_head *pos;
+	int cnt = 0;
+
+	if (len != sizeof(sctp_assoc_t))
+		return -EINVAL;
+
+	if (copy_from_user(&id, optval, sizeof(sctp_assoc_t)))
+		return -EFAULT;
+
+	/*
+	 *  For UDP-style sockets, id specifies the association to query.
+	 */
+	asoc = sctp_id2assoc(sk, id);
+	if (!asoc)
+		return -EINVAL;
+
+	list_for_each(pos, &asoc->peer.transport_addr_list) {
+		cnt ++;
+	}
+	if (copy_to_user(optval, &cnt, sizeof(int)))
+		return -EFAULT;
+
+	return 0;
+}
+
+static inline int sctp_getsockopt_get_peer_addrs(struct sock *sk, int len,
+				char *optval, int *optlen)
+{
+	sctp_association_t *asoc;
+	struct list_head *pos;
+	int cnt = 0;
+	struct sctp_getaddrs getaddrs;
+	sctp_transport_t *from;
+	struct sockaddr_storage *to;
+
+	if (len != sizeof(struct sctp_getaddrs))
+		return -EINVAL;
+
+	if (copy_from_user(&getaddrs, optval, sizeof(struct sctp_getaddrs)))
+		return -EFAULT;
+
+	if (getaddrs.addr_num <= 0) return -EINVAL;
+	/*
+	 *  For UDP-style sockets, id specifies the association to query.
+	 */
+	asoc = sctp_id2assoc(sk, getaddrs.assoc_id);
+	if (!asoc)
+		return -EINVAL;
+
+	to = getaddrs.addrs;
+	list_for_each(pos, &asoc->peer.transport_addr_list) {
+		from = list_entry(pos, sctp_transport_t, transports);
+		if (copy_to_user(to, &from->ipaddr, sizeof(from->ipaddr)))
+			return -EFAULT;
+		to ++;
+		cnt ++;
+		if (cnt >= getaddrs.addr_num) break;
+	}
+	getaddrs.addr_num = cnt;
+	if (copy_to_user(optval, &getaddrs, sizeof(struct sctp_getaddrs)))
+		return -EFAULT;
+
+	return 0;
+}
+
+static inline int sctp_getsockopt_get_local_addrs_num(struct sock *sk, int len,
+				char *optval, int *optlen)
+{
+	sctp_assoc_t id;
+	sctp_bind_addr_t *bp;
+	sctp_association_t *asoc;
+	struct list_head *pos;
+	int cnt = 0;
+
+	if (len != sizeof(sctp_assoc_t))
+		return -EINVAL;
+
+	if (copy_from_user(&id, optval, sizeof(sctp_assoc_t)))
+		return -EFAULT;
+
+	/*
+	 *  For UDP-style sockets, id specifies the association to query.
+	 *  If the id field is set to the value '0' then the locally bound
+	 *  addresses are returned without regard to any particular
+	 *  association.
+	 */
+	if (0 == id) {
+		bp = &sctp_sk(sk)->ep->base.bind_addr;
+	} else {
+		asoc = sctp_id2assoc(sk, id);
+		if (!asoc)
+			return -EINVAL;
+		bp = &asoc->base.bind_addr;
+	}
+
+	list_for_each(pos, &bp->address_list) {
+		cnt ++;
+	}
+	if (copy_to_user(optval, &cnt, sizeof(int)))
+		return -EFAULT;
+
+	return 0;
+}
+
+static inline int sctp_getsockopt_get_local_addrs(struct sock *sk, int len,
+				char *optval, int *optlen)
+{
+	sctp_bind_addr_t *bp;
+	sctp_association_t *asoc;
+	struct list_head *pos;
+	int cnt = 0;
+	struct sctp_getaddrs getaddrs;
+	struct sockaddr_storage_list *from;
+	struct sockaddr_storage *to;
+
+	if (len != sizeof(struct sctp_getaddrs))
+		return -EINVAL;
+
+	if (copy_from_user(&getaddrs, optval, sizeof(struct sctp_getaddrs)))
+		return -EFAULT;
+
+	if (getaddrs.addr_num <= 0) return -EINVAL;
+	/*
+	 *  For UDP-style sockets, id specifies the association to query.
+	 *  If the id field is set to the value '0' then the locally bound
+	 *  addresses are returned without regard to any particular
+	 *  association.
+	 */
+	if (0 == getaddrs.assoc_id) {
+		bp = &sctp_sk(sk)->ep->base.bind_addr;
+	} else {
+		asoc = sctp_id2assoc(sk, getaddrs.assoc_id);
+		if (!asoc)
+			return -EINVAL;
+		bp = &asoc->base.bind_addr;
+	}
+
+	to = getaddrs.addrs;
+	list_for_each(pos, &bp->address_list) {
+		from = list_entry(pos,
+				struct sockaddr_storage_list,
+				list);
+		if (copy_to_user(to, &from->a, sizeof(from->a)))
+			return -EFAULT;
+		to ++;
+		cnt ++;
+		if (cnt >= getaddrs.addr_num) break;
+	}
+	getaddrs.addr_num = cnt;
+	if (copy_to_user(optval, &getaddrs, sizeof(struct sctp_getaddrs)))
+		return -EFAULT;
+
 	return 0;
 }
 
@@ -1989,6 +2142,26 @@ SCTP_STATIC int sctp_getsockopt(struct sock *sk, int level, int optname,
 		retval = sctp_getsockopt_initmsg(sk, len, optval, optlen);
 		break;
 
+	case SCTP_GET_PEER_ADDRS_NUM:
+		retval = sctp_getsockopt_get_peer_addrs_num(sk, len, optval,
+							      optlen);
+		break;
+
+	case SCTP_GET_LOCAL_ADDRS_NUM:
+		retval = sctp_getsockopt_get_local_addrs_num(sk, len, optval,
+							      optlen);
+		break;
+
+	case SCTP_GET_PEER_ADDRS:
+		retval = sctp_getsockopt_get_peer_addrs(sk, len, optval,
+							      optlen);
+		break;
+
+	case SCTP_GET_LOCAL_ADDRS:
+		retval = sctp_getsockopt_get_local_addrs(sk, len, optval,
+							      optlen);
+		break;
+
 	default:
 		retval = -ENOPROTOOPT;
 		break;
@@ -2029,7 +2202,7 @@ static long sctp_get_port_local(struct sock *sk, union sctp_addr *addr)
 	sctp_protocol_t *sctp = sctp_get_protocol();
 	unsigned short snum;
 	int ret;
-	
+
 	/* NOTE:  Remember to put this back to net order. */
 	addr->v4.sin_port = ntohs(addr->v4.sin_port);
 	snum = addr->v4.sin_port;
@@ -2098,7 +2271,7 @@ static long sctp_get_port_local(struct sock *sk, union sctp_addr *addr)
 		}
 	}
 
-	
+
 	if (pp != NULL && pp->sk != NULL) {
 		/* We had a port hash table hit - there is an
 		 * available port (pp != NULL) and it is being
@@ -2129,7 +2302,7 @@ static long sctp_get_port_local(struct sock *sk, union sctp_addr *addr)
 
 			if (sk_reuse && sk2->reuse)
 				continue;
-			
+
 			if (sctp_bind_addr_match(&ep2->base.bind_addr, addr,
 						 sctp_sk(sk)))
 				goto found;
@@ -2187,7 +2360,7 @@ fail:
 }
 
 /* Assign a 'snum' port to the socket.  If snum == 0, an ephemeral
- * port is requested.  
+ * port is requested.
  */
 static int sctp_get_port(struct sock *sk, unsigned short snum)
 {
@@ -2657,10 +2830,10 @@ static int sctp_verify_addr(struct sock *sk, union sctp_addr *addr, int len)
 		return -EINVAL;
 
 	/* Is this a valid SCTP address?  */
-	if (!af->addr_valid((union sctp_addr *)addr)) 
+	if (!af->addr_valid((union sctp_addr *)addr))
 		return -EINVAL;
 
-	return 0;	
+	return 0;
 }
 
 /* Get the sndbuf space available at the time on the association.  */
