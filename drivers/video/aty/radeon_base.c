@@ -2291,7 +2291,7 @@ static void __devexit radeonfb_pci_unregister (struct pci_dev *pdev)
 #ifdef CONFIG_FB_RADEON_I2C
 	radeon_delete_i2c_busses(rinfo);
 #endif        
-        kfree (rinfo);
+        framebuffer_release(info);
 }
 
 
