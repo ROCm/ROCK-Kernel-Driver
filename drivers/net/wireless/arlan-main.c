@@ -156,7 +156,6 @@ static inline int arlan_drop_tx(struct net_device *dev)
 		TXHEAD(dev).offset = 0;
 		TXTAIL(dev).offset = 0;
 		priv->txLast = 0;
-		priv->txOffset = 0;
 		priv->bad = 0;
 		if (!priv->under_reset && !priv->under_config)
 			netif_wake_queue (dev);
@@ -549,7 +548,6 @@ static inline void arlan_retransmit_now(struct net_device *dev)
 		}
 		else
 			IFDEBUG(ARLAN_DEBUG_TX_CHAIN) printk(KERN_ERR "ReTransmit buff empty");
-		priv->txOffset = 0;
 		netif_wake_queue (dev);
 		return;
 
@@ -574,10 +572,6 @@ static void arlan_registration_timer(unsigned long data)
 	int lostTime = ((int) (jiffies - priv->registrationLastSeen)) * 1000 / HZ;
 	int bh_mark_needed = 0;
 	int next_tick = 1;
-
-
-	priv->timer_chain_active = 1;
-
 
 	if (registrationBad(dev))
 	{
@@ -643,7 +637,6 @@ static void arlan_registration_timer(unsigned long data)
 		}
 		if (!(TXHEAD(dev).offset && TXTAIL(dev).offset))
 		{
-			priv->txOffset = 0;
 			netif_wake_queue (dev);
 		}
 		priv->tx_done_delayed = 0;
@@ -651,7 +644,6 @@ static void arlan_registration_timer(unsigned long data)
 	}
 	if (bh_mark_needed)
 	{
-		priv->txOffset = 0;
 		netif_wake_queue (dev);
 	}
 	arlan_process_interrupt(dev);
@@ -659,7 +651,6 @@ static void arlan_registration_timer(unsigned long data)
 	if (next_tick < priv->card_polling_interval)
 		next_tick = priv->card_polling_interval;
 
-	priv->timer_chain_active = 0;
 	priv->timer.expires = jiffies + next_tick;
 
 	add_timer(&priv->timer);
@@ -1245,7 +1236,6 @@ static int arlan_open(struct net_device *dev)
 	priv->reset = 0;
 	memcpy_fromio(dev->dev_addr, arlan->lanCardNodeId, 6);
 	memset(dev->broadcast, 0xff, 6);
-	priv->txOffset = 0;
 	dev->tx_queue_len = tx_queue_len;
 	priv->interrupt_processing_active = 0;
 	priv->command_lock = 0;
@@ -1291,7 +1281,6 @@ static void arlan_tx_timeout (struct net_device *dev)
 
 static int arlan_tx(struct sk_buff *skb, struct net_device *dev)
 {
-	struct arlan_private *priv = dev->priv;
 	short length;
 	unsigned char *buf;
 
@@ -1300,7 +1289,7 @@ static int arlan_tx(struct sk_buff *skb, struct net_device *dev)
 	length = ETH_ZLEN < skb->len ? skb->len : ETH_ZLEN;
 	buf = skb->data;
 
-	if (priv->txOffset + length + 0x12 > 0x800) {
+	if (length + 0x12 > 0x800) {
 		printk(KERN_ERR "TX RING overflow \n");
 		netif_stop_queue (dev);
 	}
@@ -1313,13 +1302,11 @@ static int arlan_tx(struct sk_buff *skb, struct net_device *dev)
 	dev_kfree_skb(skb);
 
 	arlan_process_interrupt(dev);
-	priv->tx_chain_active = 0;
 	ARLAN_DEBUG_EXIT("arlan_tx");
 	return 0;
 
 bad_end:
 	arlan_process_interrupt(dev);
-	priv->tx_chain_active = 0;
 	netif_stop_queue (dev);
 	ARLAN_DEBUG_EXIT("arlan_tx");
 	return 1;
@@ -1417,7 +1404,6 @@ static void arlan_tx_done_interrupt(struct net_device *dev, int status)
 				}
 				if (!TXHEAD(dev).offset || !TXTAIL(dev).offset)
 				{
-					priv->txOffset = 0;
 					netif_wake_queue (dev);
 				}
 			}

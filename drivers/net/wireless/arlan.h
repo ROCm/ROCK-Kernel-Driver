@@ -358,7 +358,6 @@ struct arlan_private {
       char reTransmitBuff[0x800];
       volatile int txLast;
       volatile int txNew;
-      volatile int txOffset;
       volatile char ReTransmitRequested;
       volatile unsigned long tx_done_delayed;
       volatile long long registrationLastSeen;
@@ -367,8 +366,6 @@ struct arlan_private {
       volatile long long tx_last_sent;
       volatile long long tx_last_cleared;
       volatile int 	retransmissions;
-      volatile int	tx_chain_active;
-      volatile int 	timer_chain_active;
       volatile int 	interrupt_ack_requested;
       volatile long	command_lock;
       volatile int	rx_command_needed;
