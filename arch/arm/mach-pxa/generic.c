@@ -104,6 +104,7 @@ static struct platform_device pxamci_device = {
 	.id		= 0,
 	.dev		= {
 		.dma_mask = &pxamci_dmamask,
+		.coherent_dma_mask = 0xffffffff,
 	},
 	.num_resources	= ARRAY_SIZE(pxamci_resources),
 	.resource	= pxamci_resources,
