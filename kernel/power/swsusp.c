@@ -656,14 +656,15 @@ static void free_suspend_pagedir_zone(struct zone *zone, unsigned long pagedir)
 	}
 }
 
-void free_suspend_pagedir(unsigned long this_pagedir)
+void swsusp_free(void)
 {
+	unsigned long p = (unsigned long)pagedir_save;
 	struct zone *zone;
 	for_each_zone(zone) {
 		if (!is_highmem(zone))
-			free_suspend_pagedir_zone(zone, this_pagedir);
+			free_suspend_pagedir_zone(zone, p);
 	}
-	free_pages(this_pagedir, pagedir_order);
+	free_pages(p, pagedir_order);
 }
 
 static int prepare_suspend_processes(void)
@@ -816,7 +817,7 @@ static int swsusp_alloc(void)
 	}
 	if ((error = alloc_image_pages())) {
 		pr_debug("suspend: Allocating image pages failed.\n");
-		free_suspend_pagedir((unsigned long)pagedir_save);
+		swsusp_free();
 		return error;
 	}
 

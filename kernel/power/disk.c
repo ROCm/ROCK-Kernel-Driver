@@ -27,7 +27,7 @@ extern int swsusp_suspend(void);
 extern int swsusp_write(void);
 extern int swsusp_read(void);
 extern int swsusp_resume(void);
-extern int pmdisk_free(void);
+extern int swsusp_free(void);
 
 
 /**
@@ -180,7 +180,7 @@ int pm_suspend_disk(void)
 		}
 	} else
 		pr_debug("PM: Image restored successfully.\n");
-	pmdisk_free();
+	swsusp_free();
  Done:
 	finish();
 	return error;
@@ -231,7 +231,7 @@ static int pm_resume(void)
 	pr_debug("PM: Restore failed, recovering.n");
 	finish();
  Free:
-	pmdisk_free();
+	swsusp_free();
  Done:
 	pr_debug("PM: Resume from disk failed.\n");
 	return 0;

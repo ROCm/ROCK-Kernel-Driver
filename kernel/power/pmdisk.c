@@ -42,18 +42,6 @@ extern suspend_pagedir_t *pagedir_save;
  */
 
 
-/**
- *	pmdisk_free - Free memory allocated to hold snapshot.
- */
-
-int pmdisk_free(void)
-{
-	extern void free_suspend_pagedir(unsigned long this_pagedir);
-	pr_debug( "Freeing prev allocated pagedir\n" );
-	free_suspend_pagedir((unsigned long)pagedir_save);
-	return 0;
-}
-
 static int __init pmdisk_setup(char *str)
 {
 	if (strlen(str)) {
