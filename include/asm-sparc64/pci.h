@@ -251,6 +251,11 @@ static inline void pcibios_add_platform_entries(struct pci_dev *dev)
 {
 }
 
+static inline int pci_get_legacy_ide_irq(struct pci_dev *dev, int channel)
+{
+	return PCI_IRQ_NONE;
+}
+
 #endif /* __KERNEL__ */
 
 #endif /* __SPARC64_PCI_H */
