@@ -1669,7 +1669,16 @@ void set_cpus_allowed(task_t *p, unsigned long new_mask)
 	down(&req.sem);
 }
 
+/*
+ * Treat the bits of migration_mask as lock bits.
+ * If the bit corresponding to the cpu a migration_thread is
+ * running on then we have failed to claim our cpu and must
+ * yield in order to find another.
+ */
 static volatile unsigned long migration_mask;
+static atomic_t migration_threads_seeking_cpu;
+static struct completion migration_complete
+			= COMPLETION_INITIALIZER(migration_complete);
 
 static int migration_thread(void * unused)
 {
@@ -1693,26 +1702,54 @@ static int migration_thread(void * unused)
 	 * task binds itself to the current CPU.
 	 */
 
-	/* wait for all migration threads to start up. */
-	while (!migration_mask)
-		yield();
+	preempt_disable();
 
-	for (;;) {
-		preempt_disable();
-		if (test_and_clear_bit(smp_processor_id(), &migration_mask))
-			current->cpus_allowed = 1 << smp_processor_id();
-		if (test_thread_flag(TIF_NEED_RESCHED))
-			schedule();
-		if (!migration_mask)
-			break;
+	/*
+	 * Enter the loop with preemption disabled so that
+	 * smp_processor_id() remains valid through the check. The
+	 * interior of the wait loop re-enables preemption in an
+	 * attempt to get scheduled off the current cpu. When the
+	 * loop is exited the lock bit in migration_mask is acquired
+	 * and preemption is disabled on the way out. This way the
+	 * cpu acquired remains valid when ->cpus_allowed is set.
+	 */
+	while (test_and_set_bit(smp_processor_id(), &migration_mask)) {
 		preempt_enable();
+		yield();
+		preempt_disable();
 	}
+
+	current->cpus_allowed = 1 << smp_processor_id();
 	rq = this_rq();
 	rq->migration_thread = current;
+
+	/*
+	 * Now that we've bound ourselves to a cpu, post to
+	 * migration_threads_seeking_cpu and wait for everyone else.
+	 * Preemption should remain disabled and the cpu should remain
+	 * in busywait. Yielding the cpu will allow the livelock
+	 * where where a timing pattern causes an idle task seeking a
+	 * migration_thread to always find the unbound migration_thread 
+	 * running on the cpu's it tries to steal tasks from.
+	 */
+	atomic_dec(&migration_threads_seeking_cpu);
+	while (atomic_read(&migration_threads_seeking_cpu))
+		cpu_relax();
+
 	preempt_enable();
 
 	sprintf(current->comm, "migration_CPU%d", smp_processor_id());
 
+	/*
+	 * Everyone's found their cpu, so now wake migration_init().
+	 * Multiple wakeups are harmless; removal from the waitqueue
+	 * has locking built-in, and waking an empty queue is valid.
+	 */
+	complete(&migration_complete);
+
+	/*
+	 * Initiate the event loop.
+	 */
 	for (;;) {
 		runqueue_t *rq_src, *rq_dest;
 		struct list_head *head;
@@ -1760,33 +1797,31 @@ repeat:
 
 void __init migration_init(void)
 {
-	unsigned long tmp, orig_cache_decay_ticks;
+	unsigned long orig_cache_decay_ticks;
 	int cpu;
 
-	tmp = 0;
-	for (cpu = 0; cpu < smp_num_cpus; cpu++) {
-		if (kernel_thread(migration_thread, NULL,
-				CLONE_FS | CLONE_FILES | CLONE_SIGNAL) < 0)
-			BUG();
-		tmp |= (1UL << cpu_logical_map(cpu));
-	}
+	atomic_set(&migration_threads_seeking_cpu, smp_num_cpus);
 
-	migration_mask = tmp;
+	preempt_disable();
 
 	orig_cache_decay_ticks = cache_decay_ticks;
 	cache_decay_ticks = 0;
 
-	for (cpu = 0; cpu < smp_num_cpus; cpu++) {
-		int logical = cpu_logical_map(cpu);
+	for (cpu = 0; cpu < smp_num_cpus; cpu++)
+		if (kernel_thread(migration_thread, NULL,
+				CLONE_FS | CLONE_FILES | CLONE_SIGNAL) < 0)
+			BUG();
 
-		while (!cpu_rq(logical)->migration_thread) {
-			set_current_state(TASK_INTERRUPTIBLE);
-			schedule_timeout(2);
-		}
-	}
-	if (migration_mask)
-		BUG();
+	/*
+	 * We cannot have missed the wakeup for the migration_thread
+	 * bound for the cpu migration_init() is running on cannot
+	 * acquire this cpu until migration_init() has yielded it by
+	 * means of wait_for_completion().
+	 */
+	wait_for_completion(&migration_complete);
 
 	cache_decay_ticks = orig_cache_decay_ticks;
+
+	preempt_enable();
 }
 #endif
