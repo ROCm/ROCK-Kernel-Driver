@@ -1232,22 +1232,25 @@ static int rfcomm_recv_rpn(struct rfcomm_session *s, int cr, int len, struct sk_
 		}
 	}
 	if (rpn->param_mask & RFCOMM_RPN_PM_FLOW) {
-		if (rpn->flow_ctrl != RFCOMM_RPN_FLOW_NONE) {
-			BT_DBG("RPN flow ctrl mismatch 0x%x", rpn->flow_ctrl);
+		flow_ctrl = rpn->flow_ctrl;
+		if (flow_ctrl != RFCOMM_RPN_FLOW_NONE) {
+			BT_DBG("RPN flow ctrl mismatch 0x%x", flow_ctrl);
 			flow_ctrl = RFCOMM_RPN_FLOW_NONE;
 			rpn_mask ^= RFCOMM_RPN_PM_FLOW;
 		}
 	}
 	if (rpn->param_mask & RFCOMM_RPN_PM_XON) {
-		if (rpn->xon_char != RFCOMM_RPN_XON_CHAR) {
-			BT_DBG("RPN XON char mismatch 0x%x", rpn->xon_char);
+		xon_char = rpn->xon_char;
+		if (xon_char != RFCOMM_RPN_XON_CHAR) {
+			BT_DBG("RPN XON char mismatch 0x%x", xon_char);
 			xon_char = RFCOMM_RPN_XON_CHAR;
 			rpn_mask ^= RFCOMM_RPN_PM_XON;
 		}
 	}
 	if (rpn->param_mask & RFCOMM_RPN_PM_XOFF) {
-		if (rpn->xoff_char != RFCOMM_RPN_XOFF_CHAR) {
-			BT_DBG("RPN XOFF char mismatch 0x%x", rpn->xoff_char);
+		xoff_char = rpn->xoff_char;
+		if (xoff_char != RFCOMM_RPN_XOFF_CHAR) {
+			BT_DBG("RPN XOFF char mismatch 0x%x", xoff_char);
 			xoff_char = RFCOMM_RPN_XOFF_CHAR;
 			rpn_mask ^= RFCOMM_RPN_PM_XOFF;
 		}
