@@ -92,10 +92,6 @@ extern void destroy_8023_client(struct datalink_proto *);
 extern int sysctl_max_syn_backlog;
 #endif
 
-/* Skbuff symbols. */
-EXPORT_SYMBOL(skb_over_panic);
-EXPORT_SYMBOL(skb_under_panic);
-
 /* Socket layer registration */
 EXPORT_SYMBOL(sock_register);
 EXPORT_SYMBOL(sock_unregister);
@@ -111,21 +107,11 @@ EXPORT_SYMBOL(sock_release);
 EXPORT_SYMBOL(sock_sendmsg);
 EXPORT_SYMBOL(sock_recvmsg);
 EXPORT_SYMBOL(sock_wake_async);
-EXPORT_SYMBOL(skb_checksum);
 EXPORT_SYMBOL(skb_recv_datagram);
 EXPORT_SYMBOL(skb_free_datagram);
 EXPORT_SYMBOL(skb_copy_datagram);
 EXPORT_SYMBOL(skb_copy_datagram_iovec);
 EXPORT_SYMBOL(skb_copy_and_csum_datagram_iovec);
-EXPORT_SYMBOL(skb_copy_bits);
-EXPORT_SYMBOL(skb_copy_and_csum_bits);
-EXPORT_SYMBOL(skb_copy_and_csum_dev);
-EXPORT_SYMBOL(skb_copy_expand);
-EXPORT_SYMBOL(___pskb_trim);
-EXPORT_SYMBOL(__pskb_pull_tail);
-EXPORT_SYMBOL(pskb_expand_head);
-EXPORT_SYMBOL(pskb_copy);
-EXPORT_SYMBOL(skb_realloc_headroom);
 EXPORT_SYMBOL(datagram_poll);
 EXPORT_SYMBOL(put_cmsg);
 EXPORT_SYMBOL(sock_map_fd);
@@ -338,11 +324,6 @@ EXPORT_SYMBOL(fddi_type_trans);
 #if 0
 EXPORT_SYMBOL(eth_copy_and_sum);
 #endif
-EXPORT_SYMBOL(alloc_skb);
-EXPORT_SYMBOL(__kfree_skb);
-EXPORT_SYMBOL(skb_clone);
-EXPORT_SYMBOL(skb_copy);
-EXPORT_SYMBOL(skb_pad);
 EXPORT_SYMBOL(__netdev_watchdog_up);
 EXPORT_SYMBOL(dev_base);
 EXPORT_SYMBOL(dev_base_lock);
