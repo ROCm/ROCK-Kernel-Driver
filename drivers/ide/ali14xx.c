@@ -37,12 +37,13 @@
 
 #include <linux/types.h>
 #include <linux/kernel.h>
-#include <linux/ide.h>
 #include <linux/init.h>
+#include <linux/hdreg.h>
+#include <linux/ide.h>
 
 #include <asm/io.h>
 
-#include "ata-timing.h"
+#include "timing.h"
 
 /* port addresses for auto-detection */
 #define ALI_NUM_PORTS 4

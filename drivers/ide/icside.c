@@ -377,7 +377,7 @@ icside_config_if(struct ata_device *drive, int xfer_mode)
 	return on;
 }
 
-static int icside_set_speed(struct ata_device *drive, byte speed)
+static int icside_set_speed(struct ata_device *drive, u8 speed)
 {
 	return icside_config_if(drive, speed);
 }

@@ -85,14 +85,14 @@
 #include <linux/kernel.h>
 #include <linux/ioport.h>
 #include <linux/pci.h>
-#include <linux/hdreg.h>
 #include <linux/init.h>
 #include <linux/delay.h>
+#include <linux/hdreg.h>
 #include <linux/ide.h>
 
 #include <asm/io.h>
 
-#include "ata-timing.h"
+#include "timing.h"
 #include "pcihost.h"
 
 #undef SVWKS_DEBUG_DRIVE_INFO

@@ -47,11 +47,12 @@
 #include <linux/pci.h>
 #include <linux/delay.h>
 #include <linux/init.h>
+#include <linux/hdreg.h>
 #include <linux/ide.h>
 
 #include <asm/io.h>
 
-#include "ata-timing.h"
+#include "timing.h"
 #include "pcihost.h"
 
 /* the current version */
@@ -141,7 +142,7 @@ static u8 calc_clk(int time, int bus_speed)
  *       for mode 3 and 4 drives 8 and 16-bit timings are the same
  *
  */
-/* FIXME: use generic ata-timings library  --bkz */
+/* FIXME: use generic timings library  --bkz */
 static void compute_clocks(u8 pio, pio_clocks_t *p_pclk)
 {
 	struct ata_timing *t;
@@ -186,8 +187,8 @@ static void compute_clocks(u8 pio, pio_clocks_t *p_pclk)
  */
 static void cy82c693_dma_enable(struct ata_device *drive, int mode, int single)
 {
-        byte index;
-	byte data;
+        u8 index;
+	u8 data;
 
         if (mode>2)	/* make sure we set a valid mode */
 		mode = 2;
@@ -206,7 +207,7 @@ static void cy82c693_dma_enable(struct ata_device *drive, int mode, int single)
 	printk (KERN_INFO "%s (ch=%d, dev=%d): DMA mode is %d (single=%d)\n", drive->name, drive->channel->unit, drive->select.b.unit, (data&0x3), ((data>>2)&1));
 #endif
 
-	data = (byte)mode|(byte)(single<<2);
+	data = (u8) mode | (u8) (single << 2);
 
 	OUT_BYTE(index, CY82_INDEX_PORT);
 	OUT_BYTE(data, CY82_DATA_PORT);
@@ -271,7 +272,7 @@ static int cy82c693_udma_setup(struct ata_device *drive, int map)
 /*
  * tune ide drive - set PIO mode
  */
-static void cy82c693_tune_drive(struct ata_device *drive, byte pio)
+static void cy82c693_tune_drive(struct ata_device *drive, u8 pio)
 {
 	struct ata_channel *hwif = drive->channel;
 	struct pci_dev *dev = hwif->pci_dev;

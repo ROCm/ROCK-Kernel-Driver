@@ -42,10 +42,11 @@
 #include <linux/blkdev.h>
 #include <linux/pci.h>
 #include <linux/init.h>
+#include <linux/hdreg.h>
 #include <linux/ide.h>
 #include <asm/io.h>
 
-#include "ata-timing.h"
+#include "timing.h"
 #include "pcihost.h"
 
 #define AEC_DRIVE_TIMING	0x40
@@ -167,7 +168,7 @@ static void aec62xx_tune_drive(struct ata_device *drive, unsigned char pio)
 		return;
 	}
 
-	aec_set_drive(drive, XFER_PIO_0 + min_t(byte, pio, 5));
+	aec_set_drive(drive, XFER_PIO_0 + min_t(u8, pio, 5));
 }
 
 #ifdef CONFIG_BLK_DEV_IDEDMA

@@ -1716,7 +1716,7 @@ void msf_from_bcd (struct atapi_msf *msf)
 
 
 static inline
-void lba_to_msf (int lba, byte *m, byte *s, byte *f)
+void lba_to_msf(int lba, u8 *m, u8 *s, u8 *f)
 {
 	lba += CD_MSF_OFFSET;
 	lba &= 0xffffff;  /* negative lbas use only 24 bits */
@@ -1728,7 +1728,7 @@ void lba_to_msf (int lba, byte *m, byte *s, byte *f)
 
 
 static inline
-int msf_to_lba (byte m, byte s, byte f)
+int msf_to_lba(u8 m, u8 s, u8 f)
 {
 	return (((m * CD_SECS) + s) * CD_FRAMES + f) - CD_MSF_OFFSET;
 }

@@ -24,8 +24,9 @@
 #include <linux/genhd.h>
 #include <linux/slab.h>
 #include <linux/delay.h>
-#include <linux/ide.h>
 #include <linux/buffer_head.h>		/* for invalidate_bdev() */
+#include <linux/hdreg.h>
+#include <linux/ide.h>
 
 #include <asm/byteorder.h>
 #include <asm/irq.h>

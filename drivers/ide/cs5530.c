@@ -20,22 +20,22 @@
 #include <linux/mm.h>
 #include <linux/ioport.h>
 #include <linux/blkdev.h>
-#include <linux/hdreg.h>
 #include <linux/interrupt.h>
 #include <linux/pci.h>
 #include <linux/init.h>
+#include <linux/hdreg.h>
 #include <linux/ide.h>
 
 #include <asm/io.h>
 #include <asm/irq.h>
 
-#include "ata-timing.h"
+#include "timing.h"
 #include "pcihost.h"
 
 /*
  * Set a new transfer mode at the drive
  */
-int cs5530_set_xfer_mode(struct ata_device *drive, byte mode)
+int cs5530_set_xfer_mode(struct ata_device *drive, u8 mode)
 {
 	int error = 0;
 
@@ -67,7 +67,7 @@ static unsigned int cs5530_pio_timings[2][5] =
  * The ide_init_cs5530() routine guarantees that all drives
  * will have valid default PIO timings set up before we get here.
  */
-static void cs5530_tuneproc(struct ata_device *drive, byte pio)	/* pio=255 means "autotune" */
+static void cs5530_tuneproc(struct ata_device *drive, u8 pio)
 {
 	struct ata_channel *hwif = drive->channel;
 	unsigned int	format, basereg = CS5530_BASEREG(hwif);
@@ -75,7 +75,7 @@ static void cs5530_tuneproc(struct ata_device *drive, byte pio)	/* pio=255 means
 	if (pio == 255)
 		pio = ata_timing_mode(drive, XFER_PIO | XFER_EPIO);
 	else
-		pio = XFER_PIO_0 + min_t(byte, pio, 4);
+		pio = XFER_PIO_0 + min_t(u8, pio, 4);
 
 	if (!cs5530_set_xfer_mode(drive, pio)) {
 		format = (inl(basereg+4) >> 31) & 1;
@@ -206,7 +206,7 @@ static unsigned int __init pci_init_cs5530(struct pci_dev *dev)
 	unsigned short pcicmd = 0;
 	unsigned long flags;
 
-	pci_for_each_dev (dev) {
+	pci_for_each_dev(dev) {
 		if (dev->vendor == PCI_VENDOR_ID_CYRIX) {
 			switch (dev->device) {
 				case PCI_DEVICE_ID_CYRIX_PCI_MASTER:
@@ -256,7 +256,7 @@ static unsigned int __init pci_init_cs5530(struct pci_dev *dev)
 	 */
 	pci_write_config_byte(master_0, 0x40, 0x1e);
 
-	/* 
+	/*
 	 * Set max PCI burst size (16-bytes seems to work best):
 	 *	   16bytes: set bit-1 at 0x41 (reg value of 0x16)
 	 *	all others: clear bit-1 at 0x41, and do:

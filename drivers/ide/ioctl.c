@@ -26,7 +26,7 @@
 #include <linux/delay.h>
 #include <linux/cdrom.h>
 #include <linux/device.h>
-
+#include <linux/hdreg.h>
 #include <linux/ide.h>
 
 #include <asm/uaccess.h>
@@ -230,13 +230,13 @@ int ata_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned
 			if (!loc || (drive->type != ATA_DISK && drive->type != ATA_FLOPPY))
 				return -EINVAL;
 
-			if (put_user(drive->bios_head, (byte *) &loc->heads))
+			if (put_user(drive->bios_head, (u8 *) &loc->heads))
 				return -EFAULT;
 
-			if (put_user(drive->bios_sect, (byte *) &loc->sectors))
+			if (put_user(drive->bios_sect, (u8 *) &loc->sectors))
 				return -EFAULT;
 
-			if (put_user(bios_cyl, (unsigned short *) &loc->cylinders))
+			if (put_user(bios_cyl, (u16 *) &loc->cylinders))
 				return -EFAULT;
 
 			if (put_user((unsigned)drive->part[minor(inode->i_rdev)&PARTN_MASK].start_sect,
@@ -283,18 +283,18 @@ int ata_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned
 
 		case HDIO_GET_NICE:
 
-			return put_user(drive->dsc_overlap << IDE_NICE_DSC_OVERLAP |
-					drive->atapi_overlap << IDE_NICE_ATAPI_OVERLAP,
+			return put_user(drive->dsc_overlap | drive->atapi_overlap << 1,
 					(long *) arg);
 
 		case HDIO_SET_NICE:
 			if (!capable(CAP_SYS_ADMIN))
 				return -EACCES;
 
-			if (arg != (arg & ((1 << IDE_NICE_DSC_OVERLAP))))
+			if (arg != (arg & 1))
 				return -EPERM;
 
-			drive->dsc_overlap = (arg >> IDE_NICE_DSC_OVERLAP) & 1;
+			drive->dsc_overlap = arg & 1;
+
 			/* Only CD-ROM's and tapes support DSC overlap. */
 			if (drive->dsc_overlap && !(drive->type == ATA_ROM || drive->type == ATA_TAPE)) {
 				drive->dsc_overlap = 0;

@@ -29,12 +29,13 @@
 #include <linux/mm.h>
 #include <linux/ioport.h>
 #include <linux/blkdev.h>
+#include <linux/init.h>
 #include <linux/hdreg.h>
 #include <linux/ide.h>
-#include <linux/init.h>
+
 #include <asm/io.h>
 
-#include "ata-timing.h"
+#include "timing.h"
 #include "qd65xx.h"
 
 /*
@@ -85,7 +86,7 @@
 
 static int timings[4]={-1,-1,-1,-1}; /* stores current timing for each timer */
 
-static void qd_write_reg(byte content, byte reg)
+static void qd_write_reg(u8 content, unsigned int reg)
 {
 	unsigned long flags;
 
@@ -95,10 +96,10 @@ static void qd_write_reg(byte content, byte reg)
 	restore_flags(flags);	/* all CPUs */
 }
 
-byte __init qd_read_reg(byte reg)
+static u8 __init qd_read_reg(unsigned int reg)
 {
 	unsigned long flags;
-	byte read;
+	u8 read;
 
 	save_flags(flags);	/* all CPUs */
 	cli();			/* all CPUs */
@@ -115,8 +116,8 @@ byte __init qd_read_reg(byte reg)
 
 static void qd_select(struct ata_device *drive)
 {
-	byte index = ((	(QD_TIMREG(drive)) & 0x80 ) >> 7) |
-			(QD_TIMREG(drive) & 0x02);
+	u8 index = (((QD_TIMREG(drive)) & 0x80 ) >> 7) |
+		(QD_TIMREG(drive) & 0x02);
 
 	if (timings[index] != QD_TIMING(drive))
 		qd_write_reg(timings[index] = QD_TIMING(drive), QD_TIMREG(drive));
@@ -130,9 +131,9 @@ static void qd_select(struct ata_device *drive)
  *	upper nibble represents recovery time, in count of VLB clocks
  */
 
-static byte qd6500_compute_timing(struct ata_channel *hwif, int active_time, int recovery_time)
+static u8 qd6500_compute_timing(struct ata_channel *hwif, int active_time, int recovery_time)
 {
-	byte active_cycle,recovery_cycle;
+	u8 active_cycle,recovery_cycle;
 
 	if (system_bus_speed <= 33333) {
 		active_cycle =   9  - IDE_IN(active_time   * system_bus_speed / 1000000 + 1, 2, 9);
@@ -151,12 +152,12 @@ static byte qd6500_compute_timing(struct ata_channel *hwif, int active_time, int
  * idem for qd6580
  */
 
-static byte qd6580_compute_timing(int active_time, int recovery_time)
+static u8 qd6580_compute_timing(int active_time, int recovery_time)
 {
-	byte active_cycle   = 17 - IDE_IN(active_time   * system_bus_speed / 1000000 + 1, 2, 17);
-	byte recovery_cycle = 15 - IDE_IN(recovery_time * system_bus_speed / 1000000 + 1, 2, 15);
+	u8 active_cycle   = 17 - IDE_IN(active_time   * system_bus_speed / 1000000 + 1, 2, 17);
+	u8 recovery_cycle = 15 - IDE_IN(recovery_time * system_bus_speed / 1000000 + 1, 2, 15);
 
-	return((recovery_cycle<<4) | active_cycle);
+	return (recovery_cycle<<4) | active_cycle;
 }
 
 /*
@@ -205,7 +206,7 @@ static int qd_timing_ok(struct ata_device drives[])
  * records the timing, and enables selectproc as needed
  */
 
-static void qd_set_timing(struct ata_device *drive, byte timing)
+static void qd_set_timing(struct ata_device *drive, u8 timing)
 {
 	struct ata_channel *hwif = drive->channel;
 
@@ -224,7 +225,7 @@ static void qd_set_timing(struct ata_device *drive, byte timing)
  * qd6500_tune_drive
  */
 
-static void qd6500_tune_drive(struct ata_device *drive, byte pio)
+static void qd6500_tune_drive(struct ata_device *drive, u8 pio)
 {
 	int active_time   = 175;
 	int recovery_time = 415; /* worst case values from the dos driver */
@@ -245,7 +246,7 @@ static void qd6500_tune_drive(struct ata_device *drive, byte pio)
  * qd6580_tune_drive
  */
 
-static void qd6580_tune_drive(struct ata_device *drive, byte pio)
+static void qd6580_tune_drive(struct ata_device *drive, u8 pio)
 {
 	struct ata_timing *t;
 	int base = drive->channel->select_data;
@@ -257,7 +258,7 @@ static void qd6580_tune_drive(struct ata_device *drive, byte pio)
 		if (pio == 255)
 			pio = ata_timing_mode(drive, XFER_PIO | XFER_EPIO);
 		else
-			pio = XFER_PIO_0 + min_t(byte, pio, 4);
+			pio = XFER_PIO_0 + min_t(u8, pio, 4);
 
 		t = ata_timing_data(pio);
 
@@ -305,8 +306,8 @@ static void qd6580_tune_drive(struct ata_device *drive, byte pio)
 
 static int __init qd_testreg(int port)
 {
-	byte savereg;
-	byte readreg;
+	u8 savereg;
+	u8 readreg;
 	unsigned long flags;
 
 	save_flags(flags);	/* all CPUs */
@@ -333,7 +334,7 @@ static int __init qd_testreg(int port)
  * called to setup an ata channel : adjusts attributes & links for tuning
  */
 
-void __init qd_setup(int unit, int base, int config, unsigned int data0, unsigned int data1, void (*tuneproc) (struct ata_device *, byte pio))
+void __init qd_setup(int unit, int base, int config, unsigned int data0, unsigned int data1, void (*tuneproc) (struct ata_device *, u8 pio))
 {
 	struct ata_channel *hwif = &ide_hwifs[unit];
 
@@ -354,7 +355,7 @@ void __init qd_setup(int unit, int base, int config, unsigned int data0, unsigne
  */
 void __init qd_unsetup(int unit) {
 	struct ata_channel *hwif = &ide_hwifs[unit];
-	byte config = hwif->config_data;
+	u8 config = hwif->config_data;
 	int base = hwif->select_data;
 	void *tuneproc = (void *) hwif->tuneproc;
 
@@ -390,7 +391,7 @@ void __init qd_unsetup(int unit) {
 
 int __init qd_probe(int base)
 {
-	byte config;
+	u8 config;
 	int unit;
 
 	config = qd_read_reg(QD_CONFIG_PORT);
@@ -417,7 +418,7 @@ int __init qd_probe(int base)
 	}
 
 	if (((config & 0xf0) == QD_CONFIG_QD6580_A) || ((config & 0xf0) == QD_CONFIG_QD6580_B)) {
-		byte control;
+		u8 control;
 
 		if (qd_testreg(base) || qd_testreg(base+0x02)) return 1;
 			/* bad registers */

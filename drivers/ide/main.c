@@ -35,12 +35,13 @@
 #endif
 #include <linux/pci.h>
 #include <linux/delay.h>
-#include <linux/ide.h>
 #include <linux/devfs_fs_kernel.h>
 #include <linux/reboot.h>
 #include <linux/cdrom.h>
 #include <linux/device.h>
 #include <linux/kmod.h>
+#include <linux/hdreg.h>
+#include <linux/ide.h>
 
 #include <asm/byteorder.h>
 #include <asm/irq.h>
@@ -48,7 +49,7 @@
 #include <asm/io.h>
 #include <asm/bitops.h>
 
-#include "ata-timing.h"
+#include "timing.h"
 #include "pcihost.h"
 #include "ioctl.h"
 

@@ -1,14 +1,7 @@
-#ifndef _ATA_TIMING_H
-#define _ATA_TIMING_H
-
 /*
- * $Id: ata-timing.h,v 2.0 2002/03/12 13:02:22 vojtech Exp $
- *
  *  Copyright (C) 1996  Linus Torvalds, Igor Abramov, and Mark Lord
  *  Copyright (C) 1999-2001 Vojtech Pavlik
- */
-
-/*
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -23,9 +16,6 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
  */
-
-#include <linux/hdreg.h>
-#include <linux/ide.h>
 
 #define XFER_PIO_5		0x0d
 #define XFER_UDMA_SLOW		0x4f
@@ -91,5 +81,3 @@ extern struct ata_timing* ata_timing_data(short speed);
 extern int ata_timing_compute(struct ata_device *drive,
 		short speed, struct ata_timing *t, int T, int UT);
 extern u8 ata_best_pio_mode(struct ata_device *drive);
-
-#endif

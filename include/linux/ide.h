@@ -285,8 +285,8 @@ struct ata_device {
 
 	unsigned long sleep;		/* sleep until this time */
 
-	byte	 retry_pio;		/* retrying dma capable host in pio */
-	byte	 state;			/* retry state */
+	u8	 retry_pio;		/* retrying dma capable host in pio */
+	u8	 state;			/* retry state */
 
 	unsigned using_dma	: 1;	/* disk is using dma for read/write */
 	unsigned using_tcq	: 1;	/* disk is using queueing */
@@ -307,20 +307,20 @@ struct ata_device {
 	unsigned remap_0_to_1	: 2;	/* 0=remap if ezdrive, 1=remap, 2=noremap */
 	unsigned ata_flash	: 1;	/* 1=present, 0=default */
 	unsigned	addressing;	/* : 2; 0=28-bit, 1=48-bit, 2=64-bit */
-	byte		scsi;		/* 0=default, 1=skip current ide-subdriver for ide-scsi emulation */
+	u8		scsi;		/* 0=default, 1=skip current ide-subdriver for ide-scsi emulation */
 
 	select_t	select;		/* basic drive/head select reg value */
 	u8		status;		/* last retrived status value for device */
 
-	byte		ready_stat;	/* min status value for drive ready */
-	byte		mult_count;	/* current multiple sector setting */
-	byte		bad_wstat;	/* used for ignoring WRERR_STAT */
-	byte		nowerr;		/* used for ignoring WRERR_STAT */
-	byte		sect0;		/* offset of first sector for DM6:DDO */
-	byte		head;		/* "real" number of heads */
-	byte		sect;		/* "real" sectors per track */
-	byte		bios_head;	/* BIOS/fdisk/LILO number of heads */
-	byte		bios_sect;	/* BIOS/fdisk/LILO sectors per track */
+	u8		ready_stat;	/* min status value for drive ready */
+	u8		mult_count;	/* current multiple sector setting */
+	u8		bad_wstat;	/* used for ignoring WRERR_STAT */
+	u8		nowerr;		/* used for ignoring WRERR_STAT */
+	u8		sect0;		/* offset of first sector for DM6:DDO */
+	u8		head;		/* "real" number of heads */
+	u8		sect;		/* "real" sectors per track */
+	u8		bios_head;	/* BIOS/fdisk/LILO number of heads */
+	u8		bios_sect;	/* BIOS/fdisk/LILO sectors per track */
 	unsigned int	bios_cyl;	/* BIOS/fdisk/LILO number of cyls */
 	unsigned int	cyl;		/* "real" number of cyls */
 	u64		capacity;	/* total number of sectors */
@@ -343,13 +343,12 @@ struct ata_device {
 	int		lun;		/* logical unit */
 
 	int		crc_count;	/* crc counter to reduce drive speed */
-	byte		quirk_list;	/* drive is considered quirky if set for a specific host */
-	byte		suspend_reset;	/* drive suspend mode flag, soft-reset recovers */
-	byte		current_speed;	/* current transfer rate set */
-	byte		dn;		/* now wide spread use */
-	byte		wcache;		/* status of write cache */
-	byte		acoustic;	/* acoustic management */
-	byte		queue_depth;	/* max queue depth */
+	int		quirk_list;	/* drive is considered quirky if set for a specific host */
+	u8		current_speed;	/* current transfer rate set */
+	u8		dn;		/* now wide spread use */
+	u8		wcache;		/* status of write cache */
+	u8		acoustic;	/* acoustic management */
+	unsigned int	queue_depth;	/* max queue depth */
 	unsigned int	failures;	/* current failure count */
 	unsigned int	max_failures;	/* maximum allowed failure count */
 	struct device	dev;		/* global device tree handle */
@@ -370,7 +369,7 @@ typedef enum {
 	ATA_OP_FINISHED,	/* no drive operation was started */
 	ATA_OP_CONTINUES,	/* a drive operation was started, and a handler was set */
 	ATA_OP_RELEASED,	/* started and released bus */
-	ATA_OP_READY,		/* indicate status poll finished fine */
+	ATA_OP_READY		/* indicate status poll finished fine */
 } ide_startstop_t;
 
 /*
@@ -428,10 +427,10 @@ struct ata_channel {
 	 */
 
 	/* setup disk on a channel for a particular PIO transfer mode */
-	void (*tuneproc) (struct ata_device *, byte pio);
+	void (*tuneproc) (struct ata_device *, u8 pio);
 
 	/* setup the chipset timing for a particular transfer mode */
-	int (*speedproc) (struct ata_device *, byte pio);
+	int (*speedproc) (struct ata_device *, u8 pio);
 
 	/* tweaks hardware to select drive */
 	void (*selectproc) (struct ata_device *);
@@ -640,10 +639,8 @@ extern void ata_read(struct ata_device *, void *, unsigned int);
 extern void ata_write(struct ata_device *, void *, unsigned int);
 
 extern int ide_raw_taskfile(struct ata_device *, struct ata_taskfile *, char *);
-extern int ide_config_drive_speed(struct ata_device *, byte);
-extern byte eighty_ninty_three(struct ata_device *);
-
-extern void ide_stall_queue(struct ata_device *, unsigned long);
+extern int ide_config_drive_speed(struct ata_device *, u8);
+extern int eighty_ninty_three(struct ata_device *);
 
 extern int system_bus_speed;
 
@@ -656,11 +653,11 @@ extern int system_bus_speed;
 
 extern int drive_is_flashcard(struct ata_device *);
 
-int ide_spin_wait_hwgroup(struct ata_device *);
-void ide_timer_expiry (unsigned long data);
+extern int ide_spin_wait_hwgroup(struct ata_device *);
+extern void ide_timer_expiry(unsigned long data);
 extern void ata_irq_request(int irq, void *data, struct pt_regs *regs);
-void do_ide_request (request_queue_t * q);
-void ide_init_subdrivers (void);
+extern void do_ide_request(request_queue_t * q);
+extern void ide_init_subdrivers(void);
 
 extern struct block_device_operations ide_fops[];
 
@@ -742,12 +739,12 @@ static inline int udma_irq_status(struct ata_device *drive)
 
 static inline void udma_timeout(struct ata_device *drive)
 {
-	return drive->channel->udma_timeout(drive);
+	drive->channel->udma_timeout(drive);
 }
 
 static inline void udma_irq_lost(struct ata_device *drive)
 {
-	return drive->channel->udma_irq_lost(drive);
+	drive->channel->udma_irq_lost(drive);
 }
 
 #ifdef CONFIG_BLK_DEV_IDEDMA

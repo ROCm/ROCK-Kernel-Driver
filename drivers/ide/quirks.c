@@ -24,8 +24,9 @@
 #include <linux/interrupt.h>
 #include <linux/pci.h>
 #include <linux/init.h>
-#include <linux/ide.h>
 #include <linux/delay.h>
+#include <linux/hdreg.h>
+#include <linux/ide.h>
 
 #include <asm/io.h>
 #include <asm/irq.h>
@@ -153,14 +154,14 @@ int check_drive_lists(struct ata_device *drive, int good_bad)
 		/* Consult the list of known "good" drives */
 		list = good_dma_drives;
 		while (*list) {
-			if (!strcmp(*list++,id->model))
+			if (!strcmp(*list++, id->model))
 				return 1;
 		}
 	} else {
 		/* Consult the list of known "bad" drives */
 		list = bad_dma_drives;
 		while (*list) {
-			if (!strcmp(*list++,id->model)) {
+			if (!strcmp(*list++, id->model)) {
 				printk("%s: Disabling (U)DMA for %s\n",
 					drive->name, id->model);
 				return 1;

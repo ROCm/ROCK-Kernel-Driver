@@ -175,10 +175,10 @@ static void promise_selectproc(struct ata_device *drive)
  * by command F0. They all have the same success/failure notification -
  * 'P' (=0x50) on success, 'p' (=0x70) on failure.
  */
-int pdc4030_cmd(struct ata_device *drive, byte cmd)
+int pdc4030_cmd(struct ata_device *drive, u8 cmd)
 {
 	unsigned long timeout, timer;
-	byte status_val;
+	u8 status_val;
 
 	promise_selectproc(drive);	/* redundant? */
 	outb(0xF3, IDE_SECTOR_REG);

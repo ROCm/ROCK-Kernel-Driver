@@ -80,7 +80,7 @@ struct ide_cd_config_flags {
 	__u8 close_tray		: 1; /* can close the tray */
 	__u8 writing		: 1; /* pseudo write in progress */
 	__u8 reserved		: 3;
-	byte max_speed;		     /* Max speed of the drive */
+	u8 max_speed;		     /* Max speed of the drive */
 };
 #define CDROM_CONFIG_FLAGS(drive) (&(((struct cdrom_info *)(drive->driver_data))->config_flags))
 
@@ -92,7 +92,7 @@ struct ide_cd_state_flags {
 	__u8 door_locked   : 1; /* We think that the drive door is locked. */
 	__u8 writing       : 1; /* the drive is currently writing */
 	__u8 reserved      : 4;
-	byte current_speed;	/* Current speed of the drive */
+	u8 current_speed;	/* Current speed of the drive */
 };
 
 #define CDROM_STATE_FLAGS(drive) (&(((struct cdrom_info *)(drive->driver_data))->state_flags))
@@ -132,7 +132,7 @@ struct atapi_toc_header {
 } __attribute__((packed));
 
 struct atapi_toc_entry {
-	byte reserved1;
+	u8 reserved1;
 #if defined(__BIG_ENDIAN_BITFIELD)
 	__u8 adr     : 4;
 	__u8 control : 4;
@@ -142,8 +142,8 @@ struct atapi_toc_entry {
 #else
 #error "Please fix <asm/byteorder.h>"
 #endif
-	byte track;
-	byte reserved2;
+	u8 track;
+	u8 reserved2;
 	union {
 		unsigned lba;
 		struct atapi_msf msf;
@@ -176,8 +176,8 @@ struct atapi_cdrom_subchnl {
 #else
 #error "Please fix <asm/byteorder.h>"
 #endif
-	u_char  acdsc_trk;
-	u_char  acdsc_ind;
+	u8	acdsc_trk;
+	u8	acdsc_ind;
 	union {
 		struct atapi_msf msf;
 		int	lba;
@@ -207,7 +207,7 @@ struct atapi_capabilities_page {
 #error "Please fix <asm/byteorder.h>"
 #endif
 
-	byte     page_length;
+	u8 page_length;
 
 #if defined(__BIG_ENDIAN_BITFIELD)
 	__u8 reserved2           : 2;
@@ -435,8 +435,8 @@ struct atapi_mechstat_header {
 #error "Please fix <asm/byteorder.h>"
 #endif
 
-	byte     curlba[3];
-	byte     nslots;
+	u8 curlba[3];
+	u8 nslots;
 	__u16 slot_tablelen;
 };
 
@@ -454,7 +454,7 @@ struct atapi_slot {
 #error "Please fix <asm/byteorder.h>"
 #endif
 
-	byte reserved2[3];
+	u8 reserved2[3];
 };
 
 struct atapi_changer_info {
@@ -514,13 +514,11 @@ struct cdrom_info {
 #define ABORTED_COMMAND         0x0b
 #define MISCOMPARE              0x0e
 
- 
-
 /* This stuff should be in cdrom.h, since it is now generic... */
 #if VERBOSE_IDE_CD_ERRORS
 
  /* The generic packet command opcodes for CD/DVD Logical Units,
- * From Table 57 of the SFF8090 Ver. 3 (Mt. Fuji) draft standard. */ 
+ * From Table 57 of the SFF8090 Ver. 3 (Mt. Fuji) draft standard. */
 const struct {
 	unsigned short packet_command;
 	const char * const text;

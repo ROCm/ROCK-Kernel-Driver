@@ -48,16 +48,16 @@
 #include <linux/mm.h>
 #include <linux/ioport.h>
 #include <linux/blkdev.h>
-#include <linux/hdreg.h>
 #include <linux/interrupt.h>
 #include <linux/pci.h>
 #include <linux/init.h>
+#include <linux/hdreg.h>
 #include <linux/ide.h>
 
 #include <asm/io.h>
 #include <asm/irq.h>
 
-#include "ata-timing.h"
+#include "timing.h"
 #include "pcihost.h"
 
 #define PDC202XX_DEBUG_DRIVE_INFO		0
@@ -105,7 +105,7 @@ static struct pdc_bit_messages pdc_reg_C[] = {
 	/* MC3-MC0 - DMA "C" timing */
 };
 
-static void pdc_dump_bits(struct pdc_bit_messages *msgs, byte bits)
+static void pdc_dump_bits(struct pdc_bit_messages *msgs, u8 bits)
 {
 	int i;
 
@@ -174,7 +174,7 @@ static int __init pdc202xx_modes_map(struct ata_channel *ch)
 	return map;
 }
 
-static int pdc202xx_tune_chipset(struct ata_device *drive, byte speed)
+static int pdc202xx_tune_chipset(struct ata_device *drive, u8 speed)
 {
 	struct pci_dev *dev = drive->channel->pci_dev;
 	u32 drive_conf;
@@ -315,7 +315,7 @@ static int pdc202xx_tune_chipset(struct ata_device *drive, byte speed)
 	OUT_BYTE(value, reg); \
         mdelay(delay);
 
-static int pdc202xx_new_tune_chipset(struct ata_device *drive, byte speed)
+static int pdc202xx_new_tune_chipset(struct ata_device *drive, u8 speed)
 {
 	struct ata_channel *hwif = drive->channel;
 	u32 high_16 = pci_resource_start(hwif->pci_dev, 4);
@@ -453,7 +453,7 @@ static void pdc202xx_tune_drive(struct ata_device *drive, u8 pio)
 	if (pio == 255)
 		speed = ata_best_pio_mode(drive);
 	else
-		speed = XFER_PIO_0 + min_t(byte, pio, 4);
+		speed = XFER_PIO_0 + min_t(u8, pio, 4);
 
 	pdc202xx_tune_chipset(drive, speed);
 }
@@ -695,7 +695,7 @@ static unsigned int __init pdc202xx_init_chipset(struct pci_dev *dev)
 		break;
 	default:
 		if ((dev->class >> 8) != PCI_CLASS_STORAGE_IDE) {
-			byte irq = 0, irq2 = 0;
+			u8 irq = 0, irq2 = 0;
 			pci_read_config_byte(dev, PCI_INTERRUPT_LINE,
 					     &irq);
 			pci_read_config_byte(dev, (PCI_INTERRUPT_LINE) | 0x80, &irq2);	/* 0xbc */

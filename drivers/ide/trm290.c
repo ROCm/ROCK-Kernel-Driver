@@ -251,7 +251,7 @@ static void __init trm290_init_channel(struct ata_channel *hwif)
 {
 	unsigned int cfgbase = 0;
 	unsigned long flags;
-	byte reg;
+	u8 reg;
 	struct pci_dev *dev = hwif->pci_dev;
 
 	hwif->chipset = ide_trm290;

@@ -135,11 +135,11 @@ static int pdcraid_ioctl(struct inode *inode, struct file *file,
 				return -EINVAL;
 			if (put_user
 			    (raid[minor].geom.heads,
-			     (byte *) & loc->heads))
+			     (u8 *) & loc->heads))
 				return -EFAULT;
 			if (put_user
 			    (raid[minor].geom.sectors,
-			     (byte *) & loc->sectors))
+			     (u8 *) & loc->sectors))
 				return -EFAULT;
 			if (put_user
 			    (bios_cyl, (unsigned short *) &loc->cylinders))

@@ -44,13 +44,13 @@
 #include <linux/interrupt.h>
 #include <linux/pci.h>
 #include <linux/init.h>
-#include <linux/ide.h>
 #include <linux/hdreg.h>
+#include <linux/ide.h>
 
 #include <asm/io.h>
 #include <asm/irq.h>
 
-#include "ata-timing.h"
+#include "timing.h"
 #include "pcihost.h"
 
 /* When DEBUG is defined it outputs initial PCI config register
@@ -84,7 +84,7 @@ static unsigned char chipset_family;
    Fewer might be used depending on the actual chipset */
 static unsigned char ide_regs_copy[0x58];
 
-static byte sis5513_max_config_register(void) {
+static u8 sis5513_max_config_register(void) {
 	switch(chipset_family) {
 		case ATA_00:
 		case ATA_16:	return 0x4f;
@@ -100,9 +100,9 @@ static byte sis5513_max_config_register(void) {
 /* Read config registers, print differences from previous read */
 static void sis5513_load_verify_registers(struct pci_dev* dev, char* info) {
 	int i;
-	byte reg_val;
-	byte changed=0;
-	byte max = sis5513_max_config_register();
+	u8 reg_val;
+	u8 changed = 0;
+	u8 max = sis5513_max_config_register();
 
 	printk("SIS5513: %s, changed registers:\n", info);
 	for(i=0; i<=max; i++) {
@@ -121,9 +121,10 @@ static void sis5513_load_verify_registers(struct pci_dev* dev, char* info) {
 }
 
 /* Load config registers, no printing */
-static void sis5513_load_registers(struct pci_dev* dev) {
+static void sis5513_load_registers(struct pci_dev* dev)
+{
 	int i;
-	byte max = sis5513_max_config_register();
+	u8 max = sis5513_max_config_register();
 
 	for(i=0; i<=max; i++) {
 		pci_read_config_byte(dev, i, &(ide_regs_copy[i]));
@@ -131,14 +132,15 @@ static void sis5513_load_registers(struct pci_dev* dev) {
 }
 
 /* Print a register */
-static void sis5513_print_register(int reg) {
+static void sis5513_print_register(int reg)
+{
 	printk(" %0#x:%0#x", reg, ide_regs_copy[reg]);
 }
 
 /* Print valuable registers */
 static void sis5513_print_registers(struct pci_dev* dev, char* marker) {
 	int i;
-	byte max = sis5513_max_config_register();
+	u8 max = sis5513_max_config_register();
 
 	sis5513_load_registers(dev);
 	printk("SIS5513 %s\n", marker);
@@ -193,9 +195,9 @@ static const struct {
 /* Cycle time bits and values vary accross chip dma capabilities
    These three arrays hold the register layout and the values to set.
    Indexed by chipset_family and (dma_mode - XFER_UDMA_0) */
-static byte cycle_time_offset[] = {0,0,5,4,4,0,0};
-static byte cycle_time_range[] = {0,0,2,3,3,4,4};
-static byte cycle_time_value[][XFER_UDMA_5 - XFER_UDMA_0 + 1] = {
+static u8 cycle_time_offset[] = {0,0,5,4,4,0,0};
+static u8 cycle_time_range[] = {0,0,2,3,3,4,4};
+static u8 cycle_time_value[][XFER_UDMA_5 - XFER_UDMA_0 + 1] = {
 	{0,0,0,0,0,0}, /* no udma */
 	{0,0,0,0,0,0}, /* no udma */
 	{3,2,1,0,0,0},
@@ -317,7 +319,7 @@ static int sis5513_tune_chipset(struct ata_device *drive, u8 speed)
 	struct ata_channel *hwif = drive->channel;
 	struct pci_dev *dev	= hwif->pci_dev;
 
-	byte			drive_pci, reg;
+	u8 drive_pci, reg;
 
 #ifdef DEBUG
 	sis5513_load_verify_registers(dev, "sis5513_tune_chipset start");
@@ -418,7 +420,7 @@ static unsigned int __init pci_init_sis5513(struct pci_dev *dev)
 #endif
 
 		if (SiSHostChipInfo[i].flags & SIS5513_LATENCY) {
-			byte latency = (chipset_family == ATA_100)? 0x80 : 0x10; /* Lacking specs */
+			u8 latency = (chipset_family == ATA_100)? 0x80 : 0x10; /* Lacking specs */
 			pci_write_config_byte(dev, PCI_LATENCY_TIMER, latency);
 		}
 	}
@@ -427,7 +429,7 @@ static unsigned int __init pci_init_sis5513(struct pci_dev *dev)
 	   1/ tell IDE channels to operate in Compabitility mode only
 	   2/ tell old chips to allow per drive IDE timings */
 	if (host_dev) {
-		byte reg;
+		u8 reg;
 		switch(chipset_family) {
 			case ATA_133:
 			case ATA_100:

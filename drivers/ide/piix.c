@@ -45,11 +45,12 @@
 #include <linux/blkdev.h>
 #include <linux/pci.h>
 #include <linux/init.h>
+#include <linux/hdreg.h>
 #include <linux/ide.h>
 
 #include <asm/io.h>
 
-#include "ata-timing.h"
+#include "timing.h"
 #include "pcihost.h"
 
 #define PIIX_IDETIM0		0x40
@@ -240,7 +241,7 @@ static void piix_tune_drive(struct ata_device *drive, unsigned char pio)
 		return;
 	}
 
-	piix_set_drive(drive, XFER_PIO_0 + min_t(byte, pio, 5));
+	piix_set_drive(drive, XFER_PIO_0 + min_t(u8, pio, 5));
 }
 
 #ifdef CONFIG_BLK_DEV_IDEDMA

@@ -49,12 +49,13 @@
 #endif
 #include <linux/pci.h>
 #include <linux/delay.h>
-#include <linux/ide.h>
 #include <linux/devfs_fs_kernel.h>
 #include <linux/reboot.h>
 #include <linux/cdrom.h>
 #include <linux/device.h>
 #include <linux/kmod.h>
+#include <linux/hdreg.h>
+#include <linux/ide.h>
 
 #include <asm/byteorder.h>
 #include <asm/irq.h>
@@ -62,7 +63,7 @@
 #include <asm/io.h>
 #include <asm/bitops.h>
 
-#include "ata-timing.h"
+#include "timing.h"
 #include "pcihost.h"
 #include "ioctl.h"
 
@@ -258,7 +259,7 @@ static struct ata_bit_messages ata_error_msgs[] = {
 	{ MARK_ERR,		MARK_ERR,		"addr mark not found"   }
 };
 
-static void dump_bits(struct ata_bit_messages *msgs, int nr, byte bits)
+static void dump_bits(struct ata_bit_messages *msgs, int nr, u8 bits)
 {
 	int i;
 	int first = 1;
