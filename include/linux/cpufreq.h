@@ -137,9 +137,13 @@ struct cpufreq_governor {
 
 /* pass a target to the cpufreq driver 
  */
-inline int cpufreq_driver_target(struct cpufreq_policy *policy,
+extern int cpufreq_driver_target(struct cpufreq_policy *policy,
 				 unsigned int target_freq,
 				 unsigned int relation);
+extern int __cpufreq_driver_target(struct cpufreq_policy *policy,
+				   unsigned int target_freq,
+				   unsigned int relation);
+
 
 /* pass an event to the cpufreq governor */
 int cpufreq_governor(unsigned int cpu, unsigned int event);
@@ -159,8 +163,6 @@ struct freq_attr;
 struct cpufreq_driver {
 	struct module           *owner;
 	char			name[CPUFREQ_NAME_LEN];
-
-	struct cpufreq_policy	*policy;
 
 	/* needed by all drivers */
 	int	(*init)		(struct cpufreq_policy *policy);

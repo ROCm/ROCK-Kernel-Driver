@@ -82,7 +82,7 @@ static void speedstep_set_state (unsigned int state, unsigned int notify)
 		return;
 
 	freqs.old = speedstep_get_processor_frequency(speedstep_processor);
-	freqs.new = speedstep_freqs[SPEEDSTEP_LOW].frequency;
+	freqs.new = speedstep_freqs[state].frequency;
 	freqs.cpu = 0; /* speedstep.c is UP only driver */
 	
 	if (notify)
@@ -137,7 +137,7 @@ static void speedstep_set_state (unsigned int state, unsigned int notify)
 	dprintk(KERN_DEBUG "cpufreq: read at pmbase 0x%x + 0x50 returned 0x%x\n", pmbase, value);
 
 	if (state == (value & 0x1)) {
-		dprintk (KERN_INFO "cpufreq: change to %u MHz succeeded\n", (freqs.new / 1000));
+		dprintk (KERN_INFO "cpufreq: change to %u MHz succeeded\n", (speedstep_get_processor_frequency(speedstep_processor) / 1000));
 	} else {
 		printk (KERN_ERR "cpufreq: change failed - I/O error\n");
 	}
@@ -295,7 +295,7 @@ static int speedstep_cpu_init(struct cpufreq_policy *policy)
 		return -EIO;
 
 	dprintk(KERN_INFO "cpufreq: currently at %s speed setting - %i MHz\n", 
-		(speed == speedstep_low_freq) ? "low" : "high",
+		(speed == speedstep_freqs[SPEEDSTEP_LOW].frequency) ? "low" : "high",
 		(speed / 1000));
 
 	/* cpuinfo and default policy values */

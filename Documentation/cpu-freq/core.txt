@@ -73,9 +73,9 @@ The phase is specified in the second argument to the notifier.
 The third argument, a void *pointer, points to a struct cpufreq_policy
 consisting of five values: cpu, min, max, policy and max_cpu_freq. min 
 and max are the lower and upper frequencies (in kHz) of the new
-policy, policy the new policy, cpu the number of the affected CPU or
-CPUFREQ_ALL_CPUS for all CPUs; and max_cpu_freq the maximum supported
-CPU frequency. This value is given for informational purposes only.
+policy, policy the new policy, cpu the number of the affected CPU; and 
+max_cpu_freq the maximum supported CPU frequency. This value is given 
+for informational purposes only.
 
 
 2.2 CPUFreq transition notifiers
@@ -89,6 +89,6 @@ CPUFREQ_POSTCHANGE.
 
 The third argument is a struct cpufreq_freqs with the following
 values:
-cpu	- number of the affected CPU or CPUFREQ_ALL_CPUS
+cpu	- number of the affected CPU
 old	- old frequency
 new	- new frequency

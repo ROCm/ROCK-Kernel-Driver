@@ -1526,6 +1526,7 @@ E: davej@suse.de
 W: http://www.codemonkey.org.uk
 D: x86 errata/setup maintenance.
 D: AGPGART driver.
+D: CPUFREQ maintenance.
 D: Backport/Forwardport merge monkey.
 D: Various Janitor work.
 S: c/o SuSE Linux UK Ltd
