@@ -46,9 +46,7 @@
 #include <linux/usb.h>
 
 #include "hid.h"
-#ifdef CONFIG_USB_HIDDEV
 #include <linux/hiddev.h>
-#endif
 
 /*
  * Version Information
@@ -1441,10 +1439,8 @@ static void* hid_probe(struct usb_device *dev, unsigned int ifnum,
 
 	if (!hidinput_connect(hid))
 		hid->claimed |= HID_CLAIMED_INPUT;
-#ifdef CONFIG_USB_HIDDEV
 	if (!hiddev_connect(hid))
 		hid->claimed |= HID_CLAIMED_HIDDEV;
-#endif
 
 	if (!hid->claimed) {
 		hid_free_device(hid);
@@ -1483,13 +1479,10 @@ static void hid_disconnect(struct usb_device *dev, void *ptr)
 	usb_unlink_urb(hid->urbout);
 	usb_unlink_urb(hid->urbctrl);
 
-
 	if (hid->claimed & HID_CLAIMED_INPUT)
 		hidinput_disconnect(hid);
-#ifdef CONFIG_USB_HIDDEV
 	if (hid->claimed & HID_CLAIMED_HIDDEV)
 		hiddev_disconnect(hid);
-#endif
 
 	usb_free_urb(hid->urbin);
 	usb_free_urb(hid->urbctrl);
@@ -1516,9 +1509,7 @@ static struct usb_driver hid_driver = {
 
 static int __init hid_init(void)
 {
-#ifdef CONFIG_USB_HIDDEV
 	hiddev_init();
-#endif
 	usb_register(&hid_driver);
 	info(DRIVER_VERSION ":" DRIVER_DESC);
 
@@ -1527,9 +1518,7 @@ static int __init hid_init(void)
 
 static void __exit hid_exit(void)
 {
-#ifdef CONFIG_USB_HIDDEV
 	hiddev_exit();
-#endif
 	usb_deregister(&hid_driver);
 }
 

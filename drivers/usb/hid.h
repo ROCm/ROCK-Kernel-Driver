@@ -389,10 +389,6 @@ struct hid_descriptor {
 	struct hid_class_descriptor desc[1];
 } __attribute__ ((packed));
 
-void hidinput_hid_event(struct hid_device *, struct hid_field *, struct hid_usage *, __s32);
-int hidinput_connect(struct hid_device *);
-void hidinput_disconnect(struct hid_device *);
-
 #ifdef DEBUG
 #include "hid-debug.h"
 #else
@@ -403,9 +399,19 @@ void hidinput_disconnect(struct hid_device *);
 
 #endif
 
+#ifdef CONFIG_USB_HIDINPUT
 /* Applications from HID Usage Tables 4/8/99 Version 1.1 */
 /* We ignore a few input applications that are not widely used */
 #define IS_INPUT_APPLICATION(a) (((a >= 0x00010000) && (a <= 0x00010008)) || ( a == 0x00010080) || ( a == 0x000c0001))
+extern void hidinput_hid_event(struct hid_device *, struct hid_field *, struct hid_usage *, __s32);
+extern int hidinput_connect(struct hid_device *);
+extern void hidinput_disconnect(struct hid_device *);
+#else
+#define IS_INPUT_APPLICATION(a) (0)
+static inline void hidinput_hid_event(struct hid_device *hid, struct hid_field *field, struct hid_usage *usage, __s32 value) { }
+static inline int hidinput_connect(struct hid_device *hid) { return -ENODEV; }
+static inline void hidinput_disconnect(struct hid_device *hid) { }
+#endif
 
 int hid_open(struct hid_device *);
 void hid_close(struct hid_device *);
