@@ -449,7 +449,6 @@ struct nfs4_getattr {
         u32 *				gt_bmval;          /* request */
         struct nfs_fattr *		gt_attrs;          /* response */
 	struct nfs_fsstat *		gt_fsstat;         /* response */
-	struct nfs_fsinfo *		gt_fsinfo;         /* response */
 	struct nfs_pathconf *		gt_pathconf;       /* response */
 };
 

@@ -56,6 +56,9 @@ extern struct rpc_procinfo nfs4_procedures[];
 
 extern nfs4_stateid zero_stateid;
 
+static int nfs4_proc_fsinfo(struct nfs_server *, struct nfs_fh *, struct nfs_fsinfo *);
+
+
 static void
 nfs4_setup_compound(struct nfs4_compound *cp, struct nfs4_op *ops,
 		    struct nfs_server *server, char *tag)
@@ -177,44 +180,16 @@ u32 nfs4_statfs_bitmap[2] = {
 	| FATTR4_WORD1_SPACE_TOTAL
 };
 
-u32 nfs4_fsinfo_bitmap[2] = {
-	FATTR4_WORD0_MAXFILESIZE
-	| FATTR4_WORD0_MAXREAD
-        | FATTR4_WORD0_MAXWRITE
-	| FATTR4_WORD0_LEASE_TIME,
-	0
-};
-
 u32 nfs4_pathconf_bitmap[2] = {
 	FATTR4_WORD0_MAXLINK
 	| FATTR4_WORD0_MAXNAME,
 	0
 };
 
-/* mount bitmap: fattr bitmap + lease time */
-u32 nfs4_mount_bitmap[2] = {
-	FATTR4_WORD0_TYPE
-	| FATTR4_WORD0_CHANGE
-	| FATTR4_WORD0_SIZE
-	| FATTR4_WORD0_FSID
-	| FATTR4_WORD0_FILEID
-	| FATTR4_WORD0_LEASE_TIME,
-	FATTR4_WORD1_MODE
-	| FATTR4_WORD1_NUMLINKS
-	| FATTR4_WORD1_OWNER
-	| FATTR4_WORD1_OWNER_GROUP
-	| FATTR4_WORD1_RAWDEV
-	| FATTR4_WORD1_SPACE_USED
-	| FATTR4_WORD1_TIME_ACCESS
-	| FATTR4_WORD1_TIME_METADATA
-	| FATTR4_WORD1_TIME_MODIFY
-};
-
 static inline void
 __nfs4_setup_getattr(struct nfs4_compound *cp, u32 *bitmap,
 		     struct nfs_fattr *fattr,
 		     struct nfs_fsstat *fsstat,
-		     struct nfs_fsinfo *fsinfo,
 		     struct nfs_pathconf *pathconf)
 {
         struct nfs4_getattr *getattr = GET_OP(cp, getattr);
@@ -222,7 +197,6 @@ __nfs4_setup_getattr(struct nfs4_compound *cp, u32 *bitmap,
         getattr->gt_bmval = bitmap;
         getattr->gt_attrs = fattr;
 	getattr->gt_fsstat = fsstat;
-	getattr->gt_fsinfo = fsinfo;
 	getattr->gt_pathconf = pathconf;
 
         OPNUM(cp) = OP_GETATTR;
@@ -234,16 +208,7 @@ nfs4_setup_getattr(struct nfs4_compound *cp,
 		struct nfs_fattr *fattr)
 {
 	__nfs4_setup_getattr(cp, nfs4_fattr_bitmap, fattr,
-			NULL, NULL, NULL);
-}
-
-static void
-nfs4_setup_getrootattr(struct nfs4_compound *cp,
-		struct nfs_fattr *fattr,
-		struct nfs_fsinfo *fsinfo)
-{
-	__nfs4_setup_getattr(cp, nfs4_mount_bitmap,
-			fattr, NULL, fsinfo, NULL);
+			NULL, NULL);
 }
 
 static void
@@ -251,15 +216,7 @@ nfs4_setup_statfs(struct nfs4_compound *cp,
 		struct nfs_fsstat *fsstat)
 {
 	__nfs4_setup_getattr(cp, nfs4_statfs_bitmap,
-			NULL, fsstat, NULL, NULL);
-}
-
-static void
-nfs4_setup_fsinfo(struct nfs4_compound *cp,
-		struct nfs_fsinfo *fsinfo)
-{
-	__nfs4_setup_getattr(cp, nfs4_fsinfo_bitmap,
-			NULL, NULL, fsinfo, NULL);
+			NULL, fsstat, NULL);
 }
 
 static void
@@ -267,7 +224,7 @@ nfs4_setup_pathconf(struct nfs4_compound *cp,
 		struct nfs_pathconf *pathconf)
 {
 	__nfs4_setup_getattr(cp, nfs4_pathconf_bitmap,
-			NULL, NULL, NULL, pathconf);
+			NULL, NULL, pathconf);
 }
 
 static void
@@ -759,7 +716,7 @@ nfs4_proc_get_root(struct nfs_server *server, struct nfs_fh *fhandle,
 		fattr->valid = 0;
 		nfs4_setup_compound(&compound, ops, server, "getrootfh");
 		nfs4_setup_putrootfh(&compound);
-		nfs4_setup_getrootattr(&compound, fattr, &fsinfo);
+		nfs4_setup_getattr(&compound, fattr);
 		nfs4_setup_getfh(&compound, fhandle);
 		if ((status = nfs4_call_compound(&compound, NULL, 0)))
 			goto out_unlock;
@@ -785,7 +742,7 @@ nfs4_proc_get_root(struct nfs_server *server, struct nfs_fh *fhandle,
 	nfs4_setup_compound(&compound, ops, server, "setclientid_confirm");
 	nfs4_setup_setclientid_confirm(&compound);
 	nfs4_setup_putrootfh(&compound);
-	nfs4_setup_getrootattr(&compound, fattr, &fsinfo);
+	nfs4_setup_getattr(&compound, fattr);
 	nfs4_setup_getfh(&compound, fhandle);
 	last_renewed = jiffies;
 	if ((status = nfs4_call_compound(&compound, NULL, 0)))
@@ -797,6 +754,8 @@ nfs4_proc_get_root(struct nfs_server *server, struct nfs_fh *fhandle,
 	 * server.
 	 * FIXME: we only need one renewd daemon per server.
 	 */
+	if ((status = nfs4_proc_fsinfo(server, fhandle, &fsinfo)))
+		goto out_unlock;
 	clp->cl_lease_time = fsinfo.lease_time * HZ;
 	clp->cl_last_renewal = last_renewed;
 	nfs4_schedule_state_renewal(clp);
@@ -1434,14 +1393,14 @@ static int
 nfs4_proc_fsinfo(struct nfs_server *server, struct nfs_fh *fhandle,
 		 struct nfs_fsinfo *fsinfo)
 {
-	struct nfs4_compound compound;
-	struct nfs4_op ops[2];
+	struct rpc_message msg = {
+		.rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_FSINFO],
+		.rpc_argp = fhandle,
+		.rpc_resp = fsinfo,
+	};
 
 	memset(fsinfo, 0, sizeof(*fsinfo));
-	nfs4_setup_compound(&compound, ops, server, "statfs");
-	nfs4_setup_putfh(&compound, fhandle);
-	nfs4_setup_fsinfo(&compound, fsinfo);
-	return nfs4_call_compound(&compound, NULL, 0);
+	return rpc_call_sync(server->client, &msg, 0);
 }
 
 static int
