@@ -512,8 +512,6 @@ void exit_mm(struct task_struct *tsk)
 	__exit_mm(tsk);
 }
 
-EXPORT_SYMBOL(exit_mm);
-
 static inline void choose_new_parent(task_t *p, task_t *reaper, task_t *child_reaper)
 {
 	/*
