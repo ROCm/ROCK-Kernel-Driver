@@ -441,7 +441,7 @@ static unsigned long __init interpret_isa_props(struct device_node *np,
 	if (rp != 0 && l >= sizeof(struct isa_reg_property)) {
 		i = 0;
 		adr = (struct address_range *) mem_start;
-		while ((l -= sizeof(struct reg_property)) >= 0) {
+		while ((l -= sizeof(struct isa_reg_property)) >= 0) {
 			if (!measure_only) {
 				adr[i].space = rp[i].space;
 				adr[i].address = rp[i].address;
