@@ -31,6 +31,7 @@
 #include <asm/io.h>
 #include <asm/semaphore.h>
 
+#include <linux/swapops.h>
 
 #ifdef CONFIG_STRAM_SWAP
 #define MAJOR_NR    Z2RAM_MAJOR
