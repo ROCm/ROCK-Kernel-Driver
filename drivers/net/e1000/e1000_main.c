@@ -252,19 +252,24 @@ e1000_up(struct e1000_adapter *adapter)
 {
 	struct net_device *netdev = adapter->netdev;
 
-	if(request_irq(netdev->irq, &e1000_intr, SA_SHIRQ | SA_SAMPLE_RANDOM,
-	               netdev->name, netdev))
-		return -1;
-
 	/* hardware has been reset, we need to reload some things */
 
 	e1000_set_multi(netdev);
+
 	e1000_restore_vlan(adapter);
 
 	e1000_configure_tx(adapter);
 	e1000_setup_rctl(adapter);
 	e1000_configure_rx(adapter);
 	e1000_alloc_rx_buffers(adapter);
+
+	if(request_irq(netdev->irq, &e1000_intr, SA_SHIRQ | SA_SAMPLE_RANDOM,
+		       netdev->name, netdev)) {
+		e1000_reset_hw(&adapter->hw);
+		e1000_free_tx_resources(adapter);
+		e1000_free_rx_resources(adapter);
+		return -1;
+	}
 
 	mod_timer(&adapter->watchdog_timer, jiffies);
 	e1000_irq_enable(adapter);
