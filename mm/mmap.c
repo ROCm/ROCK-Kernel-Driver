@@ -82,14 +82,6 @@ int vm_enough_memory(long pages)
 		free += nr_swap_pages;
 
 		/*
-		 * This double-counts: the nrpages are both in the
-		 * page-cache and in the swapper space. At the same time,
-		 * this compensates for the swap-space over-allocation
-		 * (ie "nr_swap_pages" being too small).
-		 */
-		free += total_swapcache_pages;
-
-		/*
 		 * The code below doesn't account for free space in the
 		 * inode and dentry slab cache, slab cache fragmentation,
 		 * inodes and dentries which will become freeable under
