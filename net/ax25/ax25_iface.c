@@ -47,6 +47,7 @@ static struct linkfail_struct {
 	struct linkfail_struct *next;
 	void (*func)(ax25_cb *, int);
 } *linkfail_list;
+static spinlock_t linkfail_lock = SPIN_LOCK_UNLOCKED;
 
 static struct listen_struct {
 	struct listen_struct *next;
@@ -122,31 +123,27 @@ int ax25_linkfail_register(void (*func)(ax25_cb *, int))
 
 	linkfail->func = func;
 
-	save_flags(flags);
-	cli();
-
+	spin_lock_irqsave(&linkfail_lock, flags);
 	linkfail->next = linkfail_list;
 	linkfail_list  = linkfail;
-
-	restore_flags(flags);
+	spin_unlock_irqrestore(&linkfail_lock, flags);
 
 	return 1;
 }
 
 void ax25_linkfail_release(void (*func)(ax25_cb *, int))
 {
-	struct linkfail_struct *s, *linkfail = linkfail_list;
+	struct linkfail_struct *s, *linkfail;
 	unsigned long flags;
 
+	spin_lock_irqsave(&linkfail_lock, flags);
+	linkfail = linkfail_list;
 	if (linkfail == NULL)
 		return;
 
-	save_flags(flags);
-	cli();
-
 	if (linkfail->func == func) {
 		linkfail_list = linkfail->next;
-		restore_flags(flags);
+		spin_unlock_irqrestore(&linkfail_lock, flags);
 		kfree(linkfail);
 		return;
 	}
@@ -155,15 +152,14 @@ void ax25_linkfail_release(void (*func)(ax25_cb *, int))
 		if (linkfail->next->func == func) {
 			s = linkfail->next;
 			linkfail->next = linkfail->next->next;
-			restore_flags(flags);
+			spin_unlock_irqrestore(&linkfail_lock, flags);
 			kfree(s);
 			return;
 		}
 
 		linkfail = linkfail->next;
 	}
-
-	restore_flags(flags);
+	spin_unlock_irqrestore(&linkfail_lock, flags);
 }
 
 int ax25_listen_register(ax25_address *callsign, struct net_device *dev)
@@ -255,9 +251,12 @@ int ax25_listen_mine(ax25_address *callsign, struct net_device *dev)
 void ax25_link_failed(ax25_cb *ax25, int reason)
 {
 	struct linkfail_struct *linkfail;
+	unsigned long flags;
 
+	spin_lock_irqsave(&linkfail_lock, flags);
 	for (linkfail = linkfail_list; linkfail != NULL; linkfail = linkfail->next)
 		(linkfail->func)(ax25, reason);
+	spin_unlock_irqrestore(&linkfail_lock, flags);
 }
 
 int ax25_protocol_is_registered(unsigned int pid)
