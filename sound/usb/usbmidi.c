@@ -49,9 +49,9 @@
 #include <sound/rawmidi.h>
 #include "usbaudio.h"
 
-MODULE_AUTHOR("Clemens Ladisch <tiwai@suse.de>");
+MODULE_AUTHOR("Clemens Ladisch <clemens@ladisch.de>");
 MODULE_DESCRIPTION("USB Audio/MIDI helper module");
-MODULE_LICENSE("GPL");
+MODULE_LICENSE("Dual BSD/GPL");
 
 
 struct usb_ms_header_descriptor {
