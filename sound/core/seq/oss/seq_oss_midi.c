@@ -593,6 +593,7 @@ send_synth_event(seq_oss_devinfo_t *dp, snd_seq_event_t *ev, int dev)
 		break;
 	}
 	
+	snd_seq_oss_readq_put_timestamp(dp->readq, ev->time.tick, dp->seq_mode);
 	snd_seq_oss_readq_put_event(dp->readq, &ossev);
 
 	return 0;

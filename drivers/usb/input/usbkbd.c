@@ -359,6 +359,9 @@ static struct usb_driver usb_kbd_driver = {
 	.probe =	usb_kbd_probe,
 	.disconnect =	usb_kbd_disconnect,
 	.id_table =	usb_kbd_id_table,
+	.driver	= {
+		.devclass = &input_devclass,
+	},
 };
 
 static int __init usb_kbd_init(void)

@@ -119,10 +119,8 @@ nargs (unsigned int arg, char **ap)
 
 asmlinkage long
 sys32_execve (char *filename, unsigned int argv, unsigned int envp,
-	      int dummy3, int dummy4, int dummy5, int dummy6, int dummy7,
-	      int stack)
+	      struct pt_regs *regs)
 {
-	struct pt_regs *regs = (struct pt_regs *)&stack;
 	unsigned long old_map_base, old_task_size, tssd;
 	char **av, **ae;
 	int na, ne, len;
@@ -1701,7 +1699,7 @@ sys32_ipc (u32 call, int first, int second, int third, u32 ptr, u32 fifth)
 		return shmctl32(first, second, (void *)AA(ptr));
 
 	      default:
-		return -EINVAL;
+		return -ENOSYS;
 	}
 	return -EINVAL;
 }
@@ -2156,26 +2154,23 @@ sys32_ptrace (int request, pid_t pid, unsigned int addr, unsigned int data,
 	ret = -ESRCH;
 	read_lock(&tasklist_lock);
 	child = find_task_by_pid(pid);
+	if (child)
+		get_task_struct(child);
 	read_unlock(&tasklist_lock);
 	if (!child)
 		goto out;
 	ret = -EPERM;
 	if (pid == 1)		/* no messing around with init! */
-		goto out;
+		goto out_tsk;
 
 	if (request == PTRACE_ATTACH) {
 		ret = sys_ptrace(request, pid, addr, data, arg4, arg5, arg6, arg7, stack);
-		goto out;
+		goto out_tsk;
 	}
-	ret = -ESRCH;
-	if (!(child->ptrace & PT_PTRACED))
-		goto out;
-	if (child->state != TASK_STOPPED) {
-		if (request != PTRACE_KILL)
-			goto out;
-	}
-	if (child->parent != current)
-		goto out;
+
+	ret = ptrace_check_attach(child, request == PTRACE_KILL);
+	if (ret < 0)
+		goto out_tsk;
 
 	switch (request) {
 	      case PTRACE_PEEKTEXT:
@@ -2185,12 +2180,12 @@ sys32_ptrace (int request, pid_t pid, unsigned int addr, unsigned int data,
 			ret = put_user(value, (unsigned int *) A(data));
 		else
 			ret = -EIO;
-		goto out;
+		goto out_tsk;
 
 	      case PTRACE_POKETEXT:
 	      case PTRACE_POKEDATA:	/* write the word at location addr */
 		ret = ia32_poke(regs, child, addr, data);
-		goto out;
+		goto out_tsk;
 
 	      case PTRACE_PEEKUSR:	/* read word at addr in USER area */
 		ret = -EIO;
@@ -2265,41 +2260,11 @@ sys32_ptrace (int request, pid_t pid, unsigned int addr, unsigned int data,
 		break;
 
 	}
+  out_tsk:
+	put_task_struct(child);
   out:
 	unlock_kernel();
 	return ret;
-}
-
-extern asmlinkage long sys_fcntl (unsigned int fd, unsigned int cmd, unsigned long arg);
-
-asmlinkage long
-sys32_fcntl (unsigned int fd, unsigned int cmd, unsigned int arg)
-{
-	mm_segment_t old_fs;
-	struct flock f;
-	long ret;
-
-	switch (cmd) {
-	      case F_GETLK:
-	      case F_SETLK:
-	      case F_SETLKW:
-		if (get_compat_flock(&f, (struct compat_flock *) A(arg)))
-			return -EFAULT;
-		old_fs = get_fs();
-		set_fs(KERNEL_DS);
-		ret = sys_fcntl(fd, cmd, (unsigned long) &f);
-		set_fs(old_fs);
-		if (cmd == F_GETLK && put_compat_flock(&f, (struct compat_flock *) A(arg)))
-			return -EFAULT;
-		return ret;
-
-	      default:
-		/*
-		 *  `sys_fcntl' lies about arg, for the F_SETOWN
-		 *  sub-function arg can have a negative value.
-		 */
-		return sys_fcntl(fd, cmd, arg);
-	}
 }
 
 asmlinkage long sys_ni_syscall(void);
@@ -2593,66 +2558,6 @@ sys32_setgroups16 (int gidsetsize, short *grouplist)
 	set_fs(KERNEL_DS);
 	ret = sys_setgroups(gidsetsize, gl);
 	set_fs(old_fs);
-	return ret;
-}
-
-/*
- * Unfortunately, the x86 compiler aligns variables of type "long long" to a 4 byte boundary
- * only, which means that the x86 version of "struct flock64" doesn't match the ia64 version
- * of struct flock.
- */
-
-static inline long
-ia32_put_flock (struct flock *l, unsigned long addr)
-{
-	return (put_user(l->l_type, (short *) addr)
-		| put_user(l->l_whence, (short *) (addr + 2))
-		| put_user(l->l_start, (long *) (addr + 4))
-		| put_user(l->l_len, (long *) (addr + 12))
-		| put_user(l->l_pid, (int *) (addr + 20)));
-}
-
-static inline long
-ia32_get_flock (struct flock *l, unsigned long addr)
-{
-	unsigned int start_lo, start_hi, len_lo, len_hi;
-	int err = (get_user(l->l_type, (short *) addr)
-		   | get_user(l->l_whence, (short *) (addr + 2))
-		   | get_user(start_lo, (int *) (addr + 4))
-		   | get_user(start_hi, (int *) (addr + 8))
-		   | get_user(len_lo, (int *) (addr + 12))
-		   | get_user(len_hi, (int *) (addr + 16))
-		   | get_user(l->l_pid, (int *) (addr + 20)));
-	l->l_start = ((unsigned long) start_hi << 32) | start_lo;
-	l->l_len = ((unsigned long) len_hi << 32) | len_lo;
-	return err;
-}
-
-asmlinkage long
-sys32_fcntl64 (unsigned int fd, unsigned int cmd, unsigned int arg)
-{
-	mm_segment_t old_fs;
-	struct flock f;
-	long ret;
-
-	switch (cmd) {
-	      case F_GETLK64:
-	      case F_SETLK64:
-	      case F_SETLKW64:
-		if (ia32_get_flock(&f, arg))
-			return -EFAULT;
-		old_fs = get_fs();
-		set_fs(KERNEL_DS);
-		ret = sys_fcntl(fd, cmd, (unsigned long) &f);
-		set_fs(old_fs);
-		if (cmd == F_GETLK && ia32_put_flock(&f, arg))
-			return -EFAULT;
-		break;
-
-	      default:
-		ret = sys32_fcntl(fd, cmd, arg);
-		break;
-	}
 	return ret;
 }
 

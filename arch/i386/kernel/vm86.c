@@ -30,6 +30,7 @@
  *
  */
 
+#include <linux/config.h>
 #include <linux/errno.h>
 #include <linux/interrupt.h>
 #include <linux/sched.h>
@@ -725,7 +726,7 @@ static inline void free_vm86_irq(int irqnumber)
 void release_x86_irqs(struct task_struct *task)
 {
 	int i;
-	for (i=3; i<16; i++)
+	for (i = FIRST_VM86_IRQ ; i <= LAST_VM86_IRQ; i++)
 	    if (vm86_irqs[i].tsk == task)
 		free_vm86_irq(i);
 }
@@ -735,7 +736,7 @@ static inline int get_and_reset_irq(int irqnumber)
 	int bit;
 	unsigned long flags;
 	
-	if ( (irqnumber<3) || (irqnumber>15) ) return 0;
+	if (invalid_vm86_irq(irqnumber)) return 0;
 	if (vm86_irqs[irqnumber].tsk != current) return 0;
 	spin_lock_irqsave(&irqbits_lock, flags);	
 	bit = irqbits & (1 << irqnumber);
@@ -760,7 +761,7 @@ static int do_vm86_irq_handling(int subfunction, int irqnumber)
 			int irq = irqnumber & 255;
 			if (!capable(CAP_SYS_ADMIN)) return -EPERM;
 			if (!((1 << sig) & ALLOWED_SIGS)) return -EPERM;
-			if ( (irq<3) || (irq>15) ) return -EPERM;
+			if (invalid_vm86_irq(irq)) return -EPERM;
 			if (vm86_irqs[irq].tsk) return -EPERM;
 			ret = request_irq(irq, &irq_handler, 0, VM86_IRQNAME, 0);
 			if (ret) return ret;
@@ -769,7 +770,7 @@ static int do_vm86_irq_handling(int subfunction, int irqnumber)
 			return irq;
 		}
 		case  VM86_FREE_IRQ: {
-			if ( (irqnumber<3) || (irqnumber>15) ) return -EPERM;
+			if (invalid_vm86_irq(irqnumber)) return -EPERM;
 			if (!vm86_irqs[irqnumber].tsk) return 0;
 			if (vm86_irqs[irqnumber].tsk != current) return -EPERM;
 			free_vm86_irq(irqnumber);

@@ -37,6 +37,7 @@
 #include <linux/wait.h>
 #include <linux/errno.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/init.h>
 #include <linux/pci.h>
 #include <linux/fs.h>
@@ -71,9 +72,9 @@
 
 
 /* Module Parameters */
-MODULE_PARM(skip_eeprom,"i");
-MODULE_PARM_DESC(skip_eeprom, "Do not try to read bus info block from serial eeprom, but user generic one (default = 0).");
 static int skip_eeprom = 0;
+module_param(skip_eeprom, int, 0444);
+MODULE_PARM_DESC(skip_eeprom, "Use generic bus info block instead of serial eeprom (default = 0).");
 
 
 static struct hpsb_host_driver lynx_driver;
@@ -983,8 +984,9 @@ loff_t mem_llseek(struct file *file, loff_t offs, int orig)
  * on performance - the value 2400 was found by experiment and may not work
  * everywhere as good as here - use mem_mindma option for modules to change 
  */
-short mem_mindma = 2400;
-MODULE_PARM(mem_mindma, "h");
+static short mem_mindma = 2400;
+module_param(mem_mindma, short, 0444);
+MODULE_PARM_DESC(mem_mindma, "Minimum amount of data required to use DMA");
 
 static ssize_t mem_dmaread(struct memdata *md, u32 physbuf, ssize_t count,
                            int offset)

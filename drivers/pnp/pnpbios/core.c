@@ -869,7 +869,7 @@ static int pnpbios_disable_resources(struct pnp_dev *dev)
 
 /* PnP Layer support */
 
-static struct pnp_protocol pnpbios_protocol = {
+struct pnp_protocol pnpbios_protocol = {
 	.name	= "Plug and Play BIOS",
 	.get	= pnpbios_get_resources,
 	.set	= pnpbios_set_resources,

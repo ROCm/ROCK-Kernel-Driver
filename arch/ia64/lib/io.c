@@ -87,11 +87,30 @@ ia64_outl (unsigned int val, unsigned long port)
 	__ia64_outl(val, port);
 }
 
-void
-ia64_mmiob (void)
+unsigned char
+ia64_readb (void *addr)
 {
-	__ia64_mmiob();
+	return __ia64_readb (addr);
 }
+
+unsigned short
+ia64_readw (void *addr)
+{
+	return __ia64_readw (addr);
+}
+
+unsigned int
+ia64_readl (void *addr)
+{
+	return __ia64_readl (addr);
+}
+
+unsigned long
+ia64_readq (void *addr)
+{
+	return __ia64_readq (addr)
+}
+
 
 /* define aliases: */
 
@@ -105,7 +124,11 @@ asm ("__ia64_outb = ia64_outb");
 asm ("__ia64_outw = ia64_outw");
 asm ("__ia64_outl = ia64_outl");
 
-asm (".global __ia64_mmiob");
-asm ("__ia64_mmiob = ia64_mmiob");
+asm (".global __ia64_readb, __ia64_readw, __ia64_readl, __ia64_readq");
+asm ("__ia64_readb = ia64_readb");
+asm ("__ia64_readw = ia64_readw");
+asm ("__ia64_readl = ia64_readl");
+asm ("__ia64_readq = ia64_readq");
+
 
 #endif /* CONFIG_IA64_GENERIC */

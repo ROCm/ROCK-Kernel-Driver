@@ -433,8 +433,8 @@ int __devinit snd_ice1712_akm4xxx_build_controls(ice1712_t *ice)
 			strcpy(ctl.id.name, "DAC Volume");
 			ctl.id.index = idx + ak->idx_offset * 2;
 			ctl.id.iface = SNDRV_CTL_ELEM_IFACE_MIXER;
+			ctl.count = 1;
 			ctl.info = snd_ice1712_akm4xxx_volume_info;
-			ctl.access = SNDRV_CTL_ELEM_ACCESS_READ|SNDRV_CTL_ELEM_ACCESS_WRITE;
 			ctl.get = snd_ice1712_akm4xxx_volume_get;
 			ctl.put = snd_ice1712_akm4xxx_volume_put;
 			switch (ak->type) {
@@ -459,7 +459,7 @@ int __devinit snd_ice1712_akm4xxx_build_controls(ice1712_t *ice)
 				return -EINVAL;
 			}
 			ctl.private_data = ak;
-			if ((err = snd_ctl_add(ice->card, snd_ctl_new(&ctl))) < 0)
+			if ((err = snd_ctl_add(ice->card, snd_ctl_new(&ctl, SNDRV_CTL_ELEM_ACCESS_READ|SNDRV_CTL_ELEM_ACCESS_WRITE))) < 0)
 				return err;
 		}
 		for (idx = 0; idx < ak->num_adcs && ak->type == SND_AK4524; ++idx) {
@@ -468,25 +468,25 @@ int __devinit snd_ice1712_akm4xxx_build_controls(ice1712_t *ice)
 			strcpy(ctl.id.name, "ADC Volume");
 			ctl.id.index = idx;
 			ctl.id.iface = SNDRV_CTL_ELEM_IFACE_MIXER;
+			ctl.count = 1;
 			ctl.info = snd_ice1712_akm4xxx_volume_info;
-			ctl.access = SNDRV_CTL_ELEM_ACCESS_READ|SNDRV_CTL_ELEM_ACCESS_WRITE;
 			ctl.get = snd_ice1712_akm4xxx_volume_get;
 			ctl.put = snd_ice1712_akm4xxx_volume_put;
 			ctl.private_value = AK_COMPOSE(idx/2, (idx%2) + 4, 0, 127); /* register 4 & 5 */
 			ctl.private_data = ak;
-			if ((err = snd_ctl_add(ice->card, snd_ctl_new(&ctl))) < 0)
+			if ((err = snd_ctl_add(ice->card, snd_ctl_new(&ctl, SNDRV_CTL_ELEM_ACCESS_READ|SNDRV_CTL_ELEM_ACCESS_WRITE))) < 0)
 				return err;
 			memset(&ctl, 0, sizeof(ctl));
 			strcpy(ctl.id.name, "IPGA Analog Capture Volume");
 			ctl.id.index = idx;
 			ctl.id.iface = SNDRV_CTL_ELEM_IFACE_MIXER;
+			ctl.count = 1;
 			ctl.info = snd_ice1712_akm4xxx_ipga_gain_info;
-			ctl.access = SNDRV_CTL_ELEM_ACCESS_READ|SNDRV_CTL_ELEM_ACCESS_WRITE;
 			ctl.get = snd_ice1712_akm4xxx_ipga_gain_get;
 			ctl.put = snd_ice1712_akm4xxx_ipga_gain_put;
 			ctl.private_value = AK_COMPOSE(idx/2, (idx%2) + 4, 0, 0); /* register 4 & 5 */
 			ctl.private_data = ak;
-			if ((err = snd_ctl_add(ice->card, snd_ctl_new(&ctl))) < 0)
+			if ((err = snd_ctl_add(ice->card, snd_ctl_new(&ctl, SNDRV_CTL_ELEM_ACCESS_READ|SNDRV_CTL_ELEM_ACCESS_WRITE))) < 0)
 				return err;
 		}
 		for (idx = 0; idx < ak->num_dacs/2; idx++) {
@@ -495,8 +495,8 @@ int __devinit snd_ice1712_akm4xxx_build_controls(ice1712_t *ice)
 			strcpy(ctl.id.name, "Deemphasis");
 			ctl.id.index = idx + ak->idx_offset;
 			ctl.id.iface = SNDRV_CTL_ELEM_IFACE_MIXER;
+			ctl.count = 1;
 			ctl.info = snd_ice1712_akm4xxx_deemphasis_info;
-			ctl.access = SNDRV_CTL_ELEM_ACCESS_READ|SNDRV_CTL_ELEM_ACCESS_WRITE;
 			ctl.get = snd_ice1712_akm4xxx_deemphasis_get;
 			ctl.put = snd_ice1712_akm4xxx_deemphasis_put;
 			switch (ak->type) {
@@ -517,11 +517,9 @@ int __devinit snd_ice1712_akm4xxx_build_controls(ice1712_t *ice)
 				break;
 			}
 			ctl.private_data = ak;
-			if ((err = snd_ctl_add(ice->card, snd_ctl_new(&ctl))) < 0)
+			if ((err = snd_ctl_add(ice->card, snd_ctl_new(&ctl, SNDRV_CTL_ELEM_ACCESS_READ|SNDRV_CTL_ELEM_ACCESS_WRITE))) < 0)
 				return err;
 		}
 	}
 	return 0;
 }
-
-

@@ -14,7 +14,6 @@
 #include <linux/netfilter_bridge/ebtables.h>
 #include <linux/module.h>
 #include <linux/if_bridge.h>
-#include <linux/brlock.h>
 
 /* EBT_ACCEPT means the frame will be bridged
  * EBT_DROP means the frame will be routed
@@ -70,18 +69,15 @@ static int __init init(void)
 	ret = ebt_register_table(&broute_table);
 	if (ret < 0)
 		return ret;
-	br_write_lock_bh(BR_NETPROTO_LOCK);
 	/* see br_input.c */
 	br_should_route_hook = ebt_broute;
-	br_write_unlock_bh(BR_NETPROTO_LOCK);
 	return ret;
 }
 
 static void __exit fini(void)
 {
-	br_write_lock_bh(BR_NETPROTO_LOCK);
 	br_should_route_hook = NULL;
-	br_write_unlock_bh(BR_NETPROTO_LOCK);
+	synchronize_net();
 	ebt_unregister_table(&broute_table);
 }
 

@@ -313,7 +313,7 @@ void __init attach_cs4232(struct address_info *hw_config)
 	}
 }
 
-static void __exit unload_cs4232(struct address_info *hw_config)
+static void __devexit unload_cs4232(struct address_info *hw_config)
 {
 	int base = hw_config->io_base, irq = hw_config->irq;
 	int dma1 = hw_config->dma, dma2 = hw_config->dma2;
@@ -428,7 +428,7 @@ static int cs4232_pnp_probe(struct pnp_dev *dev, const struct pnp_device_id *dev
 	return 0;
 }
 
-static void cs4232_pnp_remove(struct pnp_dev *dev)
+static void __devexit cs4232_pnp_remove(struct pnp_dev *dev)
 {
 	struct address_info *cfg = pnp_get_drvdata(dev);
 	if (cfg) {
@@ -441,7 +441,7 @@ static struct pnp_driver cs4232_driver = {
 	.name		= "cs4232",
 	.id_table	= cs4232_pnp_table,
 	.probe		= cs4232_pnp_probe,
-	.remove		= cs4232_pnp_remove,
+	.remove		= __devexit_p(cs4232_pnp_remove),
 };
 
 static int __init init_cs4232(void)

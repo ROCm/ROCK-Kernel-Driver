@@ -235,13 +235,14 @@ static io_port Vector_Latch;
 
 /* These provide interrupt save 2-step access to the Z8530 registers */
 
+static spinlock_t iolock;	/* Guards paired accesses */
+
 static inline unsigned char InReg(io_port port, unsigned char reg)
 {
 	unsigned long flags;
 	unsigned char r;
-	
-	save_flags(flags);
-	cli();
+
+	spin_lock_irqsave(&iolock, flags);	
 #ifdef SCC_LDELAY
 	Outb(port, reg);
 	udelay(SCC_LDELAY);
@@ -251,16 +252,15 @@ static inline unsigned char InReg(io_port port, unsigned char reg)
 	Outb(port, reg);
 	r=Inb(port);
 #endif
-	restore_flags(flags);
+	spin_unlock_irqrestore(&iolock, flags);
 	return r;
 }
 
 static inline void OutReg(io_port port, unsigned char reg, unsigned char val)
 {
 	unsigned long flags;
-	
-	save_flags(flags);
-	cli();
+
+	spin_lock_irqsave(&iolock, flags);
 #ifdef SCC_LDELAY
 	Outb(port, reg); udelay(SCC_LDELAY);
 	Outb(port, val); udelay(SCC_LDELAY);
@@ -268,7 +268,7 @@ static inline void OutReg(io_port port, unsigned char reg, unsigned char val)
 	Outb(port, reg);
 	Outb(port, val);
 #endif
-	restore_flags(flags);
+	spin_unlock_irqrestore(&iolock, flags);
 }
 
 static inline void wr(struct scc_channel *scc, unsigned char reg,
@@ -295,9 +295,7 @@ static inline void scc_discard_buffers(struct scc_channel *scc)
 {
 	unsigned long flags;
 	
-	save_flags(flags);
-	cli();
-	
+	spin_lock_irqsave(&scc->lock, flags);	
 	if (scc->tx_buff != NULL)
 	{
 		dev_kfree_skb(scc->tx_buff);
@@ -307,7 +305,7 @@ static inline void scc_discard_buffers(struct scc_channel *scc)
 	while (skb_queue_len(&scc->tx_queue))
 		dev_kfree_skb(skb_dequeue(&scc->tx_queue));
 
-	restore_flags(flags);
+	spin_unlock_irqrestore(&scc->lock, flags);
 }
 
 
@@ -609,6 +607,7 @@ static inline void scc_spint(struct scc_channel *scc)
 
 static void scc_isr_dispatch(struct scc_channel *scc, int vector)
 {
+	spin_lock(&scc->lock);
 	switch (vector & VECTOR_MASK)
 	{
 		case TXINT: scc_txint(scc); break;
@@ -616,6 +615,7 @@ static void scc_isr_dispatch(struct scc_channel *scc, int vector)
 		case RXINT: scc_rxint(scc); break;
 		case SPINT: scc_spint(scc); break;
 	}
+	spin_unlock(&scc->lock);
 }
 
 /* If the card has a latch for the interrupt vector (like the PA0HZP card)
@@ -722,12 +722,13 @@ static inline void set_brg(struct scc_channel *scc, unsigned int tc)
 
 static inline void set_speed(struct scc_channel *scc)
 {
-	disable_irq(scc->irq);
+	unsigned long flags;
+	spin_lock_irqsave(&scc->lock, flags);
 
 	if (scc->modem.speed > 0)	/* paranoia... */
 		set_brg(scc, (unsigned) (scc->clock / (scc->modem.speed * 64)) - 2);
-
-	enable_irq(scc->irq);
+		
+	spin_unlock_irqrestore(&scc->lock, flags);
 }
 
 
@@ -988,14 +989,8 @@ static void scc_key_trx(struct scc_channel *scc, char tx)
 
 /* ----> SCC timer interrupt handler and friends. <---- */
 
-static void scc_start_tx_timer(struct scc_channel *scc, void (*handler)(unsigned long), unsigned long when)
+static void __scc_start_tx_timer(struct scc_channel *scc, void (*handler)(unsigned long), unsigned long when)
 {
-	unsigned long flags;
-	
-	
-	save_flags(flags);
-	cli();
-
 	del_timer(&scc->tx_t);
 
 	if (when == 0)
@@ -1009,17 +1004,22 @@ static void scc_start_tx_timer(struct scc_channel *scc, void (*handler)(unsigned
 		scc->tx_t.expires = jiffies + (when*HZ)/100;
 		add_timer(&scc->tx_t);
 	}
+}
+
+static void scc_start_tx_timer(struct scc_channel *scc, void (*handler)(unsigned long), unsigned long when)
+{
+	unsigned long flags;
 	
-	restore_flags(flags);
+	spin_lock_irqsave(&scc->lock, flags);
+	__scc_start_tx_timer(scc, handler, when);
+	spin_unlock_irqrestore(&scc->lock, flags);
 }
 
 static void scc_start_defer(struct scc_channel *scc)
 {
 	unsigned long flags;
 	
-	save_flags(flags);
-	cli();
-
+	spin_lock_irqsave(&scc->lock, flags);
 	del_timer(&scc->tx_wdog);
 	
 	if (scc->kiss.maxdefer != 0 && scc->kiss.maxdefer != TIMER_OFF)
@@ -1029,16 +1029,14 @@ static void scc_start_defer(struct scc_channel *scc)
 		scc->tx_wdog.expires = jiffies + HZ*scc->kiss.maxdefer;
 		add_timer(&scc->tx_wdog);
 	}
-	restore_flags(flags);
+	spin_unlock_irqrestore(&scc->lock, flags);
 }
 
 static void scc_start_maxkeyup(struct scc_channel *scc)
 {
 	unsigned long flags;
 	
-	save_flags(flags);
-	cli();
-
+	spin_lock_irqsave(&scc->lock, flags);
 	del_timer(&scc->tx_wdog);
 	
 	if (scc->kiss.maxkeyup != 0 && scc->kiss.maxkeyup != TIMER_OFF)
@@ -1048,8 +1046,7 @@ static void scc_start_maxkeyup(struct scc_channel *scc)
 		scc->tx_wdog.expires = jiffies + HZ*scc->kiss.maxkeyup;
 		add_timer(&scc->tx_wdog);
 	}
-	
-	restore_flags(flags);
+	spin_unlock_irqrestore(&scc->lock, flags);
 }
 
 /* 
@@ -1189,13 +1186,10 @@ static void t_tail(unsigned long channel)
 	struct scc_channel *scc = (struct scc_channel *) channel;
 	unsigned long flags;
 	
- 	save_flags(flags);
- 	cli();
- 
+	spin_lock_irqsave(&scc->lock, flags); 
  	del_timer(&scc->tx_wdog);	
  	scc_key_trx(scc, TX_OFF);
-
- 	restore_flags(flags);
+	spin_unlock_irqrestore(&scc->lock, flags);
 
  	if (scc->stat.tx_state == TXS_TIMEOUT)		/* we had a timeout? */
  	{
@@ -1242,9 +1236,7 @@ static void t_maxkeyup(unsigned long channel)
 	struct scc_channel *scc = (struct scc_channel *) channel;
 	unsigned long flags;
 
-	save_flags(flags);
-	cli();
-
+	spin_lock_irqsave(&scc->lock, flags);
 	/* 
 	 * let things settle down before we start to
 	 * accept new data.
@@ -1259,7 +1251,7 @@ static void t_maxkeyup(unsigned long channel)
 	cl(scc, R15, TxUIE);		/* count it. */
 	OutReg(scc->ctrl, R0, RES_Tx_P);
 
-	restore_flags(flags);
+	spin_unlock_irqrestore(&scc->lock, flags);
 
 	scc->stat.txerrs++;
 	scc->stat.tx_state = TXS_TIMEOUT;
@@ -1289,13 +1281,10 @@ static void t_idle(unsigned long channel)
 static void scc_init_timer(struct scc_channel *scc)
 {
 	unsigned long flags;
-	
-	save_flags(flags); 
-	cli();
-	
-	scc->stat.tx_state = TXS_IDLE;
 
-	restore_flags(flags);
+	spin_lock_irqsave(&scc->lock, flags);	
+	scc->stat.tx_state = TXS_IDLE;
+	spin_unlock_irqrestore(&scc->lock, flags);
 }
 
 
@@ -1414,9 +1403,7 @@ static void scc_stop_calibrate(unsigned long channel)
 	struct scc_channel *scc = (struct scc_channel *) channel;
 	unsigned long flags;
 	
-	save_flags(flags);
-	cli();
-
+	spin_lock_irqsave(&scc->lock, flags);
 	del_timer(&scc->tx_wdog);
 	scc_key_trx(scc, TX_OFF);
 	wr(scc, R6, 0);
@@ -1425,7 +1412,7 @@ static void scc_stop_calibrate(unsigned long channel)
 	Outb(scc->ctrl,RES_EXT_INT);
 
 	netif_wake_queue(scc->dev);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&scc->lock, flags);
 }
 
 
@@ -1434,9 +1421,7 @@ scc_start_calibrate(struct scc_channel *scc, int duration, unsigned char pattern
 {
 	unsigned long flags;
 	
-	save_flags(flags);
-	cli();
-
+	spin_lock_irqsave(&scc->lock, flags);
 	netif_stop_queue(scc->dev);
 	scc_discard_buffers(scc);
 
@@ -1460,7 +1445,7 @@ scc_start_calibrate(struct scc_channel *scc, int duration, unsigned char pattern
 	Outb(scc->ctrl,RES_EXT_INT);
 
 	scc_key_trx(scc, TX_ON);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&scc->lock, flags);
 }
 
 /* ******************************************************************* */
@@ -1508,16 +1493,14 @@ static void z8530_init(void)
 			
 		/* Reset and pre-init Z8530 */
 
-		save_flags(flags);
-		cli();
-		
+		spin_lock_irqsave(&scc->lock, flags);
+				
 		Outb(scc->ctrl, 0);
 		OutReg(scc->ctrl,R9,FHWRES);		/* force hardware reset */
 		udelay(100);				/* give it 'a bit' more time than required */
 		wr(scc, R2, chip*16);			/* interrupt vector */
 		wr(scc, R9, VIS);			/* vector includes status */
-		
-        	restore_flags(flags);
+		spin_unlock_irqrestore(&scc->lock, flags);		
         }
 
  
@@ -1548,6 +1531,8 @@ static int scc_net_setup(struct scc_channel *scc, unsigned char *name, int addev
 	dev->priv = (void *) scc;
 	dev->init = scc_net_init;
 
+	spin_lock_init(&scc->lock);
+	
 	if ((addev? register_netdevice(dev) : register_netdev(dev)) != 0) {
 		kfree(dev);
                 return -EIO;
@@ -1625,17 +1610,14 @@ static int scc_net_close(struct net_device *dev)
 
 	netif_stop_queue(dev);
 
-	save_flags(flags); 
-	cli();
-	
+	spin_lock_irqsave(&scc->lock, flags);	
 	Outb(scc->ctrl,0);		/* Make sure pointer is written */
 	wr(scc,R1,0);			/* disable interrupts */
 	wr(scc,R3,0);
+	spin_unlock_irqrestore(&scc->lock, flags);
 
-	del_timer(&scc->tx_t);
-	del_timer(&scc->tx_wdog);
-
-	restore_flags(flags);
+	del_timer_sync(&scc->tx_t);
+	del_timer_sync(&scc->tx_wdog);
 	
 	scc_discard_buffers(scc);
 
@@ -1689,9 +1671,8 @@ static int scc_net_tx(struct sk_buff *skb, struct net_device *dev)
 		return 0;
 	}
 
-	save_flags(flags);
-	cli();
-	
+	spin_lock_irqsave(&scc->lock, flags);
+		
 	if (skb_queue_len(&scc->tx_queue) > scc->dev->tx_queue_len) {
 		struct sk_buff *skb_del;
 		skb_del = skb_dequeue(&scc->tx_queue);
@@ -1710,12 +1691,11 @@ static int scc_net_tx(struct sk_buff *skb, struct net_device *dev)
 	if(scc->stat.tx_state == TXS_IDLE || scc->stat.tx_state == TXS_IDLE2) {
 		scc->stat.tx_state = TXS_BUSY;
 		if (scc->kiss.fulldup == KISS_DUPLEX_HALF)
-			scc_start_tx_timer(scc, t_dwait, scc->kiss.waittime);
+			__scc_start_tx_timer(scc, t_dwait, scc->kiss.waittime);
 		else
-			scc_start_tx_timer(scc, t_dwait, 0);
+			__scc_start_tx_timer(scc, t_dwait, 0);
 	}
-
-	restore_flags(flags);	
+	spin_unlock_irqrestore(&scc->lock, flags);
 	return 0;
 }
 
@@ -1785,19 +1765,23 @@ static int scc_net_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 				hwcfg.clock = SCC_DEFAULT_CLOCK;
 
 #ifndef SCC_DONT_CHECK
-			disable_irq(hwcfg.irq);
 
-			check_region(scc->ctrl, 1);
-			Outb(hwcfg.ctrl_a, 0);
-			OutReg(hwcfg.ctrl_a, R9, FHWRES);
-			udelay(100);
-			OutReg(hwcfg.ctrl_a,R13,0x55);		/* is this chip really there? */
-			udelay(5);
+			if(request_region(scc->ctrl, 1, "scc-probe"))
+			{
+				disable_irq(hwcfg.irq);
+				Outb(hwcfg.ctrl_a, 0);
+				OutReg(hwcfg.ctrl_a, R9, FHWRES);
+				udelay(100);
+				OutReg(hwcfg.ctrl_a,R13,0x55);		/* is this chip really there? */
+				udelay(5);
 
-			if (InReg(hwcfg.ctrl_a,R13) != 0x55)
+				if (InReg(hwcfg.ctrl_a,R13) != 0x55)
+					found = 0;
+				enable_irq(hwcfg.irq);
+				release_region(scc->ctrl, 1);
+			}
+			else
 				found = 0;
-
-			enable_irq(hwcfg.irq);
 #endif
 
 			if (found)
@@ -2111,6 +2095,8 @@ static int __init scc_init_driver (void)
 	
 	printk(banner);
 	
+	spin_lock_init(&iolock);
+	
 	sprintf(devname,"%s0", SCC_DriverName);
 	
 	result = scc_net_setup(SCC_Info, devname, 0);
@@ -2127,20 +2113,19 @@ static int __init scc_init_driver (void)
 
 static void __exit scc_cleanup_driver(void)
 {
-	unsigned long flags;
 	io_port ctrl;
 	int k;
 	struct scc_channel *scc;
 	
-	save_flags(flags); 
-	cli();
-
 	if (Nchips == 0)
 	{
 		unregister_netdev(SCC_Info[0].dev);
 		kfree(SCC_Info[0].dev);
 	}
 
+	/* Guard against chip prattle */
+	local_irq_disable();
+	
 	for (k = 0; k < Nchips; k++)
 		if ( (ctrl = SCC_ctrl[k].chan_A) )
 		{
@@ -2149,6 +2134,13 @@ static void __exit scc_cleanup_driver(void)
 			udelay(50);
 		}
 		
+	/* To unload the port must be closed so no real IRQ pending */
+	for (k=0; k < NR_IRQS ; k++)
+		if (Ivec[k].used) free_irq(k, NULL);
+		
+	local_irq_enable();
+		
+	/* Now clean up */
 	for (k = 0; k < Nchips*2; k++)
 	{
 		scc = &SCC_Info[k];
@@ -2164,13 +2156,9 @@ static void __exit scc_cleanup_driver(void)
 		}
 	}
 	
-	for (k=0; k < NR_IRQS ; k++)
-		if (Ivec[k].used) free_irq(k, NULL);
 		
 	if (Vector_Latch)
 		release_region(Vector_Latch, 1);
-
-	restore_flags(flags);
 
 	proc_net_remove("z8530drv");
 }

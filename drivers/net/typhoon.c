@@ -844,7 +844,7 @@ typhoon_start_tx(struct sk_buff *skb, struct net_device *dev)
 	} else {
 		int i, len;
 
-		len = skb->len - skb->data_len;
+		len = skb_headlen(skb);
 		skb_dma = pci_map_single(tp->tx_pdev, skb->data, len,
 				         PCI_DMA_TODEVICE);
 		txd->flags = TYPHOON_FRAG_DESC | TYPHOON_DESC_VALID;

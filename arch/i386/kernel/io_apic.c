@@ -38,6 +38,8 @@
 
 #include <mach_apic.h>
 
+#include "io_ports.h"
+
 #undef APIC_LOCKUP_DEBUG
 
 #define APIC_LOCKUP_DEBUG
@@ -2135,7 +2137,7 @@ static inline void check_timer(void)
  * Additionally, something is definitely wrong with irq9
  * on PIIX4 boards.
  */
-#define PIC_IRQS	(1<<2)
+#define PIC_IRQS	(1 << PIC_CASCADE_IR)
 
 void __init setup_IO_APIC(void)
 {

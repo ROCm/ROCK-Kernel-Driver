@@ -2,8 +2,8 @@
  * include/asm-v850/nb85e_timer_d.h -- `Timer D' component often used
  *	with the NB85E cpu core
  *
- *  Copyright (C) 2001,02  NEC Corporation
- *  Copyright (C) 2001,02  Miles Bader <miles@gnu.org>
+ *  Copyright (C) 2001,02,03  NEC Electronics Corporation
+ *  Copyright (C) 2001,02,03  Miles Bader <miles@gnu.org>
  *
  * This file is subject to the terms and conditions of the GNU General
  * Public License.  See the file COPYING in the main directory of this
@@ -27,7 +27,7 @@
 
 /* Count compare registers for timer D.  */
 #define NB85E_TIMER_D_CMD_ADDR(n) (NB85E_TIMER_D_CMD_BASE_ADDR + 0x10 * (n))
-#define NB85E_TIMER_D_CMD(n)	  (*(u16 *)NB85E_TIMER_D_CMD_ADDR(n))
+#define NB85E_TIMER_D_CMD(n)	  (*(volatile u16 *)NB85E_TIMER_D_CMD_ADDR(n))
 
 /* Control registers for timer D.  */
 #define NB85E_TIMER_D_TMCD_ADDR(n) (NB85E_TIMER_D_TMCD_BASE_ADDR + 0x10 * (n))

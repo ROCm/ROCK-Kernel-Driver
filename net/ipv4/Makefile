@@ -18,7 +18,8 @@ obj-$(CONFIG_NET_IPGRE) += ip_gre.o
 obj-$(CONFIG_SYN_COOKIES) += syncookies.o
 obj-$(CONFIG_INET_AH) += ah.o
 obj-$(CONFIG_INET_ESP) += esp.o
+obj-$(CONFIG_INET_IPCOMP) += ipcomp.o
 obj-$(CONFIG_IP_PNP) += ipconfig.o
 obj-$(CONFIG_NETFILTER)	+= netfilter/
 
-obj-y += xfrm4_policy.o xfrm4_state.o xfrm4_input.o
+obj-y += xfrm4_policy.o xfrm4_state.o xfrm4_input.o xfrm4_tunnel.o

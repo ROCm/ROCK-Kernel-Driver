@@ -34,6 +34,7 @@
 
 #define NFSDBG_FACILITY		NFSDBG_FILE
 
+static int nfs_file_open(struct inode *, struct file *);
 static int  nfs_file_mmap(struct file *, struct vm_area_struct *);
 static ssize_t nfs_file_sendfile(struct file *, loff_t *, size_t, read_actor_t, void *);
 static ssize_t nfs_file_read(struct kiocb *, char *, size_t, loff_t);
@@ -48,7 +49,7 @@ struct file_operations nfs_file_operations = {
 	.aio_read		= nfs_file_read,
 	.aio_write		= nfs_file_write,
 	.mmap		= nfs_file_mmap,
-	.open		= nfs_open,
+	.open		= nfs_file_open,
 	.flush		= nfs_file_flush,
 	.release	= nfs_release,
 	.fsync		= nfs_fsync,
@@ -66,6 +67,30 @@ struct inode_operations nfs_file_inode_operations = {
 #ifndef IS_SWAPFILE
 # define IS_SWAPFILE(inode)	(0)
 #endif
+
+/*
+ * Open file
+ */
+static int
+nfs_file_open(struct inode *inode, struct file *filp)
+{
+	struct nfs_server *server = NFS_SERVER(inode);
+	int (*open)(struct inode *, struct file *);
+	int res = 0;
+
+	lock_kernel();
+	/* Do NFSv4 open() call */
+	if ((open = server->rpc_ops->file_open) != NULL)
+		res = open(inode, filp);
+	/* Do cto revalidation */
+	else if (server->flags & NFS_MOUNT_NOCTO)
+		res = __nfs_revalidate_inode(server, inode);
+	/* Call generic open code in order to cache credentials */
+	if (!res)
+		res = nfs_open(inode, filp);
+	unlock_kernel();
+	return res;
+}
 
 /*
  * Flush all dirty pages, and check for write errors.

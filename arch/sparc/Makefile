@@ -30,6 +30,7 @@ ifneq ($(IS_EGCS),y)
 CFLAGS := $(CFLAGS) -pipe -mno-fpu -fcall-used-g5 -fcall-used-g7
 else
 CFLAGS := $(CFLAGS) -m32 -pipe -mno-fpu -fcall-used-g5 -fcall-used-g7
+AFLAGS := $(AFLAGS) -m32
 endif
 
 #LDFLAGS_vmlinux = -N -Ttext 0xf0004000

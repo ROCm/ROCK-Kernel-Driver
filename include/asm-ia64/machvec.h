@@ -43,7 +43,6 @@ typedef int ia64_mv_pci_map_sg (struct pci_dev *, struct scatterlist *, int, int
 typedef void ia64_mv_pci_unmap_sg (struct pci_dev *, struct scatterlist *, int, int);
 typedef void ia64_mv_pci_dma_sync_single (struct pci_dev *, dma_addr_t, size_t, int);
 typedef void ia64_mv_pci_dma_sync_sg (struct pci_dev *, struct scatterlist *, int, int);
-typedef unsigned long ia64_mv_pci_dma_address (struct scatterlist *);
 typedef int ia64_mv_pci_dma_supported (struct pci_dev *, u64);
 
 /*
@@ -61,7 +60,10 @@ typedef unsigned int ia64_mv_inl_t (unsigned long);
 typedef void ia64_mv_outb_t (unsigned char, unsigned long);
 typedef void ia64_mv_outw_t (unsigned short, unsigned long);
 typedef void ia64_mv_outl_t (unsigned int, unsigned long);
-typedef void ia64_mv_mmiob_t (void);
+typedef unsigned char ia64_mv_readb_t (void *);
+typedef unsigned short ia64_mv_readw_t (void *);
+typedef unsigned int ia64_mv_readl_t (void *);
+typedef unsigned long ia64_mv_readq_t (void *);
 
 extern void machvec_noop (void);
 
@@ -99,7 +101,6 @@ extern void machvec_noop (void);
 #  define platform_pci_unmap_sg		ia64_mv.unmap_sg
 #  define platform_pci_dma_sync_single	ia64_mv.sync_single
 #  define platform_pci_dma_sync_sg	ia64_mv.sync_sg
-#  define platform_pci_dma_address	ia64_mv.dma_address
 #  define platform_pci_dma_supported	ia64_mv.dma_supported
 #  define platform_irq_desc		ia64_mv.irq_desc
 #  define platform_irq_to_vector	ia64_mv.irq_to_vector
@@ -110,7 +111,10 @@ extern void machvec_noop (void);
 #  define platform_outb		ia64_mv.outb
 #  define platform_outw		ia64_mv.outw
 #  define platform_outl		ia64_mv.outl
-#  define platofrm_mmiob        ia64_mv.mmiob
+#  define platform_readb        ia64_mv.readb
+#  define platform_readw        ia64_mv.readw
+#  define platform_readl        ia64_mv.readl
+#  define platform_readq        ia64_mv.readq
 # endif
 
 /* __attribute__((__aligned__(16))) is required to make size of the
@@ -138,7 +142,6 @@ struct ia64_machine_vector {
 	ia64_mv_pci_unmap_sg *unmap_sg;
 	ia64_mv_pci_dma_sync_single *sync_single;
 	ia64_mv_pci_dma_sync_sg *sync_sg;
-	ia64_mv_pci_dma_address *dma_address;
 	ia64_mv_pci_dma_supported *dma_supported;
 	ia64_mv_irq_desc *irq_desc;
 	ia64_mv_irq_to_vector *irq_to_vector;
@@ -149,8 +152,11 @@ struct ia64_machine_vector {
 	ia64_mv_outb_t *outb;
 	ia64_mv_outw_t *outw;
 	ia64_mv_outl_t *outl;
-	ia64_mv_mmiob_t *mmiob;
-} __attribute__((__aligned__(16)));
+	ia64_mv_readb_t *readb;
+	ia64_mv_readw_t *readw;
+	ia64_mv_readl_t *readl;
+	ia64_mv_readq_t *readq;
+};
 
 #define MACHVEC_INIT(name)			\
 {						\
@@ -173,7 +179,6 @@ struct ia64_machine_vector {
 	platform_pci_unmap_sg,			\
 	platform_pci_dma_sync_single,		\
 	platform_pci_dma_sync_sg,		\
-	platform_pci_dma_address,		\
 	platform_pci_dma_supported,		\
 	platform_irq_desc,			\
 	platform_irq_to_vector,			\
@@ -184,7 +189,10 @@ struct ia64_machine_vector {
 	platform_outb,				\
 	platform_outw,				\
 	platform_outl,				\
-        platform_mmiob                          \
+	platform_readb,				\
+	platform_readw,				\
+	platform_readl,				\
+	platform_readq,				\
 }
 
 extern struct ia64_machine_vector ia64_mv;
@@ -206,7 +214,6 @@ extern ia64_mv_pci_map_sg swiotlb_map_sg;
 extern ia64_mv_pci_unmap_sg swiotlb_unmap_sg;
 extern ia64_mv_pci_dma_sync_single swiotlb_sync_single;
 extern ia64_mv_pci_dma_sync_sg swiotlb_sync_sg;
-extern ia64_mv_pci_dma_address swiotlb_dma_address;
 extern ia64_mv_pci_dma_supported swiotlb_pci_dma_supported;
 
 /*
@@ -267,9 +274,6 @@ extern ia64_mv_pci_dma_supported swiotlb_pci_dma_supported;
 #ifndef platform_pci_dma_sync_sg
 # define platform_pci_dma_sync_sg	swiotlb_sync_sg
 #endif
-#ifndef platform_pci_dma_address
-# define  platform_pci_dma_address	swiotlb_dma_address
-#endif
 #ifndef platform_pci_dma_supported
 # define  platform_pci_dma_supported	swiotlb_pci_dma_supported
 #endif
@@ -300,8 +304,17 @@ extern ia64_mv_pci_dma_supported swiotlb_pci_dma_supported;
 #ifndef platform_outl
 # define platform_outl		__ia64_outl
 #endif
-#ifndef platform_mmiob
-# define platform_mmiob         __ia64_mmiob
+#ifndef platform_readb
+# define platform_readb		__ia64_readb
+#endif
+#ifndef platform_readw
+# define platform_readw		__ia64_readw
+#endif
+#ifndef platform_readl
+# define platform_readl		__ia64_readl
+#endif
+#ifndef platform_readq
+# define platform_readq		__ia64_readq
 #endif
 
 #endif /* _ASM_IA64_MACHVEC_H */

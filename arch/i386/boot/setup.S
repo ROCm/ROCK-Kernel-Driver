@@ -213,7 +213,7 @@ prtspc:	movb	$0x20, %al	# Print single space (note: fall-thru)
 # Part of above routine, this one just prints ascii al
 prtchr:	pushw	%ax
 	pushw	%cx
-	xorb	%bh, %bh
+	movw	$7,%bx
 	movw	$0x01, %cx
 	movb	$0x0e, %ah
 	int	$0x10

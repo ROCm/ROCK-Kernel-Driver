@@ -41,7 +41,7 @@ int vfs_statfs(struct super_block *sb, struct statfs *buf)
 }
 
 
-asmlinkage long sys_statfs(const char * path, struct statfs * buf)
+asmlinkage long sys_statfs(const char __user * path, struct statfs __user * buf)
 {
 	struct nameidata nd;
 	int error;
@@ -57,7 +57,7 @@ asmlinkage long sys_statfs(const char * path, struct statfs * buf)
 	return error;
 }
 
-asmlinkage long sys_fstatfs(unsigned int fd, struct statfs * buf)
+asmlinkage long sys_fstatfs(unsigned int fd, struct statfs __user * buf)
 {
 	struct file * file;
 	struct statfs tmp;
@@ -92,7 +92,7 @@ int do_truncate(struct dentry *dentry, loff_t length)
 	return err;
 }
 
-static inline long do_sys_truncate(const char * path, loff_t length)
+static inline long do_sys_truncate(const char __user * path, loff_t length)
 {
 	struct nameidata nd;
 	struct inode * inode;
@@ -152,7 +152,7 @@ out:
 	return error;
 }
 
-asmlinkage long sys_truncate(const char * path, unsigned long length)
+asmlinkage long sys_truncate(const char __user * path, unsigned long length)
 {
 	/* on 32-bit boxen it will cut the range 2^31--2^32-1 off */
 	return do_sys_truncate(path, (long)length);
@@ -208,7 +208,7 @@ asmlinkage long sys_ftruncate(unsigned int fd, unsigned long length)
 
 /* LFS versions of truncate are only needed on 32 bit machines */
 #if BITS_PER_LONG == 32
-asmlinkage long sys_truncate64(const char * path, loff_t length)
+asmlinkage long sys_truncate64(const char __user * path, loff_t length)
 {
 	return do_sys_truncate(path, length);
 }
@@ -232,7 +232,7 @@ asmlinkage long sys_ftruncate64(unsigned int fd, loff_t length)
  * must be owner or have write permission.
  * Else, update from *times, must be owner or super user.
  */
-asmlinkage long sys_utime(char * filename, struct utimbuf * times)
+asmlinkage long sys_utime(char __user * filename, struct utimbuf __user * times)
 {
 	int error;
 	struct nameidata nd;
@@ -280,7 +280,7 @@ out:
  * must be owner or have write permission.
  * Else, update from *times, must be owner or super user.
  */
-long do_utimes(char * filename, struct timeval * times)
+long do_utimes(char __user * filename, struct timeval __user * times)
 {
 	int error;
 	struct nameidata nd;
@@ -319,7 +319,7 @@ out:
 	return error;
 }
 
-asmlinkage long sys_utimes(char * filename, struct timeval * utimes)
+asmlinkage long sys_utimes(char __user * filename, struct timeval __user * utimes)
 {
 	struct timeval times[2];
 
@@ -334,7 +334,7 @@ asmlinkage long sys_utimes(char * filename, struct timeval * utimes)
  * We do this by temporarily clearing all FS-related capabilities and
  * switching the fsuid/fsgid around to the real ones.
  */
-asmlinkage long sys_access(const char * filename, int mode)
+asmlinkage long sys_access(const char __user * filename, int mode)
 {
 	struct nameidata nd;
 	int old_fsuid, old_fsgid;
@@ -381,7 +381,7 @@ asmlinkage long sys_access(const char * filename, int mode)
 	return res;
 }
 
-asmlinkage long sys_chdir(const char * filename)
+asmlinkage long sys_chdir(const char __user * filename)
 {
 	struct nameidata nd;
 	int error;
@@ -432,7 +432,7 @@ out:
 	return error;
 }
 
-asmlinkage long sys_chroot(const char * filename)
+asmlinkage long sys_chroot(const char __user * filename)
 {
 	struct nameidata nd;
 	int error;
@@ -493,7 +493,7 @@ out:
 	return err;
 }
 
-asmlinkage long sys_chmod(const char * filename, mode_t mode)
+asmlinkage long sys_chmod(const char __user * filename, mode_t mode)
 {
 	struct nameidata nd;
 	struct inode * inode;
@@ -562,7 +562,7 @@ out:
 	return error;
 }
 
-asmlinkage long sys_chown(const char * filename, uid_t user, gid_t group)
+asmlinkage long sys_chown(const char __user * filename, uid_t user, gid_t group)
 {
 	struct nameidata nd;
 	int error;
@@ -575,7 +575,7 @@ asmlinkage long sys_chown(const char * filename, uid_t user, gid_t group)
 	return error;
 }
 
-asmlinkage long sys_lchown(const char * filename, uid_t user, gid_t group)
+asmlinkage long sys_lchown(const char __user * filename, uid_t user, gid_t group)
 {
 	struct nameidata nd;
 	int error;
@@ -793,7 +793,7 @@ void fd_install(unsigned int fd, struct file * file)
 	write_unlock(&files->file_lock);
 }
 
-asmlinkage long sys_open(const char * filename, int flags, int mode)
+asmlinkage long sys_open(const char __user * filename, int flags, int mode)
 {
 	char * tmp;
 	int fd, error;
@@ -829,7 +829,7 @@ out_error:
  * For backward compatibility?  Maybe this should be moved
  * into arch/i386 instead?
  */
-asmlinkage long sys_creat(const char * pathname, int mode)
+asmlinkage long sys_creat(const char __user * pathname, int mode)
 {
 	return sys_open(pathname, O_CREAT | O_WRONLY | O_TRUNC, mode);
 }

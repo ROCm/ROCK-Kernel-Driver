@@ -9,7 +9,6 @@
 #
 
 targets-$(CONFIG_IA64_HP_SIM)  += bootloader
-targets-$(CONFIG_IA64_GENERIC) += bootloader
 targets := vmlinux.bin vmlinux.gz $(targets-y)
 
 quiet_cmd_cptotop = LN      $@

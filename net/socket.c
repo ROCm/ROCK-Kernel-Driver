@@ -71,6 +71,7 @@
 #include <linux/wanrouter.h>
 #include <linux/netlink.h>
 #include <linux/rtnetlink.h>
+#include <linux/if_bridge.h>
 #include <linux/init.h>
 #include <linux/poll.h>
 #include <linux/cache.h>
@@ -712,7 +713,18 @@ static ssize_t sock_writev(struct file *file, const struct iovec *vector,
 				 file, vector, count, tot_len);
 }
 
-int (*br_ioctl_hook)(unsigned long arg);
+
+static DECLARE_MUTEX(br_ioctl_mutex);
+static int (*br_ioctl_hook)(unsigned long arg) = NULL;
+
+void brioctl_set(int (*hook)(unsigned long))
+{
+	down(&br_ioctl_mutex);
+	br_ioctl_hook = hook;
+	up(&br_ioctl_mutex);
+}
+
+
 int (*vlan_ioctl_hook)(unsigned long arg);
 
 #ifdef CONFIG_DLCI
@@ -759,12 +771,16 @@ static int sock_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		case SIOCGIFBR:
 		case SIOCSIFBR:
 			err = -ENOPKG;
+			
 #ifdef CONFIG_KMOD
 			if (!br_ioctl_hook)
 				request_module("bridge");
 #endif
-			if (br_ioctl_hook)
+
+			down(&br_ioctl_mutex);
+			if (br_ioctl_hook) 
 				err = br_ioctl_hook(arg);
+			up(&br_ioctl_mutex);
 			break;
 		case SIOCGIFVLAN:
 		case SIOCSIFVLAN:

@@ -20,6 +20,8 @@
 #ifndef _IEEE1394_NODEMGR_H
 #define _IEEE1394_NODEMGR_H
 
+#include <linux/device.h>
+
 #define CONFIG_ROM_BUS_INFO_LENGTH(q)		((q) >> 24)
 #define CONFIG_ROM_BUS_CRC_LENGTH(q)		(((q) >> 16) & 0xff)
 #define CONFIG_ROM_BUS_CRC(q)			((q) & 0xffff)
@@ -76,6 +78,12 @@ struct bus_options {
 	u16	max_rec;	/* Maximum packet size node can receive */
 };
 
+enum {
+	DEV_CLASS_NODE,
+	DEV_CLASS_UNIT_DIRECTORY,
+	DEV_CLASS_HOST,
+};
+
 #define UNIT_DIRECTORY_VENDOR_ID	0x01
 #define UNIT_DIRECTORY_MODEL_ID		0x02
 #define UNIT_DIRECTORY_SPECIFIER_ID	0x04
@@ -87,18 +95,16 @@ struct bus_options {
  * A unit directory corresponds to a protocol supported by the
  * node. If a node supports eg. IP/1394 and AV/C, its config rom has a
  * unit directory for each of these protocols.
- * 
- * Unit directories appear on two types of lists: for each node we
- * maintain a list of the unit directories found in its config rom and
- * for each driver we maintain a list of the unit directories
- * (ie. devices) the driver manages.
  */
 struct unit_directory {
 	struct node_entry *ne;  /* The node which this directory belongs to */
 	octlet_t address;	/* Address of the unit directory on the node */
 	u8 flags;		/* Indicates which entries were read */
+
 	quadlet_t vendor_id;
 	const char *vendor_name;
+	const char *vendor_oui;
+
 	int vendor_name_size;
 	quadlet_t model_id;
 	const char *model_name;
@@ -106,22 +112,21 @@ struct unit_directory {
 	quadlet_t specifier_id;
 	quadlet_t version;
 
-	struct hpsb_protocol_driver *driver;
-	void *driver_data;
+	unsigned int id;
 
-	/* For linking the nodes managed by the driver, or unmanaged nodes */
-	struct list_head driver_list;
+	int length;		/* Number of quadlets */
 
-	/* For linking directories belonging to a node */
-	struct list_head node_list;
+	struct device device;
 
-	int count;		/* Number of quadlets */
+	/* XXX Must be last in the struct! */
 	quadlet_t quadlets[0];
 };
 
 struct node_entry {
-	struct list_head list;
 	u64 guid;			/* GUID of this node */
+	u32 guid_vendor_id;		/* Top 24bits of guid */
+	const char *guid_vendor_oui;	/* OUI name of guid vendor id */
+
 	struct hpsb_host *host;		/* Host this node is attached to */
 	nodeid_t nodeid;		/* NodeID */
 	struct bus_options busopt;	/* Bus Options */
@@ -129,14 +134,16 @@ struct node_entry {
 
 	/* The following is read from the config rom */
 	u32 vendor_id;
+	const char *vendor_name;
+	const char *vendor_oui;
+
 	u32 capabilities;	
-	struct list_head unit_directories;
 
 	struct hpsb_tlabel_pool *tpool;
 
-	const char *vendor_name;
-	char *oui_name;
+	struct device device;
 
+	/* XXX Must be last in the struct! */
 	quadlet_t quadlets[0];
 };
 
@@ -154,11 +161,11 @@ struct node_entry *hpsb_guid_get_entry(u64 guid);
 
 /* Same as above, but use the nodeid to get an node entry. This is not
  * fool-proof by itself, since the nodeid can change.  */
-struct node_entry *hpsb_nodeid_get_entry(nodeid_t nodeid);
+struct node_entry *hpsb_nodeid_get_entry(struct hpsb_host *host, nodeid_t nodeid);
 
 /* Same as above except that it will not block waiting for the nodemgr
  * serialize semaphore.  */
-struct node_entry *hpsb_check_nodeid(nodeid_t nodeid);
+struct node_entry *hpsb_check_nodeid(struct hpsb_host *host, nodeid_t nodeid);
 
 /*
  * If the entry refers to a local host, this function will return the pointer
@@ -188,7 +195,7 @@ int hpsb_node_lock(struct node_entry *ne, u64 addr,
 		   int extcode, quadlet_t *data, quadlet_t arg);
 
 
-void init_ieee1394_nodemgr(int disable_hotplug);
+void init_ieee1394_nodemgr(void);
 void cleanup_ieee1394_nodemgr(void);
 
 #endif /* _IEEE1394_NODEMGR_H */

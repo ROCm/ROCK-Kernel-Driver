@@ -196,7 +196,7 @@ int ipv6_setsockopt(struct sock *sk, int level, int optname, char *optval,
 #ifdef INET_REFCNT_DEBUG
 			atomic_dec(&inet6_sock_nr);
 #endif
-			MOD_DEC_USE_COUNT;
+			module_put(THIS_MODULE);
 			retv = 0;
 			break;
 		}

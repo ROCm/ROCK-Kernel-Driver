@@ -35,6 +35,7 @@
 #define NFS_PARANOIA 1
 /* #define NFS_DEBUG_VERBOSE 1 */
 
+static int nfs_opendir(struct inode *, struct file *);
 static int nfs_readdir(struct file *, void *, filldir_t);
 static struct dentry *nfs_lookup(struct inode *, struct dentry *);
 static int nfs_cached_lookup(struct inode *, struct dentry *,
@@ -52,7 +53,7 @@ static int nfs_rename(struct inode *, struct dentry *,
 struct file_operations nfs_dir_operations = {
 	.read		= generic_read_dir,
 	.readdir	= nfs_readdir,
-	.open		= nfs_open,
+	.open		= nfs_opendir,
 	.release	= nfs_release,
 };
 
@@ -70,6 +71,26 @@ struct inode_operations nfs_dir_inode_operations = {
 	.getattr	= nfs_getattr,
 	.setattr	= nfs_setattr,
 };
+
+/*
+ * Open file
+ */
+static int
+nfs_opendir(struct inode *inode, struct file *filp)
+{
+	struct nfs_server *server = NFS_SERVER(inode);
+	int res = 0;
+
+	lock_kernel();
+	/* Do cto revalidation */
+	if (server->flags & NFS_MOUNT_NOCTO)
+		res = __nfs_revalidate_inode(server, inode);
+	/* Call generic open code in order to cache credentials */
+	if (!res)
+		res = nfs_open(inode, filp);
+	unlock_kernel();
+	return res;
+}
 
 typedef u32 * (*decode_dirent_t)(u32 *, struct nfs_entry *, int);
 typedef struct {
@@ -715,9 +736,10 @@ int nfs_cached_lookup(struct inode *dir, struct dentry *dentry,
 
 		res = -EIO;
 		if (PageUptodate(page)) {
-			desc.ptr = kmap_atomic(page, KM_USER0);
+			void * kaddr = kmap_atomic(page, KM_USER0);
+			desc.ptr = kaddr;
 			res = find_dirent_name(&desc, page, dentry);
-			kunmap_atomic(desc.ptr, KM_USER0);
+			kunmap_atomic(kaddr, KM_USER0);
 		}
 		page_cache_release(page);
 

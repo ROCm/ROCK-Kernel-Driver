@@ -231,7 +231,7 @@
 	st.b	r19, KM;						      \
 	GET_CURRENT_TASK(CURRENT_TASK);	/* Fetch the current task pointer. */ \
 	/* Save away the syscall number.  */				      \
-	sst.w	syscall_num, PTO+PT_SYSCALL[ep]
+	sst.w	syscall_num, PTO+PT_CUR_SYSCALL[ep]
 
 
 /* Save register state not normally saved by PUSH_STATE for TYPE.  */
@@ -438,11 +438,11 @@
    LP register should point to the location where the called function
    should return.  [note that MAKE_SYS_CALL uses label 1]  */
 #define MAKE_SYS_CALL							      \
-	/* See if the system call number is valid.  */			      \
-	addi	-NR_syscalls, r12, r0;					      \
-	bnh	1f;							      \
 	/* Figure out which function to use for this system call.  */	      \
 	shl	2, r12;							      \
+	/* See if the system call number is valid.  */			      \
+	addi	lo(CSYM(sys_call_table) - sys_call_table_end), r12, r0;	      \
+	bnh	1f;							      \
 	mov	hilo(CSYM(sys_call_table)), r19;			      \
 	add	r19, r12;						      \
 	ld.w	0[r12], r12;						      \
@@ -511,10 +511,8 @@ END(ret_from_trap)
    (copy_thread makes ret_from_fork the return address in each new thread's
    saved context).  */
 C_ENTRY(ret_from_fork):
-#if defined(CONFIG_SMP) || defined(CONFIG_PREEMPT)
 	mov	r10, r6			// switch_thread returns the prev task.
 	jarl	CSYM(schedule_tail), lp	// ...which is schedule_tail's arg
-#endif
 	mov	r0, r10			// Child's fork call should return 0.
 	br	ret_from_trap		// Do normal trap return.
 C_END(ret_from_fork)
@@ -982,8 +980,5 @@ C_DATA(sys_call_table):
 	.long CSYM(sys_pivot_root)	// 200
 	.long CSYM(sys_gettid)
 	.long CSYM(sys_tkill)
-	.long CSYM(sys_ni_syscall)	// sys_mincore
-	.long CSYM(sys_ni_syscall)	// sys_madvise
-
-	.space (NR_syscalls-205)*4
+sys_call_table_end:
 C_END(sys_call_table)

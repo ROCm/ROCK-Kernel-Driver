@@ -200,7 +200,7 @@ int access_process_vm(struct task_struct *tsk, unsigned long addr, void *buf, in
 	return buf - old_buf;
 }
 
-int ptrace_readdata(struct task_struct *tsk, unsigned long src, char *dst, int len)
+int ptrace_readdata(struct task_struct *tsk, unsigned long src, char __user *dst, int len)
 {
 	int copied = 0;
 
@@ -225,7 +225,7 @@ int ptrace_readdata(struct task_struct *tsk, unsigned long src, char *dst, int l
 	return copied;
 }
 
-int ptrace_writedata(struct task_struct *tsk, char * src, unsigned long dst, int len)
+int ptrace_writedata(struct task_struct *tsk, char __user *src, unsigned long dst, int len)
 {
 	int copied = 0;
 
@@ -278,19 +278,18 @@ static int ptrace_setoptions(struct task_struct *child, long data)
 	return (data & ~PTRACE_O_MASK) ? -EINVAL : 0;
 }
 
-static int ptrace_getsiginfo(struct task_struct *child, long data)
+static int ptrace_getsiginfo(struct task_struct *child, siginfo_t __user * data)
 {
 	if (child->last_siginfo == NULL)
 		return -EINVAL;
-	return copy_siginfo_to_user ((siginfo_t *) data, child->last_siginfo);
+	return copy_siginfo_to_user(data, child->last_siginfo);
 }
 
-static int ptrace_setsiginfo(struct task_struct *child, long data)
+static int ptrace_setsiginfo(struct task_struct *child, siginfo_t __user * data)
 {
 	if (child->last_siginfo == NULL)
 		return -EINVAL;
-	if (copy_from_user (child->last_siginfo, (siginfo_t *) data,
-			    sizeof (siginfo_t)) != 0)
+	if (copy_from_user(child->last_siginfo, data, sizeof (siginfo_t)) != 0)
 		return -EFAULT;
 	return 0;
 }
@@ -308,13 +307,13 @@ int ptrace_request(struct task_struct *child, long request,
 		ret = ptrace_setoptions(child, data);
 		break;
 	case PTRACE_GETEVENTMSG:
-		ret = put_user(child->ptrace_message, (unsigned long *) data);
+		ret = put_user(child->ptrace_message, (unsigned long __user *) data);
 		break;
 	case PTRACE_GETSIGINFO:
-		ret = ptrace_getsiginfo(child, data);
+		ret = ptrace_getsiginfo(child, (siginfo_t __user *) data);
 		break;
 	case PTRACE_SETSIGINFO:
-		ret = ptrace_setsiginfo(child, data);
+		ret = ptrace_setsiginfo(child, (siginfo_t __user *) data);
 		break;
 	default:
 		break;

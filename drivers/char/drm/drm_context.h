@@ -194,7 +194,7 @@ int DRM(setsareactx)(struct inode *inode, struct file *filp,
 
 	down(&dev->struct_sem);
 	list_for_each(list, &dev->maplist->head) {
-		r_list = (drm_map_list_t *)list;
+		r_list = list_entry(list, drm_map_list_t, head);
 		if(r_list->map &&
 		   r_list->map->handle == request.handle)
 			goto found;

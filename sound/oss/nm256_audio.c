@@ -925,10 +925,10 @@ nm256_default_mixer_ioctl (int dev, unsigned int cmd, caddr_t arg)
 }
 
 static struct mixer_operations nm256_mixer_operations = {
-    owner:	THIS_MODULE,
-    id:		"NeoMagic",
-    name:	"NM256AC97Mixer",
-    ioctl:	nm256_default_mixer_ioctl
+    .owner	= THIS_MODULE,
+    .id		= "NeoMagic",
+    .name	= "NM256AC97Mixer",
+    .ioctl	= nm256_default_mixer_ioctl
 };
 
 /*
@@ -1632,16 +1632,16 @@ nm256_audio_local_qlen(int dev)
 
 static struct audio_driver nm256_audio_driver =
 {
-    owner:		THIS_MODULE,
-    open:		nm256_audio_open,
-    close:		nm256_audio_close,
-    output_block:	nm256_audio_output_block,
-    start_input:	nm256_audio_start_input,
-    ioctl:		nm256_audio_ioctl,
-    prepare_for_input:	nm256_audio_prepare_for_input,
-    prepare_for_output:nm256_audio_prepare_for_output,
-    halt_io:		nm256_audio_reset,
-    local_qlen:		nm256_audio_local_qlen,
+    .owner		= THIS_MODULE,
+    .open		= nm256_audio_open,
+    .close		= nm256_audio_close,
+    .output_block	= nm256_audio_output_block,
+    .start_input	= nm256_audio_start_input,
+    .ioctl		= nm256_audio_ioctl,
+    .prepare_for_input	= nm256_audio_prepare_for_input,
+    .prepare_for_output	= nm256_audio_prepare_for_output,
+    .halt_io		= nm256_audio_reset,
+    .local_qlen		= nm256_audio_local_qlen,
 };
 
 static struct pci_device_id nm256_pci_tbl[] __devinitdata = {

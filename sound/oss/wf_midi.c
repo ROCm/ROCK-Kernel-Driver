@@ -552,16 +552,16 @@ static struct midi_operations  wf_mpu_midi_operations[2];
 
 static struct midi_operations wf_mpu_midi_proto =
 {
-	owner:		THIS_MODULE,
-	info:		{"WF-MPU MIDI", 0, MIDI_CAP_MPU401, SNDCARD_MPU401},
-	in_info:	{0},   /* in_info */
-	open:		wf_mpu_open,
-	close:		wf_mpu_close,
-	ioctl:		wf_mpu_ioctl,
-	outputc:	wf_mpu_out,
-	start_read:	wf_mpu_start_read,
-	end_read:	wf_mpu_end_read,
-	buffer_status:	wf_mpu_buffer_status,
+	.owner		= THIS_MODULE,
+	.info		= {"WF-MPU MIDI", 0, MIDI_CAP_MPU401, SNDCARD_MPU401},
+	.in_info	= {0},   /* in_info */
+	.open		= wf_mpu_open,
+	.close		= wf_mpu_close,
+	.ioctl		= wf_mpu_ioctl,
+	.outputc	= wf_mpu_out,
+	.start_read	= wf_mpu_start_read,
+	.end_read	= wf_mpu_end_read,
+	.buffer_status	= wf_mpu_buffer_status,
 };
 
 static struct synth_info wf_mpu_synth_info_proto =
@@ -668,27 +668,27 @@ wf_mpu_synth_close (int dev)
 
 static struct synth_operations wf_mpu_synth_proto =
 {
-	owner:		THIS_MODULE,
-	id:		"WaveFront (ICS2115)",
-	info:		NULL,  /* info field, filled in during configuration */
-	midi_dev:	0,     /* MIDI dev XXX should this be -1 ? */
-	synth_type:	SYNTH_TYPE_MIDI,
-	synth_subtype:	SAMPLE_TYPE_WAVEFRONT,
-	open:		wf_mpu_synth_open,
-	close:		wf_mpu_synth_close,
-	ioctl:		wf_mpu_synth_ioctl,
-	kill_note:	midi_synth_kill_note,
-	start_note:	midi_synth_start_note,
-	set_instr:	midi_synth_set_instr,
-	reset:		midi_synth_reset,
-	hw_control:	midi_synth_hw_control,
-	load_patch:	midi_synth_load_patch,
-	aftertouch:	midi_synth_aftertouch,
-	controller:	midi_synth_controller,
-	panning:	midi_synth_panning,
-	bender:		midi_synth_bender,
-	setup_voice:	midi_synth_setup_voice,
-	send_sysex:	midi_synth_send_sysex
+	.owner		= THIS_MODULE,
+	.id		= "WaveFront (ICS2115)",
+	.info		= NULL,  /* info field, filled in during configuration */
+	.midi_dev	= 0,     /* MIDI dev XXX should this be -1 ? */
+	.synth_type	= SYNTH_TYPE_MIDI,
+	.synth_subtype	= SAMPLE_TYPE_WAVEFRONT,
+	.open		= wf_mpu_synth_open,
+	.close		= wf_mpu_synth_close,
+	.ioctl		= wf_mpu_synth_ioctl,
+	.kill_note	= midi_synth_kill_note,
+	.start_note	= midi_synth_start_note,
+	.set_instr	= midi_synth_set_instr,
+	.reset		= midi_synth_reset,
+	.hw_control	= midi_synth_hw_control,
+	.load_patch	= midi_synth_load_patch,
+	.aftertouch	= midi_synth_aftertouch,
+	.controller	= midi_synth_controller,
+	.panning	= midi_synth_panning,
+	.bender		= midi_synth_bender,
+	.setup_voice	= midi_synth_setup_voice,
+	.send_sysex	= midi_synth_send_sysex
 };
 
 static int

@@ -8,7 +8,6 @@ extern ia64_mv_pci_map_single sba_map_single;
 extern ia64_mv_pci_unmap_single sba_unmap_single;
 extern ia64_mv_pci_map_sg sba_map_sg;
 extern ia64_mv_pci_unmap_sg sba_unmap_sg;
-extern ia64_mv_pci_dma_address sba_dma_address;
 extern ia64_mv_pci_dma_supported sba_dma_supported;
 
 /*
@@ -29,7 +28,6 @@ extern ia64_mv_pci_dma_supported sba_dma_supported;
 #define platform_pci_unmap_sg		sba_unmap_sg
 #define platform_pci_dma_sync_single	((ia64_mv_pci_dma_sync_single *) machvec_noop)
 #define platform_pci_dma_sync_sg	((ia64_mv_pci_dma_sync_sg *) machvec_noop)
-#define platform_pci_dma_address	sba_dma_address
 #define platform_pci_dma_supported	sba_dma_supported
 
 #endif /* _ASM_IA64_MACHVEC_HPZX1_h */

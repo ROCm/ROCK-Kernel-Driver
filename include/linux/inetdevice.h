@@ -34,7 +34,17 @@ struct in_device
 	int			dead;
 	struct in_ifaddr	*ifa_list;	/* IP ifaddr chain		*/
 	struct ip_mc_list	*mc_list;	/* IP multicast filter chain    */
+	rwlock_t		mc_lock;	/* for mc_tomb */
+	struct ip_mc_list	*mc_tomb;
 	unsigned long		mr_v1_seen;
+	unsigned long		mr_v2_seen;
+	unsigned long		mr_maxdelay;
+	unsigned char		mr_qrv;
+	unsigned char		mr_gq_running;
+	unsigned char		mr_ifc_count;
+	struct timer_list	mr_gq_timer;	/* general query timer */
+	struct timer_list	mr_ifc_timer;	/* interface change timer */
+
 	struct neigh_parms	*arp_parms;
 	struct ipv4_devconf	cnf;
 };

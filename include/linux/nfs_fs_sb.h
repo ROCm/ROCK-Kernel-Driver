@@ -36,6 +36,7 @@ struct nfs_server {
 	struct nfs4_client *	nfs4_state;	/* all NFSv4 state starts here */
 	unsigned long		lease_time;	/* in jiffies */
 	unsigned long		last_renewal;	/* in jiffies */
+	void                   *idmap;
 #endif
 };
 

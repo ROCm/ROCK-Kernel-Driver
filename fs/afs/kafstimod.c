@@ -99,18 +99,18 @@ static int kafstimod(void *arg)
 		spin_lock(&kafstimod_lock);
 		if (list_empty(&kafstimod_list)) {
 			timeout = MAX_SCHEDULE_TIMEOUT;
-		}
-		else {
-			timer = list_entry(kafstimod_list.next,afs_timer_t,link);
-			timeout = timer->timo_jif;
+		} else {
+			unsigned long tmo;
+
+			timer = list_entry(kafstimod_list.next,
+					   afs_timer_t, link);
+			tmo = timer->timo_jif;
 			jif = jiffies;
 
-			if (time_before_eq(timeout,jif))
+			if (time_before_eq(tmo,jif))
 				goto immediate;
 
-			else {
-				timeout = (long)timeout - (long)jiffies;
-			}
+			timeout = (long)tmo - (long)jiffies;
 		}
 		spin_unlock(&kafstimod_lock);
 

@@ -1,0 +1,92 @@
+config DVB_AV7110
+	tristate "AV7110 cards"
+	depends on VIDEO_DEV && DVB_CORE
+	help
+	  Support for SAA7146 and AV7110 based DVB cards as produced 
+	  by Fujitsu-Siemens, Technotrend, Hauppauge and others.
+
+	  This driver only supports the fullfeatured cards with
+	  onboard MPEG2 decoder.
+
+	  Say Y if you own such a card and want to use it.
+
+config DVB_AV7110_OSD
+	bool "AV7110 OSD support"
+	depends on DVB_AV7110
+	help
+	  The AV7110 firmware provides some code to generate an OnScreenDisplay
+	  on the video output. This is kind of nonstandard and not guaranteed to
+	  be maintained.
+
+	  Anyway, some popular DVB software like VDR uses this OSD to render
+	  its menus, so say Y if you want to use this software.
+
+	  All other people say N.
+
+config DVB_BUDGET
+	tristate "Budget cards"
+	depends on DVB_CORE
+	help
+	  Support for simple SAA7146 based DVB cards
+	  (so called Budget- or Nova-PCI cards) without onboard
+	  MPEG2 decoder.
+
+	  Say Y if you own such a card and want to use it.
+
+	  This driver is available as a module called
+	  dvb-ttpci-budget.o ( = code which can be inserted in
+	  and removed from the running kernel whenever you want).
+	  If you want to compile it as a module, say M
+	  here and read <file:Documentation/modules.txt>.
+
+config DVB_BUDGET_CI
+	tristate "Budget cards with onboard CI connector"
+	depends on VIDEO_DEV && DVB_CORE && DVB_BUDGET
+	help
+	  Support for simple SAA7146 based DVB cards
+	  (so called Budget- or Nova-PCI cards) without onboard
+	  MPEG2 decoder, but with onboard Common Interface connector.
+
+	  Say Y if you own such a card and want to use it.
+
+	  This driver is available as a module called
+	  dvb-ttpci-budget-av.o ( = code which can be inserted in
+	  and removed from the running kernel whenever you want).
+	  If you want to compile it as a module, say M
+	  here and read <file:Documentation/modules.txt>.
+
+config DVB_BUDGET_AV
+	tristate "Budget cards with analog video inputs"
+	depends on VIDEO_DEV && DVB_CORE && DVB_BUDGET
+	help
+	  Support for simple SAA7146 based DVB cards
+	  (so called Budget- or Nova-PCI cards) without onboard
+	  MPEG2 decoder, but with one or more analog video inputs.
+
+	  Say Y if you own such a card and want to use it.
+
+	  This driver is available as a module called
+	  dvb-ttpci-budget-av.o ( = code which can be inserted in
+	  and removed from the running kernel whenever you want).
+	  here and read <file:Documentation/modules.txt>.
+
+config DVB_BUDGET_PATCH
+	tristate "AV7110 cards with Budget Patch"
+	depends on DVB_CORE && DVB_BUDGET
+	help
+	  Support for Budget Patch (full TS) modification on 
+	  SAA7146+AV7110 based cards (DVB-S cards). This
+	  driver doesn't use onboard MPEG2 decoder. The 
+	  card is driven in Budget-only mode. Card is
+	  required to have loaded firmware to tune properly.
+	  Firmware can be loaded by insertion and removal of
+	  standard AV7110 driver prior to loading this
+	  driver.
+
+	  Say Y if you own such a card and want to use it.
+
+	  This driver is available as a module called
+	  dvb-ttpci-budget-patch.o ( = code which can be inserted in
+	  and removed from the running kernel whenever you want).
+	  If you want to compile it as a module, say M
+	  here and read <file:Documentation/modules.txt>.

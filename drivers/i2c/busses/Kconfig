@@ -116,5 +116,31 @@ config I2C_PIIX4
 	  in the lm_sensors package, which you can download at 
 	  http://www.lm-sensors.nu
 
+
+config I2C_VIAPRO
+	tristate "  VIA 82C596/82C686/823x"
+	depends on I2C && PCI && EXPERIMENTAL
+	help
+
+	  If you say yes to this option, support will be included for the VIA
+	  82C596/82C686/823x I2C interfaces.  Specifically, the following 
+	  chipsets are supported:
+	  82C596A/B
+	  82C686A/B
+	  8231
+	  8233
+	  8233A
+	  8235
+
+	  This can also be built as a module which can be inserted and removed
+	  while the kernel is running.  If you want to compile it as a module,
+	  say M here and read <file:Documentation/modules.txt>.
+
+	  The module will be called i2c-viapro.
+
+	  You will also need the latest user-space utilties: you can find them
+	  in the lm_sensors package, which you can download at
+	  http://www.lm-sensors.nu
+
 endmenu
 

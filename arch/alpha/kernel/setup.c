@@ -486,7 +486,7 @@ setup_arch(char **cmdline_p)
 	notifier_chain_register(&panic_notifier_list, &alpha_panic_block);
 
 #ifdef CONFIG_ALPHA_GENERIC
-	/* Assume that we've booted from SRM if we havn't booted from MILO.
+	/* Assume that we've booted from SRM if we haven't booted from MILO.
 	   Detect the later by looking for "MILO" in the system serial nr.  */
 	alpha_using_srm = strncmp((const char *)hwrpb->ssn, "MILO", 4) != 0;
 #endif
@@ -569,7 +569,7 @@ setup_arch(char **cmdline_p)
 #endif
 
 	/*
-	 * Indentify and reconfigure for the current system.
+	 * Identify and reconfigure for the current system.
 	 */
 	cpu = (struct percpu_struct*)((char*)hwrpb + hwrpb->processor_offset);
 

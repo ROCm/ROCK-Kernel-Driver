@@ -33,7 +33,7 @@ enum {LAST_NORM, LAST_ROOT, LAST_DOT, LAST_DOTDOT, LAST_BIND};
 #define LOOKUP_NOALT		32
 
 
-extern int FASTCALL(__user_walk(const char *, unsigned, struct nameidata *));
+extern int FASTCALL(__user_walk(const char __user *, unsigned, struct nameidata *));
 #define user_path_walk(name,nd) \
 	__user_walk(name, LOOKUP_FOLLOW, nd)
 #define user_path_walk_link(name,nd) \

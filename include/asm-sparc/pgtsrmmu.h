@@ -62,6 +62,11 @@
 #define SRMMU_PRIV         0x1c
 #define SRMMU_PRIV_RDONLY  0x18
 
+#define SRMMU_FILE         0x40	/* Implemented in software */
+
+#define SRMMU_PTE_FILE_MAX_BITS	24
+#define SRMMU_PTE_FILE_SHIFT     8
+
 #define SRMMU_CHG_MASK    (0xffffff00 | SRMMU_REF | SRMMU_DIRTY)
 
 /* Some day I will implement true fine grained access bits for

@@ -493,54 +493,42 @@ static size_t parport_uss720_write_compat(struct parport *pp, const void *buffer
 	return rlen;
 }
 
-void parport_uss720_inc_use_count(void)
-{
-	MOD_INC_USE_COUNT;
-}
-
-void parport_uss720_dec_use_count(void)
-{
-	MOD_DEC_USE_COUNT;
-}
-
 /* --------------------------------------------------------------------- */
 
 static struct parport_operations parport_uss720_ops = 
 {
-	parport_uss720_write_data,
-	parport_uss720_read_data,
+	.owner =		THIS_MODULE,
+	.write_data =		parport_uss720_write_data,
+	.read_data =		parport_uss720_read_data,
 
-	parport_uss720_write_control,
-	parport_uss720_read_control,
-	parport_uss720_frob_control,
+	.write_control =	parport_uss720_write_control,
+	.read_control =		parport_uss720_read_control,
+	.frob_control =		parport_uss720_frob_control,
 
-	parport_uss720_read_status,
+	.read_status =		parport_uss720_read_status,
 
-	parport_uss720_enable_irq,
-	parport_uss720_disable_irq,
+	.enable_irq =		parport_uss720_enable_irq,
+	.disable_irq =		parport_uss720_disable_irq,
 
-	parport_uss720_data_forward,
-	parport_uss720_data_reverse,
+	.data_forward =		parport_uss720_data_forward,
+	.data_reverse =		parport_uss720_data_reverse,
 
-	parport_uss720_init_state,
-	parport_uss720_save_state,
-	parport_uss720_restore_state,
+	.init_state =		parport_uss720_init_state,
+	.save_state =		parport_uss720_save_state,
+	.restore_state =	parport_uss720_restore_state,
 
-	parport_uss720_inc_use_count,
-	parport_uss720_dec_use_count,
+	.epp_write_data =	parport_uss720_epp_write_data,
+	.epp_read_data =	parport_uss720_epp_read_data,
+	.epp_write_addr =	parport_uss720_epp_write_addr,
+	.epp_read_addr =	parport_uss720_epp_read_addr,
 
-	parport_uss720_epp_write_data,
-	parport_uss720_epp_read_data,
-	parport_uss720_epp_write_addr,
-	parport_uss720_epp_read_addr,
+	.ecp_write_data =	parport_uss720_ecp_write_data,
+	.ecp_read_data =	parport_uss720_ecp_read_data,
+	.ecp_write_addr =	parport_uss720_ecp_write_addr,
 
-	parport_uss720_ecp_write_data,
-	parport_uss720_ecp_read_data,
-	parport_uss720_ecp_write_addr,
-
-	parport_uss720_write_compat,
-	parport_ieee1284_read_nibble,
-	parport_ieee1284_read_byte,
+	.compat_write_data =	parport_uss720_write_compat,
+	.nibble_read_data =	parport_ieee1284_read_nibble,
+	.byte_read_data =	parport_ieee1284_read_byte,
 };
 
 /* --------------------------------------------------------------------- */
@@ -607,7 +595,6 @@ static int uss720_probe(struct usb_interface *intf,
 	parport_proc_register(pp);
 	parport_announce_port(pp);
 
-	MOD_INC_USE_COUNT;
 	usb_set_intfdata (intf, pp);
 	return 0;
 
@@ -635,7 +622,6 @@ static void uss720_disconnect(struct usb_interface *intf)
 		parport_proc_unregister(pp);
 		parport_unregister_port(pp);
 		kfree(priv);
-		MOD_DEC_USE_COUNT;
 	}
 }
 
@@ -652,6 +638,7 @@ MODULE_DEVICE_TABLE (usb, uss720_table);
 
 
 static struct usb_driver uss720_driver = {
+	.owner =	THIS_MODULE,
 	.name =		"uss720",
 	.probe =	uss720_probe,
 	.disconnect =	uss720_disconnect,

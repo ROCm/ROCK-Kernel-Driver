@@ -199,7 +199,7 @@ asmlinkage int sys_ipc (unsigned call, int first, int second, unsigned long thir
 			goto out;
 			}
 		default:
-			err = -EINVAL;
+			err = -ENOSYS;
 			goto out;
 		}
 	if (call <= MSGCTL) 
@@ -218,7 +218,7 @@ asmlinkage int sys_ipc (unsigned call, int first, int second, unsigned long thir
 			err = sys_msgctl (first, second | IPC_64, (struct msqid_ds *) ptr);
 			goto out;
 		default:
-			err = -EINVAL;
+			err = -ENOSYS;
 			goto out;
 		}
 	if (call <= SHMCTL) 
@@ -236,18 +236,18 @@ asmlinkage int sys_ipc (unsigned call, int first, int second, unsigned long thir
 			err = sys_shmctl (first, second | IPC_64, (struct shmid_ds *) ptr);
 			goto out;
 		default:
-			err = -EINVAL;
+			err = -ENOSYS;
 			goto out;
 		}
 	else
-		err = -EINVAL;
+		err = -ENOSYS;
 out:
 	return err;
 }
 
-extern asmlinkage int sys_newuname(struct new_utsname * name);
+extern asmlinkage int sys_newuname(struct new_utsname __user *name);
 
-asmlinkage int sparc64_newuname(struct new_utsname * name)
+asmlinkage int sparc64_newuname(struct new_utsname __user *name)
 {
 	int ret = sys_newuname(name);
 	
@@ -421,7 +421,7 @@ sparc_breakpoint (struct pt_regs *regs)
 
 extern void check_pending(int signum);
 
-asmlinkage int sys_getdomainname(char *name, int len)
+asmlinkage int sys_getdomainname(char __user *name, int len)
 {
         int nlen;
 	int err = -EFAULT;
@@ -432,9 +432,9 @@ asmlinkage int sys_getdomainname(char *name, int len)
 
         if (nlen < len)
                 len = nlen;
-	if(len > __NEW_UTS_LEN)
+	if (len > __NEW_UTS_LEN)
 		goto done;
-	if(copy_to_user(name, system_utsname.domainname, len))
+	if (copy_to_user(name, system_utsname.domainname, len))
 		goto done;
 	err = 0;
 done:
@@ -458,7 +458,7 @@ asmlinkage int solaris_syscall(struct pt_regs *regs)
 		regs->tpc &= 0xffffffff;
 		regs->tnpc &= 0xffffffff;
 	}
-	if(++count <= 5) {
+	if (++count <= 5) {
 		printk ("For Solaris binary emulation you need solaris module loaded\n");
 		show_regs (regs);
 	}
@@ -478,7 +478,7 @@ asmlinkage int sunos_syscall(struct pt_regs *regs)
 		regs->tpc &= 0xffffffff;
 		regs->tnpc &= 0xffffffff;
 	}
-	if(++count <= 20)
+	if (++count <= 20)
 		printk ("SunOS binary emulation not compiled in\n");
 	force_sig(SIGSEGV, current);
 
@@ -486,9 +486,11 @@ asmlinkage int sunos_syscall(struct pt_regs *regs)
 }
 #endif
 
-asmlinkage int sys_utrap_install(utrap_entry_t type, utrap_handler_t new_p,
+asmlinkage int sys_utrap_install(utrap_entry_t type,
+				 utrap_handler_t new_p,
 				 utrap_handler_t new_d,
-				 utrap_handler_t *old_p, utrap_handler_t *old_d)
+				 utrap_handler_t __user *old_p,
+				 utrap_handler_t __user *old_d)
 {
 	if (type < UT_INSTRUCTION_EXCEPTION || type > UT_TRAP_INSTRUCTION_31)
 		return -EINVAL;
@@ -511,9 +513,11 @@ asmlinkage int sys_utrap_install(utrap_entry_t type, utrap_handler_t new_p,
 	if (!current_thread_info()->utraps) {
 		current_thread_info()->utraps =
 			kmalloc((UT_TRAP_INSTRUCTION_31+1)*sizeof(long), GFP_KERNEL);
-		if (!current_thread_info()->utraps) return -ENOMEM;
+		if (!current_thread_info()->utraps)
+			return -ENOMEM;
 		current_thread_info()->utraps[0] = 1;
-		memset(current_thread_info()->utraps+1, 0, UT_TRAP_INSTRUCTION_31*sizeof(long));
+		memset(current_thread_info()->utraps+1, 0,
+		       UT_TRAP_INSTRUCTION_31*sizeof(long));
 	} else {
 		if ((utrap_handler_t)current_thread_info()->utraps[type] != new_p &&
 		    current_thread_info()->utraps[0] > 1) {

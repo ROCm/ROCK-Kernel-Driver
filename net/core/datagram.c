@@ -220,7 +220,7 @@ int skb_copy_datagram(const struct sk_buff *skb, int offset, char *to, int size)
 int skb_copy_datagram_iovec(const struct sk_buff *skb, int offset,
 			    struct iovec *to, int len)
 {
-	int start = skb->len - skb->data_len;
+	int start = skb_headlen(skb);
 	int i, copy = start - offset;
 
 	/* Copy header. */
@@ -295,7 +295,7 @@ fault:
 int skb_copy_and_csum_datagram(const struct sk_buff *skb, int offset,
 			       u8 *to, int len, unsigned int *csump)
 {
-	int start = skb->len - skb->data_len;
+	int start = skb_headlen(skb);
 	int pos = 0;
 	int i, copy = start - offset;
 

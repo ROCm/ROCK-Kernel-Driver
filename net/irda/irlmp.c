@@ -925,7 +925,7 @@ irlmp_notify_client(irlmp_client_t *client,
 	 * Now, check all discovered devices (if any), and notify client
 	 * only about the services that the client is interested in
 	 * We also notify only about the new devices unless the caller
-	 * explicity request a dump of the log. Jean II
+	 * explicitly request a dump of the log. Jean II
 	 */
 	discoveries = irlmp_copy_discoveries(log, &number,
 					     client->hint_mask.word,

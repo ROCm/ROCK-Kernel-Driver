@@ -1,8 +1,8 @@
 /*
  * include/asm-v850/rte_cb.h -- Midas labs RTE-CB series of evaluation boards
  *
- *  Copyright (C) 2001,02  NEC Corporation
- *  Copyright (C) 2001,02  Miles Bader <miles@gnu.org>
+ *  Copyright (C) 2001,02,03  NEC Corporation
+ *  Copyright (C) 2001,02,03  Miles Bader <miles@gnu.org>
  *
  * This file is subject to the terms and conditions of the GNU General
  * Public License.  See the file COPYING in the main directory of this
@@ -14,18 +14,6 @@
 #ifndef __V850_RTE_CB_H__
 #define __V850_RTE_CB_H__
 
-
-/* CPU addresses of GBUS memory spaces.  */
-#define GCS0_ADDR		0x05000000 /* GCS0 - Common SRAM (2MB) */
-#define GCS0_SIZE		0x00200000 /*   2MB */
-#define GCS1_ADDR		0x06000000 /* GCS1 - Flash ROM (8MB) */
-#define GCS1_SIZE		0x00800000 /*   8MB */
-#define GCS2_ADDR		0x07900000 /* GCS2 - I/O registers */
-#define GCS2_SIZE		0x00400000 /*   4MB */
-#define GCS5_ADDR		0x04000000 /* GCS5 - PCI bus space */
-#define GCS5_SIZE		0x01000000 /*   16MB */
-#define GCS6_ADDR		0x07980000 /* GCS6 - PCI control registers */
-#define GCS6_SIZE		0x00000200 /*   512B */
 
 /* The SRAM on the Mother-A motherboard.  */
 #define MB_A_SRAM_ADDR		GCS0_ADDR
@@ -78,9 +66,8 @@
 
 
 #ifndef __ASSEMBLY__
-
+extern void rte_cb_early_init (void);
 extern void rte_cb_init_irqs (void);
-
 #endif /* !__ASSEMBLY__ */
 
 

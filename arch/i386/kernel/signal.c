@@ -53,7 +53,7 @@ sys_sigsuspend(int history0, int history1, old_sigset_t mask)
 }
 
 asmlinkage int
-sys_rt_sigsuspend(sigset_t *unewset, size_t sigsetsize)
+sys_rt_sigsuspend(sigset_t __user *unewset, size_t sigsetsize)
 {
 	struct pt_regs * regs = (struct pt_regs *) &unewset;
 	sigset_t saveset, newset;
@@ -82,8 +82,8 @@ sys_rt_sigsuspend(sigset_t *unewset, size_t sigsetsize)
 }
 
 asmlinkage int 
-sys_sigaction(int sig, const struct old_sigaction *act,
-	      struct old_sigaction *oact)
+sys_sigaction(int sig, const struct old_sigaction __user *act,
+	      struct old_sigaction __user *oact)
 {
 	struct k_sigaction new_ka, old_ka;
 	int ret;
@@ -148,7 +148,7 @@ struct rt_sigframe
 };
 
 static int
-restore_sigcontext(struct pt_regs *regs, struct sigcontext *sc, int *peax)
+restore_sigcontext(struct pt_regs *regs, struct sigcontext __user *sc, int *peax)
 {
 	unsigned int err = 0;
 
@@ -192,7 +192,7 @@ restore_sigcontext(struct pt_regs *regs, struct sigcontext *sc, int *peax)
 	}
 
 	{
-		struct _fpstate * buf;
+		struct _fpstate __user * buf;
 		err |= __get_user(buf, &sc->fpstate);
 		if (buf) {
 			if (verify_area(VERIFY_READ, buf, sizeof(*buf)))
@@ -211,7 +211,7 @@ badframe:
 asmlinkage int sys_sigreturn(unsigned long __unused)
 {
 	struct pt_regs *regs = (struct pt_regs *) &__unused;
-	struct sigframe *frame = (struct sigframe *)(regs->esp - 8);
+	struct sigframe __user *frame = (struct sigframe __user *)(regs->esp - 8);
 	sigset_t set;
 	int eax;
 
@@ -241,7 +241,7 @@ badframe:
 asmlinkage int sys_rt_sigreturn(unsigned long __unused)
 {
 	struct pt_regs *regs = (struct pt_regs *) &__unused;
-	struct rt_sigframe *frame = (struct rt_sigframe *)(regs->esp - 4);
+	struct rt_sigframe __user *frame = (struct rt_sigframe __user *)(regs->esp - 4);
 	sigset_t set;
 	stack_t st;
 	int eax;
@@ -278,7 +278,7 @@ badframe:
  */
 
 static int
-setup_sigcontext(struct sigcontext *sc, struct _fpstate *fpstate,
+setup_sigcontext(struct sigcontext __user *sc, struct _fpstate __user *fpstate,
 		 struct pt_regs *regs, unsigned long mask)
 {
 	int tmp, err = 0;
@@ -323,7 +323,7 @@ setup_sigcontext(struct sigcontext *sc, struct _fpstate *fpstate,
 /*
  * Determine which stack to use..
  */
-static inline void *
+static inline void __user *
 get_sigframe(struct k_sigaction *ka, struct pt_regs * regs, size_t frame_size)
 {
 	unsigned long esp;
@@ -344,14 +344,14 @@ get_sigframe(struct k_sigaction *ka, struct pt_regs * regs, size_t frame_size)
 		esp = (unsigned long) ka->sa.sa_restorer;
 	}
 
-	return (void *)((esp - frame_size) & -8ul);
+	return (void __user *)((esp - frame_size) & -8ul);
 }
 
 static void setup_frame(int sig, struct k_sigaction *ka,
 			sigset_t *set, struct pt_regs * regs)
 {
 	void *restorer;
-	struct sigframe *frame;
+	struct sigframe __user *frame;
 	int err = 0;
 
 	frame = get_sigframe(ka, regs, sizeof(*frame));
@@ -373,7 +373,7 @@ static void setup_frame(int sig, struct k_sigaction *ka,
 		goto give_sigsegv;
 
 	if (_NSIG_WORDS > 1) {
-		err |= __copy_to_user(frame->extramask, &set->sig[1],
+		err |= __copy_to_user(&frame->extramask, &set->sig[1],
 				      sizeof(frame->extramask));
 	}
 	if (err)
@@ -428,7 +428,7 @@ static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 			   sigset_t *set, struct pt_regs * regs)
 {
 	void *restorer;
-	struct rt_sigframe *frame;
+	struct rt_sigframe __user *frame;
 	int err = 0;
 
 	frame = get_sigframe(ka, regs, sizeof(*frame));

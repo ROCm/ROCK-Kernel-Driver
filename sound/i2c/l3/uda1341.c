@@ -17,7 +17,7 @@
  * 2002-05-12   Tomas Kasparek  another code cleanup
  */
 
-/* $Id: uda1341.c,v 1.7 2003/02/13 19:19:19 perex Exp $ */
+/* $Id: uda1341.c,v 1.8 2003/03/20 16:45:59 perex Exp $ */
 
 #include <sound/driver.h>
 #include <linux/module.h>

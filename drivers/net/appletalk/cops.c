@@ -801,7 +801,7 @@ static void cops_rx(struct net_device *dev)
                 lp->stats.rx_dropped++;
                 while(pkt_len--)        /* Discard packet */
                         inb(ioaddr);
-		restore_flags(flags);
+                spin_unlock_irqrestore(&lp->lock, flags);
                 return;
         }
         skb->dev = dev;

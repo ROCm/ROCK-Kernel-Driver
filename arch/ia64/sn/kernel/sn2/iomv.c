@@ -3,10 +3,11 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 2000-2002 Silicon Graphics, Inc. All rights reserved.
+ * Copyright (C) 2000-2003 Silicon Graphics, Inc. All rights reserved.
  */
 
 #include <linux/pci.h>
+#include <linux/module.h>
 #include <asm/io.h>
 #include <asm/delay.h>
 #include <asm/sn/simulator.h>
@@ -46,8 +47,10 @@ sn_io_addr(unsigned long port)
 	}
 }
 
+EXPORT_SYMBOL(sn_io_addr);
+
 /**
- * sn2_mmiob - I/O space memory barrier
+ * sn_mmiob - I/O space memory barrier
  *
  * Acts as a memory mapped I/O barrier for platforms that queue writes to 
  * I/O space.  This ensures that subsequent writes to I/O space arrive after
@@ -60,9 +63,9 @@ sn_io_addr(unsigned long port)
  *
  */
 void
-sn2_mmiob (void)
+sn_mmiob (void)
 {
-	while ((((volatile unsigned long) (*pda->pio_write_status_addr)) & SH_PIO_WRITE_STATUS_0_PENDING_WRITE_COUNT_MASK) != 
+	while ((((volatile unsigned long) (*pda.pio_write_status_addr)) & SH_PIO_WRITE_STATUS_0_PENDING_WRITE_COUNT_MASK) != 
 				SH_PIO_WRITE_STATUS_0_PENDING_WRITE_COUNT_MASK)
 		udelay(1);
 }

@@ -722,7 +722,6 @@ static void yam_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	int counter = 100;
 	int i;
 
-	sti();
 
 	for (i = 0; i < NR_PORTS; i++) {
 		yp = &yam_ports[i];
@@ -768,7 +767,6 @@ static int yam_net_get_info(char *buffer, char **start, off_t offset, int length
 	off_t pos = 0;
 	off_t begin = 0;
 
-	cli();
 
 	for (i = 0; i < NR_PORTS; i++) {
 		if (yam_ports[i].iobase == 0 || yam_ports[i].irq == 0)
@@ -802,8 +800,6 @@ static int yam_net_get_info(char *buffer, char **start, off_t offset, int length
 		if (pos > offset + length)
 			break;
 	}
-
-	sti();
 
 	*start = buffer + (offset - begin);
 	len -= (offset - begin);

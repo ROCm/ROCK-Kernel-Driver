@@ -1,0 +1,493 @@
+#include <media/saa7146_vv.h>
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,51)
+	#define KBUILD_MODNAME saa7146
+#endif
+
+#define BOARD_CAN_DO_VBI(dev)   (dev->revision != 0 && dev->vv_data->vbi_minor != -1) 
+
+/********************************************************************************/
+/* common dma functions */
+
+void saa7146_dma_free(struct saa7146_dev *dev,struct saa7146_buf *buf)
+{
+	DEB_EE(("dev:%p, buf:%p\n",dev,buf));
+
+	if (in_interrupt())
+		BUG();
+
+	videobuf_waiton(&buf->vb,0,0);
+	videobuf_dma_pci_unmap(dev->pci, &buf->vb.dma);
+	videobuf_dma_free(&buf->vb.dma);
+	buf->vb.state = STATE_NEEDS_INIT;
+}
+
+
+/********************************************************************************/
+/* common buffer functions */
+
+int saa7146_buffer_queue(struct saa7146_dev *dev,
+			 struct saa7146_dmaqueue *q,
+			 struct saa7146_buf *buf)
+{
+#if DEBUG_SPINLOCKS
+	BUG_ON(!spin_is_locked(&dev->slock));
+#endif
+	DEB_EE(("dev:%p, dmaq:%p, buf:%p\n", dev, q, buf));
+
+	if( NULL == q ) {
+		ERR(("internal error: fatal NULL pointer for q.\n"));
+		return 0;
+	}
+
+	if (NULL == q->curr) {
+		q->curr = buf;
+		DEB_D(("immediately activating buffer %p\n", buf));
+		buf->activate(dev,buf,NULL);
+	} else {
+		list_add_tail(&buf->vb.queue,&q->queue);
+		buf->vb.state = STATE_QUEUED;
+		DEB_D(("adding buffer %p to queue. (active buffer present)\n", buf));
+	}
+	return 0;
+}
+
+void saa7146_buffer_finish(struct saa7146_dev *dev,
+			   struct saa7146_dmaqueue *q,
+			   int state)
+{
+#if DEBUG_SPINLOCKS
+	BUG_ON(!spin_is_locked(&dev->slock));
+#endif
+	if( NULL == q->curr ) {
+		ERR(("internal error: fatal NULL pointer for q->curr.\n"));
+		return;
+	}
+
+	DEB_EE(("dev:%p, dmaq:%p, state:%d\n", dev, q, state));
+
+	/* finish current buffer */
+	q->curr->vb.state = state;
+	do_gettimeofday(&q->curr->vb.ts);
+	wake_up(&q->curr->vb.done);
+
+	q->curr = NULL;
+}
+
+void saa7146_buffer_next(struct saa7146_dev *dev,
+			 struct saa7146_dmaqueue *q, int vbi)
+{
+	struct saa7146_buf *buf,*next = NULL;
+
+	if( NULL == q ) {
+		ERR(("internal error: fatal NULL pointer for q.\n"));
+		return;
+	}
+
+	DEB_EE(("dev:%p, dmaq:%p, vbi:%d\n", dev, q, vbi));
+
+#if DEBUG_SPINLOCKS
+	BUG_ON(!spin_is_locked(&dev->slock));
+#endif
+	if (!list_empty(&q->queue)) {
+		/* activate next one from queue */
+		buf = list_entry(q->queue.next,struct saa7146_buf,vb.queue);
+		list_del(&buf->vb.queue);
+		if (!list_empty(&q->queue))
+			next = list_entry(q->queue.next,struct saa7146_buf, vb.queue);
+		q->curr = buf;
+		DEB_D(("next buffer: buf:%p, prev:%p, next:%p\n", buf, q->queue.prev,q->queue.next));
+		buf->activate(dev,buf,next);
+	} else {
+		DEB_D(("no next buffer. stopping.\n"));
+		if( 0 != vbi ) {
+			/* turn off video-dma3 */
+			saa7146_write(dev,MC1, MASK_20);
+		} else {
+			/* nothing to do -- just prevent next video-dma1 transfer
+			   by lowering the protection address */
+
+			// fixme: fix this for vflip != 0
+
+			saa7146_write(dev, PROT_ADDR1, 0);
+			/* write the address of the rps-program */
+			saa7146_write(dev, RPS_ADDR0, virt_to_bus(&dev->rps0[ 0]));
+			/* turn on rps */
+			saa7146_write(dev, MC1, (MASK_12 | MASK_28));
+		}
+		del_timer(&q->timeout);
+	}
+}
+
+void saa7146_buffer_timeout(unsigned long data)
+{
+	struct saa7146_dmaqueue *q = (struct saa7146_dmaqueue*)data;
+	struct saa7146_dev *dev = q->dev;
+	unsigned long flags;
+
+	DEB_EE(("dev:%p, dmaq:%p\n", dev, q));
+
+	spin_lock_irqsave(&dev->slock,flags);
+	if (q->curr) {
+		DEB_D(("timeout on %p\n", q->curr));
+		saa7146_buffer_finish(dev,q,STATE_ERROR);
+	}
+
+	/* we don't restart the transfer here like other drivers do. when
+	   a streaming capture is disabled, the timeout function will be
+	   called for the current buffer. if we activate the next buffer now,
+	   we mess up our capture logic. if a timeout occurs on another buffer,
+	   then something is seriously broken before, so no need to buffer the
+	   next capture IMHO... */
+/*
+	saa7146_buffer_next(dev,q);
+*/
+	spin_unlock_irqrestore(&dev->slock,flags);
+}
+
+/********************************************************************************/
+/* file operations */
+
+static
+int fops_open(struct inode *inode, struct file *file)
+{
+	unsigned int minor = minor(inode->i_rdev);
+	struct saa7146_dev *h = NULL, *dev = NULL;
+	struct list_head *list;
+	struct saa7146_fh *fh = NULL;
+	int result = 0;
+
+	enum v4l2_buf_type type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+
+	DEB_EE(("inode:%p, file:%p, minor:%d\n",inode,file,minor));
+
+	if (down_interruptible(&saa7146_devices_lock))
+		return -ERESTARTSYS;
+
+	list_for_each(list,&saa7146_devices) {
+		h = list_entry(list, struct saa7146_dev, item);
+		if( NULL == h->vv_data ) {
+			DEB_D(("device %p has not registered video devices.\n",h));
+			continue;
+		}
+		DEB_D(("trying: %p @ major %d,%d\n",h,h->vv_data->video_minor,h->vv_data->vbi_minor));
+
+		if (h->vv_data->video_minor == minor) {
+			dev = h;
+		}
+		if (h->vv_data->vbi_minor == minor) {
+			type = V4L2_BUF_TYPE_VBI_CAPTURE;
+			dev = h;
+		}
+	}
+	if (NULL == dev) {
+		DEB_S(("no such video device.\n"));
+		result = -ENODEV;
+		goto out;
+	}
+
+	DEB_D(("using: %p\n",dev));
+
+	/* check if an extension is registered */
+	if( NULL == dev->ext ) {
+		DEB_S(("no extension registered for this device.\n"));
+		result = -ENODEV;
+		goto out;
+	}
+
+	/* allocate per open data */
+	fh = kmalloc(sizeof(*fh),GFP_KERNEL);
+	if (NULL == fh) {
+		DEB_S(("cannot allocate memory for per open data.\n"));
+		result = -ENOMEM;
+		goto out;
+	}
+	memset(fh,0,sizeof(*fh));
+	
+	// FIXME: do we need to increase *our* usage count?
+
+	if( 0 == try_module_get(dev->ext->module)) {
+		result = -EINVAL;
+		goto out;
+	}
+
+	file->private_data = fh;
+	fh->dev = dev;
+	fh->type = type;
+
+	saa7146_video_uops.open(dev,fh);
+	if( 0 != BOARD_CAN_DO_VBI(dev) ) {
+		saa7146_vbi_uops.open(dev,fh);
+	}
+
+	result = 0;
+out:
+	if( fh != 0 && result != 0 ) {
+		kfree(fh);
+	}
+	up(&saa7146_devices_lock);
+        return result;
+}
+
+static int fops_release(struct inode *inode, struct file *file)
+{
+	struct saa7146_fh  *fh  = file->private_data;
+	struct saa7146_dev *dev = fh->dev;
+
+	DEB_EE(("inode:%p, file:%p\n",inode,file));
+
+	if (down_interruptible(&saa7146_devices_lock))
+		return -ERESTARTSYS;
+
+	saa7146_video_uops.release(dev,fh,file);
+	if( 0 != BOARD_CAN_DO_VBI(dev) ) {
+		saa7146_vbi_uops.release(dev,fh,file);
+	}
+
+	module_put(dev->ext->module);
+	file->private_data = NULL;
+	kfree(fh);
+
+	up(&saa7146_devices_lock);
+
+	return 0;
+}
+
+int saa7146_video_do_ioctl(struct inode *inode, struct file *file, unsigned int cmd, void *arg);
+static int fops_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg)
+{
+/*
+	DEB_EE(("inode:%p, file:%p, cmd:%d, arg:%li\n",inode, file, cmd, arg));
+*/
+	return video_usercopy(inode, file, cmd, arg, saa7146_video_do_ioctl);
+}
+
+static int fops_mmap(struct file *file, struct vm_area_struct * vma)
+{
+	struct saa7146_fh *fh = file->private_data;
+	struct videobuf_queue *q;
+
+	switch (fh->type) {
+	case V4L2_BUF_TYPE_VIDEO_CAPTURE: {
+		DEB_EE(("V4L2_BUF_TYPE_VIDEO_CAPTURE: file:%p, vma:%p\n",file, vma));
+		q = &fh->video_q;
+		break;
+		}
+	case V4L2_BUF_TYPE_VBI_CAPTURE: {
+		DEB_EE(("V4L2_BUF_TYPE_VBI_CAPTURE: file:%p, vma:%p\n",file, vma));
+		q = &fh->vbi_q;
+		break;
+		}
+	default:
+		BUG();
+		return 0;
+	}
+	return videobuf_mmap_mapper(vma,q);
+}
+
+static unsigned int fops_poll(struct file *file, struct poll_table_struct *wait)
+{
+	struct saa7146_fh *fh = file->private_data;
+	struct videobuf_buffer *buf = NULL;
+	struct videobuf_queue *q;
+
+	DEB_EE(("file:%p, poll:%p\n",file, wait));
+
+	if (V4L2_BUF_TYPE_VBI_CAPTURE == fh->type) {
+		if( 0 == fh->vbi_q.streaming )
+			return videobuf_poll_stream(file, &fh->vbi_q, wait);
+		q = &fh->vbi_q;
+	} else {
+		q = &fh->video_q;
+	}
+
+	if (!list_empty(&q->stream))
+		buf = list_entry(q->stream.next, struct videobuf_buffer, stream);
+
+	if (!buf) {
+		return POLLERR;
+	}
+
+	poll_wait(file, &buf->done, wait);
+	if (buf->state == STATE_DONE || buf->state == STATE_ERROR) {
+		return POLLIN|POLLRDNORM;
+	}
+
+	return 0;
+}
+
+static ssize_t fops_read(struct file *file, char *data, size_t count, loff_t *ppos)
+{
+	struct saa7146_fh *fh = file->private_data;
+
+	switch (fh->type) {
+	case V4L2_BUF_TYPE_VIDEO_CAPTURE: {
+		DEB_EE(("V4L2_BUF_TYPE_VIDEO_CAPTURE: file:%p, data:%p, count:%d\n",file, data, count));
+		return saa7146_video_uops.read(file,data,count,ppos);
+		}
+	case V4L2_BUF_TYPE_VBI_CAPTURE: {
+		DEB_EE(("V4L2_BUF_TYPE_VBI_CAPTURE: file:%p, data:%p, count:%d\n",file, data, count));
+		return saa7146_vbi_uops.read(file,data,count,ppos);
+		}
+		break;
+	default:
+		BUG();
+		return 0;
+	}
+}
+
+static struct file_operations video_fops =
+{
+	.owner		= THIS_MODULE,
+	.open		= fops_open,
+	.release	= fops_release,
+	.read		= fops_read,
+	.poll		= fops_poll,
+	.mmap		= fops_mmap,
+	.ioctl		= fops_ioctl,
+	.llseek		= no_llseek,
+};
+
+void vv_callback(struct saa7146_dev *dev, unsigned long status)
+{
+	u32 isr = status;
+	
+	DEB_EE(("dev:%p, isr:0x%08x\n",dev,(u32)status));
+
+	if (0 != (isr & (MASK_27))) {
+		DEB_INT(("irq: RPS0 (0x%08x).\n",isr));
+		saa7146_video_uops.irq_done(dev,isr);
+	}
+
+	if (0 != (isr & (MASK_28))) {
+		u32 mc2 = saa7146_read(dev, MC2);
+		if( 0 != (mc2 & MASK_15)) {
+			DEB_INT(("irq: RPS1 vbi workaround (0x%08x).\n",isr));
+			wake_up(&dev->vv_data->vbi_wq);
+			saa7146_write(dev,MC2, MASK_31);
+			return;
+		}
+		DEB_INT(("irq: RPS1 (0x%08x).\n",isr));
+		saa7146_vbi_uops.irq_done(dev,isr);
+	}
+}
+
+static struct video_device device_template =
+{
+	.hardware	= VID_HARDWARE_SAA7146,
+	.fops		= &video_fops,
+	.minor		= -1,
+};
+
+int saa7146_vv_init(struct saa7146_dev* dev)
+{
+	struct saa7146_vv *vv = kmalloc (sizeof(struct saa7146_vv),GFP_KERNEL);
+	if( NULL == vv ) {
+		ERR(("out of memory. aborting.\n"));
+		return -1;
+	}
+	memset(vv, 0x0, sizeof(*vv));
+
+	DEB_EE(("dev:%p\n",dev));
+	
+	vv->video_minor = -1;
+	vv->vbi_minor = -1;
+
+	vv->clipping = (u32*)kmalloc(SAA7146_CLIPPING_MEM, GFP_KERNEL);
+	if( NULL == vv->clipping ) {
+		ERR(("out of memory. aborting.\n"));
+		kfree(vv);
+		return -1;
+	}
+	memset(vv->clipping, 0x0, SAA7146_CLIPPING_MEM);
+
+	saa7146_video_uops.init(dev,vv);
+	saa7146_vbi_uops.init(dev,vv);
+	
+	dev->vv_data = vv;
+	dev->vv_callback = &vv_callback;
+
+	return 0;
+}
+
+int saa7146_vv_release(struct saa7146_dev* dev)
+{
+	struct saa7146_vv *vv = dev->vv_data;
+
+	DEB_EE(("dev:%p\n",dev));
+ 
+ 	kfree(vv);
+	dev->vv_data = NULL;
+	dev->vv_callback = NULL;
+	
+	return 0;
+}
+
+int saa7146_register_device(struct video_device *vid, struct saa7146_dev* dev, char *name, int type)
+{
+	struct saa7146_vv *vv = dev->vv_data;
+
+	DEB_EE(("dev:%p, name:'%s'\n",dev,name));
+ 
+ 	*vid = device_template;
+	strncpy(vid->name, name, 32);
+	vid->priv = dev;
+
+	// fixme: -1 should be an insmod parameter *for the extension* (like "video_nr");
+	if (video_register_device(vid,type,-1) < 0) {
+		ERR(("cannot register vbi v4l2 device. skipping.\n"));
+		return -1;
+	}
+
+	if( VFL_TYPE_GRABBER == type ) {
+		vv->video_minor = vid->minor;
+		INFO(("%s: registered device video%d [v4l2]\n", dev->name,vid->minor & 0x1f));
+	} else {
+		vv->vbi_minor = vid->minor;
+		INFO(("%s: registered device vbi%d [v4l2]\n", dev->name,vid->minor & 0x1f));
+	}
+
+	return 0;
+}
+
+int saa7146_unregister_device(struct video_device *vid, struct saa7146_dev* dev)
+{
+	struct saa7146_vv *vv = dev->vv_data;
+	
+	DEB_EE(("dev:%p\n",dev));
+
+	if( VFL_TYPE_GRABBER == vid->type ) {
+		vv->video_minor = -1;
+	} else {
+		vv->vbi_minor = -1;
+	}
+	video_unregister_device(vid);
+
+	return 0;
+}
+
+static
+int __init saa7146_vv_init_module(void)
+{
+	return 0;
+}
+
+
+static
+void __exit saa7146_vv_cleanup_module(void)
+{
+}
+
+module_init(saa7146_vv_init_module);
+module_exit(saa7146_vv_cleanup_module);
+
+EXPORT_SYMBOL_GPL(saa7146_set_hps_source_and_sync);
+EXPORT_SYMBOL_GPL(saa7146_register_device);
+EXPORT_SYMBOL_GPL(saa7146_unregister_device);
+
+EXPORT_SYMBOL_GPL(saa7146_vv_init);
+EXPORT_SYMBOL_GPL(saa7146_vv_release);
+
+MODULE_AUTHOR("Michael Hunold <michael@mihu.de>");
+MODULE_DESCRIPTION("video4linux driver for saa7146-based hardware");
+MODULE_LICENSE("GPL");

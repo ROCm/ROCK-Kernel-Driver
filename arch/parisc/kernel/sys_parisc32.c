@@ -1592,7 +1592,7 @@ asmlinkage long sys32_semctl_broken(int semid, int semnum, int cmd, union semun 
 	return sys_semctl (semid, semnum, cmd, arg);
 }
 
-extern int sys_lookup_dcookie(u64 cookie64, char *buf, size_t len);
+extern long sys_lookup_dcookie(u64 cookie64, char *buf, size_t len);
 
 long sys32_lookup_dcookie(u32 cookie_high, u32 cookie_low, char *buf,
 			  size_t len)

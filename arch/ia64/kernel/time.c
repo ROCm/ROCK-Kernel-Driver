@@ -60,7 +60,7 @@ do_profile (unsigned long ip)
 }
 
 /*
- * Return the number of micro-seconds that elapsed since the last update to jiffy.  The
+ * Return the number of nano-seconds that elapsed since the last update to jiffy.  The
  * xtime_lock must be at least read-locked when calling this routine.
  */
 static inline unsigned long
@@ -86,6 +86,9 @@ gettimeoffset (void)
 void
 do_settimeofday (struct timeval *tv)
 {
+	time_t sec = tv->tv_sec;
+	long nsec = tv->tv_usec * 1000;
+
 	write_seqlock_irq(&xtime_lock);
 	{
 		/*
@@ -94,22 +97,22 @@ do_settimeofday (struct timeval *tv)
 		 * Discover what correction gettimeofday would have done, and then undo
 		 * it!
 		 */
-		tv->tv_usec -= gettimeoffset();
-		tv->tv_usec -= (jiffies - wall_jiffies) * (1000000 / HZ);
+		nsec -= gettimeoffset();
 
-		while (tv->tv_usec < 0) {
-			tv->tv_usec += 1000000;
-			tv->tv_sec--;
+		while (nsec < 0) {
+			nsec += 1000000000;
+			sec--;
 		}
 
-		xtime.tv_sec = tv->tv_sec;
-		xtime.tv_nsec = 1000 * tv->tv_usec;
+		xtime.tv_sec = sec;
+		xtime.tv_nsec = nsec;
 		time_adjust = 0;		/* stop active adjtime() */
 		time_status |= STA_UNSYNC;
 		time_maxerror = NTP_PHASE_LIMIT;
 		time_esterror = NTP_PHASE_LIMIT;
 	}
 	write_sequnlock_irq(&xtime_lock);
+	clock_was_set();
 }
 
 void

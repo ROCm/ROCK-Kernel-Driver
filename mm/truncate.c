@@ -73,13 +73,13 @@ invalidate_complete_page(struct address_space *mapping, struct page *page)
 	if (PagePrivate(page) && !try_to_release_page(page, 0))
 		return 0;
 
-	write_lock(&mapping->page_lock);
+	spin_lock(&mapping->page_lock);
 	if (PageDirty(page)) {
-		write_unlock(&mapping->page_lock);
+		spin_unlock(&mapping->page_lock);
 		return 0;
 	}
 	__remove_from_page_cache(page);
-	write_unlock(&mapping->page_lock);
+	spin_unlock(&mapping->page_lock);
 	ClearPageUptodate(page);
 	page_cache_release(page);	/* pagecache ref */
 	return 1;

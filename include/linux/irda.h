@@ -25,6 +25,8 @@
 #ifndef KERNEL_IRDA_H
 #define KERNEL_IRDA_H
 
+#include <linux/socket.h> /* only for sa_family_t */
+
 /* Hint bit positions for first hint byte */
 #define HINT_PNP         0x01
 #define HINT_PDA         0x02
