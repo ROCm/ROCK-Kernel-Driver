@@ -1638,16 +1638,16 @@ static int cifs_copy_posix_acl(char * trgt,char * src, const int buflen,const in
 	}
 
 	size = posix_acl_xattr_size(count);
-	if(size > buflen) {
-	/* BB should we fill in as much data as we can first? */
-	/* seems odd that API was not designed so one could query ACL size */
+	if((buflen == 0) || (local_acl == NULL)) {
+		/* used to query ACL EA size */				
+	} else if(size > buflen) {
 		return -ERANGE;
-	}
-
-	local_acl->a_version = POSIX_ACL_XATTR_VERSION;
-	for(i = 0;i < count ;i++) {
-		cifs_convert_ace(&local_acl->a_entries[i],pACE);
-		pACE ++;
+	} else /* buffer big enough */ {
+		local_acl->a_version = POSIX_ACL_XATTR_VERSION;
+		for(i = 0;i < count ;i++) {
+			cifs_convert_ace(&local_acl->a_entries[i],pACE);
+			pACE ++;
+		}
 	}
 	return size;
 }

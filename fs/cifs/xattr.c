@@ -225,7 +225,7 @@ ssize_t cifs_getxattr(struct dentry * direntry, const char * ea_name,
 		cFYI(1,("query POSIX default ACL not supported yet"));
 #endif
     } else {
-			cFYI(1,("illegal xattr name request %s (only user namespace supported)",ea_name));
+		cFYI(1,("illegal xattr name request %s (only user namespace supported)",ea_name));
 	}
 
 	/* We could add an additional check for streams ie 
