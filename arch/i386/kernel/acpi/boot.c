@@ -41,6 +41,7 @@
 #define PREFIX			"ACPI: "
 
 extern int acpi_disabled;
+extern int acpi_irq;
 extern int acpi_ht;
 
 int acpi_lapic = 0;
@@ -407,7 +408,7 @@ acpi_boot_init (void)
 	 * If MPS is present, it will handle them,
 	 * otherwise the system will stay in PIC mode
 	 */
-	if (acpi_disabled) {
+	if (acpi_disabled || !acpi_irq) {
 		return 1;
         }
 

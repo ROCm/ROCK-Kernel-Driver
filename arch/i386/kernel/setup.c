@@ -71,6 +71,7 @@ EXPORT_SYMBOL_GPL(mmu_cr4_features);
 EXPORT_SYMBOL(acpi_disabled);
 
 #ifdef	CONFIG_ACPI_BOOT
+	int acpi_irq __initdata = 1;	/* enable IRQ */
 	int acpi_ht __initdata = 1;	/* enable HT */
 #endif
 
@@ -542,6 +543,11 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 		else if (!memcmp(from, "acpi=ht", 7)) {
 			acpi_ht = 1;
 			if (!acpi_force) acpi_disabled = 1;
+		}
+
+		/* "pci=noacpi" disables ACPI interrupt routing */
+		else if (!memcmp(from, "pci=noacpi", 10)) {
+			acpi_irq = 0;
 		}
 
 #ifdef CONFIG_X86_LOCAL_APIC
