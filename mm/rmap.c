@@ -66,21 +66,26 @@ int anon_vma_prepare(struct vm_area_struct *vma)
 	might_sleep();
 	if (unlikely(!anon_vma)) {
 		struct mm_struct *mm = vma->vm_mm;
+		struct anon_vma *allocated = NULL;
 
-		anon_vma = anon_vma_alloc();
-		if (unlikely(!anon_vma))
-			return -ENOMEM;
+		anon_vma = find_mergeable_anon_vma(vma);
+		if (!anon_vma) {
+			anon_vma = anon_vma_alloc();
+			if (unlikely(!anon_vma))
+				return -ENOMEM;
+			allocated = anon_vma;
+		}
 
 		/* page_table_lock to protect against threads */
 		spin_lock(&mm->page_table_lock);
 		if (likely(!vma->anon_vma)) {
 			vma->anon_vma = anon_vma;
 			list_add(&vma->anon_vma_node, &anon_vma->head);
-			anon_vma = NULL;
+			allocated = NULL;
 		}
 		spin_unlock(&mm->page_table_lock);
-		if (unlikely(anon_vma))
-			anon_vma_free(anon_vma);
+		if (unlikely(allocated))
+			anon_vma_free(allocated);
 	}
 	return 0;
 }
