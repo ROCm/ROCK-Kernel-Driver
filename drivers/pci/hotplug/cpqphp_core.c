@@ -322,7 +322,7 @@ static void release_slot(struct hotplug_slot *hotplug_slot)
 	kfree(slot);
 }
 
-static int ctrl_slot_setup (struct controller * ctrl, void *smbios_start,
+static int ctrl_slot_setup(struct controller * ctrl, void *smbios_start,
 			void *smbios_table)
 {
 	struct slot *new_slot;
@@ -343,32 +343,27 @@ static int ctrl_slot_setup (struct controller * ctrl, void *smbios_start,
 	slot_number = ctrl->first_slot;
 
 	while (number_of_slots) {
-		new_slot = (struct slot *) kmalloc(sizeof(struct slot), GFP_KERNEL);
+		new_slot = kmalloc(sizeof(*new_slot), GFP_KERNEL);
 		if (!new_slot)
-			return -ENOMEM;
+			goto error;
 
 		memset(new_slot, 0, sizeof(struct slot));
-		new_slot->hotplug_slot = kmalloc (sizeof (struct hotplug_slot), GFP_KERNEL);
-		if (!new_slot->hotplug_slot) {
-			kfree (new_slot);
-			return -ENOMEM;
-		}
-		memset(new_slot->hotplug_slot, 0, sizeof (struct hotplug_slot));
+		new_slot->hotplug_slot = kmalloc(sizeof(*(new_slot->hotplug_slot)),
+						GFP_KERNEL);
+		if (!new_slot->hotplug_slot)
+			goto error_slot;
+		memset(new_slot->hotplug_slot, 0, sizeof(struct hotplug_slot));
 
-		new_slot->hotplug_slot->info = kmalloc (sizeof (struct hotplug_slot_info), GFP_KERNEL);
-		if (!new_slot->hotplug_slot->info) {
-			kfree (new_slot->hotplug_slot);
-			kfree (new_slot);
-			return -ENOMEM;
-		}
-		memset(new_slot->hotplug_slot->info, 0, sizeof (struct hotplug_slot_info));
-		new_slot->hotplug_slot->name = kmalloc (SLOT_NAME_SIZE, GFP_KERNEL);
-		if (!new_slot->hotplug_slot->name) {
-			kfree (new_slot->hotplug_slot->info);
-			kfree (new_slot->hotplug_slot);
-			kfree (new_slot);
-			return -ENOMEM;
-		}
+		new_slot->hotplug_slot->info =
+				kmalloc(sizeof(*(new_slot->hotplug_slot->info)),
+							GFP_KERNEL);
+		if (!new_slot->hotplug_slot->info)
+			goto error_hpslot;
+		memset(new_slot->hotplug_slot->info, 0,
+				sizeof(struct hotplug_slot_info));
+		new_slot->hotplug_slot->name = kmalloc(SLOT_NAME_SIZE, GFP_KERNEL);
+		if (!new_slot->hotplug_slot->name)
+			goto error_info;
 
 		new_slot->ctrl = ctrl;
 		new_slot->bus = ctrl->bus;
@@ -430,8 +425,7 @@ static int ctrl_slot_setup (struct controller * ctrl, void *smbios_start,
 		result = pci_hp_register (new_slot->hotplug_slot);
 		if (result) {
 			err ("pci_hp_register failed with error %d\n", result);
-			release_slot(new_slot->hotplug_slot);
-			return result;
+			goto error_name;
 		}
 		
 		new_slot->next = ctrl->slot;
@@ -443,6 +437,17 @@ static int ctrl_slot_setup (struct controller * ctrl, void *smbios_start,
 	}
 
 	return 0;
+
+error_name:
+	kfree(new_slot->hotplug_slot->name);
+error_info:
+	kfree(new_slot->hotplug_slot->info);
+error_hpslot:
+	kfree(new_slot->hotplug_slot);
+error_slot:
+	kfree(new_slot);
+error:
+	return result;
 }
 
 static int ctrl_slot_cleanup (struct controller * ctrl)
