@@ -96,6 +96,7 @@ typedef enum page_buf_flags_e {		/* pb_flags values */
 	PBF_MAPPABLE = (1 << 9),/* use directly-addressable pages	   */
 	PBF_STALE = (1 << 10),	/* buffer has been staled, do not find it  */
 	PBF_FS_MANAGED = (1 << 11), /* filesystem controls freeing memory  */
+	PBF_FS_DATAIOD = (1 << 12), /* schedule IO completion on fs datad  */
 
 	/* flags used only as arguments to access routines */
 	PBF_LOCK = (1 << 13),	/* lock requested			   */

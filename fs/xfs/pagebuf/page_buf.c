@@ -1290,7 +1290,7 @@ bio_end_io_pagebuf(
 
 	if (atomic_dec_and_test(&pb->pb_io_remaining) == 1) {
 		pb->pb_locked = 0;
-		pagebuf_iodone(pb, 0, 1);
+		pagebuf_iodone(pb, (pb->pb_flags & PBF_FS_DATAIOD), 1);
 	}
 
 	bio_put(bio);
@@ -1434,7 +1434,7 @@ io_submitted:
 
 	if (atomic_dec_and_test(&pb->pb_io_remaining) == 1) {
 		pb->pb_locked = 0;
-		pagebuf_iodone(pb, 0, 0);
+		pagebuf_iodone(pb, (pb->pb_flags & PBF_FS_DATAIOD), 1);
 	}
 
 	return 0;
