@@ -68,7 +68,7 @@ flush_tlb_all_local:
 	 * consolidated.
 	 */
 
-	rsm     PSW_SM_I,%r19      /* relied upon translation! */
+	rsm     PSW_SM_I,%r19	/* relied upon translation! PA 2.0 Arch. F-5 */
 	nop
 	nop
 	nop
