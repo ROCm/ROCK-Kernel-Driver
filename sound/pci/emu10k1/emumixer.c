@@ -527,7 +527,7 @@ int __devinit snd_emu10k1_mixer(emu10k1_t *emu)
 			return err;
 		if (emu->audigy) {
 			/* set master volume to 0 dB */
-			snd_ac97_write(emu->ac97, AC97_MASTER, 0x0202);
+			snd_ac97_write(emu->ac97, AC97_MASTER, 0x0000);
 			/* set capture source to mic */
 			snd_ac97_write(emu->ac97, AC97_REC_SEL, 0x0000);
 			c = audigy_remove_ctls;
