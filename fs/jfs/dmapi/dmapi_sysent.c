@@ -72,7 +72,7 @@ dmapi_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 			   sizeof(sys_dmapi_args_t) ) )
 		return -EFAULT;
 
-	switch (cmd) {
+	switch (_IOC_NR(cmd)) {
 	case DM_CLEAR_INHERIT:
 		error = dm_clear_inherit(
 				(dm_sessid_t)	DM_Uarg(uap,1), /* sid */

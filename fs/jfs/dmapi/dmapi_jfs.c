@@ -40,6 +40,10 @@
 #include <linux/buffer_head.h>
 #include <linux/mm.h>
 #include <linux/security.h>
+#ifdef CONFIG_COMPAT
+#include <linux/ioctl.h>
+#include <linux/ioctl32.h>
+#endif
 #include "dmapi_private.h"
 #include "jfs_debug.h"
 #include "jfs_incore.h"
@@ -52,12 +56,12 @@
 /* Here's what's left to be done:
  * Figure out locktype in jfs_dm_send_data_event()
  * Figure out how to get name of mounted dir for mount event without stupid 
- *   mount option
+ *   mount option (mtpt=)
  * Add jfs_dm_get_bulkattr (although unused by TSM)
  * Add DM_EVENT_NOSPACE (VERY intrusive to JFS code)
- * Finish up dt_change (may not cover all yet)
- * ? Whazzup with the dump under debug spinlock?
- * ? Whazzup with unmount hang under debug spinlock?
+ * Finish up dt_change (may not cover all cases yet)
+ * ? Whazzup with the dump under sleep-inside-spinlock checking?
+ * ? Whazzup with unmount hang under spinlock debugging?
  */
 
 /* XFS bugs fixed from original port
@@ -158,7 +162,7 @@ STATIC	dm_size_t  dm_min_dio_xfer = 0; /* direct I/O disabled for now */
 #define DM_MAX_ATTR_BYTES_ON_DESTROY	256
 
 #define DM_STAT_SIZE(mask, namelen)	\
-	(sizeof(dm_stat_t) + \
+	(sizeof(dm_stat32_t) + \
 	 (((mask) & DM_AT_HANDLE) ? sizeof(jfs_handle_t) : 0) + (namelen))
 #define MAX_DIRENT_SIZE		(sizeof(dirent_t) + JFS_NAME_MAX + 1)
 
@@ -451,7 +455,7 @@ STATIC void
 jfs_ip_to_stat(
 	struct inode	*ip,
 	u_int		mask,
-	dm_stat_t	*buf)
+	dm_stat32_t	*buf)
 {
 	int		filetype;
 	struct jfs_inode_info *jfs_ip = JFS_IP(ip);
@@ -539,11 +543,11 @@ jfs_dm_bulkstat_one(
 	int		*res)		/* bulkstat result code */
 {
 	struct inode	*ip;
-	dm_stat_t	*buf;
+	dm_stat32_t	*buf;
 	jfs_handle_t	handle;
 	u_int		statstruct_sz;
 
-	buf = (dm_stat_t *)buffer;
+	buf = (dm_stat32_t *)buffer;
 
 	ip = iget(mp->i_sb, ino);
 	if (!ip) {
@@ -577,8 +581,8 @@ jfs_dm_bulkstat_one(
 		dm_ip_to_handle(ip, &handle);
 		memcpy(buf+1, &handle, sizeof(handle));	/* handle follows stat struct */
 
-		buf->dt_handle.vd_offset = (ssize_t) sizeof(dm_stat_t);
-		buf->dt_handle.vd_length = (size_t) JFS_HSIZE(handle);
+		buf->dt_handle.vd_offset = (int) sizeof(dm_stat_t);
+		buf->dt_handle.vd_length = (unsigned int) JFS_HSIZE(handle);
 
 		statstruct_sz = (statstruct_sz+(DM_STAT_ALIGN-1)) & ~(DM_STAT_ALIGN-1);
 	} else {
@@ -699,7 +703,7 @@ jfs_dirents_to_stats(
 	size_t		*offlastlinkp)  /* offset of last stat's _link */
 {
 	struct jfs_dirent *p;
-	dm_stat_t	*statp;
+	dm_stat32_t	*statp;
 	size_t		reclen;
 	size_t		namelen;
 	size_t		spaceleft;
@@ -727,7 +731,7 @@ jfs_dirents_to_stats(
 	 * is full.
 	 */
 	p = direntp;
-	statp = (dm_stat_t *) bufp;
+	statp = (dm_stat32_t *) bufp;
 	for (reclen = (size_t) sizeof(struct jfs_dirent) + p->name_len + 1; 
 					*direntbufsz > 0;
 					*direntbufsz -= reclen,
@@ -753,7 +757,7 @@ jfs_dirents_to_stats(
 			return(0);
 		}
 
-		statp = (dm_stat_t *) bufp;
+		statp = (dm_stat32_t *) bufp;
 
 		(void)jfs_dm_bulkstat_one(ip, mask, 0, p->ino, statp, &res);
 		if (res != BULKSTAT_RV_DIDONE)
@@ -1122,7 +1126,7 @@ jfs_dm_rdwr(
 			 * undo that because this I/O was supposed to be invisible.
                          */
 			struct timespec save_atime = ip->i_atime;
-			xfer = generic_file_read(&file, bufp, len, &off);
+			xfer = generic_file_read(&file, bufp, len, (loff_t *)&off);
 			ip->i_atime = save_atime;
 	                mark_inode_dirty(ip);
 	} else {
@@ -1132,7 +1136,7 @@ jfs_dm_rdwr(
 			 */
 			struct timespec save_mtime = ip->i_mtime;
 			struct timespec save_ctime = ip->i_ctime;
-			xfer = generic_file_write(&file, bufp, len, &off);
+			xfer = generic_file_write(&file, bufp, len, (loff_t *)&off);
 			ip->i_mtime = save_mtime;
 			ip->i_ctime = save_ctime;
 	                mark_inode_dirty(ip);
@@ -1505,7 +1509,7 @@ jfs_dm_get_bulkattr_rvp(
 
 	nelems = buflen / statstruct_sz;
 	if (nelems < 1) {
-		if (put_user( statstruct_sz, rlenp ))
+		if (put_user( statstruct_sz, (size32_t *)rlenp ))
 			return(-EFAULT);
 		return(-E2BIG);
 	}
@@ -1523,7 +1527,7 @@ jfs_dm_get_bulkattr_rvp(
 		*rvalp = 0;
 	}
 
-	if (put_user( statstruct_sz * nelems, rlenp ))
+	if (put_user( statstruct_sz * nelems, (size32_t *)rlenp ))
 		return(-EFAULT);
 
 	if (copy_to_user( locp, &loc, sizeof(loc)))
@@ -1754,7 +1758,8 @@ jfs_dm_get_dirattrs_rvp(
 	int		*rvp)
 {
 	size_t		direntbufsz, statbufsz;
-	size_t		nread, spaceleft, nwritten=0, totnwritten=0;
+	size_t		nread, spaceleft, nwritten=0;
+	size32_t	totnwritten=0;
 	void		*direntp, *statbufp;
 	int		error;
 	dm_attrloc_t	loc, dirloc;
@@ -1890,7 +1895,7 @@ jfs_dm_get_dirattrs_rvp(
 	kmem_free(statbufp, statbufsz);
 	kmem_free(direntp, direntbufsz);
 	if (!error){
-		if (put_user(totnwritten, rlenp))
+		if (put_user(totnwritten, (size32_t *)rlenp))
 			return(-EFAULT);
 	}
 
@@ -1968,7 +1973,7 @@ jfs_dm_get_dmattr(
 	if (!error && copy_to_user(bufp, value, value_len))
 		error = -EFAULT;
 	if (!error || error == -E2BIG) {
-		if (put_user(value_len, rlenp))
+		if (put_user(value_len, (size32_t *)rlenp))
 			error = -EFAULT;
 	}
 
@@ -2006,7 +2011,7 @@ jfs_dm_get_fileattr(
 	u_int		mask,		/* not used; always return everything */
 	dm_stat_t	*statp)
 {
-	dm_stat_t	stat;
+	dm_stat32_t	stat;
 
 	if (right < DM_RIGHT_SHARED)
 		return(-EACCES);
@@ -2019,9 +2024,10 @@ jfs_dm_get_fileattr(
 	   field so user will see it didn't change as there is no error 
 	   indication returned */
 	if ((mask & DM_AT_DTIME) && (!jfs_dmattr_exist(ip))) {
+		dm_stat32_t *stat32p = (dm_stat32_t *)statp;
 		mask = mask & (~DM_AT_DTIME);
 		if (copy_from_user(&stat.dt_dtime,
-				   &statp->dt_dtime,
+				   &stat32p->dt_dtime,
 				   sizeof(stat.dt_dtime)))
 			return(-EFAULT);
 	}
@@ -2199,7 +2205,7 @@ jfs_dm_getall_dmattr(
 		   keep track of the number of bytes for the user's
 		   next call.
 		*/
-		size_needed = sizeof(*ulist) + ea->valuelen;
+		size_needed = sizeof(*ulist) + le16_to_cpu(ea->valuelen);
 		size_needed = (size_needed + alignment) & ~alignment;
 
 		req_size += size_needed;
@@ -2234,13 +2240,13 @@ jfs_dm_getall_dmattr(
 		   keep track of the number of bytes for the user's
 		   next call.
 		*/
-		size_needed = sizeof(*ulist) + ea->valuelen;
+		size_needed = sizeof(*ulist) + le16_to_cpu(ea->valuelen);
 		size_needed = (size_needed + alignment) & ~alignment;
 
 		strncpy((char *)ulist->al_name.an_chars, user_name,
 				DM_ATTR_NAME_SIZE);
 		ulist->al_data.vd_offset = sizeof(*ulist);
-		ulist->al_data.vd_length = ea->valuelen;
+		ulist->al_data.vd_length = le16_to_cpu(ea->valuelen);
 		ulist->_link =	size_needed;
 		last_link = &ulist->_link;
 
@@ -2252,7 +2258,7 @@ jfs_dm_getall_dmattr(
 
 		memcpy((void *)(ulist + 1),
 		       (char *)ea + sizeof(ea) + ea->namelen + 1,
-		       ea->valuelen);
+		       le16_to_cpu(ea->valuelen));
 
 		ulist = (dm_attrlist_t *)((char *)ulist + ulist->_link);
 	}
@@ -2269,7 +2275,7 @@ error_return:
 	up_read(&JFS_IP(ip)->xattr_sem);
 
 	if (!error || error == -E2BIG) {
-		if (put_user(req_size, rlenp))
+		if (put_user(req_size, (size32_t *)rlenp))
 			error = -EFAULT;
 	}
 
@@ -2898,7 +2904,7 @@ jfs_dm_set_fileattr(
 	u_int		mask,
 	dm_fileattr_t	*statp)
 {
-	dm_fileattr_t	stat;
+	dm_fileattr32_t	stat;
 	struct iattr	at;
 	int		error;
 
@@ -3480,14 +3486,101 @@ jfs_dm_send_mmap_event(
 	return ret;
 }
 
+#ifdef CONFIG_COMPAT
+static struct {
+	unsigned int cmd;
+	int          reg;
+} ioctl32_cmds[] = {
+	{ .cmd = JFS_DM_IOC_CLEAR_INHERIT },
+	{ .cmd = JFS_DM_IOC_CREATE_BY_HANDLE },
+	{ .cmd = JFS_DM_IOC_CREATE_SESSION },
+	{ .cmd = JFS_DM_IOC_CREATE_USEREVENT },
+	{ .cmd = JFS_DM_IOC_DESTROY_SESSION },
+	{ .cmd = JFS_DM_IOC_DOWNGRADE_RIGHT },
+	{ .cmd = JFS_DM_IOC_FD_TO_HANDLE },
+	{ .cmd = JFS_DM_IOC_FIND_EVENTMSG },
+	{ .cmd = JFS_DM_IOC_GET_ALLOCINFO },
+	{ .cmd = JFS_DM_IOC_GET_BULKALL },
+	{ .cmd = JFS_DM_IOC_GET_BULKATTR },
+	{ .cmd = JFS_DM_IOC_GET_CONFIG },
+	{ .cmd = JFS_DM_IOC_GET_CONFIG_EVENTS },
+	{ .cmd = JFS_DM_IOC_GET_DIRATTRS },
+	{ .cmd = JFS_DM_IOC_GET_DMATTR },
+	{ .cmd = JFS_DM_IOC_GET_EVENTLIST },
+	{ .cmd = JFS_DM_IOC_GET_EVENTS },
+	{ .cmd = JFS_DM_IOC_GET_FILEATTR },
+	{ .cmd = JFS_DM_IOC_GET_MOUNTINFO },
+	{ .cmd = JFS_DM_IOC_GET_REGION },
+	{ .cmd = JFS_DM_IOC_GETALL_DISP },
+	{ .cmd = JFS_DM_IOC_GETALL_DMATTR },
+	{ .cmd = JFS_DM_IOC_GETALL_INHERIT },
+	{ .cmd = JFS_DM_IOC_GETALL_SESSIONS },
+	{ .cmd = JFS_DM_IOC_GETALL_TOKENS },
+	{ .cmd = JFS_DM_IOC_INIT_ATTRLOC },
+	{ .cmd = JFS_DM_IOC_MKDIR_BY_HANDLE },
+	{ .cmd = JFS_DM_IOC_MOVE_EVENT },
+	{ .cmd = JFS_DM_IOC_OBJ_REF_HOLD },
+	{ .cmd = JFS_DM_IOC_OBJ_REF_QUERY },
+	{ .cmd = JFS_DM_IOC_OBJ_REF_RELE },
+	{ .cmd = JFS_DM_IOC_PATH_TO_FSHANDLE },
+	{ .cmd = JFS_DM_IOC_PATH_TO_HANDLE },
+	{ .cmd = JFS_DM_IOC_PENDING },
+	{ .cmd = JFS_DM_IOC_PROBE_HOLE },
+	{ .cmd = JFS_DM_IOC_PUNCH_HOLE },
+	{ .cmd = JFS_DM_IOC_QUERY_RIGHT },
+	{ .cmd = JFS_DM_IOC_QUERY_SESSION },
+	{ .cmd = JFS_DM_IOC_READ_INVIS },
+	{ .cmd = JFS_DM_IOC_RELEASE_RIGHT },
+	{ .cmd = JFS_DM_IOC_REMOVE_DMATTR },
+	{ .cmd = JFS_DM_IOC_REQUEST_RIGHT },
+	{ .cmd = JFS_DM_IOC_RESPOND_EVENT },
+	{ .cmd = JFS_DM_IOC_SEND_MSG },
+	{ .cmd = JFS_DM_IOC_SET_DISP },
+	{ .cmd = JFS_DM_IOC_SET_DMATTR },
+	{ .cmd = JFS_DM_IOC_SET_EVENTLIST },
+	{ .cmd = JFS_DM_IOC_SET_FILEATTR },
+	{ .cmd = JFS_DM_IOC_SET_INHERIT },
+	{ .cmd = JFS_DM_IOC_SET_REGION },
+	{ .cmd = JFS_DM_IOC_SET_RETURN_ON_DESTROY },
+	{ .cmd = JFS_DM_IOC_SYMLINK_BY_HANDLE },
+	{ .cmd = JFS_DM_IOC_SYNC_BY_HANDLE },
+	{ .cmd = JFS_DM_IOC_UPGRADE_RIGHT },
+	{ .cmd = JFS_DM_IOC_WRITE_INVIS },
+	{ .cmd = JFS_DM_IOC_OPEN_BY_HANDLE },
+	{ .cmd = JFS_DM_IOC_HANDLE_TO_PATH },
+};
+#endif
+
 void __init
 jfs_dm_init(void)
 {
+#ifdef CONFIG_COMPAT
+	unsigned int i;
+	int err;
+
+	for (i = 0; i < ARRAY_SIZE(ioctl32_cmds); i++) {
+		err = register_ioctl32_conversion(ioctl32_cmds[i].cmd, NULL);
+		if (err >= 0)
+			ioctl32_cmds[i].reg++;
+		else
+			printk(KERN_ERR "jfs_dm_init: unable to register ioctl %x, err = %d\n", ioctl32_cmds[i].cmd, err);
+	}
+#endif
 }
 
 void __exit
 jfs_dm_exit(void)
 {
+#ifdef CONFIG_COMPAT
+	unsigned int i;
+
+	for (i = 0; i < ARRAY_SIZE(ioctl32_cmds); i++) {
+		if (ioctl32_cmds[i].reg) {
+			unregister_ioctl32_conversion(ioctl32_cmds[i].cmd);
+			ioctl32_cmds[i].reg--;
+		}
+	}
+#endif
 }
 
 /*
