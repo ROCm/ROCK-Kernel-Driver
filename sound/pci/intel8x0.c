@@ -2706,6 +2706,7 @@ static int __devinit snd_intel8x0_probe(struct pci_dev *pci,
 		return err;
 	}
 	
+#ifdef SUPPORT_MIDI
 	if (mpu_port[dev] == 0x300 || mpu_port[dev] == 0x330) {
 		if ((err = snd_mpu401_uart_new(card, 0, MPU401_HW_INTEL8X0,
 					       mpu_port[dev], 0,
@@ -2715,6 +2716,7 @@ static int __devinit snd_intel8x0_probe(struct pci_dev *pci,
 		}
 	} else
 		mpu_port[dev] = 0;
+#endif
 
 	snd_intel8x0_proc_init(chip);
 
