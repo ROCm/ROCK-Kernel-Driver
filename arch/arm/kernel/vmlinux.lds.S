@@ -56,6 +56,10 @@ SECTIONS
 		__initramfs_start = .;
 			usr/built-in.o(.init.ramfs)
 		__initramfs_end = .;
+		. = ALIGN(64);
+		__per_cpu_start = .;
+			*(.data.percpu)
+		__per_cpu_end = .;
 #ifndef CONFIG_XIP_KERNEL
 		__init_begin = _stext;
 		*(.init.data)

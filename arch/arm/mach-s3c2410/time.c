@@ -37,7 +37,49 @@
 #include "clock.h"
 
 static unsigned long timer_startval;
-static unsigned long timer_ticks_usec;
+static unsigned long timer_usec_ticks;
+
+#define TIMER_USEC_SHIFT 16
+
+/* we use the shifted arithmetic to work out the ratio of timer ticks
+ * to usecs, as often the peripheral clock is not a nice even multiple
+ * of 1MHz.
+ *
+ * shift of 14 and 15 are too low for the 12MHz, 16 seems to be ok
+ * for the current HZ value of 200 without producing overflows.
+ *
+ * Original patch by Dimitry Andric, updated by Ben Dooks
+*/
+
+
+/* timer_mask_usec_ticks
+ *
+ * given a clock and divisor, make the value to pass into timer_ticks_to_usec
+ * to scale the ticks into usecs
+*/
+
+static inline unsigned long
+timer_mask_usec_ticks(unsigned long scaler, unsigned long pclk)
+{
+	unsigned long den = pclk / 1000;
+
+	return ((1000 << TIMER_USEC_SHIFT) * scaler + (den >> 1)) / den;
+}
+
+/* timer_ticks_to_usec
+ *
+ * convert timer ticks to usec.
+*/
+
+static inline unsigned long timer_ticks_to_usec(unsigned long ticks)
+{
+	unsigned long res;
+
+	res = ticks * timer_usec_ticks;
+	res += 1 << (TIMER_USEC_SHIFT - 4);	/* round up slightly */
+
+	return res >> TIMER_USEC_SHIFT;
+}
 
 /***
  * Returns microsecond  since last clock interrupt.  Note that interrupts
@@ -50,31 +92,31 @@ static unsigned long timer_ticks_usec;
 static unsigned long s3c2410_gettimeoffset (void)
 {
 	unsigned long tdone;
-	unsigned long usec;
 	unsigned long irqpend;
+	unsigned long tval;
 
 	/* work out how many ticks have gone since last timer interrupt */
 
-	tdone = timer_startval - __raw_readl(S3C2410_TCNTO(4));
+        tval =  __raw_readl(S3C2410_TCNTO(4));
+	tdone = timer_startval - tval;
 
 	/* check to see if there is an interrupt pending */
 
 	irqpend = __raw_readl(S3C2410_SRCPND);
 	if (irqpend & SRCPND_TIMER4) {
 		/* re-read the timer, and try and fix up for the missed
-		 * interrupt */
+		 * interrupt. Note, the interrupt may go off before the
+		 * timer has re-loaded from wrapping.
+		 */
 
-		tdone = timer_startval - __raw_readl(S3C2410_TCNTO(4));
-		tdone += 1<<16;
+		tval =  __raw_readl(S3C2410_TCNTO(4));
+		tdone = timer_startval - tval;
+
+		if (tval != 0)
+			tdone += timer_startval;
 	}
 
-	/* currently, tcnt is in 12MHz units, but this may change
-	 * for non-bast machines...
-	 */
-
-	usec = tdone / timer_ticks_usec;
-
-	return usec;
+	return timer_ticks_to_usec(tdone);
 }
 
 
@@ -120,8 +162,9 @@ static void s3c2410_timer_setup (void)
 	/* configure the system for whichever machine is in use */
 
 	if (machine_is_bast() || machine_is_vr1000()) {
-		timer_ticks_usec = 12;	      /* timer is at 12MHz */
-		tcnt = (timer_ticks_usec * (1000*1000)) / HZ;
+		/* timer is at 12MHz, scaler is 1 */
+		timer_usec_ticks = timer_mask_usec_ticks(1, 12000000);
+		tcnt = 12000000 / HZ;
 
 		tcfg1 &= ~S3C2410_TCFG1_MUX4_MASK;
 		tcfg1 |= S3C2410_TCFG1_MUX4_TCLK1;
@@ -129,13 +172,15 @@ static void s3c2410_timer_setup (void)
 		/* for the h1940 (and others), we use the pclk from the core
 		 * to generate the timer values. since values around 50 to
 		 * 70MHz are not values we can directly generate the timer
-		 * value from, we need to pre-scaleand divide before using it.
+		 * value from, we need to pre-scale and divide before using it.
+		 *
+		 * for instance, using 50.7MHz and dividing by 6 gives 8.45MHz
+		 * (8.45 ticks per usec)
 		 */
 
 		/* this is used as default if no other timer can be found */
 
-		timer_ticks_usec = s3c24xx_pclk / (1000*1000);
-		timer_ticks_usec /= 6;
+		timer_usec_ticks = timer_mask_usec_ticks(6, s3c24xx_pclk);
 
 		tcfg1 &= ~S3C2410_TCFG1_MUX4_MASK;
 		tcfg1 |= S3C2410_TCFG1_MUX4_DIV2;
@@ -146,8 +191,12 @@ static void s3c2410_timer_setup (void)
 		tcnt = (s3c24xx_pclk / 6) / HZ;
 	}
 
-	printk("setup_timer tcon=%08lx, tcnt %04lx, tcfg %08lx,%08lx\n",
-	       tcon, tcnt, tcfg0, tcfg1);
+	/* timers reload after counting zero, so reduce the count by 1 */
+
+	tcnt--;
+
+	printk("timer tcon=%08lx, tcnt %04lx, tcfg %08lx,%08lx, usec %08lx\n",
+	       tcon, tcnt, tcfg0, tcfg1, timer_usec_ticks);
 
 	/* check to see if timer is within 16bit range... */
 	if (tcnt > 0xffff) {
