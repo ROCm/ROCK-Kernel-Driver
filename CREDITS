@@ -2156,6 +2156,14 @@ N: Thomas Molina
 E: tmolina@cox.net
 D: bug fixes, documentation, minor hackery
 
+N: James Morris
+E: jmorris@intercode.com.au
+W: http://www.intercode.com.au/jmorris/
+D: Netfilter, Linux Security Modules (LSM).
+S: PO Box 707
+S: Spit Junction NSW 2088
+S: Australia
+
 N: David Mosberger-Tang
 E: davidm@hpl.hp.com if IA-64 related, else David.Mosberger@acm.org
 D: Linux/Alpha and Linux/ia64
