@@ -1357,6 +1357,7 @@ xfs_dir2_node_addname_int(
 	xfs_mount_t		*mp;		/* filesystem mount point */
 	int			needlog;	/* need to log data header */
 	int			needscan;	/* need to rescan data frees */
+	int			needfreesp;	/* need to allocate freesp blk */
 	xfs_dir2_data_off_t	*tagp;		/* data entry tag pointer */
 	xfs_trans_t		*tp;		/* transaction pointer */
 
@@ -1508,64 +1509,6 @@ xfs_dir2_node_addname_int(
 		}
 	}
 	/*
-	 * If we don't have a data block, and there's no free slot in a
-	 * freeblock, we need to add a new freeblock.
-	 */
-	if (dbno == -1 && foundindex == -1) {
-		/*
-		 * Not allowed to allocate, so return failure.
-		 */
-		if (args->justcheck || args->total == 0) {
-			return XFS_ERROR(ENOSPC);
-		}
-		/*
-		 * Add the new freeblock.
-		 */
-		if ((error = xfs_dir2_grow_inode(args, XFS_DIR2_FREE_SPACE,
-				&fbno))) {
-			return error;
-		}
-		/*
-		 * Get a buffer for the new block.
-		 */
-		if ((error = xfs_da_get_buf(tp, dp, XFS_DIR2_DB_TO_DA(mp, fbno),
-				-1, &fbp, XFS_DATA_FORK))) {
-			return error;
-		}
-		ASSERT(fbp != NULL);
-		/*
-		 * Initialize the new block to be empty, and remember
-		 * its first slot as our empty slot.
-		 */
-		free = fbp->data;
-		INT_SET(free->hdr.magic, ARCH_CONVERT, XFS_DIR2_FREE_MAGIC);
-		INT_SET(free->hdr.firstdb, ARCH_CONVERT, (fbno - XFS_DIR2_FREE_FIRSTDB(mp)) *
-			XFS_DIR2_MAX_FREE_BESTS(mp));
-		INT_ZERO(free->hdr.nused, ARCH_CONVERT);
-		INT_ZERO(free->hdr.nvalid, ARCH_CONVERT);
-		foundindex = 0;
-		foundbno = fbno;
-	}
-	/*
-	 * If we don't have a data block, and we don't have a freeblock buffer
-	 * in hand (we dropped the one with the free slot in it),
-	 * go read the freeblock again.
-	 */
-	if (dbno == -1 && fbp == NULL) {
-		/*
-		 * We're going to use the empty slot we found before.
-		 */
-		findex = foundindex;
-		fbno = foundbno;
-		if ((error = xfs_da_read_buf(tp, dp, XFS_DIR2_DB_TO_DA(mp, fbno),
-				-1, &fbp, XFS_DATA_FORK))) {
-			return error;
-		}
-		ASSERT(fbp != NULL);
-		free = fbp->data;
-		ASSERT(INT_GET(free->hdr.magic, ARCH_CONVERT) == XFS_DIR2_FREE_MAGIC);
-	}
-	/*
 	 * If we don't have a data block, we need to allocate one and make
 	 * the freespace entries refer to it.
 	 */
@@ -1601,8 +1544,10 @@ xfs_dir2_node_addname_int(
 		 * freespace block we have in hand, drop the one we have
 		 * and get the right one.
 		 */
-		if (XFS_DIR2_DB_TO_FDB(mp, dbno) != fbno) {
-			xfs_da_brelse(tp, fbp);
+		needfreesp = 0;
+		if (XFS_DIR2_DB_TO_FDB(mp, dbno) != fbno || fbp == NULL) {
+			if (fbp)
+				xfs_da_brelse(tp, fbp);
 			if (fblk && fblk->bp)
 				fblk->bp = NULL;
 			fbno = XFS_DIR2_DB_TO_FDB(mp, dbno);
@@ -1612,10 +1557,67 @@ xfs_dir2_node_addname_int(
 				xfs_da_buf_done(dbp);
 				return error;
 			}
-			ASSERT(fbp != NULL);
-			free = fbp->data;
-			ASSERT(INT_GET(free->hdr.magic, ARCH_CONVERT) == XFS_DIR2_FREE_MAGIC);
+
+			/*
+			 * If there wasn't a freespace block, the read will
+			 * return a NULL fbp.  Allocate one later.
+			 */
+
+			if(unlikely( fbp == NULL )) {
+				needfreesp = 1;
+			} else {
+				free = fbp->data;
+				ASSERT(INT_GET(free->hdr.magic, ARCH_CONVERT) == XFS_DIR2_FREE_MAGIC);
+			}
 		}
+
+		/*
+		 * If we don't have a data block, and there's no free slot in a
+		 * freeblock, we need to add a new freeblock.
+		 */
+		if (unlikely(needfreesp || foundindex == -1)) {
+			/*
+			 * Add the new freeblock.
+			 */
+			if ((error = xfs_dir2_grow_inode(args, XFS_DIR2_FREE_SPACE,
+							&fbno))) {
+				return error;
+			}
+
+			if (XFS_DIR2_DB_TO_FDB(mp, dbno) != fbno) {
+				cmn_err(CE_ALERT,
+		"xfs_dir2_node_addname_int: needed block %lld, got %lld\n",
+					XFS_DIR2_DB_TO_FDB(mp, dbno), fbno);
+				XFS_ERROR_REPORT("xfs_dir2_node_addname_int",
+						 XFS_ERRLEVEL_LOW, mp);
+				return XFS_ERROR(EFSCORRUPTED);
+			}
+
+			/*
+			 * Get a buffer for the new block.
+			 */
+			if ((error = xfs_da_get_buf(tp, dp,
+						   XFS_DIR2_DB_TO_DA(mp, fbno),
+						   -1, &fbp, XFS_DATA_FORK))) {
+				return error;
+			}
+			ASSERT(fbp != NULL);
+
+			/*
+			 * Initialize the new block to be empty, and remember
+			 * its first slot as our empty slot.
+			 */
+			free = fbp->data;
+			INT_SET(free->hdr.magic, ARCH_CONVERT, XFS_DIR2_FREE_MAGIC);
+			INT_SET(free->hdr.firstdb, ARCH_CONVERT,
+				(fbno - XFS_DIR2_FREE_FIRSTDB(mp)) *
+				XFS_DIR2_MAX_FREE_BESTS(mp));
+			INT_ZERO(free->hdr.nvalid, ARCH_CONVERT);
+			INT_ZERO(free->hdr.nused, ARCH_CONVERT);
+			foundindex = 0;
+			foundbno = fbno;
+		}
+
 		/*
 		 * Set the freespace block index from the data block number.
 		 */
