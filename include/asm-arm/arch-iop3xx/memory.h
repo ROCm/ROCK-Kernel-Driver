@@ -51,7 +51,7 @@
 #define __bus_to_virt(x)    (__phys_to_virt(((x) & ~(*IOP310_SIALR)) | ( *IOP310_SIATVR)))
 
 /* boot mem allocate global pointer for MU circular queues QBAR */
-#ifdef CONFIG_IOP310_MU
+#ifdef CONFIG_IOP3XX_MU
 extern void *mu_mem;
 #endif
 

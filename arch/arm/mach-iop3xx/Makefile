@@ -16,7 +16,7 @@ ifneq ($(CONFIG_XSCALE_PMU_TIMER),y)
 obj-y			+= iq80310-time.o
 endif
 
-obj-$(CONFIG_IOP310_AAU) += aau.o
-obj-$(CONFIG_IOP310_DMA) += dma.o
-obj-$(CONFIG_IOP310_MU) += message.o
-obj-$(CONFIG_IOP310_PMON) += pmon.o
+obj-$(CONFIG_IOP3XX_AAU) += aau.o
+obj-$(CONFIG_IOP3XX_DMA) += dma.o
+obj-$(CONFIG_IOP3XX_MU) += message.o
+obj-$(CONFIG_IOP3XX_PMON) += pmon.o

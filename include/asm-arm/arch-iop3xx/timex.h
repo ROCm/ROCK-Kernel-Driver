@@ -18,6 +18,6 @@
 
 #else
 
-#error "No IOP310 timex information for this architecture"
+#error "No IOP3xx timex information for this architecture"
 
 #endif

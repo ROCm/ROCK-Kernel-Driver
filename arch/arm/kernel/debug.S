@@ -410,7 +410,7 @@
 		bne	1001b
 		.endm
 
-#elif defined(CONFIG_ARCH_IQ80310)
+#elif defined(CONFIG_ARCH_IOP3XX)
 
 		.macro	addruart,rx
 		mov	\rx, #0xfe000000	@ physical
