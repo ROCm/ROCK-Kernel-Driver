@@ -775,6 +775,8 @@ static int udsl_usb_data_exit (struct udsl_instance_data *instance)
 		ctx->skb = NULL;
 	}
 
+	tasklet_kill (&instance->recvqueue_tasklet);
+
 	for (i = 0; i < UDSL_NUMBER_SND_URBS; i++) {
 		struct udsl_usb_send_data_context *ctx = &(instance->send_ctx[i]);
 
