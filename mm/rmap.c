@@ -39,7 +39,7 @@
  * Something oopsable to put for now in the page->mapping
  * of an anonymous page, to test that it is ignored.
  */
-#define ANON_MAPPING_DEBUG	((struct address_space *) 0xADB)
+#define ANON_MAPPING_DEBUG	((struct address_space *) 0)
 
 static inline void clear_page_anon(struct page *page)
 {
