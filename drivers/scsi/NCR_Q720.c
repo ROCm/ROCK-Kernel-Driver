@@ -179,6 +179,7 @@ NCR_Q720_probe(struct device *dev)
 	i = inb(io_base) | (inb(io_base+1)<<8);
 	if(i != NCR_Q720_MCA_ID) {
 		printk(KERN_ERR "NCR_Q720, adapter failed to I/O map registers correctly at 0x%x(0x%x)\n", io_base, i);
+		kfree(p);
 		return -ENODEV;
 	}
 
