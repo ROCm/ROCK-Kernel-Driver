@@ -522,9 +522,12 @@ ide_startstop_t task_no_data_intr(struct ata_device *drive, struct request *rq)
 
 	ide__sti();	/* local CPU only */
 
-	if (!OK_STAT(stat = GET_STAT(), READY_STAT, BAD_STAT))
-		return ide_error(drive, "task_no_data_intr", stat);
-		/* calls ide_end_drive_cmd */
+	if (!OK_STAT(stat = GET_STAT(), READY_STAT, BAD_STAT)) {
+		/* Keep quite for NOP becouse they are expected to fail. */
+		if (args && args->taskfile.command != WIN_NOP)
+			return ide_error(drive, "task_no_data_intr", stat);
+	}
+
 	if (args)
 		ide_end_drive_cmd (drive, stat, GET_ERR());
 
@@ -854,6 +857,7 @@ void ide_cmd_type_parser(struct ata_taskfile *args)
 			return;
 
 		case WIN_NOP:
+			args->handler = task_no_data_intr;
 			args->command_type = IDE_DRIVE_TASK_NO_DATA;
 			return;
 

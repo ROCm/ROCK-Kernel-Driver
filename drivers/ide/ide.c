@@ -1190,53 +1190,6 @@ void ide_stall_queue(ide_drive_t *drive, unsigned long timeout)
 	drive->PADAM_sleep = timeout + jiffies;
 }
 
-/*
- * Select the next device which will be serviced.
- */
-static struct ata_device *choose_urgent_device(struct ata_channel *channel)
-{
-	struct ata_device *best = NULL;
-	int i;
-
-	for (i = 0; i < MAX_HWIFS; ++i) {
-		int unit;
-		struct ata_channel *ch = &ide_hwifs[i];
-
-		if (!ch->present)
-			continue;
-
-		if (ch->hwgroup != channel->hwgroup)
-			continue;
-
-		for (unit = 0; unit < MAX_DRIVES; ++unit) {
-			struct ata_device *drive = &ch->drives[unit];
-
-			if (!drive->present)
-				continue;
-
-			/* There are no request pending for this device.
-			 */
-			if (list_empty(&drive->queue.queue_head))
-				continue;
-
-			/* This device still want's to remain idle.
-			 */
-			if (drive->PADAM_sleep && time_after(jiffies, drive->PADAM_sleep))
-				continue;
-
-			/* Take this device, if there is no device choosen thus far or
-			 * it's more urgent.
-			 */
-			if (!best || (drive->PADAM_sleep && (!best->PADAM_sleep || time_after(best->PADAM_sleep, drive->PADAM_sleep))))
-			{
-				if (!blk_queue_plugged(&drive->queue))
-					best = drive;
-			}
-		}
-	}
-
-	return best;
-}
 
 /*
  * Determine the longes sleep time for the devices in our hwgroup.
@@ -1274,7 +1227,189 @@ static unsigned long longest_sleep(struct ata_channel *channel)
 }
 
 /*
- * Issue a new request to a drive from hwgroup.
+ * Select the next device which will be serviced.
+ */
+static struct ata_device *choose_urgent_device(struct ata_channel *channel)
+{
+	struct ata_device *choice = NULL;
+	unsigned long sleep = 0;
+	int i;
+
+	for (i = 0; i < MAX_HWIFS; ++i) {
+		int unit;
+		struct ata_channel *ch = &ide_hwifs[i];
+
+		if (!ch->present)
+			continue;
+
+		if (ch->hwgroup != channel->hwgroup)
+			continue;
+
+		for (unit = 0; unit < MAX_DRIVES; ++unit) {
+			struct ata_device *drive = &ch->drives[unit];
+
+			if (!drive->present)
+				continue;
+
+			/* There are no request pending for this device.
+			 */
+			if (list_empty(&drive->queue.queue_head))
+				continue;
+
+			/* This device still want's to remain idle.
+			 */
+			if (drive->PADAM_sleep && time_after(jiffies, drive->PADAM_sleep))
+				continue;
+
+			/* Take this device, if there is no device choosen thus far or
+			 * it's more urgent.
+			 */
+			if (!choice || (drive->PADAM_sleep && (!choice->PADAM_sleep || time_after(choice->PADAM_sleep, drive->PADAM_sleep))))
+			{
+				if (!blk_queue_plugged(&drive->queue))
+					choice = drive;
+			}
+		}
+	}
+
+	if (choice)
+		return choice;
+
+	channel->hwgroup->rq = NULL;
+	sleep = longest_sleep(channel);
+
+	if (sleep) {
+
+		/*
+		 * Take a short snooze, and then wake up again.  Just in case
+		 * there are big differences in relative throughputs.. don't
+		 * want to hog the cpu too much.
+		 */
+
+		if (0 < (signed long)(jiffies + WAIT_MIN_SLEEP - sleep))
+		    sleep = jiffies + WAIT_MIN_SLEEP;
+#if 1
+		if (timer_pending(&channel->hwgroup->timer))
+			printk(KERN_ERR "ide_set_handler: timer already active\n");
+#endif
+		set_bit(IDE_SLEEP, &channel->hwgroup->flags);
+		mod_timer(&channel->hwgroup->timer, sleep);
+		/* we purposely leave hwgroup busy while sleeping */
+	} else {
+		/* Ugly, but how can we sleep for the lock otherwise? perhaps
+		 * from tq_disk? */
+		ide_release_lock(&irq_lock);/* for atari only */
+		clear_bit(IDE_BUSY, &channel->hwgroup->flags);
+	}
+
+	return NULL;
+}
+
+
+/* Place holders for later expansion of functionality.
+ */
+#define ata_pending_commands(drive)	(0)
+#define ata_can_queue(drive)		(1)
+
+/*
+ * Feed commands to a drive until it barfs.  Called with ide_lock/DRIVE_LOCK
+ * held and busy channel.
+ */
+
+static void queue_commands(struct ata_device *drive, int masked_irq)
+{
+	ide_hwgroup_t *hwgroup = drive->channel->hwgroup;
+	ide_startstop_t startstop = -1;
+
+	for (;;) {
+		struct request *rq = NULL;
+
+		if (!test_bit(IDE_BUSY, &hwgroup->flags))
+			printk(KERN_ERR"%s: hwgroup not busy while queueing\n", drive->name);
+
+		/* Abort early if we can't queue another command. for non
+		 * tcq, ata_can_queue is always 1 since we never get here
+		 * unless the drive is idle.
+		 */
+		if (!ata_can_queue(drive)) {
+			if (!ata_pending_commands(drive))
+				clear_bit(IDE_BUSY, &hwgroup->flags);
+			break;
+		}
+
+		drive->PADAM_sleep = 0;
+
+		if (test_bit(IDE_DMA, &hwgroup->flags)) {
+			printk("ide_do_request: DMA in progress...\n");
+			break;
+		}
+
+		/* There's a small window between where the queue could be
+		 * replugged while we are in here when using tcq (in which
+		 * case the queue is probably empty anyways...), so check
+		 * and leave if appropriate. When not using tcq, this is
+		 * still a severe BUG!
+		 */
+		if (blk_queue_plugged(&drive->queue)) {
+			BUG();
+			break;
+		}
+
+		if (!(rq = elv_next_request(&drive->queue))) {
+			if (!ata_pending_commands(drive))
+				clear_bit(IDE_BUSY, &hwgroup->flags);
+			hwgroup->rq = NULL;
+			break;
+		}
+
+		/* If there are queued commands, we can't start a non-fs
+		 * request (really, a non-queuable command) until the
+		 * queue is empty.
+		 */
+		if (!(rq->flags & REQ_CMD) && ata_pending_commands(drive))
+			break;
+
+		hwgroup->rq = rq;
+
+		/* Some systems have trouble with IDE IRQs arriving while the
+		 * driver is still setting things up.  So, here we disable the
+		 * IRQ used by this interface while the request is being
+		 * started.  This may look bad at first, but pretty much the
+		 * same thing happens anyway when any interrupt comes in, IDE
+		 * or otherwise -- the kernel masks the IRQ while it is being
+		 * handled.
+		 */
+
+		if (masked_irq && drive->channel->irq != masked_irq)
+			disable_irq_nosync(drive->channel->irq);
+
+		spin_unlock(&ide_lock);
+		ide__sti();	/* allow other IRQs while we start this request */
+		startstop = start_request(drive, rq);
+
+		spin_lock_irq(&ide_lock);
+		if (masked_irq && drive->channel->irq != masked_irq)
+			enable_irq(drive->channel->irq);
+
+		/* command started, we are busy */
+		if (startstop == ide_started)
+			break;
+
+		/* start_request() can return either ide_stopped (no command
+		 * was started), ide_started (command started, don't queue
+		 * more), or ide_released (command started, try and queue
+		 * more).
+		 */
+#if 0
+		if (startstop == ide_stopped)
+			set_bit(IDE_BUSY, &hwgroup->flags);
+#endif
+
+	}
+}
+
+/*
+ * Issue a new request.
  * Caller must have already done spin_lock_irqsave(&ide_lock, ...)
  *
  * A hwgroup is a serialized group of IDE interfaces.  Usually there is
@@ -1312,42 +1447,14 @@ static void ide_do_request(struct ata_channel *channel, int masked_irq)
 
 	while (!test_and_set_bit(IDE_BUSY, &hwgroup->flags)) {
 		struct ata_channel *ch;
-		ide_startstop_t	startstop;
-		struct ata_device *drive = choose_urgent_device(channel);
+		struct ata_device *drive;
 
-		if (drive == NULL) {
-			unsigned long sleep = 0;
+		/* this will clear IDE_BUSY, if appropriate */
+		drive = choose_urgent_device(channel);
 
-			hwgroup->rq = NULL;
-			sleep = longest_sleep(channel);
+		if (!drive)
+			break;
 
-			if (sleep) {
-
-				/*
-				 * Take a short snooze, and then wake up again.
-				 * Just in case there are big differences in
-				 * relative throughputs.. don't want to hog the
-				 * cpu too much.
-				 */
-
-				if (0 < (signed long)(jiffies + WAIT_MIN_SLEEP - sleep))
-					sleep = jiffies + WAIT_MIN_SLEEP;
-#if 1
-				if (timer_pending(&hwgroup->timer))
-					printk("ide_set_handler: timer already active\n");
-#endif
-				set_bit(IDE_SLEEP, &hwgroup->flags);
-				mod_timer(&hwgroup->timer, sleep);
-				/* we purposely leave hwgroup busy while sleeping */
-			} else {
-				/* Ugly, but how can we sleep for the lock
-				 * otherwise? perhaps from tq_disk? */
-				ide_release_lock(&irq_lock);/* for atari only */
-				clear_bit(IDE_BUSY, &hwgroup->flags);
-			}
-
-			return;
-		}
 		ch = drive->channel;
 
 		if (hwgroup->XXX_drive->channel->sharing_irq && ch != hwgroup->XXX_drive->channel && ch->io_ports[IDE_CONTROL_OFFSET]) {
@@ -1364,49 +1471,8 @@ static void ide_do_request(struct ata_channel *channel, int masked_irq)
 		 */
 		hwgroup->XXX_drive = drive;
 
-		/* Reset wait timeout.
-		 */
-		drive->PADAM_sleep = 0;
-
-		if (blk_queue_plugged(&drive->queue))
-			BUG();
-
-		/* Just continuing an interrupted request maybe.
-		 */
-		hwgroup->rq = elv_next_request(&drive->queue);
-
-		/*
-		 * Some systems have trouble with IDE IRQs arriving while the
-		 * driver is still setting things up.  So, here we disable the
-		 * IRQ used by this interface while the request is being
-		 * started.  This may look bad at first, but pretty much the
-		 * same thing happens anyway when any interrupt comes in, IDE
-		 * or otherwise -- the kernel masks the IRQ while it is being
-		 * handled.
-		 */
-
-		if (masked_irq && ch->irq != masked_irq)
-			disable_irq_nosync(ch->irq);
-		spin_unlock(&ide_lock);
-		ide__sti();	/* allow other IRQs while we start this request */
-		startstop = start_request(drive, hwgroup->rq);
-		spin_lock_irq(&ide_lock);
-		if (masked_irq && ch->irq != masked_irq)
-			enable_irq(ch->irq);
-		if (startstop == ide_stopped)
-			clear_bit(IDE_BUSY, &hwgroup->flags);
+		queue_commands(drive, masked_irq);
 	}
-}
-
-/*
- * Returns the queue which corresponds to a given device.
- */
-request_queue_t *ide_get_queue(kdev_t dev)
-{
-	struct ata_channel *ch = (struct ata_channel *)blk_dev[major(dev)].data;
-
-	/* FIXME: ALLERT: This discriminates between master and slave! */
-	return &ch->drives[DEVICE_NR(dev) & 1].queue;
 }
 
 void do_ide_request(request_queue_t *q)
@@ -1419,20 +1485,20 @@ void do_ide_request(request_queue_t *q)
  * retry the current request in PIO mode instead of risking tossing it
  * all away
  */
-static void dma_timeout_retry(ide_drive_t *drive, struct request *rq)
+static void dma_timeout_retry(struct ata_device *drive, struct request *rq)
 {
-	struct ata_channel *hwif = drive->channel;
+	struct ata_channel *ch = drive->channel;
 
 	/*
 	 * end current dma transaction
 	 */
-	hwif->udma(ide_dma_end, drive, rq);
+	ch->udma(ide_dma_end, drive, rq);
 
 	/*
 	 * complain a little, later we might remove some of this verbosity
 	 */
 	printk("%s: timeout waiting for DMA\n", drive->name);
-	hwif->udma(ide_dma_timeout, drive, rq);
+	ch->udma(ide_dma_timeout, drive, rq);
 
 	/*
 	 * Disable dma for now, but remember that we did so because of
@@ -1441,7 +1507,7 @@ static void dma_timeout_retry(ide_drive_t *drive, struct request *rq)
 	 */
 	drive->retry_pio++;
 	drive->state = DMA_PIO_RETRY;
-	hwif->udma(ide_dma_off_quietly, drive, rq);
+	ch->udma(ide_dma_off_quietly, drive, rq);
 
 	/*
 	 * un-busy drive etc (hwgroup->busy is cleared on return) and
@@ -1713,11 +1779,11 @@ ide_drive_t *get_info_ptr(kdev_t i_rdev)
 	int h;
 
 	for (h = 0; h < MAX_HWIFS; ++h) {
-		struct ata_channel *hwif = &ide_hwifs[h];
-		if (hwif->present && major == hwif->major) {
+		struct ata_channel *ch = &ide_hwifs[h];
+		if (ch->present && major == ch->major) {
 			int unit = DEVICE_NR(i_rdev);
 			if (unit < MAX_DRIVES) {
-				struct ata_device *drive = &hwif->drives[unit];
+				struct ata_device *drive = &ch->drives[unit];
 				if (drive->present)
 					return drive;
 			}
@@ -2029,7 +2095,7 @@ void ide_unregister(struct ata_channel *ch)
 	int unit, i;
 	unsigned long flags;
 	unsigned int p, minor;
-	struct ata_channel old_hwif;
+	struct ata_channel old;
 	int n = 0;
 
 	spin_lock_irqsave(&ide_lock, flags);
@@ -2156,40 +2222,41 @@ void ide_unregister(struct ata_channel *ch)
 	 * it.
 	 */
 
-	old_hwif = *ch;
+	old = *ch;
 	init_hwif_data(ch, ch->index);
-	ch->hwgroup = old_hwif.hwgroup;
-	ch->tuneproc = old_hwif.tuneproc;
-	ch->speedproc = old_hwif.speedproc;
-	ch->selectproc = old_hwif.selectproc;
-	ch->resetproc = old_hwif.resetproc;
-	ch->intrproc = old_hwif.intrproc;
-	ch->maskproc = old_hwif.maskproc;
-	ch->quirkproc = old_hwif.quirkproc;
-	ch->rwproc	= old_hwif.rwproc;
-	ch->ata_read = old_hwif.ata_read;
-	ch->ata_write = old_hwif.ata_write;
-	ch->atapi_read = old_hwif.atapi_read;
-	ch->atapi_write = old_hwif.atapi_write;
-	ch->udma = old_hwif.udma;
-	ch->busproc = old_hwif.busproc;
-	ch->bus_state = old_hwif.bus_state;
-	ch->dma_base = old_hwif.dma_base;
-	ch->dma_extra = old_hwif.dma_extra;
-	ch->config_data = old_hwif.config_data;
-	ch->select_data = old_hwif.select_data;
-	ch->proc = old_hwif.proc;
+	ch->hwgroup = old.hwgroup;
+	ch->tuneproc = old.tuneproc;
+	ch->speedproc = old.speedproc;
+	ch->selectproc = old.selectproc;
+	ch->resetproc = old.resetproc;
+	ch->intrproc = old.intrproc;
+	ch->maskproc = old.maskproc;
+	ch->quirkproc = old.quirkproc;
+	ch->rwproc	= old.rwproc;
+	ch->ata_read = old.ata_read;
+	ch->ata_write = old.ata_write;
+	ch->atapi_read = old.atapi_read;
+	ch->atapi_write = old.atapi_write;
+	ch->udma = old.udma;
+	ch->busproc = old.busproc;
+	ch->bus_state = old.bus_state;
+	ch->dma_base = old.dma_base;
+	ch->dma_extra = old.dma_extra;
+	ch->config_data = old.config_data;
+	ch->select_data = old.select_data;
+	ch->proc = old.proc;
+	/* FIXME: most propably this is always right:! */
 #ifndef CONFIG_BLK_DEV_IDECS
-	ch->irq = old_hwif.irq;
+	ch->irq = old.irq;
 #endif
-	ch->major = old_hwif.major;
-	ch->chipset = old_hwif.chipset;
-	ch->autodma = old_hwif.autodma;
-	ch->udma_four = old_hwif.udma_four;
+	ch->major = old.major;
+	ch->chipset = old.chipset;
+	ch->autodma = old.autodma;
+	ch->udma_four = old.udma_four;
 #ifdef CONFIG_BLK_DEV_IDEPCI
-	ch->pci_dev = old_hwif.pci_dev;
+	ch->pci_dev = old.pci_dev;
 #endif
-	ch->straight8 = old_hwif.straight8;
+	ch->straight8 = old.straight8;
 
 abort:
 	spin_unlock_irqrestore(&ide_lock, flags);
@@ -3352,7 +3419,6 @@ devfs_handle_t ide_devfs_handle;
 EXPORT_SYMBOL(ide_lock);
 EXPORT_SYMBOL(drive_is_flashcard);
 EXPORT_SYMBOL(ide_timer_expiry);
-EXPORT_SYMBOL(ide_get_queue);
 EXPORT_SYMBOL(ide_add_generic_settings);
 EXPORT_SYMBOL(do_ide_request);
 /*

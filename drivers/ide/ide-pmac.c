@@ -27,6 +27,7 @@
  *    symbols or by storing hooks at arch level).
  *
  */
+
 #include <linux/config.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
@@ -77,8 +78,8 @@ struct pmac_ide_hwif {
 	struct scatterlist*		sg_table;
 	int				sg_nents;
 	int				sg_dma_direction;
-#endif /* CONFIG_BLK_DEV_IDEDMA_PMAC */
-	
+#endif
+
 } pmac_ide[MAX_HWIFS] __pmacdata;
 
 static int pmac_ide_count;
@@ -255,11 +256,11 @@ struct {
 #define IDE_WAKEUP_DELAY_MS	2000
 
 static void pmac_ide_setup_dma(struct device_node *np, int ix);
-static int pmac_ide_dmaproc(ide_dma_action_t func, ide_drive_t *drive);
-static int pmac_ide_build_dmatable(ide_drive_t *drive, int ix, int wr);
-static int pmac_ide_tune_chipset(ide_drive_t *drive, byte speed);
-static void pmac_ide_tuneproc(ide_drive_t *drive, byte pio);
-static void pmac_ide_selectproc(ide_drive_t *drive);
+static int pmac_ide_dmaproc(ide_dma_action_t func, struct ata_device *drive, struct request *rq);
+static int pmac_ide_build_dmatable(struct ata_device *drive, struct request *rq, int ix, int wr);
+static int pmac_ide_tune_chipset(struct ata_device *drive, byte speed);
+static void pmac_ide_tuneproc(struct ata_device *drive, byte pio);
+static void pmac_ide_selectproc(struct ata_device *drive);
 
 #endif /* CONFIG_BLK_DEV_IDEDMA_PMAC */
 
@@ -322,7 +323,7 @@ pmac_ide_init_hwif_ports(hw_regs_t *hw,
 	ide_hwifs[ix].selectproc = pmac_ide_selectproc;
 	ide_hwifs[ix].speedproc = &pmac_ide_tune_chipset;
 	if (pmac_ide[ix].dma_regs && pmac_ide[ix].dma_table_cpu) {
-		ide_hwifs[ix].dmaproc = &pmac_ide_dmaproc;
+		ide_hwifs[ix].udma = pmac_ide_dmaproc;
 #ifdef CONFIG_BLK_DEV_IDEDMA_PMAC_AUTO
 		if (!noautodma)
 			ide_hwifs[ix].autodma = 1;
@@ -405,7 +406,7 @@ pmac_ide_do_setfeature(ide_drive_t *drive, byte command)
 {
 	int result = 1;
 	unsigned long flags;
-	struct ata_channel *hwif = HWIF(drive);
+	struct ata_channel *hwif = drive->channel;
 	
 	disable_irq(hwif->irq);	/* disable_irq_nosync ?? */
 	udelay(1);
@@ -431,7 +432,7 @@ pmac_ide_do_setfeature(ide_drive_t *drive, byte command)
 	if (result)
 		printk(KERN_ERR "pmac_ide_do_setfeature disk not ready after SET_FEATURE !\n");
 out:
-	SELECT_MASK(HWIF(drive), drive, 0);
+	SELECT_MASK(drive->channel, drive, 0);
 	if (result == 0) {
 		drive->id->dma_ultra &= ~0xFF00;
 		drive->id->dma_mword &= ~0x0F00;
@@ -1024,7 +1025,7 @@ pmac_ide_setup_dma(struct device_node *np, int ix)
 				    	pmif->dma_table_cpu, pmif->dma_table_dma);
 		return;
 	}
-	ide_hwifs[ix].dmaproc = &pmac_ide_dmaproc;
+	ide_hwifs[ix].udma = pmac_ide_dmaproc;
 #ifdef CONFIG_BLK_DEV_IDEDMA_PMAC_AUTO
 	if (!noautodma)
 		ide_hwifs[ix].autodma = 1;
@@ -1092,11 +1093,10 @@ pmac_raw_build_sglist (int ix, struct request *rq)
  * for a transfer and sets the DBDMA channel to point to it.
  */
 static int
-pmac_ide_build_dmatable(ide_drive_t *drive, int ix, int wr)
+pmac_ide_build_dmatable(struct ata_device *drive, struct request *rq, int ix, int wr)
 {
 	struct dbdma_cmd *table;
 	int i, count = 0;
-	struct request *rq = HWGROUP(drive)->rq;
 	volatile struct dbdma_regs *dma = pmac_ide[ix].dma_regs;
 	struct scatterlist *sg;
 
@@ -1166,7 +1166,7 @@ pmac_ide_build_dmatable(ide_drive_t *drive, int ix, int wr)
 static void
 pmac_ide_destroy_dmatable (ide_drive_t *drive, int ix)
 {
-	struct pci_dev *dev = HWIF(drive)->pci_dev;
+	struct pci_dev *dev = drive->channel->pci_dev;
 	struct scatterlist *sg = pmac_ide[ix].sg_table;
 	int nents = pmac_ide[ix].sg_nents;
 
@@ -1326,17 +1326,17 @@ static void ide_toggle_bounce(ide_drive_t *drive, int on)
 {
 	dma64_addr_t addr = BLK_BOUNCE_HIGH;
 
-	if (on && drive->type == ATA_DISK && HWIF(drive)->highmem) {
+	if (on && drive->type == ATA_DISK && drive->channel->highmem) {
 		if (!PCI_DMA_BUS_IS_PHYS)
 			addr = BLK_BOUNCE_ANY;
 		else
-			addr = HWIF(drive)->pci_dev->dma_mask;
+			addr = drive->channel->pci_dev->dma_mask;
 	}
 
 	blk_queue_bounce_limit(&drive->queue, addr);
 }
 
-int pmac_ide_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
+static int pmac_ide_dmaproc(ide_dma_action_t func, struct ata_device *drive, struct request *rq)
 {
 	int ix, dstat, reading, ata4;
 	volatile struct dbdma_regs *dma;
@@ -1369,10 +1369,10 @@ int pmac_ide_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
 	case ide_dma_write:
 		/* this almost certainly isn't needed since we don't
 		   appear to have a rwproc */
-		if (HWIF(drive)->rwproc)
-			HWIF(drive)->rwproc(drive, func);
+		if (drive->channel->rwproc)
+			drive->channel->rwproc(drive, func);
 		reading = (func == ide_dma_read);
-		if (!pmac_ide_build_dmatable(drive, ix, !reading))
+		if (!pmac_ide_build_dmatable(drive, rq, ix, !reading))
 			return 1;
 		/* Apple adds 60ns to wrDataSetup on reads */
 		if (ata4 && (pmac_ide[ix].timings[unit] & TR_66_UDMA_EN)) {
@@ -1385,9 +1385,9 @@ int pmac_ide_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
 		if (drive->type != ATA_DISK)
 			return 0;
 		ide_set_handler(drive, ide_dma_intr, WAIT_CMD, NULL);
-		if ((HWGROUP(drive)->rq->flags & REQ_DRIVE_ACB) &&
+		if ((rq->flags & REQ_DRIVE_ACB) &&
 		    (drive->addressing == 1)) {
-			struct ata_taskfile *args = HWGROUP(drive)->rq->special;
+			struct ata_taskfile *args = rq->special;
 			OUT_BYTE(args->taskfile.command, IDE_COMMAND_REG);
 		} else if (drive->addressing) {
 			OUT_BYTE(reading ? WIN_READDMA_EXT : WIN_WRITEDMA_EXT, IDE_COMMAND_REG);

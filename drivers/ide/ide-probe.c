@@ -829,6 +829,20 @@ err_kmalloc_gd:
 	return;
 }
 
+/*
+ * Returns the queue which corresponds to a given device.
+ *
+ * FIXME: this should take struct block_device * as argument in future.
+ */
+
+static request_queue_t *ata_get_queue(kdev_t dev)
+{
+	struct ata_channel *ch = (struct ata_channel *)blk_dev[major(dev)].data;
+
+	/* FIXME: ALLERT: This discriminates between master and slave! */
+	return &ch->drives[DEVICE_NR(dev) & 1].queue;
+}
+
 static void channel_init(struct ata_channel *ch)
 {
 	if (!ch->present)
@@ -882,7 +896,7 @@ static void channel_init(struct ata_channel *ch)
 
 	init_gendisk(ch);
 	blk_dev[ch->major].data = ch;
-	blk_dev[ch->major].queue = ide_get_queue;
+	blk_dev[ch->major].queue = ata_get_queue;
 
 	/* all went well, flag this channel entry as valid */
 	ch->present = 1;
