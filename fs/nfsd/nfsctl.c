@@ -470,7 +470,7 @@ static int __init init_nfsd(void)
 #ifdef CONFIG_NFSD_V4
 	nfsd_idmap_init();      /* Name to ID mapping */
 #endif /* CONFIG_NFSD_V4 */
-	if (proc_mkdir("fs/nfs", 0)) {
+	if (proc_mkdir("fs/nfs", NULL)) {
 		struct proc_dir_entry *entry;
 		entry = create_proc_entry("fs/nfs/exports", 0, NULL);
 		if (entry)

@@ -2021,7 +2021,7 @@ out_status:
 	err = written ? written : status;
 out:
 	pagevec_lru_add(&lru_pvec);
-	current->backing_dev_info = 0;
+	current->backing_dev_info = NULL;
 	return err;
 }
 

@@ -121,7 +121,7 @@ islpci_eth_transmit(struct sk_buff *skb, struct net_device *ndev)
 	/* Check alignment and WDS frame formatting. The start of the packet should
 	 * be aligned on a 4-byte boundary. If WDS is enabled add another 6 bytes
 	 * and add WDS address information */
-	if (unlikely(((long) skb->data & 0x03) | init_wds)) {
+	if (likely(((long) skb->data & 0x03) | init_wds)) {
 		/* get the number of bytes to add and re-allign */
 		offset = (4 - (long) skb->data) & 0x03;
 		offset += init_wds ? 6 : 0;
@@ -156,6 +156,12 @@ islpci_eth_transmit(struct sk_buff *skb, struct net_device *ndev)
 		} else {
 			newskb =
 			    dev_alloc_skb(init_wds ? skb->len + 6 : skb->len);
+			if (unlikely(newskb == NULL)) {
+				printk(KERN_ERR "%s: Cannot allocate skb\n",
+				       ndev->name);
+				err = -ENOMEM;
+				goto drop_free;
+			}
 			newskb_offset = (4 - (long) newskb->data) & 0x03;
 
 			/* Check if newskb->data is aligned */

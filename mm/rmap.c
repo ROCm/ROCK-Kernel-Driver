@@ -740,7 +740,7 @@ static inline int try_to_unmap_file(struct page *page)
 	list_for_each_entry(vma, &mapping->i_mmap_nonlinear,
 						shared.vm_set.list) {
 		if (!(vma->vm_flags & VM_RESERVED))
-			vma->vm_private_data = 0;
+			vma->vm_private_data = NULL;
 	}
 relock:
 	page_map_lock(page);

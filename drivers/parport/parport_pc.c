@@ -2147,7 +2147,7 @@ struct parport *parport_pc_probe_port (unsigned long int base,
 	priv->ctr_writable = ~0x10;
 	priv->ecr = 0;
 	priv->fifo_depth = 0;
-	priv->dma_buf = 0;
+	priv->dma_buf = NULL;
 	priv->dma_handle = 0;
 	priv->dev = dev;
 	INIT_LIST_HEAD(&priv->list);

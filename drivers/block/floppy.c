@@ -922,7 +922,7 @@ static inline void unlock_fdc(void)
 {
 	unsigned long flags;
 
-	raw_cmd = 0;
+	raw_cmd = NULL;
 	if (!test_bit(0, &fdc_busy))
 		DPRINT("FDC access conflict!\n");
 
@@ -2021,7 +2021,7 @@ static void floppy_start(void)
 static void do_wakeup(void)
 {
 	reschedule_timeout(MAXTIMEOUT, "do wakeup", 0);
-	cont = 0;
+	cont = NULL;
 	command_status += 2;
 	wake_up(&command_done);
 }
@@ -3191,7 +3191,7 @@ static void raw_cmd_free(struct floppy_raw_cmd **ptr)
 	struct floppy_raw_cmd *next, *this;
 
 	this = *ptr;
-	*ptr = 0;
+	*ptr = NULL;
 	while (this) {
 		if (this->buffer_length) {
 			fd_dma_mem_free((unsigned long)this->kernel_data,
@@ -3211,7 +3211,7 @@ static inline int raw_cmd_copyin(int cmd, char __user *param,
 	int ret;
 	int i;
 
-	*rcmd = 0;
+	*rcmd = NULL;
 	while (1) {
 		ptr = (struct floppy_raw_cmd *)
 		    kmalloc(sizeof(struct floppy_raw_cmd), GFP_USER);
@@ -3219,7 +3219,7 @@ static inline int raw_cmd_copyin(int cmd, char __user *param,
 			return -ENOMEM;
 		*rcmd = ptr;
 		COPYIN(*ptr);
-		ptr->next = 0;
+		ptr->next = NULL;
 		ptr->buffer_length = 0;
 		param += sizeof(struct floppy_raw_cmd);
 		if (ptr->cmd_count > 33)
@@ -3236,7 +3236,7 @@ static inline int raw_cmd_copyin(int cmd, char __user *param,
 		for (i = 0; i < 16; i++)
 			ptr->reply[i] = 0;
 		ptr->resultcode = 0;
-		ptr->kernel_data = 0;
+		ptr->kernel_data = NULL;
 
 		if (ptr->flags & (FD_RAW_READ | FD_RAW_WRITE)) {
 			if (ptr->length <= 0)
@@ -4125,32 +4125,32 @@ static struct param_table {
 	int def_param;
 	int param2;
 } config_params[] = {
-	{"allowed_drive_mask", 0, &allowed_drive_mask, 0xff, 0}, /* obsolete */
-	{"all_drives", 0, &allowed_drive_mask, 0xff, 0},	/* obsolete */
-	{"asus_pci", 0, &allowed_drive_mask, 0x33, 0},
-	{"irq", 0, &FLOPPY_IRQ, 6, 0},
-	{"dma", 0, &FLOPPY_DMA, 2, 0},
-	{"daring", daring, 0, 1, 0},
+	{"allowed_drive_mask", NULL, &allowed_drive_mask, 0xff, 0}, /* obsolete */
+	{"all_drives", NULL, &allowed_drive_mask, 0xff, 0},	/* obsolete */
+	{"asus_pci", NULL, &allowed_drive_mask, 0x33, 0},
+	{"irq", NULL, &FLOPPY_IRQ, 6, 0},
+	{"dma", NULL, &FLOPPY_DMA, 2, 0},
+	{"daring", daring, NULL, 1, 0},
 #if N_FDC > 1
-	{"two_fdc", 0, &FDC2, 0x370, 0},
-	{"one_fdc", 0, &FDC2, 0, 0},
+	{"two_fdc", NULL, &FDC2, 0x370, 0},
+	{"one_fdc", NULL, &FDC2, 0, 0},
 #endif
-	{"thinkpad", floppy_set_flags, 0, 1, FD_INVERTED_DCL},
-	{"broken_dcl", floppy_set_flags, 0, 1, FD_BROKEN_DCL},
-	{"messages", floppy_set_flags, 0, 1, FTD_MSG},
-	{"silent_dcl_clear", floppy_set_flags, 0, 1, FD_SILENT_DCL_CLEAR},
-	{"debug", floppy_set_flags, 0, 1, FD_DEBUG},
-	{"nodma", 0, &can_use_virtual_dma, 1, 0},
-	{"omnibook", 0, &can_use_virtual_dma, 1, 0},
-	{"yesdma", 0, &can_use_virtual_dma, 0, 0},
-	{"fifo_depth", 0, &fifo_depth, 0xa, 0},
-	{"nofifo", 0, &no_fifo, 0x20, 0},
-	{"usefifo", 0, &no_fifo, 0, 0},
-	{"cmos", set_cmos, 0, 0, 0},
-	{"slow", 0, &slow_floppy, 1, 0},
-	{"unexpected_interrupts", 0, &print_unex, 1, 0},
-	{"no_unexpected_interrupts", 0, &print_unex, 0, 0},
-	{"L40SX", 0, &print_unex, 0, 0}
+	{"thinkpad", floppy_set_flags, NULL, 1, FD_INVERTED_DCL},
+	{"broken_dcl", floppy_set_flags, NULL, 1, FD_BROKEN_DCL},
+	{"messages", floppy_set_flags, NULL, 1, FTD_MSG},
+	{"silent_dcl_clear", floppy_set_flags, NULL, 1, FD_SILENT_DCL_CLEAR},
+	{"debug", floppy_set_flags, NULL, 1, FD_DEBUG},
+	{"nodma", NULL, &can_use_virtual_dma, 1, 0},
+	{"omnibook", NULL, &can_use_virtual_dma, 1, 0},
+	{"yesdma", NULL, &can_use_virtual_dma, 0, 0},
+	{"fifo_depth", NULL, &fifo_depth, 0xa, 0},
+	{"nofifo", NULL, &no_fifo, 0x20, 0},
+	{"usefifo", NULL, &no_fifo, 0, 0},
+	{"cmos", set_cmos, NULL, 0, 0},
+	{"slow", NULL, &slow_floppy, 1, 0},
+	{"unexpected_interrupts", NULL, &print_unex, 1, 0},
+	{"no_unexpected_interrupts", NULL, &print_unex, 0, 0},
+	{"L40SX", NULL, &print_unex, 0, 0}
 
 	EXTRA_FLOPPY_PARAMS
 };

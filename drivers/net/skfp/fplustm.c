@@ -141,16 +141,17 @@ void mac_update_counter(struct s_smc *smc)
 /*
  * write long value into buffer memory over memory data register (MDR),
  */
-void	write_mdr(struct s_smc *smc, u_long val)
+static void write_mdr(struct s_smc *smc, u_long val)
 {
 	CHECK_NPP() ;
 	MDRW(val) ;
 }
 
+#if 0
 /*
  * read long value from buffer memory over memory data register (MDR),
  */
-u_long read_mdr(struct s_smc *smc, unsigned int addr)
+static u_long read_mdr(struct s_smc *smc, unsigned int addr)
 {
 	long p ;
 	CHECK_NPP() ;
@@ -164,6 +165,8 @@ u_long read_mdr(struct s_smc *smc, unsigned int addr)
 	p += (u_long)inpw(FM_A(FM_MDRL)) ;
 	return(p) ;
 }
+#endif
+
 /*
  * clear buffer memory
  */
@@ -529,7 +532,7 @@ static void build_claim_beacon(struct s_smc *smc, u_long t_request)
 	outpw(FM_A(FM_RPXSF),0) ;
 }
 
-void formac_rcv_restart(struct s_smc *smc)
+static void formac_rcv_restart(struct s_smc *smc)
 {
 	/* enable receive function */
 	SETMASK(FM_A(FM_MDREG1),smc->hw.fp.rx_mode,FM_ADDRX) ;
@@ -1017,25 +1020,6 @@ void sm_mac_check_beacon_claim(struct s_smc *smc)
 }
 
 /*-------------------------- interface functions ----------------------------*/
-/*
- * control ODL output
- */
-void sm_pm_control(struct s_smc *smc, int mode)
-{
-	SK_UNUSED(smc) ;
-
-	/*
-	 * if PCM logic has set LS_REQUEST = Transmit QUIET Line State
-	 *	/FOTOFF signal turn activ -> ODL disable
-	 */
-	switch(mode) {
-	case PM_TRANSMIT_DISABLE :
-		break ;
-	case PM_TRANSMIT_ENABLE :
-		break ;
-	}
-}
-
 /*
  * control MAC layer	(called by RMT)
  */

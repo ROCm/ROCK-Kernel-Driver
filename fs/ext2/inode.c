@@ -133,7 +133,7 @@ static int ext2_alloc_block (struct inode * inode, unsigned long goal, int *err)
 				 &ei->i_prealloc_count,
 				 &ei->i_prealloc_block, err);
 		else
-			result = ext2_new_block (inode, goal, 0, 0, err);
+			result = ext2_new_block(inode, goal, NULL, NULL, err);
 	}
 #else
 	result = ext2_new_block (inode, goal, 0, 0, err);

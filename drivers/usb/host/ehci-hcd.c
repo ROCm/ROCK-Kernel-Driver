@@ -415,7 +415,7 @@ static int ehci_start (struct usb_hcd *hcd)
 	else					// N microframes cached
 		ehci->i_thresh = 2 + HCC_ISOC_THRES (hcc_params);
 
-	ehci->reclaim = 0;
+	ehci->reclaim = NULL;
 	ehci->next_uframe = -1;
 
 	/* controller state:  unknown --> reset */
@@ -462,7 +462,7 @@ static int ehci_start (struct usb_hcd *hcd)
 	 * its dummy is used in hw_alt_next of many tds, to prevent the qh
 	 * from automatically advancing to the next td after short reads.
 	 */
-	ehci->async->qh_next.qh = 0;
+	ehci->async->qh_next.qh = NULL;
 	ehci->async->hw_next = QH_NEXT (ehci->async->qh_dma);
 	ehci->async->hw_info1 = cpu_to_le32 (QH_HEAD);
 	ehci->async->hw_token = cpu_to_le32 (QTD_STS_HALT);
@@ -985,7 +985,7 @@ idle_timeout:
 			list_empty (&qh->qtd_list) ? "" : "(has tds)");
 		break;
 	}
-	dev->ep [epnum] = 0;
+	dev->ep[epnum] = NULL;
 done:
 	spin_unlock_irqrestore (&ehci->lock, flags);
 	return;

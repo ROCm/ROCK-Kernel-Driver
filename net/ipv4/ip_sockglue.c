@@ -775,8 +775,8 @@ int ip_setsockopt(struct sock *sk, int level, int optname, char __user *optval, 
 			extern int sysctl_optmem_max;
 			extern int sysctl_igmp_max_msf;
 			struct sockaddr_in *psin;
-			struct ip_msfilter *msf = 0;
-			struct group_filter *gsf = 0;
+			struct ip_msfilter *msf = NULL;
+			struct group_filter *gsf = NULL;
 			int msize, i, ifindex;
 
 			if (optlen < GROUP_FILTER_SIZE(0))
@@ -829,7 +829,7 @@ int ip_setsockopt(struct sock *sk, int level, int optname, char __user *optval, 
 				msf->imsf_slist[i] = psin->sin_addr.s_addr;
 			}
 			kfree(gsf);
-			gsf = 0;
+			gsf = NULL;
 
 			err = ip_mc_msfilter(sk, msf, ifindex);
 mc_msf_out:

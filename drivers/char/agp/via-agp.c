@@ -434,6 +434,7 @@ static struct pci_device_id agp_via_pci_table[] = {
 	.subvendor	= PCI_ANY_ID,			\
 	.subdevice	= PCI_ANY_ID,			\
 	}
+	ID(PCI_DEVICE_ID_VIA_82C597_0),
 	ID(PCI_DEVICE_ID_VIA_82C598_0),
 	ID(PCI_DEVICE_ID_VIA_8501_0),
 	ID(PCI_DEVICE_ID_VIA_8601_0),

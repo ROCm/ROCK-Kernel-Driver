@@ -797,7 +797,7 @@ snd_pcm_sframes_t snd_pcm_plug_write_transfer(snd_pcm_plug_t *plug, snd_pcm_plug
 					frames = plugin->src_frames(plugin, frames1);
 			}
 		} else
-			dst_channels = 0;
+			dst_channels = NULL;
 		pdprintf("write plugin: %s, %li\n", plugin->name, frames);
 		if ((frames = plugin->transfer(plugin, src_channels, dst_channels, frames)) < 0)
 			return frames;
@@ -818,7 +818,7 @@ snd_pcm_sframes_t snd_pcm_plug_read_transfer(snd_pcm_plug_t *plug, snd_pcm_plugi
 	if (frames < 0)
 		return frames;
 
-	src_channels = 0;
+	src_channels = NULL;
 	plugin = snd_pcm_plug_first(plug);
 	while (plugin && frames > 0) {
 		if ((next = plugin->next) != NULL) {

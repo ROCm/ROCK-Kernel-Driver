@@ -60,7 +60,7 @@ static size_t dcookie_hash(unsigned long dcookie)
 
 static struct dcookie_struct * find_dcookie(unsigned long dcookie)
 {
-	struct dcookie_struct * found = 0;
+	struct dcookie_struct *found = NULL;
 	struct dcookie_struct * dcs;
 	struct list_head * pos;
 	struct list_head * list;

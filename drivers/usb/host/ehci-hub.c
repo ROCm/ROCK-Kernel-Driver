@@ -71,7 +71,7 @@ static int ehci_hub_suspend (struct usb_hcd *hcd)
 	writel (ehci->command & ~CMD_RUN, &ehci->regs->command);
 	if (ehci->reclaim)
 		ehci->reclaim_ready = 1;
-	ehci_work (ehci, 0);
+	ehci_work(ehci, NULL);
 	(void) handshake (&ehci->regs->status, STS_HALT, STS_HALT, 2000);
 
 	root->dev.power.power_state = 3;

@@ -141,7 +141,7 @@ char *__acpi_map_table(unsigned long phys, unsigned long size)
 	idx = FIX_ACPI_END;
 	while (mapped_size < size) {
 		if (--idx < FIX_ACPI_BEGIN)
-			return 0;	/* cannot handle this */
+			return NULL;	/* cannot handle this */
 		phys += PAGE_SIZE;
 		set_fixmap(idx, phys);
 		mapped_size += PAGE_SIZE;
@@ -560,7 +560,7 @@ extern u32 pmtmr_ioport;
 
 static int __init acpi_parse_fadt(unsigned long phys, unsigned long size)
 {
-	struct fadt_descriptor_rev2 *fadt =0;
+	struct fadt_descriptor_rev2 *fadt = NULL;
 
 	fadt = (struct fadt_descriptor_rev2*) __acpi_map_table(phys,size);
 	if(!fadt) {

@@ -41,6 +41,9 @@
 #define ISL3877_IMAGE_FILE	"isl3877"
 #define ISL3890_IMAGE_FILE	"isl3890"
 
+static int prism54_bring_down(islpci_private *);
+static int islpci_alloc_memory(islpci_private *);
+
 /* Temporary dummy MAC address to use until firmware is loaded.
  * The idea there is that some tools (such as nameif) may query
  * the MAC address before the netdev is 'open'. By using a valid
@@ -390,7 +393,7 @@ islpci_close(struct net_device *ndev)
 	return prism54_bring_down(priv);
 }
 
-int
+static int
 prism54_bring_down(islpci_private *priv)
 {
 	void *device_base = priv->device_base;
@@ -601,7 +604,7 @@ islpci_statistics(struct net_device *ndev)
 /******************************************************************************
     Network device configuration functions
 ******************************************************************************/
-int
+static int
 islpci_alloc_memory(islpci_private *priv)
 {
 	int counter;

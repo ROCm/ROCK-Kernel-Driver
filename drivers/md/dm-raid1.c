@@ -602,7 +602,7 @@ static int recover(struct mirror_set *ms, struct region *reg)
 {
 	int r;
 	unsigned int i;
-	struct io_region from, to[ms->nr_mirrors - 1], *dest;
+	struct io_region from, to[KCOPYD_MAX_REGIONS], *dest;
 	struct mirror *m;
 	unsigned long flags = 0;
 
@@ -757,7 +757,7 @@ static void write_callback(unsigned long error, void *context)
 static void do_write(struct mirror_set *ms, struct bio *bio)
 {
 	unsigned int i;
-	struct io_region io[ms->nr_mirrors];
+	struct io_region io[KCOPYD_MAX_REGIONS+1];
 	struct mirror *m;
 
 	for (i = 0; i < ms->nr_mirrors; i++) {
@@ -1028,7 +1028,7 @@ static int mirror_ctr(struct dm_target *ti, unsigned int argc, char **argv)
 	argc -= args_used;
 
 	if (!argc || sscanf(argv[0], "%u", &nr_mirrors) != 1 ||
-	    nr_mirrors < 2) {
+	    nr_mirrors < 2 || nr_mirrors > KCOPYD_MAX_REGIONS + 1) {
 		ti->error = "dm-mirror: Invalid number of mirrors";
 		dm_destroy_dirty_log(dl);
 		return -EINVAL;

@@ -345,7 +345,7 @@ void __init init_ISA_irqs (void)
 
 	for (i = 0; i < NR_IRQS; i++) {
 		irq_desc[i].status = IRQ_DISABLED;
-		irq_desc[i].action = 0;
+		irq_desc[i].action = NULL;
 		irq_desc[i].depth = 1;
 
 		if (i < 16) {

@@ -84,9 +84,11 @@ MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
 module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable InterWave soundcard.");
 MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
+#ifdef CONFIG_PNP
 module_param_array(isapnp, bool, boot_devs, 0444);
 MODULE_PARM_DESC(isapnp, "ISA PnP detection for specified soundcard.");
 MODULE_PARM_SYNTAX(isapnp, SNDRV_ISAPNP_DESC);
+#endif
 module_param_array(port, long, boot_devs, 0444);
 MODULE_PARM_DESC(port, "Port # for InterWave driver.");
 MODULE_PARM_SYNTAX(port, SNDRV_ENABLED ",allows:{{0x210,0x260,0x10}},dialog:list");

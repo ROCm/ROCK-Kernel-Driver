@@ -786,8 +786,8 @@ ext3_xattr_set_handle2(handle_t *handle, struct inode *inode,
 					EXT3_SB(sb)->s_es->s_first_data_block) +
 				EXT3_I(inode)->i_block_group *
 				EXT3_BLOCKS_PER_GROUP(sb);
-			int block = ext3_new_block(handle,
-				inode, goal, 0, 0, &error);
+			int block = ext3_new_block(handle, inode, goal,
+						   NULL, NULL, &error);
 			if (error)
 				goto cleanup;
 			ea_idebug(inode, "creating block %d", block);

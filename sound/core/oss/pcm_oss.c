@@ -192,7 +192,7 @@ static int snd_pcm_oss_period_size(snd_pcm_substream_t *substream,
 			 params_channels(oss_params) / 8;
 
 	oss_buffer_size = snd_pcm_plug_client_size(substream,
-						   snd_pcm_hw_param_value_max(slave_params, SNDRV_PCM_HW_PARAM_BUFFER_SIZE, 0)) * oss_frame_size;
+						   snd_pcm_hw_param_value_max(slave_params, SNDRV_PCM_HW_PARAM_BUFFER_SIZE, NULL)) * oss_frame_size;
 	oss_buffer_size = 1 << ld2(oss_buffer_size);
 	if (atomic_read(&runtime->mmap_count)) {
 		if (oss_buffer_size > runtime->oss.mmap_bytes)
@@ -228,14 +228,14 @@ static int snd_pcm_oss_period_size(snd_pcm_substream_t *substream,
 	}
 
 	min_period_size = snd_pcm_plug_client_size(substream,
-						   snd_pcm_hw_param_value_min(slave_params, SNDRV_PCM_HW_PARAM_PERIOD_SIZE, 0));
+						   snd_pcm_hw_param_value_min(slave_params, SNDRV_PCM_HW_PARAM_PERIOD_SIZE, NULL));
 	min_period_size *= oss_frame_size;
 	min_period_size = 1 << (ld2(min_period_size - 1) + 1);
 	if (oss_period_size < min_period_size)
 		oss_period_size = min_period_size;
 
 	max_period_size = snd_pcm_plug_client_size(substream,
-						   snd_pcm_hw_param_value_max(slave_params, SNDRV_PCM_HW_PARAM_PERIOD_SIZE, 0));
+						   snd_pcm_hw_param_value_max(slave_params, SNDRV_PCM_HW_PARAM_PERIOD_SIZE, NULL));
 	max_period_size *= oss_frame_size;
 	max_period_size = 1 << ld2(max_period_size);
 	if (oss_period_size > max_period_size)
@@ -248,13 +248,13 @@ static int snd_pcm_oss_period_size(snd_pcm_substream_t *substream,
 			oss_periods = substream->oss.setup->periods;
 	}
 
-	s = snd_pcm_hw_param_value_max(slave_params, SNDRV_PCM_HW_PARAM_PERIODS, 0);
+	s = snd_pcm_hw_param_value_max(slave_params, SNDRV_PCM_HW_PARAM_PERIODS, NULL);
 	if (runtime->oss.maxfrags && s > runtime->oss.maxfrags)
 		s = runtime->oss.maxfrags;
 	if (oss_periods > s)
 		oss_periods = s;
 
-	s = snd_pcm_hw_param_value_min(slave_params, SNDRV_PCM_HW_PARAM_PERIODS, 0);
+	s = snd_pcm_hw_param_value_min(slave_params, SNDRV_PCM_HW_PARAM_PERIODS, NULL);
 	if (s < 2)
 		s = 2;
 	if (oss_periods < s)
@@ -307,7 +307,7 @@ static int choose_rate(snd_pcm_substream_t *substream,
 
 	/* not found, use the nearest rate */
 	kfree(save);
-	return snd_pcm_hw_param_near(substream, params, SNDRV_PCM_HW_PARAM_RATE, best_rate, 0);
+	return snd_pcm_hw_param_near(substream, params, SNDRV_PCM_HW_PARAM_RATE, best_rate, NULL);
 }
 
 static int snd_pcm_oss_change_params(snd_pcm_substream_t *substream)
@@ -357,7 +357,7 @@ static int snd_pcm_oss_change_params(snd_pcm_substream_t *substream)
 		goto failure;
 	}
 	choose_rate(substream, sparams, runtime->oss.rate);
-	snd_pcm_hw_param_near(substream, sparams, SNDRV_PCM_HW_PARAM_CHANNELS, runtime->oss.channels, 0);
+	snd_pcm_hw_param_near(substream, sparams, SNDRV_PCM_HW_PARAM_CHANNELS, runtime->oss.channels, NULL);
 
 	format = snd_pcm_oss_format_from(runtime->oss.format);
 
@@ -440,14 +440,14 @@ static int snd_pcm_oss_change_params(snd_pcm_substream_t *substream)
 		goto failure;
 
 	n = snd_pcm_plug_slave_size(substream, runtime->oss.period_bytes / oss_frame_size);
-	err = snd_pcm_hw_param_near(substream, sparams, SNDRV_PCM_HW_PARAM_PERIOD_SIZE, n, 0);
+	err = snd_pcm_hw_param_near(substream, sparams, SNDRV_PCM_HW_PARAM_PERIOD_SIZE, n, NULL);
 	snd_assert(err >= 0, goto failure);
 
 	err = snd_pcm_hw_param_near(substream, sparams, SNDRV_PCM_HW_PARAM_PERIODS,
-				     runtime->oss.periods, 0);
+				     runtime->oss.periods, NULL);
 	snd_assert(err >= 0, goto failure);
 
-	snd_pcm_kernel_ioctl(substream, SNDRV_PCM_IOCTL_DROP, 0);
+	snd_pcm_kernel_ioctl(substream, SNDRV_PCM_IOCTL_DROP, NULL);
 
 	if ((err = snd_pcm_kernel_ioctl(substream, SNDRV_PCM_IOCTL_HW_PARAMS, sparams)) < 0) {
 		snd_printd("HW_PARAMS failed: %i\n", err);
@@ -564,7 +564,7 @@ static int snd_pcm_oss_prepare(snd_pcm_substream_t *substream)
 	int err;
 	snd_pcm_runtime_t *runtime = substream->runtime;
 
-	err = snd_pcm_kernel_ioctl(substream, SNDRV_PCM_IOCTL_PREPARE, 0);
+	err = snd_pcm_kernel_ioctl(substream, SNDRV_PCM_IOCTL_PREPARE, NULL);
 	if (err < 0) {
 		snd_printd("snd_pcm_oss_prepare: SNDRV_PCM_IOCTL_PREPARE failed\n");
 		return err;
@@ -932,12 +932,12 @@ static int snd_pcm_oss_reset(snd_pcm_oss_file_t *pcm_oss_file)
 
 	substream = pcm_oss_file->streams[SNDRV_PCM_STREAM_PLAYBACK];
 	if (substream != NULL) {
-		snd_pcm_kernel_playback_ioctl(substream, SNDRV_PCM_IOCTL_DROP, 0);
+		snd_pcm_kernel_playback_ioctl(substream, SNDRV_PCM_IOCTL_DROP, NULL);
 		substream->runtime->oss.prepare = 1;
 	}
 	substream = pcm_oss_file->streams[SNDRV_PCM_STREAM_CAPTURE];
 	if (substream != NULL) {
-		snd_pcm_kernel_capture_ioctl(substream, SNDRV_PCM_IOCTL_DROP, 0);
+		snd_pcm_kernel_capture_ioctl(substream, SNDRV_PCM_IOCTL_DROP, NULL);
 		substream->runtime->oss.prepare = 1;
 	}
 	return 0;
@@ -952,7 +952,7 @@ static int snd_pcm_oss_post(snd_pcm_oss_file_t *pcm_oss_file)
 	if (substream != NULL) {
 		if ((err = snd_pcm_oss_make_ready(substream)) < 0)
 			return err;
-		snd_pcm_kernel_playback_ioctl(substream, SNDRV_PCM_IOCTL_START, 0);
+		snd_pcm_kernel_playback_ioctl(substream, SNDRV_PCM_IOCTL_START, NULL);
 	}
 	/* note: all errors from the start action are ignored */
 	/* OSS apps do not know, how to handle them */
@@ -1078,7 +1078,7 @@ static int snd_pcm_oss_sync(snd_pcm_oss_file_t *pcm_oss_file)
 	      __direct:
 		saved_f_flags = substream->ffile->f_flags;
 		substream->ffile->f_flags &= ~O_NONBLOCK;
-		err = snd_pcm_kernel_playback_ioctl(substream, SNDRV_PCM_IOCTL_DRAIN, 0);
+		err = snd_pcm_kernel_playback_ioctl(substream, SNDRV_PCM_IOCTL_DRAIN, NULL);
 		substream->ffile->f_flags = saved_f_flags;
 		if (err < 0)
 			return err;
@@ -1090,7 +1090,7 @@ static int snd_pcm_oss_sync(snd_pcm_oss_file_t *pcm_oss_file)
 		if ((err = snd_pcm_oss_make_ready(substream)) < 0)
 			return err;
 		runtime = substream->runtime;
-		err = snd_pcm_kernel_capture_ioctl(substream, SNDRV_PCM_IOCTL_DROP, 0);
+		err = snd_pcm_kernel_capture_ioctl(substream, SNDRV_PCM_IOCTL_DROP, NULL);
 		if (err < 0)
 			return err;
 		runtime->oss.buffer_used = 0;
@@ -1402,7 +1402,7 @@ static int snd_pcm_oss_set_trigger(snd_pcm_oss_file_t *pcm_oss_file, int trigger
 			cmd = SNDRV_PCM_IOCTL_DROP;
 			runtime->oss.prepare = 1;
 		}
-		err = snd_pcm_kernel_playback_ioctl(psubstream, cmd, 0);
+		err = snd_pcm_kernel_playback_ioctl(psubstream, cmd, NULL);
 		if (err < 0)
 			return err;
 	}
@@ -1423,7 +1423,7 @@ static int snd_pcm_oss_set_trigger(snd_pcm_oss_file_t *pcm_oss_file, int trigger
 			cmd = SNDRV_PCM_IOCTL_DROP;
 			runtime->oss.prepare = 1;
 		}
-		err = snd_pcm_kernel_capture_ioctl(csubstream, cmd, 0);
+		err = snd_pcm_kernel_capture_ioctl(csubstream, cmd, NULL);
 		if (err < 0)
 			return err;
 	}

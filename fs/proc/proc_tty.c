@@ -217,7 +217,7 @@ void proc_tty_unregister_driver(struct tty_driver *driver)
 		
 	remove_proc_entry(driver->driver_name, proc_tty_driver);
 	
-	driver->proc_entry = 0;
+	driver->proc_entry = NULL;
 }
 
 /*
@@ -226,18 +226,18 @@ void proc_tty_unregister_driver(struct tty_driver *driver)
 void __init proc_tty_init(void)
 {
 	struct proc_dir_entry *entry;
-	if (!proc_mkdir("tty", 0))
+	if (!proc_mkdir("tty", NULL))
 		return;
-	proc_tty_ldisc = proc_mkdir("tty/ldisc", 0);
+	proc_tty_ldisc = proc_mkdir("tty/ldisc", NULL);
 	/*
 	 * /proc/tty/driver/serial reveals the exact character counts for
 	 * serial links which is just too easy to abuse for inferring
 	 * password lengths and inter-keystroke timings during password
 	 * entry.
 	 */
-	proc_tty_driver = proc_mkdir_mode("tty/driver", S_IRUSR | S_IXUSR, 0);
+	proc_tty_driver = proc_mkdir_mode("tty/driver", S_IRUSR | S_IXUSR, NULL);
 
-	create_proc_read_entry("tty/ldiscs", 0, 0, tty_ldiscs_read_proc,NULL);
+	create_proc_read_entry("tty/ldiscs", 0, NULL, tty_ldiscs_read_proc, NULL);
 	entry = create_proc_entry("tty/drivers", 0, NULL);
 	if (entry)
 		entry->proc_fops = &proc_tty_drivers_operations;
