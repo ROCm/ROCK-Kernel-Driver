@@ -1156,7 +1156,133 @@ enum idle_type
 };
 
 #ifdef CONFIG_SMP
-#ifdef CONFIG_NUMA
+
+/*
+ * find_idlest_cpu - find the least busy runqueue.
+ */
+static int find_idlest_cpu(struct task_struct *p, int this_cpu,
+			   struct sched_domain *sd)
+{
+	unsigned long load, min_load, this_load;
+	int i, min_cpu;
+	cpumask_t mask;
+
+	min_cpu = UINT_MAX;
+	min_load = ULONG_MAX;
+
+	cpus_and(mask, sd->span, cpu_online_map);
+	cpus_and(mask, mask, p->cpus_allowed);
+
+	for_each_cpu_mask(i, mask) {
+		load = target_load(i);
+
+		if (load < min_load) {
+			min_cpu = i;
+			min_load = load;
+
+			/* break out early on an idle CPU: */
+			if (!min_load)
+				break;
+		}
+	}
+
+	/* add +1 to account for the new task */
+	this_load = source_load(this_cpu) + SCHED_LOAD_SCALE;
+
+	/*
+	 * Would with the addition of the new task to the
+	 * current CPU there be an imbalance between this
+	 * CPU and the idlest CPU?
+	 *
+	 * Use half of the balancing threshold - new-context is
+	 * a good opportunity to balance.
+	 */
+	if (min_load*(100 + (sd->imbalance_pct-100)/2) < this_load*100)
+		return min_cpu;
+
+	return this_cpu;
+}
+
+/*
+ * wake_up_forked_thread - wake up a freshly forked thread.
+ *
+ * This function will do some initial scheduler statistics housekeeping
+ * that must be done for every newly created context, and it also does
+ * runqueue balancing.
+ */
+void fastcall wake_up_forked_thread(task_t * p)
+{
+	unsigned long flags;
+	int this_cpu = get_cpu(), cpu;
+	struct sched_domain *tmp, *sd = NULL;
+	runqueue_t *this_rq = cpu_rq(this_cpu), *rq;
+
+	/*
+	 * Find the largest domain that this CPU is part of that
+	 * is willing to balance on clone:
+	 */
+	for_each_domain(this_cpu, tmp)
+		if (tmp->flags & SD_BALANCE_CLONE)
+			sd = tmp;
+	if (sd)
+		cpu = find_idlest_cpu(p, this_cpu, sd);
+	else
+		cpu = this_cpu;
+
+	local_irq_save(flags);
+lock_again:
+	rq = cpu_rq(cpu);
+	double_rq_lock(this_rq, rq);
+
+	BUG_ON(p->state != TASK_RUNNING);
+
+	/*
+	 * We did find_idlest_cpu() unlocked, so in theory
+	 * the mask could have changed - just dont migrate
+	 * in this case:
+	 */
+	if (unlikely(!cpu_isset(cpu, p->cpus_allowed))) {
+		cpu = this_cpu;
+		double_rq_unlock(this_rq, rq);
+		goto lock_again;
+	}
+	/*
+	 * We decrease the sleep average of forking parents
+	 * and children as well, to keep max-interactive tasks
+	 * from forking tasks that are max-interactive.
+	 */
+	current->sleep_avg = JIFFIES_TO_NS(CURRENT_BONUS(current) *
+		PARENT_PENALTY / 100 * MAX_SLEEP_AVG / MAX_BONUS);
+
+	p->sleep_avg = JIFFIES_TO_NS(CURRENT_BONUS(p) *
+		CHILD_PENALTY / 100 * MAX_SLEEP_AVG / MAX_BONUS);
+
+	p->interactive_credit = 0;
+
+	p->prio = effective_prio(p);
+	set_task_cpu(p, cpu);
+
+	if (cpu == this_cpu) {
+		if (unlikely(!current->array))
+			__activate_task(p, rq);
+		else {
+			p->prio = current->prio;
+			list_add_tail(&p->run_list, &current->run_list);
+			p->array = current->array;
+			p->array->nr_active++;
+			rq->nr_running++;
+		}
+	} else {
+		__activate_task(p, rq);
+		if (TASK_PREEMPTS_CURR(p, rq))
+			resched_task(rq->curr);
+	}
+
+	double_rq_unlock(this_rq, rq);
+	local_irq_restore(flags);
+	put_cpu();
+}
+
 /*
  * If dest_cpu is allowed for this process, migrate the task to it.
  * This is accomplished by forcing the cpu_allowed mask to only
@@ -1198,34 +1324,6 @@ out:
 }
 
 /*
- * Find the least loaded CPU.  Slightly favor the current CPU by
- * setting its load as the minimum to start.
- */
-static int sched_best_cpu(struct task_struct *p, struct sched_domain *sd)
-{
-	cpumask_t tmp;
-	int i, min_load, this_cpu, best_cpu;
-
-	best_cpu = this_cpu = task_cpu(p);
-	min_load = INT_MAX;
-
-	cpus_and(tmp, sd->span, cpu_online_map);
-	for_each_cpu_mask(i, tmp) {
-		unsigned long load;
-		if (i == this_cpu)
-			load = source_load(i);
-		else
-			load = target_load(i) + SCHED_LOAD_SCALE;
-
-		if (min_load > load) {
-			best_cpu = i;
-			min_load = load;
-		}
-	}
-	return best_cpu;
-}
-
-/*
  * sched_balance_exec(): find the highest-level, exec-balance-capable
  * domain and try to migrate the task to the least loaded CPU.
  *
@@ -1234,19 +1332,19 @@ static int sched_best_cpu(struct task_struct *p, struct sched_domain *sd)
  */
 void sched_balance_exec(void)
 {
-	struct sched_domain *sd, *best_sd = NULL;
+	struct sched_domain *tmp, *sd = NULL;
 	int new_cpu, this_cpu = get_cpu();
 
 	/* Prefer the current CPU if there's only this task running */
 	if (this_rq()->nr_running <= 1)
 		goto out;
 
-	for_each_domain(this_cpu, sd)
-		if (sd->flags & SD_BALANCE_EXEC)
-			best_sd = sd;
+	for_each_domain(this_cpu, tmp)
+		if (tmp->flags & SD_BALANCE_EXEC)
+			sd = tmp;
 
-	if (best_sd) {
-		new_cpu = sched_best_cpu(current, best_sd);
+	if (sd) {
+		new_cpu = find_idlest_cpu(current, this_cpu, sd);
 		if (new_cpu != this_cpu) {
 			put_cpu();
 			sched_migrate_task(current, new_cpu);
@@ -1256,7 +1354,6 @@ void sched_balance_exec(void)
 out:
 	put_cpu();
 }
-#endif /* CONFIG_NUMA */
 
 /*
  * double_lock_balance - lock the busiest runqueue, this_rq is locked already.

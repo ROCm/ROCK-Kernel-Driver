@@ -547,10 +547,11 @@ do { if (atomic_dec_and_test(&(tsk)->usage)) __put_task_struct(tsk); } while(0)
 
 #define SD_BALANCE_NEWIDLE	1	/* Balance when about to become idle */
 #define SD_BALANCE_EXEC		2	/* Balance on exec */
-#define SD_WAKE_IDLE		4	/* Wake to idle CPU on task wakeup */
-#define SD_WAKE_AFFINE		8	/* Wake task to waking CPU */
-#define SD_WAKE_BALANCE		16	/* Perform balancing at task wakeup */
-#define SD_SHARE_CPUPOWER	32	/* Domain members share cpu power */
+#define SD_BALANCE_CLONE	4	/* Balance on clone */
+#define SD_WAKE_IDLE		8	/* Wake to idle CPU on task wakeup */
+#define SD_WAKE_AFFINE		16	/* Wake task to waking CPU */
+#define SD_WAKE_BALANCE		32	/* Perform balancing at task wakeup */
+#define SD_SHARE_CPUPOWER	64	/* Domain members share cpu power */
 
 struct sched_group {
 	struct sched_group *next;	/* Must be a circular list */
@@ -598,6 +599,8 @@ struct sched_domain {
 	.cache_nice_tries	= 0,			\
 	.per_cpu_gain		= 15,			\
 	.flags			= SD_BALANCE_NEWIDLE	\
+				| SD_BALANCE_EXEC	\
+				| SD_BALANCE_CLONE	\
 				| SD_WAKE_AFFINE	\
 				| SD_WAKE_IDLE		\
 				| SD_SHARE_CPUPOWER,	\
@@ -619,6 +622,8 @@ struct sched_domain {
 	.cache_nice_tries	= 1,			\
 	.per_cpu_gain		= 100,			\
 	.flags			= SD_BALANCE_NEWIDLE	\
+				| SD_BALANCE_EXEC	\
+				| SD_BALANCE_CLONE	\
 				| SD_WAKE_AFFINE	\
 				| SD_WAKE_BALANCE,	\
 	.last_balance		= jiffies,		\
@@ -640,6 +645,7 @@ struct sched_domain {
 	.cache_nice_tries	= 1,			\
 	.per_cpu_gain		= 100,			\
 	.flags			= SD_BALANCE_EXEC	\
+				| SD_BALANCE_CLONE	\
 				| SD_WAKE_BALANCE,	\
 	.last_balance		= jiffies,		\
 	.balance_interval	= 1,			\
@@ -659,7 +665,7 @@ static inline int set_cpus_allowed(task_t *p, cpumask_t new_mask)
 
 extern unsigned long long sched_clock(void);
 
-#ifdef CONFIG_NUMA
+#ifdef CONFIG_SMP
 extern void sched_balance_exec(void);
 #else
 #define sched_balance_exec()   {}
@@ -717,12 +723,17 @@ extern void do_timer(struct pt_regs *);
 
 extern int FASTCALL(wake_up_state(struct task_struct * tsk, unsigned int state));
 extern int FASTCALL(wake_up_process(struct task_struct * tsk));
+extern void FASTCALL(wake_up_forked_process(struct task_struct * tsk));
 #ifdef CONFIG_SMP
  extern void kick_process(struct task_struct *tsk);
+ extern void FASTCALL(wake_up_forked_thread(struct task_struct * tsk));
 #else
  static inline void kick_process(struct task_struct *tsk) { }
+ static inline void wake_up_forked_thread(struct task_struct * tsk)
+ {
+	return wake_up_forked_process(tsk);
+ }
 #endif
-extern void FASTCALL(wake_up_forked_process(struct task_struct * tsk));
 extern void FASTCALL(sched_fork(task_t * p));
 extern void FASTCALL(sched_exit(task_t * p));
 
