@@ -507,7 +507,6 @@ static char *rq_flags[] = {
 	"REQ_STARTED",
 	"REQ_DONTPREP",
 	"REQ_QUEUED",
-	"REQ_DRIVE_ACB",
 	"REQ_PC",
 	"REQ_BLOCK_PC",
 	"REQ_SENSE",

@@ -7,6 +7,7 @@
 #include <linux/sched.h>
 #include <linux/pci.h>
 #include <linux/ioport.h>
+#include <linux/init.h>
 
 #include <asm/segment.h>
 #include <asm/io.h>

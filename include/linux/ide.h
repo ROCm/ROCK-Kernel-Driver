@@ -654,11 +654,6 @@ typedef enum {
 
 extern int ide_do_drive_cmd(struct ata_device *, struct request *, ide_action_t);
 
-/*
- * Clean up after success/failure of an explicit drive cmd.
- */
-extern void ide_end_drive_cmd(struct ata_device *, struct request *);
-
 struct ata_taskfile {
 	struct hd_drive_task_hdr taskfile;
 	struct hd_drive_task_hdr  hobfile;
@@ -695,7 +690,7 @@ static inline void ide_unmap_rq(struct request *rq, char *to,
 		bio_kunmap_irq(to, flags);
 }
 
-extern ide_startstop_t task_no_data_intr(struct ata_device *, struct request *);
+extern ide_startstop_t ata_special_intr(struct ata_device *, struct request *);
 extern int ide_raw_taskfile(struct ata_device *, struct ata_taskfile *);
 
 extern void ide_fix_driveid(struct hd_driveid *id);
