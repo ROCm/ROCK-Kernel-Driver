@@ -77,7 +77,6 @@
 #include <asm/uaccess.h>
 
 #define MAJOR_NR SANYO_CDROM_MAJOR
-#define DEVICE_NAME "Sanyo H94A CD-ROM"
 #define DEVICE_NR(device) (minor(device))
 #include <linux/blk.h>
 #include "sjcd.h"

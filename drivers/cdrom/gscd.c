@@ -70,7 +70,6 @@
 #include <asm/uaccess.h>
 
 #define MAJOR_NR GOLDSTAR_CDROM_MAJOR
-#define DEVICE_NAME "Goldstar R420"
 #define DEVICE_NR(device) (minor(device))
 #include <linux/blk.h>
 #define gscd_port gscd		/* for compatible parameter passing with "insmod" */

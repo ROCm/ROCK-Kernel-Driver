@@ -107,9 +107,6 @@ extern inline struct request *elv_next_request(request_queue_t *q)
 #ifndef CURRENT
 # define CURRENT elv_next_request(QUEUE)
 #endif
-#ifndef DEVICE_NAME
-# define DEVICE_NAME "unknown"
-#endif
 
 #ifdef DEVICE_INTR
 static void (*DEVICE_INTR)(void) = NULL;

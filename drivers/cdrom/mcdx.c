@@ -73,7 +73,6 @@ static const char *mcdx_c_version
 
 #include <linux/major.h>
 #define MAJOR_NR MITSUMI_X_CDROM_MAJOR
-#define DEVICE_NAME "Mitsumi CD-ROM"
 #define DEVICE_NR(device) (minor(device))
 #include <linux/blk.h>
 #include <linux/devfs_fs_kernel.h>

@@ -177,7 +177,6 @@
 #include "cdu31a.h"
 
 #define MAJOR_NR CDU31A_CDROM_MAJOR
-#define DEVICE_NAME "CDU31A"
 #define DEVICE_NR(device) (minor(device))
 #include <linux/blk.h>
 

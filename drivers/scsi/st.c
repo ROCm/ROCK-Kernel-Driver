@@ -55,7 +55,6 @@ static char *verstr = "20020205";
 #endif
 
 #define MAJOR_NR SCSI_TAPE_MAJOR
-#define DEVICE_NAME "scsitape"
 #define DEVICE_INTR do_st  
 #define DEVICE_NR(device) (minor(device) & 0x7f)
 #include <linux/blk.h>

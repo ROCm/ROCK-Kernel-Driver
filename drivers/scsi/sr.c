@@ -50,7 +50,6 @@
 
 #define MAJOR_NR SCSI_CDROM_MAJOR
 #define LOCAL_END_REQUEST
-#define DEVICE_NAME "CD-ROM"
 #define DEVICE_NR(device) (minor(device))
 #include <linux/blk.h>
 #include "scsi.h"

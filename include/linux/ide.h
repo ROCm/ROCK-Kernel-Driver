@@ -599,7 +599,6 @@ extern int noautodma;
 #define IDE_DRIVER		/* Toggle some magic bits in blk.h */
 #define LOCAL_END_REQUEST	/* Don't generate end_request in blk.h */
 #define DEVICE_NR(device)	(minor(device) >> PARTN_BITS)
-#define DEVICE_NAME "ide"
 #include <linux/blk.h>
 
 extern int __ide_end_request(struct ata_device *, struct request *, int, unsigned int);

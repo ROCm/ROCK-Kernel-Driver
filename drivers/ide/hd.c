@@ -52,7 +52,6 @@
 #include <asm/uaccess.h>
 
 #define MAJOR_NR HD_MAJOR
-#define DEVICE_NAME "hard disk"
 #define DEVICE_INTR do_hd
 #define DEVICE_NR(device) (minor(device)>>6)
 #include <linux/blk.h>

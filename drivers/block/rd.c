@@ -57,7 +57,6 @@
  * include/linux/major.h for now
  */
 #define MAJOR_NR RAMDISK_MAJOR
-#define DEVICE_NAME "ramdisk"
 #define DEVICE_NR(device) (minor(device))
 #include <linux/blk.h>
 #include <linux/blkpg.h>

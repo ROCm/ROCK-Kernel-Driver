@@ -60,7 +60,6 @@ const char * osst_version = "0.9.10";
 #define OSST_DEB_MSG  KERN_NOTICE
 
 #define MAJOR_NR OSST_MAJOR
-#define DEVICE_NAME "onstream" 
 #define DEVICE_INTR do_osst
 #define DEVICE_NR(device) (minor(device) & 0x7f) 
 #include <linux/blk.h>

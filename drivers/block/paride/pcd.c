@@ -180,7 +180,6 @@ MODULE_PARM(drive3,"1-6i");
 /* set up defines for blk.h,  why don't all drivers do it this way ? */
 
 #define MAJOR_NR	major
-#define DEVICE_NAME "PCD"
 #define DEVICE_NR(device) (minor(device))
 #define DEVICE_OFF(device)
 

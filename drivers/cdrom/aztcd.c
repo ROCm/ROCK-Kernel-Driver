@@ -168,7 +168,6 @@
 #include <linux/version.h>
 
 #define MAJOR_NR AZTECH_CDROM_MAJOR
-#define DEVICE_NAME "Aztech CD-ROM"
 #define DEVICE_NR(device) (minor(device))
 
 #include <linux/blk.h>

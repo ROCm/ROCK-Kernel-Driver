@@ -114,7 +114,6 @@
 #include <linux/delay.h>
 
 #define MAJOR_NR	MFM_ACORN_MAJOR
-#define DEVICE_NAME "mfm disk"
 #define DEVICE_INTR do_mfm
 #define DEVICE_NR(device) (minor(device) >> 6)
 #include <linux/blk.h>

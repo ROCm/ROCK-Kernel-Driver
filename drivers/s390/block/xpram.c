@@ -84,7 +84,6 @@ int xpram_major;   /* must be declared before including blk.h */
 devfs_handle_t xpram_devfs_handle;
 
 #define DEVICE_NR(device) MINOR(device)   /* xpram has no partition bits */
-#define DEVICE_NAME "xpram"               /* name for messaging */
 #define DEVICE_INTR xpram_intrptr         /* pointer to the bottom half */
 #define DEVICE_NO_RANDOM                  /* no entropy to contribute */
 #define DEVICE_OFF(d)                     /* do-nothing */

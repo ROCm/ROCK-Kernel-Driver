@@ -198,7 +198,6 @@ History:
 #include <asm/io.h>
 
 #define MAJOR_NR CM206_CDROM_MAJOR
-#define DEVICE_NAME "Philips/LMS CD-ROM cm206"
 #define DEVICE_NR(device) (minor(device))
 
 #include <linux/blk.h>

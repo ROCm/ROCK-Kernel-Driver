@@ -42,7 +42,6 @@
  */
 #define MAJOR_NR	JSFD_MAJOR
 
-#define DEVICE_NAME "jsfd"
 #define DEVICE_REQUEST jsfd_do_request
 #define DEVICE_NR(device) (MINOR(device))
 #define DEVICE_ON(device)

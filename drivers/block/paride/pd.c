@@ -204,7 +204,6 @@ MODULE_PARM(drive3,"1-8i");
 /* set up defines for blk.h,  why don't all drivers do it this way ? */
 
 #define MAJOR_NR   major
-#define DEVICE_NAME "PD"
 #define DEVICE_NR(device) (minor(device)>>PD_BITS)
 #define DEVICE_OFF(device)
 
