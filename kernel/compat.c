@@ -204,7 +204,8 @@ asmlinkage long compat_sys_sigprocmask(int how, compat_old_sigset_t *set,
 	ret = sys_sigprocmask(how, set ? &s : NULL, oset ? &s : NULL);
 	set_fs(old_fs);
 	if (ret == 0)
-		ret = put_user(s, oset);
+		if (oset)
+			ret = put_user(s, oset);
 	return ret;
 }
 

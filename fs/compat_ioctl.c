@@ -1704,7 +1704,7 @@ static int do_smb_getmountuid(unsigned int fd, unsigned int cmd, unsigned long a
 	set_fs(old_fs);
 
 	if (err >= 0)
-		err = put_user(kuid, (compat_pid_t *)arg);
+		err = put_user(kuid, (compat_uid_t *)arg);
 
 	return err;
 }
@@ -3081,7 +3081,7 @@ HANDLE_IOCTL(VIDIOCSFBUF32, do_video_ioctl)
 HANDLE_IOCTL(VIDIOCGFREQ32, do_video_ioctl)
 HANDLE_IOCTL(VIDIOCSFREQ32, do_video_ioctl)
 /* One SMB ioctl needs translations. */
-#define SMB_IOC_GETMOUNTUID_32 _IOR('u', 1, compat_pid_t)
+#define SMB_IOC_GETMOUNTUID_32 _IOR('u', 1, compat_uid_t)
 HANDLE_IOCTL(SMB_IOC_GETMOUNTUID_32, do_smb_getmountuid)
 HANDLE_IOCTL(ATM_GETLINKRATE32, do_atm_ioctl)
 HANDLE_IOCTL(ATM_GETNAMES32, do_atm_ioctl)
