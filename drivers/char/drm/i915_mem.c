@@ -75,7 +75,7 @@ static struct mem_block *split_block(struct mem_block *p, int start, int size,
 {
 	/* Maybe cut off the start of an existing block */
 	if (start > p->start) {
-		struct mem_block *newblock = DRM_MALLOC(sizeof(*newblock));
+		struct mem_block *newblock = DRM(alloc)(sizeof(*newblock), DRM_MEM_BUFLISTS);
 		if (!newblock)
 			goto out;
 		newblock->start = start;
@@ -91,7 +91,7 @@ static struct mem_block *split_block(struct mem_block *p, int start, int size,
 
 	/* Maybe cut off the end of an existing block */
 	if (size < p->size) {
-		struct mem_block *newblock = DRM_MALLOC(sizeof(*newblock));
+		struct mem_block *newblock = DRM(alloc)(sizeof(*newblock), DRM_MEM_BUFLISTS);
 		if (!newblock)
 			goto out;
 		newblock->start = start + size;
@@ -148,7 +148,7 @@ static void free_block(struct mem_block *p)
 		p->size += q->size;
 		p->next = q->next;
 		p->next->prev = p;
-		DRM_FREE(q, sizeof(*q));
+		DRM(free)(q, sizeof(*q), DRM_MEM_BUFLISTS);
 	}
 
 	if (p->prev->filp == NULL) {
@@ -156,7 +156,7 @@ static void free_block(struct mem_block *p)
 		q->size += p->size;
 		q->next = p->next;
 		q->next->prev = q;
-		DRM_FREE(p, sizeof(*q));
+		DRM(free)(p, sizeof(*q), DRM_MEM_BUFLISTS);
 	}
 }
 
@@ -164,14 +164,14 @@ static void free_block(struct mem_block *p)
  */
 static int init_heap(struct mem_block **heap, int start, int size)
 {
-	struct mem_block *blocks = DRM_MALLOC(sizeof(*blocks));
+	struct mem_block *blocks = DRM(alloc)(sizeof(*blocks), DRM_MEM_BUFLISTS);
 
 	if (!blocks)
 		return -ENOMEM;
 
-	*heap = DRM_MALLOC(sizeof(**heap));
+	*heap = DRM(alloc)(sizeof(**heap), DRM_MEM_BUFLISTS);
 	if (!*heap) {
-		DRM_FREE(blocks, sizeof(*blocks));
+		DRM(free)(blocks, sizeof(*blocks), DRM_MEM_BUFLISTS);
 		return -ENOMEM;
 	}
 
@@ -211,7 +211,7 @@ void i915_mem_release(drm_device_t * dev, DRMFILE filp, struct mem_block *heap)
 			p->size += q->size;
 			p->next = q->next;
 			p->next->prev = p;
-			DRM_FREE(q, sizeof(*q));
+			DRM(free)(q, sizeof(*q), DRM_MEM_BUFLISTS);
 		}
 	}
 }
@@ -228,10 +228,10 @@ void i915_mem_takedown(struct mem_block **heap)
 	for (p = (*heap)->next; p != *heap;) {
 		struct mem_block *q = p;
 		p = p->next;
-		DRM_FREE(q, sizeof(*q));
+		DRM(free)(q, sizeof(*q), DRM_MEM_BUFLISTS);
 	}
 
-	DRM_FREE(*heap, sizeof(**heap));
+	DRM(free)(*heap, sizeof(**heap), DRM_MEM_BUFLISTS);
 	*heap = NULL;
 }
 

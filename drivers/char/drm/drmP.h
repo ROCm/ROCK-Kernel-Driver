@@ -34,6 +34,8 @@
 #ifndef _DRM_P_H_
 #define _DRM_P_H_
 
+/* If you want the memory alloc debug functionality, change define below */
+/* #define DEBUG_MEMORY */
 
 #ifdef __KERNEL__
 #ifdef __alpha__
@@ -765,11 +767,9 @@ extern ssize_t       DRM(read)(struct file *filp, char __user *buf, size_t count
 extern void	     DRM(mem_init)(void);
 extern int	     DRM(mem_info)(char *buf, char **start, off_t offset,
 				   int request, int *eof, void *data);
-extern void	     *DRM(alloc)(size_t size, int area);
 extern void	     *DRM(calloc)(size_t nmemb, size_t size, int area);
 extern void	     *DRM(realloc)(void *oldpt, size_t oldsize, size_t size,
 				   int area);
-extern void	     DRM(free)(void *pt, size_t size, int area);
 extern unsigned long DRM(alloc_pages)(int order, int area);
 extern void	     DRM(free_pages)(unsigned long address, int order,
 				     int area);
@@ -984,6 +984,24 @@ static __inline__ struct drm_map *drm_core_findmap(struct drm_device *dev, unsig
 static __inline__ void drm_core_dropmap(struct drm_map *map)
 {
 }
+
+#ifndef DEBUG_MEMORY
+/** Wrapper around kmalloc() */
+static __inline__ void *DRM(alloc)(size_t size, int area)
+{
+	return kmalloc(size, GFP_KERNEL);
+}
+
+/** Wrapper around kfree() */
+static __inline__ void DRM(free)(void *pt, size_t size, int area)
+{
+	kfree(pt);
+}
+#else
+extern void *DRM(alloc)(size_t size, int area);
+extern void DRM(free)(void *pt, size_t size, int area);
+#endif
+
 /*@}*/
 
 extern unsigned long DRM(core_get_map_ofs)(drm_map_t *map);

@@ -300,7 +300,7 @@ int DRM(wait_vblank)( DRM_IOCTL_ARGS )
 
 		spin_unlock_irqrestore( &dev->vbl_lock, irqflags );
 
-		if ( !( vbl_sig = DRM_MALLOC( sizeof( drm_vbl_sig_t ) ) ) ) {
+		if ( !( vbl_sig = DRM(alloc)( sizeof( drm_vbl_sig_t ), DRM_MEM_DRIVER ) ) ) {
 			return -ENOMEM;
 		}
 
@@ -356,7 +356,7 @@ void DRM(vbl_send_signals)( drm_device_t *dev )
 
 			list_del( list );
 
-			DRM_FREE( vbl_sig, sizeof(*vbl_sig) );
+			DRM(free)( vbl_sig, sizeof(*vbl_sig), DRM_MEM_DRIVER );
 
 			dev->vbl_pending--;
 		}
