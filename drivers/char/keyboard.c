@@ -234,22 +234,24 @@ void to_utf8(struct vc_data *vc, ushort c)
 /* maybe called when keymap is undefined, so that shiftkey release is seen */
 void compute_shiftstate(void)
 {
-	int i, j, sym, val;
+	int i, j, k, sym, val;
 
 	shift_state = 0;
 	memset(shift_down, 0, sizeof(shift_down));
 	
-	for (i = 0; i < SIZE(key_down); i += BITS_PER_LONG) {
+	for (i = 0; i < SIZE(key_down); i++) {
 	  	
-		if (!key_down[i / BITS_PER_LONG])
+		if (!key_down[i])
 			continue;	    
+
+		k = i*BITS_PER_LONG;
 	
-		for (j = 0; j < BITS_PER_LONG; j++) {
+		for (j = 0; j < BITS_PER_LONG; j++, k++) {
 	      
-			if (!test_bit(i + j, key_down))
+			if (!test_bit(k, key_down))
 				continue;
 	
-			sym = U(plain_map[i + j]);
+			sym = U(plain_map[k]);
 			if (KTYP(sym) != KT_SHIFT && KTYP(sym) != KT_SLOCK)
 				continue;
 
