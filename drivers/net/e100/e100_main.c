@@ -1241,12 +1241,21 @@ e100_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 static unsigned char __devinit
 e100_init(struct e100_private *bdp)
 {
+	u32 st_timeout = 0;
+	u32 st_result = 0;
 	e100_sw_init(bdp);
 
-	if (!e100_selftest(bdp, NULL, NULL)) {
-		printk(KERN_ERR "e100: selftest failed\n");
+	if (!e100_selftest(bdp, &st_timeout, &st_result)) {
+        	if (st_timeout) {
+			printk(KERN_ERR "e100: selftest timeout\n");
+		} else {
+			printk(KERN_ERR "e100: selftest failed. Results: %x\n",
+					st_result);
+		}
 		return false;
 	}
+	else
+		printk(KERN_DEBUG "e100: selftest OK.\n");
 
 	/* read the MAC address from the eprom */
 	e100_rd_eaddr(bdp);
@@ -2943,11 +2952,6 @@ e100_print_brd_conf(struct e100_private *bdp)
 		       "  Mem:0x%08lx  IRQ:%d  Speed:%d Mbps  Dx:%s\n",
 		       (unsigned long) bdp->device->mem_start,
 		       bdp->device->irq, 0, "N/A");
-
-		/* Auto negotiation failed so we should display an error */
-		printk(KERN_NOTICE "  Failed to detect cable link\n");
-		printk(KERN_NOTICE "  Speed and duplex will be determined "
-		       "at time of connection\n");
 	}
 
 	/* Print the string if checksum Offloading was enabled */
