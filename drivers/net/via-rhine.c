@@ -373,7 +373,6 @@ enum rhine_revs {
 enum rhine_quirks {
 	rqWOL		= 0x0001,	/* Wake-On-LAN support */
 	rqForceReset	= 0x0002,
-	rqDavicomPhy	= 0x0020,
 	rq6patterns	= 0x0040,	/* 6 instead of 4 patterns for WOL */
 	rqStatusWBRace	= 0x0080,	/* Tx Status Writeback Error possible */
 	rqRhineI	= 0x0100,	/* See comment below */
@@ -698,7 +697,7 @@ static int __devinit rhine_init_one(struct pci_dev *pdev,
 
 	io_size = 256;
 	if (pci_rev < VT6102) {
-		quirks = rqRhineI | rqDavicomPhy;
+		quirks = rqRhineI;
 		io_size = 128;
 		name = "VT86C100A Rhine";
 	}
@@ -1113,11 +1112,6 @@ static void init_registers(struct net_device *dev)
 	writew(rp->chip_cmd, ioaddr + ChipCmd);
 
 	rhine_check_duplex(dev);
-
-	/* The LED outputs of various MII xcvrs should be configured. */
-	/* For NS or Mison phys, turn on bit 1 in register 0x17 */
-	mdio_write(dev, rp->phys[0], 0x17, mdio_read(dev, rp->phys[0], 0x17) |
-		   0x0001);
 }
 
 /* Read and write over the MII Management Data I/O (MDIO) interface. */
@@ -1692,12 +1686,7 @@ static void rhine_error(struct net_device *dev, int intr_status)
 	spin_lock(&rp->lock);
 
 	if (intr_status & (IntrLinkChange)) {
-		if (readb(ioaddr + MIIStatus) & 0x02) {
-			/* Link failed, restart autonegotiation. */
-			if (rp->quirks & rqRhineI)
-				mdio_write(dev, rp->phys[0], MII_BMCR, 0x3300);
-		} else
-			rhine_check_duplex(dev);
+		rhine_check_duplex(dev);
 		if (debug)
 			printk(KERN_ERR "%s: MII status changed: "
 			       "Autonegotiation advertising %4.4x partner "
