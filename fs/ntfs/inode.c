@@ -2314,8 +2314,10 @@ trunc_err:
  * marking the page (and in this case mft record) dirty but we do not implement
  * this yet as write_mft_record() largely ignores the @sync parameter and
  * always performs synchronous writes.
+ *
+ * Return 0 on success and -errno on error.
  */
-void ntfs_write_inode(struct inode *vi, int sync)
+int ntfs_write_inode(struct inode *vi, int sync)
 {
 	ntfs_inode *ni = NTFS_I(vi);
 #if 0
@@ -2332,7 +2334,7 @@ void ntfs_write_inode(struct inode *vi, int sync)
 	 */
 	if (NInoAttr(ni)) {
 		NInoClearDirty(ni);
-		return;
+		return 0;
 	}
 	/* Map, pin, and lock the mft record belonging to the inode. */
 	m = map_mft_record(ni);
@@ -2410,7 +2412,7 @@ void ntfs_write_inode(struct inode *vi, int sync)
 	if (unlikely(err))
 		goto err_out;
 	ntfs_debug("Done.");
-	return;
+	return 0;
 #if 0
 unm_err_out:
 	unmap_mft_record(ni);
@@ -2426,7 +2428,31 @@ err_out:
 				"as bad.  You should run chkdsk.", -err);
 		make_bad_inode(vi);
 	}
-	return;
+	return err;
+}
+
+/**
+ * ntfs_write_inode_vfs - write out a dirty inode
+ * @vi:		inode to write out
+ * @sync:	if true, write out synchronously
+ *
+ * Write out a dirty inode to disk including any extent inodes if present.
+ *
+ * If @sync is true, commit the inode to disk and wait for io completion.  This
+ * is done using write_mft_record().
+ *
+ * If @sync is false, just schedule the write to happen but do not wait for i/o
+ * completion.  In 2.6 kernels, scheduling usually happens just by virtue of
+ * marking the page (and in this case mft record) dirty but we do not implement
+ * this yet as write_mft_record() largely ignores the @sync parameter and
+ * always performs synchronous writes.
+ *
+ * This functions does not have a return value which is the required behaviour
+ * for the VFS super_operations ->dirty_inode function.
+ */
+void ntfs_write_inode_vfs(struct inode *vi, int sync)
+{
+	ntfs_write_inode(vi, sync);
 }
 
 #endif /* NTFS_RW */

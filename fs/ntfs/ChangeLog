@@ -26,6 +26,14 @@ ToDo/Notes:
 	- Enable the code for setting the NT4 compatibility flag when we start
 	  making NTFS 1.2 specific modifications.
 
+2.1.16 - WIP.
+
+	- Add support for readv/writev and aio_read/aio_write (fs/ntfs/file.c).
+	  This is done by setting the appropriate file operations pointers to
+	  the generic helper functions provided by mm/filemap.c.
+	- Implement fsync, fdatasync, and msync both for files (fs/ntfs/file.c)
+	  and directories (fs/ntfs/dir.c).
+
 2.1.15 - Invalidate quotas when (re)mounting read-write.
 
 	- Add new element itype.index.collation_rule to the ntfs inode
