@@ -392,7 +392,7 @@ void agp_device_command(u32 command, int agp_v3)
 	}
 }
 
-void agp_generic_agp_enable(u32 mode)
+void agp_generic_enable(u32 mode)
 {
 	u32 command, ncapid, major, minor;
 
@@ -760,7 +760,7 @@ EXPORT_SYMBOL(agp_generic_alloc_page);
 EXPORT_SYMBOL(agp_generic_destroy_page);
 EXPORT_SYMBOL(agp_generic_suspend);
 EXPORT_SYMBOL(agp_generic_resume);
-EXPORT_SYMBOL(agp_generic_agp_enable);
+EXPORT_SYMBOL(agp_generic_enable);
 EXPORT_SYMBOL(agp_generic_create_gatt_table);
 EXPORT_SYMBOL(agp_generic_free_gatt_table);
 EXPORT_SYMBOL(agp_generic_insert_memory);
