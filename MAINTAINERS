@@ -679,6 +679,12 @@ M:	romieu@cogenit.fr
 M:	romieu@ensta.fr
 S:	Maintained
 
+DVB SUBSYSTEM AND DRIVERS
+P:	LinuxTV.org Project
+L: 	linux-dvb@linuxtv.org
+W:	http://linuxtv.org/developer/dvb.xml
+S:	Supported
+
 EATA-DMA SCSI DRIVER
 P:	Michael Neuffer
 L:	linux-eata@i-connect.net, linux-scsi@vger.kernel.org
@@ -1667,6 +1673,12 @@ M:	linux390@de.ibm.com
 L:	linux-390@vm.marist.edu
 W:	http://oss.software.ibm.com/developerworks/opensource/linux390
 S:	Supported
+
+SAA7146 VIDEO4LINUX-2 DRIVER
+P:	Michael Hunold
+M:	michael@mihu.de
+W:	http://www.mihu.de/linux/saa7146
+S:	Maintained
 
 SA1100 SUPPORT
 P:	Nicolas Pitre
