@@ -138,6 +138,12 @@ static int nfs_stat_to_errno(int);
 #define NFS4_dec_readlink_sz	(compound_decode_hdr_maxsz + \
 				decode_putfh_maxsz + \
 				op_decode_hdr_maxsz)
+#define NFS4_enc_readdir_sz	(compound_encode_hdr_maxsz + \
+				encode_putfh_maxsz + \
+				op_encode_hdr_maxsz + 9)
+#define NFS4_dec_readdir_sz	(compound_decode_hdr_maxsz + \
+				decode_putfh_maxsz + \
+				op_decode_hdr_maxsz + 2)
 #define NFS4_enc_write_sz	(compound_encode_hdr_maxsz + \
 				encode_putfh_maxsz + \
 				op_encode_hdr_maxsz + 8)
@@ -941,8 +947,7 @@ encode_read(struct xdr_stream *xdr, struct nfs_readargs *args)
 	return 0;
 }
 
-static int
-encode_readdir(struct xdr_stream *xdr, struct nfs4_readdir *readdir, struct rpc_rqst *req)
+static int encode_readdir(struct xdr_stream *xdr, const struct nfs4_readdir_arg *readdir, struct rpc_rqst *req)
 {
 	struct rpc_auth *auth = req->rq_task->tk_auth;
 	int replen;
@@ -950,21 +955,21 @@ encode_readdir(struct xdr_stream *xdr, struct nfs4_readdir *readdir, struct rpc_
 
 	RESERVE_SPACE(32+sizeof(nfs4_verifier));
 	WRITE32(OP_READDIR);
-	WRITE64(readdir->rd_cookie);
-	WRITEMEM(readdir->rd_req_verifier.data, sizeof(readdir->rd_req_verifier.data));
-	WRITE32(readdir->rd_count >> 5);  /* meaningless "dircount" field */
-	WRITE32(readdir->rd_count);
+	WRITE64(readdir->cookie);
+	WRITEMEM(readdir->verifier.data, sizeof(readdir->verifier.data));
+	WRITE32(readdir->count >> 5);  /* meaningless "dircount" field */
+	WRITE32(readdir->count);
 	WRITE32(2);
-	WRITE32(readdir->rd_bmval[0]);
-	WRITE32(readdir->rd_bmval[1]);
+	WRITE32(FATTR4_WORD0_FILEID);
+	WRITE32(0);
 
 	/* set up reply iovec
 	 *    toplevel_status + taglen + rescount + OP_PUTFH + status
 	 *      + OP_READDIR + status + verifer(2)  = 9
 	 */
 	replen = (RPC_REPHDRSIZE + auth->au_rslack + 9) << 2;
-	xdr_inline_pages(&req->rq_rcv_buf, replen, readdir->rd_pages,
-			 readdir->rd_pgbase, readdir->rd_count);
+	xdr_inline_pages(&req->rq_rcv_buf, replen, readdir->pages,
+			 readdir->pgbase, readdir->count);
 
 	return 0;
 }
@@ -1127,55 +1132,9 @@ encode_write(struct xdr_stream *xdr, struct nfs_writeargs *args)
 
 	return 0;
 }
-
-/* FIXME: this sucks */
-static int
-encode_compound(struct xdr_stream *xdr, struct nfs4_compound *cp, struct rpc_rqst *req)
-{
-	struct compound_hdr hdr = {
-		.taglen = cp->taglen,
-		.tag	= cp->tag,
-		.nops	= cp->req_nops,
-	};
-	int i, status = 0;
-
-	encode_compound_hdr(xdr, &hdr);
-
-	for (i = 0; i < cp->req_nops; i++) {
-		switch (cp->ops[i].opnum) {
-		case OP_PUTFH:
-			status = encode_putfh(xdr, cp->ops[i].u.putfh.pf_fhandle);
-			break;
-		case OP_READDIR:
-			status = encode_readdir(xdr, &cp->ops[i].u.readdir, req);
-			break;
-		default:
-			BUG();
-		}
-		if (status)
-			return status;
-	}
-	
-	return 0;
-}
 /*
  * END OF "GENERIC" ENCODE ROUTINES.
  */
-
-/*
- * Encode COMPOUND argument
- */
-static int
-nfs4_xdr_enc_compound(struct rpc_rqst *req, uint32_t *p, struct nfs4_compound *cp)
-{
-	struct xdr_stream xdr;
-	int status;
-	
-	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
-	status = encode_compound(&xdr, cp, req);
-	cp->timestamp = jiffies;
-	return status;
-}
 
 /*
  * Encode an ACCESS request
@@ -1560,6 +1519,27 @@ static int nfs4_xdr_enc_readlink(struct rpc_rqst *req, uint32_t *p, const struct
 	if(status)
 		goto out;
 	status = encode_readlink(&xdr, args, req);
+out:
+	return status;
+}
+
+/*
+ * Encode a READDIR request
+ */
+static int nfs4_xdr_enc_readdir(struct rpc_rqst *req, uint32_t *p, const struct nfs4_readdir_arg *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops = 2,
+	};
+	int status;
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr);
+	status = encode_putfh(&xdr, args->fh);
+	if(status)
+		goto out;
+	status = encode_readdir(&xdr, args, req);
 out:
 	return status;
 }
@@ -2956,8 +2936,7 @@ decode_read(struct xdr_stream *xdr, struct rpc_rqst *req, struct nfs_readres *re
 	return 0;
 }
 
-static int
-decode_readdir(struct xdr_stream *xdr, struct rpc_rqst *req, struct nfs4_readdir *readdir)
+static int decode_readdir(struct xdr_stream *xdr, struct rpc_rqst *req, struct nfs4_readdir_res *readdir)
 {
 	struct xdr_buf	*rcvbuf = &req->rq_rcv_buf;
 	struct page	*page = *rcvbuf->pages;
@@ -2971,7 +2950,7 @@ decode_readdir(struct xdr_stream *xdr, struct rpc_rqst *req, struct nfs4_readdir
 	if (status)
 		return status;
 	READ_BUF(8);
-	COPYMEM(readdir->rd_resp_verifier.data, 8);
+	COPYMEM(readdir->verifier.data, 8);
 
 	hdrlen = (char *) p - (char *) iov->iov_base;
 	recvd = req->rq_received - hdrlen;
@@ -2979,9 +2958,9 @@ decode_readdir(struct xdr_stream *xdr, struct rpc_rqst *req, struct nfs4_readdir
 		pglen = recvd;
 	xdr_read_pages(xdr, pglen);
 
-	BUG_ON(pglen + readdir->rd_pgbase > PAGE_CACHE_SIZE);
+	BUG_ON(pglen + readdir->pgbase > PAGE_CACHE_SIZE);
 	kaddr = p = (uint32_t *) kmap_atomic(page, KM_USER0);
-	end = (uint32_t *) ((char *)p + pglen + readdir->rd_pgbase);
+	end = (uint32_t *) ((char *)p + pglen + readdir->pgbase);
 	entry = p;
 	for (nr = 0; *p++; nr++) {
 		if (p + 3 > end)
@@ -3206,53 +3185,6 @@ decode_write(struct xdr_stream *xdr, struct nfs_writeres *res)
 	return 0;
 }
 
-/* FIXME: this sucks */
-static int
-decode_compound(struct xdr_stream *xdr, struct nfs4_compound *cp, struct rpc_rqst *req)
-{
-	struct compound_hdr hdr;
-	struct nfs4_op *op;
-	int status;
-
-	status = decode_compound_hdr(xdr, &hdr);
-	if (status)
-		goto out;
-
-	cp->toplevel_status = hdr.status;
-
-	/*
-	 * We need this if our zero-copy I/O is going to work.  Rumor has
-	 * it that the spec will soon mandate it...
-	 */
-	if (hdr.taglen != cp->taglen)
-		dprintk("nfs4: non-conforming server returns tag length mismatch!\n");
-
-	cp->resp_nops = hdr.nops;
-	if (hdr.nops > cp->req_nops) {
-		dprintk("nfs4: resp_nops > req_nops!\n");
-		goto xdr_error;
-	}
-
-	op = &cp->ops[0];
-	for (cp->nops = 0; cp->nops < cp->resp_nops; cp->nops++, op++) {
-		switch (op->opnum) {
-		case OP_PUTFH:
-			status = decode_putfh(xdr);
-			break;
-		case OP_READDIR:
-			status = decode_readdir(xdr, req, &op->u.readdir);
-			break;
-		default:
-			BUG();
-			return -EIO;
-		}
-		if (status)
-			break;
-	}
-
-	DECODE_TAIL;
-}
-
 /*
  * Decode OPEN_DOWNGRADE response
  */
@@ -3278,27 +3210,6 @@ out:
 /*
  * END OF "GENERIC" DECODE ROUTINES.
  */
-
-/*
- * Decode COMPOUND response
- */
-static int
-nfs4_xdr_dec_compound(struct rpc_rqst *rqstp, uint32_t *p, struct nfs4_compound *cp)
-{
-	struct xdr_stream xdr;
-	int status;
-	
-	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
-	if ((status = decode_compound(&xdr, cp, rqstp)))
-		goto out;
-	
-	status = 0;
-	if (cp->toplevel_status)
-		status = -nfs_stat_to_errno(cp->toplevel_status);
-
-out:
-	return status;
-}
 
 /*
  * Decode ACCESS response
@@ -3692,6 +3603,27 @@ out:
 }
 
 /*
+ * Decode READDIR response
+ */
+static int nfs4_xdr_dec_readdir(struct rpc_rqst *rqstp, uint32_t *p, struct nfs4_readdir_res *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	status = decode_compound_hdr(&xdr, &hdr);
+	if (status)
+		goto out;
+	status = decode_putfh(&xdr);
+	if (status)
+		goto out;
+	status = decode_readdir(&xdr, rqstp, res);
+out:
+	return status;
+}
+
+/*
  * Decode Read response
  */
 static int
@@ -3995,7 +3927,6 @@ nfs_stat_to_errno(int stat)
     }
 
 struct rpc_procinfo	nfs4_procedures[] = {
-  PROC(COMPOUND,	enc_compound,	dec_compound),
   PROC(READ,		enc_read,	dec_read),
   PROC(WRITE,		enc_write,	dec_write),
   PROC(COMMIT,		enc_commit,	dec_commit),
@@ -4023,6 +3954,7 @@ struct rpc_procinfo	nfs4_procedures[] = {
   PROC(PATHCONF,	enc_pathconf,	dec_pathconf),
   PROC(STATFS,		enc_statfs,	dec_statfs),
   PROC(READLINK,	enc_readlink,	dec_readlink),
+  PROC(READDIR,		enc_readdir,	dec_readdir),
 };
 
 struct rpc_version		nfs_version4 = {

@@ -51,9 +51,6 @@
 
 #define NFS4_POLL_RETRY_TIME	(15*HZ)
 
-#define GET_OP(cp,name)		&cp->ops[cp->req_nops].u.name
-#define OPNUM(cp)		cp->ops[cp->req_nops].opnum
-
 static int nfs4_do_fsinfo(struct nfs_server *, struct nfs_fh *, struct nfs_fsinfo *);
 static int nfs4_async_handle_error(struct rpc_task *, struct nfs_server *);
 extern u32 *nfs4_decode_dirent(u32 *p, struct nfs_entry *entry, int plus);
@@ -70,15 +67,6 @@ static inline int nfs4_map_errors(int err)
 		return -EIO;
 	}
 	return err;
-}
-
-static void
-nfs4_setup_compound(struct nfs4_compound *cp, struct nfs4_op *ops,
-		    struct nfs_server *server, char *tag)
-{
-	memset(cp, 0, sizeof(*cp));
-	cp->ops = ops;
-	cp->server = server;
 }
 
 /*
@@ -116,37 +104,21 @@ u32 nfs4_pathconf_bitmap[2] = {
 	0
 };
 
-static void
-nfs4_setup_putfh(struct nfs4_compound *cp, struct nfs_fh *fhandle)
-{
-	struct nfs4_putfh *putfh = GET_OP(cp, putfh);
-
-	putfh->pf_fhandle = fhandle;
-
-	OPNUM(cp) = OP_PUTFH;
-	cp->req_nops++;
-}
-
-static void
-nfs4_setup_readdir(struct nfs4_compound *cp, u64 cookie, u32 *verifier,
-		     struct page **pages, unsigned int bufsize, struct dentry *dentry)
+static void nfs4_setup_readdir(u64 cookie, u32 *verifier, struct dentry *dentry,
+		struct nfs4_readdir_arg *readdir)
 {
 	u32 *start, *p;
-	struct nfs4_readdir *readdir = GET_OP(cp, readdir);
 
-	BUG_ON(bufsize < 80);
-	readdir->rd_cookie = (cookie > 2) ? cookie : 0;
-	memcpy(&readdir->rd_req_verifier, verifier, sizeof(readdir->rd_req_verifier));
-	readdir->rd_count = bufsize;
-	readdir->rd_bmval[0] = FATTR4_WORD0_FILEID;
-	readdir->rd_bmval[1] = 0;
-	readdir->rd_pages = pages;
-	readdir->rd_pgbase = 0;
-	
-	OPNUM(cp) = OP_READDIR;
-	cp->req_nops++;
+	BUG_ON(readdir->count < 80);
+	if (cookie > 2) {
+		readdir->cookie = (cookie > 2) ? cookie : 0;
+		memcpy(&readdir->verifier, verifier, sizeof(readdir->verifier));
+		return;
+	}
 
-	if (cookie >= 2)
+	readdir->cookie = 0;
+	memset(&readdir->verifier, 0, sizeof(readdir->verifier));
+	if (cookie == 2)
 		return;
 	
 	/*
@@ -156,7 +128,7 @@ nfs4_setup_readdir(struct nfs4_compound *cp, u64 cookie, u32 *verifier,
 	 * when talking to the server, we always send cookie 0
 	 * instead of 1 or 2.
 	 */
-	start = p = (u32 *)kmap_atomic(*pages, KM_USER0);
+	start = p = (u32 *)kmap_atomic(*readdir->pages, KM_USER0);
 	
 	if (cookie == 0) {
 		*p++ = xdr_one;                                  /* next */
@@ -168,7 +140,7 @@ nfs4_setup_readdir(struct nfs4_compound *cp, u64 cookie, u32 *verifier,
 		*p++ = xdr_one;                         /* bitmap length */
 		*p++ = htonl(FATTR4_WORD0_FILEID);             /* bitmap */
 		*p++ = htonl(8);              /* attribute buffer length */
-		p = xdr_encode_hyper(p, NFS_FILEID(dentry->d_inode));
+		p = xdr_encode_hyper(p, dentry->d_inode->i_ino);
 	}
 	
 	*p++ = xdr_one;                                  /* next */
@@ -180,10 +152,10 @@ nfs4_setup_readdir(struct nfs4_compound *cp, u64 cookie, u32 *verifier,
 	*p++ = xdr_one;                         /* bitmap length */
 	*p++ = htonl(FATTR4_WORD0_FILEID);             /* bitmap */
 	*p++ = htonl(8);              /* attribute buffer length */
-	p = xdr_encode_hyper(p, NFS_FILEID(dentry->d_parent->d_inode));
+	p = xdr_encode_hyper(p, dentry->d_parent->d_inode->i_ino);
 
-	readdir->rd_pgbase = (char *)p - (char *)start;
-	readdir->rd_count -= readdir->rd_pgbase;
+	readdir->pgbase = (char *)p - (char *)start;
+	readdir->count -= readdir->pgbase;
 	kunmap_atomic(start, KM_USER0);
 }
 
@@ -195,47 +167,6 @@ renew_lease(struct nfs_server *server, unsigned long timestamp)
 	if (time_before(clp->cl_last_renewal,timestamp))
 		clp->cl_last_renewal = timestamp;
 	spin_unlock(&clp->cl_lock);
-}
-
-static inline void
-process_lease(struct nfs4_compound *cp)
-{
-        /*
-         * Generic lease processing: If this operation contains a
-	 * lease-renewing operation, and it succeeded, update the RENEW time
-	 * in the superblock.  Instead of the current time, we use the time
-	 * when the request was sent out.  (All we know is that the lease was
-	 * renewed sometime between then and now, and we have to assume the
-	 * worst case.)
-	 *
-	 * Notes:
-	 *   (1) renewd doesn't acquire the spinlock when messing with
-	 *     server->last_renewal; this is OK since rpciod always runs
-	 *     under the BKL.
-	 *   (2) cp->timestamp was set at the end of XDR encode.
-         */
-	if (!cp->renew_index)
-		return;
-	if (!cp->toplevel_status || cp->resp_nops > cp->renew_index)
-		renew_lease(cp->server, cp->timestamp);
-}
-
-static int
-nfs4_call_compound(struct nfs4_compound *cp, struct rpc_cred *cred, int flags)
-{
-	int status;
-	struct rpc_message msg = {
-		.rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_COMPOUND],
-		.rpc_argp = cp,
-		.rpc_resp = cp,
-		.rpc_cred = cred,
-	};
-
-	status = rpc_call_sync(cp->server->client, &msg, flags);
-	if (!status)
-		process_lease(cp);
-	
-	return status;
 }
 
 static inline void
@@ -1209,24 +1140,31 @@ static int nfs4_proc_mkdir(struct inode *dir, struct qstr *name,
 	return nfs4_map_errors(status);
 }
 
-static int
-nfs4_proc_readdir(struct dentry *dentry, struct rpc_cred *cred,
+static int nfs4_proc_readdir(struct dentry *dentry, struct rpc_cred *cred,
                   u64 cookie, struct page *page, unsigned int count, int plus)
 {
 	struct inode		*dir = dentry->d_inode;
-	struct nfs4_compound	compound;
-	struct nfs4_op		ops[2];
+	struct nfs4_readdir_arg args = {
+		.fh = NFS_FH(dir),
+		.pages = &page,
+		.pgbase = 0,
+		.count = count,
+	};
+	struct nfs4_readdir_res res;
+	struct rpc_message msg = {
+		.rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_READDIR],
+		.rpc_argp = &args,
+		.rpc_resp = &res,
+		.rpc_cred = cred,
+	};
 	int			status;
 
 	lock_kernel();
-
-	nfs4_setup_compound(&compound, ops, NFS_SERVER(dir), "readdir");
-	nfs4_setup_putfh(&compound, NFS_FH(dir));
-	nfs4_setup_readdir(&compound, cookie, NFS_COOKIEVERF(dir), &page, count, dentry);
-	status = nfs4_call_compound(&compound, cred, 0);
+	nfs4_setup_readdir(cookie, NFS_COOKIEVERF(dir), dentry, &args);
+	res.pgbase = args.pgbase;
+	status = rpc_call_sync(NFS_CLIENT(dir), &msg, 0);
 	if (status == 0)
-		memcpy(NFS_COOKIEVERF(dir), ops[1].u.readdir.rd_resp_verifier.data, NFS4_VERIFIER_SIZE);
-
+		memcpy(NFS_COOKIEVERF(dir), res.verifier.data, NFS4_VERIFIER_SIZE);
 	unlock_kernel();
 	return nfs4_map_errors(status);
 }
