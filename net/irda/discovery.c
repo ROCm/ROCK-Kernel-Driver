@@ -32,6 +32,7 @@
 
 #include <linux/string.h>
 #include <linux/socket.h>
+#include <linux/seq_file.h>
 
 #include <net/irda/irda.h>
 #include <net/irda/irlmp.h>
@@ -349,70 +350,131 @@ __u32 irlmp_find_device(hashbin_t *cachelog, char *name, __u32 *saddr)
 	return 0;
 }
 
-/*
- * Function proc_discovery_read (buf, start, offset, len, unused)
- *
- *    Print discovery information in /proc file system
- *
- */
-int discovery_proc_read(char *buf, char **start, off_t offset, int length, 
-			int unused)
+#ifdef CONFIG_PROC_FS
+struct discovery_iter_state {
+	unsigned long flags;
+};
+
+static inline discovery_t *discovery_seq_idx(loff_t pos)
+
 {
 	discovery_t *discovery;
-	unsigned long flags;
-	hashbin_t *cachelog = irlmp->cachelog;
-	int		len = 0;
 
-	if (!irlmp)
-		return len;
-
-	len = sprintf(buf, "IrLMP: Discovery log:\n\n");	
-	
-	spin_lock_irqsave(&cachelog->hb_spinlock, flags);
-
-	discovery = (discovery_t *) hashbin_get_first(cachelog);
-	while (( discovery != NULL) && (len < length)) {
-		len += sprintf(buf+len, "nickname: %s,", discovery->data.info);
+	for (discovery = (discovery_t *) hashbin_get_first(irlmp->cachelog); 
+	     discovery != NULL;
+	     discovery = (discovery_t *) hashbin_get_next(irlmp->cachelog)) {
+		if (pos-- == 0)
+			break;
+	}
 		
-		len += sprintf(buf+len, " hint: 0x%02x%02x", 
-			       discovery->data.hints[0], 
-			       discovery->data.hints[1]);
+	return discovery;
+}
+
+static void *discovery_seq_start(struct seq_file *seq, loff_t *pos)
+{
+	struct discovery_iter_state *iter = seq->private;
+
+	spin_lock_irqsave(&irlmp->cachelog->hb_spinlock, iter->flags);
+        return *pos ? discovery_seq_idx(*pos - 1) : SEQ_START_TOKEN;
+}
+
+static void *discovery_seq_next(struct seq_file *seq, void *v, loff_t *pos)
+{
+	++*pos;
+	return (v == SEQ_START_TOKEN) 
+		? (void *) hashbin_get_first(irlmp->cachelog)
+		: (void *) hashbin_get_next(irlmp->cachelog);
+}
+
+static void discovery_seq_stop(struct seq_file *seq, void *v)
+{
+	struct discovery_iter_state *iter = seq->private;
+	spin_unlock_irqrestore(&irlmp->cachelog->hb_spinlock, iter->flags);
+}
+
+static int discovery_seq_show(struct seq_file *seq, void *v)
+{
+	if (v == SEQ_START_TOKEN)
+		seq_puts(seq, "IrLMP: Discovery log:\n\n");
+	else {
+		const discovery_t *discovery = v;
+
+		seq_printf(seq, "nickname: %s, hint: 0x%02x%02x", 
+			   discovery->data.info,
+			   discovery->data.hints[0], 
+			   discovery->data.hints[1]);
 #if 0
 		if ( discovery->data.hints[0] & HINT_PNP)
-			len += sprintf( buf+len, "PnP Compatible ");
+			seq_puts(seq, "PnP Compatible ");
 		if ( discovery->data.hints[0] & HINT_PDA)
-			len += sprintf( buf+len, "PDA/Palmtop ");
+			seq_puts(seq, "PDA/Palmtop ");
 		if ( discovery->data.hints[0] & HINT_COMPUTER)
-			len += sprintf( buf+len, "Computer ");
+			seq_puts(seq, "Computer ");
 		if ( discovery->data.hints[0] & HINT_PRINTER)
-			len += sprintf( buf+len, "Printer ");
+			seq_puts(seq, "Printer ");
 		if ( discovery->data.hints[0] & HINT_MODEM)
-			len += sprintf( buf+len, "Modem ");
+			seq_puts(seq, "Modem ");
 		if ( discovery->data.hints[0] & HINT_FAX)
-			len += sprintf( buf+len, "Fax ");
+			seq_puts(seq, "Fax ");
 		if ( discovery->data.hints[0] & HINT_LAN)
-			len += sprintf( buf+len, "LAN Access ");
+			seq_puts(seq, "LAN Access ");
 		
 		if ( discovery->data.hints[1] & HINT_TELEPHONY)
-			len += sprintf( buf+len, "Telephony ");
+			seq_puts(seq, "Telephony ");
 		if ( discovery->data.hints[1] & HINT_FILE_SERVER)
-			len += sprintf( buf+len, "File Server ");       
+			seq_puts(seq, "File Server ");       
 		if ( discovery->data.hints[1] & HINT_COMM)
-			len += sprintf( buf+len, "IrCOMM ");
+			seq_puts(seq, "IrCOMM ");
 		if ( discovery->data.hints[1] & HINT_OBEX)
-			len += sprintf( buf+len, "IrOBEX ");
+			seq_puts(seq, "IrOBEX ");
 #endif		
-		len += sprintf(buf+len, ", saddr: 0x%08x", 
-			       discovery->data.saddr);
-
-		len += sprintf(buf+len, ", daddr: 0x%08x\n", 
+		seq_printf(seq,", saddr: 0x%08x, daddr: 0x%08x\n\n",
+			       discovery->data.saddr,
 			       discovery->data.daddr);
 		
-		len += sprintf(buf+len, "\n");
-		
-		discovery = (discovery_t *) hashbin_get_next(cachelog);
+		seq_putc(seq, '\n');
 	}
-	spin_unlock_irqrestore(&cachelog->hb_spinlock, flags);
-
-	return len;
+	return 0;
 }
+
+static struct seq_operations discovery_seq_ops = {
+	.start  = discovery_seq_start,
+	.next   = discovery_seq_next,
+	.stop   = discovery_seq_stop,
+	.show   = discovery_seq_show,
+};
+
+static int discovery_seq_open(struct inode *inode, struct file *file)
+{
+	struct seq_file *seq;
+	int rc = -ENOMEM;
+	struct discovery_iter_state *s;
+       
+	ASSERT(irlmp != NULL, return -EINVAL;);
+
+	s = kmalloc(sizeof(*s), GFP_KERNEL);
+	if (!s)
+		goto out;
+
+	rc = seq_open(file, &discovery_seq_ops);
+	if (rc)
+		goto out_kfree;
+
+	seq	     = file->private_data;
+	seq->private = s;
+	memset(s, 0, sizeof(*s));
+out:
+	return rc;
+out_kfree:
+	kfree(s);
+	goto out;
+}
+
+struct file_operations discovery_seq_fops = {
+	.owner		= THIS_MODULE,
+	.open           = discovery_seq_open,
+	.read           = seq_read,
+	.llseek         = seq_lseek,
+	.release	= seq_release_private,
+};
+#endif
