@@ -77,7 +77,7 @@ static int centrino_verify_cpu_id(const struct cpuinfo_x86 *c, const struct cpu_
 
 /* Operating points for current CPU */
 static struct cpu_model *centrino_model;
-static int centrino_cpu;
+static const struct cpu_id *centrino_cpu;
 
 #ifdef CONFIG_X86_SPEEDSTEP_CENTRINO_TABLE
 
@@ -289,7 +289,9 @@ static unsigned extract_clock(unsigned msr)
 	 * for centrino, as some DSDTs are buggy.
 	 * Ideally, this can be done using the acpi_data structure.
 	 */
-	if (centrino_cpu) {
+	if ((centrino_cpu == &cpu_ids[CPU_BANIAS]) ||
+	    (centrino_cpu == &cpu_ids[CPU_DOTHAN_A1]) ||
+	    (centrino_cpu == &cpu_ids[CPU_DOTHAN_B0])) {
 		msr = (msr >> 8) & 0xff;
 		return msr * 100000;
 	}
@@ -457,7 +459,7 @@ static int centrino_cpu_init(struct cpufreq_policy *policy)
 			break;
 
 	if (i != N_IDS)
-		centrino_cpu = 1;
+		centrino_cpu = &cpu_ids[i];
 
 	if (centrino_cpu_init_acpi(policy)) {
 		if (policy->cpu != 0)
