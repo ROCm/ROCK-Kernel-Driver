@@ -742,6 +742,7 @@ static int calculate_video_dma_grab_packed(struct saa7146_dev* dev, struct saa71
 
 	int width = buf->fmt->width;
 	int height = buf->fmt->height;
+	int bytesperline = buf->fmt->bytesperline;
 	enum v4l2_field field = buf->fmt->field;
 
 	int depth = sfmt->depth;
@@ -749,7 +750,11 @@ static int calculate_video_dma_grab_packed(struct saa7146_dev* dev, struct saa71
 	DEB_CAP(("[size=%dx%d,fields=%s]\n",
 		width,height,v4l2_field_names[field]));
 
+	if( bytesperline != 0) {
+		vdma1.pitch = bytesperline*2;
+	} else {
 	vdma1.pitch		= (width*depth*2)/8;
+	}
 	vdma1.num_line_byte	= ((vv->standard->v_field<<16) + vv->standard->h_pixels);
 	vdma1.base_page		= buf->pt[0].dma | ME1;
 	
@@ -798,6 +803,8 @@ static int calc_planar_422(struct saa7146_vv *vv, struct saa7146_buf *buf, struc
 
 	vdma2->pitch	= width;
 	vdma3->pitch	= width;
+
+	/* fixme: look at bytesperline! */
 
 	if( 0 != vv->vflip ) {
 		vdma2->prot_addr	= buf->pt[1].offset;
@@ -870,6 +877,8 @@ static int calculate_video_dma_grab_planar(struct saa7146_dev* dev, struct saa71
 
 	DEB_CAP(("[size=%dx%d,fields=%s]\n",
 		width,height,v4l2_field_names[field]));
+
+	/* fixme: look at bytesperline! */
 
 	/* fixme: what happens for user space buffers here?. The offsets are
 	   most likely wrong, this version here only works for page-aligned
@@ -997,8 +1006,10 @@ static void program_capture_engine(struct saa7146_dev *dev, int planar)
 		WRITE_RPS0(CMD_PAUSE | o_wait);
 	WRITE_RPS0(CMD_PAUSE | e_wait);
 	} else if ( vv->last_field == V4L2_FIELD_TOP ) {
+		WRITE_RPS0(CMD_PAUSE | (vv->current_hps_sync == SAA7146_HPS_SYNC_PORT_A ? MASK_10 : MASK_09));
 	WRITE_RPS0(CMD_PAUSE | o_wait);
 	} else if ( vv->last_field == V4L2_FIELD_BOTTOM ) {
+		WRITE_RPS0(CMD_PAUSE | (vv->current_hps_sync == SAA7146_HPS_SYNC_PORT_A ? MASK_10 : MASK_09));
 		WRITE_RPS0(CMD_PAUSE | e_wait);
 	}
 
@@ -1033,16 +1044,6 @@ void saa7146_set_capture(struct saa7146_dev *dev, struct saa7146_buf *buf, struc
 
 	DEB_CAP(("buf:%p, next:%p\n",buf,next));
 
-/*
-	printk("vdma%d.base_even:     0x%08x\n", 1,saa7146_read(dev,BASE_EVEN1));
-	printk("vdma%d.base_odd:      0x%08x\n", 1,saa7146_read(dev,BASE_ODD1));
-	printk("vdma%d.prot_addr:     0x%08x\n", 1,saa7146_read(dev,PROT_ADDR1));
-	printk("vdma%d.base_page:     0x%08x\n", 1,saa7146_read(dev,BASE_PAGE1));
-	printk("vdma%d.pitch:         0x%08x\n", 1,saa7146_read(dev,PITCH1));
-	printk("vdma%d.num_line_byte: 0x%08x\n", 1,saa7146_read(dev,NUM_LINE_BYTE1));
-	printk("vdma%d => vptr      : 0x%08x\n", 1,saa7146_read(dev,PCI_VDP1));
-*/
-
 	vdma1_prot_addr = saa7146_read(dev, PROT_ADDR1);
 	if( 0 == vdma1_prot_addr ) {
 		/* clear out beginning of streaming bit (rps register 0)*/
@@ -1068,6 +1069,16 @@ void saa7146_set_capture(struct saa7146_dev *dev, struct saa7146_buf *buf, struc
 		calculate_video_dma_grab_packed(dev, buf);
 		program_capture_engine(dev,0);
 	}
+
+/*
+	printk("vdma%d.base_even:     0x%08x\n", 1,saa7146_read(dev,BASE_EVEN1));
+	printk("vdma%d.base_odd:      0x%08x\n", 1,saa7146_read(dev,BASE_ODD1));
+	printk("vdma%d.prot_addr:     0x%08x\n", 1,saa7146_read(dev,PROT_ADDR1));
+	printk("vdma%d.base_page:     0x%08x\n", 1,saa7146_read(dev,BASE_PAGE1));
+	printk("vdma%d.pitch:         0x%08x\n", 1,saa7146_read(dev,PITCH1));
+	printk("vdma%d.num_line_byte: 0x%08x\n", 1,saa7146_read(dev,NUM_LINE_BYTE1));
+	printk("vdma%d => vptr      : 0x%08x\n", 1,saa7146_read(dev,PCI_VDP1));
+*/
 
 	/* write the address of the rps-program */
 	saa7146_write(dev, RPS_ADDR0, dev->d_rps0.dma_handle);

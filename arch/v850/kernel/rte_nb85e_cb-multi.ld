@@ -4,11 +4,11 @@
 MEMORY {
 	/* 1MB of SRAM; we can't use the last 96KB, because it's used by
 	   the monitor scratch-RAM.  This memory is mirrored 4 times.  */
-	SRAM  : ORIGIN = 0x03C00000, LENGTH = 0x000E8000
+	SRAM  : ORIGIN = SRAM_ADDR,  LENGTH = (SRAM_SIZE - MON_SCRATCH_SIZE)
 	/* Monitor scratch RAM; only the interrupt vectors should go here.  */
-	MRAM  : ORIGIN = 0x03CE8000, LENGTH = 0x00018000
+	MRAM  : ORIGIN = MON_SCRATCH_ADDR,  LENGTH = MON_SCRATCH_SIZE
 	/* 16MB of SDRAM.  */
-	SDRAM : ORIGIN = 0x01000000, LENGTH = 0x01000000
+	SDRAM : ORIGIN = SDRAM_ADDR, LENGTH = SDRAM_SIZE
 }
 
 #ifdef CONFIG_RTE_CB_NB85E_KSRAM

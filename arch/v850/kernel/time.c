@@ -32,6 +32,14 @@ EXPORT_SYMBOL(jiffies_64);
 
 #define TICK_SIZE	(tick_nsec / 1000)
 
+/*
+ * Scheduler clock - returns current time in nanosec units.
+ */
+unsigned long long sched_clock(void)
+{
+	return (unsigned long long)jiffies * (1000000000 / HZ);
+}
+
 static inline void do_profile (unsigned long pc)
 {
 	if (prof_buffer && current->pid) {

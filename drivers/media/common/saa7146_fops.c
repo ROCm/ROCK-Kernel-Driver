@@ -304,6 +304,7 @@ static unsigned int fops_poll(struct file *file, struct poll_table_struct *wait)
 			return videobuf_poll_stream(file, &fh->vbi_q, wait);
 		q = &fh->vbi_q;
 	} else {
+		DEB_D(("using video queue.\n"));
 		q = &fh->video_q;
 	}
 
@@ -311,14 +312,17 @@ static unsigned int fops_poll(struct file *file, struct poll_table_struct *wait)
 		buf = list_entry(q->stream.next, struct videobuf_buffer, stream);
 
 	if (!buf) {
+		DEB_D(("buf == NULL!\n"));
 		return POLLERR;
 	}
 
 	poll_wait(file, &buf->done, wait);
 	if (buf->state == STATE_DONE || buf->state == STATE_ERROR) {
+		DEB_D(("poll succeeded!\n"));
 		return POLLIN|POLLRDNORM;
 	}
 
+	DEB_D(("nothing to poll for, buf->state:%d\n",buf->state));
 	return 0;
 }
 

@@ -14,6 +14,9 @@
 #include <linux/config.h>
 #include <asm-generic/vmlinux.lds.h>
 
+/* For most platforms, this will define useful things like RAM addr/size.  */
+#include <asm/machdep.h>
+
 
 /* The following macros contain the usual definitions for various data areas.
    The prefix `RAMK_' is used to indicate macros suitable for kernels loaded
