@@ -351,4 +351,9 @@ void ptrace_notify(int exit_code)
 	set_current_state(TASK_STOPPED);
 	notify_parent(current, SIGCHLD);
 	schedule();
+
+	/*
+	 * Signals sent while we were stopped might set TIF_SIGPENDING.
+	 */
+	recalc_sigpending();
 }

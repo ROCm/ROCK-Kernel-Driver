@@ -79,6 +79,7 @@ struct rpc_program {
 	unsigned int		nrvers;		/* number of versions */
 	struct rpc_version **	version;	/* version array */
 	struct rpc_stat *	stats;		/* statistics */
+	char *			pipe_dir_name;	/* path to rpc_pipefs dir */
 };
 
 struct rpc_version {

@@ -476,15 +476,16 @@ rpc_get_inode(struct super_block *sb, int mode)
  * FIXME: This probably has races.
  */
 static void
-rpc_depopulate(struct dentry *dir)
+rpc_depopulate(struct dentry *parent)
 {
+	struct inode *dir = parent->d_inode;
 	LIST_HEAD(head);
 	struct list_head *pos, *next;
 	struct dentry *dentry;
 
-	down(&dir->d_inode->i_sem);
+	down(&dir->i_sem);
 	spin_lock(&dcache_lock);
-	list_for_each_safe(pos, next, &dir->d_subdirs) {
+	list_for_each_safe(pos, next, &parent->d_subdirs) {
 		dentry = list_entry(pos, struct dentry, d_child);
 		if (!d_unhashed(dentry)) {
 			dget_locked(dentry);
@@ -499,32 +500,34 @@ rpc_depopulate(struct dentry *dir)
 		__d_drop(dentry);
 		if (dentry->d_inode) {
 			rpc_inode_setowner(dentry->d_inode, NULL);
-			simple_unlink(dir->d_inode, dentry);
+			simple_unlink(dir, dentry);
 		}
 		dput(dentry);
 	}
-	up(&dir->d_inode->i_sem);
+	up(&dir->i_sem);
 }
 
 static int
-rpc_populate(struct dentry *dir,
+rpc_populate(struct dentry *parent,
 		struct rpc_filelist *files,
 		int start, int eof)
 {
-	void *private = RPC_I(dir->d_inode)->private;
+	struct inode *inode, *dir = parent->d_inode;
+	void *private = RPC_I(dir)->private;
 	struct qstr name;
 	struct dentry *dentry;
-	struct inode *inode;
 	int mode, i;
+
+	down(&dir->i_sem);
 	for (i = start; i < eof; i++) {
 		name.name = files[i].name;
 		name.len = strlen(name.name);
 		name.hash = full_name_hash(name.name, name.len);
-		dentry = d_alloc(dir, &name);
+		dentry = d_alloc(parent, &name);
 		if (!dentry)
 			goto out_bad;
 		mode = files[i].mode;
-		inode = rpc_get_inode(dir->d_inode->i_sb, mode);
+		inode = rpc_get_inode(dir->i_sb, mode);
 		if (!inode) {
 			dput(dentry);
 			goto out_bad;
@@ -535,13 +538,15 @@ rpc_populate(struct dentry *dir,
 		if (private)
 			rpc_inode_setowner(inode, private);
 		if (S_ISDIR(mode))
-			dir->d_inode->i_nlink++;
+			dir->i_nlink++;
 		d_add(dentry, inode);
 	}
+	up(&dir->i_sem);
 	return 0;
 out_bad:
+	up(&dir->i_sem);
 	printk(KERN_WARNING "%s: %s failed to populate directory %s\n",
-			__FILE__, __FUNCTION__, dir->d_name.name);
+			__FILE__, __FUNCTION__, parent->d_name.name);
 	return -ENOMEM;
 }
 
@@ -570,6 +575,7 @@ __rpc_rmdir(struct inode *dir, struct dentry *dentry)
 {
 	int error;
 
+	shrink_dcache_parent(dentry);
 	rpc_inode_setowner(dentry->d_inode, NULL);
 	if ((error = simple_rmdir(dir, dentry)) != 0)
 		return error;
