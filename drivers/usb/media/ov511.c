@@ -293,7 +293,6 @@ static struct symbolic_list brglist[] = {
 	{ -1, NULL }
 };
 
-#if defined(CONFIG_VIDEO_PROC_FS)
 static struct symbolic_list senlist[] = {
 	{ SEN_OV76BE,	"OV76BE" },
 	{ SEN_OV7610,	"OV7610" },
@@ -309,7 +308,6 @@ static struct symbolic_list senlist[] = {
 	{ SEN_SAA7111A,	"SAA7111A" },
 	{ -1, NULL }
 };
-#endif
 
 /* URB error codes: */
 static struct symbolic_list urb_errlist[] = {
@@ -1133,7 +1131,7 @@ ov51x_clear_snapshot(struct usb_ov511 *ov)
 	}
 }
 
-#if defined(CONFIG_VIDEO_PROC_FS)
+#if 0
 /* Checks the status of the snapshot button. Returns 1 if it was pressed since
  * it was last cleared, and zero in all other cases (including errors) */
 static int
@@ -1832,7 +1830,7 @@ sensor_get_picture(struct usb_ov511 *ov, struct video_picture *p)
 	return 0;
 }
 
-#if defined(CONFIG_VIDEO_PROC_FS)
+#if 0
 // FIXME: Exposure range is only 0x00-0x7f in interlace mode
 /* Sets current exposure for sensor. This only has an effect if auto-exposure
  * is off */
@@ -1877,6 +1875,7 @@ out:
 
 	return rc;
 }
+#endif
 
 /* Gets current exposure level from sensor, regardless of whether it is under
  * manual control. */
@@ -1914,7 +1913,6 @@ sensor_get_exposure(struct usb_ov511 *ov, unsigned char *val)
 
 	return 0;
 }
-#endif /* CONFIG_VIDEO_PROC_FS */
 
 /* Turns on or off the LED. Only has an effect with OV511+/OV518(+) */
 static void
@@ -5679,9 +5677,118 @@ error:
 }
 
 /****************************************************************************
- *
+ *  sysfs
+ ***************************************************************************/
+
+static inline struct usb_ov511 *cd_to_ov(struct class_device *cd)
+{
+	struct video_device *vdev = to_video_device(cd);
+	return video_get_drvdata(vdev);
+}
+
+static ssize_t show_custom_id(struct class_device *cd, char *buf)
+{
+	struct usb_ov511 *ov = cd_to_ov(cd);
+	return sprintf(buf, "%d\n", ov->customid);
+} 
+static CLASS_DEVICE_ATTR(custom_id, S_IRUGO, show_custom_id, NULL);
+
+static ssize_t show_model(struct class_device *cd, char *buf)
+{
+	struct usb_ov511 *ov = cd_to_ov(cd);
+	return sprintf(buf, "%s\n", ov->desc);
+} 
+static CLASS_DEVICE_ATTR(model, S_IRUGO, show_model, NULL);
+
+static ssize_t show_bridge(struct class_device *cd, char *buf)
+{
+	struct usb_ov511 *ov = cd_to_ov(cd);
+	return sprintf(buf, "%s\n", symbolic(brglist, ov->bridge));
+} 
+static CLASS_DEVICE_ATTR(bridge, S_IRUGO, show_bridge, NULL);
+
+static ssize_t show_sensor(struct class_device *cd, char *buf)
+{
+	struct usb_ov511 *ov = cd_to_ov(cd);
+	return sprintf(buf, "%s\n", symbolic(senlist, ov->sensor));
+} 
+static CLASS_DEVICE_ATTR(sensor, S_IRUGO, show_sensor, NULL);
+
+static ssize_t show_brightness(struct class_device *cd, char *buf)
+{
+	struct usb_ov511 *ov = cd_to_ov(cd);
+	unsigned short x;
+
+	if (!ov->dev)
+		return -ENODEV;
+	sensor_get_brightness(ov, &x);
+	return sprintf(buf, "%d\n", x >> 8);
+} 
+static CLASS_DEVICE_ATTR(brightness, S_IRUGO, show_brightness, NULL);
+
+static ssize_t show_saturation(struct class_device *cd, char *buf)
+{
+	struct usb_ov511 *ov = cd_to_ov(cd);
+	unsigned short x;
+
+	if (!ov->dev)
+		return -ENODEV;
+	sensor_get_saturation(ov, &x);
+	return sprintf(buf, "%d\n", x >> 8);
+} 
+static CLASS_DEVICE_ATTR(saturation, S_IRUGO, show_saturation, NULL);
+
+static ssize_t show_contrast(struct class_device *cd, char *buf)
+{
+	struct usb_ov511 *ov = cd_to_ov(cd);
+	unsigned short x;
+
+	if (!ov->dev)
+		return -ENODEV;
+	sensor_get_contrast(ov, &x);
+	return sprintf(buf, "%d\n", x >> 8);
+} 
+static CLASS_DEVICE_ATTR(contrast, S_IRUGO, show_contrast, NULL);
+
+static ssize_t show_hue(struct class_device *cd, char *buf)
+{
+	struct usb_ov511 *ov = cd_to_ov(cd);
+	unsigned short x;
+
+	if (!ov->dev)
+		return -ENODEV;
+	sensor_get_hue(ov, &x);
+	return sprintf(buf, "%d\n", x >> 8);
+} 
+static CLASS_DEVICE_ATTR(hue, S_IRUGO, show_hue, NULL);
+
+static ssize_t show_exposure(struct class_device *cd, char *buf)
+{
+	struct usb_ov511 *ov = cd_to_ov(cd);
+	unsigned char exp;
+
+	if (!ov->dev)
+		return -ENODEV;
+	sensor_get_exposure(ov, &exp);
+	return sprintf(buf, "%d\n", exp >> 8);
+} 
+static CLASS_DEVICE_ATTR(exposure, S_IRUGO, show_exposure, NULL);
+
+static void ov_create_sysfs(struct video_device *vdev)
+{
+	video_device_create_file(vdev, &class_device_attr_custom_id);
+	video_device_create_file(vdev, &class_device_attr_model);
+	video_device_create_file(vdev, &class_device_attr_bridge);
+	video_device_create_file(vdev, &class_device_attr_sensor);
+	video_device_create_file(vdev, &class_device_attr_brightness);
+	video_device_create_file(vdev, &class_device_attr_saturation);
+	video_device_create_file(vdev, &class_device_attr_contrast);
+	video_device_create_file(vdev, &class_device_attr_hue);
+	video_device_create_file(vdev, &class_device_attr_exposure);
+}
+
+/****************************************************************************
  *  USB routines
- *
  ***************************************************************************/
 
 static int
@@ -5839,6 +5946,7 @@ ov51x_probe(struct usb_interface *intf, const struct usb_device_id *id)
 	     ov->vdev->minor);
 
 	usb_set_intfdata(intf, ov);
+	ov_create_sysfs(ov->vdev);
 	return 0;
 
 error:
