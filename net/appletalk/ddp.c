@@ -9,6 +9,7 @@
  *		Wesley Craig <netatalk@umich.edu>
  *
  *	Fixes:
+ *		Neil Horman		:	Added missing device ioctls
  *		Michael Callahan	:	Made routing work
  *		Wesley Craig		:	Fix probing to listen to a
  *						passed node id.
@@ -1806,6 +1807,8 @@ static int atalk_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 		case SIOCSIFHWADDR:
 		case SIOCGIFFLAGS:
 		case SIOCSIFFLAGS:
+		case SIOCGIFTXQLEN:
+		case SIOCSIFTXQLEN:
 		case SIOCGIFMTU:
 		case SIOCGIFCONF:
 		case SIOCADDMULTI:
