@@ -21,6 +21,7 @@ NEW_GAS := $(shell if $(LD) --version 2>&1 | grep 'elf64_sparc' > /dev/null; the
 ifeq ($(NEW_GAS),y)
 AS              := $(AS) -32
 LDFLAGS		:= -m elf32_sparc
+LDFLAGS_BLOB	:= --format binary --oformat elf32-sparc
 endif
 
 #CFLAGS := $(CFLAGS) -g -pipe -fcall-used-g5 -fcall-used-g7
