@@ -115,6 +115,7 @@ repeat:
 	 * for proper journal barrier handling
 	 */
 	spin_lock(&journal->j_state_lock);
+repeat_locked:
 	if (is_journal_aborted(journal) ||
 	    (journal->j_errno != 0 && !(journal->j_flags & JFS_ACK_ERR))) {
 		spin_unlock(&journal->j_state_lock);
@@ -214,8 +215,7 @@ repeat:
 		jbd_debug(2, "Handle %p waiting for checkpoint...\n", handle);
 		spin_unlock(&transaction->t_handle_lock);
 		__log_wait_for_space(journal, needed);
-		spin_unlock(&journal->j_state_lock);
-		goto repeat;
+		goto repeat_locked;
 	}
 
 	/* OK, account for the buffers that this operation expects to
