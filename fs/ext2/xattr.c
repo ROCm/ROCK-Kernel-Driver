@@ -732,7 +732,8 @@ ext2_xattr_set2(struct inode *inode, struct buffer_head *old_bh,
 			 * The old block will be released after updating
 			 * the inode.
 			 */
-			ea_bdebug(new_bh, "reusing block %ld",
+			ea_bdebug(new_bh, "%s block %ld",
+				(old_bh == new_bh) ? "keeping" : "reusing",
 				new_bh->b_blocknr);
 			
 			error = -EDQUOT;
@@ -746,6 +747,7 @@ ext2_xattr_set2(struct inode *inode, struct buffer_head *old_bh,
 		} else if (old_bh && header == HDR(old_bh)) {
 			/* Keep this block. */
 			new_bh = old_bh;
+			get_bh(new_bh);
 			ext2_xattr_cache_insert(new_bh);
 		} else {
 			/* We need to allocate a new block */
@@ -816,8 +818,7 @@ ext2_xattr_set2(struct inode *inode, struct buffer_head *old_bh,
 	}
 
 cleanup:
-	if (old_bh != new_bh)
-		brelse(new_bh);
+	brelse(new_bh);
 
 	return error;
 }
