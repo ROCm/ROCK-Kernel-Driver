@@ -467,6 +467,14 @@ running once the system is up.
 					whatever the firmware may have
 					done.
 
+		usepirqmask		[IA-32] Honor the possible IRQ mask
+					stored in the BIOS $PIR table. This is
+					needed on some systems with broken
+					BIOSes, notably some HP Pavilion N5400
+					and Omnibook XE3 notebooks. This will
+					have no effect if ACPI IRQ routing is
+					enabled.
+
 	pd.		[PARIDE]
 
 	pf.		[PARIDE]
