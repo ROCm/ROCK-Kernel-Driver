@@ -485,6 +485,9 @@ struct rhine_private {
 	dma_addr_t tx_bufs_dma;
 
 	struct pci_dev *pdev;
+#ifdef CONFIG_PM
+	long pioaddr;
+#endif
 	struct net_device_stats stats;
 	spinlock_t lock;
 
@@ -825,6 +828,9 @@ static int __devinit rhine_init_one(struct pci_dev *pdev,
 	dev->base_addr = ioaddr;
 	rp = netdev_priv(dev);
 	rp->quirks = quirks;
+#ifdef CONFIG_PM
+	rp->pioaddr = pioaddr;
+#endif
 
 	/* Get chip registers into a sane state */
 	rhine_power_init(dev);
@@ -1951,11 +1957,70 @@ static void rhine_shutdown (struct device *gendev)
 
 }
 
+#ifdef CONFIG_PM
+static int rhine_suspend(struct pci_dev *pdev, u32 state)
+{
+	struct net_device *dev = pci_get_drvdata(pdev);
+	struct rhine_private *rp = netdev_priv(dev);
+	unsigned long flags;
+
+	if (!netif_running(dev))
+		return 0;
+
+	netif_device_detach(dev);
+	pci_save_state(pdev, pdev->saved_config_space);
+
+	spin_lock_irqsave(&rp->lock, flags);
+	rhine_shutdown(&pdev->dev);
+	spin_unlock_irqrestore(&rp->lock, flags);
+
+	return 0;
+}
+
+static int rhine_resume(struct pci_dev *pdev)
+{
+	struct net_device *dev = pci_get_drvdata(pdev);
+	struct rhine_private *rp = netdev_priv(dev);
+	unsigned long flags;
+	int ret;
+
+	if (!netif_running(dev))
+		return 0;
+
+	ret = pci_set_power_state(pdev, 0);
+	if (debug > 1)
+		printk(KERN_INFO "%s: Entering power state D0 %s (%d).\n",
+			dev->name, ret ? "failed" : "succeeded", ret);
+
+	pci_restore_state(pdev, pdev->saved_config_space);
+
+	spin_lock_irqsave(&rp->lock, flags);
+#ifdef USE_MMIO
+	enable_mmio(rp->pioaddr, rp->quirks);
+#endif
+	rhine_power_init(dev);
+	free_tbufs(dev);
+	free_rbufs(dev);
+	alloc_tbufs(dev);
+	alloc_rbufs(dev);
+	init_registers(dev);
+	spin_unlock_irqrestore(&rp->lock, flags);
+
+	netif_device_attach(dev);
+
+	return 0;
+}
+#endif /* CONFIG_PM */
+
 static struct pci_driver rhine_driver = {
 	.name		= DRV_NAME,
 	.id_table	= rhine_pci_tbl,
 	.probe		= rhine_init_one,
 	.remove		= __devexit_p(rhine_remove_one),
+#ifdef CONFIG_PM
+	.suspend	= rhine_suspend,
+	.resume		= rhine_resume,
+#endif /* CONFIG_PM */
 	.driver = {
 		.shutdown = rhine_shutdown,
 	}
