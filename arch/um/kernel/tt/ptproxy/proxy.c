@@ -129,14 +129,14 @@ static int parent_syscall(debugger_state *debugger, int pid);
 
 int init_parent_proxy(int pid)
 {
-	parent = ((debugger_state) { pid :		pid,
-				     wait_options :	0,
-				     wait_status_ptr :	NULL,
-				     waiting :		0,
-				     real_wait :	0,
-				     expecting_child :	0,
-				     handle_trace : 	parent_syscall,
-				     debugee :		NULL } );
+	parent = ((debugger_state) { .pid 		= pid,
+				     .wait_options 	= 0,
+				     .wait_status_ptr 	= NULL,
+				     .waiting 		= 0,
+				     .real_wait 	= 0,
+				     .expecting_child 	= 0,
+				     .handle_trace  	= parent_syscall,
+				     .debugee 		= NULL } );
 	return(0);
 }
 

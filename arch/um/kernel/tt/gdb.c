@@ -62,11 +62,11 @@ static void gdb_announce(char *dev_name, int dev)
 }
 
 static struct chan_opts opts = {
-	announce : 	gdb_announce,
-	xterm_title :	"UML kernel debugger",
-	raw :		0,
-	tramp_stack :	0,
-	in_kernel : 	0,
+	.announce  	= gdb_announce,
+	.xterm_title 	= "UML kernel debugger",
+	.raw 		= 0,
+	.tramp_stack 	= 0,
+	.in_kernel  	= 0,
 };
 
 /* Accessed by the tracing thread, which automatically serializes access */
