@@ -3862,7 +3862,7 @@ static int ipr_queuecommand(struct scsi_cmnd *scsi_cmd,
 	 * We have told the host to stop giving us new requests, but
 	 * ERP ops don't count. FIXME
 	 */
-	if (unlikely(!ioa_cfg->allow_cmds))
+	if (unlikely(!ioa_cfg->allow_cmds && !ioa_cfg->ioa_is_dead))
 		return SCSI_MLQUEUE_HOST_BUSY;
 
 	/*
