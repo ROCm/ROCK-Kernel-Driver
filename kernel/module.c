@@ -725,7 +725,7 @@ static int obsolete_params(const char *name,
 }
 #endif /* CONFIG_OBSOLETE_MODPARM */
 
-#ifdef CONFIG_MODVERSIONING
+#ifdef CONFIG_MODVERSIONS
 static int check_version(Elf_Shdr *sechdrs,
 			 unsigned int versindex,
 			 const char *symname,
@@ -779,7 +779,7 @@ static inline int check_version(Elf_Shdr *sechdrs,
 {
 	return 1;
 }
-#endif /* CONFIG_MODVERSIONING */
+#endif /* CONFIG_MODVERSIONS */
 
 /* Resolve a symbol for this module.  I.e. if we find one, record usage.
    Must be holding module_mutex. */

@@ -42,12 +42,6 @@
  * POSSIBILITY OF SUCH DAMAGES.
  */
 
-/*
- * This is the only file where module.h should
- * embed module global version info.
- */
-#define AHD_MODVERSION_FILE
-
 #include "aic79xx_osm.h"
 #include "aic79xx_inline.h"
 #include <scsi/scsicam.h>

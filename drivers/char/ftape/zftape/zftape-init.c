@@ -331,11 +331,7 @@ KERN_INFO
 KERN_INFO
 "and builtin compression (lzrw3 algorithm).\n"
 KERN_INFO
-"Compiled for Linux version %s"
-#ifdef MODVERSIONS
-		       " with versioned symbols"
-#endif
-		       "\n", UTS_RELEASE);
+"Compiled for Linux version %s\n", UTS_RELEASE);
         }
 #else /* !MODULE */
 	/* print a short no-nonsense boot message */

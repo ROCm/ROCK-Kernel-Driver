@@ -50,9 +50,6 @@
 #include <linux/pci.h>
 #include <linux/smp_lock.h>
 #include <linux/version.h>
-#ifndef AHD_MODVERSION_FILE
-#define __NO_VERSION__
-#endif
 #include <linux/module.h>
 #include <asm/byteorder.h>
 

@@ -155,7 +155,7 @@ void *__symbol_get_gpl(const char *symbol);
 	
 #else
 
-#ifdef CONFIG_MODVERSIONING
+#ifdef CONFIG_MODVERSIONS
 /* Mark the CRC weak since genksyms apparently decides not to
  * generate a checksums for some symbols */
 #define __CRC_SYMBOL(sym, sec)					\

@@ -266,7 +266,7 @@ endif
 #	the built-in objects during the descend as well, in order to
 #	make sure the checksums are uptodate before we record them.
 
-ifdef CONFIG_MODVERSIONING
+ifdef CONFIG_MODVERSIONS
 ifeq ($(KBUILD_MODULES),1)
 ifneq ($(KBUILD_BUILTIN),1)
   KBUILD_BUILTIN := 1
@@ -402,7 +402,7 @@ $(SUBDIRS): prepare
 
 .PHONY: prepare
 prepare: include/linux/version.h include/asm include/config/MARKER
-ifdef CONFIG_MODVERSIONING
+ifdef CONFIG_MODVERSIONS
 ifdef KBUILD_MODULES
 ifeq ($(origin SUBDIRS),file)
 	$(Q)rm -rf $(MODVERDIR)
@@ -511,7 +511,7 @@ ifdef CONFIG_MODULES
 .PHONY: modules __modversions
 modules: $(SUBDIRS) __modversions
 
-ifdef CONFIG_MODVERSIONING
+ifdef CONFIG_MODVERSIONS
 
 __modversions: vmlinux $(SUBDIRS)
 	@echo '  Recording module symbol versions.';
