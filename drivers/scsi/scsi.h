@@ -383,9 +383,10 @@ struct scsi_device {
 				 * time. */
 	unsigned was_reset:1;	/* There was a bus reset on the bus for 
 				 * this device */
-	unsigned expecting_cc_ua:1;	/* Expecting a CHECK_CONDITION/UNIT_ATTN
-					 * because we did a bus reset. */
-	unsigned ten:1;		/* support ten byte read / write */
+	unsigned expecting_cc_ua:1; /* Expecting a CHECK_CONDITION/UNIT_ATTN
+				     * because we did a bus reset. */
+	unsigned use_10_for_rw:1; /* first try 10-byte read / write */
+	unsigned use_10_for_ms:1; /* first try 10-byte mode sense/select */
 	unsigned remap:1;	/* support remapping  */
 //	unsigned sync:1;	/* Sync transfer state, managed by host */
 //	unsigned wide:1;	/* WIDE transfer state, managed by host */
@@ -402,10 +403,6 @@ struct scsi_device {
 	container_of(d, struct scsi_device, sdev_driverfs_dev)
 
 
-/*
- * The Scsi_Cmnd structure is used by scsi.c internally, and for communication
- * with low level drivers that support multiple outstanding commands.
- */
 typedef struct scsi_pointer {
 	char *ptr;		/* data pointer */
 	int this_residual;	/* left in this buffer */
@@ -458,12 +455,13 @@ struct scsi_request {
 };
 
 /*
- * FIXME(eric) - one of the great regrets that I have is that I failed to define
- * these structure elements as something like sc_foo instead of foo.  This would
- * make it so much easier to grep through sources and so forth.  I propose that
- * all new elements that get added to these structures follow this convention.
- * As time goes on and as people have the stomach for it, it should be possible to 
- * go back and retrofit at least some of the elements here with with the prefix.
+ * FIXME(eric) - one of the great regrets that I have is that I failed to
+ * define these structure elements as something like sc_foo instead of foo.
+ * This would make it so much easier to grep through sources and so forth.
+ * I propose that all new elements that get added to these structures follow
+ * this convention.  As time goes on and as people have the stomach for it,
+ * it should be possible to go back and retrofit at least some of the elements
+ * here with with the prefix.
  */
 struct scsi_cmnd {
 	int     sc_magic;
