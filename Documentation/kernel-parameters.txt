@@ -1217,8 +1217,8 @@ running once the system is up.
 	sonycd535=	[HW,CD]
 			Format: <io>[,<irq>]
 
-	sonypi=		[HW] Sony Programmable I/O Control Device driver
-			Format: <minor>,<verbose>,<fnkeyinit>,<camera>,<compat>,<nojogdial>
+	sonypi.*=	[HW] Sony Programmable I/O Control Device driver
+			See Documentation/sonypi.txt
 
 	specialix=	[HW,SERIAL] Specialix multi-serial port adapter
 			See Documentation/specialix.txt.

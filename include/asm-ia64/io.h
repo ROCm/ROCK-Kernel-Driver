@@ -107,7 +107,7 @@ extern int valid_phys_addr_range (unsigned long addr, size_t *count); /* efi.c *
 #define __ia64_mf_a()	ia64_mfa()
 
 /**
- * __ia64_mmiowb - I/O write barrier
+ * ___ia64_mmiowb - I/O write barrier
  *
  * Ensure ordering of I/O space writes.  This will make sure that writes
  * following the barrier will arrive after all previous writes.  For most
@@ -115,7 +115,7 @@ extern int valid_phys_addr_range (unsigned long addr, size_t *count); /* efi.c *
  *
  * See Documentation/DocBook/deviceiobook.tmpl for more information.
  */
-static inline void __ia64_mmiowb(void)
+static inline void ___ia64_mmiowb(void)
 {
 	ia64_mfa();
 }
@@ -162,6 +162,7 @@ __ia64_mk_io_addr (unsigned long port)
 #define __ia64_writew	___ia64_writew
 #define __ia64_writel	___ia64_writel
 #define __ia64_writeq	___ia64_writeq
+#define __ia64_mmiowb	___ia64_mmiowb
 
 /*
  * For the in/out routines, we need to do "mf.a" _after_ doing the I/O access to ensure

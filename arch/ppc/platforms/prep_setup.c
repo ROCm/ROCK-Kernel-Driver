@@ -964,7 +964,8 @@ prep_request_cascade(void)
 	if (OpenPIC_Addr != NULL)
 		/* We have a cascade on OpenPIC IRQ 0, Linux IRQ 16 */
 		openpic_hookup_cascade(NUM_8259_INTERRUPTS, "82c59 cascade",
-				return 0;
+				i8259_irq);
+	return 0;
 }
 arch_initcall(prep_request_cascade);
 

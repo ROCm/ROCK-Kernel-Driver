@@ -9,6 +9,7 @@
 #include <linux/module.h>
 #include <asm/io.h>
 #include <asm/delay.h>
+#include <asm/sn/nodepda.h>
 #include <asm/sn/simulator.h>
 #include <asm/sn/pda.h>
 #include <asm/sn/sn_cpuid.h>
