@@ -174,6 +174,9 @@ void bluecard_activity_led_timeout(u_long arg)
 	bluecard_info_t *info = (bluecard_info_t *)arg;
 	unsigned int iobase = info->link.io.BasePort1;
 
+	if (!test_bit(CARD_HAS_PCCARD_ID, &(info->hw_state)))
+		return;
+
 	if (test_bit(CARD_HAS_ACTIVITY_LED, &(info->hw_state))) {
 		/* Disable activity LED */
 		outb(0x08 | 0x20, iobase + 0x30);
@@ -187,6 +190,9 @@ void bluecard_activity_led_timeout(u_long arg)
 static void bluecard_enable_activity_led(bluecard_info_t *info)
 {
 	unsigned int iobase = info->link.io.BasePort1;
+
+	if (!test_bit(CARD_HAS_PCCARD_ID, &(info->hw_state)))
+		return;
 
 	if (test_bit(CARD_HAS_ACTIVITY_LED, &(info->hw_state))) {
 		/* Enable activity LED */
@@ -629,13 +635,16 @@ static int bluecard_hci_open(struct hci_dev *hdev)
 	bluecard_info_t *info = (bluecard_info_t *)(hdev->driver_data);
 	unsigned int iobase = info->link.io.BasePort1;
 
-	bluecard_hci_set_baud_rate(hdev, DEFAULT_BAUD_RATE);
+	if (test_bit(CARD_HAS_PCCARD_ID, &(info->hw_state)))
+		bluecard_hci_set_baud_rate(hdev, DEFAULT_BAUD_RATE);
 
 	if (test_and_set_bit(HCI_RUNNING, &(hdev->flags)))
 		return 0;
 
-	/* Enable LED */
-	outb(0x08 | 0x20, iobase + 0x30);
+	if (test_bit(CARD_HAS_PCCARD_ID, &(info->hw_state))) {
+		/* Enable LED */
+		outb(0x08 | 0x20, iobase + 0x30);
+	}
 
 	return 0;
 }
@@ -651,8 +660,10 @@ static int bluecard_hci_close(struct hci_dev *hdev)
 
 	bluecard_hci_flush(hdev);
 
-	/* Disable LED */
-	outb(0x00, iobase + 0x30);
+	if (test_bit(CARD_HAS_PCCARD_ID, &(info->hw_state))) {
+		/* Disable LED */
+		outb(0x00, iobase + 0x30);
+	}
 
 	return 0;
 }
@@ -780,6 +791,24 @@ int bluecard_open(bluecard_info_t *info)
 	info->ctrl_reg |= REG_CONTROL_INTERRUPT;
 	outb(info->ctrl_reg, iobase + REG_CONTROL);
 
+	if ((id & 0x0f) == 0x03) {
+		/* Disable RTS */
+		info->ctrl_reg |= REG_CONTROL_RTS;
+		outb(info->ctrl_reg, iobase + REG_CONTROL);
+
+		/* Set baud rate */
+		info->ctrl_reg |= 0x03;
+		outb(info->ctrl_reg, iobase + REG_CONTROL);
+
+		/* Enable RTS */
+		info->ctrl_reg &= ~REG_CONTROL_RTS;
+		outb(info->ctrl_reg, iobase + REG_CONTROL);
+
+		set_bit(XMIT_BUF_ONE_READY, &(info->tx_state));
+		set_bit(XMIT_BUF_TWO_READY, &(info->tx_state));
+		set_bit(XMIT_SENDING_READY, &(info->tx_state));
+	}
+
 	/* Start the RX buffers */
 	outb(REG_COMMAND_RX_BUF_ONE, iobase + REG_COMMAND);
 	outb(REG_COMMAND_RX_BUF_TWO, iobase + REG_COMMAND);
@@ -800,6 +829,7 @@ int bluecard_open(bluecard_info_t *info)
 	/* Register HCI device */
 	if (hci_register_dev(hdev) < 0) {
 		BT_ERR("Can't register HCI device");
+		info->hdev = NULL;
 		hci_free_dev(hdev);
 		return -ENODEV;
 	}
@@ -812,6 +842,9 @@ int bluecard_close(bluecard_info_t *info)
 {
 	unsigned int iobase = info->link.io.BasePort1;
 	struct hci_dev *hdev = info->hdev;
+
+	if (!hdev)
+		return -ENODEV;
 
 	bluecard_hci_close(hdev);
 
@@ -1016,6 +1049,8 @@ void bluecard_release(dev_link_t *link)
 
 	if (link->state & DEV_PRESENT)
 		bluecard_close(info);
+
+	del_timer(&(info->timer));
 
 	link->dev = NULL;
 
