@@ -406,11 +406,12 @@ static struct file_operations mdc800_device_ops;
 /*
  * Callback to search the Mustek MDC800 on the USB Bus
  */
-static void* mdc800_usb_probe (struct usb_device *dev ,unsigned int ifnum,
+static int mdc800_usb_probe (struct usb_interface *intf,
 			       const struct usb_device_id *id)
 {
 	int i,j;
 	struct usb_interface_descriptor	*intf_desc;
+	struct usb_device *dev = interface_to_usbdev (intf);
 	int irq_interval=0;
 	int retval;
 
@@ -420,15 +421,15 @@ static void* mdc800_usb_probe (struct usb_device *dev ,unsigned int ifnum,
 	if (mdc800->dev != 0)
 	{
 		warn ("only one Mustek MDC800 is supported.");
-		return 0;
+		return -ENODEV;
 	}
 
 	if (dev->descriptor.bNumConfigurations != 1)
 	{
 		err ("probe fails -> wrong Number of Configuration");
-		return 0;
+		return -ENODEV;
 	}
-	intf_desc=&dev->actconfig->interface[ifnum].altsetting[0];
+	intf_desc = &intf->altsetting[0];
 
 	if (
 			( intf_desc->bInterfaceClass != 0xff )
@@ -438,7 +439,7 @@ static void* mdc800_usb_probe (struct usb_device *dev ,unsigned int ifnum,
 	)
 	{
 		err ("probe fails -> wrong Interface");
-		return 0;
+		return -ENODEV;
 	}
 
 	/* Check the Endpoints */
@@ -461,16 +462,16 @@ static void* mdc800_usb_probe (struct usb_device *dev ,unsigned int ifnum,
 		if (mdc800->endpoint[i] == -1)
 		{
 			err ("probe fails -> Wrong Endpoints.");
-			return 0;
+			return -ENODEV;
 		}
 	}
 
 
-	usb_driver_claim_interface (&mdc800_usb_driver, &dev->actconfig->interface[ifnum], mdc800);
-	if (usb_set_interface (dev, ifnum, 0) < 0)
+	usb_driver_claim_interface (&mdc800_usb_driver, intf, mdc800);
+	if (usb_set_interface (dev, intf_desc->bInterfaceNumber, 0) < 0)
 	{
 		err ("MDC800 Configuration fails.");
-		return 0;
+		return -ENODEV;
 	}
 
 	info ("Found Mustek MDC800 on USB.");
@@ -480,7 +481,7 @@ static void* mdc800_usb_probe (struct usb_device *dev ,unsigned int ifnum,
 	retval = usb_register_dev (&mdc800_device_ops, MDC800_DEVICE_MINOR_BASE, 1, &mdc800->minor);
 	if (retval && (retval != -ENODEV)) {
 		err ("Not able to get a minor for this device.");
-		return 0;
+		return -ENODEV;
 	}
 
 	mdc800->dev=dev;
@@ -522,33 +523,37 @@ static void* mdc800_usb_probe (struct usb_device *dev ,unsigned int ifnum,
 
 	up (&mdc800->io_lock);
 	
-	return mdc800;
+	dev_set_drvdata(&intf->dev, mdc800);
+	return 0;
 }
 
 
 /*
  * Disconnect USB device (maybe the MDC800)
  */
-static void mdc800_usb_disconnect (struct usb_device *dev,void* ptr)
+static void mdc800_usb_disconnect (struct usb_interface *intf)
 {
-	struct mdc800_data* mdc800=(struct mdc800_data*) ptr;
+	struct mdc800_data* mdc800 = dev_get_drvdata(&intf->dev);
 
 	dbg ("(mdc800_usb_disconnect) called");
 
-	if (mdc800->state == NOT_CONNECTED)
-		return;
-	
-	usb_deregister_dev (1, mdc800->minor);
+	if (mdc800) {
+		if (mdc800->state == NOT_CONNECTED)
+			return;
 
-	mdc800->state=NOT_CONNECTED;
+		usb_deregister_dev (1, mdc800->minor);
 
-	usb_unlink_urb (mdc800->irq_urb);
-	usb_unlink_urb (mdc800->write_urb);
-	usb_unlink_urb (mdc800->download_urb);
+		mdc800->state=NOT_CONNECTED;
 
-	usb_driver_release_interface (&mdc800_usb_driver, &dev->actconfig->interface[1]);
+		usb_unlink_urb (mdc800->irq_urb);
+		usb_unlink_urb (mdc800->write_urb);
+		usb_unlink_urb (mdc800->download_urb);
 
-	mdc800->dev=0;
+		usb_driver_release_interface (&mdc800_usb_driver, intf);
+
+		mdc800->dev=0;
+		dev_set_drvdata(&intf->dev, NULL);
+	}
 	info ("Mustek MDC800 disconnected from USB.");
 }
 

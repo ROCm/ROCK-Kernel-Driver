@@ -818,10 +818,11 @@ file_operations usb_scanner_fops = {
 	.release =	close_scanner,
 };
 
-static void *
-probe_scanner(struct usb_device *dev, unsigned int ifnum,
+static int
+probe_scanner(struct usb_interface *intf,
 	      const struct usb_device_id *id)
 {
+	struct usb_device *dev = interface_to_usbdev (intf);
 	struct scn_usb_data *scn;
 	struct usb_interface_descriptor *interface;
 	struct usb_endpoint_descriptor *endpoint;
@@ -876,8 +877,8 @@ probe_scanner(struct usb_device *dev, unsigned int ifnum,
 		valid_device = 1;
 	}
 
-        if (!valid_device)
-                return NULL;    /* We didn't find anything pleasing */
+	if (!valid_device)
+		return -ENODEV;	/* We didn't find anything pleasing */
 
 /*
  * After this point we can be a little noisy about what we are trying to
@@ -886,16 +887,16 @@ probe_scanner(struct usb_device *dev, unsigned int ifnum,
 
 	if (dev->descriptor.bNumConfigurations != 1) {
 		info("probe_scanner: Only one device configuration is supported.");
-		return NULL;
+		return -ENODEV;
 	}
 
 	if (dev->config[0].bNumInterfaces != 1) {
 		info("probe_scanner: Only one device interface is supported.");
-		return NULL;
+		return -ENODEV;
 	}
 
-	interface = dev->config[0].interface[ifnum].altsetting;
-	endpoint = interface[ifnum].endpoint;
+	interface = intf->altsetting;
+	endpoint = interface->endpoint;
 
 /*
  * Start checking for two bulk endpoints OR two bulk endpoints *and* one
@@ -907,7 +908,7 @@ probe_scanner(struct usb_device *dev, unsigned int ifnum,
 
 	if ((interface->bNumEndpoints != 2) && (interface->bNumEndpoints != 3)) {
 		info("probe_scanner: Only two or three endpoints supported.");
-		return NULL;
+		return -ENODEV;
 	}
 
 	ep_cnt = have_bulk_in = have_bulk_out = have_intr = 0;
@@ -935,7 +936,7 @@ probe_scanner(struct usb_device *dev, unsigned int ifnum,
 			continue;
 		}
 		info("probe_scanner: Undetected endpoint -- consult Documentation/usb/scanner.txt.");
-		return NULL;	/* Shouldn't ever get here unless we have something weird */
+		return -EIO;	/* Shouldn't ever get here unless we have something weird */
 	}
 
 
@@ -948,18 +949,18 @@ probe_scanner(struct usb_device *dev, unsigned int ifnum,
 	case 2:
 		if (!have_bulk_in || !have_bulk_out) {
 			info("probe_scanner: Two bulk endpoints required.");
-			return NULL;
+			return -EIO;
 		}
 		break;
 	case 3:
 		if (!have_bulk_in || !have_bulk_out || !have_intr) {
 			info("probe_scanner: Two bulk endpoints and one interrupt endpoint required.");
-			return NULL;
+			return -EIO;
 		}
 		break;
 	default:
 		info("probe_scanner: Endpoint determination failed --  consult Documentation/usb/scanner.txt");
-		return NULL;
+		return -EIO;
 	}
 
 
@@ -975,14 +976,14 @@ probe_scanner(struct usb_device *dev, unsigned int ifnum,
 	if (retval) {
 		err ("Not able to get a minor for this device.");
 		up(&scn_mutex);
-		return NULL;
+		return -ENOMEM;
 	}
 
 /* Check to make sure that the last slot isn't already taken */
 	if (p_scn_table[scn_minor]) {
 		err("probe_scanner: No more minor devices remaining.");
 		up(&scn_mutex);
-		return NULL;
+		return -ENOMEM;
 	}
 
 	dbg("probe_scanner: Allocated minor:%d", scn_minor);
@@ -990,7 +991,7 @@ probe_scanner(struct usb_device *dev, unsigned int ifnum,
 	if (!(scn = kmalloc (sizeof (struct scn_usb_data), GFP_KERNEL))) {
 		err("probe_scanner: Out of memory.");
 		up(&scn_mutex);
-		return NULL;
+		return -ENOMEM;
 	}
 	memset (scn, 0, sizeof(struct scn_usb_data));
 
@@ -998,7 +999,7 @@ probe_scanner(struct usb_device *dev, unsigned int ifnum,
 	if (!scn->scn_irq) {
 		kfree(scn);
 		up(&scn_mutex);
-		return NULL;
+		return -ENOMEM;
 	}
 
 	init_MUTEX(&(scn->sem)); /* Initializes to unlocked */
@@ -1018,7 +1019,7 @@ probe_scanner(struct usb_device *dev, unsigned int ifnum,
 			err("probe_scanner(%d): Unable to allocate INT URB.", scn_minor);
                 	kfree(scn);
 			up(&scn_mutex);
-                	return NULL;
+                	return -ENOMEM;
         	}
 	}
 
@@ -1028,7 +1029,7 @@ probe_scanner(struct usb_device *dev, unsigned int ifnum,
 		err("probe_scanner(%d): Not enough memory for the output buffer.", scn_minor);
 		kfree(scn);
 		up(&scn_mutex);
-		return NULL;
+		return -ENOMEM;
 	}
 	dbg("probe_scanner(%d): obuf address:%p", scn_minor, scn->obuf);
 
@@ -1037,7 +1038,7 @@ probe_scanner(struct usb_device *dev, unsigned int ifnum,
 		kfree(scn->obuf);
 		kfree(scn);
 		up(&scn_mutex);
-		return NULL;
+		return -ENOMEM;
 	}
 	dbg("probe_scanner(%d): ibuf address:%p", scn_minor, scn->ibuf);
 	
@@ -1083,45 +1084,54 @@ probe_scanner(struct usb_device *dev, unsigned int ifnum,
 
 	up(&scn_mutex);
 
-	return scn;
+	dev_set_drvdata(&intf->dev, scn);
+	return 0;
 }
 
 static void
-disconnect_scanner(struct usb_device *dev, void *ptr)
+disconnect_scanner(struct usb_interface *intf)
 {
-	struct scn_usb_data *scn = (struct scn_usb_data *) ptr;
+	struct scn_usb_data *scn = dev_get_drvdata(&intf->dev);
 
-	down (&scn_mutex);
-	down (&(scn->sem));
+	dev_set_drvdata(&intf->dev, NULL);
+	if (scn) {
+		down (&scn_mutex);
+		down (&(scn->sem));
 
-	if(scn->intr_ep) {
-		dbg("disconnect_scanner(%d): Unlinking IRQ URB", scn->scn_minor);
-		usb_unlink_urb(scn->scn_irq);
+		if(scn->intr_ep) {
+			dbg("disconnect_scanner(%d): Unlinking IRQ URB", scn->scn_minor);
+			usb_unlink_urb(scn->scn_irq);
+		}
+		usb_driver_release_interface(&scanner_driver,
+			&scn->scn_dev->actconfig->interface[scn->ifnum]);
+
+		kfree(scn->ibuf);
+		kfree(scn->obuf);
+
+		dbg("disconnect_scanner: De-allocating minor:%d", scn->scn_minor);
+		devfs_unregister(scn->devfs);
+		usb_deregister_dev(1, scn->scn_minor);
+		p_scn_table[scn->scn_minor] = NULL;
+		usb_free_urb(scn->scn_irq);
+		up (&(scn->sem));
+		kfree (scn);
+		up (&scn_mutex);
 	}
-        usb_driver_release_interface(&scanner_driver,
-                &scn->scn_dev->actconfig->interface[scn->ifnum]);
-
-	kfree(scn->ibuf);
-	kfree(scn->obuf);
-
-	dbg("disconnect_scanner: De-allocating minor:%d", scn->scn_minor);
-	devfs_unregister(scn->devfs);
-	usb_deregister_dev(1, scn->scn_minor);
-	p_scn_table[scn->scn_minor] = NULL;
-	usb_free_urb(scn->scn_irq);
-	up (&(scn->sem));
-	kfree (scn);
-	up (&scn_mutex);
 }
+
+/* we want to look at all devices, as the vendor/product id can change
+ * depending on the command line argument */
+static struct usb_device_id ids[] = {
+	{.driver_info = 42},
+	{}
+};
 
 static struct
 usb_driver scanner_driver = {
 	.name =		"usbscanner",
 	.probe =	probe_scanner,
 	.disconnect =	disconnect_scanner,
-	.id_table =	NULL, /* This would be scanner_device_ids, but we
-				 need to check every USB device, in case
-				 we match a user defined vendor/product ID. */
+	.id_table =	ids,
 };
 
 void __exit

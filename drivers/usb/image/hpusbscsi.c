@@ -30,13 +30,14 @@ struct list_head hpusbscsi_devices;
 
 /* USB related parts */
 
-static void *
-hpusbscsi_usb_probe (struct usb_device *dev, unsigned int interface,
+static int
+hpusbscsi_usb_probe (struct usb_interface *intf, 
 		     const struct usb_device_id *id)
 {
 	struct hpusbscsi *new;
+	struct usb_device *dev = interface_to_usbdev (intf);
 	struct usb_interface_descriptor *altsetting =
-		&(dev->actconfig->interface[interface].altsetting[0]);
+		&(intf->altsetting[0]);
 
 	int i, result;
 
@@ -44,7 +45,7 @@ hpusbscsi_usb_probe (struct usb_device *dev, unsigned int interface,
 
 	if (altsetting->bNumEndpoints != 3) {
 		printk (KERN_ERR "Wrong number of endpoints\n");
-		return NULL;
+		return -ENODEV;
 	}
 
 	/* descriptor allocation */
@@ -53,19 +54,19 @@ hpusbscsi_usb_probe (struct usb_device *dev, unsigned int interface,
 		(struct hpusbscsi *) kmalloc (sizeof (struct hpusbscsi),
 					      GFP_KERNEL);
 	if (new == NULL)
-		return NULL;
+		return -ENOMEM;
 	DEBUG ("Allocated memory\n");
 	memset (new, 0, sizeof (struct hpusbscsi));
 	new->dataurb = usb_alloc_urb(0, GFP_KERNEL);
 	if (!new->dataurb) {
 		kfree (new);
-		return NULL;
+		return -ENOMEM;
 	}
 	new->controlurb = usb_alloc_urb(0, GFP_KERNEL);
 	if (!new->controlurb) {
 		usb_free_urb (new->dataurb);
 		kfree (new);
-		return NULL;
+		return -ENOMEM;
 	}
 	new->dev = dev;
 	init_waitqueue_head (&new->pending);
@@ -135,20 +136,24 @@ hpusbscsi_usb_probe (struct usb_device *dev, unsigned int interface,
 	/* adding to list for module unload */
 	list_add (&hpusbscsi_devices, &new->lh);
 
-	return new;
+	dev_set_drvdata(&intf->dev, new);
+	return 0;
 
       err_out:
 	usb_free_urb (new->controlurb);
 	usb_free_urb (new->dataurb);
 	kfree (new);
-	return NULL;
+	return -ENODEV;
 }
 
 static void
-hpusbscsi_usb_disconnect (struct usb_device *dev, void *ptr)
+hpusbscsi_usb_disconnect (struct usb_interface *intf)
 {
-                 usb_unlink_urb((((struct hpusbscsi *) ptr)->controlurb));
-	((struct hpusbscsi *) ptr)->dev = NULL;
+	struct hpusbscsi *desc = dev_get_drvdata(&intf->dev);
+
+	dev_set_drvdata(&intf->dev, NULL);
+	if (desc)
+		usb_unlink_urb(desc->controlurb);
 }
 
 static struct usb_device_id hpusbscsi_usb_ids[] = {
