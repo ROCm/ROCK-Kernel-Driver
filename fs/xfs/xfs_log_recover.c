@@ -172,7 +172,7 @@ xlog_header_check_recover(xfs_mount_t *mp, xlog_rec_header_t *head)
 	xlog_header_check_dump(mp, head);
 #endif
 	XFS_ERROR_REPORT("xlog_header_check_recover(1)",
-			 XFS_ERRLEVEL_LOW, mp);
+			 XFS_ERRLEVEL_HIGH, mp);
 	return XFS_ERROR(EFSCORRUPTED);
     } else if (unlikely(!uuid_equal(&mp->m_sb.sb_uuid, &head->h_fs_uuid))) {
 	xlog_warn("XFS: dirty log entry has mismatched uuid - can't recover");
@@ -180,7 +180,7 @@ xlog_header_check_recover(xfs_mount_t *mp, xlog_rec_header_t *head)
 	xlog_header_check_dump(mp, head);
 #endif
 	XFS_ERROR_REPORT("xlog_header_check_recover(2)",
-			 XFS_ERRLEVEL_LOW, mp);
+			 XFS_ERRLEVEL_HIGH, mp);
 	return XFS_ERROR(EFSCORRUPTED);
     }
 
@@ -212,7 +212,7 @@ xlog_header_check_mount(xfs_mount_t *mp, xlog_rec_header_t *head)
 	xlog_header_check_dump(mp, head);
 #endif
 	XFS_ERROR_REPORT("xlog_header_check_mount",
-			 XFS_ERRLEVEL_LOW, mp);
+			 XFS_ERRLEVEL_HIGH, mp);
 	return XFS_ERROR(EFSCORRUPTED);
     }
 

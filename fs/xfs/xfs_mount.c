@@ -208,14 +208,14 @@ xfs_mount_validate_sb(
 	if (unlikely(sbp->sb_logstart == 0 && mp->m_logdev_targp == mp->m_ddev_targp)) {
 		cmn_err(CE_WARN, "XFS: filesystem is marked as having an external log; specify logdev on the\nmount command line.");
 		XFS_CORRUPTION_ERROR("xfs_mount_validate_sb(1)",
-				     XFS_ERRLEVEL_LOW, mp, sbp);
+				     XFS_ERRLEVEL_HIGH, mp, sbp);
 		return XFS_ERROR(EFSCORRUPTED);
 	}
 
 	if (unlikely(sbp->sb_logstart != 0 && mp->m_logdev_targp != mp->m_ddev_targp)) {
 		cmn_err(CE_WARN, "XFS: filesystem is marked as having an internal log; don't specify logdev on\nthe mount command line.");
 		XFS_CORRUPTION_ERROR("xfs_mount_validate_sb(2)",
-				     XFS_ERRLEVEL_LOW, mp, sbp);
+				     XFS_ERRLEVEL_HIGH, mp, sbp);
 		return XFS_ERROR(EFSCORRUPTED);
 	}
 
