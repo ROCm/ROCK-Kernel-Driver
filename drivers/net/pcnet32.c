@@ -844,12 +844,12 @@ static int pcnet32_phys_id(struct net_device *dev, u32 data)
     return 0;
 }
 
-int pcnet32_get_regs_len(struct net_device *dev)
+static int pcnet32_get_regs_len(struct net_device *dev)
 {
     return(PCNET32_NUM_REGS * sizeof(u16));
 }
 
-void pcnet32_get_regs(struct net_device *dev, struct ethtool_regs *regs,
+static void pcnet32_get_regs(struct net_device *dev, struct ethtool_regs *regs,
 	void *ptr)
 {
     int i, csr0;
