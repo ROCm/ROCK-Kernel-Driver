@@ -806,7 +806,7 @@ int get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
 			}
 			if (pages) {
 				pages[i] = get_page_map(map);
-				if (!pages[i]) {
+				if (!pages[i] || PageReserved(pages[i])) {
 					spin_unlock(&mm->page_table_lock);
 					while (i--)
 						page_cache_release(pages[i]);
@@ -814,8 +814,7 @@ int get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
 					goto out;
 				}
 				flush_dcache_page(pages[i]);
-				if (!PageReserved(pages[i]))
-					page_cache_get(pages[i]);
+				page_cache_get(pages[i]);
 			}
 			if (vmas)
 				vmas[i] = vma;
