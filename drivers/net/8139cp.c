@@ -49,7 +49,7 @@
  */
 
 #define DRV_NAME		"8139cp"
-#define DRV_VERSION		"1.0"
+#define DRV_VERSION		"1.1"
 #define DRV_RELDATE		"Aug 30, 2003"
 
 
