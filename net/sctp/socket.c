@@ -87,12 +87,7 @@ static int sctp_wait_for_sndbuf(sctp_association_t *asoc, long *timeo_p,
 				int msg_len);
 static int sctp_wait_for_packet(struct sock * sk, int *err, long *timeo_p);
 static int sctp_wait_for_connect(sctp_association_t *asoc, long *timeo_p);
-static inline void sctp_sk_addr_set(struct sock *,
-				    const union sctp_addr *newaddr,
-				    union sctp_addr *saveaddr);
-static inline void sctp_sk_addr_restore(struct sock *,
-					const union sctp_addr *);
-static inline int sctp_verify_addr(struct sock *, struct sockaddr *, int);
+static inline int sctp_verify_addr(struct sock *, union sctp_addr *, int);
 static int sctp_bindx_add(struct sock *, struct sockaddr_storage *, int);
 static int sctp_bindx_rem(struct sock *, struct sockaddr_storage *, int);
 static int sctp_do_bind(struct sock *, union sctp_addr *, int);
@@ -133,101 +128,75 @@ int sctp_bind(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 	return retval;
 }
 
-static long sctp_get_port_local(struct sock *, unsigned short);
+static long sctp_get_port_local(struct sock *, union sctp_addr *);
+
+/* Verify this is a valid sockaddr. */
+static struct sctp_af *sctp_sockaddr_af(struct sctp_opt *opt, 
+					union sctp_addr *addr, int len)
+{
+	struct sctp_af *af;
+
+	/* Check minimum size.  */
+	if (len < sizeof (struct sockaddr))
+		return NULL;
+
+	/* Does this PF support this AF? */
+	if (!opt->pf->af_supported(addr->sa.sa_family))
+		return NULL;
+
+	/* If we get this far, af is valid. */
+	af = sctp_get_af_specific(addr->sa.sa_family);
+
+	if (len < af->sockaddr_len)
+		return NULL;
+
+	return af;
+}
+
 
 /* Bind a local address either to an endpoint or to an association.  */
-SCTP_STATIC int sctp_do_bind(struct sock *sk, union sctp_addr *newaddr,
-			     int addr_len)
+SCTP_STATIC int sctp_do_bind(struct sock *sk, union sctp_addr *addr, int len)
 {
 	sctp_opt_t *sp = sctp_sk(sk);
 	sctp_endpoint_t *ep = sp->ep;
 	sctp_bind_addr_t *bp = &ep->base.bind_addr;
-	unsigned short sa_family = newaddr->sa.sa_family;
-	union sctp_addr tmpaddr, saveaddr;
-	unsigned short *snum;
+	struct sctp_af *af;
+	unsigned short snum;
 	int ret = 0;
 
-	SCTP_DEBUG_PRINTK("sctp_do_bind(sk: %p, newaddr: %p, addr_len: %d)\n",
-			  sk, newaddr, addr_len);
+	SCTP_DEBUG_PRINTK("sctp_do_bind(sk: %p, newaddr: %p, len: %d)\n",
+			  sk, addr, len);
 
-	/* FIXME: This function needs to handle v4-mapped-on-v6
-	 * addresses!
-	 */
-	if (PF_INET == sk->family) {
-		if (sa_family != AF_INET)
-			return -EINVAL;
-	}
-
-	/* Make a local copy of the new address.  */
-	tmpaddr = *newaddr;
-
-	switch (sa_family) {
-	case AF_INET:
-		if (addr_len < sizeof(struct sockaddr_in))
-			return -EINVAL;
-
-		ret = inet_addr_type(newaddr->v4.sin_addr.s_addr);
-
-		/* FIXME:
-		 * Should we allow apps to bind to non-local addresses by
-		 * checking the IP sysctl parameter "ip_nonlocal_bind"?
-		 */
-		if (newaddr->v4.sin_addr.s_addr != INADDR_ANY &&
-		    ret != RTN_LOCAL)
-			return -EADDRNOTAVAIL;
-
-		tmpaddr.v4.sin_port = htons(tmpaddr.v4.sin_port);
-		snum = &tmpaddr.v4.sin_port;
-		break;
-
-	case AF_INET6:
-		SCTP_V6(
-			/* FIXME: Hui, please verify this.   Looking at
-			 * the ipv6 code I see a SIN6_LEN_RFC2133 check.
-			 * I'm guessing that scope_id is a newer addition.
-			 */
-			if (addr_len < sizeof(struct sockaddr_in6))
-				return -EINVAL;
-
-			/* FIXME - The support for IPv6 multiple types
-			 * of addresses need to be added later.
-			 */
-			ret = sctp_ipv6_addr_type(&newaddr->v6.sin6_addr);
-			tmpaddr.v6.sin6_port = htons(tmpaddr.v6.sin6_port);
-			snum = &tmpaddr.v6.sin6_port;
-			break;
-		)
-
-	default:
+	/* Common sockaddr verification. */
+	af = sctp_sockaddr_af(sp, addr, len);
+	if (!af)
 		return -EINVAL;
-	};
+
+	/* PF specific bind() address verification. */
+	if (!sp->pf->bind_verify(sp, addr))
+		return -EADDRNOTAVAIL;
+
+	snum= ntohs(addr->v4.sin_port);
 
 	SCTP_DEBUG_PRINTK("sctp_do_bind: port: %d, new port: %d\n",
-			  bp->port, *snum);
+			  bp->port, snum);
 
 	/* We must either be unbound, or bind to the same port.  */
-	if (bp->port && (*snum != bp->port)) {
+	if (bp->port && (snum != bp->port)) {
 		SCTP_DEBUG_PRINTK("sctp_do_bind:"
 				  " New port %d does not match existing port "
-				  "%d.\n", *snum, bp->port);
+				  "%d.\n", snum, bp->port);
 		return -EINVAL;
 	}
 
-	if (*snum && *snum < PROT_SOCK && !capable(CAP_NET_BIND_SERVICE))
+	if (snum && snum < PROT_SOCK && !capable(CAP_NET_BIND_SERVICE))
 		return -EACCES;
-
-	/* FIXME - Make socket understand that there might be multiple bind
-	 * addresses and there will be multiple source addresses involved in
-	 * routing and failover decisions.
-	 */
-	sctp_sk_addr_set(sk, &tmpaddr, &saveaddr);
 
 	/* Make sure we are allowed to bind here.
 	 * The function sctp_get_port_local() does duplicate address
 	 * detection.
 	 */
-	if ((ret = sctp_get_port_local(sk, *snum))) {
-		sctp_sk_addr_restore(sk, &saveaddr);
+	if ((ret = sctp_get_port_local(sk, addr))) {
 		if (ret == (long) sk) {
 			/* This endpoint has a conflicting address. */
 			return -EINVAL;
@@ -237,25 +206,32 @@ SCTP_STATIC int sctp_do_bind(struct sock *sk, union sctp_addr *newaddr,
 	}
 
 	/* Refresh ephemeral port.  */
-	if (!*snum)
-		*snum = inet_sk(sk)->num;
+	if (!snum)
+		snum = inet_sk(sk)->num;
 
-	/* The getsockname() API depends on 'sport' being set.  */
-	inet_sk(sk)->sport = htons(inet_sk(sk)->num);
+
+
 
 	/* Add the address to the bind address list.  */
 	sctp_local_bh_disable();
 	sctp_write_lock(&ep->base.addr_lock);
 
 	/* Use GFP_ATOMIC since BHs are disabled.  */
-	if ((ret = sctp_add_bind_addr(bp, &tmpaddr, GFP_ATOMIC))) {
-		sctp_sk_addr_restore(sk, &saveaddr);
-	} else if (!bp->port) {
-		bp->port = *snum;
-	}
+	addr->v4.sin_port = ntohs(addr->v4.sin_port);
+	ret = sctp_add_bind_addr(bp, addr, GFP_ATOMIC);
+	addr->v4.sin_port = htons(addr->v4.sin_port);
+	if (!ret && !bp->port)
+		bp->port = snum;
 
 	sctp_write_unlock(&ep->base.addr_lock);
 	sctp_local_bh_enable();
+
+	/* Copy back into socket for getsockname() use. */
+	if (!ret) {
+		inet_sk(sk)->sport = htons(inet_sk(sk)->num);
+		af->to_sk(addr, sk);
+	}
+
 	return ret;
 }
 
@@ -778,7 +754,7 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 	 * For a peeled-off socket, msg_name is ignored.
 	 */
 	if ((SCTP_SOCKET_UDP_HIGH_BANDWIDTH != sp->type) && msg->msg_name) {
-		err = sctp_verify_addr(sk, (struct sockaddr *)msg->msg_name,
+		err = sctp_verify_addr(sk, (union sctp_addr *)msg->msg_name, 
 				       msg->msg_namelen);
 		if (err)
 			return err;
@@ -1357,13 +1333,10 @@ static inline int sctp_setsockopt_set_peer_addr_params(struct sock *sk,
  *   optlen  - the size of the buffer.
  */
 SCTP_STATIC int sctp_setsockopt(struct sock *sk, int level, int optname,
-			   char *optval, int optlen)
+				char *optval, int optlen)
 {
 	int retval = 0;
 	char *tmp;
-	sctp_protocol_t *proto = sctp_get_protocol();
-	struct list_head *pos;
-	sctp_func_t *af;
 
 	SCTP_DEBUG_PRINTK("sctp_setsockopt(sk: %p... optname: %d)\n",
 			  sk, optname);
@@ -1375,14 +1348,9 @@ SCTP_STATIC int sctp_setsockopt(struct sock *sk, int level, int optname,
 	 * are at all well-founded.
 	 */
 	if (level != SOL_SCTP) {
-		list_for_each(pos, &proto->address_families) {
-			af = list_entry(pos, sctp_func_t, list);
-
-			retval = af->setsockopt(sk, level, optname, optval,
-						optlen);
-			if (retval < 0)
-				goto out_nounlock;
-		}
+		struct sctp_af *af = sctp_sk(sk)->pf->af;
+		retval = af->setsockopt(sk, level, optname, optval, optlen);
+		goto out_nounlock;
 	}
 
 	sctp_lock_sock(sk);
@@ -1486,7 +1454,7 @@ SCTP_STATIC int sctp_connect(struct sock *sk, struct sockaddr *uaddr,
 		goto out_unlock;
 	}
 
-	err = sctp_verify_addr(sk, uaddr, addr_len);
+	err = sctp_verify_addr(sk, (union sctp_addr *)uaddr, addr_len);
 	if (err)
 		goto out_unlock;	
 
@@ -1944,9 +1912,6 @@ SCTP_STATIC int sctp_getsockopt(struct sock *sk, int level, int optname,
 				char *optval, int *optlen)
 {
 	int retval = 0;
-	sctp_protocol_t *proto = sctp_get_protocol();
-	sctp_func_t *af;
-	struct list_head *pos;
 	int len;
 
 	SCTP_DEBUG_PRINTK("sctp_getsockopt(sk: %p, ...)\n", sk);
@@ -1958,13 +1923,10 @@ SCTP_STATIC int sctp_getsockopt(struct sock *sk, int level, int optname,
 	 * are at all well-founded.
 	 */
 	if (level != SOL_SCTP) {
-		list_for_each(pos, &proto->address_families) {
-			af = list_entry(pos, sctp_func_t, list);
-			retval = af->getsockopt(sk, level, optname,
-						optval, optlen);
-			if (retval < 0)
-				return retval;
-		}
+		struct sctp_af *af = sctp_sk(sk)->pf->af;
+
+		retval = af->getsockopt(sk, level, optname, optval, optlen);
+		return retval;
 	}
 
 	if (get_user(len, optlen))
@@ -2032,12 +1994,17 @@ static void sctp_unhash(struct sock *sk)
  */
 static sctp_bind_bucket_t *sctp_bucket_create(sctp_bind_hashbucket_t *head,
 					      unsigned short snum);
-static long sctp_get_port_local(struct sock *sk, unsigned short snum)
+static long sctp_get_port_local(struct sock *sk, union sctp_addr *addr)
 {
 	sctp_bind_hashbucket_t *head; /* hash list */
 	sctp_bind_bucket_t *pp; /* hash list port iterator */
 	sctp_protocol_t *sctp = sctp_get_protocol();
+	unsigned short snum;
 	int ret;
+	
+	/* NOTE:  Remember to put this back to net order. */
+	addr->v4.sin_port = ntohs(addr->v4.sin_port);
+	snum = addr->v4.sin_port;
 
 	SCTP_DEBUG_PRINTK("sctp_get_port() begins, snum=%d\n", snum);
 
@@ -2103,6 +2070,7 @@ static long sctp_get_port_local(struct sock *sk, unsigned short snum)
 		}
 	}
 
+	
 	if (pp != NULL && pp->sk != NULL) {
 		/* We had a port hash table hit - there is an
 		 * available port (pp != NULL) and it is being
@@ -2110,34 +2078,12 @@ static long sctp_get_port_local(struct sock *sk, unsigned short snum)
 		 * socket is going to be sk2.
 		 */
 		int sk_reuse = sk->reuse;
-		union sctp_addr tmpaddr;
 		struct sock *sk2 = pp->sk;
 
 		SCTP_DEBUG_PRINTK("sctp_get_port() found a "
 				  "possible match\n");
 		if (pp->fastreuse != 0 && sk->reuse != 0)
 			goto success;
-
-		/* FIXME - multiple addresses need to be supported
-		 * later.
-		 */
-		switch (sk->family) {
-		case PF_INET:
-			tmpaddr.v4.sin_family = AF_INET;
-			tmpaddr.v4.sin_port = snum;
-			tmpaddr.v4.sin_addr.s_addr = inet_sk(sk)->rcv_saddr;
-			break;
-
-		case PF_INET6:
-			SCTP_V6(tmpaddr.v6.sin6_family = AF_INET6;
-				tmpaddr.v6.sin6_port = snum;
-				tmpaddr.v6.sin6_addr = inet6_sk(sk)->rcv_saddr;
-			)
-			break;
-
-		default:
-			break;
-		};
 
 		/* Run through the list of sockets bound to the port
 		 * (pp->port) [via the pointers bind_next and
@@ -2156,8 +2102,7 @@ static long sctp_get_port_local(struct sock *sk, unsigned short snum)
 			if (sk_reuse && sk2->reuse)
 				continue;
 			
-			if (sctp_bind_addr_match(&ep2->base.bind_addr, 
-						 &tmpaddr,
+			if (sctp_bind_addr_match(&ep2->base.bind_addr, addr,
 						 sctp_sk(sk)))
 				goto found;
 		}
@@ -2209,12 +2154,25 @@ fail:
 	sctp_local_bh_enable();
 
 	SCTP_DEBUG_PRINTK("sctp_get_port() ends, ret=%d\n", ret);
+	addr->v4.sin_port = htons(addr->v4.sin_port);
 	return ret;
 }
 
+/* Assign a 'snum' port to the socket.  If snum == 0, an ephemeral
+ * port is requested.  
+ */
 static int sctp_get_port(struct sock *sk, unsigned short snum)
 {
-	long ret = sctp_get_port_local(sk, snum);
+	long ret;
+	union sctp_addr addr;
+	struct sctp_af *af = sctp_sk(sk)->pf->af;
+
+	/* Set up a dummy address struct from the sk. */
+	af->from_sk(&addr, sk);
+	addr.v4.sin_port = htons(snum);
+
+	/* Note: sk->num gets filled in if ephemeral port request. */
+	ret = sctp_get_port_local(sk, &addr);
 
 	return (ret ? 1 : 0);
 }
@@ -2415,7 +2373,7 @@ void sctp_put_port(struct sock *sk)
 static int sctp_autobind(struct sock *sk)
 {
 	union sctp_addr autoaddr;
-	struct sctp_func *af;
+	struct sctp_af *af;
 	unsigned short port;
 
 	/* Initialize a local sockaddr structure to INADDR_ANY. */
@@ -2537,58 +2495,6 @@ SCTP_STATIC int sctp_msghdr_parse(const struct msghdr *msg,
 		};
 	}
 	return 0;
-}
-
-/* Setup sk->rcv_saddr before calling get_port().  */
-static inline void sctp_sk_addr_set(struct sock *sk,
-				    const union sctp_addr *newaddr,
-				    union sctp_addr *saveaddr)
-{
-	struct inet_opt *inet = inet_sk(sk);
-
-	saveaddr->sa.sa_family = newaddr->sa.sa_family;
-
-	switch (newaddr->sa.sa_family) {
-	case AF_INET:
-		saveaddr->v4.sin_addr.s_addr = inet->rcv_saddr;
-		inet->rcv_saddr = inet->saddr = newaddr->v4.sin_addr.s_addr;
-		break;
-
-	case AF_INET6:
-		SCTP_V6({
-			struct ipv6_pinfo *np = inet6_sk(sk);
-
-			saveaddr->v6.sin6_addr = np->rcv_saddr;
-			np->rcv_saddr = np->saddr = newaddr->v6.sin6_addr;
-			break;
-		})
-
-	default:
-		break;
-	};
-}
-
-/* Restore sk->rcv_saddr after failing get_port().  */
-static inline void sctp_sk_addr_restore(struct sock *sk, const union sctp_addr *addr)
-{
-	struct inet_opt *inet = inet_sk(sk);
-
-	switch (addr->sa.sa_family) {
-	case AF_INET:
-		inet->rcv_saddr = inet->saddr = addr->v4.sin_addr.s_addr;
-		break;
-
-	case AF_INET6:
-		SCTP_V6({
-			struct ipv6_pinfo *np = inet6_sk(sk);
-
-			np->rcv_saddr = np->saddr = addr->v6.sin6_addr;
-			break;
-		})
-
-	default:
-		break;
-	};
 }
 
 /*
@@ -2713,25 +2619,13 @@ no_packet:
 }
 
 /* Verify that this is a valid address. */
-static int sctp_verify_addr(struct sock *sk, struct sockaddr *addr, int len)
+static int sctp_verify_addr(struct sock *sk, union sctp_addr *addr, int len)
 {
-	struct sctp_func *af;
+	struct sctp_af *af;
 
-	/* Check minimum size.  */
-	if (len < sizeof (struct sockaddr))
-		return -EINVAL;
-
-	/* Do we support this address family in general? */
-	af = sctp_get_af_specific(addr->sa_family);
+	/* Verify basic sockaddr. */
+	af = sctp_sockaddr_af(sctp_sk(sk), addr, len);
 	if (!af)
-		return -EINVAL;
-
-	/* Does this PF support this AF? */
-	if (!sctp_sk(sk)->pf->af_supported(addr->sa_family))
-		return -EINVAL;
-     
-	/* Verify the minimum for this AF sockaddr. */
-	if (len < af->sockaddr_len)
 		return -EINVAL;
 
 	/* Is this a valid SCTP address?  */
