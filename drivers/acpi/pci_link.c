@@ -69,6 +69,9 @@ static struct acpi_driver acpi_pci_link_driver = {
 
 struct acpi_pci_link_irq {
 	u8			active;			/* Current IRQ */
+	u8			edge_level;		/* All IRQs */
+	u8			active_high_low;	/* All IRQs */
+	u8			setonboot;
 	u8			possible_count;
 	u8			possible[ACPI_PCI_LINK_MAX_POSSIBLE];
 };
@@ -118,6 +121,8 @@ acpi_pci_link_check_possible (
 			link->irq.possible[i] = p->interrupts[i];
 			link->irq.possible_count++;
 		}
+		link->irq.edge_level = p->edge_level;
+		link->irq.active_high_low = p->active_high_low;
 		break;
 	}
 	case ACPI_RSTYPE_EXT_IRQ:
@@ -136,6 +141,8 @@ acpi_pci_link_check_possible (
 			link->irq.possible[i] = p->interrupts[i];
 			link->irq.possible_count++;
 		}
+		link->irq.edge_level = p->edge_level;
+		link->irq.active_high_low = p->active_high_low;
 		break;
 	}
 	default:
@@ -264,7 +271,6 @@ acpi_pci_link_get_current (
 	 * IRQ a boot-enabled Link device is set to is the correct one.
 	 * (Required to support systems such as the Toshiba 5005-S504.)
 	 */
-
 	link->irq.active = irq;
 
 	ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Link at IRQ %d \n", link->irq.active));
@@ -294,29 +300,33 @@ acpi_pci_link_set (
 	if (!link || !irq)
 		return_VALUE(-EINVAL);
 
-	/* See if we're already at the target IRQ. */
-	if (irq == link->irq.active)
-		return_VALUE(0);
+	/* We don't check irqs the first time around */
+	if (link->irq.setonboot) {
+		/* See if we're already at the target IRQ. */
+		if (irq == link->irq.active)
+			return_VALUE(0);
 
-	/* Make sure the target IRQ in the list of possible IRQs. */
-	for (i=0; i<link->irq.possible_count; i++) {
-		if (irq == link->irq.possible[i])
-			valid = 1;
-	}
-	if (!valid) {
-		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Target IRQ %d invalid\n", irq));
-		return_VALUE(-EINVAL);
+		/* Make sure the target IRQ in the list of possible IRQs. */
+		for (i=0; i<link->irq.possible_count; i++) {
+			if (irq == link->irq.possible[i])
+				valid = 1;
+		}
+		if (!valid) {
+			ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Target IRQ %d invalid\n", irq));
+			return_VALUE(-EINVAL);
+		}
 	}
 
 	memset(&resource, 0, sizeof(resource));
 
-	/* NOTE: PCI interrupts are always level / active_low / shared. */
+	/* NOTE: PCI interrupts are always level / active_low / shared. But not all
+	   interrupts > 15 are PCI interrupts. Rely on the ACPI IRQ definition for 
+	   parameters */
 	if (irq <= 15) {
 		resource.res.id = ACPI_RSTYPE_IRQ;
 		resource.res.length = sizeof(struct acpi_resource);
-		resource.res.data.irq.edge_level = ACPI_LEVEL_SENSITIVE;
-		resource.res.data.irq.active_high_low = ACPI_ACTIVE_LOW;
-		resource.res.data.irq.shared_exclusive = ACPI_SHARED;
+		resource.res.data.irq.edge_level = link->irq.edge_level;
+		resource.res.data.irq.active_high_low = link->irq.active_high_low;
 		resource.res.data.irq.number_of_interrupts = 1;
 		resource.res.data.irq.interrupts[0] = irq;
 	}
@@ -324,15 +334,15 @@ acpi_pci_link_set (
 		resource.res.id = ACPI_RSTYPE_EXT_IRQ;
 		resource.res.length = sizeof(struct acpi_resource);
 		resource.res.data.extended_irq.producer_consumer = ACPI_CONSUMER;
-		resource.res.data.extended_irq.edge_level = ACPI_LEVEL_SENSITIVE;
-		resource.res.data.extended_irq.active_high_low = ACPI_ACTIVE_LOW;
-		resource.res.data.extended_irq.shared_exclusive = ACPI_SHARED;
+		resource.res.data.extended_irq.edge_level = link->irq.edge_level;
+		resource.res.data.extended_irq.active_high_low = link->irq.active_high_low;
 		resource.res.data.extended_irq.number_of_interrupts = 1;
 		resource.res.data.extended_irq.interrupts[0] = irq;
 		/* ignore resource_source, it's optional */
 	}
 	resource.end.id = ACPI_RSTYPE_END_TAG;
 
+	/* Attempt to set the resource */
 	status = acpi_set_current_resources(link->handle, &buffer);
 	if (ACPI_FAILURE(status)) {
 		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Error evaluating _SRS\n"));
@@ -355,11 +365,13 @@ acpi_pci_link_set (
 	if (result) {
 		return_VALUE(result);
 	}
+   
 	if (link->irq.active != irq) {
 		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, 
 			"Attempt to enable at IRQ %d resulted in IRQ %d\n", 
 			irq, link->irq.active));
 		link->irq.active = 0;
+		acpi_ut_evaluate_object (link->handle, "_DIS", 0, NULL);	   
 		return_VALUE(-ENODEV);
 	}
 
@@ -407,7 +419,7 @@ acpi_pci_link_check (void)
 	ACPI_FUNCTION_TRACE("acpi_pci_link_check");
 
 	/*
-	 * Pass #1: Update penalties to facilitate IRQ balancing.
+	 * Update penalties to facilitate IRQ balancing.
 	 */
 	list_for_each(node, &acpi_link.entries) {
 
@@ -428,23 +440,23 @@ acpi_pci_link_check (void)
 		}
 	}
 
-	/*
-	 * Pass #2: Enable boot-disabled Links at 'best' IRQ.
-	 */
-	list_for_each(node, &acpi_link.entries) {
-		int		irq = 0;
-		int		i = 0;
+	return_VALUE(0);
+}
 
-		link = list_entry(node, struct acpi_pci_link, node);
-		if (!link || !link->irq.possible_count) {
-			ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Invalid link context\n"));
-			continue;
-		}
+static int acpi_pci_link_allocate(struct acpi_pci_link* link) {
+	int irq;
+	int i;
 
-		if (link->irq.active)
-			continue;
+	ACPI_FUNCTION_TRACE("acpi_pci_link_allocate");
 
+	if (link->irq.setonboot)
+		return_VALUE(0);
+
+	if (link->irq.active) {
+		irq = link->irq.active;
+	} else {
 		irq = link->irq.possible[0];
+	}
 
 		/* 
 		 * Select the best IRQ.  This is done in reverse to promote 
@@ -455,16 +467,20 @@ acpi_pci_link_check (void)
 				irq = link->irq.possible[i];
 		}
 
-		/* Enable the link device at this IRQ. */
-		acpi_pci_link_set(link, irq);
-
+	/* Attempt to enable the link device at this IRQ. */
+	if (acpi_pci_link_set(link, irq)) {
+		printk(PREFIX "Unable to set IRQ for %s [%s] (likely buggy ACPI BIOS). Aborting ACPI-based IRQ routing. Try pci=noacpi or acpi=off\n",
+			acpi_device_name(link->device),
+			acpi_device_bid(link->device));
+		return_VALUE(-ENODEV);
+	} else {
 		acpi_irq_penalty[link->irq.active] += 100;
-
 		printk(PREFIX "%s [%s] enabled at IRQ %d\n", 
 			acpi_device_name(link->device),
 			acpi_device_bid(link->device), link->irq.active);
 	}
 
+	link->irq.setonboot = 1;
 	return_VALUE(0);
 }
 
@@ -472,7 +488,9 @@ acpi_pci_link_check (void)
 int
 acpi_pci_link_get_irq (
 	acpi_handle		handle,
-	int			index)
+	int			index,
+	int*			edge_level,
+	int*			active_high_low)
 {
 	int                     result = 0;
 	struct acpi_device	*device = NULL;
@@ -498,11 +516,17 @@ acpi_pci_link_get_irq (
 		return_VALUE(0);
 	}
 
+	if (acpi_pci_link_allocate(link)) {
+		return -ENODEV;
+	}
+	   
 	if (!link->irq.active) {
 		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Link disabled\n"));
 		return_VALUE(0);
 	}
 
+	if (edge_level) *edge_level = link->irq.edge_level;
+	if (active_high_low) *active_high_low = link->irq.active_high_low;
 	return_VALUE(link->irq.active);
 }
 

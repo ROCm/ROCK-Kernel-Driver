@@ -60,7 +60,7 @@ void acpi_pci_get_translations (struct acpi_pci_id* id, u64* mem_tra, u64* io_tr
 /* ACPI PCI Interrupt Link (pci_link.c) */
 
 int acpi_pci_link_check (void);
-int acpi_pci_link_get_irq (acpi_handle handle, int index);
+int acpi_pci_link_get_irq (acpi_handle handle, int index, int* edge_level, int* active_high_low);
 
 /* ACPI PCI Interrupt Routing (pci_irq.c) */
 

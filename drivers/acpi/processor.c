@@ -1781,7 +1781,6 @@ acpi_processor_remove (
 	if (ACPI_FAILURE(status)) {
 		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, 
 			"Error removing notify handler\n"));
-		return_VALUE(-ENODEV);
 	}
 
 	acpi_processor_remove_fs(device);

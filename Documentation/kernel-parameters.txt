@@ -85,7 +85,13 @@ running once the system is up.
 			See also Documentation/scsi/ncr53c7xx.txt.
 
 	acpi=		[HW,ACPI] Advanced Configuration and Power Interface 
-			Format: off[,<...>]
+			Format: off
+			off -- disables both ACPI table parsing and interpreter init
+			See also Documentation/pm.txt.
+
+	acpismp=	[IA-32] Early setup parse and use ACPI SMP table.
+			Format: force
+			force -- force use of ACPI table parsing and interpreter init
 			See also Documentation/pm.txt.
  
 	ad1816=		[HW,OSS]
