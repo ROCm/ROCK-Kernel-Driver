@@ -238,7 +238,7 @@ static int __init vesafb_probe(struct device *device)
 		vesafb_fix.smem_len = screen_info.lfb_size * 65536;
 
 	/* Set video size according to vram boot option */
-	if (vram && vram * 1024 * 1024 != vesafb_fix.smem_len)
+	if (vram)
 		vesafb_fix.smem_len = vram * 1024 * 1024;
 
 	vesafb_fix.visual   = (vesafb_defined.bits_per_pixel == 8) ?
