@@ -57,7 +57,6 @@ MODULE_PARM_DESC(force_i2c,
 
 /* Addresses to scan */
 static unsigned short normal_i2c[] = { I2C_CLIENT_END };
-static unsigned short normal_i2c_range[] = { I2C_CLIENT_END };
 static unsigned int normal_isa[] = { 0, I2C_CLIENT_ISA_END };
 
 /* Insmod parameters */
