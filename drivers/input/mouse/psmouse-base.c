@@ -326,6 +326,8 @@ static int im_explorer_detect(struct psmouse *psmouse)
 
 static int psmouse_extensions(struct psmouse *psmouse)
 {
+	int synaptics_hardware = 0;
+
 	psmouse->vendor = "Generic";
 	psmouse->name = "Mouse";
 	psmouse->model = 0;
@@ -334,17 +336,20 @@ static int psmouse_extensions(struct psmouse *psmouse)
  * Try Synaptics TouchPad
  */
 	if (psmouse_max_proto > PSMOUSE_PS2 && synaptics_detect(psmouse)) {
+		synaptics_hardware = 1;
 		psmouse->vendor = "Synaptics";
 		psmouse->name = "TouchPad";
 
-		if (psmouse_max_proto > PSMOUSE_IMEX &&
-					synaptics_init(psmouse) == 0)
-			return PSMOUSE_SYNAPTICS;
-		/*
-		 * Synaptics hardware (according to Peter Berg Larsen) can get
-		 * confused by protocol probes below so we have to stop here
-		 */
-		return PSMOUSE_PS2;
+		if (psmouse_max_proto > PSMOUSE_IMEX) {
+			if (synaptics_init(psmouse) == 0)
+				return PSMOUSE_SYNAPTICS;
+/*
+ * Some Synaptics touchpads can emulate extended protocols (like IMPS/2).
+ * Unfortunately Logitech/Genius probes confuse some firmware versions so
+ * we'll have to skip them.
+ */
+			psmouse_max_proto = PSMOUSE_IMEX;
+		}
 	}
 
 	if (psmouse_max_proto > PSMOUSE_IMEX && genius_detect(psmouse)) {
@@ -383,6 +388,15 @@ static int psmouse_extensions(struct psmouse *psmouse)
  * Okay, all failed, we have a standard mouse here. The number of the buttons
  * is still a question, though. We assume 3.
  */
+	if (synaptics_hardware) {
+/*
+ * We detected Synaptics hardware but it did not respond to IMPS/2 probes.
+ * We need to reset the touchpad because if there is a track point on the
+ * pass through port it could get disabled while probing for protocol
+ * extensions.
+ */
+		psmouse_command(psmouse, NULL, PSMOUSE_CMD_RESET_DIS);
+	}
 
 	return PSMOUSE_PS2;
 }
