@@ -494,9 +494,7 @@ static int unconfigure_visit_pci_dev_phase2(struct pci_dev_wrapped *wrapped_dev,
 		return -ENODEV;
 
 	/* Remove the Linux representation */
-	if(pci_remove_device_safe(dev) == 0) {
-		kfree(dev);
-	} else {
+	if(pci_remove_device_safe(dev)) {
 		err("Could not remove device\n");
 		return -1;
 	}
@@ -574,13 +572,18 @@ int cpci_configure_slot(struct slot* slot)
 
 	/* Still NULL? Well then scan for it! */
 	if(slot->dev == NULL) {
+		int n;
 		dbg("pci_dev still null");
 
 		/*
 		 * This will generate pci_dev structures for all functions, but
 		 * we will only call this case when lookup fails.
 		 */
-		slot->dev = pci_scan_slot(slot->bus, slot->devfn);
+		n = pci_scan_slot(slot->bus, slot->devfn);
+		dbg("%s: pci_scan_slot returned %d", __FUNCTION__, n);
+		if(n > 0)
+			pci_bus_add_devices(slot->bus);
+		slot->dev = pci_find_slot(slot->bus->number, slot->devfn);
 		if(slot->dev == NULL) {
 			err("Could not find PCI device for slot %02x", slot->number);
 			return 0;
