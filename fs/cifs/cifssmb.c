@@ -977,6 +977,7 @@ int CIFSSMBRenameOpenFile(const int xid,struct cifsTconInfo *pTcon,
 	int rc = 0;
 	int bytes_returned = 0;
 	int len_of_str;
+	__u16 params, param_offset, offset, count, byte_count;
 
 	cFYI(1, ("Rename to File by handle"));
 	rc = smb_init(SMB_COM_TRANSACTION2, 15, pTcon, (void **) &pSMB,
@@ -984,28 +985,27 @@ int CIFSSMBRenameOpenFile(const int xid,struct cifsTconInfo *pTcon,
 	if (rc)
 		return rc;
 
-	pSMB->ParameterCount = 6;
+	params = 6;
 	pSMB->MaxSetupCount = 0;
 	pSMB->Reserved = 0;
 	pSMB->Flags = 0;
 	pSMB->Timeout = 0;
 	pSMB->Reserved2 = 0;
-	pSMB->ParameterOffset = offsetof(struct smb_com_transaction2_sfi_req,
-				Fid) - 4;
-	pSMB->DataOffset = pSMB->ParameterOffset + pSMB->ParameterCount;
+	param_offset = offsetof(struct smb_com_transaction2_sfi_req, Fid) - 4;
+	offset = param_offset + params;
 
-	data_offset = (char *) (&pSMB->hdr.Protocol) + pSMB->DataOffset;
+	data_offset = (char *) (&pSMB->hdr.Protocol) + offset;
 	rename_info = (struct set_file_rename *) data_offset;
 	pSMB->MaxParameterCount = cpu_to_le16(2);
 	pSMB->MaxDataCount = cpu_to_le16(1000); /* BB find max SMB PDU from sess */
 	pSMB->SetupCount = 1;
 	pSMB->Reserved3 = 0;
 	pSMB->SubCommand = cpu_to_le16(TRANS2_SET_FILE_INFORMATION);
-	pSMB->ByteCount = 3 /* pad */  + pSMB->ParameterCount;
-	pSMB->ParameterCount = cpu_to_le16(pSMB->ParameterCount);
+	byte_count = 3 /* pad */  + params;
+	pSMB->ParameterCount = cpu_to_le16(params);
 	pSMB->TotalParameterCount = pSMB->ParameterCount;
-	pSMB->ParameterOffset = cpu_to_le16(pSMB->ParameterOffset);
-	pSMB->DataOffset = cpu_to_le16(pSMB->DataOffset);
+	pSMB->ParameterOffset = cpu_to_le16(param_offset);
+	pSMB->DataOffset = cpu_to_le16(offset);
 	/* construct random name ".cifs_tmp<inodenum><mid>" */
 	rename_info->overwrite = cpu_to_le32(1);
 	rename_info->root_fid  = 0;
@@ -1017,16 +1017,16 @@ int CIFSSMBRenameOpenFile(const int xid,struct cifsTconInfo *pTcon,
 		len_of_str = cifs_strtoUCS((wchar_t *) rename_info->target_name, target_name, 530, nls_codepage);
 	}
 	rename_info->target_name_len = cpu_to_le32(2 * len_of_str);
-	pSMB->DataCount = 12 /* sizeof(struct set_file_rename) */ + (2 * len_of_str) + 2;
-	pSMB->ByteCount += pSMB->DataCount;
-	pSMB->DataCount = cpu_to_le16(pSMB->DataCount);
+	count = 12 /* sizeof(struct set_file_rename) */ + (2 * len_of_str) + 2;
+	byte_count += count;
+	pSMB->DataCount = cpu_to_le16(count);
 	pSMB->TotalDataCount = pSMB->DataCount;
 	pSMB->Fid = netfid;
 	pSMB->InformationLevel =
 		cpu_to_le16(SMB_SET_FILE_RENAME_INFORMATION);
 	pSMB->Reserved4 = 0;
-	pSMB->hdr.smb_buf_length += pSMB->ByteCount;
-	pSMB->ByteCount = cpu_to_le16(pSMB->ByteCount);
+	pSMB->hdr.smb_buf_length += byte_count;
+	pSMB->ByteCount = cpu_to_le16(byte_count);
 	rc = SendReceive(xid, pTcon->ses, (struct smb_hdr *) pSMB,
                          (struct smb_hdr *) pSMBr, &bytes_returned, 0);
 	if (rc) {
@@ -2620,6 +2620,7 @@ CIFSSMBSetFileSize(const int xid, struct cifsTconInfo *tcon, __u64 size,
 	int rc = 0;
 	int bytes_returned = 0;
 	__u32 tmp;
+	__u16 params, param_offset, offset, byte_count, count;
 
 	cFYI(1, ("SetFileSize (via SetFileInfo) %lld",
 			(long long)size));
@@ -2634,34 +2635,33 @@ CIFSSMBSetFileSize(const int xid, struct cifsTconInfo *tcon, __u64 size,
 	tmp >>= 16;
 	pSMB->hdr.PidHigh = tmp & 0xFFFF;
     
-	pSMB->ParameterCount = 6;
+	params = 6;
 	pSMB->MaxSetupCount = 0;
 	pSMB->Reserved = 0;
 	pSMB->Flags = 0;
 	pSMB->Timeout = 0;
 	pSMB->Reserved2 = 0;
-	pSMB->ParameterOffset = offsetof(struct smb_com_transaction2_sfi_req,
-                                     Fid) - 4;
-	pSMB->DataOffset = pSMB->ParameterOffset + pSMB->ParameterCount;
+	param_offset = offsetof(struct smb_com_transaction2_sfi_req, Fid) - 4;
+	offset = param_offset + params;
 
-	data_offset = (char *) (&pSMB->hdr.Protocol) + pSMB->DataOffset;	
+	data_offset = (char *) (&pSMB->hdr.Protocol) + offset;	
 
-	pSMB->DataCount = sizeof(struct file_end_of_file_info);
+	count = sizeof(struct file_end_of_file_info);
 	pSMB->MaxParameterCount = cpu_to_le16(2);
 	pSMB->MaxDataCount = cpu_to_le16(1000);	/* BB find max SMB PDU from sess */
 	pSMB->SetupCount = 1;
 	pSMB->Reserved3 = 0;
 	pSMB->SubCommand = cpu_to_le16(TRANS2_SET_FILE_INFORMATION);
-	pSMB->ByteCount = 3 /* pad */  + pSMB->ParameterCount + pSMB->DataCount;
-	pSMB->DataCount = cpu_to_le16(pSMB->DataCount);
-	pSMB->ParameterCount = cpu_to_le16(pSMB->ParameterCount);
+	byte_count = 3 /* pad */  + params + count;
+	pSMB->DataCount = cpu_to_le16(count);
+	pSMB->ParameterCount = cpu_to_le16(params);
 	pSMB->TotalDataCount = pSMB->DataCount;
 	pSMB->TotalParameterCount = pSMB->ParameterCount;
-	pSMB->ParameterOffset = cpu_to_le16(pSMB->ParameterOffset);
+	pSMB->ParameterOffset = cpu_to_le16(param_offset);
 	parm_data =
 		(struct file_end_of_file_info *) (((char *) &pSMB->hdr.Protocol) +
-			pSMB->DataOffset);
-	pSMB->DataOffset = cpu_to_le16(pSMB->DataOffset); /* now safe to change to le */
+			offset);
+	pSMB->DataOffset = cpu_to_le16(offset);
 	parm_data->FileSize = cpu_to_le64(size);
 	pSMB->Fid = fid;
 	if(SetAllocation) {
@@ -2680,8 +2680,8 @@ CIFSSMBSetFileSize(const int xid, struct cifsTconInfo *tcon, __u64 size,
 		        cpu_to_le16(SMB_SET_FILE_END_OF_FILE_INFO);
 	}
 	pSMB->Reserved4 = 0;
-	pSMB->hdr.smb_buf_length += pSMB->ByteCount;
-	pSMB->ByteCount = cpu_to_le16(pSMB->ByteCount);
+	pSMB->hdr.smb_buf_length += byte_count;
+	pSMB->ByteCount = cpu_to_le16(byte_count);
 	rc = SendReceive(xid, tcon->ses, (struct smb_hdr *) pSMB,
 			 (struct smb_hdr *) pSMBr, &bytes_returned, 0);
 	if (rc) {
