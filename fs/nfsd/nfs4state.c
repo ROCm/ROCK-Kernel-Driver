@@ -2153,8 +2153,10 @@ nfsd4_lock(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_lock 
 		if (!(lock->lk_stateowner = alloc_init_lock_stateowner(strhashval, open_sop->so_client, open_stp, lock)))
 			goto out;
 		if ((lock_stp = alloc_init_lock_stateid(lock->lk_stateowner, 
-						fp, open_stp)) == NULL)
+						fp, open_stp)) == NULL) {
+			release_stateowner(lock->lk_stateowner);
 			goto out;
+		}
 		/* bump the open seqid used to create the lock */
 		open_sop->so_seqid++;
 	} else {
