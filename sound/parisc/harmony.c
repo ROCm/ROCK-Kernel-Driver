@@ -751,6 +751,8 @@ static int snd_card_harmony_hw_params(snd_pcm_substream_t *substream,
 	int err;
 	
 	err = snd_pcm_lib_malloc_pages(substream, params_buffer_bytes(hw_params));
+	if (err > 0 && substream->dma_device.type == SNDRV_DMA_TYPE_CONTINUOUS)
+		substream->runtime->dma_addr = __pa(substream->runtime->dma_area);
 	DPRINTK(KERN_INFO PFX "HW Params returned %d, dma_addr %lx\n", err,
 			(unsigned long)substream->runtime->dma_addr);
 	return err;
@@ -784,7 +786,7 @@ static snd_pcm_ops_t snd_card_harmony_capture_ops = {
 	.pointer =		snd_card_harmony_capture_pointer,
 };
 
-static int snd_card_harmony_pcm_init(snd_card_harmony_t *harmony, int device)
+static int snd_card_harmony_pcm_init(snd_card_harmony_t *harmony)
 {
 	snd_pcm_t *pcm;
 	int err;
@@ -797,7 +799,7 @@ static int snd_card_harmony_pcm_init(snd_card_harmony_t *harmony, int device)
 	
 	snd_harmony_disable_interrupts(harmony);
 	
-   	if ((err = snd_pcm_new(harmony->card, "Harmony", device, 1, 1, &pcm)) < 0)
+   	if ((err = snd_pcm_new(harmony->card, "Harmony", 0, 1, 1, &pcm)) < 0)
 		return err;
 	
 	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_PLAYBACK, &snd_card_harmony_playback_ops);
@@ -813,26 +815,46 @@ static int snd_card_harmony_pcm_init(snd_card_harmony_t *harmony, int device)
 	harmony->dma_dev.dev = &harmony->pa_dev->dev;
 	err = snd_dma_alloc_pages(&harmony->dma_dev, HARMONY_BUF_SIZE*GRAVEYARD_BUFS,
 				  &harmony->graveyard_dma);
-	if (err < 0)
+	if (err == -ENOMEM) {
+		/* use continuous buffers */
+		harmony->dma_dev.type = SNDRV_DMA_TYPE_CONTINUOUS;
+		harmony->dma_dev.dev = snd_dma_continuous_data(GFP_KERNEL);
+		err = snd_dma_alloc_pages(&harmony->dma_dev, HARMONY_BUF_SIZE*GRAVEYARD_BUFS,
+					  &harmony->graveyard_dma);
+	}
+	if (err < 0) {
+		printk(KERN_ERR PFX "can't allocate graveyard buffer\n");
 		return err;
+	}
 	harmony->graveyard_count = 0;
 	
 	/* initialize silence buffers */
 	err = snd_dma_alloc_pages(&harmony->dma_dev, HARMONY_BUF_SIZE*SILENCE_BUFS,
 				  &harmony->silence_dma);
-	if (err < 0)
+	if (err < 0) {
+		printk(KERN_ERR PFX "can't allocate silence buffer\n");
 		return err;
+	}
 	harmony->silence_count = 0;
+
+	if (harmony->dma_dev.type == SNDRV_DMA_TYPE_CONTINUOUS) {
+		harmony->graveyard_dma.addr = __pa(harmony->graveyard_dma.area);
+		harmony->silence_dma.addr = __pa(harmony->silence_dma.area);
+	}
 
 	harmony->ply_stopped = harmony->cap_stopped = 1;
 	
 	harmony->playback_substream = NULL;
 	harmony->capture_substream = NULL;
 	harmony->graveyard_count = 0;
-	
-	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_DEV,
-					      &harmony->pa_dev->dev,
-					      MAX_BUFFER_SIZE, MAX_BUFFER_SIZE);
+
+	err = snd_pcm_lib_preallocate_pages_for_all(pcm, harmony->dma_dev.type,
+						    harmony->dma_dev.dev,
+						    MAX_BUFFER_SIZE, MAX_BUFFER_SIZE);
+	if (err < 0) {
+		printk(KERN_ERR PFX "buffer allocation error %d\n", err);
+		// return err;
+	}
 
 	return 0;
 }
@@ -1037,7 +1059,7 @@ static int __init snd_card_harmony_probe(struct parisc_device *pa_dev)
 		snd_card_free(card);
 		return err;
 	}
-	if ((err = snd_card_harmony_pcm_init(chip, dev)) < 0) {
+	if ((err = snd_card_harmony_pcm_init(chip)) < 0) {
 		printk(KERN_ERR PFX "PCM Init failed\n");
 		snd_card_free(card);
 		return err;
