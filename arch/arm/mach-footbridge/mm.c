@@ -1,5 +1,5 @@
 /*
- *  linux/arch/arm/mm/mm-footbridge.c
+ *  linux/arch/arm/mach-footbridge/mm.c
  *
  *  Copyright (C) 1998-2000 Russell King, Dave Gilbert.
  *

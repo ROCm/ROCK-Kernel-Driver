@@ -898,9 +898,9 @@ static void kill_super(struct super_block *sb, int umount_root)
 	/* Need to clean after the sucker */
 	if (fs->fs_flags & FS_LITTER)
 		d_genocide(root);
-	if (fs->fs_flags & (FS_SINGLE|FS_LITTER))
-		shrink_dcache_parent(root);
+	shrink_dcache_parent(root);
 	dput(root);
+	fsync_dev(sb->s_dev);
 	lock_super(sb);
 	if (sop) {
 		if (sop->write_super && sb->s_dirt)
@@ -1073,20 +1073,6 @@ static int do_umount(struct vfsmount *mnt, int umount_root, int flags)
 
 	if( (flags&MNT_FORCE) && sb->s_op->umount_begin)
 		sb->s_op->umount_begin(sb);
-
-	/*
-	 * Shrink dcache, then fsync. This guarantees that if the
-	 * filesystem is quiescent at this point, then (a) only the
-	 * root entry should be in use and (b) that root entry is
-	 * clean.
-	 */
-	shrink_dcache_sb(sb);
-	fsync_dev(sb->s_dev);
-
-	if (sb->s_root->d_inode->i_state) {
-		mntput(mnt);
-		return -EBUSY;
-	}
 
 	/* Something might grab it again - redo checks */
 

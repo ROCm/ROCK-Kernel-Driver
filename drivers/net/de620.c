@@ -183,8 +183,8 @@ typedef unsigned char byte;
  * Make a clone skip the Ethernet-address range check:
  *	insmod de620.o clone=1
  */
-static int bnc = 0;
-static int utp = 0;
+static int bnc;
+static int utp;
 static int io  = DE620_IO;
 static int irq = DE620_IRQ;
 static int clone = DE620_CLONE;
@@ -722,7 +722,7 @@ static int de620_rx_intr(struct net_device *dev)
 static int adapter_init(struct net_device *dev)
 {
 	int i;
-	static int was_down = 0;
+	static int was_down;
 
 	if ((nic_data.Model == 3) || (nic_data.Model == 0)) { /* CT */
 		EIPRegister = NCTL0;

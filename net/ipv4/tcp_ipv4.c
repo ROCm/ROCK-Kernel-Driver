@@ -5,7 +5,7 @@
  *
  *		Implementation of the Transmission Control Protocol(TCP).
  *
- * Version:	$Id: tcp_ipv4.c,v 1.222 2000/12/08 17:15:53 davem Exp $
+ * Version:	$Id: tcp_ipv4.c,v 1.228 2001/04/06 18:41:36 davem Exp $
  *
  *		IPv4 specific functions
  *
@@ -670,6 +670,7 @@ int tcp_v4_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 	}
 
 	__sk_dst_set(sk, &rt->u.dst);
+	sk->route_caps = rt->u.dst.dev->features;
 
 	if (!sk->protinfo.af_inet.opt || !sk->protinfo.af_inet.opt->srr)
 		daddr = rt->rt_dst;
@@ -717,6 +718,7 @@ int tcp_v4_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 	tp->ext_header_len = 0;
 	if (sk->protinfo.af_inet.opt)
 		tp->ext_header_len = sk->protinfo.af_inet.opt->optlen;
+	sk->protinfo.af_inet.id = tp->write_seq^jiffies;
 
 	tp->mss_clamp = 536;
 
@@ -726,6 +728,7 @@ int tcp_v4_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 
 failure:
 	__sk_dst_reset(sk);
+	sk->route_caps = 0;
 	sk->dport = 0;
 	return err;
 }
@@ -850,32 +853,21 @@ static inline void do_pmtu_discovery(struct sock *sk, struct iphdr *ip, unsigned
  *
  */
 
-void tcp_v4_err(struct sk_buff *skb, unsigned char *dp, int len)
+void tcp_v4_err(struct sk_buff *skb, u32 info)
 {
-	struct iphdr *iph = (struct iphdr*)dp;
-	struct tcphdr *th; 
+	struct iphdr *iph = (struct iphdr*)skb->data;
+	struct tcphdr *th = (struct tcphdr*)(skb->data+(iph->ihl<<2));
 	struct tcp_opt *tp;
 	int type = skb->h.icmph->type;
 	int code = skb->h.icmph->code;
-#if ICMP_MIN_LENGTH < 14
-	int no_flags = 0;
-#else
-#define no_flags 0
-#endif
 	struct sock *sk;
 	__u32 seq;
 	int err;
 
-	if (len < (iph->ihl << 2) + ICMP_MIN_LENGTH) { 
+	if (skb->len < (iph->ihl << 2) + 8) {
 		ICMP_INC_STATS_BH(IcmpInErrors); 
 		return;
 	}
-#if ICMP_MIN_LENGTH < 14
-	if (len < (iph->ihl << 2) + 14)
-		no_flags = 1;
-#endif
-
-	th = (struct tcphdr*)(dp+(iph->ihl<<2));
 
 	sk = tcp_v4_lookup(iph->daddr, th->dest, iph->saddr, th->source, tcp_v4_iif(skb));
 	if (sk == NULL) {
@@ -921,7 +913,7 @@ void tcp_v4_err(struct sk_buff *skb, unsigned char *dp, int len)
 
 		if (code == ICMP_FRAG_NEEDED) { /* PMTU discovery (RFC1191) */
 			if (sk->lock.users == 0)
-				do_pmtu_discovery(sk, iph, ntohs(skb->h.icmph->un.frag.mtu));
+				do_pmtu_discovery(sk, iph, info);
 			goto out;
 		}
 
@@ -938,15 +930,6 @@ void tcp_v4_err(struct sk_buff *skb, unsigned char *dp, int len)
 		struct open_request *req, **prev;
 	case TCP_LISTEN:
 		if (sk->lock.users != 0)
-			goto out;
-
-		/* The final ACK of the handshake should be already 
-		 * handled in the new socket context, not here.
-		 * Strictly speaking - an ICMP error for the final
-		 * ACK should set the opening flag, but that is too
-		 * complicated right now. 
-		 */ 
-		if (!no_flags && !th->syn && !th->ack)
 			goto out;
 
 		req = tcp_v4_search_req(tp, iph, th, &prev); 
@@ -976,8 +959,6 @@ void tcp_v4_err(struct sk_buff *skb, unsigned char *dp, int len)
 	case TCP_SYN_RECV:  /* Cannot happen.
 			       It can f.e. if SYNs crossed.
 			     */ 
-		if (!no_flags && !th->syn)
-			goto out;
 		if (sk->lock.users == 0) {
 			TCP_INC_STATS_BH(TcpAttemptFails);
 			sk->err = err;
@@ -1023,8 +1004,13 @@ out:
 void tcp_v4_send_check(struct sock *sk, struct tcphdr *th, int len, 
 		       struct sk_buff *skb)
 {
-	th->check = tcp_v4_check(th, len, sk->saddr, sk->daddr,
-				 csum_partial((char *)th, th->doff<<2, skb->csum));
+	if (skb->ip_summed == CHECKSUM_HW) {
+		th->check = ~tcp_v4_check(th, len, sk->saddr, sk->daddr, 0);
+		skb->csum = offsetof(struct tcphdr, check);
+	} else {
+		th->check = tcp_v4_check(th, len, sk->saddr, sk->daddr,
+					 csum_partial((char *)th, th->doff<<2, skb->csum));
+	}
 }
 
 /*
@@ -1445,6 +1431,7 @@ struct sock * tcp_v4_syn_recv_sock(struct sock *sk, struct sk_buff *skb,
 		goto exit;
 
 	newsk->dst_cache = dst;
+	newsk->route_caps = dst->dev->features;
 
 	newtp = &(newsk->tp_pinfo.af_tcp);
 	newsk->daddr = req->af.v4_req.rmt_addr;
@@ -1457,6 +1444,7 @@ struct sock * tcp_v4_syn_recv_sock(struct sock *sk, struct sk_buff *skb,
 	newtp->ext_header_len = 0;
 	if (newsk->protinfo.af_inet.opt)
 		newtp->ext_header_len = newsk->protinfo.af_inet.opt->optlen;
+	newsk->protinfo.af_inet.id = newtp->write_seq^jiffies;
 
 	tcp_sync_mss(newsk, dst->pmtu);
 	newtp->advmss = dst->advmss;
@@ -1512,23 +1500,23 @@ static struct sock *tcp_v4_hnd_req(struct sock *sk,struct sk_buff *skb)
 static int tcp_v4_checksum_init(struct sk_buff *skb)
 {
 	if (skb->ip_summed == CHECKSUM_HW) {
+		skb->ip_summed = CHECKSUM_UNNECESSARY;
+		if (!tcp_v4_check(skb->h.th,skb->len,skb->nh.iph->saddr,
+				  skb->nh.iph->daddr,skb->csum))
+			return 0;
+
+		NETDEBUG(printk(KERN_DEBUG "hw tcp v4 csum failed\n"));
+		skb->ip_summed = CHECKSUM_NONE;
+	}
+	if (skb->len <= 76) {
 		if (tcp_v4_check(skb->h.th,skb->len,skb->nh.iph->saddr,
-				 skb->nh.iph->daddr,skb->csum)) {
-			NETDEBUG(printk(KERN_DEBUG "hw tcp v4 csum failed\n"));
+				 skb->nh.iph->daddr,
+				 skb_checksum(skb, 0, skb->len, 0)))
 			return -1;
-		}
 		skb->ip_summed = CHECKSUM_UNNECESSARY;
 	} else {
-		if (skb->len <= 76) {
-			if (tcp_v4_check(skb->h.th,skb->len,skb->nh.iph->saddr,
-					 skb->nh.iph->daddr,
-					 csum_partial((char *)skb->h.th, skb->len, 0)))
-				return -1;
-			skb->ip_summed = CHECKSUM_UNNECESSARY;
-		} else {
-			skb->csum = ~tcp_v4_check(skb->h.th,skb->len,skb->nh.iph->saddr,
-						  skb->nh.iph->daddr,0);
-		}
+		skb->csum = ~tcp_v4_check(skb->h.th,skb->len,skb->nh.iph->saddr,
+					  skb->nh.iph->daddr,0);
 	}
 	return 0;
 }
@@ -1601,7 +1589,7 @@ csum_err:
  *	From tcp_input.c
  */
 
-int tcp_v4_rcv(struct sk_buff *skb, unsigned short len)
+int tcp_v4_rcv(struct sk_buff *skb)
 {
 	struct tcphdr *th;
 	struct sock *sk;
@@ -1610,31 +1598,35 @@ int tcp_v4_rcv(struct sk_buff *skb, unsigned short len)
 	if (skb->pkt_type!=PACKET_HOST)
 		goto discard_it;
 
-	th = skb->h.th;
-
-	/* Pull up the IP header. */
-	__skb_pull(skb, skb->h.raw - skb->data);
-
 	/* Count it even if it's bad */
 	TCP_INC_STATS_BH(TcpInSegs);
+
+	if (!pskb_may_pull(skb, sizeof(struct tcphdr)))
+		goto discard_it;
+
+	th = skb->h.th;
+
+	if (th->doff < sizeof(struct tcphdr)/4)
+		goto bad_packet;
+	if (!pskb_may_pull(skb, th->doff*4))
+		goto discard_it;
 
 	/* An explanation is required here, I think.
 	 * Packet length and doff are validated by header prediction,
 	 * provided case of th->doff==0 is elimineted.
 	 * So, we defer the checks. */
-	if (th->doff < sizeof(struct tcphdr)/4 ||
-	    (skb->ip_summed != CHECKSUM_UNNECESSARY &&
+	if ((skb->ip_summed != CHECKSUM_UNNECESSARY &&
 	     tcp_v4_checksum_init(skb) < 0))
 		goto bad_packet;
 
+	th = skb->h.th;
 	TCP_SKB_CB(skb)->seq = ntohl(th->seq);
 	TCP_SKB_CB(skb)->end_seq = (TCP_SKB_CB(skb)->seq + th->syn + th->fin +
-				    len - th->doff*4);
+				    skb->len - th->doff*4);
 	TCP_SKB_CB(skb)->ack_seq = ntohl(th->ack_seq);
 	TCP_SKB_CB(skb)->when = 0;
 	TCP_SKB_CB(skb)->flags = skb->nh.iph->tos;
 	TCP_SKB_CB(skb)->sacked = 0;
-	skb->used = 0;
 
 	sk = __tcp_v4_lookup(skb->nh.iph->saddr, th->source,
 			     skb->nh.iph->daddr, ntohs(th->dest), tcp_v4_iif(skb));
@@ -1665,7 +1657,7 @@ process:
 	return ret;
 
 no_tcp_socket:
-	if (len < (th->doff<<2) || tcp_checksum_complete(skb)) {
+	if (skb->len < (th->doff<<2) || tcp_checksum_complete(skb)) {
 bad_packet:
 		TCP_INC_STATS_BH(TcpInErrs);
 	} else {
@@ -1682,7 +1674,7 @@ discard_and_relse:
 	goto discard_it;
 
 do_time_wait:
-	if (len < (th->doff<<2) || tcp_checksum_complete(skb)) {
+	if (skb->len < (th->doff<<2) || tcp_checksum_complete(skb)) {
 		TCP_INC_STATS_BH(TcpInErrs);
 		goto discard_and_relse;
 	}
@@ -1740,7 +1732,7 @@ static int tcp_v4_reselect_saddr(struct sock *sk)
 		return err;
 
 	__sk_dst_set(sk, &rt->u.dst);
-	/* sk->route_caps = rt->u.dst.dev->features; */
+	sk->route_caps = rt->u.dst.dev->features;
 
 	new_saddr = rt->rt_src;
 
@@ -1788,20 +1780,19 @@ int tcp_v4_rebuild_header(struct sock *sk)
 			      sk->bound_dev_if);
 	if (!err) {
 		__sk_dst_set(sk, &rt->u.dst);
-		/* sk->route_caps = rt->u.dst.dev->features; */
+		sk->route_caps = rt->u.dst.dev->features;
 		return 0;
 	}
 
 	/* Routing failed... */
-	/* sk->route_caps = 0; */
+	sk->route_caps = 0;
 
 	if (!sysctl_ip_dynaddr ||
 	    sk->state != TCP_SYN_SENT ||
 	    (sk->userlocks & SOCK_BINDADDR_LOCK) ||
-	    (err = tcp_v4_reselect_saddr(sk)) != 0) {
+	    (err = tcp_v4_reselect_saddr(sk)) != 0)
 		sk->err_soft=-err;
-		/* sk->error_report(sk); */
-	}
+
 	return err;
 }
 
@@ -1940,7 +1931,7 @@ static int tcp_v4_destroy_sock(struct sock *sk)
 	/* Cleanup up the write buffer. */
   	tcp_writequeue_purge(sk);
 
-	/* Cleans up our, hopefuly empty, out_of_order_queue. */
+	/* Cleans up our, hopefully empty, out_of_order_queue. */
   	__skb_queue_purge(&tp->out_of_order_queue);
 
 	/* Clean prequeue, it must be empty really */
@@ -1949,6 +1940,10 @@ static int tcp_v4_destroy_sock(struct sock *sk)
 	/* Clean up a referenced TCP bind bucket. */
 	if(sk->prev != NULL)
 		tcp_put_port(sk);
+
+	/* If sendmsg cached page exists, toss it. */
+	if (tp->sndmsg_page != NULL)
+		__free_page(tp->sndmsg_page);
 
 	atomic_dec(&tcp_sockets_allocated);
 
@@ -2076,7 +2071,7 @@ int tcp_get_info(char *buffer, char **start, off_t offset, int length)
 			if (pos >= offset) {
 				get_tcp_sock(sk, tmpbuf, num);
 				len += sprintf(buffer+len, "%-*s\n", TMPSZ-1, tmpbuf);
-				if (len >= length) {
+				if (pos >= offset + length) {
 					tcp_listen_unlock();
 					goto out_no_bh;
 				}
@@ -2097,7 +2092,7 @@ skip_listen:
 							continue;
 						get_openreq(sk, req, tmpbuf, num, uid);
 						len += sprintf(buffer+len, "%-*s\n", TMPSZ-1, tmpbuf);
-						if(len >= length) {
+						if (pos >= offset + length) {
 							read_unlock_bh(&tp->syn_wait_lock);
 							tcp_listen_unlock();
 							goto out_no_bh;
@@ -2129,7 +2124,7 @@ skip_listen:
 				continue;
 			get_tcp_sock(sk, tmpbuf, num);
 			len += sprintf(buffer+len, "%-*s\n", TMPSZ-1, tmpbuf);
-			if(len >= length) {
+			if (pos >= offset + length) {
 				read_unlock(&head->lock);
 				goto out;
 			}
@@ -2144,7 +2139,7 @@ skip_listen:
 				continue;
 			get_timewait_sock(tw, tmpbuf, num);
 			len += sprintf(buffer+len, "%-*s\n", TMPSZ-1, tmpbuf);
-			if(len >= length) {
+			if (pos >= offset + length) {
 				read_unlock(&head->lock);
 				goto out;
 			}
@@ -2159,7 +2154,7 @@ out_no_bh:
 	begin = len - (pos - offset);
 	*start = buffer + begin;
 	len -= begin;
-	if(len > length)
+	if (len > length)
 		len = length;
 	if (len < 0)
 		len = 0; 

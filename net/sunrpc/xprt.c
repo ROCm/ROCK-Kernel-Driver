@@ -591,7 +591,7 @@ static int csum_partial_copy_to_page_cache(struct iovec *iov,
 					   struct sk_buff *skb,
 					   int copied)
 {
-	__u8 *pkt_data = skb->h.raw + sizeof(struct udphdr);
+	int offset = sizeof(struct udphdr);
 	__u8 *cur_ptr = iov->iov_base;
 	__kernel_size_t cur_len = iov->iov_len;
 	unsigned int csum = skb->csum;
@@ -599,18 +599,18 @@ static int csum_partial_copy_to_page_cache(struct iovec *iov,
 	int slack = skb->len - copied - sizeof(struct udphdr);
 
 	if (need_csum)
-		csum = csum_partial(skb->h.raw, sizeof(struct udphdr), csum);
+		csum = csum_partial(skb->data, sizeof(struct udphdr), csum);
 	while (copied > 0) {
 		if (cur_len) {
 			int to_move = cur_len;
 			if (to_move > copied)
 				to_move = copied;
 			if (need_csum)
-				csum = csum_partial_copy_nocheck(pkt_data, cur_ptr,
-								 to_move, csum);
+				csum = skb_copy_and_csum_bits(skb, offset, cur_ptr,
+							      to_move, csum);
 			else
-				memcpy(cur_ptr, pkt_data, to_move);
-			pkt_data += to_move;
+				skb_copy_bits(skb, offset, cur_ptr, to_move);
+			offset += to_move;
 			copied -= to_move;
 			cur_ptr += to_move;
 			cur_len -= to_move;
@@ -623,7 +623,7 @@ static int csum_partial_copy_to_page_cache(struct iovec *iov,
 	}
 	if (need_csum) {
 		if (slack > 0)
-			csum = csum_partial(pkt_data, slack, csum);
+			csum = skb_checksum(skb, offset, slack, csum);
 		if ((unsigned short)csum_fold(csum))
 			return -1;
 	}
@@ -1116,6 +1116,7 @@ xprt_down_transmit(struct rpc_task *task)
 	struct rpc_xprt *xprt = task->tk_rqstp->rq_xprt;
 	struct rpc_rqst	*req = task->tk_rqstp;
 
+	spin_lock_bh(&xprt_sock_lock);
 	spin_lock(&xprt_lock);
 	if (xprt->snd_task && xprt->snd_task != task) {
 		dprintk("RPC: %4d TCP write queue full (task %d)\n",
@@ -1131,6 +1132,7 @@ xprt_down_transmit(struct rpc_task *task)
 		req->rq_bytes_sent = 0;
 	}
 	spin_unlock(&xprt_lock);
+	spin_unlock_bh(&xprt_sock_lock);
 	return xprt->snd_task == task;
 }
 
@@ -1143,10 +1145,12 @@ xprt_up_transmit(struct rpc_task *task)
 	struct rpc_xprt *xprt = task->tk_rqstp->rq_xprt;
 
 	if (xprt->snd_task && xprt->snd_task == task) {
+		spin_lock_bh(&xprt_sock_lock);
 		spin_lock(&xprt_lock);
 		xprt->snd_task = NULL;
 		rpc_wake_up_next(&xprt->sending);
 		spin_unlock(&xprt_lock);
+		spin_unlock_bh(&xprt_sock_lock);
 	}
 }
 

@@ -32,7 +32,7 @@
 #define BCR (*(volatile unsigned int *)(BCR_BASE))
 
 #define BCR_DB1110	(0x00A07410)
-#define BCR_DB1111	(0x00A07462)
+#define BCR_DB1111	(0x00A074E2)
 
 #define BCR_CF_PWR	(1<<0)	/* Compact Flash Power (1 = 3.3v, 0 = off) */
 #define BCR_CF_RST	(1<<1)	/* Compact Flash Reset (1 = power up reset) */
@@ -89,6 +89,7 @@ extern unsigned long BCR_value;
 
 #define IRQ_GPIO_CF_IRQ		IRQ_GPIO21
 #define IRQ_GPIO_CF_CD		IRQ_GPIO22
+#define IRQ_GPIO_MBREQ		IRQ_GPIO22
 #define IRQ_GPIO_UCB1300_IRQ	IRQ_GPIO23
 #define IRQ_GPIO_CF_BVD2	IRQ_GPIO24
 #define IRQ_GPIO_CF_BVD1	IRQ_GPIO25
@@ -139,6 +140,9 @@ extern unsigned long BCR_value;
 #define IRR_ETHERNET		(1<<0)
 #define IRR_USAR		(1<<1)
 #define IRR_SA1111		(1<<2)
+
+#define AUD_SEL_1341            (1<<0)
+#define AUD_MUTE_1341           (1<<1)
 
 #define NCR_GP01_OFF		(1<<0)
 #define NCR_TP_PWR_EN		(1<<1)

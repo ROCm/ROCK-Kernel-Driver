@@ -28,7 +28,7 @@ static __inline__ int ide_default_irq_hp600(ide_ioreg_t base)
 {
 	switch (base) {
 		case 0x01f0: return 77;
-		case 0x0170: return 77;
+		case 0x0170: return 78;
 		default:
 			return 0;
 	}

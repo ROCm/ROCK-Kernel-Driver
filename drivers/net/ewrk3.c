@@ -330,12 +330,12 @@ static int autoprobed = 1, loading_module = 1;
 #else
 static u_char irq[] =
 {5, 0, 10, 3, 11, 9, 15, 12};
-static int autoprobed = 0, loading_module = 0;
+static int autoprobed, loading_module;
 
 #endif				/* MODULE */
 
 static char name[EWRK3_STRLEN + 1];
-static int num_ewrk3s = 0, num_eth = 0;
+static int num_ewrk3s, num_eth;
 
 /*
    ** Miscellaneous defines...

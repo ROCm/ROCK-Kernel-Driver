@@ -19,10 +19,9 @@
 #include <asm/mach/arch.h>
 #include <asm/hardware/dec21285.h>
 
-unsigned int vram_size;
+extern void genarch_init_irq(void);
 
-extern void setup_initrd(unsigned int start, unsigned int size);
-extern void setup_ramdisk(int doload, int prompt, int start, unsigned int rd_sz);
+unsigned int vram_size;
 
 #ifdef CONFIG_ARCH_ACORN
 
@@ -79,6 +78,7 @@ MACHINE_START(RISCPC, "Acorn-RiscPC")
 	DISABLE_PARPORT(1)
 	FIXUP(fixup_acorn)
 	MAPIO(rpc_map_io)
+	INITIRQ(genarch_init_irq)
 MACHINE_END
 #endif
 #ifdef CONFIG_ARCH_ARC
@@ -86,6 +86,7 @@ MACHINE_START(ARCHIMEDES, "Acorn-Archimedes")
 	MAINTAINER("Dave Gilbert")
 	BOOT_PARAMS(0x0207c000)
 	FIXUP(fixup_acorn)
+	INITIRQ(genarch_init_irq)
 MACHINE_END
 #endif
 #ifdef CONFIG_ARCH_A5K
@@ -93,11 +94,13 @@ MACHINE_START(A5K, "Acorn-A5000")
 	MAINTAINER("Russell King")
 	BOOT_PARAMS(0x0207c000)
 	FIXUP(fixup_acorn)
+	INITIRQ(genarch_init_irq)
 MACHINE_END
 #endif
 #endif
 
 #ifdef CONFIG_ARCH_L7200
+extern void __init l7200_map_io(void);
 
 static void __init
 fixup_l7200(struct machine_desc *desc, struct param_struct *params,
@@ -109,34 +112,28 @@ fixup_l7200(struct machine_desc *desc, struct param_struct *params,
         mi->bank[0].node  = 0;
 
         ROOT_DEV = MKDEV(RAMDISK_MAJOR,0);
-        setup_ramdisk( 1, 0, 0, 8192 );
-        setup_initrd( __phys_to_virt(0xf1000000), 0x00162b0d);
+        setup_ramdisk( 1, 0, 0, CONFIG_BLK_DEV_RAM_SIZE);
+        setup_initrd( __phys_to_virt(0xf1000000), 0x005dac7b);
+
+        /* Serial Console COM2 and LCD */
+	strcpy( *cmdline, "console=tty0 console=ttyLU1,115200");
+
+        /* Serial Console COM1 and LCD */
+	//strcpy( *cmdline, "console=tty0 console=ttyLU0,115200");
+
+        /* Console on LCD */
+	//strcpy( *cmdline, "console=tty0");
 }
 
-extern void __init l7200_map_io(void);
-
-MACHINE_START(L7200, "LinkUp Systems L7200SDB")
-	MAINTAINER("Steve Hill")
+MACHINE_START(L7200, "LinkUp Systems L7200")
+	MAINTAINER("Steve Hill / Scott McConnell")
 	BOOT_MEM(0xf0000000, 0x80040000, 0xd0000000)
 	FIXUP(fixup_l7200)
 	MAPIO(l7200_map_io)
+	INITIRQ(genarch_init_irq)
 MACHINE_END
 #endif
 
-#ifdef CONFIG_ARCH_EBSA110
-
-extern void __init ebsa110_map_io(void);
-
-MACHINE_START(EBSA110, "EBSA110")
-	MAINTAINER("Russell King")
-	BOOT_MEM(0x00000000, 0xe0000000, 0xe0000000)
-	BOOT_PARAMS(0x00000400)
-	DISABLE_PARPORT(0)
-	DISABLE_PARPORT(2)
-	SOFT_REBOOT
-	MAPIO(ebsa110_map_io)
-MACHINE_END
-#endif
 #ifdef CONFIG_ARCH_NEXUSPCI
 
 extern void __init nexuspci_map_io(void);
@@ -145,6 +142,7 @@ MACHINE_START(NEXUSPCI, "FTV/PCI")
 	MAINTAINER("Philip Blundell")
 	BOOT_MEM(0x40000000, 0x10000000, 0xe0000000)
 	MAPIO(nexuspci_map_io)
+	INITIRQ(genarch_init_irq)
 MACHINE_END
 #endif
 #ifdef CONFIG_ARCH_TBOX
@@ -155,21 +153,25 @@ MACHINE_START(TBOX, "unknown-TBOX")
 	MAINTAINER("Philip Blundell")
 	BOOT_MEM(0x80000000, 0x00400000, 0xe0000000)
 	MAPIO(tbox_map_io)
+	INITIRQ(genarch_init_irq)
 MACHINE_END
 #endif
 #ifdef CONFIG_ARCH_CLPS7110
 MACHINE_START(CLPS7110, "CL-PS7110")
 	MAINTAINER("Werner Almesberger")
+	INITIRQ(genarch_init_irq)
 MACHINE_END
 #endif
 #ifdef CONFIG_ARCH_ETOILE
 MACHINE_START(ETOILE, "Etoile")
 	MAINTAINER("Alex de Vries")
+	INITIRQ(genarch_init_irq)
 MACHINE_END
 #endif
 #ifdef CONFIG_ARCH_LACIE_NAS
 MACHINE_START(LACIE_NAS, "LaCie_NAS")
 	MAINTAINER("Benjamin Herrenschmidt")
+	INITIRQ(genarch_init_irq)
 MACHINE_END
 #endif
 #ifdef CONFIG_ARCH_CLPS7500
@@ -180,5 +182,6 @@ MACHINE_START(CLPS7500, "CL-PS7500")
 	MAINTAINER("Philip Blundell")
 	BOOT_MEM(0x10000000, 0x03000000, 0xe0000000)
 	MAPIO(clps7500_map_io)
+	INITIRQ(genarch_init_irq)
 MACHINE_END
 #endif

@@ -182,7 +182,7 @@ call_dpf:
 	jsr	@r0
 	 mov	r15, r4
 	!
-	tst	#0xff, r0
+	tst	r0, r0
 	bf/s	0f
 	 lds	r10, pr
 	rts
@@ -550,10 +550,10 @@ handle_softirq:
 ret_with_reschedule:
 	stc	k_current, r1
 	mov.l	@(need_resched,r1), r0
-	tst	#0xff, r0
+	tst	r0, r0
 	bf	reschedule
 	mov.l	@(sigpending,r1), r0
-	tst	#0xff, r0
+	tst	r0, r0
 	bt	restore_all
 signal_return:
 	mov	r15, r4

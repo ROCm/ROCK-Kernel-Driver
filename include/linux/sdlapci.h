@@ -4,7 +4,7 @@
 *
 * Author:	Gideon Hack	<ghack@sangoma.com>
 *
-* Copyright:	(c) 1999 Sangoma Technologies Inc.
+* Copyright:	(c) 1999-2000 Sangoma Technologies Inc.
 *
 *		This program is free software; you can redistribute it and/or
 *		modify it under the terms of the GNU General Public License
@@ -62,7 +62,11 @@
 #define S514_CPU_START		0x01
 
 /* The maximum number of S514 adapters supported */
-#define MAX_S514_CARDS		8
+#define MAX_S514_CARDS		20	
+
+#define PCI_CARD_TYPE		0x2E
+#define S514_DUAL_CPU		0x12
+#define S514_SINGLE_CPU		0x11
 
 #endif	/* _SDLAPCI_H */
 

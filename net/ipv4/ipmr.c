@@ -9,7 +9,7 @@
  *	as published by the Free Software Foundation; either version
  *	2 of the License, or (at your option) any later version.
  *
- *	Version: $Id: ipmr.c,v 1.55 2000/11/28 13:13:27 davem Exp $
+ *	Version: $Id: ipmr.c,v 1.59 2001/02/23 06:32:11 davem Exp $
  *
  *	Fixes:
  *	Michael Chastain	:	Incorrect size of copying.
@@ -980,6 +980,9 @@ int ip_mroute_getsockopt(struct sock *sk,int optname,char *optval,int *optlen)
 		return -EFAULT;
 
 	olr=min(olr,sizeof(int));
+	if(olr<0)
+		return -EINVAL;
+		
 	if(put_user(olr,optlen))
 		return -EFAULT;
 	if(optname==MRT_VERSION)
@@ -1092,7 +1095,7 @@ static void ip_encap(struct sk_buff *skb, u32 saddr, u32 daddr)
 	iph->protocol	=	IPPROTO_IPIP;
 	iph->ihl	=	5;
 	iph->tot_len	=	htons(skb->len);
-	ip_select_ident(iph, skb->dst);
+	ip_select_ident(iph, skb->dst, NULL);
 	ip_send_check(iph);
 
 	skb->h.ipiph = skb->nh.iph;
@@ -1383,14 +1386,22 @@ dont_forward:
  * Handle IGMP messages of PIMv1
  */
 
-int pim_rcv_v1(struct sk_buff * skb, unsigned short len)
+int pim_rcv_v1(struct sk_buff * skb)
 {
 	struct igmphdr *pim = (struct igmphdr*)skb->h.raw;
 	struct iphdr   *encap;
 	struct net_device  *reg_dev = NULL;
 
+	if (skb_is_nonlinear(skb)) {
+		if (skb_linearize(skb, GFP_ATOMIC) != 0) {
+			kfree_skb(skb);
+			return -ENOMEM;
+		}
+		pim = (struct igmphdr*)skb->h.raw;
+	}
+
         if (!mroute_do_pim ||
-	    len < sizeof(*pim) + sizeof(*encap) ||
+	    skb->len < sizeof(*pim) + sizeof(*encap) ||
 	    pim->group != PIM_V1_VERSION || pim->code != PIM_V1_REGISTER) {
 		kfree_skb(skb);
                 return -EINVAL;
@@ -1405,7 +1416,7 @@ int pim_rcv_v1(struct sk_buff * skb, unsigned short len)
 	 */
 	if (!MULTICAST(encap->daddr) ||
 	    ntohs(encap->tot_len) == 0 ||
-	    ntohs(encap->tot_len) + sizeof(*pim) > len) {
+	    ntohs(encap->tot_len) + sizeof(*pim) > skb->len) {
 		kfree_skb(skb);
 		return -EINVAL;
 	}
@@ -1445,17 +1456,25 @@ int pim_rcv_v1(struct sk_buff * skb, unsigned short len)
 #endif
 
 #ifdef CONFIG_IP_PIMSM_V2
-int pim_rcv(struct sk_buff * skb, unsigned short len)
+int pim_rcv(struct sk_buff * skb)
 {
 	struct pimreghdr *pim = (struct pimreghdr*)skb->h.raw;
 	struct iphdr   *encap;
 	struct net_device  *reg_dev = NULL;
 
-        if (len < sizeof(*pim) + sizeof(*encap) ||
+	if (skb_is_nonlinear(skb)) {
+		if (skb_linearize(skb, GFP_ATOMIC) != 0) {
+			kfree_skb(skb);
+			return -ENOMEM;
+		}
+		pim = (struct pimreghdr*)skb->h.raw;
+	}
+
+        if (skb->len < sizeof(*pim) + sizeof(*encap) ||
 	    pim->type != ((PIM_VERSION<<4)|(PIM_REGISTER)) ||
 	    (pim->flags&PIM_NULL_REGISTER) ||
 	    (ip_compute_csum((void *)pim, sizeof(*pim)) != 0 &&
-	     ip_compute_csum((void *)pim, len))) {
+	     ip_compute_csum((void *)pim, skb->len))) {
 		kfree_skb(skb);
                 return -EINVAL;
         }
@@ -1464,7 +1483,7 @@ int pim_rcv(struct sk_buff * skb, unsigned short len)
 	encap = (struct iphdr*)(skb->h.raw + sizeof(struct pimreghdr));
 	if (!MULTICAST(encap->daddr) ||
 	    ntohs(encap->tot_len) == 0 ||
-	    ntohs(encap->tot_len) + sizeof(*pim) > len) {
+	    ntohs(encap->tot_len) + sizeof(*pim) > skb->len) {
 		kfree_skb(skb);
 		return -EINVAL;
 	}

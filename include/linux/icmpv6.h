@@ -143,7 +143,7 @@ extern int				icmpv6_err_convert(int type, int code,
 							   int *err);
 extern void				icmpv6_cleanup(void);
 extern void				icmpv6_param_prob(struct sk_buff *skb,
-							  int code, void *pos);
+							  int code, int pos);
 #endif
 
 #endif

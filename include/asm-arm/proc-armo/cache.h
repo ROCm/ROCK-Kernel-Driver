@@ -1,7 +1,7 @@
 /*
  *  linux/include/asm-arm/proc-armo/cache.h
  *
- *  Copyright (C) 1999-2000 Russell King
+ *  Copyright (C) 1999-2001 Russell King
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -37,8 +37,9 @@
  *  - flush_tlb_range(mm, start, end) flushes a range of pages
  */
 #define flush_tlb_all()				memc_update_all()
-#define flush_tlb_mm(mm)			do { } while (0)
-#define flush_tlb_range(mm, start, end)		do { (void)(start); (void)(end); } while (0)
+#define flush_tlb_mm(mm)			memc_update_mm(mm)
+#define flush_tlb_range(mm,start,end)		\
+		do { memc_update_mm(mm); (void)(start); (void)(end); } while (0)
 #define flush_tlb_page(vma, vmaddr)		do { } while (0)
 
 /*
@@ -57,18 +58,9 @@ extern __inline__ void memc_update_all(void)
 	processor._set_pgd(current->active_mm->pgd);
 }
 
-extern __inline__ void memc_update_mm(struct mm_struct *mm)
+static inline void memc_update_mm(struct mm_struct *mm)
 {
 	cpu_memc_update_all(mm->pgd);
-
-	if (mm == current->active_mm)
-		processor._set_pgd(mm->pgd);
-}
-
-extern __inline__ void
-memc_update_addr(struct mm_struct *mm, pte_t pte, unsigned long vaddr)
-{
-	cpu_memc_update_entry(mm->pgd, pte_val(pte), vaddr);
 
 	if (mm == current->active_mm)
 		processor._set_pgd(mm->pgd);
@@ -81,4 +73,20 @@ memc_clear(struct mm_struct *mm, struct page *page)
 
 	if (mm == current->active_mm)
 		processor._set_pgd(mm->pgd);
+}
+
+static inline void
+memc_update_addr(struct mm_struct *mm, pte_t pte, unsigned long vaddr)
+{
+	cpu_memc_update_entry(mm->pgd, pte_val(pte), vaddr);
+
+	if (mm == current->active_mm)
+		processor._set_pgd(mm->pgd);
+}
+
+static inline void
+update_mmu_cache(struct vm_area_struct *vma, unsigned long addr, pte_t pte)
+{
+	struct mm_struct *mm = vma->vm_mm;
+	memc_update_addr(mm, pte, addr);
 }

@@ -13,6 +13,7 @@
 #include <linux/init.h>
 
 #include <asm/machvec.h>
+#include <asm/rtc.h>
 #include <asm/machvec_init.h>
 
 #include <asm/io_se.h>
@@ -65,7 +66,6 @@ struct sh_machine_vector mv_se __initmv = {
 	mv_writel:		se_writel,
 
 	mv_ioremap:		generic_ioremap,
-	mv_ioremap_nocache:	generic_ioremap_nocache,
 	mv_iounmap:		generic_iounmap,
 
 	mv_isa_port2addr:	se_isa_port2addr,
@@ -75,6 +75,9 @@ struct sh_machine_vector mv_se __initmv = {
 #ifdef CONFIG_HEARTBEAT
 	mv_heartbeat:		heartbeat_se,
 #endif
+
+	mv_rtc_gettimeofday:	sh_rtc_gettimeofday,
+	mv_rtc_settimeofday:	sh_rtc_settimeofday,
 
 	mv_hw_se:		1,
 };

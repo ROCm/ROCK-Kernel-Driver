@@ -871,7 +871,7 @@ static int append_to_chain(struct ip_chain *chainptr, struct ip_fwkernel *rule)
 	if (chainptr->chain == NULL) {
 
 		/* If pointer writes are atomic then turning off
-		 * interupts is not necessary. */
+		 * interrupts is not necessary. */
 		chainptr->chain = rule;
 		if (rule->branch) rule->branch->refcount++;
 		return 0;

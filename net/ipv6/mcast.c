@@ -5,7 +5,7 @@
  *	Authors:
  *	Pedro Roque		<roque@di.fc.ul.pt>	
  *
- *	$Id: mcast.c,v 1.33 2000/09/18 05:59:48 davem Exp $
+ *	$Id: mcast.c,v 1.36 2001/03/03 01:20:10 davem Exp $
  *
  *	Based on linux/ipv4/igmp.c and linux/ipv4/ip_sockglue.c 
  *
@@ -13,6 +13,11 @@
  *      modify it under the terms of the GNU General Public License
  *      as published by the Free Software Foundation; either version
  *      2 of the License, or (at your option) any later version.
+ */
+
+/* Changes:
+ *
+ *	yoshfuji	: fix format of router-alert option
  */
 
 #define __NO_VERSION__
@@ -392,16 +397,18 @@ static void igmp6_group_queried(struct ifmcaddr6 *ma, unsigned long resptime)
 	spin_unlock(&ma->mca_lock);
 }
 
-int igmp6_event_query(struct sk_buff *skb, struct icmp6hdr *hdr, int len)
+int igmp6_event_query(struct sk_buff *skb)
 {
 	struct ifmcaddr6 *ma;
 	struct in6_addr *addrp;
 	unsigned long resptime;
 	struct inet6_dev *idev;
+	struct icmp6hdr *hdr;
 
-
-	if (len < sizeof(struct icmp6hdr) + sizeof(struct in6_addr))
+	if (!pskb_may_pull(skb, sizeof(struct in6_addr)))
 		return -EINVAL;
+
+	hdr = (struct icmp6hdr*) skb->h.raw;
 
 	/* Drop queries with not link local source */
 	if (!(ipv6_addr_type(&skb->nh.ipv6h->saddr)&IPV6_ADDR_LINKLOCAL))
@@ -437,18 +444,21 @@ int igmp6_event_query(struct sk_buff *skb, struct icmp6hdr *hdr, int len)
 }
 
 
-int igmp6_event_report(struct sk_buff *skb, struct icmp6hdr *hdr, int len)
+int igmp6_event_report(struct sk_buff *skb)
 {
 	struct ifmcaddr6 *ma;
 	struct in6_addr *addrp;
 	struct inet6_dev *idev;
+	struct icmp6hdr *hdr;
 
 	/* Our own report looped back. Ignore it. */
 	if (skb->pkt_type == PACKET_LOOPBACK)
 		return 0;
 
-	if (len < sizeof(struct icmp6hdr) + sizeof(struct in6_addr))
+	if (!pskb_may_pull(skb, sizeof(struct in6_addr)))
 		return -EINVAL;
+
+	hdr = (struct icmp6hdr*) skb->h.raw;
 
 	/* Drop reports with not link local source */
 	if (!(ipv6_addr_type(&skb->nh.ipv6h->saddr)&IPV6_ADDR_LINKLOCAL))
@@ -491,7 +501,7 @@ void igmp6_send(struct in6_addr *addr, struct net_device *dev, int type)
 	struct in6_addr all_routers;
 	int err, len, payload_len, full_len;
 	u8 ra[8] = { IPPROTO_ICMPV6, 0,
-		     IPV6_TLV_ROUTERALERT, 0, 0, 0,
+		     IPV6_TLV_ROUTERALERT, 2, 0, 0,
 		     IPV6_TLV_PADN, 0 };
 
 	snd_addr = addr;
@@ -504,7 +514,7 @@ void igmp6_send(struct in6_addr *addr, struct net_device *dev, int type)
 	payload_len = len + sizeof(ra);
 	full_len = sizeof(struct ipv6hdr) + payload_len;
 
-	skb = sock_alloc_send_skb(sk, dev->hard_header_len + full_len + 15, 0, 0, &err);
+	skb = sock_alloc_send_skb(sk, dev->hard_header_len + full_len + 15, 0, &err);
 
 	if (skb == NULL)
 		return;

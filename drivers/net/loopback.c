@@ -105,7 +105,7 @@ static struct net_device_stats *get_stats(struct net_device *dev)
 /* Initialize the rest of the LOOPBACK device. */
 int __init loopback_init(struct net_device *dev)
 {
-	dev->mtu		= PAGE_SIZE - LOOPBACK_OVERHEAD;
+	dev->mtu		= (16 * 1024) + 20 + 20 + 12;
 	dev->hard_start_xmit	= loopback_xmit;
 	dev->hard_header	= eth_header;
 	dev->hard_header_cache	= eth_header_cache;
@@ -116,14 +116,12 @@ int __init loopback_init(struct net_device *dev)
 	dev->type		= ARPHRD_LOOPBACK;	/* 0x0001		*/
 	dev->rebuild_header	= eth_rebuild_header;
 	dev->flags		= IFF_LOOPBACK;
+	dev->features		= NETIF_F_SG|NETIF_F_FRAGLIST|NETIF_F_NO_CSUM|NETIF_F_HIGHDMA;
 	dev->priv = kmalloc(sizeof(struct net_device_stats), GFP_KERNEL);
 	if (dev->priv == NULL)
 			return -ENOMEM;
 	memset(dev->priv, 0, sizeof(struct net_device_stats));
 	dev->get_stats = get_stats;
-
-	if (num_physpages >= ((128*1024*1024)>>PAGE_SHIFT))
-		dev->mtu = 4096*4 - LOOPBACK_OVERHEAD;
 
 	/*
 	 *	Fill in the generic fields of the device structure. 

@@ -5,7 +5,7 @@
  *
  *		PF_INET protocol family socket handler.
  *
- * Version:	$Id: af_inet.c,v 1.127 2000/12/22 19:51:50 davem Exp $
+ * Version:	$Id: af_inet.c,v 1.129 2001/03/02 03:13:05 davem Exp $
  *
  * Authors:	Ross Biro, <bir7@leland.Stanford.Edu>
  *		Fred N. van Kempen, <waltje@uWalt.NL.Mugnet.ORG>
@@ -354,6 +354,8 @@ static int inet_create(struct socket *sock, int protocol)
 		sk->protinfo.af_inet.pmtudisc = IP_PMTUDISC_DONT;
 	else
 		sk->protinfo.af_inet.pmtudisc = IP_PMTUDISC_WANT;
+
+	sk->protinfo.af_inet.id = 0;
 
 	sock_init_data(sock,sk);
 
@@ -934,7 +936,8 @@ struct proto_ops inet_stream_ops = {
 	getsockopt:	inet_getsockopt,
 	sendmsg:	inet_sendmsg,
 	recvmsg:	inet_recvmsg,
-	mmap:		sock_no_mmap
+	mmap:		sock_no_mmap,
+	sendpage:	tcp_sendpage
 };
 
 struct proto_ops inet_dgram_ops = {
@@ -955,6 +958,7 @@ struct proto_ops inet_dgram_ops = {
 	sendmsg:	inet_sendmsg,
 	recvmsg:	inet_recvmsg,
 	mmap:		sock_no_mmap,
+	sendpage:	sock_no_sendpage,
 };
 
 struct net_proto_family inet_family_ops = {

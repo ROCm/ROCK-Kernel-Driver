@@ -1451,7 +1451,7 @@ static int ax25_sendmsg(struct socket *sock, struct msghdr *msg, int len, struct
 	/* Assume the worst case */
 	size = len + 3 + ax25_addr_size(dp) + AX25_BPQ_HEADER_LEN;
 
-	if ((skb = sock_alloc_send_skb(sk, size, 0, msg->msg_flags & MSG_DONTWAIT, &err)) == NULL)
+	if ((skb = sock_alloc_send_skb(sk, size, msg->msg_flags & MSG_DONTWAIT, &err)) == NULL)
 		return err;
 
 	skb_reserve(skb, size - len);
@@ -1805,6 +1805,7 @@ static struct proto_ops SOCKOPS_WRAPPED(ax25_proto_ops) = {
 	sendmsg:	ax25_sendmsg,
 	recvmsg:	ax25_recvmsg,
 	mmap:		sock_no_mmap,
+	sendpage:	sock_no_sendpage,
 };
 
 #include <linux/smp_lock.h>

@@ -276,8 +276,13 @@ unsigned long do_mremap(unsigned long addr,
 	ret = -ENOMEM;
 	if (flags & MREMAP_MAYMOVE) {
 		if (!(flags & MREMAP_FIXED)) {
-			new_addr = get_unmapped_area(0, new_len);
-			if (!new_addr)
+			unsigned long map_flags = 0;
+			if (vma->vm_flags & VM_SHARED)
+				map_flags |= MAP_SHARED;
+
+			new_addr = get_unmapped_area(vma->vm_file, 0, new_len, vma->vm_pgoff, map_flags);
+			ret = new_addr;
+			if (new_addr & ~PAGE_MASK)
 				goto out;
 		}
 		ret = move_vma(vma, addr, old_len, new_len, new_addr);

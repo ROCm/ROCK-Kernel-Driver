@@ -486,7 +486,7 @@ int  newport_ioctl   (int card, int cmd, unsigned long arg);
  * DCBMODE register defines:
  */
 
-/* Widht of the data being transfered for each DCBDATA[01] word */
+/* Width of the data being transferred for each DCBDATA[01] word */
 #define DCB_DATAWIDTH_4 0x0
 #define DCB_DATAWIDTH_1 0x1
 #define DCB_DATAWIDTH_2 0x2

@@ -66,13 +66,13 @@ typedef void (*writerdp_t)(void *, unsigned short);
 typedef unsigned short (*readrdp_t)(void *);
 
 #ifdef MODULE
-static struct m147lance_private *root_m147lance_dev = NULL;
+static struct m147lance_private *root_m147lance_dev;
 #endif
 
 /* Initialise the one and only on-board 7990 */
 int __init mvme147lance_probe(struct net_device *dev)
 {
-	static int called = 0;
+	static int called;
 	static const char name[] = "MVME147 LANCE";
 	struct m147lance_private *lp;
 	u_long *addr;

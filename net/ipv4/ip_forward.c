@@ -5,7 +5,7 @@
  *
  *		The IP forwarding functionality.
  *		
- * Version:	$Id: ip_forward.c,v 1.47 2000/10/24 22:54:26 davem Exp $
+ * Version:	$Id: ip_forward.c,v 1.48 2000/12/13 18:31:48 davem Exp $
  *
  * Authors:	see ip.c
  *
@@ -83,6 +83,8 @@ int ip_forward(struct sk_buff *skb)
 
 	if (skb->pkt_type != PACKET_HOST)
 		goto drop;
+
+	skb->ip_summed = CHECKSUM_NONE;
 	
 	/*
 	 *	According to the RFC, we must first decrease the TTL field. If
@@ -116,10 +118,9 @@ int ip_forward(struct sk_buff *skb)
 		ip_rt_send_redirect(skb);
 
 	/* We are about to mangle packet. Copy it! */
-	if ((skb = skb_cow(skb, dev2->hard_header_len)) == NULL)
-		return NET_RX_DROP;
+	if (skb_cow(skb, dev2->hard_header_len))
+		goto drop;
 	iph = skb->nh.iph;
-	opt = &(IPCB(skb)->opt);
 
 	/* Decrease ttl after skb cow done */
 	ip_decrease_ttl(iph);

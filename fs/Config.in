@@ -31,6 +31,7 @@ if [ "$CONFIG_JFFS_FS" != "n" ] ; then
 	int 'JFFS debugging verbosity (0 = quiet, 3 = noisy)' CONFIG_JFFS_FS_VERBOSE 0
 fi
 tristate 'Compressed ROM file system support' CONFIG_CRAMFS
+bool 'Virtual memory file system support (former shm fs)' CONFIG_TMPFS
 tristate 'Simple RAM-based file system support' CONFIG_RAMFS
 
 tristate 'ISO 9660 CDROM file system support' CONFIG_ISO9660_FS

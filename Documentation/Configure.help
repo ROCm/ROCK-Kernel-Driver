@@ -13,8 +13,10 @@
 #     http://www.traduc.org/kernelfr
 #   - Spanish, by Carlos Perelló Marín (fperllo@ehome.encis.es), at
 #     http://visar.csustan.edu/~carlos/
+#     XXX: Site has moved, new location has no Configure.help trans.
 #   - Italian, by Alessandro Rubini (rubini@linux.it), at
 #     ftp://ftp-pavia1.linux.it/pub/linux/Configure.help
+#     XXX: ftp-pavia1.linux.it: Non-existent host/domain
 #   - Polish, by Cezar Cichocki (cezar@cs.net.pl), at
 #     http://www.cs.net.pl/~cezar/Kernel
 #   - German, by SuSE, at http://www.suse.de/~ke/kernel . This patch
@@ -268,6 +270,11 @@ CONFIG_BLK_DEV_RAM
   Most normal users won't need the RAM disk functionality, and can
   thus say N here.
 
+Default RAM disk size
+CONFIG_BLK_DEV_RAM_SIZE
+  The default value is 4096. Only change this if you know what are
+  you doing. If you are using IBM S/390, then set this to 8192.
+
 Initial RAM disk (initrd) support
 CONFIG_BLK_DEV_INITRD
   The initial RAM disk is a RAM disk that is loaded by the boot loader
@@ -415,7 +422,7 @@ CONFIG_BLK_DEV_IDE
 
   To fine-tune ATA/IDE drive/interface parameters for improved
   performance, look for the hdparm package at
-  ftp://metalab.unc.edu/pub/Linux/kernel/patches/diskdrives/ .
+  http://www.ibiblio.org/pub/Linux/system/hardware .
 
   If you want to compile this driver as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want),
@@ -711,7 +718,7 @@ CONFIG_IDEDMA_PCI_AUTO
 IGNORE word93 Validation BITS
 CONFIG_IDEDMA_IVB
   Since various rules were applied and created ... et al. as it relates
-  the detection of vaild cable signals.  This is a result of unclear terms
+  the detection of valid cable signals.  This is a result of unclear terms
   in ATA-4 and ATA-5 standards.
 
   It is normally safe to answer Y; however, the default is N.
@@ -1299,14 +1306,37 @@ CONFIG_PARIDE_ATEN
   have a high-level driver for the type of device that you want to
   support.
 
-MicroSolutions backpack protocol
+Micro Solutions BACKPACK Series 5 protocol
 CONFIG_PARIDE_BPCK
-  This option enables support for the MicroSolutions backpack parallel
-  port IDE protocol. If you chose to build PARIDE support into your
-  kernel, you may answer Y here to build in the protocol driver,
-  otherwise you should answer M to build it as a loadable module. The
-  module will be called bpck.o. You must also have a high-level driver
-  for the type of device that you want to support.
+  This option enables support for the Micro Solutions BACKPACK parallel
+  port Series 5 IDE protocol. (Most BACKPACK drives made before 1999 were 
+  Series 5) Series 5 drives will NOT always have the Series noted on the
+  bottom of the drive. Series 6 drivers will. 
+
+  In other words, if your BACKPACK drive dosen't say "Series 6" on the
+  bottom, enable this option.
+
+  If you chose to build PARIDE support into your kernel, you may answer Y
+  here to build in the protocol driver, otherwise you should answer M to
+  build it as a loadable module. The module will be called bpck.o. You
+  must also have a high-level driver for the type of device that you want
+  to support.
+
+Micro Solutions BACKPACK Series 6 protocol
+CONFIG_PARIDE_BPCK6
+  This option enables support for the Micro Solutions BACKPACK parallel
+  port Series 6 IDE protocol. (Most BACKPACK drives made after 1999 were 
+  Series 6) Series 6 drives will have the Series noted on the bottom of
+  the drive. Series 5 drivers don't always have it noted. 
+
+  In other words, if your BACKPACK drive says "Series 6" on the bottom,
+  enable this option.
+
+  If you chose to build PARIDE support into your kernel, you may answer Y
+  here to build in the protocol driver, otherwise you should answer M to
+  build it as a loadable module. The module will be called bpck6.o. You
+  must also have a high-level driver for the type of device that you want
+  to support.
 
 DataStor Commuter protocol
 CONFIG_PARIDE_COMM
@@ -1616,12 +1646,12 @@ IP27 N-Mode
 CONFIG_SGI_SN0_N_MODE
   The nodes of Origin 200, Origin 2000 and Onyx 2 systems can be
   configured in either N-Modes which allows for more nodes or M-Mode
-  which allows for more more memory.  Your system is most probably
+  which allows for more memory.  Your system is most probably
   running in M-Mode, so you should say N here.
 
 MIPS JAZZ onboard SONIC Ethernet support
 CONFIG_MIPS_JAZZ_SONIC
-  This is the driver for the onboard card of of MIPS Magnum 4000,
+  This is the driver for the onboard card of MIPS Magnum 4000,
   Acer PICA, Olivetti M700-10 and a few other identical OEM systems.
 
 MIPS JAZZ FAS216 SCSI support
@@ -2109,7 +2139,6 @@ CONFIG_IP6_NF_TARGET_MARK
 
   If you want to compile it as a module, say M here and read
   Documentation/modules.txt.  If unsure, say `N'.
-
 
 TCP Explicit Congestion Notification support
 CONFIG_INET_ECN
@@ -2821,14 +2850,6 @@ CONFIG_SYSVIPC
   section 6.4 of the Linux Programmer's Guide, available from
   http://www.linuxdoc.org/docs.html#guide .
 
-  Shared memory is now implemented using a new (minimal) virtual file
-  system. To mount it automatically at system startup just add the
-  following line to your /etc/fstab:
-
-  none	/dev/shm	shm	defaults	0 0
-
-  Saying Y here enlarges your kernel by about 18 KB. Just say Y.
-
 BSD Process Accounting
 CONFIG_BSD_PROCESS_ACCT
   If you say Y here, a user level program will be able to instruct the
@@ -2994,14 +3015,16 @@ CONFIG_M386
    - "Pentium-Classic" for the Intel Pentium.
    - "Pentium-MMX" for the Intel Pentium MMX.
    - "Pentium-Pro" for the Intel Pentium Pro/Celeron/Pentium II.
-   - "Pentium-III" for the Intel Pentium III.
-   - "Pentium-4" for the Intel Pentium 4
+   - "Pentium-III" for the Intel Pentium III
+     and Celerons based on the coppermine core.
+   - "Pentium-4" for the Intel Pentium 4.
    - "K6" for the AMD K6, K6-II and K6-III (aka K6-3D).
-   - "Athlon" for the AMD Athlon (K7).
+   - "Athlon" for the AMD K7 family (Athlon/Duron/Thunderbird).
    - "Crusoe" for the Transmeta Crusoe series.
    - "Winchip-C6" for original IDT Winchip.
    - "Winchip-2" for IDT Winchip 2.
    - "Winchip-2A" for IDT Winchips with 3dNow! capabilities.
+   - "CyrixIII" for VIA Cyrix III or VIA C3.
 
   If you don't know what to do, choose "386".
 
@@ -3509,7 +3532,7 @@ CONFIG_FB_TCX
 Virtual Frame Buffer support (ONLY FOR TESTING!)
 CONFIG_FB_VIRTUAL
   This is a `virtual' frame buffer device. It operates on a chunk of
-  unswapable kernel memory instead of on the memory of a graphics
+  unswappable kernel memory instead of on the memory of a graphics
   board. This means you cannot see any output sent to this frame
   buffer device, while it does consume precious memory. The main use
   of this frame buffer device is testing and debugging the frame
@@ -4301,7 +4324,7 @@ CONFIG_DECNET_ROUTE_FWMARK
   packets with different FWMARK ("firewalling mark") values
   (see ipchains(8), "-m" argument).
 
-Appletalk interfaces support
+AppleTalk interfaces support
 CONFIG_APPLETALK
   AppleTalk is the way Apple computers speak to each other on a
   network. If your Linux box is connected to such a network and you
@@ -4314,11 +4337,10 @@ CONFIG_ATALK
   want to join the conversation, say Y. You will need to use the
   netatalk package so that your Linux box can act as a print and file
   server for Macs as well as access AppleTalk printers. Check out
-  http://threepio.hitchcock.org/cgi-bin/faq/netatalk/faq.pl on the WWW
-  for details. EtherTalk is the name used for AppleTalk over Ethernet
-  and the cheaper and slower LocalTalk is AppleTalk over a proprietary
-  Apple network using serial links. EtherTalk and LocalTalk are fully
-  supported by Linux.
+  http://www.zettabyte.net/netatalk/ on the WWW for details. EtherTalk 
+  is the name used for AppleTalk over Ethernet and the cheaper and 
+  slower LocalTalk is AppleTalk over a proprietary Apple network using
+  serial links. EtherTalk and LocalTalk are fully supported by Linux.
 
   General information about how to connect Linux, Windows machines and
   Macs is on the WWW at http://www.eats.com/linux_mac_win.html . The
@@ -4329,8 +4351,10 @@ CONFIG_ATALK
   This driver is also available as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want).
   The module is called appletalk.o. If you want to compile it as a
-  module, say M here and read Documentation/modules.txt. I hear that
-  the GNU boycott of Apple is over, so even politically correct people
+  module, say M here and read Documentation/modules.txt.  You almost
+  certainly want to compile it as a module so you can restart your 
+  AppleTalk stack without rebooting your machine.  I hear that the 
+  GNU boycott of Apple is over, so even politically correct people
   are allowed to say Y here.
 
 AppleTalk-IP driver support
@@ -4831,7 +4855,7 @@ CONFIG_NET_DIVERT
   with the Frames Diverter on, can do some *really* transparent www 
   caching using a Squid proxy for example.
 
-  This is very usefull when you don't want to change your router's
+  This is very useful when you don't want to change your router's
   config (or if you simply don't have access to it).
 
   The other possible usages of diverting Ethernet Frames are numberous:
@@ -4916,7 +4940,7 @@ CONFIG_NETLINK
 
 Routing messages
 CONFIG_RTNETLINK
-  If you say Y here, userspace programs can receive some network
+  If you say Y here, user space programs can receive some network
   related routing information over the netlink. 'rtmon', supplied
   with the iproute2 package (ftp://ftp.inr.ac.ru), can read and
   interpret this data.  Information sent to the kernel over this link
@@ -5083,6 +5107,15 @@ CONFIG_ATM_ZATM_DEBUG
   generally using printks, but still has some impact on performance.
   Note that extended debugging may create certain race conditions
   itself. Enable this ONLY if you suspect problems with the driver.
+
+Fujitsu FireStream (FS50/FS155)
+CONFIG_ATM_FIRESTREAM
+  Driver for the Fujitsu FireStream 155 (MB86697) and 
+  FireStream 50 (MB86695) ATM PCI chips.
+
+  This driver is also available as a module. If you want to compile
+  it as a module, say M here and read Documentation/modules.txt. The
+  module will be called firestream.o.
 
 Enable usec resolution timestamps
 CONFIG_ATM_ZATM_EXACT_TS
@@ -8078,6 +8111,18 @@ CONFIG_COSA
   The module will be called cosa.o. For general information about
   modules read Documentation/modules.txt.
 
+Etinc PCISYNC serial boards support
+CONFIG_DSCC4
+  This is a driver for Etinc PCISYNC boards based on the Infineon
+  (ex. Siemens) DSCC4 chipset. It is supposed to work with the four
+  ports card. Take a look at http://www.cogenit.fr/dscc4
+  for further informations about the driver and his configuration.
+
+  The driver will be compiled as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called dscc4.o. For general information about
+  modules read Documentation/modules.txt.
+
 Lan Media sync serial boards support
 CONFIG_LANMEDIA
   This is a driver for the following Lan Media family of serial boards.
@@ -8164,13 +8209,26 @@ CONFIG_WAN_ROUTER_DRIVERS
 
 Sangoma WANPIPE(tm) multiprotocol cards
 CONFIG_VENDOR_SANGOMA
-  WANPIPE from Sangoma Technologies Inc. (http://www.sangoma.com ) is
-  a family of intelligent multiprotocol WAN adapters with data
-  transfer rates up to T1 (1.544 Mbps). They are also known as
-  Synchronous Data Link Adapters (SDLA) and designated S502E(A), S503
-  or S508. These cards support the X.25, Frame Relay, and PPP
-  protocols. If you have one or more of these cards, say Y to this
-  option; you may then also want to read the file
+
+  WANPIPE from Sangoma Technologies Inc. (http://www.sangoma.com)
+  is a family of intelligent multiprotocol WAN adapters with data 
+  transfer rates up to 4Mbps. They are also known as Synchronous 
+  Data Link Adapters (SDLA) and are designated as S514-PCI or S508-ISA. 
+  These cards support
+  
+    - X.25, Frame Relay, PPP, Cisco HDLC protocols. 
+  
+    - API support for protocols like HDLC (LAPB), 
+      HDLC Streaming, X.25, Frame Relay and BiSync. 
+  
+    - Ethernet Bridging over Frame Relay protocol.
+
+    - MULTILINK PPP
+
+    - Async PPP (Modem Dialup)
+
+  If you have one or more of these cards, say M to this option; you
+  may then also want to read the file  
   Documentation/networking/wanpipe.txt. The next questions will ask
   you about the protocols you want the driver to support.
 
@@ -8179,44 +8237,58 @@ CONFIG_VENDOR_SANGOMA
   The module will be called wanpipe.o. For general information about
   modules read Documentation/modules.txt.
 
-Maximum number of cards
-CONFIG_WANPIPE_CARDS
-  Enter number of WANPIPE adapters installed in your machine. The
-  driver can support up to 8 cards. You may enter more than you
-  actually have if you plan to add more cards in the future without
-  re-compiling the driver, but remember that in this case you'll waste
-  some kernel memory (about 1K per card).
-
-WANPIPE Cisco HDLC support
-CONFIG_WANPIPE_CHDLC
-  Say Y to this option if you are planning to connect a WANPIPE card
-  to a connection which uses the synchronous Cisco HDLC (High-level
-  Data Link Control) protocol. This protocol is often used on
-  high-speed leased lines like T1/E1.
-
 WANPIPE X.25 support
 CONFIG_WANPIPE_X25
   Say Y to this option if you are planning to connect a WANPIPE card
-  to an X.25 network. You should then also have said Y to "CCITT X.25
-  Packet Layer" and "LAPB Data Link Driver", above. If you say N, the
-  X.25 support will not be included in the driver (saves about 16 KB
-  of kernel memory).
+  to an X.25 network.  Note, this feature also includes the X.25 API
+  support used to develope custom applications over the X.25 protocol.
+  If you say N, the X.25 support will not be included in the driver. 
+  The X.25 option is supported on S514-PCI and S508-ISA cards.
 
 WANPIPE Frame Relay support
 CONFIG_WANPIPE_FR
   Say Y to this option if you are planning to connect a WANPIPE card
-  to a frame relay network. You should then also have said Y to "Frame
-  Relay (DLCI) support", above. If you say N, the frame relay
-  support will not be included in the driver (saves about 16 KB of
-  kernel memory).
+  to a frame relay network, or use frame relay API to develope 
+  custom applications over the Frame  Relay protocol.  
+  This feature also contains the Ethernet Bridging over Frame Relay,
+  where a WANPIPE frame relay link can be directly connected to the Linux
+  kernel bridge. If you say N, the frame relay support will
+  not be included in the driver. The Frame Relay option is 
+  supported on S514-PCI and S508-ISA cards.
 
 WANPIPE PPP support
 CONFIG_WANPIPE_PPP
   Say Y to this option if you are planning to connect a WANPIPE card
-  to a leased line using Point-to-Point protocol (PPP). You should
-  then also have said Y to "PPP (point-to-point) support", above. If
-  you say N, the PPP support will not be included in the driver (saves
-  about 16 KB of kernel memory).
+  to a leased line using Point-to-Point protocol (PPP). If you say N,
+  the PPP support will not be included in the driver. The PPP option
+  is supported on S514-PCI/S508-ISA cards.
+
+WANPIPE MultiPort PPP support
+CONFIG_WANPIPE_MULTPPP
+  Say Y to this option if you are planning to connect a WANPIPE card
+  to a leased line using Point-to-Point protocol (PPP). Note, the
+  MultiPort PPP uses the Linux Kernel SyncPPP protocol over the Sangoma
+  HDLC Streaming adapter.  In this case each Sangoma adapter port 
+  can support an independent PPP connection.  For example, a single
+  Quad-Port PCI adapter can support up to four independent 
+  PPP links. If you say N,the PPP support will not be included 
+  in the driver. The PPP option is supported on S514-PCI/S508-ISA cards.
+ 	
+WANPIPE Cisco HDLC support
+CONFIG_WANPIPE_CHDLC
+  Say Y to this option if you are planning to connect a WANPIPE card
+  to a leased line using the Cisco HDLC protocol. This now supports
+  Dual Port Cisco HDLC on the S514-PCI/S508-ISA cards. 
+  This support also allows user to build applications using the 
+  HDLC streaming API. 
+  
+  CHDLC Streaming driver also supports MULTILINK PPP
+  support that can bind multiple WANPIPE T1 cards into
+  a single logical channel.
+  
+  If you say  N, the Cisco HDLC support and 
+  HDLC streaming API and MULTILINK PPP will not be 
+  included in the driver.
 
 MultiGate/COMX support
 CONFIG_COMX
@@ -8288,7 +8360,7 @@ CONFIG_I810_TCO
   If you want to compile this as a module, say M and read
   Documentation/modules.txt. The module will be called
   i810-tco.o.
-  
+
 MultiGate Cisco-HDLC and synchronous PPP protocol support
 CONFIG_COMX_PROTO_PPP
   Cisco-HDLC and synchronous PPP protocol driver for all MultiGate
@@ -8350,6 +8422,49 @@ CONFIG_CYCLOMX_X25
 
   If you say N, the X.25 support will not be included in the driver
   (saves about 11 KB of kernel memory).
+
+Generic HDLC driver
+CONFIG_HDLC
+  Say Y to this option if your Linux box contains a WAN card supported
+  by this driver and you are planning to connect the box to a WAN
+  ( = Wide Area Network). You will need supporting software from
+  http://hq.pm.waw.pl/hdlc/.
+  Generic HDLC driver currently supports raw HDLC, Cisco HDLC, Frame
+  Relay, synchronous Point-to-Point Protocol (PPP) and X.25.
+
+  If unsure, say N here.
+
+Synchronous Point-to-Point Protocol (PPP)
+CONFIG_HDLC_PPP
+  Say Y to this option if you want generic HDLC driver to support
+  PPP over WAN (Wide Area Network) connections.
+
+  If unsure, say N here.
+
+CCITT X.25 protocol
+CONFIG_HDLC_X25
+  Say Y to this option if you want generic HDLC driver to support
+  X.25 protocol over WAN (Wide Area Network) connections.
+
+  If unsure, say N here.
+
+SDL RISCom/N2 driver
+CONFIG_N2
+  This driver is for RISCom/N2 single or dual channel ISA cards
+  made by SDL Communications Inc. If you have such a card,
+  say Y here and see http://hq.pm.waw.pl/pub/hdlc/
+
+  Note that N2csu and N2dds cards are not supported by this driver.
+
+  If unsure, say N here.
+
+Moxa C101 driver
+CONFIG_C101
+  This driver is for C101 SuperSync ISA cards made by Moxa
+  Technologies Co., Ltd. If you have such a card,
+  say Y here and see http://hq.pm.waw.pl/pub/hdlc/
+
+  If unsure, say N here.
 
 Ethernet (10 or 100Mbit)
 CONFIG_NET_ETHERNET
@@ -10055,31 +10170,67 @@ CONFIG_QUOTA
 Memory Technology Device (MTD) support
 CONFIG_MTD
   Memory Technology Devices are flash, RAM and similar chips, often
-  used for solid state filesystems on embedded devices. This option
+  used for solid state file systems on embedded devices. This option
   will provide the generic support for MTD drivers to register
   themselves with the kernel and for potential users of MTD devices
   to enumerate the devices which are present and obtain a handle on
   them. It will also allow you to select individual drivers for 
   particular hardware and users of MTD device. If unsure, say N.
 
+MTD debugging support
+CONFIG_MTD_DEBUG
+  This turns on low-level debugging for the entire MTD sub-system.
+
+MTD debugging verbosity
+CONFIG_MTD_DEBUG_VERBOSE
+  Determines the verbosity level of the MTD debugging messages.
+
 M-Systems Disk-On-Chip 1000 support
 CONFIG_MTD_DOC1000
   This provides an MTD device driver for the M-Systems DiskOnChip
   1000 devices, which are obsolete so you probably want to say 'N'.
 
-M-Systems Disk-On-Chip 2000 support
+M-Systems Disk-On-Chip 2000 and Millennium support
 CONFIG_MTD_DOC2000
   This provides an MTD device driver for the M-Systems DiskOnChip
-  2000 devices. If you use this, you probably also want the NFTL
-  'NAND Flash Translation Layer' below, which is used to emulate
+  2000 and Millennium devices. Originally designed for the DiskOnChip
+  2000, it also now includes support for the DiskOnChip Millennium.
+  If you have problems with this driver and the DiskOnChip Millennium,
+  you may wish to try the alternative Millennium driver below. To use
+  the alternative driver, you will need to undefine DOC_SINGLE_DRIVER
+  in the drivers/mtd/docprobe.c source code.
+
+  If you use this device, you probably also want to enable the NFTL
+  'NAND Flash Translation Layer' option below, which is used to emulate
   a block device by using a kind of filesystem on the flash chips.
 
-M-Systems Disk-On-Chip Millennium support
+Alternative Disk-On-Chip Millennium support
 CONFIG_MTD_DOC2001
-  This provides an MTD device driver for the M-Systems DiskOnChip
-  Millennium devices. If you use this, you probably also want the
-  NFTL 'NAND Flash Translation Layer' below, which is used to emulate
+  This provides an alternative MTD device driver for the M-Systems
+  DiskOnChip Millennium devices. Use this if you have problems with
+  the combined DiskOnChip 2000 and Millennium driver above. To get
+  the DiskOnChip probe code to load and use this driver instead of
+  the other one, you will need to undefine DOC_SINGLE_DRIVER near
+  the beginning of drivers/mtd/docprobe.c
+
+  If you use this device, you probably also want to enable the NFTL
+  'NAND Flash Translation Layer' option below, which is used to emulate
   a block device by using a kind of filesystem on the flash chips.
+
+Ramix PMC551 PCI Mezzanine ram card support
+CONFIG_MTD_PMC551
+  This provides a MTD device driver for the Ramix PMC551 RAM PCI card
+  from Ramix Inc. (http://www.ramix.com/products/memory/pmc551.html).
+  These devices come in memory configurations from 32M - 1G.  If you
+  have one, you probably want to enable this.
+
+  If this driver is compiled as a module you get the ability to select the
+  size of the aperture window pointing into the devices memory.  What this
+  means is that if you have a 1G card, normally the kernel will use a 1G
+  memory map as it's view of the device.  As a module, you can select a
+  1M window into the memory and the driver will "slide" the window around
+  the PMC551's memory.  This was particularly useful on the 2.2 kernels
+  on PPC architectures as there was limited kernel space to deal with.
 
 Use extra onboard system memory as MTD device
 CONFIG_MTD_SLRAM
@@ -10087,30 +10238,32 @@ CONFIG_MTD_SLRAM
   you can still use it for storage or swap by using this driver to
   present it to the system as a Memory Technology Device.
 
-Ramix PMC551 PCI Mezzanine ram card support
-CONFIG_MTD_PMC551
-  This provides an MTD device driver for the Ramix PMC551 RAM card.
-  If you have one, you probably want to enable this.
-
-PMC551 256M DRAM Bugfix.
+PMC551 256M DRAM Bugfix
 CONFIG_MTD_PMC551_BUGFIX
-  Some PMC551 boards hacve invalid column and row mux values. This 
-  option will fix them, but will break other memory configurations.
+  Some of Ramix's PMC551 boards with 256M configurations have invalid
+  column and row mux values. This option will fix them, but will break
+  other memory configurations.  If unsure say N.
+
+PMC551 Debugging
+CONFIG_MTD_PMC551_DEBUG
+  This option makes the PMC551 more verbose during it's operation and is
+  only really useful if you are developing on this driver or suspect a
+  possible hardware or driver bug.  If unsure say N.
 
 Debugging RAM test driver
 CONFIG_MTD_MTDRAM
-  This enables a test MTD device driver which uses vmalloc() to 
-  provide storage. You probably want to say 'N' unless you're 
-  testing stuff, or unless you want to use it in place of a ramdisk
-  when I've eventually got round to making the CONFIG_BLK_DEV option
-  and you've turned it off.
+  This enables a test MTD device driver which uses vmalloc() to
+  provide storage. You probably want to say 'N' unless you're
+  testing stuff.
 
 Common Flash Interface (CFI) support
 CONFIG_MTD_CFI
-  Intel's Common Flash Interface specification provides a universal
-  method for probing the capabilities of flash devices. If you wish
-  to support any device which uses CFI-compliant devices, you need
-  to enable this option.
+  The Common Flash Interface specification was developed by Intel,
+  AMD and other flash manufactures that provides a universal method
+  for probing the capabilities of flash devices. If you wish to
+  support any device that is CFI-compliant, you need to enable this
+  option. Visit (http://www.amd.com/products/nvd/overview/cfi.html)
+  for more information on CFI.
 
 CFI support for Intel/Sharp Extended Command Set chips
 CONFIG_MTD_CFI_INTELEXT
@@ -10122,10 +10275,10 @@ CONFIG_MTD_CFI_INTELEXT
 Flash chip mapping in physical memory
 CONFIG_MTD_PHYSMAP
   This provides a 'mapping' driver which allows the CFI probe and
-  command set driver code to communicate with flash chips which 
+  command set driver code to communicate with flash chips which
   are mapped physically into the CPU's memory. You will need to
   configure the physical address and size of the flash chips on
-  your particular board.
+  your particular board as well as the bus width.
 
 Physical start location of flash chip mapping
 CONFIG_MTD_PHYSMAP_START
@@ -10143,38 +10296,51 @@ CONFIG_MTD_PHYSMAP_LEN
   map which should hopefully be in the documentation for your
   board. 
 
+CONFIG_MTD_PHYSMAP_BUSWIDTH
+  This is the total width of the data bus of the flash devices
+  in octets. For example, if you have a data bus width of 32
+  bits, you would set the bus width octect value to 4. This is
+  used internally by the CFI drivers.
+
 Flash chip mapping on Mixcom piggyback card
 CONFIG_MTD_MIXMEM
   This supports the paging arrangement for access to flash chips
-  on the Mixcom piggyback card, allowing the flash chip drivers 
-  to get on with their job of driving the flash chips without 
+  on the MixCOM piggyback card, allowing the flash chip drivers
+  to get on with their job of driving the flash chips without
   having to know about the paging. If you have one of these boards,
-  you probably want to enable this mapping driver.
+  you probably want to enable this mapping driver. More info is at
+  (http://www.itc.hu/).
 
 Flash chip mapping on Nora
 CONFIG_MTD_NORA
   If you had to ask, you don't have one. Say 'N'.
 
+Flash chip mapping on PNC2000
+CONFIG_MTD_PNC2000
+  PNC-2000 is the name of Network Camera product from PHOTRON
+  Ltd. in Japan. It uses CFI-compliant flash.
+
 Flash chip mapping on Octagon 5066 SBC
 CONFIG_MTD_OCTAGON
   This provides a 'mapping' driver which supports the way in which
   the flash chips are connected in the Octagon-5066 Single Board
-  Computer. You will also need to complete and enable the driver
-  for JEDEC flash chips.
+  Computer. More information on the board is available at
+  (http://www.octagonsystems.com/Products/5066/5066.html).
 
 Flash chip mapping on RPXlite PPC board
 CONFIG_MTD_RPXLITE
-  The RPXLite PowerPC board has CFI-compliant chips mapped in 
+  The RPXLite PowerPC board has CFI-compliant chips mapped in
   a strange sparse mapping. This 'mapping' driver supports that
   arrangement, allowing the CFI probe and command set driver code
-  to communicate with the chips on the RPXLite board.
+  to communicate with the chips on the RPXLite board. More at
+  (http://www.embeddedplanet.com/rpx_lite_specification_sheet.htm).
 
 Flash chip mapping on Tempustech VMAX SBC301
 CONFIG_MTD_VMAX
   This provides a 'mapping' driver which supports the way in which
   the flash chips are connected in the Tempustech VMAX SBC301 Single
-  Board Computer. You will also need to complete and enable the driver
-  for JEDEC flash chips.
+  Board Computer. More information on the board is available at
+  (http://www.tempustech.com/tt301.htm).
 
 Direct chardevice access to MTD devices
 CONFIG_MTD_CHAR
@@ -10195,15 +10361,15 @@ CONFIG_MTD_BLOCK
 
   Later, it may be extended to perform read/erase/modify/write cycles
   on flash chips to emulate a smaller block size. Needless to say,
-  this is very unsafe, but could be useful for filesystems which are
+  this is very unsafe, but could be useful for file systems which are
   almost never written to.
 
 FTL (Flash Translation Layer) support
 CONFIG_FTL
   This provides support for the original Flash Translation Layer which
   is part of the PCMCIA specification. It uses a kind of pseudo-
-  filesystem on a flash device to emulate a block device with 512-byte
-  sectors, on top of which you put a 'normal' filesystem. You may find
+  file system on a flash device to emulate a block device with 512-byte
+  sectors, on top of which you put a 'normal' file system. You may find
   that the algorithms used in this code are patented unless you live
   in the Free World where software patents aren't legal - in the USA
   you are only permitted to use this on PCMCIA hardware, although 
@@ -10214,8 +10380,8 @@ NFTL (NAND Flash Translation Layer) support
 CONFIG_NFTL
   This provides support for the NAND Flash Translation Layer which is
   used on M-Systems' DiskOnChip devices. It uses a kind of pseudo-
-  filesystem on a flash device to emulate a block device with 512-byte
-  sectors, on top of which you put a 'normal' filesystem. You may find
+  file system on a flash device to emulate a block device with 512-byte
+  sectors, on top of which you put a 'normal' file system. You may find
   that the algorithms used in this code are patented unless you live
   in the Free World where software patents aren't legal - in the USA
   you are only permitted to use this on DiskOnChip hardware, although 
@@ -10224,8 +10390,8 @@ CONFIG_NFTL
 
 Write support for NFTL (EXPERIMENTAL)
 CONFIG_NFTL_RW
-  If you're lucky, this will actually work. Don't whinge if it doesn't.
-  Contact dwmw2@infradead.org if you want to help to make it more 
+  If you're lucky, this will actually work. Don't whine if it doesn't.
+  Contact (dwmw2@infradead.org) if you want to help to make it more
   reliable.
 
 Support for USB
@@ -10398,6 +10564,16 @@ CONFIG_INPUT_ADBHID
   keyboard and mouse drivers.
 
   If unsure, say Y.
+
+Input core support
+CONFIG_INPUT
+  Say Y here if you want to enable any of the following options for
+  USB Human Interface Device (HID) support.
+
+  Say Y here if you want to enable any of the USB HID options in the
+  USB support section which require Input core support.
+
+  Otherwise, say N.
 
 Keyboard support
 CONFIG_INPUT_KEYBDEV
@@ -11072,23 +11248,44 @@ CONFIG_CRAMFS
 
   If unsure, say N.
    
+Virtual memory file system support
+CONFIG_TMPFS
+  Tmpfs is a file system which keeps all files in virtual memory.
+
+  In contrast to RAM disks, which get allocated a fixed amount of
+  physical RAM, tmpfs grows and shrinks to accommodate the files it
+  contains and is able to swap unneeded pages out to swap space.
+
+  Everything is "virtual" in the sense that no files will be created
+  on your hard drive; if you reboot, everything in tmpfs will be
+  lost.
+  
+  You should mount the filesystem somewhere to be able to use
+  POSIX shared memory. Adding the following line to /etc/fstab should
+  take care of things:
+
+  tmpfs		/dev/shm	tmpfs		defaults	0 0
+
+  Remember to create the directory that you intend to mount tmpfs on
+  if necessary (/dev/shm is automagically created if you use devfs).
+
+  You can set limits for the number of blocks and inodes used by the
+  filesystem with the mount options "size", "nr_blocks" and
+  "nr_inodes". These parameters accept a suffix k, m or g for kilo,
+  mega and giga and can be changed on remount.
+  
+  The initial permissions of the root directory can be set with the
+  mount option "mode".
+
 Simple RAM-based file system support
 CONFIG_RAMFS
   Ramfs is a file system which keeps all files in RAM. It allows
   read and write access.
 
-  In contrast to RAM disks, which get allocated a fixed amount of RAM,
-  ramfs grows and shrinks to accommodate the files it contains.
+  It is more of an programming example than a useable filesystem. If
+  you need a file system which lives in RAM with limit checking use
+  tmpfs.
 
-  Before you can use this RAM-based file system, it has to be mounted,
-  meaning it has to be given a location in the directory hierarchy. If
-  you want to use the location /ramfiles for example, you would have
-  to create that directory first and then mount the file system by
-  saying "mount -t ramfs ramfs /ramfiles" or the equivalent line in
-  /etc/fstab. Everything is "virtual" in the sense that no files will
-  be created on your hard drive; if you reboot, everything in
-  /ramfiles will be lost.
-  
   If you want to compile this as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want),
   say M here and read Documentation/modules.txt. The module will be
@@ -11634,21 +11831,16 @@ CONFIG_EFS_FS
   whenever you want), say M here and read Documentation/modules.txt.
   The module will be called efs.o. 
 
-Journalling Flash File System (JFFS) support (EXPERIMENTAL)
+Support for the Journalling Flash Filesystem
 CONFIG_JFFS_FS
-  JFFS is a new file system designed for use on flash memory devices
-  rather than on block devices. It was developed on the 2.0 kernel
-  by Axis Communications AB for use on their Linux-based products,
-  and released under GPL, then 'borrowed' and ported to work with 
-  the 2.4 kernel and the new Memory Technology Device system. 
+  JFFS is the Journaling Flash File System developed by Axis
+  Communications in Sweden, aimed at providing a crash/powerdown-safe
+  filesystem for disk-less embedded devices. Further information is
+  available at (http://developer.axis.com/software/jffs/).
 
-  The 2.4 port is experimental and not yet supported by Axis. Basically,
-  the good bits are probably theirs, and if it's broken in 2.4 it's 
-  probably our fault. See http://www.developer.axis.com/software/jffs/
-  for more information about JFFS.
-
-  Any potential patches or queries should be sent to Axis' mailing 
-  list for JFFS: <jffs-dev@axis.com>
+JFFS debugging verbosity
+CONFIG_JFFS_FS_VERBOSE
+  Determines the verbosity level of the JFFS debugging messages.
 
 UFS file system support (read-only)
 CONFIG_UFS_FS
@@ -11723,6 +11915,12 @@ CONFIG_BSD_DISKLABEL
   file system support", above. If you don't know what all this is
   about, say N.
 
+Minix subpartition support
+CONFIG_MINIX_SUBPARTITION
+  Minix 2.0.0/2.0.2 subpartition table support for Linux.
+  Say Y here if you want to mount and use Minix 2.0.0/2.0.2
+  subpartitions.
+
 Sun partition tables support
 CONFIG_SUN_PARTITION
   Like most systems, SunOS uses its own hard disk partition table
@@ -11748,6 +11946,12 @@ SGI partition support
 CONFIG_SGI_PARTITION
   Say Y here if you would like to be able to read the hard disk
   partition table format used by SGI machines.
+
+Ultrix partition support
+CONFIG_ULTRIX_PARTITION
+  Say Y here if you would like to be able to read the hard disk
+  partition table format used by DEC (now Compaq) Ultrix machines.
+  Otherwise, say N.
 
 ADFS file system support (EXPERIMENTAL)
 CONFIG_ADFS_FS
@@ -11998,7 +12202,7 @@ CONFIG_NCPFS_EXTRAS
 
 nls default codepage
 CONFIG_NLS_DEFAULT
-  The default NLS used when mounting filesystem. Currently, the valid
+  The default NLS used when mounting file system. Currently, the valid
   values are:
   big5, cp437, cp737, cp775, cp850, cp852, cp855, cp857, cp860, cp861,
   cp862, cp863, cp864, cp865, cp866, cp869, cp874, cp932, cp936,
@@ -12187,7 +12391,7 @@ CONFIG_NLS_CODEPAGE_874
 
 nls codepage 932
 CONFIG_NLS_CODEPAGE_932
-  The Microsoft fat filesystem family can deal with filenames in
+  The Microsoft FAT file system family can deal with filenames in
   native language character sets. These character sets are stored in
   so-called DOS codepages. You need to include the appropriate
   codepage if you want to be able to read/write these filenames on
@@ -12199,7 +12403,7 @@ CONFIG_NLS_CODEPAGE_932
 
 nls codepage 936
 CONFIG_NLS_CODEPAGE_936
-  The Microsoft fat filesystem family can deal with filenames in
+  The Microsoft FAT file system family can deal with filenames in
   native language character sets. These character sets are stored in
   so-called DOS codepages. You need to include the appropriate
   codepage if you want to be able to read/write these filenames on
@@ -12210,7 +12414,7 @@ CONFIG_NLS_CODEPAGE_936
 
 nls codepage 949
 CONFIG_NLS_CODEPAGE_949
-  The Microsoft fat filesystem family can deal with filenames in
+  The Microsoft FAT file system family can deal with filenames in
   native language character sets. These character sets are stored in
   so-called DOS codepages. You need to include the appropriate
   codepage if you want to be able to read/write these filenames on
@@ -12220,7 +12424,7 @@ CONFIG_NLS_CODEPAGE_949
 
 nls codepage 950
 CONFIG_NLS_CODEPAGE_950
-  The Microsoft fat filesystem family can deal with filenames in
+  The Microsoft FAT file system family can deal with filenames in
   native language character sets. These character sets are stored in
   so-called DOS codepages. You need to include the appropriate
   codepage if you want to be able to read/write these filenames on
@@ -13742,16 +13946,31 @@ CONFIG_MIXCOMWD
   module, say M here and read Documentation/modules.txt. Most people
   will say N.
 
+ZF MachZ Watchdog
+CONFIG_MACHZ_WDT
+  If you are using a ZF Micro MachZ processor, say Y here, otherwise N.
+  This is the driver for the watchdog timer builtin on that processor
+  using ZF-Logic interface. This watchdog simply watches your kernel to
+  make sure it doesn't freeze, and if it does, it reboots your computer
+  after a certain amount of time.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module is called machzwd.o. If you want to compile it as a module,
+  say M here and read Documentation/modules.txt.
+
 Toshiba Laptop support
 CONFIG_TOSHIBA
-  If you intend to run this the kernel on a Toshiba portable say yes
-  here. This adds a driver to safely access the System Management
-  Mode of the CPU on Toshiba portables. The System Management Mode
+  This adds a driver to safely access the System Management Mode
+  of the CPU on Toshiba portables. The System Management Mode
   is used to set the BIOS and power saving options on Toshiba portables.
 
   For information on utilities to make use of this driver see the
-  Toshiba Linux utilities website at:
+  Toshiba Linux utilities web site at:
   http://www.buzzard.org.uk/toshiba/
+
+  Say Y if you intend to run this kernel on a Toshiba portable.
+  Say N otherwise.
 
 /dev/cpu/microcode - Intel IA32 CPU microcode support
 CONFIG_MICROCODE
@@ -13786,6 +14005,18 @@ CONFIG_X86_CPUID
   be executed on a specific processor.  It is a character device
   with major 203 and minors 0 to 31 for /dev/cpu/0/cpuid to
   /dev/cpu/31/cpuid.
+
+SBC-60XX Watchdog Timer
+CONFIG_60XX_WDT
+ This driver can be used with the watchdog timer found on some
+ single board computers, namely the 6010 PII based computer.
+ It may well work with other cards.  It reads port 0x443 to enable
+ and re-set the watchdog timer, and reads port 0x45 to disable
+ the watchdog.  If you have a card that behave in similar ways,
+ you can probably make this driver work with your card as well.
+
+ You can compile this driver directly into the kernel, or use
+ it as a module.  The module will be called sbc60xxwdt.o.
 
 Enhanced Real Time Clock Support
 CONFIG_RTC
@@ -14253,6 +14484,8 @@ CONFIG_SOUND_PAS
   16 or Logitech SoundMan 16 sound card. Answer N if you have some
   other card made by Media Vision or Logitech since those are not
   PAS16 compatible. Please read Documentation/sound/PAS16.
+  It is not necessary to add Sound Blaster support separately; it
+  is included in PAS support.
 
   If you compile the driver into the kernel, you have to add
   "pas2=<io>,<irq>,<dma>,<dma2>,<sbio>,<sbirq>,<sbdma>,<sbdma2>
@@ -14459,13 +14692,15 @@ CONFIG_SOUND_CS4232
   See Documentation/sound/CS4232 for more information on configuring
   this card.
 
-Support for Yamaha OPL3-SA2, SA3, and SAx based PnP cards
+Support for Yamaha OPL3-SA2 and SA3 based PnP cards
 CONFIG_SOUND_OPL3SA2
   Say Y or M if you have a card based on one of these Yamaha
-  sound chipsets. Read Documentation/sound/OPL3-SA2 for more
-  information on configuring these cards.
+  sound chipsets or the "SAx", which is actually a SA3. Read
+  Documentation/sound/OPL3-SA2 for more information on configuring
+  these cards.
 
-  If you compile the driver into the kernel, you have to add
+  If you compile the driver into the kernel and do not also
+  configure in the optional ISA PnP support, you will have to add
   "opl3sa2=<io>,<irq>,<dma>,<dma2>,<mssio>,<mpuio>" to the kernel
   command line.
 
@@ -14647,7 +14882,7 @@ CONFIG_SC6600_JOY
 
 SC-6600 CDROM Interface
 CONFIG_SC6600_CDROM
-  This is used to activate the the CDROM interface of the Audio Excel
+  This is used to activate the CDROM interface of the Audio Excel
   DSP 16 card. Enter: 0 for Sony, 1 for Panasonic, 2 for IDE, 4 for no
   CDROM present.
 
@@ -14660,6 +14895,11 @@ CONFIG_AEDSP16_MPU401
   you have selected for "MPU-401 support". If you are using this
   driver as a module you have to specify the MPU I/O base address with
   the parameter 'mpu_base=0xNNN'.
+
+C-Media PCI (CMI8338/8378)
+CONFIG_SOUND_CMPCI
+  Say Y or M if you have a PCI sound card using the CMI8338
+  or the CMI8378 chip.set.
 
 Creative EMU10K1 based PCI sound cards
 CONFIG_SOUND_EMU10K1
@@ -16523,6 +16763,68 @@ CONFIG_VIDEO_PMS
   from the running kernel whenever you want). If you want to compile
   it as a module, say M here and read Documentation/modules.txt.
 
+IBM's S/390 architecture
+CONFIG_ARCH_S390
+  Select this option, if you want to run the Kernel on one of IBM's
+  mainframes of the S/390 generation. You should have installed the
+  s390-compiler released by IBM (based on gcc-2.95.1) before.
+
+Merge some code into the kernel to make the image IPLable
+CONFIG_IPLABLE
+  If you want to use the produced kernel to IPL directly from a
+  device, you have to merge a bootsector specific to the device
+  into the first bytes of the kernel. You will have to select the
+  IPL device on another question, that pops up, when you select
+  CONFIG_IPLABE.
+
+IPL from a /390 tape unit
+CONFIG_IPL_TAPE
+  Select this option if you want to IPL the image from a Tape.
+
+IPL from a virtual card reader emulated by VM/ESA
+CONFIG_IPL_RDR_VM
+  Select this option if you are running under VM/ESA and want 
+  to IPL the image from the emulated card reader.
+
+IPL from a real card reader
+CONFIG_IPL_RDR
+  Select this option if you want to IPL the image from a real
+  card reader. Maybe you still got one and want to try. We didn't
+  test.
+
+IBMs S/390 Harddisks (DASDs)
+CONFIG_DASD
+  Enable this option if you want to access DASDs directly utilizing
+  S/390s channel subsystem commands. This is necessary for running
+  natively on a single image or an LPAR.
+
+Enable DASD fast write
+CONFIG_DASD_FAST_IO
+  Enable fast I/O for DASDs. That means that the next I/O command
+  is already issued at interrupt time, if an I/O request is pending.
+  This option gives significant speedup of I/O, because we don't
+  schedule the bottom-halves as often as Intel.
+
+Support for IBM-style disk-labels (S/390)
+CONFIG_S390_PARTITION
+  Enable this option to assure standard IBM labels on the DASDs.
+  You must enable it, if you are planning to access DASDs also
+  attached to another IBM mainframe operation system (OS/390, 
+  VM/ESA, VSE/ESA).
+
+ECKD devices
+CONFIG_DASD_ECKD
+  ECKD devices are the most commonly used devices. you should enable
+  this option unless you are very sure to have no ECKD device.
+
+CKD devices
+CONFIG_DASD_CKD
+  CKD devices are currently unsupported.
+
+FBA devices
+CONFIG_DASD_FBA
+  FBA devices are currently unsupported.
+
 SAB3036 tuner support
 CONFIG_TUNER_3036
   Say Y here to include support for Philips SAB3036 compatible tuners.
@@ -16559,7 +16861,7 @@ CONFIG_ARCH_CATS
   Saying N will reduce the size of the Footbridge kernel.
 
 Include support for the EBSA285
-CONFIG_ARCH_EBSA285
+CONFIG_ARCH_EBSA285_HOST
   Say Y here if you intend to run this kernel on the EBSA285 card
   in host ("central function") mode.
 
@@ -16645,50 +16947,14 @@ CONFIG_SA1100_VICTOR
   http://www.visuaide.com/pagevictor.en.html for information on
   this system.
 
-Support ARM610 processor
-CONFIG_CPU_ARM6
-  Say Y here if you wish to include support for the ARM610 processor.
-
-Support ARM710 processor
-CONFIG_CPU_ARM7
-  Say Y here if you wish to include support for the ARM710 processor.
-
-Support StrongARM(R) SA-110 processor
-CONFIG_CPU_SA110
-  Say Y here if you wish to include support for the Intel(R)
-  StrongARM(R) SA-110 processor.
-
-Support ARM720 processor
-CONFIG_CPU_ARM720
-  Say Y here if you wish to include support for the ARM720 processor.
-
-Support ARM920
-CONFIG_CPU_ARM920
-  Say Y here if you wish to include support for the ARM920 processor.
-
-Support ARM610 processor
-CONFIG_CPU_ARM6
-  Say Y here if you wish to include support for the ARM610 processor.
-
-Support ARM710 processor
-CONFIG_CPU_ARM7
-  Say Y here if you wish to include support for the ARM710 processor.
-
-Support StrongARM(R) SA-110 processor
-CONFIG_CPU_SA110
-  Say Y here if you wish to include support for the Intel(R)
-  StrongARM(R) SA-110 processor.
-
-Support ARM720 processor
-CONFIG_CPU_ARM720
-  Say Y here if you wish to include support for the ARM720 processor.
-
-Support ARM920
-CONFIG_CPU_ARM920
-  Say Y here if you wish to include support for the ARM920 processor.
+Load kernel using Angel Debug Monitor
+CONFIG_ANGELBOOT
+  Say Y if you plan to load the kernel using Angel, ARM Ltd's target
+  debug stub.  If you are not using Angel, you must say N.  It is
+  important to get this setting correct.
 
 Math emulation
-CONFIG_NWFPE
+CONFIG_FPE_NWFPE
   Say Y to include the NWFPE floating point emulator in the kernel.
   This is necessary to run most binaries. Linux does not currently
   support floating point hardware so you need to say Y here even if
@@ -16701,6 +16967,23 @@ CONFIG_NWFPE
 
   You may say N here if you are going to load the Acorn FPEmulator
   early in the bootup.
+
+CONFIG_FPE_FASTFPE
+  Say Y here to include the FAST floating point emulator in the kernel.
+  This is an experimental much faster emulator which has only 32 bit
+  precision for the mantissa. It does not support any exceptions. This
+  makes it very simple, it is approximately 4-8 times faster than NWFPE.
+
+  It should be sufficient for most programs. It is definitely not
+  suitable if you do scientific calculations that need double precision
+  for iteration formulas that sum up lots of very small numbers. If you
+  do not feel you need a faster FP emulation you should better choose
+  NWFPE.
+
+  It is also possible to say M to build the emulator as a module
+  (fastfpe.o). But keep in mind that you should only load the FP emulator
+  early in the bootup. You should never change from NWFPE to FASTFPE or
+  vice versa in an active system!
 
 DS1620 Thermometer support
 CONFIG_DS1620
@@ -16721,11 +17004,12 @@ CONFIG_DEBUG_ERRORS
   you are concerned with the code size or don't want to see these
   messages.
 
-Compile kernel with frame pointer
-CONFIG_FRAME_POINTER
-  If you say Y here, the resulting kernel will be slightly larger and
-  slower, but it will give useful debugging information. If you don't
-  debug the kernel, you can say N.
+Compile kernel without frame pointer
+CONFIG_NO_FRAME_POINTER
+  If you say Y here, the resulting kernel will be slightly smaller and
+  faster. However, when a problem occurs with the kernel, the
+  information that is reported is severely limited. Most people
+  should say N here.
 
 User fault debugging
 CONFIG_DEBUG_USER
@@ -16833,6 +17117,21 @@ CONFIG_SERIAL_L7200_CONSOLE
   you can make the first serial port the console by answering Y to
   this option.
 
+L7200 SDB keyboard support
+CONFIG_KEYBOARD_L7200
+  Enable this option if you would like to be able to use a keyboard
+  on a LinkUp Systems L7200 board.
+
+L7200 SDB Fujitsu keyboard support
+CONFIG_KEYBOARD_L7200_NORM
+  Select the Fujitsu keyboard if you want a normal QWERTY style
+  keyboard on the LinkUp SDB.
+
+L7200 SDB Prototype keyboard support
+CONFIG_KEYBOARD_L7200_DEMO
+  Select the prototype keyboard if you want to play with the
+  LCD/keyboard combination on the LinkUp SDB.
+
 Footbridge Mode
 CONFIG_HOST_FOOTBRIDGE
   The 21285 Footbridge chip can operate in either `host mode' or
@@ -16903,14 +17202,17 @@ CONFIG_IRDA
   infrared communication and is supported by most laptops and PDA's.
 
   To use Linux support for the IrDA (tm) protocols, you will also need
-  some user-space utilities like the irmanager and probably irattach
-  as well. For more information, see the file
+  some user-space utilities like irattach. For more information, see the file
   Documentation/networking/irda.txt. You also want to read the
   IR-HOWTO, available at http://www.linuxdoc.org/docs.html#howto .
 
   This support is also available as a module called irda.o. If you
   want to compile it as a module, say M here and read
   Documentation/modules.txt.
+
+IrDA protocol options
+CONFIG_IRDA_OPTIONS
+  Say Y here if you want to configure any of the following IrDA options.
 
 IrDA Cache last LSAP
 CONFIG_IRDA_CACHE_LAST_LSAP
@@ -16975,6 +17277,17 @@ CONFIG_IRLAN
   like the HP NetbeamIR, or the ESI JetEye NET. You can also connect 
   to another Linux machine running the IrLAN protocol for ad-hoc 
   networking!
+
+IrNET Protocol 
+CONFIG_IRNET
+  Say Y here if you want to build support for the IrNET protocol. If
+  you want to compile it as a module (irnet.o), say M here and read
+  Documentation/modules.txt. IrNET is a PPP driver, so you will also
+  need a working PPP subsystem (driver, daemon and config)...
+
+  IrNET is an alternate way to tranfer TCP/IP traffic over IrDA. It
+  uses synchronous PPP over a set of point to point IrDA sockets. You
+  can use it between Linux machine or with W2k.
 
 IrCOMM Protocol
 CONFIG_IRCOMM
@@ -17350,7 +17663,7 @@ CONFIG_IA64_PALINFO
 # LocalWords:  howto multicasting MULTICAST MBONE firewalling ipfw ACCT resp ip
 # LocalWords:  proc acct IPIP encapsulator decapsulator klogd PCTCP RARP EXT PS
 # LocalWords:  telnetting subnetted NAGLE rlogin NOSR ttyS TGA techinfo mbone nl
-# LocalWords:  Mb SKB IPX Novell dosemu Appletalk DDP ATALK vmalloc visar ehome
+# LocalWords:  Mb SKB IPX Novell dosemu DDP ATALK vmalloc visar ehome
 # LocalWords:  SD CHR scsi thingy SG CD LUNs LUN jukebox Adaptec BusLogic EATA
 # LocalWords:  buslogic DMA DPT ATT eata dma PIO UltraStor fdomain umsdos ext
 # LocalWords:  QLOGIC qlogic TMC seagate Trantor ultrastor FASST wd NETDEVICES
@@ -17378,7 +17691,7 @@ CONFIG_IA64_PALINFO
 # LocalWords:  Brumby pci TNC cis ohio faq usenet NETLINK dev hydra ca Tyne mem
 # LocalWords:  carleton DECstation SUNFD JENSEN Noname XXXM SLiRP LILO's amifb
 # LocalWords:  pppd Zilog ZS SRM bootloader ez mainmenu rarp ipfwadm paride pcd
-# LocalWords:  RTNETLINK mknod xos MTU lwared Macs mac netatalk macs cs Wolff
+# LocalWords:  RTNETLINK mknod xos MTU lwared Macs netatalk macs cs Wolff
 # LocalWords:  dartmouth flowerpt MultiMaster FlashPoint tudelft etherexpress
 # LocalWords:  ICL EtherTeam ETH IDESCSI TXC SmartRAID SmartCache httpd sjc dlp
 # LocalWords:  thesphere TwoServers BOOTP DHCP ncpfs BPQETHER BPQ MG HIPPI cern
@@ -17395,7 +17708,7 @@ CONFIG_IA64_PALINFO
 # LocalWords:  Keepalive linefill RELCOM keepalive analogue CDR conf CDI INIT
 # LocalWords:  OPTi isp irq noisp VFAT vfat NTFS losetup dmsdosfs dosfs ISDN MP
 # LocalWords:  NOWAYOUT behaviour dialin isdn callback BTX Teles  XXXX LVM lvm
-ICN EDSS Cisco
+# LocalWords:  ICN EDSS Cisco
 # LocalWords:  ipppd syncppp RFC MPP VJ downloaded icn NICCY Creatix shmem ufr
 # LocalWords:  ibp md ARCnet ether encap NDIS arcether ODI Amigas AmiTCP NetBSD
 # LocalWords:  initrd tue util DES funet des OnNet BIOSP smc Travan Iomega CMS
@@ -17522,7 +17835,7 @@ ICN EDSS Cisco
 # LocalWords:  AudioPCI lspci SonicVibes sonicvibes SPARCs roadrunner CLgen UPA
 # LocalWords:  swansea shtml Zoltrix zoltrix BINUTILS EGCS binutils VIDC DACs
 # LocalWords:  CyberVision Cirrus PowerBooks Topcat SBUS CGsix TurboGX BWtwo SS
-# LocalWords:  CGthree TCX unswapable vfb fbcon hicolor truecolor AFB ILBM SOC
+# LocalWords:  CGthree TCX unswappable vfb fbcon hicolor truecolor AFB ILBM SOC
 # LocalWords:  IPLAN gracilis Fibre SBus SparcSTORAGE SV jnewbigin swin QNX qnx
 # LocalWords:  PTY PTYS ptyxx ttyxx PTYs ssh sb Avance ALS pss pvv kerneli hd
 # LocalWords:  synth WaveFront MSND NONPNP AudioExcelDSP STRAM APUS CHRP MBX Nx

@@ -64,14 +64,14 @@ c-help: http://www.scyld.com/network/natsemi.html
 static int debug = 1;			/* 1 normal messages, 0 quiet .. 7 verbose. */
 /* Maximum events (Rx packets, etc.) to handle at each interrupt. */
 static int max_interrupt_work = 20;
-static int mtu = 0;
+static int mtu;
 /* Maximum number of multicast addresses to filter (vs. rx-all-multicast).
    This chip uses a 512 element hash table based on the Ethernet CRC.  */
 static int multicast_filter_limit = 100;
 
 /* Set the copy breakpoint for the copy-only-tiny-frames scheme.
    Setting to > 1518 effectively disables this feature. */
-static int rx_copybreak = 0;
+static int rx_copybreak;
 
 /* Used to pass the media type, etc.
    Both 'options[]' and 'full_duplex[]' should exist for driver

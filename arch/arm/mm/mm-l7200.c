@@ -17,6 +17,9 @@
 static struct map_desc l7200_io_desc[] __initdata = {
 	{ IO_BASE,	IO_START,	IO_SIZE,	DOMAIN_IO, 0, 1 ,0 ,0},
 	{ IO_BASE_2,	IO_START_2,	IO_SIZE_2,	DOMAIN_IO, 0, 1 ,0 ,0},
+	{ AUX_BASE,     AUX_START,      AUX_SIZE,       DOMAIN_IO, 0, 1 ,0 ,0},
+	{ FLASH1_BASE,  FLASH1_START,   FLASH1_SIZE,    DOMAIN_IO, 0, 1 ,0 ,0},
+	{ FLASH2_BASE,  FLASH2_START,   FLASH2_SIZE,    DOMAIN_IO, 0, 1 ,0 ,0},
 	LAST_DESC
 };
 

@@ -47,4 +47,3 @@ void _memset_io(unsigned long dst, int c, size_t count)
 EXPORT_SYMBOL(_memcpy_fromio);
 EXPORT_SYMBOL(_memcpy_toio);
 EXPORT_SYMBOL(_memset_io);
-

@@ -22,12 +22,6 @@
 
 #include <asm/mach/map.h>
 
-unsigned long *valid_addr_bitmap;
-
-extern unsigned long get_page_2k(int priority);
-extern void free_page_2k(unsigned long page);
-extern pte_t *get_bad_pte_table(void);
-
 /*
  * These are useful for identifing cache coherency
  * problems by allowing the cache or the cache and
@@ -73,47 +67,68 @@ __setup("nowb", nowrite_setup);
 /*
  * need to get a 16k page for level 1
  */
-pgd_t *get_pgd_slow(void)
+pgd_t *get_pgd_slow(struct mm_struct *mm)
 {
-	pgd_t *pgd = (pgd_t *)__get_free_pages(GFP_KERNEL,2);
-	pmd_t *new_pmd;
+	pgd_t *new_pgd, *init_pgd;
+	pmd_t *new_pmd, *init_pmd;
+	pte_t *new_pte, *init_pte;
 
-	if (pgd) {
-		pgd_t *init = pgd_offset_k(0);
+	new_pgd = (pgd_t *)__get_free_pages(GFP_KERNEL, 2);
+	if (!new_pgd)
+		goto no_pgd;
 
-		memzero(pgd, FIRST_KERNEL_PGD_NR * sizeof(pgd_t));
-		memcpy(pgd  + FIRST_KERNEL_PGD_NR, init + FIRST_KERNEL_PGD_NR,
+	memzero(new_pgd, FIRST_KERNEL_PGD_NR * sizeof(pgd_t));
+
+	/*
+	 * This lock is here just to satisfy pmd_alloc and pte_lock
+	 */
+	spin_lock(&mm->page_table_lock);
+
+	/*
+	 * On ARM, first page must always be allocated since it contains
+	 * the machine vectors.
+	 */
+	new_pmd = pmd_alloc(mm, new_pgd, 0);
+	if (!new_pmd)
+		goto no_pmd;
+
+	new_pte = pte_alloc(mm, new_pmd, 0);
+	if (!new_pte)
+		goto no_pte;
+
+	init_pgd = pgd_offset_k(0);
+	init_pmd = pmd_offset(init_pgd, 0);
+	init_pte = pte_offset(init_pmd, 0);
+
+	set_pte(new_pte, *init_pte);
+
+	/*
+	 * Copy over the kernel and IO PGD entries
+	 */
+	memcpy(new_pgd  + FIRST_KERNEL_PGD_NR, init_pgd + FIRST_KERNEL_PGD_NR,
 		       (PTRS_PER_PGD - FIRST_KERNEL_PGD_NR) * sizeof(pgd_t));
-		/*
-		 * FIXME: this should not be necessary
-		 */
-		clean_cache_area(pgd, PTRS_PER_PGD * sizeof(pgd_t));
 
-		/*
-		 * On ARM, first page must always be allocated
-		 */
-		if (!pmd_alloc(pgd, 0))
-			goto nomem;
-		else {
-			pmd_t *old_pmd = pmd_offset(init, 0);
-			new_pmd = pmd_offset(pgd, 0);
+	spin_unlock(&mm->page_table_lock);
 
-			if (!pte_alloc(new_pmd, 0))
-				goto nomem_pmd;
-			else {
-				pte_t *new_pte = pte_offset(new_pmd, 0);
-				pte_t *old_pte = pte_offset(old_pmd, 0);
+	/*
+	 * FIXME: this should not be necessary
+	 */
+	clean_cache_area(new_pgd, PTRS_PER_PGD * sizeof(pgd_t));
 
-				set_pte(new_pte, *old_pte);
-			}
-		}
-	}
-	return pgd;
+	return new_pgd;
 
-nomem_pmd:
+no_pte:
+	spin_unlock(&mm->page_table_lock);
 	pmd_free(new_pmd);
-nomem:
-	free_pages((unsigned long)pgd, 2);
+	free_pages((unsigned long)new_pgd, 2);
+	return NULL;
+
+no_pmd:
+	spin_unlock(&mm->page_table_lock);
+	free_pages((unsigned long)new_pgd, 2);
+	return NULL;
+
+no_pgd:
 	return NULL;
 }
 
@@ -140,59 +155,6 @@ void free_pgd_slow(pgd_t *pgd)
 	}
 free:
 	free_pages((unsigned long) pgd, 2);
-}
-
-pte_t *get_pte_slow(pmd_t *pmd, unsigned long offset)
-{
-	pte_t *pte;
-
-	pte = (pte_t *)get_page_2k(GFP_KERNEL);
-	if (pmd_none(*pmd)) {
-		if (pte) {
-			memzero(pte, 2 * PTRS_PER_PTE * sizeof(pte_t));
-			clean_cache_area(pte, PTRS_PER_PTE * sizeof(pte_t));
-			pte += PTRS_PER_PTE;
-			set_pmd(pmd, mk_user_pmd(pte));
-			return pte + offset;
-		}
-		set_pmd(pmd, mk_user_pmd(get_bad_pte_table()));
-		return NULL;
-	}
-	free_page_2k((unsigned long)pte);
-	if (pmd_bad(*pmd)) {
-		__handle_bad_pmd(pmd);
-		return NULL;
-	}
-	return (pte_t *) pmd_page(*pmd) + offset;
-}
-
-pte_t *get_pte_kernel_slow(pmd_t *pmd, unsigned long offset)
-{
-	pte_t *pte;
-
-	pte = (pte_t *)get_page_2k(GFP_KERNEL);
-	if (pmd_none(*pmd)) {
-		if (pte) {
-			memzero(pte, 2 * PTRS_PER_PTE * sizeof(pte_t));
-			clean_cache_area(pte, PTRS_PER_PTE * sizeof(pte_t));
-			pte += PTRS_PER_PTE;
-			set_pmd(pmd, mk_kernel_pmd(pte));
-			return pte + offset;
-		}
-		set_pmd(pmd, mk_kernel_pmd(get_bad_pte_table()));
-		return NULL;
-	}
-	free_page_2k((unsigned long)pte);
-	if (pmd_bad(*pmd)) {
-		__handle_bad_pmd_kernel(pmd);
-		return NULL;
-	}
-	return (pte_t *) pmd_page(*pmd) + offset;
-}
-
-void free_pte_slow(pte_t *pte)
-{
-	free_page_2k((unsigned long)(pte - PTRS_PER_PTE));
 }
 
 /*
@@ -481,4 +443,42 @@ void __init create_memmap_holes(struct meminfo *mi)
 
 	for (node = 0; node < numnodes; node++)
 		free_unused_memmap_node(node, mi);
+}
+
+/*
+ * PTE table allocation cache.
+ *
+ * This is a move away from our custom 2K page allocator.  We now use the
+ * slab cache to keep track of these objects.
+ *
+ * With this, it is questionable as to whether the PGT cache gains us
+ * anything.  We may be better off dropping the PTE stuff from our PGT
+ * cache implementation.
+ */
+kmem_cache_t *pte_cache;
+
+/*
+ * The constructor gets called for each object within the cache when the
+ * cache page is created.  Note that if slab tries to misalign the blocks,
+ * we BUG() loudly.
+ */
+static void pte_cache_ctor(void *pte, kmem_cache_t *cache, unsigned long flags)
+{
+	unsigned long block = (unsigned long)pte;
+
+	if (block & 2047)
+		BUG();
+
+	memzero(pte, 2 * PTRS_PER_PTE * sizeof(pte_t));
+	cpu_cache_clean_invalidate_range(block, block +
+			PTRS_PER_PTE * sizeof(pte_t), 0);
+}
+
+void __init pgtable_cache_init(void)
+{
+	pte_cache = kmem_cache_create("pte-cache",
+				2 * PTRS_PER_PTE * sizeof(pte_t), 0, 0,
+				pte_cache_ctor, NULL);
+	if (!pte_cache)
+		BUG();
 }

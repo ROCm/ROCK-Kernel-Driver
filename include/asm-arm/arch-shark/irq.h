@@ -1,13 +1,14 @@
 /*
  * linux/include/asm-arm/arch-shark/irq.h
  *
- * by Alexander.Schulz@stud.uni-karlsruhe.de
+ * by Alexander Schulz <aschulz@netwinder.org>
  *
  * derived from linux/arch/ppc/kernel/i8259.c and:
  * include/asm-arm/arch-ebsa110/irq.h
  * Copyright (C) 1996-1998 Russell King
  */
 
+#include <asm/io.h>
 #define fixup_irq(x) (x)
 
 /*

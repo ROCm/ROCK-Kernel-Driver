@@ -46,7 +46,7 @@ search_exception_table(unsigned long addr)
 	/* The kernel is the last "module" -- no need to treat it special.  */
 	struct module *mp;
 	for (mp = module_list; mp != NULL; mp = mp->next) {
-		if (mp->ex_table_start == NULL)
+		if (mp->ex_table_start == NULL || !(mp->flags&(MOD_RUNNING|MOD_INITIALIZING)))
 			continue;
 		ret = search_one_table(mp->ex_table_start,
 				       mp->ex_table_end - 1, addr);

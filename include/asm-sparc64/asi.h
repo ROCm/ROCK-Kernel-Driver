@@ -1,4 +1,4 @@
-/* $Id: asi.h,v 1.4 2001/03/15 02:08:46 davem Exp $ */
+/* $Id: asi.h,v 1.5 2001/03/29 11:47:47 davem Exp $ */
 #ifndef _SPARC64_ASI_H
 #define _SPARC64_ASI_H
 
@@ -80,6 +80,7 @@
 #define ASI_BRPRED_ARRAY	0x6f /* (III) Branch Prediction RAM diag	*/
 #define ASI_BLK_AIUP		0x70 /* Primary, user, block load/store		*/
 #define ASI_BLK_AIUS		0x71 /* Secondary, user, block load/store	*/
+#define ASI_MCU_CTRL_REG	0x72 /* (III) Memory controller registers	*/
 #define ASI_EC_DATA		0x74 /* (III) E-cache data staging register	*/
 #define ASI_EC_CTRL		0x75 /* (III) E-cache control register		*/
 #define ASI_EC_W		0x76 /* E-cache diag write access		*/

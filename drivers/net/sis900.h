@@ -50,7 +50,10 @@ enum sis900_command_register_bits {
 enum sis900_configuration_register_bits {
 	DESCRFMT = 0x00000100 /* 7016 specific */, REQALG = 0x00000080,
 	SB    = 0x00000040, POW = 0x00000020, EXD = 0x00000010, 
-	PESEL = 0x00000008, LPM = 0x00000004, BEM = 0x00000001
+	PESEL = 0x00000008, LPM = 0x00000004, BEM = 0x00000001,
+	/* 635 & 900B Specific */
+	RND_CNT = 0x00000400, FAIR_BACKOFF = 0x00000200,
+	EDB_MASTER_EN = 0x00002000
 };
 
 enum sis900_eeprom_access_reigster_bits {
@@ -78,8 +81,10 @@ enum sis900_interrupt_enable_reigster_bits {
 #define MAX_DMA_RANGE	7	/* actually 0 means MAXIMUM !! */
 #define TxMXDMA_shift   	20
 #define RxMXDMA_shift    20
-#define TX_DMA_BURST    	0
-#define RX_DMA_BURST    	0
+
+enum sis900_tx_rx_dma{
+	DMA_BURST_512 = 0,	DMA_BURST_64 = 5
+};
 
 /* transmit FIFO threshholds */
 #define TX_FILL_THRESH   16	/* 1/4 FIFO size */
@@ -233,7 +238,8 @@ enum mii_stssum_register_bits {
 
 enum sis900_revision_id {
 	SIS630A_900_REV = 0x80,		SIS630E_900_REV = 0x81,
-	SIS630S_900_REV = 0x82,		SIS630EA1_900_REV = 0x83
+	SIS630S_900_REV = 0x82,		SIS630EA1_900_REV = 0x83,
+	SIS635A_900_REV = 0x90,		SIS900B_900_REV = 0x03
 };
 
 enum sis630_revision_id {
@@ -263,8 +269,8 @@ enum sis630_revision_id {
 /* PCI stuff, should be move to pic.h */
 #define PCI_DEVICE_ID_SI_900	0x900   
 #define PCI_DEVICE_ID_SI_7016	0x7016
-#define SIS630_VENDOR_ID        0x0630
-#define SIS630_DEVICE_ID        0x1039
+#define SIS630_VENDOR_ID        0x1039
+#define SIS630_DEVICE_ID        0x0630
 
 /* ioctl for accessing MII transceiver */
 #define SIOCGMIIPHY (SIOCDEVPRIVATE)		/* Get the PHY in use. */

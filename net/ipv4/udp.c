@@ -5,7 +5,7 @@
  *
  *		The User Datagram Protocol (UDP).
  *
- * Version:	$Id: udp.c,v 1.91 2000/11/28 13:38:38 davem Exp $
+ * Version:	$Id: udp.c,v 1.98 2001/03/06 21:15:10 davem Exp $
  *
  * Authors:	Ross Biro, <bir7@leland.Stanford.Edu>
  *		Fred N. van Kempen, <waltje@uWalt.NL.Mugnet.ORG>
@@ -291,21 +291,15 @@ static inline struct sock *udp_v4_mcast_next(struct sock *sk,
  * to find the appropriate port.
  */
 
-void udp_err(struct sk_buff *skb, unsigned char *dp, int len)
+void udp_err(struct sk_buff *skb, u32 info)
 {
-	struct iphdr *iph = (struct iphdr*)dp;
-	struct udphdr *uh = (struct udphdr*)(dp+(iph->ihl<<2));
+	struct iphdr *iph = (struct iphdr*)skb->data;
+	struct udphdr *uh = (struct udphdr*)(skb->data+(iph->ihl<<2));
 	int type = skb->h.icmph->type;
 	int code = skb->h.icmph->code;
 	struct sock *sk;
 	int harderr;
-	u32 info;
 	int err;
-
-	if (len < (iph->ihl<<2)+sizeof(struct udphdr)) {
-		ICMP_INC_STATS_BH(IcmpInErrors);
-		return;
-	}
 
 	sk = udp_v4_lookup(iph->daddr, uh->dest, iph->saddr, uh->source, skb->dev->ifindex);
 	if (sk == NULL) {
@@ -314,7 +308,6 @@ void udp_err(struct sk_buff *skb, unsigned char *dp, int len)
 	}
 
 	err = 0;
-	info = 0;
 	harderr = 0;
 
 	switch (type) {
@@ -326,14 +319,12 @@ void udp_err(struct sk_buff *skb, unsigned char *dp, int len)
 		goto out;
 	case ICMP_PARAMETERPROB:
 		err = EPROTO;
-		info = ntohl(skb->h.icmph->un.gateway)>>24;
 		harderr = 1;
 		break;
 	case ICMP_DEST_UNREACH:
 		if (code == ICMP_FRAG_NEEDED) { /* Path MTU discovery */
 			if (sk->protinfo.af_inet.pmtudisc != IP_PMTUDISC_DONT) {
 				err = EMSGSIZE;
-				info = ntohs(skb->h.icmph->un.frag.mtu);
 				harderr = 1;
 				break;
 			}
@@ -379,10 +370,7 @@ struct udpfakehdr
 };
 
 /*
- *	Copy and checksum a UDP packet from user space into a buffer. We still have
- *	to do the planning to get ip_build_xmit to spot direct transfer to network
- *	card and provide an additional callback mode for direct user->board I/O
- *	transfers. That one will be fun.
+ *	Copy and checksum a UDP packet from user space into a buffer.
  */
  
 static int udp_getfrag(const void *p, char * to, unsigned int offset, unsigned int fraglen) 
@@ -409,10 +397,7 @@ static int udp_getfrag(const void *p, char * to, unsigned int offset, unsigned i
 }
 
 /*
- *	Unchecksummed UDP is sufficiently critical to stuff like ATM video conferencing
- *	that we use two routines for this for speed. Probably we ought to have a
- *	CONFIG_FAST_NET set for >10Mb/second boards to activate this sort of coding.
- *	Timing needed to verify if this is a valid decision.
+ *	Copy a UDP packet from user space into a buffer without checksumming.
  */
  
 static int udp_getfrag_nosum(const void *p, char * to, unsigned int offset, unsigned int fraglen) 
@@ -625,7 +610,7 @@ int udp_ioctl(struct sock *sk, int cmd, unsigned long arg)
 
 static __inline__ int __udp_checksum_complete(struct sk_buff *skb)
 {
-	return (unsigned short)csum_fold(csum_partial(skb->h.raw, skb->len, skb->csum));
+	return (unsigned short)csum_fold(skb_checksum(skb, 0, skb->len, skb->csum));
 }
 
 static __inline__ int udp_checksum_complete(struct sk_buff *skb)
@@ -655,11 +640,6 @@ int udp_recvmsg(struct sock *sk, struct msghdr *msg, int len,
 	if (flags & MSG_ERRQUEUE)
 		return ip_recv_error(sk, msg, len);
 
-	/*
-	 *	From here the generic datagram does a lot of the work. Come
-	 *	the finished NET3, it will do _ALL_ the work!
-	 */
-
 	skb = skb_recv_datagram(sk, flags, noblock, &err);
 	if (!skb)
 		goto out;
@@ -679,9 +659,9 @@ int udp_recvmsg(struct sock *sk, struct msghdr *msg, int len,
 		err = skb_copy_datagram_iovec(skb, sizeof(struct udphdr), msg->msg_iov,
 					      copied);
 	} else {
-		err = copy_and_csum_toiovec(msg->msg_iov, skb, sizeof(struct udphdr));
+		err = skb_copy_and_csum_datagram_iovec(skb, sizeof(struct udphdr), msg->msg_iov);
 
-		if (err)
+		if (err == -EINVAL)
 			goto csum_copy_err;
 	}
 
@@ -758,6 +738,7 @@ int udp_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 	sk->daddr = rt->rt_dst;
 	sk->dport = usin->sin_port;
 	sk->state = TCP_ESTABLISHED;
+	sk->protinfo.af_inet.id = jiffies;
 
 	sk_dst_set(sk, &rt->u.dst);
 	return(0);
@@ -872,10 +853,13 @@ static int udp_checksum_init(struct sk_buff *skb, struct udphdr *uh,
 	if (uh->check == 0) {
 		skb->ip_summed = CHECKSUM_UNNECESSARY;
 	} else if (skb->ip_summed == CHECKSUM_HW) {
-		if (udp_check(uh, ulen, saddr, daddr, skb->csum))
-			return -1;
 		skb->ip_summed = CHECKSUM_UNNECESSARY;
-	} else if (skb->ip_summed != CHECKSUM_UNNECESSARY)
+		if (!udp_check(uh, ulen, saddr, daddr, skb->csum))
+			return 0;
+		NETDEBUG(printk(KERN_DEBUG "udp v4 hw csum failure.\n"));
+		skb->ip_summed = CHECKSUM_NONE;
+	}
+	if (skb->ip_summed != CHECKSUM_UNNECESSARY)
 		skb->csum = csum_tcpudp_nofold(saddr, daddr, ulen, IPPROTO_UDP, 0);
 	/* Probably, we should checksum udp header (it should be in cache
 	 * in any case) and data in tiny packets (< rx copybreak).
@@ -887,7 +871,7 @@ static int udp_checksum_init(struct sk_buff *skb, struct udphdr *uh,
  *	All we need to do is get the socket, and then do a checksum. 
  */
  
-int udp_rcv(struct sk_buff *skb, unsigned short len)
+int udp_rcv(struct sk_buff *skb)
 {
   	struct sock *sk;
   	struct udphdr *uh;
@@ -895,29 +879,22 @@ int udp_rcv(struct sk_buff *skb, unsigned short len)
 	struct rtable *rt = (struct rtable*)skb->dst;
 	u32 saddr = skb->nh.iph->saddr;
 	u32 daddr = skb->nh.iph->daddr;
-
-	/*
-	 *	Get the header.
-	 */
-	 
-  	uh = skb->h.uh;
-	__skb_pull(skb, skb->h.raw - skb->data);
+	int len = skb->len;
 
   	IP_INC_STATS_BH(IpInDelivers);
 
 	/*
 	 *	Validate the packet and the UDP length.
 	 */
-	 
-	ulen = ntohs(uh->len);
+	ulen = ntohs(skb->h.uh->len);
 
-	if (ulen > len || ulen < sizeof(*uh)) {
-		NETDEBUG(printk(KERN_DEBUG "UDP: short packet: %d/%d\n", ulen, len));
-		UDP_INC_STATS_BH(UdpInErrors);
-		kfree_skb(skb);
-		return(0);
-	}
-	skb_trim(skb, ulen);
+	if (ulen > len || ulen < sizeof(*uh))
+		goto short_packet;
+
+	if (pskb_trim(skb, ulen))
+		goto short_packet;
+
+  	uh = skb->h.uh;
 
 	if (udp_checksum_init(skb, uh, ulen, saddr, daddr) < 0)
 		goto csum_error;
@@ -944,6 +921,12 @@ int udp_rcv(struct sk_buff *skb, unsigned short len)
 	 * Hmm.  We got an UDP packet to a port to which we
 	 * don't wanna listen.  Ignore it.
 	 */
+	kfree_skb(skb);
+	return(0);
+
+short_packet:
+	NETDEBUG(printk(KERN_DEBUG "UDP: short packet: %d/%d\n", ulen, len));
+	UDP_INC_STATS_BH(UdpInErrors);
 	kfree_skb(skb);
 	return(0);
 

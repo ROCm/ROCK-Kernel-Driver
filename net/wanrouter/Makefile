@@ -12,7 +12,7 @@ O_TARGET := wanrouter.o
 export-objs := wanmain.o
 
 obj-y :=  wanproc.o wanmain.o
-obj-m := $(O_TARGET)
+obj-m := $(O_TARGET) af_wanpipe.o
 
 include $(TOPDIR)/Rules.make
 

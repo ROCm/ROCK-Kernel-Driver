@@ -1,4 +1,4 @@
-/* $Id: bbc.h,v 1.1 2001/03/24 06:03:03 davem Exp $
+/* $Id: bbc.h,v 1.2 2001/03/26 23:47:18 davem Exp $
  * bbc.h: Defines for BootBus Controller found on UltraSPARC-III
  *        systems.
  *
@@ -89,7 +89,7 @@
  * is asserted can be controlled by this regiser.
  */
 #define BBC_WDACTION_RST  0x01	/* When set, watchdog causes system reset.
-				 * When clear, all cpus receive XIR reset.
+				 * When clear, BBC ignores watchdog signal.
 				 */
 #define BBC_WDACTION_RESV 0xfe	/* Reserved */
 

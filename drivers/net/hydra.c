@@ -60,7 +60,7 @@
 #define WORDSWAP(a)     ((((a)>>8)&0xff) | ((a)<<8))
 
 #ifdef MODULE
-static struct net_device *root_hydra_dev = NULL;
+static struct net_device *root_hydra_dev;
 #endif
 
 static int __init hydra_probe(void);

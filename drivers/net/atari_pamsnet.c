@@ -569,9 +569,9 @@ pamsnet_probe (dev)
 	HADDR *hwaddr;
 
 	unsigned char station_addr[6];
-	static unsigned version_printed = 0;
+	static unsigned version_printed;
 	/* avoid "Probing for..." printed 4 times - the driver is supporting only one adapter now! */
-	static int no_more_found = 0;
+	static int no_more_found;
 
 	if (no_more_found)
 		return -ENODEV;

@@ -16,6 +16,7 @@
  */
 #include <linux/config.h>
 #include <asm/hardware/ioc.h>
+#include <asm/io.h>
 
 #ifdef CONFIG_ARCH_ARC
 #define a_clf()	clf()
@@ -29,105 +30,81 @@
 
 static void arc_mask_irq_ack_a(unsigned int irq)
 {
-	unsigned int temp;
+	unsigned int val, mask;
 
+	mask = 1 << irq;
 	a_clf();
-	__asm__ __volatile__(
-	"ldrb	%0, [%2]\n"
-"	bic	%0, %0, %1\n"
-"	strb	%0, [%2]\n"
-"	strb	%1, [%3]"
-	: "=&r" (temp)
-	: "r" (1 << (irq & 7)), "r" (ioaddr(IOC_IRQMASKA)),
-	  "r" (ioaddr(IOC_IRQCLRA)));
+	val = ioc_readb(IOC_IRQMASKA);
+	ioc_writeb(val & ~mask, IOC_IRQMASKA);
+	ioc_writeb(mask, IOC_IRQCLRA);
 	a_stf();
 }
 
 static void arc_mask_irq_a(unsigned int irq)
 {
-	unsigned int temp;
+	unsigned int val, mask;
 
+	mask = 1 << irq;
 	a_clf();
-	__asm__ __volatile__(
-	"ldrb	%0, [%2]\n"
-"	bic	%0, %0, %1\n"
-"	strb	%0, [%2]"
-	: "=&r" (temp)
-	: "r" (1 << (irq & 7)), "r" (ioaddr(IOC_IRQMASKA)));
+	val = ioc_readb(IOC_IRQMASKA);
+	ioc_writeb(val & ~mask, IOC_IRQMASKA);
 	a_stf();
 }
 
 static void arc_unmask_irq_a(unsigned int irq)
 {
-	unsigned int temp;
+	unsigned int val, mask;
 
+	mask = 1 << irq;
 	a_clf();
-	__asm__ __volatile__(
-	"ldrb	%0, [%2]\n"
-"	orr	%0, %0, %1\n"
-"	strb	%0, [%2]"
-	: "=&r" (temp)
-	: "r" (1 << (irq & 7)), "r" (ioaddr(IOC_IRQMASKA)));
+	val = ioc_readb(IOC_IRQMASKA);
+	ioc_writeb(val | mask, IOC_IRQMASKA);
 	a_stf();
 }
 
 static void arc_mask_irq_b(unsigned int irq)
 {
-	unsigned int temp;
+	unsigned int val, mask;
 
-	__asm__ __volatile__(
-	"ldrb	%0, [%2]\n"
-"	bic	%0, %0, %1\n"
-"	strb	%0, [%2]"
-	: "=&r" (temp)
-	: "r" (1 << (irq & 7)), "r" (ioaddr(IOC_IRQMASKB)));
+	mask = 1 << (irq & 7);
+	val = ioc_readb(IOC_IRQMASKB);
+	ioc_writeb(val & ~mask, IOC_IRQMASKB);
 }
 
 static void arc_unmask_irq_b(unsigned int irq)
 {
-	unsigned int temp;
+	unsigned int val, mask;
 
-	__asm__ __volatile__(
-	"ldrb	%0, [%2]\n"
-"	orr	%0, %0, %1\n"
-"	strb	%0, [%2]"
-	: "=&r" (temp)
-	: "r" (1 << (irq & 7)), "r" (ioaddr(IOC_IRQMASKB)));
+	mask = 1 << (irq & 7);
+	val = ioc_readb(IOC_IRQMASKB);
+	ioc_writeb(val | mask, IOC_IRQMASKB);
 }
 
 static void arc_mask_irq_fiq(unsigned int irq)
 {
-	unsigned int temp;
+	unsigned int val, mask;
 
-	__asm__ __volatile__(
-	"ldrb	%0, [%2]\n"
-"	bic	%0, %0, %1\n"
-"	strb	%0, [%2]"
-	: "=&r" (temp)
-	: "r" (1 << (irq & 7)), "r" (ioaddr(IOC_FIQMASK)));
+	mask = 1 << (irq & 7);
+	val = ioc_readb(IOC_FIQMASK);
+	ioc_writeb(val & ~mask, IOC_FIQMASK);
 }
 
 static void arc_unmask_irq_fiq(unsigned int irq)
 {
-	unsigned int temp;
+	unsigned int val, mask;
 
-	__asm__ __volatile__(
-	"ldrb	%0, [%2]\n"
-"	orr	%0, %0, %1\n"
-"	strb	%0, [%2]"
-	: "=&r" (temp)
-	: "r" (1 << (irq & 7)), "r" (ioaddr(IOC_FIQMASK)));
+	mask = 1 << (irq & 7);
+	val = ioc_readb(IOC_FIQMASK);
+	ioc_writeb(val | mask, IOC_FIQMASK);
 }
 
 static __inline__ void irq_init_irq(void)
 {
-	extern void ecard_disableirq(unsigned int irq);
-	extern void ecard_enableirq(unsigned int irq);
 	int irq;
 
-	outb(0, IOC_IRQMASKA);
-	outb(0, IOC_IRQMASKB);
-	outb(0, IOC_FIQMASK);
+	ioc_writeb(0, IOC_IRQMASKA);
+	ioc_writeb(0, IOC_IRQMASKB);
+	ioc_writeb(0, IOC_FIQMASK);
 
 	for (irq = 0; irq < NR_IRQS; irq++) {
 		switch (irq) {
@@ -154,13 +131,6 @@ static __inline__ void irq_init_irq(void)
 			irq_desc[irq].mask_ack = arc_mask_irq_b;
 			irq_desc[irq].mask     = arc_mask_irq_b;
 			irq_desc[irq].unmask   = arc_unmask_irq_b;
-			break;
-
-		case 32 ... 40:
-			irq_desc[irq].valid    = 1;
-			irq_desc[irq].mask_ack = ecard_disableirq;
-			irq_desc[irq].mask     = ecard_disableirq;
-			irq_desc[irq].unmask   = ecard_enableirq;
 			break;
 
 		case 64 ... 72:

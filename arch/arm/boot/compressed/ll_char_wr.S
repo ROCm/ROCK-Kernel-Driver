@@ -16,7 +16,7 @@
 @ Regs: [] = corruptible
 @       {} = used
 @       () = do not use
-#define __ASSEMBLY__
+
 #include <linux/linkage.h>
 #include <asm/assembler.h>
 		.text

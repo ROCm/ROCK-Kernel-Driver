@@ -11,12 +11,12 @@
 static void arch_idle(void)
 {
 	while (!current->need_resched && !hlt_counter)
-		outb(0, IOMD_SUSMODE);
+		iomd_writeb(0, IOMD_SUSMODE);
 }
 
 #define arch_reset(mode)			\
 	do {					\
-		outb (0, IOMD_ROMCR0);		\
+		iomd_writeb(0, IOMD_ROMCR0);	\
 		cpu_reset(0);			\
 	} while (0);
 

@@ -123,7 +123,7 @@ extern void ipx_unregister_sysctl(void);
 static unsigned char ipxcfg_max_hops = 16;
 static char ipxcfg_auto_select_primary;
 static char ipxcfg_auto_create_interfaces;
-static int sysctl_ipx_pprop_broadcasting = 1;
+int sysctl_ipx_pprop_broadcasting = 1;
 
 /* Global Variables */
 static struct datalink_proto *p8022_datalink;
@@ -1542,7 +1542,7 @@ static int ipxrtr_route_packet(struct sock *sk, struct sockaddr_ipx *usipx, stru
 	ipx_offset = intrfc->if_ipx_offset;
 	size = sizeof(struct ipxhdr) + len + ipx_offset;
 
-	skb = sock_alloc_send_skb(sk, size, 0, noblock, &err);
+	skb = sock_alloc_send_skb(sk, size, noblock, &err);
 	if (!skb)
 		goto out_put;
 
@@ -2531,6 +2531,7 @@ static struct proto_ops SOCKOPS_WRAPPED(ipx_dgram_ops) = {
 	sendmsg:	ipx_sendmsg,
 	recvmsg:	ipx_recvmsg,
 	mmap:		sock_no_mmap,
+	sendpage:	sock_no_sendpage,
 };
 
 #include <linux/smp_lock.h>

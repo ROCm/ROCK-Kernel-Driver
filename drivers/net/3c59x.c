@@ -192,6 +192,7 @@ static int vortex_debug = 1;
 #error You must compile this driver with "-O".
 #endif
 
+#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>

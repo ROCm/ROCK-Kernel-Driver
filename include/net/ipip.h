@@ -29,8 +29,9 @@ struct ip_tunnel
 	int err;							\
 	int pkt_len = skb->len;						\
 									\
+	skb->ip_summed = CHECKSUM_NONE;					\
 	iph->tot_len = htons(skb->len);					\
-	ip_select_ident(iph, &rt->u.dst);				\
+	ip_select_ident(iph, &rt->u.dst, NULL);				\
 	ip_send_check(iph);						\
 									\
 	err = NF_HOOK(PF_INET, NF_IP_LOCAL_OUT, skb, NULL, rt->u.dst.dev, do_ip_send); \

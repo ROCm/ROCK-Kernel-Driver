@@ -1,6 +1,6 @@
-            Notes on Linux's SG driver version 2.1.36
+            Notes on Linux's SG driver version 2.1.39
             -----------------------------------------
-                                                        20000110
+                                                        20010329
 
 Introduction
 ============
@@ -12,7 +12,7 @@ Thus sg is used for scanners, cd writers and reading audio cds digitally
 amongst other things.
 
 These are notes on the Linux SCSI generic packet device driver (sg)
-describing version 2.1.36 . The original driver was written by Lawrence
+describing version 2.1.39 . The original driver was written by Lawrence
 Foard and remained in place with minimal changes since circa 1992.
 Version 2 of this driver remains backward compatible (binary and
 source **) with the original. It adds scatter gather, command queuing,
@@ -22,6 +22,10 @@ error reporting.
 This is an abridged version of the sg documentation that is targeted
 at the linux/Documentation directory. The full document can be found
 at http://www.torque.net/sg/p/scsi-generic_long.txt .
+
+The Linux 2.4 series kernels have now been released. Lk 2.4 contains
+an upgraded "version 3" sg driver which is described in a supplementary
+document at http://www.torque.net/sg/p/scsi-generic_v3.txt .
 
 The interface and usage of the original sg driver have been documented
 by Heiko Eissfeldt in a HOWTO called SCSI-Programming-HOWTO. My copy
@@ -41,7 +45,8 @@ Architecture
 The SCSI generic packet device driver (sg) is a character based device.
 It is one of the four high level device driver in the SCSI sub-system;
 the others are sd (for direct-access devices - disks), st (for tapes)
-and sr (for data cdroms). The other three devices are block devices.
+and sr (for data cdroms). Sd and sr are block devices while st (like sg)
+is a character device.
 
 The unifying layer of the SCSI sub-system is the so-called mid-level.
 Below that are the "low level" drivers which are the drivers for the
@@ -236,10 +241,11 @@ The filename should be an 'sg' device such as
 /dev/sg[a-z]
 /dev/sg[0,1,2,...]
 or a symbolic link to one of these. [Devfs has its own sub-directory for
-sg devices with entries like: /dev/sg/c1b2t3u4 .] It seems as though SCSI
-devices are allocated to sg minor numbers in the same order as they appear
-in 'cat /proc/scsi/scsi'. Sg is a "character" based Linux device driver.
-This means it has an open/close/read/write/ioctl type interface.
+sg devices with entries like: /dev/scsi/host1/bus2/target3/lun4/generic .]
+It seems as though SCSI devices are allocated to sg minor numbers in the
+same order as they appear in 'cat /proc/scsi/scsi'. Sg is a "character"
+based Linux device driver.  This means it has an open/close/read/write/ioctl
+type interface.
 
 Flags can be either O_RDONLY or O_RDWR or-ed with either
 O_EXCL          waits for other opens on sg device to be closed before
@@ -396,7 +402,7 @@ A process that has an open file descriptor to an sg device may be aborted
 (which is called 'sg_release()' in the version 2 driver) to facilitate
 the cleanup mentioned above.
 
-A problem persists in version 2.1.36 if the sg driver is a module and is
+A problem persists in version 2.1.39 if the sg driver is a module and is
 removed while packets are still "in flight".
 
 Returns 0 if successful, otherwise -1 implies an error.
@@ -595,6 +601,8 @@ Assumes 3rd argument points to an int. Unfortunately doesn't currently
 do much (may in the future after other issues are resolved). Yields an
 EBUSY error if the SCSI bus or the associated device is being reset
 when this ioctl() is called, otherwise returns 0.
+N.B. In some recent distributions there is a patch to the SCSI mid level
+code that activates this ioctl. Check your distribution.
 
 SG_SET_DEBUG +:
 Assumes 3rd argument is pointing to an int. 0 (default) turns debugging
@@ -640,7 +648,7 @@ an O_EXCL lock by another process, and when the appropriate device is
 found, switching to normal blocked io. A working example of this logic
 is in the sg_scan utility program.
 
-open("/dev/sga", O_RDONLY | O_NONBLOCK)
+open("/dev/sg0", O_RDONLY | O_NONBLOCK)
 /* check device, EBUSY means some other process has O_EXCL lock on it */
 /* when the device you want is found then ... */
 flags = fcntl(sg_fd, F_GETFL)

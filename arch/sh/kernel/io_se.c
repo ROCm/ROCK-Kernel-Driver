@@ -43,7 +43,7 @@ port2adr(unsigned int port)
 }
 
 static inline int
-shifted_port(unsigned int port)
+shifted_port(unsigned long port)
 {
 	/* For IDE registers, value is not shifted */
 	if ((0x1f0 <= port && port < 0x1f8) || port == 0x3f6)
@@ -53,10 +53,10 @@ shifted_port(unsigned int port)
 }
 
 #define maybebadio(name,port) \
-  printk("bad PC-like io %s for port 0x%x at 0x%08x\n", \
+  printk("bad PC-like io %s for port 0x%lx at 0x%08x\n", \
 	 #name, (port), (__u32) __builtin_return_address(0))
 
-unsigned long se_inb(unsigned int port)
+unsigned char se_inb(unsigned long port)
 {
 	if (sh_pcic_io_start <= port && port <= sh_pcic_io_stop)
 		return *(__u8 *) (sh_pcic_io_wbase + 0x40000 + port); 
@@ -66,7 +66,7 @@ unsigned long se_inb(unsigned int port)
 		return (*port2adr(port))&0xff; 
 }
 
-unsigned long se_inb_p(unsigned int port)
+unsigned char se_inb_p(unsigned long port)
 {
 	unsigned long v;
 
@@ -80,7 +80,7 @@ unsigned long se_inb_p(unsigned int port)
 	return v;
 }
 
-unsigned long se_inw(unsigned int port)
+unsigned short se_inw(unsigned long port)
 {
 	if (port >= 0x2000 ||
 	    (sh_pcic_io_start <= port && port <= sh_pcic_io_stop))
@@ -90,13 +90,13 @@ unsigned long se_inw(unsigned int port)
 	return 0;
 }
 
-unsigned long se_inl(unsigned int port)
+unsigned int se_inl(unsigned long port)
 {
 	maybebadio(inl, port);
 	return 0;
 }
 
-void se_outb(unsigned long value, unsigned int port)
+void se_outb(unsigned char value, unsigned long port)
 {
 	if (sh_pcic_io_start <= port && port <= sh_pcic_io_stop)
 		*(__u8 *)(sh_pcic_io_wbase + port) = value; 
@@ -106,7 +106,7 @@ void se_outb(unsigned long value, unsigned int port)
 		*(port2adr(port)) = value;
 }
 
-void se_outb_p(unsigned long value, unsigned int port)
+void se_outb_p(unsigned char value, unsigned long port)
 {
 	if (sh_pcic_io_start <= port && port <= sh_pcic_io_stop)
 		*(__u8 *)(sh_pcic_io_wbase + port) = value; 
@@ -117,7 +117,7 @@ void se_outb_p(unsigned long value, unsigned int port)
 	delay();
 }
 
-void se_outw(unsigned long value, unsigned int port)
+void se_outw(unsigned short value, unsigned long port)
 {
 	if (port >= 0x2000 ||
 	    (sh_pcic_io_start <= port && port <= sh_pcic_io_stop))
@@ -126,12 +126,12 @@ void se_outw(unsigned long value, unsigned int port)
 		maybebadio(outw, port);
 }
 
-void se_outl(unsigned long value, unsigned int port)
+void se_outl(unsigned int value, unsigned long port)
 {
 	maybebadio(outl, port);
 }
 
-void se_insb(unsigned int port, void *addr, unsigned long count)
+void se_insb(unsigned long port, void *addr, unsigned long count)
 {
 	volatile __u16 *p = port2adr(port);
 
@@ -148,19 +148,19 @@ void se_insb(unsigned int port, void *addr, unsigned long count)
 	}
 }
 
-void se_insw(unsigned int port, void *addr, unsigned long count)
+void se_insw(unsigned long port, void *addr, unsigned long count)
 {
 	volatile __u16 *p = port2adr(port);
 	while (count--)
 		*((__u16 *) addr)++ = *p;
 }
 
-void se_insl(unsigned int port, void *addr, unsigned long count)
+void se_insl(unsigned long port, void *addr, unsigned long count)
 {
 	maybebadio(insl, port);
 }
 
-void se_outsb(unsigned int port, const void *addr, unsigned long count)
+void se_outsb(unsigned long port, const void *addr, unsigned long count)
 {
 	volatile __u16 *p = port2adr(port);
 
@@ -177,29 +177,29 @@ void se_outsb(unsigned int port, const void *addr, unsigned long count)
 	}
 }
 
-void se_outsw(unsigned int port, const void *addr, unsigned long count)
+void se_outsw(unsigned long port, const void *addr, unsigned long count)
 {
 	volatile __u16 *p = port2adr(port);
 	while (count--)
 		*p = *((__u16 *) addr)++;
 }
 
-void se_outsl(unsigned int port, const void *addr, unsigned long count)
+void se_outsl(unsigned long port, const void *addr, unsigned long count)
 {
 	maybebadio(outsw, port);
 }
 
-unsigned long se_readb(unsigned long addr)
+unsigned char se_readb(unsigned long addr)
 {
 	return *(volatile unsigned char*)addr;
 }
 
-unsigned long se_readw(unsigned long addr)
+unsigned short se_readw(unsigned long addr)
 {
 	return *(volatile unsigned short*)addr;
 }
 
-unsigned long se_readl(unsigned long addr)
+unsigned int se_readl(unsigned long addr)
 {
 	return *(volatile unsigned long*)addr;
 }

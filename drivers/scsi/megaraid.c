@@ -391,42 +391,14 @@ static void WROUTDOOR (mega_host_config * megaCfg, ulong value)
 	writel (value, megaCfg->base + 0x2C);
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)	/* 0x020100 */
-
-/*
- *	Linux 2.4 and higher
- *
- *	No driver private lock
- *	Use the io_request_lock not cli/sti
- *	queue task is a simple api without irq forms
- */
-
-#include <linux/smp.h>
-#define cpuid smp_processor_id()
-
-MODULE_AUTHOR ("American Megatrends Inc.");
-MODULE_DESCRIPTION ("AMI MegaRAID driver");
-
-#define DRIVER_LOCK_T
-#define DRIVER_LOCK_INIT(p)
-#define DRIVER_LOCK(p)
-#define DRIVER_UNLOCK(p)
-#define IO_LOCK_T unsigned long io_flags = 0;
-#define IO_LOCK spin_lock_irqsave(&io_request_lock,io_flags);
-#define IO_UNLOCK spin_unlock_irqrestore(&io_request_lock,io_flags);
-
-#define queue_task_irq(a,b)     queue_task(a,b)
-#define queue_task_irq_off(a,b) queue_task(a,b)
-
-#elif LINUX_VERSION_CODE >= KERNEL_VERSION(2,2,0)	/* 0x020200 */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,2,0)	/* 0x020200 */
 
 /*
  *	Linux 2.2 and higher
  *
  *	No driver private lock
  *	Use the io_request_lock not cli/sti
- *	No pci region api
- *	queue_task is now a single simple API
+ *	queue task is a simple api without irq forms
  */
  
 #include <linux/smp.h>
@@ -443,16 +415,18 @@ MODULE_DESCRIPTION ("AMI MegaRAID driver");
 #define IO_LOCK spin_lock_irqsave(&io_request_lock,io_flags);
 #define IO_UNLOCK spin_unlock_irqrestore(&io_request_lock,io_flags);
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,0)	/* 0x020400 */
 #define pci_free_consistent(a,b,c,d)
 #define pci_unmap_single(a,b,c,d,e)
 
 #define init_MUTEX_LOCKED(x)	((x)=MUTEX_LOCKED)
 #define init_MUTEX(x)		((x)=MUTEX)
 
+#define DECLARE_WAIT_QUEUE_HEAD(x)	struct wait_queue *x = NULL
+#endif
+
 #define queue_task_irq(a,b)     queue_task(a,b)
 #define queue_task_irq_off(a,b) queue_task(a,b)
-
-#define DECLARE_WAIT_QUEUE_HEAD(x)	struct wait_queue *x = NULL
 #else
 
 /*
@@ -4299,12 +4273,9 @@ megadev_close (struct inode *inode, struct file *filep)
 }
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
-static Scsi_Host_Template driver_template = MEGARAID;
-#include "scsi_module.c"
-#else
-#ifdef MODULE
+static
+#endif
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0) || defined(MODULE)
 Scsi_Host_Template driver_template = MEGARAID;
-
 #include "scsi_module.c"
-#endif				/* MODULE */
-#endif				/* LINUX VERSION 2.4.XX  test */
+#endif

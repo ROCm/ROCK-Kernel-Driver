@@ -1,5 +1,5 @@
 /*
- *  linux/arch/arm/kernel/leds-ebsa110.c
+ *  linux/arch/arm/mach-ebsa110/leds.c
  *
  *  Copyright (C) 1998 Russell King
  *
@@ -30,7 +30,7 @@ static void ebsa110_leds_event(led_event_t ledevt)
 
 	switch(ledevt) {
 	case led_timer:
-		*(volatile unsigned char *)0xf2400000 ^= 128;
+		*(volatile unsigned char *)SOFT_BASE ^= 128;
 		break;
 
 	default:

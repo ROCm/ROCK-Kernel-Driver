@@ -104,11 +104,13 @@ extern void __iounmap(void *addr);
 		_ret = __ioremap(iomem_to_phys(_off),_size,0);	\
 	_ret;							\
  })
+
+#define __arch_iounmap __iounmap
 #endif
 
 #define ioremap(off,sz)			__arch_ioremap((off),(sz),0)
 #define ioremap_nocache(off,sz)		__arch_ioremap((off),(sz),1)
-#define iounmap(_addr)			__iounmap(_addr)
+#define iounmap(_addr)			__arch_iounmap(_addr)
 
 /*
  * DMA-consistent mapping functions.  These allocate/free a region of
@@ -188,7 +190,7 @@ out:
 	return retval;
 }
 
-#else	/* __mem_pci */
+#elif !defined(readb)
 
 #define readb(addr)			(__readwrite_bug("readb"),0)
 #define readw(addr)			(__readwrite_bug("readw"),0)

@@ -10,6 +10,8 @@
  *   05-05-2000 SJH     Complete rewrite
  */
 
+#include <asm/arch/hardware.h>
+
 /*
  * IRQ base register
  */

@@ -20,7 +20,6 @@
 #include <asm/sn/labelcl.h>
 #include <asm/sn/xtalk/xbow.h>
 #include <asm/sn/pci/bridge.h>
-#include <asm/sn/xtalk/xbow.h>
 #include <asm/sn/klconfig.h>
 #include <asm/sn/eeprom.h>
 #include <asm/sn/sn_private.h>

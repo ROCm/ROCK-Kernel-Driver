@@ -16,7 +16,6 @@
  *                      (plus examples of platform error info structures from smariset @ Intel)
  */
 
-#include <linux/config.h>
 #include <linux/spinlock.h>
 
 #include <asm/pal.h>

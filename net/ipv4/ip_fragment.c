@@ -5,7 +5,7 @@
  *
  *		The IP fragmentation functionality.
  *		
- * Version:	$Id: ip_fragment.c,v 1.53 2000/12/08 17:15:53 davem Exp $
+ * Version:	$Id: ip_fragment.c,v 1.57 2001/03/07 22:00:57 davem Exp $
  *
  * Authors:	Fred N. van Kempen <waltje@uWalt.NL.Mugnet.ORG>
  *		Alan Cox <Alan.Cox@linux.org>
@@ -83,7 +83,8 @@ struct ipq {
 	atomic_t	refcnt;
 	struct timer_list timer;	/* when will this queue expire?		*/
 	struct ipq	**pprev;
-	int		iif;		/* Device index - for icmp replies	*/
+	int		iif;
+	struct timeval	stamp;
 };
 
 /* Hash table. */
@@ -255,7 +256,6 @@ static void ip_expire(unsigned long arg)
 
 	if ((qp->last_in&FIRST_IN) && qp->fragments != NULL) {
 		struct sk_buff *head = qp->fragments;
-
 		/* Send an ICMP "Fragment Reassembly Timeout" message. */
 		if ((head->dev = dev_get_by_index(qp->iif)) != NULL) {
 			icmp_send(head, ICMP_TIME_EXCEEDED, ICMP_EXC_FRAGTIME, 0);
@@ -370,7 +370,6 @@ static inline struct ipq *ip_find(struct iphdr *iph)
 /* Add new segment to existing queue. */
 static void ip_frag_queue(struct ipq *qp, struct sk_buff *skb)
 {
-	struct iphdr *iph = skb->nh.iph;
 	struct sk_buff *prev, *next;
 	int flags, offset;
 	int ihl, end;
@@ -378,14 +377,14 @@ static void ip_frag_queue(struct ipq *qp, struct sk_buff *skb)
 	if (qp->last_in & COMPLETE)
 		goto err;
 
-	offset = ntohs(iph->frag_off);
+ 	offset = ntohs(skb->nh.iph->frag_off);
 	flags = offset & ~IP_OFFSET;
 	offset &= IP_OFFSET;
 	offset <<= 3;		/* offset is in 8-byte chunks */
-	ihl = iph->ihl * 4;
+ 	ihl = skb->nh.iph->ihl * 4;
 
 	/* Determine the position of this fragment. */
-	end = offset + (ntohs(iph->tot_len) - ihl);
+ 	end = offset + skb->len - ihl;
 
 	/* Is this the final fragment? */
 	if ((flags & IP_MF) == 0) {
@@ -413,9 +412,10 @@ static void ip_frag_queue(struct ipq *qp, struct sk_buff *skb)
 	if (end == offset)
 		goto err;
 
-	/* Point into the IP datagram 'data' part. */
-	skb_pull(skb, (skb->nh.raw+ihl) - skb->data);
-	skb_trim(skb, end - offset);
+	if (pskb_pull(skb, ihl) == NULL)
+		goto err;
+	if (pskb_trim(skb, end-offset))
+		goto err;
 
 	/* Find out which fragments are in front and at the back of us
 	 * in the chain of fragments so far.  We must know where to put
@@ -439,7 +439,8 @@ static void ip_frag_queue(struct ipq *qp, struct sk_buff *skb)
 			offset += i;
 			if (end <= offset)
 				goto err;
-			skb_pull(skb, i);
+			if (!pskb_pull(skb, i))
+				goto err;
 			if (skb->ip_summed != CHECKSUM_UNNECESSARY)
 				skb->ip_summed = CHECKSUM_NONE;
 		}
@@ -452,8 +453,9 @@ static void ip_frag_queue(struct ipq *qp, struct sk_buff *skb)
 			/* Eat head of the next overlapped fragment
 			 * and leave the loop. The next ones cannot overlap.
 			 */
+			if (!pskb_pull(next, i))
+				goto err;
 			FRAG_CB(next)->offset += i;
-			skb_pull(next, i);
 			qp->meat -= i;
 			if (next->ip_summed != CHECKSUM_UNNECESSARY)
 				next->ip_summed = CHECKSUM_NONE;
@@ -485,9 +487,10 @@ static void ip_frag_queue(struct ipq *qp, struct sk_buff *skb)
 	else
 		qp->fragments = skb;
 
-	if (skb->dev)
-		qp->iif = skb->dev->ifindex;
+ 	if (skb->dev)
+ 		qp->iif = skb->dev->ifindex;
 	skb->dev = NULL;
+	qp->stamp = skb->stamp;
 	qp->meat += skb->len;
 	atomic_add(skb->truesize, &ip_frag_mem);
 	if (offset == 0)
@@ -500,15 +503,10 @@ err:
 }
 
 
-/* Build a new IP datagram from all its fragments.
- *
- * FIXME: We copy here because we lack an effective way of handling lists
- * of bits on input. Until the new skb data handling is in I'm not going
- * to touch this with a bargepole. 
- */
+/* Build a new IP datagram from all its fragments. */
+
 static struct sk_buff *ip_frag_reasm(struct ipq *qp, struct net_device *dev)
 {
-	struct sk_buff *skb;
 	struct iphdr *iph;
 	struct sk_buff *fp, *head = qp->fragments;
 	int len;
@@ -526,61 +524,58 @@ static struct sk_buff *ip_frag_reasm(struct ipq *qp, struct net_device *dev)
 	if(len > 65535)
 		goto out_oversize;
 
-	skb = dev_alloc_skb(len);
-	if (!skb)
+	/* Head of list must not be cloned. */
+	if (skb_cloned(head) && pskb_expand_head(head, 0, 0, GFP_ATOMIC))
 		goto out_nomem;
 
-	/* Fill in the basic details. */
-	skb->mac.raw = skb->data;
-	skb->nh.raw = skb->data;
-	FRAG_CB(skb)->h = FRAG_CB(head)->h;
-	skb->ip_summed = head->ip_summed;
-	skb->csum = 0;
+	/* If the first fragment is fragmented itself, we split
+	 * it to two chunks: the first with data and paged part
+	 * and the second, holding only fragments. */
+	if (skb_shinfo(head)->frag_list) {
+		struct sk_buff *clone;
+		int i, plen = 0;
 
-	/* Copy the original IP headers into the new buffer. */
-	memcpy(skb_put(skb, ihlen), head->nh.iph, ihlen);
-
-	/* Copy the data portions of all fragments into the new buffer. */
-	for (fp=head; fp; fp = fp->next) {
-		memcpy(skb_put(skb, fp->len), fp->data, fp->len);
-
-		if (skb->ip_summed != fp->ip_summed)
-			skb->ip_summed = CHECKSUM_NONE;
-		else if (skb->ip_summed == CHECKSUM_HW)
-			skb->csum = csum_add(skb->csum, fp->csum);
+		if ((clone = alloc_skb(0, GFP_ATOMIC)) == NULL)
+			goto out_nomem;
+		clone->next = head->next;
+		head->next = clone;
+		skb_shinfo(clone)->frag_list = skb_shinfo(head)->frag_list;
+		skb_shinfo(head)->frag_list = NULL;
+		for (i=0; i<skb_shinfo(head)->nr_frags; i++)
+			plen += skb_shinfo(head)->frags[i].size;
+		clone->len = clone->data_len = head->data_len - plen;
+		head->data_len -= clone->len;
+		head->len -= clone->len;
+		clone->csum = 0;
+		clone->ip_summed = head->ip_summed;
+		atomic_add(clone->truesize, &ip_frag_mem);
 	}
 
-	skb->dst = dst_clone(head->dst);
-	skb->pkt_type = head->pkt_type;
-	skb->protocol = head->protocol;
-	skb->dev = dev;
+	skb_shinfo(head)->frag_list = head->next;
+	skb_push(head, head->data - head->nh.raw);
+	atomic_sub(head->truesize, &ip_frag_mem);
 
-	/*
-	*  Clearly bogus, because security markings of the individual
-	*  fragments should have been checked for consistency before
-	*  gluing, and intermediate coalescing of fragments may have
-	*  taken place in ip_defrag() before ip_glue() ever got called.
-	*  If we're not going to do the consistency checking, we might
-	*  as well take the value associated with the first fragment.
-	*	--rct
-	*/
-	skb->security = head->security;
+	for (fp=head->next; fp; fp = fp->next) {
+		head->data_len += fp->len;
+		head->len += fp->len;
+		if (head->ip_summed != fp->ip_summed)
+			head->ip_summed = CHECKSUM_NONE;
+		else if (head->ip_summed == CHECKSUM_HW)
+			head->csum = csum_add(head->csum, fp->csum);
+		head->truesize += fp->truesize;
+		atomic_sub(fp->truesize, &ip_frag_mem);
+	}
 
-#ifdef CONFIG_NETFILTER
-	/* Connection association is same as fragment (if any). */
-	skb->nfct = head->nfct;
-	nf_conntrack_get(skb->nfct);
-#ifdef CONFIG_NETFILTER_DEBUG
-	skb->nf_debug = head->nf_debug;
-#endif
-#endif
+	head->next = NULL;
+	head->dev = dev;
+	head->stamp = qp->stamp;
 
-	/* Done with all fragments. Fixup the new IP header. */
-	iph = skb->nh.iph;
+	iph = head->nh.iph;
 	iph->frag_off = 0;
 	iph->tot_len = htons(len);
 	IP_INC_STATS_BH(IpReasmOKs);
-	return skb;
+	qp->fragments = NULL;
+	return head;
 
 out_nomem:
  	NETDEBUG(printk(KERN_ERR 

@@ -1,4 +1,4 @@
-/* $Id: dtlb_prot.S,v 1.21 2000/11/10 08:28:45 davem Exp $
+/* $Id: dtlb_prot.S,v 1.22 2001/04/11 23:40:32 davem Exp $
  * dtlb_prot.S: DTLB protection trap strategy.
  *              This is included directly into the trap table.
  *
@@ -43,7 +43,7 @@
 	nop
 	nop
 
-/* PROT ** ICACHE line 3: Unused...	*/
+/* PROT ** ICACHE line 4: Unused...	*/
 	nop
 	nop
 	nop

@@ -415,9 +415,7 @@ retry:
 
 	/* Setup the dispatch data registers. */
 	__asm__ __volatile__("stxa	%0, [%3] %6\n\t"
-			     "membar	#Sync\n\t"
 			     "stxa	%1, [%4] %6\n\t"
-			     "membar	#Sync\n\t"
 			     "stxa	%2, [%5] %6\n\t"
 			     "membar	#Sync\n\t"
 			     : /* no outputs */
@@ -994,6 +992,8 @@ static inline unsigned long find_flush_base(unsigned long size)
 
 cycles_t cacheflush_time;
 
+extern unsigned long cheetah_tune_scheduling(void);
+
 static void __init smp_tune_scheduling (void)
 {
 	unsigned long orig_flush_base, flush_base, flags, *p;
@@ -1011,6 +1011,11 @@ static void __init smp_tune_scheduling (void)
 	 * of moving a process from one cpu to another).
 	 */
 	printk("SMP: Calibrating ecache flush... ");
+	if (tlb_type == cheetah) {
+		cacheflush_time = cheetah_tune_scheduling();
+		goto report;
+	}
+
 	ecache_size = prom_getintdefault(linux_cpus[0].prom_node,
 					 "ecache-size", (512 * 1024));
 	if (ecache_size > (4 * 1024 * 1024))
@@ -1063,7 +1068,7 @@ static void __init smp_tune_scheduling (void)
 		cacheflush_time = ((ecache_size << 2) +
 				   (ecache_size << 1));
 	}
-
+report:
 	printk("Using heuristic of %d cycles.\n",
 	       (int) cacheflush_time);
 }

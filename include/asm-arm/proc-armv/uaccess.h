@@ -91,7 +91,7 @@ extern __inline__ void set_fs (mm_segment_t fs)
 	"	.align	3\n"					\
 	"	.long	1b, 3b\n"				\
 	"	.previous"					\
-	: "=r" (err), "=r" (x)					\
+	: "=r" (err), "=&r" (x)					\
 	: "r" (addr), "i" (-EFAULT), "0" (err))
 
 #define __get_user_asm_half(x,addr,err)				\
@@ -117,7 +117,7 @@ extern __inline__ void set_fs (mm_segment_t fs)
 	"	.align	3\n"					\
 	"	.long	1b, 3b\n"				\
 	"	.previous"					\
-	: "=r" (err), "=r" (x)					\
+	: "=r" (err), "=&r" (x)					\
 	: "r" (addr), "i" (-EFAULT), "0" (err))
 
 extern unsigned long __arch_copy_from_user(void *to, const void *from, unsigned long n);

@@ -340,7 +340,7 @@ void prune_dcache(int count)
 		if (dentry->d_flags & DCACHE_REFERENCED) {
 			dentry->d_flags &= ~DCACHE_REFERENCED;
 			list_add(&dentry->d_lru, &dentry_unused);
-			goto next;
+			continue;
 		}
 		dentry_stat.nr_unused--;
 
@@ -349,7 +349,6 @@ void prune_dcache(int count)
 			BUG();
 
 		prune_one_dentry(dentry);
-	next:
 		if (!--count)
 			break;
 	}

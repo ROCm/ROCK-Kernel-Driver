@@ -894,7 +894,12 @@ ip_ct_gather_frags(struct sk_buff *skb)
 	if (!skb) {
 		if (sk) sock_put(sk);
 		return skb;
+	} else if (skb_is_nonlinear(skb) && skb_linearize(skb, GFP_ATOMIC) != 0) {
+		kfree_skb(skb);
+		if (sk) sock_put(sk);
+		return NULL;
 	}
+
 	if (sk) {
 		skb_set_owner_w(skb, sk);
 		sock_put(sk);
@@ -986,7 +991,7 @@ getorigdst(struct sock *sk, int optval, void *user, int *len)
 		return -ENOPROTOOPT;
 	}
 
-	if (*len != sizeof(struct sockaddr_in)) {
+	if ((unsigned int) *len < sizeof(struct sockaddr_in)) {
 		DEBUGP("SO_ORIGINAL_DST: len %u not %u\n",
 		       *len, sizeof(struct sockaddr_in));
 		return -EINVAL;

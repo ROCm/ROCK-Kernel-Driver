@@ -59,7 +59,7 @@ static void __init oldlatch_init(void)
 	}
 }
 
-initcall(oldlatch_init);
+__initcall(oldlatch_init);
 
 EXPORT_SYMBOL(oldlatch_aupdate);
 EXPORT_SYMBOL(oldlatch_bupdate);

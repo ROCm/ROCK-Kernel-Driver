@@ -21,21 +21,7 @@
  * 	node 3:  0xd8000000 - 0xdfffffff
  */
 
-
-/*
- * Currently defined in arch/arm/mm/mm-sa1100.c
- */
-extern pg_data_t sa1100_node_data[];
-
-/*
- * Return a pointer to the node data for node n.
- */
-#define NODE_DATA(nid)	(&sa1100_node_data[nid])
-
-/*
- * NODE_MEM_MAP gives the kaddr for the mem_map of the node.
- */
-#define NODE_MEM_MAP(nid)	(NODE_DATA(nid)->node_mem_map)
+#define NR_NODES	4
 
 /*
  * Given a kernel address, find the home node of the underlying memory.
@@ -71,7 +57,7 @@ extern pg_data_t sa1100_node_data[];
  */
 #define VALID_PAGE(page) \
 ({ unsigned int node = KVADDR_TO_NID(page); \
-   ( (node < 4) && \
+   ( (node < NR_NODES) && \
      ((unsigned)((page) - NODE_MEM_MAP(node)) < NODE_DATA(node)->node_size) ); \
 })
 

@@ -231,43 +231,13 @@ void blk_cleanup_queue(request_queue_t * q)
  *    If a driver processes several requests at once, it must remove them (or
  *    at least all but one of them) from the request queue.
  *
- *    When a queue is plugged (see blk_queue_pluggable()) the head will be
- *    assumed to be inactive.
+ *    When a queue is plugged the head will be assumed to be inactive.
  **/
  
 void blk_queue_headactive(request_queue_t * q, int active)
 {
 	q->head_active = active;
 }
-
-/**
- * blk_queue_pluggable - define a plugging function for a request queue
- * @q:   the request queue to which the function will apply
- * @plug: the function to be called to plug a queue
- *
- * Description:
- *   A request queue will be "plugged" if a request is added to it
- *   while it is empty.  This allows a number of requests to be added
- *   before any are processed, thus providing an opportunity for these
- *   requests to be merged or re-ordered.
- *   The default plugging function (generic_plug_device()) sets the
- *   "plugged" flag for the queue and adds a task to the $tq_disk task
- *   queue to unplug the queue and call the request function at a
- *   later time.
- *
- *   A device driver may provide an alternate plugging function by
- *   passing it to blk_queue_pluggable().  This function should set
- *   the "plugged" flag if it want calls to the request_function to be
- *   blocked, and should place a task on $tq_disk which will unplug
- *   the queue.  Alternately it can simply do nothing and there-by
- *   disable plugging of the device.
- **/
-
-void blk_queue_pluggable (request_queue_t * q, plug_device_fn *plug)
-{
-	q->plug_device_fn = plug;
-}
-
 
 /**
  * blk_queue_make_request - define an alternate make_request function for a device
@@ -590,7 +560,7 @@ static inline void add_request(request_queue_t * q, struct request * req,
 	list_add(&req->queue, insert_here);
 }
 
-void inline blk_refill_freelist(request_queue_t *q, int rw)
+inline void blk_refill_freelist(request_queue_t *q, int rw)
 {
 	if (q->pending_free[rw]) {
 		list_splice(&q->pending_freelist[rw], &q->request_freelist[rw]);
@@ -602,7 +572,7 @@ void inline blk_refill_freelist(request_queue_t *q, int rw)
 /*
  * Must be called with io_request_lock held and interrupts disabled
  */
-void inline blkdev_release_request(struct request *req)
+inline void blkdev_release_request(struct request *req)
 {
 	request_queue_t *q = req->q;
 	int rw = req->cmd;
@@ -1347,7 +1317,6 @@ EXPORT_SYMBOL(blk_get_queue);
 EXPORT_SYMBOL(__blk_get_queue);
 EXPORT_SYMBOL(blk_cleanup_queue);
 EXPORT_SYMBOL(blk_queue_headactive);
-EXPORT_SYMBOL(blk_queue_pluggable);
 EXPORT_SYMBOL(blk_queue_make_request);
 EXPORT_SYMBOL(generic_make_request);
 EXPORT_SYMBOL(blkdev_release_request);

@@ -407,7 +407,7 @@ static int options[8] = { -1, -1, -1, -1, -1, -1, -1, -1, };
 #ifdef MODULE
 static int debug = -1;
 /* A list of all installed Vortex devices, for removing the driver module. */
-static struct net_device *root_corkscrew_dev = NULL;
+static struct net_device *root_corkscrew_dev;
 
 int init_module(void)
 {
@@ -445,7 +445,7 @@ static int corkscrew_scan(struct net_device *dev)
 	static int ioaddr;
 #ifdef CONFIG_ISAPNP
 	short i;
-	static int pnp_cards = 0;
+	static int pnp_cards;
 #endif
 
 #ifdef CONFIG_ISAPNP
@@ -1166,7 +1166,7 @@ static void corkscrew_interrupt(int irq, void *dev_id,
 		printk("%s: interrupt, status %4.4x, timer %d.\n",
 			dev->name, status, latency);
 	if ((status & 0xE000) != 0xE000) {
-		static int donedidthis = 0;
+		static int donedidthis;
 		/* Some interrupt controllers store a bogus interrupt from boot-time.
 		   Ignore a single early interrupt, but don't hang the machine for
 		   other interrupt problems. */
@@ -1234,7 +1234,7 @@ static void corkscrew_interrupt(int irq, void *dev_id,
 				outw(AckIntr | RxEarly, ioaddr + EL3_CMD);
 			}
 			if (status & StatsFull) {	/* Empty statistics. */
-				static int DoneDidThat = 0;
+				static int DoneDidThat;
 				if (corkscrew_debug > 4)
 					printk("%s: Updating stats.\n",
 					       dev->name);

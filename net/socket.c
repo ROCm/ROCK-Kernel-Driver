@@ -71,6 +71,7 @@
 #include <linux/poll.h>
 #include <linux/cache.h>
 #include <linux/module.h>
+#include <linux/highmem.h>
 
 #if defined(CONFIG_KMOD) && defined(CONFIG_NET)
 #include <linux/kmod.h>
@@ -104,6 +105,8 @@ static ssize_t sock_readv(struct file *file, const struct iovec *vector,
 			  unsigned long count, loff_t *ppos);
 static ssize_t sock_writev(struct file *file, const struct iovec *vector,
 			  unsigned long count, loff_t *ppos);
+static ssize_t sock_writepage(struct file *file, struct page *page,
+			  int offset, size_t size, loff_t *ppos, int more);
 
 
 /*
@@ -122,7 +125,8 @@ static struct file_operations socket_file_ops = {
 	release:	sock_close,
 	fasync:		sock_fasync,
 	readv:		sock_readv,
-	writev:		sock_writev
+	writev:		sock_writev,
+	writepage:	sock_writepage
 };
 
 /*
@@ -600,6 +604,24 @@ static ssize_t sock_write(struct file *file, const char *ubuf,
 	iov.iov_len=size;
 	
 	return sock_sendmsg(sock, &msg, size);
+}
+
+ssize_t sock_writepage(struct file *file, struct page *page,
+		       int offset, size_t size, loff_t *ppos, int more)
+{
+	struct socket *sock;
+	int flags;
+
+	if (ppos != &file->f_pos)
+		return -ESPIPE;
+
+	sock = socki_lookup(file->f_dentry->d_inode);
+
+	flags = !(file->f_flags & O_NONBLOCK) ? 0 : MSG_DONTWAIT;
+	if (more)
+		flags |= MSG_MORE;
+
+	return sock->ops->sendpage(sock, page, offset, size, flags);
 }
 
 int sock_readv_writev(int type, struct inode * inode, struct file * file,
@@ -1269,7 +1291,10 @@ asmlinkage long sys_setsockopt(int fd, int level, int optname, char *optval, int
 {
 	int err;
 	struct socket *sock;
-	
+
+	if (optlen < 0)
+		return -EINVAL;
+			
 	if ((sock = sockfd_lookup(fd, &err))!=NULL)
 	{
 		if (level == SOL_SOCKET)

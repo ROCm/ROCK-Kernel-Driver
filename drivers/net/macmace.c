@@ -200,7 +200,7 @@ static int bitrev(int b)
 int mace68k_probe(struct net_device *unused)
 {
 	int j;
-	static int once=0;
+	static int once;
 	struct mace68k_data *mp;
 	unsigned char *addr;
 	struct net_device *dev;

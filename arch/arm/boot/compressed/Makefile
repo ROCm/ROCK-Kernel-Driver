@@ -9,7 +9,7 @@
 
 HEAD		 = head.o
 OBJS		 = misc.o
-CFLAGS		 = $(CPPFLAGS) -O2 -DSTDC_HEADERS $(CFLAGS_PROC)
+CFLAGS		 = $(CPPFLAGS) -O2 -DSTDC_HEADERS $(CFLAGS_PROC) -msoft-float
 FONTC		 = $(TOPDIR)/drivers/video/font_acorn_8x8.c
 ZLDFLAGS	 = -p -X -T vmlinux.lds
 
@@ -25,16 +25,24 @@ ifeq ($(CONFIG_ARCH_NETWINDER),y)
 OBJS		+= head-netwinder.o
 endif
 
+ifeq ($(CONFIG_ARCH_SHARK),y)
+OBJS		+= head-shark.o ofw-shark.o
+endif
+
 ifeq ($(CONFIG_ARCH_INTEGRATOR),y)
 OBJS		+= head-netwinder.o
 endif
 
-ifeq ($(CONFIG_ARCH_NEXUSPCI),y)
-HEAD		 = head-nexuspci.o
+ifeq ($(CONFIG_ARCH_FTVPCI),y)
+OBJS		+= head-ftvpci.o
 endif
 
 ifeq ($(CONFIG_ARCH_L7200),y)
 OBJS		+= head-l7200.o
+endif
+
+ifeq ($(CONFIG_ARCH_CLPS7500),y)
+HEAD		= head-clps7500.o
 endif
 
 ifeq ($(CONFIG_ARCH_P720T),y)

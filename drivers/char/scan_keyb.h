@@ -6,7 +6,7 @@
  *	Generic scan keyboard driver
  */
 
-int register_scan_keyboard(void (*scan)(unsigned char *buffer),
+int register_scan_keyboard(int (*scan)(unsigned char *buffer),
 			   const unsigned char *table,
 			   int length);
 

@@ -2,34 +2,14 @@
  *
  * Written by David Howells (dhowells@redhat.com), 2001.
  * Derived from asm-i386/semaphore.h
- *
- *
- * The MSW of the count is the negated number of active writers and waiting
- * lockers, and the LSW is the total number of active locks
- *
- * The lock count is initialized to 0 (no active and no waiting lockers).
- *
- * When a writer subtracts WRITE_BIAS, it'll get 0xffff0001 for the case of an
- * uncontended lock. This can be determined because XADD returns the old value.
- * Readers increment by 1 and see a positive value when uncontended, negative
- * if there are writers (and maybe) readers waiting (in which case it goes to
- * sleep).
- *
- * The value of WAITING_BIAS supports up to 32766 waiting processes. This can
- * be extended to 65534 by manually checking the whole MSW rather than relying
- * on the S flag.
- *
- * The value of ACTIVE_BIAS supports up to 65535 active processes.
- *
- * This should be totally fair - if anything is waiting, a process that wants a
- * lock will go to the back of the queue. When the currently active lock is
- * released, if there's a writer at the front of the queue, then that and only
- * that will be woken up; if there's a bunch of consequtive readers at the
- * front, then they'll all be woken up, but no other readers will be.
  */
 
 #ifndef _I386_RWSEM_XADD_H
 #define _I386_RWSEM_XADD_H
+
+#ifndef _LINUX_RWSEM_H
+#error please dont include asm/rwsem-xadd.h directly, use linux/rwsem.h instead
+#endif
 
 #ifdef __KERNEL__
 
@@ -37,7 +17,7 @@
  * the semaphore definition
  */
 struct rw_semaphore {
-	atomic_t		count;
+	signed long		count;
 #define RWSEM_UNLOCKED_VALUE		0x00000000
 #define RWSEM_ACTIVE_BIAS		0x00000001
 #define RWSEM_ACTIVE_MASK		0x0000ffff
@@ -72,7 +52,7 @@ struct rw_semaphore {
 #endif
 
 #define __RWSEM_INITIALIZER(name,count) \
-{ ATOMIC_INIT(RWSEM_UNLOCKED_VALUE), __WAIT_QUEUE_HEAD_INITIALIZER((name).wait) \
+{ RWSEM_UNLOCKED_VALUE, __WAIT_QUEUE_HEAD_INITIALIZER((name).wait) \
 	__RWSEM_DEBUG_INIT __RWSEM_DEBUG_MINIT(name) }
 
 #define __DECLARE_RWSEM_GENERIC(name,count) \
@@ -84,7 +64,7 @@ struct rw_semaphore {
 
 static inline void init_rwsem(struct rw_semaphore *sem)
 {
-	atomic_set(&sem->count, RWSEM_UNLOCKED_VALUE);
+	sem->count = RWSEM_UNLOCKED_VALUE;
 	init_waitqueue_head(&sem->wait);
 #if RWSEM_DEBUG
 	sem->debug = 0;
@@ -108,7 +88,7 @@ LOCK_PREFIX	"  incl      (%%eax)\n\t" /* adds 0x00000001, returns the old value 
 		"1:\n\t"
 		".section .text.lock,\"ax\"\n"
 		"2:\n\t"
-		"  call      __down_read_failed\n\t"
+		"  call      __rwsem_down_read_failed\n\t"
 		"  jmp       1b\n"
 		".previous"
 		"# ending down_read\n\t"
@@ -133,7 +113,7 @@ LOCK_PREFIX	"  xadd      %0,(%%eax)\n\t" /* subtract 0x00010001, returns the old
 		"1:\n\t"
 		".section .text.lock,\"ax\"\n"
 		"2:\n\t"
-		"  call      __down_write_failed\n\t"
+		"  call      __rwsem_down_write_failed\n\t"
 		"  jmp       1b\n"
 		".previous\n"
 		"# ending down_write"
@@ -188,6 +168,30 @@ LOCK_PREFIX	"  addl      %2,(%%eax)\n\t" /* adds 0x0000ffff */
 		: "=m"(sem->count)
 		: "a"(sem), "i"(-RWSEM_ACTIVE_WRITE_BIAS), "m"(sem->count)
 		: "memory");
+}
+
+/*
+ * implement exchange and add functionality
+ */
+static inline int rwsem_atomic_update(int delta, struct rw_semaphore *sem)
+{
+	int tmp = delta;
+
+	__asm__ __volatile__(
+		LOCK_PREFIX "xadd %0,(%1)"
+		: "+r"(tmp)
+		: "r"(sem)
+		: "memory");
+
+	return tmp+delta;
+}
+
+/*
+ * implement compare and exchange functionality on the rw-semaphore count LSW
+ */
+static inline __u16 rwsem_cmpxchgw(struct rw_semaphore *sem, __u16 old, __u16 new)
+{
+	return cmpxchg((__u16*)&sem->count,0,RWSEM_ACTIVE_BIAS);
 }
 
 #endif /* __KERNEL__ */

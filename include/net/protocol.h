@@ -36,8 +36,8 @@
 /* This is used to register protocols. */
 struct inet_protocol 
 {
-	int			(*handler)(struct sk_buff *skb, unsigned short len);
-	void			(*err_handler)(struct sk_buff *skb, unsigned char *dp, int len);
+	int			(*handler)(struct sk_buff *skb);
+	void			(*err_handler)(struct sk_buff *skb, u32 info);
 	struct inet_protocol	*next;
 	unsigned char		protocol;
 	unsigned char		copy:1;
@@ -48,12 +48,11 @@ struct inet_protocol
 #if defined(CONFIG_IPV6) || defined (CONFIG_IPV6_MODULE)
 struct inet6_protocol 
 {
-	int	(*handler)(struct sk_buff *skb,
-			unsigned long len);
+	int	(*handler)(struct sk_buff *skb);
 
-	void	(*err_handler)(struct sk_buff *skb, struct ipv6hdr *hdr,
+	void	(*err_handler)(struct sk_buff *skb,
 			       struct inet6_skb_parm *opt,
-			       int type, int code, unsigned char *buff,
+			       int type, int code, int offset,
 			       __u32 info);
 	struct inet6_protocol *next;
 	unsigned char	protocol;

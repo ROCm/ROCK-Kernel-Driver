@@ -1,4 +1,4 @@
-/* $Id: unaligned.c,v 1.21 2001/03/21 11:46:20 davem Exp $
+/* $Id: unaligned.c,v 1.23 2001/04/09 04:29:03 davem Exp $
  * unaligned.c: Unaligned load/store trap handling with special
  *              cases for the kernel to do them more quickly.
  *
@@ -12,6 +12,7 @@
 #include <linux/mm.h>
 #include <asm/asi.h>
 #include <asm/ptrace.h>
+#include <asm/pstate.h>
 #include <asm/processor.h>
 #include <asm/system.h>
 #include <asm/uaccess.h>
@@ -376,6 +377,9 @@ void kernel_mna_trap_fault(struct pt_regs *regs, unsigned int insn)
 	regs->tpc = fixup;
 	regs->tnpc = regs->tpc + 4;
 	regs->u_regs [UREG_G2] = g2;
+
+	regs->tstate &= ~TSTATE_ASI;
+	regs->tstate |= (ASI_AIUS << 24UL);
 }
 
 asmlinkage void kernel_unaligned_trap(struct pt_regs *regs, unsigned int insn, unsigned long sfar, unsigned long sfsr)

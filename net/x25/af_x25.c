@@ -409,6 +409,9 @@ static int x25_getsockopt(struct socket *sock, int level, int optname,
 
 	len = min(len, sizeof(int));
 
+	if (len < 0)
+		return -EINVAL;
+		
 	if (put_user(len, optlen))
 		return -EFAULT;
 
@@ -912,7 +915,7 @@ static int x25_sendmsg(struct socket *sock, struct msghdr *msg, int len, struct 
 
 	size = len + X25_MAX_L2_LEN + X25_EXT_MIN_LEN;
 
-	if ((skb = sock_alloc_send_skb(sk, size, 0, msg->msg_flags & MSG_DONTWAIT, &err)) == NULL)
+	if ((skb = sock_alloc_send_skb(sk, size, msg->msg_flags & MSG_DONTWAIT, &err)) == NULL)
 		return err;
 	X25_SKB_CB(skb)->flags = msg->msg_flags;
 
@@ -1283,6 +1286,7 @@ static struct proto_ops SOCKOPS_WRAPPED(x25_proto_ops) = {
 	sendmsg:	x25_sendmsg,
 	recvmsg:	x25_recvmsg,
 	mmap:		sock_no_mmap,
+	sendpage:	sock_no_sendpage,
 };
 
 #include <linux/smp_lock.h>

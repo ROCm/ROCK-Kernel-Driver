@@ -8,7 +8,7 @@
  *	the older version didn't come out right using gcc 2.5.8, the newer one
  *	seems to fall out with gcc 2.6.2.
  *
- *	Version: $Id: igmp.c,v 1.41 2000/08/31 23:39:12 davem Exp $
+ *	Version: $Id: igmp.c,v 1.45 2001/02/23 06:32:11 davem Exp $
  *
  *	Authors:
  *		Alan Cox <Alan.Cox@linux.org>
@@ -235,7 +235,7 @@ static int igmp_send_report(struct net_device *dev, u32 group, int type)
 	iph->saddr    = rt->rt_src;
 	iph->protocol = IPPROTO_IGMP;
 	iph->tot_len  = htons(IGMP_SIZE);
-	ip_select_ident(iph, &rt->u.dst);
+	ip_select_ident(iph, &rt->u.dst, NULL);
 	((u8*)&iph[1])[0] = IPOPT_RA;
 	((u8*)&iph[1])[1] = 4;
 	((u8*)&iph[1])[2] = 0;
@@ -341,15 +341,24 @@ static void igmp_heard_query(struct in_device *in_dev, unsigned char max_resp_ti
 	read_unlock(&in_dev->lock);
 }
 
-int igmp_rcv(struct sk_buff *skb, unsigned short len)
+int igmp_rcv(struct sk_buff *skb)
 {
 	/* This basically follows the spec line by line -- see RFC1112 */
 	struct igmphdr *ih = skb->h.igmph;
 	struct in_device *in_dev = in_dev_get(skb->dev);
+	int len = skb->len;
 
 	if (in_dev==NULL) {
 		kfree_skb(skb);
 		return 0;
+	}
+
+	if (skb_is_nonlinear(skb)) {
+		if (skb_linearize(skb, GFP_ATOMIC) != 0) {
+			kfree_skb(skb);
+			return -ENOMEM;
+		}
+		ih = skb->h.igmph;
 	}
 
 	if (len < sizeof(struct igmphdr) || ip_compute_csum((void *)ih, len)) {
@@ -357,7 +366,7 @@ int igmp_rcv(struct sk_buff *skb, unsigned short len)
 		kfree_skb(skb);
 		return 0;
 	}
-	
+
 	switch (ih->type) {
 	case IGMP_HOST_MEMBERSHIP_QUERY:
 		igmp_heard_query(in_dev, ih->code, ih->group);
@@ -372,7 +381,7 @@ int igmp_rcv(struct sk_buff *skb, unsigned short len)
 	case IGMP_PIM:
 #ifdef CONFIG_IP_PIMSM_V1
 		in_dev_put(in_dev);
-		return pim_rcv_v1(skb, len);
+		return pim_rcv_v1(skb);
 #endif
 	case IGMP_DVMRP:
 	case IGMP_TRACE:

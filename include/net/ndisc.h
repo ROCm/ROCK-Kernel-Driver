@@ -60,7 +60,7 @@ extern int			ndisc_init(struct net_proto_family *ops);
 
 extern void			ndisc_cleanup(void);
 
-extern int			ndisc_rcv(struct sk_buff *skb, unsigned long len);
+extern int			ndisc_rcv(struct sk_buff *skb);
 
 extern void			ndisc_send_ns(struct net_device *dev,
 					      struct neighbour *neigh,
@@ -91,13 +91,9 @@ extern int			igmp6_init(struct net_proto_family *ops);
 
 extern void			igmp6_cleanup(void);
 
-extern int			igmp6_event_query(struct sk_buff *skb,
-						  struct icmp6hdr *hdr,
-						  int len);
+extern int			igmp6_event_query(struct sk_buff *skb);
 
-extern int			igmp6_event_report(struct sk_buff *skb,
-						   struct icmp6hdr *hdr,
-						   int len);
+extern int			igmp6_event_report(struct sk_buff *skb);
 
 extern void			igmp6_cleanup(void);
 

@@ -1,12 +1,16 @@
-/* $Id: ttable.S,v 1.32 2001/03/23 07:56:30 davem Exp $
- * ttable.S: Sparc V9 Trap Table(s) with SpitFire extensions.
+/* $Id: ttable.S,v 1.33 2001/03/28 10:56:34 davem Exp $
+ * ttable.S: Sparc V9 Trap Table(s) with SpitFire/Cheetah extensions.
  *
- * Copyright (C) 1996 David S. Miller (davem@caip.rutgers.edu)
+ * Copyright (C) 1996, 2001 David S. Miller (davem@caip.rutgers.edu)
  */
 
 #include <linux/config.h>
 
-	.globl	sparc64_ttable_tl0, sparc64_ttable_tl1,
+	.globl	sparc64_ttable_tl0, sparc64_ttable_tl1
+	.globl	tl0_fecc, tl1_fecc
+	.globl	tl0_cee, tl1_cee
+	.globl	tl0_iae, tl1_iae
+	.globl	tl0_dae, tl1_dae
 
 sparc64_ttable_tl0:
 tl0_resv000:	BOOT_KERNEL BTRAP(0x1) BTRAP(0x2) BTRAP(0x3)
@@ -64,7 +68,8 @@ tl0_damiss:
 #include	"dtlb_base.S"
 tl0_daprot:
 #include	"dtlb_prot.S"
-tl0_resv070:	BTRAP(0x70) BTRAP(0x71) BTRAP(0x72) BTRAP(0x73) BTRAP(0x74) BTRAP(0x75)
+tl0_fecc:	BTRAP(0x70)	/* Fast-ECC on Cheetah */
+tl0_resv071:	BTRAP(0x71) BTRAP(0x72) BTRAP(0x73) BTRAP(0x74) BTRAP(0x75)
 tl0_resv076:	BTRAP(0x76) BTRAP(0x77) BTRAP(0x78) BTRAP(0x79) BTRAP(0x7a) BTRAP(0x7b)
 tl0_resv07c:	BTRAP(0x7c) BTRAP(0x7d) BTRAP(0x7e) BTRAP(0x7f)
 tl0_s0n:	SPILL_0_NORMAL
@@ -203,13 +208,30 @@ tl1_resv05c:	BTRAPTL1(0x5c) BTRAPTL1(0x5d) BTRAPTL1(0x5e) BTRAPTL1(0x5f)
 tl1_ivec:	TRAP_IVEC
 tl1_paw:	TRAPTL1(do_paw_tl1)
 tl1_vaw:	TRAPTL1(do_vaw_tl1)
-tl1_cee:	TRAPTL1_CEE
+
+		/* The grotty trick to save %g1 into current->thread.kernel_cntd0
+		 * is because when we take this trap we could be interrupting trap
+		 * code already using the trap alternate global registers.  It is
+		 * better to corrupt a performance counter than corrupt trap register
+		 * state.  We cross our fingers and pray that this store/load does
+		 * not cause yet another CEE trap.
+		 */
+tl1_cee:	membar	#Sync
+		stx	%g1, [%g6 + AOFF_task_thread + AOFF_thread_kernel_cntd0]
+		ldxa	[%g0] ASI_AFSR, %g1
+		membar	#Sync
+		stxa	%g1, [%g0] ASI_AFSR
+		membar	#Sync
+		ldx	[%g6 + AOFF_task_thread + AOFF_thread_kernel_cntd0], %g1
+		retry
+
 tl1_iamiss:	BTRAPTL1(0x64) BTRAPTL1(0x65) BTRAPTL1(0x66) BTRAPTL1(0x67)
 tl1_damiss:
 #include	"dtlb_backend.S"
 tl1_daprot:
 #include	"dtlb_prot.S"
-tl1_resv070:	BTRAPTL1(0x70) BTRAPTL1(0x71) BTRAPTL1(0x72) BTRAPTL1(0x73)
+tl1_fecc:	BTRAP(0x70)	/* Fast-ECC on Cheetah */
+tl1_resc071:	BTRAPTL1(0x71) BTRAPTL1(0x72) BTRAPTL1(0x73)
 tl1_resv074:	BTRAPTL1(0x74) BTRAPTL1(0x75) BTRAPTL1(0x76) BTRAPTL1(0x77)
 tl1_resv078:	BTRAPTL1(0x78) BTRAPTL1(0x79) BTRAPTL1(0x7a) BTRAPTL1(0x7b)
 tl1_resv07c:	BTRAPTL1(0x7c) BTRAPTL1(0x7d) BTRAPTL1(0x7e) BTRAPTL1(0x7f)

@@ -119,7 +119,7 @@ static int init_pcmcia(void);
 static const char *version =
     "apne.c:v1.1 7/10/98 Alain Malek (Alain.Malek@cryogen.ch)\n";
 
-static int apne_owned = 0;	/* signal if card already owned */
+static int apne_owned;	/* signal if card already owned */
 
 int __init apne_probe(struct net_device *dev)
 {
@@ -173,7 +173,7 @@ static int __init apne_probe1(struct net_device *dev, int ioaddr)
 #ifndef MANUAL_HWADDR0
     int neX000, ctron;
 #endif
-    static unsigned version_printed = 0;
+    static unsigned version_printed;
     static u32 pcmcia_offsets[16]={
                 0,   1+GAYLE_ODD,   2,   3+GAYLE_ODD,
                 4,   5+GAYLE_ODD,   6,   7+GAYLE_ODD,

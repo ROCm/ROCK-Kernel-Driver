@@ -1,4 +1,4 @@
-/* $Id: generic.c,v 1.10 2000/08/09 00:00:15 davem Exp $
+/* $Id: generic.c,v 1.12 2001/04/09 21:40:46 davem Exp $
  * generic.c: Generic Sparc mm routines that are not dependent upon
  *            MMU type but are Sparc specific.
  *
@@ -21,7 +21,7 @@ static inline void forget_pte(pte_t page)
 		struct page *ptpage = pte_page(page);
 		if ((!VALID_PAGE(ptpage)) || PageReserved(ptpage))
 			return;
-		page_cache_release(page);
+		page_cache_release(ptpage);
 		return;
 	}
 	swap_free(pte_to_swp_entry(page));

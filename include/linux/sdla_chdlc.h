@@ -4,7 +4,7 @@
  Author:      	Gideon Hack
 		Nenad Corbic <ncorbic@sangoma.com>	
 
- Copyright:	(c) 1995-1999 Sangoma Technologies Inc.
+ Copyright:	(c) 1995-2000 Sangoma Technologies Inc.
 
 		This program is free software; you can redistribute it and/or
 		modify it under the term of the GNU General Public License
@@ -136,6 +136,8 @@ typedef struct {
 #define TRACE_ALL                       0x00
 #define TRACE_PROT			0x01
 #define TRACE_DATA			0x02
+
+#define DISCARD_RX_ERROR_FRAMES	0x0001
 
 /* ----------------------------------------------------------------------------
  *                     Return codes from interface commands
@@ -358,6 +360,9 @@ typedef struct {
 #define IGNORE_KPALV_FOR_LINK_STAT		0x0004
 /* ignore keepalive frames in determining the CHDLC link status */ 
 
+#define SINGLE_TX_BUFFER			0x4000 
+/* configure a single transmit buffer */
+
 #define HDLC_STREAMING_MODE			0x8000
 
 /*   settings for the 'CHDLC_statistics_options' */
@@ -469,7 +474,7 @@ typedef struct {
 	unsigned long reserved_CDP_stat5 PACKED;		/* reserved for later */
 	unsigned long reserved_CDP_stat6 PACKED;		/* reserved for later */
 
-	/* Incomming frames with a format error statistics */
+	/* Incoming frames with a format error statistics */
 	unsigned short Rx_frm_incomp_CHDLC_hdr_count PACKED;	/* frames received of with incomplete Cisco HDLC header */
 	unsigned short Rx_frms_too_long_count PACKED;		/* frames received of excessive length count */
 	unsigned short Rx_invalid_CHDLC_addr_count PACKED;	/* frames received with an invalid CHDLC address count */
@@ -484,7 +489,7 @@ typedef struct {
 	unsigned long reserved_frm_format_err4 PACKED;		/* reserved for later */
 
 	/* CHDLC timeout/retry statistics */
-	unsigned short SLARP_Rx_keepalive_TO_count PACKED;	/* timeout count for incomming SLARP frames */
+	unsigned short SLARP_Rx_keepalive_TO_count PACKED;	/* timeout count for incoming SLARP frames */
 	unsigned short SLARP_Request_TO_count PACKED;		/* timeout count for SLARP Request frames */
 	unsigned long To_retry_reserved_stat1 PACKED;		/* reserved for later */
 	unsigned long To_retry_reserved_stat2 PACKED;		/* reserved for later */

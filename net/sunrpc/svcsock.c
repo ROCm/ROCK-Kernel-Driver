@@ -381,10 +381,17 @@ svc_udp_recvfrom(struct svc_rqst *rqstp)
 		dprintk("svc: recvfrom returned error %d\n", -err);
 	}
 
+	/* Sorry. */
+	if (skb_is_nonlinear(skb)) {
+		if (skb_linearize(skb, GFP_ATOMIC) != 0) {
+			kfree_skb(skb);
+			svc_sock_received(svsk, 0);
+			return 0;
+		}
+	}
+
 	if (skb->ip_summed != CHECKSUM_UNNECESSARY) {
-		unsigned int csum = skb->csum;
-		csum = csum_partial(skb->h.raw, skb->len, csum);
-		if ((unsigned short)csum_fold(csum)) {
+		if ((unsigned short)csum_fold(skb_checksum(skb, 0, skb->len, skb->csum))) {
 			skb_free_datagram(svsk->sk_sk, skb);
 			svc_sock_received(svsk, 0);
 			return 0;
@@ -395,7 +402,7 @@ svc_udp_recvfrom(struct svc_rqst *rqstp)
 	svsk->sk_data = 1;
 
 	len  = skb->len - sizeof(struct udphdr);
-	data = (u32 *) (skb->h.raw + sizeof(struct udphdr));
+	data = (u32 *) (skb->data + sizeof(struct udphdr));
 
 	rqstp->rq_skbuff      = skb;
 	rqstp->rq_argbuf.base = data;

@@ -15,6 +15,7 @@
 
 #ifndef TAPECHAR_H
 #define TAPECHAR_H
+#include <linux/config.h>
 #define TAPECHAR_DEFAULTMODE 0020644
 #define  TAPE_MAJOR                    0        /* get dynamic major since no major officialy defined for tape */
 /*

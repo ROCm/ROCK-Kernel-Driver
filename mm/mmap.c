@@ -233,14 +233,9 @@ unsigned long do_mmap_pgoff(struct file * file, unsigned long addr, unsigned lon
 	/* Obtain the address to map to. we verify (or select) it and ensure
 	 * that it represents a valid section of the address space.
 	 */
-	if (flags & MAP_FIXED) {
-		if (addr & ~PAGE_MASK)
-			return -EINVAL;
-	} else {
-		addr = get_unmapped_area(addr, len);
-		if (!addr)
-			return -ENOMEM;
-	}
+	addr = get_unmapped_area(file, addr, len, pgoff, flags);
+	if (addr & ~PAGE_MASK)
+		return addr;
 
 	/* Do simple checking here so the lower-level routines won't have
 	 * to. we assume access permissions have been handled by the open
@@ -393,30 +388,51 @@ free_vma:
 }
 
 /* Get an address range which is currently unmapped.
- * For mmap() without MAP_FIXED and shmat() with addr=0.
- * Return value 0 means ENOMEM.
+ * For shmat() with addr=0.
+ *
+ * Ugly calling convention alert:
+ * Return value with the low bits set means error value,
+ * ie
+ *	if (ret & ~PAGE_MASK)
+ *		error = ret;
+ *
+ * This function "knows" that -ENOMEM has the bits set.
  */
 #ifndef HAVE_ARCH_UNMAPPED_AREA
-unsigned long get_unmapped_area(unsigned long addr, unsigned long len)
+static inline unsigned long arch_get_unmapped_area(struct file *filp, unsigned long addr, unsigned long len, unsigned long pgoff, unsigned long flags)
 {
-	struct vm_area_struct * vmm;
+	struct vm_area_struct *vma;
 
 	if (len > TASK_SIZE)
-		return 0;
+		return -ENOMEM;
 	if (!addr)
 		addr = TASK_UNMAPPED_BASE;
 	addr = PAGE_ALIGN(addr);
 
-	for (vmm = find_vma(current->mm, addr); ; vmm = vmm->vm_next) {
-		/* At this point:  (!vmm || addr < vmm->vm_end). */
+	for (vma = find_vma(current->mm, addr); ; vma = vma->vm_next) {
+		/* At this point:  (!vma || addr < vma->vm_end). */
 		if (TASK_SIZE - len < addr)
-			return 0;
-		if (!vmm || addr + len <= vmm->vm_start)
+			return -ENOMEM;
+		if (!vma || addr + len <= vma->vm_start)
 			return addr;
-		addr = vmm->vm_end;
+		addr = vma->vm_end;
 	}
 }
-#endif
+#endif	
+
+unsigned long get_unmapped_area(struct file *file, unsigned long addr, unsigned long len, unsigned long pgoff, unsigned long flags)
+{
+	if (flags & MAP_FIXED) {
+		if (addr & ~PAGE_MASK)
+			return -EINVAL;
+		return addr;
+	}
+
+	if (file && file->f_op && file->f_op->get_unmapped_area)
+		return file->f_op->get_unmapped_area(file, addr, len, pgoff, flags);
+
+	return arch_get_unmapped_area(file, addr, len, pgoff, flags);
+}
 
 #define vm_avl_empty	(struct vm_area_struct *) NULL
 

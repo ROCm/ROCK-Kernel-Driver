@@ -19,8 +19,23 @@
 
 #include <asm/mach/arch.h>
 
-extern void setup_initrd(unsigned int start, unsigned int size);
-extern void setup_ramdisk(int doload, int prompt, int start, unsigned int rd_sz);
+extern void genarch_init_irq(void);
+
+
+static void sa1100_power_off(void)
+{
+	mdelay(100);
+	cli();
+	/* disable internal oscillator, float CS lines */
+	PCFR = (PCFR_OPDE | PCFR_FP | PCFR_FS);
+	/* set lowest clock */
+	PPCR = 0;
+	/* set all GPIOs to input mode */
+	GPDR = 0;
+	/* enter sleep mode */
+	PMCR = PMCR_SF;
+}
+
 
 static void victor_power_off(void)
 {
@@ -47,10 +62,13 @@ extern void __init sa1100_map_io(void);
 	mi->bank[__nr].start = (__start), \
 	mi->bank[__nr].size = (__size), \
 	mi->bank[__nr].node = (((unsigned)(__start) - PHYS_OFFSET) >> 27)
+
 static void __init
 fixup_sa1100(struct machine_desc *desc, struct param_struct *params,
 	     char **cmdline, struct meminfo *mi)
 {
+	pm_power_off = sa1100_power_off;
+
 	if (machine_is_assabet()) {
 		/* 
 		 * On Assabet, we must probe for the Neponset board *before*
@@ -80,6 +98,16 @@ fixup_sa1100(struct machine_desc *desc, struct param_struct *params,
 		ROOT_DEV = MKDEV(RAMDISK_MAJOR,0);
 		setup_ramdisk( 1, 0, 0, 8192 );
 		setup_initrd( 0xc0800000, 3*1024*1024 );
+	}
+
+	else if (machine_is_pangolin()) {
+		SET_BANK( 0, 0xc0000000, 32*1024*1024 );
+		SET_BANK( 1, 0xc8000000, 32*1024*1024 );
+		mi->nr_banks = 2;
+		
+		ROOT_DEV = MKDEV(RAMDISK_MAJOR,0);
+		setup_ramdisk( 1, 0, 0, 16384 );
+		setup_initrd( 0xc0800000, 9*1024*1024 );
 	}
 
 	else if (machine_is_brutus()) {
@@ -133,7 +161,7 @@ fixup_sa1100(struct machine_desc *desc, struct param_struct *params,
 		setup_initrd(0xc0400000, 4*1024*1024);
 	}
 
-	else if (machine_is_thinclient() || machine_is_graphicsclient()) {
+	else if (machine_is_graphicsclient()) {
 		SET_BANK( 0, 0xc0000000, 16*1024*1024 );
 		mi->nr_banks = 1;
 
@@ -154,15 +182,6 @@ fixup_sa1100(struct machine_desc *desc, struct param_struct *params,
 		if( *((char*)0xc0000100) )
 			*cmdline = ((char *)0xc0000100);
 	}
-	else if (machine_is_tifon()) {
-		SET_BANK( 0, 0xc0000000, 16*1024*1024 );
-		SET_BANK( 1, 0xc8000000, 16*1024*1024 );
-		mi->nr_banks = 2;
-
-		ROOT_DEV = MKDEV(UNNAMED_MAJOR, 0);
-		setup_ramdisk(1, 0, 0, 4096);
-		setup_initrd( 0xd0000000 + 0x1100004, 0x140000 );
-	}
 
 	else if (machine_is_victor()) {
 		SET_BANK( 0, 0xc0000000, 4*1024*1024 );
@@ -180,6 +199,16 @@ fixup_sa1100(struct machine_desc *desc, struct param_struct *params,
 		pm_power_off = victor_power_off;
 	}
 
+        else if (machine_is_sherman()) {
+                SET_BANK( 0, 0xc0000000, 64*1024*1024 );
+                SET_BANK( 1, 0xc8000000, 64*1024*1024 );
+                mi->nr_banks = 2;
+
+                ROOT_DEV = MKDEV( 60, 2 );
+                setup_ramdisk( 1, 0, 0, 8192 );
+//              setup_initrd( 0xc0400000, 8*1024*1024 );
+}
+
 	else if (machine_is_xp860()) {
 		SET_BANK( 0, 0xc0000000, 32*1024*1024 );
 		mi->nr_banks = 1;
@@ -193,6 +222,15 @@ MACHINE_START(ASSABET, "Intel-Assabet")
 	BOOT_MEM(0xc0000000, 0x80000000, 0xf8000000)
 	FIXUP(fixup_sa1100)
 	MAPIO(sa1100_map_io)
+	INITIRQ(genarch_init_irq)
+MACHINE_END
+#endif
+#ifdef CONFIG_SA1100_PANGOLIN
+MACHINE_START(PANGOLIN, "Dialogue-Pangolin")
+	BOOT_MEM(0xc0000000, 0x80000000, 0xf8000000)
+	FIXUP(fixup_sa1100)
+	MAPIO(sa1100_map_io)
+	INITIRQ(genarch_init_irq)
 MACHINE_END
 #endif
 #ifdef CONFIG_SA1100_BITSY
@@ -201,6 +239,7 @@ MACHINE_START(BITSY, "Compaq Bitsy")
 	BOOT_PARAMS(0xc0000100)
 	FIXUP(fixup_sa1100)
 	MAPIO(sa1100_map_io)
+	INITIRQ(genarch_init_irq)
 MACHINE_END
 #endif
 #ifdef CONFIG_SA1100_BRUTUS
@@ -208,6 +247,7 @@ MACHINE_START(BRUTUS, "Intel Brutus (SA1100 eval board)")
 	BOOT_MEM(0xc0000000, 0x80000000, 0xf8000000)
 	FIXUP(fixup_sa1100)
 	MAPIO(sa1100_map_io)
+	INITIRQ(genarch_init_irq)
 MACHINE_END
 #endif
 #ifdef CONFIG_SA1100_CERF
@@ -216,6 +256,7 @@ MACHINE_START(CERF, "Intrinsyc CerfBoard")
 	BOOT_MEM(0xc0000000, 0x80000000, 0xf8000000)
 	FIXUP(fixup_sa1100)
 	MAPIO(sa1100_map_io)
+	INITIRQ(genarch_init_irq)
 MACHINE_END
 #endif
 #ifdef CONFIG_SA1100_EMPEG
@@ -223,6 +264,7 @@ MACHINE_START(EMPEG, "empeg MP3 Car Audio Player")
 	BOOT_MEM(0xc0000000, 0x80000000, 0xf8000000)
 	FIXUP(fixup_sa1100)
 	MAPIO(sa1100_map_io)
+	INITIRQ(genarch_init_irq)
 MACHINE_END
 #endif
 #ifdef CONFIG_SA1100_GRAPHICSCLIENT
@@ -230,14 +272,16 @@ MACHINE_START(GRAPHICSCLIENT, "ADS GraphicsClient")
 	BOOT_MEM(0xc0000000, 0x80000000, 0xf8000000)
 	FIXUP(fixup_sa1100)
 	MAPIO(sa1100_map_io)
+	INITIRQ(genarch_init_irq)
 MACHINE_END
 #endif
 #ifdef CONFIG_SA1100_ITSY
 MACHINE_START(ITSY, "Compaq Itsy")
 	BOOT_MEM(0xc0000000, 0x80000000, 0xf8000000)
-	BOOT_PARAMS(0xc0000100
+	BOOT_PARAMS(0xc0000100)
 	FIXUP(fixup_sa1100)
 	MAPIO(sa1100_map_io)
+	INITIRQ(genarch_init_irq)
 MACHINE_END
 #endif
 #ifdef CONFIG_SA1100_LART
@@ -245,6 +289,7 @@ MACHINE_START(LART, "LART")
 	BOOT_MEM(0xc0000000, 0x80000000, 0xf8000000)
 	FIXUP(fixup_sa1100)
 	MAPIO(sa1100_map_io)
+	INITIRQ(genarch_init_irq)
 MACHINE_END
 #endif
 #ifdef CONFIG_SA1100_NANOENGINE
@@ -252,6 +297,7 @@ MACHINE_START(NANOENGINE, "BSE nanoEngine")
 	BOOT_MEM(0xc0000000, 0x80000000, 0xf8000000)
 	FIXUP(fixup_sa1100)
 	MAPIO(sa1100_map_io)
+	INITIRQ(genarch_init_irq)
 MACHINE_END
 #endif
 #ifdef CONFIG_SA1100_PLEB
@@ -259,20 +305,7 @@ MACHINE_START(PLEB, "PLEB")
 	BOOT_MEM(0xc0000000, 0x80000000, 0xf8000000)
 	FIXUP(fixup_sa1100)
 	MAPIO(sa1100_map_io)
-MACHINE_END
-#endif
-#ifdef CONFIG_SA1100_THINCLIENT
-MACHINE_START(THINCLIENT, "ADS ThinClient")
-	BOOT_MEM(0xc0000000, 0x80000000, 0xf8000000)
-	FIXUP(fixup_sa1100)
-	MAPIO(sa1100_map_io)
-MACHINE_END
-#endif
-#ifdef CONFIG_SA1100_TIFON
-MACHINE_START(TIFON, "Tifon")
-	BOOT_MEM(0xc0000000, 0x80000000, 0xf8000000)
-	FIXUP(fixup_sa1100)
-	MAPIO(sa1100_map_io)
+	INITIRQ(genarch_init_irq)
 MACHINE_END
 #endif
 #ifdef CONFIG_SA1100_VICTOR
@@ -280,6 +313,15 @@ MACHINE_START(VICTOR, "VisuAide Victor")
 	BOOT_MEM(0xc0000000, 0x80000000, 0xf8000000)
 	FIXUP(fixup_sa1100)
 	MAPIO(sa1100_map_io)
+	INITIRQ(genarch_init_irq)
+MACHINE_END
+#endif
+#ifdef CONFIG_SA1100_SHERMAN
+MACHINE_START(SHERMAN, "Blazie Engineering Sherman")
+        BOOT_MEM(0xc0000000, 0x80000000, 0xf8000000)
+        FIXUP(fixup_sa1100)
+        MAPIO(sa1100_map_io)
+	INITIRQ(genarch_init_irq)
 MACHINE_END
 #endif
 #ifdef CONFIG_SA1100_XP860
@@ -287,5 +329,6 @@ MACHINE_START(XP860, "XP860")
 	BOOT_MEM(0xc0000000, 0x80000000, 0xf8000000)
 	FIXUP(fixup_sa1100)
 	MAPIO(sa1100_map_io)
+	INITIRQ(genarch_init_irq)
 MACHINE_END
 #endif

@@ -209,7 +209,7 @@ static void tx_timeout(struct net_device *dev);
 
 
 /* A list of all installed ATP devices, for removing the driver module. */
-static struct net_device *root_atp_dev = NULL;
+static struct net_device *root_atp_dev;
 
 /* Check for a network adapter of this type, and return '0' iff one exists.
    If dev->base_addr == 0, probe all likely locations.
@@ -584,7 +584,7 @@ static void atp_interrupt(int irq, void *dev_instance, struct pt_regs * regs)
 	struct net_device *dev = (struct net_device *)dev_instance;
 	struct net_local *lp;
 	long ioaddr;
-	static int num_tx_since_rx = 0;
+	static int num_tx_since_rx;
 	int boguscount = max_interrupt_work;
 
 	if (dev == NULL) {

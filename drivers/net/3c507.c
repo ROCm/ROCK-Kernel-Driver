@@ -323,7 +323,7 @@ int __init el16_probe(struct net_device *dev)
 
 static int __init el16_probe1(struct net_device *dev, int ioaddr)
 {
-	static unsigned char init_ID_done = 0, version_printed = 0;
+	static unsigned char init_ID_done, version_printed;
 	int i, irq, irqval, retval;
 	struct net_local *lp;
 
@@ -858,7 +858,7 @@ static void el16_rx(struct net_device *dev)
 #ifdef MODULE
 static struct net_device dev_3c507;
 static int io = 0x300;
-static int irq = 0;
+static int irq;
 MODULE_PARM(io, "i");
 MODULE_PARM(irq, "i");
 

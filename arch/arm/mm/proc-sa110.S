@@ -556,7 +556,7 @@ ENTRY(cpu_sa1100_set_pmd)
 	mov	pc, lr
 
 /*
- * cpu_sa110_arm920_set_pte(ptep, pte)
+ * cpu_sa110_set_pte(ptep, pte)
  *
  * Set a PTE and flush it out
  */
@@ -737,7 +737,7 @@ __sa110_proc_info:
 	b	__sa110_setup
 	.long	cpu_arch_name
 	.long	cpu_elf_name
-	.long	HWCAP_SWP | HWCAP_HALF | HWCAP_26BIT
+	.long	HWCAP_SWP | HWCAP_HALF | HWCAP_26BIT | HWCAP_FAST_MULT
 	.long	cpu_sa110_info
 	.long	sa110_processor_functions
 	.size	__sa110_proc_info, . - __sa110_proc_info
@@ -750,7 +750,7 @@ __sa1100_proc_info:
 	b	__sa1100_setup
 	.long	cpu_arch_name
 	.long	cpu_elf_name
-	.long	HWCAP_SWP | HWCAP_HALF | HWCAP_26BIT
+	.long	HWCAP_SWP | HWCAP_HALF | HWCAP_26BIT | HWCAP_FAST_MULT
 	.long	cpu_sa1100_info
 	.long	sa1100_processor_functions
 	.size	__sa1100_proc_info, . - __sa1100_proc_info
@@ -763,7 +763,7 @@ __sa1110_proc_info:
 	b	__sa1100_setup
 	.long	cpu_arch_name
 	.long	cpu_elf_name
-	.long	HWCAP_SWP | HWCAP_HALF | HWCAP_26BIT
+	.long	HWCAP_SWP | HWCAP_HALF | HWCAP_26BIT | HWCAP_FAST_MULT
 	.long	cpu_sa1110_info
 	.long	sa1100_processor_functions
 	.size	__sa1110_proc_info, . - __sa1110_proc_info

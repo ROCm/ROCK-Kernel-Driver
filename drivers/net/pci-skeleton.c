@@ -740,7 +740,7 @@ static int __devinit netdrv_init_one (struct pci_dev *pdev,
 	int i, addr_len, option;
 	void *ioaddr = NULL;
 	static int board_idx = -1;
-	static int printed_version = 0;
+	static int printed_version;
 	u8 tmp;
 
 	DPRINTK ("ENTER\n");

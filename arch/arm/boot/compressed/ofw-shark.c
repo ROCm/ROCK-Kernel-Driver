@@ -1,7 +1,7 @@
 /*
  * linux/arch/arm/boot/compressed/ofw-shark.c
  *
- * by Alexander.Schulz@stud.uni-karlsruhe.de
+ * by Alexander Schulz <aschulz@netwinder.org>
  *
  * This file is used to get some basic information
  * about the memory layout of the shark we are running
@@ -11,6 +11,7 @@
 
 
 #include <linux/kernel.h>
+#include <linux/types.h>
 #include <asm/setup.h>
 #include <asm/page.h>
 
@@ -18,7 +19,7 @@
 asmlinkage void
 create_params (unsigned long *buffer)
 {
-	/* Is there a better address? Also change in kernel/arch.c */
+	/* Is there a better address? Also change in mach-shark/arch.c */
 	struct param_struct *params = (struct param_struct *) 0x08003000;
 	int j,i,m,k,nr_banks,size;
 

@@ -18,6 +18,6 @@ obj-			:=
 
 export-objs		:= 
 
-#obj-$(CONFIG_LEDS)	+= leds.o
+obj-$(CONFIG_LEDS)	+= leds.o
 
 include $(TOPDIR)/Rules.make

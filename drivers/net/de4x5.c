@@ -585,7 +585,7 @@ static int de4x5_debug = (DEBUG_MEDIA | DEBUG_VERSION);
 #ifdef DE4X5_PARM
 static char *args = DE4X5_PARM;
 #else
-static char *args = NULL;
+static char *args;
 #endif
 
 struct parameters {
@@ -666,7 +666,7 @@ struct parameters {
 #define DESC_ALIGN
 
 #ifndef DEC_ONLY                        /* See README.de4x5 for using this */
-static int dec_only = 0;
+static int dec_only;
 #else
 static int dec_only = 1;
 #endif
@@ -1039,24 +1039,24 @@ MODULE_PARM(de4x5_debug, "i");
 MODULE_PARM(dec_only, "i");
 MODULE_PARM(args, "s");
 # else
-static int loading_module = 0;
+static int loading_module;
 #endif /* MODULE */
 
 static char name[DE4X5_NAME_LENGTH + 1];
 #if !defined(__sparc_v9__) && !defined(__powerpc__) && !defined(__alpha__)
 static u_char de4x5_irq[] = EISA_ALLOWED_IRQ_LIST;
-static int lastEISA = 0;
+static int lastEISA;
 #  ifdef DE4X5_FORCE_EISA                 /* Force an EISA bus probe or not */
 static int forceEISA = 1;
 #  else
-static int forceEISA = 0;
+static int forceEISA;
 #  endif
 #endif
-static int num_de4x5s = 0;
-static int cfrv = 0, useSROM = 0;
+static int num_de4x5s;
+static int cfrv, useSROM;
 static int lastPCI = -1;
-static struct net_device *lastModule = NULL;
-static struct pci_dev *pdev = NULL;
+static struct net_device *lastModule;
+static struct pci_dev *pdev;
 
 /*
 ** List the SROM infoleaf functions and chipsets

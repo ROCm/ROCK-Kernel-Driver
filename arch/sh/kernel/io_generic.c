@@ -15,6 +15,7 @@
 
 #include <asm/io.h>
 #include <asm/machvec.h>
+#include <linux/module.h>
 
 #if defined(__sh3__)
 /* I'm not sure SH7709 has this kind of bug */
@@ -31,22 +32,22 @@ static inline void delay(void)
 	ctrl_inw(0xa0000000);
 }
 
-unsigned long generic_inb(unsigned int port)
+unsigned char generic_inb(unsigned long port)
 {
 	return *(volatile unsigned char*)PORT2ADDR(port);
 }
 
-unsigned long generic_inw(unsigned int port)
+unsigned short generic_inw(unsigned long port)
 {
 	return *(volatile unsigned short*)PORT2ADDR(port);
 }
 
-unsigned long generic_inl(unsigned int port)
+unsigned int generic_inl(unsigned long port)
 {
 	return *(volatile unsigned long*)PORT2ADDR(port);
 }
 
-unsigned long generic_inb_p(unsigned int port)
+unsigned char generic_inb_p(unsigned long port)
 {
 	unsigned long v = *(volatile unsigned char*)PORT2ADDR(port);
 
@@ -54,7 +55,7 @@ unsigned long generic_inb_p(unsigned int port)
 	return v;
 }
 
-unsigned long generic_inw_p(unsigned int port)
+unsigned short generic_inw_p(unsigned long port)
 {
 	unsigned long v = *(volatile unsigned short*)PORT2ADDR(port);
 
@@ -62,7 +63,7 @@ unsigned long generic_inw_p(unsigned int port)
 	return v;
 }
 
-unsigned long generic_inl_p(unsigned int port)
+unsigned int generic_inl_p(unsigned long port)
 {
 	unsigned long v = *(volatile unsigned long*)PORT2ADDR(port);
 
@@ -70,13 +71,13 @@ unsigned long generic_inl_p(unsigned int port)
 	return v;
 }
 
-void generic_insb(unsigned int port, void *buffer, unsigned long count)
+void generic_insb(unsigned long port, void *buffer, unsigned long count)
 {
 	unsigned char *buf=buffer;
 	while(count--) *buf++=inb(port);
 }
 
-void generic_insw(unsigned int port, void *buffer, unsigned long count)
+void generic_insw(unsigned long port, void *buffer, unsigned long count)
 {
 	unsigned short *buf=buffer;
 	while(count--) *buf++=inw(port);
@@ -85,7 +86,7 @@ void generic_insw(unsigned int port, void *buffer, unsigned long count)
 #endif
 }
 
-void generic_insl(unsigned int port, void *buffer, unsigned long count)
+void generic_insl(unsigned long port, void *buffer, unsigned long count)
 {
 	unsigned long *buf=buffer;
 	while(count--) *buf++=inl(port);
@@ -94,46 +95,46 @@ void generic_insl(unsigned int port, void *buffer, unsigned long count)
 #endif
 }
 
-void generic_outb(unsigned long b, unsigned int port)
+void generic_outb(unsigned char b, unsigned long port)
 {
 	*(volatile unsigned char*)PORT2ADDR(port) = b;
 }
 
-void generic_outw(unsigned long b, unsigned int port)
+void generic_outw(unsigned short b, unsigned long port)
 {
 	*(volatile unsigned short*)PORT2ADDR(port) = b;
 }
 
-void generic_outl(unsigned long b, unsigned int port)
+void generic_outl(unsigned int b, unsigned long port)
 {
         *(volatile unsigned long*)PORT2ADDR(port) = b;
 }
 
-void generic_outb_p(unsigned long b, unsigned int port)
+void generic_outb_p(unsigned char b, unsigned long port)
 {
 	*(volatile unsigned char*)PORT2ADDR(port) = b;
 	delay();
 }
 
-void generic_outw_p(unsigned long b, unsigned int port)
+void generic_outw_p(unsigned short b, unsigned long port)
 {
 	*(volatile unsigned short*)PORT2ADDR(port) = b;
 	delay();
 }
 
-void generic_outl_p(unsigned long b, unsigned int port)
+void generic_outl_p(unsigned int b, unsigned long port)
 {
 	*(volatile unsigned long*)PORT2ADDR(port) = b;
 	delay();
 }
 
-void generic_outsb(unsigned int port, const void *buffer, unsigned long count)
+void generic_outsb(unsigned long port, const void *buffer, unsigned long count)
 {
 	const unsigned char *buf=buffer;
 	while(count--) outb(*buf++, port);
 }
 
-void generic_outsw(unsigned int port, const void *buffer, unsigned long count)
+void generic_outsw(unsigned long port, const void *buffer, unsigned long count)
 {
 	const unsigned short *buf=buffer;
 	while(count--) outw(*buf++, port);
@@ -142,7 +143,7 @@ void generic_outsw(unsigned int port, const void *buffer, unsigned long count)
 #endif
 }
 
-void generic_outsl(unsigned int port, const void *buffer, unsigned long count)
+void generic_outsl(unsigned long port, const void *buffer, unsigned long count)
 {
 	const unsigned long *buf=buffer;
 	while(count--) outl(*buf++, port);
@@ -151,17 +152,17 @@ void generic_outsl(unsigned int port, const void *buffer, unsigned long count)
 #endif
 }
 
-unsigned long generic_readb(unsigned long addr)
+unsigned char generic_readb(unsigned long addr)
 {
 	return *(volatile unsigned char*)addr;
 }
 
-unsigned long generic_readw(unsigned long addr)
+unsigned short generic_readw(unsigned long addr)
 {
 	return *(volatile unsigned short*)addr;
 }
 
-unsigned long generic_readl(unsigned long addr)
+unsigned int generic_readl(unsigned long addr)
 {
 	return *(volatile unsigned long*)addr;
 }
@@ -185,15 +186,12 @@ void * generic_ioremap(unsigned long offset, unsigned long size)
 {
 	return (void *) P2SEGADDR(offset);
 }
-
-void * generic_ioremap_nocache (unsigned long offset, unsigned long size)
-{
-	return (void *) P2SEGADDR(offset);
-}
+EXPORT_SYMBOL(generic_ioremap);
 
 void generic_iounmap(void *addr)
 {
 }
+EXPORT_SYMBOL(generic_iounmap);
 
 unsigned long generic_isa_port2addr(unsigned long offset)
 {

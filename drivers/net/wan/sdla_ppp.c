@@ -3,14 +3,30 @@
 *
 * Author: 	Nenad Corbic <ncorbic@sangoma.com>
 *
-* Copyright:	(c) 1995-1999 Sangoma Technologies Inc.
+* Copyright:	(c) 1995-2001 Sangoma Technologies Inc.
 *
 *		This program is free software; you can redistribute it and/or
 *		modify it under the terms of the GNU General Public License
 *		as published by the Free Software Foundation; either version
 *		2 of the License, or (at your option) any later version.
 * ============================================================================
-*
+* Feb 28, 2001  Nenad Corbic	o Updated if_tx_timeout() routine for 
+* 				  2.4.X kernels.
+* Nov 29, 2000  Nenad Corbic	o Added the 2.4.x kernel support:
+* 				  get_ip_address() function has moved
+* 				  into the ppp_poll() routine. It cannot
+* 				  be called from an interrupt.
+* Nov 07, 2000  Nenad Corbic	o Added security features for UDP debugging:
+*                                 Deny all and specify allowed requests.
+* May 02, 2000  Nenad Corbic	o Added the dynamic interface shutdown
+*                                 option. When the link goes down, the
+*                                 network interface IFF_UP flag is reset.
+* Mar 06, 2000  Nenad Corbic	o Bug Fix: corrupted mbox recovery.
+* Feb 25, 2000  Nenad Corbic    o Fixed the FT1 UDP debugger problem.
+* Feb 09, 2000  Nenad Coribc    o Shutdown bug fix. update() was called
+*                                 with NULL dev pointer: no check.
+* Jan 24, 2000  Nenad Corbic    o Disabled use of CMD complete inter.
+* Dev 15, 1999  Nenad Corbic    o Fixed up header files for 2.0.X kernels
 * Oct 25, 1999  Nenad Corbic    o Support for 2.0.X kernels
 *                                 Moved dynamic route processing into 
 *                                 a polling routine.
@@ -74,13 +90,12 @@
 * Jan 06, 1997	Gene Kozin	Initial version.
 *****************************************************************************/
 
-#include <linux/config.h>
 #include <linux/version.h>
 #include <linux/kernel.h>	/* printk(), and other useful stuff */
 #include <linux/stddef.h>	/* offsetof(), etc. */
 #include <linux/errno.h>	/* return codes */
 #include <linux/string.h>	/* inline memset(), etc. */
-#include <linux/slab.h>	/* kmalloc(), kfree() */
+#include <linux/malloc.h>	/* kmalloc(), kfree() */
 #include <linux/wanrouter.h>	/* WAN router definitions */
 #include <linux/wanpipe.h>	/* WANPIPE common user API definitions */
 #include <linux/if_arp.h>	/* ARPHRD_* defines */
@@ -88,23 +103,28 @@
 #include <linux/in.h>		/* sockaddr_in */
 #include <linux/inet.h>		/* in_aton(), in_ntoa() prototypes */
 
-#include <linux/inetdevice.h>
-#include <asm/uaccess.h>
+
+/* ---- 2.4.X KERNEL SUPPORT -----------------------*/
+#if defined(LINUX_2_1) || defined(LINUX_2_4)
+ #include <asm/uaccess.h>
+ #include <linux/inetdevice.h>
+ #include <linux/netdevice.h>
+#else
+ #include <asm/segment.h>
+ #include <net/route.h>          /* Adding new route entries : 2.0.X kernels */
+#endif
 
 #include <linux/if.h>
+#include <linux/wanpipe.h>
 #include <linux/sdla_ppp.h>		/* PPP firmware API definitions */
 #include <linux/sdlasfm.h>		/* S514 Type Definition */
 /****** Defines & Macros ****************************************************/
 
-#ifdef	_DEBUG_
-#define	STATIC
-#else
-#define	STATIC		static
-#endif
-
 #define	PPP_DFLT_MTU	1500		/* default MTU */
 #define	PPP_MAX_MTU	4000		/* maximum MTU */
 #define PPP_HDR_LEN	1
+
+#define MAX_IP_ERRORS 100 
 
 #define	CONNECT_TIMEOUT	(90*HZ)		/* link connection timeout */
 #define	HOLD_DOWN_TIME	(5*HZ)		/* link hold down time : Changed from 30 to 5 */
@@ -125,9 +145,10 @@
 #define LCP(a)   ( a == 0x09 ? "OPEN" : "CLOSED" )
 #define IP(a)    ( a == 0x09 ? "ENABLED" : "DISABLED" )
 
-#define TMR_INT_ENABLED_UPDATE  	1
-#define TMR_INT_ENABLED_PPP_EVENT	2
-#define TMR_INT_ENABLED_UDP		4
+#define TMR_INT_ENABLED_UPDATE  	0x01
+#define TMR_INT_ENABLED_PPP_EVENT	0x02
+#define TMR_INT_ENABLED_UDP		0x04
+#define TMR_INT_ENABLED_CONFIG		0x20
 
 /* Set Configuraton Command Definitions */
 #define PERCENT_TX_BUFF			60
@@ -143,8 +164,11 @@
 #define NUM_AUTH_REQ_WITHOUT_REPLY      10
 
 #define END_OFFSET 0x1F0
+#if LINUX_VERSION_CODE < 0x020125
+#define test_and_set_bit set_bit
+#define net_ratelimit() 1
+#endif
 
-#define TX_TIMEOUT (5*HZ)
 
 /******Data Structures*****************************************************/
 
@@ -155,9 +179,7 @@
   
 typedef struct ppp_private_area
 {
-	/* This member must be first. */
-	struct net_device *slave;	/* WAN slave */
-
+	netdevice_t *slave;
 	sdla_t* card;	
 	unsigned long router_start_time;	/*router start time in sec */
 	unsigned long tick_counter;		/*used for 5 second counter*/
@@ -173,12 +195,20 @@ typedef struct ppp_private_area
 	u32 ip_local;				/* Local IP Address */
 	u32 ip_remote;				/* remote IP Address */
 
+	u32 ip_local_tmp;
+	u32 ip_remote_tmp;
+	
 	unsigned char timer_int_enabled;	/* Who enabled the timer inter*/
 	unsigned char update_comms_stats;	/* Used by update function */
 	unsigned long curr_trace_addr;		/* Trace information */
 	unsigned long start_trace_addr;
 	unsigned long end_trace_addr;
 
+	unsigned char interface_down;		/* Brind down interface when channel 
+                                                   goes down */
+	unsigned long config_wait_timeout;	/* After if_open() if in dynamic if mode,
+						   wait a few seconds before configuring */
+	
 	unsigned short udp_pkt_lgth;
 	char  udp_pkt_src;
       	char  udp_pkt_data[MAX_LGTH_UDP_MGNT_PKT];
@@ -191,6 +221,16 @@ typedef struct ppp_private_area
 
 	unsigned long router_up_time; 
 
+	/* Polling task queue. Each interface
+         * has its own task queue, which is used
+         * to defer events from the interrupt */
+	struct tq_struct poll_task;
+	struct timer_list poll_delay_timer;
+
+	u8 gateway;
+	u8 config_ppp;
+	u8 ip_error;
+	
 }ppp_private_area_t;
 
 /* variable for keeping track of enabling/disabling FT1 monitor status */
@@ -203,22 +243,32 @@ extern void enable_irq(unsigned int);
 
 /* WAN link driver entry points. These are called by the WAN router module. */
 static int update(wan_device_t *wandev);
-static int new_if(wan_device_t *wandev, struct net_device *dev, wanif_conf_t *conf);
-static int del_if(wan_device_t *wandev, struct net_device *dev);
+static int new_if(wan_device_t *wandev, netdevice_t *dev, wanif_conf_t *conf);
+static int del_if(wan_device_t *wandev, netdevice_t *dev);
 
 /* WANPIPE-specific entry points */
 static int wpp_exec (struct sdla *card, void *u_cmd, void *u_data);
 
 /* Network device interface */
-static int if_init(struct net_device *dev);
-static int if_open(struct net_device *dev);
-static int if_close(struct net_device *dev);
-static void if_tx_timeout (struct net_device *dev);
-static int if_header(struct sk_buff *skb, struct net_device *dev, unsigned short type, 
+static int if_init(netdevice_t *dev);
+static int if_open(netdevice_t *dev);
+static int if_close(netdevice_t *dev);
+static int if_header(struct sk_buff *skb, netdevice_t *dev, unsigned short type, 
 		     void *daddr, void *saddr, unsigned len);
+
+#ifdef LINUX_2_4
+static void if_tx_timeout (netdevice_t *dev);
+#endif
+
+#if defined(LINUX_2_1) || defined(LINUX_2_4)
 static int if_rebuild_hdr(struct sk_buff *skb);
-static struct net_device_stats *if_stats(struct net_device *dev);
-static int if_send(struct sk_buff *skb, struct net_device *dev);
+static struct net_device_stats *if_stats(netdevice_t *dev);
+#else
+static struct enet_statistics *if_stats(netdevice_t *dev);
+static int if_rebuild_hdr (void* hdr, netdevice_t* dev, unsigned long raddr,
+        struct sk_buff* skb);
+#endif
+static int if_send(struct sk_buff *skb, netdevice_t *dev);
 
 
 /* PPP firmware interface functions */
@@ -229,27 +279,28 @@ static int ppp_configure(sdla_t *card, void *data);
 static int ppp_set_intr_mode(sdla_t *card, unsigned char mode);
 static int ppp_comm_enable(sdla_t *card);
 static int ppp_comm_disable(sdla_t *card);
+static int ppp_comm_disable_shutdown(sdla_t *card);
 static int ppp_get_err_stats(sdla_t *card);
 static int ppp_send(sdla_t *card, void *data, unsigned len, unsigned proto);
 static int ppp_error(sdla_t *card, int err, ppp_mbox_t *mb);
 
-STATIC void wpp_isr(sdla_t *card);
+static void wpp_isr(sdla_t *card);
 static void rx_intr(sdla_t *card);
 static void event_intr(sdla_t *card);
 static void timer_intr(sdla_t *card);
 
 /* Background polling routines */
 static void process_route(sdla_t *card);
-static void poll_disconnected(sdla_t *card);
+static void retrigger_comm(sdla_t *card);
 
 /* Miscellaneous functions */
 static int read_info( sdla_t *card );
 static int read_connection_info (sdla_t *card);
-static int remove_route( sdla_t *card );
-static int config508(ppp_private_area_t *ppp_priv_area, sdla_t *card);
+static void remove_route( sdla_t *card );
+static int config508(netdevice_t *dev, sdla_t *card);
 static void show_disc_cause(sdla_t * card, unsigned cause);
 static int reply_udp( unsigned char *data, unsigned int mbox_len );
-static void process_udp_mgmt_pkt(sdla_t *card, struct net_device *dev, 
+static void process_udp_mgmt_pkt(sdla_t *card, netdevice_t *dev, 
 				ppp_private_area_t *ppp_priv_area);
 static void init_ppp_tx_rx_buff( sdla_t *card );
 static int intr_test( sdla_t *card );
@@ -258,11 +309,19 @@ static void init_ppp_priv_struct( ppp_private_area_t *ppp_priv_area);
 static void init_global_statistics( sdla_t *card );
 static int tokenize(char *str, char **tokens);
 static char* strstrip(char *str, char *s);
-static int chk_bcast_mcast_addr(sdla_t* card, struct net_device* dev,
+static int chk_bcast_mcast_addr(sdla_t* card, netdevice_t* dev,
 				struct sk_buff *skb);
+
+static int config_ppp (sdla_t *);
+static void ppp_poll(netdevice_t *);
+static void trigger_ppp_poll(netdevice_t *);
+static void ppp_poll_delay (unsigned long dev_ptr);
+
+
 static int Read_connection_info;
 static int Intr_test_counter;
 static unsigned short available_buffer_space;
+
 
 /* IPX functions */
 static void switch_net_numbers(unsigned char *sendpacket, unsigned long network_number, 
@@ -275,12 +334,11 @@ static void s508_lock (sdla_t *card, unsigned long *smp_flags);
 static void s508_unlock (sdla_t *card, unsigned long *smp_flags);
 
 static int store_udp_mgmt_pkt(char udp_pkt_src, sdla_t* card,
-                                struct sk_buff *skb, struct net_device* dev,
+                                struct sk_buff *skb, netdevice_t* dev,
                                 ppp_private_area_t* ppp_priv_area );
 static unsigned short calc_checksum (char *data, int len);
-
-
-
+static void disable_comm (sdla_t *card);
+static int detect_and_fix_tx_bug (sdla_t *card);
 
 /****** Public Functions ****************************************************/
 
@@ -298,6 +356,7 @@ static unsigned short calc_checksum (char *data, int len);
  */
 int wpp_init(sdla_t *card, wandev_conf_t *conf)
 {
+	ppp_flags_t *flags;
 	union
 	{
 		char str[80];
@@ -329,6 +388,7 @@ int wpp_init(sdla_t *card, wandev_conf_t *conf)
 			return -EINVAL;
 
 	}
+	flags = card->flags;
 
 	/* Read firmware version.  Note that when adapter initializes, it
 	 * clears the mailbox, so it may appear that the first command was
@@ -353,9 +413,10 @@ int wpp_init(sdla_t *card, wandev_conf_t *conf)
 	card->wandev.update	= &update;
 	card->wandev.new_if	= &new_if;
 	card->wandev.del_if	= &del_if;
-	card->wandev.state	= WAN_DISCONNECTED;
         card->wandev.udp_port   = conf->udp_port;
 	card->wandev.ttl	= conf->ttl;
+	card->wandev.state      = WAN_DISCONNECTED;
+	card->disable_comm	= &disable_comm;
 	card->irq_dis_if_send_count = 0;
         card->irq_dis_poll_count = 0;
 	card->u.p.authenticator = conf->u.ppp.authenticator;
@@ -366,6 +427,33 @@ int wpp_init(sdla_t *card, wandev_conf_t *conf)
 
 	/* initialize global statistics */
 	init_global_statistics( card );
+
+
+
+	if (!card->configured){
+		int err;
+
+		Intr_test_counter = 0;
+		err = intr_test(card);
+
+		if(err || (Intr_test_counter < MAX_INTR_TEST_COUNTER)) {
+			printk("%s: Interrupt Test Failed, Counter: %i\n", 
+				card->devname, Intr_test_counter);
+			printk( "%s: Please choose another interrupt\n",card->devname);
+			return -EIO;
+		}
+		
+		printk(KERN_INFO "%s: Interrupt Test Passed, Counter: %i\n", 
+			card->devname, Intr_test_counter);
+		card->configured = 1;
+	}
+
+	ppp_set_intr_mode(card, PPP_INTR_TIMER); 
+
+	/* Turn off the transmit and timer interrupt */
+	flags->imask &= ~PPP_INTR_TIMER;
+
+	printk(KERN_INFO "\n");
 
 	return 0;
 }
@@ -378,8 +466,8 @@ int wpp_init(sdla_t *card, wandev_conf_t *conf)
 static int update(wan_device_t *wandev)
 {
 	sdla_t* card = wandev->private;
- 	struct net_device* dev = card->wandev.dev;
-        volatile ppp_private_area_t *ppp_priv_area = dev->priv;
+ 	netdevice_t* dev;
+        volatile ppp_private_area_t *ppp_priv_area;
 	ppp_flags_t *flags = card->flags;
 	unsigned long timeout;
 
@@ -390,9 +478,17 @@ static int update(wan_device_t *wandev)
 	if (wandev->state == WAN_UNCONFIGURED)
 		return -ENODEV;
 	
-	//FIXME: Do we need this
-	if (test_bit(0, (void*)&wandev->critical))
-		return -EAGAIN;
+	/* Shutdown bug fix. This function can be
+         * called with NULL dev pointer during
+         * shutdown 
+	 */
+	if ((dev=card->wandev.dev) == NULL){
+		return -ENODEV;
+	}
+
+	if ((ppp_priv_area=dev->priv) == NULL){
+		return -ENODEV;
+	}
 	
 	ppp_priv_area->update_comms_stats = 2;
 	ppp_priv_area->timer_int_enabled |= TMR_INT_ENABLED_UPDATE;
@@ -427,17 +523,21 @@ static int update(wan_device_t *wandev)
  * Return:	0	o.k.
  *		< 0	failure (channel will not be created)
  */
-static int new_if(wan_device_t *wandev, struct net_device *dev, wanif_conf_t *conf)
+static int new_if(wan_device_t *wandev, netdevice_t *dev, wanif_conf_t *conf)
 {
 	sdla_t *card = wandev->private;
 	ppp_private_area_t *ppp_priv_area;
-	
+
 	if (wandev->ndev)
 		return -EEXIST;
 	
+
+	printk(KERN_INFO "%s: Configuring Interface: %s\n",
+			card->devname, conf->name);
+
 	if ((conf->name[0] == '\0') || (strlen(conf->name) > WAN_IFNAME_SZ)) {
 
-		printk(KERN_INFO "%s: invalid interface name!\n",
+		printk(KERN_INFO "%s: Invalid interface name!\n",
 			card->devname);
 		return -EINVAL;
 
@@ -463,6 +563,14 @@ static int new_if(wan_device_t *wandev, struct net_device *dev, wanif_conf_t *co
 	ppp_priv_area->mc = conf->mc;
 	ppp_priv_area->pap = conf->pap;
 	ppp_priv_area->chap = conf->chap;
+
+	/* Option to bring down the interface when 
+         * the link goes down */
+	if (conf->if_down){
+		set_bit(DYN_OPT_ON,&ppp_priv_area->interface_down);
+		printk("%s: Dynamic interface configuration enabled\n",
+			card->devname);
+	} 
 
 	/* If no user ids are specified */
 	if(!strlen(conf->userid) && (ppp_priv_area->pap||ppp_priv_area->chap)){
@@ -494,16 +602,48 @@ static int new_if(wan_device_t *wandev, struct net_device *dev, wanif_conf_t *co
 
 	
 	ppp_priv_area->enable_IPX = conf->enable_IPX;
-	if (conf->network_number)
+	if (conf->network_number){
 		ppp_priv_area->network_number = conf->network_number;
-	else
+	}else{
 		ppp_priv_area->network_number = 0xDEADBEEF;
+	}
 
+	/* Tells us that if this interface is a
+         * gateway or not */
+	if ((ppp_priv_area->gateway = conf->gateway) == WANOPT_YES){
+		printk(KERN_INFO "%s: Interface %s is set as a gateway.\n",
+			card->devname,card->u.p.if_name);
+	}
 
 	/* prepare network device data space for registration */
-	strcpy(dev->name, card->u.p.if_name);
+      #ifdef LINUX_2_4
+ 	strcpy(dev->name,card->u.p.if_name);
+      #else
+	dev->name = (char *)kmalloc(strlen(card->u.p.if_name) + 2, GFP_KERNEL); 
+	sprintf(dev->name, "%s", card->u.p.if_name);
+      #endif
+	
 	dev->init = &if_init;
 	dev->priv = ppp_priv_area;
+	dev->mtu = min(dev->mtu, card->wandev.mtu);
+
+	/* Initialize the polling task routine */
+      #ifndef LINUX_2_4
+	ppp_priv_area->poll_task.next = NULL;
+      #endif
+	ppp_priv_area->poll_task.sync=0;
+	ppp_priv_area->poll_task.routine = (void*)(void*)ppp_poll;
+	ppp_priv_area->poll_task.data = dev;
+
+	/* Initialize the polling delay timer */
+	init_timer(&ppp_priv_area->poll_delay_timer);
+	ppp_priv_area->poll_delay_timer.data = (unsigned long)dev;
+	ppp_priv_area->poll_delay_timer.function = ppp_poll_delay;
+	
+	
+	/* Since we start with dummy IP addresses we can say
+	 * that route exists */
+	printk(KERN_INFO "\n");
 
 	return 0;
 }
@@ -511,15 +651,15 @@ static int new_if(wan_device_t *wandev, struct net_device *dev, wanif_conf_t *co
 /*============================================================================
  * Delete logical channel.
  */
-static int del_if(wan_device_t *wandev, struct net_device *dev)
+static int del_if(wan_device_t *wandev, netdevice_t *dev)
 {
-	if (dev->priv) {
-
-                kfree(dev->priv);
-                dev->priv = NULL;
-        }
-
 	return 0;
+}
+
+static void disable_comm (sdla_t *card)
+{
+	ppp_comm_disable_shutdown(card);
+	return;
 }
 
 /****** WANPIPE-specific entry points ***************************************/
@@ -534,6 +674,7 @@ static int wpp_exec(struct sdla *card, void *u_cmd, void *u_data)
 	ppp_mbox_t *mbox = card->mbox;
 	int len;
 
+#if defined(LINUX_2_1) || defined(LINUX_2_4)
 	if (copy_from_user((void*)&mbox->cmd, u_cmd, sizeof(ppp_cmd_t)))
 		return -EFAULT;
 
@@ -558,6 +699,35 @@ static int wpp_exec(struct sdla *card, void *u_cmd, void *u_data)
 	if (len && u_data && copy_to_user(u_data, (void*)&mbox->data, len))
 		return -EFAULT;
 
+#else
+
+        if (!u_cmd || verify_area(VERIFY_WRITE, u_cmd, sizeof(ppp_cmd_t)))
+                return -EFAULT;
+
+        memcpy_fromfs((void*)&mbox->cmd, u_cmd, sizeof(ppp_cmd_t));
+
+	len = mbox->cmd.length;
+
+        if (len) {
+
+                if (!u_data || verify_area(VERIFY_READ, u_data, len))
+                        return -EFAULT;
+        }
+
+        /* execute command */
+        if (!sdla_exec(mbox))
+               	return -EIO;
+
+        /* return result */
+        memcpy_tofs(u_cmd, (void*)&mbox->cmd, sizeof(ppp_cmd_t));
+        len = mbox->cmd.length;
+
+        if (len && u_data && !verify_area(VERIFY_WRITE, u_data, len))
+                memcpy_tofs(u_data, (void*)&mbox->data, len);
+
+
+#endif
+
 	return 0;
 }
 
@@ -570,14 +740,14 @@ static int wpp_exec(struct sdla *card, void *u_cmd, void *u_data)
  * interface registration.  Returning anything but zero will fail interface
  * registration.
  */
-static int if_init(struct net_device *dev)
+static int if_init(netdevice_t *dev)
 {
 	ppp_private_area_t *ppp_priv_area = dev->priv;
 	sdla_t *card = ppp_priv_area->card;
 	wan_device_t *wandev = &card->wandev;
-#ifndef LINUX_2_1
+      #ifdef LINUX_2_0
 	int i;
-#endif
+      #endif
 
 	/* Initialize device driver entry points */
 	dev->open		= &if_open;
@@ -586,21 +756,24 @@ static int if_init(struct net_device *dev)
 	dev->rebuild_header	= &if_rebuild_hdr;
 	dev->hard_start_xmit	= &if_send;
 	dev->get_stats		= &if_stats;
+      #ifdef LINUX_2_4
 	dev->tx_timeout		= &if_tx_timeout;
 	dev->watchdog_timeo	= TX_TIMEOUT;
+      #endif
 
 	/* Initialize media-specific parameters */
 	dev->type		= ARPHRD_PPP;	/* ARP h/w type */
-	dev->flags	       |= IFF_POINTOPOINT;
+	dev->flags		|= IFF_POINTOPOINT;
+	dev->flags		|= IFF_NOARP;
 
 	/* Enable Mulitcasting if specified by user*/
 	if (ppp_priv_area->mc == WANOPT_YES){
-		dev->flags     |= IFF_MULTICAST;
+		dev->flags	|= IFF_MULTICAST;
 	}
 
-#ifndef LINUX_2_1
+      #ifdef LINUX_2_0
 	dev->family		= AF_INET;
-#endif	
+      #endif	
 	dev->mtu		= wandev->mtu;
 	dev->hard_header_len	= PPP_HDR_LEN;	/* media header length */
 
@@ -615,7 +788,13 @@ static int if_init(struct net_device *dev)
         dev->tx_queue_len = 100;
    
 	/* Initialize socket buffers */
+      #if defined(LINUX_2_1) || defined(LINUX_2_4)
 	dev_init_buffers(dev);
+      #else
+        for (i = 0; i < DEV_NUMBUFFS; ++i)
+                skb_queue_head_init(&dev->buffs[i]);
+      #endif
+
 	return 0;
 }
 
@@ -626,105 +805,44 @@ static int if_init(struct net_device *dev)
  *
  * Return 0 if O.k. or errno.
  */
-static int if_open(struct net_device *dev)
+static int if_open (netdevice_t *dev)
 {
 	ppp_private_area_t *ppp_priv_area = dev->priv;
 	sdla_t *card = ppp_priv_area->card;
-	ppp_flags_t *flags = card->flags;
 	struct timeval tv;
-	int err = 0;
+	//unsigned long smp_flags;
 
-	if (netif_running(dev))
-		return -EBUSY;		/* only one open is allowed */
-	
-	if (test_and_set_bit(0, (void*)&card->wandev.critical))
-		return -EAGAIN;
+	if (is_dev_running(dev))
+		return -EBUSY;
 
-	if (!card->configured){
-
-		if (config508(ppp_priv_area, card)){
-
-			err = -EIO;
-			card->wandev.critical = 0;
-			return err;
-		}
-
-		Intr_test_counter = 0;
-		err = intr_test( card );
-
-		if(err || (Intr_test_counter < MAX_INTR_TEST_COUNTER)) {
-			printk("%s: Interrupt Test Failed, Counter: %i\n", 
-				card->devname, Intr_test_counter);
-			printk( "%s: Please choose another interrupt\n",card->devname);
-			err = -EIO;
-			card->wandev.critical = 0;
-			return err;
-		}
-		
-		printk(KERN_INFO "%s: Interrupt Test Passed, Counter: %i\n", 
-			card->devname, Intr_test_counter);
-		card->configured = 1;
-
-	}
-
-	/* Initialize Rx/Tx buffer control fields */
-	init_ppp_tx_rx_buff( card );
-
-	if (ppp_set_intr_mode(card, PPP_INTR_RXRDY|
-			    		PPP_INTR_TXRDY|
-				    	PPP_INTR_MODEM|
-				    	PPP_INTR_CMD  |
-				    	PPP_INTR_DISC |
-				    	PPP_INTR_OPEN |
-				    	PPP_INTR_DROP_DTR |
-					PPP_INTR_TIMER)) {
-	
-		err = -EIO;
-		card->wandev.critical = 0;
-		return err;
-
-	}
-
-        /* Turn off the transmit and timer interrupt */
-	flags->imask &= ~(PPP_INTR_TXRDY | PPP_INTR_TIMER) ;
-
-	/* If you are not the authenticator and any one of the protocol is 
-	 * enabled then we call the set_out_bound_authentication.
-	 */
-	if ( !card->u.p.authenticator  && (ppp_priv_area->pap || ppp_priv_area->chap)) {
-		if ( ppp_set_outbnd_auth(card, ppp_priv_area) ){
-			err = -EIO;
-			card->wandev.critical = 0;
-			return err;
-		}
-	} 
-	
-	/* If you are the authenticator and any one of the protocol is enabled
-	 * then we call the set_in_bound_authentication.
-	 */
-	if ( card->u.p.authenticator && (ppp_priv_area->pap || ppp_priv_area->chap)) {
-		if ( ppp_set_inbnd_auth(card, ppp_priv_area) ){
-			err = -EIO;
-			card->wandev.critical = 0;
-			return err;
-		}
-	}
-
-	if (ppp_comm_enable(card)) {
-		err = -EIO;
-		card->wandev.critical = 0;
-		return err;
-	}
-	
-	wanpipe_set_state(card, WAN_CONNECTING);
 	wanpipe_open(card);
-	dev->mtu = min(dev->mtu, card->wandev.mtu);
-	netif_start_queue(dev);	
+
+      #ifdef LINUX_2_4
+	netif_start_queue(dev);
+      #else
+	dev->interrupt = 0;
+	dev->tbusy = 0;
+	dev->start = 1;
+      #endif
+	
 	do_gettimeofday( &tv );
 	ppp_priv_area->router_start_time = tv.tv_sec;
-	card->wandev.critical = 0;
 
-	return err;
+	/* We cannot configure the card here because we don't
+	 * have access to the interface IP addresses.
+         * Once the interface initilization is complete, we will be
+         * able to access the IP addresses.  Therefore,
+         * configure the ppp link in the poll routine */
+	set_bit(0,&ppp_priv_area->config_ppp);
+	ppp_priv_area->config_wait_timeout=jiffies;
+
+	/* Start the PPP configuration after 1sec delay.
+	 * This will give the interface initilization time
+	 * to finish its configuration */
+	del_timer(&ppp_priv_area->poll_delay_timer);
+	ppp_priv_area->poll_delay_timer.expires = jiffies+HZ;
+	add_timer(&ppp_priv_area->poll_delay_timer);
+	return 0;
 }
 
 /*============================================================================
@@ -732,20 +850,18 @@ static int if_open(struct net_device *dev)
  * o if this is the last open, then disable communications and interrupts.
  * o reset flags.
  */
-static int if_close(struct net_device *dev)
+static int if_close(netdevice_t *dev)
 {
 	ppp_private_area_t *ppp_priv_area = dev->priv;
 	sdla_t *card = ppp_priv_area->card;
 
-	if (test_and_set_bit(0, (void*)&card->wandev.critical))
-		return -EAGAIN;
-	
-	netif_stop_queue(dev);
+	stop_net_queue(dev);
+      #ifndef LINUX_2_4
+	dev->start=0;
+      #endif
 	wanpipe_close(card);
-	wanpipe_set_state(card, WAN_DISCONNECTED);
-	ppp_set_intr_mode(card, 0);
-	ppp_comm_disable(card);
-	card->wandev.critical = 0;
+
+	del_timer (&ppp_priv_area->poll_delay_timer);
 	return 0;
 }
 
@@ -758,13 +874,12 @@ static int if_close(struct net_device *dev)
  *
  * Return:	media header length.
  */
-static int if_header(struct sk_buff *skb, struct net_device *dev,
+static int if_header(struct sk_buff *skb, netdevice_t *dev,
 	unsigned short type, void *daddr, void *saddr, unsigned len)
 {
 	switch (type)
 	{
 		case ETH_P_IP:
-	
 		case ETH_P_IPX:
 			skb->protocol = htons(type);
 			break;
@@ -782,10 +897,10 @@ static int if_header(struct sk_buff *skb, struct net_device *dev,
  * Return:	1	physical address resolved.
  *		0	physical address not resolved
  */
-
+#if defined(LINUX_2_1) || defined(LINUX_2_4)
 static int if_rebuild_hdr (struct sk_buff *skb)
 {
-	struct net_device *dev = skb->dev;
+	netdevice_t *dev = skb->dev;
 	ppp_private_area_t *ppp_priv_area = dev->priv;
 	sdla_t *card = ppp_priv_area->card;
 
@@ -794,33 +909,39 @@ static int if_rebuild_hdr (struct sk_buff *skb)
 	return 1;
 }
 
-
-/*============================================================================
- * Handle transmit timeout from netif watchdog
- */
-static void if_tx_timeout (struct net_device *dev)
+#else
+static int if_rebuild_hdr (void* hdr, netdevice_t* dev, unsigned long raddr,
+                           struct sk_buff* skb)
 {
-	ppp_private_area_t *ppp_priv_area = dev->priv;
-	sdla_t *card = ppp_priv_area->card;
+	return 1;
 
+}
+#endif
 
+#ifdef LINUX_2_4
+/*============================================================================
+ * Handle transmit timeout event from netif watchdog
+ */
+static void if_tx_timeout (netdevice_t *dev)
+{
+    	ppp_private_area_t* chan = dev->priv;
+	sdla_t *card = chan->card;
+	
 	/* If our device stays busy for at least 5 seconds then we will
-	 * kick start the device by making dev->tbusy = 0.  We expect 
-	 * that our device never stays busy more than 5 seconds. So this
-	 * is only used as a last resort. 
+	 * kick start the device by making dev->tbusy = 0.  We expect
+	 * that our device never stays busy more than 5 seconds. So this                 
+	 * is only used as a last resort.
 	 */
 
-	++ppp_priv_area->if_send_stat.if_send_tbusy;
+	++ chan->if_send_stat.if_send_tbusy;
 	++card->wandev.stats.collisions;
 
-	printk (KERN_INFO "%s: Transmit times out\n", card->devname);
-
-	++ppp_priv_area->if_send_stat.if_send_tbusy_timeout;
-	++card->wandev.stats.collisions;
-
-	/* unbusy the card (because only one interface per card) */
-	netif_wake_queue(dev);
+	printk (KERN_INFO "%s: Transmit timed out on %s\n", card->devname,dev->name);
+	++chan->if_send_stat.if_send_tbusy_timeout;
+	netif_wake_queue (dev);
 }
+#endif
+
 
 
 /*============================================================================
@@ -840,19 +961,22 @@ static void if_tx_timeout (struct net_device *dev)
  * 2. Setting tbusy flag will inhibit further transmit requests from the
  *    protocol stack and can be used for flow control with protocol layer.
  */
-static int if_send (struct sk_buff *skb, struct net_device *dev)
+static int if_send (struct sk_buff *skb, netdevice_t *dev)
 {
 	ppp_private_area_t *ppp_priv_area = dev->priv;
 	sdla_t *card = ppp_priv_area->card;
 	unsigned char *sendpacket;
 	unsigned long smp_flags;
 	ppp_flags_t *flags = card->flags;
-	int retry = 0;
 	int udp_type;
-	
+	int err=0;
 	
 	++ppp_priv_area->if_send_stat.if_send_entry;
 
+      #ifdef LINUX_2_4
+	netif_stop_queue(dev);
+      #endif
+	
 	if (skb == NULL) {
 
 		/* If we get here, some higher layer thinks we've missed an
@@ -862,12 +986,37 @@ static int if_send (struct sk_buff *skb, struct net_device *dev)
 			card->devname, dev->name);
 		
 		++ppp_priv_area->if_send_stat.if_send_skb_null;
-		
-		netif_wake_queue(dev);
+	
+		wake_net_dev(dev);
 		return 0;
-
 	}
 
+      #ifndef LINUX_2_4
+	if (dev->tbusy) {
+
+		/* If our device stays busy for at least 5 seconds then we will
+		 * kick start the device by making dev->tbusy = 0.  We expect 
+		 * that our device never stays busy more than 5 seconds. So this
+		 * is only used as a last resort. 
+		 */
+              
+		++ppp_priv_area->if_send_stat.if_send_tbusy;
+        	++card->wandev.stats.collisions;
+
+		if ((jiffies - ppp_priv_area->tick_counter) < (5*HZ)) {
+			return 1;
+		}
+
+		printk (KERN_INFO "%s: Transmit times out on %s\n",card->devname,dev->name);
+	
+		++ppp_priv_area->if_send_stat.if_send_tbusy_timeout;
+		++card->wandev.stats.collisions;
+
+		/* unbusy the card (because only one interface per card)*/
+		dev->tbusy = 0;
+	}	
+      #endif
+	
 	sendpacket = skb->data;
 
 	udp_type = udp_pkt_type( skb, card );
@@ -879,15 +1028,18 @@ static int if_send (struct sk_buff *skb, struct net_device *dev)
 	               	flags->imask |= PPP_INTR_TIMER;
 		}
 		++ppp_priv_area->if_send_stat.if_send_PIPE_request;
+		start_net_queue(dev);
 		return 0;
-
 	}
 
 	/* Check for broadcast and multicast addresses 
 	 * If found, drop (deallocate) a packet and return.
 	 */
 	if(chk_bcast_mcast_addr(card, dev, skb)){
-                        return 0;
+		++card->wandev.stats.tx_dropped;
+		wan_dev_kfree_skb(skb,FREE_WRITE);
+		start_net_queue(dev);
+		return 0;
 	}
 
 
@@ -895,31 +1047,28 @@ static int if_send (struct sk_buff *skb, struct net_device *dev)
 		s508_lock(card,&smp_flags);
 	}
 
-    	if (test_and_set_bit(0, (void*)&card->wandev.critical)) {
+    	if (test_and_set_bit(SEND_CRIT, (void*)&card->wandev.critical)) {
 
 		printk(KERN_INFO "%s: Critical in if_send: %lx\n",
 				card->wandev.name,card->wandev.critical);
-    		dev_kfree_skb(skb);
-
+		
 		++card->wandev.stats.tx_dropped;
 		++ppp_priv_area->if_send_stat.if_send_critical_non_ISR;
-	
-		if(card->hw.type != SDLA_S514){	
-			s508_unlock(card,&smp_flags);
-		}
-
-		return 0;
+		start_net_queue(dev);
+		goto if_send_exit_crit;
 	}
 
 	if (card->wandev.state != WAN_CONNECTED) {
 
 		++ppp_priv_area->if_send_stat.if_send_wan_disconnected;
         	++card->wandev.stats.tx_dropped;
-
+		start_net_queue(dev);
+		
      	} else if (!skb->protocol) {
 		++ppp_priv_area->if_send_stat.if_send_protocol_error;
         	++card->wandev.stats.tx_errors;
-
+		start_net_queue(dev);
+		
 	} else {
 
 		/*If it's IPX change the network numbers to 0 if they're ours.*/
@@ -929,37 +1078,45 @@ static int if_send (struct sk_buff *skb, struct net_device *dev)
 					ppp_priv_area->network_number, 0);
 			} else {
 				++card->wandev.stats.tx_dropped;
-				goto tx_done;
+				start_net_queue(dev);
+				goto if_send_exit_crit;
 			}
 		}
 
 		if (ppp_send(card, skb->data, skb->len, skb->protocol)) {
-			retry = 1;
-			netif_stop_queue(dev);
+			stop_net_queue(dev);
 			++ppp_priv_area->if_send_stat.if_send_adptr_bfrs_full;
 			++ppp_priv_area->if_send_stat.if_send_tx_int_enabled;
-			ppp_priv_area->tick_counter = jiffies;
-			flags->imask |= 0x02;	/* unmask Tx interrupts */
 		} else {
 			++ppp_priv_area->if_send_stat.if_send_bfr_passed_to_adptr;
 			++card->wandev.stats.tx_packets;
+                      #if defined(LINUX_2_1) || defined(LINUX_2_4)
 			card->wandev.stats.tx_bytes += skb->len;
+                      #endif
+			start_net_queue(dev);
+		      #ifdef LINUX_2_4
+			dev->trans_start = jiffies;
+		      #endif
+
+
 		}
     	}
 	
-tx_done:	
-	if (!retry){
-		dev_kfree_skb(skb);
-	}
-
-	card->wandev.critical = 0;
+if_send_exit_crit:
 	
+	if (!(err=is_queue_stopped(dev))){
+      		wan_dev_kfree_skb(skb, FREE_WRITE);
+	}else{
+		ppp_priv_area->tick_counter = jiffies;
+		flags->imask |= PPP_INTR_TXRDY;	/* unmask Tx interrupts */
+	}
+	
+	clear_bit(SEND_CRIT,&card->wandev.critical);
 	if(card->hw.type != SDLA_S514){	
 		s508_unlock(card,&smp_flags);
 	}
 
-	
-	return retry;
+	return err;
 }
 
 
@@ -968,7 +1125,7 @@ tx_done:
  */
 
 static int store_udp_mgmt_pkt(char udp_pkt_src, sdla_t* card,
-                                struct sk_buff *skb, struct net_device* dev,
+                                struct sk_buff *skb, netdevice_t* dev,
                                 ppp_private_area_t* ppp_priv_area )
 {
 	int udp_pkt_stored = 0;
@@ -982,8 +1139,13 @@ static int store_udp_mgmt_pkt(char udp_pkt_src, sdla_t* card,
 		udp_pkt_stored = 1;
 	}else{
 		if (skb->len > MAX_LGTH_UDP_MGNT_PKT){
+#if defined(LINUX_2_1) || defined(LINUX_2_4)
 			printk(KERN_INFO "%s: PIPEMON UDP request too long : %i\n",
 				card->devname, skb->len);
+#else
+			printk(KERN_INFO "%s: PIPEMON UDP request too long : %li\n",
+				card->devname, skb->len);
+#endif
 		}else{
 			printk(KERN_INFO "%s: PIPEMON UPD request already pending\n",
 				card->devname);
@@ -991,7 +1153,12 @@ static int store_udp_mgmt_pkt(char udp_pkt_src, sdla_t* card,
 		ppp_priv_area->udp_pkt_lgth = 0;
 	}
 
-	dev_kfree_skb(skb);
+	if(udp_pkt_src == UDP_PKT_FRM_STACK){
+		wan_dev_kfree_skb(skb, FREE_WRITE);
+	}else{
+                wan_dev_kfree_skb(skb, FREE_READ);
+	}
+
 	return(udp_pkt_stored);
 }
 
@@ -1157,7 +1324,11 @@ static void switch_net_numbers(unsigned char *sendpacket, unsigned long network_
  * Get ethernet-style interface statistics.
  * Return a pointer to struct net_device_stats.
  */
-static struct net_device_stats *if_stats(struct net_device *dev)
+#if defined(LINUX_2_1) || defined(LINUX_2_4)
+static struct net_device_stats *if_stats(netdevice_t *dev)
+#else
+static struct enet_statistics *if_stats(netdevice_t *dev)
+#endif
 {
 
 	ppp_private_area_t *ppp_priv_area = dev->priv;
@@ -1354,7 +1525,7 @@ static int ppp_set_intr_mode(sdla_t *card, unsigned char mode)
 
        /* If timer has been enabled, set the timer delay to 1sec */
        if (mode & 0x80){
-       		ppp_intr_data->timer_len = 5;//100; //250;
+       		ppp_intr_data->timer_len = 250; //5;//100; //250;
                 mb->cmd.length = 4;
         }
 	
@@ -1382,7 +1553,9 @@ static int ppp_comm_enable(sdla_t *card)
 	
 	if (err != CMD_OK) 
 		ppp_error(card, err, mb);
-	
+	else	
+		card->u.p.comm_enabled = 1;	
+
 	return err;
 }
 
@@ -1399,9 +1572,45 @@ static int ppp_comm_disable(sdla_t *card)
 	err = sdla_exec(mb) ? mb->cmd.result : CMD_TIMEOUT;
 	if (err != CMD_OK) 
 		ppp_error(card, err, mb);
+	else
+		card->u.p.comm_enabled = 0;
 
 	return err;
 }
+
+static int ppp_comm_disable_shutdown(sdla_t *card)
+{
+	ppp_mbox_t *mb = card->mbox;
+	ppp_intr_info_t *ppp_intr_data;
+	int err;
+
+	if (!mb){
+		return 1;
+	}
+	
+	ppp_intr_data = (ppp_intr_info_t *) &mb->data[0];
+	
+	/* Disable all interrupts */
+	memset(&mb->cmd, 0, sizeof(ppp_cmd_t));
+	ppp_intr_data->i_enable = 0;
+
+	ppp_intr_data->irq = card->hw.irq;
+	mb->cmd.length = 2;
+
+	mb->cmd.command = PPP_SET_INTR_FLAGS;
+	err = sdla_exec(mb) ? mb->cmd.result : CMD_TIMEOUT;
+
+	/* Disable communicatinons */
+	memset(&mb->cmd, 0, sizeof(ppp_cmd_t));
+	mb->cmd.command = PPP_COMM_DISABLE;
+	err = sdla_exec(mb) ? mb->cmd.result : CMD_TIMEOUT;
+
+	card->u.p.comm_enabled = 0;
+
+	return 0;
+}
+
+
 
 /*============================================================================
  * Get communications error statistics.
@@ -1495,35 +1704,39 @@ static int ppp_error(sdla_t *card, int err, ppp_mbox_t *mb)
 /*============================================================================
  * PPP interrupt service routine.
  */
-STATIC void wpp_isr(sdla_t *card)
+static void wpp_isr (sdla_t *card)
 {
 	ppp_flags_t *flags = card->flags;
 	char *ptr = &flags->iflag;
-	struct net_device *dev = card->wandev.dev;
-
-
+	netdevice_t *dev = card->wandev.dev;
 	int i;
 
 	card->in_isr = 1;
-	
 	++card->statistics.isr_entry;
 
-	//FIXME: Do we need this
-	card->force_enable_irq = 0;
-
+	if (!dev && flags->iflag != PPP_INTR_CMD){
+		card->in_isr = 0;
+		flags->iflag = 0;
+		return;
+	}
+	
+	if (test_bit(PERI_CRIT, (void*)&card->wandev.critical)) {
+		card->in_isr = 0;
+		flags->iflag = 0;
+		return;
+	}
+	
+	
 	if(card->hw.type != SDLA_S514){
-		if (test_and_set_bit(0, (void*)&card->wandev.critical)) {
-        	
+		if (test_bit(SEND_CRIT, (void*)&card->wandev.critical)) {
 			++card->statistics.isr_already_critical;
 			printk (KERN_INFO "%s: Critical while in ISR!\n",
 					card->devname);
 			card->in_isr = 0;
+			flags->iflag = 0;
 			return;
-	
 		}
 	}
-
-	card->buff_int_mode_unbusy = 0;
 
 	switch (flags->iflag) {
 
@@ -1535,8 +1748,7 @@ STATIC void wpp_isr(sdla_t *card)
 		case PPP_INTR_TXRDY:	/* transmit interrupt  0x02 (bit 1)*/
 			++card->statistics.isr_tx;
 			flags->imask &= ~PPP_INTR_TXRDY;
-			netif_wake_queue (dev);
-			card->buff_int_mode_unbusy = 1;
+			wake_net_dev(dev);
 			break;
 
 		case PPP_INTR_CMD:      /* interface command completed */
@@ -1567,10 +1779,7 @@ STATIC void wpp_isr(sdla_t *card)
 	
 	card->in_isr = 0;
 	flags->iflag = 0;
-	card->wandev.critical = 0;
-
-	if(card->buff_int_mode_unbusy)
-		netif_wake_queue(dev);
+	return;
 }
 
 /*============================================================================
@@ -1579,7 +1788,7 @@ STATIC void wpp_isr(sdla_t *card)
 static void rx_intr(sdla_t *card)
 {
 	ppp_buf_ctl_t *rxbuf = card->rxmb;
-	struct net_device *dev = card->wandev.dev;
+	netdevice_t *dev = card->wandev.dev;
 	ppp_private_area_t *ppp_priv_area;
 	struct sk_buff *skb;
 	unsigned len;
@@ -1603,11 +1812,21 @@ static void rx_intr(sdla_t *card)
 		printk(KERN_INFO "\n");	
 		
 		++card->statistics.rx_intr_corrupt_rx_bfr;
+
+
+		/* Bug Fix: Mar 6 2000
+                 * If we get a corrupted mailbox, it means that driver 
+                 * is out of sync with the firmware. There is no recovery.
+                 * If we don't turn off all interrupts for this card
+                 * the machine will crash. 
+                 */
+		printk(KERN_INFO "%s: Critical router failure ...!!!\n", card->devname);
+		printk(KERN_INFO "Please contact Sangoma Technologies !\n");
+		ppp_set_intr_mode(card,0);
 		return;
-
 	}
-
-	if (dev && netif_running(dev)) {
+      
+	if (dev && is_dev_running(dev) && dev->priv){
 	
 		len  = rxbuf->length;
 		ppp_priv_area = dev->priv;
@@ -1662,9 +1881,12 @@ static void rx_intr(sdla_t *card)
 			
 				/* Handle an IPXWAN packet */
 				if( ppp_priv_area->enable_IPX) {
-					ppp_send(card, skb->data, skb->len, htons(ETH_P_IPX));
-                        		dev_kfree_skb(skb);
-
+					
+					/* Make sure we are not already sending */
+					if (!test_bit(SEND_CRIT, &card->wandev.critical)){
+					 	ppp_send(card, skb->data, skb->len, htons(ETH_P_IPX));
+					}
+					wan_dev_kfree_skb(skb,FREE_READ);
 
 				} else {
 					++card->wandev.stats.rx_dropped;
@@ -1675,15 +1897,19 @@ static void rx_intr(sdla_t *card)
 				skb->mac.raw  = skb->data;
 
 			    	++card->wandev.stats.rx_packets;
+ 			      #if defined(LINUX_2_1) || defined(LINUX_2_4)
 				card->wandev.stats.rx_bytes += skb->len;
+			      #endif
 		    		++ppp_priv_area->rx_intr_stat.rx_intr_bfr_passed_to_stack;	
 				netif_rx(skb);
 			}
 
 		} else {
-		
-			printk(KERN_INFO "%s: no socket buffers available!\n",
-				card->devname);
+	
+			if (net_ratelimit()){
+				printk(KERN_INFO "%s: no socket buffers available!\n",
+					card->devname);
+			}
 			++card->wandev.stats.rx_dropped;
 			++ppp_priv_area->rx_intr_stat.rx_intr_no_socket;
 		}
@@ -1703,16 +1929,18 @@ static void rx_intr(sdla_t *card)
 void event_intr (sdla_t *card)
 {
 
- 	struct net_device* dev = card->wandev.dev;
+ 	netdevice_t* dev = card->wandev.dev;
         ppp_private_area_t* ppp_priv_area = dev->priv;
 	volatile ppp_flags_t *flags = card->flags;
 
 	switch (flags->iflag){
 
 		case PPP_INTR_MODEM:    /* modem status change (DCD, CTS) 0x04  (bit 2)*/
-			printk (KERN_INFO "%s: Modem status: DCD=%s CTS=%s\n",
-				card->devname, DCD(flags->mstatus), CTS(flags->mstatus));
 
+			if (net_ratelimit()){
+				printk (KERN_INFO "%s: Modem status: DCD=%s CTS=%s\n",
+					card->devname, DCD(flags->mstatus), CTS(flags->mstatus));
+			}
 			break;
 
 		case PPP_INTR_DISC:  	/* Data link disconnected 0x10  (bit 4)*/	
@@ -1723,15 +1951,16 @@ void event_intr (sdla_t *card)
 			if (flags->disc_cause &
 				(PPP_LOCAL_TERMINATION | PPP_DCD_CTS_DROP |
 				PPP_REMOTE_TERMINATION)) {
+
 				if (card->u.p.ip_mode == WANOPT_PPP_PEER) { 
-					Read_connection_info = 1;
-					remove_route (card);
+					set_bit(0,&Read_connection_info);
 				}
 				wanpipe_set_state(card, WAN_DISCONNECTED);
+
 				show_disc_cause(card, flags->disc_cause);
-				ppp_priv_area->timer_int_enabled |= 
-						TMR_INT_ENABLED_PPP_EVENT;
+				ppp_priv_area->timer_int_enabled |= TMR_INT_ENABLED_PPP_EVENT;
 				flags->imask |= PPP_INTR_TIMER;
+				trigger_ppp_poll(dev);
 			}
 			break;
 
@@ -1743,30 +1972,68 @@ void event_intr (sdla_t *card)
 
 			if (flags->lcp_state == 0x09 && 
                            (flags->ip_state == 0x09 || flags->ipx_state == 0x09)){
+
                                 /* Initialize the polling timer and set the state
-                                 * to WAN_CONNNECTED 
-                                 */
-                                card->state_tick = jiffies;
-				wanpipe_set_state(card, WAN_CONNECTED);
-				ppp_priv_area->timer_int_enabled |= 
+                                 * to WAN_CONNNECTED */
+
+
+				/* BUG FIX: When the protocol restarts, during heavy 
+                                 * traffic, board tx buffers and driver tx buffers
+                                 * can go out of sync.  This checks the condition
+                                 * and if the tx buffers are out of sync, the 
+                                 * protocols are restarted. 
+                                 * I don't know why the board tx buffer is out
+                                 * of sync. It could be that a packets is tx
+                                 * while the link is down, but that is not 
+                                 * possible. The other possiblility is that the
+                                 * firmware doesn't reinitialize properly.
+                                 * FIXME: A better fix should be found.
+                                 */ 
+				if (detect_and_fix_tx_bug(card)){
+
+					ppp_comm_disable(card);
+
+					wanpipe_set_state(card, WAN_DISCONNECTED);
+
+					ppp_priv_area->timer_int_enabled |= 
 						TMR_INT_ENABLED_PPP_EVENT;
+					flags->imask |= PPP_INTR_TIMER;
+					break;	
+				}
+
+				card->state_tick = jiffies;
+				wanpipe_set_state(card, WAN_CONNECTED);
+
+				NEX_PRINTK(KERN_INFO "CON: L Tx: %lx  B Tx: %lx || L Rx %lx B Rx %lx\n",
+					(unsigned long)card->u.p.txbuf, *card->u.p.txbuf_next,
+					(unsigned long)card->rxmb, *card->u.p.rxbuf_next);
+
+				/* Tell timer interrupt that PPP event occured */
+				ppp_priv_area->timer_int_enabled |= TMR_INT_ENABLED_PPP_EVENT;
 				flags->imask |= PPP_INTR_TIMER;
 
+				/* If we are in PEER mode, we must first obtain the
+				 * IP information and then go into the poll routine */
+				if (card->u.p.ip_mode != WANOPT_PPP_PEER){	
+					trigger_ppp_poll(dev);
+				}
 			}
                    	break;
 
 		case PPP_INTR_DROP_DTR:		/* DTR drop timeout expired  0x40 bit 6 */
 
 			NEX_PRINTK(KERN_INFO "DTR Drop Timeout Interrrupt \n"); 
+
 			if (card->u.p.ip_mode == WANOPT_PPP_PEER) { 
-				Read_connection_info = 1;
-				remove_route (card);
+				set_bit(0,&Read_connection_info);
 			}
+		
 			wanpipe_set_state(card, WAN_DISCONNECTED);
+
 			show_disc_cause(card, flags->disc_cause);
-			ppp_priv_area->timer_int_enabled |= 
-						TMR_INT_ENABLED_PPP_EVENT;
+			ppp_priv_area->timer_int_enabled |= TMR_INT_ENABLED_PPP_EVENT;
 			flags->imask |= PPP_INTR_TIMER;
+			trigger_ppp_poll(dev);
 			break;
 		
 		default:
@@ -1781,9 +2048,17 @@ void event_intr (sdla_t *card)
 void timer_intr (sdla_t *card)
 {
 
-        struct net_device* dev = card->wandev.dev;
+        netdevice_t* dev = card->wandev.dev;
         ppp_private_area_t* ppp_priv_area = dev->priv;
 	ppp_flags_t *flags = card->flags;
+
+
+	if (ppp_priv_area->timer_int_enabled & TMR_INT_ENABLED_CONFIG){
+		if (!config_ppp(card)){
+			ppp_priv_area->timer_int_enabled &= 
+					~TMR_INT_ENABLED_CONFIG;	
+		}
+	}
 
 	/* Update statistics */
 	if (ppp_priv_area->timer_int_enabled & TMR_INT_ENABLED_UPDATE){
@@ -1801,12 +2076,11 @@ void timer_intr (sdla_t *card)
 		ppp_priv_area->timer_int_enabled &= ~TMR_INT_ENABLED_UDP;
 	}
 
-
 	/* PPP Event */
 	if (ppp_priv_area->timer_int_enabled & TMR_INT_ENABLED_PPP_EVENT){
 
 		if (card->wandev.state == WAN_DISCONNECTED){
-			poll_disconnected(card);
+			retrigger_comm(card);
 		}
 
 		/* If the state is CONNECTING, it means that communicatins were
@@ -1823,21 +2097,22 @@ void timer_intr (sdla_t *card)
 	 	 * poll for an IP address which will be provided by remote end.
 	 	 */
 		else if ((card->wandev.state == WAN_CONNECTED && 
-		  	card->u.p.ip_mode == WANOPT_PPP_PEER) && 
-		  	Read_connection_info){
+		  	  card->u.p.ip_mode == WANOPT_PPP_PEER) && 
+		  	  test_bit(0,&Read_connection_info)){
 
 			card->state_tick = jiffies;
-			if (!read_connection_info (card)){
-				card->poll = &process_route;
+			if (read_connection_info (card)){
+				printk(KERN_INFO "%s: Failed to read PEER IP Addresses\n",
+					card->devname);
+			}else{
+				clear_bit(0,&Read_connection_info);
+				set_bit(1,&Read_connection_info);
+				trigger_ppp_poll(dev);
 			}
-
 		}else{
-			/* If we are using Static IP,no need to poll for
-			 * an IP address. 
-		 	 */
-			NEX_PRINTK(KERN_INFO "Turning off TIMER \n");
+			//FIXME Put the comment back int
 			ppp_priv_area->timer_int_enabled &= ~TMR_INT_ENABLED_PPP_EVENT;
-		}	
+		}
 
 	}/* End of PPP_EVENT */
 
@@ -1970,32 +2245,62 @@ static int handle_IPXWAN(unsigned char *sendpacket, char *devname, unsigned char
 static void process_route (sdla_t *card)
 {
 	ppp_flags_t *flags = card->flags;
-	struct net_device *dev = card->wandev.dev;
-	struct in_device *in_dev = dev->ip_ptr;
+	netdevice_t *dev = card->wandev.dev;
+	ppp_private_area_t *ppp_priv_area = dev->priv;
 	
-	if (in_dev != NULL ) {
-		if ((card->u.p.ip_mode == WANOPT_PPP_PEER) &&
-		    (Read_connection_info && flags->ip_state == 0x09)){ 
+#if defined(LINUX_2_1) || defined(LINUX_2_4)
+
+	if ((card->u.p.ip_mode == WANOPT_PPP_PEER) &&
+	    (flags->ip_state == 0x09)){ 
+
+		/* We get ip_local from the firmware in PEER mode.
+	         * Therefore, if ip_local is 0, we failed to obtain
+         	 * the remote IP address. */
+		if (ppp_priv_area->ip_local == 0) 
+			return;
 		
-			printk(KERN_INFO "%s: IPCP State Opened.\n", card->devname);
-			if (read_info( card )) {
-   				printk(KERN_INFO 
-					"%s: An error occurred in IP assignment.\n", 
-					card->devname);
-			} else {
+		printk(KERN_INFO "%s: IPCP State Opened.\n", card->devname);
+		if (read_info( card )) {
+   			printk(KERN_INFO 
+				"%s: An error occurred in IP assignment.\n", 
+				card->devname);
+		} else {
+			struct in_device *in_dev = dev->ip_ptr;
+			if (in_dev != NULL ) {
 				struct in_ifaddr *ifa = in_dev->ifa_list;
 				printk(KERN_INFO "%s: Assigned Lcl. Addr: %s\n", 
-						card->devname, in_ntoa(ifa->ifa_local));
+					card->devname, in_ntoa(ifa->ifa_local));
 				printk(KERN_INFO "%s: Assigned Rmt. Addr: %s\n", 
 						card->devname, in_ntoa(ifa->ifa_address));
+			}else{
+				printk(KERN_INFO 
+				"%s: Error: Failed to add a route for PPP interface %s\n",
+					card->devname,dev->name);	
 			}
-			Read_connection_info = 0;
 		}
-	}else{
-		printk(KERN_INFO "%s: Error: Null pointer in Poll Active\n",
-				card->devname);
 	}
-	card->poll = NULL;
+#else
+
+	if ((card->u.p.ip_mode == WANOPT_PPP_PEER) &&
+	    (flags->ip_state == 0x09)){ 
+	
+		if (ppp_priv_area->ip_local == 0)
+			return;
+	
+		printk(KERN_INFO "%s: IPCP State Opened.\n", card->devname);
+		if (read_info( card )) {
+			printk(KERN_INFO 
+				"%s: An error occurred in IP assignment.\n", 
+				card->devname);
+		} else {
+			printk(KERN_INFO "%s: Assigned Lcl. Addr: %s\n", 
+					card->devname, in_ntoa(dev->pa_addr));
+			printk(KERN_INFO "%s: Assigned Rmt. Addr: %s\n", 
+					card->devname, in_ntoa(dev->pa_dstaddr));
+		}
+	}
+
+#endif
 
 }
 
@@ -2004,19 +2309,17 @@ static void process_route (sdla_t *card)
  *  o if interface is up and the hold-down timeout has expired, then retry
  *    connection.
  */
-static void poll_disconnected(sdla_t *card)
+static void retrigger_comm(sdla_t *card)
 {
-	struct net_device *dev = card->wandev.dev;
+	netdevice_t *dev = card->wandev.dev;
 
-	if (dev && netif_running(dev) &&
-	    ((jiffies - card->state_tick) > HOLD_DOWN_TIME)) {
-	
+	if (dev && ((jiffies - card->state_tick) > HOLD_DOWN_TIME)) {
+
 		wanpipe_set_state(card, WAN_CONNECTING);
-		
+
 		if(ppp_comm_enable(card) == CMD_OK){
 			init_ppp_tx_rx_buff( card );
 		}	         
-		
 	}
 }
 
@@ -2025,12 +2328,14 @@ static void poll_disconnected(sdla_t *card)
 /*============================================================================
  * Configure S508 adapter.
  */
-static int config508(ppp_private_area_t *ppp_priv_area, sdla_t *card)
+static int config508(netdevice_t *dev, sdla_t *card)
 {
 	ppp508_conf_t cfg;
-	struct net_device *dev = card->wandev.dev;
+#if defined(LINUX_2_1) || defined(LINUX_2_4)
 	struct in_device *in_dev = dev->ip_ptr;
-	
+#endif
+	ppp_private_area_t *ppp_priv_area = dev->priv;
+
 	/* Prepare PPP configuration structure */
 	memset(&cfg, 0, sizeof(ppp508_conf_t));
 
@@ -2039,6 +2344,7 @@ static int config508(ppp_private_area_t *ppp_priv_area, sdla_t *card)
 
 	if (card->wandev.interface == WANOPT_RS232)
 		cfg.conf_flags |= INTERFACE_LEVEL_RS232;
+
 
         cfg.conf_flags 	|= DONT_TERMINATE_LNK_MAX_CONFIG; /*send Configure-Request packets forever*/
 	cfg.txbuf_percent	= PERCENT_TX_BUFF;	/* % of Tx bufs */
@@ -2065,6 +2371,7 @@ static int config508(ppp_private_area_t *ppp_priv_area, sdla_t *card)
 				card->devname);
 		cfg.auth_options = INBOUND_AUTH;
 	}
+
 	if( ppp_priv_area->pap == WANOPT_YES){
 		cfg.auth_options |=PAP_AUTH;
 		printk(KERN_INFO "%s: Pap enabled\n", card->devname);
@@ -2076,6 +2383,7 @@ static int config508(ppp_private_area_t *ppp_priv_area, sdla_t *card)
 
 
 	if (ppp_priv_area->enable_IPX == WANOPT_YES){
+		printk(KERN_INFO "%s: Enabling IPX Protocol\n",card->devname);
 		cfg.ipx_options		= ENABLE_IPX | ROUTING_PROT_DEFAULT;
 	}else{
 		cfg.ipx_options 	= DISABLE_IPX;
@@ -2085,25 +2393,92 @@ static int config508(ppp_private_area_t *ppp_priv_area, sdla_t *card)
 	
 		case WANOPT_PPP_STATIC:
 
+			printk(KERN_INFO "%s: PPP IP Mode: STATIC\n",card->devname);
 			cfg.ip_options		= L_AND_R_IP_NO_ASSIG | 
 							    ENABLE_IP;
+#if defined(LINUX_2_1) || defined(LINUX_2_4)
 			cfg.ip_local		= in_dev->ifa_list->ifa_local;
 			cfg.ip_remote		= in_dev->ifa_list->ifa_address;
+#else
+			cfg.ip_local		= dev->pa_addr;
+			cfg.ip_remote		= dev->pa_dstaddr;
+#endif
+
+			/* Debugging code used to check that IP addresses
+                         * obtained from the kernel are correct */
+
+			{
+			char laddr[20];
+			char raddr[20];
+			strcpy(laddr,in_ntoa(cfg.ip_local));
+			strcpy(raddr,in_ntoa(cfg.ip_remote));
+
                         NEX_PRINTK(KERN_INFO "Local %s Remote %s Name %s\n",
-					in_ntoa(cfg.ip_local), 
-					in_ntoa(cfg.ip_remote), 
-					dev->name);
+					laddr,raddr, dev->name);
+			
+			}	
+			break;
+
+		case WANOPT_PPP_HOST:
+
+			printk(KERN_INFO "%s: PPP IP Mode: HOST\n",card->devname);
+			cfg.ip_options		= L_IP_LOCAL_ASSIG |
+						  R_IP_LOCAL_ASSIG | 
+						  ENABLE_IP;
+                      #if defined(LINUX_2_1) || defined(LINUX_2_4)
+			cfg.ip_local		= in_dev->ifa_list->ifa_local;
+			cfg.ip_remote		= in_dev->ifa_list->ifa_address;
+		      #else
+			cfg.ip_local		= dev->pa_addr;
+			cfg.ip_remote		= dev->pa_dstaddr;
+                      #endif
+
+			/* Debugging code used to check that IP addresses
+                         * obtained from the kernel are correct */
+			{
+			char laddr[20];
+			char raddr[20];
+			strcpy(laddr,in_ntoa(cfg.ip_local));
+			strcpy(raddr,in_ntoa(cfg.ip_remote));
+
+                        NEX_PRINTK (KERN_INFO "Local %s Remote %s Name %s\n",
+					laddr,raddr, dev->name);
+			
+			}	
+
+
 			break;
 	
 		case WANOPT_PPP_PEER:
+
+			#if defined(LINUX_2_1) || defined(LINUX_2_4)
+
+			printk(KERN_INFO "%s: PPP IP Mode: PEER\n",card->devname);
 			cfg.ip_options		= L_IP_REMOTE_ASSIG | 
 						  R_IP_REMOTE_ASSIG | 
 							  ENABLE_IP;
 			cfg.ip_local		= 0x00;
 			cfg.ip_remote		= 0x00;
 			break;
-	
+
+			#else
+
+			/* No PEER support for 2.0.X kernels, drop down to default
+   			 * condition */
+
+			printk(KERN_INFO "%s: ERROR, PEER mode is not supported in 2.0.X kernels\n",
+						card->devname);
+			
+			#endif
+
+		default:
+			printk(KERN_INFO "%s: ERROR: Unsuported PPP Mode Selected\n",
+					card->devname);
+			printk(KERN_INFO "%s:        PPP IP Modes: STATIC, PEER or HOST\n",
+					card->devname);	
+			return 1;
 	}
+
 	return ppp_configure(card, &cfg);
 }
 
@@ -2168,7 +2543,7 @@ static void show_disc_cause(sdla_t *card, unsigned cause)
 /*=============================================================================
  * Process UDP call of type PTPIPEAB.
  */
-static void process_udp_mgmt_pkt(sdla_t *card, struct net_device *dev, 
+static void process_udp_mgmt_pkt(sdla_t *card, netdevice_t *dev, 
 				 ppp_private_area_t *ppp_priv_area ) 
 {
 	unsigned char buf2[5];
@@ -2186,33 +2561,31 @@ static void process_udp_mgmt_pkt(sdla_t *card, struct net_device *dev,
 	memcpy(&buf2, &card->wandev.udp_port, 2 );
 
 
-	switch(ppp_udp_pkt->cblock.command) {
+	if(ppp_priv_area->udp_pkt_src == UDP_PKT_FRM_NETWORK) {
 
-		/* FT1 MONITOR STATUS */
-		case FT1_MONITOR_STATUS_CTRL:
-		
-		/* PPIPE_ENABLE_TRACING */
-		case PPIPE_ENABLE_TRACING:
-		   
-		/* PPIPE_DISABLE_TRACING */
-		case PPIPE_DISABLE_TRACING:
-		   
-		/* PPIPE_GET_TRACE_INFO */
-		case PPIPE_GET_TRACE_INFO:
-		   
-		/* SET FT1 MODE */
-		case SET_FT1_MODE:
-			if(ppp_priv_area->udp_pkt_src == UDP_PKT_FRM_NETWORK) {
-			
-				++ppp_priv_area->pipe_mgmt_stat.
-						UDP_PIPE_mgmt_direction_err;
+		switch(ppp_udp_pkt->cblock.command) {
+
+			case PPIPE_GET_IBA_DATA:
+			case PPP_READ_CONFIG:
+			case PPP_GET_CONNECTION_INFO:
+			case PPIPE_ROUTER_UP_TIME:
+			case PPP_READ_STATISTICS:
+			case PPP_READ_ERROR_STATS:
+			case PPP_READ_PACKET_STATS:
+			case PPP_READ_LCP_STATS:
+			case PPP_READ_IPCP_STATS:
+			case PPP_READ_IPXCP_STATS:
+			case PPP_READ_PAP_STATS:
+			case PPP_READ_CHAP_STATS:
+			case PPP_READ_CODE_VERSION:
+				udp_mgmt_req_valid = 1;
+				break;
+			   
+			default:
 				udp_mgmt_req_valid = 0;
-			}	 
-			break;
-		   
-		default:
-			break;
-	} 
+				break;
+		} 
+	}
 	
   	if(!udp_mgmt_req_valid) {
 	    
@@ -2221,7 +2594,13 @@ static void process_udp_mgmt_pkt(sdla_t *card, struct net_device *dev,
 
     		/* set return code */
     		ppp_udp_pkt->cblock.result = 0xCD; 
-
+		++ppp_priv_area->pipe_mgmt_stat.UDP_PIPE_mgmt_direction_err;
+	
+		if (net_ratelimit()){	
+			printk(KERN_INFO 
+			"%s: Warning, Illegal UDP command attempted from network: %x\n",
+			card->devname,ppp_udp_pkt->cblock.command);
+		}
    	} else {
 		/* Initialize the trace element */
 		trace_element_t trace_element;		    
@@ -2422,27 +2801,24 @@ static void process_udp_mgmt_pkt(sdla_t *card, struct net_device *dev,
 
 			/* set return code */
 			ppp_udp_pkt->cblock.result = 0x00;
-
-			break;
-
-		/* PPIPE_KILL_BOARD */
-		case PPIPE_KILL_BOARD:
+			ppp_udp_pkt->cblock.result = 0;
 			break;
 
 		/* PPIPE_FT1_READ_STATUS */
 		case PPIPE_FT1_READ_STATUS:
-			sdla_peek(&card->hw, 0xF020, &ppp_udp_pkt->data, 2);
-			ppp_udp_pkt->cblock.length = 2;
+			sdla_peek(&card->hw, 0xF020, &ppp_udp_pkt->data[0], 2);
+			ppp_udp_pkt->cblock.length = mbox->cmd.length = 2;
 			ppp_udp_pkt->cblock.result = 0;
-			mbox->cmd.length = 2;
 			break;
 		
 		case PPIPE_FLUSH_DRIVER_STATS:   
 			init_ppp_priv_struct( ppp_priv_area );
 			init_global_statistics( card );
 			mbox->cmd.length = 0;
+			ppp_udp_pkt->cblock.result = 0;
 			break;
 
+		
 		case PPIPE_ROUTER_UP_TIME:
 
 			do_gettimeofday( &tv );
@@ -2450,34 +2826,11 @@ static void process_udp_mgmt_pkt(sdla_t *card, struct net_device *dev,
 					ppp_priv_area->router_start_time;
 			*(unsigned long *)&ppp_udp_pkt->data = ppp_priv_area->router_up_time;
 			mbox->cmd.length = 4;
+			ppp_udp_pkt->cblock.result = 0;
 			break;
 
-		/* FT1 MONITOR STATUS */
-   		case FT1_MONITOR_STATUS_CTRL:
-	
-			/* Enable FT1 MONITOR STATUS */
-	        	if( ppp_udp_pkt->data[0] == 1) {
-			
-				if( rCount++ != 0 ) {
-		        		ppp_udp_pkt->cblock.result = 0;
-	          			mbox->cmd.length = 1;
-		  			break;
-		    		}	
-	      		}
-
-	      		/* Disable FT1 MONITOR STATUS */
-	      		if( ppp_udp_pkt->data[0] == 0) {
-
-	      	   		if( --rCount != 0) {
-		  			ppp_udp_pkt->cblock.result = 0;
-		  			mbox->cmd.length = 1;
-		  			break;
-	   	    		} 
-	      		} 	
-
-		/* PPIPE_DRIVER_STATISTICS */   
+				/* PPIPE_DRIVER_STATISTICS */   
 		case PPIPE_DRIVER_STAT_IFSEND:
-			printk(KERN_INFO "Getting IF_SEND Drivers Statistics\n");
 			memcpy(&ppp_udp_pkt->data, &ppp_priv_area->if_send_stat, 
 				sizeof(if_send_stat_t));
 
@@ -2515,8 +2868,38 @@ static void process_udp_mgmt_pkt(sdla_t *card, struct net_device *dev,
 			mbox->cmd.length = ppp_udp_pkt->cblock.length;
 			break;
 
+
+		/* FT1 MONITOR STATUS */
+   		case FT1_MONITOR_STATUS_CTRL:
 	
+			/* Enable FT1 MONITOR STATUS */
+	        	if( ppp_udp_pkt->data[0] == 1) {
+			
+				if( rCount++ != 0 ) {
+		        		ppp_udp_pkt->cblock.result = 0;
+	          			mbox->cmd.length = 1;
+		  			break;
+		    		}	
+	      		}
+
+	      		/* Disable FT1 MONITOR STATUS */
+	      		if( ppp_udp_pkt->data[0] == 0) {
+
+	      	   		if( --rCount != 0) {
+		  			ppp_udp_pkt->cblock.result = 0;
+		  			mbox->cmd.length = 1;
+		  			break;
+	   	    		} 
+	      		} 	
+			goto udp_dflt_cmd;
+			
+		/* WARNING: FIXME: This should be fixed.
+		 * The FT1 Status Ctrl doesn't have a break
+                 * statment.  Thus, no code must be inserted
+                 * HERE: between default and above case statement */
+
 		default:
+udp_dflt_cmd:
 	        
 			/* it's a board command */
 			mbox->cmd.command = ppp_udp_pkt->cblock.command;
@@ -2555,9 +2938,12 @@ static void process_udp_mgmt_pkt(sdla_t *card, struct net_device *dev,
      	len = reply_udp(ppp_priv_area->udp_pkt_data, mbox->cmd.length);
 
      	if (ppp_priv_area->udp_pkt_src == UDP_PKT_FRM_NETWORK) {
-	
-		++ppp_priv_area->pipe_mgmt_stat.UDP_PIPE_mgmt_passed_to_adptr;
-		ppp_send(card,ppp_priv_area->udp_pkt_data,len,ppp_priv_area->protocol);
+
+		/* Make sure we are not already sending */
+		if (!test_bit(SEND_CRIT,&card->wandev.critical)){
+			++ppp_priv_area->pipe_mgmt_stat.UDP_PIPE_mgmt_passed_to_adptr;
+			ppp_send(card,ppp_priv_area->udp_pkt_data,len,ppp_priv_area->protocol);
+		}
 
 	} else {	
 	
@@ -2587,6 +2973,8 @@ static void process_udp_mgmt_pkt(sdla_t *card, struct net_device *dev,
     	}	
 
 	ppp_priv_area->udp_pkt_lgth = 0;
+	
+	return; 
 }
 
 /*=============================================================================
@@ -2648,9 +3036,12 @@ static void init_ppp_tx_rx_buff( sdla_t *card )
 			(info->rxb_num - 1);
 	}
 
+	card->u.p.txbuf_next = (unsigned long*)&info->txb_nxt; 
+	card->u.p.rxbuf_next = (unsigned long*)&info->rxb1_ptr;
+
 	card->u.p.rx_base = info->rxb_base;
         card->u.p.rx_top  = info->rxb_end;
-       
+      
 	card->u.p.txbuf = card->u.p.txbuf_base;
 	card->rxmb = card->u.p.rxbuf_base;
 
@@ -2662,21 +3053,32 @@ static void init_ppp_tx_rx_buff( sdla_t *card )
  */
 static int read_info( sdla_t *card )
 {
-	struct net_device *dev = card->wandev.dev;
+	netdevice_t *dev = card->wandev.dev;
 	ppp_private_area_t *ppp_priv_area = dev->priv;
 	int err;
+
+      #if defined(LINUX_2_1) || defined(LINUX_2_4)
 	struct ifreq if_info;
 	struct sockaddr_in *if_data1, *if_data2;
 	mm_segment_t fs;
+      #else
+	#ifdef _DYNAMIC_ROUTE_20X_SUPPORT_
+        struct rtentry route;
+	#endif
+      #endif
+
+
+	
+#if defined(LINUX_2_1) || defined(LINUX_2_4)
 
 	/* Set Local and remote addresses */
 	memset(&if_info, 0, sizeof(if_info));
 	strcpy(if_info.ifr_name, dev->name);
 
+
 	fs = get_fs();
 	set_fs(get_ds());     /* get user space block */ 
 
-	
 	/* Change the local and remote ip address of the interface.
 	 * This will also add in the destination route.
 	 */	
@@ -2690,11 +3092,43 @@ static int read_info( sdla_t *card )
 	err = devinet_ioctl( SIOCSIFDSTADDR, &if_info );
 
 	set_fs(fs);           /* restore old block */
+	
+#else
+	/* FIXME: Dynamic Routing in 2.0.X kernels is not
+         * supported. Sorry ! I'll come back to it when I get
+         * a chance. */
+	
+	printk(KERN_INFO "%s: ERROR, Dynamic routing is not supported in 2.0.X kernels\n",
+				card->devname);
+	printk(KERN_INFO "%s:        Please use the STATIC IP mode!\n",
+				card->devname);
 
+	err = 0;
+
+      #ifdef _DYNAMIC_ROUTE_20X_SUPPORT_
+	dev->pa_dstaddr = ppp_priv_area->ip_remote;
+	dev->pa_addr = ppp_priv_area->ip_local;
+
+	memset(&route, 0, sizeof(route));
+	route.rt_dev = dev->name;
+	route.rt_flags = 0;
+	((struct sockaddr_in *)&(route.rt_dst))->sin_addr.s_addr =
+		dev->pa_dstaddr;
+	((struct sockaddr_in *)&(route.rt_dst))->sin_family = AF_INET;
+	((struct sockaddr_in *)&(route.rt_genmask))->sin_addr.s_addr =
+			0xFFFFFFFF;
+	((struct sockaddr_in *)&(route.rt_genmask))->sin_family =
+			AF_INET;
+	
+	err = ip_rt_new(&route);
+
+      #endif
+
+#endif
 
 	if (err) {
-		printk (KERN_INFO "%s: Adding of route failed:\n",
-			card->devname);
+		printk (KERN_INFO "%s: Adding of route failed: %i\n",
+			card->devname,err);
 		printk (KERN_INFO "%s:	Local : %s\n",
 			card->devname,in_ntoa(ppp_priv_area->ip_local));
 		printk (KERN_INFO "%s:	Remote: %s\n",
@@ -2708,31 +3142,39 @@ static int read_info( sdla_t *card )
  * Called when ppp interface disconnected.
  */
 
-static int remove_route( sdla_t *card )
+static void remove_route( sdla_t *card )
 {
 
-	struct net_device *dev = card->wandev.dev;
+	netdevice_t *dev = card->wandev.dev;
 	long ip_addr;
 	int err;
 
+#if defined(LINUX_2_1) || defined(LINUX_2_4)
         mm_segment_t fs;
 	struct ifreq if_info;
 	struct sockaddr_in *if_data1;
         struct in_device *in_dev = dev->ip_ptr;
         struct in_ifaddr *ifa = in_dev->ifa_list;	
+#else
+	unsigned long fs = 0;
+        struct rtentry route;
+#endif
 
 
+#if defined(LINUX_2_1) || defined(LINUX_2_4)
 	ip_addr = ifa->ifa_local;
 
 	/* Set Local and remote addresses */
 	memset(&if_info, 0, sizeof(if_info));
 	strcpy(if_info.ifr_name, dev->name);
+#endif
 
 
 	fs = get_fs();
        	set_fs(get_ds());     /* get user space block */ 
 
 
+#if defined(LINUX_2_1) || defined(LINUX_2_4)	
 	/* Change the local ip address of the interface to 0.
 	 * This will also delete the destination route.
 	 */	
@@ -2740,6 +3182,26 @@ static int remove_route( sdla_t *card )
 	if_data1->sin_addr.s_addr = 0;
 	if_data1->sin_family = AF_INET;
 	err = devinet_ioctl( SIOCSIFADDR, &if_info );
+#else
+
+	ip_addr = dev->pa_addr;
+	dev->pa_dstaddr = 0;
+
+	memset(&route, 0, sizeof(route));
+	route.rt_dev = dev->name;
+	route.rt_flags = 0;
+	((struct sockaddr_in *)&(route.rt_dst))->sin_addr.s_addr =
+			dev->pa_dstaddr;
+	((struct sockaddr_in *)&(route.rt_dst))->sin_family = AF_INET;
+	((struct sockaddr_in *)&(route.rt_genmask))->sin_addr.s_addr =
+			0xFFFFFFFF;
+        ((struct sockaddr_in *)&(route.rt_genmask))->sin_family =
+			AF_INET;
+
+
+	err = ip_rt_kill(&route);
+
+#endif
 
         set_fs(fs);           /* restore old block */
 
@@ -2747,13 +3209,12 @@ static int remove_route( sdla_t *card )
 	if (err) {
 		printk (KERN_INFO "%s: Deleting dynamic route failed %d!\n",
 			 card->devname, err);
-		return err;
-	}else
-		printk (KERN_INFO "%s: PPP Deleting dynamic route %s successfully\n",
+		return;
+	}else{
+		printk (KERN_INFO "%s: PPP Deleting dynamic route %s successfuly\n",
 			card->devname, in_ntoa(ip_addr));
-
-	
-	return 0;
+	}
+	return;
 }
 
 /*=============================================================================
@@ -2764,13 +3225,6 @@ static int intr_test( sdla_t *card )
 {
 	ppp_mbox_t *mb = card->mbox;
 	int err,i;
-
-	/* The critical flag is unset because during intialization (if_open) 
-	 * we want the interrupts to be enabled so that when the wpp_isr is
-	 * called it does not exit due to critical flag set.
-	 */ 
-	 
-	card->wandev.critical = 0;
 
 	err = ppp_set_intr_mode( card, 0x08 );
 	
@@ -2792,7 +3246,6 @@ static int intr_test( sdla_t *card )
 	if (err != CMD_OK) 
 		return err;
 
-	card->wandev.critical = 1;
 	return 0;
 }
 
@@ -2803,7 +3256,6 @@ static int udp_pkt_type( struct sk_buff *skb, sdla_t *card )
 {
 	unsigned char *sendpacket;
 	unsigned char buf2[5]; 
-	//FIXME: Use the structure
 	ppp_udp_pkt_t *ppp_udp_pkt = (ppp_udp_pkt_t *)skb->data; 
 	
 	sendpacket = skb->data;
@@ -2850,16 +3302,19 @@ static int udp_pkt_type( struct sk_buff *skb, sdla_t *card )
  * multicast source IP address.
  */
 
-static int chk_bcast_mcast_addr(sdla_t *card, struct net_device* dev,
+static int chk_bcast_mcast_addr(sdla_t *card, netdevice_t* dev,
 				struct sk_buff *skb)
 {
 	u32 src_ip_addr;
         u32 broadcast_ip_addr = 0;
+      #if defined(LINUX_2_1) || defined(LINUX_2_4)
         struct in_device *in_dev;
+      #endif
         /* read the IP source address from the outgoing packet */
         src_ip_addr = *(u32 *)(skb->data + 12);
 
 	/* read the IP broadcast address for the device */
+      #if defined(LINUX_2_1) || defined(LINUX_2_4)
         in_dev = dev->ip_ptr;
         if(in_dev != NULL) {
                 struct in_ifaddr *ifa= in_dev->ifa_list;
@@ -2868,13 +3323,14 @@ static int chk_bcast_mcast_addr(sdla_t *card, struct net_device* dev,
                 else
                         return 0;
         }
+      #else
+        broadcast_ip_addr = dev->pa_brdaddr;
+      #endif
  
         /* check if the IP Source Address is a Broadcast address */
         if((dev->flags & IFF_BROADCAST) && (src_ip_addr == broadcast_ip_addr)) {
                 printk(KERN_INFO "%s: Broadcast Source Address silently discarded\n",
 				card->devname);
-                dev_kfree_skb(skb);
-                ++card->wandev.stats.tx_dropped;
                 return 1;
         } 
 
@@ -2883,8 +3339,6 @@ static int chk_bcast_mcast_addr(sdla_t *card, struct net_device* dev,
 		(ntohl(src_ip_addr) <= 0xFFFFFFFE)) {
                 printk(KERN_INFO "%s: Multicast Source Address silently discarded\n",
 				card->devname);
-                dev_kfree_skb(skb);
-                ++card->wandev.stats.tx_dropped;
                 return 1;
         }
 
@@ -2893,26 +3347,26 @@ static int chk_bcast_mcast_addr(sdla_t *card, struct net_device* dev,
 
 void s508_lock (sdla_t *card, unsigned long *smp_flags)
 {
-#ifdef CONFIG_SMP
-	spin_lock_irqsave(&card->lock, *smp_flags);
-#else
+      #if defined(__SMP__) || defined(LINUX_2_4)
+	spin_lock_irqsave(&card->wandev.lock, *smp_flags);
+      #else
 	disable_irq(card->hw.irq);
-#endif                                                                     
+      #endif                                                                     
 }
 
 void s508_unlock (sdla_t *card, unsigned long *smp_flags)
 {
-#ifdef CONFIG_SMP
-        spin_unlock_irqrestore(&card->lock, *smp_flags);
-#else
+      #if defined(__SMP__) || defined(LINUX_2_4)
+        spin_unlock_irqrestore(&card->wandev.lock, *smp_flags);
+      #else
 	enable_irq(card->hw.irq);
-#endif           
+      #endif           
 }
 
 static int read_connection_info (sdla_t *card)
 {
 	ppp_mbox_t *mb = card->mbox;
-	struct net_device *dev = card->wandev.dev;
+	netdevice_t *dev = card->wandev.dev;
 	ppp_private_area_t *ppp_priv_area = dev->priv;
 	ppp508_connect_info_t *ppp508_connect_info;
 	int err;
@@ -2924,15 +3378,347 @@ static int read_connection_info (sdla_t *card)
 
 	if (err != CMD_OK) { 
 		ppp_error(card, err, mb);
+		ppp_priv_area->ip_remote = 0;
+		ppp_priv_area->ip_local = 0;
 	}
 	else {
 		ppp508_connect_info = (ppp508_connect_info_t *)mb->data;
-
 		ppp_priv_area->ip_remote = ppp508_connect_info->ip_remote;
 		ppp_priv_area->ip_local = ppp508_connect_info->ip_local;
+
+		NEX_PRINTK(KERN_INFO "READ CONNECTION GOT IP ADDRESS %x, %x\n",
+				ppp_priv_area->ip_remote,
+				ppp_priv_area->ip_local);
 	}
 
 	return err;
 }
+
+/*===============================================================================
+ * config_ppp
+ *
+ *	Configure the ppp protocol and enable communications.		
+ *
+ *   	The if_open function binds this function to the poll routine.
+ *      Therefore, this function will run every time the ppp interface
+ *      is brought up.  
+ *      
+ *	If the communications are not enabled, proceed to configure
+ *      the card and enable communications.
+ *
+ *      If the communications are enabled, it means that the interface
+ *      was shutdown by ether the user or driver. In this case, we 
+ *      have to check that the IP addresses have not changed.  If
+ *      the IP addresses changed, we have to reconfigure the firmware
+ *      and update the changed IP addresses.  Otherwise, just exit.
+ */
+static int config_ppp (sdla_t *card)
+{
+
+	netdevice_t *dev = card->wandev.dev;
+	ppp_flags_t *flags = card->flags;
+	ppp_private_area_t *ppp_priv_area = dev->priv;
+
+	if (card->u.p.comm_enabled){
+
+		if (ppp_priv_area->ip_local_tmp != ppp_priv_area->ip_local ||
+		    ppp_priv_area->ip_remote_tmp != ppp_priv_area->ip_remote){
+			
+			/* The IP addersses have changed, we must
+                         * stop the communications and reconfigure
+                         * the card. Reason: the firmware must know
+                         * the local and remote IP addresses. */
+			disable_comm(card);
+			wanpipe_set_state(card, WAN_DISCONNECTED);
+			printk(KERN_INFO 
+				"%s: IP addresses changed!\n",
+					card->devname);
+			printk(KERN_INFO "%s: Restarting communications ...\n",
+					card->devname);
+		}else{ 
+			/* IP addresses are the same and the link is up, 
+                         * we dont have to do anything here. Therefore, exit */
+			return 0;
+		}
+	}
+
+	/* Record the new IP addreses */
+	ppp_priv_area->ip_local = ppp_priv_area->ip_local_tmp;
+	ppp_priv_area->ip_remote = ppp_priv_area->ip_remote_tmp;
+
+	if (config508(dev, card)){
+		printk(KERN_INFO "%s: Failed to configure PPP device\n",
+			card->devname);
+		return 0;
+	}
+
+	if (ppp_set_intr_mode(card, PPP_INTR_RXRDY|
+			    		PPP_INTR_TXRDY|
+				    	PPP_INTR_MODEM|
+				    	PPP_INTR_DISC |
+				    	PPP_INTR_OPEN |
+				    	PPP_INTR_DROP_DTR |
+					PPP_INTR_TIMER)) {
+
+		printk(KERN_INFO "%s: Failed to configure board interrupts !\n", 
+			card->devname);
+		return 0;
+	}
+
+        /* Turn off the transmit and timer interrupt */
+	flags->imask &= ~(PPP_INTR_TXRDY | PPP_INTR_TIMER) ;
+
+
+	/* If you are not the authenticator and any one of the protocol is 
+	 * enabled then we call the set_out_bound_authentication.
+	 */
+	if ( !card->u.p.authenticator  && (ppp_priv_area->pap || ppp_priv_area->chap)) {
+		if ( ppp_set_outbnd_auth(card, ppp_priv_area) ){
+			printk(KERN_INFO "%s: Outbound authentication failed !\n",
+				card->devname);
+			return 0;
+		}
+	} 
+	
+	/* If you are the authenticator and any one of the protocol is enabled
+	 * then we call the set_in_bound_authentication.
+	 */
+	if (card->u.p.authenticator && (ppp_priv_area->pap || ppp_priv_area->chap)){
+		if (ppp_set_inbnd_auth(card, ppp_priv_area)){
+			printk(KERN_INFO "%s: Inbound authentication failed !\n",
+				card->devname);	
+			return 0;
+		}
+	}
+
+	/* If we fail to enable communications here it's OK,
+	 * since the DTR timer will cause a disconnected, which
+	 * will retrigger communication in timer_intr() */
+	if (ppp_comm_enable(card) == CMD_OK) {
+		wanpipe_set_state(card, WAN_CONNECTING);
+		init_ppp_tx_rx_buff(card);
+	}
+
+	return 0; 
+}
+
+/*============================================================
+ * ppp_poll
+ *	
+ * Rationale:
+ * 	We cannot manipulate the routing tables, or
+ *      ip addresses withing the interrupt. Therefore
+ *      we must perform such actons outside an interrupt 
+ *      at a later time. 
+ *
+ * Description:	
+ *	PPP polling routine, responsible for 
+ *     	shutting down interfaces upon disconnect
+ *     	and adding/removing routes. 
+ *      
+ * Usage:        
+ * 	This function is executed for each ppp  
+ * 	interface through a tq_schedule bottom half.
+ *      
+ *      trigger_ppp_poll() function is used to kick
+ *      the ppp_poll routine.  
+ */
+static void ppp_poll (netdevice_t *dev)
+{
+	ppp_private_area_t *ppp_priv_area; 	
+	sdla_t *card;
+	u8 check_gateway=0;
+	ppp_flags_t *flags;
+
+	if (!dev || (ppp_priv_area = dev->priv) == NULL)
+		return;
+
+	card = ppp_priv_area->card;
+	flags = card->flags;
+
+	/* Shutdown is in progress, stop what you are 
+	 * doing and get out */
+	if (test_bit(PERI_CRIT,&card->wandev.critical)){
+		clear_bit(POLL_CRIT,&card->wandev.critical);
+		return;
+	}
+
+	/* if_open() function has triggered the polling routine
+	 * to determine the configured IP addresses.  Once the
+	 * addresses are found, trigger the chdlc configuration */
+	if (test_bit(0,&ppp_priv_area->config_ppp)){
+
+		ppp_priv_area->ip_local_tmp  = get_ip_address(dev,WAN_LOCAL_IP);
+		ppp_priv_area->ip_remote_tmp = get_ip_address(dev,WAN_POINTOPOINT_IP);
+
+		if (ppp_priv_area->ip_local_tmp == ppp_priv_area->ip_remote_tmp && 
+	            card->u.p.ip_mode == WANOPT_PPP_HOST){
+			
+			if (++ppp_priv_area->ip_error > MAX_IP_ERRORS){
+				printk(KERN_INFO "\n%s: --- WARNING ---\n",
+						card->devname);
+				printk(KERN_INFO "%s: The local IP address is the same as the\n",
+						card->devname);
+				printk(KERN_INFO "%s: Point-to-Point IP address.\n",
+						card->devname);
+				printk(KERN_INFO "%s: --- WARNING ---\n\n",
+						card->devname);
+			}else{
+				clear_bit(POLL_CRIT,&card->wandev.critical);
+				ppp_priv_area->poll_delay_timer.expires = jiffies+HZ;
+				add_timer(&ppp_priv_area->poll_delay_timer);
+				return;
+			}
+		}
+
+		ppp_priv_area->timer_int_enabled |= TMR_INT_ENABLED_CONFIG;
+		flags->imask |= PPP_INTR_TIMER;	
+		ppp_priv_area->ip_error=0;	
+		
+		clear_bit(0,&ppp_priv_area->config_ppp);
+		clear_bit(POLL_CRIT,&card->wandev.critical);
+		return;
+	}
+
+	/* Dynamic interface implementation, as well as dynamic
+	 * routing.  */
+	
+	switch (card->wandev.state) {
+	
+	case WAN_DISCONNECTED:
+
+		/* If the dynamic interface configuration is on, and interface 
+		 * is up, then bring down the netowrk interface */
+
+		if (test_bit(DYN_OPT_ON,&ppp_priv_area->interface_down) &&
+		    !test_bit(DEV_DOWN,&ppp_priv_area->interface_down)	&&	
+		    card->wandev.dev->flags & IFF_UP){	
+
+			printk(KERN_INFO "%s: Interface %s down.\n",
+				card->devname,card->wandev.dev->name);
+			change_dev_flags(card->wandev.dev,
+					(card->wandev.dev->flags&~IFF_UP));
+			set_bit(DEV_DOWN,&ppp_priv_area->interface_down);
+		}else{
+			/* We need to check if the local IP address is
+               	   	 * zero. If it is, we shouldn't try to remove it.
+                 	 * For some reason the kernel crashes badly if 
+                 	 * we try to remove the route twice */
+
+			if (card->wandev.dev->flags & IFF_UP && 
+		    	    get_ip_address(card->wandev.dev,WAN_LOCAL_IP) &&
+		    	    card->u.p.ip_mode == WANOPT_PPP_PEER){
+
+				remove_route(card);
+			}
+		}
+		break;
+
+	case WAN_CONNECTED:
+		
+		/* In SMP machine this code can execute before the interface
+		 * comes up.  In this case, we must make sure that we do not
+		 * try to bring up the interface before dev_open() is finished */
+
+
+		/* DEV_DOWN will be set only when we bring down the interface
+		 * for the very first time. This way we know that it was us
+		 * that brought the interface down */
+		
+		if (test_bit(DYN_OPT_ON,&ppp_priv_area->interface_down) &&
+	            test_bit(DEV_DOWN,  &ppp_priv_area->interface_down) &&
+ 		    !(card->wandev.dev->flags & IFF_UP)){
+			
+			printk(KERN_INFO "%s: Interface %s up.\n",
+				card->devname,card->wandev.dev->name);
+			
+			change_dev_flags(card->wandev.dev,(card->wandev.dev->flags|IFF_UP));
+			clear_bit(DEV_DOWN,&ppp_priv_area->interface_down);
+			check_gateway=1;
+		}
+
+		if ((card->u.p.ip_mode == WANOPT_PPP_PEER) && 
+		    test_bit(1,&Read_connection_info)) { 
+			
+			process_route(card);
+			clear_bit(1,&Read_connection_info);
+			check_gateway=1;
+		}
+
+		if (ppp_priv_area->gateway && check_gateway)
+			add_gateway(card,dev);
+
+		break;
+	}
+	clear_bit(POLL_CRIT,&card->wandev.critical);
+	return;
+}
+
+/*============================================================
+ * trigger_ppp_poll
+ *
+ * Description:
+ * 	Add a ppp_poll() task into a tq_scheduler bh handler
+ *      for a specific interface.  This will kick
+ *      the ppp_poll() routine at a later time. 
+ *
+ * Usage:
+ * 	Interrupts use this to defer a taks to 
+ *      a polling routine.
+ *
+ */	
+
+static void trigger_ppp_poll (netdevice_t *dev)
+{
+	ppp_private_area_t *ppp_priv_area;
+	if ((ppp_priv_area=dev->priv) != NULL){ 	
+		
+		sdla_t *card = ppp_priv_area->card;
+
+		if (test_bit(PERI_CRIT,&card->wandev.critical)){
+			return;
+		}
+		
+		if (test_and_set_bit(POLL_CRIT,&card->wandev.critical)){
+			return;
+		}
+
+	      #ifdef LINUX_2_4
+		schedule_task(&ppp_priv_area->poll_task);
+	      #else
+		queue_task(&ppp_priv_area->poll_task, &tq_scheduler);
+	      #endif
+	}
+	return;
+}
+
+static void ppp_poll_delay (unsigned long dev_ptr)
+{
+	netdevice_t *dev = (netdevice_t *)dev_ptr;
+	trigger_ppp_poll(dev);
+}
+
+/*============================================================
+ * detect_and_fix_tx_bug
+ *
+ * Description:
+ *	On connect, if the board tx buffer ptr is not the same
+ *      as the driver tx buffer ptr, we found a firmware bug.
+ *      Report the bug to the above layer.  To fix the
+ *      error restart communications again.
+ *
+ * Usage:
+ *
+ */	
+
+static int detect_and_fix_tx_bug (sdla_t *card)
+{
+	if (((unsigned long)card->u.p.txbuf_base&0xFFF) != ((*card->u.p.txbuf_next)&0xFFF)){
+		NEX_PRINTK(KERN_INFO "Major Error, Fix the bug\n");
+		return 1;
+	}
+	return 0;
+}
+
 
 /****** End *****************************************************************/

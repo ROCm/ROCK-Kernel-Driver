@@ -24,7 +24,6 @@
  *	o if both the unw.lock spinlock and a script's read-write lock must be
  *	  acquired, then the read-write lock must be acquired first.
  */
-#include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/slab.h>

@@ -149,7 +149,7 @@ static char couldnot_msg[] __initdata = "%s: 3c505 not found\n";
 #ifdef ELP_DEBUG
 static const int elp_debug = ELP_DEBUG;
 #else
-static const int elp_debug = 0;
+static const int elp_debug;
 #endif
 
 /*

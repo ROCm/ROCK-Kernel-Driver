@@ -2,7 +2,7 @@
  *  linux/arch/arm/kernel/irq.c
  *
  *  Copyright (C) 1992 Linus Torvalds
- *  Modifications for ARM processor Copyright (C) 1995-1998 Russell King.
+ *  Modifications for ARM processor Copyright (C) 1995-2000 Russell King.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -29,9 +29,11 @@
 #include <linux/smp.h>
 #include <linux/init.h>
 
-#include <asm/hardware.h>
-#include <asm/io.h>
+#include <asm/irq.h>
 #include <asm/system.h>
+#include <asm/mach/irq.h>
+
+#include <asm/arch/irq.h>	/* pick up fixup_irq definition */
 
 /*
  * Maximum IRQ count.  Currently, this is arbitary.  However, it should
@@ -42,41 +44,11 @@
  */
 #define MAX_IRQ_CNT	100000
 
-spinlock_t irq_controller_lock;
-
-int setup_arm_irq(int, struct irqaction *);
-extern int get_fiq_list(char *);
-extern void init_FIQ(void);
-
-struct irqdesc {
-	unsigned int	 nomask   : 1;		/* IRQ does not mask in IRQ   */
-	unsigned int	 enabled  : 1;		/* IRQ is currently enabled   */
-	unsigned int	 triggered: 1;		/* IRQ has occurred	      */
-	unsigned int	 probing  : 1;		/* IRQ in use for a probe     */
-	unsigned int	 probe_ok : 1;		/* IRQ can be used for probe  */
-	unsigned int	 valid    : 1;		/* IRQ claimable	      */
-	unsigned int	 noautoenable : 1;	/* don't automatically enable IRQ */
-	unsigned int	 unused   :25;
-	void (*mask_ack)(unsigned int irq);	/* Mask and acknowledge IRQ   */
-	void (*mask)(unsigned int irq);		/* Mask IRQ		      */
-	void (*unmask)(unsigned int irq);	/* Unmask IRQ		      */
-	struct irqaction *action;
-	/*
-	 * IRQ lock detection
-	 */
-	unsigned int	 lck_cnt;
-	unsigned int	 lck_pc;
-	unsigned int	 lck_jif;
-};
-
-static struct irqdesc irq_desc[NR_IRQS];
 static volatile unsigned long irq_err_count;
+static spinlock_t irq_controller_lock;
 
-/*
- * Get architecture specific interrupt handlers
- * and interrupt initialisation.
- */
-#include <asm/arch/irq.h>
+struct irqdesc irq_desc[NR_IRQS];
+void (*init_arch_irq)(void) __initdata = NULL;
 
 /*
  * Dummy mask/unmask handler
@@ -85,6 +57,14 @@ static void dummy_mask_unmask_irq(unsigned int irq)
 {
 }
 
+/**
+ *	disable_irq - disable an irq and wait for completion
+ *	@irq: Interrupt to disable
+ *
+ *	Disable the selected interrupt line.
+ *
+ *	This function may be called - with care - from IRQ context.
+ */
 void disable_irq(unsigned int irq)
 {
 	unsigned long flags;
@@ -95,6 +75,14 @@ void disable_irq(unsigned int irq)
 	spin_unlock_irqrestore(&irq_controller_lock, flags);
 }
 
+/**
+ *	enable_irq - enable interrupt handling on an irq
+ *	@irq: Interrupt to enable
+ *
+ *	Re-enables the processing of interrupts on this IRQ line
+ *
+ *	This function may be called from IRQ context.
+ */
 void enable_irq(unsigned int irq)
 {
 	unsigned long flags;
@@ -271,6 +259,7 @@ int setup_arm_irq(int irq, struct irqaction * new)
 	int shared = 0;
 	struct irqaction *old, **p;
 	unsigned long flags;
+	struct irqdesc *desc;
 
 	/*
 	 * Some drivers like serial.c use request_irq() heavily,
@@ -292,8 +281,9 @@ int setup_arm_irq(int irq, struct irqaction * new)
 	/*
 	 * The following block of code has to be executed atomically
 	 */
+	desc = irq_desc + irq;
 	spin_lock_irqsave(&irq_controller_lock, flags);
-	p = &irq_desc[irq].action;
+	p = &desc->action;
 	if ((old = *p) != NULL) {
 		/* Can't share interrupts unless both agree to */
 		if (!(old->flags & new->flags & SA_SHIRQ)) {
@@ -312,11 +302,11 @@ int setup_arm_irq(int irq, struct irqaction * new)
 	*p = new;
 
 	if (!shared) {
-		irq_desc[irq].nomask = (new->flags & SA_IRQNOMASK) ? 1 : 0;
-		irq_desc[irq].probing = 0;
-		if (!irq_desc[irq].noautoenable) {
-			irq_desc[irq].enabled = 1;
-			irq_desc[irq].unmask(irq);
+		desc->nomask = (new->flags & SA_IRQNOMASK) ? 1 : 0;
+		desc->probing = 0;
+		if (!desc->noautoenable) {
+			desc->enabled = 1;
+			desc->unmask(irq);
 		}
 	}
 
@@ -324,13 +314,45 @@ int setup_arm_irq(int irq, struct irqaction * new)
 	return 0;
 }
 
+/**
+ *	request_irq - allocate an interrupt line
+ *	@irq: Interrupt line to allocate
+ *	@handler: Function to be called when the IRQ occurs
+ *	@irqflags: Interrupt type flags
+ *	@devname: An ascii name for the claiming device
+ *	@dev_id: A cookie passed back to the handler function
+ *
+ *	This call allocates interrupt resources and enables the
+ *	interrupt line and IRQ handling. From the point this
+ *	call is made your handler function may be invoked. Since
+ *	your handler function must clear any interrupt the board
+ *	raises, you must take care both to initialise your hardware
+ *	and to set up the interrupt handler in the right order.
+ *
+ *	Dev_id must be globally unique. Normally the address of the
+ *	device data structure is used as the cookie. Since the handler
+ *	receives this value it makes sense to use it.
+ *
+ *	If your interrupt is shared you must pass a non NULL dev_id
+ *	as this is required when freeing the interrupt.
+ *
+ *	Flags:
+ *
+ *	SA_SHIRQ		Interrupt is shared
+ *
+ *	SA_INTERRUPT		Disable local interrupts while processing
+ *
+ *	SA_SAMPLE_RANDOM	The interrupt can be used for entropy
+ *
+ */
 int request_irq(unsigned int irq, void (*handler)(int, void *, struct pt_regs *),
 		 unsigned long irq_flags, const char * devname, void *dev_id)
 {
 	unsigned long retval;
 	struct irqaction *action;
 
-	if (irq >= NR_IRQS || !irq_desc[irq].valid || !handler)
+	if (irq >= NR_IRQS || !irq_desc[irq].valid || !handler ||
+	    (irq_flags & SA_SHIRQ && !dev_id))
 		return -EINVAL;
 
 	action = (struct irqaction *)kmalloc(sizeof(struct irqaction), GFP_KERNEL);
@@ -351,6 +373,18 @@ int request_irq(unsigned int irq, void (*handler)(int, void *, struct pt_regs *)
 	return retval;
 }
 
+/**
+ *	free_irq - free an interrupt
+ *	@irq: Interrupt line to free
+ *	@dev_id: Device identity to free
+ *
+ *	Remove an interrupt handler. The handler is removed and if the
+ *	interrupt line is no longer in use by any driver it is disabled.
+ *	On a shared IRQ the caller must ensure the interrupt is disabled
+ *	on the card it drives before calling this function.
+ *
+ *	This function may be called from interrupt context.
+ */
 void free_irq(unsigned int irq, void *dev_id)
 {
 	struct irqaction * action, **p;
@@ -486,6 +520,6 @@ void __init init_IRQ(void)
 		irq_desc[irq].unmask   = dummy_mask_unmask_irq;
 	}
 
-	irq_init_irq();
+	init_arch_irq();
 	init_dma();
 }

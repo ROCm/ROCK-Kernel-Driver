@@ -91,7 +91,7 @@ static char version[] __initdata =
 #define DEFAULT_RECV_INIT_CONTEXT  0xA17  
 
 
-static U32 DriverControlWord =  0;
+static U32 DriverControlWord;
 
 static void rc_timer(unsigned long);
 

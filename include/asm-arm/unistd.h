@@ -224,6 +224,10 @@
 #define __NR_setfsuid32			(__NR_SYSCALL_BASE+215)
 #define __NR_setfsgid32			(__NR_SYSCALL_BASE+216)
 #define __NR_getdents64			(__NR_SYSCALL_BASE+217)
+#define __NR_pivot_root			(__NR_SYSCALL_BASE+218)
+#define __NR_mincore			(__NR_SYSCALL_BASE+219)
+#define __NR_madvise			(__NR_SYSCALL_BASE+220)
+#define __NR_fcntl64			(__NR_SYSCALL_BASE+221)
 
 #define __sys2(x) #x
 #define __sys1(x) __sys2(x)

@@ -9,8 +9,6 @@
 #ifndef _ASM_SN_ARC_TYPES_H
 #define _ASM_SN_ARC_TYPES_H
 
-#include <linux/config.h>
-
 typedef char		CHAR;
 typedef short		SHORT;
 typedef long		LARGE_INTEGER __attribute__ ((__mode__ (__DI__)));

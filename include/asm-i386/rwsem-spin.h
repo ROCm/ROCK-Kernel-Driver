@@ -8,6 +8,14 @@
 #ifndef _I386_RWSEM_SPIN_H
 #define _I386_RWSEM_SPIN_H
 
+#include <linux/config.h>
+
+#ifndef _LINUX_RWSEM_H
+#error please dont include asm/rwsem-spin.h directly, use linux/rwsem.h instead
+#endif
+
+#include <linux/spinlock.h>
+
 #ifdef __KERNEL__
 
 #define CONFIG_USING_SPINLOCK_BASED_RWSEM 1
@@ -16,7 +24,7 @@
  * the semaphore definition
  */
 struct rw_semaphore {
-	atomic_t		count;
+	signed long		count;
 #define RWSEM_UNLOCKED_VALUE		0x00000000
 #define RWSEM_ACTIVE_BIAS		0x00000001
 #define RWSEM_ACTIVE_MASK		0x0000ffff
@@ -53,7 +61,7 @@ struct rw_semaphore {
 #endif
 
 #define __RWSEM_INITIALIZER(name,count) \
-{ ATOMIC_INIT(RWSEM_UNLOCKED_VALUE), SPIN_LOCK_UNLOCKED, \
+{ RWSEM_UNLOCKED_VALUE, SPIN_LOCK_UNLOCKED, \
 	__WAIT_QUEUE_HEAD_INITIALIZER((name).wait) \
 	__RWSEM_DEBUG_INIT __RWSEM_DEBUG_MINIT(name) }
 
@@ -66,7 +74,7 @@ struct rw_semaphore {
 
 static inline void init_rwsem(struct rw_semaphore *sem)
 {
-	atomic_set(&sem->count, RWSEM_UNLOCKED_VALUE);
+	sem->count = RWSEM_UNLOCKED_VALUE;
 	spin_lock_init(&sem->lock);
 	init_waitqueue_head(&sem->wait);
 #if RWSEM_DEBUG
@@ -106,7 +114,7 @@ LOCK_PREFIX	"  decb      "RWSEM_SPINLOCK_OFFSET_STR"(%%eax)\n\t" /* try to grab 
 		"  jmp       1b\n"
 #endif
 		"4:\n\t"
-		"  call      __down_read_failed\n\t"
+		"  call      __rwsem_down_read_failed\n\t"
 		"  jmp       2b\n"
 		".previous"
 		"# ending __down_read\n\t"
@@ -147,7 +155,7 @@ LOCK_PREFIX	"  decb      "RWSEM_SPINLOCK_OFFSET_STR"(%%eax)\n\t" /* try to grab 
 		"  jmp       1b\n"
 #endif
 		"4:\n\t"
-		"  call     __down_write_failed\n\t"
+		"  call     __rwsem_down_write_failed\n\t"
 		"  jmp      2b\n"
 		".previous\n"
 		"# ending down_write"
@@ -233,6 +241,83 @@ LOCK_PREFIX	"  decb      "RWSEM_SPINLOCK_OFFSET_STR"(%%eax)\n\t" /* try to grab 
 		: "=m"(sem->count), "=m"(sem->lock)
 		: "a"(sem), "i"(-RWSEM_ACTIVE_WRITE_BIAS), "m"(sem->count), "m"(sem->lock)
 		: "memory");
+}
+
+/*
+ * implement exchange and add functionality
+ */
+static inline int rwsem_atomic_update(int delta, struct rw_semaphore *sem)
+{
+	int tmp = delta;
+
+	__asm__ __volatile__(
+		"# beginning rwsem_atomic_update\n\t"
+#ifdef CONFIG_SMP
+LOCK_PREFIX	"  decb      "RWSEM_SPINLOCK_OFFSET_STR"(%1)\n\t" /* try to grab the spinlock */
+		"  js        3f\n" /* jump if failed */
+		"1:\n\t"
+#endif
+		"  xchgl     %0,(%1)\n\t" /* retrieve the old value */
+		"  addl      %0,(%1)\n\t" /* add 0xffff0001, result in memory */
+#ifdef CONFIG_SMP
+		"  movb      $1,"RWSEM_SPINLOCK_OFFSET_STR"(%1)\n\t" /* release the spinlock */
+#endif
+		".section .text.lock,\"ax\"\n"
+#ifdef CONFIG_SMP
+		"3:\n\t" /* spin on the spinlock till we get it */
+		"  cmpb      $0,"RWSEM_SPINLOCK_OFFSET_STR"(%1)\n\t"
+		"  rep;nop   \n\t"
+		"  jle       3b\n\t"
+		"  jmp       1b\n"
+#endif
+		".previous\n"
+		"# ending rwsem_atomic_update\n\t"
+		: "+r"(tmp)
+		: "r"(sem)
+		: "memory");
+
+	return tmp+delta;
+}
+
+/*
+ * implement compare and exchange functionality on the rw-semaphore count LSW
+ */
+static inline __u16 rwsem_cmpxchgw(struct rw_semaphore *sem, __u16 old, __u16 new)
+{
+	__u16 prev;
+
+	__asm__ __volatile__(
+		"# beginning rwsem_cmpxchgw\n\t"
+#ifdef CONFIG_SMP
+LOCK_PREFIX	"  decb      "RWSEM_SPINLOCK_OFFSET_STR"(%3)\n\t" /* try to grab the spinlock */
+		"  js        3f\n" /* jump if failed */
+		"1:\n\t"
+#endif
+		"  cmpw      %w1,(%3)\n\t"
+		"  jne       4f\n\t" /* jump if old doesn't match sem->count LSW */
+		"  movw      %w2,(%3)\n\t" /* replace sem->count LSW with the new value */
+		"2:\n\t"
+#ifdef CONFIG_SMP
+		"  movb      $1,"RWSEM_SPINLOCK_OFFSET_STR"(%3)\n\t" /* release the spinlock */
+#endif
+		".section .text.lock,\"ax\"\n"
+#ifdef CONFIG_SMP
+		"3:\n\t" /* spin on the spinlock till we get it */
+		"  cmpb      $0,"RWSEM_SPINLOCK_OFFSET_STR"(%3)\n\t"
+		"  rep;nop   \n\t"
+		"  jle       3b\n\t"
+		"  jmp       1b\n"
+#endif
+		"4:\n\t"
+		"  movw      (%3),%w0\n" /* we'll want to return the current value */
+		"  jmp       2b\n"
+		".previous\n"
+		"# ending rwsem_cmpxchgw\n\t"
+		: "=r"(prev)
+		: "r0"(old), "r"(new), "r"(sem)
+		: "memory");
+
+	return prev;
 }
 
 #endif /* __KERNEL__ */

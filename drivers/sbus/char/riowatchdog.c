@@ -1,4 +1,4 @@
-/* $Id: riowatchdog.c,v 1.1 2001/03/24 06:04:24 davem Exp $
+/* $Id: riowatchdog.c,v 1.2 2001/03/26 23:47:18 davem Exp $
  * riowatchdog.c - driver for hw watchdog inside Super I/O of RIO
  *
  * Copyright (C) 2001 David S. Miller (davem@redhat.com)
@@ -24,10 +24,9 @@
  * as its' watchdog.
  *
  * When the watchdog triggers, it asserts a line to the BBC (Boot Bus
- * Controller) of the machine.  The BBC can be configured to treat the
- * assertion of this signal in different ways.  It can trigger an XIR
- * (external CPU reset) to all the processors or it can trigger a true
- * power-on reset which triggers the RST signal of all devices in the machine.
+ * Controller) of the machine.  The BBC can only be configured to
+ * trigger a power-on reset when the signal is asserted.  The BBC
+ * can be configured to ignore the signal entirely as well.
  *
  * The only Super I/O device register we care about is at index
  * 0x05 (WDTO_INDEX) which is the watchdog time-out in minutes (1-255).
@@ -54,15 +53,13 @@ MODULE_SUPPORTED_DEVICE("watchdog");
 
 static spinlock_t riowd_lock = SPIN_LOCK_UNLOCKED;
 
+static void *bbc_regs;
 static void *riowd_regs;
 #define WDTO_INDEX	0x05
 
 static int riowd_timeout = 1;		/* in minutes */
-static int riowd_xir = 1;		/* watchdog generates XIR? */
 MODULE_PARM(riowd_timeout,"i");
 MODULE_PARM_DESC(riowd_timeout, "Watchdog timeout in minutes");
-MODULE_PARM(riowd_xir,"i");
-MODULE_PARM_DESC(riowd_xir, "Watchdog generates XIR reset if non-zero");
 
 #if 0 /* Currently unused. */
 static u8 riowd_readreg(int index)
@@ -96,12 +93,24 @@ static void riowd_pingtimer(void)
 
 static void riowd_stoptimer(void)
 {
+	u8 val;
+
 	riowd_writereg(0, WDTO_INDEX);
+
+	val = readb(bbc_regs + BBC_WDACTION);
+	val &= ~BBC_WDACTION_RST;
+	writeb(val, bbc_regs + BBC_WDACTION);
 }
 
 static void riowd_starttimer(void)
 {
+	u8 val;
+
 	riowd_writereg(riowd_timeout, WDTO_INDEX);
+
+	val = readb(bbc_regs + BBC_WDACTION);
+	val |= BBC_WDACTION_RST;
+	writeb(val, bbc_regs + BBC_WDACTION);
 }
 
 static int riowd_open(struct inode *inode, struct file *filp)
@@ -189,7 +198,6 @@ static int __init riowd_bbc_init(void)
 {
 	struct 	linux_ebus *ebus = NULL;
 	struct 	linux_ebus_device *edev = NULL;
-	void *bbc_regs;
 	u8 val;
 
 	for_each_ebus(ebus) {
@@ -206,14 +214,11 @@ found_bbc:
 	if (!bbc_regs)
 		return -ENODEV;
 
+	/* Turn it off. */
 	val = readb(bbc_regs + BBC_WDACTION);
-	if (riowd_xir != 0)
-		val &= ~BBC_WDACTION_RST;
-	else
-		val |= BBC_WDACTION_RST;
+	val &= ~BBC_WDACTION_RST;
 	writeb(val, bbc_regs + BBC_WDACTION);
 
-	iounmap(bbc_regs);
 	return 0;
 }
 
@@ -249,10 +254,8 @@ ebus_done:
 		goto fail;
 	}
 
-	printk(KERN_INFO "pmc: Hardware watchdog [%i minutes, %s reset], "
-	       "regs at %p\n",
-	       riowd_timeout, (riowd_xir ? "XIR" : "POR"),
-	       riowd_regs);
+	printk(KERN_INFO "pmc: Hardware watchdog [%i minutes], "
+	       "regs at %p\n", riowd_timeout, riowd_regs);
 
 	return 0;
 
@@ -260,6 +263,10 @@ fail:
 	if (riowd_regs) {
 		iounmap(riowd_regs);
 		riowd_regs = NULL;
+	}
+	if (bbc_regs) {
+		iounmap(bbc_regs);
+		bbc_regs = NULL;
 	}
 	return -ENODEV;
 }
@@ -269,6 +276,8 @@ static void __exit riowd_cleanup(void)
 	misc_deregister(&riowd_miscdev);
 	iounmap(riowd_regs);
 	riowd_regs = NULL;
+	iounmap(bbc_regs);
+	bbc_regs = NULL;
 }
 
 module_init(riowd_init);

@@ -20,15 +20,22 @@ obj-y	:= process.o signal.o entry.o traps.o irq.o irq_ipr.o \
 
 obj-$(CONFIG_CF_ENABLER)	+= cf-enabler.o
 obj-$(CONFIG_CPU_SH4)		+= fpu.o
-obj-$(CONFIG_PCI)		+= pci-sh.o 
 obj-$(CONFIG_SH_RTC)            += rtc.o
 obj-$(CONFIG_SH_STANDARD_BIOS)	+= sh_bios.o
+
+ifeq ($(CONFIG_PCI),y)
+obj-y				+= pci-sh.o 
+obj-$(CONFIG_CPU_SUBTYPE_ST40STB1)+= pci_st40.o
+endif
 
 obj-$(CONFIG_SH_HP600)		+= mach_hp600.o
 machine-specific-objs		+= mach_hp600.o
 
 obj-$(CONFIG_SH_SOLUTION_ENGINE)+= mach_se.o setup_se.o io_se.o led_se.o
 machine-specific-objs		+= mach_se.o setup_se.o io_se.o led_se.o
+
+obj-$(CONFIG_SH_CAT68701) 	+= mach_cat68701.o io_cat68701.o
+machine-specific-objs		+= mach_cat68701.o io_cat68701.o
 
 obj-$(CONFIG_SH_CQREEK)		+= setup_cqreek.o
 machine-specific-objs		+= setup_cqreek.o
@@ -39,9 +46,13 @@ machine-specific-objs		+= mach_unknown.o io_unknown.o
 obj-$(CONFIG_HD64461)		+= setup_hd64461.o io_hd64461.o
 machine-specific-objs		+= setup_hd64461.o io_hd64461.o
 
+obj-$(CONFIG_CPU_SUBTYPE_ST40STB1) +=irq_intc2.o
+
 # Doesn't compile well, so don't include in machine-specific-objs
-obj-$(CONFIG_HD64465)		+= setup_hd64465.o io_hd64465.o
-obj-$(CONFIG_SH_FOOBAR)		+= mach_foobar.o
+obj-$(CONFIG_HD64465)		+= setup_hd64465.o io_hd64465.o hd64465_gpio.o
+obj-$(CONFIG_SH_DMIDA)		+= mach_dmida.o
+obj-$(CONFIG_SH_EC3104)         += setup_ec3104.o io_ec3104.o mach_ec3104.o
+obj-$(CONFIG_SH_DREAMCAST)	+= mach_dc.o setup_dc.o io_dc.o
 
 ifeq ($(CONFIG_SH_GENERIC),y)
 obj-y		+= $(machine-specific-objs)

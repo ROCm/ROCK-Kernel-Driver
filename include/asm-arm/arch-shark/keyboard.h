@@ -1,6 +1,6 @@
 /*
  * linux/include/asm-arm/arch-shark/keyboard.h
- * by Alexander.Schulz@stud.uni-karlsruhe.de
+ * by Alexander Schulz <aschulz@netwinder.org>
  * 
  * Derived from linux/include/asm-arm/arch-ebsa285/keyboard.h
  * (C) 1998 Russell King

@@ -1,4 +1,4 @@
-/* $Id: ioctl32.c,v 1.110 2001/03/22 12:51:25 davem Exp $
+/* $Id: ioctl32.c,v 1.111 2001/03/27 07:28:43 davem Exp $
  * ioctl32.c: Conversion between 32bit and 64bit native ioctls.
  *
  * Copyright (C) 1997-2000  Jakub Jelinek  (jakub@redhat.com)
@@ -527,6 +527,55 @@ static inline int dev_ifconf(unsigned int fd, unsigned int cmd, unsigned long ar
 	return err;
 }
 
+static inline int ethtool_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
+{
+	struct ifreq ifr;
+	mm_segment_t old_fs;
+	int err, len;
+	u32 data, ethcmd;
+	
+	if (copy_from_user(&ifr, (struct ifreq32 *)arg, sizeof(struct ifreq32)))
+		return -EFAULT;
+	ifr.ifr_data = (__kernel_caddr_t)get_free_page(GFP_KERNEL);
+	if (!ifr.ifr_data)
+		return -EAGAIN;
+
+	__get_user(data, &(((struct ifreq32 *)arg)->ifr_ifru.ifru_data));
+
+	if (get_user(ethcmd, (u32 *)A(data))) {
+		err = -EFAULT;
+		goto out;
+	}
+	switch (ethcmd) {
+	case ETHTOOL_GDRVINFO:	len = sizeof(struct ethtool_drvinfo); break;
+	case ETHTOOL_GSET:
+	case ETHTOOL_SSET:
+	default:		len = sizeof(struct ethtool_cmd); break;
+	}
+
+	if (copy_from_user(ifr.ifr_data, (char *)A(data), len)) {
+		err = -EFAULT;
+		goto out;
+	}
+
+	old_fs = get_fs();
+	set_fs (KERNEL_DS);
+	err = sys_ioctl (fd, cmd, (unsigned long)&ifr);
+	set_fs (old_fs);
+	if (!err) {
+		u32 data;
+
+		__get_user(data, &(((struct ifreq32 *)arg)->ifr_ifru.ifru_data));
+		len = copy_to_user((char *)A(data), ifr.ifr_data, len);
+		if (len)
+			err = -EFAULT;
+	}
+
+out:
+	free_page((unsigned long)ifr.ifr_data);
+	return err;
+}
+
 static inline int dev_ifsioc(unsigned int fd, unsigned int cmd, unsigned long arg)
 {
 	struct ifreq ifr;
@@ -548,23 +597,11 @@ static inline int dev_ifsioc(unsigned int fd, unsigned int cmd, unsigned long ar
 	case SIOCGPPPSTATS:
 	case SIOCGPPPCSTATS:
 	case SIOCGPPPVER:
-	case SIOCETHTOOL:
 		if (copy_from_user(&ifr, (struct ifreq32 *)arg, sizeof(struct ifreq32)))
 			return -EFAULT;
 		ifr.ifr_data = (__kernel_caddr_t)get_free_page(GFP_KERNEL);
 		if (!ifr.ifr_data)
 			return -EAGAIN;
-		if(cmd == SIOCETHTOOL) {
-			u32 data;
-
-			__get_user(data, &(((struct ifreq32 *)arg)->ifr_ifru.ifru_data));
-			if(copy_from_user(ifr.ifr_data,
-					  (char *)A(data),
-					  sizeof(struct ethtool_cmd))) {
-				free_page((unsigned long)ifr.ifr_data);
-				return -EFAULT;
-			}
-		}
 		break;
 	default:
 		if (copy_from_user(&ifr, (struct ifreq32 *)arg, sizeof(struct ifreq32)))
@@ -594,14 +631,11 @@ static inline int dev_ifsioc(unsigned int fd, unsigned int cmd, unsigned long ar
 		case SIOCGPPPSTATS:
 		case SIOCGPPPCSTATS:
 		case SIOCGPPPVER:
-		case SIOCETHTOOL:
 		{
 			u32 data;
 			int len;
 
 			__get_user(data, &(((struct ifreq32 *)arg)->ifr_ifru.ifru_data));
-			if(cmd == SIOCETHTOOL)
-				len = sizeof(struct ethtool_cmd);
 			if(cmd == SIOCGPPPVER)
 				len = strlen((char *)ifr.ifr_data) + 1;
 			else if(cmd == SIOCGPPPCSTATS)
@@ -625,6 +659,14 @@ static inline int dev_ifsioc(unsigned int fd, unsigned int cmd, unsigned long ar
 			err |= __put_user(ifr.ifr_map.port, &(((struct ifreq32 *)arg)->ifr_ifru.ifru_map.port));
 			if (err)
 				err = -EFAULT;
+			break;
+		}
+	} else {
+		switch (cmd) {
+		case SIOCGPPPSTATS:
+		case SIOCGPPPCSTATS:
+		case SIOCGPPPVER:
+			free_page((unsigned long)ifr.ifr_data);
 			break;
 		}
 	}
@@ -3705,7 +3747,7 @@ HANDLE_IOCTL(SIOCGPPPCSTATS, dev_ifsioc)
 HANDLE_IOCTL(SIOCGPPPVER, dev_ifsioc)
 HANDLE_IOCTL(SIOCGIFTXQLEN, dev_ifsioc)
 HANDLE_IOCTL(SIOCSIFTXQLEN, dev_ifsioc)
-HANDLE_IOCTL(SIOCETHTOOL, dev_ifsioc)
+HANDLE_IOCTL(SIOCETHTOOL, ethtool_ioctl)
 HANDLE_IOCTL(SIOCADDRT, routing_ioctl)
 HANDLE_IOCTL(SIOCDELRT, routing_ioctl)
 /* Note SIOCRTMSG is no longer, so this is safe and * the user would have seen just an -EINVAL anyways. */

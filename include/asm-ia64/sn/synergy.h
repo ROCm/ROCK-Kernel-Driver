@@ -1,6 +1,8 @@
 #ifndef ASM_IA64_SN_SYNERGY_H
 #define ASM_IA64_SN_SYNERGY_H
 
+#include <linux/config.h>
+
 #include "asm/io.h"
 #include "asm/sn/nodepda.h"
 #include "asm/sn/intr_public.h"

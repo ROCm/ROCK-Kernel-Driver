@@ -1217,7 +1217,7 @@ err_out:
 /* Find all the lance cards on the system and initialize them */
 static int __init dec_lance_probe(void)
 {
-	static int called = 0;
+	static int called;
 
 #ifdef MODULE
 	root_lance_dev = NULL;

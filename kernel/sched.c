@@ -1093,9 +1093,11 @@ asmlinkage long sys_sched_yield(void)
 	int i;
 
 	// Substract non-idle processes running on other CPUs.
-	for (i = 0; i < smp_num_cpus; i++)
-		if (aligned_data[i].schedule_data.curr != idle_task(i))
+	for (i = 0; i < smp_num_cpus; i++) {
+		int cpu = cpu_logical_map(i);
+		if (aligned_data[cpu].schedule_data.curr != idle_task(cpu))
 			nr_pending--;
+	}
 #else
 	// on UP this process is on the runqueue as well
 	nr_pending--;

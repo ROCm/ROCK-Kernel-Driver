@@ -37,14 +37,8 @@
  * the correspondent code in isdn.c
  */
 
-#ifdef CONFIG_COBALT_MICRO_SERVER
-/* Save memory */
-#define ISDN_MAX_DRIVERS    2
-#define ISDN_MAX_CHANNELS   8
-#else
 #define ISDN_MAX_DRIVERS    32
 #define ISDN_MAX_CHANNELS   64
-#endif
 #define ISDN_MINOR_B        0
 #define ISDN_MINOR_BMAX     (ISDN_MAX_CHANNELS-1)
 #define ISDN_MINOR_CTRL     64
@@ -420,7 +414,7 @@ typedef struct isdn_net_dev_s {
   struct net_device dev;               /* interface to upper levels        */
 #ifdef CONFIG_ISDN_PPP
   ippp_bundle * pb;		/* pointer to the common bundle structure
-   			         * with the the per-bundle data */
+   			         * with the per-bundle data */
 #endif
 #ifdef CONFIG_ISDN_X25
   struct concap_proto  *cprot; /* connection oriented encapsulation protocol */

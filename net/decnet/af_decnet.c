@@ -2128,6 +2128,7 @@ static struct proto_ops dn_proto_ops = {
 	sendmsg:	dn_sendmsg,
 	recvmsg:	dn_recvmsg,
 	mmap:		sock_no_mmap,
+	sendpage:	sock_no_sendpage,
 };
 
 #ifdef CONFIG_SYSCTL

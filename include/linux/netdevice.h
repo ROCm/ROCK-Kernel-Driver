@@ -653,6 +653,7 @@ extern int		netdev_max_backlog;
 extern unsigned long	netdev_fc_xoff;
 extern atomic_t netdev_dropping;
 extern int		netdev_set_master(struct net_device *dev, struct net_device *master);
+extern struct sk_buff * skb_checksum_help(struct sk_buff *skb);
 #ifdef CONFIG_NET_FASTROUTE
 extern int		netdev_fastroute;
 extern int		netdev_fastroute_obstacles;

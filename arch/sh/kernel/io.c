@@ -8,123 +8,149 @@
  */
 
 #include <asm/io.h>
+#include <linux/module.h>
 
-unsigned int _inb(unsigned long port)
+unsigned char _inb(unsigned long port)
 {
 	return __inb(port);
 }
+EXPORT_SYMBOL(_inb);
 
-unsigned int _inw(unsigned long port)
+unsigned short _inw(unsigned long port)
 {
 	return __inw(port);
 }
+EXPORT_SYMBOL(_inw);
 
 unsigned int _inl(unsigned long port)
 {
 	return __inl(port);
 }
+EXPORT_SYMBOL(_inl);
 
 void _outb(unsigned char b, unsigned long port)
 {
 	__outb(b, port);
 }
+EXPORT_SYMBOL(_outb);
 
 void _outw(unsigned short b, unsigned long port)
 {
 	__outw(b, port);
 }
+EXPORT_SYMBOL(_outw);
+
 
 void _outl(unsigned int b, unsigned long port)
 {
 	__outl(b, port);
 }
+EXPORT_SYMBOL(_outl);
 
-unsigned int _inb_p(unsigned long port)
+
+unsigned char _inb_p(unsigned long port)
 {
 	return __inb_p(port);
 }
+EXPORT_SYMBOL(_inb_p);
 
-unsigned int _inw_p(unsigned long port)
+unsigned short _inw_p(unsigned long port)
 {
 	return __inw_p(port);
 }
+EXPORT_SYMBOL(_inw_p);
+
 
 void _outb_p(unsigned char b, unsigned long port)
 {
 	__outb_p(b, port);
 }
+EXPORT_SYMBOL(_outb_p);
 
 void _outw_p(unsigned short b, unsigned long port)
 {
 	__outw_p(b, port);
 }
+EXPORT_SYMBOL(_outw_p);
 
 void _insb(unsigned long port, void *buffer, unsigned long count)
 {
 	return __insb(port, buffer, count);
 }
+EXPORT_SYMBOL(_insb);
 
 void _insw(unsigned long port, void *buffer, unsigned long count)
 {
 	__insw(port, buffer, count);
 }
+EXPORT_SYMBOL(_insw);
 
 void _insl(unsigned long port, void *buffer, unsigned long count)
 {
 	__insl(port, buffer, count);
 }
+EXPORT_SYMBOL(_insl);
 
 void _outsb(unsigned long port, const void *buffer, unsigned long count)
 {
 	__outsb(port, buffer, count);
 }
+EXPORT_SYMBOL(_outsb);
 
 void _outsw(unsigned long port, const void *buffer, unsigned long count)
 {
 	__outsw(port, buffer, count);
 }
+EXPORT_SYMBOL(_outsw);
 
 void _outsl(unsigned long port, const void *buffer, unsigned long count)
 {
 	__outsl(port, buffer, count);
 
 }
+EXPORT_SYMBOL(_outsl);
 
-unsigned long ___raw_readb(unsigned long addr)
+unsigned char ___raw_readb(unsigned long addr)
 {
 	return __readb(addr);
 }
+EXPORT_SYMBOL(___raw_readb);
 
-unsigned long ___raw_readw(unsigned long addr)
+unsigned short ___raw_readw(unsigned long addr)
 {
 	return __readw(addr);
 }
+EXPORT_SYMBOL(___raw_readw);
 
-unsigned long ___raw_readl(unsigned long addr)
+unsigned int ___raw_readl(unsigned long addr)
 {
 	return __readl(addr);
 }
+EXPORT_SYMBOL(___raw_readl);
 
-unsigned long _readb(unsigned long addr)
+unsigned char _readb(unsigned long addr)
 {
 	unsigned long r = __readb(addr);
 	mb();
 	return r;
 }
+EXPORT_SYMBOL(_readb);
 
-unsigned long _readw(unsigned long addr)
+unsigned short _readw(unsigned long addr)
 {
 	unsigned long r = __readw(addr);
 	mb();
 	return r;
 }
+EXPORT_SYMBOL(_readw);
 
-unsigned long _readl(unsigned long addr)
+unsigned int _readl(unsigned long addr)
 {
 	unsigned long r = __readl(addr);
 	mb();
 	return r;
 }
+EXPORT_SYMBOL(_readl);
 
 void ___raw_writeb(unsigned char b, unsigned long addr)
 {
@@ -135,29 +161,34 @@ void ___raw_writew(unsigned short b, unsigned long addr)
 {
 	__writew(b, addr);
 }
+EXPORT_SYMBOL(___raw_writew);
 
 void ___raw_writel(unsigned int b, unsigned long addr)
 {
 	__writel(b, addr);
 }
+EXPORT_SYMBOL(___raw_writel);
 
 void _writeb(unsigned char b, unsigned long addr)
 {
 	__writeb(b, addr);
 	mb();
 }
+EXPORT_SYMBOL(_writeb);
 
 void _writew(unsigned short b, unsigned long addr)
 {
 	__writew(b, addr);
 	mb();
 }
+EXPORT_SYMBOL(_writew);
 
 void _writel(unsigned int b, unsigned long addr)
 {
 	__writel(b, addr);
 	mb();
 }
+EXPORT_SYMBOL(_writel);
 
 /*
  * Copy data from IO memory space to "real" memory space.

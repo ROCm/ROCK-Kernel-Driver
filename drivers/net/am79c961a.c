@@ -637,7 +637,7 @@ am79c961_hw_init(struct net_device *dev)
 
 static void __init am79c961_banner(void)
 {
-	static unsigned version_printed = 0;
+	static unsigned version_printed;
 
 	if (net_debug && version_printed++ == 0)
 		printk(KERN_INFO "%s", version);

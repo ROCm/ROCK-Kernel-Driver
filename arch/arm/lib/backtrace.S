@@ -26,7 +26,7 @@ ENTRY(__backtrace)
 
 ENTRY(c_backtrace)
 
-#ifndef CONFIG_FRAME_POINTER
+#ifdef CONFIG_NO_FRAME_POINTER
 		mov	pc, lr
 #else
 

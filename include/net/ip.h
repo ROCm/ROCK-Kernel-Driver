@@ -188,11 +188,16 @@ int ip_dont_fragment(struct sock *sk, struct dst_entry *dst)
 
 extern void __ip_select_ident(struct iphdr *iph, struct dst_entry *dst);
 
-static inline void ip_select_ident(struct iphdr *iph, struct dst_entry *dst)
+static inline void ip_select_ident(struct iphdr *iph, struct dst_entry *dst, struct sock *sk)
 {
-	if (iph->frag_off&__constant_htons(IP_DF))
-		iph->id = 0;
-	else
+	if (iph->frag_off&__constant_htons(IP_DF)) {
+		/* This is only to work around buggy Windows95/2000
+		 * VJ compression implementations.  If the ID field
+		 * does not change, they drop every other packet in
+		 * a TCP stream using header compression.
+		 */
+		iph->id = ((sk && sk->daddr) ? htons(sk->protinfo.af_inet.id++) : 0);
+	} else
 		__ip_select_ident(iph, dst);
 }
 

@@ -271,6 +271,7 @@ typedef PCMCIAPrtType	PCMCIAType [PCMCIASp/PCMCIAPrtSp] ;
 
 #define UDCCR_UDD	0x00000001	/* UDC Disable                     */
 #define UDCCR_UDA	0x00000002	/* UDC Active (read)               */
+#define UDCCR_RESIM	0x00000004	/* Resume Interrupt Mask, per errata */
 #define UDCCR_EIM	0x00000008	/* End-point 0 Interrupt Mask      */
                 	        	/* (disable)                       */
 #define UDCCR_RIM	0x00000010	/* Receive Interrupt Mask          */
@@ -279,6 +280,7 @@ typedef PCMCIAPrtType	PCMCIAType [PCMCIASp/PCMCIAPrtSp] ;
                 	        	/* (disable)                       */
 #define UDCCR_SRM	0x00000040	/* Suspend/Resume interrupt Mask   */
                 	        	/* (disable)                       */
+#define UDCCR_SUSIM	UDCCR_SRM	/* Per errata, SRM just masks suspend */
 #define UDCCR_REM	0x00000080	/* REset interrupt Mask (disable)  */
 
 #define UDCAR_ADD	Fld (7, 0)	/* function ADDress                */
@@ -501,6 +503,32 @@ typedef PCMCIAPrtType	PCMCIAType [PCMCIASp/PCMCIAPrtSp] ;
                 	(*((volatile Word *) io_p2v (_Ser3UTSR0)))
 #define Ser3UTSR1	        	/* Ser. port 3 UART Status Reg. 1  */ \
                 	(*((volatile Word *) io_p2v (_Ser3UTSR1)))
+
+#elif LANGUAGE == Assembly
+#define Ser1UTCR0	( io_p2v (_Ser1UTCR0))
+#define Ser1UTCR1	( io_p2v (_Ser1UTCR1))
+#define Ser1UTCR2	( io_p2v (_Ser1UTCR2))
+#define Ser1UTCR3	( io_p2v (_Ser1UTCR3))
+#define Ser1UTDR	( io_p2v (_Ser1UTDR))
+#define Ser1UTSR0	( io_p2v (_Ser1UTSR0))
+#define Ser1UTSR1	( io_p2v (_Ser1UTSR1))
+
+#define Ser2UTCR0	( io_p2v (_Ser2UTCR0))
+#define Ser2UTCR1	( io_p2v (_Ser2UTCR1))
+#define Ser2UTCR2	( io_p2v (_Ser2UTCR2))
+#define Ser2UTCR3	( io_p2v (_Ser2UTCR3))
+#define Ser2UTCR4	( io_p2v (_Ser2UTCR4))
+#define Ser2UTDR	( io_p2v (_Ser2UTDR))
+#define Ser2UTSR0	( io_p2v (_Ser2UTSR0))
+#define Ser2UTSR1	( io_p2v (_Ser2UTSR1))
+
+#define Ser3UTCR0	( io_p2v (_Ser3UTCR0))
+#define Ser3UTCR1	( io_p2v (_Ser3UTCR1))
+#define Ser3UTCR2	( io_p2v (_Ser3UTCR2))
+#define Ser3UTCR3	( io_p2v (_Ser3UTCR3))
+#define Ser3UTDR	( io_p2v (_Ser3UTDR))
+#define Ser3UTSR0	( io_p2v (_Ser3UTSR0))
+#define Ser3UTSR1	( io_p2v (_Ser3UTSR1))
 
 #endif /* LANGUAGE == C */
 
@@ -1229,6 +1257,17 @@ typedef PCMCIAPrtType	PCMCIAType [PCMCIASp/PCMCIAPrtSp] ;
                 	(*((volatile Word *) io_p2v (_PGSR)))
 #define POSR    	        	/* PM Oscillator Status Reg.       */ \
                 	(*((volatile Word *) io_p2v (_POSR)))
+
+#elif LANGUAGE == Assembly
+#define PMCR          	(io_p2v (_PMCR))
+#define PSSR          	(io_p2v (_PSSR))
+#define PSPR          	(io_p2v (_PSPR))
+#define PWER          	(io_p2v (_PWER))
+#define PCFR          	(io_p2v (_PCFR))
+#define PPCR          	(io_p2v (_PPCR))
+#define PGSR          	(io_p2v (_PGSR))
+#define POSR          	(io_p2v (_POSR))
+
 #endif /* LANGUAGE == C */
 
 #define PMCR_SF 	0x00000001	/* Sleep Force (set only)          */
@@ -1481,6 +1520,17 @@ typedef PCMCIAPrtType	PCMCIAType [PCMCIASp/PCMCIAPrtSp] ;
                 	(*((volatile Word *) io_p2v (_GEDR)))
 #define GAFR    	        	/* GPIO Alternate Function Reg.    */ \
                 	(*((volatile Word *) io_p2v (_GAFR)))
+#elif LANGUAGE == Assembly
+
+#define GPLR  (io_p2v (_GPLR))
+#define GPDR  (io_p2v (_GPDR))
+#define GPSR  (io_p2v (_GPSR))
+#define GPCR  (io_p2v (_GPCR))
+#define GRER  (io_p2v (_GRER))
+#define GFER  (io_p2v (_GFER))
+#define GEDR  (io_p2v (_GEDR))
+#define GAFR  (io_p2v (_GAFR))
+
 #endif /* LANGUAGE == C */
 
 #define GPIO_MIN	(0)
@@ -1784,6 +1834,11 @@ typedef PCMCIAPrtType	PCMCIAType [PCMCIASp/PCMCIAPrtSp] ;
 #define MDCAS0  	(MDCAS [0])	/*  DRAM CAS shift reg. 0          */
 #define MDCAS1  	(MDCAS [1])	/*  DRAM CAS shift reg. 1          */
 #define MDCAS2  	(MDCAS [2])	/*  DRAM CAS shift reg. 2          */
+
+#elif LANGUAGE == Assembly
+
+#define MDCNFG		(io_p2v(_MDCNFG))
+
 #endif /* LANGUAGE == C */
 
 /* SA1100 MDCNFG values */
@@ -1870,6 +1925,13 @@ typedef PCMCIAPrtType	PCMCIAType [PCMCIASp/PCMCIAPrtSp] ;
                 	((volatile Word *) io_p2v (_MSC (0)))
 #define MSC0    	(MSC [0])	/*  Static memory Control reg. 0   */
 #define MSC1    	(MSC [1])	/*  Static memory Control reg. 1   */
+
+#elif LANGUAGE == Assembly
+
+#define MSC0		io_p2v(0xa0000010)
+#define MSC1		io_p2v(0xa0000014)
+#define MSC2		io_p2v(0xa000002c)
+
 #endif /* LANGUAGE == C */
 
 #define MSC_Bnk(Nb)	        	/* static memory Bank [0..3]       */ \
@@ -1895,32 +1957,32 @@ typedef PCMCIAPrtType	PCMCIAType [PCMCIASp/PCMCIAPrtSp] ;
                 	        	/* First access - 1(.5) [Tmem]     */
 #define MSC_1stRdAcc(Tcpu)      	/*  1st Read Access time (burst    */ \
                 	        	/*  static memory) [3..65 Tcpu]    */ \
-                	(((Tcpu) - 3)/2 << FShft (MSC_RDF))
+                	((((Tcpu) - 3)/2) << FShft (MSC_RDF))
 #define MSC_Ceil1stRdAcc(Tcpu)  	/*  Ceil. of 1stRdAcc [3..65 Tcpu] */ \
-                	(((Tcpu) - 2)/2 << FShft (MSC_RDF))
+                	((((Tcpu) - 2)/2) << FShft (MSC_RDF))
 #define MSC_RdAcc(Tcpu)	        	/*  Read Access time (non-burst    */ \
                 	        	/*  static memory) [2..64 Tcpu]    */ \
-                	(((Tcpu) - 2)/2 << FShft (MSC_RDF))
+                	((((Tcpu) - 2)/2) << FShft (MSC_RDF))
 #define MSC_CeilRdAcc(Tcpu)     	/*  Ceil. of RdAcc [2..64 Tcpu]    */ \
-                	(((Tcpu) - 1)/2 << FShft (MSC_RDF))
+                	((((Tcpu) - 1)/2) << FShft (MSC_RDF))
 #define MSC_RDN 	Fld (5, 8)	/* ROM/static memory read Delay    */
                 	        	/* Next access - 1 [Tmem]          */
 #define MSC_NxtRdAcc(Tcpu)      	/*  Next Read Access time (burst   */ \
                 	        	/*  static memory) [2..64 Tcpu]    */ \
-                	(((Tcpu) - 2)/2 << FShft (MSC_RDN))
+                	((((Tcpu) - 2)/2) << FShft (MSC_RDN))
 #define MSC_CeilNxtRdAcc(Tcpu)  	/*  Ceil. of NxtRdAcc [2..64 Tcpu] */ \
-                	(((Tcpu) - 1)/2 << FShft (MSC_RDN))
+                	((((Tcpu) - 1)/2) << FShft (MSC_RDN))
 #define MSC_WrAcc(Tcpu)	        	/*  Write Access time (non-burst   */ \
                 	        	/*  static memory) [2..64 Tcpu]    */ \
-                	(((Tcpu) - 2)/2 << FShft (MSC_RDN))
+                	((((Tcpu) - 2)/2) << FShft (MSC_RDN))
 #define MSC_CeilWrAcc(Tcpu)     	/*  Ceil. of WrAcc [2..64 Tcpu]    */ \
-                	(((Tcpu) - 1)/2 << FShft (MSC_RDN))
+                	((((Tcpu) - 1)/2) << FShft (MSC_RDN))
 #define MSC_RRR 	Fld (3, 13)	/* ROM/static memory RecoveRy      */
                 	        	/* time/2 [Tmem]                   */
 #define MSC_Rec(Tcpu)	        	/*  Recovery time [0..28 Tcpu]     */ \
-                	((Tcpu)/4 << FShft (MSC_RRR))
+                	(((Tcpu)/4) << FShft (MSC_RRR))
 #define MSC_CeilRec(Tcpu)       	/*  Ceil. of Rec [0..28 Tcpu]      */ \
-                	(((Tcpu) + 3)/4 << FShft (MSC_RRR))
+                	((((Tcpu) + 3)/4) << FShft (MSC_RRR))
 
 
 /*
@@ -1955,20 +2017,20 @@ typedef PCMCIAPrtType	PCMCIAType [PCMCIASp/PCMCIAPrtSp] ;
 
 #define MECR_BSIO	Fld (5, 0)	/* BCLK Select I/O - 1 [Tmem]      */
 #define MECR_IOClk(Tcpu)        	/*  I/O Clock [2..64 Tcpu]         */ \
-                	(((Tcpu) - 2)/2 << FShft (MECR_BSIO))
+                	((((Tcpu) - 2)/2) << FShft (MECR_BSIO))
 #define MECR_CeilIOClk(Tcpu)    	/*  Ceil. of IOClk [2..64 Tcpu]    */ \
-                	(((Tcpu) - 1)/2 << FShft (MECR_BSIO))
+                	((((Tcpu) - 1)/2) << FShft (MECR_BSIO))
 #define MECR_BSA	Fld (5, 5)	/* BCLK Select Attribute - 1       */
                 	        	/* [Tmem]                          */
 #define MECR_AttrClk(Tcpu)      	/*  Attribute Clock [2..64 Tcpu]   */ \
-                	(((Tcpu) - 2)/2 << FShft (MECR_BSA))
+                	((((Tcpu) - 2)/2) << FShft (MECR_BSA))
 #define MECR_CeilAttrClk(Tcpu)  	/*  Ceil. of AttrClk [2..64 Tcpu]  */ \
-                	(((Tcpu) - 1)/2 << FShft (MECR_BSA))
+                	((((Tcpu) - 1)/2) << FShft (MECR_BSA))
 #define MECR_BSM	Fld (5, 10)	/* BCLK Select Memory - 1 [Tmem]   */
 #define MECR_MemClk(Tcpu)       	/*  Memory Clock [2..64 Tcpu]      */ \
-                	(((Tcpu) - 2)/2 << FShft (MECR_BSM))
+                	((((Tcpu) - 2)/2) << FShft (MECR_BSM))
 #define MECR_CeilMemClk(Tcpu)   	/*  Ceil. of MemClk [2..64 Tcpu]   */ \
-                	(((Tcpu) - 1)/2 << FShft (MECR_BSM))
+                	((((Tcpu) - 1)/2) << FShft (MECR_BSM))
 
 /*
  * On SA1110 only
@@ -1980,6 +2042,10 @@ typedef PCMCIAPrtType	PCMCIAType [PCMCIASp/PCMCIAPrtSp] ;
                 	        	/* Memory system:                  */
 #define MDREFR \
                 	(*((volatile Word *) io_p2v (_MDREFR)))
+
+#elif LANGUAGE == Assembly
+
+#define MDREFR		(io_p2v(_MDREFR))
 
 #endif /* LANGUAGE == C */
 
@@ -2456,18 +2522,18 @@ typedef PCMCIAPrtType	PCMCIAType [PCMCIASp/PCMCIAPrtSp] ;
                 	(DDAR_DevRd + DDAR_Brst4 + DDAR_8BitDev + \
                 	 DDAR_Ser3UARTRc + DDAR_DevAdd (_Ser3UTDR))
 #define DDAR_Ser4MCP0Wr	        	/* Ser. port 4 MCP 0 Write (audio) */ \
-                	(DDAR_DevWr + DDAR_Brst8 + DDAR_16BitDev + \
+                	(DDAR_DevWr + DDAR_Brst4 + DDAR_16BitDev + \
                 	 DDAR_Ser4MCP0Tr + DDAR_DevAdd (_Ser4MCDR0))
 #define DDAR_Ser4MCP0Rd	        	/* Ser. port 4 MCP 0 Read (audio)  */ \
-                	(DDAR_DevRd + DDAR_Brst8 + DDAR_16BitDev + \
+                	(DDAR_DevRd + DDAR_Brst4 + DDAR_16BitDev + \
                 	 DDAR_Ser4MCP0Rc + DDAR_DevAdd (_Ser4MCDR0))
 #define DDAR_Ser4MCP1Wr	        	/* Ser. port 4 MCP 1 Write         */ \
                 	        	/* (telecom)                       */ \
-                	(DDAR_DevWr + DDAR_Brst8 + DDAR_16BitDev + \
+                	(DDAR_DevWr + DDAR_Brst4 + DDAR_16BitDev + \
                 	 DDAR_Ser4MCP1Tr + DDAR_DevAdd (_Ser4MCDR1))
 #define DDAR_Ser4MCP1Rd	        	/* Ser. port 4 MCP 1 Read          */ \
                 	        	/* (telecom)                       */ \
-                	(DDAR_DevRd + DDAR_Brst8 + DDAR_16BitDev + \
+                	(DDAR_DevRd + DDAR_Brst4 + DDAR_16BitDev + \
                 	 DDAR_Ser4MCP1Rc + DDAR_DevAdd (_Ser4MCDR1))
 #define DDAR_Ser4SSPWr	        	/* Ser. port 4 SSP Write (16 bits) */ \
                 	(DDAR_DevWr + DDAR_Brst4 + DDAR_16BitDev + \

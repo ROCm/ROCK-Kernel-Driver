@@ -15,9 +15,8 @@
  *
  */
 #include <linux/config.h>
-#include <linux/mm.h>
+#include <linux/sched.h>
 #include <linux/init.h>
-#include <linux/bootmem.h>
 
 #include <asm/hardware.h>
 #include <asm/pgtable.h>
@@ -109,22 +108,9 @@ static struct map_desc nanoengine_io_desc[] __initdata = {
   LAST_DESC
 };
 
-static struct map_desc thinclient_io_desc[] __initdata = {
-#ifdef CONFIG_SA1100_THINCLIENT
-#if 0
-  { 0xe8000000, 0x00000000, 0x01000000, DOMAIN_IO, 1, 1, 0, 0 }, /* Flash bank 0 when JP1 2-4 */
-#else
-  { 0xe8000000, 0x08000000, 0x01000000, DOMAIN_IO, 1, 1, 0, 0 }, /* Flash bank 1 when JP1 3-4 */
-#endif
-  { 0xf0000000, 0x10000000, 0x00400000, DOMAIN_IO, 0, 1, 0, 0 }, /* CPLD */
-#endif
-  LAST_DESC
-};
-
-static struct map_desc tifon_io_desc[] __initdata = {
-#ifdef CONFIG_SA1100_TIFON
-  { 0xe8000000, 0x00000000, 0x00800000, DOMAIN_IO, 1, 1, 0, 0 }, /* Flash bank 1 */
-  { 0xe8800000, 0x08000000, 0x00800000, DOMAIN_IO, 1, 1, 0, 0 }, /* Flash bank 2 */
+static struct map_desc sherman_io_desc[] __initdata = {
+#ifdef CONFIG_SA1100_SHERMAN
+  { 0xe8000000, 0x00000000, 0x02000000, DOMAIN_IO, 1, 1, 0, 0 }, /* Flash*/
 #endif
   LAST_DESC
 };
@@ -138,9 +124,16 @@ static struct map_desc victor_io_desc[] __initdata = {
 
 static struct map_desc xp860_io_desc[] __initdata = {
 #ifdef CONFIG_SA1100_XP860
-  { 0xf4000000, 0x40000000, 0x00800000, DOMAIN_IO, 1, 1, 0, 0 }, /* SA-1111 */
   { 0xf0000000, 0x10000000, 0x00100000, DOMAIN_IO, 1, 1, 0, 0 }, /* SCSI */
   { 0xf1000000, 0x18000000, 0x00100000, DOMAIN_IO, 1, 1, 0, 0 }, /* LAN */
+  { 0xf4000000, 0x40000000, 0x00800000, DOMAIN_IO, 1, 1, 0, 0 }, /* SA-1111 */
+#endif
+  LAST_DESC
+};
+
+static struct map_desc pangolin_io_desc[] __initdata = {
+#ifdef CONFIG_SA1100_PANGOLIN
+  { 0xe8000000, 0x00000000, 0x02000000, DOMAIN_IO, 1, 1, 0, 0 }, /* Flash bank 0 */
 #endif
   LAST_DESC
 };
@@ -153,8 +146,6 @@ void __init sa1100_map_io(void)
 
 	if (machine_is_assabet())
 		desc = assabet_io_desc;
-	else if (machine_is_nanoengine())
-		desc = nanoengine_io_desc;
 	else if (machine_is_bitsy())
 		desc = bitsy_io_desc;
 	else if (machine_is_cerf())
@@ -165,38 +156,21 @@ void __init sa1100_map_io(void)
 		desc = graphicsclient_io_desc;
 	else if (machine_is_lart())
 	        desc = lart_io_desc;
-	else if (machine_is_thinclient())
-		desc = thinclient_io_desc;
-	else if (machine_is_tifon())
-		desc = tifon_io_desc;
+	else if (machine_is_nanoengine())
+		desc = nanoengine_io_desc;
+	else if (machine_is_sherman())
+		desc = sherman_io_desc;
 	else if (machine_is_victor())
 		desc = victor_io_desc;
 	else if (machine_is_xp860())
 		desc = xp860_io_desc;
+	else if (machine_is_pangolin())
+		desc = pangolin_io_desc;
 
 	if (desc)
 		iotable_init(desc);
 }
 
-
-#ifdef CONFIG_DISCONTIGMEM
-
-/*
- * Our node_data structure for discontigous memory.
- * There is 4 possible nodes i.e. the 4 SA1100 RAM banks.
- */
-
-static bootmem_data_t node_bootmem_data[4];
-
-pg_data_t sa1100_node_data[4] =
-{ { bdata: &node_bootmem_data[0] },
-  { bdata: &node_bootmem_data[1] },
-  { bdata: &node_bootmem_data[2] },
-  { bdata: &node_bootmem_data[3] } };
-
-#endif
-
-  
 /*
  * On Assabet, we must probe for the Neponset board *before* paging_init() 
  * has occurred to actually determine the amount of RAM available.  To do so, 

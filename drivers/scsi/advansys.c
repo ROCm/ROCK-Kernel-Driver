@@ -6306,13 +6306,11 @@ advansys_setup(char *str, int *ints)
  */
 
 #if ASC_LINUX_KERNEL24
-static Scsi_Host_Template driver_template = ADVANSYS;
-# include "scsi_module.c"
-#elif ASC_LINUX_KERNEL22
-#ifdef MODULE
+static
+#endif
+#if ASC_LINUX_KERNEL24 || (ASC_LINUX_KERNEL22 && defined(MODULE))
 Scsi_Host_Template driver_template = ADVANSYS;
 # include "scsi_module.c"
-#endif /* MODULE */
 #endif
 
 

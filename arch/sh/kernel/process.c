@@ -139,10 +139,6 @@ void free_task_struct(struct task_struct *p)
 /*
  * This is the mechanism for creating a new kernel thread.
  *
- * NOTE! Only a kernel-only process(ie the swapper or direct descendants
- * who haven't done an "execve()") should use this: it will work within
- * a system call from a "real" process, but the process memory space will
- * not be free'd until both the parent and the child have exited.
  */
 int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags)
 {	/* Don't use this in BL=1(cli).  Or else, CPU resets! */
@@ -154,7 +150,7 @@ int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags)
 	register unsigned long __sc9 __asm__ ("r9") = (long) fn;
 
 	__asm__("trapa	#0x12\n\t" 	/* Linux/SH system call */
-		"tst	#0xff, r0\n\t"	/* child or parent? */
+		"tst	r0, r0\n\t"	/* child or parent? */
 		"bf	1f\n\t"		/* parent - jump */
 		"jsr	@r9\n\t"	/* call fn */
 		" mov	r8, r4\n\t"	/* push argument */

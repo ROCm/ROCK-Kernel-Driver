@@ -7,7 +7,7 @@
  *
  *	Based on linux/ipv4/udp.c
  *
- *	$Id: udp.c,v 1.59 2000/11/28 13:38:38 davem Exp $
+ *	$Id: udp.c,v 1.62 2001/03/06 21:15:11 davem Exp $
  *
  *	Fixes:
  *	Hideaki YOSHIFUJI	:	sin6_scope_id support
@@ -391,13 +391,13 @@ int udpv6_recvmsg(struct sock *sk, struct msghdr *msg, int len,
 		err = skb_copy_datagram_iovec(skb, sizeof(struct udphdr), msg->msg_iov,
 					      copied);
 	} else if (msg->msg_flags&MSG_TRUNC) {
-		if ((unsigned short)csum_fold(csum_partial(skb->h.raw, skb->len, skb->csum)))
+		if ((unsigned short)csum_fold(skb_checksum(skb, 0, skb->len, skb->csum)))
 			goto csum_copy_err;
 		err = skb_copy_datagram_iovec(skb, sizeof(struct udphdr), msg->msg_iov,
 					      copied);
 	} else {
-		err = copy_and_csum_toiovec(msg->msg_iov, skb, sizeof(struct udphdr));
-		if (err)
+		err = skb_copy_and_csum_datagram_iovec(skb, sizeof(struct udphdr), msg->msg_iov);
+		if (err == -EINVAL)
 			goto csum_copy_err;
 	}
 	if (err)
@@ -461,21 +461,16 @@ csum_copy_err:
 	goto out_free;
 }
 
-void udpv6_err(struct sk_buff *skb, struct ipv6hdr *hdr,
-	       struct inet6_skb_parm *opt,
-	       int type, int code, unsigned char *buff, __u32 info)
+void udpv6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
+	       int type, int code, int offset, __u32 info)
 {
+	struct ipv6hdr *hdr = (struct ipv6hdr*)skb->data;
 	struct net_device *dev = skb->dev;
 	struct in6_addr *saddr = &hdr->saddr;
 	struct in6_addr *daddr = &hdr->daddr;
+	struct udphdr *uh = (struct udphdr*)(skb->data+offset);
 	struct sock *sk;
-	struct udphdr *uh;
 	int err;
-
-	if (buff + sizeof(struct udphdr) > skb->tail)
-		return;
-
-	uh = (struct udphdr *) buff;
 
 	sk = udp_v6_lookup(daddr, uh->dest, saddr, uh->source, dev->ifindex);
    
@@ -577,8 +572,8 @@ static void udpv6_mcast_deliver(struct udphdr *uh,
 
 	buff = NULL;
 	sk2 = sk;
-	while((sk2 = udp_v6_mcast_next(sk2->next, uh->dest, saddr,
-						  uh->source, daddr, dif))) {
+	while((sk2 = udp_v6_mcast_next(sk2->next, uh->dest, daddr,
+						  uh->source, saddr, dif))) {
 		if (!buff) {
 			buff = skb_clone(skb, GFP_ATOMIC);
 			if (!buff)
@@ -596,31 +591,29 @@ free_skb:
 	read_unlock(&udp_hash_lock);
 }
 
-int udpv6_rcv(struct sk_buff *skb, unsigned long len)
+int udpv6_rcv(struct sk_buff *skb)
 {
 	struct sock *sk;
   	struct udphdr *uh;
 	struct net_device *dev = skb->dev;
-	struct in6_addr *saddr = &skb->nh.ipv6h->saddr;
-	struct in6_addr *daddr = &skb->nh.ipv6h->daddr;
-	u32 ulen;
+	struct in6_addr *saddr, *daddr;
+	u32 ulen = 0;
 
+	if (!pskb_may_pull(skb, sizeof(struct udphdr)))
+		goto short_packet;
+
+	saddr = &skb->nh.ipv6h->saddr;
+	daddr = &skb->nh.ipv6h->daddr;
 	uh = skb->h.uh;
-	__skb_pull(skb, skb->h.raw - skb->data);
 
 	ulen = ntohs(uh->len);
 
 	/* Check for jumbo payload */
-	if (ulen == 0 && skb->nh.ipv6h->payload_len == 0)
-		ulen = len;
+	if (ulen == 0)
+		ulen = skb->len;
 
-	if (ulen > len || len < sizeof(*uh)) {
-		if (net_ratelimit())
-			printk(KERN_DEBUG "UDP: short packet: %d/%ld\n", ulen, len);
-		UDP6_INC_STATS_BH(UdpInErrors);
-		kfree_skb(skb);
-		return(0);
-	}
+	if (ulen > skb->len || ulen < sizeof(*uh))
+		goto short_packet;
 
 	if (uh->check == 0) {
 		/* IPv6 draft-v2 section 8.1 says that we SHOULD log
@@ -631,16 +624,23 @@ int udpv6_rcv(struct sk_buff *skb, unsigned long len)
 		goto discard;
 	}
 
-	skb_trim(skb, ulen);
+	if (ulen < skb->len) {
+		if (__pskb_trim(skb, ulen))
+			goto discard;
+		saddr = &skb->nh.ipv6h->saddr;
+		daddr = &skb->nh.ipv6h->daddr;
+		uh = skb->h.uh;
+	}
 
 	if (skb->ip_summed==CHECKSUM_HW) {
-		if (csum_ipv6_magic(saddr, daddr, ulen, IPPROTO_UDP, skb->csum))
-			goto discard;
 		skb->ip_summed = CHECKSUM_UNNECESSARY;
-	} else if (skb->ip_summed != CHECKSUM_UNNECESSARY)
+		if (csum_ipv6_magic(saddr, daddr, ulen, IPPROTO_UDP, skb->csum)) {
+			NETDEBUG(printk(KERN_DEBUG "udp v6 hw csum failure.\n"));
+			skb->ip_summed = CHECKSUM_NONE;
+		}
+	}
+	if (skb->ip_summed != CHECKSUM_UNNECESSARY)
 		skb->csum = ~csum_ipv6_magic(saddr, daddr, ulen, IPPROTO_UDP, 0);
-
-	len = ulen;
 
 	/* 
 	 *	Multicast receive code 
@@ -656,12 +656,11 @@ int udpv6_rcv(struct sk_buff *skb, unsigned long len)
 	 * check socket cache ... must talk to Alan about his plans
 	 * for sock caches... i'll skip this for now.
 	 */
-	
 	sk = udp_v6_lookup(saddr, uh->source, daddr, uh->dest, dev->ifindex);
-	
+
 	if (sk == NULL) {
 		if (skb->ip_summed != CHECKSUM_UNNECESSARY &&
-		    (unsigned short)csum_fold(csum_partial((char*)uh, len, skb->csum)))
+		    (unsigned short)csum_fold(skb_checksum(skb, 0, skb->len, skb->csum)))
 			goto discard;
 		UDP6_INC_STATS_BH(UdpNoPorts);
 
@@ -676,7 +675,11 @@ int udpv6_rcv(struct sk_buff *skb, unsigned long len)
 	udpv6_queue_rcv_skb(sk, skb);
 	sock_put(sk);
 	return(0);
-	
+
+short_packet:	
+	if (net_ratelimit())
+		printk(KERN_DEBUG "UDP: short packet: %d/%u\n", ulen, skb->len);
+
 discard:
 	UDP6_INC_STATS_BH(UdpInErrors);
 	kfree_skb(skb);

@@ -9,7 +9,6 @@
  */
 
 #include <linux/types.h>
-#include <linux/config.h>
 #include <linux/slab.h>
 #include <asm/sn/sgi.h>
 #include <asm/sn/iobus.h>

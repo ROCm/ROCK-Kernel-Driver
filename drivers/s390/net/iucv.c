@@ -10,7 +10,6 @@
  */
 
 #include <linux/module.h>
-#include <linux/config.h>
 #include <linux/version.h>
 #include <linux/spinlock.h>
 #include <linux/kernel.h>

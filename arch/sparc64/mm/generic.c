@@ -1,4 +1,4 @@
-/* $Id: generic.c,v 1.16 2001/03/25 04:40:05 davem Exp $
+/* $Id: generic.c,v 1.17 2001/04/09 04:08:06 davem Exp $
  * generic.c: Generic Sparc mm routines that are not dependent upon
  *            MMU type but are Sparc specific.
  *
@@ -8,6 +8,7 @@
 #include <linux/kernel.h>
 #include <linux/mm.h>
 #include <linux/swap.h>
+#include <linux/pagemap.h>
 
 #include <asm/pgalloc.h>
 #include <asm/pgtable.h>

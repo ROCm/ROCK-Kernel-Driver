@@ -1,4 +1,4 @@
-/* $Id: pgtable.h,v 1.138 2001/03/08 09:55:56 davem Exp $
+/* $Id: pgtable.h,v 1.139 2001/03/27 02:36:37 davem Exp $
  * pgtable.h: SpitFire page table operations.
  *
  * Copyright 1996,1997 David S. Miller (davem@caip.rutgers.edu)
@@ -302,9 +302,15 @@ extern int io_remap_page_range(unsigned long from, unsigned long offset,
 
 #include <asm-generic/pgtable.h>
 
-#endif /* !(__ASSEMBLY__) */
-
 /* We provide our own get_unmapped_area to cope with VA holes for userland */
 #define HAVE_ARCH_UNMAPPED_AREA
+
+/* We provide a special get_unmapped_area for framebuffer mmaps to try and use
+ * the largest alignment possible such that larget PTEs can be used.
+ */
+extern unsigned long get_fb_unmapped_area(struct file *filp, unsigned long, unsigned long, unsigned long, unsigned long);
+#define HAVE_ARCH_FB_UNMAPPED_AREA
+
+#endif /* !(__ASSEMBLY__) */
 
 #endif /* !(_SPARC64_PGTABLE_H) */

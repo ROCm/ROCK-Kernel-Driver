@@ -12,7 +12,6 @@
 #include <linux/config.h>
 #include <linux/linkage.h>
 #include <asm/hardware.h>
-#include <asm/hardware/dec21285.h>
 
 		.text
 
@@ -67,8 +66,31 @@
 		tst	\rd, #0x10
 		beq	1001b
 		.endm
+ 	
+#elif defined(CONFIG_ARCH_SHARK)
+		.macro	addruart,rx
+		mov	\rx, #0xe0000000
+		orr	\rx, \rx, #0x000003f8
+		.endm
+
+		.macro	senduart,rd,rx
+		strb	\rd, [\rx]
+		.endm
+
+		.macro	busyuart,rd,rx
+		mov	\rd, #0
+1001:		add	\rd, \rd, #1
+		teq	\rd, #0x10000
+		bne	1001b
+		.endm
+
+		.macro	waituart,rd,rx
+		.endm
 
 #elif defined(CONFIG_FOOTBRIDGE)
+
+#include <asm/hardware/dec21285.h>
+
 #ifndef CONFIG_DEBUG_DC21285_PORT
 	/* For NetWinder debugging */
 		.macro	addruart,rx
@@ -120,9 +142,12 @@
 		.macro	waituart,rd,rx
 		.endm
 #endif
-#elif defined(CONFIG_ARCH_NEXUSPCI)
+#elif defined(CONFIG_ARCH_FTVPCI)
 		.macro	addruart,rx
-		ldr	\rx, =0xfff00000
+		mrc	p15, 0, \rx, c1, c0
+		tst	\rx, #1			@ MMU enabled?
+		movne	\rx, #0xe0000000
+		moveq	\rx, #0x10000000
 		.endm
 
 		.macro	senduart,rd,rx
@@ -131,8 +156,8 @@
 
 		.macro	busyuart,rd,rx
 1001:		ldr	\rd, [\rx, #0x4]
-		tst	\rd, #1 << 0
-		bne	1001b
+		tst	\rd, #1 << 2
+		beq	1001b
 		.endm
 
 		.macro	waituart,rd,rx
@@ -164,6 +189,26 @@
 		bne	1001b
 		.endm
 
+#elif defined(CONFIG_ARCH_CLPS7500)
+		.macro	addruart,rx
+		mov	\rx, #0xe0000000
+		orr	\rx, \rx, #0x00010000
+		orr	\rx, \rx, #0x00000be0
+		.endm
+
+		.macro	senduart,rd,rx
+		strb	\rd, [\rx]
+		.endm
+
+		.macro	busyuart,rd,rx
+		.endm
+
+		.macro	waituart,rd,rx
+1001:		ldrb	\rd, [\rx, #0x14]
+		tst	\rd, #0x20
+		beq	1001b
+		.endm
+
 #elif defined(CONFIG_ARCH_L7200)
 
 		.equ	io_virt, IO_BASE
@@ -174,12 +219,12 @@
 		tst	\rx, #1			@ MMU enabled?
 		moveq	\rx, #io_phys		@ physical base address
 		movne	\rx, #io_virt		@ virtual address
-		add	\rx, \rx, #0x00044000	@ Ser1
-@		add	\rx, \rx, #0x00045000	@ Ser2
+		add	\rx, \rx, #0x00044000	@ UART1
+@		add	\rx, \rx, #0x00045000	@ UART2
 		.endm
 
 		.macro	senduart,rd,rx
-		str	\rd, [\rx, #0x0]	@ UARTDR1
+		str	\rd, [\rx, #0x0]	@ UARTDR
 		.endm
 
 		.macro	waituart,rd,rx
@@ -197,9 +242,6 @@
 #elif defined(CONFIG_ARCH_INTEGRATOR)
 
 #include <asm/hardware/serial_amba.h>
-
-		.equ	io_virt, 0xf0000000 + (0x16000000 >> 4)
-		.equ	io_phys, 0x16000000
 
 		.macro	addruart,rx
 		mrc	p15, 0, \rx, c1, c0
@@ -223,6 +265,41 @@
 1001:		ldr	\rd, [\rx, #0x18]	@ UARTFLG
 		tst	\rd, #1 << 3		@ UARTFLGUBUSY - 1 when busy
 		bne	1001b
+		.endm
+
+#elif defined(CONFIG_ARCH_CLPS711X)
+
+#include <asm/hardware/clps7111.h>
+
+		.macro	addruart,rx
+		mrc	p15, 0, \rx, c1, c0
+		tst	\rx, #1			@ MMU enabled?
+		moveq	\rx, #CLPS7111_PHYS_BASE
+		movne	\rx, #CLPS7111_VIRT_BASE
+#ifndef CONFIG_DEBUG_CLPS711X_UART2
+		add	\rx, \rx, #0x0000	@ UART1
+#else
+		add	\rx, \rx, #0x1000	@ UART2
+#endif
+		.endm
+
+		.macro	senduart,rd,rx
+		str	\rd, [\rx, #0x0480]	@ UARTDR
+		.endm
+
+		.macro	waituart,rd,rx
+1001:		ldr	\rd, [\rx, #0x0140]	@ SYSFLGx
+		tst	\rd, #1 << 11		@ UBUSYx
+		bne	1001b
+		.endm
+
+		.macro	busyuart,rd,rx
+		tst	\rx, #0x1000		@ UART2 does not have CTS here
+		bne	1002f
+1001:		ldr	\rd, [\rx, #0x0140]	@ SYSFLGx
+		tst	\rd, #1 << 8		@ CTS
+		bne	1001b
+1002:
 		.endm
 
 #else

@@ -11,19 +11,26 @@
 #include <asm/assembler.h>
 		.text
 
-LC0:		.word	SYMBOL_NAME(loops_per_sec)
+LC0:		.word	SYMBOL_NAME(loops_per_jiffy)
 
+/*
+ * 0 <= r0 <= 2000
+ */
 ENTRY(udelay)
-		mov	r2, #0x1000
-		orr	r2, r2, #0x00c6
+		mov	r2,     #0x6800
+		orr	r2, r2, #0x00db
 		mul	r1, r0, r2
 		ldr	r2, LC0
 		ldr	r2, [r2]
 		mov	r1, r1, lsr #11
 		mov	r2, r2, lsr #11
 		mul	r0, r1, r2
-		movs	r0, r0, lsr #10
+		movs	r0, r0, lsr #6
 		RETINSTR(moveq,pc,lr)
+
+/*
+ * loops = (r0 * 0x10c6 * 100 * loops_per_jiffie) / 2^32
+ */
 
 @ Delay routine
 ENTRY(__delay)

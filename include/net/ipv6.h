@@ -4,7 +4,7 @@
  *	Authors:
  *	Pedro Roque		<roque@di.fc.ul.pt>
  *
- *	$Id: ipv6.h,v 1.22 2000/09/18 05:54:13 davem Exp $
+ *	$Id: ipv6.h,v 1.23 2000/12/13 18:31:48 davem Exp $
  *
  *	This program is free software; you can redistribute it and/or
  *      modify it under the terms of the GNU General Public License
@@ -181,11 +181,11 @@ extern int 			ip6_ra_control(struct sock *sk, int sel,
 
 extern int			ip6_call_ra_chain(struct sk_buff *skb, int sel);
 
-extern u8 *			ipv6_reassembly(struct sk_buff **skb, u8 *nhptr);
+extern int			ipv6_reassembly(struct sk_buff **skb, int);
 
-extern u8 *			ipv6_parse_hopopts(struct sk_buff *skb, u8 *nhptr);
+extern int			ipv6_parse_hopopts(struct sk_buff *skb, int);
 
-extern u8 *			ipv6_parse_exthdrs(struct sk_buff **skb, u8 *nhptr);
+extern int			ipv6_parse_exthdrs(struct sk_buff **skb, int);
 
 extern struct ipv6_txoptions *  ipv6_dup_options(struct sock *sk, struct ipv6_txoptions *opt);
 
@@ -303,8 +303,10 @@ extern void			ipv6_push_frag_opts(struct sk_buff *skb,
 						    struct ipv6_txoptions *opt,
 						    u8 *proto);
 
-extern u8 *			ipv6_skip_exthdr(struct ipv6_opt_hdr *hdr, 
+extern int			ipv6_skip_exthdr(struct sk_buff *, int start,
 					         u8 *nexthdrp, int len);
+
+extern int 			ipv6_ext_hdr(u8 nexthdr);
 
 extern struct ipv6_txoptions *	ipv6_invert_rthdr(struct sock *sk,
 						  struct ipv6_rt_hdr *hdr);

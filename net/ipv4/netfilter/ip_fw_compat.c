@@ -96,7 +96,8 @@ fw_in(unsigned int hooknum,
 
 	/* Assume worse case: any hook could change packet */
 	(*pskb)->nfcache |= NFC_UNKNOWN | NFC_ALTERED;
-	(*pskb)->ip_summed = CHECKSUM_NONE;
+	if ((*pskb)->ip_summed == CHECKSUM_HW)
+		(*pskb)->ip_summed = CHECKSUM_NONE;
 
 	switch (hooknum) {
 	case NF_IP_PRE_ROUTING:

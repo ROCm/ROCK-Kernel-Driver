@@ -166,13 +166,6 @@ static char *lvm_short_version = "version 0.9.1_beta2 (18/01/2001)";
 
 #include <linux/config.h>
 #include <linux/version.h>
-
-#ifdef MODVERSIONS
-#undef MODULE
-#define MODULE
-#include <linux/modversions.h>
-#endif
-
 #include <linux/module.h>
 
 #include <linux/kernel.h>

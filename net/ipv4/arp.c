@@ -1,6 +1,6 @@
 /* linux/net/inet/arp.c
  *
- * Version:	$Id: arp.c,v 1.90 2000/10/04 09:20:56 anton Exp $
+ * Version:	$Id: arp.c,v 1.96 2001/02/02 08:42:59 davem Exp $
  *
  * Copyright (C) 1994 by Florian  La Roche
  *
@@ -590,6 +590,13 @@ int arp_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt)
 	if ((skb = skb_share_check(skb, GFP_ATOMIC)) == NULL)
 		goto out_of_mem;
 
+	if (skb_is_nonlinear(skb)) {
+		if (skb_linearize(skb, GFP_ATOMIC) != 0)
+			goto freeskb;
+		arp = skb->nh.arph;
+		arp_ptr= (unsigned char *)(arp+1);
+	}
+
 	switch (dev_type) {
 	default:	
 		if (arp->ar_pro != __constant_htons(ETH_P_IP))
@@ -796,9 +803,10 @@ int arp_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt)
 	}
 
 out:
-	kfree_skb(skb);
 	if (in_dev)
 		in_dev_put(in_dev);
+freeskb:
+	kfree_skb(skb);
 out_of_mem:
 	return 0;
 }

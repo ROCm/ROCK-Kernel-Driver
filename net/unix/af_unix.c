@@ -8,7 +8,7 @@
  *		as published by the Free Software Foundation; either version
  *		2 of the License, or (at your option) any later version.
  *
- * Version:	$Id: af_unix.c,v 1.111 2001/02/02 11:37:28 davem Exp $
+ * Version:	$Id: af_unix.c,v 1.116 2001/03/03 01:20:11 davem Exp $
  *
  * Fixes:
  *		Linus Torvalds	:	Assorted bug cures.
@@ -1182,7 +1182,7 @@ static int unix_dgram_sendmsg(struct socket *sock, struct msghdr *msg, int len,
 	if ((unsigned)len > sk->sndbuf - 32)
 		goto out;
 
-	skb = sock_alloc_send_skb(sk, len, 0, msg->msg_flags&MSG_DONTWAIT, &err);
+	skb = sock_alloc_send_skb(sk, len, msg->msg_flags&MSG_DONTWAIT, &err);
 	if (skb==NULL)
 		goto out;
 
@@ -1285,7 +1285,6 @@ static int unix_stream_sendmsg(struct socket *sock, struct msghdr *msg, int len,
 	struct sockaddr_un *sunaddr=msg->msg_name;
 	int err,size;
 	struct sk_buff *skb;
-	int limit=0;
 	int sent=0;
 
 	err = -EOPNOTSUPP;
@@ -1323,21 +1322,10 @@ static int unix_stream_sendmsg(struct socket *sock, struct msghdr *msg, int len,
 			size = (128 * 1024) / 2;
 			
 		/*
-		 *	Keep to page sized kmalloc()'s as various people
-		 *	have suggested. Big mallocs stress the vm too
-		 *	much.
-		 */
-
-		if (size > PAGE_SIZE-16)
-			limit = PAGE_SIZE-16; /* Fall back to a page if we can't grab a big buffer this instant */
-		else
-			limit = 0;	/* Otherwise just grab and wait */
-
-		/*
 		 *	Grab a buffer
 		 */
 		 
-		skb=sock_alloc_send_skb(sk,size,limit,msg->msg_flags&MSG_DONTWAIT, &err);
+		skb=sock_alloc_send_skb(sk,size,msg->msg_flags&MSG_DONTWAIT, &err);
 
 		if (skb==NULL)
 			goto out_err;
@@ -1821,6 +1809,7 @@ struct proto_ops unix_stream_ops = {
 	sendmsg:	unix_stream_sendmsg,
 	recvmsg:	unix_stream_recvmsg,
 	mmap:		sock_no_mmap,
+	sendpage:	sock_no_sendpage,
 };
 
 struct proto_ops unix_dgram_ops = {
@@ -1841,6 +1830,7 @@ struct proto_ops unix_dgram_ops = {
 	sendmsg:	unix_dgram_sendmsg,
 	recvmsg:	unix_dgram_recvmsg,
 	mmap:		sock_no_mmap,
+	sendpage:	sock_no_sendpage,
 };
 
 struct net_proto_family unix_family_ops = {

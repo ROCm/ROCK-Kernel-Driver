@@ -1,7 +1,7 @@
 /*
  * linux/include/asm-arm/arch-shark/param.h
  *
- * by Alexander.Schulz@stud.uni-karlsruhe.de
+ * by Alexander Schulz <aschulz@netwinder.org>
  */
 
 /* This must be a power of 2 because the RTC

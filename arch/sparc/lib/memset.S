@@ -188,7 +188,7 @@ C_LABEL(__memset_end):
 	b 30f
 	 add	%o0, %o1, %o0
 30:
-/* %o4 is faulting address, %o5 is %pc where fault occured */
+/* %o4 is faulting address, %o5 is %pc where fault occurred */
 	save	%sp, -104, %sp
 	mov	%i5, %o0
 	mov	%i7, %o1

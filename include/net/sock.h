@@ -56,6 +56,10 @@
 #if defined(CONFIG_X25) || defined(CONFIG_X25_MODULE)
 #include <net/x25.h>
 #endif
+#if defined(CONFIG_WAN_ROUTER) || defined(CONFIG_WAN_ROUTER_MODULE)
+#include <linux/if_wanpipe.h>
+#endif
+
 #if defined(CONFIG_AX25) || defined(CONFIG_AX25_MODULE)
 #include <net/ax25.h>
 #if defined(CONFIG_NETROM) || defined(CONFIG_NETROM_MODULE)
@@ -204,6 +208,7 @@ struct inet_opt
 	__u8			mc_loop;		/* Loopback */
 	unsigned		recverr : 1,
 				freebind : 1;
+	__u16			id;			/* ID counter for DF pkts */
 	__u8			pmtudisc;
 	int			mc_index;		/* Multicast device index */
 	__u32			mc_addr;
@@ -331,6 +336,8 @@ struct tcp_opt {
 
 	struct tcp_func		*af_specific;	/* Operations which are AF_INET{4,6} specific	*/
 	struct sk_buff		*send_head;	/* Front of stuff to transmit			*/
+	struct page		*sndmsg_page;	/* Cached page for sendmsg			*/
+	u32			sndmsg_off;	/* Cached offset for sendmsg			*/
 
  	__u32	rcv_wnd;	/* Current receiver window		*/
 	__u32	rcv_wup;	/* rcv_nxt on last window update sent	*/
@@ -381,8 +388,6 @@ struct tcp_opt {
 				 * the first SYN. */
 	__u32	undo_marker;	/* tracking retrans started here. */
 	int	undo_retrans;	/* number of undoable retransmissions. */
-	__u32	syn_seq;	/* Seq of received SYN. */
-	__u32	fin_seq;	/* Seq of received FIN. */
 	__u32	urg_seq;	/* Seq of received urgent pointer */
 	__u16	urg_data;	/* Saved octet of OOB data and control flags */
 	__u8	pending;	/* Scheduled timer event	*/
@@ -535,6 +540,7 @@ struct sock {
 	unsigned char		debug;
 	unsigned char		rcvtstamp;
 	unsigned char		userlocks;
+	int			route_caps;
 	int			proc;
 	unsigned long	        lingertime;
 
@@ -644,6 +650,9 @@ struct sock {
 #endif
 #if defined(CONFIG_IRDA) || defined(CONFIG_IRDA_MODULE)
 		struct irda_sock        *irda;
+#endif
+#if defined(CONFIG_WAN_ROUTER) || defined(CONFIG_WAN_ROUTER_MODULE)
+               struct wanpipe_opt      *af_wanpipe;
 #endif
 	} protinfo;  		
 
@@ -833,13 +842,10 @@ extern int			sock_getsockopt(struct socket *sock, int level,
 						int *optlen);
 extern struct sk_buff 		*sock_alloc_send_skb(struct sock *sk,
 						     unsigned long size,
-						     unsigned long fallback,
 						     int noblock,
 						     int *errcode);
 extern void *sock_kmalloc(struct sock *sk, int size, int priority);
 extern void sock_kfree_s(struct sock *sk, void *mem, int size);
-
-extern int copy_and_csum_toiovec(struct iovec *iov, struct sk_buff *skb, int hlen);
 
 /*
  * Functions to fill in entries in struct proto_ops when a protocol
@@ -877,6 +883,10 @@ extern int                      sock_no_recvmsg(struct socket *,
 extern int			sock_no_mmap(struct file *file,
 					     struct socket *sock,
 					     struct vm_area_struct *vma);
+extern ssize_t			sock_no_sendpage(struct socket *sock,
+						struct page *page,
+						int offset, size_t size, 
+						int flags);
 
 /*
  *	Default socket callbacks and setup code

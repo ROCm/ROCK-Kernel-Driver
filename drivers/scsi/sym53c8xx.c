@@ -14672,9 +14672,9 @@ sym_read_Tekram_nvram (ncr_slot *np, u_short device_id, Tekram_nvram *nvram)
 */
 
 #if LINUX_VERSION_CODE >= LinuxVersionCode(2,4,0)
-static Scsi_Host_Template driver_template = SYM53C8XX;
-#include "scsi_module.c"
-#elif defined(MODULE)
+static
+#endif
+#if LINUX_VERSION_CODE >= LinuxVersionCode(2,4,0) || defined(MODULE)
 Scsi_Host_Template driver_template = SYM53C8XX;
 #include "scsi_module.c"
 #endif

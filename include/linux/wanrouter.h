@@ -5,19 +5,19 @@
 *
 * Author: 	Nenad Corbic <ncorbic@sangoma.com>
 *		Gideon Hack 	
-* Additions:	Arnaldo Carvalho de Melo <acme@conectiva.com.br>
 *
-* Copyright:	(c) 1995-1999 Sangoma Technologies Inc.
+* Copyright:	(c) 1995-2000 Sangoma Technologies Inc.
 *
 *		This program is free software; you can redistribute it and/or
 *		modify it under the terms of the GNU General Public License
 *		as published by the Free Software Foundation; either version
 *		2 of the License, or (at your option) any later version.
 * ============================================================================
+* Jul 21, 2000  Nenad Corbic	Added WAN_FT1_READY State
+* Feb 24, 2000  Nenad Corbic    Added support for socket based x25api
+* Jan 28, 2000  Nenad Corbic    Added support for the ASYNC protocol.
 * Oct 04, 1999  Nenad Corbic 	Updated for 2.1.0 release
 * Jun 02, 1999  Gideon Hack	Added support for the S514 adapter.
-* May 23, 1999	Arnaldo Melo	Added local_addr to wanif_conf_t
-*				WAN_DISCONNECTING state added
 * Jul 20, 1998	David Fong	Added Inverse ARP options to 'wanif_conf_t'
 * Jun 12, 1998	David Fong	Added Cisco HDLC support.
 * Dec 16, 1997	Jaspreet Singh	Moved 'enable_IPX' and 'network_number' to
@@ -42,8 +42,24 @@
 *****************************************************************************/
 #include <linux/version.h>
 
-#if LINUX_VERSION_CODE >= 0x020100
-#define LINUX_2_1
+#ifndef KERNEL_VERSION
+  #define KERNEL_VERSION(a,b,c) (((a) << 16) + ((b) << 8) + (c))
+#endif
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,0)
+ #define LINUX_2_4
+ #define netdevice_t struct net_device
+ #include <linux/spinlock.h>       /* Support for SMP Locking */
+
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(2,1,0)
+ #define LINUX_2_1
+ #define netdevice_t struct device
+ #include <asm/spinlock.h>       /* Support for SMP Locking */
+
+#else
+ #define LINUX_2_0
+ #define netdevice_t struct device
+ #define spinlock_t int
 #endif
 
 #ifndef	_ROUTER_H
@@ -135,6 +151,10 @@ typedef struct wan_x25_conf
 	unsigned r12_r22;	/* RESET retransmission limit (0..250) */
 	unsigned r13_r23;	/* CLEAR retransmission limit (0..250) */
 	unsigned ccitt_compat;	/* compatibility mode: 1988/1984/1980 */
+	unsigned x25_conf_opt;   /* User defined x25 config optoins */
+	unsigned char LAPB_hdlc_only; /* Run in HDLC only mode */
+	unsigned char logging;   /* Control connection logging */  
+	unsigned char oob_on_modem; /* Whether to send modem status to the user app */
 } wan_x25_conf_t;
 
 /*----------------------------------------------------------------------------
@@ -182,6 +202,7 @@ typedef struct wan_chdlc_conf
 	unsigned char ignore_cts;	/*  Ignore these to determine	*/
 	unsigned char ignore_keepalive;	/*  link status (Yes or No)	*/
 	unsigned char hdlc_streaming;	/*  hdlc_streaming mode (Y/N) */
+	unsigned char receive_only;	/*  no transmit buffering (Y/N) */
 	unsigned keepalive_tx_tmr;	/* transmit keepalive timer */
 	unsigned keepalive_rx_tmr;	/* receive  keepalive timer */
 	unsigned keepalive_err_margin;	/* keepalive_error_tolerance */
@@ -204,6 +225,7 @@ typedef struct wandev_conf
 	int dma;		/* DMA request level */
         char S514_CPU_no[1];	/* S514 PCI adapter CPU number ('A' or 'B') */
         unsigned PCI_slot_no;	/* S514 PCI adapter slot number */
+	char auto_pci_cfg;	/* S515 PCI automatic slot detection */
 	char comm_port;		/* Communication Port (PRI=0, SEC=1) */ 
 	unsigned bps;		/* data transfer rate */
 	unsigned mtu;		/* maximum transmit unit size */
@@ -216,6 +238,12 @@ typedef struct wandev_conf
 	char station;		/* DTE/DCE, primary/secondary, etc. */
 	char connection;	/* permanent/switched/on-demand */
 	char read_mode;		/* read mode: Polling or interrupt */
+	char receive_only;	/* disable tx buffers */
+	char tty;		/* Create a fake tty device */
+	unsigned tty_major;	/* Major number for wanpipe tty device */
+	unsigned tty_minor; 	/* Minor number for wanpipe tty device */
+	unsigned tty_mode;	/* TTY operation mode SYNC or ASYNC */
+	char backup;		/* Backup Mode */
 	unsigned hw_opt[4];	/* other hardware options */
 	unsigned reserved[4];
 				/****** arbitrary data ***************/
@@ -237,6 +265,7 @@ typedef struct wandev_conf
 #define WANCONFIG_CHDLC	104	/* Cisco HDLC Link */
 #define WANCONFIG_BSC	105	/* BiSync Streaming */
 #define WANCONFIG_HDLC	106	/* HDLC Support */
+#define WANCONFIG_MPPP  107	/* Multi Port PPP over RAW CHDLC */
 
 /*
  * Configuration options defines.
@@ -288,6 +317,15 @@ typedef struct wandev_conf
 #define	WANOPT_PPP_HOST		1
 #define	WANOPT_PPP_PEER		2
 
+/* ASY Mode Options */
+#define WANOPT_ONE 		1
+#define WANOPT_TWO		2
+#define WANOPT_ONE_AND_HALF	3
+
+#define WANOPT_NONE	0
+#define WANOPT_ODD      1
+#define WANOPT_EVEN	2
+
 /* CHDLC Protocol Options */
 /* DF Commmented out for now.
 
@@ -303,6 +341,9 @@ typedef struct wandev_conf
 #define	WANOPT_INTR	0
 #define WANOPT_POLL	1
 
+
+#define WANOPT_TTY_SYNC  0
+#define WANOPT_TTY_ASYNC 1
 /*----------------------------------------------------------------------------
  * WAN Link Status Info (for ROUTER_STAT IOCTL).
  */
@@ -345,7 +386,15 @@ enum wan_states
 	WAN_CONNECTED,		/* link/channel is operational */
 	WAN_LIMIT,		/* for verification only */
 	WAN_DUALPORT,		/* for Dual Port cards */
-	WAN_DISCONNECTING	/* link/channel is disconnecting */
+	WAN_DISCONNECTING,
+	WAN_FT1_READY		/* FT1 Configurator Ready */
+};
+
+enum {
+	WAN_LOCAL_IP,
+	WAN_POINTOPOINT_IP,
+	WAN_NETMASK_IP,
+	WAN_BROADCAST_IP
 };
 
 /* 'modem_status' masks */
@@ -374,9 +423,6 @@ typedef struct wanif_conf
 	unsigned inarp_interval;	/* sec, between InARP requests */
 	unsigned long network_number;	/* Network Number for IPX */
 	char mc;			/* Multicast on or off */
-	char local_addr[WAN_ADDRESS_SZ+1];/* local media address, ASCIIZ */
-	unsigned char port;		/* board port */
-	unsigned char protocol;		/* prococol used in this channel (TCPOX25 or X25) */
 	char pap;			/* PAP enabled or disabled */
 	char chap;			/* CHAP enabled or disabled */
 	unsigned char userid[511];	/* List of User Id */
@@ -386,6 +432,7 @@ typedef struct wanif_conf
 	unsigned char ignore_cts;	/*  Ignore these to determine */
 	unsigned char ignore_keepalive;	/*  link status (Yes or No) */
 	unsigned char hdlc_streaming;	/*  Hdlc streaming mode (Y/N) */
+	unsigned char receive_only;	/*  no transmit buffering (Y/N) */
 	unsigned keepalive_tx_tmr;	/* transmit keepalive timer */
 	unsigned keepalive_rx_tmr;	/* receive  keepalive timer */
 	unsigned keepalive_err_margin;	/* keepalive_error_tolerance */
@@ -395,6 +442,27 @@ typedef struct wanif_conf
 	char clocking;			/* external/internal */
 	unsigned bps;			/* data transfer rate */
 	unsigned mtu;			/* maximum transmit unit size */
+	unsigned char if_down;		/* brind down interface when disconnected */
+	unsigned char gateway;		/* Is this interface a gateway */
+	unsigned char true_if_encoding;	/* Set the dev->type to true board protocol */
+
+	unsigned char asy_data_trans;     /* async API options */
+        unsigned char rts_hs_for_receive; /* async Protocol options */
+        unsigned char xon_xoff_hs_for_receive;
+	unsigned char xon_xoff_hs_for_transmit;
+	unsigned char dcd_hs_for_transmit;
+	unsigned char cts_hs_for_transmit;
+	unsigned char async_mode;
+	unsigned tx_bits_per_char;
+	unsigned rx_bits_per_char;
+	unsigned stop_bits;  
+	unsigned char parity;
+ 	unsigned break_timer;
+        unsigned inter_char_timer;
+	unsigned rx_complete_length;
+	unsigned xon_char;
+	unsigned xoff_char;
+
 } wanif_conf_t;
 
 #ifdef	__KERNEL__
@@ -440,30 +508,40 @@ typedef struct wan_device
 					/****** status and statistics *******/
 	char state;			/* device state */
 	char api_status;		/* device api status */
+      #if defined(LINUX_2_1) || defined(LINUX_2_4)
 	struct net_device_stats stats; 	/* interface statistics */
+      #else
+	struct enet_statistics stats;	/* interface statistics */
+      #endif
 	unsigned reserved[16];		/* reserved for future use */
 	unsigned long critical;		/* critical section flag */
+	spinlock_t lock;                /* Support for SMP Locking */
+
 					/****** device management methods ***/
 	int (*setup) (struct wan_device *wandev, wandev_conf_t *conf);
 	int (*shutdown) (struct wan_device *wandev);
 	int (*update) (struct wan_device *wandev);
 	int (*ioctl) (struct wan_device *wandev, unsigned cmd,
 		unsigned long arg);
-	int (*new_if) (struct wan_device *wandev, struct net_device *dev,
+	int (*new_if) (struct wan_device *wandev, netdevice_t *dev,
 		wanif_conf_t *conf);
-	int (*del_if) (struct wan_device *wandev, struct net_device *dev);
+	int (*del_if) (struct wan_device *wandev, netdevice_t *dev);
 					/****** maintained by the router ****/
 	struct wan_device* next;	/* -> next device */
-	struct net_device* dev;		/* list of network interfaces */
+	netdevice_t* dev;		/* list of network interfaces */
 	unsigned ndev;			/* number of interfaces */
+      #ifdef LINUX_2_4
 	struct proc_dir_entry *dent;	/* proc filesystem entry */
+      #else
+	struct proc_dir_entry dent;	/* proc filesystem entry */
+      #endif
 } wan_device_t;
 
 /* Public functions available for device drivers */
 extern int register_wan_device(wan_device_t *wandev);
 extern int unregister_wan_device(char *name);
-unsigned short wanrouter_type_trans(struct sk_buff *skb, struct net_device *dev);
-int wanrouter_encapsulate(struct sk_buff *skb, struct net_device *dev);
+unsigned short wanrouter_type_trans(struct sk_buff *skb, netdevice_t *dev);
+int wanrouter_encapsulate(struct sk_buff *skb, netdevice_t *dev,unsigned short type);
 
 /* Proc interface functions. These must not be called by the drivers! */
 extern int wanrouter_proc_init(void);
@@ -471,6 +549,11 @@ extern void wanrouter_proc_cleanup(void);
 extern int wanrouter_proc_add(wan_device_t *wandev);
 extern int wanrouter_proc_delete(wan_device_t *wandev);
 extern int wanrouter_ioctl( struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg);
+
+extern void lock_adapter_irq(spinlock_t *lock, unsigned long *smp_flags);
+extern void unlock_adapter_irq(spinlock_t *lock, unsigned long *smp_flags);
+
+
 
 /* Public Data */
 extern wan_device_t *router_devlist;	/* list of registered devices */

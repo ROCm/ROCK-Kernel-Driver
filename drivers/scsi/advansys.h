@@ -28,6 +28,7 @@
 #ifndef _ADVANSYS_H
 #define _ADVANSYS_H
 
+#include <linux/config.h>
 #ifndef LINUX_VERSION_CODE
 #include <linux/version.h>
 #endif /* LINUX_VERSION_CODE */

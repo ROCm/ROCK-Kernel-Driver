@@ -124,7 +124,7 @@ void set_fiq_regs(struct pt_regs *regs)
 #ifdef CONFIG_CPU_26
 	"mov	%0, pc
 	bic	%1, %0, #0x3
-	orr	%1, %1, #0x0c000001
+	orr	%1, %1, %3
 	teqp	%1, #0		@ select FIQ mode
 	mov	r0, r0
 	ldmia	%2, {r8 - r14}
@@ -133,7 +133,7 @@ void set_fiq_regs(struct pt_regs *regs)
 #endif
 #ifdef CONFIG_CPU_32
 	"mrs	%0, cpsr
-	mov	%1, #0xc1
+	mov	%1, %3
 	msr	cpsr_c, %1	@ select FIQ mode
 	mov	r0, r0
 	ldmia	%2, {r8 - r14}
@@ -141,7 +141,7 @@ void set_fiq_regs(struct pt_regs *regs)
 	mov	r0, r0"
 #endif
 	: "=&r" (tmp), "=&r" (tmp2)
-	: "r" (&regs->ARM_r8)
+	: "r" (&regs->ARM_r8), "I" (I_BIT | F_BIT | FIQ_MODE)
 	/* These registers aren't modified by the above code in a way
 	   visible to the compiler, but we mark them as clobbers anyway
 	   so that GCC won't put any of the input or output operands in
@@ -156,7 +156,7 @@ void get_fiq_regs(struct pt_regs *regs)
 #ifdef CONFIG_CPU_26
 	"mov	%0, pc
 	bic	%1, %0, #0x3
-	orr	%1, %1, #0x0c000001
+	orr	%1, %1, %3
 	teqp	%1, #0		@ select FIQ mode
 	mov	r0, r0
 	stmia	%2, {r8 - r14}
@@ -165,7 +165,7 @@ void get_fiq_regs(struct pt_regs *regs)
 #endif
 #ifdef CONFIG_CPU_32
 	"mrs	%0, cpsr
-	mov	%1, #0xc1
+	mov	%1, %3
 	msr	cpsr_c, %1	@ select FIQ mode
 	mov	r0, r0
 	stmia	%2, {r8 - r14}
@@ -173,7 +173,7 @@ void get_fiq_regs(struct pt_regs *regs)
 	mov	r0, r0"
 #endif
 	: "=&r" (tmp), "=&r" (tmp2)
-	: "r" (&regs->ARM_r8)
+	: "r" (&regs->ARM_r8), "I" (I_BIT | F_BIT | FIQ_MODE)
 	/* These registers aren't modified by the above code in a way
 	   visible to the compiler, but we mark them as clobbers anyway
 	   so that GCC won't put any of the input or output operands in

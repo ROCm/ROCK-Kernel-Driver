@@ -13,45 +13,45 @@
 #include <linux/config.h>
 #include <linux/types.h>
 
+struct timeval;
+
 struct sh_machine_vector
 {
 	const char *mv_name;
 
 	int mv_nr_irqs;
 
-	unsigned long (*mv_inb)(unsigned int);
-	unsigned long (*mv_inw)(unsigned int);
-	unsigned long (*mv_inl)(unsigned int);
-	void (*mv_outb)(unsigned long, unsigned int);
-	void (*mv_outw)(unsigned long, unsigned int);
-	void (*mv_outl)(unsigned long, unsigned int);
+	unsigned char (*mv_inb)(unsigned long);
+	unsigned short (*mv_inw)(unsigned long);
+	unsigned int (*mv_inl)(unsigned long);
+	void (*mv_outb)(unsigned char, unsigned long);
+	void (*mv_outw)(unsigned short, unsigned long);
+	void (*mv_outl)(unsigned int, unsigned long);
 
-	unsigned long (*mv_inb_p)(unsigned int);
-	unsigned long (*mv_inw_p)(unsigned int);
-	unsigned long (*mv_inl_p)(unsigned int);
-	void (*mv_outb_p)(unsigned long, unsigned int);
-	void (*mv_outw_p)(unsigned long, unsigned int);
-	void (*mv_outl_p)(unsigned long, unsigned int);
+	unsigned char (*mv_inb_p)(unsigned long);
+	unsigned short (*mv_inw_p)(unsigned long);
+	unsigned int (*mv_inl_p)(unsigned long);
+	void (*mv_outb_p)(unsigned char, unsigned long);
+	void (*mv_outw_p)(unsigned short, unsigned long);
+	void (*mv_outl_p)(unsigned int, unsigned long);
 
-	void (*mv_insb)(unsigned int port, void *addr, unsigned long count);
-	void (*mv_insw)(unsigned int port, void *addr, unsigned long count);
-	void (*mv_insl)(unsigned int port, void *addr, unsigned long count);
-	void (*mv_outsb)(unsigned int port, const void *addr, unsigned long count);
-	void (*mv_outsw)(unsigned int port, const void *addr, unsigned long count);
-	void (*mv_outsl)(unsigned int port, const void *addr, unsigned long count);
-	
-	unsigned long (*mv_readb)(unsigned long);
-	unsigned long (*mv_readw)(unsigned long);
-	unsigned long (*mv_readl)(unsigned long);
+	void (*mv_insb)(unsigned long port, void *addr, unsigned long count);
+	void (*mv_insw)(unsigned long port, void *addr, unsigned long count);
+	void (*mv_insl)(unsigned long port, void *addr, unsigned long count);
+	void (*mv_outsb)(unsigned long port, const void *addr, unsigned long count);
+	void (*mv_outsw)(unsigned long port, const void *addr, unsigned long count);
+	void (*mv_outsl)(unsigned long port, const void *addr, unsigned long count);
+
+	unsigned char (*mv_readb)(unsigned long);
+	unsigned short (*mv_readw)(unsigned long);
+	unsigned int (*mv_readl)(unsigned long);
 	void (*mv_writeb)(unsigned char, unsigned long);
 	void (*mv_writew)(unsigned short, unsigned long);
 	void (*mv_writel)(unsigned int, unsigned long);
 
 	void* (*mv_ioremap)(unsigned long offset, unsigned long size);
-	void* (*mv_ioremap_nocache)(unsigned long offset, unsigned long size);
 	void (*mv_iounmap)(void *addr);
 
-	unsigned long (*mv_port2addr)(unsigned long offset);
 	unsigned long (*mv_isa_port2addr)(unsigned long offset);
 
 	int (*mv_irq_demux)(int irq);
@@ -63,9 +63,17 @@ struct sh_machine_vector
 
 	void (*mv_heartbeat)(void);
 
+	void (*mv_rtc_gettimeofday)(struct timeval *tv);
+	int (*mv_rtc_settimeofday)(const struct timeval *tv);
+
 	unsigned int mv_hw_se : 1;
 	unsigned int mv_hw_hp600 : 1;
+	unsigned int mv_hw_hp620 : 1;
+	unsigned int mv_hw_hp680 : 1;
+	unsigned int mv_hw_hp690 : 1;
 	unsigned int mv_hw_hd64461 : 1;
+	unsigned int mv_hw_hd64465 : 1;
+	unsigned int mv_hw_dreamcast : 1;
 };
 
 extern struct sh_machine_vector sh_mv;
@@ -74,7 +82,12 @@ extern struct sh_machine_vector sh_mv;
 #ifdef CONFIG_SH_GENERIC
 #define MACH_SE		(sh_mv.mv_hw_se)
 #define MACH_HP600	(sh_mv.mv_hw_hp600)
+#define MACH_HP620	(sh_mv.mv_hw_hp620)
+#define MACH_HP680	(sh_mv.mv_hw_hp680)
+#define MACH_HP690	(sh_mv.mv_hw_hp690)
 #define MACH_HD64461	(sh_mv.mv_hw_hd64461)
+#define MACH_HD64465	(sh_mv.mv_hw_hd64465)
+#define MACH_DREAMCAST	(sh_mv.mv_hw_dreamcast)
 #else
 # ifdef CONFIG_SH_SOLUTION_ENGINE
 #  define MACH_SE		1
@@ -86,10 +99,40 @@ extern struct sh_machine_vector sh_mv;
 # else
 #  define MACH_HP600		0
 # endif
+# ifdef CONFIG_SH_HP620
+#  define MACH_HP620		1
+# else
+#  define MACH_HP620		0
+# endif
+# ifdef CONFIG_SH_HP680
+#  define MACH_HP680		1
+# else
+#  define MACH_HP680		0
+# endif
+# ifdef CONFIG_SH_HP690
+#  define MACH_HP690		1
+# else
+#  define MACH_HP690		0
+# endif
 # ifdef CONFIG_HD64461
 #  define MACH_HD64461		1
 # else
 #  define MACH_HD64461		0
+# endif
+# ifdef CONFIG_HD64465
+#  define MACH_HD64465		1
+# else
+#  define MACH_HD64465		0
+# endif
+# ifdef CONFIG_SH_EC3104
+#  define MACH_EC3104		1
+# else
+#  define MACH_EC3104		0
+# endif
+# ifdef CONFIG_SH_DREAMCAST
+#  define MACH_DREAMCAST	1
+# else
+#  define MACH_DREAMCAST	0
 # endif
 #endif
 

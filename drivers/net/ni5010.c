@@ -74,7 +74,7 @@ static char *version =
 	"ni5010.c: v1.00 06/23/97 Jan-Pascal van Best and Andreas Mohr\n";
 	
 /* bufsize_rcv == 0 means autoprobing */
-static unsigned int bufsize_rcv = 0;
+static unsigned int bufsize_rcv;
 
 #define jumpered_interrupts	/* IRQ line jumpered on board */
 #undef jumpered_dma		/* No DMA used */
@@ -186,7 +186,7 @@ static void __init trigger_irq(int ioaddr)
 
 static int __init ni5010_probe1(struct net_device *dev, int ioaddr)
 {
-	static unsigned version_printed = 0;
+	static unsigned version_printed;
 	int i;
 	unsigned int data = 0;
 	int boguscount = 40;

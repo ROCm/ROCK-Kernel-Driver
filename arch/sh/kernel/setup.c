@@ -50,6 +50,7 @@
 
 struct sh_cpuinfo boot_cpu_data = { CPU_SH_NONE, 0, 0, 0, };
 struct screen_info screen_info;
+unsigned char aux_device_present = 0xaa;
 
 #ifdef CONFIG_BLK_DEV_RAM
 extern int rd_doload;		/* 1 = load ramdisk, 0 = don't load */
@@ -60,6 +61,19 @@ extern int rd_image_start;	/* starting block # of image */
 #if defined(CONFIG_SH_GENERIC) || defined(CONFIG_SH_UNKNOWN)
 struct sh_machine_vector sh_mv;
 #endif
+
+/* We need this to satisfy some external references. */
+struct screen_info screen_info = {
+        0, 25,                  /* orig-x, orig-y */
+        0,                      /* unused */
+        0,                      /* orig-video-page */
+        0,                      /* orig-video-mode */
+        80,                     /* orig-video-cols */
+        0,0,0,                  /* ega_ax, ega_bx, ega_cx */
+        25,                     /* orig-video-lines */
+        0,                      /* orig-video-isVGA */
+        16                      /* orig-video-points */
+};
 
 extern void fpu_init(void);
 extern int root_mountflags;
@@ -115,7 +129,7 @@ static struct resource ram_resources[] = {
 	{ "Kernel data", 0, 0 }
 };
 
-static unsigned long memory_start, memory_end;
+unsigned long memory_start, memory_end;
 
 #ifdef CONFIG_SH_EARLY_PRINTK
 /*

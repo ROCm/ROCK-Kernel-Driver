@@ -155,6 +155,7 @@ struct ucred {
 #define AF_SNA		22	/* Linux SNA Project (nutters!) */
 #define AF_IRDA		23	/* IRDA sockets			*/
 #define AF_PPPOX	24	/* PPPoX sockets		*/
+#define AF_WANPIPE	25	/* Wanpipe API Sockets */
 #define AF_MAX		32	/* For now.. */
 
 /* Protocol families, same as address families. */
@@ -184,6 +185,7 @@ struct ucred {
 #define PF_SNA		AF_SNA
 #define PF_IRDA		AF_IRDA
 #define PF_PPPOX	AF_PPPOX
+#define PF_WANPIPE	AF_WANPIPE
 #define PF_MAX		AF_MAX
 
 /* Maximum queue length specifiable by listen.  */
@@ -209,6 +211,7 @@ struct ucred {
 #define MSG_RST		0x1000
 #define MSG_ERRQUEUE	0x2000	/* Fetch message from error queue */
 #define MSG_NOSIGNAL	0x4000	/* Do not generate SIGPIPE */
+#define MSG_MORE	0x8000	/* Sender will send more */
 
 #define MSG_EOF         MSG_FIN
 

@@ -42,7 +42,6 @@ extern int swim3_init(void);
 extern int swimiop_init(void);
 extern int amiga_floppy_init(void);
 extern int atari_floppy_init(void);
-extern int nbd_init(void);
 extern int ez_init(void);
 extern int bpcd_init(void);
 extern int ps2esdi_init(void);
@@ -51,6 +50,7 @@ extern int jsfd_init(void);
 #if defined(CONFIG_ARCH_S390)
 extern int mdisk_init(void);
 extern int dasd_init(void);
+extern int xpram_init(void);
 #endif /* CONFIG_ARCH_S390 */
 
 extern void set_device_ro(kdev_t dev,int flag);

@@ -1,4 +1,4 @@
-/* $Id: pci.c,v 1.23 2001/03/14 04:17:14 davem Exp $
+/* $Id: pci.c,v 1.24 2001/03/28 10:56:34 davem Exp $
  * pci.c: UltraSparc PCI controller support.
  *
  * Copyright (C) 1997, 1998, 1999 David S. Miller (davem@redhat.com)
@@ -73,6 +73,7 @@ int pci_device_reorder = 0;
 
 spinlock_t pci_poke_lock = SPIN_LOCK_UNLOCKED;
 volatile int pci_poke_in_progress;
+volatile int pci_poke_cpu = -1;
 volatile int pci_poke_faulted;
 
 /* Probe for all PCI controllers in the system. */

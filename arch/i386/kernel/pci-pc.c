@@ -843,6 +843,8 @@ static void __init pci_fixup_i450gx(struct pci_dev *d)
 	pcibios_last_bus = -1;
 }
 
+#if 0
+/* Until we get proper handling pray the BIOS gets it right */
 /*
  * ServerWorks host bridges -- Find and scan all secondary buses.
  * Register 0x44 contains first, 0x45 last bus number routed there.
@@ -860,6 +862,7 @@ static void __init pci_fixup_serverworks(struct pci_dev *d)
 		printk("PCI: ServerWorks host bridge: last bus %02x\n", pcibios_last_bus);
 	}
 }
+#endif
 
 #if 0
 /* Our bus code shouldnt need this fixup any more. Delete once verified */

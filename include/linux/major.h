@@ -128,6 +128,8 @@
 #define IDE8_MAJOR	90
 #define IDE9_MAJOR	91
 
+#define UBD_MAJOR	98
+
 #define AURORA_MAJOR 79
 
 #define JSFD_MAJOR	99
@@ -155,6 +157,9 @@
 #define CPUID_MAJOR		203
 
 #define OSST_MAJOR	206	/* OnStream-SCx0 SCSI tape */
+
+#define IBM_TTY3270_MAJOR       227	/* Official allocations now */
+#define IBM_FS3270_MAJOR        228
 
 /*
  * Tests for SCSI devices.

@@ -1,4 +1,4 @@
-/* $Id: blockops.S,v 1.30 2001/03/22 13:10:10 davem Exp $
+/* $Id: blockops.S,v 1.31 2001/04/05 11:08:12 davem Exp $
  * blockops.S: UltraSparc block zero optimized routines.
  *
  * Copyright (C) 1996, 1998, 1999, 2000 David S. Miller (davem@redhat.com)
@@ -399,7 +399,6 @@ clear_page_common:
 	jmpl		%o7 + 0x8, %g0
 	 wrpr		%g3, 0x0, %pstate
 
-	/* We will write cheetah optimized versions later. */
 	.globl		cheetah_patch_pgcopyops
 cheetah_patch_pgcopyops:
 	sethi		%hi(FIX_INSN_1), %g1

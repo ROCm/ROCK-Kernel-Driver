@@ -32,7 +32,7 @@
 static inline int pgd_none(pgd_t pgd)		{ return 0; }
 static inline int pgd_bad(pgd_t pgd)		{ return 0; }
 static inline int pgd_present(pgd_t pgd)	{ return 1; }
-#define pgd_clear(xp)	do { } while (0)
+static inline void pgd_clear (pgd_t * pgd) 	{ }
 
 /*
  * Certain architectures need to do special things when PTEs

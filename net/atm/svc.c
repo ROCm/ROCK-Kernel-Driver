@@ -408,6 +408,7 @@ static struct proto_ops SOCKOPS_WRAPPED(svc_proto_ops) = {
 	sendmsg:	atm_sendmsg,
 	recvmsg:	atm_recvmsg,
 	mmap:		sock_no_mmap,
+	sendpage:	sock_no_sendpage,
 };
 
 

@@ -22,17 +22,16 @@
 #define COLOR_ALIGN(addr)	(((addr) + SHMLBA - 1) & ~(SHMLBA - 1))
 
 unsigned long
-get_unmapped_area (unsigned long addr, unsigned long len)
+arch_get_unmapped_area (struct file *filp, unsigned long addr, unsigned long len, unsigned long pgoff, unsigned long flags)
 {
 	struct vm_area_struct * vmm;
-	long map_shared = (current->thread.flags & IA64_THREAD_MAP_SHARED) != 0;
 
 	if (len > RGN_MAP_LIMIT)
-		return 0;
+		return -ENOMEM;
 	if (!addr)
 		addr = TASK_UNMAPPED_BASE;
 
-	if (map_shared)
+	if (flags & MAP_SHARED)
 		addr = COLOR_ALIGN(addr);
 	else
 		addr = PAGE_ALIGN(addr);
@@ -40,13 +39,13 @@ get_unmapped_area (unsigned long addr, unsigned long len)
 	for (vmm = find_vma(current->mm, addr); ; vmm = vmm->vm_next) {
 		/* At this point:  (!vmm || addr < vmm->vm_end). */
 		if (TASK_SIZE - len < addr)
-			return 0;
+			return -ENOMEM;
 		if (rgn_offset(addr) + len > RGN_MAP_LIMIT)	/* no risk of overflow here... */
-			return 0;
+			return -ENOMEM;
 		if (!vmm || addr + len <= vmm->vm_start)
 			return addr;
 		addr = vmm->vm_end;
-		if (map_shared)
+		if (flags & MAP_SHARED)
 			addr = COLOR_ALIGN(addr);
 	}
 }
@@ -200,14 +199,9 @@ do_mmap2 (unsigned long addr, unsigned long len, int prot, int flags, int fd, un
 			return -EBADF;
 	}
 
-	if (flags & MAP_SHARED)
-		current->thread.flags |= IA64_THREAD_MAP_SHARED;
-
 	down_write(&current->mm->mmap_sem);
 	addr = do_mmap_pgoff(file, addr, len, prot, flags, pgoff);
 	up_write(&current->mm->mmap_sem);
-
-	current->thread.flags &= ~IA64_THREAD_MAP_SHARED;
 
 	if (file)
 		fput(file);

@@ -26,6 +26,7 @@
 #include <asm/mach-types.h>
 
 #include <asm/mach/arch.h>
+#include <asm/mach/irq.h>
 
 #ifndef MEM_SIZE
 #define MEM_SIZE	(16*1024*1024)
@@ -35,10 +36,21 @@
 #define CONFIG_CMDLINE ""
 #endif
 
+#if defined(CONFIG_FPE_NWFPE) || defined(CONFIG_FPE_FASTFPE)
+char fpe_type[8];
+
+static int __init fpe_setup(char *line)
+{
+	memcpy(fpe_type, line, 8);
+	return 1;
+}
+
+__setup("fpe=", fpe_setup);
+#endif
+
 extern void paging_init(struct meminfo *, struct machine_desc *desc);
 extern void bootmem_init(struct meminfo *);
 extern void reboot_setup(char *str);
-extern void disable_hlt(void);
 extern unsigned long memparse(char *ptr, char **retptr);
 extern int root_mountflags;
 extern int _stext, _text, _etext, _edata, _end;
@@ -71,9 +83,10 @@ unsigned char aux_device_present;
 char elf_platform[ELF_PLATFORM_SIZE];
 char saved_command_line[COMMAND_LINE_SIZE];
 
+static struct meminfo meminfo __initdata = { 0, };
 static struct proc_info_item proc_info;
 static const char *machine_name;
-static char command_line[COMMAND_LINE_SIZE] = { 0, };
+static char command_line[COMMAND_LINE_SIZE];
 
 static char default_command_line[COMMAND_LINE_SIZE] __initdata = CONFIG_CMDLINE;
 static union { char c[4]; unsigned long l; } endian_test __initdata = { { 'l', '?', '?', 'b' } };
@@ -306,24 +319,191 @@ request_standard_resources(struct meminfo *mi, struct machine_desc *mdesc)
 		request_resource(&ioport_resource, &lp2);
 }
 
+/*
+ *  Tag parsing.
+ *
+ * This is the new way of passing data to the kernel at boot time.  Rather
+ * than passing a fixed inflexible structure to the kernel, we pass a list
+ * of variable-sized tags to the kernel.  The first tag must be a ATAG_CORE
+ * tag for the list to be recognised (to distinguish the tagged list from
+ * a param_struct).  The list is terminated with a zero-length tag (this tag
+ * is not parsed in any way).
+ */
+static int __init parse_tag_core(const struct tag *tag)
+{
+	if ((tag->u.core.flags & 1) == 0)
+		root_mountflags &= ~MS_RDONLY;
+	ROOT_DEV = to_kdev_t(tag->u.core.rootdev);
+	return 0;
+}
+
+static int __init parse_tag_mem32(const struct tag *tag)
+{
+	if (meminfo.nr_banks >= NR_BANKS) {
+		printk(KERN_WARNING
+		       "Ignoring memory bank 0x%08x size %dKB\n",
+			tag->u.mem.start, tag->u.mem.size / 1024);
+		return -EINVAL;
+	}
+	meminfo.bank[meminfo.nr_banks].start = tag->u.mem.start;
+	meminfo.bank[meminfo.nr_banks].size  = tag->u.mem.size;
+	meminfo.bank[meminfo.nr_banks].node  = 0;
+	meminfo.nr_banks += 1;
+
+	return 0;
+}
+
+static int __init parse_tag_videotext(const struct tag *tag)
+{
+	screen_info.orig_x            = tag->u.videotext.x;
+	screen_info.orig_y            = tag->u.videotext.y;
+	screen_info.orig_video_page   = tag->u.videotext.video_page;
+	screen_info.orig_video_mode   = tag->u.videotext.video_mode;
+	screen_info.orig_video_cols   = tag->u.videotext.video_cols;
+	screen_info.orig_video_ega_bx = tag->u.videotext.video_ega_bx;
+	screen_info.orig_video_lines  = tag->u.videotext.video_lines;
+	screen_info.orig_video_isVGA  = tag->u.videotext.video_isvga;
+	screen_info.orig_video_points = tag->u.videotext.video_points;
+	return 0;
+}
+
+static int __init parse_tag_ramdisk(const struct tag *tag)
+{
+	setup_ramdisk((tag->u.ramdisk.flags & 1) == 0,
+		      (tag->u.ramdisk.flags & 2) == 0,
+		      tag->u.ramdisk.start, tag->u.ramdisk.size);
+	return 0;
+}
+
+static int __init parse_tag_initrd(const struct tag *tag)
+{
+	setup_initrd(tag->u.initrd.start, tag->u.initrd.size);
+	return 0;
+}
+
+static int __init parse_tag_serialnr(const struct tag *tag)
+{
+	system_serial_low = tag->u.serialnr.low;
+	system_serial_high = tag->u.serialnr.high;
+	return 0;
+}
+
+static int __init parse_tag_revision(const struct tag *tag)
+{
+	system_rev = tag->u.revision.rev;
+	return 0;
+}
+
+static int __init parse_tag_cmdline(const struct tag *tag)
+{
+	strncpy(default_command_line, tag->u.cmdline.cmdline, COMMAND_LINE_SIZE);
+	default_command_line[COMMAND_LINE_SIZE - 1] = '\0';
+	return 0;
+}
+
+/*
+ * This is the core tag table; these are the tags
+ * that we recognise for any machine type.
+ */
+static const struct tagtable core_tagtable[] __init = {
+	{ ATAG_CORE,      parse_tag_core      },
+	{ ATAG_MEM,       parse_tag_mem32     },
+	{ ATAG_VIDEOTEXT, parse_tag_videotext },
+	{ ATAG_RAMDISK,   parse_tag_ramdisk   },
+	{ ATAG_INITRD,    parse_tag_initrd    },
+	{ ATAG_SERIAL,    parse_tag_serialnr  },
+	{ ATAG_REVISION,  parse_tag_revision  },
+	{ ATAG_CMDLINE,   parse_tag_cmdline   }
+};
+
+/*
+ * Scan one tag table for this tag, and call its parse function.
+ */
+static int __init
+parse_tag(const struct tagtable *tbl, int size, const struct tag *t)
+{
+	int i;
+
+	for (i = 0; i < size; i++, tbl++)
+		if (t->hdr.tag == tbl->tag) {
+			tbl->parse(t);
+			break;
+		}
+
+	return i < size;
+}
+
+/*
+ * Parse all tags in the list, checking both the global and architecture
+ * specific tag tables.
+ */
+static void __init
+parse_tags(const struct tagtable *tbl, int size, const struct tag *t)
+{
+	/*
+	 * The tag list is terminated with a zero-sized tag.  Size is
+	 * defined to be in units of 32-bit quantities.
+	 */
+	for (; t->hdr.size; t = (struct tag *)((u32 *)t + t->hdr.size)) {
+		if (parse_tag(core_tagtable, ARRAY_SIZE(core_tagtable), t))
+			continue;
+
+		if (tbl && parse_tag(tbl, size, t))
+			continue;
+
+		printk(KERN_WARNING
+		       "Ignoring unrecognised tag 0x%08x\n", t->hdr.tag);
+	}
+}
+
+static void __init parse_params(struct param_struct *params)
+{
+	if (params->u1.s.page_size != PAGE_SIZE) {
+		printk(KERN_WARNING "Warning: bad configuration page, "
+		       "trying to continue\n");
+		return;
+	}
+
+	ROOT_DEV	   = to_kdev_t(params->u1.s.rootdev);
+	system_rev	   = params->u1.s.system_rev;
+	system_serial_low  = params->u1.s.system_serial_low;
+	system_serial_high = params->u1.s.system_serial_high;
+
+	if (params->u1.s.mem_fclk_21285 > 0)
+		mem_fclk_21285 = params->u1.s.mem_fclk_21285;  
+
+	setup_ramdisk((params->u1.s.flags & FLAG_RDLOAD) == 0,
+		      (params->u1.s.flags & FLAG_RDPROMPT) == 0,
+		      params->u1.s.rd_start,
+		      params->u1.s.ramdisk_size);
+
+	setup_initrd(params->u1.s.initrd_start,
+		     params->u1.s.initrd_size);
+
+	if (!(params->u1.s.flags & FLAG_READONLY))
+		root_mountflags &= ~MS_RDONLY;
+
+	strncpy(default_command_line, params->commandline, COMMAND_LINE_SIZE);
+	default_command_line[COMMAND_LINE_SIZE - 1] = '\0';
+
+	if (meminfo.nr_banks == 0) {
+		meminfo.nr_banks      = 1;
+		meminfo.bank[0].start = PHYS_OFFSET;
+		meminfo.bank[0].size  = params->u1.s.nr_pages << PAGE_SHIFT;
+	}
+}
+
 void __init setup_arch(char **cmdline_p)
 {
 	struct param_struct *params = NULL;
 	struct machine_desc *mdesc;
-	struct meminfo meminfo;
 	char *from = default_command_line;
-
-	memset(&meminfo, 0, sizeof(meminfo));
-
-	setup_processor();
 
 	ROOT_DEV = MKDEV(0, 255);
 
+	setup_processor();
 	mdesc = setup_architecture(machine_arch_type);
 	machine_name = mdesc->name;
-
-	if (mdesc->broken_hlt)
-		disable_hlt();
 
 	if (mdesc->soft_reboot)
 		reboot_setup("s");
@@ -331,46 +511,30 @@ void __init setup_arch(char **cmdline_p)
 	if (mdesc->param_offset)
 		params = phys_to_virt(mdesc->param_offset);
 
+	/*
+	 * Do the machine-specific fixups before we parse the
+	 * parameters or tags.
+	 */
 	if (mdesc->fixup)
 		mdesc->fixup(mdesc, params, &from, &meminfo);
 
-	if (params && params->u1.s.page_size != PAGE_SIZE) {
-		printk(KERN_WARNING "Warning: bad configuration page, "
-		       "trying to continue\n");
-		params = NULL;
-	}
-
 	if (params) {
-		ROOT_DEV	   = to_kdev_t(params->u1.s.rootdev);
-		system_rev	   = params->u1.s.system_rev;
-		system_serial_low  = params->u1.s.system_serial_low;
-		system_serial_high = params->u1.s.system_serial_high;
+		struct tag *tag = (struct tag *)params;
 
-		if (params->u1.s.mem_fclk_21285 > 0)
-			mem_fclk_21285 = params->u1.s.mem_fclk_21285;  
-
-		setup_ramdisk((params->u1.s.flags & FLAG_RDLOAD) == 0,
-			      (params->u1.s.flags & FLAG_RDPROMPT) == 0,
-			      params->u1.s.rd_start,
-			      params->u1.s.ramdisk_size);
-
-		setup_initrd(params->u1.s.initrd_start,
-			     params->u1.s.initrd_size);
-
-		if (!(params->u1.s.flags & FLAG_READONLY))
-			root_mountflags &= ~MS_RDONLY;
-
-		from = params->commandline;
+		/*
+		 * Is the first tag the CORE tag?  This differentiates
+		 * between the tag list and the parameter table.
+		 */
+		if (tag->hdr.tag == ATAG_CORE)
+			parse_tags(mdesc->tagtable, mdesc->tagsize, tag);
+		else
+			parse_params(params);
 	}
 
 	if (meminfo.nr_banks == 0) {
 		meminfo.nr_banks      = 1;
 		meminfo.bank[0].start = PHYS_OFFSET;
-		meminfo.bank[0].node  = 0;
-		if (params)
-			meminfo.bank[0].size = params->u1.s.nr_pages << PAGE_SHIFT;
-		else
-			meminfo.bank[0].size = MEM_SIZE;
+		meminfo.bank[0].size  = MEM_SIZE;
 	}
 
 	init_mm.start_code = (unsigned long) &_text;
@@ -384,6 +548,11 @@ void __init setup_arch(char **cmdline_p)
 	bootmem_init(&meminfo);
 	paging_init(&meminfo, mdesc);
 	request_standard_resources(&meminfo, mdesc);
+
+	/*
+	 * Set up various architecture-specific pointers
+	 */
+	init_arch_irq = mdesc->init_irq;
 
 #ifdef CONFIG_VT
 #if defined(CONFIG_VGA_CONSOLE)
@@ -403,8 +572,8 @@ int get_cpuinfo(char * buffer)
 		     (int)processor_id & 15, elf_platform);
 
 	p += sprintf(p, "BogoMIPS\t: %lu.%02lu\n",
-		     (loops_per_sec+2500) / 500000,
-		     ((loops_per_sec+2500) / 5000) % 100);
+		     loops_per_jiffy / (500000/HZ),
+		     (loops_per_jiffy / (5000/HZ)) % 100);
 
 	p += sprintf(p, "Hardware\t: %s\n", machine_name);
 

@@ -121,7 +121,7 @@ struct lancedata {
 };
 
 #ifdef MODULE
-static struct ariadne_private *root_ariadne_dev = NULL;
+static struct ariadne_private *root_ariadne_dev;
 #endif
 
 static int ariadne_open(struct net_device *dev);

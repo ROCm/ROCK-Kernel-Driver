@@ -39,7 +39,7 @@
 #include <asm/system.h>
 #include <asm/atomic.h>
 #include <linux/wait.h>
-#include <asm/rwsem.h>
+#include <linux/rwsem.h>
 
 struct semaphore {
 	atomic_t count;

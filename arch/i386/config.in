@@ -36,11 +36,12 @@ choice 'Processor family' \
 	 Pentium-III			CONFIG_MPENTIUMIII \
 	 Pentium-4			CONFIG_MPENTIUM4 \
 	 K6/K6-II/K6-III		CONFIG_MK6 \
-	 Athlon/K7			CONFIG_MK7 \
+	 Athlon/Duron/K7		CONFIG_MK7 \
 	 Crusoe				CONFIG_MCRUSOE \
 	 Winchip-C6			CONFIG_MWINCHIPC6 \
 	 Winchip-2			CONFIG_MWINCHIP2 \
-	 Winchip-2A/Winchip-3		CONFIG_MWINCHIP3D" Pentium-Pro
+	 Winchip-2A/Winchip-3		CONFIG_MWINCHIP3D \
+	 CyrixIII/C3			CONFIG_MCYRIXIII" Pentium-Pro
 #
 # Define implied options from the CPU selection here
 #
@@ -113,6 +114,13 @@ if [ "$CONFIG_MK7" = "y" ]; then
    define_bool CONFIG_X86_GOOD_APIC y
    define_bool CONFIG_X86_USE_3DNOW y
    define_bool CONFIG_X86_PGE y
+   define_bool CONFIG_X86_USE_PPRO_CHECKSUM y
+fi
+if [ "$CONFIG_MCYRIXIII" = "y" ]; then
+   define_int  CONFIG_X86_L1_CACHE_SHIFT 5
+   define_bool CONFIG_X86_TSC y
+   define_bool CONFIG_X86_ALIGNMENT_16 y
+   define_bool CONFIG_X86_USE_3DNOW y
    define_bool CONFIG_X86_USE_PPRO_CHECKSUM y
 fi
 if [ "$CONFIG_MCRUSOE" = "y" ]; then

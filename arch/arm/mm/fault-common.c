@@ -2,7 +2,7 @@
  *  linux/arch/arm/mm/fault-common.c
  *
  *  Copyright (C) 1995  Linus Torvalds
- *  Modifications for ARM processor (c) 1995-1999 Russell King
+ *  Modifications for ARM processor (c) 1995-2001 Russell King
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -93,8 +93,82 @@ void show_pte(struct mm_struct *mm, unsigned long addr)
 	printk("\n");
 }
 
+/*
+ * Oops.  The kernel tried to access some page that wasn't present.
+ */
+static void
+__do_kernel_fault(struct mm_struct *mm, unsigned long addr, int error_code,
+		  struct pt_regs *regs)
+{
+	unsigned long fixup;
+
+	/*
+	 * Are we prepared to handle this kernel fault?
+	 */
+	if ((fixup = search_exception_table(instruction_pointer(regs))) != 0) {
+#ifdef DEBUG
+		printk(KERN_DEBUG "%s: Exception at [<%lx>] addr=%lx (fixup: %lx)\n",
+			tsk->comm, regs->ARM_pc, addr, fixup);
+#endif
+		regs->ARM_pc = fixup;
+		return;
+	}
+
+	/*
+	 * No handler, we'll have to terminate things with extreme prejudice.
+	 */
+	printk(KERN_ALERT
+		"Unable to handle kernel %s at virtual address %08lx\n",
+		(addr < PAGE_SIZE) ? "NULL pointer dereference" :
+		"paging request", addr);
+
+	show_pte(mm, addr);
+	die("Oops", regs, error_code);
+	do_exit(SIGKILL);
+}
+
+/*
+ * Something tried to access memory that isn't in our memory map..
+ * User mode accesses just cause a SIGSEGV
+ */
+static void
+__do_user_fault(struct task_struct *tsk, unsigned long addr, int error_code,
+		int code, struct pt_regs *regs)
+{
+	struct siginfo si;
+
+#ifdef CONFIG_DEBUG_USER
+	printk(KERN_DEBUG "%s: unhandled page fault at pc=0x%08lx, "
+	       "lr=0x%08lx (bad address=0x%08lx, code %d)\n",
+	       tsk->comm, regs->ARM_pc, regs->ARM_lr, addr, error_code);
+#endif
+
+	tsk->thread.address = addr;
+	tsk->thread.error_code = error_code;
+	tsk->thread.trap_no = 14;
+	si.si_signo = SIGSEGV;
+	si.si_errno = 0;
+	si.si_code = code;
+	si.si_addr = (void *)addr;
+	force_sig_info(SIGSEGV, &si, tsk);
+}
+
+void
+do_bad_area(struct task_struct *tsk, struct mm_struct *mm, unsigned long addr,
+	    int error_code, struct pt_regs *regs)
+{
+	/*
+	 * If we are in kernel mode at this point, we
+	 * have no context to handle this fault with.
+	 */
+	if (user_mode(regs))
+		__do_user_fault(tsk, addr, error_code, SEGV_MAPERR, regs);
+	else
+		__do_kernel_fault(mm, addr, error_code, regs);
+}
+
 static int
-__do_page_fault(struct mm_struct *mm, unsigned long addr, int mode,
+__do_page_fault(struct mm_struct *mm, unsigned long addr, int error_code,
 		struct task_struct *tsk)
 {
 	struct vm_area_struct *vma;
@@ -112,7 +186,7 @@ __do_page_fault(struct mm_struct *mm, unsigned long addr, int mode,
 	 * memory access, so we can handle it.
 	 */
 good_area:
-	if (READ_FAULT(mode)) /* read? */
+	if (READ_FAULT(error_code)) /* read? */
 		mask = VM_READ|VM_EXEC;
 	else
 		mask = VM_WRITE;
@@ -127,7 +201,7 @@ good_area:
 	 * than endlessly redo the fault.
 	 */
 survive:
-	fault = handle_mm_fault(mm, vma, addr & PAGE_MASK, DO_COW(mode));
+	fault = handle_mm_fault(mm, vma, addr & PAGE_MASK, DO_COW(error_code));
 
 	/*
 	 * Handle the "normal" cases first - successful and sigbus
@@ -161,60 +235,14 @@ out:
 	return fault;
 }
 
-static int __do_vmalloc_fault(unsigned long addr, struct mm_struct *mm)
-{
-	/* Synchronise this task's top level page-table
-	 * with the 'reference' page table.
-	 */
-	int offset = __pgd_offset(addr);
-	pgd_t *pgd, *pgd_k;
-	pmd_t *pmd, *pmd_k;
-
-	pgd_k = init_mm.pgd + offset;
-	if (!pgd_present(*pgd_k))
-		goto bad_area;
-
-	pgd = mm->pgd + offset;
-#if 0	/* note that we are two-level */
-	if (!pgd_present(*pgd))
-		set_pgd(pgd, *pgd_k);
-#endif
-
-	pmd_k = pmd_offset(pgd_k, addr);
-	if (pmd_none(*pmd_k))
-		goto bad_area;
-
-	pmd = pmd_offset(pgd, addr);
-	if (!pmd_none(*pmd))
-		goto bad_area;
-	set_pmd(pmd, *pmd_k);
-	return 1;
-
-bad_area:
-	return -2;
-}
-
-int do_page_fault(unsigned long addr, int mode, struct pt_regs *regs)
+int do_page_fault(unsigned long addr, int error_code, struct pt_regs *regs)
 {
 	struct task_struct *tsk;
 	struct mm_struct *mm;
-	unsigned long fixup;
 	int fault;
 
 	tsk = current;
 	mm  = tsk->mm;
-
-	/*
-	 * We fault-in kernel-space virtual memory on-demand. The
-	 * 'reference' page table is init_mm.pgd.
-	 *
-	 * NOTE! We MUST NOT take any locks for this case. We may
-	 * be in an interrupt or a critical region, and should
-	 * only copy the information from the master page table,
-	 * nothing more.
-	 */
-	if (addr >= TASK_SIZE)
-		goto vmalloc_fault;
 
 	/*
 	 * If we're in an interrupt or have no user
@@ -224,10 +252,9 @@ int do_page_fault(unsigned long addr, int mode, struct pt_regs *regs)
 		goto no_context;
 
 	down_read(&mm->mmap_sem);
-	fault = __do_page_fault(mm, addr, mode, tsk);
+	fault = __do_page_fault(mm, addr, error_code, tsk);
 	up_read(&mm->mmap_sem);
 
-ret:
 	/*
 	 * Handle the "normal" case first
 	 */
@@ -255,28 +282,9 @@ ret:
 		 */
 		printk("VM: killing process %s\n", tsk->comm);
 		do_exit(SIGKILL);
-	} else {
-		/*
-		 * Something tried to access memory that isn't in our memory map..
-		 * User mode accesses just cause a SIGSEGV
-		 */
-		struct siginfo si;
-
-#ifdef CONFIG_DEBUG_USER
-		printk(KERN_DEBUG "%s: unhandled page fault at pc=0x%08lx, "
-		       "lr=0x%08lx (bad address=0x%08lx, code %d)\n",
-		       tsk->comm, regs->ARM_pc, regs->ARM_lr, addr, mode);
-#endif
-
-		tsk->thread.address = addr;
-		tsk->thread.error_code = mode;
-		tsk->thread.trap_no = 14;
-		si.si_signo = SIGSEGV;
-		si.si_errno = 0;
-		si.si_code = fault == -1 ? SEGV_ACCERR : SEGV_MAPERR;
-		si.si_addr = (void *)addr;
-		force_sig_info(SIGSEGV, &si, tsk);
-	}
+	} else
+		__do_user_fault(tsk, addr, error_code, fault == -1 ?
+				SEGV_ACCERR : SEGV_MAPERR, regs);
 	return 0;
 
 
@@ -290,7 +298,7 @@ do_sigbus:
 	 * or user mode.
 	 */
 	tsk->thread.address = addr;
-	tsk->thread.error_code = mode;
+	tsk->thread.error_code = error_code;
 	tsk->thread.trap_no = 14;
 	force_sig(SIGBUS, tsk);
 
@@ -299,32 +307,64 @@ do_sigbus:
 		return 0;
 
 no_context:
-	/* Are we prepared to handle this kernel fault?  */
-	if ((fixup = search_exception_table(instruction_pointer(regs))) != 0) {
-#ifdef DEBUG
-		printk(KERN_DEBUG "%s: Exception at [<%lx>] addr=%lx (fixup: %lx)\n",
-			tsk->comm, regs->ARM_pc, addr, fixup);
+	__do_kernel_fault(mm, addr, error_code, regs);
+	return 0;
+}
+
+/*
+ * First Level Translation Fault Handler
+ *
+ * We enter here because the first level page table doesn't contain
+ * a valid entry for the address.
+ *
+ * If the address is in kernel space (>= TASK_SIZE), then we are
+ * probably faulting in the vmalloc() area.
+ *
+ * If the init_task's first level page tables contains the relevant
+ * entry, we copy the it to this task.  If not, we send the process
+ * a signal, fixup the exception, or oops the kernel.
+ *
+ * NOTE! We MUST NOT take any locks for this case. We may be in an
+ * interrupt or a critical region, and should only copy the information
+ * from the master page table, nothing more.
+ */
+int do_translation_fault(unsigned long addr, int error_code, struct pt_regs *regs)
+{
+	struct task_struct *tsk;
+	struct mm_struct *mm;
+	int offset;
+	pgd_t *pgd, *pgd_k;
+	pmd_t *pmd, *pmd_k;
+
+	if (addr < TASK_SIZE)
+		return do_page_fault(addr, error_code, regs);
+
+	tsk = current;
+	mm  = tsk->active_mm;
+
+	offset = __pgd_offset(addr);
+
+	pgd_k = init_mm.pgd + offset;
+	pgd   = mm->pgd + offset;
+
+	if (pgd_none(*pgd_k))
+		goto bad_area;
+
+#if 0	/* note that we are two-level */
+	if (!pgd_present(*pgd))
+		set_pgd(pgd, *pgd_k);
 #endif
-		regs->ARM_pc = fixup;
-		return 0;
-	}
 
-	/*
-	 * Oops. The kernel tried to access some bad page. We'll have to
-	 * terminate things with extreme prejudice.
-	 */
-	printk(KERN_ALERT
-		"Unable to handle kernel %s at virtual address %08lx\n",
-		(addr < PAGE_SIZE) ? "NULL pointer dereference" :
-		"paging request", addr);
+	pmd_k = pmd_offset(pgd_k, addr);
+	pmd   = pmd_offset(pgd, addr);
 
-	show_pte(mm, addr);
-	die("Oops", regs, mode);
-	do_exit(SIGKILL);
+	if (pmd_none(*pmd_k))
+		goto bad_area;
 
+	set_pmd(pmd, *pmd_k);
 	return 0;
 
-vmalloc_fault:
-	fault = __do_vmalloc_fault(addr, mm);
-	goto ret;
+bad_area:
+	do_bad_area(tsk, mm, addr, error_code, regs);
+	return 0;
 }

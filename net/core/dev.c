@@ -91,6 +91,8 @@
 #include <net/dst.h>
 #include <net/pkt_sched.h>
 #include <net/profile.h>
+#include <net/checksum.h>
+#include <linux/highmem.h>
 #include <linux/init.h>
 #include <linux/kmod.h>
 #include <linux/module.h>
@@ -503,7 +505,7 @@ struct net_device * dev_get_by_index(int ifindex)
 }
 
 /**
- *	dev_getbyhwaddr - find a device by its hardware addres
+ *	dev_getbyhwaddr - find a device by its hardware address
  *	@type: media type of device
  *	@ha: hardware address
  *
@@ -871,12 +873,10 @@ void dev_queue_xmit_nit(struct sk_buff *skb, struct net_device *dev)
 			 */
 			skb2->mac.raw = skb2->data;
 
-			if (skb2->nh.raw < skb2->data || skb2->nh.raw >= skb2->tail) {
+			if (skb2->nh.raw < skb2->data || skb2->nh.raw > skb2->tail) {
 				if (net_ratelimit())
 					printk(KERN_DEBUG "protocol %04x is buggy, dev %s\n", skb2->protocol, dev->name);
 				skb2->nh.raw = skb2->data;
-				if (dev->hard_header)
-					skb2->nh.raw += dev->hard_header_len;
 			}
 
 			skb2->h.raw = skb2->nh.raw;
@@ -886,6 +886,55 @@ void dev_queue_xmit_nit(struct sk_buff *skb, struct net_device *dev)
 	}
 	br_read_unlock(BR_NETPROTO_LOCK);
 }
+
+/* Calculate csum in the case, when packet is misrouted.
+ * If it failed by some reason, ignore and send skb with wrong
+ * checksum.
+ */
+struct sk_buff * skb_checksum_help(struct sk_buff *skb)
+{
+	int offset;
+	unsigned int csum;
+
+	offset = skb->h.raw - skb->data;
+	if (offset > (int)skb->len)
+		BUG();
+	csum = skb_checksum(skb, offset, skb->len-offset, 0);
+
+	offset = skb->tail - skb->h.raw;
+	if (offset <= 0)
+		BUG();
+	if (skb->csum+2 > offset)
+		BUG();
+
+	*(u16*)(skb->h.raw + skb->csum) = csum_fold(csum);
+	skb->ip_summed = CHECKSUM_NONE;
+	return skb;
+}
+
+#ifdef CONFIG_HIGHMEM
+/* Actually, we should eliminate this check as soon as we know, that:
+ * 1. IOMMU is present and allows to map all the memory.
+ * 2. No high memory really exists on this machine.
+ */
+
+static inline int
+illegal_highdma(struct net_device *dev, struct sk_buff *skb)
+{
+	int i;
+
+	if (dev->features&NETIF_F_HIGHDMA)
+		return 0;
+
+	for (i=0; i<skb_shinfo(skb)->nr_frags; i++)
+		if (skb_shinfo(skb)->frags[i].page >= highmem_start_page)
+			return 1;
+
+	return 0;
+}
+#else
+#define illegal_highdma(dev, skb)	(0)
+#endif
 
 /**
  *	dev_queue_xmit - transmit a buffer
@@ -899,11 +948,40 @@ void dev_queue_xmit_nit(struct sk_buff *skb, struct net_device *dev)
  *	guarantee the frame will be transmitted as it may be dropped due
  *	to congestion or traffic shaping.
  */
- 
+
 int dev_queue_xmit(struct sk_buff *skb)
 {
 	struct net_device *dev = skb->dev;
 	struct Qdisc  *q;
+
+	if (skb_shinfo(skb)->frag_list &&
+	    !(dev->features&NETIF_F_FRAGLIST) &&
+	    skb_linearize(skb, GFP_ATOMIC) != 0) {
+		kfree_skb(skb);
+		return -ENOMEM;
+	}
+
+	/* Fragmented skb is linearized if device does not support SG,
+	 * or if at least one of fragments is in highmem and device
+	 * does not support DMA from it.
+	 */
+	if (skb_shinfo(skb)->nr_frags &&
+	    (!(dev->features&NETIF_F_SG) || illegal_highdma(dev, skb)) &&
+	    skb_linearize(skb, GFP_ATOMIC) != 0) {
+		kfree_skb(skb);
+		return -ENOMEM;
+	}
+
+	/* If packet is not checksummed and device does not support
+	 * checksumming for this protocol, complete checksumming here.
+	 */
+	if (skb->ip_summed == CHECKSUM_HW &&
+	    (!(dev->features&(NETIF_F_HW_CSUM|NETIF_F_NO_CSUM)) &&
+	     (!(dev->features&NETIF_F_IP_CSUM) ||
+	      skb->protocol != htons(ETH_P_IP)))) {
+		if ((skb = skb_checksum_help(skb)) == NULL)
+			return -ENOMEM;
+	}
 
 	/* Grab device queue */
 	spin_lock_bh(&dev->queue_lock);
@@ -1182,6 +1260,10 @@ static int deliver_to_old_ones(struct packet_type *pt, struct sk_buff *skb, int 
 		skb = skb_clone(skb, GFP_ATOMIC);
 		if (skb == NULL)
 			return ret;
+	}
+	if (skb_is_nonlinear(skb) && skb_linearize(skb, GFP_ATOMIC) != 0) {
+		kfree_skb(skb);
+		return ret;
 	}
 
 	/* The assumption (correct one) is that old protocols

@@ -9,7 +9,6 @@
  */
 
 #include <linux/types.h>
-#include <linux/config.h>
 #include <linux/slab.h>
 #include <linux/sched.h>
 #include <asm/sn/sgi.h>

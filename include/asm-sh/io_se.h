@@ -14,27 +14,27 @@
 
 #include <asm/io_generic.h>
 
-extern unsigned long se_inb(unsigned int port);
-extern unsigned long se_inw(unsigned int port);
-extern unsigned long se_inl(unsigned int port);
+extern unsigned char se_inb(unsigned long port);
+extern unsigned short se_inw(unsigned long port);
+extern unsigned int se_inl(unsigned long port);
 
-extern void se_outb(unsigned long value, unsigned int port);
-extern void se_outw(unsigned long value, unsigned int port);
-extern void se_outl(unsigned long value, unsigned int port);
+extern void se_outb(unsigned char value, unsigned long port);
+extern void se_outw(unsigned short value, unsigned long port);
+extern void se_outl(unsigned int value, unsigned long port);
 
-extern unsigned long se_inb_p(unsigned int port);
-extern void se_outb_p(unsigned long value, unsigned int port);
+extern unsigned char se_inb_p(unsigned long port);
+extern void se_outb_p(unsigned char value, unsigned long port);
 
-extern void se_insb(unsigned int port, void *addr, unsigned long count);
-extern void se_insw(unsigned int port, void *addr, unsigned long count);
-extern void se_insl(unsigned int port, void *addr, unsigned long count);
-extern void se_outsb(unsigned int port, const void *addr, unsigned long count);
-extern void se_outsw(unsigned int port, const void *addr, unsigned long count);
-extern void se_outsl(unsigned int port, const void *addr, unsigned long count);
+extern void se_insb(unsigned long port, void *addr, unsigned long count);
+extern void se_insw(unsigned long port, void *addr, unsigned long count);
+extern void se_insl(unsigned long port, void *addr, unsigned long count);
+extern void se_outsb(unsigned long port, const void *addr, unsigned long count);
+extern void se_outsw(unsigned long port, const void *addr, unsigned long count);
+extern void se_outsl(unsigned long port, const void *addr, unsigned long count);
 
-extern unsigned long se_readb(unsigned long addr);
-extern unsigned long se_readw(unsigned long addr);
-extern unsigned long se_readl(unsigned long addr);
+extern unsigned char se_readb(unsigned long addr);
+extern unsigned short se_readw(unsigned long addr);
+extern unsigned int se_readl(unsigned long addr);
 extern void se_writeb(unsigned char b, unsigned long addr);
 extern void se_writew(unsigned short b, unsigned long addr);
 extern void se_writel(unsigned int b, unsigned long addr);
@@ -73,7 +73,6 @@ extern unsigned long se_isa_port2addr(unsigned long offset);
 
 # define __isa_port2addr	se_isa_port2addr
 # define __ioremap		generic_ioremap
-# define __ioremap_nocache	generic_ioremap_nocache
 # define __iounmap		generic_iounmap
 
 #endif

@@ -347,15 +347,16 @@ void parport_pc_init_state(struct pardevice *dev, struct parport_state *s)
 void parport_pc_save_state(struct parport *p, struct parport_state *s)
 {
 	const struct parport_pc_private *priv = p->physport->private_data;
-	s->u.pc.ctr = inb (CONTROL (p));
+	s->u.pc.ctr = priv->ctr;
 	if (priv->ecr)
 		s->u.pc.ecr = inb (ECONTROL (p));
 }
 
 void parport_pc_restore_state(struct parport *p, struct parport_state *s)
 {
-	const struct parport_pc_private *priv = p->physport->private_data;
+	struct parport_pc_private *priv = p->physport->private_data;
 	outb (s->u.pc.ctr, CONTROL (p));
+	priv->ctr = s->u.pc.ctr;
 	if (priv->ecr)
 		outb (s->u.pc.ecr, ECONTROL (p));
 }

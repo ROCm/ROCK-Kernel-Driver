@@ -3144,51 +3144,6 @@ static int atyfb_mmap(struct fb_info *info, struct file *file,
 
 	vma->vm_pgoff = off >> PAGE_SHIFT;	/* propagate off changes */
 
-#ifdef __sparc_v9__
-	/* Align it as much as desirable */
-	{
-		unsigned long j, align;
-		int max = -1;
-
-		map_offset = off + size;
-		for (i = 0; fb->mmap_map[i].size; i++) {
-			if (fb->mmap_map[i].voff < off)
-				continue;
-			if (fb->mmap_map[i].voff >= map_offset)
-				break;
-			if (max < 0 ||
-			    fb->mmap_map[i].size > fb->mmap_map[max].size)
-				max = i;
-		}
-		if (max >= 0) {
-			j = fb->mmap_map[max].size;
-			if (fb->mmap_map[max].voff + j > map_offset)
-				j = map_offset - fb->mmap_map[max].voff;
-			for (align = 0x400000; align > PAGE_SIZE; align >>= 3)
-				if (j >= align &&
-				    !(fb->mmap_map[max].poff & (align - 1)))
-					break;
-			if (align > PAGE_SIZE) {
-				j = align;
-				align = j - ((vma->vm_start
-					      + fb->mmap_map[max].voff
-					      - off) & (j - 1));
-				if (align != j) {
-					struct vm_area_struct *vmm;
-
-					vmm = find_vma(current->mm,
-						       vma->vm_start);
-					if (!vmm || vmm->vm_start
-						    >= vma->vm_end + align) {
-						vma->vm_start += align;
-						vma->vm_end += align;
-					}
-				}
-			}
-		}
-	}
-#endif
-
 	/* Each page, see which map applies */
 	for (page = 0; page < size; ) {
 		map_size = 0;

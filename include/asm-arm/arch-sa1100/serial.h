@@ -22,11 +22,18 @@
 
 #define RS_TABLE_SIZE 4
 
-#define STD_SERIAL_PORT_DEFNS			\
-	/* UART CLK   PORT IRQ     FLAGS        */			\
-	{ 0, BASE_BAUD, 0x3F8, IRQ_GPIO3, STD_COM_FLAGS },	/* ttyS0 */	\
-	{ 0, BASE_BAUD, 0x2F8, IRQ_GPIO3, STD_COM_FLAGS },	/* ttyS1 */	\
-	{ 0, BASE_BAUD, 0x3E8, IRQ_GPIO3, STD_COM_FLAGS },	/* ttyS2 */	\
-	{ 0, BASE_BAUD, 0x2E8, IRQ_GPIO3, STD_COM4_FLAGS }	/* ttyS3 */
 
+/*
+ * Rather empty table...
+ * Hardwired serial ports should be defined here.
+ * PCMCIA will fill it dynamically.
+ */
+#define STD_SERIAL_PORT_DEFNS	\
+       /* UART	CLK     	PORT		IRQ	FLAGS		*/ \
+	{ 0,	BASE_BAUD,	0, 		0,	STD_COM_FLAGS },   \
+	{ 0,	BASE_BAUD,	0, 		0,	STD_COM_FLAGS },   \
+	{ 0,	BASE_BAUD,	0, 		0,	STD_COM_FLAGS },   \
+	{ 0,	BASE_BAUD,	0, 		0,	STD_COM_FLAGS }
+
+#define EXTRA_SERIAL_PORT_DEFNS
 

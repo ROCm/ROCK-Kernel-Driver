@@ -1,7 +1,7 @@
 /*
  *  linux/include/asm-arm/proc-armv/pgtable.h
  *
- *  Copyright (C) 1995-1999 Russell King
+ *  Copyright (C) 1995-2001 Russell King
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -48,7 +48,7 @@
 #define pmd_bad(pmd)		(pmd_val(pmd) & 2)
 #define set_pmd(pmdp,pmd)	cpu_set_pmd(pmdp,pmd)
 
-extern __inline__ pmd_t __mk_pmd(pte_t *ptep, unsigned long prot)
+static inline pmd_t __mk_pmd(pte_t *ptep, unsigned long prot)
 {
 	unsigned long pte_ptr = (unsigned long)ptep;
 	pmd_t pmd;
@@ -64,11 +64,7 @@ extern __inline__ pmd_t __mk_pmd(pte_t *ptep, unsigned long prot)
 	return pmd;
 }
 
-/* these are aliases for the above function */
-#define mk_user_pmd(ptep)	__mk_pmd(ptep, _PAGE_USER_TABLE)
-#define mk_kernel_pmd(ptep)	__mk_pmd(ptep, _PAGE_KERNEL_TABLE)
-
-extern __inline__ unsigned long pmd_page(pmd_t pmd)
+static inline unsigned long pmd_page(pmd_t pmd)
 {
 	unsigned long ptr;
 
@@ -161,7 +157,6 @@ PTE_BIT_FUNC(mkclean,   &= ~L_PTE_DIRTY);
 PTE_BIT_FUNC(mkdirty,   |= L_PTE_DIRTY);
 PTE_BIT_FUNC(mkold,     &= ~L_PTE_YOUNG);
 PTE_BIT_FUNC(mkyoung,   |= L_PTE_YOUNG);
-PTE_BIT_FUNC(nocache,   &= ~L_PTE_CACHEABLE);
 
 /*
  * Mark the prot value as uncacheable and unbufferable.

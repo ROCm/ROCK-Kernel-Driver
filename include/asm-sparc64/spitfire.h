@@ -1,4 +1,4 @@
-/* $Id: spitfire.h,v 1.14 2001/03/22 07:26:04 davem Exp $
+/* $Id: spitfire.h,v 1.15 2001/03/27 00:10:15 davem Exp $
  * spitfire.h: SpitFire/BlackBird/Cheetah inline MMU operations.
  *
  * Copyright (C) 1996 David S. Miller (davem@caip.rutgers.edu)
@@ -13,10 +13,15 @@
  * and ASI_IMMU, that is there is a distinct and unique copy of
  * each these registers for each TLB.
  */
-#define TSB_TAG_TARGET		0x0000000000000000
-#define TLB_SFSR		0x0000000000000018
-#define TSB_REG			0x0000000000000028
-#define TLB_TAG_ACCESS		0x0000000000000030
+#define TSB_TAG_TARGET		0x0000000000000000 /* All chips				*/
+#define TLB_SFSR		0x0000000000000018 /* All chips				*/
+#define TSB_REG			0x0000000000000028 /* All chips				*/
+#define TLB_TAG_ACCESS		0x0000000000000030 /* All chips				*/
+#define VIRT_WATCHPOINT		0x0000000000000038 /* All chips				*/
+#define PHYS_WATCHPOINT		0x0000000000000040 /* All chips				*/
+#define TSB_EXTENSION_P		0x0000000000000048 /* Ultra-III and later		*/
+#define TSB_EXTENSION_S		0x0000000000000050 /* Ultra-III and later, D-TLB only	*/
+#define TSB_EXTENSION_N		0x0000000000000058 /* Ultra-III and later		*/
 
 /* These registers only exist as one entity, and are accessed
  * via ASI_DMMU only.

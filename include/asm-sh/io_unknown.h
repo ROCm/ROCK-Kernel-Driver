@@ -12,38 +12,37 @@
 #ifndef _ASM_SH_IO_UNKNOWN_H
 #define _ASM_SH_IO_UNKNOWN_H
 
-extern unsigned long unknown_inb(unsigned int port);
-extern unsigned long unknown_inw(unsigned int port);
-extern unsigned long unknown_inl(unsigned int port);
+extern unsigned char unknown_inb(unsigned long port);
+extern unsigned short unknown_inw(unsigned long port);
+extern unsigned int unknown_inl(unsigned long port);
 
-extern void unknown_outb(unsigned long value, unsigned int port);
-extern void unknown_outw(unsigned long value, unsigned int port);
-extern void unknown_outl(unsigned long value, unsigned int port);
+extern void unknown_outb(unsigned char value, unsigned long port);
+extern void unknown_outw(unsigned short value, unsigned long port);
+extern void unknown_outl(unsigned int value, unsigned long port);
 
-extern unsigned long unknown_inb_p(unsigned int port);
-extern unsigned long unknown_inw_p(unsigned int port);
-extern unsigned long unknown_inl_p(unsigned int port);
-extern void unknown_outb_p(unsigned long value, unsigned int port);
-extern void unknown_outw_p(unsigned long value, unsigned int port);
-extern void unknown_outl_p(unsigned long value, unsigned int port);
+extern unsigned char unknown_inb_p(unsigned long port);
+extern unsigned short unknown_inw_p(unsigned long port);
+extern unsigned int unknown_inl_p(unsigned long port);
+extern void unknown_outb_p(unsigned char value, unsigned long port);
+extern void unknown_outw_p(unsigned short value, unsigned long port);
+extern void unknown_outl_p(unsigned int value, unsigned long port);
 
-extern void unknown_insb(unsigned int port, void *addr, unsigned long count);
-extern void unknown_insw(unsigned int port, void *addr, unsigned long count);
-extern void unknown_insl(unsigned int port, void *addr, unsigned long count);
-extern void unknown_outsb(unsigned int port, const void *addr, unsigned long count);
-extern void unknown_outsw(unsigned int port, const void *addr, unsigned long count);
-extern void unknown_outsl(unsigned int port, const void *addr, unsigned long count);
+extern void unknown_insb(unsigned long port, void *addr, unsigned long count);
+extern void unknown_insw(unsigned long port, void *addr, unsigned long count);
+extern void unknown_insl(unsigned long port, void *addr, unsigned long count);
+extern void unknown_outsb(unsigned long port, const void *addr, unsigned long count);
+extern void unknown_outsw(unsigned long port, const void *addr, unsigned long count);
+extern void unknown_outsl(unsigned long port, const void *addr, unsigned long count);
 
-extern unsigned long unknown_readb(unsigned long addr);
-extern unsigned long unknown_readw(unsigned long addr);
-extern unsigned long unknown_readl(unsigned long addr);
+extern unsigned char unknown_readb(unsigned long addr);
+extern unsigned short unknown_readw(unsigned long addr);
+extern unsigned int unknown_readl(unsigned long addr);
 extern void unknown_writeb(unsigned char b, unsigned long addr);
 extern void unknown_writew(unsigned short b, unsigned long addr);
 extern void unknown_writel(unsigned int b, unsigned long addr);
 
 extern unsigned long unknown_isa_port2addr(unsigned long offset);
-extern void * unknown_ioremap(unsigned long offset, unsigned long size);
-extern void * unknown_ioremap_nocache (unsigned long offset, unsigned long size);
+extern void *unknown_ioremap(unsigned long offset, unsigned long size);
 extern void unknown_iounmap(void *addr);
 
 #ifdef __WANT_IO_DEF
@@ -78,7 +77,6 @@ extern void unknown_iounmap(void *addr);
 
 # define __isa_port2addr	unknown_isa_port2addr
 # define __ioremap		unknown_ioremap
-# define __ioremap_nocache	unknown_ioremap_nocache
 # define __iounmap		unknown_iounmap
 
 #endif

@@ -199,7 +199,9 @@ MODULE_SUPPORTED_DEVICE
 
 /* Forward declarations of internal methods
  */
+#ifdef WD_DEBUG
 static void wd_dumpregs(void);
+#endif
 static void wd_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 static void wd_toggleintr(struct wd_timer* pTimer, int enable);
 static void wd_pingtimer(struct wd_timer* pTimer);
@@ -471,6 +473,7 @@ static struct miscdevice wd0_miscdev = { WD0_MINOR, WD0_DEVNAME, &wd_fops };
 static struct miscdevice wd1_miscdev = { WD1_MINOR, WD1_DEVNAME, &wd_fops };
 static struct miscdevice wd2_miscdev = { WD2_MINOR, WD2_DEVNAME, &wd_fops };
 
+#ifdef WD_DEBUG
 static void wd_dumpregs(void)
 {
 	/* Reading from downcounters initiates watchdog countdown--
@@ -507,6 +510,7 @@ static void wd_dumpregs(void)
 		(unsigned long)(&wd_dev.regs->pld_regs.status), 
 		readb(&wd_dev.regs->pld_regs.status));
 }
+#endif
 
 /* Enable or disable watchdog interrupts
  * Because of the CP1400 defect this should only be

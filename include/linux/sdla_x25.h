@@ -1,15 +1,16 @@
 /*****************************************************************************
 * sdla_x25.h	Sangoma X.25 firmware API definitions.
 *
-* Author:	Gene Kozin	<74604.152@compuserve.com>
+* Author:	Nenad Corbic	<ncorbic@sangoma.com>
 *
-* Copyright:	(c) 1995-1996 Sangoma Technologies Inc.
+* Copyright:	(c) 1995-2000 Sangoma Technologies Inc.
 *
 *		This program is free software; you can redistribute it and/or
 *		modify it under the terms of the GNU General Public License
 *		as published by the Free Software Foundation; either version
-*		2 of the License, or (at your option) any later version.
+		2 of the License, or (at your option) any later version.
 * ============================================================================
+* Feb 28, 2000  Nenad Corbic    Updated for socket based x25api
 * Dec 13, 1996	Gene Kozin	Initial version
 *****************************************************************************/
 #ifndef	_SDLA_X25_H
@@ -18,39 +19,35 @@
 /*----------------------------------------------------------------------------
  * Notes:
  * ------
- * 1. All structures defined in this file are byte-aligned.  To ensure
- *    portability of this code between different platforms and compilers, one
- *    of the following defines must be defined before including this file:
- *
- *	Compiler	Platform	Define		Use option
- *	--------	--------	------		----------
- *	GNU C		Linux		_GNUC_		-
- *	Microsoft C	DOS/Windows	_MSC_		-
+ * 1. All structures defined in this file are byte-alined.  
+ *	Compiler	Platform	
+ *	--------	--------
+ *	GNU C		Linux
  *
  */
 
-#ifdef		_GNUC_
-#  ifndef	PACKED
-#    define	PACKED	__attribute__((packed))
-#  endif	/* PACKED */
-#else
-#  define	PACKED
-#endif
-#ifdef		_MSC_
-#  pragma	pack(1)
-#endif
+#ifndef	PACKED
+#	define	PACKED	__attribute__((packed))
+#endif	/* PACKED */
 
 /******	CONSTANTS DEFINITIONS ***********************************************/
 
 #define	X25_MAX_CHAN	255	/* max number of open X.25 circuits */
 #define	X25_MAX_DATA	1024	/* max length of X.25 data buffer */
-
 /*
  * X.25 shared memory layout.
  */
 #define	X25_MBOX_OFFS	0x16B0	/* general mailbox block */
 #define	X25_RXMBOX_OFFS	0x1AD0	/* receive mailbox */
 #define	X25_STATUS_OFFS	0x1EF0	/* X.25 status structure */
+#define X25_MB_VECTOR	0xE000	/* S514 mailbox window vecotr */
+#define X25_MISC_HDLC_BITS 0x1F00 /*X.25 miscallaneous HDLC bits */
+
+/* code levels */
+#define HDLC_LEVEL 0x01
+#define X25_LEVEL  0x02
+#define X25_AND_HDLC_LEVEL 0x03
+#define DO_HDLC_LEVEL_ERROR_CHECKING 0x04
 
 /****** DATA STRUCTURES *****************************************************/
 
@@ -100,11 +97,12 @@ typedef struct X25Cmd
 #define X25_HDLC_READ		0x21	/* read HDLC information frame */
 #define X25_HDLC_READ_CONFIG	0x12	/* read HDLC configuration */
 #define X25_HDLC_SET_CONFIG	0x13	/* set HDLC configuration */
+#define SET_PROTOCOL_LEVEL	0x1F	/* set protocol level */
 /*----- X.25-level commands -----------*/
 #define X25_READ		0x22	/* read X.25 packet */
 #define X25_WRITE		0x23	/* send X.25 packet */
 #define X25_PLACE_CALL		0x30	/* place a call on SVC */
-#define X25_ACCEPT_CALL		0x31	/* accept incoming call */
+#define X25_ACCEPT_CALL		0x31	/* accept incomming call */
 #define X25_CLEAR_CALL		0x32	/* clear call */
 #define X25_CLEAR_CONFRM	0x33	/* send clear confirmation packet */
 #define X25_RESET		0x34	/* send reset request packet */
@@ -116,14 +114,14 @@ typedef struct X25Cmd
 #define X25_REGISTRATION_RQST	0x3A	/* send registration request packet */
 #define X25_REGISTRATION_CONFRM	0x3B	/* send registration confirmation */
 #define X25_IS_DATA_AVAILABLE	0x40	/* querry receive queue */
-#define X25_INCOMING_CALL_CTL	0x41	/* select incoming call options */
+#define X25_INCOMMING_CALL_CTL	0x41	/* select incomming call options */
 #define X25_CONFIGURE_PVC	0x42	/* configure PVC */
 #define X25_GET_ACTIVE_CHANNELS	0x43	/* get a list of active circuits */
 #define X25_READ_CHANNEL_CONFIG	0x44	/* read virt. circuit configuration */
 #define X25_FLUSH_DATA_BUFFERS	0x45	/* flush X.25-level data buffers */
 #define X25_READ_HISTORY_TABLE	0x46	/* read asynchronous event log */
 #define X25_HISTORY_TABLE_CTL	0x47	/* control asynchronous event log */
-#define	X25_GET_TX_D_BIT_STATUS	0x48	/* is packet with D-bit acknowledged */
+#define	X25_GET_TX_D_BIT_STATUS	0x48	/* is packet with D-bit acknowleged */
 #define	X25_READ_STATISTICS	0x49	/* read X.25-level statistics */
 #define	X25_FLUSH_STATISTICS	0x4A	/* flush X.25-level statistics */
 #define	X25_READ_CONFIGURATION	0x50	/* read HDLC & X.25 configuration */
@@ -139,7 +137,7 @@ typedef struct X25Cmd
 #define X25RES_LINK_CLOSED	0x03
 #define X25RES_INVAL_LENGTH	0x04
 #define X25RES_INVAL_CMD	0x05
-#define X25RES_UNNUMBERED_FRAME	0x06	/* unnumbered frame received */
+#define X25RES_UNNUMBERED_FRAME	0x06	/* unnunbered frame received */
 #define X25RES_FRM_REJECT_MODE	0x07	/* link is in Frame Reject mode */
 #define X25RES_MODEM_FAILURE	0x08	/* DCD and/or CTS dropped */
 #define X25RES_N2_RETRY_LIMIT	0x09	/* N2 retry limit has been exceeded */
@@ -153,13 +151,13 @@ typedef struct X25Cmd
 #define X25RES_INVAL_FORMAT	0x37	/* invalid packet format */
 #define X25RES_D_BIT_NOT_SUPPRT	0x38	/* D-bit pragmatics not supported */
 #define X25RES_FACIL_NOT_SUPPRT	0x39	/* Call facility not supported */
-#define X25RES_INVAL_CALL_ARG	0x3A	/* erroneous call arguments */
-#define X25RES_INVAL_CALL_DATA	0x3B	/* erroneous call user data */
+#define X25RES_INVAL_CALL_ARG	0x3A	/* errorneous call arguments */
+#define X25RES_INVAL_CALL_DATA	0x3B	/* errorneous call user data */
 #define X25RES_ASYNC_PACKET	0x40	/* asynchronous packet received */
-#define X25RES_PROTO_VIOLATION	0x41	/* protocol violation occurred */
+#define X25RES_PROTO_VIOLATION	0x41	/* protocol violation occured */
 #define X25RES_PKT_TIMEOUT	0x42	/* X.25 packet time out */
 #define X25RES_PKT_RETRY_LIMIT	0x43	/* X.25 packet retry limit exceeded */
-/*----- Command-dependent results -----*/
+/*----- Command-dependant results -----*/
 #define X25RES_LINK_DISC	0x00	/* HDLC_LINK_STATUS */
 #define X25RES_LINK_IN_ABM	0x01	/* HDLC_LINK_STATUS */
 #define X25RES_NO_DATA		0x01	/* HDLC_READ/READ_TRACE_DATA*/
@@ -167,7 +165,7 @@ typedef struct X25Cmd
 #define X25RES_LINK_IS_OPEN	0x01	/* HDLC_LINK_OPEN */
 #define X25RES_LINK_IS_DISC	0x02	/* HDLC_LINK_DISC */
 #define X25RES_LINK_IS_CLOSED	0x03	/* HDLC_LINK_CLOSE */
-#define X25RES_INVAL_PARAM	0x31	/* INCOMING_CALL_CTL */
+#define X25RES_INVAL_PARAM	0x31	/* INCOMMING_CALL_CTL */
 #define X25RES_INVAL_CONFIG	0x35	/* REGISTR_RQST/CONFRM */
 
 /*
@@ -207,6 +205,22 @@ typedef struct X25Cmd
 #define PVE_RESTART_RQST	0x34
 #define PVE_DIAGNOSTIC		0x37
 
+#define INTR_ON_RX_FRAME            0x01
+#define INTR_ON_TX_FRAME            0x02
+#define INTR_ON_MODEM_STATUS_CHANGE 0x04
+#define INTR_ON_COMMAND_COMPLETE    0x08
+#define INTR_ON_X25_ASY_TRANSACTION 0x10
+#define INTR_ON_TIMER		    0x40
+#define DIRECT_RX_INTR_USAGE        0x80
+
+#define NO_INTR_PENDING  	        0x00
+#define RX_INTR_PENDING			0x01	
+#define TX_INTR_PENDING			0x02
+#define MODEM_INTR_PENDING		0x04
+#define COMMAND_COMPLETE_INTR_PENDING 	0x08
+#define X25_ASY_TRANS_INTR_PENDING	0x10
+#define TIMER_INTR_PENDING		0x40
+
 /*----------------------------------------------------------------------------
  * X.25 Mailbox.
  *	This structure is located at offsets X25_MBOX_OFFS and X25_RXMBOX_OFFS
@@ -239,7 +253,7 @@ typedef struct X25TimeStamp
 typedef struct X25Status
 {
 	unsigned short pvc_map	PACKED;	/* 00h: PVC map */
-	unsigned short icc_map	PACKED;	/* 02h: Incoming Chan. map */
+	unsigned short icc_map	PACKED;	/* 02h: Incomming Chan. map */
 	unsigned short twc_map	PACKED;	/* 04h: Two-way Cnan. map */
 	unsigned short ogc_map	PACKED;	/* 06h: Outgoing Chan. map */
 	TX25TimeStamp tstamp	PACKED;	/* 08h: timestamp (BCD) */
@@ -256,7 +270,7 @@ typedef struct X25Status
 #define X25_RX_INTR	0x01	/* receive interrupt */
 #define X25_TX_INTR	0x02	/* transmit interrupt */
 #define X25_MODEM_INTR	0x04	/* modem status interrupt (CTS/DCD) */
-#define X25_EVENT_INTR	0x10	/* asynchronous event encountered */
+#define X25_EVENT_INTR	0x10	/* asyncronous event encountered */
 #define X25_CMD_INTR	0x08	/* interface command complete */
 
 /*
@@ -374,7 +388,7 @@ typedef struct HdlcCommErr
  */
 typedef struct X25Config
 {
-	unsigned char baudRate		PACKED;	/* 00h:  */
+unsigned char baudRate		PACKED;	/* 00h:  */
 	unsigned char t1		PACKED;	/* 01h:  */
 	unsigned char t2		PACKED;	/* 02h:  */
 	unsigned char n2		PACKED;	/* 03h:  */
@@ -390,8 +404,8 @@ typedef struct X25Config
 	unsigned short pktMTU		PACKED;	/* 0Fh:  */
 	unsigned short loPVC		PACKED;	/* 11h:  */
 	unsigned short hiPVC		PACKED;	/* 13h:  */
-	unsigned short loIncomingSVC	PACKED;	/* 15h:  */
-	unsigned short hiIncomingSVC	PACKED;	/* 17h:  */
+	unsigned short loIncommingSVC	PACKED;	/* 15h:  */
+	unsigned short hiIncommingSVC	PACKED;	/* 17h:  */
 	unsigned short loTwoWaySVC	PACKED;	/* 19h:  */
 	unsigned short hiTwoWaySVC	PACKED;	/* 1Bh:  */
 	unsigned short loOutgoingSVC	PACKED;	/* 1Dh:  */
@@ -421,8 +435,8 @@ typedef struct X25ChanAlloc			/*----- Channel allocation -*/
 {
 	unsigned short loPVC		PACKED;	/* 00h: lowest PVC number */
 	unsigned short hiPVC		PACKED;	/* 02h: highest PVC number */
-	unsigned short loIncomingSVC	PACKED;	/* 04h: lowest incoming SVC */
-	unsigned short hiIncomingSVC	PACKED;	/* 06h: highest incoming SVC */
+	unsigned short loIncommingSVC	PACKED;	/* 04h: lowest incoming SVC */
+	unsigned short hiIncommingSVC	PACKED;	/* 06h: highest incoming SVC */
 	unsigned short loTwoWaySVC	PACKED;	/* 08h: lowest two-way SVC */
 	unsigned short hiTwoWaySVC	PACKED;	/* 0Ah: highest two-way SVC */
 	unsigned short loOutgoingSVC	PACKED;	/* 0Ch: lowest outgoing SVC */
@@ -499,7 +513,7 @@ typedef struct X25EventLog
 /*
  * Defines for the 'type' field.
  */
-#define X25LOG_INCOMING		0x00
+#define X25LOG_INCOMMING	0x00
 #define X25LOG_APPLICATION 	0x01
 #define X25LOG_AUTOMATIC	0x02
 #define X25LOG_ERROR		0x04
@@ -568,7 +582,7 @@ typedef struct X25Trace			/*----- Trace data structure -------*/
 #define X25_TRCERR_RX_BADCRC	0x20	/* receive CRC error */
 #define X25_TRCERR_RX_OVERRUN	0x30	/* receiver overrun error */
 #define X25_TRCERR_RX_TOO_LONG	0x40	/* excessive frame length error */
-#define X25_TRCERR_TX_ABORT	0x70	/* aborted frame transmission error */
+#define X25_TRCERR_TX_ABORT	0x70	/* aborted frame transmittion error */
 #define X25_TRCERR_TX_UNDERRUN	0x80	/* transmit underrun error */
 
 /*****************************************************************************
@@ -582,7 +596,7 @@ typedef struct HDLCFrame		/*----- DHLC Frame Format ----------*/
 	unsigned char data[0]	PACKED;
 } THDLCFrame;
 
-typedef struct X25Pkt			/*----- X.25 Packet Format ----------*/
+typedef struct X25Pkt			/*----- X.25 Paket Format ----------*/
 {
 	unsigned char lcn_hi	PACKED;	/* 4 MSB of Logical Channel Number */
 	unsigned char lcn_lo	PACKED;	/* 8 LSB of Logical Channel Number */
@@ -619,7 +633,140 @@ typedef struct X25Pkt			/*----- X.25 Packet Format ----------*/
 #define	X25PKT_RR_MASKED	0x01	/* Receive Ready packet after masking */
 #define	X25PKT_RNR_MASKED	0x05	/* Receive Not Ready after masking  */
 
-#ifdef		_MSC_
-#  pragma	pack()
-#endif
+
+typedef struct {
+	TX25Cmd cmd		PACKED;
+	char data[X25_MAX_DATA]	PACKED;
+} mbox_cmd_t;
+
+
+typedef struct {
+	unsigned char  qdm	PACKED;	/* Q/D/M bits */
+	unsigned char  cause	PACKED;	/* cause field */
+	unsigned char  diagn	PACKED;	/* diagnostics */
+	unsigned char  pktType  PACKED;
+	unsigned short length   PACKED;
+	unsigned char  result	PACKED;
+	unsigned short lcn	PACKED;
+	char reserved[7]	PACKED;
+}x25api_hdr_t;
+
+
+typedef struct {
+	x25api_hdr_t hdr	PACKED;
+	char data[X25_MAX_DATA]	PACKED;
+}x25api_t;
+
+
+/* 
+ * XPIPEMON Definitions
+ */
+
+/* valid ip_protocol for UDP management */
+#define UDPMGMT_UDP_PROTOCOL 0x11
+#define UDPMGMT_XPIPE_SIGNATURE         "XLINK8ND"
+#define UDPMGMT_DRVRSTATS_SIGNATURE     "DRVSTATS"
+
+/* values for request/reply byte */
+#define UDPMGMT_REQUEST	0x01
+#define UDPMGMT_REPLY	0x02
+#define UDP_OFFSET	12
+
+
+typedef struct {
+	unsigned char opp_flag  PACKED; /* the opp flag */
+	unsigned char command	PACKED;	/* command code */
+	unsigned short length	PACKED;	/* transfer data length */
+	unsigned char result	PACKED;	/* return code */
+	unsigned char pf	PACKED;	/* P/F bit */
+	unsigned short lcn	PACKED;	/* logical channel */
+	unsigned char qdm	PACKED;	/* Q/D/M bits */
+	unsigned char cause	PACKED;	/* cause field */
+	unsigned char diagn	PACKED;	/* diagnostics */
+	unsigned char pktType	PACKED;	/* packet type */
+	unsigned char resrv[4]	PACKED;	/* reserved */
+} cblock_t;
+
+typedef struct {
+	ip_pkt_t 		ip_pkt		PACKED;
+	udp_pkt_t		udp_pkt		PACKED;
+	wp_mgmt_t 		wp_mgmt       	PACKED;
+        cblock_t                cblock          PACKED;
+        unsigned char           data[4080]      PACKED;
+} x25_udp_pkt_t;
+
+
+typedef struct read_hdlc_stat {
+	unsigned short inf_frames_rx_ok PACKED;
+        unsigned short inf_frames_rx_out_of_seq PACKED;
+	unsigned short inf_frames_rx_no_data PACKED;
+	unsigned short inf_frames_rx_dropped PACKED;
+	unsigned short inf_frames_rx_data_too_long PACKED;
+	unsigned short inf_frames_rx_invalid_addr PACKED;
+	unsigned short inf_frames_tx_ok PACKED;
+        unsigned short inf_frames_tx_retransmit PACKED;
+       	unsigned short T1_timeouts PACKED;
+	unsigned short SABM_frames_rx PACKED;
+	unsigned short DISC_frames_rx PACKED;
+	unsigned short DM_frames_rx PACKED;
+	unsigned short FRMR_frames_rx PACKED;
+	unsigned short SABM_frames_tx PACKED;
+	unsigned short DISC_frames_tx PACKED;
+	unsigned short DM_frames_tx PACKED;
+	unsigned short FRMR_frames_tx PACKED;
+} read_hdlc_stat_t;
+
+typedef struct read_comms_err_stats{
+	unsigned char overrun_err_rx PACKED;
+	unsigned char CRC_err PACKED;
+	unsigned char abort_frames_rx PACKED;
+	unsigned char frames_dropped_buf_full PACKED;
+	unsigned char abort_frames_tx PACKED;
+	unsigned char transmit_underruns PACKED;
+	unsigned char missed_tx_underruns_intr PACKED;
+	unsigned char reserved PACKED;
+	unsigned char DCD_drop PACKED;
+	unsigned char CTS_drop PACKED;
+} read_comms_err_stats_t;
+
+typedef struct trace_data {
+	unsigned short length PACKED;
+	unsigned char  type PACKED;
+	unsigned char  trace_dropped PACKED;
+	unsigned char  reserved[5] PACKED;
+	unsigned short timestamp PACKED;
+        unsigned char  data PACKED;
+} trace_data_t;
+
+enum {UDP_XPIPE_TYPE};
+
+#define XPIPE_ENABLE_TRACING                    0x14
+#define XPIPE_DISABLE_TRACING                   0x14
+#define XPIPE_GET_TRACE_INFO                    0x16
+#define XPIPE_FT1_READ_STATUS                   0x74
+#define XPIPE_DRIVER_STAT_IFSEND                0x75
+#define XPIPE_DRIVER_STAT_INTR                  0x76
+#define XPIPE_DRIVER_STAT_GEN                   0x77
+#define XPIPE_FLUSH_DRIVER_STATS                0x78
+#define XPIPE_ROUTER_UP_TIME                    0x79        
+#define XPIPE_SET_FT1_MODE			0x81
+#define XPIPE_FT1_STATUS_CTRL			0x80
+
+
+/* error messages */
+#define NO_BUFFS_OR_CLOSED_WIN  0x33
+#define DATA_LENGTH_TOO_BIG     0x32
+#define NO_DATA_AVAILABLE       0x33
+#define Z80_TIMEOUT_ERROR       0x0a   
+#define	NO_BUFFS		0x08
+
+
+/* Trace options */
+#define TRACE_DEFAULT		0x03
+#define TRACE_SUPERVISOR_FRMS	0x10
+#define TRACE_ASYNC_FRMS	0x20
+#define TRACE_ALL_HDLC_FRMS	0x40
+#define TRACE_DATA_FRMS		0x08
+
+
 #endif	/* _SDLA_X25_H */

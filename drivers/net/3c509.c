@@ -144,7 +144,7 @@ struct el3_private {
 	char mca_slot;
 };
 static int id_port __initdata = 0x110;	/* Start with 0x110 to avoid new sound cards.*/
-static struct net_device *el3_root_dev = NULL;
+static struct net_device *el3_root_dev;
 
 static ushort id_read_eeprom(int index);
 static ushort read_eeprom(int ioaddr, int index);
@@ -209,10 +209,10 @@ int __init el3_probe(struct net_device *dev)
 	short lrs_state = 0xff, i;
 	int ioaddr, irq, if_port;
 	u16 phys_addr[3];
-	static int current_tag = 0;
+	static int current_tag;
 	int mca_slot = -1;
 #ifdef CONFIG_ISAPNP
-	static int pnp_cards = 0;
+	static int pnp_cards;
 #endif /* CONFIG_ISAPNP */
 
 	if (dev) SET_MODULE_OWNER(dev);
@@ -942,7 +942,7 @@ set_multicast_list(struct net_device *dev)
 	int ioaddr = dev->base_addr;
 
 	if (el3_debug > 1) {
-		static int old = 0;
+		static int old;
 		if (old != dev->mc_count) {
 			old = dev->mc_count;
 			printk("%s: Setting Rx mode to %d addresses.\n", dev->name, dev->mc_count);

@@ -1,7 +1,7 @@
 /*
  * linux/include/asm-arm/arch-shark/irqs.h
  *
- * by Alexander.Schulz@stud.uni-karlsruhe.de
+ * by Alexander Schulz <aschulz@netwinder.org>
  */
 
 #define NR_IRQS			16

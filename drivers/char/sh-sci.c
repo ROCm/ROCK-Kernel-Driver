@@ -74,6 +74,8 @@ static int sci_set_real_termios(void *ptr);
 static void sci_hungup(void *ptr);
 static void sci_close(void *ptr);
 static int sci_chars_in_buffer(void *ptr);
+static int sci_request_irq(struct sci_port *port);
+static void sci_free_irq(struct sci_port *port);
 static int sci_init_drivers(void);
 
 static struct tty_driver sci_driver, sci_callout_driver;
@@ -83,8 +85,8 @@ static struct tty_struct *sci_table[SCI_NPORTS] = { NULL, };
 static struct termios *sci_termios[SCI_NPORTS];
 static struct termios *sci_termios_locked[SCI_NPORTS];
 
-int sci_refcount;
-int sci_debug = 0;
+static int sci_refcount;
+static int sci_debug = 0;
 
 #ifdef MODULE
 MODULE_PARM(sci_debug, "i");
@@ -102,7 +104,7 @@ static void put_char(struct sci_port *port, char c)
 	do
 		status = sci_in(port, SCxSR);
 	while (!(status & SCxSR_TDxE(port)));
-  
+	
 	sci_out(port, SCxTDR, c);
 	sci_in(port, SCxSR);            /* Dummy read */
 	sci_out(port, SCxSR, SCxSR_TDxE_CLEAR(port));
@@ -626,10 +628,10 @@ static inline int sci_handle_breaks(struct sci_port *port)
 		dprintk("sci: BREAK detected\n");
 	}
 
-#if defined(CONFIG_CPU_SUBTYPE_SH7750)
+#if defined(CONFIG_CPU_SUBTYPE_SH7750) || defined(CONFIG_CPU_SUBTYPE_ST40STB1)
 	/* XXX: Handle SCIF overrun error */
-	if (port->type == PORT_SCIF && (ctrl_inw(SCLSR2) & SCIF_ORER) != 0) {
-		ctrl_outw(0, SCLSR2);
+	if (port->type == PORT_SCIF && (sci_in(port, SCLSR) & SCIF_ORER) != 0) {
+		sci_out(port, SCLSR, 0);
 		if(tty->flip.count<TTY_FLIPBUF_SIZE) {
 			copied++;
 			*tty->flip.flag_buf_ptr++ = TTY_OVERRUN;
@@ -796,6 +798,7 @@ static void sci_shutdown_port(void * ptr)
 	port->gs.flags &= ~ GS_ACTIVE;
 	if (port->gs.tty && port->gs.tty->termios->c_cflag & HUPCL)
 		sci_setsignals(port, 0, 0);
+	sci_free_irq(port);
 }
 
 /* ********************************************************************** *
@@ -828,8 +831,7 @@ static int sci_open(struct tty_struct * tty, struct file * filp)
 	 */
 	retval = gs_init_port(&port->gs);
 	if (retval) {
-		port->gs.count--;
-		return retval;
+		goto failed_1;
 	}
 
 	port->gs.flags |= GS_ACTIVE;
@@ -837,14 +839,17 @@ static int sci_open(struct tty_struct * tty, struct file * filp)
 
 	if (port->gs.count == 1) {
 		MOD_INC_USE_COUNT;
+
+		retval = sci_request_irq(port);
+		if (retval) {
+			goto failed_2;
+		}
 	}
 
 	retval = gs_block_til_ready(port, filp);
 
 	if (retval) {
-		MOD_DEC_USE_COUNT;
-		port->gs.count--;
-		return retval;
+		goto failed_3;
 	}
 
 	if ((port->gs.count == 1) && (port->gs.flags & ASYNC_SPLIT_TERMIOS)) {
@@ -870,6 +875,14 @@ static int sci_open(struct tty_struct * tty, struct file * filp)
 	port->gs.pgrp = current->pgrp;
 
 	return 0;
+
+failed_3:
+	sci_free_irq(port);
+failed_2:
+	MOD_DEC_USE_COUNT;
+failed_1:
+	port->gs.count--;
+	return retval;
 }
 
 static void sci_hungup(void *ptr)
@@ -1094,14 +1107,39 @@ static int sci_init_drivers(void)
 	return 0;
 }
 
-int __init sci_init(void)
+static int sci_request_irq(struct sci_port *port)
 {
-	struct sci_port *port;
-	int i, j;
+	int i;
 	void (*handlers[4])(int irq, void *ptr, struct pt_regs *regs) = {
 		sci_er_interrupt, sci_rx_interrupt, sci_tx_interrupt,
 		sci_br_interrupt,
 	};
+
+	for (i=0; i<4; i++) {
+		if (!port->irqs[i]) continue;
+		if (request_irq(port->irqs[i], handlers[i], SA_INTERRUPT,
+				"sci", port)) {
+			printk(KERN_ERR "sci: Cannot allocate irq.\n");
+			return -ENODEV;
+		}
+	}
+	return 0;
+}
+
+static void sci_free_irq(struct sci_port *port)
+{
+	int i;
+
+	for (i=0; i<4; i++) {
+		if (!port->irqs[i]) continue;
+		free_irq(port->irqs[i], port);
+	}
+}
+
+int __init sci_init(void)
+{
+	struct sci_port *port;
+	int j;
 
 	printk("SuperH SCI(F) driver initialized\n");
 
@@ -1109,14 +1147,6 @@ int __init sci_init(void)
 		port = &sci_ports[j];
 		printk("ttySC%d at 0x%08x is a %s\n", j, port->base,
 		       (port->type == PORT_SCI) ? "SCI" : "SCIF");
-		for (i=0; i<4; i++) {
-			if (!port->irqs[i]) continue;
-			if (request_irq(port->irqs[i], handlers[i], SA_INTERRUPT,
-					"sci", port)) {
-				printk(KERN_ERR "sci: Cannot allocate irq.\n");
-				return -ENODEV;
-			}
-		}
 	}
 
 	sci_init_drivers();
@@ -1135,11 +1165,6 @@ module_init(sci_init);
 
 void cleanup_module(void)
 {
-	int i;
-
-	for (i=SCI_ERI_IRQ; i<SCI_TEI_IRQ; i++) /* XXX: irq_end?? */
-		free_irq(i, port);
-
 	tty_unregister_driver(&sci_driver);
 	tty_unregister_driver(&sci_callout_driver);
 }

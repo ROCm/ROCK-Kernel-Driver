@@ -27,6 +27,12 @@ static __inline__ unsigned long PORT2ADDR(unsigned long port)
 	   detail of CF's memory mapped addressing. */
 	if (0x1f0<=port && port<=0x1f7)	return 0xb5000000 + port;
 	if (port == 0x3f6) return 0xb50001fe;
+	if (port == 0x3f7) return 0xb50001ff;
+
+	/* ide1 */
+	if (0x170<=port && port<=0x177)	return 0xba000000 + port;
+	if (port == 0x376) return 0xba000376;
+	if (port == 0x377) return 0xba000377;
 #endif
 
 	/* ??? */
@@ -50,80 +56,80 @@ static inline void delay(void)
 	ctrl_inw(0xa0000000);
 }
 
-unsigned long hd64461_inb(unsigned int port)
+unsigned char hd64461_inb(unsigned long port)
 {
 	return *(volatile unsigned char*)PORT2ADDR(port);
 }
 
-unsigned long hd64461_inb_p(unsigned int port)
+unsigned char hd64461_inb_p(unsigned long port)
 {
 	unsigned long v = *(volatile unsigned char*)PORT2ADDR(port);
 	delay();
 	return v;
 }
 
-unsigned long hd64461_inw(unsigned int port)
+unsigned short hd64461_inw(unsigned long port)
 {
 	return *(volatile unsigned short*)PORT2ADDR(port);
 }
 
-unsigned long hd64461_inl(unsigned int port)
+unsigned int hd64461_inl(unsigned long port)
 {
 	return *(volatile unsigned long*)PORT2ADDR(port);
 }
 
-void hd64461_insb(unsigned int port, void *buffer, unsigned long count)
+void hd64461_insb(unsigned long port, void *buffer, unsigned long count)
 {
 	unsigned char *buf=buffer;
 	while(count--) *buf++=inb(port);
 }
 
-void hd64461_insw(unsigned int port, void *buffer, unsigned long count)
+void hd64461_insw(unsigned long port, void *buffer, unsigned long count)
 {
 	unsigned short *buf=buffer;
 	while(count--) *buf++=inw(port);
 }
 
-void hd64461_insl(unsigned int port, void *buffer, unsigned long count)
+void hd64461_insl(unsigned long port, void *buffer, unsigned long count)
 {
 	unsigned long *buf=buffer;
 	while(count--) *buf++=inl(port);
 }
 
-void hd64461_outb(unsigned long b, unsigned int port)
+void hd64461_outb(unsigned char b, unsigned long port)
 {
 	*(volatile unsigned char*)PORT2ADDR(port) = b;
 }
 
-void hd64461_outb_p(unsigned long b, unsigned int port)
+void hd64461_outb_p(unsigned char b, unsigned long port)
 {
 	*(volatile unsigned char*)PORT2ADDR(port) = b;
 	delay();
 }
 
-void hd64461_outw(unsigned long b, unsigned int port)
+void hd64461_outw(unsigned short b, unsigned long port)
 {
 	*(volatile unsigned short*)PORT2ADDR(port) = b;
 }
 
-void hd64461_outl(unsigned long b, unsigned int port)
+void hd64461_outl(unsigned int b, unsigned long port)
 {
         *(volatile unsigned long*)PORT2ADDR(port) = b;
 }
 
-void hd64461_outsb(unsigned int port, const void *buffer, unsigned long count)
+void hd64461_outsb(unsigned long port, const void *buffer, unsigned long count)
 {
 	const unsigned char *buf=buffer;
 	while(count--) outb(*buf++, port);
 }
 
-void hd64461_outsw(unsigned int port, const void *buffer, unsigned long count)
+void hd64461_outsw(unsigned long port, const void *buffer, unsigned long count)
 {
 	const unsigned short *buf=buffer;
 	while(count--) outw(*buf++, port);
 }
 
-void hd64461_outsl(unsigned int port, const void *buffer, unsigned long count)
+void hd64461_outsl(unsigned long port, const void *buffer, unsigned long count)
 {
 	const unsigned long *buf=buffer;
 	while(count--) outl(*buf++, port);

@@ -7,7 +7,7 @@
 
 static inline void arch_idle(void)
 {
-	while (!current->need_resched && !hlt_counter)
+	if (!hlt_counter)
 		cpu_do_idle(0);
 }
 

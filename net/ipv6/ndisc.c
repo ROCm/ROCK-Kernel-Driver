@@ -338,7 +338,7 @@ void ndisc_send_na(struct net_device *dev, struct neighbour *neigh,
 	}
 
 	skb = sock_alloc_send_skb(sk, MAX_HEADER + len + dev->hard_header_len + 15,
-				  0, 0, &err);
+				  0, &err);
 
 	if (skb == NULL) {
 		ND_PRINTK1("send_na: alloc skb failed\n");
@@ -397,7 +397,7 @@ void ndisc_send_ns(struct net_device *dev, struct neighbour *neigh,
 		len += NDISC_OPT_SPACE(dev->addr_len);
 
 	skb = sock_alloc_send_skb(sk, MAX_HEADER + len + dev->hard_header_len + 15,
-				  0, 0, &err);
+				  0, &err);
 	if (skb == NULL) {
 		ND_PRINTK1("send_ns: alloc skb failed\n");
 		return;
@@ -458,7 +458,7 @@ void ndisc_send_rs(struct net_device *dev, struct in6_addr *saddr,
 		len += NDISC_OPT_SPACE(dev->addr_len);
 
         skb = sock_alloc_send_skb(sk, MAX_HEADER + len + dev->hard_header_len + 15,
-				  0, 0, &err);
+				  0, &err);
 	if (skb == NULL) {
 		ND_PRINTK1("send_ns: alloc skb failed\n");
 		return;
@@ -869,7 +869,7 @@ void ndisc_send_redirect(struct sk_buff *skb, struct neighbour *neigh,
  	}
 
 	buff = sock_alloc_send_skb(sk, MAX_HEADER + len + dev->hard_header_len + 15,
-				   0, 0, &err);
+				   0, &err);
 	if (buff == NULL) {
 		ND_PRINTK1("ndisc_send_redirect: alloc_skb failed\n");
 		return;
@@ -957,11 +957,11 @@ static __inline__ int ndisc_recv_na(struct neighbour *neigh, struct sk_buff *skb
 
 static void pndisc_redo(struct sk_buff *skb)
 {
-	ndisc_rcv(skb, skb->len);
+	ndisc_rcv(skb);
 	kfree_skb(skb);
 }
 
-int ndisc_rcv(struct sk_buff *skb, unsigned long len)
+int ndisc_rcv(struct sk_buff *skb)
 {
 	struct net_device *dev = skb->dev;
 	struct in6_addr *saddr = &skb->nh.ipv6h->saddr;
@@ -969,6 +969,8 @@ int ndisc_rcv(struct sk_buff *skb, unsigned long len)
 	struct nd_msg *msg = (struct nd_msg *) skb->h.raw;
 	struct neighbour *neigh;
 	struct inet6_ifaddr *ifp;
+
+	__skb_push(skb, skb->data-skb->h.raw);
 
 	switch (msg->icmph.icmp6_type) {
 	case NDISC_NEIGHBOUR_SOLICITATION:

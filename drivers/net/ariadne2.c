@@ -62,7 +62,7 @@
 #define WORDSWAP(a)	((((a)>>8)&0xff) | ((a)<<8))
 
 #ifdef MODULE
-static struct net_device *root_ariadne2_dev = NULL;
+static struct net_device *root_ariadne2_dev;
 #endif
 
 static const struct card_info {

@@ -1,4 +1,4 @@
-/* $Id: sys_sparc32.c,v 1.174 2001/03/24 09:36:10 davem Exp $
+/* $Id: sys_sparc32.c,v 1.175 2001/03/27 02:36:37 davem Exp $
  * sys_sparc32.c: Conversion between 32bit and 64bit native syscalls.
  *
  * Copyright (C) 1997,1998 Jakub Jelinek (jj@sunsite.mff.cuni.cz)
@@ -4134,24 +4134,36 @@ asmlinkage unsigned long sys32_mremap(unsigned long addr,
 	if (addr > 0xf0000000UL - old_len)
 		goto out;
 	down_write(&current->mm->mmap_sem);
-	vma = find_vma(current->mm, addr);
-	if (vma && (vma->vm_flags & VM_SHARED))
-		current->thread.flags |= SPARC_FLAG_MMAPSHARED;
 	if (flags & MREMAP_FIXED) {
 		if (new_addr > 0xf0000000UL - new_len)
 			goto out_sem;
 	} else if (addr > 0xf0000000UL - new_len) {
+		unsigned long (*get_addr)(struct file *, unsigned long, unsigned long, unsigned long, unsigned long);
+		unsigned long map_flags = 0;
+		struct file *file = NULL;
+
 		ret = -ENOMEM;
 		if (!(flags & MREMAP_MAYMOVE))
 			goto out_sem;
-		new_addr = get_unmapped_area(addr, new_len);
-		if (!new_addr)
+
+		vma = find_vma(current->mm, addr);
+		if (vma) {
+			if (vma->vm_flags & VM_SHARED)
+				map_flags |= MAP_SHARED;
+			file = vma->vm_file;
+		}
+
+		/* MREMAP_FIXED checked above. */
+		new_addr = get_unmapped_addr(file, addr, new_len,
+				    vma ? vma->vm_pgoff : 0,
+				    map_flags);
+		ret = new_addr;
+		if (new_addr & ~PAGE_MASK)
 			goto out_sem;
 		flags |= MREMAP_FIXED;
 	}
 	ret = do_mremap(addr, old_len, new_len, flags, new_addr);
 out_sem:
-	current->thread.flags &= ~(SPARC_FLAG_MMAPSHARED);
 	up_write(&current->mm->mmap_sem);
 out:
 	return ret;       

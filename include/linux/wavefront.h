@@ -31,7 +31,7 @@
 	member, which has the same semantics anyway. 
      */
 
-#endif __GNUC__
+#endif /* __GNUC__ */
 
 /***************************** WARNING ********************************
   PLEASE DO NOT MODIFY THIS FILE IN ANY WAY THAT AFFECTS ITS ABILITY TO 
@@ -40,11 +40,11 @@
 
 #ifndef NUM_MIDIKEYS 
 #define NUM_MIDIKEYS 128
-#endif  NUM_MIDIKEYS
+#endif  /* NUM_MIDIKEYS */
 
 #ifndef NUM_MIDICHANNELS
 #define NUM_MIDICHANNELS 16
-#endif  NUM_MIDICHANNELS
+#endif  /* NUM_MIDICHANNELS */
 
 /* These are very useful/important. the original wavefront interface
    was developed on a 16 bit system, where sizeof(int) = 2
@@ -667,9 +667,9 @@ typedef struct wf_fx_info {
 
 /* Allow direct user-space control over FX memory/coefficient data.
    In theory this could be used to download the FX microprogram,
-   but it would be a little slower, and involve some wierd code.
+   but it would be a little slower, and involve some weird code.
  */
 
 #define WFFX_MEMSET              69
 
-#endif __wavefront_h__
+#endif /* __wavefront_h__ */

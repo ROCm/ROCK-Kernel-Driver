@@ -1,31 +1,57 @@
 /*
- * linux/include/asm-arm/arch-ebsa110/uncompress.h
+ * linux/include/asm-arm/arch-shark/uncompress.h
+ * by Alexander Schulz <aschulz@netwinder.org>
  *
+ * derived from:
+ * linux/include/asm-arm/arch-ebsa285/uncompress.h
  * Copyright (C) 1996,1997,1998 Russell King
  */
+
+#define SERIAL_BASE ((volatile unsigned char *)0x400003f8)
+
+static __inline__ void putc(char c)
+{
+	int t;
+
+	SERIAL_BASE[0] = c;
+	t=0x10000;
+	while (t--);
+}
 
 /*
  * This does not append a newline
  */
 static void puts(const char *s)
 {
-	__asm__ __volatile__("
-	ldrb	%0, [%2], #1
-	teq	%0, #0
-	beq	3f
-1:	strb	%0, [%3]
-2:	ldrb	%1, [%3, #0x14]
-	and	%1, %1, #0x60
-	teq	%1, #0x60
-	bne	2b
-	teq	%0, #'\n'
-	moveq	%0, #'\r'
-	beq	1b
-	ldrb	%0, [%2], #1
-	teq	%0, #0
-	bne	1b
-3:	" : : "r" (0), "r" (0), "r" (s), "r" (0xf0000be0) : "cc");
+	while (*s) {
+		putc(*s);
+		if (*s == '\n')
+			putc('\r');
+		s++;
+	}
 }
+
+#ifdef DEBUG
+static void putn(unsigned long z)
+{
+	int i;
+	char x;
+
+	putc('0');
+	putc('x');
+	for (i=0;i<8;i++) {
+		x='0'+((z>>((7-i)*4))&0xf);
+		if (x>'9') x=x-'0'+'A'-10;
+		putc(x);
+	}
+}
+
+static void putr()
+{
+	putc('\n');
+	putc('\r');
+}
+#endif
 
 /*
  * nothing to do

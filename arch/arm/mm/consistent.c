@@ -34,9 +34,9 @@
  */
 void *consistent_alloc(int gfp, size_t size, dma_addr_t *dma_handle)
 {
-	int order;
-	unsigned long page;
-	void *ret;
+	struct page *page, *end, *free;
+	unsigned long order;
+	void *ret, *virt;
 
 	if (in_interrupt())
 		BUG();
@@ -44,37 +44,47 @@ void *consistent_alloc(int gfp, size_t size, dma_addr_t *dma_handle)
 	size = PAGE_ALIGN(size);
 	order = get_order(size);
 
-	page = __get_free_pages(gfp, order);
+	page = alloc_pages(gfp, order);
 	if (!page)
 		goto no_page;
 
-	ret = __ioremap(virt_to_phys((void *)page), size, 0);
-	if (ret) {
-		/* free wasted pages */
-		unsigned long end;
+	/*
+	 * We could do with a page_to_phys and page_to_bus here.
+	 */
+	virt = page_address(page);
+	*dma_handle = virt_to_bus(virt);
+	ret = __ioremap(virt_to_phys(virt), size, 0);
+	if (!ret)
+		goto no_remap;
 
-		/*
-		 * we need to ensure that there are no
-		 * cachelines in use, or worse dirty in
-		 * this area.
-		 */
-		invalidate_dcache_range(page, page + size);
-		invalidate_dcache_range((unsigned long)ret, (unsigned long)ret + size);
+#if 0 /* ioremap_does_flush_cache_all */
+	/*
+	 * we need to ensure that there are no cachelines in use, or
+	 * worse dirty in this area.  Really, we don't need to do
+	 * this since __ioremap does a flush_cache_all() anyway. --rmk
+	 */
+	invalidate_dcache_range(virt, virt + size);
+#endif
 
-		*dma_handle = __virt_to_bus(page);
+	/*
+	 * free wasted pages.  We skip the first page since
+	 * we know that it will have count = 1 and won't
+	 * require freeing.
+	 */
+	page = virt_to_page(virt);
+	free = page + (size >> PAGE_SHIFT);
+	end  = page + (1 << order);
 
-		end = page + (PAGE_SIZE << order);
-		page += size;
-		while (page < end) {
-			free_page(page);
-			page += PAGE_SIZE;
-		}
-		return ret;
+	while (++page < end) {
+		set_page_count(page, 1);
+		if (page >= free)
+			__free_page(page);
 	}
+	return ret;
 
-	free_pages(page, order);
+no_remap:
+	__free_pages(page, order);
 no_page:
-	BUG();
 	return NULL;
 }
 

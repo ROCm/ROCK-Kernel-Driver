@@ -1,4 +1,4 @@
-/*  $Id: init.c,v 1.172 2001/03/24 09:36:01 davem Exp $
+/*  $Id: init.c,v 1.174 2001/03/30 07:10:42 davem Exp $
  *  arch/sparc64/mm/init.c
  *
  *  Copyright (C) 1996-1999 David S. Miller (davem@caip.rutgers.edu)
@@ -1126,6 +1126,7 @@ unsigned long __init bootmem_init(unsigned long *pages_avail)
 /* paging_init() sets up the page tables */
 
 extern void sun_serial_setup(void);
+extern void cheetah_ecache_flush_init(void);
 
 static unsigned long last_valid_pfn;
 
@@ -1466,6 +1467,9 @@ void __init mem_init(void)
 	       datapages << (PAGE_SHIFT-10), 
 	       initpages << (PAGE_SHIFT-10), 
 	       PAGE_OFFSET, (last_valid_pfn << PAGE_SHIFT));
+
+	if (tlb_type == cheetah)
+		cheetah_ecache_flush_init();
 }
 
 void free_initmem (void)

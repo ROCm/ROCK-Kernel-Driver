@@ -44,14 +44,18 @@ static inline void remap_area_pte(pte_t * pte, unsigned long address, unsigned l
 	end = address + size;
 	if (end > PMD_SIZE)
 		end = PMD_SIZE;
+	if (address >= end)
+		BUG();
 	do {
-		if (!pte_none(*pte))
+		if (!pte_none(*pte)) {
 			printk("remap_area_pte: page already exists\n");
+			BUG();
+		}
 		set_pte(pte, mk_pte_phys(phys_addr, pgprot));
 		address += PAGE_SIZE;
 		phys_addr += PAGE_SIZE;
 		pte++;
-	} while (address < end);
+	} while (address && (address < end));
 }
 
 static inline int remap_area_pmd(pmd_t * pmd, unsigned long address, unsigned long size,
@@ -67,40 +71,50 @@ static inline int remap_area_pmd(pmd_t * pmd, unsigned long address, unsigned lo
 		end = PGDIR_SIZE;
 
 	phys_addr -= address;
+	if (address >= end)
+		BUG();
+
 	pgprot = __pgprot(L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY | L_PTE_WRITE | flags);
 	do {
-		pte_t * pte = pte_alloc_kernel(pmd, address);
+		pte_t * pte = pte_alloc(&init_mm, pmd, address);
 		if (!pte)
 			return -ENOMEM;
 		remap_area_pte(pte, address, end - address, address + phys_addr, pgprot);
 		address = (address + PMD_SIZE) & PMD_MASK;
 		pmd++;
-	} while (address < end);
+	} while (address && (address < end));
 	return 0;
 }
 
 static int remap_area_pages(unsigned long address, unsigned long phys_addr,
 				 unsigned long size, unsigned long flags)
 {
+	int error;
 	pgd_t * dir;
 	unsigned long end = address + size;
 
 	phys_addr -= address;
 	dir = pgd_offset(&init_mm, address);
 	flush_cache_all();
-	while (address < end) {
-		pmd_t *pmd = pmd_alloc_kernel(dir, address);
+	if (address >= end)
+		BUG();
+	spin_lock(&init_mm.page_table_lock);
+	do {
+		pmd_t *pmd;
+		pmd = pmd_alloc(&init_mm, dir, address);
+		error = -ENOMEM;
 		if (!pmd)
-			return -ENOMEM;
+			break;
 		if (remap_area_pmd(pmd, address, end - address,
 					 phys_addr + address, flags))
-			return -ENOMEM;
-		set_pgdir(address, *dir);
+			break;
+		error = 0;
 		address = (address + PGDIR_SIZE) & PGDIR_MASK;
 		dir++;
-	}
+	} while (address && (address < end));
+	spin_unlock(&init_mm.page_table_lock);
 	flush_tlb_all();
-	return 0;
+	return error;
 }
 
 /*

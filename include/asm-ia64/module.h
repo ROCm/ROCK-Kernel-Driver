@@ -7,7 +7,6 @@
  * Copyright (C) 2000 Mike Stephens <mike.stephens@intel.com>
  */
 
-#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/vmalloc.h>
 #include <asm/unwind.h>

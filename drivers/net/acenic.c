@@ -2,7 +2,7 @@
  * acenic.c: Linux driver for the Alteon AceNIC Gigabit Ethernet card
  *           and other Tigon based cards.
  *
- * Copyright 1998-2000 by Jes Sorensen, <jes@linuxcare.com>.
+ * Copyright 1998-2001 by Jes Sorensen, <jes@linuxcare.com>.
  *
  * Thanks to Alteon and 3Com for providing hardware and documentation
  * enabling me to write this driver.
@@ -62,6 +62,7 @@
 #include <linux/init.h>
 #include <linux/delay.h>
 #include <linux/mm.h>
+#include <linux/highmem.h>
 #include <linux/sockios.h>
 
 #ifdef SIOCETHTOOL
@@ -282,6 +283,10 @@ static inline void tasklet_init(struct tasklet_struct *tasklet,
 
 #include "acenic_firmware.h"
 
+#ifndef tigon2FwReleaseLocal
+#define tigon2FwReleaseLocal 0
+#endif
+
 /*
  * This driver currently supports Tigon I and Tigon II based cards
  * including the Alteon AceNIC, the 3Com 3C985[B] and NetGear
@@ -464,7 +469,7 @@ static inline void tasklet_init(struct tasklet_struct *tasklet,
  * Jumbo frames are enabled, the user wants optimal tuning for that case.
  */
 #define DEF_TX_COAL		400 /* 996 */
-#define DEF_TX_MAX_DESC		40
+#define DEF_TX_MAX_DESC		60  /* was 40 */
 #define DEF_RX_COAL		120 /* 1000 */
 #define DEF_RX_MAX_DESC		25
 #define DEF_TX_RATIO		21 /* 24 */
@@ -475,9 +480,25 @@ static inline void tasklet_init(struct tasklet_struct *tasklet,
 #define DEF_JUMBO_RX_MAX_DESC	6
 #define DEF_JUMBO_TX_RATIO	21
 
-#define TX_COAL_INTS_ONLY	0	/* seems not worth it */
+#if tigon2FwReleaseLocal < 20001118
+/*
+ * Standard firmware and early modifications duplicate
+ * IRQ load without this flag (coal timer is never reset).
+ * Note that with this flag tx_coal should be less than
+ * time to xmit full tx ring.
+ * 400usec is not so bad for tx ring size of 128.
+ */
+#define TX_COAL_INTS_ONLY	1	/* worth it */
+#else
+/*
+ * With modified firmware, this is not necessary, but still useful.
+ */
+#define TX_COAL_INTS_ONLY	1
+#endif
+
 #define DEF_TRACE		0
 #define DEF_STAT		(2 * TICKS_PER_SEC)
+
 
 static int link[ACE_MAX_MOD_PARMS];
 static int trace[ACE_MAX_MOD_PARMS];
@@ -489,7 +510,7 @@ static int tx_ratio[ACE_MAX_MOD_PARMS];
 static int dis_pci_mem_inval[ACE_MAX_MOD_PARMS] = {1, 1, 1, 1, 1, 1, 1, 1};
 
 static char version[] __initdata = 
-  "acenic.c: v0.50 02/02/2001  Jes Sorensen, linux-acenic@SunSITE.dk\n"
+  "acenic.c: v0.80 03/08/2001  Jes Sorensen, linux-acenic@SunSITE.dk\n"
   "                            http://home.cern.ch/~jes/gige/acenic.html\n";
 
 static struct net_device *root_dev;
@@ -560,6 +581,12 @@ int __devinit acenic_probe (ACE_PROBE_ARG)
 		dev->irq = pdev->irq;
 		dev->open = &ace_open;
 		dev->hard_start_xmit = &ace_start_xmit;
+		dev->features |= NETIF_F_SG | NETIF_F_IP_CSUM | NETIF_F_HIGHDMA;
+		if (1) {
+			static void ace_watchdog(struct net_device *dev);
+			dev->tx_timeout = &ace_watchdog;
+			dev->watchdog_timeo = 5*HZ;
+		}
 		dev->stop = &ace_close;
 		dev->get_stats = &ace_get_stats;
 		dev->set_multicast_list = &ace_set_multicast_list;
@@ -762,15 +789,17 @@ static void __exit ace_module_cleanup(void)
 			struct sk_buff *skb = ap->skb->rx_std_skbuff[i].skb;
 
 			if (skb) {
+#ifndef DUMMY_PCI_UNMAP
 				dma_addr_t mapping;
 
 				mapping = ap->skb->rx_std_skbuff[i].mapping;
-
-				ap->rx_std_ring[i].size = 0;
-				ap->skb->rx_std_skbuff[i].skb = NULL;
 				pci_unmap_single(ap->pdev, mapping,
 						 ACE_STD_BUFSIZE - (2 + 16),
 						 PCI_DMA_FROMDEVICE);
+#endif
+
+				ap->rx_std_ring[i].size = 0;
+				ap->skb->rx_std_skbuff[i].skb = NULL;
 				dev_kfree_skb(skb);
 			}
 		}
@@ -779,14 +808,16 @@ static void __exit ace_module_cleanup(void)
 				struct sk_buff *skb = ap->skb->rx_mini_skbuff[i].skb;
 
 				if (skb) {
+#ifndef DUMMY_PCI_UNMAP
 					dma_addr_t mapping;
 
 					mapping = ap->skb->rx_mini_skbuff[i].mapping;
-					ap->rx_mini_ring[i].size = 0;
-					ap->skb->rx_mini_skbuff[i].skb = NULL;
 					pci_unmap_single(ap->pdev, mapping,
 							 ACE_MINI_BUFSIZE - (2 + 16),
 							 PCI_DMA_FROMDEVICE);
+#endif
+					ap->rx_mini_ring[i].size = 0;
+					ap->skb->rx_mini_skbuff[i].skb = NULL;
 					dev_kfree_skb(skb);
 				}
 			}
@@ -794,15 +825,17 @@ static void __exit ace_module_cleanup(void)
 		for (i = 0; i < RX_JUMBO_RING_ENTRIES; i++) {
 			struct sk_buff *skb = ap->skb->rx_jumbo_skbuff[i].skb;
 			if (skb) {
+#ifndef DUMMY_PCI_UNMAP
 				dma_addr_t mapping;
 
 				mapping = ap->skb->rx_jumbo_skbuff[i].mapping;
-
-				ap->rx_jumbo_ring[i].size = 0;
-				ap->skb->rx_jumbo_skbuff[i].skb = NULL;
 				pci_unmap_single(ap->pdev, mapping,
 						 ACE_JUMBO_BUFSIZE - (2 + 16),
 						 PCI_DMA_FROMDEVICE);
+#endif
+
+				ap->rx_jumbo_ring[i].size = 0;
+				ap->skb->rx_jumbo_skbuff[i].skb = NULL;
 				dev_kfree_skb(skb);
 			}
 		}
@@ -1177,10 +1210,21 @@ static int __init ace_init(struct net_device *dev)
 				printk(KERN_INFO "  Disabling PCI memory "
 				       "write and invalidate\n");
 			}
+#ifdef __alpha__
+			/* This maximizes throughput on my alpha. */
+			tmp |= DMA_WRITE_MAX_128;
+#endif
 		} else if (ap->pci_command & PCI_COMMAND_INVALIDATE) {
 			printk(KERN_INFO "  PCI memory write & invalidate "
 			       "enabled by BIOS, enabling counter measures\n");
 
+#ifdef __alpha__
+			/* All the docs sy MUST NOT. Well, I did.
+			 * Nothing terrible happens, if we load wrong size.
+			 * Bit w&i still works better!
+			 */
+			tmp |= DMA_WRITE_MAX_128;
+#else
 			switch(SMP_CACHE_BYTES) {
 			case 16:
 				tmp |= DMA_WRITE_MAX_16;
@@ -1199,6 +1243,7 @@ static int __init ace_init(struct net_device *dev)
 				pci_write_config_word(ap->pdev, PCI_COMMAND,
 						      ap->pci_command);
 			}
+#endif
 		}
 	}
 
@@ -1217,6 +1262,9 @@ static int __init ace_init(struct net_device *dev)
 	tmp = tmp & ~DMA_READ_WRITE_MASK;
 	tmp |= DMA_READ_MAX_64;
 	tmp |= DMA_WRITE_MAX_64;
+#endif
+#ifdef __alpha__
+	tmp |= DMA_READ_MAX_128;
 #endif
 	writel(tmp, &regs->PciState);
 
@@ -1313,7 +1361,7 @@ static int __init ace_init(struct net_device *dev)
 
 	set_aceaddr(&info->rx_std_ctrl.rngptr, ap->rx_ring_base_dma);
 	info->rx_std_ctrl.max_len = ACE_STD_MTU + ETH_HLEN + 4;
-	info->rx_std_ctrl.flags = RCB_FLG_TCP_UDP_SUM;
+	info->rx_std_ctrl.flags = RCB_FLG_TCP_UDP_SUM|RCB_FLG_NO_PSEUDO_HDR;
 
 	memset(ap->rx_std_ring, 0,
 	       RX_STD_RING_ENTRIES * sizeof(struct rx_desc));
@@ -1328,7 +1376,7 @@ static int __init ace_init(struct net_device *dev)
 		    (ap->rx_ring_base_dma +
 		     (sizeof(struct rx_desc) * RX_STD_RING_ENTRIES)));
 	info->rx_jumbo_ctrl.max_len = 0;
-	info->rx_jumbo_ctrl.flags = RCB_FLG_TCP_UDP_SUM;
+	info->rx_jumbo_ctrl.flags = RCB_FLG_TCP_UDP_SUM|RCB_FLG_NO_PSEUDO_HDR;
 
 	memset(ap->rx_jumbo_ring, 0,
 	       RX_JUMBO_RING_ENTRIES * sizeof(struct rx_desc));
@@ -1349,7 +1397,7 @@ static int __init ace_init(struct net_device *dev)
 			      (RX_STD_RING_ENTRIES +
 			       RX_JUMBO_RING_ENTRIES))));
 		info->rx_mini_ctrl.max_len = ACE_MINI_SIZE;
-		info->rx_mini_ctrl.flags = RCB_FLG_TCP_UDP_SUM;
+		info->rx_mini_ctrl.flags = RCB_FLG_TCP_UDP_SUM|RCB_FLG_NO_PSEUDO_HDR;
 
 		for (i = 0; i < RX_MINI_RING_ENTRIES; i++)
 			ap->rx_mini_ring[i].flags =
@@ -1384,13 +1432,10 @@ static int __init ace_init(struct net_device *dev)
 	set_aceaddr(&info->tx_ctrl.rngptr, ap->tx_ring_dma);
 
 	info->tx_ctrl.max_len = TX_RING_ENTRIES;
-
-	tmp = 0;
+	tmp = RCB_FLG_TCP_UDP_SUM|RCB_FLG_NO_PSEUDO_HDR|RCB_FLG_TX_HOST_RING;
 #if TX_COAL_INTS_ONLY
 	tmp |= RCB_FLG_COAL_INT_ONLY;
 #endif
-	tmp |= RCB_FLG_TX_HOST_RING;
-
 	info->tx_ctrl.flags = tmp;
 
 	set_aceaddr(&info->tx_csm_ptr, ap->tx_csm_dma);
@@ -1398,8 +1443,13 @@ static int __init ace_init(struct net_device *dev)
 	/*
 	 * Potential item for tuning parameter
 	 */
+#if 0 /* NO */
+	writel(DMA_THRESH_16W, &regs->DmaReadCfg);
+	writel(DMA_THRESH_16W, &regs->DmaWriteCfg);
+#else
 	writel(DMA_THRESH_8W, &regs->DmaReadCfg);
 	writel(DMA_THRESH_8W, &regs->DmaWriteCfg);
+#endif
 
 	writel(0, &regs->MaskInt);
 	writel(1, &regs->IfIdx);
@@ -1430,7 +1480,7 @@ static int __init ace_init(struct net_device *dev)
 		if (trace[board_idx])
 			writel(trace[board_idx], &regs->TuneTrace);
 
-		if ((tx_ratio[board_idx] >= 0) && (tx_ratio[board_idx] < 64))
+		if ((tx_ratio[board_idx] > 0) && (tx_ratio[board_idx] < 64))
 			writel(tx_ratio[board_idx], &regs->TxBufRat);
 	}
 
@@ -1501,13 +1551,17 @@ static int __init ace_init(struct net_device *dev)
 	 * tx ints before we are up and running, which may cause a null
 	 * pointer access in the int handler.
 	 */
-	ap->tx_full = 0;
 	ap->cur_rx = 0;
 	ap->tx_prd = *(ap->tx_csm) = ap->tx_ret_csm = 0;
 
 	wmb();
 	ace_set_txprd(regs, ap, 0);
 	writel(0, &regs->RxRetCsm);
+
+	/*
+	 * Zero the stats before starting the interface
+	 */
+	memset(&ap->stats, 0, sizeof(ap->stats));
 
 	/*
 	 * Start the NIC CPU
@@ -1611,12 +1665,9 @@ static void ace_set_rxtx_parms(struct net_device *dev, int jumbo)
 }
 
 
-/*
- * Monitor the card to detect hangs.
- */
-static void ace_timer(unsigned long data)
+static void ace_watchdog(struct net_device *data)
 {
-	struct net_device *dev = (struct net_device *)data;
+	struct net_device *dev = data;
 	struct ace_private *ap = dev->priv;
 	struct ace_regs *regs = ap->regs;
 
@@ -1628,12 +1679,12 @@ static void ace_timer(unsigned long data)
 	if (*ap->tx_csm != ap->tx_ret_csm) {
 		printk(KERN_WARNING "%s: Transmitter is stuck, %08x\n",
 		       dev->name, (unsigned int)readl(&regs->HostCtrl));
+		/* This can happen due to ieee flow control. */
+	} else {
+		printk(KERN_DEBUG "%s: BUG... transmitter died. Kicking it.\n", dev->name);
+		netif_wake_queue(dev);
 	}
-
-	ap->timer.expires = jiffies + (5/2*HZ);
-	add_timer(&ap->timer);
 }
-
 
 static void ace_tasklet(unsigned long dev)
 {
@@ -1719,7 +1770,9 @@ static void ace_load_std_rx_ring(struct ace_private *ap, int nr_bufs)
 					 ACE_STD_BUFSIZE - (2 + 16),
 					 PCI_DMA_FROMDEVICE);
 		ap->skb->rx_std_skbuff[idx].skb = skb;
+#ifndef DUMMY_PCI_UNMAP
 		ap->skb->rx_std_skbuff[idx].mapping = mapping;
+#endif
 
 		rd = &ap->rx_std_ring[idx];
 		set_aceaddr(&rd->addr, mapping);
@@ -1781,7 +1834,9 @@ static void ace_load_mini_rx_ring(struct ace_private *ap, int nr_bufs)
 					 ACE_MINI_BUFSIZE - (2 + 16),
 					 PCI_DMA_FROMDEVICE);
 		ap->skb->rx_mini_skbuff[idx].skb = skb;
+#ifndef DUMMY_PCI_UNMAP
 		ap->skb->rx_mini_skbuff[idx].mapping = mapping;
+#endif
 
 		rd = &ap->rx_mini_ring[idx];
 		set_aceaddr(&rd->addr, mapping);
@@ -1840,7 +1895,9 @@ static void ace_load_jumbo_rx_ring(struct ace_private *ap, int nr_bufs)
 					 ACE_JUMBO_BUFSIZE - (2 + 16),
 					 PCI_DMA_FROMDEVICE);
 		ap->skb->rx_jumbo_skbuff[idx].skb = skb;
+#ifndef DUMMY_PCI_UNMAP
 		ap->skb->rx_jumbo_skbuff[idx].mapping = mapping;
+#endif
 
 		rd = &ap->rx_jumbo_ring[idx];
 		set_aceaddr(&rd->addr, mapping);
@@ -1870,8 +1927,9 @@ static void ace_load_jumbo_rx_ring(struct ace_private *ap, int nr_bufs)
 	clear_bit(0, &ap->jumbo_refill_busy);
 	return;
  error_out:
-	printk(KERN_INFO "Out of memory when allocating "
-	       "jumbo receive buffers\n");
+	if (net_ratelimit())
+		printk(KERN_INFO "Out of memory when allocating "
+		       "jumbo receive buffers\n");
 	goto out;
 }
 
@@ -1902,9 +1960,16 @@ static u32 ace_handle_event(struct net_device *dev, u32 evtcsm, u32 evtprd)
 			u16 code = ap->evt_ring[evtcsm].code;
 			switch (code) {
 			case E_C_LINK_UP:
-				printk(KERN_WARNING "%s: Optical link UP\n",
-				       dev->name);
+			{
+				u32 state = readl(&ap->regs->GigLnkState);
+				printk(KERN_WARNING "%s: Optical link UP "
+				       "(%s Duplex, Flow Control: %s%s)\n",
+				       dev->name,
+				       state & LNK_FULL_DUPLEX ? "Full":"Half",
+				       state & LNK_TX_FLOW_CTL_Y ? "TX " : "",
+				       state & LNK_RX_FLOW_CTL_Y ? "RX" : "");
 				break;
+			}
 			case E_C_LINK_DOWN:
 				printk(KERN_WARNING "%s: Optical link DOWN\n",
 				       dev->name);
@@ -1965,8 +2030,6 @@ static u32 ace_handle_event(struct net_device *dev, u32 evtcsm, u32 evtprd)
 			ap->rx_jumbo_skbprd = 0;
 			printk(KERN_INFO "%s: Jumbo ring flushed\n",
 			       dev->name);
-			if (!ap->tx_full)
-				netif_wake_queue(dev);
 			clear_bit(0, &ap->jumbo_refill_busy);
 			break;
 		}
@@ -1994,12 +2057,13 @@ static void ace_rx_int(struct net_device *dev, u32 rxretprd, u32 rxretcsm)
 		struct sk_buff *skb;
 		struct rx_desc *rxdesc, *retdesc;
 		u32 skbidx;
-		int desc_type, mapsize;
+		int bd_flags, desc_type, mapsize;
 		u16 csum;
 
 		retdesc = &ap->rx_return_ring[idx];
 		skbidx = retdesc->idx;
-		desc_type = retdesc->flags & (BD_FLG_JUMBO | BD_FLG_MINI);
+		bd_flags = retdesc->flags;
+		desc_type = bd_flags & (BD_FLG_JUMBO | BD_FLG_MINI);
 
 		switch(desc_type) {
 			/*
@@ -2036,8 +2100,10 @@ static void ace_rx_int(struct net_device *dev, u32 rxretprd, u32 rxretcsm)
 
 		skb = rip->skb;
 		rip->skb = NULL;
+#ifndef DUMMY_PCI_UNMAP
 		pci_unmap_single(ap->pdev, rip->mapping, mapsize,
 				 PCI_DMA_FROMDEVICE);
+#endif
 		skb_put(skb, retdesc->size);
 #if 0
 		/* unncessary */
@@ -2053,15 +2119,15 @@ static void ace_rx_int(struct net_device *dev, u32 rxretprd, u32 rxretcsm)
 		skb->protocol = eth_type_trans(skb, dev);
 
 		/*
-		 * If the checksum is correct and this is not a
-		 * fragment, tell the stack that the data is correct.
+		 * Instead of forcing the poor tigon mips cpu to calculate
+		 * pseudo hdr checksum, we do this ourselves.
 		 */
-		if(!(csum ^ 0xffff) &&
-		   (!(((struct iphdr *)skb->data)->frag_off &
-		      __constant_htons(IP_MF|IP_OFFSET))))
-			skb->ip_summed = CHECKSUM_UNNECESSARY;
-		else
+		if (bd_flags & BD_FLG_TCP_UDP_SUM) {
+			skb->csum = htons(csum);
+			skb->ip_summed = CHECKSUM_HW;
+		} else {
 			skb->ip_summed = CHECKSUM_NONE;
+		}
 
 		netif_rx(skb);		/* send it up */
 
@@ -2094,6 +2160,75 @@ static void ace_rx_int(struct net_device *dev, u32 rxretprd, u32 rxretcsm)
 }
 
 
+static inline void ace_tx_int(struct net_device *dev,
+			      u32 txcsm, u32 idx)
+{
+	struct ace_private *ap = dev->priv;
+
+	do {
+		struct sk_buff *skb;
+#ifndef DUMMY_PCI_UNMAP
+		dma_addr_t mapping;
+#endif
+		struct tx_ring_info *info;
+
+		info = ap->skb->tx_skbuff + idx;
+		skb = info->skb;
+#ifndef DUMMY_PCI_UNMAP
+		mapping = info->mapping;
+
+		if (mapping) {
+			pci_unmap_single(ap->pdev, mapping, info->maplen,
+					 PCI_DMA_TODEVICE);
+			info->mapping = 0;
+		}
+#endif
+		if (skb) {
+			ap->stats.tx_packets++;
+			ap->stats.tx_bytes += skb->len;
+			dev_kfree_skb_irq(skb);
+			info->skb = NULL;
+		}
+
+		idx = (idx + 1) % TX_RING_ENTRIES;
+	} while (idx != txcsm);
+
+	if (netif_queue_stopped(dev))
+		netif_wake_queue(dev);
+
+	wmb();
+	ap->tx_ret_csm = txcsm;
+
+	/* So... tx_ret_csm is advanced _after_ check for device wakeup.
+	 *
+	 * We could try to make it before. In this case we would get
+	 * the following race condition: hard_start_xmit on other cpu
+	 * enters after we advanced tx_ret_csm and fills space,
+	 * which we have just freed, so that we make illegal device wakeup.
+	 * There is no good way to workaround this (at entry
+	 * to ace_start_xmit detects this condition and prevents
+	 * ring corruption, but it is not a good workaround.)
+	 *
+	 * When tx_ret_csm is advanced after, we wake up device _only_
+	 * if we really have some space in ring (though the core doing
+	 * hard_start_xmit can see full ring for some period and has to
+	 * synchronize.) Superb.
+	 * BUT! We get another subtle race condition. hard_start_xmit
+	 * may think that ring is full between wakeup and advancing
+	 * tx_ret_csm and will stop device instantly! It is not so bad.
+	 * We are guaranteed that there is something in ring, so that
+	 * the next irq will resume transmission. To speedup this we could
+	 * mark descriptor, which closes ring with BD_FLG_COAL_NOW
+	 * (see ace_start_xmit).
+	 *
+	 * Well, this dilemma exists in all lock-free devices.
+	 * We, following scheme used in drivers by Donald Becker,
+	 * select the least dangerous.
+	 *							--ANK
+	 */
+}
+
+
 static void ace_interrupt(int irq, void *dev_id, struct pt_regs *ptregs)
 {
 	struct ace_private *ap;
@@ -2115,9 +2250,14 @@ static void ace_interrupt(int irq, void *dev_id, struct pt_regs *ptregs)
 		return;
 
 	/*
-	 * Tell the card not to generate interrupts while we are in here.
+	 * ACK intr now. Otherwise we will lose updates to rx_ret_prd,
+	 * which happened _after_ rxretprd = *ap->rx_ret_prd; but before
+	 * writel(0, &regs->Mb0Lo).
+	 *
+	 * "IRQ avoidance" recommended in docs applies to IRQs served
+	 * threads and it is wrong even for that case.
 	 */
-	writel(1, &regs->Mb0Lo);
+	writel(0, &regs->Mb0Lo);
 
 	/*
 	 * There is no conflict between transmit handling in
@@ -2136,75 +2276,15 @@ static void ace_interrupt(int irq, void *dev_id, struct pt_regs *ptregs)
 	idx = ap->tx_ret_csm;
 
 	if (txcsm != idx) {
-		do {
-			struct sk_buff *skb;
-
-			skb = ap->skb->tx_skbuff[idx].skb;
-			/*
-			 * Race condition between the code cleaning
-			 * the tx queue in the interrupt handler and the
-			 * interface close,
-			 *
-			 * This is a kludge that really should be fixed 
-			 * by preventing the driver from generating a tx
-			 * interrupt when the packet has already been
-			 * removed from the tx queue.
-			 *
-			 * Nailed by Don Dugger and Chip Salzenberg of
-			 * VA Linux.
-			 */
-			if (skb) {
-				dma_addr_t mapping;
-
-				mapping = ap->skb->tx_skbuff[idx].mapping;
-
-				ap->stats.tx_packets++;
-				ap->stats.tx_bytes += skb->len;
-				pci_unmap_single(ap->pdev, mapping, skb->len,
-						 PCI_DMA_TODEVICE);
-				dev_kfree_skb_irq(skb);
-
-				ap->skb->tx_skbuff[idx].skb = NULL;
-			}
-
-			/*
-			 * Question here is whether one should not skip
-			 * these writes - I have never seen any errors
-			 * caused by the NIC actually trying to access
-			 * these incorrectly.
-			 */
-#ifdef ACE_64BIT_PTR
-			ap->tx_ring[idx].addr.addrhi = 0;
-#endif
-			ap->tx_ring[idx].addr.addrlo = 0;
-			ap->tx_ring[idx].flagsize = 0;
-
-			idx = (idx + 1) % TX_RING_ENTRIES;
-		} while (idx != txcsm);
-
 		/*
-		 * Once we actually get to this point the tx ring has
-		 * already been trimmed thus it cannot be full!
-		 * Ie. skip the comparison of the tx producer vs. the
-		 * consumer.
+		 * If each skb takes only one descriptor this check degenerates
+		 * to identity, because new space has just been opened.
+		 * But if skbs are fragmented we must check that this index
+		 * update releases enough of space, otherwise we just
+		 * wait for device to make more work.
 		 */
-		if (netif_queue_stopped(dev) && xchg(&ap->tx_full, 0)) {
-			/*
-			 * This does not need to be atomic (and expensive),
-			 * I've seen cases where it would fail otherwise ;-(
-			 */
-			netif_wake_queue(dev);
-			ace_mark_net_bh();
-
-			/*
-			 * TX ring is no longer full, aka the
-			 * transmitter is working fine - kill timer.
-			 */
-			del_timer(&ap->timer);
-		}
-
-		ap->tx_ret_csm = txcsm;
-		wmb();
+		if (!tx_ring_full(txcsm, ap->tx_prd))
+			ace_tx_int(dev, txcsm, idx);
 	}
 
 	evtcsm = readl(&regs->EvtCsm);
@@ -2272,11 +2352,6 @@ static void ace_interrupt(int irq, void *dev_id, struct pt_regs *ptregs)
 			tasklet_schedule(&ap->ace_tasklet);
 		}
 	}
-
-	/*
-	 * Allow the card to generate interrupts again
-	 */
-	writel(0, &regs->Mb0Lo);
 }
 
 
@@ -2295,11 +2370,6 @@ static int ace_open(struct net_device *dev)
 	}
 
 	writel(dev->mtu + ETH_HLEN + 4, &regs->IfMtu);
-
-	/*
-	 * Zero the stats when restarting the interface...
-	 */
-	memset(&ap->stats, 0, sizeof(ap->stats));
 
 	cmd.evt = C_CLEAR_STATS;
 	cmd.code = 0;
@@ -2338,13 +2408,6 @@ static int ace_open(struct net_device *dev)
 	ACE_MOD_INC_USE_COUNT;
 
 	/*
-	 * Setup the timer
-	 */
-	init_timer(&ap->timer);
-	ap->timer.data = (unsigned long)dev;
-	ap->timer.function = ace_timer;
-
-	/*
 	 * Setup the bottom half rx ring refill handler
 	 */
 	tasklet_init(&ap->ace_tasklet, ace_tasklet, (unsigned long)dev);
@@ -2361,12 +2424,16 @@ static int ace_close(struct net_device *dev)
 	short i;
 
 	ace_if_down(dev);
+
+	/*
+	 * Without (or before) releasing irq and stopping hardware, this
+	 * is an absolute non-sense, by the way. It will be reset instantly
+	 * by the first irq.
+	 */
 	netif_stop_queue(dev);
 
 	ap = dev->priv;
 	regs = ap->regs;
-
-	del_timer(&ap->timer);
 
 	if (ap->promisc) {
 		cmd.evt = C_SET_PROMISC_MODE;
@@ -2392,16 +2459,26 @@ static int ace_close(struct net_device *dev)
 
 	for (i = 0; i < TX_RING_ENTRIES; i++) {
 		struct sk_buff *skb;
+#ifndef DUMMY_PCI_UNMAP
 		dma_addr_t mapping;
+#endif
+		struct tx_ring_info *info;
 
-		skb = ap->skb->tx_skbuff[i].skb;
-		mapping = ap->skb->tx_skbuff[i].mapping;
-		if (skb) {
-			memset(&ap->tx_ring[i].addr, 0, sizeof(struct tx_desc));
-			pci_unmap_single(ap->pdev, mapping, skb->len,
+		info = ap->skb->tx_skbuff + i;
+		skb = info->skb;
+#ifndef DUMMY_PCI_UNMAP
+		mapping = info->mapping;
+
+		if (mapping) {
+			memset(ap->tx_ring+i, 0, sizeof(struct tx_desc));
+			pci_unmap_single(ap->pdev, mapping, info->maplen,
 					 PCI_DMA_TODEVICE);
+			info->mapping = 0;
+		}
+#endif
+		if (skb) {
 			dev_kfree_skb(skb);
-			ap->skb->tx_skbuff[i].skb = NULL;
+			info->skb = NULL;
 		}
 	}
 
@@ -2419,85 +2496,216 @@ static int ace_close(struct net_device *dev)
 }
 
 
+/*
+ * Following below should be (in more clean form!) in arch/ARCH/kernel/pci_*.
+ * For now, let it stay here.
+ */
+#if defined(CONFIG_HIGHMEM) && MAX_SKB_FRAGS
+#ifndef DUMMY_PCI_UNMAP
+#error Sorry, cannot DMA from high memory on this architecture.
+#endif
+
+#if defined(CONFIG_X86)
+#define DMAADDR_OFFSET	0
+typedef unsigned long long dmaaddr_high_t;
+#elif defined(CONFIG_PPC)
+#define DMAADDR_OFFSET PCI_DRAM_OFFSET
+typedef unsigned long dmaaddr_high_t;
+#endif
+
+
+static inline dmaaddr_high_t
+pci_map_single_high(struct pci_dev *hwdev, struct page *page,
+		    int offset, size_t size, int dir)
+{
+	dmaaddr_high_t phys;
+
+	phys = (page-mem_map) *	(dmaaddr_high_t) PAGE_SIZE + offset;
+
+	return (phys + DMAADDR_OFFSET);
+}
+
+#else
+
+typedef unsigned long dmaaddr_high_t;
+
+static inline dmaaddr_high_t
+pci_map_single_high(struct pci_dev *hwdev, struct page *page,
+		    int offset, size_t size, int dir)
+{
+	return pci_map_single(hwdev, page_address(page) + offset, size, dir);
+}
+
+#endif
+
+
+static inline dmaaddr_high_t
+ace_map_tx_skb(struct ace_private *ap, struct sk_buff *skb,
+	       struct sk_buff *tail, u32 idx)
+{
+	unsigned long addr;
+	struct tx_ring_info *info;
+
+	addr = pci_map_single(ap->pdev, skb->data, skb->len, PCI_DMA_TODEVICE);
+
+	info = ap->skb->tx_skbuff + idx;
+	info->skb = tail;
+#ifndef DUMMY_PCI_UNMAP
+	info->mapping = addr;
+	info->maplen = skb->len;
+#endif
+	return addr;
+}
+
+
+static inline void
+ace_load_tx_bd(struct tx_desc *desc, dmaaddr_high_t addr, u32 flagsize)
+{
+#if !USE_TX_COAL_NOW
+	flagsize &= ~BD_FLG_COAL_NOW;
+#endif
+
+#ifdef ACE_64BIT_PTR
+	desc->addr.addrhi = addr >> 32;
+#endif
+	desc->addr.addrlo = addr;
+	desc->flagsize = flagsize;
+}
+
+
 static int ace_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	struct ace_private *ap = dev->priv;
 	struct ace_regs *regs = ap->regs;
-	unsigned long addr;
+	struct tx_desc *desc;
 	u32 idx, flagsize;
 
-	/*
+ 	/*
 	 * This only happens with pre-softnet, ie. 2.2.x kernels.
-	 */
+ 	 */
 	if (early_stop_netif_stop_queue(dev))
-		return 1;
+ 		return 1;
 
+
+restart:
 	idx = ap->tx_prd;
 
-	if ((idx + 1) % TX_RING_ENTRIES == ap->tx_ret_csm) {
-		ap->tx_full = 1;
-#if DEBUG
-		printk("%s: trying to transmit while the tx ring is full "
-		       "- this should not happen!\n", dev->name);
+	if (tx_ring_full(ap->tx_ret_csm, idx))
+		goto overflow;
+
+#if MAX_SKB_FRAGS
+	if (!skb_shinfo(skb)->nr_frags)
 #endif
-		return 1;
+	{
+		unsigned long addr;
+
+		addr = ace_map_tx_skb(ap, skb, skb, idx);
+		flagsize = (skb->len << 16) | (BD_FLG_END);
+		if (skb->ip_summed == CHECKSUM_HW)
+			flagsize |= BD_FLG_TCP_UDP_SUM;
+		desc = ap->tx_ring + idx;
+		idx = (idx + 1) % TX_RING_ENTRIES;
+
+		/* Look at ace_tx_int for explanations. */
+		if (tx_ring_full(ap->tx_ret_csm, idx))
+			flagsize |= BD_FLG_COAL_NOW;
+
+		ace_load_tx_bd(desc, addr, flagsize);
 	}
+#if MAX_SKB_FRAGS
+	else {
+		unsigned long addr;
+		int i, len = 0;
 
-	ap->skb->tx_skbuff[idx].skb = skb;
-	ap->skb->tx_skbuff[idx].mapping =
-		pci_map_single(ap->pdev, skb->data, skb->len,
-			       PCI_DMA_TODEVICE);
-	addr = (unsigned long) ap->skb->tx_skbuff[idx].mapping;
-	flagsize = (skb->len << 16) | (BD_FLG_END) ;
-	set_aceaddr(&ap->tx_ring[idx].addr, addr);
-	ap->tx_ring[idx].flagsize = flagsize;
-	wmb();
-	idx = (idx + 1) % TX_RING_ENTRIES;
+		addr = ace_map_tx_skb(ap, skb, NULL, idx);
+		flagsize = ((skb->len - skb->data_len) << 16);
+		if (skb->ip_summed == CHECKSUM_HW)
+			flagsize |= BD_FLG_TCP_UDP_SUM;
 
-	ap->tx_prd = idx;
-	ace_set_txprd(regs, ap, idx);
+		ace_load_tx_bd(ap->tx_ring + idx, addr, flagsize);
 
-	/*
-	 * tx_csm is set by the NIC whereas we set tx_ret_csm which
-	 * is always trying to catch tx_csm
-	 */
-	if ((idx + 2) % TX_RING_ENTRIES == ap->tx_ret_csm) {
-		ap->tx_full = 1;
-		/*
-		 * Queue is full, add timer to detect whether the
-		 * transmitter is stuck. Use mod_timer as we can get
-		 * into the situation where we risk adding several
-		 * timers.
-		 */
-		mod_timer(&ap->timer, jiffies + (3 * HZ));
+		idx = (idx + 1) % TX_RING_ENTRIES;
 
-		/*
-		 * The following check will fix a race between the interrupt
-		 * handler increasing the tx_ret_csm and testing for tx_full
-		 * and this tx routine's testing the tx_ret_csm and setting
-		 * the tx_full; note that this fix makes assumptions on the
-		 * ordering of writes (sequential consistency will fly; TSO
-		 * processor order would work too) but that's what lock-less
-		 * programming is all about
-		 */
-		if (((idx + 2) % TX_RING_ENTRIES != ap->tx_ret_csm)
-			&& xchg(&ap->tx_full, 0)) {
-			del_timer(&ap->timer);
-			/*
-			 * We may not need this one in the post softnet era
-			 * in this case this can be changed to a
-			 * early_stop_netif_wake_queue(dev);
-			 */
-			netif_wake_queue(dev);
-		} else {
-			late_stop_netif_stop_queue(dev);
+		for (i = 0; i < skb_shinfo(skb)->nr_frags; i++) {
+			skb_frag_t *frag = &skb_shinfo(skb)->frags[i];
+			struct tx_ring_info *info;
+			dmaaddr_high_t phys;
+
+			len += frag->size;
+			info = ap->skb->tx_skbuff + idx;
+			desc = ap->tx_ring + idx;
+
+			phys = pci_map_single_high(ap->pdev, frag->page,
+						   frag->page_offset,
+						   frag->size,
+						   PCI_DMA_TODEVICE);
+
+			flagsize = (frag->size << 16);
+			if (skb->ip_summed == CHECKSUM_HW)
+				flagsize |= BD_FLG_TCP_UDP_SUM;
+			idx = (idx + 1) % TX_RING_ENTRIES;
+
+			if (i == skb_shinfo(skb)->nr_frags-1) {
+				flagsize |= BD_FLG_END;
+				if (tx_ring_full(ap->tx_ret_csm, idx))
+					flagsize |= BD_FLG_COAL_NOW;
+
+				/*
+				 * Only the last fragment frees
+				 * the skb!
+				 */
+				info->skb = skb;
+			} else {
+				info->skb = NULL;
+			}
+#ifndef DUMMY_PCI_UNMAP
+			info->mapping = phys;
+			info->maplen = frag->size;
+#endif
+			ace_load_tx_bd(desc, phys, flagsize);
 		}
-	} else {
-		early_stop_netif_wake_queue(dev);
+	}
+#endif
+
+ 	wmb();
+ 	ap->tx_prd = idx;
+ 	ace_set_txprd(regs, ap, idx);
+
+	if (flagsize & BD_FLG_COAL_NOW) {
+		netif_stop_queue(dev);
+
+		/*
+		 * A TX-descriptor producer (an IRQ) might have gotten
+		 * inbetween, making the ring free again. Since xmit is
+		 * serialized, this is the only situation we have to
+		 * re-test.
+		 */
+		if (!tx_ring_full(ap->tx_ret_csm, idx))
+			netif_wake_queue(dev);
 	}
 
 	dev->trans_start = jiffies;
 	return 0;
+
+overflow:
+	/*
+	 * This race condition is unavoidable with lock-free drivers.
+	 * We wake up the queue _before_ tx_prd is advanced, so that we can
+	 * enter hard_start_xmit too early, while tx ring still looks closed.
+	 * This happens ~1-4 times per 100000 packets, so that we can allow
+	 * to loop syncing to other CPU. Probably, we need an additional
+	 * wmb() in ace_tx_intr as well.
+	 *
+	 * Note that this race is relieved by reserving one more entry
+	 * in tx ring than it is necessary (see original non-SG driver).
+	 * However, with SG we need to reserve 2*MAX_SKB_FRAGS+1, which
+	 * is already overkill.
+	 *
+	 * Alternative is to return with 1 not throttling queue. In this
+	 * case loop becomes longer, no more useful effects.
+	 */
+	barrier();
+	goto restart;
 }
 
 
@@ -2522,7 +2730,6 @@ static int ace_change_mtu(struct net_device *dev, int new_mtu)
 			ace_set_rxtx_parms(dev, 1);
 		}
 	} else {
-		netif_stop_queue(dev);
 		while (test_and_set_bit(0, &ap->jumbo_refill_busy));
 		synchronize_irq();
 		ace_set_rxtx_parms(dev, 0);
@@ -2542,27 +2749,12 @@ static int ace_change_mtu(struct net_device *dev, int new_mtu)
 
 static int ace_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
-#ifdef SIOCETHTOOL
 	struct ace_private *ap = dev->priv;
 	struct ace_regs *regs = ap->regs;
+#ifdef SIOCETHTOOL
 	struct ethtool_cmd ecmd;
 	u32 link, speed;
 
-#ifdef SPIN_DEBUG
-	if (cmd == (SIOCDEVPRIVATE+0x0e)) {
-		printk(KERN_NOTICE "%s: dumping debug info\n", dev->name);
-		printk(KERN_NOTICE "%s: tbusy %li, tx_ret_csm %i, "
-		       "tx_prd %i\n", dev->name, dev->tbusy,
-		       ap->tx_ret_csm, ap->tx_prd);
-		printk(KERN_NOTICE "%s: cur_rx %i, std_refill %li, "
-		       "mini_rx %i, mini_refill %li\n", dev->name,
-		       atomic_read(&ap->cur_rx_bufs), ap->std_refill_busy,
-		       atomic_read(&ap->cur_mini_bufs), ap->mini_refill_busy);
-		printk(KERN_NOTICE "%s: CpuCtrl %08x\n",
-		       dev->name, readl(&regs->CpuCtrl));
-		return 0;
-	}
-#endif
 	if (cmd != SIOCETHTOOL)
 		return -EOPNOTSUPP;
 	if (copy_from_user(&ecmd, ifr->ifr_data, sizeof(ecmd)))
@@ -2699,7 +2891,8 @@ static int ace_set_mac_addr(struct net_device *dev, void *p)
 
 	regs = ((struct ace_private *)dev->priv)->regs;
 	writel(da[0] << 8 | da[1], &regs->MacAddrHi);
-	writel((da[2] << 24) | (da[3] << 16) | (da[4] << 8) | da[5] , &regs->MacAddrLo);
+	writel((da[2] << 24) | (da[3] << 16) | (da[4] << 8) | da[5],
+	       &regs->MacAddrLo);
 
 	cmd.evt = C_SET_MAC_ADDR;
 	cmd.code = 0;
@@ -2774,11 +2967,12 @@ static struct net_device_stats *ace_get_stats(struct net_device *dev)
 	ap->stats.multicast = readl(&mac_stats->kept_mc);
 	ap->stats.collisions = readl(&mac_stats->coll);
 
-	return(&ap->stats);
+	return &ap->stats;
 }
 
 
-static void __init ace_copy(struct ace_regs *regs, void *src, u32 dest, int size)
+static void __init ace_copy(struct ace_regs *regs, void *src,
+			    u32 dest, int size)
 {
 	unsigned long tdest;
 	u32 *wsrc;
@@ -3124,6 +3318,6 @@ static int __init read_eeprom_byte(struct net_device *dev,
 
 /*
  * Local variables:
- * compile-command: "gcc -D__KERNEL__ -DMODULE -I../../include -Wall -Wstrict-prototypes -O2 -fomit-frame-pointer -pipe -fno-strength-reduce -DMODVERSIONS -include ../../include/linux/modversions.h   -c -o acenic.o acenic.c"
+ * compile-command: "gcc -D__SMP__ -D__KERNEL__ -DMODULE -I../../include -Wall -Wstrict-prototypes -O2 -fomit-frame-pointer -pipe -fno-strength-reduce -DMODVERSIONS -include ../../include/linux/modversions.h   -c -o acenic.o acenic.c"
  * End:
  */

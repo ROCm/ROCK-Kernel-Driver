@@ -1,4 +1,4 @@
-/* $Id: ttable.h,v 1.15 2000/04/03 10:36:42 davem Exp $ */
+/* $Id: ttable.h,v 1.16 2001/03/28 10:56:34 davem Exp $ */
 #ifndef _SPARC64_TTABLE_H
 #define _SPARC64_TTABLE_H
 
@@ -54,13 +54,6 @@
 	 clr	%l6;					\
 	nop;
 	
-#define TRAPTL1_CEE			\
-	ldxa	[%g0] ASI_AFSR, %g1;	\
-	membar	#Sync;			\
-	stxa	%g1, [%g0] ASI_AFSR;	\
-	membar	#Sync;			\
-	retry; nop; nop; nop;
-
 #define TRAP_ARG(routine, arg)				\
 	sethi	%hi(109f), %g7;				\
 	ba,pt	%xcc, etrap;				\

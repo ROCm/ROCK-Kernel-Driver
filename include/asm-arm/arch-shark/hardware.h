@@ -1,7 +1,7 @@
 /*
  * linux/include/asm-arm/arch-shark/hardware.h
  *
- * by Alexander.Schulz@stud.uni-karlsruhe.de
+ * by Alexander Schulz <aschulz@netwinder.org>
  *
  * derived from:
  * linux/include/asm-arm/arch-ebsa110/hardware.h
@@ -40,14 +40,16 @@
 /* defines for the Framebuffer */
 #define FB_START                0x06000000
 
-/* Registers for Framebuffer */
-/*#define FBREG_START             0x06800000*/
-
 #define UNCACHEABLE_ADDR        0xdf010000
 
 #define SEQUOIA_LED_GREEN       (1<<6)
 #define SEQUOIA_LED_AMBER       (1<<5)
 #define SEQUOIA_LED_BACK        (1<<7)
+
+#define pcibios_assign_all_busses()     1
+
+#define PCIBIOS_MIN_IO          0x6000
+#define PCIBIOS_MIN_MEM         0x50000000
 
 #endif
 

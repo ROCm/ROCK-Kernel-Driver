@@ -34,6 +34,10 @@ static void __init check_bugs(void)
 		*p++ = '4';
 		printk("CPU: SH7750\n");
 		break;
+	case CPU_ST40STB1:
+		*p++ = '4';
+		printk("CPU: ST40STB1\n");
+		break;
 	default:
 		printk("CPU: ??????\n");
 		break;

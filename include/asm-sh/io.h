@@ -35,7 +35,7 @@
  */
 
 #ifdef __KERNEL__
-#ifdef CONFIG_SH_GENERIC
+#if defined(CONFIG_SH_GENERIC) || defined(CONFIG_SH_CQREEK) || defined(CONFIG_SH_UNKNOWN)
 
 /* In a generic kernel, we always go through the machine vector.  */
 
@@ -70,7 +70,6 @@
 # define __writel(v,a)	sh_mv.mv_writel((v),(a))
 
 # define __ioremap(a,s)	sh_mv.mv_ioremap((a), (s))
-# define __ioremap_nocache(a,s)	sh_mv.mv_ioremap_nocache((a), (s))
 # define __iounmap(a)	sh_mv.mv_iounmap((a))
 
 # define __isa_port2addr(a)	sh_mv.mv_isa_port2addr(a)
@@ -110,10 +109,20 @@
 
 # if defined(CONFIG_SH_HP600)
 #  include <asm/io_hd64461.h>
-# elif defined(CONFIG_SH_OVERDRIVE)
+# elif defined(CONFIG_SH_7750_OVERDRIVE)
 #  include <asm/io_od.h>
 # elif defined(CONFIG_SH_SOLUTION_ENGINE)
 #  include <asm/io_se.h>
+# elif defined(CONFIG_SH_DMIDA) || \
+       defined(CONFIG_SH_STB1_HARP) || \
+       defined(CONFIG_SH_STB1_OVERDRIVE)
+#  include <asm/io_hd64465.h>
+# elif defined(CONFIG_SH_EC3104)
+#  include <asm/io_ec3104.h>
+# elif defined(CONFIG_SH_DREAMCAST)
+#  include <asm/io_dc.h>
+# elif defined(CONFIG_SH_CAT68701)
+#  include <asm/io_cat68701.h>
 # elif defined(CONFIG_SH_UNKNOWN)
 #  include <asm/io_unknown.h>
 # else
@@ -126,40 +135,38 @@
 #endif /* __KERNEL__ */
 
 /* These are always function calls, in both kernel and user space */
-extern unsigned int	_inb (unsigned long port);
-extern unsigned int	_inw (unsigned long port);
+extern unsigned char	_inb (unsigned long port);
+extern unsigned short	_inw (unsigned long port);
 extern unsigned int	_inl (unsigned long port);
-extern void		_outb (unsigned char b,unsigned long port);
-extern void		_outw (unsigned short w,unsigned long port);
-extern void		_outl (unsigned int l,unsigned long port);
-extern unsigned int	_inb_p (unsigned long port);
-extern unsigned int	_inw_p (unsigned long port);
+extern void		_outb (unsigned char b, unsigned long port);
+extern void		_outw (unsigned short w, unsigned long port);
+extern void		_outl (unsigned int l, unsigned long port);
+extern unsigned char	_inb_p (unsigned long port);
+extern unsigned short	_inw_p (unsigned long port);
 extern unsigned int	_inl_p (unsigned long port);
-extern void		_outb_p (unsigned char b,unsigned long port);
-extern void		_outw_p (unsigned short w,unsigned long port);
-extern void		_outl_p (unsigned int l,unsigned long port);
+extern void		_outb_p (unsigned char b, unsigned long port);
+extern void		_outw_p (unsigned short w, unsigned long port);
+extern void		_outl_p (unsigned int l, unsigned long port);
 extern void		_insb (unsigned long port, void *dst, unsigned long count);
 extern void		_insw (unsigned long port, void *dst, unsigned long count);
 extern void		_insl (unsigned long port, void *dst, unsigned long count);
 extern void		_outsb (unsigned long port, const void *src, unsigned long count);
 extern void		_outsw (unsigned long port, const void *src, unsigned long count);
 extern void		_outsl (unsigned long port, const void *src, unsigned long count);
-extern unsigned long	_readb(unsigned long addr);
-extern unsigned long	_readw(unsigned long addr);
-extern unsigned long	_readl(unsigned long addr);
+extern unsigned char	_readb(unsigned long addr);
+extern unsigned short	_readw(unsigned long addr);
+extern unsigned int	_readl(unsigned long addr);
 extern void		_writeb(unsigned char b, unsigned long addr);
 extern void		_writew(unsigned short b, unsigned long addr);
 extern void		_writel(unsigned int b, unsigned long addr);
 
 #ifdef __KERNEL__
-extern unsigned long	___raw_readb(unsigned long addr);
-extern unsigned long	___raw_readw(unsigned long addr);
-extern unsigned long	___raw_readl(unsigned long addr);
-extern unsigned long	___raw_readq(unsigned long addr);
+extern unsigned char	___raw_readb(unsigned long addr);
+extern unsigned short	___raw_readw(unsigned long addr);
+extern unsigned int	___raw_readl(unsigned long addr);
 extern void		___raw_writeb(unsigned char b, unsigned long addr);
 extern void		___raw_writew(unsigned short b, unsigned long addr);
 extern void		___raw_writel(unsigned int b, unsigned long addr);
-extern void		___raw_writeq(unsigned long b, unsigned long addr);
 #endif
 
 #ifdef __KERNEL__
@@ -291,20 +298,20 @@ extern void		___raw_writeq(unsigned long b, unsigned long addr);
 
 /* Userspace declarations.  */
 
-extern unsigned int	inb(unsigned long port);
-extern unsigned int	inw(unsigned long port);
+extern unsigned char	inb(unsigned long port);
+extern unsigned short	inw(unsigned long port);
 extern unsigned int	inl(unsigned long port);
-extern void		outb(unsigned char b,unsigned long port);
-extern void		outw(unsigned short w,unsigned long port);
-extern void		outl(unsigned int l,unsigned long port);
-extern void		insb (unsigned long port, void *dst, unsigned long count);
-extern void		insw (unsigned long port, void *dst, unsigned long count);
-extern void		insl (unsigned long port, void *dst, unsigned long count);
-extern void		outsb (unsigned long port, const void *src, unsigned long count);
-extern void		outsw (unsigned long port, const void *src, unsigned long count);
-extern void		outsl (unsigned long port, const void *src, unsigned long count);
-extern unsigned long	readb(unsigned long addr);
-extern unsigned long	readw(unsigned long addr);
+extern void		outb(unsigned char b, unsigned long port);
+extern void		outw(unsigned short w, unsigned long port);
+extern void		outl(unsigned int l, unsigned long port);
+extern void		insb(unsigned long port, void *dst, unsigned long count);
+extern void		insw(unsigned long port, void *dst, unsigned long count);
+extern void		insl(unsigned long port, void *dst, unsigned long count);
+extern void		outsb(unsigned long port, const void *src, unsigned long count);
+extern void		outsw(unsigned long port, const void *src, unsigned long count);
+extern void		outsl(unsigned long port, const void *src, unsigned long count);
+extern unsigned char	readb(unsigned long addr);
+extern unsigned short	readw(unsigned long addr);
 extern unsigned long	readl(unsigned long addr);
 extern void		writeb(unsigned char b, unsigned long addr);
 extern void		writew(unsigned short b, unsigned long addr);
@@ -342,17 +349,17 @@ extern void memcpy_toio(unsigned long, const void *, unsigned long);
 extern void memset_io(unsigned long, int, unsigned long);
 
 /* SuperH on-chip I/O functions */
-extern __inline__ unsigned long ctrl_inb(unsigned long addr)
+extern __inline__ unsigned char ctrl_inb(unsigned long addr)
 {
 	return *(volatile unsigned char*)addr;
 }
 
-extern __inline__ unsigned long ctrl_inw(unsigned long addr)
+extern __inline__ unsigned short ctrl_inw(unsigned long addr)
 {
 	return *(volatile unsigned short*)addr;
 }
 
-extern __inline__ unsigned long ctrl_inl(unsigned long addr)
+extern __inline__ unsigned int ctrl_inl(unsigned long addr)
 {
 	return *(volatile unsigned long*)addr;
 }
@@ -412,20 +419,12 @@ static __inline__ void * ioremap(unsigned long offset, unsigned long size)
 	return __ioremap(offset, size);
 }
 
-/*
- * This one maps high address device memory and turns off caching for that area.
- * it's useful if some control registers are in such an area and write combining
- * or read caching is not desirable:
- */
-static __inline__ void * ioremap_nocache (unsigned long offset, unsigned long size)
-{
-	return __ioremap_nocache(offset, size);
-}
-
 static __inline__ void iounmap(void *addr)
 {
 	return __iounmap(addr);
 }
+
+#define ioremap_nocache(off,size) ioremap(off,size)
 
 static __inline__ int check_signature(unsigned long io_addr,
 			const unsigned char *signature, int length)

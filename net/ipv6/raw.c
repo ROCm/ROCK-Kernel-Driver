@@ -7,7 +7,7 @@
  *
  *	Adapted from linux/net/ipv4/raw.c
  *
- *	$Id: raw.c,v 1.42 2000/11/28 13:38:38 davem Exp $
+ *	$Id: raw.c,v 1.45 2001/02/18 09:10:42 davem Exp $
  *
  *	Fixes:
  *	Hideaki YOSHIFUJI	:	sin6_scope_id support
@@ -116,8 +116,11 @@ static __inline__ int icmpv6_filter(struct sock *sk, struct sk_buff *skb)
 	struct raw6_opt *opt;
 
 	opt = &sk->tp_pinfo.tp_raw;
-	icmph = (struct icmp6hdr *) (skb->nh.ipv6h + 1);
-	return test_bit(icmph->icmp6_type, &opt->filter);
+	if (pskb_may_pull(skb, sizeof(struct icmp6hdr))) {
+		icmph = (struct icmp6hdr *) skb->data;
+		return test_bit(icmph->icmp6_type, &opt->filter);
+	}
+	return 0;
 }
 
 /*
@@ -125,8 +128,7 @@ static __inline__ int icmpv6_filter(struct sock *sk, struct sk_buff *skb)
  *	(should consider queueing the skb in the sock receive_queue
  *	without calling rawv6.c)
  */
-struct sock * ipv6_raw_deliver(struct sk_buff *skb,
-			       int nexthdr, unsigned long len)
+struct sock * ipv6_raw_deliver(struct sk_buff *skb, int nexthdr)
 {
 	struct in6_addr *saddr;
 	struct in6_addr *daddr;
@@ -163,7 +165,7 @@ struct sock * ipv6_raw_deliver(struct sk_buff *skb,
 
 			buff = skb_clone(skb, GFP_ATOMIC);
 			if (buff)
-				rawv6_rcv(sk2, buff, len);
+				rawv6_rcv(sk2, buff);
 		}
 	}
 
@@ -176,8 +178,6 @@ out:
 	read_unlock(&raw_v6_lock);
 	return sk;
 }
-
-
 
 /* This cleans up af_inet6 a bit. -DaveM */
 static int rawv6_bind(struct sock *sk, struct sockaddr *uaddr, int addr_len)
@@ -239,15 +239,12 @@ out:
 	return err;
 }
 
-void rawv6_err(struct sock *sk, struct sk_buff *skb, struct ipv6hdr *hdr,
+void rawv6_err(struct sock *sk, struct sk_buff *skb,
 	       struct inet6_skb_parm *opt,
-	       int type, int code, unsigned char *buff, u32 info)
+	       int type, int code, int offset, u32 info)
 {
 	int err;
 	int harderr;
-
-	if (buff > skb->tail)
-		return;
 
 	/* Report error on raw socket, if:
 	   1. User requested recverr.
@@ -261,8 +258,12 @@ void rawv6_err(struct sock *sk, struct sk_buff *skb, struct ipv6hdr *hdr,
 	if (type == ICMPV6_PKT_TOOBIG)
 		harderr = (sk->net_pinfo.af_inet6.pmtudisc == IPV6_PMTUDISC_DO);
 
-	if (sk->net_pinfo.af_inet6.recverr)
-		ipv6_icmp_error(sk, skb, err, 0, ntohl(info), buff);
+	if (sk->net_pinfo.af_inet6.recverr) {
+		u8 *payload = skb->data;
+		if (!sk->protinfo.af_inet.hdrincl)
+			payload += offset;
+		ipv6_icmp_error(sk, skb, err, 0, ntohl(info), payload);
+	}
 
 	if (sk->net_pinfo.af_inet6.recverr || harderr) {
 		sk->err = err;
@@ -290,10 +291,12 @@ static inline int rawv6_rcv_skb(struct sock * sk, struct sk_buff * skb)
  *	maybe we could have the network decide uppon a hint if it 
  *	should call raw_rcv for demultiplexing
  */
-int rawv6_rcv(struct sock *sk, struct sk_buff *skb, unsigned long len)
+int rawv6_rcv(struct sock *sk, struct sk_buff *skb)
 {
-	if (sk->protinfo.af_inet.hdrincl)
+	if (sk->protinfo.af_inet.hdrincl) {
+		__skb_push(skb, skb->nh.raw - skb->data);
 		skb->h.raw = skb->nh.raw;
+	}
 
 	rawv6_rcv_skb(sk, skb);
 	return 0;
@@ -325,7 +328,7 @@ int rawv6_recvmsg(struct sock *sk, struct msghdr *msg, int len,
 	if (!skb)
 		goto out;
 
-	copied = skb->tail - skb->h.raw;
+	copied = skb->len;
   	if (copied > len) {
   		copied = len;
   		msg->msg_flags |= MSG_TRUNC;
@@ -594,6 +597,8 @@ static int rawv6_geticmpfilter(struct sock *sk, int level, int optname,
 	case ICMPV6_FILTER:
 		if (get_user(len, optlen))
 			return -EFAULT;
+		if (len < 0)
+			return -EINVAL;
 		if (len > sizeof(struct icmp6_filter))
 			len = sizeof(struct icmp6_filter);
 		if (put_user(len, optlen))

@@ -37,13 +37,6 @@
 #include <asm/sn/intr.h>
 
 
-#if defined (CONFIG_SGI_IP35)
-
-#include <asm/sn/pci/pciio.h>		/* For SN1 + pcibr Addressing Limitation */
-#include <asm/sn/pci/pcibr.h>		/* For SN1 + pcibr Addressing Limitation */
-#include <asm/sn/pci/pcibr_private.h>	/* For SN1 + pcibr Addressing Limitation */
-#endif /* SN1 */
-
 #if DEBUG_INTR_TSTAMP_DEBUG
 #include <sys/debug.h>
 #include <sys/idbg.h>

@@ -35,20 +35,22 @@
 #define IRQ_IOP5		29
 #define IRQ_IOP6		30
 #define IRQ_IOP7		31
-#define IRQ_MOUSERX		32
-#define IRQ_MOUSETX		33
-#define IRQ_ADC			34
-#define IRQ_EVENT1		35
-#define IRQ_EVENT2		36
 
-#define IRQ_ISA_3		40
-#define IRQ_ISA_4		41
-#define IRQ_ISA_5		42
-#define IRQ_ISA_7		43
-#define IRQ_ISA_9		44
-#define IRQ_ISA_10		45
-#define IRQ_ISA_11		46
-#define IRQ_ISA_14		47	
+#define IRQ_MOUSERX		40
+#define IRQ_MOUSETX		41
+#define IRQ_ADC			42
+#define IRQ_EVENT1		43
+#define IRQ_EVENT2		44
+
+#define IRQ_ISA_BASE		48
+#define IRQ_ISA_3		48
+#define IRQ_ISA_4		49
+#define IRQ_ISA_5		50
+#define IRQ_ISA_7		51
+#define IRQ_ISA_9		52
+#define IRQ_ISA_10		53
+#define IRQ_ISA_11		54
+#define IRQ_ISA_14		55	
 
 #define FIQ_INT9		0
 #define FIQ_INT5		1

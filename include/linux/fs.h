@@ -774,6 +774,8 @@ struct file_operations {
 	int (*lock) (struct file *, int, struct file_lock *);
 	ssize_t (*readv) (struct file *, const struct iovec *, unsigned long, loff_t *);
 	ssize_t (*writev) (struct file *, const struct iovec *, unsigned long, loff_t *);
+	ssize_t (*writepage) (struct file *, struct page *, int, size_t, loff_t *, int);
+	unsigned long (*get_unmapped_area)(struct file *, unsigned long, unsigned long, unsigned long, unsigned long);
 };
 
 struct inode_operations {
@@ -1225,6 +1227,7 @@ static inline struct inode * new_inode(struct super_block *sb)
 	}
 	return inode;
 }
+extern void remove_suid(struct inode *inode);
 
 extern void insert_inode_hash(struct inode *);
 extern void remove_inode_hash(struct inode *);
@@ -1272,6 +1275,7 @@ int generic_commit_write(struct file *, struct page *, unsigned, unsigned);
 int block_truncate_page(struct address_space *, loff_t, get_block_t *);
 
 extern int generic_file_mmap(struct file *, struct vm_area_struct *);
+extern int file_read_actor(read_descriptor_t * desc, struct page *page, unsigned long offset, unsigned long size);
 extern ssize_t generic_file_read(struct file *, char *, size_t, loff_t *);
 extern ssize_t generic_file_write(struct file *, const char *, size_t, loff_t *);
 extern void do_generic_file_read(struct file *, loff_t *, read_descriptor_t *, read_actor_t);

@@ -1,4 +1,4 @@
-/* $Id: sungem.h,v 1.5 2001/03/21 23:02:04 davem Exp $
+/* $Id: sungem.h,v 1.7 2001/04/04 14:49:40 davem Exp $
  * sungem.h: Definitions for Sun GEM ethernet driver.
  *
  * Copyright (C) 2000 David S. Miller (davem@redhat.com)
@@ -727,7 +727,10 @@
 #define PCS_DMODE_MGM	0x00000004	/* MII/GMII mode		*/
 #define PCS_DMODE_GMOE	0x00000008	/* GMII Output Enable		*/
 
-/* Serialink Control Register. */
+/* Serialink Control Register.
+ *
+ * NOTE: When in SERDES mode, the loopback bit has inverse logic.
+ */
 #define PCS_SCTRL_LOOP	0x00000001	/* Loopback enable		*/
 #define PCS_SCTRL_ESCD	0x00000002	/* Enable sync char detection	*/
 #define PCS_SCTRL_LOCK	0x00000004	/* Lock to reference clock	*/
@@ -837,8 +840,8 @@ struct gem_rxd {
 #define RXDCTRL_ALTMAC	0x2000000000000000	/* Matched ALT MAC	*/
 #define RXDCTRL_BAD	0x4000000000000000	/* Frame has bad CRC	*/
 
-#define RXDCTRL_FRESH	\
-	((((RX_BUF_ALLOC_SIZE - RX_OFFSET) << 16) & RXDCTRL_BUFSZ) | \
+#define RXDCTRL_FRESH(gp)	\
+	((((RX_BUF_ALLOC_SIZE(gp) - RX_OFFSET) << 16) & RXDCTRL_BUFSZ) | \
 	 RXDCTRL_OWN)
 
 #define TX_RING_SIZE 128
@@ -897,7 +900,7 @@ struct gem_rxd {
 	  (GP)->tx_old - (GP)->tx_new - 1)
 
 #define RX_OFFSET          2
-#define RX_BUF_ALLOC_SIZE  (1546 + RX_OFFSET + 64)
+#define RX_BUF_ALLOC_SIZE(gp)	((gp)->dev->mtu + 46 + RX_OFFSET + 64)
 
 #define RX_COPY_THRESHOLD  256
 

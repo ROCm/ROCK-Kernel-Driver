@@ -17,6 +17,7 @@
 
 #include <asm/io_unknown.h>
 
+#include <asm/rtc.h>
 /*
  * The Machine Vector
  */
@@ -61,9 +62,11 @@ struct sh_machine_vector mv_unknown __initmv = {
 	mv_writel:		unknown_writel,
 
 	mv_ioremap:		unknown_ioremap,
-	mv_ioremap_nocache:	unknown_ioremap_nocache,
 	mv_iounmap:		unknown_iounmap,
 
 	mv_isa_port2addr:	unknown_isa_port2addr,
+
+	mv_rtc_gettimeofday:	sh_rtc_gettimeofday,
+	mv_rtc_settimeofday:	sh_rtc_settimeofday,
 };
 ALIAS_MV(unknown)

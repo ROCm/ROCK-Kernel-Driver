@@ -99,9 +99,9 @@
  * < 30.Sep.93: first versions
  */
 
-static int debuglevel = 0; /* debug-printk 0: off 1: a few 2: more */
-static int automatic_resume = 0; /* experimental .. better should be zero */
-static int rfdadd = 0; /* rfdadd=1 may be better for 8K MEM cards */
+static int debuglevel;	/* debug-printk 0: off 1: a few 2: more */
+static int automatic_resume; /* experimental .. better should be zero */
+static int rfdadd;	/* rfdadd=1 may be better for 8K MEM cards */
 static int fifo=0x8;	/* don't change */
 
 /* #define REALLY_SLOW_IO */
@@ -1289,8 +1289,8 @@ static struct net_device dev_ni52;
 /* set: io,irq,memstart,memend or set it when calling insmod */
 static int irq=9;
 static int io=0x300;
-static long memstart=0; /* e.g 0xd0000 */
-static long memend=0;	 /* e.g 0xd4000 */
+static long memstart;	/* e.g 0xd0000 */
+static long memend;	/* e.g 0xd4000 */
 
 MODULE_PARM(io, "i");
 MODULE_PARM(irq, "i");

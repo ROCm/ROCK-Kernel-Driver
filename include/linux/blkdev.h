@@ -161,7 +161,6 @@ extern void blkdev_release_request(struct request *);
 extern void blk_init_queue(request_queue_t *, request_fn_proc *);
 extern void blk_cleanup_queue(request_queue_t *);
 extern void blk_queue_headactive(request_queue_t *, int);
-extern void blk_queue_pluggable(request_queue_t *, plug_device_fn *);
 extern void blk_queue_make_request(request_queue_t *, make_request_fn *);
 extern void generic_unplug_device(void *);
 

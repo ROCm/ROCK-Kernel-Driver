@@ -1,7 +1,7 @@
 /*
  *  linux/include/asm-arm/proc-armv/cache.h
  *
- *  Copyright (C) 1999-2000 Russell King
+ *  Copyright (C) 1999-2001 Russell King
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -154,3 +154,9 @@ static __inline__ void flush_page_to_ram(struct page *page)
 			cpu_tlb_invalidate_page((_page),		\
 				 ((_vma)->vm_flags & VM_EXEC));		\
 	} while (0)
+
+/*
+ * 32-bit ARM Processors don't have any MMU cache
+ */
+#define update_mmu_cache(vma,address,pte) do { } while (0)
+

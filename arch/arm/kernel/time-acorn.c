@@ -28,17 +28,17 @@ static unsigned long ioctime_gettimeoffset(void)
 	unsigned int count1, count2, status1, status2;
 	unsigned long offset = 0;
 
-	status1 = inb(IOC_IRQREQA);
+	status1 = ioc_readb(IOC_IRQREQA);
 	barrier ();
-	outb (0, IOC_T0LATCH);
+	ioc_writeb (0, IOC_T0LATCH);
 	barrier ();
-	count1 = inb(IOC_T0CNTL) | (inb(IOC_T0CNTH) << 8);
+	count1 = ioc_readb(IOC_T0CNTL) | (ioc_readb(IOC_T0CNTH) << 8);
 	barrier ();
-	status2 = inb(IOC_IRQREQA);
+	status2 = ioc_readb(IOC_IRQREQA);
 	barrier ();
-	outb (0, IOC_T0LATCH);
+	ioc_writeb (0, IOC_T0LATCH);
 	barrier ();
-	count2 = inb(IOC_T0CNTL) | (inb(IOC_T0CNTH) << 8);
+	count2 = ioc_readb(IOC_T0CNTL) | (ioc_readb(IOC_T0CNTH) << 8);
 
 	if (count2 < count1) {
 		/*
@@ -67,9 +67,9 @@ static unsigned long ioctime_gettimeoffset(void)
 
 void __init ioctime_init(void)
 {
-	outb(LATCH & 255, IOC_T0LTCHL);
-	outb(LATCH >> 8, IOC_T0LTCHH);
-	outb(0, IOC_T0GO);
+	ioc_writeb(LATCH & 255, IOC_T0LTCHL);
+	ioc_writeb(LATCH >> 8, IOC_T0LTCHH);
+	ioc_writeb(0, IOC_T0GO);
 
 	gettimeoffset = ioctime_gettimeoffset;
 }

@@ -17,8 +17,6 @@ obj-y		:= backtrace.o changebit.o csumipv6.o csumpartial.o   \
 obj-m		:=
 obj-n		:=
 
-export-objs	:= io.o
-
 obj-arc		:= ecard.o io-acorn.o floppydma.o
 obj-rpc		:= ecard.o io-acorn.o floppydma.o
 obj-clps7500	:= io-acorn.o
@@ -47,10 +45,6 @@ obj-y		+= io-writesl.o
 
 ifeq ($(PROCESSOR),armo)
   obj-y		+= uaccess-armo.o
-endif
-
-ifneq ($(MACHINE),ebsa110)
-  obj-y		+= io.o
 endif
 
 include $(TOPDIR)/Rules.make

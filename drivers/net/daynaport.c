@@ -250,12 +250,12 @@ static int __init apple_8390_mem_probe(volatile unsigned short *p)
 
 int __init mac8390_probe(struct net_device *dev)
 {
-	static int slots = 0;
+	static int slots;
 	volatile unsigned short *i;
 	volatile unsigned char *p;
 	int plen;
 	int id;
-	static struct nubus_dev* ndev = NULL;
+	static struct nubus_dev* ndev;
 
 	/* Find the first card that hasn't already been seen */
 	while ((ndev = nubus_find_type(NUBUS_CAT_NETWORK,

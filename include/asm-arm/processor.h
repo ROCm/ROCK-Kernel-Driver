@@ -38,6 +38,7 @@ typedef unsigned long mm_segment_t;		/* domain register	*/
 
 #define EISA_bus 0
 #define MCA_bus 0
+#define MCA_bus__is_a_macro
 
 #include <asm/atomic.h>
 #include <asm/ptrace.h>

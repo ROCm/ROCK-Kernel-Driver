@@ -1,4 +1,4 @@
-/* $Id: head.S,v 1.75 2001/03/22 09:54:26 davem Exp $
+/* $Id: head.S,v 1.77 2001/04/05 12:44:34 davem Exp $
  * head.S: Initial boot code for the Sparc64 port of Linux.
  *
  * Copyright (C) 1996,1997 David S. Miller (davem@caip.rutgers.edu)
@@ -90,13 +90,25 @@ cheetah_boot:
 	mov	DCR_BPE | DCR_RPE | DCR_SI | DCR_IFPOE | DCR_MS, %g1
 	wr	%g1, %asr18
 
-	sethi	%uhi(DCU_ME | DCU_RE | DCU_PE | DCU_HPE | DCU_SPE | DCU_SL | DCU_WE), %g5
-	or	%g5, %ulo(DCU_ME | DCU_RE | DCU_PE | DCU_HPE | DCU_SPE | DCU_SL | DCU_WE), %g5
+	sethi	%uhi(DCU_ME | DCU_RE | /*DCU_PE |*/ DCU_HPE | DCU_SPE | DCU_SL | DCU_WE), %g5
+	or	%g5, %ulo(DCU_ME | DCU_RE | /*DCU_PE |*/ DCU_HPE | DCU_SPE | DCU_SL | DCU_WE), %g5
 	sllx	%g5, 32, %g5
 	or	%g5, DCU_DM | DCU_IM | DCU_DC | DCU_IC, %g5
-	ldxa	[%g0] ASI_DCU_CONTROL_REG, %g3
-	or	%g5, %g3, %g5
 	stxa	%g5, [%g0] ASI_DCU_CONTROL_REG
+	membar	#Sync
+
+	mov	TSB_EXTENSION_P, %g3
+	stxa	%g0, [%g3] ASI_DMMU
+	stxa	%g0, [%g3] ASI_IMMU
+	membar	#Sync
+
+	mov	TSB_EXTENSION_S, %g3
+	stxa	%g0, [%g3] ASI_DMMU
+	membar	#Sync
+
+	mov	TSB_EXTENSION_N, %g3
+	stxa	%g0, [%g3] ASI_DMMU
+	stxa	%g0, [%g3] ASI_IMMU
 	membar	#Sync
 
 	wrpr    %g0, (PSTATE_PRIV|PSTATE_PEF|PSTATE_IE), %pstate

@@ -77,7 +77,7 @@ extern int stop_a_enabled;
 #endif
 
 #ifdef CONFIG_ARCH_S390
-#ifdef CONFIG_IEEEFPU_EMULATION
+#ifdef CONFIG_MATHEMU
 extern int sysctl_ieee_emulation_warnings;
 #endif
 extern int sysctl_userprocess_debug;
@@ -242,7 +242,7 @@ static ctl_table kern_table[] = {
 	 &proc_dointvec_minmax, &sysctl_intvec, NULL,
 	 &minolduid, &maxolduid},
 #ifdef CONFIG_ARCH_S390
-#ifdef CONFIG_IEEEFPU_EMULATION
+#ifdef CONFIG_MATHEMU
 	{KERN_IEEE_EMULATION_WARNINGS,"ieee_emulation_warnings",
 	 &sysctl_ieee_emulation_warnings,sizeof(int),0644,NULL,&proc_dointvec},
 #endif

@@ -93,9 +93,9 @@ char *get_options (char *str, int nints, int *ints)
  *	megabyte, or one gigabyte, respectively.
  */
 
-unsigned long memparse (char *ptr, char **retptr)
+unsigned long long memparse (char *ptr, char **retptr)
 {
-	unsigned long ret = simple_strtoul (ptr, retptr, 0);
+	unsigned long long ret = simple_strtoull (ptr, retptr, 0);
 
 	switch (**retptr) {
 	case 'G':

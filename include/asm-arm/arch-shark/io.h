@@ -1,7 +1,7 @@
 /*
  * linux/include/asm-arm/arch-shark/io.h
  *
- * by Alexander.Schulz@stud.uni-karlsruhe.de
+ * by Alexander Schulz <aschulz@netwinder.org>
  *
  * derived from:
  * linux/include/asm-arm/arch-ebsa110/io.h

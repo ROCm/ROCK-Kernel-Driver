@@ -12,6 +12,8 @@
 #ifndef __MACH_TQM8xx_DEFS
 #define __MACH_TQM8xx_DEFS
 
+#include <linux/config.h>
+
 #ifndef __ASSEMBLY__
 
 typedef	void (interrupt_handler_t)(void *);

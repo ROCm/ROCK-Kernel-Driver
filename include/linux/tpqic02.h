@@ -588,7 +588,7 @@
  */
 
 #define	TP_REWCLOSE(d)	((MINOR(d)&0x01) == 1)	   		/* rewind bit */
-			   /* rewind is only done if data has been transfered */
+			   /* rewind is only done if data has been transferred */
 #define	TP_DENS(dev)	((MINOR(dev) >> 1) & 0x07) 	      /* tape density */
 #define TP_UNIT(dev)	((MINOR(dev) >> 4) & 0x07)	       /* unit number */
 
@@ -633,8 +633,8 @@ struct tpstatus {	/* sizeof(short)==2), LSB first */
 #define EXC_WP		3	/* Write protected */
 #define EXC_EOM		4	/* EOM */
 #define EXC_RWA		5	/* read/write abort */
-#define EXC_XBAD	6	/* read error, bad block transfered */
-#define EXC_XFILLER	7	/* read error, filler block transfered */
+#define EXC_XBAD	6	/* read error, bad block transferred */
+#define EXC_XFILLER	7	/* read error, filler block transferred */
 #define EXC_NDT		8	/* read error, no data */
 #define EXC_NDTEOM	9	/* read error, no data & EOM */
 #define EXC_NDTBOM	10	/* read error, no data & BOM */

@@ -1031,7 +1031,7 @@ static ctl_table arlan_root_table[] =
 
 
 
-static struct ctl_table_header *arlan_device_sysctl_header = NULL;
+static struct ctl_table_header *arlan_device_sysctl_header;
 
 int init_arlan_proc(void)
 {

@@ -5,7 +5,7 @@
  *
  *		PACKET - implements raw packet sockets.
  *
- * Version:	$Id: af_packet.c,v 1.47 2000/12/08 17:15:54 davem Exp $
+ * Version:	$Id: af_packet.c,v 1.54 2001/03/03 01:20:11 davem Exp $
  *
  * Authors:	Ross Biro, <bir7@leland.Stanford.Edu>
  *		Fred N. van Kempen, <waltje@uWalt.NL.Mugnet.ORG>
@@ -149,7 +149,7 @@ dev->hard_header == NULL (ll header is added by device, we cannot control it)
  */
 
 /* List of all packet sockets. */
-static struct sock * packet_sklist = NULL;
+static struct sock * packet_sklist;
 static rwlock_t packet_sklist_lock = RW_LOCK_UNLOCKED;
 
 atomic_t packet_socks_nr;
@@ -404,6 +404,7 @@ static int packet_rcv(struct sk_buff *skb, struct net_device *dev,  struct packe
 	struct sockaddr_ll *sll;
 	struct packet_opt *po;
 	u8 * skb_head = skb->data;
+	int skb_len = skb->len;
 #ifdef CONFIG_FILTER
 	unsigned snaplen;
 #endif
@@ -461,7 +462,7 @@ static int packet_rcv(struct sk_buff *skb, struct net_device *dev,  struct packe
 
 		if (skb_head != skb->data) {
 			skb->data = skb_head;
-			skb->len = skb->tail - skb->data;
+			skb->len = skb_len;
 		}
 		kfree_skb(skb);
 		skb = nskb;
@@ -479,8 +480,8 @@ static int packet_rcv(struct sk_buff *skb, struct net_device *dev,  struct packe
 		sll->sll_halen = dev->hard_header_parse(skb, sll->sll_addr);
 
 #ifdef CONFIG_FILTER
-	if (skb->len > snaplen)
-		__skb_trim(skb, snaplen);
+	if (pskb_trim(skb, snaplen))
+		goto drop_n_acct;
 #endif
 
 	skb_set_owner_r(skb, sk);
@@ -502,7 +503,7 @@ drop_n_restore:
 #endif
 	if (skb_head != skb->data && skb_shared(skb)) {
 		skb->data = skb_head;
-		skb->len = skb->tail - skb->data;
+		skb->len = skb_len;
 	}
 drop:
 	kfree_skb(skb);
@@ -517,6 +518,7 @@ static int tpacket_rcv(struct sk_buff *skb, struct net_device *dev,  struct pack
 	struct sockaddr_ll *sll;
 	struct tpacket_hdr *h;
 	u8 * skb_head = skb->data;
+	int skb_len = skb->len;
 	unsigned snaplen;
 	unsigned long status = TP_STATUS_LOSING|TP_STATUS_USER;
 	unsigned short macoff, netoff;
@@ -534,6 +536,8 @@ static int tpacket_rcv(struct sk_buff *skb, struct net_device *dev,  struct pack
 		else if (skb->pkt_type == PACKET_OUTGOING) {
 			/* Special case: outgoing packets have ll header at head */
 			skb_pull(skb, skb->nh.raw - skb->data);
+			if (skb->ip_summed == CHECKSUM_HW)
+				status |= TP_STATUS_CSUMNOTREADY;
 		}
 	}
 
@@ -580,6 +584,8 @@ static int tpacket_rcv(struct sk_buff *skb, struct net_device *dev,  struct pack
 		if ((int)snaplen < 0)
 			snaplen = 0;
 	}
+	if (snaplen > skb->len-skb->data_len)
+		snaplen = skb->len-skb->data_len;
 
 	spin_lock(&sk->receive_queue.lock);
 	h = po->iovec[po->head];
@@ -623,7 +629,7 @@ static int tpacket_rcv(struct sk_buff *skb, struct net_device *dev,  struct pack
 drop_n_restore:
 	if (skb_head != skb->data && skb_shared(skb)) {
 		skb->data = skb_head;
-		skb->len = skb->tail - skb->data;
+		skb->len = skb_len;
 	}
 drop:
         kfree_skb(skb);
@@ -682,7 +688,7 @@ static int packet_sendmsg(struct socket *sock, struct msghdr *msg, int len,
 	if (len > dev->mtu+reserve)
 		goto out_unlock;
 
-	skb = sock_alloc_send_skb(sk, len+dev->hard_header_len+15, 0, 
+	skb = sock_alloc_send_skb(sk, len+dev->hard_header_len+15, 
 				msg->msg_flags & MSG_DONTWAIT, &err);
 	if (skb==NULL)
 		goto out_unlock;
@@ -1051,8 +1057,7 @@ static int packet_recvmsg(struct socket *sock, struct msghdr *msg, int len,
 		msg->msg_flags|=MSG_TRUNC;
 	}
 
-	/* We can't use skb_copy_datagram here */
-	err = memcpy_toiovec(msg->msg_iov, skb->data, copied);
+	err = skb_copy_datagram_iovec(skb, 0, msg->msg_iov, copied);
 	if (err)
 		goto out_free;
 
@@ -1318,6 +1323,9 @@ int packet_getsockopt(struct socket *sock, int level, int optname,
   	if (get_user(len,optlen))
   		return -EFAULT;
 
+	if (len < 0)
+		return -EINVAL;
+		
 	switch(optname)	{
 	case PACKET_STATISTICS:
 	{
@@ -1780,6 +1788,7 @@ struct proto_ops packet_ops_spkt = {
 	sendmsg:	packet_sendmsg_spkt,
 	recvmsg:	packet_recvmsg,
 	mmap:		sock_no_mmap,
+	sendpage:	sock_no_sendpage,
 };
 #endif
 
@@ -1801,17 +1810,16 @@ struct proto_ops packet_ops = {
 	sendmsg:	packet_sendmsg,
 	recvmsg:	packet_recvmsg,
 	mmap:		packet_mmap,
+	sendpage:	sock_no_sendpage,
 };
 
 static struct net_proto_family packet_family_ops = {
-	PF_PACKET,
-	packet_create
+	family:		PF_PACKET,
+	create:		packet_create,
 };
 
-struct notifier_block packet_netdev_notifier={
-	packet_notifier,
-	NULL,
-	0
+static struct notifier_block packet_netdev_notifier = {
+	notifier_call:	packet_notifier,
 };
 
 #ifdef CONFIG_PROC_FS
@@ -1864,18 +1872,13 @@ done:
 }
 #endif
 
-
-
 static void __exit packet_exit(void)
 {
-#ifdef CONFIG_PROC_FS
 	remove_proc_entry("net/packet", 0);
-#endif
 	unregister_netdevice_notifier(&packet_netdev_notifier);
 	sock_unregister(PF_PACKET);
 	return;
 }
-
 
 static int __init packet_init(void)
 {
@@ -1886,7 +1889,6 @@ static int __init packet_init(void)
 #endif
 	return 0;
 }
-
 
 module_init(packet_init);
 module_exit(packet_exit);

@@ -28,7 +28,11 @@ static void puts(const char *s)
 	ldrb	%0, [%2], #1
 	teq	%0, #0
 	bne	1b
-3:	" : : "r" (0), "r" (0), "r" (s), "r" (0xf0000be0) : "cc");
+3:	ldrb	%1, [%3, #0x14]
+	and	%1, %1, #0x60
+	teq	%1, #0x60
+	bne	3b
+	" : : "r" (0), "r" (0), "r" (s), "r" (0xf0000be0) : "cc");
 }
 
 /*

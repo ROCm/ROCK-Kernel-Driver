@@ -407,6 +407,9 @@ static int nr_getsockopt(struct socket *sock, int level, int optname,
 	if (get_user(len, optlen))
 		return -EFAULT;
 
+	if (len < 0)
+		return -EINVAL;
+		
 	switch (optname) {
 		case NETROM_T1:
 			val = sk->protinfo.nr->t1 / HZ;
@@ -1010,7 +1013,7 @@ static int nr_sendmsg(struct socket *sock, struct msghdr *msg, int len, struct s
 	SOCK_DEBUG(sk, "NET/ROM: sendto: building packet.\n");
 	size = len + AX25_BPQ_HEADER_LEN + AX25_MAX_HEADER_LEN + NR_NETWORK_LEN + NR_TRANSPORT_LEN;
 
-	if ((skb = sock_alloc_send_skb(sk, size, 0, msg->msg_flags & MSG_DONTWAIT, &err)) == NULL)
+	if ((skb = sock_alloc_send_skb(sk, size, msg->msg_flags & MSG_DONTWAIT, &err)) == NULL)
 		return err;
 
 	skb_reserve(skb, size - len);
@@ -1224,10 +1227,9 @@ static int nr_get_info(char *buffer, char **start, off_t offset, int length)
 	return(len);
 } 
 
-static struct net_proto_family nr_family_ops = 
-{
-	PF_NETROM,
-	nr_create
+static struct net_proto_family nr_family_ops = {
+	family:		PF_NETROM,
+	create:		nr_create,
 };
 
 static struct proto_ops SOCKOPS_WRAPPED(nr_proto_ops) = {
@@ -1248,21 +1250,28 @@ static struct proto_ops SOCKOPS_WRAPPED(nr_proto_ops) = {
 	sendmsg:	nr_sendmsg,
 	recvmsg:	nr_recvmsg,
 	mmap:		sock_no_mmap,
+	sendpage:	sock_no_sendpage,
 };
 
 #include <linux/smp_lock.h>
 SOCKOPS_WRAP(nr_proto, PF_NETROM);
 
 static struct notifier_block nr_dev_notifier = {
-	nr_device_event,
-	0
+	notifier_call:	nr_device_event,
 };
 
 static struct net_device *dev_nr;
 
+static const char banner[] __initdata = KERN_INFO "G4KLX NET/ROM for Linux. Version 0.7 for AX25.037 Linux 2.4\n";
+
 static int __init nr_proto_init(void)
 {
 	int i;
+
+	if (nr_ndevs * sizeof(struct net_device) >= KMALLOC_MAXSIZE) {
+		printk(KERN_ERR "NET/ROM: nr_proto_init - nr_ndevs parameter to large\n");
+		return -1;
+	}
 
 	if ((dev_nr = kmalloc(nr_ndevs * sizeof(struct net_device), GFP_KERNEL)) == NULL) {
 		printk(KERN_ERR "NET/ROM: nr_proto_init - unable to allocate device structure\n");
@@ -1279,7 +1288,7 @@ static int __init nr_proto_init(void)
 
 	sock_register(&nr_family_ops);
 	register_netdevice_notifier(&nr_dev_notifier);
-	printk(KERN_INFO "G4KLX NET/ROM for Linux. Version 0.7 for AX25.037 Linux 2.4\n");
+	printk(banner);
 
 	ax25_protocol_register(AX25_P_NETROM, nr_route_frame);
 	ax25_linkfail_register(nr_link_failed);

@@ -7,7 +7,7 @@
  *
  *	Adapted from linux/net/ipv4/af_inet.c
  *
- *	$Id: af_inet6.c,v 1.60 2000/10/19 01:05:34 davem Exp $
+ *	$Id: af_inet6.c,v 1.63 2001/03/02 03:13:05 davem Exp $
  *
  * 	Fixes:
  * 	Hideaki YOSHIFUJI	:	sin6_scope_id support
@@ -461,6 +461,7 @@ struct proto_ops inet6_stream_ops = {
 	sendmsg:	inet_sendmsg,			/* ok		*/
 	recvmsg:	inet_recvmsg,			/* ok		*/
 	mmap:		sock_no_mmap,
+	sendpage:	tcp_sendpage
 };
 
 struct proto_ops inet6_dgram_ops = {
@@ -481,6 +482,7 @@ struct proto_ops inet6_dgram_ops = {
 	sendmsg:	inet_sendmsg,			/* ok		*/
 	recvmsg:	inet_recvmsg,			/* ok		*/
 	mmap:		sock_no_mmap,
+	sendpage:	sock_no_sendpage,
 };
 
 struct net_proto_family inet6_family_ops = {

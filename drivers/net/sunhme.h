@@ -1,4 +1,4 @@
-/* $Id: sunhme.h,v 1.31 2000/11/12 10:23:30 davem Exp $
+/* $Id: sunhme.h,v 1.32 2000/12/13 18:31:47 davem Exp $
  * sunhme.h: Definitions for Sparc HME/BigMac 10/100baseT ethernet driver.
  *           Also known as the "Happy Meal".
  *
@@ -151,7 +151,8 @@
 #define ERX_CFG_SIZE128      0x00000400 /* Receive ring size == 128  */
 #define ERX_CFG_SIZE256      0x00000600 /* Receive ring size == 256  */
 #define ERX_CFG_RESV3        0x0000f800 /* Unused...                 */
-#define ERX_CFG_CSUMSTART    0x007f0000 /* Offset of checksum start  */
+#define ERX_CFG_CSUMSTART    0x007f0000 /* Offset of checksum start,
+					 * in halfwords. */
 
 /* I'd like a Big Mac, small fries, small coke, and SparcLinux please. */
 #define BMAC_XIFCFG	0x0000UL	/* XIF config register                */
@@ -445,14 +446,31 @@ struct happy_meal_txd {
 #define TX_RING_SIZE       32         /* Must be >16 and <255, multiple of 16  */
 #define RX_RING_SIZE       32         /* see ERX_CFG_SIZE* for possible values */
 
+#if (TX_RING_SIZE < 16 || TX_RING_SIZE > 256 || (TX_RING_SIZE % 16) != 0)
+#error TX_RING_SIZE holds illegal value
+#endif
+
 #define TX_RING_MAXSIZE    256
 #define RX_RING_MAXSIZE    256
 
-/* 34 byte offset for checksum computation.  This works because ip_input() will clear out
- * the skb->csum and skb->ip_summed fields and recompute the csum if IP options are
- * present in the header.  34 == (ethernet header len) + sizeof(struct iphdr)
- */
-#define ERX_CFG_DEFAULT(off) (ERX_CFG_DMAENABLE|((off)<<3)|ERX_CFG_SIZE32|(0x22<<16))
+/* We use a 14 byte offset for checksum computation. */
+#if (RX_RING_SIZE == 32)
+#define ERX_CFG_DEFAULT(off) (ERX_CFG_DMAENABLE|((off)<<3)|ERX_CFG_SIZE32|((14/2)<<16))
+#else
+#if (RX_RING_SIZE == 64)
+#define ERX_CFG_DEFAULT(off) (ERX_CFG_DMAENABLE|((off)<<3)|ERX_CFG_SIZE64|((14/2)<<16))
+#else
+#if (RX_RING_SIZE == 128)
+#define ERX_CFG_DEFAULT(off) (ERX_CFG_DMAENABLE|((off)<<3)|ERX_CFG_SIZE128|((14/2)<<16))
+#else
+#if (RX_RING_SIZE == 256)
+#define ERX_CFG_DEFAULT(off) (ERX_CFG_DMAENABLE|((off)<<3)|ERX_CFG_SIZE256|((14/2)<<16))
+#else
+#error RX_RING_SIZE holds illegal value
+#endif
+#endif
+#endif
+#endif
 
 #define NEXT_RX(num)       (((num) + 1) & (RX_RING_SIZE - 1))
 #define NEXT_TX(num)       (((num) + 1) & (TX_RING_SIZE - 1))

@@ -1,11 +1,11 @@
 /*
  * linux/include/asm-arm/arch-cl7500/uncompress.h
  *
- * Copyright (C) 1999 Nexus Electronics Ltd.
+ * Copyright (C) 1999, 2000 Nexus Electronics Ltd.
  */
 
 #define BASE 0x03010000
-#define SERBASE (BASE + (0x3f8 << 2))
+#define SERBASE (BASE + (0x2f8 << 2))
 
 static __inline__ void putc(char c)
 {

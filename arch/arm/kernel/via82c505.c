@@ -106,8 +106,8 @@ dummy_read_config_dword(struct pci_dev *dev, int where, u32 *value)
 	    break;
 	  case PCI_BASE_ADDRESS_0:
 	    if (size_wanted) {
-	      /* 0x00900000 bytes long */
-	      *value = 0xff700000;
+	      /* 0x00900000 bytes long (0xff700000) */
+	      *value = 0xff000000;
 	      size_wanted = 0;
 	    } else {
 	      *value = FB_START;
@@ -117,7 +117,7 @@ dummy_read_config_dword(struct pci_dev *dev, int where, u32 *value)
 	    *value = 6;
 	    break;
 	  default:
-	    *value=0;
+	    *value = 0;
 	  }
 	return PCIBIOS_SUCCESSFUL;
 }

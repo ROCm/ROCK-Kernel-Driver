@@ -207,7 +207,7 @@ struct tagtable {
 /*
  * Memory map description
  */
-#define NR_BANKS 4
+#define NR_BANKS 8
 
 struct meminfo {
 	int nr_banks;

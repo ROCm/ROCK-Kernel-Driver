@@ -1,6 +1,19 @@
 #ifndef _ACENIC_H_
 #define _ACENIC_H_
 
+
+/*
+ * Generate TX index update each time, when TX ring is closed.
+ * Normally, this is not useful, because results in more dma (and irqs
+ * without TX_COAL_INTS_ONLY).
+ */
+#define USE_TX_COAL_NOW	 0
+
+#ifndef MAX_SKB_FRAGS
+#define MAX_SKB_FRAGS 0
+#endif
+
+
 /*
  * Addressing:
  *
@@ -258,7 +271,12 @@ typedef struct {
  * DMA config
  */
 
+#define DMA_THRESH_1W		0x10
+#define DMA_THRESH_2W		0x20
+#define DMA_THRESH_4W		0x40
 #define DMA_THRESH_8W		0x80
+#define DMA_THRESH_16W		0x100
+#define DMA_THRESH_32W		0x0	/* not described in doc, but exists. */
 
 
 /*
@@ -399,6 +417,7 @@ struct cmd {
 #define BD_FLG_IP_SUM		0x02
 #define BD_FLG_END		0x04
 #define BD_FLG_JUMBO		0x10
+#define BD_FLG_COAL_NOW		0x800
 #define BD_FLG_MINI		0x1000
 
 
@@ -407,6 +426,7 @@ struct cmd {
  */
 #define RCB_FLG_TCP_UDP_SUM	0x01
 #define RCB_FLG_IP_SUM		0x02
+#define RCB_FLG_NO_PSEUDO_HDR	0x08
 #define RCB_FLG_VLAN_ASSIST	0x10
 #define RCB_FLG_COAL_INT_ONLY	0x20
 #define RCB_FLG_TX_HOST_RING	0x40
@@ -561,12 +581,29 @@ struct ace_info {
 	aceaddr	stats2_ptr;
 };
 
+#if defined(CONFIG_X86) || defined(CONFIG_PPC)
+/* Intel has null pci_unmap_single, no reasons to remember mapping. */
+#define DUMMY_PCI_UNMAP
+#endif
 
 struct ring_info {
 	struct sk_buff		*skb;
+#ifndef DUMMY_PCI_UNMAP
 	dma_addr_t		mapping;
+#endif
 };
 
+/* Funny... As soon as we add maplen on alpha, it starts to work
+ * much slower. Hmm... is it because struct does not fit to one cacheline?
+ * So, split tx_ring_info.
+ */
+struct tx_ring_info {
+	struct sk_buff		*skb;
+#ifndef DUMMY_PCI_UNMAP
+	dma_addr_t		mapping;
+	int			maplen;
+#endif
+};
 
 /*
  * struct ace_skb holding the rings of skb's. This is an awful lot of
@@ -575,7 +612,7 @@ struct ring_info {
  */
 struct ace_skb
 {
-	struct ring_info	tx_skbuff[TX_RING_ENTRIES];
+	struct tx_ring_info	tx_skbuff[TX_RING_ENTRIES];
 	struct ring_info	rx_std_skbuff[RX_STD_RING_ENTRIES];
 	struct ring_info	rx_mini_skbuff[RX_MINI_RING_ENTRIES];
 	struct ring_info	rx_jumbo_skbuff[RX_JUMBO_RING_ENTRIES];
@@ -605,11 +642,10 @@ struct ace_private
 	/*
 	 * TX elements
 	 */
-	struct tx_desc		*tx_ring
-				__attribute__ ((aligned (SMP_CACHE_BYTES)));
-	struct timer_list	timer;		/* used by TX handling only */
+	struct tx_desc		*tx_ring;
 	u32			tx_prd;
-	volatile u32		tx_full, tx_ret_csm;
+	volatile u32		tx_ret_csm;
+	struct timer_list	timer;
 
 	/*
 	 * RX elements
@@ -655,6 +691,22 @@ struct ace_private
 #endif
 	struct net_device_stats stats;
 };
+
+
+#define TX_RESERVED	MAX_SKB_FRAGS
+
+static inline int tx_space (u32 csm, u32 prd)
+{
+	return (csm - prd - 1) & (TX_RING_ENTRIES - 1);
+}
+
+#define tx_free(ap) 		tx_space((ap)->tx_ret_csm, (ap)->tx_prd)
+
+#if MAX_SKB_FRAGS
+#define tx_ring_full(csm, prd)	(tx_space(csm, prd) <= TX_RESERVED)
+#else
+#define tx_ring_full		0
+#endif
 
 
 static inline void set_aceaddr(aceaddr *aa, dma_addr_t addr)
@@ -717,14 +769,10 @@ static int ace_load_firmware(struct net_device *dev);
 static int ace_open(struct net_device *dev);
 static int ace_start_xmit(struct sk_buff *skb, struct net_device *dev);
 static int ace_close(struct net_device *dev);
-static void ace_timer(unsigned long data);
 static void ace_tasklet(unsigned long dev);
 static void ace_dump_trace(struct ace_private *ap);
 static void ace_set_multicast_list(struct net_device *dev);
 static int ace_change_mtu(struct net_device *dev, int new_mtu);
-#ifdef SKB_RECYCLE
-extern int ace_recycle(struct sk_buff *skb);
-#endif
 static int ace_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd);
 static int ace_set_mac_addr(struct net_device *dev, void *p);
 static void ace_set_rxtx_parms(struct net_device *dev, int jumbo);

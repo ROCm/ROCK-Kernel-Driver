@@ -238,7 +238,7 @@ static int __init ne_probe1(struct net_device *dev, int ioaddr)
 	int start_page, stop_page;
 	int neX000, ctron, copam, bad_card;
 	int reg0, ret;
-	static unsigned version_printed = 0;
+	static unsigned version_printed;
 
 	if (!request_region(ioaddr, NE_IO_EXTENT, dev->name))
 		return -EBUSY;

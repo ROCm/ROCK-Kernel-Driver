@@ -22,9 +22,11 @@
 #include <linux/nubus.h>
 #include <linux/init.h>
 
+#include <asm/machvec.h>
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
 #include <asm/io.h>
+#include <asm/hd64461.h>
 
 #include <linux/fb.h>
 
@@ -32,20 +34,6 @@
 #include <video/fbcon-cfb8.h>
 #include <video/fbcon-cfb16.h>
 
-#include <asm/hd64461.h>
-
-#define CONFIG_SH_LCD_VIDEOBASE		CONFIG_HD64461_IOBASE+0x2000000
-
-/* These are for HP Jornada 680/690.
-   It is desired that they are configurable...  */
-#define CONFIG_SH_LCD_VIDEOSIZE		1024*1024
-#define CONFIG_SH_LCD_HORZ		640
-#define CONFIG_SH_LCD_VERT		240
-#define CONFIG_SH_LCD_DEFAULTBPP	16
-
-struct hitfb_info {
-    struct fb_info_gen gen;
-};
 
 struct hitfb_par
 {
@@ -53,55 +41,79 @@ struct hitfb_par
     int bpp;
 };
 
-static struct hitfb_info fb_info;
-static struct hitfb_par current_par;
-static int current_par_valid = 0;
-static struct display disp;
 
-static union {
+struct hitfb_info {
+    struct fb_info_gen gen;
+    struct display disp;
+    struct hitfb_par current_par;
+    struct fb_var_screeninfo default_var;
+    int current_par_valid;
+    unsigned long hit_videobase, hit_videosize;
+    union {
 #ifdef FBCON_HAS_CFB16
-    u16 cfb16[16];
+	u16 cfb16[16];
 #endif
-} fbcon_cmap;
+    } fbcon_cmap;
+} fb_info = {
+    {},
+    {},
+    {},
+    {},
+    0, 0, 0,
+    {},
+};
 
-unsigned long hit_videobase, hit_videosize;
-static struct fb_var_screeninfo default_var;
 
-int hitfb_init(void);
-
-static void hitfb_set_par(struct hitfb_par *par, const struct fb_info *info);
-static void hitfb_encode_var(struct fb_var_screeninfo *var, 
-			     struct hitfb_par *par,
-			     const struct fb_info *info);
+static void hitfb_set_par(const void *fb_par, struct fb_info_gen *info);
+static int hitfb_encode_var(struct fb_var_screeninfo *var, const void *fb_par,
+			    struct fb_info_gen *info);
 
 
 static void hitfb_detect(void)
 {
     struct hitfb_par par;
+    unsigned short lcdclor, ldr3, ldvntr;
 
-    hit_videobase = CONFIG_SH_LCD_VIDEOBASE;
-    hit_videosize = CONFIG_SH_LCD_VIDEOSIZE;
+    fb_info.hit_videobase = CONFIG_HD64461_IOBASE + 0x02000000;
+    fb_info.hit_videosize = (MACH_HP680 || MACH_HP690) ? 1024*1024 : 512*1024;
 
-    par.x = CONFIG_SH_LCD_HORZ;
-    par.y = CONFIG_SH_LCD_VERT;
-    par.bpp = CONFIG_SH_LCD_DEFAULTBPP;
+    lcdclor = inw(HD64461_LCDCLOR);
+    ldvntr = inw(HD64461_LDVNTR);
+    ldr3 = inw(HD64461_LDR3);
+
+    switch(ldr3&15) {
+    default:
+    case 4:
+        par.bpp = 8;
+	par.x = lcdclor;
+	break;
+    case 8:
+        par.bpp = 16;
+	par.x = lcdclor/2;
+	break;
+    }
+
+    par.y = ldvntr+1;
 
     hitfb_set_par(&par, NULL);
-    hitfb_encode_var(&default_var, &par, NULL);
+    hitfb_encode_var(&fb_info.default_var, &par, NULL);
 }
 
-static int hitfb_encode_fix(struct fb_fix_screeninfo *fix,
-			    struct hitfb_par *par,
-			    const struct fb_info *info)
+
+static int hitfb_encode_fix(struct fb_fix_screeninfo *fix, const void *fb_par,
+			     struct fb_info_gen *info)
 {
+    const struct hitfb_par *par = fb_par;
+
     memset(fix, 0, sizeof(struct fb_fix_screeninfo));
 
     strcpy(fix->id, "Hitachi HD64461");
-    fix->smem_start = hit_videobase;
-    fix->smem_len = hit_videosize;
+    fix->smem_start = fb_info.hit_videobase;
+    fix->smem_len = fb_info.hit_videosize;
     fix->type = FB_TYPE_PACKED_PIXELS;
     fix->type_aux = 0;
-    fix->visual = FB_VISUAL_TRUECOLOR;
+    fix->visual = (par->bpp == 8) ?
+	FB_VISUAL_PSEUDOCOLOR : FB_VISUAL_TRUECOLOR;
     fix->xpanstep = 0;
     fix->ypanstep = 0;
     fix->ywrapstep = 0;
@@ -120,10 +132,11 @@ static int hitfb_encode_fix(struct fb_fix_screeninfo *fix,
 }
 
 
-static int hitfb_decode_var(struct fb_var_screeninfo *var,
-			    struct hitfb_par *par,
-			    const struct fb_info *info)
+static int hitfb_decode_var(const struct fb_var_screeninfo *var, void *fb_par,
+			     struct fb_info_gen *info)
 {
+    struct hitfb_par *par = fb_par;
+
     par->x = var->xres;
     par->y = var->yres;
     par->bpp = var->bits_per_pixel;
@@ -131,10 +144,11 @@ static int hitfb_decode_var(struct fb_var_screeninfo *var,
 }
 
 
-static void hitfb_encode_var(struct fb_var_screeninfo *var, 
-			     struct hitfb_par *par,
-			     const struct fb_info *info)
+static int hitfb_encode_var(struct fb_var_screeninfo *var, const void *fb_par,
+			     struct fb_info_gen *info)
 {
+    const struct hitfb_par *par = fb_par;
+
     memset(var, 0, sizeof(*var));
 
     var->xres = par->x;
@@ -191,25 +205,28 @@ static void hitfb_encode_var(struct fb_var_screeninfo *var,
     var->green.msb_right = 0;
     var->blue.msb_right = 0;
     var->transp.msb_right = 0;
+
+    return 0;
 }
 
 
-static void hitfb_get_par(struct hitfb_par *par, const struct fb_info *info)
+static void hitfb_get_par(void *par, struct fb_info_gen *info)
 {
-    *par = current_par;
+    *(struct hitfb_par *)par = fb_info.current_par;
 }
 
 
-static void hitfb_set_par(struct hitfb_par *par, const struct fb_info *info)
+static void hitfb_set_par(const void *fb_par, struct fb_info_gen *info)
 {
-    /* Set the hardware according to 'par'. */
-    current_par = *par;
-    current_par_valid = 1;
+    const struct hitfb_par *par = fb_par;
+    fb_info.current_par = *par;
+    fb_info.current_par_valid = 1;
 }
 
 
-static int hitfb_getcolreg(u_int regno, u_int *red, u_int *green, u_int *blue,
-                         u_int *transp, struct fb_info *info)
+static int hitfb_getcolreg(unsigned regno, unsigned *red, unsigned *green,
+			   unsigned *blue, unsigned *transp,
+			   struct fb_info *info)
 {
     if (regno > 255)
 	return 1;	
@@ -224,8 +241,9 @@ static int hitfb_getcolreg(u_int regno, u_int *red, u_int *green, u_int *blue,
 }
 
 
-static int hitfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
-                         u_int transp, struct fb_info *info)
+static int hitfb_setcolreg(unsigned regno, unsigned red, unsigned green,
+			   unsigned blue, unsigned transp,
+			   struct fb_info *info)
 {
     if (regno > 255)
 	return 1;
@@ -236,10 +254,10 @@ static int hitfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
     outw(blue>>10, HD64461_CPTWDR);
     
     if(regno<16) {
-	switch(current_par.bpp) {
+	switch(fb_info.current_par.bpp) {
 #ifdef FBCON_HAS_CFB16
 	case 16:
-	    fbcon_cmap.cfb16[regno] =
+	    fb_info.fbcon_cmap.cfb16[regno] =
 		((red   & 0xf800)      ) |
 		((green & 0xfc00) >>  5) |
 		((blue  & 0xf800) >> 11);
@@ -251,16 +269,34 @@ static int hitfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
     return 0;
 }
 
-static int hitfb_blank(int blank_mode, const struct fb_info *info)
+
+static int hitfb_pan_display(const struct fb_var_screeninfo *var,
+			     struct fb_info_gen *info)
 {
+    if (!fb_info.current_par_valid)
+	return -EINVAL;
+
     return 0;
 }
 
 
-static void hitfb_set_disp(const void *par, struct display *disp,
-			   struct fb_info_gen *info)
+static int hitfb_blank(int blank_mode, struct fb_info_gen *info)
 {
-    disp->screen_base = (void *)hit_videobase;
+    if (!fb_info.current_par_valid)
+	return 1;
+
+    return 0;
+}
+
+
+static void hitfb_set_disp(const void *fb_par, struct display *disp,
+			    struct fb_info_gen *info)
+{
+    const struct hitfb_par *par = fb_par;
+
+    disp->screen_base = (void *)fb_info.hit_videobase;
+    disp->scrollmode = SCROLL_YREDRAW;
+
     switch(((struct hitfb_par *)par)->bpp) {
 #ifdef FBCON_HAS_CFB8
     case 8:
@@ -270,7 +306,7 @@ static void hitfb_set_disp(const void *par, struct display *disp,
 #ifdef FBCON_HAS_CFB16
     case 16:
 	disp->dispsw = &fbcon_cfb16;
-	disp->dispsw_data = fbcon_cmap.cfb16;
+	disp->dispsw_data = fb_info.fbcon_cmap.cfb16;
 	break;
 #endif
     default:
@@ -288,18 +324,20 @@ struct fbgen_hwswitch hitfb_switch = {
     hitfb_set_par,
     hitfb_getcolreg,
     hitfb_setcolreg,
-    NULL,
+    hitfb_pan_display,
     hitfb_blank,
     hitfb_set_disp
 };
 
+
 static struct fb_ops hitfb_ops = {
-	owner:		THIS_MODULE,
-	fb_get_fix:	fbgen_get_fix,
-	fb_get_var:	fbgen_get_var,
-	fb_set_var:	fbgen_set_var,
-	fb_get_cmap:	fbgen_get_cmap,
-	fb_set_cmap:	fbgen_set_cmap,
+    owner:		THIS_MODULE,
+    fb_get_fix:		fbgen_get_fix,
+    fb_get_var:		fbgen_get_var,
+    fb_set_var:		fbgen_set_var,
+    fb_get_cmap:	fbgen_get_cmap,
+    fb_set_cmap:	fbgen_set_cmap,
+    fb_pan_display:	fbgen_pan_display,
 };
 
 
@@ -309,7 +347,7 @@ int __init hitfb_init(void)
     fb_info.gen.info.node = -1;
     fb_info.gen.info.flags = FBINFO_FLAG_DEFAULT;
     fb_info.gen.info.fbops = &hitfb_ops;
-    fb_info.gen.info.disp = &disp;
+    fb_info.gen.info.disp = &fb_info.disp;
     fb_info.gen.info.changevar = NULL;
     fb_info.gen.info.switch_con = &fbgen_switch;
     fb_info.gen.info.updatevar = &fbgen_update_var;
@@ -318,9 +356,9 @@ int __init hitfb_init(void)
     fb_info.gen.fbhw = &hitfb_switch;
     fb_info.gen.fbhw->detect();
     
-    fbgen_get_var(&disp.var, -1, &fb_info.gen.info);
-    disp.var.activate = FB_ACTIVATE_NOW;
-    fbgen_do_set_var(&disp.var, 1, &fb_info.gen);
+    fbgen_get_var(&fb_info.disp.var, -1, &fb_info.gen.info);
+    fb_info.disp.var.activate = FB_ACTIVATE_NOW;
+    fbgen_do_set_var(&fb_info.disp.var, 1, &fb_info.gen);
     fbgen_set_disp(-1, &fb_info.gen);
     fbgen_install_cmap(0, &fb_info.gen);
     
@@ -347,6 +385,13 @@ int init_module(void)
 
 void cleanup_module(void)
 {
-    hitfb_cleanup(void);
+  hitfb_cleanup(void);
 }
 #endif
+
+
+/*
+ * Local variables:
+ * c-basic-offset: 4
+ * End:
+ */

@@ -14,27 +14,27 @@
 
 #include <asm/io_generic.h>
 
-extern unsigned long od_inb(unsigned int port);
-extern unsigned long od_inw(unsigned int port);
-extern unsigned long od_inl(unsigned int port);
+extern unsigned char od_inb(unsigned long port);
+extern unsigned short od_inw(unsigned long port);
+extern unsigned int od_inl(unsigned long port);
 
-extern void od_outb(unsigned long value, unsigned int port);
-extern void od_outw(unsigned long value, unsigned int port);
-extern void od_outl(unsigned long value, unsigned int port);
+extern void od_outb(unsigned char value, unsigned long port);
+extern void od_outw(unsigned short value, unsigned long port);
+extern void od_outl(unsigned int value, unsigned long port);
 
-extern unsigned long od_inb_p(unsigned int port);
-extern unsigned long od_inw_p(unsigned int port);
-extern unsigned long od_inl_p(unsigned int port);
-extern void od_outb_p(unsigned long value, unsigned int port);
-extern void od_outw_p(unsigned long value, unsigned int port);
-extern void od_outl_p(unsigned long value, unsigned int port);
+extern unsigned char od_inb_p(unsigned long port);
+extern unsigned short od_inw_p(unsigned long port);
+extern unsigned int od_inl_p(unsigned long port);
+extern void od_outb_p(unsigned char value, unsigned long port);
+extern void od_outw_p(unsigned short value, unsigned long port);
+extern void od_outl_p(unsigned int value, unsigned long port);
 
-extern void od_insb(unsigned int port, void *addr, unsigned long count);
-extern void od_insw(unsigned int port, void *addr, unsigned long count);
-extern void od_insl(unsigned int port, void *addr, unsigned long count);
-extern void od_outsb(unsigned int port, const void *addr, unsigned long count);
-extern void od_outsw(unsigned int port, const void *addr, unsigned long count);
-extern void od_outsl(unsigned int port, const void *addr, unsigned long count);
+extern void od_insb(unsigned long port, void *addr, unsigned long count);
+extern void od_insw(unsigned long port, void *addr, unsigned long count);
+extern void od_insl(unsigned long port, void *addr, unsigned long count);
+extern void od_outsb(unsigned long port, const void *addr, unsigned long count);
+extern void od_outsw(unsigned long port, const void *addr, unsigned long count);
+extern void od_outsl(unsigned long port, const void *addr, unsigned long count);
 
 extern unsigned long od_isa_port2addr(unsigned long offset);
 
@@ -70,7 +70,6 @@ extern unsigned long od_isa_port2addr(unsigned long offset);
 
 # define __isa_port2addr	od_isa_port2addr
 # define __ioremap		generic_ioremap
-# define __ioremap_nocache	generic_ioremap_nocache
 # define __iounmap		generic_iounmap
 
 #endif

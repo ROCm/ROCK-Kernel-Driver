@@ -9,7 +9,6 @@
  */
 
 #include <linux/types.h>
-#include <linux/config.h>
 #include <linux/slab.h>
 #include <asm/sn/sgi.h>
 #include <asm/sn/invent.h>
@@ -17,7 +16,6 @@
 #include <asm/sn/labelcl.h>
 #include <asm/sn/xtalk/xbow.h>
 #include <asm/sn/pci/bridge.h>
-#include <asm/sn/xtalk/xbow.h>
 #include <asm/sn/klconfig.h>
 #include <asm/sn/sn1/hubdev.h>
 #include <asm/sn/module.h>

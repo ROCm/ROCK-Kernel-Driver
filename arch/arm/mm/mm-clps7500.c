@@ -6,6 +6,7 @@
  *
  * Extra MM routines for CL7500 architecture
  */
+#include <linux/types.h>
 #include <linux/init.h>
 
 #include <asm/hardware.h>

@@ -21,7 +21,7 @@
 extern struct proto raw_prot;
 
 
-extern void 	raw_err(struct sock *, struct sk_buff *);
+extern void 	raw_err(struct sock *, struct sk_buff *, u32 info);
 extern int 	raw_rcv(struct sock *, struct sk_buff *);
 
 /* Note: v4 ICMP wants to get at this stuff, if you change the

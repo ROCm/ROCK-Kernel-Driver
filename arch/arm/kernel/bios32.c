@@ -307,7 +307,8 @@ void __init pcibios_fixup_bus(struct pci_bus *bus)
 		 * parity line correctly.
 		 */
 		if (dev->vendor == PCI_VENDOR_ID_INTERG &&
-		    dev->device == PCI_DEVICE_ID_INTERG_2000)
+		    (dev->device == PCI_DEVICE_ID_INTERG_2000 ||
+		     dev->device == PCI_DEVICE_ID_INTERG_2010))
 			busdata->features &= ~(PCI_COMMAND_SERR |
 					       PCI_COMMAND_PARITY);
 
@@ -394,6 +395,7 @@ extern struct hw_pci cats_pci;
 extern struct hw_pci netwinder_pci;
 extern struct hw_pci personal_server_pci;
 extern struct hw_pci ftv_pci;
+extern struct hw_pci shark_pci;
 extern struct hw_pci integrator_pci;
 
 void __init pcibios_init(void)
@@ -406,6 +408,12 @@ void __init pcibios_init(void)
 #ifdef CONFIG_ARCH_EBSA285
 		if (machine_is_ebsa285()) {
 			hw_pci = &ebsa285_pci;
+			break;
+		}
+#endif
+#ifdef CONFIG_ARCH_SHARK
+		if (machine_is_shark()) {
+			hw_pci = &shark_pci;
 			break;
 		}
 #endif
@@ -427,8 +435,8 @@ void __init pcibios_init(void)
 			break;
 		}
 #endif
-#ifdef CONFIG_ARCH_NEXUSPCI
-		if (machine_is_nexuspci()) {
+#ifdef CONFIG_ARCH_FTVPCI
+		if (machine_is_ftvpci()) {
 			hw_pci = &ftv_pci;
 			break;
 		}

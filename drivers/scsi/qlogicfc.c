@@ -1866,7 +1866,9 @@ static int isp2x00_reset_hardware(struct Scsi_Host *host)
 	hostdata = (struct isp2x00_hostdata *) host->hostdata;
 
 	outw(0x01, host->io_port + ISP_CTRL_STATUS);
+	udelay(100);
 	outw(HCCR_RESET, host->io_port + HOST_HCCR);
+	udelay(100);
 	outw(HCCR_RELEASE, host->io_port + HOST_HCCR);
 	outw(HCCR_BIOS_DISABLE, host->io_port + HOST_HCCR);
 

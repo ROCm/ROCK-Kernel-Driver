@@ -5,7 +5,7 @@
  *
  *		Implementation of the Transmission Control Protocol(TCP).
  *
- * Version:	$Id: tcp_timer.c,v 1.81 2001/01/01 02:38:30 davem Exp $
+ * Version:	$Id: tcp_timer.c,v 1.83 2001/03/07 22:00:57 davem Exp $
  *
  * Authors:	Ross Biro, <bir7@leland.Stanford.Edu>
  *		Fred N. van Kempen, <waltje@uWalt.NL.Mugnet.ORG>
@@ -326,6 +326,29 @@ static void tcp_retransmit_timer(struct sock *sk)
 
 	BUG_TRAP(!skb_queue_empty(&sk->write_queue));
 
+	if (tp->snd_wnd == 0 && !sk->dead &&
+	    !((1<<sk->state)&(TCPF_SYN_SENT|TCPF_SYN_RECV))) {
+		/* Receiver dastardly shrinks window. Our retransmits
+		 * become zero probes, but we should not timeout this
+		 * connection. If the socket is an orphan, time it out,
+		 * we cannot allow such beasts to hang infinitely.
+		 */
+#ifdef TCP_DEBUG
+		if (net_ratelimit())
+			printk(KERN_DEBUG "TCP: Treason uncloaked! Peer %u.%u.%u.%u:%u/%u shrinks window %u:%u. Repaired.\n",
+			       NIPQUAD(sk->daddr), htons(sk->dport), sk->num,
+			       tp->snd_una, tp->snd_nxt);
+#endif
+		if (tcp_time_stamp - tp->rcv_tstamp > TCP_RTO_MAX) {
+			tcp_write_err(sk);
+			goto out;
+		}
+		tcp_enter_loss(sk, 0);
+		tcp_retransmit_skb(sk, skb_peek(&sk->write_queue));
+		__sk_dst_reset(sk);
+		goto out_reset_timer;
+	}
+
 	if (tcp_write_timeout(sk))
 		goto out;
 
@@ -379,6 +402,8 @@ static void tcp_retransmit_timer(struct sock *sk)
 	 */
 	tp->backoff++;
 	tp->retransmits++;
+
+out_reset_timer:
 	tp->rto = min(tp->rto << 1, TCP_RTO_MAX);
 	tcp_reset_xmit_timer(sk, TCP_TIME_RETRANS, tp->rto);
 	if (tp->retransmits > sysctl_tcp_retries1)

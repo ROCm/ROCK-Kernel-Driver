@@ -137,7 +137,7 @@ struct lance_private {
 };
 
 #ifdef MODULE
-static struct lance_private *root_a2065_dev = NULL;
+static struct lance_private *root_a2065_dev;
 #endif
 
 #define TX_BUFFS_AVAIL ((lp->tx_old<=lp->tx_new)?\

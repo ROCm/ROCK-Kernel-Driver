@@ -163,7 +163,7 @@ netcard_probe(struct net_device *dev)
 static int __init netcard_probe1(struct net_device *dev, int ioaddr)
 {
 	struct net_local *np;
-	static unsigned version_printed = 0;
+	static unsigned version_printed;
 	int i;
 
 	/*

@@ -1,4 +1,4 @@
-/* $Id: sys_sparc.c,v 1.68 2001/03/24 09:36:10 davem Exp $
+/* $Id: sys_sparc.c,v 1.69 2001/03/27 02:36:37 davem Exp $
  * linux/arch/sparc/kernel/sys_sparc.c
  *
  * This file contains various random system calls that
@@ -36,19 +36,28 @@ asmlinkage unsigned long sys_getpagesize(void)
 
 #define COLOUR_ALIGN(addr)      (((addr)+SHMLBA-1)&~(SHMLBA-1))
 
-unsigned long get_unmapped_area(unsigned long addr, unsigned long len)
+unsigned long arch_get_unmapped_area(struct file *filp, unsigned long addr, unsigned long len, unsigned long pgoff, unsigned long flags)
 {
 	struct vm_area_struct * vmm;
 
+	if (flags & MAP_FIXED) {
+		/* We do not accept a shared mapping if it would violate
+		 * cache aliasing constraints.
+		 */
+		if ((flags & MAP_SHARED) && (addr & (SHMLBA - 1)))
+			return -EINVAL;
+		return addr;
+	}
+
 	/* See asm-sparc/uaccess.h */
 	if (len > TASK_SIZE - PAGE_SIZE)
-		return 0;
+		return -ENOMEM;
 	if (ARCH_SUN4C_SUN4 && len > 0x20000000)
-		return 0;
+		return -ENOMEM;
 	if (!addr)
 		addr = TASK_UNMAPPED_BASE;
 
-	if (current->thread.flags & SPARC_FLAG_MMAPSHARED)
+	if (flags & MAP_SHARED)
 		addr = COLOUR_ALIGN(addr);
 	else
 		addr = PAGE_ALIGN(addr);
@@ -60,11 +69,11 @@ unsigned long get_unmapped_area(unsigned long addr, unsigned long len)
 			vmm = find_vma(current->mm, PAGE_OFFSET);
 		}
 		if (TASK_SIZE - PAGE_SIZE - len < addr)
-			return 0;
+			return -ENOMEM;
 		if (!vmm || addr + len <= vmm->vm_start)
 			return addr;
 		addr = vmm->vm_end;
-		if (current->thread.flags & SPARC_FLAG_MMAPSHARED)
+		if (flags & MAP_SHARED)
 			addr = COLOUR_ALIGN(addr);
 	}
 }
@@ -233,14 +242,9 @@ static unsigned long do_mmap2(unsigned long addr, unsigned long len,
 
 	flags &= ~(MAP_EXECUTABLE | MAP_DENYWRITE);
 
-	if (flags & MAP_SHARED)
-		current->thread.flags |= SPARC_FLAG_MMAPSHARED;
-
 	down_write(&current->mm->mmap_sem);
 	retval = do_mmap_pgoff(file, addr, len, prot, flags, pgoff);
 	up_write(&current->mm->mmap_sem);
-
-	current->thread.flags &= ~(SPARC_FLAG_MMAPSHARED);
 
 out_putf:
 	if (file)
@@ -285,9 +289,6 @@ asmlinkage unsigned long sparc_mremap(unsigned long addr,
 	    new_len > TASK_SIZE - PAGE_SIZE)
 		goto out;
 	down_write(&current->mm->mmap_sem);
-	vma = find_vma(current->mm, addr);
-	if (vma && (vma->vm_flags & VM_SHARED))
-		current->thread.flags |= SPARC_FLAG_MMAPSHARED;
 	if (flags & MREMAP_FIXED) {
 		if (ARCH_SUN4C_SUN4 &&
 		    new_addr < 0xe0000000 &&
@@ -298,17 +299,31 @@ asmlinkage unsigned long sparc_mremap(unsigned long addr,
 	} else if ((ARCH_SUN4C_SUN4 && addr < 0xe0000000 &&
 		    addr + new_len > 0x20000000) ||
 		   addr + new_len > TASK_SIZE - PAGE_SIZE) {
+		unsigned long (*get_addr)(struct file *, unsigned long, unsigned long, unsigned long, unsigned long);
+		unsigned long map_flags = 0;
+		struct file *file = NULL;
+
 		ret = -ENOMEM;
 		if (!(flags & MREMAP_MAYMOVE))
 			goto out_sem;
-		new_addr = get_unmapped_area (addr, new_len);
-		if (!new_addr)
+
+		vma = find_vma(current->mm, addr);
+		if (vma) {
+			if (vma->vm_flags & VM_SHARED)
+				map_flags |= MAP_SHARED;
+			file = vma->vm_file;
+		}
+
+		new_addr = get_unmapped_area(file, addr, new_len,
+				     vma ? vma->vm_pgoff : 0,
+				     map_flags);
+		ret = new_addr;
+		if (new_addr & ~PAGE_MASK)
 			goto out_sem;
 		flags |= MREMAP_FIXED;
 	}
 	ret = do_mremap(addr, old_len, new_len, flags, new_addr);
 out_sem:
-	current->thread.flags &= ~(SPARC_FLAG_MMAPSHARED);
 	up_write(&current->mm->mmap_sem);
 out:
 	return ret;       

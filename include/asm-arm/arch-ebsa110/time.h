@@ -18,39 +18,16 @@
 
 #include <asm/leds.h>
 
-#define MCLK_47_8
-
-#if defined(MCLK_42_3)
-#define PIT1_COUNT 0xecbe
-#elif defined(MCLK_47_8)
-/*
- * This should be 0x10B43, but that doesn't exactly fit.
- * We run the timer interrupt at 5ms, and then divide it by
- * two in software...  This is so that the user processes
- * see exactly the same model whichever ARM processor they're
- * running on.
- */
-#define PIT1_COUNT 0x85A1
-#define DIVISOR 2
-#endif
+extern int  ebsa110_reset_timer(void);
+extern void ebsa110_setup_timer(void);
 
 static void timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	*PIT_T1 = (PIT1_COUNT) & 0xff;
-	*PIT_T1 = (PIT1_COUNT) >> 8;
-
-#ifdef DIVISOR
-	{
-		static unsigned int divisor;
-
-		if (divisor--)
-			return;
-		divisor = DIVISOR - 1;
+	if (ebsa110_reset_timer()) {
+		do_leds();
+		do_timer(regs);
+		do_profile(regs);
 	}
-#endif
-	do_leds();
-	do_timer(regs);
-	do_profile(regs);
 }
 
 /*
@@ -58,17 +35,7 @@ static void timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
  */
 extern __inline__ void setup_timer(void)
 {
-	/*
-	 * Timer 1, mode 0, 16-bit, autoreload
-	 */
-	*PIT_CTRL = 0x70;
-
-	/*
-	 * Refresh counter clocked at 47.8MHz/7 = 146.4ns
-	 * We want centi-second interrupts
-	 */
-	*PIT_T1 = (PIT1_COUNT) & 0xff;
-	*PIT_T1 = (PIT1_COUNT) >> 8;
+	ebsa110_setup_timer();
 
 	timer_irq.handler = timer_interrupt;
 

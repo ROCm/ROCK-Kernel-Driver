@@ -6,7 +6,7 @@
  *	Pedro Roque		<roque@di.fc.ul.pt>
  *	Ian P. Morris		<I.P.Morris@soton.ac.uk>
  *
- *	$Id: ip6_input.c,v 1.18 2000/12/08 17:15:54 davem Exp $
+ *	$Id: ip6_input.c,v 1.19 2000/12/13 18:31:50 davem Exp $
  *
  *	Based in linux/net/ipv4/ip_input.c
  *
@@ -44,7 +44,6 @@
 
 static inline int ip6_rcv_finish( struct sk_buff *skb) 
 {
-
 	if (skb->dst == NULL)
 		ip6_route_input(skb);
 
@@ -69,9 +68,15 @@ int ipv6_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt
 	 */
 	((struct inet6_skb_parm *)skb->cb)->iif = dev->ifindex;
 
+	if (skb->len < sizeof(struct ipv6hdr))
+		goto err;
+
+	if (!pskb_may_pull(skb, sizeof(struct ipv6hdr)))
+		goto drop;
+
 	hdr = skb->nh.ipv6h;
 
-	if (skb->len < sizeof(struct ipv6hdr) || hdr->version != 6)
+	if (hdr->version != 6)
 		goto err;
 
 	pkt_len = ntohs(hdr->payload_len);
@@ -80,16 +85,24 @@ int ipv6_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt
 	if (pkt_len || hdr->nexthdr != NEXTHDR_HOP) {
 		if (pkt_len + sizeof(struct ipv6hdr) > skb->len)
 			goto truncated;
-		skb_trim(skb, pkt_len + sizeof(struct ipv6hdr));
+		if (pkt_len + sizeof(struct ipv6hdr) < skb->len) {
+			if (__pskb_trim(skb, pkt_len + sizeof(struct ipv6hdr)))
+				goto drop;
+			hdr = skb->nh.ipv6h;
+			if (skb->ip_summed == CHECKSUM_HW)
+				skb->ip_summed = CHECKSUM_NONE;
+		}
 	}
 
 	if (hdr->nexthdr == NEXTHDR_HOP) {
 		skb->h.raw = (u8*)(hdr+1);
-		if (!ipv6_parse_hopopts(skb, &hdr->nexthdr)) {
+		if (ipv6_parse_hopopts(skb, offsetof(struct ipv6hdr, nexthdr)) < 0) {
 			IP6_INC_STATS_BH(Ip6InHdrErrors);
 			return 0;
 		}
+		hdr = skb->nh.ipv6h;
 	}
+
 	return NF_HOOK(PF_INET6,NF_IP6_PRE_ROUTING, skb, dev, NULL, ip6_rcv_finish);
 truncated:
 	IP6_INC_STATS_BH(Ip6InTruncatedPkts);
@@ -111,12 +124,11 @@ static inline int ip6_input_finish(struct sk_buff *skb)
 	struct ipv6hdr *hdr = skb->nh.ipv6h;
 	struct inet6_protocol *ipprot;
 	struct sock *raw_sk;
-	__u8 *nhptr;
+	int nhoff;
 	int nexthdr;
 	int found = 0;
 	u8 hash;
-	int len;
-	
+
 	skb->h.raw = skb->nh.raw + sizeof(struct ipv6hdr);
 
 	/*
@@ -124,13 +136,13 @@ static inline int ip6_input_finish(struct sk_buff *skb)
 	 */
 
 	nexthdr = hdr->nexthdr;
-	nhptr = &hdr->nexthdr;
+	nhoff = offsetof(struct ipv6hdr, nexthdr);
 
 	/* Skip  hop-by-hop options, they are already parsed. */
 	if (nexthdr == NEXTHDR_HOP) {
-		nhptr = (u8*)(hdr+1);
-		nexthdr = *nhptr;
-		skb->h.raw += (nhptr[1]+1)<<3;
+		nhoff = sizeof(struct ipv6hdr);
+		nexthdr = skb->h.raw[0];
+		skb->h.raw += (skb->h.raw[1]+1)<<3;
 	}
 
 	/* This check is sort of optimization.
@@ -138,17 +150,23 @@ static inline int ip6_input_finish(struct sk_buff *skb)
 	   which are missing with probability of 200%
 	 */
 	if (nexthdr != IPPROTO_TCP && nexthdr != IPPROTO_UDP) {
-		nhptr = ipv6_parse_exthdrs(&skb, nhptr);
-		if (nhptr == NULL)
+		nhoff = ipv6_parse_exthdrs(&skb, nhoff);
+		if (nhoff < 0)
 			return 0;
-		nexthdr = *nhptr;
+		nexthdr = skb->nh.raw[nhoff];
 		hdr = skb->nh.ipv6h;
 	}
-	len = skb->tail - skb->h.raw;
+
+	if (!pskb_pull(skb, skb->h.raw - skb->data))
+		goto discard;
+
+	if (skb->ip_summed == CHECKSUM_HW)
+		skb->csum = csum_sub(skb->csum,
+				     csum_partial(skb->nh.raw, skb->h.raw-skb->nh.raw, 0));
 
 	raw_sk = raw_v6_htable[nexthdr&(MAX_INET_PROTOS-1)];
 	if (raw_sk)
-		raw_sk = ipv6_raw_deliver(skb, nexthdr, len);
+		raw_sk = ipv6_raw_deliver(skb, nexthdr);
 
 	hash = nexthdr & (MAX_INET_PROTOS - 1);
 	for (ipprot = (struct inet6_protocol *) inet6_protos[hash]; 
@@ -163,12 +181,12 @@ static inline int ip6_input_finish(struct sk_buff *skb)
 			buff = skb_clone(skb, GFP_ATOMIC);
 
 		if (buff)
-			ipprot->handler(buff, len);
+			ipprot->handler(buff);
 		found = 1;
 	}
 
 	if (raw_sk) {
-		rawv6_rcv(raw_sk, skb, len);
+		rawv6_rcv(raw_sk, skb);
 		sock_put(raw_sk);
 		found = 1;
 	}
@@ -178,9 +196,13 @@ static inline int ip6_input_finish(struct sk_buff *skb)
 	 */
 	if (!found) {
 		IP6_INC_STATS_BH(Ip6InUnknownProtos);
-		icmpv6_param_prob(skb, ICMPV6_UNK_NEXTHDR, nhptr);
+		icmpv6_param_prob(skb, ICMPV6_UNK_NEXTHDR, nhoff);
 	}
 
+	return 0;
+
+discard:
+	kfree_skb(skb);
 	return 0;
 }
 

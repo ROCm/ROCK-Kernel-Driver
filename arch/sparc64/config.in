@@ -1,4 +1,4 @@
-# $Id: config.in,v 1.136 2001/03/24 06:04:24 davem Exp $
+# $Id: config.in,v 1.139 2001/04/03 12:29:38 davem Exp $
 # For a description of the syntax of this configuration file,
 # see the Configure script.
 #
@@ -20,6 +20,8 @@ endmenu
 
 mainmenu_option next_comment
 comment 'General setup'
+
+tristate 'UltraSPARC-III bootbus i2c controller driver' CONFIG_BBC_I2C
 
 define_bool CONFIG_VT y
 define_bool CONFIG_VT_CONSOLE y

@@ -1,4 +1,4 @@
-/* $Id: processor.h,v 1.69 2001/03/08 22:08:51 davem Exp $
+/* $Id: processor.h,v 1.70 2001/03/27 02:36:38 davem Exp $
  * include/asm-sparc64/processor.h
  *
  * Copyright (C) 1996 David S. Miller (davem@caip.rutgers.edu)
@@ -79,7 +79,6 @@ struct thread_struct {
 #define SPARC_FLAG_32BIT        0x04    /* task is older 32-bit binary		*/
 #define SPARC_FLAG_NEWCHILD     0x08    /* task is just-spawned child process	*/
 #define SPARC_FLAG_PERFCTR	0x10    /* task has performance counters active	*/
-#define SPARC_FLAG_MMAPSHARED	0x20    /* task wants a shared mmap             */
 
 #define FAULT_CODE_WRITE	0x01	/* Write access, implies D-TLB		*/
 #define FAULT_CODE_DTLB		0x02	/* Miss happened in D-TLB		*/

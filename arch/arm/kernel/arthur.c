@@ -1,7 +1,9 @@
 /*
- * Arthur personality
+ *  linux/arch/arm/kernel/arthur.c
  *
- * Copyright (C) 1998, 1999, 2000 Philip Blundell
+ *  Copyright (C) 1998, 1999, 2000 Philip Blundell
+ *
+ * Arthur personality
  */
 
 /*

@@ -19,9 +19,8 @@
 
 #include <asm/mach/arch.h>
 
-extern void setup_initrd(unsigned int start, unsigned int size);
-extern void setup_ramdisk(int doload, int prompt, int start, unsigned int rd_sz);
-extern void __init footbridge_map_io(void);
+extern void footbridge_map_io(void);
+extern void footbridge_init_irq(void);
 
 #ifdef CONFIG_ARCH_EBSA285
 
@@ -42,6 +41,7 @@ MACHINE_START(EBSA285, "EBSA285")
 	VIDEO(0x000a0000, 0x000bffff)
 	FIXUP(fixup_ebsa285)
 	MAPIO(footbridge_map_io)
+	INITIRQ(footbridge_init_irq)
 MACHINE_END
 #endif
 
@@ -91,6 +91,7 @@ MACHINE_START(NETWINDER, "Rebel-NetWinder")
 	DISABLE_PARPORT(2)
 	FIXUP(fixup_netwinder)
 	MAPIO(footbridge_map_io)
+	INITIRQ(footbridge_init_irq)
 MACHINE_END
 #endif
 
@@ -111,9 +112,11 @@ fixup_cats(struct machine_desc *desc, struct param_struct *params,
 MACHINE_START(CATS, "Chalice-CATS")
 	MAINTAINER("Philip Blundell")
 	BOOT_MEM(0x00000000, DC21285_ARMCSR_BASE, 0xfe000000)
+	BOOT_PARAMS(0x00000100)
 	SOFT_REBOOT
 	FIXUP(fixup_cats)
 	MAPIO(footbridge_map_io)
+	INITIRQ(footbridge_init_irq)
 MACHINE_END
 #endif
 
@@ -139,6 +142,7 @@ MACHINE_START(CO285, "co-EBSA285")
 	BOOT_MEM(0x00000000, DC21285_ARMCSR_BASE, 0x7cf00000)
 	FIXUP(fixup_coebsa285)
 	MAPIO(footbridge_map_io)
+	INITIRQ(footbridge_init_irq)
 MACHINE_END
 #endif
 
@@ -148,5 +152,6 @@ MACHINE_START(PERSONAL_SERVER, "Compaq-PersonalServer")
 	BOOT_MEM(0x00000000, DC21285_ARMCSR_BASE, 0xfe000000)
 	BOOT_PARAMS(0x00000100)
 	MAPIO(footbridge_map_io)
+	INITIRQ(footbridge_init_irq)
 MACHINE_END
 #endif

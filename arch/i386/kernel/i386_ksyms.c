@@ -80,8 +80,8 @@ EXPORT_SYMBOL_NOVERS(__down_failed);
 EXPORT_SYMBOL_NOVERS(__down_failed_interruptible);
 EXPORT_SYMBOL_NOVERS(__down_failed_trylock);
 EXPORT_SYMBOL_NOVERS(__up_wakeup);
-EXPORT_SYMBOL_NOVERS(__down_write_failed);
-EXPORT_SYMBOL_NOVERS(__down_read_failed);
+EXPORT_SYMBOL_NOVERS(__rwsem_down_write_failed);
+EXPORT_SYMBOL_NOVERS(__rwsem_down_read_failed);
 EXPORT_SYMBOL_NOVERS(__rwsem_wake);
 /* Networking helper routines. */
 EXPORT_SYMBOL(csum_partial_copy_generic);

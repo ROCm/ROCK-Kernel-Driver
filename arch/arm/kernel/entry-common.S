@@ -35,9 +35,7 @@
 
 		.align	5
 fast_syscall_return:
-		str	r0, [sp, #S_R0 + S_OFF]	@ returned r0
-slow_syscall_return:
-		add	sp, sp, #S_OFF
+		str	r0, [sp, #S_R0+S_OFF]!	@ returned r0
 ret_from_sys_call:				@ external entry
 		get_softirq r0
 		get_current_task r5
@@ -52,6 +50,7 @@ ret_with_reschedule:				@ external entry (r5 must be set) (__irq_usr)
 		bne	ret_reschedule
 		teq	r1, #0			@ check for signals
 		blne	ret_signal
+
 ret_from_all:	restore_user_regs		@ internal
 
 ret_signal:	mov	r1, sp			@ internal
@@ -132,7 +131,8 @@ vector_swi:	save_user_regs
 		str	ip, [sp, #S_IP + S_OFF]	@ trace exit [IP = 1]
 		bl	SYMBOL_NAME(syscall_trace)
 		str	tip, [sp, #S_IP + S_OFF]
-		b	slow_syscall_return
+		add	sp, sp, #S_OFF
+		b	ret_from_sys_call
 
 2:		add	r1, sp, #S_OFF
 		tst	scno, #0x00f00000	@ is it a Unix SWI?
@@ -142,8 +142,9 @@ vector_swi:	save_user_regs
 		b	SYMBOL_NAME(sys_ni_syscall) @ not private func
 
 3:		eor	r0, scno, #OS_NUMBER <<20	@ Put OS number back
-		adrsvc	al, lr, slow_syscall_return
-		b	SYMBOL_NAME(deferred)
+		bl	SYMBOL_NAME(deferred)
+		add	sp, sp, #S_OFF
+		b	ret_from_sys_call
 
 		.align	5
 		.type	__irq_stat, #object

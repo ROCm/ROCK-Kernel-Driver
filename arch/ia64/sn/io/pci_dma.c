@@ -30,11 +30,6 @@
 #include <asm/sn/pci/pcibr_private.h>
 #include <asm/sn/iobus.h>
 #include <asm/sn/types.h>
-#include <asm/sn/sgi.h>
-#include <asm/sn/invent.h>
-#include <asm/sn/hcl.h>
-#include <asm/sn/pci/pcibr.h>
-#include <asm/sn/pci/pcibr_private.h>
 #include <asm/sn/alenlist.h>
 #include <asm/sn/pci/pci_bus_cvlink.h>
 

@@ -82,6 +82,10 @@ ifdef CONFIG_MWINCHIP3D
 CFLAGS += -march=i586
 endif
 
+ifdef CONFIG_MCYRIXIII
+CFLAGS += -march=i586
+endif
+
 HEAD := arch/i386/kernel/head.o arch/i386/kernel/init_task.o
 
 SUBDIRS += arch/i386/kernel arch/i386/mm arch/i386/lib

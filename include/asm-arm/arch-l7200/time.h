@@ -40,7 +40,7 @@
 #define RTC_EN_STWDOG	0x08      /* Enable watchdog */
 
 /*
- * Handler for timer interrupt
+ * Handler for RTC timer interrupt
  */
 static void timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
@@ -50,7 +50,7 @@ static void timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 }
 
 /*
- * Set up timer interrupt, and return the current time in seconds.
+ * Set up RTC timer interrupt, and return the current time in seconds.
  */
 extern __inline__ void setup_timer(void)
 {

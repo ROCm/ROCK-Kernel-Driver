@@ -15,13 +15,6 @@ static void arch_idle(void)
 
 extern __inline__ void arch_reset(char mode)
 {
-	extern void ecard_reset(int card);
-
-	/*
-	 * Reset all expansion cards.
-	 */
-	ecard_reset(-1);
-
 	/*
 	 * copy branch instruction to reset location and call it
 	 */

@@ -9,7 +9,6 @@
  */
 
 #include <linux/types.h>
-#include <linux/config.h>
 #include <asm/sn/sgi.h>
 #include <asm/sn/invent.h>
 #include <asm/sn/hcl.h>
@@ -17,7 +16,6 @@
 #include <asm/sn/nodepda.h>
 #include <asm/sn/hubspc.h>
 #include <asm/sn/iograph.h>
-#include <asm/sn/invent.h>
 #include <asm/sn/mem_refcnt.h>
 #include <asm/sn/hwcntrs.h>
 // From numa_hw.h

@@ -14,23 +14,24 @@
 
 #include <asm/io_generic.h>
 
-extern unsigned long hd64461_inb(unsigned int port);
-extern unsigned long hd64461_inw(unsigned int port);
-extern unsigned long hd64461_inl(unsigned int port);
+extern unsigned char hd64461_inb(unsigned long port);
+extern unsigned short hd64461_inw(unsigned long port);
+extern unsigned int hd64461_inl(unsigned long port);
 
-extern void hd64461_outb(unsigned long value, unsigned int port);
-extern void hd64461_outw(unsigned long value, unsigned int port);
-extern void hd64461_outl(unsigned long value, unsigned int port);
+extern void hd64461_outb(unsigned char value, unsigned long port);
+extern void hd64461_outw(unsigned short value, unsigned long port);
+extern void hd64461_outl(unsigned int value, unsigned long port);
 
-extern unsigned long hd64461_inb_p(unsigned int port);
-extern void hd64461_outb_p(unsigned long value, unsigned int port);
+extern unsigned char hd64461_inb_p(unsigned long port);
+extern void hd64461_outb_p(unsigned char value, unsigned long port);
 
-extern void hd64461_insb(unsigned int port, void *addr, unsigned long count);
-extern void hd64461_insw(unsigned int port, void *addr, unsigned long count);
-extern void hd64461_insl(unsigned int port, void *addr, unsigned long count);
-extern void hd64461_outsb(unsigned int port, const void *addr, unsigned long count);
-extern void hd64461_outsw(unsigned int port, const void *addr, unsigned long count);
-extern void hd64461_outsl(unsigned int port, const void *addr, unsigned long count);
+extern void hd64461_insb(unsigned long port, void *addr, unsigned long count);
+extern void hd64461_insw(unsigned long port, void *addr, unsigned long count);
+extern void hd64461_insl(unsigned long port, void *addr, unsigned long count);
+extern void hd64461_outsb(unsigned long port, const void *addr, unsigned long count);
+extern void hd64461_outsw(unsigned long port, const void *addr, unsigned long count);
+extern void hd64461_outsl(unsigned long port, const void *addr, unsigned long count);
+extern int hd64461_irq_demux(int irq);
 
 #ifdef __WANT_IO_DEF
 
@@ -64,6 +65,7 @@ extern void hd64461_outsl(unsigned int port, const void *addr, unsigned long cou
 
 # define __isa_port2addr	generic_isa_port2addr
 # define __ioremap		generic_ioremap
+# define __ioremap_nocache	generic_ioremap_nocache
 # define __iounmap		generic_iounmap
 
 #endif

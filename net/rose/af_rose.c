@@ -70,7 +70,7 @@ int sysctl_rose_link_fail_timeout       = ROSE_DEFAULT_FAIL_TIMEOUT;
 int sysctl_rose_maximum_vcs             = ROSE_DEFAULT_MAXVC;
 int sysctl_rose_window_size             = ROSE_DEFAULT_WINDOW_SIZE;
 
-static struct sock *volatile rose_list = NULL;
+static struct sock *rose_list;
 
 static struct proto_ops rose_proto_ops;
 
@@ -471,7 +471,10 @@ static int rose_getsockopt(struct socket *sock, int level, int optname,
 		
 	if (get_user(len, optlen))
 		return -EFAULT;
-	
+
+	if (len < 0)
+		return -EINVAL;
+			
 	switch (optname) {
 		case ROSE_DEFER:
 			val = sk->protinfo.rose->defer;
@@ -1056,7 +1059,7 @@ static int rose_sendmsg(struct socket *sock, struct msghdr *msg, int len,
 	SOCK_DEBUG(sk, "ROSE: sendto: building packet.\n");
 	size = len + AX25_BPQ_HEADER_LEN + AX25_MAX_HEADER_LEN + ROSE_MIN_LEN;
 
-	if ((skb = sock_alloc_send_skb(sk, size, 0, msg->msg_flags & MSG_DONTWAIT, &err)) == NULL)
+	if ((skb = sock_alloc_send_skb(sk, size, msg->msg_flags & MSG_DONTWAIT, &err)) == NULL)
 		return err;
 
 	skb_reserve(skb, AX25_BPQ_HEADER_LEN + AX25_MAX_HEADER_LEN + ROSE_MIN_LEN);
@@ -1118,7 +1121,7 @@ static int rose_sendmsg(struct socket *sock, struct msghdr *msg, int len,
 		frontlen = skb_headroom(skb);
 
 		while (skb->len > 0) {
-			if ((skbn = sock_alloc_send_skb(sk, frontlen + ROSE_PACLEN, 0, 0, &err)) == NULL)
+			if ((skbn = sock_alloc_send_skb(sk, frontlen + ROSE_PACLEN, 0, &err)) == NULL)
 				return err;
 
 			skbn->sk   = sk;
@@ -1414,6 +1417,7 @@ static struct proto_ops SOCKOPS_WRAPPED(rose_proto_ops) = {
 	sendmsg:	rose_sendmsg,
 	recvmsg:	rose_recvmsg,
 	mmap:		sock_no_mmap,
+	sendpage:	sock_no_sendpage,
 };
 
 #include <linux/smp_lock.h>

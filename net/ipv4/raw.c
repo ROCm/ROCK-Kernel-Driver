@@ -5,7 +5,7 @@
  *
  *		RAW - implementation of IP "raw" sockets.
  *
- * Version:	$Id: raw.c,v 1.56 2000/11/28 13:38:38 davem Exp $
+ * Version:	$Id: raw.c,v 1.60 2001/02/23 06:32:11 davem Exp $
  *
  * Authors:	Ross Biro, <bir7@leland.Stanford.Edu>
  *		Fred N. van Kempen, <waltje@uWalt.NL.Mugnet.ORG>
@@ -170,11 +170,10 @@ out:
 	return sk;
 }
 
-void raw_err (struct sock *sk, struct sk_buff *skb)
+void raw_err (struct sock *sk, struct sk_buff *skb, u32 info)
 {
 	int type = skb->h.icmph->type;
 	int code = skb->h.icmph->code;
-	u32 info = 0;
 	int err = 0;
 	int harderr = 0;
 
@@ -195,7 +194,6 @@ void raw_err (struct sock *sk, struct sk_buff *skb)
 		return;
 	case ICMP_PARAMETERPROB:
 		err = EPROTO;
-		info = ntohl(skb->h.icmph->un.gateway)>>24;
 		harderr = 1;
 		break;
 	case ICMP_DEST_UNREACH:
@@ -207,12 +205,17 @@ void raw_err (struct sock *sk, struct sk_buff *skb)
 		if (code == ICMP_FRAG_NEEDED) {
 			harderr = (sk->protinfo.af_inet.pmtudisc != IP_PMTUDISC_DONT);
 			err = EMSGSIZE;
-			info = ntohs(skb->h.icmph->un.frag.mtu);
 		}
 	}
 
-	if (sk->protinfo.af_inet.recverr)
-		ip_icmp_error(sk, skb, err, 0, info, (u8 *)(skb->h.icmph + 1));
+	if (sk->protinfo.af_inet.recverr) {
+		struct iphdr *iph = (struct iphdr*)skb->data;
+		u8 *payload = skb->data+(iph->ihl<<2);
+
+		if (sk->protinfo.af_inet.hdrincl)
+			payload = skb->data;
+		ip_icmp_error(sk, skb, err, 0, info, payload);
+	}
 
 	if (sk->protinfo.af_inet.recverr || harderr) {
 		sk->err = err;
@@ -235,18 +238,9 @@ static int raw_rcv_skb(struct sock * sk, struct sk_buff * skb)
 	return NET_RX_SUCCESS;
 }
 
-/*
- *	This should be the easiest of all, all we do is
- *	copy it into a buffer. All demultiplexing is done
- *	in ip.c
- */
-
 int raw_rcv(struct sock *sk, struct sk_buff *skb)
 {
-	/* Now we need to copy this into memory. */
-	skb_trim(skb, ntohs(skb->nh.iph->tot_len));
-	
-	skb->h.raw = skb->nh.raw;
+	skb_push(skb, skb->data-skb->nh.raw);
 
 	raw_rcv_skb(sk, skb);
 	return 0;
@@ -296,7 +290,7 @@ static int raw_getrawfrag(const void *p, char *to, unsigned int offset, unsigned
 	 	 *	ip_build_xmit clean (well less messy).
 		 */
 		if (!iph->id)
-			ip_select_ident(iph, rfh->dst);
+			ip_select_ident(iph, rfh->dst, NULL);
 		iph->check=ip_fast_csum((unsigned char *)iph, iph->ihl);
 	}
 	return 0;
@@ -498,7 +492,7 @@ int raw_recvmsg(struct sock *sk, struct msghdr *msg, int len,
 		msg->msg_flags |= MSG_TRUNC;
 		copied = len;
 	}
-	
+
 	err = skb_copy_datagram_iovec(skb, 0, msg->msg_iov, copied);
 	if (err)
 		goto done;
@@ -540,6 +534,8 @@ static int raw_geticmpfilter(struct sock *sk, char *optval, int *optlen)
 
 	if (get_user(len,optlen))
 		return -EFAULT;
+	if (len < 0)
+		return -EINVAL;
 	if (len > sizeof(struct icmp_filter))
 		len = sizeof(struct icmp_filter);
 	if (put_user(len, optlen))

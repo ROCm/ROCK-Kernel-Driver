@@ -6,7 +6,6 @@
 //  __initdata should work as advertized
 //
 
-#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/version.h>
 #include <linux/init.h>

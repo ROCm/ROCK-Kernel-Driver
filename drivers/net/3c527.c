@@ -270,7 +270,7 @@ int __init mc32_probe(struct net_device *dev)
 
 static int __init mc32_probe1(struct net_device *dev, int slot)
 {
-	static unsigned version_printed = 0;
+	static unsigned version_printed;
 	int i, err;
 	u8 POS;
 	u32 base;

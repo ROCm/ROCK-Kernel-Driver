@@ -32,7 +32,6 @@
 #include <asm/processor.h>
 #include <asm/signal.h>
 #include <asm/system.h>
-#include <asm/system.h>
 #include <asm/uaccess.h>
 #include <asm/delay.h> /* for ia64_get_itc() */
 
@@ -468,7 +467,7 @@ pfm_smpl_buffer_alloc(pfm_context_t *ctx, unsigned long which_pmds, unsigned lon
 	if (size > current->rlim[RLIMIT_MEMLOCK].rlim_cur) return -EAGAIN;
 
 	/* find some free area in address space */
-	addr = get_unmapped_area(0, size);
+	addr = get_unmapped_area(NULL, 0, size, 0, 0);
 	if (!addr) goto no_addr;
 
 	DBprintk((" entries=%ld aligned size=%ld, unmapped @0x%lx\n", entries, size, addr));

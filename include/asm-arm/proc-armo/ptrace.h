@@ -1,7 +1,7 @@
 /*
  *  linux/include/asm-arm/proc-armo/ptrace.h
  *
- *  Copyright (C) 1996-1999 Russell King
+ *  Copyright (C) 1996-2001 Russell King
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -14,6 +14,10 @@
 #define FIQ26_MODE	0x01
 #define IRQ26_MODE	0x02
 #define SVC26_MODE	0x03
+#define USR_MODE	USR26_MODE
+#define FIQ_MODE	FIQ26_MODE
+#define IRQ_MODE	IRQ26_MODE
+#define SVC_MODE	SVC26_MODE
 #define MODE_MASK	0x03
 #define F_BIT		(1 << 26)
 #define I_BIT		(1 << 27)

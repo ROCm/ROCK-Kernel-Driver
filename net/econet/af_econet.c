@@ -297,7 +297,7 @@ static int econet_sendmsg(struct socket *sock, struct msghdr *msg, int len,
 #ifdef CONFIG_ECONET_NATIVE
 		atomic_inc(&dev->refcnt);
 		
-		skb = sock_alloc_send_skb(sk, len+dev->hard_header_len+15, 0, 
+		skb = sock_alloc_send_skb(sk, len+dev->hard_header_len+15, 
 					  msg->msg_flags & MSG_DONTWAIT, &err);
 		if (skb==NULL)
 			goto out_unlock;
@@ -410,7 +410,7 @@ static int econet_sendmsg(struct socket *sock, struct msghdr *msg, int len,
 	}
 
 	/* Get a skbuff (no data, just holds our cb information) */
-	if ((skb = sock_alloc_send_skb(sk, 0, 0, 
+	if ((skb = sock_alloc_send_skb(sk, 0, 
 			     msg->msg_flags & MSG_DONTWAIT, &err)) == NULL)
 		return err;
 
@@ -717,6 +717,7 @@ static struct proto_ops SOCKOPS_WRAPPED(econet_ops) = {
 	sendmsg:	econet_sendmsg,
 	recvmsg:	econet_recvmsg,
 	mmap:		sock_no_mmap,
+	sendpage:	sock_no_sendpage,
 };
 
 #include <linux/smp_lock.h>

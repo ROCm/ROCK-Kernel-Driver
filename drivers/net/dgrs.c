@@ -174,7 +174,7 @@ static int	dgrs_hashexpire = -1;
 static uchar	dgrs_ipaddr[4] = { 0xff, 0xff, 0xff, 0xff};
 static uchar	dgrs_iptrap[4] = { 0xff, 0xff, 0xff, 0xff};
 static __u32	dgrs_ipxnet = -1;
-static int	dgrs_nicmode = 0;
+static int	dgrs_nicmode;
 
 /*
  *	Chain of device structures

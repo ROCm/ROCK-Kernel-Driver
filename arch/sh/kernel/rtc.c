@@ -7,6 +7,7 @@
 
 #include <linux/init.h>
 #include <linux/kernel.h>
+#include <linux/sched.h>
 #include <linux/time.h>
 
 #include <asm/io.h>
@@ -44,6 +45,8 @@
 #define RMONAR  	0xfffffeda
 #define RCR1    	0xfffffedc
 #define RCR2    	0xfffffede
+
+#define RTC_BIT_INVERTED	0	/* No bug on SH7708, SH7709A */
 #elif defined(__SH4__)
 /* SH-4 RTC */
 #define R64CNT  	0xffc80000
@@ -62,6 +65,8 @@
 #define RMONAR  	0xffc80034
 #define RCR1    	0xffc80038
 #define RCR2    	0xffc8003c
+
+#define RTC_BIT_INVERTED	0x40	/* bug on SH7750, SH7750S */
 #endif
 
 #ifndef BCD_TO_BIN
@@ -79,7 +84,7 @@ void sh_rtc_gettimeofday(struct timeval *tv)
  again:
 	do {
 		ctrl_outb(0, RCR1);  /* Clear CF-bit */
-		sec128 = ctrl_inb(RSECCNT);
+		sec128 = ctrl_inb(R64CNT);
 		sec = ctrl_inb(RSECCNT);
 		min = ctrl_inb(RMINCNT);
 		hr  = ctrl_inb(RHRCNT);
@@ -95,6 +100,14 @@ void sh_rtc_gettimeofday(struct timeval *tv)
 		yr100 = (yr == 0x99) ? 0x19 : 0x20;
 #endif
 	} while ((ctrl_inb(RCR1) & RCR1_CF) != 0);
+
+#if RTC_BIT_INVERTED != 0
+	/* Work around to avoid reading correct value. */
+	if (sec128 == RTC_BIT_INVERTED) {
+		schedule_timeout(1);
+		goto again;
+	}
+#endif
 
 	BCD_TO_BIN(yr100);
 	BCD_TO_BIN(yr);
@@ -125,7 +138,7 @@ void sh_rtc_gettimeofday(struct timeval *tv)
 	}
 
 	tv->tv_sec = mktime(yr100 * 100 + yr, mon, day, hr, min, sec);
-	tv->tv_usec = (sec128 * 1000000) / 128;
+	tv->tv_usec = ((sec128 ^ RTC_BIT_INVERTED) * 1000000) / 128;
 }
 
 static int set_rtc_time(unsigned long nowtime)
@@ -170,5 +183,9 @@ static int set_rtc_time(unsigned long nowtime)
 
 int sh_rtc_settimeofday(const struct timeval *tv)
 {
+#if RTC_BIT_INVERTED != 0
+	/* This is not accurate, but better than nothing. */
+	schedule_timeout(HZ/2);
+#endif
 	return set_rtc_time(tv->tv_sec);
 }

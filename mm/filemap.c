@@ -1061,7 +1061,7 @@ void do_generic_file_read(struct file * filp, loff_t *ppos, read_descriptor_t * 
 
 	for (;;) {
 		struct page *page, **hash;
-		unsigned long end_index, nr;
+		unsigned long end_index, nr, ret;
 
 		end_index = inode->i_size >> PAGE_CACHE_SHIFT;
 		if (index > end_index)
@@ -1109,13 +1109,13 @@ page_ok:
 		 * "pos" here (the actor routine has to update the user buffer
 		 * pointers and the remaining count).
 		 */
-		nr = actor(desc, page, offset, nr);
-		offset += nr;
+		ret = actor(desc, page, offset, nr);
+		offset += ret;
 		index += offset >> PAGE_CACHE_SHIFT;
 		offset &= ~PAGE_CACHE_MASK;
 	
 		page_cache_release(page);
-		if (nr && desc->count)
+		if (ret == nr && desc->count)
 			continue;
 		break;
 
@@ -1208,7 +1208,7 @@ no_cached_page:
 	UPDATE_ATIME(inode);
 }
 
-static int file_read_actor(read_descriptor_t * desc, struct page *page, unsigned long offset, unsigned long size)
+int file_read_actor(read_descriptor_t * desc, struct page *page, unsigned long offset, unsigned long size)
 {
 	char *kaddr;
 	unsigned long left, count = desc->count;
@@ -1261,21 +1261,29 @@ ssize_t generic_file_read(struct file * filp, char * buf, size_t count, loff_t *
 
 static int file_send_actor(read_descriptor_t * desc, struct page *page, unsigned long offset , unsigned long size)
 {
-	char *kaddr;
 	ssize_t written;
 	unsigned long count = desc->count;
 	struct file *file = (struct file *) desc->buf;
-	mm_segment_t old_fs;
 
 	if (size > count)
 		size = count;
-	old_fs = get_fs();
-	set_fs(KERNEL_DS);
 
-	kaddr = kmap(page);
-	written = file->f_op->write(file, kaddr + offset, size, &file->f_pos);
-	kunmap(page);
-	set_fs(old_fs);
+ 	if (file->f_op->writepage) {
+ 		written = file->f_op->writepage(file, page, offset,
+						size, &file->f_pos, size<count);
+	} else {
+		char *kaddr;
+		mm_segment_t old_fs;
+
+		old_fs = get_fs();
+		set_fs(KERNEL_DS);
+
+		kaddr = kmap(page);
+		written = file->f_op->write(file, kaddr + offset, size, &file->f_pos);
+		kunmap(page);
+
+		set_fs(old_fs);
+	}
 	if (written < 0) {
 		desc->error = written;
 		written = 0;
@@ -2407,7 +2415,7 @@ struct page *grab_cache_page(struct address_space *mapping, unsigned long index)
 	return page;
 }
 
-static inline void remove_suid(struct inode *inode)
+inline void remove_suid(struct inode *inode)
 {
 	unsigned int mode;
 

@@ -59,52 +59,10 @@ extern char _stext, _text, _etext, _end, __init_begin, __init_end;
 static struct meminfo meminfo __initdata = { 0, };
 
 /*
- * empty_bad_page is the page that is used for page faults when
- * linux is out-of-memory. Older versions of linux just did a
- * do_exit(), but using this instead means there is less risk
- * for a process dying in kernel mode, possibly leaving a inode
- * unused etc..
- *
- * empty_bad_pte_table is the accompanying page-table: it is
- * initialized to point to BAD_PAGE entries.
- *
  * empty_zero_page is a special page that is used for
  * zero-initialized data and COW.
  */
 struct page *empty_zero_page;
-struct page *empty_bad_page;
-pte_t *empty_bad_pte_table;
-
-pte_t *get_bad_pte_table(void)
-{
-	pte_t v;
-	int i;
-
-	v = pte_mkdirty(mk_pte(empty_bad_page, PAGE_SHARED));
-
-	for (i = 0; i < PTRS_PER_PTE; i++)
-		set_pte(empty_bad_pte_table + i, v);
-
-	return empty_bad_pte_table;
-}
-
-void __handle_bad_pmd(pmd_t *pmd)
-{
-	pmd_ERROR(*pmd);
-#ifdef CONFIG_DEBUG_ERRORS
-	__backtrace();
-#endif
-	set_pmd(pmd, mk_user_pmd(get_bad_pte_table()));
-}
-
-void __handle_bad_pmd_kernel(pmd_t *pmd)
-{
-	pmd_ERROR(*pmd);
-#ifdef CONFIG_DEBUG_ERRORS
-	__backtrace();
-#endif
-	set_pmd(pmd, mk_kernel_pmd(get_bad_pte_table()));
-}
 
 #ifndef CONFIG_NO_PGT_CACHE
 struct pgtable_cache_struct quicklists;
@@ -120,12 +78,12 @@ int do_check_pgt_cache(int low, int high)
 				freed++;
 			}
 			if(pmd_quicklist) {
-				free_pmd_slow(get_pmd_fast());
+				pmd_free_slow(pmd_alloc_one_fast(NULL, 0));
 				freed++;
 			}
 			if(pte_quicklist) {
-				free_pte_slow(get_pte_fast());
-				 freed++;
+				pte_free_slow(pte_alloc_one_fast(NULL, 0));
+				freed++;
 			}
 		} while(pgtable_cache_size > low);
 	}
@@ -514,18 +472,15 @@ void __init bootmem_init(struct meminfo *mi)
  */
 void __init paging_init(struct meminfo *mi, struct machine_desc *mdesc)
 {
-	void *zero_page, *bad_page, *bad_table;
+	void *zero_page;
 	int node;
 
 	memcpy(&meminfo, mi, sizeof(meminfo));
 
 	/*
-	 * allocate what we need for the bad pages.
-	 * note that we count on this going ok.
+	 * allocate the zero page.  Note that we count on this going ok.
 	 */
 	zero_page = alloc_bootmem_low_pages(PAGE_SIZE);
-	bad_page  = alloc_bootmem_low_pages(PAGE_SIZE);
-	bad_table = alloc_bootmem_low_pages(TABLE_SIZE);
 
 	/*
 	 * initialise the page tables.
@@ -586,11 +541,7 @@ void __init paging_init(struct meminfo *mi, struct machine_desc *mdesc)
 	 * the mem_map is initialised
 	 */
 	memzero(zero_page, PAGE_SIZE);
-	memzero(bad_page, PAGE_SIZE);
-
 	empty_zero_page = virt_to_page(zero_page);
-	empty_bad_page  = virt_to_page(bad_page);
-	empty_bad_pte_table = ((pte_t *)bad_table) + TABLE_OFFSET;
 }
 
 /*

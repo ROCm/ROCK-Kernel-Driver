@@ -30,7 +30,7 @@ typedef struct { void *null; } elf_fpregset_t;
  */
 #define ELF_CLASS	ELFCLASS32
 #ifdef __ARMEB__
-#define ELF_DATA	ELFDATA2LSB;
+#define ELF_DATA	ELFDATA2MSB;
 #else
 #define ELF_DATA	ELFDATA2LSB;
 #endif

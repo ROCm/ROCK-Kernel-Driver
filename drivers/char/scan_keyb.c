@@ -18,33 +18,40 @@
 #include <linux/miscdevice.h>
 #include <linux/slab.h>
 #include <linux/kbd_kern.h>
+#include <linux/timer.h>
+
+#define SCANHZ	(HZ/20)
 
 struct scan_keyboard {
 	struct scan_keyboard *next;
-	void (*scan)(unsigned char *buffer);
+	int (*scan)(unsigned char *buffer);
 	const unsigned char *table;
 	unsigned char *s0, *s1;
 	int length;
 };
-		     
+
+static int scan_jiffies=0;
 static struct scan_keyboard *keyboards=NULL;
-static struct tq_struct task_scan_kbd;	
+struct timer_list scan_timer;
 
 static void check_kbd(const unsigned char *table,
 		      unsigned char *new, unsigned char *old, int length)
 {
 	int need_tasklet_schedule=0;
-	unsigned char xor, bit;
+	unsigned int xor, bit;
 	
 	while(length-->0) {
 		if((xor=*new^*old)==0) {
 			table+=8;
 		}
 		else {
-			for(bit=0x80; bit!=0; bit>>=1) {
+			for(bit=0x01; bit<0x100; bit<<=1) {
 				if(xor&bit) {
 					handle_scancode(*table, !(*new&bit));
 					need_tasklet_schedule=1;
+#if 0
+					printk("0x%x %s\n", *table, (*new&bit)?"released":"pressed");
+#endif
 				}
 				table++;
 			}
@@ -57,26 +64,39 @@ static void check_kbd(const unsigned char *table,
 }
 
 
-static void scan_kbd(void *dummy)
+static void scan_kbd(unsigned long dummy)
 {
 	struct scan_keyboard *kbd;
 
+	scan_jiffies++;
+
 	for(kbd=keyboards; kbd!=NULL; kbd=kbd->next) {
-		if(jiffies&1) {
-			kbd->scan(kbd->s0);
-			check_kbd(kbd->table, kbd->s0, kbd->s1, kbd->length);
+		if(scan_jiffies&1) {
+			if(!kbd->scan(kbd->s0))
+				check_kbd(kbd->table,
+					  kbd->s0, kbd->s1, kbd->length);
+			else
+				memcpy(kbd->s0, kbd->s1, kbd->length);
 		}
 		else {
-			kbd->scan(kbd->s1);
-			check_kbd(kbd->table, kbd->s1, kbd->s0, kbd->length);
+			if(!kbd->scan(kbd->s1))
+				check_kbd(kbd->table,
+					  kbd->s1, kbd->s0, kbd->length);
+			else
+				memcpy(kbd->s1, kbd->s0, kbd->length);
 		}
 		
 	}
-	queue_task(&task_scan_kbd, &tq_timer);
+
+	init_timer(&scan_timer);
+	scan_timer.expires = jiffies + SCANHZ;
+	scan_timer.data = 0;
+	scan_timer.function = scan_kbd;
+	add_timer(&scan_timer);
 }
 
 
-int register_scan_keyboard(void (*scan)(unsigned char *buffer),
+int register_scan_keyboard(int (*scan)(unsigned char *buffer),
 			   const unsigned char *table,
 			   int length)
 {
@@ -98,8 +118,8 @@ int register_scan_keyboard(void (*scan)(unsigned char *buffer),
 	if (kbd->s1 == NULL)
 		goto error_free_s0;
 
-	kbd->scan(kbd->s0);
-	kbd->scan(kbd->s1);
+	memset(kbd->s0, -1, kbd->length);
+	memset(kbd->s1, -1, kbd->length);
 	
 	kbd->next=keyboards;
 	keyboards=kbd;
@@ -119,11 +139,11 @@ int register_scan_keyboard(void (*scan)(unsigned char *buffer),
 			      
 void __init scan_kbd_init(void)
 {
+	init_timer(&scan_timer);
+	scan_timer.expires = jiffies + SCANHZ;
+	scan_timer.data = 0;
+	scan_timer.function = scan_kbd;
+	add_timer(&scan_timer);
 
-	INIT_LIST_HEAD(task_scan_kbd.list);
-	task_scan_kbd.sync=0;
-	task_scan_kbd.routine=scan_kbd;
-	task_scan_kbd.data=NULL;
-	queue_task(&task_scan_kbd, &tq_timer);
 	printk(KERN_INFO "Generic scan keyboard driver initialized\n");
 }

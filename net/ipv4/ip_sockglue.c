@@ -5,7 +5,7 @@
  *
  *		The IP to API glue.
  *		
- * Version:	$Id: ip_sockglue.c,v 1.54 2000/11/28 13:34:56 davem Exp $
+ * Version:	$Id: ip_sockglue.c,v 1.56 2001/02/18 09:07:58 davem Exp $
  *
  * Authors:	see ip.c
  *
@@ -257,9 +257,8 @@ void ip_icmp_error(struct sock *sk, struct sk_buff *skb, int err,
 	serr->port = port;
 
 	skb->h.raw = payload;
-	skb_pull(skb, payload - skb->data);
-
-	if (sock_queue_err_skb(sk, skb))
+	if (!skb_pull(skb, payload - skb->data) ||
+	    sock_queue_err_skb(sk, skb))
 		kfree_skb(skb);
 }
 
@@ -292,7 +291,7 @@ void ip_local_error(struct sock *sk, int err, u32 daddr, u16 port, u32 info)
 	serr->port = port;
 
 	skb->h.raw = skb->tail;
-	skb_pull(skb, skb->tail - skb->data);
+	__skb_pull(skb, skb->tail - skb->data);
 
 	if (sock_queue_err_skb(sk, skb))
 		kfree_skb(skb);
@@ -323,7 +322,7 @@ int ip_recv_error(struct sock *sk, struct msghdr *msg, int len)
 		msg->msg_flags |= MSG_TRUNC;
 		copied = len;
 	}
-	err = memcpy_toiovec(msg->msg_iov, skb->data, copied);
+	err = skb_copy_datagram_iovec(skb, 0, msg->msg_iov, copied);
 	if (err)
 		goto out_free_skb;
 
@@ -333,9 +332,10 @@ int ip_recv_error(struct sock *sk, struct msghdr *msg, int len)
 
 	sin = (struct sockaddr_in *)msg->msg_name;
 	if (sin) {
-		sin->sin_family = AF_INET; 
+		sin->sin_family = AF_INET;
 		sin->sin_addr.s_addr = *(u32*)(skb->nh.raw + serr->addr_offset);
-		sin->sin_port = serr->port; 
+		sin->sin_port = serr->port;
+		memset(&sin->sin_zero, 0, sizeof(sin->sin_zero));
 	}
 
 	memcpy(&errhdr.ee, &serr->ee, sizeof(struct sock_extended_err));
@@ -344,6 +344,8 @@ int ip_recv_error(struct sock *sk, struct msghdr *msg, int len)
 	if (serr->ee.ee_origin == SO_EE_ORIGIN_ICMP) {
 		sin->sin_family = AF_INET;
 		sin->sin_addr.s_addr = skb->nh.iph->saddr;
+		sin->sin_port = 0;
+		memset(&sin->sin_zero, 0, sizeof(sin->sin_zero));
 		if (sk->protinfo.af_inet.cmsg_flags)
 			ip_cmsg_recv(msg, skb);
 	}
@@ -661,7 +663,9 @@ int ip_getsockopt(struct sock *sk, int level, int optname, char *optval, int *op
 
 	if(get_user(len,optlen))
 		return -EFAULT;
-
+	if(len < 0)
+		return -EINVAL;
+		
 	lock_sock(sk);
 
 	switch(optname)	{

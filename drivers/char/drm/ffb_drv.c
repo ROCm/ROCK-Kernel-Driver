@@ -1,4 +1,4 @@
-/* $Id: ffb_drv.c,v 1.9 2001/03/23 07:58:39 davem Exp $
+/* $Id: ffb_drv.c,v 1.11 2001/03/27 02:36:37 davem Exp $
  * ffb_drv.c: Creator/Creator3D direct rendering driver.
  *
  * Copyright (C) 2000 David S. Miller (davem@redhat.com)
@@ -6,8 +6,10 @@
 
 #include "drmP.h"
 
+#include <linux/config.h>
 #include <linux/sched.h>
 #include <linux/smp_lock.h>
+#include <asm/shmparam.h>
 #include <asm/oplib.h>
 #include <asm/upa.h>
 
@@ -34,6 +36,7 @@ static int  ffb_lock(struct inode *inode, struct file *filp,
 static int  ffb_unlock(struct inode *inode, struct file *filp,
 		       unsigned int cmd, unsigned long arg);
 static int ffb_mmap(struct file *filp, struct vm_area_struct *vma);
+static unsigned long ffb_get_unmapped_area(struct file *, unsigned long, unsigned long, unsigned long, unsigned long);
 
 /* From ffb_context.c */
 extern int ffb_resctx(struct inode *, struct file *, unsigned int, unsigned long);
@@ -46,15 +49,16 @@ extern int ffb_rmctx(struct inode *, struct file *, unsigned int, unsigned long)
 extern int ffb_context_switch(drm_device_t *, int, int);
 
 static struct file_operations ffb_fops = {
-	owner:		THIS_MODULE,
-	open:		ffb_open,
-	flush:		drm_flush,
-	release:	ffb_release,
-	ioctl:		ffb_ioctl,
-	mmap:		ffb_mmap,
-	read:		drm_read,
-	fasync:		drm_fasync,
-	poll:		drm_poll,
+	owner:			THIS_MODULE,
+	open:			ffb_open,
+	flush:			drm_flush,
+	release:		ffb_release,
+	ioctl:			ffb_ioctl,
+	mmap:			ffb_mmap,
+	read:			drm_read,
+	fasync:			drm_fasync,
+	poll:			drm_poll,
+	get_unmapped_area:	ffb_get_unmapped_area,
 };
 
 /* This is just a template, we make a new copy for each FFB
@@ -770,45 +774,6 @@ int ffb_unlock(struct inode *inode, struct file *filp, unsigned int cmd, unsigne
 	return 0;
 }
 
-static void align_fb_mapping(struct vm_area_struct *vma)
-{
-	unsigned long j, alignment;
-
-	j = vma->vm_end - vma->vm_start;
-	for (alignment = (4 * 1024 * 1024); alignment > PAGE_SIZE; alignment >>= 3)
-		if (j >= alignment)
-			break;
-	if (alignment > PAGE_SIZE) {
-		j = alignment;
-		alignment = j - (vma->vm_start & (j - 1));
-		if (alignment != j) {
-			struct vm_area_struct *vmm = find_vma(current->mm,vma->vm_start);
-
-			if (!vmm || vmm->vm_start >= vma->vm_end + alignment) {
-				vma->vm_start += alignment;
-				vma->vm_end += alignment;
-			}
-		}
-	}
-}
-
-/* The problem here is, due to virtual cache aliasing,
- * we must make sure the shared memory area lands in the
- * same dcache line for both the kernel and all drm clients.
- */
-static void align_shm_mapping(struct vm_area_struct *vma, unsigned long kvirt)
-{
-	kvirt &= PAGE_SIZE;
-	if ((vma->vm_start & PAGE_SIZE) != kvirt) {
-		struct vm_area_struct *vmm = find_vma(current->mm, vma->vm_start);
-
-		if (!vmm || vmm->vm_start >= vma->vm_end + PAGE_SIZE) {
-			vma->vm_start += PAGE_SIZE;
-			vma->vm_end += PAGE_SIZE;
-		}
-	}
-}
-
 extern struct vm_operations_struct drm_vm_ops;
 extern struct vm_operations_struct drm_vm_shm_ops;
 extern struct vm_operations_struct drm_vm_shm_lock_ops;
@@ -868,7 +833,6 @@ static int ffb_mmap(struct file *filp, struct vm_area_struct *vma)
 
 	switch (map->type) {
 	case _DRM_FRAME_BUFFER:
-		align_fb_mapping(vma);
 		/* FALLTHROUGH */
 
 	case _DRM_REGISTERS:
@@ -887,7 +851,6 @@ static int ffb_mmap(struct file *filp, struct vm_area_struct *vma)
 		vma->vm_ops = &drm_vm_ops;
 		break;
 	case _DRM_SHM:
-		align_shm_mapping(vma, (unsigned long)dev->lock.hw_lock);
 		if (map->flags & _DRM_CONTAINS_LOCK)
 			vma->vm_ops = &drm_vm_shm_lock_ops;
 		else {
@@ -909,6 +872,69 @@ static int ffb_mmap(struct file *filp, struct vm_area_struct *vma)
 	vma->vm_file = filp; /* Needed for drm_vm_open() */
 	drm_vm_open(vma);
 	return 0;
+}
+
+static drm_map_t *ffb_find_map(struct file *filp, unsigned long off)
+{
+	drm_file_t	*priv	= filp->private_data;
+	drm_device_t	*dev;
+	drm_map_t	*map;
+	int		i;
+
+	if (!priv || (dev = priv->dev) == NULL)
+		return NULL;
+
+	for (i = 0; i < dev->map_count; i++) {
+		unsigned long uoff;
+
+		map = dev->maplist[i];
+
+		/* Ok, a little hack to make 32-bit apps work. */
+		uoff = (map->offset & 0xffffffff);
+		if (uoff == off)
+			return map;
+	}
+	return NULL;
+}
+
+static unsigned long ffb_get_unmapped_area(struct file *filp, unsigned long hint, unsigned long len, unsigned long pgoff, unsigned long flags)
+{
+	drm_map_t *map = ffb_find_map(filp, pgoff << PAGE_SHIFT);
+	unsigned long addr = -ENOMEM;
+
+	if (!map)
+		return get_unmapped_area(NULL, hint, len, pgoff, flags);
+
+	if (map->type == _DRM_FRAME_BUFFER ||
+	    map->type == _DRM_REGISTERS) {
+#ifdef HAVE_ARCH_FB_UNMAPPED_AREA
+		addr = get_fb_unmapped_area(filp, hint, len, pgoff, flags);
+#else
+		addr = get_unmapped_area(NULL, hint, len, pgoff, flags);
+#endif
+	} else if (map->type == _DRM_SHM && SHMLBA > PAGE_SIZE) {
+		unsigned long slack = SHMLBA - PAGE_SIZE;
+
+		addr = get_unmapped_area(NULL, hint, len + slack, pgoff, flags);
+		if (!(addr & ~PAGE_MASK)) {
+			unsigned long kvirt = (unsigned long) map->handle;
+
+			if ((kvirt & (SHMLBA - 1)) != (addr & (SHMLBA - 1))) {
+				unsigned long koff, aoff;
+
+				koff = kvirt & (SHMLBA - 1);
+				aoff = addr & (SHMLBA - 1);
+				if (koff < aoff)
+					koff += SHMLBA;
+
+				addr += (koff - aoff);
+			}
+		}
+	} else {
+		addr = get_unmapped_area(NULL, hint, len, pgoff, flags);
+	}
+
+	return addr;
 }
 
 module_init(ffb_init);

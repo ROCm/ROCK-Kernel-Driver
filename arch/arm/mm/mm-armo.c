@@ -22,120 +22,98 @@
 #include <asm/mach/map.h>
 
 #define MEMC_TABLE_SIZE (256*sizeof(unsigned long))
-#define PGD_TABLE_SIZE	(PTRS_PER_PGD * BYTES_PER_PTR)
 
+kmem_cache_t *pte_cache, *pgd_cache;
 int page_nr;
-
-extern unsigned long get_page_2k(int prio);
-extern void free_page_2k(unsigned long);
-extern pte_t *get_bad_pte_table(void);
 
 /*
  * Allocate a page table.  Note that we place the MEMC
  * table before the page directory.  This means we can
  * easily get to both tightly-associated data structures
  * with a single pointer.
- *
- * We actually only need 1152 bytes, 896 bytes is wasted.
- * We could try to fit 7 PTEs into that slot somehow.
  */
-static inline void *alloc_pgd_table(int priority)
+static inline pgd_t *alloc_pgd_table(int priority)
 {
-	unsigned long pg2k;
+	void *pg2k = kmem_cache_alloc(pgd_cache, GFP_KERNEL);
 
-	pg2k = get_page_2k(priority);
 	if (pg2k)
 		pg2k += MEMC_TABLE_SIZE;
 
-	return (void *)pg2k;
+	return (pgd_t *)pg2k;
 }
 
 void free_pgd_slow(pgd_t *pgd)
 {
 	unsigned long tbl = (unsigned long)pgd;
 
+	/*
+	 * CHECKME: are we leaking pte tables here???
+	 */
+
 	tbl -= MEMC_TABLE_SIZE;
-	free_page_2k(tbl);
+
+	kmem_cache_free(pgd_cache, (void *)tbl);
 }
 
-/*
- * FIXME: the following over-allocates by 1600%
- */
-static inline void *alloc_pte_table(int size, int prio)
+pgd_t *get_pgd_slow(struct mm_struct *mm)
 {
-	if (size != 128)
-		printk("invalid table size\n");
-	return (void *)get_page_2k(prio);
-}
+	pgd_t *new_pgd, *init_pgd;
+	pmd_t *new_pmd, *init_pmd;
+	pte_t *new_pte, *init_pte;
 
-void free_pte_slow(pte_t *pte)
-{
-	unsigned long tbl = (unsigned long)pte;
-	free_page_2k(tbl);
-}
+	new_pgd = alloc_pgd_table(GFP_KERNEL);
+	if (!new_pgd)
+		goto no_pgd;
 
-pgd_t *get_pgd_slow(void)
-{
-	pgd_t *pgd = (pgd_t *)alloc_pgd_table(GFP_KERNEL);
-	pmd_t *new_pmd;
+	/*
+	 * This lock is here just to satisfy pmd_alloc and pte_lock
+	 */
+	spin_lock(&mm->page_table_lock);
 
-	if (pgd) {
-		pgd_t *init = pgd_offset(&init_mm, 0);
-		
-		memzero(pgd, USER_PTRS_PER_PGD * sizeof(pgd_t));
-		memcpy(pgd + USER_PTRS_PER_PGD, init + USER_PTRS_PER_PGD,
-			(PTRS_PER_PGD - USER_PTRS_PER_PGD) * sizeof(pgd_t));
+	/*
+	 * On ARM, first page must always be allocated since it contains
+	 * the machine vectors.
+	 */
+	new_pmd = pmd_alloc(mm, new_pgd, 0);
+	if (!new_pmd)
+		goto no_pmd;
 
-		/*
-		 * On ARM, first page must always be allocated
-		 */
-		if (!pmd_alloc(pgd, 0))
-			goto nomem;
-		else {
-			pmd_t *old_pmd = pmd_offset(init, 0);
-			new_pmd = pmd_offset(pgd, 0);
+	new_pte = pte_alloc(mm, new_pmd, 0);
+	if (!new_pte)
+		goto no_pte;
 
-			if (!pte_alloc(new_pmd, 0))
-				goto nomem_pmd;
-			else {
-				pte_t *new_pte = pte_offset(new_pmd, 0);
-				pte_t *old_pte = pte_offset(old_pmd, 0);
+	init_pgd = pgd_offset_k(0);
+	init_pmd = pmd_offset(init_pgd, 0);
+	init_pte = pte_offset(init_pmd, 0);
 
-				set_pte (new_pte, *old_pte);
-			}
-		}
-		/* update MEMC tables */
-		cpu_memc_update_all(pgd);
-	}
-	return pgd;
+	set_pte(new_pte, *init_pte);
 
-nomem_pmd:
+	/*
+	 * most of the page table entries are zeroed
+	 * wne the table is created.
+	 */
+	memcpy(new_pgd + USER_PTRS_PER_PGD, init_pgd + USER_PTRS_PER_PGD,
+		(PTRS_PER_PGD - USER_PTRS_PER_PGD) * sizeof(pgd_t));
+
+	spin_unlock(&mm->page_table_lock);
+
+	/* update MEMC tables */
+	cpu_memc_update_all(new_pgd);
+	return new_pgd;
+
+no_pte:
+	spin_unlock(&mm->page_table_lock);
 	pmd_free(new_pmd);
-nomem:
-	free_pgd_slow(pgd);
+	free_pgd_slow(new_pgd);
 	return NULL;
-}
 
-pte_t *get_pte_slow(pmd_t *pmd, unsigned long offset)
-{
-	pte_t *pte;
+no_pmd:
+	spin_unlock(&mm->page_table_lock);
+	free_pgd_slow(new_pgd);
+	return NULL;
 
-	pte = (pte_t *)alloc_pte_table(PTRS_PER_PTE * sizeof(pte_t), GFP_KERNEL);
-	if (pmd_none(*pmd)) {
-		if (pte) {
-			memzero(pte, PTRS_PER_PTE * sizeof(pte_t));
-			set_pmd(pmd, mk_user_pmd(pte));
-			return pte + offset;
-		}
-		set_pmd(pmd, mk_user_pmd(get_bad_pte_table()));
-		return NULL;
-	}
-	free_pte_slow(pte);
-	if (pmd_bad(*pmd)) {
-		__handle_bad_pmd(pmd);
-		return NULL;
-	}
-	return (pte_t *) pmd_page(*pmd) + offset;
+no_pgd:
+	return NULL;
 }
 
 /*
@@ -160,7 +138,7 @@ void __init memtable_init(struct meminfo *mi)
 
 	pte = alloc_bootmem_low_pages(PTRS_PER_PTE * sizeof(pte_t));
 	pte[0] = mk_pte_phys(PAGE_OFFSET + 491520, PAGE_READONLY);
-	set_pmd(pmd_offset(swapper_pg_dir, 0), mk_kernel_pmd(pte));
+	pmd_populate(&init_mm, pmd_offset(swapper_pg_dir, 0), pte);
 
 	for (i = 1; i < PTRS_PER_PGD; i++)
 		pgd_val(swapper_pg_dir[i]) = 0;
@@ -176,4 +154,31 @@ void __init iotable_init(struct map_desc *io_desc)
  */
 void __init create_memmap_holes(struct meminfo *mi)
 {
+}
+
+static void pte_cache_ctor(void *pte, kmem_cache_t *cache, unsigned long flags)
+{
+	memzero(pte, sizeof(pte_t) * PTRS_PER_PTE);
+}
+
+static void pgd_cache_ctor(void *pte, kmem_cache_t *cache, unsigned long flags)
+{
+	pgd_t *pgd = (pte + MEMC_TABLE_SIZE);
+
+	memzero(pgd, USER_PTRS_PER_PGD * sizeof(pgd_t));
+}
+
+void __init pgtable_cache_init(void)
+{
+	pte_cache = kmem_cache_create("pte-cache",
+				sizeof(pte_t) * PTRS_PER_PTE,
+				0, 0, pte_cache_ctor, NULL);
+	if (!pte_cache)
+		BUG();
+
+	pgd_cache = kmem_cache_create("pgd-cache", MEMC_TABLE_SIZE +
+				sizeof(pgd_t) * PTRS_PER_PGD,
+				0, 0, pgd_cache_ctor, NULL);
+	if (!pgd_cache)
+		BUG();
 }

@@ -140,7 +140,7 @@ static int __init e21_probe1(struct net_device *dev, int ioaddr)
 {
 	int i, status, retval;
 	unsigned char *station_addr = dev->dev_addr;
-	static unsigned version_printed = 0;
+	static unsigned version_printed;
 
 	if (!request_region(ioaddr, E21_IO_EXTENT, dev->name))
 		return -EBUSY;

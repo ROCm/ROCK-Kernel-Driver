@@ -130,7 +130,6 @@
 #include <asm/dma.h>
 #endif
 #include <linux/errno.h>
-#include <linux/init.h>
 #include <linux/spinlock.h>
 
 #include <linux/netdevice.h>
@@ -361,7 +360,7 @@ static int __init
 cs89x0_probe1(struct net_device *dev, int ioaddr)
 {
 	struct net_local *lp;
-	static unsigned version_printed = 0;
+	static unsigned version_printed;
 	int i;
 	unsigned rev_type = 0;
 	int eeprom_buff[CHKSUM_LEN];
@@ -1590,14 +1589,14 @@ static struct net_device dev_cs89x0 = {
  * avoid breaking someone's startup scripts 
  */
 
-static int io=0;
-static int irq=0;
-static int debug=0;
+static int io;
+static int irq;
+static int debug;
 static char media[8];
 static int duplex=-1;
 
-static int use_dma = 0;			/* These generate unused var warnings if ALLOW_DMA = 0 */
-static int dma=0;
+static int use_dma;			/* These generate unused var warnings if ALLOW_DMA = 0 */
+static int dma;
 static int dmasize=16;			/* or 64 */
 
 MODULE_PARM(io, "i");

@@ -328,6 +328,9 @@ D: m68k port to HP9000/300
 D: AUN network protocols
 D: Co-architect of the parallel port sharing system
 D: IPv6 netfilter
+S: FutureTV Labs Ltd
+S: Brunswick House, 61-69 Newmarket Rd, Cambridge CB5 8EG
+S: United Kingdom
 
 N: Thomas Bogendörfer
 E: tsbogend@alpha.franken.de

@@ -1672,7 +1672,7 @@ static int atalk_sendmsg(struct socket *sock, struct msghdr *msg, int len,
 			sk, size, dev->name);
 
 	size += dev->hard_header_len;
-	skb = sock_alloc_send_skb(sk, size, 0, (flags & MSG_DONTWAIT), &err);
+	skb = sock_alloc_send_skb(sk, size, (flags & MSG_DONTWAIT), &err);
 	if (!skb)
 		return err;
 	
@@ -1913,6 +1913,7 @@ static struct proto_ops SOCKOPS_WRAPPED(atalk_dgram_ops)=
 	sendmsg:	atalk_sendmsg,
 	recvmsg:	atalk_recvmsg,
 	mmap:		sock_no_mmap,
+	sendpage:	sock_no_sendpage,
 };
 
 #include <linux/smp_lock.h>
@@ -1988,7 +1989,7 @@ module_init(atalk_init);
  * Use counts are incremented/decremented when
  * sockets are created/deleted.
  *
- * AppleTalk interfaces are not incremented untill atalkd is run
+ * AppleTalk interfaces are not incremented until atalkd is run
  * and are only decremented when they are downed.
  *
  * Ergo, before the AppleTalk module can be removed, all AppleTalk

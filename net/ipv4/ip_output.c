@@ -5,7 +5,7 @@
  *
  *		The Internet Protocol (IP) output module.
  *
- * Version:	$Id: ip_output.c,v 1.87 2000/10/25 20:07:22 davem Exp $
+ * Version:	$Id: ip_output.c,v 1.91 2001/03/29 06:25:55 davem Exp $
  *
  * Authors:	Ross Biro, <bir7@leland.Stanford.Edu>
  *		Fred N. van Kempen, <waltje@uWalt.NL.Mugnet.ORG>
@@ -95,7 +95,7 @@ __inline__ void ip_send_check(struct iphdr *iph)
 static int ip_dev_loopback_xmit(struct sk_buff *newskb)
 {
 	newskb->mac.raw = newskb->data;
-	skb_pull(newskb, newskb->nh.raw - newskb->data);
+	__skb_pull(newskb, newskb->nh.raw - newskb->data);
 	newskb->pkt_type = PACKET_LOOPBACK;
 	newskb->ip_summed = CHECKSUM_UNNECESSARY;
 	BUG_TRAP(newskb->dst);
@@ -141,7 +141,7 @@ int ip_build_and_send_pkt(struct sk_buff *skb, struct sock *sk,
 	iph->saddr    = rt->rt_src;
 	iph->protocol = sk->protocol;
 	iph->tot_len  = htons(skb->len);
-	ip_select_ident(iph, &rt->u.dst);
+	ip_select_ident(iph, &rt->u.dst, sk);
 	skb->nh.iph   = iph;
 
 	if (opt && opt->optlen) {
@@ -307,7 +307,7 @@ static inline int ip_queue_xmit2(struct sk_buff *skb)
 	if (ip_dont_fragment(sk, &rt->u.dst))
 		iph->frag_off |= __constant_htons(IP_DF);
 
-	ip_select_ident(iph, &rt->u.dst);
+	ip_select_ident(iph, &rt->u.dst, sk);
 
 	/* Add an IP checksum. */
 	ip_send_check(iph);
@@ -328,7 +328,10 @@ fragment:
 		kfree_skb(skb);
 		return -EMSGSIZE;
 	}
-	ip_select_ident(iph, &rt->u.dst);
+	ip_select_ident(iph, &rt->u.dst, sk);
+	if (skb->ip_summed == CHECKSUM_HW &&
+	    (skb = skb_checksum_help(skb)) == NULL)
+		return -ENOMEM;
 	return ip_fragment(skb, skb->dst->output);
 }
 
@@ -358,6 +361,7 @@ int ip_queue_xmit(struct sk_buff *skb)
 				    sk->bound_dev_if))
 			goto no_route;
 		__sk_dst_set(sk, &rt->u.dst);
+		sk->route_caps = rt->u.dst.dev->features;
 	}
 	skb->dst = dst_clone(&rt->u.dst);
 
@@ -425,7 +429,7 @@ static int ip_build_xmit_slow(struct sock *sk,
 	int err;
 	int offset, mf;
 	int mtu;
-	u16 id = 0;
+	u16 id;
 
 	int hh_len = (rt->u.dst.dev->hard_header_len + 15)&~15;
 	int nfrags=0;
@@ -495,6 +499,8 @@ static int ip_build_xmit_slow(struct sock *sk,
 	 *	Begin outputting the bytes.
 	 */
 
+	id = (sk ? sk->protinfo.af_inet.id++ : 0);
+
 	do {
 		char *data;
 		struct sk_buff * skb;
@@ -503,7 +509,7 @@ static int ip_build_xmit_slow(struct sock *sk,
 		 *	Get the memory we require with some space left for alignment.
 		 */
 
-		skb = sock_alloc_send_skb(sk, fraglen+hh_len+15, 0, flags&MSG_DONTWAIT, &err);
+		skb = sock_alloc_send_skb(sk, fraglen+hh_len+15, flags&MSG_DONTWAIT, &err);
 		if (skb == NULL)
 			goto error;
 
@@ -659,7 +665,7 @@ int ip_build_xmit(struct sock *sk,
 	int hh_len = (rt->u.dst.dev->hard_header_len + 15)&~15;
 
 	skb = sock_alloc_send_skb(sk, length+hh_len+15,
-				  0, flags&MSG_DONTWAIT, &err);
+				  flags&MSG_DONTWAIT, &err);
 	if(skb==NULL)
 		goto error; 
 	skb_reserve(skb, hh_len);
@@ -677,7 +683,7 @@ int ip_build_xmit(struct sock *sk,
 		iph->tot_len = htons(length);
 		iph->frag_off = df;
 		iph->ttl=sk->protinfo.af_inet.mc_ttl;
-		ip_select_ident(iph, &rt->u.dst);
+		ip_select_ident(iph, &rt->u.dst, sk);
 		if (rt->rt_type != RTN_MULTICAST)
 			iph->ttl=sk->protinfo.af_inet.ttl;
 		iph->protocol=sk->protocol;
@@ -722,8 +728,8 @@ error:
 int ip_fragment(struct sk_buff *skb, int (*output)(struct sk_buff*))
 {
 	struct iphdr *iph;
-	unsigned char *raw;
-	unsigned char *ptr;
+	int raw = 0;
+	int ptr;
 	struct net_device *dev;
 	struct sk_buff *skb2;
 	unsigned int mtu, hlen, left, len; 
@@ -738,17 +744,16 @@ int ip_fragment(struct sk_buff *skb, int (*output)(struct sk_buff*))
 	 *	Point into the IP datagram header.
 	 */
 
-	raw = skb->nh.raw;
-	iph = (struct iphdr*)raw;
+	iph = skb->nh.iph;
 
 	/*
 	 *	Setup starting values.
 	 */
 
 	hlen = iph->ihl * 4;
-	left = ntohs(iph->tot_len) - hlen;	/* Space per frame */
+	left = skb->len - hlen;		/* Space per frame */
 	mtu = rt->u.dst.pmtu - hlen;	/* Size of data space */
-	ptr = raw + hlen;			/* Where to start from */
+	ptr = raw + hlen;		/* Where to start from */
 
 	/*
 	 *	Fragment the datagram.
@@ -806,12 +811,13 @@ int ip_fragment(struct sk_buff *skb, int (*output)(struct sk_buff*))
 		 *	Copy the packet header into the new buffer.
 		 */
 
-		memcpy(skb2->nh.raw, raw, hlen);
+		memcpy(skb2->nh.raw, skb->data, hlen);
 
 		/*
 		 *	Copy a block of the IP datagram.
 		 */
-		memcpy(skb2->h.raw, ptr, len);
+		if (skb_copy_bits(skb, ptr, skb2->h.raw, len))
+			BUG();
 		left -= len;
 
 		/*
@@ -828,6 +834,9 @@ int ip_fragment(struct sk_buff *skb, int (*output)(struct sk_buff*))
 		 */
 		if (offset == 0)
 			ip_options_fragment(skb);
+
+		/* Copy the flags to each fragment. */
+		IPCB(skb2)->flags = IPCB(skb)->flags;
 
 		/*
 		 *	Added AC : If we are fragmenting a fragment that's not the

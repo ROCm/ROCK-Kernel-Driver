@@ -64,7 +64,7 @@ ip_nat_fn(unsigned int hooknum,
 	(*pskb)->nfcache |= NFC_UNKNOWN;
 
 	/* If we had a hardware checksum before, it's now invalid */
-	if ((*pskb)->pkt_type != PACKET_LOOPBACK)
+	if ((*pskb)->ip_summed == CHECKSUM_HW)
 		(*pskb)->ip_summed = CHECKSUM_NONE;
 
 	ct = ip_conntrack_get(*pskb, &ctinfo);

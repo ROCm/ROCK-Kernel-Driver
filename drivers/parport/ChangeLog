@@ -1,3 +1,20 @@
+2001-04-08  Tim Waugh  <twaugh@redhat.com>
+
+      * parport_pc.c (parport_pc_save_state): Read from the soft copy of
+      the control port.
+      (parport_pc_restore_state): Update the soft copy of the control
+      port.
+
+2001-03-26  Tim Waugh  <twaugh@redhat.com>
+
+	* share.c (parport_find_number, parport_find_base): Trigger
+	a lowlevel driver load if there are no ports yet.
+
+2001-03-26  Tim Waugh  <twaugh@redhat.com>
+
+	* parport_pc.c (parport_ECP_supported): Remove the IRQ conflict
+	check since it seems totally unreliable.
+
 2001-03-02  Tim Waugh  <twaugh@redhat.com>
 
 	* ieee1284_ops.c (parport_ieee1284_read_nibble): Reset nAutoFd

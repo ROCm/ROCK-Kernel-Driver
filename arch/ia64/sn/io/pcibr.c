@@ -29,10 +29,8 @@ int NeedXbridgeSwap = 0;
 #include <asm/sn/pci/pcibr.h>
 #include <asm/sn/pci/pcibr_private.h>
 #include <asm/sn/pci/pci_defs.h>
-#include <asm/sn/pci/bridge.h>
 #include <asm/sn/prio.h>
 #include <asm/sn/ioerror_handling.h>
-#include <asm/sn/xtalk/xbow.h>
 #include <asm/sn/xtalk/xbow.h>
 #include <asm/sn/ioc3.h>
 #include <asm/sn/eeprom.h>

@@ -434,7 +434,8 @@ extern void insert_vm_struct(struct mm_struct *, struct vm_area_struct *);
 extern void __insert_vm_struct(struct mm_struct *, struct vm_area_struct *);
 extern void build_mmap_avl(struct mm_struct *);
 extern void exit_mmap(struct mm_struct *);
-extern unsigned long get_unmapped_area(unsigned long, unsigned long);
+
+extern unsigned long get_unmapped_area(struct file *, unsigned long, unsigned long, unsigned long, unsigned long);
 
 extern unsigned long do_mmap_pgoff(struct file *file, unsigned long addr,
 	unsigned long len, unsigned long prot,

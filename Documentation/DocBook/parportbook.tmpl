@@ -2079,7 +2079,7 @@ ssize_t write_printer (int fd, const void *ptr, size_t count)
                               | PARPORT_STATUS_BUSY);
         unsigned char val = (PARPORT_STATUS_ERROR
                               | PARPORT_STATUS_BUSY);
-        struct parport_frob_struct frob;
+        struct ppdev_frob_struct frob;
         struct timespec ts;
 
         /* Wait for printer to be ready */

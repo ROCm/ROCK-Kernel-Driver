@@ -666,15 +666,17 @@ int do_fork(unsigned long clone_flags, unsigned long stack_start,
 	p->pdeath_signal = 0;
 
 	/*
-	 * "share" dynamic priority between parent and child, thus the
-	 * total amount of dynamic priorities in the system doesnt change,
-	 * more scheduling fairness. This is only important in the first
-	 * timeslice, on the long run the scheduling behaviour is unchanged.
+	 * Give the parent's dynamic priority entirely to the child.  The
+	 * total amount of dynamic priorities in the system doesn't change
+	 * (more scheduling fairness), but the child will run first, which
+	 * is especially useful in avoiding a lot of copy-on-write faults
+	 * if the child for a fork() just wants to do a few simple things
+	 * and then exec(). This is only important in the first timeslice.
+	 * In the long run, the scheduling behavior is unchanged.
 	 */
-	p->counter = (current->counter + 1) >> 1;
-	current->counter >>= 1;
-	if (!current->counter)
-		current->need_resched = 1;
+	p->counter = current->counter;
+	current->counter = 0;
+	current->need_resched = 1;
 
 	/*
 	 * Ok, add it to the run-queues and make it

@@ -43,7 +43,7 @@ static void ethertap_rx(struct sock *sk, int len);
 static void set_multicast_list(struct net_device *dev);
 #endif
 
-static int ethertap_debug = 0;
+static int ethertap_debug;
 
 static struct net_device *tap_map[32];	/* Returns the tap device for a given netlink */
 

@@ -389,9 +389,9 @@ static int __init lance_probe1(struct net_device *dev, int ioaddr, int irq, int 
 	int i, reset_val, lance_version;
 	const char *chipname;
 	/* Flags for specific chips or boards. */
-	unsigned char hpJ2405A = 0;			/* HP ISA adaptor */
-	int hp_builtin = 0;					/* HP on-board ethernet. */
-	static int did_version = 0;			/* Already printed version info. */
+	unsigned char hpJ2405A = 0;		/* HP ISA adaptor */
+	int hp_builtin = 0;			/* HP on-board ethernet. */
+	static int did_version;			/* Already printed version info. */
 	unsigned long flags;
 
 	/* First we look for special cases.

@@ -43,16 +43,19 @@
 #define FLUSH_BASE		0xdf000000
 #define UNCACHEABLE_ADDR	0xdf010000
 
-
-#ifndef __ASSEMBLY__
-
 /*
- * for use with inb/outb
+ * IO Addresses
  */
-#define IO_VIDC_AUDIO_BASE	0x80140000
-#define IO_VIDC_BASE		0x80100000
-#define IO_IOMD_BASE		0x80080000
-#define IOC_BASE		0x80080000
+#define VIDC_BASE		0xe0400000
+#define EXPMASK_BASE		0xe0360000
+#define IOMD_BASE		0xe0200000
+#define IOC_BASE		0xe0200000
+#define PCIO_BASE		0xe0010000
+#define FLOPPYDMA_BASE		0xe002a000
+
+#define FLUSH_BASE_PHYS		0x00000000	/* ROM */
+
+#define vidc_writel(val)	__raw_writel(val, VIDC_BASE)
 
 #define IO_EC_EASI_BASE		0x81400000
 #define IO_EC_IOC4_BASE		0x8009c000
@@ -60,49 +63,7 @@
 #define IO_EC_MEMC8_BASE	0x8000ac00
 #define IO_EC_MEMC_BASE		0x80000000
 
-/*
- * IO definitions
- */
-#define EXPMASK_BASE		((volatile unsigned char *)0xe0360000)
-#define IOEB_BASE		((volatile unsigned char *)0xe0350050)
-#define PCIO_FLOPPYDMABASE	((volatile unsigned char *)0xe002a000)
-#define PCIO_BASE		0xe0010000
-
-/*
- * Offsets from RAM base
- */
-#define PARAMS_OFFSET		0x0100
-
-/*
- * RAM definitions
- */
-#define GET_MEMORY_END(p)	(PAGE_OFFSET + p->u1.s.page_size * \
-						(p->u1.s.pages_in_bank[0] + \
-						 p->u1.s.pages_in_bank[1] + \
-						 p->u1.s.pages_in_bank[2] + \
-						 p->u1.s.pages_in_bank[3]))
-
-#define Z_PARAMS_BASE		(RAM_START + PARAMS_OFFSET)
-#define FLUSH_BASE_PHYS		0x00000000	/* ROM */
-
-#else
-
-#define VIDC_SND_BASE		0xe0500000
-#define VIDC_BASE		0xe0400000
-#define IOMD_BASE		0xe0200000
-#define IOC_BASE		0xe0200000
-#define PCIO_FLOPPYDMABASE	0xe002a000
-#define PCIO_BASE		0xe0010000
-
-#endif
-
-#ifndef __ASSEMBLY__
-#define __EXPMASK(offset)	(((volatile unsigned char *)EXPMASK_BASE)[offset])
-#else
-#define __EXPMASK(offset)	offset
-#endif
-
-#define	EXPMASK_STATUS	__EXPMASK(0x00)
-#define EXPMASK_ENABLE	__EXPMASK(0x04)
+#define	EXPMASK_STATUS		(EXPMASK_BASE + 0x00)
+#define EXPMASK_ENABLE		(EXPMASK_BASE + 0x04)
 
 #endif

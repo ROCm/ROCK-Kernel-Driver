@@ -16,7 +16,7 @@ static char *version =
 #include "ptifddi_asm.h"
 
 #ifdef MODULE
-static struct ptifddi *root_pti_dev = NULL;
+static struct ptifddi *root_pti_dev;
 #endif
 
 static inline void pti_reset(struct ptifddi *pp)
@@ -151,7 +151,7 @@ static void pti_set_multicast(struct net_device *dev)
 
 static inline int pti_fddi_init(struct net_device *dev, struct sbus_dev *sdev, int num)
 {
-	static unsigned version_printed = 0;
+	static unsigned version_printed;
 	struct ptifddi *pp;
 	int i;
 
@@ -208,7 +208,7 @@ int __init ptifddi_sbus_probe(struct net_device *dev)
 {
 	struct sbus_bus *bus;
 	struct sbus_dev *sdev = 0;
-	static int called = 0;
+	static int called;
 	int cards = 0, v;
 
 	if(called)

@@ -9,6 +9,7 @@
  *  Thanks to Martin Schwidefsky.
  */
 
+#include <linux/config.h>
 #include <linux/major.h>
 #include <linux/termios.h>
 #include <linux/tty.h>

@@ -19,10 +19,7 @@
 #define _TCP_H
 
 #define TCP_DEBUG 1
-#define FASTRETRANS_DEBUG 1
-
-/* Be paranoid about data immediately beyond right edge of window. */
-#undef  TCP_FORMAL_WINDOW
+#define FASTRETRANS_DEBUG 2
 
 /* Cancel timers, when they are not required. */
 #undef TCP_CLEAR_TIMERS
@@ -182,7 +179,6 @@ struct tcp_tw_bucket {
 	__u32			rcv_nxt;
 	__u32			snd_nxt;
 	__u32			rcv_wnd;
-	__u32			syn_seq;
         __u32			ts_recent;
         long			ts_recent_stamp;
 	unsigned long		ttd;
@@ -357,7 +353,7 @@ static __inline__ int tcp_sk_listen_hashfn(struct sock *sk)
 #define TCP_TWKILL_PERIOD	(TCP_TIMEWAIT_LEN/TCP_TWKILL_SLOTS)
 
 #define TCP_SYNQ_INTERVAL	(HZ/5)	/* Period of SYNACK timer */
-#define TCP_SYNQ_HSIZE		64	/* Size of SYNACK hash table */
+#define TCP_SYNQ_HSIZE		512	/* Size of SYNACK hash table */
 
 #define TCP_PAWS_24DAYS	(60 * 60 * 24 * 24)
 #define TCP_PAWS_MSL	60		/* Per-host timestamps are invalidated
@@ -632,19 +628,18 @@ extern void			tcp_put_port(struct sock *sk);
 extern void			__tcp_put_port(struct sock *sk);
 extern void			tcp_inherit_port(struct sock *sk, struct sock *child);
 
-extern void			tcp_v4_err(struct sk_buff *skb,
-					   unsigned char *, int);
+extern void			tcp_v4_err(struct sk_buff *skb, u32);
 
 extern void			tcp_shutdown (struct sock *sk, int how);
 
-extern int			tcp_v4_rcv(struct sk_buff *skb,
-					   unsigned short len);
+extern int			tcp_v4_rcv(struct sk_buff *skb);
 
 extern int			tcp_v4_remember_stamp(struct sock *sk);
 
 extern int		    	tcp_v4_tw_remember_stamp(struct tcp_tw_bucket *tw);
 
 extern int			tcp_sendmsg(struct sock *sk, struct msghdr *msg, int size);
+extern ssize_t			tcp_sendpage(struct socket *sock, struct page *page, int offset, size_t size, int flags);
 
 extern int			tcp_ioctl(struct sock *sk, 
 					  int cmd, 
@@ -799,7 +794,7 @@ extern __u32 cookie_v4_init_sequence(struct sock *sk, struct sk_buff *skb,
 
 /* tcp_output.c */
 
-extern int tcp_write_xmit(struct sock *);
+extern int tcp_write_xmit(struct sock *, int nonagle);
 extern int tcp_retransmit_skb(struct sock *, struct sk_buff *);
 extern void tcp_xmit_retransmit_queue(struct sock *);
 extern void tcp_simple_retransmit(struct sock *);
@@ -812,6 +807,7 @@ extern void tcp_send_active_reset(struct sock *sk, int priority);
 extern int  tcp_send_synack(struct sock *);
 extern int  tcp_transmit_skb(struct sock *, struct sk_buff *);
 extern void tcp_send_skb(struct sock *, struct sk_buff *, int force_queue, unsigned mss_now);
+extern void tcp_push_one(struct sock *, unsigned mss_now);
 extern void tcp_send_ack(struct sock *sk);
 extern void tcp_send_delayed_ack(struct sock *sk);
 
@@ -940,6 +936,15 @@ static __inline__ void __tcp_fast_path_on(struct tcp_opt *tp, u32 snd_wnd)
 static __inline__ void tcp_fast_path_on(struct tcp_opt *tp)
 {
 	__tcp_fast_path_on(tp, tp->snd_wnd>>tp->snd_wscale);
+}
+
+static inline void tcp_fast_path_check(struct sock *sk, struct tcp_opt *tp)
+{
+	if (skb_queue_len(&tp->out_of_order_queue) == 0 &&
+	    tp->rcv_wnd &&
+	    atomic_read(&sk->rmem_alloc) < sk->rcvbuf &&
+	    !tp->urg_data)
+		tcp_fast_path_on(tp);
 }
 
 /* Compute the actual receive window we are currently advertising.
@@ -1082,6 +1087,13 @@ static inline __u32 tcp_current_ssthresh(struct tcp_opt *tp)
 		return tp->snd_ssthresh;
 	else
 		return max(tp->snd_ssthresh, (tp->snd_cwnd>>1)+(tp->snd_cwnd>>2));
+}
+
+static inline void tcp_sync_left_out(struct tcp_opt *tp)
+{
+	if (tp->sack_ok && tp->sacked_out >= tp->packets_out - tp->lost_out)
+		tp->sacked_out = tp->packets_out - tp->lost_out;
+	tp->left_out = tp->sacked_out + tp->lost_out;
 }
 
 extern void tcp_cwnd_application_limited(struct sock *sk);
@@ -1229,7 +1241,7 @@ static __inline__ void __tcp_push_pending_frames(struct sock *sk,
 		if (!tcp_skb_is_last(sk, skb))
 			nonagle = 1;
 		if (!tcp_snd_test(tp, skb, cur_mss, nonagle) ||
-		    tcp_write_xmit(sk))
+		    tcp_write_xmit(sk, nonagle))
 			tcp_check_probe_timer(sk, tp);
 	}
 	tcp_cwnd_validate(sk, tp);
@@ -1275,7 +1287,7 @@ static __inline__ u16 tcp_v4_check(struct tcphdr *th, int len,
 
 static __inline__ int __tcp_checksum_complete(struct sk_buff *skb)
 {
-	return (unsigned short)csum_fold(csum_partial(skb->h.raw, skb->len, skb->csum));
+	return (unsigned short)csum_fold(skb_checksum(skb, 0, skb->len, skb->csum));
 }
 
 static __inline__ int tcp_checksum_complete(struct sk_buff *skb)
@@ -1299,23 +1311,31 @@ static __inline__ void tcp_prequeue_init(struct tcp_opt *tp)
  * idea (VJ's mail "Re: query about TCP header on tcp-ip" of 07 Sep 93)
  * failed somewhere. Latency? Burstiness? Well, at least now we will
  * see, why it failed. 8)8)				  --ANK
+ *
+ * NOTE: is this not too big to inline?
  */
 static __inline__ int tcp_prequeue(struct sock *sk, struct sk_buff *skb)
 {
 	struct tcp_opt *tp = &sk->tp_pinfo.af_tcp;
 
 	if (tp->ucopy.task) {
-		if ((tp->ucopy.memory += skb->truesize) <= (sk->rcvbuf<<1)) {
-			__skb_queue_tail(&tp->ucopy.prequeue, skb);
-			if (skb_queue_len(&tp->ucopy.prequeue) == 1) {
-				wake_up_interruptible(sk->sleep);
-				if (!tcp_ack_scheduled(tp))
-					tcp_reset_xmit_timer(sk, TCP_TIME_DACK, (3*TCP_RTO_MIN)/4);
+		__skb_queue_tail(&tp->ucopy.prequeue, skb);
+		tp->ucopy.memory += skb->truesize;
+		if (tp->ucopy.memory > sk->rcvbuf) {
+			struct sk_buff *skb1;
+
+			if (sk->lock.users) BUG();
+
+			while ((skb1 = __skb_dequeue(&tp->ucopy.prequeue)) != NULL) {
+				sk->backlog_rcv(sk, skb1);
+				NET_INC_STATS_BH(TCPPrequeueDropped);
 			}
-		} else {
-			NET_INC_STATS_BH(TCPPrequeueDropped);
-			tp->ucopy.memory -= skb->truesize;
-			__kfree_skb(skb);
+
+			tp->ucopy.memory = 0;
+		} else if (skb_queue_len(&tp->ucopy.prequeue) == 1) {
+			wake_up_interruptible(sk->sleep);
+			if (!tcp_ack_scheduled(tp))
+				tcp_reset_xmit_timer(sk, TCP_TIME_DACK, (3*TCP_RTO_MIN)/4);
 		}
 		return 1;
 	}
@@ -1677,19 +1697,40 @@ static inline void tcp_moderate_sndbuf(struct sock *sk)
 	}
 }
 
-static inline struct sk_buff *tcp_alloc_skb(struct sock *sk, int size, int gfp)
+static inline struct sk_buff *tcp_alloc_pskb(struct sock *sk, int size, int mem, int gfp)
 {
-	struct sk_buff *skb = alloc_skb(size, gfp);
+	struct sk_buff *skb = alloc_skb(size+MAX_TCP_HEADER, gfp);
 
 	if (skb) {
+		skb->truesize += mem;
 		if (sk->forward_alloc >= (int)skb->truesize ||
-		    tcp_mem_schedule(sk, skb->truesize, 0))
+		    tcp_mem_schedule(sk, skb->truesize, 0)) {
+			skb_reserve(skb, MAX_TCP_HEADER);
 			return skb;
+		}
 		__kfree_skb(skb);
 	} else {
 		tcp_enter_memory_pressure();
 		tcp_moderate_sndbuf(sk);
 	}
+	return NULL;
+}
+
+static inline struct sk_buff *tcp_alloc_skb(struct sock *sk, int size, int gfp)
+{
+	return tcp_alloc_pskb(sk, size, 0, gfp);
+}
+
+static inline struct page * tcp_alloc_page(struct sock *sk)
+{
+	if (sk->forward_alloc >= (int)PAGE_SIZE ||
+	    tcp_mem_schedule(sk, PAGE_SIZE, 0)) {
+		struct page *page = alloc_pages(sk->allocation, 0);
+		if (page)
+			return page;
+	}
+	tcp_enter_memory_pressure();
+	tcp_moderate_sndbuf(sk);
 	return NULL;
 }
 

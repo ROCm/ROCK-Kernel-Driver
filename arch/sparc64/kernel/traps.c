@@ -1,4 +1,4 @@
-/* $Id: traps.c,v 1.73 2001/03/22 07:26:03 davem Exp $
+/* $Id: traps.c,v 1.76 2001/04/03 13:46:31 davem Exp $
  * arch/sparc64/kernel/traps.c
  *
  * Copyright (C) 1995,1997 David S. Miller (davem@caip.rutgers.edu)
@@ -15,6 +15,7 @@
 #include <linux/signal.h>
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
+#include <linux/mm.h>
 
 #include <asm/delay.h>
 #include <asm/system.h>
@@ -27,229 +28,11 @@
 #include <asm/fpumacro.h>
 #include <asm/lsu.h>
 #include <asm/dcu.h>
+#include <asm/estate.h>
+#include <asm/chafsr.h>
 #include <asm/psrcompat.h>
 #ifdef CONFIG_KMOD
 #include <linux/kmod.h>
-#endif
-
-/* #define SYSCALL_TRACING */
-/* #define VERBOSE_SYSCALL_TRACING */
-/* #define DEBUG_FPU */
-
-#ifdef SYSCALL_TRACING
-#ifdef VERBOSE_SYSCALL_TRACING
-struct sdesc {
-	int	scall_num;
-	char	*name;
-	int	num_args;
-	char	arg_is_string[6];
-} sdesc_entries[] = {
-	{ 0, "setup", 0, },
-	{ 1, "exit", 1, { 0, } },
-	{ 2, "fork", 0, },
-	{ 3, "read", 3, { 0, 0, 0, } },
-	{ 4, "write", 3, { 0, 0, 0, } },
-	{ 5, "open", 3, { 1, 0, 0, } },
-	{ 6, "close", 1, { 0, } },
-	{ 7, "wait4", 4, { 0, 0, 0, 0, } },
-	{ 8, "creat", 2, { 1, 0, } },
-	{ 9, "link", 2, { 1, 1, } },
-	{ 10, "unlink", 1, { 1, } },
-	{ 11, "execv", 2, { 1, 0, } },
-	{ 12, "chdir", 1, { 1, } },
-	{ 15, "chmod", 2, { 1, 0, } },
-	{ 16, "chown", 3, { 1, 0, 0, } },
-	{ 17, "brk", 1, { 0, } },
-	{ 19, "lseek", 3, { 0, 0, 0, } },
-	{ 27, "alarm", 1, { 0, } },
-	{ 29, "pause", 0, },
-	{ 33, "access", 2, { 1, 0, } },
-	{ 36, "sync", 0, },
-	{ 37, "kill", 2, { 0, 0, } },
-	{ 38, "stat", 2, { 1, 0, } },
-	{ 40, "lstat", 2, { 1, 0, } },
-	{ 41, "dup", 1, { 0, } },
-	{ 42, "pipd", 0, },
-	{ 54, "ioctl", 3, { 0, 0, 0, } },
-	{ 57, "symlink", 2, { 1, 1, } },
-	{ 58, "readlink", 3, { 1, 0, 0, } },
-	{ 59, "execve", 3, { 1, 0, 0, } },
-	{ 60, "umask", 1, { 0, } },
-	{ 62, "fstat", 2, { 0, 0, } },
-	{ 64, "getpagesize", 0, },
-	{ 71, "mmap", 6, { 0, 0, 0, 0, 0, 0, } },
-	{ 73, "munmap", 2, { 0, 0, } },
-	{ 74, "mprotect", 3, { 0, 0, 0, } },
-	{ 83, "setitimer", 3, { 0, 0, 0, } },
-	{ 90, "dup2", 2, { 0, 0, } },
-	{ 92, "fcntl", 3, { 0, 0, 0, } },
-	{ 93, "select", 5, { 0, 0, 0, 0, 0, } },
-	{ 97, "socket", 3, { 0, 0, 0, } },
-	{ 98, "connect", 3, { 0, 0, 0, } },
-	{ 99, "accept", 3, { 0, 0, 0, } },
-	{ 101, "send", 4, { 0, 0, 0, 0, } },
-	{ 102, "recv", 4, { 0, 0, 0, 0, } },
-	{ 104, "bind", 3, { 0, 0, 0, } },
-	{ 105, "setsockopt", 5, { 0, 0, 0, 0, 0, } },
-	{ 106, "listen", 2, { 0, 0, } },
-	{ 120, "readv", 3, { 0, 0, 0, } },
-	{ 121, "writev", 3, { 0, 0, 0, } },
-	{ 123, "fchown", 3, { 0, 0, 0, } },
-	{ 124, "fchmod", 2, { 0, 0, } },
-	{ 128, "rename", 2, { 1, 1, } },
-	{ 129, "truncate", 2, { 1, 0, } },
-	{ 130, "ftruncate", 2, { 0, 0, } },
-	{ 131, "flock", 2, { 0, 0, } },
-	{ 136, "mkdir", 2, { 1, 0, } },
-	{ 137, "rmdir", 1, { 1, } },
-	{ 146, "killpg", 1, { 0, } },
-	{ 157, "statfs", 2, { 1, 0, } },
-	{ 158, "fstatfs", 2, { 0, 0, } },
-	{ 159, "umount", 1, { 1, } },
-	{ 167, "mount", 5, { 1, 1, 1, 0, 0, } },
-	{ 174, "getdents", 3, { 0, 0, 0, } },
-	{ 176, "fchdir", 2, { 0, 0, } },
-	{ 198, "sigaction", 3, { 0, 0, 0, } },
-	{ 201, "sigsuspend", 1, { 0, } },
-	{ 206, "socketcall", 2, { 0, 0, } },
-	{ 216, "sigreturn", 0, },
-	{ 230, "newselect", 5, { 0, 0, 0, 0, 0, } },
-	{ 236, "llseek", 5, { 0, 0, 0, 0, 0, } },
-	{ 251, "sysctl", 1, { 0, } },
-};
-#define NUM_SDESC_ENTRIES (sizeof(sdesc_entries) / sizeof(sdesc_entries[0]))
-#endif
-
-#ifdef VERBOSE_SYSCALL_TRACING
-static char scall_strbuf[512];
-#endif
-
-void syscall_trace_entry(unsigned long g1, struct pt_regs *regs)
-{
-#ifdef VERBOSE_SYSCALL_TRACING
-	struct sdesc *sdp;
-	int i;
-#endif
-
-#if 0
-	if (!current->pid) return;
-#endif	
-	printk("SYS[%s:%d]: PC(%016lx) <%3d> ",
-	       current->comm, current->pid, regs->tpc, (int)g1);
-#ifdef VERBOSE_SYSCALL_TRACING
-	sdp = NULL;
-	for(i = 0; i < NUM_SDESC_ENTRIES; i++)
-		if(sdesc_entries[i].scall_num == g1) {
-			sdp = &sdesc_entries[i];
-			break;
-		}
-	if(sdp) {
-		printk("%s(", sdp->name);
-		for(i = 0; i < sdp->num_args; i++) {
-			if(i)
-				printk(",");
-			if(!sdp->arg_is_string[i]) {
-				if (current->thread.flags & SPARC_FLAG_32BIT)
-					printk("%08x", (unsigned int)regs->u_regs[UREG_I0 + i]);
-				else
-					printk("%016lx", regs->u_regs[UREG_I0 + i]);
-			} else {
-				if (current->thread.flags & SPARC_FLAG_32BIT)
-					strncpy_from_user(scall_strbuf,
-							  (char *)(regs->u_regs[UREG_I0 + i] & 0xffffffff),
-							  512);
-				else
-					strncpy_from_user(scall_strbuf,
-							  (char *)regs->u_regs[UREG_I0 + i],
-							  512);
-				printk("%s", scall_strbuf);
-			}
-		}
-		printk(") ");
-	}
-#endif
-}
-
-unsigned long syscall_trace_exit(unsigned long retval, struct pt_regs *regs)
-{
-#if 0
-	if (current->pid)
-#endif
-		printk("ret[%016lx]\n", retval);
-	return retval;
-}
-#endif /* SYSCALL_TRACING */
-
-#if 1
-void rtrap_check(struct pt_regs *regs)
-{
-	register unsigned long pgd_phys asm("o1");
-	register unsigned long pgd_cache asm("o2");
-	register unsigned long g1_or_g3 asm("o3");
-	register unsigned long g2 asm("o4");
-	unsigned long ctx;
-
-#if 0
-	do {
-		unsigned long test;
-		__asm__ __volatile__("rdpr	%%pstate, %0"
-				     : "=r" (test));
-		if((test & PSTATE_MG) != 0 ||
-		   (test & PSTATE_IE) == 0) {
-			printk("rtrap_check: Bogus pstate[%016lx]\n", test);
-			return;
-		}
-	} while(0);
-#endif
-
-	__asm__ __volatile__("
-	rdpr	%%pstate, %%o5
-	wrpr	%%o5, %4, %%pstate
-	or	%%g1, %%g3, %2
-	mov	%%g2, %3
-	mov	%%g7, %0
-	mov	%5, %1
-	ldxa	[%1] %6, %1
-	wrpr	%%o5, 0x0, %%pstate"
-	: "=r" (pgd_phys), "=r" (pgd_cache),
-	  "=r" (g1_or_g3), "=r" (g2)
-	: "i" (PSTATE_IE | PSTATE_MG), "i" (TSB_REG),
-	  "i" (ASI_DMMU)
-	: "o5");
-
-	ctx = spitfire_get_secondary_context();
-
-	if((pgd_phys != __pa(current->mm->pgd)) ||
-	   ((pgd_cache != 0) &&
-	    (pgd_cache != pgd_val(current->mm->pgd[0])<<11UL)) ||
-	   (g1_or_g3 != (0xfffffffe00000000UL | 0x0000000000000018UL)) ||
-#define KERN_HIGHBITS		((_PAGE_VALID | _PAGE_SZ4MB) ^ 0xfffff80000000000)
-#define KERN_LOWBITS		(_PAGE_CP | _PAGE_CV | _PAGE_P | _PAGE_W)
-	   (g2 != (KERN_HIGHBITS | KERN_LOWBITS)) ||
-#undef KERN_HIGHBITS
-#undef KERN_LOWBITS
-	   ((ctx != (current->mm->context & 0x3ff)) ||
-	    (ctx == 0) ||
-	    (CTX_HWBITS(current->mm->context) != ctx))) {
-		printk("SHIT[%s:%d]: "
-		       "(PP[%016lx] CACH[%016lx] CTX[%lx] g1g3[%016lx] g2[%016lx]) ",
-		       current->comm, current->pid,
-		       pgd_phys, pgd_cache, ctx, g1_or_g3, g2);
-		printk("SHIT[%s:%d]: "
-		       "[PP[%016lx] CACH[%016lx] CTX[%lx]] PC[%016lx:%016lx]\n",
-		       current->comm, current->pid,
-		       __pa(current->mm->pgd),
-		       pgd_val(current->mm->pgd[0]),
-		       current->mm->context & 0x3ff,
-		       regs->tpc, regs->tnpc);
-		show_regs(regs);
-#if 1
-		__sti();
-		while(1)
-			barrier();
-#endif
-	}
-}
 #endif
 
 void bad_trap (struct pt_regs *regs, long lvl)
@@ -290,10 +73,8 @@ void instruction_access_exception (struct pt_regs *regs,
 	siginfo_t info;
 
 	if (regs->tstate & TSTATE_PRIV) {
-#if 1
-		printk("instruction_access_exception: Shit SFSR[%016lx] SFAR[%016lx], going.\n",
+		printk("instruction_access_exception: SFSR[%016lx] SFAR[%016lx], going.\n",
 		       sfsr, sfar);
-#endif
 		die_if_kernel("Iax", regs);
 	}
 	if ((current->thread.flags & SPARC_FLAG_32BIT) != 0) {
@@ -331,16 +112,11 @@ void data_access_exception (struct pt_regs *regs,
 			return;
 		}
 		/* Shit... */
-#if 1
-		printk("data_access_exception: Shit SFSR[%016lx] SFAR[%016lx], going.\n",
+		printk("data_access_exception: SFSR[%016lx] SFAR[%016lx], going.\n",
 		       sfsr, sfar);
-#endif
 		die_if_kernel("Dax", regs);
 	}
-#if 0
-	else
-		rtrap_check(regs);
-#endif
+
 	info.si_signo = SIGSEGV;
 	info.si_errno = 0;
 	info.si_code = SEGV_MAPERR;
@@ -352,6 +128,7 @@ void data_access_exception (struct pt_regs *regs,
 #ifdef CONFIG_PCI
 /* This is really pathetic... */
 extern volatile int pci_poke_in_progress;
+extern volatile int pci_poke_cpu;
 extern volatile int pci_poke_faulted;
 #endif
 
@@ -405,7 +182,7 @@ void do_iae(struct pt_regs *regs)
 void do_dae(struct pt_regs *regs)
 {
 #ifdef CONFIG_PCI
-	if (pci_poke_in_progress) {
+	if (pci_poke_in_progress && pci_poke_cpu == smp_processor_id()) {
 		clean_and_reenable_l1_caches();
 
 		pci_poke_faulted = 1;
@@ -539,6 +316,986 @@ asmlinkage void cee_log(unsigned long ce_status,
 	}
 }
 
+/* Cheetah error trap handling. */
+static unsigned long ecache_flush_physbase;
+static unsigned long ecache_flush_linesize;
+static unsigned long ecache_flush_size;
+
+/* WARNING: The error trap handlers in assembly know the precise
+ *	    layout of the following structure.
+ *
+ * C-level handlers below use this information to log the error
+ * and then determine how to recover (if possible).
+ */
+struct cheetah_err_info {
+/*0x00*/u64 afsr;
+/*0x08*/u64 afar;
+
+	/* D-cache state */
+/*0x10*/u64 dcache_data[4];	/* The actual data	*/
+/*0x30*/u64 dcache_index;	/* D-cache index	*/
+/*0x38*/u64 dcache_tag;		/* D-cache tag/valid	*/
+/*0x40*/u64 dcache_utag;	/* D-cache microtag	*/
+/*0x48*/u64 dcache_stag;	/* D-cache snooptag	*/
+
+	/* I-cache state */
+/*0x50*/u64 icache_data[8];	/* The actual insns + predecode	*/
+/*0x90*/u64 icache_index;	/* I-cache index	*/
+/*0x98*/u64 icache_tag;		/* I-cache phys tag	*/
+/*0xa0*/u64 icache_utag;	/* I-cache microtag	*/
+/*0xa8*/u64 icache_stag;	/* I-cache snooptag	*/
+/*0xb0*/u64 icache_upper;	/* I-cache upper-tag	*/
+/*0xb8*/u64 icache_lower;	/* I-cache lower-tag	*/
+
+	/* E-cache state */
+/*0xc0*/u64 ecache_data[4];	/* 32 bytes from staging registers */
+/*0xe0*/u64 ecache_index;	/* E-cache index	*/
+/*0xe8*/u64 ecache_tag;		/* E-cache tag/state	*/
+
+/*0xf0*/u64 __pad[32 - 30];
+};
+#define CHAFSR_INVALID		((u64)-1L)
+
+/* This is allocated at boot time based upon the largest hardware
+ * cpu ID in the system.  We allocate two entries per cpu, one for
+ * TL==0 logging and one for TL >= 1 logging.
+ */
+struct cheetah_err_info *cheetah_error_log;
+
+static __inline__ struct cheetah_err_info *cheetah_get_error_log(unsigned long afsr)
+{
+	struct cheetah_err_info *p;
+	int cpu = smp_processor_id();
+
+	if (!cheetah_error_log)
+		return NULL;
+
+	p = cheetah_error_log + (cpu * 2);
+	if ((afsr & CHAFSR_TL1) != 0UL)
+		p++;
+
+	return p;
+}
+
+extern unsigned int tl0_fecc[], tl1_fecc[];
+extern unsigned int tl0_cee[], tl1_cee[];
+extern unsigned int tl0_iae[], tl1_iae[];
+extern unsigned int tl0_dae[], tl1_dae[];
+extern unsigned int cheetah_fecc_trap_vector[], cheetah_fecc_trap_vector_tl1[];
+extern unsigned int cheetah_cee_trap_vector[], cheetah_cee_trap_vector_tl1[];
+extern unsigned int cheetah_deferred_trap_vector[], cheetah_deferred_trap_vector_tl1[];
+
+void cheetah_ecache_flush_init(void)
+{
+	unsigned long largest_size, smallest_linesize, order;
+	char type[16];
+	int node, highest_cpu, i;
+
+	/* Scan all cpu device tree nodes, note two values:
+	 * 1) largest E-cache size
+	 * 2) smallest E-cache line size
+	 */
+	largest_size = 0UL;
+	smallest_linesize = ~0UL;
+	node = prom_getchild(prom_root_node);
+	while ((node = prom_getsibling(node)) != 0) {
+		prom_getstring(node, "device_type", type, sizeof(type));
+		if (!strcmp(type, "cpu")) {
+			unsigned long val;
+
+			val = prom_getintdefault(node, "ecache-size",
+						 (2 * 1024 * 1024));
+			if (val > largest_size)
+				largest_size = val;
+			val = prom_getintdefault(node, "ecache-line-size", 64);
+			if (val < smallest_linesize)
+				smallest_linesize = val;
+		}
+	}
+	if (largest_size == 0UL || smallest_linesize == ~0UL) {
+		prom_printf("cheetah_ecache_flush_init: Cannot probe cpu E-cache "
+			    "parameters.\n");
+		prom_halt();
+	}
+
+	ecache_flush_size = (2 * largest_size);
+	ecache_flush_linesize = smallest_linesize;
+
+	/* Discover a physically contiguous chunk of physical
+	 * memory in 'sp_banks' of size ecache_flush_size calculated
+	 * above.  Store the physical base of this area at
+	 * ecache_flush_physbase.
+	 */
+	for (node = 0; ; node++) {
+		if (sp_banks[node].num_bytes == 0)
+			break;
+		if (sp_banks[node].num_bytes >= ecache_flush_size) {
+			ecache_flush_physbase = sp_banks[node].base_addr;
+			break;
+		}
+	}
+
+	/* Note: Zero would be a valid value of ecache_flush_physbase so
+	 * don't use that as the success test. :-)
+	 */
+	if (sp_banks[node].num_bytes == 0) {
+		prom_printf("cheetah_ecache_flush_init: Cannot find %d byte "
+			    "contiguous physical memory.\n", ecache_flush_size);
+		prom_halt();
+	}
+
+	/* Now allocate error trap reporting scoreboard. */
+	highest_cpu = 0;
+#ifdef CONFIG_SMP
+	for (i = 0; i < NR_CPUS; i++) {
+		if ((1UL << i) & cpu_present_map)
+			highest_cpu = i;
+	}
+#endif
+	highest_cpu++;
+	node = highest_cpu * (2 * sizeof(struct cheetah_err_info));
+	for (order = 0; order < MAX_ORDER; order++) {
+		if ((PAGE_SIZE << order) >= node)
+			break;
+	}
+	cheetah_error_log = (struct cheetah_err_info *)
+		__get_free_pages(GFP_KERNEL, order);
+	if (!cheetah_error_log) {
+		prom_printf("cheetah_ecache_flush_init: Failed to allocate "
+			    "error logging scoreboard (%d bytes).\n", node);
+		prom_halt();
+	}
+	memset(cheetah_error_log, 0, PAGE_SIZE << order);
+
+	/* Mark all AFSRs as invalid so that the trap handler will
+	 * log new new information there.
+	 */
+	for (i = 0; i < 2 * highest_cpu; i++)
+		cheetah_error_log[i].afsr = CHAFSR_INVALID;
+
+	/* Now patch trap tables. */
+	memcpy(tl0_fecc, cheetah_fecc_trap_vector, (8 * 4));
+	memcpy(tl1_fecc, cheetah_fecc_trap_vector_tl1, (8 * 4));
+	memcpy(tl0_cee, cheetah_cee_trap_vector, (8 * 4));
+	memcpy(tl1_cee, cheetah_cee_trap_vector_tl1, (8 * 4));
+	memcpy(tl0_iae, cheetah_deferred_trap_vector, (8 * 4));
+	memcpy(tl1_iae, cheetah_deferred_trap_vector_tl1, (8 * 4));
+	memcpy(tl0_dae, cheetah_deferred_trap_vector, (8 * 4));
+	memcpy(tl1_dae, cheetah_deferred_trap_vector_tl1, (8 * 4));
+	flushi(PAGE_OFFSET);
+}
+
+static void cheetah_flush_ecache(void)
+{
+	unsigned long flush_base = ecache_flush_physbase;
+	unsigned long flush_linesize = ecache_flush_linesize;
+	unsigned long flush_size = ecache_flush_size;
+
+	__asm__ __volatile__("1: subcc	%0, %4, %0\n\t"
+			     "   bne,pt	%%xcc, 1b\n\t"
+			     "    ldxa	[%2 + %0] %3, %%g0\n\t"
+			     : "=&r" (flush_size)
+			     : "0" (flush_size), "r" (flush_base),
+			       "i" (ASI_PHYS_USE_EC), "r" (flush_linesize));
+}
+
+static void cheetah_flush_ecache_line(unsigned long physaddr)
+{
+	unsigned long alias;
+
+	physaddr &= ~(8UL - 1UL);
+	physaddr = (ecache_flush_physbase +
+		    (physaddr & ((ecache_flush_size>>1UL) - 1UL)));
+	alias = physaddr + (ecache_flush_size >> 1UL);
+	__asm__ __volatile__("ldxa [%0] %2, %%g0\n\t"
+			     "ldxa [%1] %2, %%g0\n\t"
+			     "membar #Sync"
+			     : /* no outputs */
+			     : "r" (physaddr), "r" (alias),
+			       "i" (ASI_PHYS_USE_EC));
+}
+
+#ifdef CONFIG_SMP
+unsigned long cheetah_tune_scheduling(void)
+{
+	unsigned long tick1, tick2, raw;
+
+	__asm__ __volatile__("rd %%tick, %0" : "=r" (tick1));
+	cheetah_flush_ecache();
+	__asm__ __volatile__("rd %%tick, %0" : "=r" (tick2));
+
+	raw = (tick2 - tick1);
+
+	return (raw - (raw >> 2));
+}
+#endif
+
+/* Unfortunately, the diagnostic access to the I-cache tags we need to
+ * use to clear the thing interferes with I-cache coherency transactions.
+ *
+ * So we must only flush the I-cache when it is disabled.
+ */
+static void cheetah_flush_icache(void)
+{
+	unsigned long dcu_save, i;
+
+	/* Save current DCU, disable I-cache. */
+	__asm__ __volatile__("ldxa [%%g0] %1, %0\n\t"
+			     "or %0, %2, %%g1\n\t"
+			     "stxa %%g1, [%%g0] %1\n\t"
+			     "membar #Sync"
+			     : "=r" (dcu_save)
+			     : "i" (ASI_DCU_CONTROL_REG), "i" (DCU_IC)
+			     : "g1");
+
+	/* Clear the valid bits in all the tags. */
+	for (i = 0; i < (1 << 16); i += (1 << 5)) {
+		__asm__ __volatile__("stxa %%g0, [%0] %1\n\t"
+				     "membar #Sync"
+				     : /* no outputs */
+				     : "r" (i | (2 << 3)), "i" (ASI_IC_TAG));
+	}
+
+	/* Restore DCU register */
+	__asm__ __volatile__("stxa %0, [%%g0] %1\n\t"
+			     "membar #Sync"
+			     : /* no outputs */
+			     : "r" (dcu_save), "i" (ASI_DCU_CONTROL_REG));
+}
+
+static void cheetah_flush_dcache(void)
+{
+	unsigned long i;
+
+	for (i = 0; i < (1 << 16); i += (1 << 5)) {
+		__asm__ __volatile__("stxa %%g0, [%0] %1\n\t"
+				     "membar #Sync"
+				     : /* no outputs */
+				     : "r" (i), "i" (ASI_DCACHE_TAG));
+	}
+}
+
+/* Conversion tables used to frob Cheetah AFSR syndrome values into
+ * something palatable to the memory controller driver get_unumber
+ * routine.
+ */
+#define MT0	137
+#define MT1	138
+#define MT2	139
+#define NONE	254
+#define MTC0	140
+#define MTC1	141
+#define MTC2	142
+#define MTC3	143
+#define C0	128
+#define C1	129
+#define C2	130
+#define C3	131
+#define C4	132
+#define C5	133
+#define C6	134
+#define C7	135
+#define C8	136
+#define M2	144
+#define M3	145
+#define M4	146
+#define M	147
+static unsigned char cheetah_ecc_syntab[] = {
+/*00*/NONE, C0, C1, M2, C2, M2, M3, 47, C3, M2, M2, 53, M2, 41, 29, M,
+/*01*/C4, M, M, 50, M2, 38, 25, M2, M2, 33, 24, M2, 11, M, M2, 16,
+/*02*/C5, M, M, 46, M2, 37, 19, M2, M, 31, 32, M, 7, M2, M2, 10,
+/*03*/M2, 40, 13, M2, 59, M, M2, 66, M, M2, M2, 0, M2, 67, 71, M,
+/*04*/C6, M, M, 43, M, 36, 18, M, M2, 49, 15, M, 63, M2, M2, 6,
+/*05*/M2, 44, 28, M2, M, M2, M2, 52, 68, M2, M2, 62, M2, M3, M3, M4,
+/*06*/M2, 26, 106, M2, 64, M, M2, 2, 120, M, M2, M3, M, M3, M3, M4,
+/*07*/116, M2, M2, M3, M2, M3, M, M4, M2, 58, 54, M2, M, M4, M4, M3,
+/*08*/C7, M2, M, 42, M, 35, 17, M2, M, 45, 14, M2, 21, M2, M2, 5,
+/*09*/M, 27, M, M, 99, M, M, 3, 114, M2, M2, 20, M2, M3, M3, M,
+/*0a*/M2, 23, 113, M2, 112, M2, M, 51, 95, M, M2, M3, M2, M3, M3, M2,
+/*0b*/103, M, M2, M3, M2, M3, M3, M4, M2, 48, M, M, 73, M2, M, M3,
+/*0c*/M2, 22, 110, M2, 109, M2, M, 9, 108, M2, M, M3, M2, M3, M3, M,
+/*0d*/102, M2, M, M, M2, M3, M3, M, M2, M3, M3, M2, M, M4, M, M3,
+/*0e*/98, M, M2, M3, M2, M, M3, M4, M2, M3, M3, M4, M3, M, M, M,
+/*0f*/M2, M3, M3, M, M3, M, M, M, 56, M4, M, M3, M4, M, M, M,
+/*10*/C8, M, M2, 39, M, 34, 105, M2, M, 30, 104, M, 101, M, M, 4,
+/*11*/M, M, 100, M, 83, M, M2, 12, 87, M, M, 57, M2, M, M3, M,
+/*12*/M2, 97, 82, M2, 78, M2, M2, 1, 96, M, M, M, M, M, M3, M2,
+/*13*/94, M, M2, M3, M2, M, M3, M, M2, M, 79, M, 69, M, M4, M,
+/*14*/M2, 93, 92, M, 91, M, M2, 8, 90, M2, M2, M, M, M, M, M4,
+/*15*/89, M, M, M3, M2, M3, M3, M, M, M, M3, M2, M3, M2, M, M3,
+/*16*/86, M, M2, M3, M2, M, M3, M, M2, M, M3, M, M3, M, M, M3,
+/*17*/M, M, M3, M2, M3, M2, M4, M, 60, M, M2, M3, M4, M, M, M2,
+/*18*/M2, 88, 85, M2, 84, M, M2, 55, 81, M2, M2, M3, M2, M3, M3, M4,
+/*19*/77, M, M, M, M2, M3, M, M, M2, M3, M3, M4, M3, M2, M, M,
+/*1a*/74, M, M2, M3, M, M, M3, M, M, M, M3, M, M3, M, M4, M3,
+/*1b*/M2, 70, 107, M4, 65, M2, M2, M, 127, M, M, M, M2, M3, M3, M,
+/*1c*/80, M2, M2, 72, M, 119, 118, M, M2, 126, 76, M, 125, M, M4, M3,
+/*1d*/M2, 115, 124, M, 75, M, M, M3, 61, M, M4, M, M4, M, M, M,
+/*1e*/M, 123, 122, M4, 121, M4, M, M3, 117, M2, M2, M3, M4, M3, M, M,
+/*1f*/111, M, M, M, M4, M3, M3, M, M, M, M3, M, M3, M2, M, M
+};
+static unsigned char cheetah_mtag_syntab[] = {
+       NONE, MTC0,
+       MTC1, NONE,
+       MTC2, NONE,
+       NONE, MT0,
+       MTC3, NONE,
+       NONE, MT1,
+       NONE, MT2,
+       NONE, NONE
+};
+
+/* This table is ordered in priority of errors and matches the
+ * AFAR overwrite policy as well.
+ */
+static struct {
+	unsigned long mask;
+	char *name;
+} cheetah_error_table[] = {
+	{	CHAFSR_PERR,	"System interface protocol error"			},
+	{	CHAFSR_IERR,	"Internal processor error"				},
+	{	CHAFSR_ISAP,	"System request parity error on incoming addresss"	},
+	{	CHAFSR_UCU,	"Uncorrectable E-cache ECC error for ifetch/data"	},
+	{	CHAFSR_UCC,	"SW Correctable E-cache ECC error for ifetch/data"	},
+	{	CHAFSR_UE,	"Uncorrectable system bus data ECC error for read"	},
+	{	CHAFSR_EDU,	"Uncorrectable E-cache ECC error for stmerge/blkld"	},
+	{	CHAFSR_EMU,	"Uncorrectable system bus MTAG error"			},
+	{	CHAFSR_WDU,	"Uncorrectable E-cache ECC error for writeback"		},
+	{	CHAFSR_CPU,	"Uncorrectable ECC error for copyout"			},
+	{	CHAFSR_CE,	"HW corrected system bus data ECC error for read"	},
+	{	CHAFSR_EDC,	"HW corrected E-cache ECC error for stmerge/blkld"	},
+	{	CHAFSR_EMC,	"HW corrected system bus MTAG ECC error"		},
+	{	CHAFSR_WDC,	"HW corrected E-cache ECC error for writeback"		},
+	{	CHAFSR_CPC,	"HW corrected ECC error for copyout"			},
+	{	CHAFSR_TO,	"Unmapped error from system bus"			},
+	{	CHAFSR_BERR,	"Bus error response from system bus"			},
+	/* These two do not update the AFAR. */
+	{	CHAFSR_IVC,	"HW corrected system bus data ECC error for ivec read"	},
+	{	CHAFSR_IVU,	"Uncorrectable system bus data ECC error for ivec read"	},
+	{	0,		NULL							}
+};
+
+/* Return the highest priority error conditon mentioned. */
+static __inline__ unsigned long cheetah_get_hipri(unsigned long afsr)
+{
+	unsigned long tmp = 0;
+	int i;
+
+	for (i = 0; cheetah_error_table[i].mask; i++) {
+		if ((tmp = (afsr & cheetah_error_table[i].mask)) != 0UL)
+			return tmp;
+	}
+	return tmp;
+}
+
+static char *cheetah_get_string(unsigned long bit)
+{
+	int i;
+
+	for (i = 0; cheetah_error_table[i].mask; i++) {
+		if ((bit & cheetah_error_table[i].mask) != 0UL)
+			return cheetah_error_table[i].name;
+	}
+	return "???";
+}
+
+extern int chmc_getunumber(int, unsigned long, char *, int);
+
+static void cheetah_log_errors(struct pt_regs *regs, struct cheetah_err_info *info,
+			       unsigned long afsr, unsigned long afar, int recoverable)
+{
+	unsigned long hipri;
+	char unum[256];
+
+	printk("%s" "ERROR(%d): Cheetah error trap taken afsr[%016lx] afar[%016lx] TL1(%d)\n",
+	       (recoverable ? KERN_WARNING : KERN_CRIT), smp_processor_id(),
+	       afsr, afar,
+	       (afsr & CHAFSR_TL1) ? 1 : 0);
+	printk("%s" "ERROR(%d): TPC[%016lx] TNPC[%016lx] TSTATE[%016lx]\n",
+	       (recoverable ? KERN_WARNING : KERN_CRIT), smp_processor_id(),
+	       regs->tpc, regs->tnpc, regs->tstate);
+	printk("%s" "ERROR(%d): M_SYND(%lx),  E_SYND(%lx)%s%s\n",
+	       (recoverable ? KERN_WARNING : KERN_CRIT), smp_processor_id(),
+	       (afsr & CHAFSR_M_SYNDROME) >> CHAFSR_M_SYNDROME_SHIFT,
+	       (afsr & CHAFSR_E_SYNDROME) >> CHAFSR_E_SYNDROME_SHIFT,
+	       (afsr & CHAFSR_ME) ? ", Multiple Errors" : "",
+	       (afsr & CHAFSR_PRIV) ? ", Privileged" : "");
+	hipri = cheetah_get_hipri(afsr);
+	printk("%s" "ERROR(%d): Highest priority error (%016lx) \"%s\"\n",
+	       (recoverable ? KERN_WARNING : KERN_CRIT), smp_processor_id(),
+	       hipri, cheetah_get_string(hipri));
+
+	/* Try to get unumber if relevant. */
+#define ESYND_ERRORS	(CHAFSR_IVC | CHAFSR_IVU | \
+			 CHAFSR_CPC | CHAFSR_CPU | \
+			 CHAFSR_UE  | CHAFSR_CE  | \
+			 CHAFSR_EDC | CHAFSR_EDU  | \
+			 CHAFSR_UCC | CHAFSR_UCU  | \
+			 CHAFSR_WDU | CHAFSR_WDC)
+#define MSYND_ERRORS	(CHAFSR_EMC | CHAFSR_EMU)
+	if (afsr & ESYND_ERRORS) {
+		int syndrome;
+		int ret;
+
+		syndrome = (afsr & CHAFSR_E_SYNDROME) >> CHAFSR_E_SYNDROME_SHIFT;
+		syndrome = cheetah_ecc_syntab[syndrome];
+		ret = chmc_getunumber(syndrome, afar, unum, sizeof(unum));
+		if (ret != -1)
+			printk("%s" "ERROR(%d): AFAR E-syndrome [%s]\n",
+			       (recoverable ? KERN_WARNING : KERN_CRIT),
+			       smp_processor_id(), unum);
+	} else if (afsr & MSYND_ERRORS) {
+		int syndrome;
+		int ret;
+
+		syndrome = (afsr & CHAFSR_M_SYNDROME) >> CHAFSR_M_SYNDROME_SHIFT;
+		syndrome = cheetah_mtag_syntab[syndrome];
+		ret = chmc_getunumber(syndrome, afar, unum, sizeof(unum));
+		if (ret != -1)
+			printk("%s" "ERROR(%d): AFAR M-syndrome [%s]\n",
+			       (recoverable ? KERN_WARNING : KERN_CRIT),
+			       smp_processor_id(), unum);
+	}
+
+	/* Now dump the cache snapshots. */
+	printk("%s" "ERROR(%d): D-cache idx[%x] tag[%016lx] utag[%016lx] stag[%016lx]\n",
+	       (recoverable ? KERN_WARNING : KERN_CRIT), smp_processor_id(),
+	       (int) info->dcache_index,
+	       info->dcache_tag,
+	       info->dcache_utag,
+	       info->dcache_stag);
+	printk("%s" "ERROR(%d): D-cache data0[%016lx] data1[%016lx] data2[%016lx] data3[%016lx]\n",
+	       (recoverable ? KERN_WARNING : KERN_CRIT), smp_processor_id(),
+	       info->dcache_data[0],
+	       info->dcache_data[1],
+	       info->dcache_data[2],
+	       info->dcache_data[3]);
+	printk("%s" "ERROR(%d): I-cache idx[%x] tag[%016lx] utag[%016lx] stag[%016lx] "
+	       "u[%016lx] l[%016lx]\n",
+	       (recoverable ? KERN_WARNING : KERN_CRIT), smp_processor_id(),
+	       (int) info->icache_index,
+	       info->icache_tag,
+	       info->icache_utag,
+	       info->icache_stag,
+	       info->icache_upper,
+	       info->icache_lower);
+	printk("%s" "ERROR(%d): I-cache INSN0[%016lx] INSN1[%016lx] INSN2[%016lx] INSN3[%016lx]\n",
+	       (recoverable ? KERN_WARNING : KERN_CRIT), smp_processor_id(),
+	       info->icache_data[0],
+	       info->icache_data[1],
+	       info->icache_data[2],
+	       info->icache_data[3]);
+	printk("%s" "ERROR(%d): I-cache INSN4[%016lx] INSN5[%016lx] INSN6[%016lx] INSN7[%016lx]\n",
+	       (recoverable ? KERN_WARNING : KERN_CRIT), smp_processor_id(),
+	       info->icache_data[4],
+	       info->icache_data[5],
+	       info->icache_data[6],
+	       info->icache_data[7]);
+	printk("%s" "ERROR(%d): E-cache idx[%x] tag[%016lx]\n",
+	       (recoverable ? KERN_WARNING : KERN_CRIT), smp_processor_id(),
+	       (int) info->ecache_index, info->ecache_tag);
+	printk("%s" "ERROR(%d): E-cache data0[%016lx] data1[%016lx] data2[%016lx] data3[%016lx]\n",
+	       (recoverable ? KERN_WARNING : KERN_CRIT), smp_processor_id(),
+	       info->ecache_data[0],
+	       info->ecache_data[1],
+	       info->ecache_data[2],
+	       info->ecache_data[3]);
+
+	afsr = (afsr & ~hipri) & CHAFSR_ERRORS;
+	while (afsr != 0UL) {
+		unsigned long bit = cheetah_get_hipri(afsr);
+
+		printk("%s" "ERROR: Multiple-error (%016lx) \"%s\"\n",
+		       (recoverable ? KERN_WARNING : KERN_CRIT),
+		       bit, cheetah_get_string(bit));
+
+		afsr &= ~bit;
+	}
+
+	if (!recoverable)
+		printk(KERN_CRIT "ERROR: This condition is not recoverable.\n");
+}
+
+static int cheetah_recheck_errors(struct cheetah_err_info *logp)
+{
+	unsigned long afsr, afar;
+	int ret = 0;
+
+	__asm__ __volatile__("ldxa [%%g0] %1, %0\n\t"
+			     : "=r" (afsr)
+			     : "i" (ASI_AFSR));
+	if ((afsr & CHAFSR_ERRORS) != 0) {
+		if (logp != NULL) {
+			__asm__ __volatile__("ldxa [%%g0] %1, %0\n\t"
+					     : "=r" (afar)
+					     : "i" (ASI_AFAR));
+			logp->afsr = afsr;
+			logp->afar = afar;
+		}
+		ret = 1;
+	}
+	__asm__ __volatile__("stxa %0, [%%g0] %1\n\t"
+			     "membar #Sync\n\t"
+			     : : "r" (afsr), "i" (ASI_AFSR));
+
+	return ret;
+}
+
+void cheetah_fecc_handler(struct pt_regs *regs, unsigned long afsr, unsigned long afar)
+{
+	struct cheetah_err_info local_snapshot, *p;
+	int recoverable;
+
+	/* Flush E-cache */
+	cheetah_flush_ecache();
+
+	p = cheetah_get_error_log(afsr);
+	if (!p) {
+		prom_printf("ERROR: Early Fast-ECC error afsr[%016lx] afar[%016lx]\n",
+			    afsr, afar);
+		prom_printf("ERROR: CPU(%d) TPC[%016lx] TNPC[%016lx] TSTATE[%016lx]\n",
+			    smp_processor_id(), regs->tpc, regs->tnpc, regs->tstate);
+		prom_halt();
+	}
+
+	/* Grab snapshot of logged error. */
+	memcpy(&local_snapshot, p, sizeof(local_snapshot));
+
+	/* If the current trap snapshot does not match what the
+	 * trap handler passed along into our args, big trouble.
+	 * In such a case, mark the local copy as invalid.
+	 *
+	 * Else, it matches and we mark the afsr in the non-local
+	 * copy as invalid so we may log new error traps there.
+	 */
+	if (p->afsr != afsr || p->afar != afar)
+		local_snapshot.afsr = CHAFSR_INVALID;
+	else
+		p->afsr = CHAFSR_INVALID;
+
+	cheetah_flush_icache();
+	cheetah_flush_dcache();
+
+	/* Re-enable I-cache/D-cache */
+	__asm__ __volatile__("ldxa [%%g0] %0, %%g1\n\t"
+			     "or %%g1, %1, %%g1\n\t"
+			     "stxa %%g1, [%%g0] %0\n\t"
+			     "membar #Sync"
+			     : /* no outputs */
+			     : "i" (ASI_DCU_CONTROL_REG),
+			       "i" (DCU_DC | DCU_IC)
+			     : "g1");
+
+	/* Re-enable error reporting */
+	__asm__ __volatile__("ldxa [%%g0] %0, %%g1\n\t"
+			     "or %%g1, %1, %%g1\n\t"
+			     "stxa %%g1, [%%g0] %0\n\t"
+			     "membar #Sync"
+			     : /* no outputs */
+			     : "i" (ASI_ESTATE_ERROR_EN),
+			       "i" (ESTATE_ERROR_NCEEN | ESTATE_ERROR_CEEN)
+			     : "g1");
+
+	/* Decide if we can continue after handling this trap and
+	 * logging the error.
+	 */
+	recoverable = 1;
+	if (afsr & (CHAFSR_PERR | CHAFSR_IERR | CHAFSR_ISAP))
+		recoverable = 0;
+
+	/* Re-check AFSR/AFAR.  What we are looking for here is whether a new
+	 * error was logged while we had error reporting traps disabled.
+	 */
+	if (cheetah_recheck_errors(&local_snapshot)) {
+		unsigned long new_afsr = local_snapshot.afsr;
+
+		/* If we got a new asynchronous error, die... */
+		if (new_afsr & (CHAFSR_EMU | CHAFSR_EDU |
+				CHAFSR_WDU | CHAFSR_CPU |
+				CHAFSR_IVU | CHAFSR_UE |
+				CHAFSR_BERR | CHAFSR_TO))
+			recoverable = 0;
+	}
+
+	/* Log errors. */
+	cheetah_log_errors(regs, &local_snapshot, afsr, afar, recoverable);
+
+	if (!recoverable)
+		panic("Irrecoverable Fast-ECC error trap.\n");
+
+	/* Flush E-cache to kick the error trap handlers out. */
+	cheetah_flush_ecache();
+}
+
+/* Try to fix a correctable error by pushing the line out from
+ * the E-cache.  Recheck error reporting registers to see if the
+ * problem is intermittent.
+ */
+static int cheetah_fix_ce(unsigned long physaddr)
+{
+	unsigned long orig_estate;
+	unsigned long alias1, alias2;
+	int ret;
+
+	/* Make sure correctable error traps are disabled. */
+	__asm__ __volatile__("ldxa	[%%g0] %2, %0\n\t"
+			     "andn	%0, %1, %%g1\n\t"
+			     "stxa	%%g1, [%%g0] %2\n\t"
+			     "membar	#Sync"
+			     : "=&r" (orig_estate)
+			     : "i" (ESTATE_ERROR_CEEN),
+			       "i" (ASI_ESTATE_ERROR_EN)
+			     : "g1");
+
+	/* We calculate alias addresses that will force the
+	 * cache line in question out of the E-cache.  Then
+	 * we bring it back in with an atomic instruction so
+	 * that we get it in some modified/exclusive state,
+	 * then we displace it again to try and get proper ECC
+	 * pushed back into the system.
+	 */
+	physaddr &= ~(8UL - 1UL);
+	alias1 = (ecache_flush_physbase +
+		  (physaddr & ((ecache_flush_size >> 1) - 1)));
+	alias2 = alias1 + (ecache_flush_size >> 1);
+	__asm__ __volatile__("ldxa	[%0] %3, %%g0\n\t"
+			     "ldxa	[%1] %3, %%g0\n\t"
+			     "casxa	[%2] %3, %%g0, %%g0\n\t"
+			     "ldxa	[%0] %3, %%g0\n\t"
+			     "ldxa	[%1] %3, %%g0\n\t"
+			     "membar	#Sync"
+			     : /* no outputs */
+			     : "r" (alias1), "r" (alias2),
+			       "r" (physaddr), "i" (ASI_PHYS_USE_EC));
+
+	/* Did that trigger another error? */
+	if (cheetah_recheck_errors(NULL)) {
+		/* Try one more time. */
+		__asm__ __volatile__("ldxa [%0] %1, %%g0\n\t"
+				     "membar #Sync"
+				     : : "r" (physaddr), "i" (ASI_PHYS_USE_EC));
+		if (cheetah_recheck_errors(NULL))
+			ret = 2;
+		else
+			ret = 1;
+	} else {
+		/* No new error, intermittent problem. */
+		ret = 0;
+	}
+
+	/* Restore error enables. */
+	__asm__ __volatile__("stxa	%0, [%%g0] %1\n\t"
+			     "membar	#Sync"
+			     : : "r" (orig_estate), "i" (ASI_ESTATE_ERROR_EN));
+
+	return ret;
+}
+
+/* Return non-zero if PADDR is a valid physical memory address. */
+static int cheetah_check_main_memory(unsigned long paddr)
+{
+	int i;
+
+	for (i = 0; ; i++) {
+		if (sp_banks[i].num_bytes == 0)
+			break;
+		if (paddr >= sp_banks[i].base_addr &&
+		    paddr < (sp_banks[i].base_addr + sp_banks[i].num_bytes))
+			return 1;
+	}
+	return 0;
+}
+
+void cheetah_cee_handler(struct pt_regs *regs, unsigned long afsr, unsigned long afar)
+{
+	struct cheetah_err_info local_snapshot, *p;
+	int recoverable, is_memory;
+
+	p = cheetah_get_error_log(afsr);
+	if (!p) {
+		prom_printf("ERROR: Early CEE error afsr[%016lx] afar[%016lx]\n",
+			    afsr, afar);
+		prom_printf("ERROR: CPU(%d) TPC[%016lx] TNPC[%016lx] TSTATE[%016lx]\n",
+			    smp_processor_id(), regs->tpc, regs->tnpc, regs->tstate);
+		prom_halt();
+	}
+
+	/* Grab snapshot of logged error. */
+	memcpy(&local_snapshot, p, sizeof(local_snapshot));
+
+	/* If the current trap snapshot does not match what the
+	 * trap handler passed along into our args, big trouble.
+	 * In such a case, mark the local copy as invalid.
+	 *
+	 * Else, it matches and we mark the afsr in the non-local
+	 * copy as invalid so we may log new error traps there.
+	 */
+	if (p->afsr != afsr || p->afar != afar)
+		local_snapshot.afsr = CHAFSR_INVALID;
+	else
+		p->afsr = CHAFSR_INVALID;
+
+	is_memory = cheetah_check_main_memory(afar);
+
+	if (is_memory && (afsr & CHAFSR_CE) != 0UL) {
+		/* XXX Might want to log the results of this operation
+		 * XXX somewhere... -DaveM
+		 */
+		cheetah_fix_ce(afar);
+	}
+
+	{
+		int flush_all, flush_line;
+
+		flush_all = flush_line = 0;
+		if ((afsr & CHAFSR_EDC) != 0UL) {
+			if ((afsr & CHAFSR_ERRORS) == CHAFSR_EDC)
+				flush_line = 1;
+			else
+				flush_all = 1;
+		} else if ((afsr & CHAFSR_CPC) != 0UL) {
+			if ((afsr & CHAFSR_ERRORS) == CHAFSR_CPC)
+				flush_line = 1;
+			else
+				flush_all = 1;
+		}
+
+		/* Trap handler only disabled I-cache, flush it. */
+		cheetah_flush_icache();
+
+		/* Re-enable I-cache */
+		__asm__ __volatile__("ldxa [%%g0] %0, %%g1\n\t"
+				     "or %%g1, %1, %%g1\n\t"
+				     "stxa %%g1, [%%g0] %0\n\t"
+				     "membar #Sync"
+				     : /* no outputs */
+				     : "i" (ASI_DCU_CONTROL_REG),
+				     "i" (DCU_IC)
+				     : "g1");
+
+		if (flush_all)
+			cheetah_flush_ecache();
+		else if (flush_line)
+			cheetah_flush_ecache_line(afar);
+	}
+
+	/* Re-enable error reporting */
+	__asm__ __volatile__("ldxa [%%g0] %0, %%g1\n\t"
+			     "or %%g1, %1, %%g1\n\t"
+			     "stxa %%g1, [%%g0] %0\n\t"
+			     "membar #Sync"
+			     : /* no outputs */
+			     : "i" (ASI_ESTATE_ERROR_EN),
+			       "i" (ESTATE_ERROR_CEEN)
+			     : "g1");
+
+	/* Decide if we can continue after handling this trap and
+	 * logging the error.
+	 */
+	recoverable = 1;
+	if (afsr & (CHAFSR_PERR | CHAFSR_IERR | CHAFSR_ISAP))
+		recoverable = 0;
+
+	/* Re-check AFSR/AFAR */
+	(void) cheetah_recheck_errors(&local_snapshot);
+
+	/* Log errors. */
+	cheetah_log_errors(regs, &local_snapshot, afsr, afar, recoverable);
+
+	if (!recoverable)
+		panic("Irrecoverable Correctable-ECC error trap.\n");
+}
+
+void cheetah_deferred_handler(struct pt_regs *regs, unsigned long afsr, unsigned long afar)
+{
+	struct cheetah_err_info local_snapshot, *p;
+	int recoverable, is_memory;
+
+#ifdef CONFIG_PCI
+	/* Check for the special PCI poke sequence. */
+	if (pci_poke_in_progress && pci_poke_cpu == smp_processor_id()) {
+		cheetah_flush_icache();
+		cheetah_flush_dcache();
+
+		/* Re-enable I-cache/D-cache */
+		__asm__ __volatile__("ldxa [%%g0] %0, %%g1\n\t"
+				     "or %%g1, %1, %%g1\n\t"
+				     "stxa %%g1, [%%g0] %0\n\t"
+				     "membar #Sync"
+				     : /* no outputs */
+				     : "i" (ASI_DCU_CONTROL_REG),
+				       "i" (DCU_DC | DCU_IC)
+				     : "g1");
+
+		/* Re-enable error reporting */
+		__asm__ __volatile__("ldxa [%%g0] %0, %%g1\n\t"
+				     "or %%g1, %1, %%g1\n\t"
+				     "stxa %%g1, [%%g0] %0\n\t"
+				     "membar #Sync"
+				     : /* no outputs */
+				     : "i" (ASI_ESTATE_ERROR_EN),
+				       "i" (ESTATE_ERROR_NCEEN | ESTATE_ERROR_CEEN)
+				     : "g1");
+
+		(void) cheetah_recheck_errors(NULL);
+
+		pci_poke_faulted = 1;
+		regs->tpc += 4;
+		regs->tnpc = regs->tpc + 4;
+		return;
+	}
+#endif
+
+	p = cheetah_get_error_log(afsr);
+	if (!p) {
+		prom_printf("ERROR: Early deferred error afsr[%016lx] afar[%016lx]\n",
+			    afsr, afar);
+		prom_printf("ERROR: CPU(%d) TPC[%016lx] TNPC[%016lx] TSTATE[%016lx]\n",
+			    smp_processor_id(), regs->tpc, regs->tnpc, regs->tstate);
+		prom_halt();
+	}
+
+	/* Grab snapshot of logged error. */
+	memcpy(&local_snapshot, p, sizeof(local_snapshot));
+
+	/* If the current trap snapshot does not match what the
+	 * trap handler passed along into our args, big trouble.
+	 * In such a case, mark the local copy as invalid.
+	 *
+	 * Else, it matches and we mark the afsr in the non-local
+	 * copy as invalid so we may log new error traps there.
+	 */
+	if (p->afsr != afsr || p->afar != afar)
+		local_snapshot.afsr = CHAFSR_INVALID;
+	else
+		p->afsr = CHAFSR_INVALID;
+
+	is_memory = cheetah_check_main_memory(afar);
+
+	{
+		int flush_all, flush_line;
+
+		flush_all = flush_line = 0;
+		if ((afsr & CHAFSR_EDU) != 0UL) {
+			if ((afsr & CHAFSR_ERRORS) == CHAFSR_EDU)
+				flush_line = 1;
+			else
+				flush_all = 1;
+		} else if ((afsr & CHAFSR_BERR) != 0UL) {
+			if ((afsr & CHAFSR_ERRORS) == CHAFSR_BERR)
+				flush_line = 1;
+			else
+				flush_all = 1;
+		}
+
+		cheetah_flush_icache();
+		cheetah_flush_dcache();
+
+		/* Re-enable I/D caches */
+		__asm__ __volatile__("ldxa [%%g0] %0, %%g1\n\t"
+				     "or %%g1, %1, %%g1\n\t"
+				     "stxa %%g1, [%%g0] %0\n\t"
+				     "membar #Sync"
+				     : /* no outputs */
+				     : "i" (ASI_DCU_CONTROL_REG),
+				     "i" (DCU_IC | DCU_DC)
+				     : "g1");
+
+		if (flush_all)
+			cheetah_flush_ecache();
+		else if (flush_line)
+			cheetah_flush_ecache_line(afar);
+	}
+
+	/* Re-enable error reporting */
+	__asm__ __volatile__("ldxa [%%g0] %0, %%g1\n\t"
+			     "or %%g1, %1, %%g1\n\t"
+			     "stxa %%g1, [%%g0] %0\n\t"
+			     "membar #Sync"
+			     : /* no outputs */
+			     : "i" (ASI_ESTATE_ERROR_EN),
+			     "i" (ESTATE_ERROR_NCEEN | ESTATE_ERROR_CEEN)
+			     : "g1");
+
+	/* Decide if we can continue after handling this trap and
+	 * logging the error.
+	 */
+	recoverable = 1;
+	if (afsr & (CHAFSR_PERR | CHAFSR_IERR | CHAFSR_ISAP))
+		recoverable = 0;
+
+	/* Re-check AFSR/AFAR.  What we are looking for here is whether a new
+	 * error was logged while we had error reporting traps disabled.
+	 */
+	if (cheetah_recheck_errors(&local_snapshot)) {
+		unsigned long new_afsr = local_snapshot.afsr;
+
+		/* If we got a new asynchronous error, die... */
+		if (new_afsr & (CHAFSR_EMU | CHAFSR_EDU |
+				CHAFSR_WDU | CHAFSR_CPU |
+				CHAFSR_IVU | CHAFSR_UE |
+				CHAFSR_BERR | CHAFSR_TO))
+			recoverable = 0;
+	}
+
+	/* Log errors. */
+	cheetah_log_errors(regs, &local_snapshot, afsr, afar, recoverable);
+
+	/* "Recoverable" here means we try to yank the page from ever
+	 * being newly used again.  This depends upon a few things:
+	 * 1) Must be main memory, and AFAR must be valid.
+	 * 2) If we trapped from use, OK.
+	 * 3) Else, if we trapped from kernel we must find exception
+	 *    table entry (ie. we have to have been accessing user
+	 *    space).
+	 *
+	 * If AFAR is not in main memory, or we trapped from kernel
+	 * and cannot find an exception table entry, it is unacceptable
+	 * to try and continue.
+	 */
+	if (recoverable && is_memory) {
+		if ((regs->tstate & TSTATE_PRIV) == 0UL) {
+			/* OK, usermode access. */
+			recoverable = 1;
+		} else {
+			unsigned long g2 = regs->u_regs[UREG_G2];
+			unsigned long fixup = search_exception_table(regs->tpc, &g2);
+
+			if (fixup != 0UL) {
+				/* OK, kernel access to userspace. */
+				recoverable = 1;
+
+			} else {
+				/* BAD, privileged state is corrupted. */
+				recoverable = 0;
+			}
+
+			if (recoverable) {
+				struct page *page = virt_to_page(__va(afar));
+
+				if (VALID_PAGE(page))
+					get_page(page);
+				else
+					recoverable = 0;
+
+				/* Only perform fixup if we still have a
+				 * recoverable condition.
+				 */
+				if (fixup != 0UL && recoverable) {
+					regs->tpc = fixup;
+					regs->tnpc = regs->tpc + 4;
+					regs->u_regs[UREG_G2] = g2;
+				}
+			}
+		}
+	} else {
+		recoverable = 0;
+	}
+
+	if (!recoverable)
+		panic("Irrecoverable deferred error trap.\n");
+}
+
 void do_fpe_common(struct pt_regs *regs)
 {
 	if(regs->tstate & TSTATE_PRIV) {
@@ -575,9 +1332,6 @@ void do_fpe_common(struct pt_regs *regs)
 
 void do_fpieee(struct pt_regs *regs)
 {
-#ifdef DEBUG_FPU
-	printk("fpieee %016lx\n", current->thread.xfsr[0]);
-#endif
 	do_fpe_common(regs);
 }
 
@@ -594,10 +1348,8 @@ void do_fpother(struct pt_regs *regs)
 		ret = do_mathemu(regs, f);
 		break;
 	}
-	if (ret) return;
-#ifdef DEBUG_FPU
-	printk("fpother %016lx\n", current->thread.xfsr[0]);
-#endif
+	if (ret)
+		return;
 	do_fpe_common(regs);
 }
 

@@ -5,7 +5,7 @@
  *	Authors:
  *	Pedro Roque		<roque@di.fc.ul.pt>	
  *
- *	$Id: datagram.c,v 1.21 2000/11/28 13:42:08 davem Exp $
+ *	$Id: datagram.c,v 1.22 2000/12/13 18:31:50 davem Exp $
  *
  *	This program is free software; you can redistribute it and/or
  *      modify it under the terms of the GNU General Public License
@@ -57,7 +57,7 @@ void ipv6_icmp_error(struct sock *sk, struct sk_buff *skb, int err,
 	serr->port = port;
 
 	skb->h.raw = payload;
-	skb_pull(skb, payload - skb->data);
+	__skb_pull(skb, payload - skb->data);
 
 	if (sock_queue_err_skb(sk, skb))
 		kfree_skb(skb);
@@ -92,7 +92,7 @@ void ipv6_local_error(struct sock *sk, int err, struct flowi *fl, u32 info)
 	serr->port = fl->uli_u.ports.dport;
 
 	skb->h.raw = skb->tail;
-	skb_pull(skb, skb->tail - skb->data);
+	__skb_pull(skb, skb->tail - skb->data);
 
 	if (sock_queue_err_skb(sk, skb))
 		kfree_skb(skb);
@@ -123,7 +123,7 @@ int ipv6_recv_error(struct sock *sk, struct msghdr *msg, int len)
 		msg->msg_flags |= MSG_TRUNC;
 		copied = len;
 	}
-	err = memcpy_toiovec(msg->msg_iov, skb->data, copied);
+	err = skb_copy_datagram_iovec(skb, 0, msg->msg_iov, copied);
 	if (err)
 		goto out_free_skb;
 

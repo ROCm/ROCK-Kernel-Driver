@@ -87,7 +87,8 @@ start:
 
 		b	1f
 		.word	0x016f2818		@ Magic numbers to help the loader
-		.word	start	
+		.word	start			@ absolute load/run zImage address
+		.word	_edata			@ zImage end address
 1:		mov	r7, r1			@ save architecture ID
 		mov	r8, #0			@ save r0
 #ifdef CONFIG_ANGELBOOT
@@ -210,7 +211,7 @@ cache_on:	ldr	r1, proc_sa110_type
 		mov	r0, r3
 		mov	r8, r0, lsr #18
 		mov	r8, r8, lsl #18		@ start of RAM
-		add	r9, r8, #0x20000000	@ the maximum RAM size
+		add	r9, r8, #0x10000000	@ a reasonable RAM size
 		mov	r1, #0x12
 		orr	r1, r1, #3 << 10
 		add	r2, r3, #16384

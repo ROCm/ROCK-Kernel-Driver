@@ -14,6 +14,7 @@
  */
 
 #include "tapedefs.h"
+#include <linux/config.h>
 #include <linux/blkdev.h>
 #include <linux/blk.h>
 #include <linux/version.h>

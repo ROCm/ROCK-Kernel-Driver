@@ -4,7 +4,7 @@
 * Author:       Gideon Hack  	
 *		Nenad Corbic <ncorbic@sangoma.com> 	
 *
-* Copyright:	(c) 1995-1999 Sangoma Technologies Inc.
+* Copyright:	(c) 1995-2000 Sangoma Technologies Inc.
 *
 *		This program is free software; you can redistribute it and/or
 *		modify it under the terms of the GNU General Public License
@@ -541,7 +541,7 @@ typedef struct {
 } fr_encap_hdr_t;
 
 typedef struct {
-	fr_encap_hdr_t 		fr_encap_hdr	PACKED;
+//	fr_encap_hdr_t 		fr_encap_hdr	PACKED;
 	ip_pkt_t 		ip_pkt		PACKED;
 	udp_pkt_t		udp_pkt		PACKED;
 	wp_mgmt_t 		wp_mgmt       	PACKED;

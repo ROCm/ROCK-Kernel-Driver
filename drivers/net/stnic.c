@@ -7,6 +7,7 @@
  * Copyright (C) 1999 kaz Kojima
  */
 
+#include <linux/config.h>
 #include <linux/module.h>
 
 #include <linux/kernel.h>
@@ -21,6 +22,9 @@
 #include <asm/io.h>
 #include <asm/hitachi_se.h>
 #include <asm/machvec.h>
+#ifdef CONFIG_SH_STANDARD_BIOS 
+#include <asm/sh_bios.h>
+#endif
 
 #include "8390.h"
 
@@ -74,6 +78,7 @@ STNIC_DELAY (void)
   vword trash;
   trash = *(vword *) 0xa0000000;
   trash = *(vword *) 0xa0000000;
+  trash = *(vword *) 0xa0000000;
 }
 
 static inline byte
@@ -112,10 +117,13 @@ int __init stnic_probe(void)
   /* Allocate dev->priv and fill in 8390 specific dev fields. */
   if (ethdev_init (dev))
     {
-      printk ("Unable to get memory for dev->priv.\n");
+      printk (KERN_EMERG "Unable to get memory for dev->priv.\n");
       return -ENOMEM;
     }
 
+#ifdef CONFIG_SH_STANDARD_BIOS 
+  sh_bios_get_node_addr (stnic_eadr);
+#endif
   for (i = 0; i < ETHER_ADDR_LEN; i++)
     dev->dev_addr[i] = stnic_eadr[i];
 
@@ -129,7 +137,7 @@ int __init stnic_probe(void)
      share and the board will usually be enabled. */
   i = request_irq (dev->irq, ei_interrupt, 0, dev->name, dev);
   if (i)  {
-      printk (" unable to get IRQ %d.\n", dev->irq);
+      printk (KERN_EMERG " unable to get IRQ %d.\n", dev->irq);
       unregister_netdev(dev);
       kfree(dev->priv);
       kfree(dev);
@@ -157,7 +165,7 @@ static int
 stnic_open (struct net_device *dev)
 {
 #if 0
-  printk ("stnic open\n");
+  printk (KERN_DEBUG "stnic open\n");
 #endif
   ei_open (dev);
   return 0;
@@ -176,7 +184,7 @@ stnic_reset (struct net_device *dev)
   *(vhalf *) PA_83902_RST = 0;
   udelay (5);
   if (ei_debug > 1)
-    printk("8390 reset done (%ld).\n", jiffies);
+    printk (KERN_WARNING "8390 reset done (%ld).\n", jiffies);
   *(vhalf *) PA_83902_RST = ~0;
   udelay (5);
 }
@@ -206,7 +214,7 @@ stnic_get_hdr (struct net_device *dev, struct e8390_pkt_hdr *hdr,
 #endif
 
   if (ei_debug > 1)
-    printk ("ring %x status %02x next %02x count %04x.\n",
+    printk (KERN_DEBUG "ring %x status %02x next %02x count %04x.\n",
 	    ring_page, hdr->status, hdr->next, hdr->count);
 
   STNIC_WRITE (STNIC_CR, CR_RDMA | CR_PG0 | CR_STA);
@@ -254,22 +262,14 @@ static void
 stnic_block_output (struct net_device *dev, int length,
 		    const unsigned char *buf, int output_page)
 {
-#if 0
-  STNIC_WRITE (PG0_RBCR0, 1);
-  STNIC_WRITE (STNIC_CR, CR_RRD | CR_PG0 | CR_STA);
-#else  /* XXX: I don't know why but this works.  -- gniibe  */
-  STNIC_WRITE (PG0_RBCR0, 0x42);
-  STNIC_WRITE (PG0_RBCR1, 0x00);
-  STNIC_WRITE (PG0_RBCR0, 0x42);
-  STNIC_WRITE (PG0_RBCR1, 0x00);
+  STNIC_WRITE (PG0_RBCR0, 1);	/* Write non-zero value */
   STNIC_WRITE (STNIC_CR, CR_RRD | CR_PG0 | CR_STA);
   STNIC_DELAY ();
-#endif
 
-  STNIC_WRITE (PG0_RSAR0, 0);
-  STNIC_WRITE (PG0_RSAR1, output_page);
   STNIC_WRITE (PG0_RBCR0, length & 0xff);
   STNIC_WRITE (PG0_RBCR1, length >> 8);
+  STNIC_WRITE (PG0_RSAR0, 0);
+  STNIC_WRITE (PG0_RSAR1, output_page);
   STNIC_WRITE (STNIC_CR, CR_RWR | CR_PG0 | CR_STA);
 
   if (length & 1)

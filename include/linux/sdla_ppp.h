@@ -1,7 +1,7 @@
 /*****************************************************************************
 * sdla_ppp.h	Sangoma PPP firmware API definitions.
 *
-* Author:	Gene Kozin	<74604.152@compuserve.com>
+* Author:	Nenad Corbic	<ncorbic@sangoma.com>
 *
 * Copyright:	(c) 1995-1997 Sangoma Technologies Inc.
 *
@@ -10,6 +10,7 @@
 *		as published by the Free Software Foundation; either version
 *		2 of the License, or (at your option) any later version.
 * ============================================================================
+* Feb 24, 2000  Nenad Corbic    v2.1.2
 * Jan 06, 1997	Gene Kozin	v2.0
 * Apr 11, 1996	Gene Kozin	Initial version.
 *****************************************************************************/
@@ -214,7 +215,8 @@ typedef struct	ppp508_buf_info
 {
 	unsigned short txb_num	PACKED;	/* 00: number of transmit buffers */
 	unsigned long  txb_ptr	PACKED;	/* 02: pointer to the buffer ctl. */
-	unsigned char  rsrv1[26] PACKED;
+	unsigned long  txb_nxt  PACKED;
+	unsigned char  rsrv1[22] PACKED;
 	unsigned short rxb_num	PACKED;	/* 20: number of receive buffers */
 	unsigned long  rxb_ptr	PACKED;	/* 22: pointer to the buffer ctl. */
 	unsigned long  rxb1_ptr	PACKED;	/* 26: pointer to the first buf.ctl. */

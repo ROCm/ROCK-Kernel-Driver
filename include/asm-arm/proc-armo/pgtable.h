@@ -1,7 +1,7 @@
 /*
  *  linux/include/asm-arm/proc-armo/pgtable.h
  *
- *  Copyright (C) 1995-1999 Russell King
+ *  Copyright (C) 1995-2001 Russell King
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -33,7 +33,7 @@
 #define pmd_bad(pmd)		((pmd_val(pmd) & 0xfc000002))
 #define set_pmd(pmdp,pmd)	((*(pmdp)) = (pmd))
 
-extern __inline__ pmd_t __mk_pmd(pte_t *ptep, unsigned long prot)
+static inline pmd_t __mk_pmd(pte_t *ptep, unsigned long prot)
 {
 	unsigned long pte_ptr = (unsigned long)ptep;
 	pmd_t pmd;
@@ -43,11 +43,7 @@ extern __inline__ pmd_t __mk_pmd(pte_t *ptep, unsigned long prot)
 	return pmd;
 }
 
-/* these are aliases for the above function */
-#define mk_user_pmd(ptep)	__mk_pmd(ptep, _PAGE_TABLE)
-#define mk_kernel_pmd(ptep)	__mk_pmd(ptep, _PAGE_TABLE)
-
-extern __inline__ unsigned long pmd_page(pmd_t pmd)
+static inline unsigned long pmd_page(pmd_t pmd)
 {
 	return __phys_to_virt(pmd_val(pmd) & ~_PAGE_TABLE);
 }
@@ -81,7 +77,6 @@ extern __inline__ unsigned long pmd_page(pmd_t pmd)
 #define pte_dirty(pte)			(!(pte_val(pte) & _PAGE_CLEAN))
 #define pte_young(pte)			(!(pte_val(pte) & _PAGE_OLD))
 
-extern inline pte_t pte_nocache(pte_t pte)	{ return pte; }
 extern inline pte_t pte_wrprotect(pte_t pte)    { pte_val(pte) |= _PAGE_READONLY;  return pte; }
 extern inline pte_t pte_rdprotect(pte_t pte)    { pte_val(pte) |= _PAGE_NOT_USER;  return pte; }
 extern inline pte_t pte_exprotect(pte_t pte)    { pte_val(pte) |= _PAGE_NOT_USER;  return pte; }

@@ -46,21 +46,28 @@
 #define SCREEN_BASE		0x02000000
 
 
+#define EXPMASK_BASE		0x03360000
+#define IOEB_BASE		0x03350000
+#define VIDC_BASE		0x03400000
+#define LATCHA_BASE		0x03250040
+#define LATCHB_BASE		0x03250018
+#define IOC_BASE		0x03200000
+#define FLOPPYDMA_BASE		0x0302a000
+#define PCIO_BASE		0x03010000
+
+#define vidc_writel(val)	__raw_writel(val, VIDC_BASE)
+
 #ifndef __ASSEMBLY__
 
 /*
  * for use with inb/outb
  */
-#define IO_VIDC_BASE		0x80100000
 #ifdef CONFIG_ARCH_A5K
-#define IOEB_VID_CTL		0x800d4012
-#define IOEB_PRESENT		0x800d4014
-#define IOEB_PSCLR		0x800d4016
-#define IOEB_MONTYPE		0x800d401c
+#define IOEB_VID_CTL		(IOEB_BASE + 0x48)
+#define IOEB_PRESENT		(IOEB_BASE + 0x50)
+#define IOEB_PSCLR		(IOEB_BASE + 0x58)
+#define IOEB_MONTYPE		(IOEB_BASE + 0x70)
 #endif
-#define LATCHAADDR		0x80094010
-#define LATCHBADDR		0x80094006
-#define IOC_BASE		0x80080000
 
 #define IO_EC_IOC4_BASE		0x8009c000
 #define IO_EC_IOC_BASE		0x80090000
@@ -74,36 +81,9 @@
 #define SCSI_BASE		0x03100000
 #endif
 
-/*
- * IO definitions
- */
-#define EXPMASK_BASE		((volatile unsigned char *)0x03360000)
-#define IOEB_BASE		((volatile unsigned char *)0x03350050)
-#define PCIO_FLOPPYDMABASE	((volatile unsigned char *)0x0302a000)
-#define PCIO_BASE		0x03010000
-
-/*
- * RAM definitions
- */
-#define GET_MEMORY_END(p)	(PAGE_OFFSET + (p->u1.s.page_size) * (p->u1.s.nr_pages))
-#define PARAMS_OFFSET		0x7c000
-
-#else
-
-#define IOEB_BASE		0x03350050
-#define IOC_BASE		0x03200000
-#define PCIO_FLOPPYDMABASE	0x0302a000
-#define PCIO_BASE		0x03010000
-
 #endif
 
-#ifndef __ASSEMBLY__
-#define __EXPMASK(offset)	(((volatile unsigned char *)EXPMASK_BASE)[offset])
-#else
-#define __EXPMASK(offset)	offset
-#endif
-
-#define	EXPMASK_STATUS	__EXPMASK(0x00)
-#define EXPMASK_ENABLE	__EXPMASK(0x04)
+#define	EXPMASK_STATUS		(EXPMASK_BASE + 0x00)
+#define EXPMASK_ENABLE		(EXPMASK_BASE + 0x04)
 
 #endif

@@ -35,7 +35,7 @@
 /*
  * core module and version information
  */
-#define RNG_VERSION "0.9.5"
+#define RNG_VERSION "0.9.6"
 #define RNG_MODULE_NAME "i810_rng"
 #define RNG_DRIVER_NAME   RNG_MODULE_NAME " hardware driver " RNG_VERSION
 #define PFX RNG_MODULE_NAME ": "
@@ -81,26 +81,13 @@
 #define RNG_ADDR			0xFFBC015F
 #define RNG_ADDR_LEN			3
 
-#define RNG_MAX_ENTROPY			8 /* max entropy h/w is capable of */
-
 #define RNG_MISCDEV_MINOR		183 /* official */
-
-
-/*
- * number of bytes required for a FIPS test.
- * do not alter unless you really, I mean
- * REALLY know what you are doing.
- */
-#define RNG_FIPS_TEST_THRESHOLD	2500
-
 
 /*
  * various RNG status variables.  they are globals
  * as we only support a single RNG device
  */
-static int rng_hw_enabled;		/* is the RNG h/w enabled? */
 static void *rng_mem;			/* token to our ioremap'd RNG register area */
-static struct pci_dev *rng_pdev;	/* Firmware Hub PCI device found during PCI probe */
 static struct semaphore rng_open_sem;	/* Semaphore for serializing rng_open/release */
 
 
@@ -113,18 +100,17 @@ static inline u8 rng_hwstatus (void)
 	return readb (rng_mem + RNG_HW_STATUS);
 }
 
-
-static inline void rng_hwstatus_set (u8 hw_status)
+static inline u8 rng_hwstatus_set (u8 hw_status)
 {
 	assert (rng_mem != NULL);
 	writeb (hw_status, rng_mem + RNG_HW_STATUS);
+	return rng_hwstatus ();
 }
 
 
 static inline int rng_data_present (void)
 {
 	assert (rng_mem != NULL);
-	assert (rng_hw_enabled > 0);
 
 	return (readb (rng_mem + RNG_STATUS) & RNG_DATA_PRESENT) ? 1 : 0;
 }
@@ -133,65 +119,67 @@ static inline int rng_data_present (void)
 static inline int rng_data_read (void)
 {
 	assert (rng_mem != NULL);
-	assert (rng_hw_enabled > 0);
 
 	return readb (rng_mem + RNG_DATA);
 }
 
-
 /*
- * rng_enable - enable or disable the RNG hardware
+ * rng_enable - enable the RNG hardware
  */
-static int rng_enable (int enable)
+
+static int rng_enable (void)
 {
-	int rc = 0, action = 0;
+	int rc = 0;
 	u8 hw_status, new_status;
 
 	DPRINTK ("ENTER\n");
 
 	hw_status = rng_hwstatus ();
 
-	if (enable) {
-		rng_hw_enabled++;
-		MOD_INC_USE_COUNT;
-	} else {
-		if (rng_hw_enabled) {
-			rng_hw_enabled--;
-			MOD_DEC_USE_COUNT;
-		}
-	}
+	if ((hw_status & RNG_ENABLED) == 0) {
+		new_status = rng_hwstatus_set (hw_status | RNG_ENABLED);
 
-	if (rng_hw_enabled && ((hw_status & RNG_ENABLED) == 0)) {
-		rng_hwstatus_set (hw_status | RNG_ENABLED);
-		action = 1;
-	}
-
-	else if (!rng_hw_enabled && (hw_status & RNG_ENABLED)) {
-		rng_hwstatus_set (hw_status & ~RNG_ENABLED);
-		action = 2;
-	}
-
-	new_status = rng_hwstatus ();
-
-	if (action == 1) {
 		if (new_status & RNG_ENABLED)
 			printk (KERN_INFO PFX "RNG h/w enabled\n");
-		else
+		else {
 			printk (KERN_ERR PFX "Unable to enable the RNG\n");
-	} else if (action == 2) {
-		if ((new_status & RNG_ENABLED) == 0)
-			printk (KERN_INFO PFX "RNG h/w disabled\n");
-		else
-			printk (KERN_ERR PFX "Unable to disable the RNG\n");
+			rc = -EIO;
+		}
 	}
 
 	DPRINTK ("EXIT, returning %d\n", rc);
 	return rc;
 }
 
+/*
+ * rng_disable - disable the RNG hardware
+ */
+
+static void rng_disable(void)
+{
+	u8 hw_status, new_status;
+
+	DPRINTK ("ENTER\n");
+
+	hw_status = rng_hwstatus ();
+
+	if (hw_status & RNG_ENABLED) {
+		new_status = rng_hwstatus_set (hw_status & ~RNG_ENABLED);
+	
+		if ((new_status & RNG_ENABLED) == 0)
+			printk (KERN_INFO PFX "RNG h/w disabled\n");
+		else {
+			printk (KERN_ERR PFX "Unable to disable the RNG\n");
+		}
+	}
+
+	DPRINTK ("EXIT\n");
+}
 
 static int rng_dev_open (struct inode *inode, struct file *filp)
 {
+	int rc;
+
 	if ((filp->f_mode & FMODE_READ) == 0)
 		return -EINVAL;
 	if (filp->f_mode & FMODE_WRITE)
@@ -206,9 +194,10 @@ static int rng_dev_open (struct inode *inode, struct file *filp)
 			return -ERESTARTSYS;
 	}
 
-	if (rng_enable (1)) {
+	rc = rng_enable ();
+	if (rc) {
 		up (&rng_open_sem);
-		return -EIO;
+		return rc;
 	}
 
 	return 0;
@@ -217,7 +206,7 @@ static int rng_dev_open (struct inode *inode, struct file *filp)
 
 static int rng_dev_release (struct inode *inode, struct file *filp)
 {
-	rng_enable(0);
+	rng_disable ();
 	up (&rng_open_sem);
 	return 0;
 }
@@ -315,8 +304,9 @@ static int __init rng_init_one (struct pci_dev *dev)
 	}
 
 	/* turn RNG h/w off, if it's on */
-	rc = rng_enable (0);
-	if (rc) {
+	if (hw_status & RNG_ENABLED)
+		hw_status = rng_hwstatus_set (hw_status & ~RNG_ENABLED);
+	if (hw_status & RNG_ENABLED) {
 		printk (KERN_ERR PFX "cannot disable RNG, aborting\n");
 		goto err_out_free_map;
 	}
@@ -381,8 +371,6 @@ match:
 
 	printk (KERN_INFO RNG_DRIVER_NAME " loaded\n");
 
-	rng_pdev = pdev;
-
 	DPRINTK ("EXIT, returning 0\n");
 	return 0;
 }
@@ -395,13 +383,9 @@ static void __exit rng_cleanup (void)
 {
 	DPRINTK ("ENTER\n");
 
-	assert (rng_hw_enabled == 0);
-
 	misc_deregister (&rng_miscdev);
 
 	iounmap (rng_mem);
-
-	rng_pdev = NULL;
 
 	DPRINTK ("EXIT\n");
 }

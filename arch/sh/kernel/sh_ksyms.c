@@ -17,6 +17,7 @@
 #include <asm/io.h>
 #include <asm/hardirq.h>
 #include <asm/delay.h>
+#include <asm/pgalloc.h>
 #include <linux/irq.h>
 
 extern void dump_thread(struct pt_regs *, struct user *);
@@ -45,6 +46,7 @@ EXPORT_SYMBOL(strstr);
 EXPORT_SYMBOL(strlen);
 EXPORT_SYMBOL(strchr);
 EXPORT_SYMBOL(strcat);
+EXPORT_SYMBOL(strncat);
 
 /* mem exports */
 EXPORT_SYMBOL(memchr);

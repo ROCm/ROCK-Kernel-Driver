@@ -1,7 +1,7 @@
 /*
  * This file define a set of standard wireless extensions
  *
- * Version :	9	16.10.99
+ * Version :	11	28.3.01
  *
  * Authors :	Jean Tourrilhes - HPL - <jt@hpl.hp.com>
  */
@@ -63,7 +63,7 @@
  * (there is some stuff that will be added in the future...)
  * I just plan to increment with each new version.
  */
-#define WIRELESS_EXT	10
+#define WIRELESS_EXT	11
 
 /*
  * Changes :
@@ -111,6 +111,11 @@
  *	- Add PM modifier : MAX/MIN/RELATIVE
  *	- Add encoding option : IW_ENCODE_NOKEY
  *	- Add TxPower ioctls (work like TxRate)
+ *
+ * V10 to V11
+ * ----------
+ *	- Add WE version in range (help backward/forward compatibility)
+ *	- Add retry ioctls (work like PM)
  */
 
 /* -------------------------- IOCTL LIST -------------------------- */
@@ -153,7 +158,7 @@
  * The "flags" member indicate if the ESSID is active or not (promiscuous).
  */
 
-/* Other parameters usefull in 802.11 and some other devices */
+/* Other parameters useful in 802.11 and some other devices */
 #define SIOCSIWRATE	0x8B20		/* set default bit rate (bps) */
 #define SIOCGIWRATE	0x8B21		/* get default bit rate (bps) */
 #define SIOCSIWRTS	0x8B22		/* set RTS/CTS threshold (bytes) */
@@ -162,6 +167,8 @@
 #define SIOCGIWFRAG	0x8B25		/* get fragmentation thr (bytes) */
 #define SIOCSIWTXPOW	0x8B26		/* set transmit power (dBm) */
 #define SIOCGIWTXPOW	0x8B27		/* get transmit power (dBm) */
+#define SIOCSIWRETRY	0x8B28		/* set retry limits and lifetime */
+#define SIOCGIWRETRY	0x8B29		/* get retry limits and lifetime */
 
 /* Encoding stuff (scrambling, hardware security, WEP...) */
 #define SIOCSIWENCODE	0x8B2A		/* set encoding token & mode */
@@ -272,6 +279,16 @@
 #define IW_TXPOW_DBM		0x0000	/* Value is in dBm */
 #define IW_TXPOW_MWATT		0x0001	/* Value is in mW */
 
+/* Retry limits and lifetime flags available */
+#define IW_RETRY_ON		0x0000	/* No details... */
+#define IW_RETRY_TYPE		0xF000	/* Type of parameter */
+#define IW_RETRY_LIMIT		0x1000	/* Maximum number of retries*/
+#define IW_RETRY_LIFETIME	0x2000	/* Maximum duration of retries in us */
+#define IW_RETRY_MODIFIER	0x000F	/* Modify a parameter */
+#define IW_RETRY_MIN		0x0001	/* Value is a minimum  */
+#define IW_RETRY_MAX		0x0002	/* Value is a maximum */
+#define IW_RETRY_RELATIVE	0x0004	/* Value is not in seconds/ms/us */
+
 /****************************** TYPES ******************************/
 
 /* --------------------------- SUBTYPES --------------------------- */
@@ -288,7 +305,7 @@ struct	iw_param
 
 /*
  *	For all data larger than 16 octets, we need to use a
- *	pointer to memory alocated in user space.
+ *	pointer to memory allocated in user space.
  */
 struct	iw_point
 {
@@ -385,6 +402,7 @@ struct	iwreq
 		struct iw_param	rts;		/* RTS threshold threshold */
 		struct iw_param	frag;		/* Fragmentation threshold */
 		__u32		mode;		/* Operation mode */
+		struct iw_param	retry;		/* Retry limits & lifetime */
 
 		struct iw_point	encoding;	/* Encoding stuff : tokens */
 		struct iw_param	power;		/* PM duration/timeout */
@@ -462,6 +480,19 @@ struct	iw_range
 	__u16		txpower_capa;	/* What options are supported */
 	__u8		num_txpower;	/* Number of entries in the list */
 	__s32		txpower[IW_MAX_TXPOWER];	/* list, in bps */
+
+	/* Wireless Extension version info */
+	__u8		we_version_compiled;	/* Must be WIRELESS_EXT */
+	__u8		we_version_source;	/* Last update of source */
+
+	/* Retry limits and lifetime */
+	__u16		retry_capa;	/* What retry options are supported */
+	__u16		retry_flags;	/* How to decode max/min retry limit */
+	__u16		r_time_flags;	/* How to decode max/min retry life */
+	__s32		min_retry;	/* Minimal number of retries */
+	__s32		max_retry;	/* Maximal number of retries */
+	__s32		min_r_time;	/* Minimal retry lifetime */
+	__s32		max_r_time;	/* Maximal retry lifetime */
 };
 
 /*

@@ -13,13 +13,22 @@ O_TARGET	:= mm.o
 
 # Object file lists.
 
-obj-y		:= extable.o fault-common.o fault-$(PROCESSOR).o init.o \
-		   mm-$(PROCESSOR).o small_page.o
+obj-y		:= init.o
 obj-m		:=
 obj-n		:=
 obj-		:=
 export-objs	:= proc-syms.o
 
+cpu32-y		:= consistent.o fault-armv.o ioremap.o mm-armv.o
+cpu32-$(CONFIG_MODULES) += proc-syms.o
+
+obj-y		+= extable.o fault-common.o
+obj-$(CONFIG_CPU_26) += fault-armo.o mm-armo.o small_page.o
+obj-$(CONFIG_CPU_32) += $(cpu32-y)
+
+obj-$(CONFIG_DISCONTIGMEM) += discontig.o
+
+# Select the processor-specific files
 p-$(CONFIG_CPU_26)	+= proc-arm2,3.o
 p-$(CONFIG_CPU_ARM610)	+= proc-arm6,7.o
 p-$(CONFIG_CPU_ARM710)	+= proc-arm6,7.o
@@ -28,11 +37,6 @@ p-$(CONFIG_CPU_ARM920T)	+= proc-arm920.o
 p-$(CONFIG_CPU_ARM10)	+= proc-arm10.o
 p-$(CONFIG_CPU_SA110)	+= proc-sa110.o
 p-$(CONFIG_CPU_SA1100)	+= proc-sa110.o
-
-obj-$(CONFIG_CPU_32)  	+= consistent.o ioremap.o
-ifeq ($(CONFIG_CPU_32),y)
-obj-$(CONFIG_MODULES)	+= proc-syms.o
-endif
 
 # Integrator follows "new style"
 # Soon, others will do too, and we can get rid of this
@@ -46,10 +50,4 @@ obj-y		+= $(sort $(p-y))
 include $(TOPDIR)/Rules.make
 
 # Special dependencies
-proc-arm2,3.o:	../lib/constants.h
-proc-arm6,7.o:	../lib/constants.h
-proc-arm720.o:	../lib/constants.h
-proc-arm920.o:	../lib/constants.h
-proc-arm10.o:	../lib/constants.h
-proc-sa110.o:	../lib/constants.h
-
+$(p-y):	$(TOPDIR)/include/asm-arm/constants.h

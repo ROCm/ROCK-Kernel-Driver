@@ -44,7 +44,7 @@ static int debug = 1;		/* 1 normal messages, 0 quiet .. 7 verbose.  */
 #define hamachi_debug debug
 /* Maximum events (Rx packets, etc.) to handle at each interrupt. */
 static int max_interrupt_work = 40;
-static int mtu = 0;
+static int mtu;
 /* Default values selected by testing on a dual processor PIII-450 */
 /* These six interrupt control parameters may be set directly when loading the
  * module, or through the rx_params and tx_params variables
@@ -60,13 +60,13 @@ static int min_tx_pkt = 0x30;
    -Setting to > 1518 causes all frames to be copied
 	-Setting to 0 disables copies
 */
-static int rx_copybreak = 0;
+static int rx_copybreak;
 
 /* An override for the hardware detection of bus width.
 	Set to 1 to force 32 bit PCI bus detection.  Set to 4 to force 64 bit.
 	Add 2 to disable parity detection.
 */
-static int force32 = 0;
+static int force32;
 
 
 /* Used to pass the media type, etc.
@@ -548,13 +548,13 @@ static void set_rx_mode(struct net_device *dev);
 static int __init hamachi_init_one (struct pci_dev *pdev,
 				    const struct pci_device_id *ent)
 {
-	static int did_version = 0;			/* Already printed version info. */
+	static int did_version;			/* Already printed version info. */
 	struct hamachi_private *hmp;
 	int option, i, rx_int_var, tx_int_var, boguscnt;
 	int chip_id = ent->driver_data;
 	int irq;
 	long ioaddr;
-	static int card_idx = 0;
+	static int card_idx;
 	struct net_device *dev;
 
 	if (hamachi_debug > 0  &&  did_version++ == 0)

@@ -7,7 +7,7 @@
  *		handler for protocols to use and generic option handler.
  *
  *
- * Version:	$Id: sock.c,v 1.104 2001/01/30 07:48:30 davem Exp $
+ * Version:	$Id: sock.c,v 1.109 2001/03/03 01:20:10 davem Exp $
  *
  * Authors:	Ross Biro, <bir7@leland.Stanford.Edu>
  *		Fred N. van Kempen, <waltje@uWalt.NL.Mugnet.ORG>
@@ -79,6 +79,7 @@
  *		Jay Schulist	:	Added SO_ATTACH_FILTER and SO_DETACH_FILTER.
  *		Andi Kleen	:	Add sock_kmalloc()/sock_kfree_s()
  *		Andi Kleen	:	Fix write_space callback
+ *		Chris Evans	:	Security fixes - signedness again
  *
  * To Fix:
  *
@@ -425,11 +426,13 @@ int sock_getsockopt(struct socket *sock, int level, int optname,
 		struct timeval tm;
 	} v;
 	
-	int lv=sizeof(int),len;
+	unsigned int lv=sizeof(int),len;
   	
   	if(get_user(len,optlen))
   		return -EFAULT;
-
+	if(len < 0)
+		return -EINVAL;
+		
   	switch(optname) 
   	{
 		case SO_DEBUG:		
@@ -727,6 +730,8 @@ static long sock_wait_for_wmem(struct sock * sk, long timeo)
 	clear_bit(SOCK_ASYNC_NOSPACE, &sk->socket->flags);
 	add_wait_queue(sk->sleep, &wait);
 	for (;;) {
+		if (!timeo)
+			break;
 		if (signal_pending(current))
 			break;
 		set_bit(SOCK_NOSPACE, &sk->socket->flags);
@@ -750,7 +755,7 @@ static long sock_wait_for_wmem(struct sock * sk, long timeo)
  */
 
 struct sk_buff *sock_alloc_send_skb(struct sock *sk, unsigned long size, 
-			unsigned long fallback, int noblock, int *errcode)
+			int noblock, int *errcode)
 {
 	int err;
 	struct sk_buff *skb;
@@ -780,15 +785,6 @@ struct sk_buff *sock_alloc_send_skb(struct sock *sk, unsigned long size,
 			goto failure;
 
 		if (atomic_read(&sk->wmem_alloc) < sk->sndbuf) {
-			if (fallback) {
-				/* The buffer get won't block, or use the atomic queue.
-			 	* It does produce annoying no free page messages still.
-			 	*/
-				skb = alloc_skb(size, GFP_BUFFER);
-				if (skb)
-					break;
-				try_size = fallback;
-			}
 			skb = alloc_skb(try_size, sk->allocation);
 			if (skb)
 				break;
@@ -1064,6 +1060,36 @@ int sock_no_mmap(struct file *file, struct socket *sock, struct vm_area_struct *
 {
 	/* Mirror missing mmap method error code */
 	return -ENODEV;
+}
+
+ssize_t sock_no_sendpage(struct socket *sock, struct page *page, int offset, size_t size, int flags)
+{
+	ssize_t res;
+	struct msghdr msg;
+	struct iovec iov;
+	mm_segment_t old_fs;
+	char *kaddr;
+
+	kaddr = kmap(page);
+
+	msg.msg_name = NULL;
+	msg.msg_namelen = 0;
+	msg.msg_iov = &iov;
+	msg.msg_iovlen = 1;
+	msg.msg_control = NULL;
+	msg.msg_controllen = 0;
+	msg.msg_flags = flags;
+
+	iov.iov_base = kaddr + offset;
+	iov.iov_len = size;
+
+	old_fs = get_fs();
+	set_fs(KERNEL_DS);
+	res = sock_sendmsg(sock, &msg, size);
+	set_fs(old_fs);
+
+	kunmap(page);
+	return res;
 }
 
 /*

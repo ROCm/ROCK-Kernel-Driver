@@ -168,7 +168,6 @@
 #define IA64_THREAD_UAC_NOPRINT	(__IA64_UL(1) << 3)	/* don't log unaligned accesses */
 #define IA64_THREAD_UAC_SIGBUS	(__IA64_UL(1) << 4)	/* generate SIGBUS on unaligned acc. */
 #define IA64_THREAD_KRBS_SYNCED	(__IA64_UL(1) << 5)	/* krbs synced with process vm? */
-#define IA64_THREAD_MAP_SHARED	(__IA64_UL(1) << 6)	/* ugly: just a tmp flag for mmap() */
 #define IA64_KERNEL_DEATH	(__IA64_UL(1) << 63)	/* see die_if_kernel()... */
 
 #define IA64_THREAD_UAC_SHIFT	3

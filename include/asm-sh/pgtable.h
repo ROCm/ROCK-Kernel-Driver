@@ -166,12 +166,6 @@ extern unsigned long empty_zero_page[1024];
 #define __S110	PAGE_SHARED
 #define __S111	PAGE_SHARED
 
-/*
- * Handling allocation failures during page table setup.
- */
-extern void __handle_bad_pmd(pmd_t * pmd);
-extern void __handle_bad_pmd_kernel(pmd_t * pmd);
-
 #define pte_none(x)	(!pte_val(x))
 #define pte_present(x)	(pte_val(x) & (_PAGE_PRESENT | _PAGE_PROTNONE))
 #define pte_clear(xp)	do { set_pte(xp, __pte(0)); } while (0)

@@ -1257,7 +1257,7 @@ static int irda_sendmsg(struct socket *sock, struct msghdr *msg, int len,
 		len = self->max_data_size;
 	}
 
-	skb = sock_alloc_send_skb(sk, len + self->max_header_size, 0, 
+	skb = sock_alloc_send_skb(sk, len + self->max_header_size, 
 				  msg->msg_flags & MSG_DONTWAIT, &err);
 	if (!skb)
 		return -ENOBUFS;
@@ -1500,7 +1500,7 @@ static int irda_sendmsg_dgram(struct socket *sock, struct msghdr *msg,
 		len = self->max_data_size;
 	}
 
-	skb = sock_alloc_send_skb(sk, len + self->max_header_size, 0, 
+	skb = sock_alloc_send_skb(sk, len + self->max_header_size, 
 				  msg->msg_flags & MSG_DONTWAIT, &err);
 	if (!skb)
 		return -ENOBUFS;
@@ -1563,7 +1563,7 @@ static int irda_sendmsg_ultra(struct socket *sock, struct msghdr *msg,
 		len = self->max_data_size;
 	}
 
-	skb = sock_alloc_send_skb(sk, len + self->max_header_size, 0, 
+	skb = sock_alloc_send_skb(sk, len + self->max_header_size, 
 				  msg->msg_flags & MSG_DONTWAIT, &err);
 	if (!skb)
 		return -ENOBUFS;
@@ -2256,6 +2256,7 @@ static struct proto_ops SOCKOPS_WRAPPED(irda_stream_ops) = {
 	sendmsg:	irda_sendmsg,
 	recvmsg:	irda_recvmsg_stream,
 	mmap:		sock_no_mmap,
+	sendpage:	sock_no_sendpage,
 };
 
 static struct proto_ops SOCKOPS_WRAPPED(irda_seqpacket_ops) = {
@@ -2276,6 +2277,7 @@ static struct proto_ops SOCKOPS_WRAPPED(irda_seqpacket_ops) = {
 	sendmsg:	irda_sendmsg,
 	recvmsg:	irda_recvmsg_dgram,
 	mmap:		sock_no_mmap,
+	sendpage:	sock_no_sendpage,
 };
 
 static struct proto_ops SOCKOPS_WRAPPED(irda_dgram_ops) = {
@@ -2296,6 +2298,7 @@ static struct proto_ops SOCKOPS_WRAPPED(irda_dgram_ops) = {
 	sendmsg:	irda_sendmsg_dgram,
 	recvmsg:	irda_recvmsg_dgram,
 	mmap:		sock_no_mmap,
+	sendpage:	sock_no_sendpage,
 };
 
 #ifdef CONFIG_IRDA_ULTRA
@@ -2317,6 +2320,7 @@ static struct proto_ops SOCKOPS_WRAPPED(irda_ultra_ops) = {
 	sendmsg:	irda_sendmsg_ultra,
 	recvmsg:	irda_recvmsg_dgram,
 	mmap:		sock_no_mmap,
+	sendpage:	sock_no_sendpage,
 };
 #endif /* CONFIG_IRDA_ULTRA */
 

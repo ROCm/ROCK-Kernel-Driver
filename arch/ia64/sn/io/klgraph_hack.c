@@ -15,7 +15,6 @@
  */
 
 #include <linux/types.h>
-#include <linux/config.h>
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
 #include <asm/sn/sgi.h>

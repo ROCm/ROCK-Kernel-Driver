@@ -19,6 +19,7 @@ typedef struct {
 
 struct shmem_inode_info {
 	spinlock_t	lock;
+	unsigned long	max_index;
 	swp_entry_t	i_direct[SHMEM_NR_DIRECT]; /* for the first blocks */
 	swp_entry_t   **i_indirect; /* doubly indirect blocks */
 	unsigned long	swapped;

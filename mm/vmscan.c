@@ -563,7 +563,7 @@ dirty_page_rescan:
 
 			/*
 			 * Unlock the page and drop the extra reference.
-			 * We can only do it here because we ar accessing
+			 * We can only do it here because we are accessing
 			 * the page struct above.
 			 */
 			UnlockPage(page);

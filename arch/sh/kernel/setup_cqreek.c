@@ -1,4 +1,4 @@
-/* $Id: setup_cqreek.c,v 1.5 2000/09/18 05:51:24 gniibe Exp $
+/* $Id: setup_cqreek.c,v 1.6 2001/02/14 09:36:42 gniibe Exp $
  *
  * arch/sh/kernel/setup_cqreek.c
  *
@@ -18,6 +18,7 @@
 #include <asm/irq.h>
 #include <asm/machvec.h>
 #include <asm/machvec_init.h>
+#include <asm/rtc.h>
 
 #define BRIDGE_FEATURE		0x0002
 
@@ -247,5 +248,11 @@ struct sh_machine_vector mv_cqreek __initmv = {
 	mv_init_irq:		init_cqreek_IRQ,
 
 	mv_isa_port2addr:	cqreek_port2addr,
+
+	mv_ioremap:		generic_ioremap,
+	mv_iounmap:		generic_iounmap,
+
+	mv_rtc_gettimeofday:	sh_rtc_gettimeofday,
+	mv_rtc_settimeofday:	sh_rtc_settimeofday,
 };
 ALIAS_MV(cqreek)

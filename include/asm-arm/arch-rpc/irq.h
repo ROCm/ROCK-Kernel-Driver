@@ -12,129 +12,100 @@
  *   22-08-1998	RMK	Restructured IRQ routines
  */
 #include <asm/hardware/iomd.h>
+#include <asm/io.h>
 
 #define fixup_irq(x) (x)
 
 static void rpc_mask_irq_ack_a(unsigned int irq)
 {
-	unsigned int temp;
+	unsigned int val, mask;
 
-	__asm__ __volatile__(
-	"ldrb	%0, [%2]\n"
-"	bic	%0, %0, %1\n"
-"	strb	%0, [%2]\n"
-"	strb	%1, [%3]"
-	: "=&r" (temp)
-	: "r" (1 << (irq & 7)), "r" (ioaddr(IOMD_IRQMASKA)),
-	  "r" (ioaddr(IOMD_IRQCLRA)));
+	mask = 1 << irq;
+	val = iomd_readb(IOMD_IRQMASKA);
+	iomd_writeb(val & ~mask, IOMD_IRQMASKA);
+	iomd_writeb(mask, IOMD_IRQCLRA);
 }
 
 static void rpc_mask_irq_a(unsigned int irq)
 {
-	unsigned int temp;
+	unsigned int val, mask;
 
-	__asm__ __volatile__(
-	"ldrb	%0, [%2]\n"
-"	bic	%0, %0, %1\n"
-"	strb	%0, [%2]"
-	: "=&r" (temp)
-	: "r" (1 << (irq & 7)), "r" (ioaddr(IOMD_IRQMASKA)));
+	mask = 1 << irq;
+	val = iomd_readb(IOMD_IRQMASKA);
+	iomd_writeb(val & ~mask, IOMD_IRQMASKA);
 }
 
 static void rpc_unmask_irq_a(unsigned int irq)
 {
-	unsigned int temp;
+	unsigned int val, mask;
 
-	__asm__ __volatile__(
-	"ldrb	%0, [%2]\n"
-"	orr	%0, %0, %1\n"
-"	strb	%0, [%2]"
-	: "=&r" (temp)
-	: "r" (1 << (irq & 7)), "r" (ioaddr(IOMD_IRQMASKA)));
+	mask = 1 << irq;
+	val = iomd_readb(IOMD_IRQMASKA);
+	iomd_writeb(val | mask, IOMD_IRQMASKA);
 }
 
 static void rpc_mask_irq_b(unsigned int irq)
 {
-	unsigned int temp;
+	unsigned int val, mask;
 
-	__asm__ __volatile__(
-	"ldrb	%0, [%2]\n"
-"	bic	%0, %0, %1\n"
-"	strb	%0, [%2]"
-	: "=&r" (temp)
-	: "r" (1 << (irq & 7)), "r" (ioaddr(IOMD_IRQMASKB)));
+	mask = 1 << (irq & 7);
+	val = iomd_readb(IOMD_IRQMASKB);
+	iomd_writeb(val & ~mask, IOMD_IRQMASKB);
 }
 
 static void rpc_unmask_irq_b(unsigned int irq)
 {
-	unsigned int temp;
+	unsigned int val, mask;
 
-	__asm__ __volatile__(
-	"ldrb	%0, [%2]\n"
-"	orr	%0, %0, %1\n"
-"	strb	%0, [%2]"
-	: "=&r" (temp)
-	: "r" (1 << (irq & 7)), "r" (ioaddr(IOMD_IRQMASKB)));
+	mask = 1 << (irq & 7);
+	val = iomd_readb(IOMD_IRQMASKB);
+	iomd_writeb(val | mask, IOMD_IRQMASKB);
 }
 
 static void rpc_mask_irq_dma(unsigned int irq)
 {
-	unsigned int temp;
+	unsigned int val, mask;
 
-	__asm__ __volatile__(
-	"ldrb	%0, [%2]\n"
-"	bic	%0, %0, %1\n"
-"	strb	%0, [%2]"
-	: "=&r" (temp)
-	: "r" (1 << (irq & 7)), "r" (ioaddr(IOMD_DMAMASK)));
+	mask = 1 << (irq & 7);
+	val = iomd_readb(IOMD_DMAMASK);
+	iomd_writeb(val & ~mask, IOMD_DMAMASK);
 }
 
 static void rpc_unmask_irq_dma(unsigned int irq)
 {
-	unsigned int temp;
+	unsigned int val, mask;
 
-	__asm__ __volatile__(
-	"ldrb	%0, [%2]\n"
-"	orr	%0, %0, %1\n"
-"	strb	%0, [%2]"
-	: "=&r" (temp)
-	: "r" (1 << (irq & 7)), "r" (ioaddr(IOMD_DMAMASK)));
+	mask = 1 << (irq & 7);
+	val = iomd_readb(IOMD_DMAMASK);
+	iomd_writeb(val | mask, IOMD_DMAMASK);
 }
 
 static void rpc_mask_irq_fiq(unsigned int irq)
 {
-	unsigned int temp;
+	unsigned int val, mask;
 
-	__asm__ __volatile__(
-	"ldrb	%0, [%2]\n"
-"	bic	%0, %0, %1\n"
-"	strb	%0, [%2]"
-	: "=&r" (temp)
-	: "r" (1 << (irq & 7)), "r" (ioaddr(IOMD_FIQMASK)));
+	mask = 1 << (irq & 7);
+	val = iomd_readb(IOMD_FIQMASK);
+	iomd_writeb(val & ~mask, IOMD_FIQMASK);
 }
 
 static void rpc_unmask_irq_fiq(unsigned int irq)
 {
-	unsigned int temp;
+	unsigned int val, mask;
 
-	__asm__ __volatile__(
-	"ldrb	%0, [%2]\n"
-"	orr	%0, %0, %1\n"
-"	strb	%0, [%2]"
-	: "=&r" (temp)
-	: "r" (1 << (irq & 7)), "r" (ioaddr(IOMD_FIQMASK)));
+	mask = 1 << (irq & 7);
+	val = iomd_readb(IOMD_FIQMASK);
+	iomd_writeb(val | mask, IOMD_FIQMASK);
 }
 
 static __inline__ void irq_init_irq(void)
 {
-	extern void ecard_disableirq(unsigned int irq);
-	extern void ecard_enableirq(unsigned int irq);
 	int irq;
 
-	outb(0, IOMD_IRQMASKA);
-	outb(0, IOMD_IRQMASKB);
-	outb(0, IOMD_FIQMASK);
-	outb(0, IOMD_DMAMASK);
+	iomd_writeb(0, IOMD_IRQMASKA);
+	iomd_writeb(0, IOMD_IRQMASKB);
+	iomd_writeb(0, IOMD_FIQMASK);
+	iomd_writeb(0, IOMD_DMAMASK);
 
 	for (irq = 0; irq < NR_IRQS; irq++) {
 		switch (irq) {
@@ -156,19 +127,14 @@ static __inline__ void irq_init_irq(void)
 			irq_desc[irq].unmask   = rpc_unmask_irq_b;
 			break;
 
-		case 16 ... 21:
-			irq_desc[irq].valid    = 1;
+		case 16 ... 19:
+		case 21:
 			irq_desc[irq].noautoenable = 1;
+		case 20:
+			irq_desc[irq].valid    = 1;
 			irq_desc[irq].mask_ack = rpc_mask_irq_dma;
 			irq_desc[irq].mask     = rpc_mask_irq_dma;
 			irq_desc[irq].unmask   = rpc_unmask_irq_dma;
-			break;
-
-		case 32 ... 39:
-			irq_desc[irq].valid    = 1;
-			irq_desc[irq].mask_ack = ecard_disableirq;
-			irq_desc[irq].mask     = ecard_disableirq;
-			irq_desc[irq].unmask   = ecard_enableirq;
 			break;
 
 		case 64 ... 71:

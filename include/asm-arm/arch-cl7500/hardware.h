@@ -49,47 +49,18 @@
 
 #define FLUSH_BASE		0xdf000000
 
-
-#ifndef __ASSEMBLY__
-
-/*
- * for use with inb/outb
- */
-#define IO_VIDC_AUDIO_BASE	0x80140000
-#define IO_VIDC_BASE		0x80100000
-#define IO_IOMD_BASE		0x80080000
-#define IOC_BASE		0x80080000
-
-/*
- * IO definitions
- */
-#define EXPMASK_BASE		((volatile unsigned char *)0xe0360000)
-#define IOEB_BASE		((volatile unsigned char *)0xe0350050)
-#define PCIO_FLOPPYDMABASE	((volatile unsigned char *)0xe002a000)
-#define PCIO_BASE		0xe0010000
-/* in/out bias for the ISA slot region */
-#define ISASLOT_IO		0x80400000
-
-/*
- * RAM definitions
- */
-#define GET_MEMORY_END(p)	(PAGE_OFFSET + p->u1.s.page_size * \
-						(p->u1.s.pages_in_bank[0] + \
-						 p->u1.s.pages_in_bank[1] + \
-						 p->u1.s.pages_in_bank[2] + \
-						 p->u1.s.pages_in_bank[3]))
-
-#define FLUSH_BASE_PHYS		0x00000000	/* ROM */
-
-#else
-
-#define VIDC_SND_BASE		0xe0500000
 #define VIDC_BASE		0xe0400000
 #define IOMD_BASE		0xe0200000
 #define IOC_BASE		0xe0200000
-#define PCIO_FLOPPYDMABASE	0xe002a000
+#define FLOPPYDMA_BASE		0xe002a000
 #define PCIO_BASE		0xe0010000
 
-#endif
+#define FLUSH_BASE_PHYS		0x00000000	/* ROM */
+
+#define vidc_writel(val)	__raw_writel(val, VIDC_BASE)
+
+/* in/out bias for the ISA slot region */
+#define ISASLOT_IO		0x80400000
+
 #endif
 

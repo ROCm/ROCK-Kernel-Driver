@@ -118,7 +118,7 @@ int __init sonic_probe(struct net_device *dev)
 static int __init sonic_probe1(struct net_device *dev,
                                unsigned int base_addr, unsigned int irq)
 {
-    static unsigned version_printed = 0;
+    static unsigned version_printed;
     unsigned int silicon_revision;
     unsigned int val;
     struct sonic_local *lp;

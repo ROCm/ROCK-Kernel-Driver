@@ -18,6 +18,14 @@
 *		as published by the Free Software Foundation; either version
 *		2 of the License, or (at your option) any later version.
 * ============================================================================
+* Nov 24, 2000  Nenad Corbic	Updated for 2.4.X kernels 
+* Nov 07, 2000  Nenad Corbic	Fixed the Mulit-Port PPP for kernels 2.2.16 and
+*  				greater.
+* Aug 2,  2000  Nenad Corbic	Block the Multi-Port PPP from running on
+*  			        kernels 2.2.16 or greater.  The SyncPPP 
+*  			        has changed.
+* Jul 13, 2000  Nenad Corbic	Added SyncPPP support
+* 				Added extra debugging in device_setup().
 * Oct 01, 1999  Gideon Hack     Update for s514 PCI card
 * Dec 27, 1996	Gene Kozin	Initial version (based on Sangoma's WANPIPE)
 * Jan 16, 1997	Gene Kozin	router_devlist made public
@@ -31,7 +39,6 @@
 * Dec 22, 1998  Arnaldo Melo    vmalloc/vfree used in device_setup to allocate
 *                               kernel memory and copy configuration data to
 *                               kernel space (for big firmwares)
-* May 19, 1999  Arnaldo Melo    __init in wanrouter_init
 * Jun 02, 1999  Gideon Hack	Updates for Linux 2.0.X and 2.2.X kernels.	
 *****************************************************************************/
 
@@ -41,16 +48,94 @@
 #include <linux/errno.h>	/* return codes */
 #include <linux/kernel.h>
 #include <linux/module.h>	/* support for loadable modules */
-#include <linux/slab.h>	/* kmalloc(), kfree() */
+#include <linux/malloc.h>	/* kmalloc(), kfree() */
 #include <linux/mm.h>		/* verify_area(), etc. */
 #include <linux/string.h>	/* inline mem*, str* functions */
-#include <linux/vmalloc.h>	/* vmalloc, vfree */
-#include <asm/segment.h>	/* kernel <-> user copy */
-#include <asm/byteorder.h>	/* htons(), etc. */
-#include <asm/uaccess.h>	/* copy_to/from_user */
-#include <linux/wanrouter.h>	/* WAN router API definitions */
-#include <linux/init.h>		/* __init et al. */
 
+#include <asm/byteorder.h>	/* htons(), etc. */
+#include <linux/wanrouter.h>	/* WAN router API definitions */
+
+
+#if defined(LINUX_2_4)
+ #include <linux/vmalloc.h>	/* vmalloc, vfree */
+ #include <asm/uaccess.h>        /* copy_to/from_user */
+ #include <linux/init.h>         /* __initfunc et al. */
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,3)
+ #include <net/syncppp.h>
+#else
+ #include <../drivers/net/wan/syncppp.h>
+#endif
+
+#elif defined(LINUX_2_1) 
+ #define LINUX_2_1
+ #include <linux/vmalloc.h>	/* vmalloc, vfree */
+ #include <asm/uaccess.h>        /* copy_to/from_user */
+ #include <linux/init.h>         /* __initfunc et al. */
+ #include <../drivers/net/syncppp.h>
+
+#else
+ #include <asm/segment.h>	/* kernel <-> user copy */
+#endif
+
+#define KMEM_SAFETYZONE 8
+
+/***********FOR DEBUGGING PURPOSES*********************************************
+static void * dbg_kmalloc(unsigned int size, int prio, int line) {
+	int i = 0;
+	void * v = kmalloc(size+sizeof(unsigned int)+2*KMEM_SAFETYZONE*8,prio);
+	char * c1 = v;	
+	c1 += sizeof(unsigned int);
+	*((unsigned int *)v) = size;
+
+	for (i = 0; i < KMEM_SAFETYZONE; i++) {
+		c1[0] = 'D'; c1[1] = 'E'; c1[2] = 'A'; c1[3] = 'D';
+		c1[4] = 'B'; c1[5] = 'E'; c1[6] = 'E'; c1[7] = 'F';
+		c1 += 8;
+	}
+	c1 += size;
+	for (i = 0; i < KMEM_SAFETYZONE; i++) {
+		c1[0] = 'M'; c1[1] = 'U'; c1[2] = 'N'; c1[3] = 'G';
+		c1[4] = 'W'; c1[5] = 'A'; c1[6] = 'L'; c1[7] = 'L';
+		c1 += 8;
+	}
+	v = ((char *)v) + sizeof(unsigned int) + KMEM_SAFETYZONE*8;
+	printk(KERN_INFO "line %d  kmalloc(%d,%d) = %p\n",line,size,prio,v);
+	return v;
+}
+static void dbg_kfree(void * v, int line) {
+	unsigned int * sp = (unsigned int *)(((char *)v) - (sizeof(unsigned int) + KMEM_SAFETYZONE*8));
+	unsigned int size = *sp;
+	char * c1 = ((char *)v) - KMEM_SAFETYZONE*8;
+	int i = 0;
+	for (i = 0; i < KMEM_SAFETYZONE; i++) {
+		if (   c1[0] != 'D' || c1[1] != 'E' || c1[2] != 'A' || c1[3] != 'D'
+		    || c1[4] != 'B' || c1[5] != 'E' || c1[6] != 'E' || c1[7] != 'F') {
+			printk(KERN_INFO "kmalloced block at %p has been corrupted (underrun)!\n",v);
+			printk(KERN_INFO " %4x: %2x %2x %2x %2x %2x %2x %2x %2x\n", i*8,
+			                c1[0],c1[1],c1[2],c1[3],c1[4],c1[5],c1[6],c1[7] );
+		}
+		c1 += 8;
+	}
+	c1 += size;
+	for (i = 0; i < KMEM_SAFETYZONE; i++) {
+		if (   c1[0] != 'M' || c1[1] != 'U' || c1[2] != 'N' || c1[3] != 'G'
+		    || c1[4] != 'W' || c1[5] != 'A' || c1[6] != 'L' || c1[7] != 'L'
+		   ) {
+			printk(KERN_INFO "kmalloced block at %p has been corrupted (overrun):\n",v);
+			printk(KERN_INFO " %4x: %2x %2x %2x %2x %2x %2x %2x %2x\n", i*8,
+			                c1[0],c1[1],c1[2],c1[3],c1[4],c1[5],c1[6],c1[7] );
+		}
+		c1 += 8;
+	}
+	printk(KERN_INFO "line %d  kfree(%p)\n",line,v);
+	v = ((char *)v) - (sizeof(unsigned int) + KMEM_SAFETYZONE*8);
+	kfree(v);
+}
+
+#define kmalloc(x,y) dbg_kmalloc(x,y,__LINE__)
+#define kfree(x) dbg_kfree(x,__LINE__)
+*****************************************************************************/
 
 
 /*
@@ -91,14 +176,18 @@ static int device_del_if(wan_device_t *wandev, char *u_name);
  */
 
 static wan_device_t *find_device (char *name);
-static int delete_interface (wan_device_t *wandev, char *name, int force);
+static int delete_interface (wan_device_t *wandev, char *name);
+void lock_adapter_irq(spinlock_t *lock, unsigned long *smp_flags);
+void unlock_adapter_irq(spinlock_t *lock, unsigned long *smp_flags);
+
+
 
 /*
  *	Global Data
  */
 
-static char fullname[]		= "WAN Router";
-static char copyright[]		= "(c) 1995-1999 Sangoma Technologies Inc.";
+static char fullname[]		= "Sangoma WANPIPE Router";
+static char copyright[]		= "(c) 1995-2000 Sangoma Technologies Inc.";
 static char modname[]		= ROUTER_NAME;	/* short module name */
 wan_device_t* router_devlist 	= NULL;	/* list of registered devices */
 static int devcnt 		= 0;
@@ -113,30 +202,40 @@ static unsigned char oui_802_2[] = { 0x00, 0x80, 0xC2 };
 #endif
 
 #ifndef MODULE
-int __init wanrouter_init(void)
+
+int wanrouter_init(void)
 {
 	int err;
-	extern int wanpipe_init(void),
-		   cyclomx_init(void);
+	extern int wanpipe_init(void);
+	extern int sdladrv_init(void);
 
 	printk(KERN_INFO "%s v%u.%u %s\n",
 		fullname, ROUTER_VERSION, ROUTER_RELEASE, copyright);
-	err = wanrouter_proc_init();
-	if (err)
-		printk(KERN_ERR "%s: can't create entry in proc filesystem!\n",	modname);
 
-	/*
-	 *	Initialise compiled in boards
-	 */		
-	 
+	err = wanrouter_proc_init();
+	if (err){
+		printk(KERN_INFO "%s: can't create entry in proc filesystem!\n", modname);
+	}
+
+        /*
+         *      Initialise compiled in boards
+         */
+
 #ifdef CONFIG_VENDOR_SANGOMA
+	sdladrv_init();
 	wanpipe_init();
 #endif	
-#ifdef CONFIG_CYCLADES_SYNC
-	cyclomx_init();
-#endif
+ 
 	return err;
 }
+
+
+#ifdef LINUX_2_4
+static void __exit wanrouter_cleanup (void)
+{
+	wanrouter_proc_cleanup();
+}
+#endif
 
 #else
 
@@ -161,9 +260,13 @@ int init_module	(void)
 
 	printk(KERN_INFO "%s v%u.%u %s\n",
 		fullname, ROUTER_VERSION, ROUTER_RELEASE, copyright);
+	
 	err = wanrouter_proc_init();
-	if (err) printk(KERN_ERR
+	
+	if (err){ 
+		printk(KERN_INFO
 		"%s: can't create entry in proc filesystem!\n", modname);
+	}
 	return err;
 }
 
@@ -207,7 +310,7 @@ int register_wan_device(wan_device_t *wandev)
 	if ((wandev == NULL) || (wandev->magic != ROUTER_MAGIC) ||
 	    (wandev->name == NULL))
 		return -EINVAL;
-
+ 		
 	namelen = strlen(wandev->name);
 	if (!namelen || (namelen > WAN_DRVNAME_SZ))
 		return -EINVAL;
@@ -219,12 +322,13 @@ int register_wan_device(wan_device_t *wandev)
 	printk(KERN_INFO "%s: registering WAN device %s\n",
 		modname, wandev->name);
 #endif
+
 	/*
 	 *	Register /proc directory entry 
 	 */
 	err = wanrouter_proc_add(wandev);
 	if (err) {
-		printk(KERN_ERR
+		printk(KERN_INFO
 			"%s: can't create /proc/net/router/%s entry!\n",
 			modname, wandev->name);
 		return err;
@@ -274,17 +378,17 @@ int unregister_wan_device(char *name)
 #ifdef WANDEBUG		
 	printk(KERN_INFO "%s: unregistering WAN device %s\n", modname, name);
 #endif
-	
+
 	if (wandev->state != WAN_UNCONFIGURED) {
-		while(wandev->dev)
-			delete_interface(wandev, wandev->dev->name, 1);
-		if (wandev->shutdown)	
-			wandev->shutdown(wandev);
+		device_shutdown(wandev);
 	}
-	if (prev)
+	
+	if (prev){
 		prev->next = wandev->next;
-	else
+	}else{
 		router_devlist = wandev->next;
+	}
+	
 	--devcnt;
 	wanrouter_proc_delete(wandev);
         MOD_DEC_USE_COUNT;
@@ -302,12 +406,12 @@ int unregister_wan_device(char *name)
  */
 
 
-int wanrouter_encapsulate (struct sk_buff* skb, struct net_device* dev)
+int wanrouter_encapsulate (struct sk_buff *skb, netdevice_t *dev,
+	unsigned short type)
 {
 	int hdr_len = 0;
 
-	switch (skb->protocol)
-	{
+	switch (type) {
 	case ETH_P_IP:		/* IP datagram encapsulation */
 		hdr_len += 1;
 		skb_push(skb, 1);
@@ -321,17 +425,18 @@ int wanrouter_encapsulate (struct sk_buff* skb, struct net_device* dev)
 		skb->data[0] = 0;
 		skb->data[1] = NLPID_SNAP;
 		memcpy(&skb->data[2], oui_ether, sizeof(oui_ether));
-		*((unsigned short*)&skb->data[5]) = htons(skb->protocol);
+		*((unsigned short*)&skb->data[5]) = htons(type);
 		break;
 
 	default:		/* Unknown packet type */
 		printk(KERN_INFO
 			"%s: unsupported Ethertype 0x%04X on interface %s!\n",
-			modname, skb->protocol, dev->name);
+			modname, type, dev->name);
 		hdr_len = -EINVAL;
 	}
 	return hdr_len;
 }
+
 
 /*
  *	Decapsulate packet.
@@ -344,21 +449,19 @@ int wanrouter_encapsulate (struct sk_buff* skb, struct net_device* dev)
  */
 
 
-unsigned short wanrouter_type_trans (struct sk_buff* skb, struct net_device* dev)
+unsigned short wanrouter_type_trans (struct sk_buff *skb, netdevice_t *dev)
 {
 	int cnt = skb->data[0] ? 0 : 1;	/* there may be a pad present */
 	unsigned short ethertype;
 
-	switch (skb->data[cnt])
-	{
+	switch (skb->data[cnt]) {
 	case NLPID_IP:		/* IP datagramm */
 		ethertype = htons(ETH_P_IP);
 		cnt += 1;
 		break;
 
         case NLPID_SNAP:	/* SNAP encapsulation */
-		if (memcmp(&skb->data[cnt + 1], oui_ether, sizeof(oui_ether)))
-		{
+		if (memcmp(&skb->data[cnt + 1], oui_ether, sizeof(oui_ether))){
           		printk(KERN_INFO
 				"%s: unsupported SNAP OUI %02X-%02X-%02X "
 				"on interface %s!\n", modname,
@@ -380,8 +483,8 @@ unsigned short wanrouter_type_trans (struct sk_buff* skb, struct net_device* dev
 	}
 	skb->protocol = ethertype;
 	skb->pkt_type = PACKET_HOST;	/*	Physically point to point */
-	skb->mac.raw  = skb->data;
 	skb_pull(skb, cnt);
+	skb->mac.raw  = skb->data;
 	return ethertype;
 }
 
@@ -399,9 +502,11 @@ int wanrouter_ioctl(struct inode *inode, struct file *file,
 	struct proc_dir_entry *dent;
 	wan_device_t *wandev;
 
+      #if defined (LINUX_2_1) || defined (LINUX_2_4)
 	if (!capable(CAP_NET_ADMIN)){
 		return -EPERM;
 	}
+      #endif
 		
 	if ((cmd >> 8) != ROUTER_IOCTL)
 		return -EINVAL;
@@ -466,44 +571,105 @@ static int device_setup (wan_device_t *wandev, wandev_conf_t *u_conf)
 	wandev_conf_t *conf;
 	int err = -EINVAL;
 
-	if (wandev->setup == NULL)	/* Nothing to do ? */
+	if (wandev->setup == NULL){	/* Nothing to do ? */
+		printk(KERN_INFO "%s: ERROR, No setup script: wandev->setup()\n",
+				wandev->name);
 		return 0;
+	}
+
+      #ifdef LINUX_2_0 
+	err = verify_area (VERIFY_READ, u_conf, sizeof(wandev_conf_t));
+	if(err){
+		return err;
+	}
+      #endif	
 
 	conf = kmalloc(sizeof(wandev_conf_t), GFP_KERNEL);
-	if (conf == NULL)
+	if (conf == NULL){
+		printk(KERN_INFO "%s: ERROR, Failed to allocate kernel memory !\n",
+				wandev->name);
 		return -ENOBUFS;
-
+	}
+		
+      #if defined (LINUX_2_1) || defined (LINUX_2_4)		
 	if(copy_from_user(conf, u_conf, sizeof(wandev_conf_t))) {
+		printk(KERN_INFO "%s: Failed to copy user config data to kernel space!\n",
+				wandev->name);
 		kfree(conf);
 		return -EFAULT;
 	}
+      #else
+	memcpy_fromfs ((void *)conf, (void *)u_conf, sizeof(wandev_conf_t));
+      #endif
 	
-	if (conf->magic != ROUTER_MAGIC) {
+	if (conf->magic != ROUTER_MAGIC){
 		kfree(conf);
+		printk(KERN_INFO "%s: ERROR, Invalid MAGIC Number\n",
+				wandev->name);
 	        return -EINVAL; 
 	}
 
-	if (conf->data_size && conf->data) {
+	if (conf->data_size && conf->data){
 		if(conf->data_size > 128000 || conf->data_size < 0) {
 			kfree(conf);
+			printk(KERN_INFO 
+			    "%s: ERROR, Invalid firmware data size %i !\n",
+					wandev->name, conf->data_size);
 		        return -EINVAL;;
 		}
 
+#if defined (LINUX_2_1) || defined (LINUX_2_4)
 		data = vmalloc(conf->data_size);
 		if (data) {
 			if(!copy_from_user(data, conf->data, conf->data_size)){
 				conf->data=data;
 				err = wandev->setup(wandev,conf);
-			}
-			else 
+			}else{ 
+				printk(KERN_INFO 
+				     "%s: ERROR, Faild to copy from user data !\n",
+				       wandev->name);
 				err = -EFAULT;
-		}
-		else 
+			}
+		}else{ 
+			printk(KERN_INFO 
+			 	"%s: ERROR, Faild allocate kernel memory !\n",
+				wandev->name);
 			err = -ENOBUFS;
-
-		if (data)
+		}
+			
+		if (data){
 			vfree(data);
+		}
+#else
+                err = verify_area(VERIFY_READ, conf->data, conf->data_size);
+                if (!err) {
+                        data = kmalloc(conf->data_size, GFP_KERNEL);
+                        if (data) {
+                                memcpy_fromfs(data, (void*)conf->data,
+                                        conf->data_size);
+                                conf->data = data;
+                        }else{
+				printk(KERN_INFO 
+				    "%s: ERROR, Faild allocate kernel memory !\n",wandev->name);
+				err = -ENOMEM;
+			}
+                }else{
+			printk(KERN_INFO 
+			 	"%s: ERROR, Faild to copy from user data !\n",wandev->name);
+		}
 
+		if (!err){
+			err = wandev->setup(wandev, conf);
+		}
+		
+        	if (data){
+			kfree(data);
+		}
+#endif
+	}else{
+		printk(KERN_INFO 
+		    "%s: ERROR, No firmware found ! Firmware size = %i !\n",
+				wandev->name, conf->data_size);
 	}
 
 	kfree(conf);
@@ -516,27 +682,37 @@ static int device_setup (wan_device_t *wandev, wandev_conf_t *u_conf)
  *	o call driver's shutdown() entry point
  */
  
-static int device_shutdown (wan_device_t* wandev)
+static int device_shutdown (wan_device_t *wandev)
 {
-	struct net_device* dev;
-
-	if (wandev->state == WAN_UNCONFIGURED)
+	netdevice_t *dev;
+	int err=0;
+		
+	if (wandev->state == WAN_UNCONFIGURED){
 		return 0;
-		
-	for (dev = wandev->dev; dev;)
-	{
-		if (delete_interface(wandev, dev->name, 0))
-		{
-			struct net_device **slave = dev->priv;
-			dev = *slave;
-		}
 	}
-	if (wandev->ndev)
-		return -EBUSY;	/* there are opened interfaces  */
+
+	printk(KERN_INFO "\n%s: Shutting Down!\n",wandev->name);
 		
+	for (dev = wandev->dev; dev;) {
+		if ((err=delete_interface(wandev, dev->name)) != 0){
+			return err;
+		}
+
+		/* The above function deallocates the current dev
+		 * structure. Therefore, we cannot use dev->priv
+		 * as the next element: wandev->dev points to the
+		 * next element */
+		dev = wandev->dev;
+	}
+	
+	if (wandev->ndev){
+		return -EBUSY;	/* there are opened interfaces  */
+	}	
+	
 	if (wandev->shutdown)
-		return wandev->shutdown(wandev);
-	return 0;
+		err=wandev->shutdown(wandev);
+	
+	return err;
 }
 
 /*
@@ -546,6 +722,13 @@ static int device_shutdown (wan_device_t* wandev)
 static int device_stat (wan_device_t *wandev, wandev_stat_t *u_stat)
 {
 	wandev_stat_t stat;
+
+      #ifdef LINUX_2_0
+	int err;
+	err = verify_area(VERIFY_WRITE, u_stat, sizeof(wandev_stat_t));
+        if (err)
+                return err;
+      #endif
 
 	memset(&stat, 0, sizeof(stat));
 
@@ -557,8 +740,12 @@ static int device_stat (wan_device_t *wandev, wandev_stat_t *u_stat)
 	stat.ndev  = wandev->ndev;
 	stat.state = wandev->state;
 
+      #if defined (LINUX_2_1) || defined (LINUX_2_4)
 	if(copy_to_user(u_stat, &stat, sizeof(stat)))
 		return -EFAULT;
+      #else
+        memcpy_tofs((void*)u_stat, (void*)&stat, sizeof(stat));
+      #endif
 
 	return 0;
 }
@@ -573,58 +760,149 @@ static int device_stat (wan_device_t *wandev, wandev_stat_t *u_stat)
  *	o register network interface
  */
 
-static int device_new_if (wan_device_t* wandev, wanif_conf_t* u_conf)
+static int device_new_if (wan_device_t *wandev, wanif_conf_t *u_conf)
 {
 	wanif_conf_t conf;
-	struct net_device *dev;
+	netdevice_t *dev=NULL;
+      #ifdef CONFIG_WANPIPE_MULTPPP
+	struct ppp_device *pppdev=NULL;
+      #endif
 	int err;
 
 	if ((wandev->state == WAN_UNCONFIGURED) || (wandev->new_if == NULL))
 		return -ENODEV;
-		
+	
+      #if defined (LINUX_2_1) || defined (LINUX_2_4)	
 	if(copy_from_user(&conf, u_conf, sizeof(wanif_conf_t)))
 		return -EFAULT;
+      #else
+        err = verify_area(VERIFY_READ, u_conf, sizeof(wanif_conf_t));
+        if (err)
+                return err;
+        memcpy_fromfs((void*)&conf, (void*)u_conf, sizeof(wanif_conf_t));
+      #endif
 		
 	if (conf.magic != ROUTER_MAGIC)
 		return -EINVAL;
+
+	err = -EPROTONOSUPPORT;
+
+	
+#ifdef CONFIG_WANPIPE_MULTPPP
+	if (conf.config_id == WANCONFIG_MPPP){
+
+		pppdev = kmalloc(sizeof(struct ppp_device), GFP_KERNEL);
+		if (pppdev == NULL){
+			return -ENOBUFS;
+		}
+		memset(pppdev, 0, sizeof(struct ppp_device));
+
+	      #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,2,16)
+		pppdev->dev = kmalloc(sizeof(netdevice_t), GFP_KERNEL);
+		if (pppdev->dev == NULL){
+			return -ENOBUFS;
+		}
+		memset(pppdev->dev, 0, sizeof(netdevice_t));
+	      #endif
 		
-	dev = kmalloc(sizeof(struct net_device), GFP_KERNEL);
-	if (dev == NULL)
-		return -ENOBUFS;
+		err = wandev->new_if(wandev, (netdevice_t *)pppdev, &conf);
 		
-	memset(dev, 0, sizeof(struct net_device));
-	err = wandev->new_if(wandev, dev, &conf);
+		      #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,2,16)
+			dev = pppdev->dev;
+		      #else
+			dev = &pppdev->dev;
+		      #endif
+			
+	}else{
+
+		dev = kmalloc(sizeof(netdevice_t), GFP_KERNEL);
+		if (dev == NULL){
+			return -ENOBUFS;
+		}
+		memset(dev, 0, sizeof(netdevice_t));	
+		err = wandev->new_if(wandev, dev, &conf);
+	}
+
+#else
+	/* Sync PPP is disabled */
+	if (conf.config_id != WANCONFIG_MPPP){
+
+		dev = kmalloc(sizeof(netdevice_t), GFP_KERNEL);
+		if (dev == NULL){
+			return -ENOBUFS;
+		}
+		memset(dev, 0, sizeof(netdevice_t));	
+		err = wandev->new_if(wandev, dev, &conf);
+	}else{
+		printk(KERN_INFO "%s: Wanpipe Mulit-Port PPP support has not been compiled in!\n",
+				wandev->name);
+		return err;
+	}
+#endif
+	
 	if (!err) {
 		/* Register network interface. This will invoke init()
 		 * function supplied by the driver.  If device registered
 		 * successfully, add it to the interface list.
 		 */
-		if (dev->name == NULL)
+
+		if (dev->name == NULL){
 			err = -EINVAL;
-			
-		else if (dev_get(dev->name))
+		}else if (dev_get(dev->name)){
 			err = -EEXIST;	/* name already exists */
-		else {
-#ifdef WANDEBUG		
+		}else{
+				
+			#ifdef WANDEBUG		
 			printk(KERN_INFO "%s: registering interface %s...\n",
 				modname, dev->name);
-#endif				
+			#endif				
+			
 			err = register_netdev(dev);
 			if (!err) {
-				struct net_device **slave = dev->priv;
+				netdevice_t *slave=NULL;
+				unsigned long smp_flags=0;
+				
+				lock_adapter_irq(&wandev->lock, &smp_flags);
+			
+				if (wandev->dev == NULL){
+					wandev->dev = dev;
+				}else{
+					for (slave=wandev->dev;
+					     *((netdevice_t**)slave->priv);
+					     slave=*((netdevice_t**)slave->priv));
 
-				cli();	/***** critical section start *****/
-				*slave = wandev->dev;
-				wandev->dev = dev;
+					*((netdevice_t**)slave->priv) = dev;
+				}
 				++wandev->ndev;
-				sti();	/****** critical section end ******/
+				
+				unlock_adapter_irq(&wandev->lock, &smp_flags);
 				return 0;	/* done !!! */
 			}
 		}
 		if (wandev->del_if)
 			wandev->del_if(wandev, dev);
 	}
-	kfree(dev);
+
+	/* This code has moved from del_if() function */
+	if (dev->priv){
+		kfree(dev->priv);
+		dev->priv=NULL;
+	}
+
+	
+      #ifdef CONFIG_WANPIPE_MULTPPP
+	if (conf.config_id == WANCONFIG_MPPP){
+		kfree(pppdev);
+	}else{
+		kfree(dev);
+	}
+      #else
+	/* Sync PPP is disabled */
+	if (conf.config_id != WANCONFIG_MPPP){
+		kfree(dev);
+	}
+      #endif
+	
 	return err;
 }
 
@@ -638,15 +916,43 @@ static int device_new_if (wan_device_t* wandev, wanif_conf_t* u_conf)
 static int device_del_if (wan_device_t *wandev, char *u_name)
 {
 	char name[WAN_IFNAME_SZ + 1];
+        int err = 0;
 
 	if (wandev->state == WAN_UNCONFIGURED)
 		return -ENODEV;
 	
+      #ifdef LINUX_2_0
+        err = verify_area(VERIFY_READ, u_name, WAN_IFNAME_SZ);
+        if (err)
+		return err;
+      #endif	
+
 	memset(name, 0, sizeof(name));
 
+      #if defined (LINUX_2_1) || defined (LINUX_2_4)
 	if(copy_from_user(name, u_name, WAN_IFNAME_SZ))
 		return -EFAULT;
-	return delete_interface(wandev, name, 0);
+      #else
+        memcpy_fromfs((void*)name, (void*)u_name, WAN_IFNAME_SZ);
+      #endif
+
+	err = delete_interface(wandev, name);
+	if (err)
+		return(err);
+
+	/* If last interface being deleted, shutdown card
+	 * This helps with administration at leaf nodes
+	 * (You can tell if the person at the other end of the phone 
+	 * has an interface configured) and avoids DoS vulnerabilities
+	 * in binary driver files - this fixes a problem with the current
+	 * Sangoma driver going into strange states when all the network
+	 * interfaces are deleted and the link irrecoverably disconnected.
+	 */ 
+
+        if (!wandev->ndev && wandev->shutdown){
+                err = wandev->shutdown(wandev);
+	}
+	return err;
 }
 
 
@@ -685,59 +991,102 @@ static wan_device_t *find_device(char *name)
  *	sure that opened interfaces are not removed!
  */
 
-static int delete_interface (wan_device_t *wandev, char *name, int force)
+static int delete_interface (wan_device_t *wandev, char *name)
 {
-	struct net_device *dev, *prev;
+	netdevice_t *dev=NULL, *prev=NULL;
+	unsigned long smp_flags=0;
 
+	lock_adapter_irq(&wandev->lock, &smp_flags);
 	dev = wandev->dev;
 	prev = NULL;
 	while (dev && strcmp(name, dev->name)) {
-		struct net_device **slave = dev->priv;
-
+		netdevice_t **slave = dev->priv;
 		prev = dev;
 		dev = *slave;
 	}
-
-	if (dev == NULL)
+	unlock_adapter_irq(&wandev->lock, &smp_flags);
+	
+	if (dev == NULL){
 		return -ENODEV;	/* interface not found */
-
-	if (netif_running(dev)) {
-		if (force) {
-			printk(KERN_WARNING
-				"%s: deleting opened interface %s!\n",
-				modname, name);
-		}
-		else
-			return -EBUSY;	/* interface in use */
+	}
+		
+       #ifdef LINUX_2_4
+	if (netif_running(dev)){
+       #else
+	if (dev->start) {
+       #endif
+		return -EBUSY;	/* interface in use */
 	}
 
 	if (wandev->del_if)
 		wandev->del_if(wandev, dev);
 
-	cli();			/***** critical section start *****/
+	lock_adapter_irq(&wandev->lock, &smp_flags);
 	if (prev) {
-		struct net_device **prev_slave = prev->priv;
-		struct net_device **slave = dev->priv;
+		netdevice_t **prev_slave = prev->priv;
+		netdevice_t **slave = dev->priv;
 
 		*prev_slave = *slave;
 	} else {
-		struct net_device **slave = dev->priv;
-
+		netdevice_t **slave = dev->priv;
 		wandev->dev = *slave;
 	}
 	--wandev->ndev;
-	sti();			/****** critical section end ******/
+	unlock_adapter_irq(&wandev->lock, &smp_flags);
+	
+	printk(KERN_INFO "%s: unregistering '%s'\n", wandev->name, dev->name); 
+	
+	/* Due to new interface linking method using dev->priv,
+	 * this code has moved from del_if() function.*/
+	if (dev->priv){
+		kfree(dev->priv);
+		dev->priv=NULL;
+	}
 
-	printk("Unregistering '%s'\n", dev->name); 
 	unregister_netdev(dev);
+
+      #ifdef LINUX_2_4
 	kfree(dev);
+      #else
+	if (dev->name){
+		kfree(dev->name);
+	}
+	kfree(dev);
+      #endif
+
 	return 0;
 }
 
+void lock_adapter_irq(spinlock_t *lock, unsigned long *smp_flags)
+{
+      #ifdef LINUX_2_0
+	save_flags(*smp_flags);
+	cli();
+      #else
+       	spin_lock_irqsave(lock, *smp_flags);
+      #endif
+}
+
+
+void unlock_adapter_irq(spinlock_t *lock, unsigned long *smp_flags)
+{
+      #ifdef LINUX_2_0
+	restore_flags(*smp_flags);
+      #else
+	spin_unlock_irqrestore(lock, *smp_flags);
+      #endif
+}
+
+
+
+#if defined (LINUX_2_1) || defined (LINUX_2_4)
 EXPORT_SYMBOL(register_wan_device);
 EXPORT_SYMBOL(unregister_wan_device);
 EXPORT_SYMBOL(wanrouter_encapsulate);
 EXPORT_SYMBOL(wanrouter_type_trans);
+EXPORT_SYMBOL(lock_adapter_irq);
+EXPORT_SYMBOL(unlock_adapter_irq);
+#endif
 
 /*
  *	End

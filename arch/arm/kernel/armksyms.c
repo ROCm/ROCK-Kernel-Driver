@@ -48,7 +48,6 @@ extern int sys_write(int, const char *, int);
 extern int sys_read(int, char *, int);
 extern int sys_lseek(int, off_t, int);
 extern int sys_exit(int);
-extern int sys_wait4(int, int *, int, struct rusage *);
 
 /*
  * libgcc functions - functions that are used internally by the
@@ -77,15 +76,18 @@ extern void ret_from_exception(void);
 extern void fpundefinstr(void);
 extern void fp_enter(void);
 
-#define EXPORT_SYMBOL_ALIAS(sym,orig) \
- const char __kstrtab_##sym##[] __attribute__((section(".kstrtab"))) = \
-    __MODULE_STRING(##sym##); \
- const struct module_symbol __ksymtab_##sym __attribute__((section("__ksymtab"))) = \
+#define EXPORT_SYMBOL_ALIAS(sym,orig)		\
+ const char __kstrtab_##sym##[]			\
+  __attribute__((section(".kstrtab"))) =	\
+    __MODULE_STRING(sym);			\
+ const struct module_symbol __ksymtab_##sym	\
+  __attribute__((section("__ksymtab"))) =	\
     { (unsigned long)&##orig, __kstrtab_##sym };
-	/*
-	 * floating point math emulator support.
-	 * These symbols will never change their calling convention...
-	 */
+
+/*
+ * floating point math emulator support.
+ * These symbols will never change their calling convention...
+ */
 EXPORT_SYMBOL_ALIAS(kern_fp_enter,fp_enter);
 EXPORT_SYMBOL_ALIAS(fp_printk,printk);
 EXPORT_SYMBOL_ALIAS(fp_send_sig,send_sig);
@@ -95,7 +97,9 @@ EXPORT_SYMBOL(fpundefinstr);
 EXPORT_SYMBOL(ret_from_exception);
 #endif
 
+#ifdef CONFIG_VT
 EXPORT_SYMBOL(kd_mksound);
+#endif
 
 	/* platform dependent support */
 EXPORT_SYMBOL(dump_thread);
@@ -150,8 +154,6 @@ EXPORT_SYMBOL(__bus_to_virt);
 #ifndef CONFIG_NO_PGT_CACHE
 EXPORT_SYMBOL(quicklists);
 #endif
-EXPORT_SYMBOL(__handle_bad_pmd);
-EXPORT_SYMBOL(__handle_bad_pmd_kernel);
 
 	/* string / mem functions */
 EXPORT_SYMBOL_NOVERS(strcpy);

@@ -1,7 +1,7 @@
 /*
  *  linux/include/asm-arm/pgtable.h
  *
- *  Copyright (C) 2000 Russell King
+ *  Copyright (C) 2000-2001 Russell King
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -75,12 +75,6 @@ extern void __pgd_error(const char *file, int line, unsigned long val);
 extern struct page *empty_zero_page;
 #define ZERO_PAGE(vaddr)	(empty_zero_page)
 
-/*
- * Handling allocation failures during page table setup.
- */
-extern void __handle_bad_pmd(pmd_t *pmd);
-extern void __handle_bad_pmd_kernel(pmd_t *pmd);
-
 #define pte_none(pte)		(!pte_val(pte))
 #define pte_clear(ptep)		set_pte((ptep), __pte(0))
 
@@ -98,6 +92,7 @@ extern void __handle_bad_pmd_kernel(pmd_t *pmd);
 #endif
 
 #define pmd_none(pmd)		(!pmd_val(pmd))
+#define pmd_present(pmd)	(pmd_val(pmd))
 #define pmd_clear(pmdp)		set_pmd(pmdp, __pmd(0))
 
 /*
@@ -163,8 +158,6 @@ extern __inline__ pte_t pte_modify(pte_t pte, pgprot_t newprot)
 }
 
 extern pgd_t swapper_pg_dir[PTRS_PER_PGD];
-
-#define update_mmu_cache(vma,address,pte) do { } while (0)
 
 /* Encode and decode a swap entry.
  *

@@ -206,7 +206,7 @@ static struct net_device *gdev;
 
 void sgiseeq_dump_rings(void)
 {
-	static int once = 0;
+	static int once;
 	struct sgiseeq_rx_desc *r = gpriv->srings.rx_desc;
 	struct sgiseeq_tx_desc *t = gpriv->srings.tx_desc;
 	volatile struct hpc3_ethregs *hregs = gpriv->hregs;
@@ -611,7 +611,7 @@ static char onboard_eth_addr[6];
 int sgiseeq_init(struct net_device *dev, struct sgiseeq_regs *sregs,
 		 struct hpc3_ethregs *hregs, int irq)
 {
-	static unsigned version_printed = 0;
+	static unsigned version_printed;
 	int i;
 	struct sgiseeq_private *sp;
 
@@ -704,7 +704,7 @@ static inline void str2eaddr(unsigned char *ea, unsigned char *str)
 
 int sgiseeq_probe(struct net_device *dev)
 {
-	static int initialized = 0;
+	static int initialized;
 	char *ep;
 
 	if (initialized)	/* Already initialized? */

@@ -171,6 +171,7 @@ static struct net_device *init_netdev(struct net_device *dev, int sizeof_priv,
 	return dev;
 }
 
+#if defined(CONFIG_HIPPI) || defined(CONFIG_TR) || defined(CONFIG_NET_FC)
 static int __register_netdev(struct net_device *dev)
 {
 	dev_init_buffers(dev);
@@ -181,6 +182,7 @@ static int __register_netdev(struct net_device *dev)
 	}
 	return 0;
 }
+#endif
 
 /**
  * init_etherdev - Register ethernet device

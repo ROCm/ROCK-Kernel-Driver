@@ -265,14 +265,14 @@ static int	adapter_init(struct net_device *dev);
 /*
  * D-Link driver variables:
  */
-static volatile int		rx_page		= 0;
+static volatile int		rx_page;
 
 #define TX_PAGES 2
 static volatile int		tx_fifo[TX_PAGES];
-static volatile int		tx_fifo_in = 0;
-static volatile int		tx_fifo_out = 0;
+static volatile int		tx_fifo_in;
+static volatile int		tx_fifo_out;
 static volatile int		free_tx_pages = TX_PAGES;
-static int			was_down = 0;
+static int			was_down;
 
 /*
  * Convenience macros/functions for D-Link adapter

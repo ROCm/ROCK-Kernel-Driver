@@ -1,4 +1,4 @@
-/*  $Id: modutil.c,v 1.7 2001/02/13 01:16:44 davem Exp $
+/*  $Id: modutil.c,v 1.8 2001/04/04 00:49:39 davem Exp $
  *  arch/sparc64/mm/modutil.c
  *
  *  Copyright (C) 1997,1998 Jakub Jelinek (jj@sunsite.mff.cuni.cz)
@@ -59,7 +59,7 @@ void * module_map (unsigned long size)
 	*p = area;
 
 	if (vmalloc_area_pages(VMALLOC_VMADDR(addr), size, GFP_KERNEL, PAGE_KERNEL)) {
-		vfree(addr);
+		module_unmap(addr);
 		return NULL;
 	}
 	return addr;

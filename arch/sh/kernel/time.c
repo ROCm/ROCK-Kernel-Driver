@@ -57,6 +57,13 @@
 #define TMU0_TCR	0xffd80010	/* Word access */
 
 #define FRQCR		0xffc00000
+
+/* Core Processor Version Register */
+#define CCN_PVR		0xff000030
+#define CCN_PVR_CHIP_SHIFT 24
+#define CCN_PVR_CHIP_MASK  0xff
+#define CCN_PVR_CHIP_ST40STB1 0x4
+
 #endif
 
 extern rwlock_t xtime_lock;
@@ -289,13 +296,62 @@ void __init time_init(void)
 	static int ifc_table[] = { 1, 2, 3, 4, 6, 8, 1, 1 };
 #define bfc_table ifc_table	/* Same */
 	static int pfc_table[] = { 2, 3, 4, 6, 8, 2, 2, 2 };
+
+#ifdef CONFIG_CPU_SUBTYPE_ST40STB1
+	struct frqcr_data {
+		unsigned short frqcr;
+		struct {
+			unsigned char multiplier;
+			unsigned char divisor;
+		} factor[3];
+	};
+
+	static struct frqcr_data st40_frqcr_table[] = {		
+		{ 0x000, {{1,1}, {1,1}, {1,2}}},
+		{ 0x002, {{1,1}, {1,1}, {1,4}}},
+		{ 0x004, {{1,1}, {1,1}, {1,8}}},
+		{ 0x008, {{1,1}, {1,2}, {1,2}}},
+		{ 0x00A, {{1,1}, {1,2}, {1,4}}},
+		{ 0x00C, {{1,1}, {1,2}, {1,8}}},
+		{ 0x011, {{1,1}, {2,3}, {1,6}}},
+		{ 0x013, {{1,1}, {2,3}, {1,3}}},
+		{ 0x01A, {{1,1}, {1,2}, {1,4}}},
+		{ 0x01C, {{1,1}, {1,2}, {1,8}}},
+		{ 0x023, {{1,1}, {2,3}, {1,3}}},
+		{ 0x02C, {{1,1}, {1,2}, {1,8}}},
+		{ 0x048, {{1,2}, {1,2}, {1,4}}},
+		{ 0x04A, {{1,2}, {1,2}, {1,6}}},
+		{ 0x04C, {{1,2}, {1,2}, {1,8}}},
+		{ 0x05A, {{1,2}, {1,3}, {1,6}}},
+		{ 0x05C, {{1,2}, {1,3}, {1,6}}},
+		{ 0x063, {{1,2}, {1,4}, {1,4}}},
+		{ 0x06C, {{1,2}, {1,4}, {1,8}}},
+		{ 0x091, {{1,3}, {1,3}, {1,6}}},
+		{ 0x093, {{1,3}, {1,3}, {1,6}}},
+		{ 0x0A3, {{1,3}, {1,6}, {1,6}}},
+		{ 0x0DA, {{1,4}, {1,4}, {1,8}}},
+		{ 0x0DC, {{1,4}, {1,4}, {1,8}}},
+		{ 0x0EC, {{1,4}, {1,8}, {1,8}}},
+		{ 0x123, {{1,4}, {1,4}, {1,8}}},
+		{ 0x16C, {{1,4}, {1,8}, {1,8}}},
+	};
+#endif
 #endif
 
+#if defined(CONFIG_SH_DREAMCAST)
+	xtime.tv_sec = 0;
+	xtime.tv_usec = 0;
+#else
 	rtc_gettimeofday(&xtime);
+#endif
 
 	setup_irq(TIMER_IRQ, &irq0);
 
+#if defined(CONFIG_SH_DREAMCAST)
+	timer_freq = 50*1000*1000/4;
+#else
 	timer_freq = get_timer_frequency();
+#endif
 
 	module_clock = timer_freq * 4;
 
@@ -316,15 +372,53 @@ void __init time_init(void)
 	}
 #elif defined(__SH4__)
 	{
+		unsigned long pvr;
 		frqcr = ctrl_inw(FRQCR);
-		ifc  = ifc_table[(frqcr>> 6) & 0x0007];
-		bfc  = bfc_table[(frqcr>> 3) & 0x0007];
-		pfc = pfc_table[frqcr & 0x0007];
+
+#ifdef CONFIG_CPU_SUBTYPE_ST40STB1
+		/* This should probably be moved into the SH3 probing code, and then use the processor
+		 * structure to determine which CPU we are running on.
+		 */
+		pvr = ctrl_inl(CCN_PVR);
+		printk("PVR %08x\n", pvr);
+
+		if (((pvr >>CCN_PVR_CHIP_SHIFT) & CCN_PVR_CHIP_MASK) == CCN_PVR_CHIP_ST40STB1) {
+			/* Unfortunatly the STB1 FRQCR values are different from the 7750 ones */
+			struct frqcr_data *d;
+			int a;
+
+			for (a=0; a<ARRAY_SIZE(st40_frqcr_table); a++) {
+				d = &st40_frqcr_table[a];
+				if (d->frqcr == (frqcr & 0x1ff))
+					break;
+			}
+			if (a == ARRAY_SIZE(st40_frqcr_table)) {
+				d = st40_frqcr_table;
+				printk("ERROR: Unrecognised FRQCR value, using default multipliers\n");
+			}
+
+			printk("Clock multipliers: CPU: %d/%d Bus: %d/%d Periph: %d/%d\n",
+			       d->factor[0].multiplier, d->factor[0].divisor,
+			       d->factor[1].multiplier, d->factor[1].divisor,
+			       d->factor[2].multiplier, d->factor[2].divisor);
+			
+			master_clock = module_clock * d->factor[2].divisor    / d->factor[2].multiplier;
+			bus_clock    = master_clock * d->factor[1].multiplier / d->factor[1].divisor;
+			cpu_clock    = master_clock * d->factor[0].multiplier / d->factor[0].divisor;
+			goto skip_calc;
+		} else
+#endif
+		{
+			ifc  = ifc_table[(frqcr>> 6) & 0x0007];
+			bfc  = bfc_table[(frqcr>> 3) & 0x0007];
+			pfc = pfc_table[frqcr & 0x0007];
+		}
 	}
 #endif
 	master_clock = module_clock * pfc;
 	bus_clock = master_clock / bfc;
 	cpu_clock = master_clock / ifc;
+ skip_calc:
 	printk("CPU clock: %d.%02dMHz\n",
 	       (cpu_clock / 1000000), (cpu_clock % 1000000)/10000);
 	printk("Bus clock: %d.%02dMHz\n",

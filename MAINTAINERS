@@ -1494,8 +1494,8 @@ W:	http://roadrunner.swansea.linux.org.uk/v4l.shtml
 S:	Maintained for 2.2 only
 
 WAN ROUTER & SANGOMA WANPIPE DRIVERS & API (X.25, FRAME RELAY, PPP, CISCO HDLC)
-P:     Jaspreet Singh
-M:     jaspreet@sangoma.com
+P:     Nenad Corbic
+M:     ncorbic@sangoma.com
 M:     dm@sangoma.com
 W:     http://www.sangoma.com
 S:     Supported

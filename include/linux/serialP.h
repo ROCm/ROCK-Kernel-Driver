@@ -181,7 +181,7 @@ struct pci_board_inst {
 #define SPCI_FL_IRQBASE4       (0x0004 << 4)
 #define SPCI_FL_GET_IRQBASE(x)        ((x & SPCI_FL_IRQ_MASK) >> 4)
 
-/* Use sucessive BARs (PCI base address registers), 
+/* Use successive BARs (PCI base address registers), 
    else use offset into some specified BAR */
 #define SPCI_FL_BASE_TABLE	0x0100
 

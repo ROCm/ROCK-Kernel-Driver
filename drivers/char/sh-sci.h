@@ -25,6 +25,7 @@
 #define SH3_SCIF_IRQS { 56,  57,  59,  58 }
 #define SH3_IRDA_IRQS { 52,  53,  55,  54 }
 #define SH4_SCIF_IRQS { 40,  41,  43,  42 }
+#define STB1_SCIF1_IRQS {23, 24,  26,  25 }
 
 #if defined(CONFIG_CPU_SUBTYPE_SH7708)
 # define SCI_NPORTS 1
@@ -53,12 +54,22 @@
 }
 # define SCSPTR1 0xffe0001c /* 8  bit SCI */
 # define SCSPTR2 0xFFE80020 /* 16 bit SCIF */
-# define SCLSR2  0xFFE80024 /* 16 bit SCIF */
 # define SCIF_ORER 0x0001   /* overrun error bit */
 # define SCSCR_INIT(port) (((port)->type == PORT_SCI) ? \
 	0x30 /* TIE=0,RIE=0,TE=1,RE=1 */ : \
 	0x38 /* TIE=0,RIE=0,TE=1,RE=1,REIE=1 */ )
 # define SCI_AND_SCIF
+#elif defined(CONFIG_CPU_SUBTYPE_ST40STB1)
+# define SCI_NPORTS 2
+# define SCI_INIT { \
+  { {}, PORT_SCIF, 0xffe00000, STB1_SCIF1_IRQS, sci_init_pins_scif }, \
+  { {}, PORT_SCIF, 0xffe80000, SH4_SCIF_IRQS,   sci_init_pins_scif }  \
+}
+# define SCSPTR1 0xffe00020 /* 16 bit SCIF */
+# define SCSPTR2 0xffe80020 /* 16 bit SCIF */
+# define SCIF_ORER 0x0001   /* overrun error bit */
+# define SCSCR_INIT(port)          0x38 /* TIE=0,RIE=0,TE=1,RE=1,REIE=1 */
+# define SCIF_ONLY
 #else
 # error CPU subtype not defined
 #endif
@@ -260,6 +271,7 @@ SCIx_FNS(SCxSR,  0x08,  8, 0x10,  8, 0x08, 16, 0x10, 16)
 SCIx_FNS(SCxRDR, 0x0a,  8, 0x14,  8, 0x0A,  8, 0x14,  8)
 SCIF_FNS(SCFCR,                      0x0c,  8, 0x18, 16)
 SCIF_FNS(SCFDR,                      0x0e, 16, 0x1C, 16)
+SCIF_FNS(SCLSR,                         0,  0, 0x24, 16)
 
 #define sci_in(port, reg) sci_##reg##_in(port)
 #define sci_out(port, reg, value) sci_##reg##_out(port, value)
@@ -285,11 +297,24 @@ static inline int sci_rxd_in(struct sci_port *port)
 #elif defined(CONFIG_CPU_SUBTYPE_SH7750)
 static inline int sci_rxd_in(struct sci_port *port)
 {
+#ifndef SCIF_ONLY
 	if (port->base == 0xffe00000)
 		return ctrl_inb(SCSPTR1)&0x01 ? 1 : 0; /* SCI */
+#endif
+#ifndef SCI_ONLY
 	if (port->base == 0xffe80000)
 		return ctrl_inw(SCSPTR2)&0x0001 ? 1 : 0; /* SCIF */
+#endif
 	return 1;
+}
+#elif defined(CONFIG_CPU_SUBTYPE_ST40STB1)
+static inline int sci_rxd_in(struct sci_port *port)
+{
+	if (port->base == 0xffe00000)
+		return ctrl_inw(SCSPTR1)&0x0001 ? 1 : 0; /* SCIF */
+	else
+		return ctrl_inw(SCSPTR2)&0x0001 ? 1 : 0; /* SCIF */
+
 }
 #endif
 

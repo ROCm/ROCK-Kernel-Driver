@@ -26,7 +26,9 @@
  *
  * Note that swapper_pg_dir is the virtual address of the page tables, and
  * pgtbl gives us a position-independent reference to these tables.  We can
- * do this because stext == TEXT_ADDR
+ * do this because stext == TEXTADDR
+ *
+ * swapper_pg_dir, pgtbl and krnladr are all closely related.
  */
 #if (TEXTADDR & 0xffff) != 0x8000
 #error TEXTADDR must start at 0xXXXX8000
@@ -35,24 +37,36 @@
 		.globl	SYMBOL_NAME(swapper_pg_dir)
 		.equ	SYMBOL_NAME(swapper_pg_dir), TEXTADDR - 0x4000
 
-		.macro	pgtbl, reg
+		.macro	pgtbl, reg, rambase
 		adr	\reg, stext
 		sub	\reg, \reg, #0x4000
 		.endm
 
+/*
+ * Since the page table is closely related to the kernel start address, we
+ * can convert the page table base address to the base address of the section
+ * containing both.
+ */
+		.macro	krnladr, rd, pgtable, rambase
+		bic	\rd, \pgtable, #0x000ff000
+		.endm
+
+/*
+ *  Kernel startup entry point.
+ *
+ * The rules are:
+ *  r0      - should be 0
+ *  r1      - unique architecture number
+ *  MMU     - off
+ *  I-cache - on or off
+ *  D-cache - off
+ *
+ * See linux/arch/arm/tools/mach-types for the complete list of numbers
+ * for r1.
+ */
 		.section ".text.init",#alloc,#execinstr
 		.type	stext, #function
 ENTRY(stext)
-/*
- * Entry point.  The general rules are:
- *  should be called with r0 == 0
- *  r1 contains the unique architecture number
- *  with MMU is off, I-cache may be on or off, D-cache should be off.
- * See linux/arch/arm/kernel/arch.c and linux/include/asm-arm/system.h
- * for the complete list of numbers for r1.  If you require a new number,
- * please follow the instructions given towards the end of
- * linux/Documentation/arm/README.
- */
 		mov	r12, r0
 /*
  * NOTE!  Any code which is placed here should be done for one of
@@ -115,7 +129,7 @@ __entry:
 #endif
 
 		mov	r0, #F_BIT | I_BIT | MODE_SVC	@ make sure svc mode
-		msr	cpsr_c, r0			@ and all irqs diabled
+		msr	cpsr_c, r0			@ and all irqs disabled
 		bl	__lookup_processor_type
 		teq	r10, #0				@ invalid processor?
 		moveq	r0, #'p'			@ yes, error 'p'
@@ -129,6 +143,7 @@ __entry:
 		add	pc, r10, #12			@ initialise processor
 							@ (return control reg)
 
+		.type	__switch_data, %object
 __switch_data:	.long	__mmap_switched
 		.long	SYMBOL_NAME(compat)
 		.long	SYMBOL_NAME(__bss_start)
@@ -138,6 +153,7 @@ __switch_data:	.long	__mmap_switched
 		.long	SYMBOL_NAME(cr_alignment)
 		.long	SYMBOL_NAME(init_task_union)+8192
 
+		.type	__ret, %function
 __ret:		ldr	lr, __switch_data
 		mcr	p15, 0, r0, c1, c0
 		mov	r0, r0
@@ -190,31 +206,37 @@ __mmap_switched:
  * r8 = page table flags
  */
 __create_page_tables:
-		pgtbl	r4
+		pgtbl	r4, r5				@ page table address
+
+		/*
+		 * Clear the 16K level 1 swapper page table
+		 */
 		mov	r0, r4
 		mov	r3, #0
-		add	r2, r0, #0x4000			@ 16k of page table
-1:		str	r3, [r0], #4			@ Clear page table
+		add	r2, r0, #0x4000
+1:		str	r3, [r0], #4
 		str	r3, [r0], #4
 		str	r3, [r0], #4
 		str	r3, [r0], #4
 		teq	r0, r2
 		bne	1b
+
 		/*
-		 * Create identity mapping for first MB of kernel.
-		 * This is marked cacheable and bufferable.
-		 *
-		 * The identity mapping will be removed by  paging_init()
+		 * Create identity mapping for first MB of kernel to
+		 * cater for the MMU enable.  This identity mapping
+		 * will be removed by paging_init()
 		 */
-		add	r3, r8, r5			@ mmuflags + start of RAM
-		add	r0, r4, r5, lsr #18
-		str	r3, [r0]			@ identity mapping
+		krnladr	r2, r4, r5			@ start of kernel
+		add	r3, r8, r2			@ flags + kernel base
+		str	r3, [r4, r2, lsr #18]		@ identity mapping
+
 		/*
 		 * Now setup the pagetables for our kernel direct
 		 * mapped region.  We round TEXTADDR down to the
 		 * nearest megabyte boundary.
 		 */
-		add	r0, r4, #(TEXTADDR & 0xfff00000) >> 18 @ start of kernel
+		add	r0, r4, #(TEXTADDR & 0xff000000) >> 18 @ start of kernel
+		add	r0, r0, #(TEXTADDR & 0x00f00000) >> 18
 		str	r3, [r0], #4			@ PAGE_OFFSET + 0MB
 		add	r3, r3, #1 << 20
 		str	r3, [r0], #4			@ PAGE_OFFSET + 1MB
@@ -223,13 +245,25 @@ __create_page_tables:
 		add	r3, r3, #1 << 20
 		str	r3, [r0], #4			@ PAGE_OFFSET + 3MB
 
+		/*
+		 * Ensure that the first section of RAM is present.
+		 * we assume that:
+		 *  1. the RAM is aligned to a 256MB boundary
+		 *  2. the kernel is executing in the same 256MB chunk
+		 *     as the start of RAM.
+		 */
+		bic	r0, r0, #0x0ff00000 >> 18	@ round down
+		and	r2, r5, #0xf0000000		@ round down
+		add	r3, r8, r2			@ flags + rambase
+		str	r3, [r0]
+
 		bic	r8, r8, #0x0c			@ turn off cacheable
 							@ and bufferable bits
 #ifdef CONFIG_DEBUG_LL
 		/*
 		 * Map in IO space for serial debugging.
 		 * This allows debug messages to be output
-		 * via a serial before paging_init.
+		 * via a serial console before paging_init.
 		 */
 		add	r0, r4, r7
 		rsb	r3, r7, #0x4000	@ PTRS_PER_PGD*sizeof(long)
@@ -241,12 +275,13 @@ __create_page_tables:
 		add	r3, r3, #1 << 20
 		teq	r0, r2
 		bne	1b
-#ifdef CONFIG_ARCH_NETWINDER
+#if defined(CONFIG_ARCH_NETWINDER) || defined(CONFIG_ARCH_CATS)
 		/*
 		 * If we're using the NetWinder, we need to map in
 		 * the 16550-type serial port for the debug messages
 		 */
-		teq	r1, #5
+		teq	r1, #MACH_TYPE_NETWINDER
+		teqne	r1, #MACH_TYPE_CATS
 		bne	1f
 		add	r0, r4, #0x3fc0
 		mov	r3, #0x7c000000
@@ -263,13 +298,12 @@ __create_page_tables:
 		 * Similar reasons here - for debug.  This is
 		 * only for Acorn RiscPC architectures.
 		 */
-		teq	r5, #0
-		addne	r0, r4, #0x80			@ 02000000
-		movne	r3, #0x02000000
-		orrne	r3, r3, r8
-		strne	r3, [r0]
-		addne	r0, r4, #0x3600			@ d8000000
-		strne	r3, [r0]
+		add	r0, r4, #0x80			@ 02000000
+		mov	r3, #0x02000000
+		orr	r3, r3, r8
+		str	r3, [r0]
+		add	r0, r4, #0x3600			@ d8000000
+		str	r3, [r0]
 #endif
 		mov	pc, lr
 

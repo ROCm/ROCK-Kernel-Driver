@@ -112,6 +112,7 @@
  *  8: SMP friendliness has been improved
  *
  */
+#include <linux/config.h>
 
 /*
  * The next three defines are user configurable.  These should be the only

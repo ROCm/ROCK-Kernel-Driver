@@ -20,7 +20,7 @@
 #include <asm/pgtable.h>
 #include "mace.h"
 
-static struct net_device *mace_devs = NULL;
+static struct net_device *mace_devs;
 
 #define N_RX_RING	8
 #define N_TX_RING	6

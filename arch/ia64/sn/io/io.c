@@ -27,7 +27,6 @@
 #include <asm/sn/intr.h>
 #include <asm/sn/xtalk/xtalkaddrs.h>
 #include <asm/sn/klconfig.h>
-#include <asm/sn/xtalk/xwidget.h>
 #include <asm/sn/io.h>
 #include <asm/sn/sn_cpuid.h>
 

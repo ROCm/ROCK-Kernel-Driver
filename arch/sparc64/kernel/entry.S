@@ -1,4 +1,4 @@
-/* $Id: entry.S,v 1.127 2001/03/23 07:56:30 davem Exp $
+/* $Id: entry.S,v 1.128 2001/03/28 10:56:34 davem Exp $
  * arch/sparc64/kernel/entry.S:  Sparc64 trap low-level entry points.
  *
  * Copyright (C) 1995,1997 David S. Miller (davem@caip.rutgers.edu)
@@ -19,6 +19,7 @@
 #include <asm/pgtable.h>
 #include <asm/processor.h>
 #include <asm/visasm.h>
+#include <asm/estate.h>
 
 /* #define SYSCALL_TRACING */
 
@@ -788,6 +789,284 @@ cee_trap:
 	call	cee_log
 	 add	%sp, STACK_BIAS + REGWIN_SZ, %o2
 	ba,a,pt	%xcc, rtrap_clr_l6
+
+	/* Capture I/D/E-cache state into per-cpu error scoreboard.
+	 *
+	 * %g1:		(TL>=0) ? 1 : 0
+	 * %g2:		scratch
+	 * %g3:		scratch
+	 * %g4:		AFSR
+	 * %g5:		AFAR
+	 * %g6:		current thread ptr
+	 * %g7:		scratch
+	 */
+#define CHEETAH_LOG_ERROR						\
+	/* Put "TL1" software bit into AFSR. */				\
+	and		%g1, 0x1, %g1;					\
+	sllx		%g1, 63, %g2;					\
+	or		%g4, %g2, %g4;					\
+	/* Get log entry pointer for this cpu at this trap level. */	\
+	ldxa		[%g0] ASI_SAFARI_CONFIG, %g2;			\
+	srlx		%g2, 17, %g2;					\
+	and		%g2, 0x3ff, %g2;				\
+	sllx		%g2, 9, %g2;					\
+	sethi		%hi(cheetah_error_log), %g3;			\
+	ldx		[%g3 + %lo(cheetah_error_log)], %g3;		\
+	brz,pn		%g3, 80f;					\
+	 nop;								\
+	add		%g3, %g2, %g3;					\
+	sllx		%g1, 8, %g1;					\
+	add		%g3, %g1, %g1;					\
+	/* %g1 holds pointer to the top of the logging scoreboard */	\
+	ldx		[%g1 + 0x0], %g7;				\
+	cmp		%g7, -1;					\
+	bne,pn		%xcc, 80f;					\
+	 nop;								\
+	stx		%g4, [%g1 + 0x0];				\
+	stx		%g5, [%g1 + 0x8];				\
+	add		%g1, 0x10, %g1;					\
+	/* %g1 now points to D-cache logging area */			\
+	set		0x3ff8, %g2;	/* DC_addr mask		*/	\
+	and		%g5, %g2, %g2;	/* DC_addr bits of AFAR	*/	\
+	srlx		%g5, 12, %g3;					\
+	or		%g3, 1, %g3;	/* PHYS tag + valid	*/	\
+10:	ldxa		[%g2] ASI_DCACHE_TAG, %g7;			\
+	cmp		%g3, %g7;	/* TAG match?		*/	\
+	bne,pt		%xcc, 13f;					\
+	 nop;								\
+	/* Yep, what we want, capture state. */				\
+	stx		%g2, [%g1 + 0x20];				\
+	stx		%g7, [%g1 + 0x28];				\
+	/* A membar Sync is required before and after utag access. */	\
+	membar		#Sync;						\
+	ldxa		[%g2] ASI_DCACHE_UTAG, %g7;			\
+	membar		#Sync;						\
+	stx		%g7, [%g1 + 0x30];				\
+	ldxa		[%g2] ASI_DCACHE_SNOOP_TAG, %g7;		\
+	stx		%g7, [%g1 + 0x38];				\
+	clr		%g3;						\
+12:	ldxa		[%g2 + %g3] ASI_DCACHE_DATA, %g7;		\
+	stx		%g7, [%g1];					\
+	add		%g3, (1 << 5), %g3;				\
+	cmp		%g3, (4 << 5);					\
+	bl,pt		%xcc, 12b;					\
+	 add		%g1, 0x8, %g1;					\
+	ba,pt		%xcc, 20f;					\
+	 add		%g1, 0x20, %g1;					\
+13:	sethi		%hi(1 << 14), %g7;				\
+	add		%g2, %g7, %g2;					\
+	srlx		%g2, 14, %g7;					\
+	cmp		%g7, 4;						\
+	bl,pt		%xcc, 10b;					\
+	 nop;								\
+	add		%g1, 0x40, %g1;					\
+20:	/* %g1 now points to I-cache logging area */			\
+	set		0x1fe0, %g2;	/* IC_addr mask		*/	\
+	and		%g5, %g2, %g2;	/* IC_addr bits of AFAR	*/	\
+	sllx		%g2, 1, %g2;	/* IC_addr[13:6]==VA[12:5] */	\
+	srlx		%g5, (13 - 8), %g3; /* Make PTAG */		\
+	andn		%g3, 0xff, %g3;	/* Mask off undefined bits */	\
+21:	ldxa		[%g2] ASI_IC_TAG, %g7;				\
+	andn		%g7, 0xff, %g7;					\
+	cmp		%g3, %g7;					\
+	bne,pt		%xcc, 23f;					\
+	 nop;								\
+	/* Yep, what we want, capture state. */				\
+	stx		%g2, [%g1 + 0x40];				\
+	stx		%g7, [%g1 + 0x48];				\
+	add		%g2, (1 << 3), %g2;				\
+	ldxa		[%g2] ASI_IC_TAG, %g7;				\
+	add		%g2, (1 << 3), %g2;				\
+	stx		%g7, [%g1 + 0x50];				\
+	ldxa		[%g2] ASI_IC_TAG, %g7;				\
+	add		%g2, (1 << 3), %g2;				\
+	stx		%g7, [%g1 + 0x60];				\
+	ldxa		[%g2] ASI_IC_TAG, %g7;				\
+	stx		%g7, [%g1 + 0x68];				\
+	sub		%g2, (3 << 3), %g2;				\
+	ldxa		[%g2] ASI_IC_STAG, %g7;				\
+	stx		%g7, [%g1 + 0x58];				\
+	clr		%g3;						\
+	srlx		%g2, 2, %g2;					\
+22:	ldxa		[%g2 + %g3] ASI_IC_INSTR, %g7;			\
+	stx		%g7, [%g1];					\
+	add		%g3, (1 << 3), %g3;				\
+	cmp		%g3, (8 << 3);					\
+	bl,pt		%xcc, 22b;					\
+	 add		%g1, 0x8, %g1;					\
+	ba,pt		%xcc, 30f;					\
+	 add		%g1, 0x30, %g1;					\
+23:	sethi		%hi(1 << 14), %g7;				\
+	add		%g2, %g7, %g2;					\
+	srlx		%g2, 14, %g7;					\
+	cmp		%g7, 4;						\
+	bl,pt		%xcc, 21b;					\
+	 nop;								\
+	add		%g1, 0x70, %g1;					\
+30:	/* %g1 now points to E-cache logging area */			\
+	andn		%g5, (32 - 1), %g2;	/* E-cache subblock */	\
+	stx		%g2, [%g1 + 0x20];				\
+	ldxa		[%g2] ASI_EC_TAG_DATA, %g7;			\
+	stx		%g7, [%g1 + 0x28];				\
+	ldxa		[%g2] ASI_EC_R, %g0;				\
+	clr		%g3;						\
+31:	ldxa		[%g3] ASI_EC_DATA, %g7;				\
+	stx		%g7, [%g1 + %g3];				\
+	add		%g3, 0x8, %g3;					\
+	cmp		%g3, 0x20;					\
+	bl,pt		%xcc, 31b;					\
+	 nop;								\
+80:	/* DONE */
+
+	/* These get patched into the trap table at boot time
+	 * once we know we have a cheetah processor.
+	 */
+	.globl		cheetah_fecc_trap_vector, cheetah_fecc_trap_vector_tl1
+cheetah_fecc_trap_vector:
+	membar		#Sync
+	ldxa		[%g0] ASI_DCU_CONTROL_REG, %g1
+	andn		%g1, DCU_DC | DCU_IC, %g1
+	stxa		%g1, [%g0] ASI_DCU_CONTROL_REG
+	membar		#Sync
+	sethi		%hi(cheetah_fast_ecc), %g2
+	jmpl		%g2 + %lo(cheetah_fast_ecc), %g0
+	 mov		0, %g1
+cheetah_fecc_trap_vector_tl1:
+	membar		#Sync
+	ldxa		[%g0] ASI_DCU_CONTROL_REG, %g1
+	andn		%g1, DCU_DC | DCU_IC, %g1
+	stxa		%g1, [%g0] ASI_DCU_CONTROL_REG
+	membar		#Sync
+	sethi		%hi(cheetah_fast_ecc), %g2
+	jmpl		%g2 + %lo(cheetah_fast_ecc), %g0
+	 mov		1, %g1
+	.globl	cheetah_cee_trap_vector, cheetah_cee_trap_vector_tl1
+cheetah_cee_trap_vector:
+	membar		#Sync
+	ldxa		[%g0] ASI_DCU_CONTROL_REG, %g1
+	andn		%g1, DCU_IC, %g1
+	stxa		%g1, [%g0] ASI_DCU_CONTROL_REG
+	membar		#Sync
+	sethi		%hi(cheetah_cee), %g2
+	jmpl		%g2 + %lo(cheetah_cee), %g0
+	 mov		0, %g1
+cheetah_cee_trap_vector_tl1:
+	membar		#Sync
+	ldxa		[%g0] ASI_DCU_CONTROL_REG, %g1
+	andn		%g1, DCU_IC, %g1
+	stxa		%g1, [%g0] ASI_DCU_CONTROL_REG
+	membar		#Sync
+	sethi		%hi(cheetah_cee), %g2
+	jmpl		%g2 + %lo(cheetah_cee), %g0
+	 mov		1, %g1
+	.globl	cheetah_deferred_trap_vector, cheetah_deferred_trap_vector_tl1
+cheetah_deferred_trap_vector:
+	membar		#Sync
+	ldxa		[%g0] ASI_DCU_CONTROL_REG, %g1;
+	andn		%g1, DCU_DC | DCU_IC, %g1;
+	stxa		%g1, [%g0] ASI_DCU_CONTROL_REG;
+	membar		#Sync;
+	sethi		%hi(cheetah_deferred_trap), %g2
+	jmpl		%g2 + %lo(cheetah_deferred_trap), %g0
+	 mov		0, %g1
+cheetah_deferred_trap_vector_tl1:
+	membar		#Sync;
+	ldxa		[%g0] ASI_DCU_CONTROL_REG, %g1;
+	andn		%g1, DCU_DC | DCU_IC, %g1;
+	stxa		%g1, [%g0] ASI_DCU_CONTROL_REG;
+	membar		#Sync;
+	sethi		%hi(cheetah_deferred_trap), %g2
+	jmpl		%g2 + %lo(cheetah_deferred_trap), %g0
+	 mov		1, %g1
+
+	/* Cheetah FECC trap handling, we get here from tl{0,1}_fecc
+	 * in the trap table.  That code has done a memory barrier
+	 * and has disabled both the I-cache and D-cache in the DCU
+	 * control register.  The I-cache is disabled so that we may
+	 * capture the corrupted cache line, and the D-cache is disabled
+	 * because corrupt data may have been placed there and we don't
+	 * want to reference it.
+	 *
+	 * %g1 is one if this trap occured at %tl >= 1.
+	 *
+	 * Next, we turn off error reporting so that we don't recurse.
+	 */
+	.globl		cheetah_fast_ecc
+cheetah_fast_ecc:
+	ldxa		[%g0] ASI_ESTATE_ERROR_EN, %g2
+	andn		%g2, ESTATE_ERROR_NCEEN | ESTATE_ERROR_CEEN, %g2
+	stxa		%g2, [%g0] ASI_ESTATE_ERROR_EN
+	membar		#Sync
+
+	/* Fetch and clear AFSR/AFAR */
+	ldxa		[%g0] ASI_AFSR, %g4
+	ldxa		[%g0] ASI_AFAR, %g5
+	stxa		%g4, [%g0] ASI_AFSR
+	membar		#Sync
+
+	CHEETAH_LOG_ERROR
+
+	rdpr		%pil, %g2
+	wrpr		%g0, 15, %pil
+	ba,pt		%xcc, etrap_irq
+	 rd		%pc, %g7
+	mov		%l4, %o1
+	mov		%l5, %o2
+	call		cheetah_fecc_handler
+	 add		%sp, STACK_BIAS + REGWIN_SZ, %o0
+	ba,a,pt		%xcc, rtrap_clr_l6
+
+	/* Our caller has disabled I-cache and performed membar Sync. */
+	.globl		cheetah_cee
+cheetah_cee:
+	ldxa		[%g0] ASI_ESTATE_ERROR_EN, %g2
+	andn		%g2, ESTATE_ERROR_CEEN, %g2
+	stxa		%g2, [%g0] ASI_ESTATE_ERROR_EN
+	membar		#Sync
+
+	/* Fetch and clear AFSR/AFAR */
+	ldxa		[%g0] ASI_AFSR, %g4
+	ldxa		[%g0] ASI_AFAR, %g5
+	stxa		%g4, [%g0] ASI_AFSR
+	membar		#Sync
+
+	CHEETAH_LOG_ERROR
+
+	rdpr		%pil, %g2
+	wrpr		%g0, 15, %pil
+	ba,pt		%xcc, etrap_irq
+	 rd		%pc, %g7
+	mov		%l4, %o1
+	mov		%l5, %o2
+	call		cheetah_cee_handler
+	 add		%sp, STACK_BIAS + REGWIN_SZ, %o0
+	ba,a,pt		%xcc, rtrap_clr_l6
+
+	/* Our caller has disabled I-cache+D-cache and performed membar Sync. */
+	.globl		cheetah_deferred_trap
+cheetah_deferred_trap:
+	ldxa		[%g0] ASI_ESTATE_ERROR_EN, %g2
+	andn		%g2, ESTATE_ERROR_NCEEN | ESTATE_ERROR_CEEN, %g2
+	stxa		%g2, [%g0] ASI_ESTATE_ERROR_EN
+	membar		#Sync
+
+	/* Fetch and clear AFSR/AFAR */
+	ldxa		[%g0] ASI_AFSR, %g4
+	ldxa		[%g0] ASI_AFAR, %g5
+	stxa		%g4, [%g0] ASI_AFSR
+	membar		#Sync
+
+	CHEETAH_LOG_ERROR
+
+	rdpr		%pil, %g2
+	wrpr		%g0, 15, %pil
+	ba,pt		%xcc, etrap_irq
+	 rd		%pc, %g7
+	mov		%l4, %o1
+	mov		%l5, %o2
+	call		cheetah_deferred_handler
+	 add		%sp, STACK_BIAS + REGWIN_SZ, %o0
+	ba,a,pt		%xcc, rtrap_clr_l6
 
 	.globl		__do_privact
 __do_privact:

@@ -1293,7 +1293,7 @@ plip_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 }
 
 static int parport[PLIP_MAX] = { [0 ... PLIP_MAX-1] = -1 };
-static int timid = 0;
+static int timid;
 
 MODULE_PARM(parport, "1-" __MODULE_STRING(PLIP_MAX) "i");
 MODULE_PARM(timid, "1i");
@@ -1314,7 +1314,7 @@ plip_searchfor(int list[], int a)
  * available to use. */
 static void plip_attach (struct parport *port)
 {
-	static int i = 0;
+	static int i;
 
 	if ((parport[0] == -1 && (!timid || !port->devices)) || 
 	    plip_searchfor(parport, port->number)) {
@@ -1377,7 +1377,7 @@ static void __exit plip_cleanup_module (void)
 
 #ifndef MODULE
 
-static int parport_ptr = 0;
+static int parport_ptr;
 
 static int __init plip_setup(char *str)
 {

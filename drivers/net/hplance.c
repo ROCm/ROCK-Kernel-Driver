@@ -63,7 +63,7 @@ static void hplance_writerdp(struct hplance_private *lp, unsigned short value);
 static unsigned short hplance_readrdp(struct hplance_private *lp);
 
 #ifdef MODULE
-static struct hplance_private *root_hplance_dev = NULL;
+static struct hplance_private *root_hplance_dev;
 #endif
 
 /* Find all the HP Lance boards and initialise them... */

@@ -213,8 +213,6 @@ struct scc_kiss {
 /* SCC channel structure */
 
 struct scc_channel {
-	int magic;			/* magic word */
-
 	int init;			/* channel exists? */
 
 	struct net_device *dev;		/* link to device control structure */

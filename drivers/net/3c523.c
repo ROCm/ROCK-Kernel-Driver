@@ -404,7 +404,7 @@ static int elmc_getinfo(char *buf, int slot, void *d)
 
 int __init elmc_probe(struct net_device *dev)
 {
-	static int slot = 0;
+	static int slot;
 	int base_addr = dev->base_addr;
 	int irq = dev->irq;
 	u_char status = 0;

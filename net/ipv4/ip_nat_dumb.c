@@ -5,7 +5,7 @@
  *
  *		Dumb Network Address Translation.
  *
- * Version:	$Id: ip_nat_dumb.c,v 1.10 2000/10/24 22:54:26 davem Exp $
+ * Version:	$Id: ip_nat_dumb.c,v 1.11 2000/12/13 18:31:48 davem Exp $
  *
  * Authors:	Alexey Kuznetsov, <kuznet@ms2.inr.ac.ru>
  *
@@ -70,8 +70,14 @@ ip_do_nat(struct sk_buff *skb)
 			cksum  = (u16*)&((struct tcphdr*)(((char*)iph) + (iph->ihl<<2)))->check;
 			if ((u8*)(cksum+1) > skb->tail)
 				goto truncated;
-			check  = csum_tcpudp_magic(iph->saddr, iph->daddr, 0, 0, ~(*cksum));
-			*cksum = csum_tcpudp_magic(~osaddr, ~odaddr, 0, 0, ~check);
+			check = *cksum;
+			if (skb->ip_summed != CHECKSUM_HW)
+				check = ~check;
+			check = csum_tcpudp_magic(iph->saddr, iph->daddr, 0, 0, check);
+			check = csum_tcpudp_magic(~osaddr, ~odaddr, 0, 0, ~check);
+			if (skb->ip_summed == CHECKSUM_HW)
+				check = ~check;
+			*cksum = check;
 			break;
 		case IPPROTO_UDP:
 			cksum  = (u16*)&((struct udphdr*)(((char*)iph) + (iph->ihl<<2)))->check;

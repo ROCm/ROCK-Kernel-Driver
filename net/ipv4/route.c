@@ -5,7 +5,7 @@
  *
  *		ROUTE - implementation of the IP router.
  *
- * Version:	$Id: route.c,v 1.91 2000/10/03 07:29:00 anton Exp $
+ * Version:	$Id: route.c,v 1.93 2001/02/22 01:03:05 davem Exp $
  *
  * Authors:	Ross Biro, <bir7@leland.Stanford.Edu>
  *		Fred N. van Kempen, <waltje@uWalt.NL.Mugnet.ORG>
@@ -115,7 +115,7 @@ int ip_rt_error_burst = 5*HZ;
 int ip_rt_gc_elasticity = 8;
 int ip_rt_mtu_expires = 10*60*HZ;
 int ip_rt_min_pmtu = 512+20+20;
-int ip_rt_min_advmss = 536;
+int ip_rt_min_advmss = 256;
 
 static unsigned long rt_deadline;
 
@@ -667,7 +667,7 @@ static void ip_select_fb_ident(struct iphdr *iph)
 
 	spin_lock_bh(&ip_fb_id_lock);
 	salt = secure_ip_id(ip_fallback_id ^ iph->daddr);
-	iph->id = salt & 0xFFFF;
+	iph->id = htons(salt & 0xFFFF);
 	ip_fallback_id = salt;
 	spin_unlock_bh(&ip_fb_id_lock);
 }
@@ -684,7 +684,7 @@ void __ip_select_ident(struct iphdr *iph, struct dst_entry *dst)
 		   so that we need not to grab a lock to dereference it.
 		 */
 		if (rt->peer) {
-			iph->id = inet_getid(rt->peer);
+			iph->id = htons(inet_getid(rt->peer));
 			return;
 		}
 	} else {

@@ -6,7 +6,7 @@
  *	Pedro Roque		<roque@di.fc.ul.pt>	
  *	Alexey Kuznetsov	<kuznet@ms2.inr.ac.ru>
  *
- *	$Id: sit.c,v 1.47 2000/11/28 13:49:22 davem Exp $
+ *	$Id: sit.c,v 1.49 2001/03/19 20:31:17 davem Exp $
  *
  *	This program is free software; you can redistribute it and/or
  *      modify it under the terms of the GNU General Public License
@@ -229,7 +229,7 @@ static void ipip6_tunnel_uninit(struct net_device *dev)
 }
 
 
-void ipip6_err(struct sk_buff *skb, unsigned char *dp, int len)
+void ipip6_err(struct sk_buff *skb, u32 info)
 {
 #ifndef I_WISH_WORLD_WERE_PERFECT
 
@@ -237,13 +237,10 @@ void ipip6_err(struct sk_buff *skb, unsigned char *dp, int len)
    8 bytes of packet payload. It means, that precise relaying of
    ICMP in the real Internet is absolutely infeasible.
  */
-	struct iphdr *iph = (struct iphdr*)dp;
+	struct iphdr *iph = (struct iphdr*)skb->data;
 	int type = skb->h.icmph->type;
 	int code = skb->h.icmph->code;
 	struct ip_tunnel *t;
-
-	if (len < sizeof(struct iphdr))
-		return;
 
 	switch (type) {
 	default:
@@ -382,20 +379,22 @@ static inline void ipip6_ecn_decapsulate(struct iphdr *iph, struct sk_buff *skb)
 		IP6_ECN_set_ce(skb->nh.ipv6h);
 }
 
-int ipip6_rcv(struct sk_buff *skb, unsigned short len)
+int ipip6_rcv(struct sk_buff *skb)
 {
 	struct iphdr *iph;
 	struct ip_tunnel *tunnel;
+
+	if (!pskb_may_pull(skb, sizeof(struct ipv6hdr)))
+		goto out;
 
 	iph = skb->nh.iph;
 
 	read_lock(&ipip6_lock);
 	if ((tunnel = ipip6_tunnel_lookup(iph->saddr, iph->daddr)) != NULL) {
 		skb->mac.raw = skb->nh.raw;
-		skb->nh.raw = skb_pull(skb, skb->h.raw - skb->data);
+		skb->nh.raw = skb->data;
 		memset(&(IPCB(skb)->opt), 0, sizeof(struct ip_options));
 		skb->protocol = __constant_htons(ETH_P_IPV6);
-		skb->ip_summed = 0;
 		skb->pkt_type = PACKET_HOST;
 		tunnel->stat.rx_packets++;
 		tunnel->stat.rx_bytes += skb->len;
@@ -418,6 +417,7 @@ int ipip6_rcv(struct sk_buff *skb, unsigned short len)
 	icmp_send(skb, ICMP_DEST_UNREACH, ICMP_PROT_UNREACH, 0);
 	kfree_skb(skb);
 	read_unlock(&ipip6_lock);
+out:
 	return 0;
 }
 
@@ -842,7 +842,7 @@ static struct inet_protocol sit_protocol = {
 void sit_cleanup(void)
 {
 	inet_del_protocol(&sit_protocol);
-	unregister_netdevice(&ipip6_fb_tunnel_dev);
+	unregister_netdev(&ipip6_fb_tunnel_dev);
 }
 #endif
 
@@ -852,13 +852,7 @@ int __init sit_init(void)
 
 	ipip6_fb_tunnel_dev.priv = (void*)&ipip6_fb_tunnel;
 	strcpy(ipip6_fb_tunnel_dev.name, ipip6_fb_tunnel.parms.name);
-#ifdef MODULE
 	register_netdev(&ipip6_fb_tunnel_dev);
-#else
-	rtnl_lock();
-	register_netdevice(&ipip6_fb_tunnel_dev);
-	rtnl_unlock();
-#endif
 	inet_add_protocol(&sit_protocol);
 	return 0;
 }

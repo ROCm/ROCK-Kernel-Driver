@@ -24,6 +24,9 @@ GPIO_BASE:	.long	0x90040000
 PPC_BASE:	.long	0x90060000
 #define PPAR	0x08
 
+IC_BASE:	.long	0x90050000
+#define ICMR	0x04
+
 UART1_BASE:	.long	0x80010000
 UART3_BASE:	.long	0x80050000
 #define UTCR0           0x00
@@ -51,6 +54,11 @@ SCR_loc:	.long	SYMBOL_NAME(SCR_value)
 
 ENTRY(sa1100_setup)
 		mov	r3, r0			@ keep machine type in r3
+
+		@ Clear all interrupt sources
+		ldr	r0, IC_BASE
+		mov	r1, #0
+		str	r1, [r0, #ICMR]
 
 @ Read System Configuration "Register" for Assabet.
 @ (taken from "Intel StrongARM SA-1110 Microprocessor Development Board
@@ -87,11 +95,17 @@ skip_SCR:
 		@ Initialize UART (if bootloader has not done it yet)...
 		teq	r3, #MACH_TYPE_BRUTUS
 		teqne	r3, #MACH_TYPE_ASSABET
+		teqne	r3, #MACH_TYPE_GRAPHICSCLIENT
 		bne	skip_uart
 
 		@ UART3 if Assabet is used with Neponset
 		teq	r3, #MACH_TYPE_ASSABET	@ if Assabet 
 		tsteq	r2, #(1 << 9)		@ ... and Neponset present
+		ldreq	r0, UART3_BASE
+		beq	uart_init
+
+		@ UART3 on GraphicsClient
+		teq	r3, #MACH_TYPE_GRAPHICSCLIENT
 		ldreq	r0, UART3_BASE
 		beq	uart_init
 
@@ -115,7 +129,8 @@ alt_GPIO_uart:	ldr	r0, GPIO_BASE
 
 uart1:		ldr	r0, UART1_BASE
 
-uart_init:	ldr	r1, [r0, #UTSR1]
+uart_init:
+1:		ldr	r1, [r0, #UTSR1]
 		tst	r1, #1<<0		@ TBY
 		bne	1b
 		mov	r1, #0

@@ -37,6 +37,7 @@
 #include <linux/mm.h>
 #include <linux/slab.h>
 #include <linux/proc_fs.h>
+#include <linux/notifier.h>
 #include <linux/init.h>
 
 #include <asm/dma.h>
@@ -46,6 +47,7 @@
 #include <asm/irq.h>
 #include <asm/pgalloc.h>
 #include <asm/mmu_context.h>
+#include <asm/mach/irq.h>
 
 #ifndef CONFIG_ARCH_RPC
 #define HAVE_EXPMASK
@@ -53,7 +55,7 @@
 
 enum req {
 	req_readbytes,
-	req_reset
+	req_reset_all
 };
 
 struct ecard_request {
@@ -134,19 +136,14 @@ slot_to_ecard(unsigned int slot)
 #define POD_INT_ADDR(x)	((volatile unsigned char *)\
 			 ((BUS_ADDR((x)) - IO_BASE) + IO_START))
 
-static void
-ecard_task_reset(struct ecard_request *req)
+static inline void ecard_task_reset(void)
 {
-	if (req->ec == NULL) {
-		ecard_t *ec;
+	ecard_t *ec;
 
-		for (ec = cards; ec; ec = ec->next)
-			if (ec->loader)
-				ecard_loader_reset(POD_INT_ADDR(ec->podaddr),
-						   ec->loader);
-	} else if (req->ec->loader)
-		ecard_loader_reset(POD_INT_ADDR(req->ec->podaddr),
-				   req->ec->loader);
+	for (ec = cards; ec; ec = ec->next)
+		if (ec->loader)
+			ecard_loader_reset(POD_INT_ADDR(ec->podaddr),
+					   ec->loader);
 }
 
 static void
@@ -156,48 +153,47 @@ ecard_task_readbytes(struct ecard_request *req)
 	volatile unsigned char *base_addr =
 		(volatile unsigned char *)POD_INT_ADDR(req->ec->podaddr);
 	unsigned int len = req->length;
+	unsigned int off = req->address;
 
 	if (req->ec->slot_no == 8) {
 		/*
-		 * The card maintains an index which
-		 * increments the address into a 4096-byte
-		 * page on each access.  We need to keep
+		 * The card maintains an index which increments the address
+		 * into a 4096-byte page on each access.  We need to keep
 		 * track of the counter.
 		 */
 		static unsigned int index;
-		unsigned int offset, page;
-		unsigned char byte = 0; /* keep gcc quiet */
+		unsigned int page;
 
-		offset = req->address & 4095;
-		page   = req->address >> 12;
-
-		if (page > 256)
+		page = (off >> 12) * 4;
+		if (page > 256 * 4)
 			return;
 
-		page *= 4;
+		off &= 4095;
 
-		if (offset == 0 || index > offset) {
-			/*
-			 * We need to reset the index counter.
-			 */
+		/*
+		 * If we are reading offset 0, or our current index is
+		 * greater than the offset, reset the hardware index counter.
+		 */
+		if (off == 0 || index > off) {
 			*base_addr = 0;
 			index = 0;
 		}
 
-		while (index <= offset) {
+		/*
+		 * Increment the hardware index counter until we get to the
+		 * required offset.  The read bytes are discarded.
+		 */
+		while (index < off) {
+			unsigned char byte;
 			byte = base_addr[page];
 			index += 1;
 		}
 
 		while (len--) {
-			*buf++ = byte;
-			if (len) {
-				byte = base_addr[page];
-				index += 1;
-			}
+			*buf++ = base_addr[page];
+			index += 1;
 		}
 	} else {
-		unsigned int off = req->address;
 
 		if (!req->use_loader || !req->ec->loader) {
 			off *= 4;
@@ -220,50 +216,30 @@ ecard_task_readbytes(struct ecard_request *req)
 
 }
 
+static void ecard_do_request(struct ecard_request *req)
+{
+	switch (req->req) {
+	case req_readbytes:
+		ecard_task_readbytes(req);
+		break;
+
+	case req_reset_all:
+		ecard_task_reset();
+		break;
+	}
+}
+
 #ifdef CONFIG_CPU_32
 static pid_t ecard_pid;
 static wait_queue_head_t ecard_wait;
-static wait_queue_head_t ecard_done;
 static struct ecard_request *ecard_req;
 
-/* to be removed when exec_mmap becomes extern */
-static int exec_mmap(void)
-{
-	struct mm_struct * mm, * old_mm;
-
-	old_mm = current->mm;
-	if (old_mm && atomic_read(&old_mm->mm_users) == 1) {
-		flush_cache_mm(old_mm);
-		mm_release();
-		exit_mmap(old_mm);
-		flush_tlb_mm(old_mm);
-		return 0;
-	}
-
-	mm = mm_alloc();
-	if (mm) {
-		struct mm_struct *active_mm = current->active_mm;
-
-		current->mm = mm;
-		current->active_mm = mm;
-		activate_mm(active_mm, mm);
-		mm_release();
-		if (old_mm) {
-			if (active_mm != old_mm) BUG();
-			mmput(old_mm);
-			return 0;
-		}
-		mmdrop(active_mm);
-		return 0;
-	}
-	return -ENOMEM;
-}
+static DECLARE_MUTEX_LOCKED(ecard_done_sem);
 
 /*
- * Set up the expansion card
- * daemon's environment.
+ * Set up the expansion card daemon's page tables.
  */
-static void ecard_init_task(int force)
+static void ecard_init_pgtables(struct mm_struct *mm)
 {
 	/* We want to set up the page tables for the following mapping:
 	 *  Virtual	Physical
@@ -279,29 +255,41 @@ static void ecard_init_task(int force)
 	pgd_t *src_pgd, *dst_pgd;
 	unsigned int dst_addr = IO_START;
 
-	if (!force)
-		exec_mmap();
-
-	src_pgd = pgd_offset(current->mm, IO_BASE);
-	dst_pgd = pgd_offset(current->mm, dst_addr);
+	src_pgd = pgd_offset(mm, IO_BASE);
+	dst_pgd = pgd_offset(mm, dst_addr);
 
 	while (dst_addr < IO_START + IO_SIZE) {
 		*dst_pgd++ = *src_pgd++;
 		dst_addr += PGDIR_SIZE;
 	}
 
-	flush_tlb_range(current->mm, IO_START, IO_START + IO_SIZE);
-
 	dst_addr = EASI_START;
-	src_pgd = pgd_offset(current->mm, EASI_BASE);
-	dst_pgd = pgd_offset(current->mm, dst_addr);
+	src_pgd = pgd_offset(mm, EASI_BASE);
+	dst_pgd = pgd_offset(mm, dst_addr);
 
 	while (dst_addr < EASI_START + EASI_SIZE) {
 		*dst_pgd++ = *src_pgd++;
 		dst_addr += PGDIR_SIZE;
 	}
 
-	flush_tlb_range(current->mm, EASI_START, EASI_START + EASI_SIZE);
+	flush_tlb_range(mm, IO_START, IO_START + IO_SIZE);
+	flush_tlb_range(mm, EASI_START, EASI_START + EASI_SIZE);
+}
+
+static int ecard_init_mm(void)
+{
+	struct mm_struct * mm = mm_alloc();
+	struct mm_struct *active_mm = current->active_mm;
+
+	if (!mm)
+		return -ENOMEM;
+
+	current->mm = mm;
+	current->active_mm = mm;
+	activate_mm(active_mm, mm);
+	mmdrop(active_mm);
+	ecard_init_pgtables(mm);
+	return 0;
 }
 
 static int
@@ -309,22 +297,23 @@ ecard_task(void * unused)
 {
 	struct task_struct *tsk = current;
 
-	tsk->session = 1;
-	tsk->pgrp = 1;
-
 	/*
 	 * We don't want /any/ signals, not even SIGKILL
 	 */
 	sigfillset(&tsk->blocked);
 	sigemptyset(&tsk->pending.signal);
 	recalc_sigpending(tsk);
-
 	strcpy(tsk->comm, "kecardd");
+	daemonize();
 
 	/*
-	 * Set up the environment
+	 * Allocate a mm.  We're not a lazy-TLB kernel task since we need
+	 * to set page table entries where the user space would be.  Note
+	 * that this also creates the page tables.  Failure is not an
+	 * option here.
 	 */
-	ecard_init_task(0);
+	if (ecard_init_mm())
+		panic("kecardd: unable to alloc mm\n");
 
 	while (1) {
 		struct ecard_request *req;
@@ -338,16 +327,8 @@ ecard_task(void * unused)
 			}
 		} while (req == NULL);
 
-		switch (req->req) {
-		case req_readbytes:
-			ecard_task_readbytes(req);
-			break;
-
-		case req_reset:
-			ecard_task_reset(req);
-			break;
-		}
-		wake_up(&ecard_done);
+		ecard_do_request(req);
+		up(&ecard_done_sem);
 	}
 }
 
@@ -357,75 +338,89 @@ ecard_task(void * unused)
  * FIXME: The test here is not sufficient to detect if the
  * kcardd is running.
  */
-static inline void
+static void
 ecard_call(struct ecard_request *req)
 {
 	/*
-	 * If we're called from task 0, or from an
-	 * interrupt (will be keyboard interrupt),
-	 * we forcefully set up the memory map, and
-	 * call the loader.  We can't schedule, or
-	 * sleep for this call.
+	 * Make sure we have a context that is able to sleep.
 	 */
-	if ((current == &init_task || in_interrupt()) &&
-	    req->req == req_reset && req->ec == NULL) {
-		ecard_init_task(1);
-		ecard_task_reset(req);
-	} else {
-		if (ecard_pid <= 0)
-			ecard_pid = kernel_thread(ecard_task, NULL,
-					CLONE_FS | CLONE_FILES | CLONE_SIGHAND);
+	if (current == &init_task || in_interrupt())
+		BUG();
 
-		ecard_req = req;
+	if (ecard_pid <= 0)
+		ecard_pid = kernel_thread(ecard_task, NULL,
+				CLONE_FS | CLONE_FILES | CLONE_SIGHAND);
 
-		wake_up(&ecard_wait);
+	ecard_req = req;
+	wake_up(&ecard_wait);
 
-		sleep_on(&ecard_done);
-	}
+	/*
+	 * Now wait for kecardd to run.
+	 */
+	down(&ecard_done_sem);
 }
 #else
 /*
  * On 26-bit processors, we don't need the kcardd thread to access the
  * expansion card loaders.  We do it directly.
  */
-static inline void
-ecard_call(struct ecard_request *req)
-{
-	if (req->req == req_reset)
-		ecard_task_reset(req);
-	else
-		ecard_task_readbytes(req);
-}
+#define ecard_call(req)	ecard_do_request(req)
 #endif
 
 /* ======================= Mid-level card control ===================== */
+
 /*
- * This is called to reset the loaders for each expansion card on reboot.
+ * This function is responsible for resetting the expansion cards to a
+ * sensible state immediately prior to rebooting the system.  This function
+ * has process state (keventd), so we can sleep.
  *
- * This is required to make sure that the card is in the correct state
- * that RiscOS expects it to be.
+ * Possible "val" values here:
+ *  SYS_RESTART   -  restarting system
+ *  SYS_HALT      - halting system
+ *  SYS_POWER_OFF - powering down system
+ *
+ * We ignore all calls, unless it is a SYS_RESTART call - power down/halts
+ * will be followed by a SYS_RESTART if ctrl-alt-del is pressed again.
  */
-void
-ecard_reset(int slot)
+static void ecard_reboot(struct notifier_block *me, unsigned long val, void *v)
 {
 	struct ecard_request req;
 
-	req.req = req_reset;
+	if (val != SYS_RESTART)
+		return;
 
-	if (slot < 0)
-		req.ec = NULL;
-	else
-		req.ec = slot_to_ecard(slot);
+	/*
+	 * Disable the expansion card interrupt
+	 */
+	disable_irq(IRQ_EXPANSIONCARD);
 
+	/*
+	 * If we have any expansion card loader code which will handle
+	 * the reset for us, call it now.
+	 */
+	req.req = req_reset_all;
 	ecard_call(&req);
 
+	/*
+	 * Disable the expansion card interrupt again, just to be sure.
+	 */
+	disable_irq(IRQ_EXPANSIONCARD);
+
+	/*
+	 * Finally, reset the expansion card interrupt mask to
+	 * all enable (RISC OS doesn't set this)
+	 */
 #ifdef HAS_EXPMASK
-	if (have_expmask && slot < 0) {
-		have_expmask |= ~0;
-		EXPMASK_ENABLE = have_expmask;
-	}
+	have_expmask = ~0;
+	__raw_writeb(have_expmask, EXPMASK_ENABLE);
 #endif
 }
+
+static struct notifier_block ecard_reboot_notifier = {
+	notifier_call:	ecard_reboot,
+};
+
+
 
 static void
 ecard_readbytes(void *addr, ecard_t *ec, int off, int len, int useld)
@@ -506,7 +501,7 @@ static void ecard_def_irq_enable(ecard_t *ec, int irqnr)
 #ifdef HAS_EXPMASK
 	if (irqnr < 4 && have_expmask) {
 		have_expmask |= 1 << irqnr;
-		EXPMASK_ENABLE = have_expmask;
+		__raw_writeb(have_expmask, EXPMASK_ENABLE);
 	}
 #endif
 }
@@ -516,7 +511,7 @@ static void ecard_def_irq_disable(ecard_t *ec, int irqnr)
 #ifdef HAS_EXPMASK
 	if (irqnr < 4 && have_expmask) {
 		have_expmask &= ~(1 << irqnr);
-		EXPMASK_ENABLE = have_expmask;
+		__raw_writeb(have_expmask, EXPMASK_ENABLE);
 	}
 #endif
 }
@@ -556,7 +551,7 @@ static expansioncard_ops_t ecard_default_ops = {
  *
  * They are not meant to be called directly, but via enable/disable_irq.
  */
-void ecard_enableirq(unsigned int irqnr)
+static void ecard_enableirq(unsigned int irqnr)
 {
 	ecard_t *ec = slot_to_ecard(irqnr - 32);
 
@@ -572,7 +567,7 @@ void ecard_enableirq(unsigned int irqnr)
 	}
 }
 
-void ecard_disableirq(unsigned int irqnr)
+static void ecard_disableirq(unsigned int irqnr)
 {
 	ecard_t *ec = slot_to_ecard(irqnr - 32);
 
@@ -717,7 +712,7 @@ ecard_irq_expmask(int intr_no, void *dev_id, struct pt_regs *regs)
 	const unsigned int statusmask = 15;
 	unsigned int status;
 
-	status = EXPMASK_STATUS & statusmask;
+	status = __raw_readb(EXPMASK_STATUS) & statusmask;
 	if (status) {
 		unsigned int slot;
 		ecard_t *ec;
@@ -739,18 +734,21 @@ again:
 			 * otherwise you will lose serial data at high speeds!
 			 */
 			oldexpmask = have_expmask;
-			EXPMASK_ENABLE = (have_expmask &= priority_masks[slot]);
+			have_expmask &= priority_masks[slot];
+			__raw_writeb(have_expmask, EXPMASK_ENABLE);
 			sti();
 			do_ecard_IRQ(ec->irq, regs);
 			cli();
-			EXPMASK_ENABLE = have_expmask = oldexpmask;
-			status = EXPMASK_STATUS & statusmask;
+			have_expmask = oldexpmask;
+			__raw_writeb(have_expmask, EXPMASK_ENABLE);
+			status = __raw_readb(EXPMASK_STATUS) & statusmask;
 			if (status)
 				goto again;
 		} else {
 			printk(KERN_WARNING "card%d: interrupt from unclaimed "
 			       "card???\n", slot);
-			EXPMASK_ENABLE = (have_expmask &= ~(1 << slot));
+			have_expmask &= ~(1 << slot);
+			__raw_writeb(have_expmask, EXPMASK_ENABLE);
 		}
 	} else
 		printk(KERN_WARNING "Wild interrupt from backplane (masks)\n");
@@ -762,10 +760,10 @@ ecard_probeirqhw(void)
 	ecard_t *ec;
 	int found;
 
-	EXPMASK_ENABLE = 0x00;
-	EXPMASK_STATUS = 0xff;
-	found = ((EXPMASK_STATUS & 15) == 0);
-	EXPMASK_ENABLE = 0xff;
+	__raw_writeb(0x00, EXPMASK_ENABLE);
+	__raw_writeb(0xff, EXPMASK_STATUS);
+	found = (__raw_readb(EXPMASK_STATUS) & 15) == 0;
+	__raw_writeb(0xff, EXPMASK_ENABLE);
 
 	if (!found)
 		return;
@@ -781,7 +779,7 @@ ecard_probeirqhw(void)
 	for (ec = cards; ec; ec = ec->next)
 		have_expmask |= 1 << ec->slot_no;
 
-	EXPMASK_ENABLE = have_expmask;
+	__raw_writeb(have_expmask, EXPMASK_ENABLE);
 }
 #else
 #define ecard_probeirqhw()
@@ -830,7 +828,7 @@ unsigned int ecard_address(ecard_t *ec, card_type_t type, card_speed_t speed)
 	}
 
 #ifdef IOMD_ECTCR
-	outb(ectcr, IOMD_ECTCR);
+	iomd_writeb(ectcr, IOMD_ECTCR);
 #endif
 	return address;
 }
@@ -910,9 +908,8 @@ ecard_probe(int slot, card_type_t type)
 	int i, rc = -ENOMEM;
 
 	ec = kmalloc(sizeof(ecard_t), GFP_KERNEL);
-
 	if (!ec)
-		goto nodev;
+		goto nomem;
 
 	memset(ec, 0, sizeof(ecard_t));
 
@@ -969,27 +966,31 @@ ecard_probe(int slot, card_type_t type)
 	if (slot == 8)
 		ec->irq = 11;
 #endif
+	/*
+	 * hook the interrupt handlers
+	 */
+	if (ec->irq != 0 && ec->irq >= 32) {
+		irq_desc[ec->irq].mask_ack = ecard_disableirq;
+		irq_desc[ec->irq].mask     = ecard_disableirq;
+		irq_desc[ec->irq].unmask   = ecard_enableirq;
+		irq_desc[ec->irq].valid    = 1;
+	}
+
 #ifdef CONFIG_ARCH_RPC
 	/* On RiscPC, only first two slots have DMA capability */
 	if (slot < 2)
 		ec->dma = 2 + slot;
 #endif
-#if 0	/* We don't support FIQs on expansion cards at the moment */
-	ec->fiq = 96 + slot;
-#endif
-
-	rc = 0;
 
 	for (ecp = &cards; *ecp; ecp = &(*ecp)->next);
 
 	*ecp = ec;
+	slot_to_expcard[slot] = ec;
+	return 0;
 
 nodev:
-	if (rc && ec)
-		kfree(ec);
-	else
-		slot_to_expcard[slot] = ec;
-
+	kfree(ec);
+nomem:
 	return rc;
 }
 
@@ -1058,9 +1059,13 @@ void __init ecard_init(void)
 {
 	int slot;
 
+	/*
+	 * Register our reboot notifier
+	 */
+	register_reboot_notifier(&ecard_reboot_notifier);
+
 #ifdef CONFIG_CPU_32
 	init_waitqueue_head(&ecard_wait);
-	init_waitqueue_head(&ecard_done);
 #endif
 
 	printk("Probing expansion cards\n");

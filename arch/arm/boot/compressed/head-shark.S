@@ -1,5 +1,5 @@
 /* The head-file for the Shark
- * by Alexander.Schulz@stud.uni-karlsruhe.de
+ * by Alexander Schulz <aschulz@netwinder.org>
  *
  * Does the following:
  * - get the memory layout from firmware. This can only be done as long as the mmu
@@ -20,8 +20,6 @@
 
 		b	__beginning
 	
-__serial_addr:	.long	0xf7eff3f8
-		.long	0				@ space
 __ofw_data:	.long	0				@ the number of memory blocks
 		.space  128				@ (startaddr,size) ...
 		.space  128				@ bootargs
@@ -31,14 +29,10 @@ __beginning:	mov	r4, r0				@ save the entry to the firmware
 
 		mov	r0, #0xC0			@ disable irq and fiq
 		mov	r1, r0
-		mrs	r3, cpsr_all
+		mrs	r3, cpsr
 		bic	r2, r3, r0
 		eor	r2, r2, r1
-		msr	cpsr_all, r2
-
-		ldr	r0, __serial_addr		@ disable serial interrupt
-		mov	r1, #0				@ hangs the machine, I don t know why.
-		strb	r1, [r0, #0x01]
+		msr	cpsr_c, r2
 
 		mov	r0, r4				@ get the Memory layout from firmware
 		adr	r1, __ofw_data

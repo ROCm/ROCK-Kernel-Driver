@@ -5,7 +5,7 @@
  *
  *		The Internet Protocol (IP) module.
  *
- * Version:	$Id: ip_input.c,v 1.51 2000/12/08 17:15:53 davem Exp $
+ * Version:	$Id: ip_input.c,v 1.53 2000/12/18 19:01:50 davem Exp $
  *
  * Authors:	Ross Biro, <bir7@leland.Stanford.Edu>
  *		Fred N. van Kempen, <waltje@uWalt.NL.Mugnet.ORG>
@@ -207,8 +207,7 @@ static int ip_run_ipprot(struct sk_buff *skb, struct iphdr *iph,
 				skb2 = skb_clone(skb, GFP_ATOMIC);
 			if(skb2 != NULL) {
 				ret = 1;
-				ipprot->handler(skb2,
-						ntohs(iph->tot_len) - (iph->ihl * 4));
+				ipprot->handler(skb2);
 			}
 		}
 		ipprot = (struct inet_protocol *) ipprot->next;
@@ -219,18 +218,31 @@ static int ip_run_ipprot(struct sk_buff *skb, struct iphdr *iph,
 
 static inline int ip_local_deliver_finish(struct sk_buff *skb)
 {
-	struct iphdr *iph = skb->nh.iph;
+	int ihl = skb->nh.iph->ihl*4;
 
 #ifdef CONFIG_NETFILTER_DEBUG
 	nf_debug_ip_local_deliver(skb);
 #endif /*CONFIG_NETFILTER_DEBUG*/
 
+	/* Pull out additionl 8 bytes to save some space in protocols. */
+	if (!pskb_may_pull(skb, ihl+8))
+		goto out;
+	__skb_pull(skb, ihl);
+
+#ifdef CONFIG_NETFILTER
+	/* Free reference early: we don't need it any more, and it may
+           hold ip_conntrack module loaded indefinitely. */
+	nf_conntrack_put(skb->nfct);
+	skb->nfct = NULL;
+#endif /*CONFIG_NETFILTER*/
+
         /* Point into the IP datagram, just past the header. */
-        skb->h.raw = skb->nh.raw + iph->ihl*4;
+        skb->h.raw = skb->data;
 
 	{
 		/* Note: See raw.c and net/raw.h, RAWV4_HTABLE_SIZE==MAX_INET_PROTOS */
-		int hash = iph->protocol & (MAX_INET_PROTOS - 1);
+		int protocol = skb->nh.iph->protocol;
+		int hash = protocol & (MAX_INET_PROTOS - 1);
 		struct sock *raw_sk = raw_v4_htable[hash];
 		struct inet_protocol *ipprot;
 		int flag;
@@ -239,23 +251,22 @@ static inline int ip_local_deliver_finish(struct sk_buff *skb)
 		 * don't care less
 		 */
 		if(raw_sk != NULL)
-			raw_sk = raw_v4_input(skb, iph, hash);
+			raw_sk = raw_v4_input(skb, skb->nh.iph, hash);
 
 		ipprot = (struct inet_protocol *) inet_protos[hash];
 		flag = 0;
 		if(ipprot != NULL) {
 			if(raw_sk == NULL &&
 			   ipprot->next == NULL &&
-			   ipprot->protocol == iph->protocol) {
+			   ipprot->protocol == protocol) {
 				int ret;
-				
+
 				/* Fast path... */
-				ret = ipprot->handler(skb, (ntohs(iph->tot_len) -
-							    (iph->ihl * 4)));
+				ret = ipprot->handler(skb);
 
 				return ret;
 			} else {
-				flag = ip_run_ipprot(skb, iph, ipprot, (raw_sk != NULL));
+				flag = ip_run_ipprot(skb, skb->nh.iph, ipprot, (raw_sk != NULL));
 			}
 		}
 
@@ -269,6 +280,7 @@ static inline int ip_local_deliver_finish(struct sk_buff *skb)
 			sock_put(raw_sk);
 		} else if (!flag) {		/* Free and report errors */
 			icmp_send(skb, ICMP_DEST_UNREACH, ICMP_PROT_UNREACH, 0);	
+out:
 			kfree_skb(skb);
 		}
 	}
@@ -281,13 +293,11 @@ static inline int ip_local_deliver_finish(struct sk_buff *skb)
  */ 
 int ip_local_deliver(struct sk_buff *skb)
 {
-	struct iphdr *iph = skb->nh.iph;
-
 	/*
 	 *	Reassemble IP fragments.
 	 */
 
-	if (iph->frag_off & htons(IP_MF|IP_OFFSET)) {
+	if (skb->nh.iph->frag_off & htons(IP_MF|IP_OFFSET)) {
 		skb = ip_defrag(skb);
 		if (!skb)
 			return 0;
@@ -333,9 +343,8 @@ static inline int ip_rcv_finish(struct sk_buff *skb)
 		                                      --ANK (980813)
 		*/
 
-		skb = skb_cow(skb, skb_headroom(skb));
-		if (skb == NULL)
-			return NET_RX_DROP;
+		if (skb_cow(skb, skb_headroom(skb)))
+			goto drop;
 		iph = skb->nh.iph;
 
 		skb->ip_summed = 0;
@@ -387,6 +396,11 @@ int ip_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt)
 	if ((skb = skb_share_check(skb, GFP_ATOMIC)) == NULL)
 		goto out;
 
+	if (!pskb_may_pull(skb, sizeof(struct iphdr)))
+		goto inhdr_error;
+
+	iph = skb->nh.iph;
+
 	/*
 	 *	RFC1122: 3.1.2.2 MUST silently discard any IP frame that fails the checksum.
 	 *
@@ -398,9 +412,13 @@ int ip_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt)
 	 *	4.	Doesn't have a bogus length
 	 */
 
-	if (skb->len < sizeof(struct iphdr) || skb->len < (iph->ihl<<2))
+	if (iph->ihl < 5 || iph->version != 4)
 		goto inhdr_error; 
-	if (iph->ihl < 5 || iph->version != 4 || ip_fast_csum((u8 *)iph, iph->ihl) != 0)
+
+	if (!pskb_may_pull(skb, iph->ihl*4))
+		goto inhdr_error;
+
+	if (ip_fast_csum((u8 *)iph, iph->ihl) != 0)
 		goto inhdr_error; 
 
 	{
@@ -412,7 +430,11 @@ int ip_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt)
 		 * is IP we can trim to the true length of the frame.
 		 * Note this now means skb->len holds ntohs(iph->tot_len).
 		 */
-		__skb_trim(skb, len);
+		if (skb->len > len) {
+			__pskb_trim(skb, len);
+			if (skb->ip_summed == CHECKSUM_HW)
+				skb->ip_summed = CHECKSUM_NONE;
+		}
 	}
 
 	return NF_HOOK(PF_INET, NF_IP_PRE_ROUTING, skb, dev, NULL,

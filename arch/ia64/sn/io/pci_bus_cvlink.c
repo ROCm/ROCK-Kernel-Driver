@@ -11,7 +11,6 @@
 #include <linux/init.h>
 #include <linux/types.h>
 #include <linux/pci.h>
-#include <linux/pci_ids.h>
 #include <linux/sched.h>
 #include <linux/ioport.h>
 #include <asm/sn/types.h>
@@ -31,7 +30,6 @@
 #include <asm/sn/intr.h>
 #include <asm/sn/xtalk/xtalkaddrs.h>
 #include <asm/sn/klconfig.h>
-#include <asm/sn/xtalk/xwidget.h>
 #include <asm/sn/io.h>
 
 #include <asm/sn/pci/pciio.h>
@@ -39,7 +37,6 @@
 #include <asm/sn/pci/pcibr.h>
 #include <asm/sn/pci/pcibr_private.h>
 extern int bridge_rev_b_data_check_disable;
-#include <asm/sn/pci/pciio.h>
 #include <asm/sn/pci/pci_bus_cvlink.h>
 
 #define MAX_PCI_XWIDGET 256

@@ -9271,9 +9271,9 @@ const char *ncr53c8xx_info (struct Scsi_Host *host)
 */
 
 #if LINUX_VERSION_CODE >= LinuxVersionCode(2,4,0)
-static Scsi_Host_Template driver_template = NCR53C8XX;
-#include "scsi_module.c"
-#elif defined(MODULE)
+static
+#endif
+#if LINUX_VERSION_CODE >= LinuxVersionCode(2,4,0) || defined(MODULE)
 Scsi_Host_Template driver_template = NCR53C8XX;
 #include "scsi_module.c"
 #endif

@@ -16,7 +16,7 @@ struct sigcontext {
 #if defined(__SH4__)
 	/* FPU registers */
 	unsigned long sc_fpregs[16];
-	unsigned long long sc_xdregs[8];
+	unsigned long sc_xfpregs[16];
 	unsigned int sc_fpscr;
 	unsigned int sc_fpul;
 	unsigned int sc_ownedfp;

@@ -1,7 +1,7 @@
 /*
  *  linux/arch/arm/mach-shark/mm.c
  *
- *  by Alexander.Schulz@stud.uni-karlsruhe.de
+ *  by Alexander Schulz <aschulz@netwinder.org>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -19,8 +19,6 @@
 
 static struct map_desc shark_io_desc[] __initdata = {
 	{ IO_BASE	, IO_START	, IO_SIZE	, DOMAIN_IO, 0, 1, 0, 0 },
-	{ FB_BASE	, FB_START	, FB_SIZE	, DOMAIN_IO, 0, 1, 0, 0 },
-	{ FBREG_BASE	, FBREG_START	, FBREG_SIZE	, DOMAIN_IO, 0, 1, 0, 0 },
 	LAST_DESC
 };
 

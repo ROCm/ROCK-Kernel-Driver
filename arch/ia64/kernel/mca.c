@@ -27,7 +27,6 @@
 #include <asm/mca.h>
 
 #include <asm/irq.h>
-#include <asm/machvec.h>
 
 
 typedef struct ia64_fptr {

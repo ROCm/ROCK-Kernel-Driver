@@ -440,7 +440,7 @@ static int spx_transmit(struct sock *sk, struct sk_buff *skb, int type, int len)
 
 		save_flags(flags);
 		cli();
-        	skb = sock_alloc_send_skb(sk, size, 1, 0, &err);
+        	skb = sock_alloc_send_skb(sk, size, 0, &err);
         	if(skb == NULL) {
 			restore_flags(flags);
                 	return (-ENOMEM);
@@ -742,7 +742,7 @@ static int spx_sendmsg(struct socket *sock, struct msghdr *msg, int len,
         size 	= offset + sizeof(struct ipxspxhdr) + len;
 
 	cli();
-        skb  	= sock_alloc_send_skb(sk, size, 0, flags&MSG_DONTWAIT, &err);
+        skb  	= sock_alloc_send_skb(sk, size, flags&MSG_DONTWAIT, &err);
 	sti();
         if(skb == NULL)
                 return (err);
@@ -901,6 +901,7 @@ static struct proto_ops SOCKOPS_WRAPPED(spx_ops) = {
 	sendmsg:	spx_sendmsg,
 	recvmsg:	spx_recvmsg,
 	mmap:		sock_no_mmap,
+	sendpage:	sock_no_sendpage,
 };
 
 #include <linux/smp_lock.h>

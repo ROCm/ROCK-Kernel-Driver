@@ -355,10 +355,6 @@ struct scsi_inquiry_data
 
 #define AIC7XXX_DRIVER_VERSION  "6.1.5"
 
-#ifndef LINUX_VERSION_CODE
-#include <linux/version.h>
-#endif
-
 #ifndef KERNEL_VERSION
 #define KERNEL_VERSION(x,y,z) (((x)<<16)+((y)<<8)+(z))
 #endif

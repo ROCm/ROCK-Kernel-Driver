@@ -53,6 +53,7 @@ struct tpacket_hdr
 #define TP_STATUS_USER		1
 #define TP_STATUS_COPY		2
 #define TP_STATUS_LOSING	4
+#define TP_STATUS_CSUMNOTREADY	8
 	unsigned int	tp_len;
 	unsigned int	tp_snaplen;
 	unsigned short	tp_mac;

@@ -97,9 +97,6 @@ static int full_duplex[MAX_UNITS] = {-1, -1, -1, -1, -1, -1, -1, -1};
 /* Include files, designed to support most kernel versions 2.0.0 and later. */
 #include <linux/version.h>
 #include <linux/module.h>
-#if LINUX_VERSION_CODE < 0x20300  &&  defined(MODVERSIONS)
-#include <linux/modversions.h>
-#endif
 
 #include <linux/kernel.h>
 #include <linux/string.h>

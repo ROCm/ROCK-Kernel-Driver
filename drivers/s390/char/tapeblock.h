@@ -15,6 +15,7 @@
 
 #ifndef TAPEBLOCK_H
 #define TAPEBLOCK_H
+#include <linux/config.h>
 #define PARTN_BITS 0
 
 #define TAPEBLOCK_READAHEAD 30
