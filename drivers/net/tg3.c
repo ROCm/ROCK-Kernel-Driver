@@ -213,12 +213,11 @@ static void tg3_enable_ints(struct tg3 *tp)
 	tw32(TG3PCI_MISC_HOST_CTRL,
 	     (tp->misc_host_ctrl & ~MISC_HOST_CTRL_MASK_PCI_INT));
 	tw32_mailbox(MAILBOX_INTERRUPT_0 + TG3_64BIT_REG_LOW, 0x00000000);
+	tr32(MAILBOX_INTERRUPT_0 + TG3_64BIT_REG_LOW);
 
-	if (tp->hw_status->status & SD_STATUS_UPDATED) {
+	if (tp->hw_status->status & SD_STATUS_UPDATED)
 		tw32(GRC_LOCAL_CTRL,
 		     tp->grc_local_ctrl | GRC_LCLCTRL_SETINT);
-	}
-	tr32(MAILBOX_INTERRUPT_0 + TG3_64BIT_REG_LOW);
 }
 
 static void tg3_switch_clocks(struct tg3 *tp)
