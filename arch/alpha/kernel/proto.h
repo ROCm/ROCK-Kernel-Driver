@@ -153,6 +153,10 @@ extern void die_if_kernel(char *, struct pt_regs *, long, unsigned long *);
 extern void switch_to_system_map(void);
 extern void srm_paging_stop(void);
 
+/* ../mm/remap.c */
+extern int __alpha_remap_area_pages(unsigned long, unsigned long, 
+				    unsigned long, unsigned long);
+
 /* irq.c */
 
 #ifdef CONFIG_SMP
