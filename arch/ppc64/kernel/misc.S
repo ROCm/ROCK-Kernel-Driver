@@ -443,26 +443,61 @@ _GLOBAL(cvt_df)
  *   kernel_thread(fn, arg, flags)
  */
 _GLOBAL(kernel_thread)
-	/* XXX fix this when we optimise syscall entry to not save volatiles */
-	mr	r6,r3		/* function */
-	mr	r7,r4		/* arg */
+	std	r29,-24(r1)
+	std	r30,-16(r1)
+	stdu	r1,-STACK_FRAME_OVERHEAD(r1)
+	mr	r29,r3
+	mr	r30,r4
 	ori	r3,r5,CLONE_VM	/* flags */
 	oris	r3,r3,(CLONE_UNTRACED>>16)
 	li	r4,0		/* new sp (unused) */
 	li	r0,__NR_clone
 	sc
 	cmpi	0,r3,0		/* parent or child? */
-	bnelr			/* return if parent */
+	bne	1f		/* return if parent */
 	li	r0,0
 	stdu	r0,-STACK_FRAME_OVERHEAD(r1)
-	ld	r2,8(r6)
-	ld	r6,0(r6)
-	mtlr	r6              /* fn addr in lr */
-	mr	r3,r7	        /* load arg and call fn */
+	ld	r2,8(r29)
+	ld	r29,0(r29)
+	mtlr	r29              /* fn addr in lr */
+	mr	r3,r30	        /* load arg and call fn */
 	blrl
 	li	r0,__NR_exit	/* exit after child exits */
         li	r3,0
 	sc
+1:	addi	r1,r1,STACK_FRAME_OVERHEAD	
+	ld	r29,-24(r1)
+	ld	r30,-16(r1)
+	blr
+
+	.section	".toc","aw"
+.SYSCALL_ERRNO:
+	.tc errno[TC],errno
+
+	.section	".text"
+	.align 3
+	
+#define SYSCALL(name) \
+_GLOBAL(name) \
+	li	r0,__NR_##name; \
+	sc; \
+	bnslr; \
+	ld	r4,.SYSCALL_ERRNO@toc(2); \
+	std	r3,0(r4); \
+	li	r3,-1; \
+	blr
+
+#define __NR__exit __NR_exit
+
+SYSCALL(setsid)
+SYSCALL(open)
+SYSCALL(read)
+SYSCALL(write)
+SYSCALL(lseek)
+SYSCALL(close)
+SYSCALL(dup)
+SYSCALL(execve)
+SYSCALL(waitpid)
 
 #ifdef CONFIG_BINFMT_ELF32
 /* Why isn't this a) automatic, b) written in 'C'? */	
