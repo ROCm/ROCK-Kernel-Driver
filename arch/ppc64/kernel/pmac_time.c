@@ -39,6 +39,8 @@
 
 extern void setup_default_decr(void);
 
+extern unsigned long ppc_tb_freq;
+
 /* Apparently the RTC stores seconds since 1 Jan 1904 */
 #define RTC_OFFSET	2082844800
 
@@ -151,6 +153,7 @@ void __init pmac_calibrate_decr(void)
 	tb_to_us = mulhwu_scale_factor(freq, 1000000);
 	div128_by_32( 1024*1024, 0, tb_ticks_per_sec, &divres );
 	tb_to_xs = divres.result_low;
+	ppc_tb_freq = freq;
 
 	setup_default_decr();
 }
