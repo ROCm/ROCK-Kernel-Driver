@@ -59,8 +59,9 @@ struct ppp_device
 
 static inline struct sppp *sppp_of(struct net_device *dev) 
 {
-	struct ppp_device *ppp = dev->priv;
-	return &ppp->sppp;
+	struct ppp_device **ppp = dev->priv;
+	BUG_ON((*ppp)->dev != dev);
+	return &(*ppp)->sppp;
 }
 
 #define PP_KEEPALIVE    0x01    /* use keepalive protocol */
