@@ -231,9 +231,9 @@ struct tcp_opt {
 	/* Data for direct copy to user */
 	struct {
 		struct sk_buff_head	prequeue;
-		int			memory;
 		struct task_struct	*task;
 		struct iovec		*iov;
+		int			memory;
 		int			len;
 	} ucopy;
 
