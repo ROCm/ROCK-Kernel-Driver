@@ -3,16 +3,16 @@
 #include <linux/types.h>
 #include <linux/kdev_t.h>
 
-int scsi_debug_detect(Scsi_Host_Template *);
-int scsi_debug_command(Scsi_Cmnd *);
-int scsi_debug_queuecommand(Scsi_Cmnd *, void (*done) (Scsi_Cmnd *));
-int scsi_debug_abort(Scsi_Cmnd *);
-int scsi_debug_biosparam(Disk *, kdev_t, int[]);
-int scsi_debug_bus_reset(Scsi_Cmnd *);
-int scsi_debug_dev_reset(Scsi_Cmnd *);
-int scsi_debug_host_reset(Scsi_Cmnd *);
-int scsi_debug_proc_info(char *, char **, off_t, int, int, int);
-const char * scsi_debug_info(struct Scsi_Host *);
+static int scsi_debug_detect(Scsi_Host_Template *);
+/* static int scsi_debug_command(Scsi_Cmnd *); */
+static int scsi_debug_queuecommand(Scsi_Cmnd *, void (*done) (Scsi_Cmnd *));
+static int scsi_debug_abort(Scsi_Cmnd *);
+static int scsi_debug_biosparam(Disk *, kdev_t, int[]);
+static int scsi_debug_bus_reset(Scsi_Cmnd *);
+static int scsi_debug_device_reset(Scsi_Cmnd *);
+static int scsi_debug_host_reset(Scsi_Cmnd *);
+static int scsi_debug_proc_info(char *, char **, off_t, int, int, int);
+static const char * scsi_debug_info(struct Scsi_Host *);
 
 #ifndef NULL
 #define NULL 0
@@ -31,6 +31,7 @@ const char * scsi_debug_info(struct Scsi_Host *);
 		    info:              scsi_debug_info,		\
 		    detect:            scsi_debug_detect,	\
 		    release:           scsi_debug_release,	\
+		    ioctl:             scsi_debug_ioctl,	\
 		    queuecommand:      scsi_debug_queuecommand, \
 		    eh_abort_handler:  scsi_debug_abort,	\
 		    eh_bus_reset_handler: scsi_debug_bus_reset,	\

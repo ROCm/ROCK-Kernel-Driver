@@ -14,8 +14,8 @@
  *
  *   D. Gilbert (dpg) work for MOD device test [20010421]
  *   dpg, work for devfs large number of disks [20010809]
- *   dpg, make more generic [20011123]
  *   dpg, forked for lk 2.5 series [20011216, 20020101]
+ *   dpg, use vmalloc() more inquiry+mode_sense [20020302]
  */
 
 #include <linux/config.h>
@@ -46,7 +46,7 @@
 #include <linux/version.h>
 #endif
 
-static char scsi_debug_version_str[] = "Version: 1.57 (20011216)";
+static char scsi_debug_version_str[] = "Version: 1.59 (20020302)";
 
 #ifndef SCSI_CMD_READ_16
 #define SCSI_CMD_READ_16 0x88
@@ -60,22 +60,26 @@ static char scsi_debug_version_str[] = "Version: 1.57 (20011216)";
 #define DEF_DEV_SIZE_MB   8
 #define DEF_FAKE_BLK0   0
 
+#define DEF_OPTS   0
+#define SCSI_DEBUG_OPT_NOISE   1
+#define SCSI_DEBUG_OPT_MEDIUM_ERR   2
+
+#define OPT_MEDIUM_ERR_ADDR   0x1234
+
 static int scsi_debug_num_devs = DEF_NR_FAKE_DEVS;
+static int scsi_debug_opts = DEF_OPTS;
 
 #define NR_HOSTS_PRESENT (((scsi_debug_num_devs - 1) / 7) + 1)
 #define N_HEAD          8
 #define N_SECTOR        32
-#define DISK_READONLY(TGT)      (0)
-#define DISK_REMOVEABLE(TGT)    (0)
+#define DEV_READONLY(TGT)      (0)
+#define DEV_REMOVEABLE(TGT)    (0)
 #define DEVICE_TYPE(TGT) (TYPE_DISK);
 
 #define SCSI_DEBUG_MAILBOXES (scsi_debug_num_devs + 1)
 
 static int scsi_debug_dev_size_mb = DEF_DEV_SIZE_MB;
 #define STORE_SIZE (scsi_debug_dev_size_mb * 1024 * 1024)
-#define STORE_ELEM_ORDER 1
-#define STORE_ELEM_SIZE (PAGE_SIZE * (1 << STORE_ELEM_ORDER))
-#define STORE_ELEMENTS ((STORE_SIZE / STORE_ELEM_SIZE) + 1)
 
 /* default sector size is 512 bytes, 2**9 bytes */
 #define POW2_SECT_SIZE 9
@@ -83,13 +87,9 @@ static int scsi_debug_dev_size_mb = DEF_DEV_SIZE_MB;
 
 #define N_CYLINDER (STORE_SIZE / (SECT_SIZE * N_SECTOR * N_HEAD))
 
-static int scsi_debug_fake_blk0 = DEF_FAKE_BLK0;
-
 /* Do not attempt to use a timer to simulate a real disk with latency */
 /* Only use this in the actual kernel, not in the simulator. */
 #define IMMEDIATE
-
-#define SDEBUG_SG_ADDRESS
 
 #define START_PARTITION 4
 
@@ -97,20 +97,14 @@ static int scsi_debug_fake_blk0 = DEF_FAKE_BLK0;
 #define DISK_SPEED     (HZ/10)	/* 100ms */
 #define CAPACITY (N_HEAD * N_SECTOR * N_CYLINDER)
 #define SECT_SIZE_PER(TGT) SECT_SIZE
-#define SECT_PER_ELEM (STORE_ELEM_SIZE / SECT_SIZE)
 
 static int starts[] =
 {N_SECTOR,
  N_HEAD * N_SECTOR,		/* Single cylinder */
  N_HEAD * N_SECTOR * 4,
  0 /* CAPACITY */, 0};
-static int npart = 0;
 
-typedef struct scsi_debug_store_elem {
-	unsigned char * p;
-} Sd_store_elem;
-
-static Sd_store_elem * store_arr = 0;
+static unsigned char * fake_storep;
 
 typedef struct sdebug_dev_info {
 	Scsi_Device * sdp;
@@ -135,13 +129,18 @@ typedef void (*done_fct_t) (Scsi_Cmnd *);
 
 static volatile done_fct_t * do_done = 0;
 
-struct Scsi_Host * SHpnt = NULL;
+static struct Scsi_Host * SHpnt = NULL;
 
+static int scsi_debug_inquiry(unsigned char * cmd, int target,
+			      unsigned char * buff, int bufflen,
+			      Sdebug_dev_info * devip);
+static int scsi_debug_mode_sense(unsigned char * cmd, int target,
+			         unsigned char * buff, int bufflen,
+			         Sdebug_dev_info * devip);
 static int scsi_debug_read(Scsi_Cmnd * SCpnt, int upper_blk, int block, 
 			   int num, int * errstsp, Sdebug_dev_info * devip);
 static int scsi_debug_write(Scsi_Cmnd * SCpnt, int upper_blk, int block, 
 			    int num, int * errstsp, Sdebug_dev_info * devip);
-static void scsi_debug_send_self_command(struct Scsi_Host * shpnt);
 static void scsi_debug_intr_handle(unsigned long);
 static Sdebug_dev_info * devInfoReg(Scsi_Device * sdp);
 static void mk_sense_buffer(Sdebug_dev_info * devip, int index, int key, 
@@ -160,49 +159,23 @@ static int scsi_debug_lockup = 0;
 #define SENSE_BUFF_LEN 32
 static char sense_buffers[NUM_SENSE_BUFFS][SENSE_BUFF_LEN];
 
-static int made_block0 = 0;
 
-static void scsi_debug_mkblock0(unsigned char * buff, int bufflen,
-				Scsi_Cmnd * SCpnt)
+static inline 
+unsigned char * sdebug_scatg2virt(const struct scatterlist * sclp)
 {
-	int i;
-	struct partition *p;
-
-	memset(buff, 0, bufflen);
-	*((unsigned short *) (buff + 510)) = 0xAA55;
-	p = (struct partition *) (buff + 0x1be);
-	i = 0;
-	while (starts[i + 1]) {
-		int start_cyl, end_cyl;
-
-		start_cyl = starts[i] / N_HEAD / N_SECTOR;
-		end_cyl = (starts[i + 1] - 1) / N_HEAD / N_SECTOR;
-		p->boot_ind = 0;
-
-		p->head = (i == 0 ? 1 : 0);
-		p->sector = 1 | ((start_cyl >> 8) << 6);
-		p->cyl = (start_cyl & 0xff);
-
-		p->end_head = N_HEAD - 1;
-		p->end_sector = N_SECTOR | ((end_cyl >> 8) << 6);
-		p->end_cyl = (end_cyl & 0xff);
-
-		p->start_sect = starts[i];
-		p->nr_sects = starts[i + 1] - starts[i];
-		p->sys_ind = 0x83;	/* Linux ext2 partition */
-		p++;
-		i++;
-	}
-	if (!npart)
-		npart = i;
-	made_block0 = 1;
-	i = (bufflen > STORE_ELEM_SIZE) ? STORE_ELEM_SIZE : bufflen;
-	memcpy(store_arr[0].p, buff, i);
+	if (NULL == sclp)
+		return NULL;
+	else if (sclp->page)
+		return (unsigned char *)page_address(sclp->page) + 
+		       sclp->offset;
+	else
+		return NULL;
 }
 
+static
 int scsi_debug_queuecommand(Scsi_Cmnd * SCpnt, void (*done) (Scsi_Cmnd *))
 {
-	unchar *cmd = (unchar *) SCpnt->cmnd;
+	unsigned char *cmd = (unsigned char *) SCpnt->cmnd;
 	int block;
 	int upper_blk;
 	unsigned char *buff;
@@ -214,6 +187,12 @@ int scsi_debug_queuecommand(Scsi_Cmnd * SCpnt, void (*done) (Scsi_Cmnd *))
 	Sdebug_dev_info * devip = NULL;
 	char * sbuff;
 
+	if (SCSI_DEBUG_OPT_NOISE & scsi_debug_opts) {
+		printk(KERN_INFO "scsi_debug: queue_command: cmd ");
+		for (i = 0, num = SCpnt->cmd_len; i < num; ++i)
+	            printk("%02x ", cmd[i]);
+		printk("   use_sg=%d\n", SCpnt->use_sg);
+	}
 	/*
 	 * If we are being notified of the mid-level reposessing a command
 	 * due to timeout, just return.
@@ -222,14 +201,23 @@ int scsi_debug_queuecommand(Scsi_Cmnd * SCpnt, void (*done) (Scsi_Cmnd *))
 		return 0;
 	}
 
-	buff = (unsigned char *) SCpnt->request_buffer;
+	if (SCpnt->use_sg) { /* just use first element */
+		struct scatterlist *sgpnt = (struct scatterlist *)
+						SCpnt->request_buffer;
+
+		buff = sdebug_scatg2virt(&sgpnt[0]);
+		bufflen = sgpnt[0].length;
+		/* READ and WRITE process scatterlist themselves */
+	}
+	else 
+		buff = (unsigned char *) SCpnt->request_buffer;
 
         /*
          * If a command comes for the ID of the host itself, just print
          * a silly message and return.
          */
         if(target == 7) {
-                printk("How do you do!\n");
+                printk(KERN_WARNING "How do you do!\n");
                 SCpnt->result = 0;
                 done(SCpnt);
                 return 0;
@@ -243,7 +231,7 @@ int scsi_debug_queuecommand(Scsi_Cmnd * SCpnt, void (*done) (Scsi_Cmnd *))
 #if 0
 	printk(KERN_INFO "sdebug:qc: host_no=%d, id=%d, sdp=%p, cmd=0x%x\n",
 	       (int)SCpnt->device->host->host_no, (int)SCpnt->device->id,
-	       SCpnt->device, (int)(unsigned char)*cmd);
+	       SCpnt->device, (int)*cmd);
 #endif
 	if (NULL == SCpnt->device->hostdata) {
 		devip = devInfoReg(SCpnt->device);
@@ -257,6 +245,13 @@ int scsi_debug_queuecommand(Scsi_Cmnd * SCpnt, void (*done) (Scsi_Cmnd *))
 	devip = SCpnt->device->hostdata;
 
 	switch (*cmd) {
+	case INQUIRY:     /* mandatory */
+		scsi_debug_errsts = scsi_debug_inquiry(cmd, target, buff, 
+						       bufflen, devip);
+		/* assume INQUIRY called first so setup max_cmd_len */
+		if (SCpnt->host->max_cmd_len != SCSI_DEBUG_MAX_CMD_LEN)
+			SCpnt->host->max_cmd_len = SCSI_DEBUG_MAX_CMD_LEN;
+		break;
 	case REQUEST_SENSE:	/* mandatory */
 		SCSI_LOG_LLQUEUE(3, printk("Request sense...\n"));
 		if (devip) {
@@ -294,23 +289,6 @@ int scsi_debug_queuecommand(Scsi_Cmnd * SCpnt, void (*done) (Scsi_Cmnd *))
 		}
 		scsi_debug_errsts = 0;
 		break;
-	case INQUIRY:     /* mandatory */
-		SCSI_LOG_LLQUEUE(3, printk("Inquiry...(%p %d)\n", buff, bufflen));
-		memset(buff, 0, bufflen);
-		buff[0] = DEVICE_TYPE(target);
-		buff[1] = DISK_REMOVEABLE(target) ? 0x80 : 0;	
-				/* Removable disk */
-		buff[2] = 2;	/* claim SCSI 2 */
-		buff[4] = 36 - 5;
-		memcpy(&buff[8], "Linux   ", 8);
-		memcpy(&buff[16], "scsi_debug      ", 16);
-		memcpy(&buff[32], "0002", 4);
-		scsi_debug_errsts = 0;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,10)
-		if (SCpnt->host->max_cmd_len != SCSI_DEBUG_MAX_CMD_LEN)
-			SCpnt->host->max_cmd_len = SCSI_DEBUG_MAX_CMD_LEN;
-#endif
-		break;
 	case SEND_DIAGNOSTIC:     /* mandatory */
 		SCSI_LOG_LLQUEUE(3, printk("Send Diagnostic\n"));
 		if (buff)
@@ -318,7 +296,8 @@ int scsi_debug_queuecommand(Scsi_Cmnd * SCpnt, void (*done) (Scsi_Cmnd *))
 		scsi_debug_errsts = 0;
 		break;
 	case TEST_UNIT_READY:     /* mandatory */
-		SCSI_LOG_LLQUEUE(3, printk("Test unit ready(%p %d)\n", buff, bufflen));
+		SCSI_LOG_LLQUEUE(3, printk("Test unit ready(%p %d)\n", 
+					   buff, bufflen));
 		if (buff)
 			memset(buff, 0, bufflen);
 		scsi_debug_errsts = 0;
@@ -424,19 +403,15 @@ int scsi_debug_queuecommand(Scsi_Cmnd * SCpnt, void (*done) (Scsi_Cmnd *))
 		(done) (SCpnt);	
 		return 0;
 	case MODE_SENSE:
-		/*
-		 * Used to detect write protected status.
-		 */
-		scsi_debug_errsts = 0;
-		memset(buff, 0, 6);
+	case MODE_SENSE_10:
+		scsi_debug_errsts = 
+		    scsi_debug_mode_sense(cmd, target, buff, bufflen, devip);
 		break;
 	default:
 #if 0
-		SCSI_LOG_LLQUEUE(3, printk("Unknown command %d\n", *cmd));
-		SCpnt->result = DID_NO_CONNECT << 16;
-		done(SCpnt);
-		return 0;
-#else
+		printk(KERN_INFO "scsi_debug: Unsupported command, "
+		       "opcode=0x%x\n", (int)cmd[0]);
+#endif
 		if (check_reset(SCpnt, devip)) {
 			done(SCpnt);
 			return 0;
@@ -445,7 +420,6 @@ int scsi_debug_queuecommand(Scsi_Cmnd * SCpnt, void (*done) (Scsi_Cmnd *))
 				    (CHECK_CONDITION << 1);
 		mk_sense_buffer(devip, 2, ILLEGAL_REQUEST, 0x20, 0, 14);
 		break;
-#endif
 	}
 
 	spin_lock_irqsave(&mailbox_lock, iflags);
@@ -485,15 +459,24 @@ int scsi_debug_queuecommand(Scsi_Cmnd * SCpnt, void (*done) (Scsi_Cmnd *))
 	spin_unlock_irqrestore(&mailbox_lock, iflags);
 	add_timer(&timeout[i]);
 	if (!done)
-		printk("scsi_debug_queuecommand: done can't be NULL\n");
+		printk(KERN_ERR "scsi_debug_queuecommand: "
+		       "done can't be NULL\n");
 
 #if 0
-	printk("Sending command (%d %x %d %d)...", i, done, 
+	printk(KERN_INFO "Sending command (%d %x %d %d)...", i, done, 
 	       timeout[i].expires, jiffies);
 #endif
 #endif
 
 	return 0;
+}
+
+static int scsi_debug_ioctl(Scsi_Device *dev, int cmd, void *arg)
+{
+	if (SCSI_DEBUG_OPT_NOISE & scsi_debug_opts) {
+		printk(KERN_INFO "scsi_debug: ioctl: cmd=0x%x\n", cmd);
+	}
+	return -ENOTTY;
 }
 
 static int check_reset(Scsi_Cmnd * SCpnt, Sdebug_dev_info * devip)
@@ -508,21 +491,188 @@ static int check_reset(Scsi_Cmnd * SCpnt, Sdebug_dev_info * devip)
 	return 0;
 }
 
-static inline 
-unsigned char * sdebug_scatg2virt(const struct scatterlist * sclp)
+#define SDEBUG_MAX_INQ_SZ 58
+
+static int scsi_debug_inquiry(unsigned char * cmd, int target,
+			      unsigned char * buff, int bufflen,
+			      Sdebug_dev_info * devip)
 {
-	if (NULL == sclp)
-		return NULL;
-	else if (sclp->page)
-		return (unsigned char *)page_address(sclp->page) + 
-		       sclp->offset;
-	else {
-#ifdef SDEBUG_SG_ADDRESS
-		return sclp->address;
-#else
-		return NULL;
-#endif
+	unsigned char pq_pdt;
+	unsigned char arr[SDEBUG_MAX_INQ_SZ];
+	int min_len = bufflen > SDEBUG_MAX_INQ_SZ ? 
+			SDEBUG_MAX_INQ_SZ : bufflen;
+
+	SCSI_LOG_LLQUEUE(3, printk("Inquiry...(%p %d)\n", buff, bufflen));
+	if (bufflen < cmd[4])
+		printk(KERN_INFO "scsi_debug: inquiry: bufflen=%d "
+		       "< alloc_length=%d\n", bufflen, (int)cmd[4]);
+	memset(buff, 0, bufflen);
+	memset(arr, 0, SDEBUG_MAX_INQ_SZ);
+	pq_pdt = DEVICE_TYPE(target);
+	arr[0] = pq_pdt;
+	if (0x2 & cmd[1]) {  /* CMDDT bit set */
+		mk_sense_buffer(devip, 1, ILLEGAL_REQUEST, 0x24, 0, 14);
+		return (COMMAND_COMPLETE << 8) | (CHECK_CONDITION << 1);
 	}
+	else if (0x1 & cmd[1]) {  /* EVPD bit set */
+		if (0 == cmd[2]) { /* supported vital product data pages */
+			arr[3] = 1;
+			arr[4] = 0x80; /* ... only unit serial number */
+		}
+		else if (0x80 == cmd[2]) { /* unit serial number */
+			arr[1] = 0x80;
+			arr[3] = 4;
+			arr[4] = '1'; arr[5] = '2'; arr[6] = '3';
+			arr[7] = '4';
+		}
+		else {
+			/* Illegal request, invalid field in cdb */
+			mk_sense_buffer(devip, 1, ILLEGAL_REQUEST, 0x24, 0, 14);
+			return (COMMAND_COMPLETE << 8) | (CHECK_CONDITION << 1);
+		}
+		memcpy(buff, arr, min_len); 
+		return 0;
+	}
+	/* drops through here for a standard inquiry */
+	arr[1] = DEV_REMOVEABLE(target) ? 0x80 : 0;	/* Removable disk */
+	arr[2] = 3;	/* claim SCSI 3 */
+	arr[4] = SDEBUG_MAX_INQ_SZ - 5;
+	arr[7] = 0x3a; /* claim: WBUS16, SYNC, LINKED + CMDQUE */
+	memcpy(&arr[8], "Linux   ", 8);
+	memcpy(&arr[16], "scsi_debug      ", 16);
+	memcpy(&arr[32], "0003", 4);
+	memcpy(buff, arr, min_len);
+	return 0;
+}
+
+/* <<Following mode page info copied from ST318451LW>> */ 
+
+static int sdebug_err_recov_pg(unsigned char * p, int pcontrol, int target)
+{	/* Read-Write Error Recovery page for mode_sense */
+	unsigned char err_recov_pg[] = {0x1, 0xa, 0xc0, 11, 240, 0, 0, 0, 
+					5, 0, 0xff, 0xff};
+
+	memcpy(p, err_recov_pg, sizeof(err_recov_pg));
+	if (1 == pcontrol)
+		memset(p + 2, 0, sizeof(err_recov_pg) - 2);
+	return sizeof(err_recov_pg);
+}
+
+static int sdebug_disconnect_pg(unsigned char * p, int pcontrol, int target)
+{ 	/* Disconnect-Reconnect page for mode_sense */
+	unsigned char disconnect_pg[] = {0x2, 0xe, 128, 128, 0, 10, 0, 0, 
+					 0, 0, 0, 0, 0, 0, 0, 0};
+
+	memcpy(p, disconnect_pg, sizeof(disconnect_pg));
+	if (1 == pcontrol)
+		memset(p + 2, 0, sizeof(disconnect_pg) - 2);
+	return sizeof(disconnect_pg);
+}
+
+static int sdebug_caching_pg(unsigned char * p, int pcontrol, int target)
+{ 	/* Caching page for mode_sense */
+	unsigned char caching_pg[] = {0x8, 18, 0x14, 0, 0xff, 0xff, 0, 0, 
+		0xff, 0xff, 0xff, 0xff, 0x80, 0x14, 0, 0,     0, 0, 0, 0};
+
+	memcpy(p, caching_pg, sizeof(caching_pg));
+	if (1 == pcontrol)
+		memset(p + 2, 0, sizeof(caching_pg) - 2);
+	return sizeof(caching_pg);
+}
+
+static int sdebug_ctrl_m_pg(unsigned char * p, int pcontrol, int target)
+{ 	/* Control mode page for mode_sense */
+	unsigned char ctrl_m_pg[] = {0xa, 10, 2, 0, 0, 0, 0, 0,
+				     0, 0, 0x2, 0x4b};
+
+	memcpy(p, ctrl_m_pg, sizeof(ctrl_m_pg));
+	if (1 == pcontrol)
+		memset(p + 2, 0, sizeof(ctrl_m_pg) - 2);
+	return sizeof(ctrl_m_pg);
+}
+
+
+#define SDEBUG_MAX_MSENSE_SZ 256
+
+static int scsi_debug_mode_sense(unsigned char * cmd, int target,
+			         unsigned char * buff, int bufflen,
+			         Sdebug_dev_info * devip)
+{
+	unsigned char dbd;
+	int pcontrol, pcode;
+	unsigned char dev_spec;
+	int alloc_len, msense_6, offset, len;
+	unsigned char * ap;
+	unsigned char arr[SDEBUG_MAX_MSENSE_SZ];
+	int min_len = bufflen > SDEBUG_MAX_MSENSE_SZ ? 
+			SDEBUG_MAX_MSENSE_SZ : bufflen;
+
+	SCSI_LOG_LLQUEUE(3, printk("Mode sense ...(%p %d)\n", buff, bufflen));
+	dbd = cmd[1] & 0x8;
+	pcontrol = (cmd[2] & 0xc0) >> 6;
+	pcode = cmd[2] & 0x3f;
+	msense_6 = (MODE_SENSE == cmd[0]);
+	alloc_len = msense_6 ? cmd[4] : ((cmd[7] << 8) | cmd[6]);
+	/* printk(KERN_INFO "msense: dbd=%d pcontrol=%d pcode=%d "
+		"msense_6=%d alloc_len=%d\n", dbd, pcontrol, pcode, "
+		"msense_6, alloc_len); */
+	if (bufflen < alloc_len)
+		printk(KERN_INFO "scsi_debug: mode_sense: bufflen=%d "
+		       "< alloc_length=%d\n", bufflen, alloc_len);
+	memset(buff, 0, bufflen);
+	memset(arr, 0, SDEBUG_MAX_MSENSE_SZ);
+	if (0x3 == pcontrol) {  /* Saving values not supported */
+		mk_sense_buffer(devip, 1, ILLEGAL_REQUEST, 0x39, 0, 14);
+		return (COMMAND_COMPLETE << 8) | (CHECK_CONDITION << 1);
+	}
+	dev_spec = DEV_READONLY(target) ? 0x80 : 0x0;
+	if (msense_6) {
+		arr[2] = dev_spec;
+		offset = 4;
+	}
+	else {
+		arr[3] = dev_spec;
+		offset = 8;
+	}
+	ap = arr + offset;
+
+	switch (pcode) {
+	case 0x1:	/* Read-Write error recovery page, direct access */
+		len = sdebug_err_recov_pg(ap, pcontrol, target);
+		offset += len;
+		break;
+	case 0x2:	/* Disconnect-Reconnect page, all devices */
+		len = sdebug_disconnect_pg(ap, pcontrol, target);
+		offset += len;
+		break;
+	case 0x8:	/* Caching page, direct access */
+		len = sdebug_caching_pg(ap, pcontrol, target);
+		offset += len;
+		break;
+	case 0xa:	/* Control Mode page, all devices */
+		len = sdebug_ctrl_m_pg(ap, pcontrol, target);
+		offset += len;
+		break;
+	case 0x3f:	/* Read all Mode pages */
+		len = sdebug_err_recov_pg(ap, pcontrol, target);
+		len += sdebug_disconnect_pg(ap + len, pcontrol, target);
+		len += sdebug_caching_pg(ap + len, pcontrol, target);
+		len += sdebug_ctrl_m_pg(ap + len, pcontrol, target);
+		offset += len;
+		break;
+	default:
+		mk_sense_buffer(devip, 1, ILLEGAL_REQUEST, 0x24, 0, 14);
+		return (COMMAND_COMPLETE << 8) | (CHECK_CONDITION << 1);
+	}
+	if (msense_6)
+		arr[0] = offset - 1;
+	else {
+		offset -= 2;
+		arr[0] = (offset >> 8) & 0xff; 
+		arr[1] = offset & 0xff; 
+	}
+	memcpy(buff, arr, min_len);
+	return 0;
 }
 
 static int scsi_debug_read(Scsi_Cmnd * SCpnt, int upper_blk, int block, 
@@ -549,11 +699,19 @@ static int scsi_debug_read(Scsi_Cmnd * SCpnt, int upper_blk, int block,
 			usleep(delay);
 	}
 #endif
-
+	if ((SCSI_DEBUG_OPT_MEDIUM_ERR & scsi_debug_opts) &&
+	    (block >= OPT_MEDIUM_ERR_ADDR) && 
+	    (block < (OPT_MEDIUM_ERR_ADDR + num))) {
+		*errstsp = (COMMAND_COMPLETE << 8) |
+			   (CHECK_CONDITION << 1);
+		mk_sense_buffer(devip, 1, MEDIUM_ERROR, 0x11, 0, 14);
+		/* claim unrecoverable read error */
+		return 1;
+	}
 	read_lock_irqsave(&sdebug_atomic_rw, iflags);
         sgcount = 0;
 	nbytes = bufflen;
-	/* printk("scsi_debug_read: block=%d, tot_bufflen=%d\n", 
+	/* printk(KERN_INFO "scsi_debug_read: block=%d, tot_bufflen=%d\n", 
 	       block, bufflen); */
 	if (SCpnt->use_sg) {
 		sgcount = 0;
@@ -563,30 +721,7 @@ static int scsi_debug_read(Scsi_Cmnd * SCpnt, int upper_blk, int block,
 	}
 	*errstsp = 0;
 	do {
-		int resid, k, off, len, rem, blk;
-		unsigned char * bp;
-
-		/* If this is block 0, then we want to read the partition
-		 * table for this device.  Let's make one up */
-		if (scsi_debug_fake_blk0 && (block == 0) && (! made_block0)) {
-			scsi_debug_mkblock0(buff, bufflen, SCpnt);
-			*errstsp = 0;
-			break;
-		}
-		bp = buff;
-		blk = block;
-		for (resid = bufflen; resid > 0; resid -= len) {
-			k = blk / SECT_PER_ELEM; 
-			off = (blk % SECT_PER_ELEM) * SECT_SIZE;
-			rem = STORE_ELEM_SIZE - off;
-			len = (resid > rem) ? rem : resid;
-/* printk("sdr: blk=%d k=%d off=%d rem=%d resid"
-			       "=%d len=%d  sgcount=%d\n", blk, k, 
-				off, rem, resid, len, sgcount); */
-			memcpy(bp, store_arr[k].p + off, len);
-			bp += len;
-			blk += len / SECT_SIZE;
-		}
+		memcpy(buff, fake_storep + (block * SECT_SIZE), bufflen);
 #if 0
 		/* Simulate a disk change */
 		if (block == 0xfff0) {
@@ -612,7 +747,8 @@ static int scsi_debug_read(Scsi_Cmnd * SCpnt, int upper_blk, int block,
 			}
 		}
 		else if (nbytes > 0)
-			printk("sdebug_read: unexpected nbytes=%d\n", nbytes);
+			printk(KERN_WARNING "sdebug_read: unexpected "
+			       "nbytes=%d\n", nbytes);
 	} while (nbytes);
 	read_unlock_irqrestore(&sdebug_atomic_rw, iflags);
 	return 0;
@@ -645,20 +781,7 @@ static int scsi_debug_write(Scsi_Cmnd * SCpnt, int upper_blk, int block,
 	}
 	*errstsp = 0;
 	do {
-		int resid, k, off, len, rem, blk;
-		unsigned char * bp;
-
-		bp = buff;
-		blk = block;
-		for (resid = bufflen; resid > 0; resid -= len) {
-			k = blk / SECT_PER_ELEM; 
-			off = (blk % SECT_PER_ELEM) * SECT_SIZE;
-			rem = STORE_ELEM_SIZE - off;
-			len = (resid > rem) ? rem : resid;
-			memcpy(store_arr[k].p + off, bp, len);
-			bp += len;
-			blk += len / SECT_SIZE;
-		}
+		memcpy(fake_storep + (block * SECT_SIZE), buff, bufflen);
 
 		nbytes -= bufflen;
 		if (SCpnt->use_sg) {
@@ -670,50 +793,11 @@ static int scsi_debug_write(Scsi_Cmnd * SCpnt, int upper_blk, int block,
 			}
 		}
 		else if (nbytes > 0)
-			printk("sdebug_write: unexpected nbytes=%d\n", nbytes);
+			printk(KERN_WARNING "sdebug_write: "
+			       "unexpected nbytes=%d\n", nbytes);
 	} while (nbytes);
 	write_unlock_irqrestore(&sdebug_atomic_rw, iflags);
 	return 0;
-}
-
-static void scsi_debug_send_self_command(struct Scsi_Host * shpnt)
-{
-	static unsigned char cmd[6] =
-	{TEST_UNIT_READY, 0, 0, 0, 0, 0};
-
-        Scsi_Request  * scp;
-        Scsi_Device   * sdev;
-        
-        printk("Allocating host dev\n");
-        sdev = scsi_get_host_dev(shpnt);
-        if(sdev==NULL)
-        {
-        	printk("Out of memory.\n");
-        	return;
-        }
-        
-        printk("Got %p. Allocating command block\n", sdev);
-        scp  = scsi_allocate_request(sdev);
-        printk("Got %p\n", scp);
-        
-        if(scp==NULL)
-        {
-        	printk("Out of memory.\n");
-        	goto bail;
-        }
-
-        scp->sr_cmd_len = 6;
-        scp->sr_use_sg = 0;
-        
-        printk("Sending command\n");
-        scsi_wait_req (scp, (void *) cmd, (void *) NULL,
-                       0, 100, 3);
-        
-        printk("Releasing command\n");
-        scsi_release_request(scp);
-bail:
-	printk("Freeing device\n");
-        scsi_free_host_dev(sdev);
 }
 
 /* A "high" level interrupt handler.  This should be called once per jiffy
@@ -734,18 +818,19 @@ static void scsi_debug_intr_handle(unsigned long indx)
 	SCint[indx] = NULL;
 
 	if (!my_done) {
-		printk("scsi_debug_intr_handle: Unexpected interrupt\n");
+		printk(KERN_ERR "scsi_debug_intr_handle: Unexpected "
+		       "interrupt\n");
 		return;
 	}
 #if 0
-	printk("In intr_handle...");
-	printk("...done %d %x %d %d\n", i, my_done, to, jiffies);
-	printk("In intr_handle: %d %x %x\n", i, SCtmp, my_done);
+	printk(KERN_INFO "In intr_handle...");
+	printk(KERN_INFO "...done %d %x %d %d\n", i, my_done, to, jiffies);
+	printk(KERN_INFO "In intr_handle: %d %x %x\n", i, SCtmp, my_done);
 #endif
 
 	my_done(SCtmp);
 #if 0
-	printk("Called done.\n");
+	printk(KERN_INFO "Called done.\n");
 #endif
 }
 
@@ -753,14 +838,13 @@ static int initialized = 0;
 
 static int do_init(void)
 {
-	int sz;
+	int sz = STORE_SIZE;
 
 	starts[3] = CAPACITY;
-	sz = sizeof(Sd_store_elem) * STORE_ELEMENTS;
-	store_arr = kmalloc(sz, GFP_ATOMIC);
-	if (NULL == store_arr)
+	fake_storep = vmalloc(sz);
+	if (NULL == fake_storep)
 		return 1;
-	memset(store_arr, 0, sz);
+	memset(fake_storep, 0, sz);
 
 	sz = sizeof(done_fct_t) * SCSI_DEBUG_MAILBOXES;
 	do_done = kmalloc(sz, GFP_ATOMIC);
@@ -783,8 +867,8 @@ static int do_init(void)
 	return 0;
 
 out:
-	if (store_arr)
-		kfree(store_arr);
+	if (fake_storep)
+		vfree(fake_storep);
 	if (do_done)
 		kfree((void *)do_done);
 	if (timeout)
@@ -799,33 +883,30 @@ static void do_end(void)
 	kfree(SCint);
 	kfree(timeout);
 	kfree((void *)do_done);
-	kfree(store_arr);
+	vfree(fake_storep);
 }
 
 
-int scsi_debug_detect(Scsi_Host_Template * tpnt)
+static int scsi_debug_detect(Scsi_Host_Template * tpnt)
 {
-	int k, num, sz;
+	int k, sz;
 
+	if (SCSI_DEBUG_OPT_NOISE & scsi_debug_opts)
+		printk(KERN_INFO "scsi_debug: detect\n");
 	if (0 == initialized) {
 		++initialized;
 		sz = sizeof(Sdebug_dev_info) * scsi_debug_num_devs;
 		devInfop = kmalloc(sz, GFP_ATOMIC);
 		if (NULL == devInfop) {
-			printk("scsi_debug_detect: out of memory, 0.5\n");
+			printk(KERN_ERR "scsi_debug_detect: out of "
+			       "memory, 0.5\n");
 			return 0;
 		}
 		memset(devInfop, 0, sz);
 		if (do_init()) {
-			printk("scsi_debug_detect: out of memory, 0\n");
+			printk(KERN_ERR "scsi_debug_detect: out of memory"
+			       ", 0\n");
 			return 0;
-		}
-		for (k = 0; k < STORE_ELEMENTS; ++k) {
-			store_arr[k].p = (unsigned char *)
-				__get_free_pages(GFP_ATOMIC, STORE_ELEM_ORDER);
-			if (0 == store_arr[k].p)
-				goto detect_err;
-			memset(store_arr[k].p, 0, STORE_ELEM_SIZE);
 		}
 		for (k = 0; k < NUM_SENSE_BUFFS; ++k)
 			sense_buffers[k][0] = 0x70;
@@ -836,43 +917,21 @@ int scsi_debug_detect(Scsi_Host_Template * tpnt)
 		return NR_HOSTS_PRESENT;
 	}
 	else {
-		printk("scsi_debug_detect: called again\n");
+		printk(KERN_WARNING "scsi_debug_detect: called again\n");
 		return 0;
 	}
-
-detect_err:
-	num = k;
-	for (k = 0; k < STORE_ELEMENTS; ++k) {
-		if (0 != store_arr[k].p) {
-			free_pages((unsigned long)store_arr[k].p, 
-				   STORE_ELEM_ORDER);
-			store_arr[k].p = NULL;
-		}
-	}
-	printk("scsi_debug_detect: out of memory: %d out of %d bytes\n",
-	       (int)(num * STORE_ELEM_SIZE), 
-	       (int)(scsi_debug_dev_size_mb * 1024 * 1024));
-	return 0;
 }
 
 
 static int num_releases = 0;
 
-int scsi_debug_release(struct Scsi_Host * hpnt)
+static int scsi_debug_release(struct Scsi_Host * hpnt)
 {
-	int k;
-	
+	if (SCSI_DEBUG_OPT_NOISE & scsi_debug_opts)
+		printk(KERN_INFO "scsi_debug: release\n");
 	scsi_unregister(hpnt);
 	if (++num_releases != NR_HOSTS_PRESENT)
 		return 0;
-
-	for (k = 0; k < STORE_ELEMENTS; ++k) {
-		if (0 != store_arr[k].p) {
-			free_pages((unsigned long)store_arr[k].p, 
-				   STORE_ELEM_ORDER);
-			store_arr[k].p = NULL;
-		}
-	}
 	do_end();
 	kfree(devInfop);
 	return 0;
@@ -922,8 +981,10 @@ static void mk_sense_buffer(Sdebug_dev_info * devip, int index, int key,
 	sbuff[13] = asq;
 }
 
-int scsi_debug_abort(Scsi_Cmnd * SCpnt)
+static int scsi_debug_abort(Scsi_Cmnd * SCpnt)
 {
+	if (SCSI_DEBUG_OPT_NOISE & scsi_debug_opts)
+		printk(KERN_INFO "scsi_debug: abort\n");
 #if 1
 	++num_aborts;
 	return SUCCESS;
@@ -947,8 +1008,10 @@ int scsi_debug_abort(Scsi_Cmnd * SCpnt)
 #endif
 }
 
-int scsi_debug_biosparam(Disk * disk, kdev_t dev, int *info)
+static int scsi_debug_biosparam(Disk * disk, kdev_t dev, int *info)
 {
+	if (SCSI_DEBUG_OPT_NOISE & scsi_debug_opts)
+		printk(KERN_INFO "scsi_debug: biosparam\n");
 	/* int size = disk->capacity; */
 	info[0] = N_HEAD;
 	info[1] = N_SECTOR;
@@ -958,36 +1021,13 @@ int scsi_debug_biosparam(Disk * disk, kdev_t dev, int *info)
 	return 0;
 }
 
-#if 0
-int scsi_debug_reset(Scsi_Cmnd * SCpnt, unsigned int why)
-{
-	int i;
-	unsigned long iflags;
-
-	void (*my_done) (Scsi_Cmnd *);
-	printk("Bus unlocked by reset - %d\n", why);
-	scsi_debug_lockup = 0;
-	for (i = 0; i < SCSI_DEBUG_MAILBOXES; i++) {
-		if (SCint[i] == NULL)
-			continue;
-		SCint[i]->result = DID_RESET << 16;
-		my_done = do_done[i];
-		my_done(SCint[i]);
-		spin_lock_irqsave(&mailbox_lock, iflags);
-		SCint[i] = NULL;
-		do_done[i] = NULL;
-		timeout[i].function = NULL;
-		spin_unlock_irqrestore(&mailbox_lock, iflags);
-	}
-	return SCSI_RESET_SUCCESS;
-}
-#endif
-
-int scsi_debug_device_reset(Scsi_Cmnd * SCpnt)
+static int scsi_debug_device_reset(Scsi_Cmnd * SCpnt)
 {
 	Scsi_Device * sdp;
 	int k;
 
+	if (SCSI_DEBUG_OPT_NOISE & scsi_debug_opts)
+		printk(KERN_INFO "scsi_debug: device_reset\n");
 	++num_dev_resets;
 	if (SCpnt && ((sdp = SCpnt->device))) {
 		for (k = 0; k < scsi_debug_num_devs; ++k) {
@@ -1000,12 +1040,14 @@ int scsi_debug_device_reset(Scsi_Cmnd * SCpnt)
 	return SUCCESS;
 }
 
-int scsi_debug_bus_reset(Scsi_Cmnd * SCpnt)
+static int scsi_debug_bus_reset(Scsi_Cmnd * SCpnt)
 {
 	Scsi_Device * sdp;
 	struct Scsi_Host * hp;
 	int k;
 
+	if (SCSI_DEBUG_OPT_NOISE & scsi_debug_opts)
+		printk(KERN_INFO "scsi_debug: bus_reset\n");
 	++num_bus_resets;
 	if (SCpnt && ((sdp = SCpnt->device)) && ((hp = sdp->host))) {
 		for (k = 0; k < scsi_debug_num_devs; ++k) {
@@ -1016,10 +1058,12 @@ int scsi_debug_bus_reset(Scsi_Cmnd * SCpnt)
 	return SUCCESS;
 }
 
-int scsi_debug_host_reset(Scsi_Cmnd * SCpnt)
+static int scsi_debug_host_reset(Scsi_Cmnd * SCpnt)
 {
 	int k;
 
+	if (SCSI_DEBUG_OPT_NOISE & scsi_debug_opts)
+		printk(KERN_INFO "scsi_debug: host_reset\n");
 	++num_host_resets;
 	for (k = 0; k < scsi_debug_num_devs; ++k)
 		devInfop[k].reset = 1;
@@ -1037,7 +1081,7 @@ static int __init scsi_debug_num_devs_setup(char *str)
             scsi_debug_num_devs = tmp;
         return 1;
     } else {
-        printk("scsi_debug_num_devs: usage scsi_debug_num_devs=<n> "
+        printk(KERN_INFO "scsi_debug_num_devs: usage scsi_debug_num_devs=<n> "
                "(<n> can be from 1 to around 2000)\n");
         return 0;
     }
@@ -1054,13 +1098,32 @@ static int __init scsi_debug_dev_size_mb_setup(char *str)
             scsi_debug_dev_size_mb = tmp;
         return 1;
     } else {
-        printk("scsi_debug_dev_size_mb: usage scsi_debug_dev_size_mb=<n>\n"
+        printk(KERN_INFO "scsi_debug_dev_size_mb: usage "
+	       "scsi_debug_dev_size_mb=<n>\n"
                "    (<n> is number of MB ram shared by all devs\n");
         return 0;
     }
 }
 
 __setup("scsi_debug_dev_size_mb=", scsi_debug_dev_size_mb_setup);
+
+static int __init scsi_debug_opts_setup(char *str)
+{   
+    int tmp; 
+    
+    if (get_option(&str, &tmp) == 1) {
+        if (tmp > 0)
+            scsi_debug_opts = tmp;
+        return 1;
+    } else {
+        printk(KERN_INFO "scsi_debug_opts: usage "
+	       "scsi_debug_opts=<n>\n"
+               "    (1->noise, 2->medium_error, 4->... (can be or-ed)\n");
+        return 0;
+    }
+}
+
+__setup("scsi_debug_opts=", scsi_debug_opts_setup);
 #endif
 
 MODULE_AUTHOR("Eric Youngdale + Douglas Gilbert");
@@ -1069,6 +1132,8 @@ MODULE_PARM(scsi_debug_num_devs, "i");
 MODULE_PARM_DESC(scsi_debug_num_devs, "number of SCSI devices to simulate");
 MODULE_PARM(scsi_debug_dev_size_mb, "i");
 MODULE_PARM_DESC(scsi_debug_dev_size_mb, "size in MB of ram shared by devs");
+MODULE_PARM(scsi_debug_opts, "i");
+MODULE_PARM_DESC(scsi_debug_opts, "1->noise, 2->medium_error, 4->...");
 
 #ifdef MODULE_LICENSE
 MODULE_LICENSE("GPL");
@@ -1076,19 +1141,20 @@ MODULE_LICENSE("GPL");
 
 static char sdebug_info[256];
 
-const char * scsi_debug_info(struct Scsi_Host * shp)
+static const char * scsi_debug_info(struct Scsi_Host * shp)
 {
 	sprintf(sdebug_info, "scsi_debug, %s, num_devs=%d, "
-		"dev_size_mb=%d\n", scsi_debug_version_str,
-		scsi_debug_num_devs, scsi_debug_dev_size_mb);
+		"dev_size_mb=%d, opts=0x%x", scsi_debug_version_str,
+		scsi_debug_num_devs, scsi_debug_dev_size_mb,
+		scsi_debug_opts);
 	return sdebug_info;
 }
 
 /* scsi_debug_proc_info
  * Used if the driver currently has no own support for /proc/scsi
  */
-int scsi_debug_proc_info(char *buffer, char **start, off_t offset,
-			 int length, int inode, int inout)
+static int scsi_debug_proc_info(char *buffer, char **start, off_t offset,
+				int length, int inode, int inout)
 {
 	int len, pos, begin;
 	int orig_length;
@@ -1096,55 +1162,28 @@ int scsi_debug_proc_info(char *buffer, char **start, off_t offset,
 	orig_length = length;
 
 	if (inout == 1) {
-		/* First check for the Signature */
-		if (length >= 10 && strncmp(buffer, "scsi_debug", 10) == 0) {
-			buffer += 11;
-			length -= 11;
+		char arr[16];
+		int minLen = length > 15 ? 15 : length;
 
-			if (buffer[length - 1] == '\n') {
-				buffer[length - 1] = '\0';
-				length--;
-			}
-			/*
-			 * OK, we are getting some kind of command.  Figure out
-			 * what we are supposed to do here.  Simulate bus lockups
-			 * to test our reset capability.
-			 */
-			if (length == 4 && strncmp(buffer, "test", length) == 0) {
-                                printk("Testing send self command %p\n", SHpnt);
-                                scsi_debug_send_self_command(SHpnt);
-                                return orig_length;
-                        }
-			if (length == 6 && strncmp(buffer, "lockup", length) == 0) {
-				scsi_debug_lockup = 1;
-				return orig_length;
-			}
-			if (length == 6 && strncmp(buffer, "unlock", length) == 0) {
-				scsi_debug_lockup = 0;
-				return orig_length;
-			}
-			printk("Unknown command:%s (%d)\n", buffer, length);
-		} else
-			printk("Wrong Signature:%10s\n", (char *) buffer);
-
-		return -EINVAL;
-
+		if (!capable(CAP_SYS_ADMIN) || !capable(CAP_SYS_RAWIO))
+			return -EACCES;
+		memcpy(arr, buffer, minLen);
+		arr[minLen] = '\0';
+		if (1 != sscanf(arr, "%d", &pos))
+			return -EINVAL;
+		scsi_debug_opts = pos;
+		return length;
 	}
 	begin = 0;
 	pos = len = sprintf(buffer, "scsi_debug adapter driver, %s\n"
-	    "num_devs=%d, shared (ram) size=%d MB, sector_size=%d bytes\n" 
-	    "cylinders=%d, heads=%d, sectors=%d\n"
+	    "num_devs=%d, shared (ram) size=%d MB, opts=0x%x\n"
+	    "sector_size=%d bytes, cylinders=%d, heads=%d, sectors=%d\n"
 	    "number of aborts=%d, device_reset=%d, bus_resets=%d, " 
 	    "host_resets=%d\n",
 	    scsi_debug_version_str, scsi_debug_num_devs, 
-	    scsi_debug_dev_size_mb, SECT_SIZE,
+	    scsi_debug_dev_size_mb, scsi_debug_opts, SECT_SIZE,
 	    N_CYLINDER, N_HEAD, N_SECTOR,
 	    num_aborts, num_dev_resets, num_bus_resets, num_host_resets);
-#if 0
-	 "This driver is not a real scsi driver, but it plays one on TV.\n"
-	 "It is very handy for debugging specific problems because you\n"
-			 "can simulate a variety of error conditions\n");
-#endif
 	if (pos < offset) {
 		len = 0;
 		begin = pos;
