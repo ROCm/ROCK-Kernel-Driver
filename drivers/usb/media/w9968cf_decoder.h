@@ -1,7 +1,7 @@
 /***************************************************************************
  * Video decoder for the W996[87]CF driver for Linux.                      *
  *                                                                         *
- * Copyright (C) 2003 by Luca Risolia <luca_ing@libero.it>                 *
+ * Copyright (C) 2003 2004 by Luca Risolia <luca.risolia@studio.unibo.it>  *
  *                                                                         *
  * This program is free software; you can redistribute it and/or modify    *
  * it under the terms of the GNU General Public License as published by    *
