@@ -28,7 +28,7 @@ obj-$(CONFIG_PPC_ISERIES) += iSeries_irq.o \
 			     mf.o HvLpEvent.o iSeries_proc.o iSeries_htab.o \
 			     iSeries_iommu.o
 
-obj-$(CONFIG_PPC_MULTIPLATFORM) += nvram.o open_pic.o i8259.o prom_init.o prom.o
+obj-$(CONFIG_PPC_MULTIPLATFORM) += nvram.o i8259.o prom_init.o prom.o mpic.o
 
 obj-$(CONFIG_PPC_PSERIES) += pSeries_pci.o pSeries_lpar.o pSeries_hvCall.o \
 			     eeh.o pSeries_nvram.o rtasd.o ras.o \
@@ -47,8 +47,8 @@ obj-$(CONFIG_BOOTX_TEXT)	+= btext.o
 obj-$(CONFIG_HVCS)		+= hvcserver.o
 
 obj-$(CONFIG_PPC_PMAC)		+= pmac_setup.o pmac_feature.o pmac_pci.o \
-				   pmac_time.o pmac_nvram.o pmac_low_i2c.o \
-				   open_pic_u3.o
+				   pmac_time.o pmac_nvram.o pmac_low_i2c.o
+
 obj-$(CONFIG_U3_DART)		+= u3_iommu.o
 
 ifdef CONFIG_SMP

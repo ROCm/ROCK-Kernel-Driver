@@ -52,7 +52,6 @@
 #include <asm/btext.h>
 #include <asm/sections.h>
 #include <asm/machdep.h>
-#include "open_pic.h"
 
 #ifdef DEBUG
 #define DBG(fmt...) udbg_printf(fmt)
@@ -1092,8 +1091,7 @@ prom_n_size_cells(struct device_node* np)
  * Work out the sense (active-low level / active-high edge)
  * of each interrupt from the device tree.
  */
-void __init
-prom_get_irq_senses(unsigned char *senses, int off, int max)
+void __init prom_get_irq_senses(unsigned char *senses, int off, int max)
 {
 	struct device_node *np;
 	int i, j;
@@ -1105,7 +1103,9 @@ prom_get_irq_senses(unsigned char *senses, int off, int max)
 		for (j = 0; j < np->n_intrs; j++) {
 			i = np->intrs[j].line;
 			if (i >= off && i < max)
-				senses[i-off] = np->intrs[j].sense;
+				senses[i-off] = np->intrs[j].sense ?
+					IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE :
+					IRQ_SENSE_EDGE | IRQ_POLARITY_POSITIVE;
 		}
 	}
 }

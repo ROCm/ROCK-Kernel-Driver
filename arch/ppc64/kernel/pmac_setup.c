@@ -72,6 +72,7 @@
 #include <asm/lmb.h>
 
 #include "pmac.h"
+#include "mpic.h"
 
 #ifdef DEBUG
 #define DBG(fmt...) udbg_printf(fmt)
@@ -319,29 +320,9 @@ void __init pmac_init_early(void)
 	DBG(" <- pmac_init_early\n");
 }
 
-extern void* OpenPIC_Addr;
-extern void* OpenPIC2_Addr;
-extern u_int OpenPIC_NumInitSenses;
-extern u_char *OpenPIC_InitSenses;
-extern void openpic_init(int main_pic, int offset, unsigned char* chrp_ack,
-			 int programmer_switch_irq);
-extern void openpic2_init(int offset);
-extern int openpic_get_irq(struct pt_regs *regs);
-extern int openpic2_get_irq(struct pt_regs *regs);
-
-static int pmac_cascade_irq = -1;
-
-static irqreturn_t pmac_u3_do_cascade(int cpl, void *dev_id, struct pt_regs *regs)
+static int pmac_u3_cascade(struct pt_regs *regs, void *data)
 {
-	int irq;
-
-	for (;;) {
-		irq = openpic2_get_irq(regs);
-		if (irq == -1)
-			break;
-		ppc_irq_dispatch_handler(regs, irq);
-	}
-	return IRQ_HANDLED;
+	return mpic_get_one_irq((struct mpic *)data, regs);
 }
 
 static __init void pmac_init_IRQ(void)
@@ -349,6 +330,7 @@ static __init void pmac_init_IRQ(void)
         struct device_node *irqctrler  = NULL;
         struct device_node *irqctrler2 = NULL;
 	struct device_node *np = NULL;
+	struct mpic *mpic1, *mpic2;
 
 	/* We first try to detect Apple's new Core99 chipset, since mac-io
 	 * is quite different on those machines and contains an IBM MPIC2.
@@ -368,43 +350,36 @@ static __init void pmac_init_IRQ(void)
 		       (unsigned int)irqctrler->addrs[0].address);
 
 		prom_get_irq_senses(senses, 0, 128);
-		OpenPIC_InitSenses = senses;
-		OpenPIC_NumInitSenses = 128;
-		OpenPIC_Addr = ioremap(irqctrler->addrs[0].address,
-				       irqctrler->addrs[0].size);
-		openpic_init(1, 0, NULL, -1);
+		mpic1 = mpic_alloc(irqctrler->addrs[0].address,
+				   MPIC_PRIMARY | MPIC_WANTS_RESET,
+				   0, 0, 128, 256, senses, 128, " K2-MPIC  ");
+		BUG_ON(mpic1 == NULL);
+		mpic_init(mpic1);		
 
 		if (irqctrler2 != NULL && irqctrler2->n_intrs > 0 &&
 		    irqctrler2->n_addrs > 0) {
 			printk(KERN_INFO "Slave OpenPIC at 0x%08x hooked on IRQ %d\n",
 			       (u32)irqctrler2->addrs[0].address,
 			       irqctrler2->intrs[0].line);
+
 			pmac_call_feature(PMAC_FTR_ENABLE_MPIC, irqctrler2, 0, 0);
-			OpenPIC2_Addr = ioremap(irqctrler2->addrs[0].address,
-						irqctrler2->addrs[0].size);
 			prom_get_irq_senses(senses, 128, 128 + 128);
-			OpenPIC_InitSenses = senses;
-			OpenPIC_NumInitSenses = 128;
-			openpic2_init(128);
-			pmac_cascade_irq = irqctrler2->intrs[0].line;
+
+			/* We don't need to set MPIC_BROKEN_U3 here since we don't have
+			 * hypertransport interrupts routed to it
+			 */
+			mpic2 = mpic_alloc(irqctrler2->addrs[0].address,
+					   MPIC_BIG_ENDIAN | MPIC_WANTS_RESET,
+					   0, 128, 128, 0, senses, 128, " U3-MPIC  ");
+			BUG_ON(mpic2 == NULL);
+			mpic_init(mpic2);
+			mpic_setup_cascade(irqctrler2->intrs[0].line,
+					   pmac_u3_cascade, mpic2);
 		}
 	}
 	of_node_put(irqctrler);
 	of_node_put(irqctrler2);
 }
-
-/* We cannot do request_irq too early ... Right now, we get the
- * cascade as a core_initcall, which should be fine for our needs
- */
-static int __init pmac_irq_cascade_init(void)
-{
-	if (request_irq(pmac_cascade_irq, pmac_u3_do_cascade, 0,
-			"U3->K2 Cascade", NULL))
-		printk(KERN_ERR "Unable to get OpenPIC IRQ for cascade\n");
-	return 0;
-}
-
-core_initcall(pmac_irq_cascade_init);
 
 static void __init pmac_progress(char *s, unsigned short hex)
 {
@@ -463,7 +438,7 @@ struct machdep_calls __initdata pmac_md = {
 	.init_early		= pmac_init_early,
        	.get_cpuinfo		= pmac_show_cpuinfo,
 	.init_IRQ		= pmac_init_IRQ,
-	.get_irq		= openpic_get_irq,
+	.get_irq		= mpic_get_irq,
 	.pcibios_fixup		= pmac_pcibios_fixup,
 	.restart		= pmac_restart,
 	.power_off		= pmac_power_off,

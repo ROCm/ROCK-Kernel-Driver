@@ -67,6 +67,10 @@ extern int query_cpu_stopped(unsigned int pcpu);
 
 extern int smt_enabled_at_boot;
 
+extern int smp_mpic_probe(void);
+extern void smp_mpic_setup_cpu(int cpu);
+extern void smp_mpic_message_pass(int target, int msg);
+
 #endif /* __ASSEMBLY__ */
 
 #endif /* !(_PPC64_SMP_H) */

@@ -61,18 +61,17 @@
 #include <asm/nvram.h>
 
 #include "i8259.h"
-#include "open_pic.h"
 #include <asm/xics.h>
 #include <asm/ppcdebug.h>
 #include <asm/cputable.h>
+
+#include "mpic.h"
 
 #ifdef DEBUG
 #define DBG(fmt...) udbg_printf(fmt)
 #else
 #define DBG(fmt...)
 #endif
-
-extern void pSeries_init_openpic(void);
 
 extern void find_and_init_phbs(void);
 extern void pSeries_final_fixup(void);
@@ -90,6 +89,9 @@ extern unsigned long loops_per_jiffy;
 
 extern unsigned long ppc_proc_freq;
 extern unsigned long ppc_tb_freq;
+
+static volatile void __iomem * chrp_int_ack_special;
+struct mpic *pSeries_mpic;
 
 void pSeries_get_cpuinfo(struct seq_file *m)
 {
@@ -120,15 +122,86 @@ static void __init fwnmi_init(void)
 		fwnmi_active = 1;
 }
 
+static int pSeries_irq_cascade(struct pt_regs *regs, void *data)
+{
+	if (chrp_int_ack_special)
+		return readb(chrp_int_ack_special);
+	else
+		return i8259_irq(smp_processor_id());
+}
+
+static void __init pSeries_init_mpic(void)
+{
+        unsigned int *addrp;
+        unsigned char* chrp_int_ack_special = NULL;
+	struct device_node *np;
+        int i;
+
+	/* All ISUs are setup, complete initialization */
+	mpic_init(pSeries_mpic);
+
+	/* Check what kind of cascade ACK we have */
+        if (!(np = of_find_node_by_name(NULL, "pci"))
+            || !(addrp = (unsigned int *)
+                 get_property(np, "8259-interrupt-acknowledge", NULL)))
+                printk(KERN_ERR "Cannot find pci to get ack address\n");
+        else
+		chrp_int_ack_special = (unsigned char *) 
+			ioremap(addrp[prom_n_addr_cells(np)-1], 1);
+	of_node_put(np);
+
+	/* Setup the legacy interrupts & controller */
+        for (i = 0; i < NUM_ISA_INTERRUPTS; i++)
+                irq_desc[i].handler = &i8259_pic;
+	i8259_init(0);
+
+	/* Hook cascade to mpic */
+	mpic_setup_cascade(NUM_ISA_INTERRUPTS, pSeries_irq_cascade, NULL);
+}
+
+static void __init pSeries_setup_mpic(void)
+{
+	unsigned int *opprop;
+	unsigned long openpic_addr = 0;
+        unsigned char senses[NR_IRQS - NUM_ISA_INTERRUPTS];
+        struct device_node *root;
+	int irq_count;
+
+	/* Find the Open PIC if present */
+	root = of_find_node_by_path("/");
+	opprop = (unsigned int *) get_property(root, "platform-open-pic", NULL);
+	if (opprop != 0) {
+		int n = prom_n_addr_cells(root);
+
+		for (openpic_addr = 0; n > 0; --n)
+			openpic_addr = (openpic_addr << 32) + *opprop++;
+		printk(KERN_DEBUG "OpenPIC addr: %lx\n", openpic_addr);
+	}
+	of_node_put(root);
+
+	BUG_ON(openpic_addr == 0);
+
+	/* Get the sense values from OF */
+	prom_get_irq_senses(senses, NUM_ISA_INTERRUPTS, NR_IRQS);
+	
+	/* Setup the openpic driver */
+	irq_count = NR_IRQS - NUM_ISA_INTERRUPTS - 4; /* leave room for IPIs */
+	pSeries_mpic = mpic_alloc(openpic_addr, MPIC_PRIMARY,
+				  16, 16, irq_count, /* isu size, irq offset, irq count */ 
+				  NR_IRQS - 4, /* ipi offset */
+				  senses, irq_count, /* sense & sense size */
+				  " MPIC     ");
+}
+
 static void __init pSeries_setup_arch(void)
 {
-	struct device_node *root;
-	unsigned int *opprop;
-
 	/* Fixup ppc_md depending on the type of interrupt controller */
 	if (naca->interrupt_controller == IC_OPEN_PIC) {
-		ppc_md.init_IRQ       = pSeries_init_openpic; 
-		ppc_md.get_irq        = openpic_get_irq;
+		ppc_md.init_IRQ       = pSeries_init_mpic; 
+		ppc_md.get_irq        = mpic_get_irq;
+		/* Allocate the mpic now, so that find_and_init_phbs() can
+		 * fill the ISUs */
+		pSeries_setup_mpic();
 	} else {
 		ppc_md.init_IRQ       = xics_init_IRQ;
 		ppc_md.get_irq        = xics_get_irq;
@@ -155,21 +228,6 @@ static void __init pSeries_setup_arch(void)
 	/* iSeries needs to be done much later. */
 	eeh_init();
 	find_and_init_phbs();
-
-	/* Find the Open PIC if present */
-	root = of_find_node_by_path("/");
-	opprop = (unsigned int *) get_property(root,
-				"platform-open-pic", NULL);
-	if (opprop != 0) {
-		int n = prom_n_addr_cells(root);
-		unsigned long openpic;
-
-		for (openpic = 0; n > 0; --n)
-			openpic = (openpic << 32) + *opprop++;
-		printk(KERN_DEBUG "OpenPIC addr: %lx\n", openpic);
-		OpenPIC_Addr = __ioremap(openpic, 0x40000, _PAGE_NO_CACHE);
-	}
-	of_node_put(root);
 
 #ifdef CONFIG_DUMMY_CONSOLE
 	conswitchp = &dummy_con;

@@ -42,7 +42,7 @@
 #include <asm/iommu.h>
 #include <asm/rtas.h>
 
-#include "open_pic.h"
+#include "mpic.h"
 #include "pci.h"
 
 /* RTAS tokens */
@@ -54,6 +54,7 @@ static int ibm_write_pci_config;
 static int s7a_workaround;
 
 extern unsigned long pci_probe_only;
+extern struct mpic *pSeries_mpic;
 
 static int rtas_read_config(struct device_node *dn, int where, int size, u32 *val)
 {
@@ -399,9 +400,9 @@ unsigned long __init find_and_init_phbs(void)
 		pci_process_bridge_OF_ranges(phb, node);
 		pci_setup_phb_io(phb, index == 0);
 
-		if (naca->interrupt_controller == IC_OPEN_PIC) {
+		if (naca->interrupt_controller == IC_OPEN_PIC && pSeries_mpic) {
 			int addr = root_size_cells * (index + 2) - 1;
-			openpic_setup_ISU(index, opprop[addr]); 
+			mpic_assign_isu(pSeries_mpic, index, opprop[addr]);
 		}
 
 		index++;

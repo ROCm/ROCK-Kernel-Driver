@@ -48,11 +48,12 @@
 #include <asm/iSeries/HvCallCfg.h>
 #include <asm/time.h>
 #include <asm/ppcdebug.h>
-#include "open_pic.h"
 #include <asm/machdep.h>
 #include <asm/xics.h>
 #include <asm/cputable.h>
 #include <asm/system.h>
+
+#include "mpic.h"
 #include <asm/rtas.h>
 #include <asm/plpar_wrappers.h>
 
@@ -194,7 +195,7 @@ void __init smp_init_iSeries(void)
 #endif
 
 #ifdef CONFIG_PPC_MULTIPLATFORM
-void smp_openpic_message_pass(int target, int msg)
+void smp_mpic_message_pass(int target, int msg)
 {
 	/* make sure we're sending something that translates to an IPI */
 	if ( msg > 0x3 ){
@@ -205,33 +206,36 @@ void smp_openpic_message_pass(int target, int msg)
 	switch ( target )
 	{
 	case MSG_ALL:
-		openpic_cause_IPI(msg, 0xffffffff);
+		mpic_send_ipi(msg, 0xffffffff);
 		break;
 	case MSG_ALL_BUT_SELF:
-		openpic_cause_IPI(msg,
-				  0xffffffff & ~(1 << smp_processor_id()));
+		mpic_send_ipi(msg, 0xffffffff & ~(1 << smp_processor_id()));
 		break;
 	default:
-		openpic_cause_IPI(msg, 1<<target);
+		mpic_send_ipi(msg, 1 << target);
 		break;
 	}
 }
 
-static int __init smp_openpic_probe(void)
+int __init smp_mpic_probe(void)
 {
 	int nr_cpus;
 
+	DBG("smp_mpic_probe()...\n");
+
 	nr_cpus = cpus_weight(cpu_possible_map);
 
+	DBG("nr_cpus: %d\n", nr_cpus);
+
 	if (nr_cpus > 1)
-		openpic_request_IPIs();
+		mpic_request_ipis();
 
 	return nr_cpus;
 }
 
-static void __devinit smp_openpic_setup_cpu(int cpu)
+void __devinit smp_mpic_setup_cpu(int cpu)
 {
-	do_openpic_setup_cpu();
+	mpic_setup_this_cpu();
 }
 
 #endif /* CONFIG_PPC_MULTIPLATFORM */
@@ -532,11 +536,11 @@ static void __devinit pSeries_take_timebase(void)
 	spin_unlock(&timebase_lock);
 }
 
-static struct smp_ops_t pSeries_openpic_smp_ops = {
-	.message_pass	= smp_openpic_message_pass,
-	.probe		= smp_openpic_probe,
+static struct smp_ops_t pSeries_mpic_smp_ops = {
+	.message_pass	= smp_mpic_message_pass,
+	.probe		= smp_mpic_probe,
 	.kick_cpu	= smp_pSeries_kick_cpu,
-	.setup_cpu	= smp_openpic_setup_cpu,
+	.setup_cpu	= smp_mpic_setup_cpu,
 };
 
 static struct smp_ops_t pSeries_xics_smp_ops = {
@@ -554,7 +558,7 @@ void __init smp_init_pSeries(void)
 	DBG(" -> smp_init_pSeries()\n");
 
 	if (naca->interrupt_controller == IC_OPEN_PIC)
-		smp_ops = &pSeries_openpic_smp_ops;
+		smp_ops = &pSeries_mpic_smp_ops;
 	else
 		smp_ops = &pSeries_xics_smp_ops;
 

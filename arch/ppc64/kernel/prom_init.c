@@ -51,7 +51,6 @@
 #include <asm/btext.h>
 #include <asm/sections.h>
 #include <asm/machdep.h>
-#include "open_pic.h"
 
 #ifdef CONFIG_LOGO_LINUX_CLUT224
 #include <linux/linux_logo.h>

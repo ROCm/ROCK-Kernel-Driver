@@ -32,6 +32,7 @@
 #include <linux/init.h>
 #include <linux/spinlock.h>
 #include <linux/errno.h>
+#include <linux/irq.h>
 
 #include <asm/ptrace.h>
 #include <asm/atomic.h>
@@ -48,13 +49,12 @@
 #include <asm/cacheflush.h>
 #include <asm/keylargo.h>
 
-#include "open_pic.h"
+#include "mpic.h"
+
 
 extern void pmac_secondary_start_1(void);
 extern void pmac_secondary_start_2(void);
 extern void pmac_secondary_start_3(void);
-
-extern void smp_openpic_message_pass(int target, int msg);
 
 extern struct smp_ops_t *smp_ops;
 
@@ -75,7 +75,7 @@ static int __init smp_core99_probe(void)
 	printk(KERN_INFO "PowerMac SMP probe found %d cpus\n", ncpus);
 
 	if (ncpus > 1)
-		openpic_request_IPIs();
+		mpic_request_ipis();
 
 	return ncpus;
 }
@@ -138,8 +138,8 @@ static void __init smp_core99_kick_cpu(int nr)
 
 static void __init smp_core99_setup_cpu(int cpu_nr)
 {
-	/* Setup openpic */
-	do_openpic_setup_cpu();
+	/* Setup MPIC */
+	mpic_setup_this_cpu();
 
 	if (cpu_nr == 0) {
 		extern void g5_phy_disable_cpu1(void);
@@ -157,7 +157,7 @@ extern void smp_generic_give_timebase(void);
 extern void smp_generic_take_timebase(void);
 
 struct smp_ops_t core99_smp_ops __pmacdata = {
-	.message_pass	= smp_openpic_message_pass,
+	.message_pass	= smp_mpic_message_pass,
 	.probe		= smp_core99_probe,
 	.kick_cpu	= smp_core99_kick_cpu,
 	.setup_cpu	= smp_core99_setup_cpu,
