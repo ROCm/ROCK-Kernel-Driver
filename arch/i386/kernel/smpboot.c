@@ -49,10 +49,10 @@
 #include <asm/tlbflush.h>
 #include <asm/desc.h>
 #include <asm/arch_hooks.h>
-#include "smpboot_hooks.h"
 
 #include <mach_apic.h>
 #include <mach_wakecpu.h>
+#include <smpboot_hooks.h>
 
 /* Set if we find a B stepping CPU */
 static int __initdata smp_b_stepping;
@@ -1045,7 +1045,7 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 	/*
 	 * Cleanup possible dangling ends...
 	 */
-	smpboot_setup_warm_reset_vector();
+	smpboot_restore_warm_reset_vector();
 
 	/*
 	 * Allow the user to impress friends.
