@@ -2182,10 +2182,19 @@ static int wl3501_get_encode(struct net_device *dev,
 			     struct iw_request_info *info,
 			     union iwreq_data *wrqu, char *extra)
 {
-	u8 restricted, keys[100], len_keys, tocopy;
+	u8 implemented, restricted, keys[100], len_keys, tocopy;
 	struct wl3501_card *this = (struct wl3501_card *)dev->priv;
-	int rc = wl3501_get_mib_value(this, WL3501_MIB_ATTR_EXCLUDE_UNENCRYPTED,
-				      &restricted, sizeof(restricted));
+	int rc = wl3501_get_mib_value(this,
+				      WL3501_MIB_ATTR_PRIV_OPT_IMPLEMENTED,
+				      &implemented, sizeof(implemented));
+	if (rc)
+		goto out;
+	if (!implemented) {
+		wrqu->encoding.flags = IW_ENCODE_DISABLED;
+		goto out;
+	}
+	rc = wl3501_get_mib_value(this, WL3501_MIB_ATTR_EXCLUDE_UNENCRYPTED,
+				  &restricted, sizeof(restricted));
 	if (rc)
 		goto out;
 	wrqu->encoding.flags = restricted ? IW_ENCODE_RESTRICTED :
