@@ -772,11 +772,11 @@ void get_disc_status(void)
 
 struct block_device_operations cm206_bdops =
 {
-	owner:			THIS_MODULE,
-	open:			cdrom_open,
-	release:		cdrom_release,
-	ioctl:			cdrom_ioctl,
-	check_media_change:	cdrom_media_changed,
+	.owner			= THIS_MODULE,
+	.open			= cdrom_open,
+	.release		= cdrom_release,
+	.ioctl			= cdrom_ioctl,
+	.check_media_change	= cdrom_media_changed,
 };
 
 /* The new open. The real opening strategy is defined in cdrom.c. */
@@ -1330,57 +1330,40 @@ int cm206_select_speed(struct cdrom_device_info *cdi, int speed)
 }
 
 static struct cdrom_device_ops cm206_dops = {
-	open:cm206_open,
-	release:cm206_release,
-	drive_status:cm206_drive_status,
-	media_changed:cm206_media_changed,
-	tray_move:cm206_tray_move,
-	lock_door:cm206_lock_door,
-	select_speed:cm206_select_speed,
-	get_last_session:cm206_get_last_session,
-	get_mcn:cm206_get_upc,
-	reset:cm206_reset,
-	audio_ioctl:cm206_audio_ioctl,
-	dev_ioctl:cm206_ioctl,
-	capability:CDC_CLOSE_TRAY | CDC_OPEN_TRAY | CDC_LOCK |
-	    CDC_MULTI_SESSION | CDC_MEDIA_CHANGED |
-	    CDC_MCN | CDC_PLAY_AUDIO | CDC_SELECT_SPEED |
-	    CDC_IOCTLS | CDC_DRIVE_STATUS,
-	n_minors:1,
+	.open			= cm206_open,
+	.release		= cm206_release,
+	.drive_status		= cm206_drive_status,
+	.media_changed		= cm206_media_changed,
+	.tray_move		= cm206_tray_move,
+	.lock_door		= cm206_lock_door,
+	.select_speed		= cm206_select_speed,
+	.get_last_session	= cm206_get_last_session,
+	.get_mcn		= cm206_get_upc,
+	.reset			= cm206_reset,
+	.audio_ioctl		= cm206_audio_ioctl,
+	.dev_ioctl		= cm206_ioctl,
+	.capability		= CDC_CLOSE_TRAY | CDC_OPEN_TRAY | CDC_LOCK |
+				  CDC_MULTI_SESSION | CDC_MEDIA_CHANGED |
+				  CDC_MCN | CDC_PLAY_AUDIO | CDC_SELECT_SPEED |
+				  CDC_IOCTLS | CDC_DRIVE_STATUS,
+	.n_minors		= 1,
 };
 
 
 static struct cdrom_device_info cm206_info = {
-	ops:&cm206_dops,
-	speed:2,
-	capacity:1,
-	name:"cm206",
+	.ops		= &cm206_dops,
+	.speed		= 2,
+	.capacity	= 1,
+	.name		= "cm206",
 };
 
-/* This routine gets called during initialization if things go wrong,
- * can be used in cleanup_module as well. */
-static void cleanup(int level)
-{
-	switch (level) {
-	case 4:
-		if (unregister_cdrom(&cm206_info)) {
-			printk("Can't unregister cdrom cm206\n");
-			return;
-		}
-		if (unregister_blkdev(MAJOR_NR, "cm206")) {
-			printk("Can't unregister major cm206\n");
-			return;
-		}
-		blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
-	case 3:
-		free_irq(cm206_irq, NULL);
-	case 2:
-	case 1:
-		kfree(cd);
-		release_region(cm206_base, 16);
-	default:;
-	}
-}
+static struct gendisk cm206_gendisk = {
+	.major		= MAJOR_NR,
+	.first_minor	= 0,
+	.minor_shift	= 0,
+	.major_name	= "cm206",
+	.fops		= &cm206_bdops,
+};
 
 /* This function probes for the adapter card. It returns the base
    address if it has found the adapter card. One can specify a base 
@@ -1435,6 +1418,7 @@ int __init cm206_init(void)
 {
 	uch e = 0;
 	long int size = sizeof(struct cm206_struct);
+	struct gendisk *disk = &cm206_gendisk;
 
 	printk(KERN_INFO "cm206 cdrom driver " REVISION);
 	cm206_base = probe_base_port(auto_probe ? 0 : cm206_base);
@@ -1454,7 +1438,7 @@ int __init cm206_init(void)
 	cm206_irq = probe_irq(auto_probe ? 0 : cm206_irq);
 	if (cm206_irq <= 0) {
 		printk("can't find IRQ!\n");
-		cleanup(1);
+		goto out_probe;
 		return -EIO;
 	} else
 		printk(" IRQ %d found\n", cm206_irq);
@@ -1472,8 +1456,7 @@ int __init cm206_init(void)
 	if (send_receive_polled(c_drive_configuration) !=
 	    c_drive_configuration) {
 		printk(KERN_INFO " drive not there\n");
-		cleanup(1);
-		return -EIO;
+		goto out_probe;
 	}
 	e = send_receive_polled(c_gimme);
 	printk(KERN_INFO "Firmware revision %d", e & dcf_revision_code);
@@ -1486,24 +1469,25 @@ int __init cm206_init(void)
 		printk(", motorized tray");
 	if (request_irq(cm206_irq, cm206_interrupt, 0, "cm206", NULL)) {
 		printk("\nUnable to reserve IRQ---aborted\n");
-		cleanup(2);
-		return -EIO;
+		goto out_probe;
 	}
 	printk(".\n");
 	if (register_blkdev(MAJOR_NR, "cm206", &cm206_bdops) != 0) {
-		printk(KERN_INFO "Cannot register for major %d!\n",
-		       MAJOR_NR);
-		cleanup(3);
-		return -EIO;
+		printk(KERN_INFO "Cannot register for major %d!\n", MAJOR_NR);
+		goto out_blkdev;
 	}
 	cm206_info.dev = mk_kdev(MAJOR_NR, 0);
 	if (register_cdrom(&cm206_info) != 0) {
-		printk(KERN_INFO "Cannot register for cdrom %d!\n",
-		       MAJOR_NR);
-		cleanup(3);
-		return -EIO;
+		printk(KERN_INFO "Cannot register for cdrom %d!\n", MAJOR_NR);
+		goto out_cdrom;
 	}
-	devfs_plain_cdrom(&cm206_info, &cm206_bdops);
+	devfs_plain_cdrom(&cm206_info, disk->fops);
+	add_gendisk(disk);
+	register_disk(disk,
+		      mk_kdev(disk->major,disk->first_minor),
+		      1<<disk->minor_shift,
+		      disk->fops,
+		      0);
 	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_cm206_request,
 		       &cm206_lock);
 	blk_queue_hardsect_size(BLK_DEFAULT_QUEUE(MAJOR_NR), 2048);
@@ -1517,6 +1501,15 @@ int __init cm206_init(void)
 	       " %ld bytes kernel memory used.\n", cd->max_sectors * 2,
 	       size);
 	return 0;
+
+out_cdrom:
+	unregister_blkdev(MAJOR_NR, "cm206");
+out_blkdev:
+	free_irq(cm206_irq, NULL);
+out_probe:
+	kfree(cd);
+	release_region(cm206_base, 16);
+	return -EIO;
 }
 
 #ifdef MODULE
@@ -1548,7 +1541,19 @@ int __cm206_init(void)
 
 void __exit cm206_exit(void)
 {
-	cleanup(4);
+	del_gendisk(&cm206_gendisk);
+	if (unregister_cdrom(&cm206_info)) {
+		printk("Can't unregister cdrom cm206\n");
+		return;
+	}
+	if (unregister_blkdev(MAJOR_NR, "cm206")) {
+		printk("Can't unregister major cm206\n");
+		return;
+	}
+	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
+	free_irq(cm206_irq, NULL);
+	kfree(cd);
+	release_region(cm206_base, 16);
 	printk(KERN_INFO "cm206 removed\n");
 }
 
