@@ -2116,22 +2116,6 @@ static void ata_pio_task(void *_data)
 }
 
 /**
- *	ata_check_bmdma - read PCI IDE BMDMA status
- *	@ap: struct ata_port
- */
-
-static u8 ata_check_bmdma(struct ata_port *ap)
-{
-	u8 host_stat;
-	if (ap->flags & ATA_FLAG_MMIO) {
-		void *mmio = (void *) ap->ioaddr.bmdma_addr;
-		host_stat = readb(mmio + ATA_DMA_STATUS);
-	} else
-		host_stat = inb(ap->ioaddr.bmdma_addr + ATA_DMA_STATUS);
-	return host_stat;
-}
-
-/**
  *	ata_eng_timeout - Handle timeout of queued command
  *	@ap: Port on which timed-out command is active
  *
@@ -2174,7 +2158,7 @@ void ata_eng_timeout(struct ata_port *ap)
 
 	switch (qc->tf.protocol) {
 	case ATA_PROT_DMA:
-		host_stat = ata_check_bmdma(ap);
+		host_stat = ata_bmdma_status(ap);
 
 		printk(KERN_ERR "ata%u: DMA timeout, stat 0x%x\n",
 		       ap->id, host_stat);
@@ -2546,29 +2530,8 @@ static void ata_dma_complete(struct ata_queued_cmd *qc, u8 host_stat)
 	struct ata_port *ap = qc->ap;
 	VPRINTK("ENTER\n");
 
-	if (ap->flags & ATA_FLAG_MMIO) {
-		void *mmio = (void *) ap->ioaddr.bmdma_addr;
-
-		/* clear start/stop bit */
-		writeb(readb(mmio + ATA_DMA_CMD) & ~ATA_DMA_START,
-		       mmio + ATA_DMA_CMD);
-
-		/* ack intr, err bits */
-		writeb(host_stat | ATA_DMA_INTR | ATA_DMA_ERR,
-		       mmio + ATA_DMA_STATUS);
-	} else {
-		/* clear start/stop bit */
-		outb(inb(ap->ioaddr.bmdma_addr + ATA_DMA_CMD) & ~ATA_DMA_START,
-		     ap->ioaddr.bmdma_addr + ATA_DMA_CMD);
-
-		/* ack intr, err bits */
-		outb(host_stat | ATA_DMA_INTR | ATA_DMA_ERR,
-		     ap->ioaddr.bmdma_addr + ATA_DMA_STATUS);
-	}
-
-
-	/* one-PIO-cycle guaranteed wait, per spec, for HDMA1:0 transition */
-	ata_altstatus(ap);		/* dummy read */
+	ata_bmdma_stop(ap);
+	ata_bmdma_ack_irq(ap);
 
 	DPRINTK("host %u, host_stat==0x%X, drv_stat==0x%X\n",
 		ap->id, (u32) host_stat, (u32) ata_chk_status(ap));
@@ -2604,7 +2567,7 @@ inline unsigned int ata_host_intr (struct ata_port *ap,
 	/* BMDMA completion */
 	case ATA_PROT_DMA:
 	case ATA_PROT_ATAPI_DMA:
-		host_stat = ata_check_bmdma(ap);
+		host_stat = ata_bmdma_status(ap);
 		VPRINTK("BUS_DMA (host_stat 0x%X)\n", host_stat);
 
 		if (!(host_stat & ATA_DMA_INTR)) {
