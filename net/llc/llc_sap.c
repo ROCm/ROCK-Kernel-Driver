@@ -226,3 +226,93 @@ void llc_sap_handler(struct llc_sap *sap, struct sk_buff *skb)
 	} else
 		kfree_skb(skb);
 }
+
+/**
+ *	llc_sap_alloc - allocates and initializes sap.
+ *
+ *	Allocates and initializes sap.
+ */
+struct llc_sap *llc_sap_alloc(void)
+{
+	struct llc_sap *sap = kmalloc(sizeof(*sap), GFP_ATOMIC);
+
+	if (sap) {
+		memset(sap, 0, sizeof(*sap));
+		sap->state = LLC_SAP_STATE_ACTIVE;
+		memcpy(sap->laddr.mac, llc_main_station.mac_sa, ETH_ALEN);
+		rwlock_init(&sap->sk_list.lock);
+	}
+	return sap;
+}
+
+/*
+ * FIXME: this will go away as soon as sap->release_connections is introduced
+ * in the next changesets.
+ */
+extern int llc_release_connections(struct llc_sap *sap);
+
+/**
+ *	llc_free_sap - frees a sap
+ *	@sap: Address of the sap
+ *
+ * 	Frees all associated connections (if any), removes this sap from
+ * 	the list of saps in te station and them frees the memory for this sap.
+ */
+void llc_free_sap(struct llc_sap *sap)
+{
+	llc_release_connections(sap);
+	write_lock_bh(&sap->station->sap_list.lock);
+	list_del(&sap->node);
+	write_unlock_bh(&sap->station->sap_list.lock);
+	kfree(sap);
+}
+
+/**
+ *	llc_sap_open - open interface to the upper layers.
+ *	@lsap: SAP number.
+ *	@func: rcv func for datalink protos
+ *
+ *	Interface function to upper layer. Each one who wants to get a SAP
+ *	(for example NetBEUI) should call this function. Returns the opened
+ *	SAP for success, NULL for failure.
+ */
+struct llc_sap *llc_sap_open(u8 lsap, int (*func)(struct sk_buff *skb,
+						  struct net_device *dev,
+						  struct packet_type *pt))
+{
+	/* verify this SAP is not already open; if so, return error */
+	struct llc_sap *sap;
+
+	sap = llc_sap_find(lsap);
+	if (sap) { /* SAP already exists */
+		sap = NULL;
+		goto out;
+	}
+	/* sap requested does not yet exist */
+	sap = llc_sap_alloc();
+	if (!sap)
+		goto out;
+	/* allocated a SAP; initialize it and clear out its memory pool */
+	sap->laddr.lsap = lsap;
+	sap->rcv_func	= func;
+	sap->station	= &llc_main_station;
+	/* initialized SAP; add it to list of SAPs this station manages */
+	llc_sap_save(sap);
+out:
+	return sap;
+}
+
+/**
+ *	llc_sap_close - close interface for upper layers.
+ *	@sap: SAP to be closed.
+ *
+ *	Close interface function to upper layer. Each one who wants to
+ *	close an open SAP (for example NetBEUI) should call this function.
+ */
+void llc_sap_close(struct llc_sap *sap)
+{
+	llc_free_sap(sap);
+}
+
+EXPORT_SYMBOL(llc_sap_open);
+EXPORT_SYMBOL(llc_sap_close);

@@ -30,53 +30,6 @@
 u8 llc_mac_null_var[IFHWADDRLEN];
 
 /**
- *	llc_sap_open - open interface to the upper layers.
- *	@lsap: SAP number.
- *	@func: rcv func for datalink protos
- *
- *	Interface function to upper layer. Each one who wants to get a SAP
- *	(for example NetBEUI) should call this function. Returns the opened
- *	SAP for success, NULL for failure.
- */
-struct llc_sap *llc_sap_open(u8 lsap, int (*func)(struct sk_buff *skb,
-						  struct net_device *dev,
-						  struct packet_type *pt))
-{
-	/* verify this SAP is not already open; if so, return error */
-	struct llc_sap *sap;
-
-	sap = llc_sap_find(lsap);
-	if (sap) { /* SAP already exists */
-		sap = NULL;
-		goto out;
-	}
-	/* sap requested does not yet exist */
-	sap = llc_sap_alloc();
-	if (!sap)
-		goto out;
-	/* allocated a SAP; initialize it and clear out its memory pool */
-	sap->laddr.lsap = lsap;
-	sap->rcv_func	= func;
-	sap->station	= &llc_main_station;
-	/* initialized SAP; add it to list of SAPs this station manages */
-	llc_sap_save(sap);
-out:
-	return sap;
-}
-
-/**
- *	llc_sap_close - close interface for upper layers.
- *	@sap: SAP to be closed.
- *
- *	Close interface function to upper layer. Each one who wants to
- *	close an open SAP (for example NetBEUI) should call this function.
- */
-void llc_sap_close(struct llc_sap *sap)
-{
-	llc_free_sap(sap);
-}
-
-/**
  *	llc_build_and_send_ui_pkt - unitdata request interface for upper layers
  *	@sap: sap to use
  *	@skb: packet to send
@@ -310,6 +263,4 @@ int llc_build_and_send_reset_pkt(struct sock *sk)
 	return rc;
 }
 
-EXPORT_SYMBOL(llc_sap_open);
-EXPORT_SYMBOL(llc_sap_close);
 EXPORT_SYMBOL(llc_build_and_send_ui_pkt);

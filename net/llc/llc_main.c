@@ -46,46 +46,6 @@ static struct llc_station_state_trans *
 struct llc_station llc_main_station;	/* only one of its kind */
 
 /**
- *	llc_sap_alloc - allocates and initializes sap.
- *
- *	Allocates and initializes sap.
- */
-struct llc_sap *llc_sap_alloc(void)
-{
-	struct llc_sap *sap = kmalloc(sizeof(*sap), GFP_ATOMIC);
-
-	if (sap) {
-		memset(sap, 0, sizeof(*sap));
-		sap->state = LLC_SAP_STATE_ACTIVE;
-		memcpy(sap->laddr.mac, llc_main_station.mac_sa, ETH_ALEN);
-		rwlock_init(&sap->sk_list.lock);
-	}
-	return sap;
-}
-
-/*
- * FIXME: this will go away as soon as sap->release_connections is introduced
- * in the next changesets.
- */
-extern int llc_release_connections(struct llc_sap *sap);
-
-/**
- *	llc_free_sap - frees a sap
- *	@sap: Address of the sap
- *
- * 	Frees all associated connections (if any), removes this sap from
- * 	the list of saps in te station and them frees the memory for this sap.
- */
-void llc_free_sap(struct llc_sap *sap)
-{
-	llc_release_connections(sap);
-	write_lock_bh(&sap->station->sap_list.lock);
-	list_del(&sap->node);
-	write_unlock_bh(&sap->station->sap_list.lock);
-	kfree(sap);
-}
-
-/**
  *	llc_sap_save - add sap to station list
  *	@sap: Address of the sap
  *
