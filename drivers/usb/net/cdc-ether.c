@@ -411,6 +411,7 @@ static int CDCEther_ioctl( struct net_device *net, struct ifreq *rq, int cmd )
 	}
 }
 
+#if 0
 static void CDC_SetEthernetPacketFilter (ether_dev_t *ether_dev)
 {
 	usb_control_msg(ether_dev->usb,
@@ -423,6 +424,7 @@ static void CDC_SetEthernetPacketFilter (ether_dev_t *ether_dev)
 			0, /* size */
 			HZ); /* timeout */
 }	
+#endif
 
 
 static void CDCEther_set_multicast( struct net_device *net )
