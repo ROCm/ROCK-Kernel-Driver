@@ -44,6 +44,7 @@ MODULE_LICENSE("GPL");
 #include <linux/proc_fs.h>
 #include <linux/smp_lock.h>
 #include <asm/uaccess.h>
+#include <asm/byteorder.h>
 
 #include <net/irda/irda.h>
 #include <net/irda/irda_device.h>
@@ -541,7 +542,14 @@ static struct vlsi_ring *vlsi_alloc_ring(struct pci_dev *pdev, struct ring_descr
 		memset(rd, 0, sizeof(*rd));
 		rd->hw = hwmap + i;
 		rd->buf = kmalloc(len, GFP_KERNEL|GFP_DMA);
-		if (rd->buf == NULL) {
+		if (rd->buf == NULL
+		    ||  !(busaddr = pci_map_single(pdev, rd->buf, len, dir))) {
+			if (rd->buf) {
+				ERROR("%s: failed to create PCI-MAP for %p",
+					__FUNCTION__, rd->buf);
+				kfree(rd->buf);
+				rd->buf = NULL;
+			}
 			for (j = 0; j < i; j++) {
 				rd = r->rd + j;
 				busaddr = rd_get_addr(rd);
@@ -553,12 +561,6 @@ static struct vlsi_ring *vlsi_alloc_ring(struct pci_dev *pdev, struct ring_descr
 			}
 			kfree(r);
 			return NULL;
-		}
-		busaddr = pci_map_single(pdev, rd->buf, len, dir);
-		if (!busaddr) {
-			ERROR("%s: failed to create PCI-MAP for %p",
-				__FUNCTION__, rd->buf);
-			BUG();
 		}
 		rd_set_addr_status(rd, busaddr, 0);
 		pci_dma_sync_single(pdev, busaddr, len, dir);
@@ -706,7 +708,9 @@ static void vlsi_fill_rx(struct vlsi_ring *r)
 
 	for (rd = ring_last(r); rd != NULL; rd = ring_put(r)) {
 		if (rd_is_active(rd)) {
-			BUG();
+			WARNING("%s: driver bug: rx descr race with hw\n",
+				__FUNCTION__);
+			vlsi_ring_debug(r);
 			break;
 		}
 		if (!rd->skb) {
@@ -1043,28 +1047,26 @@ static int vlsi_hard_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 		goto drop;
 	}
 
-	/* sanity checks - should never happen!
-	 * simply BUGging the violation and dropping the packet
-	 */
+	/* sanity checks - simply drop the packet */
 
 	rd = ring_last(r);
-	if (!rd) {				/* ring full - queue should have been stopped! */
-		BUG();
+	if (!rd) {
+		ERROR("%s - ring full but queue wasn't stopped", __FUNCTION__);
 		goto drop;
 	}
 
-	if (rd_is_active(rd)) {			/* entry still owned by hw! */
-		BUG();
+	if (rd_is_active(rd)) {
+		ERROR("%s - entry still owned by hw!", __FUNCTION__);
 		goto drop;
 	}
 
-	if (!rd->buf) {				/* no memory for this tx entry - weird! */
-		BUG();
+	if (!rd->buf) {
+		ERROR("%s - tx ring entry without pci buffer", __FUNCTION__);
 		goto drop;
 	}
 
-	if (rd->skb) {				/* hm, associated old skb still there */
-		BUG();
+	if (rd->skb) {
+		ERROR("%s - ring entry with old skb still attached", __FUNCTION__);
 		goto drop;
 	}
 

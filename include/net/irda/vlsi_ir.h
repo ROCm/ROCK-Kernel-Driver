@@ -669,21 +669,22 @@ static inline void rd_set_addr_status(struct ring_descr *rd, dma_addr_t a, u8 s)
 	 */
 
 	if ((a & ~DMA_MASK_MSTRPAGE)>>24 != MSTRPAGE_VALUE) {
-		BUG();
+		ERROR("%s: pci busaddr inconsistency!\n", __FUNCTION__);
+		dump_stack();
 		return;
 	}
 
 	a &= DMA_MASK_MSTRPAGE;  /* clear highbyte to make sure we won't write
 				  * to status - just in case MSTRPAGE_VALUE!=0
 				  */
-	rd->hw->rd_addr = a;
+	rd->hw->rd_addr = cpu_to_le32(a);
 	wmb();
 	rd_set_status(rd, s);	 /* may pass ownership to the hardware */
 }
 
 static inline void rd_set_count(struct ring_descr *rd, u16 c)
 {
-	rd->hw->rd_count = c;
+	rd->hw->rd_count = cpu_to_le16(c);
 }
 
 static inline u8 rd_get_status(struct ring_descr *rd)
@@ -695,13 +696,13 @@ static inline dma_addr_t rd_get_addr(struct ring_descr *rd)
 {
 	dma_addr_t	a;
 
-	a = (rd->hw->rd_addr & DMA_MASK_MSTRPAGE) | (MSTRPAGE_VALUE << 24);
-	return a;
+	a = le32_to_cpu(rd->hw->rd_addr);
+	return (a & DMA_MASK_MSTRPAGE) | (MSTRPAGE_VALUE << 24);
 }
 
 static inline u16 rd_get_count(struct ring_descr *rd)
 {
-	return rd->hw->rd_count;
+	return le16_to_cpu(rd->hw->rd_count);
 }
 
 /******************************************************************/
