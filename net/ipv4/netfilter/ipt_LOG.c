@@ -38,7 +38,7 @@ MODULE_PARM_DESC(nflog, "register as internal netfilter logging module");
 #endif
 
 /* Use lock to serialize, so printks don't overlap */
-static spinlock_t log_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(log_lock);
 
 /* One level of recursion won't kill us */
 static void dump_packet(const struct ipt_log_info *info,

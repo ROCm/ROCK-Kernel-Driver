@@ -109,7 +109,7 @@ static void ipv6_regen_rndid(unsigned long data);
 
 static int desync_factor = MAX_DESYNC_FACTOR * HZ;
 static struct crypto_tfm *md5_tfm;
-static spinlock_t md5_tfm_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(md5_tfm_lock);
 #endif
 
 static int ipv6_count_addresses(struct inet6_dev *idev);
@@ -118,16 +118,16 @@ static int ipv6_count_addresses(struct inet6_dev *idev);
  *	Configured unicast address hash table
  */
 static struct inet6_ifaddr		*inet6_addr_lst[IN6_ADDR_HSIZE];
-static rwlock_t	addrconf_hash_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(addrconf_hash_lock);
 
 /* Protects inet6 devices */
-rwlock_t addrconf_lock = RW_LOCK_UNLOCKED;
+DEFINE_RWLOCK(addrconf_lock);
 
 static void addrconf_verify(unsigned long);
 
 static struct timer_list addr_chk_timer =
 			TIMER_INITIALIZER(addrconf_verify, 0, 0);
-static spinlock_t addrconf_verify_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(addrconf_verify_lock);
 
 static void addrconf_join_anycast(struct inet6_ifaddr *ifp);
 static void addrconf_leave_anycast(struct inet6_ifaddr *ifp);

@@ -46,7 +46,7 @@
 #define MY_TAB_MASK     (MY_TAB_SIZE - 1)
 static u32 idx_gen;
 static struct tcf_mirred *tcf_mirred_ht[MY_TAB_SIZE];
-static rwlock_t mirred_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(mirred_lock);
 
 /* ovewrride the defaults */
 #define tcf_st		tcf_mirred

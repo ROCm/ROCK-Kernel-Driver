@@ -80,7 +80,7 @@ static struct rpc_credops gss_credops;
 /* dump the buffer in `emacs-hexl' style */
 #define isprint(c)      ((c > 0x1f) && (c < 0x7f))
 
-static rwlock_t gss_ctx_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(gss_ctx_lock);
 
 struct gss_auth {
 	struct rpc_auth rpc_auth;

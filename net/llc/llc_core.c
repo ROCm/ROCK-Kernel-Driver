@@ -22,7 +22,7 @@
 #include <net/llc.h>
 
 LIST_HEAD(llc_sap_list);
-rwlock_t llc_sap_list_lock = RW_LOCK_UNLOCKED;
+DEFINE_RWLOCK(llc_sap_list_lock);
 
 unsigned char llc_station_mac_sa[ETH_ALEN];
 

@@ -161,7 +161,7 @@ void cache_fresh(struct cache_detail *detail,
  */
 
 static LIST_HEAD(cache_list);
-static spinlock_t cache_list_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(cache_list_lock);
 static struct cache_detail *current_detail;
 static int current_index;
 
@@ -405,7 +405,7 @@ void cache_purge(struct cache_detail *detail)
 
 #define	DFR_MAX	300	/* ??? */
 
-static spinlock_t cache_defer_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(cache_defer_lock);
 static LIST_HEAD(cache_defer_list);
 static struct list_head cache_defer_hash[DFR_HASHSIZE];
 static int cache_defer_cnt;
@@ -533,7 +533,7 @@ void cache_clean_deferred(void *owner)
  *
  */
 
-static spinlock_t queue_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(queue_lock);
 static DECLARE_MUTEX(queue_io_sem);
 
 struct cache_queue {

@@ -41,7 +41,7 @@
 
 static u32 idx_gen;
 static struct tcf_gact *tcf_gact_ht[MY_TAB_SIZE];
-static rwlock_t gact_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(gact_lock);
 
 /* ovewrride the defaults */
 #define tcf_st		tcf_gact

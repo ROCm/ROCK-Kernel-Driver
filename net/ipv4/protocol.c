@@ -49,7 +49,7 @@
 #include <linux/igmp.h>
 
 struct net_protocol *inet_protos[MAX_INET_PROTOS];
-static spinlock_t inet_proto_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(inet_proto_lock);
 
 /*
  *	Add a protocol handler to the hash tables

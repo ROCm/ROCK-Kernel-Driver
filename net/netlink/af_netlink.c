@@ -101,7 +101,7 @@ static unsigned int nl_nonroot[MAX_LINKS];
 static int netlink_dump(struct sock *sk);
 static void netlink_destroy_callback(struct netlink_callback *cb);
 
-static rwlock_t nl_table_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(nl_table_lock);
 static atomic_t nl_table_users = ATOMIC_INIT(0);
 
 static struct notifier_block *netlink_chain;

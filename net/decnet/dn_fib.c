@@ -57,9 +57,9 @@
 
 extern int dn_cache_dump(struct sk_buff *skb, struct netlink_callback *cb);
 
-static spinlock_t dn_fib_multipath_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(dn_fib_multipath_lock);
 static struct dn_fib_info *dn_fib_info_list;
-static rwlock_t dn_fib_info_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(dn_fib_info_lock);
 int dn_fib_info_cnt;
 
 static struct

@@ -49,7 +49,7 @@
 static struct tcf_proto_ops *tcf_proto_base;
 
 /* Protects list of registered TC modules. It is pure SMP lock. */
-static rwlock_t cls_mod_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(cls_mod_lock);
 
 /* Find classifier type by string name */
 

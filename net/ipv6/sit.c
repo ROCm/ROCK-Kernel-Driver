@@ -73,7 +73,7 @@ static struct ip_tunnel *tunnels_l[HASH_SIZE];
 static struct ip_tunnel *tunnels_wc[1];
 static struct ip_tunnel **tunnels[4] = { tunnels_wc, tunnels_l, tunnels_r, tunnels_r_l };
 
-static rwlock_t ipip6_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(ipip6_lock);
 
 static struct ip_tunnel * ipip6_tunnel_lookup(u32 remote, u32 local)
 {

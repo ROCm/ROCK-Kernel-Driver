@@ -77,7 +77,7 @@ static struct aarp_entry *proxies[AARP_HASH_SIZE];
 static int unresolved_count;
 
 /* One lock protects it all. */
-static rwlock_t aarp_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(aarp_lock);
 
 /* Used to walk the list and purge/kick entries.  */
 static struct timer_list aarp_timer;

@@ -15,7 +15,7 @@
 #include <linux/if_arp.h>
 #include <linux/spinlock.h>
 
-static spinlock_t ebt_log_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(ebt_log_lock);
 
 static int ebt_log_check(const char *tablename, unsigned int hookmask,
    const struct ebt_entry *e, void *data, unsigned int datalen)

@@ -72,7 +72,7 @@ static struct workqueue_struct *rpciod_workqueue;
 /*
  * Spinlock for other critical sections of code.
  */
-static spinlock_t rpc_sched_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(rpc_sched_lock);
 
 /*
  * Disable the timer for a given RPC task. Should be called with

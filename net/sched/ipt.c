@@ -46,7 +46,7 @@
 static u32 idx_gen;
 static struct tcf_ipt *tcf_ipt_ht[MY_TAB_SIZE];
 /* ipt hash table lock */
-static rwlock_t ipt_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(ipt_lock);
 
 /* ovewrride the defaults */
 #define tcf_st		tcf_ipt

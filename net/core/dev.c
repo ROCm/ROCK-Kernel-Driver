@@ -154,7 +154,7 @@
  *		86DD	IPv6
  */
 
-static spinlock_t ptype_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(ptype_lock);
 static struct list_head ptype_base[16];	/* 16 way hashed list */
 static struct list_head ptype_all;		/* Taps */
 
@@ -184,7 +184,7 @@ static struct timer_list samp_timer = TIMER_INITIALIZER(sample_queue, 0, 0);
  */
 struct net_device *dev_base;
 static struct net_device **dev_tail = &dev_base;
-rwlock_t dev_base_lock = RW_LOCK_UNLOCKED;
+DEFINE_RWLOCK(dev_base_lock);
 
 EXPORT_SYMBOL(dev_base);
 EXPORT_SYMBOL(dev_base_lock);
@@ -2674,7 +2674,7 @@ static int dev_new_index(void)
 static int dev_boot_phase = 1;
 
 /* Delayed registration/unregisteration */
-static spinlock_t net_todo_list_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(net_todo_list_lock);
 static struct list_head net_todo_list = LIST_HEAD_INIT(net_todo_list);
 
 static inline void net_set_todo(struct net_device *dev)

@@ -65,7 +65,7 @@ struct proc_dir_entry	*proc_net_sctp;
 DEFINE_SNMP_STAT(struct sctp_mib, sctp_statistics);
 
 struct idr sctp_assocs_id;
-spinlock_t sctp_assocs_id_lock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(sctp_assocs_id_lock);
 
 /* This is the global socket data structure used for responding to
  * the Out-of-the-blue (OOTB) packets.  A control sock will be created

@@ -131,7 +131,7 @@ static int tclass_notify(struct sk_buff *oskb, struct nlmsghdr *n,
  */
 
 /* Protects list of registered TC modules. It is pure SMP lock. */
-static rwlock_t qdisc_mod_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(qdisc_mod_lock);
 
 
 /************************************************

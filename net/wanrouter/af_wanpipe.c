@@ -158,7 +158,7 @@ static void dbg_kfree(void * v, int line) {
 
 /* List of all wanpipe sockets. */
 HLIST_HEAD(wanpipe_sklist);
-static rwlock_t wanpipe_sklist_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(wanpipe_sklist_lock);
 
 atomic_t wanpipe_socks_nr;
 static unsigned long wanpipe_tx_critical;

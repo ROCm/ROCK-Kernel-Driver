@@ -42,7 +42,7 @@
 #define MY_TAB_MASK     15
 static u32 idx_gen;
 static struct tcf_pedit *tcf_pedit_ht[MY_TAB_SIZE];
-static rwlock_t pedit_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(pedit_lock);
 
 #define tcf_st		tcf_pedit
 #define tc_st		tc_pedit

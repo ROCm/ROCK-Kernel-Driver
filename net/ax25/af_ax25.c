@@ -52,7 +52,7 @@
 
 
 HLIST_HEAD(ax25_list);
-spinlock_t ax25_list_lock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(ax25_list_lock);
 
 static struct proto_ops ax25_proto_ops;
 

@@ -46,7 +46,7 @@
 #endif
 
 static struct tc_action_ops *act_base = NULL;
-static rwlock_t act_mod_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(act_mod_lock);
 
 int tcf_register_action(struct tc_action_ops *act)
 {

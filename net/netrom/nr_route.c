@@ -41,9 +41,9 @@
 static unsigned int nr_neigh_no = 1;
 
 static HLIST_HEAD(nr_node_list);
-static spinlock_t nr_node_list_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(nr_node_list_lock);
 static HLIST_HEAD(nr_neigh_list);
-static spinlock_t nr_neigh_list_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(nr_neigh_list_lock);
 
 static struct nr_node *nr_node_get(ax25_address *callsign)
 {

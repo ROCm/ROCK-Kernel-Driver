@@ -56,7 +56,7 @@
 #include <linux/seq_file.h>
 
 struct hlist_head raw_v6_htable[RAWV6_HTABLE_SIZE];
-rwlock_t raw_v6_lock = RW_LOCK_UNLOCKED;
+DEFINE_RWLOCK(raw_v6_lock);
 
 static void raw_v6_hash(struct sock *sk)
 {

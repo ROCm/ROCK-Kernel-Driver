@@ -144,7 +144,7 @@ static struct net_proto_family *net_families[NPROTO];
 
 #if defined(CONFIG_SMP) || defined(CONFIG_PREEMPT)
 static atomic_t net_family_lockct = ATOMIC_INIT(0);
-static spinlock_t net_family_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(net_family_lock);
 
 /* The strategy is: modifications net_family vector are short, do not
    sleep and veeery rare, but read access should be free of any exclusive

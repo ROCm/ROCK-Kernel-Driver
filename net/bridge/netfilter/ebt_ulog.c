@@ -255,7 +255,7 @@ static int __init init(void)
 		init_timer(&ulog_buffers[i].timer);
 		ulog_buffers[i].timer.function = ulog_timer;
 		ulog_buffers[i].timer.data = i;
-		ulog_buffers[i].lock = SPIN_LOCK_UNLOCKED;
+		spin_lock_init(&ulog_buffers[i].lock);
 	}
 
 	ebtulognl = netlink_kernel_create(NETLINK_NFLOG, NULL);

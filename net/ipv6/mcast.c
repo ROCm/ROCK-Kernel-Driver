@@ -124,7 +124,7 @@ struct mld2_query {
 struct in6_addr mld2_all_mcr = MLD2_ALL_MCR_INIT;
 
 /* Big mc list lock for all the sockets */
-static rwlock_t ipv6_sk_mc_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(ipv6_sk_mc_lock);
 
 static struct socket *igmp6_socket;
 

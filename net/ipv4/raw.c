@@ -81,7 +81,7 @@
 #include <linux/netfilter_ipv4.h>
 
 struct hlist_head raw_v4_htable[RAWV4_HTABLE_SIZE];
-rwlock_t raw_v4_lock = RW_LOCK_UNLOCKED;
+DEFINE_RWLOCK(raw_v4_lock);
 
 static void raw_v4_hash(struct sock *sk)
 {

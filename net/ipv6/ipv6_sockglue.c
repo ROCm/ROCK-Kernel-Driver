@@ -63,7 +63,7 @@ static struct packet_type ipv6_packet_type = {
 };
 
 struct ip6_ra_chain *ip6_ra_chain;
-rwlock_t ip6_ra_lock = RW_LOCK_UNLOCKED;
+DEFINE_RWLOCK(ip6_ra_lock);
 
 int ip6_ra_control(struct sock *sk, int sel, void (*destructor)(struct sock *))
 {

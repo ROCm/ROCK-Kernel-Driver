@@ -125,7 +125,7 @@ extern void ip_mc_drop_socket(struct sock *sk);
  * build a new socket.
  */
 static struct list_head inetsw[SOCK_MAX];
-static spinlock_t inetsw_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(inetsw_lock);
 
 /* New destruction routine */
 

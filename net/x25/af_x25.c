@@ -58,7 +58,7 @@ int sysctl_x25_clear_request_timeout   = X25_DEFAULT_T23;
 int sysctl_x25_ack_holdback_timeout    = X25_DEFAULT_T2;
 
 HLIST_HEAD(x25_list);
-rwlock_t x25_list_lock = RW_LOCK_UNLOCKED;
+DEFINE_RWLOCK(x25_list_lock);
 
 static struct proto_ops x25_proto_ops;
 

@@ -43,7 +43,7 @@
 static u32 idx_gen;
 static struct tcf_police *tcf_police_ht[MY_TAB_SIZE];
 /* Policer hash table lock */
-static rwlock_t police_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(police_lock);
 
 /* Each policer is serialized by its individual spinlock */
 
