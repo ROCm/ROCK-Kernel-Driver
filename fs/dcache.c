@@ -28,6 +28,7 @@
 #include <asm/uaccess.h>
 #include <linux/security.h>
 #include <linux/seqlock.h>
+#include <linux/swap.h>
 
 #define DCACHE_PARANOIA 1
 /* #define DCACHE_DEBUG 1 */
@@ -1619,13 +1620,21 @@ extern void chrdev_init(void);
 
 void __init vfs_caches_init(unsigned long mempages)
 {
-	names_cachep = kmem_cache_create("names_cache", 
-			PATH_MAX, 0, 
+	unsigned long reserve;
+
+	/* Base hash sizes on available memory, with a reserve equal to
+           150% of current kernel size */
+
+	reserve = (mempages - nr_free_pages()) * 3/2;
+	mempages -= reserve;
+
+	names_cachep = kmem_cache_create("names_cache",
+			PATH_MAX, 0,
 			SLAB_HWCACHE_ALIGN, NULL, NULL);
 	if (!names_cachep)
 		panic("Cannot create names SLAB cache");
 
-	filp_cachep = kmem_cache_create("filp", 
+	filp_cachep = kmem_cache_create("filp",
 			sizeof(struct file), 0,
 			SLAB_HWCACHE_ALIGN, filp_ctor, filp_dtor);
 	if(!filp_cachep)
@@ -1633,7 +1642,7 @@ void __init vfs_caches_init(unsigned long mempages)
 
 	dcache_init(mempages);
 	inode_init(mempages);
-	files_init(mempages); 
+	files_init(mempages);
 	mnt_init(mempages);
 	bdev_cache_init();
 	chrdev_init();
