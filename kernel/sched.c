@@ -2465,7 +2465,7 @@ static void show_task(task_t * p)
 		unsigned long * n = (unsigned long *) (p->thread_info+1);
 		while (!*n)
 			n++;
-		free = (unsigned long) n - (unsigned long)(p+1);
+		free = (unsigned long) n - (unsigned long)(p->thread_info+1);
 	}
 	printk("%5lu %5d %6d ", free, p->pid, p->parent->pid);
 	if ((relative = eldest_child(p)))
