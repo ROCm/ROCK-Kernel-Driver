@@ -181,6 +181,7 @@ xdr_decode_fattr(u32 *p, struct nfs_fattr *fattr)
 
 	/* Update the mode bits */
 	fattr->valid |= (NFS_ATTR_FATTR | NFS_ATTR_FATTR_V3);
+	fattr->timestamp = jiffies;
 	return p;
 }
 

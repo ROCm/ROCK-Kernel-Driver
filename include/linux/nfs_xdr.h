@@ -27,6 +27,7 @@ struct nfs_fattr {
 	__u64			atime;
 	__u64			mtime;
 	__u64			ctime;
+	unsigned long		timestamp;
 };
 
 #define NFS_ATTR_WCC		0x0001		/* pre-op WCC data    */
