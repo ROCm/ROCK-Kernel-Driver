@@ -126,6 +126,8 @@ mprotect_attempt_merge(struct vm_area_struct *vma, struct vm_area_struct *prev,
 		return 0;
 	if (vma->vm_file || (vma->vm_flags & VM_SHARED))
 		return 0;
+	if (!mpol_equal(vma->vm_policy, prev->vm_policy))
+		return 0;
 
 	/*
 	 * If the whole area changes to the protection of the previous one
@@ -137,6 +139,7 @@ mprotect_attempt_merge(struct vm_area_struct *vma, struct vm_area_struct *prev,
 		__vma_unlink(mm, vma, prev);
 		spin_unlock(&mm->page_table_lock);
 
+		mpol_free(vma->vm_policy);
 		kmem_cache_free(vm_area_cachep, vma);
 		mm->map_count--;
 		return 1;
@@ -325,12 +328,14 @@ do_mprotect(struct mm_struct *mm, unsigned long start, size_t len,
 #if VMA_MERGING_FIXUP
 	if (next && prev->vm_end == next->vm_start &&
 			can_vma_merge(next, prev->vm_flags) &&
+	    		mpol_equal(prev->vm_policy, next->vm_policy) &&
 			!prev->vm_file && !(prev->vm_flags & VM_SHARED)) {
 		spin_lock(&prev->vm_mm->page_table_lock);
 		prev->vm_end = next->vm_end;
 		__vma_unlink(prev->vm_mm, next, prev);
 		spin_unlock(&prev->vm_mm->page_table_lock);
 
+		mpol_free(next->vm_policy);
 		kmem_cache_free(vm_area_cachep, next);
 		prev->vm_mm->map_count--;
 	}

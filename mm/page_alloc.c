@@ -469,6 +469,31 @@ void drain_local_pages(void)
 }
 #endif /* CONFIG_PM */
 
+static void zone_statistics(struct zonelist *zonelist, struct zone *z) 
+{ 
+#ifdef CONFIG_NUMA
+	unsigned long flags;
+	int cpu; 
+	pg_data_t *pg = z->zone_pgdat,
+		*orig = zonelist->zones[0]->zone_pgdat;
+	struct per_cpu_pageset *p;
+	local_irq_save(flags); 
+	cpu = smp_processor_id();
+	p = &z->pageset[cpu];
+	if (pg == orig) {
+		z->pageset[cpu].numa_hit++;
+	} else { 
+		p->numa_miss++;
+		zonelist->zones[0]->pageset[cpu].numa_foreign++;
+	}
+	if (pg == NODE_DATA(numa_node_id()))
+		p->local_node++;
+	else
+		p->other_node++;	
+	local_irq_restore(flags);
+#endif
+} 
+
 /*
  * Free a 0-order page
  */
@@ -606,8 +631,10 @@ __alloc_pages(unsigned int gfp_mask, unsigned int order,
 		if (z->free_pages >= min ||
 				(!wait && z->free_pages >= z->pages_high)) {
 			page = buffered_rmqueue(z, order, cold);
-			if (page)
+			if (page) { 
+				zone_statistics(zonelist, z); 
 		       		goto got_pg;
+		}
 		}
 		min += z->pages_low * sysctl_lower_zone_protection;
 	}
@@ -631,8 +658,10 @@ __alloc_pages(unsigned int gfp_mask, unsigned int order,
 		if (z->free_pages >= min ||
 				(!wait && z->free_pages >= z->pages_high)) {
 			page = buffered_rmqueue(z, order, cold);
-			if (page)
+			if (page) {
+				zone_statistics(zonelist, z); 
 				goto got_pg;
+		}
 		}
 		min += local_min * sysctl_lower_zone_protection;
 	}
@@ -646,8 +675,10 @@ rebalance:
 			struct zone *z = zones[i];
 
 			page = buffered_rmqueue(z, order, cold);
-			if (page)
+			if (page) {
+				zone_statistics(zonelist, z); 
 				goto got_pg;
+		}
 		}
 		goto nopage;
 	}
@@ -674,8 +705,10 @@ rebalance:
 		if (z->free_pages >= min ||
 				(!wait && z->free_pages >= z->pages_high)) {
 			page = buffered_rmqueue(z, order, cold);
-			if (page)
+			if (page) {
+				zone_statistics(zonelist, z); 
 				goto got_pg;
+		}
 		}
 		min += z->pages_low * sysctl_lower_zone_protection;
 	}

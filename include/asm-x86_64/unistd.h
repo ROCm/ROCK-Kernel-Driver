@@ -532,10 +532,14 @@ __SYSCALL(__NR_tgkill, sys_tgkill)
 __SYSCALL(__NR_utimes, sys_utimes)
 #define __NR_vserver		236
 __SYSCALL(__NR_vserver, sys_ni_syscall)
+#define __NR_mbind 237
+__SYSCALL(__NR_mbind, sys_mbind)
+#define __NR_set_mempolicy 238
+__SYSCALL(__NR_set_mempolicy, sys_set_mempolicy)
+#define __NR_get_mempolicy 239
+__SYSCALL(__NR_get_mempolicy, sys_get_mempolicy)
 
-/* 237,238,239 reserved for NUMA API */
-
-#define __NR_syscall_max __NR_vserver
+#define __NR_syscall_max __NR_get_mempolicy
 #ifndef __NO_STUBS
 
 /* user-visible error numbers are in the range -1 - -4095 */
