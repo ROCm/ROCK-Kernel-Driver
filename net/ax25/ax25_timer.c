@@ -141,12 +141,9 @@ static void ax25_heartbeat_expiry(unsigned long param)
 {
 	int proto = AX25_PROTO_STD_SIMPLEX;
 	ax25_cb *ax25 = (ax25_cb *)param;
-	struct sock *sk = ax25->sk;
 
 	if (ax25->ax25_dev)
 		proto = ax25->ax25_dev->values[AX25_VALUES_PROTOCOL];
-
-	bh_lock_sock(sk);
 
 	switch (proto) {
 	case AX25_PROTO_STD_SIMPLEX:
@@ -163,15 +160,12 @@ static void ax25_heartbeat_expiry(unsigned long param)
 		break;
 #endif
 	}
-	bh_unlock_sock(sk);
 }
 
 static void ax25_t1timer_expiry(unsigned long param)
 {
 	ax25_cb *ax25 = (ax25_cb *)param;
-	struct sock *sk = ax25->sk;
 
-	bh_lock_sock(sk);
 	switch (ax25->ax25_dev->values[AX25_VALUES_PROTOCOL]) {
 	case AX25_PROTO_STD_SIMPLEX:
 	case AX25_PROTO_STD_DUPLEX:
@@ -185,15 +179,12 @@ static void ax25_t1timer_expiry(unsigned long param)
 		break;
 #endif
 	}
-	bh_unlock_sock(sk);
 }
 
 static void ax25_t2timer_expiry(unsigned long param)
 {
 	ax25_cb *ax25 = (ax25_cb *)param;
-	struct sock *sk = ax25->sk;
 
-	bh_lock_sock(sk);
 	switch (ax25->ax25_dev->values[AX25_VALUES_PROTOCOL]) {
 	case AX25_PROTO_STD_SIMPLEX:
 	case AX25_PROTO_STD_DUPLEX:
@@ -207,15 +198,12 @@ static void ax25_t2timer_expiry(unsigned long param)
 		break;
 #endif
 	}
-	bh_unlock_sock(sk);
 }
 
 static void ax25_t3timer_expiry(unsigned long param)
 {
 	ax25_cb *ax25 = (ax25_cb *)param;
-	struct sock *sk = ax25->sk;
 
-	bh_lock_sock(sk);
 	switch (ax25->ax25_dev->values[AX25_VALUES_PROTOCOL]) {
 	case AX25_PROTO_STD_SIMPLEX:
 	case AX25_PROTO_STD_DUPLEX:
@@ -231,15 +219,12 @@ static void ax25_t3timer_expiry(unsigned long param)
 		break;
 #endif
 	}
-	bh_unlock_sock(sk);
 }
 
 static void ax25_idletimer_expiry(unsigned long param)
 {
 	ax25_cb *ax25 = (ax25_cb *)param;
-	struct sock *sk = ax25->sk;
 
-	bh_lock_sock(sk);
 	switch (ax25->ax25_dev->values[AX25_VALUES_PROTOCOL]) {
 	case AX25_PROTO_STD_SIMPLEX:
 	case AX25_PROTO_STD_DUPLEX:
@@ -255,5 +240,4 @@ static void ax25_idletimer_expiry(unsigned long param)
 		break;
 #endif
 	}
-	bh_unlock_sock(sk);
 }

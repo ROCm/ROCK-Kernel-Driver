@@ -10,6 +10,7 @@
 #include <linux/ax25.h>
 #include <linux/spinlock.h>
 #include <linux/timer.h>
+#include <linux/list.h>
 #include <asm/atomic.h>
 
 #define	AX25_T1CLAMPLO  		1
@@ -180,7 +181,7 @@ typedef struct ax25_dev {
 } ax25_dev;
 
 typedef struct ax25_cb {
-	struct ax25_cb		*next;
+	struct hlist_node	ax25_node;
 	ax25_address		source_addr, dest_addr;
 	ax25_digi		*digipeat;
 	ax25_dev		*ax25_dev;
@@ -197,17 +198,32 @@ typedef struct ax25_cb {
 	struct sk_buff_head	ack_queue;
 	struct sk_buff_head	frag_queue;
 	unsigned char		window;
-	struct timer_list	timer;
+	struct timer_list	timer, dtimer;
 	struct sock		*sk;		/* Backlink to socket */
+	atomic_t		refcount;
 } ax25_cb;
 
 #define ax25_sk(__sk) ((ax25_cb *)(__sk)->sk_protinfo)
 
+#define ax25_for_each(__ax25, node, list) \
+	hlist_for_each_entry(__ax25, node, list, ax25_node)
+
+#define ax25_cb_hold(__ax25) \
+	atomic_inc(&((__ax25)->refcount))
+
+static __inline__ void ax25_cb_put(ax25_cb *ax25)
+{
+	if (atomic_dec_and_test(&ax25->refcount)) {
+		if (ax25->digipeat)
+			kfree(ax25->digipeat);
+		kfree(ax25);
+	}
+}
+
 /* af_ax25.c */
-extern ax25_cb *ax25_list;
+extern struct hlist_head ax25_list;
 extern spinlock_t ax25_list_lock;
-extern void ax25_free_cb(ax25_cb *);
-extern void ax25_insert_socket(ax25_cb *);
+extern void ax25_cb_add(ax25_cb *);
 struct sock *ax25_find_listener(ax25_address *, int, struct net_device *, int);
 struct sock *ax25_get_socket(ax25_address *, ax25_address *, int);
 extern ax25_cb *ax25_find_cb(ax25_address *, ax25_address *, ax25_digi *, struct net_device *);

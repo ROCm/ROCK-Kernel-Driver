@@ -42,8 +42,6 @@ static void rif_check_expire(unsigned long dummy);
 
 #define TR_SR_DEBUG 0
 
-typedef struct rif_cache_s *rif_cache;
-
 /*
  *	Each RIF entry we learn is kept this way
  */
@@ -53,7 +51,7 @@ struct rif_cache_s {
 	int iface;
 	__u16 rcf;
 	__u16 rseg[8];
-	rif_cache next;
+	struct rif_cache_s *next;
 	unsigned long last_used;
 	unsigned char local_ring;
 };
@@ -65,12 +63,10 @@ struct rif_cache_s {
  *	up a lot.
  */
  
-static rif_cache rif_table[RIF_TABLE_SIZE];
+static struct rif_cache_s *rif_table[RIF_TABLE_SIZE];
 
 static spinlock_t rif_lock = SPIN_LOCK_UNLOCKED;
 
-#define RIF_TIMEOUT 60*10*HZ
-#define RIF_CHECK_INTERVAL 60*HZ
 
 /*
  *	Garbage disposal timer.
@@ -78,7 +74,23 @@ static spinlock_t rif_lock = SPIN_LOCK_UNLOCKED;
  
 static struct timer_list rif_timer;
 
-int sysctl_tr_rif_timeout = RIF_TIMEOUT;
+int sysctl_tr_rif_timeout = 60*10*HZ;
+
+static inline unsigned long rif_hash(const unsigned char *addr)
+{
+	unsigned long x;
+
+	x = addr[0];
+	x = (x << 2) ^ addr[1];
+	x = (x << 2) ^ addr[2];
+	x = (x << 2) ^ addr[3];
+	x = (x << 2) ^ addr[4];
+	x = (x << 2) ^ addr[5];
+
+	x ^= x >> 8;
+
+	return x & (RIF_TABLE_SIZE - 1);
+}
 
 /*
  *	Put the headers on a token ring packet. Token ring source routing
@@ -233,14 +245,14 @@ unsigned short tr_type_trans(struct sk_buff *skb, struct net_device *dev)
 
 void tr_source_route(struct sk_buff *skb,struct trh_hdr *trh,struct net_device *dev) 
 {
-	int i, slack;
+	int slack;
 	unsigned int hash;
-	rif_cache entry;
+	struct rif_cache_s *entry;
 	unsigned char *olddata;
-	unsigned char mcast_func_addr[] = {0xC0,0x00,0x00,0x04,0x00,0x00};
-	unsigned long flags ; 
+	static const unsigned char mcast_func_addr[] 
+		= {0xC0,0x00,0x00,0x04,0x00,0x00};
 	
-	spin_lock_irqsave(&rif_lock,flags);
+	spin_lock_bh(&rif_lock);
 
 	/*
 	 *	Broadcasts are single route as stated in RFC 1042 
@@ -254,8 +266,7 @@ void tr_source_route(struct sk_buff *skb,struct trh_hdr *trh,struct net_device *
 	}
 	else 
 	{
-		for(i=0,hash=0;i<TR_ALEN;hash+=trh->daddr[i++]);
-		hash&=RIF_TABLE_SIZE-1;
+		hash = rif_hash(trh->daddr);
 		/*
 		 *	Walk the hash table and look for an entry
 		 */
@@ -310,7 +321,7 @@ printk("source routing for %02X:%02X:%02X:%02X:%02X:%02X\n",trh->daddr[0],
 	else 
 		slack = 18 - ((ntohs(trh->rcf) & TR_RCF_LEN_MASK)>>8);
 	olddata = skb->data;
-	spin_unlock_irqrestore(&rif_lock,flags);
+	spin_unlock_bh(&rif_lock);
 
 	skb_pull(skb, slack);
 	memmove(skb->data, olddata, sizeof(struct trh_hdr) - slack);
@@ -323,9 +334,8 @@ printk("source routing for %02X:%02X:%02X:%02X:%02X:%02X\n",trh->daddr[0],
  
 static void tr_add_rif_info(struct trh_hdr *trh, struct net_device *dev)
 {
-	int i;
 	unsigned int hash, rii_p = 0;
-	rif_cache entry;
+	struct rif_cache_s *entry;
 
 
 	spin_lock_bh(&rif_lock);
@@ -343,8 +353,7 @@ static void tr_add_rif_info(struct trh_hdr *trh, struct net_device *dev)
 	        }
 	}
 
-	for(i=0,hash=0;i<TR_ALEN;hash+=trh->saddr[i++]);
-	hash&=RIF_TABLE_SIZE-1;
+	hash = rif_hash(trh->saddr);
 	for(entry=rif_table[hash];entry && memcmp(&(entry->addr[0]),&(trh->saddr[0]),TR_ALEN);entry=entry->next);
 
 	if(entry==NULL) 
@@ -419,36 +428,33 @@ printk("updating rif_entry: addr:%02X:%02X:%02X:%02X:%02X:%02X rcf:%04X\n",
 static void rif_check_expire(unsigned long dummy) 
 {
 	int i;
-	unsigned long now=jiffies;
-	unsigned long flags ; 
+	unsigned long next_interval = jiffies + sysctl_tr_rif_timeout/2;
 
-	spin_lock_irqsave(&rif_lock,flags);
+	spin_lock_bh(&rif_lock);
 	
-	for(i=0; i < RIF_TABLE_SIZE;i++) 
-	{
-		rif_cache entry, *pentry=rif_table+i;	
-		while((entry=*pentry)) 
-		{
-			/*
-			 *	Out it goes
-			 */
-			if((now-entry->last_used) > sysctl_tr_rif_timeout) 
-			{
-				*pentry=entry->next;
+	for(i =0; i < RIF_TABLE_SIZE; i++) {
+		struct rif_cache_s *entry, **pentry;
+		
+		pentry = rif_table+i;
+		while((entry=*pentry) != NULL) {
+			unsigned long expires
+				= entry->last_used + sysctl_tr_rif_timeout;
+
+			if (time_before_eq(expires, jiffies)) {
+				*pentry = entry->next;
 				kfree(entry);
+			} else {
+				pentry = &entry->next;
+
+				if (time_before(expires, next_interval))
+					next_interval = expires;
 			}
-			else
-				pentry=&entry->next;
 		}
 	}
 	
-	spin_unlock_irqrestore(&rif_lock,flags);
+	spin_unlock_bh(&rif_lock);
 
-	/*
-	 *	Reset the timer
-	 */
-	 
-	mod_timer(&rif_timer, jiffies+sysctl_tr_rif_timeout);
+	mod_timer(&rif_timer, next_interval);
 
 }
 
@@ -467,8 +473,8 @@ static struct rif_cache_s *rif_get_idx(loff_t pos)
 	struct rif_cache_s *entry;
 	loff_t off = 0;
 
-	for(i=0;i < RIF_TABLE_SIZE;i++) 
-		for(entry=rif_table[i];entry;entry=entry->next) {
+	for(i = 0; i < RIF_TABLE_SIZE; i++) 
+		for(entry = rif_table[i]; entry; entry = entry->next) {
 			if (off == pos)
 				return entry;
 			++off;
@@ -479,41 +485,58 @@ static struct rif_cache_s *rif_get_idx(loff_t pos)
 
 static void *rif_seq_start(struct seq_file *seq, loff_t *pos)
 {
-	unsigned long flags;
-
-	spin_lock_irqsave(&rif_lock, flags);
-	seq->private = (void *) flags;
+	spin_lock_bh(&rif_lock);
 
 	return *pos ? rif_get_idx(*pos - 1) : RIF_PROC_START;
 }
 
 static void *rif_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 {
-	return rif_get_idx(*pos++);
+	int i;
+	struct rif_cache_s *ent = v;
+
+	++*pos;
+
+	if (v == RIF_PROC_START) {
+		i = -1;
+		goto scan;
+	}
+
+	if (ent->next) 
+		return ent->next;
+
+	i = rif_hash(ent->addr);
+ scan:
+	while (++i < RIF_TABLE_SIZE) {
+		if ((ent = rif_table[i]) != NULL)
+			return ent;
+	}
+	return NULL;
 }
 
 static void rif_seq_stop(struct seq_file *seq, void *v)
 {
-	unsigned long flags = (unsigned long) seq->private;
-	spin_lock_irqsave(&rif_lock, flags);
+	spin_unlock_bh(&rif_lock);
 }
 
 static int rif_seq_show(struct seq_file *seq, void *v)
 {
 	int j, rcf_len, segment, brdgnmb;
-	rif_cache entry = v;
+	struct rif_cache_s *entry = v;
 
 	if (v == RIF_PROC_START)
 		seq_puts(seq,
 		     "if     TR address       TTL   rcf   routing segments\n");
 	else {
 		struct net_device *dev = dev_get_by_index(entry->iface);
+		long ttl = (long) (entry->last_used + sysctl_tr_rif_timeout)
+				- (long) jiffies;
 
 		seq_printf(seq, "%s %02X:%02X:%02X:%02X:%02X:%02X %7li ",
 			   dev?dev->name:"?",
 			   entry->addr[0],entry->addr[1],entry->addr[2],
 			   entry->addr[3],entry->addr[4],entry->addr[5],
-			   sysctl_tr_rif_timeout-(jiffies-entry->last_used));
+			   ttl/HZ);
 
 			if (entry->local_ring)
 			        seq_puts(seq, "local\n");
@@ -569,7 +592,7 @@ static struct file_operations rif_seq_fops = {
 static int __init rif_init(void)
 {
 	init_timer(&rif_timer);
-	rif_timer.expires  = RIF_TIMEOUT;
+	rif_timer.expires  = sysctl_tr_rif_timeout;
 	rif_timer.data     = 0L;
 	rif_timer.function = rif_check_expire;
 	add_timer(&rif_timer);

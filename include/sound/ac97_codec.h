@@ -345,13 +345,20 @@ void snd_ac97_suspend(ac97_t *ac97);
 void snd_ac97_resume(ac97_t *ac97);
 #endif
 
-enum { AC97_TUNE_HP_ONLY, AC97_TUNE_SWAP_HP, AC97_TUNE_SWAP_SURROUND };
+/* quirk types */
+enum {
+	AC97_TUNE_HP_ONLY,	/* headphone (true line-out) control as master only */
+	AC97_TUNE_SWAP_HP,	/* swap headphone and master controls */
+	AC97_TUNE_SWAP_SURROUND, /* swap master and surround controls */
+	AC97_TUNE_AD_SHARING	/* for AD1985, turn on OMS bit and use headphone */
+};
 
 struct ac97_quirk {
-	unsigned short vendor;
-	unsigned short device;
-	const char *name;
-	int type;
+	unsigned short vendor;	/* PCI vendor id */
+	unsigned short device;	/* PCI device id */
+	unsigned short mask;	/* device id bit mask, 0 = accept all */
+	const char *name;	/* name shown as info */
+	int type;		/* quirk type above */
 };
 
 int snd_ac97_tune_hardware(ac97_t *ac97, struct ac97_quirk *quirk);

@@ -1439,18 +1439,18 @@ static int __devinit snd_cs4281_create(snd_card_t * card,
 	chip->dual_codec = dual_codec;
 
 	if ((chip->ba0_res = request_mem_region(chip->ba0_addr, CS4281_BA0_SIZE, "CS4281 BA0")) == NULL) {
-		snd_cs4281_free(chip);
 		snd_printk(KERN_ERR "unable to grab memory region 0x%lx-0x%lx\n", chip->ba0_addr, chip->ba0_addr + CS4281_BA0_SIZE - 1);
+		snd_cs4281_free(chip);
 		return -ENOMEM;
 	}
 	if ((chip->ba1_res = request_mem_region(chip->ba1_addr, CS4281_BA1_SIZE, "CS4281 BA1")) == NULL) {
-		snd_cs4281_free(chip);
 		snd_printk(KERN_ERR "unable to grab memory region 0x%lx-0x%lx\n", chip->ba1_addr, chip->ba1_addr + CS4281_BA1_SIZE - 1);
+		snd_cs4281_free(chip);
 		return -ENOMEM;
 	}
 	if (request_irq(pci->irq, snd_cs4281_interrupt, SA_INTERRUPT|SA_SHIRQ, "CS4281", (void *)chip)) {
-		snd_cs4281_free(chip);
 		snd_printk(KERN_ERR "unable to grab IRQ %d\n", pci->irq);
+		snd_cs4281_free(chip);
 		return -ENOMEM;
 	}
 	chip->irq = pci->irq;

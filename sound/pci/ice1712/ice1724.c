@@ -566,7 +566,7 @@ static snd_pcm_hardware_t snd_vt1724_playback_pro =
 				 SNDRV_PCM_INFO_MMAP_VALID |
 				 SNDRV_PCM_INFO_PAUSE | SNDRV_PCM_INFO_SYNC_START),
 	.formats =		SNDRV_PCM_FMTBIT_S32_LE,
-	.rates =		SNDRV_PCM_RATE_KNOT | SNDRV_PCM_RATE_8000_96000,
+	.rates =		SNDRV_PCM_RATE_KNOT | SNDRV_PCM_RATE_8000_192000,
 	.rate_min =		4000,
 	.rate_max =		192000,
 	.channels_min =		2,
@@ -585,7 +585,7 @@ static snd_pcm_hardware_t snd_vt1724_capture_pro =
 				 SNDRV_PCM_INFO_MMAP_VALID |
 				 SNDRV_PCM_INFO_PAUSE | SNDRV_PCM_INFO_SYNC_START),
 	.formats =		SNDRV_PCM_FMTBIT_S32_LE,
-	.rates =		SNDRV_PCM_RATE_KNOT | SNDRV_PCM_RATE_8000_96000,
+	.rates =		SNDRV_PCM_RATE_KNOT | SNDRV_PCM_RATE_8000_192000,
 	.rate_min =		4000,
 	.rate_max =		192000,
 	.channels_min =		2,
@@ -720,7 +720,7 @@ static snd_pcm_hardware_t snd_vt1724_playback_spdif =
 				 SNDRV_PCM_INFO_MMAP_VALID |
 				 SNDRV_PCM_INFO_PAUSE | SNDRV_PCM_INFO_SYNC_START),
 	.formats =		SNDRV_PCM_FMTBIT_S32_LE,
-	.rates =		SNDRV_PCM_RATE_KNOT | SNDRV_PCM_RATE_8000_96000,
+	.rates =		SNDRV_PCM_RATE_KNOT | SNDRV_PCM_RATE_8000_192000,
 	.rate_min =		4000,
 	.rate_max =		192000,
 	.channels_min =		2,
@@ -778,7 +778,7 @@ static int snd_vt1724_playback_spdif_open(snd_pcm_substream_t *substream)
 	snd_pcm_set_sync(substream);
 	snd_pcm_hw_constraint_msbits(runtime, 0, 32, 24);
 
-	snd_pcm_hw_constraint_list(runtime, 0, SNDRV_PCM_HW_PARAM_RATE, &hw_constraints_rates_96);
+	snd_pcm_hw_constraint_list(runtime, 0, SNDRV_PCM_HW_PARAM_RATE, &hw_constraints_rates_192);
 	return 0;
 }
 
@@ -1796,20 +1796,20 @@ static int __devinit snd_vt1724_create(snd_card_t * card,
 	synchronize_irq(pci->irq);
 
 	if ((ice->res_port = request_region(ice->port, 32, "ICE1724 - Controller")) == NULL) {
-		snd_vt1724_free(ice);
 		snd_printk("unable to grab ports 0x%lx-0x%lx\n", ice->port, ice->port + 32 - 1);
+		snd_vt1724_free(ice);
 		return -EIO;
 	}
 
 	if ((ice->res_profi_port = request_region(ice->profi_port, 128, "ICE1724 - Professional")) == NULL) {
-		snd_vt1724_free(ice);
 		snd_printk("unable to grab ports 0x%lx-0x%lx\n", ice->profi_port, ice->profi_port + 16 - 1);
+		snd_vt1724_free(ice);
 		return -EIO;
 	}
 		
 	if (request_irq(pci->irq, snd_vt1724_interrupt, SA_INTERRUPT|SA_SHIRQ, "ICE1724", (void *) ice)) {
-		snd_vt1724_free(ice);
 		snd_printk("unable to grab IRQ %d\n", pci->irq);
+		snd_vt1724_free(ice);
 		return -EIO;
 	}
 

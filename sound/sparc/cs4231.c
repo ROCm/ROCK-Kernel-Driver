@@ -1994,10 +1994,10 @@ static int __init snd_cs4231_sbus_create(snd_card_t *card,
 
 	if (request_irq(sdev->irqs[0], snd_cs4231_sbus_interrupt,
 			SA_SHIRQ, "cs4231", chip)) {
-		snd_cs4231_sbus_free(chip);
 		snd_printk("cs4231-%d: Unable to grab SBUS IRQ %s\n",
 			   dev,
 			   __irq_itoa(sdev->irqs[0]));
+		snd_cs4231_sbus_free(chip);
 		return -EBUSY;
 	}
 	chip->irq[0] = sdev->irqs[0];
