@@ -870,22 +870,22 @@ typedef struct smb_com_transaction_ioctl_req {
 	struct smb_hdr hdr;	/* wct = 23 */
 	__u8 MaxSetupCount;
 	__u16 Reserved;
-	__u32 TotalParameterCount;
-	__u32 TotalDataCount;
-	__u32 MaxParameterCount;
-	__u32 MaxDataCount;
-	__u32 ParameterCount;
-	__u32 ParameterOffset;
-	__u32 DataCount;
-	__u32 DataOffset;
+	__le32 TotalParameterCount;
+	__le32 TotalDataCount;
+	__le32 MaxParameterCount;
+	__le32 MaxDataCount;
+	__le32 ParameterCount;
+	__le32 ParameterOffset;
+	__le32 DataCount;
+	__le32 DataOffset;
 	__u8 SetupCount; /* four setup words follow subcommand */
 	/* SNIA spec incorrectly included spurious pad here */
-	__u16 SubCommand;/* 2 = IOCTL/FSCTL */
-	__u32 FunctionCode;
+	__le16 SubCommand;/* 2 = IOCTL/FSCTL */
+	__le32 FunctionCode;
 	__u16 Fid;
 	__u8 IsFsctl;    /* 1 = File System Control, 0 = device control (IOCTL)*/
 	__u8 IsRootFlag; /* 1 = apply command to root of share (must be DFS share)*/
-	__u16 ByteCount;
+	__le16 ByteCount;
 	__u8 Pad[3];
 	__u8 Data[1];
 } TRANSACT_IOCTL_REQ;
@@ -893,16 +893,16 @@ typedef struct smb_com_transaction_ioctl_req {
 typedef struct smb_com_transaction_ioctl_rsp {
 	struct smb_hdr hdr;	/* wct = 19 */
 	__u8 Reserved[3];
-	__u32 TotalParameterCount;
-	__u32 TotalDataCount;
-	__u32 ParameterCount;
-	__u32 ParameterOffset;
-	__u32 ParameterDisplacement;
-	__u32 DataCount;
-	__u32 DataOffset;
-	__u32 DataDisplacement;
+	__le32 TotalParameterCount;
+	__le32 TotalDataCount;
+	__le32 ParameterCount;
+	__le32 ParameterOffset;
+	__le32 ParameterDisplacement;
+	__le32 DataCount;
+	__le32 DataOffset;
+	__le32 DataDisplacement;
 	__u8 SetupCount;	/* 1 */
-	__u16 ReturnedDataLen;
+	__le16 ReturnedDataLen;
 	__u16 ByteCount;
 	__u8 Pad[3];
 } TRANSACT_IOCTL_RSP;
