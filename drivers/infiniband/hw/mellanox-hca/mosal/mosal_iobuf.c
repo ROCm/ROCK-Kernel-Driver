@@ -1174,7 +1174,6 @@ static void mosal_flush_tlb(MOSAL_iobuf_t iobuf)
   }
   up_read(&current->mm->mmap_sem);
 #else
-#ifdef MT_FLUSH_TLB_TAKES_VMA
   struct vm_area_struct *vma;
   MT_virt_addr_t va = iobuf->va;
 
@@ -1184,9 +1183,6 @@ static void mosal_flush_tlb(MOSAL_iobuf_t iobuf)
     flush_tlb_range(vma, iobuf->va, iobuf->va+iobuf->size);
   }
   up_read(&current->mm->mmap_sem);
-#else
-  flush_tlb_range(current->mm, iobuf->va, iobuf->va+iobuf->size);
-#endif
 #endif
 }
 
