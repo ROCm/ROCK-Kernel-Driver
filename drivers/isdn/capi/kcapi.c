@@ -24,6 +24,7 @@
 #include <linux/capi.h>
 #include <linux/kernelcapi.h>
 #include <linux/init.h>
+#include <linux/moduleparam.h>
 #include <linux/delay.h>
 #include <asm/uaccess.h>
 #include <linux/isdn/capicmd.h>
@@ -41,7 +42,7 @@ static int showcapimsgs = 0;
 MODULE_DESCRIPTION("CAPI4Linux: kernel CAPI layer");
 MODULE_AUTHOR("Carsten Paeth");
 MODULE_LICENSE("GPL");
-MODULE_PARM(showcapimsgs, "i");
+module_param(showcapimsgs, uint, 0);
 
 /* ------------------------------------------------------------- */
 

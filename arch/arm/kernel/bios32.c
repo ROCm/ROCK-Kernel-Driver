@@ -574,13 +574,13 @@ void __init pci_common_init(struct hw_pci *hw)
 
 		if (!use_firmware) {
 			/*
-		 	 * Size the bridge windows.
-		 	 */
+			 * Size the bridge windows.
+			 */
 			pci_bus_size_bridges(bus);
 
 			/*
-		 	 * Assign resources.
-		 	 */
+			 * Assign resources.
+			 */
 			pci_bus_assign_resources(bus);
 		}
 

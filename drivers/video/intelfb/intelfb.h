@@ -97,12 +97,12 @@
 /* module parameters */
 #define INTELFB_INT_PARAM(name, default, desc)				\
 	static int name = default;					\
-	MODULE_PARM(name, "i");					        \
+	module_param(name, int, default);			        \
 	MODULE_PARM_DESC(name, desc);
 
 #define INTELFB_STR_PARAM(name, default, desc)				\
-	static const char *name = default;				\
-	MODULE_PARM(name, "s");				                \
+	static char *name = (char *) default;				\
+	module_param(name, charp, default);		                \
 	MODULE_PARM_DESC(name, desc);
 
 /* misc macros */

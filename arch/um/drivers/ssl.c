@@ -119,7 +119,7 @@ static int ssl_write(struct tty_struct * tty,
 
 static void ssl_put_char(struct tty_struct *tty, unsigned char ch)
 {
-	line_write(serial_lines, tty, 0, &ch, sizeof(ch));
+	line_write(serial_lines, tty, &ch, sizeof(ch));
 }
 
 static void ssl_flush_chars(struct tty_struct *tty)

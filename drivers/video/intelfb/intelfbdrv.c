@@ -197,7 +197,7 @@ INTELFB_INT_PARAM(probeonly, 0, "Do a minimal probe (debug)");
 INTELFB_INT_PARAM(idonly, 0,
 		  "Just identify without doing anything else (debug)");
 INTELFB_INT_PARAM(bailearly, 0, "Bail out early, depending on value (debug)");
-INTELFB_STR_PARAM(mode, NULL,
+INTELFB_STR_PARAM(mode, 0,
 		  "Initial video mode \"<xres>x<yres>[-<depth>][@<refresh>]\"");
 /***************************************************************
  *                     modules entry points                    *
@@ -1573,7 +1573,7 @@ intelfb_cursor(struct fb_info *info, struct fb_cursor *cursor)
 		intelfbhw_cursor_setcolor(dinfo, bg, fg);
 	}
 
-	if (cursor->set & FB_CUR_SETSHAPE) {
+	if (cursor->set & (FB_CUR_SETSHAPE & FB_CUR_SETIMAGE)) {
 		u32 s_pitch = (ROUND_UP_TO(cursor->image.width, 8) / 8);
 		u32 size = s_pitch * cursor->image.height;
 		u8 *dat = (u8 *) cursor->image.data;

@@ -2028,13 +2028,6 @@ pmac_ide_setup_dma(pmac_ide_hwif_t *pmif, ide_hwif_t *hwif)
 	hwif->ide_dma_timeout = &__ide_dma_timeout;
 	hwif->ide_dma_lostirq = &pmac_ide_dma_lostirq;
 
-#ifdef CONFIG_BLK_DEV_IDEDMA_PMAC_AUTO
-	if (!noautodma)
-		hwif->autodma = 1;
-#endif
-	hwif->drives[0].autodma = hwif->autodma;
-	hwif->drives[1].autodma = hwif->autodma;
-
 	hwif->atapi_dma = 1;
 	switch(pmif->kind) {
 		case controller_un_ata6:

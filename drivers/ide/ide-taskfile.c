@@ -274,14 +274,20 @@ static void ide_pio_sector(ide_drive_t *drive, unsigned int write)
 #ifdef CONFIG_HIGHMEM
 	unsigned long flags;
 #endif
+	unsigned int offset;
 	u8 *buf;
 
 	page = sg[hwif->cursg].page;
+	offset = sg[hwif->cursg].offset + hwif->cursg_ofs * SECTOR_SIZE;
+
+	/* get the current page and offset */
+	page = nth_page(page, (offset >> PAGE_SHIFT));
+	offset %= PAGE_SIZE;
+
 #ifdef CONFIG_HIGHMEM
 	local_irq_save(flags);
 #endif
-	buf = kmap_atomic(page, KM_BIO_SRC_IRQ) +
-	      sg[hwif->cursg].offset + (hwif->cursg_ofs * SECTOR_SIZE);
+	buf = kmap_atomic(page, KM_BIO_SRC_IRQ) + offset;
 
 	hwif->nleft--;
 	hwif->cursg_ofs++;

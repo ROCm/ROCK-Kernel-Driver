@@ -998,13 +998,11 @@ EXPORT_SYMBOL(unregister_key_type);
 /*
  * initialise the key management stuff
  */
-static int __init key_init(void)
+void __init key_init(void)
 {
 	/* allocate a slab in which we can store keys */
 	key_jar = kmem_cache_create("key_jar", sizeof(struct key),
-				    0, SLAB_HWCACHE_ALIGN, NULL, NULL);
-	if (!key_jar)
-		panic("Cannot create key jar\n");
+			0, SLAB_HWCACHE_ALIGN|SLAB_PANIC, NULL, NULL);
 
 	/* add the special key types */
 	list_add_tail(&key_type_keyring.link, &key_types_list);
@@ -1031,9 +1029,4 @@ static int __init key_init(void)
 
 	/* link the two root keyrings together */
 	key_link(&root_session_keyring, &root_user_keyring);
-
-	return 0;
-
 } /* end key_init() */
-
-security_initcall(key_init);

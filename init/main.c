@@ -45,6 +45,7 @@
 #include <linux/unistd.h>
 #include <linux/rmap.h>
 #include <linux/mempolicy.h>
+#include <linux/key.h>
 
 #include <asm/io.h>
 #include <asm/bugs.h>
@@ -639,7 +640,7 @@ static void __init do_basic_setup(void)
 	/* drivers will send hotplug events */
 	init_workqueues();
 	usermodehelper_init();
-
+	key_init();
 	driver_init();
 
 #ifdef CONFIG_SYSCTL

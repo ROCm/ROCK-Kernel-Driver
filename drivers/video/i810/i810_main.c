@@ -1994,44 +1994,44 @@ int __init i810fb_init(void)
 	return pci_register_driver(&i810fb_driver);
 }
 
-MODULE_PARM(vram, "i");
+module_param(vram, int, 4);
 MODULE_PARM_DESC(vram, "System RAM to allocate to framebuffer in MiB" 
 		 " (default=4)");
-MODULE_PARM(voffset, "i");
+module_param(voffset, int, 0);
 MODULE_PARM_DESC(voffset, "at what offset to place start of framebuffer "
                  "memory (0 to maximum aperture size), in MiB (default = 48)");
-MODULE_PARM(bpp, "i");
+module_param(bpp, int, 8);
 MODULE_PARM_DESC(bpp, "Color depth for display in bits per pixel"
 		 " (default = 8)");
-MODULE_PARM(xres, "i");
+module_param(xres, int, 640);
 MODULE_PARM_DESC(xres, "Horizontal resolution in pixels (default = 640)");
-MODULE_PARM(yres, "i");
+module_param(yres, int, 480);
 MODULE_PARM_DESC(yres, "Vertical resolution in scanlines (default = 480)");
-MODULE_PARM(vyres, "i");
+module_param(vyres,int, 480);
 MODULE_PARM_DESC(vyres, "Virtual vertical resolution in scanlines"
 		 " (default = 480)");
-MODULE_PARM(hsync1, "i");
+module_param(hsync1, int, 0);
 MODULE_PARM_DESC(hsync1, "Minimum horizontal frequency of monitor in KHz"
 		 " (default = 31)");
-MODULE_PARM(hsync2, "i");
+module_param(hsync2, int, 0);
 MODULE_PARM_DESC(hsync2, "Maximum horizontal frequency of monitor in KHz"
 		 " (default = 31)");
-MODULE_PARM(vsync1, "i");
+module_param(vsync1, int, 0);
 MODULE_PARM_DESC(vsync1, "Minimum vertical frequency of monitor in Hz"
 		 " (default = 50)");
-MODULE_PARM(vsync2, "i");
+module_param(vsync2, int, 0);
 MODULE_PARM_DESC(vsync2, "Maximum vertical frequency of monitor in Hz" 
 		 " (default = 60)");
-MODULE_PARM(accel, "i");
+module_param(accel, bool, 0);
 MODULE_PARM_DESC(accel, "Use Acceleration (BLIT) engine (default = 0)");
-MODULE_PARM(mtrr, "i");
+module_param(mtrr, bool, 0);
 MODULE_PARM_DESC(mtrr, "Use MTRR (default = 0)");
-MODULE_PARM(ext_vga, "i");
+module_param(ext_vga, bool, 0);
 MODULE_PARM_DESC(ext_vga, "Enable external VGA connector (default = 0)");
-MODULE_PARM(sync, "i");
+module_param(sync, bool, 0);
 MODULE_PARM_DESC(sync, "wait for accel engine to finish drawing"
 		 " (default = 0)");
-MODULE_PARM(dcolor, "i");
+module_param(dcolor, bool, 0);
 MODULE_PARM_DESC(dcolor, "use DirectColor visuals"
 		 " (default = 0 = TrueColor)");
 

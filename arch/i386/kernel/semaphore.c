@@ -49,12 +49,12 @@
  *    we cannot lose wakeup events.
  */
 
-asmlinkage void __up(struct semaphore *sem)
+fastcall void __up(struct semaphore *sem)
 {
 	wake_up(&sem->wait);
 }
 
-asmlinkage void __sched __down(struct semaphore * sem)
+fastcall void __sched __down(struct semaphore * sem)
 {
 	struct task_struct *tsk = current;
 	DECLARE_WAITQUEUE(wait, tsk);
@@ -91,7 +91,7 @@ asmlinkage void __sched __down(struct semaphore * sem)
 	tsk->state = TASK_RUNNING;
 }
 
-asmlinkage int __sched __down_interruptible(struct semaphore * sem)
+fastcall int __sched __down_interruptible(struct semaphore * sem)
 {
 	int retval = 0;
 	struct task_struct *tsk = current;
@@ -154,7 +154,7 @@ asmlinkage int __sched __down_interruptible(struct semaphore * sem)
  * single "cmpxchg" without failure cases,
  * but then it wouldn't work on a 386.
  */
-asmlinkage int __down_trylock(struct semaphore * sem)
+fastcall int __down_trylock(struct semaphore * sem)
 {
 	int sleepers;
 	unsigned long flags;
@@ -183,9 +183,9 @@ asmlinkage int __down_trylock(struct semaphore * sem)
  * need to convert that sequence back into the C sequence when
  * there is contention on the semaphore.
  *
- * %ecx contains the semaphore pointer on entry. Save the C-clobbered
- * registers (%eax, %edx and %ecx) except %eax when used as a return
- * value..
+ * %eax contains the semaphore pointer on entry. Save the C-clobbered
+ * registers (%eax, %edx and %ecx) except %eax whish is either a return
+ * value or just clobbered..
  */
 asm(
 ".section .sched.text\n"
@@ -196,13 +196,11 @@ asm(
 	"pushl %ebp\n\t"
 	"movl  %esp,%ebp\n\t"
 #endif
-	"pushl %eax\n\t"
 	"pushl %edx\n\t"
 	"pushl %ecx\n\t"
 	"call __down\n\t"
 	"popl %ecx\n\t"
 	"popl %edx\n\t"
-	"popl %eax\n\t"
 #if defined(CONFIG_FRAME_POINTER)
 	"movl %ebp,%esp\n\t"
 	"popl %ebp\n\t"
@@ -257,13 +255,11 @@ asm(
 ".align 4\n"
 ".globl __up_wakeup\n"
 "__up_wakeup:\n\t"
-	"pushl %eax\n\t"
 	"pushl %edx\n\t"
 	"pushl %ecx\n\t"
 	"call __up\n\t"
 	"popl %ecx\n\t"
 	"popl %edx\n\t"
-	"popl %eax\n\t"
 	"ret"
 );
 

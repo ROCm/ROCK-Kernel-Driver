@@ -374,6 +374,9 @@ static void __init chrp_find_openpic(void)
 static int __init
 chrp_request_cascade(void)
 {
+	if (_machine != _MACH_chrp)
+		return 0;
+
 	/* We have a cascade on OpenPIC IRQ 0, Linux IRQ 16 */
 	openpic_hookup_cascade(NUM_8259_INTERRUPTS, "82c59 cascade",
 			       i8259_irq);

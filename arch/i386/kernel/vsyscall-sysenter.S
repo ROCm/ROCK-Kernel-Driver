@@ -84,7 +84,7 @@ SYSENTER_RETURN:
 	.byte 0x04		/* DW_CFA_advance_loc4 */
 	.long .Lpop_ebp-.Lenter_kernel
 	.byte 0x0e		/* DW_CFA_def_cfa_offset */
-	.byte 0x12		/* RA at offset 12 now */
+	.byte 0x0c		/* RA at offset 12 now */
 	.byte 0xc5		/* DW_CFA_restore %ebp */
 	.byte 0x04		/* DW_CFA_advance_loc4 */
 	.long .Lpop_edx-.Lpop_ebp
