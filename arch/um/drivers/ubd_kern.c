@@ -56,10 +56,10 @@ static int ubd_revalidate(kdev_t rdev);
 #define DEVICE_NR(n) (minor(n) >> UBD_SHIFT)
 
 static struct block_device_operations ubd_blops = {
-        open:		ubd_open,
-        release:	ubd_release,
-        ioctl:		ubd_ioctl,
-        revalidate:	ubd_revalidate,
+        .open =		ubd_open,
+        .release =	ubd_release,
+        .ioctl =	ubd_ioctl,
+        .revalidate =	ubd_revalidate,
 };
 
 static request_queue_t *ubd_queue;
@@ -69,9 +69,9 @@ static struct gendisk *ubd_gendisk[MAX_DEV];
 static struct gendisk *fake_gendisk[MAX_DEV];
  
 #ifdef CONFIG_BLK_DEV_UBD_SYNC
-#define OPEN_FLAGS ((struct openflags) { r : 1, w : 1, s : 1, c : 0 })
+#define OPEN_FLAGS ((struct openflags) { .r = 1, .w = 1, .s = 1, .c = 0 })
 #else
-#define OPEN_FLAGS ((struct openflags) { r : 1, w : 1, s : 0, c : 0 })
+#define OPEN_FLAGS ((struct openflags) { .r = 1, .w = 1, .s = 0, .c = 0 })
 #endif
 
 static struct openflags global_openflags = OPEN_FLAGS;
@@ -99,24 +99,24 @@ struct ubd {
 };
 
 #define DEFAULT_COW { \
-	file:			NULL, \
-        fd:			-1, \
-        bitmap:			NULL, \
-	bitmap_offset:		0, \
-        data_offset:		0, \
+	.file =			NULL, \
+        .fd =			-1, \
+        .bitmap =		NULL, \
+	.bitmap_offset =	0, \
+        .data_offset =		0, \
 }
 
 #define DEFAULT_UBD { \
-	file: 			NULL, \
-	is_dir:			0, \
-	count:			0, \
-	fd:			-1, \
-	size:			-1, \
-	boot_openflags:		OPEN_FLAGS, \
-	openflags:		OPEN_FLAGS, \
-	real:			NULL, \
-	fake:			NULL, \
-        cow:			DEFAULT_COW, \
+	.file = 		NULL, \
+	.is_dir =		0, \
+	.count =		0, \
+	.fd =			-1, \
+	.size =			-1, \
+	.boot_openflags =	OPEN_FLAGS, \
+	.openflags =		OPEN_FLAGS, \
+	.real =			NULL, \
+	.fake =			NULL, \
+        .cow =			DEFAULT_COW, \
 }
 
 struct ubd ubd_dev[MAX_DEV] = { [ 0 ... MAX_DEV - 1 ] = DEFAULT_UBD };
@@ -131,9 +131,9 @@ static int ubd0_init(void)
 __initcall(ubd0_init);
 
 static struct hd_driveid ubd_id = {
-        cyls:		0,
-	heads:		128,
-	sectors:	32,
+        .cyls =		0,
+	.heads =	128,
+	.sectors =	32,
 };
 
 static int fake_ide = 0;
@@ -199,7 +199,7 @@ static int ubd_setup_common(char *str, int *index_out)
 {
 	struct openflags flags = global_openflags;
 	char *backing_file;
-	int i, n;
+	int n;
 
 	if(index_out) *index_out = -1;
 	n = *str++;
@@ -886,7 +886,7 @@ static int ubd_ioctl(struct inode * inode, struct file * file,
 static int ubd_revalidate(kdev_t rdev)
 {
 	__u64 size;
-	int n, offset, err;
+	int n, err;
 	struct ubd *dev;
 
 	n = minor(rdev) >> UBD_SHIFT;
