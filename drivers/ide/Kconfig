@@ -1049,10 +1049,7 @@ config BLK_DEV_UMC8672
 endif
 
 config BLK_DEV_IDEDMA
-	bool
-	default BLK_DEV_IDEDMA_ICS if ARCH_ACORN
-	default BLK_DEV_IDEDMA_PMAC if PPC_PMAC && BLK_DEV_IDE_PMAC
-	default BLK_DEV_IDEDMA_PCI if PCI && BLK_DEV_IDEPCI
+	def_bool BLK_DEV_IDEDMA_PCI || BLK_DEV_IDEDMA_PMAC || BLK_DEV_IDEDMA_ICS
 
 config IDEDMA_IVB
 	bool "IGNORE word93 Validation BITS"
@@ -1071,14 +1068,10 @@ config IDEDMA_IVB
 	  It is normally safe to answer Y; however, the default is N.
 
 config IDEDMA_AUTO
-	bool
-	depends on IDEDMA_PCI_AUTO || BLK_DEV_IDEDMA_PMAC_AUTO || IDEDMA_ICS_AUTO
-	default y
+	def_bool IDEDMA_PCI_AUTO || BLK_DEV_IDEDMA_PMAC_AUTO || IDEDMA_ICS_AUTO
 
 config DMA_NONPCI
-	bool
-	depends on BLK_DEV_TIVO
-	default y
+	def_bool BLK_DEV_TIVO
 
 endif
 
@@ -1102,9 +1095,7 @@ config BLK_DEV_HD_ONLY
 	  <http://www.tldp.org/docs.html#howto>.
 
 config BLK_DEV_HD
-	bool
-	default BLK_DEV_HD_ONLY if BLK_DEV_IDE=n
-	default BLK_DEV_HD_IDE if BLK_DEV_IDE
+	def_bool BLK_DEV_HD_IDE || BLK_DEV_HD_ONLY
 
 endif
 
