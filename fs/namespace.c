@@ -418,36 +418,54 @@ static int mount_is_safe(struct nameidata *nd)
 #endif
 }
 
+static int
+lives_below_in_same_fs(struct dentry *d, struct dentry *dentry)
+{
+	while (1) {
+		if (d == dentry)
+			return 1;
+		if (d == NULL || d == d->d_parent)
+			return 0;
+		d = d->d_parent;
+	}
+}
+
 static struct vfsmount *copy_tree(struct vfsmount *mnt, struct dentry *dentry)
 {
-	struct vfsmount *p, *next, *q, *res;
+	struct vfsmount *res, *p, *q, *r, *s;
+	struct list_head *h;
 	struct nameidata nd;
 
-	p = mnt;
-	res = nd.mnt = q = clone_mnt(p, dentry);
+	res = q = clone_mnt(mnt, dentry);
 	if (!q)
 		goto Enomem;
-	q->mnt_parent = q;
-	q->mnt_mountpoint = p->mnt_mountpoint;
+	q->mnt_mountpoint = mnt->mnt_mountpoint;
 
-	while ( (next = next_mnt(p, mnt)) != NULL) {
-		while (p != next->mnt_parent) {
-			p = p->mnt_parent;
-			q = q->mnt_parent;
+	p = mnt;
+	for (h = mnt->mnt_mounts.next; h != &mnt->mnt_mounts; h = h->next) {
+		r = list_entry(h, struct vfsmount, mnt_child);
+		if (!lives_below_in_same_fs(r->mnt_mountpoint, dentry))
+			continue;
+
+		for (s = r; s; s = next_mnt(s, r)) {
+			while (p != s->mnt_parent) {
+				p = p->mnt_parent;
+				q = q->mnt_parent;
+			}
+			p = s;
+			nd.mnt = q;
+			nd.dentry = p->mnt_mountpoint;
+			q = clone_mnt(p, p->mnt_root);
+			if (!q)
+				goto Enomem;
+			spin_lock(&dcache_lock);
+			list_add_tail(&q->mnt_list, &res->mnt_list);
+			attach_mnt(q, &nd);
+			spin_unlock(&dcache_lock);
 		}
-		p = next;
-		nd.mnt = q;
-		nd.dentry = p->mnt_mountpoint;
-		q = clone_mnt(p, p->mnt_root);
-		if (!q)
-			goto Enomem;
-		spin_lock(&dcache_lock);
-		list_add_tail(&q->mnt_list, &res->mnt_list);
-		attach_mnt(q, &nd);
-		spin_unlock(&dcache_lock);
 	}
 	return res;
-Enomem:
+ Enomem:
 	if (res) {
 		spin_lock(&dcache_lock);
 		umount_tree(res);
