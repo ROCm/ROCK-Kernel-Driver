@@ -585,7 +585,6 @@ debug_info_t *debug_register
 {
 	debug_info_t *rc = NULL;
 
-	MOD_INC_USE_COUNT;
 	if (!initialized)
 		BUG();
 	down(&debug_lock);
@@ -605,7 +604,6 @@ debug_info_t *debug_register
       out:
         if (rc == NULL){
 		printk(KERN_ERR "debug: debug_register failed for %s\n",name);
-		MOD_DEC_USE_COUNT;
         }
 	up(&debug_lock);
 	return rc;
@@ -627,7 +625,6 @@ void debug_unregister(debug_info_t * id)
 	debug_info_put(id);
 	up(&debug_lock);
 
-	MOD_DEC_USE_COUNT;
       out:
 	return;
 }
