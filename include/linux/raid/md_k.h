@@ -315,7 +315,7 @@ typedef struct mdk_thread_s {
 
 #define THREAD_WAKEUP  0
 
-#define __wait_event_lock_irq(wq, condition, lock) 			\
+#define __wait_event_lock_irq(wq, condition, lock, cmd) 		\
 do {									\
 	wait_queue_t __wait;						\
 	init_waitqueue_entry(&__wait, current);				\
@@ -326,6 +326,7 @@ do {									\
 		if (condition)						\
 			break;						\
 		spin_unlock_irq(&lock);					\
+		cmd;							\
 		schedule();						\
 		spin_lock_irq(&lock);					\
 	}								\
@@ -333,11 +334,11 @@ do {									\
 	remove_wait_queue(&wq, &__wait);				\
 } while (0)
 
-#define wait_event_lock_irq(wq, condition, lock) 			\
+#define wait_event_lock_irq(wq, condition, lock, cmd) 			\
 do {									\
 	if (condition)	 						\
 		break;							\
-	__wait_event_lock_irq(wq, condition, lock);			\
+	__wait_event_lock_irq(wq, condition, lock, cmd);		\
 } while (0)
 
 #endif

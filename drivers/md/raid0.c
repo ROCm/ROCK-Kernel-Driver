@@ -25,6 +25,21 @@
 #define MD_DRIVER
 #define MD_PERSONALITY
 
+static void raid0_unplug(request_queue_t *q)
+{
+	mddev_t *mddev = q->queuedata;
+	raid0_conf_t *conf = mddev_to_conf(mddev);
+	mdk_rdev_t **devlist = conf->strip_zone[0].dev;
+	int i;
+
+	for (i=0; i<mddev->raid_disks; i++) {
+		request_queue_t *r_queue = bdev_get_queue(devlist[i]->bdev);
+
+		if (r_queue->unplug_fn)
+			r_queue->unplug_fn(r_queue);
+	}
+}
+
 static int create_strip_zones (mddev_t *mddev)
 {
 	int i, c, j;
@@ -201,6 +216,8 @@ static int create_strip_zones (mddev_t *mddev)
 		if (sz >= min_spacing && sz < conf->hash_spacing)
 			conf->hash_spacing = sz;
 	}
+
+	mddev->queue->unplug_fn = raid0_unplug;
 
 	printk("raid0: done.\n");
 	return 0;
