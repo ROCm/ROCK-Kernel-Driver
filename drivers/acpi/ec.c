@@ -30,6 +30,7 @@
 #include <linux/types.h>
 #include <linux/delay.h>
 #include <linux/proc_fs.h>
+#include <linux/seq_file.h>
 #include <asm/io.h>
 #include <acpi/acpi_bus.h>
 #include <acpi/acpi_drivers.h>
@@ -491,41 +492,38 @@ struct proc_dir_entry		*acpi_ec_dir;
 
 
 static int
-acpi_ec_read_info (
-	char			*page,
-	char			**start,
-	off_t			off,
-	int 			count,
-	int 			*eof,
-	void			*data)
+acpi_ec_read_info (struct seq_file *seq, void *offset)
 {
-	struct acpi_ec		*ec = (struct acpi_ec *) data;
-	char			*p = page;
-	int			len = 0;
+	struct acpi_ec		*ec = (struct acpi_ec *) seq->private;
 
 	ACPI_FUNCTION_TRACE("acpi_ec_read_info");
 
-	if (!ec || (off != 0))
+	if (!ec)
 		goto end;
 
-	p += sprintf(p, "gpe bit:                 0x%02x\n",
+	seq_printf(seq, "gpe bit:                 0x%02x\n",
 		(u32) ec->gpe_bit);
-	p += sprintf(p, "ports:                   0x%02x, 0x%02x\n",
+	seq_printf(seq, "ports:                   0x%02x, 0x%02x\n",
 		(u32) ec->status_addr.address, (u32) ec->data_addr.address);
-	p += sprintf(p, "use global lock:         %s\n",
+	seq_printf(seq, "use global lock:         %s\n",
 		ec->global_lock?"yes":"no");
 
 end:
-	len = (p - page);
-	if (len <= off+count) *eof = 1;
-	*start = page + off;
-	len -= off;
-	if (len>count) len = count;
-	if (len<0) len = 0;
-
-	return_VALUE(len);
+	return_VALUE(0);
 }
 
+static int acpi_ec_info_open_fs(struct inode *inode, struct file *file)
+{
+	return single_open(file, acpi_ec_read_info, PDE(inode)->data);
+}
+
+static struct file_operations acpi_ec_info_ops = {
+	.open		= acpi_ec_info_open_fs,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+	.owner = THIS_MODULE,
+};
 
 static int
 acpi_ec_add_fs (
@@ -542,13 +540,17 @@ acpi_ec_add_fs (
 			return_VALUE(-ENODEV);
 	}
 
-	entry = create_proc_read_entry(ACPI_EC_FILE_INFO, S_IRUGO,
-		acpi_device_dir(device), acpi_ec_read_info,
-		acpi_driver_data(device));
+	entry = create_proc_entry(ACPI_EC_FILE_INFO, S_IRUGO,
+		acpi_device_dir(device));
 	if (!entry)
 		ACPI_DEBUG_PRINT((ACPI_DB_WARN,
 			"Unable to create '%s' fs entry\n",
 			ACPI_EC_FILE_INFO));
+	else {
+		entry->proc_fops = &acpi_ec_info_ops;
+		entry->data = acpi_driver_data(device);
+		entry->owner = THIS_MODULE;
+	}
 
 	return_VALUE(0);
 }
