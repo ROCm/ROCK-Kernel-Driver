@@ -532,16 +532,27 @@ static inline request_queue_t *bdev_get_queue(struct block_device *bdev)
 	return bdev->bd_disk->queue;
 }
 
-static inline void blk_run_backing_dev(struct backing_dev_info *bdi)
+static inline void blk_run_backing_dev(struct backing_dev_info *bdi,
+				       struct page *page)
 {
 	if (bdi && bdi->unplug_io_fn)
-		bdi->unplug_io_fn(bdi);
+		bdi->unplug_io_fn(bdi, page);
 }
 
 static inline void blk_run_address_space(struct address_space *mapping)
 {
 	if (mapping)
-		blk_run_backing_dev(mapping->backing_dev_info);
+		blk_run_backing_dev(mapping->backing_dev_info, NULL);
+}
+
+static inline void blk_run_page(struct page *page)
+{
+	struct address_space *mapping;
+
+	smp_mb();
+	mapping = page->mapping;
+	if (mapping)
+		blk_run_backing_dev(mapping->backing_dev_info, page);
 }
 
 /*

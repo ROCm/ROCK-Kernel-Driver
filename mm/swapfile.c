@@ -100,7 +100,7 @@ void swap_unplug_io_fn(struct backing_dev_info *unused_bdi)
 		if (bdev == NULL)
 			break;
 		bdi = bdev->bd_inode->i_mapping->backing_dev_info;
-		(*bdi->unplug_io_fn)(bdi);
+		bdi->unplug_io_fn(bdi, page);
 	}
 	up(&swap_bdevs_sem);
 }
