@@ -107,44 +107,8 @@ static irq_info_t irq_table[NR_IRQS];
 
 ======================================================================*/
 
-static struct resource *resource_parent(unsigned long b, unsigned long n,
-					int flags, struct pci_dev *dev)
-{
-#ifdef CONFIG_PCI
-	struct resource res, *pr;
-
-	if (dev != NULL) {
-		res.start = b;
-		res.end = b + n - 1;
-		res.flags = flags;
-		pr = pci_find_parent_resource(dev, &res);
-		if (pr)
-			return pr;
-	}
-#endif /* CONFIG_PCI */
-	if (flags & IORESOURCE_MEM)
-		return &iomem_resource;
-	return &ioport_resource;
-}
-
-/* FIXME: Fundamentally racy. */
-static inline int check_io_resource(unsigned long b, unsigned long n,
-				    struct pci_dev *dev)
-{
-	struct resource *region;
-
-	region = __request_region(resource_parent(b, n, IORESOURCE_IO, dev),
-				  b, n, "check_io_resource");
-	if (!region)
-		return -EBUSY;
-
-	release_resource(region);
-	kfree(region);
-	return 0;
-}
-
-static struct resource *make_resource(unsigned long b, unsigned long n,
-				      int flags, char *name)
+static struct resource *
+make_resource(unsigned long b, unsigned long n, int flags, char *name)
 {
 	struct resource *res = kmalloc(sizeof(*res), GFP_KERNEL);
 
@@ -291,7 +255,7 @@ static int sub_interval(resource_map_t *map, u_long base, u_long num)
 #ifdef CONFIG_PCMCIA_PROBE
 static void do_io_probe(ioaddr_t base, ioaddr_t num)
 {
-    
+    struct resource *res;
     ioaddr_t i, j, bad, any;
     u_char *b, hole, most;
     
@@ -306,11 +270,13 @@ static void do_io_probe(ioaddr_t base, ioaddr_t num)
     }   
     memset(b, 0, 256);
     for (i = base, most = 0; i < base+num; i += 8) {
-	if (check_io_resource(i, 8, NULL))
+	res = claim_region(NULL, i, 8, IORESOURCE_IO, "PCMCIA IO probe");
+	if (!res)
 	    continue;
 	hole = inb(i);
 	for (j = 1; j < 8; j++)
 	    if (inb(i+j) != hole) break;
+	free_region(res);
 	if ((j == 8) && (++b[hole] > b[most]))
 	    most = hole;
 	if (b[most] == 127) break;
@@ -319,10 +285,12 @@ static void do_io_probe(ioaddr_t base, ioaddr_t num)
 
     bad = any = 0;
     for (i = base; i < base+num; i += 8) {
-	if (check_io_resource(i, 8, NULL))
+	res = claim_region(NULL, i, 8, IORESOURCE_IO, "PCMCIA IO probe");
+	if (!res)
 	    continue;
 	for (j = 0; j < 8; j++)
 	    if (inb(i+j) != most) break;
+	free_region(res);
 	if (j < 8) {
 	    if (!any)
 		printk(" excluding");
