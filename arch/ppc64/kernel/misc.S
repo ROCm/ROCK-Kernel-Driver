@@ -605,7 +605,7 @@ _GLOBAL(sys_call_table32)
 	.llong .sys_ni_syscall			/* old profil syscall holder */
 	.llong .sys32_statfs
 	.llong .sys32_fstatfs	/* 100 */
-	.llong .sys_ni_syscall		/* old ioperm syscall holder */
+	.llong .sys_ioperm
 	.llong .sys32_socketcall
 	.llong .sys32_syslog
 	.llong .sys32_setitimer
@@ -730,8 +730,9 @@ _GLOBAL(sys_call_table32)
 	.llong .sys32_sched_getaffinity
 	.llong .sys_ni_syscall		/* reserved for security */
 	.llong .sys_ni_syscall		/* 225 - reserved for tux */
+	.llong .sys32_sendfile64
 
-	.rept NR_syscalls-225
+	.rept NR_syscalls-226
 		.llong .sys_ni_syscall
 	.endr
 #endif
@@ -839,7 +840,7 @@ _GLOBAL(sys_call_table)
 	.llong .sys_ni_syscall			/* old profil syscall holder */
 	.llong .sys_statfs
 	.llong .sys_fstatfs	/* 100 */
-	.llong .sys_ni_syscall		/* old ioperm syscall holder */
+	.llong .sys_ioperm
 	.llong .sys_socketcall
 	.llong .sys_syslog
 	.llong .sys_setitimer
@@ -964,7 +965,8 @@ _GLOBAL(sys_call_table)
 	.llong .sys_sched_getaffinity
 	.llong .sys_ni_syscall		/* reserved for security */
 	.llong .sys_ni_syscall		/* reserved for tux */
+	.llong .sys_ni_syscall		/* reserved for sendfile64 */
 
-	.rept NR_syscalls-225
-	.llong .sys_ni_syscall
+	.rept NR_syscalls-226
+		.llong .sys_ni_syscall
 	.endr

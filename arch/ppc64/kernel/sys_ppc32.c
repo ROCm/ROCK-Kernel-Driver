@@ -2785,6 +2785,27 @@ asmlinkage long sys32_sendfile(u32 out_fd, u32 in_fd, __kernel_off_t32* offset, 
 	return ret;
 }
 
+extern asmlinkage ssize_t sys_sendfile64(int out_fd, int in_fd, loff_t *offset, size_t count);
+
+asmlinkage int sys32_sendfile64(int out_fd, int in_fd, __kernel_loff_t32 *offset, s32 count)
+{
+	mm_segment_t old_fs = get_fs();
+	int ret;
+	loff_t lof;
+	
+	if (offset && get_user(lof, offset))
+		return -EFAULT;
+		
+	set_fs(KERNEL_DS);
+	ret = sys_sendfile64(out_fd, in_fd, offset ? &lof : NULL, count);
+	set_fs(old_fs);
+	
+	if (offset && put_user(lof, offset))
+		return -EFAULT;
+		
+	return ret;
+}
+
 extern asmlinkage int sys_setsockopt(int fd, int level, int optname, char *optval, int optlen);
 
 asmlinkage long sys32_setsockopt(int fd, int level, int optname, char* optval, int optlen)
@@ -4249,6 +4270,11 @@ asmlinkage int sys32_sched_getaffinity(__kernel_pid_t32 pid, unsigned int len,
 
 	return ret;
 }
+
+extern unsigned long sys_mmap(unsigned long addr, size_t len,
+			      unsigned long prot, unsigned long flags,
+			      unsigned long fd, off_t offset);
+
 unsigned long sys32_mmap2(unsigned long addr, size_t len,
 			  unsigned long prot, unsigned long flags,
 			  unsigned long fd, unsigned long pgoff)
