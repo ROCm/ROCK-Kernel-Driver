@@ -346,8 +346,9 @@ int fat_subdirs(struct inode *dir)
  * Scans a directory for a given file (name points to its formatted name).
  * Returns an error code or zero.
  */
-int fat_scan(struct inode *dir, const char *name, struct buffer_head **bh,
-	     struct msdos_dir_entry **de, loff_t *i_pos)
+int fat_scan(struct inode *dir, const unsigned char *name,
+	     struct buffer_head **bh, struct msdos_dir_entry **de,
+	     loff_t *i_pos)
 {
 	loff_t cpos;
 

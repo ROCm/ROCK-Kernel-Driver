@@ -734,7 +734,7 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 	struct msdos_sb_info *sbi;
 	int logical_sector_size, fat_clusters, debug, cp, first;
 	unsigned int total_sectors, rootdir_sectors;
-	unsigned char media;
+	unsigned int media;
 	long error;
 	char buf[50];
 
@@ -1037,9 +1037,9 @@ int fat_statfs(struct super_block *sb, struct kstatfs *buf)
 	return 0;
 }
 
-static int is_exec(char *extension)
+static int is_exec(unsigned char *extension)
 {
-	char *exe_extensions = "EXECOMBAT", *walk;
+	unsigned char *exe_extensions = "EXECOMBAT", *walk;
 
 	for (walk = exe_extensions; *walk; walk += 3)
 		if (!strncmp(extension, walk, 3))

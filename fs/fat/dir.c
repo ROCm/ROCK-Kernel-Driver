@@ -152,7 +152,7 @@ fat_strnicmp(struct nls_table *t, const unsigned char *s1,
 }
 
 static inline int
-fat_shortname2uni(struct nls_table *nls, char *buf, int buf_size,
+fat_shortname2uni(struct nls_table *nls, unsigned char *buf, int buf_size,
 		  wchar_t *uni_buf, unsigned short opt, int lower)
 {
 	int len = 0;
@@ -176,8 +176,8 @@ fat_shortname2uni(struct nls_table *nls, char *buf, int buf_size,
  * Return values: negative -> error, 0 -> not found, positive -> found,
  * value is the total amount of slots, including the shortname entry.
  */
-int fat_search_long(struct inode *inode, const char *name, int name_len,
-			int anycase, loff_t *spos, loff_t *lpos)
+int fat_search_long(struct inode *inode, const unsigned char *name,
+		    int name_len, int anycase, loff_t *spos, loff_t *lpos)
 {
 	struct super_block *sb = inode->i_sb;
 	struct buffer_head *bh = NULL;
@@ -187,7 +187,7 @@ int fat_search_long(struct inode *inode, const char *name, int name_len,
 	wchar_t bufuname[14];
 	unsigned char xlate_len, long_slots;
 	wchar_t *unicode = NULL;
-	char work[8], bufname[260];	/* 256 + 4 */
+	unsigned char work[8], bufname[260];	/* 256 + 4 */
 	int uni_xlate = MSDOS_SB(sb)->options.unicode_xlate;
 	int utf8 = MSDOS_SB(sb)->options.utf8;
 	unsigned short opt_shortname = MSDOS_SB(sb)->options.shortname;
@@ -199,7 +199,7 @@ int fat_search_long(struct inode *inode, const char *name, int name_len,
 			goto EODir;
 parse_record:
 		long_slots = 0;
-		if (de->name[0] == (__s8) DELETED_FLAG)
+		if (de->name[0] == DELETED_FLAG)
 			continue;
 		if (de->attr != ATTR_EXT && (de->attr & ATTR_VOLUME))
 			continue;
@@ -258,7 +258,7 @@ parse_long:
 				if (ds->alias_checksum != alias_checksum)
 					goto parse_long;
 			}
-			if (de->name[0] == (__s8) DELETED_FLAG)
+			if (de->name[0] == DELETED_FLAG)
 				continue;
 			if (de->attr ==  ATTR_EXT)
 				goto parse_long;
@@ -351,7 +351,7 @@ static int fat_readdirx(struct inode *inode, struct file *filp, void *dirent,
 	wchar_t bufuname[14];
 	unsigned char long_slots;
 	wchar_t *unicode = NULL;
-	char c, work[8], bufname[56], *ptname = bufname;
+	unsigned char c, work[8], bufname[56], *ptname = bufname;
 	unsigned long lpos, dummy, *furrfu = &lpos;
 	int uni_xlate = MSDOS_SB(sb)->options.unicode_xlate;
 	int isvfat = MSDOS_SB(sb)->options.isvfat;
@@ -392,7 +392,7 @@ GetNew:
 		goto EODir;
 	/* Check for long filename entry */
 	if (isvfat) {
-		if (de->name[0] == (__s8) DELETED_FLAG)
+		if (de->name[0] == DELETED_FLAG)
 			goto RecEnd;
 		if (de->attr != ATTR_EXT && (de->attr & ATTR_VOLUME))
 			goto RecEnd;
@@ -458,7 +458,7 @@ ParseLong:
 			if (ds->alias_checksum != alias_checksum)
 				goto ParseLong;
 		}
-		if (de->name[0] == (__s8) DELETED_FLAG)
+		if (de->name[0] == DELETED_FLAG)
 			goto RecEnd;
 		if (de->attr ==  ATTR_EXT)
 			goto ParseLong;
@@ -555,7 +555,7 @@ ParseLong:
 			    (de->attr & ATTR_DIR) ? DT_DIR : DT_REG) < 0)
 			goto FillFailed;
 	} else {
-		char longname[275];
+		unsigned char longname[275];
 		int long_len = utf8
 			? utf8_wcstombs(longname, unicode, sizeof(longname))
 			: uni16_to_x8(longname, unicode, uni_xlate,
