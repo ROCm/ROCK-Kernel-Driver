@@ -55,6 +55,8 @@ struct readdir_cd {
 	char			plus;		/* readdirplus */
 	char			eob;		/* end of buffer */
 	char			dotonly;
+	int			nfserr;		/* v4 only */
+	u32			bmval[2];	/* v4 only */
 };
 typedef int		(*encode_dent_fn)(struct readdir_cd *, const char *,
 						int, loff_t, ino_t, unsigned int);
@@ -86,11 +88,11 @@ int		nfsd_create(struct svc_rqst *, struct svc_fh *,
 				char *name, int len, struct iattr *attrs,
 				int type, dev_t rdev, struct svc_fh *res);
 #ifdef CONFIG_NFSD_V3
-int		nfsd_access(struct svc_rqst *, struct svc_fh *, u32 *);
+int		nfsd_access(struct svc_rqst *, struct svc_fh *, u32 *, u32 *);
 int		nfsd_create_v3(struct svc_rqst *, struct svc_fh *,
 				char *name, int len, struct iattr *attrs,
 				struct svc_fh *res, int createmode,
-				u32 *verifier);
+				u32 *verifier, int *truncp);
 int		nfsd_commit(struct svc_rqst *, struct svc_fh *,
 				off_t, unsigned long);
 #endif /* CONFIG_NFSD_V3 */
@@ -119,7 +121,8 @@ int		nfsd_truncate(struct svc_rqst *, struct svc_fh *,
 				unsigned long size);
 int		nfsd_readdir(struct svc_rqst *, struct svc_fh *,
 				loff_t, encode_dent_fn,
-				u32 *buffer, int *countp, u32 *verf);
+				u32 *buffer, int *countp, u32 *verf,
+				u32 *bmval);
 int		nfsd_statfs(struct svc_rqst *, struct svc_fh *,
 				struct statfs *);
 
@@ -170,6 +173,16 @@ void		nfsd_lockd_unexport(struct svc_client *);
 #define	nfserr_serverfault	__constant_htonl(NFSERR_SERVERFAULT)
 #define	nfserr_badtype		__constant_htonl(NFSERR_BADTYPE)
 #define	nfserr_jukebox		__constant_htonl(NFSERR_JUKEBOX)
+#define	nfserr_bad_cookie	__constant_htonl(NFSERR_BAD_COOKIE)
+#define	nfserr_same		__constant_htonl(NFSERR_SAME)
+#define	nfserr_clid_inuse	__constant_htonl(NFSERR_CLID_INUSE)
+#define	nfserr_resource		__constant_htonl(NFSERR_RESOURCE)
+#define	nfserr_nofilehandle	__constant_htonl(NFSERR_NOFILEHANDLE)
+#define	nfserr_minor_vers_mismatch	__constant_htonl(NFSERR_MINOR_VERS_MISMATCH)
+#define	nfserr_symlink		__constant_htonl(NFSERR_SYMLINK)
+#define	nfserr_not_same		__constant_htonl(NFSERR_NOT_SAME)
+#define	nfserr_readdir_nospc	__constant_htonl(NFSERR_READDIR_NOSPC)
+#define	nfserr_bad_xdr		__constant_htonl(NFSERR_BAD_XDR)
 
 /* error code for internal use - if a request fails due to
  * kmalloc failure, it gets dropped.  Client should resend eventually

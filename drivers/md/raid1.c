@@ -135,7 +135,7 @@ static void put_all_bios(conf_t *conf, r1bio_t *r1_bio)
 		bio_put(r1_bio->read_bio);
 		r1_bio->read_bio = NULL;
 	}
-	for (i = 0; i < MD_SB_DISKS; i++) {
+	for (i = 0; i < conf->raid_disks; i++) {
 		struct bio **bio = r1_bio->write_bios + i;
 		if (*bio) {
 			if (atomic_read(&(*bio)->bi_cnt) != 1)
@@ -188,22 +188,27 @@ static inline void put_buf(r1bio_t *r1_bio)
 	mempool_free(r1_bio, conf->r1buf_pool);
 }
 
-static int map(mddev_t *mddev, struct block_device **bdev)
+static int map(mddev_t *mddev, mdk_rdev_t **rdevp)
 {
 	conf_t *conf = mddev_to_conf(mddev);
-	int i, disks = MD_SB_DISKS;
+	int i, disks = conf->raid_disks;
 
 	/*
 	 * Later we do read balancing on the read side
 	 * now we use the first available disk.
 	 */
 
+	spin_lock_irq(&conf->device_lock);
 	for (i = 0; i < disks; i++) {
-		if (conf->mirrors[i].operational) {
-			*bdev = conf->mirrors[i].bdev;
+		mdk_rdev_t *rdev = conf->mirrors[i].rdev;
+		if (rdev && rdev->in_sync) {
+			*rdevp = rdev;
+			atomic_inc(&rdev->nr_pending);
+			spin_unlock_irq(&conf->device_lock);
 			return 0;
 		}
 	}
+	spin_unlock_irq(&conf->device_lock);
 
 	printk (KERN_ERR "raid1_map(): huh, no more operational devices?\n");
 	return -1;
@@ -244,7 +249,6 @@ static void inline update_head_pos(int disk, r1bio_t *r1_bio)
 
 	conf->mirrors[disk].head_position =
 		r1_bio->sector + (r1_bio->master_bio->bi_size >> 9);
-	atomic_dec(&conf->mirrors[disk].nr_pending);
 }
 
 static void end_request(struct bio *bio)
@@ -257,7 +261,7 @@ static void end_request(struct bio *bio)
 	if (r1_bio->cmd == READ || r1_bio->cmd == READA)
 		mirror = r1_bio->read_disk;
 	else {
-		for (mirror = 0; mirror < MD_SB_DISKS; mirror++)
+		for (mirror = 0; mirror < conf->raid_disks; mirror++)
 			if (r1_bio->write_bios[mirror] == bio)
 				break;
 	}
@@ -265,7 +269,7 @@ static void end_request(struct bio *bio)
 	 * this branch is our 'one mirror IO has finished' event handler:
 	 */
 	if (!uptodate)
-		md_error(r1_bio->mddev, conf->mirrors[mirror].bdev);
+		md_error(r1_bio->mddev, conf->mirrors[mirror].rdev);
 	else
 		/*
 		 * Set R1BIO_Uptodate in our master bio, so that
@@ -285,29 +289,30 @@ static void end_request(struct bio *bio)
 		/*
 		 * we have only one bio on the read side
 		 */
-		if (uptodate) {
+		if (uptodate)
 			raid_end_bio_io(r1_bio, uptodate);
-			return;
+		else {
+			/*
+			 * oops, read error:
+			 */
+			printk(KERN_ERR "raid1: %s: rescheduling sector %lu\n",
+			       bdev_partition_name(conf->mirrors[mirror].rdev->bdev), r1_bio->sector);
+			reschedule_retry(r1_bio);
 		}
-		/*
-		 * oops, read error:
-		 */
-		printk(KERN_ERR "raid1: %s: rescheduling sector %lu\n",
-			bdev_partition_name(conf->mirrors[mirror].bdev), r1_bio->sector);
-		reschedule_retry(r1_bio);
-		return;
-	}
+	} else {
 
-	if (r1_bio->read_bio)
-		BUG();
-	/*
-	 * WRITE:
-	 *
-	 * Let's see if all mirrored write operations have finished
-	 * already.
-	 */
-	if (atomic_dec_and_test(&r1_bio->remaining))
-		raid_end_bio_io(r1_bio, uptodate);
+		if (r1_bio->read_bio)
+			BUG();
+		/*
+		 * WRITE:
+		 *
+		 * Let's see if all mirrored write operations have finished
+		 * already.
+		 */
+		if (atomic_dec_and_test(&r1_bio->remaining))
+			raid_end_bio_io(r1_bio, uptodate);
+	}
+	atomic_dec(&conf->mirrors[mirror].rdev->nr_pending);
 }
 
 /*
@@ -321,6 +326,8 @@ static void end_request(struct bio *bio)
  *
  * If there are 2 mirrors in the same 2 devices, performance degrades
  * because position is mirror, not device based.
+ *
+ * The rdev for the device selected will have nr_pending incremented.
  */
 static int read_balance(conf_t *conf, struct bio *bio, r1bio_t *r1_bio)
 {
@@ -329,6 +336,7 @@ static int read_balance(conf_t *conf, struct bio *bio, r1bio_t *r1_bio)
 	const int sectors = bio->bi_size >> 9;
 	sector_t new_distance, current_distance;
 
+	spin_lock_irq(&conf->device_lock);
 	/*
 	 * Check if it if we can balance. We can balance on the whole
 	 * device if no resync is going on, or below the resync window.
@@ -337,7 +345,9 @@ static int read_balance(conf_t *conf, struct bio *bio, r1bio_t *r1_bio)
 	if (!conf->mddev->in_sync && (this_sector + sectors >= conf->next_resync)) {
 		/* make sure that disk is operational */
 		new_disk = 0;
-		while (!conf->mirrors[new_disk].operational || conf->mirrors[new_disk].write_only) {
+
+		while (!conf->mirrors[new_disk].rdev ||
+		       !conf->mirrors[new_disk].rdev->in_sync) {
 			new_disk++;
 			if (new_disk == conf->raid_disks) {
 				new_disk = 0;
@@ -349,7 +359,8 @@ static int read_balance(conf_t *conf, struct bio *bio, r1bio_t *r1_bio)
 
 
 	/* make sure the disk is operational */
-	while (!conf->mirrors[new_disk].operational) {
+	while (!conf->mirrors[new_disk].rdev ||
+	       !conf->mirrors[new_disk].rdev->in_sync) {
 		if (new_disk <= 0)
 			new_disk = conf->raid_disks;
 		new_disk--;
@@ -378,11 +389,11 @@ static int read_balance(conf_t *conf, struct bio *bio, r1bio_t *r1_bio)
 			disk = conf->raid_disks;
 		disk--;
 
-		if ((conf->mirrors[disk].write_only) ||
-				(!conf->mirrors[disk].operational))
+		if (!conf->mirrors[disk].rdev ||
+		    !conf->mirrors[disk].rdev->in_sync)
 			continue;
 
-		if (!atomic_read(&conf->mirrors[disk].nr_pending)) {
+		if (!atomic_read(&conf->mirrors[disk].rdev->nr_pending)) {
 			new_disk = disk;
 			break;
 		}
@@ -398,6 +409,10 @@ rb_out:
 	conf->next_seq_sect = this_sector + sectors;
 
 	conf->last_used = new_disk;
+
+	if (conf->mirrors[new_disk].rdev)
+		atomic_inc(&conf->mirrors[new_disk].rdev->nr_pending);
+	spin_unlock_irq(&conf->device_lock);
 
 	return new_disk;
 }
@@ -441,7 +456,7 @@ static int make_request(request_queue_t *q, struct bio * bio)
 	mirror_info_t *mirror;
 	r1bio_t *r1_bio;
 	struct bio *read_bio;
-	int i, sum_bios = 0, disks = MD_SB_DISKS;
+	int i, sum_bios = 0, disks = conf->raid_disks;
 
 	/*
 	 * Register the new request and wait if the reconstruction
@@ -478,31 +493,42 @@ static int make_request(request_queue_t *q, struct bio * bio)
 		r1_bio->read_bio = read_bio;
 
 		read_bio->bi_sector = r1_bio->sector;
-		read_bio->bi_bdev = mirror->bdev;
+		read_bio->bi_bdev = mirror->rdev->bdev;
 		read_bio->bi_end_io = end_request;
 		read_bio->bi_rw = r1_bio->cmd;
 		read_bio->bi_private = r1_bio;
 
 		generic_make_request(read_bio);
-		atomic_inc(&conf->mirrors[r1_bio->read_disk].nr_pending);
 		return 0;
 	}
 
 	/*
 	 * WRITE:
 	 */
+	/* first select target devices under spinlock and
+	 * inc refcount on their rdev.  Record them by setting
+	 * write_bios[x] to bio
+	 */
+	spin_lock_irq(&conf->device_lock);
+	for (i = 0;  i < disks; i++) {
+		if (conf->mirrors[i].rdev &&
+		    !conf->mirrors[i].rdev->faulty) {
+			atomic_inc(&conf->mirrors[i].rdev->nr_pending);
+			r1_bio->write_bios[i] = bio;
+		} else
+			r1_bio->write_bios[i] = NULL;
+	}
+	spin_unlock_irq(&conf->device_lock);
 	for (i = 0; i < disks; i++) {
 		struct bio *mbio;
-		if (!conf->mirrors[i].operational)
+		if (!r1_bio->write_bios[i])
 			continue;
 
 		mbio = bio_clone(bio, GFP_NOIO);
-		if (r1_bio->write_bios[i])
-			BUG();
 		r1_bio->write_bios[i] = mbio;
 
 		mbio->bi_sector	= r1_bio->sector;
-		mbio->bi_bdev = conf->mirrors[i].bdev;
+		mbio->bi_bdev = conf->mirrors[i].rdev->bdev;
 		mbio->bi_end_io	= end_request;
 		mbio->bi_rw = r1_bio->cmd;
 		mbio->bi_private = r1_bio;
@@ -529,14 +555,13 @@ static int make_request(request_queue_t *q, struct bio * bio)
 	 * do end_request by hand if all requests finish until we had a
 	 * chance to set up the semaphore correctly ... lots of races).
 	 */
-	for (i = 0; i < disks; i++) {
+	for (i=disks; i--; ) {
 		struct bio *mbio;
 		mbio = r1_bio->write_bios[i];
 		if (!mbio)
 			continue;
 
 		generic_make_request(mbio);
-		atomic_inc(&conf->mirrors[i].nr_pending);
 	}
 	return 0;
 }
@@ -550,7 +575,8 @@ static int status(char *page, mddev_t *mddev)
 						conf->working_disks);
 	for (i = 0; i < conf->raid_disks; i++)
 		sz += sprintf(page+sz, "%s",
-			conf->mirrors[i].operational ? "U" : "_");
+			      conf->mirrors[i].rdev &&
+			      conf->mirrors[i].rdev->in_sync ? "U" : "_");
 	sz += sprintf (page+sz, "]");
 	return sz;
 }
@@ -571,48 +597,37 @@ static int status(char *page, mddev_t *mddev)
 #define ALREADY_SYNCING KERN_INFO \
 "raid1: syncing already in progress.\n"
 
-static void mark_disk_bad(mddev_t *mddev, int failed)
+
+static void error(mddev_t *mddev, mdk_rdev_t *rdev)
 {
 	conf_t *conf = mddev_to_conf(mddev);
-	mirror_info_t *mirror = conf->mirrors+failed;
-
-	mirror->operational = 0;
-	if (!mirror->write_only) {
-		mddev->degraded++;
-		conf->working_disks--;
-	}
-	mddev->sb_dirty = 1;
-	printk(DISK_FAILED, bdev_partition_name(mirror->bdev), conf->working_disks);
-}
-
-static int error(mddev_t *mddev, struct block_device *bdev)
-{
-	conf_t *conf = mddev_to_conf(mddev);
-	mirror_info_t * mirrors = conf->mirrors;
-	int disks = MD_SB_DISKS;
-	int i;
 
 	/*
-	 * Find the drive.
 	 * If it is not operational, then we have already marked it as dead
 	 * else if it is the last working disks, ignore the error, let the
 	 * next level up know.
 	 * else mark the drive as failed
 	 */
-	for (i = 0; i < disks; i++)
-		if (mirrors[i].bdev == bdev && mirrors[i].operational)
-			break;
-	if (i == disks)
-		return 0;
-
-	if (i < conf->raid_disks && conf->working_disks == 1)
+	if (rdev->in_sync
+	    && conf->working_disks == 1)
 		/*
 		 * Don't fail the drive, act as though we were just a
 		 * normal single drive
 		 */
-		return 1;
-	mark_disk_bad(mddev, i);
-	return 0;
+		return;
+	if (rdev->in_sync) {
+		mddev->degraded++;
+		conf->working_disks--;
+		/*
+		 * if recovery was running, stop it now.
+		 */
+		if (mddev->recovery_running) 
+			mddev->recovery_running = -EIO;
+	}
+	rdev->in_sync = 0;
+	rdev->faulty = 1;
+	mddev->sb_dirty = 1;
+	printk(DISK_FAILED, bdev_partition_name(rdev->bdev), conf->working_disks);
 }
 
 static void print_conf(conf_t *conf)
@@ -628,12 +643,12 @@ static void print_conf(conf_t *conf)
 	printk(" --- wd:%d rd:%d\n", conf->working_disks,
 			conf->raid_disks);
 
-	for (i = 0; i < MD_SB_DISKS; i++) {
+	for (i = 0; i < conf->raid_disks; i++) {
 		tmp = conf->mirrors + i;
-		printk(" disk %d, s:%d, o:%d, us:%d dev:%s\n",
-			i, tmp->spare, tmp->operational,
-			tmp->used_slot,
-			bdev_partition_name(tmp->bdev));
+		if (tmp->rdev)
+			printk(" disk %d, wo:%d, o:%d, dev:%s\n",
+			       i, !tmp->rdev->in_sync, !tmp->rdev->faulty,
+			       bdev_partition_name(tmp->rdev->bdev));
 	}
 }
 
@@ -653,160 +668,52 @@ static void close_sync(conf_t *conf)
 
 static int raid1_spare_active(mddev_t *mddev)
 {
-	int err = 0;
-	int i, failed_disk = -1, spare_disk = -1;
+	int i;
 	conf_t *conf = mddev->private;
-	mirror_info_t *tmp, *sdisk, *fdisk;
-	mdk_rdev_t *spare_rdev, *failed_rdev;
+	mirror_info_t *tmp;
 
-	print_conf(conf);
 	spin_lock_irq(&conf->device_lock);
 	/*
-	 * Find the failed disk within the RAID1 configuration ...
-	 * (this can only be in the first conf->working_disks part)
+	 * Find all failed disks within the RAID1 configuration 
+	 * and mark them readable
 	 */
 	for (i = 0; i < conf->raid_disks; i++) {
 		tmp = conf->mirrors + i;
-		if ((!tmp->operational && !tmp->spare) ||
-				!tmp->used_slot) {
-			failed_disk = i;
-			break;
+		if (tmp->rdev 
+		    && !tmp->rdev->faulty
+		    && !tmp->rdev->in_sync) {
+			conf->working_disks++;
+			mddev->degraded--;
+			tmp->rdev->in_sync = 1;
 		}
 	}
-	/*
-	 * When we activate a spare disk we _must_ have a disk in
-	 * the lower (active) part of the array to replace.
-	 */
-	if (failed_disk == -1) {
-		MD_BUG();
-		err = 1;
-		goto abort;
-	}
-	/*
-	 * Find the spare disk ... (can only be in the 'high'
-	 * area of the array)
-	 */
-	spare_disk = mddev->spare->raid_disk;
-
-	sdisk = conf->mirrors + spare_disk;
-	fdisk = conf->mirrors + failed_disk;
-
-	/*
-	 * do the switch finally
-	 */
-	spare_rdev = find_rdev_nr(mddev, spare_disk);
-	failed_rdev = find_rdev_nr(mddev, failed_disk);
-
-	/*
-	 * There must be a spare_rdev, but there may not be a
-	 * failed_rdev. That slot might be empty...
-	 */
-	spare_rdev->desc_nr = failed_disk;
-	spare_rdev->raid_disk = failed_disk;
-	if (failed_rdev) {
-		failed_rdev->desc_nr = spare_disk;
-		failed_rdev->raid_disk = spare_disk;
-	}
-
-	xchg_values(*fdisk, *sdisk);
-
-	/*
-	 * (careful, 'failed' and 'spare' are switched from now on)
-	 *
-	 * we want to preserve linear numbering and we want to
-	 * give the proper raid_disk number to the now activated
-	 * disk. (this means we switch back these values)
-	 */
-
-	if (!sdisk->bdev)
-		sdisk->used_slot = 0;
-	/*
-	 * this really activates the spare.
-	 */
-	fdisk->spare = 0;
-	fdisk->write_only = 0;
-
-	/*
-	 * if we activate a spare, we definitely replace a
-	 * non-operational disk slot in the 'low' area of
-	 * the disk array.
-	 */
-
-	conf->working_disks++;
-	mddev->degraded--;
-abort:
 	spin_unlock_irq(&conf->device_lock);
 
 	print_conf(conf);
-	return err;
+	return 0;
 }
 
-static int raid1_spare_inactive(mddev_t *mddev)
-{
-	conf_t *conf = mddev->private;
-	mirror_info_t *p;
-	int err = 0;
-
-	print_conf(conf);
-	spin_lock_irq(&conf->device_lock);
-	p = conf->mirrors + mddev->spare->raid_disk;
-	if (p) {
-		p->operational = 0;
-		p->write_only = 0;
-	} else {
-		MD_BUG();
-		err = 1;
-	}
-	spin_unlock_irq(&conf->device_lock);
-	print_conf(conf);
-	return err;
-}
-
-static int raid1_spare_write(mddev_t *mddev)
-{
-	conf_t *conf = mddev->private;
-	mirror_info_t *p;
-	int err = 0;
-
-	print_conf(conf);
-	spin_lock_irq(&conf->device_lock);
-	p = conf->mirrors + mddev->spare->raid_disk;
-	if (p) {
-		p->operational = 1;
-		p->write_only = 1;
-	} else {
-		MD_BUG();
-		err = 1;
-	}
-	spin_unlock_irq(&conf->device_lock);
-	print_conf(conf);
-	return err;
-}
 
 static int raid1_add_disk(mddev_t *mddev, mdk_rdev_t *rdev)
 {
 	conf_t *conf = mddev->private;
-	int err = 1;
-	mirror_info_t *p = conf->mirrors + rdev->raid_disk;
+	int found = 0;
+	int mirror;
+	mirror_info_t *p;
 
-	print_conf(conf);
 	spin_lock_irq(&conf->device_lock);
-	if (!p->used_slot) {
-		/* it will be held open by rdev */
-		p->bdev = rdev->bdev;
-		p->operational = 0;
-		p->write_only = 0;
-		p->spare = 1;
-		p->used_slot = 1;
-		p->head_position = 0;
-		err = 0;
-	}
-	if (err)
-		MD_BUG();
+	for (mirror=0; mirror < mddev->raid_disks; mirror++)
+		if ( !(p=conf->mirrors+mirror)->rdev) {
+			p->rdev = rdev;
+			p->head_position = 0;
+			rdev->raid_disk = mirror;
+			found = 1;
+			break;
+		}
 	spin_unlock_irq(&conf->device_lock);
 
 	print_conf(conf);
-	return err;
+	return found;
 }
 
 static int raid1_remove_disk(mddev_t *mddev, int number)
@@ -817,13 +724,13 @@ static int raid1_remove_disk(mddev_t *mddev, int number)
 
 	print_conf(conf);
 	spin_lock_irq(&conf->device_lock);
-	if (p->used_slot) {
-		if (p->operational) {
+	if (p->rdev) {
+		if (p->rdev->in_sync ||
+		    atomic_read(&p->rdev->nr_pending)) {
 			err = -EBUSY;
 			goto abort;
 		}
-		p->bdev = NULL;
-		p->used_slot = 0;
+		p->rdev = NULL;
 		err = 0;
 	}
 	if (err)
@@ -857,9 +764,10 @@ static void end_sync_read(struct bio *bio)
 	 */
 	if (!uptodate)
 		md_error(r1_bio->mddev,
-			 conf->mirrors[r1_bio->read_disk].bdev);
+			 conf->mirrors[r1_bio->read_disk].rdev);
 	else
 		set_bit(R1BIO_Uptodate, &r1_bio->state);
+	atomic_dec(&conf->mirrors[r1_bio->read_disk].rdev->nr_pending);
 	reschedule_retry(r1_bio);
 }
 
@@ -872,13 +780,13 @@ static void end_sync_write(struct bio *bio)
 	int i;
 	int mirror=0;
 
-	for (i = 0; i < MD_SB_DISKS; i++)
+	for (i = 0; i < conf->raid_disks; i++)
 		if (r1_bio->write_bios[i] == bio) {
 			mirror = i;
 			break;
 		}
 	if (!uptodate)
-		md_error(mddev, conf->mirrors[mirror].bdev);
+		md_error(mddev, conf->mirrors[mirror].rdev);
 	update_head_pos(mirror, r1_bio);
 
 	if (atomic_dec_and_test(&r1_bio->remaining)) {
@@ -886,13 +794,14 @@ static void end_sync_write(struct bio *bio)
 		resume_device(conf);
 		put_buf(r1_bio);
 	}
+	atomic_dec(&conf->mirrors[mirror].rdev->nr_pending);
 }
 
 static void sync_request_write(mddev_t *mddev, r1bio_t *r1_bio)
 {
 	conf_t *conf = mddev_to_conf(mddev);
 	int i, sum_bios = 0;
-	int disks = MD_SB_DISKS;
+	int disks = conf->raid_disks;
 	struct bio *bio, *mbio;
 
 	bio = r1_bio->master_bio;
@@ -913,25 +822,33 @@ static void sync_request_write(mddev_t *mddev, r1bio_t *r1_bio)
 		return;
 	}
 
+	spin_lock_irq(&conf->device_lock);
 	for (i = 0; i < disks ; i++) {
-		if (!conf->mirrors[i].operational)
+		r1_bio->write_bios[i] = NULL;
+		if (!conf->mirrors[i].rdev || 
+		    conf->mirrors[i].rdev->faulty)
 			continue;
 		if (i == conf->last_used)
 			/*
 			 * we read from here, no need to write
 			 */
 			continue;
-		if (i < conf->raid_disks && mddev->in_sync)
+		if (conf->mirrors[i].rdev->in_sync && mddev->in_sync)
 			/*
 			 * don't need to write this we are just rebuilding
 			 */
 			continue;
+		atomic_inc(&conf->mirrors[i].rdev->nr_pending);
+		r1_bio->write_bios[i] = bio;
+	}
+	spin_unlock_irq(&conf->device_lock);
 
+	for (i = 0; i < disks ; i++) {
+		if (!r1_bio->write_bios[i])
+			continue;
 		mbio = bio_clone(bio, GFP_NOIO);
-		if (r1_bio->write_bios[i])
-			BUG();
 		r1_bio->write_bios[i] = mbio;
-		mbio->bi_bdev = conf->mirrors[i].bdev;
+		mbio->bi_bdev = conf->mirrors[i].rdev->bdev;
 		mbio->bi_sector = r1_bio->sector;
 		mbio->bi_end_io	= end_sync_write;
 		mbio->bi_rw = WRITE;
@@ -949,7 +866,7 @@ static void sync_request_write(mddev_t *mddev, r1bio_t *r1_bio)
 		 * Nowhere to write this to... I guess we
 		 * must be done
 		 */
-		printk(IO_ERROR, bdev_partition_name(bio->bi_bdev), r1_bio->sector);
+		printk(KERN_ALERT "raid1: sync aborting as there is nowhere to write sector %lu\n", r1_bio->sector);
 		md_done_sync(mddev, r1_bio->master_bio->bi_size >> 9, 0);
 		resume_device(conf);
 		put_buf(r1_bio);
@@ -960,9 +877,8 @@ static void sync_request_write(mddev_t *mddev, r1bio_t *r1_bio)
 		if (!mbio)
 			continue;
 
-		md_sync_acct(mbio->bi_bdev, mbio->bi_size >> 9);
+		md_sync_acct(conf->mirrors[i].rdev, mbio->bi_size >> 9);
 		generic_make_request(mbio);
-		atomic_inc(&conf->mirrors[i].nr_pending);
 	}
 }
 
@@ -982,7 +898,7 @@ static void raid1d(void *data)
 	unsigned long flags;
 	mddev_t *mddev;
 	conf_t *conf;
-	struct block_device *bdev;
+	mdk_rdev_t *rdev;
 
 
 	for (;;) {
@@ -1002,20 +918,18 @@ static void raid1d(void *data)
 			break;
 		case READ:
 		case READA:
-			bdev = bio->bi_bdev;
-			map(mddev, &bio->bi_bdev);
-			if (bio->bi_bdev == bdev) {
+			if (map(mddev, &rdev) == -1) {
 				printk(IO_ERROR, bdev_partition_name(bio->bi_bdev), r1_bio->sector);
 				raid_end_bio_io(r1_bio, 0);
 				break;
 			}
 			printk(REDIRECT_SECTOR,
-				bdev_partition_name(bio->bi_bdev), r1_bio->sector);
+				bdev_partition_name(rdev->bdev), r1_bio->sector);
+			bio->bi_bdev = rdev->bdev;
 			bio->bi_sector = r1_bio->sector;
 			bio->bi_rw = r1_bio->cmd;
 
 			generic_make_request(bio);
-			atomic_inc(&conf->mirrors[r1_bio->read_disk].nr_pending);
 			break;
 		}
 	}
@@ -1081,7 +995,9 @@ static int sync_request(mddev_t *mddev, sector_t sector_nr, int go_faster)
 	 */
 	disk = conf->last_used;
 	/* make sure disk is operational */
-	while (!conf->mirrors[disk].operational) {
+	spin_lock_irq(&conf->device_lock);
+	while (conf->mirrors[disk].rdev == NULL ||
+	       !conf->mirrors[disk].rdev->in_sync) {
 		if (disk <= 0)
 			disk = conf->raid_disks;
 		disk--;
@@ -1089,6 +1005,8 @@ static int sync_request(mddev_t *mddev, sector_t sector_nr, int go_faster)
 			break;
 	}
 	conf->last_used = disk;
+	atomic_inc(&conf->mirrors[disk].rdev->nr_pending);
+	spin_unlock_irq(&conf->device_lock);
 
 	mirror = conf->mirrors + conf->last_used;
 
@@ -1119,7 +1037,7 @@ static int sync_request(mddev_t *mddev, sector_t sector_nr, int go_faster)
 	read_bio = bio_clone(r1_bio->master_bio, GFP_NOIO);
 
 	read_bio->bi_sector = sector_nr;
-	read_bio->bi_bdev = mirror->bdev;
+	read_bio->bi_bdev = mirror->rdev->bdev;
 	read_bio->bi_end_io = end_sync_read;
 	read_bio->bi_rw = READ;
 	read_bio->bi_private = r1_bio;
@@ -1128,10 +1046,9 @@ static int sync_request(mddev_t *mddev, sector_t sector_nr, int go_faster)
 		BUG();
 	r1_bio->read_bio = read_bio;
 
-	md_sync_acct(read_bio->bi_bdev, nr_sectors);
+	md_sync_acct(mirror->rdev, nr_sectors);
 
 	generic_make_request(read_bio);
-	atomic_inc(&conf->mirrors[conf->last_used].nr_pending);
 
 	return nr_sectors;
 }
@@ -1209,61 +1126,18 @@ static int run(mddev_t *mddev)
 		goto out;
 	}
 
-//	for (tmp = (mddev)->disks.next; rdev = ((mdk_rdev_t *)((char *)(tmp)-(unsigned long)(&((mdk_rdev_t *)0)->same_set))), tmp = tmp->next, tmp->prev != &(mddev)->disks ; ) {
 
 	ITERATE_RDEV(mddev, rdev, tmp) {
-		if (rdev->faulty) {
-			printk(ERRORS, bdev_partition_name(rdev->bdev));
-		} else {
-			if (!rdev->sb) {
-				MD_BUG();
-				continue;
-			}
-		}
-		if (rdev->desc_nr == -1) {
-			MD_BUG();
-			continue;
-		}
 		disk_idx = rdev->raid_disk;
+		if (disk_idx >= mddev->raid_disks
+		    || disk_idx < 0)
+			continue;
 		disk = conf->mirrors + disk_idx;
 
-		if (rdev->faulty) {
-			disk->bdev = rdev->bdev;
-			disk->operational = 0;
-			disk->write_only = 0;
-			disk->spare = 0;
-			disk->used_slot = 1;
-			disk->head_position = 0;
-			continue;
-		}
-		if (rdev->in_sync) {
-			if (disk->operational) {
-				printk(ALREADY_RUNNING,
-					bdev_partition_name(rdev->bdev),
-					disk_idx);
-				continue;
-			}
-			printk(OPERATIONAL, bdev_partition_name(rdev->bdev),
-					disk_idx);
-			disk->bdev = rdev->bdev;
-			disk->operational = 1;
-			disk->write_only = 0;
-			disk->spare = 0;
-			disk->used_slot = 1;
-			disk->head_position = 0;
+		disk->rdev = rdev;
+		disk->head_position = 0;
+		if (!rdev->faulty && rdev->in_sync)
 			conf->working_disks++;
-		} else {
-		/*
-		 * Must be a spare disk ..
-		 */
-			printk(SPARE, bdev_partition_name(rdev->bdev));
-			disk->bdev = rdev->bdev;
-			disk->operational = 0;
-			disk->write_only = 0;
-			disk->spare = 1;
-			disk->used_slot = 1;
-			disk->head_position = 0;
-		}
 	}
 	conf->raid_disks = mddev->raid_disks;
 	conf->mddev = mddev;
@@ -1283,23 +1157,19 @@ static int run(mddev_t *mddev)
 
 		disk = conf->mirrors + i;
 
-		if (!disk->used_slot) {
-			disk->bdev = NULL;
-			disk->operational = 0;
-			disk->write_only = 0;
-			disk->spare = 0;
-			disk->used_slot = 1;
+		if (!disk->rdev) {
 			disk->head_position = 0;
-		}
-		if (!disk->used_slot)
 			mddev->degraded++;
+		}
 	}
 
 	/*
 	 * find the first working one and use it as a starting point
 	 * to read balancing.
 	 */
-	for (j = 0; !conf->mirrors[j].operational && j < MD_SB_DISKS; j++)
+	for (j = 0; j < conf->raid_disks &&
+		     (!conf->mirrors[j].rdev ||
+		      !conf->mirrors[j].rdev->in_sync) ; j++)
 		/* nothing */;
 	conf->last_used = j;
 
@@ -1354,8 +1224,6 @@ static mdk_personality_t raid1_personality =
 	.error_handler	= error,
 	.hot_add_disk	= raid1_add_disk,
 	.hot_remove_disk= raid1_remove_disk,
-	.spare_write	= raid1_spare_write,
-	.spare_inactive	= raid1_spare_inactive,
 	.spare_active	= raid1_spare_active,
 	.sync_request	= sync_request,
 };

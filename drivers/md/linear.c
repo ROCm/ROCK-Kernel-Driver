@@ -55,12 +55,12 @@ static int linear_run (mddev_t *mddev)
 		int j = rdev->raid_disk;
 		dev_info_t *disk = conf->disks + j;
 
-		if (j < 0 || j > mddev->raid_disks || disk->bdev) {
+		if (j < 0 || j > mddev->raid_disks || disk->rdev) {
 			printk("linear: disk numbering problem. Aborting!\n");
 			goto out;
 		}
 
-		disk->bdev = rdev->bdev;
+		disk->rdev = rdev;
 		disk->size = rdev->size;
 
 		if (!conf->smallest || (disk->size < conf->smallest->size))
@@ -153,11 +153,11 @@ static int linear_make_request (request_queue_t *q, struct bio *bio)
     
 	if (block >= (tmp_dev->size + tmp_dev->offset)
 				|| block < tmp_dev->offset) {
-		printk ("linear_make_request: Block %ld out of bounds on dev %s size %ld offset %ld\n", block, bdevname(tmp_dev->bdev), tmp_dev->size, tmp_dev->offset);
+		printk ("linear_make_request: Block %ld out of bounds on dev %s size %ld offset %ld\n", block, bdevname(tmp_dev->rdev->bdev), tmp_dev->size, tmp_dev->offset);
 		bio_io_error(bio);
 		return 0;
 	}
-	bio->bi_bdev = tmp_dev->bdev;
+	bio->bi_bdev = tmp_dev->rdev->bdev;
 	bio->bi_sector = bio->bi_sector - (tmp_dev->offset << 1);
 
 	return 1;
@@ -176,11 +176,11 @@ static int linear_status (char *page, mddev_t *mddev)
 	for (j = 0; j < conf->nr_zones; j++)
 	{
 		sz += sprintf(page+sz, "[%s",
-			bdev_partition_name(conf->hash_table[j].dev0->bdev));
+			bdev_partition_name(conf->hash_table[j].dev0->rdev->bdev));
 
 		if (conf->hash_table[j].dev1)
 			sz += sprintf(page+sz, "/%s] ",
-			  bdev_partition_name(conf->hash_table[j].dev1->bdev));
+			  bdev_partition_name(conf->hash_table[j].dev1->rdev->bdev));
 		else
 			sz += sprintf(page+sz, "] ");
 	}

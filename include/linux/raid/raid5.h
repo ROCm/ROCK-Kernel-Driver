@@ -148,6 +148,11 @@ struct stripe_head {
 #define	R5_UPTODATE	0	/* page contains current data */
 #define	R5_LOCKED	1	/* IO has been submitted on "req" */
 #define	R5_OVERWRITE	2	/* towrite covers whole page */
+/* and some that are internal to handle_stripe */
+#define	R5_Insync	3	/* rdev && rdev->in_sync at start */
+#define	R5_Wantread	4	/* want to schedule a read */
+#define	R5_Wantwrite	5
+#define	R5_Syncio	6	/* this io need to be accounted as resync io */
 
 /*
  * Write method
@@ -192,11 +197,7 @@ struct stripe_head {
  
 
 struct disk_info {
-	struct block_device *bdev;
-	int	operational;
-	int	write_only;
-	int	spare;
-	int	used_slot;
+	mdk_rdev_t	*rdev;
 };
 
 struct raid5_private_data {

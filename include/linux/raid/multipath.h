@@ -5,14 +5,7 @@
 #include <linux/bio.h>
 
 struct multipath_info {
-	struct block_device *bdev;
-
-	/*
-	 * State bits:
-	 */
-	int		operational;
-
-	int		used_slot;
+	mdk_rdev_t	*rdev;
 };
 
 struct multipath_private_data {

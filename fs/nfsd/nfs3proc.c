@@ -134,7 +134,7 @@ nfsd3_proc_access(struct svc_rqst *rqstp, struct nfsd3_accessargs *argp,
 
 	fh_copy(&resp->fh, &argp->fh);
 	resp->access = argp->access;
-	nfserr = nfsd_access(rqstp, &resp->fh, &resp->access);
+	nfserr = nfsd_access(rqstp, &resp->fh, &resp->access, NULL);
 	RETURN_STATUS(nfserr);
 }
 
@@ -267,7 +267,7 @@ nfsd3_proc_create(struct svc_rqst *rqstp, struct nfsd3_createargs *argp,
 	/* Now create the file and set attributes */
 	nfserr = nfsd_create_v3(rqstp, dirfhp, argp->name, argp->len,
 				attr, newfhp,
-				argp->createmode, argp->verf);
+				argp->createmode, argp->verf, NULL);
 
 	RETURN_STATUS(nfserr);
 }
@@ -460,7 +460,7 @@ nfsd3_proc_readdir(struct svc_rqst *rqstp, struct nfsd3_readdirargs *argp,
 	fh_copy(&resp->fh, &argp->fh);
 	nfserr = nfsd_readdir(rqstp, &resp->fh, (loff_t) argp->cookie, 
 					nfs3svc_encode_entry,
-					buffer, &count, argp->verf);
+					buffer, &count, argp->verf, NULL);
 	memcpy(resp->verf, argp->verf, 8);
 	resp->count = count;
 
@@ -495,7 +495,7 @@ nfsd3_proc_readdirplus(struct svc_rqst *rqstp, struct nfsd3_readdirargs *argp,
 	fh_copy(&resp->fh, &argp->fh);
 	nfserr = nfsd_readdir(rqstp, &resp->fh, (loff_t) argp->cookie, 
 					nfs3svc_encode_entry_plus,
-					buffer, &count, argp->verf);
+					buffer, &count, argp->verf, NULL);
 	memcpy(resp->verf, argp->verf, 8);
 	resp->count = count;
 

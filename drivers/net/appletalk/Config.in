@@ -16,3 +16,4 @@ if [ "$CONFIG_DEV_APPLETALK" = "y" ]; then
       bool '    Appletalk-IP to IP Decapsulation support' CONFIG_IPDDP_DECAP
    fi
 fi
+
