@@ -1615,7 +1615,7 @@ static int ext3_create (struct inode * dir, struct dentry * dentry, int mode)
 			inode->i_mapping->a_ops = &ext3_aops;
 		err = ext3_add_nondir(handle, dentry, inode);
 	}
-	ext3_journal_stop(handle, dir);
+	ext3_journal_stop(handle);
 	unlock_kernel();
 	return err;
 }
@@ -1647,7 +1647,7 @@ static int ext3_mknod (struct inode * dir, struct dentry *dentry,
 #endif
 		err = ext3_add_nondir(handle, dentry, inode);
 	}
-	ext3_journal_stop(handle, dir);
+	ext3_journal_stop(handle);
 	unlock_kernel();
 	return err;
 }
@@ -1721,7 +1721,7 @@ static int ext3_mkdir(struct inode * dir, struct dentry * dentry, int mode)
 	ext3_mark_inode_dirty(handle, dir);
 	d_instantiate(dentry, inode);
 out_stop:
-	ext3_journal_stop(handle, dir);
+	ext3_journal_stop(handle);
 	unlock_kernel();
 	return err;
 }
@@ -1994,7 +1994,7 @@ static int ext3_rmdir (struct inode * dir, struct dentry *dentry)
 	ext3_mark_inode_dirty(handle, dir);
 
 end_rmdir:
-	ext3_journal_stop(handle, dir);
+	ext3_journal_stop(handle);
 	brelse (bh);
 	unlock_kernel();
 	return retval;
@@ -2050,7 +2050,7 @@ static int ext3_unlink(struct inode * dir, struct dentry *dentry)
 	retval = 0;
 
 end_unlink:
-	ext3_journal_stop(handle, dir);
+	ext3_journal_stop(handle);
 	unlock_kernel();
 	brelse (bh);
 	return retval;
@@ -2109,7 +2109,7 @@ static int ext3_symlink (struct inode * dir,
 	EXT3_I(inode)->i_disksize = inode->i_size;
 	err = ext3_add_nondir(handle, dentry, inode);
 out_stop:
-	ext3_journal_stop(handle, dir);
+	ext3_journal_stop(handle);
 	unlock_kernel();
 	return err;
 }
@@ -2142,7 +2142,7 @@ static int ext3_link (struct dentry * old_dentry,
 	atomic_inc(&inode->i_count);
 
 	err = ext3_add_nondir(handle, dentry, inode);
-	ext3_journal_stop(handle, dir);
+	ext3_journal_stop(handle);
 	unlock_kernel();
 	return err;
 }
@@ -2299,7 +2299,7 @@ end_rename:
 	brelse (dir_bh);
 	brelse (old_bh);
 	brelse (new_bh);
-	ext3_journal_stop(handle, old_dir);
+	ext3_journal_stop(handle);
 	unlock_kernel();
 	return retval;
 }

@@ -633,6 +633,10 @@ struct journal_s
 	/* The revoke table: maintains the list of revoked blocks in the */
         /*  current transaction. */
 	struct jbd_revoke_table_s *j_revoke;
+
+	/* An opaque pointer to fs-private information.  ext3 puts its
+	 * superblock pointer here */
+	void *j_private;
 };
 
 /* 
