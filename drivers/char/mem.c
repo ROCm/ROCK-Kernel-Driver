@@ -713,4 +713,4 @@ static int __init chr_dev_init(void)
 	return 0;
 }
 
-subsys_initcall(chr_dev_init);
+fs_initcall(chr_dev_init);
