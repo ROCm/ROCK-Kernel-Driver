@@ -74,7 +74,7 @@ void fat_clusters_flush(struct super_block *sb)
 	} else {
 		if (sbi->free_clusters != -1)
 			fsinfo->free_clusters = CF_LE_L(sbi->free_clusters);
-		if (sbi->prev_free)
+		if (sbi->prev_free != -1)
 			fsinfo->next_cluster = CF_LE_L(sbi->prev_free);
 		mark_buffer_dirty(bh);
 	}

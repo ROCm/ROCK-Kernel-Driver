@@ -885,7 +885,7 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 	sbi->fat_length = CF_LE_W(b->fat_length);
 	sbi->root_cluster = 0;
 	sbi->free_clusters = -1;	/* Don't know yet */
-	sbi->prev_free = 0;
+	sbi->prev_free = -1;
 
 	if (!sbi->fat_length && b->fat32_length) {
 		struct fat_boot_fsinfo *fsinfo;

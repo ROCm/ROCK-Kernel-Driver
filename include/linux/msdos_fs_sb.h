@@ -49,7 +49,7 @@ struct msdos_sb_info {
 	unsigned long root_cluster;  /* first cluster of the root directory */
 	unsigned long fsinfo_sector; /* FAT32 fsinfo offset from start of disk */
 	struct semaphore fat_lock;
-	int prev_free;               /* previously returned free cluster number */
+	int prev_free;               /* previously allocated cluster number */
 	int free_clusters;           /* -1 if undefined */
 	struct fat_mount_options options;
 	struct nls_table *nls_disk;  /* Codepage used on disk */
