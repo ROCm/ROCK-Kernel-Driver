@@ -1443,36 +1443,27 @@ int sddr09_transport(Scsi_Cmnd *srb, struct us_data *us)
 	}
 
 	if (srb->cmnd[0] == MODE_SENSE) {
+		int modepage = (srb->cmnd[2] & 0x3F);
+		int len;
 
-		// Read-write error recovery page: there needs to
-		// be a check for write-protect here
+		/* They ask for the Read/Write error recovery page,
+		   or for all pages. Give as much as they have room for. */
+		if (modepage == 0x01 || modepage == 0x3F) {
 
-		if ( (srb->cmnd[2] & 0x3F) == 0x01 ) {
+			US_DEBUGP("SDDR09: Dummy up request for "
+				  "mode page 0x%x\n", modepage);
 
-			US_DEBUGP(
-				"SDDR09: Dummy up request for mode page 1\n");
-
-			if (ptr == NULL || 
-			    srb->request_bufflen<sizeof(mode_page_01))
+			if (ptr == NULL)
 				return USB_STOR_TRANSPORT_ERROR;
+
+			len = srb->request_bufflen;
+			if (len > sizeof(mode_page_01))
+				len = sizeof(mode_page_01);
 
 			mode_page_01[0] = sizeof(mode_page_01) - 1;
 			mode_page_01[2] = (info->flags & SDDR09_WP) ? 0x80 : 0;
-			memcpy(ptr, mode_page_01, sizeof(mode_page_01));
+			memcpy(ptr, mode_page_01, len);
 			return USB_STOR_TRANSPORT_GOOD;
-
-		} else if ( (srb->cmnd[2] & 0x3F) == 0x3F ) {
-
-			US_DEBUGP("SDDR09: Dummy up request for "
-				  "all mode pages\n");
-
-			if (ptr == NULL || 
-			    srb->request_bufflen<sizeof(mode_page_01))
-				return USB_STOR_TRANSPORT_ERROR;
-
-			memcpy(ptr, mode_page_01, sizeof(mode_page_01));
-			return USB_STOR_TRANSPORT_GOOD;
-
 		}
 
 		return USB_STOR_TRANSPORT_ERROR;
