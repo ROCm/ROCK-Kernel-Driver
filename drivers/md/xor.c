@@ -109,7 +109,6 @@ calibrate_xor_block(void)
 	b2 = b1 + 2*PAGE_SIZE + BENCH_SIZE;
 
 	printk(KERN_INFO "raid5: measuring checksumming speed\n");
-	sti();
 
 #define xor_speed(templ)	do_xor_speed((templ), b1, b2)
 
