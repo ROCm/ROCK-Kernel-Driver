@@ -229,17 +229,6 @@ pmac_show_cpuinfo(struct seq_file *m)
 	return 0;
 }
 
-#ifdef CONFIG_VT
-/*
- * Dummy mksound function that does nothing.
- * The real one is in the dmasound driver.
- */
-static void __pmac
-pmac_mksound(unsigned int hz, unsigned int ticks)
-{
-}
-#endif /* CONFIG_VT */
-
 static volatile u32 *sysctrl_regs;
 
 void __init
@@ -322,9 +311,6 @@ pmac_setup_arch(void)
 #endif
 #ifdef CONFIG_DUMMY_CONSOLE
 	conswitchp = &dummy_con;
-#endif
-#ifdef CONFIG_VT
-	kd_mksound = pmac_mksound;
 #endif
 #ifdef CONFIG_BLK_DEV_INITRD
 	if (initrd_start)

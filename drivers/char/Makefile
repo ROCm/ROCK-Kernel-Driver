@@ -17,28 +17,8 @@ export-objs     :=	busmouse.o console.o keyboard.o sysrq.o \
 			sonypi.o tty_io.o tty_ioctl.o generic_serial.o rtc.o \
 			ip2main.o
 
-ifneq ($(ARCH),s390)
-	ifneq ($(ARCH),s390x)
-		ifneq ($(ARCH),um)
-			KEYMAP   =defkeymap.o
-			CONSOLE  =console.o
-		endif
-	endif
-endif
-
-ifdef CONFIG_Q40
-  SERIAL = serial.o
-endif
-
-ifeq ($(CONFIG_DECSTATION),y)
-  SERIAL   = decserial.o
-endif
-
-obj-$(CONFIG_VT) += vt.o vc_screen.o consolemap.o consolemap_deftbl.o $(CONSOLE) selection.o
-#obj-$(CONFIG_SERIAL) += $(SERIAL) # Fix for decserial.o
-
-obj-$(CONFIG_VT) += keyboard.o $(KEYMAP)
-
+obj-$(CONFIG_VT) += vt.o vc_screen.o consolemap.o consolemap_deftbl.o selection.o keyboard.o
+obj-$(CONFIG_HW_CONSOLE) += console.o defkeymap.o
 obj-$(CONFIG_MAGIC_SYSRQ) += sysrq.o
 obj-$(CONFIG_ATARI_DSP56K) += dsp56k.o
 obj-$(CONFIG_ROCKETPORT) += rocket.o

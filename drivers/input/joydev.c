@@ -42,6 +42,7 @@
 #include <linux/poll.h>
 #include <linux/init.h>
 #include <linux/smp_lock.h>
+#include <linux/device.h>
 
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
 MODULE_DESCRIPTION("Joystick device interfaces");
@@ -534,8 +535,14 @@ static struct input_handler joydev_handler = {
 	.id_table =	joydev_ids,
 };
 
+static struct device_interface joydev_intf = {
+	.name		= "joystick",
+	.devclass	= &input_devclass,
+};
+
 static int __init joydev_init(void)
 {
+	interface_register(&joydev_intf);
 	input_register_handler(&joydev_handler);
 	return 0;
 }
@@ -543,6 +550,7 @@ static int __init joydev_init(void)
 static void __exit joydev_exit(void)
 {
 	input_unregister_handler(&joydev_handler);
+	interface_unregister(&joydev_intf);
 }
 
 module_init(joydev_init);

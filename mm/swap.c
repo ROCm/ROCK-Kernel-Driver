@@ -77,7 +77,6 @@ void lru_add_drain(void)
 void __page_cache_release(struct page *page)
 {
 	unsigned long flags;
-	BUG_ON(page_count(page) != 0);
 
 	spin_lock_irqsave(&_pagemap_lru_lock, flags);
 	if (TestClearPageLRU(page)) {
