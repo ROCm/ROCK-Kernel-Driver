@@ -388,14 +388,16 @@ static inline long get_ts32(struct timespec *o, struct compat_timeval *i)
 
 asmlinkage long sys32_time(compat_time_t *tloc)
 {
-    time_t now = get_seconds();
-    compat_time_t now32 = now;
+    struct timeval tv;
 
-    if (tloc)
-    	if (put_user(now32, tloc))
-		now32 = -EFAULT;
+	do_gettimeofday(&tv);
+	compat_time_t now32 = tv.tv_sec;
 
-    return now32;
+	if (tloc)
+		if (put_user(now32, tloc))
+			now32 = -EFAULT;
+
+	return now32;
 }
 
 asmlinkage int
