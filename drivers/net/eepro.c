@@ -1779,7 +1779,9 @@ static struct ethtool_ops eepro_ethtool_ops = {
 #define MAX_EEPRO 8
 static struct net_device *dev_eepro[MAX_EEPRO];
 
-static int io[MAX_EEPRO];
+static int io[MAX_EEPRO] = {
+  [0 ... MAX_EEPRO-1] = -1
+};
 static int irq[MAX_EEPRO];
 static int mem[MAX_EEPRO] = {	/* Size of the rx buffer in KB */
   [0 ... MAX_EEPRO-1] = RCV_DEFAULT_RAM/1024
@@ -1808,19 +1810,21 @@ init_module(void)
 {
 	struct net_device *dev;
 	int i;
-	if (io[0] == 0 && autodetect == 0) {
+	if (io[0] == -1 && autodetect == 0) {
 		printk(KERN_WARNING "eepro_init_module: Probe is very dangerous in ISA boards!\n");
 		printk(KERN_WARNING "eepro_init_module: Please add \"autodetect=1\" to force probe\n");
 		return -ENODEV;
 	}
 	else if (autodetect) {
 		/* if autodetect is set then we must force detection */
-		io[0] = 0;
+		for (i = 0; i < MAX_EEPRO; i++) {
+			io[i] = 0;
+		}
 
 		printk(KERN_INFO "eepro_init_module: Auto-detecting boards (May God protect us...)\n");
 	}
 
-	for (i = 0; i < MAX_EEPRO; i++) {
+	for (i = 0; io[i] != -1 && i < MAX_EEPRO; i++) {
 		dev = alloc_etherdev(sizeof(struct eepro_local));
 		if (!dev)
 			break;
