@@ -133,6 +133,10 @@ pcibr_dmatrans_direct64(struct pcidev_info * info, uint64_t paddr,
 	} else
 		pci_addr |= TIOCP_PCI64_CMDTYPE_MEM;
 
+	/* If PCI mode, func zero uses VCHAN0, every other func uses VCHAN1 */
+	if (!IS_PCIX(pcibus_info) && PCI_FUNC(info->pdi_linux_pcidev->devfn))
+		pci_addr |= PCI64_ATTR_VIRTUAL;
+
 	return pci_addr;
 
 }
