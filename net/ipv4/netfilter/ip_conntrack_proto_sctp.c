@@ -66,7 +66,7 @@ unsigned long ip_ct_sctp_timeout_shutdown_recd     = 300 SECS / 1000;
 unsigned long ip_ct_sctp_timeout_shutdown_ack_sent =   3 SECS;
 
 static unsigned long * sctp_timeouts[]
-= { 0,                                     /* SCTP_CONNTRACK_NONE  */
+= { NULL,                                  /* SCTP_CONNTRACK_NONE  */
     &ip_ct_sctp_timeout_closed,	           /* SCTP_CONNTRACK_CLOSED */
     &ip_ct_sctp_timeout_cookie_wait,       /* SCTP_CONNTRACK_COOKIE_WAIT */
     &ip_ct_sctp_timeout_cookie_echoed,     /* SCTP_CONNTRACK_COOKIE_ECHOED */

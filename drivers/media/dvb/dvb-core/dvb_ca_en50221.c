@@ -1196,7 +1196,7 @@ static ssize_t dvb_ca_en50221_io_write(struct file *file, const char __user *buf
         int status;
         char fragbuf[HOST_LINK_BUF_SIZE];
         int fragpos = 0;
-        int fraglen;
+        size_t fraglen;
         unsigned long timeout;
         int written;
 
@@ -1257,7 +1257,7 @@ static int dvb_ca_en50221_io_read_condition(struct dvb_ca_private* ca, int* resu
         int slot;
         int slot_count = 0;
         int idx;
-        int fraglen;
+        size_t fraglen;
         int connection_id = -1;
         int found = 0;
         u8 hdr[2];

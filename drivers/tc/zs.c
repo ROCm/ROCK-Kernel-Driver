@@ -1742,14 +1742,10 @@ static void __init probe_sccs(void)
 			 * We're called early and memory managment isn't up, yet.
 			 * Thus check_region would fail.
 			 */
-			if (check_region((unsigned long)
+			if (!request_region((unsigned long)
 					 zs_channels[n_channels].control,
-					 ZS_CHAN_IO_SIZE) < 0) {
+					 ZS_CHAN_IO_SIZE, "SCC"))
 				panic("SCC I/O region is not free");
-			}
-			request_region((unsigned long)
-				       zs_channels[n_channels].control,
-				       ZS_CHAN_IO_SIZE, "SCC");
 #endif
 			zs_soft[n_channels].zs_channel = &zs_channels[n_channels];
 			zs_soft[n_channels].irq = zs_parms->irq;

@@ -1346,18 +1346,20 @@ static int __init probe_waveartist(struct address_info *hw_config)
 		return 0;
 	}
 
-	if (check_region(hw_config->io_base, 15))  {
+	if (!request_region(hw_config->io_base, 15, hw_config->name))  {
 		printk(KERN_WARNING "WaveArtist: I/O port conflict\n");
 		return 0;
 	}
 
 	if (hw_config->irq > 15 || hw_config->irq < 0) {
+		release_region(hw_config->io_base, 15);
 		printk(KERN_WARNING "WaveArtist: Bad IRQ %d\n",
 		       hw_config->irq);
 		return 0;
 	}
 
 	if (hw_config->dma != 3) {
+		release_region(hw_config->io_base, 15);
 		printk(KERN_WARNING "WaveArtist: Bad DMA %d\n",
 		       hw_config->dma);
 		return 0;
@@ -1391,8 +1393,6 @@ attach_waveartist(struct address_info *hw, const struct waveartist_mixer_info *m
 
 	if (hw->dma != hw->dma2 && hw->dma2 != NO_DMA)
 		devc->audio_flags |= DMA_DUPLEX;
-
-	request_region(hw->io_base, 15, devc->hw.name);
 
 	devc->mix = mix;
 	devc->dev_no = waveartist_init(devc);

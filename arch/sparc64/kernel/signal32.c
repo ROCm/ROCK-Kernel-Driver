@@ -59,6 +59,16 @@ struct signal_sframe32 {
 	unsigned int extramask[_COMPAT_NSIG_WORDS - 1];
 };
 
+/* This magic should be in g_upper[0] for all upper parts
+ * to be valid.
+ */
+#define SIGINFO_EXTRA_V8PLUS_MAGIC	0x130e269
+typedef struct {
+	unsigned int g_upper[8];
+	unsigned int o_upper[8];
+	unsigned int asi;
+} siginfo_extra_v8plus_t;
+
 /* 
  * And the new one, intended to be used for Linux applications only
  * (we have enough in there to work with clone).
@@ -299,8 +309,13 @@ void do_new_sigreturn32(struct pt_regs *regs)
 	if ((psr & (PSR_VERS|PSR_IMPL)) == PSR_V8PLUS) {
 		err |= __get_user(i, &sf->v8plus.g_upper[0]);
 		if (i == SIGINFO_EXTRA_V8PLUS_MAGIC) {
+			unsigned long asi;
+
 			for (i = UREG_G1; i <= UREG_I7; i++)
 				err |= __get_user(((u32 *)regs->u_regs)[2*i], &sf->v8plus.g_upper[i]);
+			err |= __get_user(asi, &sf->v8plus.asi);
+			regs->tstate &= ~TSTATE_ASI;
+			regs->tstate |= ((asi & 0xffUL) << 24UL);
 		}
 	}
 
@@ -330,7 +345,7 @@ void do_new_sigreturn32(struct pt_regs *regs)
 	return;
 
 segv:
-	do_exit(SIGSEGV);
+	force_sig(SIGSEGV, current);
 }
 
 asmlinkage void do_sigreturn32(struct pt_regs *regs)
@@ -400,7 +415,7 @@ asmlinkage void do_sigreturn32(struct pt_regs *regs)
 	return;
 
 segv:
-	do_exit(SIGSEGV);
+	force_sig(SIGSEGV, current);
 }
 
 asmlinkage void do_rt_sigreturn32(struct pt_regs *regs)
@@ -447,8 +462,13 @@ asmlinkage void do_rt_sigreturn32(struct pt_regs *regs)
 	if ((psr & (PSR_VERS|PSR_IMPL)) == PSR_V8PLUS) {
 		err |= __get_user(i, &sf->v8plus.g_upper[0]);
 		if (i == SIGINFO_EXTRA_V8PLUS_MAGIC) {
+			unsigned long asi;
+
 			for (i = UREG_G1; i <= UREG_I7; i++)
 				err |= __get_user(((u32 *)regs->u_regs)[2*i], &sf->v8plus.g_upper[i]);
+			err |= __get_user(asi, &sf->v8plus.asi);
+			regs->tstate &= ~TSTATE_ASI;
+			regs->tstate |= ((asi & 0xffUL) << 24UL);
 		}
 	}
 
@@ -487,7 +507,7 @@ asmlinkage void do_rt_sigreturn32(struct pt_regs *regs)
 	spin_unlock_irq(&current->sighand->siglock);
 	return;
 segv:
-	do_exit(SIGSEGV);
+	force_sig(SIGSEGV, current);
 }
 
 /* Checks if the fp is valid */
@@ -648,7 +668,7 @@ setup_frame32(struct sigaction *sa, struct pt_regs *regs, int signr, sigset_t *o
 	return;
 
 sigsegv:
-	do_exit(SIGSEGV);
+	force_sigsegv(signr, current);
 }
 
 
@@ -715,7 +735,10 @@ static void new_setup_frame32(struct k_sigaction *ka, struct pt_regs *regs,
 	err |= __put_user(sizeof(siginfo_extra_v8plus_t), &sf->extra_size);
 	err |= __put_user(SIGINFO_EXTRA_V8PLUS_MAGIC, &sf->v8plus.g_upper[0]);
 	for (i = 1; i < 16; i++)
-		err |= __put_user(((u32 *)regs->u_regs)[2*i], &sf->v8plus.g_upper[i]);
+		err |= __put_user(((u32 *)regs->u_regs)[2*i],
+				  &sf->v8plus.g_upper[i]);
+	err |= __put_user((regs->tstate & TSTATE_ASI) >> 24UL,
+			  &sf->v8plus.asi);
 
 	if (psr & PSR_EF) {
 		err |= save_fpu_state32(regs, &sf->fpu_state);
@@ -796,7 +819,7 @@ static void new_setup_frame32(struct k_sigaction *ka, struct pt_regs *regs,
 sigill:
 	do_exit(SIGILL);
 sigsegv:
-	do_exit(SIGSEGV);
+	force_sigsegv(signo, current);
 }
 
 /* Setup a Solaris stack frame */
@@ -920,7 +943,7 @@ setup_svr4_frame32(struct sigaction *sa, unsigned long pc, unsigned long npc,
 	return;
 
 sigsegv:
-	do_exit(SIGSEGV);
+	force_sigsegv(signr, current);
 }
 
 asmlinkage int
@@ -1071,7 +1094,7 @@ asmlinkage int svr4_setcontext(svr4_ucontext_t __user *c, struct pt_regs *regs)
 
 	return -EINTR;
 sigsegv:
-	do_exit(SIGSEGV);
+	return -EFAULT;
 }
 
 static void setup_rt_frame32(struct k_sigaction *ka, struct pt_regs *regs,
@@ -1120,6 +1143,8 @@ static void setup_rt_frame32(struct k_sigaction *ka, struct pt_regs *regs,
 	for (i = 1; i < 16; i++)
 		err |= __put_user(((u32 *)regs->u_regs)[2*i],
 				  &sf->v8plus.g_upper[i]);
+	err |= __put_user((regs->tstate & TSTATE_ASI) >> 24UL,
+			  &sf->v8plus.asi);
 
 	if (psr & PSR_EF) {
 		err |= save_fpu_state32(regs, &sf->fpu_state);
@@ -1208,7 +1233,7 @@ static void setup_rt_frame32(struct k_sigaction *ka, struct pt_regs *regs,
 sigill:
 	do_exit(SIGILL);
 sigsegv:
-	do_exit(SIGSEGV);
+	force_sigsegv(signr, current);
 }
 
 static inline void handle_signal32(unsigned long signr, struct k_sigaction *ka,

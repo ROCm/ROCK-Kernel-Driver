@@ -269,7 +269,8 @@ static int memcmpb(void *a, int c, int n)
 static int check_free_sectors(struct NFTLrecord *nftl, unsigned int address, int len, 
 			      int check_oob)
 {
-	int i, retlen;
+	int i;
+	size_t retlen;
 	u8 buf[SECTORSIZE + nftl->mbd.mtd->oobsize];
 
 	for (i = 0; i < len; i += SECTORSIZE) {
@@ -366,7 +367,8 @@ static void check_sectors_in_chain(struct NFTLrecord *nftl, unsigned int first_b
 {
 	unsigned int block, i, status;
 	struct nftl_bci bci;
-	int sectors_per_block, retlen;
+	int sectors_per_block;
+	size_t retlen;
 
 	sectors_per_block = nftl->EraseSize / SECTORSIZE;
 	block = first_block;
