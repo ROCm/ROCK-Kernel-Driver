@@ -48,7 +48,7 @@ int fat_get_block(struct inode *inode, sector_t iblock,
 		BUG();
 		return -EIO;
 	}
-	if (!((unsigned long)iblock % MSDOS_SB(sb)->cluster_size)) {
+	if (!((unsigned long)iblock % MSDOS_SB(sb)->sec_per_clus)) {
 		int error;
 
 		error = fat_add_cluster(inode);
@@ -84,14 +84,15 @@ static ssize_t fat_file_write(struct file *filp, const char *buf, size_t count,
 void fat_truncate(struct inode *inode)
 {
 	struct msdos_sb_info *sbi = MSDOS_SB(inode->i_sb);
-	int cluster;
+	const unsigned int cluster_size = sbi->cluster_size;
+	int nr_clusters;
 
 	/* Why no return value?  Surely the disk could fail... */
 	if (IS_RDONLY (inode))
 		return /* -EPERM */;
 	if (IS_IMMUTABLE(inode))
 		return /* -EPERM */;
-	cluster = 1 << sbi->cluster_bits;
+
 	/* 
 	 * This protects against truncating a file bigger than it was then
 	 * trying to write into the hole.
@@ -99,8 +100,10 @@ void fat_truncate(struct inode *inode)
 	if (MSDOS_I(inode)->mmu_private > inode->i_size)
 		MSDOS_I(inode)->mmu_private = inode->i_size;
 
+	nr_clusters = (inode->i_size + (cluster_size - 1)) >> sbi->cluster_bits;
+
 	lock_kernel();
-	fat_free(inode, (inode->i_size + (cluster - 1)) >> sbi->cluster_bits);
+	fat_free(inode, nr_clusters);
 	MSDOS_I(inode)->i_attrs |= ATTR_ARCH;
 	unlock_kernel();
 	inode->i_ctime = inode->i_mtime = CURRENT_TIME;

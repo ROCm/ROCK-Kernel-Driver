@@ -484,7 +484,7 @@ static unsigned int __init init_chipset_via82cxxx(struct pci_dev *dev, const cha
 			for (i = 24; i >= 0; i -= 8)
 				if (((u >> i) & 0x10) ||
 				    (((u >> i) & 0x20) &&
-				     (((u >> i) & 7) < 8))) {
+				     (((u >> i) & 7) < 6))) {
 					/* BIOS 80-wire bit or
 					 * UDMA w/ < 60ns/cycle
 					 */

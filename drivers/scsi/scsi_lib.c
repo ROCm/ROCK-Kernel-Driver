@@ -69,7 +69,7 @@ int scsi_insert_special_req(struct scsi_request *sreq, int at_head)
 	 */
 	sreq->sr_request->flags &= ~REQ_DONTPREP;
 	blk_insert_request(sreq->sr_device->request_queue, sreq->sr_request,
-		       	   at_head, sreq);
+		       	   at_head, sreq, 0);
 	return 0;
 }
 
@@ -147,7 +147,7 @@ int scsi_queue_insert(struct scsi_cmnd *cmd, int reason)
 	 * function.  The SCSI request function detects the blocked condition
 	 * and plugs the queue appropriately.
 	 */
-	blk_insert_request(device->request_queue, cmd->request, 1, cmd);
+	blk_insert_request(device->request_queue, cmd->request, 1, cmd, 1);
 	return 0;
 }
 
@@ -445,7 +445,7 @@ static void scsi_run_queue(struct request_queue *q)
 static void scsi_requeue_command(struct request_queue *q, struct scsi_cmnd *cmd)
 {
 	cmd->request->flags &= ~REQ_DONTPREP;
-	blk_insert_request(q, cmd->request, 1, cmd);
+	blk_insert_request(q, cmd->request, 1, cmd, 1);
 
 	scsi_run_queue(q);
 }

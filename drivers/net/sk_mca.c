@@ -1155,6 +1155,7 @@ int __init skmca_probe(struct SKMCA_NETDEV *dev)
 	priv->cmdaddr = base + 0x3ff3;
 	priv->medium = medium;
 	memset(&(priv->stat), 0, sizeof(struct net_device_stats));
+	spin_lock_init(&priv->lock);
 
 	/* set base + irq for this device (irq not allocated so far) */
 	dev->irq = 0;

@@ -18,11 +18,9 @@
 ifdef CONFIG_CPU_LITTLE_ENDIAN
 tool-prefix	= mipsel-linux-
 JIFFIES32	= jiffies_64
-LDFLAGS_BLOB   := --format binary --oformat elf32-tradlittlemips
 else
 tool-prefix	= mips-linux-
 JIFFIES32	= jiffies_64 + 4
-LDFLAGS_BLOB   := --format binary --oformat elf32-tradbigmips
 endif
 
 ifdef CONFIG_CROSSCOMPILE

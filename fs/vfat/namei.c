@@ -23,6 +23,7 @@
 #include <linux/slab.h>
 #include <linux/smp_lock.h>
 #include <linux/buffer_head.h>
+#include <linux/namei.h>
 
 #define DEBUG_LEVEL 0
 #if (DEBUG_LEVEL >= 1)
@@ -70,14 +71,20 @@ static struct dentry_operations vfat_dentry_ops[4] = {
 
 static int vfat_revalidate(struct dentry *dentry, struct nameidata *nd)
 {
+	int ret = 1;
 	PRINTK1(("vfat_revalidate: %s\n", dentry->d_name.name));
 	spin_lock(&dcache_lock);
-	if (dentry->d_time == dentry->d_parent->d_inode->i_version) {
-		spin_unlock(&dcache_lock);
-		return 1;
-	}
+	if (nd && !(nd->flags & LOOKUP_CONTINUE) && (nd->flags & LOOKUP_CREATE))
+		/*
+		 * negative dentry is dropped, in order to make sure
+		 * to use the name which a user desires if this is
+		 * create path.
+		 */
+		ret = 0;
+	else if (dentry->d_time != dentry->d_parent->d_inode->i_version)
+		ret = 0;
 	spin_unlock(&dcache_lock);
-	return 0;
+	return ret;
 }
 
 static inline unsigned char
@@ -115,7 +122,7 @@ vfat_strnicmp(struct nls_table *t, const unsigned char *s1,
  */
 static int vfat_hash(struct dentry *dentry, struct qstr *qstr)
 {
-	const char *name;
+	const unsigned char *name;
 	int len;
 
 	len = qstr->len;
@@ -137,7 +144,7 @@ static int vfat_hash(struct dentry *dentry, struct qstr *qstr)
 static int vfat_hashi(struct dentry *dentry, struct qstr *qstr)
 {
 	struct nls_table *t = MSDOS_SB(dentry->d_inode->i_sb)->nls_io;
-	const char *name;
+	const unsigned char *name;
 	int len;
 	unsigned long hash;
 
@@ -197,44 +204,13 @@ static int vfat_cmp(struct dentry *dentry, struct qstr *a, struct qstr *b)
 	return 1;
 }
 
-#ifdef DEBUG
-
-static void dump_fat(struct super_block *sb,int start)
-{
-	printk("[");
-	while (start) {
-		printk("%d ",start);
-		start = fat_access(sb,start,-1);
-		if (!start) {
-			printk("ERROR");
-			break;
-		}
-		if (start == -1) break;
-	}
-	printk("]\n");
-}
-
-static void dump_de(struct msdos_dir_entry *de)
-{
-	int i;
-	unsigned char *p = (unsigned char *) de;
-	printk("[");
-
-	for (i = 0; i < 32; i++, p++) {
-		printk("%02x ", *p);
-	}
-	printk("]\n");
-}
-
-#endif
-
 /* MS-DOS "device special files" */
 
-static const char *reserved3_names[] = {
+static const unsigned char *reserved3_names[] = {
 	"con     ", "prn     ", "nul     ", "aux     ", NULL
 };
 
-static const char *reserved4_names[] = {
+static const unsigned char *reserved4_names[] = {
 	"com1    ", "com2    ", "com3    ", "com4    ", "com5    ",
 	"com6    ", "com7    ", "com8    ", "com9    ",
 	"lpt1    ", "lpt2    ", "lpt3    ", "lpt4    ", "lpt5    ",
@@ -287,16 +263,20 @@ static inline int vfat_is_used_badchars(const wchar_t *s, int len)
 /* Returns negative number on error, 0 for a normal
  * return, and 1 for . or .. */
 
-static int vfat_valid_longname(const char *name, int len, int xlate)
+static int vfat_valid_longname(const unsigned char *name, int len, int xlate)
 {
-	const char **reserved, *walk;
+	const unsigned char **reserved, *walk;
 	int baselen;
 
-	if (len && name[len-1] == ' ') return -EINVAL;
-	if (len >= 256) return -EINVAL;
- 	if (len < 3) return 0;
+	if (len && name[len-1] == ' ')
+		return -EINVAL;
+	if (len >= 256)
+		return -EINVAL;
+	if (len < 3)
+		return 0;
 
-	for (walk = name; *walk != 0 && *walk != '.'; walk++);
+	for (walk = name; *walk != 0 && *walk != '.'; walk++)
+		;
 	baselen = walk - name;
 
 	if (baselen == 3) {
@@ -313,7 +293,7 @@ static int vfat_valid_longname(const char *name, int len, int xlate)
 	return 0;
 }
 
-static int vfat_find_form(struct inode *dir,char *name)
+static int vfat_find_form(struct inode *dir, unsigned char *name)
 {
 	struct msdos_dir_entry *de;
 	struct buffer_head *bh = NULL;
@@ -426,7 +406,7 @@ static inline int to_shortname_char(struct nls_table *nls,
  */
 static int vfat_create_shortname(struct inode *dir, struct nls_table *nls,
 				 wchar_t *uname, int ulen,
-				 char *name_res, unsigned char *lcase)
+				 unsigned char *name_res, unsigned char *lcase)
 {
 	wchar_t *ip, *ext_start, *end, *name_start;
 	unsigned char base[9], ext[4], buf[8], *p;
@@ -606,21 +586,22 @@ static int vfat_create_shortname(struct inode *dir, struct nls_table *nls,
 
 /* Translate a string, including coded sequences into Unicode */
 static int
-xlate_to_uni(const char *name, int len, char *outname, int *longlen, int *outlen,
-	     int escape, int utf8, struct nls_table *nls)
+xlate_to_uni(const unsigned char *name, int len, unsigned char *outname,
+	     int *longlen, int *outlen, int escape, int utf8,
+	     struct nls_table *nls)
 {
 	const unsigned char *ip;
 	unsigned char nc;
-	char *op;
+	unsigned char *op;
 	unsigned int ec;
 	int i, k, fill;
 	int charlen;
 
 	if (utf8) {
-		*outlen = utf8_mbstowcs((__u16 *) outname, name, PAGE_SIZE);
+		*outlen = utf8_mbstowcs((wchar_t *)outname, name, PAGE_SIZE);
 		if (name[len-1] == '.')
 			*outlen-=2;
-		op = &outname[*outlen * sizeof(__u16)];
+		op = &outname[*outlen * sizeof(wchar_t)];
 	} else {
 		if (name[len-1] == '.') 
 			len--;
@@ -691,8 +672,9 @@ xlate_to_uni(const char *name, int len, char *outname, int *longlen, int *outlen
 	return 0;
 }
 
-static int vfat_build_slots(struct inode *dir, const char *name, int len,
-			    struct msdos_dir_slot *ds, int *slots, int is_dir)
+static int vfat_build_slots(struct inode *dir, const unsigned char *name,
+			    int len, struct msdos_dir_slot *ds,
+			    int *slots, int is_dir)
 {
 	struct msdos_sb_info *sbi = MSDOS_SB(dir->i_sb);
 	struct fat_mount_options *opts = &sbi->options;
@@ -700,7 +682,7 @@ static int vfat_build_slots(struct inode *dir, const char *name, int len,
 	struct msdos_dir_entry *de;
 	unsigned long page;
 	unsigned char cksum, lcase;
-	char msdos_name[MSDOS_NAME];
+	unsigned char msdos_name[MSDOS_NAME];
 	wchar_t *uname;
 	int res, slot, ulen, usize, i;
 	loff_t offset;
@@ -714,7 +696,7 @@ static int vfat_build_slots(struct inode *dir, const char *name, int len,
 		return -ENOMEM;
 
 	uname = (wchar_t *)page;
-	res = xlate_to_uni(name, len, (char *)uname, &ulen, &usize,
+	res = xlate_to_uni(name, len, (unsigned char *)uname, &ulen, &usize,
 			   opts->unicode_xlate, opts->utf8, sbi->nls_io);
 	if (res < 0)
 		goto out_free;

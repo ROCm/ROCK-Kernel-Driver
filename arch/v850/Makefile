@@ -27,7 +27,6 @@ CFLAGS += -D__linux__ -DUTS_SYSNAME=\"uClinux\"
 # some reason)
 LDFLAGS_MODULE += --unique=.gnu.linkonce.this_module
 
-LDFLAGS_BLOB := -b binary --oformat elf32-little
 OBJCOPY_FLAGS_BLOB := -I binary -O elf32-little -B v850e
 
 
