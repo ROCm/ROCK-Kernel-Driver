@@ -119,6 +119,8 @@ gss_mech_register(struct gss_api_mech *gm)
 	return 0;
 }
 
+EXPORT_SYMBOL(gss_mech_register);
+
 void
 gss_mech_unregister(struct gss_api_mech *gm)
 {
@@ -129,12 +131,16 @@ gss_mech_unregister(struct gss_api_mech *gm)
 	gss_mech_free(gm);
 }
 
+EXPORT_SYMBOL(gss_mech_unregister);
+
 struct gss_api_mech *
 gss_mech_get(struct gss_api_mech *gm)
 {
 	__module_get(gm->gm_owner);
 	return gm;
 }
+
+EXPORT_SYMBOL(gss_mech_get);
 
 struct gss_api_mech *
 gss_mech_get_by_name(char *name)
@@ -154,6 +160,8 @@ gss_mech_get_by_name(char *name)
 	return gm;
 
 }
+
+EXPORT_SYMBOL(gss_mech_get_by_name);
 
 static inline int
 mech_supports_pseudoflavor(struct gss_api_mech *gm, u32 pseudoflavor)
@@ -187,6 +195,8 @@ gss_mech_get_by_pseudoflavor(u32 pseudoflavor)
 	return gm;
 }
 
+EXPORT_SYMBOL(gss_mech_get_by_pseudoflavor);
+
 u32
 gss_pseudoflavor_to_service(struct gss_api_mech *gm, u32 pseudoflavor)
 {
@@ -198,6 +208,8 @@ gss_pseudoflavor_to_service(struct gss_api_mech *gm, u32 pseudoflavor)
 	}
 	return 0;
 }
+
+EXPORT_SYMBOL(gss_pseudoflavor_to_service);
 
 char *
 gss_service_to_auth_domain_name(struct gss_api_mech *gm, u32 service)
@@ -211,11 +223,15 @@ gss_service_to_auth_domain_name(struct gss_api_mech *gm, u32 service)
 	return NULL;
 }
 
+EXPORT_SYMBOL(gss_service_to_auth_domain_name);
+
 void
 gss_mech_put(struct gss_api_mech * gm)
 {
 	module_put(gm->gm_owner);
 }
+
+EXPORT_SYMBOL(gss_mech_put);
 
 /* The mech could probably be determined from the token instead, but it's just
  * as easy for now to pass it in. */

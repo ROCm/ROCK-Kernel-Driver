@@ -88,6 +88,8 @@ out:
 	return(ret);
 }
 
+EXPORT_SYMBOL(krb5_encrypt);
+
 u32
 krb5_decrypt(
      struct crypto_tfm *tfm,
@@ -127,6 +129,8 @@ out:
 	dprintk("RPC:      gss_k5decrypt returns %d\n",ret);
 	return(ret);
 }
+
+EXPORT_SYMBOL(krb5_decrypt);
 
 void
 buf_to_sg(struct scatterlist *sg, char *ptr, int len) {
@@ -201,3 +205,5 @@ out:
 		crypto_free_tfm(tfm);
 	return code;
 }
+
+EXPORT_SYMBOL(make_checksum);

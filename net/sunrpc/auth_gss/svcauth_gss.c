@@ -664,6 +664,8 @@ out:
 	return stat;
 }
 
+EXPORT_SYMBOL(svcauth_gss_register_pseudoflavor);
+
 static inline int
 read_u32_from_xdr_buf(struct xdr_buf *buf, int base, u32 *obj)
 {

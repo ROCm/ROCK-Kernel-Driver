@@ -132,6 +132,8 @@ print_hexl(u32 *p, u_int length, u_int offset)
 	}
 }
 
+EXPORT_SYMBOL(print_hexl);
+
 static inline struct gss_cl_ctx *
 gss_get_ctx(struct gss_cl_ctx *ctx)
 {
