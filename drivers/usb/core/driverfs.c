@@ -23,28 +23,29 @@
 #include "usb.h"
 
 /* Active configuration fields */
-#define usb_actconfig_show(field, format_string)			\
-static ssize_t								\
-show_##field (struct device *dev, char *buf)				\
+#define usb_actconfig_show(field, multiplier, format_string)		\
+static ssize_t  show_##field (struct device *dev, char *buf)		\
 {									\
 	struct usb_device *udev;					\
 									\
 	udev = to_usb_device (dev);					\
-	if (udev->actconfig) \
-	return sprintf (buf, format_string, udev->actconfig->desc.field); \
-	else return 0;							\
+	if (udev->actconfig)						\
+		return sprintf (buf, format_string,			\
+				udev->actconfig->desc.field * multiplier);	\
+	else								\
+		return 0;						\
 }									\
 
-#define usb_actconfig_attr(field, format_string)			\
-usb_actconfig_show(field,format_string)					\
+#define usb_actconfig_attr(field, multiplier, format_string)		\
+usb_actconfig_show(field, multiplier, format_string)			\
 static DEVICE_ATTR(field, S_IRUGO, show_##field, NULL);
 
-usb_actconfig_attr (bNumInterfaces, "%2d\n")
-usb_actconfig_attr (bmAttributes, "%2x\n")
-usb_actconfig_attr (bMaxPower, "%3dmA\n")
+usb_actconfig_attr (bNumInterfaces, 1, "%2d\n")
+usb_actconfig_attr (bmAttributes, 1, "%2x\n")
+usb_actconfig_attr (bMaxPower, 2, "%3dmA\n")
 
 /* configuration value is always present, and r/w */
-usb_actconfig_show(bConfigurationValue,"%u\n");
+usb_actconfig_show(bConfigurationValue, 1, "%u\n");
 
 static ssize_t
 set_bConfigurationValue (struct device *dev, const char *buf, size_t count)
@@ -62,55 +63,25 @@ static DEVICE_ATTR(bConfigurationValue, S_IRUGO | S_IWUSR,
 		show_bConfigurationValue, set_bConfigurationValue);
 
 /* String fields */
-static ssize_t show_product (struct device *dev, char *buf)
-{
-	struct usb_device *udev;
-	int len;
+#define usb_string_attr(name, field)		\
+static ssize_t  show_##name(struct device *dev, char *buf)		\
+{									\
+	struct usb_device *udev;					\
+	int len;							\
+									\
+	udev = to_usb_device (dev);					\
+	len = usb_string(udev, udev->descriptor.field, buf, PAGE_SIZE);	\
+	if (len < 0)							\
+		return 0;						\
+	buf[len] = '\n';						\
+	buf[len+1] = 0;							\
+	return len+1;							\
+}									\
+static DEVICE_ATTR(name, S_IRUGO, show_##name, NULL);
 
-	udev = to_usb_device (dev);
-
-	len = usb_string(udev, udev->descriptor.iProduct, buf, PAGE_SIZE);
-	if (len < 0)
-		return 0;
-	buf[len] = '\n';
-	buf[len+1] = 0;
-	return len+1;
-}
-static DEVICE_ATTR(product,S_IRUGO,show_product,NULL);
-
-static ssize_t
-show_manufacturer (struct device *dev, char *buf)
-{
-	struct usb_device *udev;
-	int len;
-
-	udev = to_usb_device (dev);
-
-	len = usb_string(udev, udev->descriptor.iManufacturer, buf, PAGE_SIZE);
-	if (len < 0)
-		return 0;
-	buf[len] = '\n';
-	buf[len+1] = 0;
-	return len+1;
-}
-static DEVICE_ATTR(manufacturer,S_IRUGO,show_manufacturer,NULL);
-
-static ssize_t
-show_serial (struct device *dev, char *buf)
-{
-	struct usb_device *udev;
-	int len;
-
-	udev = to_usb_device (dev);
-
-	len = usb_string(udev, udev->descriptor.iSerialNumber, buf, PAGE_SIZE);
-	if (len < 0)
-		return 0;
-	buf[len] = '\n';
-	buf[len+1] = 0;
-	return len+1;
-}
-static DEVICE_ATTR(serial,S_IRUGO,show_serial,NULL);
+usb_string_attr(product, iProduct);
+usb_string_attr(manufacturer, iManufacturer);
+usb_string_attr(serial, iSerialNumber);
 
 static ssize_t
 show_speed (struct device *dev, char *buf)
