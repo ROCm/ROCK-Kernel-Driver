@@ -183,14 +183,14 @@ USER(		strt	r3, [r0], #4)			@ May fault
 		strnet	r3, [r0], #4			@ Shouldnt fault
 		ands	ip, ip, #3
 		beq	.c2u_1fupi
-.c2u_1nowords:	mov	r3, r7, lsr #byte(1)
+.c2u_1nowords:	mov	r3, r7, get_byte_1
 		teq	ip, #0
 		beq	.c2u_finished
 		cmp	ip, #2
 USER(		strbt	r3, [r0], #1)			@ May fault
-		movge	r3, r7, lsr #byte(2)
+		movge	r3, r7, get_byte_2
 USER(		strgebt	r3, [r0], #1)			@ May fault
-		movgt	r3, r7, lsr #byte(3)
+		movgt	r3, r7, get_byte_3
 USER(		strgtbt	r3, [r0], #1)			@ May fault
 		b	.c2u_finished
 
@@ -250,12 +250,12 @@ USER(		strt	r3, [r0], #4)			@ May fault
 		strnet	r3, [r0], #4			@ Shouldnt fault
 		ands	ip, ip, #3
 		beq	.c2u_2fupi
-.c2u_2nowords:	mov	r3, r7, lsr #byte(2)
+.c2u_2nowords:	mov	r3, r7, get_byte_2
 		teq	ip, #0
 		beq	.c2u_finished
 		cmp	ip, #2
 USER(		strbt	r3, [r0], #1)			@ May fault
-		movge	r3, r7, lsr #byte(3)
+		movge	r3, r7, get_byte_3
 USER(		strgebt	r3, [r0], #1)			@ May fault
 		ldrgtb	r3, [r1], #0
 USER(		strgtbt	r3, [r0], #1)			@ May fault
@@ -317,7 +317,7 @@ USER(		strt	r3, [r0], #4)			@ May fault
 		strnet	r3, [r0], #4			@ Shouldnt fault
 		ands	ip, ip, #3
 		beq	.c2u_3fupi
-.c2u_3nowords:	mov	r3, r7, lsr #byte(3)
+.c2u_3nowords:	mov	r3, r7, get_byte_3
 		teq	ip, #0
 		beq	.c2u_finished
 		cmp	ip, #2
@@ -496,14 +496,14 @@ USER(		ldrnet	r7, [r1], #4)			@ May fault
 		strne	r3, [r0], #4
 		ands	ip, ip, #3
 		beq	.cfu_1fupi
-.cfu_1nowords:	mov	r3, r7, lsr #byte(1)
+.cfu_1nowords:	mov	r3, r7, get_byte_1
 		teq	ip, #0
 		beq	.cfu_finished
 		cmp	ip, #2
 		strb	r3, [r0], #1
-		movge	r3, r7, lsr #byte(2)
+		movge	r3, r7, get_byte_2
 		strgeb	r3, [r0], #1
-		movgt	r3, r7, lsr #byte(3)
+		movgt	r3, r7, get_byte_3
 		strgtb	r3, [r0], #1
 		b	.cfu_finished
 
@@ -563,12 +563,12 @@ USER(		ldrnet	r7, [r1], #4)			@ May fault
 		strne	r3, [r0], #4
 		ands	ip, ip, #3
 		beq	.cfu_2fupi
-.cfu_2nowords:	mov	r3, r7, lsr #byte(2)
+.cfu_2nowords:	mov	r3, r7, get_byte_2
 		teq	ip, #0
 		beq	.cfu_finished
 		cmp	ip, #2
 		strb	r3, [r0], #1
-		movge	r3, r7, lsr #byte(3)
+		movge	r3, r7, get_byte_3
 		strgeb	r3, [r0], #1
 USER(		ldrgtbt	r3, [r1], #0)			@ May fault
 		strgtb	r3, [r0], #1
@@ -630,7 +630,7 @@ USER(		ldrnet	r7, [r1], #4)			@ May fault
 		strne	r3, [r0], #4
 		ands	ip, ip, #3
 		beq	.cfu_3fupi
-.cfu_3nowords:	mov	r3, r7, lsr #byte(3)
+.cfu_3nowords:	mov	r3, r7, get_byte_3
 		teq	ip, #0
 		beq	.cfu_finished
 		cmp	ip, #2

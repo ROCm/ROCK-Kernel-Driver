@@ -90,7 +90,7 @@ kmem_flags_convert(int flags)
 	lflags = (flags & KM_NOSLEEP) ? GFP_ATOMIC : (GFP_KERNEL|__GFP_NOFAIL);
 
 	/* avoid recusive callbacks to filesystem during transactions */
-	if (PFLAGS_TEST_FSTRANS())
+	if (PFLAGS_TEST_FSTRANS() || (flags & KM_NOFS))
 		lflags &= ~__GFP_FS;
 
 	return lflags;

@@ -673,48 +673,6 @@ __und_invalid:	sub	sp, sp, #S_FRAME_SIZE
 		and	r2, r6, #31			@ int mode
 		b	bad_mode
 
-#if 1 /* defined CONFIG_FPE_NWFPE || defined CONFIG_FPE_FASTFPE */
-		/* The FPE is always present */
-		.equ	fpe_not_present, fpundefinstr
-#else
-wfs_mask_data:	.word	0x0e200110			@ WFS/RFS
-		.word	0x0fef0fff
-		.word	0x0d000100			@ LDF [sp]/STF [sp]
-		.word	0x0d000100			@ LDF [fp]/STF [fp]
-		.word	0x0f000f00
-
-/* We get here if an undefined instruction happens and the floating
- * point emulator is not present.  If the offending instruction was
- * a WFS, we just perform a normal return as if we had emulated the
- * operation.  This is a hack to allow some basic userland binaries
- * to run so that the emulator module proper can be loaded. --philb
- */
-fpe_not_present:
-		adr	r10, wfs_mask_data
-		ldmia	r10, {r4, r5, r6, r7, r8}
-		ldr	r10, [sp, #S_PC]		@ Load PC
-		sub	r10, r10, #4
-		mask_pc	r10, r10
-		ldrt	r10, [r10]			@ get instruction
-		and	r5, r10, r5
-		teq	r5, r4				@ Is it WFS?
-		moveq	pc, r9
-		and	r5, r10, r8
-		teq	r5, r6				@ Is it LDF/STF on sp or fp?
-		teqne	r5, r7
-		movne	pc, lr
-		tst	r10, #0x00200000		@ Does it have WB
-		moveq	pc, r9
-		and	r4, r10, #255			@ get offset
-		and	r6, r10, #0x000f0000
-		tst	r10, #0x00800000		@ +/-
-		ldr	r5, [sp, r6, lsr #14]		@ Load reg
-		rsbeq	r4, r4, #0
-		add	r5, r5, r4, lsl #2
-		str	r5, [sp, r6, lsr #14]		@ Save reg
-		mov	pc, r9
-#endif
-
 /*
  * SVC mode handlers
  */
@@ -963,23 +921,46 @@ __und_usr:	sub	sp, sp, #S_FRAME_SIZE		@ Allocate frame size in one go
  * co-processor instructions.  However, we have to watch out
  * for the ARM6/ARM7 SWI bug.
  *
- * Emulators may wish to make use of the instruction value we
- * prepared for them in r0.
+ * Emulators may wish to make use of the following registers:
+ *  r0  - instruction opcode.
+ *  r10 - this threads thread_info structure.
  */
 call_fpe:	enable_irq r10				@ Enable interrupts
 		tst	r0, #0x08000000			@ only CDP/CPRT/LDC/STC have bit 27
 #if defined(CONFIG_CPU_ARM610) || defined(CONFIG_CPU_ARM710)
-		and	r10, r0, #0x0f000000		@ mask out op-code bits
-		teqne	r10, #0x0f000000		@ SWI (ARM6/7 bug)?
+		and	r8, r0, #0x0f000000		@ mask out op-code bits
+		teqne	r8, #0x0f000000			@ SWI (ARM6/7 bug)?
 #endif
 		moveq	pc, lr
-do_fpe:		get_thread_info r10			@ get current thread
-		ldr	r4, [r10, #TI_TASK]		@ get current task
-		mov	r8, #1
-		strb	r8, [r4, #TSK_USED_MATH]	@ set current->used_math
-		ldr	r4, .LCfp
+		get_thread_info r10			@ get current thread
+		and	r8, r0, #0x00000f00		@ mask out CP number
+		mov	r7, #1
+		add	r6, r10, #TI_USED_CP
+		strb	r7, [r6, r8, lsr #8]		@ set appropriate used_cp[]
+		add	pc, pc, r8, lsr #6
+		mov	r0, r0
+
+		mov	pc, lr				@ CP#0
+		b	do_fpe				@ CP#1 (FPE)
+		b	do_fpe				@ CP#2 (FPE)
+		mov	pc, lr				@ CP#3
+		mov	pc, lr				@ CP#4
+		mov	pc, lr				@ CP#5
+		mov	pc, lr				@ CP#6
+		mov	pc, lr				@ CP#7
+		mov	pc, lr				@ CP#8
+		mov	pc, lr				@ CP#9
+		mov	pc, lr				@ CP#10 (VFP)
+		mov	pc, lr				@ CP#11 (VFP)
+		mov	pc, lr				@ CP#12
+		mov	pc, lr				@ CP#13
+		mov	pc, lr				@ CP#14 (Debug)
+		mov	pc, lr				@ CP#15 (Control)
+
+do_fpe:		ldr	r4, .LCfp
 		add	r10, r10, #TI_FPSTATE		@ r10 = workspace
 		ldr	pc, [r4]			@ Call FP module USR entry point
+
 /*
  * The FP module is called with these registers set:
  *  r0  = instruction
@@ -988,6 +969,11 @@ do_fpe:		get_thread_info r10			@ get current thread
  *  r10 = FP workspace
  *  lr  = unrecognised FP instruction return address
  */
+
+		.data
+ENTRY(fp_enter)
+		.word	fpundefinstr
+		.text
 
 fpundefinstr:	mov	r0, sp
 		adrsvc	al, lr, ret_from_exception
@@ -1016,10 +1002,6 @@ ENTRY(ret_from_exception)
 		mov	why, #0
 		b	ret_to_user
 
-		.data
-ENTRY(fp_enter)
-		.word	fpe_not_present
-		.text
 /*
  * Register switch for ARMv3 and ARMv4 processors
  * r0 = previous thread_info, r1 = next thread_info

@@ -208,6 +208,12 @@ acpi_processor_get_performance_states (
 			goto end;
 		}
 
+		if (!px->core_frequency) {
+			ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Invalid _PSS data: freq is zero\n"));
+			result = -EFAULT;
+			goto end;
+		}
+
 		ACPI_DEBUG_PRINT((ACPI_DB_INFO, 
 			"State [%d]: core_frequency[%d] power[%d] transition_latency[%d] bus_master_latency[%d] control[0x%x] status[0x%x]\n",
 			i, 

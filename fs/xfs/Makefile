@@ -30,7 +30,7 @@
 # http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
 #
 
-EXTRA_CFLAGS +=	 -Ifs/xfs -funsigned-char
+EXTRA_CFLAGS +=	 -Ifs/xfs -Ifs/xfs/linux -funsigned-char
 
 ifeq ($(CONFIG_XFS_DEBUG),y)
 	EXTRA_CFLAGS += -g -DSTATIC="" -DDEBUG -DXFSDEBUG
@@ -83,6 +83,7 @@ xfs-y				+= xfs_alloc.o \
 				   xfs_alloc_btree.o \
 				   xfs_attr.o \
 				   xfs_attr_leaf.o \
+				   xfs_behavior.o \
 				   xfs_bit.o \
 				   xfs_bmap.o \
 				   xfs_bmap_btree.o \
@@ -106,6 +107,7 @@ xfs-y				+= xfs_alloc.o \
 				   xfs_inode.o \
 				   xfs_inode_item.o \
 				   xfs_iocore.o \
+				   xfs_iomap.o \
 				   xfs_itable.o \
 				   xfs_dfrag.o \
 				   xfs_log.o \
@@ -126,18 +128,15 @@ xfs-y				+= xfs_alloc.o \
 
 xfs-$(CONFIG_XFS_TRACE)		+= xfs_dir2_trace.o
 
-# Objects in pagebuf/
-xfs-y				+= pagebuf/page_buf.o
-
 # Objects in linux/
 xfs-y				+= $(addprefix linux/, \
+				   mrlock.o \
 				   xfs_aops.o \
-				   xfs_behavior.o \
+				   xfs_buf.o \
 				   xfs_file.o \
 				   xfs_fs_subr.o \
 				   xfs_globals.o \
 				   xfs_ioctl.o \
-				   xfs_iomap.o \
 				   xfs_iops.o \
 				   xfs_lrw.o \
 				   xfs_super.o \
@@ -148,7 +147,6 @@ xfs-y				+= $(addprefix linux/, \
 xfs-y				+= $(addprefix support/, \
 				   debug.o \
 				   move.o \
-				   mrlock.o \
 				   qsort.o \
 				   uuid.o)
 

@@ -154,50 +154,34 @@ static struct mtd_partition badge4_partitions[] = {
 
 #ifdef CONFIG_SA1100_CERF
 #ifdef CONFIG_SA1100_CERF_FLASH_32MB
-static struct mtd_partition cerf_partitions[] = {
-	{
-		.name		= "firmware",
-		.size		= 0x00040000,
-		.offset		= 0,
-	}, {
-		.name		= "params",
-		.size		= 0x00040000,
-		.offset		= 0x00040000,
-	}, {
-		.name		= "kernel",
-		.size		= 0x00100000,
-		.offset		= 0x00080000,
-	}, {
-		.name		= "rootdisk",
-		.size		= 0x01E80000,
-		.offset		= 0x00180000,
-	}
-};
+#  define CERF_FLASH_SIZE	0x02000000
 #elif defined CONFIG_SA1100_CERF_FLASH_16MB
+#  define CERF_FLASH_SIZE	0x01000000
+#elif defined CONFIG_SA1100_CERF_FLASH_8MB
+#  define CERF_FLASH_SIZE	0x00800000
+#else
+#  error "Undefined flash size for CERF in sa1100-flash.c"
+#endif
+
 static struct mtd_partition cerf_partitions[] = {
 	{
-		.name		= "firmware",
+		.name		= "Bootloader",
 		.size		= 0x00020000,
-		.offset		= 0,
+		.offset		= 0x00000000,
 	}, {
-		.name		= "params",
-		.size		= 0x00020000,
+		.name		= "Params",
+		.size		= 0x00040000,
 		.offset		= 0x00020000,
 	}, {
-		.name		= "kernel",
+		.name		= "Kernel",
 		.size		= 0x00100000,
-		.offset		= 0x00040000,
+		.offset		= 0x00060000,
 	}, {
-		.name		= "rootdisk",
-		.size		= 0x00EC0000,
-		.offset		= 0x00140000,
+		.name		= "Filesystem",
+		.size		= CERF_FLASH_SIZE-0x00160000,
+		.offset		= 0x00160000,
 	}
 };
-#elif defined CONFIG_SA1100_CERF_FLASH_8MB
-#   error "Unwritten type definition"
-#else
-#   error "Undefined memory orientation for CERF in sa1100-flash.c"
-#endif
 #endif
 
 #ifdef CONFIG_SA1100_CONSUS
