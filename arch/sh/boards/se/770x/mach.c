@@ -33,6 +33,8 @@ struct sh_machine_vector mv_se __initmv = {
 	.mv_nr_irqs		= 32,
 #elif defined(CONFIG_CPU_SUBTYPE_SH7709)
 	.mv_nr_irqs		= 61,
+#elif defined(CONFIG_CPU_SUBTYPE_SH7705)
+	.mv_nr_irqs		= 86,
 #endif
 
 	.mv_inb			= se_inb,
