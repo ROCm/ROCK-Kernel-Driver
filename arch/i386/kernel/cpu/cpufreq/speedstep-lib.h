@@ -17,6 +17,12 @@
 #define SPEEDSTEP_PROCESSOR_PIII_T 		0x00000003  /* Tualatin core */
 #define SPEEDSTEP_PROCESSOR_P4M			0x00000004  /* P4-M  */
 
+/* the following processors are not speedstep-capable and are not auto-detected
+ * in speedstep_detect_processor(). However, their speed can be detected using
+ * the speedstep_get_processor_frequency() call. */
+#define SPEEDSTEP_PROCESSOR_PM			0xFFFFFF03  /* Pentium M  */
+#define SPEEDSTEP_PROCESSOR_P4D			0xFFFFFF04  /* desktop P4  */
+
 /* speedstep states -- only two of them */
 
 #define SPEEDSTEP_HIGH                  0x00000000
