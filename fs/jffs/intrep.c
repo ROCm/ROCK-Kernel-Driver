@@ -209,7 +209,7 @@ flash_safe_write(struct mtd_info *mtd, loff_t to,
 
 
 static int
-flash_safe_writev(struct mtd_info *mtd, const struct iovec *vecs,
+flash_safe_writev(struct mtd_info *mtd, const struct kvec *vecs,
 			unsigned long iovec_cnt, loff_t to)
 {
 	size_t retlen, retlen_a;
@@ -1740,7 +1740,7 @@ jffs_write_node(struct jffs_control *c, struct jffs_node *node,
 {
 	struct jffs_fmcontrol *fmc = c->fmc;
 	struct jffs_fm *fm;
-	struct iovec node_iovec[4];
+	struct kvec node_iovec[4];
 	unsigned long iovec_cnt;
 
 	__u32 pos;

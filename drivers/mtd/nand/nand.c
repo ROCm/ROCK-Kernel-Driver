@@ -168,9 +168,9 @@ static int nand_write (struct mtd_info *mtd, loff_t to, size_t len, size_t * ret
 static int nand_write_ecc (struct mtd_info *mtd, loff_t to, size_t len,
 			   size_t * retlen, const u_char * buf, u_char * eccbuf, struct nand_oobinfo *oobsel);
 static int nand_write_oob (struct mtd_info *mtd, loff_t to, size_t len, size_t * retlen, const u_char *buf);
-static int nand_writev (struct mtd_info *mtd, const struct iovec *vecs,
+static int nand_writev (struct mtd_info *mtd, const struct kvec *vecs,
 			unsigned long count, loff_t to, size_t * retlen);
-static int nand_writev_ecc (struct mtd_info *mtd, const struct iovec *vecs,
+static int nand_writev_ecc (struct mtd_info *mtd, const struct kvec *vecs,
 			unsigned long count, loff_t to, size_t * retlen, u_char *eccbuf, struct nand_oobinfo *oobsel);
 static int nand_erase (struct mtd_info *mtd, struct erase_info *instr);
 static void nand_sync (struct mtd_info *mtd);
@@ -961,15 +961,15 @@ out:
 
 
 /*
- * NAND write with iovec
+ * NAND write with kvec
  */
-static int nand_writev (struct mtd_info *mtd, const struct iovec *vecs, unsigned long count, 
+static int nand_writev (struct mtd_info *mtd, const struct kvec *vecs, unsigned long count, 
 		loff_t to, size_t * retlen)
 {
 	return (nand_writev_ecc (mtd, vecs, count, to, retlen, NULL, 0));	
 }
 
-static int nand_writev_ecc (struct mtd_info *mtd, const struct iovec *vecs, unsigned long count, 
+static int nand_writev_ecc (struct mtd_info *mtd, const struct kvec *vecs, unsigned long count, 
 		loff_t to, size_t * retlen, u_char *eccbuf, struct nand_oobinfo *oobsel)
 {
 	int i, page, len, total_len, ret = 0, written = 0;
@@ -1016,7 +1016,7 @@ static int nand_writev_ecc (struct mtd_info *mtd, const struct iovec *vecs, unsi
 		goto out;
 	}
 
-	/* Loop until all iovecs' data has been written */
+	/* Loop until all kvec' data has been written */
 	len = 0;
 	while (count) {
 		/* 
@@ -1025,7 +1025,7 @@ static int nand_writev_ecc (struct mtd_info *mtd, const struct iovec *vecs, unsi
 		 *  else we have to copy into data_buf.		
 		 */
 		if ((vecs->iov_len - len) >= mtd->oobblock) {
-			this->data_poi = (u_char *) vecs->iov_base;
+			this->data_poi = vecs->iov_base;
 			this->data_poi += len;
 			len += mtd->oobblock; 
 			/* Check, if we have to switch to the next tuple */

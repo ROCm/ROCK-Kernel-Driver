@@ -232,7 +232,7 @@ void put_mtd_device(struct mtd_info *mtd)
  *			dont implement their own
  */
 
-int default_mtd_writev(struct mtd_info *mtd, const struct iovec *vecs,
+int default_mtd_writev(struct mtd_info *mtd, const struct kvec *vecs,
 		       unsigned long count, loff_t to, size_t *retlen)
 {
 	unsigned long i;
@@ -262,7 +262,7 @@ int default_mtd_writev(struct mtd_info *mtd, const struct iovec *vecs,
  *		       implement their own
  */
 
-int default_mtd_readv(struct mtd_info *mtd, struct iovec *vecs,
+int default_mtd_readv(struct mtd_info *mtd, struct kvec *vecs,
 		      unsigned long count, loff_t from, size_t *retlen)
 {
 	unsigned long i;
