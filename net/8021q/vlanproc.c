@@ -38,8 +38,6 @@
 
 /****** Function Prototypes *************************************************/
 
-#ifdef CONFIG_PROC_FS
-
 /* Proc filesystem interface */
 static ssize_t vlan_proc_read(struct file *file, char *buf, size_t count,
                               loff_t *ppos);
@@ -438,32 +436,3 @@ static int vlandev_get_info(char *buf, char **start,
 
 	return cnt;
 }
-
-#else /* No CONFIG_PROC_FS */
-
-/*
- *	No /proc - output stubs
- */
- 
-int __init vlan_proc_init (void)
-{
-	return 0;
-}
-
-void vlan_proc_cleanup(void)
-{
-	return;
-}
-
-
-int vlan_proc_add_dev(struct net_device *vlandev)
-{
-	return 0;
-}
-
-int vlan_proc_rem_dev(struct net_device *vlandev)
-{
-	return 0;
-}
-
-#endif /* No CONFIG_PROC_FS */
