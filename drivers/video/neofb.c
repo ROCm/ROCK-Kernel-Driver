@@ -1340,7 +1340,7 @@ int neofb_blank(int blank_mode, struct fb_info *info)
 	int seqflags, lcdflags, dpmsflags, reg;
 
 	switch (blank_mode) {
-	case 4:		/* powerdown - both sync lines down */
+	case FB_BLANK_POWERDOWN:	/* powerdown - both sync lines down */
 		seqflags = VGA_SR01_SCREEN_OFF; /* Disable sequencer */
 		lcdflags = 0;			/* LCD off */
 		dpmsflags = NEO_GR01_SUPPRESS_HSYNC |
@@ -1358,22 +1358,22 @@ int neofb_blank(int blank_mode, struct fb_info *info)
 		}
 #endif
 		break;
-	case 3:		/* hsync off */
+	case FB_BLANK_HSYNC_SUSPEND:		/* hsync off */
 		seqflags = VGA_SR01_SCREEN_OFF;	/* Disable sequencer */
 		lcdflags = 0;			/* LCD off */
 		dpmsflags = NEO_GR01_SUPPRESS_HSYNC;
 		break;
-	case 2:		/* vsync off */
+	case FB_BLANK_VSYNC_SUSPEND:		/* vsync off */
 		seqflags = VGA_SR01_SCREEN_OFF;	/* Disable sequencer */
 		lcdflags = 0;			/* LCD off */
 		dpmsflags = NEO_GR01_SUPPRESS_VSYNC;
 		break;
-	case 1:		/* just blank screen (backlight stays on) */
+	case FB_BLANK_NORMAL:		/* just blank screen (backlight stays on) */
 		seqflags = VGA_SR01_SCREEN_OFF;	/* Disable sequencer */
 		lcdflags = par->PanelDispCntlReg1 & 0x02; /* LCD normal */
 		dpmsflags = 0;			/* no hsync/vsync suppression */
 		break;
-	case 0:		/* unblank */
+	case FB_BLANK_UNBLANK:		/* unblank */
 		seqflags = 0;			/* Enable sequencer */
 		lcdflags = par->PanelDispCntlReg1 & 0x02; /* LCD normal */
 		dpmsflags = 0x00;	/* no hsync/vsync suppression */
@@ -1481,7 +1481,7 @@ neo2200_imageblit(struct fb_info *info, const struct fb_image *image)
 	int s_pitch = (image->width * image->depth + 7) >> 3;
 	int scan_align = info->pixmap.scan_align - 1;
 	int buf_align = info->pixmap.buf_align - 1;
-	int bltCntl_flags, d_pitch, data_len, i;
+	int bltCntl_flags, d_pitch, data_len;
 
 	// The data is padded for the hardware
 	d_pitch = (s_pitch + scan_align) & ~scan_align;
@@ -1533,8 +1533,7 @@ neo2200_imageblit(struct fb_info *info, const struct fb_image *image)
 	writel((image->height << 16) | (image->width & 0xffff),
 	       &par->neo2200->xyExt);
 
-	for (i = 0; i < data_len; i++)
-		writeb(image->data[i], par->mmio_vbase + 0x100000 + i);
+	memcpy_toio(par->mmio_vbase + 0x100000, image->data, data_len);
 }
 
 static void

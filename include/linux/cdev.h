@@ -17,8 +17,6 @@ struct cdev *cdev_alloc(void);
 
 void cdev_put(struct cdev *p);
 
-struct kobject *cdev_get(struct cdev *);
-
 int cdev_add(struct cdev *, dev_t, unsigned);
 
 void cdev_del(struct cdev *);

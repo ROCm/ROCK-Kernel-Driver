@@ -245,7 +245,7 @@ static void __iomem *eni_alloc_mem(struct eni_dev *eni_dev, unsigned long *size)
 	list = eni_dev->free_list;
 	len = eni_dev->free_len;
 	if (*size < MID_MIN_BUF_SIZE) *size = MID_MIN_BUF_SIZE;
-	if (*size > MID_MAX_BUF_SIZE) return 0;
+	if (*size > MID_MAX_BUF_SIZE) return NULL;
 	for (order = 0; (1 << order) < *size; order++);
 	DPRINTK("trying: %ld->%d\n",*size,order);
 	best_order = 65; /* we don't have more than 2^64 of anything ... */
@@ -260,7 +260,7 @@ static void __iomem *eni_alloc_mem(struct eni_dev *eni_dev, unsigned long *size)
 				best_order = list[i].order;
 				index = i;
 			}
-	if (best_order == 65) return 0;
+	if (best_order == 65) return NULL;
 	start = list[index].start-eni_dev->base_diff;
 	list[index] = list[--len];
 	eni_dev->free_len = len;
@@ -1315,7 +1315,7 @@ static int reserve_or_set_tx(struct atm_vcc *vcc,struct atm_trafprm *txtp,
 		size = UBR_BUFFER;
 	}
 	new_tx = !eni_vcc->tx;
-	mem = 0; /* for gcc */
+	mem = NULL; /* for gcc */
 	if (!new_tx) tx = eni_vcc->tx;
 	else {
 		mem = eni_alloc_mem(eni_dev,&size);
@@ -1349,7 +1349,7 @@ static int reserve_or_set_tx(struct atm_vcc *vcc,struct atm_trafprm *txtp,
 		error = -EINVAL;
 	if (error) {
 		if (new_tx) {
-			tx->send = 0;
+			tx->send = NULL;
 			eni_free_mem(eni_dev,mem,size);
 		}
 		return error;
@@ -1423,7 +1423,7 @@ static void close_tx(struct atm_vcc *vcc)
 		    eni_in(MID_TX_DESCRSTART(eni_vcc->tx->index)))
 			schedule();
 		eni_free_mem(eni_dev,eni_vcc->tx->send,eni_vcc->tx->words << 2);
-		eni_vcc->tx->send = 0;
+		eni_vcc->tx->send = NULL;
 		eni_dev->tx_bw += eni_vcc->tx->reserved;
 	}
 	eni_vcc->tx = NULL;
@@ -1444,7 +1444,7 @@ static int start_tx(struct atm_dev *dev)
 	skb_queue_head_init(&eni_dev->tx_queue);
 	eni_out(0,MID_DMA_WR_TX);
 	for (i = 0; i < NR_CHAN; i++) {
-		eni_dev->tx[i].send = 0;
+		eni_dev->tx[i].send = NULL;
 		eni_dev->tx[i].index = i;
 	}
 	return 0;
@@ -1702,7 +1702,7 @@ static int __devinit get_esi_fpga(struct atm_dev *dev, void __iomem *base)
 
 static int __devinit eni_do_init(struct atm_dev *dev)
 {
-	struct midway_eprom *eprom;
+	struct midway_eprom __iomem *eprom;
 	struct eni_dev *eni_dev;
 	struct pci_dev *pci_dev;
 	unsigned long real_base;
@@ -1742,8 +1742,7 @@ static int __devinit eni_do_init(struct atm_dev *dev)
 	eni_dev->base_diff = real_base - (unsigned long) base;
 	/* id may not be present in ASIC Tonga boards - check this @@@ */
 	if (!eni_dev->asic) {
-		eprom = (struct midway_eprom *) (base+EPROM_SIZE-sizeof(struct
-		    midway_eprom));
+		eprom = (base+EPROM_SIZE-sizeof(struct midway_eprom));
 		if (readl(&eprom->magic) != ENI155_MAGIC) {
 			printk("\n");
 			printk(KERN_ERR KERN_ERR DEV_LABEL "(itf %d): bad "

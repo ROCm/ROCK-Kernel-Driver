@@ -852,7 +852,7 @@ GLOBAL_ENTRY(ia64_syscall_setup)
 	add r17=PT(R11),r1			// initialize second base pointer
 	;;
 	alloc r19=ar.pfs,8,0,0,0		// ensure in0-in7 are writable
-	st8 [r16]=r29,PT(CR_IFS)-PT(CR_IPSR)	// save cr.ipsr
+	st8 [r16]=r29,PT(AR_PFS)-PT(CR_IPSR)	// save cr.ipsr
 	tnat.nz p8,p0=in0
 
 	st8.spill [r17]=r11,PT(CR_IIP)-PT(R11)	// save r11
@@ -860,31 +860,31 @@ GLOBAL_ENTRY(ia64_syscall_setup)
 (pKStk)	mov r18=r0				// make sure r18 isn't NaT
 	;;
 
+	st8 [r16]=r26,PT(CR_IFS)-PT(AR_PFS)	// save ar.pfs
 	st8 [r17]=r28,PT(AR_UNAT)-PT(CR_IIP)	// save cr.iip
 	mov r28=b0				// save b0 (2 cyc)
+	;;
+
+	st8 [r17]=r25,PT(AR_RSC)-PT(AR_UNAT)	// save ar.unat
+	dep r19=0,r19,38,26			// clear all bits but 0..37 [I0]
 (p8)	mov in0=-1
 	;;
 
-	st8 [r16]=r0,PT(AR_PFS)-PT(CR_IFS)	// clear cr.ifs
-	st8 [r17]=r25,PT(AR_RSC)-PT(AR_UNAT)	// save ar.unat
-(p9)	mov in1=-1
-	;;
-
-	st8 [r16]=r26,PT(AR_RNAT)-PT(AR_PFS)	// save ar.pfs
+	st8 [r16]=r19,PT(AR_RNAT)-PT(CR_IFS)	// store ar.pfs.pfm in cr.ifs
 	st8 [r17]=r27,PT(AR_BSPSTORE)-PT(AR_RSC)// save ar.rsc
-	tnat.nz p10,p0=in2
+(p9)	mov in1=-1
 
 (pUStk) sub r18=r18,r22				// r18=RSE.ndirty*8
 	tbit.nz p15,p0=r29,IA64_PSR_I_BIT
-	tnat.nz p11,p0=in3
+	tnat.nz p10,p0=in2
 	;;
 (pKStk) adds r16=PT(PR)-PT(AR_RNAT),r16		// skip over ar_rnat field
 (pKStk) adds r17=PT(B0)-PT(AR_BSPSTORE),r17	// skip over ar_bspstore field
+	tnat.nz p11,p0=in3
+	;;
 (p10)	mov in2=-1
-
+	tnat.nz p12,p0=in4				// [I0]
 (p11)	mov in3=-1
-	tnat.nz p12,p0=in4
-	tnat.nz p13,p0=in5
 	;;
 (pUStk) st8 [r16]=r24,PT(PR)-PT(AR_RNAT)	// save ar.rnat
 (pUStk) st8 [r17]=r23,PT(B0)-PT(AR_BSPSTORE)	// save ar.bspstore
@@ -892,28 +892,29 @@ GLOBAL_ENTRY(ia64_syscall_setup)
 	;;
 	st8 [r16]=r31,PT(LOADRS)-PT(PR)		// save predicates
 	st8 [r17]=r28,PT(R1)-PT(B0)		// save b0
-(p12)	mov in4=-1
+	tnat.nz p13,p0=in5				// [I0]
 	;;
 	st8 [r16]=r18,PT(R12)-PT(LOADRS)	// save ar.rsc value for "loadrs"
 	st8.spill [r17]=r20,PT(R13)-PT(R1)	// save original r1
-(p13)	mov in5=-1
+(p12)	mov in4=-1
 	;;
 
 .mem.offset 0,0; st8.spill [r16]=r12,PT(AR_FPSR)-PT(R12)	// save r12
 .mem.offset 8,0; st8.spill [r17]=r13,PT(R15)-PT(R13)		// save r13
-	tnat.nz p14,p0=in6
+(p13)	mov in5=-1
 	;;
 	st8 [r16]=r21,PT(R8)-PT(AR_FPSR)	// save ar.fpsr
 	st8.spill [r17]=r15			// save r15
-	tnat.nz p8,p0=in7
+	tnat.nz p14,p0=in6
 	;;
 	stf8 [r16]=f1		// ensure pt_regs.r8 != 0 (see handle_syscall_error)
 	adds r12=-16,r1		// switch to kernel memory stack (with 16 bytes of scratch)
-(p14)	mov in6=-1
+	tnat.nz p8,p0=in7
 
 	mov r13=r2				// establish `current'
 	movl r1=__gp				// establish kernel global pointer
 	;;
+(p14)	mov in6=-1
 (p8)	mov in7=-1
 	tnat.nz p9,p0=r15
 

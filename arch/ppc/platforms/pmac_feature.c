@@ -117,10 +117,10 @@ static const char* macio_names[] __pmacdata =
 #define UN_BIC(r,v)	(UN_OUT((r), UN_IN(r) & ~(v)))
 
 static struct device_node* uninorth_node __pmacdata;
-static u32* uninorth_base __pmacdata;
+static u32 __iomem * uninorth_base __pmacdata;
 static u32 uninorth_rev __pmacdata;
 static int uninorth_u3 __pmacdata;
-static void *u3_ht;
+static void __iomem *u3_ht;
 
 /*
  * For each motherboard family, we have a table of functions pointers
@@ -517,7 +517,7 @@ dbdma_save(struct macio_chip* macio, struct dbdma_regs* save)
 
 	/* Save state & config of DBDMA channels */
 	for (i=0; i<13; i++) {
-		volatile struct dbdma_regs* chan = (volatile struct dbdma_regs*)
+		volatile struct dbdma_regs __iomem * chan = (void __iomem *)
 			(macio->base + ((0x8000+i*0x100)>>2));
 		save[i].cmdptr_hi = in_le32(&chan->cmdptr_hi);
 		save[i].cmdptr = in_le32(&chan->cmdptr);
@@ -534,7 +534,7 @@ dbdma_restore(struct macio_chip* macio, struct dbdma_regs* save)
 
 	/* Save state & config of DBDMA channels */
 	for (i=0; i<13; i++) {
-		volatile struct dbdma_regs* chan = (volatile struct dbdma_regs*)
+		volatile struct dbdma_regs __iomem * chan = (void __iomem *)
 			(macio->base + ((0x8000+i*0x100)>>2));
 		out_le32(&chan->control, (ACTIVE|DEAD|WAKE|FLUSH|PAUSE|RUN)<<16);
 		while (in_le32(&chan->status) & ACTIVE)
@@ -2286,14 +2286,14 @@ found:
 #ifndef CONFIG_POWER4
 	/* Fixup Hooper vs. Comet */
 	if (pmac_mb.model_id == PMAC_TYPE_HOOPER) {
-		u32* mach_id_ptr = (u32*)ioremap(0xf3000034, 4);
+		u32 __iomem * mach_id_ptr = ioremap(0xf3000034, 4);
 		if (!mach_id_ptr)
 			return -ENODEV;
 		/* Here, I used to disable the media-bay on comet. It
 		 * appears this is wrong, the floppy connector is actually
 		 * a kind of media-bay and works with the current driver.
 		 */
-		if ((*mach_id_ptr) & 0x20000000UL)
+		if (__raw_readl(mach_id_ptr) & 0x20000000UL)
 			pmac_mb.model_id = PMAC_TYPE_COMET;
 		iounmap(mach_id_ptr);
 	}
@@ -2394,7 +2394,7 @@ probe_one_macio(const char* name, const char* compat, int type)
 {
 	struct device_node*	node;
 	int			i;
-	volatile u32*		base;
+	volatile u32 __iomem *	base;
 	u32*			revp;
 
 	node = find_devices(name);
@@ -2419,7 +2419,7 @@ probe_one_macio(const char* name, const char* compat, int type)
 		printk(KERN_ERR "pmac_feature: %s skipped\n", node->full_name);
 		return;
 	}
-	base = (volatile u32*)ioremap(node->addrs[0].address, node->addrs[0].size);
+	base = ioremap(node->addrs[0].address, node->addrs[0].size);
 	if (!base) {
 		printk(KERN_ERR "pmac_feature: Can't map mac-io chip !\n");
 		return;

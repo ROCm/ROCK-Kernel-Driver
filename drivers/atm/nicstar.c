@@ -267,7 +267,7 @@ static struct atmdev_ops atm_ops =
 };
 static struct timer_list ns_timer;
 static char *mac[NS_MAX_CARDS];
-MODULE_PARM(mac, "1-" __MODULE_STRING(NS_MAX_CARDS) "s");
+module_param_array(mac, charp, NULL, 0);
 MODULE_LICENSE("GPL");
 
 

@@ -1,5 +1,6 @@
 /* 
  * Copyright (C) 2000, 2001, 2002 Jeff Dike (jdike@karaya.com)
+ * Copyright 2003 PathScale, Inc.
  * Licensed under the GPL
  */
 
@@ -140,7 +141,7 @@ void *_switch_to(void *prev, void *next, void *last)
 void interrupt_end(void)
 {
 	if(need_resched()) schedule();
-	if(test_tsk_thread_flag(current, TIF_SIGPENDING)) do_signal(0);
+	if(test_tsk_thread_flag(current, TIF_SIGPENDING)) do_signal();
 }
 
 void release_thread(struct task_struct *task)
@@ -225,7 +226,7 @@ int page_size(void)
 	return(PAGE_SIZE);
 }
 
-int page_mask(void)
+unsigned long page_mask(void)
 {
 	return(PAGE_MASK);
 }

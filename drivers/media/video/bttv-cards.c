@@ -1,5 +1,5 @@
 /*
-    $Id: bttv-cards.c,v 1.29 2004/10/13 10:39:00 kraxel Exp $
+    $Id: bttv-cards.c,v 1.32 2004/11/07 13:17:14 kraxel Exp $
 
     bttv-cards.c
 
@@ -106,52 +106,30 @@ static unsigned int audioall = UNSET;
 static unsigned int audiomux[5] = { [ 0 ... 4 ] = UNSET };
 
 /* insmod options */
-MODULE_PARM(triton1,"i");
+module_param(triton1,    int, 0444);
+module_param(vsfx,       int, 0444);
+module_param(no_overlay, int, 0444);
+module_param(latency,    int, 0444);
+module_param(gpiomask,   int, 0444);
+module_param(audioall,   int, 0444);
+module_param(autoload,   int, 0444);
+
+module_param_array(card,     int, NULL, 0444);
+module_param_array(pll,      int, NULL, 0444);
+module_param_array(tuner,    int, NULL, 0444);
+module_param_array(svhs,     int, NULL, 0444);
+module_param_array(remote,   int, NULL, 0444);
+module_param_array(audiomux, int, NULL, 0444);
+
 MODULE_PARM_DESC(triton1,"set ETBF pci config bit "
 		 "[enable bug compatibility for triton1 + others]");
-MODULE_PARM(vsfx,"i");
 MODULE_PARM_DESC(vsfx,"set VSFX pci config bit "
 		 "[yet another chipset flaw workaround]");
-MODULE_PARM(no_overlay,"i");
-MODULE_PARM(latency,"i");
 MODULE_PARM_DESC(latency,"pci latency timer");
-MODULE_PARM(card,"1-" __stringify(BTTV_MAX) "i");
 MODULE_PARM_DESC(card,"specify TV/grabber card model, see CARDLIST file for a list");
-MODULE_PARM(pll,"1-" __stringify(BTTV_MAX) "i");
 MODULE_PARM_DESC(pll,"specify installed crystal (0=none, 28=28 MHz, 35=35 MHz)");
-MODULE_PARM(tuner,"1-" __stringify(BTTV_MAX) "i");
 MODULE_PARM_DESC(tuner,"specify installed tuner type");
-MODULE_PARM(autoload,"i");
 MODULE_PARM_DESC(autoload,"automatically load i2c modules like tuner.o, default is 1 (yes)");
-
-MODULE_PARM(svhs,"1-" __stringify(BTTV_MAX) "i");
-MODULE_PARM(remote,"1-" __stringify(BTTV_MAX) "i");
-
-MODULE_PARM(gpiomask,"i");
-MODULE_PARM(audioall,"i");
-MODULE_PARM(audiomux,"1-6i");
-
-/* kernel args */
-#ifndef MODULE
-static int __init p_card(char *str)  { return bttv_parse(str,BTTV_MAX,card);  }
-static int __init p_pll(char *str)   { return bttv_parse(str,BTTV_MAX,pll);   }
-static int __init p_tuner(char *str) { return bttv_parse(str,BTTV_MAX,tuner); }
-__setup("bttv.card=",  p_card);
-__setup("bttv.pll=",   p_pll);
-__setup("bttv.tuner=", p_tuner);
-
-int __init bttv_parse(char *str, int max, int *vals)
-{
-	int i,number,res = 2;
-
-	for (i = 0; res == 2 && i < max; i++) {
-		res = get_option(&str,&number);
-		if (res)
-			vals[i] = number;
-	}
-	return 1;
-}
-#endif
 
 /* ----------------------------------------------------------------------- */
 /* list of card IDs for bt878+ cards                                       */
@@ -184,7 +162,6 @@ static struct CARD {
  	{ 0xd01810fc, BTTV_GVBCTV5PCI,    "I-O Data Co. GV-BCTV5/PCI" },
 
 	{ 0x001211bd, BTTV_PINNACLE,      "Pinnacle PCTV" },
-	{ 0x001c11bd, BTTV_PINNACLESAT,   "Pinnacle PCTV Sat" },
 	// some cards ship with byteswapped IDs ...
 	{ 0x1200bd11, BTTV_PINNACLE,      "Pinnacle PCTV [bswap]" },
 	{ 0xff00bd11, BTTV_PINNACLE,      "Pinnacle PCTV [bswap]" },
@@ -194,6 +171,7 @@ static struct CARD {
 	{ 0x3060121a, BTTV_STB2,	  "3Dfx VoodooTV 100/ STB OEM" },
 
 	{ 0x3000144f, BTTV_MAGICTVIEW063, "(Askey Magic/others) TView99 CPH06x" },
+	{ 0xa005144f, BTTV_MAGICTVIEW063, "CPH06X TView99-Card" },
 	{ 0x3002144f, BTTV_MAGICTVIEW061, "(Askey Magic/others) TView99 CPH05x" },
 	{ 0x3005144f, BTTV_MAGICTVIEW061, "(Askey Magic/others) TView99 CPH061/06L (T1/LC)" },
 	{ 0x5000144f, BTTV_MAGICTVIEW061, "Askey CPH050" },
@@ -306,6 +284,7 @@ static struct CARD {
 	// DVB cards (using pci function .1 for mpeg data xfer)
 	{ 0x01010071, BTTV_NEBULA_DIGITV, "Nebula Electronics DigiTV" },
 	{ 0x07611461, BTTV_AVDVBT_761,    "AverMedia AverTV DVB-T" },
+	{ 0x001c11bd, BTTV_PINNACLESAT,   "Pinnacle PCTV Sat" },
 	{ 0x002611bd, BTTV_TWINHAN_DST,   "Pinnacle PCTV SAT CI" },
 	{ 0x00011822, BTTV_TWINHAN_DST,   "Twinhan VisionPlus DVB-T" },
 	{ 0xfc00270f, BTTV_TWINHAN_DST,   "ChainTech digitop DST-1000 DVB-S" },
@@ -1670,6 +1649,7 @@ struct tvcard bttv_tvcards[] = {
 	.needs_tvaudio  = 0,
 	.pll            = PLL_28,
 	.no_gpioirq     = 1,
+	.has_dvb        = 1,
 },{
         .name           = "Formac ProTV II (bt878)",
         .video_inputs   = 4,
@@ -2084,9 +2064,7 @@ struct tvcard bttv_tvcards[] = {
         .pll            = PLL_28,
         .has_dvb        = 1,
         .no_gpioirq     = 1,
-#if 0 /* untested */
         .has_remote     = 1,
-#endif
 },{
 	/* ---- card 0x7c ---------------------------------- */
 	/* Matt Jesson <dvb@jesson.eclipse.co.uk> */
@@ -2969,40 +2947,6 @@ static int __devinit pvr_altera_load(struct bttv *btv, u8 *micro, u32 microlen)
 	return 0;
 }
 
-#if !defined(CONFIG_FW_LOADER) && !defined(CONFIG_FW_LOADER_MODULE)
-/* old 2.4.x way -- via soundcore's mod_firmware_load */
-
-static char *firm_altera = "/usr/lib/video4linux/hcwamc.rbf";
-MODULE_PARM(firm_altera,"s");
-MODULE_PARM_DESC(firm_altera,"WinTV/PVR firmware "
-		 "(driver CD => unzip pvr45xxx.exe => hcwamc.rbf)");
-
-extern int mod_firmware_load(const char *fn, char **fp);
-
-int __devinit pvr_boot(struct bttv *btv)
-{
-	u32 microlen;
-	u8 *micro;
-	int result;
-
-	microlen = mod_firmware_load(firm_altera, (char**) &micro);
-	if (!microlen) {
-		printk(KERN_WARNING "bttv%d: altera firmware not found [%s]\n",
-		       btv->c.nr, firm_altera);
-		return -1;
-	}
-
-	printk(KERN_INFO "bttv%d: uploading altera firmware [%s] ...\n",
-	       btv->c.nr, firm_altera);
-	result = pvr_altera_load(btv, micro, microlen);
-	printk(KERN_INFO "bttv%d: ... upload %s\n",
-	       btv->c.nr, (result < 0) ? "failed" : "ok");
-	vfree(micro);
-	return result;
-}
-#else
-/* new 2.5.x way -- via hotplug firmware loader */
-
 int __devinit pvr_boot(struct bttv *btv)
 {
         const struct firmware *fw_entry;
@@ -3020,7 +2964,6 @@ int __devinit pvr_boot(struct bttv *btv)
         release_firmware(fw_entry);
 	return rc;
 }
-#endif
 
 /* ----------------------------------------------------------------------- */
 /* some osprey specific stuff                                              */

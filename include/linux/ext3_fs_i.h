@@ -20,17 +20,17 @@
 #include <linux/rbtree.h>
 #include <linux/seqlock.h>
 
-struct reserve_window {
+struct ext3_reserve_window {
 	__u32			_rsv_start;	/* First byte reserved */
 	__u32			_rsv_end;	/* Last byte reserved or 0 */
 };
 
-struct reserve_window_node {
+struct ext3_reserve_window_node {
 	struct rb_node	 	rsv_node;
 	atomic_t		rsv_goal_size;
 	atomic_t		rsv_alloc_hit;
 	seqlock_t		rsv_seqlock;
-	struct reserve_window	rsv_window;
+	struct ext3_reserve_window	rsv_window;
 };
 
 #define rsv_start rsv_window._rsv_start
@@ -76,7 +76,7 @@ struct ext3_inode_info {
 	 */
 	__u32	i_next_alloc_goal;
 	/* block reservation window */
-	struct reserve_window_node i_rsv_window;
+	struct ext3_reserve_window_node i_rsv_window;
 
 	__u32	i_dir_start_lookup;
 #ifdef CONFIG_EXT3_FS_XATTR

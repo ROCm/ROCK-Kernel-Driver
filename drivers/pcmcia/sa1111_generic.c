@@ -136,14 +136,8 @@ static int pcmcia_probe(struct sa1111_dev *dev)
 	sa1111_writel(PCSSR_S0_SLEEP | PCSSR_S1_SLEEP, base + SA1111_PCSSR);
 	sa1111_writel(PCCR_S0_FLT | PCCR_S1_FLT, base + SA1111_PCCR);
 
-#ifdef CONFIG_SA1100_ADSBITSY
-	pcmcia_adsbitsy_init(&dev->dev);
-#endif
 #ifdef CONFIG_SA1100_BADGE4
 	pcmcia_badge4_init(&dev->dev);
-#endif
-#ifdef CONFIG_SA1100_GRAPHICSMASTER
-	pcmcia_graphicsmaster_init(&dev->dev);
 #endif
 #ifdef CONFIG_SA1100_JORNADA720
 	pcmcia_jornada720_init(&dev->dev);
@@ -153,15 +147,6 @@ static int pcmcia_probe(struct sa1111_dev *dev)
 #endif
 #ifdef CONFIG_ASSABET_NEPONSET
 	pcmcia_neponset_init(dev);
-#endif
-#ifdef CONFIG_SA1100_PFS168
-	pcmcia_pfs_init(&dev->dev);
-#endif
-#ifdef CONFIG_SA1100_PT_SYSTEM3
-	pcmcia_system3_init(&dev->dev);
-#endif
-#ifdef CONFIG_SA1100_XP860
-	pcmcia_xp860_init(&dev->dev);
 #endif
 	return 0;
 }

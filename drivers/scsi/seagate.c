@@ -237,13 +237,13 @@ static unsigned int base_address = 0;	/* Where the card ROM starts, used to
 					   calculate memory mapped register
 					   location.  */
 
-static unsigned long st0x_cr_sr;	/* control register write, status
+static void __iomem *st0x_cr_sr;	/* control register write, status
 					   register read.  256 bytes in
 					   length.
 					   Read is status of SCSI BUS, as per 
 					   STAT masks.  */
 
-static unsigned long st0x_dr;	/* data register, read write 256
+static void __iomem *st0x_dr;	/* data register, read write 256
 				   bytes in length.  */
 
 static volatile int st0x_aborted = 0;	/* set when we are aborted, ie by a
@@ -254,17 +254,17 @@ static unsigned char controller_type = 0;	/* set to SEAGATE for ST0x
 						   boards */
 static int irq = IRQ;
 
-MODULE_PARM (base_address, "i");
-MODULE_PARM (controller_type, "b");
-MODULE_PARM (irq, "i");
+module_param(base_address, uint, 0);
+module_param(controller_type, byte, 0);
+module_param(irq, int, 0);
 MODULE_LICENSE("GPL");
 
 
 #define retcode(result) (((result) << 16) | (message << 8) | status)
-#define STATUS ((u8) isa_readb(st0x_cr_sr))
-#define DATA ((u8) isa_readb(st0x_dr))
-#define WRITE_CONTROL(d) { isa_writeb((d), st0x_cr_sr); }
-#define WRITE_DATA(d) { isa_writeb((d), st0x_dr); }
+#define STATUS ((u8) readb(st0x_cr_sr))
+#define DATA ((u8) readb(st0x_dr))
+#define WRITE_CONTROL(d) { writeb((d), st0x_cr_sr); }
+#define WRITE_DATA(d) { writeb((d), st0x_dr); }
 
 #ifndef OVERRIDE
 static unsigned int seagate_bases[] = {
@@ -420,6 +420,7 @@ int __init seagate_st0x_detect (Scsi_Host_Template * tpnt)
 {
 	struct Scsi_Host *instance;
 	int i, j;
+	unsigned long cr, dr;
 
 	tpnt->proc_name = "seagate";
 /*
@@ -454,12 +455,18 @@ int __init seagate_st0x_detect (Scsi_Host_Template * tpnt)
  * space for the on-board RAM instead.
  */
 
-		for (i = 0; i < (sizeof (seagate_bases) / sizeof (unsigned int)); ++i)
-			for (j = 0; !base_address && j < NUM_SIGNATURES; ++j)
-				if (isa_check_signature(seagate_bases[i] + signatures[j].offset, signatures[j].signature, signatures[j].length)) {
+		for (i = 0; i < (sizeof (seagate_bases) / sizeof (unsigned int)); ++i) {
+			void __iomem *p = ioremap(seagate_bases[i], 0x2000);
+			if (!p)
+				continue;
+			for (j = 0; j < NUM_SIGNATURES; ++j)
+				if (check_signature(p + signatures[j].offset, signatures[j].signature, signatures[j].length)) {
 					base_address = seagate_bases[i];
 					controller_type = signatures[j].type;
+					break;
 				}
+			iounmap(p);
+		}
 #endif				/* OVERRIDE */
 	}
 	/* (! controller_type) */
@@ -471,11 +478,13 @@ int __init seagate_st0x_detect (Scsi_Host_Template * tpnt)
 		return 0;
 	}
 
-	st0x_cr_sr = base_address + (controller_type == SEAGATE ? 0x1a00 : 0x1c00);
-	st0x_dr = st0x_cr_sr + 0x200;
+	cr = base_address + (controller_type == SEAGATE ? 0x1a00 : 0x1c00);
+	dr = cr + 0x200;
+	st0x_cr_sr = ioremap(cr, 0x100);
+	st0x_dr = ioremap(dr, 0x100);
 
 	DANY("%s detected. Base address = %x, cr = %x, dr = %x\n",
-	      tpnt->name, base_address, st0x_cr_sr, st0x_dr);
+	      tpnt->name, base_address, cr, dr);
 
 	/*
 	 *	At all times, we will use IRQ 5.  Should also check for IRQ3
@@ -1140,7 +1149,7 @@ connect_loop:
 #endif
 						 "loop 1b;"
 				      /* output */ :
-				      /* input */ :"D" (phys_to_virt (st0x_dr)),
+				      /* input */ :"D" (st0x_dr),
 						 "S"
 						 (data),
 						 "c" (SCint->transfersize)
@@ -1148,19 +1157,7 @@ connect_loop:
 				      :	 "eax", "ecx",
 						 "esi");
 #else				/* SEAGATE_USE_ASM */
-					{
-#ifdef FAST32
-						unsigned int *iop = phys_to_virt (st0x_dr);
-						const unsigned int *dp =(unsigned int *) data;
-						int xferlen = transfersize >> 2;
-#else
-						unsigned char *iop = phys_to_virt (st0x_dr);
-						const unsigned char *dp = data;
-						int xferlen = transfersize;
-#endif
-						for (; xferlen; --xferlen)
-							*iop = *dp++;
-					}
+					memcpy_toio(st0x_dr, data, transfersize);
 #endif				/* SEAGATE_USE_ASM */
 /* SJT: End */
 					len -= transfersize;
@@ -1212,10 +1209,8 @@ connect_loop:
 							"=D" (__dummy_2)
 /* input */
 				      :		"0" (data), "1" (len),
-							"2" (phys_to_virt
-							     (st0x_cr_sr)),
-							"3" (phys_to_virt
-							     (st0x_dr))
+							"2" (st0x_cr_sr),
+							"3" (st0x_dr)
 /* clobbered */
 				      :		"eax");
 #else				/* SEAGATE_USE_ASM */
@@ -1292,7 +1287,7 @@ connect_loop:
 #endif
 						 "loop 1b\n\t"
 				      /* output */ :
-				      /* input */ :"S" (phys_to_virt (st0x_dr)),
+				      /* input */ :"S" (st0x_dr),
 						 "D"
 						 (data),
 						 "c" (SCint->transfersize)
@@ -1300,22 +1295,7 @@ connect_loop:
 				      :	 "eax", "ecx",
 						 "edi");
 #else				/* SEAGATE_USE_ASM */
-					{
-#ifdef FAST32
-						const unsigned int *iop =
-						    phys_to_virt (st0x_dr);
-						unsigned int *dp =
-						    (unsigned int *) data;
-						int xferlen = len >> 2;
-#else
-						const unsigned char *iop =
-						    phys_to_virt (st0x_dr);
-						unsigned char *dp = data;
-						int xferlen = len;
-#endif
-						for (; xferlen; --xferlen)
-							*dp++ = *iop;
-					}
+					memcpy_fromio(data, st0x_dr, len);
 #endif				/* SEAGATE_USE_ASM */
 /* SJT: End */
 					len -= transfersize;
@@ -1381,10 +1361,8 @@ connect_loop:
 							"=b" (__dummy_4)
 /* input */
 				      :		"0" (data), "1" (len),
-							"2" (phys_to_virt
-							     (st0x_cr_sr)),
-							"3" (phys_to_virt
-							     (st0x_dr))
+							"2" (st0x_cr_sr),
+							"3" (st0x_dr)
 /* clobbered */
 				      :		"eax");
 #else				/* SEAGATE_USE_ASM */

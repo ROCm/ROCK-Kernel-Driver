@@ -23,6 +23,8 @@
 #include <linux/smp_lock.h>
 #include <linux/wait.h>
 #include <linux/suspend.h>
+#include <linux/kthread.h>
+#include <linux/moduleparam.h>
 
 #include <asm/prom.h>
 #include <asm/machdep.h>
@@ -30,7 +32,6 @@
 #include <asm/system.h>
 #include <asm/sections.h>
 #include <asm/of_device.h>
-#include <linux/kthread.h>
 
 #undef DEBUG
 
@@ -56,11 +57,11 @@ MODULE_DESCRIPTION("Driver for ADT746x thermostat in iBook G4 and "
 		   "Powerbook G4 Alu");
 MODULE_LICENSE("GPL");
 
-MODULE_PARM(limit_adjust,"i");
+module_param(limit_adjust, int, 0644);
 MODULE_PARM_DESC(limit_adjust,"Adjust maximum temperatures (50 cpu, 70 gpu) "
 		 "by N degrees.");
 
-MODULE_PARM(fan_speed,"i");
+module_param(fan_speed, int, 0644);
 MODULE_PARM_DESC(fan_speed,"Specify starting fan speed (0-255) "
 		 "(default 64)");
 

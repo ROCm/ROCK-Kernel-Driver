@@ -429,8 +429,8 @@ struct i810_card {
 
 	unsigned long ac97base_mmio_phys;
 	unsigned long iobase_mmio_phys;
-	u_int8_t *ac97base_mmio;
-	u_int8_t *iobase_mmio;
+	u_int8_t __iomem *ac97base_mmio;
+	u_int8_t __iomem *iobase_mmio;
 
 	int           use_mmio;
 	

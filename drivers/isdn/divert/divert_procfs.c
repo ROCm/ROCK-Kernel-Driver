@@ -22,6 +22,7 @@
 #include <linux/isdnif.h>
 #include "isdn_divert.h"
 
+
 /*********************************/
 /* Variables for interface queue */
 /*********************************/
@@ -76,7 +77,7 @@ put_info_buffer(char *cp)
 /* deflection device read routine */
 /**********************************/
 static ssize_t
-isdn_divert_read(struct file *file, char *buf, size_t count, loff_t * off)
+isdn_divert_read(struct file *file, char __user *buf, size_t count, loff_t * off)
 {
 	struct divert_info *inf;
 	int len;
@@ -90,7 +91,7 @@ isdn_divert_read(struct file *file, char *buf, size_t count, loff_t * off)
 		return (0);
 
 	inf->usage_cnt--;	/* new usage count */
-	(struct divert_info **) file->private_data = &inf->next;	/* next structure */
+	file->private_data = &inf->next;	/* next structure */
 	if ((len = strlen(inf->info_start)) <= count) {
 		if (copy_to_user(buf, inf->info_start, len))
 			return -EFAULT;
@@ -104,7 +105,7 @@ isdn_divert_read(struct file *file, char *buf, size_t count, loff_t * off)
 /* deflection device write routine */
 /**********************************/
 static ssize_t
-isdn_divert_write(struct file *file, const char *buf, size_t count, loff_t * off)
+isdn_divert_write(struct file *file, const char __user *buf, size_t count, loff_t * off)
 {
 	return (-ENODEV);
 }				/* isdn_divert_write */
@@ -137,9 +138,9 @@ isdn_divert_open(struct inode *ino, struct file *filep)
 	spin_lock_irqsave( &divert_info_lock, flags );
  	if_used++;
 	if (divert_info_head)
-		(struct divert_info **) filep->private_data = &(divert_info_tail->next);
+		filep->private_data = &(divert_info_tail->next);
 	else
-		(struct divert_info **) filep->private_data = &divert_info_head;
+		filep->private_data = &divert_info_head;
 	spin_unlock_irqrestore( &divert_info_lock, flags );
 	/*  start_divert(); */
 	return nonseekable_open(ino, filep);
@@ -184,7 +185,7 @@ isdn_divert_ioctl(struct inode *inode, struct file *file,
 	divert_rule *rulep;
 	char *cp;
 
-	if (copy_from_user(&dioctl, (char *) arg, sizeof(dioctl)))
+	if (copy_from_user(&dioctl, (void __user *) arg, sizeof(dioctl)))
 		return -EFAULT;
 
 	switch (cmd) {
@@ -215,10 +216,9 @@ isdn_divert_ioctl(struct inode *inode, struct file *file,
 		case IIOCMODRULE:
 			if (!(rulep = getruleptr(dioctl.getsetrule.ruleidx)))
 				return (-EINVAL);
-			save_flags(flags);
-			cli();
+            spin_lock_irqsave(&divert_lock, flags);
 			*rulep = dioctl.getsetrule.rule;	/* copy data */
-			restore_flags(flags);
+			spin_unlock_irqrestore(&divert_lock, flags);
 			return (0);	/* no copy required */
 			break;
 
@@ -253,7 +253,7 @@ isdn_divert_ioctl(struct inode *inode, struct file *file,
 		default:
 			return (-EINVAL);
 	}			/* switch cmd */
-	return copy_to_user((char *)arg, &dioctl, sizeof(dioctl)) ? -EFAULT : 0;
+	return copy_to_user((void __user *)arg, &dioctl, sizeof(dioctl)) ? -EFAULT : 0;
 }				/* isdn_divert_ioctl */
 
 

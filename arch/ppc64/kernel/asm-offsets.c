@@ -103,6 +103,7 @@ int main(void)
         DEFINE(PACA_EXDSI, offsetof(struct paca_struct, exdsi));
         DEFINE(PACAEMERGSP, offsetof(struct paca_struct, emergency_sp));
 	DEFINE(PACALPPACA, offsetof(struct paca_struct, lppaca));
+	DEFINE(PACAHWCPUID, offsetof(struct paca_struct, hw_cpu_id));
         DEFINE(LPPACASRR0, offsetof(struct ItLpPaca, xSavedSrr0));
         DEFINE(LPPACASRR1, offsetof(struct ItLpPaca, xSavedSrr1));
 	DEFINE(LPPACAANYINT, offsetof(struct ItLpPaca, xIntDword.xAnyInt));

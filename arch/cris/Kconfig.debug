@@ -1,15 +1,11 @@
 menu "Kernel hacking"
 
-source "lib/Kconfig.debug"
-
 #bool 'Debug kmalloc/kfree' CONFIG_DEBUG_MALLOC
-config PROFILE
+config PROFILING
 	bool "Kernel profiling support"
 
-config PROFILE_SHIFT
-	int "Profile shift count"
-	depends on PROFILE
-	default "2"
+config SYSTEM_PROFILER
+        bool "System profiling support"
 
 config ETRAX_KGDB
 	bool "Use kernel GDB debugger"
@@ -24,5 +20,22 @@ config ETRAX_KGDB
 	  This should connect you to your booted kernel (or boot it now if you
 	  didn't before).  The kernel halts when it boots, waiting for gdb if
 	  this option is turned on!
+
+
+config DEBUG_INFO
+        bool "Compile the kernel with debug info"
+        help
+          If you say Y here the resulting kernel image will include
+          debugging info resulting in a larger kernel image.
+          Say Y here only if you plan to use gdb to debug the kernel.
+          If you don't debug the kernel, you can say N.
+
+config FRAME_POINTER
+        bool "Compile the kernel with frame pointers"
+        help
+          If you say Y here the resulting kernel image will be slightly larger
+          and slower, but it will give very useful debugging information.
+          If you don't debug the kernel, you can say N, but we may not be able
+          to solve problems without frame pointers.
 
 endmenu

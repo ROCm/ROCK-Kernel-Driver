@@ -1357,8 +1357,28 @@ void blk_stop_queue(request_queue_t *q)
 	blk_remove_plug(q);
 	set_bit(QUEUE_FLAG_STOPPED, &q->queue_flags);
 }
-
 EXPORT_SYMBOL(blk_stop_queue);
+
+/**
+ * blk_sync_queue - cancel any pending callbacks on a queue
+ * @q: the queue
+ *
+ * Description:
+ *     The block layer may perform asynchronous callback activity
+ *     on a queue, such as calling the unplug function after a timeout.
+ *     A block device may call blk_sync_queue to ensure that any
+ *     such activity is cancelled, thus allowing it to release resources
+ *     the the callbacks might use. The caller must already have made sure
+ *     that its ->make_request_fn will not re-add plugging prior to calling
+ *     this function.
+ *
+ */
+void blk_sync_queue(struct request_queue *q)
+{
+	del_timer_sync(&q->unplug_timer);
+	kblockd_flush();
+}
+EXPORT_SYMBOL(blk_sync_queue);
 
 /**
  * blk_run_queue - run a single device queue
@@ -1373,7 +1393,6 @@ void blk_run_queue(struct request_queue *q)
 	q->request_fn(q);
 	spin_unlock_irqrestore(q->queue_lock, flags);
 }
-
 EXPORT_SYMBOL(blk_run_queue);
 
 /**
@@ -1401,8 +1420,7 @@ void blk_cleanup_queue(request_queue_t * q)
 	if (q->elevator)
 		elevator_exit(q->elevator);
 
-	del_timer_sync(&q->unplug_timer);
-	kblockd_flush();
+	blk_sync_queue(q);
 
 	if (rl->rq_pool)
 		mempool_destroy(rl->rq_pool);
@@ -1633,7 +1651,7 @@ static struct request *get_request(request_queue_t *q, int rw, int gfp_mask)
 	struct io_context *ioc = get_io_context(gfp_mask);
 
 	if (unlikely(test_bit(QUEUE_FLAG_DRAIN, &q->queue_flags)))
-		return NULL;
+		goto out;
 
 	spin_lock_irq(q->queue_lock);
 	if (rl->count[rw]+1 >= q->nr_requests) {

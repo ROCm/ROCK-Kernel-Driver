@@ -32,7 +32,13 @@
 #include <asm/io.h>
 #include <asm/irq.h>
 
+#include <asm/arch/regs-serial.h>
+
 #include "devs.h"
+
+/* Serial port registrations */
+
+struct platform_device *s3c24xx_uart_devs[3];
 
 /* USB Host Controller */
 

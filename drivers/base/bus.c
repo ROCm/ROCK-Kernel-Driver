@@ -247,7 +247,7 @@ int bus_for_each_drv(struct bus_type * bus, struct device_driver * start,
  *	device_bind_driver - bind a driver to one device.
  *	@dev:	device.
  *
- *	Allow manual attachment of a driver to a deivce.
+ *	Allow manual attachment of a driver to a device.
  *	Caller must have already set @dev->driver.
  *
  *	Note that this does not modify the bus reference count

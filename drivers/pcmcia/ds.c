@@ -134,8 +134,6 @@ static dev_info_t dev_info = "Driver Services";
 
 static int major_dev = -1;
 
-static struct proc_dir_entry *proc_pccard;
-
 /*====================================================================*/
 
 /* code which was in cs.c before */

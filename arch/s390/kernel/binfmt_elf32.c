@@ -56,6 +56,9 @@
 
 #define ELF_CORE_COPY_REGS(pr_reg, regs) dump_regs32(regs, &pr_reg);
 
+#define ELF_CORE_COPY_TASK_REGS(tsk, regs) dump_task_regs32(tsk, regs)
+
+#define ELF_CORE_COPY_FPREGS(tsk, fpregs) dump_task_fpu(tsk, fpregs)
 
 /* This yields a mask that user programs can use to figure out what
    instruction set this CPU supports. */
@@ -99,10 +102,34 @@ static inline int dump_regs32(struct pt_regs *ptregs, elf_gregset_t *regs)
 	int i;
 
 	memcpy(&regs->psw.mask, &ptregs->psw.mask, 4);
-	memcpy(&regs->psw.addr, &ptregs->psw.addr, 4);
+	memcpy(&regs->psw.addr, (char *)&ptregs->psw.addr + 4, 4);
 	for (i = 0; i < NUM_GPRS; i++)
 		regs->gprs[i] = ptregs->gprs[i];
+	save_access_regs(regs->acrs);
 	regs->orig_gpr2 = ptregs->orig_gpr2;
+	return 1;
+}
+
+static inline int dump_task_regs32(struct task_struct *tsk, elf_gregset_t *regs)
+{
+	struct pt_regs *ptregs = __KSTK_PTREGS(tsk);
+	int i;
+
+	memcpy(&regs->psw.mask, &ptregs->psw.mask, 4);
+	memcpy(&regs->psw.addr, (char *)&ptregs->psw.addr + 4, 4);
+	for (i = 0; i < NUM_GPRS; i++)
+		regs->gprs[i] = ptregs->gprs[i];
+	memcpy(regs->acrs, tsk->thread.acrs, sizeof(regs->acrs));
+	regs->orig_gpr2 = ptregs->orig_gpr2;
+	return 1;
+}
+
+static inline int dump_task_fpu(struct task_struct *tsk, elf_fpregset_t *fpregs)
+{
+	if (tsk == current)
+		save_fp_regs((s390_fp_regs *) fpregs);
+	else
+		memcpy(fpregs, &tsk->thread.fp_regs, sizeof(elf_fpregset_t));
 	return 1;
 }
 

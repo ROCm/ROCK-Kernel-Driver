@@ -14,6 +14,8 @@
  *	12-Oct-2004 BJD	 Moved clock info out to clock.c
  *	01-Nov-2004 BJD  Fixed clock build code
  *	09-Nov-2004 BJD  Added sysdev for power management
+ *	04-Nov-2004 BJD  New serial registration
+ *	15-Nov-2004 BJD  Rename the i2c device for the s3c2440
 */
 
 #include <linux/kernel.h>
@@ -128,6 +130,25 @@ static struct platform_device *uart_devices[] __initdata = {
 	&s3c_uart1,
 	&s3c_uart2
 };
+
+/* uart initialisation */
+
+static int __initdata s3c2440_uart_count;
+
+void __init s3c2440_init_uarts(struct s3c2410_uartcfg *cfg, int no)
+{
+	struct platform_device *platdev;
+	int uart;
+
+	for (uart = 0; uart < no; uart++, cfg++) {
+		platdev = uart_devices[cfg->hwport];
+
+		s3c24xx_uart_devs[uart] = platdev;
+		platdev->dev.platform_data = cfg;
+	}
+
+	s3c2440_uart_count = uart;
+}
 
 /* s3c2440 specific clock sources */
 
@@ -244,6 +265,10 @@ void __init s3c2440_map_io(struct map_desc *mach_desc, int size)
 
 	clk_disable(&s3c2440_clk_ac97);
 	clk_disable(&s3c2440_clk_cam);
+
+	/* rename any peripherals used differing from the s3c2410 */
+
+	s3c_device_i2c.name = "s3c2440-i2c";
 }
 
 int __init s3c2440_init(void)
@@ -259,9 +284,8 @@ int __init s3c2440_init(void)
 	if (ret != 0)
 		printk(KERN_ERR "failed to register sysdev for s3c2440\n");
 
-	if (ret != 0)
-		ret = platform_add_devices(uart_devices,
-					   ARRAY_SIZE(uart_devices));
+	if (ret == 0)
+		ret = platform_add_devices(s3c24xx_uart_devs, s3c2440_uart_count);
 
 	return ret;
 }

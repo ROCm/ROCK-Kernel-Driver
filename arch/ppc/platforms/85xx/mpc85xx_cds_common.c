@@ -172,8 +172,7 @@ mpc85xx_cds_show_cpuinfo(struct seq_file *m)
 
         seq_printf(m, "Vendor\t\t: Freescale Semiconductor\n");
 	seq_printf(m, "Machine\t\t: CDS (%x)\n", cadmus[CM_VER]);
-        seq_printf(m, "bus freq\t: %u.%.6u MHz\n", freq / 1000000,
-                   freq % 1000000);
+	seq_printf(m, "clock\t\t: %dMHz\n", freq / 1000000);
         seq_printf(m, "PVR\t\t: 0x%x\n", pvid);
         seq_printf(m, "SVR\t\t: 0x%x\n", svid);
 

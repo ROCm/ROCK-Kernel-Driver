@@ -820,7 +820,7 @@ config PROC_FS
 
 config PROC_KCORE
 	bool "/proc/kcore support" if !ARM
-	depends on PROC_FS
+	depends on PROC_FS && MMU
 
 config SYSFS
 	bool "sysfs file system support" if EMBEDDED

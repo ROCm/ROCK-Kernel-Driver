@@ -4567,7 +4567,7 @@ advansys_detect(struct scsi_host_template *tpnt)
             boardp->id = asc_board_count - 1;
 
             /* Initialize spinlock. */
-            boardp->lock = SPIN_LOCK_UNLOCKED;
+            spin_lock_init(&boardp->lock);
 
             /*
              * Handle both narrow and wide boards.

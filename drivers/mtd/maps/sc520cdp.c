@@ -16,7 +16,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA
  *
- * $Id: sc520cdp.c,v 1.17 2004/09/16 23:27:14 gleixner Exp $
+ * $Id: sc520cdp.c,v 1.18 2004/11/04 13:24:15 gleixner Exp $
  *
  *
  * The SC520CDP is an evaluation board for the Elan SC520 processor available
@@ -186,12 +186,12 @@ static struct sc520_par_table par_table[NUM_FLASH_BANKS] =
 
 static void sc520cdp_setup_par(void)
 {
-	volatile unsigned long *mmcr;
+	volatile unsigned long __iomem *mmcr;
 	unsigned long mmcr_val;
 	int i, j;
 
 	/* map in SC520's MMCR area */
-	mmcr = (unsigned long *)ioremap_nocache(SC520_MMCR_BASE, SC520_MMCR_EXTENT);
+	mmcr = ioremap_nocache(SC520_MMCR_BASE, SC520_MMCR_EXTENT);
 	if(!mmcr) { /* ioremap_nocache failed: skip the PAR reprogramming */
 		/* force physical address fields to BIOS defaults: */
 		for(i = 0; i < NUM_FLASH_BANKS; i++)
@@ -223,7 +223,7 @@ static void sc520cdp_setup_par(void)
 			sc520cdp_map[i].phys = par_table[i].default_address;
 		}
 	}
-	iounmap((void *)mmcr);
+	iounmap(mmcr);
 }
 #endif
 
@@ -241,7 +241,7 @@ static int __init init_sc520cdp(void)
 		printk(KERN_NOTICE "SC520 CDP flash device: 0x%lx at 0x%lx\n",
 		       sc520cdp_map[i].size, sc520cdp_map[i].phys);
 
-		sc520cdp_map[i].virt = (void __iomem *)ioremap_nocache(sc520cdp_map[i].phys, sc520cdp_map[i].size);
+		sc520cdp_map[i].virt = ioremap_nocache(sc520cdp_map[i].phys, sc520cdp_map[i].size);
 
 		if (!sc520cdp_map[i].virt) {
 			printk("Failed to ioremap_nocache\n");
@@ -261,7 +261,7 @@ static int __init init_sc520cdp(void)
 			++devices_found;
 		}
 		else {
-			iounmap((void *)sc520cdp_map[i].virt);
+			iounmap(sc520cdp_map[i].virt);
 		}
 	}
 	if(devices_found >= 2) {
@@ -290,8 +290,8 @@ static void __exit cleanup_sc520cdp(void)
 		if (mymtd[i])
 			map_destroy(mymtd[i]);
 		if (sc520cdp_map[i].virt) {
-			iounmap((void *)sc520cdp_map[i].virt);
-			sc520cdp_map[i].virt = 0;
+			iounmap(sc520cdp_map[i].virt);
+			sc520cdp_map[i].virt = NULL;
 		}
 	}
 }

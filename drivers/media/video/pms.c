@@ -68,6 +68,7 @@ static int standard 		= 0;	/* 0 - auto 1 - ntsc 2 - pal 3 - secam */
 static int io_port		=	0x250;
 static int data_port		=	0x251;
 static int mem_base		=	0xC8000;
+static void __iomem *mem;
 static int video_nr             =       -1;
 
 	
@@ -629,7 +630,6 @@ static int pms_capture(struct pms_device *dev, char __user *buf, int rgb555, int
 {
 	int y;
 	int dw = 2*dev->width;
-	u32 src = mem_base;
 
 	char tmp[dw+32]; /* using a temp buffer is faster than direct  */
 	int cnt = 0;
@@ -644,14 +644,14 @@ static int pms_capture(struct pms_device *dev, char __user *buf, int rgb555, int
   
 	for (y = 0; y < dev->height; y++ ) 
 	{
-		isa_writeb(0, src);  /* synchronisiert neue Zeile */
+		writeb(0, mem);  /* synchronisiert neue Zeile */
 		
 		/*
 		 *	This is in truth a fifo, be very careful as if you
 		 *	forgot this odd things will occur 8)
 		 */
 		 
-		isa_memcpy_fromio(tmp, src, dw+32); /* discard 16 word   */
+		memcpy_fromio(tmp, mem, dw+32); /* discard 16 word   */
 		cnt -= dev->height;
 		while (cnt <= 0) 
 		{ 
@@ -865,7 +865,7 @@ static int pms_ioctl(struct inode *inode, struct file *file,
 	return video_usercopy(inode, file, cmd, arg, pms_do_ioctl);
 }
 
-static int pms_read(struct file *file, char __user *buf,
+static ssize_t pms_read(struct file *file, char __user *buf,
 		    size_t count, loff_t *ppos)
 {
 	struct video_device *v = video_devdata(file);
@@ -918,16 +918,22 @@ static int init_mediavision(void)
 		0x34,0x0A,0xF4,0xCE,
 		0xE4
 	};
+
+	mem = ioremap(mem_base, 0x800);
+	if (!mem)
+		return -ENOMEM;
 	
 	if (!request_region(0x9A01, 1, "Mediavision PMS config"))
 	{
 		printk(KERN_WARNING "mediavision: unable to detect: 0x9A01 in use.\n");
+		iounmap(mem);
 		return -EBUSY;
 	}
 	if (!request_region(io_port, 3, "Mediavision PMS"))
 	{
 		printk(KERN_WARNING "mediavision: I/O port %d in use.\n", io_port);
 		release_region(0x9A01, 1);
+		iounmap(mem);
 		return -EBUSY;
 	}
 	outb(0xB8, 0x9A01);		/* Unlock */
@@ -950,6 +956,7 @@ static int init_mediavision(void)
 	if(idec == 0) {
 		release_region(io_port, 3);
 		release_region(0x9A01, 1);
+		iounmap(mem);
 		return -ENODEV;
 	}
 
@@ -1045,6 +1052,7 @@ static void __exit cleanup_pms_module(void)
 {
 	shutdown_mediavision();
 	video_unregister_device((struct video_device *)&pms_device);
+	iounmap(mem);
 }
 
 module_init(init_pms_cards);

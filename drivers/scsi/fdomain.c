@@ -384,6 +384,7 @@ enum out_port_type {
 /* .bss will zero all the static variables below */
 static int               port_base;
 static unsigned long     bios_base;
+static void __iomem *    bios_mem;
 static int               bios_major;
 static int               bios_minor;
 static int               PCI_bus;
@@ -458,7 +459,7 @@ static unsigned short ints[] = { 3, 5, 10, 11, 12, 14, 15, 0 };
 
 */
 
-struct signature {
+static struct signature {
    const char *signature;
    int  sig_offset;
    int  sig_length;
@@ -676,12 +677,15 @@ static int fdomain_isa_detect( int *irq, int *iobase )
    printk( "scsi: <fdomain> fdomain_isa_detect:" );
 #endif
 
-   for (i = 0; !bios_base && i < ADDRESS_COUNT; i++) {
+   for (i = 0; i < ADDRESS_COUNT; i++) {
+      void __iomem *p = ioremap(addresses[i], 0x2000);
+      if (!p)
+	continue;
 #if DEBUG_DETECT
       printk( " %lx(%lx),", addresses[i], bios_base );
 #endif
-      for (j = 0; !bios_base && j < SIGNATURE_COUNT; j++) {
-	 if (isa_check_signature(addresses[i] + signatures[j].sig_offset,
+      for (j = 0; j < SIGNATURE_COUNT; j++) {
+	 if (check_signature(p + signatures[j].sig_offset,
 			     signatures[j].signature,
 			     signatures[j].sig_length )) {
 	    bios_major = signatures[j].major_bios_version;
@@ -689,10 +693,14 @@ static int fdomain_isa_detect( int *irq, int *iobase )
 	    PCI_bus    = (signatures[j].flag == 1);
 	    Quantum    = (signatures[j].flag > 1) ? signatures[j].flag : 0;
 	    bios_base  = addresses[i];
+	    bios_mem   = p;
+	    goto found;
 	 }
       }
+      iounmap(p);
    }
-   
+ 
+found:
    if (bios_major == 2) {
       /* The TMC-1660/TMC-1680 has a RAM area just after the BIOS ROM.
 	 Assuming the ROM is enabled (otherwise we wouldn't have been
@@ -705,13 +713,13 @@ static int fdomain_isa_detect( int *irq, int *iobase )
       switch (Quantum) {
       case 2:			/* ISA_200S */
       case 3:			/* ISA_250MG */
-	 base = isa_readb(bios_base + 0x1fa2) + (isa_readb(bios_base + 0x1fa3) << 8);
+	 base = readb(bios_mem + 0x1fa2) + (readb(bios_mem + 0x1fa3) << 8);
 	 break;
       case 4:			/* ISA_200S (another one) */
-	 base = isa_readb(bios_base + 0x1fa3) + (isa_readb(bios_base + 0x1fa4) << 8);
+	 base = readb(bios_mem + 0x1fa3) + (readb(bios_mem + 0x1fa4) << 8);
 	 break;
       default:
-	 base = isa_readb(bios_base + 0x1fcc) + (isa_readb(bios_base + 0x1fcd) << 8);
+	 base = readb(bios_mem + 0x1fcc) + (readb(bios_mem + 0x1fcd) << 8);
 	 break;
       }
    
@@ -1611,26 +1619,26 @@ static int fdomain_16x0_biosparam(struct scsi_device *sdev,
       case 2:			/* ISA_200S */
 				/* The value of 25 has never been verified.
 				   It should probably be 15. */
-	 offset = bios_base + 0x1f33 + drive * 25;
+	 offset = 0x1f33 + drive * 25;
 	 break;
       case 3:			/* ISA_250MG */
-	 offset = bios_base + 0x1f36 + drive * 15;
+	 offset = 0x1f36 + drive * 15;
 	 break;
       case 4:			/* ISA_200S (another one) */
-	 offset = bios_base + 0x1f34 + drive * 15;
+	 offset = 0x1f34 + drive * 15;
 	 break;
       default:
-	 offset = bios_base + 0x1f31 + drive * 25;
+	 offset = 0x1f31 + drive * 25;
 	 break;
       }
-      isa_memcpy_fromio( &i, offset, sizeof( struct drive_info ) );
+      memcpy_fromio( &i, bios_mem + offset, sizeof( struct drive_info ) );
       info_array[0] = i.heads;
       info_array[1] = i.sectors;
       info_array[2] = i.cylinders;
    } else if (bios_major == 3
 	      && bios_minor >= 0
 	      && bios_minor < 4) { /* 3.0 and 3.2 BIOS */
-      memcpy_fromio( &i, bios_base + 0x1f71 + drive * 10,
+      memcpy_fromio( &i, bios_mem + 0x1f71 + drive * 10,
 		     sizeof( struct drive_info ) );
       info_array[0] = i.heads + 1;
       info_array[1] = i.sectors;

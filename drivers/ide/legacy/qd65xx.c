@@ -101,7 +101,7 @@ static void qd_write_reg (u8 content, unsigned long reg)
 	spin_unlock_irqrestore(&ide_lock, flags);
 }
 
-u8 __init qd_read_reg (unsigned long reg)
+static u8 __init qd_read_reg (unsigned long reg)
 {
 	unsigned long flags;
 	u8 read;

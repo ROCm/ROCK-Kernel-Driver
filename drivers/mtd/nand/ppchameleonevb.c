@@ -6,7 +6,7 @@
  *  Derived from drivers/mtd/nand/edb7312.c
  *
  *
- * $Id: ppchameleonevb.c,v 1.4 2004/10/05 13:50:20 gleixner Exp $
+ * $Id: ppchameleonevb.c,v 1.6 2004/11/05 16:07:16 kalev Exp $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -64,13 +64,14 @@ static struct mtd_info *ppchameleonevb_mtd = NULL;
 /*
  * Module stuff
  */
-static int ppchameleon_fio_pbase 	= CFG_NAND0_PADDR;
-static int ppchameleonevb_fio_pbase = CFG_NAND1_PADDR;
+static unsigned long ppchameleon_fio_pbase 	= CFG_NAND0_PADDR;
+static unsigned long ppchameleonevb_fio_pbase = CFG_NAND1_PADDR;
 
 #ifdef MODULE
-MODULE_PARM(ppchameleon_fio_pbase, "i");
+module_param(ppchameleon_fio_pbase, ulong, 0);
+module_param(ppchameleonevb_fio_pbase, ulong, 0);
+#else
 __setup("ppchameleon_fio_pbase=",ppchameleon_fio_pbase);
-MODULE_PARM(ppchameleonevb_fio_pbase, "i");
 __setup("ppchameleonevb_fio_pbase=",ppchameleonevb_fio_pbase);
 #endif
 
@@ -206,7 +207,7 @@ static int __init ppchameleonevb_init (void)
 	}
 
 	/* map physical address */
-	ppchameleon_fio_base = (void __iomem *) ioremap(ppchameleon_fio_pbase, SZ_4M);
+	ppchameleon_fio_base = ioremap(ppchameleon_fio_pbase, SZ_4M);
 	if(!ppchameleon_fio_base) {
 		printk("ioremap PPChameleon NAND flash failed\n");
 		kfree(ppchameleon_mtd);
@@ -305,7 +306,7 @@ nand_evb_init:
 	}
 
 	/* map physical address */
-	ppchameleonevb_fio_base = (void __iomem *)ioremap(ppchameleonevb_fio_pbase, SZ_4M);
+	ppchameleonevb_fio_base = ioremap(ppchameleonevb_fio_pbase, SZ_4M);
 	if(!ppchameleonevb_fio_base) {
 		printk("ioremap PPChameleonEVB NAND flash failed\n");
 		kfree(ppchameleonevb_mtd);

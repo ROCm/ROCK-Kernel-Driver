@@ -479,6 +479,11 @@ error:
 /*
  * Root Hub interrupt transfers are synthesized with a timer.
  * Completions are called in_interrupt() but not in_irq().
+ *
+ * Note: some root hubs (including common UHCI based designs) can't
+ * correctly issue port change IRQs.  They're the ones that _need_ a
+ * timer; most other root hubs don't.  Some systems could save a
+ * lot of battery power by eliminating these root hub timer IRQs.
  */
 
 static void rh_report_status (unsigned long ptr);
@@ -488,10 +493,7 @@ static int rh_status_urb (struct usb_hcd *hcd, struct urb *urb)
 	int	len = 1 + (urb->dev->maxchild / 8);
 
 	/* rh_timer protected by hcd_data_lock */
-	if (hcd->rh_timer.data
-			|| urb->status != -EINPROGRESS
-			|| urb->transfer_buffer_length < len
-			|| !HCD_IS_RUNNING (hcd->state)) {
+	if (hcd->rh_timer.data || urb->transfer_buffer_length < len) {
 		dev_dbg (hcd->self.controller,
 				"not queuing rh status urb, stat %d\n",
 				urb->status);
@@ -530,19 +532,19 @@ static void rh_report_status (unsigned long ptr)
 		return;
 	}
 
-	if (!HCD_IS_SUSPENDED (hcd->state))
-		length = hcd->driver->hub_status_data (
-					hcd, urb->transfer_buffer);
-
 	/* complete the status urb, or retrigger the timer */
 	spin_lock (&hcd_data_lock);
-	if (length > 0) {
-		hcd->rh_timer.data = 0;
-		urb->actual_length = length;
-		urb->status = 0;
-		urb->hcpriv = NULL;
-	} else if (!urb->dev->dev.power.power_state)
-		mod_timer (&hcd->rh_timer, jiffies + HZ/4);
+	if (urb->dev->state == USB_STATE_CONFIGURED) {
+		length = hcd->driver->hub_status_data (
+					hcd, urb->transfer_buffer);
+		if (length > 0) {
+			hcd->rh_timer.data = 0;
+			urb->actual_length = length;
+			urb->status = 0;
+			urb->hcpriv = NULL;
+		} else
+			mod_timer (&hcd->rh_timer, jiffies + HZ/4);
+	}
 	spin_unlock (&hcd_data_lock);
 	spin_unlock (&urb->lock);
 
@@ -1103,13 +1105,17 @@ static int hcd_submit_urb (struct urb *urb, int mem_flags)
 	spin_lock_irqsave (&hcd_data_lock, flags);
 	if (unlikely (urb->reject))
 		status = -EPERM;
-	else if (HCD_IS_RUNNING (hcd->state) &&
-			hcd->state != USB_STATE_QUIESCING) {
+	else switch (hcd->state) {
+	case USB_STATE_RUNNING:
+	case USB_STATE_RESUMING:
 		usb_get_dev (urb->dev);
 		list_add_tail (&urb->urb_list, &dev->urb_list);
 		status = 0;
-	} else
+		break;
+	default:
 		status = -ESHUTDOWN;
+		break;
+	}
 	spin_unlock_irqrestore (&hcd_data_lock, flags);
 	if (status) {
 		INIT_LIST_HEAD (&urb->urb_list);

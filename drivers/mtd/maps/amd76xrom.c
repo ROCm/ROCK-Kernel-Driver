@@ -2,7 +2,7 @@
  * amd76xrom.c
  *
  * Normal mappings of chips in physical memory
- * $Id: amd76xrom.c,v 1.17 2004/09/18 01:59:56 eric Exp $
+ * $Id: amd76xrom.c,v 1.18 2004/11/16 18:29:02 dwmw2 Exp $
  */
 
 #include <linux/module.h>
@@ -89,7 +89,7 @@ static int __devinit amd76xrom_init_one (struct pci_dev *pdev,
 	static char *rom_probe_types[] = { "cfi_probe", "jedec_probe", NULL };
 	u8 byte;
 	struct amd76xrom_window *window = &amd76xrom_window;
-	struct amd76xrom_map_info *map = 0;
+	struct amd76xrom_map_info *map = NULL;
 	unsigned long map_top;
 
 	/* Remember the pci dev I find the window in */
@@ -244,7 +244,7 @@ static int __devinit amd76xrom_init_one (struct pci_dev *pdev,
 		map->mtd->owner = THIS_MODULE;
 		if (add_mtd_device(map->mtd)) {
 			map_destroy(map->mtd);
-			map->mtd = 0;
+			map->mtd = NULL;
 			goto out;
 		}
 
@@ -254,7 +254,7 @@ static int __devinit amd76xrom_init_one (struct pci_dev *pdev,
 
 		/* File away the map structure */
 		list_add(&map->list, &window->maps);
-		map = 0;
+		map = NULL;
 	}
 
  out:
@@ -298,7 +298,7 @@ static struct pci_driver amd76xrom_driver = {
 };
 #endif
 
-int __init init_amd76xrom(void)
+static int __init init_amd76xrom(void)
 {
 	struct pci_dev *pdev;
 	struct pci_device_id *id;

@@ -179,7 +179,7 @@ static void sock_disable_timestamp(struct sock *sk)
 {	
 	if (sock_flag(sk, SOCK_TIMESTAMP)) { 
 		sock_reset_flag(sk, SOCK_TIMESTAMP);
-		atomic_dec(&netstamp_needed);
+		net_disable_timestamp();
 	}
 }
 
@@ -1226,9 +1226,6 @@ void fastcall release_sock(struct sock *sk)
 }
 EXPORT_SYMBOL(release_sock);
 
-/* When > 0 there are consumers of rx skb time stamps */
-atomic_t netstamp_needed = ATOMIC_INIT(0); 
-
 int sock_get_timestamp(struct sock *sk, struct timeval __user *userstamp)
 { 
 	if (!sock_flag(sk, SOCK_TIMESTAMP))
@@ -1246,7 +1243,7 @@ void sock_enable_timestamp(struct sock *sk)
 {	
 	if (!sock_flag(sk, SOCK_TIMESTAMP)) { 
 		sock_set_flag(sk, SOCK_TIMESTAMP);
-		atomic_inc(&netstamp_needed);
+		net_enable_timestamp();
 	}
 }
 EXPORT_SYMBOL(sock_enable_timestamp); 

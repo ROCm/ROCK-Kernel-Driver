@@ -39,11 +39,7 @@
  * Define your architecture specific bus configuration parameters here.
  */
 
-#if	defined(CONFIG_SA1100_GRAPHICSCLIENT) || \
-	defined(CONFIG_SA1100_PFS168) || \
-	defined(CONFIG_SA1100_FLEXANET) || \
-	defined(CONFIG_SA1100_GRAPHICSMASTER) || \
-	defined(CONFIG_ARCH_LUBBOCK)
+#if	defined(CONFIG_ARCH_LUBBOCK)
 
 /* We can only do 16-bit reads and writes in the static memory space. */
 #define SMC_CAN_USE_8BIT	0
@@ -95,6 +91,25 @@
 		}							\
 	} while (0)
 #define set_irq_type(irq, type)
+
+#elif defined(CONFIG_SA1100_PLEB)
+/* We can only do 16-bit reads and writes in the static memory space. */
+#define SMC_CAN_USE_8BIT	1
+#define SMC_CAN_USE_16BIT	1
+#define SMC_CAN_USE_32BIT	0
+#define SMC_IO_SHIFT		0
+#define SMC_NOWAIT		1
+
+#define SMC_inb(a, r)		inb((a) + (r))
+#define SMC_insb(a, r, p, l)	insb((a) + (r), p, (l))
+#define SMC_inw(a, r)		inw((a) + (r))
+#define SMC_insw(a, r, p, l)	insw((a) + (r), p, l)
+#define SMC_outb(v, a, r)	outb(v, (a) + (r))
+#define SMC_outsb(a, r, p, l)	outsb((a) + (r), p, (l))
+#define SMC_outw(v, a, r)	outw(v, (a) + (r))
+#define SMC_outsw(a, r, p, l)	outsw((a) + (r), p, l)
+
+#define set_irq_type(irq, type) do {} while (0)
 
 #elif defined(CONFIG_SA1100_ASSABET)
 

@@ -310,11 +310,11 @@ tiglusb_ioctl (struct inode *inode, struct file *filp,
 			ret = -EIO;
 		break;
 	case IOCTL_TIUSB_GET_MAXPS:
-                if (copy_to_user((int *) arg, &s->max_ps, sizeof(int)))
+                if (copy_to_user((int __user *) arg, &s->max_ps, sizeof(int)))
                         return -EFAULT;
                 break;
         case IOCTL_TIUSB_GET_DEVID:
-                if (copy_to_user((int *) arg, &s->dev->descriptor.idProduct,
+                if (copy_to_user((int __user *) arg, &s->dev->descriptor.idProduct,
                                  sizeof(int)))
                         return -EFAULT;
                 break;

@@ -479,7 +479,7 @@ static void __devinit quirk_via_acpi(struct pci_dev *d)
 DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_82C586_3,	quirk_via_acpi );
 DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_82C686_4,	quirk_via_acpi );
 
-static void __devinit quirk_via_irqpic(struct pci_dev *dev)
+static void quirk_via_irqpic(struct pci_dev *dev)
 {
 	u8 irq, new_irq = dev->irq & 0xf;
 
@@ -861,7 +861,7 @@ static void __init quirk_sis_96x_smbus(struct pci_dev *dev)
 #define EHCI_USBLEGCTLSTS	4		/* legacy control/status */
 #define EHCI_USBLEGCTLSTS_SOOE	(1 << 13)	/* SMI on ownership change */
 
-int usb_early_handoff __initdata = 0;
+int usb_early_handoff __devinitdata = 0;
 static int __init usb_handoff_early(char *str)
 {
 	usb_early_handoff = 1;
@@ -1136,7 +1136,7 @@ DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_EESSC,	quirk_a
 #endif
 
 #ifdef CONFIG_SCSI_SATA
-static void __init quirk_intel_ide_combined(struct pci_dev *pdev)
+static void __devinit quirk_intel_ide_combined(struct pci_dev *pdev)
 {
 	u8 prog, comb, tmp;
 	int ich = 0;
@@ -1210,14 +1210,15 @@ DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_INTEL,    PCI_ANY_ID,	  quirk_intel_ide_co
 #endif /* CONFIG_SCSI_SATA */
 
 
-int pciehp_msi_quirk;
+int pcie_mch_quirk;
 
-static void __devinit quirk_pciehp_msi(struct pci_dev *pdev)
+static void __devinit quirk_pcie_mch(struct pci_dev *pdev)
 {
-	pciehp_msi_quirk = 1;
+	pcie_mch_quirk = 1;
 }
-DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_INTEL,    PCI_DEVICE_ID_INTEL_SMCH,	quirk_pciehp_msi );
-
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_E7520_MCH,	quirk_pcie_mch );
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_E7320_MCH,	quirk_pcie_mch );
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_E7525_MCH,	quirk_pcie_mch );
 
 static void pci_do_fixups(struct pci_dev *dev, struct pci_fixup *f, struct pci_fixup *end)
 {
@@ -1266,4 +1267,7 @@ void pci_fixup_device(enum pci_fixup_pass pass, struct pci_dev *dev)
 	pci_do_fixups(dev, start, end);
 }
 
-EXPORT_SYMBOL(pciehp_msi_quirk);
+EXPORT_SYMBOL(pcie_mch_quirk);
+#ifdef CONFIG_HOTPLUG
+EXPORT_SYMBOL(pci_fixup_device);
+#endif

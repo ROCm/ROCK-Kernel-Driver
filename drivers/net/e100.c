@@ -2204,22 +2204,24 @@ static int __devinit e100_probe(struct pci_dev *pdev,
 		goto err_out_disable_pdev;
 	}
 
-	pci_set_master(pdev);
-
-	if((err = pci_set_dma_mask(pdev, 0xFFFFFFFFULL))) {
-		DPRINTK(PROBE, ERR, "No usable DMA configuration, aborting.\n");
-		goto err_out_free_res;
-	}
-
-	SET_MODULE_OWNER(netdev);
-	SET_NETDEV_DEV(netdev, &pdev->dev);
-
 	nic->csr = ioremap(pci_resource_start(pdev, 0), sizeof(struct csr));
 	if(!nic->csr) {
 		DPRINTK(PROBE, ERR, "Cannot map device registers, aborting.\n");
 		err = -ENOMEM;
 		goto err_out_free_res;
 	}
+
+	e100_hw_reset(nic);
+
+	pci_set_master(pdev);
+
+	if((err = pci_set_dma_mask(pdev, 0xFFFFFFFFULL))) {
+		DPRINTK(PROBE, ERR, "No usable DMA configuration, aborting.\n");
+		goto err_out_iounmap;
+	}
+
+	SET_MODULE_OWNER(netdev);
+	SET_NETDEV_DEV(netdev, &pdev->dev);
 
 	if(ent->driver_data)
 		nic->flags |= ich;

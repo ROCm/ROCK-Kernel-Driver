@@ -701,8 +701,10 @@ void *radix_tree_delete(struct radix_tree_root *root, unsigned long index)
 		for (tag = 0; tag < RADIX_TREE_TAGS; tag++) {
 			int idx;
 
-			if (!tags[tag])
-				tag_clear(pathp[0].node, tag, pathp[0].offset);
+			if (tags[tag])
+				continue;
+
+			tag_clear(pathp[0].node, tag, pathp[0].offset);
 
 			for (idx = 0; idx < RADIX_TREE_TAG_LONGS; idx++) {
 				if (pathp[0].node->tags[tag][idx]) {

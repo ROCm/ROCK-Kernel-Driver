@@ -228,12 +228,12 @@ typedef struct _adpt_hba {
 	char name[32];
 	char detail[55];
 
-	ulong base_addr_virt;
-	ulong msg_addr_virt;
+	void __iomem *base_addr_virt;
+	void __iomem *msg_addr_virt;
 	ulong base_addr_phys;
-	ulong  post_port;
-	ulong  reply_port;
-	ulong  irq_mask;
+	void __iomem *post_port;
+	void __iomem *reply_port;
+	void __iomem *irq_mask;
 	u16  post_count;
 	u32  post_fifo_size;
 	u32  reply_fifo_size;
@@ -251,12 +251,12 @@ typedef struct _adpt_hba {
 	struct adpt_channel channel[MAX_CHANNEL];
 	struct proc_dir_entry* proc_entry;	/* /proc dir */
 
-	ulong FwDebugBuffer_P;	// Virtual Address Of FW Debug Buffer
+	void __iomem *FwDebugBuffer_P;	// Virtual Address Of FW Debug Buffer
 	u32   FwDebugBufferSize;	// FW Debug Buffer Size In Bytes
-	ulong FwDebugStrLength_P;	// Virtual Addr Of FW Debug String Len
-	ulong FwDebugFlags_P;	// Virtual Address Of FW Debug Flags 
-	ulong FwDebugBLEDflag_P;	// Virtual Addr Of FW Debug BLED
-	ulong FwDebugBLEDvalue_P;	// Virtual Addr Of FW Debug BLED
+	void __iomem *FwDebugStrLength_P;// Virtual Addr Of FW Debug String Len
+	void __iomem *FwDebugFlags_P;	// Virtual Address Of FW Debug Flags 
+	void __iomem *FwDebugBLEDflag_P;// Virtual Addr Of FW Debug BLED
+	void __iomem *FwDebugBLEDvalue_P;// Virtual Addr Of FW Debug BLED
 	u32 FwDebugFlags;
 } adpt_hba;
 

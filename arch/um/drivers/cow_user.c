@@ -67,7 +67,7 @@ struct cow_header_v2 {
 struct cow_header_v3 {
 	__u32 magic;
 	__u32 version;
-	time_t mtime;
+	__u32 mtime;
 	__u64 size;
 	__u32 sectorsize;
 	__u32 alignment;

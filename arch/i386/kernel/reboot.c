@@ -137,7 +137,7 @@ static struct dmi_system_id __initdata reboot_dmi_table[] = {
 	{ }
 };
 
-static int reboot_init(void)
+static int __init reboot_init(void)
 {
 	dmi_check_system(reboot_dmi_table);
 	return 0;

@@ -140,7 +140,7 @@ static void child_common(struct common_raw *common, sighandler_t handler,
 	}
 	if(sigaltstack(&ss, NULL) < 0){
 		printf("sigaltstack failed - errno = %d\n", errno);
-		kill(getpid(), SIGKILL);
+		kill(os_getpid(), SIGKILL);
 	}
 
 	if(restorer){
@@ -162,7 +162,7 @@ static void child_common(struct common_raw *common, sighandler_t handler,
 	
 	if(err < 0){
 		printf("sigaction failed - errno = %d\n", errno);
-		kill(getpid(), SIGKILL);
+		kill(os_getpid(), SIGKILL);
 	}
 
 	os_stop_process(os_getpid());
@@ -191,7 +191,7 @@ static void sc_handler(int sig, struct sigcontext sc)
 	setup_arch_frame_raw(&raw_sc->common.arch, &sc + 1, raw_sc->common.sr);
 
 	os_stop_process(os_getpid());
-	kill(getpid(), SIGKILL);
+	kill(os_getpid(), SIGKILL);
 }
 
 static int sc_child(void *arg)
@@ -229,7 +229,7 @@ static void si_handler(int sig, siginfo_t *si, struct ucontext *ucontext)
 			     ucontext->uc_mcontext.fpregs, raw_si->common.sr);
 	
 	os_stop_process(os_getpid());
-	kill(getpid(), SIGKILL);
+	kill(os_getpid(), SIGKILL);
 }
 
 static int si_child(void *arg)

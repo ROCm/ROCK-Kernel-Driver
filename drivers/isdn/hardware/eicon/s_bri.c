@@ -41,11 +41,11 @@
   Investigate card state, recovery trace buffer
   -------------------------------------------------------------------------- */
 static void bri_cpu_trapped (PISDN_ADAPTER IoAdapter) {
- byte  *addrHi, *addrLo, *ioaddr ;
+ byte  __iomem *addrHi, *addrLo, *ioaddr ;
  word *Xlog ;
  dword   regs[4], i, size ;
  Xdesc   xlogDesc ;
- byte *Port;
+ byte __iomem *Port;
 /*
  * first read pointers and trap frame
  */
@@ -61,15 +61,15 @@ static void bri_cpu_trapped (PISDN_ADAPTER IoAdapter) {
 /*
  * check for trapped MIPS 3xxx CPU, dump only exception frame
  */
- if ( READ_DWORD(&Xlog[0x80 / sizeof(Xlog[0])]) == 0x99999999 )
+ if ( GET_DWORD(&Xlog[0x80 / sizeof(Xlog[0])]) == 0x99999999 )
  {
   dump_trap_frame (IoAdapter, &((byte *)Xlog)[0x90]) ;
   IoAdapter->trapped = 1 ;
  }
- regs[0] = READ_DWORD(&((byte *)Xlog)[0x70]);
- regs[1] = READ_DWORD(&((byte *)Xlog)[0x74]);
- regs[2] = READ_DWORD(&((byte *)Xlog)[0x78]);
- regs[3] = READ_DWORD(&((byte *)Xlog)[0x7c]);
+ regs[0] = GET_DWORD(&((byte *)Xlog)[0x70]);
+ regs[1] = GET_DWORD(&((byte *)Xlog)[0x74]);
+ regs[2] = GET_DWORD(&((byte *)Xlog)[0x78]);
+ regs[3] = GET_DWORD(&((byte *)Xlog)[0x7c]);
  outpp (addrHi, (regs[1] >> 16) & 0x7F) ;
  outppw (addrLo, regs[1] & 0xFFFF) ;
  xlogDesc.cnt = inppw(ioaddr) ;
@@ -102,7 +102,7 @@ static void bri_cpu_trapped (PISDN_ADAPTER IoAdapter) {
    Reset hardware
   --------------------------------------------------------------------- */
 static void reset_bri_hardware (PISDN_ADAPTER IoAdapter) {
- byte *p = DIVA_OS_MEM_ATTACH_CTLREG(IoAdapter);
+ byte __iomem *p = DIVA_OS_MEM_ATTACH_CTLREG(IoAdapter);
  outpp (p, 0x00) ;
  DIVA_OS_MEM_DETACH_CTLREG(IoAdapter, p);
 }
@@ -110,7 +110,7 @@ static void reset_bri_hardware (PISDN_ADAPTER IoAdapter) {
    Halt system
   --------------------------------------------------------------------- */
 static void stop_bri_hardware (PISDN_ADAPTER IoAdapter) {
- byte *p = DIVA_OS_MEM_ATTACH_RESET(IoAdapter);
+ byte __iomem *p = DIVA_OS_MEM_ATTACH_RESET(IoAdapter);
  if (p) {
   outpp (p, 0x00) ; /* disable interrupts ! */
  }
@@ -471,7 +471,7 @@ static int load_bri_hardware (PISDN_ADAPTER IoAdapter) {
 #endif /* } */
 /******************************************************************************/
 static int bri_ISR (struct _ISDN_ADAPTER* IoAdapter) {
- byte *p;
+ byte __iomem *p;
 
  p = DIVA_OS_MEM_ATTACH_CTLREG(IoAdapter);
  if ( !(inpp (p) & 0x01) ) {
@@ -493,7 +493,7 @@ static int bri_ISR (struct _ISDN_ADAPTER* IoAdapter) {
   Disable IRQ in the card hardware
   -------------------------------------------------------------------------- */
 static void disable_bri_interrupt (PISDN_ADAPTER IoAdapter) {
- byte *p;
+ byte __iomem *p;
  p = DIVA_OS_MEM_ATTACH_RESET(IoAdapter);
  if ( p )
  {

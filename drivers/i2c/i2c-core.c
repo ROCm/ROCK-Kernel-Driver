@@ -760,7 +760,7 @@ int i2c_probe(struct i2c_adapter *adapter,
 			if (addr == address_data->normal_i2c[i]) {
 				found = 1;
 				dev_dbg(&adapter->dev, "found normal i2c entry for adapter %d, "
-					"addr %02x", adap_id,addr);
+					"addr %02x\n", adap_id, addr);
 			}
 		}
 
@@ -1021,23 +1021,19 @@ s32 i2c_smbus_write_word_data(struct i2c_client *client, u8 command, u16 value)
 	                      I2C_SMBUS_WORD_DATA,&data);
 }
 
-/* Returns the number of read bytes */
-s32 i2c_smbus_block_process_call(struct i2c_client *client, u8 command, u8 length, u8 *values)
+s32 i2c_smbus_write_block_data(struct i2c_client *client, u8 command,
+			       u8 length, u8 *values)
 {
 	union i2c_smbus_data data;
 	int i;
-	if (length > I2C_SMBUS_BLOCK_MAX - 1)
-		return -1;
-	data.block[0] = length;
+	if (length > I2C_SMBUS_BLOCK_MAX)
+		length = I2C_SMBUS_BLOCK_MAX;
 	for (i = 1; i <= length; i++)
 		data.block[i] = values[i-1];
-	if(i2c_smbus_xfer(client->adapter,client->addr,client->flags,
-	                  I2C_SMBUS_WRITE, command,
-	                  I2C_SMBUS_BLOCK_PROC_CALL, &data))
-		return -1;
-	for (i = 1; i <= data.block[0]; i++)
-		values[i-1] = data.block[i];
-	return data.block[0];
+	data.block[0] = length;
+	return i2c_smbus_xfer(client->adapter,client->addr,client->flags,
+			      I2C_SMBUS_WRITE,command,
+			      I2C_SMBUS_BLOCK_DATA,&data);
 }
 
 /* Returns the number of read bytes */
@@ -1279,6 +1275,7 @@ EXPORT_SYMBOL(i2c_smbus_read_byte_data);
 EXPORT_SYMBOL(i2c_smbus_write_byte_data);
 EXPORT_SYMBOL(i2c_smbus_read_word_data);
 EXPORT_SYMBOL(i2c_smbus_write_word_data);
+EXPORT_SYMBOL(i2c_smbus_write_block_data);
 EXPORT_SYMBOL(i2c_smbus_read_i2c_block_data);
 
 EXPORT_SYMBOL(i2c_get_functionality);

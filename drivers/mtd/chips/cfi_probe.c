@@ -39,25 +39,24 @@ static int qry_present(struct map_info *map, __u32 base,
 				struct cfi_private *cfi)
 {
 	int osf = cfi->interleave * cfi->device_type;	// scale factor
-	map_word val;
-	map_word qry;
+	map_word val[3];
+	map_word qry[3];
 
-	qry =  cfi_build_cmd('Q', map, cfi);
-	val = map_read(map, base + osf*0x10);
+	qry[0] = cfi_build_cmd('Q', map, cfi);
+	qry[1] = cfi_build_cmd('R', map, cfi);
+	qry[2] = cfi_build_cmd('Y', map, cfi);
 
-	if (!map_word_equal(map, qry, val))
+	val[0] = map_read(map, base + osf*0x10);
+	val[1] = map_read(map, base + osf*0x11);
+	val[2] = map_read(map, base + osf*0x12);
+
+	if (!map_word_equal(map, qry[0], val[0]))
 		return 0;
 
-	qry =  cfi_build_cmd('R', map, cfi);
-	val = map_read(map, base + osf*0x11);
-
-	if (!map_word_equal(map, qry, val))
+	if (!map_word_equal(map, qry[1], val[1]))
 		return 0;
 
-	qry =  cfi_build_cmd('Y', map, cfi);
-	val = map_read(map, base + osf*0x12);
-
-	if (!map_word_equal(map, qry, val))
+	if (!map_word_equal(map, qry[2], val[2]))
 		return 0;
 
 	return 1; 	// nothing found

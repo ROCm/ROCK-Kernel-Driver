@@ -1,5 +1,5 @@
 /*
- * $Id: physmap.c,v 1.35 2004/09/16 23:27:13 gleixner Exp $
+ * $Id: physmap.c,v 1.36 2004/11/04 13:24:15 gleixner Exp $
  *
  * Normal mappings of chips in physical memory
  *
@@ -51,7 +51,7 @@ static int __init init_physmap(void)
 	const char **type;
 
        	printk(KERN_NOTICE "physmap flash device: %lx at %lx\n", physmap_map.size, physmap_map.phys);
-	physmap_map.virt = (void __iomem *)ioremap(physmap_map.phys, physmap_map.size);
+	physmap_map.virt = ioremap(physmap_map.phys, physmap_map.size);
 
 	if (!physmap_map.virt) {
 		printk("Failed to ioremap\n");
@@ -92,7 +92,7 @@ static int __init init_physmap(void)
 		return 0;
 	}
 
-	iounmap((void *)physmap_map.virt);
+	iounmap(physmap_map.virt);
 	return -ENXIO;
 }
 
@@ -112,8 +112,8 @@ static void __exit cleanup_physmap(void)
 #endif
 	map_destroy(mymtd);
 
-	iounmap((void *)physmap_map.virt);
-	physmap_map.virt = 0;
+	iounmap(physmap_map.virt);
+	physmap_map.virt = NULL;
 }
 
 module_init(init_physmap);

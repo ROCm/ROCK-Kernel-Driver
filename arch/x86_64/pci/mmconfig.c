@@ -63,9 +63,6 @@ static int pci_mmcfg_write(int seg, int bus, int devfn, int reg, int len, u32 va
 		break;
 	}
 
-	/* Dummy read to flush PCI write */
-	readl(addr);
-
 	return 0;
 }
 

@@ -519,7 +519,7 @@ void scsi_exit_devinfo(void)
  * 	Add command line @dev_list entries, then add
  * 	scsi_static_device_list entries to the scsi device info list.
  **/
-int scsi_init_devinfo(void)
+int __init scsi_init_devinfo(void)
 {
 #ifdef CONFIG_SCSI_PROC_FS
 	struct proc_dir_entry *p;

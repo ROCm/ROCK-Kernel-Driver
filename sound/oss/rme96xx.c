@@ -273,7 +273,7 @@ typedef struct _rme96xx_info {
 	/* hardware settings */
 	int magic;
 	struct pci_dev * pcidev; /* pci_dev structure */
-	unsigned long *iobase;	
+	unsigned long __iomem *iobase;	
 	unsigned int irq;
 
 	/* list of rme96xx devices */

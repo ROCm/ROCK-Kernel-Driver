@@ -35,6 +35,15 @@ config MACH_VR1000
 	  This linux port is currently being maintained by Simtec, on behalf
 	  of Thorcom. Any queries, please contact Thorcom first.
 
+config MACH_RX3715
+	bool "HP iPAQ rx3715"
+	select CPU_S3C2440
+	help
+	  Say Y here if you are using the HP iPAQ rx3715.
+
+	  See http://www.handhelds.org/projects/rx3715.html for more
+	  information on this project
+
 endmenu
 
 config CPU_S3C2410
@@ -98,5 +107,17 @@ config S3C2410_PM_CHECK_CHUNKSIZE
 	  corruption over suspend and resume. A smaller value will mean that
 	  the CRC data block will take more memory, but wil identify any
 	  faults with better precision.
+
+config S3C2410_LOWLEVEL_UART_PORT
+	int "S3C2410 UART to use for low-level messages"
+	default 0
+	help
+	  Choice of which UART port to use for the low-level messages,
+	  such as the `Uncompressing...` at start time. The value of
+	  this configuration should be between zero and two. The port
+	  must have been initalised by the boot-loader before use.
+
+	  Note, this does not affect the port used by the debug messages,
+	  which is a seperate configuration.
 
 endif

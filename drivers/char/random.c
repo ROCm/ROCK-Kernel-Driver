@@ -2046,6 +2046,7 @@ static void sysctl_init_random(struct entropy_store *random_state)
  *
  ********************************************************************/
 
+#ifdef CONFIG_INET
 /*
  * TCP initial sequence number picking.  This uses the random number
  * generator to pick an initial secret value.  This value is hashed
@@ -2445,3 +2446,4 @@ __u32 check_tcp_syn_cookie(__u32 cookie, __u32 saddr, __u32 daddr, __u16 sport,
 	return (cookie - tmp[17]) & COOKIEMASK;	/* Leaving the data behind */
 }
 #endif
+#endif /* CONFIG_INET */

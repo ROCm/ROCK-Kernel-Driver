@@ -58,7 +58,7 @@ struct pio_clocks
 	int recovery;
 };
 
-struct pio_clocks cs5520_pio_clocks[]={
+static struct pio_clocks cs5520_pio_clocks[]={
 	{3, 6, 11},
 	{2, 5, 6},
 	{1, 4, 3},

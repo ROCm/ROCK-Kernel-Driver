@@ -1,5 +1,5 @@
 /*
- *  linux/drivers/s390/misc/z90common.h
+ *  linux/drivers/s390/crypto/z90common.h
  *
  *  z90crypt 1.3.2
  *
@@ -24,10 +24,10 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#ifndef _Z90COMMON_
-#define _Z90COMMON_
+#ifndef _Z90COMMON_H_
+#define _Z90COMMON_H_
 
-#define VERSION_Z90COMMON_H "$Revision: 1.15 $"
+#define VERSION_Z90COMMON_H "$Revision: 1.16 $"
 
 
 #define RESPBUFFSIZE 256

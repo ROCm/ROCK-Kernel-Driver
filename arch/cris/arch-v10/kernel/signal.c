@@ -264,7 +264,6 @@ asmlinkage int sys_rt_sigreturn(long r10, long r11, long r12, long r13,
 {
 	struct rt_sigframe __user *frame = (struct rt_sigframe *)rdusp();
 	sigset_t set;
-	stack_t st;
 
         /*
          * Since we stacked the signal on a dword boundary,
@@ -288,11 +287,8 @@ asmlinkage int sys_rt_sigreturn(long r10, long r11, long r12, long r13,
 	if (restore_sigcontext(regs, &frame->uc.uc_mcontext))
 		goto badframe;
 
-	if (__copy_from_user(&st, &frame->uc.uc_stack, sizeof(st)))
+	if (do_sigaltstack(&frame->uc.uc_stack, NULL, rdusp()) == -EFAULT)
 		goto badframe;
-	/* It is more difficult to avoid calling this function than to
-	   call it and ignore errors.  */
-	do_sigaltstack(&st, NULL, rdusp());
 
 	return regs->r10;
 
@@ -388,9 +384,9 @@ static void setup_frame(int sig, struct k_sigaction *ka,
 		/* trampoline - the desired return ip is the retcode itself */
 		return_ip = (unsigned long)&frame->retcode;
 		/* This is movu.w __NR_sigreturn, r9; break 13; */
-		err |= __put_user(0x9c5f,         (short *)(frame->retcode+0));
-		err |= __put_user(__NR_sigreturn, (short *)(frame->retcode+2));
-		err |= __put_user(0xe93d,         (short *)(frame->retcode+4));
+		err |= __put_user(0x9c5f,         (short __user*)(frame->retcode+0));
+		err |= __put_user(__NR_sigreturn, (short __user*)(frame->retcode+2));
+		err |= __put_user(0xe93d,         (short __user*)(frame->retcode+4));
 	}
 
 	if (err)
@@ -448,9 +444,9 @@ static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 		/* trampoline - the desired return ip is the retcode itself */
 		return_ip = (unsigned long)&frame->retcode;
 		/* This is movu.w __NR_rt_sigreturn, r9; break 13; */
-		err |= __put_user(0x9c5f,            (short *)(frame->retcode+0));
-		err |= __put_user(__NR_rt_sigreturn, (short *)(frame->retcode+2));
-		err |= __put_user(0xe93d,            (short *)(frame->retcode+4));
+		err |= __put_user(0x9c5f,            (short __user*)(frame->retcode+0));
+		err |= __put_user(__NR_rt_sigreturn, (short __user*)(frame->retcode+2));
+		err |= __put_user(0xe93d,            (short __user*)(frame->retcode+4));
 	}
 
 	if (err)
@@ -482,10 +478,9 @@ give_sigsegv:
 
 extern inline void
 handle_signal(int canrestart, unsigned long sig,
-	      siginfo_t *info, sigset_t *oldset, struct pt_regs * regs)
+	      siginfo_t *info, struct k_sigaction *ka,
+              sigset_t *oldset, struct pt_regs * regs)
 {
-	struct k_sigaction *ka = &current->sighand->action[sig-1];
-
 	/* Are we from a system call? */
 	if (canrestart) {
 		/* If so, check system call restarting.. */
@@ -547,6 +542,7 @@ int do_signal(int canrestart, sigset_t *oldset, struct pt_regs *regs)
 {
 	siginfo_t info;
 	int signr;
+        struct k_sigaction ka;
 
 	/*
 	 * We want the common case to go fast, which
@@ -560,10 +556,10 @@ int do_signal(int canrestart, sigset_t *oldset, struct pt_regs *regs)
 	if (!oldset)
 		oldset = &current->blocked;
 
-	signr = get_signal_to_deliver(&info, regs, NULL);
+	signr = get_signal_to_deliver(&info, &ka, regs, NULL);
 	if (signr > 0) {
 		/* Whee!  Actually deliver the signal.  */
-		handle_signal(canrestart, signr, &info, oldset, regs);
+		handle_signal(canrestart, signr, &info, &ka, oldset, regs);
 		return 1;
 	}
 

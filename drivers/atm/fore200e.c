@@ -275,7 +275,7 @@ fore200e_poll(struct fore200e* fore200e, volatile u32* addr, u32 val, int msecs)
 
 
 static int
-fore200e_io_poll(struct fore200e* fore200e, volatile u32* addr, u32 val, int msecs)
+fore200e_io_poll(struct fore200e* fore200e, volatile u32 __iomem *addr, u32 val, int msecs)
 {
     unsigned long timeout = jiffies + MSECS(msecs);
     int           ok;
@@ -347,7 +347,7 @@ fore200e_reset(struct fore200e* fore200e, int diag)
 {
     int ok;
 
-    fore200e->cp_monitor = (struct cp_monitor*)(fore200e->virt_base + FORE200E_CP_MONITOR_OFFSET);
+    fore200e->cp_monitor = fore200e->virt_base + FORE200E_CP_MONITOR_OFFSET;
     
     fore200e->bus->write(BSTAT_COLD_START, &fore200e->cp_monitor->bstat);
 
@@ -440,7 +440,7 @@ fore200e_shutdown(struct fore200e* fore200e)
 
 #ifdef CONFIG_ATM_FORE200E_PCA
 
-static u32 fore200e_pca_read(volatile u32* addr)
+static u32 fore200e_pca_read(volatile u32 __iomem *addr)
 {
     /* on big-endian hosts, the board is configured to convert
        the endianess of slave RAM accesses  */
@@ -448,7 +448,7 @@ static u32 fore200e_pca_read(volatile u32* addr)
 }
 
 
-static void fore200e_pca_write(u32 val, volatile u32* addr)
+static void fore200e_pca_write(u32 val, volatile u32 __iomem *addr)
 {
     /* on big-endian hosts, the board is configured to convert
        the endianess of slave RAM accesses  */
@@ -576,9 +576,9 @@ fore200e_pca_map(struct fore200e* fore200e)
     DPRINTK(1, "device %s mapped to 0x%p\n", fore200e->name, fore200e->virt_base);
 
     /* gain access to the PCA specific registers  */
-    fore200e->regs.pca.hcr = (u32*)(fore200e->virt_base + PCA200E_HCR_OFFSET);
-    fore200e->regs.pca.imr = (u32*)(fore200e->virt_base + PCA200E_IMR_OFFSET);
-    fore200e->regs.pca.psr = (u32*)(fore200e->virt_base + PCA200E_PSR_OFFSET);
+    fore200e->regs.pca.hcr = fore200e->virt_base + PCA200E_HCR_OFFSET;
+    fore200e->regs.pca.imr = fore200e->virt_base + PCA200E_IMR_OFFSET;
+    fore200e->regs.pca.psr = fore200e->virt_base + PCA200E_PSR_OFFSET;
 
     fore200e->state = FORE200E_STATE_MAP;
     return 0;
@@ -689,7 +689,7 @@ fore200e_pca_prom_read(struct fore200e* fore200e, struct prom_data* prom)
     
     *entry->status = STATUS_PENDING;
 
-    fore200e->bus->write(*(u32*)&opcode, (u32*)&entry->cp_entry->cmd.prom_block.opcode);
+    fore200e->bus->write(*(u32*)&opcode, (u32 __iomem *)&entry->cp_entry->cmd.prom_block.opcode);
 
     ok = fore200e_poll(fore200e, entry->status, STATUS_COMPLETE, 400);
 
@@ -730,14 +730,14 @@ fore200e_pca_proc_read(struct fore200e* fore200e, char *page)
 #ifdef CONFIG_ATM_FORE200E_SBA
 
 static u32
-fore200e_sba_read(volatile u32* addr)
+fore200e_sba_read(volatile u32 __iomem *addr)
 {
     return sbus_readl(addr);
 }
 
 
 static void
-fore200e_sba_write(u32 val, volatile u32* addr)
+fore200e_sba_write(u32 val, volatile u32 __iomem *addr)
 {
     sbus_writel(val, addr);
 }
@@ -856,10 +856,10 @@ fore200e_sba_map(struct fore200e* fore200e)
     unsigned int bursts;
 
     /* gain access to the SBA specific registers  */
-    fore200e->regs.sba.hcr = (u32*)sbus_ioremap(&sbus_dev->resource[0], 0, SBA200E_HCR_LENGTH, "SBA HCR");
-    fore200e->regs.sba.bsr = (u32*)sbus_ioremap(&sbus_dev->resource[1], 0, SBA200E_BSR_LENGTH, "SBA BSR");
-    fore200e->regs.sba.isr = (u32*)sbus_ioremap(&sbus_dev->resource[2], 0, SBA200E_ISR_LENGTH, "SBA ISR");
-    fore200e->virt_base    = (u32*)sbus_ioremap(&sbus_dev->resource[3], 0, SBA200E_RAM_LENGTH, "SBA RAM");
+    fore200e->regs.sba.hcr = sbus_ioremap(&sbus_dev->resource[0], 0, SBA200E_HCR_LENGTH, "SBA HCR");
+    fore200e->regs.sba.bsr = sbus_ioremap(&sbus_dev->resource[1], 0, SBA200E_BSR_LENGTH, "SBA BSR");
+    fore200e->regs.sba.isr = sbus_ioremap(&sbus_dev->resource[2], 0, SBA200E_ISR_LENGTH, "SBA ISR");
+    fore200e->virt_base    = sbus_ioremap(&sbus_dev->resource[3], 0, SBA200E_RAM_LENGTH, "SBA RAM");
 
     if (fore200e->virt_base == NULL) {
 	printk(FORE200E "unable to map RAM of device %s\n", fore200e->name);
@@ -884,10 +884,10 @@ fore200e_sba_map(struct fore200e* fore200e)
 static void
 fore200e_sba_unmap(struct fore200e* fore200e)
 {
-    sbus_iounmap((ulong)fore200e->regs.sba.hcr, SBA200E_HCR_LENGTH);
-    sbus_iounmap((ulong)fore200e->regs.sba.bsr, SBA200E_BSR_LENGTH);
-    sbus_iounmap((ulong)fore200e->regs.sba.isr, SBA200E_ISR_LENGTH);
-    sbus_iounmap((ulong)fore200e->virt_base,    SBA200E_RAM_LENGTH);
+    sbus_iounmap(fore200e->regs.sba.hcr, SBA200E_HCR_LENGTH);
+    sbus_iounmap(fore200e->regs.sba.bsr, SBA200E_BSR_LENGTH);
+    sbus_iounmap(fore200e->regs.sba.isr, SBA200E_ISR_LENGTH);
+    sbus_iounmap(fore200e->virt_base,    SBA200E_RAM_LENGTH);
 }
 
 
@@ -1477,12 +1477,12 @@ fore200e_activate_vcin(struct fore200e* fore200e, int activate, struct atm_vcc* 
 #endif
 	/* the MTU is not used by the cp, except in the case of AAL0 */
 	fore200e->bus->write(mtu,                        &entry->cp_entry->cmd.activate_block.mtu);
-	fore200e->bus->write(*(u32*)&vpvc,         (u32*)&entry->cp_entry->cmd.activate_block.vpvc);
-	fore200e->bus->write(*(u32*)&activ_opcode, (u32*)&entry->cp_entry->cmd.activate_block.opcode);
+	fore200e->bus->write(*(u32*)&vpvc,         (u32 __iomem *)&entry->cp_entry->cmd.activate_block.vpvc);
+	fore200e->bus->write(*(u32*)&activ_opcode, (u32 __iomem *)&entry->cp_entry->cmd.activate_block.opcode);
     }
     else {
-	fore200e->bus->write(*(u32*)&vpvc,           (u32*)&entry->cp_entry->cmd.deactivate_block.vpvc);
-	fore200e->bus->write(*(u32*)&deactiv_opcode, (u32*)&entry->cp_entry->cmd.deactivate_block.opcode);
+	fore200e->bus->write(*(u32*)&vpvc,         (u32 __iomem *)&entry->cp_entry->cmd.deactivate_block.vpvc);
+	fore200e->bus->write(*(u32*)&deactiv_opcode, (u32 __iomem *)&entry->cp_entry->cmd.deactivate_block.opcode);
     }
 
     ok = fore200e_poll(fore200e, entry->status, STATUS_COMPLETE, 400);
@@ -1858,7 +1858,7 @@ fore200e_send(struct atm_vcc *vcc, struct sk_buff *skb)
     tpd_haddr.haddr = entry->tpd_dma >> TPD_HADDR_SHIFT;          /* shift the address, as we are in a bitfield */
 
     *entry->status = STATUS_PENDING;
-    fore200e->bus->write(*(u32*)&tpd_haddr, (u32*)&entry->cp_entry->tpd_haddr);
+    fore200e->bus->write(*(u32*)&tpd_haddr, (u32 __iomem *)&entry->cp_entry->tpd_haddr);
 
     spin_unlock_irqrestore(&fore200e->q_lock, flags);
 
@@ -1893,7 +1893,7 @@ fore200e_getstats(struct fore200e* fore200e)
     
     *entry->status = STATUS_PENDING;
 
-    fore200e->bus->write(*(u32*)&opcode, (u32*)&entry->cp_entry->cmd.stats_block.opcode);
+    fore200e->bus->write(*(u32*)&opcode, (u32 __iomem *)&entry->cp_entry->cmd.stats_block.opcode);
 
     ok = fore200e_poll(fore200e, entry->status, STATUS_COMPLETE, 400);
 
@@ -1996,7 +1996,7 @@ fore200e_set_oc3(struct fore200e* fore200e, u32 reg, u32 value, u32 mask)
     
     *entry->status = STATUS_PENDING;
 
-    fore200e->bus->write(*(u32*)&opcode, (u32*)&entry->cp_entry->cmd.oc3_block.opcode);
+    fore200e->bus->write(*(u32*)&opcode, (u32 __iomem *)&entry->cp_entry->cmd.oc3_block.opcode);
 
     ok = fore200e_poll(fore200e, entry->status, STATUS_COMPLETE, 400);
 
@@ -2291,7 +2291,7 @@ fore200e_init_bs_queue(struct fore200e* fore200e)
     int scheme, magn, i;
 
     struct host_bsq*     bsq;
-    struct cp_bsq_entry* cp_entry;
+    struct cp_bsq_entry __iomem * cp_entry;
 
     for (scheme = 0; scheme < BUFFER_SCHEME_NBR; scheme++) {
 	for (magn = 0; magn < BUFFER_MAGN_NBR; magn++) {
@@ -2321,8 +2321,8 @@ fore200e_init_bs_queue(struct fore200e* fore200e)
 	    }
 	    
 	    /* get the base address of the cp resident buffer supply queue entries */
-	    cp_entry = (struct cp_bsq_entry*)(fore200e->virt_base + 
-		       fore200e->bus->read(&fore200e->cp_queues->cp_bsq[ scheme ][ magn ]));
+	    cp_entry = fore200e->virt_base + 
+		       fore200e->bus->read(&fore200e->cp_queues->cp_bsq[ scheme ][ magn ]);
 	    
 	    /* fill the host resident and cp resident buffer supply queue entries */
 	    for (i = 0; i < QUEUE_SIZE_BS; i++) {
@@ -2352,7 +2352,7 @@ static int __init
 fore200e_init_rx_queue(struct fore200e* fore200e)
 {
     struct host_rxq*     rxq =  &fore200e->host_rxq;
-    struct cp_rxq_entry* cp_entry;
+    struct cp_rxq_entry __iomem * cp_entry;
     int i;
 
     DPRINTK(2, "receive queue is being initialized\n");
@@ -2378,8 +2378,7 @@ fore200e_init_rx_queue(struct fore200e* fore200e)
     }
 
     /* get the base address of the cp resident rx queue entries */
-    cp_entry = (struct cp_rxq_entry*)(fore200e->virt_base + 
-				      fore200e->bus->read(&fore200e->cp_queues->cp_rxq));
+    cp_entry = fore200e->virt_base + fore200e->bus->read(&fore200e->cp_queues->cp_rxq);
 
     /* fill the host resident and cp resident rx entries */
     for (i=0; i < QUEUE_SIZE_RX; i++) {
@@ -2413,7 +2412,7 @@ static int __init
 fore200e_init_tx_queue(struct fore200e* fore200e)
 {
     struct host_txq*     txq =  &fore200e->host_txq;
-    struct cp_txq_entry* cp_entry;
+    struct cp_txq_entry __iomem * cp_entry;
     int i;
 
     DPRINTK(2, "transmit queue is being initialized\n");
@@ -2439,8 +2438,7 @@ fore200e_init_tx_queue(struct fore200e* fore200e)
     }
 
     /* get the base address of the cp resident tx queue entries */
-    cp_entry = (struct cp_txq_entry*)(fore200e->virt_base + 
-				      fore200e->bus->read(&fore200e->cp_queues->cp_txq));
+    cp_entry = fore200e->virt_base + fore200e->bus->read(&fore200e->cp_queues->cp_txq);
 
     /* fill the host resident and cp resident tx entries */
     for (i=0; i < QUEUE_SIZE_TX; i++) {
@@ -2477,7 +2475,7 @@ static int __init
 fore200e_init_cmd_queue(struct fore200e* fore200e)
 {
     struct host_cmdq*     cmdq =  &fore200e->host_cmdq;
-    struct cp_cmdq_entry* cp_entry;
+    struct cp_cmdq_entry __iomem * cp_entry;
     int i;
 
     DPRINTK(2, "command queue is being initialized\n");
@@ -2492,8 +2490,7 @@ fore200e_init_cmd_queue(struct fore200e* fore200e)
     }
     
     /* get the base address of the cp resident cmd queue entries */
-    cp_entry = (struct cp_cmdq_entry*)(fore200e->virt_base + 
-				       fore200e->bus->read(&fore200e->cp_queues->cp_cmdq));
+    cp_entry = fore200e->virt_base + fore200e->bus->read(&fore200e->cp_queues->cp_cmdq);
 
     /* fill the host resident and cp resident cmd entries */
     for (i=0; i < QUEUE_SIZE_CMD; i++) {
@@ -2521,7 +2518,7 @@ fore200e_param_bs_queue(struct fore200e* fore200e,
 			enum buffer_scheme scheme, enum buffer_magn magn,
 			int queue_length, int pool_size, int supply_blksize)
 {
-    struct bs_spec* bs_spec = &fore200e->cp_queues->init.bs_spec[ scheme ][ magn ];
+    struct bs_spec __iomem * bs_spec = &fore200e->cp_queues->init.bs_spec[ scheme ][ magn ];
 
     fore200e->bus->write(queue_length,                           &bs_spec->queue_length);
     fore200e->bus->write(fore200e_rx_buf_size[ scheme ][ magn ], &bs_spec->buffer_size);
@@ -2533,7 +2530,7 @@ fore200e_param_bs_queue(struct fore200e* fore200e,
 static int __init
 fore200e_initialize(struct fore200e* fore200e)
 {
-    struct cp_queues* cpq;
+    struct cp_queues __iomem * cpq;
     int               ok, scheme, magn;
 
     DPRINTK(2, "device %s being initialized\n", fore200e->name);
@@ -2541,7 +2538,7 @@ fore200e_initialize(struct fore200e* fore200e)
     init_MUTEX(&fore200e->rate_sf);
     spin_lock_init(&fore200e->q_lock);
 
-    cpq = fore200e->cp_queues = (struct cp_queues*) (fore200e->virt_base + FORE200E_CP_QUEUES_OFFSET);
+    cpq = fore200e->cp_queues = fore200e->virt_base + FORE200E_CP_QUEUES_OFFSET;
 
     /* enable cp to host interrupts */
     fore200e->bus->write(1, &cpq->imask);
@@ -2585,7 +2582,7 @@ fore200e_initialize(struct fore200e* fore200e)
 static void __init
 fore200e_monitor_putc(struct fore200e* fore200e, char c)
 {
-    struct cp_monitor* monitor = fore200e->cp_monitor;
+    struct cp_monitor __iomem * monitor = fore200e->cp_monitor;
 
 #if 0
     printk("%c", c);
@@ -2597,7 +2594,7 @@ fore200e_monitor_putc(struct fore200e* fore200e, char c)
 static int __init
 fore200e_monitor_getc(struct fore200e* fore200e)
 {
-    struct cp_monitor* monitor = fore200e->cp_monitor;
+    struct cp_monitor __iomem * monitor = fore200e->cp_monitor;
     unsigned long      timeout = jiffies + MSECS(50);
     int                c;
 
@@ -2673,7 +2670,7 @@ fore200e_load_fw(struct fore200e* fore200e)
 
     struct fw_header* fw_header = (struct fw_header*) fw_data;
 
-    u32* load_addr = fore200e->virt_base + le32_to_cpu(fw_header->load_offset);
+    u32 __iomem *load_addr = fore200e->virt_base + le32_to_cpu(fw_header->load_offset);
 
     DPRINTK(2, "device %s firmware being loaded at 0x%p (%d words)\n", 
 	    fore200e->name, load_addr, fw_size);
@@ -2854,7 +2851,7 @@ fore200e_proc_read(struct atm_dev *dev, loff_t* pos, char* page)
 		"   board serial number:\t\t%d\n\n",
 		fore200e_irq_itoa(fore200e->irq),
 		(void*)fore200e->phys_base,
-		(void*)fore200e->virt_base,
+		fore200e->virt_base,
 		fore200e->esi[0], fore200e->esi[1], fore200e->esi[2],
 		fore200e->esi[3], fore200e->esi[4], fore200e->esi[5],
 		fore200e->esi[4] * 256 + fore200e->esi[5]);
@@ -2938,7 +2935,7 @@ fore200e_proc_read(struct atm_dev *dev, loff_t* pos, char* page)
     }
 
     if (!left--) {
-	struct cp_monitor* cp_monitor = fore200e->cp_monitor;
+	struct cp_monitor __iomem * cp_monitor = fore200e->cp_monitor;
 
 	return sprintf(page,
 		       "\n\n"

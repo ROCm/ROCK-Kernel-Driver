@@ -50,8 +50,7 @@
 
 extern int i2o_parm_issue(struct i2o_device *, int, void *, int, void *, int);
 
-static spinlock_t i2o_config_lock = SPIN_LOCK_UNLOCKED;
-struct wait_queue *i2o_wait_queue;
+static spinlock_t i2o_config_lock;
 
 #define MODINC(x,y) ((x) = ((x) + 1) % (y))
 
@@ -79,7 +78,7 @@ static ulong i2o_cfg_info_id = 0;
  *	multiplexed by the i2o_core code
  */
 
-struct i2o_driver i2o_config_driver = {
+static struct i2o_driver i2o_config_driver = {
 	.name = "Config-OSM"
 };
 
@@ -247,7 +246,7 @@ static int i2o_cfg_swdl(unsigned long arg)
 	struct i2o_sw_xfer __user *pxfer = (struct i2o_sw_xfer __user *)arg;
 	unsigned char maxfrag = 0, curfrag = 1;
 	struct i2o_dma buffer;
-	struct i2o_message *msg;
+	struct i2o_message __iomem *msg;
 	u32 m;
 	unsigned int status = 0, swlen = 0, fragsize = 8192;
 	struct i2o_controller *c;
@@ -321,7 +320,7 @@ static int i2o_cfg_swul(unsigned long arg)
 	struct i2o_sw_xfer __user *pxfer = (struct i2o_sw_xfer __user *)arg;
 	unsigned char maxfrag = 0, curfrag = 1;
 	struct i2o_dma buffer;
-	struct i2o_message *msg;
+	struct i2o_message __iomem *msg;
 	u32 m;
 	unsigned int status = 0, swlen = 0, fragsize = 8192;
 	struct i2o_controller *c;
@@ -401,7 +400,7 @@ static int i2o_cfg_swdel(unsigned long arg)
 	struct i2o_controller *c;
 	struct i2o_sw_xfer kxfer;
 	struct i2o_sw_xfer __user *pxfer = (struct i2o_sw_xfer __user *)arg;
-	struct i2o_message *msg;
+	struct i2o_message __iomem *msg;
 	u32 m;
 	unsigned int swlen;
 	int token;
@@ -446,7 +445,7 @@ static int i2o_cfg_validate(unsigned long arg)
 {
 	int token;
 	int iop = (int)arg;
-	struct i2o_message *msg;
+	struct i2o_message __iomem *msg;
 	u32 m;
 	struct i2o_controller *c;
 
@@ -477,7 +476,7 @@ static int i2o_cfg_validate(unsigned long arg)
 
 static int i2o_cfg_evt_reg(unsigned long arg, struct file *fp)
 {
-	struct i2o_message *msg;
+	struct i2o_message __iomem *msg;
 	u32 m;
 	struct i2o_evt_id __user *pdesc = (struct i2o_evt_id __user *)arg;
 	struct i2o_evt_id kdesc;
@@ -778,7 +777,7 @@ static int i2o_cfg_passthru(unsigned long arg)
 	u32 i = 0;
 	void *p = NULL;
 	i2o_status_block *sb;
-	struct i2o_message *msg;
+	struct i2o_message __iomem *msg;
 	u32 m;
 	unsigned int iop;
 
@@ -1128,6 +1127,8 @@ static int __init i2o_config_init(void)
 {
 	printk(KERN_INFO "I2O configuration manager v 0.04.\n");
 	printk(KERN_INFO "  (C) Copyright 1999 Red Hat Software\n");
+
+	spin_lock_init(&i2o_config_lock);
 
 	if (misc_register(&i2o_miscdev) < 0) {
 		printk(KERN_ERR "i2o_config: can't register device.\n");

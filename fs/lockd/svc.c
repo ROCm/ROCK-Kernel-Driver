@@ -39,7 +39,10 @@
 #define ALLOWED_SIGS		(sigmask(SIGKILL))
 
 extern struct svc_program	nlmsvc_program;
+
 struct nlmsvc_binding *		nlmsvc_ops;
+EXPORT_SYMBOL(nlmsvc_ops);
+
 static DECLARE_MUTEX(nlmsvc_sema);
 static unsigned int		nlmsvc_users;
 static pid_t			nlmsvc_pid;
@@ -270,6 +273,7 @@ out:
 	up(&nlmsvc_sema);
 	return error;
 }
+EXPORT_SYMBOL(lockd_up);
 
 /*
  * Decrement the user count and bring down lockd if we're the last.
@@ -311,6 +315,7 @@ lockd_down(void)
 out:
 	up(&nlmsvc_sema);
 }
+EXPORT_SYMBOL(lockd_down);
 
 /*
  * Sysctl parameters (same as module parameters, different interface).

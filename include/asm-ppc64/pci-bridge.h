@@ -18,21 +18,11 @@ struct pci_controller;
 extern struct pci_controller*
 pci_find_hose_for_OF_device(struct device_node* node);
 
-enum phb_types { 
-	phb_type_unknown    = 0x0,
-	phb_type_hypervisor = 0x1,
-	phb_type_python     = 0x10,
-	phb_type_speedwagon = 0x11,
-	phb_type_winnipeg   = 0x12,
-	phb_type_apple      = 0xff
-};
-
 /*
  * Structure of a PCI controller (host bridge)
  */
 struct pci_controller {
 	char what[8];                     /* Eye catcher      */
-	enum phb_types type;              /* Type of hardware */
 	struct pci_bus *bus;
 	char is_dynamic;
 	void *arch_data;
@@ -94,26 +84,13 @@ extern void pci_process_bridge_OF_ranges(struct pci_controller *hose,
 
 extern int pcibios_remove_root_bus(struct pci_controller *phb);
 
-/* Use this macro after the PCI bus walk for max performance when it
- * is known that sysdata is correct.
- */
-#define PCI_GET_DN(dev) ((struct device_node *)((dev)->sysdata))
-
 extern void phbs_remap_io(void);
 
 static inline struct pci_controller *pci_bus_to_host(struct pci_bus *bus)
 {
-	struct device_node *busdn;
+	struct device_node *busdn = bus->sysdata;
 
-	busdn = bus->sysdata;
-	if (busdn == 0) {
-		struct pci_bus *b;
-		for (b = bus->parent; b && bus->sysdata == 0; b = b->parent)
-			;
-		busdn = b->sysdata;
-	}
-	if (busdn == NULL)
-		return NULL;
+	BUG_ON(busdn == NULL);
 	return busdn->phb;
 }
 

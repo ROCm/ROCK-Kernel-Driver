@@ -33,7 +33,7 @@
 
 #include <asm/io.h>
 
-static void __init init_hwif_rz1000 (ide_hwif_t *hwif)
+static void __devinit init_hwif_rz1000 (ide_hwif_t *hwif)
 {
 	u16 reg;
 	struct pci_dev *dev = hwif->pci_dev;

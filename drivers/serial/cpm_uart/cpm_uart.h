@@ -17,13 +17,8 @@
 #include "cpm_uart_cpm1.h"
 #endif
 
-#ifndef CONFIG_SERIAL_8250
-#define SERIAL_CPM_MAJOR	TTY_MAJOR
-#define SERIAL_CPM_MINOR	64
-#else
 #define SERIAL_CPM_MAJOR	204
-#define SERIAL_CPM_MINOR	42
-#endif
+#define SERIAL_CPM_MINOR	46
 
 #define IS_SMC(pinfo) 		(pinfo->flags & FLAG_SMC)
 #define IS_DISCARDING(pinfo)	(pinfo->flags & FLAG_DISCARDING)

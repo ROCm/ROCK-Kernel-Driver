@@ -2,7 +2,7 @@
  * ichxrom.c
  *
  * Normal mappings of chips in physical memory
- * $Id: ichxrom.c,v 1.14 2004/09/18 01:59:56 eric Exp $
+ * $Id: ichxrom.c,v 1.15 2004/11/16 18:29:02 dwmw2 Exp $
  */
 
 #include <linux/module.h>
@@ -89,7 +89,7 @@ static int __devinit ichxrom_init_one (struct pci_dev *pdev,
 {
 	static char *rom_probe_types[] = { "cfi_probe", "jedec_probe", NULL };
 	struct ichxrom_window *window = &ichxrom_window;
-	struct ichxrom_map_info *map = 0;
+	struct ichxrom_map_info *map = NULL;
 	unsigned long map_top;
 	u8 byte;
 	u16 word;
@@ -291,7 +291,7 @@ static int __devinit ichxrom_init_one (struct pci_dev *pdev,
 		map->mtd->owner = THIS_MODULE;
 		if (add_mtd_device(map->mtd)) {
 			map_destroy(map->mtd);
-			map->mtd = 0;
+			map->mtd = NULL;
 			goto out;
 		}
 
@@ -301,7 +301,7 @@ static int __devinit ichxrom_init_one (struct pci_dev *pdev,
 
 		/* File away the map structure */
 		list_add(&map->list, &window->maps);
-		map = 0;
+		map = NULL;
 	}
 
  out:
@@ -349,7 +349,7 @@ static struct pci_driver ichxrom_driver = {
 };
 #endif
 
-int __init init_ichxrom(void)
+static int __init init_ichxrom(void)
 {
 	struct pci_dev *pdev;
 	struct pci_device_id *id;

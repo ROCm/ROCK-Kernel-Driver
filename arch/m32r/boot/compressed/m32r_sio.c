@@ -6,12 +6,10 @@
  */
 
 #include <linux/config.h>
-#include <asm/m32r.h>
-#include <asm/io.h>
 
-void putc(char c);
+static void putc(char c);
 
-int puts(const char *s)
+static int puts(const char *s)
 {
 	char c;
 	while ((c = *s++)) putc(c);
@@ -19,6 +17,9 @@ int puts(const char *s)
 }
 
 #if defined(CONFIG_PLAT_M32700UT_Alpha) || defined(CONFIG_PLAT_M32700UT)
+#include <asm/m32r.h>
+#include <asm/io.h>
+
 #define USE_FPGA_MAP	0
 
 #if USE_FPGA_MAP
@@ -35,7 +36,7 @@ int puts(const char *s)
 #define BOOT_SIO0TXB	PLD_ESIO0TXB
 #endif
 
-void putc(char c)
+static void putc(char c)
 {
 
 	while ((*BOOT_SIO0STS & 0x3) != 0x3) ;
@@ -46,8 +47,17 @@ void putc(char c)
 	*BOOT_SIO0TXB = c;
 }
 #else
-void putc(char c)
+#define SIO0STS	(volatile unsigned short *)(0xa0efd000 + 14)
+#define SIO0TXB	(volatile unsigned short *)(0xa0efd000 + 30)
+
+static void putc(char c)
 {
-	/* do nothing */
+
+	while ((*SIO0STS & 0x1) == 0) ;
+	if (c == '\n') {
+		*SIO0TXB = '\r';
+		while ((*SIO0STS & 0x1) == 0) ;
+	}
+	*SIO0TXB = c;
 }
 #endif

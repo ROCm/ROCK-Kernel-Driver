@@ -75,7 +75,7 @@ int atyfb_cursor(struct fb_info *info, struct fb_cursor *cursor)
 {
 	struct atyfb_par *par = (struct atyfb_par *) info->par;
 	u16 xoff, yoff;
-	int x, y;
+	int x, y, h;
 
 #ifdef __sparc__
 	if (par->mmaped)
@@ -106,17 +106,20 @@ int atyfb_cursor(struct fb_info *info, struct fb_cursor *cursor)
 			yoff = 0;
 		}
 
+		h = cursor->image.height;
+
 		/*
-		 * In doublescan mode, the cursor location also needs to be
-		 * doubled.
+		 * In doublescan mode, the cursor location
+		 * and heigh also needs to be doubled.
 		 */
-                if (par->crtc.gen_cntl & CRTC_DBL_SCAN_EN)
+                if (par->crtc.gen_cntl & CRTC_DBL_SCAN_EN) {
 			y<<=1;
+			h<<=1;
+		}
 		wait_for_fifo(4, par);
 		aty_st_le32(CUR_OFFSET, (info->fix.smem_len >> 3) + (yoff << 1), par);
 		aty_st_le32(CUR_HORZ_VERT_OFF,
-			    ((u32) (64 - cursor->image.height + yoff) << 16) | xoff,
-			    par);
+			    ((u32) (64 - h + yoff) << 16) | xoff, par);
 		aty_st_le32(CUR_HORZ_VERT_POSN, ((u32) y << 16) | x, par);
 	}
 

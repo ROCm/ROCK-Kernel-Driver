@@ -75,6 +75,7 @@
 #include <linux/init.h>
 #include <linux/compat.h>
 #include <linux/mempolicy.h>
+#include <asm/tlbflush.h>
 #include <asm/uaccess.h>
 
 static kmem_cache_t *policy_cache;
@@ -530,7 +531,7 @@ asmlinkage long sys_get_mempolicy(int __user *policy,
 
 #ifdef CONFIG_COMPAT
 
-asmlinkage long compat_get_mempolicy(int __user *policy,
+asmlinkage long compat_sys_get_mempolicy(int __user *policy,
 				     compat_ulong_t __user *nmask,
 				     compat_ulong_t maxnode,
 				     compat_ulong_t addr, compat_ulong_t flags)
@@ -558,7 +559,7 @@ asmlinkage long compat_get_mempolicy(int __user *policy,
 	return err;
 }
 
-asmlinkage long compat_set_mempolicy(int mode, compat_ulong_t __user *nmask,
+asmlinkage long compat_sys_set_mempolicy(int mode, compat_ulong_t __user *nmask,
 				     compat_ulong_t maxnode)
 {
 	long err = 0;
@@ -581,7 +582,7 @@ asmlinkage long compat_set_mempolicy(int mode, compat_ulong_t __user *nmask,
 	return sys_set_mempolicy(mode, nm, nr_bits+1);
 }
 
-asmlinkage long compat_mbind(compat_ulong_t start, compat_ulong_t len,
+asmlinkage long compat_sys_mbind(compat_ulong_t start, compat_ulong_t len,
 			     compat_ulong_t mode, compat_ulong_t __user *nmask,
 			     compat_ulong_t maxnode, compat_ulong_t flags)
 {
@@ -900,13 +901,13 @@ sp_lookup(struct shared_policy *sp, unsigned long start, unsigned long end)
 
 	while (n) {
 		struct sp_node *p = rb_entry(n, struct sp_node, nd);
-		if (start >= p->end) {
+
+		if (start >= p->end)
 			n = n->rb_right;
-		} else if (end < p->start) {
+		else if (end <= p->start)
 			n = n->rb_left;
-		} else {
+		else
 			break;
-		}
 	}
 	if (!n)
 		return NULL;

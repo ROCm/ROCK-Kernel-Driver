@@ -552,14 +552,14 @@ typedef struct {
   int long_timeout;		/* timeout for commands known to take long time*/
 
   /* Mode characteristics */
-  ST_mode modes[ST_NBR_MODES];
+  struct st_modedef modes[ST_NBR_MODES];
   int current_mode;
 
   /* Status variables */
   int partition;
   int new_partition;
   int nbr_partitions;    /* zero until partition support enabled */
-  ST_partstat ps[ST_NBR_PARTITIONS];
+  struct st_partstat ps[ST_NBR_PARTITIONS];
   unsigned char dirty;
   unsigned char ready;
   unsigned char write_prot;

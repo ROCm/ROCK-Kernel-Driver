@@ -30,7 +30,7 @@
 
 int is_skas_winch(int pid, int fd, void *data)
 {
-	if(pid != getpid())
+	if(pid != os_getpid())
 		return(0);
 
 	register_winch_irq(-1, fd, -1, data);
@@ -64,7 +64,7 @@ static void handle_trap(int pid, union uml_pt_regs *regs, int local_using_sysemu
 
 	syscall_nr = PT_SYSCALL_NR(regs->skas.regs);
 	UPT_SYSCALL_NR(regs) = syscall_nr;
-	if(syscall_nr < 1){
+	if(syscall_nr < 0){
 		relay_signal(SIGTRAP, regs);
 		return;
 	}

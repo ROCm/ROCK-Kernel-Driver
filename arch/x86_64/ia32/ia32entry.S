@@ -391,7 +391,7 @@ ia32_sys_call_table:
 	.quad sys_uselib
 	.quad sys_swapon
 	.quad sys_reboot
-	.quad compat_old_readdir
+	.quad compat_sys_old_readdir
 	.quad sys32_mmap		/* 90 */
 	.quad sys_munmap
 	.quad sys_truncate
@@ -562,22 +562,22 @@ ia32_sys_call_table:
 	.quad sys_remap_file_pages
 	.quad sys_set_tid_address
 	.quad sys32_timer_create
-	.quad compat_timer_settime	/* 260 */
-	.quad compat_timer_gettime
+	.quad compat_sys_timer_settime	/* 260 */
+	.quad compat_sys_timer_gettime
 	.quad sys_timer_getoverrun
 	.quad sys_timer_delete
-	.quad compat_clock_settime
-	.quad compat_clock_gettime	/* 265 */
-	.quad compat_clock_getres
-	.quad compat_clock_nanosleep
-	.quad compat_statfs64
-	.quad compat_fstatfs64
+	.quad compat_sys_clock_settime
+	.quad compat_sys_clock_gettime	/* 265 */
+	.quad compat_sys_clock_getres
+	.quad compat_sys_clock_nanosleep
+	.quad compat_sys_statfs64
+	.quad compat_sys_fstatfs64
 	.quad sys_tgkill		/* 270 */
 	.quad compat_sys_utimes
 	.quad sys32_fadvise64_64
 	.quad quiet_ni_syscall	/* sys_vserver */
 	.quad sys_mbind
-	.quad compat_get_mempolicy	/* 275 */
+	.quad compat_sys_get_mempolicy	/* 275 */
 	.quad sys_set_mempolicy
 	.quad compat_sys_mq_open
 	.quad sys_mq_unlink

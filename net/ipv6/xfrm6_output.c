@@ -79,7 +79,7 @@ static int xfrm6_tunnel_check_size(struct sk_buff *skb)
 	int mtu, ret = 0;
 	struct dst_entry *dst = skb->dst;
 
-	mtu = dst_pmtu(dst) - sizeof(struct ipv6hdr);
+	mtu = dst_pmtu(dst) - dst->header_len - dst->trailer_len;
 	if (mtu < IPV6_MIN_MTU)
 		mtu = IPV6_MIN_MTU;
 

@@ -5,7 +5,7 @@
  *
  * This code is GPL
  *
- * $Id: mtdpart.c,v 1.50 2004/08/10 16:18:34 dwmw2 Exp $
+ * $Id: mtdpart.c,v 1.51 2004/11/16 18:28:59 dwmw2 Exp $
  *
  * 	02-21-2002	Thomas Gleixner <gleixner@autronix.de>
  *			added support for read_oob, write_oob
@@ -526,7 +526,7 @@ EXPORT_SYMBOL(del_mtd_partitions);
 static spinlock_t part_parser_lock = SPIN_LOCK_UNLOCKED;
 static LIST_HEAD(part_parsers);
 
-struct mtd_part_parser *get_partition_parser(const char *name)
+static struct mtd_part_parser *get_partition_parser(const char *name)
 {
 	struct list_head *this;
 	void *ret = NULL;

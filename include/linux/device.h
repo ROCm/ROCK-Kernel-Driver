@@ -268,12 +268,7 @@ struct device {
 	void		*platform_data;	/* Platform specific data (e.g. ACPI,
 					   BIOS data relevant to device) */
 	struct dev_pm_info	power;
-	u32		power_state;	/* Current operating state. In
-					   ACPI-speak, this is D0-D3, D0
-					   being fully functional, and D3
-					   being off. */
 
-	unsigned char *saved_state;	/* saved device state */
 	u32		detach_state;	/* State to enter when device is
 					   detached from its driver. */
 

@@ -497,10 +497,11 @@ restore:
 
 	li	r3,0
 	stb	r3,PACAPROCENABLED(r13)	/* ensure we are soft-disabled */
+	ori	r10,r10,MSR_EE
 	mtmsrd	r10			/* hard-enable again */
 	addi	r3,r1,STACK_FRAME_OVERHEAD
 	bl	.do_IRQ
-	b	.ret_from_except		/* loop back and handle more */
+	b	.ret_from_except_lite		/* loop back and handle more */
 
 4:	stb	r5,PACAPROCENABLED(r13)
 #endif
@@ -574,6 +575,7 @@ do_work:
 	li	r0,1
 	stb	r0,PACAPROCENABLED(r13)
 #endif
+	ori	r10,r10,MSR_EE
 	mtmsrd	r10,1		/* reenable interrupts */
 	bl	.schedule
 	mfmsr	r10
@@ -591,6 +593,7 @@ do_work:
 user_work:
 #endif
 	/* Enable interrupts */
+	ori	r10,r10,MSR_EE
 	mtmsrd	r10,1
 
 	andi.	r0,r4,_TIF_NEED_RESCHED

@@ -13,12 +13,14 @@
 #include <linux/ioport.h>
 #include <linux/init.h>
 #include <linux/console.h>
+#include <linux/device.h>
+#include <linux/tty_flip.h>
 #include <linux/serial_core.h>
 #include <linux/serial.h>
-#include <linux/device.h>
 
 #include <asm/io.h>
 #include <asm/irq.h>
+#include <asm/mach-types.h>
 #include <asm/hardware/dec21285.h>
 #include <asm/hardware.h>
 
@@ -90,22 +92,21 @@ static irqreturn_t serial21285_rx_chars(int irq, void *dev_id, struct pt_regs *r
 {
 	struct uart_port *port = dev_id;
 	struct tty_struct *tty = port->info->tty;
-	unsigned int status, ch, rxs, max_count = 256;
+	unsigned int status, ch, flag, rxs, max_count = 256;
 
 	status = *CSR_UARTFLG;
 	while (!(status & 0x10) && max_count--) {
 		if (tty->flip.count >= TTY_FLIPBUF_SIZE) {
-			tty->flip.work.func((void *)tty);
-			if (tty->flip.count >= TTY_FLIPBUF_SIZE) {
-				printk(KERN_WARNING "TTY_DONT_FLIP set\n");
-				goto out;
-			}
+			if (tty->low_latency)
+				tty_flip_buffer_push(tty);
+			/*
+			 * If this failed then we will throw away the
+			 * bytes but must do so to clear interrupts
+			 */
 		}
 
 		ch = *CSR_UARTDR;
-
-		*tty->flip.char_buf_ptr = ch;
-		*tty->flip.flag_buf_ptr = TTY_NORMAL;
+		flag = TTY_NORMAL;
 		port->icount.rx++;
 
 		rxs = *CSR_RXSTAT | RXSTAT_DUMMY_READ;
@@ -120,15 +121,13 @@ static irqreturn_t serial21285_rx_chars(int irq, void *dev_id, struct pt_regs *r
 			rxs &= port->read_status_mask;
 
 			if (rxs & RXSTAT_PARITY)
-				*tty->flip.flag_buf_ptr = TTY_PARITY;
+				flag = TTY_PARITY;
 			else if (rxs & RXSTAT_FRAME)
-				*tty->flip.flag_buf_ptr = TTY_FRAME;
+				flag = TTY_FRAME;
 		}
 
 		if ((rxs & port->ignore_status_mask) == 0) {
-			tty->flip.flag_buf_ptr++;
-			tty->flip.char_buf_ptr++;
-			tty->flip.count++;
+			tty_insert_flip_char(tty, ch, flag);
 		}
 		if ((rxs & RXSTAT_OVERRUN) &&
 		    tty->flip.count < TTY_FLIPBUF_SIZE) {
@@ -137,9 +136,7 @@ static irqreturn_t serial21285_rx_chars(int irq, void *dev_id, struct pt_regs *r
 			 * immediately, and doesn't affect the current
 			 * character.
 			 */
-			*tty->flip.char_buf_ptr++ = 0;
-			*tty->flip.flag_buf_ptr++ = TTY_OVERRUN;
-			tty->flip.count++;
+			tty_insert_flip_char(tty, 0, TTY_OVERRUN);
 		}
 		status = *CSR_UARTFLG;
 	}

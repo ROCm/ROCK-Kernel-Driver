@@ -82,8 +82,8 @@ ppc4xx_find_bridges(void)
 	unsigned int tmp_addr;
 	unsigned int tmp_size;
 	unsigned int reg_index;
-	unsigned int new_pmm_max;
-	unsigned int new_pmm_min;
+	unsigned int new_pmm_max = 0;
+	unsigned int new_pmm_min = 0;
 
 	isa_io_base = 0;
 	isa_mem_base = 0;

@@ -9,7 +9,7 @@ Each io queue has a set of io scheduler tunables associated with it. These
 tunables control how the io scheduler works. You can find these entries
 in:
 
-/sys/block/<device>/iosched
+/sys/block/<device>/queue/iosched
 
 assuming that you have sysfs mounted on /sys. If you don't have sysfs mounted,
 you can do so by typing:

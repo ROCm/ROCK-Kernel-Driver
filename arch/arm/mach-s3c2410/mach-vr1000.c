@@ -17,6 +17,7 @@
  *     06-Aug-2004 BJD  Fixed call to time initialisation
  *     05-Apr-2004 BJD  Copied to make mach-vr1000.c
  *     18-Oct-2004 BJD  Updated board struct
+ *     04-Nov-2004 BJD  Clock and serial configuration update
 */
 
 #include <linux/kernel.h>
@@ -42,6 +43,7 @@
 #include <asm/arch/regs-serial.h>
 
 #include "s3c2410.h"
+#include "clock.h"
 #include "devs.h"
 #include "cpu.h"
 #include "usb-simtec.h"
@@ -113,34 +115,52 @@ static struct map_desc vr1000_iodesc[] __initdata = {
 #define ULCON S3C2410_LCON_CS8 | S3C2410_LCON_PNONE | S3C2410_LCON_STOPB
 #define UFCON S3C2410_UFCON_RXTRIG8 | S3C2410_UFCON_FIFOMODE
 
-/* base baud rate for all our UARTs */
-static unsigned long vr1000_serial_clock = 3692307;
+/* uart clock source(s) */
+
+static struct s3c24xx_uart_clksrc vr1000_serial_clocks[] = {
+	[0] = {
+		.name		= "uclk",
+		.divisor	= 1,
+		.min_baud	= 0,
+		.max_baud	= 0,
+	},
+	[1] = {
+		.name		= "pclk",
+		.divisor	= 1,
+		.min_baud	= 0,
+		.max_baud	= 0.
+	}
+};
 
 static struct s3c2410_uartcfg vr1000_uartcfgs[] = {
 	[0] = {
 		.hwport	     = 0,
 		.flags	     = 0,
-		.clock	     = &vr1000_serial_clock,
 		.ucon	     = UCON,
 		.ulcon	     = ULCON,
 		.ufcon	     = UFCON,
+		.clocks	     = vr1000_serial_clocks,
+		.clocks_size = ARRAY_SIZE(vr1000_serial_clocks),
 	},
 	[1] = {
 		.hwport	     = 1,
 		.flags	     = 0,
-		.clock	     = &vr1000_serial_clock,
 		.ucon	     = UCON,
 		.ulcon	     = ULCON,
 		.ufcon	     = UFCON,
+		.clocks	     = vr1000_serial_clocks,
+		.clocks_size = ARRAY_SIZE(vr1000_serial_clocks),
 	},
 	/* port 2 is not actually used */
 	[2] = {
 		.hwport	     = 2,
 		.flags	     = 0,
-		.clock	     = &vr1000_serial_clock,
 		.ucon	     = UCON,
 		.ulcon	     = ULCON,
 		.ufcon	     = UFCON,
+		.clocks	     = vr1000_serial_clocks,
+		.clocks_size = ARRAY_SIZE(vr1000_serial_clocks),
+
 	}
 };
 
@@ -152,14 +172,37 @@ static struct platform_device *vr1000_devices[] __initdata = {
 	&s3c_device_iis,
 };
 
+static struct clk *vr1000_clocks[] = {
+	&s3c24xx_dclk0,
+	&s3c24xx_dclk1,
+	&s3c24xx_clkout0,
+	&s3c24xx_clkout1,
+	&s3c24xx_uclk,
+};
+
 static struct s3c24xx_board vr1000_board __initdata = {
 	.devices       = vr1000_devices,
-	.devices_count = ARRAY_SIZE(vr1000_devices)
+	.devices_count = ARRAY_SIZE(vr1000_devices),
+	.clocks	       = vr1000_clocks,
+	.clocks_count  = ARRAY_SIZE(vr1000_clocks),
 };
 
 
 void __init vr1000_map_io(void)
 {
+	/* initialise clock sources */
+
+	s3c24xx_dclk0.parent = NULL;
+	s3c24xx_dclk0.rate   = 12*1000*1000;
+
+	s3c24xx_dclk1.parent = NULL;
+	s3c24xx_dclk1.rate   = 3692307;
+
+	s3c24xx_clkout0.parent  = &s3c24xx_dclk0;
+	s3c24xx_clkout1.parent  = &s3c24xx_dclk1;
+
+	s3c24xx_uclk.parent  = &s3c24xx_clkout1;
+
 	s3c24xx_init_io(vr1000_iodesc, ARRAY_SIZE(vr1000_iodesc));
 	s3c2410_init_uarts(vr1000_uartcfgs, ARRAY_SIZE(vr1000_uartcfgs));
 	s3c24xx_set_board(&vr1000_board);

@@ -3,7 +3,7 @@
  * 
  * (C) 2001 Pete Popov <ppopov@mvista.com>
  * 
- * $Id: pb1xxx-flash.c,v 1.13 2004/09/26 07:33:01 ppopov Exp $
+ * $Id: pb1xxx-flash.c,v 1.14 2004/11/04 13:24:15 gleixner Exp $
  */
 
 #include <linux/config.h>
@@ -149,7 +149,7 @@ int __init pb1xxx_mtd_init(void)
 	 */
 	printk(KERN_NOTICE "Pb1xxx flash: probing %d-bit flash bus\n", 
 			BUSWIDTH*8);
-	pb1xxx_mtd_map.virt = (void __iomem *)ioremap(WINDOW_ADDR, WINDOW_SIZE);
+	pb1xxx_mtd_map.virt = ioremap(WINDOW_ADDR, WINDOW_SIZE);
 
 	simple_map_init(&pb1xxx_mtd_map);
 

@@ -94,6 +94,11 @@
  *              Use module_param instead of old MODULE_PARM
  *              Some cleanup
  *
+ *    11/2004 - Version 0.9.2
+ *              Add vram option to reserve more memory than stolen by BIOS
+ *              Fix intelfbhw_pan_display typo
+ *              Add __initdata annotations
+ *
  * TODO:
  *
  *
@@ -186,19 +191,22 @@ MODULE_DESCRIPTION(
 MODULE_LICENSE("Dual BSD/GPL");
 MODULE_DEVICE_TABLE(pci, intelfb_pci_table);
 
-static int accel        = 1;
-static int hwcursor     = 1;
-static int mtrr         = 1;
-static int fixed        = 0;
-static int noinit       = 0;
-static int noregister   = 0;
-static int probeonly    = 0;
-static int idonly       = 0;
-static int bailearly    = 0;
-static char *mode       = NULL;
+static int accel        __initdata = 1;
+static int vram         __initdata = 4;
+static int hwcursor     __initdata = 1;
+static int mtrr         __initdata = 1;
+static int fixed        __initdata = 0;
+static int noinit       __initdata = 0;
+static int noregister   __initdata = 0;
+static int probeonly    __initdata = 0;
+static int idonly       __initdata = 0;
+static int bailearly    __initdata = 0;
+static char *mode       __initdata = NULL;
 
 module_param(accel, bool, S_IRUGO);
 MODULE_PARM_DESC(accel, "Enable console acceleration");
+module_param(vram, int, S_IRUGO);
+MODULE_PARM_DESC(vram, "System RAM to allocate to framebuffer in MiB");
 module_param(hwcursor, bool, S_IRUGO);
 MODULE_PARM_DESC(hwcursor, "Enable HW cursor");
 module_param(mtrr, bool, S_IRUGO);
@@ -257,6 +265,7 @@ intelfb_exit(void)
 
 #ifndef MODULE
 #define OPT_EQUAL(opt, name) (!strncmp(opt, name, strlen(name)))
+#define OPT_INTVAL(opt, name) simple_strtoul(opt + strlen(name), NULL, 0)
 #define OPT_STRVAL(opt, name) (opt + strlen(name))
 
 static __inline__ char *
@@ -276,6 +285,19 @@ get_opt_string(const char *this_opt, const char *name)
 		ret[i] = '\0';
 	}
 	return ret;
+}
+
+static __inline__ int
+get_opt_int(const char *this_opt, const char *name, int *ret)
+{
+	if (!ret)
+		return 0;
+
+	if (!OPT_EQUAL(this_opt, name))
+		return 0;
+
+	*ret = OPT_INTVAL(this_opt, name);
+	return 1;
 }
 
 static __inline__ int
@@ -329,6 +351,8 @@ intelfb_setup(char *options)
 		if (!*this_opt)
 			continue;
 		if (get_opt_bool(this_opt, "accel", &accel))
+			;
+ 		else if (get_opt_int(this_opt, "vram", &vram))
 			;
 		else if (get_opt_bool(this_opt, "hwcursor", &hwcursor))
 			;
@@ -402,8 +426,10 @@ cleanup(struct intelfb_info *dinfo)
 
 	unset_mtrr(dinfo);
 
-	if (dinfo->gtt_fb_mem)
+	if (dinfo->fbmem_gart && dinfo->gtt_fb_mem) {
 		agp_unbind_memory(dinfo->gtt_fb_mem);
+		agp_free_memory(dinfo->gtt_fb_mem);
+	}
 	if (dinfo->gtt_cursor_mem) {
 		agp_unbind_memory(dinfo->gtt_cursor_mem);
 		agp_free_memory(dinfo->gtt_cursor_mem);
@@ -560,13 +586,14 @@ intelfb_pci_register(struct pci_dev *pdev, const struct pci_device_id *ent)
 		dinfo->accel = 0;
 	}
 
-	/* Framebuffer parameters - Use all the stolen memory */
-	dinfo->fb.size = ROUND_UP_TO_PAGE(stolen_size);
-	dinfo->fb.offset = 0;   // starts at offset 0
-	dinfo->fb.physical = dinfo->aperture.physical
-		+ (dinfo->fb.offset << 12);
-	dinfo->fb.virtual = dinfo->aperture.virtual + (dinfo->fb.offset << 12);
-	dinfo->fb_start = dinfo->fb.offset << 12;
+	/* Framebuffer parameters - Use all the stolen memory if >= vram */
+	if (ROUND_UP_TO_PAGE(stolen_size) >= MB(vram)) {
+		dinfo->fb.size = ROUND_UP_TO_PAGE(stolen_size);
+		dinfo->fbmem_gart = 0;
+	} else {
+		dinfo->fb.size =  MB(vram);
+		dinfo->fbmem_gart = 1;
+	}
 
 	/* Allocate space for the ring buffer and HW cursor if enabled. */
 	if (dinfo->accel) {
@@ -600,6 +627,11 @@ intelfb_pci_register(struct pci_dev *pdev, const struct pci_device_id *ent)
 	if (dinfo->hwcursor) {
 		dinfo->cursor.offset = (stolen_size >> 12) +
 			+ gtt_info.current_memory + (dinfo->ring.size >> 12);
+	}
+	if (dinfo->fbmem_gart) {
+		dinfo->fb.offset = (stolen_size >> 12) +
+			+ gtt_info.current_memory + (dinfo->ring.size >> 12)
+			+ (dinfo->cursor.size >> 12);
 	}
 
 	/* Allocate memories (which aren't stolen) */
@@ -652,6 +684,29 @@ intelfb_pci_register(struct pci_dev *pdev, const struct pci_device_id *ent)
 		dinfo->cursor.virtual = dinfo->aperture.virtual
 			+ (dinfo->cursor.offset << 12);
 	}
+	if (dinfo->fbmem_gart) {
+		if (!(dinfo->gtt_fb_mem =
+		      agp_allocate_memory(dinfo->fb.size >> 12,
+					  AGP_NORMAL_MEMORY))) {
+			WRN_MSG("cannot allocate framebuffer memory - use "
+				"the stolen one\n");
+			dinfo->fbmem_gart = 0;
+		}
+		if (agp_bind_memory(dinfo->gtt_fb_mem,
+				    dinfo->fb.offset)) {
+			WRN_MSG("cannot bind framebuffer memory - use "
+				"the stolen one\n");
+			dinfo->fbmem_gart = 0;
+		}
+	}
+
+	/* update framebuffer memory parameters */
+	if (!dinfo->fbmem_gart)
+		dinfo->fb.offset = 0;   /* starts at offset 0 */
+	dinfo->fb.physical = dinfo->aperture.physical
+		+ (dinfo->fb.offset << 12);
+	dinfo->fb.virtual = dinfo->aperture.virtual + (dinfo->fb.offset << 12);
+	dinfo->fb_start = dinfo->fb.offset << 12;
 
 	/* release agpgart */
 	agp_backend_release();
@@ -673,8 +728,8 @@ intelfb_pci_register(struct pci_dev *pdev, const struct pci_device_id *ent)
 		(u32 __iomem ) dinfo->cursor.virtual, dinfo->cursor.offset,
 		dinfo->cursor.physical);
 
-	DBG_MSG("options: accel = %d, hwcursor = %d, fixed = %d, "
-		"noinit = %d\n", accel, hwcursor, fixed, noinit);
+	DBG_MSG("options: vram = %d, accel = %d, hwcursor = %d, fixed = %d, "
+		"noinit = %d\n", vram, accel, hwcursor, fixed, noinit);
 	DBG_MSG("options: mode = \"%s\"\n", mode ? mode : "");
 
 	if (probeonly)
@@ -1191,7 +1246,7 @@ intelfb_set_par(struct fb_info *info)
 	DBG_MSG("intelfb_set_par (%dx%d-%d)\n", info->var.xres,
 		info->var.yres, info->var.bits_per_pixel);
 
-	intelfb_blank(1, info);
+	intelfb_blank(FB_BLANK_POWERDOWN, info);
 
 	if (dinfo->accel)
 		intelfbhw_2d_stop(dinfo);
@@ -1214,7 +1269,7 @@ intelfb_set_par(struct fb_info *info)
 
 	intelfb_pan_display(&info->var, info);
 
-	intelfb_blank(0, info);
+	intelfb_blank(FB_BLANK_UNBLANK, info);
 
 	if (ACCEL(dinfo, info)) {
 		info->flags = FBINFO_DEFAULT | FBINFO_HWACCEL_YPAN |

@@ -3336,7 +3336,6 @@ ctl_table cdrom_cdrom_table[] = {
 
 /* Make sure that /proc/sys/dev is there */
 ctl_table cdrom_root_table[] = {
-#ifdef CONFIG_PROC_FS
 	{
 		.ctl_name	= CTL_DEV,
 		.procname	= "dev",
@@ -3344,7 +3343,6 @@ ctl_table cdrom_root_table[] = {
 		.mode		= 0555,
 		.child		= cdrom_cdrom_table,
 	},
-#endif /* CONFIG_PROC_FS */
 	{ .ctl_name = 0 }
 };
 static struct ctl_table_header *cdrom_sysctl_header;

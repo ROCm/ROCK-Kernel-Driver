@@ -88,10 +88,10 @@ static int __devinit tpam_probe(struct pci_dev *dev, const struct pci_device_id 
 	tpam_card *card, *c;
 	int i, err;
 
-	if (pci_enable_device(dev)) {
+	if ((err = pci_enable_device(dev))) {
 		printk(KERN_ERR "TurboPAM: can't enable PCI device at %s\n",
 			pci_name(dev));
-		return -ENODEV;
+		return err;
 	}
 
 	/* allocate memory for the board structure */
@@ -118,7 +118,7 @@ static int __devinit tpam_probe(struct pci_dev *dev, const struct pci_device_id 
 	}
 
 	/* remap board memory */
-	if (!(card->bar0 = (unsigned long) ioremap(pci_resource_start(dev, 0),
+	if (!(card->bar0 = ioremap(pci_resource_start(dev, 0),
 						   0x800000))) {
 		printk(KERN_ERR "TurboPAM: tpam_register_card: "
 		       "unable to remap bar0\n");
@@ -130,12 +130,12 @@ static int __devinit tpam_probe(struct pci_dev *dev, const struct pci_device_id 
 	readl(card->bar0 + TPAM_RESETPAM_REGISTER);
 
 	/* initialisation magic :-( */
-	copy_to_pam_dword(card, (void *)0x01800008, 0x00000030);
-	copy_to_pam_dword(card, (void *)0x01800010, 0x00000030);
-	copy_to_pam_dword(card, (void *)0x01800014, 0x42240822);
-	copy_to_pam_dword(card, (void *)0x01800018, 0x07114000);
-	copy_to_pam_dword(card, (void *)0x0180001c, 0x00000400);
-	copy_to_pam_dword(card, (void *)0x01840070, 0x00000010);
+	copy_to_pam_dword(card, 0x01800008, 0x00000030);
+	copy_to_pam_dword(card, 0x01800010, 0x00000030);
+	copy_to_pam_dword(card, 0x01800014, 0x42240822);
+	copy_to_pam_dword(card, 0x01800018, 0x07114000);
+	copy_to_pam_dword(card, 0x0180001c, 0x00000400);
+	copy_to_pam_dword(card, 0x01840070, 0x00000010);
 
 	/* fill the ISDN link layer structure */
 	card->interface.owner = THIS_MODULE;
@@ -201,7 +201,7 @@ static int __devinit tpam_probe(struct pci_dev *dev, const struct pci_device_id 
 	return 0;
 
 err_out_iounmap:
-	iounmap((void *)card->bar0);
+	iounmap(card->bar0);
 
 err_out_free_irq:
 	free_irq(card->irq, card);
@@ -231,7 +231,7 @@ static void __devexit tpam_unregister_card(struct pci_dev *pcidev, tpam_card *ca
 	free_irq(card->irq, card);
 
 	/* release mapped memory */
-	iounmap((void *)card->bar0);
+	iounmap(card->bar0);
 
 	pci_disable_device(pcidev);
 }

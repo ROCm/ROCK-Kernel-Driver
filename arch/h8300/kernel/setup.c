@@ -218,7 +218,7 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 		   "BogoMips:\t%lu.%02lu\n"
 		   "Calibration:\t%lu loops\n",
 	           cpu,mode,
-		   clockfreq/100,clockfreq%100,
+		   clockfreq/1000,clockfreq%1000,
 		   (loops_per_jiffy*HZ)/500000,((loops_per_jiffy*HZ)/5000)%100,
 		   (loops_per_jiffy*HZ));
 

@@ -41,6 +41,8 @@ boot := arch/m32r/boot
 
 .PHONY: zImage
 
+all: zImage
+
 zImage: vmlinux
 	$(Q)$(MAKE) $(build)=$(boot) $(boot)/$@
 
@@ -50,5 +52,5 @@ archclean:
 	$(Q)$(MAKE) $(clean)=$(boot)
 
 define archhelp
-	@echo '  zImage			- Compressed kernel image (arch/m32r/boot/zImage)'
+	echo  '* zImage          - Compressed kernel image (arch/$(ARCH)/boot/zImage)'
 endef

@@ -1,5 +1,5 @@
 /*
- * $Id: ixp4xx.c,v 1.6 2004/09/17 00:25:06 gleixner Exp $
+ * $Id: ixp4xx.c,v 1.7 2004/11/04 13:24:15 gleixner Exp $
  *
  * drivers/mtd/maps/ixp4xx.c
  *
@@ -196,9 +196,8 @@ static int ixp4xx_flash_probe(struct device *_dev)
 		goto Error;
 	}
 
-	info->map.map_priv_1 =
-	    (void __iomem *) ioremap(dev->resource->start, 
-				    dev->resource->end - dev->resource->start + 1);
+	info->map.map_priv_1 = ioremap(dev->resource->start,
+			    dev->resource->end - dev->resource->start + 1);
 	if (!info->map.map_priv_1) {
 		printk(KERN_ERR "IXP4XXFlash: Failed to ioremap region\n");
 		err = -EIO;
