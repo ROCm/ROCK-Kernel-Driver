@@ -34,7 +34,9 @@
 #include <linux/delay.h>
 #include <linux/timer.h>
 #include <linux/interrupt.h>
+#include <linux/completion.h>
 #include <linux/suspend.h>
+#include <linux/workqueue.h>
 #include <scsi/scsi.h>
 #include "scsi.h"
 #include "hosts.h"
@@ -44,14 +46,10 @@
 
 #include "libata.h"
 
-static void atapi_cdb_send(struct ata_port *ap);
 static unsigned int ata_busy_sleep (struct ata_port *ap,
 				    unsigned long tmout_pat,
 			    	    unsigned long tmout);
 static void __ata_dev_select (struct ata_port *ap, unsigned int device);
-#if 0 /* to be used eventually */
-static void ata_qc_push (struct ata_queued_cmd *qc, unsigned int append);
-#endif
 static void ata_dma_complete(struct ata_port *ap, u8 host_stat,
 			     unsigned int done_late);
 static void ata_host_set_pio(struct ata_port *ap);
@@ -59,8 +57,10 @@ static void ata_host_set_udma(struct ata_port *ap);
 static void ata_dev_set_pio(struct ata_port *ap, unsigned int device);
 static void ata_dev_set_udma(struct ata_port *ap, unsigned int device);
 static void ata_set_mode(struct ata_port *ap);
+static int ata_qc_issue_prot(struct ata_queued_cmd *qc);
 
 static unsigned int ata_unique_id = 1;
+static struct workqueue_struct *ata_wq;
 
 MODULE_AUTHOR("Jeff Garzik");
 MODULE_DESCRIPTION("Library module for ATA devices");
@@ -74,13 +74,6 @@ static const char * thr_state_name[] = {
 	"THR_IDLE",
 	"THR_PROBE_SUCCESS",
 	"THR_PROBE_START",
-	"THR_PIO_POLL",
-	"THR_PIO_TMOUT",
-	"THR_PIO",
-	"THR_PIO_LAST",
-	"THR_PIO_LAST_POLL",
-	"THR_PIO_ERR",
-	"THR_PACKET",
 };
 
 /**
@@ -315,8 +308,6 @@ static inline void ata_exec(struct ata_port *ap, struct ata_taskfile *tf)
 
 static void ata_tf_to_host(struct ata_port *ap, struct ata_taskfile *tf)
 {
-	init_MUTEX_LOCKED(&ap->sem);
-
 	ap->ops->tf_load(ap, tf);
 
 	ata_exec(ap, tf);
@@ -337,8 +328,6 @@ static void ata_tf_to_host(struct ata_port *ap, struct ata_taskfile *tf)
 
 void ata_tf_to_host_nolock(struct ata_port *ap, struct ata_taskfile *tf)
 {
-	init_MUTEX_LOCKED(&ap->sem);
-
 	ap->ops->tf_load(ap, tf);
 	ap->ops->exec_command(ap, tf);
 }
@@ -437,6 +426,77 @@ u8 ata_check_status_pio(struct ata_port *ap)
 u8 ata_check_status_mmio(struct ata_port *ap)
 {
        	return readb((void *) ap->ioaddr.status_addr);
+}
+
+/**
+ *	ata_tf_to_fis - Convert ATA taskfile to SATA FIS structure
+ *	@tf: Taskfile to convert
+ *	@fis: Buffer into which data will output
+ *
+ *	Converts a standard ATA taskfile to a Serial ATA
+ *	FIS structure (Register - Host to Device).
+ *
+ *	LOCKING:
+ *	Inherited from caller.
+ */
+
+void ata_tf_to_fis(struct ata_taskfile *tf, u8 *fis, u8 pmp)
+{
+	fis[0] = 0x27;	/* Register - Host to Device FIS */
+	fis[1] = (pmp & 0xf) | (1 << 7); /* Port multiplier number,
+					    bit 7 indicates Command FIS */
+	fis[2] = tf->command;
+	fis[3] = tf->feature;
+
+	fis[4] = tf->lbal;
+	fis[5] = tf->lbam;
+	fis[6] = tf->lbah;
+	fis[7] = tf->device;
+
+	fis[8] = tf->hob_lbal;
+	fis[9] = tf->hob_lbam;
+	fis[10] = tf->hob_lbah;
+	fis[11] = tf->hob_feature;
+
+	fis[12] = tf->nsect;
+	fis[13] = tf->hob_nsect;
+	fis[14] = 0;
+	fis[15] = tf->ctl;
+
+	fis[16] = 0;
+	fis[17] = 0;
+	fis[18] = 0;
+	fis[19] = 0;
+}
+
+/**
+ *	ata_tf_from_fis - Convert SATA FIS to ATA taskfile
+ *	@fis: Buffer from which data will be input
+ *	@tf: Taskfile to output
+ *
+ *	Converts a standard ATA taskfile to a Serial ATA
+ *	FIS structure (Register - Host to Device).
+ *
+ *	LOCKING:
+ *	Inherited from caller.
+ */
+
+void ata_tf_from_fis(u8 *fis, struct ata_taskfile *tf)
+{
+	tf->command	= fis[2];	/* status */
+	tf->feature	= fis[3];	/* error */
+
+	tf->lbal	= fis[4];
+	tf->lbam	= fis[5];
+	tf->lbah	= fis[6];
+	tf->device	= fis[7];
+
+	tf->hob_lbal	= fis[8];
+	tf->hob_lbam	= fis[9];
+	tf->hob_lbah	= fis[10];
+
+	tf->nsect	= fis[12];
+	tf->hob_nsect	= fis[13];
 }
 
 /**
@@ -1928,20 +1988,20 @@ static int ata_sg_setup(struct ata_queued_cmd *qc)
 static unsigned long ata_pio_poll(struct ata_port *ap)
 {
 	u8 status;
-	unsigned int poll_state = THR_UNKNOWN;
-	unsigned int reg_state = THR_UNKNOWN;
-	const unsigned int tmout_state = THR_PIO_TMOUT;
+	unsigned int poll_state = PIO_ST_UNKNOWN;
+	unsigned int reg_state = PIO_ST_UNKNOWN;
+	const unsigned int tmout_state = PIO_ST_TMOUT;
 
-	switch (ap->thr_state) {
-	case THR_PIO:
-	case THR_PIO_POLL:
-		poll_state = THR_PIO_POLL;
-		reg_state = THR_PIO;
+	switch (ap->pio_task_state) {
+	case PIO_ST:
+	case PIO_ST_POLL:
+		poll_state = PIO_ST_POLL;
+		reg_state = PIO_ST;
 		break;
-	case THR_PIO_LAST:
-	case THR_PIO_LAST_POLL:
-		poll_state = THR_PIO_LAST_POLL;
-		reg_state = THR_PIO_LAST;
+	case PIO_ST_LAST:
+	case PIO_ST_LAST_POLL:
+		poll_state = PIO_ST_LAST_POLL;
+		reg_state = PIO_ST_LAST;
 		break;
 	default:
 		BUG();
@@ -1950,36 +2010,16 @@ static unsigned long ata_pio_poll(struct ata_port *ap)
 
 	status = ata_chk_status(ap);
 	if (status & ATA_BUSY) {
-		if (time_after(jiffies, ap->thr_timeout)) {
-			ap->thr_state = tmout_state;
+		if (time_after(jiffies, ap->pio_task_timeout)) {
+			ap->pio_task_state = tmout_state;
 			return 0;
 		}
-		ap->thr_state = poll_state;
+		ap->pio_task_state = poll_state;
 		return ATA_SHORT_PAUSE;
 	}
 
-	ap->thr_state = reg_state;
+	ap->pio_task_state = reg_state;
 	return 0;
-}
-
-/**
- *	ata_pio_start -
- *	@qc:
- *
- *	LOCKING:
- *	spin_lock_irqsave(host_set lock)
- */
-
-static void ata_pio_start (struct ata_queued_cmd *qc)
-{
-	struct ata_port *ap = qc->ap;
-
-	assert(qc->tf.protocol == ATA_PROT_PIO);
-
-	qc->flags |= ATA_QCFLAG_POLL;
-	qc->tf.ctl |= ATA_NIEN;	/* disable interrupts */
-	ata_tf_to_host_nolock(ap, &qc->tf);
-	ata_thread_wake(ap, THR_PIO);
 }
 
 /**
@@ -1992,7 +2032,6 @@ static void ata_pio_start (struct ata_queued_cmd *qc)
 static void ata_pio_complete (struct ata_port *ap)
 {
 	struct ata_queued_cmd *qc;
-	unsigned long flags;
 	u8 drv_stat;
 
 	/*
@@ -2001,31 +2040,29 @@ static void ata_pio_complete (struct ata_port *ap)
 	 * a chk-status or two.  If not, the drive is probably seeking
 	 * or something.  Snooze for a couple msecs, then
 	 * chk-status again.  If still busy, fall back to
-	 * THR_PIO_POLL state.
+	 * PIO_ST_POLL state.
 	 */
 	drv_stat = ata_busy_wait(ap, ATA_BUSY | ATA_DRQ, 10);
 	if (drv_stat & (ATA_BUSY | ATA_DRQ)) {
 		msleep(2);
 		drv_stat = ata_busy_wait(ap, ATA_BUSY | ATA_DRQ, 10);
 		if (drv_stat & (ATA_BUSY | ATA_DRQ)) {
-			ap->thr_state = THR_PIO_LAST_POLL;
-			ap->thr_timeout = jiffies + ATA_TMOUT_PIO;
+			ap->pio_task_state = PIO_ST_LAST_POLL;
+			ap->pio_task_timeout = jiffies + ATA_TMOUT_PIO;
 			return;
 		}
 	}
 
 	drv_stat = ata_wait_idle(ap);
 	if (drv_stat & (ATA_BUSY | ATA_DRQ)) {
-		ap->thr_state = THR_PIO_ERR;
+		ap->pio_task_state = PIO_ST_ERR;
 		return;
 	}
 
 	qc = ata_qc_from_tag(ap, ap->active_tag);
 	assert(qc != NULL);
 
-	spin_lock_irqsave(&ap->host_set->lock, flags);
-	ap->thr_state = THR_IDLE;
-	spin_unlock_irqrestore(&ap->host_set->lock, flags);
+	ap->pio_task_state = PIO_ST_IDLE;
 
 	ata_irq_on(ap);
 
@@ -2053,22 +2090,22 @@ static void ata_pio_sector(struct ata_port *ap)
 	 * a chk-status or two.  If not, the drive is probably seeking
 	 * or something.  Snooze for a couple msecs, then
 	 * chk-status again.  If still busy, fall back to
-	 * THR_PIO_POLL state.
+	 * PIO_ST_POLL state.
 	 */
 	status = ata_busy_wait(ap, ATA_BUSY, 5);
 	if (status & ATA_BUSY) {
 		msleep(2);
 		status = ata_busy_wait(ap, ATA_BUSY, 10);
 		if (status & ATA_BUSY) {
-			ap->thr_state = THR_PIO_POLL;
-			ap->thr_timeout = jiffies + ATA_TMOUT_PIO;
+			ap->pio_task_state = PIO_ST_POLL;
+			ap->pio_task_timeout = jiffies + ATA_TMOUT_PIO;
 			return;
 		}
 	}
 
 	/* handle BSY=0, DRQ=0 as error */
 	if ((status & ATA_DRQ) == 0) {
-		ap->thr_state = THR_PIO_ERR;
+		ap->pio_task_state = PIO_ST_ERR;
 		return;
 	}
 
@@ -2079,7 +2116,7 @@ static void ata_pio_sector(struct ata_port *ap)
 	sg = qc->sg;
 
 	if (qc->cursect == (qc->nsect - 1))
-		ap->thr_state = THR_PIO_LAST;
+		ap->pio_task_state = PIO_ST_LAST;
 
 	buf = kmap(sg[qc->cursg].page) +
 	      sg[qc->cursg].offset + (qc->cursg_ofs * ATA_SECT_SIZE);
@@ -2107,20 +2144,48 @@ static void ata_pio_sector(struct ata_port *ap)
 	kunmap(sg[qc->cursg].page);
 }
 
-#if 0 /* to be used eventually */
-/**
- *	ata_eng_schedule - run an iteration of the pio/dma/whatever engine
- *	@ap: port on which activity will occur
- *	@eng: instance of engine
- *
- *	LOCKING:
- *	spin_lock_irqsave(host_set lock)
- */
-static void ata_eng_schedule (struct ata_port *ap, struct ata_engine *eng)
+static void ata_pio_task(void *_data)
 {
-	/* FIXME */
+	struct ata_port *ap = _data;
+	unsigned long timeout = 0;
+
+	switch (ap->pio_task_state) {
+	case PIO_ST:
+		ata_pio_sector(ap);
+		break;
+
+	case PIO_ST_LAST:
+		ata_pio_complete(ap);
+		break;
+
+	case PIO_ST_POLL:
+	case PIO_ST_LAST_POLL:
+		timeout = ata_pio_poll(ap);
+		break;
+
+	case PIO_ST_TMOUT:
+		printk(KERN_ERR "ata%d: FIXME: PIO_ST_TMOUT\n", /* FIXME */
+		       ap->id);
+		timeout = 11 * HZ;
+		break;
+
+	case PIO_ST_ERR:
+		printk(KERN_ERR "ata%d: FIXME: PIO_ST_ERR\n", /* FIXME */
+		       ap->id);
+		timeout = 11 * HZ;
+		break;
+	}
+
+	if ((ap->pio_task_state != PIO_ST_IDLE) &&
+	    (ap->pio_task_state != PIO_ST_TMOUT) &&
+	    (ap->pio_task_state != PIO_ST_ERR)) {
+		if (timeout)
+			queue_delayed_work(ata_wq, &ap->pio_task,
+					   timeout);
+		else
+			queue_work(ata_wq, &ap->pio_task);
+	}
 }
-#endif
 
 /**
  *	ata_eng_timeout - Handle timeout of queued command
@@ -2246,8 +2311,6 @@ struct ata_queued_cmd *ata_qc_new_init(struct ata_port *ap,
 		qc->ap = ap;
 		qc->dev = dev;
 		qc->cursect = qc->cursg = qc->cursg_ofs = 0;
-		INIT_LIST_HEAD(&qc->node);
-		init_MUTEX_LOCKED(&qc->sem);
 
 		ata_tf_init(ap, &qc->tf, dev->devno);
 
@@ -2304,52 +2367,33 @@ void ata_qc_complete(struct ata_queued_cmd *qc, u8 drv_stat, unsigned int done_l
 		do_clear = 1;
 	}
 
-	up(&qc->sem);
+	if (qc->waiting)
+		complete(qc->waiting);
 
 	if (likely(do_clear))
 		clear_bit(tag, &ap->qactive);
 }
 
-#if 0 /* to be used eventually */
 /**
- *	ata_qc_push -
- *	@qc:
- *	@append:
+ *	ata_qc_issue - issue taskfile to device
+ *	@qc: command to issue to device
+ *
+ *	Prepare an ATA command to submission to device.
+ *	This includes mapping the data into a DMA-able
+ *	area, filling in the S/G table, and finally
+ *	writing the taskfile to hardware, starting the command.
  *
  *	LOCKING:
  *	spin_lock_irqsave(host_set lock)
- */
-static void ata_qc_push (struct ata_queued_cmd *qc, unsigned int append)
-{
-	struct ata_port *ap = qc->ap;
-	struct ata_engine *eng = &ap->eng;
-
-	if (likely(append))
-		list_add_tail(&qc->node, &eng->q);
-	else
-		list_add(&qc->node, &eng->q);
-
-	if (!test_and_set_bit(ATA_EFLG_ACTIVE, &eng->flags))
-		ata_eng_schedule(ap, eng);
-}
-#endif
-
-/**
- *	ata_qc_issue -
- *	@qc:
- *
- *	LOCKING:
  *
  *	RETURNS:
- *
+ *	Zero on success, negative on error.
  */
+
 int ata_qc_issue(struct ata_queued_cmd *qc)
 {
 	struct ata_port *ap = qc->ap;
 	struct scsi_cmnd *cmd = qc->scsicmd;
-	unsigned int dma = qc->flags & ATA_QCFLAG_DMA;
-
-	ata_dev_select(ap, qc->dev->devno, 1, 0);
 
 	/* set up SG table */
 	if (cmd->use_sg) {
@@ -2365,17 +2409,58 @@ int ata_qc_issue(struct ata_queued_cmd *qc)
 	qc->ap->active_tag = qc->tag;
 	qc->flags |= ATA_QCFLAG_ACTIVE;
 
-	if (likely(dma)) {
-		ap->ops->tf_load(ap, &qc->tf);	/* load tf registers */
-		ap->ops->bmdma_start(qc);	/* initiate bmdma */
-	} else
-		/* load tf registers, initiate polling pio */
-		ata_pio_start(qc);
-
-	return 0;
+	return ata_qc_issue_prot(qc);
 
 err_out:
 	return -1;
+}
+
+/**
+ *	ata_qc_issue_prot - issue taskfile to device in proto-dependent manner
+ *	@qc: command to issue to device
+ *
+ *	Using various libata functions and hooks, this function
+ *	starts an ATA command.  ATA commands are grouped into
+ *	classes called "protocols", and issuing each type of protocol
+ *	is slightly different.
+ *
+ *	LOCKING:
+ *	spin_lock_irqsave(host_set lock)
+ *
+ *	RETURNS:
+ *	Zero on success, negative on error.
+ */
+
+static int ata_qc_issue_prot(struct ata_queued_cmd *qc)
+{
+	struct ata_port *ap = qc->ap;
+
+	ata_dev_select(ap, qc->dev->devno, 1, 0);
+
+	switch (qc->tf.protocol) {
+	case ATA_PROT_NODATA:
+		ata_tf_to_host_nolock(ap, &qc->tf);
+		break;
+
+	case ATA_PROT_DMA:
+		ap->ops->tf_load(ap, &qc->tf);	 /* load tf registers */
+		ap->ops->bmdma_start(qc);	    /* initiate bmdma */
+		break;
+
+	case ATA_PROT_PIO: /* load tf registers, initiate polling pio */
+		qc->flags |= ATA_QCFLAG_POLL;
+		qc->tf.ctl |= ATA_NIEN;	/* disable interrupts */
+		ata_tf_to_host_nolock(ap, &qc->tf);
+		ap->pio_task_state = PIO_ST;
+		queue_work(ata_wq, &ap->pio_task);
+		break;
+
+	default:
+		WARN_ON(1);
+		return -1;
+	}
+
+	return 0;
 }
 
 /**
@@ -2614,36 +2699,6 @@ irqreturn_t ata_interrupt (int irq, void *dev_instance, struct pt_regs *regs)
 }
 
 /**
- *	ata_thread_wake -
- *	@ap:
- *	@thr_state:
- *
- *	LOCKING:
- *	spin_lock_irqsave(host_set lock)
- */
-
-void ata_thread_wake(struct ata_port *ap, unsigned int thr_state)
-{
-	assert(ap->thr_state == THR_IDLE);
-	ap->thr_state = thr_state;
-	up(&ap->thr_sem);
-}
-
-/**
- *	ata_thread_timer -
- *	@opaque:
- *
- *	LOCKING:
- */
-
-static void ata_thread_timer(unsigned long opaque)
-{
-	struct ata_port *ap = (struct ata_port *) opaque;
-
-	up(&ap->thr_sem);
-}
-
-/**
  *	ata_thread_iter -
  *	@ap:
  *
@@ -2666,7 +2721,6 @@ static unsigned long ata_thread_iter(struct ata_port *ap)
 		break;
 
 	case THR_PROBE_START:
-		down(&ap->sem);
 		ap->thr_state = THR_PORT_RESET;
 		break;
 
@@ -2685,40 +2739,8 @@ static unsigned long ata_thread_iter(struct ata_port *ap)
 		break;
 
 	case THR_AWAIT_DEATH:
-		timeout = -1;
-		break;
-
 	case THR_IDLE:
-		timeout = 30 * HZ;
-		break;
-
-	case THR_PIO:
-		ata_pio_sector(ap);
-		break;
-
-	case THR_PIO_LAST:
-		ata_pio_complete(ap);
-		break;
-
-	case THR_PIO_POLL:
-	case THR_PIO_LAST_POLL:
-		timeout = ata_pio_poll(ap);
-		break;
-
-	case THR_PIO_TMOUT:
-		printk(KERN_ERR "ata%d: FIXME: THR_PIO_TMOUT\n", /* FIXME */
-		       ap->id);
-		timeout = 11 * HZ;
-		break;
-
-	case THR_PIO_ERR:
-		printk(KERN_ERR "ata%d: FIXME: THR_PIO_ERR\n", /* FIXME */
-		       ap->id);
-		timeout = 11 * HZ;
-		break;
-
-	case THR_PACKET:
-		atapi_cdb_send(ap);
+		timeout = -1;
 		break;
 
 	default:
@@ -2732,87 +2754,23 @@ static unsigned long ata_thread_iter(struct ata_port *ap)
 	return timeout;
 }
 
-/**
- *	ata_thread -
- *	@data:
- *
- *	LOCKING:
- *
- *	RETURNS:
- *
- */
-
-static int ata_thread (void *data)
+void atapi_start(struct ata_queued_cmd *qc)
 {
-        struct ata_port *ap = data;
-	long timeout;
+	struct ata_port *ap = qc->ap;
 
-	daemonize ("katad-%u", ap->id);
-	allow_signal(SIGTERM);
+	qc->flags |= ATA_QCFLAG_ACTIVE;
+	ap->active_tag = qc->tag;
 
-        while (1) {
-		cond_resched();
+	ata_dev_select(ap, qc->dev->devno, 1, 0);
+	ata_tf_to_host_nolock(ap, &qc->tf);
+	queue_work(ata_wq, &ap->packet_task);
 
-		timeout = ata_thread_iter(ap);
-
-                if (signal_pending (current))
-                        flush_signals(current);
-                        
-                if (current->flags & PF_FREEZE)
-			refrigerator(PF_FREEZE);
-                                                        
-
-                if ((timeout < 0) || (ap->time_to_die))
-                        break;
-
- 		/* note sleeping for full timeout not guaranteed (that's ok) */
-		if (timeout) {
-			mod_timer(&ap->thr_timer, jiffies + timeout);
-			down_interruptible(&ap->thr_sem);
-
-                	if (signal_pending (current))
-                        	flush_signals(current);
-
-                	if (ap->time_to_die)
-                        	break;
-		}
-        }
-
-	printk(KERN_DEBUG "ata%u: thread exiting\n", ap->id);
-	ap->thr_pid = -1;
-	del_timer_sync(&ap->thr_timer);
-	complete_and_exit (&ap->thr_exited, 0);
+	VPRINTK("EXIT\n");
 }
 
 /**
- *	ata_thread_kill - kill per-port kernel thread
- *	@ap: port those thread is to be killed
- *
- *	LOCKING:
- *
- */
-
-static int ata_thread_kill(struct ata_port *ap)
-{
-	int ret = 0;
-
-	if (ap->thr_pid >= 0) {
-		ap->time_to_die = 1;
-		wmb();
-		ret = kill_proc(ap->thr_pid, SIGTERM, 1);
-		if (ret)
-			printk(KERN_ERR "ata%d: unable to kill kernel thread\n",
-			       ap->id);
-		else
-			wait_for_completion(&ap->thr_exited);
-	}
-
-	return ret;
-}
-
-/**
- *	atapi_cdb_send - Write CDB bytes to hardware
- *	@ap: Port to which ATAPI device is attached.
+ *	atapi_packet_task - Write CDB bytes to hardware
+ *	@_data: Port to which ATAPI device is attached.
  *
  *	When device has indicated its readiness to accept
  *	a CDB, this function is called.  Send the CDB.
@@ -2824,8 +2782,9 @@ static int ata_thread_kill(struct ata_port *ap)
  *	Kernel thread context (may sleep)
  */
 
-static void atapi_cdb_send(struct ata_port *ap)
+static void atapi_packet_task(void *_data)
 {
+	struct ata_port *ap = _data;
 	struct ata_queued_cmd *qc;
 	u8 status;
 
@@ -2850,30 +2809,17 @@ static void atapi_cdb_send(struct ata_port *ap)
 	      qc->scsicmd->cmnd, ap->host->max_cmd_len / 4);
 
 	/* if we are DMA'ing, irq handler takes over from here */
-	if (qc->tf.feature == ATAPI_PKT_DMA)
-		goto out;
+	if (qc->tf.protocol == ATA_PROT_ATAPI_DMA) {
+		/* FIXME: start DMA here */
+	} else {
+		ap->pio_task_state = PIO_ST;
+		queue_work(ata_wq, &ap->pio_task);
+	}
 
-	/* sleep-wait for BSY to clear */
-	DPRINTK("busy wait 2\n");
-	if (ata_busy_sleep(ap, ATA_TMOUT_CDB_QUICK, ATA_TMOUT_CDB))
-		goto err_out;
-
-	/* wait for BSY,DRQ to clear */
-	status = ata_wait_idle(ap);
-	if (status & (ATA_BUSY | ATA_DRQ))
-		goto err_out;
-
-	/* transaction completed, indicate such to scsi stack */
-	ata_qc_complete(qc, status, 0);
-	ata_irq_on(ap);
-
-out:
-	ap->thr_state = THR_IDLE;
 	return;
 
 err_out:
 	ata_qc_complete(qc, ATA_ERR, 0);
-	goto out;
 }
 
 int ata_port_start (struct ata_port *ap)
@@ -2883,7 +2829,7 @@ int ata_port_start (struct ata_port *ap)
 	ap->prd = pci_alloc_consistent(pdev, ATA_PRD_TBL_SZ, &ap->prd_dma);
 	if (!ap->prd)
 		return -ENOMEM;
-	
+
 	DPRINTK("prd alloc, virt %p, dma %llx\n", ap->prd, (unsigned long long) ap->prd_dma);
 
 	return 0;
@@ -2894,6 +2840,21 @@ void ata_port_stop (struct ata_port *ap)
 	struct pci_dev *pdev = ap->host_set->pdev;
 
 	pci_free_consistent(pdev, ATA_PRD_TBL_SZ, ap->prd, ap->prd_dma);
+}
+
+static void ata_probe_task(void *_data)
+{
+	struct ata_port *ap = _data;
+	long timeout;
+
+	timeout = ata_thread_iter(ap);
+	if (timeout < 0)
+		return;
+
+	if (timeout > 0)
+		queue_delayed_work(ata_wq, &ap->probe_task, timeout);
+	else
+		queue_work(ata_wq, &ap->probe_task);
 }
 
 /**
@@ -2912,8 +2873,6 @@ static void ata_host_remove(struct ata_port *ap, unsigned int do_unregister)
 
 	if (do_unregister)
 		scsi_remove_host(sh);
-
-	ata_thread_kill(ap);	/* FIXME: check return val */
 
 	ap->ops->port_stop(ap);
 }
@@ -2958,21 +2917,14 @@ static void ata_host_init(struct ata_port *ap, struct Scsi_Host *host,
 	ap->active_tag = ATA_TAG_POISON;
 	ap->last_ctl = 0xFF;
 
-	/* ata_engine init */
-	ap->eng.flags = 0;
-	INIT_LIST_HEAD(&ap->eng.q);
+	INIT_WORK(&ap->packet_task, atapi_packet_task, ap);
+	INIT_WORK(&ap->pio_task, ata_pio_task, ap);
+	INIT_WORK(&ap->probe_task, ata_probe_task, ap);
 
 	for (i = 0; i < ATA_MAX_DEVICES; i++)
 		ap->device[i].devno = i;
 
-	init_completion(&ap->thr_exited);
 	init_MUTEX_LOCKED(&ap->probe_sem);
-	init_MUTEX_LOCKED(&ap->sem);
-	init_MUTEX_LOCKED(&ap->thr_sem);
-
-	init_timer(&ap->thr_timer);
-	ap->thr_timer.function = ata_thread_timer;
-	ap->thr_timer.data = (unsigned long) ap;
 
 #ifdef ATA_IRQ_TRAP
 	ap->stats.unhandled_irq = 1;
@@ -3015,17 +2967,7 @@ static struct ata_port * ata_host_add(struct ata_probe_ent *ent,
 	if (rc)
 		goto err_out;
 
-	ap->thr_pid = kernel_thread(ata_thread, ap, CLONE_FS | CLONE_FILES);
-	if (ap->thr_pid < 0) {
-		printk(KERN_ERR "ata%d: unable to start kernel thread\n",
-		       ap->id);
-		goto err_out_free;
-	}
-
 	return ap;
-
-err_out_free:
-	ap->ops->port_stop(ap);
 
 err_out:
 	scsi_host_put(host);
@@ -3106,7 +3048,7 @@ int ata_device_add(struct ata_probe_ent *ent)
 		ap = host_set->ports[i];
 
 		DPRINTK("ata%u: probe begin\n", ap->id);
-		up(&ap->sem);		/* start probe */
+		queue_work(ata_wq, &ap->probe_task);	/* start probe */
 
 		DPRINTK("ata%u: probe-wait begin\n", ap->id);
 		down(&ap->probe_sem);	/* wait for end */
@@ -3489,11 +3431,21 @@ int pci_test_config_bits(struct pci_dev *pdev, struct pci_bits *bits)
 
 static int __init ata_init(void)
 {
+	ata_wq = create_workqueue("ata");
+	if (!ata_wq)
+		return -ENOMEM;
+
 	printk(KERN_DEBUG "libata version " DRV_VERSION " loaded.\n");
 	return 0;
 }
 
+static void __exit ata_exit(void)
+{
+	destroy_workqueue(ata_wq);
+}
+
 module_init(ata_init);
+module_exit(ata_exit);
 
 /*
  * libata is essentially a library of internal helper functions for
@@ -3512,6 +3464,8 @@ EXPORT_SYMBOL_GPL(ata_tf_load_pio);
 EXPORT_SYMBOL_GPL(ata_tf_load_mmio);
 EXPORT_SYMBOL_GPL(ata_tf_read_pio);
 EXPORT_SYMBOL_GPL(ata_tf_read_mmio);
+EXPORT_SYMBOL_GPL(ata_tf_to_fis);
+EXPORT_SYMBOL_GPL(ata_tf_from_fis);
 EXPORT_SYMBOL_GPL(ata_check_status_pio);
 EXPORT_SYMBOL_GPL(ata_check_status_mmio);
 EXPORT_SYMBOL_GPL(ata_exec_command_pio);

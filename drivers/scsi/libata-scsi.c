@@ -167,7 +167,26 @@ int ata_scsi_slave_config(struct scsi_device *sdev)
 {
 	sdev->use_10_for_rw = 1;
 	sdev->use_10_for_ms = 1;
+
 	blk_queue_max_phys_segments(sdev->request_queue, LIBATA_MAX_PRD);
+
+	if (sdev->id < ATA_MAX_DEVICES) {
+		struct ata_port *ap;
+		struct ata_device *dev;
+
+		ap = (struct ata_port *) &sdev->host->hostdata[0];
+		dev = &ap->device[sdev->id];
+
+		/* TODO: 1024 is an arbitrary number, not the
+		 * hardware maximum.  This should be increased to
+		 * 65534 when Jens Axboe's patch for dynamically
+		 * determining max_sectors is merged.
+		 */
+		if (dev->flags & ATA_DFLAG_LBA48) {
+			sdev->host->max_sectors = 2048;
+			blk_queue_max_sectors(sdev->request_queue, 2048);
+		}
+	}
 
 	return 0;	/* scsi layer doesn't check return value, sigh */
 }
@@ -884,8 +903,7 @@ static void atapi_scsi_queuecmd(struct ata_port *ap, struct ata_device *dev,
 			       struct scsi_cmnd *cmd, void (*done)(struct scsi_cmnd *))
 {
 	struct ata_queued_cmd *qc;
-	u8 *scsicmd = cmd->cmnd, status;
-	unsigned int doing_dma = 0;
+	u8 *scsicmd = cmd->cmnd;
 
 	VPRINTK("ENTER, drv_stat = 0x%x\n", ata_chk_status(ap));
 
@@ -925,52 +943,17 @@ static void atapi_scsi_queuecmd(struct ata_port *ap, struct ata_device *dev,
 
 	qc->tf.command = ATA_CMD_PACKET;
 
-	/* set up SG table */
 	if (cmd->sc_data_direction == SCSI_DATA_NONE) {
-		ap->active_tag = qc->tag;
-		qc->flags |= ATA_QCFLAG_ACTIVE | ATA_QCFLAG_POLL;
 		qc->tf.protocol = ATA_PROT_ATAPI;
-
-		ata_dev_select(ap, dev->devno, 1, 0);
-
-		DPRINTK("direction: none\n");
+		qc->flags |= ATA_QCFLAG_POLL;
 		qc->tf.ctl |= ATA_NIEN;	/* disable interrupts */
-		ata_tf_to_host_nolock(ap, &qc->tf);
 	} else {
-		qc->flags |= ATA_QCFLAG_SG; /* data is present; dma-map it */
-		qc->tf.feature = ATAPI_PKT_DMA;
 		qc->tf.protocol = ATA_PROT_ATAPI_DMA;
-
-		doing_dma = 1;
-
-		/* select device, send command to hardware */
-		if (ata_qc_issue(qc))
-			goto err_out;
+		qc->flags |= ATA_QCFLAG_SG; /* data is present; dma-map it */
+		qc->tf.feature |= ATAPI_PKT_DMA;
 	}
 
-	status = ata_busy_wait(ap, ATA_BUSY, 1000);
-	if (status & ATA_BUSY) {
-		ata_thread_wake(ap, THR_PACKET);
-		return;
-	}
-	if ((status & ATA_DRQ) == 0)
-		goto err_out;
-
-	/* FIXME: mmio-ize */
-	DPRINTK("writing cdb\n");
-	outsl(ap->ioaddr.data_addr, scsicmd, ap->host->max_cmd_len / 4);
-
-	if (!doing_dma)
-		ata_thread_wake(ap, THR_PACKET);
-
-	VPRINTK("EXIT\n");
-	return;
-
-err_out:
-	if (!doing_dma)
-		ata_irq_on(ap);	/* re-enable interrupts */
-	ata_bad_cdb(cmd, done);
-	DPRINTK("EXIT - badcmd\n");
+	atapi_start(qc);
 }
 
 /**
