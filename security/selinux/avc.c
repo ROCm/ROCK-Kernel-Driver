@@ -81,6 +81,24 @@ static inline int avc_hash(u32 ssid, u32 tsid, u16 tclass)
 	return (ssid ^ (tsid<<2) ^ (tclass<<4)) & (AVC_CACHE_SLOTS - 1);
 }
 
+#ifdef AVC_CACHE_STATS
+static inline void avc_cache_stats_incr(int type)
+{
+	avc_cache_stats[type]++;
+}
+
+static inline void avc_cache_stats_add(int type, unsigned val)
+{
+	avc_cache_stats[type] += val;
+}
+#else
+static inline void avc_cache_stats_incr(int type)
+{ }
+
+static inline void avc_cache_stats_add(int type, unsigned val)
+{ }
+#endif
+
 /**
  * avc_dump_av - Display an access vector in human-readable form.
  * @tclass: target security class
