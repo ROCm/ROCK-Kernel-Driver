@@ -498,7 +498,7 @@ int ipmi_addr_equal(struct ipmi_addr *addr1, struct ipmi_addr *addr2);
 /* Messages sent to the interface are this format. */
 struct ipmi_req
 {
-	unsigned char *addr; /* Address to send the message to. */
+	unsigned char __user *addr; /* Address to send the message to. */
 	unsigned int  addr_len;
 
 	long    msgid; /* The sequence number for the message.  This
@@ -549,7 +549,7 @@ struct ipmi_recv
 	int     recv_type; /* Is this a command, response or an
 			      asyncronous event. */
 
-	unsigned char *addr;    /* Address the message was from is put
+	unsigned char __user *addr;    /* Address the message was from is put
 				   here.  The caller must supply the
 				   memory. */
 	unsigned int  addr_len; /* The size of the address buffer.

@@ -75,9 +75,10 @@ struct idmap {
 	struct idmap_hashtable idmap_group_hash;
 };
 
-static ssize_t   idmap_pipe_upcall(struct file *, struct rpc_pipe_msg *, char *,
-                     size_t);
-static ssize_t   idmap_pipe_downcall(struct file *, const char *, size_t);
+static ssize_t   idmap_pipe_upcall(struct file *, struct rpc_pipe_msg *,
+		     char __user *, size_t);
+static ssize_t   idmap_pipe_downcall(struct file *, const char __user *,
+		     size_t);
 void             idmap_pipe_destroy_msg(struct rpc_pipe_msg *);
 
 static unsigned int fnvhash32(const void *, size_t);
@@ -332,7 +333,7 @@ nfs_idmap_name(struct idmap *idmap, struct idmap_hashtable *h,
 /* RPC pipefs upcall/downcall routines */
 static ssize_t
 idmap_pipe_upcall(struct file *filp, struct rpc_pipe_msg *msg,
-    char *dst, size_t buflen)
+    char __user *dst, size_t buflen)
 {
         char *data = (char *)msg->data + msg->copied;
         ssize_t mlen = msg->len - msg->copied;
@@ -353,7 +354,7 @@ idmap_pipe_upcall(struct file *filp, struct rpc_pipe_msg *msg,
 }
 
 static ssize_t
-idmap_pipe_downcall(struct file *filp, const char *src, size_t mlen)
+idmap_pipe_downcall(struct file *filp, const char __user *src, size_t mlen)
 {
         struct rpc_inode *rpci = RPC_I(filp->f_dentry->d_inode);
 	struct idmap *idmap = (struct idmap *)rpci->private;

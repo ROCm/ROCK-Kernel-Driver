@@ -1544,7 +1544,7 @@ static int radeonfb_ioctl (struct inode *inode, struct file *file, unsigned int 
 					break;
 			}
 
-			rc = get_user(value, (__u32*)arg);
+			rc = get_user(value, (__u32 __user *)arg);
 
 			if (rc)
 				return rc;
@@ -1598,7 +1598,7 @@ static int radeonfb_ioctl (struct inode *inode, struct file *file, unsigned int 
 			if (CRTC_CRT_ON & tmp)
 				value |= 0x02;
 
-			return put_user(value, (__u32*)arg);
+			return put_user(value, (__u32 __user *)arg);
 		default:
 			return -EINVAL;
 	}

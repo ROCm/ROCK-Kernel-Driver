@@ -1267,48 +1267,49 @@ imsttfb_ioctl(struct inode *inode, struct file *file, u_int cmd,
 	      u_long arg, struct fb_info *info)
 {
 	struct imstt_par *par = (struct imstt_par *) info->par;
+	void __user *argp = (void __user *)arg;
 	__u32 reg[2];
 	__u8 idx[2];
 
 	switch (cmd) {
 		case FBIMSTT_SETREG:
-			if (copy_from_user(reg, (void *)arg, 8) || reg[0] > (0x1000 - sizeof(reg[0])) / sizeof(reg[0]))
+			if (copy_from_user(reg, argp, 8) || reg[0] > (0x1000 - sizeof(reg[0])) / sizeof(reg[0]))
 				return -EFAULT;
 			write_reg_le32(par->dc_regs, reg[0], reg[1]);
 			return 0;
 		case FBIMSTT_GETREG:
-			if (copy_from_user(reg, (void *)arg, 4) || reg[0] > (0x1000 - sizeof(reg[0])) / sizeof(reg[0]))
+			if (copy_from_user(reg, argp, 4) || reg[0] > (0x1000 - sizeof(reg[0])) / sizeof(reg[0]))
 				return -EFAULT;
 			reg[1] = read_reg_le32(par->dc_regs, reg[0]);
-			if (copy_to_user((void *)(arg + 4), &reg[1], 4))
+			if (copy_to_user((void __user *)(arg + 4), &reg[1], 4))
 				return -EFAULT;
 			return 0;
 		case FBIMSTT_SETCMAPREG:
-			if (copy_from_user(reg, (void *)arg, 8) || reg[0] > (0x1000 - sizeof(reg[0])) / sizeof(reg[0]))
+			if (copy_from_user(reg, argp, 8) || reg[0] > (0x1000 - sizeof(reg[0])) / sizeof(reg[0]))
 				return -EFAULT;
 			write_reg_le32(((u_int *)par->cmap_regs), reg[0], reg[1]);
 			return 0;
 		case FBIMSTT_GETCMAPREG:
-			if (copy_from_user(reg, (void *)arg, 4) || reg[0] > (0x1000 - sizeof(reg[0])) / sizeof(reg[0]))
+			if (copy_from_user(reg, argp, 4) || reg[0] > (0x1000 - sizeof(reg[0])) / sizeof(reg[0]))
 				return -EFAULT;
 			reg[1] = read_reg_le32(((u_int *)par->cmap_regs), reg[0]);
-			if (copy_to_user((void *)(arg + 4), &reg[1], 4))
+			if (copy_to_user((void __user *)(arg + 4), &reg[1], 4))
 				return -EFAULT;
 			return 0;
 		case FBIMSTT_SETIDXREG:
-			if (copy_from_user(idx, (void *)arg, 2))
+			if (copy_from_user(idx, argp, 2))
 				return -EFAULT;
 			par->cmap_regs[PIDXHI] = 0;		eieio();
 			par->cmap_regs[PIDXLO] = idx[0];	eieio();
 			par->cmap_regs[PIDXDATA] = idx[1];	eieio();
 			return 0;
 		case FBIMSTT_GETIDXREG:
-			if (copy_from_user(idx, (void *)arg, 1))
+			if (copy_from_user(idx, argp, 1))
 				return -EFAULT;
 			par->cmap_regs[PIDXHI] = 0;		eieio();
 			par->cmap_regs[PIDXLO] = idx[0];	eieio();
 			idx[1] = par->cmap_regs[PIDXDATA];
-			if (copy_to_user((void *)(arg + 1), &idx[1], 1))
+			if (copy_to_user((void __user *)(arg + 1), &idx[1], 1))
 				return -EFAULT;
 			return 0;
 		default:

@@ -459,8 +459,8 @@ struct fb_ops {
 	/* For framebuffers with strange non linear layouts or that do not
 	 * work with normal memory mapped access
 	 */
-	ssize_t (*fb_read)(struct file *file, char *buf, size_t count, loff_t *ppos);
-	ssize_t (*fb_write)(struct file *file, const char *buf, size_t count, loff_t *ppos);
+	ssize_t (*fb_read)(struct file *file, char __user *buf, size_t count, loff_t *ppos);
+	ssize_t (*fb_write)(struct file *file, const char __user *buf, size_t count, loff_t *ppos);
 
 	/* checks var and eventually tweaks it to something supported,
 	 * DO NOT MODIFY PAR */

@@ -806,7 +806,7 @@ static int fbmem_read_proc(char *buf, char **start, off_t offset,
 }
 
 static ssize_t
-fb_read(struct file *file, char *buf, size_t count, loff_t *ppos)
+fb_read(struct file *file, char __user *buf, size_t count, loff_t *ppos)
 {
 	unsigned long p = *ppos;
 	struct inode *inode = file->f_dentry->d_inode;
@@ -843,7 +843,7 @@ fb_read(struct file *file, char *buf, size_t count, loff_t *ppos)
 }
 
 static ssize_t
-fb_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
+fb_write(struct file *file, const char __user *buf, size_t count, loff_t *ppos)
 {
 	unsigned long p = *ppos;
 	struct inode *inode = file->f_dentry->d_inode;

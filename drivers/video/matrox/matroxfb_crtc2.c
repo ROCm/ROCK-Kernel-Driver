@@ -437,7 +437,7 @@ static int matroxfb_dh_ioctl(struct inode* inode,
 				err = matroxfb_dh_get_vblank(m2info, &vblank);
 				if (err)
 					return err;
-				if (copy_to_user((struct fb_vblank*)arg, &vblank, sizeof(vblank)))
+				if (copy_to_user((void __user *)arg, &vblank, sizeof(vblank)))
 					return -EFAULT;
 				return 0;
 			}
@@ -445,7 +445,7 @@ static int matroxfb_dh_ioctl(struct inode* inode,
 			{
 				u_int32_t crt;
 
-				if (get_user(crt, (u_int32_t *)arg))
+				if (get_user(crt, (u_int32_t __user *)arg))
 					return -EFAULT;
 
 				if (crt != 0)
@@ -464,7 +464,7 @@ static int matroxfb_dh_ioctl(struct inode* inode,
 				int out;
 				int changes;
 
-				if (get_user(tmp, (u_int32_t*)arg))
+				if (get_user(tmp, (u_int32_t __user *)arg))
 					return -EFAULT;
 				for (out = 0; out < 32; out++) {
 					if (tmp & (1 << out)) {
@@ -514,7 +514,7 @@ static int matroxfb_dh_ioctl(struct inode* inode,
 						conn |= 1 << out;
 					}
 				}
-				if (put_user(conn, (u_int32_t*)arg))
+				if (put_user(conn, (u_int32_t __user *)arg))
 					return -EFAULT;
 				return 0;
 			}
@@ -539,7 +539,7 @@ static int matroxfb_dh_ioctl(struct inode* inode,
 						tmp = 0;
 					}
 				}
-				if (put_user(tmp, (u_int32_t*)arg))
+				if (put_user(tmp, (u_int32_t __user *)arg))
 					return -EFAULT;
 				return 0;
 			}

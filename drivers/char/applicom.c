@@ -105,8 +105,8 @@ static unsigned int WriteErrorCount;	/* number of write error      */
 static unsigned int ReadErrorCount;	/* number of read error       */
 static unsigned int DeviceErrorCount;	/* number of device error     */
 
-static ssize_t ac_read (struct file *, char *, size_t, loff_t *);
-static ssize_t ac_write (struct file *, const char *, size_t, loff_t *);
+static ssize_t ac_read (struct file *, char __user *, size_t, loff_t *);
+static ssize_t ac_write (struct file *, const char __user *, size_t, loff_t *);
 static int ac_ioctl(struct inode *, struct file *, unsigned int,
 		    unsigned long);
 static irqreturn_t ac_interrupt(int, void *, struct pt_regs *);
@@ -343,7 +343,7 @@ int __init applicom_init(void)
 __initcall(applicom_init);
 #endif
 
-static ssize_t ac_write(struct file *file, const char *buf, size_t count, loff_t * ppos)
+static ssize_t ac_write(struct file *file, const char __user *buf, size_t count, loff_t * ppos)
 {
 	unsigned int NumCard;	/* Board number 1 -> 8           */
 	unsigned int IndexCard;	/* Index board number 0 -> 7     */
@@ -467,7 +467,7 @@ static ssize_t ac_write(struct file *file, const char *buf, size_t count, loff_t
 	return 0;
 }
 
-static int do_ac_read(int IndexCard, char *buf,
+static int do_ac_read(int IndexCard, char __user *buf,
 		struct st_ram_io *st_loc, struct mailbox *mailbox)
 {
 	unsigned long from = (unsigned long)apbs[IndexCard].RamIO + RAM_TO_PC;
@@ -521,7 +521,7 @@ static int do_ac_read(int IndexCard, char *buf,
 	return (sizeof(struct st_ram_io) + sizeof(struct mailbox));
 }
 
-static ssize_t ac_read (struct file *filp, char *buf, size_t count, loff_t *ptr)
+static ssize_t ac_read (struct file *filp, char __user *buf, size_t count, loff_t *ptr)
 {
 	unsigned long flags;
 	unsigned int i;
@@ -689,6 +689,7 @@ static int ac_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
 	int ret = 0;
 	volatile unsigned char byte_reset_it;
 	struct st_ram_io *adgl;
+	void __user *argp = (void __user *)arg;
 
 	/* In general, the device is only openable by root anyway, so we're not
 	   particularly concerned that bogus ioctls can flood the console. */
@@ -697,7 +698,7 @@ static int ac_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
 	if (!adgl)
 		return -ENOMEM;
 
-	if (copy_from_user(adgl, (void *)arg,sizeof(struct st_ram_io))) {
+	if (copy_from_user(adgl, argp, sizeof(struct st_ram_io))) {
 		kfree(adgl);
 		return -EFAULT;
 	}
@@ -721,7 +722,7 @@ static int ac_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
 		pmem = apbs[IndexCard].RamIO;
 		for (i = 0; i < sizeof(struct st_ram_io); i++)
 			((unsigned char *)adgl)[i]=readb(pmem++);
-		if (copy_to_user((void *)arg, adgl, sizeof(struct st_ram_io)))
+		if (copy_to_user(argp, adgl, sizeof(struct st_ram_io)))
 			ret = -EFAULT;
 		break;
 	case 1:
@@ -742,7 +743,7 @@ static int ac_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
 			(readb(apbs[IndexCard].RamIO + SERIAL_NUMBER + 1) << 8) + 
 			(readb(apbs[IndexCard].RamIO + SERIAL_NUMBER + 2) );
 
-		if (copy_to_user((void *)arg, adgl, sizeof(struct st_ram_io)))
+		if (copy_to_user(argp, adgl, sizeof(struct st_ram_io)))
 			ret = -EFAULT;
 		break;
 	case 2:
@@ -768,7 +769,7 @@ static int ac_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
 		pmem = apbs[IndexCard].RamIO + TIC_OWNER_TO_PC;
 		adgl->tic_owner_to_pc     = readb(pmem++);
 		adgl->numcard_owner_to_pc = readb(pmem);
-		if (copy_to_user((void *)arg, adgl,sizeof(struct st_ram_io)))
+		if (copy_to_user(argp, adgl,sizeof(struct st_ram_io)))
 			ret = -EFAULT;
 		break;
 	case 5:

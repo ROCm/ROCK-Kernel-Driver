@@ -140,14 +140,14 @@ static int aout_core_dump(long signr, struct pt_regs * regs, struct file *file)
 /* make sure we actually have a data and stack area to dump */
 	set_fs(USER_DS);
 #ifdef __sparc__
-	if (verify_area(VERIFY_READ, (void *) START_DATA(dump), dump.u_dsize))
+	if (verify_area(VERIFY_READ, (void __user *)START_DATA(dump), dump.u_dsize))
 		dump.u_dsize = 0;
-	if (verify_area(VERIFY_READ, (void *) START_STACK(dump), dump.u_ssize))
+	if (verify_area(VERIFY_READ, (void __user *)START_STACK(dump), dump.u_ssize))
 		dump.u_ssize = 0;
 #else
-	if (verify_area(VERIFY_READ, (void *) START_DATA(dump), dump.u_dsize << PAGE_SHIFT))
+	if (verify_area(VERIFY_READ, (void __user *)START_DATA(dump), dump.u_dsize << PAGE_SHIFT))
 		dump.u_dsize = 0;
-	if (verify_area(VERIFY_READ, (void *) START_STACK(dump), dump.u_ssize << PAGE_SHIFT))
+	if (verify_area(VERIFY_READ, (void __user *)START_STACK(dump), dump.u_ssize << PAGE_SHIFT))
 		dump.u_ssize = 0;
 #endif
 
@@ -193,17 +193,18 @@ end_coredump:
  * memory and creates the pointer tables from them, and puts their
  * addresses on the "stack", returning the new stack pointer value.
  */
-static unsigned long * create_aout_tables(char * p, struct linux_binprm * bprm)
+static unsigned long __user *create_aout_tables(char __user *p, struct linux_binprm * bprm)
 {
-	char **argv, **envp;
-	unsigned long * sp;
+	char __user * __user *argv;
+	char __user * __user *envp;
+	unsigned long __user *sp;
 	int argc = bprm->argc;
 	int envc = bprm->envc;
 
-	sp = (unsigned long *) ((-(unsigned long)sizeof(char *)) & (unsigned long) p);
+	sp = (void __user *)((-(unsigned long)sizeof(char *)) & (unsigned long) p);
 #ifdef __sparc__
 	/* This imposes the proper stack alignment for a new process. */
-	sp = (unsigned long *) (((unsigned long) sp) & ~7);
+	sp = (void __user *) (((unsigned long) sp) & ~7);
 	if ((envc+argc+3)&1) --sp;
 #endif
 #ifdef __alpha__
@@ -220,9 +221,9 @@ static unsigned long * create_aout_tables(char * p, struct linux_binprm * bprm)
 	put_user(0x3e9, --sp);
 #endif
 	sp -= envc+1;
-	envp = (char **) sp;
+	envp = (char __user * __user *) sp;
 	sp -= argc+1;
-	argv = (char **) sp;
+	argv = (char __user * __user *) sp;
 #if defined(__i386__) || defined(__mc68000__) || defined(__arm__) || defined(__arch_um__)
 	put_user((unsigned long) envp,--sp);
 	put_user((unsigned long) argv,--sp);
@@ -420,7 +421,7 @@ beyond_if:
 	}
 
 	current->mm->start_stack =
-		(unsigned long) create_aout_tables((char *) bprm->p, bprm);
+		(unsigned long) create_aout_tables((char __user *) bprm->p, bprm);
 #ifdef __alpha__
 	regs->gp = ex.a_gpvalue;
 #endif

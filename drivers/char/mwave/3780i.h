@@ -323,16 +323,16 @@ int dsp3780I_EnableDSP(DSP_3780I_CONFIG_SETTINGS * pSettings,
 int dsp3780I_DisableDSP(DSP_3780I_CONFIG_SETTINGS * pSettings);
 int dsp3780I_Reset(DSP_3780I_CONFIG_SETTINGS * pSettings);
 int dsp3780I_Run(DSP_3780I_CONFIG_SETTINGS * pSettings);
-int dsp3780I_ReadDStore(unsigned short usDspBaseIO, void *pvBuffer,
+int dsp3780I_ReadDStore(unsigned short usDspBaseIO, void __user *pvBuffer,
                         unsigned uCount, unsigned long ulDSPAddr);
 int dsp3780I_ReadAndClearDStore(unsigned short usDspBaseIO,
-                                void *pvBuffer, unsigned uCount,
+                                void __user *pvBuffer, unsigned uCount,
                                 unsigned long ulDSPAddr);
-int dsp3780I_WriteDStore(unsigned short usDspBaseIO, void *pvBuffer,
+int dsp3780I_WriteDStore(unsigned short usDspBaseIO, void __user *pvBuffer,
                          unsigned uCount, unsigned long ulDSPAddr);
-int dsp3780I_ReadIStore(unsigned short usDspBaseIO, void *pvBuffer,
+int dsp3780I_ReadIStore(unsigned short usDspBaseIO, void __user *pvBuffer,
                         unsigned uCount, unsigned long ulDSPAddr);
-int dsp3780I_WriteIStore(unsigned short usDspBaseIO, void *pvBuffer,
+int dsp3780I_WriteIStore(unsigned short usDspBaseIO, void __user *pvBuffer,
                          unsigned uCount, unsigned long ulDSPAddr);
 unsigned short dsp3780I_ReadMsaCfg(unsigned short usDspBaseIO,
                                    unsigned long ulMsaAddr);

@@ -592,11 +592,11 @@ static int kyrofb_ioctl(struct inode *inode, struct file *file,
 {
 	overlay_create ol_create;
 	overlay_viewport_set ol_viewport_set;
+	void __user *argp = (void __user *)arg;
 
 	switch (cmd) {
 	case KYRO_IOCTL_OVERLAY_CREATE:
-		copy_from_user((void *) &ol_create, (void *) arg,
-			       sizeof(overlay_create));
+		copy_from_user(&ol_create, argp, sizeof(overlay_create));
 
 		if (kyro_dev_overlay_create(ol_create.ulWidth,
 					    ol_create.ulHeight, 0) < 0) {
@@ -606,7 +606,7 @@ static int kyrofb_ioctl(struct inode *inode, struct file *file,
 		}
 		break;
 	case KYRO_IOCTL_OVERLAY_VIEWPORT_SET:
-		copy_from_user((void *) &ol_viewport_set, (void *) arg,
+		copy_from_user(&ol_viewport_set, argp,
 			       sizeof(overlay_viewport_set));
 
 		if (kyro_dev_overlay_viewport_set(ol_viewport_set.xOrgin,
@@ -627,13 +627,13 @@ static int kyrofb_ioctl(struct inode *inode, struct file *file,
 		}
 		break;
 	case KYRO_IOCTL_UVSTRIDE:
-		copy_to_user((void *)arg, (void *)&deviceInfo.ulOverlayUVStride, sizeof(unsigned long));
+		copy_to_user(argp, &deviceInfo.ulOverlayUVStride, sizeof(unsigned long));
 		break;
 	case KYRO_IOCTL_STRIDE:
-		copy_to_user((void *)arg, (void *)&deviceInfo.ulOverlayStride, sizeof(unsigned long));
+		copy_to_user(argp, &deviceInfo.ulOverlayStride, sizeof(unsigned long));
 		break;
 	case KYRO_IOCTL_OVERLAY_OFFSET:
-		copy_to_user((void *)arg, (void *)&deviceInfo.ulOverlayOffset, sizeof(unsigned long));
+		copy_to_user(argp, &deviceInfo.ulOverlayOffset, sizeof(unsigned long));
 		break;
 	}
 
