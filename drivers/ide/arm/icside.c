@@ -423,7 +423,7 @@ static ide_startstop_t icside_dmaintr(ide_drive_t *drive)
 		       drive->name, dma_stat);
 	}
 
-	return DRIVER(drive)->error(drive, __FUNCTION__, stat);
+	return ide_error(drive, __FUNCTION__, stat);
 }
 
 static int icside_dma_setup(ide_drive_t *drive)

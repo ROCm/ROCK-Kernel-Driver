@@ -2067,9 +2067,10 @@ static int default_end_request (ide_drive_t *drive, int uptodate, int nr_sects)
 	return ide_end_request(drive, uptodate, nr_sects);
 }
 
-static ide_startstop_t default_error (ide_drive_t *drive, const char *msg, u8 stat)
+static ide_startstop_t
+default_error(ide_drive_t *drive, struct request *rq, u8 stat, u8 err)
 {
-	return ide_error(drive, msg, stat);
+	return __ide_error(drive, rq, stat, err);
 }
 
 static void default_pre_reset (ide_drive_t *drive)

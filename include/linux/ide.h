@@ -1097,7 +1097,7 @@ typedef struct ide_driver_s {
 	int		(*cleanup)(ide_drive_t *);
 	ide_startstop_t	(*do_request)(ide_drive_t *, struct request *, sector_t);
 	int		(*end_request)(ide_drive_t *, int, int);
-	ide_startstop_t	(*error)(ide_drive_t *, const char *, u8);
+	ide_startstop_t	(*error)(ide_drive_t *, struct request *rq, u8, u8);
 	ide_startstop_t	(*abort)(ide_drive_t *, const char *);
 	int		(*ioctl)(ide_drive_t *, struct inode *, struct file *, unsigned int, unsigned long);
 	void		(*pre_reset)(ide_drive_t *);
@@ -1145,6 +1145,8 @@ extern void ide_set_handler (ide_drive_t *drive, ide_handler_t *handler, unsigne
  * with respect to the command issue (which it also does)
  */
 extern void ide_execute_command(ide_drive_t *, task_ioreg_t cmd, ide_handler_t *, unsigned int, ide_expiry_t *);
+
+ide_startstop_t __ide_error(ide_drive_t *, struct request *, u8, u8);
 
 /*
  * ide_error() takes action based on the error returned by the controller.

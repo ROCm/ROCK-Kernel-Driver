@@ -183,7 +183,7 @@ ide_startstop_t ide_dma_intr (ide_drive_t *drive)
 		printk(KERN_ERR "%s: dma_intr: bad DMA status (dma_stat=%x)\n", 
 		       drive->name, dma_stat);
 	}
-	return DRIVER(drive)->error(drive, "dma_intr", stat);
+	return ide_error(drive, "dma_intr", stat);
 }
 
 EXPORT_SYMBOL_GPL(ide_dma_intr);

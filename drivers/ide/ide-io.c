@@ -529,6 +529,14 @@ static ide_startstop_t ide_atapi_error(ide_drive_t *drive, struct request *rq, u
 	return ide_stopped;
 }
 
+ide_startstop_t
+__ide_error(ide_drive_t *drive, struct request *rq, u8 stat, u8 err)
+{
+	if (drive->media == ide_disk)
+		return ide_ata_error(drive, rq, stat, err);
+	return ide_atapi_error(drive, rq, stat, err);
+}
+
 /**
  *	ide_error	-	handle an error on the IDE
  *	@drive: drive the error occurred on
@@ -559,10 +567,10 @@ ide_startstop_t ide_error (ide_drive_t *drive, const char *msg, u8 stat)
 		return ide_stopped;
 	}
 
-	if (drive->media == ide_disk)
-		return ide_ata_error(drive, rq, stat, err);
-	return ide_atapi_error(drive, rq, stat, err);
+	return drive->driver->error(drive, rq, stat, err);
 }
+
+EXPORT_SYMBOL_GPL(ide_error);
 
 /**
  *	ide_abort	-	abort pending IDE operatins
@@ -655,7 +663,7 @@ static ide_startstop_t drive_cmd_intr (ide_drive_t *drive)
 	}
 
 	if (!OK_STAT(stat, READY_STAT, BAD_STAT) && DRIVER(drive) != NULL)
-		return DRIVER(drive)->error(drive, "drive_cmd", stat);
+		return ide_error(drive, "drive_cmd", stat);
 		/* calls ide_end_drive_cmd */
 	ide_end_drive_cmd(drive, stat, hwif->INB(IDE_ERROR_REG));
 	return ide_stopped;
@@ -1202,7 +1210,7 @@ static ide_startstop_t ide_dma_timeout_retry(ide_drive_t *drive, int error)
 	if (error < 0) {
 		printk(KERN_WARNING "%s: DMA timeout error\n", drive->name);
 		(void)HWIF(drive)->ide_dma_end(drive);
-		ret = DRIVER(drive)->error(drive, "dma timeout error",
+		ret = ide_error(drive, "dma timeout error",
 						hwif->INB(IDE_STATUS_REG));
 	} else {
 		printk(KERN_WARNING "%s: DMA timeout retry\n", drive->name);
@@ -1325,7 +1333,7 @@ void ide_timer_expiry (unsigned long data)
 					startstop = ide_dma_timeout_retry(drive, wait);
 				} else
 					startstop =
-					DRIVER(drive)->error(drive, "irq timeout", hwif->INB(IDE_STATUS_REG));
+					ide_error(drive, "irq timeout", hwif->INB(IDE_STATUS_REG));
 			}
 			drive->service_time = jiffies - drive->service_start;
 			spin_lock_irq(&ide_lock);

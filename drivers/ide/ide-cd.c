@@ -651,7 +651,7 @@ static int cdrom_decode_status(ide_drive_t *drive, int good_stat, int *stat_ret)
 
 		rq->flags |= REQ_FAILED;
 		cdrom_end_request(drive, 0);
-		DRIVER(drive)->error(drive, "request sense failure", stat);
+		ide_error(drive, "request sense failure", stat);
 		return 1;
 
 	} else if (rq->flags & (REQ_PC | REQ_BLOCK_PC)) {
@@ -762,7 +762,7 @@ static int cdrom_decode_status(ide_drive_t *drive, int good_stat, int *stat_ret)
 		} else if ((err & ~ABRT_ERR) != 0) {
 			/* Go to the default handler
 			   for other errors. */
-			DRIVER(drive)->error(drive, "cdrom_decode_status",stat);
+			ide_error(drive, "cdrom_decode_status", stat);
 			return 1;
 		} else if ((++rq->errors > ERROR_MAX)) {
 			/* We've racked up too many retries.  Abort. */
@@ -1031,7 +1031,7 @@ static ide_startstop_t cdrom_read_intr (ide_drive_t *drive)
 			ide_end_request(drive, 1, rq->nr_sectors);
 			return ide_stopped;
 		} else
-			return DRIVER(drive)->error(drive, "dma error", stat);
+			return ide_error(drive, "dma error", stat);
 	}
 
 	/* Read the interrupt reason and the transfer length. */
@@ -1634,7 +1634,7 @@ static ide_startstop_t cdrom_newpc_intr(ide_drive_t *drive)
 		if (dma_error) {
 			printk("ide-cd: dma error\n");
 			__ide_dma_off(drive);
-			return DRIVER(drive)->error(drive, "dma error", stat);
+			return ide_error(drive, "dma error", stat);
 		}
 
 		end_that_request_chunk(rq, 1, rq->data_len);
@@ -1772,7 +1772,7 @@ static ide_startstop_t cdrom_write_intr(ide_drive_t *drive)
 	 */
 	if (dma) {
 		if (dma_error)
-			return DRIVER(drive)->error(drive, "dma error", stat);
+			return ide_error(drive, "dma error", stat);
 
 		ide_end_request(drive, 1, rq->nr_sectors);
 		return ide_stopped;
