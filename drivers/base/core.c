@@ -185,7 +185,6 @@ void device_initialize(struct device *dev)
 	INIT_LIST_HEAD(&dev->children);
 	INIT_LIST_HEAD(&dev->driver_list);
 	INIT_LIST_HEAD(&dev->bus_list);
-	INIT_LIST_HEAD(&dev->class_list);
 }
 
 /**
@@ -235,7 +234,6 @@ int device_add(struct device *dev)
 	if (platform_notify)
 		platform_notify(dev);
 
-	devclass_add_device(dev);
  register_done:
 	if (error && parent)
 		put_device(parent);
