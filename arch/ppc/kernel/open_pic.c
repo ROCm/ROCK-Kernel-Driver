@@ -46,7 +46,6 @@ extern int use_of_interrupt_tree;
 static u_int NumProcessors;
 static u_int NumSources;
 static int open_pic_irq_offset;
-static volatile unsigned char *chrp_int_ack_special;
 static volatile OpenPIC_Source *ISR[NR_IRQS];
 
 /* Global Operations */
@@ -303,8 +302,7 @@ void openpic_set_sources(int first_irq, int num_irqs, void *first_ISR)
 		ISR[i] = src;
 }
 
-void __init openpic_init(int main_pic, int offset, unsigned char *chrp_ack,
-			 int programmer_switch_irq)
+void __init openpic_init(int main_pic, int offset, int programmer_switch_irq)
 {
 	u_int t, i;
 	u_int timerfreq;
@@ -357,7 +355,6 @@ void __init openpic_init(int main_pic, int offset, unsigned char *chrp_ack,
 		return;
 
 	open_pic_irq_offset = offset;
-	chrp_int_ack_special = chrp_ack;
 
 	/* Initialize timer interrupts */
 	if ( ppc_md.progress ) ppc_md.progress("openpic timer",0x3ba);
@@ -814,19 +811,13 @@ openpic_get_irq(struct pt_regs *regs)
 	/* Management of the cascade should be moved out of here */
 
 	/* Yep - because openpic !=> i8259, for one thing. -VAL */
-        if (open_pic_irq_offset && irq == open_pic_irq_offset)
-        {
-                /*
-                 * This magic address generates a PCI IACK cycle.
-                 */
-		if ( chrp_int_ack_special )
-			irq = *chrp_int_ack_special;
+	if (open_pic_irq_offset && irq == open_pic_irq_offset)
+	{
 #ifndef CONFIG_GEMINI
-		else
-			irq = i8259_poll();
+		irq = i8259_irq(regs); /* get IRQ from cascade */
 #endif
 		openpic_eoi();
-        }
+	}
 	if (irq == OPENPIC_VEC_SPURIOUS + open_pic_irq_offset)
 		irq = -1;
 	return irq;

@@ -691,7 +691,7 @@ prep_init_IRQ(void)
 	int i;
 
 	if (OpenPIC_Addr != NULL)
-		openpic_init(1, NUM_8259_INTERRUPTS, 0, -1);
+		openpic_init(1, NUM_8259_INTERRUPTS, -1);
 	for ( i = 0 ; i < NUM_8259_INTERRUPTS ; i++ )
 		irq_desc[i].handler = &i8259_pic;
 	i8259_init(0xbffffff0); /* PCI interrupt ack address for MPC105 and 106 */

@@ -217,13 +217,17 @@ lopec_init_IRQ(void)
 	/* Skip reserved space and map Message Unit Interrupt (I2O) */
 	openpic_set_sources(19, 1, OpenPIC_Addr + 0x110C0);
 
-	openpic_init(1, NUM_8259_INTERRUPTS, NULL, -1);
+	openpic_init(1, NUM_8259_INTERRUPTS, -1);
 
 	/* Map i8259 interrupts */
 	for(i = 0; i < NUM_8259_INTERRUPTS; i++)
 		irq_desc[i].handler = &i8259_pic;
 
-	i8259_init(0);
+	/*
+	 * The EPIC allows for a read in the range of 0xFEF00000 ->
+	 * 0xFEFFFFFF to generate a PCI interrupt-acknowledge transaction.
+	 */
+	i8259_init(0xfef00000);
 }
 
 void __init

@@ -171,6 +171,10 @@ static struct resource pic_edgectrl_iores = {
 	"8259 edge control", 0x4d0, 0x4d1, IORESOURCE_BUSY
 };
 
+/* i8259_init()
+ * intack_addr - PCI interrupt acknowledge (real) address which will return
+ *               the active irq from the 8259
+ */
 void __init i8259_init(long intack_addr)
 {
 	unsigned long flags;
@@ -205,6 +209,9 @@ void __init i8259_init(long intack_addr)
 	request_resource(&ioport_resource, &pic2_iores);
 	request_resource(&ioport_resource, &pic_edgectrl_iores);
 
-	if (intack_addr)
-		pci_intack = ioremap(intack_addr, 1);
+	/* XXX remove me after board maintainers fix their i8259_init calls */
+	if (intack_addr == 0)
+		panic("You must supply a PCI interrupt acknowledge address to i8259_init()\n");
+
+	pci_intack = ioremap(intack_addr, 1);
 }
