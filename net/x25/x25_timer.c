@@ -131,7 +131,7 @@ static void x25_heartbeat_expiry(unsigned long param)
 	struct sock *sk = (struct sock *)param;
 
         bh_lock_sock(sk);
-        if (sk->lock.users) /* can currently only occur in state 3 */ 
+        if (sock_owned_by_user(sk)) /* can currently only occur in state 3 */ 
 		goto restart_heartbeat;
 
 	switch (x25_sk(sk)->state) {
@@ -193,7 +193,7 @@ static void x25_timer_expiry(unsigned long param)
 	struct sock *sk = (struct sock *)param;
 
 	bh_lock_sock(sk);
-	if (sk->lock.users) { /* can currently only occur in state 3 */
+	if (sock_owned_by_user(sk)) { /* can currently only occur in state 3 */
 		if (x25_sk(sk)->state == X25_STATE_3)
 			x25_start_t2timer(sk);
 	} else

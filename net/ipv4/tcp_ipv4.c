@@ -1003,7 +1003,7 @@ void tcp_v4_err(struct sk_buff *skb, u32 info)
 	/* If too many ICMPs get dropped on busy
 	 * servers this needs to be solved differently.
 	 */
-	if (sk->lock.users)
+	if (sock_owned_by_user(sk))
 		NET_INC_STATS_BH(LockDroppedIcmps);
 
 	if (sk->state == TCP_CLOSE)
@@ -1022,7 +1022,7 @@ void tcp_v4_err(struct sk_buff *skb, u32 info)
 		/* This is deprecated, but if someone generated it,
 		 * we have no reasons to ignore it.
 		 */
-		if (!sk->lock.users)
+		if (!sock_owned_by_user(sk))
 			tcp_enter_cwr(tp);
 		goto out;
 	case ICMP_PARAMETERPROB:
@@ -1033,7 +1033,7 @@ void tcp_v4_err(struct sk_buff *skb, u32 info)
 			goto out;
 
 		if (code == ICMP_FRAG_NEEDED) { /* PMTU discovery (RFC1191) */
-			if (!sk->lock.users)
+			if (!sock_owned_by_user(sk))
 				do_pmtu_discovery(sk, iph, info);
 			goto out;
 		}
@@ -1050,7 +1050,7 @@ void tcp_v4_err(struct sk_buff *skb, u32 info)
 	switch (sk->state) {
 		struct open_request *req, **prev;
 	case TCP_LISTEN:
-		if (sk->lock.users)
+		if (sock_owned_by_user(sk))
 			goto out;
 
 		req = tcp_v4_search_req(tp, &prev, th->dest,
@@ -1081,7 +1081,7 @@ void tcp_v4_err(struct sk_buff *skb, u32 info)
 	case TCP_SYN_RECV:  /* Cannot happen.
 			       It can f.e. if SYNs crossed.
 			     */
-		if (!sk->lock.users) {
+		if (!sock_owned_by_user(sk)) {
 			TCP_INC_STATS_BH(TcpAttemptFails);
 			sk->err = err;
 
@@ -1111,7 +1111,7 @@ void tcp_v4_err(struct sk_buff *skb, u32 info)
 	 */
 
 	inet = inet_sk(sk);
-	if (!sk->lock.users && inet->recverr) {
+	if (!sock_owned_by_user(sk) && inet->recverr) {
 		sk->err = err;
 		sk->error_report(sk);
 	} else	{ /* Only an error on timeout */
@@ -1778,7 +1778,7 @@ process:
 
 	bh_lock_sock(sk);
 	ret = 0;
-	if (!sk->lock.users) {
+	if (!sock_owned_by_user(sk)) {
 		if (!tcp_prequeue(sk, skb))
 			ret = tcp_v4_do_rcv(sk, skb);
 	} else

@@ -623,7 +623,7 @@ static void tcp_listen_stop (struct sock *sk)
 
 		local_bh_disable();
 		bh_lock_sock(child);
-		BUG_TRAP(!child->lock.users);
+		BUG_TRAP(!sock_owned_by_user(child));
 		sock_hold(child);
 
 		tcp_disconnect(child, O_NONBLOCK);
@@ -2019,7 +2019,7 @@ adjudge_to_death:
 	 */
 	local_bh_disable();
 	bh_lock_sock(sk);
-	BUG_TRAP(!sk->lock.users);
+	BUG_TRAP(!sock_owned_by_user(sk));
 
 	sock_hold(sk);
 	sock_orphan(sk);

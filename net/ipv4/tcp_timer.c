@@ -213,7 +213,7 @@ static void tcp_delack_timer(unsigned long data)
 	struct tcp_opt *tp = tcp_sk(sk);
 
 	bh_lock_sock(sk);
-	if (sk->lock.users) {
+	if (sock_owned_by_user(sk)) {
 		/* Try again later. */
 		tp->ack.blocked = 1;
 		NET_INC_STATS_BH(DelayedACKLocked);
@@ -421,7 +421,7 @@ static void tcp_write_timer(unsigned long data)
 	int event;
 
 	bh_lock_sock(sk);
-	if (sk->lock.users) {
+	if (sock_owned_by_user(sk)) {
 		/* Try again later */
 		if (!mod_timer(&tp->retransmit_timer, jiffies + (HZ/20)))
 			sock_hold(sk);
@@ -581,7 +581,7 @@ static void tcp_keepalive_timer (unsigned long data)
 
 	/* Only process if socket is not in use. */
 	bh_lock_sock(sk);
-	if (sk->lock.users) {
+	if (sock_owned_by_user(sk)) {
 		/* Try again later. */ 
 		tcp_reset_keepalive_timer (sk, HZ/20);
 		goto out;

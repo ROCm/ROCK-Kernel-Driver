@@ -1348,7 +1348,7 @@ static __inline__ int tcp_prequeue(struct sock *sk, struct sk_buff *skb)
 		if (tp->ucopy.memory > sk->rcvbuf) {
 			struct sk_buff *skb1;
 
-			if (sk->lock.users) BUG();
+			if (sock_owned_by_user(sk)) BUG();
 
 			while ((skb1 = __skb_dequeue(&tp->ucopy.prequeue)) != NULL) {
 				sk->backlog_rcv(sk, skb1);

@@ -70,15 +70,16 @@
  * between user contexts and software interrupt processing, whereas the
  * mini-semaphore synchronizes multiple users amongst themselves.
  */
+struct sock_iocb;
 typedef struct {
 	spinlock_t		slock;
-	unsigned int		users;
+	struct sock_iocb	*owner;
 	wait_queue_head_t	wq;
 } socket_lock_t;
 
 #define sock_lock_init(__sk) \
 do {	spin_lock_init(&((__sk)->lock.slock)); \
-	(__sk)->lock.users = 0; \
+	(__sk)->lock.owner = NULL; \
 	init_waitqueue_head(&((__sk)->lock.wq)); \
 } while(0)
 
@@ -306,14 +307,16 @@ static __inline__ void sock_prot_dec_use(struct proto *prot)
  * Since ~2.3.5 it is also exclusive sleep lock serializing
  * accesses from user process context.
  */
+extern int __async_lock_sock(struct sock_iocb *, struct sock *, struct list_head *);
 extern void __lock_sock(struct sock *sk);
 extern void __release_sock(struct sock *sk);
+#define sock_owned_by_user(sk)	(NULL != (sk)->lock.owner)
 #define lock_sock(__sk) \
 do {	might_sleep(); \
 	spin_lock_bh(&((__sk)->lock.slock)); \
-	if ((__sk)->lock.users != 0) \
+	if ((__sk)->lock.owner != NULL) \
 		__lock_sock(__sk); \
-	(__sk)->lock.users = 1; \
+	(__sk)->lock.owner = (void *)1; \
 	spin_unlock_bh(&((__sk)->lock.slock)); \
 } while(0)
 
@@ -321,7 +324,7 @@ do {	might_sleep(); \
 do {	spin_lock_bh(&((__sk)->lock.slock)); \
 	if ((__sk)->backlog.tail != NULL) \
 		__release_sock(__sk); \
-	(__sk)->lock.users = 0; \
+	(__sk)->lock.owner = NULL; \
         if (waitqueue_active(&((__sk)->lock.wq))) wake_up(&((__sk)->lock.wq)); \
 	spin_unlock_bh(&((__sk)->lock.slock)); \
 } while(0)

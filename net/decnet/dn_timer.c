@@ -57,7 +57,7 @@ static void dn_slow_timer(unsigned long arg)
 	sock_hold(sk);
 	bh_lock_sock(sk);
 
-	if (sk->lock.users != 0) {
+	if (sock_owned_by_user(sk)) {
 		sk->timer.expires = jiffies + HZ / 10;
 		add_timer(&sk->timer);
 		goto out;
@@ -115,7 +115,7 @@ static void dn_fast_timer(unsigned long arg)
 	struct dn_scp *scp = DN_SK(sk);
 
 	bh_lock_sock(sk);
-	if (sk->lock.users != 0) {
+	if (sock_owned_by_user(sk)) {
 		scp->delack_timer.expires = jiffies + HZ / 20;
 		add_timer(&scp->delack_timer);
 		goto out;

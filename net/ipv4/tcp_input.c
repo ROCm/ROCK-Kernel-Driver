@@ -2570,7 +2570,7 @@ static void tcp_data_queue(struct sock *sk, struct sk_buff *skb)
 		/* Ok. In sequence. In window. */
 		if (tp->ucopy.task == current &&
 		    tp->copied_seq == tp->rcv_nxt && tp->ucopy.len &&
-		    sk->lock.users && !tp->urg_data) {
+		    sock_owned_by_user(sk) && !tp->urg_data) {
 			int chunk = min_t(unsigned int, skb->len,
 							tp->ucopy.len);
 
@@ -3190,7 +3190,7 @@ static int __tcp_checksum_complete_user(struct sock *sk, struct sk_buff *skb)
 {
 	int result;
 
-	if (sk->lock.users) {
+	if (sock_owned_by_user(sk)) {
 		local_bh_enable();
 		result = __tcp_checksum_complete(skb);
 		local_bh_disable();
@@ -3324,7 +3324,7 @@ int tcp_rcv_established(struct sock *sk, struct sk_buff *skb,
 			if (tp->ucopy.task == current &&
 			    tp->copied_seq == tp->rcv_nxt &&
 			    len - tcp_header_len <= tp->ucopy.len &&
-			    sk->lock.users) {
+			    sock_owned_by_user(sk)) {
 				__set_current_state(TASK_RUNNING);
 
 				if (!tcp_copy_to_iovec(sk, skb, tcp_header_len)) {
@@ -3864,7 +3864,7 @@ int tcp_rcv_state_process(struct sock *sk, struct sk_buff *skb,
 					tmo = tcp_fin_time(tp);
 					if (tmo > TCP_TIMEWAIT_LEN) {
 						tcp_reset_keepalive_timer(sk, tmo - TCP_TIMEWAIT_LEN);
-					} else if (th->fin || sk->lock.users) {
+					} else if (th->fin || sock_owned_by_user(sk)) {
 						/* Bad case. We could lose such FIN otherwise.
 						 * It is not a big problem, but it looks confusing
 						 * and not so rare event. We still can lose it now,

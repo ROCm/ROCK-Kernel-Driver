@@ -989,7 +989,7 @@ int tcp_child_process(struct sock *parent, struct sock *child,
 	int ret = 0;
 	int state = child->state;
 
-	if (child->lock.users == 0) {
+	if (!sock_owned_by_user(child)) {
 		ret = tcp_rcv_state_process(child, skb, skb->h.th, skb->len);
 
 		/* Wakeup parent, send SIGIO */

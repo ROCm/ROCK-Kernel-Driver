@@ -140,7 +140,7 @@ int llc_rcv(struct sk_buff *skb, struct net_device *dev,
 		} else
 			skb->sk = sk;
 		bh_lock_sock(sk);
-		if (!sk->lock.users) {
+		if (!sock_owned_by_user(sk)) {
 			/* rc = */ llc_conn_rcv(sk, skb);
 			rc = 0;
 		} else {

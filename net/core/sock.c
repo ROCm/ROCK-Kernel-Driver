@@ -861,7 +861,7 @@ void __lock_sock(struct sock *sk)
 		spin_unlock_bh(&sk->lock.slock);
 		schedule();
 		spin_lock_bh(&sk->lock.slock);
-		if(!sk->lock.users)
+		if(!sock_owned_by_user(sk))
 			break;
 	}
 	current->state = TASK_RUNNING;

@@ -1489,7 +1489,7 @@ static void llc_process_tmr_ev(struct sock *sk, struct sk_buff *skb)
 		       __FUNCTION__);
 		kfree_skb(skb);
 	} else {
-		if (!sk->lock.users)
+		if (!sock_owned_by_user(sk))
 			llc_conn_state_process(sk, skb);
 		else {
 			llc_set_backlog_type(skb, LLC_EVENT);

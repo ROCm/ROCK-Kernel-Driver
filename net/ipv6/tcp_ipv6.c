@@ -731,7 +731,7 @@ static void tcp_v6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
 	}
 
 	bh_lock_sock(sk);
-	if (sk->lock.users)
+	if (sock_owned_by_user(sk))
 		NET_INC_STATS_BH(LockDroppedIcmps);
 
 	if (sk->state == TCP_CLOSE)
@@ -749,7 +749,7 @@ static void tcp_v6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
 	if (type == ICMPV6_PKT_TOOBIG) {
 		struct dst_entry *dst = NULL;
 
-		if (sk->lock.users)
+		if (sock_owned_by_user(sk))
 			goto out;
 		if ((1<<sk->state)&(TCPF_LISTEN|TCPF_CLOSE))
 			goto out;
@@ -792,7 +792,7 @@ static void tcp_v6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
 	switch (sk->state) {
 		struct open_request *req, **prev;
 	case TCP_LISTEN:
-		if (sk->lock.users)
+		if (sock_owned_by_user(sk))
 			goto out;
 
 		req = tcp_v6_search_req(tp, &prev, th->dest, &hdr->daddr,
@@ -816,7 +816,7 @@ static void tcp_v6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
 	case TCP_SYN_SENT:
 	case TCP_SYN_RECV:  /* Cannot happen.
 			       It can, it SYNs are crossed. --ANK */ 
-		if (sk->lock.users == 0) {
+		if (!sock_owned_by_user(sk)) {
 			TCP_INC_STATS_BH(TcpAttemptFails);
 			sk->err = err;
 			sk->error_report(sk);		/* Wake people up to see the error (see connect in sock.c) */
@@ -828,7 +828,7 @@ static void tcp_v6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
 		goto out;
 	}
 
-	if (sk->lock.users == 0 && np->recverr) {
+	if (!sock_owned_by_user(sk) && np->recverr) {
 		sk->err = err;
 		sk->error_report(sk);
 	} else {
@@ -1622,7 +1622,7 @@ process:
 
 	bh_lock_sock(sk);
 	ret = 0;
-	if (!sk->lock.users) {
+	if (!sock_owned_by_user(sk)) {
 		if (!tcp_prequeue(sk, skb))
 			ret = tcp_v6_do_rcv(sk, skb);
 	} else

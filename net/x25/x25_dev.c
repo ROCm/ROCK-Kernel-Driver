@@ -70,7 +70,7 @@ static int x25_receive_data(struct sk_buff *skb, struct x25_neigh *nb)
 
 		skb->h.raw = skb->data;
 		bh_lock_sock(sk);
-		if (!sk->lock.users) {
+		if (!sock_owned_by_user(sk)) {
 			queued = x25_process_rx_frame(sk, skb);
 		} else {
 			sk_add_backlog(sk, skb);
