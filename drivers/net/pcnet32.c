@@ -935,8 +935,13 @@ pcnet32_probe1(unsigned long ioaddr, unsigned int irq_line, int shared,
     if (register_netdev(dev))
 	goto err_free_consistent;
 
-    lp->next = pcnet32_dev;
-    pcnet32_dev = dev;
+    if (pdev) {
+	pci_set_drvdata(pdev, dev);
+    } else {
+	lp->next = pcnet32_dev;
+	pcnet32_dev = dev;
+    }
+
     printk(KERN_INFO "%s: registered as %s\n",dev->name, lp->name);
     cards_found++;
     return 0;
@@ -1330,6 +1335,9 @@ pcnet32_interrupt(int irq, void *dev_id, struct pt_regs * regs)
     
     rap = lp->a.read_rap(ioaddr);
     while ((csr0 = lp->a.read_csr (ioaddr, 0)) & 0x8600 && --boguscnt >= 0) {
+	if (csr == 0xffff) {
+	    break;			/* PCMCIA remove happened */
+	}
 	/* Acknowledge all of the current interrupt sources ASAP. */
 	lp->a.write_csr (ioaddr, 0, csr0 & ~0x004f);
 
@@ -1764,9 +1772,25 @@ static void pcnet32_watchdog(struct net_device *dev)
     mod_timer (&(lp->watchdog_timer), PCNET32_WATCHDOG_TIMEOUT);
 }
 
+static void __devexit pcnet32_remove_one(struct pci_dev *pdev)
+{
+    struct net_device *dev = pci_get_drvdata(pdev);
+
+    if (dev) {
+	struct pcnet32_private *lp = dev->priv;
+
+	unregister_netdev(dev);
+	release_region(dev->base_addr, PCNET32_TOTAL_SIZE);
+	pci_free_consistent(lp->pci_dev, sizeof(*lp), lp, lp->dma_addr);
+	free_netdev(dev);
+	pci_set_drvdata(pdev, NULL);
+    }
+}
+
 static struct pci_driver pcnet32_driver = {
     .name	= DRV_NAME,
     .probe	= pcnet32_probe_pci,
+    .remove	= __devexit_p(pcnet32_remove_one),
     .id_table	= pcnet32_pci_tbl,
 };
 
