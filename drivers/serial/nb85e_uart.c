@@ -304,7 +304,7 @@ void nb85e_uart_tx (struct uart_port *port)
 		port->icount.tx++;
 
 		if (uart_circ_chars_pending (xmit) < WAKEUP_CHARS)
-			uart_event (port, EVT_WRITE_WAKEUP);
+			uart_write_wakeup (port);
 	}
 
  no_xmit:
