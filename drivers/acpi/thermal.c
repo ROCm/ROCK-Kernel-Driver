@@ -289,6 +289,13 @@ acpi_thermal_set_cooling_mode (
 	status = acpi_get_handle(tz->handle, "_SCP", &handle);
 	if (ACPI_FAILURE(status)) {
 		ACPI_DEBUG_PRINT((ACPI_DB_INFO, "_SCP not present\n"));
+		status = acpi_get_handle(tz->handle, "_PSV", &handle);
+		if(!ACPI_FAILURE(status)) {
+			tz->cooling_mode = 1;
+			ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Cooling mode [%s]\n", 
+				mode?"passive":"active"));
+			return_VALUE(0);
+		}
 		return_VALUE(-ENODEV);
 	}
 
