@@ -750,7 +750,7 @@ static inline void ace_set_txprd(struct ace_regs *regs,
 
 static inline void ace_mask_irq(struct net_device *dev)
 {
-	struct ace_private *ap = dev->priv;
+	struct ace_private *ap = netdev_priv(dev);
 	struct ace_regs *regs = ap->regs;
 
 	if (ACE_IS_TIGON_I(ap))
@@ -764,7 +764,7 @@ static inline void ace_mask_irq(struct net_device *dev)
 
 static inline void ace_unmask_irq(struct net_device *dev)
 {
-	struct ace_private *ap = dev->priv;
+	struct ace_private *ap = netdev_priv(dev);
 	struct ace_regs *regs = ap->regs;
  
 	if (ACE_IS_TIGON_I(ap))

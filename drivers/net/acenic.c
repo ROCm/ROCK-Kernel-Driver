@@ -1618,7 +1618,7 @@ static void ace_watchdog(struct net_device *data)
 
 static void ace_tasklet(unsigned long dev)
 {
-	struct ace_private *ap = ((struct net_device *)dev)->priv;
+	struct ace_private *ap = netdev_priv((struct net_device *)dev);
 	int cur_size;
 
 	cur_size = atomic_read(&ap->cur_rx_bufs);
