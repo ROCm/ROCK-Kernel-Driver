@@ -2386,7 +2386,7 @@ static void uhci_call_completion(struct urb *urb)
 	} else {
 		if (is_ring && !killed) {
 			urb->dev = dev;
-			uhci_submit_urb(urb, GFP_KERNEL);
+			uhci_submit_urb(urb, GFP_ATOMIC);
 		} else {
 			/* We decrement the usage count after we're done */
 			/*  with everything */
