@@ -121,6 +121,9 @@ extern unsigned long nr_iowait(void);
 #define set_current_state(state_value)		\
 	set_mb(current->state, (state_value))
 
+/* Task command name length */
+#define TASK_COMM_LEN 16
+
 /*
  * Scheduling policies
  */
@@ -612,7 +615,7 @@ struct task_struct {
 	struct key *thread_keyring;	/* keyring private to this thread */
 #endif
 	unsigned short used_math;
-	char comm[16];
+	char comm[TASK_COMM_LEN];
 /* file system info */
 	int link_count, total_link_count;
 /* ipc stuff */
