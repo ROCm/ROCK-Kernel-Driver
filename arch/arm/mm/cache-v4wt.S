@@ -12,6 +12,7 @@
  *  We assume that the write buffer is not enabled.
  */
 #include <linux/linkage.h>
+#include <linux/init.h>
 #include <asm/hardware.h>
 #include <asm/page.h>
 #include "proc-macros.S"
@@ -158,6 +159,9 @@ ENTRY(v4wt_dma_clean_range)
 	.globl	v4wt_dma_flush_range
 	.equ	v4wt_dma_flush_range, v4wt_dma_inv_range
 
+	__INITDATA
+
+	.type	v4wt_cache_fns, #object
 ENTRY(v4wt_cache_fns)
 	.long	v4wt_flush_kern_cache_all
 	.long	v4wt_flush_user_cache_all
@@ -167,4 +171,4 @@ ENTRY(v4wt_cache_fns)
 	.long	v4wt_dma_inv_range
 	.long	v4wt_dma_clean_range
 	.long	v4wt_dma_flush_range
-
+	.size	v4wt_cache_fns, . - v4wt_cache_fns

@@ -329,8 +329,7 @@ ecard_call(struct ecard_request *req)
 		BUG();
 
 	if (ecard_pid <= 0)
-		ecard_pid = kernel_thread(ecard_task, NULL,
-				CLONE_FS | CLONE_FILES | CLONE_SIGHAND);
+		ecard_pid = kernel_thread(ecard_task, NULL, CLONE_KERNEL);
 
 	ecard_req = req;
 	wake_up(&ecard_wait);

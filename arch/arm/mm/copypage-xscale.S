@@ -104,8 +104,10 @@ ENTRY(xscale_mc_clear_user_page)
 	bne	1b
 	mov	pc, lr
 
-	__INIT
+	__INITDATA
 
+	.type	xscale_mc_user_fns, #object
 ENTRY(xscale_mc_user_fns)
 	.long	xscale_mc_clear_user_page
 	.long	xscale_mc_copy_user_page
+	.size	xscale_mc_user_fns, . - xscale_mc_user_fns

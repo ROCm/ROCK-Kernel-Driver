@@ -527,9 +527,9 @@ Verifying Bond Configuration
 
 1) Bonding information files
 ----------------------------
-The bonding driver information files reside in the /proc/net/bond* directories.
+The bonding driver information files reside in the /proc/net/bonding directory.
 
-Sample contents of /proc/net/bond0/info after the driver is loaded with 
+Sample contents of /proc/net/bonding/bond0 after the driver is loaded with 
 parameters of mode=0 and miimon=1000 is shown below.
  
         Bonding Mode: load balancing (round-robin)

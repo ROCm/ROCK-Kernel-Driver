@@ -206,8 +206,8 @@ get_curr_sync_buff(unsigned long time)
 	struct ip_vs_sync_buff *sb;
 
 	spin_lock_bh(&curr_sb_lock);
-	if (curr_sb &&
-	    (jiffies - curr_sb->firstuse > time || time == 0)) {
+	if (curr_sb && (time == 0 ||
+			time_before(jiffies - curr_sb->firstuse, time))) {
 		sb = curr_sb;
 		curr_sb = NULL;
 	} else

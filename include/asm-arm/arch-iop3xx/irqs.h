@@ -10,6 +10,8 @@
  *
  */
 
+#include <linux/config.h>
+
 /*
  * Whic iop3xx implementation is this?
  */

@@ -11,10 +11,7 @@
  *
  * See the GNU General Public License for more details.
  */
-/* Defines SAP component states */
 
-#define LLC_SAP_STATE_INACTIVE	1
-#define LLC_SAP_STATE_ACTIVE	2
 #define LLC_NR_SAP_STATES	2       /* size of state table */
 
 /* structures and types */

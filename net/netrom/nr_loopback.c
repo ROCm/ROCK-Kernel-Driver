@@ -14,19 +14,17 @@
 #include <net/netrom.h>
 #include <linux/init.h>
 
+static void nr_loopback_timer(unsigned long);
+
 static struct sk_buff_head loopback_queue;
-static struct timer_list loopback_timer;
+static struct timer_list loopback_timer = TIMER_INITIALIZER(nr_loopback_timer, 0, 0);
 
-static void nr_set_loopback_timer(void);
-
-void nr_loopback_init(void)
+void __init nr_loopback_init(void)
 {
 	skb_queue_head_init(&loopback_queue);
-
-	init_timer(&loopback_timer);
 }
 
-static int nr_loopback_running(void)
+static inline int nr_loopback_running(void)
 {
 	return timer_pending(&loopback_timer);
 }
@@ -42,24 +40,11 @@ int nr_loopback_queue(struct sk_buff *skb)
 		skb_queue_tail(&loopback_queue, skbn);
 
 		if (!nr_loopback_running())
-			nr_set_loopback_timer();
+			mod_timer(&loopback_timer, jiffies + 10);
 	}
 
 	kfree_skb(skb);
 	return 1;
-}
-
-static void nr_loopback_timer(unsigned long);
-
-static void nr_set_loopback_timer(void)
-{
-	del_timer(&loopback_timer);
-
-	loopback_timer.data     = 0;
-	loopback_timer.function = &nr_loopback_timer;
-	loopback_timer.expires  = jiffies + 10;
-
-	add_timer(&loopback_timer);
 }
 
 static void nr_loopback_timer(unsigned long param)
@@ -80,12 +65,12 @@ static void nr_loopback_timer(unsigned long param)
 			dev_put(dev);
 
 		if (!skb_queue_empty(&loopback_queue) && !nr_loopback_running())
-			nr_set_loopback_timer();
+			mod_timer(&loopback_timer, jiffies + 10);
 	}
 }
 
 void __exit nr_loopback_clear(void)
 {
-	del_timer(&loopback_timer);
+	del_timer_sync(&loopback_timer);
 	skb_queue_purge(&loopback_queue);
 }

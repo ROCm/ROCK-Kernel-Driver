@@ -56,25 +56,22 @@ static int gcd(int a, int b)
 
 static int ip_vs_wrr_gcd_weight(struct ip_vs_service *svc)
 {
-	register struct list_head *l, *e;
 	struct ip_vs_dest *dest;
 	int weight;
 	int g = 1;
 
-	l = &svc->destinations;
-	for (e=l->next; e!=l; e=e->next) {
-		dest = list_entry(e, struct ip_vs_dest, n_list);
+	list_for_each_entry(dest, &svc->destinations, n_list) {
 		weight = atomic_read(&dest->weight);
 		if (weight > 0) {
 			g = weight;
-			break;
+			goto search_gcd;
 		}
 	}
-	if (e == l)
-		return g;
 
-	for (e=e->next; e!=l; e=e->next) {
-		dest = list_entry(e, struct ip_vs_dest, n_list);
+	return g;
+
+ search_gcd:
+	list_for_each_entry(dest, &svc->destinations, n_list) {
 		weight = atomic_read(&dest->weight);
 		if (weight > 0)
 			g = gcd(weight, g);
@@ -89,13 +86,10 @@ static int ip_vs_wrr_gcd_weight(struct ip_vs_service *svc)
  */
 static int ip_vs_wrr_max_weight(struct ip_vs_service *svc)
 {
-	register struct list_head *l, *e;
 	struct ip_vs_dest *dest;
 	int weight = 0;
 
-	l = &svc->destinations;
-	for (e=l->next; e!=l; e=e->next) {
-		dest = list_entry(e, struct ip_vs_dest, n_list);
+	list_for_each_entry(dest, &svc->destinations, n_list) {
 		if (atomic_read(&dest->weight) > weight)
 			weight = atomic_read(&dest->weight);
 	}

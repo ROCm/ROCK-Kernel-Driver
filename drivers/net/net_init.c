@@ -381,7 +381,7 @@ void ether_setup(struct net_device *dev)
 	dev->hard_header_len 	= ETH_HLEN;
 	dev->mtu		= 1500; /* eth_mtu */
 	dev->addr_len		= ETH_ALEN;
-	dev->tx_queue_len	= 100;	/* Ethernet wants good queues */	
+	dev->tx_queue_len	= 1000;	/* Ethernet wants good queues */	
 	
 	memset(dev->broadcast,0xFF, ETH_ALEN);
 

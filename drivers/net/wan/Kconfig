@@ -342,6 +342,30 @@ config HDLC_X25
 comment "X.25/LAPB support is disabled"
 	depends on WAN && HDLC && (LAPB!=m || HDLC!=m) && LAPB!=y
 
+config WANXL
+	tristate "SBE Inc. wanXL support"
+	depends on HDLC && PCI
+	help
+	  This driver is for wanXL PCI cards made by SBE Inc.  If you have
+	  such a card, say Y here and see <http://hq.pm.waw.pl/pub/hdlc/>.
+
+	  If you want to compile the driver as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want),
+	  say M here and read <file:Documentation/modules.txt>.  The module
+	  will be called wanxl.
+
+	  If unsure, say N here.
+
+config WANXL_BUILD_FIRMWARE
+	bool "rebuild wanXL firmware"
+	depends on WANXL
+	help
+	  This option allows you to rebuild firmware run by the QUICC
+	  processor. It requires as68k, ld68k and hexdump programs.
+	  You should never need this option.
+
+	  If unsure, say N here.
+
 config PC300
 	tristate "Cyclades-PC300 support (RS-232/V.35, X.21, T1/E1 boards)"
 	depends on HDLC && PCI

@@ -612,8 +612,6 @@ extern long kernel_thread(int (*fn)(void *), void *arg, unsigned long flags);
 /*
  * Bus types
  */
-#define EISA_bus 0
-#define EISA_bus__is_a_macro /* for versions in ksyms.c */
 #define MCA_bus 0
 #define MCA_bus__is_a_macro /* for versions in ksyms.c */
 

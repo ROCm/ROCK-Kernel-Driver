@@ -74,6 +74,13 @@
  *
  */
 
+static union pnp_bios_install_struct * pnp_bios_install = NULL;
+
+int pnp_bios_present(void)
+{
+	return (pnp_bios_install != NULL);
+}
+
 struct pnp_dev_node_info node_info;
 
 void *pnpbios_kmalloc(size_t size, int f)
@@ -410,7 +417,56 @@ static int __init pnpbios_setup(char *str)
 __setup("pnpbios=", pnpbios_setup);
 #endif
 
-subsys_initcall(pnpbios_init);
+/* PnP BIOS signature: "$PnP" */
+#define PNP_SIGNATURE   (('$' << 0) + ('P' << 8) + ('n' << 16) + ('P' << 24))
+
+int __init pnpbios_probe_system(void)
+{
+	union pnp_bios_install_struct *check;
+	u8 sum;
+	int length, i;
+
+	printk(KERN_INFO "PnPBIOS: Scanning system for PnP BIOS support...\n");
+
+	/*
+ 	 * Search the defined area (0xf0000-0xffff0) for a valid PnP BIOS
+	 * structure and, if one is found, sets up the selectors and
+	 * entry points
+	 */
+	for (check = (union pnp_bios_install_struct *) __va(0xf0000);
+	     check < (union pnp_bios_install_struct *) __va(0xffff0);
+	     ((void *) (check)) += 16) {
+		if (check->fields.signature != PNP_SIGNATURE)
+			continue;
+		printk(KERN_INFO "PnPBIOS: Found PnP BIOS installation structure at 0x%p\n", check);
+		length = check->fields.length;
+		if (!length) {
+			printk(KERN_ERR "PnPBIOS: installation structure is invalid, skipping\n");
+			continue;
+		}
+		for (sum = 0, i = 0; i < length; i++)
+			sum += check->chars[i];
+		if (sum) {
+			printk(KERN_ERR "PnPBIOS: installation structure is corrupted, skipping\n");
+			continue;
+		}
+		if (check->fields.version < 0x10) {
+			printk(KERN_WARNING "PnPBIOS: PnP BIOS version %d.%d is not supported\n",
+			       check->fields.version >> 4,
+			       check->fields.version & 15);
+			continue;
+		}
+		printk(KERN_INFO "PnPBIOS: PnP BIOS version %d.%d, entry 0x%x:0x%x, dseg 0x%x\n",
+                       check->fields.version >> 4, check->fields.version & 15,
+		       check->fields.pm16cseg, check->fields.pm16offset,
+		       check->fields.pm16dseg);
+		pnp_bios_install = check;
+		return 1;
+	}
+
+	printk(KERN_INFO "PnPBIOS: PnP BIOS support was not detected.\n");
+	return 0;
+}
 
 int __init pnpbios_init(void)
 {
@@ -421,30 +477,38 @@ int __init pnpbios_init(void)
 	}
 
 	/* scan the system for pnpbios support */
-	if (!pnpbios_probe_installation())
+	if (!pnpbios_probe_system())
 		return -ENODEV;
 
+	/* make preparations for bios calls */
+	pnpbios_calls_init(pnp_bios_install);
+
 	/* read the node info */
-	if (pnp_bios_dev_node_info(&node_info)) {
+	ret = pnp_bios_dev_node_info(&node_info);
+	if (ret) {
 		printk(KERN_ERR "PnPBIOS: Unable to get node info.  Aborting.\n");
-		return -EIO;
+		return ret;
 	}
 
 	/* register with the pnp layer */
-	pnp_register_protocol(&pnpbios_protocol);
+	ret = pnp_register_protocol(&pnpbios_protocol);
+	if (ret) {
+		printk(KERN_ERR "PnPBIOS: Unable to register driver.  Aborting.\n");
+		return ret;
+	}
 
-#ifdef CONFIG_PROC_FS
 	/* start the proc interface */
 	ret = pnpbios_proc_init();
 	if (ret)
-		return ret;
-#endif
+		printk(KERN_ERR "PnPBIOS: Failed to create proc interface.\n");
 
 	/* scan for pnpbios devices */
 	build_devlist();
 
 	return 0;
 }
+
+subsys_initcall(pnpbios_init);
 
 static int __init pnpbios_thread_init(void)
 {

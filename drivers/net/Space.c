@@ -58,7 +58,6 @@ extern int at1500_probe(struct net_device *);
 extern int at1700_probe(struct net_device *);
 extern int fmv18x_probe(struct net_device *);
 extern int eth16i_probe(struct net_device *);
-extern int depca_probe(struct net_device *);
 extern int i82596_probe(struct net_device *);
 extern int ewrk3_probe(struct net_device *);
 extern int el1_probe(struct net_device *);
@@ -251,9 +250,6 @@ static struct devprobe isa_probes[] __initdata = {
 #endif
 #ifdef CONFIG_EEXPRESS_PRO	/* Intel EtherExpress Pro/10 */
 	{eepro_probe, 0},
-#endif
-#ifdef CONFIG_DEPCA		/* DEC DEPCA */
-	{depca_probe, 0},
 #endif
 #ifdef CONFIG_EWRK3             /* DEC EtherWORKS 3 */
     	{ewrk3_probe, 0},

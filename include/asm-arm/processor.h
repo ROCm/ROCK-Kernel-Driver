@@ -19,7 +19,6 @@
 
 #ifdef __KERNEL__
 
-#define EISA_bus 0
 #define MCA_bus 0
 #define MCA_bus__is_a_macro
 

@@ -2166,9 +2166,9 @@ xfs_da_do_buf(
 			if (xfs_error_level >= XFS_ERRLEVEL_LOW) {
 				int	i;
 				cmn_err(CE_ALERT, "xfs_da_do_buf: bno %lld\n",
-					bno);
+					(long long)bno);
 				cmn_err(CE_ALERT, "dir: inode %lld\n",
-					dp->i_ino);
+					(long long)dp->i_ino);
 				for (i = 0; i < nmap; i++) {
 					cmn_err(CE_ALERT,
 						"[%02d] br_startoff %lld br_startblock %lld br_blockcount %lld br_state %d\n",

@@ -1655,6 +1655,8 @@ int make_pages_present(unsigned long addr, unsigned long end)
 	len = (end+PAGE_SIZE-1)/PAGE_SIZE-addr/PAGE_SIZE;
 	ret = get_user_pages(current, current->mm, addr,
 			len, write, 0, NULL, NULL);
+	if (ret < 0)
+		return ret;
 	return ret == len ? 0 : -1;
 }
 

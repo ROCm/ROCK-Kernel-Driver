@@ -155,7 +155,8 @@ source "drivers/input/joystick/iforce/Kconfig"
 
 config JOYSTICK_WARRIOR
 	tristate "Logitech WingMan Warrior joystick"
-	depends on INPUT && INPUT_JOYSTICK && SERIO
+	depends on INPUT && INPUT_JOYSTICK
+	select SERIO
 	help
 	  Say Y here if you have a Logitech WingMan Warrior joystick connected
 	  to your computer's serial port. 
@@ -167,7 +168,8 @@ config JOYSTICK_WARRIOR
 
 config JOYSTICK_MAGELLAN
 	tristate "LogiCad3d Magellan/SpaceMouse 6dof controllers"
-	depends on INPUT && INPUT_JOYSTICK && SERIO
+	depends on INPUT && INPUT_JOYSTICK
+	select SERIO
 	help
 	  Say Y here if you have a Magellan or Space Mouse 6DOF controller
 	  connected to your computer's serial port.
@@ -179,7 +181,8 @@ config JOYSTICK_MAGELLAN
 
 config JOYSTICK_SPACEORB
 	tristate "SpaceTec SpaceOrb/Avenger 6dof controllers"
-	depends on INPUT && INPUT_JOYSTICK && SERIO
+	depends on INPUT && INPUT_JOYSTICK
+	select SERIO
 	help
 	  Say Y here if you have a SpaceOrb 360 or SpaceBall Avenger 6DOF
 	  controller connected to your computer's serial port.
@@ -191,7 +194,8 @@ config JOYSTICK_SPACEORB
 
 config JOYSTICK_SPACEBALL
 	tristate "SpaceTec SpaceBall 6dof controllers"
-	depends on INPUT && INPUT_JOYSTICK && SERIO
+	depends on INPUT && INPUT_JOYSTICK
+	select SERIO
 	help
 	  Say Y here if you have a SpaceTec SpaceBall 2003/3003/4000 FLX
 	  controller connected to your computer's serial port. For the
@@ -204,7 +208,8 @@ config JOYSTICK_SPACEBALL
 
 config JOYSTICK_STINGER
 	tristate "Gravis Stinger gamepad"
-	depends on INPUT && INPUT_JOYSTICK && SERIO
+	depends on INPUT && INPUT_JOYSTICK
+	select SERIO
 	help
 	  Say Y here if you have a Gravis Stinger connected to one of your
 	  serial ports.
@@ -216,7 +221,8 @@ config JOYSTICK_STINGER
 
 config JOYSTICK_TWIDDLER
 	tristate "Twiddler as a joystick"
-	depends on INPUT && INPUT_JOYSTICK && SERIO
+	depends on INPUT && INPUT_JOYSTICK
+	select SERIO
 	help
 	  Say Y here if you have a Handykey Twiddler connected to your
 	  computer's serial port and want to use it as a joystick.

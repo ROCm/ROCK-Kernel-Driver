@@ -5,9 +5,6 @@
 
 #ifdef CONFIG_PROC_FS
 
-
-#include <linux/version.h>
-
 /* void enableReceive(struct net_device* dev);
 */
 

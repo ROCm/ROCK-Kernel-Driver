@@ -213,7 +213,7 @@ static struct dentry *autofs_root_lookup(struct inode *dir, struct dentry *dentr
 
 	oz_mode = autofs_oz_mode(sbi);
 	DPRINTK(("autofs_lookup: pid = %u, pgrp = %u, catatonic = %d, oz_mode = %d\n",
-		 current->pid, current->pgrp, sbi->catatonic, oz_mode));
+		 current->pid, process_group(current), sbi->catatonic, oz_mode));
 
 	/*
 	 * Mark the dentry incomplete, but add it. This is needed so
@@ -527,7 +527,7 @@ static int autofs_root_ioctl(struct inode *inode, struct file *filp,
 {
 	struct autofs_sb_info *sbi = autofs_sbi(inode->i_sb);
 
-	DPRINTK(("autofs_ioctl: cmd = 0x%08x, arg = 0x%08lx, sbi = %p, pgrp = %u\n",cmd,arg,sbi,current->pgrp));
+	DPRINTK(("autofs_ioctl: cmd = 0x%08x, arg = 0x%08lx, sbi = %p, pgrp = %u\n",cmd,arg,sbi,process_group(current)));
 
 	if ( _IOC_TYPE(cmd) != _IOC_TYPE(AUTOFS_IOC_FIRST) ||
 	     _IOC_NR(cmd) - _IOC_NR(AUTOFS_IOC_FIRST) >= AUTOFS_IOC_COUNT )

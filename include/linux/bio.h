@@ -20,7 +20,6 @@
 #ifndef __LINUX_BIO_H
 #define __LINUX_BIO_H
 
-#include <linux/kdev_t.h>
 #include <linux/highmem.h>
 #include <linux/mempool.h>
 

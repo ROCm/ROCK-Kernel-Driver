@@ -410,7 +410,7 @@ int init_module(void)
 		}
 	} else {
 		for(i = 0; num < ISATR_MAX_ADAPTERS && portlist[i]; i++) {
-			if (setup_card(portlist[i], irq[i], dma[i]))
+			if (setup_card(portlist[i], irq[num], dma[num]) == 0)
 				num++;
 		}
 	}

@@ -784,7 +784,7 @@ int reiserfs_prepare_file_region_for_write(
     /* Now if all the write area lies past the file end, no point in
        maping blocks, since there is none, so we just zero out remaining
        parts of first and last pages in write area (if needed) */
-    if ( (pos & ~(PAGE_CACHE_SIZE - 1)) > inode->i_size ) {
+    if ( (pos & ~((loff_t)PAGE_CACHE_SIZE - 1)) > inode->i_size ) {
 	if ( from != 0 ) {/* First page needs to be partially zeroed */
 	    char *kaddr = kmap_atomic(prepared_pages[0], KM_USER0);
 	    memset(kaddr, 0, from);
@@ -806,9 +806,9 @@ int reiserfs_prepare_file_region_for_write(
        we need to allocate (calculated above) */
     /* Mask write position to start on blocksize, we do it out of the
        loop for performance reasons */
-    pos &= ~(inode->i_sb->s_blocksize - 1);
+    pos &= ~((loff_t) inode->i_sb->s_blocksize - 1);
     /* Set cpu key to the starting position in a file (on left block boundary)*/
-    make_cpu_key (&key, inode, 1 + ((pos) & ~(inode->i_sb->s_blocksize - 1)), TYPE_ANY, 3/*key length*/);
+    make_cpu_key (&key, inode, 1 + ((pos) & ~((loff_t) inode->i_sb->s_blocksize - 1)), TYPE_ANY, 3/*key length*/);
 
     reiserfs_write_lock(inode->i_sb); // We need that for at least search_by_key()
     for ( i = 0; i < num_pages ; i++ ) { 

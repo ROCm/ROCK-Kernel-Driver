@@ -820,7 +820,6 @@ struct rr_private
 	u32			tx_full;
 	u32			fw_rev;
 	volatile short		fw_running;
-	char			name[24];	/* The assigned name */
 	struct net_device_stats stats;
 	struct pci_dev		*pci_dev;
 };

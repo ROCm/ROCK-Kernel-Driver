@@ -132,7 +132,7 @@ static int irda_thread(void *startup)
 		if (list_empty(&irda_rq_queue.request_list))
 			schedule();
 		else
-			set_task_state(current, TASK_RUNNING);
+			__set_task_state(current, TASK_RUNNING);
 		remove_wait_queue(&irda_rq_queue.kick, &wait);
 
 		/* make swsusp happy with our thread */
@@ -165,7 +165,7 @@ static void flush_irda_queue(void)
 		if (atomic_read(&irda_rq_queue.num_pending))
 			schedule();
 		else
-			set_task_state(current, TASK_RUNNING);
+			__set_task_state(current, TASK_RUNNING);
 		remove_wait_queue(&irda_rq_queue.done, &wait);
 	}
 }

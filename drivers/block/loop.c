@@ -757,7 +757,7 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
 		blk_queue_merge_bvec(lo->lo_queue, q->merge_bvec_fn);
 	}
 
-	kernel_thread(loop_thread, lo, CLONE_FS | CLONE_FILES | CLONE_SIGHAND);
+	kernel_thread(loop_thread, lo, CLONE_KERNEL);
 	down(&lo->lo_sem);
 
 	fput(file);

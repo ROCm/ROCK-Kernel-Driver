@@ -372,7 +372,7 @@ static int NCR5380_poll_politely(struct Scsi_Host *instance, int reg, int bit, i
 	{
 		r = NCR5380_read(reg);
 		if((r & bit) == val)
-			return r;
+			return 0;
 		cpu_relax();
 	}
 	
@@ -381,7 +381,7 @@ static int NCR5380_poll_politely(struct Scsi_Host *instance, int reg, int bit, i
 	{
 		r = NCR5380_read(reg);
 		if((r & bit) == val)
-			return r; 
+			return 0;
 		if(!in_interrupt())
 			yield();
 		else

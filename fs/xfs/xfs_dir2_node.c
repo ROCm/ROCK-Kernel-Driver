@@ -1612,7 +1612,8 @@ xfs_dir2_node_addname_int(
 			if (XFS_DIR2_DB_TO_FDB(mp, dbno) != fbno) {
 				cmn_err(CE_ALERT,
 		"xfs_dir2_node_addname_int: needed block %lld, got %lld\n",
-					XFS_DIR2_DB_TO_FDB(mp, dbno), fbno);
+					(long long)XFS_DIR2_DB_TO_FDB(mp, dbno),
+					(long long)fbno);
 				XFS_ERROR_REPORT("xfs_dir2_node_addname_int",
 						 XFS_ERRLEVEL_LOW, mp);
 				return XFS_ERROR(EFSCORRUPTED);

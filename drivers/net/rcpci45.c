@@ -259,10 +259,12 @@ rcpci45_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 	dev->set_config = &RCconfig;
 
 	if ((error = register_netdev(dev)))
-		goto err_out_free_region;
+		goto err_out_iounmap;
 
 	return 0;		/* success */
 
+err_out_iounmap:
+	iounmap((void *) dev->base_addr);
 err_out_free_region:
 	pci_release_regions (pdev);
 err_out_free_msgbuf:
