@@ -887,7 +887,7 @@ const snd_kcontrol_new_t snd_ac97_controls_spdif[5] = {
 #define AD18XX_PCM_BITS(xname, codec, lshift, rshift, mask) \
 { .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, .info = snd_ac97_ad18xx_pcm_info_bits, \
   .get = snd_ac97_ad18xx_pcm_get_bits, .put = snd_ac97_ad18xx_pcm_put_bits, \
-  .private_value = (codec) | ((lshift) << 8) | ((rshift) << 12) | ((mask) << 24) }
+  .private_value = (codec) | ((lshift) << 8) | ((rshift) << 12) | ((mask) << 16) }
 
 static int snd_ac97_ad18xx_pcm_info_bits(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {
