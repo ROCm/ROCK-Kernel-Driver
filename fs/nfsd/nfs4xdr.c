@@ -1806,6 +1806,23 @@ out_put:
 	return nfserr;
 }
 
+static u32 *
+nfsd4_encode_rdattr_error(u32 *p, int buflen, int nfserr)
+{
+	u32 *attrlenp;
+
+	if (buflen < 6)
+		return NULL;
+	*p++ = htonl(2);
+	*p++ = htonl(FATTR4_WORD0_RDATTR_ERROR); /* bmval0 */
+	*p++ = htonl(0);			 /* bmval1 */
+
+	attrlenp = p++;
+	*p++ = nfserr;       /* no htonl */
+	*attrlenp = htonl((char *)p - (char *)attrlenp - 4);
+	return p;
+}
+
 static int
 nfsd4_encode_dirent(struct readdir_cd *ccd, const char *name, int namlen,
 		    loff_t offset, ino_t ino, unsigned int d_type)
@@ -1813,7 +1830,6 @@ nfsd4_encode_dirent(struct readdir_cd *ccd, const char *name, int namlen,
 	struct nfsd4_readdir *cd = container_of(ccd, struct nfsd4_readdir, common);
 	int buflen;
 	u32 *p = cd->buffer;
-	u32 *attrlenp;
 	int nfserr = 0;
 
 	/* In nfsv4, "." and ".." never make it onto the wire.. */
@@ -1858,16 +1874,9 @@ nfsd4_encode_dirent(struct readdir_cd *ccd, const char *name, int namlen,
 		cd->common.err = nfserr;
 		return -EINVAL;
 	}
-
-	if (buflen < 6)
-		goto nospc;
-	*p++ = htonl(2);
-	*p++ = htonl(FATTR4_WORD0_RDATTR_ERROR); /* bmval0 */
-	*p++ = htonl(0);			 /* bmval1 */
-
-	attrlenp = p++;
-	*p++ = nfserr;       /* no htonl */
-	*attrlenp = htonl((char *)p - (char *)attrlenp - 4);
+	p = nfsd4_encode_rdattr_error(p, buflen, nfserr);
+	if (p == NULL)
+		goto out_nospc;
 
 out:
 	cd->buflen -= (p - cd->buffer);
