@@ -29,7 +29,7 @@
  */
 
 /* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_AUX_REVISION "$Revision: 1.114 $"
+#define ZFCP_AUX_REVISION "$Revision: 1.115 $"
 
 #include "zfcp_ext.h"
 
@@ -40,8 +40,6 @@ static char *device;
 
 /* written against the module interface */
 static int __init  zfcp_module_init(void);
-
-int zfcp_reboot_handler(struct notifier_block *, unsigned long, void *);
 
 /* FCP related */
 static void zfcp_ns_gid_pn_handler(unsigned long);
@@ -338,9 +336,6 @@ zfcp_module_init(void)
 	/* initialise configuration rw lock */
 	rwlock_init(&zfcp_data.config_lock);
 
-	zfcp_data.reboot_notifier.notifier_call = zfcp_reboot_handler;
-	register_reboot_notifier(&zfcp_data.reboot_notifier);
-
 	/* save address of data structure managing the driver module */
 	zfcp_data.scsi_host_template.module = THIS_MODULE;
 
@@ -357,7 +352,6 @@ zfcp_module_init(void)
 	goto out;
 
  out_ccw_register:
-	unregister_reboot_notifier(&zfcp_data.reboot_notifier);
 	misc_deregister(&zfcp_cfdc_misc);
  out_misc_register:
 #ifdef CONFIG_S390_SUPPORT
@@ -368,23 +362,6 @@ zfcp_module_init(void)
  out:
 	return retval;
 }
-
-/*
- * This function is called automatically by the kernel whenever a reboot or a 
- * shut-down is initiated and zfcp is still loaded
- *
- * locks:       zfcp_data.config_sema is taken prior to shutting down the module
- *              and removing all structures
- * returns:     NOTIFY_DONE in all cases
- */
-int
-zfcp_reboot_handler(struct notifier_block *notifier, unsigned long code,
-		    void *ptr)
-{
-	zfcp_ccw_unregister();
-	return NOTIFY_DONE;
-}
-
 
 /*
  * function:    zfcp_cfdc_dev_ioctl

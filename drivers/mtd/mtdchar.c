@@ -1,5 +1,5 @@
 /*
- * $Id: mtdchar.c,v 1.62 2004/07/14 13:20:42 dwmw2 Exp $
+ * $Id: mtdchar.c,v 1.64 2004/08/09 13:59:46 dwmw2 Exp $
  *
  * Character-device access to raw MTD devices.
  *
@@ -262,7 +262,7 @@ static ssize_t mtd_write(struct file *file, const char __user *buf, size_t count
     IOCTL calls for getting device parameters.
 
 ======================================================================*/
-static void mtd_erase_callback (struct erase_info *instr)
+static void mtdchar_erase_callback (struct erase_info *instr)
 {
 	wake_up((wait_queue_head_t *)instr->priv);
 }
@@ -336,7 +336,7 @@ static int mtd_ioctl(struct inode *inode, struct file *file,
 				return -EFAULT;
 			}
 			erase->mtd = mtd;
-			erase->callback = mtd_erase_callback;
+			erase->callback = mtdchar_erase_callback;
 			erase->priv = (unsigned long)&waitq;
 			
 			/*
@@ -511,7 +511,6 @@ static int mtd_ioctl(struct inode *inode, struct file *file,
 	}
 
 	default:
-		DEBUG(MTD_DEBUG_LEVEL0, "Invalid ioctl %x (MEMGETINFO = %lx)\n", cmd, (unsigned long)MEMGETINFO);
 		ret = -ENOTTY;
 	}
 

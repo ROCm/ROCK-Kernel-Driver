@@ -185,7 +185,7 @@ match:
 
 	up(&card->open_sem);
 
-	return 0;
+	return nonseekable_open(inode, file);
 }
 
 static int emu10k1_midi_release(struct inode *inode, struct file *file)
@@ -252,9 +252,6 @@ static ssize_t emu10k1_midi_read(struct file *file, char __user *buffer, size_t 
 	unsigned long flags;
 
 	DPD(4, "emu10k1_midi_read(), count %#x\n", (u32) count);
-
-	if (pos != &file->f_pos)
-		return -ESPIPE;
 
 	if (!access_ok(VERIFY_WRITE, buffer, count))
 		return -EFAULT;
@@ -327,9 +324,6 @@ static ssize_t emu10k1_midi_write(struct file *file, const char __user *buffer, 
 	unsigned long flags;
 
 	DPD(4, "emu10k1_midi_write(), count=%#x\n", (u32) count);
-
-	if (pos != &file->f_pos)
-		return -ESPIPE;
 
 	if (!access_ok(VERIFY_READ, buffer, count))
 		return -EFAULT;

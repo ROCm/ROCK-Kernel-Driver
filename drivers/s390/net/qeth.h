@@ -23,7 +23,7 @@
 
 #include "qeth_mpc.h"
 
-#define VERSION_QETH_H 		"$Revision: 1.111 $"
+#define VERSION_QETH_H 		"$Revision: 1.113 $"
 
 #ifdef CONFIG_QETH_IPV6
 #define QETH_VERSION_IPV6 	":IPv6"
@@ -149,6 +149,8 @@ qeth_hex_dump(unsigned char *buf, size_t len)
 #define SENSE_COMMAND_REJECT_FLAG 0x80
 #define SENSE_RESETTING_EVENT_BYTE 1
 #define SENSE_RESETTING_EVENT_FLAG 0x80
+
+#define atomic_swap(a,b) xchg((int *)a.counter, b)
 
 /*
  * Common IO related definitions
@@ -425,12 +427,18 @@ struct qeth_qdio_out_buffer {
 
 struct qeth_card;
 
+enum qeth_out_q_states {
+       QETH_OUT_Q_UNLOCKED,
+       QETH_OUT_Q_LOCKED,
+       QETH_OUT_Q_LOCKED_FLUSH,
+};
+
 struct qeth_qdio_out_q {
 	struct qdio_buffer qdio_bufs[QDIO_MAX_BUFFERS_PER_Q];
 	struct qeth_qdio_out_buffer bufs[QDIO_MAX_BUFFERS_PER_Q];
 	int queue_no;
 	struct qeth_card *card;
-	spinlock_t lock;
+	atomic_t state;
 	volatile int do_pack;
 	/*
 	 * index of buffer to be filled by driver; state EMPTY or PACKING

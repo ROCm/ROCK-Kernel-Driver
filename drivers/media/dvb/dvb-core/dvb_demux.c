@@ -179,7 +179,7 @@ static int dvb_dmx_swfilter_sectionfilter (struct dvb_demux_feed *feed,
 		neq |= f->maskandnotmode[i] & xor;
 	}
 
-	if (f->doneq & !neq)
+	if (f->doneq && !neq)
 		return 0;
 
 	return feed->cb.sec (feed->feed.sec.secbuf, feed->feed.sec.seclen, 

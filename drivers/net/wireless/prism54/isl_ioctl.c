@@ -436,7 +436,7 @@ prism54_get_range(struct net_device *ndev, struct iw_request_info *info,
 {
 	struct iw_range *range = (struct iw_range *) extra;
 	islpci_private *priv = netdev_priv(ndev);
-	char *data;
+	u8 *data;
 	int i, m, rvalue;
 	struct obj_frequencies *freq;
 	union oid_res_t r;
@@ -513,8 +513,7 @@ prism54_get_range(struct net_device *ndev, struct iw_request_info *info,
 	i = 0;
 	while ((i < IW_MAX_BITRATES) && (*data != 0)) {
 		/*       the result must be in bps. The card gives us 500Kbps */
-		range->bitrate[i] = (__s32) (*data >> 1);
-		range->bitrate[i] *= 1000000;
+		range->bitrate[i] = *data * 500000;
 		i++;
 		data++;
 	}
@@ -820,9 +819,11 @@ prism54_set_rate(struct net_device *ndev,
 		return mgt_set_request(priv, DOT11_OID_PROFILES, 0, &profile);
 	}
 
-	if ((ret =
-	     mgt_get_request(priv, DOT11_OID_SUPPORTEDRATES, 0, NULL, &r)))
+	ret = mgt_get_request(priv, DOT11_OID_SUPPORTEDRATES, 0, NULL, &r);
+	if (ret) {
+		kfree(r.ptr);
 		return ret;
+	}
 
 	rate = (u32) (vwrq->value / 500000);
 	data = r.ptr;
@@ -840,6 +841,7 @@ prism54_set_rate(struct net_device *ndev,
 	}
 
 	if (!data[i]) {
+		kfree(r.ptr);
 		return -EINVAL;
 	}
 
@@ -888,8 +890,11 @@ prism54_get_rate(struct net_device *ndev,
 	vwrq->value = r.u * 500000;
 
 	/* request the device for the enabled rates */
-	if ((rvalue = mgt_get_request(priv, DOT11_OID_RATES, 0, NULL, &r)))
+	rvalue = mgt_get_request(priv, DOT11_OID_RATES, 0, NULL, &r);
+	if (rvalue) {
+		kfree(r.ptr);
 		return rvalue;
+	}
 	data = r.ptr;
 	vwrq->fixed = (data[0] != 0) && (data[1] == 0);
 	kfree(r.ptr);

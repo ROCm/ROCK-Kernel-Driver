@@ -143,47 +143,6 @@ EXPORT_SYMBOL(synchronize_irq);
 
 #endif /* CONFIG_SMP */
 
-/* XXX Make this into free_irq() - Anton */
-
-/* This could be promoted to a real free_irq() ... */
-static int
-do_free_irq(int irq, void* dev_id)
-{
-	irq_desc_t *desc = get_irq_desc(irq);
-	struct irqaction **p;
-	unsigned long flags;
-
-	spin_lock_irqsave(&desc->lock,flags);
-	p = &desc->action;
-	for (;;) {
-		struct irqaction * action = *p;
-		if (action) {
-			struct irqaction **pp = p;
-			p = &action->next;
-			if (action->dev_id != dev_id)
-				continue;
-
-			/* Found it - now remove it from the list of entries */
-			*pp = action->next;
-			if (!desc->action) {
-				desc->status |= IRQ_DISABLED;
-				mask_irq(irq);
-			}
-			spin_unlock_irqrestore(&desc->lock,flags);
-
-			/* Wait to make sure it's not being used on another CPU */
-			synchronize_irq(irq);
-			kfree(action);
-			return 0;
-		}
-		printk("Trying to free free IRQ%d\n",irq);
-		spin_unlock_irqrestore(&desc->lock,flags);
-		break;
-	}
-	return -ENOENT;
-}
-
-
 int request_irq(unsigned int irq,
 	irqreturn_t (*handler)(int, void *, struct pt_regs *),
 	unsigned long irqflags, const char * devname, void *dev_id)
@@ -194,8 +153,7 @@ int request_irq(unsigned int irq,
 	if (irq >= NR_IRQS)
 		return -EINVAL;
 	if (!handler)
-		/* We could implement really free_irq() instead of that... */
-		return do_free_irq(irq, dev_id);
+		return -EINVAL;
 
 	action = (struct irqaction *)
 		kmalloc(sizeof(struct irqaction), GFP_KERNEL);
@@ -222,7 +180,38 @@ EXPORT_SYMBOL(request_irq);
 
 void free_irq(unsigned int irq, void *dev_id)
 {
-	request_irq(irq, NULL, 0, NULL, dev_id);
+	irq_desc_t *desc = get_irq_desc(irq);
+	struct irqaction **p;
+	unsigned long flags;
+
+	spin_lock_irqsave(&desc->lock,flags);
+	p = &desc->action;
+	for (;;) {
+		struct irqaction * action = *p;
+		if (action) {
+			struct irqaction **pp = p;
+			p = &action->next;
+			if (action->dev_id != dev_id)
+				continue;
+
+			/* Found it - now remove it from the list of entries */
+			*pp = action->next;
+			if (!desc->action) {
+				desc->status |= IRQ_DISABLED;
+				mask_irq(irq);
+			}
+			spin_unlock_irqrestore(&desc->lock,flags);
+
+			/* Wait to make sure it's not being used on another CPU */
+			synchronize_irq(irq);
+			kfree(action);
+			return;
+		}
+		printk("Trying to free free IRQ%d\n",irq);
+		spin_unlock_irqrestore(&desc->lock,flags);
+		break;
+	}
+	return;
 }
 
 EXPORT_SYMBOL(free_irq);

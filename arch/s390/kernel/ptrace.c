@@ -553,6 +553,19 @@ do_ptrace_emu31(struct task_struct *child, long request, long addr, long data)
 			copied += sizeof(unsigned int);
 		}
 		return 0;
+	case PTRACE_GETEVENTMSG:
+		return put_user((__u32) child->ptrace_message,
+				(unsigned int __user *) data);
+	case PTRACE_GETSIGINFO:
+		if (child->last_siginfo == NULL)
+			return -EINVAL;
+		return copy_siginfo_to_user32((siginfo_t32 __user *) data,
+					      child->last_siginfo);
+	case PTRACE_SETSIGINFO:
+		if (child->last_siginfo == NULL)
+			return -EINVAL;
+		return copy_siginfo_from_user32(child->last_siginfo,
+						(siginfo_t32 __user *) data);
 	}
 	return ptrace_request(child, request, addr, data);
 }

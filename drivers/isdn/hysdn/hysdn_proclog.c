@@ -158,9 +158,6 @@ hysdn_log_write(struct file *file, const char __user *buf, size_t count, loff_t 
 	long base = 10;
 	hysdn_card *card = (hysdn_card *) file->private_data;
 
-	if (&file->f_pos != off)	/* fs error check */
-		return (-ESPIPE);
-
 	if (count > (sizeof(valbuf) - 1))
 		count = sizeof(valbuf) - 1;	/* limit length */
 	if (copy_from_user(valbuf, buf, count))
@@ -237,7 +234,7 @@ hysdn_log_read(struct file *file, char __user *buf, size_t count, loff_t * off)
 	if ((len = strlen(inf->log_start)) <= count) {
 		if (copy_to_user(buf, inf->log_start, len))
 			return -EFAULT;
-		file->f_pos += len;
+		*off += len;
 		return (len);
 	}
 	return (0);
@@ -285,7 +282,7 @@ hysdn_log_open(struct inode *ino, struct file *filep)
 		return (-EPERM);	/* no permission this time */
 	}
 	unlock_kernel();
-	return (0);
+	return nonseekable_open(ino, filep);
 }				/* hysdn_log_open */
 
 /*******************************************************************************/

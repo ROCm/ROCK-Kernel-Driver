@@ -94,10 +94,6 @@ pipe_readv(struct file *filp, const struct iovec *_iov,
 	struct iovec *iov = (struct iovec *)_iov;
 	size_t total_len;
 
-	/* pread is not allowed on pipes. */
-	if (unlikely(ppos != &filp->f_pos))
-		return -ESPIPE;
-
 	total_len = iov_length(iov, nr_segs);
 	/* Null read succeeds. */
 	if (unlikely(total_len == 0))
@@ -186,10 +182,6 @@ pipe_writev(struct file *filp, const struct iovec *_iov,
 	int do_wakeup;
 	struct iovec *iov = (struct iovec *)_iov;
 	size_t total_len;
-
-	/* pwrite is not allowed on pipes. */
-	if (unlikely(ppos != &filp->f_pos))
-		return -ESPIPE;
 
 	total_len = iov_length(iov, nr_segs);
 	/* Null write succeeds. */
@@ -656,13 +648,13 @@ int do_pipe(int *fd)
 	f1->f_pos = f2->f_pos = 0;
 	f1->f_flags = O_RDONLY;
 	f1->f_op = &read_pipe_fops;
-	f1->f_mode = 1;
+	f1->f_mode = FMODE_READ;
 	f1->f_version = 0;
 
 	/* write file */
 	f2->f_flags = O_WRONLY;
 	f2->f_op = &write_pipe_fops;
-	f2->f_mode = 2;
+	f2->f_mode = FMODE_WRITE;
 	f2->f_version = 0;
 
 	fd_install(i, f1);

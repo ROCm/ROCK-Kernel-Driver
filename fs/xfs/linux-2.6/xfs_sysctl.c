@@ -46,12 +46,13 @@ xfs_stats_clear_proc_handler(
 	int		write,
 	struct file	*filp,
 	void		*buffer,
-	size_t		*lenp)
+	size_t		*lenp,
+	loff_t		*ppos)
 {
 	int		c, ret, *valp = ctl->data;
 	__uint32_t	vn_active;
 
-	ret = proc_dointvec_minmax(ctl, write, filp, buffer, lenp);
+	ret = proc_dointvec_minmax(ctl, write, filp, buffer, lenp, ppos);
 
 	if (!ret && write && *valp) {
 		printk("XFS Clearing xfsstats\n");

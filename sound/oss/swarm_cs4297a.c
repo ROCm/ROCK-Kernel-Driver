@@ -1526,14 +1526,6 @@ static int mixer_ioctl(struct cs4297a_state *s, unsigned int cmd,
 
 // --------------------------------------------------------------------- 
 
-static loff_t cs4297a_llseek(struct file *file, loff_t offset, int origin)
-{
-	return -ESPIPE;
-}
-
-
-// --------------------------------------------------------------------- 
-
 static int cs4297a_open_mixdev(struct inode *inode, struct file *file)
 {
 	int minor = iminor(inode);
@@ -1561,7 +1553,7 @@ static int cs4297a_open_mixdev(struct inode *inode, struct file *file)
 	CS_DBGOUT(CS_FUNCTION | CS_OPEN, 4,
 		  printk(KERN_INFO "cs4297a: cs4297a_open_mixdev()- 0\n"));
 
-	return 0;
+	return nonseekable_open(inode, file);
 }
 
 
@@ -1588,7 +1580,7 @@ static int cs4297a_ioctl_mixdev(struct inode *inode, struct file *file,
 // ******************************************************************************************
 static /*const */ struct file_operations cs4297a_mixer_fops = {
 	.owner		= THIS_MODULE,
-	.llseek		= cs4297a_llseek,
+	.llseek		= no_llseek,
 	.ioctl		= cs4297a_ioctl_mixdev,
 	.open		= cs4297a_open_mixdev,
 	.release	= cs4297a_release_mixdev,
@@ -1658,8 +1650,6 @@ static ssize_t cs4297a_read(struct file *file, char *buffer, size_t count,
 		  printk(KERN_INFO "cs4297a: cs4297a_read()+ %d \n", count));
 
 	VALIDATE_STATE(s);
-	if (ppos != &file->f_pos)
-		return -ESPIPE;
 	if (s->dma_adc.mapped)
 		return -ENXIO;
 	if (!s->dma_adc.ready && (ret = prog_dmabuf_adc(s)))
@@ -1784,8 +1774,6 @@ static ssize_t cs4297a_write(struct file *file, const char *buffer,
 			 count));
 	VALIDATE_STATE(s);
 
-	if (ppos != &file->f_pos)
-		return -ESPIPE;
 	if (s->dma_dac.mapped)
 		return -ENXIO;
 	if (!s->dma_dac.ready && (ret = prog_dmabuf_dac(s)))
@@ -2494,7 +2482,7 @@ static int cs4297a_open(struct inode *inode, struct file *file)
 	}
 	CS_DBGOUT(CS_FUNCTION | CS_OPEN, 2,
 		  printk(KERN_INFO "cs4297a: cs4297a_open()- 0\n"));
-	return 0;
+	return nonseekable_open(inode, file);
 }
 
 
@@ -2503,7 +2491,7 @@ static int cs4297a_open(struct inode *inode, struct file *file)
 // ******************************************************************************************
 static /*const */ struct file_operations cs4297a_audio_fops = {
 	.owner		= THIS_MODULE,
-	.llseek		= cs4297a_llseek,
+	.llseek		= no_llseek,
 	.read		= cs4297a_read,
 	.write		= cs4297a_write,
 	.poll		= cs4297a_poll,

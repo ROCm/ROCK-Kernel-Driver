@@ -1512,13 +1512,6 @@ exit_pfm_fs(void)
 	mntput(pfmfs_mnt);
 }
 
-static loff_t
-pfm_lseek(struct file *file, loff_t offset, int whence)
-{
-	DPRINT(("pfm_lseek called\n"));
-	return -ESPIPE;
-}
-
 static ssize_t
 pfm_read(struct file *filp, char *buf, size_t size, loff_t *ppos)
 {
@@ -1545,10 +1538,6 @@ pfm_read(struct file *filp, char *buf, size_t size, loff_t *ppos)
 		DPRINT(("message is too small ctx=%p (>=%ld)\n", ctx, sizeof(pfm_msg_t)));
 		return -EINVAL;
 	}
-	/*
-	 * seeks are not allowed on message queues
-	 */
-	if (ppos != &filp->f_pos) return -ESPIPE;
 
 	PROTECT_CTX(ctx, flags);
 
@@ -2141,7 +2130,7 @@ pfm_no_open(struct inode *irrelevant, struct file *dontcare)
 
 
 static struct file_operations pfm_file_ops = {
-	.llseek   = pfm_lseek,
+	.llseek   = no_llseek,
 	.read     = pfm_read,
 	.write    = pfm_write,
 	.poll     = pfm_poll,

@@ -1773,14 +1773,10 @@ static int journal_unmap_buffer(journal_t *journal, struct buffer_head *bh)
 	jbd_lock_bh_state(bh);
 	spin_lock(&journal->j_list_lock);
 
-	/*
-	 * Now we have the locks, check again to see whether kjournald has
-	 * taken the buffer off the transaction.
-	 */
-	if (!buffer_jbd(bh))
-		goto zap_buffer;
+	jh = journal_grab_journal_head(bh);
+	if (!jh)
+		goto zap_buffer_no_jh;
 
-	jh = bh2jh(bh);
 	transaction = jh->b_transaction;
 	if (transaction == NULL) {
 		/* First case: not on any transaction.  If it
@@ -1811,6 +1807,7 @@ static int journal_unmap_buffer(journal_t *journal, struct buffer_head *bh)
 			spin_unlock(&journal->j_list_lock);
 			jbd_unlock_bh_state(bh);
 			spin_unlock(&journal->j_state_lock);
+			journal_put_journal_head(jh);
 			return ret;
 		} else {
 			/* There is no currently-running transaction. So the
@@ -1824,6 +1821,7 @@ static int journal_unmap_buffer(journal_t *journal, struct buffer_head *bh)
 				spin_unlock(&journal->j_list_lock);
 				jbd_unlock_bh_state(bh);
 				spin_unlock(&journal->j_state_lock);
+				journal_put_journal_head(jh);
 				return ret;
 			} else {
 				/* The orphan record's transaction has
@@ -1847,6 +1845,7 @@ static int journal_unmap_buffer(journal_t *journal, struct buffer_head *bh)
 		spin_unlock(&journal->j_list_lock);
 		jbd_unlock_bh_state(bh);
 		spin_unlock(&journal->j_state_lock);
+		journal_put_journal_head(jh);
 		return 0;
 	} else {
 		/* Good, the buffer belongs to the running transaction.
@@ -1860,6 +1859,8 @@ static int journal_unmap_buffer(journal_t *journal, struct buffer_head *bh)
 	}
 
 zap_buffer:
+	journal_put_journal_head(jh);
+zap_buffer_no_jh:
 	spin_unlock(&journal->j_list_lock);
 	jbd_unlock_bh_state(bh);
 	spin_unlock(&journal->j_state_lock);

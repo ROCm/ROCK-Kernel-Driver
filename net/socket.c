@@ -401,7 +401,7 @@ int sock_map_fd(struct socket *sock)
 
 		sock->file = file;
 		file->f_op = SOCK_INODE(sock)->i_fop = &socket_file_ops;
-		file->f_mode = 3;
+		file->f_mode = FMODE_READ | FMODE_WRITE;
 		file->f_flags = O_RDWR;
 		file->f_pos = 0;
 		fd_install(fd, file);
@@ -726,9 +726,6 @@ ssize_t sock_sendpage(struct file *file, struct page *page,
 {
 	struct socket *sock;
 	int flags;
-
-	if (ppos != &file->f_pos)
-		return -ESPIPE;
 
 	sock = SOCKET_I(file->f_dentry->d_inode);
 

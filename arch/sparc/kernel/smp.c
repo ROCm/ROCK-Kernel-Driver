@@ -45,6 +45,7 @@ int smp_activated = 0;
 volatile int __cpu_number_map[NR_CPUS];
 volatile int __cpu_logical_map[NR_CPUS];
 cycles_t cacheflush_time = 0; /* XXX */
+unsigned long cache_decay_ticks = 100;
 
 cpumask_t cpu_online_map = CPU_MASK_NONE;
 cpumask_t phys_cpu_present_map = CPU_MASK_NONE;
@@ -201,6 +202,11 @@ void smp_flush_tlb_page(struct vm_area_struct *vma, unsigned long page)
 			xc2((smpfunc_t) BTFIXUP_CALL(local_flush_tlb_page), (unsigned long) vma, page);
 		local_flush_tlb_page(vma, page);
 	}
+}
+
+void smp_reschedule_irq(void)
+{
+	set_need_resched();
 }
 
 void smp_flush_page_to_ram(unsigned long page)

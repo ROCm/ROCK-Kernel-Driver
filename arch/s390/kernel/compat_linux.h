@@ -214,4 +214,7 @@ struct sigevent32 {
 	} _sigev_un;
 };
 
+extern int copy_siginfo_to_user32(siginfo_t32 __user *to, siginfo_t *from);
+extern int copy_siginfo_from_user32(siginfo_t *to, siginfo_t32 __user *from);
+
 #endif /* _ASM_S390X_S390_H */

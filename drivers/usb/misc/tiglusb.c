@@ -132,7 +132,7 @@ tiglusb_open (struct inode *inode, struct file *filp)
 	filp->f_pos = 0;
 	filp->private_data = s;
 
-	return 0;
+	return nonseekable_open(inode, filp);
 }
 
 static int

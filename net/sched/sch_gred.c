@@ -106,7 +106,7 @@ gred_enqueue(struct sk_buff *skb, struct Qdisc* sch)
 {
 	psched_time_t now;
 	struct gred_sched_data *q=NULL;
-	struct gred_sched *t= (struct gred_sched *)sch->data;
+	struct gred_sched *t= qdisc_priv(sch);
 	unsigned long	qave=0;	
 	int i=0;
 
@@ -215,7 +215,7 @@ static int
 gred_requeue(struct sk_buff *skb, struct Qdisc* sch)
 {
 	struct gred_sched_data *q;
-	struct gred_sched *t= (struct gred_sched *)sch->data;
+	struct gred_sched *t= qdisc_priv(sch);
 	q= t->tab[(skb->tc_index&0xf)];
 /* error checking here -- probably unnecessary */
 	PSCHED_SET_PASTPERFECT(q->qidlestart);
@@ -231,7 +231,7 @@ gred_dequeue(struct Qdisc* sch)
 {
 	struct sk_buff *skb;
 	struct gred_sched_data *q;
-	struct gred_sched *t= (struct gred_sched *)sch->data;
+	struct gred_sched *t= qdisc_priv(sch);
 
 	skb = __skb_dequeue(&sch->q);
 	if (skb) {
@@ -264,7 +264,7 @@ static unsigned int gred_drop(struct Qdisc* sch)
 	struct sk_buff *skb;
 
 	struct gred_sched_data *q;
-	struct gred_sched *t= (struct gred_sched *)sch->data;
+	struct gred_sched *t= qdisc_priv(sch);
 
 	skb = __skb_dequeue_tail(&sch->q);
 	if (skb) {
@@ -300,7 +300,7 @@ static void gred_reset(struct Qdisc* sch)
 {
 	int i;
 	struct gred_sched_data *q;
-	struct gred_sched *t= (struct gred_sched *)sch->data;
+	struct gred_sched *t= qdisc_priv(sch);
 
 	__skb_queue_purge(&sch->q);
 
@@ -323,7 +323,7 @@ static void gred_reset(struct Qdisc* sch)
 
 static int gred_change(struct Qdisc *sch, struct rtattr *opt)
 {
-	struct gred_sched *table = (struct gred_sched *)sch->data;
+	struct gred_sched *table = qdisc_priv(sch);
 	struct gred_sched_data *q;
 	struct tc_gred_qopt *ctl;
 	struct tc_gred_sopt *sopt;
@@ -469,7 +469,7 @@ static int gred_change(struct Qdisc *sch, struct rtattr *opt)
 
 static int gred_init(struct Qdisc *sch, struct rtattr *opt)
 {
-	struct gred_sched *table = (struct gred_sched *)sch->data;
+	struct gred_sched *table = qdisc_priv(sch);
 	struct tc_gred_sopt *sopt;
 	struct rtattr *tb[TCA_GRED_STAB];
 	struct rtattr *tb2[TCA_GRED_DPS];
@@ -502,7 +502,7 @@ static int gred_dump(struct Qdisc *sch, struct sk_buff *skb)
 	struct rtattr *rta;
 	struct tc_gred_qopt *opt = NULL ;
 	struct tc_gred_qopt *dst;
-	struct gred_sched *table = (struct gred_sched *)sch->data;
+	struct gred_sched *table = qdisc_priv(sch);
 	struct gred_sched_data *q;
 	int i;
 	unsigned char	 *b = skb->tail;
@@ -593,7 +593,7 @@ rtattr_failure:
 
 static void gred_destroy(struct Qdisc *sch)
 {
-	struct gred_sched *table = (struct gred_sched *)sch->data;
+	struct gred_sched *table = qdisc_priv(sch);
 	int i;
 
 	for (i = 0;i < table->DPs; i++) {

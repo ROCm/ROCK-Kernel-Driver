@@ -2933,13 +2933,13 @@ struct cdrom_sysctl_settings {
 } cdrom_sysctl_settings;
 
 int cdrom_sysctl_info(ctl_table *ctl, int write, struct file * filp,
-                           void __user *buffer, size_t *lenp)
+                           void __user *buffer, size_t *lenp, loff_t *ppos)
 {
         int pos;
 	struct cdrom_device_info *cdi;
 	char *info = cdrom_sysctl_settings.info;
 	
-	if (!*lenp || (filp->f_pos && !write)) {
+	if (!*lenp || (*ppos && !write)) {
 		*lenp = 0;
 		return 0;
 	}
@@ -3028,7 +3028,7 @@ int cdrom_sysctl_info(ctl_table *ctl, int write, struct file * filp,
 
 	strcpy(info+pos,"\n\n");
 		
-        return proc_dostring(ctl, write, filp, buffer, lenp);
+        return proc_dostring(ctl, write, filp, buffer, lenp, ppos);
 }
 
 /* Unfortunately, per device settings are not implemented through
@@ -3060,13 +3060,13 @@ void cdrom_update_settings(void)
 }
 
 static int cdrom_sysctl_handler(ctl_table *ctl, int write, struct file * filp,
-				void __user *buffer, size_t *lenp)
+				void __user *buffer, size_t *lenp, loff_t *ppos)
 {
 	int *valp = ctl->data;
 	int val = *valp;
 	int ret;
 	
-	ret = proc_dointvec(ctl, write, filp, buffer, lenp);
+	ret = proc_dointvec(ctl, write, filp, buffer, lenp, ppos);
 
 	if (write && *valp != val) {
 	

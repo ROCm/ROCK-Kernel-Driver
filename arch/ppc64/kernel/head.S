@@ -221,7 +221,8 @@ exception_marker:
 	mtspr	SRR0,r12;						\
 	mfspr	r12,SRR1;		/* and SRR1 */			\
 	mtspr	SRR1,r10;						\
-	rfid
+	rfid;								\
+	b	.	/* prevent speculative execution */
 
 /*
  * This is the start of the interrupt handlers for iSeries
@@ -302,12 +303,14 @@ exception_marker:
 	. = n;						\
 	.globl label##_Pseries;				\
 label##_Pseries:					\
+	HMT_MEDIUM;					\
 	mtspr	SPRG1,r13;		/* save r13 */	\
 	EXCEPTION_PROLOG_PSERIES(PACA_EXGEN, label##_common)
 
 #define STD_EXCEPTION_ISERIES(n, label, area)		\
 	.globl label##_Iseries;				\
 label##_Iseries:					\
+	HMT_MEDIUM;					\
 	mtspr	SPRG1,r13;		/* save r13 */	\
 	EXCEPTION_PROLOG_ISERIES_1(area);		\
 	EXCEPTION_PROLOG_ISERIES_2;			\
@@ -316,6 +319,7 @@ label##_Iseries:					\
 #define MASKABLE_EXCEPTION_ISERIES(n, label)				\
 	.globl label##_Iseries;						\
 label##_Iseries:							\
+	HMT_MEDIUM;							\
 	mtspr	SPRG1,r13;		/* save r13 */			\
 	EXCEPTION_PROLOG_ISERIES_1(PACA_EXGEN);				\
 	lbz	r10,PACAPROFENABLED(r13);				\
@@ -409,12 +413,14 @@ __start_interrupts:
 
 	. = 0x200
 _MachineCheckPseries:
+	HMT_MEDIUM
 	mtspr	SPRG1,r13		/* save r13 */
 	EXCEPTION_PROLOG_PSERIES(PACA_EXMC, MachineCheck_common)
 
 	. = 0x300
 	.globl DataAccess_Pseries
 DataAccess_Pseries:
+	HMT_MEDIUM
 	mtspr	SPRG1,r13
 BEGIN_FTR_SECTION
 	mtspr	SPRG2,r12
@@ -433,6 +439,7 @@ END_FTR_SECTION_IFCLR(CPU_FTR_SLB)
 	. = 0x380
 	.globl DataAccessSLB_Pseries
 DataAccessSLB_Pseries:
+	HMT_MEDIUM
 	mtspr	SPRG1,r13
 	mfspr	r13,SPRG3		/* get paca address into r13 */
 	std	r9,PACA_EXSLB+EX_R9(r13)	/* save r9 - r12 */
@@ -453,12 +460,14 @@ DataAccessSLB_Pseries:
 	mtspr	SRR1,r10
 	mfspr	r3,DAR
 	rfid
+	b	.	/* prevent speculative execution */
 
 	STD_EXCEPTION_PSERIES(0x400, InstructionAccess)
 
 	. = 0x480
 	.globl InstructionAccessSLB_Pseries
 InstructionAccessSLB_Pseries:
+	HMT_MEDIUM
 	mtspr	SPRG1,r13
 	mfspr	r13,SPRG3		/* get paca address into r13 */
 	std	r9,PACA_EXSLB+EX_R9(r13)	/* save r9 - r12 */
@@ -479,6 +488,7 @@ InstructionAccessSLB_Pseries:
 	mtspr	SRR1,r10
 	mr	r3,r11			/* SRR0 is faulting address */
 	rfid
+	b	.	/* prevent speculative execution */
 
 	STD_EXCEPTION_PSERIES(0x500, HardwareInterrupt)
 	STD_EXCEPTION_PSERIES(0x600, Alignment)
@@ -491,6 +501,7 @@ InstructionAccessSLB_Pseries:
 	. = 0xc00
 	.globl	SystemCall_Pseries
 SystemCall_Pseries:
+	HMT_MEDIUM
 	mr	r9,r13
 	mfmsr	r10
 	mfspr	r13,SPRG3
@@ -503,6 +514,7 @@ SystemCall_Pseries:
 	mfspr	r12,SRR1
 	mtspr	SRR1,r10
 	rfid
+	b	.	/* prevent speculative execution */
 
 	STD_EXCEPTION_PSERIES(0xd00, SingleStep)
 	STD_EXCEPTION_PSERIES(0xe00, Trap_0e)
@@ -727,6 +739,7 @@ HardwareInterrupt_Iseries_masked:
 	ld	r12,PACA_EXGEN+EX_R12(r13)
 	ld	r13,PACA_EXGEN+EX_R13(r13)
 	rfid
+	b	.	/* prevent speculative execution */
 #endif
 
 /*
@@ -742,10 +755,12 @@ fwnmi_data_area:
 	. = 0x8000
 	.globl SystemReset_FWNMI
 SystemReset_FWNMI:
+	HMT_MEDIUM
 	mtspr	SPRG1,r13		/* save r13 */
 	EXCEPTION_PROLOG_PSERIES(PACA_EXGEN, SystemReset_common)
 	.globl MachineCheck_FWNMI
 MachineCheck_FWNMI:
+	HMT_MEDIUM
 	mtspr	SPRG1,r13		/* save r13 */
 	EXCEPTION_PROLOG_PSERIES(PACA_EXMC, MachineCheck_common)
 
@@ -867,6 +882,7 @@ fast_exception_return:
 	REST_4GPRS(10, r1)
 	ld	r1,GPR1(r1)
 	rfid
+	b	.	/* prevent speculative execution */
 
 unrecov_fer:
 	bl	.save_nvgprs
@@ -1146,6 +1162,7 @@ _GLOBAL(do_stab_bolted)
 	ld	r12,PACA_EXSLB+EX_R12(r13)
 	ld	r13,PACA_EXSLB+EX_R13(r13)
 	rfid
+	b	.	/* prevent speculative execution */
 
 /*
  * r13 points to the PACA, r9 contains the saved CR,
@@ -1190,6 +1207,7 @@ _GLOBAL(do_slb_miss)
 	ld	r12,PACA_EXSLB+EX_R12(r13)
 	ld	r13,PACA_EXSLB+EX_R13(r13)
 	rfid
+	b	.	/* prevent speculative execution */
 
 unrecov_slb:
 	EXCEPTION_PROLOG_COMMON(0x4100, PACA_EXSLB)
@@ -1295,6 +1313,7 @@ _STATIC(mmu_off)
 	mtspr	SRR1,r3
 	sync
 	rfid
+	b	.	/* prevent speculative execution */
 _GLOBAL(__start_initialization_pSeries)
 	mr	r31,r3			/* save parameters */
 	mr	r30,r4
@@ -1777,6 +1796,7 @@ _GLOBAL(__secondary_start)
 	mtspr	SRR0,r3
 	mtspr	SRR1,r4
 	rfid
+	b	.	/* prevent speculative execution */
 
 /* 
  * Running with relocation on at this point.  All we want to do is
@@ -1940,6 +1960,7 @@ _STATIC(start_here_pSeries)
 	mtspr	SRR0,r3
 	mtspr	SRR1,r4
 	rfid
+	b	.	/* prevent speculative execution */
 #endif /* CONFIG_PPC_PSERIES */
 	
 	/* This is where all platforms converge execution */

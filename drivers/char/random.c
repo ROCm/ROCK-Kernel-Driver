@@ -822,6 +822,11 @@ static void add_timer_randomness(struct timer_rand_state *state, unsigned num)
 	} else {
 		time = jiffies;
 	}
+#elif defined (__sparc_v9__)
+	unsigned long tick = tick_ops->get_tick();
+
+	time = (unsigned int) tick;
+	num ^= (tick >> 32UL);
 #else
 	time = jiffies;
 #endif
@@ -1894,13 +1899,13 @@ static int change_poolsize(int poolsize)
 }
 
 static int proc_do_poolsize(ctl_table *table, int write, struct file *filp,
-			    void __user *buffer, size_t *lenp)
+			    void __user *buffer, size_t *lenp, loff_t *ppos)
 {
 	int	ret;
 
 	sysctl_poolsize = random_state->poolinfo.POOLBYTES;
 
-	ret = proc_dointvec(table, write, filp, buffer, lenp);
+	ret = proc_dointvec(table, write, filp, buffer, lenp, ppos);
 	if (ret || !write ||
 	    (sysctl_poolsize == random_state->poolinfo.POOLBYTES))
 		return ret;
@@ -1945,7 +1950,7 @@ static int poolsize_strategy(ctl_table *table, int __user *name, int nlen,
  * sysctl system call, it is returned as 16 bytes of binary data.
  */
 static int proc_do_uuid(ctl_table *table, int write, struct file *filp,
-			void __user *buffer, size_t *lenp)
+			void __user *buffer, size_t *lenp, loff_t *ppos)
 {
 	ctl_table	fake_table;
 	unsigned char	buf[64], tmp_uuid[16], *uuid;
@@ -1967,7 +1972,7 @@ static int proc_do_uuid(ctl_table *table, int write, struct file *filp,
 	fake_table.data = buf;
 	fake_table.maxlen = sizeof(buf);
 
-	return proc_dostring(&fake_table, write, filp, buffer, lenp);
+	return proc_dostring(&fake_table, write, filp, buffer, lenp, ppos);
 }
 
 static int uuid_strategy(ctl_table *table, int __user *name, int nlen,

@@ -121,7 +121,6 @@ void __init dvma_init(struct sbus_bus *sbus)
 void __init sun4_dvma_init(void)
 {
 	struct sbus_dma *dma;
-	struct sbus_dma *dchain;
 	struct resource r;
 
 	if(sun4_dma_physaddr) {

@@ -38,21 +38,6 @@ extern int pc_debug;
 
 
 /* General driver definitions */
-#define PCIVENDOR_INTERSIL                      0x1260UL
-#define PCIVENDOR_3COM				0x10b7UL
-#define PCIVENDOR_DLINK				0x1186UL
-#define PCIVENDOR_I4				0x17cfUL
-#define PCIVENDOR_IODATA			0x10fcUL
-#define PCIVENDOR_NETGEAR			0x1385UL
-#define PCIVENDOR_SMC				0x10b8UL
-#define PCIVENDOR_ACCTON			0x1113UL
-#define PCIVENDOR_ATI				0x1259UL
-#define PCIVENDOR_TTL				0x16a5UL
-
-#define PCIDEVICE_ISL3877                       0x3877UL
-#define PCIDEVICE_ISL3886                       0x3886UL
-#define PCIDEVICE_ISL3890                       0x3890UL
-#define	PCIDEVICE_3COM6001			0x6001UL
 #define PCIDEVICE_LATENCY_TIMER_MIN 		0x40
 #define PCIDEVICE_LATENCY_TIMER_VAL 		0x50
 

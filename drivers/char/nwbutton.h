@@ -26,8 +26,6 @@ struct button_callback {
 
 static void button_sequence_finished (unsigned long parameters);
 static irqreturn_t button_handler (int irq, void *dev_id, struct pt_regs *regs);
-static int button_read (struct file *filp, char *buffer,
-			size_t count, loff_t *ppos);
 int button_init (void);
 int button_add_callback (void (*callback) (void), int count);
 int button_del_callback (void (*callback) (void));

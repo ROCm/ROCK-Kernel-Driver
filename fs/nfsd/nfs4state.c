@@ -1140,10 +1140,9 @@ int status;
 
 	if (share_access & NFS4_SHARE_ACCESS_WRITE) {
 		status = get_write_access(filp->f_dentry->d_inode);
-		if (!status)
-			filp->f_mode = FMODE_WRITE;
-		else
+		if (status)
 			return nfserrno(status);
+		filp->f_mode = (filp->f_mode | FMODE_WRITE) & ~FMODE_READ;
 	}
 	return nfs_ok;
 }
@@ -1153,7 +1152,7 @@ nfs4_file_downgrade(struct file *filp, unsigned int share_access)
 {
 	if (share_access & NFS4_SHARE_ACCESS_WRITE) {
 		put_write_access(filp->f_dentry->d_inode);
-		filp->f_mode = FMODE_READ;
+		filp->f_mode = (filp->f_mode | FMODE_READ) & ~FMODE_WRITE;
 	}
 }
 

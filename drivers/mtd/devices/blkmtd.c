@@ -1,5 +1,5 @@
 /*
- * $Id: blkmtd-25.c,v 1.6 2004/07/15 15:09:15 dwmw2 Exp $
+ * $Id: blkmtd.c,v 1.23 2004/08/09 14:03:19 dwmw2 Exp $
  *
  * blkmtd.c - use a block device as a fake MTD
  *
@@ -39,7 +39,7 @@
 
 /* Default erase size in K, always make it a multiple of PAGE_SIZE */
 #define CONFIG_MTD_BLKDEV_ERASESIZE (128 << 10)	/* 128KiB */
-#define VERSION "$Revision: 1.6 $"
+#define VERSION "$Revision: 1.23 $"
 
 /* Info for the block device */
 struct blkmtd_dev {
@@ -435,9 +435,7 @@ static int blkmtd_erase(struct mtd_info *mtd, struct erase_info *instr)
 	}
 
 	DEBUG(3, "blkmtd: erase: checking callback\n");
-	if (instr->callback) {
-		(*(instr->callback))(instr);
-	}
+	mtd_erase_callback(instr);
 	DEBUG(2, "blkmtd: erase: finished (err = %d)\n", err);
 	return err;
 }
