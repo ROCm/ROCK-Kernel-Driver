@@ -151,7 +151,6 @@ static int it8172_tune_chipset (ide_drive_t *drive, u8 xferspeed)
      */
     
 	switch(speed) {
-#ifdef CONFIG_BLK_DEV_IDEDMA
 		case XFER_UDMA_4:
 		case XFER_UDMA_2:	//u_speed = 2 << (drive->dn * 4); break;
 		case XFER_UDMA_5:
@@ -162,7 +161,6 @@ static int it8172_tune_chipset (ide_drive_t *drive, u8 xferspeed)
 		case XFER_MW_DMA_1:
 		case XFER_MW_DMA_0:
 		case XFER_SW_DMA_2:	break;
-#endif /* CONFIG_BLK_DEV_IDEDMA */
 		case XFER_PIO_4:
 		case XFER_PIO_3:
 		case XFER_PIO_2:
@@ -183,7 +181,6 @@ static int it8172_tune_chipset (ide_drive_t *drive, u8 xferspeed)
 	return (ide_config_drive_speed(drive, speed));
 }
 
-#ifdef CONFIG_BLK_DEV_IDEDMA
 static int it8172_config_chipset_for_dma (ide_drive_t *drive)
 {
 	u8 speed = ide_dma_speed(drive, it8172_ratemask(drive));
@@ -239,7 +236,6 @@ no_dma_set:
 	}
 	return hwif->ide_dma_on(drive);
 }
-#endif /* CONFIG_BLK_DEV_IDEDMA */
 
 static unsigned int __init init_chipset_it8172 (struct pci_dev *dev, const char *name)
 {
@@ -282,13 +278,11 @@ static void __init init_hwif_it8172 (ide_hwif_t *hwif)
 	hwif->mwdma_mask = 0x06;
 	hwif->swdma_mask = 0x04;
 
-#ifdef CONFIG_BLK_DEV_IDEDMA
 	hwif->ide_dma_check = &it8172_config_drive_xfer_rate;
 	if (!noautodma)
 		hwif->autodma = 1;
 	hwif->drives[0].autodma = hwif->autodma;
 	hwif->drives[1].autodma = hwif->autodma;
-#endif /* !CONFIG_BLK_DEV_IDEDMA */
 }
 
 static void __init init_dma_it8172 (ide_hwif_t *hwif, unsigned long dmabase)
