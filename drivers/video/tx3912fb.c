@@ -313,7 +313,7 @@ int __init tx3912fb_init(void)
 	return 0;
 }
 
-void __init tx3912fb_setup(char *options)
+int __init tx3912fb_setup(char *options)
 {
 	char *this_opt;
 
@@ -324,6 +324,7 @@ void __init tx3912fb_setup(char *options)
 		if (!strncmp(options, "bpp:", 4))	
 			tx3912fb_var.bits_per_pixel = simple_strtoul(options+4, NULL, 0);
 	}	
+	return 0;
 }
 
 MODULE_LICENSE("GPL");
