@@ -2631,18 +2631,22 @@ static int __init dv1394_init_module(void)
 	hpsb_register_protocol(&dv1394_driver);
 
 #ifdef CONFIG_COMPAT
-	/* First compatible ones */
-	ret = register_ioctl32_conversion(DV1394_IOC_SHUTDOWN, NULL);
-	ret |= register_ioctl32_conversion(DV1394_IOC_SUBMIT_FRAMES, NULL);
-	ret |= register_ioctl32_conversion(DV1394_IOC_WAIT_FRAMES, NULL);
-	ret |= register_ioctl32_conversion(DV1394_IOC_RECEIVE_FRAMES, NULL);
-	ret |= register_ioctl32_conversion(DV1394_IOC_START_RECEIVE, NULL);
+	{
+		int ret;
 
-	/* These need to be handled by translation */
-	ret |= register_ioctl32_conversion(DV1394_IOC32_INIT, handle_dv1394_init);
-	ret |= register_ioctl32_conversion(DV1394_IOC32_GET_STATUS, handle_dv1394_get_status);
-	if (ret)
-		printk(KERN_ERR "dv1394: Error registering ioctl32 translations\n");
+		/* First compatible ones */
+		ret = register_ioctl32_conversion(DV1394_IOC_SHUTDOWN, NULL);
+		ret |= register_ioctl32_conversion(DV1394_IOC_SUBMIT_FRAMES, NULL);
+		ret |= register_ioctl32_conversion(DV1394_IOC_WAIT_FRAMES, NULL);
+		ret |= register_ioctl32_conversion(DV1394_IOC_RECEIVE_FRAMES, NULL);
+		ret |= register_ioctl32_conversion(DV1394_IOC_START_RECEIVE, NULL);
+
+		/* These need to be handled by translation */
+		ret |= register_ioctl32_conversion(DV1394_IOC32_INIT, handle_dv1394_init);
+		ret |= register_ioctl32_conversion(DV1394_IOC32_GET_STATUS, handle_dv1394_get_status);
+		if (ret)
+			printk(KERN_ERR "dv1394: Error registering ioctl32 translations\n");
+	}
 #endif
 
 	return 0;

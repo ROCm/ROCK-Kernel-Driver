@@ -1470,25 +1470,29 @@ static int __init video1394_init_module (void)
 	hpsb_register_protocol(&video1394_driver);
 
 #ifdef CONFIG_COMPAT
-	/* First the compatible ones */
-	ret = register_ioctl32_conversion(VIDEO1394_IOC_LISTEN_CHANNEL, NULL);
-	ret |= register_ioctl32_conversion(VIDEO1394_IOC_UNLISTEN_CHANNEL, NULL);
-	ret |= register_ioctl32_conversion(VIDEO1394_IOC_TALK_CHANNEL, NULL);
-	ret |= register_ioctl32_conversion(VIDEO1394_IOC_UNTALK_CHANNEL, NULL);
+	{
+		int ret;
 
-	/* These need translation */
-	ret |= register_ioctl32_conversion(VIDEO1394_IOC32_LISTEN_QUEUE_BUFFER,
-				    video1394_w_wait32);
-	ret |= register_ioctl32_conversion(VIDEO1394_IOC32_LISTEN_WAIT_BUFFER,
-				    video1394_wr_wait32);
-	ret |= register_ioctl32_conversion(VIDEO1394_IOC_TALK_QUEUE_BUFFER,
-				    video1394_queue_buf32);
-	ret |= register_ioctl32_conversion(VIDEO1394_IOC32_TALK_WAIT_BUFFER,
-				    video1394_w_wait32);
-	ret |= register_ioctl32_conversion(VIDEO1394_IOC32_LISTEN_POLL_BUFFER,
-				    video1394_wr_wait32);
-	if (ret)
-		PRINT_G(KERN_INFO, "Error registering ioctl32 translations");
+		/* First the compatible ones */
+		ret = register_ioctl32_conversion(VIDEO1394_IOC_LISTEN_CHANNEL, NULL);
+		ret |= register_ioctl32_conversion(VIDEO1394_IOC_UNLISTEN_CHANNEL, NULL);
+		ret |= register_ioctl32_conversion(VIDEO1394_IOC_TALK_CHANNEL, NULL);
+		ret |= register_ioctl32_conversion(VIDEO1394_IOC_UNTALK_CHANNEL, NULL);
+
+		/* These need translation */
+		ret |= register_ioctl32_conversion(VIDEO1394_IOC32_LISTEN_QUEUE_BUFFER,
+					    video1394_w_wait32);
+		ret |= register_ioctl32_conversion(VIDEO1394_IOC32_LISTEN_WAIT_BUFFER,
+					    video1394_wr_wait32);
+		ret |= register_ioctl32_conversion(VIDEO1394_IOC_TALK_QUEUE_BUFFER,
+					    video1394_queue_buf32);
+		ret |= register_ioctl32_conversion(VIDEO1394_IOC32_TALK_WAIT_BUFFER,
+					    video1394_w_wait32);
+		ret |= register_ioctl32_conversion(VIDEO1394_IOC32_LISTEN_POLL_BUFFER,
+					    video1394_wr_wait32);
+		if (ret)
+			PRINT_G(KERN_INFO, "Error registering ioctl32 translations");
+	}
 #endif
 
 	PRINT_G(KERN_INFO, "Installed " VIDEO1394_DRIVER_NAME " module");

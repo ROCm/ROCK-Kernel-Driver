@@ -1277,12 +1277,15 @@ static int __init amdtp_init_module (void)
 	hpsb_register_highlevel(&amdtp_highlevel);
 
 #ifdef CONFIG_COMPAT
-	ret = register_ioctl32_conversion(AMDTP_IOC_CHANNEL, NULL);
-	ret |= register_ioctl32_conversion(AMDTP_IOC_PLUG, NULL);
-	ret |= register_ioctl32_conversion(AMDTP_IOC_PING, NULL);
-	ret |= register_ioctl32_conversion(AMDTP_IOC_ZAP, NULL);
-	if (ret)
-		HPSB_ERR("amdtp: Error registering ioctl32 translations");
+	{
+		int ret;
+		ret = register_ioctl32_conversion(AMDTP_IOC_CHANNEL, NULL);
+		ret |= register_ioctl32_conversion(AMDTP_IOC_PLUG, NULL);
+		ret |= register_ioctl32_conversion(AMDTP_IOC_PING, NULL);
+		ret |= register_ioctl32_conversion(AMDTP_IOC_ZAP, NULL);
+		if (ret)
+			HPSB_ERR("amdtp: Error registering ioctl32 translations");
+	}
 #endif
 
 	HPSB_INFO("Loaded AMDTP driver");
