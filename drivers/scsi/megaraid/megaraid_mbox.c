@@ -1623,6 +1623,7 @@ megaraid_queue_command(struct scsi_cmnd *scp, void (* done)(struct scsi_cmnd *))
 
 	if (!scb) {	// command already completed
 		done(scp);
+		return 0;
 	}
 
 	return if_busy;
