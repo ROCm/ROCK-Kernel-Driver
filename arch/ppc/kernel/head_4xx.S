@@ -75,7 +75,8 @@ _GLOBAL(_start)
  * ready to work.
  */
 turn_on_mmu:
-	li	r0,MSR_KERNEL
+	lis	r0,MSR_KERNEL@h
+	ori	r0,r0,MSR_KERNEL@l
 	mtspr	SRR1,r0
 	lis	r0,start_here@h
 	ori	r0,r0,start_here@l
@@ -213,42 +214,21 @@ _GLOBAL(crit_srr1)
 	SAVE_4GPRS(3, r11);						     \
 	SAVE_2GPRS(7, r11)
 
-#if 0
-#define CRITICAL_EXCEPTION_PROLOG					     \
-	stw	r10,crit_save@l(0);	/* save two registers to work with */\
-	stw	r11,4+crit_save@l(0);					     \
-	mfcr	r10;			/* save CR in r10 for now	   */\
-	mfspr	r11,SPRN_SRR3;		/* check whether user or kernel    */\
-	andi.	r11,r11,MSR_PR;						     \
-	mr	r11,r1;							     \
-	beq	1f;							     \
-	mfspr	r11,SPRG3;		/* if from user, start at top of   */\
-	lwz	r11,THREAD_INFO-THREAD(r11); /* this thread's kernel stack */\
-	addi	r11,r11,THREAD_SIZE;					     \
-1:	subi	r11,r11,INT_FRAME_SIZE;	/* Allocate an exception frame     */\
-	tophys(r11,r11);						     \
-	stw	r10,_CCR(r11);          /* save various registers	   */\
-	stw	r12,GPR12(r11);						     \
-	stw	r9,GPR9(r11);						     \
-	lwz	r10,crit_save@l(0);					     \
-	stw	r10,GPR10(r11);						     \
-	lwz	r12,4+crit_save@l(0);					     \
-	stw	r12,GPR11(r11);						     \
-	mflr	r10;							     \
-	stw	r10,_LINK(r11);						     \
-	mfspr	r12,SRR0;		/* save SRR0 and SRR1 in the frame */\
-	stw	r12,_SRR0(r11);		/* since they may have had stuff   */\
-	mfspr	r9,SRR1;		/* in them at the point where the  */\
-	stw	r9,_SRR1(r11);		/* exception was taken		   */\
-	mfspr	r12,SRR2;						     \
-	stw	r1,GPR1(r11);						     \
-	mfspr	r9,SRR3;						     \
-	stw	r1,0(r11);						     \
-	rlwinm	r9,r9,0,14,12;		/* clear MSR_WE (necessary?)	   */\
-	stw	r0,GPR0(r11);						     \
-	SAVE_4GPRS(3, r11);						     \
-	SAVE_2GPRS(7, r11)
-#endif
+	/*
+	 * State at this point:
+	 * r9 saved in stack frame, now saved SRR3 & ~MSR_WE
+	 * r10 saved in crit_r10 and in stack frame, trashed
+	 * r11 saved in crit_r11 and in stack frame,
+	 *	now phys stack/exception frame pointer
+	 * r12 saved in stack frame, now saved SRR2
+	 * SPRG0,1,4,5,6,7 saved in crit_sprg0,1,4,5,6,7
+	 * PID saved in crit_pid
+	 * SRR0,1 saved in crit_srr0,1
+	 * CR saved in stack frame, CR0.EQ = !SRR3.PR
+	 * LR, DEAR, ESR in stack frame
+	 * r1 saved in stack frame, now virt stack/excframe pointer
+	 * r0, r3-r8 saved in stack frame
+	 */
 
 /*
  * Exception vectors.
@@ -256,12 +236,6 @@ _GLOBAL(crit_srr1)
 #define	START_EXCEPTION(n, label)					     \
 	. = n;								     \
 label:
-
-#define FINISH_EXCEPTION(func)					\
-	bl	transfer_to_handler_full;			\
-	.long	func;						\
-	.long	ret_from_except_full
-
 
 #define EXCEPTION(n, label, hdlr, xfer)				\
 	START_EXCEPTION(n, label);				\
@@ -274,13 +248,14 @@ label:
 	CRITICAL_EXCEPTION_PROLOG;				\
 	addi	r3,r1,STACK_FRAME_OVERHEAD;			\
 	EXC_XFER_TEMPLATE(hdlr, n+2, (MSR_KERNEL & ~(MSR_ME|MSR_DE|MSR_CE)), \
-			  NOCOPY, transfer_to_handler_full, \
-			  ret_from_except_full)
+			  NOCOPY, crit_transfer_to_handler,	\
+			  ret_from_crit_exc)
 
 #define EXC_XFER_TEMPLATE(hdlr, trap, msr, copyee, tfer, ret)	\
 	li	r10,trap;					\
 	stw	r10,TRAP(r11);					\
-	li	r10,msr;					\
+	lis	r10,msr@h;					\
+	ori	r10,r10,msr@l;					\
 	copyee(r10, r9);					\
 	bl	tfer;		 				\
 	.long	hdlr;						\
@@ -732,7 +707,47 @@ label:
 
 /* 0x2000 - Debug Exception
 */
-	CRITICAL_EXCEPTION(0x2000, DebugTrap, DebugException)
+	START_EXCEPTION(0x2000, DebugTrap)
+	CRITICAL_EXCEPTION_PROLOG
+
+	/*
+	 * If this is a single step or branch-taken exception in an
+	 * exception entry sequence, it was probably meant to apply to
+	 * the code where the exception occurred (since exception entry
+	 * doesn't turn off DE automatically).  We simulate the effect
+	 * of turning off DE on entry to an exception handler by turning
+	 * off DE in the SRR3 value and clearing the debug status.
+	 */
+	mfspr	r10,SPRN_DBSR		/* check single-step/branch taken */
+	andis.	r10,r10,(DBSR_IC|DBSR_BT)@h
+	beq+	1f
+	andi.	r0,r9,MSR_IR|MSR_PR	/* check supervisor + MMU off */
+	beq	2f			/* branch if we need to fix it up... */
+
+	/* continue normal handling for a critical exception... */
+1:	mfspr	r4,SPRN_DBSR
+	addi	r3,r1,STACK_FRAME_OVERHEAD
+	EXC_XFER_TEMPLATE(DebugException, 0x2002, \
+		(MSR_KERNEL & ~(MSR_ME|MSR_DE|MSR_CE)), \
+		NOCOPY, crit_transfer_to_handler, ret_from_crit_exc)
+
+	/* here it looks like we got an inappropriate debug exception. */
+2:	rlwinm	r9,r9,0,~MSR_DE		/* clear DE in the SRR3 value */
+	mtspr	SPRN_DBSR,r10		/* clear the IC/BT debug intr status */
+	/* restore state and get out */
+	lwz	r10,_CCR(r11)
+	lwz	r0,GPR0(r11)
+	lwz	r1,GPR1(r11)
+	mtcrf	0x80,r10
+	mtspr	SRR2,r12
+	mtspr	SRR3,r9
+	lwz	r9,GPR9(r11)
+	lwz	r12,GPR12(r11)
+	lwz	r10,crit_r10@l(0)
+	lwz	r11,crit_r11@l(0)
+	PPC405_ERR77_SYNC
+	rfci
+	b	.
 
 /*
  * The other Data TLB exceptions bail out to this point
@@ -746,60 +761,6 @@ DataAccess:
 	stw	r4,_DEAR(r11)
 	addi	r3,r1,STACK_FRAME_OVERHEAD
 	EXC_XFER_EE_LITE(0x300, do_page_fault)
-
-#if 0
-/* Check for a single step debug exception while in an exception
- * handler before state has been saved.  This is to catch the case
- * where an instruction that we are trying to single step causes
- * an exception (eg ITLB miss) and thus the first instruction of
- * the exception handler generates a single step debug exception.
- *
- * If we get a debug trap on the first instruction of an exception handler,
- * we reset the MSR_DE in the _exception handlers_ MSR (the debug trap is
- * a critical exception, so we are using SPRN_SRR3 to manipulate the MSR).
- * The exception handler was handling a non-critical interrupt, so it will
- * save (and later restore) the MSR via SPRN_SRR1, which will still have
- * the MSR_DE bit set.
- */
-check_single_step_in_exception:
-
-	/* This first instruction was already executed by the exception
-	 * handler and must be the first instruction of every exception
-	 * handler.
-	 */
-	mtspr	SPRN_SPRG0,r10		/* Save some working registers... */
-	mtspr	SPRN_SPRG1,r11
-	mfcr	r10			/* ..and the cr because we change it */
-
-	mfspr   r11,SPRN_SRR3		/* MSR at the time of fault */
-	andi.   r11,r11,MSR_PR
-	bne+    2f			/* trapped from problem state */
-
-	mfspr   r11,SPRN_SRR2		/* Faulting instruction address */
-	cmplwi  r11,0x2100
-	bgt+    2f			/* address above exception vectors */
-
-	lis     r11,DBSR_IC@h           /* Remove the trap status */
-	mtspr   SPRN_DBSR,r11
-
-	mfspr	r11,SPRN_SRR3
-	rlwinm	r11,r11,0,23,21		/* clear MSR_DE */
-	mtspr	SPRN_SRR3, r11		/* restore MSR at rcfi without DE */
-
-	mtcrf   0xff,r10                /* restore registers */
-	mfspr   r11,SPRN_SPRG1
-	mfspr   r10,SPRN_SPRG0
-
-	sync
-	rfci                            /* return to the exception handler  */
-	b	.			/* prevent prefetch past rfi */
-
-2:
-	mtcrf   0xff,r10                /* restore registers */
-	mfspr   r11,SPRN_SPRG1
-	mfspr   r10,SPRN_SPRG0
-	b       ret_to_debug_exception
-#endif 0
 
 /* Other PowerPC processors, namely those derived from the 6xx-series
  * have vectors from 0x2100 through 0x2F00 defined, but marked as reserved.
@@ -911,7 +872,8 @@ start_here:
 	lis	r4,2f@h
 	ori	r4,r4,2f@l
 	tophys(r4,r4)
-	li	r3,MSR_KERNEL & ~(MSR_IR|MSR_DR)
+	lis	r3,(MSR_KERNEL & ~(MSR_IR|MSR_DR))@h
+	ori	r3,r3,(MSR_KERNEL & ~(MSR_IR|MSR_DR))@l
 	mtspr	SRR0,r4
 	mtspr	SRR1,r3
 	rfi
@@ -934,7 +896,8 @@ start_here:
 	stw	r6, 0(r5)
 
 /* Now turn on the MMU for real! */
-	li	r4,MSR_KERNEL
+	lis	r4,MSR_KERNEL@h
+	ori	r4,r4,MSR_KERNEL@l
 	lis	r3,start_kernel@h
 	ori	r3,r3,start_kernel@l
 	mtspr	SRR0,r3
