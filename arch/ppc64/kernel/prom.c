@@ -16,10 +16,6 @@
  */
 
 #if 0
-#define DEBUG_YABOOT
-#endif
-
-#if 0
 #define DEBUG_PROM
 #endif
 
@@ -32,22 +28,6 @@
 #include <linux/threads.h>
 #include <linux/spinlock.h>
 #include <linux/blk.h>
-
-#ifdef DEBUG_YABOOT
-#define call_yaboot(FUNC,...) \
-	do { \
-		if (FUNC) {					\
-			struct prom_t *_prom = PTRRELOC(&prom);	\
-			unsigned long prom_entry = _prom->entry;\
-			_prom->entry = (unsigned long)(FUNC);	\
-			enter_prom(__VA_ARGS__); 		\
-			_prom->entry = prom_entry;		\
-		}						\
-	} while (0)
-#else
-#define call_yaboot(FUNC,...) do { ; } while (0)
-#endif
-
 #include <linux/types.h>
 #include <linux/pci.h>
 #include <asm/prom.h>
@@ -65,15 +45,13 @@
 #include <asm/bitops.h>
 #include <asm/naca.h>
 #include <asm/pci.h>
-#include "open_pic.h"
 #include <asm/bootinfo.h>
 #include <asm/ppcdebug.h>
+#include "open_pic.h"
 
 #ifdef CONFIG_FB
 #include <asm/linux_logo.h>
 #endif
-
-extern char _end[];
 
 /*
  * prom_init() is called very early on, before the kernel text
@@ -131,12 +109,7 @@ struct pci_intr_map {
 
 typedef unsigned long interpret_func(struct device_node *, unsigned long,
 				     int, int);
-#if 0
 static interpret_func interpret_pci_props;
-#endif
-static unsigned long interpret_pci_props(struct device_node *, unsigned long,
-					 int, int);
-
 static interpret_func interpret_isa_props;
 static interpret_func interpret_root_props;
 
@@ -156,9 +129,6 @@ struct prom_t prom = {
 	0,			/* version */
 	32,			/* encode_phys_size */
 	0			/* bi_rec pointer */
-#ifdef DEBUG_YABOOT
-	,NULL			/* yaboot */
-#endif
 };
 
 
@@ -1213,7 +1183,7 @@ prom_hold_cpus(unsigned long mem)
 
 unsigned long __init
 prom_init(unsigned long r3, unsigned long r4, unsigned long pp,
-	  unsigned long r6, unsigned long r7, yaboot_debug_t *yaboot)
+	  unsigned long r6, unsigned long r7)
 {
 	int chrp = 0;
 	unsigned long mem;
@@ -1241,32 +1211,12 @@ prom_init(unsigned long r3, unsigned long r4, unsigned long pp,
 		RELOC(klimit) = PTRUNRELOC((unsigned long)_prom->bi_recs + _prom->bi_recs->data[1]);
 	}
 
-#ifdef DEBUG_YABOOT
-	call_yaboot(yaboot->dummy,offset>>32,offset&0xffffffff);
-	call_yaboot(yaboot->printf, RELOC("offset = 0x%08x%08x\n"), LONG_MSW(offset), LONG_LSW(offset));
-#endif
-
  	/* Default */
  	phys = KERNELBASE - offset;
-
-#ifdef DEBUG_YABOOT
-	call_yaboot(yaboot->printf, RELOC("phys = 0x%08x%08x\n"), LONG_MSW(phys), LONG_LSW(phys));
-#endif
-
-
-#ifdef DEBUG_YABOOT
-	_prom->yaboot = yaboot;
-	call_yaboot(yaboot->printf, RELOC("pp = 0x%08x%08x\n"), LONG_MSW(pp), LONG_LSW(pp));
-	call_yaboot(yaboot->printf, RELOC("prom = 0x%08x%08x\n"), LONG_MSW(_prom->entry), LONG_LSW(_prom->entry));
-#endif
 
 	/* First get a handle for the stdout device */
 	_prom->chosen = (ihandle)call_prom(RELOC("finddevice"), 1, 1,
 				       RELOC("/chosen"));
-
-#ifdef DEBUG_YABOOT
-	call_yaboot(yaboot->printf, RELOC("prom->chosen = 0x%08x%08x\n"), LONG_MSW(_prom->chosen), LONG_LSW(_prom->chosen));
-#endif
 
 	if ((long)_prom->chosen <= 0)
 		prom_exit();
@@ -1278,22 +1228,7 @@ prom_init(unsigned long r3, unsigned long r4, unsigned long pp,
 
         _prom->stdout = (ihandle)(unsigned long)getprop_rval;
 
-#ifdef DEBUG_YABOOT
-        if (_prom->stdout == 0) {
-	    call_yaboot(yaboot->printf, RELOC("prom->stdout = 0x%08x%08x\n"), LONG_MSW(_prom->stdout), LONG_LSW(_prom->stdout));
-        }
-
-	call_yaboot(yaboot->printf, RELOC("prom->stdout = 0x%08x%08x\n"), LONG_MSW(_prom->stdout), LONG_LSW(_prom->stdout));
-#endif
-
-#ifdef DEBUG_YABOOT
-	call_yaboot(yaboot->printf, RELOC("Location: 0x11\n"));
-#endif
-
 	mem = RELOC(klimit) - offset; 
-#ifdef DEBUG_YABOOT
-	call_yaboot(yaboot->printf, RELOC("Location: 0x11b\n"));
-#endif
 
 	/* Get the full OF pathname of the stdout device */
 	p = (char *) mem;
