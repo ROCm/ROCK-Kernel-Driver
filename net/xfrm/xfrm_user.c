@@ -656,26 +656,6 @@ static int xfrm_add_policy(struct sk_buff *skb, struct nlmsghdr *nlh, void **xfr
 	return 0;
 }
 
-static int xfrm_del_policy(struct sk_buff *skb, struct nlmsghdr *nlh, void **xfrma)
-{
-	struct xfrm_policy *xp;
-	struct xfrm_userpolicy_id *p;
-	int err;
-
-	p = NLMSG_DATA(nlh);
-
-	err = verify_policy_dir(p->dir);
-	if (err)
-		return err;
-
-	xp = xfrm_policy_delete(p->dir, &p->sel);
-	if (xp == NULL)
-		return -ENOENT;
-	xfrm_policy_kill(xp);
-	xfrm_pol_put(xp);
-	return 0;
-}
-
 static int dump_one_policy(struct xfrm_policy *xp, int dir, int count, void *ptr)
 {
 	struct xfrm_dump_info *sp = ptr;
@@ -774,20 +754,36 @@ static int xfrm_get_policy(struct sk_buff *skb, struct nlmsghdr *nlh, void **xfr
 {
 	struct xfrm_policy *xp;
 	struct xfrm_userpolicy_id *p;
-	struct sk_buff *resp_skb;
 	int err;
+	int delete;
 
 	p = NLMSG_DATA(nlh);
-	xp = xfrm_policy_byid(p->dir, p->index, 0);
+	delete = nlh->nlmsg_type == XFRM_MSG_DELPOLICY;
+
+	err = verify_policy_dir(p->dir);
+	if (err)
+		return err;
+
+	if (p->index)
+		xp = xfrm_policy_byid(p->dir, p->index, delete);
+	else
+		xp = xfrm_policy_bysel(p->dir, &p->sel, delete);
 	if (xp == NULL)
 		return -ENOENT;
 
-	resp_skb = xfrm_policy_netlink(skb, xp, p->dir, nlh->nlmsg_seq);
-	if (IS_ERR(resp_skb)) {
-		err = PTR_ERR(resp_skb);
-	} else {
-		err = netlink_unicast(xfrm_nl, resp_skb,
-				      NETLINK_CB(skb).pid, MSG_DONTWAIT);
+	if (delete)
+		xfrm_policy_kill(xp);
+	else {
+		struct sk_buff *resp_skb;
+
+		resp_skb = xfrm_policy_netlink(skb, xp, p->dir, nlh->nlmsg_seq);
+		if (IS_ERR(resp_skb)) {
+			err = PTR_ERR(resp_skb);
+		} else {
+			err = netlink_unicast(xfrm_nl, resp_skb,
+					      NETLINK_CB(skb).pid,
+					      MSG_DONTWAIT);
+		}
 	}
 
 	xfrm_pol_put(xp);
@@ -819,7 +815,7 @@ static struct xfrm_link {
 		.dump	=	xfrm_dump_sa,
 	},
 	{	.doit	=	xfrm_add_policy 	},
-	{	.doit	=	xfrm_del_policy 	},
+	{	.doit	=	xfrm_get_policy 	},
 	{
 		.doit	=	xfrm_get_policy,
 		.dump	=	xfrm_dump_policy,

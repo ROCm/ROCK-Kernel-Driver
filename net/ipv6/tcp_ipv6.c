@@ -939,7 +939,7 @@ static int tcp_v6_send_synack(struct sock *sk, struct open_request *req,
 					 csum_partial((char *)th, skb->len, skb->csum));
 
 		ipv6_addr_copy(&fl.fl6_dst, &req->af.v6_req.rmt_addr);
-		err = ip6_xmit(sk, skb, &fl, opt);
+		err = ip6_xmit(sk, skb, &fl, opt, 0);
 		if (err == NET_XMIT_CN)
 			err = 0;
 	}
@@ -1057,7 +1057,7 @@ static void tcp_v6_send_reset(struct sk_buff *skb)
 	buff->dst = ip6_route_output(NULL, &fl);
 
 	if (buff->dst->error == 0) {
-		ip6_xmit(NULL, buff, &fl, NULL);
+		ip6_xmit(NULL, buff, &fl, NULL, 0);
 		TCP_INC_STATS_BH(TcpOutSegs);
 		TCP_INC_STATS_BH(TcpOutRsts);
 		return;
@@ -1120,7 +1120,7 @@ static void tcp_v6_send_ack(struct sk_buff *skb, u32 seq, u32 ack, u32 win, u32 
 	buff->dst = ip6_route_output(NULL, &fl);
 
 	if (buff->dst->error == 0) {
-		ip6_xmit(NULL, buff, &fl, NULL);
+		ip6_xmit(NULL, buff, &fl, NULL, 0);
 		TCP_INC_STATS_BH(TcpOutSegs);
 		return;
 	}
@@ -1823,7 +1823,7 @@ static int tcp_v6_xmit(struct sk_buff *skb, int ipfragok)
 	/* Restore final destination back after routing done */
 	ipv6_addr_copy(&fl.fl6_dst, &np->daddr);
 
-	return ip6_xmit(sk, skb, &fl, np->opt);
+	return ip6_xmit(sk, skb, &fl, np->opt, 0);
 }
 
 static void v6_addr2sockaddr(struct sock *sk, struct sockaddr * uaddr)

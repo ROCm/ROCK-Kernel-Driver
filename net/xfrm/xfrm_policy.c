@@ -297,19 +297,25 @@ int xfrm_policy_insert(int dir, struct xfrm_policy *policy, int excl)
 	return 0;
 }
 
-struct xfrm_policy *xfrm_policy_delete(int dir, struct xfrm_selector *sel)
+struct xfrm_policy *xfrm_policy_bysel(int dir, struct xfrm_selector *sel,
+				      int delete)
 {
 	struct xfrm_policy *pol, **p;
 
 	write_lock_bh(&xfrm_policy_lock);
 	for (p = &xfrm_policy_list[dir]; (pol=*p)!=NULL; p = &pol->next) {
 		if (memcmp(sel, &pol->selector, sizeof(*sel)) == 0) {
-			*p = pol->next;
+			if (delete)
+				*p = pol->next;
 			break;
 		}
 	}
-	if (pol)
-		atomic_inc(&flow_cache_genid);
+	if (pol) {
+		if (delete)
+			atomic_inc(&flow_cache_genid);
+		else
+			xfrm_pol_hold(pol);
+	}
 	write_unlock_bh(&xfrm_policy_lock);
 	return pol;
 }

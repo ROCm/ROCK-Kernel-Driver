@@ -196,7 +196,7 @@ static inline int ip6_maybe_reroute(struct sk_buff *skb)
  */
 
 int ip6_xmit(struct sock *sk, struct sk_buff *skb, struct flowi *fl,
-	     struct ipv6_txoptions *opt)
+	     struct ipv6_txoptions *opt, int ipfragok)
 {
 	struct ipv6_pinfo *np = sk ? inet6_sk(sk) : NULL;
 	struct in6_addr *first_hop = &fl->fl6_dst;
@@ -258,13 +258,14 @@ int ip6_xmit(struct sock *sk, struct sk_buff *skb, struct flowi *fl,
 	ipv6_addr_copy(&hdr->daddr, first_hop);
 
 	mtu = dst_pmtu(dst);
-	if (skb->len <= mtu) {
+	if ((skb->len <= mtu) || ipfragok) {
 		IP6_INC_STATS(Ip6OutRequests);
 		return NF_HOOK(PF_INET6, NF_IP6_LOCAL_OUT, skb, NULL, dst->dev, ip6_maybe_reroute);
 	}
 
 	if (net_ratelimit())
 		printk(KERN_DEBUG "IPv6: sending pkt_too_big to self\n");
+	skb->dev = dst->dev;
 	icmpv6_send(skb, ICMPV6_PKT_TOOBIG, 0, mtu, skb->dev);
 	kfree_skb(skb);
 	return -EMSGSIZE;
@@ -381,7 +382,7 @@ static int ip6_frag_xmit(struct sock *sk, inet_getfrag_t getfrag,
 	/*
 	 *	Length of fragmented part on every packet but 
 	 *	the last must be an:
-	 *	"integer multiple of 8 octects".
+	 *	"integer multiple of 8 octets".
 	 */
 
 	frag_len = (mtu - unfrag_len) & ~0x7;
@@ -587,7 +588,7 @@ int ip6_build_xmit(struct sock *sk, inet_getfrag_t getfrag, const void *data,
 		if (err) {
 #if IP6_DEBUG >= 2
 			printk(KERN_DEBUG "ip6_build_xmit: "
-			       "no availiable source address\n");
+			       "no available source address\n");
 #endif
 			goto out;
 		}
@@ -887,7 +888,7 @@ static void ip6_copy_metadata(struct sk_buff *to, struct sk_buff *from)
 #endif
 }
 
-int ip6_found_nexthdr(struct sk_buff *skb, u8 **nexthdr)
+int ip6_find_1stfragopt(struct sk_buff *skb, u8 **nexthdr)
 {
 	u16 offset = sizeof(struct ipv6hdr);
 	struct ipv6_opt_hdr *exthdr = (struct ipv6_opt_hdr*)(skb->nh.ipv6h + 1);
@@ -929,7 +930,7 @@ static int ip6_fragment(struct sk_buff *skb, int (*output)(struct sk_buff*))
 	u8 *prevhdr, nexthdr = 0;
 
 	dev = rt->u.dst.dev;
-	hlen = ip6_found_nexthdr(skb, &prevhdr);
+	hlen = ip6_find_1stfragopt(skb, &prevhdr);
 	nexthdr = *prevhdr;
 
 	mtu = dst_pmtu(&rt->u.dst) - hlen - sizeof(struct frag_hdr);
@@ -1187,7 +1188,7 @@ int ip6_dst_lookup(struct sock *sk, struct dst_entry **dst, struct flowi *fl)
 		if (err) {
 #if IP6_DEBUG >= 2
 			printk(KERN_DEBUG "ip6_build_xmit: "
-			       "no availiable source address\n");
+			       "no available source address\n");
 #endif
 			return err;
 		}

@@ -299,7 +299,8 @@ extern int			ipv6_rcv(struct sk_buff *skb,
 extern int			ip6_xmit(struct sock *sk,
 					 struct sk_buff *skb,
 					 struct flowi *fl,
-					 struct ipv6_txoptions *opt);
+					 struct ipv6_txoptions *opt,
+					 int ipfragok);
 
 extern int			ip6_nd_hdr(struct sock *sk,
 					   struct sk_buff *skb,
@@ -315,7 +316,7 @@ extern int			ip6_build_xmit(struct sock *sk,
 					       unsigned length,
 					       struct ipv6_txoptions *opt,
 					       int hlimit, int flags);
-extern int			ip6_found_nexthdr(struct sk_buff *skb, u8 **nexthdr);
+extern int			ip6_find_1stfragopt(struct sk_buff *skb, u8 **nexthdr);
 
 extern int			ip6_append_data(struct sock *sk,
 						int getfrag(void *from, char *to, int offset, int len, int odd, struct sk_buff *skb),

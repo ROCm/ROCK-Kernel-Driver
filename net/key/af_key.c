@@ -1990,7 +1990,7 @@ static int pfkey_spddelete(struct sock *sk, struct sk_buff *skb, struct sadb_msg
 	if (sel.dport)
 		sel.dport_mask = ~0;
 
-	xp = xfrm_policy_delete(pol->sadb_x_policy_dir-1, &sel);
+	xp = xfrm_policy_bysel(pol->sadb_x_policy_dir-1, &sel, 1);
 	if (xp == NULL)
 		return -ENOENT;
 
