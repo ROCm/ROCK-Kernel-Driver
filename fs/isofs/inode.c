@@ -1247,14 +1247,6 @@ static void isofs_read_inode(struct inode * inode)
 		inode->i_mode = sbi->s_mode;
 		inode->i_nlink = 1;
 	        inode->i_mode |= S_IFREG;
-		/* If there are no periods in the name,
-		 * then set the execute permission bit
-		 */
-		for(i=0; i< de->name_len[0]; i++)
-			if(de->name[i]=='.' || de->name[i]==';')
-				break;
-		if(i == de->name_len[0] || de->name[i] == ';')
-			inode->i_mode |= S_IXUGO; /* execute permission */
 	}
 	inode->i_uid = sbi->s_uid;
 	inode->i_gid = sbi->s_gid;
