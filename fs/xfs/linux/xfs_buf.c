@@ -81,7 +81,7 @@
  */
 
 STATIC kmem_cache_t *pagebuf_cache;
-STATIC void pagebuf_daemon_wakeup(int);
+STATIC void pagebuf_daemon_wakeup(void);
 STATIC void pagebuf_delwri_queue(page_buf_t *, int);
 STATIC struct workqueue_struct *pagebuf_logio_workqueue;
 STATIC struct workqueue_struct *pagebuf_dataio_workqueue;
@@ -516,7 +516,7 @@ _pagebuf_lookup_pages(
 			if (!page) {
 				if (--retry_count > 0) {
 					PB_STATS_INC(pb_page_retries);
-					pagebuf_daemon_wakeup(1);
+					pagebuf_daemon_wakeup();
 					current->state = TASK_UNINTERRUPTIBLE;
 					schedule_timeout(10);
 					goto retry;
@@ -1646,7 +1646,6 @@ pagebuf_iomove(
  * Pagebuf delayed write buffer handling
  */
 
-STATIC int pbd_active = 1;
 STATIC LIST_HEAD(pbd_delwrite_queue);
 STATIC spinlock_t pbd_delwrite_lock = SPIN_LOCK_UNLOCKED;
 
@@ -1693,20 +1692,18 @@ pagebuf_runall_queues(
 }
 
 /* Defines for pagebuf daemon */
-DECLARE_WAIT_QUEUE_HEAD(pbd_waitq);
+STATIC DECLARE_COMPLETION(pagebuf_daemon_done);
+STATIC struct task_struct *pagebuf_daemon_task;
+STATIC int pagebuf_daemon_active;
 STATIC int force_flush;
 
 STATIC void
-pagebuf_daemon_wakeup(
-	int			flag)
+pagebuf_daemon_wakeup(void)
 {
-	force_flush = flag;
-	if (waitqueue_active(&pbd_waitq)) {
-		wake_up_interruptible(&pbd_waitq);
-	}
+	force_flush = 1;
+	barrier();
+	wake_up_process(pagebuf_daemon_task);
 }
-
-typedef void (*timeout_fn)(unsigned long);
 
 STATIC int
 pagebuf_daemon(
@@ -1715,13 +1712,14 @@ pagebuf_daemon(
 	int			count;
 	page_buf_t		*pb;
 	struct list_head	*curr, *next, tmp;
-	struct timer_list	pb_daemon_timer =
-		TIMER_INITIALIZER((timeout_fn)pagebuf_daemon_wakeup, 0, 0);
 
 	/*  Set up the thread  */
 	daemonize("pagebufd");
-
 	current->flags |= PF_MEMALLOC;
+
+	pagebuf_daemon_task = current;
+	pagebuf_daemon_active = 1;
+	barrier();
 
 	INIT_LIST_HEAD(&tmp);
 	do {
@@ -1729,15 +1727,8 @@ pagebuf_daemon(
 		if (current->flags & PF_FREEZE)
 			refrigerator(PF_IOTHREAD);
 
-		if (pbd_active == 1) {
-			mod_timer(&pb_daemon_timer,
-				  jiffies + pb_params.flush_interval.val);
-			interruptible_sleep_on(&pbd_waitq);
-		}
-
-		if (pbd_active == 0) {
-			del_timer_sync(&pb_daemon_timer);
-		}
+		set_current_state(TASK_INTERRUPTIBLE);
+		schedule_timeout(pb_params.flush_interval.val);
 
 		spin_lock(&pbd_delwrite_lock);
 
@@ -1781,12 +1772,9 @@ pagebuf_daemon(
 			blk_run_queues();
 
 		force_flush = 0;
-	} while (pbd_active == 1);
+	} while (pagebuf_daemon_active);
 
-	pbd_active = -1;
-	wake_up_interruptible(&pbd_waitq);
-
-	return 0;
+	complete_and_exit(&pagebuf_daemon_done, 0);
 }
 
 void
@@ -1896,9 +1884,10 @@ pagebuf_daemon_start(void)
 STATIC void
 pagebuf_daemon_stop(void)
 {
-	pbd_active = 0;
-	wake_up_interruptible(&pbd_waitq);
-	wait_event_interruptible(pbd_waitq, pbd_active);
+	pagebuf_daemon_active = 0;
+	barrier();
+	wait_for_completion(&pagebuf_daemon_done);
+
 	destroy_workqueue(pagebuf_logio_workqueue);
 	destroy_workqueue(pagebuf_dataio_workqueue);
 }
