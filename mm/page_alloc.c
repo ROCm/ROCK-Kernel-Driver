@@ -35,7 +35,6 @@
 #include <asm/tlbflush.h>
 
 DECLARE_BITMAP(node_online_map, MAX_NUMNODES);
-DECLARE_BITMAP(memblk_online_map, MAX_NR_MEMBLKS);
 struct pglist_data *pgdat_list;
 unsigned long totalram_pages;
 unsigned long totalhigh_pages;
@@ -1374,7 +1373,6 @@ void __init free_area_init_node(int nid, struct pglist_data *pgdat,
 	pgdat->node_mem_map = node_mem_map;
 
 	free_area_init_core(pgdat, zones_size, zholes_size);
-	memblk_set_online(node_to_memblk(nid));
 }
 
 #ifndef CONFIG_DISCONTIGMEM

@@ -29,15 +29,6 @@
 #define node_to_cpumask(node) (node_to_cpu_mask[node])
 
 /*
- * Returns the number of the node containing MemBlk 'memblk'
- */
-#ifdef CONFIG_ACPI_NUMA
-#define memblk_to_node(memblk) (node_memblk[memblk].nid)
-#else
-#define memblk_to_node(memblk) (memblk)
-#endif
-
-/*
  * Returns the number of the node containing Node 'nid'.
  * Not implemented here. Multi-level hierarchies detected with
  * the help of node_distance().
@@ -48,12 +39,6 @@
  * Returns the number of the first CPU on Node 'node'.
  */
 #define node_to_first_cpu(node) (__ffs(node_to_cpumask(node)))
-
-/*
- * Returns the number of the first MemBlk on Node 'node'
- * Should be fixed when IA64 discontigmem goes in.
- */
-#define node_to_memblk(node) (node)
 
 /* Cross-node load balancing interval. */
 #define NODE_BALANCE_RATE 10
