@@ -367,14 +367,19 @@ int scsi_sysfs_add_sdev(struct scsi_device *sdev)
 		printk(KERN_INFO "error 2\n");
 		goto clean_device;
 	}
+	/* take a reference for the sdev_classdev; this is
+	 * released by the sdev_class .release */
+	get_device(&sdev->sdev_gendev);
 
 	if (sdev->transport_classdev.class) {
 		error = class_device_add(&sdev->transport_classdev);
 		if (error)
 			goto clean_device2;
+		/* take a reference for the transport_classdev; this
+		 * is released by the transport_class .release */
+		get_device(&sdev->sdev_gendev);
+		
 	}
-
-	get_device(&sdev->sdev_gendev);
 
 	if (sdev->host->hostt->sdev_attrs) {
 		for (i = 0; sdev->host->hostt->sdev_attrs[i]; i++) {
@@ -434,7 +439,8 @@ void scsi_remove_device(struct scsi_device *sdev)
 	if (sdev->sdev_state == SDEV_RUNNING || sdev->sdev_state == SDEV_CANCEL) {
 		scsi_device_set_state(sdev, SDEV_DEL);
 		class_device_unregister(&sdev->sdev_classdev);
-		class_device_unregister(&sdev->transport_classdev);
+		if(sdev->transport_classdev.class)
+			class_device_unregister(&sdev->transport_classdev);
 		device_del(&sdev->sdev_gendev);
 		if (sdev->host->hostt->slave_destroy)
 			sdev->host->hostt->slave_destroy(sdev);
