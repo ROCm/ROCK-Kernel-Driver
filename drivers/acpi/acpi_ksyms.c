@@ -102,6 +102,8 @@ EXPORT_SYMBOL(acpi_os_free);
 EXPORT_SYMBOL(acpi_os_printf);
 EXPORT_SYMBOL(acpi_os_sleep);
 EXPORT_SYMBOL(acpi_os_stall);
+EXPORT_SYMBOL(acpi_os_read_port);
+EXPORT_SYMBOL(acpi_os_write_port);
 EXPORT_SYMBOL(acpi_os_signal);
 EXPORT_SYMBOL(acpi_os_queue_for_execution);
 EXPORT_SYMBOL(acpi_os_signal_semaphore);
@@ -125,6 +127,7 @@ EXPORT_SYMBOL(acpi_evaluate_reference);
 #ifdef CONFIG_ACPI_BUS
 
 EXPORT_SYMBOL(acpi_fadt);
+EXPORT_SYMBOL(acpi_fadt_is_v1);
 EXPORT_SYMBOL(acpi_walk_namespace);
 EXPORT_SYMBOL(acpi_root_dir);
 EXPORT_SYMBOL(acpi_bus_get_device);

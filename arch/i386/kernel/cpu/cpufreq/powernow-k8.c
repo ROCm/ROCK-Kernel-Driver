@@ -777,6 +777,10 @@ static int powernow_k8_cpu_init_acpi(struct powernow_k8_data *data)
 	data->numps = data->acpi_data.state_count;
 	print_basics(data);
 	powernow_k8_acpi_pst_values(data, 0);
+
+	/* notify BIOS that we exist */
+	acpi_processor_notify_smm(THIS_MODULE);
+
 	return 0;
 
 err_out_mem:

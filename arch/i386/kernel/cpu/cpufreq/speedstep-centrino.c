@@ -428,6 +428,9 @@ static int centrino_cpu_init_acpi(struct cpufreq_policy *policy)
 			centrino_model->op_points[i].frequency = CPUFREQ_ENTRY_INVALID;
 	}
 
+	/* notify BIOS that we exist */
+	acpi_processor_notify_smm(THIS_MODULE);
+
 	return 0;
 
  err_kfree_all:
