@@ -216,22 +216,6 @@ struct rfcomm_dlc {
 #define RFCOMM_CFC_DISABLED 0
 #define RFCOMM_CFC_ENABLED  RFCOMM_MAX_CREDITS
 
-extern struct task_struct *rfcomm_thread;
-extern unsigned long rfcomm_event;
-
-static inline void rfcomm_schedule(uint event)
-{
-	if (!rfcomm_thread)
-		return;
-	//set_bit(event, &rfcomm_event);
-	set_bit(RFCOMM_SCHED_WAKEUP, &rfcomm_event);
-	wake_up_process(rfcomm_thread);
-}
-
-extern struct semaphore rfcomm_sem;
-#define rfcomm_lock()	down(&rfcomm_sem);
-#define rfcomm_unlock()	up(&rfcomm_sem);
-
 /* ---- RFCOMM DLCs (channels) ---- */
 struct rfcomm_dlc *rfcomm_dlc_alloc(int prio);
 void rfcomm_dlc_free(struct rfcomm_dlc *d);
@@ -271,22 +255,11 @@ static inline void rfcomm_dlc_unthrottle(struct rfcomm_dlc *d)
 }
 
 /* ---- RFCOMM sessions ---- */
-struct rfcomm_session *rfcomm_session_add(struct socket *sock, int state);
-struct rfcomm_session *rfcomm_session_get(bdaddr_t *src, bdaddr_t *dst);
-struct rfcomm_session *rfcomm_session_create(bdaddr_t *src, bdaddr_t *dst, int *err);
-void   rfcomm_session_del(struct rfcomm_session *s);
-void   rfcomm_session_close(struct rfcomm_session *s, int err);
 void   rfcomm_session_getaddr(struct rfcomm_session *s, bdaddr_t *src, bdaddr_t *dst);
 
 static inline void rfcomm_session_hold(struct rfcomm_session *s)
 {
 	atomic_inc(&s->refcnt);
-}
-
-static inline void rfcomm_session_put(struct rfcomm_session *s)
-{
-	if (atomic_dec_and_test(&s->refcnt))
-		rfcomm_session_del(s);
 }
 
 /* ---- RFCOMM chechsum ---- */

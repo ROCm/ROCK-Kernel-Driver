@@ -393,7 +393,7 @@ static int rfcomm_sock_connect(struct socket *sock, struct sockaddr *addr, int a
 	return err;
 }
 
-int rfcomm_sock_listen(struct socket *sock, int backlog)
+static int rfcomm_sock_listen(struct socket *sock, int backlog)
 {
 	struct sock *sk = sock->sk;
 	int err = 0;
@@ -437,7 +437,7 @@ done:
 	return err;
 }
 
-int rfcomm_sock_accept(struct socket *sock, struct socket *newsock, int flags)
+static int rfcomm_sock_accept(struct socket *sock, struct socket *newsock, int flags)
 {
 	DECLARE_WAITQUEUE(wait, current);
 	struct sock *sk = sock->sk, *nsk;
