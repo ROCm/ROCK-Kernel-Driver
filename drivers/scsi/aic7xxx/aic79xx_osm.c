@@ -1,7 +1,7 @@
 /*
  * Adaptec AIC79xx device driver for Linux.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.c#159 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.c#160 $
  *
  * --------------------------------------------------------------------------
  * Copyright (c) 1994-2000 Justin T. Gibbs.
@@ -1406,7 +1406,7 @@ ahd_linux_abort(Scsi_Cmnd *cmd)
 	}
 
 	printf("%s: At time of recovery, card was %spaused\n",
-	       was_paused ? "" : "not ");
+	       ahd_name(ahd), was_paused ? "" : "not ");
 	ahd_dump_card_state(ahd);
 
 	disconnected = TRUE;

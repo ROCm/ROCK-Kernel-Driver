@@ -1,7 +1,7 @@
 #
 # Makefile for the Linux aic7xxx SCSI driver.
 #
-# $Id: //depot/linux-aic79xx-2.5.0/drivers/scsi/aic7xxx/Makefile#5 $
+# $Id: //depot/linux-aic79xx-2.5.0/drivers/scsi/aic7xxx/Makefile#6 $
 #
 
 # Let kbuild descend into aicasm when cleaning
@@ -33,7 +33,7 @@ aic79xx-y					+= aic79xx_osm.o	\
 						   aic79xx_proc.o	\
 						   aic79xx_osm_pci.o
 
-EXTRA_CFLAGS += -Idrivers/scsi
+EXTRA_CFLAGS += -Idrivers/scsi -Werror
 #EXTRA_CFLAGS += -g
 
 # Files generated that shall be removed upon make clean

@@ -1,7 +1,7 @@
 /*
  * Adaptec AIC7xxx device driver for Linux.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.c#220 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.c#221 $
  *
  * Copyright (c) 1994 John Aycock
  *   The University of Calgary Department of Computer Science.
@@ -4877,7 +4877,7 @@ ahc_linux_queue_recovery_cmd(Scsi_Cmnd *cmd, scb_flag flag)
 	}
 
 	printf("%s: At time of recovery, card was %spaused\n",
-	       was_paused ? "" : "not ");
+	       ahc_name(ahc), was_paused ? "" : "not ");
 	ahc_dump_card_state(ahc);
 
 	disconnected = TRUE;
