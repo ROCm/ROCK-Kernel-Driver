@@ -21,18 +21,20 @@
  *
  ********************************************************************/
 
+#include <linux/config.h>
 #include <linux/module.h>
  
-MODULE_DESCRIPTION("IrDA SIR/MIR/FIR driver for VLSI 82C147");
-MODULE_AUTHOR("Martin Diehl <info@mdiehl.de>");
-MODULE_LICENSE("GPL");
+#define DRIVER_NAME 		"vlsi_ir"
+#define DRIVER_VERSION		"v0.5"
+#define DRIVER_DESCRIPTION	"IrDA SIR/MIR/FIR driver for VLSI 82C147"
+#define DRIVER_AUTHOR		"Martin Diehl <info@mdiehl.de>"
 
-#define DRIVER_NAME "vlsi_ir"
-#define DRIVER_VERSION "v0.4a"
+MODULE_DESCRIPTION(DRIVER_DESCRIPTION);
+MODULE_AUTHOR(DRIVER_AUTHOR);
+MODULE_LICENSE("GPL");
 
 /********************************************************/
 
-#include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/pci.h>
@@ -118,7 +120,7 @@ static int sirpulse = 1;		/* default is 3/16 bittime */
 
 MODULE_PARM(qos_mtt_bits, "i");
 MODULE_PARM_DESC(qos_mtt_bits, "IrLAP bitfield representing min-turn-time");
-static int qos_mtt_bits = 0x04;		/* default is 1 ms */
+static int qos_mtt_bits = 0x07;		/* default is 1 ms or more */
 
 /********************************************************/
 
@@ -258,7 +260,7 @@ static int vlsi_proc_ndev(struct net_device *ndev, char *buf, int len)
 		(word&IRCFG_RXPOL) ? " RXPOL" : "");
 	word = inw(iobase+VLSI_PIO_IRENABLE);
 	out += sprintf(out, "IRENABLE:%s%s%s%s%s%s%s%s\n",
-		(word&IRENABLE_IREN) ? " IRENABLE" : "",
+		(word&IRENABLE_PHYANDCLOCK) ? " PHYANDCLOCK" : "",
 		(word&IRENABLE_CFGER) ? " CFGERR" : "",
 		(word&IRENABLE_FIR_ON) ? " FIR_ON" : "",
 		(word&IRENABLE_MIR_ON) ? " MIR_ON" : "",
@@ -926,7 +928,7 @@ static int vlsi_set_baud(vlsi_irda_dev_t *idev, unsigned iobase)
 	outw(config, iobase+VLSI_PIO_IRCFG);
 	outw(nphyctl, iobase+VLSI_PIO_NPHYCTL);
 	wmb();
-	outw(IRENABLE_IREN, iobase+VLSI_PIO_IRENABLE);
+	outw(IRENABLE_PHYANDCLOCK, iobase+VLSI_PIO_IRENABLE);
 	mb();
 
 	udelay(1);	/* chip applies IRCFG on next rising edge of its 8MHz clock */
@@ -942,7 +944,7 @@ static int vlsi_set_baud(vlsi_irda_dev_t *idev, unsigned iobase)
 	else
 		config ^= IRENABLE_SIR_ON;
 
-	if (config != (IRENABLE_IREN|IRENABLE_ENRXST)) {
+	if (config != (IRENABLE_PHYANDCLOCK|IRENABLE_ENRXST)) {
 		WARNING("%s: failed to set %s mode!\n", __FUNCTION__,
 			(mode==IFF_SIR)?"SIR":((mode==IFF_MIR)?"MIR":"FIR"));
 		ret = -1;

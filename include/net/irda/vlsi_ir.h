@@ -3,7 +3,7 @@
  *
  *	vlsi_ir.h:	VLSI82C147 PCI IrDA controller driver for Linux
  *
- *	Version:	0.4a
+ *	Version:	0.5
  *
  *	Copyright (c) 2001-2003 Martin Diehl
  *
@@ -191,7 +191,7 @@ enum vlsi_pci_clkctl {
  *	- IRMISC_UARTSEL configured
  *	- IRCFG_MASTER must be cleared
  *	- IRCFG_SIR must be set
- *	- IRENABLE_IREN must be asserted 0->1 (and hence IRENABLE_SIR_ON)
+ *	- IRENABLE_PHYANDCLOCK must be asserted 0->1 (and hence IRENABLE_SIR_ON)
  */
 
 enum vlsi_pci_irmisc {
@@ -351,7 +351,7 @@ enum vlsi_pio_irintr {
 /* notes:
  *	- not more than one SIR/MIR/FIR bit must be set at any time
  *	- SIR, MIR, FIR and CRC16 select the configuration which will
- *	  be applied on next 0->1 transition of IRENABLE_IREN (see below).
+ *	  be applied on next 0->1 transition of IRENABLE_PHYANDCLOCK (see below).
  *	- besides allowing the PCI interface to execute busmaster cycles
  *	  and therefore the ring SM to operate, the MSTR bit has side-effects:
  *	  when MSTR is cleared, the RINGPTR's get reset and the legacy UART mode
@@ -402,7 +402,7 @@ enum vlsi_pio_ircfg {
  */
 
 enum vlsi_pio_irenable {
-	IRENABLE_IREN		= 0x8000,  /* enable IR phy and gate the mode config (rw) */
+	IRENABLE_PHYANDCLOCK	= 0x8000,  /* enable IR phy and gate the mode config (rw) */
 	IRENABLE_CFGER		= 0x4000,  /* mode configuration error (ro) */
 	IRENABLE_FIR_ON		= 0x2000,  /* FIR on status (ro) */
 	IRENABLE_MIR_ON		= 0x1000,  /* MIR on status (ro) */
@@ -419,7 +419,7 @@ enum vlsi_pio_irenable {
 /* VLSI_PIO_PHYCTL: IR Physical Layer Current Control Register (u16, ro) */
 
 /* read-back of the currently applied physical layer status.
- * applied from VLSI_PIO_NPHYCTL at rising edge of IRENABLE_IREN
+ * applied from VLSI_PIO_NPHYCTL at rising edge of IRENABLE_PHYANDCLOCK
  * contents identical to VLSI_PIO_NPHYCTL (see below)
  */
 
@@ -427,7 +427,7 @@ enum vlsi_pio_irenable {
 
 /* VLSI_PIO_NPHYCTL: IR Physical Layer Next Control Register (u16, rw) */
 
-/* latched during IRENABLE_IREN=0 and applied at 0-1 transition
+/* latched during IRENABLE_PHYANDCLOCK=0 and applied at 0-1 transition
  *
  * consists of BAUD[15:10], PLSWID[9:5] and PREAMB[4:0] bits defined as follows:
  *
