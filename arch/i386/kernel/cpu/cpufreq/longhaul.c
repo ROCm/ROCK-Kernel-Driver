@@ -638,13 +638,13 @@ static int __init longhaul_init(void)
 static void __exit longhaul_exit(void)
 {
 	int i=0;
-	unsigned int new_clock_ratio;
 
-	while (clock_ratio[i] != maxmult)
-		i++;
-
-	new_clock_ratio = longhaul_table[i].index & 0xFF;
-	longhaul_setstate(new_clock_ratio);
+	for (i=0; i < numscales; i++) {
+		if (clock_ratio[i] == maxmult) {
+			longhaul_setstate(i);
+			break;
+		}
+	}
 
 	cpufreq_unregister_driver(&longhaul_driver);
 	kfree(longhaul_table);
