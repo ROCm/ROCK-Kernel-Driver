@@ -227,7 +227,7 @@ void scsi_queue_next_request(request_queue_t * q, Scsi_Cmnd * SCpnt)
 	/*
 	 * Just hit the requeue function for the queue.
 	 */
-	q->request_fn(q);
+	__blk_run_queue(q);
 
 	SDpnt = (Scsi_Device *) q->queuedata;
 	SHpnt = SDpnt->host;
@@ -240,8 +240,6 @@ void scsi_queue_next_request(request_queue_t * q, Scsi_Cmnd * SCpnt)
 	 * use function pointers to pick the right one.
 	 */
 	if (SDpnt->single_lun && blk_queue_empty(q) && SDpnt->device_busy ==0) {
-		request_queue_t *q;
-
 		for (SDpnt = SHpnt->host_queue; SDpnt; SDpnt = SDpnt->next) {
 			if (((SHpnt->can_queue > 0)
 			     && (SHpnt->host_busy >= SHpnt->can_queue))
@@ -251,8 +249,7 @@ void scsi_queue_next_request(request_queue_t * q, Scsi_Cmnd * SCpnt)
 				break;
 			}
 
-			q = &SDpnt->request_queue;
-			q->request_fn(q);
+			__blk_run_queue(&SDpnt->request_queue);
 		}
 	}
 
@@ -267,7 +264,6 @@ void scsi_queue_next_request(request_queue_t * q, Scsi_Cmnd * SCpnt)
 	all_clear = 1;
 	if (SHpnt->some_device_starved) {
 		for (SDpnt = SHpnt->host_queue; SDpnt; SDpnt = SDpnt->next) {
-			request_queue_t *q;
 			if ((SHpnt->can_queue > 0 && (SHpnt->host_busy >= SHpnt->can_queue))
 			    || (SHpnt->host_blocked) 
 			    || (SHpnt->host_self_blocked)) {
@@ -276,8 +272,7 @@ void scsi_queue_next_request(request_queue_t * q, Scsi_Cmnd * SCpnt)
 			if (SDpnt->device_blocked || !SDpnt->starved) {
 				continue;
 			}
-			q = &SDpnt->request_queue;
-			q->request_fn(q);
+			__blk_run_queue(&SDpnt->request_queue);
 			all_clear = 0;
 		}
 		if (SDpnt == NULL && all_clear) {
