@@ -681,18 +681,18 @@ int blkdev_close(struct inode * inode, struct file * filp)
 	return blkdev_put(inode->i_bdev, BDEV_FILE);
 }
 
-static ssize_t blkdev_file_write(struct file *file, const char *buf,
+static ssize_t blkdev_file_write(struct file *file, const char __user *buf,
 				   size_t count, loff_t *ppos)
 {
-	struct iovec local_iov = { .iov_base = (void *)buf, .iov_len = count };
+	struct iovec local_iov = { .iov_base = (void __user *)buf, .iov_len = count };
 
 	return generic_file_write_nolock(file, &local_iov, 1, ppos);
 }
 
-static ssize_t blkdev_file_aio_write(struct kiocb *iocb, const char *buf,
+static ssize_t blkdev_file_aio_write(struct kiocb *iocb, const char __user *buf,
 				   size_t count, loff_t pos)
 {
-	struct iovec local_iov = { .iov_base = (void *)buf, .iov_len = count };
+	struct iovec local_iov = { .iov_base = (void __user *)buf, .iov_len = count };
 
 	return generic_file_aio_write_nolock(iocb, &local_iov, 1, &iocb->ki_pos);
 }

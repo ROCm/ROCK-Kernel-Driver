@@ -405,12 +405,12 @@ extern void			sock_wfree(struct sk_buff *skb);
 extern void			sock_rfree(struct sk_buff *skb);
 
 extern int			sock_setsockopt(struct socket *sock, int level,
-						int op, char *optval,
+						int op, char __user *optval,
 						int optlen);
 
 extern int			sock_getsockopt(struct socket *sock, int level,
-						int op, char *optval, 
-						int *optlen);
+						int op, char __user *optval, 
+						int __user *optlen);
 extern struct sk_buff 		*sock_alloc_send_skb(struct sock *sk,
 						     unsigned long size,
 						     int noblock,

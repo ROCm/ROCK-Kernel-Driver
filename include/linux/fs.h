@@ -521,12 +521,12 @@ extern struct list_head file_lock_list;
 
 #include <linux/fcntl.h>
 
-extern int fcntl_getlk(struct file *, struct flock *);
-extern int fcntl_setlk(struct file *, unsigned int, struct flock *);
+extern int fcntl_getlk(struct file *, struct flock __user *);
+extern int fcntl_setlk(struct file *, unsigned int, struct flock __user *);
 
 #if BITS_PER_LONG == 32
-extern int fcntl_getlk64(struct file *, struct flock64 *);
-extern int fcntl_setlk64(struct file *, unsigned int, struct flock64 *);
+extern int fcntl_getlk64(struct file *, struct flock64 __user *);
+extern int fcntl_setlk64(struct file *, unsigned int, struct flock64 __user *);
 #endif
 
 /* fs/locks.c */
@@ -1263,8 +1263,8 @@ void inode_set_bytes(struct inode *inode, loff_t bytes);
 
 extern int vfs_readdir(struct file *, filldir_t, void *);
 
-extern int vfs_stat(char *, struct kstat *);
-extern int vfs_lstat(char *, struct kstat *);
+extern int vfs_stat(char __user *, struct kstat *);
+extern int vfs_lstat(char __user *, struct kstat *);
 extern int vfs_fstat(unsigned int, struct kstat *);
 
 extern struct file_system_type *get_fs_type(const char *name);
@@ -1291,7 +1291,7 @@ extern int simple_commit_write(struct file *file, struct page *page,
 				unsigned offset, unsigned to);
 
 extern struct dentry *simple_lookup(struct inode *, struct dentry *);
-extern ssize_t generic_read_dir(struct file *, char *, size_t, loff_t *);
+extern ssize_t generic_read_dir(struct file *, char __user *, size_t, loff_t *);
 extern struct file_operations simple_dir_operations;
 extern struct inode_operations simple_dir_inode_operations;
 struct tree_descr { char *name; struct file_operations *ops; int mode; };

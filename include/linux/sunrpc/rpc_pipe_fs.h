@@ -12,8 +12,8 @@ struct rpc_pipe_msg {
 };
 
 struct rpc_pipe_ops {
-	ssize_t (*upcall)(struct file *, struct rpc_pipe_msg *, char *, size_t);
-	ssize_t (*downcall)(struct file *, const char *, size_t);
+	ssize_t (*upcall)(struct file *, struct rpc_pipe_msg *, char __user *, size_t);
+	ssize_t (*downcall)(struct file *, const char __user *, size_t);
 	void (*destroy_msg)(struct rpc_pipe_msg *);
 };
 

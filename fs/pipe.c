@@ -44,7 +44,7 @@ void pipe_wait(struct inode * inode)
 }
 
 static ssize_t
-pipe_read(struct file *filp, char *buf, size_t count, loff_t *ppos)
+pipe_read(struct file *filp, char __user *buf, size_t count, loff_t *ppos)
 {
 	struct inode *inode = filp->f_dentry->d_inode;
 	int do_wakeup;
@@ -126,7 +126,7 @@ pipe_read(struct file *filp, char *buf, size_t count, loff_t *ppos)
 }
 
 static ssize_t
-pipe_write(struct file *filp, const char *buf, size_t count, loff_t *ppos)
+pipe_write(struct file *filp, const char __user *buf, size_t count, loff_t *ppos)
 {
 	struct inode *inode = filp->f_dentry->d_inode;
 	ssize_t ret;
@@ -216,13 +216,13 @@ pipe_write(struct file *filp, const char *buf, size_t count, loff_t *ppos)
 }
 
 static ssize_t
-bad_pipe_r(struct file *filp, char *buf, size_t count, loff_t *ppos)
+bad_pipe_r(struct file *filp, char __user *buf, size_t count, loff_t *ppos)
 {
 	return -EBADF;
 }
 
 static ssize_t
-bad_pipe_w(struct file *filp, const char *buf, size_t count, loff_t *ppos)
+bad_pipe_w(struct file *filp, const char __user *buf, size_t count, loff_t *ppos)
 {
 	return -EBADF;
 }
@@ -233,7 +233,7 @@ pipe_ioctl(struct inode *pino, struct file *filp,
 {
 	switch (cmd) {
 		case FIONREAD:
-			return put_user(PIPE_LEN(*pino), (int *)arg);
+			return put_user(PIPE_LEN(*pino), (int __user *)arg);
 		default:
 			return -EINVAL;
 	}

@@ -305,11 +305,11 @@ static long do_fcntl(unsigned int fd, unsigned int cmd,
 			err = setfl(fd, filp, arg);
 			break;
 		case F_GETLK:
-			err = fcntl_getlk(filp, (struct flock *) arg);
+			err = fcntl_getlk(filp, (struct flock __user *) arg);
 			break;
 		case F_SETLK:
 		case F_SETLKW:
-			err = fcntl_setlk(filp, cmd, (struct flock *) arg);
+			err = fcntl_setlk(filp, cmd, (struct flock __user *) arg);
 			break;
 		case F_GETOWN:
 			/*
@@ -393,11 +393,11 @@ asmlinkage long sys_fcntl64(unsigned int fd, unsigned int cmd, unsigned long arg
 	
 	switch (cmd) {
 		case F_GETLK64:
-			err = fcntl_getlk64(filp, (struct flock64 *) arg);
+			err = fcntl_getlk64(filp, (struct flock64 __user *) arg);
 			break;
 		case F_SETLK64:
 		case F_SETLKW64:
-			err = fcntl_setlk64(filp, cmd, (struct flock64 *) arg);
+			err = fcntl_setlk64(filp, cmd, (struct flock64 __user *) arg);
 			break;
 		default:
 			err = do_fcntl(fd, cmd, arg, filp);
