@@ -108,7 +108,7 @@
  *	- lots more testing!!
  */
 
-#define DRIVER_VERSION "2002-Sep-03"
+#define DRIVER_VERSION "2002-Sep-17"
 #define DRIVER_AUTHOR "Roman Weissgaerber, David Brownell"
 #define DRIVER_DESC "USB 1.1 'Open' Host Controller (OHCI) Driver"
 
@@ -318,9 +318,6 @@ ohci_free_config (struct usb_hcd *hcd, struct usb_device *udev)
 	struct hcd_dev		*dev = (struct hcd_dev *) udev->hcpriv;
 	int			i;
 	unsigned long		flags;
-#ifdef DEBUG
-	int			rescans = 0;
-#endif
 
 rescan:
 	/* free any eds, and dummy tds, still hanging around */
@@ -340,16 +337,18 @@ rescan:
 			td_free (ohci, ed->dummy);
 			break;
 		default:
-#ifdef DEBUG
-			err ("illegal ED %d state in free_config, %d",
+			err ("%s-%s ed %p (#%d) not unlinked; disconnect() bug? %d",
+				ohci->hcd.self.bus_name, udev->devpath, ed,
 				i, ed->state);
-#endif
 			/* ED_OPER: some driver disconnect() is broken,
 			 * it didn't even start its unlinks much less wait
 			 * for their completions.
 			 * OTHERWISE:  hcd bug, ed is garbage
+			 *
+			 * ... we can't recycle this memory in either case,
+			 * so just leak it to avoid oopsing.
 			 */
-			BUG ();
+			continue;
 		}
 		ed_free (ohci, ed);
 	}
@@ -360,13 +359,9 @@ do_rescan:
 #ifdef DEBUG
 	/* a driver->disconnect() returned before its unlinks completed? */
 	if (in_interrupt ()) {
-		dbg ("WARNING: spin in interrupt; driver->disconnect() bug");
-		dbg ("dev usb-%s-%s ep 0x%x", 
+		warn ("disconnect() bug for dev usb-%s-%s ep 0x%x", 
 			ohci->hcd.self.bus_name, udev->devpath, i);
 	}
-	BUG_ON (!(readl (&ohci->regs->intrenable) & OHCI_INTR_SF));
-	BUG_ON (rescans >= 2);	/* HWBUG */
-	rescans++;
 #endif
 
 	spin_unlock_irqrestore (&ohci->lock, flags);
