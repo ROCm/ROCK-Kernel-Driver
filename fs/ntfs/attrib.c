@@ -1082,35 +1082,45 @@ BOOL find_attr(const ATTR_TYPES type, const uchar_t *name, const u32 name_len,
 
 /**
  * load_attribute_list - load an attribute list into memory
- * @vol:	ntfs volume from which to read
- * @rl:		run list of the attribute list
- * @al:		destination buffer
- * @size:	size of the destination buffer in bytes
+ * @vol:		ntfs volume from which to read
+ * @run_list:		run list of the attribute list
+ * @al:			destination buffer
+ * @size:		size of the destination buffer in bytes
+ * @initialized_size:	initialized size of the attribute list
  *
- * Walk the run list @rl and load all clusters from it copying them into the
- * linear buffer @al. The maximum number of bytes copied to @al is @size bytes.
- * Note, @size does not need to be a multiple of the cluster size.
- *
- * It is up to the caller to serialize access to the run list @rl.
+ * Walk the run list @run_list and load all clusters from it copying them into
+ * the linear buffer @al. The maximum number of bytes copied to @al is @size
+ * bytes. Note, @size does not need to be a multiple of the cluster size. If
+ * @initialized_size is less than @size, the region in @al between
+ * @initialized_size and @size will be zeroed and not read from disk.
  *
  * Return 0 on success or -errno on error.
  */
-int load_attribute_list(ntfs_volume *vol, run_list_element *rl, u8 *al,
-		const s64 size)
+int load_attribute_list(ntfs_volume *vol, run_list *run_list, u8 *al,
+		const s64 size, const s64 initialized_size)
 {
 	LCN lcn;
-	u8 *al_end = al + size;
+	u8 *al_end = al + initialized_size;
+	run_list_element *rl;
 	struct buffer_head *bh;
 	struct super_block *sb = vol->sb;
 	unsigned long block_size = sb->s_blocksize;
 	unsigned long block, max_block;
+	int err = 0;
 	unsigned char block_size_bits = sb->s_blocksize_bits;
 
 	ntfs_debug("Entering.");
 #ifdef DEBUG
-	if (!vol || !rl || !al || size <= 0)
+	if (!vol || !run_list || !al || size <= 0 || initialized_size < 0 ||
+			initialized_size > size)
 		return -EINVAL;
 #endif
+	if (!initialized_size) {
+		memset(al, 0, size);
+		return 0;
+	}
+	down_read(&run_list->lock);
+	rl = run_list->rl;
 	/* Read all clusters specified by the run list one run at a time. */
 	while (rl->length) {
 		lcn = vcn_to_lcn(rl, rl->vcn);
@@ -1120,7 +1130,7 @@ int load_attribute_list(ntfs_volume *vol, run_list_element *rl, u8 *al,
 		if (lcn < 0) {
 			ntfs_error(sb, "vcn_to_lcn() failed. Cannot read "
 					"attribute list.");
-			return -EIO;;
+			goto err_out;
 		}
 		block = lcn << vol->cluster_size_bits >> block_size_bits;
 		/* Read the run from device in chunks of block_size bytes. */
@@ -1130,8 +1140,11 @@ int load_attribute_list(ntfs_volume *vol, run_list_element *rl, u8 *al,
 		do {
 			ntfs_debug("Reading block = 0x%lx.", block);
 			bh = sb_bread(sb, block);
-			if (!bh)
-				goto bread_err;
+			if (!bh) {
+				ntfs_error(sb, "sb_bread() failed. Cannot "
+						"read attribute list.");
+				goto err_out;
+			}
 			if (al + block_size > al_end)
 				goto do_partial;
 			memcpy(al, bh->b_data, block_size);
@@ -1140,21 +1153,31 @@ int load_attribute_list(ntfs_volume *vol, run_list_element *rl, u8 *al,
 		} while (++block < max_block);
 		rl++;
 	}
-	return 0;
+	if (initialized_size < size) {
+initialize:
+		memset(al + initialized_size, 0, size - initialized_size);
+	}
+done:
+	up_read(&run_list->lock);
+	return err;
 do_partial:
 	if (al < al_end) {
 		/* Partial block. */
 		memcpy(al, bh->b_data, al_end - al);
 		brelse(bh);
+		/*
+		 * Skip sanity checking if initialized_size < size as it is
+		 * too much trouble.
+		 */
+		if (initialized_size < size)
+			goto initialize;
 		/* If the final lcn is partial all is fine. */
 		if (((s64)(block - (lcn << vol->cluster_size_bits >>
 				block_size_bits)) << block_size_bits >>
 				vol->cluster_size_bits) == rl->length - 1) {
-			if (!(rl + 1)->length)
-				return 0;
-			if ((rl + 1)->lcn == LCN_RL_NOT_MAPPED &&
-					!(rl + 2)->length)
-				return 0;
+			if (!rl[1].length || (rl[1].lcn == LCN_RL_NOT_MAPPED
+					&& !rl[2].length))
+				goto done;
 		}
 	} else
 		brelse(bh);
@@ -1162,10 +1185,8 @@ do_partial:
 	ntfs_error(sb, "Attribute list buffer overflow. Read attribute list "
 			"is truncated.");
 err_out:
-	return -EIO;
-bread_err:
-	ntfs_error(sb, "sb_bread() failed. Cannot read attribute list.");
-	goto err_out;
+	err = -EIO;
+	goto done;
 }
 
 /**

@@ -398,12 +398,11 @@ void ntfs_read_inode(struct inode *vi)
 						-err);
 				goto ec_put_unm_err_out;
 			}
-			/*
-			 * Now load the attribute list. Again no need for
-			 * locking as above.
-			 */
-			if ((err = load_attribute_list(vol, ni->attr_list_rl.rl,
-					ni->attr_list, ni->attr_list_size))) {
+			/* Now load the attribute list. */
+			if ((err = load_attribute_list(vol, &ni->attr_list_rl,
+					ni->attr_list, ni->attr_list_size,
+					sle64_to_cpu(
+					ctx->attr->_ANR(initialized_size))))) {
 				ntfs_error(vi->i_sb, "Failed to load "
 						"attribute list attribute.");
 				goto ec_put_unm_err_out;
@@ -982,8 +981,10 @@ void ntfs_read_inode_mount(struct inode *vi)
 				goto put_err_out;
 			}
 			/* Now load the attribute list. */
-			if ((err = load_attribute_list(vol, ni->attr_list_rl.rl,
-					ni->attr_list, ni->attr_list_size))) {
+			if ((err = load_attribute_list(vol, &ni->attr_list_rl,
+					ni->attr_list, ni->attr_list_size,
+					sle64_to_cpu(
+					ctx->attr->_ANR(initialized_size))))) {
 				ntfs_error(sb, "Failed to load attribute list "
 						"attribute with error code %i.",
 						-err);

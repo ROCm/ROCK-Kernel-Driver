@@ -8,7 +8,7 @@ ToDo:
 	  functions need to clone block_read_full_page and modify it to cope
 	  with the significance of the different attribute sizes.
 	  Still need to go through:
-		aops.c, attrib.c, compress.c, dir.c
+		aops.c, compress.c, dir.c
 	- Find and fix bugs.
 	- W.r.t. s_maxbytes still need to be careful on reading/truncating as
 	  there are dragons lurking in the details, e.g. read_inode() currently
@@ -27,12 +27,8 @@ ToDo:
 	- vcn_to_lcn() should somehow return the correct pointer within the
 	  ->run_list so we can get at the lcns for the following vcns, this is
 	  strictly a speed optimization. Obviously need to keep the ->run_list
-	  locked or RACE. load_attribute_list() which we call without any locks
-	  held already performs such an optimization but that is no longer
-	  possible when using the spinlock on the run lists as this would sleep
-	  in between. But now we have a semaphore so are ok. Update
-	  load_attribute_list to use the semaphore so can be called outside
-	  read_inode, too. Apply the same optimization where desired.
+	  locked or RACE. load_attribute_list() already performs such an
+	  optimization so use the same optimization where desired.
 	- Optimize mft_readpage() to not do i/o on buffer heads beyond
 	  initialized_size, just zero the buffer heads instead. Question: How
 	  to setup the buffer heads so they point to the on disk location
@@ -45,7 +41,9 @@ tng-0.0.9 - Work in progress
 	  from the CVS import into BitKeeper.
 	- Begin to implement proper handling of allocated_size vs
 	  initialized_size vs data_size (i.e. i_size). Done are
-	  mft.c::ntfs_mft_readpage() and aops.c::end_buffer_read_index_async().
+	  mft.c::ntfs_mft_readpage(), aops.c::end_buffer_read_index_async(),
+	  and attrib.c::load_attribute_list().
+	- Lock the run list in attrib.c::load_attribute_list() while using it.
 
 tng-0.0.8 - 08/03/2002 - Now using BitKeeper, http://linux-ntfs.bkbits.net/
 
