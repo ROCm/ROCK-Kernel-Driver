@@ -95,7 +95,8 @@ static int multicast_filter_limit = 32;
 #define R8169_RX_RING_BYTES	(NUM_RX_DESC * sizeof(struct RxDesc))
 
 #define RTL_MIN_IO_SIZE 0x80
-#define TX_TIMEOUT  (6*HZ)
+#define RTL8169_TX_TIMEOUT	(6*HZ)
+#define RTL8169_PHY_TIMEOUT	(HZ) 
 
 /* write/read MMIO register */
 #define RTL_W8(reg, val8)	writeb ((val8), ioaddr + (reg))
@@ -311,6 +312,8 @@ struct rtl8169_private {
 	dma_addr_t RxPhyAddr;
 	struct sk_buff *Rx_skbuff[NUM_RX_DESC];	/* Rx data buffers */
 	struct sk_buff *Tx_skbuff[NUM_TX_DESC];	/* Index of Transmit data buffer */
+	struct timer_list timer;
+	unsigned long phy_link_down_cnt;
 };
 
 MODULE_AUTHOR("Realtek");
@@ -540,6 +543,90 @@ static void rtl8169_hw_phy_config(struct net_device *dev)
 	mdio_write(ioaddr, 31, 0x0000); //w 31 2 0 0
 }
 
+static void rtl8169_hw_phy_reset(struct net_device *dev)
+{
+	struct rtl8169_private *tp = dev->priv;
+	void *ioaddr = tp->mmio_addr;
+	int i, val;
+
+	printk(KERN_WARNING PFX "%s: Reset RTL8169s PHY\n", dev->name);
+
+	val = (mdio_read(ioaddr, 0) | 0x8000) & 0xffff;
+	mdio_write(ioaddr, 0, val);
+
+	for (i = 50; i >= 0; i--) {
+		if (!(mdio_read(ioaddr, 0) & 0x8000))
+			break;
+		udelay(100); /* Gross */
+	}
+
+	if (i < 0) {
+		printk(KERN_WARNING PFX "%s: no PHY Reset ack. Giving up.\n",
+		       dev->name);
+	}
+}
+
+static void rtl8169_phy_timer(unsigned long __opaque)
+{
+	struct net_device *dev = (struct net_device *)__opaque;
+	struct rtl8169_private *tp = dev->priv;
+	struct timer_list *timer = &tp->timer;
+	void *ioaddr = tp->mmio_addr;
+
+	assert(tp->mac_version > RTL_GIGA_MAC_VER_B);
+	assert(tp->phy_version < RTL_GIGA_PHY_VER_G);
+
+	if (RTL_R8(PHYstatus) & LinkStatus)
+		tp->phy_link_down_cnt = 0;
+	else {
+		tp->phy_link_down_cnt++;
+		if (tp->phy_link_down_cnt >= 12) {
+			int reg;
+
+			// If link on 1000, perform phy reset.
+			reg = mdio_read(ioaddr, PHY_1000_CTRL_REG);
+			if (reg & PHY_Cap_1000_Full) 
+				rtl8169_hw_phy_reset(dev);
+
+			tp->phy_link_down_cnt = 0;
+		}
+	}
+
+	mod_timer(timer, RTL8169_PHY_TIMEOUT);
+}
+
+static inline void rtl8169_delete_timer(struct net_device *dev)
+{
+	struct rtl8169_private *tp = dev->priv;
+	struct timer_list *timer = &tp->timer;
+
+	if ((tp->mac_version <= RTL_GIGA_MAC_VER_B) ||
+	    (tp->phy_version >= RTL_GIGA_PHY_VER_G))
+		return;
+
+	del_timer_sync(timer);
+
+	tp->phy_link_down_cnt = 0;
+}
+
+static inline void rtl8169_request_timer(struct net_device *dev)
+{
+	struct rtl8169_private *tp = dev->priv;
+	struct timer_list *timer = &tp->timer;
+
+	if ((tp->mac_version <= RTL_GIGA_MAC_VER_B) ||
+	    (tp->phy_version >= RTL_GIGA_PHY_VER_G))
+		return;
+
+	tp->phy_link_down_cnt = 0;
+
+	init_timer(timer);
+	timer->expires = jiffies + RTL8169_PHY_TIMEOUT;
+	timer->data = (unsigned long)(dev);
+	timer->function = rtl8169_phy_timer;
+	add_timer(timer);
+}
+
 static int __devinit
 rtl8169_init_board(struct pci_dev *pdev, struct net_device **dev_out,
 		   void **ioaddr_out)
@@ -691,7 +778,7 @@ rtl8169_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	dev->stop = rtl8169_close;
 	dev->tx_timeout = rtl8169_tx_timeout;
 	dev->set_multicast_list = rtl8169_set_rx_mode;
-	dev->watchdog_timeo = TX_TIMEOUT;
+	dev->watchdog_timeo = RTL8169_TX_TIMEOUT;
 	dev->irq = pdev->irq;
 	dev->base_addr = (unsigned long) ioaddr;
 //      dev->do_ioctl           = mii_ioctl;
@@ -888,6 +975,7 @@ rtl8169_open(struct net_device *dev)
 
 	rtl8169_hw_start(dev);
 
+	rtl8169_request_timer(dev);
 out:
 	return retval;
 
@@ -1380,6 +1468,8 @@ rtl8169_close(struct net_device *dev)
 	void *ioaddr = tp->mmio_addr;
 
 	netif_stop_queue(dev);
+
+	rtl8169_delete_timer(dev);
 
 	spin_lock_irq(&tp->lock);
 
