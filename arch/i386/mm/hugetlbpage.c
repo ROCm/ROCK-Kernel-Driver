@@ -13,6 +13,7 @@
 #include <linux/smp_lock.h>
 #include <linux/slab.h>
 #include <linux/module.h>
+#include <linux/err.h>
 #include <asm/mman.h>
 #include <asm/pgalloc.h>
 #include <asm/tlb.h>
@@ -27,20 +28,111 @@ static LIST_HEAD(htlbpage_freelist);
 static spinlock_t htlbpage_lock = SPIN_LOCK_UNLOCKED;
 
 #define MAX_ID 	32
-static struct htlbpagekey {
-	struct inode *in;
-	int key;
-} htlbpagek[MAX_ID];
 
-static struct inode *find_key_inode(int key)
+struct hugetlb_key {
+	struct radix_tree_root tree;
+	atomic_t count;
+	spinlock_t lock;
+	int key;
+	int busy;
+	uid_t uid;
+	gid_t gid;
+	umode_t mode;
+	loff_t size;
+};
+
+static struct hugetlb_key htlbpagek[MAX_ID];
+
+static void mark_key_busy(struct hugetlb_key *hugetlb_key)
+{
+	hugetlb_key->busy = 1;
+}
+
+static void clear_key_busy(struct hugetlb_key *hugetlb_key)
+{
+	hugetlb_key->busy = 0;
+}
+
+static int key_busy(struct hugetlb_key *hugetlb_key)
+{
+	return hugetlb_key->busy;
+}
+
+static struct hugetlb_key *find_key(int key)
 {
 	int i;
 
 	for (i = 0; i < MAX_ID; i++) {
 		if (htlbpagek[i].key == key)
-			return (htlbpagek[i].in);
+			return &htlbpagek[i];
 	}
 	return NULL;
+}
+
+static int check_size_prot(struct hugetlb_key *key, unsigned long len, int prot, int flag);
+/*
+ * Call without htlbpage_lock, returns with htlbpage_lock held.
+ */
+struct hugetlb_key *alloc_key(int key, unsigned long len, int prot, int flag, int *new)
+{
+	struct hugetlb_key *hugetlb_key;
+
+	do {
+		spin_lock(&htlbpage_lock);
+		hugetlb_key = find_key(key);
+		if (!hugetlb_key) {
+			if (!capable(CAP_SYS_ADMIN) || !in_group_p(0))
+				hugetlb_key = ERR_PTR(-EPERM);
+			else if (!(flag & IPC_CREAT))
+				hugetlb_key = ERR_PTR(-ENOENT);
+			else {
+				int i;
+				for (i = 0; i < MAX_ID; ++i)
+					if (!htlbpagek[i].key)
+						break;
+				if (i == MAX_ID) {
+					hugetlb_key = ERR_PTR(-ENOMEM);
+				} else {
+					hugetlb_key = &htlbpagek[i];
+					mark_key_busy(hugetlb_key);
+					hugetlb_key->key = key;
+					INIT_RADIX_TREE(&hugetlb_key->tree, GFP_ATOMIC);
+					hugetlb_key->uid = current->fsuid;
+					hugetlb_key->gid = current->fsgid;
+					hugetlb_key->mode = prot;
+					hugetlb_key->size = len;
+					atomic_set(&hugetlb_key->count, 1);
+					*new = 1;
+				}
+			}
+		} else if (key_busy(hugetlb_key)) {
+			hugetlb_key = ERR_PTR(-EAGAIN);
+			spin_unlock(&htlbpage_lock);
+		} else if (check_size_prot(hugetlb_key, len, prot, flag) < 0) {
+			hugetlb_key->key = 0;
+			hugetlb_key = ERR_PTR(-EINVAL);
+		} else
+			*new = 0;
+	} while (hugetlb_key == ERR_PTR(-EAGAIN));
+	return hugetlb_key;
+}
+
+void hugetlb_release_key(struct hugetlb_key *key)
+{
+	unsigned long index;
+
+	if (!atomic_dec_and_lock(&key->count, &htlbpage_lock))
+		return;	
+
+	for (index = 0; index < key->size; ++index) {
+		struct page *page = radix_tree_lookup(&key->tree, index);
+		if (!page)
+			continue;
+		huge_page_release(page);
+	}
+	key->key = 0;
+	INIT_RADIX_TREE(&key->tree, GFP_ATOMIC);
+	spin_unlock(&htlbpage_lock);
 }
 
 static struct page *alloc_hugetlb_page(void)
@@ -236,55 +328,22 @@ void huge_page_release(struct page *page)
 	free_huge_page(page);
 }
 
-static void
-free_rsrc(struct inode * inode)
-{
-	int i;
-	spin_lock(&htlbpage_lock);
-	for (i=0;i<MAX_ID;i++) 
-		if (htlbpagek[i].key == inode->i_ino) {
-			htlbpagek[i].key = 0;
-			htlbpagek[i].in = NULL;
-			break;
-		}
-	spin_unlock(&htlbpage_lock);
-	kfree(inode);
-}
-
 void unmap_hugepage_range(struct vm_area_struct *vma, unsigned long start, unsigned long end)
 {
 	struct mm_struct *mm = vma->vm_mm;
 	unsigned long address;
 	pte_t *pte;
 	struct page *page;
-	int free_more = 0;
-	struct inode *inode = NULL;
 
 	BUG_ON(start & (HPAGE_SIZE - 1));
 	BUG_ON(end & (HPAGE_SIZE - 1));
 
-	if (start < end) {
-		pte = huge_pte_offset(mm, start);
-		page = pte_page(*pte);
-		if ((page->mapping != NULL) && (page_count(page) == 2) &&
-			((inode=page->mapping->host)->i_mapping->a_ops == NULL)) 
-			free_more = 1;
-	}
 	for (address = start; address < end; address += HPAGE_SIZE) {
 		pte = huge_pte_offset(mm, address);
 		page = pte_page(*pte);
-		if (free_more) {
-			ClearPageDirty(page);
-			SetPageLocked(page);
-			remove_from_page_cache(page);
-			ClearPageLocked(page);
-			set_page_count(page, 1);
-		}
 		huge_page_release(page);
 		pte_clear(pte);
 	}
-	if (free_more)
-		free_rsrc(inode);
 	mm->rss -= (end - start) >> PAGE_SHIFT;
 	flush_tlb_range(vma, start, end);
 }
@@ -297,109 +356,112 @@ void zap_hugepage_range(struct vm_area_struct *vma, unsigned long start, unsigne
 	spin_unlock(&mm->page_table_lock);
 }
 
-static struct inode *set_new_inode(unsigned long len, int prot, int flag, int key)
+static int check_size_prot(struct hugetlb_key *key, unsigned long len, int prot, int flag)
 {
-	struct inode *inode;
-	int i;
-
-	for (i = 0; i < MAX_ID; i++) {
-		if (htlbpagek[i].key == 0)
-			break;
-	}
-	if (i == MAX_ID)
-		return NULL;
-	inode = kmalloc(sizeof (struct inode), GFP_ATOMIC);
-	if (inode == NULL)
-		return NULL;
-
-	inode_init_once(inode);
-	atomic_inc(&inode->i_writecount);
-	inode->i_mapping = &inode->i_data;
-	inode->i_mapping->host = inode;
-	inode->i_ino = (unsigned long)key;
-
-	htlbpagek[i].key = key;
-	htlbpagek[i].in = inode;
-	inode->i_uid = current->fsuid;
-	inode->i_gid = current->fsgid;
-	inode->i_mode = prot;
-	inode->i_size = len;
-	return inode;
-}
-
-static int check_size_prot(struct inode *inode, unsigned long len, int prot, int flag)
-{
-	if (inode->i_uid != current->fsuid)
+	if (key->uid != current->fsuid)
 		return -1;
-	if (inode->i_gid != current->fsgid)
+	if (key->gid != current->fsgid)
 		return -1;
-	if (inode->i_size != len)
+	if (key->size != len)
 		return -1;
 	return 0;
+}
+
+struct page *key_find_page(struct hugetlb_key *key, unsigned long index)
+{
+	struct page *page = radix_tree_lookup(&key->tree, index);
+	if (page)
+		get_page(page);
+	return page;
+}
+
+int key_add_page(struct page *page, struct hugetlb_key *key, unsigned long index)
+{
+	int error = radix_tree_insert(&key->tree, index, page);
+	if (!error)
+		get_page(page);
+	return error;
+}
+
+static int prefault_key(struct hugetlb_key *key, struct vm_area_struct *vma)
+{
+	struct mm_struct *mm = current->mm;
+	unsigned long addr;
+	int ret = 0;
+
+	BUG_ON(vma->vm_start & ~HPAGE_MASK);
+	BUG_ON(vma->vm_end & ~HPAGE_MASK);
+
+	spin_lock(&mm->page_table_lock);
+	spin_lock(&key->lock);
+	for (addr = vma->vm_start; addr < vma->vm_end; addr += HPAGE_SIZE) {
+		unsigned long idx;
+		pte_t *pte = huge_pte_alloc(mm, addr);
+		struct page *page;
+
+		if (!pte) {
+			ret = -ENOMEM;
+			goto out;
+		}
+		if (!pte_none(*pte))
+			continue;
+
+		idx = ((addr - vma->vm_start) >> HPAGE_SHIFT)
+			+ (vma->vm_pgoff >> (HPAGE_SHIFT - PAGE_SHIFT));
+		page = key_find_page(key, idx);
+		if (!page) {
+			page = alloc_hugetlb_page();
+			if (!page) {
+				spin_unlock(&key->lock);
+				ret = -ENOMEM;
+				goto out;
+			}
+			key_add_page(page, key, idx);
+			unlock_page(page);
+		}
+		set_huge_pte(mm, vma, page, pte, vma->vm_flags & VM_WRITE);
+	}
+	spin_unlock(&key->lock);
+out:
+	spin_unlock(&mm->page_table_lock);
+	return ret;
 }
 
 static int alloc_shared_hugetlb_pages(int key, unsigned long addr, unsigned long len, int prot, int flag)
 {
 	struct mm_struct *mm = current->mm;
 	struct vm_area_struct *vma;
-	struct inode *inode;
-	struct address_space *mapping;
-	int idx;
+	struct hugetlb_key *hugetlb_key;
 	int retval = -ENOMEM;
 	int newalloc = 0;
 
-try_again:
-	spin_lock(&htlbpage_lock);
-
-	inode = find_key_inode(key);
-	if (inode == NULL) {
-		if (!capable(CAP_SYS_ADMIN)) {
-			if (!in_group_p(0)) {
-				retval = -EPERM;
-				goto out_err;
-			}
-		}
-		if (!(flag & IPC_CREAT)) {
-			retval = -ENOENT;
-			goto out_err;
-		}
-		inode = set_new_inode(len, prot, flag, key);
-		if (inode == NULL)
-			goto out_err;
-		newalloc = 1;
-	} else {
-		if (check_size_prot(inode, len, prot, flag) < 0) {
-			retval = -EINVAL;
-			goto out_err;
-		}
-		else if (atomic_read(&inode->i_writecount)) {
-			spin_unlock(&htlbpage_lock);
-			goto try_again;
-		}
-	}
-	spin_unlock(&htlbpage_lock);
-	mapping = inode->i_mapping;
+	hugetlb_key = alloc_key(key, len, prot, flag, &newalloc);
+	if (IS_ERR(hugetlb_key)) {
+		spin_unlock(&htlbpage_lock);
+		return PTR_ERR(hugetlb_key);
+	} else
+		spin_unlock(&htlbpage_lock);
 
 	addr = do_mmap_pgoff(NULL, addr, len, (unsigned long) prot,
 			MAP_NORESERVE|MAP_FIXED|MAP_PRIVATE|MAP_ANONYMOUS, 0);
 	if (IS_ERR((void *) addr))
-		goto freeinode;
+		goto out_release;
 
 	vma = find_vma(mm, addr);
 	if (!vma) {
 		retval = -EINVAL;
-		goto freeinode;
+		goto out_release;
 	}
 
-	retval = hugetlb_prefault(mapping, vma);
+	retval = prefault_key(hugetlb_key, vma);
 	if (retval)
 		goto out;
 
 	vma->vm_flags |= (VM_HUGETLB | VM_RESERVED);
 	vma->vm_ops = &hugetlb_vm_ops;
-	spin_unlock(&mm->page_table_lock);
+	vma->vm_private_data = hugetlb_key;
 	spin_lock(&htlbpage_lock);
-	atomic_set(&inode->i_writecount, 0);
+	clear_key_busy(hugetlb_key);
 	spin_unlock(&htlbpage_lock);
 	return retval;
 out:
@@ -410,23 +472,12 @@ out:
 		zap_hugepage_range(vma, vma->vm_start, vma->vm_end - vma->vm_start);
 		vma->vm_end = raddr;
 	}
-	spin_unlock(&mm->page_table_lock);
+	spin_lock(&mm->page_table_lock);
 	do_munmap(mm, vma->vm_start, len);
-	if (newalloc)
-		goto freeinode;
+	spin_unlock(&mm->page_table_lock);
+out_release:
+	hugetlb_release_key(hugetlb_key);
 	return retval;
-out_err: spin_unlock(&htlbpage_lock);
-freeinode:
-	 if (newalloc) {
-		 for(idx=0;idx<MAX_ID;idx++)
-			 if (htlbpagek[idx].key == inode->i_ino) {
-				 htlbpagek[idx].key = 0;
-				 htlbpagek[idx].in = NULL;
-				 break;
-			 }
-		 kfree(inode);
-	 }
-	 return retval;
 }
 
 int hugetlb_prefault(struct address_space *mapping, struct vm_area_struct *vma)
@@ -578,6 +629,10 @@ static int __init hugetlb_init(void)
 	}
 	htlbpage_max = htlbpagemem = htlbzone_pages = i;
 	printk("Total HugeTLB memory allocated, %ld\n", htlbpagemem);
+	for (i = 0; i < MAX_ID; ++i) {
+		atomic_set(&htlbpagek[i].count, 0);
+		spin_lock_init(&htlbpagek[i].lock);
+	}
 	return 0;
 }
 module_init(hugetlb_init);

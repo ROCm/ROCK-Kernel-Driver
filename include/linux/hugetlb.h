@@ -4,6 +4,7 @@
 #ifdef CONFIG_HUGETLB_PAGE
 
 struct ctl_table;
+struct hugetlb_key;
 
 static inline int is_vm_hugetlb_page(struct vm_area_struct *vma)
 {
@@ -17,6 +18,7 @@ void zap_hugepage_range(struct vm_area_struct *, unsigned long, unsigned long);
 void unmap_hugepage_range(struct vm_area_struct *, unsigned long, unsigned long);
 int hugetlb_prefault(struct address_space *, struct vm_area_struct *);
 void huge_page_release(struct page *);
+void hugetlb_release_key(struct hugetlb_key *);
 int hugetlb_report_meminfo(char *);
 
 extern int htlbpage_max;

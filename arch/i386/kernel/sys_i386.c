@@ -294,14 +294,17 @@ asmlinkage int sys_free_hugepages(unsigned long addr)
 {
 	struct mm_struct *mm = current->mm;
 	struct vm_area_struct *vma;
+	struct hugetlb_key *key;
 	int retval;
 
 	vma = find_vma(current->mm, addr);
 	if (!vma || !(vma->vm_flags & VM_HUGETLB) || vma->vm_start != addr)
 		return -EINVAL;
 	down_write(&mm->mmap_sem);
+	key = (struct hugetlb_key *)vma->vm_private_data;
 	retval = do_munmap(vma->vm_mm, addr, vma->vm_end - addr);
 	up_write(&mm->mmap_sem);
+	hugetlb_release_key(key);
 	return retval;
 }
 #else
