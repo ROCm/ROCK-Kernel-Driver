@@ -1851,10 +1851,10 @@ static void hc_state_transitions(struct uhci_hcd *uhci)
 	}
 }
 
-static void start_hc(struct uhci_hcd *uhci)
+static int start_hc(struct uhci_hcd *uhci)
 {
 	unsigned long io_addr = uhci->io_addr;
-	int timeout = 1000;
+	int timeout = 10;
 
 	/*
 	 * Reset the HC - this will force us to get a
@@ -1864,10 +1864,11 @@ static void start_hc(struct uhci_hcd *uhci)
 	 */
 	outw(USBCMD_HCRESET, io_addr + USBCMD);
 	while (inw(io_addr + USBCMD) & USBCMD_HCRESET) {
-		if (!--timeout) {
+		if (--timeout < 0) {
 			dev_err(uhci_dev(uhci), "USBCMD_HCRESET timed out!\n");
-			break;
+			return -ETIMEDOUT;
 		}
+		msleep(1);
 	}
 
 	/* Turn on PIRQ and all interrupts */
@@ -1886,6 +1887,7 @@ static void start_hc(struct uhci_hcd *uhci)
 	outw(USBCMD_RS | USBCMD_CF | USBCMD_MAXP, io_addr + USBCMD);
 
         uhci->hcd.state = USB_STATE_RUNNING;
+	return 0;
 }
 
 /*
@@ -2137,7 +2139,8 @@ static int uhci_start(struct usb_hcd *hcd)
 	 * the memory writes above before the I/O transfers in start_hc().
 	 */
 	mb();
-	start_hc(uhci);
+	if ((retval = start_hc(uhci)) != 0)
+		goto err_alloc_skelqh;
 
 	init_stall_timer(hcd);
 
@@ -2243,6 +2246,7 @@ static int uhci_suspend(struct usb_hcd *hcd, u32 state)
 static int uhci_resume(struct usb_hcd *hcd)
 {
 	struct uhci_hcd *uhci = hcd_to_uhci(hcd);
+	int rc;
 
 	pci_set_master(to_pci_dev(uhci_dev(uhci)));
 
@@ -2265,7 +2269,8 @@ static int uhci_resume(struct usb_hcd *hcd)
 				USBLEGSUP_DEFAULT);
 	} else {
 		reset_hc(uhci);
-		start_hc(uhci);
+		if ((rc = start_hc(uhci)) != 0)
+			return rc;
 	}
 	uhci->hcd.state = USB_STATE_RUNNING;
 	return 0;
