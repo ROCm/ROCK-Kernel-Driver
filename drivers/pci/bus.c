@@ -92,7 +92,7 @@ void __devinit pci_bus_add_devices(struct pci_bus *bus)
 		if (!list_empty(&dev->global_list))
 			continue;
 
-		device_register(&dev->dev);
+		device_add(&dev->dev);
 		list_add_tail(&dev->global_list, &pci_devices);
 #ifdef CONFIG_PROC_FS
 		pci_proc_attach_device(dev);

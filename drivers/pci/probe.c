@@ -462,6 +462,21 @@ int pci_setup_device(struct pci_dev * dev)
 	return 0;
 }
 
+/**
+ * pci_release_dev - free a pci device structure when all users of it are finished.
+ * @dev: device that's been disconnected
+ *
+ * Will be called only by the device core when all users of this pci device are
+ * done.
+ */
+static void pci_release_dev(struct device *dev)
+{
+	struct pci_dev *pci_dev;
+
+	pci_dev = to_pci_dev(dev);
+	kfree(pci_dev);
+}
+
 /*
  * Read the config data for a PCI device, sanity-check it
  * and fill in the dev structure...
@@ -506,6 +521,9 @@ pci_scan_device(struct pci_bus *bus, int devfn)
 		kfree(dev);
 		return NULL;
 	}
+	device_initialize(&dev->dev);
+	dev->dev.release = pci_release_dev;
+	pci_get_dev(dev);
 
 	pci_name_device(dev);
 

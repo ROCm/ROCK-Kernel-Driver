@@ -319,6 +319,7 @@ extern void device_del(struct device * dev);
  */
 extern void device_bind_driver(struct device * dev);
 extern void device_release_driver(struct device * dev);
+extern void driver_attach(struct device_driver * drv);
 
 
 /* driverfs interface for exporting device attributes */
