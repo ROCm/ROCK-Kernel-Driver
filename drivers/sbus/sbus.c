@@ -20,7 +20,9 @@
 struct sbus_bus *sbus_root = NULL;
 
 static struct linux_prom_irqs irqs[PROMINTR_MAX] __initdata = { { 0 } };
+#ifdef CONFIG_SPARC32
 static int interrupts[PROMINTR_MAX] __initdata = { 0 };
+#endif
 
 #ifdef CONFIG_PCI
 extern int pcic_present(void);
@@ -109,7 +111,7 @@ no_ranges:
 	 * XXX Pull this crud out into an arch specific area
 	 * XXX at some point. -DaveM
 	 */
-#ifdef __sparc_v9__
+#ifdef CONFIG_SPARC64
 	len = prom_getproperty(prom_node, "interrupts",
 			       (char *) irqs, sizeof(irqs));
 	if (len == -1 || len == 0) {
@@ -124,7 +126,9 @@ no_ranges:
 
 		sdev->irqs[0] =	sbus_build_irq(sdev->bus, pri);
 	}
-#else
+#endif /* CONFIG_SPARC64 */
+
+#ifdef CONFIG_SPARC32
 	len = prom_getproperty(prom_node, "intr",
 			       (char *)irqs, sizeof(irqs));
 	if (len != -1) {
@@ -158,7 +162,7 @@ no_ranges:
 			}
 		}
 	} 
-#endif /* !__sparc_v9__ */
+#endif /* CONFIG_SPARC32 */
 }
 
 /* This routine gets called from whoever needs the sbus first, to scan
@@ -313,7 +317,7 @@ static int __init sbus_init(void)
 	struct sbus_dev *this_dev;
 	int num_sbus = 0;  /* How many did we find? */
 
-#ifndef __sparc_v9__
+#ifdef CONFIG_SPARC32
 	register_proc_sparc_ioport();
 #endif
 
@@ -334,7 +338,7 @@ static int __init sbus_init(void)
 				prom_printf("Neither SBUS nor PCI found.\n");
 				prom_halt();
 			} else {
-#ifdef __sparc_v9__
+#ifdef CONFIG_SPARC64
 				firetruck_init();
 #endif
 			}
@@ -380,18 +384,19 @@ static int __init sbus_init(void)
 
 	/* Loop until we find no more SBUS's */
 	while(this_sbus) {
-#ifdef __sparc_v9__						  
+#ifdef CONFIG_SPARC64
 		/* IOMMU hides inside SBUS/SYSIO prom node on Ultra. */
 		if(sparc_cpu_model == sun4u) {
 			extern void sbus_iommu_init(int prom_node, struct sbus_bus *sbus);
 
 			sbus_iommu_init(this_sbus, sbus);
 		}
-#endif
-#ifndef __sparc_v9__						  
+#endif /* CONFIG_SPARC64 */
+
+#ifdef CONFIG_SPARC32
 		if (sparc_cpu_model == sun4d)
 			iounit_init(this_sbus, iommund, sbus);
-#endif						   
+#endif /* CONFIG_SPARC32 */
 		printk("sbus%d: ", num_sbus);
 		sbus_clock = prom_getint(this_sbus, "clock-frequency");
 		if(sbus_clock == -1)
@@ -403,7 +408,7 @@ static int __init sbus_init(void)
 		prom_getstring(this_sbus, "name",
 			       sbus->prom_name, sizeof(sbus->prom_name));
 		sbus->clock_freq = sbus_clock;
-#ifndef __sparc_v9__		
+#ifdef CONFIG_SPARC32
 		if (sparc_cpu_model == sun4d) {
 			sbus->devid = prom_getint(iommund, "device-id");
 			sbus->board = prom_getint(iommund, "board#");
@@ -516,7 +521,7 @@ static int __init sbus_init(void)
 		sun4d_init_sbi_irq();
 	}
 	
-#ifdef __sparc_v9__
+#ifdef CONFIG_SPARC64
 	if (sparc_cpu_model == sun4u) {
 		firetruck_init();
 	}
@@ -525,7 +530,7 @@ static int __init sbus_init(void)
 	if (sparc_cpu_model == sun4u)
 		auxio_probe ();
 #endif
-#ifdef __sparc_v9__
+#ifdef CONFIG_SPARC64
 	if (sparc_cpu_model == sun4u) {
 		extern void clock_probe(void);
 
