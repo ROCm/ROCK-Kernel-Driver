@@ -106,6 +106,7 @@ static int __pdflush(struct pdflush_work *my_work)
 		schedule();
 		if (current->flags & PF_FREEZE) {
 			refrigerator(PF_IOTHREAD);
+			spin_lock_irq(&pdflush_lock);
 			continue;
 		}
 

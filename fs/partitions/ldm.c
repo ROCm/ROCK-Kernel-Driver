@@ -1162,8 +1162,10 @@ static BOOL ldm_ldmdb_add (u8 *data, int len, struct ldmdb *ldb)
 		return FALSE;
 	}
 
-	if (!ldm_parse_vblk (data, len, vb))
+	if (!ldm_parse_vblk (data, len, vb)) {
+		kfree(vb);
 		return FALSE;			/* Already logged */
+	}
 
 	/* Put vblk into the correct list. */
 	switch (vb->type) {

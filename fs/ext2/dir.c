@@ -337,6 +337,9 @@ struct ext2_dir_entry_2 * ext2_find_entry (struct inode * dir,
 	struct ext2_inode_info *ei = EXT2_I(dir);
 	ext2_dirent * de;
 
+	if (npages == 0)
+		goto out;
+
 	/* OFFSET_CACHE */
 	*res_page = NULL;
 
