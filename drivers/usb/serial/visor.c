@@ -344,13 +344,13 @@ static int visor_write (struct usb_serial_port *port, int from_user, const unsig
 
 	dbg(__FUNCTION__ " - port %d", port->number);
 
-	buffer = kmalloc (count, GFP_KERNEL);
+	buffer = kmalloc (count, GFP_ATOMIC);
 	if (!buffer) {
 		err ("out of memory");
 		return -ENOMEM;
 	}
 
-	urb = usb_alloc_urb(0, GFP_KERNEL);
+	urb = usb_alloc_urb(0, GFP_ATOMIC);
 	if (!urb) {
 		err ("no more free urbs");
 		kfree (buffer);
@@ -377,7 +377,7 @@ static int visor_write (struct usb_serial_port *port, int from_user, const unsig
 	urb->transfer_flags |= USB_QUEUE_BULK;
 
 	/* send it down the pipe */
-	status = usb_submit_urb(urb, GFP_KERNEL);
+	status = usb_submit_urb(urb, GFP_ATOMIC);
 	if (status) {
 		err(__FUNCTION__ " - usb_submit_urb(write bulk) failed with status = %d", status);
 		count = status;
@@ -491,7 +491,7 @@ static void visor_read_bulk_callback (struct urb *urb)
 			   port->read_urb->transfer_buffer,
 			   port->read_urb->transfer_buffer_length,
 			   visor_read_bulk_callback, port);
-	result = usb_submit_urb(port->read_urb, GFP_KERNEL);
+	result = usb_submit_urb(port->read_urb, GFP_ATOMIC);
 	if (result)
 		err(__FUNCTION__ " - failed resubmitting read urb, error %d", result);
 	return;
@@ -512,7 +512,7 @@ static void visor_unthrottle (struct usb_serial_port *port)
 	dbg(__FUNCTION__ " - port %d", port->number);
 
 	port->read_urb->dev = port->serial->dev;
-	result = usb_submit_urb(port->read_urb, GFP_KERNEL);
+	result = usb_submit_urb(port->read_urb, GFP_ATOMIC);
 	if (result)
 		err(__FUNCTION__ " - failed submitting read urb, error %d", result);
 }

@@ -292,7 +292,7 @@ static void keyspan_pda_rx_unthrottle (struct usb_serial_port *port)
 	/* just restart the receive interrupt URB */
 	dbg("keyspan_pda_rx_unthrottle port %d", port->number);
 	port->interrupt_in_urb->dev = port->serial->dev;
-	if (usb_submit_urb(port->interrupt_in_urb, GFP_KERNEL))
+	if (usb_submit_urb(port->interrupt_in_urb, GFP_ATOMIC))
 		dbg(" usb_submit_urb(read urb) failed");
 	return;
 }
@@ -584,7 +584,7 @@ static int keyspan_pda_write(struct usb_serial_port *port, int from_user,
 		priv->tx_room -= count;
 
 		port->write_urb->dev = port->serial->dev;
-		rc = usb_submit_urb(port->write_urb, GFP_KERNEL);
+		rc = usb_submit_urb(port->write_urb, GFP_ATOMIC);
 		if (rc) {
 			dbg(" usb_submit_urb(write bulk) failed");
 			goto exit;

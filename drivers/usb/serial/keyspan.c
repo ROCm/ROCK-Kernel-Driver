@@ -378,7 +378,7 @@ static int keyspan_write(struct usb_serial_port *port, int from_user,
 
 		this_urb->transfer_flags &= ~USB_ASYNC_UNLINK;
 		this_urb->dev = port->serial->dev;
-		if ((err = usb_submit_urb(this_urb, GFP_KERNEL)) != 0) {
+		if ((err = usb_submit_urb(this_urb, GFP_ATOMIC)) != 0) {
 			dbg("usb_submit_urb(write bulk) failed (%d)\n", err);
 		}
 		p_priv->tx_start_time[flip] = jiffies;
@@ -436,7 +436,7 @@ static void	usa26_indat_callback(struct urb *urb)
 				
 		/* Resubmit urb so we continue receiving */
 	urb->dev = port->serial->dev;
-	if ((err = usb_submit_urb(urb, GFP_KERNEL)) != 0) {
+	if ((err = usb_submit_urb(urb, GFP_ATOMIC)) != 0) {
 		dbg(__FUNCTION__ "resubmit read urb failed. (%d)\n", err);
 	}
 	return;
@@ -535,7 +535,7 @@ static void	usa26_instat_callback(struct urb *urb)
 exit:
 	/* Resubmit urb so we continue receiving */
 	urb->dev = serial->dev;
-	if ((err = usb_submit_urb(urb, GFP_KERNEL)) != 0) {
+	if ((err = usb_submit_urb(urb, GFP_ATOMIC)) != 0) {
 		dbg(__FUNCTION__ "resubmit read urb failed. (%d)\n", err);
 	}
 }
@@ -586,7 +586,7 @@ static void     usa28_indat_callback(struct urb *urb)
 
 		/* Resubmit urb so we continue receiving */
 		urb->dev = port->serial->dev;
-		if ((err = usb_submit_urb(urb, GFP_KERNEL)) != 0) {
+		if ((err = usb_submit_urb(urb, GFP_ATOMIC)) != 0) {
 			dbg(__FUNCTION__ "resubmit read urb failed. (%d)\n",
 err);
 		}
@@ -671,7 +671,7 @@ static void	usa28_instat_callback(struct urb *urb)
 exit:	
 		/* Resubmit urb so we continue receiving */
 	urb->dev = serial->dev;
-	if ((err = usb_submit_urb(urb, GFP_KERNEL)) != 0) {
+	if ((err = usb_submit_urb(urb, GFP_ATOMIC)) != 0) {
 		dbg(__FUNCTION__ "resubmit read urb failed. (%d)\n", err);
 	}
 }
@@ -764,7 +764,7 @@ exit:
 		/* Resubmit urb so we continue receiving */
 	urb->dev = serial->dev;
 
-	if ((err = usb_submit_urb(urb, GFP_KERNEL)) != 0) {
+	if ((err = usb_submit_urb(urb, GFP_ATOMIC)) != 0) {
 		dbg(__FUNCTION__ "resubmit read urb failed. (%d)\n", err);
 	}
 }
@@ -819,7 +819,7 @@ static void	usa49_indat_callback(struct urb *urb)
 				
 		/* Resubmit urb so we continue receiving */
 	urb->dev = port->serial->dev;
-	if ((err = usb_submit_urb(urb, GFP_KERNEL)) != 0) {
+	if ((err = usb_submit_urb(urb, GFP_ATOMIC)) != 0) {
 		dbg(__FUNCTION__ "resubmit read urb failed. (%d)\n", err);
 	}
 }
