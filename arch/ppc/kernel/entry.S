@@ -170,8 +170,6 @@ _GLOBAL(DoSyscall)
 #ifdef SHOW_SYSCALLS
 	bl	do_show_syscall
 #endif /* SHOW_SYSCALLS */
-	cmpli	0,r0,NR_syscalls
-	bge-	66f
 	rlwinm	r10,r1,0,0,18	/* current_thread_info() */
 	lwz	r11,TI_FLAGS(r10)
 	rlwinm	r11,r11,0,~_TIF_FORCE_NOERROR
@@ -179,9 +177,11 @@ _GLOBAL(DoSyscall)
 	andi.	r11,r11,_TIF_SYSCALL_TRACE
 	bne-	syscall_dotrace
 syscall_dotrace_cont:
+	cmpli	0,r0,NR_syscalls
 	lis	r10,sys_call_table@h
 	ori	r10,r10,sys_call_table@l
 	slwi	r0,r0,2
+	bge-	66f
 	lwzx	r10,r10,r0	/* Fetch system call handler [ptr] */
 	mtlr	r10
 	addi	r9,r1,STACK_FRAME_OVERHEAD
@@ -200,7 +200,7 @@ ret_from_syscall:
 	andi.	r11,r11,_TIF_FORCE_NOERROR
 	bne	30f
 	neg	r3,r3
-22:	lwz	r10,_CCR(r1)	/* Set SO bit in CR */
+	lwz	r10,_CCR(r1)	/* Set SO bit in CR */
 	oris	r10,r10,0x1000
 	stw	r10,_CCR(r1)
 
@@ -233,8 +233,8 @@ syscall_exit_cont:
 	SYNC
 	RFI
 
-66:	li	r3,ENOSYS
-	b	22b
+66:	li	r3,-ENOSYS
+	b	ret_from_syscall
 
 	.globl	ret_from_fork
 ret_from_fork:
