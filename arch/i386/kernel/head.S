@@ -42,7 +42,7 @@
  *
  * On entry, %esi points to the real-mode code as a 32-bit pointer.
  */
-startup_32:
+ENTRY(startup_32)
 /*
  * Set segments to known values
  */
