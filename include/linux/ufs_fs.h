@@ -33,6 +33,9 @@
 #include <linux/stat.h>
 #include <linux/fs.h>
 
+#include <linux/ufs_fs_i.h>
+#include <linux/ufs_fs_sb.h>
+
 #define UFS_BBLOCK 0
 #define UFS_BBSIZE 8192
 #define UFS_SBLOCK 8192
@@ -398,7 +401,7 @@ struct ufs_super_block {
  * Convert cylinder group to base address of its global summary info.
  */
 #define fs_cs(indx) \
-	u.ufs_sb.s_csp[(indx) >> uspi->s_csshift][(indx) & ~uspi->s_csmask]
+	s_csp[(indx) >> uspi->s_csshift][(indx) & ~uspi->s_csmask]
 
 /*
  * Cylinder group block for a file system.
@@ -780,7 +783,10 @@ extern struct inode_operations ufs_fast_symlink_inode_operations;
 /* truncate.c */
 extern void ufs_truncate (struct inode *);
 
-#include <linux/ufs_fs_i.h>
+static inline struct ufs_sb_info *UFS_SB(struct super_block *sb)
+{
+	return sb->u.generic_sbp;
+}
 
 static inline struct ufs_inode_info *UFS_I(struct inode *inode)
 {

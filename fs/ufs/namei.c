@@ -139,7 +139,7 @@ static int ufs_symlink (struct inode * dir, struct dentry * dentry,
 	if (IS_ERR(inode))
 		goto out;
 
-	if (l > sb->u.ufs_sb.s_uspi->s_maxsymlinklen) {
+	if (l > UFS_SB(sb)->s_uspi->s_maxsymlinklen) {
 		/* slow symlink */
 		inode->i_op = &page_symlink_inode_operations;
 		inode->i_mapping->a_ops = &ufs_aops;

@@ -731,7 +731,7 @@ repeat:
 		tsk = next_thread(tsk);
 	} while (tsk != current);
 	read_unlock(&tasklist_lock);
-	if (flag) {
+	if (flag || !list_empty(&current->ptrace_children)) {
 		retval = 0;
 		if (options & WNOHANG)
 			goto end_wait4;
