@@ -2227,6 +2227,15 @@ out:
 static void
 pfm_free_fd(int fd, struct file *file)
 {
+	struct files_struct *files = current->files;
+
+	/* 
+	 * there ie no fd_uninstall(), so we do it here
+	 */
+	spin_lock(&files->file_lock);
+        files->fd[fd] = NULL;
+	spin_unlock(&files->file_lock);
+
 	if (file) put_filp(file);
 	put_unused_fd(fd);
 }
@@ -2659,8 +2668,10 @@ pfm_context_create(pfm_context_t *ctx, void *arg, int count, struct pt_regs *reg
 	ctx = pfm_context_alloc();
 	if (!ctx) goto error;
 
-	req->ctx_fd = ctx->ctx_fd = pfm_alloc_fd(&filp);
-	if (req->ctx_fd < 0) goto error_file;
+	ret = pfm_alloc_fd(&filp);
+	if (ret < 0) goto error_file;
+
+	req->ctx_fd = ctx->ctx_fd = ret;
 
 	/*
 	 * attach context to file
