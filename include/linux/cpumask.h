@@ -252,6 +252,11 @@ static inline int __next_cpu(int n, const cpumask_t *srcp, int nbits)
 	[0 ... BITS_TO_LONGS(NR_CPUS)-1] =  0UL				\
 } })
 
+#define CPU_MASK_CPU0							\
+((cpumask_t) { {							\
+	[0] =  1UL							\
+} })
+
 #define cpus_addr(src) ((src).bits)
 
 #define cpumask_scnprintf(buf, len, src) \

@@ -1,5 +1,5 @@
 # drivers/mtd/chips/Kconfig
-# $Id: Kconfig,v 1.8 2004/07/13 22:32:02 dwmw2 Exp $
+# $Id: Kconfig,v 1.9 2004/07/16 15:32:14 dwmw2 Exp $
 
 menu "RAM/ROM/Flash chip drivers"
 	depends on MTD!=n
@@ -233,6 +233,7 @@ config MTD_ABSENT
 	  with this driver will return -ENODEV upon access.
 
 config MTD_OBSOLETE_CHIPS
+	depends on MTD && BROKEN
 	bool "Older (theoretically obsoleted now) drivers for non-CFI chips"
 	help
 	  This option does not enable any code directly, but will allow you to
