@@ -45,6 +45,12 @@
 /* People can turn this off for buggy TCP's found in printers etc. */
 int sysctl_tcp_retrans_collapse = 1;
 
+/* This limits the percentage of the congestion window which we
+ * will allow a single TSO frame to consume.  Building TSO frames
+ * which are too large can cause TCP streams to be bursty.
+ */
+int sysctl_tcp_tso_win_divisor = 8;
+
 static __inline__
 void update_send_head(struct sock *sk, struct tcp_opt *tp, struct sk_buff *skb)
 {
@@ -658,7 +664,7 @@ unsigned int tcp_current_mss(struct sock *sk, int large)
 {
 	struct tcp_opt *tp = tcp_sk(sk);
 	struct dst_entry *dst = __sk_dst_get(sk);
-	int do_large, mss_now;
+	unsigned int do_large, mss_now;
 
 	mss_now = tp->mss_cache_std;
 	if (dst) {
@@ -673,7 +679,7 @@ unsigned int tcp_current_mss(struct sock *sk, int large)
 		    !tp->urg_mode);
 
 	if (do_large) {
-		int large_mss, factor;
+		unsigned int large_mss, factor, limit;
 
 		large_mss = 65535 - tp->af_specific->net_header_len -
 			tp->ext_header_len - tp->ext2_header_len -
@@ -683,13 +689,19 @@ unsigned int tcp_current_mss(struct sock *sk, int large)
 			large_mss = max((tp->max_window>>1),
 					68U - tp->tcp_header_len);
 
-		/* Always keep large mss multiple of real mss, but
-		 * do not exceed 1/4 of the congestion window so we
-		 * can keep the ACK clock ticking.
-		 */
 		factor = large_mss / mss_now;
-		if (factor > (tp->snd_cwnd >> 2))
-			factor = max(1, tp->snd_cwnd >> 2);
+
+		/* Always keep large mss multiple of real mss, but
+		 * do not exceed 1/tso_win_divisor of the congestion window
+		 * so we can keep the ACK clock ticking and minimize
+		 * bursting.
+		 */
+		limit = tp->snd_cwnd;
+		if (sysctl_tcp_tso_win_divisor)
+			limit /= sysctl_tcp_tso_win_divisor;
+		limit = max(1U, limit);
+		if (factor > limit)
+			factor = limit;
 
 		tp->mss_cache = mss_now * factor;
 

@@ -674,6 +674,14 @@ ctl_table ipv4_table[] = {
 		.mode		= 0644,
 		.proc_handler	= &proc_dointvec,
 	},
+	{
+		.ctl_name	= NET_TCP_TSO_WIN_DIVISOR,
+		.procname	= "tcp_tso_win_divisor",
+		.data		= &sysctl_tcp_tso_win_divisor,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},
 	{ .ctl_name = 0 }
 };
 

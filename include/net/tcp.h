@@ -609,6 +609,7 @@ extern int sysctl_tcp_bic;
 extern int sysctl_tcp_bic_fast_convergence;
 extern int sysctl_tcp_bic_low_window;
 extern int sysctl_tcp_moderate_rcvbuf;
+extern int sysctl_tcp_tso_win_divisor;
 
 extern atomic_t tcp_memory_allocated;
 extern atomic_t tcp_sockets_allocated;
