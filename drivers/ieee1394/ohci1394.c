@@ -164,7 +164,7 @@ printk(level "%s: " fmt "\n" , OHCI1394_DRIVER_NAME , ## args)
 printk(level "%s_%d: " fmt "\n" , OHCI1394_DRIVER_NAME, card , ## args)
 
 static char version[] __devinitdata =
-	"$Rev: 921 $ Ben Collins <bcollins@debian.org>";
+	"$Rev: 931 $ Ben Collins <bcollins@debian.org>";
 
 /* Module Parameters */
 static int phys_dma = 1;
@@ -2446,7 +2446,7 @@ static irqreturn_t ohci_irq_handler(int irq, void *dev_id,
 				reg_write(ohci,OHCI1394_PhyReqFilterLoSet, 0x00000000);
 			}
 
-			DBGMSG(ohci->id, "PhyReqFilter=%08x%08x\n",
+			DBGMSG(ohci->id, "PhyReqFilter=%08x%08x",
 			       reg_read(ohci,OHCI1394_PhyReqFilterHiSet),
 			       reg_read(ohci,OHCI1394_PhyReqFilterLoSet));
 
