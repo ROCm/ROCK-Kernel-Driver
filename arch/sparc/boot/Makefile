@@ -32,7 +32,3 @@ $(obj)/tftpboot.img: $(obj)/piggyback $(obj)/System.map $(obj)/image FORCE
 
 $(obj)/btfix.s: $(obj)/btfixupprep vmlinux FORCE
 	$(call if_changed,btfix)
-
-archhelp:
-	@echo '* image		- kernel image ($(obj)/image)'
-	@echo '  tftpboot.img	- image prepared for tftp'
