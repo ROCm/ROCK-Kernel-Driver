@@ -566,12 +566,60 @@ static void ncp_put_super(struct super_block *sb)
 
 static int ncp_statfs(struct super_block *sb, struct statfs *buf)
 {
+	struct dentry* d;
+	struct inode* i;
+	struct ncp_inode_info* ni;
+	struct ncp_server* s;
+	struct ncp_volume_info vi;
+	int err;
+	__u8 dh;
+	
+	d = sb->s_root;
+	if (!d) {
+		goto dflt;
+	}
+	i = d->d_inode;
+	if (!i) {
+		goto dflt;
+	}
+	ni = NCP_FINFO(i);
+	if (!ni) {
+		goto dflt;
+	}
+	s = NCP_SBP(sb);
+	if (!s) {
+		goto dflt;
+	}
+	if (!s->m.mounted_vol[0]) {
+		goto dflt;
+	}
+
+	err = ncp_dirhandle_alloc(s, ni->volNumber, ni->DosDirNum, &dh);
+	if (err) {
+		goto dflt;
+	}
+	err = ncp_get_directory_info(s, dh, &vi);
+	ncp_dirhandle_free(s, dh);
+	if (err) {
+		goto dflt;
+	}
+	buf->f_type = NCP_SUPER_MAGIC;
+	buf->f_bsize = vi.sectors_per_block * 512;
+	buf->f_blocks = vi.total_blocks;
+	buf->f_bfree = vi.free_blocks;
+	buf->f_bavail = vi.free_blocks;
+	buf->f_files = vi.total_dir_entries;
+	buf->f_ffree = vi.available_dir_entries;
+	buf->f_namelen = 12;
+	return 0;
+
 	/* We cannot say how much disk space is left on a mounted
 	   NetWare Server, because free space is distributed over
 	   volumes, and the current user might have disk quotas. So
 	   free space is not that simple to determine. Our decision
 	   here is to err conservatively. */
 
+dflt:;
 	buf->f_type = NCP_SUPER_MAGIC;
 	buf->f_bsize = NCP_BLOCK_SIZE;
 	buf->f_blocks = 0;

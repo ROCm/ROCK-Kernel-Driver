@@ -44,8 +44,13 @@
 int ncp_negotiate_buffersize(struct ncp_server *, int, int *);
 int ncp_negotiate_size_and_options(struct ncp_server *server, int size,
   			  int options, int *ret_size, int *ret_options);
-int ncp_get_volume_info_with_number(struct ncp_server *, int,
-				struct ncp_volume_info *);
+
+int ncp_get_volume_info_with_number(struct ncp_server* server, int n,
+				    struct ncp_volume_info *target);
+
+int ncp_get_directory_info(struct ncp_server* server, __u8 dirhandle,
+			   struct ncp_volume_info* target);
+
 int ncp_close_file(struct ncp_server *, const char *);
 static inline int ncp_read_bounce_size(__u32 size) {
 	return sizeof(struct ncp_reply_header) + 2 + 2 + size + 8;
@@ -99,6 +104,8 @@ ncp_ClearPhysicalRecord(struct ncp_server *server,
 int
 ncp_mount_subdir(struct ncp_server *, struct nw_info_struct *,
 			__u8, __u8, __u32);
+int ncp_dirhandle_alloc(struct ncp_server *, __u8 vol, __u32 dirent, __u8 *dirhandle);
+int ncp_dirhandle_free(struct ncp_server *, __u8 dirhandle);
 
 #ifdef CONFIG_NCPFS_NLS
 

@@ -107,6 +107,10 @@ static __u32
 	return get_unaligned((__u32 *) ncp_reply_data(server, offset));
 }
 
+static inline __u32 ncp_reply_dword_lh(struct ncp_server* server, int offset) {
+	return le32_to_cpu(ncp_reply_dword(server, offset));
+}
+
 int
 ncp_negotiate_buffersize(struct ncp_server *server, int size, int *target)
 {
@@ -159,10 +163,8 @@ ncp_negotiate_size_and_options(struct ncp_server *server,
 	return 0;
 }
 
-int
-ncp_get_volume_info_with_number(struct ncp_server *server, int n,
-				    struct ncp_volume_info *target)
-{
+int ncp_get_volume_info_with_number(struct ncp_server* server,
+			     int n, struct ncp_volume_info* target) {
 	int result;
 	int len;
 
@@ -172,12 +174,12 @@ ncp_get_volume_info_with_number(struct ncp_server *server, int n,
 	if ((result = ncp_request(server, 22)) != 0) {
 		goto out;
 	}
-	target->total_blocks = ncp_reply_dword(server, 0);
-	target->free_blocks = ncp_reply_dword(server, 4);
-	target->purgeable_blocks = ncp_reply_dword(server, 8);
-	target->not_yet_purgeable_blocks = ncp_reply_dword(server, 12);
-	target->total_dir_entries = ncp_reply_dword(server, 16);
-	target->available_dir_entries = ncp_reply_dword(server, 20);
+	target->total_blocks = ncp_reply_dword_lh(server, 0);
+	target->free_blocks = ncp_reply_dword_lh(server, 4);
+	target->purgeable_blocks = ncp_reply_dword_lh(server, 8);
+	target->not_yet_purgeable_blocks = ncp_reply_dword_lh(server, 12);
+	target->total_dir_entries = ncp_reply_dword_lh(server, 16);
+	target->available_dir_entries = ncp_reply_dword_lh(server, 20);
 	target->sectors_per_block = ncp_reply_byte(server, 28);
 
 	memset(&(target->volume_name), 0, sizeof(target->volume_name));
@@ -189,6 +191,40 @@ ncp_get_volume_info_with_number(struct ncp_server *server, int n,
 		goto out;
 	}
 	memcpy(&(target->volume_name), ncp_reply_data(server, 30), len);
+	result = 0;
+out:
+	ncp_unlock_server(server);
+	return result;
+}
+
+int ncp_get_directory_info(struct ncp_server* server, __u8 n, 
+			   struct ncp_volume_info* target) {
+	int result;
+	int len;
+
+	ncp_init_request_s(server, 45);
+	ncp_add_byte(server, n);
+
+	if ((result = ncp_request(server, 22)) != 0) {
+		goto out;
+	}
+	target->total_blocks = ncp_reply_dword_lh(server, 0);
+	target->free_blocks = ncp_reply_dword_lh(server, 4);
+	target->purgeable_blocks = 0;
+	target->not_yet_purgeable_blocks = 0;
+	target->total_dir_entries = ncp_reply_dword_lh(server, 8);
+	target->available_dir_entries = ncp_reply_dword_lh(server, 12);
+	target->sectors_per_block = ncp_reply_byte(server, 20);
+
+	memset(&(target->volume_name), 0, sizeof(target->volume_name));
+
+	result = -EIO;
+	len = ncp_reply_byte(server, 21);
+	if (len > NCP_VOLNAME_LEN) {
+		DPRINTK("ncpfs: volume name too long: %d\n", len);
+		goto out;
+	}
+	memcpy(&(target->volume_name), ncp_reply_data(server, 22), len);
 	result = 0;
 out:
 	ncp_unlock_server(server);
@@ -248,10 +284,37 @@ static void ncp_add_handle_path(struct ncp_server *server, __u8 vol_num,
 	}
 }
 
+int ncp_dirhandle_alloc(struct ncp_server* server, __u8 volnum, __u32 dirent,
+			__u8* dirhandle) {
+	int result;
+
+	ncp_init_request(server);
+	ncp_add_byte(server, 12);		/* subfunction */
+	ncp_add_byte(server, NW_NS_DOS);
+	ncp_add_byte(server, 0);
+	ncp_add_word(server, 0);
+	ncp_add_handle_path(server, volnum, dirent, 1, NULL);
+	if ((result = ncp_request(server, 87)) == 0) {
+		*dirhandle = ncp_reply_byte(server, 0);
+	}
+	ncp_unlock_server(server);
+	return result;
+}
+
+int ncp_dirhandle_free(struct ncp_server* server, __u8 dirhandle) {
+	int result;
+	
+	ncp_init_request_s(server, 20);
+	ncp_add_byte(server, dirhandle);
+	result = ncp_request(server, 22);
+	ncp_unlock_server(server);
+	return result;
+}
+
 static void ncp_extract_file_info(void *structure, struct nw_info_struct *target)
 {
 	__u8 *name_len;
-	const int info_struct_size = sizeof(struct nw_info_struct) - 257;
+	const int info_struct_size = offsetof(struct nw_info_struct, nameLen);
 
 	memcpy(target, structure, info_struct_size);
 	name_len = structure + info_struct_size;
