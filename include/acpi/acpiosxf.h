@@ -287,15 +287,15 @@ acpi_os_derive_pci_id(
  * Miscellaneous
  */
 
-u8
+BOOLEAN
 acpi_os_readable (
 	void                            *pointer,
-	acpi_size                       length);
+	u32                       	length);
 
-u8
+BOOLEAN
 acpi_os_writable (
 	void                            *pointer,
-	acpi_size                       length);
+	u32                       	length);
 
 u32
 acpi_os_get_timer (
