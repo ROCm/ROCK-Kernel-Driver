@@ -1706,6 +1706,7 @@ void __init sched_init(void)
 	rq = this_rq();
 	rq->curr = current;
 	rq->idle = current;
+	set_task_cpu(current, smp_processor_id());
 	wake_up_process(current);
 
 	init_timervecs();
