@@ -245,7 +245,7 @@ static void st5481B_mode(struct st5481_bcs *bcs, int mode)
 	}
 }
 
-static int __devinit st5481_setup_b_out(struct st5481_bcs *bcs)
+static int st5481_setup_b_out(struct st5481_bcs *bcs)
 {
 	struct usb_device *dev = bcs->adapter->usb_dev;
 	struct usb_host_interface *altsetting;
@@ -279,7 +279,7 @@ static void st5481_release_b_out(struct st5481_bcs *bcs)
 	st5481_release_isocpipes(b_out->urb);
 }
 
-int __devinit st5481_setup_b(struct st5481_bcs *bcs)
+int st5481_setup_b(struct st5481_bcs *bcs)
 {
 	int retval;
 
