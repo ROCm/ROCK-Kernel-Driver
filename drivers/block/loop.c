@@ -548,8 +548,6 @@ static int loop_make_request(request_queue_t *q, struct bio *old_bio)
 		goto err;
 	}
 
-	blk_queue_bounce(q, &old_bio);
-
 	/*
 	 * file backed, queue for loop_thread to handle
 	 */
@@ -742,7 +740,6 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
 	 * device
 	 */
 	blk_queue_make_request(&lo->lo_queue, loop_make_request);
-	blk_queue_bounce_limit(&lo->lo_queue, BLK_BOUNCE_HIGH);
 	lo->lo_queue.queuedata = lo;
 
 	/*
