@@ -924,7 +924,6 @@ static unsigned int atapi_xlat(struct ata_queued_cmd *qc, u8 *scsicmd)
 
 	/* DMA data xfer - interrupt-driven */
 	} else {
-		qc->flags |= ATA_QCFLAG_SG; /* data is present; dma-map it */
 		qc->tf.protocol = ATA_PROT_ATAPI_DMA;
 		qc->tf.feature |= ATAPI_PKT_DMA;
 
