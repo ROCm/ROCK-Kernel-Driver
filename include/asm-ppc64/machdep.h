@@ -37,11 +37,12 @@ struct machdep_calls {
 	long		(*hpte_updatepp)(unsigned long slot, 
 					 unsigned long newpp, 
 					 unsigned long va,
-					 int large);
+					 int large,
+					 int local);
 	void            (*hpte_updateboltedpp)(unsigned long newpp, 
 					       unsigned long ea);
 	long		(*hpte_insert)(unsigned long hpte_group,
-				       unsigned long vpn,
+				       unsigned long va,
 				       unsigned long prpn,
 				       int secondary, 
 				       unsigned long hpteflags, 
@@ -51,11 +52,6 @@ struct machdep_calls {
 	void		(*flush_hash_range)(unsigned long context,
 					    unsigned long number,
 					    int local);
-	void		(*make_pte)(void *htab, unsigned long va,
-				    unsigned long pa,
-				    int mode,
-				    unsigned long hash_mask,
-				    int large);
 
 	void		(*tce_build)(struct TceTable * tbl,
 				     long tcenum,

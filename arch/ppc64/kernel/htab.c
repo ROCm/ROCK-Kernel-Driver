@@ -62,7 +62,6 @@
 HTAB htab_data = {NULL, 0, 0, 0, 0};
 
 extern unsigned long _SDR1;
-extern unsigned long klimit;
 
 #define KB (1024)
 #define MB (1024*KB)
@@ -77,10 +76,9 @@ loop_forever(void)
 
 static inline void
 create_pte_mapping(unsigned long start, unsigned long end,
-		   unsigned long mode, unsigned long mask, int large)
+		   unsigned long mode, int large)
 {
 	unsigned long addr;
-	HPTE *htab = (HPTE *)__v2a(htab_data.htab);
 	unsigned int step;
 
 	if (large)
@@ -89,14 +87,33 @@ create_pte_mapping(unsigned long start, unsigned long end,
 		step = 4*KB;
 
 	for (addr = start; addr < end; addr += step) {
+		unsigned long vpn, hash, hpteg;
 		unsigned long vsid = get_kernel_vsid(addr);
 		unsigned long va = (vsid << 28) | (addr & 0xfffffff);
-		if (naca->platform == PLATFORM_PSERIES_LPAR)
-			pSeries_lpar_make_pte(htab, va,
-				(unsigned long)__v2a(addr), mode, mask, large);
+		int ret;
+
+		if (large)
+			vpn = va >> LARGE_PAGE_SHIFT;
 		else
-			pSeries_make_pte(htab, va,
-				(unsigned long)__v2a(addr), mode, mask, large);
+			vpn = va >> PAGE_SHIFT;
+
+		hash = hpt_hash(vpn, large);
+
+		hpteg = ((hash & htab_data.htab_hash_mask)*HPTES_PER_GROUP);
+
+		if (naca->platform == PLATFORM_PSERIES_LPAR)
+			ret = pSeries_lpar_hpte_insert(hpteg, va,
+				(unsigned long)__v2a(addr) >> PAGE_SHIFT,
+				0, mode, 1, large);
+		else
+			ret = pSeries_hpte_insert(hpteg, va,
+				(unsigned long)__v2a(addr) >> PAGE_SHIFT,
+				0, mode, 1, large);
+
+		if (ret == -1) {
+			ppc64_terminate_msg(0x20, "create_pte_mapping");
+			loop_forever();
+		}
 	}
 }
 
@@ -105,7 +122,7 @@ htab_initialize(void)
 {
 	unsigned long table, htab_size_bytes;
 	unsigned long pteg_count;
-	unsigned long mode_rw, mask;
+	unsigned long mode_rw;
 
 	/*
 	 * Calculate the required size of the htab.  We want the number of
@@ -146,19 +163,18 @@ htab_initialize(void)
 	}
 
 	mode_rw = _PAGE_ACCESSED | _PAGE_COHERENT | PP_RWXX;
-	mask = pteg_count-1;
 
 	/* XXX we currently map kernel text rw, should fix this */
 	if (cpu_has_largepage() && naca->physicalMemorySize > 256*MB) {
 		create_pte_mapping((unsigned long)KERNELBASE, 
-				   KERNELBASE + 256*MB, mode_rw, mask, 0);
+				   KERNELBASE + 256*MB, mode_rw, 0);
 		create_pte_mapping((unsigned long)KERNELBASE + 256*MB, 
 				   KERNELBASE + (naca->physicalMemorySize), 
-				   mode_rw, mask, 1);
+				   mode_rw, 1);
 	} else {
 		create_pte_mapping((unsigned long)KERNELBASE, 
 				   KERNELBASE+(naca->physicalMemorySize), 
-				   mode_rw, mask, 0);
+				   mode_rw, 0);
 	}
 }
 #undef KB
@@ -204,7 +220,7 @@ static inline unsigned long computeHptePP(unsigned long pte)
  * to be valid via Linux page tables, return 1. If handled return 0
  */
 int __hash_page(unsigned long ea, unsigned long access, unsigned long vsid,
-		pte_t *ptep, unsigned long trap)
+		pte_t *ptep, unsigned long trap, int local)
 {
 	unsigned long va, vpn;
 	unsigned long newpp, prpn;
@@ -212,9 +228,16 @@ int __hash_page(unsigned long ea, unsigned long access, unsigned long vsid,
 	long slot;
 	pte_t old_pte, new_pte;
 
+	/* XXX fix for large ptes */
+	int large = 0;
+
 	/* Search the Linux page table for a match with va */
 	va = (vsid << 28) | (ea & 0x0fffffff);
-	vpn = va >> PAGE_SHIFT;
+
+	if (large)
+		vpn = va >> LARGE_PAGE_SHIFT;
+	else
+		vpn = va >> PAGE_SHIFT;
 
 	/*
 	 * If no pte found or not present, send the problem up to
@@ -276,16 +299,14 @@ int __hash_page(unsigned long ea, unsigned long access, unsigned long vsid,
 		/* There MIGHT be an HPTE for this pte */
 		unsigned long hash, slot, secondary;
 
-		/* XXX fix large pte flag */
-		hash = hpt_hash(vpn, 0);
+		hash = hpt_hash(vpn, large);
 		secondary = (pte_val(old_pte) & _PAGE_SECONDARY) >> 15;
 		if (secondary)
 			hash = ~hash;
 		slot = (hash & htab_data.htab_hash_mask) * HPTES_PER_GROUP;
 		slot += (pte_val(old_pte) & _PAGE_GROUP_IX) >> 12;
 
-		/* XXX fix large pte flag */
-		if (ppc_md.hpte_updatepp(slot, newpp, va, 0) == -1)
+		if (ppc_md.hpte_updatepp(slot, newpp, va, large, local) == -1)
 			pte_val(old_pte) &= ~_PAGE_HPTEFLAGS;
 		else
 			if (!pte_same(old_pte, new_pte))
@@ -293,8 +314,7 @@ int __hash_page(unsigned long ea, unsigned long access, unsigned long vsid,
 	}
 
 	if (likely(!(pte_val(old_pte) & _PAGE_HASHPTE))) {
-		/* XXX fix large pte flag */
-		unsigned long hash = hpt_hash(vpn, 0);
+		unsigned long hash = hpt_hash(vpn, large);
 		unsigned long hpte_group;
 		prpn = pte_val(old_pte) >> PTE_SHIFT;
 
@@ -309,18 +329,16 @@ repeat:
 		/* copy appropriate flags from linux pte */
 		hpteflags = (pte_val(new_pte) & 0x1f8) | newpp;
 
-		/* XXX fix large pte flag */
-		slot = ppc_md.hpte_insert(hpte_group, vpn, prpn, 0,
-					  hpteflags, 0, 0);
+		slot = ppc_md.hpte_insert(hpte_group, va, prpn, 0,
+					  hpteflags, 0, large);
 
 		/* Primary is full, try the secondary */
 		if (slot == -1) {
 			pte_val(new_pte) |= 1 << 15;
 			hpte_group = ((~hash & htab_data.htab_hash_mask) *
 				      HPTES_PER_GROUP) & ~0x7UL; 
-			/* XXX fix large pte flag */
-			slot = ppc_md.hpte_insert(hpte_group, vpn, prpn,
-						  1, hpteflags, 0, 0);
+			slot = ppc_md.hpte_insert(hpte_group, va, prpn,
+						  1, hpteflags, 0, large);
 			if (slot == -1) {
 				if (mftb() & 0x1)
 					hpte_group = ((hash & htab_data.htab_hash_mask) * HPTES_PER_GROUP) & ~0x7UL;
@@ -351,6 +369,8 @@ int hash_page(unsigned long ea, unsigned long access, unsigned long trap)
 	struct mm_struct *mm;
 	pte_t *ptep;
 	int ret;
+	int user_region = 0;
+	int local = 0;
 
 	/* Check for invalid addresses. */
 	if (!IS_VALID_EA(ea))
@@ -358,6 +378,7 @@ int hash_page(unsigned long ea, unsigned long access, unsigned long trap)
 
  	switch (REGION_ID(ea)) {
 	case USER_REGION_ID:
+		user_region = 1;
 		mm = current->mm;
 		if (mm == NULL)
 			return 1;
@@ -401,8 +422,12 @@ int hash_page(unsigned long ea, unsigned long access, unsigned long trap)
 	 * from modifying entries while we search and update
 	 */
 	spin_lock(&mm->page_table_lock);
+
+	if (user_region && (mm->cpu_vm_mask == (1 << smp_processor_id())))
+		local = 1;
+
 	ptep = find_linux_pte(pgdir, ea);
-	ret = __hash_page(ea, access, vsid, ptep, trap);
+	ret = __hash_page(ea, access, vsid, ptep, trap, local);
 	spin_unlock(&mm->page_table_lock);
 
 	return ret;
