@@ -577,12 +577,15 @@ svc_udp_recvfrom(struct svc_rqst *rqstp)
 
 	if (skb_is_nonlinear(skb)) {
 		/* we have to copy */
+		local_bh_disable();
 		if (csum_partial_copy_to_xdr(&rqstp->rq_arg, skb)) {
+			local_bh_enable();
 			/* checksum error */
 			skb_free_datagram(svsk->sk_sk, skb);
 			svc_sock_received(svsk);
 			return 0;
 		}
+		local_bh_enable();
 		skb_free_datagram(svsk->sk_sk, skb); 
 	} else {
 		/* we can use it in-place */
