@@ -614,11 +614,10 @@ iso_stream_init (
 	 */
 	epnum = usb_pipeendpoint (pipe);
 	is_input = usb_pipein (pipe) ? USB_DIR_IN : 0;
+	maxp = usb_maxpacket(dev, pipe, !is_input);
 	if (is_input) {
-		maxp = dev->epmaxpacketin [epnum];
 		buf1 = (1 << 11);
 	} else {
-		maxp = dev->epmaxpacketout [epnum];
 		buf1 = 0;
 	}
 
