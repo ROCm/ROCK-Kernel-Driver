@@ -473,7 +473,7 @@ EXPORT_SYMBOL(eeh_dn_check_failure);
  *
  * Note this routine is safe to call in an interrupt context.
  */
-unsigned long eeh_check_failure(void *token, unsigned long val)
+unsigned long eeh_check_failure(const volatile void __iomem *token, unsigned long val)
 {
 	unsigned long addr;
 	struct pci_dev *dev;
@@ -739,7 +739,7 @@ EXPORT_SYMBOL(eeh_remove_device);
  * Remap the addr (trivially) to the EEH region if EEH checking enabled.
  * For addresses not known to PCI the vaddr is simply returned unchanged.
  */
-void *eeh_ioremap(unsigned long addr, void *vaddr)
+void __iomem *eeh_ioremap(unsigned long addr, void __iomem *vaddr)
 {
 	struct pci_dev *dev;
 	struct device_node *dn;
@@ -763,7 +763,7 @@ void *eeh_ioremap(unsigned long addr, void *vaddr)
 	}
 
 	pci_dev_put(dev);
-	return (void *)IO_ADDR_TO_TOKEN(vaddr);
+	return (void __iomem *)IO_ADDR_TO_TOKEN(vaddr);
 }
 
 static int proc_eeh_show(struct seq_file *m, void *v)

@@ -117,18 +117,18 @@ void show_mem(void)
 
 #ifdef CONFIG_PPC_ISERIES
 
-void *ioremap(unsigned long addr, unsigned long size)
+void __iomem *ioremap(unsigned long addr, unsigned long size)
 {
-	return (void *)addr;
+	return (void __iomem *)addr;
 }
 
-extern void *__ioremap(unsigned long addr, unsigned long size,
+extern void __iomem *__ioremap(unsigned long addr, unsigned long size,
 		       unsigned long flags)
 {
-	return (void *)addr;
+	return (void __iomem *)addr;
 }
 
-void iounmap(void *addr)
+void iounmap(volatile void __iomem *addr)
 {
 	return;
 }
@@ -182,7 +182,7 @@ static void map_io_page(unsigned long ea, unsigned long pa, int flags)
 }
 
 
-static void * __ioremap_com(unsigned long addr, unsigned long pa,
+static void __iomem * __ioremap_com(unsigned long addr, unsigned long pa,
 			    unsigned long ea, unsigned long size,
 			    unsigned long flags)
 {
@@ -197,20 +197,20 @@ static void * __ioremap_com(unsigned long addr, unsigned long pa,
 		map_io_page(ea+i, pa+i, flags);
 	}
 
-	return (void *) (ea + (addr & ~PAGE_MASK));
+	return (void __iomem *) (ea + (addr & ~PAGE_MASK));
 }
 
 
-void *
+void __iomem *
 ioremap(unsigned long addr, unsigned long size)
 {
-	void *ret = __ioremap(addr, size, _PAGE_NO_CACHE);
+	void __iomem *ret = __ioremap(addr, size, _PAGE_NO_CACHE);
 	if(mem_init_done)
 		return eeh_ioremap(addr, ret);	/* may remap the addr */
 	return ret;
 }
 
-void *
+void __iomem *
 __ioremap(unsigned long addr, unsigned long size, unsigned long flags)
 {
 	unsigned long pa, ea;
@@ -353,11 +353,12 @@ static void unmap_im_area_pmd(pgd_t *dir, unsigned long address,
  *
  * XXX	what about calls before mem_init_done (ie python_countermeasures())	
  */
-void iounmap(void *addr)
+void iounmap(volatile void __iomem *token)
 {
 	unsigned long address, start, end, size;
 	struct mm_struct *mm;
 	pgd_t *dir;
+	void *addr;
 
 	if (!mem_init_done) {
 		return;
@@ -365,7 +366,7 @@ void iounmap(void *addr)
 	
 	/* addr could be in EEH or IO region, map it to IO region regardless.
 	 */
-	addr = (void *) (IO_TOKEN_TO_ADDR(addr) & PAGE_MASK);
+	addr = (void *) (IO_TOKEN_TO_ADDR(token) & PAGE_MASK);
 	
 	if ((size = im_free(addr)) == 0) {
 		return;
@@ -391,38 +392,39 @@ void iounmap(void *addr)
 	return;
 }
 
-static int iounmap_subset_regions(void *addr, unsigned long size)
+static int iounmap_subset_regions(unsigned long addr, unsigned long size)
 {
 	struct vm_struct *area;
 
 	/* Check whether subsets of this region exist */
-	area = im_get_area((unsigned long) addr, size, IM_REGION_SUPERSET);
+	area = im_get_area(addr, size, IM_REGION_SUPERSET);
 	if (area == NULL)
 		return 1;
 
 	while (area) {
-		iounmap(area->addr);
-		area = im_get_area((unsigned long) addr, size,
+		iounmap((void __iomem *) area->addr);
+		area = im_get_area(addr, size,
 				IM_REGION_SUPERSET);
 	}
 
 	return 0;
 }
 
-int iounmap_explicit(void *addr, unsigned long size)
+int iounmap_explicit(volatile void __iomem *start, unsigned long size)
 {
 	struct vm_struct *area;
+	unsigned long addr;
 	int rc;
 	
 	/* addr could be in EEH or IO region, map it to IO region regardless.
 	 */
-	addr = (void *) (IO_TOKEN_TO_ADDR(addr) & PAGE_MASK);
+	addr = (IO_TOKEN_TO_ADDR(start) & PAGE_MASK);
 
 	/* Verify that the region either exists or is a subset of an existing
 	 * region.  In the latter case, split the parent region to create 
 	 * the exact region 
 	 */
-	area = im_get_area((unsigned long) addr, size, 
+	area = im_get_area(addr, size, 
 			    IM_REGION_EXISTS | IM_REGION_SUBSET);
 	if (area == NULL) {
 		/* Determine whether subset regions exist.  If so, unmap */
@@ -430,14 +432,17 @@ int iounmap_explicit(void *addr, unsigned long size)
 		if (rc) {
 			printk(KERN_ERR
 			       "%s() cannot unmap nonexistent range 0x%lx\n",
- 				__FUNCTION__, (unsigned long) addr);
+ 				__FUNCTION__, addr);
 			return 1;
 		}
 	} else {
-		iounmap(area->addr);
+		iounmap((void __iomem *) area->addr);
 	}
-
+	/*
+	 * FIXME! This can't be right:
 	iounmap(area->addr);
+	 * Maybe it should be "iounmap(area);"
+	 */
 	return 0;
 }
 

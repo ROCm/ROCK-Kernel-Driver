@@ -419,46 +419,39 @@ static int iSeries_Scan_Bridge_Slot(HvBusNumber Bus,
  * I/0 Memory copy MUST use mmio commands on iSeries
  * To do; For performance, include the hv call directly
  */
-void *iSeries_memset_io(void *dest, char c, size_t Count)
+void iSeries_memset_io(volatile void __iomem *dest, char c, size_t Count)
 {
 	u8 ByteValue = c;
 	long NumberOfBytes = Count;
-	char *IoBuffer = dest;
 
 	while (NumberOfBytes > 0) {
-		iSeries_Write_Byte(ByteValue, (void *)IoBuffer);
-		++IoBuffer;
+		iSeries_Write_Byte(ByteValue, dest++);
 		-- NumberOfBytes;
 	}
-	return dest;
 }
 EXPORT_SYMBOL(iSeries_memset_io);
 
-void *iSeries_memcpy_toio(void *dest, void *source, size_t count)
+void iSeries_memcpy_toio(volatile void __iomem *dest, void *source, size_t count)
 {
-	char *dst = dest;
 	char *src = source;
 	long NumberOfBytes = count;
 
 	while (NumberOfBytes > 0) {
-		iSeries_Write_Byte(*src++, (void *)dst++);
+		iSeries_Write_Byte(*src++, dest++);
 		-- NumberOfBytes;
 	}
-	return dest;
 }
 EXPORT_SYMBOL(iSeries_memcpy_toio);
 
-void *iSeries_memcpy_fromio(void *dest, void *source, size_t count)
+void iSeries_memcpy_fromio(void *dest, const volatile void __iomem *src, size_t count)
 {
 	char *dst = dest;
-	char *src = source;
 	long NumberOfBytes = count;
 
 	while (NumberOfBytes > 0) {
-		*dst++ = iSeries_Read_Byte((void *)src++);
+		*dst++ = iSeries_Read_Byte(src++);
 		-- NumberOfBytes;
 	}
-	return dest;
 }
 EXPORT_SYMBOL(iSeries_memcpy_fromio);
 
@@ -612,17 +605,19 @@ static int CheckReturnCode(char *TextHdr, struct iSeries_Device_Node *DevNode,
  * Note: Make sure the passed variable end up on the stack to avoid
  * the exposure of being device global.
  */
-static inline struct iSeries_Device_Node *xlateIoMmAddress(void *IoAddress,
+static inline struct iSeries_Device_Node *xlateIoMmAddress(const volatile void __iomem *IoAddress,
 		 u64 *dsaptr, u64 *BarOffsetPtr)
 {
+	unsigned long OrigIoAddr;
 	unsigned long BaseIoAddr;
 	unsigned long TableIndex;
 	struct iSeries_Device_Node *DevNode;
 
-	if (((unsigned long)IoAddress < iSeries_Base_Io_Memory) ||
-			((unsigned long)IoAddress >= iSeries_Max_Io_Memory))
+	OrigIoAddr = (unsigned long __force)IoAddress;
+	if ((OrigIoAddr < iSeries_Base_Io_Memory) ||
+			(OrigIoAddr >= iSeries_Max_Io_Memory))
 		return NULL;
-	BaseIoAddr = (unsigned long)IoAddress - iSeries_Base_Io_Memory;
+	BaseIoAddr = OrigIoAddr - iSeries_Base_Io_Memory;
 	TableIndex = BaseIoAddr / iSeries_IoMmTable_Entry_Size;
 	DevNode = iSeries_IoMmTable[TableIndex];
 
@@ -644,7 +639,7 @@ static inline struct iSeries_Device_Node *xlateIoMmAddress(void *IoAddress,
  * iSeries_Read_Word = Read Word  (16 bit)
  * iSeries_Read_Long = Read Long  (32 bit)
  */
-u8 iSeries_Read_Byte(void *IoAddress)
+u8 iSeries_Read_Byte(const volatile void __iomem *IoAddress)
 {
 	u64 BarOffset;
 	u64 dsa;
@@ -673,7 +668,7 @@ u8 iSeries_Read_Byte(void *IoAddress)
 }
 EXPORT_SYMBOL(iSeries_Read_Byte);
 
-u16 iSeries_Read_Word(void *IoAddress)
+u16 iSeries_Read_Word(const volatile void __iomem *IoAddress)
 {
 	u64 BarOffset;
 	u64 dsa;
@@ -703,7 +698,7 @@ u16 iSeries_Read_Word(void *IoAddress)
 }
 EXPORT_SYMBOL(iSeries_Read_Word);
 
-u32 iSeries_Read_Long(void *IoAddress)
+u32 iSeries_Read_Long(const volatile void __iomem *IoAddress)
 {
 	u64 BarOffset;
 	u64 dsa;
@@ -740,7 +735,7 @@ EXPORT_SYMBOL(iSeries_Read_Long);
  * iSeries_Write_Word = Write Word(16 bit)
  * iSeries_Write_Long = Write Long(32 bit)
  */
-void iSeries_Write_Byte(u8 data, void *IoAddress)
+void iSeries_Write_Byte(u8 data, volatile void __iomem *IoAddress)
 {
 	u64 BarOffset;
 	u64 dsa;
@@ -767,7 +762,7 @@ void iSeries_Write_Byte(u8 data, void *IoAddress)
 }
 EXPORT_SYMBOL(iSeries_Write_Byte);
 
-void iSeries_Write_Word(u16 data, void *IoAddress)
+void iSeries_Write_Word(u16 data, volatile void __iomem *IoAddress)
 {
 	u64 BarOffset;
 	u64 dsa;
@@ -794,7 +789,7 @@ void iSeries_Write_Word(u16 data, void *IoAddress)
 }
 EXPORT_SYMBOL(iSeries_Write_Word);
 
-void iSeries_Write_Long(u32 data, void *IoAddress)
+void iSeries_Write_Long(u32 data, volatile void __iomem *IoAddress)
 {
 	u64 BarOffset;
 	u64 dsa;

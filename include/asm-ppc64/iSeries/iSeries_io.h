@@ -31,16 +31,16 @@
 /*   Created December 28, 2000                                          */
 /* End Change Activity                                                  */
 /************************************************************************/
-extern u8   iSeries_Read_Byte(void* IoAddress);
-extern u16  iSeries_Read_Word(void* IoAddress);
-extern u32  iSeries_Read_Long(void* IoAddress);
-extern void iSeries_Write_Byte(u8  IoData,void* IoAddress);
-extern void iSeries_Write_Word(u16 IoData,void* IoAddress);
-extern void iSeries_Write_Long(u32 IoData,void* IoAddress);
+extern u8   iSeries_Read_Byte(const volatile void __iomem * IoAddress);
+extern u16  iSeries_Read_Word(const volatile void __iomem * IoAddress);
+extern u32  iSeries_Read_Long(const volatile void __iomem * IoAddress);
+extern void iSeries_Write_Byte(u8  IoData, volatile void __iomem * IoAddress);
+extern void iSeries_Write_Word(u16 IoData, volatile void __iomem * IoAddress);
+extern void iSeries_Write_Long(u32 IoData, volatile void __iomem * IoAddress);
 
-extern void* iSeries_memset_io(void *dest, char x, size_t n);
-extern void* iSeries_memcpy_toio(void *dest, void *source, size_t n);
-extern void* iSeries_memcpy_fromio(void *dest, void *source, size_t n);
+extern void iSeries_memset_io(volatile void __iomem *dest, char x, size_t n);
+extern void iSeries_memcpy_toio(volatile void __iomem *dest, void *source, size_t n);
+extern void iSeries_memcpy_fromio(void *dest, const volatile void __iomem *source, size_t n);
 
 #endif /* CONFIG_PPC_ISERIES */
 #endif /* _ISERIES_IO_H */
