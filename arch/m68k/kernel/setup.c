@@ -34,6 +34,7 @@
 #endif
 #ifdef CONFIG_ATARI
 #include <asm/atarihw.h>
+#include <asm/atari_stram.h>
 #endif
 #ifdef CONFIG_SUN3X
 #include <asm/dvma.h>
@@ -383,7 +384,7 @@ void __init setup_arch(char **cmdline_p)
 
 #ifdef CONFIG_ATARI
 	if (MACH_IS_ATARI)
-		atari_stram_reserve_pages(availmem);
+		atari_stram_reserve_pages((void *)availmem);
 #endif
 #ifdef CONFIG_SUN3X
 	if (MACH_IS_SUN3X) {
