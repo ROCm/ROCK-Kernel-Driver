@@ -1581,11 +1581,12 @@ do_notify_parent_cldstop(struct task_struct *tsk, struct task_struct *parent,
  * We always set current->last_siginfo while stopped here.
  * That makes it a way to test a stopped process for
  * being ptrace-stopped vs being job-control-stopped.
+ *
+ * If we actually decide not to stop at all because the tracer is gone,
+ * we leave nostop_code in current->exit_code.
  */
-static void ptrace_stop(int exit_code, siginfo_t *info)
+static void ptrace_stop(int exit_code, int nostop_code, siginfo_t *info)
 {
-	BUG_ON(!(current->ptrace & PT_PTRACED));
-
 	/*
 	 * If there is a group stop in progress,
 	 * we must participate in the bookkeeping.
@@ -1600,9 +1601,22 @@ static void ptrace_stop(int exit_code, siginfo_t *info)
 	set_current_state(TASK_TRACED);
 	spin_unlock_irq(&current->sighand->siglock);
 	read_lock(&tasklist_lock);
-	do_notify_parent_cldstop(current, current->parent, CLD_TRAPPED);
-	read_unlock(&tasklist_lock);
-	schedule();
+	if (likely(current->ptrace & PT_PTRACED) &&
+	    likely(current->parent != current->real_parent ||
+		   !(current->ptrace & PT_ATTACHED))) {
+		do_notify_parent_cldstop(current, current->parent,
+					 CLD_TRAPPED);
+		read_unlock(&tasklist_lock);
+		schedule();
+	} else {
+		/*
+		 * By the time we got the lock, our tracer went away.
+		 * Don't stop here.
+		 */
+		read_unlock(&tasklist_lock);
+		set_current_state(TASK_RUNNING);
+		current->exit_code = nostop_code;
+	}
 
 	/*
 	 * We are back.  Now reacquire the siglock before touching
@@ -1633,7 +1647,7 @@ void ptrace_notify(int exit_code)
 
 	/* Let the debugger run.  */
 	spin_lock_irq(&current->sighand->siglock);
-	ptrace_stop(exit_code, &info);
+	ptrace_stop(exit_code, 0, &info);
 	spin_unlock_irq(&current->sighand->siglock);
 }
 
@@ -1836,7 +1850,7 @@ relock:
 			ptrace_signal_deliver(regs, cookie);
 
 			/* Let the debugger run.  */
-			ptrace_stop(signr, info);
+			ptrace_stop(signr, signr, info);
 
 			/* We're back.  Did the debugger cancel the sig?  */
 			signr = current->exit_code;
