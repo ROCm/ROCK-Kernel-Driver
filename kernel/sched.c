@@ -2057,7 +2057,7 @@ static void show_task(task_t * p)
 		printk(" %016lx ", thread_saved_pc(p));
 #endif
 	{
-		unsigned long * n = (unsigned long *) (p+1);
+		unsigned long * n = (unsigned long *) (p->thread_info+1);
 		while (!*n)
 			n++;
 		free = (unsigned long) n - (unsigned long)(p+1);
