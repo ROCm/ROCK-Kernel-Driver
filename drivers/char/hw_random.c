@@ -454,11 +454,7 @@ static int __init via_init(struct pci_dev *dev)
 
 static void via_cleanup(void)
 {
-	u32 lo, hi;
-
-	rdmsr(MSR_VIA_RNG, lo, hi);
-	lo &= ~VIA_RNG_ENABLE;
-	wrmsr(MSR_VIA_RNG, lo, hi);
+	/* do nothing */
 }
 
 

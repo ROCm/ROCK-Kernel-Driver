@@ -50,7 +50,7 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 		NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 
 		/* VIA/Cyrix/Centaur-defined */
-		NULL, NULL, "xstore", NULL, NULL, NULL, NULL, NULL,
+		NULL, NULL, "rng", "rng_en", NULL, NULL, "ace", "ace_en",
 		NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 		NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 		NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
