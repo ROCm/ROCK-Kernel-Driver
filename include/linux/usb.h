@@ -89,6 +89,8 @@ struct usb_host_interface {
  *	number from the USB core by calling usb_register_dev().
  * @dev: driver model's view of this device
  * @class_dev: driver model's class view of this device.
+ * @released: wait for the interface to be released when changing
+ *	configurations.
  *
  * USB device drivers attach to interfaces on a physical device.  Each
  * interface encapsulates a single high level function, such as feeding
@@ -122,6 +124,7 @@ struct usb_interface {
 	int minor;			/* minor number this interface is bound to */
 	struct device dev;		/* interface specific device info */
 	struct class_device *class_dev;
+	struct completion *released;	/* wait for release */
 };
 #define	to_usb_interface(d) container_of(d, struct usb_interface, dev)
 #define	interface_to_usbdev(intf) \

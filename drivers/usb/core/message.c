@@ -793,6 +793,13 @@ void usb_disable_interface(struct usb_device *dev, struct usb_interface *intf)
 	}
 }
 
+static void release_interface(struct device *dev)
+{
+	struct usb_interface *interface = to_usb_interface(dev);
+
+	complete(interface->released);
+}
+
 /*
  * usb_disable_device - Disable all the endpoints for a USB device
  * @dev: the device whose endpoints are being disabled
@@ -822,12 +829,16 @@ void usb_disable_device(struct usb_device *dev, int skip_ep0)
 	if (dev->actconfig) {
 		for (i = 0; i < dev->actconfig->desc.bNumInterfaces; i++) {
 			struct usb_interface	*interface;
+			struct completion	intf_completion;
 
 			/* remove this interface */
 			interface = dev->actconfig->interface[i];
 			dev_dbg (&dev->dev, "unregistering interface %s\n",
 				interface->dev.bus_id);
-			device_del(&interface->dev);
+			init_completion (&intf_completion);
+			interface->released = &intf_completion;
+			device_unregister (&interface->dev);
+			wait_for_completion (&intf_completion);
 		}
 		dev->actconfig = 0;
 		if (dev->state == USB_STATE_CONFIGURED)
@@ -1145,6 +1156,7 @@ int usb_set_configuration(struct usb_device *dev, int configuration)
 			intf->dev.driver = NULL;
 			intf->dev.bus = &usb_bus_type;
 			intf->dev.dma_mask = dev->dev.dma_mask;
+			intf->dev.release = release_interface;
 			sprintf (&intf->dev.bus_id[0], "%d-%s:%d.%d",
 				 dev->bus->busnum, dev->devpath,
 				 configuration,
@@ -1153,7 +1165,7 @@ int usb_set_configuration(struct usb_device *dev, int configuration)
 				"registering %s (config #%d, interface %d)\n",
 				intf->dev.bus_id, configuration,
 				desc->bInterfaceNumber);
-			device_add (&intf->dev);
+			device_register (&intf->dev);
 			usb_create_driverfs_intf_files (intf);
 		}
 	}
