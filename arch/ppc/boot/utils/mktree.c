@@ -15,7 +15,11 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <netinet/in.h>
+#ifdef __sun__
+#include <inttypes.h>
+#else
 #include <stdint.h>
+#endif
 
 /* This gets tacked on the front of the image.  There are also a few
  * bytes allocated after the _start label used by the boot rom (see
