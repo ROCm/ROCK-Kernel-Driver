@@ -762,6 +762,72 @@ CIFSSMBRename(const int xid, struct cifsTconInfo *tcon,
 	return rc;
 }
 
+int CIFSSMBDummyRenameOpenFile(const int xid,struct cifsTconInfo *pTcon, 
+		int netfid, const struct nls_table * nls_codepage) 
+{
+        struct smb_com_transaction2_sfi_req *pSMB  = NULL;
+        struct smb_com_transaction2_sfi_rsp *pSMBr = NULL;
+	struct set_file_rename * rename_info;
+        char *data_offset;
+        int rc = 0;
+        int bytes_returned = 0;
+	int len_of_str;
+
+        cFYI(1, ("Rename to Dummy Random File Name"));
+
+        rc = smb_init(SMB_COM_TRANSACTION2, 15, pTcon, (void **) &pSMB,
+                      (void **) &pSMBr);
+        if (rc)
+                return rc;
+
+        pSMB->ParameterCount = 6;
+        pSMB->MaxSetupCount = 0;
+        pSMB->Reserved = 0;
+        pSMB->Flags = 0;
+        pSMB->Timeout = 0;
+        pSMB->Reserved2 = 0;
+        pSMB->ParameterOffset = offsetof(struct smb_com_transaction2_sfi_req,
+                                     Fid) - 4;
+        pSMB->DataOffset = pSMB->ParameterOffset + pSMB->ParameterCount;
+
+        data_offset = (char *) (&pSMB->hdr.Protocol) + pSMB->DataOffset;
+	rename_info = (struct set_file_rename *) data_offset;
+        pSMB->MaxParameterCount = cpu_to_le16(2);
+        pSMB->MaxDataCount = cpu_to_le16(1000); /* BB find max SMB PDU from sess */
+        pSMB->SetupCount = 1;
+        pSMB->Reserved3 = 0;
+        pSMB->SubCommand = cpu_to_le16(TRANS2_SET_FILE_INFORMATION);
+        pSMB->ByteCount = 3 /* pad */  + pSMB->ParameterCount;
+        pSMB->ParameterCount = cpu_to_le16(pSMB->ParameterCount);
+        pSMB->TotalParameterCount = pSMB->ParameterCount;
+        pSMB->ParameterOffset = cpu_to_le16(pSMB->ParameterOffset);
+        pSMB->DataOffset = cpu_to_le16(pSMB->DataOffset);
+	/* construct random name ".cifs_tmp<inodenum><mid>" */
+	rename_info->overwrite = cpu_to_le32(1);
+	rename_info->root_fid  = 0;
+        len_of_str = cifs_strtoUCS((wchar_t *) rename_info->target_name, ".cifs", 12, nls_codepage);
+	pSMB->DataCount = 12 /* sizeof(struct set_file_rename) */ + (2 * len_of_str);
+        pSMB->ByteCount += pSMB->DataCount;
+        pSMB->DataCount = cpu_to_le16(pSMB->DataCount);
+        pSMB->Fid = netfid;
+	/* should we check the passthrough bit ? */
+	pSMB->InformationLevel =
+		cpu_to_le16(SMB_SET_FILE_RENAME_INFORMATION);
+        pSMB->Reserved4 = 0;
+        pSMB->hdr.smb_buf_length += pSMB->ByteCount;
+        pSMB->ByteCount = cpu_to_le16(pSMB->ByteCount);
+        rc = SendReceive(xid, pTcon->ses, (struct smb_hdr *) pSMB,
+                         (struct smb_hdr *) pSMBr, &bytes_returned, 0);
+        if (rc) {
+                cFYI(1,("Send error in DummyRename = %d", rc));
+        }
+
+        if (pSMB)
+                buf_release(pSMB);
+        return rc;
+}
+
+
 int
 CIFSUnixCreateSymLink(const int xid, struct cifsTconInfo *tcon,
 		      const char *fromName, const char *toName,
@@ -1979,7 +2045,7 @@ CIFSSMBQFSDeviceInfo(int xid, struct cifsTconInfo *tcon,
 	rc = SendReceive(xid, tcon->ses, (struct smb_hdr *) pSMB,
 			 (struct smb_hdr *) pSMBr, &bytes_returned, 0);
 	if (rc) {
-		cERROR(1, ("Send error in QFSDeviceInfo = %d", rc));
+		cFYI(1, ("Send error in QFSDeviceInfo = %d", rc));
 	} else {		/* decode response */
 		pSMBr->DataOffset = le16_to_cpu(pSMBr->DataOffset);
 		if ((pSMBr->ByteCount < sizeof (FILE_SYSTEM_DEVICE_INFO))
@@ -2202,10 +2268,10 @@ CIFSSMBSetFileSize(const int xid, struct cifsTconInfo *tcon, __u64 size,
 	pSMB->TotalDataCount = pSMB->DataCount;
 	pSMB->TotalParameterCount = pSMB->ParameterCount;
 	pSMB->ParameterOffset = cpu_to_le16(pSMB->ParameterOffset);
-	pSMB->DataOffset = cpu_to_le16(pSMB->DataOffset);
 	parm_data =
 		(struct file_end_of_file_info *) (((char *) &pSMB->hdr.Protocol) +
 			pSMB->DataOffset);
+	pSMB->DataOffset = cpu_to_le16(pSMB->DataOffset); /* now safe to change to le */
 	parm_data->FileSize = size;
 	pSMB->Fid = fid;
 	if(SetAllocation) {

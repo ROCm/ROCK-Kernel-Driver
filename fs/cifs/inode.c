@@ -353,8 +353,9 @@ cifs_unlink(struct inode *inode, struct dentry *direntry)
 				CREATE_NOT_DIR | CREATE_DELETE_ON_CLOSE,
 				&netfid, &oplock, NULL, cifs_sb->local_nls);
 		if(rc==0) {
+			CIFSSMBDummyRenameOpenFile(xid,pTcon,netfid,
+				cifs_sb->local_nls);
 			CIFSSMBClose(xid, pTcon, netfid);
-			/* BB In the future chain close with the NTCreateX to narrow window */
 			direntry->d_inode->i_nlink--;
 		}
 	} else if (rc == -EACCES) {
@@ -370,8 +371,22 @@ cifs_unlink(struct inode *inode, struct dentry *direntry)
 		}
 		if(rc==0) {
 			rc = CIFSSMBDelFile(xid, pTcon, full_path, cifs_sb->local_nls);
-			if (!rc)
+			if (!rc) {
 				direntry->d_inode->i_nlink--;
+			} else if (rc == -ETXTBSY) {
+				int oplock = FALSE;
+				__u16 netfid;
+
+				rc = CIFSSMBOpen(xid, pTcon, full_path, FILE_OPEN, DELETE,
+                                	CREATE_NOT_DIR | CREATE_DELETE_ON_CLOSE,
+	                                &netfid, &oplock, NULL, cifs_sb->local_nls);
+				if(rc==0) {
+					CIFSSMBDummyRenameOpenFile(xid,pTcon,netfid,cifs_sb->local_nls);
+					CIFSSMBClose(xid, pTcon, netfid);
+		                        direntry->d_inode->i_nlink--;
+				}
+			/* BB if rc = -ETXTBUSY goto the rename logic BB */
+			}
 		}
 	}
 	cifsInode = CIFS_I(direntry->d_inode);
