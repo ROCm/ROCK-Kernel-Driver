@@ -210,8 +210,8 @@ config FB_VIRGE
 	  Cybervision 64 card, as they use incompatible video chips.
 
 config FB_RETINAZ3
-	tristate "Amiga RetinaZ3 support"
-	depends on FB && ZORRO
+	tristate "Amiga Retina Z3 support"
+	depends on FB && ZORRO && BROKEN
 	help
 	  This enables support for the Retina Z3 graphics card. Say N unless
 	  you have a Retina Z3 or plan to get one before you next recompile
