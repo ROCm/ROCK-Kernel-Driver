@@ -53,6 +53,7 @@ in_trap_handler:
 	.text
 	.align	4
 
+#if 0 /* kgdb is dropped from 2.5.33 */
 ! This function is called when any SPARC trap (except window overflow or
 ! underflow) occurs.  It makes sure that the invalid register window is still
 ! available before jumping into C code.  It will also restore the world if you
@@ -119,7 +120,7 @@ C_LABEL(trap_low):
 	STORE_PT_PRIV(sp, l0, l1, l2)
 
 	RESTORE_ALL
-
+#endif
 
 #ifdef CONFIG_BLK_DEV_FD
 	.text

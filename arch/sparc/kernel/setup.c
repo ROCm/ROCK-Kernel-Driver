@@ -34,7 +34,6 @@
 #include <asm/segment.h>
 #include <asm/system.h>
 #include <asm/io.h>
-#include <asm/kgdb.h>
 #include <asm/processor.h>
 #include <asm/oplib.h>
 #include <asm/page.h>
@@ -67,8 +66,6 @@ struct screen_info screen_info = {
  */
 
 extern unsigned long trapbase;
-extern int serial_console;
-extern void breakpoint(void);
 void (*prom_palette)(int);
 asmlinkage void sys_sync(void);	/* it's really int */
 
@@ -105,27 +102,14 @@ void prom_sync_me(void)
 	return;
 }
 
-extern void rs_kgdb_hook(int tty_num); /* sparc/serial.c */
-
 unsigned int boot_flags __initdata = 0;
 #define BOOTME_DEBUG  0x1
 #define BOOTME_SINGLE 0x2
-#define BOOTME_KGDBA  0x4
-#define BOOTME_KGDBB  0x8
-#define BOOTME_KGDB   0xc
 
 static int console_fb __initdata = 0;
 
 /* Exported for mm/init.c:paging_init. */
 unsigned long cmdline_memory_size __initdata = 0;
-
-void kernel_enter_debugger(void)
-{
-	if (boot_flags & BOOTME_KGDB) {
-		printk("KGDB: Entered\n");
-		breakpoint();
-	}
-}
 
 static void
 prom_console_write(struct console *con, const char *s, unsigned n)
@@ -142,11 +126,6 @@ static struct console prom_debug_console = {
 
 int obp_system_intr(void)
 {
-	if (boot_flags & BOOTME_KGDB) {
-		printk("KGDB: system interrupted\n");
-		breakpoint();
-		return 1;
-	}
 	if (boot_flags & BOOTME_DEBUG) {
 		printk("OBP: system interrupted\n");
 		prom_halt();
@@ -196,24 +175,6 @@ static void __init boot_flags_init(char *commands)
 			commands++;
 			while (*commands && *commands != ' ')
 				process_switch(*commands++);
-		} else if (strlen(commands) >= 9
-			   && !strncmp(commands, "kgdb=tty", 8)) {
-			switch (commands[8]) {
-#ifdef CONFIG_SUN_SERIAL
-			case 'a':
-				boot_flags |= BOOTME_KGDBA;
-				prom_printf("KGDB: Using serial line /dev/ttya.\n");
-				break;
-			case 'b':
-				boot_flags |= BOOTME_KGDBB;
-				prom_printf("KGDB: Using serial line /dev/ttyb.\n");
-				break;
-#endif
-			default:
-				printk("KGDB: Unknown tty line.\n");
-				break;
-			}
-			commands += 9;
 		} else {
 			if (!strncmp(commands, "console=", 8)) {
 				commands += 8;
@@ -413,22 +374,10 @@ void __init setup_arch(char **cmdline_p)
 #endif
 	}
 
-	if ((boot_flags & BOOTME_KGDBA)) {
-		rs_kgdb_hook(0);
-	}
-	if ((boot_flags & BOOTME_KGDBB)) {
-		rs_kgdb_hook(1);
-	}
-
 	if((boot_flags&BOOTME_DEBUG) && (linux_dbvec!=0) && 
 	   ((*(short *)linux_dbvec) != -1)) {
 		printk("Booted under KADB. Syncing trap table.\n");
 		(*(linux_dbvec->teach_debugger))();
-	}
-	if((boot_flags & BOOTME_KGDB)) {
-		set_debug_traps();
-		prom_printf ("Breakpoint!\n");
-		breakpoint();
 	}
 
 	init_mm.context = (unsigned long) NO_CONTEXT;

@@ -382,13 +382,6 @@ static void sunzilog_receive_chars(struct uart_sunzilog_port *up,
 			sun_do_break();
 			return;
 		}
-#ifndef CONFIG_SPARC64
-		/* Look for kgdb 'stop' character.  */
-		if (ZS_IS_KGDB(up) && (ch == '\003')) {
-			breakpoint();
-			return;
-		}
-#endif
 
 		/* A real serial line, record the character and status.  */
 		*tty->flip.char_buf_ptr = ch;
