@@ -1507,3 +1507,19 @@ void msleep(unsigned int msecs)
 
 EXPORT_SYMBOL(msleep);
 
+/**
+ * msleep_interruptible - sleep waiting for waitqueue interruptions
+ * @msecs: Time in milliseconds to sleep for
+ */
+unsigned long msleep_interruptible(unsigned int msecs)
+{
+       unsigned long timeout = msecs_to_jiffies(msecs);
+
+       while (timeout && !signal_pending(current)) {
+               set_current_state(TASK_INTERRUPTIBLE);
+               timeout = schedule_timeout(timeout);
+       }
+       return jiffies_to_msecs(timeout);
+}
+
+EXPORT_SYMBOL(msleep_interruptible);
