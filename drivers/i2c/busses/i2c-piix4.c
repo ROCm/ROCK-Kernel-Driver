@@ -493,7 +493,7 @@ static void __devexit piix4_remove(struct pci_dev *dev)
 }
 
 static struct pci_driver piix4_driver = {
-	.name		= "piix4-smbus",
+	.name		= "piix4_smbus",
 	.id_table	= piix4_ids,
 	.probe		= piix4_probe,
 	.remove		= __devexit_p(piix4_remove),

@@ -509,7 +509,7 @@ static void __devexit ali15x3_remove(struct pci_dev *dev)
 }
 
 static struct pci_driver ali15x3_driver = {
-	.name		= "ali15x3 smbus",
+	.name		= "ali15x3_smbus",
 	.id_table	= ali15x3_ids,
 	.probe		= ali15x3_probe,
 	.remove		= __devexit_p(ali15x3_remove),

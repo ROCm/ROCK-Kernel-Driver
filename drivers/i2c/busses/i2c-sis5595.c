@@ -393,7 +393,7 @@ static void __devexit sis5595_remove(struct pci_dev *dev)
 }
 
 static struct pci_driver sis5595_driver = {
-	.name		= "sis5595 smbus",
+	.name		= "sis5595_smbus",
 	.id_table	= sis5595_ids,
 	.probe		= sis5595_probe,
 	.remove		= __devexit_p(sis5595_remove),

@@ -455,7 +455,7 @@ static struct pci_device_id vt596_ids[] = {
 };
 
 static struct pci_driver vt596_driver = {
-	.name		= "vt596 smbus",
+	.name		= "vt596_smbus",
 	.id_table	= vt596_ids,
 	.probe		= vt596_probe,
 	.remove		= __devexit_p(vt596_remove),
