@@ -1282,8 +1282,6 @@ static int __init c4_init(void)
 {
 	int retval;
 
-	MOD_INC_USE_COUNT;
-
 	b1_set_revision(&c2_driver, revision);
         attach_capi_driver(&c2_driver);
 
@@ -1304,7 +1302,6 @@ static int __init c4_init(void)
 	detach_capi_driver(&c2_driver);
 	detach_capi_driver(&c4_driver);
  out:
-	MOD_DEC_USE_COUNT;
 	return retval;
 }
 

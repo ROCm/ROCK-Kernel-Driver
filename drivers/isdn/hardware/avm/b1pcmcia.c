@@ -200,12 +200,9 @@ EXPORT_SYMBOL(b1pcmcia_delcard);
 
 static int __init b1pcmcia_init(void)
 {
-	MOD_INC_USE_COUNT;
-
 	b1_set_revision(&b1pcmcia_driver, revision);
         attach_capi_driver(&b1pcmcia_driver);
 
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
