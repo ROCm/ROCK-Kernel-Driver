@@ -2979,6 +2979,7 @@ asmlinkage long sys_sched_yield(void)
 	 * no need to preempt:
 	 */
 	_raw_spin_unlock(&rq->lock);
+	local_irq_enable();
 	preempt_enable_no_resched();
 
 	schedule();
