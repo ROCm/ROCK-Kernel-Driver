@@ -44,8 +44,6 @@
 #include <linux/atmdev.h>
 #include "atmsar.h"
 
-const char *udsl_version = "1.5A";
-
 /*
 #define DEBUG 1
 #define DEBUG_PACKET 1
@@ -1011,7 +1009,7 @@ static int __init udsl_usb_init (void)
 {
 	int i;
 
-	PDEBUG ("Initializing SpeedTouch Driver Version %s\n", udsl_version);
+	PDEBUG ("Initializing SpeedTouch Driver Version " DRIVER_VERSION "\n");
 
 	for (i = 0; i < MAX_UDSL; i++)
 		minor_data[i] = NULL;
