@@ -167,7 +167,7 @@ extern int br_del_if(struct net_bridge *br,
 extern int br_get_bridge_ifindices(int *indices,
 			    int num);
 extern void br_get_port_ifindices(struct net_bridge *br,
-			   int *ifindices);
+			   int *ifindices, int num);
 
 /* br_input.c */
 extern int br_handle_frame_finish(struct sk_buff *skb);

@@ -262,13 +262,14 @@ int br_get_bridge_ifindices(int *indices, int num)
 	return i;
 }
 
-void br_get_port_ifindices(struct net_bridge *br, int *ifindices)
+void br_get_port_ifindices(struct net_bridge *br, int *ifindices, int num)
 {
 	struct net_bridge_port *p;
 
 	rcu_read_lock();
 	list_for_each_entry_rcu(p, &br->port_list, list) {
-		ifindices[p->port_no] = p->dev->ifindex;
+		if (p->port_no < num)
+			ifindices[p->port_no] = p->dev->ifindex;
 	}
 	rcu_read_unlock();
 }

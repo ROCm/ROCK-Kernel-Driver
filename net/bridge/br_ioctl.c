@@ -104,17 +104,18 @@ int br_ioctl_device(struct net_bridge *br, unsigned int cmd,
 
 	case BRCTL_GET_PORT_LIST:
 	{
-		int *indices;
+		int num = arg1 ? arg1 : 256;	/* compatiablity */
 		int ret = 0;
+		int *indices;
 
-		indices = kmalloc(256*sizeof(int), GFP_KERNEL);
+		indices = kmalloc(num*sizeof(int), GFP_KERNEL);
 		if (indices == NULL)
 			return -ENOMEM;
 
-		memset(indices, 0, 256*sizeof(int));
+		memset(indices, 0, num*sizeof(int));
 
-		br_get_port_ifindices(br, indices);
-		if (copy_to_user((void *)arg0, indices, 256*sizeof(int)))
+		br_get_port_ifindices(br, indices, num);
+		if (copy_to_user((void *)arg0, indices, num*sizeof(int)))
 			ret =  -EFAULT;
 		kfree(indices);
 		return ret;
@@ -263,9 +264,6 @@ static int br_ioctl_deviceless(unsigned int cmd,
 	{
 		int *indices;
 		int ret = 0;
-
-		if (arg1 > 64)
-			arg1 = 64;
 
 		indices = kmalloc(arg1*sizeof(int), GFP_KERNEL);
 		if (indices == NULL)
