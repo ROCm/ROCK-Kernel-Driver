@@ -31,7 +31,7 @@ module_param(psmouse_noext, int, 0);
 MODULE_PARM_DESC(psmouse_noext, "[DEPRECATED] Disable any protocol extensions. Useful for KVM switches.");
 
 static char *psmouse_proto;
-static unsigned int psmouse_max_proto = -1UL;
+static unsigned int psmouse_max_proto = -1U;
 module_param(psmouse_proto, charp, 0);
 MODULE_PARM_DESC(psmouse_proto, "Highest protocol extension to probe (bare, imps, exps). Useful for KVM switches.");
 
