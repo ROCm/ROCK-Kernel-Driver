@@ -312,7 +312,6 @@ iSeries_init_early(void)
 	ppc_md.setup_arch	 	= iSeries_setup_arch;
 	ppc_md.setup_residual	 	= iSeries_setup_residual;
 	ppc_md.get_cpuinfo	 	= iSeries_get_cpuinfo;
-	ppc_md.irq_cannonicalize 	= NULL;
 	ppc_md.init_IRQ		 	= iSeries_init_IRQ;
 	ppc_md.init_ras_IRQ		= NULL;
 	ppc_md.get_irq		 	= iSeries_get_irq;
@@ -325,8 +324,7 @@ iSeries_init_early(void)
 	ppc_md.power_off	 	= iSeries_power_off;
 	ppc_md.halt		 	= iSeries_halt;
 
-	ppc_md.time_init	 	= NULL;
-	ppc_md.get_boot_time    = iSeries_get_boot_time;
+	ppc_md.get_boot_time		= iSeries_get_boot_time;
 	ppc_md.set_rtc_time	 	= iSeries_set_rtc_time;
 	ppc_md.get_rtc_time	 	= iSeries_get_rtc_time;
 	ppc_md.calibrate_decr	 	= iSeries_calibrate_decr;
@@ -782,15 +780,6 @@ void
 iSeries_halt(void)
 {
 	mf_powerOff();
-}
-
-/*
- * Nothing to do here.
- */
-void __init
-iSeries_time_init(void)
-{
-	/* Nothing to do */
 }
 
 /* JDH Hack */

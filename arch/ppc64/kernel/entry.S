@@ -20,14 +20,15 @@
  *  2 of the License, or (at your option) any later version.
  */
 
-#include "ppc_asm.h"
+#include <linux/config.h>
+#include <linux/errno.h>
+#include <linux/sys.h>
 #include <asm/processor.h>
 #include <asm/page.h>
 #include <asm/mmu.h>
 #include <asm/thread_info.h>
-#include <linux/errno.h>
-#include <linux/sys.h>
-#include <linux/config.h>
+#include <asm/ppc_asm.h>
+#include <asm/offsets.h>
 
 #ifdef CONFIG_PPC_ISERIES
 #define DO_SOFT_DISABLE

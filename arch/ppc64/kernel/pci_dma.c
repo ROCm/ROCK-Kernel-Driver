@@ -1438,69 +1438,6 @@ void pci_unmap_sg(struct pci_dev *pdev, struct scatterlist *sglist, int nelems,
 }
 #endif
 
-/*
- * phb_tce_table_init
- * 
- * Function: Display TCE config registers.  Could be easily changed
- *           to initialize the hardware to use TCEs.
- */
-unsigned long phb_tce_table_init(struct pci_controller *phb) {
-	unsigned int r, cfg_rw, i;	
-	unsigned long r64;	
-	phandle node;
-
-	PPCDBG(PPCDBG_TCE, "phb_tce_table_init: start.\n"); 
-
-	node = ((struct device_node *)(phb->arch_data))->node;
-
-	PPCDBG(PPCDBG_TCEINIT, "\tphb            = 0x%lx\n", phb); 
-	PPCDBG(PPCDBG_TCEINIT, "\tphb->type      = 0x%lx\n", phb->type); 
-	PPCDBG(PPCDBG_TCEINIT, "\tphb->phb_regs  = 0x%lx\n", phb->phb_regs); 
-	PPCDBG(PPCDBG_TCEINIT, "\tphb->chip_regs = 0x%lx\n", phb->chip_regs); 
-	PPCDBG(PPCDBG_TCEINIT, "\tphb: node      = 0x%lx\n", node);
-	PPCDBG(PPCDBG_TCEINIT, "\tphb->arch_data = 0x%lx\n", phb->arch_data); 
-
-	i = 0;
-	while(of_tce_table[i].node) {
-		if(of_tce_table[i].node == node) {
-			if(phb->type == phb_type_python) {
-				r = *(((unsigned int *)phb->phb_regs) + (0xf10>>2)); 
-				PPCDBG(PPCDBG_TCEINIT, "\tTAR(low)    = 0x%x\n", r);
-				r = *(((unsigned int *)phb->phb_regs) + (0xf00>>2)); 
-				PPCDBG(PPCDBG_TCEINIT, "\tTAR(high)   = 0x%x\n", r);
-				r = *(((unsigned int *)phb->phb_regs) + (0xfd0>>2)); 
-				PPCDBG(PPCDBG_TCEINIT, "\tPHB cfg(rw) = 0x%x\n", r);
-				break;
-			} else if(phb->type == phb_type_speedwagon) {
-				r64 = *(((unsigned long *)phb->chip_regs) + 
-					(0x800>>3)); 
-				PPCDBG(PPCDBG_TCEINIT, "\tNCFG    = 0x%lx\n", r64);
-				r64 = *(((unsigned long *)phb->chip_regs) + 
-					(0x580>>3)); 
-				PPCDBG(PPCDBG_TCEINIT, "\tTAR0    = 0x%lx\n", r64);
-				r64 = *(((unsigned long *)phb->chip_regs) + 
-					(0x588>>3)); 
-				PPCDBG(PPCDBG_TCEINIT, "\tTAR1    = 0x%lx\n", r64);
-				r64 = *(((unsigned long *)phb->chip_regs) + 
-					(0x590>>3)); 
-				PPCDBG(PPCDBG_TCEINIT, "\tTAR2    = 0x%lx\n", r64);
-				r64 = *(((unsigned long *)phb->chip_regs) + 
-					(0x598>>3)); 
-				PPCDBG(PPCDBG_TCEINIT, "\tTAR3    = 0x%lx\n", r64);
-				cfg_rw = *(((unsigned int *)phb->chip_regs) + 
-					   ((0x160 +
-					     (((phb->local_number)+8)<<12))>>2)); 
-				PPCDBG(PPCDBG_TCEINIT, "\tcfg_rw = 0x%x\n", cfg_rw);
-			}
-		}
-		i++;
-	}
-
-	PPCDBG(PPCDBG_TCEINIT, "phb_tce_table_init: done\n"); 
-
-	return(0); 
-}
-
 /* These are called very early. */
 void tce_init_pSeries(void)
 {

@@ -57,10 +57,6 @@ struct pci_controller {
 	unsigned long pci_io_offset;
 
 	struct pci_ops *ops;
-	volatile unsigned long *cfg_addr;
-	volatile unsigned char *cfg_data;
-	volatile unsigned long *phb_regs;
-	volatile unsigned long *chip_regs;
 
 	/* Currently, we limit ourselves to 1 IO range and 3 mem
 	 * ranges since the common pci_bus structure can't handle more
@@ -68,28 +64,12 @@ struct pci_controller {
 	struct resource io_resource;
 	struct resource mem_resources[3];
 	int mem_resource_count;
-	int    global_number;		
-	int    local_number;		
-	int    system_bus_number;	
+	int global_number;		
+	int local_number;		
 	unsigned long buid;
 	unsigned long dma_window_base_cur;
 	unsigned long dma_window_size;
 };
-
-
-/* This version handles the new Uni-N host bridge, the iobase is now
- * a per-device thing. I also added the memory base so PReP can
- * be fixed to return 0xc0000000 (I didn't actually implement it)
- *
- * pci_dev_io_base() returns either a virtual (ioremap'ed) address or
- * a physical address. In-kernel clients will use logical while the
- * sys_pciconfig_iobase syscall returns a physical one to userland.
- */
-void *pci_dev_io_base(unsigned char bus, unsigned char devfn, int physical);
-void *pci_dev_mem_base(unsigned char bus, unsigned char devfn);
-
-/* Returns the root-bridge number (Uni-N number) of a device */
-int pci_dev_root_bridge(unsigned char bus, unsigned char devfn);
 
 /*
  * pci_device_loc returns the bus number and device/function number
@@ -98,17 +78,6 @@ int pci_dev_root_bridge(unsigned char bus, unsigned char devfn);
  */
 int pci_device_loc(struct device_node *dev, unsigned char *bus_ptr,
 		   unsigned char *devfn_ptr);
-
-struct bridge_data {
-	volatile unsigned int *cfg_addr;
-	volatile unsigned char *cfg_data;
-	void *io_base;		/* virtual */
-	unsigned long io_base_phys;
-	int bus_number;
-	int max_bus;
-	struct bridge_data *next;
-	struct device_node *node;
-};
 
 #endif
 #endif /* __KERNEL__ */

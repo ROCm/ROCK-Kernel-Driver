@@ -8,9 +8,9 @@
  * as published by the Free Software Foundation; either version
  * 2 of the License, or (at your option) any later version.
  */
-#include <asm/ppc_asm.tmpl>
 #include <asm/processor.h>
 #include <asm/errno.h>
+#include <asm/ppc_asm.h>
 
 _GLOBAL(strcpy)
 	addi	r5,r3,-1

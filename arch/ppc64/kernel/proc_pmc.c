@@ -24,7 +24,6 @@
  * End Change Activity 
  */
 
-#include <linux/config.h>
 #include <linux/proc_fs.h>
 #include <linux/spinlock.h>
 

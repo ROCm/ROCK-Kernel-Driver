@@ -53,8 +53,6 @@
 #include <asm/machdep.h>
 #include <asm/paca.h>
 
-#include "local_irq.h"
-
 void enable_irq(unsigned int irq_nr);
 void disable_irq(unsigned int irq_nr);
 
@@ -69,7 +67,6 @@ irq_desc_t irq_desc[NR_IRQS] __cacheline_aligned =
 	{ [0 ... NR_IRQS-1] = { 0, NULL, NULL, 0, SPIN_LOCK_UNLOCKED}};
 	
 int ppc_spurious_interrupts = 0;
-struct irqaction *ppc_irq_action[NR_IRQS];
 unsigned long lpEvent_count = 0;
 
 /* nasty hack for shared irq's since we need to do kmalloc calls but

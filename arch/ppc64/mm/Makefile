@@ -12,5 +12,6 @@ EXTRA_CFLAGS = -mno-minimal-toc
 O_TARGET := mm.o
 
 obj-y           := fault.o init.o extable.o imalloc.o
+obj-$(CONFIG_DISCONTIGMEM) += numa.o
 
 include $(TOPDIR)/Rules.make
