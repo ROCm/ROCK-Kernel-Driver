@@ -737,21 +737,66 @@ out:
  * detach and kill segment if marked destroyed.
  * The work is done in shm_close.
  */
-asmlinkage long sys_shmdt (char *shmaddr)
+asmlinkage long sys_shmdt(char *shmaddr)
 {
 	struct mm_struct *mm = current->mm;
-	struct vm_area_struct *shmd, *shmdnext;
+	struct vm_area_struct *vma, *next;
+	unsigned long addr = (unsigned long)shmaddr;
+	loff_t size = 0;
 	int retval = -EINVAL;
 
 	down_write(&mm->mmap_sem);
-	for (shmd = mm->mmap; shmd; shmd = shmdnext) {
-		shmdnext = shmd->vm_next;
-		if ((shmd->vm_ops == &shm_vm_ops || (shmd->vm_flags & VM_HUGETLB))
-		    && shmd->vm_start - (shmd->vm_pgoff << PAGE_SHIFT) == (ulong) shmaddr) {
-			do_munmap(mm, shmd->vm_start, shmd->vm_end - shmd->vm_start);
+
+	/*
+	 * If it had been mremap()'d, the starting address would not
+	 * match the usual checks anyway. So assume all vma's are
+	 * above the starting address given.
+	 */
+	vma = find_vma(mm, addr);
+
+	while (vma) {
+		next = vma->vm_next;
+
+		/*
+		 * Check if the starting address would match, i.e. it's
+		 * a fragment created by mprotect() and/or munmap(), or it
+		 * otherwise it starts at this address with no hassles.
+		 */
+		if ((vma->vm_ops == &shm_vm_ops || is_vm_hugetlb_page(vma)) &&
+			(vma->vm_start - addr)/PAGE_SIZE == vma->vm_pgoff) {
+
+
+			size = vma->vm_file->f_dentry->d_inode->i_size;
+			do_munmap(mm, vma->vm_start, vma->vm_end - vma->vm_start);
+			/*
+			 * We discovered the size of the shm segment, so
+			 * break out of here and fall through to the next
+			 * loop that uses the size information to stop
+			 * searching for matching vma's.
+			 */
 			retval = 0;
+			vma = next;
+			break;
 		}
+		vma = next;
 	}
+
+	/*
+	 * We need look no further than the maximum address a fragment
+	 * could possibly have landed at. Also cast things to loff_t to
+	 * prevent overflows and make comparisions vs. equal-width types.
+	 */
+	while (vma && (loff_t)(vma->vm_end - addr) <= size) {
+		next = vma->vm_next;
+
+		/* finding a matching vma now does not alter retval */
+		if ((vma->vm_ops == &shm_vm_ops || is_vm_hugetlb_page(vma)) &&
+			(vma->vm_start - addr)/PAGE_SIZE == vma->vm_pgoff)
+
+			do_munmap(mm, vma->vm_start, vma->vm_end - vma->vm_start);
+		vma = next;
+	}
+
 	up_write(&mm->mmap_sem);
 	return retval;
 }
