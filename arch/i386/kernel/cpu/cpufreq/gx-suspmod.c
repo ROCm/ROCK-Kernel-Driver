@@ -297,6 +297,7 @@ static void gx_set_cpuspeed(unsigned int khz)
 		case PCI_DEVICE_ID_CYRIX_5520:
 		case PCI_DEVICE_ID_CYRIX_5510:
 			suscfg = gx_params->pci_suscfg | SUSMOD;
+			break;
 		default:
 			local_irq_restore(flags);
 			dprintk("fatal: try to set unknown chipset.\n");
