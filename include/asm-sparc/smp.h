@@ -33,9 +33,6 @@ extern unsigned char boot_cpu_id;
 extern cpumask_t phys_cpu_present_map;
 #define cpu_possible_map phys_cpu_present_map
 
-extern atomic_t sparc_num_cpus_possible;
-#define num_possible_cpus()	(atomic_read(&sparc_num_cpus_possible))
-
 typedef void (*smpfunc_t)(unsigned long, unsigned long, unsigned long,
 		       unsigned long, unsigned long);
 
@@ -168,10 +165,6 @@ extern __inline__ int hard_smp_processor_id(void)
 #define MBOX_IDLECPU          0xFC
 #define MBOX_IDLECPU2         0xFD
 #define MBOX_STOPCPU2         0xFE
-
-#else /* SMP */
-
-#define num_possible_cpus()	(1)
 
 #endif /* SMP */
 
