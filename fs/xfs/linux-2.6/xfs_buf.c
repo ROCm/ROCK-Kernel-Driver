@@ -734,8 +734,6 @@ pagebuf_readahead(
 	bdi = target->pbr_mapping->backing_dev_info;
 	if (bdi_read_congested(bdi))
 		return;
-	if (bdi_write_congested(bdi))
-		return;
 
 	flags |= (PBF_TRYLOCK|PBF_ASYNC|PBF_READ_AHEAD);
 	xfs_buf_read_flags(target, ioff, isize, flags);
