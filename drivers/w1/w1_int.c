@@ -89,17 +89,14 @@ struct w1_master * w1_alloc_dev(u32 id, int slave_count, int slave_ttl,
 	dev->seq = 1;
 	dev->nls = netlink_kernel_create(NETLINK_NFLOG, NULL);
 	if (!dev->nls) {
-		printk(KERN_ERR "Failed to create new netlink socket(%u).\n",
-			NETLINK_NFLOG);
-		memset(dev, 0, sizeof(struct w1_master));
-		kfree(dev);
-		dev = NULL;
+		printk(KERN_ERR "Failed to create new netlink socket(%u) for w1 master %s.\n",
+			NETLINK_NFLOG, dev->dev.bus_id);
 	}
 
 	err = device_register(&dev->dev);
 	if (err) {
 		printk(KERN_ERR "Failed to register master device. err=%d\n", err);
-		if (dev->nls->sk_socket)
+		if (dev->nls && dev->nls->sk_socket)
 			sock_release(dev->nls->sk_socket);
 		memset(dev, 0, sizeof(struct w1_master));
 		kfree(dev);
@@ -112,7 +109,7 @@ struct w1_master * w1_alloc_dev(u32 id, int slave_count, int slave_ttl,
 void w1_free_dev(struct w1_master *dev)
 {
 	device_unregister(&dev->dev);
-	if (dev->nls->sk_socket)
+	if (dev->nls && dev->nls->sk_socket)
 		sock_release(dev->nls->sk_socket);
 	memset(dev, 0, sizeof(struct w1_master) + sizeof(struct w1_bus_master));
 	kfree(dev);
