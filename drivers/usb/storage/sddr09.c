@@ -662,31 +662,24 @@ sddr09_read_status(struct us_data *us, unsigned char *status) {
 static int
 sddr09_read_data(struct us_data *us,
 		 unsigned long address,
-		 unsigned int sectors,
-		 unsigned char *buffer,
-		 int use_sg) {
+		 unsigned int sectors) {
 
 	struct sddr09_card_info *info = (struct sddr09_card_info *) us->extra;
+	unsigned char *buffer;
 	unsigned int lba, maxlba, pba;
 	unsigned int page, pages;
 	unsigned int len, index, offset;
 	int result;
 
 	// Since we only read in one block at a time, we have to create
-	// a bounce buffer if the transfer uses scatter-gather.  We will
-	// move the data a piece at a time between the bounce buffer and
-	// the actual transfer buffer.  If we're not using scatter-gather,
-	// we can simply update the transfer buffer pointer to get the
-	// same effect.
+	// a bounce buffer and move the data a piece at a time between the
+	// bounce buffer and the actual transfer buffer.
 
-	if (use_sg) {
-		len = min(sectors, (unsigned int) info->blocksize) *
-				info->pagesize;
-		buffer = kmalloc(len, GFP_NOIO);
-		if (buffer == NULL) {
-			printk("sddr09_read_data: Out of memory\n");
-			return USB_STOR_TRANSPORT_ERROR;
-		}
+	len = min(sectors, (unsigned int) info->blocksize) * info->pagesize;
+	buffer = kmalloc(len, GFP_NOIO);
+	if (buffer == NULL) {
+		printk("sddr09_read_data: Out of memory\n");
+		return USB_STOR_TRANSPORT_ERROR;
 	}
 
 	// Figure out the initial LBA and page
@@ -743,21 +736,16 @@ sddr09_read_data(struct us_data *us,
 				break;
 		}
 
-		// Store the data (s-g) or update the pointer (!s-g)
-		if (use_sg)
-			usb_stor_access_xfer_buf(buffer, len, us->srb,
-					&index, &offset, TO_XFER_BUF);
-		else
-			buffer += len;
+		// Store the data in the transfer buffer
+		usb_stor_access_xfer_buf(buffer, len, us->srb,
+				&index, &offset, TO_XFER_BUF);
 
 		page = 0;
 		lba++;
 		sectors -= pages;
 	}
 
-	if (use_sg)
-		kfree(buffer);
-
+	kfree(buffer);
 	return result;
 }
 
@@ -897,14 +885,13 @@ sddr09_write_lba(struct us_data *us, unsigned int lba,
 static int
 sddr09_write_data(struct us_data *us,
 		  unsigned long address,
-		  unsigned int sectors,
-		  unsigned char *buffer,
-		  int use_sg) {
+		  unsigned int sectors) {
 
 	struct sddr09_card_info *info = (struct sddr09_card_info *) us->extra;
 	unsigned int lba, page, pages;
 	unsigned int pagelen, blocklen;
 	unsigned char *blockbuffer;
+	unsigned char *buffer;
 	unsigned int len, index, offset;
 	int result;
 
@@ -923,21 +910,15 @@ sddr09_write_data(struct us_data *us,
 	}
 
 	// Since we don't write the user data directly to the device,
-	// we have to create a bounce buffer if the transfer uses
-	// scatter-gather.  We will move the data a piece at a time
-	// between the bounce buffer and the actual transfer buffer.
-	// If we're not using scatter-gather, we can simply update
-	// the transfer buffer pointer to get the same effect.
+	// we have to create a bounce buffer and move the data a piece
+	// at a time between the bounce buffer and the actual transfer buffer.
 
-	if (use_sg) {
-		len = min(sectors, (unsigned int) info->blocksize) *
-				info->pagesize;
-		buffer = kmalloc(len, GFP_NOIO);
-		if (buffer == NULL) {
-			printk("sddr09_write_data: Out of memory\n");
-			kfree(blockbuffer);
-			return USB_STOR_TRANSPORT_ERROR;
-		}
+	len = min(sectors, (unsigned int) info->blocksize) * info->pagesize;
+	buffer = kmalloc(len, GFP_NOIO);
+	if (buffer == NULL) {
+		printk("sddr09_write_data: Out of memory\n");
+		kfree(blockbuffer);
+		return USB_STOR_TRANSPORT_ERROR;
 	}
 
 	// Figure out the initial LBA and page
@@ -954,27 +935,21 @@ sddr09_write_data(struct us_data *us,
 		pages = min(sectors, info->blocksize - page);
 		len = (pages << info->pageshift);
 
-		// Get the data from the transfer buffer (s-g)
-		if (use_sg)
-			usb_stor_access_xfer_buf(buffer, len, us->srb,
-					&index, &offset, FROM_XFER_BUF);
+		// Get the data from the transfer buffer
+		usb_stor_access_xfer_buf(buffer, len, us->srb,
+				&index, &offset, FROM_XFER_BUF);
 
 		result = sddr09_write_lba(us, lba, page, pages,
 				buffer, blockbuffer);
 		if (result != USB_STOR_TRANSPORT_GOOD)
 			break;
 
-		// Update the transfer buffer pointer (!s-g)
-		if (!use_sg)
-			buffer += len;
-
 		page = 0;
 		lba++;
 		sectors -= pages;
 	}
 
-	if (use_sg)
-		kfree(buffer);
+	kfree(buffer);
 	kfree(blockbuffer);
 
 	return result;
@@ -1546,7 +1521,7 @@ int sddr09_transport(Scsi_Cmnd *srb, struct us_data *us)
 		US_DEBUGP("READ_10: read page %d pagect %d\n",
 			  page, pages);
 
-		return sddr09_read_data(us, page, pages, ptr, srb->use_sg);
+		return sddr09_read_data(us, page, pages);
 	}
 
 	if (srb->cmnd[0] == WRITE_10) {
@@ -1559,7 +1534,7 @@ int sddr09_transport(Scsi_Cmnd *srb, struct us_data *us)
 		US_DEBUGP("WRITE_10: write page %d pagect %d\n",
 			  page, pages);
 
-		return sddr09_write_data(us, page, pages, ptr, srb->use_sg);
+		return sddr09_write_data(us, page, pages);
 	}
 
 	// Pass TEST_UNIT_READY and REQUEST_SENSE through

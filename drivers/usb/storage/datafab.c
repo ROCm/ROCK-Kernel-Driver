@@ -89,11 +89,10 @@ datafab_bulk_write(struct us_data *us, unsigned char *data, unsigned int len) {
 static int datafab_read_data(struct us_data *us,
 			     struct datafab_info *info,
 			     u32 sector,
-			     u32 sectors, 
-			     unsigned char *buffer, 
-			     int use_sg)
+			     u32 sectors)
 {
 	unsigned char *command = us->iobuf;
+	unsigned char *buffer;
 	unsigned char  thistime;
 	unsigned int totallen, alloclen;
 	int len, result;
@@ -116,18 +115,13 @@ static int datafab_read_data(struct us_data *us,
 	totallen = sectors * info->ssize;
 
 	// Since we don't read more than 64 KB at a time, we have to create
-	// a bounce buffer if the transfer uses scatter-gather.  We will
-	// move the data a piece at a time between the bounce buffer and
-	// the actual transfer buffer.  If we're not using scatter-gather,
-	// we can simply update the transfer buffer pointer to get the
-	// same effect.
+	// a bounce buffer and move the data a piece at a time between the
+	// bounce buffer and the actual transfer buffer.
 
 	alloclen = min(totallen, 65536u);
-	if (use_sg) {
-		buffer = kmalloc(alloclen, GFP_NOIO);
-		if (buffer == NULL)
-			return USB_STOR_TRANSPORT_ERROR;
-	}
+	buffer = kmalloc(alloclen, GFP_NOIO);
+	if (buffer == NULL)
+		return USB_STOR_TRANSPORT_ERROR;
 
 	do {
 		// loop, never allocate or transfer more than 64k at once
@@ -157,24 +151,19 @@ static int datafab_read_data(struct us_data *us,
 		if (result != USB_STOR_XFER_GOOD)
 			goto leave;
 
-		// Store the data (s-g) or update the pointer (!s-g)
-		if (use_sg)
-			usb_stor_access_xfer_buf(buffer, len, us->srb,
-					 &sg_idx, &sg_offset, TO_XFER_BUF);
-		else
-			buffer += len;
+		// Store the data in the transfer buffer
+		usb_stor_access_xfer_buf(buffer, len, us->srb,
+				 &sg_idx, &sg_offset, TO_XFER_BUF);
 
 		sector += thistime;
 		totallen -= len;
 	} while (totallen > 0);
 
-	if (use_sg)
-		kfree(buffer);
+	kfree(buffer);
 	return USB_STOR_TRANSPORT_GOOD;
 
  leave:
-	if (use_sg)
-		kfree(buffer);
+	kfree(buffer);
 	return USB_STOR_TRANSPORT_ERROR;
 }
 
@@ -182,12 +171,11 @@ static int datafab_read_data(struct us_data *us,
 static int datafab_write_data(struct us_data *us,
 			      struct datafab_info *info,
 			      u32 sector,
-			      u32 sectors, 
-			      unsigned char *buffer, 
-			      int use_sg)
+			      u32 sectors)
 {
 	unsigned char *command = us->iobuf;
 	unsigned char *reply = us->iobuf;
+	unsigned char *buffer;
 	unsigned char thistime;
 	unsigned int totallen, alloclen;
 	int len, result;
@@ -210,18 +198,13 @@ static int datafab_write_data(struct us_data *us,
 	totallen = sectors * info->ssize;
 
 	// Since we don't write more than 64 KB at a time, we have to create
-	// a bounce buffer if the transfer uses scatter-gather.  We will
-	// move the data a piece at a time between the bounce buffer and
-	// the actual transfer buffer.  If we're not using scatter-gather,
-	// we can simply update the transfer buffer pointer to get the
-	// same effect.
+	// a bounce buffer and move the data a piece at a time between the
+	// bounce buffer and the actual transfer buffer.
 
 	alloclen = min(totallen, 65536u);
-	if (use_sg) {
-		buffer = kmalloc(alloclen, GFP_NOIO);
-		if (buffer == NULL)
-			return USB_STOR_TRANSPORT_ERROR;
-	}
+	buffer = kmalloc(alloclen, GFP_NOIO);
+	if (buffer == NULL)
+		return USB_STOR_TRANSPORT_ERROR;
 
 	do {
 		// loop, never allocate or transfer more than 64k at once
@@ -230,10 +213,9 @@ static int datafab_write_data(struct us_data *us,
 		len = min(totallen, alloclen);
 		thistime = (len / info->ssize) & 0xff;
 
-		// Get the data from the transfer buffer (s-g)
-		if (use_sg)
-			usb_stor_access_xfer_buf(buffer, len, us->srb,
-					&sg_idx, &sg_offset, FROM_XFER_BUF);
+		// Get the data from the transfer buffer
+		usb_stor_access_xfer_buf(buffer, len, us->srb,
+				&sg_idx, &sg_offset, FROM_XFER_BUF);
 
 		command[0] = 0;
 		command[1] = thistime;
@@ -269,21 +251,15 @@ static int datafab_write_data(struct us_data *us,
 			goto leave;
 		}
 
-		// Update the transfer buffer pointer (!s-g)
-		if (!use_sg)
-			buffer += len;
-
 		sector += thistime;
 		totallen -= len;
 	} while (totallen > 0);
 
-	if (use_sg)
-		kfree(buffer);
+	kfree(buffer);
 	return USB_STOR_TRANSPORT_GOOD;
 
  leave:
-	if (use_sg)
-		kfree(buffer);
+	kfree(buffer);
 	return USB_STOR_TRANSPORT_ERROR;
 }
 
@@ -615,7 +591,7 @@ int datafab_transport(Scsi_Cmnd * srb, struct us_data *us)
 		blocks = ((u32)(srb->cmnd[7]) << 8) | ((u32)(srb->cmnd[8]));
 
 		US_DEBUGP("datafab_transport:  READ_10: read block 0x%04lx  count %ld\n", block, blocks);
-		return datafab_read_data(us, info, block, blocks, ptr, srb->use_sg);
+		return datafab_read_data(us, info, block, blocks);
 	}
 
 	if (srb->cmnd[0] == READ_12) {
@@ -628,7 +604,7 @@ int datafab_transport(Scsi_Cmnd * srb, struct us_data *us)
 			 ((u32)(srb->cmnd[8]) <<  8) | ((u32)(srb->cmnd[9]));
 
 		US_DEBUGP("datafab_transport:  READ_12: read block 0x%04lx  count %ld\n", block, blocks);
-		return datafab_read_data(us, info, block, blocks, ptr, srb->use_sg);
+		return datafab_read_data(us, info, block, blocks);
 	}
 
 	if (srb->cmnd[0] == WRITE_10) {
@@ -638,7 +614,7 @@ int datafab_transport(Scsi_Cmnd * srb, struct us_data *us)
 		blocks = ((u32)(srb->cmnd[7]) << 8) | ((u32)(srb->cmnd[8]));
 
 		US_DEBUGP("datafab_transport:  WRITE_10: write block 0x%04lx  count %ld\n", block, blocks);
-		return datafab_write_data(us, info, block, blocks, ptr, srb->use_sg);
+		return datafab_write_data(us, info, block, blocks);
 	}
 
 	if (srb->cmnd[0] == WRITE_12) {
@@ -651,7 +627,7 @@ int datafab_transport(Scsi_Cmnd * srb, struct us_data *us)
 			 ((u32)(srb->cmnd[8]) <<  8) | ((u32)(srb->cmnd[9]));
 
 		US_DEBUGP("datafab_transport:  WRITE_12: write block 0x%04lx  count %ld\n", block, blocks);
-		return datafab_write_data(us, info, block, blocks, ptr, srb->use_sg);
+		return datafab_write_data(us, info, block, blocks);
 	}
 
 	if (srb->cmnd[0] == TEST_UNIT_READY) {
