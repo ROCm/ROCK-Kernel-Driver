@@ -178,17 +178,6 @@ static struct net_device *init_netdev(struct net_device *dev, int sizeof_priv,
 	return dev;
 }
 
-#if defined(CONFIG_HIPPI) || defined(CONFIG_TR) || defined(CONFIG_NET_FC)
-static int __register_netdev(struct net_device *dev)
-{
-	if (dev->init && dev->init(dev) != 0) {
-		unregister_netdev(dev);
-		return -EIO;
-	}
-	return 0;
-}
-#endif
-
 /**
  * init_etherdev - Register ethernet device
  * @dev: An ethernet device structure to be filled in, or %NULL if a new
@@ -536,28 +525,6 @@ void tr_setup(struct net_device *dev)
 }
 
 /**
- * init_trdev - Register token ring device
- * @dev: A token ring device structure to be filled in, or %NULL if a new
- *	struct should be allocated.
- * @sizeof_priv: Size of additional driver-private structure to be allocated
- *	for this ethernet device
- *
- * Fill in the fields of the device structure with token ring-generic values.
- *
- * If no device structure is passed, a new one is constructed, complete with
- * a private data area of size @sizeof_priv.  A 32-byte (not bit)
- * alignment is enforced for this private data area.
- *
- * If an empty string area is passed as dev->name, or a new structure is made,
- * a new name string is constructed.
- */
-
-struct net_device *init_trdev(struct net_device *dev, int sizeof_priv)
-{
-	return init_netdev(dev, sizeof_priv, "tr%d", tr_setup);
-}
-
-/**
  * alloc_trdev - Register token ring device
  * @sizeof_priv: Size of additional driver-private structure to be allocated
  *	for this token ring device
@@ -574,21 +541,8 @@ struct net_device *alloc_trdev(int sizeof_priv)
 	return alloc_netdev(sizeof_priv, "tr%d", tr_setup);
 }
 
-int register_trdev(struct net_device *dev)
-{
-	return __register_netdev(dev);
-}
-
-void unregister_trdev(struct net_device *dev)
-{
-	unregister_netdev(dev);
-}
-
 EXPORT_SYMBOL(tr_setup);
-EXPORT_SYMBOL(init_trdev);
 EXPORT_SYMBOL(alloc_trdev);
-EXPORT_SYMBOL(register_trdev);
-EXPORT_SYMBOL(unregister_trdev);
 
 #endif /* CONFIG_TR */
 
