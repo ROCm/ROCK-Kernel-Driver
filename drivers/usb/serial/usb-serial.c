@@ -14,6 +14,10 @@
  *
  * See Documentation/usb/usb-serial.txt for more information on using this driver
  *
+ * (12/10/2002) gkh
+ *	Split the ports off into their own struct device, and added a
+ *	usb-serial bus driver.
+ *
  * (11/19/2002) gkh
  *	removed a few #ifdefs for the generic code and cleaned up the failure
  *	logic in initialization.
@@ -345,7 +349,7 @@
 /*
  * Version Information
  */
-#define DRIVER_VERSION "v1.8"
+#define DRIVER_VERSION "v2.0"
 #define DRIVER_AUTHOR "Greg Kroah-Hartman, greg@kroah.com, http://www.kroah.com/linux/"
 #define DRIVER_DESC "USB Serial Driver core"
 
@@ -384,6 +388,32 @@ static struct termios *		serial_termios[SERIAL_TTY_MINORS];
 static struct termios *		serial_termios_locked[SERIAL_TTY_MINORS];
 static struct usb_serial	*serial_table[SERIAL_TTY_MINORS];	/* initially all NULL */
 static LIST_HEAD(usb_serial_driver_list);
+
+static int usb_serial_device_match (struct device *dev, struct device_driver *drv)
+{
+	struct usb_serial_device_type *driver;
+	const struct usb_serial_port *port;
+
+	/* 
+	 * drivers are already assigned to ports in serial_probe so it's
+	 * a simple check here.
+	 */
+	port = to_usb_serial_port(dev);
+	if (!port)
+		return 0;
+
+	driver = to_usb_serial_driver(drv);
+
+	if (driver == port->serial->type)
+		return 1;
+
+	return 0;
+}
+
+static struct bus_type usb_serial_bus_type = {
+	.name =		"usb-serial",
+	.match =	usb_serial_device_match,
+};
 
 struct usb_serial *usb_serial_get_by_minor (unsigned int minor)
 {
@@ -1132,11 +1162,17 @@ int usb_serial_probe(struct usb_interface *interface,
 		}
 	}
 
-	/* initialize the devfs nodes for this device and let the user know what ports we are bound to */
-	for (i = 0; i < serial->num_ports; ++i) {
-		tty_register_devfs (&serial_tty_driver, 0, serial->port[i].number);
-		info("%s converter now attached to ttyUSB%d (or usb/tts/%d for devfs)", 
-		     type->name, serial->port[i].number, serial->port[i].number);
+	/* register all of the individual ports with the driver core */
+	for (i = 0; i < num_ports; ++i) {
+		port = &serial->port[i];
+		port->dev.parent = &serial->dev->dev;
+		port->dev.driver = NULL;
+		port->dev.bus = &usb_serial_bus_type;
+
+		snprintf (&port->dev.bus_id[0], sizeof(port->dev.bus_id), "ttyUSB%d", port->number);
+		snprintf (&port->dev.name[0], sizeof(port->dev.name), "usb serial port %d", port->number);
+		dbg ("%s - registering %s", __FUNCTION__, port->dev.bus_id);
+		device_register (&port->dev);
 	}
 
 	usb_serial_console_init (debug, minor);
@@ -1204,6 +1240,9 @@ void usb_serial_disconnect(struct usb_interface *interface)
 		serial_shutdown (serial);
 
 		for (i = 0; i < serial->num_ports; ++i)
+			device_unregister(&serial->port[i].dev);
+
+		for (i = 0; i < serial->num_ports; ++i)
 			serial->port[i].open_count = 0;
 
 		for (i = 0; i < serial->num_bulk_in; ++i) {
@@ -1233,12 +1272,6 @@ void usb_serial_disconnect(struct usb_interface *interface)
 			if (port->interrupt_in_buffer)
 				kfree (port->interrupt_in_buffer);
 		}
-
-		for (i = 0; i < serial->num_ports; ++i) {
-			tty_unregister_devfs (&serial_tty_driver, serial->port[i].number);
-			info("%s converter now disconnected from ttyUSB%d", serial->type->name, serial->port[i].number);
-		}
-
 		/* return the minor range that this device had */
 		return_serial (serial);
 
@@ -1294,6 +1327,8 @@ static int __init usb_serial_init(void)
 		serial_table[i] = NULL;
 	}
 
+	bus_register(&usb_serial_bus_type);
+
 	/* register the generic driver, if we should */
 	result = usb_serial_generic_register(debug);
 	if (result < 0) {
@@ -1341,21 +1376,103 @@ static void __exit usb_serial_exit(void)
 
 	usb_deregister(&usb_serial_driver);
 	tty_unregister_driver(&serial_tty_driver);
+	bus_unregister(&usb_serial_bus_type);
 }
 
 
 module_init(usb_serial_init);
 module_exit(usb_serial_exit);
 
+static int usb_serial_device_probe (struct device *dev)
+{
+	struct usb_serial_device_type *driver;
+	struct usb_serial_port *port;
+	int retval = 0;
+	int minor;
+
+	port = to_usb_serial_port(dev);
+	if (!port) {
+		retval = -ENODEV;
+		goto exit;
+	}
+
+	driver = port->serial->type;
+	if (driver->port_probe) {
+		if (!try_module_get(driver->owner)) {
+			err ("module get failed, exiting");
+			retval = -EIO;
+			goto exit;
+		}
+		retval = driver->port_probe (port);
+		module_put(driver->owner);
+		if (retval)
+			goto exit;
+	}
+
+	minor = port->number;
+
+	tty_register_devfs (&serial_tty_driver, 0, minor);
+	info("%s converter now attached to ttyUSB%d (or usb/tts/%d for devfs)",
+	     driver->name, minor, minor);
+
+exit:
+	return retval;
+}
+
+static int usb_serial_device_remove (struct device *dev)
+{
+	struct usb_serial_device_type *driver;
+	struct usb_serial_port *port;
+	int retval = 0;
+	int minor;
+
+	port = to_usb_serial_port(dev);
+	if (!port) {
+		return -ENODEV;
+	}
+
+	driver = port->serial->type;
+	if (driver->port_remove) {
+		if (!try_module_get(driver->owner)) {
+			err ("module get failed, exiting");
+			retval = -EIO;
+			goto exit;
+		}
+		retval = driver->port_remove (port);
+		module_put(driver->owner);
+	}
+exit:
+	minor = port->number;
+	tty_unregister_devfs (&serial_tty_driver, minor);
+	info("%s converter now disconnected from ttyUSB%d",
+	     driver->name, minor);
+
+	return retval;
+}
 
 int usb_serial_register(struct usb_serial_device_type *new_device)
 {
+	int retval;
+
 	/* Add this device to our list of devices */
 	list_add(&new_device->driver_list, &usb_serial_driver_list);
 
-	info ("USB Serial support registered for %s", new_device->name);
+	new_device->driver.name = (char *)new_device->name;
+	new_device->driver.bus = &usb_serial_bus_type;
+	new_device->driver.probe = usb_serial_device_probe;
+	new_device->driver.remove = usb_serial_device_remove;
 
-	return 0;
+	retval = driver_register(&new_device->driver);
+
+	if (!retval) {
+		info("USB Serial support registered for %s",
+			new_device->name);
+	} else {
+		err("problem %d when registering driver %s",
+			retval, new_device->name);
+	}
+
+	return retval;
 }
 
 
