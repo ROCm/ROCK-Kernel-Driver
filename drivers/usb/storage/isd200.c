@@ -548,10 +548,9 @@ void isd200_invoke_transport( struct us_data *us,
 	/* if the command gets aborted by the higher layers, we need to
 	 * short-circuit all other processing
 	 */
-	if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
-		US_DEBUGP("-- transport indicates command was aborted\n");
-		srb->result = DID_ABORT << 16;
-		return;
+	if (us->sm_state == US_STATE_ABORTING) {
+		US_DEBUGP("-- command was aborted\n");
+		goto Handle_Abort;
 	}
 
 	switch (transferStatus) {
@@ -560,6 +559,11 @@ void isd200_invoke_transport( struct us_data *us,
 		/* Indicate a good result */
 		srb->result = SAM_STAT_GOOD;
 		break;
+
+	case USB_STOR_TRANSPORT_NO_SENSE:
+		US_DEBUGP("-- transport indicates protocol failure\n");
+		srb->result = SAM_STAT_CHECK_CONDITION;
+		return;
 
 	case USB_STOR_TRANSPORT_FAILED:
 		US_DEBUGP("-- transport indicates command failure\n");
@@ -591,10 +595,9 @@ void isd200_invoke_transport( struct us_data *us,
 
 	if (need_auto_sense) {
 		result = isd200_read_regs(us);
-		if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
+		if (us->sm_state == US_STATE_ABORTING) {
 			US_DEBUGP("-- auto-sense aborted\n");
-			srb->result = DID_ABORT << 16;
-			return;
+			goto Handle_Abort;
 		}
 		if (result == ISD200_GOOD) {
 			isd200_build_sense(us, srb);
@@ -603,8 +606,10 @@ void isd200_invoke_transport( struct us_data *us,
 			/* If things are really okay, then let's show that */
 			if ((srb->sense_buffer[2] & 0xf) == 0x0)
 				srb->result = SAM_STAT_GOOD;
-		} else
+		} else {
 			srb->result = DID_ERROR << 16;
+			/* Need reset here */
+		}
 	}
 
 	/* Regardless of auto-sense, if we _know_ we have an error
@@ -612,6 +617,16 @@ void isd200_invoke_transport( struct us_data *us,
 	 */
 	if (transferStatus == USB_STOR_TRANSPORT_FAILED)
 		srb->result = SAM_STAT_CHECK_CONDITION;
+	return;
+
+	/* abort processing: the bulk-only transport requires a reset
+	 * following an abort */
+	Handle_Abort:
+	srb->result = DID_ABORT << 16;
+
+	/* permit the reset transfer to take place */
+	clear_bit(US_FLIDX_ABORTING, &us->flags);
+	/* Need reset here */
 }
 
 #ifdef CONFIG_USB_STORAGE_DEBUG

@@ -328,13 +328,13 @@ static int usb_stor_control_thread(void * __us)
 		scsi_lock(host);
 
 		/* has the command been aborted *already* ? */
-		if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
+		if (us->sm_state == US_STATE_ABORTING) {
 			us->srb->result = DID_ABORT << 16;
 			goto SkipForAbort;
 		}
 
 		/* set the state and release the lock */
-		atomic_set(&us->sm_state, US_STATE_RUNNING);
+		us->sm_state = US_STATE_RUNNING;
 		scsi_unlock(host);
 
 		/* lock the device pointers */
@@ -404,12 +404,12 @@ static int usb_stor_control_thread(void * __us)
 		 * sm_state == US_STATE_ABORTING, not srb->result == DID_ABORT,
 		 * because an abort request might be received after all the
 		 * USB processing was complete. */
-		if (atomic_read(&us->sm_state) == US_STATE_ABORTING)
+		if (us->sm_state == US_STATE_ABORTING)
 			complete(&(us->notify));
 
 		/* empty the queue, reset the state, and release the lock */
 		us->srb = NULL;
-		atomic_set(&us->sm_state, US_STATE_IDLE);
+		us->sm_state = US_STATE_IDLE;
 		scsi_unlock(host);
 	} /* for (;;) */
 
@@ -447,7 +447,7 @@ static void get_device_info(struct us_data *us,
 	if (dev->descriptor.iProduct)
 		usb_string(dev, dev->descriptor.iProduct, 
 			   us->product, sizeof(us->product));
-	if (dev->descriptor.iSerialNumber && !(us->flags & US_FL_IGNORE_SER))
+	if (dev->descriptor.iSerialNumber)
 		usb_string(dev, dev->descriptor.iSerialNumber, 
 			   us->serial, sizeof(us->serial));
 
@@ -698,13 +698,6 @@ static int usb_stor_acquire_resources(struct us_data *us)
 		return -ENOMEM;
 	}
 
-	US_DEBUGP("Allocating scatter-gather request block\n");
-	us->current_sg = kmalloc(sizeof(*us->current_sg), GFP_KERNEL);
-	if (!us->current_sg) {
-		US_DEBUGP("allocation failed\n");
-		return -ENOMEM;
-	}
-
 	/* Lock the device while we carry out the next two operations */
 	down(&us->dev_semaphore);
 
@@ -720,7 +713,7 @@ static int usb_stor_acquire_resources(struct us_data *us)
 	up(&us->dev_semaphore);
 
 	/* Start up our control thread */
-	atomic_set(&us->sm_state, US_STATE_IDLE);
+	us->sm_state = US_STATE_IDLE;
 	p = kernel_thread(usb_stor_control_thread, us, CLONE_VM);
 	if (p < 0) {
 		printk(KERN_WARNING USB_STORAGE 
@@ -782,7 +775,7 @@ void usb_stor_release_resources(struct us_data *us)
 	 */
 	if (us->pid) {
 		US_DEBUGP("-- sending exit command to thread\n");
-		BUG_ON(atomic_read(&us->sm_state) != US_STATE_IDLE);
+		BUG_ON(us->sm_state != US_STATE_IDLE);
 		us->srb = NULL;
 		up(&(us->sema));
 		wait_for_completion(&(us->notify));
@@ -800,8 +793,6 @@ void usb_stor_release_resources(struct us_data *us)
 	}
 
 	/* Free the USB control blocks */
-	if (us->current_sg)
-		kfree(us->current_sg);
 	if (us->current_urb)
 		usb_free_urb(us->current_urb);
 	if (us->dr)

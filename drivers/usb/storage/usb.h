@@ -139,7 +139,7 @@ struct us_data {
 
 	/* thread information */
 	int			pid;		 /* control thread	 */
-	atomic_t		sm_state;	 /* what we are doing	 */
+	int			sm_state;	 /* what we are doing	 */
 
 	/* interrupt communications data */
 	unsigned char		irqdata[2];	 /* data from USB IRQ	 */
@@ -147,7 +147,7 @@ struct us_data {
 	/* control and bulk communications data */
 	struct urb		*current_urb;	 /* non-int USB requests */
 	struct usb_ctrlrequest	*dr;		 /* control requests	 */
-	struct usb_sg_request	*current_sg;	 /* scatter-gather USB   */
+	struct usb_sg_request	current_sg;	 /* scatter-gather USB   */
 
 	/* the semaphore for sleeping the control thread */
 	struct semaphore	sema;		 /* to sleep thread on   */
