@@ -50,6 +50,11 @@
 #define HCI_RS232 	4
 #define HCI_PCI		5
 
+/* HCI device quirks */
+enum {
+	HCI_QUIRK_RESET_ON_INIT
+};
+
 /* HCI device flags */
 enum {
 	HCI_UP,
