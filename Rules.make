@@ -126,11 +126,23 @@ endif
 
 # for make >= 3.78 the following is cleaner:
 # multi-used := $(foreach m,$(obj-y) $(obj-m), $(if $($(basename $(m))-objs), $(m)))
-multi-used := $(sort $(foreach m,$(obj-y) $(obj-m),$(patsubst %,$(m),$($(basename $(m))-objs))))
-ld-multi-used := $(filter-out $(list-multi),$(multi-used))
-ld-multi-objs := $(foreach m, $(ld-multi-used), $($(basename $(m))-objs))
+multi-used-y := $(sort $(foreach m,$(obj-y),$(patsubst %,$(m),$($(basename $(m))-objs))))
+multi-used-m := $(sort $(foreach m,$(obj-m),$(patsubst %,$(m),$($(basename $(m))-objs))))
+ld-multi-used-y := $(filter-out $(list-multi),$(multi-used-y))
+ld-multi-used-m := $(filter-out $(list-multi),$(multi-used-m))
+ld-multi-objs-y := $(foreach m, $(ld-multi-used-y), $($(basename $(m))-objs))
+ld-multi-objs-m := $(foreach m, $(ld-multi-used-m), $($(basename $(m))-objs))
 
-$(ld-multi-used) : %.o: $(ld-multi-objs)
+$(ld-multi-used-y) : %.o: $(ld-multi-objs-y)
+	rm -f $@
+	$(LD) $(EXTRA_LDFLAGS) -r -o $@ $(filter $($(basename $@)-objs), $^)
+	@ ( \
+	    echo 'ifeq ($(strip $(subst $(comma),:,$(LD) $(EXTRA_LDFLAGS) $($(basename $@)-objs)),$$(strip $$(subst $$(comma),:,$$(LD) $$(EXTRA_LDFLAGS) $$($(basename $@)-objs)))))' ; \
+	    echo 'FILES_FLAGS_UP_TO_DATE += $@' ; \
+	    echo 'endif' \
+	) > $(dir $@)/.$(notdir $@).flags
+
+$(ld-multi-used-m) : %.o: $(ld-multi-objs-m)
 	rm -f $@
 	$(LD) $(EXTRA_LDFLAGS) -r -o $@ $(filter $($(basename $@)-objs), $^)
 	@ ( \
@@ -153,7 +165,7 @@ $(patsubst %,_sfdep_%,$(_FASTDEP_ALL_SUB_DIRS)):
 	$(MAKE) -C $(patsubst _sfdep_%,%,$@) fastdep
 endif
 
-	
+
 #
 # A rule to make subdirectories
 #
@@ -250,7 +262,7 @@ $(MODINCL)/$(MODPREFIX)%.ver: %.c
 		if [ -r $@ ] && cmp -s $@ $@.tmp; then echo $@ is unchanged; rm -f $@.tmp; \
 		else echo mv $@.tmp $@; mv -f $@.tmp $@; fi; \
 	fi; touch $(MODINCL)/$(MODPREFIX)$*.stamp
-	
+
 $(addprefix $(MODINCL)/$(MODPREFIX),$(export-objs:.o=.ver)): $(TOPDIR)/include/linux/autoconf.h
 
 # updates .ver files but not modversions.h
