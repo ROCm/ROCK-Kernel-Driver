@@ -603,7 +603,7 @@ static int lock_rdev(mdk_rdev_t *rdev)
 	err = blkdev_get(bdev, FMODE_READ|FMODE_WRITE, 0, BDEV_RAW);
 	if (err)
 		return err;
-	err = bd_claim(bdev, lock_rdev);
+	err = bd_claim(bdev, rdev);
 	if (err) {
 		blkdev_put(bdev, BDEV_RAW);
 		return err;
@@ -819,19 +819,6 @@ static int uuid_equal(mdk_rdev_t *rdev1, mdk_rdev_t *rdev2)
 	return 0;
 }
 
-static mdk_rdev_t * find_rdev_all(kdev_t dev)
-{
-	struct list_head *tmp;
-	mdk_rdev_t *rdev;
-
-	list_for_each(tmp, &all_raid_disks) {
-		rdev = list_entry(tmp, mdk_rdev_t, all);
-		if (kdev_same(rdev->dev, dev))
-			return rdev;
-	}
-	return NULL;
-}
-
 static int write_disk_sb(mdk_rdev_t * rdev)
 {
 	kdev_t dev = rdev->dev;
@@ -1007,9 +994,6 @@ static mdk_rdev_t *md_import_device(kdev_t newdev, int on_disk)
 	mdk_rdev_t *rdev;
 	unsigned int size;
 
-	if (find_rdev_all(newdev))
-		return ERR_PTR(-EEXIST);
-
 	rdev = (mdk_rdev_t *) kmalloc(sizeof(*rdev), GFP_KERNEL);
 	if (!rdev) {
 		printk(KERN_ERR "md: could not alloc mem for %s!\n", partition_name(newdev));
@@ -1021,10 +1005,10 @@ static mdk_rdev_t *md_import_device(kdev_t newdev, int on_disk)
 		goto abort_free;
 
 	rdev->dev = newdev;
-	if (lock_rdev(rdev)) {
-		printk(KERN_ERR "md: could not lock %s, zero-size? Marking faulty.\n",
+	err = lock_rdev(rdev);
+	if (err) {
+		printk(KERN_ERR "md: could not lock %s.\n",
 			partition_name(newdev));
-		err = -EINVAL;
 		goto abort_free;
 	}
 	rdev->desc_nr = -1;
@@ -2103,18 +2087,12 @@ static int add_new_disk(mddev_t * mddev, mdu_disk_info_t *info)
 	unsigned int nr;
 	kdev_t dev;
 	dev = mk_kdev(info->major,info->minor);
-
-	if (find_rdev_all(dev)) {
-		printk(KERN_WARNING "md: device %s already used in a RAID array!\n",
-		       partition_name(dev));
-		return -EBUSY;
-	}
 	if (!mddev->sb) {
 		/* expecting a device which has a superblock */
 		rdev = md_import_device(dev, 1);
 		if (IS_ERR(rdev)) {
 			printk(KERN_WARNING "md: md_import_device returned %ld\n", PTR_ERR(rdev));
-			return -EINVAL;
+			return PTR_ERR(rdev);
 		}
 		if (!list_empty(&mddev->disks)) {
 			mdk_rdev_t *rdev0 = list_entry(mddev->disks.next,
@@ -2153,7 +2131,7 @@ static int add_new_disk(mddev_t * mddev, mdu_disk_info_t *info)
 		rdev = md_import_device (dev, 0);
 		if (IS_ERR(rdev)) {
 			printk(KERN_WARNING "md: error, md_import_device() returned %ld\n", PTR_ERR(rdev));
-			return -EINVAL;
+			return PTR_ERR(rdev);
 		}
 		rdev->old_dev = dev;
 		rdev->desc_nr = info->number;
