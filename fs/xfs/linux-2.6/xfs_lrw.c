@@ -962,9 +962,9 @@ retry:
 				xfs_trans_set_sync(tp);
 				error = xfs_trans_commit(tp, 0, NULL);
 				xfs_iunlock(xip, XFS_ILOCK_EXCL);
-				if (error)
-					goto out_unlock_internal;
 			}
+			if (error)
+				goto out_unlock_internal;
 		}
 	
 		xfs_rwunlock(bdp, locktype);
