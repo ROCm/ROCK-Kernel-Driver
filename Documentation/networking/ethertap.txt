@@ -47,7 +47,7 @@ This allows the kernel to exchange data with userspace applications. There
 are two ways of doing this, the new way works with netlink sockets and I
 have no experience with that yet. ANK uses it in his excellent iproute2
 package, see for example rtmon.c. iproute2 can be found on
-ftp://ftp.inr.ac.ru/ip-routing/iproute2*
+ftp://ftp.tux.org/pub/net/ip-routing/iproute2*
 
 The new way is described, partly in netlink(7), available on 
 http://www.europe.redhat.com/documentation/man-pages/man7/netlink.7.php3

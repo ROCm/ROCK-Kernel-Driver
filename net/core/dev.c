@@ -161,6 +161,47 @@ static struct timer_list samp_timer = TIMER_INITIALIZER(sample_queue, 0, 0);
 #endif
 
 /*
+ * The @dev_base list is protected by @dev_base_lock and the rtln
+ * semaphore.
+ *
+ * Pure readers hold dev_base_lock for reading.
+ *
+ * Writers must hold the rtnl semaphore while they loop through the
+ * dev_base list, and hold dev_base_lock for writing when they do the
+ * actual updates.  This allows pure readers to access the list even
+ * while a writer is preparing to update it.
+ *
+ * To put it another way, dev_base_lock is held for writing only to
+ * protect against pure readers; the rtnl semaphore provides the
+ * protection against other writers.
+ *
+ * See, for example usages, register_netdevice() and
+ * unregister_netdevice(), which must be called with the rtnl
+ * semaphore held.
+ */
+struct net_device *dev_base;
+struct net_device **dev_tail = &dev_base;
+rwlock_t dev_base_lock = RW_LOCK_UNLOCKED;
+
+EXPORT_SYMBOL(dev_base);
+EXPORT_SYMBOL(dev_base_lock);
+
+#define NETDEV_HASHBITS	8
+static struct hlist_head dev_name_head[1<<NETDEV_HASHBITS];
+static struct hlist_head dev_index_head[1<<NETDEV_HASHBITS];
+
+static inline struct hlist_head *dev_name_hash(const char *name)
+{
+	unsigned hash = full_name_hash(name, strnlen(name, IFNAMSIZ));
+	return &dev_name_head[hash & ((1<<NETDEV_HASHBITS)-1)];
+}
+
+static inline struct hlist_head *dev_index_hash(int ifindex)
+{
+	return &dev_index_head[ifindex & ((1<<NETDEV_HASHBITS)-1)];
+}
+
+/*
  *	Our notifier list
  */
 
@@ -443,12 +484,15 @@ __setup("netdev=", netdev_boot_setup);
 
 struct net_device *__dev_get_by_name(const char *name)
 {
-	struct net_device *dev;
+	struct hlist_node *p;
 
-	for (dev = dev_base; dev; dev = dev->next)
+	hlist_for_each(p, dev_name_hash(name)) {
+		struct net_device *dev
+			= hlist_entry(p, struct net_device, name_hlist);
 		if (!strncmp(dev->name, name, IFNAMSIZ))
-			break;
-	return dev;
+			return dev;
+	}
+	return NULL;
 }
 
 /**
@@ -516,12 +560,15 @@ int __dev_get(const char *name)
 
 struct net_device *__dev_get_by_index(int ifindex)
 {
-	struct net_device *dev;
+	struct hlist_node *p;
 
-	for (dev = dev_base; dev; dev = dev->next)
+	hlist_for_each(p, dev_index_hash(ifindex)) {
+		struct net_device *dev
+			= hlist_entry(p, struct net_device, index_hlist);
 		if (dev->ifindex == ifindex)
-			break;
-	return dev;
+			return dev;
+	}
+	return NULL;
 }
 
 
@@ -673,30 +720,55 @@ int dev_valid_name(const char *name)
 
 int dev_alloc_name(struct net_device *dev, const char *name)
 {
-	int i;
-	char buf[32];
-	char *p;
+	int i = 0;
+	char buf[IFNAMSIZ];
+	const char *p;
+	const int max_netdevices = 8*PAGE_SIZE;
+	long *inuse;
+	struct net_device *d;
 
-	/*
-	 * Verify the string as this thing may have come from
-	 * the user.  There must be either one "%d" and no other "%"
-	 * characters, or no "%" characters at all.
-	 */
-	p = strchr(name, '%');
-	if (p && (p[1] != 'd' || strchr(p + 2, '%')))
-		return -EINVAL;
+	p = strnchr(name, IFNAMSIZ-1, '%');
+	if (p) {
+		/*
+		 * Verify the string as this thing may have come from
+		 * the user.  There must be either one "%d" and no other "%"
+		 * characters.
+		 */
+		if (p[1] != 'd' || strchr(p + 2, '%'))
+			return -EINVAL;
 
-	/*
-	 * If you need over 100 please also fix the algorithm...
-	 */
-	for (i = 0; i < 100; i++) {
-		snprintf(buf, sizeof(buf), name, i);
-		if (!__dev_get_by_name(buf)) {
-			strcpy(dev->name, buf);
-			return i;
+		/* Use one page as a bit array of possible slots */
+		inuse = (long *) get_zeroed_page(GFP_ATOMIC);
+		if (!inuse)
+			return -ENOMEM;
+
+		for (d = dev_base; d; d = d->next) {
+			if (!sscanf(d->name, name, &i))
+				continue;
+			if (i < 0 || i >= max_netdevices)
+				continue;
+
+			/*  avoid cases where sscanf is not exact inverse of printf */
+			snprintf(buf, sizeof(buf), name, i);
+			if (!strncmp(buf, d->name, IFNAMSIZ))
+				set_bit(i, inuse);
 		}
+
+		i = find_first_zero_bit(inuse, max_netdevices);
+		free_page((unsigned long) inuse);
 	}
-	return -ENFILE;	/* Over 100 of the things .. bail out! */
+
+	snprintf(buf, sizeof(buf), name, i);
+	if (!__dev_get_by_name(buf)) {
+		strlcpy(dev->name, buf, IFNAMSIZ);
+		return i;
+	}
+
+	/* It is possible to run out of possible slots
+	 * when the name is long and there isn't enough space left
+	 * for the digits, or if all bits are used.
+	 */
+	return -ENFILE;
 }
 
 
@@ -728,6 +800,9 @@ int dev_change_name(struct net_device *dev, char *newname)
 		return -EEXIST;
 	else
 		strlcpy(dev->name, newname, IFNAMSIZ);
+
+	hlist_del(&dev->name_hlist);
+	hlist_add_head(&dev->name_hlist, dev_name_hash(dev->name));
 
 	class_device_rename(&dev->class_dev, dev->name);
 	notifier_call_chain(&netdev_chain, NETDEV_CHANGENAME, dev);
@@ -2717,7 +2792,8 @@ static inline void net_set_todo(struct net_device *dev)
 
 int register_netdevice(struct net_device *dev)
 {
-	struct net_device *d, **dp;
+	struct hlist_head *head;
+	struct hlist_node *p;
 	int ret;
 
 	BUG_ON(dev_boot_phase);
@@ -2758,13 +2834,17 @@ int register_netdevice(struct net_device *dev)
 	if (dev->iflink == -1)
 		dev->iflink = dev->ifindex;
 
-	/* Check for existence, and append to tail of chain */
-	ret = -EEXIST;
-	for (dp = &dev_base; (d = *dp) != NULL; dp = &d->next) {
-		if (d == dev || !strcmp(d->name, dev->name))
-			goto out_err;
-	}
-	
+	/* Check for existence of name */
+	head = dev_name_hash(dev->name);
+	hlist_for_each(p, head) {
+		struct net_device *d
+			= hlist_entry(p, struct net_device, name_hlist);
+		if (!strncmp(d->name, dev->name, IFNAMSIZ)) {
+			ret = -EEXIST;
+ 			goto out_err;
+		}
+ 	}
+
 	/* Fix illegal SG+CSUM combinations. */
 	if ((dev->features & NETIF_F_SG) &&
 	    !(dev->features & (NETIF_F_IP_CSUM |
@@ -2793,7 +2873,10 @@ int register_netdevice(struct net_device *dev)
 	dev->next = NULL;
 	dev_init_scheduler(dev);
 	write_lock_bh(&dev_base_lock);
-	*dp = dev;
+	*dev_tail = dev;
+	dev_tail = &dev->next;
+	hlist_add_head(&dev->name_hlist, head);
+	hlist_add_head(&dev->index_hlist, dev_index_hash(dev->ifindex));
 	dev_hold(dev);
 	dev->reg_state = NETREG_REGISTERING;
 	write_unlock_bh(&dev_base_lock);
@@ -3015,6 +3098,10 @@ int unregister_netdevice(struct net_device *dev)
 	for (dp = &dev_base; (d = *dp) != NULL; dp = &d->next) {
 		if (d == dev) {
 			write_lock_bh(&dev_base_lock);
+			hlist_del(&dev->name_hlist);
+			hlist_del(&dev->index_hlist);
+			if (dev_tail == &dev->next)
+				dev_tail = dp;
 			*dp = d->next;
 			write_unlock_bh(&dev_base_lock);
 			break;
@@ -3090,6 +3177,12 @@ static int __init net_dev_init(void)
 	INIT_LIST_HEAD(&ptype_all);
 	for (i = 0; i < 16; i++) 
 		INIT_LIST_HEAD(&ptype_base[i]);
+
+	for (i = 0; i < ARRAY_SIZE(dev_name_head); i++)
+		INIT_HLIST_HEAD(&dev_name_head[i]);
+
+	for (i = 0; i < ARRAY_SIZE(dev_index_head); i++)
+		INIT_HLIST_HEAD(&dev_index_head[i]);
 
 	/*
 	 *	Initialise the packet receive queues.
