@@ -314,7 +314,10 @@ static void *snd_hammerfall_get_buffer(struct pci_dev *pci, size_t size, dma_add
 	struct snd_dma_device pdev;
 	struct snd_dma_buffer dmbuf;
 
-	snd_dma_device_pci(&pdev, pci, capture);
+	memset(&pdev, 0, sizeof(pdev));
+	pdev.type = SNDRV_DMA_TYPE_PCI;
+	pdev.dev.pci = pci;
+	pdev.id = capture;
 	dmbuf.bytes = 0;
 	if (! snd_dma_get_reserved(&pdev, &dmbuf)) {
 		if (snd_dma_alloc_pages(&pdev, size, &dmbuf) < 0)
@@ -327,9 +330,13 @@ static void *snd_hammerfall_get_buffer(struct pci_dev *pci, size_t size, dma_add
 
 static void snd_hammerfall_free_buffer(struct pci_dev *pci, size_t size, void *ptr, dma_addr_t addr, int capture)
 {
-	struct snd_dma_device dev;
-	snd_dma_device_pci(&dev, pci, capture);
-	snd_dma_free_reserved(&dev);
+	struct snd_dma_device pdev;
+
+	memset(&pdev, 0, sizeof(pdev));
+	pdev.type = SNDRV_DMA_TYPE_PCI;
+	pdev.dev.pci = pci;
+	pdev.id = capture;
+	snd_dma_free_reserved(&pdev);
 }
 
 #else

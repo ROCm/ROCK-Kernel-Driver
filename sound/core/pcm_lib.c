@@ -2659,20 +2659,6 @@ EXPORT_SYMBOL(snd_pcm_lib_preallocate_free);
 EXPORT_SYMBOL(snd_pcm_lib_preallocate_free_for_all);
 EXPORT_SYMBOL(snd_pcm_lib_preallocate_pages);
 EXPORT_SYMBOL(snd_pcm_lib_preallocate_pages_for_all);
+EXPORT_SYMBOL(snd_pcm_sgbuf_ops_page);
 EXPORT_SYMBOL(snd_pcm_lib_malloc_pages);
 EXPORT_SYMBOL(snd_pcm_lib_free_pages);
-#ifdef CONFIG_ISA
-EXPORT_SYMBOL(snd_pcm_lib_preallocate_isa_pages);
-EXPORT_SYMBOL(snd_pcm_lib_preallocate_isa_pages_for_all);
-#endif
-#ifdef CONFIG_PCI
-EXPORT_SYMBOL(snd_pcm_lib_preallocate_pci_pages);
-EXPORT_SYMBOL(snd_pcm_lib_preallocate_pci_pages_for_all);
-EXPORT_SYMBOL(snd_pcm_lib_preallocate_sg_pages);
-EXPORT_SYMBOL(snd_pcm_lib_preallocate_sg_pages_for_all);
-EXPORT_SYMBOL(snd_pcm_sgbuf_ops_page);
-#endif
-#ifdef CONFIG_SBUS
-EXPORT_SYMBOL(snd_pcm_lib_preallocate_sbus_pages);
-EXPORT_SYMBOL(snd_pcm_lib_preallocate_sbus_pages_for_all);
-#endif

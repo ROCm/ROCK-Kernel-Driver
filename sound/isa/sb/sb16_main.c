@@ -881,7 +881,9 @@ int snd_sb16dsp_pcm(sb_t * chip, int device, snd_pcm_t ** rpcm)
 	else
 		pcm->info_flags = SNDRV_PCM_INFO_HALF_DUPLEX;
 
-	snd_pcm_lib_preallocate_isa_pages_for_all(pcm, 64*1024, 128*1024);
+	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_ISA,
+					      snd_pcm_dma_flags(0),
+					      64*1024, 128*1024);
 
 	if (rpcm)
 		*rpcm = pcm;

@@ -47,7 +47,7 @@
 /* fill TLB entrie(s) corresponding to page with ptr */
 #define set_tlb_bus(trident,page,ptr,addr) __set_tlb_bus(trident,page,ptr,addr)
 /* fill TLB entrie(s) corresponding to page with silence pointer */
-#define set_silent_tlb(trident,page)	__set_tlb_bus(trident, page, (unsigned long)trident->tlb.silent_page, trident->tlb.silent_page_dmaaddr)
+#define set_silent_tlb(trident,page)	__set_tlb_bus(trident, page, (unsigned long)trident->tlb.silent_page.area, trident->tlb.silent_page.addr)
 /* get aligned page from offset address */
 #define get_aligned_page(offset)	((offset) >> 12)
 /* get offset address from aligned page */
@@ -367,8 +367,13 @@ static void clear_tlb(trident_t *trident, int page)
 	void *ptr = page_to_ptr(trident, page);
 	dma_addr_t addr = page_to_addr(trident, page);
 	set_silent_tlb(trident, page);
-	if (ptr)
-		snd_free_pci_pages(trident->pci, ALIGN_PAGE_SIZE, ptr, addr);
+	if (ptr) {
+		struct snd_dma_buffer dmab;
+		dmab.area = ptr;
+		dmab.addr = addr;
+		dmab.bytes = ALIGN_PAGE_SIZE;
+		snd_dma_free_pages(&trident->dma_dev, &dmab);
+	}
 }
 
 /* check new allocation range */
@@ -399,8 +404,7 @@ static void get_single_page_range(snd_util_memhdr_t *hdr, snd_util_memblk_t *blk
 static int synth_alloc_pages(trident_t *hw, snd_util_memblk_t *blk)
 {
 	int page, first_page, last_page;
-	void *ptr;
-	dma_addr_t addr;
+	struct snd_dma_buffer dmab;
 
 	firstpg(blk) = get_aligned_page(blk->offset);
 	lastpg(blk) = get_aligned_page(blk->offset + blk->size - 1);
@@ -410,14 +414,13 @@ static int synth_alloc_pages(trident_t *hw, snd_util_memblk_t *blk)
 	 * fortunately Trident page size and kernel PAGE_SIZE is identical!
 	 */
 	for (page = first_page; page <= last_page; page++) {
-		ptr = snd_malloc_pci_pages(hw->pci, ALIGN_PAGE_SIZE, &addr);
-		if (ptr == NULL)
+		if (snd_dma_alloc_pages(&hw->dma_dev, ALIGN_PAGE_SIZE, &dmab) < 0)
 			goto __fail;
-		if (! is_valid_page(addr)) {
-			snd_free_pci_pages(hw->pci, ALIGN_PAGE_SIZE, ptr, addr);
+		if (! is_valid_page(dmab.addr)) {
+			snd_dma_free_pages(&hw->dma_dev, &dmab);
 			goto __fail;
 		}
-		set_tlb_bus(hw, page, (unsigned long)ptr, addr);
+		set_tlb_bus(hw, page, (unsigned long)dmab.area, dmab.addr);
 	}
 	return 0;
 

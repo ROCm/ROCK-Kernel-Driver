@@ -2189,10 +2189,10 @@ int __devinit snd_trident_pcm(trident_t * trident, int device, snd_pcm_t ** rpcm
 	if (trident->tlb.entries) {
 		snd_pcm_substream_t *substream;
 		for (substream = pcm->streams[SNDRV_PCM_STREAM_PLAYBACK].substream; substream; substream = substream->next)
-			snd_pcm_lib_preallocate_sg_pages(trident->pci, substream, 64*1024, 128*1024);
-		snd_pcm_lib_preallocate_pci_pages(trident->pci, pcm->streams[SNDRV_PCM_STREAM_CAPTURE].substream, 64*1024, 128*1024);
+			snd_pcm_lib_preallocate_pages(substream, SNDRV_DMA_TYPE_PCI_SG, trident->pci, 64*1024, 128*1024);
+		snd_pcm_lib_preallocate_pages(pcm->streams[SNDRV_PCM_STREAM_CAPTURE].substream, SNDRV_DMA_TYPE_PCI, trident->pci, 64*1024, 128*1024);
 	} else {
-		snd_pcm_lib_preallocate_pci_pages_for_all(trident->pci, pcm, 64*1024, 128*1024);
+		snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_PCI, trident->pci, 64*1024, 128*1024);
 	}
 
 	if (rpcm)
@@ -2246,9 +2246,9 @@ int __devinit snd_trident_foldback_pcm(trident_t * trident, int device, snd_pcm_
 	trident->foldback = foldback;
 
 	if (trident->tlb.entries)
-		snd_pcm_lib_preallocate_sg_pages_for_all(trident->pci, foldback, 0, 128*1024);
+		snd_pcm_lib_preallocate_pages_for_all(foldback, SNDRV_DMA_TYPE_PCI_SG, trident->pci, 0, 128*1024);
 	else
-		snd_pcm_lib_preallocate_pci_pages_for_all(trident->pci, foldback, 64*1024, 128*1024);
+		snd_pcm_lib_preallocate_pages_for_all(foldback, SNDRV_DMA_TYPE_PCI, trident->pci, 64*1024, 128*1024);
 
 	if (rpcm)
 		*rpcm = foldback;
@@ -2287,7 +2287,7 @@ int __devinit snd_trident_spdif_pcm(trident_t * trident, int device, snd_pcm_t *
 	strcpy(spdif->name, "Trident 4DWave IEC958");
 	trident->spdif = spdif;
 
-	snd_pcm_lib_preallocate_pci_pages_for_all(trident->pci, spdif, 64*1024, 128*1024);
+	snd_pcm_lib_preallocate_pages_for_all(spdif, SNDRV_DMA_TYPE_PCI, trident->pci, 64*1024, 128*1024);
 
 	if (rpcm)
 		*rpcm = spdif;
@@ -3052,29 +3052,49 @@ static int __devinit snd_trident_mixer(trident_t * trident, int pcm_spdif_device
 	}
 	if (trident->device == TRIDENT_DEVICE_ID_NX || trident->device == TRIDENT_DEVICE_ID_SI7018) {
 
-		if ((err = snd_ctl_add(card, kctl = snd_ctl_new1(&snd_trident_spdif_control, trident))) < 0)
+		kctl = snd_ctl_new1(&snd_trident_spdif_control, trident);
+		if (kctl == NULL) {
+			err = -ENOMEM;
 			goto __out;
+		}
 		if (trident->ac97->ext_id & AC97_EI_SPDIF)
 			kctl->id.index++;
 		if (trident->ac97_sec && (trident->ac97_sec->ext_id & AC97_EI_SPDIF))
 			kctl->id.index++;
 		idx = kctl->id.index;
+		if ((err = snd_ctl_add(card, kctl)) < 0)
+			goto __out;
 		kctl->put(kctl, uctl);
 
-		if ((err = snd_ctl_add(card, kctl = snd_ctl_new1(&snd_trident_spdif_default, trident))) < 0)
+		kctl = snd_ctl_new1(&snd_trident_spdif_default, trident);
+		if (kctl == NULL) {
+			err = -ENOMEM;
 			goto __out;
+		}
 		kctl->id.index = idx;
 		kctl->id.device = pcm_spdif_device;
+		if ((err = snd_ctl_add(card, kctl)) < 0)
+			goto __out;
 
-		if ((err = snd_ctl_add(card, kctl = snd_ctl_new1(&snd_trident_spdif_mask, trident))) < 0)
+		kctl = snd_ctl_new1(&snd_trident_spdif_mask, trident);
+		if (kctl == NULL) {
+			err = -ENOMEM;
 			goto __out;
+		}
 		kctl->id.index = idx;
 		kctl->id.device = pcm_spdif_device;
+		if ((err = snd_ctl_add(card, kctl)) < 0)
+			goto __out;
 
-		if ((err = snd_ctl_add(card, kctl = snd_ctl_new1(&snd_trident_spdif_stream, trident))) < 0)
+		kctl = snd_ctl_new1(&snd_trident_spdif_stream, trident);
+		if (kctl == NULL) {
+			err = -ENOMEM;
 			goto __out;
+		}
 		kctl->id.index = idx;
 		kctl->id.device = pcm_spdif_device;
+		if ((err = snd_ctl_add(card, kctl)) < 0)
+			goto __out;
 		trident->spdif_pcm_ctl = kctl;
 	}
 
@@ -3328,13 +3348,12 @@ static int __devinit snd_trident_tlb_alloc(trident_t *trident)
 	/* TLB array must be aligned to 16kB !!! so we allocate
 	   32kB region and correct offset when necessary */
 
-	trident->tlb.buffer = snd_malloc_pci_pages(trident->pci, 2 * SNDRV_TRIDENT_MAX_PAGES * 4, &trident->tlb.buffer_dmaaddr);
-	if (trident->tlb.buffer == NULL) {
+	if (snd_dma_alloc_pages(&trident->dma_dev, 2 * SNDRV_TRIDENT_MAX_PAGES * 4, &trident->tlb.buffer) < 0) {
 		snd_printk(KERN_ERR "trident: unable to allocate TLB buffer\n");
 		return -ENOMEM;
 	}
-	trident->tlb.entries = (unsigned int*)(((unsigned long)trident->tlb.buffer + SNDRV_TRIDENT_MAX_PAGES * 4 - 1) & ~(SNDRV_TRIDENT_MAX_PAGES * 4 - 1));
-	trident->tlb.entries_dmaaddr = (trident->tlb.buffer_dmaaddr + SNDRV_TRIDENT_MAX_PAGES * 4 - 1) & ~(SNDRV_TRIDENT_MAX_PAGES * 4 - 1);
+	trident->tlb.entries = (unsigned int*)(((unsigned long)trident->tlb.buffer.area + SNDRV_TRIDENT_MAX_PAGES * 4 - 1) & ~(SNDRV_TRIDENT_MAX_PAGES * 4 - 1));
+	trident->tlb.entries_dmaaddr = (trident->tlb.buffer.addr + SNDRV_TRIDENT_MAX_PAGES * 4 - 1) & ~(SNDRV_TRIDENT_MAX_PAGES * 4 - 1);
 	/* allocate shadow TLB page table (virtual addresses) */
 	trident->tlb.shadow_entries = (unsigned long *)vmalloc(SNDRV_TRIDENT_MAX_PAGES*sizeof(unsigned long));
 	if (trident->tlb.shadow_entries == NULL) {
@@ -3342,15 +3361,14 @@ static int __devinit snd_trident_tlb_alloc(trident_t *trident)
 		return -ENOMEM;
 	}
 	/* allocate and setup silent page and initialise TLB entries */
-	trident->tlb.silent_page = snd_malloc_pci_pages(trident->pci, SNDRV_TRIDENT_PAGE_SIZE, &trident->tlb.silent_page_dmaaddr);
-	if (trident->tlb.silent_page == 0UL) {
+	if (snd_dma_alloc_pages(&trident->dma_dev, SNDRV_TRIDENT_PAGE_SIZE, &trident->tlb.silent_page) < 0) {
 		snd_printk(KERN_ERR "trident: unable to allocate silent page\n");
 		return -ENOMEM;
 	}
-	memset(trident->tlb.silent_page, 0, SNDRV_TRIDENT_PAGE_SIZE);
+	memset(trident->tlb.silent_page.area, 0, SNDRV_TRIDENT_PAGE_SIZE);
 	for (i = 0; i < SNDRV_TRIDENT_MAX_PAGES; i++) {
-		trident->tlb.entries[i] = cpu_to_le32(trident->tlb.silent_page_dmaaddr & ~(SNDRV_TRIDENT_PAGE_SIZE-1));
-		trident->tlb.shadow_entries[i] = (unsigned long)trident->tlb.silent_page;
+		trident->tlb.entries[i] = cpu_to_le32(trident->tlb.silent_page.addr & ~(SNDRV_TRIDENT_PAGE_SIZE-1));
+		trident->tlb.shadow_entries[i] = (unsigned long)trident->tlb.silent_page.area;
 	}
 
 	/* use emu memory block manager code to manage tlb page allocation */
@@ -3565,9 +3583,13 @@ int __devinit snd_trident_create(snd_card_t * card,
 	}
 	trident->irq = pci->irq;
 
+	memset(&trident->dma_dev, 0, sizeof(trident->dma_dev));
+	trident->dma_dev.type = SNDRV_DMA_TYPE_PCI;
+	trident->dma_dev.dev.pci = pci;
+
 	/* allocate 16k-aligned TLB for NX cards */
 	trident->tlb.entries = NULL;
-	trident->tlb.buffer = NULL;
+	trident->tlb.buffer.area = NULL;
 	if (trident->device == TRIDENT_DEVICE_ID_NX) {
 		if ((err = snd_trident_tlb_alloc(trident)) < 0) {
 			snd_trident_free(trident);
@@ -3661,15 +3683,15 @@ int snd_trident_free(trident_t *trident)
 	else if (trident->device == TRIDENT_DEVICE_ID_SI7018) {
 		outl(0, TRID_REG(trident, SI_SERIAL_INTF_CTRL));
 	}
-	if (trident->tlb.buffer) {
+	if (trident->tlb.buffer.area) {
 		outl(0, TRID_REG(trident, NX_TLBC));
 		if (trident->tlb.memhdr)
 			snd_util_memhdr_free(trident->tlb.memhdr);
-		if (trident->tlb.silent_page)
-			snd_free_pci_pages(trident->pci, SNDRV_TRIDENT_PAGE_SIZE, trident->tlb.silent_page, trident->tlb.silent_page_dmaaddr);
+		if (trident->tlb.silent_page.area)
+			snd_dma_free_pages(&trident->dma_dev, &trident->tlb.silent_page);
 		if (trident->tlb.shadow_entries)
 			vfree(trident->tlb.shadow_entries);
-		snd_free_pci_pages(trident->pci, 2 * SNDRV_TRIDENT_MAX_PAGES * 4, trident->tlb.buffer, trident->tlb.buffer_dmaaddr);
+		snd_dma_free_pages(&trident->dma_dev, &trident->tlb.buffer);
 	}
 	if (trident->irq >= 0)
 		free_irq(trident->irq, (void *)trident);

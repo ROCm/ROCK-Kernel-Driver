@@ -6,6 +6,9 @@ menu "ISA devices"
 config SND_AD1816A
 	tristate "Analog Devices SoundPort AD1816A"
 	depends on SND && ISAPNP
+	select SND_OPL3_LIB
+	select SND_MPU401_UART
+	select SND_PCM
 	help
 	  Say 'Y' or 'M' to include support for Analog Devices SoundPort AD1816A or
 	  compatible sound chips.
@@ -13,6 +16,7 @@ config SND_AD1816A
 config SND_AD1848
 	tristate "Generic AD1848/CS4248 driver"
 	depends on SND
+	select SND_PCM
 	help
 	  Say 'Y' or 'M' to include support for AD1848 (Analog Devices) or CS4248 
 	  (Cirrus Logic - Crystal Semiconductors) chips. Please, for newer chips
@@ -21,6 +25,8 @@ config SND_AD1848
 config SND_CS4231
 	tristate "Generic Cirrus Logic CS4231 driver"
 	depends on SND
+	select SND_MPU401_UART
+	select SND_PCM
 	help
 	  Say 'Y' or 'M' to include support for CS4231 chips from Cirrus Logic -
 	  Crystal Semiconductors.
@@ -28,6 +34,9 @@ config SND_CS4231
 config SND_CS4232
 	tristate "Generic Cirrus Logic CS4232 driver"
 	depends on SND
+	select SND_OPL3_LIB
+	select SND_MPU401_UART
+	select SND_PCM
 	help
 	  Say 'Y' or 'M' to include support for CS4232 chips from Cirrus Logic -
 	  Crystal Semiconductors.
@@ -35,6 +44,9 @@ config SND_CS4232
 config SND_CS4236
 	tristate "Generic Cirrus Logic CS4236+ driver"
 	depends on SND
+	select SND_OPL3_LIB
+	select SND_MPU401_UART
+	select SND_PCM
 	help
 	  Say 'Y' or 'M' to include support for CS4235,CS4236,CS4237B,CS4238B,CS4239
 	  chips from Cirrus Logic - Crystal Semiconductors.
@@ -42,6 +54,9 @@ config SND_CS4236
 config SND_PC98_CS4232
 	tristate "NEC PC9800 CS4232 driver"
 	depends on SND && X86_PC9800
+	select SND_OPL3_LIB
+	select SND_MPU401_UART
+	select SND_PCM
 	help
 	  Say 'Y' or 'M' to include support for NEC PC-9801/PC-9821 on-board
 	  soundchip based on CS4232.
@@ -49,42 +64,59 @@ config SND_PC98_CS4232
 config SND_ES968
 	tristate "Generic ESS ES968 driver"
 	depends on SND && ISAPNP
+	select SND_MPU401_UART
+	select SND_PCM
 	help
 	  Say 'Y' or 'M' to include support for ESS AudioDrive ES968 chip.
 
 config SND_ES1688
 	tristate "Generic ESS ES688/ES1688 driver"
 	depends on SND
+	select SND_OPL3_LIB
+	select SND_MPU401_UART
+	select SND_PCM
 	help
 	  Say 'Y' or 'M' to include support for ESS AudioDrive ES688 or ES1688 chips.
 
 config SND_ES18XX
 	tristate "Generic ESS ES18xx driver"
 	depends on SND
+	select SND_OPL3_LIB
+	select SND_MPU401_UART
+	select SND_PCM
 	help
 	  Say 'Y' or 'M' to include support for ESS AudioDrive ES18xx chips.
 
 config SND_GUSCLASSIC
 	tristate "Gravis UltraSound Classic"
 	depends on SND
+	select SND_RAWMIDI
+	select SND_PCM
 	help
 	  Say 'Y' or 'M' to include support for Gravis UltraSound Classic soundcard.
 
 config SND_GUSEXTREME
 	tristate "Gravis UltraSound Extreme"
 	depends on SND
+	select SND_HWDEP
+	select SND_MPU401_UART
+	select SND_PCM
 	help
 	  Say 'Y' or 'M' to include support for Gravis UltraSound Extreme soundcard.
 
 config SND_GUSMAX
 	tristate "Gravis UltraSound MAX"
 	depends on SND
+	select SND_RAWMIDI
+	select SND_PCM
 	help
 	  Say 'Y' or 'M' to include support for Gravis UltraSound MAX soundcard.
 
 config SND_INTERWAVE
 	tristate "AMD InterWave, Gravis UltraSound PnP"
 	depends on SND
+	select SND_RAWMIDI
+	select SND_PCM
 	help
 	  Say 'Y' or 'M' to include support for AMD InterWave based soundcards
 	  (Gravis UltraSound Plug & Play, STB SoundRage32, MED3210, Dynasonic Pro,
@@ -93,6 +125,8 @@ config SND_INTERWAVE
 config SND_INTERWAVE_STB
 	tristate "AMD InterWave + TEA6330T (UltraSound 32-Pro)"
 	depends on SND
+	select SND_RAWMIDI
+	select SND_PCM
 	help
 	  Say 'Y' or 'M' to include support for AMD InterWave based soundcards
 	  with TEA6330T bass and treble regulator (UltraSound 32-Pro).
@@ -100,6 +134,10 @@ config SND_INTERWAVE_STB
 config SND_OPTI92X_AD1848
 	tristate "OPTi 82C92x - AD1848"
 	depends on SND
+	select SND_OPL3_LIB
+	select SND_OPL4_LIB
+	select SND_MPU401_UART
+	select SND_PCM
 	help
 	  Say 'Y' or 'M' to include support for Opti92x soundcards equiped with
 	  AD1848 codec.
@@ -107,6 +145,10 @@ config SND_OPTI92X_AD1848
 config SND_OPTI92X_CS4231
 	tristate "OPTi 82C92x - CS4231"
 	depends on SND
+	select SND_OPL3_LIB
+	select SND_OPL4_LIB
+	select SND_MPU401_UART
+	select SND_PCM
 	help
 	  Say 'Y' or 'M' to include support for Opti92x soundcards equiped with
 	  CS4231 codec.
@@ -114,12 +156,18 @@ config SND_OPTI92X_CS4231
 config SND_OPTI93X
 	tristate "OPTi 82C93x"
 	depends on SND
+	select SND_OPL3_LIB
+	select SND_MPU401_UART
+	select SND_PCM
 	help
 	  Say 'Y' or 'M' to include support for Opti93x soundcards.
 
 config SND_SB8
 	tristate "Sound Blaster 1.0/2.0/Pro (8-bit)"
 	depends on SND
+	select SND_OPL3_LIB
+	select SND_RAWMIDI
+	select SND_PCM
 	help
 	  Say 'Y' or 'M' to include support for Sound Blaster 1.0/2.0/Pro (8-bit)
 	  soundcards or 100% compatible from Creative.
@@ -127,6 +175,9 @@ config SND_SB8
 config SND_SB16
 	tristate "Sound Blaster 16 (PnP)"
 	depends on SND
+	select SND_OPL3_LIB
+	select SND_MPU401_UART
+	select SND_PCM
 	help
 	  Say 'Y' or 'M' to include support for Sound Blaster 16 (including
 	  Plug and Play version).
@@ -134,6 +185,9 @@ config SND_SB16
 config SND_SBAWE
 	tristate "Sound Blaster AWE (32,64) (PnP)"
 	depends on SND
+	select SND_OPL3_LIB
+	select SND_MPU401_UART
+	select SND_PCM
 	help
 	  Say 'Y' or 'M' to include support for Sound Blaster AWE (including
 	  Plug and Play version).
@@ -149,6 +203,9 @@ config SND_SB16_CSP
 config SND_WAVEFRONT
 	tristate "Turtle Beach Maui,Tropez,Tropez+ (Wavefront)"
 	depends on SND
+	select SND_OPL3_LIB
+	select SND_MPU401_UART
+	select SND_PCM
 	help
 	  Say 'Y' or 'M' to include support for Turtle Beach Maui, Tropez
 	  and Tropez+ soundcards based on Wavefront chip.
@@ -156,6 +213,9 @@ config SND_WAVEFRONT
 config SND_ALS100
 	tristate "Avance Logic ALS100/ALS120"
 	depends on SND && ISAPNP
+	select SND_OPL3_LIB
+	select SND_MPU401_UART
+	select SND_PCM
 	help
 	  Say 'Y' or 'M' to include support for Avance Logic ALS100, ALS110,
 	  ALS120 and ALS200 soundcards.
@@ -163,18 +223,25 @@ config SND_ALS100
 config SND_AZT2320
 	tristate "Aztech Systems AZT2320"
 	depends on SND && ISAPNP
+	select SND_OPL3_LIB
+	select SND_MPU401_UART
+	select SND_PCM
 	help
 	  Say 'Y' or 'M' to include support for Aztech Systems AZT2320 soundcard.
 
 config SND_CMI8330
 	tristate "C-Media CMI8330"
 	depends on SND
+	select SND_PCM
 	help
 	  Say 'Y' or 'M' to include support for C-Media CMI8330 based soundcards.
 
 config SND_DT019X
 	tristate "Diamond Technologies DT-019X, Avance Logic ALS-007"
 	depends on SND && ISAPNP
+	select SND_OPL3_LIB
+	select SND_MPU401_UART
+	select SND_PCM
 	help
 	  Say 'Y' or 'M' to include support for Diamond Technologies DT-019X and
 	  Avance Logic ALS-007 soundcards.
@@ -182,18 +249,25 @@ config SND_DT019X
 config SND_OPL3SA2
 	tristate "Yamaha OPL3-SA2/SA3"
 	depends on SND
+	select SND_OPL3_LIB
+	select SND_MPU401_UART
+	select SND_PCM
 	help
 	  Say 'Y' or 'M' to include support for Yamaha OPL3SA2 or OPL3SA3 chips.
 
 config SND_SGALAXY
 	tristate "Aztech Sound Galaxy"
 	depends on SND
+	select SND_PCM
 	help
 	  Say 'Y' or 'M' to include support for Aztech Sound Galaxy.
 
 config SND_SSCAPE
 	tristate "Ensoniq SoundScape PnP driver"
 	depends on SND
+	select SND_HWDEP
+	select SND_MPU401_UART
+	select SND_PCM
 	help
 	  Say 'Y' or 'M' to include support for Ensoniq SoundScape PnP
 	  soundcard.
