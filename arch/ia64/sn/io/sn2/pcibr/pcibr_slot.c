@@ -47,6 +47,7 @@ void pcibr_bus_addr_free(pciio_win_info_t);
 cfg_p pcibr_find_capability(cfg_p, unsigned);
 extern uint64_t  do_pcibr_config_get(cfg_p, unsigned, unsigned);
 void do_pcibr_config_set(cfg_p, unsigned, unsigned, uint64_t); 
+int pcibr_slot_pwr(vertex_hdl_t pcibr_vhdl, pciio_slot_t slot, int up, char *err_msg);
 
 
 /* 
@@ -351,7 +352,7 @@ pcibr_slot_enable(vertex_hdl_t pcibr_vhdl, struct pcibr_slot_enable_req_s *req_p
         goto enable_unlock;
     }
 
-    error = pcibr_slot_attach(pcibr_vhdl, slot, NULL,
+    error = pcibr_slot_attach(pcibr_vhdl, slot, 0,
                               req_p->req_resp.resp_l1_msg,
 			      &req_p->req_resp.resp_sub_errno);
 
