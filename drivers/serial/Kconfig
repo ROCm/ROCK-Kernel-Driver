@@ -279,7 +279,7 @@ config SERIAL_BAST_SIO
 
 config SERIAL_DZ
 	bool "DECstation DZ serial driver"
-	depends on DECSTATION
+	depends on MACH_DECSTATION && MIPS32
 	select SERIAL_CORE
 	help
 	  DZ11-family serial controllers for VAXstations, including the
