@@ -35,7 +35,6 @@
 #include <linux/random.h>
 
 #include <net/irda/irda.h>
-#include <net/irda/irmod.h>
 #include <net/irda/timer.h>
 #include <net/irda/qos.h>
 #include <net/irda/irlap.h>
@@ -108,7 +107,7 @@ int __init irlmp_init(void)
  *    Remove IrLMP layer
  *
  */
-void irlmp_cleanup(void)
+void __exit irlmp_cleanup(void) 
 {
 	/* Check for main structure */
 	ASSERT(irlmp != NULL, return;);

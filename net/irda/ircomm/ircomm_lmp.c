@@ -35,6 +35,7 @@
 #include <net/irda/irda.h>
 #include <net/irda/irlmp.h>
 #include <net/irda/iriap.h>
+#include <net/irda/irda_device.h>	/* struct irda_skb_cb */
 
 #include <net/irda/ircomm_event.h>
 #include <net/irda/ircomm_lmp.h>

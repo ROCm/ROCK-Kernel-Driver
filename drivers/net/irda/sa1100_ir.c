@@ -33,7 +33,6 @@
 #include <linux/pm.h>
 
 #include <net/irda/irda.h>
-#include <net/irda/irmod.h>
 #include <net/irda/wrapper.h>
 #include <net/irda/irda_device.h>
 
@@ -1078,9 +1077,7 @@ static void sa1100_irda_net_uninit(struct net_device *dev)
 	kfree(si);
 }
 
-#ifdef MODULE
 static
-#endif
 int __init sa1100_irda_init(void)
 {
 	struct net_device *dev;
@@ -1181,10 +1178,8 @@ static int __init sa1100ir_setup(char *line)
 
 __setup("sa1100ir=", sa1100ir_setup);
 
-#ifdef MODULE
 module_init(sa1100_irda_init);
 module_exit(sa1100_irda_exit);
-#endif
 
 MODULE_AUTHOR("Russell King <rmk@arm.linux.org.uk>");
 MODULE_DESCRIPTION("StrongARM SA1100 IrDA driver");

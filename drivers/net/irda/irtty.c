@@ -37,7 +37,6 @@
 #include <net/irda/irda.h>
 #include <net/irda/irtty.h>
 #include <net/irda/wrapper.h>
-#include <net/irda/timer.h>
 #include <net/irda/irda_device.h>
 
 static hashbin_t *irtty = NULL;
@@ -113,8 +112,7 @@ int __init irtty_init(void)
  *    Called when the irda module is removed. Here we remove all instances
  *    of the driver, and the master array.
  */
-#ifdef MODULE
-static void irtty_cleanup(void) 
+static void __exit irtty_cleanup(void) 
 {
 	int ret;
 	
@@ -132,7 +130,6 @@ static void irtty_cleanup(void)
 	 */
 	hashbin_delete(irtty, NULL);
 }
-#endif /* MODULE */
 
 /* 
  *  Function irtty_open(tty)
@@ -1058,8 +1055,6 @@ static struct net_device_stats *irtty_net_get_stats(struct net_device *dev)
 	return &self->stats;
 }
 
-#ifdef MODULE
-
 MODULE_AUTHOR("Dag Brattli <dagb@cs.uit.no>");
 MODULE_DESCRIPTION("IrDA TTY device driver");
 MODULE_LICENSE("GPL");
@@ -1074,10 +1069,7 @@ MODULE_PARM_DESC(qos_mtt_bits, "Minimum Turn Time");
  *    Initialize IrTTY module
  *
  */
-int init_module(void)
-{
-	return irtty_init();
-}
+module_init(irtty_init);
 
 /*
  * Function cleanup_module (void)
@@ -1085,9 +1077,4 @@ int init_module(void)
  *    Cleanup IrTTY module
  *
  */
-void cleanup_module(void)
-{
-	irtty_cleanup();
-}
-
-#endif /* MODULE */
+module_exit(irtty_cleanup);

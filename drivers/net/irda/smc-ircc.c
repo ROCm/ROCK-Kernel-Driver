@@ -59,8 +59,6 @@
 
 #include <net/irda/wrapper.h>
 #include <net/irda/irda.h>
-#include <net/irda/irmod.h>
-#include <net/irda/irlap_frame.h>
 #include <net/irda/irda_device.h>
 #include <net/irda/smc-ircc.h>
 #include <net/irda/irport.h>
@@ -1160,15 +1158,12 @@ static int ircc_pmproc(struct pm_dev *dev, pm_request_t rqst, void *data)
 	return 0;
 }
 
-#ifdef MODULE
-
 /*
  * Function ircc_close (self)
  *
  *    Close driver instance
  *
  */
-#ifdef MODULE
 static int __exit ircc_close(struct ircc_cb *self)
 {
 	int iobase;
@@ -1207,7 +1202,6 @@ static int __exit ircc_close(struct ircc_cb *self)
 
 	return 0;
 }
-#endif /* MODULE */
 
 int __init smc_init(void)
 {
@@ -1243,5 +1237,3 @@ MODULE_PARM(ircc_sir, "1-4i");
 MODULE_PARM_DESC(ircc_sir, "SIR Base Address");
 MODULE_PARM(ircc_cfg, "1-4i");
 MODULE_PARM_DESC(ircc_cfg, "Configuration register base address");
-
-#endif /* MODULE */

@@ -11,7 +11,7 @@
  * 
  *     Copyright (c) 1998-1999 Dag Brattli <dagb@cs.uit.no>, 
  *     All Rights Reserved.
- *     Copyright (c) 2000-2001 Jean Tourrilhes <jt@hpl.hp.com>
+ *     Copyright (c) 2000-2002 Jean Tourrilhes <jt@hpl.hp.com>
  *     
  *     This program is free software; you can redistribute it and/or 
  *     modify it under the terms of the GNU General Public License as 
@@ -33,7 +33,11 @@
 #include <linux/netdevice.h>
 #include <linux/timer.h>
 
-#include <net/irda/irlap_event.h>
+#include <net/irda/irqueue.h>		/* irda_queue_t */
+#include <net/irda/qos.h>		/* struct qos_info */
+#include <net/irda/discovery.h>		/* discovery_t */
+#include <net/irda/irlap_event.h>	/* IRLAP_STATE, ... */
+#include <net/irda/irmod.h>		/* struct notify_t */
 
 #define CONFIG_IRDA_DYNAMIC_WINDOW 1
 
@@ -84,6 +88,29 @@
 #define NS_EXPECTED     1
 #define NS_UNEXPECTED   0
 #define NS_INVALID     -1
+
+/*
+ *  Meta information passed within the IrLAP state machine
+ */
+struct irlap_info {
+	__u8 caddr;   /* Connection address */
+	__u8 control; /* Frame type */
+        __u8 cmd;
+
+	__u32 saddr;
+	__u32 daddr;
+	
+	int pf;        /* Poll/final bit set */
+
+	__u8  nr;      /* Sequence number of next frame expected */
+	__u8  ns;      /* Sequence number of frame sent */
+
+	int  S;        /* Number of slots */
+	int  slot;     /* Random chosen slot */
+	int  s;        /* Current slot */
+
+	discovery_t *discovery; /* Discovery information */
+};
 
 /* Main structure of IrLAP */
 struct irlap_cb {

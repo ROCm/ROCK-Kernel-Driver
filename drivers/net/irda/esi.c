@@ -38,7 +38,6 @@
 #include <linux/init.h>
 
 #include <net/irda/irda.h>
-#include <net/irda/irmod.h>
 #include <net/irda/irda_device.h>
 
 static void esi_open(dongle_t *self, struct qos_info *qos);
@@ -60,7 +59,7 @@ int __init esi_init(void)
 	return irda_device_register_dongle(&dongle);
 }
 
-void esi_cleanup(void)
+void __exit esi_cleanup(void)
 {
 	irda_device_unregister_dongle(&dongle);
 }
@@ -133,7 +132,6 @@ static int esi_reset(struct irda_task *task)
 	return 0;
 }
 
-#ifdef MODULE
 MODULE_AUTHOR("Dag Brattli <dagb@cs.uit.no>");
 MODULE_DESCRIPTION("Extended Systems JetEye PC dongle driver");
 MODULE_LICENSE("GPL");
@@ -144,10 +142,7 @@ MODULE_LICENSE("GPL");
  *    Initialize ESI module
  *
  */
-int init_module(void)
-{
-	return esi_init();
-}
+module_init(esi_init);
 
 /*
  * Function cleanup_module (void)
@@ -155,9 +150,5 @@ int init_module(void)
  *    Cleanup ESI module
  *
  */
-void cleanup_module(void)
-{
-        esi_cleanup();
-}
-#endif /* MODULE */
+module_exit(esi_cleanup);
 

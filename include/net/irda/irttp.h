@@ -11,6 +11,7 @@
  * 
  *     Copyright (c) 1998-1999 Dag Brattli <dagb@cs.uit.no>, 
  *     All Rights Reserved.
+ *     Copyright (c) 2000-2002 Jean Tourrilhes <jt@hpl.hp.com>
  *     
  *     This program is free software; you can redistribute it and/or 
  *     modify it under the terms of the GNU General Public License as 
@@ -31,8 +32,8 @@
 #include <linux/spinlock.h>
 
 #include <net/irda/irda.h>
-#include <net/irda/irlmp.h>
-#include <net/irda/qos.h>
+#include <net/irda/irlmp.h>		/* struct lsap_cb */
+#include <net/irda/qos.h>		/* struct qos_info */
 #include <net/irda/irqueue.h>
 
 #define TTP_MAX_CONNECTIONS    LM_MAX_CONNECTIONS

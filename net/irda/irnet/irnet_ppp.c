@@ -1040,7 +1040,7 @@ ppp_irnet_ioctl(struct ppp_channel *	chan,
  * Hook our device callbacks in the filesystem, to connect our code
  * to /dev/irnet
  */
-int
+static inline int __init
 ppp_irnet_init(void)
 {
   int err = 0;
@@ -1058,7 +1058,7 @@ ppp_irnet_init(void)
 /*
  * Cleanup at exit...
  */
-void
+static inline void __exit
 ppp_irnet_cleanup(void)
 {
   DENTER(MODULE_TRACE, "()\n");
@@ -1069,13 +1069,12 @@ ppp_irnet_cleanup(void)
   DEXIT(MODULE_TRACE, "\n");
 }
 
-#ifdef MODULE
 /*------------------------------------------------------------------*/
 /*
  * Module main entry point
  */
-int
-init_module(void)
+int __init
+irnet_init(void)
 {
   int err;
 
@@ -1090,11 +1089,19 @@ init_module(void)
 /*
  * Module exit
  */
-void
-cleanup_module(void)
+void __exit
+irnet_cleanup(void)
 {
   irda_irnet_cleanup();
   return ppp_irnet_cleanup();
 }
-#endif /* MODULE */
+
+/*------------------------------------------------------------------*/
+/*
+ * Module magic
+ */
+module_init(irnet_init);
+module_exit(irnet_cleanup);
+MODULE_AUTHOR("Jean Tourrilhes <jt@hpl.hp.com>");
+MODULE_DESCRIPTION("IrNET : Synchronous PPP over IrDA"); 
 MODULE_LICENSE("GPL");

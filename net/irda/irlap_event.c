@@ -39,6 +39,7 @@
 #include <net/irda/irlap_frame.h>
 #include <net/irda/qos.h>
 #include <net/irda/parameters.h>
+#include <net/irda/irlmp.h>		/* irlmp_flow_indication(), ... */
 
 #include <net/irda/irda_device.h>
 

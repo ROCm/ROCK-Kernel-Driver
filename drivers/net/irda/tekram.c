@@ -29,7 +29,6 @@
 #include <linux/init.h>
 
 #include <net/irda/irda.h>
-#include <net/irda/irmod.h>
 #include <net/irda/irda_device.h>
 #include <net/irda/irtty.h>
 
@@ -60,7 +59,7 @@ int __init tekram_init(void)
 	return irda_device_register_dongle(&dongle);
 }
 
-void tekram_cleanup(void)
+void __exit tekram_cleanup(void)
 {
 	irda_device_unregister_dongle(&dongle);
 }
@@ -264,7 +263,6 @@ int tekram_reset(struct irda_task *task)
 	return ret;
 }
 
-#ifdef MODULE
 MODULE_AUTHOR("Dag Brattli <dagb@cs.uit.no>");
 MODULE_DESCRIPTION("Tekram IrMate IR-210B dongle driver");
 MODULE_LICENSE("GPL");
@@ -275,10 +273,7 @@ MODULE_LICENSE("GPL");
  *    Initialize Tekram module
  *
  */
-int init_module(void)
-{
-	return tekram_init();
-}
+module_init(tekram_init);
 
 /*
  * Function cleanup_module (void)
@@ -286,8 +281,4 @@ int init_module(void)
  *    Cleanup Tekram module
  *
  */
-void cleanup_module(void)
-{
-        tekram_cleanup();
-}
-#endif /* MODULE */
+module_exit(tekram_cleanup);

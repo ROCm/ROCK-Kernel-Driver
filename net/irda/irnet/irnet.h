@@ -222,6 +222,9 @@
  *	o Fix race condition in irnet_connect_indication().
  *	  If the socket was already trying to connect, drop old connection
  *	  and use new one only if acting as primary. See comments.
+ *
+ * v13 - 30.5.02 - Jean II
+ *	o Update module init code
  */
 
 /***************************** INCLUDES *****************************/
@@ -239,6 +242,7 @@
 #include <linux/config.h>
 #include <linux/ctype.h>	/* isspace() */
 #include <asm/uaccess.h>
+#include <linux/init.h>
 
 #include <linux/ppp_defs.h>
 #include <linux/if_ppp.h>
@@ -502,16 +506,11 @@ extern int
 	irda_irnet_init(void);		/* Initialise IrDA part of IrNET */
 extern void
 	irda_irnet_cleanup(void);	/* Teardown IrDA part of IrNET */
-/* --------------------------- PPP PART --------------------------- */
-extern int
-	ppp_irnet_init(void);		/* Initialise PPP part of IrNET */
-extern void
-	ppp_irnet_cleanup(void);	/* Teardown PPP part of IrNET */
 /* ---------------------------- MODULE ---------------------------- */
 extern int
-	init_module(void);		/* Initialise IrNET module */
+	irnet_init(void);		/* Initialise IrNET module */
 extern void
-	cleanup_module(void);		/* Teardown IrNET module  */
+	irnet_cleanup(void);		/* Teardown IrNET module */
 
 /**************************** VARIABLES ****************************/
 

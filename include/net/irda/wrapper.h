@@ -30,7 +30,7 @@
 #include <linux/skbuff.h>
 #include <linux/netdevice.h>
 
-#include <net/irda/irda_device.h>
+#include <net/irda/irda_device.h>	/* iobuff_t */
 
 #define BOF  0xc0 /* Beginning of frame */
 #define XBOF 0xff

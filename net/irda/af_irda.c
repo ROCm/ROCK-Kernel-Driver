@@ -48,27 +48,17 @@
 #include <linux/socket.h>
 #include <linux/sockios.h>
 #include <linux/init.h>
-#include <linux/if_arp.h>
 #include <linux/net.h>
 #include <linux/irda.h>
 #include <linux/poll.h>
 
+#include <asm/ioctls.h>		/* TIOCOUTQ, TIOCINQ */
 #include <asm/uaccess.h>
 
 #include <net/sock.h>
 #include <net/tcp.h>
 
-#include <net/irda/irda.h>
-#include <net/irda/iriap.h>
-#include <net/irda/irias_object.h>
-#include <net/irda/irlmp.h>
-#include <net/irda/irttp.h>
-#include <net/irda/discovery.h>
-
-extern int  irda_init(void);
-extern void irda_cleanup(void);
-extern int  irlap_driver_rcv(struct sk_buff *, struct net_device *,
-			     struct packet_type *);
+#include <net/irda/af_irda.h>
 
 static int irda_create(struct socket *sock, int protocol);
 
@@ -82,10 +72,6 @@ static struct proto_ops irda_ultra_ops;
 #endif /* CONFIG_IRDA_ULTRA */
 
 #define IRDA_MAX_HEADER (TTP_MAX_HEADER)
-
-#ifdef CONFIG_IRDA_DEBUG
-__u32 irda_debug = IRDA_DEBUG_LEVEL;
-#endif
 
 /*
  * Function irda_data_indication (instance, sap, skb)
@@ -2527,118 +2513,27 @@ SOCKOPS_WRAP(irda_ultra, PF_IRDA);
 #endif /* CONFIG_IRDA_ULTRA */
 
 /*
- * Function irda_device_event (this, event, ptr)
+ * Function irsock_init (pro)
  *
- *    Called when a device is taken up or down
- *
- */
-static int irda_device_event(struct notifier_block *this, unsigned long event,
-			     void *ptr)
-{
-	struct net_device *dev = (struct net_device *) ptr;
-
-        /* Reject non IrDA devices */
-	if (dev->type != ARPHRD_IRDA)
-		return NOTIFY_DONE;
-
-        switch (event) {
-	case NETDEV_UP:
-		IRDA_DEBUG(3, __FUNCTION__ "(), NETDEV_UP\n");
-		/* irda_dev_device_up(dev); */
-		break;
-	case NETDEV_DOWN:
-		IRDA_DEBUG(3, __FUNCTION__ "(), NETDEV_DOWN\n");
-		/* irda_kill_by_device(dev); */
-		/* irda_rt_device_down(dev); */
-		/* irda_dev_device_down(dev); */
-		break;
-	default:
-		break;
-        }
-
-        return NOTIFY_DONE;
-}
-
-static struct packet_type irda_packet_type =
-{
-	0,	/* MUTTER ntohs(ETH_P_IRDA),*/
-	NULL,
-	irlap_driver_rcv,
-	NULL,
-	NULL,
-};
-
-static struct notifier_block irda_dev_notifier = {
-	irda_device_event,
-	NULL,
-	0
-};
-
-/*
- * Function irda_proc_modcount (inode, fill)
- *
- *    Use by the proc file system functions to prevent the irda module
- *    being removed while the use is standing in the net/irda directory
- */
-void irda_proc_modcount(struct inode *inode, int fill)
-{
-#ifdef MODULE
-#ifdef CONFIG_PROC_FS
-	if (fill)
-		MOD_INC_USE_COUNT;
-	else
-		MOD_DEC_USE_COUNT;
-#endif /* CONFIG_PROC_FS */
-#endif /* MODULE */
-}
-
-/*
- * Function irda_proto_init (pro)
- *
- *    Initialize IrDA protocol layer
+ *    Initialize IrDA protocol
  *
  */
-int __init irda_proto_init(void)
+int __init irsock_init(void)
 {
 	sock_register(&irda_family_ops);
 
-	irda_packet_type.type = htons(ETH_P_IRDA);
-        dev_add_pack(&irda_packet_type);
-
-	register_netdevice_notifier(&irda_dev_notifier);
-
-	irda_init();
-	irda_device_init();
 	return 0;
 }
 
-late_initcall(irda_proto_init);
-
 /*
- * Function irda_proto_cleanup (void)
+ * Function irsock_cleanup (void)
  *
- *    Remove IrDA protocol layer
+ *    Remove IrDA protocol
  *
  */
-#ifdef MODULE
-void irda_proto_cleanup(void)
+void __exit irsock_cleanup(void)
 {
-	irda_packet_type.type = htons(ETH_P_IRDA);
-        dev_remove_pack(&irda_packet_type);
-
-        unregister_netdevice_notifier(&irda_dev_notifier);
-
 	sock_unregister(PF_IRDA);
-	irda_cleanup();
 
         return;
 }
-module_exit(irda_proto_cleanup);
-
-MODULE_AUTHOR("Dag Brattli <dagb@cs.uit.no>");
-MODULE_DESCRIPTION("The Linux IrDA Protocol Subsystem");
-MODULE_LICENSE("GPL");
-#ifdef CONFIG_IRDA_DEBUG
-MODULE_PARM(irda_debug, "1l");
-#endif
-#endif /* MODULE */
