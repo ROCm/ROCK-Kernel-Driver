@@ -108,7 +108,7 @@ struct rt6_info ip6_null_entry = {
 			.dev		= &loopback_dev,
 			.obsolete	= -1,
 			.error		= -ENETUNREACH,
-			.metrics[RTAX_HOPLIMIT-1] = 255,
+			.metrics	= { [RTAX_HOPLIMIT - 1] = 255, },
 			.input		= ip6_pkt_discard,
 			.output		= ip6_pkt_discard,
 			.ops		= &ip6_dst_ops,
