@@ -1283,8 +1283,6 @@ void exit_mmap(struct mm_struct * mm)
 
 	profile_exit_mmap(mm);
  
-	release_segments(mm);
- 
 	spin_lock(&mm->page_table_lock);
 
 	tlb = tlb_gather_mmu(mm, 1);
