@@ -231,7 +231,6 @@ static Scsi_Host_Template scsi_driver_template;
 
 const u8 sbp2_speedto_max_payload[] = { 0x7, 0x8, 0x9, 0xA, 0xB, 0xC };
 
-static void sbp2_remove_host(struct hpsb_host *host);
 static void sbp2_host_reset(struct hpsb_host *host);
 
 static int sbp2_probe(struct device *dev);
@@ -240,7 +239,6 @@ static int sbp2_update(struct unit_directory *ud);
 
 static struct hpsb_highlevel sbp2_highlevel = {
 	.name =		SBP2_DEVICE_NAME,
-	.remove_host =	sbp2_remove_host,
 	.host_reset =	sbp2_host_reset,
 };
 
@@ -773,26 +771,6 @@ static void sbp2_host_reset(struct hpsb_host *host)
 	if (hi) {
 		list_for_each_entry(scsi_id, &hi->scsi_ids, scsi_list)
 			scsi_block_requests(scsi_id->scsi_host);
-	}
-}
-
-
-static void sbp2_remove_host(struct hpsb_host *host)
-{
-	struct sbp2scsi_host_info *hi;
-
-	SBP2_DEBUG("sbp2_remove_host");
-
-	hi = hpsb_get_hostinfo(&sbp2_highlevel, host);
-
-	if (hi) {
-		struct scsi_id_instance_data *scsi_id;
-
-		list_for_each_entry(scsi_id, &hi->scsi_ids, scsi_list) {
-			down_write(&scsi_id->ud->device.bus->subsys.rwsem);
-			device_release_driver(&scsi_id->ud->device);
-			up_write(&scsi_id->ud->device.bus->subsys.rwsem);
-		}
 	}
 }
 
