@@ -1244,6 +1244,11 @@ static irqreturn_t smc_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 	spin_lock(&lp->lock);
 
+	/* A preamble may be used when there is a potential race
+	 * between the interruptible transmit functions and this
+	 * ISR. */
+	SMC_INTERRUPT_PREAMBLE;
+
 	saved_pointer = SMC_GET_PTR();
 	mask = SMC_GET_INT_MASK();
 	SMC_SET_INT_MASK(0);
