@@ -394,13 +394,6 @@ static inline void remove_debug_files (struct ohci_hcd *bus) { }
 
 #else
 
-static inline struct ohci_hcd *dev_to_ohci (struct device *dev)
-{
-	struct usb_hcd	*hcd = dev_get_drvdata (dev);
-
-	return hcd_to_ohci (hcd);
-}
-
 static ssize_t
 show_list (struct ohci_hcd *ohci, char *buf, size_t count, struct ed *ed)
 {
