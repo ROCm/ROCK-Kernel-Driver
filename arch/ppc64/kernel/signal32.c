@@ -1021,7 +1021,7 @@ static void handle_signal32(unsigned long sig, siginfo_t *info,
 		    || __put_user(sig,&rt_stack_frame->uc.uc_mcontext.signal))
 			goto badframe; 
 	} else {
-		/* Put another sigcontext on the stack */
+		/* Put a sigcontext on the stack */
 		*newspp -= sizeof(*sc);
 		sc = (struct sigcontext32_struct *)(u64)*newspp;
 		if (verify_area(VERIFY_WRITE, sc, sizeof(*sc)))

@@ -70,8 +70,8 @@ static __inline__ void clear_page(void *addr)
 
 extern void copy_page(void *to, void *from);
 struct page;
-extern void clear_user_page(void *page, unsigned long vaddr);
-extern void copy_user_page(void *to, void *from, unsigned long vaddr);
+extern void clear_user_page(void *page, unsigned long vaddr, struct page *pg);
+extern void copy_user_page(void *to, void *from, unsigned long vaddr, struct page *p);
 
 #ifdef STRICT_MM_TYPECHECKS
 /*
