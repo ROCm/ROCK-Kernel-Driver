@@ -23,7 +23,7 @@ ifdef CONFIG_VGA_HOSE
 obj-y	 += console.o
 endif
 
-obj-$(CONFIG_SMP)    += smp.o irq_smp.o
+obj-$(CONFIG_SMP)    += smp.o
 obj-$(CONFIG_PCI)    += pci.o pci_iommu.o
 obj-$(CONFIG_SRM_ENV)	+= srm_env.o
 

@@ -182,7 +182,7 @@ die_if_kernel(char * str, struct pt_regs *regs, long err, unsigned long *r9_15)
 
 	if (test_and_set_thread_flag (TIF_DIE_IF_KERNEL)) {
 		printk("die_if_kernel recursion detected.\n");
-		sti();
+		local_irq_enable();
 		while (1);
 	}
 	do_exit(SIGSEGV);
@@ -613,7 +613,7 @@ got_exception:
 
 	if (test_and_set_thread_flag (TIF_DIE_IF_KERNEL)) {
 		printk("die_if_kernel recursion detected.\n");
-		sti();
+		local_irq_enable();
 		while (1);
 	}
 	do_exit(SIGSEGV);

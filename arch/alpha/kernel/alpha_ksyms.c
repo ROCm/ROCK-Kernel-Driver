@@ -31,6 +31,8 @@
 #include <asm/machvec.h>
 #include <asm/pgalloc.h>
 #include <asm/semaphore.h>
+#include <asm/tlbflush.h>
+#include <asm/cacheflush.h>
 
 #define __KERNEL_SYSCALLS__
 #include <asm/unistd.h>
@@ -213,15 +215,9 @@ EXPORT_SYMBOL(flush_tlb_range);
 EXPORT_SYMBOL(flush_tlb_page);
 EXPORT_SYMBOL(smp_imb);
 EXPORT_SYMBOL(cpu_data);
-EXPORT_SYMBOL(__cpu_number_map);
 EXPORT_SYMBOL(smp_num_cpus);
 EXPORT_SYMBOL(smp_call_function);
 EXPORT_SYMBOL(smp_call_function_on_cpu);
-EXPORT_SYMBOL(global_irq_holder);
-EXPORT_SYMBOL(__global_cli);
-EXPORT_SYMBOL(__global_sti);
-EXPORT_SYMBOL(__global_save_flags);
-EXPORT_SYMBOL(__global_restore_flags);
 EXPORT_SYMBOL(atomic_dec_and_lock);
 #ifdef CONFIG_DEBUG_SPINLOCK
 EXPORT_SYMBOL(spin_unlock);

@@ -75,13 +75,7 @@ int
 handle_IRQ_event(unsigned int irq, struct pt_regs *regs,
 		 struct irqaction *action)
 {
-	int status;
-	int cpu = smp_processor_id();
-
-	kstat.irqs[cpu][irq]++;
-	irq_enter(cpu, irq);
-
-	status = 1;	/* Force the "do bottom halves" bit */
+	int status = 1;	/* Force the "do bottom halves" bit */
 
 	do {
 		if (!(action->flags & SA_INTERRUPT))
@@ -96,8 +90,6 @@ handle_IRQ_event(unsigned int irq, struct pt_regs *regs,
 	if (status & SA_SAMPLE_RANDOM)
 		add_interrupt_randomness(irq);
 	local_irq_disable();
-
-	irq_exit(cpu, irq);
 
 	return status;
 }
@@ -130,12 +122,7 @@ void
 disable_irq(unsigned int irq)
 {
 	disable_irq_nosync(irq);
-
-	if (!local_irq_count(smp_processor_id())) {
-		do {
-			barrier();
-		} while (irq_desc[irq].status & IRQ_INPROGRESS);
-	}
+	synchronize_irq(irq);
 }
 
 void
@@ -602,7 +589,8 @@ handle_irq(int irq, struct pt_regs * regs)
 		return;
 	}
 
-	irq_attempt(cpu, irq)++;
+	irq_enter();
+	kstat.irqs[cpu][irq]++;
 	spin_lock_irq(&desc->lock); /* mask also the higher prio events */
 	desc->handler->ack(irq);
 	/*
@@ -661,8 +649,7 @@ out:
 	desc->handler->end(irq);
 	spin_unlock(&desc->lock);
 
-	if (softirq_pending(cpu))
-		do_softirq();
+	irq_exit();
 }
 
 /*
@@ -694,7 +681,7 @@ probe_irq_on(void)
 
 	/* Wait for longstanding interrupts to trigger. */
 	for (delay = jiffies + HZ/50; time_after(delay, jiffies); )
-		/* about 20ms delay */ synchronize_irq();
+		/* about 20ms delay */ barrier();
 
 	/* enable any unassigned irqs (we must startup again here because
 	   if a longstanding irq happened in the previous stage, it may have
@@ -715,7 +702,7 @@ probe_irq_on(void)
 	 * Wait for spurious interrupts to trigger
 	 */
 	for (delay = jiffies + HZ/10; time_after(delay, jiffies); )
-		/* about 100ms delay */ synchronize_irq();
+		/* about 100ms delay */ barrier();
 
 	/*
 	 * Now filter out any obviously spurious interrupts
@@ -813,3 +800,15 @@ probe_irq_off(unsigned long val)
 		irq_found = -irq_found;
 	return irq_found;
 }
+
+#ifdef CONFIG_SMP
+void synchronize_irq(unsigned int irq)
+{
+        /* is there anything to synchronize with? */
+	if (!irq_desc[irq].action)
+		return;
+
+	while (irq_desc[irq].status & IRQ_INPROGRESS)
+		barrier();
+}
+#endif

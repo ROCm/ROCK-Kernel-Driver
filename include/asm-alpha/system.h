@@ -311,32 +311,6 @@ extern int __min_ipl;
 #define local_irq_save(flags)	do { (flags) = swpipl(IPL_MAX); barrier(); } while(0)
 #define local_irq_restore(flags)	do { barrier(); setipl(flags); barrier(); } while(0)
 
-#ifdef CONFIG_SMP
-
-extern int global_irq_holder;
-
-#define save_and_cli(flags)     (save_flags(flags), cli())
-
-extern void __global_cli(void);
-extern void __global_sti(void);
-extern unsigned long __global_save_flags(void);
-extern void __global_restore_flags(unsigned long flags);
-
-#define cli()                   __global_cli()
-#define sti()                   __global_sti()
-#define save_flags(flags)	((flags) = __global_save_flags())
-#define restore_flags(flags)    __global_restore_flags(flags)
-
-#else /* CONFIG_SMP */
-
-#define cli()			local_irq_disable()
-#define sti()			local_irq_enable()
-#define save_flags(flags)	local_save_flags(flags)
-#define save_and_cli(flags)	local_irq_save(flags)
-#define restore_flags(flags)	local_irq_restore(flags)
-
-#endif /* CONFIG_SMP */
-
 /*
  * TB routines..
  */

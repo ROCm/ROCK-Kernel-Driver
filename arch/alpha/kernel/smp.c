@@ -117,8 +117,6 @@ smp_store_cpu_info(int cpuid)
 	cpu_data[cpuid].last_asn = ASN_FIRST_VERSION;
 	cpu_data[cpuid].need_new_asn = 0;
 	cpu_data[cpuid].asn_lock = 0;
-	local_irq_count(cpuid) = 0;
-	local_bh_count(cpuid) = 0;
 }
 
 /*
@@ -632,15 +630,13 @@ smp_percpu_timer_interrupt(struct pt_regs *regs)
 		/* We need to make like a normal interrupt -- otherwise
 		   timer interrupts ignore the global interrupt lock,
 		   which would be a Bad Thing.  */
-		irq_enter(cpu, RTC_IRQ);
+		irq_enter();
 
 		update_process_times(user);
 
 		data->prof_counter = data->prof_multiplier;
-		irq_exit(cpu, RTC_IRQ);
 
-		if (softirq_pending(cpu))
-			do_softirq();
+		irq_exit();
 	}
 }
 
