@@ -21,11 +21,7 @@
 #define _FPLUS_
 
 #ifndef	HW_PTR
-#ifdef	MEM_MAPPED_IO
-#define	HW_PTR	u_long
-#else
-#define	HW_PTR	u_short
-#endif
+#define	HW_PTR	void __iomem *
 #endif
 
 /*

@@ -206,6 +206,7 @@ static int skfp_init_one(struct pci_dev *pdev,
 	struct net_device *dev;
 	struct s_smc *smc;	/* board pointer */
 	unsigned long port, len;
+	void __iomem *mem;
 	int err;
 
 	PRINTK(KERN_INFO "entering skfp_init_one\n");
@@ -263,16 +264,16 @@ static int skfp_init_one(struct pci_dev *pdev,
 	}
 
 #ifdef MEM_MAPPED_IO
-	dev->base_addr = (unsigned long) ioremap(port, len);
-	if (!dev->base_addr) {
-		printk(KERN_ERR "skfp:  Unable to map MEMORY register, "
+	mem = ioremap(port, len);
+#else
+	mem =ioport_map(port, len);
+#endif
+	if (!mem) {
+		printk(KERN_ERR "skfp:  Unable to map register, "
 				"FDDI adapter will be disabled.\n");
 		err = -EIO;
 		goto err_out3;
 	}
-#else
-	dev->base_addr = port;
-#endif
 
 	dev->irq = pdev->irq;
 	dev->get_stats = &skfp_ctl_get_stats;
@@ -296,8 +297,11 @@ static int skfp_init_one(struct pci_dev *pdev,
 	smc->os.MaxFrameSize = MAX_FRAME_SIZE;
 	smc->os.dev = dev;
 	smc->hw.slot = -1;
+	smc->hw.iop = mem;
 	smc->os.ResetRequested = FALSE;
 	skb_queue_head_init(&smc->os.SendSkbQueue);
+
+	dev->base_addr = (unsigned long)mem;
 
 	err = skfp_driver_init(dev);
 	if (err)
@@ -328,7 +332,9 @@ err_out5:
 			    smc->os.LocalRxBuffer, smc->os.LocalRxBufferDMA);
 err_out4:
 #ifdef MEM_MAPPED_IO
-	iounmap((void *) dev->base_addr);
+	iounmap(smc->hw.iop);
+#else
+	ioport_unmap(smc->hw.iop);
 #endif
 err_out3:
 	free_netdev(dev);
@@ -363,7 +369,9 @@ static void __devexit skfp_remove_one(struct pci_dev *pdev)
 		lp->os.LocalRxBuffer = NULL;
 	}
 #ifdef MEM_MAPPED_IO
-	iounmap((void *) p->base_addr);
+	iounmap(lp->hw.iop);
+#else
+	ioport_unmap(lp->hw.iop);
 #endif
 	pci_release_regions(pdev);
 	free_netdev(p);
@@ -406,7 +414,6 @@ static  int skfp_driver_init(struct net_device *dev)
 
 	// set the io address in private structures
 	bp->base_addr = dev->base_addr;
-	smc->hw.iop = dev->base_addr;
 
 	// Get the interrupt level from the PCI Configuration Table
 	smc->hw.irq = dev->irq;
