@@ -664,6 +664,8 @@ source "drivers/misc/Kconfig"
 
 source "drivers/usb/Kconfig"
 
+source "drivers/mmc/Kconfig"
+
 source "arch/arm/Kconfig.debug"
 
 source "security/Kconfig"
