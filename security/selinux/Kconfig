@@ -8,9 +8,20 @@ config SECURITY_SELINUX
 	  You can obtain the policy compiler (checkpolicy), the utility for
 	  labeling filesystems (setfiles), and an example policy configuration
 	  from http://www.nsa.gov/selinux.
-	  SELinux needs to be explicitly enabled on the kernel command line with
-	  selinux=1.  If you specify selinux=0 or do not use this parameter,
-	  SELinux will not be enabled.
+	  If you are unsure how to answer this question, answer N.
+
+config SECURITY_SELINUX_BOOTPARAM
+	bool "NSA SELinux boot parameter"
+	depends on SECURITY_SELINUX
+	default n
+	help
+	  This option adds a kernel parameter 'selinux', which allows SELinux
+	  to be disabled at boot.  If this option is selected, SELinux
+	  functionality can be disabled with selinux=0 on the kernel
+	  command line.  The purpose of this option is to allow a single
+	  kernel image to be distributed with SELinux built in, but not
+	  necessarily enabled.
+
 	  If you are unsure how to answer this question, answer N.
 
 config SECURITY_SELINUX_DEVELOP
