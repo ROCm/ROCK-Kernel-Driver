@@ -55,6 +55,7 @@ struct bus_type {
 	struct kset		devices;
 
 	struct bus_attribute	* bus_attrs;
+	struct device_attribute	* dev_attrs;
 
 	int		(*match)(struct device * dev, struct device_driver * drv);
 	struct device * (*add)	(struct device * parent, char * bus_id);

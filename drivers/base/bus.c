@@ -392,6 +392,38 @@ static void driver_detach(struct device_driver * drv)
 	
 }
 
+static int device_add_attrs(struct bus_type * bus, struct device * dev)
+{
+	int error = 0;
+	int i;
+
+	if (bus->dev_attrs) {
+		for (i = 0; attr_name(bus->dev_attrs[i]); i++) {
+			error = device_create_file(dev,&bus->dev_attrs[i]);
+			if (error)
+				goto Err;
+		}
+	}
+ Done:
+	return error;
+ Err:
+	while (--i >= 0)
+		device_remove_file(dev,&bus->dev_attrs[i]);
+	goto Done;
+}
+
+
+static void device_remove_attrs(struct bus_type * bus, struct device * dev)
+{
+	int i;
+	
+	if (bus->dev_attrs) {
+		for (i = 0; attr_name(bus->dev_attrs[i]); i++)
+			device_remove_file(dev,&bus->dev_attrs[i]);
+	}
+}
+
+
 /**
  *	bus_add_device - add device to bus
  *	@dev:	device being added
@@ -411,6 +443,7 @@ int bus_add_device(struct device * dev)
 		list_add_tail(&dev->bus_list,&dev->bus->devices.list);
 		device_attach(dev);
 		up_write(&dev->bus->subsys.rwsem);
+		device_add_attrs(bus,dev);
 		sysfs_create_link(&bus->devices.kobj,&dev->kobj,dev->bus_id);
 	}
 	return error;
@@ -429,6 +462,7 @@ void bus_remove_device(struct device * dev)
 {
 	if (dev->bus) {
 		sysfs_remove_link(&dev->bus->devices.kobj,dev->bus_id);
+		device_remove_attrs(dev->bus,dev);
 		down_write(&dev->bus->subsys.rwsem);
 		pr_debug("bus %s: remove device %s\n",dev->bus->name,dev->bus_id);
 		device_release_driver(dev);
@@ -569,7 +603,7 @@ static int bus_add_attrs(struct bus_type * bus)
  Done:
 	return error;
  Err:
-	while (i >= 0)
+	while (--i >= 0)
 		bus_remove_file(bus,&bus->bus_attrs[i]);
 	goto Done;
 }
