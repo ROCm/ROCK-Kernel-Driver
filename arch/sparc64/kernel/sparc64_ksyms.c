@@ -30,7 +30,6 @@
 #include <asm/pgtable.h>
 #include <asm/io.h>
 #include <asm/irq.h>
-#include <asm/softirq.h>
 #include <asm/hardirq.h>
 #include <asm/idprom.h>
 #include <asm/svr4.h>

@@ -17,7 +17,6 @@ unsigned long cpu_online_map = 1;
 #include "asm/smp.h"
 #include "asm/processor.h"
 #include "asm/spinlock.h"
-#include "asm/softirq.h"
 #include "asm/hardirq.h"
 #include "user_util.h"
 #include "kern_util.h"

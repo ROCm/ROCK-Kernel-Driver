@@ -6,6 +6,7 @@
  * Rewritten. Old one was good in 2.2, but in 2.3 it was immoral. --ANK (990903)
  */
 
+#include <linux/module.h>
 #include <linux/kernel_stat.h>
 #include <linux/interrupt.h>
 #include <linux/notifier.h>
@@ -99,6 +100,17 @@ restart:
 
 	local_irq_restore(flags);
 }
+
+void local_bh_enable(void)
+{
+	__local_bh_enable();
+	BUG_ON(irqs_disabled());
+	if (unlikely(!in_interrupt() &&
+		     softirq_pending(smp_processor_id())))
+		do_softirq();
+	preempt_check_resched();
+}
+EXPORT_SYMBOL(local_bh_enable);
 
 /*
  * This function must run with irqs disabled!

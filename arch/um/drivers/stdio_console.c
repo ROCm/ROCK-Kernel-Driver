@@ -18,7 +18,6 @@
 #include "linux/interrupt.h"
 #include "linux/slab.h"
 #include "asm/current.h"
-#include "asm/softirq.h"
 #include "asm/hardirq.h"
 #include "asm/irq.h"
 #include "stdio_console.h"
