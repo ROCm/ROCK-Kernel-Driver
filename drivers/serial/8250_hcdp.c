@@ -147,7 +147,7 @@ setup_serial_hcdp(void *tablep)
 		printk("  gsi = %d, baud rate = %lu, bits = %d, clock = %d\n",
 		       gsi, (unsigned long) hcdp_dev->baud, hcdp_dev->bits,
 		       hcdp_dev->clock_rate);
-		if (hcdp_dev->base_addr.space_id == ACPI_PCICONF_SPACE)
+		if (HCDP_PCI_UART(hcdp_dev))
 			printk(" PCI id: %02x:%02x:%02x, vendor ID=0x%x, "
 				"dev ID=0x%x\n", hcdp_dev->pci_seg,
 				hcdp_dev->pci_bus, hcdp_dev->pci_dev,
@@ -179,15 +179,25 @@ setup_serial_hcdp(void *tablep)
 			printk(KERN_WARNING"warning: No support for PCI serial console\n");
 			return;
 		}
+
+		if (HCDP_IRQ_SUPPORTED(hcdp_dev)) {
 #ifdef CONFIG_IA64
-		port.irq = acpi_register_irq(gsi, ACPI_ACTIVE_HIGH,
-				ACPI_EDGE_SENSITIVE);
+			if (HCDP_PCI_UART(hcdp_dev))
+				port.irq = acpi_register_irq(gsi,
+					ACPI_ACTIVE_LOW, ACPI_LEVEL_SENSITIVE);
+			else
+				port.irq = acpi_register_irq(gsi,
+					ACPI_ACTIVE_HIGH, ACPI_EDGE_SENSITIVE);
 #else
-		port.irq = gsi;
+			port.irq = gsi;
 #endif
-		port.flags = UPF_SKIP_TEST | UPF_BOOT_AUTOCONF | UPF_RESOURCES;
-		if (gsi)
 			port.flags |= UPF_AUTO_IRQ;
+
+			if (HCDP_PCI_UART(hcdp_dev))
+				port.flags |= UPF_SHARE_IRQ;
+		}
+
+		port.flags |= UPF_SKIP_TEST | UPF_BOOT_AUTOCONF | UPF_RESOURCES;
 
 		/*
 		 * Note: the above memset() initializes port.line to 0,
@@ -197,6 +207,7 @@ setup_serial_hcdp(void *tablep)
 			printk("setup_serial_hcdp(): early_serial_setup() "
 				"for HCDP serial console port failed. "
 				"Will try any additional consoles in HCDP.\n");
+			memset(&port, 0, sizeof(port));
 			continue;
 		}
 		break;
