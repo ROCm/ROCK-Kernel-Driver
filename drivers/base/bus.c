@@ -544,11 +544,11 @@ int bus_register(struct bus_type * bus)
 	subsys_set_kset(bus,bus_subsys);
 	subsystem_register(&bus->subsys);
 
-	snprintf(bus->devices.kobj.name,KOBJ_NAME_LEN,"devices");
+	strlcpy(bus->devices.kobj.name, "devices", KOBJ_NAME_LEN);
 	bus->devices.subsys = &bus->subsys;
 	kset_register(&bus->devices);
 
-	snprintf(bus->drivers.kobj.name,KOBJ_NAME_LEN,"drivers");
+	strlcpy(bus->drivers.kobj.name, "drivers", KOBJ_NAME_LEN);
 	bus->drivers.subsys = &bus->subsys;
 	bus->drivers.ktype = &ktype_driver;
 	kset_register(&bus->drivers);
