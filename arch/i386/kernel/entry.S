@@ -211,6 +211,7 @@ ENTRY(resume_userspace)
 ENTRY(resume_kernel)
 	cmpl $0,TI_PRE_COUNT(%ebx)	# non-zero preempt_count ?
 	jnz restore_all
+need_resched:
 	movl TI_FLAGS(%ebx), %ecx	# need_resched set ?
 	testb $_TIF_NEED_RESCHED, %cl
 	jz restore_all
@@ -220,7 +221,8 @@ ENTRY(resume_kernel)
 	sti
 	call schedule
 	movl $0,TI_PRE_COUNT(%ebx) 
-	jmp restore_all
+	cli
+	jmp need_resched
 #endif
 
 	# system call handler stub

@@ -893,9 +893,15 @@ asmlinkage void preempt_schedule(void)
 	if (unlikely(ti->preempt_count))
 		return;
 
+need_resched:
 	ti->preempt_count = PREEMPT_ACTIVE;
 	schedule();
 	ti->preempt_count = 0;
+
+	/* we can miss a preemption opportunity between schedule and now */
+	barrier();
+	if (unlikely(test_thread_flag(TIF_NEED_RESCHED)))
+		goto need_resched;
 }
 #endif /* CONFIG_PREEMPT */
 
