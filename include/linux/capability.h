@@ -41,6 +41,10 @@ typedef struct __user_cap_data_struct {
   
 #ifdef __KERNEL__
 
+#include <linux/spinlock.h>
+
+extern spinlock_t task_capability_lock;
+
 /* #define STRICT_CAP_T_TYPECHECKS */
 
 #ifdef STRICT_CAP_T_TYPECHECKS
