@@ -2043,8 +2043,4 @@ void __init trap_init(void)
 	 */
 	atomic_inc(&init_mm.mm_count);
 	current->active_mm = &init_mm;
-
-#ifdef CONFIG_SMP
-	current_thread_info()->cpu = hard_smp_processor_id();
-#endif
 }
