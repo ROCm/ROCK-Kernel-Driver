@@ -12,13 +12,9 @@
 #include <linux/errno.h>
 #include <linux/init.h>
 
-extern void timer_init(struct oprofile_operations ** ops);
-
-int __init oprofile_arch_init(struct oprofile_operations ** ops)
+void __init oprofile_arch_init(struct oprofile_operations * ops)
 {
-	return -ENODEV;
 }
-
 
 void oprofile_arch_exit(void)
 {
