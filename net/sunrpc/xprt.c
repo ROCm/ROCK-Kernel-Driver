@@ -537,8 +537,17 @@ void xprt_connect(struct rpc_task *task)
 
 	task->tk_timeout = RPC_CONNECT_TIMEOUT;
 	rpc_sleep_on(&xprt->pending, task, xprt_connect_status, NULL);
-	if (!test_and_set_bit(XPRT_CONNECTING, &xprt->sockstate))
-		schedule_work(&xprt->sock_connect);
+	if (!test_and_set_bit(XPRT_CONNECTING, &xprt->sockstate)) {
+		/* Note: if we are here due to a dropped connection
+		 * 	 we delay reconnecting by RPC_REESTABLISH_TIMEOUT/HZ
+		 * 	 seconds
+		 */
+		if (xprt->sock != NULL)
+			schedule_delayed_work(&xprt->sock_connect,
+					RPC_REESTABLISH_TIMEOUT);
+		else
+			schedule_work(&xprt->sock_connect);
+	}
 	return;
  out_write:
 	xprt_release_write(xprt, task);
@@ -566,7 +575,6 @@ xprt_connect_status(struct rpc_task *task)
 	case -ECONNREFUSED:
 	case -ECONNRESET:
 	case -ENOTCONN:
-		rpc_delay(task, RPC_REESTABLISH_TIMEOUT);
 		return;
 	case -ETIMEDOUT:
 		dprintk("RPC: %4d xprt_connect_status: timed out\n",
