@@ -96,7 +96,9 @@ static int sysv_mknod(struct inode * dir, struct dentry * dentry, int mode, int 
 	if (!IS_ERR(inode)) {
 		sysv_set_inode(inode, rdev);
 		mark_inode_dirty(inode);
+		lock_kernel();
 		err = add_nondir(dentry, inode);
+		unlock_kernel();
 	}
 	return err;
 }

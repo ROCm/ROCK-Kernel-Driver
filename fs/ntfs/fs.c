@@ -578,6 +578,7 @@ static int ntfs_create(struct inode* dir, struct dentry *d, int mode)
 	int error = 0;
 	ntfs_attribute *si;
 
+	lock_kernel();
 	r = new_inode(dir->i_sb);
 	if (!r) {
 		error = -ENOMEM;
@@ -622,10 +623,12 @@ static int ntfs_create(struct inode* dir, struct dentry *d, int mode)
 	r->i_mode |= S_IWUGO;
 #endif
 	r->i_mode &= ~vol->umask;
+	unlock_kernel();
 	insert_inode_hash(r);
 	d_instantiate(d, r);
 	return 0;
  fail:
+	unlock_kernel();
 	if (r)
 		iput(r);
 	return error;

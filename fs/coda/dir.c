@@ -219,12 +219,15 @@ static int coda_create(struct inode *dir, struct dentry *de, int mode)
 	struct ViceFid newfid;
 	struct coda_vattr attrs;
 
+	lock_kernel();
 	coda_vfs_stat.create++;
 
 	CDEBUG(D_INODE, "name: %s, length %d, mode %o\n", name, length, mode);
 
-	if (coda_isroot(dir) && coda_iscontrol(name, length))
+	if (coda_isroot(dir) && coda_iscontrol(name, length)) {
+		unlock_kernel();
 		return -EPERM;
+	}
 
 	error = venus_create(dir->i_sb, coda_i2f(dir), name, length, 
 				0, mode, 0, &newfid, &attrs);
@@ -232,12 +235,14 @@ static int coda_create(struct inode *dir, struct dentry *de, int mode)
         if ( error ) {
 		CDEBUG(D_INODE, "create: %s, result %d\n",
 		       coda_f2s(&newfid), error); 
+		unlock_kernel();
 		d_drop(de);
 		return error;
 	}
 
 	error = coda_cnode_make(&result, &newfid, dir->i_sb);
 	if ( error ) {
+		unlock_kernel();
 		d_drop(de);
 		result = NULL;
 		return error;
@@ -245,6 +250,7 @@ static int coda_create(struct inode *dir, struct dentry *de, int mode)
 
 	/* invalidate the directory cnode's attributes */
 	coda_dir_changed(dir, 0);
+	unlock_kernel();
 	d_instantiate(de, result);
         return 0;
 }

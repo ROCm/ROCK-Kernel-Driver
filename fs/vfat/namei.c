@@ -1031,19 +1031,25 @@ int vfat_create(struct inode *dir,struct dentry* dentry,int mode)
 	struct vfat_slot_info sinfo;
 	int res;
 
+	lock_kernel();
 	res = vfat_add_entry(dir, &dentry->d_name, 0, &sinfo, &bh, &de);
-	if (res < 0)
+	if (res < 0) {
+		unlock_kernel();
 		return res;
+	}
 	inode = fat_build_inode(sb, de, sinfo.ino, &res);
 	fat_brelse(sb, bh);
-	if (!inode)
+	if (!inode) {
+		unlock_kernel();
 		return res;
+	}
 	inode->i_mtime = inode->i_atime = inode->i_ctime = CURRENT_TIME;
 	mark_inode_dirty(inode);
 	inode->i_version++;
 	dir->i_version++;
 	dentry->d_time = dentry->d_parent->d_inode->i_version;
 	d_instantiate(dentry,inode);
+	unlock_kernel();
 	return 0;
 }
 

@@ -272,11 +272,13 @@ static int dbl_create(struct inode * dir, struct dentry *dentry,
 {
 	int error;
 
+	lock_kernel();
 	if (is_hdr(dir, dentry->d_name.name, dentry->d_name.len)) {
 		error = -EEXIST;
 	} else {
 		error = hfs_create(dir, dentry, mode);
 	}
+	unlock_kernel();
 	return error;
 }
 

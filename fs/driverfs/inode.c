@@ -127,8 +127,12 @@ static int driverfs_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 
 static int driverfs_create(struct inode *dir, struct dentry *dentry, int mode)
 {
+	int res;
+	lock_kernel();
 	dentry->d_op = &driverfs_dentry_file_ops;
- 	return driverfs_mknod(dir, dentry, mode | S_IFREG, 0);
+ 	res = driverfs_mknod(dir, dentry, mode | S_IFREG, 0);
+	unlock_kernel();
+	return res;
 }
 
 static int

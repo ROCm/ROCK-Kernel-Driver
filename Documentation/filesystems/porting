@@ -89,3 +89,8 @@ unlock_kernel() so that they would protect exactly what needs to be protected.
 [mandatory]
 
 ->truncate() is called without BKL now (same as above).
+
+---
+[mandatory]
+
+->create() is called without BKL now (same as above).

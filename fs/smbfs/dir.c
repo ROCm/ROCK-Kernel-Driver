@@ -485,6 +485,7 @@ smb_create(struct inode *dir, struct dentry *dentry, int mode)
 
 	VERBOSE("creating %s/%s, mode=%d\n", DENTRY_PATH(dentry), mode);
 
+	lock_kernel();
 	smb_invalid_dir_cache(dir);
 	error = smb_proc_create(dentry, 0, CURRENT_TIME, &fileid);
 	if (!error) {
@@ -493,6 +494,7 @@ smb_create(struct inode *dir, struct dentry *dentry, int mode)
 		PARANOIA("%s/%s failed, error=%d\n",
 			 DENTRY_PATH(dentry), error);
 	}
+	unlock_kernel();
 	return error;
 }
 

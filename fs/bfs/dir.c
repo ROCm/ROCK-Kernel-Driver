@@ -83,8 +83,10 @@ static int bfs_create(struct inode * dir, struct dentry * dentry, int mode)
 	inode = new_inode(s);
 	if (!inode)
 		return -ENOSPC;
+	lock_kernel();
 	ino = find_first_zero_bit(s->su_imap, s->su_lasti);
 	if (ino > s->su_lasti) {
+		unlock_kernel();
 		iput(inode);
 		return -ENOSPC;
 	}
@@ -111,8 +113,10 @@ static int bfs_create(struct inode * dir, struct dentry * dentry, int mode)
 		inode->i_nlink--;
 		mark_inode_dirty(inode);
 		iput(inode);
+		unlock_kernel();
 		return err;
 	}
+	unlock_kernel();
 	d_instantiate(dentry, inode);
 	return 0;
 }

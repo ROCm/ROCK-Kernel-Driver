@@ -827,6 +827,7 @@ int ncp_create_new(struct inode *dir, struct dentry *dentry, int mode,
 	PPRINTK("ncp_create_new: creating %s/%s, mode=%x\n",
 		dentry->d_parent->d_name.name, dentry->d_name.name, mode);
 	error = -EIO;
+	lock_kernel();
 	if (!ncp_conn_valid(server))
 		goto out;
 
@@ -863,6 +864,7 @@ int ncp_create_new(struct inode *dir, struct dentry *dentry, int mode,
 	finfo.access = opmode;
 	error = ncp_instantiate(dir, dentry, &finfo);
 out:
+	unlock_kernel();
 	return error;
 }
 

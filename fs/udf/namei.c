@@ -631,9 +631,12 @@ static int udf_create(struct inode *dir, struct dentry *dentry, int mode)
 	struct FileIdentDesc cfi, *fi;
 	int err;
 
+	lock_kernel();
 	inode = udf_new_inode(dir, mode, &err);
-	if (!inode)
+	if (!inode) {
+		unlock_kernel();
 		return err;
+	}
 
 	if (UDF_I_ALLOCTYPE(inode) == ICB_FLAG_AD_IN_ICB)
 		inode->i_data.a_ops = &udf_adinicb_aops;
@@ -649,6 +652,7 @@ static int udf_create(struct inode *dir, struct dentry *dentry, int mode)
 		inode->i_nlink --;
 		mark_inode_dirty(inode);
 		iput(inode);
+		unlock_kernel();
 		return err;
 	}
 	cfi.icb.extLength = cpu_to_le32(inode->i_sb->s_blocksize);
@@ -663,6 +667,7 @@ static int udf_create(struct inode *dir, struct dentry *dentry, int mode)
 	if (fibh.sbh != fibh.ebh)
 		udf_release_data(fibh.ebh);
 	udf_release_data(fibh.sbh);
+	unlock_kernel();
 	d_instantiate(dentry, inode);
 	return 0;
 }

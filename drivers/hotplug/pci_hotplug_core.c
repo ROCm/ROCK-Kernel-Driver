@@ -130,6 +130,7 @@ static struct inode *pcihpfs_get_inode (struct super_block *sb, int mode, int de
 	return inode; 
 }
 
+/* SMP-safe */
 static int pcihpfs_mknod (struct inode *dir, struct dentry *dentry, int mode, int dev)
 {
 	struct inode *inode = pcihpfs_get_inode(dir->i_sb, mode, dev);

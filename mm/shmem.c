@@ -984,6 +984,7 @@ static struct dentry * shmem_lookup(struct inode *dir, struct dentry *dentry)
 /*
  * File creation. Allocate an inode, and we're done..
  */
+/* SMP-safe */
 static int shmem_mknod(struct inode *dir, struct dentry *dentry, int mode, int dev)
 {
 	struct inode * inode = shmem_get_inode(dir->i_sb, mode, dev);

@@ -91,7 +91,9 @@ static int minix_mknod(struct inode * dir, struct dentry *dentry, int mode, int 
 		inode->i_mode = mode;
 		minix_set_inode(inode, rdev);
 		mark_inode_dirty(inode);
+		lock_kernel();
 		error = add_nondir(dentry, inode);
+		unlock_kernel();
 	}
 	return error;
 }

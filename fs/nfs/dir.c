@@ -642,6 +642,7 @@ static int nfs_create(struct inode *dir, struct dentry *dentry, int mode)
 	 * select the appropriate create strategy. Currently open_namei
 	 * does not pass the create flags.
 	 */
+	lock_kernel();
 	nfs_zap_caches(dir);
 	error = NFS_PROTO(dir)->create(dir, &dentry->d_name,
 					 &attr, 0, &fhandle, &fattr);
@@ -649,6 +650,7 @@ static int nfs_create(struct inode *dir, struct dentry *dentry, int mode)
 		error = nfs_instantiate(dentry, &fhandle, &fattr);
 	if (error || fhandle.size == 0)
 		d_drop(dentry);
+	unlock_kernel();
 	return error;
 }
 

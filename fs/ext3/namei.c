@@ -456,9 +456,12 @@ static int ext3_create (struct inode * dir, struct dentry * dentry, int mode)
 	struct inode * inode;
 	int err;
 
+	lock_kernel();
 	handle = ext3_journal_start(dir, EXT3_DATA_TRANS_BLOCKS + 3);
-	if (IS_ERR(handle))
+	if (IS_ERR(handle)) {
+		unlock_kernel();
 		return PTR_ERR(handle);
+	}
 
 	if (IS_SYNC(dir))
 		handle->h_sync = 1;
@@ -473,6 +476,7 @@ static int ext3_create (struct inode * dir, struct dentry * dentry, int mode)
 		err = ext3_add_nondir(handle, dentry, inode);
 	}
 	ext3_journal_stop(handle, dir);
+	unlock_kernel();
 	return err;
 }
 
@@ -1118,8 +1122,8 @@ end_rename:
  * directories can handle most operations...
  */
 struct inode_operations ext3_dir_inode_operations = {
-	create:		ext3_create,		/* BKL held */
-	lookup:		ext3_lookup,		/* BKL held */
+	create:		ext3_create,
+	lookup:		ext3_lookup,
 	link:		ext3_link,		/* BKL held */
 	unlink:		ext3_unlink,		/* BKL held */
 	symlink:	ext3_symlink,		/* BKL held */

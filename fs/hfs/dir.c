@@ -20,6 +20,7 @@
 #include <linux/hfs_fs_sb.h>
 #include <linux/hfs_fs_i.h>
 #include <linux/hfs_fs.h>
+#include <linux/smp_lock.h>
 
 /*================ File-local functions ================*/
 
@@ -170,15 +171,20 @@ int hfs_create(struct inode * dir, struct dentry *dentry, int mode)
 	struct inode *inode;
 	int error;
 
+	lock_kernel();
 	/* build the key, checking against reserved names */
-	if (build_key(&key, dir, dentry->d_name.name, dentry->d_name.len)) 
+	if (build_key(&key, dir, dentry->d_name.name, dentry->d_name.len)) {
+		unlock_kernel();
 		return -EEXIST;
+	}
 
 	if ((error = hfs_cat_create(entry, &key, 
 			       (mode & S_IWUSR) ? 0 : HFS_FIL_LOCK,
 			       HFS_SB(dir->i_sb)->s_type,
-			       HFS_SB(dir->i_sb)->s_creator, &new)))
+			       HFS_SB(dir->i_sb)->s_creator, &new))) {
+		unlock_kernel();
 		return error;
+	}
 
 	/* create an inode for the new file. back out if we run
 	 * into trouble. */
@@ -186,6 +192,7 @@ int hfs_create(struct inode * dir, struct dentry *dentry, int mode)
 	if (!(inode = hfs_iget(new, HFS_I(dir)->file_type, dentry))) {
 		hfs_cat_delete(entry, new, 1);
 		hfs_cat_put(new);
+		unlock_kernel();
 		return -EIO;
 	}
 
@@ -195,6 +202,7 @@ int hfs_create(struct inode * dir, struct dentry *dentry, int mode)
 	if (HFS_I(dir)->d_drop_op)
 		HFS_I(dir)->d_drop_op(dentry, HFS_I(dir)->file_type);
 	mark_inode_dirty(inode);
+	unlock_kernel();
 	d_instantiate(dentry, inode);
 	return 0;
 }

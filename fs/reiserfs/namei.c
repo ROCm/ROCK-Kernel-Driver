@@ -525,11 +525,11 @@ static int reiserfs_create (struct inode * dir, struct dentry *dentry, int mode)
     int jbegin_count = JOURNAL_PER_BALANCE_CNT * 2 ;
     struct reiserfs_transaction_handle th ;
 
-
     inode = new_inode(dir->i_sb) ;
     if (!inode) {
 	return -ENOMEM ;
     }
+    lock_kernel();
     journal_begin(&th, dir->i_sb, jbegin_count) ;
     th.t_caller = "create" ;
     windex = push_journal_writer("reiserfs_create") ;
@@ -537,6 +537,7 @@ static int reiserfs_create (struct inode * dir, struct dentry *dentry, int mode)
     if (!inode) {
 	pop_journal_writer(windex) ;
 	journal_end(&th, dir->i_sb, jbegin_count) ;
+	unlock_kernel();
 	return retval;
     }
 	
@@ -554,6 +555,7 @@ static int reiserfs_create (struct inode * dir, struct dentry *dentry, int mode)
 	// in the same transactioin
 	journal_end(&th, dir->i_sb, jbegin_count) ;
 	iput (inode);
+	unlock_kernel();
 	return retval;
     }
     reiserfs_update_inode_transaction(inode) ;
@@ -562,6 +564,7 @@ static int reiserfs_create (struct inode * dir, struct dentry *dentry, int mode)
     d_instantiate(dentry, inode);
     pop_journal_writer(windex) ;
     journal_end(&th, dir->i_sb, jbegin_count) ;
+    unlock_kernel();
     return 0;
 }
 

@@ -100,7 +100,9 @@ static int ufs_create (struct inode * dir, struct dentry * dentry, int mode)
 		inode->i_fop = &ufs_file_operations;
 		inode->i_mapping->a_ops = &ufs_aops;
 		mark_inode_dirty(inode);
+		lock_kernel();
 		err = ufs_add_nondir(dentry, inode);
+		unlock_kernel();
 	}
 	return err;
 }

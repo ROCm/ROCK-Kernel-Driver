@@ -108,7 +108,9 @@ int hpfs_create(struct inode *dir, struct dentry *dentry, int mode)
 	int r;
 	struct hpfs_dirent dee;
 	int err;
-	if ((err = hpfs_chk_name((char *)name, &len))) return err==-ENOENT ? -EINVAL : err;
+	if ((err = hpfs_chk_name((char *)name, &len)))
+		return err==-ENOENT ? -EINVAL : err;
+	lock_kernel();
 	if (!(fnode = hpfs_alloc_fnode(dir->i_sb, hpfs_i(dir)->i_dno, &fno, &bh))) goto bail;
 	memset(&dee, 0, sizeof dee);
 	if (!(mode & 0222)) dee.read_only = 1;
@@ -123,6 +125,7 @@ int hpfs_create(struct inode *dir, struct dentry *dentry, int mode)
 		brelse(bh);
 		hpfs_free_sectors(dir->i_sb, fno, 1);
 		hpfs_unlock_inode(dir);
+		unlock_kernel();
 		return -EEXIST;
 	}
 	fnode->len = len;
@@ -155,12 +158,14 @@ int hpfs_create(struct inode *dir, struct dentry *dentry, int mode)
 	}
 	hpfs_unlock_iget(dir->i_sb);
 	hpfs_unlock_inode(dir);
+	unlock_kernel();
 	return 0;
-	bail1:
+bail1:
 	brelse(bh);
 	hpfs_free_sectors(dir->i_sb, fno, 1);
 	hpfs_unlock_inode(dir);
-	bail:
+bail:
+	unlock_kernel();
 	return -ENOSPC;
 }
 

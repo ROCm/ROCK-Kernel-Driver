@@ -105,7 +105,9 @@ static int ext2_create (struct inode * dir, struct dentry * dentry, int mode)
 		inode->i_fop = &ext2_file_operations;
 		inode->i_mapping->a_ops = &ext2_aops;
 		mark_inode_dirty(inode);
+		lock_kernel();
 		err = ext2_add_nondir(dentry, inode);
+		unlock_kernel();
 	}
 	return err;
 }

@@ -990,9 +990,7 @@ int vfs_create(struct inode *dir, struct dentry *dentry, int mode)
 
 	mode &= S_IALLUGO;
 	mode |= S_IFREG;
-	lock_kernel();
 	error = dir->i_op->create(dir, dentry, mode);
-	unlock_kernel();
 	if (!error)
 		inode_dir_notify(dir, DN_CREATE);
 	return error;

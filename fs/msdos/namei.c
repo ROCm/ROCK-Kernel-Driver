@@ -280,27 +280,36 @@ int msdos_create(struct inode *dir,struct dentry *dentry,int mode)
 	int ino,res,is_hid;
 	char msdos_name[MSDOS_NAME];
 
+	lock_kernel();
 	res = msdos_format_name(dentry->d_name.name,dentry->d_name.len,
 				msdos_name, &MSDOS_SB(sb)->options);
-	if (res < 0)
+	if (res < 0) {
+		unlock_kernel();
 		return res;
+	}
 	is_hid = (dentry->d_name.name[0]=='.') && (msdos_name[0]!='.');
 	/* Have to do it due to foo vs. .foo conflicts */
 	if (fat_scan(dir,msdos_name,&bh,&de,&ino) >= 0) {
 		fat_brelse(sb, bh);
+		unlock_kernel();
 		return -EINVAL;
  	}
 	inode = NULL;
 	res = msdos_add_entry(dir, msdos_name, &bh, &de, &ino, 0, is_hid);
-	if (res)
+	if (res) {
+		unlock_kernel();
 		return res;
+	}
 	inode = fat_build_inode(dir->i_sb, de, ino, &res);
 	fat_brelse(sb, bh);
-	if (!inode)
+	if (!inode) {
+		unlock_kernel();
 		return res;
+	}
 	inode->i_mtime = inode->i_atime = inode->i_ctime = CURRENT_TIME;
 	mark_inode_dirty(inode);
 	d_instantiate(dentry, inode);
+	unlock_kernel();
 	return 0;
 }
 

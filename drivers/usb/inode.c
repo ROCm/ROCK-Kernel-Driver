@@ -186,6 +186,7 @@ static struct inode *usbfs_get_inode (struct super_block *sb, int mode, int dev)
 	return inode; 
 }
 
+/* SMP-safe */
 static int usbfs_mknod (struct inode *dir, struct dentry *dentry, int mode,
 			int dev)
 {

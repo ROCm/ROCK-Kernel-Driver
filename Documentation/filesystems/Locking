@@ -50,7 +50,7 @@ locking rules:
 	all may block
 		BKL	i_sem(inode)
 lookup:		no	yes
-create:		yes	yes
+create:		no	yes
 link:		yes	yes
 mknod:		yes	yes
 mkdir:		yes	yes
@@ -59,7 +59,7 @@ rmdir:		yes	yes (both)	(see below)
 rename:		yes	yes (all)	(see below)
 readlink:	no	no
 follow_link:	no	no
-truncate:	yes	yes		(see below)
+truncate:	no	yes		(see below)
 setattr:	yes	if ATTR_SIZE
 permssion:	yes	no
 getattr:				(see below)

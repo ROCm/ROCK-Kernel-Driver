@@ -1243,6 +1243,7 @@ jffs_create(struct inode *dir, struct dentry *dentry, int mode)
 	struct inode *inode;
 	int err;
 
+	lock_kernel();
 	D1({
 		int len = dentry->d_name.len;
 		char *s = (char *)kmalloc(len + 1, GFP_KERNEL);
@@ -1256,6 +1257,7 @@ jffs_create(struct inode *dir, struct dentry *dentry, int mode)
 	ASSERT(if (!dir_f) {
 		printk(KERN_ERR "jffs_create(): No reference to a "
 		       "jffs_file struct in inode.\n");
+		unlock_kernel();
 		return -EIO;
 	});
 
@@ -1264,6 +1266,7 @@ jffs_create(struct inode *dir, struct dentry *dentry, int mode)
 	/* Create a node and initialize as much as needed.  */
 	if (!(node = jffs_alloc_node())) {
 		D(printk("jffs_create(): Allocation failed: node == 0\n"));
+		unlock_kernel();
 		return -ENOMEM;
 	}
 	D3(printk (KERN_NOTICE "create(): down biglock\n"));
@@ -1321,6 +1324,7 @@ jffs_create(struct inode *dir, struct dentry *dentry, int mode)
  jffs_create_end:
 	D3(printk (KERN_NOTICE "create(): up biglock\n"));
 	up(&c->fmc->biglock);
+	unlock_kernel();
 	return err;
 } /* jffs_create()  */
 

@@ -134,6 +134,7 @@ struct inode *ramfs_get_inode(struct super_block *sb, int mode, int dev)
 /*
  * File creation. Allocate an inode, and we're done..
  */
+/* SMP-safe */
 static int ramfs_mknod(struct inode *dir, struct dentry *dentry, int mode, int dev)
 {
 	struct inode * inode = ramfs_get_inode(dir->i_sb, mode, dev);
