@@ -483,7 +483,7 @@ static int __init snd_sb16_probe(int dev,
 	if (fm_port[dev] > 0 && fm_port[dev] != SNDRV_AUTO_PORT) {
 		if (snd_opl3_create(card, fm_port[dev], fm_port[dev] + 2,
 				    OPL3_HW_OPL3,
-				    acard->fm_res != NULL,
+				    acard->fm_res != NULL || fm_port[dev] == port[dev],
 				    &opl3) < 0) {
 			snd_printk(KERN_ERR PFX "no OPL device at 0x%lx-0x%lx\n",
 				   fm_port[dev], fm_port[dev] + 2);
