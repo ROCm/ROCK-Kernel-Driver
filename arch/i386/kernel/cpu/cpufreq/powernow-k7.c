@@ -27,7 +27,7 @@
 #include <asm/io.h>
 #include <asm/system.h>
 
-#if defined(CONFIG_ACPI_PROCESSOR) || defined(CONFIG_ACPI_PROCESSOR_MODULE)
+#ifdef CONFIG_X86_POWERNOW_K7_ACPI
 #include <linux/acpi.h>
 #include <acpi/processor.h>
 #endif
@@ -54,7 +54,7 @@ struct pst_s {
 	u8 numpstates;
 };
 
-#if defined(CONFIG_ACPI_PROCESSOR) || defined(CONFIG_ACPI_PROCESSOR_MODULE)
+#ifdef CONFIG_X86_POWERNOW_K7_ACPI
 union powernow_acpi_control_t {
 	struct {
 		unsigned long fid:5,
@@ -196,7 +196,7 @@ static int get_ranges (unsigned char *pst)
 		speed = powernow_table[j].frequency;
 
 		if ((fid_codes[fid] % 10)==5) {
-#if defined(CONFIG_ACPI_PROCESSOR) || defined(CONFIG_ACPI_PROCESSOR_MODULE)
+#ifdef CONFIG_X86_POWERNOW_K7_ACPI
 			if (have_a0 == 1)
 				powernow_table[j].frequency = CPUFREQ_ENTRY_INVALID;
 #endif
@@ -300,7 +300,7 @@ static void change_speed (unsigned int index)
 }
 
 
-#if defined(CONFIG_ACPI_PROCESSOR) || defined(CONFIG_ACPI_PROCESSOR_MODULE)
+#ifdef CONFIG_X86_POWERNOW_K7_ACPI
 
 struct acpi_processor_performance *acpi_processor_perf;
 
@@ -674,7 +674,7 @@ static int __init powernow_init (void)
 
 static void __exit powernow_exit (void)
 {
-#if defined(CONFIG_ACPI_PROCESSOR) || defined(CONFIG_ACPI_PROCESSOR_MODULE)
+#ifdef CONFIG_X86_POWERNOW_K7_ACPI
 	if (acpi_processor_perf) {
 		acpi_processor_unregister_performance(acpi_processor_perf, 0);
 		kfree(acpi_processor_perf);
