@@ -145,7 +145,7 @@ config DECNET
 
 	  To find some tools to use with the kernel layer support, please
 	  look at Patrick Caulfield's web site:
-	  <http://linux.dreamtime.org/decnet/>.
+	  <http://linux-decnet.sourceforge.net/>.
 
 	  More detailed documentation is available in
 	  <file:Documentation/networking/decnet.txt>.
@@ -436,7 +436,7 @@ config X25
 	  (say Y to "LAPB Data Link Driver" below if you want that).
 
 	  You can read more about X.25 at <http://www.sangoma.com/x25.htm> and
-	  <http://www.cisco.com/univercd/data/doc/software/11_0/rpcg/cx25.htm>.
+	  <http://www.cisco.com/univercd/cc/td/doc/product/software/ios11/cbook/cx25.htm>.
 	  Information about X.25 for Linux is contained in the files
 	  <file:Documentation/networking/x25.txt> and
 	  <file:Documentation/networking/x25-iface.txt>.
@@ -571,7 +571,7 @@ config NET_FASTROUTE
 
 	  At the moment, few devices support fast switching (tulip is one of
 	  them, a modified 8390 driver can be found at
-	  <ftp://ftp.inr.ac.ru/ip-routing/fastroute/fastroute-8390.tar.gz>).
+	  <ftp://ftp.tux.org/pub/net/ip-routing/fastroute/fastroute-8390.tar.gz>).
 
 	  If unsure, say N.
 
@@ -583,7 +583,7 @@ config NET_HW_FLOWCONTROL
 	  during periods of extreme congestion. At the moment only a couple
 	  of device drivers support it (really only one -- tulip, a modified
 	  8390 driver can be found at
-	  <ftp://ftp.inr.ac.ru/ip-routing/fastroute/fastroute-8390.tar.gz>).
+	  <ftp://ftp.tux.org/pub/net/ip-routing/fastroute/fastroute-8390.tar.gz>).
 
 	  Really, this option is applicable to any machine attached to a fast
 	  enough network, and even a 10 Mb NIC is able to kill a not very slow
@@ -614,7 +614,7 @@ config NET_SCHED
 	  This code is considered to be experimental.
 
 	  To administer these schedulers, you'll need the user-level utilities
-	  from the package iproute2+tc at <ftp://ftp.inr.ac.ru/ip-routing/>.
+	  from the package iproute2+tc at <ftp://ftp.tux.org/pub/net/ip-routing/>.
 	  That package also contains some documentation; for more, check out
 	  <http://snafu.freedom.org/linux2.2/iproute-notes.html>.
 
