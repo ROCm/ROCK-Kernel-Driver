@@ -817,13 +817,16 @@ static int tc_dump_qdisc(struct sk_buff *skb, struct netlink_callback *cb)
 		read_lock_bh(&qdisc_tree_lock);
 		q_idx = 0;
 		list_for_each_entry(q, &dev->qdisc_list, list) {
-			if (q_idx++ < s_q_idx)
+			if (q_idx < s_q_idx) {
+				q_idx++;
 				continue;
+			}
 			if (tc_fill_qdisc(skb, q, 0, NETLINK_CB(cb->skb).pid,
 					  cb->nlh->nlmsg_seq, NLM_F_MULTI, RTM_NEWQDISC) <= 0) {
 				read_unlock_bh(&qdisc_tree_lock);
 				goto done;
 			}
+			q_idx++;
 		}
 		read_unlock_bh(&qdisc_tree_lock);
 	}
@@ -832,7 +835,7 @@ done:
 	read_unlock(&dev_base_lock);
 
 	cb->args[0] = idx;
-	cb->args[1] = q_idx - 1;
+	cb->args[1] = q_idx;
 
 	return skb->len;
 }
