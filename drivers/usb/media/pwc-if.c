@@ -66,7 +66,7 @@
 /* Function prototypes and driver templates */
 
 /* hotplug device table support */
-static __devinitdata struct usb_device_id pwc_device_table [] = {
+static struct usb_device_id pwc_device_table [] = {
 	{ USB_DEVICE(0x0471, 0x0302) },
 	{ USB_DEVICE(0x0471, 0x0303) },
 	{ USB_DEVICE(0x0471, 0x0304) },

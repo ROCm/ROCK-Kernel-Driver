@@ -828,8 +828,10 @@ static int __init eepro_probe1(struct net_device *dev, short ioaddr)
 			}
 
 			/* Grab the region so we can find another board if autoIRQ fails. */
-			request_region(ioaddr, EEPRO_IO_EXTENT, dev->name);
-
+			if (!request_region(ioaddr, EEPRO_IO_EXTENT, dev->name)) { 
+				printk(KERN_WARNING "EEPRO: io-port 0x%04x in use \n", ioaddr);
+				goto freeall;
+			}
 			((struct eepro_local *)dev->priv)->lock = SPIN_LOCK_UNLOCKED;
 
 			dev->open               = eepro_open;

@@ -99,7 +99,6 @@
 
 #include "../scsi.h"
 #include "../hosts.h"
-#include "../constants.h"
 #include "../sd.h"
 
 #include <linux/types.h>

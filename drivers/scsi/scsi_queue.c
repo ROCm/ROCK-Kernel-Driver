@@ -34,7 +34,6 @@
 
 #include "scsi.h"
 #include "hosts.h"
-#include "constants.h"
 
 /*
  * TODO:

@@ -105,7 +105,6 @@
 #include "hosts.h"
 #include "atari_scsi.h"
 #include "NCR5380.h"
-#include "constants.h"
 #include <asm/atari_stdma.h>
 #include <asm/atari_stram.h>
 #include <asm/io.h>

@@ -129,7 +129,7 @@ static void mct_u232_break_ctl	         (struct usb_serial_port *port,
 /*
  * All of the device info needed for the MCT USB-RS232 converter.
  */
-static __devinitdata struct usb_device_id id_table_combined [] = {
+static struct usb_device_id id_table_combined [] = {
 	{ USB_DEVICE(MCT_U232_VID, MCT_U232_PID) },
 	{ USB_DEVICE(MCT_U232_VID, MCT_U232_SITECOM_PID) },
 	{ USB_DEVICE(MCT_U232_VID, MCT_U232_DU_H3SP_PID) },
@@ -158,7 +158,7 @@ static struct usb_serial_device_type mct_u232_device = {
 	ioctl:		     mct_u232_ioctl,
 	set_termios:	     mct_u232_set_termios,
 	break_ctl:	     mct_u232_break_ctl,
-	startup:	     mct_u232_startup,
+	attach:		     mct_u232_startup,
 	shutdown:	     mct_u232_shutdown,
 };
 

@@ -560,7 +560,7 @@ static int do_recalibrate(struct ata_device *drive)
 		memset(&args, 0, sizeof(args));
 		args.taskfile.sector_count = drive->sect;
 		args.cmd = WIN_RESTORE;
-		ide_raw_taskfile(drive, &args);
+		ide_raw_taskfile(drive, &args, NULL);
 		printk(KERN_INFO "%s: done!\n", drive->name);
 	}
 

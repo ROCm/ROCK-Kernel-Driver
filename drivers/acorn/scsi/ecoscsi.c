@@ -54,7 +54,6 @@
 #include "../../scsi/scsi.h"
 #include "../../scsi/hosts.h"
 #include "../../scsi/NCR5380.h"
-#include "../../scsi/constants.h"
 
 #define ECOSCSI_PUBLIC_RELEASE 1
 

@@ -74,8 +74,6 @@ const char * osst_version = "0.9.10";
 #include "osst_options.h"
 #include "osst_detect.h"
 
-#include "constants.h"
-
 static int buffer_kbs = 0;
 static int write_threshold_kbs = 0;
 static int max_buffers = 0;

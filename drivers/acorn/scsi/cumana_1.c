@@ -61,7 +61,6 @@
 
 #include "../../scsi/scsi.h"
 #include "../../scsi/hosts.h"
-#include "../../scsi/constants.h"
 
 #include <scsi/scsicam.h>
 

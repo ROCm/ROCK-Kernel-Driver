@@ -372,6 +372,8 @@ CONFIG_BLK_DEV_HPT366
   HPT366 is an Ultra DMA chipset for ATA-66.
   HPT368 is an Ultra DMA chipset for ATA-66 RAID Based.
   HPT370 is an Ultra DMA chipset for ATA-100.
+  HPT372 is an Ultra DMA chipset for ATA-100.
+  HPT374 is an Ultra DMA chipset for ATA-100.
 
   This driver adds up to 4 more EIDE devices sharing a single
   interrupt.

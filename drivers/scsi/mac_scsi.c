@@ -70,7 +70,6 @@
 #include "hosts.h"
 #include "mac_scsi.h"
 #include "NCR5380.h"
-#include "constants.h"
 
 #if 0
 #define NDEBUG (NDEBUG_INTR | NDEBUG_PSEUDO_DMA | NDEBUG_ARBITRATION | NDEBUG_SELECTION | NDEBUG_RESELECTION)

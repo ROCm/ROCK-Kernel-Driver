@@ -274,6 +274,9 @@ int cb_alloc(socket_info_t * s)
 
 		dev->bus = bus;
 		dev->sysdata = bus->sysdata;
+		dev->dev.parent = bus->dev;
+		dev->dev.bus = &pci_bus_type;
+
 		dev->devfn = i;
 		dev->vendor = vend;
 		pci_readw(dev, PCI_DEVICE_ID, &dev->device);
@@ -281,10 +284,8 @@ int cb_alloc(socket_info_t * s)
 
 		pci_setup_device(dev);
 
-		dev->dev.parent = bus->dev;
 		strcpy(dev->dev.name, dev->name);
 		strcpy(dev->dev.bus_id, dev->slot_name);
-		device_register(&dev->dev);
 
 		/* FIXME: Do we need to enable the expansion ROM? */
 		for (r = 0; r < 7; r++) {
@@ -301,6 +302,7 @@ int cb_alloc(socket_info_t * s)
 		}
 
 		pci_enable_device(dev); /* XXX check return */
+		device_register(&dev->dev);
 		pci_insert_device(dev, bus);
 	}
 

@@ -156,26 +156,27 @@ static void program_drive_counts(struct ata_device *drive, int setup_count, int 
  * 8: prefetch off, 9: prefetch on, 255: auto-select best mode.
  * Called with 255 at boot time.
  */
-static void cmd64x_tuneproc(struct ata_device *drive, byte mode_wanted)
+static void cmd64x_tuneproc(struct ata_device *drive, u8 pio)
 {
-	int recovery_time, clock_time;
-	u8 recovery_count2, cycle_count, speed;
-	int setup_count, active_count, recovery_count;
+	int T;
+	u8 speed, active, recover;
 	struct ata_timing *t;
 
-	switch (mode_wanted) {
+	switch (pio) {
+		/* FIXME: b0rken  --bkz */
 		case 8: /* set prefetch off */
 		case 9: /* set prefetch on */
-			mode_wanted &= 1;
+			pio &= 1;
 			/*set_prefetch_mode(index, mode_wanted);*/
-			cmdprintk("%s: %sabled cmd640 prefetch\n", drive->name, mode_wanted ? "en" : "dis");
+			cmdprintk("%s: %sabled cmd640 prefetch\n", drive->name,
+				  pio ? "en" : "dis");
 			return;
 	}
 
-	if (mode_wanted == 255)
+	if (pio == 255)
 		speed = ata_best_pio_mode(drive);
 	else
-		speed = XFER_PIO_0 + min_t(u8, mode_wanted, 4);
+		speed = XFER_PIO_0 + min_t(u8, pio, 4);
 
 	t = ata_timing_data(speed);
 
@@ -183,24 +184,21 @@ static void cmd64x_tuneproc(struct ata_device *drive, byte mode_wanted)
 	 * I copied all this complicated stuff from cmd640.c and made a few minor changes.
 	 * For now I am just going to pray that it is correct.
 	 */
-	/* FIXME: try to use generic ata-timings library  --bkz */
+	/* FIXME: verify it  --bkz */
 
-	recovery_time = t->cycle - (t->setup + t->active);
-	clock_time = 1000000 / system_bus_speed;
-	cycle_count = (t->cycle + clock_time - 1) / clock_time;
-	setup_count = (t->setup + clock_time - 1) / clock_time;
-	active_count = (t->active + clock_time - 1) / clock_time;
+	T = 1000000000 / system_bus_speed;
+	ata_timing_quantize(t, t, T, T);
 
-	recovery_count = (recovery_time + clock_time - 1) / clock_time;
-	recovery_count2 = cycle_count - (setup_count + active_count);
-	if (recovery_count2 > recovery_count)
-		recovery_count = recovery_count2;
-	if (recovery_count > 16) {
-		active_count += recovery_count - 16;
-		recovery_count = 16;
+	/* FIXME: maybe switch to ata_timing_compute()  --bkz */
+	recover = t->cycle - (t->setup + t->active);
+	active = t->active;
+
+	if (recover > 16) {
+		active += recover - 16;
+		recover = 16;
 	}
-	if (active_count > 16)
-		active_count = 16; /* maximum allowed by cmd646 */
+	if (active > 16)
+		active = 16;	/* maximum allowed by CMD646 */
 
 	/*
 	 * In a perfect world, we might set the drive pio mode here
@@ -210,13 +208,12 @@ static void cmd64x_tuneproc(struct ata_device *drive, byte mode_wanted)
 	 *	1) this is the wrong place to do it (proper is do_special() in ide.c)
 	 * 	2) in practice this is rarely, if ever, necessary
 	 */
-	program_drive_counts (drive, setup_count, active_count, recovery_count);
+	program_drive_counts(drive, t->setup, active, recover);
 
 	cmdprintk("%s: selected cmd646 PIO mode%d : %d (%dns), clocks=%d/%d/%d\n",
-		drive->name, t.mode - XFER_PIO_0, mode_wanted, cycle_time,
-		setup_count, active_count, recovery_count);
+		drive->name, t.mode - XFER_PIO_0, pio, t->cycle,
+		t->setup, active, recover);
 
-	drive->current_speed = speed;
 	ide_config_drive_speed(drive, speed);
 }
 
@@ -237,7 +234,7 @@ static int cmd64x_ratemask(struct ata_device *drive)
 			break;
 		case PCI_DEVICE_ID_CMD_646:
 		{
-			unsigned int class_rev	= 0;
+			u32 class_rev;
 			pci_read_config_dword(dev,
 				PCI_CLASS_REVISION, &class_rev);
 			class_rev &= 0xff;
@@ -332,11 +329,10 @@ static void cmd680_tuneproc(struct ata_device *drive, u8 pio)
 
 	speed = XFER_PIO_0 + min_t(u8, pio, 4);
 
-	drive->current_speed = speed;
 	ide_config_drive_speed(drive, speed);
 }
 
-static int cmd64x_tune_chipset(struct ata_device *drive, byte speed)
+static int cmd64x_tune_chipset(struct ata_device *drive, u8 speed)
 {
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	struct ata_channel *hwif = drive->channel;
@@ -345,34 +341,40 @@ static int cmd64x_tune_chipset(struct ata_device *drive, byte speed)
 	u8 unit			= (drive->select.b.unit & 0x01);
 	u8 pciU			= (hwif->unit) ? UDIDETCR1 : UDIDETCR0;
 	u8 pciD			= (hwif->unit) ? BMIDESR1 : BMIDESR0;
-	u8 regU, regD;
+	u8 regU, regD, U = 0, D = 0;
 
 	if ((drive->type != ATA_DISK) && (speed < XFER_SW_DMA_0))
 		return 1;
 
-	(void) pci_read_config_byte(dev, pciD, &regD);
-	(void) pci_read_config_byte(dev, pciU, &regU);
-	regD &= ~(unit ? 0x40 : 0x20);
-	regU &= ~(unit ? 0xCA : 0x35);
-	(void) pci_write_config_byte(dev, pciD, regD);
-	(void) pci_write_config_byte(dev, pciU, regU);
+	pci_read_config_byte(dev, pciD, &regD);
+	pci_read_config_byte(dev, pciU, &regU);
 
-	(void) pci_read_config_byte(dev, pciD, &regD);
-	(void) pci_read_config_byte(dev, pciU, &regU);
-	/* FIXME: get unit checking out of here  --bkz */
+	/* unit 1 - 01000000b	unit 0 - 00100000b */
+	regD &= ~(unit ? 0x40 : 0x20);
+
+	/* unit 1 - 11001010b	unit 0 - 00110101b */
+	regU &= ~(unit ? 0xCA : 0x35);
+
+	pci_write_config_byte(dev, pciD, regD);
+	pci_write_config_byte(dev, pciU, regU);
+
+	pci_read_config_byte(dev, pciD, &regD);
+	pci_read_config_byte(dev, pciU, &regU);
+
 	switch(speed) {
-		case XFER_UDMA_5:	regU |= (unit ? 0x0A : 0x05); break;
-		case XFER_UDMA_4:	regU |= (unit ? 0x4A : 0x15); break;
-		case XFER_UDMA_3:	regU |= (unit ? 0x8A : 0x25); break;
-		case XFER_UDMA_2:	regU |= (unit ? 0x42 : 0x11); break;
-		case XFER_UDMA_1:	regU |= (unit ? 0x82 : 0x21); break;
-		case XFER_UDMA_0:	regU |= (unit ? 0xC2 : 0x31); break;
-		case XFER_MW_DMA_2:	regD |= (unit ? 0x40 : 0x10); break;
-		case XFER_MW_DMA_1:	regD |= (unit ? 0x80 : 0x20); break;
-		case XFER_MW_DMA_0:	regD |= (unit ? 0xC0 : 0x30); break;
-		case XFER_SW_DMA_2:	regD |= (unit ? 0x40 : 0x10); break;
-		case XFER_SW_DMA_1:	regD |= (unit ? 0x80 : 0x20); break;
-		case XFER_SW_DMA_0:	regD |= (unit ? 0xC0 : 0x30); break;
+		/* FIXME: use tables  --bkz */
+		case XFER_UDMA_5:	U = 0x05; break;
+		case XFER_UDMA_4:	U = 0x15; break;
+		case XFER_UDMA_3:	U = 0x25; break;
+		case XFER_UDMA_2:	U = 0x11; break;
+		case XFER_UDMA_1:	U = 0x21; break;
+		case XFER_UDMA_0:	U = 0x31; break;
+		case XFER_MW_DMA_2:	D = 0x10; break;
+		case XFER_MW_DMA_1:	D = 0x20; break;
+		case XFER_MW_DMA_0:	D = 0x30; break;
+		case XFER_SW_DMA_2:	D = 0x10; break;
+		case XFER_SW_DMA_1:	D = 0x20; break;
+		case XFER_SW_DMA_0:	D = 0x30; break;
 #else
 	switch(speed) {
 #endif /* CONFIG_BLK_DEV_IDEDMA */
@@ -390,15 +392,22 @@ static int cmd64x_tune_chipset(struct ata_device *drive, byte speed)
 
 	cmd64x_tuneproc(drive, 255);
 #ifdef CONFIG_BLK_DEV_IDEDMA
-	(void) pci_write_config_byte(dev, pciU, regU);
-#endif /* CONFIG_BLK_DEV_IDEDMA */
 
-	drive->current_speed = speed;
+	if (unit) {
+		if (speed >= XFER_UDMA_0)
+			regU |= (((U & 0xf0) << 2) | ((U & 0x0f) << 1));
+		else if (speed >= XFER_SW_DMA_0)
+			regD |= ((D & 0xf0) << 2);
+	} else {
+		regU |= U;
+		regD |= D;
+	}
 
-#ifdef CONFIG_BLK_DEV_IDEDMA
+	pci_write_config_byte(dev, pciU, regU);
+
 	regD |= (unit ? 0x40 : 0x20);
-	(void) pci_write_config_byte(dev, pciD, regD);
-#endif /* CONFIG_BLK_DEV_IDEDMA */
+	pci_write_config_byte(dev, pciD, regD);
+#endif
 
 	return ide_config_drive_speed(drive, speed);
 }
@@ -410,19 +419,20 @@ static int cmd680_tune_chipset(struct ata_device *drive, byte speed)
 	u8 addr_mask		= (hwif->unit) ? 0x84 : 0x80;
 	u8 unit			= (drive->select.b.unit & 0x01);
 	u8 dma_pci, udma_pci;
-	u8 mode_pci, scsc;
+	u8 mode_pci, scsc, scsc_on = 0;
 	u16 ultra, multi;
 
         pci_read_config_byte(dev, addr_mask, &mode_pci);
 	pci_read_config_byte(dev, 0x8A, &scsc);
 
         switch (drive->dn) {
-		case 0: dma_pci = 0xA8; udma_pci = 0xAC; break;
-		case 1: dma_pci = 0xAA; udma_pci = 0xAE; break;
-		case 2: dma_pci = 0xB8; udma_pci = 0xBC; break;
-		case 3: dma_pci = 0xBA; udma_pci = 0xBE; break;
+		case 0: dma_pci = 0xA8; break;
+		case 1: dma_pci = 0xAA; break;
+		case 2: dma_pci = 0xB8; break;
+		case 3: dma_pci = 0xBA; break;
 		default: return 1;
 	}
+	udma_pci = dma_pci + 4;
 
 	pci_read_config_byte(dev, addr_mask, &mode_pci);
 	mode_pci &= ~((unit) ? 0x30 : 0x03);
@@ -434,46 +444,38 @@ static int cmd680_tune_chipset(struct ata_device *drive, byte speed)
 		pci_read_config_byte(dev, 0x8A, &scsc);
 	}
 
+	if (speed >= XFER_UDMA_0) {
+		ultra &= ~0x3F;
+		multi = 0x10C1;
+		scsc_on = ((scsc & 0x30) == 0x00) ? 1 : 0;
+	}
+
 	switch(speed) {
 #ifdef CONFIG_BLK_DEV_IDEDMA
 		case XFER_UDMA_6:
-			if ((scsc & 0x30) == 0x00)
+			if (scsc_on)
 				goto speed_break;
-			multi = 0x10C1;
-			ultra &= ~0x3F;
 			ultra |= 0x01;
 			break;
 speed_break :
 			speed = XFER_UDMA_5;
 		case XFER_UDMA_5:
-			multi = 0x10C1;
-			ultra &= ~0x3F;
-			ultra |= (((scsc & 0x30) == 0x00) ? 0x01 : 0x02);
+			ultra |= (scsc_on ? 0x01 : 0x02);
 			break;
 		case XFER_UDMA_4:
-			multi = 0x10C1;
-			ultra &= ~0x3F;
-			ultra |= (((scsc & 0x30) == 0x00) ? 0x02 : 0x03);
+			ultra |= (scsc_on ? 0x02 : 0x03);
 			break;
 		case XFER_UDMA_3:
-			multi = 0x10C1;
-			ultra &= ~0x3F;
-			ultra |= (((scsc & 0x30) == 0x00) ? 0x04 : 0x05);
+			ultra |= (scsc_on ? 0x04 : 0x05);
 			break;
 		case XFER_UDMA_2:
-			multi = 0x10C1;
-			ultra &= ~0x3F;
-			ultra |= (((scsc & 0x30) == 0x00) ? 0x05 : 0x07);
+			ultra |= (scsc_on ? 0x05 : 0x07);
 			break;
 		case XFER_UDMA_1:
-			multi = 0x10C1;
-			ultra &= ~0x3F;
-			ultra |= (((scsc & 0x30) == 0x00) ? 0x07 : 0x0B);
+			ultra |= (scsc_on ? 0x07 : 0x0B);
 			break;
 		case XFER_UDMA_0:
-			multi = 0x10C1;
-			ultra &= ~0x3F;
-			ultra |= (((scsc & 0x30) == 0x00) ? 0x0C : 0x0F);
+			ultra |= (scsc_on ? 0x0C : 0x0F);
 			break;
 		case XFER_MW_DMA_2:
 			multi = 0x10C1;
@@ -509,8 +511,6 @@ speed_break :
 	pci_write_config_word(dev, dma_pci, multi);
 	pci_write_config_word(dev, udma_pci, ultra);
 
-	drive->current_speed = speed;
-
 	return ide_config_drive_speed(drive, speed);
 }
 
@@ -519,11 +519,6 @@ static int config_chipset_for_dma(struct ata_device *drive, u8 udma)
 {
 	int map;
 	u8 mode;
-
-	if (drive->type != ATA_DISK) {
-		cmdprintk("CMD64X: drive is not a disk at double check, inital check failed!!\n");
-		return 0;
-	}
 
 	if (udma)
 		map = cmd64x_ratemask(drive);
@@ -728,8 +723,8 @@ static unsigned int cmd680_pci_init(struct pci_dev *dev)
 
 static unsigned int cmd64x_pci_init(struct pci_dev *dev)
 {
-	unsigned char mrdmode;
-	unsigned int class_rev;
+	u8 mrdmode;
+	u32 class_rev;
 
 	pci_read_config_dword(dev, PCI_CLASS_REVISION, &class_rev);
 	class_rev &= 0xff;

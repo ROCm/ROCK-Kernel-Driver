@@ -100,12 +100,12 @@
    separate ID tables, and then a third table that combines them
    just for the purpose of exporting the autoloading information.
 */
-static __devinitdata struct usb_device_id id_table_std [] = {
+static struct usb_device_id id_table_std [] = {
 	{ USB_DEVICE(CONNECT_TECH_VENDOR_ID, CONNECT_TECH_WHITE_HEAT_ID) },
 	{ }						/* Terminating entry */
 };
 
-static __devinitdata struct usb_device_id id_table_prerenumeration [] = {
+static struct usb_device_id id_table_prerenumeration [] = {
 	{ USB_DEVICE(CONNECT_TECH_VENDOR_ID, CONNECT_TECH_FAKE_WHITE_HEAT_ID) },
 	{ }						/* Terminating entry */
 };
@@ -125,9 +125,9 @@ static int  whiteheat_ioctl		(struct usb_serial_port *port, struct file * file, 
 static void whiteheat_set_termios	(struct usb_serial_port *port, struct termios * old);
 static void whiteheat_throttle		(struct usb_serial_port *port);
 static void whiteheat_unthrottle	(struct usb_serial_port *port);
-static int  whiteheat_fake_startup	(struct usb_serial *serial);
-static int  whiteheat_real_startup	(struct usb_serial *serial);
-static void whiteheat_real_shutdown	(struct usb_serial *serial);
+static int  whiteheat_firmware_download	(struct usb_serial *serial);
+static int  whiteheat_attach		(struct usb_serial *serial);
+static void whiteheat_shutdown		(struct usb_serial *serial);
 
 static struct usb_serial_device_type whiteheat_fake_device = {
 	owner:			THIS_MODULE,
@@ -137,7 +137,7 @@ static struct usb_serial_device_type whiteheat_fake_device = {
 	num_bulk_in:		NUM_DONT_CARE,
 	num_bulk_out:		NUM_DONT_CARE,
 	num_ports:		1,
-	startup:		whiteheat_fake_startup,
+	probe:			whiteheat_firmware_download,
 };
 
 static struct usb_serial_device_type whiteheat_device = {
@@ -154,8 +154,8 @@ static struct usb_serial_device_type whiteheat_device = {
 	unthrottle:		whiteheat_unthrottle,
 	ioctl:			whiteheat_ioctl,
 	set_termios:		whiteheat_set_termios,
-	startup:		whiteheat_real_startup,
-	shutdown:		whiteheat_real_shutdown,
+	attach:			whiteheat_attach,
+	shutdown:		whiteheat_shutdown,
 };
 
 struct whiteheat_private {
@@ -504,7 +504,7 @@ static void whiteheat_unthrottle (struct usb_serial_port *port)
  - device renumerated itself and comes up as new device id with all
    firmware download completed.
 */
-static int  whiteheat_fake_startup (struct usb_serial *serial)
+static int whiteheat_firmware_download (struct usb_serial *serial)
 {
 	int response;
 	const struct whiteheat_hex_record *record;
@@ -518,8 +518,8 @@ static int  whiteheat_fake_startup (struct usb_serial *serial)
 		response = ezusb_writememory (serial, record->address, 
 				(unsigned char *)record->data, record->data_size, 0xa0);
 		if (response < 0) {
-			err(__FUNCTION__ " - ezusb_writememory failed for loader (%d %04X %p %d)", 
-				response, record->address, record->data, record->data_size);
+			err("%s - ezusb_writememory failed for loader (%d %04X %p %d)",
+				__FUNCTION__, response, record->address, record->data, record->data_size);
 			break;
 		}
 		++record;
@@ -535,8 +535,8 @@ static int  whiteheat_fake_startup (struct usb_serial *serial)
 		response = ezusb_writememory (serial, record->address, 
 				(unsigned char *)record->data, record->data_size, 0xa3);
 		if (response < 0) {
-			err(__FUNCTION__ " - ezusb_writememory failed for first firmware step (%d %04X %p %d)", 
-				response, record->address, record->data, record->data_size);
+			err("%s - ezusb_writememory failed for first firmware step (%d %04X %p %d)", 
+				__FUNCTION__, response, record->address, record->data, record->data_size);
 			break;
 		}
 		++record;
@@ -549,8 +549,8 @@ static int  whiteheat_fake_startup (struct usb_serial *serial)
 		response = ezusb_writememory (serial, record->address, 
 				(unsigned char *)record->data, record->data_size, 0xa0);
 		if (response < 0) {
-			err(__FUNCTION__" - ezusb_writememory failed for second firmware step (%d %04X %p %d)", 
-				response, record->address, record->data, record->data_size);
+			err("%s - ezusb_writememory failed for second firmware step (%d %04X %p %d)", 
+				__FUNCTION__, response, record->address, record->data, record->data_size);
 			break;
 		}
 		++record;
@@ -563,7 +563,7 @@ static int  whiteheat_fake_startup (struct usb_serial *serial)
 }
 
 
-static int  whiteheat_real_startup (struct usb_serial *serial)
+static int whiteheat_attach (struct usb_serial *serial)
 {
 	struct whiteheat_hw_info *hw_info;
 	int pipe;
@@ -622,7 +622,7 @@ error_out:
 	return 0;
 }
 
-static void whiteheat_real_shutdown (struct usb_serial *serial)
+static void whiteheat_shutdown (struct usb_serial *serial)
 {
 	struct usb_serial_port *command_port;
 

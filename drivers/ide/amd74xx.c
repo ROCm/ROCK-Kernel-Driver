@@ -153,8 +153,6 @@ static int amd_set_drive(struct ata_device *drive, unsigned char speed)
 
 	amd_set_speed(drive->channel->pci_dev, drive->dn, &t);
 
-	drive->current_speed = speed;
-
 	return 0;
 }
 

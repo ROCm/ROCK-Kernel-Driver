@@ -43,7 +43,6 @@
 
 #include "scsi.h"
 #include "hosts.h"
-#include "constants.h"
 #include <scsi/scsi_ioctl.h>
 
 /*

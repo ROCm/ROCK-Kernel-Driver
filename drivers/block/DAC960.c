@@ -2404,8 +2404,12 @@ static void DAC960_DetectControllers(DAC960_HardwareType_T HardwareType)
 	    DAC960_V1_QueueReadWriteCommand;
 	  break;
 	case DAC960_PD_Controller:
-	  request_region(Controller->IO_Address, 0x80,
-			 Controller->FullModelName);
+	  if (!request_region(Controller->IO_Address, 0x80,
+			      Controller->FullModelName)) {
+		DAC960_Error("IO port 0x%d busy for Controller at\n",
+			     Controller, Controller->IO_Address);
+		goto Failure;
+	  }
 	  DAC960_PD_DisableInterrupts(BaseAddress);
 	  DAC960_PD_AcknowledgeStatus(BaseAddress);
 	  udelay(1000);
@@ -2415,7 +2419,7 @@ static void DAC960_DetectControllers(DAC960_HardwareType_T HardwareType)
 					    &Parameter0, &Parameter1) &&
 		  DAC960_ReportErrorStatus(Controller, ErrorStatus,
 					   Parameter0, Parameter1))
-		goto Failure;
+		goto Failure1;
 	      udelay(10);
 	    }
 	  DAC960_PD_EnableInterrupts(Controller->BaseAddress);
@@ -2430,8 +2434,12 @@ static void DAC960_DetectControllers(DAC960_HardwareType_T HardwareType)
 	    DAC960_V1_QueueReadWriteCommand;
 	  break;
 	case DAC960_P_Controller:
-	  request_region(Controller->IO_Address, 0x80,
-			 Controller->FullModelName);
+	  if (!request_region(Controller->IO_Address, 0x80,
+			      Controller->FullModelName)){
+		DAC960_Error("IO port 0x%d busy for Controller at\n",
+		   	     Controller, Controller->IO_Address);
+		goto Failure;
+	  }
 	  DAC960_PD_DisableInterrupts(BaseAddress);
 	  DAC960_PD_AcknowledgeStatus(BaseAddress);
 	  udelay(1000);
@@ -2441,7 +2449,7 @@ static void DAC960_DetectControllers(DAC960_HardwareType_T HardwareType)
 					    &Parameter0, &Parameter1) &&
 		  DAC960_ReportErrorStatus(Controller, ErrorStatus,
 					   Parameter0, Parameter1))
-		goto Failure;
+		goto Failure1;
 	      udelay(10);
 	    }
 	  DAC960_PD_EnableInterrupts(Controller->BaseAddress);
@@ -2463,7 +2471,7 @@ static void DAC960_DetectControllers(DAC960_HardwareType_T HardwareType)
 	{
 	  DAC960_Error("IRQ Channel %d illegal for Controller at\n",
 		       Controller, IRQ_Channel);
-	  goto Failure;
+	  goto Failure1;
 	}
       strcpy(Controller->FullModelName, "DAC960");
       if (request_irq(IRQ_Channel, InterruptHandler, SA_SHIRQ,
@@ -2471,7 +2479,7 @@ static void DAC960_DetectControllers(DAC960_HardwareType_T HardwareType)
 	{
 	  DAC960_Error("Unable to acquire IRQ Channel %d for Controller at\n",
 		       Controller, IRQ_Channel);
-	  goto Failure;
+	  goto Failure1;
 	}
       Controller->IRQ_Channel = IRQ_Channel;
       DAC960_ActiveControllerCount++;
@@ -2481,6 +2489,8 @@ static void DAC960_DetectControllers(DAC960_HardwareType_T HardwareType)
       Controller->FreeCommands = &Controller->InitialCommand;
       Controller->ControllerDetectionSuccessful = true;
       continue;
+    Failure1:
+      if (Controller->IO_Address) release_region(Controller->IO_Address, 0x80);
     Failure:
       if (IO_Address == 0)
 	DAC960_Error("PCI Bus %d Device %d Function %d I/O Address N/A "

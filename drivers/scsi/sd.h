@@ -11,9 +11,6 @@
  */
 #ifndef _SD_H
 #define _SD_H
-/*
-   $Header: /usr/src/linux/kernel/blk_drv/scsi/RCS/sd.h,v 1.1 1992/07/24 06:27:38 root Exp root $
- */
 
 #ifndef _SCSI_H
 #include "scsi.h"
@@ -26,13 +23,11 @@
 extern struct hd_struct *sd;
 
 typedef struct scsi_disk {
-	unsigned capacity;	/* size in blocks */
+	unsigned capacity;		/* size in 512-byte sectors */
 	Scsi_Device *device;
-	unsigned char ready;	/* flag ready for FLOPTICAL */
-	unsigned char write_prot;	/* flag write_protect for rmvable dev */
-	unsigned char sector_bit_size;	/* sector_size = 2 to the  bit size power */
-	unsigned char sector_bit_shift;		/* power of 2 sectors per FS block */
-	unsigned has_part_table:1;	/* has partition table */
+	unsigned char media_present;
+	unsigned char write_prot;
+	unsigned has_been_registered:1;
 } Scsi_Disk;
 
 extern int revalidate_scsidisk(kdev_t dev, int maxusage);
@@ -48,22 +43,3 @@ extern kdev_t sd_find_target(void *host, int tgt);
 #define SD_PARTITION(i)		(((major(i) & SD_MAJOR_MASK) << 8) | (minor(i) & 255))
 
 #endif
-
-/*
- * Overrides for Emacs so that we follow Linus's tabbing style.
- * Emacs will notice this stuff at the end of the file and automatically
- * adjust the settings for this buffer only.  This must remain at the end
- * of the file.
- * ---------------------------------------------------------------------------
- * Local variables:
- * c-indent-level: 4
- * c-brace-imaginary-offset: 0
- * c-brace-offset: -4
- * c-argdecl-indent: 4
- * c-label-offset: -4
- * c-continued-statement-offset: 4
- * c-continued-brace-offset: 0
- * indent-tabs-mode: nil
- * tab-width: 8
- * End:
- */

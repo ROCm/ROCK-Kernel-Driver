@@ -1466,10 +1466,6 @@ fst_init_card ( struct fst_card_info *card )
                                  + BUF_OFFSET ( txBuffer[i][0][0]);
                 dev->mem_end     = card->phys_mem
                                  + BUF_OFFSET ( txBuffer[i][NUM_TX_BUFFER][0]);
-                dev->rmem_start  = card->phys_mem
-                                 + BUF_OFFSET ( rxBuffer[i][0][0]);
-                dev->rmem_end    = card->phys_mem
-                                 + BUF_OFFSET ( rxBuffer[i][NUM_RX_BUFFER][0]);
                 dev->base_addr   = card->pci_conf;
                 dev->irq         = card->irq;
 
@@ -1528,6 +1524,13 @@ fst_add_one ( struct pci_dev *pdev, const struct pci_device_id *ent )
         }
         memset ( card, 0, sizeof ( struct fst_card_info ));
 
+        /* Try to enable the device */
+        if (( err = pci_enable_device ( pdev )) != 0 )
+        {
+                printk_err ("Failed to enable card. Err %d\n", -err );
+                goto error_free_card;
+        }
+
         /* Record info we need*/
         card->irq         = pdev->irq;
         card->pci_conf    = pci_resource_start ( pdev, 1 );
@@ -1567,12 +1570,6 @@ fst_add_one ( struct pci_dev *pdev, const struct pci_device_id *ent )
                 goto error_release_mem;
         }
 
-        /* Try to enable the device */
-        if (( err = pci_enable_device ( pdev )) != 0 )
-        {
-                printk_err ("Failed to enable card. Err %d\n", -err );
-                goto error_release_ctlmem;
-        }
 
         /* Get virtual addresses of memory regions */
         if (( card->mem = ioremap ( card->phys_mem, FST_MEMSIZE )) == NULL )

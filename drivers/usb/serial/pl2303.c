@@ -65,7 +65,7 @@
 
 
 
-static __devinitdata struct usb_device_id id_table [] = {
+static struct usb_device_id id_table [] = {
 	{ USB_DEVICE(PL2303_VENDOR_ID, PL2303_PRODUCT_ID) },
 	{ USB_DEVICE(PL2303_VENDOR_ID, PL2303_PRODUCT_ID_RSAQ2) },
 	{ USB_DEVICE(IODATA_VENDOR_ID, IODATA_PRODUCT_ID) },
@@ -134,7 +134,7 @@ static struct usb_serial_device_type pl2303_device = {
 	read_bulk_callback:	pl2303_read_bulk_callback,
 	read_int_callback:	pl2303_read_int_callback,
 	write_bulk_callback:	pl2303_write_bulk_callback,
-	startup:		pl2303_startup,
+	attach:			pl2303_startup,
 	shutdown:		pl2303_shutdown,
 };
 

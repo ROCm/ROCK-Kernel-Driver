@@ -69,7 +69,6 @@
 
 #include "scsi.h"
 #include "hosts.h"
-#include "constants.h"
 
 #ifdef CONFIG_KMOD
 #include <linux/kmod.h>

@@ -230,8 +230,6 @@ static int pdc202xx_tune_chipset(struct ata_device *drive, byte speed)
 	printk(KERN_DEBUG "DP(%x)\n", DP);
 #endif
 
-	drive->current_speed = speed;
-
 #if PDC202XX_DEBUG_DRIVE_INFO
 	printk("%s: %02x drive%d 0x%08x ",
 		drive->name, speed,
@@ -351,8 +349,6 @@ static int pdc202xx_new_tune_chipset(struct ata_device *drive, byte speed)
 		default:
 			;
 	}
-
-	drive->current_speed = speed;
 
 	return ide_config_drive_speed(drive, speed);
 }
@@ -551,7 +547,7 @@ no_dma_set:
 	return 0;
 }
 
-static int pdc202xx_udma_start(struct ata_device *drive, struct request *rq)
+static void pdc202xx_udma_start(struct ata_device *drive, struct request *rq)
 {
 	struct ata_channel *ch = drive->channel;
 	u32 high_16 = pci_resource_start(ch->pci_dev, 4);

@@ -267,7 +267,7 @@ static int config_art_rwp_pio(struct ata_device *drive, u8 pio)
 {
 	struct ata_channel *hwif = drive->channel;
 	struct pci_dev *dev = hwif->pci_dev;
-	u8 drive_pci, test1, test2, speed;
+	u8 drive_pci, test1, test2;
 
 #ifdef DEBUG
 	sis5513_load_verify_registers(dev, "config_drive_art_rwp_pio start");
@@ -280,13 +280,10 @@ static int config_art_rwp_pio(struct ata_device *drive, u8 pio)
 	       drive->dn, pio, timing);
 #endif
 
-	switch(drive->dn) {
-		case 0:		drive_pci = 0x40; break;
-		case 1:		drive_pci = 0x42; break;
-		case 2:		drive_pci = 0x44; break;
-		case 3:		drive_pci = 0x46; break;
-		default:	return 1;
-	}
+	if (drive->dn > 3)	/* FIXME: remove this  --bkz */
+		return 1;
+
+	drive_pci = 0x40 + (drive->dn << 1);
 
 	/* register layout changed with newer ATA100 chips */
 	if (chipset_family < ATA_100) {
@@ -321,9 +318,8 @@ static int config_art_rwp_pio(struct ata_device *drive, u8 pio)
 #ifdef DEBUG
 	sis5513_load_verify_registers(dev, "config_drive_art_rwp_pio start");
 #endif
-	speed = XFER_PIO_0 + min_t(u8, pio, 4);
-	drive->current_speed = speed;
-	return ide_config_drive_speed(drive, speed);
+
+	return ide_config_drive_speed(drive, XFER_PIO_0 + min_t(u8, pio, 4));
 }
 
 static int sis5513_tune_chipset(struct ata_device *drive, u8 speed)
@@ -338,13 +334,11 @@ static int sis5513_tune_chipset(struct ata_device *drive, u8 speed)
 	printk("SIS5513: sis5513_tune_chipset, drive %d, speed %d\n",
 	       drive->dn, speed);
 #endif
-	switch(drive->dn) {
-		case 0:		drive_pci = 0x40; break;
-		case 1:		drive_pci = 0x42; break;
-		case 2:		drive_pci = 0x44; break;
-		case 3:		drive_pci = 0x46; break;
-		default:	return 0;
-	}
+
+	if (drive->dn > 3)	/* FIXME: remove this  --bkz */
+		return 1;
+
+	drive_pci = 0x40 + (drive->dn << 1);
 
 #ifdef BROKEN_LEVEL
 #ifdef DEBUG
@@ -396,11 +390,10 @@ static int sis5513_tune_chipset(struct ata_device *drive, u8 speed)
 		default:
 			return config_art_rwp_pio(drive, 0);
 	}
-	drive->current_speed = speed;
 #ifdef DEBUG
 	sis5513_load_verify_registers(dev, "sis5513_tune_chipset end");
 #endif
-	return ((int) ide_config_drive_speed(drive, speed));
+	return ide_config_drive_speed(drive, speed);
 }
 
 static void sis5513_tune_drive(struct ata_device *drive, u8 pio)
@@ -568,8 +561,8 @@ static unsigned int __init pci_init_sis5513(struct pci_dev *dev)
 
 static unsigned int __init ata66_sis5513(struct ata_channel *hwif)
 {
-	byte reg48h = 0, ata66 = 0;
-	byte mask = hwif->unit ? 0x20 : 0x10;
+	u8 reg48h, ata66 = 0;
+	u8 mask = hwif->unit ? 0x20 : 0x10;
 	pci_read_config_byte(hwif->pci_dev, 0x48, &reg48h);
 
 	if (chipset_family >= ATA_66) {
