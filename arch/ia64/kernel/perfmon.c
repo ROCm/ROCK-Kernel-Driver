@@ -1764,7 +1764,7 @@ pfm_stop(struct task_struct *task, pfm_context_t *ctx, void *arg, int count,
 		ia64_srlz_i();
 
 #ifdef CONFIG_SMP
-		this_cpu(pfm_dcr_pp)  = 0;
+		__get_cpu_var(pfm_dcr_pp)  = 0;
 #else
 		pfm_tasklist_toggle_pp(0);
 #endif
@@ -2172,7 +2172,7 @@ pfm_start(struct task_struct *task, pfm_context_t *ctx, void *arg, int count,
 	if (ctx->ctx_fl_system) {
 		
 #ifdef CONFIG_SMP
-		this_cpu(pfm_dcr_pp)  = 1;
+		__get_cpu_var(pfm_dcr_pp)  = 1;
 #else
 		pfm_tasklist_toggle_pp(1);
 #endif
@@ -2227,8 +2227,8 @@ pfm_enable(struct task_struct *task, pfm_context_t *ctx, void *arg, int count,
 		ia64_srlz_i();
 
 #ifdef CONFIG_SMP
-		this_cpu(pfm_syst_wide) = 1;
-		this_cpu(pfm_dcr_pp)    = 0;
+		__get_cpu_var(pfm_syst_wide) = 1;
+		__get_cpu_var(pfm_dcr_pp)    = 0;
 #endif
 	} else {
 		/*
@@ -2980,9 +2980,9 @@ perfmon_proc_info(char *page)
 	p += sprintf(p, "CPU%d syst_wide   : %d\n"
 			"CPU%d dcr_pp      : %d\n", 
 			smp_processor_id(), 
-			this_cpu(pfm_syst_wide), 
+			__get_cpu_var(pfm_syst_wide), 
 			smp_processor_id(), 
-			this_cpu(pfm_dcr_pp));
+			__get_cpu_var(pfm_dcr_pp));
 #endif
 
 	LOCK_PFS();
@@ -3052,7 +3052,7 @@ pfm_syst_wide_update_task(struct task_struct *task, int mode)
 	/*
 	 * propagate the value of the dcr_pp bit to the psr
 	 */
-	ia64_psr(regs)->pp = mode ? this_cpu(pfm_dcr_pp) : 0;
+	ia64_psr(regs)->pp = mode ? __get_cpu_var(pfm_dcr_pp) : 0;
 }
 #endif
 
@@ -3546,8 +3546,8 @@ pfm_flush_regs (struct task_struct *task)
 		ia64_srlz_i();
 
 #ifdef CONFIG_SMP
-		this_cpu(pfm_syst_wide) = 0;
-		this_cpu(pfm_dcr_pp)    = 0;
+		__get_cpu_var(pfm_syst_wide) = 0;
+		__get_cpu_var(pfm_dcr_pp)    = 0;
 #else
 		pfm_tasklist_toggle_pp(0);
 #endif

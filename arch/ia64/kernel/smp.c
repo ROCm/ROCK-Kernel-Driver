@@ -99,7 +99,7 @@ void
 handle_IPI (int irq, void *dev_id, struct pt_regs *regs)
 {
 	int this_cpu = smp_processor_id();
-	unsigned long *pending_ipis = &this_cpu(ipi_operation);
+	unsigned long *pending_ipis = &__get_cpu_var(ipi_operation);
 	unsigned long ops;
 
 	/* Count this now; we may make a call that never returns. */

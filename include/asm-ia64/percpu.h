@@ -17,7 +17,7 @@
 extern unsigned long __per_cpu_offset[NR_CPUS];
 
 #define per_cpu(var, cpu)	(*(__typeof__(&(var))) ((void *) &(var) + __per_cpu_offset[cpu]))
-#define this_cpu(var)		(var)
+#define __get_cpu_var(var)	(var)
 
 #endif /* !__ASSEMBLY__ */
 

@@ -8,7 +8,9 @@
 #else
 #define __per_cpu_data
 #define per_cpu(var, cpu)			var
-#define this_cpu(var)				var
+#define __get_cpu_var(var)			var
 #endif
 
+#define get_cpu_var(var) ({ preempt_disable(); __get_cpu_var(var); })
+#define put_cpu_var(var) preempt_enable()
 #endif /* __LINUX_PERCPU_H */

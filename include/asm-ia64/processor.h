@@ -181,7 +181,7 @@ extern struct cpuinfo_ia64 {
  * The "local" data pointer.  It points to the per-CPU data of the currently executing
  * CPU, much like "current" points to the per-task data of the currently executing task.
  */
-#define local_cpu_data		(&this_cpu(cpu_info))
+#define local_cpu_data		(&__get_cpu_var(cpu_info))
 #define cpu_data(cpu)		(&per_cpu(cpu_info, cpu))
 
 extern void identify_cpu (struct cpuinfo_ia64 *);
