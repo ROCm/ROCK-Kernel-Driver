@@ -9,8 +9,10 @@
 #include <linux/module.h>
 #include <linux/stat.h>
 
+static spinlock_t kobj_lock = SPIN_LOCK_UNLOCKED;
+
 /**
- *	kobject_populate_dir - populate directory with attributes.
+ *	populate_dir - populate directory with attributes.
  *	@kobj:	object we're working on.
  *
  *	Most subsystems have a set of default attributes that 
@@ -21,7 +23,7 @@
  *
  */
 
-static int kobject_populate_dir(struct kobject * kobj)
+static int populate_dir(struct kobject * kobj)
 {
 	struct subsystem * s = kobj->subsys;
 	struct attribute * attr;
@@ -37,6 +39,20 @@ static int kobject_populate_dir(struct kobject * kobj)
 	return error;
 }
 
+static int create_dir(struct kobject * kobj)
+{
+	int error = 0;
+	if (strlen(kobj->name)) {
+		error = sysfs_create_dir(kobj);
+		if (!error) {
+			if ((error = populate_dir(kobj)))
+				sysfs_remove_dir(kobj);
+		}
+	}
+	return error;
+}
+
+
 /**
  *	kobject_init - initialize object.
  *	@kobj:	object in question.
@@ -46,70 +62,88 @@ void kobject_init(struct kobject * kobj)
 {
 	atomic_set(&kobj->refcount,1);
 	INIT_LIST_HEAD(&kobj->entry);
+	kobj->subsys = subsys_get(kobj->subsys);
 }
 
 /**
- *	kobject_register - register an object.
- *	@kobj:	object in question.
- *
- *	For now, fill in the replicated fields in the object's
- *	directory entry, and create a dir in sysfs. 
- *	This stuff should go away in the future, as we move
- *	more implicit things to sysfs.
+ *	kobject_add - add an object to the hierarchy.
+ *	@kobj:	object.
  */
 
-int kobject_register(struct kobject * kobj)
+int kobject_add(struct kobject * kobj)
 {
 	int error = 0;
-	struct subsystem * s = subsys_get(kobj->subsys);
+	struct subsystem * s = kobj->subsys;
 	struct kobject * parent = kobject_get(kobj->parent);
 
-	pr_debug("kobject %s: registering\n",kobj->name);
-	if (parent)
-		pr_debug("  parent is %s\n",parent->name);
+	if (!(kobj = kobject_get(kobj)))
+		return -ENOENT;
+	pr_debug("kobject %s: registering. parent: %s, subsys: %s\n",
+		 kobj->name, parent ? parent->name : "<NULL>", 
+		 kobj->subsys ? kobj->subsys->kobj.name : "<NULL>" );
+
 	if (s) {
 		down_write(&s->rwsem);
 		if (parent) 
 			list_add_tail(&kobj->entry,&parent->entry);
 		else {
 			list_add_tail(&kobj->entry,&s->list);
-			kobj->parent = &s->kobj;
+			kobj->parent = kobject_get(&s->kobj);
 		}
 		up_write(&s->rwsem);
 	}
-	if (strlen(kobj->name)) {
-		error = sysfs_create_dir(kobj);
-		if (!error) {
-			error = kobject_populate_dir(kobj);
-			if (error)
-				sysfs_remove_dir(kobj);
-		}
-	}
+	error = create_dir(kobj);
+	if (error && kobj->parent)
+		kobject_put(kobj->parent);
+	return error;
+}
+
+
+/**
+ *	kobject_register - initialize and add an object.
+ *	@kobj:	object in question.
+ */
+
+int kobject_register(struct kobject * kobj)
+{
+	int error = 0;
+	if (kobj) {
+		kobject_init(kobj);
+		error = kobject_add(kobj);
+		if (error)
+			kobject_cleanup(kobj);
+	} else
+		error = -EINVAL;
 	return error;
 }
 
 /**
- *	kobject_unregister - unlink an object.
- *	@kobj:	object going away.
- *
- *	The device has been told to be removed, but may
- *	not necessarily be disappearing from the kernel.
- *	So, we remove the directory and decrement the refcount
- *	that we set with kobject_register().
- *
- *	Eventually (maybe now), the refcount will hit 0, and 
- *	put_device() will clean the device up.
+ *	kobject_del - unlink kobject from hierarchy.
+ * 	@kobj:	object.
  */
 
-void kobject_unregister(struct kobject * kobj)
+void kobject_del(struct kobject * kobj)
 {
-	pr_debug("kobject %s: unregistering\n",kobj->name);
 	sysfs_remove_dir(kobj);
 	if (kobj->subsys) {
 		down_write(&kobj->subsys->rwsem);
 		list_del_init(&kobj->entry);
 		up_write(&kobj->subsys->rwsem);
 	}
+	if (kobj->parent) 
+		kobject_put(kobj->parent);
+	kobject_put(kobj);
+}
+
+/**
+ *	kobject_unregister - remove object from hierarchy and decrement refcount.
+ *	@kobj:	object going away.
+ */
+
+void kobject_unregister(struct kobject * kobj)
+{
+	pr_debug("kobject %s: unregistering\n",kobj->name);
+	kobject_del(kobj);
 	kobject_put(kobj);
 }
 
@@ -121,45 +155,48 @@ void kobject_unregister(struct kobject * kobj)
 struct kobject * kobject_get(struct kobject * kobj)
 {
 	struct kobject * ret = kobj;
+	spin_lock(&kobj_lock);
 	if (kobj && atomic_read(&kobj->refcount) > 0)
 		atomic_inc(&kobj->refcount);
 	else
 		ret = NULL;
+	spin_unlock(&kobj_lock);
 	return ret;
+}
+
+/**
+ *	kobject_cleanup - free kobject resources. 
+ *	@kobj:	object.
+ */
+
+void kobject_cleanup(struct kobject * kobj)
+{
+	struct subsystem * s = kobj->subsys;
+
+	pr_debug("kobject %s: cleaning up\n",kobj->name);
+	if (s) {
+		down_write(&s->rwsem);
+		list_del_init(&kobj->entry);
+		if (s->release)
+			s->release(kobj);
+		up_write(&s->rwsem);
+		subsys_put(s);
+	}
 }
 
 /**
  *	kobject_put - decrement refcount for object.
  *	@kobj:	object.
  *
- *	Decrement the refcount, and check if 0. If it is, then 
- *	we're gonna need to clean it up, and decrement the refcount
- *	of its parent.
- *
- *	@kobj->parent could point to its subsystem, which we also 
- *	want to decrement the reference count for. We always dec 
- *	the refcount for the parent, but only do so for the subsystem
- *	if it points to a different place than the parent.
+ *	Decrement the refcount, and if 0, call kobject_cleanup().
  */
 
 void kobject_put(struct kobject * kobj)
 {
-	struct kobject * parent = kobj->parent;
-	struct subsystem * s = kobj->subsys;
-
-	if (!atomic_dec_and_test(&kobj->refcount))
+	if (!atomic_dec_and_lock(&kobj->refcount, &kobj_lock))
 		return;
-
-	pr_debug("kobject %s: cleaning up\n",kobj->name);
-	if (s) {
-		if (s->release)
-			s->release(kobj);
-		if (&s->kobj != parent)
-			subsys_put(s);
-	} 
-
-	if (parent) 
-		kobject_put(parent);
+	spin_unlock(&kobj_lock);
+	kobject_cleanup(kobj);
 }
 
 
@@ -180,9 +217,8 @@ int subsystem_register(struct subsystem * s)
 	subsystem_init(s);
 	if (s->parent)
 		s->kobj.parent = &s->parent->kobj;
-	pr_debug("subsystem %s: registering\n",s->kobj.name);
-	if (s->parent)
-		pr_debug("  parent is %s\n",s->parent->kobj.name);
+	pr_debug("subsystem %s: registering, parent: %s\n",
+		 s->kobj.name,s->parent ? s->parent->kobj.name : "<none>");
 	return kobject_register(&s->kobj);
 }
 
