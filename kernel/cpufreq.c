@@ -422,7 +422,29 @@ static int cpufreq_remove_dev (struct sys_device * sys_dev)
 	return 0;
 }
 
-static int cpufreq_restore(struct sys_device *);
+/**
+ *	cpufreq_restore - restore the CPU clock frequency after resume
+ *
+ *	Restore the CPU clock frequency so that our idea of the current
+ *	frequency reflects the actual hardware.
+ */
+static int cpufreq_restore(struct sys_device * sysdev)
+{
+	int cpu = sysdev->id;
+	unsigned int ret = 0;
+	struct cpufreq_policy policy;
+
+	if (cpu_online(cpu) && cpufreq_cpu_get(cpu)) {
+		down(&cpufreq_driver_sem);
+		memcpy(&policy, &cpufreq_driver->policy[cpu], 
+		       sizeof(struct cpufreq_policy));
+		up(&cpufreq_driver_sem);
+		ret = cpufreq_set_policy(&policy);
+		cpufreq_cpu_put(cpu);
+	}
+
+	return ret;
+}
 
 static struct sysdev_driver cpufreq_sysdev_driver = {
 	.add		= cpufreq_add_dev,
@@ -877,37 +899,3 @@ int cpufreq_unregister_driver(struct cpufreq_driver *driver)
 	return 0;
 }
 EXPORT_SYMBOL_GPL(cpufreq_unregister_driver);
-
-
-#ifdef CONFIG_PM
-
-/**
- *	cpufreq_restore - restore the CPU clock frequency after resume
- *
- *	Restore the CPU clock frequency so that our idea of the current
- *	frequency reflects the actual hardware.
- */
-static int cpufreq_restore(struct sys_device * sysdev)
-{
-	int cpu = sysdev->id;
-	unsigned int ret = 0;
-	struct cpufreq_policy policy;
-
-	if (cpu_online(cpu) && cpufreq_cpu_get(cpu)) {
-		down(&cpufreq_driver_sem);
-		memcpy(&policy, &cpufreq_driver->policy[cpu], 
-		       sizeof(struct cpufreq_policy));
-		up(&cpufreq_driver_sem);
-		ret = cpufreq_set_policy(&policy);
-		cpufreq_cpu_put(cpu);
-	}
-
-	return ret;
-}
-
-#else
-static int cpufreq_restore(struct sys_device * sysdev)
-{
-	return 0;
-}
-#endif /* CONFIG_PM */
