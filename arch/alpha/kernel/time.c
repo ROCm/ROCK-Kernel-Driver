@@ -451,8 +451,9 @@ do_gettimeofday(struct timeval *tv)
 int
 do_settimeofday(struct timespec *tv)
 {
+	time_t wtm_sec, sec = tv->tv_sec;
+	long wtm_nsec, nsec = tv->tv_nsec;
 	unsigned long delta_nsec;
-	long sec, nsec;
 
 	if ((unsigned long)tv->tv_nsec >= NSEC_PER_SEC)
 		return -EINVAL;
@@ -474,30 +475,18 @@ do_settimeofday(struct timespec *tv)
 	delta_nsec *= 1000;
 #endif
 
-	sec = tv->tv_sec;
-	nsec = tv->tv_nsec;
 	nsec -= delta_nsec;
-	if (nsec < 0) {
-		nsec += NSEC_PER_SEC;
-		sec -= 1;
-	}
 
-	xtime.tv_sec = sec;
-	xtime.tv_nsec = nsec;
+	wtm_sec  = wall_to_monotonic.tv_sec + (xtime.tv_sec - sec);
+	wtm_nsec = wall_to_monotonic.tv_nsec + (xtime.tv_nsec - nsec);
+
+	set_normalized_timespec(&xtime, sec, nsec);
+	set_normalized_timespec(&wall_to_monotonic, wtm_sec, wtm_nsec);
+
 	time_adjust = 0;		/* stop active adjtime() */
 	time_status |= STA_UNSYNC;
 	time_maxerror = NTP_PHASE_LIMIT;
 	time_esterror = NTP_PHASE_LIMIT;
-
-        wall_to_monotonic.tv_sec += xtime.tv_sec - tv->tv_sec;
-        wall_to_monotonic.tv_nsec += xtime.tv_nsec - tv->tv_nsec;
-        if (wall_to_monotonic.tv_nsec > NSEC_PER_SEC) {
-                wall_to_monotonic.tv_nsec -= NSEC_PER_SEC;
-                wall_to_monotonic.tv_sec++;
-        } else if (wall_to_monotonic.tv_nsec < 0) {
-                wall_to_monotonic.tv_nsec += NSEC_PER_SEC;
-                wall_to_monotonic.tv_sec--;
-        }
 
 	write_sequnlock_irq(&xtime_lock);
 	return 0;

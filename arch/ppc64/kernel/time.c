@@ -339,9 +339,11 @@ void do_gettimeofday(struct timeval *tv)
 
 int do_settimeofday(struct timespec *tv)
 {
+	time_t wtm_sec, new_sec = tv->tv_sec;
+	long wtm_nsec, new_nsec = tv->tv_nsec;
 	unsigned long flags;
 	unsigned long delta_xsec;
-	long int tb_delta, new_nsec, new_sec;
+	long int tb_delta;
 	unsigned long new_xsec;
 
 	if ((unsigned long)tv->tv_nsec >= NSEC_PER_SEC)
@@ -364,14 +366,13 @@ int do_settimeofday(struct timespec *tv)
 	tb_delta = tb_ticks_since(tb_last_stamp);
 	tb_delta += (jiffies - wall_jiffies) * tb_ticks_per_jiffy;
 
-	new_sec = tv->tv_sec;
-	new_nsec = tv->tv_nsec - (tb_delta / tb_ticks_per_usec / 1000);
-	while (new_nsec < 0) {
-		new_sec--; 
-		new_nsec += NSEC_PER_SEC;
-	}
-	xtime.tv_nsec = new_nsec;
-	xtime.tv_sec = new_sec;
+	new_nsec -= tb_delta / tb_ticks_per_usec / 1000;
+
+	wtm_sec  = wall_to_monotonic.tv_sec + (xtime.tv_sec - new_sec);
+	wtm_nsec = wall_to_monotonic.tv_nsec + (xtime.tv_nsec - new_nsec);
+
+ 	set_normalized_timespec(&xtime, new_sec, new_nsec);
+	set_normalized_timespec(&wall_to_monotonic, wtm_sec, wtm_nsec);
 
 	/* In case of a large backwards jump in time with NTP, we want the 
 	 * clock to be updated as soon as the PLL is again in lock.
@@ -484,6 +485,8 @@ void __init time_init(void)
 
 	xtime.tv_nsec = 0;
 	last_rtc_update = xtime.tv_sec;
+	set_normalized_timespec(&wall_to_monotonic,
+	                        -xtime.tv_sec, -xtime.tv_nsec);
 	write_sequnlock_irqrestore(&xtime_lock, flags);
 
 	/* Not exact, but the timer interrupt takes care of this */

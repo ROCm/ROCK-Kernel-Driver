@@ -703,9 +703,9 @@ static void __init set_system_time(void)
 	}
 
 	xtime.tv_sec = mktime(year, mon, day, hour, min, sec);
-	wall_to_monotonic.tv_sec = -xtime.tv_sec;
 	xtime.tv_nsec = (INITIAL_JIFFIES % HZ) * (NSEC_PER_SEC / HZ);
-	wall_to_monotonic.tv_nsec = -xtime.tv_nsec;
+	set_normalized_timespec(&wall_to_monotonic,
+ 	                        -xtime.tv_sec, -xtime.tv_nsec);
 
 	if (mregs) {
 		tmp = mostek_read(mregs + MOSTEK_CREG);
@@ -743,9 +743,9 @@ void __init clock_probe(void)
 			(unsigned int) (long) &unix_tod);
 		prom_feval(obp_gettod);
 		xtime.tv_sec = unix_tod;
-		wall_to_monotonic.tv_sec = -xtime.tv_sec;
 		xtime.tv_nsec = (INITIAL_JIFFIES % HZ) * (NSEC_PER_SEC / HZ);
-		wall_to_monotonic.tv_nsec = -xtime.tv_nsec;
+		set_normalized_timespec(&wall_to_monotonic,
+		                        -xtime.tv_sec, -xtime.tv_nsec);
 		return;
 	}
 
@@ -1090,6 +1090,9 @@ static __inline__ unsigned long do_gettimeoffset(void)
 
 int do_settimeofday(struct timespec *tv)
 {
+	time_t wtm_sec, sec = tv->tv_sec;
+	long wtm_nsec, nsec = tv->tv_nsec;
+
 	if ((unsigned long)tv->tv_nsec >= NSEC_PER_SEC)
 		return -EINVAL;
 
@@ -1103,28 +1106,15 @@ int do_settimeofday(struct timespec *tv)
 	 * wall time.  Discover what correction gettimeofday() would have
 	 * made, and then undo it!
 	 */
-	tv->tv_nsec -= do_gettimeoffset() * 1000;
-	tv->tv_nsec -= (jiffies - wall_jiffies) * (NSEC_PER_SEC / HZ);
+	nsec -= do_gettimeoffset() * 1000;
+	nsec -= (jiffies - wall_jiffies) * (NSEC_PER_SEC / HZ);
 
-	while (tv->tv_nsec < 0) {
-		tv->tv_nsec += NSEC_PER_SEC;
-		tv->tv_sec--;
-	}
+	wtm_sec  = wall_to_monotonic.tv_sec + (xtime.tv_sec - sec);
+	wtm_nsec = wall_to_monotonic.tv_nsec + (xtime.tv_nsec - nsec);
 
-	wall_to_monotonic.tv_sec += xtime.tv_sec - tv->tv_sec;
-	wall_to_monotonic.tv_nsec += xtime.tv_nsec - tv->tv_nsec;
+	set_normalized_timespec(&xtime, sec, nsec);
+	set_normalized_timespec(&wall_to_monotonic, wtm_sec, wtm_nsec);
 
-	if (wall_to_monotonic.tv_nsec > NSEC_PER_SEC) {
-		wall_to_monotonic.tv_nsec -= NSEC_PER_SEC;
-		wall_to_monotonic.tv_sec++;
-	}
-	if (wall_to_monotonic.tv_nsec < 0) {
-		wall_to_monotonic.tv_nsec += NSEC_PER_SEC;
-		wall_to_monotonic.tv_sec--;
-	}
-
-	xtime.tv_sec = tv->tv_sec;
-	xtime.tv_nsec = tv->tv_nsec;
 	time_adjust = 0;		/* stop active adjtime() */
 	time_status |= STA_UNSYNC;
 	time_maxerror = NTP_PHASE_LIMIT;
