@@ -1216,19 +1216,6 @@ nfsd_symlink(struct svc_rqst *rqstp, struct svc_fh *fhp,
 	if (!err) {
 		if (EX_ISSYNC(fhp->fh_export))
 			nfsd_sync_dir(dentry);
-		if (iap) {
-			iap->ia_valid &= ~ATTR_MODE;
-			if (iap->ia_valid) {
-				iap->ia_valid |= ATTR_CTIME;
-				iap->ia_mode = (iap->ia_mode&S_IALLUGO)
-					| S_IFLNK;
-				err = notify_change(dnew, iap);
-				if (err)
-					err = nfserrno(err);
-				else if (EX_ISSYNC(fhp->fh_export))
-					write_inode_now(dentry->d_inode, 1);
-		       }
-		}
 	} else
 		err = nfserrno(err);
 	fh_unlock(fhp);
