@@ -314,6 +314,69 @@ int agp_unbind_memory(agp_memory * curr)
 
 /* Generic Agp routines - Start */
 
+u32 agp_collect_device_status(u32 mode, u32 command)
+{
+	struct pci_dev *device;
+	u8 agp;
+	u32 scratch; 
+
+	pci_for_each_dev(device) {
+		agp = pci_find_capability(device, PCI_CAP_ID_AGP);
+		if (!agp)
+			continue;
+
+		/*
+		 * Ok, here we have a AGP device. Disable impossible 
+		 * settings, and adjust the readqueue to the minimum.
+		 */
+		pci_read_config_dword(device, agp + 4, &scratch);
+
+		/* adjust RQ depth */
+		command = ((command & ~0xff000000) |
+		     min_t(u32, (mode & 0xff000000),
+			 min_t(u32, (command & 0xff000000),
+			     (scratch & 0xff000000))));
+
+		/* disable SBA if it's not supported */
+		if (!((command & 0x00000200) &&
+		      (scratch & 0x00000200) &&
+		      (mode & 0x00000200)))
+			command &= ~0x00000200;
+
+		/* disable FW if it's not supported */
+		if (!((command & 0x00000010) &&
+		      (scratch & 0x00000010) &&
+		      (mode & 0x00000010)))
+			command &= ~0x00000010;
+
+		if (!((command & 4) &&
+		      (scratch & 4) &&
+		      (mode & 4)))
+			command &= ~0x00000004;
+
+		if (!((command & 2) &&
+		      (scratch & 2) &&
+		      (mode & 2)))
+			command &= ~0x00000002;
+
+		if (!((command & 1) &&
+		      (scratch & 1) &&
+		      (mode & 1)))
+			command &= ~0x00000001;
+	}
+
+	if (command & 4)
+		command &= ~3;	/* 4X */
+
+	if (command & 2)
+		command &= ~5;	/* 2X (8X for AGP3.0) */
+
+	if (command & 1)
+		command &= ~6;	/* 1X (4X for AGP3.0) */
+
+	return command;
+}
+
 void agp_device_command(u32 command, int agp_v3)
 {
 	struct pci_dev *device;
@@ -336,85 +399,16 @@ void agp_device_command(u32 command, int agp_v3)
 
 void agp_generic_agp_enable(u32 mode)
 {
-	struct pci_dev *device = NULL;
-	u32 command, scratch; 
-	u8 cap_ptr;
+	u32 command;
 
 	pci_read_config_dword(agp_bridge.dev, agp_bridge.capndx + 4, &command);
 
-	/*
-	 * PASS1: go through all devices that claim to be
-	 *        AGP devices and collect their data.
-	 */
-
-	pci_for_each_dev(device) {
-		cap_ptr = pci_find_capability(device, PCI_CAP_ID_AGP);
-		if (cap_ptr != 0x00) {
-			/*
-			 * Ok, here we have a AGP device. Disable impossible 
-			 * settings, and adjust the readqueue to the minimum.
-			 */
-
-			pci_read_config_dword(device, cap_ptr + 4, &scratch);
-
-			/* adjust RQ depth */
-			command = ((command & ~0xff000000) |
-			     min_t(u32, (mode & 0xff000000),
-				 min_t(u32, (command & 0xff000000),
-				     (scratch & 0xff000000))));
-
-			/* disable SBA if it's not supported */
-			if (!((command & 0x00000200) &&
-			      (scratch & 0x00000200) &&
-			      (mode & 0x00000200)))
-				command &= ~0x00000200;
-
-			/* disable FW if it's not supported */
-			if (!((command & 0x00000010) &&
-			      (scratch & 0x00000010) &&
-			      (mode & 0x00000010)))
-				command &= ~0x00000010;
-
-			if (!((command & 4) &&
-			      (scratch & 4) &&
-			      (mode & 4)))
-				command &= ~0x00000004;
-
-			if (!((command & 2) &&
-			      (scratch & 2) &&
-			      (mode & 2)))
-				command &= ~0x00000002;
-
-			if (!((command & 1) &&
-			      (scratch & 1) &&
-			      (mode & 1)))
-				command &= ~0x00000001;
-		}
-	}
-	/*
-	 * PASS2: Figure out the 4X/2X/1X setting and enable the
-	 *        target (our motherboard chipset).
-	 */
-
-	if (command & 4)
-		command &= ~3;	/* 4X */
-
-	if (command & 2)
-		command &= ~5;	/* 2X */
-
-	if (command & 1)
-		command &= ~6;	/* 1X */
-
-	command |= 0x00000100;
+	command = agp_collect_device_status(mode, command);
+	command |= 0x100;
 
 	pci_write_config_dword(agp_bridge.dev,
 			       agp_bridge.capndx + 8,
 			       command);
-
-	/*
-	 * PASS3: Go throu all AGP devices and update the
-	 *        command registers.
-	 */
 
 	agp_device_command(command, 0);
 }

@@ -413,88 +413,22 @@ static struct aper_size_info_lvl2 serverworks_sizes[7] =
 
 static void serverworks_agp_enable(u32 mode)
 {
-	struct pci_dev *device = NULL;
-	u32 command, scratch, cap_id;
-	u8 cap_ptr;
+	u32 command;
 
 	pci_read_config_dword(serverworks_private.svrwrks_dev,
 			      agp_bridge.capndx + 4,
 			      &command);
 
-	/*
-	 * PASS1: go throu all devices that claim to be
-	 *        AGP devices and collect their data.
-	 */
+	command = agp_collect_device_status(mode, command);
 
+	command &= ~0x10;	/* disable FW */
+	command &= ~0x08;
 
-	pci_for_each_dev(device) {
-		cap_ptr = pci_find_capability(device, PCI_CAP_ID_AGP);
-		if (cap_ptr != 0x00) {
-			/*
-			 * Ok, here we have a AGP device. Disable impossible 
-			 * settings, and adjust the readqueue to the minimum.
-			 */
-
-			pci_read_config_dword(device, cap_ptr + 4, &scratch);
-
-			/* adjust RQ depth */
-			command =
-			    ((command & ~0xff000000) |
-			     min_t(u32, (mode & 0xff000000),
-				 min_t(u32, (command & 0xff000000),
-				     (scratch & 0xff000000))));
-
-			/* disable SBA if it's not supported */
-			if (!((command & 0x00000200) &&
-			      (scratch & 0x00000200) &&
-			      (mode & 0x00000200)))
-				command &= ~0x00000200;
-
-			/* disable FW */
-			command &= ~0x00000010;
-
-			command &= ~0x00000008;
-
-			if (!((command & 4) &&
-			      (scratch & 4) &&
-			      (mode & 4)))
-				command &= ~0x00000004;
-
-			if (!((command & 2) &&
-			      (scratch & 2) &&
-			      (mode & 2)))
-				command &= ~0x00000002;
-
-			if (!((command & 1) &&
-			      (scratch & 1) &&
-			      (mode & 1)))
-				command &= ~0x00000001;
-		}
-	}
-	/*
-	 * PASS2: Figure out the 4X/2X/1X setting and enable the
-	 *        target (our motherboard chipset).
-	 */
-
-	if (command & 4) {
-		command &= ~3;	/* 4X */
-	}
-	if (command & 2) {
-		command &= ~5;	/* 2X */
-	}
-	if (command & 1) {
-		command &= ~6;	/* 1X */
-	}
-	command |= 0x00000100;
+	command |= 0x100;
 
 	pci_write_config_dword(serverworks_private.svrwrks_dev,
 			       agp_bridge.capndx + 8,
 			       command);
-
-	/*
-	 * PASS3: Go throu all AGP devices and update the
-	 *        command registers.
-	 */
 
 	agp_device_command(command, 0);
 }

@@ -370,61 +370,10 @@ static void agp_x86_64_agp_enable(u32 mode)
 
 	pci_read_config_dword(agp_bridge.dev, agp_bridge.capndx+4, &command);
 
-	/*
-	 * PASS2: go through all devices that claim to be
-	 *        AGP devices and collect their data.
-	 */
-
-	pci_for_each_dev(device) {
-		cap_ptr = pci_find_capability(device, PCI_CAP_ID_AGP);
-		if (cap_ptr != 0x00) {
-			/*
-			 * Ok, here we have a AGP device. Disable impossible 
-			 * settings, and adjust the readqueue to the minimum.
-			 */
-			pci_read_config_dword(device, cap_ptr + 4, &scratch);
-
-			/* adjust RQ depth */
-			command =
-			    ((command & ~0xff000000) |
-			     min_t(u32, (mode & 0xff000000),
-				 min_t(u32, (command & 0xff000000),
-				     (scratch & 0xff000000))));
-
-			/* disable SBA if it's not supported */
-			if (!((command & 0x200) && (scratch & 0x200) && (mode & 0x200)))
-				command &= ~0x200;
-
-			/* disable FW if it's not supported */
-			if (!((command & 0x10) && (scratch & 0x10) && (mode & 0x10)))
-				command &= ~0x10;
-
-			if (!((command & 2) && (scratch & 2) && (mode & 2)))
-				command &= ~2;		/* 8x */
-
-			if (!((command & 1) && (scratch & 1) && (mode & 1)))
-				command &= ~1;		/* 4x */
-		}
-	}
-	/*
-	 * PASS3: Figure out the 8X/4X setting and enable the
-	 *        target (our motherboard chipset).
-	 */
-
-	if (command & 2)
-		command &= ~5;	/* 8X */
-
-	if (command & 1)
-		command &= ~6;	/* 4X */
-
+	command = agp_collect_device_status(mode, command);
 	command |= 0x100;
 
 	pci_write_config_dword(agp_bridge.dev, agp_bridge.capndx+8, command);
-
-	/*
-	 * PASS4: Go through all AGP devices and update the
-	 *        command registers.
-	 */
 
 	agp_device_command(command, 1);
 }
