@@ -1067,12 +1067,6 @@ static int atyfb_ioctl(struct inode *inode, struct file *file, u_int cmd,
 #endif				/* __sparc__ || DEBUG */
 #ifdef __sparc__
 	struct fbtype fbtyp;
-	struct display *disp;
-
-	if (con >= 0)
-		disp = &fb_display[con];
-	else
-		disp = info2->disp;
 #endif
 
 	switch (cmd) {
@@ -1082,7 +1076,7 @@ static int atyfb_ioctl(struct inode *inode, struct file *file, u_int cmd,
 		fbtyp.fb_width = par->crtc.vxres;
 		fbtyp.fb_height = par->crtc.vyres;
 		fbtyp.fb_depth = info->var.bits_per_pixel;
-		fbtyp.fb_cmsize = disp->cmap.len;
+		fbtyp.fb_cmsize = info->cmap.len;
 		fbtyp.fb_size = info->fix.smem_len;
 		if (copy_to_user
 		    ((struct fbtype *) arg, &fbtyp, sizeof(fbtyp)))
@@ -2082,8 +2076,7 @@ int __init atyfb_init(void)
 			/*
 			 * Map in big-endian aperture.
 			 */
-			info->screen_base =
-			    (unsigned long) addr + 0x800000UL;
+			info->screen_base = (char *) (addr + 0x800000UL);
 			info->fix.smem_start = addr + 0x800000UL;
 
 			/*
@@ -2180,10 +2173,8 @@ int __init atyfb_init(void)
 				 * Fix PROMs idea of MEM_CNTL settings...
 				 */
 				mem = aty_ld_le32(MEM_CNTL, default_par);
-				chip_id =
-				    aty_ld_le32(CONFIG_CHIP_ID, defualt_par);
-				if (((chip_id & CFG_CHIP_TYPE) ==
-				     VT_CHIP_ID)
+				chip_id = aty_ld_le32(CONFIG_CHIP_ID, default_par);
+				if (((chip_id & CFG_CHIP_TYPE) == VT_CHIP_ID)
 				    && !((chip_id >> 24) & 1)) {
 					switch (mem & 0x0f) {
 					case 3:
@@ -2373,7 +2364,7 @@ int __init atyfb_init(void)
 			 */
 			default_par->mmap_map[0].voff = 0x8000000000000000UL;
 			default_par->mmap_map[0].poff =
-			    info->screen_base & PAGE_MASK;
+			    (unsigned long) info->screen_base & PAGE_MASK;
 			default_par->mmap_map[0].size =
 			    info->fix.smem_len;
 			default_par->mmap_map[0].prot_mask = _PAGE_CACHE;
