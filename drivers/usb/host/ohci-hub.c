@@ -385,6 +385,7 @@ ohci_hub_status_data (struct usb_hcd *hcd, char *buf)
 			) {
 		ohci_vdbg (ohci, "autosuspend\n");
 		(void) ohci_hub_suspend (&ohci->hcd);
+		ohci->hcd.state = USB_STATE_RUNNING;
 		up (&hcd->self.root_hub->serialize);
 	}
 #endif
