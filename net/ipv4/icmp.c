@@ -65,6 +65,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/types.h>
 #include <linux/jiffies.h>
 #include <linux/kernel.h>
@@ -1126,3 +1127,8 @@ void __init icmp_init(struct net_proto_family *ops)
 		per_cpu(__icmp_socket, i)->sk->sk_prot->unhash(per_cpu(__icmp_socket, i)->sk);
 	}
 }
+
+EXPORT_SYMBOL(icmp_err_convert);
+EXPORT_SYMBOL(icmp_send);
+EXPORT_SYMBOL(icmp_statistics);
+EXPORT_SYMBOL(xrlim_allow);

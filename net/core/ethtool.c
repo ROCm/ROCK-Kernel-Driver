@@ -9,6 +9,7 @@
  * It's GPL, stupid.
  */
 
+#include <linux/module.h>
 #include <linux/types.h>
 #include <linux/errno.h>
 #include <linux/ethtool.h>
@@ -727,3 +728,11 @@ int dev_ethtool(struct ifreq *ifr)
 		return dev->do_ioctl(dev, ifr, SIOCETHTOOL);
 	return -EOPNOTSUPP;
 }
+
+EXPORT_SYMBOL(ethtool_op_get_link);
+EXPORT_SYMBOL(ethtool_op_get_sg);
+EXPORT_SYMBOL(ethtool_op_get_tso);
+EXPORT_SYMBOL(ethtool_op_get_tx_csum);
+EXPORT_SYMBOL(ethtool_op_set_sg);
+EXPORT_SYMBOL(ethtool_op_set_tso);
+EXPORT_SYMBOL(ethtool_op_set_tx_csum);

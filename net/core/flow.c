@@ -5,6 +5,7 @@
  */
 
 #include <linux/kernel.h>
+#include <linux/module.h>
 #include <linux/list.h>
 #include <linux/jhash.h>
 #include <linux/interrupt.h>
@@ -401,3 +402,6 @@ static int __init flow_cache_init(void)
 }
 
 module_init(flow_cache_init);
+
+EXPORT_SYMBOL(flow_cache_genid);
+EXPORT_SYMBOL(flow_cache_lookup);

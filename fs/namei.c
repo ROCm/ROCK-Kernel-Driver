@@ -15,6 +15,7 @@
  */
 
 #include <linux/init.h>
+#include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/fs.h>
 #include <linux/namei.h>
@@ -2275,3 +2276,33 @@ struct inode_operations page_symlink_inode_operations = {
 	.readlink	= page_readlink,
 	.follow_link	= page_follow_link,
 };
+
+EXPORT_SYMBOL(__user_walk);
+EXPORT_SYMBOL(follow_down);
+EXPORT_SYMBOL(follow_up);
+EXPORT_SYMBOL(get_write_access); /* binfmt_aout */
+EXPORT_SYMBOL(getname);
+EXPORT_SYMBOL(lock_rename);
+EXPORT_SYMBOL(lookup_create);
+EXPORT_SYMBOL(lookup_hash);
+EXPORT_SYMBOL(lookup_one_len);
+EXPORT_SYMBOL(page_follow_link);
+EXPORT_SYMBOL(page_readlink);
+EXPORT_SYMBOL(page_symlink);
+EXPORT_SYMBOL(page_symlink_inode_operations);
+EXPORT_SYMBOL(path_lookup);
+EXPORT_SYMBOL(path_release);
+EXPORT_SYMBOL(path_walk);
+EXPORT_SYMBOL(permission);
+EXPORT_SYMBOL(unlock_rename);
+EXPORT_SYMBOL(vfs_create);
+EXPORT_SYMBOL(vfs_follow_link);
+EXPORT_SYMBOL(vfs_link);
+EXPORT_SYMBOL(vfs_mkdir);
+EXPORT_SYMBOL(vfs_mknod);
+EXPORT_SYMBOL(vfs_permission);
+EXPORT_SYMBOL(vfs_readlink);
+EXPORT_SYMBOL(vfs_rename);
+EXPORT_SYMBOL(vfs_rmdir);
+EXPORT_SYMBOL(vfs_symlink);
+EXPORT_SYMBOL(vfs_unlink);

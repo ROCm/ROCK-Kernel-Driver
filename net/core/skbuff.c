@@ -39,6 +39,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
@@ -1103,3 +1104,22 @@ void __init skb_init(void)
 	if (!skbuff_head_cache)
 		panic("cannot create skbuff cache");
 }
+
+EXPORT_SYMBOL(___pskb_trim);
+EXPORT_SYMBOL(__kfree_skb);
+EXPORT_SYMBOL(__pskb_pull_tail);
+EXPORT_SYMBOL(alloc_skb);
+EXPORT_SYMBOL(pskb_copy);
+EXPORT_SYMBOL(pskb_expand_head);
+EXPORT_SYMBOL(skb_checksum);
+EXPORT_SYMBOL(skb_clone);
+EXPORT_SYMBOL(skb_clone_fraglist);
+EXPORT_SYMBOL(skb_copy);
+EXPORT_SYMBOL(skb_copy_and_csum_bits);
+EXPORT_SYMBOL(skb_copy_and_csum_dev);
+EXPORT_SYMBOL(skb_copy_bits);
+EXPORT_SYMBOL(skb_copy_expand);
+EXPORT_SYMBOL(skb_over_panic);
+EXPORT_SYMBOL(skb_pad);
+EXPORT_SYMBOL(skb_realloc_headroom);
+EXPORT_SYMBOL(skb_under_panic);

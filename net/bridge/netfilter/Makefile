@@ -13,6 +13,7 @@ obj-$(CONFIG_BRIDGE_EBT_T_NAT) += ebtable_nat.o
 obj-$(CONFIG_BRIDGE_EBT_802_3) += ebt_802_3.o
 obj-$(CONFIG_BRIDGE_EBT_ARP) += ebt_arp.o
 obj-$(CONFIG_BRIDGE_EBT_IP) += ebt_ip.o
+obj-$(CONFIG_BRIDGE_EBT_LIMIT) += ebt_limit.o
 obj-$(CONFIG_BRIDGE_EBT_MARK) += ebt_mark_m.o
 obj-$(CONFIG_BRIDGE_EBT_PKTTYPE) += ebt_pkttype.o
 obj-$(CONFIG_BRIDGE_EBT_STP) += ebt_stp.o

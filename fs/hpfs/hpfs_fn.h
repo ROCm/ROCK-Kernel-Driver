@@ -249,7 +249,7 @@ int hpfs_file_fsync(struct file *, struct dentry *, int);
 secno hpfs_bmap(struct inode *, unsigned);
 void hpfs_truncate(struct inode *);
 int hpfs_get_block(struct inode *inode, sector_t iblock, struct buffer_head *bh_result, int create);
-ssize_t hpfs_file_write(struct file *file, const char *buf, size_t count, loff_t *ppos);
+ssize_t hpfs_file_write(struct file *file, const char __user *buf, size_t count, loff_t *ppos);
 
 /* inode.c */
 

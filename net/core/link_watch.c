@@ -1,5 +1,5 @@
 /*
- * Linux network device link state notifaction
+ * Linux network device link state notification
  *
  * Author:
  *     Stefan Rompf <sux@loplof.de>
@@ -12,6 +12,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/netdevice.h>
 #include <linux/if.h>
 #include <linux/rtnetlink.h>
@@ -132,3 +133,4 @@ void linkwatch_fire_event(struct net_device *dev)
 	}
 }
 
+EXPORT_SYMBOL(linkwatch_fire_event);

@@ -22,7 +22,8 @@
 #include <linux/ext3_fs.h>
 #include "xattr.h"
 
-static int ext3_readlink(struct dentry *dentry, char *buffer, int buflen)
+static int
+ext3_readlink(struct dentry *dentry, char __user *buffer, int buflen)
 {
 	struct ext3_inode_info *ei = EXT3_I(dentry->d_inode);
 	return vfs_readlink(dentry, buffer, buflen, (char*)ei->i_data);

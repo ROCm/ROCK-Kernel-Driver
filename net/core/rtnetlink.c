@@ -18,6 +18,7 @@
 
 #include <linux/config.h>
 #include <linux/errno.h>
+#include <linux/module.h>
 #include <linux/types.h>
 #include <linux/socket.h>
 #include <linux/kernel.h>
@@ -556,7 +557,6 @@ struct notifier_block rtnetlink_dev_notifier = {
 	.notifier_call	= rtnetlink_event,
 };
 
-
 void __init rtnetlink_init(void)
 {
 	rtnl = netlink_kernel_create(NETLINK_ROUTE, rtnetlink_rcv);
@@ -567,3 +567,13 @@ void __init rtnetlink_init(void)
 	rtnetlink_links[PF_UNSPEC] = link_rtnetlink_table;
 	rtnetlink_links[PF_PACKET] = link_rtnetlink_table;
 }
+
+EXPORT_SYMBOL(__rta_fill);
+EXPORT_SYMBOL(rtattr_parse);
+EXPORT_SYMBOL(rtnetlink_dump_ifinfo);
+EXPORT_SYMBOL(rtnetlink_links);
+EXPORT_SYMBOL(rtnetlink_put_metrics);
+EXPORT_SYMBOL(rtnl);
+EXPORT_SYMBOL(rtnl_lock);
+EXPORT_SYMBOL(rtnl_sem);
+EXPORT_SYMBOL(rtnl_unlock);

@@ -16,8 +16,8 @@
  *		Andi Kleen	:	Fix csum*fromiovecend for IPv6.
  */
 
-
 #include <linux/errno.h>
+#include <linux/module.h>
 #include <linux/sched.h>
 #include <linux/kernel.h>
 #include <linux/mm.h>
@@ -254,3 +254,9 @@ out_fault:
 	err = -EFAULT;
 	goto out;
 }
+
+EXPORT_SYMBOL(csum_partial_copy_fromiovecend);
+EXPORT_SYMBOL(memcpy_fromiovec);
+EXPORT_SYMBOL(memcpy_fromiovecend);
+EXPORT_SYMBOL(memcpy_toiovec);
+EXPORT_SYMBOL(memcpy_tokerneliovec);

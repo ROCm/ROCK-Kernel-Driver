@@ -95,9 +95,16 @@ static void tune_dtc2278 (ide_drive_t *drive, u8 pio)
 	HWIF(drive)->drives[!drive->select.b.unit].io_32bit = 1;
 }
 
-void __init probe_dtc2278 (void)
+static int __init probe_dtc2278(void)
 {
 	unsigned long flags;
+	ide_hwif_t *hwif, *mate;
+
+	hwif = &ide_hwifs[0];
+	mate = &ide_hwifs[1];
+
+	if (hwif->chipset != ide_unknown || mate->chipset != ide_unknown)
+		return 1;
 
 	local_irq_save(flags);
 	/*
@@ -117,76 +124,60 @@ void __init probe_dtc2278 (void)
 #endif
 	local_irq_restore(flags);
 
-	ide_hwifs[0].serialized = 1;
-	ide_hwifs[1].serialized = 1;
-	ide_hwifs[0].chipset = ide_dtc2278;
-	ide_hwifs[1].chipset = ide_dtc2278;
-	ide_hwifs[0].tuneproc = &tune_dtc2278;
-	ide_hwifs[0].drives[0].no_unmask = 1;
-	ide_hwifs[0].drives[1].no_unmask = 1;
-	ide_hwifs[1].drives[0].no_unmask = 1;
-	ide_hwifs[1].drives[1].no_unmask = 1;
-	ide_hwifs[0].mate = &ide_hwifs[1];
-	ide_hwifs[1].mate = &ide_hwifs[0];
-	ide_hwifs[1].channel = 1;
+	hwif->serialized = 1;
+	hwif->chipset = ide_dtc2278;
+	hwif->tuneproc = &tune_dtc2278;
+	hwif->drives[0].no_unmask = 1;
+	hwif->drives[1].no_unmask = 1;
+	hwif->mate = mate;
 
-	probe_hwif_init(&ide_hwifs[0]);
-	probe_hwif_init(&ide_hwifs[1]);
+	mate->serialized = 1;
+	mate->chipset = ide_dtc2278;
+	mate->drives[0].no_unmask = 1;
+	mate->drives[1].no_unmask = 1;
+	mate->mate = hwif;
+	mate->channel = 1;
+
+	probe_hwif_init(hwif);
+	probe_hwif_init(mate);
+
+	return 0;
 }
 
-static void dtc2278_release (void)
+/* Can be called directly from ide.c. */
+int __init dtc2278_init(void)
 {
-	if (ide_hwifs[0].chipset != ide_dtc2278 &&
-	    ide_hwifs[1].chipset != ide_dtc2278)
+	if (probe_dtc2278()) {
+		printk(KERN_ERR "dtc2278: ide interfaces already in use!\n");
+		return -EBUSY;
+	}
+	return 0;
+}
+
+#ifdef MODULE
+static void __exit dtc2278_release_hwif(ide_hwif_t *hwif)
+{
+	if (hwif->chipset != ide_dtc2278)
 		return;
 
-	ide_hwifs[0].serialized = 0;
-	ide_hwifs[1].serialized = 0;
-	ide_hwifs[0].chipset = ide_unknown;
-	ide_hwifs[1].chipset = ide_unknown;
-	ide_hwifs[0].tuneproc = NULL;
-	ide_hwifs[0].drives[0].no_unmask = 0;
-	ide_hwifs[0].drives[1].no_unmask = 0;
-	ide_hwifs[1].drives[0].no_unmask = 0;
-	ide_hwifs[1].drives[1].no_unmask = 0;
-	ide_hwifs[0].mate = NULL;
-	ide_hwifs[1].mate = NULL;
+	hwif->serialized = 0;
+	hwif->chipset = ide_unknown;
+	hwif->tuneproc = NULL;
+	hwif->drives[0].no_unmask = 0;
+	hwif->drives[1].no_unmask = 0;
+	hwif->mate = NULL;
 }
 
-#ifndef MODULE
-/*
- * init_dtc2278:
- *
- * called by ide.c when parsing command line
- */
-
-void __init init_dtc2278 (void)
+static void __exit dtc2278_exit(void)
 {
-	probe_dtc2278();
+	dtc2278_release_hwif(&ide_hwifs[0]);
+	dtc2278_release_hwif(&ide_hwifs[1]);
 }
 
-#else
+module_init(dtc2278_init);
+module_exit(dtc2278_exit);
+#endif
 
 MODULE_AUTHOR("See Local File");
 MODULE_DESCRIPTION("support of DTC-2278 VLB IDE chipsets");
 MODULE_LICENSE("GPL");
-
-static int __init dtc2278_mod_init(void)
-{
-	probe_dtc2278();
-	if (ide_hwifs[0].chipset != ide_dtc2278 &&
-	    ide_hwifs[1].chipset != ide_dtc2278) {
-		dtc2278_release();
-		return -ENODEV;
-	}
-	return 0;
-}
-module_init(dtc2278_mod_init);
-
-static void __exit dtc2278_mod_exit(void)
-{
-	dtc2278_release();
-}
-module_exit(dtc2278_mod_exit);
-#endif
-

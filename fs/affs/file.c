@@ -39,7 +39,7 @@ static int affs_grow_extcache(struct inode *inode, u32 lc_idx);
 static struct buffer_head *affs_alloc_extblock(struct inode *inode, struct buffer_head *bh, u32 ext);
 static inline struct buffer_head *affs_get_extblock(struct inode *inode, u32 ext);
 static struct buffer_head *affs_get_extblock_slow(struct inode *inode, u32 ext);
-static ssize_t affs_file_write(struct file *filp, const char *buf, size_t count, loff_t *ppos);
+static ssize_t affs_file_write(struct file *filp, const char __user *buf, size_t count, loff_t *ppos);
 static int affs_file_open(struct inode *inode, struct file *filp);
 static int affs_file_release(struct inode *inode, struct file *filp);
 
@@ -491,7 +491,8 @@ affs_getemptyblk_ino(struct inode *inode, int block)
 }
 
 static ssize_t
-affs_file_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
+affs_file_write(struct file *file, const char __user *buf,
+		size_t count, loff_t *ppos)
 {
 	ssize_t retval;
 

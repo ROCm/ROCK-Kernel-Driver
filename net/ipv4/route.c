@@ -62,6 +62,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/module.h>
 #include <asm/uaccess.h>
 #include <asm/system.h>
 #include <asm/bitops.h>
@@ -2823,3 +2824,7 @@ out_enomem1:
 	rc = -ENOMEM;
 	goto out;
 }
+
+EXPORT_SYMBOL(__ip_select_ident);
+EXPORT_SYMBOL(ip_route_input);
+EXPORT_SYMBOL(ip_route_output_key);

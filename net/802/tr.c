@@ -18,6 +18,7 @@
 #include <asm/uaccess.h>
 #include <asm/system.h>
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/jiffies.h>
@@ -600,3 +601,6 @@ static int __init rif_init(void)
 }
 
 module_init(rif_init);
+
+EXPORT_SYMBOL(tr_source_route);
+EXPORT_SYMBOL(tr_type_trans);

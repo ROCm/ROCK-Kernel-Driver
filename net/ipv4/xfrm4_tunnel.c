@@ -169,6 +169,7 @@ static struct xfrm_type ipip_type = {
 static struct inet_protocol ipip_protocol = {
 	.handler	=	ipip_rcv,
 	.err_handler	=	ipip_err,
+	.no_policy	=	1,
 };
 
 static int __init ipip_init(void)

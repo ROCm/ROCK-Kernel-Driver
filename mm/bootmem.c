@@ -146,7 +146,7 @@ static void __init free_bootmem_core(bootmem_data_t *bdata, unsigned long addr, 
  * We 'merge' subsequent allocations to save space. We might 'lose'
  * some fraction of a page if allocations cannot be satisfied due to
  * size constraints on boxes where there is physical RAM space
- * fragmentation - in these cases * (mostly large memory boxes) this
+ * fragmentation - in these cases (mostly large memory boxes) this
  * is not a problem.
  *
  * On low memory boxes we get it right in 100% of the cases.

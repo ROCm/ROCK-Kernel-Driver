@@ -56,6 +56,8 @@ extern int overflowgid;
 #define SET_GID16(var, gid)	var = high2lowgid(gid)
 #define NEW_TO_OLD_UID(uid)	high2lowuid(uid)
 #define NEW_TO_OLD_GID(gid)	high2lowgid(gid)
+#define OLD_TO_NEW_UID(uid)	low2highuid(uid)
+#define OLD_TO_NEW_GID(gid)	low2highgid(gid)
 
 /* specific to fs/stat.c */
 #define SET_OLDSTAT_UID(stat, uid)	(stat).st_uid = high2lowuid(uid)
@@ -69,6 +71,8 @@ extern int overflowgid;
 #define SET_GID16(var, gid)	do { ; } while (0)
 #define NEW_TO_OLD_UID(uid)	(uid)
 #define NEW_TO_OLD_GID(gid)	(gid)
+#define OLD_TO_NEW_UID(uid)	(uid)
+#define OLD_TO_NEW_GID(gid)	(gid)
 
 #define SET_OLDSTAT_UID(stat, uid)	(stat).st_uid = (uid)
 #define SET_OLDSTAT_GID(stat, gid)	(stat).st_gid = (gid)

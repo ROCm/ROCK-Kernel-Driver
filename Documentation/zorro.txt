@@ -2,7 +2,7 @@
 		----------------------------------------
 
 Written by Geert Uytterhoeven <geert@linux-m68k.org>
-Last revised: February 27, 2000
+Last revised: September 5, 2003
 
 
 1. Introduction
@@ -75,7 +75,7 @@ they are CPU physical addresses as well.
 The treatment of these regions depends on the type of Zorro space:
 
   - Zorro II address space is always mapped and does not have to be mapped
-    explicitly using ioremap().
+    explicitly using z_ioremap().
     
     Conversion from bus/physical Zorro II addresses to kernel virtual addresses
     and vice versa is done using:
@@ -83,22 +83,20 @@ The treatment of these regions depends on the type of Zorro space:
 	virt_addr = ZTWO_VADDR(bus_addr);
 	bus_addr = ZTWO_PADDR(virt_addr);
 
-  - Zorro III address space must be mapped explicitly using ioremap() first
+  - Zorro III address space must be mapped explicitly using z_ioremap() first
     before it can be accessed:
  
-	virt_addr = ioremap(bus_addr, size);
+	virt_addr = z_ioremap(bus_addr, size);
 	...
-	iounmap(virt_addr);
+	z_iounmap(virt_addr);
 
 
 5. References
 -------------
 
 linux/include/linux/zorro.h
-linux/include/linux/ioport.h
-linux/include/asm-m68k/io.h
-linux/include/asm-m68k/amigahw.h
-linux/include/asm-ppc/io.h
+linux/include/asm-{m68k,ppc}/zorro.h
+linux/include/linux/zorro_ids.h
 linux/drivers/zorro
 /proc/bus/zorro
 

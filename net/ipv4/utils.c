@@ -21,6 +21,7 @@
  *		2 of the License, or (at your option) any later version.
  */
 
+#include <linux/module.h>
 #include <linux/types.h>
 #include <asm/byteorder.h>
 
@@ -55,3 +56,4 @@ __u32 in_aton(const char *str)
 	return(htonl(l));
 }
 
+EXPORT_SYMBOL(in_aton);

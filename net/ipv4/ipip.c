@@ -483,6 +483,11 @@ static int ipip_rcv(struct sk_buff *skb)
 
 	read_lock(&ipip_lock);
 	if ((tunnel = ipip_tunnel_lookup(iph->saddr, iph->daddr)) != NULL) {
+		if (!xfrm4_policy_check(NULL, XFRM_POLICY_IN, skb)) {
+			kfree_skb(skb);
+			return 0;
+		}
+
 		tunnel->stat.rx_packets++;
 		tunnel->stat.rx_bytes += skb->len;
 		skb->dev = tunnel->dev;
