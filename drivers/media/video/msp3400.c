@@ -1300,6 +1300,7 @@ static int msp_attach(struct i2c_adapter *adap, int addr,
 	}
 
 	/* timer for stereo checking */
+	init_timer(&msp->wake_stereo);
 	msp->wake_stereo.function = msp3400c_stereo_wake;
 	msp->wake_stereo.data     = (unsigned long)msp;
 

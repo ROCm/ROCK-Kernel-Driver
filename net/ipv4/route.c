@@ -2526,7 +2526,9 @@ void __init ip_rt_init(void)
 	devinet_init();
 	ip_fib_init();
 
+	init_timer(&rt_flush_timer);
 	rt_flush_timer.function = rt_run_flush;
+	init_timer(&rt_periodic_timer);
 	rt_periodic_timer.function = rt_check_expire;
 
 	/* All the timers, started at system startup tend

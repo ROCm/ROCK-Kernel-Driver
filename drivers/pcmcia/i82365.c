@@ -1003,6 +1003,7 @@ static void pcic_interrupt(int irq, void *dev,
 static void pcic_interrupt_wrapper(u_long data)
 {
     pcic_interrupt(0, NULL, NULL);
+    init_timer(&poll_timer);
     poll_timer.expires = jiffies + poll_interval;
     add_timer(&poll_timer);
 }

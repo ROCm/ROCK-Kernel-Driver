@@ -1304,6 +1304,7 @@ static int smc91c92_open(struct net_device *dev)
     smc->packets_waiting = 0;
     
     smc_reset(dev);
+    init_timer(&smc->media);
     smc->media.function = &media_check;
     smc->media.data = (u_long)smc;
     smc->media.expires = jiffies + HZ;

@@ -2248,7 +2248,6 @@ void ext3_read_inode(struct inode * inode)
 					 * (for stat), not the fs block
 					 * size */  
 	inode->i_blocks = le32_to_cpu(raw_inode->i_blocks);
-	inode->i_version = ++event;
 	ei->i_flags = le32_to_cpu(raw_inode->i_flags);
 #ifdef EXT3_FRAGMENTS
 	ei->i_faddr = le32_to_cpu(raw_inode->i_faddr);

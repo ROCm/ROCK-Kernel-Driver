@@ -927,8 +927,6 @@ struct e100_private {
 
 	struct proc_dir_entry *proc_parent;
 
-	rwlock_t isolate_lock;
-	int driver_isolated;
 	char *id_string;
 	char *cable_status;
 	char *mdix_status;
@@ -977,8 +975,7 @@ extern unsigned char e100_selftest(struct e100_private *bdp, u32 *st_timeout,
 extern unsigned char e100_get_link_state(struct e100_private *bdp);
 extern unsigned char e100_wait_scb(struct e100_private *bdp);
 
-extern void e100_deisolate_driver(struct e100_private *bdp,
-				  u8 recover, u8 full_reset);
+extern void e100_deisolate_driver(struct e100_private *bdp, u8 full_reset);
 extern unsigned char e100_hw_reset_recover(struct e100_private *bdp,
 					   u32 reset_cmd);
 

@@ -1034,6 +1034,7 @@ static int pcnet_open(struct net_device *dev)
 
     info->phy_id = info->eth_phy;
     info->link_status = 0x00;
+    init_timer(&info->watchdog);
     info->watchdog.function = &ei_watchdog;
     info->watchdog.data = (u_long)info;
     info->watchdog.expires = jiffies + HZ;

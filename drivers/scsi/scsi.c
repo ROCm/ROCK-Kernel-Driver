@@ -603,6 +603,7 @@ inline void __scsi_release_command(Scsi_Cmnd * SCpnt)
 				 GFP_DMA : 0));
 		if(newSCpnt) {
 			memset(newSCpnt, 0, sizeof(Scsi_Cmnd));
+			init_timer(&newSCpnt->eh_timeout);
 			newSCpnt->host = SDpnt->host;
 			newSCpnt->device = SDpnt;
 			newSCpnt->target = SDpnt->id;
@@ -1551,6 +1552,7 @@ void scsi_build_commandblocks(Scsi_Device * SDpnt)
 	}
 
 	memset(SCpnt, 0, sizeof(Scsi_Cmnd));
+	init_timer(&SCpnt->eh_timeout);
 	SCpnt->host = SDpnt->host;
 	SCpnt->device = SDpnt;
 	SCpnt->target = SDpnt->id;

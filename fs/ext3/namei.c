@@ -1201,7 +1201,7 @@ static int add_dirent_to_buf(handle_t *handle, struct dentry *dentry,
 	 */
 	dir->i_mtime = dir->i_ctime = CURRENT_TIME;
 	ext3_update_dx_flag(dir);
-	dir->i_version = ++event;
+	dir->i_version++;
 	ext3_mark_inode_dirty(handle, dir);
 	BUFFER_TRACE(bh, "call ext3_journal_dirty_metadata");
 	err = ext3_journal_dirty_metadata(handle, bh);
@@ -1520,7 +1520,7 @@ static int ext3_delete_entry (handle_t *handle,
 						    le16_to_cpu(de->rec_len));
 			else
 				de->inode = 0;
-			dir->i_version = ++event;
+			dir->i_version++;
 			BUFFER_TRACE(bh, "call ext3_journal_dirty_metadata");
 			ext3_journal_dirty_metadata(handle, bh);
 			return 0;
@@ -1964,7 +1964,7 @@ static int ext3_rmdir (struct inode * dir, struct dentry *dentry)
 		ext3_warning (inode->i_sb, "ext3_rmdir",
 			      "empty directory has nlink!=2 (%d)",
 			      inode->i_nlink);
-	inode->i_version = ++event;
+	inode->i_version++;
 	inode->i_nlink = 0;
 	/* There's no need to set i_disksize: the fact that i_nlink is
 	 * zero will ensure that the right thing happens during any
@@ -2214,7 +2214,7 @@ static int ext3_rename (struct inode * old_dir, struct dentry *old_dentry,
 		if (EXT3_HAS_INCOMPAT_FEATURE(new_dir->i_sb,
 					      EXT3_FEATURE_INCOMPAT_FILETYPE))
 			new_de->file_type = old_de->file_type;
-		new_dir->i_version = ++event;
+		new_dir->i_version++;
 		BUFFER_TRACE(new_bh, "call ext3_journal_dirty_metadata");
 		ext3_journal_dirty_metadata(handle, new_bh);
 		brelse(new_bh);

@@ -552,7 +552,6 @@ EXPORT_SYMBOL(remove_inode_hash);
 EXPORT_SYMBOL(buffer_insert_list);
 EXPORT_SYMBOL(make_bad_inode);
 EXPORT_SYMBOL(is_bad_inode);
-EXPORT_SYMBOL(event);
 EXPORT_SYMBOL(__inode_dir_notify);
 
 #ifdef CONFIG_UID16
