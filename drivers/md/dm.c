@@ -58,11 +58,15 @@ struct mapped_device {
 	 * The current mapping.
 	 */
 	struct dm_table *map;
+
+	/*
+	 * io objects are allocated from here.
+	 */
+	mempool_t *io_pool;
 };
 
 #define MIN_IOS 256
 static kmem_cache_t *_io_cache;
-static mempool_t *_io_pool;
 
 static __init int local_init(void)
 {
@@ -74,18 +78,10 @@ static __init int local_init(void)
 	if (!_io_cache)
 		return -ENOMEM;
 
-	_io_pool = mempool_create(MIN_IOS, mempool_alloc_slab,
-				  mempool_free_slab, _io_cache);
-	if (!_io_pool) {
-		kmem_cache_destroy(_io_cache);
-		return -ENOMEM;
-	}
-
 	_major = major;
 	r = register_blkdev(_major, _name, &dm_blk_dops);
 	if (r < 0) {
 		DMERR("register_blkdev failed");
-		mempool_destroy(_io_pool);
 		kmem_cache_destroy(_io_cache);
 		return r;
 	}
@@ -98,7 +94,6 @@ static __init int local_init(void)
 
 static void local_exit(void)
 {
-	mempool_destroy(_io_pool);
 	kmem_cache_destroy(_io_cache);
 
 	if (unregister_blkdev(_major, _name) < 0)
@@ -178,14 +173,14 @@ static int dm_blk_close(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static inline struct dm_io *alloc_io(void)
+static inline struct dm_io *alloc_io(struct mapped_device *md)
 {
-	return mempool_alloc(_io_pool, GFP_NOIO);
+	return mempool_alloc(md->io_pool, GFP_NOIO);
 }
 
-static inline void free_io(struct dm_io *io)
+static inline void free_io(struct mapped_device *md, struct dm_io *io)
 {
-	mempool_free(io, _io_pool);
+	mempool_free(io, md->io_pool);
 }
 
 static inline struct deferred_io *alloc_deferred(void)
@@ -254,7 +249,7 @@ static inline void dec_pending(struct dm_io *io, int error)
 			wake_up(&io->md->wait);
 
 		bio_endio(io->bio, io->error ? 0 : io->bio->bi_size, io->error);
-		free_io(io);
+		free_io(io->md, io);
 	}
 }
 
@@ -419,7 +414,7 @@ static void __split_bio(struct mapped_device *md, struct bio *bio)
 
 	ci.md = md;
 	ci.bio = bio;
-	ci.io = alloc_io();
+	ci.io = alloc_io(md);
 	ci.io->error = 0;
 	atomic_set(&ci.io->io_count, 1);
 	ci.io->bio = bio;
@@ -558,8 +553,17 @@ static struct mapped_device *alloc_dev(int minor)
 	md->queue.queuedata = md;
 	blk_queue_make_request(&md->queue, dm_request);
 
+	md->io_pool = mempool_create(MIN_IOS, mempool_alloc_slab,
+				     mempool_free_slab, _io_cache);
+	if (!md->io_pool) {
+		free_minor(md->disk->first_minor);
+		kfree(md);
+		return NULL;
+	}
+
 	md->disk = alloc_disk(1);
 	if (!md->disk) {
+		mempool_destroy(md->io_pool);
 		free_minor(md->disk->first_minor);
 		kfree(md);
 		return NULL;
@@ -581,6 +585,7 @@ static struct mapped_device *alloc_dev(int minor)
 static void free_dev(struct mapped_device *md)
 {
 	free_minor(md->disk->first_minor);
+	mempool_destroy(md->io_pool);
 	del_gendisk(md->disk);
 	put_disk(md->disk);
 	kfree(md);
