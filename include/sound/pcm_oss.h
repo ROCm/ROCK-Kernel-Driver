@@ -51,11 +51,11 @@ typedef struct _snd_pcm_oss_runtime {
 	unsigned int subdivision;		/* requested subdivision */
 	size_t period_bytes;			/* requested period size */
 	unsigned int periods;
-	size_t buffer_bytes;			/* requested period size */
+	size_t buffer_bytes;			/* requested buffer size */
 	size_t bytes;				/* total # bytes processed */
 	size_t mmap_bytes;
 	char *buffer;				/* vmallocated period */
-	size_t buffer_used;			/* used length from buffer */
+	size_t buffer_used;			/* used length from period buffer */
 	snd_pcm_plugin_t *plugin_first;
 	snd_pcm_plugin_t *plugin_last;
 	unsigned int prev_hw_ptr_interrupt;

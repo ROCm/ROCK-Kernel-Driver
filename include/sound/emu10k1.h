@@ -1152,6 +1152,8 @@ int snd_emu10k1_proc_init(emu10k1_t * emu);
 #define FXBUS_MIDI_RIGHT	0x05
 #define FXBUS_PCM_CENTER	0x06
 #define FXBUS_PCM_LFE		0x07
+#define FXBUS_PT_LEFT		20
+#define FXBUS_PT_RIGHT		21
 #define FXBUS_MIDI_REVERB	0x0c
 #define FXBUS_MIDI_CHORUS	0x0d
 

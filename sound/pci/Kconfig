@@ -17,7 +17,7 @@ config SND_AZT3328
 
 config SND_CS46XX
 	tristate "Cirrus Logic (Sound Fusion) CS4280/CS461x/CS462x/CS463x"
-	depends on SND && SOUND_GAMEPORT
+	depends on SND && GAMEPORT
 	help
 	  Say 'Y' or 'M' to include support for Cirrus Logic CS4610 / CS4612 /
 	  CS4614 / CS4615 / CS4622 / CS4624 / CS4630 / CS4280 chips.
@@ -30,7 +30,7 @@ config SND_CS46XX_NEW_DSP
 
 config SND_CS4281
 	tristate "Cirrus Logic (Sound Fusion) CS4281"
-	depends on SND && SOUND_GAMEPORT
+	depends on SND && GAMEPORT
 	help
 	  Say 'Y' or 'M' to include support for Cirrus Logic CS4281.
 
@@ -83,7 +83,7 @@ config SND_HDSP
 
 config SND_TRIDENT
 	tristate "Trident 4D-Wave DX/NX; SiS 7018"
-	depends on SND && SOUND_GAMEPORT
+	depends on SND && GAMEPORT
 	help
 	  Say 'Y' or 'M' to include support for Trident 4D-Wave DX/NX and
 	  SiS 7018 soundcards.
@@ -110,20 +110,20 @@ config SND_CMIPCI
 
 config SND_ENS1370
 	tristate "(Creative) Ensoniq AudioPCI 1370"
-	depends on SND && SOUND_GAMEPORT
+	depends on SND && GAMEPORT
 	help
 	  Say 'Y' or 'M' to include support for Ensoniq AudioPCI ES1370.
 
 config SND_ENS1371
 	tristate "(Creative) Ensoniq AudioPCI 1371/1373"
-	depends on SND && SOUND_GAMEPORT
+	depends on SND && GAMEPORT
 	help
 	  Say 'Y' or 'M' to include support for Ensoniq AudioPCI ES1371 and
 	  Sound Blaster PCI 64 or 128 soundcards.
 
 config SND_ES1938
 	tristate "ESS ES1938/1946/1969 (Solo-1)"
-	depends on SND && SOUND_GAMEPORT
+	depends on SND && GAMEPORT
 	help
 	  Say 'Y' or 'M' to include support for ESS Solo-1 (ES1938, ES1946, ES1969)
 	  soundcard.
@@ -173,7 +173,7 @@ config SND_INTEL8X0
 
 config SND_SONICVIBES
 	tristate "S3 SonicVibes"
-	depends on SND && SOUND_GAMEPORT
+	depends on SND && GAMEPORT
 	help
 	  Say 'Y' or 'M' to include support for S3 SonicVibes based soundcards.
 

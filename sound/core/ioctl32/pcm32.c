@@ -421,6 +421,7 @@ enum {
 struct ioctl32_mapper pcm_mappers[] = {
 	MAP_COMPAT(SNDRV_PCM_IOCTL_PVERSION),
 	MAP_COMPAT(SNDRV_PCM_IOCTL_INFO),
+	MAP_COMPAT(SNDRV_PCM_IOCTL_TSTAMP),
 	{ SNDRV_PCM_IOCTL_HW_REFINE32, AP(pcm_hw_refine) },
 	{ SNDRV_PCM_IOCTL_HW_PARAMS32, AP(pcm_hw_params) },
 	{ SNDRV_PCM_IOCTL_HW_REFINE_OLD32, AP(pcm_hw_refine_old) },
