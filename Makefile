@@ -1,7 +1,7 @@
 VERSION = 2
 PATCHLEVEL = 6
 SUBLEVEL = 0
-EXTRAVERSION = -test1
+EXTRAVERSION = -test2
 
 # *DOCUMENTATION*
 # To see a list of typical targets execute "make help"

@@ -1209,17 +1209,31 @@ static int blk_init_free_list(request_queue_t *q)
 
 static int __make_request(request_queue_t *, struct bio *);
 
-static elevator_t *chosen_elevator = &iosched_as;
+static elevator_t *chosen_elevator =
+#if defined(CONFIG_IOSCHED_AS)
+	&iosched_as;
+#elif defined(CONFIG_IOSCHED_DEADLINE)
+	&iosched_deadline;
+#else
+	&elevator_noop;
+#endif
 
+#if defined(CONFIG_IOSCHED_AS) || defined(CONFIG_IOSCHED_DEADLINE)
 static int __init elevator_setup(char *str)
 {
+#ifdef CONFIG_IOSCHED_DEADLINE
 	if (!strcmp(str, "deadline"))
 		chosen_elevator = &iosched_deadline;
+#endif
+#ifdef CONFIG_IOSCHED_AS
 	if (!strcmp(str, "as"))
 		chosen_elevator = &iosched_as;
+#endif
 	return 1;
 }
+
 __setup("elevator=", elevator_setup);
+#endif /* CONFIG_IOSCHED_AS || CONFIG_IOSCHED_DEADLINE */
 
 /**
  * blk_init_queue  - prepare a request queue for use with a block device
@@ -1259,10 +1273,7 @@ int blk_init_queue(request_queue_t *q, request_fn_proc *rfn, spinlock_t *lock)
 
 	if (!printed) {
 		printed = 1;
-		if (chosen_elevator == &iosched_deadline)
-			printk("deadline elevator\n");
-		else if (chosen_elevator == &iosched_as)
-			printk("anticipatory scheduling elevator\n");
+		printk("Using %s elevator\n", chosen_elevator->elevator_name);
 	}
 
 	if ((ret = elevator_init(q, chosen_elevator))) {
@@ -2296,8 +2307,8 @@ static int __end_that_request_first(struct request *req, int uptodate,
 			 * not a complete bvec done
 			 */
 			if (unlikely(nbytes > nr_bytes)) {
-				bio_iovec(bio)->bv_offset += nr_bytes;
-				bio_iovec(bio)->bv_len -= nr_bytes;
+				bio_iovec_idx(bio, idx)->bv_offset += nr_bytes;
+				bio_iovec_idx(bio, idx)->bv_len -= nr_bytes;
 				bio_nbytes += nr_bytes;
 				total_bytes += nr_bytes;
 				break;
