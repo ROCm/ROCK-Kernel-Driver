@@ -29,5 +29,6 @@ obj-$(CONFIG_ZLIB_DEFLATE) += zlib_deflate/
 include $(TOPDIR)/drivers/net/Makefile.lib
 include $(TOPDIR)/drivers/usb/class/Makefile.lib
 include $(TOPDIR)/fs/Makefile.lib
+include $(TOPDIR)/net/bluetooth/bnep/Makefile.lib
 
 include $(TOPDIR)/Rules.make
