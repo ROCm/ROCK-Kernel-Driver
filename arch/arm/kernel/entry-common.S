@@ -11,6 +11,7 @@
 
 #include <asm/thread_info.h>
 #include <asm/ptrace.h>
+#include <asm/unistd.h>
 
 #include "entry-header.S"
 
@@ -190,13 +191,14 @@ ENTRY(sys_call_table)
 		.type	sys_syscall, #function
 sys_syscall:
 		eor	scno, r0, #OS_NUMBER << 20
-		cmp	scno, #NR_syscalls	@ check range
-		stmleia	sp, {r5, r6}		@ shuffle args
-		movle	r0, r1
-		movle	r1, r2
-		movle	r2, r3
-		movle	r3, r4
-		ldrle	pc, [tbl, scno, lsl #2]
+		cmp	scno, #__NR_syscall - __NR_SYSCALL_BASE
+		cmpne	scno, #NR_syscalls	@ check range
+		stmloia	sp, {r5, r6}		@ shuffle args
+		movlo	r0, r1
+		movlo	r1, r2
+		movlo	r2, r3
+		movlo	r3, r4
+		ldrlo	pc, [tbl, scno, lsl #2]
 		b	sys_ni_syscall
 
 sys_fork_wrapper:
