@@ -10,9 +10,9 @@ O_TARGET :=	network.o
 mod-subdirs :=	ipv4 ipv4/netfilter ipv6/netfilter ipx irda bluetooth atm netlink sched
 export-objs :=	netsyms.o
 
-obj-y	:= socket.o core/ ethernet/
+obj-y	:= socket.o core/
 
-obj-$(CONFIG_NET)		+= 802/ sched/ netlink/
+obj-$(CONFIG_NET)		+= ethernet/ 802/ sched/ netlink/
 obj-$(CONFIG_INET)		+= ipv4/
 obj-$(CONFIG_NETFILTER)		+= ipv4/netfilter/
 obj-$(CONFIG_UNIX)		+= unix/
