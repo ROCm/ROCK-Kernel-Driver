@@ -26,7 +26,7 @@
 /*
  *
  */
-void pdacf_interrupt(int irq, void *dev, struct pt_regs *regs)
+irqreturn_t pdacf_interrupt(int irq, void *dev, struct pt_regs *regs)
 {
 	pdacf_t *chip = snd_magic_cast(pdacf_t, dev, return);
 	unsigned short stat;
@@ -34,7 +34,7 @@ void pdacf_interrupt(int irq, void *dev, struct pt_regs *regs)
 	if ((chip->chip_status & (PDAUDIOCF_STAT_IS_STALE|
 				  PDAUDIOCF_STAT_IS_CONFIGURED|
 				  PDAUDIOCF_STAT_IS_SUSPENDED)) != PDAUDIOCF_STAT_IS_CONFIGURED)
-		return;
+		return IRQ_HANDLED;	/* IRQ_NONE here? */
 
 	stat = inw(chip->port + PDAUDIOCF_REG_ISR);
 	if (stat & (PDAUDIOCF_IRQLVL|PDAUDIOCF_IRQOVR)) {
@@ -47,6 +47,7 @@ void pdacf_interrupt(int irq, void *dev, struct pt_regs *regs)
 	}
 	if (regs != NULL)
 		snd_ak4117_check_rate_and_errors(chip->ak4117, 0);
+	return IRQ_HANDLED;
 }
 
 static inline void pdacf_transfer_mono16(u16 *dst, u16 xor, unsigned int size, unsigned long rdp_port)
