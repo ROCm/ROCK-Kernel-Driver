@@ -203,6 +203,17 @@ static inline int has_stopped_jobs(int pgrp)
 	for_each_task_pid(pgrp, PIDTYPE_PGID, p, l, pid) {
 		if (p->state != TASK_STOPPED)
 			continue;
+
+		/* If p is stopped by a debugger on a signal that won't
+		   stop it, then don't count p as stopped.  This isn't
+		   perfect but it's a good approximation.  */
+		if (unlikely (p->ptrace)
+		    && p->exit_code != SIGSTOP
+		    && p->exit_code != SIGTSTP
+		    && p->exit_code != SIGTTOU
+		    && p->exit_code != SIGTTIN)
+			continue;
+
 		retval = 1;
 		break;
 	}
