@@ -110,9 +110,9 @@ typedef enum {
 	LookOutBWPEG  = 7,  /* LookOut WPEG                        */
 } node_type;
 
-static inline int is_WPEG(node_type type){
-	return (type == CompatWPEG || type == AltWPEG ||
-		type == LookOutAWPEG || type == LookOutBWPEG);
+static inline int is_WPEG(struct rio_detail *rio){
+	return (rio->type == CompatWPEG || rio->type == AltWPEG ||
+		rio->type == LookOutAWPEG || rio->type == LookOutBWPEG);
 }
 
 #endif /* __ASM_MACH_MPPARSE_H */
