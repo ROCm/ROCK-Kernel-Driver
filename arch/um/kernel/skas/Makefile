@@ -3,8 +3,9 @@
 # Licensed under the GPL
 #
 
-obj-y = exec_kern.o exec_user.o mem_user.o mmu.o process.o process_kern.o \
-	syscall_kern.o syscall_user.o time.o trap_user.o sys-$(SUBARCH)/
+obj-y = exec_kern.o exec_user.o mem.o mem_user.o mmu.o process.o \
+	process_kern.o syscall_kern.o syscall_user.o time.o trap_user.o \
+	sys-$(SUBARCH)/
 
 USER_OBJS = $(filter %_user.o,$(obj-y)) process.o time.o
 USER_OBJS := $(foreach file,$(USER_OBJS),$(obj)/$(file))

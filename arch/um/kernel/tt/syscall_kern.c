@@ -98,9 +98,6 @@ static int check_bogosity(struct pt_regs *regs)
 	return(0);
 }
 
-/*  Unlocked, I don't care if this is a bit off */
-int nsyscalls = 0;
-
 extern syscall_handler_t *sys_call_table[];
 
 long execute_syscall_tt(void *r)
