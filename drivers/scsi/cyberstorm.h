@@ -56,18 +56,18 @@ extern int esp_proc_info(char *buffer, char **start, off_t offset, int length,
 			 int hostno, int inout);
 
 
-#define SCSI_CYBERSTORM   { proc_name:		"esp-cyberstorm", \
-			    proc_info:		esp_proc_info, \
-			    name:		"CyberStorm SCSI", \
-			    detect:		cyber_esp_detect, \
-			    release:		cyber_esp_release, \
-			    queuecommand:	esp_queue, \
-			    abort:		esp_abort, \
-			    reset:		esp_reset, \
-			    can_queue:          7, \
-			    this_id:		7, \
-			    sg_tablesize:	SG_ALL, \
-			    cmd_per_lun:	1, \
-			    use_clustering:	ENABLE_CLUSTERING }
+#define SCSI_CYBERSTORM   { .proc_name		= "esp-cyberstorm", \
+			    .proc_info		= esp_proc_info, \
+			    .name		= "CyberStorm SCSI", \
+			    .detect		= cyber_esp_detect, \
+			    .release		= cyber_esp_release, \
+			    .queuecommand	= esp_queue, \
+			    .abort		= esp_abort, \
+			    .reset		= esp_reset, \
+			    .can_queue          = 7, \
+			    .this_id		= 7, \
+			    .sg_tablesize	= SG_ALL, \
+			    .cmd_per_lun	= 1, \
+			    .use_clustering	= ENABLE_CLUSTERING }
 
 #endif /* CYBER_ESP_H */

@@ -172,7 +172,7 @@ static inline struct scsi_disk *scsi_disk(struct gendisk *disk)
  **/
 static int sd_init_command(struct scsi_cmnd * SCpnt)
 {
-	int this_count, timeout;
+	unsigned int this_count, timeout;
 	struct gendisk *disk;
 	sector_t block;
 	struct scsi_device *sdp = SCpnt->device;
@@ -298,8 +298,23 @@ static int sd_init_command(struct scsi_cmnd * SCpnt)
 		"writing" : "reading", this_count, SCpnt->request->nr_sectors));
 
 	SCpnt->cmnd[1] = 0;
-
-	if (((this_count > 0xff) || (block > 0x1fffff)) || SCpnt->device->ten) {
+	
+	if (block > 0xffffffff) {
+		SCpnt->cmnd[0] += READ_16 - READ_6;
+		SCpnt->cmnd[2] = (unsigned char) (block >> 56) & 0xff;
+		SCpnt->cmnd[3] = (unsigned char) (block >> 48) & 0xff;
+		SCpnt->cmnd[4] = (unsigned char) (block >> 40) & 0xff;
+		SCpnt->cmnd[5] = (unsigned char) (block >> 32) & 0xff;
+		SCpnt->cmnd[6] = (unsigned char) (block >> 24) & 0xff;
+		SCpnt->cmnd[7] = (unsigned char) (block >> 16) & 0xff;
+		SCpnt->cmnd[8] = (unsigned char) (block >> 8) & 0xff;
+		SCpnt->cmnd[9] = (unsigned char) block & 0xff;
+		SCpnt->cmnd[10] = (unsigned char) (this_count >> 24) & 0xff;
+		SCpnt->cmnd[11] = (unsigned char) (this_count >> 16) & 0xff;
+		SCpnt->cmnd[12] = (unsigned char) (this_count >> 8) & 0xff;
+		SCpnt->cmnd[13] = (unsigned char) this_count & 0xff;
+		SCpnt->cmnd[14] = SCpnt->cmnd[15] = 0;
+	} else if (((this_count > 0xff) || (block > 0x1fffff)) || SCpnt->device->ten) {
 		if (this_count > 0xffff)
 			this_count = 0xffff;
 
@@ -904,24 +919,34 @@ sd_read_cache_type(struct scsi_disk *sdkp, char *diskname,
 static void
 sd_read_capacity(struct scsi_disk *sdkp, char *diskname,
 		 struct scsi_request *SRpnt, unsigned char *buffer) {
-	unsigned char cmd[10];
+	unsigned char cmd[16];
 	struct scsi_device *sdp = sdkp->device;
 	int the_result, retries;
-	int sector_size;
+	int sector_size = 0;
+	int longrc = 0;
 
+repeat:
 	retries = 3;
 	do {
-		cmd[0] = READ_CAPACITY;
-		memset((void *) &cmd[1], 0, 9);
-		memset((void *) buffer, 0, 8);
-
+		if (longrc) {
+			memset((void *) cmd, 0, 16);
+			cmd[0] = SERVICE_ACTION_IN;
+			cmd[1] = 0x10; /* READ CAPACITY (16) */
+			cmd[13] = 12;
+			memset((void *) buffer, 0, 12);
+		} else {
+			cmd[0] = READ_CAPACITY;
+			memset((void *) &cmd[1], 0, 9);
+			memset((void *) buffer, 0, 8);
+		}
+		
 		SRpnt->sr_cmd_len = 0;
 		SRpnt->sr_sense_buffer[0] = 0;
 		SRpnt->sr_sense_buffer[2] = 0;
 		SRpnt->sr_data_direction = SCSI_DATA_READ;
 
 		scsi_wait_req(SRpnt, (void *) cmd, (void *) buffer,
-			      8, SD_TIMEOUT, SD_MAX_RETRIES);
+			      longrc ? 12 : 8, SD_TIMEOUT, SD_MAX_RETRIES);
 
 		if (media_not_present(sdkp, SRpnt))
 			return;
@@ -931,7 +956,7 @@ sd_read_capacity(struct scsi_disk *sdkp, char *diskname,
 
 	} while (the_result && retries);
 
-	if (the_result) {
+	if (the_result && !longrc) {
 		printk(KERN_NOTICE "%s : READ CAPACITY failed.\n"
 		       "%s : status=%x, message=%02x, host=%d, driver=%02x \n",
 		       diskname, diskname,
@@ -957,16 +982,51 @@ sd_read_capacity(struct scsi_disk *sdkp, char *diskname,
 		sdkp->capacity = 0x200000; /* 1 GB - random */
 
 		return;
-	}
+	} else if (the_result && longrc) {
+		/* READ CAPACITY(16) has been failed */
+		printk(KERN_NOTICE "%s : READ CAPACITY(16) failed.\n"
+		       "%s : status=%x, message=%02x, host=%d, driver=%02x \n",
+		       diskname, diskname,
+		       status_byte(the_result),
+		       msg_byte(the_result),
+		       host_byte(the_result),
+		       driver_byte(the_result));
+		printk(KERN_NOTICE "%s : use 0xffffffff as device size\n",
+		       diskname);
+		
+		sdkp->capacity = 1 + (sector_t) 0xffffffff;		
+		goto got_data;
+	}	
+	
+	if (!longrc) {
+		sector_size = (buffer[4] << 24) |
+			(buffer[5] << 16) | (buffer[6] << 8) | buffer[7];
+		if (buffer[0] == 0xff && buffer[1] == 0xff &&
+			buffer[2] == 0xff && buffer[3] == 0xff) {
+			printk(KERN_NOTICE "%s : very big device. try to use"
+				" READ CAPACITY(16).\n", diskname);
+			longrc = 1;
+			goto repeat;
+		}
+		sdkp->capacity = 1 + (((sector_t)buffer[0] << 24) |
+			(buffer[1] << 16) |
+			(buffer[2] << 8) |
+			buffer[3]);			
+	} else {
+		sdkp->capacity = 1 + (((sector_t)buffer[0] << 56) |
+			((sector_t)buffer[1] << 48) |
+			((sector_t)buffer[2] << 40) |
+			((sector_t)buffer[3] << 32) |
+			((sector_t)buffer[4] << 24) |
+			((sector_t)buffer[5] << 16) |
+			((sector_t)buffer[6] << 8)  |
+			(sector_t)buffer[7]);
+			
+		sector_size = (buffer[8] << 24) |
+			(buffer[9] << 16) | (buffer[10] << 8) | buffer[11];
+	}	
 
-	sdkp->capacity = 1 + (((sector_t)buffer[0] << 24) |
-			      (buffer[1] << 16) |
-			      (buffer[2] << 8) |
-			      buffer[3]);
-
-	sector_size = (buffer[4] << 24) |
-		(buffer[5] << 16) | (buffer[6] << 8) | buffer[7];
-
+got_data:
 	if (sector_size == 0) {
 		sector_size = 512;
 		printk(KERN_NOTICE "%s : sector size 0 reported, "
@@ -1139,10 +1199,10 @@ sd_init_onedisk(struct scsi_disk * sdkp, struct gendisk *disk)
 
 	if (sdkp->media_present)
 		sd_read_capacity(sdkp, disk->disk_name, SRpnt, buffer);
-
+	
 	if (sdp->removable && sdkp->media_present)
 		sd_read_write_protect_flag(sdkp, disk->disk_name, SRpnt, buffer);
-
+		
 	SRpnt->sr_device->ten = 1;
 	SRpnt->sr_device->remap = 1;
 
@@ -1217,7 +1277,7 @@ static int sd_attach(struct scsi_device * sdp)
 	gd->minors = 16;
 	gd->fops = &sd_fops;
 
-	if (index > 26) {
+	if (index >= 26) {
 		sprintf(gd->disk_name, "sd%c%c",
 			'a' + index/26-1,'a' + index % 26);
 	} else {

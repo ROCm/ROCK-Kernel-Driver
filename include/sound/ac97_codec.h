@@ -199,6 +199,10 @@
 #define AC97_ALC650_MULTICH	0x6a
 #define AC97_ALC650_CLOCK	0x7a
 
+/* specific - Yamaha YMF753 */
+#define AC97_YMF753_DIT_CTRL2	0x66	/* DIT Control 2 */
+#define AC97_YMF753_3D_MODE_SEL	0x68	/* 3D Mode Select */
+
 /* ac97->scaps */
 #define AC97_SCAP_AUDIO		(1<<0)	/* audio AC'97 codec */
 #define AC97_SCAP_MODEM		(1<<1)	/* modem AC'97 codec */

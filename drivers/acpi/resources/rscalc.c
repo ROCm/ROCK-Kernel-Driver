@@ -1,7 +1,6 @@
 /*******************************************************************************
  *
  * Module Name: rscalc - Calculate stream and list lengths
- *              $Revision: 45 $
  *
  ******************************************************************************/
 
@@ -35,10 +34,10 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_rs_get_byte_stream_length
+ * FUNCTION:    acpi_rs_get_byte_stream_length
  *
- * PARAMETERS:  Linked_list         - Pointer to the resource linked list
- *              Size_needed         - u32 pointer of the size buffer needed
+ * PARAMETERS:  linked_list         - Pointer to the resource linked list
+ *              size_needed         - u32 pointer of the size buffer needed
  *                                    to properly return the parsed data
  *
  * RETURN:      Status
@@ -52,15 +51,15 @@
 acpi_status
 acpi_rs_get_byte_stream_length (
 	acpi_resource           *linked_list,
-	ACPI_SIZE               *size_needed)
+	acpi_size               *size_needed)
 {
-	ACPI_SIZE               byte_stream_size_needed = 0;
-	ACPI_SIZE               segment_size;
+	acpi_size               byte_stream_size_needed = 0;
+	acpi_size               segment_size;
 	acpi_resource_ext_irq   *ex_irq = NULL;
 	u8                      done = FALSE;
 
 
-	ACPI_FUNCTION_TRACE ("Rs_get_byte_stream_length");
+	ACPI_FUNCTION_TRACE ("rs_get_byte_stream_length");
 
 
 	while (!done) {
@@ -90,7 +89,7 @@ acpi_rs_get_byte_stream_length (
 		case ACPI_RSTYPE_START_DPF:
 			/*
 			 * Start Dependent Functions Resource
-			 * For a Start_dependent_functions Resource, Byte 1,
+			 * For a start_dependent_functions Resource, Byte 1,
 			 * although optional, will always be created.
 			 */
 			segment_size = 2;
@@ -229,7 +228,7 @@ acpi_rs_get_byte_stream_length (
 			 * Resource Source + 1 for the null.
 			 */
 			segment_size = 9 +
-				(((ACPI_SIZE) linked_list->data.extended_irq.number_of_interrupts - 1) * 4);
+				(((acpi_size) linked_list->data.extended_irq.number_of_interrupts - 1) * 4);
 
 			if (ex_irq && ex_irq->resource_source.string_ptr) {
 				segment_size += linked_list->data.extended_irq.resource_source.string_length;
@@ -244,7 +243,7 @@ acpi_rs_get_byte_stream_length (
 			 */
 			return_ACPI_STATUS (AE_AML_INVALID_RESOURCE_TYPE);
 
-		} /* switch (Linked_list->Id) */
+		} /* switch (linked_list->Id) */
 
 		/*
 		 * Update the total
@@ -268,11 +267,11 @@ acpi_rs_get_byte_stream_length (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_rs_get_list_length
+ * FUNCTION:    acpi_rs_get_list_length
  *
- * PARAMETERS:  Byte_stream_buffer      - Pointer to the resource byte stream
- *              Byte_stream_buffer_length - Size of Byte_stream_buffer
- *              Size_needed             - u32 pointer of the size buffer
+ * PARAMETERS:  byte_stream_buffer      - Pointer to the resource byte stream
+ *              byte_stream_buffer_length - Size of byte_stream_buffer
+ *              size_needed             - u32 pointer of the size buffer
  *                                        needed to properly return the
  *                                        parsed data
  *
@@ -288,7 +287,7 @@ acpi_status
 acpi_rs_get_list_length (
 	u8                      *byte_stream_buffer,
 	u32                     byte_stream_buffer_length,
-	ACPI_SIZE               *size_needed)
+	acpi_size               *size_needed)
 {
 	u32                     buffer_size = 0;
 	u32                     bytes_parsed = 0;
@@ -304,7 +303,7 @@ acpi_rs_get_list_length (
 	u8                      additional_bytes;
 
 
-	ACPI_FUNCTION_TRACE ("Rs_get_list_length");
+	ACPI_FUNCTION_TRACE ("rs_get_list_length");
 
 
 	while (bytes_parsed < byte_stream_buffer_length) {
@@ -337,7 +336,7 @@ acpi_rs_get_list_length (
 			/*
 			 * Ensure a 32-bit boundary for the structure
 			 */
-			temp16 = (u16) ACPI_ROUND_UP_TO_32_bITS (temp16);
+			temp16 = (u16) ACPI_ROUND_UP_to_32_bITS (temp16);
 
 			structure_size = ACPI_SIZEOF_RESOURCE (acpi_resource_vendor) +
 					   (temp16 * sizeof (u8));
@@ -396,7 +395,7 @@ acpi_rs_get_list_length (
 			/*
 			 * Ensure a 64-bit boundary for the structure
 			 */
-			temp8 = (u8) ACPI_ROUND_UP_TO_64_bITS (temp8);
+			temp8 = (u8) ACPI_ROUND_UP_to_64_bITS (temp8);
 
 			structure_size = ACPI_SIZEOF_RESOURCE (acpi_resource_address64) +
 					   (temp8 * sizeof (u8));
@@ -434,7 +433,7 @@ acpi_rs_get_list_length (
 			/*
 			 * Ensure a 32-bit boundary for the structure
 			 */
-			temp8 = (u8) ACPI_ROUND_UP_TO_32_bITS (temp8);
+			temp8 = (u8) ACPI_ROUND_UP_to_32_bITS (temp8);
 
 			structure_size = ACPI_SIZEOF_RESOURCE (acpi_resource_address32) +
 					   (temp8 * sizeof (u8));
@@ -472,7 +471,7 @@ acpi_rs_get_list_length (
 			/*
 			 * Ensure a 32-bit boundary for the structure
 			 */
-			temp8 = (u8) ACPI_ROUND_UP_TO_32_bITS (temp8);
+			temp8 = (u8) ACPI_ROUND_UP_to_32_bITS (temp8);
 
 			structure_size = ACPI_SIZEOF_RESOURCE (acpi_resource_address16) +
 					   (temp8 * sizeof (u8));
@@ -524,7 +523,7 @@ acpi_rs_get_list_length (
 			/*
 			 * Ensure a 32-bit boundary for the structure
 			 */
-			temp8 = (u8) ACPI_ROUND_UP_TO_32_bITS (temp8);
+			temp8 = (u8) ACPI_ROUND_UP_to_32_bITS (temp8);
 
 			structure_size = ACPI_SIZEOF_RESOURCE (acpi_resource_ext_irq) +
 					   (additional_bytes * sizeof (u8)) +
@@ -659,7 +658,7 @@ acpi_rs_get_list_length (
 			/*
 			 * Ensure a 32-bit boundary for the structure
 			 */
-			temp8 = (u8) ACPI_ROUND_UP_TO_32_bITS (temp8);
+			temp8 = (u8) ACPI_ROUND_UP_to_32_bITS (temp8);
 			structure_size = ACPI_SIZEOF_RESOURCE (acpi_resource_vendor) +
 					   (temp8 * sizeof (u8));
 			break;
@@ -705,10 +704,10 @@ acpi_rs_get_list_length (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_rs_get_pci_routing_table_length
+ * FUNCTION:    acpi_rs_get_pci_routing_table_length
  *
- * PARAMETERS:  Package_object          - Pointer to the package object
- *              Buffer_size_needed      - u32 pointer of the size buffer
+ * PARAMETERS:  package_object          - Pointer to the package object
+ *              buffer_size_needed      - u32 pointer of the size buffer
  *                                        needed to properly return the
  *                                        parsed data
  *
@@ -723,10 +722,10 @@ acpi_rs_get_list_length (
 acpi_status
 acpi_rs_get_pci_routing_table_length (
 	acpi_operand_object     *package_object,
-	ACPI_SIZE               *buffer_size_needed)
+	acpi_size               *buffer_size_needed)
 {
 	u32                     number_of_elements;
-	ACPI_SIZE               temp_size_needed = 0;
+	acpi_size               temp_size_needed = 0;
 	acpi_operand_object     **top_object_list;
 	u32                     index;
 	acpi_operand_object     *package_element;
@@ -735,7 +734,7 @@ acpi_rs_get_pci_routing_table_length (
 	u32                     table_index;
 
 
-	ACPI_FUNCTION_TRACE ("Rs_get_pci_routing_table_length");
+	ACPI_FUNCTION_TRACE ("rs_get_pci_routing_table_length");
 
 
 	number_of_elements = package_object->package.count;
@@ -759,13 +758,13 @@ acpi_rs_get_pci_routing_table_length (
 		package_element = *top_object_list;
 
 		/*
-		 * The Sub_object_list will now point to an array of the
-		 * four IRQ elements: Address, Pin, Source and Source_index
+		 * The sub_object_list will now point to an array of the
+		 * four IRQ elements: Address, Pin, Source and source_index
 		 */
 		sub_object_list = package_element->package.elements;
 
 		/*
-		 * Scan the Irq_table_elements for the Source Name String
+		 * Scan the irq_table_elements for the Source Name String
 		 */
 		name_found = FALSE;
 
@@ -811,7 +810,7 @@ acpi_rs_get_pci_routing_table_length (
 
 		/* Round up the size since each element must be aligned */
 
-		temp_size_needed = ACPI_ROUND_UP_TO_64_bITS (temp_size_needed);
+		temp_size_needed = ACPI_ROUND_UP_to_64_bITS (temp_size_needed);
 
 		/*
 		 * Point to the next acpi_operand_object

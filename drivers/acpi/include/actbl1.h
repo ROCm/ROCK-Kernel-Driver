@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Name: actbl1.h - ACPI 1.0 tables
- *       $Revision: 21 $
  *
  *****************************************************************************/
 
@@ -44,7 +43,7 @@ typedef struct
  */
 typedef struct
 {
-	NATIVE_CHAR             signature[4];           /* ACPI Signature */
+	char                    signature[4];           /* ACPI Signature */
 	u32                     length;                 /* Length of structure, in bytes */
 	u32                     hardware_signature;     /* Hardware configuration signature */
 	u32                     firmware_waking_vector; /* ACPI OS waking vector */
@@ -72,16 +71,16 @@ typedef struct
 	u8                      acpi_disable;           /* Value to write to smi_cmd to disable ACPI */
 	u8                      S4bios_req;             /* Value to write to SMI CMD to enter S4BIOS state */
 	u8                      reserved2;              /* Reserved - must be zero */
-	u32                     pm1a_evt_blk;           /* Port address of Power Mgt 1a Acpi_event Reg Blk */
-	u32                     pm1b_evt_blk;           /* Port address of Power Mgt 1b Acpi_event Reg Blk */
+	u32                     pm1a_evt_blk;           /* Port address of Power Mgt 1a acpi_event Reg Blk */
+	u32                     pm1b_evt_blk;           /* Port address of Power Mgt 1b acpi_event Reg Blk */
 	u32                     pm1a_cnt_blk;           /* Port address of Power Mgt 1a Control Reg Blk */
 	u32                     pm1b_cnt_blk;           /* Port address of Power Mgt 1b Control Reg Blk */
 	u32                     pm2_cnt_blk;            /* Port address of Power Mgt 2 Control Reg Blk */
 	u32                     pm_tmr_blk;             /* Port address of Power Mgt Timer Ctrl Reg Blk */
-	u32                     gpe0_blk;               /* Port addr of General Purpose Acpi_event 0 Reg Blk */
-	u32                     gpe1_blk;               /* Port addr of General Purpose Acpi_event 1 Reg Blk */
-	u8                      pm1_evt_len;            /* Byte Length of ports at pm1_x_evt_blk */
-	u8                      pm1_cnt_len;            /* Byte Length of ports at pm1_x_cnt_blk */
+	u32                     gpe0_blk;               /* Port addr of General Purpose acpi_event 0 Reg Blk */
+	u32                     gpe1_blk;               /* Port addr of General Purpose acpi_event 1 Reg Blk */
+	u8                      pm1_evt_len;            /* Byte length of ports at pm1_x_evt_blk */
+	u8                      pm1_cnt_len;            /* Byte length of ports at pm1_x_cnt_blk */
 	u8                      pm2_cnt_len;            /* Byte Length of ports at pm2_cnt_blk */
 	u8                      pm_tm_len;              /* Byte Length of ports at pm_tm_blk */
 	u8                      gpe0_blk_len;           /* Byte Length of ports at gpe0_blk */

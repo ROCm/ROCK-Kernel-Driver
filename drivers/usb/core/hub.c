@@ -57,6 +57,12 @@ static inline char *portspeed (int portstatus)
 }
 #endif
 
+/* for dev_info, dev_dbg, etc */
+static inline struct device *hubdev (struct usb_device *dev)
+{
+	return &dev->actconfig->interface [0].dev;
+}
+
 /* USB 2.0 spec Section 11.24.4.5 */
 static int usb_get_hub_descriptor(struct usb_device *dev, void *data, int size)
 {
@@ -298,7 +304,7 @@ static int usb_hub_configure(struct usb_hub *hub,
 	}
 
 	dev->maxchild = hub->descriptor->bNbrPorts;
-	info("%d port%s detected", dev->maxchild,
+	dev_info (*hubdev (dev), "%d port%s detected\n", dev->maxchild,
 		(dev->maxchild == 1) ? "" : "s");
 
 	le16_to_cpus(&hub->descriptor->wHubCharacteristics);
@@ -521,7 +527,7 @@ static int hub_probe(struct usb_interface *intf, const struct usb_device_id *id)
 	}
 
 	/* We found a hub */
-	info("USB hub found at %s", dev->devpath);
+	dev_info (*hubdev (dev), "USB hub found\n");
 
 	hub = kmalloc(sizeof(*hub), GFP_KERNEL);
 	if (!hub) {
@@ -651,8 +657,6 @@ static int usb_hub_port_status(struct usb_device *hub, int port,
 		else {
 			*status = le16_to_cpu(portsts->wPortStatus);
 			*change = le16_to_cpu(portsts->wPortChange); 
-			dbg("port %d, portstatus %x, change %x, %s", port + 1,
-				*status, *change, portspeed(*status));
 			ret = 0;
 		}
 		kfree(portsts);
@@ -710,8 +714,9 @@ static int usb_hub_port_wait_reset(struct usb_device *hub, int port,
 		if (delay_time >= 2 * HUB_SHORT_RESET_TIME)
 			delay = HUB_LONG_RESET_TIME;
 
-		dbg("port %d of hub %s not reset yet, waiting %dms", port + 1,
-			hub->devpath, delay);
+		dev_dbg (*hubdev (hub),
+			"port %d not reset yet, waiting %dms\n",
+			port + 1, delay);
 	}
 
 	return -1;
@@ -735,14 +740,15 @@ static int usb_hub_port_reset(struct usb_device *hub, int port,
 			return status;
 		}
 
-		dbg("port %d of hub %s not enabled, trying reset again...",
-			port + 1, hub->devpath);
+		dev_dbg (*hubdev (hub),
+			"port %d not enabled, trying reset again...\n",
+			port + 1);
 		delay = HUB_LONG_RESET_TIME;
 	}
 
-	err("Cannot enable port %i of hub %s, disabling port.",
-		port + 1, hub->devpath);
-	err("Maybe the USB cable is bad?");
+	dev_err (*hubdev (hub),
+		"Cannot enable port %i.  Maybe the USB cable is bad?\n",
+		port + 1);
 
 	return -1;
 }
@@ -768,35 +774,50 @@ void usb_hub_port_disable(struct usb_device *hub, int port)
  * Not covered by the spec - but easy to deal with.
  *
  * This implementation uses 400ms minimum debounce timeout and checks
- * every 100ms for transient disconnects to restart the delay.
+ * every 25ms for transient disconnects to restart the delay.
  */
 
 #define HUB_DEBOUNCE_TIMEOUT	400
-#define HUB_DEBOUNCE_STEP	100
+#define HUB_DEBOUNCE_STEP	 25
+#define HUB_DEBOUNCE_STABLE	  4
 
 /* return: -1 on error, 0 on success, 1 on disconnect.  */
 static int usb_hub_port_debounce(struct usb_device *hub, int port)
 {
 	int ret;
-	unsigned delay_time;
+	int delay_time, stable_count;
 	u16 portchange, portstatus;
+	unsigned connection;
 
-	for (delay_time = 0; delay_time < HUB_DEBOUNCE_TIMEOUT; /* empty */ ) {
-
-		/* wait debounce step increment */
+	connection = 0;
+	stable_count = 0;
+	for (delay_time = 0; delay_time < HUB_DEBOUNCE_TIMEOUT; delay_time += HUB_DEBOUNCE_STEP) {
 		wait_ms(HUB_DEBOUNCE_STEP);
 
 		ret = usb_hub_port_status(hub, port, &portstatus, &portchange);
 		if (ret < 0)
 			return -1;
 
+		if ((portstatus & USB_PORT_STAT_CONNECTION) == connection) {
+			if (connection) {
+				if (++stable_count == HUB_DEBOUNCE_STABLE)
+					break;
+			}
+		} else {
+			stable_count = 0;
+		}
+		connection = portstatus & USB_PORT_STAT_CONNECTION;
+
 		if ((portchange & USB_PORT_STAT_C_CONNECTION)) {
 			usb_clear_port_feature(hub, port+1, USB_PORT_FEAT_C_CONNECTION);
-			delay_time = 0;
 		}
-		else
-			delay_time += HUB_DEBOUNCE_STEP;
 	}
+
+	/* XXX Replace this with dbg() when 2.6 is about to ship. */
+	dev_info (*hubdev (hub),
+		"debounce: port %d: delay %dms stable %d status 0x%x\n",
+		port + 1, delay_time, stable_count, portstatus);
+
 	return ((portstatus&USB_PORT_STAT_CONNECTION)) ? 0 : 1;
 }
 
@@ -808,9 +829,9 @@ static void usb_hub_port_connect_change(struct usb_hub *hubstate, int port,
 	unsigned int delay = HUB_SHORT_RESET_TIME;
 	int i;
 
-	dbg("hub %s port %d, portstatus %x, change %x, %s",
-		hub->devpath, port + 1,
-		portstatus, portchange, portspeed (portstatus));
+	dev_dbg (hubstate->intf->dev,
+		"port %d, status %x, change %x, %s\n",
+		port + 1, portstatus, portchange, portspeed (portstatus));
 
 	/* Clear the connection change status */
 	usb_clear_port_feature(hub, port + 1, USB_PORT_FEAT_C_CONNECTION);
@@ -828,7 +849,9 @@ static void usb_hub_port_connect_change(struct usb_hub *hubstate, int port,
 	}
 
 	if (usb_hub_port_debounce(hub, port)) {
-		err("connect-debounce failed, port %d disabled", port+1);
+		dev_err (hubstate->intf->dev,
+			"connect-debounce failed, port %d disabled\n",
+			port+1);
 		usb_hub_port_disable(hub, port);
 		return;
 	}
@@ -847,7 +870,8 @@ static void usb_hub_port_connect_change(struct usb_hub *hubstate, int port,
 		/* Allocate a new device struct */
 		dev = usb_alloc_dev(hub, hub->bus);
 		if (!dev) {
-			err("couldn't allocate usb_device");
+			dev_err (hubstate->intf->dev,
+				"couldn't allocate usb_device\n");
 			break;
 		}
 
@@ -890,10 +914,12 @@ static void usb_hub_port_connect_change(struct usb_hub *hubstate, int port,
 			len = snprintf (dev->devpath, sizeof dev->devpath,
 				"%d", port + 1);
 		if (len == sizeof dev->devpath)
-			warn ("devpath size! usb/%03d/%03d path %s",
+			dev_err (hubstate->intf->dev,
+				"devpath size! usb/%03d/%03d path %s\n",
 				dev->bus->busnum, dev->devnum, dev->devpath);
-		info("new USB device %s-%s, assigned address %d",
-			dev->bus->bus_name, dev->devpath, dev->devnum);
+		dev_info (hubstate->intf->dev,
+			"new USB device on port %d, assigned address %d\n",
+			port + 1, dev->devnum);
 
 		/* put the device in the global device tree. the hub port
 		 * is the "bus_id"; hubs show in hierarchy like bridges
@@ -978,12 +1004,11 @@ static void usb_hub_events(void)
 			}
 
 			if (portchange & USB_PORT_STAT_C_CONNECTION) {
-				dbg("hub %s port %d connection change",
-					dev->devpath, i + 1);
 				usb_hub_port_connect_change(hub, i, portstatus, portchange);
 			} else if (portchange & USB_PORT_STAT_C_ENABLE) {
-				dbg("hub %s port %d enable change, status %x",
-					dev->devpath, i + 1, portstatus);
+				dev_dbg (*hubdev (dev),
+					"port %d enable change, status %x\n",
+					i + 1, portstatus);
 				usb_clear_port_feature(dev,
 					i + 1, USB_PORT_FEAT_C_ENABLE);
 

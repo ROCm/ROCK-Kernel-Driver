@@ -62,6 +62,7 @@
  *          ->mapping->page_lock
  *  ->inode_lock
  *    ->sb_lock			(fs/fs-writeback.c)
+ *    ->mapping->page_lock	(__sync_single_inode)
  *  ->page_table_lock
  *    ->swap_device_lock	(try_to_unmap_one)
  *    ->private_lock		(try_to_unmap_one)
@@ -108,37 +109,6 @@ static inline int sync_page(struct page *page)
 	return 0;
 }
 
-/*
- * In-memory filesystems have to fail their
- * writepage function - and this has to be
- * worked around in the VM layer..
- *
- * We
- *  - mark the page dirty again (but do NOT
- *    add it back to the inode dirty list, as
- *    that would livelock in fdatasync)
- *  - activate the page so that the page stealer
- *    doesn't try to write it out over and over
- *    again.
- *
- * NOTE!  The livelock in fdatasync went away, due to io_pages.
- * So this function can now call set_page_dirty().
- */
-int fail_writepage(struct page *page)
-{
-	/* Only activate on memory-pressure, not fsync.. */
-	if (current->flags & PF_MEMALLOC) {
-		if (!PageActive(page))
-			activate_page(page);
-		if (!PageReferenced(page))
-			SetPageReferenced(page);
-	}
-
-	unlock_page(page);
-	return -EAGAIN;		/* It will be set dirty again */
-}
-EXPORT_SYMBOL(fail_writepage);
-
 /**
  * filemap_fdatawrite - start writeback against all of a mapping's dirty pages
  * @mapping: address space structure to write
@@ -147,10 +117,6 @@ EXPORT_SYMBOL(fail_writepage);
  * cleansing writeback.  The difference between these two operations is that
  * if a dirty page/buffer is encountered, it must be waited upon, and not just
  * skipped over.
- *
- * The PF_SYNC flag is set across this operation and the various functions
- * which care about this distinction must use called_for_sync() to find out
- * which behaviour they should implement.
  */
 int filemap_fdatawrite(struct address_space *mapping)
 {
@@ -160,9 +126,13 @@ int filemap_fdatawrite(struct address_space *mapping)
 		.nr_to_write = mapping->nrpages * 2,
 	};
 
-	current->flags |= PF_SYNC;
+	if (mapping->backing_dev_info->memory_backed)
+		return 0;
+
+	write_lock(&mapping->page_lock);
+	list_splice_init(&mapping->dirty_pages, &mapping->io_pages);
+	write_unlock(&mapping->page_lock);
 	ret = do_writepages(mapping, &wbc);
-	current->flags &= ~PF_SYNC;
 	return ret;
 }
 
@@ -927,20 +897,10 @@ static ssize_t
 do_readahead(struct address_space *mapping, struct file *filp,
 	     unsigned long index, unsigned long nr)
 {
-	unsigned long max;
-	unsigned long active;
-	unsigned long inactive;
-
 	if (!mapping || !mapping->a_ops || !mapping->a_ops->readpage)
 		return -EINVAL;
 
-	/* Limit it to a sane percentage of the inactive list.. */
-	get_zone_counts(&active, &inactive);
-	max = inactive / 2;
-	if (nr > max)
-		nr = max;
-
-	do_page_cache_readahead(mapping, filp, index, nr);
+	do_page_cache_readahead(mapping, filp, index, max_sane_readahead(nr));
 	return 0;
 }
 
@@ -1327,15 +1287,19 @@ int generic_file_mmap(struct file * file, struct vm_area_struct * vma)
 	struct address_space *mapping = file->f_dentry->d_inode->i_mapping;
 	struct inode *inode = mapping->host;
 
-	if ((vma->vm_flags & VM_SHARED) && (vma->vm_flags & VM_MAYWRITE)) {
-		if (!mapping->a_ops->writepage)
-			return -EINVAL;
-	}
 	if (!mapping->a_ops->readpage)
 		return -ENOEXEC;
 	UPDATE_ATIME(inode);
 	vma->vm_ops = &generic_file_vm_ops;
 	return 0;
+}
+
+int generic_file_readonly_mmap(struct file *file, struct vm_area_struct *vma)
+{
+	if ((vma->vm_flags & VM_SHARED) && (vma->vm_flags & VM_WRITE))
+		return -EINVAL;
+	vma->vm_flags &= ~VM_MAYWRITE;
+	return generic_file_mmap(file, vma);
 }
 #else
 int generic_file_mmap(struct file * file, struct vm_area_struct * vma)
@@ -1564,6 +1528,7 @@ generic_file_write_nolock(struct file *file, const struct iovec *iov,
 	size_t count;		/* after file limit checks */
 	struct inode 	*inode = mapping->host;
 	unsigned long	limit = current->rlim[RLIMIT_FSIZE].rlim_cur;
+	const int	isblk = S_ISBLK(inode->i_mode);
 	long		status = 0;
 	loff_t		pos;
 	struct page	*page;
@@ -1615,22 +1580,21 @@ generic_file_write_nolock(struct file *file, const struct iovec *iov,
 
 	written = 0;
 
-	/* FIXME: this is for backwards compatibility with 2.4 */
-	if (!S_ISBLK(inode->i_mode) && file->f_flags & O_APPEND)
-		pos = inode->i_size;
+	if (!isblk) {
+		/* FIXME: this is for backwards compatibility with 2.4 */
+		if (file->f_flags & O_APPEND)
+			pos = inode->i_size;
 
-	/*
-	 * Check whether we've reached the file size limit.
-	 */
-	if (unlikely(limit != RLIM_INFINITY)) {
-		if (pos >= limit) {
-			send_sig(SIGXFSZ, current, 0);
-			err = -EFBIG;
-			goto out;
-		}
-		if (pos > 0xFFFFFFFFULL || count > limit - (u32)pos) {
-			/* send_sig(SIGXFSZ, current, 0); */
-			count = limit - (u32)pos;
+		if (limit != RLIM_INFINITY) {
+			if (pos >= limit) {
+				send_sig(SIGXFSZ, current, 0);
+				err = -EFBIG;
+				goto out;
+			}
+			if (pos > 0xFFFFFFFFULL || count > limit - (u32)pos) {
+				/* send_sig(SIGXFSZ, current, 0); */
+				count = limit - (u32)pos;
+			}
 		}
 	}
 
@@ -1657,7 +1621,7 @@ generic_file_write_nolock(struct file *file, const struct iovec *iov,
 	 * exceeded without writing data we send a signal and return EFBIG.
 	 * Linus frestrict idea will clean these up nicely..
 	 */
-	if (likely(!S_ISBLK(inode->i_mode))) {
+	if (likely(!isblk)) {
 		if (unlikely(pos >= inode->i_sb->s_maxbytes)) {
 			if (count || pos > inode->i_sb->s_maxbytes) {
 				send_sig(SIGXFSZ, current, 0);
@@ -1701,7 +1665,7 @@ generic_file_write_nolock(struct file *file, const struct iovec *iov,
 					iov, pos, nr_segs);
 		if (written > 0) {
 			loff_t end = pos + written;
-			if (end > inode->i_size && !S_ISBLK(inode->i_mode)) {
+			if (end > inode->i_size && !isblk) {
 				inode->i_size = end;
 				mark_inode_dirty(inode);
 			}

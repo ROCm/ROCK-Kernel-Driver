@@ -133,6 +133,7 @@ struct snd_usb_audio {
 	int index;
 	struct usb_device *dev;
 	snd_card_t *card;
+	int shutdown;
 	int num_interfaces;
 
 	struct list_head pcm_list;	/* list of pcm streams */
@@ -171,7 +172,8 @@ struct snd_usb_midi_endpoint_info {
 
 /* for QUIRK_MIDI_YAMAHA, data is NULL */
 
-/* for QUIRK_MIDI_MIDIMAN, data is the number of ports */
+/* for QUIRK_MIDI_MIDIMAN, data points to a snd_usb_midi_endpoint_info
+ * structure (out_cables and in_cables only) */
 
 /* for QUIRK_ROLAND_UA100, data is NULL */
 
@@ -200,6 +202,10 @@ int snd_usb_create_midi_interface(snd_usb_audio_t *chip, struct usb_interface *i
 #define get_endpoint(alt,ep)	(&(alt)->endpoint[ep].desc)
 #define get_ep_desc(ep)		(&(ep)->desc)
 #define get_cfg_desc(cfg)	(&(cfg)->desc)
+#endif
+
+#ifndef usb_pipe_needs_resubmit
+#define usb_pipe_needs_resubmit(pipe) 1
 #endif
 
 #endif /* __USBAUDIO_H */

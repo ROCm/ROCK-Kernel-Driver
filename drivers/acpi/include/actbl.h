@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Name: actbl.h - Table data structures defined in ACPI specification
- *       $Revision: 53 $
  *
  *****************************************************************************/
 
@@ -76,29 +75,29 @@
  */
 typedef struct  /* Root System Descriptor Pointer */
 {
-	NATIVE_CHAR             signature [8];          /* ACPI signature, contains "RSD PTR " */
+	char                    signature [8];          /* ACPI signature, contains "RSD PTR " */
 	u8                      checksum;               /* To make sum of struct == 0 */
-	NATIVE_CHAR             oem_id [6];             /* OEM identification */
+	char                    oem_id [6];             /* OEM identification */
 	u8                      revision;               /* Must be 0 for 1.0, 2 for 2.0 */
 	u32                     rsdt_physical_address;  /* 32-bit physical address of RSDT */
 	u32                     length;                 /* XSDT Length in bytes including hdr */
 	u64                     xsdt_physical_address;  /* 64-bit physical address of XSDT */
 	u8                      extended_checksum;      /* Checksum of entire table */
-	NATIVE_CHAR             reserved [3];           /* Reserved field must be 0 */
+	char                    reserved [3];           /* Reserved field must be 0 */
 
-} RSDP_DESCRIPTOR;
+} rsdp_descriptor;
 
 
 typedef struct  /* ACPI common table header */
 {
-	NATIVE_CHAR             signature [4];          /* ACPI signature (4 ASCII characters) */
+	char                    signature [4];          /* ACPI signature (4 ASCII characters) */
 	u32                     length;                 /* Length of table, in bytes, including header */
 	u8                      revision;               /* ACPI Specification minor version # */
 	u8                      checksum;               /* To make sum of entire table == 0 */
-	NATIVE_CHAR             oem_id [6];             /* OEM identification */
-	NATIVE_CHAR             oem_table_id [8];       /* OEM table identification */
+	char                    oem_id [6];             /* OEM identification */
+	char                    oem_table_id [8];       /* OEM table identification */
 	u32                     oem_revision;           /* OEM revision number */
-	NATIVE_CHAR             asl_compiler_id [4];    /* ASL compiler vendor ID */
+	char                    asl_compiler_id [4];    /* ASL compiler vendor ID */
 	u32                     asl_compiler_revision;  /* ASL compiler revision number */
 
 } acpi_table_header;
@@ -199,8 +198,8 @@ typedef struct  /* Smart Battery Description Table */
 
 typedef struct _acpi_table_support
 {
-	NATIVE_CHAR             *name;
-	NATIVE_CHAR             *signature;
+	char                    *name;
+	char                    *signature;
 	void                    **global_ptr;
 	u8                      sig_length;
 	u8                      flags;

@@ -58,5 +58,3 @@ obj-$(CONFIG_USB_SPEEDTOUCH)	+= misc/
 obj-$(CONFIG_USB_TEST)		+= misc/
 obj-$(CONFIG_USB_TIGL)		+= misc/
 obj-$(CONFIG_USB_USS720)	+= misc/
-
-include $(TOPDIR)/Rules.make

@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Module Name: psxface - Parser external interfaces
- *              $Revision: 66 $
  *
  *****************************************************************************/
 
@@ -37,14 +36,14 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_psx_execute
+ * FUNCTION:    acpi_psx_execute
  *
- * PARAMETERS:  Method_node         - A method object containing both the AML
+ * PARAMETERS:  method_node         - A method object containing both the AML
  *                                    address and length.
  *              **Params            - List of parameters to pass to method,
  *                                    terminated by NULL. Params itself may be
  *                                    NULL if no parameters are being passed.
- *              **Return_obj_desc   - Return object from execution of the
+ *              **return_obj_desc   - Return object from execution of the
  *                                    method.
  *
  * RETURN:      Status
@@ -66,7 +65,7 @@ acpi_psx_execute (
 	acpi_walk_state         *walk_state;
 
 
-	ACPI_FUNCTION_TRACE ("Psx_execute");
+	ACPI_FUNCTION_TRACE ("psx_execute");
 
 
 	/* Validate the Node and get the attached object */
@@ -113,7 +112,7 @@ acpi_psx_execute (
 	}
 
 	/*
-	 * Get a new Owner_id for objects created by this method. Namespace
+	 * Get a new owner_id for objects created by this method. Namespace
 	 * objects (such as Operation Regions) can be created during the
 	 * first pass parse.
 	 */
@@ -193,7 +192,7 @@ acpi_psx_execute (
 	 * a control exception code
 	 */
 	if (*return_obj_desc) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_PARSE, "Method returned Obj_desc=%p\n",
+		ACPI_DEBUG_PRINT ((ACPI_DB_PARSE, "Method returned obj_desc=%p\n",
 			*return_obj_desc));
 		ACPI_DUMP_STACK_ENTRY (*return_obj_desc);
 

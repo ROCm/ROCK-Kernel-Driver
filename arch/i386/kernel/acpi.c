@@ -448,10 +448,11 @@ acpi_boot_init (
 
 /* address in low memory of the wakeup routine. */
 unsigned long acpi_wakeup_address = 0;
+extern char wakeup_start, wakeup_end;
 
 extern unsigned long FASTCALL(acpi_copy_wakeup_routine(unsigned long));
 
-static void init_low_mapping(pgd_t *pgd, int pgd_ofs, int pgd_limit)
+static void init_low_mapping(pgd_t *pgd, int pgd_limit)
 {
 	int pgd_ofs = 0;
 
@@ -473,7 +474,8 @@ int acpi_save_state_mem (void)
 	panic("S3 and PAE do not like each other for now.");
 	return 1;
 #endif
-	init_low_mapping(swapper_pg_dir, 0, USER_PTRS_PER_PGD);
+	init_low_mapping(swapper_pg_dir, USER_PTRS_PER_PGD);
+	memcpy((void *) acpi_wakeup_address, &wakeup_start, &wakeup_end - &wakeup_start);
 	acpi_copy_wakeup_routine(acpi_wakeup_address);
 
 	return 0;
@@ -506,7 +508,6 @@ void acpi_restore_state_mem (void)
  */
 void __init acpi_reserve_bootmem(void)
 {
-	extern char wakeup_start, wakeup_end;
 	acpi_wakeup_address = (unsigned long)alloc_bootmem_low(PAGE_SIZE);
 	if ((&wakeup_end - &wakeup_start) > PAGE_SIZE)
 		printk(KERN_CRIT "ACPI: Wakeup code way too big, will crash on attempt to suspend\n");

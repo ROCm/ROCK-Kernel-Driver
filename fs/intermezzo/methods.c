@@ -46,7 +46,7 @@
 #include <linux/module.h>
 
 #include <linux/fsfilter.h>
-#include <linux/intermezzo_fs.h>
+#include "intermezzo_fs.h"
 
 
 int filter_print_entry = 0;

@@ -1,9 +1,5 @@
 /*
  * include/linux/writeback.h.
- *
- * These declarations are private to fs/ and mm/.
- * Declarations which are exported to filesystems do not
- * get placed here.
  */
 #ifndef WRITEBACK_H
 #define WRITEBACK_H
@@ -45,8 +41,19 @@ struct writeback_control {
 					   this for each page written */
 	int nonblocking;		/* Don't get stuck on request queues */
 	int encountered_congestion;	/* An output: a queue is full */
+	int for_kupdate;		/* A kupdate writeback */
+	int for_reclaim;		/* Invoked from the page allocator */
 };
-	
+
+/*
+ * ->writepage() return values (make these much larger than a pagesize, in
+ * case some fs is returning number-of-bytes-written from writepage)
+ */
+#define WRITEPAGE_ACTIVATE	0x80000	/* IO was not started: activate page */
+
+/*
+ * fs/fs-writeback.c
+ */	
 void writeback_inodes(struct writeback_control *wbc);
 void wake_up_inode(struct inode *inode);
 void __wait_on_inode(struct inode * inode);
@@ -81,14 +88,5 @@ int do_writepages(struct address_space *mapping, struct writeback_control *wbc);
 extern int nr_pdflush_threads;	/* Global so it can be exported to sysctl
 				   read-only. */
 
-
-/*
- * Tell the writeback paths that they are being called for a "data integrity"
- * operation such as fsync().
- */
-static inline int called_for_sync(void)
-{
-	return current->flags & PF_SYNC;
-}
 
 #endif		/* WRITEBACK_H */

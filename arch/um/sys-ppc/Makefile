@@ -76,5 +76,3 @@ fastdep:
 dep:
 
 modules:
-
-include $(TOPDIR)/Rules.make

@@ -13,5 +13,3 @@ mwave-objs := mwavedd.o smapi.o tp3780i.o 3780i.o
 
 # To compile in lots (~20 KiB) of run-time enablable printk()s for debugging:
 EXTRA_CFLAGS += -DMW_TRACE
-
-include $(TOPDIR)/Rules.make

@@ -449,9 +449,9 @@ int sysv_getattr(struct vfsmount *mnt, struct dentry *dentry, struct kstat *stat
 	return 0;
 }
 
-static int sysv_writepage(struct page *page)
+static int sysv_writepage(struct page *page, struct writeback_control *wbc)
 {
-	return block_write_full_page(page,get_block);
+	return block_write_full_page(page,get_block,wbc);
 }
 static int sysv_readpage(struct file *file, struct page *page)
 {

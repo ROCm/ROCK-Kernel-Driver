@@ -20,8 +20,6 @@ obj-$(CONFIG_PERFMON)	+= carta_random.o
 IGNORE_FLAGS_OBJS =	__divsi3.o __udivsi3.o __modsi3.o __umodsi3.o \
 			__divdi3.o __udivdi3.o __moddi3.o __umoddi3.o
 
-include $(TOPDIR)/Rules.make
-
 AFLAGS___divdi3.o	=
 AFLAGS___udivdi3.o	= -DUNSIGNED
 AFLAGS___moddi3.o	= 	     -DMODULO

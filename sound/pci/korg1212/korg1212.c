@@ -1894,7 +1894,7 @@ static void snd_korg1212_proc_read(snd_info_entry_t *entry, snd_info_buffer_t *b
         snd_iprintf(buffer, "      Irq count: %ld\n", korg1212->irqcount);
 }
 
-static void __init snd_korg1212_proc_init(korg1212_t *korg1212)
+static void __devinit snd_korg1212_proc_init(korg1212_t *korg1212)
 {
 	snd_info_entry_t *entry;
 
@@ -1920,7 +1920,7 @@ static void snd_korg1212_proc_done(korg1212_t * korg1212)
 	}
 }
 
-static int __init snd_korg1212_create(korg1212_t *korg1212)
+static int __devinit snd_korg1212_create(korg1212_t *korg1212)
 {
         struct pci_dev *pci = korg1212->pci;
         int err;

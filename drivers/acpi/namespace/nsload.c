@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Module Name: nsload - namespace loading/expanding/contracting procedures
- *              $Revision: 61 $
  *
  *****************************************************************************/
 
@@ -26,7 +25,6 @@
 
 #include "acpi.h"
 #include "acnamesp.h"
-#include "acparser.h"
 #include "acdispat.h"
 
 
@@ -38,9 +36,9 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ns_load_table
+ * FUNCTION:    acpi_ns_load_table
  *
- * PARAMETERS:  Table_desc      - Descriptor for table to be loaded
+ * PARAMETERS:  table_desc      - Descriptor for table to be loaded
  *              Node            - Owning NS node
  *
  * RETURN:      Status
@@ -57,7 +55,7 @@ acpi_ns_load_table (
 	acpi_status             status;
 
 
-	ACPI_FUNCTION_TRACE ("Ns_load_table");
+	ACPI_FUNCTION_TRACE ("ns_load_table");
 
 
 	/* Check if table contains valid AML (must be DSDT, PSDT, SSDT, etc.) */
@@ -125,9 +123,9 @@ acpi_ns_load_table (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ns_load_table_by_type
+ * FUNCTION:    acpi_ns_load_table_by_type
  *
- * PARAMETERS:  Table_type          - Id of the table type to load
+ * PARAMETERS:  table_type          - Id of the table type to load
  *
  * RETURN:      Status
  *
@@ -146,7 +144,7 @@ acpi_ns_load_table_by_type (
 	acpi_table_desc         *table_desc;
 
 
-	ACPI_FUNCTION_TRACE ("Ns_load_table_by_type");
+	ACPI_FUNCTION_TRACE ("ns_load_table_by_type");
 
 
 	status = acpi_ut_acquire_mutex (ACPI_MTX_TABLES);
@@ -253,7 +251,7 @@ unlock_and_exit:
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_load_namespace
+ * FUNCTION:    acpi_load_namespace
  *
  * PARAMETERS:  None
  *
@@ -271,7 +269,7 @@ acpi_ns_load_namespace (
 	acpi_status             status;
 
 
-	ACPI_FUNCTION_TRACE ("Acpi_load_name_space");
+	ACPI_FUNCTION_TRACE ("acpi_load_name_space");
 
 
 	/* There must be at least a DSDT installed */
@@ -305,9 +303,9 @@ acpi_ns_load_namespace (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ns_delete_subtree
+ * FUNCTION:    acpi_ns_delete_subtree
  *
- * PARAMETERS:  Start_handle        - Handle in namespace where search begins
+ * PARAMETERS:  start_handle        - Handle in namespace where search begins
  *
  * RETURNS      Status
  *
@@ -331,7 +329,7 @@ acpi_ns_delete_subtree (
 	u32                     level;
 
 
-	ACPI_FUNCTION_TRACE ("Ns_delete_subtree");
+	ACPI_FUNCTION_TRACE ("ns_delete_subtree");
 
 
 	parent_handle = start_handle;
@@ -395,7 +393,7 @@ acpi_ns_delete_subtree (
 
 /*******************************************************************************
  *
- *  FUNCTION:       Acpi_ns_unload_name_space
+ *  FUNCTION:       acpi_ns_unload_name_space
  *
  *  PARAMETERS:     Handle          - Root of namespace subtree to be deleted
  *
@@ -414,7 +412,7 @@ acpi_ns_unload_namespace (
 	acpi_status             status;
 
 
-	ACPI_FUNCTION_TRACE ("Ns_unload_name_space");
+	ACPI_FUNCTION_TRACE ("ns_unload_name_space");
 
 
 	/* Parameter validation */

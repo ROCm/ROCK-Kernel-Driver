@@ -38,7 +38,7 @@ unsigned long totalram_pages;
 unsigned long totalhigh_pages;
 int nr_swap_pages;
 int numnodes = 1;
-
+int sysctl_lower_zone_protection = 0;
 
 /*
  * Used by page_zone() to look up the address of the struct zone whose
@@ -464,12 +464,13 @@ __alloc_pages(unsigned int gfp_mask, unsigned int order,
 		struct zone *z = zones[i];
 
 		min += z->pages_low;
-		if (z->free_pages > min ||
+		if (z->free_pages >= min ||
 				(!wait && z->free_pages >= z->pages_high)) {
 			page = buffered_rmqueue(z, order, cold);
 			if (page)
 				return page;
 		}
+		min += z->pages_low * sysctl_lower_zone_protection;
 	}
 
 	/* we're somewhat low on memory, failed to find what we needed */
@@ -486,12 +487,13 @@ __alloc_pages(unsigned int gfp_mask, unsigned int order,
 		if (gfp_mask & __GFP_HIGH)
 			local_min >>= 2;
 		min += local_min;
-		if (z->free_pages > min ||
+		if (z->free_pages >= min ||
 				(!wait && z->free_pages >= z->pages_high)) {
 			page = buffered_rmqueue(z, order, cold);
 			if (page)
 				return page;
 		}
+		min += local_min * sysctl_lower_zone_protection;
 	}
 
 	/* here we're in the low on memory slow path */
@@ -506,13 +508,13 @@ rebalance:
 			if (page)
 				return page;
 		}
+		goto nopage;
 	}
 
 	/* Atomic allocations - we can't balance anything */
 	if (!wait)
 		goto nopage;
 
-	inc_page_state(allocstall);
 	current->flags |= PF_MEMALLOC;
 	try_to_free_pages(classzone, gfp_mask, order);
 	current->flags &= ~PF_MEMALLOC;
@@ -523,12 +525,13 @@ rebalance:
 		struct zone *z = zones[i];
 
 		min += z->pages_min;
-		if (z->free_pages > min ||
+		if (z->free_pages >= min ||
 				(!wait && z->free_pages >= z->pages_high)) {
 			page = buffered_rmqueue(z, order, cold);
 			if (page)
 				return page;
 		}
+		min += z->pages_low * sysctl_lower_zone_protection;
 	}
 
 	/*
@@ -693,6 +696,15 @@ unsigned int nr_free_highpages (void)
 }
 #endif
 
+#ifdef CONFIG_NUMA
+static void show_node(struct zone *zone)
+{
+	printk("Node %d ", zone->zone_pgdat->node_id);
+}
+#else
+#define show_node(zone)	do { } while (0)
+#endif
+
 /*
  * Accumulate the page_state information across all CPUs.
  * The result is unavoidably approximate - it can change
@@ -703,16 +715,21 @@ EXPORT_PER_CPU_SYMBOL(page_states);
 
 void __get_page_state(struct page_state *ret, int nr)
 {
-	int cpu;
+	int cpu = 0;
 
 	memset(ret, 0, sizeof(*ret));
-	for (cpu = 0; cpu < NR_CPUS; cpu++) {
+	while (cpu < NR_CPUS) {
 		unsigned long *in, *out, off;
 
-		if (!cpu_online(cpu))
+		if (!cpu_online(cpu)) {
+			cpu++;
 			continue;
+		}
 
 		in = (unsigned long *)&per_cpu(page_states, cpu);
+		cpu++;
+		if (cpu < NR_CPUS && cpu_online(cpu))
+			prefetch(&per_cpu(page_states, cpu));
 		out = (unsigned long *)ret;
 		for (off = 0; off < nr; off++)
 			*out++ += *in++;
@@ -792,67 +809,90 @@ void si_meminfo_node(struct sysinfo *val, int nid)
  */
 void show_free_areas(void)
 {
-	pg_data_t *pgdat;
 	struct page_state ps;
-	int type;
+	int cpu, temperature;
 	unsigned long active;
 	unsigned long inactive;
+	struct zone *zone;
+
+	for_each_zone(zone) {
+		show_node(zone);
+		printk("%s per-cpu:", zone->name);
+
+		if (!zone->present_pages) {
+			printk(" empty\n");
+			continue;
+		} else
+			printk("\n");
+
+		for (cpu = 0; cpu < NR_CPUS; ++cpu) {
+			struct per_cpu_pageset *pageset = zone->pageset + cpu;
+			for (temperature = 0; temperature < 2; temperature++)
+				printk("cpu %d %s: low %d, high %d, batch %d\n",
+					cpu,
+					temperature ? "cold" : "hot",
+					pageset->pcp[temperature].low,
+					pageset->pcp[temperature].high,
+					pageset->pcp[temperature].batch);
+		}
+	}
 
 	get_page_state(&ps);
 	get_zone_counts(&active, &inactive);
 
-	printk("Free pages:      %6dkB (%6dkB HighMem)\n",
+	printk("\nFree pages: %11ukB (%ukB HighMem)\n",
 		K(nr_free_pages()),
 		K(nr_free_highpages()));
 
-	for (pgdat = pgdat_list; pgdat; pgdat = pgdat->pgdat_next)
-		for (type = 0; type < MAX_NR_ZONES; ++type) {
-			struct zone *zone = &pgdat->node_zones[type];
-			printk("Zone:%s"
-				" freepages:%6lukB"
-				" min:%6lukB"
-				" low:%6lukB"
-				" high:%6lukB"
-				" active:%6lukB"
-				" inactive:%6lukB"
-				"\n",
-				zone->name,
-				K(zone->free_pages),
-				K(zone->pages_min),
-				K(zone->pages_low),
-				K(zone->pages_high),
-				K(zone->nr_active),
-				K(zone->nr_inactive)
-				);
-		}
-
-	printk("( Active:%lu inactive:%lu dirty:%lu writeback:%lu free:%u )\n",
+	printk("Active:%lu inactive:%lu dirty:%lu writeback:%lu free:%u\n",
 		active,
 		inactive,
 		ps.nr_dirty,
 		ps.nr_writeback,
 		nr_free_pages());
 
-	for (pgdat = pgdat_list; pgdat; pgdat = pgdat->pgdat_next)
-		for (type = 0; type < MAX_NR_ZONES; type++) {
-			struct list_head *elem;
-			struct zone *zone = &pgdat->node_zones[type];
- 			unsigned long nr, flags, order, total = 0;
+	for_each_zone(zone) {
+		show_node(zone);
+		printk("%s"
+			" free:%lukB"
+			" min:%lukB"
+			" low:%lukB"
+			" high:%lukB"
+			" active:%lukB"
+			" inactive:%lukB"
+			"\n",
+			zone->name,
+			K(zone->free_pages),
+			K(zone->pages_min),
+			K(zone->pages_low),
+			K(zone->pages_high),
+			K(zone->nr_active),
+			K(zone->nr_inactive)
+			);
+	}
 
-			if (!zone->present_pages)
-				continue;
+	for_each_zone(zone) {
+		struct list_head *elem;
+ 		unsigned long nr, flags, order, total = 0;
 
-			spin_lock_irqsave(&zone->lock, flags);
-			for (order = 0; order < MAX_ORDER; order++) {
-				nr = 0;
-				list_for_each(elem, &zone->free_area[order].free_list)
-					++nr;
-				total += nr << order;
-				printk("%lu*%lukB ", nr, K(1UL) << order);
-			}
-			spin_unlock_irqrestore(&zone->lock, flags);
-			printk("= %lukB)\n", K(total));
+		show_node(zone);
+		printk("%s: ", zone->name);
+		if (!zone->present_pages) {
+			printk("empty\n");
+			continue;
 		}
+
+		spin_lock_irqsave(&zone->lock, flags);
+		for (order = 0; order < MAX_ORDER; order++) {
+			nr = 0;
+			list_for_each(elem, &zone->free_area[order].free_list)
+				++nr;
+			total += nr << order;
+			printk("%lu*%lukB ", nr, K(1UL) << order);
+		}
+		spin_unlock_irqrestore(&zone->lock, flags);
+		printk("= %lukB\n", K(total));
+	}
 
 	show_swap_cache_info();
 }
@@ -961,7 +1001,7 @@ static inline unsigned long wait_table_size(unsigned long pages)
 	 */
 	size = min(size, 4096UL);
 
-	return size;
+	return max(size, 4UL);
 }
 
 /*
@@ -1321,6 +1361,7 @@ static char *vmstat_text[] = {
 	"kswapd_steal",
 	"pageoutrun",
 	"allocstall",
+	"pgrotated",
 };
 
 static void *vmstat_start(struct seq_file *m, loff_t *pos)

@@ -27,5 +27,3 @@ obj-y                           := mipsIRQ.o pci.o reset.o display.o init.o \
 obj-$(CONFIG_REMOTE_DEBUG)      += gdb_hook.o
 
 EXTRA_AFLAGS := $(CFLAGS)
-
-include $(TOPDIR)/Rules.make

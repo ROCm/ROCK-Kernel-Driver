@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Module Name: dsobject - Dispatcher object management routines
- *              $Revision: 111 $
  *
  *****************************************************************************/
 
@@ -38,11 +37,11 @@
 #ifndef ACPI_NO_METHOD_EXECUTION
 /*****************************************************************************
  *
- * FUNCTION:    Acpi_ds_build_internal_object
+ * FUNCTION:    acpi_ds_build_internal_object
  *
- * PARAMETERS:  Walk_state      - Current walk state
+ * PARAMETERS:  walk_state      - Current walk state
  *              Op              - Parser object to be translated
- *              Obj_desc_ptr    - Where the ACPI internal object is returned
+ *              obj_desc_ptr    - Where the ACPI internal object is returned
  *
  * RETURN:      Status
  *
@@ -61,7 +60,7 @@ acpi_ds_build_internal_object (
 	acpi_status             status;
 
 
-	ACPI_FUNCTION_TRACE ("Ds_build_internal_object");
+	ACPI_FUNCTION_TRACE ("ds_build_internal_object");
 
 
 	*obj_desc_ptr = NULL;
@@ -104,12 +103,12 @@ acpi_ds_build_internal_object (
 
 /*****************************************************************************
  *
- * FUNCTION:    Acpi_ds_build_internal_buffer_obj
+ * FUNCTION:    acpi_ds_build_internal_buffer_obj
  *
- * PARAMETERS:  Walk_state      - Current walk state
+ * PARAMETERS:  walk_state      - Current walk state
  *              Op              - Parser object to be translated
- *              Buffer_length   - Length of the buffer
- *              Obj_desc_ptr    - Where the ACPI internal object is returned
+ *              buffer_length   - Length of the buffer
+ *              obj_desc_ptr    - Where the ACPI internal object is returned
  *
  * RETURN:      Status
  *
@@ -131,7 +130,7 @@ acpi_ds_build_internal_buffer_obj (
 	u32                     byte_list_length = 0;
 
 
-	ACPI_FUNCTION_TRACE ("Ds_build_internal_buffer_obj");
+	ACPI_FUNCTION_TRACE ("ds_build_internal_buffer_obj");
 
 
 	obj_desc = *obj_desc_ptr;
@@ -152,9 +151,9 @@ acpi_ds_build_internal_buffer_obj (
 	}
 
 	/*
-	 * Second arg is the buffer data (optional) Byte_list can be either
+	 * Second arg is the buffer data (optional) byte_list can be either
 	 * individual bytes or a string initializer.  In either case, a
-	 * Byte_list appears in the AML.
+	 * byte_list appears in the AML.
 	 */
 	arg = op->common.value.arg;         /* skip first arg */
 
@@ -187,21 +186,21 @@ acpi_ds_build_internal_buffer_obj (
 	if (obj_desc->buffer.length == 0) {
 		obj_desc->buffer.pointer = NULL;
 		ACPI_REPORT_WARNING (("Buffer created with zero length in AML\n"));
-		return_ACPI_STATUS (AE_OK);
 	}
+	else {
+		obj_desc->buffer.pointer = ACPI_MEM_CALLOCATE (
+				   obj_desc->buffer.length);
+		if (!obj_desc->buffer.pointer) {
+			acpi_ut_delete_object_desc (obj_desc);
+			return_ACPI_STATUS (AE_NO_MEMORY);
+		}
 
-	obj_desc->buffer.pointer = ACPI_MEM_CALLOCATE (
-			   obj_desc->buffer.length);
-	if (!obj_desc->buffer.pointer) {
-		acpi_ut_delete_object_desc (obj_desc);
-		return_ACPI_STATUS (AE_NO_MEMORY);
-	}
+		/* Initialize buffer from the byte_list (if present) */
 
-	/* Initialize buffer from the Byte_list (if present) */
-
-	if (byte_list) {
-		ACPI_MEMCPY (obj_desc->buffer.pointer, byte_list->named.data,
-				  byte_list_length);
+		if (byte_list) {
+			ACPI_MEMCPY (obj_desc->buffer.pointer, byte_list->named.data,
+					  byte_list_length);
+		}
 	}
 
 	obj_desc->buffer.flags |= AOPOBJ_DATA_VALID;
@@ -212,12 +211,12 @@ acpi_ds_build_internal_buffer_obj (
 
 /*****************************************************************************
  *
- * FUNCTION:    Acpi_ds_build_internal_package_obj
+ * FUNCTION:    acpi_ds_build_internal_package_obj
  *
- * PARAMETERS:  Walk_state      - Current walk state
+ * PARAMETERS:  walk_state      - Current walk state
  *              Op              - Parser object to be translated
- *              Package_length  - Number of elements in the package
- *              Obj_desc_ptr    - Where the ACPI internal object is returned
+ *              package_length  - Number of elements in the package
+ *              obj_desc_ptr    - Where the ACPI internal object is returned
  *
  * RETURN:      Status
  *
@@ -241,7 +240,7 @@ acpi_ds_build_internal_package_obj (
 	u32                     i;
 
 
-	ACPI_FUNCTION_TRACE ("Ds_build_internal_package_obj");
+	ACPI_FUNCTION_TRACE ("ds_build_internal_package_obj");
 
 
 	/* Find the parent of a possibly nested package */
@@ -295,7 +294,7 @@ acpi_ds_build_internal_package_obj (
 	 * that the list is always null terminated.
 	 */
 	obj_desc->package.elements = ACPI_MEM_CALLOCATE (
-			 ((ACPI_SIZE) obj_desc->package.count + 1) * sizeof (void *));
+			 ((acpi_size) obj_desc->package.count + 1) * sizeof (void *));
 
 	if (!obj_desc->package.elements) {
 		acpi_ut_delete_object_desc (obj_desc);
@@ -331,9 +330,9 @@ acpi_ds_build_internal_package_obj (
 
 /*****************************************************************************
  *
- * FUNCTION:    Acpi_ds_create_node
+ * FUNCTION:    acpi_ds_create_node
  *
- * PARAMETERS:  Walk_state      - Current walk state
+ * PARAMETERS:  walk_state      - Current walk state
  *              Node            - NS Node to be initialized
  *              Op              - Parser object to be translated
  *
@@ -353,7 +352,7 @@ acpi_ds_create_node (
 	acpi_operand_object     *obj_desc;
 
 
-	ACPI_FUNCTION_TRACE_PTR ("Ds_create_node", op);
+	ACPI_FUNCTION_TRACE_PTR ("ds_create_node", op);
 
 
 	/*
@@ -397,12 +396,12 @@ acpi_ds_create_node (
 
 /*****************************************************************************
  *
- * FUNCTION:    Acpi_ds_init_object_from_op
+ * FUNCTION:    acpi_ds_init_object_from_op
  *
- * PARAMETERS:  Walk_state      - Current walk state
+ * PARAMETERS:  walk_state      - Current walk state
  *              Op              - Parser op used to init the internal object
  *              Opcode          - AML opcode associated with the object
- *              Ret_obj_desc    - Namespace object to be initialized
+ *              ret_obj_desc    - Namespace object to be initialized
  *
  * RETURN:      Status
  *
@@ -424,7 +423,7 @@ acpi_ds_init_object_from_op (
 	acpi_status             status = AE_OK;
 
 
-	ACPI_FUNCTION_TRACE ("Ds_init_object_from_op");
+	ACPI_FUNCTION_TRACE ("ds_init_object_from_op");
 
 
 	obj_desc = *ret_obj_desc;
@@ -441,7 +440,7 @@ acpi_ds_init_object_from_op (
 	case ACPI_TYPE_BUFFER:
 
 		/*
-		 * Defer evaluation of Buffer Term_arg operand
+		 * Defer evaluation of Buffer term_arg operand
 		 */
 		obj_desc->buffer.node     = (acpi_namespace_node *) walk_state->operands[0];
 		obj_desc->buffer.aml_start = op->named.data;
@@ -452,7 +451,7 @@ acpi_ds_init_object_from_op (
 	case ACPI_TYPE_PACKAGE:
 
 		/*
-		 * Defer evaluation of Package Term_arg operand
+		 * Defer evaluation of Package term_arg operand
 		 */
 		obj_desc->package.node     = (acpi_namespace_node *) walk_state->operands[0];
 		obj_desc->package.aml_start = op->named.data;
@@ -469,7 +468,7 @@ acpi_ds_init_object_from_op (
 			 * All constants are integers.
 			 * We mark the integer with a flag that indicates that it started life
 			 * as a constant -- so that stores to constants will perform as expected (noop).
-			 * (Zero_op is used as a placeholder for optional target operands.)
+			 * (zero_op is used as a placeholder for optional target operands.)
 			 */
 			obj_desc->common.flags = AOPOBJ_AML_CONSTANT;
 

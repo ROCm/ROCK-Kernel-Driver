@@ -691,7 +691,8 @@ count_page_state(
 
 STATIC int
 linvfs_writepage(
-	struct page		*page)
+	struct page		*page,
+	struct writeback_control *wbc)
 {
 	int			error;
 	int			need_trans = 1;

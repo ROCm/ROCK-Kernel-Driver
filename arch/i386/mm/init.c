@@ -72,7 +72,7 @@ static pmd_t * __init one_md_table_init(pgd_t *pgd)
 static pte_t * __init one_page_table_init(pmd_t *pmd)
 {
 	pte_t *page_table = (pte_t *) alloc_bootmem_low_pages(PAGE_SIZE);
-	set_pmd(pmd, __pmd(__pa(page_table) | _KERNPG_TABLE));
+	set_pmd(pmd, __pmd(__pa(page_table) | _PAGE_TABLE));
 	if (page_table != pte_offset_kernel(pmd, 0))
 		BUG();	
 
@@ -134,8 +134,10 @@ static void __init kernel_physical_mapping_init(pgd_t *pgd_base)
 	pgd = pgd_base + pgd_ofs;
 	pfn = 0;
 
-	for (; pgd_ofs < PTRS_PER_PGD && pfn < max_low_pfn; pgd++, pgd_ofs++) {
+	for (; pgd_ofs < PTRS_PER_PGD; pgd++, pgd_ofs++) {
 		pmd = one_md_table_init(pgd);
+		if (pfn >= max_low_pfn)
+			continue;
 		for (pmd_ofs = 0; pmd_ofs < PTRS_PER_PMD && pfn < max_low_pfn; pmd++, pmd_ofs++) {
 			/* Map with big pages if possible, otherwise create normal page tables. */
 			if (cpu_has_pse) {

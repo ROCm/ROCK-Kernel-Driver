@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Module Name: tbxfroot - Find the root ACPI table (RSDT)
- *              $Revision: 66 $
  *
  *****************************************************************************/
 
@@ -34,11 +33,11 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_tb_find_table
+ * FUNCTION:    acpi_tb_find_table
  *
  * PARAMETERS:  Signature           - String with ACPI table signature
- *              Oem_id              - String with the table OEM ID
- *              Oem_table_id        - String with the OEM Table ID.
+ *              oem_id              - String with the table OEM ID
+ *              oem_table_id        - String with the OEM Table ID.
  *
  * RETURN:      Status
  *
@@ -49,16 +48,16 @@
 
 acpi_status
 acpi_tb_find_table (
-	NATIVE_CHAR             *signature,
-	NATIVE_CHAR             *oem_id,
-	NATIVE_CHAR             *oem_table_id,
+	char                    *signature,
+	char                    *oem_id,
+	char                    *oem_table_id,
 	acpi_table_header       **table_ptr)
 {
 	acpi_status             status;
 	acpi_table_header       *table;
 
 
-	ACPI_FUNCTION_TRACE ("Tb_find_table");
+	ACPI_FUNCTION_TRACE ("tb_find_table");
 
 
 	/* Validate string lengths */
@@ -77,7 +76,7 @@ acpi_tb_find_table (
 		return_ACPI_STATUS (status);
 	}
 
-	/* Check Oem_id and Oem_table_id */
+	/* Check oem_id and oem_table_id */
 
 	if ((oem_id[0]     && ACPI_STRCMP (oem_id, table->oem_id)) ||
 		(oem_table_id[0] && ACPI_STRCMP (oem_table_id, table->oem_table_id))) {
@@ -91,22 +90,22 @@ acpi_tb_find_table (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_get_firmware_table
+ * FUNCTION:    acpi_get_firmware_table
  *
  * PARAMETERS:  Signature       - Any ACPI table signature
  *              Instance        - the non zero instance of the table, allows
  *                                support for multiple tables of the same type
  *              Flags           - Physical/Virtual support
- *              Ret_buffer      - pointer to a structure containing a buffer to
+ *              ret_buffer      - pointer to a structure containing a buffer to
  *                                receive the table
  *
  * RETURN:      Status
  *
  * DESCRIPTION: This function is called to get an ACPI table.  The caller
- *              supplies an Out_buffer large enough to contain the entire ACPI
+ *              supplies an out_buffer large enough to contain the entire ACPI
  *              table.  Upon completion
- *              the Out_buffer->Length field will indicate the number of bytes
- *              copied into the Out_buffer->Buf_ptr buffer. This table will be
+ *              the out_buffer->Length field will indicate the number of bytes
+ *              copied into the out_buffer->buf_ptr buffer. This table will be
  *              a complete table including the header.
  *
  ******************************************************************************/
@@ -118,8 +117,8 @@ acpi_get_firmware_table (
 	u32                     flags,
 	acpi_table_header       **table_pointer)
 {
-	ACPI_POINTER            rsdp_address;
-	ACPI_POINTER            address;
+	acpi_pointer            rsdp_address;
+	acpi_pointer            address;
 	acpi_status             status;
 	acpi_table_header       header;
 	acpi_table_desc         table_info;
@@ -129,7 +128,7 @@ acpi_get_firmware_table (
 	u32                     j;
 
 
-	ACPI_FUNCTION_TRACE ("Acpi_get_firmware_table");
+	ACPI_FUNCTION_TRACE ("acpi_get_firmware_table");
 
 
 	/*
@@ -160,7 +159,7 @@ acpi_get_firmware_table (
 		/* Map and validate the RSDP */
 
 		if ((flags & ACPI_MEMORY_MODE) == ACPI_LOGICAL_ADDRESSING) {
-			status = acpi_os_map_memory (rsdp_address.pointer.physical, sizeof (RSDP_DESCRIPTOR),
+			status = acpi_os_map_memory (rsdp_address.pointer.physical, sizeof (rsdp_descriptor),
 					  (void **) &acpi_gbl_RSDP);
 			if (ACPI_FAILURE (status)) {
 				return_ACPI_STATUS (status);
@@ -173,7 +172,7 @@ acpi_get_firmware_table (
 		/*
 		 *  The signature and checksum must both be correct
 		 */
-		if (ACPI_STRNCMP ((NATIVE_CHAR *) acpi_gbl_RSDP, RSDP_SIG, sizeof (RSDP_SIG)-1) != 0) {
+		if (ACPI_STRNCMP ((char *) acpi_gbl_RSDP, RSDP_SIG, sizeof (RSDP_SIG)-1) != 0) {
 			/* Nope, BAD Signature */
 
 			return_ACPI_STATUS (AE_BAD_SIGNATURE);
@@ -196,7 +195,7 @@ acpi_get_firmware_table (
 		ACPI_HIDWORD (address.pointer.value),
 		ACPI_LODWORD (address.pointer.value)));
 
-	/* Insert Processor_mode flags */
+	/* Insert processor_mode flags */
 
 	address.pointer_type |= flags;
 
@@ -227,8 +226,8 @@ acpi_get_firmware_table (
 			address.pointer.value = ((RSDT_DESCRIPTOR *) rsdt_info.pointer)->table_offset_entry[i];
 		}
 		else {
-			address.pointer.value = ACPI_GET_ADDRESS (
-				((xsdt_descriptor *) rsdt_info.pointer)->table_offset_entry[i]);
+			address.pointer.value =
+				((xsdt_descriptor *) rsdt_info.pointer)->table_offset_entry[i];
 		}
 
 		/* Get the table header */
@@ -264,7 +263,7 @@ acpi_get_firmware_table (
 
 
 cleanup:
-	acpi_os_unmap_memory (rsdt_info.pointer, (ACPI_SIZE) rsdt_info.pointer->length);
+	acpi_os_unmap_memory (rsdt_info.pointer, (acpi_size) rsdt_info.pointer->length);
 	return_ACPI_STATUS (status);
 }
 
@@ -275,9 +274,9 @@ cleanup:
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_find_root_pointer
+ * FUNCTION:    acpi_find_root_pointer
  *
- * PARAMETERS:  **Rsdp_address          - Where to place the RSDP address
+ * PARAMETERS:  **rsdp_address          - Where to place the RSDP address
  *              Flags                   - Logical/Physical addressing
  *
  * RETURN:      Status, Physical address of the RSDP
@@ -289,13 +288,13 @@ cleanup:
 acpi_status
 acpi_find_root_pointer (
 	u32                     flags,
-	ACPI_POINTER            *rsdp_address)
+	acpi_pointer            *rsdp_address)
 {
 	acpi_table_desc         table_info;
 	acpi_status             status;
 
 
-	ACPI_FUNCTION_TRACE ("Acpi_find_root_pointer");
+	ACPI_FUNCTION_TRACE ("acpi_find_root_pointer");
 
 
 	/* Get the RSDP */
@@ -315,9 +314,9 @@ acpi_find_root_pointer (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_tb_scan_memory_for_rsdp
+ * FUNCTION:    acpi_tb_scan_memory_for_rsdp
  *
- * PARAMETERS:  Start_address       - Starting pointer for search
+ * PARAMETERS:  start_address       - Starting pointer for search
  *              Length              - Maximum length to search
  *
  * RETURN:      Pointer to the RSDP if found, otherwise NULL.
@@ -335,7 +334,7 @@ acpi_tb_scan_memory_for_rsdp (
 	u8                      *mem_rover;
 
 
-	ACPI_FUNCTION_TRACE ("Tb_scan_memory_for_rsdp");
+	ACPI_FUNCTION_TRACE ("tb_scan_memory_for_rsdp");
 
 
 	/* Search from given start addr for the requested length  */
@@ -346,7 +345,7 @@ acpi_tb_scan_memory_for_rsdp (
 
 		/* The signature and checksum must both be correct */
 
-		if (ACPI_STRNCMP ((NATIVE_CHAR *) mem_rover,
+		if (ACPI_STRNCMP ((char *) mem_rover,
 				RSDP_SIG, sizeof (RSDP_SIG)-1) == 0 &&
 			acpi_tb_checksum (mem_rover, ACPI_RSDP_CHECKSUM_LENGTH) == 0) {
 			/* If so, we have found the RSDP */
@@ -366,18 +365,18 @@ acpi_tb_scan_memory_for_rsdp (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_tb_find_rsdp
+ * FUNCTION:    acpi_tb_find_rsdp
  *
- * PARAMETERS:  *Table_info             - Where the table info is returned
+ * PARAMETERS:  *table_info             - Where the table info is returned
  *              Flags                   - Current memory mode (logical vs.
  *                                        physical addressing)
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Search lower 1_mbyte of memory for the root system descriptor
+ * DESCRIPTION: search lower 1_mbyte of memory for the root system descriptor
  *              pointer structure.  If it is found, set *RSDP to point to it.
  *
- *              NOTE: The RSDP must be either in the first 1_k of the Extended
+ *              NOTE: The RSDp must be either in the first 1_k of the Extended
  *              BIOS Data Area or between E0000 and FFFFF (ACPI 1.0 section
  *              5.2.2; assertion #421).
  *
@@ -394,7 +393,7 @@ acpi_tb_find_rsdp (
 	acpi_status             status = AE_OK;
 
 
-	ACPI_FUNCTION_TRACE ("Tb_find_rsdp");
+	ACPI_FUNCTION_TRACE ("tb_find_rsdp");
 
 
 	/*

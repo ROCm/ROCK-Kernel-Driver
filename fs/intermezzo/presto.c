@@ -37,8 +37,8 @@
 #include <linux/string.h>
 #include <linux/smp_lock.h>
 
-#include <linux/intermezzo_fs.h>
-#include <linux/intermezzo_psdev.h>
+#include "intermezzo_fs.h"
+#include "intermezzo_psdev.h"
 
 int presto_walk(const char *name, struct nameidata *nd)
 {
@@ -627,8 +627,10 @@ int presto_put_permit(struct inode * inode)
 void presto_getversion(struct presto_version * presto_version,
                        struct inode * inode)
 {
-        presto_version->pv_mtime = (__u64)inode->i_mtime;
-        presto_version->pv_ctime = (__u64)inode->i_ctime;
+        presto_version->pv_mtime_sec = inode->i_mtime.tv_sec;
+        presto_version->pv_mtime_nsec = inode->i_mtime.tv_nsec;
+        presto_version->pv_ctime_sec = inode->i_ctime.tv_sec;
+        presto_version->pv_ctime_nsec = inode->i_ctime.tv_nsec;
         presto_version->pv_size  = (__u64)inode->i_size;
 }
 

@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Module Name: tbgetall - Get all required ACPI tables
- *              $Revision: 3 $
  *
  *****************************************************************************/
 
@@ -34,10 +33,10 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_tb_get_primary_table
+ * FUNCTION:    acpi_tb_get_primary_table
  *
  * PARAMETERS:  Address             - Physical address of table to retrieve
- *              *Table_info         - Where the table info is returned
+ *              *table_info         - Where the table info is returned
  *
  * RETURN:      Status
  *
@@ -47,14 +46,14 @@
 
 acpi_status
 acpi_tb_get_primary_table (
-	ACPI_POINTER            *address,
+	acpi_pointer            *address,
 	acpi_table_desc         *table_info)
 {
 	acpi_status             status;
 	acpi_table_header       header;
 
 
-	ACPI_FUNCTION_TRACE ("Tb_get_primary_table");
+	ACPI_FUNCTION_TRACE ("tb_get_primary_table");
 
 
 	/* Ignore a NULL address in the RSDT */
@@ -71,7 +70,7 @@ acpi_tb_get_primary_table (
 		return_ACPI_STATUS (status);
 	}
 
-	/* Clear the Table_info */
+	/* Clear the table_info */
 
 	ACPI_MEMSET (table_info, 0, sizeof (acpi_table_desc));
 
@@ -101,10 +100,10 @@ acpi_tb_get_primary_table (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_tb_get_secondary_table
+ * FUNCTION:    acpi_tb_get_secondary_table
  *
  * PARAMETERS:  Address             - Physical address of table to retrieve
- *              *Table_info         - Where the table info is returned
+ *              *table_info         - Where the table info is returned
  *
  * RETURN:      Status
  *
@@ -114,7 +113,7 @@ acpi_tb_get_primary_table (
 
 acpi_status
 acpi_tb_get_secondary_table (
-	ACPI_POINTER            *address,
+	acpi_pointer            *address,
 	acpi_string             signature,
 	acpi_table_desc         *table_info)
 {
@@ -122,7 +121,7 @@ acpi_tb_get_secondary_table (
 	acpi_table_header       header;
 
 
-	ACPI_FUNCTION_TRACE_STR ("Tb_get_secondary_table", signature);
+	ACPI_FUNCTION_TRACE_STR ("tb_get_secondary_table", signature);
 
 
 	/* Get the header in order to match the signature */
@@ -166,7 +165,7 @@ acpi_tb_get_secondary_table (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_tb_get_required_tables
+ * FUNCTION:    acpi_tb_get_required_tables
  *
  * PARAMETERS:  None
  *
@@ -190,10 +189,10 @@ acpi_tb_get_required_tables (
 	acpi_status             status = AE_OK;
 	u32                     i;
 	acpi_table_desc         table_info;
-	ACPI_POINTER            address;
+	acpi_pointer            address;
 
 
-	ACPI_FUNCTION_TRACE ("Tb_get_required_tables");
+	ACPI_FUNCTION_TRACE ("tb_get_required_tables");
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "%d ACPI tables in RSDT\n",
 		acpi_gbl_rsdt_table_count));
@@ -212,7 +211,7 @@ acpi_tb_get_required_tables (
 	for (i = 0; i < acpi_gbl_rsdt_table_count; i++) {
 		/* Get the table addresss from the common internal XSDT */
 
-		address.pointer.value = ACPI_GET_ADDRESS (acpi_gbl_XSDT->table_offset_entry[i]);
+		address.pointer.value = acpi_gbl_XSDT->table_offset_entry[i];
 
 		/*
 		 * Get the tables needed by this subsystem (FADT and any SSDTs).
@@ -247,7 +246,7 @@ acpi_tb_get_required_tables (
 	/*
 	 * Get the FACS (Pointed to by the FADT)
 	 */
-	address.pointer.value = ACPI_GET_ADDRESS (acpi_gbl_FADT->Xfirmware_ctrl);
+	address.pointer.value = acpi_gbl_FADT->xfirmware_ctrl;
 
 	status = acpi_tb_get_secondary_table (&address, FACS_SIG, &table_info);
 	if (ACPI_FAILURE (status)) {
@@ -268,7 +267,7 @@ acpi_tb_get_required_tables (
 	/*
 	 * Get/install the DSDT (Pointed to by the FADT)
 	 */
-	address.pointer.value = ACPI_GET_ADDRESS (acpi_gbl_FADT->Xdsdt);
+	address.pointer.value = acpi_gbl_FADT->Xdsdt;
 
 	status = acpi_tb_get_secondary_table (&address, DSDT_SIG, &table_info);
 	if (ACPI_FAILURE (status)) {

@@ -19,7 +19,7 @@
 #define EX(x,y...)			\
 	99: x,##y;			\
 	.section __ex_table,"a";	\
-	.gprel32 99b;			\
+	.long 99b - .;			\
 	lda $31, $exception-99b($0); 	\
 	.previous
 
@@ -31,7 +31,7 @@
 	.globl __strncpy_from_user
 	.ent __strncpy_from_user
 	.frame $30, 0, $26
-	.prologue 1
+	.prologue 0
 
 	.align 3
 $aligned:
@@ -100,8 +100,6 @@ $a_eoc:
 	/*** The Function Entry Point ***/
 	.align 3
 __strncpy_from_user:
-	ldgp	$29, 0($27)	# we do exceptions -- we need the gp.
-
 	mov	a0, v0		# save the string start
 	beq	a2, $zerolength
 

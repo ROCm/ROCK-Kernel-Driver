@@ -51,6 +51,7 @@ enum chipset_type {
 	INTEL_I850,
 	INTEL_I860,
 	INTEL_460GX,
+	INTEL_I7505,
 	VIA_GENERIC,
 	VIA_VP3,
 	VIA_MVP3,

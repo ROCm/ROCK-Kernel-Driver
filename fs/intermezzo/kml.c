@@ -5,10 +5,10 @@
 #include <linux/module.h>
 #include <asm/uaccess.h>
 
-#include <linux/intermezzo_fs.h>
-#include <linux/intermezzo_upcall.h>
-#include <linux/intermezzo_psdev.h>
-#include <linux/intermezzo_kml.h>
+#include "intermezzo_fs.h"
+#include "intermezzo_upcall.h"
+#include "intermezzo_psdev.h"
+#include "intermezzo_kml.h"
 
 static struct presto_file_set * kml_getfset (char *path)
 {

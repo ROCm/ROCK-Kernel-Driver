@@ -16,9 +16,12 @@ config USB_AUDIO
 	  The module will be called audio.o. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
+comment "USB Bluetooth TTY can only be used with disabled Bluetooth subsystem"
+	depends on USB && BT
+
 config USB_BLUETOOTH_TTY
 	tristate "USB Bluetooth TTY support"
-	depends on USB
+	depends on USB && BT=n
 	---help---
 	  This driver implements a nonstandard tty interface to a Bluetooth
 	  device that can be used only by specialized Bluetooth HCI software.

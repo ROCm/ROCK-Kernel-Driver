@@ -225,7 +225,7 @@ void clear_inode(struct inode *inode)
 		BUG();
 	wait_on_inode(inode);
 	DQUOT_DROP(inode);
-	if (inode->i_sb && inode->i_sb->s_op && inode->i_sb->s_op->clear_inode)
+	if (inode->i_sb && inode->i_sb->s_op->clear_inode)
 		inode->i_sb->s_op->clear_inode(inode);
 	if (inode->i_bdev)
 		bd_forget(inode);
@@ -937,7 +937,7 @@ void generic_delete_inode(struct inode *inode)
 
 	security_inode_delete(inode);
 
-	if (op && op->delete_inode) {
+	if (op->delete_inode) {
 		void (*delete)(struct inode *) = op->delete_inode;
 		if (!is_bad_inode(inode))
 			DQUOT_INIT(inode);

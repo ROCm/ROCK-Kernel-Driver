@@ -12,8 +12,5 @@ obj-$(CONFIG_SND_EMU10K1) += snd-util-mem.o
 obj-$(CONFIG_SND_TRIDENT) += snd-util-mem.o
 ifeq ($(subst m,y,$(CONFIG_SND_SEQUENCER)),y)
   obj-$(CONFIG_SND_SBAWE) += snd-util-mem.o
+  obj-$(CONFIG_SND) += emux/
 endif
-
-obj-$(CONFIG_SND) += emux/
-
-include $(TOPDIR)/Rules.make

@@ -2,7 +2,6 @@
 /******************************************************************************
  *
  * Module Name: exoparg6 - AML execution - opcodes with 6 arguments
- *              $Revision: 11 $
  *
  *****************************************************************************/
 
@@ -60,11 +59,11 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_do_match
+ * FUNCTION:    acpi_ex_do_match
  *
- * PARAMETERS:  Match_op        - The AML match operand
- *              Package_value   - Value from the target package
- *              Match_value     - Value to be matched
+ * PARAMETERS:  match_op        - The AML match operand
+ *              package_value   - Value from the target package
+ *              match_value     - Value to be matched
  *
  * RETURN:      TRUE if the match is successful, FALSE otherwise
  *
@@ -137,9 +136,9 @@ acpi_ex_do_match (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_opcode_6A_0T_1R
+ * FUNCTION:    acpi_ex_opcode_6A_0T_1R
  *
- * PARAMETERS:  Walk_state          - Current walk state
+ * PARAMETERS:  walk_state          - Current walk state
  *
  * RETURN:      Status
  *
@@ -158,14 +157,14 @@ acpi_ex_opcode_6A_0T_1R (
 	acpi_operand_object     *this_element;
 
 
-	ACPI_FUNCTION_TRACE_STR ("Ex_opcode_6A_0T_1R", acpi_ps_get_opcode_name (walk_state->opcode));
+	ACPI_FUNCTION_TRACE_STR ("ex_opcode_6A_0T_1R", acpi_ps_get_opcode_name (walk_state->opcode));
 
 
 	switch (walk_state->opcode) {
 	case AML_MATCH_OP:
 		/*
-		 * Match (Search_package[0], Match_op1[1], Match_object1[2],
-		 *                          Match_op2[3], Match_object2[4], Start_index[5])
+		 * Match (search_package[0], match_op1[1], match_object1[2],
+		 *                          match_op2[3], match_object2[4], start_index[5])
 		 */
 
 		/* Validate match comparison sub-opcodes */
@@ -201,7 +200,7 @@ acpi_ex_opcode_6A_0T_1R (
 		 * and the next should be examined.
 		 *
 		 * Upon finding a match, the loop will terminate via "break" at
-		 * the bottom.  If it terminates "normally", Match_value will be -1
+		 * the bottom.  If it terminates "normally", match_value will be -1
 		 * (its initial value) indicating that no match was found.  When
 		 * returned as a Number, this will produce the Ones value as specified.
 		 */
@@ -247,7 +246,7 @@ acpi_ex_opcode_6A_0T_1R (
 
 	default:
 
-		ACPI_REPORT_ERROR (("Acpi_ex_opcode_3A_0T_0R: Unknown opcode %X\n",
+		ACPI_REPORT_ERROR (("acpi_ex_opcode_3A_0T_0R: Unknown opcode %X\n",
 				walk_state->opcode));
 		status = AE_AML_BAD_OPCODE;
 		goto cleanup;

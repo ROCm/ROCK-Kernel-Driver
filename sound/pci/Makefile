@@ -35,5 +35,3 @@ obj-$(CONFIG_SND_SONICVIBES) += snd-sonicvibes.o
 obj-$(CONFIG_SND_VIA82XX) += snd-via82xx.o
 
 obj-$(CONFIG_SND) += ac97/ ali5451/ cs46xx/ emu10k1/ korg1212/ nm256/ rme9652/ trident/ ymfpci/ ice1712/
-
-include $(TOPDIR)/Rules.make

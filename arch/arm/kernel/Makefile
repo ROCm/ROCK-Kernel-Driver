@@ -40,8 +40,6 @@ endif
 
 EXTRA_TARGETS := $(head-y) init_task.o
 
-include $(TOPDIR)/Rules.make
-
 # Spell out some dependencies that `make dep' doesn't spot
 $(obj)/entry-armv.o: 	$(obj)/entry-header.S include/asm-arm/constants.h
 $(obj)/entry-armo.o: 	$(obj)/entry-header.S include/asm-arm/constants.h

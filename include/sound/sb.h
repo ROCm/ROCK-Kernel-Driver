@@ -225,7 +225,6 @@ typedef struct _snd_sb sb_t;
 #define SB_DT019X_MIC_DEV	0x6a
 #define SB_DT019X_SPKR_DEV	0x6a
 #define SB_DT019X_LINE_DEV	0x6e
-#define SB_DT019X_OUTPUT_SW1	0x3c
 #define SB_DT019X_OUTPUT_SW2	0x4c
 #define SB_DT019X_CAPTURE_SW	0x6c
 
@@ -234,6 +233,14 @@ typedef struct _snd_sb sb_t;
 #define SB_DT019X_CAP_LINE	0x06
 #define SB_DT019X_CAP_SYNTH	0x07
 #define SB_DT019X_CAP_MAIN	0x07
+
+#define SB_ALS4000_MONO_IO_CTRL	0x4b
+#define SB_ALS4000_MIC_IN_GAIN	0x4d
+#define SB_ALS4000_FMDAC	0x4f
+#define SB_ALS4000_3D_SND_FX	0x50
+#define SB_ALS4000_3D_TIME_DELAY	0x51
+#define SB_ALS4000_3D_AUTO_MUTE	0x52
+#define SB_ALS4000_QSOUND	0xdb
 
 /* IRQ setting bitmap */
 #define SB_IRQSETUP_IRQ9	0x01

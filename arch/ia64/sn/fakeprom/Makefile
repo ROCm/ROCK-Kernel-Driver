@@ -18,7 +18,3 @@ fprom: $(OBJ)
 
 clean:
 	rm -f *.o fprom
-
-
-include $(TOPDIR)/Rules.make
-

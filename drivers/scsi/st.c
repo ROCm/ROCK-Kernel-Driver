@@ -12,13 +12,13 @@
    Copyright 1992 - 2002 Kai Makisara
    email Kai.Makisara@metla.fi
 
-   Last modified: Tue Oct 15 22:01:04 2002 by makisara
+   Last modified: Sat Dec 14 14:25:09 2002 by makisara
    Some small formal changes - aeb, 950809
 
    Last modified: 18-JAN-1998 Richard Gooch <rgooch@atnf.csiro.au> Devfs support
  */
 
-static char *verstr = "20021015";
+static char *verstr = "20021214";
 
 #include <linux/module.h>
 
@@ -923,8 +923,9 @@ static int check_tape(Scsi_Tape *STp, struct file *filp)
 
                 DEBC(printk(ST_DEB_MSG "%s: Write protected\n", name));
 
-		if ((st_flags & O_ACCMODE) == O_WRONLY ||
-		    (st_flags & O_ACCMODE) == O_RDWR) {
+		if (do_wait &&
+		    ((st_flags & O_ACCMODE) == O_WRONLY ||
+		     (st_flags & O_ACCMODE) == O_RDWR)) {
 			retval = (-EROFS);
 			goto err_out;
 		}
@@ -991,8 +992,10 @@ static int st_open(struct inode *inode, struct file *filp)
 		return (-EBUSY);
 	}
 
-	if(!scsi_device_get(STp->device))
+	if(scsi_device_get(STp->device)) {
+		write_unlock(&st_dev_arr_lock);
 		return (-ENXIO);
+	}
 	STp->in_use = 1;
 	write_unlock(&st_dev_arr_lock);
 	STp->rew_at_close = STp->autorew_dev = (minor(inode->i_rdev) & 0x80) == 0;

@@ -728,9 +728,13 @@ static int storage_probe(struct usb_interface *intf,
 			USB_ENDPOINT_NUMBER_MASK;
 		ss->ep_out = ep_out->bEndpointAddress & 
 			USB_ENDPOINT_NUMBER_MASK;
-		ss->ep_int = ep_int->bEndpointAddress & 
-			USB_ENDPOINT_NUMBER_MASK;
-		ss->ep_bInterval = ep_int->bInterval;
+		if (ep_int) {
+			ss->ep_int = ep_int->bEndpointAddress & 
+				USB_ENDPOINT_NUMBER_MASK;
+			ss->ep_bInterval = ep_int->bInterval;
+		}
+		else
+			ss->ep_int = ss->ep_bInterval = 0;
 
 		/* allocate the URB, the usb_ctrlrequest, and the IRQ URB */
 		if (usb_stor_allocate_urbs(ss))
@@ -771,9 +775,13 @@ static int storage_probe(struct usb_interface *intf,
 			USB_ENDPOINT_NUMBER_MASK;
 		ss->ep_out = ep_out->bEndpointAddress & 
 			USB_ENDPOINT_NUMBER_MASK;
-		ss->ep_int = ep_int->bEndpointAddress & 
-			USB_ENDPOINT_NUMBER_MASK;
-		ss->ep_bInterval = ep_int->bInterval;
+		if (ep_int) {
+			ss->ep_int = ep_int->bEndpointAddress & 
+				USB_ENDPOINT_NUMBER_MASK;
+			ss->ep_bInterval = ep_int->bInterval;
+		}
+		else
+			ss->ep_int = ss->ep_bInterval = 0;
 
 		/* establish the connection to the new device */
 		ss->ifnum = ifnum;

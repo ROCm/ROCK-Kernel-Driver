@@ -5,9 +5,27 @@
 
 #include <qlistview.h>
 
-class ConfigLineEdit;
+class ConfigList;
 class ConfigItem;
-class ConfigView;
+class ConfigLineEdit;
+class ConfigMainWindow;
+
+class ConfigView : public QVBox {
+	Q_OBJECT
+	typedef class QVBox Parent;
+public:
+	ConfigView(QWidget* parent, ConfigMainWindow* cview);
+	~ConfigView(void);
+	static void updateList(ConfigItem* item);
+	static void updateListAll(void);
+
+public:
+	ConfigList* list;
+	ConfigLineEdit* lineEdit;
+
+	static ConfigView* viewList;
+	ConfigView* nextView;
+};
 
 enum colIdx {
 	promptColIdx, nameColIdx, noColIdx, modColIdx, yesColIdx, dataColIdx, colNr
@@ -20,12 +38,15 @@ class ConfigList : public QListView {
 	Q_OBJECT
 	typedef class QListView Parent;
 public:
-	ConfigList(QWidget* p, ConfigView* cview);
+	ConfigList(ConfigView* p, ConfigMainWindow* cview);
 	void reinit(void);
+	ConfigView* parent(void) const
+	{
+		return (ConfigView*)Parent::parent();
+	}
 
-	ConfigLineEdit* lineEdit;
 protected:
-	ConfigView* cview;
+	ConfigMainWindow* cview;
 
 	void keyPressEvent(QKeyEvent *e);
 	void contentsMousePressEvent(QMouseEvent *e);
@@ -43,7 +64,6 @@ public slots:
 signals:
 	void menuSelected(struct menu *menu);
 	void parentSelected(void);
-	void symbolChanged(ConfigItem* item);
 	void gotFocus(void);
 
 public:
@@ -100,13 +120,13 @@ private:
 class ConfigItem : public QListViewItem {
 	typedef class QListViewItem Parent;
 public:
-	ConfigItem(QListView *parent, ConfigItem *after, struct menu *m)
-	: Parent(parent, after), menu(m)
+	ConfigItem(QListView *parent, ConfigItem *after, struct menu *m, bool v)
+	: Parent(parent, after), menu(m), visible(v)
 	{
 		init();
 	}
-	ConfigItem(ConfigItem *parent, ConfigItem *after, struct menu *m)
-	: Parent(parent, after), menu(m)
+	ConfigItem(ConfigItem *parent, ConfigItem *after, struct menu *m, bool v)
+	: Parent(parent, after), menu(m), visible(v)
 	{
 		init();
 	}
@@ -116,6 +136,7 @@ public:
 	void okRename(int col);
 #endif
 	void updateMenu(void);
+	bool updateNeeded(void);
 	ConfigList* listView() const
 	{
 		return (ConfigList*)Parent::listView();
@@ -146,31 +167,33 @@ public:
 	}
 	void paintCell(QPainter* p, const QColorGroup& cg, int column, int width, int align);
 
+	ConfigItem* nextItem;
 	struct menu *menu;
 	bool visible;
-	bool doInit;
 };
 
 class ConfigLineEdit : public QLineEdit {
 	Q_OBJECT
 	typedef class QLineEdit Parent;
 public:
-	ConfigLineEdit(QWidget * parent)
-	: QLineEdit(parent)
+	ConfigLineEdit(ConfigView* parent)
+	: Parent(parent)
 	{ }
+	ConfigView* parent(void) const
+	{
+		return (ConfigView*)Parent::parent();
+	}
 	void show(ConfigItem *i);
 	void keyPressEvent(QKeyEvent *e);
-signals:
-	void lineChanged(ConfigItem *item);
 
 public:
 	ConfigItem *item;
 };
 
-class ConfigView : public QMainWindow {
+class ConfigMainWindow : public QMainWindow {
 	Q_OBJECT
 public:
-	ConfigView(void);
+	ConfigMainWindow(void);
 public slots:
 	void setHelp(QListViewItem* item);
 	void changeMenu(struct menu *);
@@ -187,6 +210,8 @@ public slots:
 	void setShowRange(bool);
 	void setShowName(bool);
 	void setShowData(bool);
+	void showIntro(void);
+	void showAbout(void);
 
 protected:
 	void closeEvent(QCloseEvent *e);

@@ -188,8 +188,6 @@ static void usblp_dump(struct usblp *usblp) {
 
 extern devfs_handle_t usb_devfs_handle;			/* /dev/usb dir. */
 
-static struct usblp *usblp_table[USBLP_MINORS];
-
 /* Quirks: various printer quirks are handled by this table & its flags. */
 
 struct quirk_printer_struct {
@@ -325,17 +323,22 @@ static int usblp_check_status(struct usblp *usblp, int err)
 
 static int usblp_open(struct inode *inode, struct file *file)
 {
-	int minor = minor(inode->i_rdev) - USBLP_MINOR_BASE;
+	int minor = minor(inode->i_rdev);
 	struct usblp *usblp;
+	struct usb_interface *intf;
 	int retval;
 
 	if (minor < 0 || minor >= USBLP_MINORS)
 		return -ENODEV;
 
 	lock_kernel();
-	usblp  = usblp_table[minor];
 
 	retval = -ENODEV;
+	intf = usb_find_interface(&usblp_driver, mk_kdev(USB_MAJOR,minor));
+	if (!intf) {
+		goto out;
+	}
+	usblp = dev_get_drvdata (&intf->dev);
 	if (!usblp || !usblp->dev)
 		goto out;
 
@@ -382,7 +385,6 @@ out:
 static void usblp_cleanup (struct usblp *usblp)
 {
 	devfs_unregister (usblp->devfs);
-	usblp_table [usblp->minor] = NULL;
 	usb_deregister_dev (1, usblp->minor);
 	info("usblp%d: removed", usblp->minor);
 
@@ -905,14 +907,11 @@ static int usblp_probe(struct usb_interface *intf,
 	usblp_check_status(usblp, 0);
 #endif
 
-	/* add a table entry so the device works when advertised */
-	usblp_table[usblp->minor] = usblp;
-
 	/* If we have devfs, create with perms=660. */
 	sprintf(name, "lp%d", usblp->minor);
 	usblp->devfs = devfs_register(usb_devfs_handle, name,
 				      DEVFS_FL_DEFAULT, USB_MAJOR,
-				      USBLP_MINOR_BASE + usblp->minor,
+				      usblp->minor,
 				      S_IFCHR | S_IRUSR | S_IWUSR | S_IRGRP |
 				      S_IWGRP, &usblp_fops, NULL);
 
@@ -925,6 +924,10 @@ static int usblp_probe(struct usb_interface *intf,
 		usblp->dev->descriptor.idProduct);
 
 	dev_set_drvdata (&intf->dev, usblp);
+
+	/* add device id so the device works when advertised */
+	intf->kdev = mk_kdev(USB_MAJOR,usblp->minor);
+
 	return 0;
 
 abort_minor:
@@ -1108,6 +1111,9 @@ static int usblp_cache_device_id_string(struct usblp *usblp)
 static void usblp_disconnect(struct usb_interface *intf)
 {
 	struct usblp *usblp = dev_get_drvdata (&intf->dev);
+
+	/* remove device id to disable open() */
+	intf->kdev = NODEV;
 
 	if (!usblp || !usblp->dev) {
 		err("bogus disconnect");

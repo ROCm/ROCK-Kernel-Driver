@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Module Name: tbget - ACPI Table get* routines
- *              $Revision: 81 $
  *
  *****************************************************************************/
 
@@ -34,11 +33,11 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_tb_get_table
+ * FUNCTION:    acpi_tb_get_table
  *
  * PARAMETERS:  Address             - Address of table to retrieve.  Can be
  *                                    Logical or Physical
- *              Table_info          - Where table info is returned
+ *              table_info          - Where table info is returned
  *
  * RETURN:      None
  *
@@ -48,14 +47,14 @@
 
 acpi_status
 acpi_tb_get_table (
-	ACPI_POINTER            *address,
+	acpi_pointer            *address,
 	acpi_table_desc         *table_info)
 {
 	acpi_status             status;
 	acpi_table_header       header;
 
 
-	ACPI_FUNCTION_TRACE ("Tb_get_table");
+	ACPI_FUNCTION_TRACE ("tb_get_table");
 
 
 	/*
@@ -81,11 +80,11 @@ acpi_tb_get_table (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_tb_get_table_header
+ * FUNCTION:    acpi_tb_get_table_header
  *
  * PARAMETERS:  Address             - Address of table to retrieve.  Can be
  *                                    Logical or Physical
- *              Return_header       - Where the table header is returned
+ *              return_header       - Where the table header is returned
  *
  * RETURN:      Status
  *
@@ -98,19 +97,19 @@ acpi_tb_get_table (
 
 acpi_status
 acpi_tb_get_table_header (
-	ACPI_POINTER            *address,
+	acpi_pointer            *address,
 	acpi_table_header       *return_header)
 {
 	acpi_status             status = AE_OK;
 	acpi_table_header       *header = NULL;
 
 
-	ACPI_FUNCTION_TRACE ("Tb_get_table_header");
+	ACPI_FUNCTION_TRACE ("tb_get_table_header");
 
 
 	/*
 	 * Flags contains the current processor mode (Virtual or Physical addressing)
-	 * The Pointer_type is either Logical or Physical
+	 * The pointer_type is either Logical or Physical
 	 */
 	switch (address->pointer_type) {
 	case ACPI_PHYSMODE_PHYSPTR:
@@ -156,12 +155,12 @@ acpi_tb_get_table_header (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_tb_get_table_body
+ * FUNCTION:    acpi_tb_get_table_body
  *
  * PARAMETERS:  Address             - Address of table to retrieve.  Can be
  *                                    Logical or Physical
  *              Header              - Header of the table to retrieve
- *              Table_info          - Where the table info is returned
+ *              table_info          - Where the table info is returned
  *
  * RETURN:      Status
  *
@@ -176,14 +175,14 @@ acpi_tb_get_table_header (
 
 acpi_status
 acpi_tb_get_table_body (
-	ACPI_POINTER            *address,
+	acpi_pointer            *address,
 	acpi_table_header       *header,
 	acpi_table_desc         *table_info)
 {
 	acpi_status             status;
 
 
-	ACPI_FUNCTION_TRACE ("Tb_get_table_body");
+	ACPI_FUNCTION_TRACE ("tb_get_table_body");
 
 
 	if (!table_info || !address) {
@@ -209,10 +208,10 @@ acpi_tb_get_table_body (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_tb_table_override
+ * FUNCTION:    acpi_tb_table_override
  *
  * PARAMETERS:  Header              - Pointer to table header
- *              Table_info          - Return info if table is overridden
+ *              table_info          - Return info if table is overridden
  *
  * RETURN:      None
  *
@@ -228,15 +227,15 @@ acpi_tb_table_override (
 {
 	acpi_table_header       *new_table;
 	acpi_status             status;
-	ACPI_POINTER            address;
+	acpi_pointer            address;
 
 
-	ACPI_FUNCTION_TRACE ("Tb_table_override");
+	ACPI_FUNCTION_TRACE ("tb_table_override");
 
 
 	/*
 	 * The OSL will examine the header and decide whether to override this
-	 * table.  If it decides to override, a table will be returned in New_table,
+	 * table.  If it decides to override, a table will be returned in new_table,
 	 * which we will then copy.
 	 */
 	status = acpi_os_table_override (header, &new_table);
@@ -279,12 +278,12 @@ acpi_tb_table_override (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_tb_get_this_table
+ * FUNCTION:    acpi_tb_get_this_table
  *
  * PARAMETERS:  Address             - Address of table to retrieve.  Can be
  *                                    Logical or Physical
  *              Header              - Header of the table to retrieve
- *              Table_info          - Where the table info is returned
+ *              table_info          - Where the table info is returned
  *
  * RETURN:      Status
  *
@@ -297,7 +296,7 @@ acpi_tb_table_override (
 
 acpi_status
 acpi_tb_get_this_table (
-	ACPI_POINTER            *address,
+	acpi_pointer            *address,
 	acpi_table_header       *header,
 	acpi_table_desc         *table_info)
 {
@@ -306,12 +305,12 @@ acpi_tb_get_this_table (
 	acpi_status             status = AE_OK;
 
 
-	ACPI_FUNCTION_TRACE ("Tb_get_this_table");
+	ACPI_FUNCTION_TRACE ("tb_get_this_table");
 
 
 	/*
 	 * Flags contains the current processor mode (Virtual or Physical addressing)
-	 * The Pointer_type is either Logical or Physical
+	 * The pointer_type is either Logical or Physical
 	 */
 	switch (address->pointer_type) {
 	case ACPI_PHYSMODE_PHYSPTR:
@@ -342,7 +341,7 @@ acpi_tb_get_this_table (
 		 * Just map the table's physical memory
 		 * into our address space.
 		 */
-		status = acpi_os_map_memory (address->pointer.physical, (ACPI_SIZE) header->length,
+		status = acpi_os_map_memory (address->pointer.physical, (acpi_size) header->length,
 				  (void **) &full_table);
 		if (ACPI_FAILURE (status)) {
 			ACPI_REPORT_ERROR (("Could not map memory for table [%4.4s] at %8.8X%8.8X for length %X\n",
@@ -384,7 +383,7 @@ acpi_tb_get_this_table (
 	/* Return values */
 
 	table_info->pointer     = full_table;
-	table_info->length      = (ACPI_SIZE) header->length;
+	table_info->length      = (acpi_size) header->length;
 	table_info->allocation  = allocation;
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
@@ -399,11 +398,11 @@ acpi_tb_get_this_table (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_tb_get_table_ptr
+ * FUNCTION:    acpi_tb_get_table_ptr
  *
- * PARAMETERS:  Table_type      - one of the defined table types
+ * PARAMETERS:  table_type      - one of the defined table types
  *              Instance        - Which table of this type
- *              Table_ptr_loc   - pointer to location to place the pointer for
+ *              table_ptr_loc   - pointer to location to place the pointer for
  *                                return
  *
  * RETURN:      Status
@@ -422,7 +421,7 @@ acpi_tb_get_table_ptr (
 	u32                     i;
 
 
-	ACPI_FUNCTION_TRACE ("Tb_get_table_ptr");
+	ACPI_FUNCTION_TRACE ("tb_get_table_ptr");
 
 
 	if (!acpi_gbl_DSDT) {
@@ -455,7 +454,7 @@ acpi_tb_get_table_ptr (
 
 	/* Walk the list to get the desired table
 	 * Since the if (Instance == 1) check above checked for the
-	 * first table, setting Table_desc equal to the .Next member
+	 * first table, setting table_desc equal to the .Next member
 	 * is actually pointing to the second table.  Therefore, we
 	 * need to walk from the 2nd table until we reach the Instance
 	 * that the user is looking for and return its table pointer.

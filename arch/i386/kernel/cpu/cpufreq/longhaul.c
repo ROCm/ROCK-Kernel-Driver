@@ -779,7 +779,6 @@ static int __init longhaul_init (void)
 	driver->policy = (struct cpufreq_policy *) (driver + 1);
 
 #ifdef CONFIG_CPU_FREQ_24_API
-	driver->cpu_min_freq[0] = (unsigned int) lowest_speed;
 	driver->cpu_cur_freq[0] = currentspeed;
 #endif
 
@@ -790,7 +789,9 @@ static int __init longhaul_init (void)
 	driver->policy[0].min = (unsigned int) lowest_speed;
 	driver->policy[0].max = (unsigned int) highest_speed;
 	driver->policy[0].policy = CPUFREQ_POLICY_PERFORMANCE;
-	driver->policy[0].max_cpu_freq = (unsigned int) highest_speed;
+	driver->policy[0].cpuinfo.min_freq = (unsigned int) lowest_speed;
+	driver->policy[0].cpuinfo.max_freq = (unsigned int) highest_speed;
+	driver->policy[0].cpuinfo.transition_latency = CPUFREQ_ETERNAL;
 
 	longhaul_driver = driver;
 

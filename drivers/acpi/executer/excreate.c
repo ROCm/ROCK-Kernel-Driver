@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Module Name: excreate - Named object creation
- *              $Revision: 97 $
  *
  *****************************************************************************/
 
@@ -39,9 +38,9 @@
 #ifndef ACPI_NO_METHOD_EXECUTION
 /*****************************************************************************
  *
- * FUNCTION:    Acpi_ex_create_alias
+ * FUNCTION:    acpi_ex_create_alias
  *
- * PARAMETERS:  Walk_state           - Current state, contains operands
+ * PARAMETERS:  walk_state           - Current state, contains operands
  *
  * RETURN:      Status
  *
@@ -58,7 +57,7 @@ acpi_ex_create_alias (
 	acpi_status             status = AE_OK;
 
 
-	ACPI_FUNCTION_TRACE ("Ex_create_alias");
+	ACPI_FUNCTION_TRACE ("ex_create_alias");
 
 
 	/* Get the source/alias operands (both namespace nodes) */
@@ -123,9 +122,9 @@ acpi_ex_create_alias (
 
 /*****************************************************************************
  *
- * FUNCTION:    Acpi_ex_create_event
+ * FUNCTION:    acpi_ex_create_event
  *
- * PARAMETERS:  Walk_state          - Current state
+ * PARAMETERS:  walk_state          - Current state
  *
  * RETURN:      Status
  *
@@ -141,7 +140,7 @@ acpi_ex_create_event (
 	acpi_operand_object     *obj_desc;
 
 
-	ACPI_FUNCTION_TRACE ("Ex_create_event");
+	ACPI_FUNCTION_TRACE ("ex_create_event");
 
 
 	obj_desc = acpi_ut_create_internal_object (ACPI_TYPE_EVENT);
@@ -177,15 +176,15 @@ cleanup:
 
 /*****************************************************************************
  *
- * FUNCTION:    Acpi_ex_create_mutex
+ * FUNCTION:    acpi_ex_create_mutex
  *
- * PARAMETERS:  Walk_state          - Current state
+ * PARAMETERS:  walk_state          - Current state
  *
  * RETURN:      Status
  *
  * DESCRIPTION: Create a new mutex object
  *
- *              Mutex (Name[0], Sync_level[1])
+ *              Mutex (Name[0], sync_level[1])
  *
  ****************************************************************************/
 
@@ -197,7 +196,7 @@ acpi_ex_create_mutex (
 	acpi_operand_object     *obj_desc;
 
 
-	ACPI_FUNCTION_TRACE_PTR ("Ex_create_mutex", ACPI_WALK_OPERANDS);
+	ACPI_FUNCTION_TRACE_PTR ("ex_create_mutex", ACPI_WALK_OPERANDS);
 
 
 	/* Create the new mutex object */
@@ -239,12 +238,12 @@ cleanup:
 
 /*****************************************************************************
  *
- * FUNCTION:    Acpi_ex_create_region
+ * FUNCTION:    acpi_ex_create_region
  *
- * PARAMETERS:  Aml_start           - Pointer to the region declaration AML
- *              Aml_length          - Max length of the declaration AML
+ * PARAMETERS:  aml_start           - Pointer to the region declaration AML
+ *              aml_length          - Max length of the declaration AML
  *              Operands            - List of operands for the opcode
- *              Walk_state          - Current state
+ *              walk_state          - Current state
  *
  * RETURN:      Status
  *
@@ -265,7 +264,7 @@ acpi_ex_create_region (
 	acpi_operand_object     *region_obj2;
 
 
-	ACPI_FUNCTION_TRACE ("Ex_create_region");
+	ACPI_FUNCTION_TRACE ("ex_create_region");
 
 
 	/* Get the Node from the object stack  */
@@ -286,7 +285,7 @@ acpi_ex_create_region (
 	 */
 	if ((region_space >= ACPI_NUM_PREDEFINED_REGIONS) &&
 		(region_space < ACPI_USER_REGION_BEGIN)) {
-		ACPI_REPORT_ERROR (("Invalid Address_space type %X\n", region_space));
+		ACPI_REPORT_ERROR (("Invalid address_space type %X\n", region_space));
 		return_ACPI_STATUS (AE_AML_INVALID_SPACE_ID);
 	}
 
@@ -333,13 +332,13 @@ cleanup:
 
 /*****************************************************************************
  *
- * FUNCTION:    Acpi_ex_create_table_region
+ * FUNCTION:    acpi_ex_create_table_region
  *
- * PARAMETERS:  Walk_state          - Current state
+ * PARAMETERS:  walk_state          - Current state
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Create a new Data_table_region object
+ * DESCRIPTION: Create a new data_table_region object
  *
  ****************************************************************************/
 
@@ -355,7 +354,7 @@ acpi_ex_create_table_region (
 	acpi_operand_object     *region_obj2;
 
 
-	ACPI_FUNCTION_TRACE ("Ex_create_table_region");
+	ACPI_FUNCTION_TRACE ("ex_create_table_region");
 
 	/* Get the Node from the object stack  */
 
@@ -392,7 +391,7 @@ acpi_ex_create_table_region (
 	/* Init the region from the operands */
 
 	obj_desc->region.space_id = REGION_DATA_TABLE;
-	obj_desc->region.address = (ACPI_PHYSICAL_ADDRESS) ACPI_TO_INTEGER (table);
+	obj_desc->region.address = (acpi_physical_address) ACPI_TO_INTEGER (table);
 	obj_desc->region.length = table->length;
 	obj_desc->region.node   = node;
 	obj_desc->region.flags  = AOPOBJ_DATA_VALID;
@@ -428,15 +427,15 @@ cleanup:
 
 /*****************************************************************************
  *
- * FUNCTION:    Acpi_ex_create_processor
+ * FUNCTION:    acpi_ex_create_processor
  *
- * PARAMETERS:  Walk_state          - Current state
+ * PARAMETERS:  walk_state          - Current state
  *
  * RETURN:      Status
  *
  * DESCRIPTION: Create a new processor object and populate the fields
  *
- *              Processor (Name[0], Cpu_iD[1], Pblock_addr[2], Pblock_length[3])
+ *              Processor (Name[0], cpu_iD[1], pblock_addr[2], pblock_length[3])
  *
  ****************************************************************************/
 
@@ -449,7 +448,7 @@ acpi_ex_create_processor (
 	acpi_status             status;
 
 
-	ACPI_FUNCTION_TRACE_PTR ("Ex_create_processor", walk_state);
+	ACPI_FUNCTION_TRACE_PTR ("ex_create_processor", walk_state);
 
 
 	/* Create the processor object */
@@ -463,7 +462,7 @@ acpi_ex_create_processor (
 	 * Initialize the processor object from the operands
 	 */
 	obj_desc->processor.proc_id = (u8)          operand[1]->integer.value;
-	obj_desc->processor.address = (ACPI_IO_ADDRESS) operand[2]->integer.value;
+	obj_desc->processor.address = (acpi_io_address) operand[2]->integer.value;
 	obj_desc->processor.length = (u8)           operand[3]->integer.value;
 
 	/* Install the processor object in the parent Node */
@@ -481,15 +480,15 @@ acpi_ex_create_processor (
 
 /*****************************************************************************
  *
- * FUNCTION:    Acpi_ex_create_power_resource
+ * FUNCTION:    acpi_ex_create_power_resource
  *
- * PARAMETERS:  Walk_state          - Current state
+ * PARAMETERS:  walk_state          - Current state
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Create a new Power_resource object and populate the fields
+ * DESCRIPTION: Create a new power_resource object and populate the fields
  *
- *              Power_resource (Name[0], System_level[1], Resource_order[2])
+ *              power_resource (Name[0], system_level[1], resource_order[2])
  *
  ****************************************************************************/
 
@@ -502,7 +501,7 @@ acpi_ex_create_power_resource (
 	acpi_operand_object     *obj_desc;
 
 
-	ACPI_FUNCTION_TRACE_PTR ("Ex_create_power_resource", walk_state);
+	ACPI_FUNCTION_TRACE_PTR ("ex_create_power_resource", walk_state);
 
 
 	/* Create the power resource object */
@@ -533,11 +532,11 @@ acpi_ex_create_power_resource (
 
 /*****************************************************************************
  *
- * FUNCTION:    Acpi_ex_create_method
+ * FUNCTION:    acpi_ex_create_method
  *
- * PARAMETERS:  Aml_start       - First byte of the method's AML
- *              Aml_length      - AML byte count for this method
- *              Walk_state      - Current state
+ * PARAMETERS:  aml_start       - First byte of the method's AML
+ *              aml_length      - AML byte count for this method
+ *              walk_state      - Current state
  *
  * RETURN:      Status
  *
@@ -557,7 +556,7 @@ acpi_ex_create_method (
 	u8                      method_flags;
 
 
-	ACPI_FUNCTION_TRACE_PTR ("Ex_create_method", walk_state);
+	ACPI_FUNCTION_TRACE_PTR ("ex_create_method", walk_state);
 
 
 	/* Create a new method object */
@@ -586,7 +585,7 @@ acpi_ex_create_method (
 	if (method_flags & METHOD_FLAGS_SERIALIZED) {
 		/*
 		 * ACPI 1.0: Concurrency = 1
-		 * ACPI 2.0: Concurrency = (Sync_level (in method declaration) + 1)
+		 * ACPI 2.0: Concurrency = (sync_level (in method declaration) + 1)
 		 */
 		obj_desc->method.concurrency = (u8)
 				  (((method_flags & METHOD_FLAGS_SYNCH_LEVEL) >> 4) + 1);

@@ -13,6 +13,4 @@ obj-y    := bindec.o binstr.o decbin.o do_func.o gen_except.o get_op.o \
 EXTRA_AFLAGS := -traditional
 EXTRA_LDFLAGS := -x
 
-include $(TOPDIR)/Rules.make
-
 $(OS_OBJS): fpsp.h

@@ -10,5 +10,3 @@ obj-n			:=
 obj-			:=
 
 export-objs		:= 
-
-include $(TOPDIR)/Rules.make

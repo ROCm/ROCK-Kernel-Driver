@@ -182,6 +182,8 @@ static struct isapnp_card_id snd_sb16_pnpids[] __devinitdata = {
 	/* Sound Blaster 16 PnP */
 	ISAPNP_SB16('C','T','L',0x0024,0x0031),
 	/* Sound Blaster 16 PnP */
+	ISAPNP_SB16('C','T','L',0x0025,0x0031),
+	/* Sound Blaster 16 PnP */
 	ISAPNP_SB16('C','T','L',0x0026,0x0031),
 	/* Sound Blaster 16 PnP */
 	ISAPNP_SB16('C','T','L',0x0027,0x0031),
@@ -664,7 +666,7 @@ static int __init alsa_card_sb16_setup(char *str)
 {
 	static unsigned __initdata nr_dev = 0;
 	int __attribute__ ((__unused__)) pnp = INT_MAX;
-	int __attribute__ ((__unused__)) csp = INT_MAX;
+	int __attribute__ ((__unused__)) xcsp = INT_MAX;
 
 	if (nr_dev >= SNDRV_CARDS)
 		return 0;
@@ -681,7 +683,7 @@ static int __init alsa_card_sb16_setup(char *str)
 	       get_option(&str,&mic_agc[nr_dev]) == 2
 #ifdef CONFIG_SND_SB16_CSP
 	       &&
-	       get_option(&str,&csp[nr_dev]) == 2
+	       get_option(&str,&xcsp) == 2
 #endif
 #ifdef SNDRV_SBAWE_EMU8000
 	       &&
@@ -694,8 +696,8 @@ static int __init alsa_card_sb16_setup(char *str)
 		isapnp[nr_dev] = pnp;
 #endif
 #ifdef CONFIG_SND_SB16_CSP
-	if (csp != INT_MAX)
-		csp[nr_dev] = csp;
+	if (xcsp != INT_MAX)
+		csp[nr_dev] = xcsp;
 #endif
 	nr_dev++;
 	return 1;

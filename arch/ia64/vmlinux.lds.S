@@ -102,6 +102,10 @@ SECTIONS
   .init.setup : AT(ADDR(.init.setup) - PAGE_OFFSET)
         { *(.init.setup) }
   __setup_end = .;
+  __start___param = .;
+  __param : AT(ADDR(__param) - PAGE_OFFSET)
+        { *(__param) }
+  __stop___param = .;
   __initcall_start = .;
   .initcall.init : AT(ADDR(.initcall.init) - PAGE_OFFSET)
 	{

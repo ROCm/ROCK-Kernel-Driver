@@ -446,8 +446,8 @@ int pwc_set_video_mode(struct pwc_device *pdev, int width, int height, int frame
 			Info("Video mode %s@%d fps is only supported with the decompressor module (pwcx).\n", size2name[size], frames);
 		else {
 			Err("Failed to set video mode %s@%d fps; return code = %d\n", size2name[size], frames, ret);
-			return ret;
 		}
+		return ret;
 	}
 	pdev->view.x = width;
 	pdev->view.y = height;
@@ -1534,7 +1534,15 @@ int pwc_ioctl(struct pwc_device *pdev, unsigned int cmd, void *arg)
 		*dynnoise = ret;
 		break;
 	}
-	
+
+	case VIDIOCPWCGREALSIZE:
+	{
+		struct pwc_imagesize *size = arg;
+		
+		size->width = pdev->image.x;
+		size->height = pdev->image.y;
+		break;
+	}	
 
 	default:
 		ret = -ENOIOCTLCMD;

@@ -1,7 +1,6 @@
 /*******************************************************************************
  *
  * Module Name: utmath - Integer math support routines
- *              $Revision: 11 $
  *
  ******************************************************************************/
 
@@ -39,12 +38,12 @@
 #ifndef ACPI_USE_NATIVE_DIVIDE
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ut_short_divide
+ * FUNCTION:    acpi_ut_short_divide
  *
- * PARAMETERS:  In_dividend         - Pointer to the dividend
+ * PARAMETERS:  in_dividend         - Pointer to the dividend
  *              Divisor             - 32-bit divisor
- *              Out_quotient        - Pointer to where the quotient is returned
- *              Out_remainder       - Pointer to where the remainder is returned
+ *              out_quotient        - Pointer to where the quotient is returned
+ *              out_remainder       - Pointer to where the remainder is returned
  *
  * RETURN:      Status (Checks for divide-by-zero)
  *
@@ -66,14 +65,14 @@ acpi_ut_short_divide (
 	u32                     remainder32;
 
 
-	ACPI_FUNCTION_TRACE ("Ut_short_divide");
+	ACPI_FUNCTION_TRACE ("ut_short_divide");
 
 	dividend.full = *in_dividend;
 
 	/* Always check for a zero divisor */
 
 	if (divisor == 0) {
-		ACPI_REPORT_ERROR (("Acpi_ut_short_divide: Divide by zero\n"));
+		ACPI_REPORT_ERROR (("acpi_ut_short_divide: Divide by zero\n"));
 		return_ACPI_STATUS (AE_AML_DIVIDE_BY_ZERO);
 	}
 
@@ -101,12 +100,12 @@ acpi_ut_short_divide (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ut_divide
+ * FUNCTION:    acpi_ut_divide
  *
- * PARAMETERS:  In_dividend         - Pointer to the dividend
- *              In_divisor          - Pointer to the divisor
- *              Out_quotient        - Pointer to where the quotient is returned
- *              Out_remainder       - Pointer to where the remainder is returned
+ * PARAMETERS:  in_dividend         - Pointer to the dividend
+ *              in_divisor          - Pointer to the divisor
+ *              out_quotient        - Pointer to where the quotient is returned
+ *              out_remainder       - Pointer to where the remainder is returned
  *
  * RETURN:      Status (Checks for divide-by-zero)
  *
@@ -132,13 +131,13 @@ acpi_ut_divide (
 	uint64_overlay          partial3;
 
 
-	ACPI_FUNCTION_TRACE ("Ut_divide");
+	ACPI_FUNCTION_TRACE ("ut_divide");
 
 
 	/* Always check for a zero divisor */
 
 	if (*in_divisor == 0) {
-		ACPI_REPORT_ERROR (("Acpi_ut_divide: Divide by zero\n"));
+		ACPI_REPORT_ERROR (("acpi_ut_divide: Divide by zero\n"));
 		return_ACPI_STATUS (AE_AML_DIVIDE_BY_ZERO);
 	}
 
@@ -238,9 +237,9 @@ acpi_ut_divide (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ut_short_divide, Acpi_ut_divide
+ * FUNCTION:    acpi_ut_short_divide, acpi_ut_divide
  *
- * DESCRIPTION: Native versions of the Ut_divide functions. Use these if either
+ * DESCRIPTION: Native versions of the ut_divide functions. Use these if either
  *              1) The target is a 64-bit platform and therefore 64-bit
  *                 integer math is supported directly by the machine.
  *              2) The target is a 32-bit or 16-bit platform, and the
@@ -257,13 +256,13 @@ acpi_ut_short_divide (
 	u32                     *out_remainder)
 {
 
-	ACPI_FUNCTION_TRACE ("Ut_short_divide");
+	ACPI_FUNCTION_TRACE ("ut_short_divide");
 
 
 	/* Always check for a zero divisor */
 
 	if (divisor == 0) {
-		ACPI_REPORT_ERROR (("Acpi_ut_short_divide: Divide by zero\n"));
+		ACPI_REPORT_ERROR (("acpi_ut_short_divide: Divide by zero\n"));
 		return_ACPI_STATUS (AE_AML_DIVIDE_BY_ZERO);
 	}
 
@@ -286,13 +285,13 @@ acpi_ut_divide (
 	acpi_integer            *out_quotient,
 	acpi_integer            *out_remainder)
 {
-	ACPI_FUNCTION_TRACE ("Ut_divide");
+	ACPI_FUNCTION_TRACE ("ut_divide");
 
 
 	/* Always check for a zero divisor */
 
 	if (*in_divisor == 0) {
-		ACPI_REPORT_ERROR (("Acpi_ut_divide: Divide by zero\n"));
+		ACPI_REPORT_ERROR (("acpi_ut_divide: Divide by zero\n"));
 		return_ACPI_STATUS (AE_AML_DIVIDE_BY_ZERO);
 	}
 

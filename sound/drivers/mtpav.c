@@ -205,19 +205,19 @@ static int translate_subdevice_to_hwport(mtpav_t *chip, int subdev)
 
 static int translate_hwport_to_subdevice(mtpav_t *chip, int hwport)
 {
-	int port;
+	int p;
 	if (hwport <= 0x00) /* all ports */
 		return chip->num_ports + MTPAV_PIDX_BROADCAST;
 	else if (hwport <= 0x08) { /* single port */
-		port = hwport - 1;
-		if (port >= chip->num_ports)
-			port = 0;
-		return port;
+		p = hwport - 1;
+		if (p >= chip->num_ports)
+			p = 0;
+		return p;
 	} else if (hwport <= 0x10) { /* remote port */
-		port = hwport - 0x09 + chip->num_ports;
-		if (port >= chip->num_ports * 2)
-			port = chip->num_ports;
-		return port;
+		p = hwport - 0x09 + chip->num_ports;
+		if (p >= chip->num_ports * 2)
+			p = chip->num_ports;
+		return p;
 	} else if (hwport == 0x11)  /* computer port */
 		return chip->num_ports + MTPAV_PIDX_COMPUTER;
 	else  /* ADAT */
@@ -335,11 +335,11 @@ static void snd_mtpav_output_write(snd_rawmidi_substream_t * substream)
 
 static void snd_mtpav_portscan(mtpav_t *chip)	// put mtp into smart routing mode
 {
-	u8 port;
+	u8 p;
 
-	for (port = 0; port < 8; port++) {
+	for (p = 0; p < 8; p++) {
 		snd_mtpav_send_byte(chip, 0xf5);
-		snd_mtpav_send_byte(chip, port);
+		snd_mtpav_send_byte(chip, p);
 		snd_mtpav_send_byte(chip, 0xfe);
 	}
 }
@@ -350,12 +350,12 @@ static void snd_mtpav_portscan(mtpav_t *chip)	// put mtp into smart routing mode
 static int snd_mtpav_input_open(snd_rawmidi_substream_t * substream)
 {
 	unsigned long flags;
-	mtpav_port_t *port = &mtp_card->ports[substream->number];
+	mtpav_port_t *portp = &mtp_card->ports[substream->number];
 
 	//printk("mtpav port: %d opened\n", (int) substream->number);
 	spin_lock_irqsave(&mtp_card->spinlock, flags);
-	port->mode |= MTPAV_MODE_INPUT_OPENED;
-	port->input = substream;
+	portp->mode |= MTPAV_MODE_INPUT_OPENED;
+	portp->input = substream;
 	if (mtp_card->share_irq++ == 0)
 		snd_mtpav_mputreg(mtp_card, CREG, (SIGC_INTEN | SIGC_WRITE));	// enable pport interrupts
 	spin_unlock_irqrestore(&mtp_card->spinlock, flags);
@@ -368,14 +368,14 @@ static int snd_mtpav_input_open(snd_rawmidi_substream_t * substream)
 static int snd_mtpav_input_close(snd_rawmidi_substream_t *substream)
 {
 	unsigned long flags;
-	mtpav_port_t *port = &mtp_card->ports[substream->number];
+	mtpav_port_t *portp = &mtp_card->ports[substream->number];
 
-	//printk("mtpav port: %d closed\n", (int) port);
+	//printk("mtpav port: %d closed\n", (int) portp);
 
 	spin_lock_irqsave(&mtp_card->spinlock, flags);
 
-	port->mode &= (~MTPAV_MODE_INPUT_OPENED);
-	port->input = NULL;
+	portp->mode &= (~MTPAV_MODE_INPUT_OPENED);
+	portp->input = NULL;
 	if (--mtp_card->share_irq == 0)
 		snd_mtpav_mputreg(mtp_card, CREG, 0);	// disable pport interrupts
 
@@ -389,13 +389,13 @@ static int snd_mtpav_input_close(snd_rawmidi_substream_t *substream)
 static void snd_mtpav_input_trigger(snd_rawmidi_substream_t * substream, int up)
 {
 	unsigned long flags;
-	mtpav_port_t *port = &mtp_card->ports[substream->number];
+	mtpav_port_t *portp = &mtp_card->ports[substream->number];
 
 	spin_lock_irqsave(&mtp_card->spinlock, flags);
 	if (up)
-		port->mode |= MTPAV_MODE_INPUT_TRIGGERED;
+		portp->mode |= MTPAV_MODE_INPUT_TRIGGERED;
 	else
-		port->mode &= ~MTPAV_MODE_INPUT_TRIGGERED;
+		portp->mode &= ~MTPAV_MODE_INPUT_TRIGGERED;
 	spin_unlock_irqrestore(&mtp_card->spinlock, flags);
 
 }
@@ -416,9 +416,9 @@ static void snd_mtpav_output_timer(unsigned long data)
 	add_timer(&chip->timer);
 	/* process each port */
 	for (p = 0; p <= chip->num_ports * 2 + MTPAV_PIDX_BROADCAST; p++) {
-		mtpav_port_t *port = &mtp_card->ports[p];
-		if ((port->mode & MTPAV_MODE_OUTPUT_TRIGGERED) && port->output)
-			snd_mtpav_output_port_write(port, port->output);
+		mtpav_port_t *portp = &mtp_card->ports[p];
+		if ((portp->mode & MTPAV_MODE_OUTPUT_TRIGGERED) && portp->output)
+			snd_mtpav_output_port_write(portp, portp->output);
 	}
 	spin_unlock(&chip->spinlock);
 }
@@ -445,11 +445,11 @@ static void snd_mtpav_remove_output_timer(mtpav_t *chip)
 static int snd_mtpav_output_open(snd_rawmidi_substream_t * substream)
 {
 	unsigned long flags;
-	mtpav_port_t *port = &mtp_card->ports[substream->number];
+	mtpav_port_t *portp = &mtp_card->ports[substream->number];
 
 	spin_lock_irqsave(&mtp_card->spinlock, flags);
-	port->mode |= MTPAV_MODE_OUTPUT_OPENED;
-	port->output = substream;
+	portp->mode |= MTPAV_MODE_OUTPUT_OPENED;
+	portp->output = substream;
 	spin_unlock_irqrestore(&mtp_card->spinlock, flags);
 	return 0;
 };
@@ -460,11 +460,11 @@ static int snd_mtpav_output_open(snd_rawmidi_substream_t * substream)
 static int snd_mtpav_output_close(snd_rawmidi_substream_t * substream)
 {
 	unsigned long flags;
-	mtpav_port_t *port = &mtp_card->ports[substream->number];
+	mtpav_port_t *portp = &mtp_card->ports[substream->number];
 
 	spin_lock_irqsave(&mtp_card->spinlock, flags);
-	port->mode &= (~MTPAV_MODE_OUTPUT_OPENED);
-	port->output = NULL;
+	portp->mode &= (~MTPAV_MODE_OUTPUT_OPENED);
+	portp->output = NULL;
 	spin_unlock_irqrestore(&mtp_card->spinlock, flags);
 	return 0;
 };
@@ -475,17 +475,17 @@ static int snd_mtpav_output_close(snd_rawmidi_substream_t * substream)
 static void snd_mtpav_output_trigger(snd_rawmidi_substream_t * substream, int up)
 {
 	unsigned long flags;
-	mtpav_port_t *port = &mtp_card->ports[substream->number];
+	mtpav_port_t *portp = &mtp_card->ports[substream->number];
 
 	spin_lock_irqsave(&mtp_card->spinlock, flags);
 	if (up) {
-		if (! (port->mode  & MTPAV_MODE_OUTPUT_TRIGGERED)) {
+		if (! (portp->mode  & MTPAV_MODE_OUTPUT_TRIGGERED)) {
 			if (mtp_card->istimer++ == 0)
 				snd_mtpav_add_output_timer(mtp_card);
-			port->mode |= MTPAV_MODE_OUTPUT_TRIGGERED;
+			portp->mode |= MTPAV_MODE_OUTPUT_TRIGGERED;
 		}
 	} else {
-		port->mode &= ~MTPAV_MODE_OUTPUT_TRIGGERED;
+		portp->mode &= ~MTPAV_MODE_OUTPUT_TRIGGERED;
 		if (--mtp_card->istimer == 0)
 			snd_mtpav_remove_output_timer(mtp_card);
 	}
@@ -501,15 +501,15 @@ static void snd_mtpav_output_trigger(snd_rawmidi_substream_t * substream, int up
 
 static void snd_mtpav_inmidi_process(mtpav_t *mcrd, u8 inbyte)
 {
-	mtpav_port_t *port;
+	mtpav_port_t *portp;
 
 	if (mcrd->inmidiport > mcrd->num_ports * 2 + MTPAV_PIDX_BROADCAST)
 		return;
 
-	port = &mcrd->ports[mcrd->inmidiport];
-	if (port->mode & MTPAV_MODE_INPUT_TRIGGERED) {
+	portp = &mcrd->ports[mcrd->inmidiport];
+	if (portp->mode & MTPAV_MODE_INPUT_TRIGGERED) {
 		spin_unlock(&mcrd->spinlock);
-		snd_rawmidi_receive(port->input, &inbyte, 1);
+		snd_rawmidi_receive(portp->input, &inbyte, 1);
 		spin_lock(&mcrd->spinlock);
 	}
 }

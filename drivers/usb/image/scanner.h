@@ -216,7 +216,7 @@ MODULE_DEVICE_TABLE (usb, scanner_device_ids);
 #define IS_EP_BULK_OUT(ep) (IS_EP_BULK(ep) && ((ep)->bEndpointAddress & USB_ENDPOINT_DIR_MASK) == USB_DIR_OUT)
 #define IS_EP_INTR(ep) ((ep)->bmAttributes == USB_ENDPOINT_XFER_INT ? 1 : 0)
 
-#define USB_SCN_MINOR(X) minor((X)->i_rdev) - SCN_BASE_MNR
+#define USB_SCN_MINOR(X) minor((X)->i_rdev)
 
 #ifdef DEBUG
 #define SCN_DEBUG(X) X
@@ -273,7 +273,5 @@ struct scn_usb_data {
 };
 
 extern devfs_handle_t usb_devfs_handle;
-
-static struct scn_usb_data *p_scn_table[SCN_MAX_MNR] = { NULL, /* ... */};
 
 static struct usb_driver scanner_driver;

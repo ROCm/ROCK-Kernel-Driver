@@ -2,7 +2,6 @@
 /******************************************************************************
  *
  * Module Name: exsystem - Interface to OS services
- *              $Revision: 74 $
  *
  *****************************************************************************/
 
@@ -35,7 +34,7 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_system_wait_semaphore
+ * FUNCTION:    acpi_ex_system_wait_semaphore
  *
  * PARAMETERS:  Semaphore           - OSD semaphore to wait on
  *              Timeout             - Max time to wait
@@ -57,7 +56,7 @@ acpi_ex_system_wait_semaphore (
 	acpi_status             status2;
 
 
-	ACPI_FUNCTION_TRACE ("Ex_system_wait_semaphore");
+	ACPI_FUNCTION_TRACE ("ex_system_wait_semaphore");
 
 
 	status = acpi_os_wait_semaphore (semaphore, 1, 0);
@@ -91,9 +90,9 @@ acpi_ex_system_wait_semaphore (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_system_do_stall
+ * FUNCTION:    acpi_ex_system_do_stall
  *
- * PARAMETERS:  How_long            - The amount of time to stall
+ * PARAMETERS:  how_long            - The amount of time to stall
  *
  * RETURN:      Status
  *
@@ -133,9 +132,9 @@ acpi_ex_system_do_stall (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_system_do_suspend
+ * FUNCTION:    acpi_ex_system_do_suspend
  *
- * PARAMETERS:  How_long            - The amount of time to suspend
+ * PARAMETERS:  how_long            - The amount of time to suspend
  *
  * RETURN:      None
  *
@@ -169,16 +168,16 @@ acpi_ex_system_do_suspend (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_system_acquire_mutex
+ * FUNCTION:    acpi_ex_system_acquire_mutex
  *
- * PARAMETERS:  *Time_desc          - The 'time to delay' object descriptor
- *              *Obj_desc           - The object descriptor for this op
+ * PARAMETERS:  *time_desc          - The 'time to delay' object descriptor
+ *              *obj_desc           - The object descriptor for this op
  *
  * RETURN:      Status
  *
  * DESCRIPTION: Provides an access point to perform synchronization operations
  *              within the AML.  This function will cause a lock to be generated
- *              for the Mutex pointed to by Obj_desc.
+ *              for the Mutex pointed to by obj_desc.
  *
  ******************************************************************************/
 
@@ -190,7 +189,7 @@ acpi_ex_system_acquire_mutex (
 	acpi_status             status = AE_OK;
 
 
-	ACPI_FUNCTION_TRACE_PTR ("Ex_system_acquire_mutex", obj_desc);
+	ACPI_FUNCTION_TRACE_PTR ("ex_system_acquire_mutex", obj_desc);
 
 
 	if (!obj_desc) {
@@ -213,9 +212,9 @@ acpi_ex_system_acquire_mutex (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_system_release_mutex
+ * FUNCTION:    acpi_ex_system_release_mutex
  *
- * PARAMETERS:  *Obj_desc           - The object descriptor for this op
+ * PARAMETERS:  *obj_desc           - The object descriptor for this op
  *
  * RETURN:      Status
  *
@@ -233,7 +232,7 @@ acpi_ex_system_release_mutex (
 	acpi_status             status = AE_OK;
 
 
-	ACPI_FUNCTION_TRACE ("Ex_system_release_mutex");
+	ACPI_FUNCTION_TRACE ("ex_system_release_mutex");
 
 
 	if (!obj_desc) {
@@ -255,9 +254,9 @@ acpi_ex_system_release_mutex (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_system_signal_event
+ * FUNCTION:    acpi_ex_system_signal_event
  *
- * PARAMETERS:  *Obj_desc           - The object descriptor for this op
+ * PARAMETERS:  *obj_desc           - The object descriptor for this op
  *
  * RETURN:      AE_OK
  *
@@ -273,7 +272,7 @@ acpi_ex_system_signal_event (
 	acpi_status             status = AE_OK;
 
 
-	ACPI_FUNCTION_TRACE ("Ex_system_signal_event");
+	ACPI_FUNCTION_TRACE ("ex_system_signal_event");
 
 
 	if (obj_desc) {
@@ -286,10 +285,10 @@ acpi_ex_system_signal_event (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_system_wait_event
+ * FUNCTION:    acpi_ex_system_wait_event
  *
- * PARAMETERS:  *Time_desc          - The 'time to delay' object descriptor
- *              *Obj_desc           - The object descriptor for this op
+ * PARAMETERS:  *time_desc          - The 'time to delay' object descriptor
+ *              *obj_desc           - The object descriptor for this op
  *
  * RETURN:      Status
  *
@@ -307,7 +306,7 @@ acpi_ex_system_wait_event (
 	acpi_status             status = AE_OK;
 
 
-	ACPI_FUNCTION_TRACE ("Ex_system_wait_event");
+	ACPI_FUNCTION_TRACE ("ex_system_wait_event");
 
 
 	if (obj_desc) {
@@ -321,9 +320,9 @@ acpi_ex_system_wait_event (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_system_reset_event
+ * FUNCTION:    acpi_ex_system_reset_event
  *
- * PARAMETERS:  *Obj_desc           - The object descriptor for this op
+ * PARAMETERS:  *obj_desc           - The object descriptor for this op
  *
  * RETURN:      Status
  *

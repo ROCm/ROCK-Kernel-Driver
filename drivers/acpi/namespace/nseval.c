@@ -2,7 +2,6 @@
  *
  * Module Name: nseval - Object evaluation interfaces -- includes control
  *                       method lookup and execution.
- *              $Revision: 119 $
  *
  ******************************************************************************/
 
@@ -37,7 +36,7 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ns_evaluate_relative
+ * FUNCTION:    acpi_ns_evaluate_relative
  *
  * PARAMETERS:  Handle              - The relative containing object
  *              Pathname            - Name of method to execute, If NULL, the
@@ -45,7 +44,7 @@
  *              Params              - List of parameters to pass to the method,
  *                                    terminated by NULL.  Params itself may be
  *                                    NULL if no parameters are being passed.
- *              Return_object       - Where to put method's return value (if
+ *              return_object       - Where to put method's return value (if
  *                                    any).  If NULL, no value is returned.
  *
  * RETURN:      Status
@@ -60,18 +59,18 @@
 acpi_status
 acpi_ns_evaluate_relative (
 	acpi_namespace_node     *handle,
-	NATIVE_CHAR             *pathname,
+	char                    *pathname,
 	acpi_operand_object     **params,
 	acpi_operand_object     **return_object)
 {
 	acpi_namespace_node     *prefix_node;
 	acpi_status             status;
 	acpi_namespace_node     *node = NULL;
-	NATIVE_CHAR             *internal_path = NULL;
+	char                    *internal_path = NULL;
 	acpi_generic_state      scope_info;
 
 
-	ACPI_FUNCTION_TRACE ("Ns_evaluate_relative");
+	ACPI_FUNCTION_TRACE ("ns_evaluate_relative");
 
 
 	/*
@@ -138,10 +137,10 @@ cleanup:
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ns_evaluate_by_name
+ * FUNCTION:    acpi_ns_evaluate_by_name
  *
  * PARAMETERS:  Pathname            - Fully qualified pathname to the object
- *              Return_object       - Where to put method's return value (if
+ *              return_object       - Where to put method's return value (if
  *                                    any).  If NULL, no value is returned.
  *              Params              - List of parameters to pass to the method,
  *                                    terminated by NULL.  Params itself may be
@@ -158,16 +157,16 @@ cleanup:
 
 acpi_status
 acpi_ns_evaluate_by_name (
-	NATIVE_CHAR             *pathname,
+	char                    *pathname,
 	acpi_operand_object     **params,
 	acpi_operand_object     **return_object)
 {
 	acpi_status             status;
 	acpi_namespace_node     *node = NULL;
-	NATIVE_CHAR             *internal_path = NULL;
+	char                    *internal_path = NULL;
 
 
-	ACPI_FUNCTION_TRACE ("Ns_evaluate_by_name");
+	ACPI_FUNCTION_TRACE ("ns_evaluate_by_name");
 
 
 	/* Build an internal name string for the method */
@@ -223,13 +222,13 @@ cleanup:
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ns_evaluate_by_handle
+ * FUNCTION:    acpi_ns_evaluate_by_handle
  *
  * PARAMETERS:  Handle              - Method Node to execute
  *              Params              - List of parameters to pass to the method,
  *                                    terminated by NULL.  Params itself may be
  *                                    NULL if no parameters are being passed.
- *              Return_object       - Where to put method's return value (if
+ *              return_object       - Where to put method's return value (if
  *                                    any).  If NULL, no value is returned.
  *
  * RETURN:      Status
@@ -251,7 +250,7 @@ acpi_ns_evaluate_by_handle (
 	acpi_operand_object     *local_return_object;
 
 
-	ACPI_FUNCTION_TRACE ("Ns_evaluate_by_handle");
+	ACPI_FUNCTION_TRACE ("ns_evaluate_by_handle");
 
 
 	/* Check if namespace has been initialized */
@@ -292,7 +291,7 @@ acpi_ns_evaluate_by_handle (
 	 *      value
 	 *
 	 * In both cases, the namespace is unlocked by the
-	 *  Acpi_ns* procedure
+	 *  acpi_ns* procedure
 	 */
 	if (acpi_ns_get_type (node) == ACPI_TYPE_METHOD) {
 		/*
@@ -334,7 +333,7 @@ acpi_ns_evaluate_by_handle (
 	}
 
 	/*
-	 * Namespace was unlocked by the handling Acpi_ns* function,
+	 * Namespace was unlocked by the handling acpi_ns* function,
 	 * so we just return
 	 */
 	return_ACPI_STATUS (status);
@@ -343,13 +342,13 @@ acpi_ns_evaluate_by_handle (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ns_execute_control_method
+ * FUNCTION:    acpi_ns_execute_control_method
  *
- * PARAMETERS:  Method_node         - The method to execute
+ * PARAMETERS:  method_node         - The method to execute
  *              Params              - List of parameters to pass to the method,
  *                                    terminated by NULL.  Params itself may be
  *                                    NULL if no parameters are being passed.
- *              Return_obj_desc     - List of result objects to be returned
+ *              return_obj_desc     - List of result objects to be returned
  *                                    from the method.
  *
  * RETURN:      Status
@@ -370,7 +369,7 @@ acpi_ns_execute_control_method (
 	acpi_operand_object     *obj_desc;
 
 
-	ACPI_FUNCTION_TRACE ("Ns_execute_control_method");
+	ACPI_FUNCTION_TRACE ("ns_execute_control_method");
 
 
 	/* Verify that there is a method associated with this object */
@@ -419,10 +418,10 @@ acpi_ns_execute_control_method (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ns_get_object_value
+ * FUNCTION:    acpi_ns_get_object_value
  *
  * PARAMETERS:  Node                - The object
- *              Return_obj_desc     - Where the objects value is returned
+ *              return_obj_desc     - Where the objects value is returned
  *
  * RETURN:      Status
  *
@@ -441,7 +440,7 @@ acpi_ns_get_object_value (
 	acpi_namespace_node     *resolved_node = node;
 
 
-	ACPI_FUNCTION_TRACE ("Ns_get_object_value");
+	ACPI_FUNCTION_TRACE ("ns_get_object_value");
 
 
 	/*
@@ -451,13 +450,13 @@ acpi_ns_get_object_value (
 	 */
 
 	/*
-	 * Use Resolve_node_to_value() to get the associated value. This call
-	 * always deletes Obj_desc (allocated above).
+	 * Use resolve_node_to_value() to get the associated value. This call
+	 * always deletes obj_desc (allocated above).
 	 *
 	 * NOTE: we can get away with passing in NULL for a walk state
-	 * because Obj_desc is guaranteed to not be a reference to either
+	 * because obj_desc is guaranteed to not be a reference to either
 	 * a method local or a method argument (because this interface can only be
-	 * called from the Acpi_evaluate external interface, never called from
+	 * called from the acpi_evaluate external interface, never called from
 	 * a running control method.)
 	 *
 	 * Even though we do not directly invoke the interpreter
@@ -477,8 +476,8 @@ acpi_ns_get_object_value (
 	if (ACPI_SUCCESS (status)) {
 		status = acpi_ex_resolve_node_to_value (&resolved_node, NULL);
 		/*
-		 * If Acpi_ex_resolve_node_to_value() succeeded, the return value was
-		 * placed in Resolved_node.
+		 * If acpi_ex_resolve_node_to_value() succeeded, the return value was
+		 * placed in resolved_node.
 		 */
 		acpi_ex_exit_interpreter ();
 

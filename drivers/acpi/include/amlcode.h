@@ -3,7 +3,6 @@
  * Name: amlcode.h - Definitions for AML, as included in "definition blocks"
  *                   Declarations and definitions contained herein are derived
  *                   directly from the ACPI specification.
- *       $Revision: 71 $
  *
  *****************************************************************************/
 
@@ -191,7 +190,7 @@
 
 /*
  * Argument types for the AML Parser
- * Each field in the Arg_types u32 is 5 bits, allowing for a maximum of 6 arguments.
+ * Each field in the arg_types u32 is 5 bits, allowing for a maximum of 6 arguments.
  * There can be up to 31 unique argument types
  */
 
@@ -216,7 +215,7 @@
 
 /*
  * Resolved argument types for the AML Interpreter
- * Each field in the Arg_types u32 is 5 bits, allowing for a maximum of 6 arguments.
+ * Each field in the arg_types u32 is 5 bits, allowing for a maximum of 6 arguments.
  * There can be up to 31 unique argument types (0 is end-of-arg-list indicator)
  *
  * Note: If and when 5 bits becomes insufficient, it would probably be best
@@ -240,7 +239,7 @@
 #define ARGI_ANYOBJECT              0x11
 #define ARGI_ANYTYPE                0x12
 #define ARGI_COMPUTEDATA            0x13     /* Buffer, String, or Integer */
-#define ARGI_DATAOBJECT             0x14     /* Buffer, String, package or reference to a Node - Used only by Size_of operator*/
+#define ARGI_DATAOBJECT             0x14     /* Buffer, String, package or reference to a Node - Used only by size_of operator*/
 #define ARGI_COMPLEXOBJ             0x15     /* Buffer, String, or package (Used by INDEX op only) */
 #define ARGI_INTEGER_REF            0x16
 #define ARGI_OBJECT_REF             0x17
@@ -296,10 +295,10 @@
 #define AML_FLAGS_EXEC_1A_0T_0R     AML_HAS_ARGS                                   /* Monadic1  */
 #define AML_FLAGS_EXEC_1A_0T_1R     AML_HAS_ARGS |                  AML_HAS_RETVAL /* Monadic2  */
 #define AML_FLAGS_EXEC_1A_1T_0R     AML_HAS_ARGS | AML_HAS_TARGET
-#define AML_FLAGS_EXEC_1A_1T_1R     AML_HAS_ARGS | AML_HAS_TARGET | AML_HAS_RETVAL /* Monadic2_r */
+#define AML_FLAGS_EXEC_1A_1T_1R     AML_HAS_ARGS | AML_HAS_TARGET | AML_HAS_RETVAL /* monadic2_r */
 #define AML_FLAGS_EXEC_2A_0T_0R     AML_HAS_ARGS                                   /* Dyadic1   */
 #define AML_FLAGS_EXEC_2A_0T_1R     AML_HAS_ARGS |                  AML_HAS_RETVAL /* Dyadic2   */
-#define AML_FLAGS_EXEC_2A_1T_1R     AML_HAS_ARGS | AML_HAS_TARGET | AML_HAS_RETVAL /* Dyadic2_r  */
+#define AML_FLAGS_EXEC_2A_1T_1R     AML_HAS_ARGS | AML_HAS_TARGET | AML_HAS_RETVAL /* dyadic2_r  */
 #define AML_FLAGS_EXEC_2A_2T_1R     AML_HAS_ARGS | AML_HAS_TARGET | AML_HAS_RETVAL
 #define AML_FLAGS_EXEC_3A_0T_0R     AML_HAS_ARGS
 #define AML_FLAGS_EXEC_3A_1T_1R     AML_HAS_ARGS | AML_HAS_TARGET | AML_HAS_RETVAL
@@ -313,10 +312,10 @@
 #define AML_TYPE_EXEC_1A_0T_0R      0x00 /* Monadic1  */
 #define AML_TYPE_EXEC_1A_0T_1R      0x01 /* Monadic2  */
 #define AML_TYPE_EXEC_1A_1T_0R      0x02
-#define AML_TYPE_EXEC_1A_1T_1R      0x03 /* Monadic2_r */
+#define AML_TYPE_EXEC_1A_1T_1R      0x03 /* monadic2_r */
 #define AML_TYPE_EXEC_2A_0T_0R      0x04 /* Dyadic1   */
 #define AML_TYPE_EXEC_2A_0T_1R      0x05 /* Dyadic2   */
-#define AML_TYPE_EXEC_2A_1T_1R      0x06 /* Dyadic2_r  */
+#define AML_TYPE_EXEC_2A_1T_1R      0x06 /* dyadic2_r  */
 #define AML_TYPE_EXEC_2A_2T_1R      0x07
 #define AML_TYPE_EXEC_3A_0T_0R      0x08
 #define AML_TYPE_EXEC_3A_1T_1R      0x09
@@ -364,7 +363,7 @@
 #define AML_CLASS_UNKNOWN           0x0A
 
 
-/* Predefined Operation Region Space_iDs */
+/* Predefined Operation Region space_iDs */
 
 typedef enum
 {
@@ -381,7 +380,7 @@ typedef enum
 } AML_REGION_TYPES;
 
 
-/* Comparison operation codes for Match_op operator */
+/* Comparison operation codes for match_op operator */
 
 typedef enum
 {
@@ -398,7 +397,7 @@ typedef enum
 
 
 /*
- * Field_flags
+ * field_flags
  *
  * This byte is extracted from the AML and includes three separate
  * pieces of information about the field:
@@ -406,9 +405,9 @@ typedef enum
  * 2) The field update rule
  * 3) The lock rule for the field
  *
- * Bits 00 - 03 : Access_type (Any_acc, Byte_acc, etc.)
- *      04      : Lock_rule (1 == Lock)
- *      05 - 06 : Update_rule
+ * Bits 00 - 03 : access_type (any_acc, byte_acc, etc.)
+ *      04      : lock_rule (1 == Lock)
+ *      05 - 06 : update_rule
  */
 #define AML_FIELD_ACCESS_TYPE_MASK  0x0F
 #define AML_FIELD_LOCK_RULE_MASK    0x10
@@ -453,7 +452,7 @@ typedef enum
 /*
  * Field Access Attributes.
  * This byte is extracted from the AML via the
- * Access_as keyword
+ * access_as keyword
  */
 typedef enum
 {
@@ -468,7 +467,7 @@ typedef enum
 } AML_ACCESS_ATTRIBUTE;
 
 
-/* bit fields in Method_flags byte */
+/* bit fields in method_flags byte */
 
 #define METHOD_FLAGS_ARG_COUNT      0x07
 #define METHOD_FLAGS_SERIALIZED     0x08

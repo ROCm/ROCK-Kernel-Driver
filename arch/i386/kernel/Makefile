@@ -29,10 +29,9 @@ obj-$(CONFIG_X86_NUMAQ)		+= numaq.o
 obj-$(CONFIG_PROFILING)		+= profile.o
 obj-$(CONFIG_EDD)             	+= edd.o
 obj-$(CONFIG_MODULES)		+= module.o
+obj-y				+= sysenter.o
 
 EXTRA_AFLAGS   := -traditional
 
 export-objs += scx200.o
 obj-$(CONFIG_SCx200)		+= scx200.o
-
-include $(TOPDIR)/Rules.make

@@ -61,6 +61,7 @@ struct _snd_oss_mixer {
 	void (*private_free_recsrc)(snd_mixer_oss_t *mixer);
 	struct semaphore reg_mutex;
 	snd_info_entry_t *proc_entry;
+	int oss_dev_alloc;
 	/* --- */
 	int oss_recsrc;
 };

@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Name: acexcep.h - Exception codes returned by the ACPI subsystem
- *       $Revision: 65 $
  *
  *****************************************************************************/
 
@@ -171,7 +170,7 @@
  * String versions of the exception codes above
  * These strings must match the corresponding defines exactly
  */
-NATIVE_CHAR const   *acpi_gbl_exception_names_env[] =
+char const   *acpi_gbl_exception_names_env[] =
 {
 	"AE_OK",
 	"AE_ERROR",
@@ -204,7 +203,7 @@ NATIVE_CHAR const   *acpi_gbl_exception_names_env[] =
 	"AE_ABORT_METHOD"
 };
 
-NATIVE_CHAR const   *acpi_gbl_exception_names_pgm[] =
+char const   *acpi_gbl_exception_names_pgm[] =
 {
 	"AE_BAD_PARAMETER",
 	"AE_BAD_CHARACTER",
@@ -217,7 +216,7 @@ NATIVE_CHAR const   *acpi_gbl_exception_names_pgm[] =
 	"AE_BAD_DECIMAL_CONSTANT"
 };
 
-NATIVE_CHAR const   *acpi_gbl_exception_names_tbl[] =
+char const   *acpi_gbl_exception_names_tbl[] =
 {
 	"AE_BAD_SIGNATURE",
 	"AE_BAD_HEADER",
@@ -227,7 +226,7 @@ NATIVE_CHAR const   *acpi_gbl_exception_names_tbl[] =
 	"AE_INVALID_TABLE_LENGTH"
 };
 
-NATIVE_CHAR const   *acpi_gbl_exception_names_aml[] =
+char const   *acpi_gbl_exception_names_aml[] =
 {
 	"AE_AML_ERROR",
 	"AE_AML_PARSE",
@@ -263,7 +262,7 @@ NATIVE_CHAR const   *acpi_gbl_exception_names_aml[] =
 	"AE_AML_CIRCULAR_REFERENCE"
 };
 
-NATIVE_CHAR const   *acpi_gbl_exception_names_ctrl[] =
+char const   *acpi_gbl_exception_names_ctrl[] =
 {
 	"AE_CTRL_RETURN_VALUE",
 	"AE_CTRL_PENDING",

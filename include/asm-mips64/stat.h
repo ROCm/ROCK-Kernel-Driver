@@ -10,6 +10,7 @@
 #define _ASM_STAT_H
 
 #include <linux/types.h>
+#include <linux/compat.h>
 
 struct __old_kernel_stat {
 	unsigned int	st_dev;
@@ -40,11 +41,11 @@ struct stat32 {
 	int		    st_pad2[2];
 	__kernel_off_t32    st_size;
 	int		    st_pad3;
-	__kernel_time_t32   st_atime;
+	compat_time_t     st_atime;
 	int		    reserved0;
-	__kernel_time_t32   st_mtime;
+	compat_time_t     st_mtime;
 	int		    reserved1;
-	__kernel_time_t32   st_ctime;
+	compat_time_t     st_ctime;
 	int		    reserved2;
 	int		    st_blksize;
 	int		    st_blocks;

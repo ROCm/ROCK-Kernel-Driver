@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Module Name: exfield - ACPI AML (p-code) execution - field manipulation
- *              $Revision: 116 $
  *
  *****************************************************************************/
 
@@ -35,11 +34,11 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_read_data_from_field
+ * FUNCTION:    acpi_ex_read_data_from_field
  *
- * PARAMETERS:  Walk_state          - Current execution state
- *              Obj_desc            - The named field
- *              Ret_buffer_desc     - Where the return data object is stored
+ * PARAMETERS:  walk_state          - Current execution state
+ *              obj_desc            - The named field
+ *              ret_buffer_desc     - Where the return data object is stored
  *
  * RETURN:      Status
  *
@@ -56,12 +55,12 @@ acpi_ex_read_data_from_field (
 {
 	acpi_status             status;
 	acpi_operand_object     *buffer_desc;
-	ACPI_SIZE               length;
+	acpi_size               length;
 	void                    *buffer;
 	u8                      locked;
 
 
-	ACPI_FUNCTION_TRACE_PTR ("Ex_read_data_from_field", obj_desc);
+	ACPI_FUNCTION_TRACE_PTR ("ex_read_data_from_field", obj_desc);
 
 
 	/* Parameter validation */
@@ -72,7 +71,7 @@ acpi_ex_read_data_from_field (
 
 	if (ACPI_GET_OBJECT_TYPE (obj_desc) == ACPI_TYPE_BUFFER_FIELD) {
 		/*
-		 * If the Buffer_field arguments have not been previously evaluated,
+		 * If the buffer_field arguments have not been previously evaluated,
 		 * evaluate them now and save the results.
 		 */
 		if (!(obj_desc->common.flags & AOPOBJ_DATA_VALID)) {
@@ -118,7 +117,7 @@ acpi_ex_read_data_from_field (
 	 *
 	 * Note: Field.length is in bits.
 	 */
-	length = (ACPI_SIZE) ACPI_ROUND_BITS_UP_TO_BYTES (obj_desc->field.bit_length);
+	length = (acpi_size) ACPI_ROUND_BITS_UP_TO_BYTES (obj_desc->field.bit_length);
 	if (length > acpi_gbl_integer_byte_width) {
 		/* Field is too large for an Integer, create a Buffer instead */
 
@@ -145,7 +144,7 @@ acpi_ex_read_data_from_field (
 		"Obj=%p Type=%X Buf=%p Len=%X\n",
 		obj_desc, ACPI_GET_OBJECT_TYPE (obj_desc), buffer, (u32) length));
 	ACPI_DEBUG_PRINT ((ACPI_DB_BFIELD,
-		"Field_write: Bit_len=%X Bit_off=%X Byte_off=%X\n",
+		"field_write: bit_len=%X bit_off=%X byte_off=%X\n",
 		obj_desc->common_field.bit_length,
 		obj_desc->common_field.start_field_bit_offset,
 		obj_desc->common_field.base_byte_offset));
@@ -174,10 +173,10 @@ exit:
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_write_data_to_field
+ * FUNCTION:    acpi_ex_write_data_to_field
  *
- * PARAMETERS:  Source_desc         - Contains data to write
- *              Obj_desc            - The named field
+ * PARAMETERS:  source_desc         - Contains data to write
+ *              obj_desc            - The named field
  *
  * RETURN:      Status
  *
@@ -200,7 +199,7 @@ acpi_ex_write_data_to_field (
 	acpi_operand_object     *buffer_desc;
 
 
-	ACPI_FUNCTION_TRACE_PTR ("Ex_write_data_to_field", obj_desc);
+	ACPI_FUNCTION_TRACE_PTR ("ex_write_data_to_field", obj_desc);
 
 
 	/* Parameter validation */
@@ -211,7 +210,7 @@ acpi_ex_write_data_to_field (
 
 	if (ACPI_GET_OBJECT_TYPE (obj_desc) == ACPI_TYPE_BUFFER_FIELD) {
 		/*
-		 * If the Buffer_field arguments have not been previously evaluated,
+		 * If the buffer_field arguments have not been previously evaluated,
 		 * evaluate them now and save the results.
 		 */
 		if (!(obj_desc->common.flags & AOPOBJ_DATA_VALID)) {
@@ -320,7 +319,7 @@ acpi_ex_write_data_to_field (
 		"Obj=%p Type=%X Buf=%p Len=%X\n",
 		obj_desc, ACPI_GET_OBJECT_TYPE (obj_desc), buffer, length));
 	ACPI_DEBUG_PRINT ((ACPI_DB_BFIELD,
-		"Field_read: Bit_len=%X Bit_off=%X Byte_off=%X\n",
+		"field_read: bit_len=%X bit_off=%X byte_off=%X\n",
 		obj_desc->common_field.bit_length,
 		obj_desc->common_field.start_field_bit_offset,
 		obj_desc->common_field.base_byte_offset));

@@ -46,8 +46,8 @@
 #include <asm/segment.h>
 #include <linux/smp_lock.h>
 
-#include <linux/intermezzo_fs.h>
-#include <linux/intermezzo_psdev.h>
+#include "intermezzo_fs.h"
+#include "intermezzo_psdev.h"
 
 #ifdef CONFIG_FS_EXT_ATTR
 #include <linux/ext_attr.h>

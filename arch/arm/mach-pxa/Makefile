@@ -21,5 +21,3 @@ obj-$(CONFIG_LEDS) += $(leds-y)
 
 # Misc features
 obj-$(CONFIG_PM) += pm.o sleep.o
-
-include $(TOPDIR)/Rules.make

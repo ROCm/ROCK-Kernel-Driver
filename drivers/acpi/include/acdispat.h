@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Name: acdispat.h - dispatcher (parser to interpreter interface)
- *       $Revision: 55 $
  *
  *****************************************************************************/
 
@@ -146,7 +145,7 @@ acpi_ds_exec_end_op (
 
 acpi_status
 acpi_ds_get_field_names (
-	ACPI_CREATE_FIELD_INFO  *info,
+	acpi_create_field_info  *info,
 	acpi_walk_state         *walk_state,
 	acpi_parse_object       *arg);
 
@@ -282,7 +281,7 @@ acpi_ds_parse_method (
 
 acpi_status
 acpi_ds_call_control_method (
-	ACPI_THREAD_STATE       *thread,
+	acpi_thread_state       *thread,
 	acpi_walk_state         *walk_state,
 	acpi_parse_object       *op);
 
@@ -410,7 +409,7 @@ acpi_ds_create_walk_state (
 	acpi_owner_id           owner_id,
 	acpi_parse_object       *origin,
 	acpi_operand_object     *mth_desc,
-	ACPI_THREAD_STATE       *thread);
+	acpi_thread_state       *thread);
 
 acpi_status
 acpi_ds_init_aml_walk (
@@ -438,12 +437,12 @@ acpi_ds_delete_walk_state (
 
 acpi_walk_state *
 acpi_ds_pop_walk_state (
-	ACPI_THREAD_STATE       *thread);
+	acpi_thread_state       *thread);
 
 void
 acpi_ds_push_walk_state (
 	acpi_walk_state         *walk_state,
-	ACPI_THREAD_STATE       *thread);
+	acpi_thread_state       *thread);
 
 acpi_status
 acpi_ds_result_stack_pop (
@@ -459,7 +458,7 @@ acpi_ds_result_stack_clear (
 
 acpi_walk_state *
 acpi_ds_get_current_walk_state (
-	ACPI_THREAD_STATE       *thread);
+	acpi_thread_state       *thread);
 
 void
 acpi_ds_delete_walk_state_cache (

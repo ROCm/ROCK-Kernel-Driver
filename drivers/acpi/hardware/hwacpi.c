@@ -2,7 +2,6 @@
 /******************************************************************************
  *
  * Module Name: hwacpi - ACPI Hardware Initialization/Mode Interface
- *              $Revision: 60 $
  *
  *****************************************************************************/
 
@@ -34,7 +33,7 @@
 
 /******************************************************************************
  *
- * FUNCTION:    Acpi_hw_initialize
+ * FUNCTION:    acpi_hw_initialize
  *
  * PARAMETERS:  None
  *
@@ -51,7 +50,7 @@ acpi_hw_initialize (
 	acpi_status             status;
 
 
-	ACPI_FUNCTION_TRACE ("Hw_initialize");
+	ACPI_FUNCTION_TRACE ("hw_initialize");
 
 
 	/* We must have the ACPI tables by the time we get here */
@@ -75,7 +74,7 @@ acpi_hw_initialize (
 
 /******************************************************************************
  *
- * FUNCTION:    Acpi_hw_set_mode
+ * FUNCTION:    acpi_hw_set_mode
  *
  * PARAMETERS:  Mode            - SYS_MODE_ACPI or SYS_MODE_LEGACY
  *
@@ -94,7 +93,7 @@ acpi_hw_set_mode (
 	u32                     retry;
 
 
-	ACPI_FUNCTION_TRACE ("Hw_set_mode");
+	ACPI_FUNCTION_TRACE ("hw_set_mode");
 
 	/*
 	 * ACPI 2.0 clarified that if SMI_CMD in FADT is zero,
@@ -170,7 +169,7 @@ acpi_hw_set_mode (
 
 /******************************************************************************
  *
- * FUNCTION:    Acpi_hw_get_mode
+ * FUNCTION:    acpi_hw_get_mode
  *
  * PARAMETERS:  none
  *
@@ -188,7 +187,7 @@ acpi_hw_get_mode (void)
 	u32                     value;
 
 
-	ACPI_FUNCTION_TRACE ("Hw_get_mode");
+	ACPI_FUNCTION_TRACE ("hw_get_mode");
 
 	status = acpi_get_register (ACPI_BITREG_SCI_ENABLE, &value, ACPI_MTX_LOCK);
 	if (ACPI_FAILURE (status)) {

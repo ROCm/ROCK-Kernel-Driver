@@ -12,19 +12,15 @@
  * escape value ESCAPE_CODE followed by an identifying code.
  */
 
-#include <linux/fs.h>
-#include <linux/slab.h>
-#include <linux/sched.h>
 #include <linux/vmalloc.h>
-#include <linux/smp.h>
-#include <linux/dcookies.h>
 #include <linux/oprofile.h>
+#include <linux/sched.h>
+#include <linux/dcookies.h>
+#include <linux/fs.h>
 #include <asm/uaccess.h>
-#include <asm/atomic.h>
-
-#include "event_buffer.h"
-#include "cpu_buffer.h"
+ 
 #include "oprof.h"
+#include "event_buffer.h"
 #include "oprofile_stats.h"
 
 DECLARE_MUTEX(buffer_sem);

@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Module Name: exfldio - Aml Field I/O
- *              $Revision: 90 $
  *
  *****************************************************************************/
 
@@ -37,16 +36,16 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_setup_region
+ * FUNCTION:    acpi_ex_setup_region
  *
- * PARAMETERS:  *Obj_desc               - Field to be read or written
- *              Field_datum_byte_offset - Byte offset of this datum within the
+ * PARAMETERS:  *obj_desc               - Field to be read or written
+ *              field_datum_byte_offset - Byte offset of this datum within the
  *                                        parent field
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Common processing for Acpi_ex_extract_from_field and
- *              Acpi_ex_insert_into_field. Initialize the
+ * DESCRIPTION: Common processing for acpi_ex_extract_from_field and
+ *              acpi_ex_insert_into_field. Initialize the
  *
  ******************************************************************************/
 
@@ -59,7 +58,7 @@ acpi_ex_setup_region (
 	acpi_operand_object     *rgn_desc;
 
 
-	ACPI_FUNCTION_TRACE_U32 ("Ex_setup_region", field_datum_byte_offset);
+	ACPI_FUNCTION_TRACE_U32 ("ex_setup_region", field_datum_byte_offset);
 
 
 	rgn_desc = obj_desc->common_field.region_obj;
@@ -101,7 +100,7 @@ acpi_ex_setup_region (
 			   + obj_desc->common_field.access_byte_width)) {
 		if (rgn_desc->region.length < obj_desc->common_field.access_byte_width) {
 			/*
-			 * This is the case where the Access_type (Acc_word, etc.) is wider
+			 * This is the case where the access_type (acc_word, etc.) is wider
 			 * than the region itself.  For example, a region of length one
 			 * byte, and a field with Dword access specified.
 			 */
@@ -130,10 +129,10 @@ acpi_ex_setup_region (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_access_region
+ * FUNCTION:    acpi_ex_access_region
  *
- * PARAMETERS:  *Obj_desc               - Field to be read
- *              Field_datum_byte_offset - Byte offset of this datum within the
+ * PARAMETERS:  *obj_desc               - Field to be read
+ *              field_datum_byte_offset - Byte offset of this datum within the
  *                                        parent field
  *              *Value                  - Where to store value (must at least
  *                                        the size of acpi_integer)
@@ -155,10 +154,10 @@ acpi_ex_access_region (
 {
 	acpi_status             status;
 	acpi_operand_object     *rgn_desc;
-	ACPI_PHYSICAL_ADDRESS   address;
+	acpi_physical_address   address;
 
 
-	ACPI_FUNCTION_TRACE ("Ex_access_region");
+	ACPI_FUNCTION_TRACE ("ex_access_region");
 
 
 	/*
@@ -198,7 +197,7 @@ acpi_ex_access_region (
 		field_datum_byte_offset,
 		ACPI_HIDWORD (address), ACPI_LODWORD (address)));
 
-	/* Invoke the appropriate Address_space/Op_region handler */
+	/* Invoke the appropriate address_space/op_region handler */
 
 	status = acpi_ev_address_space_dispatch (rgn_desc, function,
 			  address, ACPI_MUL_8 (obj_desc->common_field.access_byte_width), value);
@@ -224,9 +223,9 @@ acpi_ex_access_region (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_register_overflow
+ * FUNCTION:    acpi_ex_register_overflow
  *
- * PARAMETERS:  *Obj_desc               - Register(Field) to be written
+ * PARAMETERS:  *obj_desc               - Register(Field) to be written
  *              Value                   - Value to be stored
  *
  * RETURN:      TRUE if value overflows the field, FALSE otherwise
@@ -269,19 +268,19 @@ acpi_ex_register_overflow (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_field_datum_io
+ * FUNCTION:    acpi_ex_field_datum_io
  *
- * PARAMETERS:  *Obj_desc               - Field to be read
- *              Field_datum_byte_offset - Byte offset of this datum within the
+ * PARAMETERS:  *obj_desc               - Field to be read
+ *              field_datum_byte_offset - Byte offset of this datum within the
  *                                        parent field
  *              *Value                  - Where to store value (must be 64 bits)
- *              Read_write              - Read or Write flag
+ *              read_write              - Read or Write flag
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Read or Write a single datum of a field.  The Field_type is
+ * DESCRIPTION: Read or Write a single datum of a field.  The field_type is
  *              demultiplexed here to handle the different types of fields
- *              (Buffer_field, Region_field, Index_field, Bank_field)
+ *              (buffer_field, region_field, index_field, bank_field)
  *
  ******************************************************************************/
 
@@ -296,7 +295,7 @@ acpi_ex_field_datum_io (
 	acpi_integer            local_value;
 
 
-	ACPI_FUNCTION_TRACE_U32 ("Ex_field_datum_io", field_datum_byte_offset);
+	ACPI_FUNCTION_TRACE_U32 ("ex_field_datum_io", field_datum_byte_offset);
 
 
 	if (read_write == ACPI_READ) {
@@ -313,15 +312,15 @@ acpi_ex_field_datum_io (
 	/*
 	 * The four types of fields are:
 	 *
-	 * Buffer_fields - Read/write from/to a Buffer
-	 * Region_fields - Read/write from/to a Operation Region.
-	 * Bank_fields  - Write to a Bank Register, then read/write from/to an Op_region
-	 * Index_fields - Write to an Index Register, then read/write from/to a Data Register
+	 * buffer_fields - Read/write from/to a Buffer
+	 * region_fields - Read/write from/to a Operation Region.
+	 * bank_fields  - Write to a Bank Register, then read/write from/to an op_region
+	 * index_fields - Write to an Index Register, then read/write from/to a Data Register
 	 */
 	switch (ACPI_GET_OBJECT_TYPE (obj_desc)) {
 	case ACPI_TYPE_BUFFER_FIELD:
 		/*
-		 * If the Buffer_field arguments have not been previously evaluated,
+		 * If the buffer_field arguments have not been previously evaluated,
 		 * evaluate them now and save the results.
 		 */
 		if (!(obj_desc->common.flags & AOPOBJ_DATA_VALID)) {
@@ -358,7 +357,7 @@ acpi_ex_field_datum_io (
 
 	case ACPI_TYPE_LOCAL_BANK_FIELD:
 
-		/* Ensure that the Bank_value is not beyond the capacity of the register */
+		/* Ensure that the bank_value is not beyond the capacity of the register */
 
 		if (acpi_ex_register_overflow (obj_desc->bank_field.bank_obj,
 				  (acpi_integer) obj_desc->bank_field.value)) {
@@ -366,8 +365,8 @@ acpi_ex_field_datum_io (
 		}
 
 		/*
-		 * For Bank_fields, we must write the Bank_value to the Bank_register
-		 * (itself a Region_field) before we can access the data.
+		 * For bank_fields, we must write the bank_value to the bank_register
+		 * (itself a region_field) before we can access the data.
 		 */
 		status = acpi_ex_insert_into_field (obj_desc->bank_field.bank_obj,
 				 &obj_desc->bank_field.value,
@@ -378,7 +377,7 @@ acpi_ex_field_datum_io (
 
 		/*
 		 * Now that the Bank has been selected, fall through to the
-		 * Region_field case and write the datum to the Operation Region
+		 * region_field case and write the datum to the Operation Region
 		 */
 
 		/*lint -fallthrough */
@@ -386,7 +385,7 @@ acpi_ex_field_datum_io (
 
 	case ACPI_TYPE_LOCAL_REGION_FIELD:
 		/*
-		 * For simple Region_fields, we just directly access the owning
+		 * For simple region_fields, we just directly access the owning
 		 * Operation Region.
 		 */
 		status = acpi_ex_access_region (obj_desc, field_datum_byte_offset, value,
@@ -397,14 +396,14 @@ acpi_ex_field_datum_io (
 	case ACPI_TYPE_LOCAL_INDEX_FIELD:
 
 
-		/* Ensure that the Index_value is not beyond the capacity of the register */
+		/* Ensure that the index_value is not beyond the capacity of the register */
 
 		if (acpi_ex_register_overflow (obj_desc->index_field.index_obj,
 				  (acpi_integer) obj_desc->index_field.value)) {
 			return_ACPI_STATUS (AE_AML_REGISTER_LIMIT);
 		}
 
-		/* Write the index value to the Index_register (itself a Region_field) */
+		/* Write the index value to the index_register (itself a region_field) */
 
 		status = acpi_ex_insert_into_field (obj_desc->index_field.index_obj,
 				 &obj_desc->index_field.value,
@@ -414,7 +413,7 @@ acpi_ex_field_datum_io (
 		}
 
 		if (read_write == ACPI_READ) {
-			/* Read the datum from the Data_register */
+			/* Read the datum from the data_register */
 
 			status = acpi_ex_extract_from_field (obj_desc->index_field.data_obj,
 					  value, obj_desc->common_field.access_byte_width);
@@ -453,9 +452,9 @@ acpi_ex_field_datum_io (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_write_with_update_rule
+ * FUNCTION:    acpi_ex_write_with_update_rule
  *
- * PARAMETERS:  *Obj_desc           - Field to be set
+ * PARAMETERS:  *obj_desc           - Field to be set
  *              Value               - Value to store
  *
  * RETURN:      Status
@@ -476,7 +475,7 @@ acpi_ex_write_with_update_rule (
 	acpi_integer            current_value;
 
 
-	ACPI_FUNCTION_TRACE_U32 ("Ex_write_with_update_rule", mask);
+	ACPI_FUNCTION_TRACE_U32 ("ex_write_with_update_rule", mask);
 
 
 	/* Start with the new bits  */
@@ -522,7 +521,7 @@ acpi_ex_write_with_update_rule (
 
 		default:
 			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-				"Write_with_update_rule: Unknown Update_rule setting: %X\n",
+				"write_with_update_rule: Unknown update_rule setting: %X\n",
 				(obj_desc->common_field.field_flags & AML_FIELD_UPDATE_RULE_MASK)));
 			return_ACPI_STATUS (AE_AML_OPERAND_VALUE);
 		}
@@ -534,7 +533,7 @@ acpi_ex_write_with_update_rule (
 			  &merged_value, ACPI_WRITE);
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_BFIELD,
-		"Mask %8.8X%8.8X Datum_offset %X Value %8.8X%8.8X, Merged_value %8.8X%8.8X\n",
+		"Mask %8.8X%8.8X datum_offset %X Value %8.8X%8.8X, merged_value %8.8X%8.8X\n",
 		ACPI_HIDWORD (mask), ACPI_LODWORD (mask),
 		field_datum_byte_offset,
 		ACPI_HIDWORD (field_value), ACPI_LODWORD (field_value),
@@ -546,11 +545,11 @@ acpi_ex_write_with_update_rule (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_get_buffer_datum
+ * FUNCTION:    acpi_ex_get_buffer_datum
  *
  * PARAMETERS:  Datum               - Where the Datum is returned
  *              Buffer              - Raw field buffer
- *              Byte_granularity    - 1/2/4/8 Granularity of the field
+ *              byte_granularity    - 1/2/4/8 Granularity of the field
  *                                    (aka Datum Size)
  *              Offset              - Datum offset into the buffer
  *
@@ -602,11 +601,11 @@ acpi_ex_get_buffer_datum(
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_set_buffer_datum
+ * FUNCTION:    acpi_ex_set_buffer_datum
  *
- * PARAMETERS:  Merged_datum        - Value to store
+ * PARAMETERS:  merged_datum        - Value to store
  *              Buffer              - Receiving buffer
- *              Byte_granularity    - 1/2/4/8 Granularity of the field
+ *              byte_granularity    - 1/2/4/8 Granularity of the field
  *                                    (aka Datum Size)
  *              Offset              - Datum offset into the buffer
  *
@@ -658,9 +657,9 @@ acpi_ex_set_buffer_datum (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_extract_from_field
+ * FUNCTION:    acpi_ex_extract_from_field
  *
- * PARAMETERS:  *Obj_desc           - Field to be read
+ * PARAMETERS:  *obj_desc           - Field to be read
  *              *Value              - Where to store value
  *
  * RETURN:      Status
@@ -685,7 +684,7 @@ acpi_ex_extract_from_field (
 	u32                     datum_count;
 
 
-	ACPI_FUNCTION_TRACE ("Ex_extract_from_field");
+	ACPI_FUNCTION_TRACE ("ex_extract_from_field");
 
 
 	/*
@@ -706,7 +705,7 @@ acpi_ex_extract_from_field (
 			   obj_desc->common_field.access_byte_width);
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_BFIELD,
-		"Byte_len=%X, Datum_len=%X, Byte_gran=%X\n",
+		"byte_len=%X, datum_len=%X, byte_gran=%X\n",
 		byte_field_length, datum_count,obj_desc->common_field.access_byte_width));
 
 	/*
@@ -834,9 +833,9 @@ acpi_ex_extract_from_field (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_insert_into_field
+ * FUNCTION:    acpi_ex_insert_into_field
  *
- * PARAMETERS:  *Obj_desc           - Field to be set
+ * PARAMETERS:  *obj_desc           - Field to be set
  *              Buffer              - Value to store
  *
  * RETURN:      Status
@@ -862,7 +861,7 @@ acpi_ex_insert_into_field (
 	u32                     datum_count;
 
 
-	ACPI_FUNCTION_TRACE ("Ex_insert_into_field");
+	ACPI_FUNCTION_TRACE ("ex_insert_into_field");
 
 
 	/*
@@ -884,7 +883,7 @@ acpi_ex_insert_into_field (
 	datum_count = ACPI_ROUND_UP_TO (byte_field_length, obj_desc->common_field.access_byte_width);
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_BFIELD,
-		"Byte_len=%X, Datum_len=%X, Byte_gran=%X\n",
+		"byte_len=%X, datum_len=%X, byte_gran=%X\n",
 		byte_field_length, datum_count, obj_desc->common_field.access_byte_width));
 
 	/*
@@ -907,7 +906,7 @@ acpi_ex_insert_into_field (
 	 * Note: The code in this section also handles the aligned case
 	 *
 	 * Construct Mask with 1 bits where the field is, 0 bits elsewhere
-	 * (Only the bottom 5 bits of Bit_length are valid for a shift operation)
+	 * (Only the bottom 5 bits of bit_length are valid for a shift operation)
 	 *
 	 * Mask off bits that are "below" the field (if any)
 	 */

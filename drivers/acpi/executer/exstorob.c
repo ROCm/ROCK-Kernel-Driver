@@ -2,7 +2,6 @@
 /******************************************************************************
  *
  * Module Name: exstorob - AML Interpreter object store support, store to object
- *              $Revision: 47 $
  *
  *****************************************************************************/
 
@@ -35,10 +34,10 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_store_buffer_to_buffer
+ * FUNCTION:    acpi_ex_store_buffer_to_buffer
  *
- * PARAMETERS:  Source_desc         - Source object to copy
- *              Target_desc         - Destination object of the copy
+ * PARAMETERS:  source_desc         - Source object to copy
+ *              target_desc         - Destination object of the copy
  *
  * RETURN:      Status
  *
@@ -55,11 +54,11 @@ acpi_ex_store_buffer_to_buffer (
 	u8                      *buffer;
 
 
-	ACPI_FUNCTION_NAME ("Ex_store_buffer_to_buffer");
+	ACPI_FUNCTION_TRACE_PTR ("ex_store_buffer_to_buffer", source_desc);
 
 
 	/*
-	 * We know that Source_desc is a buffer by now
+	 * We know that source_desc is a buffer by now
 	 */
 	buffer = (u8 *) source_desc->buffer.pointer;
 	length = source_desc->buffer.length;
@@ -72,7 +71,7 @@ acpi_ex_store_buffer_to_buffer (
 		(target_desc->common.flags & AOPOBJ_STATIC_POINTER)) {
 		target_desc->buffer.pointer = ACPI_MEM_ALLOCATE (length);
 		if (!target_desc->buffer.pointer) {
-			return (AE_NO_MEMORY);
+			return_ACPI_STATUS (AE_NO_MEMORY);
 		}
 
 		target_desc->common.flags &= ~AOPOBJ_STATIC_POINTER;
@@ -103,16 +102,16 @@ acpi_ex_store_buffer_to_buffer (
 	/* Copy flags */
 
 	target_desc->buffer.flags = source_desc->buffer.flags;
-	return (AE_OK);
+	return_ACPI_STATUS (AE_OK);
 }
 
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_store_string_to_string
+ * FUNCTION:    acpi_ex_store_string_to_string
  *
- * PARAMETERS:  Source_desc         - Source object to copy
- *              Target_desc         - Destination object of the copy
+ * PARAMETERS:  source_desc         - Source object to copy
+ *              target_desc         - Destination object of the copy
  *
  * RETURN:      Status
  *
@@ -129,11 +128,11 @@ acpi_ex_store_string_to_string (
 	u8                      *buffer;
 
 
-	ACPI_FUNCTION_ENTRY ();
+	ACPI_FUNCTION_TRACE_PTR ("ex_store_string_to_string", source_desc);
 
 
 	/*
-	 * We know that Source_desc is a string by now.
+	 * We know that source_desc is a string by now.
 	 */
 	buffer = (u8 *) source_desc->string.pointer;
 	length = source_desc->string.length;
@@ -148,7 +147,7 @@ acpi_ex_store_string_to_string (
 		 * String will fit in existing non-static buffer.
 		 * Clear old string and copy in the new one
 		 */
-		ACPI_MEMSET (target_desc->string.pointer, 0, (ACPI_SIZE) target_desc->string.length + 1);
+		ACPI_MEMSET (target_desc->string.pointer, 0, (acpi_size) target_desc->string.length + 1);
 		ACPI_MEMCPY (target_desc->string.pointer, buffer, length);
 	}
 	else {
@@ -164,9 +163,9 @@ acpi_ex_store_string_to_string (
 			ACPI_MEM_FREE (target_desc->string.pointer);
 		}
 
-		target_desc->string.pointer = ACPI_MEM_CALLOCATE ((ACPI_SIZE) length + 1);
+		target_desc->string.pointer = ACPI_MEM_CALLOCATE ((acpi_size) length + 1);
 		if (!target_desc->string.pointer) {
-			return (AE_NO_MEMORY);
+			return_ACPI_STATUS (AE_NO_MEMORY);
 		}
 
 		target_desc->common.flags &= ~AOPOBJ_STATIC_POINTER;
@@ -176,7 +175,7 @@ acpi_ex_store_string_to_string (
 	/* Set the new target length */
 
 	target_desc->string.length = length;
-	return (AE_OK);
+	return_ACPI_STATUS (AE_OK);
 }
 
 

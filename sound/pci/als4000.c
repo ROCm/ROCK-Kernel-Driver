@@ -2,6 +2,7 @@
  *  card-als4000.c - driver for Avance Logic ALS4000 based soundcards.
  *  Copyright (C) 2000 by Bart Hartgers <bart@etpmod.phys.tue.nl>,
  *			  Jaroslav Kysela <perex@suse.cz>
+ *  Copyright (C) 2002 by Andreas Mohr <hw7oshyuv3001@sneakemail.com>
  *
  *  Framework borrowed from Massimo Piccioni's card-als100.c.
  *
@@ -10,6 +11,9 @@
  *  Since Avance does not provide any meaningful documentation, and I
  *  bought an ALS4000 based soundcard, I was forced to base this driver
  *  on reverse engineering.
+ *
+ *  Note: this is no longer true. Pretty verbose chip docu (ALS4000a.PDF)
+ *  can be found on the ALSA web site.
  *
  *  The ALS4000 seems to be the PCI-cousin of the ALS100. It contains an
  *  ALS100-like SB DSP/mixer, an OPL3 synth, a MPU401 and a gameport 
@@ -23,11 +27,21 @@
  * 
  * The ALS4000 can do real full duplex playback/capture.
  *
- * BUGS
- *   The box suggests there is some support for 3D sound, but I did not
- *   investigate this yet.
- * 
+ * FMDAC:
+ * - 0x4f -> port 0x14
+ * - port 0x15 |= 1
  *
+ * Enable/disable 3D sound:
+ * - 0x50 -> port 0x14
+ * - change bit 6 (0x40) of port 0x15
+ *
+ * Set QSound:
+ * - 0xdb -> port 0x14
+ * - set port 0x15:
+ *   0x3e (mode 3), 0x3c (mode 2), 0x3a (mode 1), 0x38 (mode 0)
+ *
+ * Set KSound:
+ * - value -> some port 0x0c0d
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -256,11 +270,18 @@ static int snd_als4000_playback_prepare(snd_pcm_substream_t *substream)
 		count >>=1;
 	count--;
 	
+	/* FIXME: from second playback on, there's a lot more clicks and pops
+	 * involved here than on first playback. Fiddling with
+	 * tons of different settings didn't help (DMA, speaker on/off,
+	 * reordering, ...). Something seems to get enabled on playback
+	 * that I haven't found out how to disable again, which then causes
+	 * the switching pops to reach the speakers the next time here. */
 	spin_lock_irqsave(&chip->reg_lock, flags);
 	snd_als4000_set_rate(chip, runtime->rate);
 	snd_als4000_set_playback_dma(chip, runtime->dma_addr, size);
 	
-	snd_sbdsp_command(chip, SB_DSP_SPEAKER_ON);
+	/* SPEAKER_ON not needed, since dma_on seems to also enable speaker */
+	/* snd_sbdsp_command(chip, SB_DSP_SPEAKER_ON); */
 	snd_sbdsp_command(chip, playback_cmd(chip).dsp_cmd);
 	snd_sbdsp_command(chip, playback_cmd(chip).format);
 	snd_sbdsp_command(chip, count);
@@ -359,9 +380,9 @@ static void snd_als4000_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	spin_unlock_irqrestore(&chip->mixer_lock, flags);
 	
 	if (sb_status & SB_IRQTYPE_8BIT) 
-		inb(SBP(chip, DATA_AVAIL));
+		snd_sb_ack_8bit(chip);
 	if (sb_status & SB_IRQTYPE_16BIT) 
-		inb(SBP(chip, DATA_AVAIL_16));
+		snd_sb_ack_16bit(chip);
 	if (sb_status & SB_IRQTYPE_MPUIN)
 		inb(chip->mpu_port);
 	if (sb_status & 0x20)
@@ -547,14 +568,14 @@ static void __devinit snd_als4000_configure(sb_t *chip)
 	spin_unlock_irqrestore(&chip->reg_lock,flags);
 }
 
-static void snd_card_als4k_free( snd_card_t *card )
+static void snd_card_als4000_free( snd_card_t *card )
 {
 	snd_card_als4000_t * acard = (snd_card_als4000_t *)card->private_data;
 	/* make sure that interrupts are disabled */
 	snd_als4000_gcr_write_addr( acard->gcr, 0x8c, 0);
 }
 
-static int __devinit snd_card_als4k_probe(struct pci_dev *pci,
+static int __devinit snd_card_als4000_probe(struct pci_dev *pci,
 					  const struct pci_device_id *pci_id)
 {
 	static int dev;
@@ -608,7 +629,7 @@ static int __devinit snd_card_als4k_probe(struct pci_dev *pci,
 
 	acard = (snd_card_als4000_t *)card->private_data;
 	acard->gcr = gcr;
-	card->private_free = snd_card_als4k_free;
+	card->private_free = snd_card_als4000_free;
 
 	if ((err = snd_sbdsp_create(card,
 				    gcr + 0x10,
@@ -672,7 +693,7 @@ static int __devinit snd_card_als4k_probe(struct pci_dev *pci,
 	return 0;
 }
 
-static void __devexit snd_card_als4k_remove(struct pci_dev *pci)
+static void __devexit snd_card_als4000_remove(struct pci_dev *pci)
 {
 	snd_card_free(pci_get_drvdata(pci));
 	pci_set_drvdata(pci, NULL);
@@ -681,11 +702,11 @@ static void __devexit snd_card_als4k_remove(struct pci_dev *pci)
 static struct pci_driver driver = {
 	.name = "ALS4000",
 	.id_table = snd_als4000_ids,
-	.probe = snd_card_als4k_probe,
-	.remove = __devexit_p(snd_card_als4k_remove),
+	.probe = snd_card_als4000_probe,
+	.remove = __devexit_p(snd_card_als4000_remove),
 };
 
-static int __init alsa_card_als4k_init(void)
+static int __init alsa_card_als4000_init(void)
 {
 	int err;
 	
@@ -698,13 +719,13 @@ static int __init alsa_card_als4k_init(void)
 	return 0;
 }
 
-static void __exit alsa_card_als4k_exit(void)
+static void __exit alsa_card_als4000_exit(void)
 {
 	pci_unregister_driver(&driver);
 }
 
-module_init(alsa_card_als4k_init)
-module_exit(alsa_card_als4k_exit)
+module_init(alsa_card_als4000_init)
+module_exit(alsa_card_als4000_exit)
 
 #ifndef MODULE
 

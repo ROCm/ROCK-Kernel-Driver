@@ -443,8 +443,9 @@ struct _snd_pcm {
 };
 
 typedef struct _snd_pcm_notify {
-	int (*n_register) (unsigned short minor, snd_pcm_t * pcm);
-	int (*n_unregister) (unsigned short minor, snd_pcm_t * pcm);
+	int (*n_register) (snd_pcm_t * pcm);
+	int (*n_disconnect) (snd_pcm_t * pcm);
+	int (*n_unregister) (snd_pcm_t * pcm);
 	struct list_head list;
 } snd_pcm_notify_t;
 

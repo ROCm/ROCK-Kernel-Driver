@@ -422,7 +422,7 @@ acpi_ec_space_setup (
 static acpi_status
 acpi_ec_space_handler (
 	u32			function,
-	ACPI_PHYSICAL_ADDRESS	address,
+	acpi_physical_address	address,
 	u32			bit_width,
 	acpi_integer		*value,
 	void			*handler_context,

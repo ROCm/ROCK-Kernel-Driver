@@ -18,6 +18,3 @@ NAND_OBJS-$(CONFIG_JFFS2_FS_NAND)	:= wbuf.o
 
 jffs2-objs := $(COMPR_OBJS) $(JFFS2_OBJS) $(VERS_OBJS) $(NAND_OBJS-y) \
 	      $(LINUX_OBJS-$(VERSION)$(PATCHLEVEL))
-
-include $(TOPDIR)/Rules.make
-

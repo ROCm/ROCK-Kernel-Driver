@@ -2073,13 +2073,14 @@ extern inline int reiserfs_new_form_blocknrs (struct tree_balance * tb,
 }
 
 extern inline int reiserfs_new_unf_blocknrs (struct reiserfs_transaction_handle *th,
+					     struct inode *inode,
 					     b_blocknr_t *new_blocknrs,
 					     struct path * path, long block)
 {
     reiserfs_blocknr_hint_t hint = {
 	.th = th,
 	.path = path,
-	.inode = NULL,
+	.inode = inode,
 	.block = block,
 	.formatted_node = 0,
 	.preallocate = 0

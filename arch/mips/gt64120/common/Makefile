@@ -3,5 +3,3 @@
 #
 
 obj-y	 := gt_irq.o pci.o
-
-include $(TOPDIR)/Rules.make

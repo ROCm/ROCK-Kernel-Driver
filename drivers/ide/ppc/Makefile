@@ -4,5 +4,3 @@ obj-$(CONFIG_BLK_DEV_IDE_PMAC)		+= pmac.o
 obj-$(CONFIG_BLK_DEV_IDE_SWARM)		+= swarm.o
 
 EXTRA_CFLAGS	:= -Idrivers/ide
-
-include $(TOPDIR)/Rules.make

@@ -68,8 +68,8 @@
 #include <linux/namei.h>
 #include <linux/blk.h>
 
-#include <linux/intermezzo_fs.h>
-#include <linux/intermezzo_psdev.h>
+#include "intermezzo_fs.h"
+#include "intermezzo_psdev.h"
 
 #ifdef CONFIG_FS_EXT_ATTR
 # include <linux/ext_attr.h>
@@ -186,7 +186,7 @@ inline void presto_debug_fail_blkdev(struct presto_file_set *fset,
 
         if (errorval && errorval == (long)value && !is_read_only(dev)) {
                 CDEBUG(D_SUPER, "setting device %s read only\n", kdevname(dev));
-                BLKDEV_FAIL(dev, 1);
+                BLKDEV_FAIL(kdev_val(dev), 1);
                 izo_channels[minor].uc_errorval = -kdev_val(dev);
         }
 }
@@ -475,7 +475,7 @@ int lento_setattr(const char *name, struct iattr *iattr,
                name, iattr->ia_valid, iattr->ia_mode, iattr->ia_uid,
                iattr->ia_gid, iattr->ia_size);
         CDEBUG(D_PIOCTL, "atime %#lx, mtime %#lx, ctime %#lx, attr_flags %#x\n",
-               iattr->ia_atime, iattr->ia_mtime.tv_sec, iattr->ia_ctime.tv_sec,
+               iattr->ia_atime.tv_sec, iattr->ia_mtime.tv_sec, iattr->ia_ctime.tv_sec,
                iattr->ia_attr_flags);
         CDEBUG(D_PIOCTL, "offset %d, recno %d, flags %#x\n",
                info->slot_offset, info->recno, info->flags);

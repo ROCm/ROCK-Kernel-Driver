@@ -13,58 +13,35 @@ snd-opl3-synth-objs += opl3_oss.o
 endif
 endif
 
-# Toplevel Module Dependency
-obj-$(CONFIG_SND_ALS100) += snd-opl3-lib.o
-obj-$(CONFIG_SND_AZT2320) += snd-opl3-lib.o
-obj-$(CONFIG_SND_DT019X) += snd-opl3-lib.o
-obj-$(CONFIG_SND_ES18XX) += snd-opl3-lib.o
-obj-$(CONFIG_SND_OPL3SA2) += snd-opl3-lib.o
-obj-$(CONFIG_SND_AD1816A) += snd-opl3-lib.o
-obj-$(CONFIG_SND_CS4232) += snd-opl3-lib.o
-obj-$(CONFIG_SND_CS4236) += snd-opl3-lib.o
-obj-$(CONFIG_SND_ES1688) += snd-opl3-lib.o
-obj-$(CONFIG_SND_GUSEXTREME) += snd-opl3-lib.o
-obj-$(CONFIG_SND_OPTI92X_AD1848) += snd-opl3-lib.o
-obj-$(CONFIG_SND_OPTI92X_CS4231) += snd-opl3-lib.o
-obj-$(CONFIG_SND_OPTI93X) += snd-opl3-lib.o
-obj-$(CONFIG_SND_SB8) += snd-opl3-lib.o
-obj-$(CONFIG_SND_SB16) += snd-opl3-lib.o
-obj-$(CONFIG_SND_SBAWE) += snd-opl3-lib.o
-obj-$(CONFIG_SND_WAVEFRONT) += snd-opl3-lib.o
-obj-$(CONFIG_SND_ALS4000) += snd-opl3-lib.o
-obj-$(CONFIG_SND_CMIPCI) += snd-opl3-lib.o
-obj-$(CONFIG_SND_CS4281) += snd-opl3-lib.o
-obj-$(CONFIG_SND_ES1938) += snd-opl3-lib.o
-obj-$(CONFIG_SND_FM801) += snd-opl3-lib.o
-obj-$(CONFIG_SND_SONICVIBES) += snd-opl3-lib.o
-obj-$(CONFIG_SND_YMFPCI) += snd-opl3-lib.o
+OPL3_OBJS = snd-opl3-lib.o
 ifeq ($(subst m,y,$(CONFIG_SND_SEQUENCER)),y)
-  obj-$(CONFIG_SND_ALS100) += snd-opl3-synth.o
-  obj-$(CONFIG_SND_AZT2320) += snd-opl3-synth.o
-  obj-$(CONFIG_SND_DT019X) += snd-opl3-synth.o
-  obj-$(CONFIG_SND_ES18XX) += snd-opl3-synth.o
-  obj-$(CONFIG_SND_OPL3SA2) += snd-opl3-synth.o
-  obj-$(CONFIG_SND_AD1816A) += snd-opl3-synth.o
-  obj-$(CONFIG_SND_CS4232) += snd-opl3-synth.o
-  obj-$(CONFIG_SND_CS4236) += snd-opl3-synth.o
-  obj-$(CONFIG_SND_ES1688) += snd-opl3-synth.o
-  obj-$(CONFIG_SND_GUSEXTREME) += snd-opl3-synth.o
-  obj-$(CONFIG_SND_OPTI92X_AD1848) += snd-opl3-synth.o
-  obj-$(CONFIG_SND_OPTI92X_CS4231) += snd-opl3-synth.o
-  obj-$(CONFIG_SND_OPTI93X) += snd-opl3-synth.o
-  obj-$(CONFIG_SND_SB8) += snd-opl3-synth.o
-  obj-$(CONFIG_SND_SB16) += snd-opl3-synth.o
-  obj-$(CONFIG_SND_SBAWE) += snd-opl3-synth.o
-  obj-$(CONFIG_SND_WAVEFRONT) += snd-opl3-synth.o
-  obj-$(CONFIG_SND_ALS4000) += snd-opl3-synth.o
-  obj-$(CONFIG_SND_CMIPCI) += snd-opl3-synth.o
-  obj-$(CONFIG_SND_CS4281) += snd-opl3-synth.o
-  obj-$(CONFIG_SND_ES1938) += snd-opl3-synth.o
-  obj-$(CONFIG_SND_FM801) += snd-opl3-synth.o
-  obj-$(CONFIG_SND_SONICVIBES) += snd-opl3-synth.o
-  obj-$(CONFIG_SND_YMFPCI) += snd-opl3-synth.o
+OPL3_OBJS += snd-opl3-synth.o
 endif
 
-obj-m := $(sort $(obj-m))
+# Toplevel Module Dependency
+obj-$(CONFIG_SND_ALS100) += $(OPL3_OBJS)
+obj-$(CONFIG_SND_AZT2320) += $(OPL3_OBJS)
+obj-$(CONFIG_SND_DT019X) += $(OPL3_OBJS)
+obj-$(CONFIG_SND_ES18XX) += $(OPL3_OBJS)
+obj-$(CONFIG_SND_OPL3SA2) += $(OPL3_OBJS)
+obj-$(CONFIG_SND_AD1816A) += $(OPL3_OBJS)
+obj-$(CONFIG_SND_CS4232) += $(OPL3_OBJS)
+obj-$(CONFIG_SND_CS4236) += $(OPL3_OBJS)
+obj-$(CONFIG_SND_ES1688) += $(OPL3_OBJS)
+obj-$(CONFIG_SND_GUSEXTREME) += $(OPL3_OBJS)
+obj-$(CONFIG_SND_OPTI92X_AD1848) += $(OPL3_OBJS)
+obj-$(CONFIG_SND_OPTI92X_CS4231) += $(OPL3_OBJS)
+obj-$(CONFIG_SND_OPTI93X) += $(OPL3_OBJS)
+obj-$(CONFIG_SND_SB8) += $(OPL3_OBJS)
+obj-$(CONFIG_SND_SB16) += $(OPL3_OBJS)
+obj-$(CONFIG_SND_SBAWE) += $(OPL3_OBJS)
+obj-$(CONFIG_SND_WAVEFRONT) += $(OPL3_OBJS)
+obj-$(CONFIG_SND_ALS4000) += $(OPL3_OBJS)
+obj-$(CONFIG_SND_CMIPCI) += $(OPL3_OBJS)
+obj-$(CONFIG_SND_CS4281) += $(OPL3_OBJS)
+obj-$(CONFIG_SND_ES1938) += $(OPL3_OBJS)
+obj-$(CONFIG_SND_FM801) += $(OPL3_OBJS)
+obj-$(CONFIG_SND_SONICVIBES) += $(OPL3_OBJS)
+obj-$(CONFIG_SND_YMFPCI) += $(OPL3_OBJS)
 
-include $(TOPDIR)/Rules.make
+obj-m := $(sort $(obj-m))

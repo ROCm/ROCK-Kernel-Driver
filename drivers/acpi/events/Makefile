@@ -7,5 +7,3 @@ obj-y := evevent.o  evregion.o  evsci.o    evxfevnt.o \
 	 evgpe.o
 
 EXTRA_CFLAGS += $(ACPI_CFLAGS)
-
-include $(TOPDIR)/Rules.make

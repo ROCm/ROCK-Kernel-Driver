@@ -126,37 +126,37 @@ struct RingQueue {
 	wait_queue_head_t wqh;	/* Processes waiting */
 };
 
-typedef enum {
+enum ScanState {
 	ScanState_Scanning,	/* Scanning for header */
 	ScanState_Lines		/* Parsing lines */
-} ScanState_t;
+};
 
 /* Completion states of the data parser */
-typedef enum {
+enum ParseState {
 	scan_Continue,		/* Just parse next item */
 	scan_NextFrame,		/* Frame done, send it to V4L */
 	scan_Out,		/* Not enough data for frame */
 	scan_EndParse		/* End parsing */
-} ParseState_t;
+};
 
-typedef enum {
+enum FrameState {
 	FrameState_Unused,	/* Unused (no MCAPTURE) */
 	FrameState_Ready,	/* Ready to start grabbing */
 	FrameState_Grabbing,	/* In the process of being grabbed into */
 	FrameState_Done,	/* Finished grabbing, but not been synced yet */
 	FrameState_Done_Hold,	/* Are syncing or reading */
 	FrameState_Error,	/* Something bad happened while processing */
-} FrameState_t;
+};
 
 /*
  * Some frames may contain only even or odd lines. This type
  * specifies what type of deinterlacing is required.
  */
-typedef enum {
+enum Deinterlace {
 	Deinterlace_None=0,
 	Deinterlace_FillOddLines,
 	Deinterlace_FillEvenLines
-} Deinterlace_t;
+};
 
 #define USBVIDEO_NUMFRAMES	2	/* How many frames we work with */
 #define USBVIDEO_NUMSBUF	2	/* How many URBs linked in a ring */
@@ -175,9 +175,9 @@ struct usbvideo_frame {
 	videosize_t request;	/* That's what the application asked for */
 	unsigned short palette;	/* The desired format */
 
-	FrameState_t frameState;/* State of grabbing */
-	ScanState_t scanstate;	/* State of scanning */
-	Deinterlace_t deinterlace;
+	enum FrameState frameState;/* State of grabbing */
+	enum ScanState scanstate;	/* State of scanning */
+	enum Deinterlace deinterlace;
 	int flags;		/* USBVIDEO_FRAME_FLAG_xxx bit flags */
 
 	int curline;		/* Line of frame we're working on */
@@ -199,12 +199,12 @@ struct usbvideo_statistics {
 	unsigned long iso_err_count;	/* How many bad ISO packets received */
 };
 
-struct s_usbvideo_t;
+struct usbvideo;
 
 struct uvd {
 	struct video_device vdev;	/* Must be the first field! */
 	struct usb_device *dev;
-	struct s_usbvideo_t *handle;	/* Points back to the usbvideo_t */
+	struct usbvideo *handle;	/* Points back to the struct usbvideo */
 	void *user_data;		/* Camera-dependent data */
 	int user_size;			/* Size of that camera-dependent data */
 	int debug;			/* Debug level for usbvideo */
@@ -273,7 +273,7 @@ struct usbvideo_cb {
 	int (*setVideoMode)(struct uvd *uvd, struct video_window *vw);
 };
 
-struct s_usbvideo_t {
+struct usbvideo {
 	int num_cameras;		/* As allocated */
 	struct usb_driver usbdrv;	/* Interface to the USB stack */
 	char drvName[80];		/* Driver name */
@@ -285,7 +285,7 @@ struct s_usbvideo_t {
 	struct proc_dir_entry *procfs_dEntry;	/* /proc/video/MYDRIVER */
 	struct module *md_module;	/* Minidriver module */
 };
-typedef struct s_usbvideo_t usbvideo_t;
+
 
 /*
  * This macro retrieves callback address from the struct uvd object.
@@ -332,16 +332,16 @@ void usbvideo_TestPattern(struct uvd *uvd, int fullframe, int pmode);
 unsigned long usbvideo_kvirt_to_pa(unsigned long adr);
 
 int usbvideo_register(
-	usbvideo_t **pCams,
+	struct usbvideo **pCams,
 	const int num_cams,
 	const int num_extra,
 	const char *driverName,
 	const struct usbvideo_cb *cbTable,
 	struct module *md,
 	const struct usb_device_id *id_table);
-struct uvd *usbvideo_AllocateDevice(usbvideo_t *cams);
+struct uvd *usbvideo_AllocateDevice(struct usbvideo *cams);
 int usbvideo_RegisterVideoDevice(struct uvd *uvd);
-void usbvideo_Deregister(usbvideo_t **uvt);
+void usbvideo_Deregister(struct usbvideo **uvt);
 
 int usbvideo_v4l_initialize(struct video_device *dev);
 

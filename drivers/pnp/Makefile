@@ -10,5 +10,3 @@ obj-$(CONFIG_PNPBIOS)		+= pnpbios/
 obj-$(CONFIG_ISAPNP)		+= isapnp/
 
 export-objs	:= core.o driver.o resource.o $(pnp-card-y)
-
-include $(TOPDIR)/Rules.make

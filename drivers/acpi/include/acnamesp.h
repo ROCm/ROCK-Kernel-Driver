@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Name: acnamesp.h - Namespace subcomponent prototypes and defines
- *       $Revision: 131 $
  *
  *****************************************************************************/
 
@@ -27,12 +26,12 @@
 #define __ACNAMESP_H__
 
 
-/* To search the entire name space, pass this as Search_base */
+/* To search the entire name space, pass this as search_base */
 
 #define ACPI_NS_ALL                 ((acpi_handle)0)
 
 /*
- * Elements of Acpi_ns_properties are bit significant
+ * Elements of acpi_ns_properties are bit significant
  * and should be one-to-one with values of acpi_object_type
  */
 #define ACPI_NS_NORMAL              0
@@ -50,7 +49,7 @@
 #define ACPI_NS_SYSTEM_BUS          "_SB_"
 
 
-/* Flags for Acpi_ns_lookup, Acpi_ns_search_and_enter */
+/* Flags for acpi_ns_lookup, acpi_ns_search_and_enter */
 
 #define ACPI_NS_NO_UPSEARCH         0
 #define ACPI_NS_SEARCH_PARENT       0x01
@@ -146,7 +145,7 @@ acpi_ns_root_initialize (
 acpi_status
 acpi_ns_lookup (
 	acpi_generic_state      *scope_info,
-	NATIVE_CHAR             *name,
+	char                    *name,
 	acpi_object_type        type,
 	acpi_interpreter_mode   interpreter_mode,
 	u32                     flags,
@@ -213,7 +212,7 @@ acpi_ns_dump_entry (
 void
 acpi_ns_dump_pathname (
 	acpi_handle             handle,
-	NATIVE_CHAR             *msg,
+	char                    *msg,
 	u32                     level,
 	u32                     component);
 
@@ -261,14 +260,14 @@ acpi_ns_evaluate_by_handle (
 
 acpi_status
 acpi_ns_evaluate_by_name (
-	NATIVE_CHAR             *pathname,
+	char                    *pathname,
 	acpi_operand_object     **params,
 	acpi_operand_object     **return_object);
 
 acpi_status
 acpi_ns_evaluate_relative (
 	acpi_namespace_node     *prefix_node,
-	NATIVE_CHAR             *pathname,
+	char                    *pathname,
 	acpi_operand_object     **params,
 	acpi_operand_object     **return_object);
 
@@ -304,14 +303,14 @@ acpi_ns_opens_scope (
 void
 acpi_ns_build_external_path (
 	acpi_namespace_node     *node,
-	ACPI_SIZE               size,
-	NATIVE_CHAR             *name_buffer);
+	acpi_size               size,
+	char                    *name_buffer);
 
-NATIVE_CHAR *
+char *
 acpi_ns_get_external_pathname (
 	acpi_namespace_node     *node);
 
-NATIVE_CHAR *
+char *
 acpi_ns_name_of_current_scope (
 	acpi_walk_state         *walk_state);
 
@@ -323,16 +322,16 @@ acpi_ns_handle_to_pathname (
 u8
 acpi_ns_pattern_match (
 	acpi_namespace_node     *obj_node,
-	NATIVE_CHAR             *search_for);
+	char                    *search_for);
 
 acpi_status
 acpi_ns_get_node_by_path (
-	NATIVE_CHAR             *external_pathname,
+	char                    *external_pathname,
 	acpi_namespace_node     *in_prefix_node,
 	u32                     flags,
 	acpi_namespace_node     **out_node);
 
-ACPI_SIZE
+acpi_size
 acpi_ns_get_pathname_length (
 	acpi_namespace_node     *node);
 
@@ -358,18 +357,18 @@ acpi_ns_get_secondary_object (
 acpi_status
 acpi_ns_attach_data (
 	acpi_namespace_node     *node,
-	ACPI_OBJECT_HANDLER     handler,
+	acpi_object_handler     handler,
 	void                    *data);
 
 acpi_status
 acpi_ns_detach_data (
 	acpi_namespace_node     *node,
-	ACPI_OBJECT_HANDLER     handler);
+	acpi_object_handler     handler);
 
 acpi_status
 acpi_ns_get_attached_data (
 	acpi_namespace_node     *node,
-	ACPI_OBJECT_HANDLER     handler,
+	acpi_object_handler     handler,
 	void                    **data);
 
 
@@ -408,11 +407,11 @@ acpi_ns_install_node (
 
 u8
 acpi_ns_valid_root_prefix (
-	NATIVE_CHAR             prefix);
+	char                    prefix);
 
 u8
 acpi_ns_valid_path_separator (
-	NATIVE_CHAR             sep);
+	char                    sep);
 
 acpi_object_type
 acpi_ns_get_type (
@@ -424,7 +423,7 @@ acpi_ns_local (
 
 void
 acpi_ns_report_error (
-	NATIVE_CHAR             *module_name,
+	char                    *module_name,
 	u32                     line_number,
 	u32                     component_id,
 	char                    *internal_name,
@@ -432,7 +431,7 @@ acpi_ns_report_error (
 
 void
 acpi_ns_report_method_error (
-	NATIVE_CHAR             *module_name,
+	char                    *module_name,
 	u32                     line_number,
 	u32                     component_id,
 	char                    *message,
@@ -443,7 +442,7 @@ acpi_ns_report_method_error (
 void
 acpi_ns_print_node_pathname (
 	acpi_namespace_node     *node,
-	NATIVE_CHAR             *msg);
+	char                    *msg);
 
 acpi_status
 acpi_ns_build_internal_name (
@@ -455,15 +454,15 @@ acpi_ns_get_internal_name_length (
 
 acpi_status
 acpi_ns_internalize_name (
-	NATIVE_CHAR             *dotted_name,
-	NATIVE_CHAR             **converted_name);
+	char                    *dotted_name,
+	char                    **converted_name);
 
 acpi_status
 acpi_ns_externalize_name (
 	u32                     internal_name_length,
-	NATIVE_CHAR             *internal_name,
+	char                    *internal_name,
 	u32                     *converted_name_length,
-	NATIVE_CHAR             **converted_name);
+	char                    **converted_name);
 
 acpi_namespace_node *
 acpi_ns_map_handle_to_node (

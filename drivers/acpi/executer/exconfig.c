@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Module Name: exconfig - Namespace reconfiguration (Load/Unload opcodes)
- *              $Revision: 69 $
  *
  *****************************************************************************/
 
@@ -38,11 +37,11 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_add_table
+ * FUNCTION:    acpi_ex_add_table
  *
  * PARAMETERS:  Table               - Pointer to raw table
- *              Parent_node         - Where to load the table (scope)
- *              Ddb_handle          - Where to return the table handle.
+ *              parent_node         - Where to load the table (scope)
+ *              ddb_handle          - Where to return the table handle.
  *
  * RETURN:      Status
  *
@@ -62,7 +61,7 @@ acpi_ex_add_table (
 	acpi_operand_object     *obj_desc;
 
 
-	ACPI_FUNCTION_TRACE ("Ex_add_table");
+	ACPI_FUNCTION_TRACE ("ex_add_table");
 
 
 	/* Create an object to be the table handle */
@@ -75,7 +74,7 @@ acpi_ex_add_table (
 	/* Install the new table into the local data structures */
 
 	table_info.pointer     = table;
-	table_info.length      = (ACPI_SIZE) table->length;
+	table_info.length      = (acpi_size) table->length;
 	table_info.allocation  = ACPI_MEM_ALLOCATED;
 
 	status = acpi_tb_install_table (&table_info);
@@ -109,10 +108,10 @@ cleanup:
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_load_table_op
+ * FUNCTION:    acpi_ex_load_table_op
  *
- * PARAMETERS:  Walk_state          - Current state with operands
- *              Return_desc         - Where to store the return object
+ * PARAMETERS:  walk_state          - Current state with operands
+ *              return_desc         - Where to store the return object
  *
  * RETURN:      Status
  *
@@ -134,7 +133,7 @@ acpi_ex_load_table_op (
 	acpi_operand_object     *ddb_handle;
 
 
-	ACPI_FUNCTION_TRACE ("Ex_load_table_op");
+	ACPI_FUNCTION_TRACE ("ex_load_table_op");
 
 
 #if 0
@@ -178,11 +177,11 @@ acpi_ex_load_table_op (
 	start_node = walk_state->scope_info->scope.node;
 	parent_node = acpi_gbl_root_node;
 
-	/* Root_path (optional parameter) */
+	/* root_path (optional parameter) */
 
 	if (operand[3]->string.length > 0) {
 		/*
-		 * Find the node referenced by the Root_path_string. This is the
+		 * Find the node referenced by the root_path_string. This is the
 		 * location within the namespace where the table will be loaded.
 		 */
 		status = acpi_ns_get_node_by_path (operand[3]->string.pointer, start_node,
@@ -192,20 +191,20 @@ acpi_ex_load_table_op (
 		}
 	}
 
-	/* Parameter_path (optional parameter) */
+	/* parameter_path (optional parameter) */
 
 	if (operand[4]->string.length > 0) {
 		if ((operand[4]->string.pointer[0] != '\\') &&
 			(operand[4]->string.pointer[0] != '^')) {
 			/*
 			 * Path is not absolute, so it will be relative to the node
-			 * referenced by the Root_path_string (or the NS root if omitted)
+			 * referenced by the root_path_string (or the NS root if omitted)
 			 */
 			start_node = parent_node;
 		}
 
 		/*
-		 * Find the node referenced by the Parameter_path_string
+		 * Find the node referenced by the parameter_path_string
 		 */
 		status = acpi_ns_get_node_by_path (operand[4]->string.pointer, start_node,
 				   ACPI_NS_SEARCH_PARENT, &parameter_node);
@@ -239,12 +238,12 @@ acpi_ex_load_table_op (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_load_op
+ * FUNCTION:    acpi_ex_load_op
  *
- * PARAMETERS:  Obj_desc        - Region or Field where the table will be
+ * PARAMETERS:  obj_desc        - Region or Field where the table will be
  *                                obtained
  *              Target          - Where a handle to the table will be stored
- *              Walk_state      - Current state
+ *              walk_state      - Current state
  *
  * RETURN:      Status
  *
@@ -266,10 +265,10 @@ acpi_ex_load_op (
 	acpi_table_header       table_header;
 	u32                     i;
 
-	ACPI_FUNCTION_TRACE ("Ex_load_op");
+	ACPI_FUNCTION_TRACE ("ex_load_op");
 
 
-	/* Object can be either an Op_region or a Field */
+	/* Object can be either an op_region or a Field */
 
 	switch (ACPI_GET_OBJECT_TYPE (obj_desc)) {
 	case ACPI_TYPE_REGION:
@@ -282,7 +281,7 @@ acpi_ex_load_op (
 		table_header.length = 0;
 		for (i = 0; i < sizeof (acpi_table_header); i++) {
 			status = acpi_ev_address_space_dispatch (obj_desc, ACPI_READ,
-					   (ACPI_PHYSICAL_ADDRESS) i, 8,
+					   (acpi_physical_address) i, 8,
 					   ((u8 *) &table_header) + i);
 			if (ACPI_FAILURE (status)) {
 				return_ACPI_STATUS (status);
@@ -305,7 +304,7 @@ acpi_ex_load_op (
 
 		for (i = 0; i < table_header.length; i++) {
 			status = acpi_ev_address_space_dispatch (obj_desc, ACPI_READ,
-					   (ACPI_PHYSICAL_ADDRESS) i, 8,
+					   (acpi_physical_address) i, 8,
 					   ((u8 *) table_data_ptr + i));
 			if (ACPI_FAILURE (status)) {
 				goto cleanup;
@@ -362,7 +361,7 @@ acpi_ex_load_op (
 		goto cleanup;
 	}
 
-	/* Store the Ddb_handle into the Target operand */
+	/* Store the ddb_handle into the Target operand */
 
 	status = acpi_ex_store (ddb_handle, target, walk_state);
 	if (ACPI_FAILURE (status)) {
@@ -386,9 +385,9 @@ cleanup:
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_unload_table
+ * FUNCTION:    acpi_ex_unload_table
  *
- * PARAMETERS:  Ddb_handle          - Handle to a previously loaded table
+ * PARAMETERS:  ddb_handle          - Handle to a previously loaded table
  *
  * RETURN:      Status
  *
@@ -405,13 +404,13 @@ acpi_ex_unload_table (
 	acpi_table_desc         *table_info;
 
 
-	ACPI_FUNCTION_TRACE ("Ex_unload_table");
+	ACPI_FUNCTION_TRACE ("ex_unload_table");
 
 
 	/*
 	 * Validate the handle
-	 * Although the handle is partially validated in Acpi_ex_reconfiguration(),
-	 * when it calls Acpi_ex_resolve_operands(), the handle is more completely
+	 * Although the handle is partially validated in acpi_ex_reconfiguration(),
+	 * when it calls acpi_ex_resolve_operands(), the handle is more completely
 	 * validated here.
 	 */
 	if ((!ddb_handle) ||
@@ -420,13 +419,13 @@ acpi_ex_unload_table (
 		return_ACPI_STATUS (AE_BAD_PARAMETER);
 	}
 
-	/* Get the actual table descriptor from the Ddb_handle */
+	/* Get the actual table descriptor from the ddb_handle */
 
 	table_info = (acpi_table_desc *) table_desc->reference.object;
 
 	/*
 	 * Delete the entire namespace under this table Node
-	 * (Offset contains the Table_id)
+	 * (Offset contains the table_id)
 	 */
 	acpi_ns_delete_namespace_by_owner (table_info->table_id);
 
@@ -434,7 +433,7 @@ acpi_ex_unload_table (
 
 	(void) acpi_tb_uninstall_table (table_info->installed_desc);
 
-	/* Delete the table descriptor (Ddb_handle) */
+	/* Delete the table descriptor (ddb_handle) */
 
 	acpi_ut_remove_reference (table_desc);
 	return_ACPI_STATUS (status);

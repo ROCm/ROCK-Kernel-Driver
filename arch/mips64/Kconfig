@@ -371,6 +371,11 @@ config MIPS32_COMPAT
 	  compatibility. Since all software available for Linux/MIPS is
 	  currently 32-bit you should say Y here.
 
+config COMPAT
+	bool
+	depends on MIPS32_COMPAT
+	default y
+
 config BINFMT_ELF32
 	bool
 	depends on MIPS32_COMPAT

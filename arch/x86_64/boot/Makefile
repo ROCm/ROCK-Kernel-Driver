@@ -36,8 +36,6 @@ host-progs	:= tools/build
 
 boot: bzImage
 
-include $(TOPDIR)/Rules.make
-
 # ---------------------------------------------------------------------------
 
 $(obj)/zImage:  IMAGE_OFFSET := 0x1000

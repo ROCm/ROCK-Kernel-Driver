@@ -7,19 +7,13 @@
  * @author John Levon <levon@movementarian.org>
  */
 
-#include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/notifier.h>
 #include <linux/smp.h>
 #include <linux/oprofile.h>
-#include <linux/pm.h>
-#include <linux/thread_info.h>
 #include <asm/nmi.h>
-#include <asm/ptrace.h>
 #include <asm/msr.h>
 #include <asm/apic.h>
-#include <asm/bitops.h>
-#include <asm/processor.h>
  
 #include "op_counter.h"
 #include "op_x86_model.h"
@@ -27,7 +21,6 @@
 static struct op_x86_model_spec const * model;
 static struct op_msrs cpu_msrs[NR_CPUS];
 static unsigned long saved_lvtpc[NR_CPUS];
-static unsigned long kernel_only;
  
 static int nmi_start(void);
 static void nmi_stop(void);
@@ -53,10 +46,9 @@ static int oprofile_pm_callback(struct pm_dev * dev,
 }
  
  
-// FIXME: kernel_only
 static int nmi_callback(struct pt_regs * regs, int cpu)
 {
-	return (model->check_ctrs(cpu, &cpu_msrs[cpu], regs));
+	return model->check_ctrs(cpu, &cpu_msrs[cpu], regs);
 }
  
  
@@ -210,7 +202,6 @@ static int nmi_create_files(struct super_block * sb, struct dentry * root)
 		oprofilefs_create_ulong(sb, dir, "user", &counter_config[i].user); 
 	}
 
-	oprofilefs_create_ulong(sb, root, "kernel_only", &kernel_only);
 	return 0;
 }
  

@@ -5,7 +5,7 @@ menu "ALSA USB devices"
 
 config SND_USB_AUDIO
 	tristate "USB Audio/MIDI driver"
-	depends on SND
+	depends on SND && USB
 	help
 	  Say 'Y' or 'M' to include support for USB audio and USB MIDI devices.
 

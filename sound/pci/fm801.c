@@ -164,7 +164,7 @@ struct _snd_fm801 {
 };
 
 static struct pci_device_id snd_fm801_ids[] __devinitdata = {
-	{ 0x1319, 0x0801, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0, },   /* FM801 */
+	{ 0x1319, 0x0801, PCI_ANY_ID, PCI_ANY_ID, PCI_CLASS_MULTIMEDIA_AUDIO << 8, 0xffff00, 0, },   /* FM801 */
 	{ 0, }
 };
 
@@ -517,18 +517,18 @@ static snd_pcm_hardware_t snd_fm801_playback =
 	.info =			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
 				 SNDRV_PCM_INFO_BLOCK_TRANSFER |
 				 SNDRV_PCM_INFO_MMAP_VALID),
-	formats:		SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE,
-	rates:			SNDRV_PCM_RATE_KNOT | SNDRV_PCM_RATE_8000_48000,
-	rate_min:		5500,
-	rate_max:		48000,
-	channels_min:		1,
-	channels_max:		2,
-	buffer_bytes_max:	(128*1024),
-	period_bytes_min:	64,
-	period_bytes_max:	(128*1024),
-	periods_min:		1,
-	periods_max:		1024,
-	fifo_size:		0,
+	.formats =		SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE,
+	.rates =		SNDRV_PCM_RATE_KNOT | SNDRV_PCM_RATE_8000_48000,
+	.rate_min =		5500,
+	.rate_max =		48000,
+	.channels_min =		1,
+	.channels_max =		2,
+	.buffer_bytes_max =	(128*1024),
+	.period_bytes_min =	64,
+	.period_bytes_max =	(128*1024),
+	.periods_min =		1,
+	.periods_max =		1024,
+	.fifo_size =		0,
 };
 
 static snd_pcm_hardware_t snd_fm801_capture =
@@ -536,18 +536,18 @@ static snd_pcm_hardware_t snd_fm801_capture =
 	.info =			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
 				 SNDRV_PCM_INFO_BLOCK_TRANSFER |
 				 SNDRV_PCM_INFO_MMAP_VALID),
-	formats:		SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE,
-	rates:			SNDRV_PCM_RATE_KNOT | SNDRV_PCM_RATE_8000_48000,
-	rate_min:		5500,
-	rate_max:		48000,
-	channels_min:		1,
-	channels_max:		2,
-	buffer_bytes_max:	(128*1024),
-	period_bytes_min:	64,
-	period_bytes_max:	(128*1024),
-	periods_min:		1,
-	periods_max:		1024,
-	fifo_size:		0,
+	.formats =		SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE,
+	.rates =		SNDRV_PCM_RATE_KNOT | SNDRV_PCM_RATE_8000_48000,
+	.rate_min =		5500,
+	.rate_max =		48000,
+	.channels_min =		1,
+	.channels_max =		2,
+	.buffer_bytes_max =	(128*1024),
+	.period_bytes_min =	64,
+	.period_bytes_max =	(128*1024),
+	.periods_min =		1,
+	.periods_max =		1024,
+	.fifo_size =		0,
 };
 
 static int snd_fm801_playback_open(snd_pcm_substream_t * substream)
@@ -834,7 +834,7 @@ static void snd_fm801_mixer_free_ac97(ac97_t *ac97)
 	}
 }
 
-static int __init snd_fm801_mixer(fm801_t *chip)
+static int __devinit snd_fm801_mixer(fm801_t *chip)
 {
 	ac97_t ac97;
 	int err, i;
@@ -907,7 +907,7 @@ static int __devinit snd_fm801_create(snd_card_t * card,
 	static snd_device_ops_t ops = {
 		.dev_free =	snd_fm801_dev_free,
 	};
-	
+
 	*rchip = NULL;
 	if ((err = pci_enable_device(pci)) < 0)
 		return err;
@@ -920,13 +920,13 @@ static int __devinit snd_fm801_create(snd_card_t * card,
 	chip->irq = -1;
 	chip->port = pci_resource_start(pci, 0);
 	if ((chip->res_port = request_region(chip->port, 0x80, "FM801")) == NULL) {
-		snd_fm801_free(chip);
 		snd_printk("unable to grab region 0x%lx-0x%lx\n", chip->port, chip->port + 0x80 - 1);
+		snd_fm801_free(chip);
 		return -EBUSY;
 	}
 	if (request_irq(pci->irq, snd_fm801_interrupt, SA_INTERRUPT|SA_SHIRQ, "FM801", (void *)chip)) {
-		snd_fm801_free(chip);
 		snd_printk("unable to grab IRQ %d\n", chip->irq);
+		snd_fm801_free(chip);
 		return -EBUSY;
 	}
 	chip->irq = pci->irq;
@@ -1070,7 +1070,7 @@ static int __devinit snd_card_fm801_probe(struct pci_dev *pci,
 		snd_card_free(card);
 		return err;
 	}
- 
+
 	strcpy(card->driver, "FM801");
 	strcpy(card->shortname, "ForteMedia FM801-");
 	strcat(card->shortname, chip->multichannel ? "AU" : "AS");
@@ -1098,7 +1098,7 @@ static struct pci_driver driver = {
 	.probe = snd_card_fm801_probe,
 	.remove = __devexit_p(snd_card_fm801_remove),
 };
-                                                                
+
 static int __init alsa_card_fm801_init(void)
 {
 	int err;

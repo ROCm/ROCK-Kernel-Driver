@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Module Name: dsmethod - Parser/Interpreter interface - control method parsing
- *              $Revision: 89 $
  *
  *****************************************************************************/
 
@@ -38,12 +37,12 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ds_parse_method
+ * FUNCTION:    acpi_ds_parse_method
  *
- * PARAMETERS:  Obj_handle      - Node of the method
+ * PARAMETERS:  obj_handle      - Node of the method
  *              Level           - Current nesting level
  *              Context         - Points to a method counter
- *              Return_value    - Not used
+ *              return_value    - Not used
  *
  * RETURN:      Status
  *
@@ -66,7 +65,7 @@ acpi_ds_parse_method (
 	acpi_walk_state         *walk_state;
 
 
-	ACPI_FUNCTION_TRACE_PTR ("Ds_parse_method", obj_handle);
+	ACPI_FUNCTION_TRACE_PTR ("ds_parse_method", obj_handle);
 
 
 	/* Parameter Validation */
@@ -75,7 +74,7 @@ acpi_ds_parse_method (
 		return_ACPI_STATUS (AE_NULL_ENTRY);
 	}
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_PARSE, "**** Parsing [%4.4s] **** Named_obj=%p\n",
+	ACPI_DEBUG_PRINT ((ACPI_DB_PARSE, "**** Parsing [%4.4s] **** named_obj=%p\n",
 		((acpi_namespace_node *) obj_handle)->name.ascii, obj_handle));
 
 	/* Extract the method object from the method Node */
@@ -113,7 +112,7 @@ acpi_ds_parse_method (
 	op->common.node = node;
 
 	/*
-	 * Get a new Owner_id for objects created by this method. Namespace
+	 * Get a new owner_id for objects created by this method. Namespace
 	 * objects (such as Operation Regions) can be created during the
 	 * first pass parse.
 	 */
@@ -150,7 +149,7 @@ acpi_ds_parse_method (
 	}
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_PARSE,
-		"**** [%4.4s] Parsed **** Named_obj=%p Op=%p\n",
+		"**** [%4.4s] Parsed **** named_obj=%p Op=%p\n",
 		((acpi_namespace_node *) obj_handle)->name.ascii, obj_handle, op));
 
 	acpi_ps_delete_parse_tree (op);
@@ -160,11 +159,11 @@ acpi_ds_parse_method (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ds_begin_method_execution
+ * FUNCTION:    acpi_ds_begin_method_execution
  *
- * PARAMETERS:  Method_node         - Node of the method
- *              Obj_desc            - The method object
- *              Calling_method_node - Caller of this method (if non-null)
+ * PARAMETERS:  method_node         - Node of the method
+ *              obj_desc            - The method object
+ *              calling_method_node - Caller of this method (if non-null)
  *
  * RETURN:      Status
  *
@@ -185,7 +184,7 @@ acpi_ds_begin_method_execution (
 	acpi_status             status = AE_OK;
 
 
-	ACPI_FUNCTION_TRACE_PTR ("Ds_begin_method_execution", method_node);
+	ACPI_FUNCTION_TRACE_PTR ("ds_begin_method_execution", method_node);
 
 
 	if (!method_node) {
@@ -199,7 +198,7 @@ acpi_ds_begin_method_execution (
 	if (obj_desc->method.semaphore) {
 		/*
 		 * Allow recursive method calls, up to the reentrancy/concurrency
-		 * limit imposed by the SERIALIZED rule and the Sync_level method
+		 * limit imposed by the SERIALIZED rule and the sync_level method
 		 * parameter.
 		 *
 		 * The point of this code is to avoid permanently blocking a
@@ -230,9 +229,9 @@ acpi_ds_begin_method_execution (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ds_call_control_method
+ * FUNCTION:    acpi_ds_call_control_method
  *
- * PARAMETERS:  Walk_state          - Current state of the walk
+ * PARAMETERS:  walk_state          - Current state of the walk
  *              Op                  - Current Op to be walked
  *
  * RETURN:      Status
@@ -243,7 +242,7 @@ acpi_ds_begin_method_execution (
 
 acpi_status
 acpi_ds_call_control_method (
-	ACPI_THREAD_STATE       *thread,
+	acpi_thread_state       *thread,
 	acpi_walk_state         *this_walk_state,
 	acpi_parse_object       *op)
 {
@@ -254,7 +253,7 @@ acpi_ds_call_control_method (
 	u32                     i;
 
 
-	ACPI_FUNCTION_TRACE_PTR ("Ds_call_control_method", this_walk_state);
+	ACPI_FUNCTION_TRACE_PTR ("ds_call_control_method", this_walk_state);
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH, "Execute method %p, currentstate=%p\n",
 		this_walk_state->prev_op, this_walk_state));
@@ -364,9 +363,9 @@ cleanup:
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ds_restart_control_method
+ * FUNCTION:    acpi_ds_restart_control_method
  *
- * PARAMETERS:  Walk_state          - State of the method when it was preempted
+ * PARAMETERS:  walk_state          - State of the method when it was preempted
  *              Op                  - Pointer to new current op
  *
  * RETURN:      Status
@@ -383,7 +382,7 @@ acpi_ds_restart_control_method (
 	acpi_status             status;
 
 
-	ACPI_FUNCTION_TRACE_PTR ("Ds_restart_control_method", walk_state);
+	ACPI_FUNCTION_TRACE_PTR ("ds_restart_control_method", walk_state);
 
 
 	if (return_desc) {
@@ -408,7 +407,7 @@ acpi_ds_restart_control_method (
 	}
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH,
-		"Method=%p Return=%p Return_used?=%X Res_stack=%p State=%p\n",
+		"Method=%p Return=%p return_used?=%X res_stack=%p State=%p\n",
 		walk_state->method_call_op, return_desc, walk_state->return_used,
 		walk_state->results, walk_state));
 
@@ -418,9 +417,9 @@ acpi_ds_restart_control_method (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ds_terminate_control_method
+ * FUNCTION:    acpi_ds_terminate_control_method
  *
- * PARAMETERS:  Walk_state          - State of the method
+ * PARAMETERS:  walk_state          - State of the method
  *
  * RETURN:      Status
  *
@@ -439,7 +438,7 @@ acpi_ds_terminate_control_method (
 	acpi_status             status;
 
 
-	ACPI_FUNCTION_TRACE_PTR ("Ds_terminate_control_method", walk_state);
+	ACPI_FUNCTION_TRACE_PTR ("ds_terminate_control_method", walk_state);
 
 
 	if (!walk_state) {

@@ -1,7 +1,6 @@
 /*******************************************************************************
  *
  * Module Name: nsaccess - Top-level functions for accessing ACPI namespace
- *              $Revision: 165 $
  *
  ******************************************************************************/
 
@@ -36,7 +35,7 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ns_root_initialize
+ * FUNCTION:    acpi_ns_root_initialize
  *
  * PARAMETERS:  None
  *
@@ -57,7 +56,7 @@ acpi_ns_root_initialize (void)
 	acpi_operand_object         *obj_desc;
 
 
-	ACPI_FUNCTION_TRACE ("Ns_root_initialize");
+	ACPI_FUNCTION_TRACE ("ns_root_initialize");
 
 
 	status = acpi_ut_acquire_mutex (ACPI_MTX_NAMESPACE);
@@ -67,7 +66,7 @@ acpi_ns_root_initialize (void)
 
 	/*
 	 * The global root ptr is initially NULL, so a non-NULL value indicates
-	 * that Acpi_ns_root_initialize() has already been called; just return.
+	 * that acpi_ns_root_initialize() has already been called; just return.
 	 */
 	if (acpi_gbl_root_node) {
 		status = AE_OK;
@@ -97,7 +96,7 @@ acpi_ns_root_initialize (void)
 
 		/*
 		 * Name entered successfully.
-		 * If entry in Pre_defined_names[] specifies an
+		 * If entry in pre_defined_names[] specifies an
 		 * initial value, create the initial value.
 		 */
 		if (init_val->val) {
@@ -124,7 +123,7 @@ acpi_ns_root_initialize (void)
 
 #if defined (ACPI_NO_METHOD_EXECUTION) || defined (ACPI_CONSTANT_EVAL_ONLY)
 
-				/* Compiler cheats by putting parameter count in the Owner_iD */
+				/* Compiler cheats by putting parameter count in the owner_iD */
 
 				new_node->owner_id = obj_desc->method.param_count;
 #endif
@@ -210,16 +209,16 @@ unlock_and_exit:
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ns_lookup
+ * FUNCTION:    acpi_ns_lookup
  *
- * PARAMETERS:  Prefix_node     - Search scope if name is not fully qualified
+ * PARAMETERS:  prefix_node     - Search scope if name is not fully qualified
  *              Pathname        - Search pathname, in internal format
  *                                (as represented in the AML stream)
  *              Type            - Type associated with name
- *              Interpreter_mode - IMODE_LOAD_PASS2 => add name if not found
+ *              interpreter_mode - IMODE_LOAD_PASS2 => add name if not found
  *              Flags           - Flags describing the search restrictions
- *              Walk_state      - Current state of the walk
- *              Return_node     - Where the Node is placed (if found
+ *              walk_state      - Current state of the walk
+ *              return_node     - Where the Node is placed (if found
  *                                or created successfully)
  *
  * RETURN:      Status
@@ -234,7 +233,7 @@ unlock_and_exit:
 acpi_status
 acpi_ns_lookup (
 	acpi_generic_state      *scope_info,
-	NATIVE_CHAR             *pathname,
+	char                    *pathname,
 	acpi_object_type        type,
 	acpi_interpreter_mode   interpreter_mode,
 	u32                     flags,
@@ -242,7 +241,7 @@ acpi_ns_lookup (
 	acpi_namespace_node     **return_node)
 {
 	acpi_status             status;
-	NATIVE_CHAR             *path = pathname;
+	char                    *path = pathname;
 	acpi_namespace_node     *prefix_node;
 	acpi_namespace_node     *current_node = NULL;
 	acpi_namespace_node     *this_node = NULL;
@@ -256,7 +255,7 @@ acpi_ns_lookup (
 			   ACPI_NS_SEARCH_PARENT);
 
 
-	ACPI_FUNCTION_TRACE ("Ns_lookup");
+	ACPI_FUNCTION_TRACE ("ns_lookup");
 
 
 	if (!return_node) {
@@ -309,7 +308,7 @@ acpi_ns_lookup (
 	 * Begin examination of the actual pathname
 	 */
 	if (!pathname) {
-		/* A Null Name_path is allowed and refers to the root */
+		/* A Null name_path is allowed and refers to the root */
 
 		num_segments = 0;
 		this_node    = acpi_gbl_root_node;
@@ -393,8 +392,8 @@ acpi_ns_lookup (
 		 *
 		 * The segment part consists of either:
 		 *  - A Null name segment (0)
-		 *  - A Dual_name_prefix followed by two 4-byte name segments
-		 *  - A Multi_name_prefix followed by a byte indicating the
+		 *  - A dual_name_prefix followed by two 4-byte name segments
+		 *  - A multi_name_prefix followed by a byte indicating the
 		 *      number of segments and the segments themselves.
 		 *  - A single 4-byte name segment
 		 *
@@ -416,7 +415,7 @@ acpi_ns_lookup (
 
 		case AML_DUAL_NAME_PREFIX:
 
-			/* More than one Name_seg, search rules do not apply */
+			/* More than one name_seg, search rules do not apply */
 
 			search_parent_flag = ACPI_NS_NO_UPSEARCH;
 
@@ -431,7 +430,7 @@ acpi_ns_lookup (
 
 		case AML_MULTI_NAME_PREFIX_OP:
 
-			/* More than one Name_seg, search rules do not apply */
+			/* More than one name_seg, search rules do not apply */
 
 			search_parent_flag = ACPI_NS_NO_UPSEARCH;
 
@@ -482,7 +481,7 @@ acpi_ns_lookup (
 
 			/*
 			 * Only allow automatic parent search (search rules) if the caller
-			 * requested it AND we have a single, non-fully-qualified Name_seg
+			 * requested it AND we have a single, non-fully-qualified name_seg
 			 */
 			if ((search_parent_flag != ACPI_NS_NO_UPSEARCH) &&
 				(flags & ACPI_NS_SEARCH_PARENT)) {
@@ -521,7 +520,7 @@ acpi_ns_lookup (
 		/*
 		 * Sanity typecheck of the target object:
 		 *
-		 * If 1) This is the last segment (Num_segments == 0)
+		 * If 1) This is the last segment (num_segments == 0)
 		 *    2) And we are looking for a specific type
 		 *       (Not checking for TYPE_ANY)
 		 *    3) Which is not an alias
@@ -540,7 +539,7 @@ acpi_ns_lookup (
 			/* Complain about a type mismatch */
 
 			ACPI_REPORT_WARNING (
-				("Ns_lookup: Type mismatch on %4.4s (%s), searching for (%s)\n",
+				("ns_lookup: Type mismatch on %4.4s (%s), searching for (%s)\n",
 				(char *) &simple_name, acpi_ut_get_type_name (this_node->type),
 				acpi_ut_get_type_name (type_to_check_for)));
 		}

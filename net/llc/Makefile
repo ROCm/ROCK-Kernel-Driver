@@ -21,5 +21,3 @@ llc-$(CONFIG_LLC_UI)	+= af_llc.o
 
 # Objects that export symbols.
 export-objs := llc_if.o
-
-include $(TOPDIR)/Rules.make

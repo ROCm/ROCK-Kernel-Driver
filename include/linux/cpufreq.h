@@ -37,15 +37,26 @@ int cpufreq_unregister_notifier(struct notifier_block *nb, unsigned int list);
 #define CPUFREQ_POLICY_POWERSAVE        (1)
 #define CPUFREQ_POLICY_PERFORMANCE      (2)
 
-/* values here are CPU kHz so that hardware which doesn't run with some
- * frequencies can complain without having to guess what per cent / per
- * mille means. */
+/* Frequency values here are CPU kHz so that hardware which doesn't run 
+ * with some frequencies can complain without having to guess what per 
+ * cent / per mille means. 
+ * Maximum transition latency is in nanoseconds - if it's unknown,
+ * CPUFREQ_ETERNAL shall be used.
+ */
+
+#define CPUFREQ_ETERNAL (-1)
+struct cpufreq_cpuinfo {
+	unsigned int            max_freq;
+	unsigned int            min_freq;
+	unsigned int            transition_latency;
+};
+
 struct cpufreq_policy {
 	unsigned int            cpu;    /* cpu nr or CPUFREQ_ALL_CPUS */
 	unsigned int            min;    /* in kHz */
 	unsigned int            max;    /* in kHz */
         unsigned int            policy; /* see above */
-	unsigned int            max_cpu_freq; /* for information */
+	struct cpufreq_cpuinfo  cpuinfo;     /* see above */
 };
 
 #define CPUFREQ_ADJUST          (0)
@@ -116,7 +127,6 @@ struct cpufreq_driver {
 #endif
 	/* 2.4. compatible API */
 #ifdef CONFIG_CPU_FREQ_24_API
-	unsigned int            cpu_min_freq[NR_CPUS];
 	unsigned int            cpu_cur_freq[NR_CPUS];
 #endif
 };

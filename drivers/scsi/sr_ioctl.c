@@ -8,6 +8,7 @@
 #include <linux/blk.h>
 #include <linux/blkpg.h>
 #include <linux/cdrom.h>
+#include <asm/io.h>
 
 #include "scsi.h"
 #include "hosts.h"
@@ -156,9 +157,6 @@ int sr_do_ioctl(Scsi_CD *cd, struct cdrom_generic_command *cgc)
 			err = -ENOMEDIUM;
 			break;
 		case ILLEGAL_REQUEST:
-			if (!cgc->quiet)
-				printk(KERN_ERR "%s: CDROM (ioctl) reports ILLEGAL "
-				       "REQUEST.\n", cd->cdi.name);
 			err = -EIO;
 			if (SRpnt->sr_sense_buffer[12] == 0x20 &&
 			    SRpnt->sr_sense_buffer[13] == 0x00)

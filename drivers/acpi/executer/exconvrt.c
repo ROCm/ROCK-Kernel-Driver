@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Module Name: exconvrt - Object conversion routines
- *              $Revision: 45 $
  *
  *****************************************************************************/
 
@@ -35,11 +34,11 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_convert_to_integer
+ * FUNCTION:    acpi_ex_convert_to_integer
  *
- * PARAMETERS:  *Obj_desc       - Object to be converted.  Must be an
+ * PARAMETERS:  *obj_desc       - Object to be converted.  Must be an
  *                                Integer, Buffer, or String
- *              Walk_state      - Current method state
+ *              walk_state      - Current method state
  *
  * RETURN:      Status
  *
@@ -61,7 +60,7 @@ acpi_ex_convert_to_integer (
 	acpi_status             status;
 
 
-	ACPI_FUNCTION_TRACE_PTR ("Ex_convert_to_integer", obj_desc);
+	ACPI_FUNCTION_TRACE_PTR ("ex_convert_to_integer", obj_desc);
 
 
 	switch (ACPI_GET_OBJECT_TYPE (obj_desc)) {
@@ -169,11 +168,11 @@ acpi_ex_convert_to_integer (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_convert_to_buffer
+ * FUNCTION:    acpi_ex_convert_to_buffer
  *
- * PARAMETERS:  *Obj_desc       - Object to be converted.  Must be an
+ * PARAMETERS:  *obj_desc       - Object to be converted.  Must be an
  *                                Integer, Buffer, or String
- *              Walk_state      - Current method state
+ *              walk_state      - Current method state
  *
  * RETURN:      Status
  *
@@ -192,7 +191,7 @@ acpi_ex_convert_to_buffer (
 	u8                      *new_buf;
 
 
-	ACPI_FUNCTION_TRACE_PTR ("Ex_convert_to_buffer", obj_desc);
+	ACPI_FUNCTION_TRACE_PTR ("ex_convert_to_buffer", obj_desc);
 
 
 	switch (ACPI_GET_OBJECT_TYPE (obj_desc)) {
@@ -230,7 +229,7 @@ acpi_ex_convert_to_buffer (
 		 * Create a new Buffer object
 		 * Size will be the string length
 		 */
-		ret_desc = acpi_ut_create_buffer_object ((ACPI_SIZE) obj_desc->string.length);
+		ret_desc = acpi_ut_create_buffer_object ((acpi_size) obj_desc->string.length);
 		if (!ret_desc) {
 			return_ACPI_STATUS (AE_NO_MEMORY);
 		}
@@ -269,11 +268,12 @@ acpi_ex_convert_to_buffer (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_convert_ascii
+ * FUNCTION:    acpi_ex_convert_ascii
  *
  * PARAMETERS:  Integer         - Value to be converted
  *              Base            - 10 or 16
  *              String          - Where the string is returned
+ *              data_width      - Size of data item to be converted
  *
  * RETURN:      Actual string length
  *
@@ -285,7 +285,8 @@ u32
 acpi_ex_convert_to_ascii (
 	acpi_integer            integer,
 	u32                     base,
-	u8                      *string)
+	u8                      *string,
+	u8                      data_width)
 {
 	u32                     i;
 	u32                     j;
@@ -293,11 +294,20 @@ acpi_ex_convert_to_ascii (
 	char                    hex_digit;
 	acpi_integer            digit;
 	u32                     remainder;
-	u32                     length = sizeof (acpi_integer);
-	u8                      leading_zero = TRUE;
+	u32                     length;
+	u8                      leading_zero;
 
 
 	ACPI_FUNCTION_ENTRY ();
+
+	if (data_width < sizeof (acpi_integer)) {
+		leading_zero = FALSE;
+		length = data_width;
+	}
+	else {
+		leading_zero = TRUE;
+		length = sizeof (acpi_integer);
+	}
 
 
 	switch (base) {
@@ -357,19 +367,19 @@ acpi_ex_convert_to_ascii (
 		string [0] = ACPI_ASCII_ZERO;
 		k = 1;
 	}
-	string [k] = 0;
 
+	string [k] = 0;
 	return (k);
 }
 
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_convert_to_string
+ * FUNCTION:    acpi_ex_convert_to_string
  *
- * PARAMETERS:  *Obj_desc       - Object to be converted.  Must be an
+ * PARAMETERS:  *obj_desc       - Object to be converted.  Must be an
  *                                Integer, Buffer, or String
- *              Walk_state      - Current method state
+ *              walk_state      - Current method state
  *
  * RETURN:      Status
  *
@@ -387,13 +397,12 @@ acpi_ex_convert_to_string (
 {
 	acpi_operand_object     *ret_desc;
 	u32                     i;
-	u32                     index;
 	u32                     string_length;
 	u8                      *new_buf;
 	u8                      *pointer;
 
 
-	ACPI_FUNCTION_TRACE_PTR ("Ex_convert_to_string", obj_desc);
+	ACPI_FUNCTION_TRACE_PTR ("ex_convert_to_string", obj_desc);
 
 
 	switch (ACPI_GET_OBJECT_TYPE (obj_desc)) {
@@ -427,17 +436,17 @@ acpi_ex_convert_to_string (
 
 		/* Need enough space for one ASCII integer plus null terminator */
 
-		new_buf = ACPI_MEM_CALLOCATE ((ACPI_SIZE) string_length + 1);
+		new_buf = ACPI_MEM_CALLOCATE ((acpi_size) string_length + 1);
 		if (!new_buf) {
 			ACPI_REPORT_ERROR
-				(("Ex_convert_to_string: Buffer allocation failure\n"));
+				(("ex_convert_to_string: Buffer allocation failure\n"));
 			acpi_ut_remove_reference (ret_desc);
 			return_ACPI_STATUS (AE_NO_MEMORY);
 		}
 
 		/* Convert */
 
-		i = acpi_ex_convert_to_ascii (obj_desc->integer.value, base, new_buf);
+		i = acpi_ex_convert_to_ascii (obj_desc->integer.value, base, new_buf, sizeof (acpi_integer));
 
 		/* Null terminate at the correct place */
 
@@ -456,9 +465,15 @@ acpi_ex_convert_to_string (
 
 	case ACPI_TYPE_BUFFER:
 
-		string_length = obj_desc->buffer.length * 3;
-		if (base == 10) {
-			string_length = obj_desc->buffer.length * 4;
+		/* Find the string length */
+
+		pointer = obj_desc->buffer.pointer;
+		for (string_length = 0; string_length < obj_desc->buffer.length; string_length++) {
+			/* Exit on null terminator */
+
+			if (!pointer[string_length]) {
+				break;
+			}
 		}
 
 		if (max_length > ACPI_MAX_STRING_CONVERSION) {
@@ -481,31 +496,23 @@ acpi_ex_convert_to_string (
 			string_length = max_length;
 		}
 
-		new_buf = ACPI_MEM_CALLOCATE ((ACPI_SIZE) string_length + 1);
+		new_buf = ACPI_MEM_CALLOCATE ((acpi_size) string_length + 1);
 		if (!new_buf) {
 			ACPI_REPORT_ERROR
-				(("Ex_convert_to_string: Buffer allocation failure\n"));
+				(("ex_convert_to_string: Buffer allocation failure\n"));
 			acpi_ut_remove_reference (ret_desc);
 			return_ACPI_STATUS (AE_NO_MEMORY);
 		}
 
-		/*
-		 * Convert each byte of the buffer to two ASCII characters plus a space.
-		 */
-		pointer = obj_desc->buffer.pointer;
-		index = 0;
-		for (i = 0, index = 0; i < obj_desc->buffer.length; i++) {
-			index = acpi_ex_convert_to_ascii ((acpi_integer) pointer[i], base, &new_buf[index]);
+		/* Copy the appropriate number of buffer characters */
 
-			new_buf[index] = ' ';
-			index++;
-		}
+		ACPI_MEMCPY (new_buf, pointer, string_length);
 
 		/* Null terminate */
 
-		new_buf [index-1] = 0;
+		new_buf [string_length] = 0;
 		ret_desc->buffer.pointer = new_buf;
-		ret_desc->string.length = (u32) ACPI_STRLEN ((char *) new_buf);
+		ret_desc->string.length = string_length;
 		break;
 
 
@@ -532,11 +539,11 @@ acpi_ex_convert_to_string (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_convert_to_target_type
+ * FUNCTION:    acpi_ex_convert_to_target_type
  *
- * PARAMETERS:  Destination_type    - Current type of the destination
- *              Source_desc         - Source object to be converted.
- *              Walk_state          - Current method state
+ * PARAMETERS:  destination_type    - Current type of the destination
+ *              source_desc         - Source object to be converted.
+ *              walk_state          - Current method state
  *
  * RETURN:      Status
  *
@@ -554,7 +561,7 @@ acpi_ex_convert_to_target_type (
 	acpi_status             status = AE_OK;
 
 
-	ACPI_FUNCTION_TRACE ("Ex_convert_to_target_type");
+	ACPI_FUNCTION_TRACE ("ex_convert_to_target_type");
 
 
 	/* Default behavior */
@@ -635,14 +642,14 @@ acpi_ex_convert_to_target_type (
 
 	case ARGI_REFERENCE:
 		/*
-		 * Create_xxxx_field cases - we are storing the field object into the name
+		 * create_xxxx_field cases - we are storing the field object into the name
 		 */
 		break;
 
 
 	default:
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-			"Unknown Target type ID 0x%X Op %s Dest_type %s\n",
+			"Unknown Target type ID 0x%X Op %s dest_type %s\n",
 			GET_CURRENT_ARG_TYPE (walk_state->op_info->runtime_args),
 			walk_state->op_info->name, acpi_ut_get_type_name (destination_type)));
 

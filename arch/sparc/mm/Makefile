@@ -21,5 +21,3 @@ obj-y   += nosun4c.o
 else
 obj-y   += sun4c.o
 endif
-
-include $(TOPDIR)/Rules.make

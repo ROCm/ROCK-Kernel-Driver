@@ -117,9 +117,26 @@ static int stripe_ctr(struct dm_target *ti, int argc, char **argv)
 		return -EINVAL;
 	}
 
+	/*
+	 * chunk_size is a power of two
+	 */
+	if (!chunk_size || (chunk_size & (chunk_size - 1))) {
+		ti->error = "dm-stripe: Invalid chunk size";
+		return -EINVAL;
+	}
+
 	if (!multiple(ti->len, stripes, &width)) {
 		ti->error = "dm-stripe: Target length not divisable by "
 		    "number of stripes";
+		return -EINVAL;
+	}
+
+	/*
+	 * Do we have enough arguments for that many stripes ?
+	 */
+	if (argc != (2 + 2 * stripes)) {
+		ti->error = "dm-stripe: Not enough destinations "
+			"specified";
 		return -EINVAL;
 	}
 
@@ -134,15 +151,6 @@ static int stripe_ctr(struct dm_target *ti, int argc, char **argv)
 	sc->stripe_width = width;
 	ti->split_io = chunk_size;
 
-	/*
-	 * chunk_size is a power of two
-	 */
-	if (!chunk_size || (chunk_size & (chunk_size - 1))) {
-		ti->error = "dm-stripe: Invalid chunk size";
-		kfree(sc);
-		return -EINVAL;
-	}
-
 	sc->chunk_mask = ((sector_t) chunk_size) - 1;
 	for (sc->chunk_shift = 0; chunk_size; sc->chunk_shift++)
 		chunk_size >>= 1;
@@ -152,13 +160,6 @@ static int stripe_ctr(struct dm_target *ti, int argc, char **argv)
 	 * Get the stripe destinations.
 	 */
 	for (i = 0; i < stripes; i++) {
-		if (argc < 2) {
-			ti->error = "dm-stripe: Not enough destinations "
-				"specified";
-			kfree(sc);
-			return -EINVAL;
-		}
-
 		argv += 2;
 
 		r = get_stripe(ti, sc, i, argv);

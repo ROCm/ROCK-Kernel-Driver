@@ -51,7 +51,7 @@ enum frame_sizes {
 
 #define MAX_FRAME_SIZE	SIZE_320X240
 
-static usbvideo_t *cams;
+static struct usbvideo *cams;
 
 #ifdef CONFIG_USB_DEBUG
 static int debug;

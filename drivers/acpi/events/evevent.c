@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Module Name: evevent - Fixed Event handling and dispatch
- *              $Revision: 104 $
  *
  *****************************************************************************/
 
@@ -25,7 +24,6 @@
 
 #include "acpi.h"
 #include "acevents.h"
-#include "acnamesp.h"
 
 #define _COMPONENT          ACPI_EVENTS
 	 ACPI_MODULE_NAME    ("evevent")
@@ -33,7 +31,7 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ev_initialize
+ * FUNCTION:    acpi_ev_initialize
  *
  * PARAMETERS:  None
  *
@@ -50,7 +48,7 @@ acpi_ev_initialize (
 	acpi_status             status;
 
 
-	ACPI_FUNCTION_TRACE ("Ev_initialize");
+	ACPI_FUNCTION_TRACE ("ev_initialize");
 
 
 	/* Make sure we have ACPI tables */
@@ -61,7 +59,7 @@ acpi_ev_initialize (
 	}
 
 	/*
-	 * Initialize the Fixed and General Purpose Acpi_events prior. This is
+	 * Initialize the Fixed and General Purpose acpi_events prior. This is
 	 * done prior to enabling SCIs to prevent interrupts from occuring
 	 * before handers are installed.
 	 */
@@ -87,7 +85,7 @@ acpi_ev_initialize (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ev_handler_initialize
+ * FUNCTION:    acpi_ev_handler_initialize
  *
  * PARAMETERS:  None
  *
@@ -104,7 +102,7 @@ acpi_ev_handler_initialize (
 	acpi_status             status;
 
 
-	ACPI_FUNCTION_TRACE ("Ev_handler_initialize");
+	ACPI_FUNCTION_TRACE ("ev_handler_initialize");
 
 
 	/* Install the SCI handler */
@@ -144,7 +142,7 @@ acpi_ev_handler_initialize (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ev_fixed_event_initialize
+ * FUNCTION:    acpi_ev_fixed_event_initialize
  *
  * PARAMETERS:  None
  *
@@ -158,7 +156,7 @@ acpi_status
 acpi_ev_fixed_event_initialize (
 	void)
 {
-	NATIVE_UINT             i;
+	acpi_native_uint        i;
 	acpi_status             status;
 
 
@@ -187,7 +185,7 @@ acpi_ev_fixed_event_initialize (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ev_fixed_event_detect
+ * FUNCTION:    acpi_ev_fixed_event_detect
  *
  * PARAMETERS:  None
  *
@@ -204,10 +202,10 @@ acpi_ev_fixed_event_detect (
 	u32                     int_status = ACPI_INTERRUPT_NOT_HANDLED;
 	u32                     fixed_status;
 	u32                     fixed_enable;
-	NATIVE_UINT_MAX32       i;
+	acpi_native_uint        i;
 
 
-	ACPI_FUNCTION_NAME ("Ev_fixed_event_detect");
+	ACPI_FUNCTION_NAME ("ev_fixed_event_detect");
 
 
 	/*
@@ -218,7 +216,7 @@ acpi_ev_fixed_event_detect (
 	(void) acpi_hw_register_read (ACPI_MTX_DO_NOT_LOCK, ACPI_REGISTER_PM1_ENABLE, &fixed_enable);
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_INTERRUPTS,
-		"Fixed Acpi_event Block: Enable %08X Status %08X\n",
+		"Fixed acpi_event Block: Enable %08X Status %08X\n",
 		fixed_enable, fixed_status));
 
 	/*
@@ -231,7 +229,7 @@ acpi_ev_fixed_event_detect (
 			(fixed_enable & acpi_gbl_fixed_event_info[i].enable_bit_mask)) {
 			/* Found an active (signalled) event */
 
-			int_status |= acpi_ev_fixed_event_dispatch (i);
+			int_status |= acpi_ev_fixed_event_dispatch ((u32) i);
 		}
 	}
 
@@ -241,7 +239,7 @@ acpi_ev_fixed_event_detect (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ev_fixed_event_dispatch
+ * FUNCTION:    acpi_ev_fixed_event_dispatch
  *
  * PARAMETERS:  Event               - Event type
  *
@@ -275,7 +273,7 @@ acpi_ev_fixed_event_dispatch (
 				0, ACPI_MTX_DO_NOT_LOCK);
 
 		ACPI_REPORT_ERROR (
-			("Ev_gpe_dispatch: No installed handler for fixed event [%08X]\n",
+			("ev_gpe_dispatch: No installed handler for fixed event [%08X]\n",
 			event));
 
 		return (ACPI_INTERRUPT_NOT_HANDLED);

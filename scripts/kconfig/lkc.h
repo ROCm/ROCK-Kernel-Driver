@@ -21,12 +21,14 @@ extern "C" {
 #include "lkc_proto.h"
 #undef P
 
-void symbol_end(char *help);
+#define SRCTREE "srctree"
+
 int zconfparse(void);
 void zconfdump(FILE *out);
 
 extern int zconfdebug;
 void zconf_starthelp(void);
+FILE *zconf_fopen(const char *name);
 void zconf_initscan(const char *name);
 void zconf_nextfile(const char *name);
 int zconf_lineno(void);
@@ -61,6 +63,7 @@ extern struct menu *current_menu;
 /* symbol.c */
 void sym_init(void);
 void sym_clear_all_valid(void);
+void sym_set_changed(struct symbol *sym);
 
 static inline tristate sym_get_tristate_value(struct symbol *sym)
 {

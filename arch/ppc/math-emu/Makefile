@@ -11,5 +11,3 @@ obj-$(CONFIG_MATH_EMULATION)	+= fabs.o fadd.o fadds.o fcmpo.o fcmpu.o \
 					mcrfs.o mffs.o mtfsb0.o mtfsb1.o \
 					mtfsf.o mtfsfi.o stfiwx.o stfs.o \
 					udivmodti4.o
-
-include $(TOPDIR)/Rules.make

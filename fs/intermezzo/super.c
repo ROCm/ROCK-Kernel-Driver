@@ -47,8 +47,8 @@ static char rcsid[] __attribute ((unused)) = "$Id: super.c,v 1.4 2002/10/12 02:1
 #define __NO_VERSION__
 #include <linux/module.h>
 
-#include <linux/intermezzo_fs.h>
-#include <linux/intermezzo_psdev.h>
+#include "intermezzo_fs.h"
+#include "intermezzo_psdev.h"
 
 #ifdef PRESTO_DEBUG
 long presto_vmemory = 0;

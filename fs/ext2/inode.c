@@ -430,8 +430,12 @@ static int ext2_alloc_branch(struct inode *inode,
 		mark_buffer_dirty_inode(bh, inode);
 		/* We used to sync bh here if IS_SYNC(inode).
 		 * But we now rely upon generic_osync_inode()
-		 * and b_inode_buffers
+		 * and b_inode_buffers.  But not for directories.
 		 */
+		if (S_ISDIR(inode->i_mode) && IS_DIRSYNC(inode)) {
+			ll_rw_block(WRITE, 1, &bh);
+			wait_on_buffer(bh);
+		}
 		parent = nr;
 	}
 	if (n == num)
@@ -588,9 +592,9 @@ changed:
 	goto reread;
 }
 
-static int ext2_writepage(struct page *page)
+static int ext2_writepage(struct page *page, struct writeback_control *wbc)
 {
-	return block_write_full_page(page,ext2_get_block);
+	return block_write_full_page(page, ext2_get_block, wbc);
 }
 
 static int ext2_readpage(struct file *file, struct page *page)

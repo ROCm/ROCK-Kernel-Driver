@@ -17,8 +17,6 @@ EXTRA_CFLAGS += -DSMBFS_PARANOIA
 #EXTRA_CFLAGS += -DDEBUG_SMB_TIMESTAMP
 #EXTRA_CFLAGS += -Werror
 
-include $(TOPDIR)/Rules.make
-
 #
 # Maintainer rules
 #

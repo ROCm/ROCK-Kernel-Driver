@@ -6,7 +6,7 @@
 #include <asm/segment.h>
 #include <asm/page.h>
 
-ENTRY(do_magic):
+ENTRY(do_magic)
 	pushl %ebx
 	cmpl $0,8(%esp)
 	jne .L1450
@@ -66,7 +66,7 @@ ENTRY(do_magic):
 .L1453:
 	movl $104,%eax
 
-	movw %eax, %ds
+	movw %ax, %ds
 	movl saved_context_esp, %esp
 	movl saved_context_ebp, %ebp
 	movl saved_context_eax, %eax

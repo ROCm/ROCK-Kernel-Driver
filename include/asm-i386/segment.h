@@ -9,8 +9,8 @@
  *   2 - reserved
  *   3 - reserved
  *
- *   4 - default user CS		<==== new cacheline
- *   5 - default user DS
+ *   4 - unused			<==== new cacheline
+ *   5 - unused
  *
  *  ------- start of TLS (Thread-Local Storage) segments:
  *
@@ -25,16 +25,18 @@
  *
  *  12 - kernel code segment		<==== new cacheline
  *  13 - kernel data segment
- *  14 - TSS
- *  15 - LDT
- *  16 - PNPBIOS support (16->32 gate)
- *  17 - PNPBIOS support
- *  18 - PNPBIOS support
+ *  14 - default user CS
+ *  15 - default user DS
+ *  16 - TSS
+ *  17 - LDT
+ *  18 - PNPBIOS support (16->32 gate)
  *  19 - PNPBIOS support
  *  20 - PNPBIOS support
- *  21 - APM BIOS support
- *  22 - APM BIOS support
- *  23 - APM BIOS support 
+ *  21 - PNPBIOS support
+ *  22 - PNPBIOS support
+ *  23 - APM BIOS support
+ *  24 - APM BIOS support
+ *  25 - APM BIOS support 
  */
 #define GDT_ENTRY_TLS_ENTRIES	3
 #define GDT_ENTRY_TLS_MIN	6
@@ -42,10 +44,10 @@
 
 #define TLS_SIZE (GDT_ENTRY_TLS_ENTRIES * 8)
 
-#define GDT_ENTRY_DEFAULT_USER_CS	4
+#define GDT_ENTRY_DEFAULT_USER_CS	14
 #define __USER_CS (GDT_ENTRY_DEFAULT_USER_CS * 8 + 3)
 
-#define GDT_ENTRY_DEFAULT_USER_DS	5
+#define GDT_ENTRY_DEFAULT_USER_DS	15
 #define __USER_DS (GDT_ENTRY_DEFAULT_USER_DS * 8 + 3)
 
 #define GDT_ENTRY_KERNEL_BASE	12
@@ -56,16 +58,16 @@
 #define GDT_ENTRY_KERNEL_DS		(GDT_ENTRY_KERNEL_BASE + 1)
 #define __KERNEL_DS (GDT_ENTRY_KERNEL_DS * 8)
 
-#define GDT_ENTRY_TSS			(GDT_ENTRY_KERNEL_BASE + 2)
-#define GDT_ENTRY_LDT			(GDT_ENTRY_KERNEL_BASE + 3)
+#define GDT_ENTRY_TSS			(GDT_ENTRY_KERNEL_BASE + 4)
+#define GDT_ENTRY_LDT			(GDT_ENTRY_KERNEL_BASE + 5)
 
-#define GDT_ENTRY_PNPBIOS_BASE		(GDT_ENTRY_KERNEL_BASE + 4)
-#define GDT_ENTRY_APMBIOS_BASE		(GDT_ENTRY_KERNEL_BASE + 9)
+#define GDT_ENTRY_PNPBIOS_BASE		(GDT_ENTRY_KERNEL_BASE + 6)
+#define GDT_ENTRY_APMBIOS_BASE		(GDT_ENTRY_KERNEL_BASE + 11)
 
 /*
- * The GDT has 21 entries but we pad it to cacheline boundary:
+ * The GDT has 25 entries but we pad it to cacheline boundary:
  */
-#define GDT_ENTRIES 24
+#define GDT_ENTRIES 28
 
 #define GDT_SIZE (GDT_ENTRIES * 8)
 

@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Module Name: dsfield - Dispatcher field routines
- *              $Revision: 69 $
  *
  *****************************************************************************/
 
@@ -38,21 +37,21 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ds_create_buffer_field
+ * FUNCTION:    acpi_ds_create_buffer_field
  *
  * PARAMETERS:  Opcode              - The opcode to be executed
  *              Operands            - List of operands for the opcode
- *              Walk_state          - Current state
+ *              walk_state          - Current state
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Execute the Create_field operators:
- *              Create_bit_field_op,
- *              Create_byte_field_op,
- *              Create_word_field_op,
- *              Create_dWord_field_op,
- *              Create_qWord_field_op,
- *              Create_field_op     (all of which define fields in buffers)
+ * DESCRIPTION: Execute the create_field operators:
+ *              create_bit_field_op,
+ *              create_byte_field_op,
+ *              create_word_field_op,
+ *              create_dword_field_op,
+ *              create_qword_field_op,
+ *              create_field_op     (all of which define fields in buffers)
  *
  ******************************************************************************/
 
@@ -69,10 +68,10 @@ acpi_ds_create_buffer_field (
 	u32                     flags;
 
 
-	ACPI_FUNCTION_TRACE ("Ds_create_buffer_field");
+	ACPI_FUNCTION_TRACE ("ds_create_buffer_field");
 
 
-	/* Get the Name_string argument */
+	/* Get the name_string argument */
 
 	if (op->common.aml_opcode == AML_CREATE_FIELD_OP) {
 		arg = acpi_ps_get_arg (op, 3);
@@ -100,7 +99,7 @@ acpi_ds_create_buffer_field (
 	}
 
 	/*
-	 * Enter the Name_string into the namespace
+	 * Enter the name_string into the namespace
 	 */
 	status = acpi_ns_lookup (walk_state->scope_info, arg->common.value.string,
 			 ACPI_TYPE_ANY, ACPI_IMODE_LOAD_PASS1,
@@ -168,10 +167,10 @@ cleanup:
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ds_get_field_names
+ * FUNCTION:    acpi_ds_get_field_names
  *
- * PARAMETERS:  Info            - Create_field info structure
- *  `           Walk_state      - Current method state
+ * PARAMETERS:  Info            - create_field info structure
+ *  `           walk_state      - Current method state
  *              Arg             - First parser arg for the field name list
  *
  * RETURN:      Status
@@ -183,7 +182,7 @@ cleanup:
 
 acpi_status
 acpi_ds_get_field_names (
-	ACPI_CREATE_FIELD_INFO  *info,
+	acpi_create_field_info  *info,
 	acpi_walk_state         *walk_state,
 	acpi_parse_object       *arg)
 {
@@ -191,7 +190,7 @@ acpi_ds_get_field_names (
 	acpi_integer            position;
 
 
-	ACPI_FUNCTION_TRACE_PTR ("Ds_get_field_names", info);
+	ACPI_FUNCTION_TRACE_PTR ("ds_get_field_names", info);
 
 
 	/* First field starts at bit zero */
@@ -204,7 +203,7 @@ acpi_ds_get_field_names (
 		/*
 		 * Three types of field elements are handled:
 		 * 1) Offset - specifies a bit offset
-		 * 2) Access_as - changes the access mode
+		 * 2) access_as - changes the access mode
 		 * 3) Name - Enters a new named field into the namespace
 		 */
 		switch (arg->common.aml_opcode) {
@@ -225,10 +224,10 @@ acpi_ds_get_field_names (
 		case AML_INT_ACCESSFIELD_OP:
 
 			/*
-			 * Get a new Access_type and Access_attribute -- to be used for all
-			 * field units that follow, until field end or another Access_as keyword.
+			 * Get a new access_type and access_attribute -- to be used for all
+			 * field units that follow, until field end or another access_as keyword.
 			 *
-			 * In Field_flags, preserve the flag bits other than the ACCESS_TYPE bits
+			 * In field_flags, preserve the flag bits other than the ACCESS_TYPE bits
 			 */
 			info->field_flags = (u8) ((info->field_flags & ~(AML_FIELD_ACCESS_TYPE_MASK)) |
 					  ((u8) (arg->common.value.integer32 >> 8)));
@@ -242,7 +241,7 @@ acpi_ds_get_field_names (
 			/* Lookup the name */
 
 			status = acpi_ns_lookup (walk_state->scope_info,
-					  (NATIVE_CHAR *) &arg->named.name,
+					  (char *) &arg->named.name,
 					  info->field_type, ACPI_IMODE_EXECUTE, ACPI_NS_DONT_OPEN_SCOPE,
 					  walk_state, &info->field_node);
 			if (ACPI_FAILURE (status)) {
@@ -296,11 +295,11 @@ acpi_ds_get_field_names (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ds_create_field
+ * FUNCTION:    acpi_ds_create_field
  *
  * PARAMETERS:  Op              - Op containing the Field definition and args
- *              Region_node     - Object for the containing Operation Region
- *  `           Walk_state      - Current method state
+ *              region_node     - Object for the containing Operation Region
+ *  `           walk_state      - Current method state
  *
  * RETURN:      Status
  *
@@ -316,13 +315,13 @@ acpi_ds_create_field (
 {
 	acpi_status             status;
 	acpi_parse_object       *arg;
-	ACPI_CREATE_FIELD_INFO  info;
+	acpi_create_field_info  info;
 
 
-	ACPI_FUNCTION_TRACE_PTR ("Ds_create_field", op);
+	ACPI_FUNCTION_TRACE_PTR ("ds_create_field", op);
 
 
-	/* First arg is the name of the parent Op_region (must already exist) */
+	/* First arg is the name of the parent op_region (must already exist) */
 
 	arg = op->common.value.arg;
 	if (!region_node) {
@@ -354,10 +353,10 @@ acpi_ds_create_field (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ds_init_field_objects
+ * FUNCTION:    acpi_ds_init_field_objects
  *
  * PARAMETERS:  Op              - Op containing the Field definition and args
- *  `           Walk_state      - Current method state
+ *  `           walk_state      - Current method state
  *
  * RETURN:      Status
  *
@@ -378,7 +377,7 @@ acpi_ds_init_field_objects (
 	u8                      type = 0;
 
 
-	ACPI_FUNCTION_TRACE_PTR ("Ds_init_field_objects", op);
+	ACPI_FUNCTION_TRACE_PTR ("ds_init_field_objects", op);
 
 
 	switch (walk_state->opcode) {
@@ -402,14 +401,14 @@ acpi_ds_init_field_objects (
 	}
 
 	/*
-	 * Walk the list of entries in the Field_list
+	 * Walk the list of entries in the field_list
 	 */
 	while (arg) {
 		/* Ignore OFFSET and ACCESSAS terms here */
 
 		if (arg->common.aml_opcode == AML_INT_NAMEDFIELD_OP) {
 			status = acpi_ns_lookup (walk_state->scope_info,
-					  (NATIVE_CHAR *) &arg->named.name,
+					  (char *) &arg->named.name,
 					  type, ACPI_IMODE_LOAD_PASS1,
 					  ACPI_NS_NO_UPSEARCH | ACPI_NS_DONT_OPEN_SCOPE | ACPI_NS_ERROR_IF_FOUND,
 					  walk_state, &node);
@@ -438,11 +437,11 @@ acpi_ds_init_field_objects (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ds_create_bank_field
+ * FUNCTION:    acpi_ds_create_bank_field
  *
  * PARAMETERS:  Op              - Op containing the Field definition and args
- *              Region_node     - Object for the containing Operation Region
- *  `           Walk_state      - Current method state
+ *              region_node     - Object for the containing Operation Region
+ *  `           walk_state      - Current method state
  *
  * RETURN:      Status
  *
@@ -458,13 +457,13 @@ acpi_ds_create_bank_field (
 {
 	acpi_status             status;
 	acpi_parse_object       *arg;
-	ACPI_CREATE_FIELD_INFO  info;
+	acpi_create_field_info  info;
 
 
-	ACPI_FUNCTION_TRACE_PTR ("Ds_create_bank_field", op);
+	ACPI_FUNCTION_TRACE_PTR ("ds_create_bank_field", op);
 
 
-	/* First arg is the name of the parent Op_region (must already exist) */
+	/* First arg is the name of the parent op_region (must already exist) */
 
 	arg = op->common.value.arg;
 	if (!region_node) {
@@ -488,7 +487,7 @@ acpi_ds_create_bank_field (
 		return_ACPI_STATUS (status);
 	}
 
-	/* Third arg is the Bank_value */
+	/* Third arg is the bank_value */
 
 	arg = arg->common.next;
 	info.bank_value = arg->common.value.integer32;
@@ -511,11 +510,11 @@ acpi_ds_create_bank_field (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ds_create_index_field
+ * FUNCTION:    acpi_ds_create_index_field
  *
  * PARAMETERS:  Op              - Op containing the Field definition and args
- *              Region_node     - Object for the containing Operation Region
- *  `           Walk_state      - Current method state
+ *              region_node     - Object for the containing Operation Region
+ *  `           walk_state      - Current method state
  *
  * RETURN:      Status
  *
@@ -531,10 +530,10 @@ acpi_ds_create_index_field (
 {
 	acpi_status             status;
 	acpi_parse_object       *arg;
-	ACPI_CREATE_FIELD_INFO  info;
+	acpi_create_field_info  info;
 
 
-	ACPI_FUNCTION_TRACE_PTR ("Ds_create_index_field", op);
+	ACPI_FUNCTION_TRACE_PTR ("ds_create_index_field", op);
 
 
 	/* First arg is the name of the Index register (must already exist) */

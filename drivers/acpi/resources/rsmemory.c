@@ -1,7 +1,6 @@
 /*******************************************************************************
  *
  * Module Name: rsmem24 - Memory resource descriptors
- *              $Revision: 20 $
  *
  ******************************************************************************/
 
@@ -33,21 +32,21 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_rs_memory24_resource
+ * FUNCTION:    acpi_rs_memory24_resource
  *
- * PARAMETERS:  Byte_stream_buffer      - Pointer to the resource input byte
+ * PARAMETERS:  byte_stream_buffer      - Pointer to the resource input byte
  *                                        stream
- *              Bytes_consumed          - Pointer to where the number of bytes
- *                                        consumed the Byte_stream_buffer is
+ *              bytes_consumed          - Pointer to where the number of bytes
+ *                                        consumed the byte_stream_buffer is
  *                                        returned
- *              Output_buffer           - Pointer to the return data buffer
- *              Structure_size          - Pointer to where the number of bytes
+ *              output_buffer           - Pointer to the return data buffer
+ *              structure_size          - Pointer to where the number of bytes
  *                                        in the return data struct is returned
  *
  * RETURN:      Status
  *
  * DESCRIPTION: Take the resource byte stream and fill out the appropriate
- *              structure pointed to by the Output_buffer. Return the
+ *              structure pointed to by the output_buffer. Return the
  *              number of bytes consumed from the byte stream.
  *
  ******************************************************************************/
@@ -55,18 +54,18 @@
 acpi_status
 acpi_rs_memory24_resource (
 	u8                      *byte_stream_buffer,
-	ACPI_SIZE               *bytes_consumed,
+	acpi_size               *bytes_consumed,
 	u8                      **output_buffer,
-	ACPI_SIZE               *structure_size)
+	acpi_size               *structure_size)
 {
 	u8                      *buffer = byte_stream_buffer;
 	acpi_resource           *output_struct = (void *) *output_buffer;
 	u16                     temp16 = 0;
 	u8                      temp8 = 0;
-	ACPI_SIZE               struct_size = ACPI_SIZEOF_RESOURCE (acpi_resource_mem24);
+	acpi_size               struct_size = ACPI_SIZEOF_RESOURCE (acpi_resource_mem24);
 
 
-	ACPI_FUNCTION_TRACE ("Rs_memory24_resource");
+	ACPI_FUNCTION_TRACE ("rs_memory24_resource");
 
 
 	/*
@@ -76,7 +75,7 @@ acpi_rs_memory24_resource (
 
 	ACPI_MOVE_UNALIGNED16_TO_16 (&temp16, buffer);
 	buffer += 2;
-	*bytes_consumed = (ACPI_SIZE) temp16 + 3;
+	*bytes_consumed = (acpi_size) temp16 + 3;
 	output_struct->id = ACPI_RSTYPE_MEM24;
 
 	/*
@@ -87,14 +86,14 @@ acpi_rs_memory24_resource (
 	output_struct->data.memory24.read_write_attribute = temp8 & 0x01;
 
 	/*
-	 * Get Min_base_address (Bytes 4-5)
+	 * Get min_base_address (Bytes 4-5)
 	 */
 	ACPI_MOVE_UNALIGNED16_TO_16 (&temp16, buffer);
 	buffer += 2;
 	output_struct->data.memory24.min_base_address = temp16;
 
 	/*
-	 * Get Max_base_address (Bytes 6-7)
+	 * Get max_base_address (Bytes 6-7)
 	 */
 	ACPI_MOVE_UNALIGNED16_TO_16 (&temp16, buffer);
 	buffer += 2;
@@ -108,7 +107,7 @@ acpi_rs_memory24_resource (
 	output_struct->data.memory24.alignment = temp16;
 
 	/*
-	 * Get Range_length (Bytes 10-11)
+	 * Get range_length (Bytes 10-11)
 	 */
 	ACPI_MOVE_UNALIGNED16_TO_16 (&temp16, buffer);
 	output_struct->data.memory24.range_length = temp16;
@@ -128,12 +127,12 @@ acpi_rs_memory24_resource (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_rs_memory24_stream
+ * FUNCTION:    acpi_rs_memory24_stream
  *
- * PARAMETERS:  Linked_list             - Pointer to the resource linked list
- *              Output_buffer           - Pointer to the user's return buffer
- *              Bytes_consumed          - Pointer to where the number of bytes
- *                                        used in the Output_buffer is returned
+ * PARAMETERS:  linked_list             - Pointer to the resource linked list
+ *              output_buffer           - Pointer to the user's return buffer
+ *              bytes_consumed          - Pointer to where the number of bytes
+ *                                        used in the output_buffer is returned
  *
  * RETURN:      Status
  *
@@ -146,14 +145,14 @@ acpi_status
 acpi_rs_memory24_stream (
 	acpi_resource           *linked_list,
 	u8                      **output_buffer,
-	ACPI_SIZE               *bytes_consumed)
+	acpi_size               *bytes_consumed)
 {
 	u8                      *buffer = *output_buffer;
 	u16                     temp16 = 0;
 	u8                      temp8 = 0;
 
 
-	ACPI_FUNCTION_TRACE ("Rs_memory24_stream");
+	ACPI_FUNCTION_TRACE ("rs_memory24_stream");
 
 
 	/*
@@ -210,21 +209,21 @@ acpi_rs_memory24_stream (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_rs_memory32_range_resource
+ * FUNCTION:    acpi_rs_memory32_range_resource
  *
- * PARAMETERS:  Byte_stream_buffer      - Pointer to the resource input byte
+ * PARAMETERS:  byte_stream_buffer      - Pointer to the resource input byte
  *                                        stream
- *              Bytes_consumed          - Pointer to where the number of bytes
- *                                        consumed the Byte_stream_buffer is
+ *              bytes_consumed          - Pointer to where the number of bytes
+ *                                        consumed the byte_stream_buffer is
  *                                        returned
- *              Output_buffer           - Pointer to the return data buffer
- *              Structure_size          - Pointer to where the number of bytes
+ *              output_buffer           - Pointer to the return data buffer
+ *              structure_size          - Pointer to where the number of bytes
  *                                        in the return data struct is returned
  *
  * RETURN:      Status
  *
  * DESCRIPTION: Take the resource byte stream and fill out the appropriate
- *              structure pointed to by the Output_buffer. Return the
+ *              structure pointed to by the output_buffer. Return the
  *              number of bytes consumed from the byte stream.
  *
  ******************************************************************************/
@@ -232,18 +231,18 @@ acpi_rs_memory24_stream (
 acpi_status
 acpi_rs_memory32_range_resource (
 	u8                      *byte_stream_buffer,
-	ACPI_SIZE               *bytes_consumed,
+	acpi_size               *bytes_consumed,
 	u8                      **output_buffer,
-	ACPI_SIZE               *structure_size)
+	acpi_size               *structure_size)
 {
 	u8                      *buffer = byte_stream_buffer;
 	acpi_resource           *output_struct = (void *) *output_buffer;
 	u16                     temp16 = 0;
 	u8                      temp8 = 0;
-	ACPI_SIZE               struct_size = ACPI_SIZEOF_RESOURCE (acpi_resource_mem32);
+	acpi_size               struct_size = ACPI_SIZEOF_RESOURCE (acpi_resource_mem32);
 
 
-	ACPI_FUNCTION_TRACE ("Rs_memory32_range_resource");
+	ACPI_FUNCTION_TRACE ("rs_memory32_range_resource");
 
 
 	/*
@@ -253,7 +252,7 @@ acpi_rs_memory32_range_resource (
 
 	ACPI_MOVE_UNALIGNED16_TO_16 (&temp16, buffer);
 	buffer += 2;
-	*bytes_consumed = (ACPI_SIZE) temp16 + 3;
+	*bytes_consumed = (acpi_size) temp16 + 3;
 
 	output_struct->id = ACPI_RSTYPE_MEM32;
 
@@ -263,7 +262,7 @@ acpi_rs_memory32_range_resource (
 	 *  1. Set the RESOURCE_DATA * Data to point to it's own address, then
 	 *  2. Set the pointer to the next address.
 	 *
-	 *  NOTE: Output_struct->Data is cast to u8, otherwise, this addition adds
+	 *  NOTE: output_struct->Data is cast to u8, otherwise, this addition adds
 	 *  4 * sizeof(RESOURCE_DATA) instead of 4 * sizeof(u8)
 	 */
 
@@ -276,14 +275,14 @@ acpi_rs_memory32_range_resource (
 	output_struct->data.memory32.read_write_attribute = temp8 & 0x01;
 
 	/*
-	 * Get Min_base_address (Bytes 4-7)
+	 * Get min_base_address (Bytes 4-7)
 	 */
 	ACPI_MOVE_UNALIGNED32_TO_32 (&output_struct->data.memory32.min_base_address,
 			 buffer);
 	buffer += 4;
 
 	/*
-	 * Get Max_base_address (Bytes 8-11)
+	 * Get max_base_address (Bytes 8-11)
 	 */
 	ACPI_MOVE_UNALIGNED32_TO_32 (&output_struct->data.memory32.max_base_address,
 			 buffer);
@@ -296,7 +295,7 @@ acpi_rs_memory32_range_resource (
 	buffer += 4;
 
 	/*
-	 * Get Range_length (Bytes 16-19)
+	 * Get range_length (Bytes 16-19)
 	 */
 	ACPI_MOVE_UNALIGNED32_TO_32 (&output_struct->data.memory32.range_length, buffer);
 
@@ -315,21 +314,21 @@ acpi_rs_memory32_range_resource (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_rs_fixed_memory32_resource
+ * FUNCTION:    acpi_rs_fixed_memory32_resource
  *
- * PARAMETERS:  Byte_stream_buffer      - Pointer to the resource input byte
+ * PARAMETERS:  byte_stream_buffer      - Pointer to the resource input byte
  *                                        stream
- *              Bytes_consumed          - Pointer to where the number of bytes
- *                                        consumed the Byte_stream_buffer is
+ *              bytes_consumed          - Pointer to where the number of bytes
+ *                                        consumed the byte_stream_buffer is
  *                                        returned
- *              Output_buffer           - Pointer to the return data buffer
- *              Structure_size          - Pointer to where the number of bytes
+ *              output_buffer           - Pointer to the return data buffer
+ *              structure_size          - Pointer to where the number of bytes
  *                                        in the return data struct is returned
  *
  * RETURN:      Status
  *
  * DESCRIPTION: Take the resource byte stream and fill out the appropriate
- *              structure pointed to by the Output_buffer. Return the
+ *              structure pointed to by the output_buffer. Return the
  *              number of bytes consumed from the byte stream.
  *
  ******************************************************************************/
@@ -337,18 +336,18 @@ acpi_rs_memory32_range_resource (
 acpi_status
 acpi_rs_fixed_memory32_resource (
 	u8                      *byte_stream_buffer,
-	ACPI_SIZE               *bytes_consumed,
+	acpi_size               *bytes_consumed,
 	u8                      **output_buffer,
-	ACPI_SIZE               *structure_size)
+	acpi_size               *structure_size)
 {
 	u8                      *buffer = byte_stream_buffer;
 	acpi_resource           *output_struct = (void *) *output_buffer;
 	u16                     temp16 = 0;
 	u8                      temp8 = 0;
-	ACPI_SIZE               struct_size = ACPI_SIZEOF_RESOURCE (acpi_resource_fixed_mem32);
+	acpi_size               struct_size = ACPI_SIZEOF_RESOURCE (acpi_resource_fixed_mem32);
 
 
-	ACPI_FUNCTION_TRACE ("Rs_fixed_memory32_resource");
+	ACPI_FUNCTION_TRACE ("rs_fixed_memory32_resource");
 
 
 	/*
@@ -358,7 +357,7 @@ acpi_rs_fixed_memory32_resource (
 	ACPI_MOVE_UNALIGNED16_TO_16 (&temp16, buffer);
 
 	buffer += 2;
-	*bytes_consumed = (ACPI_SIZE) temp16 + 3;
+	*bytes_consumed = (acpi_size) temp16 + 3;
 
 	output_struct->id = ACPI_RSTYPE_FIXED_MEM32;
 
@@ -370,14 +369,14 @@ acpi_rs_fixed_memory32_resource (
 	output_struct->data.fixed_memory32.read_write_attribute = temp8 & 0x01;
 
 	/*
-	 * Get Range_base_address (Bytes 4-7)
+	 * Get range_base_address (Bytes 4-7)
 	 */
 	ACPI_MOVE_UNALIGNED32_TO_32 (&output_struct->data.fixed_memory32.range_base_address,
 			 buffer);
 	buffer += 4;
 
 	/*
-	 * Get Range_length (Bytes 8-11)
+	 * Get range_length (Bytes 8-11)
 	 */
 	ACPI_MOVE_UNALIGNED32_TO_32 (&output_struct->data.fixed_memory32.range_length,
 			 buffer);
@@ -397,12 +396,12 @@ acpi_rs_fixed_memory32_resource (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_rs_memory32_range_stream
+ * FUNCTION:    acpi_rs_memory32_range_stream
  *
- * PARAMETERS:  Linked_list             - Pointer to the resource linked list
- *              Output_buffer           - Pointer to the user's return buffer
- *              Bytes_consumed          - Pointer to where the number of bytes
- *                                        used in the Output_buffer is returned
+ * PARAMETERS:  linked_list             - Pointer to the resource linked list
+ *              output_buffer           - Pointer to the user's return buffer
+ *              bytes_consumed          - Pointer to where the number of bytes
+ *                                        used in the output_buffer is returned
  *
  * RETURN:      Status
  *
@@ -415,14 +414,14 @@ acpi_status
 acpi_rs_memory32_range_stream (
 	acpi_resource           *linked_list,
 	u8                      **output_buffer,
-	ACPI_SIZE               *bytes_consumed)
+	acpi_size               *bytes_consumed)
 {
 	u8                      *buffer = *output_buffer;
 	u16                     temp16 = 0;
 	u8                      temp8 = 0;
 
 
-	ACPI_FUNCTION_TRACE ("Rs_memory32_range_stream");
+	ACPI_FUNCTION_TRACE ("rs_memory32_range_stream");
 
 
 	/*
@@ -480,12 +479,12 @@ acpi_rs_memory32_range_stream (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_rs_fixed_memory32_stream
+ * FUNCTION:    acpi_rs_fixed_memory32_stream
  *
- * PARAMETERS:  Linked_list             - Pointer to the resource linked list
- *              Output_buffer           - Pointer to the user's return buffer
- *              Bytes_consumed          - Pointer to where the number of bytes
- *                                        used in the Output_buffer is returned
+ * PARAMETERS:  linked_list             - Pointer to the resource linked list
+ *              output_buffer           - Pointer to the user's return buffer
+ *              bytes_consumed          - Pointer to where the number of bytes
+ *                                        used in the output_buffer is returned
  *
  * RETURN:      Status
  *
@@ -498,14 +497,14 @@ acpi_status
 acpi_rs_fixed_memory32_stream (
 	acpi_resource           *linked_list,
 	u8                      **output_buffer,
-	ACPI_SIZE               *bytes_consumed)
+	acpi_size               *bytes_consumed)
 {
 	u8                      *buffer = *output_buffer;
 	u16                     temp16 = 0;
 	u8                      temp8 = 0;
 
 
-	ACPI_FUNCTION_TRACE ("Rs_fixed_memory32_stream");
+	ACPI_FUNCTION_TRACE ("rs_fixed_memory32_stream");
 
 
 	/*

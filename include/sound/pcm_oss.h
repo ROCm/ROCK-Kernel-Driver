@@ -77,6 +77,7 @@ typedef struct _snd_pcm_oss_stream {
 
 typedef struct _snd_pcm_oss {
 	int reg;
+	unsigned int reg_mask;
 } snd_pcm_oss_t;
 
 #endif /* __SOUND_PCM_OSS_H */
