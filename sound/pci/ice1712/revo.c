@@ -128,7 +128,7 @@ static int __devinit revo_init(ice1712_t *ice)
 	switch (ice->eeprom.subvendor) {
 	case VT1724_SUBDEVICE_REVOLUTION71:
 		ice->num_total_dacs = 8;
-		ice->num_total_adcs = 4;
+		ice->num_total_adcs = 2;
 		break;
 	default:
 		snd_BUG();

@@ -149,11 +149,19 @@ static unsigned short wm_get(ice1712_t *ice, int reg)
 }
 
 /*
+ * set the register value of WM codec
+ */
+static void wm_put_nocache(ice1712_t *ice, int reg, unsigned short val)
+{
+	aureon_spi_write(ice, AUREON_WM_CS, (reg << 9) | (val & 0x1ff), 16);
+}
+
+/*
  * set the register value of WM codec and remember it
  */
 static void wm_put(ice1712_t *ice, int reg, unsigned short val)
 {
-	aureon_spi_write(ice, AUREON_WM_CS, (reg << 9) | (val & 0x1ff), 16);
+	wm_put_nocache(ice, reg, val);
 	reg <<= 1;
 	ice->akm[0].images[reg] = val >> 8;
 	ice->akm[0].images[reg + 1] = val;
@@ -219,10 +227,7 @@ static int wm_dac_vol_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontr
 	unsigned short vol;
 
 	down(&ice->gpio_mutex);
-	if (kcontrol->private_value)
-		idx = WM_DAC_MASTER_ATTEN;
-	else
-		idx  = snd_ctl_get_ioffidx(kcontrol, &ucontrol->id) + WM_DAC_ATTEN;
+	idx  = snd_ctl_get_ioffidx(kcontrol, &ucontrol->id) + WM_DAC_ATTEN;
 	vol = wm_get(ice, idx) & 0x7f;
 	if (vol <= 0x1a)
 		ucontrol->value.integer.value[0] = 0;
@@ -240,18 +245,17 @@ static int wm_dac_vol_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontr
 	int change;
 
 	snd_ice1712_save_gpio_status(ice);
-	if (kcontrol->private_value)
-		idx = WM_DAC_MASTER_ATTEN;
-	else
-		idx  = snd_ctl_get_ioffidx(kcontrol, &ucontrol->id) + WM_DAC_ATTEN;
+	idx  = snd_ctl_get_ioffidx(kcontrol, &ucontrol->id) + WM_DAC_ATTEN;
 	nvol = ucontrol->value.integer.value[0] + 0x1a;
 	ovol = wm_get(ice, idx) & 0x7f;
 	change = (ovol != nvol);
 	if (change) {
 		if (nvol <= 0x1a && ovol <= 0x1a)
 			change = 0;
-		else
-			wm_put(ice, idx, nvol | 0x180); /* update on zero detect */
+		else {
+			wm_put(ice, idx, nvol | 0x80); /* zero-detect, prelatch */
+			wm_put_nocache(ice, idx, nvol | 0x180); /* update */
+		}
 	}
 	snd_ice1712_restore_gpio_status(ice);
 	return change;
@@ -718,11 +722,11 @@ static int __devinit aureon_init(ice1712_t *ice)
 
 	if (ice->eeprom.subvendor == VT1724_SUBDEVICE_AUREON51_SKY) {
 		ice->num_total_dacs = 6;
-		ice->num_total_adcs = 6;
+		ice->num_total_adcs = 2;
 	} else {
 		/* aureon 7.1 and prodigy 7.1 */
 		ice->num_total_dacs = 8;
-		ice->num_total_adcs = 8;
+		ice->num_total_adcs = 2;
 	}
 
 	/* to remeber the register values */
