@@ -674,9 +674,20 @@ NCR_700_scsi_done(struct NCR_700_Host_Parameters *hostdata,
 			print_sense("53c700", SCp);
 
 #endif
-			SCp->use_sg = SCp->cmnd[8];
+			/* restore the old result if the request sense was
+			 * successful */
 			if(result == 0)
 				result = SCp->cmnd[7];
+			/* now restore the original command */
+			memcpy((void *) SCp->cmnd, (void *) SCp->data_cmnd,
+			       sizeof(SCp->data_cmnd));
+			SCp->request_buffer = SCp->buffer;
+			SCp->request_bufflen = SCp->bufflen;
+			SCp->use_sg = SCp->old_use_sg;
+			SCp->cmd_len = SCp->old_cmd_len;
+			SCp->sc_data_direction = SCp->sc_old_data_direction;
+			SCp->underflow = SCp->old_underflow;
+			
 		}
 
 		free_slot(slot, hostdata);
@@ -1048,7 +1059,6 @@ process_script_interrupt(__u32 dsps, __u32 dsp, Scsi_Cmnd *SCp,
 				 * of the command */
 				SCp->cmnd[6] = NCR_700_INTERNAL_SENSE_MAGIC;
 				SCp->cmnd[7] = hostdata->status[0];
-				SCp->cmnd[8] = SCp->use_sg;
 				SCp->use_sg = 0;
 				SCp->sc_data_direction = SCSI_DATA_READ;
 				pci_dma_sync_single(hostdata->pci_dev,
