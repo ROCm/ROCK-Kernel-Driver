@@ -1933,7 +1933,8 @@ static int cdrom_read_cdda_old(struct cdrom_device_info *cdi, __u8 __user *ubuf,
 			       int lba, int nframes)
 {
 	struct packet_command cgc;
-	int nr, ret;
+	int ret = 0;
+	int nr;
 
 	cdi->last_sense = 0;
 
@@ -1955,8 +1956,8 @@ static int cdrom_read_cdda_old(struct cdrom_device_info *cdi, __u8 __user *ubuf,
 		return -ENOMEM;
 
 	if (!access_ok(VERIFY_WRITE, ubuf, nframes * CD_FRAMESIZE_RAW)) {
-		kfree(cgc.buffer);
-		return -EFAULT;
+		ret = -EFAULT;
+		goto out;
 	}
 
 	cgc.data_direction = CGC_DATA_READ;
@@ -1967,13 +1968,17 @@ static int cdrom_read_cdda_old(struct cdrom_device_info *cdi, __u8 __user *ubuf,
 		ret = cdrom_read_block(cdi, &cgc, lba, nr, 1, CD_FRAMESIZE_RAW);
 		if (ret)
 			break;
-		__copy_to_user(ubuf, cgc.buffer, CD_FRAMESIZE_RAW * nr);
+		if (__copy_to_user(ubuf, cgc.buffer, CD_FRAMESIZE_RAW * nr)) {
+			ret = -EFAULT;
+			break;
+		}
 		ubuf += CD_FRAMESIZE_RAW * nr;
 		nframes -= nr;
 		lba += nr;
 	}
+out:
 	kfree(cgc.buffer);
-	return 0;
+	return ret;
 }
 
 static int cdrom_read_cdda_bpc(struct cdrom_device_info *cdi, __u8 __user *ubuf,
