@@ -31,12 +31,12 @@ extern __inline__ void pmd_free(pmd_t *pmd)
 
 static inline pmd_t *pmd_alloc_one (struct mm_struct *mm, unsigned long addr)
 {
-	return (pmd_t *) get_zeroed_page(GFP_KERNEL); 
+	return (pmd_t *)get_zeroed_page(GFP_KERNEL|__GFP_REPEAT);
 }
 
 static inline pgd_t *pgd_alloc (struct mm_struct *mm)
 {
-	return (pgd_t *)get_zeroed_page(GFP_KERNEL);
+	return (pgd_t *)get_zeroed_page(GFP_KERNEL|__GFP_REPEAT);
 }
 
 static inline void pgd_free (pgd_t *pgd)

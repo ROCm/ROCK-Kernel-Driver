@@ -93,7 +93,7 @@ pmd_alloc_one_fast (struct mm_struct *mm, unsigned long addr)
 static inline pmd_t*
 pmd_alloc_one (struct mm_struct *mm, unsigned long addr)
 {
-	pmd_t *pmd = (pmd_t *) __get_free_page(GFP_KERNEL);
+	pmd_t *pmd = (pmd_t *)__get_free_page(GFP_KERNEL|__GFP_REPEAT);
 
 	if (likely(pmd != NULL))
 		clear_page(pmd);

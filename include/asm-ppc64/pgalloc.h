@@ -31,19 +31,11 @@ pgd_free(pgd_t *pgd)
 static inline pmd_t *
 pmd_alloc_one(struct mm_struct *mm, unsigned long addr)
 {
-	int count = 0;
 	pmd_t *pmd;
 
-	do {
-		pmd = (pmd_t *)__get_free_page(GFP_KERNEL);
-		if (pmd)
-			clear_page(pmd);
-		else {
-			current->state = TASK_UNINTERRUPTIBLE;
-			schedule_timeout(HZ);
-		}
-	} while (!pmd && (count++ < 10));
-
+	pmd = (pmd_t *)__get_free_page(GFP_KERNEL|__GFP_REPEAT);
+	if (pmd)
+		clear_page(pmd);
 	return pmd;
 }
 
