@@ -1023,7 +1023,7 @@ static int flush_commit_list(struct super_block *s, struct reiserfs_journal_list
     //
     if (buffer_dirty(tbh)) /* redundant, sync_dirty_buffer() checks */
       sync_dirty_buffer(tbh);
-    if (unlikely (!buffer_uptodate(tbh) || reiserfs_debug_trigger(s) == 101)) {
+    if (unlikely (!buffer_uptodate(tbh))) {
 #ifdef CONFIG_REISERFS_CHECK
       reiserfs_warning(s, "journal-601, buffer write failed") ;
 #endif
@@ -1049,7 +1049,7 @@ static int flush_commit_list(struct super_block *s, struct reiserfs_journal_list
   /* If there was a write error in the journal - we can't commit this
    * transaction - it will be invalid and, if successful, will just end
    * up propogating the write error out to the filesystem. */
-  if (unlikely (!buffer_uptodate(jl->j_commit_bh) || reiserfs_debug_trigger(s) == 102)) {
+  if (unlikely (!buffer_uptodate(jl->j_commit_bh))) {
 #ifdef CONFIG_REISERFS_CHECK
     reiserfs_warning(s, "journal-615: buffer write failed") ;
 #endif
@@ -1153,7 +1153,7 @@ static int _update_journal_header_block(struct super_block *p_s_sb, unsigned lon
   if (trans_id >= journal->j_last_flush_trans_id) {
     if (buffer_locked((journal->j_header_bh)))  {
       wait_on_buffer((journal->j_header_bh)) ;
-      if (unlikely (!buffer_uptodate(journal->j_header_bh) || reiserfs_debug_trigger(p_s_sb) == 103)) {
+      if (unlikely (!buffer_uptodate(journal->j_header_bh))) {
 #ifdef CONFIG_REISERFS_CHECK
         reiserfs_warning (p_s_sb, "journal-699: buffer write failed") ;
 #endif
@@ -1183,7 +1183,7 @@ sync:
 	set_buffer_dirty(journal->j_header_bh) ;
 	sync_dirty_buffer(journal->j_header_bh) ;
     }
-    if (!buffer_uptodate(journal->j_header_bh) || reiserfs_debug_trigger(p_s_sb) == 104) {
+    if (!buffer_uptodate(journal->j_header_bh)) {
       reiserfs_warning (p_s_sb, "journal-837: IO error during journal replay");
       return -EIO ;
     }
@@ -1405,7 +1405,7 @@ free_cnode:
 	if (!cn->bh) {
 	  reiserfs_panic(s, "journal-1012: cn->bh is NULL\n") ;
 	}
-	if (unlikely (!buffer_uptodate(cn->bh) || reiserfs_debug_trigger(s) == 105)) {
+	if (unlikely (!buffer_uptodate(cn->bh))) {
 #ifdef CONFIG_REISERFS_CHECK
 	  reiserfs_warning(s, "journal-949: buffer write failed\n") ;
 #endif
