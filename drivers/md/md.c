@@ -1714,8 +1714,8 @@ static int do_md_run(mddev_t * mddev)
 	err = mddev->pers->run(mddev);
 	if (err) {
 		printk(KERN_ERR "md: pers->run() failed ...\n");
-		mddev->pers = NULL;
 		module_put(mddev->pers->owner);
+		mddev->pers = NULL;
 		return -EINVAL;
 	}
  	atomic_set(&mddev->writes_pending,0);
