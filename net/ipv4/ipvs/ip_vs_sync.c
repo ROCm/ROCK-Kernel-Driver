@@ -480,7 +480,7 @@ static struct socket * make_send_sock(void)
 	struct socket *sock;
 
 	/* First create a socket */
-	if (sock_create(PF_INET, SOCK_DGRAM, IPPROTO_UDP, &sock) < 0) {
+	if (sock_create_kern(PF_INET, SOCK_DGRAM, IPPROTO_UDP, &sock) < 0) {
 		IP_VS_ERR("Error during creation of socket; terminating\n");
 		return NULL;
 	}
@@ -521,7 +521,7 @@ static struct socket * make_receive_sock(void)
 	struct socket *sock;
 
 	/* First create a socket */
-	if (sock_create(PF_INET, SOCK_DGRAM, IPPROTO_UDP, &sock) < 0) {
+	if (sock_create_kern(PF_INET, SOCK_DGRAM, IPPROTO_UDP, &sock) < 0) {
 		IP_VS_ERR("Error during creation of socket; terminating\n");
 		return NULL;
 	}

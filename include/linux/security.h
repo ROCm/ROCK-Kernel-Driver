@@ -680,6 +680,7 @@ struct swap_info_struct;
  *	@family contains the requested protocol family.
  *	@type contains the requested communications type.
  *	@protocol contains the requested protocol.
+ *	@kern set to 1 if a kernel socket.
  *	Return 0 if permission is granted.
  * @socket_post_create:
  *	This hook allows a module to update or allocate a per-socket security
@@ -694,6 +695,7 @@ struct swap_info_struct;
  *	@family contains the requested protocol family.
  *	@type contains the requested communications type.
  *	@protocol contains the requested protocol.
+ *	@kern set to 1 if a kernel socket.
  * @socket_bind:
  *	Check permission before socket protocol layer bind operation is
  *	performed and the socket @sock is bound to the address specified in the
@@ -1198,9 +1200,9 @@ struct security_operations {
 				    struct socket * other, struct sock * newsk);
 	int (*unix_may_send) (struct socket * sock, struct socket * other);
 
-	int (*socket_create) (int family, int type, int protocol);
+	int (*socket_create) (int family, int type, int protocol, int kern);
 	void (*socket_post_create) (struct socket * sock, int family,
-				    int type, int protocol);
+				    int type, int protocol, int kern);
 	int (*socket_bind) (struct socket * sock,
 			    struct sockaddr * address, int addrlen);
 	int (*socket_connect) (struct socket * sock,
@@ -2526,17 +2528,19 @@ static inline int security_unix_may_send(struct socket * sock,
 	return security_ops->unix_may_send(sock, other);
 }
 
-static inline int security_socket_create (int family, int type, int protocol)
+static inline int security_socket_create (int family, int type,
+					  int protocol, int kern)
 {
-	return security_ops->socket_create(family, type, protocol);
+	return security_ops->socket_create(family, type, protocol, kern);
 }
 
 static inline void security_socket_post_create(struct socket * sock, 
 					       int family,
 					       int type, 
-					       int protocol)
+					       int protocol, int kern)
 {
-	security_ops->socket_post_create(sock, family, type, protocol);
+	security_ops->socket_post_create(sock, family, type,
+					 protocol, kern);
 }
 
 static inline int security_socket_bind(struct socket * sock, 
@@ -2645,7 +2649,8 @@ static inline int security_unix_may_send(struct socket * sock,
 	return 0;
 }
 
-static inline int security_socket_create (int family, int type, int protocol)
+static inline int security_socket_create (int family, int type,
+					  int protocol, int kern)
 {
 	return 0;
 }
@@ -2653,7 +2658,7 @@ static inline int security_socket_create (int family, int type, int protocol)
 static inline void security_socket_post_create(struct socket * sock, 
 					       int family,
 					       int type, 
-					       int protocol)
+					       int protocol, int kern)
 {
 }
 

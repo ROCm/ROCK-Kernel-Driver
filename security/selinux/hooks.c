@@ -2810,34 +2810,43 @@ static int socket_has_perm(struct task_struct *task, struct socket *sock,
 	struct inode_security_struct *isec;
 	struct task_security_struct *tsec;
 	struct avc_audit_data ad;
-	int err;
+	int err = 0;
 
 	tsec = task->security;
 	isec = SOCK_INODE(sock)->i_security;
+
+	if (isec->sid == SECINITSID_KERNEL)
+		goto out;
 
 	AVC_AUDIT_DATA_INIT(&ad,NET);
 	ad.u.net.sk = sock->sk;
 	err = avc_has_perm(tsec->sid, isec->sid, isec->sclass,
 			   perms, &isec->avcr, &ad);
 
+out:
 	return err;
 }
 
-static int selinux_socket_create(int family, int type, int protocol)
+static int selinux_socket_create(int family, int type,
+				 int protocol, int kern)
 {
-	int err;
+	int err = 0;
 	struct task_security_struct *tsec;
 
-	tsec = current->security;
+	if (kern)
+		goto out;
 
+	tsec = current->security;
 	err = avc_has_perm(tsec->sid, tsec->sid,
 			   socket_type_to_security_class(family, type),
 			   SOCKET__CREATE, NULL, NULL);
 
+out:
 	return err;
 }
 
-static void selinux_socket_post_create(struct socket *sock, int family, int type, int protocol)
+static void selinux_socket_post_create(struct socket *sock, int family,
+				       int type, int protocol, int kern)
 {
 	int err;
 	struct inode_security_struct *isec;
@@ -2850,7 +2859,7 @@ static void selinux_socket_post_create(struct socket *sock, int family, int type
 
 	tsec = current->security;
 	isec->sclass = socket_type_to_security_class(family, type);
-	isec->sid = tsec->sid;
+	isec->sid = kern ? SECINITSID_KERNEL : tsec->sid;
 
 	return;
 }

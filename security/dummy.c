@@ -750,13 +750,14 @@ static int dummy_unix_may_send (struct socket *sock,
 	return 0;
 }
 
-static int dummy_socket_create (int family, int type, int protocol)
+static int dummy_socket_create (int family, int type,
+				int protocol, int kern)
 {
 	return 0;
 }
 
 static void dummy_socket_post_create (struct socket *sock, int family, int type,
-				      int protocol)
+				      int protocol, int kern)
 {
 	return;
 }

@@ -653,8 +653,8 @@ int sctp_ctl_sock_init(void)
 	else
 		family = PF_INET;
 
-	err = sock_create(family, SOCK_SEQPACKET, IPPROTO_SCTP,
-			  &sctp_ctl_socket);
+	err = sock_create_kern(family, SOCK_SEQPACKET, IPPROTO_SCTP,
+			       &sctp_ctl_socket);
 	if (err < 0) {
 		printk(KERN_ERR
 		       "SCTP: Failed to create the SCTP control socket.\n");

@@ -1413,7 +1413,7 @@ svc_create_socket(struct svc_serv *serv, int protocol, struct sockaddr_in *sin)
 	}
 	type = (protocol == IPPROTO_UDP)? SOCK_DGRAM : SOCK_STREAM;
 
-	if ((error = sock_create(PF_INET, type, protocol, &sock)) < 0)
+	if ((error = sock_create_kern(PF_INET, type, protocol, &sock)) < 0)
 		return error;
 
 	if (sin != NULL) {

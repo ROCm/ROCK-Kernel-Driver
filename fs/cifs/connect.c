@@ -900,7 +900,7 @@ ipv4_connect(struct sockaddr_in *psin_server, struct socket **csocket,
 	unsigned short int orig_port = 0;
 
 	if(*csocket == NULL) {
-		rc = sock_create(PF_INET, SOCK_STREAM, IPPROTO_TCP, csocket);
+		rc = sock_create_kern(PF_INET, SOCK_STREAM, IPPROTO_TCP, csocket);
 		if (rc < 0) {
 			cERROR(1, ("Error %d creating socket",rc));
 			*csocket = NULL;
@@ -1007,7 +1007,7 @@ ipv6_connect(struct sockaddr_in6 *psin_server, struct socket **csocket)
 	int connected = 0;
 
 	if(*csocket == NULL) {
-		rc = sock_create(PF_INET6, SOCK_STREAM, IPPROTO_TCP, csocket);
+		rc = sock_create_kern(PF_INET6, SOCK_STREAM, IPPROTO_TCP, csocket);
 		if (rc < 0) {
 			cERROR(1, ("Error %d creating ipv6 socket",rc));
 			*csocket = NULL;
