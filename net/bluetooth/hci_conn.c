@@ -333,6 +333,20 @@ int hci_conn_encrypt(struct hci_conn *conn)
 }
 EXPORT_SYMBOL(hci_conn_encrypt);
 
+/* Change link key */
+int hci_conn_change_link_key(struct hci_conn *conn)
+{
+	BT_DBG("conn %p", conn);
+
+	if (!test_and_set_bit(HCI_CONN_AUTH_PEND, &conn->pend)) {
+		struct hci_cp_change_conn_link_key cp;
+		cp.handle = __cpu_to_le16(conn->handle);
+		hci_send_cmd(conn->hdev, OGF_LINK_CTL, OCF_CHANGE_CONN_LINK_KEY, sizeof(cp), &cp);
+	}
+	return 0;
+}
+EXPORT_SYMBOL(hci_conn_change_link_key);
+
 /* Drop all connection on the device */
 void hci_conn_hash_flush(struct hci_dev *hdev)
 {

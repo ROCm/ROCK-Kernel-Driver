@@ -338,7 +338,7 @@ static struct miscdevice hci_vhci_miscdev=
         &hci_vhci_fops
 };
 
-int __init hci_vhci_init(void)
+static int __init hci_vhci_init(void)
 {
 	BT_INFO("VHCI driver ver %s", VERSION);
 
@@ -350,7 +350,7 @@ int __init hci_vhci_init(void)
 	return 0;
 }
 
-void hci_vhci_cleanup(void)
+static void hci_vhci_cleanup(void)
 {
 	misc_deregister(&hci_vhci_miscdev);
 }
