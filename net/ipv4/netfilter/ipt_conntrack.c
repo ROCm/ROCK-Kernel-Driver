@@ -27,7 +27,11 @@ match(const struct sk_buff *skb,
 
 #define FWINV(bool,invflg) ((bool) ^ !!(sinfo->invflags & invflg))
 
-	statebit = ct ? IPT_CONNTRACK_STATE_INVALID : IPT_CONNTRACK_STATE_BIT(ctinfo);
+	if (ct)
+		statebit = IPT_CONNTRACK_STATE_BIT(ctinfo);
+	else
+		statebit = IPT_CONNTRACK_STATE_INVALID;
+
 	if(sinfo->flags & IPT_CONNTRACK_STATE) {
 		if (ct) {
 			if(ct->tuplehash[IP_CT_DIR_ORIGINAL].tuple.src.ip !=
