@@ -396,7 +396,7 @@ static struct pci_resource *do_pre_bridge_resource_split (struct pci_resource **
 		/* This one isn't an aligned length, so we'll make a new entry
 		 * and split it up.
 		 */
-		split_node = (struct pci_resource*) kmalloc(sizeof(struct pci_resource), GFP_KERNEL);
+		split_node = kmalloc(sizeof(*split_node), GFP_KERNEL);
 
 		if (!split_node)
 			return(NULL);
@@ -530,7 +530,7 @@ static struct pci_resource *get_io_resource (struct pci_resource **head, u32 siz
 			if ((node->length - (temp_dword - node->base)) < size)
 				continue;
 
-			split_node = (struct pci_resource*) kmalloc(sizeof(struct pci_resource), GFP_KERNEL);
+			split_node = kmalloc(sizeof(*split_node), GFP_KERNEL);
 
 			if (!split_node)
 				return(NULL);
@@ -549,7 +549,7 @@ static struct pci_resource *get_io_resource (struct pci_resource **head, u32 siz
 		if (node->length > size) {
 			/* This one is longer than we need
 			   so we'll make a new entry and split it up */
-			split_node = (struct pci_resource*) kmalloc(sizeof(struct pci_resource), GFP_KERNEL);
+			split_node = kmalloc(sizeof(*split_node), GFP_KERNEL);
 
 			if (!split_node)
 				return(NULL);
@@ -630,7 +630,7 @@ static struct pci_resource *get_max_resource (struct pci_resource **head, u32 si
 			if ((max->length - (temp_dword - max->base)) < size)
 				continue;
 
-			split_node = (struct pci_resource*) kmalloc(sizeof(struct pci_resource), GFP_KERNEL);
+			split_node = kmalloc(sizeof(*split_node), GFP_KERNEL);
 
 			if (!split_node)
 				return(NULL);
@@ -648,7 +648,7 @@ static struct pci_resource *get_max_resource (struct pci_resource **head, u32 si
 		if ((max->base + max->length) & (size - 1)) {
 			/* This one isn't end aligned properly at the top
 			   so we'll make a new entry and split it up */
-			split_node = (struct pci_resource*) kmalloc(sizeof(struct pci_resource), GFP_KERNEL);
+			split_node = kmalloc(sizeof(*split_node), GFP_KERNEL);
 
 			if (!split_node)
 				return(NULL);
@@ -669,7 +669,8 @@ static struct pci_resource *get_max_resource (struct pci_resource **head, u32 si
 
 		for ( i = 0; max_size[i] > size; i++) {
 			if (max->length > max_size[i]) {
-				split_node = (struct pci_resource *) kmalloc(sizeof(struct pci_resource), GFP_KERNEL);
+				split_node = kmalloc(sizeof(*split_node),
+							GFP_KERNEL);
 				if (!split_node)
 					break;	/* return (NULL); */
 				split_node->base = max->base + max_size[i];
@@ -744,7 +745,7 @@ static struct pci_resource *get_resource (struct pci_resource **head, u32 size)
 			if ((node->length - (temp_dword - node->base)) < size)
 				continue;
 
-			split_node = (struct pci_resource*) kmalloc(sizeof(struct pci_resource), GFP_KERNEL);
+			split_node = kmalloc(sizeof(*split_node), GFP_KERNEL);
 
 			if (!split_node)
 				return(NULL);
@@ -764,7 +765,7 @@ static struct pci_resource *get_resource (struct pci_resource **head, u32 size)
 			dbg("%s: too big\n", __FUNCTION__);
 			/* this one is longer than we need
 			   so we'll make a new entry and split it up */
-			split_node = (struct pci_resource*) kmalloc(sizeof(struct pci_resource), GFP_KERNEL);
+			split_node = kmalloc(sizeof(*split_node), GFP_KERNEL);
 
 			if (!split_node)
 				return(NULL);
@@ -882,7 +883,7 @@ struct pci_func *shpchp_slot_create(u8 busnumber)
 	struct pci_func *new_slot;
 	struct pci_func *next;
 
-	new_slot = (struct pci_func *) kmalloc(sizeof(struct pci_func), GFP_KERNEL);
+	new_slot = kmalloc(sizeof(*new_slot), GFP_KERNEL);
 
 	if (new_slot == NULL) {
 		return(new_slot);
@@ -1795,6 +1796,81 @@ static void pushbutton_helper_thread (unsigned long data)
 }
 
 
+/**
+ * shpchp_pushbutton_thread
+ *
+ * Scheduled procedure to handle blocking stuff for the pushbuttons
+ * Handles all pending events and exits.
+ *
+ */
+static void shpchp_pushbutton_thread (unsigned long slot)
+{
+	struct slot *p_slot = (struct slot *) slot;
+	u8 getstatus;
+	int rc;
+	
+	pushbutton_pending = 0;
+
+	if (!p_slot) {
+		dbg("%s: Error! slot NULL\n", __FUNCTION__);
+		return;
+	}
+
+	p_slot->hpc_ops->get_power_status(p_slot, &getstatus);
+	if (getstatus) {
+		p_slot->state = POWEROFF_STATE;
+		dbg("In power_down_board, b:d(%x:%x)\n", p_slot->bus, p_slot->device);
+
+		if (shpchp_disable_slot(p_slot)) {
+			/* Wait for exclusive access to hardware */
+			down(&p_slot->ctrl->crit_sect);
+
+			/* Turn on the Attention LED */
+			rc = p_slot->hpc_ops->set_attention_status(p_slot, 1);
+			if (rc) {
+				err("%s: Issue of Set Atten Indicator On command failed\n", __FUNCTION__);
+				return;
+			}
+	
+			/* Wait for the command to complete */
+			wait_for_ctrl_irq (p_slot->ctrl);
+
+			/* Done with exclusive hardware access */
+			up(&p_slot->ctrl->crit_sect);
+		}
+		p_slot->state = STATIC_STATE;
+	} else {
+		p_slot->state = POWERON_STATE;
+		dbg("In add_board, b:d(%x:%x)\n", p_slot->bus, p_slot->device);
+
+		if (shpchp_enable_slot(p_slot)) {
+			/* Wait for exclusive access to hardware */
+			down(&p_slot->ctrl->crit_sect);
+
+			/* Turn off the green LED */
+			rc = p_slot->hpc_ops->set_attention_status(p_slot, 1);
+			if (rc) {
+				err("%s: Issue of Set Atten Indicator On command failed\n", __FUNCTION__);
+				return;
+			}
+			/* Wait for the command to complete */
+			wait_for_ctrl_irq (p_slot->ctrl);
+			
+			p_slot->hpc_ops->green_led_off(p_slot);
+
+			/* Wait for the command to complete */
+			wait_for_ctrl_irq (p_slot->ctrl);
+
+			/* Done with exclusive hardware access */
+			up(&p_slot->ctrl->crit_sect);
+		}
+		p_slot->state = STATIC_STATE;
+	}
+
+	return;
+}
+
+
 /* this is the main worker thread */
 static int event_thread(void* data)
 {
@@ -1856,7 +1932,7 @@ static int update_slot_info (struct slot *slot)
 	struct hotplug_slot_info *info;
 	int result;
 
-	info = kmalloc (sizeof (struct hotplug_slot_info), GFP_KERNEL);
+	info = kmalloc(sizeof(*info), GFP_KERNEL);
 	if (!info)
 		return -ENOMEM;
 
@@ -2005,81 +2081,6 @@ static void interrupt_event_handler(struct controller *ctrl)
 				change = 1;
 			}
 		}		/* End of FOR loop */
-	}
-
-	return;
-}
-
-
-/**
- * shpchp_pushbutton_thread
- *
- * Scheduled procedure to handle blocking stuff for the pushbuttons
- * Handles all pending events and exits.
- *
- */
-void shpchp_pushbutton_thread (unsigned long slot)
-{
-	struct slot *p_slot = (struct slot *) slot;
-	u8 getstatus;
-	int rc;
-	
-	pushbutton_pending = 0;
-
-	if (!p_slot) {
-		dbg("%s: Error! slot NULL\n", __FUNCTION__);
-		return;
-	}
-
-	p_slot->hpc_ops->get_power_status(p_slot, &getstatus);
-	if (getstatus) {
-		p_slot->state = POWEROFF_STATE;
-		dbg("In power_down_board, b:d(%x:%x)\n", p_slot->bus, p_slot->device);
-
-		if (shpchp_disable_slot(p_slot)) {
-			/* Wait for exclusive access to hardware */
-			down(&p_slot->ctrl->crit_sect);
-
-			/* Turn on the Attention LED */
-			rc = p_slot->hpc_ops->set_attention_status(p_slot, 1);
-			if (rc) {
-				err("%s: Issue of Set Atten Indicator On command failed\n", __FUNCTION__);
-				return;
-			}
-	
-			/* Wait for the command to complete */
-			wait_for_ctrl_irq (p_slot->ctrl);
-
-			/* Done with exclusive hardware access */
-			up(&p_slot->ctrl->crit_sect);
-		}
-		p_slot->state = STATIC_STATE;
-	} else {
-		p_slot->state = POWERON_STATE;
-		dbg("In add_board, b:d(%x:%x)\n", p_slot->bus, p_slot->device);
-
-		if (shpchp_enable_slot(p_slot)) {
-			/* Wait for exclusive access to hardware */
-			down(&p_slot->ctrl->crit_sect);
-
-			/* Turn off the green LED */
-			rc = p_slot->hpc_ops->set_attention_status(p_slot, 1);
-			if (rc) {
-				err("%s: Issue of Set Atten Indicator On command failed\n", __FUNCTION__);
-				return;
-			}
-			/* Wait for the command to complete */
-			wait_for_ctrl_irq (p_slot->ctrl);
-			
-			p_slot->hpc_ops->green_led_off(p_slot);
-
-			/* Wait for the command to complete */
-			wait_for_ctrl_irq (p_slot->ctrl);
-
-			/* Done with exclusive hardware access */
-			up(&p_slot->ctrl->crit_sect);
-		}
-		p_slot->state = STATIC_STATE;
 	}
 
 	return;
@@ -2504,22 +2505,18 @@ static int configure_new_function (struct controller * ctrl, struct pci_func * f
 		/* Make copies of the nodes we are going to pass down so that
 		 * if there is a problem,we can just use these to free resources
 		 */
-		hold_bus_node = (struct pci_resource *) kmalloc(sizeof(struct pci_resource), GFP_KERNEL);
-		hold_IO_node = (struct pci_resource *) kmalloc(sizeof(struct pci_resource), GFP_KERNEL);
-		hold_mem_node = (struct pci_resource *) kmalloc(sizeof(struct pci_resource), GFP_KERNEL);
-		hold_p_mem_node = (struct pci_resource *) kmalloc(sizeof(struct pci_resource), GFP_KERNEL);
+		hold_bus_node = kmalloc(sizeof(*hold_bus_node), GFP_KERNEL);
+		hold_IO_node = kmalloc(sizeof(*hold_IO_node), GFP_KERNEL);
+		hold_mem_node = kmalloc(sizeof(*hold_mem_node), GFP_KERNEL);
+		hold_p_mem_node = kmalloc(sizeof(*hold_p_mem_node), GFP_KERNEL);
 
 		if (!hold_bus_node || !hold_IO_node || !hold_mem_node || !hold_p_mem_node) {
-			if (hold_bus_node)
-				kfree(hold_bus_node);
-			if (hold_IO_node)
-				kfree(hold_IO_node);
-			if (hold_mem_node)
-				kfree(hold_mem_node);
-			if (hold_p_mem_node)
-				kfree(hold_p_mem_node);
+			kfree(hold_bus_node);
+			kfree(hold_IO_node);
+			kfree(hold_mem_node);
+			kfree(hold_p_mem_node);
 
-			return(1);
+			return 1;
 		}
 
 		memcpy(hold_bus_node, bus_node, sizeof(struct pci_resource));
@@ -2538,11 +2535,11 @@ static int configure_new_function (struct controller * ctrl, struct pci_func * f
 			/* set IO base and Limit registers */
 			RES_CHECK(io_node->base, 8);
 			temp_byte = (u8)(io_node->base >> 8);
-			rc = pci_bus_write_config_byte (pci_bus, devfn, PCI_IO_BASE, temp_byte);
+			rc = pci_bus_write_config_byte(pci_bus, devfn, PCI_IO_BASE, temp_byte);
 
 			RES_CHECK(io_node->base + io_node->length - 1, 8);
 			temp_byte = (u8)((io_node->base + io_node->length - 1) >> 8);
-			rc = pci_bus_write_config_byte (pci_bus, devfn, PCI_IO_LIMIT, temp_byte);
+			rc = pci_bus_write_config_byte(pci_bus, devfn, PCI_IO_LIMIT, temp_byte);
 		} else {
 			kfree(hold_IO_node);
 			hold_IO_node = NULL;
@@ -2559,17 +2556,17 @@ static int configure_new_function (struct controller * ctrl, struct pci_func * f
 			/* set Mem base and Limit registers */
 			RES_CHECK(mem_node->base, 16);
 			temp_word = (u32)(mem_node->base >> 16);
-			rc = pci_bus_write_config_word (pci_bus, devfn, PCI_MEMORY_BASE, temp_word);
+			rc = pci_bus_write_config_word(pci_bus, devfn, PCI_MEMORY_BASE, temp_word);
 
 			RES_CHECK(mem_node->base + mem_node->length - 1, 16);
 			temp_word = (u32)((mem_node->base + mem_node->length - 1) >> 16);
-			rc = pci_bus_write_config_word (pci_bus, devfn, PCI_MEMORY_LIMIT, temp_word);
+			rc = pci_bus_write_config_word(pci_bus, devfn, PCI_MEMORY_LIMIT, temp_word);
 		} else {
 			temp_word = 0xFFFF;
-			rc = pci_bus_write_config_word (pci_bus, devfn, PCI_MEMORY_BASE, temp_word);
+			rc = pci_bus_write_config_word(pci_bus, devfn, PCI_MEMORY_BASE, temp_word);
 
 			temp_word = 0x0000;
-			rc = pci_bus_write_config_word (pci_bus, devfn, PCI_MEMORY_LIMIT, temp_word);
+			rc = pci_bus_write_config_word(pci_bus, devfn, PCI_MEMORY_LIMIT, temp_word);
 
 			kfree(hold_mem_node);
 			hold_mem_node = NULL;
@@ -2586,17 +2583,17 @@ static int configure_new_function (struct controller * ctrl, struct pci_func * f
 			/* set Pre Mem base and Limit registers */
 			RES_CHECK(p_mem_node->base, 16);
 			temp_word = (u32)(p_mem_node->base >> 16);
-			rc = pci_bus_write_config_word (pci_bus, devfn, PCI_PREF_MEMORY_BASE, temp_word);
+			rc = pci_bus_write_config_word(pci_bus, devfn, PCI_PREF_MEMORY_BASE, temp_word);
 
 			RES_CHECK(p_mem_node->base + p_mem_node->length - 1, 16);
 			temp_word = (u32)((p_mem_node->base + p_mem_node->length - 1) >> 16);
-			rc = pci_bus_write_config_word (pci_bus, devfn, PCI_PREF_MEMORY_LIMIT, temp_word);
+			rc = pci_bus_write_config_word(pci_bus, devfn, PCI_PREF_MEMORY_LIMIT, temp_word);
 		} else {
 			temp_word = 0xFFFF;
-			rc = pci_bus_write_config_word (pci_bus, devfn, PCI_PREF_MEMORY_BASE, temp_word);
+			rc = pci_bus_write_config_word(pci_bus, devfn, PCI_PREF_MEMORY_BASE, temp_word);
 
 			temp_word = 0x0000;
-			rc = pci_bus_write_config_word (pci_bus, devfn, PCI_PREF_MEMORY_LIMIT, temp_word);
+			rc = pci_bus_write_config_word(pci_bus, devfn, PCI_PREF_MEMORY_LIMIT, temp_word);
 
 			kfree(hold_p_mem_node);
 			hold_p_mem_node = NULL;
@@ -2613,7 +2610,8 @@ static int configure_new_function (struct controller * ctrl, struct pci_func * f
 
 			ID = 0xFFFFFFFF;
 			pci_bus->number = hold_bus_node->base;
-			pci_bus_read_config_dword (pci_bus, PCI_DEVFN(device, 0), PCI_VENDOR_ID, &ID);
+			pci_bus_read_config_dword(pci_bus, PCI_DEVFN(device, 0),
+					PCI_VENDOR_ID, &ID);
 			pci_bus->number = func->bus;
 
 			if (ID != 0xFFFFFFFF) {	  /*  device Present */
