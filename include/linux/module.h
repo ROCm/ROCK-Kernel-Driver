@@ -119,6 +119,7 @@ struct kernel_symbol_group
 
 	unsigned int num_syms;
 	const struct kernel_symbol *syms;
+	const unsigned long *crcs;
 };
 
 /* Given an address, look for it in the exception tables */

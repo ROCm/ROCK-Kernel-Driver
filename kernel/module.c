@@ -916,7 +916,7 @@ static void layout_sections(struct module *mod,
 			    || strstr(secstrings + s->sh_name, ".init"))
 				continue;
 			s->sh_entsize = get_offset(&mod->core_size, s);
-			DEBUGP("\t%s\n", name);
+			DEBUGP("\t%s\n", secstrings + s->sh_name);
 		}
 	}
 
@@ -932,7 +932,7 @@ static void layout_sections(struct module *mod,
 				continue;
 			s->sh_entsize = (get_offset(&mod->init_size, s)
 					 | INIT_OFFSET_MASK);
-			DEBUGP("\t%s\n", name);
+			DEBUGP("\t%s\n", secstrings + s->sh_name);
 		}
 	}
 }
@@ -976,7 +976,8 @@ static struct module *load_module(void *umod,
 	Elf_Shdr *sechdrs;
 	char *secstrings, *args;
 	unsigned int i, symindex, exportindex, strindex, setupindex, exindex,
-		modindex, obsparmindex, licenseindex, gplindex, vmagindex;
+		modindex, obsparmindex, licenseindex, gplindex, vmagindex,
+		crcindex, gplcrcindex;
 	long arglen;
 	struct module *mod;
 	long err = 0;
@@ -1012,7 +1013,8 @@ static struct module *load_module(void *umod,
 
 	/* May not export symbols, or have setup params, so these may
            not exist */
-	exportindex = setupindex = obsparmindex = gplindex = licenseindex = 0;
+	exportindex = setupindex = obsparmindex = gplindex = licenseindex 
+		= crcindex = gplcrcindex = 0;
 
 	/* And these should exist, but gcc whinges if we don't init them */
 	symindex = strindex = exindex = modindex = vmagindex = 0;
@@ -1045,6 +1047,16 @@ static struct module *load_module(void *umod,
 			/* Exported symbols. (GPL) */
 			DEBUGP("GPL symbols found in section %u\n", i);
 			gplindex = i;
+		} else if (strcmp(secstrings+sechdrs[i].sh_name, "__kcrctab")
+			   == 0) {
+			/* Exported symbols CRCs. */
+			DEBUGP("CRC table in section %u\n", i);
+			crcindex = i;
+		} else if (strcmp(secstrings+sechdrs[i].sh_name, "__kcrctab_gpl")
+			   == 0) {
+			/* Exported symbols CRCs. (GPL)*/
+			DEBUGP("CRC table in section %u\n", i);
+			gplcrcindex = i;
 		} else if (strcmp(secstrings+sechdrs[i].sh_name, "__param")
 			   == 0) {
 			/* Setup parameter info */
@@ -1192,9 +1204,11 @@ static struct module *load_module(void *umod,
 	mod->symbols.num_syms = (sechdrs[exportindex].sh_size
 				 / sizeof(*mod->symbols.syms));
 	mod->symbols.syms = (void *)sechdrs[exportindex].sh_addr;
+	mod->symbols.crcs = (void *)sechdrs[crcindex].sh_addr;
 	mod->gpl_symbols.num_syms = (sechdrs[gplindex].sh_size
 				 / sizeof(*mod->symbols.syms));
 	mod->gpl_symbols.syms = (void *)sechdrs[gplindex].sh_addr;
+	mod->gpl_symbols.crcs = (void *)sechdrs[gplcrcindex].sh_addr;
 
 	/* Set up exception table */
 	if (exindex) {
@@ -1497,6 +1511,10 @@ extern const struct kernel_symbol __start___ksymtab[];
 extern const struct kernel_symbol __stop___ksymtab[];
 extern const struct kernel_symbol __start___ksymtab_gpl[];
 extern const struct kernel_symbol __stop___ksymtab_gpl[];
+extern const unsigned long __start___kcrctab[];
+extern const unsigned long __stop___kcrctab[];
+extern const unsigned long __start___kcrctab_gpl[];
+extern const unsigned long __stop___kcrctab_gpl[];
 
 static struct kernel_symbol_group kernel_symbols, kernel_gpl_symbols;
 
@@ -1505,12 +1523,14 @@ static int __init symbols_init(void)
 	/* Add kernel symbols to symbol table */
 	kernel_symbols.num_syms = (__stop___ksymtab - __start___ksymtab);
 	kernel_symbols.syms = __start___ksymtab;
+	kernel_symbols.crcs = __start___kcrctab;
 	kernel_symbols.gplonly = 0;
 	list_add(&kernel_symbols.list, &symbols);
 
 	kernel_gpl_symbols.num_syms = (__stop___ksymtab_gpl
 				       - __start___ksymtab_gpl);
 	kernel_gpl_symbols.syms = __start___ksymtab_gpl;
+	kernel_gpl_symbols.crcs = __start___kcrctab_gpl;
 	kernel_gpl_symbols.gplonly = 1;
 	list_add(&kernel_gpl_symbols.list, &symbols);
 
