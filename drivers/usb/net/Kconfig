@@ -7,25 +7,6 @@ comment "USB Network adaptors"
 comment "Networking support is needed for USB Networking device support"
 	depends on USB && !NET
 
-config USB_AX8817X_STANDALONE
-	tristate "USB ASIX AX8817X Ethernet device support (EXPERIMENTAL)"
-	depends on USB && NET && EXPERIMENTAL
-	---help---
-	  Say Y if you want to use one of the following 10/100Mps USB
-	  Ethernet devices based on the ASIX AX88172 chip.  Supported
-	  devices are:
-		ASIX AX88172
-		D-Link DUB-E100
-		Hawking UF200
-		Netgear FA120
-
-	  This driver makes the adapter appear as a normal Ethernet interface,
-	  typically on eth0, if it is the only ethernet device, or perhaps on
-	  eth1, if you have a PCI or ISA ethernet card installed.
-
-	  To compile this driver as a module, choose M here: the
-	  module will be called ax8817x.
-
 config USB_CATC
 	tristate "USB CATC NetMate-based Ethernet device support (EXPERIMENTAL)"
 	depends on USB && NET && EXPERIMENTAL
