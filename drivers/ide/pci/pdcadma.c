@@ -25,67 +25,79 @@
 #include <asm/irq.h>
 
 #include "ide_modes.h"
-
-#undef DISPLAY_PDCADMA_TIMINGS
+#include "pdcadma.h"
 
 #if defined(DISPLAY_PDCADMA_TIMINGS) && defined(CONFIG_PROC_FS)
 #include <linux/stat.h>
 #include <linux/proc_fs.h>
 
-static int pdcadma_get_info(char *, char **, off_t, int);
-extern int (*pdcadma_display_info)(char *, char **, off_t, int); /* ide-proc.c */
-static struct pci_dev *bmide_dev;
+static u8 pdcadma_proc = 0;
+#define PDC_MAX_DEVS		5
+static struct pci_dev *pdc_devs[PDC_MAX_DEVS];
+static int n_pdc_devs;
 
 static int pdcadma_get_info (char *buffer, char **addr, off_t offset, int count)
 {
 	char *p = buffer;
-	u32 bibma = pci_resource_start(bmide_dev, 4);
+	int i;
 
-	p += sprintf(p, "\n                                PDC ADMA %04X Chipset.\n", bmide_dev->device);
-	p += sprintf(p, "UDMA\n");
-	p += sprintf(p, "PIO\n");
+	for (i = 0; i < n_pdc_devs; i++) {
+		struct pci_dev *dev	= pdc_devs[i];
+		u32 bibma = pci_resource_start(dev, 4);
 
+		p += sprintf(p, "\n                                "
+			"PDC ADMA %04X Chipset.\n", dev->device);
+		p += sprintf(p, "UDMA\n");
+		p += sprintf(p, "PIO\n");
+
+	}
 	return p-buffer;	/* => must be less than 4k! */
 }
 #endif  /* defined(DISPLAY_PDCADMA_TIMINGS) && defined(CONFIG_PROC_FS) */
 
-byte pdcadma_proc = 0;
-
 #ifdef CONFIG_BLK_DEV_IDEDMA
 /*
- * pdcadma_dmaproc() initiates/aborts (U)DMA read/write operations on a drive.
+ * pdcadma_dma functions() initiates/aborts (U)DMA read/write
+ * operations on a drive.
  */
+#if 0
+        int (*ide_dma_read)(ide_drive_t *drive);
+        int (*ide_dma_write)(ide_drive_t *drive);
+        int (*ide_dma_begin)(ide_drive_t *drive);
+        int (*ide_dma_end)(ide_drive_t *drive);
+        int (*ide_dma_check)(ide_drive_t *drive);
+        int (*ide_dma_on)(ide_drive_t *drive);
+        int (*ide_dma_off)(ide_drive_t *drive);
+        int (*ide_dma_off_quietly)(ide_drive_t *drive);
+        int (*ide_dma_test_irq)(ide_drive_t *drive);
+        int (*ide_dma_host_on)(ide_drive_t *drive);
+        int (*ide_dma_host_off)(ide_drive_t *drive);
+        int (*ide_dma_bad_drive)(ide_drive_t *drive);
+        int (*ide_dma_good_drive)(ide_drive_t *drive);
+        int (*ide_dma_count)(ide_drive_t *drive);
+        int (*ide_dma_verbose)(ide_drive_t *drive);
+        int (*ide_dma_retune)(ide_drive_t *drive);
+        int (*ide_dma_lostirq)(ide_drive_t *drive);
+        int (*ide_dma_timeout)(ide_drive_t *drive);
 
-int pdcadma_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
-{
-	switch (func) {
-		case ide_dma_check:
-			func = ide_dma_off_quietly;
-		default:
-			break;
-	}
-	return ide_dmaproc(func, drive);	/* use standard DMA stuff */
-}
+#endif
+
 #endif /* CONFIG_BLK_DEV_IDEDMA */
 
-unsigned int __init pci_init_pdcadma (struct pci_dev *dev, const char *name)
+static unsigned int __init init_chipset_pdcadma (struct pci_dev *dev, const char *name)
 {
 #if defined(DISPLAY_PDCADMA_TIMINGS) && defined(CONFIG_PROC_FS)
+	pdc_devs[n_pdc_devs++] = dev;
+
 	if (!pdcadma_proc) {
 		pdcadma_proc = 1;
-		bmide_dev = dev;
-		pdcadma_display_info = &pdcadma_get_info;
+		ide_pci_register_host_proc(&pdcadma_procs[0]);
 	}
 #endif /* DISPLAY_PDCADMA_TIMINGS && CONFIG_PROC_FS */
 	return 0;
 }
 
-unsigned int __init ata66_pdcadma (ide_hwif_t *hwif)
-{
-	return 1;
-}
-
-void __init ide_init_pdcadma (ide_hwif_t *hwif)
+static void __init init_hwif_pdcadma (ide_hwif_t *hwif)
 {
 	hwif->autodma = 0;
 	hwif->dma_base = 0;
@@ -94,13 +106,47 @@ void __init ide_init_pdcadma (ide_hwif_t *hwif)
 //	hwif->speedproc = &pdcadma_tune_chipset;
 
 //	if (hwif->dma_base) {
-//		hwif->dmaproc = &pdcadma_dmaproc;
 //		hwif->autodma = 1;
 //	}
+
+	hwif->udma_four = 1;
+
+//	hwif->atapi_dma = 1;
+//	hwif->ultra_mask = 0x7f;
+//	hwif->mwdma_mask = 0x07;
+//	hwif->swdma_mask = 0x07;
+
 }
 
-void __init ide_dmacapable_pdcadma (ide_hwif_t *hwif, unsigned long dmabase)
+static void __init init_dma_pdcadma (ide_hwif_t *hwif, unsigned long dmabase)
 {
-//	ide_setup_dma(hwif, dmabase, 8);
+#if 0
+	ide_setup_dma(hwif, dmabase, 8);
+#endif
+}
+
+extern void ide_setup_pci_device(struct pci_dev *, ide_pci_device_t *);
+
+static void __init init_setup_pdcadma (struct pci_dev *dev, ide_pci_device_t *d)
+{
+	ide_setup_pci_device(dev, d);
+}
+
+int __init pdcadma_scan_pcidev (struct pci_dev *dev)
+{
+	ide_pci_device_t *d;
+
+	if (dev->vendor != PCI_VENDOR_ID_PDC)
+		return 0;
+
+	for (d = pdcadma_chipsets; d && d->vendor && d->device; ++d) {
+		if (((d->vendor == dev->vendor) &&
+		     (d->device == dev->device)) &&
+		    (d->init_setup)) {
+			d->init_setup(dev, d);
+			return 1;
+		}
+	}
+	return 0;
 }
 
