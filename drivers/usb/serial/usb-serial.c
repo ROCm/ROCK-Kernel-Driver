@@ -1185,10 +1185,10 @@ void usb_serial_disconnect(struct usb_interface *interface)
 			port = &serial->port[i];
 			down (&port->sem);
 			if (port->tty != NULL) {
+				port->tty->driver_data = NULL;
 				while (port->open_count > 0) {
 					__serial_close(port, NULL);
 				}
-				port->tty->driver_data = NULL;
 			}
 			up (&port->sem);
 		}
