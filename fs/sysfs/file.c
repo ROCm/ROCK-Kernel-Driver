@@ -84,7 +84,7 @@ static int fill_read_buffer(struct file * file, struct sysfs_buffer * buffer)
 	ssize_t count;
 
 	if (!buffer->page)
-		buffer->page = (char *) __get_free_page(GFP_KERNEL);
+		buffer->page = (char *) get_zeroed_page(GFP_KERNEL);
 	if (!buffer->page)
 		return -ENOMEM;
 
@@ -174,7 +174,7 @@ fill_write_buffer(struct sysfs_buffer * buffer, const char * buf, size_t count)
 	int error;
 
 	if (!buffer->page)
-		buffer->page = (char *)__get_free_page(GFP_KERNEL);
+		buffer->page = (char *)get_zeroed_page(GFP_KERNEL);
 	if (!buffer->page)
 		return -ENOMEM;
 

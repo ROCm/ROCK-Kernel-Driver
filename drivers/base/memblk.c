@@ -2,7 +2,6 @@
  * drivers/base/memblk.c - basic Memory Block class support
  */
 
-#include <linux/device.h>
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/memblk.h>
@@ -10,8 +9,8 @@
 #include <linux/topology.h>
 
 
-static struct class memblk_class = {
-	.name		= "memblk",
+static struct sysdev_class memblk_class = {
+	set_kset_name("memblk"),
 };
 
 
@@ -29,27 +28,23 @@ static struct device_driver memblk_driver = {
  */
 int __init register_memblk(struct memblk *memblk, int num, struct node *root)
 {
+	int error;
+
 	memblk->node_id = memblk_to_node(num);
-	memblk->sysdev.name = "memblk";
+	memblk->sysdev.cls = &memblk_class,
 	memblk->sysdev.id = num;
-	if (root)
-		memblk->sysdev.root = &root->sysroot;
-	snprintf(memblk->sysdev.dev.name, DEVICE_NAME_SIZE, "Memory Block %u", num);
-	memblk->sysdev.dev.driver = &memblk_driver;
-	return sys_device_register(&memblk->sysdev);
+
+	error = sys_device_register(&memblk->sysdev);
+	if (!error) 
+		error = sysfs_create_link(&root->sysdev.kobj,
+					  &memblk->sysdev,kobj,
+					  memblk->sysdev.kobj.name);
+	return error;
 }
 
 
 int __init register_memblk_type(void)
 {
-	int error;
-
-	error = class_register(&memblk_class);
-	if (!error) {
-		error = driver_register(&memblk_driver);
-		if (error)
-			class_unregister(&memblk_class);
-	}
-	return error;
+	return sysdev_class_register(&memblk_class);
 }
 postcore_initcall(register_memblk_type);

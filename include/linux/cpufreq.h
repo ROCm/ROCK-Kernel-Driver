@@ -205,10 +205,6 @@ struct freq_attr {
 int cpufreq_set_policy(struct cpufreq_policy *policy);
 int cpufreq_get_policy(struct cpufreq_policy *policy, unsigned int cpu);
 
-#ifdef CONFIG_PM
-int cpufreq_restore(void);
-#endif
-
 /* the proc_intf.c needs this */
 int cpufreq_parse_governor (char *str_governor, unsigned int *policy, struct cpufreq_governor **governor);
 
