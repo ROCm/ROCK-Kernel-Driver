@@ -227,28 +227,12 @@ newversion:
 	@mv -f .tmpversion .version
 
 include/linux/compile.h: $(CONFIGURATION) include/linux/version.h newversion
-	@echo -n \#define UTS_VERSION \"\#`cat .version` > .ver
-	@if [ -n "$(CONFIG_SMP)" ] ; then echo -n " SMP" >> .ver; fi
-	@if [ -f .name ]; then  echo -n \-`cat .name` >> .ver; fi
-	@echo ' '`date`'"' >> .ver
-	@echo \#define LINUX_COMPILE_TIME \"`date +%T`\" >> .ver
-	@echo \#define LINUX_COMPILE_BY \"`whoami`\" >> .ver
-	@echo \#define LINUX_COMPILE_HOST \"`hostname`\" >> .ver
-	@if [ -x /bin/dnsdomainname ]; then \
-	   echo \#define LINUX_COMPILE_DOMAIN \"`dnsdomainname`\"; \
-	 elif [ -x /bin/domainname ]; then \
-	   echo \#define LINUX_COMPILE_DOMAIN \"`domainname`\"; \
-	 else \
-	   echo \#define LINUX_COMPILE_DOMAIN ; \
-	 fi >> .ver
-	@echo \#define LINUX_COMPILER \"`$(CC) $(CFLAGS) -v 2>&1 | tail -1`\" >> .ver
-	@mv -f .ver $@
+	@echo Generating $@
+	@. scripts/mkcompile_h $@ "$(ARCH)" "$(CONFIG_SMP)" "$(CC) $(CFLAGS)"
 
 include/linux/version.h: ./Makefile
-	@echo \#define UTS_RELEASE \"$(KERNELRELEASE)\" > .ver
-	@echo \#define LINUX_VERSION_CODE `expr $(VERSION) \\* 65536 + $(PATCHLEVEL) \\* 256 + $(SUBLEVEL)` >> .ver
-	@echo '#define KERNEL_VERSION(a,b,c) (((a) << 16) + ((b) << 8) + (c))' >>.ver
-	@mv -f .ver $@
+	@echo Generating $@
+	@. scripts/mkversion_h $@ $(KERNELRELEASE) $(VERSION) $(PATCHLEVEL) $(SUBLEVEL)
 
 comma	:= ,
 
@@ -257,7 +241,7 @@ comma	:= ,
 # FIXME should be moved to init/Makefile
 
 init/version.o: init/version.c include/linux/compile.h include/config/MARKER
-	$(CC) $(CFLAGS) $(CFLAGS_KERNEL) -DUTS_MACHINE='"$(ARCH)"' -DKBUILD_BASENAME=$(subst $(comma),_,$(subst -,_,$(*F))) -c -o init/version.o init/version.c
+	$(CC) $(CFLAGS) $(CFLAGS_KERNEL) -DKBUILD_BASENAME=$(subst $(comma),_,$(subst -,_,$(*F))) -c -o init/version.o init/version.c
 
 init/main.o: init/main.c include/config/MARKER
 	$(CC) $(CFLAGS) $(CFLAGS_KERNEL) $(PROFILING) -DKBUILD_BASENAME=$(subst $(comma),_,$(subst -,_,$(*F))) -c -o $*.o $<
