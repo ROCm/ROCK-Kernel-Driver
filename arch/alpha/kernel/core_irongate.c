@@ -236,14 +236,15 @@ albacore_init_arch(void)
 			unsigned long size;
 
 			size = initrd_end - initrd_start;
-			free_bootmem(__pa(initrd_start), PAGE_ALIGN(size));
+			free_bootmem_node(NODE_DATA(0), __pa(initrd_start),
+					  PAGE_ALIGN(size));
 			if (!move_initrd(pci_mem))
 				printk("irongate_init_arch: initrd too big "
 				       "(%ldK)\ndisabling initrd\n",
 				       size / 1024);
 		}
 #endif
-		reserve_bootmem(pci_mem, memtop - pci_mem);
+		reserve_bootmem_node(NODE_DATA(0), pci_mem, memtop - pci_mem);
 		printk("irongate_init_arch: temporarily reserving "
 			"region %08lx-%08lx for PCI\n", pci_mem, memtop - 1);
 	}
