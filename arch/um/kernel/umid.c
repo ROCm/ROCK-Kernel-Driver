@@ -186,7 +186,6 @@ int not_dead_yet(char *dir)
 	}
 	if(!dead) return(1);
 	return(actually_do_remove(dir));
-	return(0);
 }
 
 static int __init set_uml_dir(char *name, int *add)

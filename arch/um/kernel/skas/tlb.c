@@ -99,7 +99,6 @@ static void flush_kernel_vm_range(unsigned long start, unsigned long end)
 				protect_memory(addr, PAGE_SIZE, 1, 1, 1, 1);
 			}
 			addr += PAGE_SIZE;
-
 		}
 		else {
 			if(pmd_newpage(*pmd)){

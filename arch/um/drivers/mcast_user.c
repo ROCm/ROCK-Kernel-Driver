@@ -153,14 +153,14 @@ static int mcast_set_mtu(int mtu, void *data)
 }
 
 struct net_user_info mcast_user_info = {
-	init:		mcast_user_init,
-	open:		mcast_open,
-	close:	 	mcast_close,
-	remove:	 	NULL,
-	set_mtu:	mcast_set_mtu,
-	add_address:	NULL,
-	delete_address: NULL,
-	max_packet:	MAX_PACKET - ETH_HEADER_OTHER
+	.init		= mcast_user_init,
+	.open		= mcast_open,
+	.close	 	= mcast_close,
+	.remove	 	= NULL,
+	.set_mtu	= mcast_set_mtu,
+	.add_address	= NULL,
+	.delete_address = NULL,
+	.max_packet	= MAX_PACKET - ETH_HEADER_OTHER
 };
 
 /*

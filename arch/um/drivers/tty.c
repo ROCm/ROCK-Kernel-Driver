@@ -32,8 +32,8 @@ void *tty_chan_init(char *str, int device, struct chan_opts *opts)
 
 	if((data = um_kmalloc(sizeof(*data))) == NULL) 
 		return(NULL);
-	*data = ((struct tty_chan) { dev :	str,
-				     raw :	opts->raw });
+	*data = ((struct tty_chan) { .dev 	= str,
+				     .raw 	= opts->raw });
 				     
 	return(data);
 }
@@ -62,16 +62,16 @@ int tty_console_write(int fd, const char *buf, int n, void *d)
 }
 
 struct chan_ops tty_ops = {
-	type:		"tty",
-	init:		tty_chan_init,
-	open:		tty_open,
-	close:		generic_close,
-	read:		generic_read,
-	write:		generic_write,
-	console_write:	tty_console_write,
-	window_size:	generic_window_size,
-	free:		generic_free,
-	winch:		0,
+	.type		= "tty",
+	.init		= tty_chan_init,
+	.open		= tty_open,
+	.close		= generic_close,
+	.read		= generic_read,
+	.write		= generic_write,
+	.console_write	= tty_console_write,
+	.window_size	= generic_window_size,
+	.free		= generic_free,
+	.winch		= 0,
 };
 
 /*
