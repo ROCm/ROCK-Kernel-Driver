@@ -525,7 +525,7 @@ static int tcp_fragment(struct sock *sk, struct sk_buff *skb, u32 len)
  * eventually). The difference is that pulled data not copied, but
  * immediately discarded.
  */
-unsigned char * __pskb_trim_head(struct sk_buff *skb, int len)
+static unsigned char *__pskb_trim_head(struct sk_buff *skb, int len)
 {
 	int i, k, eat;
 
@@ -553,8 +553,10 @@ unsigned char * __pskb_trim_head(struct sk_buff *skb, int len)
 	return skb->tail;
 }
 
-static int __tcp_trim_head(struct tcp_opt *tp, struct sk_buff *skb, u32 len)
+int tcp_trim_head(struct sock *sk, struct sk_buff *skb, u32 len)
 {
+	struct tcp_opt *tp = tcp_sk(sk);
+
 	if (skb_cloned(skb) &&
 	    pskb_expand_head(skb, 0, 0, GFP_ATOMIC))
 		return -ENOMEM;
@@ -566,7 +568,13 @@ static int __tcp_trim_head(struct tcp_opt *tp, struct sk_buff *skb, u32 len)
 			return -ENOMEM;
 	}
 
+	TCP_SKB_CB(skb)->seq += len;
 	skb->ip_summed = CHECKSUM_HW;
+
+	skb->truesize	     -= len;
+	sk->sk_queue_shrunk   = 1;
+	sk->sk_wmem_queued   -= len;
+	sk->sk_forward_alloc += len;
 
 	/* Any change of skb->len requires recalculation of tso
 	 * factor and mss.
@@ -574,16 +582,6 @@ static int __tcp_trim_head(struct tcp_opt *tp, struct sk_buff *skb, u32 len)
 	tcp_set_skb_tso_factor(skb, tp->mss_cache_std);
 
 	return 0;
-}
-
-static inline int tcp_trim_head(struct tcp_opt *tp, struct sk_buff *skb, u32 len)
-{
-	int err = __tcp_trim_head(tp, skb, len);
-
-	if (!err)
-		TCP_SKB_CB(skb)->seq += len;
-
-	return err;
 }
 
 /* This function synchronize snd mss to current pmtu/exthdr set.
@@ -686,11 +684,12 @@ unsigned int tcp_current_mss(struct sock *sk, int large)
 					68U - tp->tcp_header_len);
 
 		/* Always keep large mss multiple of real mss, but
-		 * do not exceed congestion window.
+		 * do not exceed 1/4 of the congestion window so we
+		 * can keep the ACK clock ticking.
 		 */
 		factor = large_mss / mss_now;
-		if (factor > tp->snd_cwnd)
-			factor = tp->snd_cwnd;
+		if (factor > (tp->snd_cwnd >> 2))
+			factor = max(1, tp->snd_cwnd >> 2);
 
 		tp->mss_cache = mss_now * factor;
 
@@ -1003,7 +1002,6 @@ int tcp_retransmit_skb(struct sock *sk, struct sk_buff *skb)
 {
 	struct tcp_opt *tp = tcp_sk(sk);
  	unsigned int cur_mss = tcp_current_mss(sk, 0);
-	__u32 data_seq, data_end_seq;
 	int err;
 
 	/* Do not sent more than we queued. 1/4 is reserved for possible
@@ -1012,24 +1010,6 @@ int tcp_retransmit_skb(struct sock *sk, struct sk_buff *skb)
 	if (atomic_read(&sk->sk_wmem_alloc) >
 	    min(sk->sk_wmem_queued + (sk->sk_wmem_queued >> 2), sk->sk_sndbuf))
 		return -EAGAIN;
-
-	/* What is going on here?  When TSO packets are partially ACK'd,
-	 * we adjust the TCP_SKB_CB(skb)->seq value forward but we do
-	 * not adjust the data area of the SKB.  We defer that to here
-	 * so that we can avoid the work unless we really retransmit
-	 * the packet.
-	 */
-	data_seq = TCP_SKB_CB(skb)->seq;
-	data_end_seq = TCP_SKB_CB(skb)->end_seq;
-	if (TCP_SKB_CB(skb)->flags & TCPCB_FLAG_FIN)
-		data_end_seq--;
-
-	if (skb->len > (data_end_seq - data_seq)) {
-		u32 to_trim = skb->len - (data_end_seq - data_seq);
-
-		if (__tcp_trim_head(tp, skb, to_trim))
-			return -ENOMEM;
-	}		
 
 	if (before(TCP_SKB_CB(skb)->seq, tp->snd_una)) {
 		if (before(TCP_SKB_CB(skb)->end_seq, tp->snd_una))
@@ -1041,7 +1021,7 @@ int tcp_retransmit_skb(struct sock *sk, struct sk_buff *skb)
 			tp->mss_cache = tp->mss_cache_std;
 		}
 
-		if (tcp_trim_head(tp, skb, tp->snd_una - TCP_SKB_CB(skb)->seq))
+		if (tcp_trim_head(sk, skb, tp->snd_una - TCP_SKB_CB(skb)->seq))
 			return -ENOMEM;
 	}
 

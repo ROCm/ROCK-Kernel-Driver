@@ -2364,13 +2364,14 @@ static __inline__ void tcp_ack_packets_out(struct sock *sk, struct tcp_opt *tp)
  * then making a write space wakeup callback is a possible
  * future enhancement.  WARNING: it is not trivial to make.
  */
-static int tcp_tso_acked(struct tcp_opt *tp, struct sk_buff *skb,
+static int tcp_tso_acked(struct sock *sk, struct sk_buff *skb,
 			 __u32 now, __s32 *seq_rtt)
 {
+	struct tcp_opt *tp = tcp_sk(sk);
 	struct tcp_skb_cb *scb = TCP_SKB_CB(skb); 
 	__u32 mss = scb->tso_mss;
 	__u32 snd_una = tp->snd_una;
-	__u32 seq = scb->seq;
+	__u32 orig_seq, seq;
 	__u32 packets_acked = 0;
 	int acked = 0;
 
@@ -2379,21 +2380,17 @@ static int tcp_tso_acked(struct tcp_opt *tp, struct sk_buff *skb,
 	 */
 	BUG_ON(!after(scb->end_seq, snd_una));
 
+	seq = orig_seq = scb->seq;
 	while (!after(seq + mss, snd_una)) {
 		packets_acked++;
 		seq += mss;
 	}
 
+	if (tcp_trim_head(sk, skb, (seq - orig_seq)))
+		return 0;
+
 	if (packets_acked) {
 		__u8 sacked = scb->sacked;
-
-		/* We adjust scb->seq but we do not pskb_pull() the
-		 * SKB.  We let tcp_retransmit_skb() handle this case
-		 * by checking skb->len against the data sequence span.
-		 * This way, we avoid the pskb_pull() work unless we
-		 * actually need to retransmit the SKB.
-		 */
-		scb->seq = seq;
 
 		acked |= FLAG_DATA_ACKED;
 		if (sacked) {
@@ -2413,7 +2410,7 @@ static int tcp_tso_acked(struct tcp_opt *tp, struct sk_buff *skb,
 							packets_acked);
 			if (sacked & TCPCB_URG) {
 				if (tp->urg_mode &&
-				    !before(scb->seq, tp->snd_up))
+				    !before(orig_seq, tp->snd_up))
 					tp->urg_mode = 0;
 			}
 		} else if (*seq_rtt < 0)
@@ -2425,7 +2422,6 @@ static int tcp_tso_acked(struct tcp_opt *tp, struct sk_buff *skb,
 			tcp_dec_pcount_explicit(&tp->fackets_out, dval);
 		}
 		tcp_dec_pcount_explicit(&tp->packets_out, packets_acked);
-		scb->tso_factor -= packets_acked;
 
 		BUG_ON(scb->tso_factor == 0);
 		BUG_ON(!before(scb->seq, scb->end_seq));
@@ -2455,7 +2451,7 @@ static int tcp_clean_rtx_queue(struct sock *sk, __s32 *seq_rtt_p)
 		 */
 		if (after(scb->end_seq, tp->snd_una)) {
 			if (scb->tso_factor > 1)
-				acked |= tcp_tso_acked(tp, skb,
+				acked |= tcp_tso_acked(sk, skb,
 						       now, &seq_rtt);
 			break;
 		}
