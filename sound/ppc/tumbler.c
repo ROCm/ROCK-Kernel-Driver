@@ -136,7 +136,7 @@ static int snapper_init_client(pmac_keywest_t *i2c)
 		/* normal operation, all-pass mode */
 		TAS_REG_MCS2, (1<<1),
 		/* normal output, no deemphasis, A input, power-up */
-		TAS_REG_ACS, 0,
+		TAS_REG_ACS, 2,
 		0, /* terminator */
 	};
 	return send_init_client(i2c, regs);
