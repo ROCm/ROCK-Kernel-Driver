@@ -10,5 +10,7 @@ if [ "$CONFIG_PCMCIA_SERIAL_CS" = "y" ]; then
    define_bool CONFIG_PCMCIA_CHRDEV y
 fi
 
+tristate 'SyncLink PC Card support' CONFIG_SYNCLINK_CS
+
 endmenu
 
