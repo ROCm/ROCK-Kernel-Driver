@@ -178,11 +178,6 @@ int __init s3c2440_init(void)
 	printk("S3C2440: Initialising architecture\n");
 
 	ret = platform_add_devices(uart_devices, ARRAY_SIZE(uart_devices));
-	if (ret)
-		return ret;
-
-	// todo: board specific inits?
-
 	return ret;
 }
 

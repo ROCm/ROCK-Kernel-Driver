@@ -112,6 +112,17 @@ s3c_lookup_cpu(unsigned long idcode)
 	return NULL;
 }
 
+/* board information */
+
+static struct s3c24xx_board *board;
+
+void s3c24xx_set_board(struct s3c24xx_board *b)
+{
+	board = b;
+}
+
+/* cpu information */
+
 static struct cpu_table *cpu;
 
 void __init s3c24xx_init_io(struct map_desc *mach_desc, int size)
@@ -141,12 +152,29 @@ void __init s3c24xx_init_io(struct map_desc *mach_desc, int size)
 
 static int __init s3c_arch_init(void)
 {
+	int ret;
+
 	// do the correct init for cpu
 
 	if (cpu == NULL)
 		panic("s3c_arch_init: NULL cpu\n");
 
-	return (cpu->init)();
+	ret = (cpu->init)();
+	if (ret != 0)
+		return ret;
+
+	if (board != NULL) {
+		ret = platform_add_devices(board->devices, board->devices_count);
+		if (ret) {
+			printk(KERN_ERR "s3c24xx: failed to add board devices (%d)\n", ret);
+		}
+
+		/* mask any error, we may not need all these board
+		 * devices */
+		ret = 0;
+	}
+
+	return ret;
 }
 
 arch_initcall(s3c_arch_init);

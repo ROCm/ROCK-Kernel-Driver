@@ -207,7 +207,7 @@ static struct platform_device *bast_devices[] __initdata = {
 	&bast_device_nor
 };
 
-static struct s3c2410_board bast_board __initdata = {
+static struct s3c24xx_board bast_board __initdata = {
 	.devices       = bast_devices,
 	.devices_count = ARRAY_SIZE(bast_devices)
 };
@@ -216,7 +216,7 @@ void __init bast_map_io(void)
 {
 	s3c24xx_init_io(bast_iodesc, ARRAY_SIZE(bast_iodesc));
 	s3c2410_init_uarts(bast_uartcfgs, ARRAY_SIZE(bast_uartcfgs));
-	s3c2410_set_board(&bast_board);
+	s3c24xx_set_board(&bast_board);
 	usb_simtec_init();
 }
 
