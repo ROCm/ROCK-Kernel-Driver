@@ -262,6 +262,9 @@ sctp_disposition_t sctp_sf_do_5_1B_init(const sctp_endpoint_t *ep,
 		len = ntohs(err_chunk->chunk_hdr->length) -
 			sizeof(sctp_chunkhdr_t);
 
+	if (sctp_assoc_set_bind_addr_from_ep(new_asoc, GFP_ATOMIC) < 0)
+		goto nomem_ack;
+	
 	repl = sctp_make_init_ack(new_asoc, chunk, GFP_ATOMIC, len);
 	if (!repl)
 		goto nomem_ack;
@@ -1181,6 +1184,10 @@ static sctp_disposition_t sctp_sf_do_unexpected_init(
 		len = ntohs(err_chunk->chunk_hdr->length) -
 			sizeof(sctp_chunkhdr_t);
 	}
+
+	if (sctp_assoc_set_bind_addr_from_ep(new_asoc, GFP_ATOMIC) < 0)
+		goto nomem;
+
 	repl = sctp_make_init_ack(new_asoc, chunk, GFP_ATOMIC, len);
 	if (!repl)
 		goto nomem;
@@ -3234,10 +3241,6 @@ sctp_disposition_t sctp_sf_do_prm_asoc(const sctp_endpoint_t *ep,
 				       sctp_cmd_seq_t *commands)
 {
 	sctp_chunk_t *repl;
-	sctp_bind_addr_t *bp;
-	sctp_scope_t scope;
-	int error;
-	int flags;
 
 	/* The comment below says that we enter COOKIE-WAIT AFTER
 	 * sending the INIT, but that doesn't actually work in our
@@ -3245,35 +3248,6 @@ sctp_disposition_t sctp_sf_do_prm_asoc(const sctp_endpoint_t *ep,
 	 */
 	sctp_add_cmd_sf(commands, SCTP_CMD_NEW_STATE,
 			SCTP_STATE(SCTP_STATE_COOKIE_WAIT));
-
-	/* Build up the bind address list for the association based on
-	 * info from the local endpoint and the remote peer.
-	 */
-	bp = sctp_bind_addr_new(GFP_ATOMIC);
-	if (!bp)
-		goto nomem;
-
-	/* Use scoping rules to determine the subset of addresses from
-	 * the endpoint.
-	 */
-	scope = sctp_scope(&asoc->peer.active_path->ipaddr);
-	flags = (PF_INET6 == asoc->base.sk->family) ? SCTP_ADDR6_ALLOWED : 0;
-	if (asoc->peer.ipv4_address)
-		flags |= SCTP_ADDR4_PEERSUPP;
-	if (asoc->peer.ipv6_address)
-		flags |= SCTP_ADDR6_PEERSUPP;
-	error = sctp_bind_addr_copy(bp, &ep->base.bind_addr, scope,
-				    GFP_ATOMIC, flags);
-	if (error)
-		goto nomem;
-
-	/* FIXME: Either move address assignment out of this function
-	 * or else move the association allocation/init into this function.
-	 * The association structure is brand new before calling this
-	 * function, so would not be a sideeffect if the allocation
-	 * moved into this function.  --jgrimm
-	 */
-	sctp_add_cmd_sf(commands, SCTP_CMD_SET_BIND_ADDR, (sctp_arg_t) bp);
 
 	/* RFC 2960 5.1 Normal Establishment of an Association
 	 *
@@ -3283,7 +3257,7 @@ sctp_disposition_t sctp_sf_do_prm_asoc(const sctp_endpoint_t *ep,
 	 * 1 to 4294967295 (see 5.3.1 for Tag value selection). ...
 	 */
 
-	repl = sctp_make_init(asoc, bp, GFP_ATOMIC, 0);
+	repl = sctp_make_init(asoc, &asoc->base.bind_addr, GFP_ATOMIC, 0);
 	if (!repl)
 		goto nomem;
 
@@ -3302,9 +3276,6 @@ sctp_disposition_t sctp_sf_do_prm_asoc(const sctp_endpoint_t *ep,
 	return SCTP_DISPOSITION_CONSUME;
 
 nomem:
-	if (bp)
-		sctp_bind_addr_free(bp);
-
 	return SCTP_DISPOSITION_NOMEM;
 }
 

@@ -242,35 +242,10 @@ sctp_chunk_t *sctp_make_init_ack(const sctp_association_t *asoc,
 	sctp_cookie_param_t *cookie;
 	int cookie_len;
 	size_t chunksize;
-	int error;
-	sctp_scope_t scope;
-	sctp_bind_addr_t *bp = NULL;
-	int flags;
 
 	retval = NULL;
-
-	/* Build up the bind address list for the association based on
-	 * info from the local endpoint and the remote peer.
-	 */
-	bp = sctp_bind_addr_new(priority);
-	if (!bp)
-		goto nomem_bindaddr;
-
-	/* Look for supported address types parameter and then build
-	 * our address list based on that.
-	 */
-	scope = sctp_scope(&asoc->peer.active_path->ipaddr);
-	flags = (PF_INET6 == asoc->base.sk->family) ? SCTP_ADDR6_ALLOWED : 0;
-	if (asoc->peer.ipv4_address)
-		flags |= SCTP_ADDR4_PEERSUPP;
-	if (asoc->peer.ipv6_address)
-		flags |= SCTP_ADDR6_PEERSUPP;
-	error = sctp_bind_addr_copy(bp, &asoc->ep->base.bind_addr,
-				    scope, priority, flags);
-	if (error)
-		goto nomem_copyaddr;
-
-	addrs = sctp_bind_addrs_to_raw(bp, &addrs_len, priority);
+	
+	addrs = sctp_bind_addrs_to_raw(&asoc->base.bind_addr, &addrs_len, priority);
 	if (!addrs.v)
 		goto nomem_rawaddr;
 
@@ -333,9 +308,6 @@ nomem_chunk:
 nomem_cookie:
 	kfree(addrs.v);
 nomem_rawaddr:
-nomem_copyaddr:
-	sctp_bind_addr_free(bp);
-nomem_bindaddr:
 	return retval;
 }
 
@@ -1363,11 +1335,10 @@ sctp_association_t *sctp_unpack_cookie(const sctp_endpoint_t *ep,
 	sctp_signed_cookie_t *cookie;
 	sctp_cookie_t *bear_cookie;
 	int headersize, bodysize;
-	int fixed_size, var_size1, var_size2, var_size3;
+	int fixed_size;
 	__u8 digest_buf[SCTP_SIGNATURE_SIZE];
 	int secret;
 	sctp_scope_t scope;
-	__u8 *raw_addr_list;
 
 	headersize = sizeof(sctp_chunkhdr_t) + SCTP_SECRET_SIZE;
 	bodysize = ntohs(chunk->chunk_hdr->length) - headersize;
@@ -1388,9 +1359,6 @@ sctp_association_t *sctp_unpack_cookie(const sctp_endpoint_t *ep,
 	/* Process the cookie.  */
 	cookie = chunk->subh.cookie_hdr;
 	bear_cookie = &cookie->c;
-	var_size1 = ntohs(chunk->chunk_hdr->length) - fixed_size;
-	var_size2 = ntohs(bear_cookie->peer_init->chunk_hdr.length);
-	var_size3 = bear_cookie->raw_addr_list_len;
 
 	/* Check the signature.  */
 	secret = ep->current_key;
@@ -1455,12 +1423,8 @@ sctp_association_t *sctp_unpack_cookie(const sctp_endpoint_t *ep,
 	/* Populate the association from the cookie.  */
 	retval->c = *bear_cookie;
 
-	/* Build the bind address list based on the cookie.  */
-	raw_addr_list = (__u8 *) bear_cookie +
-		sizeof(sctp_cookie_t) + var_size2;
-	if (sctp_raw_to_bind_addrs(&retval->base.bind_addr, raw_addr_list,
-				   var_size3, retval->base.bind_addr.port,
-				   priority)) {
+	if (sctp_assoc_set_bind_addr_from_cookie(retval, bear_cookie,
+						 GFP_ATOMIC) < 0) {
 		*error = -SCTP_IERROR_NOMEM;
 		goto fail;
 	}

@@ -1636,6 +1636,10 @@ void sctp_assoc_sync_pmtu(sctp_association_t *);
 void sctp_assoc_rwnd_increase(sctp_association_t *, int);
 void sctp_assoc_rwnd_decrease(sctp_association_t *, int);
 
+int sctp_assoc_set_bind_addr_from_ep(sctp_association_t *, int);
+int sctp_assoc_set_bind_addr_from_cookie(sctp_association_t *,
+					 sctp_cookie_t *, int);
+
 int sctp_cmp_addr_exact(const union sctp_addr *ss1,
 		        const union sctp_addr *ss2);
 sctp_chunk_t *sctp_get_ecne_prepend(sctp_association_t *asoc);

@@ -924,6 +924,15 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 
 		/* Prime the peer's transport structures.  */
 		transport = sctp_assoc_add_peer(asoc, &to, GFP_KERNEL);
+		if (!transport) {
+			err = -ENOMEM;
+			goto out_free;
+		}
+		err = sctp_assoc_set_bind_addr_from_ep(asoc, GFP_KERNEL);
+		if (err < 0) {
+			err = -ENOMEM;
+			goto out_free;
+		}
 	}
 
 	/* ASSERT: we have a valid association at this point.  */
@@ -1513,6 +1522,15 @@ SCTP_STATIC int sctp_connect(struct sock *sk, struct sockaddr *uaddr,
 
 	/* Prime the peer's transport structures.  */
 	transport = sctp_assoc_add_peer(asoc, &to, GFP_KERNEL);
+	if (!transport) {
+		sctp_association_free(asoc);
+		goto out_unlock;
+	}
+	err = sctp_assoc_set_bind_addr_from_ep(asoc, GFP_KERNEL);
+	if (err < 0) {
+		sctp_association_free(asoc);
+		goto out_unlock;
+	}
 
 	err = sctp_primitive_ASSOCIATE(asoc, NULL);
 	if (err < 0) {

@@ -69,7 +69,6 @@ typedef enum {
 	SCTP_CMD_INIT_FAILED,   /* High level, do init failure work. */
 	SCTP_CMD_REPORT_DUP,	/* Report a duplicate TSN.  */
 	SCTP_CMD_REPORT_BIGGAP, /* Narc on a TSN (it was too high).  */
-	SCTP_CMD_SET_BIND_ADDR, /* Set the association bind_addr.  */
 	SCTP_CMD_STRIKE,	/* Mark a strike against a transport.  */
 	SCTP_CMD_TRANSMIT,      /* Transmit the outqueue. */
 	SCTP_CMD_HB_TIMERS_START,    /* Start the heartbeat timers. */

@@ -1044,3 +1044,40 @@ void sctp_assoc_rwnd_decrease(sctp_association_t *asoc, int len)
 	SCTP_DEBUG_PRINTK("%s: asoc %p rwnd decreased by %d to (%u, %u)\n",
 			  __FUNCTION__, asoc, len, asoc->rwnd, asoc->rwnd_over);
 }
+
+/* Build the bind address list for the association based on info from the
+ * local endpoint and the remote peer.
+ */
+int sctp_assoc_set_bind_addr_from_ep(sctp_association_t *asoc, int priority)
+{
+	sctp_scope_t scope;
+	int flags;
+
+	/* Use scoping rules to determine the subset of addresses from
+	 * the endpoint.
+	 */
+	scope = sctp_scope(&asoc->peer.active_path->ipaddr);
+	flags = (PF_INET6 == asoc->base.sk->family) ? SCTP_ADDR6_ALLOWED : 0;
+	if (asoc->peer.ipv4_address)
+		flags |= SCTP_ADDR4_PEERSUPP;
+	if (asoc->peer.ipv6_address)
+		flags |= SCTP_ADDR6_PEERSUPP;
+
+	return sctp_bind_addr_copy(&asoc->base.bind_addr,
+				   &asoc->ep->base.bind_addr,
+				   scope, priority, flags);
+}
+
+/* Build the association's bind address list from the cookie.  */
+int sctp_assoc_set_bind_addr_from_cookie(sctp_association_t *asoc,
+					 sctp_cookie_t *cookie, int priority)
+{
+	int var_size2 = ntohs(cookie->peer_init->chunk_hdr.length);
+	int var_size3 = cookie->raw_addr_list_len;
+	__u8 *raw_addr_list = (__u8 *)cookie + sizeof(sctp_cookie_t) +
+				      var_size2;
+
+	return sctp_raw_to_bind_addrs(&asoc->base.bind_addr, raw_addr_list,
+				      var_size3, asoc->ep->base.bind_addr.port,
+				      priority);
+}

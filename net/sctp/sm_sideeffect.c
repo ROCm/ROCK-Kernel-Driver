@@ -75,8 +75,6 @@ static void sctp_cmd_hb_timers_start(sctp_cmd_seq_t *, sctp_association_t *);
 static void sctp_cmd_hb_timers_stop(sctp_cmd_seq_t *, sctp_association_t *);
 static void sctp_cmd_hb_timer_update(sctp_cmd_seq_t *, sctp_association_t *,
 				     struct sctp_transport *);
-static void sctp_cmd_set_bind_addrs(sctp_cmd_seq_t *, sctp_association_t *,
-				    sctp_bind_addr_t *);
 static void sctp_cmd_transport_reset(sctp_cmd_seq_t *, sctp_association_t *,
 				     struct sctp_transport *);
 static void sctp_cmd_transport_on(sctp_cmd_seq_t *, sctp_association_t *,
@@ -544,11 +542,6 @@ int sctp_cmd_interpreter(sctp_event_t event_type, sctp_subtype_t subtype,
 
 		case SCTP_CMD_REPORT_BAD_TAG:
 			SCTP_DEBUG_PRINTK("vtag mismatch!\n");
-			break;
-
-		case SCTP_CMD_SET_BIND_ADDR:
-		        sctp_cmd_set_bind_addrs(commands, asoc,
-						command->obj.bp);
 			break;
 
 		case SCTP_CMD_STRIKE:
@@ -1158,23 +1151,6 @@ static void sctp_cmd_hb_timer_update(sctp_cmd_seq_t *cmds,
 	/* Update the heartbeat timer.  */
 	if (!mod_timer(&t->hb_timer, sctp_transport_timeout(t)))
 		sctp_transport_hold(t);
-}
-
-/* Helper function to break out SCTP_CMD_SET_BIND_ADDR handling.  */
-void sctp_cmd_set_bind_addrs(sctp_cmd_seq_t *cmds, sctp_association_t *asoc,
-			     sctp_bind_addr_t *bp)
-{
-	struct list_head *pos, *temp;
-
-	list_for_each_safe(pos, temp, &bp->address_list) {
-		list_del_init(pos);
-		list_add_tail(pos, &asoc->base.bind_addr.address_list);
-	}
-
-	/* Free the temporary bind addr header, otherwise
-	 * there will a memory leak.
-	 */
-	sctp_bind_addr_free(bp);
 }
 
 /* Helper function to handle the reception of an HEARTBEAT ACK.  */
