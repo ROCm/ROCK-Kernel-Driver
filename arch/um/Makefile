@@ -8,8 +8,10 @@ OS := $(shell uname -s)
 #We require it or things break.
 SHELL := /bin/bash
 
-core-y			+= $(ARCH_DIR)/kernel/		 \
-			   $(ARCH_DIR)/drivers/          \
+filechk_gen_header = $<
+
+core-y			+= $(ARCH_DIR)/kernel/		\
+			   $(ARCH_DIR)/drivers/		\
 			   $(ARCH_DIR)/sys-$(SUBARCH)/
 
 # Have to precede the include because the included Makefiles reference them.
@@ -29,10 +31,11 @@ ifneq ($(MAKEFILE-y),)
   include $(addprefix $(ARCH_DIR)/,$(MAKEFILE-y))
 endif
 
+ARCH_INCLUDE	:= -I$(ARCH_DIR)/include
+SYS_DIR		:= $(ARCH_DIR)/include/sysdep-$(SUBARCH)
+
 include $(ARCH_DIR)/Makefile-$(SUBARCH)
 include $(ARCH_DIR)/Makefile-os-$(OS)
-
-ARCH_INCLUDE = -I$(ARCH_DIR)/include
 
 # -Derrno=kernel_errno - This turns all kernel references to errno into
 # kernel_errno to separate them from the libc errno.  This allows -fno-common
@@ -56,7 +59,7 @@ CONFIG_KERNEL_HALF_GIGS ?= 0
 SIZE = (($(CONFIG_NEST_LEVEL) + $(CONFIG_KERNEL_HALF_GIGS)) * 0x20000000)
 
 ifeq ($(CONFIG_MODE_SKAS), y)
-$(SYS_HEADERS) : $(TOPDIR)/$(ARCH_DIR)/include/skas_ptregs.h
+$(SYS_HEADERS) : $(ARCH_DIR)/include/skas_ptregs.h
 endif
 
 prepare: $(ARCH_SYMLINKS) $(SYS_HEADERS) $(GEN_HEADERS) \
@@ -82,12 +85,6 @@ ifeq ($(CONFIG_MODE_SKAS),y)
 endif
 endif
 endif
-
-#We need to re-preprocess this when the symlink dest changes.
-#So we just touch it.
-$(ARCH_DIR)/kernel/vmlinux.lds.S:
-	ln -sf $(LD_SCRIPT-y) $@
-	touch $@
 
 CPP_MODE_TT := $(shell [ "$(CONFIG_MODE_TT)" = "y" ] && echo -DMODE_TT)
 CONFIG_KERNEL_STACK_ORDER ?= 2
@@ -120,9 +117,10 @@ USER_CFLAGS := $(patsubst -D__KERNEL__,,$(USER_CFLAGS)) $(ARCH_INCLUDE) \
 # To get a definition of F_SETSIG
 USER_CFLAGS += -D_GNU_SOURCE
 
-CLEAN_FILES += linux x.i gmon.out $(ARCH_DIR)/uml.lds \
-	$(ARCH_DIR)/dyn_link.ld.s $(ARCH_DIR)/include/uml-config.h \
-	$(GEN_HEADERS)
+#When cleaning we don't include .config, so we don't include
+#TT or skas makefiles and don't clean skas_ptregs.h.
+CLEAN_FILES += linux x.i gmon.out $(ARCH_DIR)/include/uml-config.h \
+	$(GEN_HEADERS) $(ARCH_DIR)/include/skas_ptregs.h
 
 MRPROPER_FILES += $(SYMLINK_HEADERS) $(ARCH_SYMLINKS) \
 	$(addprefix $(ARCH_DIR)/kernel/,$(KERN_SYMLINKS))
@@ -131,42 +129,60 @@ archmrproper:
 	@:
 
 archclean:
+	$(Q)$(MAKE) $(clean)=$(ARCH_DIR)/util
 	@find . \( -name '*.bb' -o -name '*.bbg' -o -name '*.da' \
 		-o -name '*.gcov' \) -type f -print | xargs rm -f
 
+#We need to re-preprocess this when the symlink dest changes.
+#So we touch it.
+$(ARCH_DIR)/kernel/vmlinux.lds.S: FORCE
+	@echo '  SYMLINK $@'
+	$(Q)ln -sf $(LD_SCRIPT-y) $@
+	$(Q)touch $@
+
 $(SYMLINK_HEADERS):
-	cd $(TOPDIR)/$(dir $@) ; \
+	@echo '  SYMLINK $@'
+	$(Q)cd $(TOPDIR)/$(dir $@) ; \
 	ln -sf $(basename $(notdir $@))-$(SUBARCH)$(suffix $@) $(notdir $@)
 
 include/asm-um/arch:
-	cd $(TOPDIR)/include/asm-um && ln -sf ../asm-$(SUBARCH) arch
+	@echo '  SYMLINK $@'
+	$(Q)cd $(TOPDIR)/include/asm-um && ln -sf ../asm-$(SUBARCH) arch
 
 $(ARCH_DIR)/include/sysdep:
-	cd $(ARCH_DIR)/include && ln -sf sysdep-$(SUBARCH) sysdep
+	@echo '  SYMLINK $@'
+	$(Q)cd $(ARCH_DIR)/include && ln -sf sysdep-$(SUBARCH) sysdep
 
 $(ARCH_DIR)/os:
-	cd $(ARCH_DIR) && ln -sf os-$(OS) os
+	@echo '  SYMLINK $@'
+	$(Q)cd $(ARCH_DIR) && ln -sf os-$(OS) os
 
 # Generated files
 define filechk_umlconfig
 	sed 's/ CONFIG/ UML_CONFIG/'
 endef
 
-$(ARCH_DIR)/include/uml-config.h : $(TOPDIR)/include/linux/autoconf.h
+$(ARCH_DIR)/include/uml-config.h : include/linux/autoconf.h
 	$(call filechk,umlconfig)
 
-filechk_gen_header = $<
-
-$(ARCH_DIR)/include/task.h : $(ARCH_DIR)/util/mk_task
+$(ARCH_DIR)/include/task.h: $(ARCH_DIR)/util/mk_task
 	$(call filechk,gen_header)
 
-$(ARCH_DIR)/include/kern_constants.h : $(ARCH_DIR)/util/mk_constants
+$(ARCH_DIR)/include/kern_constants.h: $(ARCH_DIR)/util/mk_constants
 	$(call filechk,gen_header)
 
-$(ARCH_DIR)/util/mk_task $(ARCH_DIR)/util/mk_constants : $(ARCH_DIR)/util \
+$(ARCH_DIR)/include/skas_ptregs.h: $(ARCH_DIR)/kernel/skas/util/mk_ptregs
+	$(call filechk,gen_header)
+
+$(ARCH_DIR)/util/mk_task $(ARCH_DIR)/util/mk_constants: $(ARCH_DIR)/util \
 	FORCE ;
 
-$(ARCH_DIR)/util: $(SYS_DIR)/sc.h FORCE
+$(ARCH_DIR)/kernel/skas/util/mk_ptregs: $(ARCH_DIR)/kernel/skas/util FORCE ;
+
+$(ARCH_DIR)/util: scripts_basic $(SYS_DIR)/sc.h FORCE
+	$(Q)$(MAKE) $(build)=$@
+
+$(ARCH_DIR)/kernel/skas/util: scripts_basic FORCE
 	$(Q)$(MAKE) $(build)=$@
 
 export SUBARCH USER_CFLAGS OS
