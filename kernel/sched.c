@@ -940,7 +940,7 @@ asmlinkage void schedule(void)
 	struct list_head *queue;
 	int idx;
 
-	if (unlikely(in_interrupt()))
+	if (unlikely(in_atomic()))
 		BUG();
 
 #if CONFIG_DEBUG_HIGHMEM
