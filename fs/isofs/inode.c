@@ -131,6 +131,21 @@ static struct super_operations isofs_sops = {
 	statfs:		isofs_statfs,
 };
 
+/* the export_operations structure for describing
+ * how to export (e.g. via kNFSd) is deliberately
+ * empty.
+ * This means that the filesystem want to use iget
+ * to map an inode number into an inode.
+ * The lack of a get_parent operation means that 
+ * if something isn't in the cache, then you cannot
+ * access it.
+ * It should be possible to write a get_parent,
+ * but it would be a bit hairy...
+ */
+static struct export_operations isofs_export_ops = {
+};
+
+
 static struct dentry_operations isofs_dentry_ops[] = {
 	{
 		d_hash:		isofs_hash,
@@ -786,6 +801,7 @@ root_found:
 	}
 #endif
 	s->s_op = &isofs_sops;
+	s->s_export_op = &isofs_export_ops;
 	sbi->s_mapping = opt.map;
 	sbi->s_rock = (opt.rock == 'y' ? 2 : 0);
 	sbi->s_rock_offset = -1; /* initial offset, will guess until SP is found*/
