@@ -503,6 +503,7 @@ _pagebuf_lookup_pages(
 		}
 	}
 
+	pb->pb_flags |= _PBF_PAGECACHE;
 mapit:
 	pb->pb_flags |= _PBF_MEM_ALLOCATED;
 	if (all_mapped) {
