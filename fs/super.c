@@ -376,8 +376,6 @@ static void insert_super(struct super_block *s, struct file_system_type *type)
 	get_filesystem(type);
 }
 
-static void put_anon_dev(kdev_t dev);
-
 /**
  *	remove_super	-	makes superblock unreachable
  *	@s:	superblock in question
@@ -437,15 +435,11 @@ static void generic_shutdown_super(struct super_block *sb)
 static void shutdown_super(struct super_block *sb)
 {
 	struct file_system_type *fs = sb->s_type;
-	kdev_t dev = sb->s_dev;
 	struct block_device *bdev = sb->s_bdev;
 
 	generic_shutdown_super(sb);
-	if (bdev) {
-		bd_release(bdev);
-		blkdev_put(bdev, BDEV_FS);
-	} else
-		put_anon_dev(dev);
+	bd_release(bdev);
+	blkdev_put(bdev, BDEV_FS);
 }
 
 void kill_super(struct super_block *sb)
@@ -614,17 +608,6 @@ int do_remount_sb(struct super_block *sb, int flags, void *data)
 enum {Max_anon = 256};
 static unsigned long unnamed_dev_in_use[Max_anon/(8*sizeof(unsigned long))];
 static spinlock_t unnamed_dev_lock = SPIN_LOCK_UNLOCKED;/* protects the above */
-
-/**
- *	put_anon_dev	-	release anonymous device number.
- *	@dev:	device in question
- */
-static void put_anon_dev(kdev_t dev)
-{
-	spin_lock(&unnamed_dev_lock);
-	clear_bit(minor(dev), unnamed_dev_in_use);
-	spin_unlock(&unnamed_dev_lock);
-}
 
 /**
  *	get_anon_super	-	allocate a superblock for non-device fs

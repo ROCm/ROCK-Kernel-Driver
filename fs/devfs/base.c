@@ -3323,6 +3323,7 @@ static struct super_block *devfs_get_sb(struct file_system_type *fs_type,
 static struct file_system_type devfs_fs_type = {
 	name:		DEVFS_NAME,
 	get_sb:		devfs_get_sb,
+	kill_sb:	kill_anon_super,
 };
 
 /*  File operations for devfsd follow  */
