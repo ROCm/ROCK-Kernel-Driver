@@ -359,10 +359,12 @@ static void inline leave_mm (unsigned long cpu)
 
 asmlinkage void smp_invalidate_interrupt (void)
 {
-	unsigned long cpu = smp_processor_id();
+	unsigned long cpu;
+
+	cpu = get_cpu();
 
 	if (!test_bit(cpu, &flush_cpumask))
-		return;
+		goto out;
 		/* 
 		 * This was a BUG() but until someone can quote me the
 		 * line from the intel manual that guarantees an IPI to
@@ -383,6 +385,9 @@ asmlinkage void smp_invalidate_interrupt (void)
 	}
 	ack_APIC_irq();
 	clear_bit(cpu, &flush_cpumask);
+
+out:
+	put_cpu();
 }
 
 static void flush_tlb_others (unsigned long cpumask, struct mm_struct *mm,
@@ -432,16 +437,23 @@ static void flush_tlb_others (unsigned long cpumask, struct mm_struct *mm,
 void flush_tlb_current_task(void)
 {
 	struct mm_struct *mm = current->mm;
-	unsigned long cpu_mask = mm->cpu_vm_mask & ~(1 << smp_processor_id());
+	unsigned long cpu_mask;
+
+	preempt_disable();
+	cpu_mask = mm->cpu_vm_mask & ~(1UL << smp_processor_id());
 
 	local_flush_tlb();
 	if (cpu_mask)
 		flush_tlb_others(cpu_mask, mm, FLUSH_ALL);
+	preempt_enable();
 }
 
 void flush_tlb_mm (struct mm_struct * mm)
 {
-	unsigned long cpu_mask = mm->cpu_vm_mask & ~(1 << smp_processor_id());
+	unsigned long cpu_mask;
+
+	preempt_disable();
+	cpu_mask = mm->cpu_vm_mask & ~(1UL << smp_processor_id());
 
 	if (current->active_mm == mm) {
 		if (current->mm)
@@ -451,12 +463,17 @@ void flush_tlb_mm (struct mm_struct * mm)
 	}
 	if (cpu_mask)
 		flush_tlb_others(cpu_mask, mm, FLUSH_ALL);
+
+	preempt_enable();
 }
 
 void flush_tlb_page(struct vm_area_struct * vma, unsigned long va)
 {
 	struct mm_struct *mm = vma->vm_mm;
-	unsigned long cpu_mask = mm->cpu_vm_mask & ~(1 << smp_processor_id());
+	unsigned long cpu_mask;
+
+	preempt_disable();
+	cpu_mask = mm->cpu_vm_mask & ~(1UL << smp_processor_id());
 
 	if (current->active_mm == mm) {
 		if(current->mm)
@@ -467,6 +484,8 @@ void flush_tlb_page(struct vm_area_struct * vma, unsigned long va)
 
 	if (cpu_mask)
 		flush_tlb_others(cpu_mask, mm, va);
+
+	preempt_enable();
 }
 
 static inline void do_flush_tlb_all_local(void)
