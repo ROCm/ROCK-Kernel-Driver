@@ -19,7 +19,7 @@
 #include <asm/abs_addr.h>
 
 #if 1
-#define dbg(args...) udbg_printf(args)
+#define dbg(args...) printk(KERN_INFO args)
 #else
 #define dbg(args...)
 #endif
@@ -56,16 +56,46 @@ static inline void map_cpu_to_node(int cpu, int node)
 	}
 }
 
+static struct device_node * __init find_cpu_node(unsigned int cpu)
+{
+	unsigned int hw_cpuid = get_hard_smp_processor_id(cpu);
+	struct device_node *cpu_node = NULL;
+	unsigned int *interrupt_server, *reg;
+	int len;
+
+	while ((cpu_node = of_find_node_by_type(cpu_node, "cpu")) != NULL) {
+		/* Try interrupt server first */
+		interrupt_server = (unsigned int *)get_property(cpu_node,
+					"ibm,ppc-interrupt-server#s", &len);
+
+		if (interrupt_server && (len > 0)) {
+			while (len--) {
+				if (interrupt_server[len-1] == hw_cpuid)
+					return cpu_node;
+			}
+		} else {
+			reg = (unsigned int *)get_property(cpu_node,
+							   "reg", &len);
+			if (reg && (len > 0) && (reg[0] == hw_cpuid))
+				return cpu_node;
+		}
+	}
+
+	return NULL;
+}
+
 static int __init parse_numa_properties(void)
 {
 	struct device_node *cpu = NULL;
 	struct device_node *memory = NULL;
-	int *cpu_associativity;
-	int *memory_associativity;
+	unsigned int *tmp;
+	int cpu_associativity;
+	int memory_associativity;
 	int depth;
+	int len;
 	int max_domain = 0;
 	long entries = lmb_end_of_DRAM() >> MEMORY_INCREMENT_SHIFT;
-	long i;
+	unsigned long i;
 
 	if (strstr(saved_command_line, "numa=off")) {
 		printk(KERN_WARNING "NUMA disabled by user\n");
@@ -78,75 +108,88 @@ static int __init parse_numa_properties(void)
 	for (i = 0; i < entries ; i++)
 		numa_memory_lookup_table[i] = ARRAY_INITIALISER;
 
+	/* Check that both memory and cpu have associativity information */
 	cpu = of_find_node_by_type(NULL, "cpu");
 	if (!cpu)
-		goto err;
+		return -1;
+
+	tmp = (int *)get_property(cpu, "ibm,associativity", &len);
+	if (!tmp || len <= 0) {
+		of_node_put(cpu);
+		return -1;
+	}
+	cpu_associativity = tmp[0];
+	of_node_put(cpu);
 
 	memory = of_find_node_by_type(NULL, "memory");
 	if (!memory)
-		goto err;
+		return -1;
 
-	cpu_associativity = (int *)get_property(cpu, "ibm,associativity", NULL);
-	if (!cpu_associativity)
-		goto err;
-
-	memory_associativity = (int *)get_property(memory, "ibm,associativity",
-						   NULL);
-	if (!memory_associativity)
-		goto err;
+	tmp = (int *)get_property(memory, "ibm,associativity", &len);
+	if (!tmp || len <= 0) {
+		of_node_put(memory);
+		return -1;
+	}
+	memory_associativity = tmp[0];
+	of_node_put(memory);
 
 	/* find common depth */
-	if (cpu_associativity[0] < memory_associativity[0])
-		depth = cpu_associativity[0];
+	if (cpu_associativity < memory_associativity)
+		depth = cpu_associativity;
 	else
-		depth = memory_associativity[0];
+		depth = memory_associativity;
 
-	for (; cpu; cpu = of_find_node_by_type(cpu, "cpu")) {
-		int *tmp;
-		int cpu_nr, numa_domain;
+	for_each_cpu(i) {
+		int numa_domain;
 
-		tmp = (int *)get_property(cpu, "reg", NULL);
-		if (!tmp)
-			continue;
-		cpu_nr = *tmp;
+		cpu = find_cpu_node(i);
 
-		tmp = (int *)get_property(cpu, "ibm,associativity",
-					  NULL);
-		if (!tmp)
-			continue;
-		numa_domain = tmp[depth];
+		if (cpu) {
+			tmp = (int *)get_property(cpu, "ibm,associativity",
+						  &len);
+			if (tmp && (len >= depth)) {
+				numa_domain = tmp[depth];
+				of_node_put(cpu);
+			} else {
+				printk(KERN_ERR "WARNING: no NUMA "
+				       "information for cpu %ld\n", i);
+				numa_domain = 0;
+			}
 
-		/* FIXME */
-		if (numa_domain == 0xffff) {
-			dbg("cpu %d has no numa doman\n", cpu_nr);
+			if (numa_domain >= MAX_NUMNODES) {
+				/*
+			 	 * POWER4 LPAR uses 0xffff as invalid node,
+				 * dont warn in this case.
+			 	 */
+				if (numa_domain != 0xffff)
+					printk(KERN_ERR "WARNING: cpu %ld "
+					       "maps to invalid NUMA node %d\n",
+					       i, numa_domain);
+				numa_domain = 0;
+			}
+		} else {
+			printk(KERN_ERR "WARNING: no NUMA information for "
+			       "cpu %ld\n", i);
 			numa_domain = 0;
 		}
-
-		if (numa_domain >= MAX_NUMNODES)
-			BUG();
 
 		node_set_online(numa_domain);
 
 		if (max_domain < numa_domain)
 			max_domain = numa_domain;
 
-		map_cpu_to_node(cpu_nr, numa_domain);
-		/* register the second thread on an SMT machine */
-		if (cur_cpu_spec->cpu_features & CPU_FTR_SMT)
-			map_cpu_to_node(cpu_nr ^ 0x1, numa_domain);
+		map_cpu_to_node(i, numa_domain);
 	}
 
-	for (; memory; memory = of_find_node_by_type(memory, "memory")) {
-		unsigned int *tmp1, *tmp2;
-		unsigned long i;
+	memory = NULL;
+	while ((memory = of_find_node_by_type(memory, "memory")) != NULL) {
 		unsigned long start = 0;
 		unsigned long size = 0;
 		int numa_domain;
 		int ranges;
-		int propsize;
 
-		tmp1 = (int *)get_property(memory, "reg", NULL);
-		if (!tmp1)
+		tmp = (unsigned int *)get_property(memory, "reg", &len);
+		if (!tmp || len <= 0)
 			continue;
 
 		ranges = memory->n_addrs;
@@ -154,47 +197,36 @@ new_range:
 
 		i = prom_n_size_cells(memory);
 		while (i--) {
-			start = (start << 32) | *tmp1;
-			tmp1++;
+			start = (start << 32) | *tmp;
+			tmp++;
 		}
 
 		i = prom_n_size_cells(memory);
 		while (i--) {
-			size = (size << 32) | *tmp1;
-			tmp1++;
+			size = (size << 32) | *tmp;
+			tmp++;
 		}
 
 		start = _ALIGN_DOWN(start, MEMORY_INCREMENT);
 		size = _ALIGN_UP(size, MEMORY_INCREMENT);
 
-		if ((start + size) > MAX_MEMORY)
-			BUG();
-
-		/* Some versions of OF sometimes have an empty property for
-		 * associativity, so we need to get the size too.
-		 */
-		tmp2 = (int *)get_property(memory, "ibm,associativity",
-					   &propsize);
-		if (!tmp2)
-			continue;
-
-		if (!propsize) {
-			printk(KERN_INFO "Buggy OF? Empty ibm,associativity "
-			       "property for %s. Disabling NUMA.\n",
-			       memory->full_name);
-			goto err;
-		}
-
-		numa_domain = tmp2[depth];
-
-		/* FIXME */
-		if (numa_domain == 0xffff) {
-			dbg("memory has no numa doman\n");
+		tmp = (unsigned int *)get_property(memory, "ibm,associativity",
+					   &len);
+		if (tmp && len >= depth) {
+			numa_domain = tmp[depth];
+		} else {
+			printk(KERN_ERR "WARNING: no NUMA information for "
+			       "memory at %lx\n", start);
 			numa_domain = 0;
 		}
 
-		if (numa_domain >= MAX_NUMNODES)
-			BUG();
+		if (numa_domain >= MAX_NUMNODES) {
+			if (numa_domain != 0xffff)
+				printk(KERN_ERR "WARNING: memory at %lx maps "
+				       "to invalid NUMA node %d\n", start,
+				       numa_domain);
+			numa_domain = 0;
+		}
 
 		node_set_online(numa_domain);
 
@@ -202,10 +234,8 @@ new_range:
 			max_domain = numa_domain;
 
 		/* 
-		 * For backwards compatibility, OF splits the first node
-		 * into two regions (the first being 0-4GB). Check for
-		 * this simple case and complain if there is a gap in
-		 * memory
+		 * Coalesce memory regions. We dont handle holes within
+		 * NUMA nodes.
 		 */
 		if (node_data[numa_domain].node_spanned_pages) {
 			unsigned long shouldstart =
@@ -217,11 +247,13 @@ new_range:
 						start, size);
 				continue;
 			}
-			node_data[numa_domain].node_spanned_pages += size / PAGE_SIZE;
+			node_data[numa_domain].node_spanned_pages +=
+				size / PAGE_SIZE;
 		} else {
 			node_data[numa_domain].node_start_pfn =
 				start / PAGE_SIZE;
-			node_data[numa_domain].node_spanned_pages = size / PAGE_SIZE;
+			node_data[numa_domain].node_spanned_pages =
+				size / PAGE_SIZE;
 		}
 
 		for (i = start ; i < (start+size); i += MEMORY_INCREMENT)
@@ -239,10 +271,6 @@ new_range:
 	numnodes = max_domain + 1;
 
 	return 0;
-err:
-	of_node_put(cpu);
-	of_node_put(memory);
-	return -1;
 }
 
 static void __init setup_nonnuma(void)
