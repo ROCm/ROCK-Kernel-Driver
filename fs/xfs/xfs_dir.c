@@ -1096,7 +1096,7 @@ xfs_dir_trace_g_du(char *where, xfs_inode_t *dp, uio_t *uio)
 		     (void *)dp, (void *)dp->i_mount,
 		     (void *)((unsigned long)(uio->uio_offset >> 32)),
 		     (void *)((unsigned long)(uio->uio_offset & 0xFFFFFFFF)),
-		     (void *)uio->uio_resid,
+		     (void *)(unsigned long)uio->uio_resid,
 		     NULL, NULL, NULL, NULL, NULL, NULL, NULL);
 }
 
@@ -1110,8 +1110,8 @@ xfs_dir_trace_g_dub(char *where, xfs_inode_t *dp, uio_t *uio, xfs_dablk_t bno)
 		     (void *)dp, (void *)dp->i_mount,
 		     (void *)((unsigned long)(uio->uio_offset >> 32)),
 		     (void *)((unsigned long)(uio->uio_offset & 0xFFFFFFFF)),
-		     (void *)uio->uio_resid,
-		     (void *)bno,
+		     (void *)(unsigned long)uio->uio_resid,
+		     (void *)(unsigned long)bno,
 		     NULL, NULL, NULL, NULL, NULL, NULL);
 }
 
@@ -1128,11 +1128,15 @@ xfs_dir_trace_g_dun(char *where, xfs_inode_t *dp, uio_t *uio,
 		     (void *)dp, (void *)dp->i_mount,
 		     (void *)((unsigned long)(uio->uio_offset >> 32)),
 		     (void *)((unsigned long)(uio->uio_offset & 0xFFFFFFFF)),
-		     (void *)uio->uio_resid,
-		     (void *)INT_GET(node->hdr.info.forw, ARCH_CONVERT),
-		     (void *)INT_GET(node->hdr.count, ARCH_CONVERT),
-		     (void *)INT_GET(node->btree[0].hashval, ARCH_CONVERT),
-		     (void *)INT_GET(node->btree[last].hashval, ARCH_CONVERT),
+		     (void *)(unsigned long)uio->uio_resid,
+		     (void *)(unsigned long)
+			INT_GET(node->hdr.info.forw, ARCH_CONVERT),
+		     (void *)(unsigned long)
+			INT_GET(node->hdr.count, ARCH_CONVERT),
+		     (void *)(unsigned long)
+			INT_GET(node->btree[0].hashval, ARCH_CONVERT),
+		     (void *)(unsigned long)
+			INT_GET(node->btree[last].hashval, ARCH_CONVERT),
 		     NULL, NULL, NULL);
 }
 
@@ -1149,11 +1153,15 @@ xfs_dir_trace_g_dul(char *where, xfs_inode_t *dp, uio_t *uio,
 		     (void *)dp, (void *)dp->i_mount,
 		     (void *)((unsigned long)(uio->uio_offset >> 32)),
 		     (void *)((unsigned long)(uio->uio_offset & 0xFFFFFFFF)),
-		     (void *)uio->uio_resid,
-		     (void *)INT_GET(leaf->hdr.info.forw, ARCH_CONVERT),
-		     (void *)INT_GET(leaf->hdr.count, ARCH_CONVERT),
-		     (void *)INT_GET(leaf->entries[0].hashval, ARCH_CONVERT),
-		     (void *)INT_GET(leaf->entries[last].hashval, ARCH_CONVERT),
+		     (void *)(unsigned long)uio->uio_resid,
+		     (void *)(unsigned long)
+			INT_GET(leaf->hdr.info.forw, ARCH_CONVERT),
+		     (void *)(unsigned long)
+			INT_GET(leaf->hdr.count, ARCH_CONVERT),
+		     (void *)(unsigned long)
+			INT_GET(leaf->entries[0].hashval, ARCH_CONVERT),
+		     (void *)(unsigned long)
+			INT_GET(leaf->entries[last].hashval, ARCH_CONVERT),
 		     NULL, NULL, NULL);
 }
 
@@ -1168,8 +1176,9 @@ xfs_dir_trace_g_due(char *where, xfs_inode_t *dp, uio_t *uio,
 		     (void *)dp, (void *)dp->i_mount,
 		     (void *)((unsigned long)(uio->uio_offset >> 32)),
 		     (void *)((unsigned long)(uio->uio_offset & 0xFFFFFFFF)),
-		     (void *)uio->uio_resid,
-		     (void *)INT_GET(entry->hashval, ARCH_CONVERT),
+		     (void *)(unsigned long)uio->uio_resid,
+		     (void *)(unsigned long)
+			INT_GET(entry->hashval, ARCH_CONVERT),
 		     NULL, NULL, NULL, NULL, NULL, NULL);
 }
 
@@ -1183,7 +1192,7 @@ xfs_dir_trace_g_duc(char *where, xfs_inode_t *dp, uio_t *uio, xfs_off_t cookie)
 		     (void *)dp, (void *)dp->i_mount,
 		     (void *)((unsigned long)(uio->uio_offset >> 32)),
 		     (void *)((unsigned long)(uio->uio_offset & 0xFFFFFFFF)),
-		     (void *)uio->uio_resid,
+		     (void *)(unsigned long)uio->uio_resid,
 		     (void *)((unsigned long)(cookie >> 32)),
 		     (void *)((unsigned long)(cookie & 0xFFFFFFFF)),
 		     NULL, NULL, NULL, NULL, NULL);
@@ -1203,7 +1212,7 @@ xfs_dir_trace_enter(int type, char *where,
 			void * a10, void * a11)
 {
 	ASSERT(xfs_dir_trace_buf);
-	ktrace_enter(xfs_dir_trace_buf, (void *)((void *)type),
+	ktrace_enter(xfs_dir_trace_buf, (void *)(unsigned long)type,
 					(void *)where,
 					(void *)a0, (void *)a1, (void *)a2,
 					(void *)a3, (void *)a4, (void *)a5,

@@ -3574,14 +3574,14 @@ xfs_bmap_trace_addentry(
 		(void *)(__psint_t)cnt,
 		(void *)(__psunsigned_t)(ip->i_ino >> 32),
 		(void *)(__psunsigned_t)(unsigned)ip->i_ino,
-		(void *)(__psunsigned_t)(INT_GET(r1->l0, ARCH_CONVERT) >> 32),
-		(void *)(__psunsigned_t)(unsigned)(INT_GET(r1->l0, ARCH_CONVERT)),
-		(void *)(__psunsigned_t)(INT_GET(r1->l1, ARCH_CONVERT) >> 32),
-		(void *)(__psunsigned_t)(unsigned)(INT_GET(r1->l1, ARCH_CONVERT)),
-		(void *)(__psunsigned_t)(INT_GET(r2->l0, ARCH_CONVERT) >> 32),
-		(void *)(__psunsigned_t)(unsigned)(INT_GET(r2->l0, ARCH_CONVERT)),
-		(void *)(__psunsigned_t)(INT_GET(r2->l1, ARCH_CONVERT) >> 32),
-		(void *)(__psunsigned_t)(unsigned)(INT_GET(r2->l1, ARCH_CONVERT))
+		(void *)(__psunsigned_t)(r1->l0 >> 32),
+		(void *)(__psunsigned_t)(unsigned)(r1->l0),
+		(void *)(__psunsigned_t)(r1->l1 >> 32),
+		(void *)(__psunsigned_t)(unsigned)(r1->l1),
+		(void *)(__psunsigned_t)(r2->l0 >> 32),
+		(void *)(__psunsigned_t)(unsigned)(r2->l0),
+		(void *)(__psunsigned_t)(r2->l1 >> 32),
+		(void *)(__psunsigned_t)(unsigned)(r2->l1)
 		);
 	ASSERT(ip->i_xtrace);
 	ktrace_enter(ip->i_xtrace,
@@ -3591,14 +3591,14 @@ xfs_bmap_trace_addentry(
 		(void *)(__psint_t)cnt,
 		(void *)(__psunsigned_t)(ip->i_ino >> 32),
 		(void *)(__psunsigned_t)(unsigned)ip->i_ino,
-		(void *)(__psunsigned_t)(INT_GET(r1->l0, ARCH_CONVERT) >> 32),
-		(void *)(__psunsigned_t)(unsigned)(INT_GET(r1->l0, ARCH_CONVERT)),
-		(void *)(__psunsigned_t)(INT_GET(r1->l1, ARCH_CONVERT) >> 32),
-		(void *)(__psunsigned_t)(unsigned)(INT_GET(r1->l1, ARCH_CONVERT)),
-		(void *)(__psunsigned_t)(INT_GET(r2->l0, ARCH_CONVERT) >> 32),
-		(void *)(__psunsigned_t)(unsigned)(INT_GET(r2->l0, ARCH_CONVERT)),
-		(void *)(__psunsigned_t)(INT_GET(r2->l1, ARCH_CONVERT) >> 32),
-		(void *)(__psunsigned_t)(unsigned)(INT_GET(r2->l1, ARCH_CONVERT))
+		(void *)(__psunsigned_t)(r1->l0 >> 32),
+		(void *)(__psunsigned_t)(unsigned)(r1->l0),
+		(void *)(__psunsigned_t)(r1->l1 >> 32),
+		(void *)(__psunsigned_t)(unsigned)(r1->l1),
+		(void *)(__psunsigned_t)(r2->l0 >> 32),
+		(void *)(__psunsigned_t)(unsigned)(r2->l0),
+		(void *)(__psunsigned_t)(r2->l1 >> 32),
+		(void *)(__psunsigned_t)(unsigned)(r2->l1)
 		);
 }
 
@@ -3741,7 +3741,7 @@ xfs_bunmap_trace(
 		(void *)(__psint_t)((xfs_dfiloff_t)bno & 0xffffffff),
 		(void *)(__psint_t)len,
 		(void *)(__psint_t)flags,
-		(void *)current_cpu(),
+		(void *)(unsigned long)current_cpu(),
 		(void *)ra,
 		(void *)0,
 		(void *)0,

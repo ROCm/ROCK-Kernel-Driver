@@ -1368,7 +1368,7 @@ xfs_itrunc_trace(
 		     (void*)(unsigned long)(toss_start & 0xffffffff),
 		     (void*)(unsigned long)((toss_finish >> 32) & 0xffffffff),
 		     (void*)(unsigned long)(toss_finish & 0xffffffff),
-		     (void*)current_cpu(),
+		     (void*)(unsigned long)current_cpu(),
 		     (void*)0,
 		     (void*)0,
 		     (void*)0,
@@ -3851,11 +3851,11 @@ xfs_ilock_trace(xfs_inode_t *ip, int lock, unsigned int lockflags, inst_t *ra)
 {
 	ktrace_enter(ip->i_lock_trace,
 		     (void *)ip,
-		     (void *)lock,		/* 1 = LOCK, 3=UNLOCK, etc */
-		     (void *)lockflags,		/* XFS_ILOCK_EXCL etc */
+		     (void *)(unsigned long)lock, /* 1 = LOCK, 3=UNLOCK, etc */
+		     (void *)(unsigned long)lockflags, /* XFS_ILOCK_EXCL etc */
 		     (void *)ra,		/* caller of ilock */
-		     (void *)current_cpu(),
-		     (void *)current_pid(),
+		     (void *)(unsigned long)current_cpu(),
+		     (void *)(unsigned long)current_pid(),
 		     0,0,0,0,0,0,0,0,0,0);
 }
 #endif

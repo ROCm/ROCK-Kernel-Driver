@@ -1214,7 +1214,7 @@ xfs_buf_item_trace(
 		     (void *)((unsigned long)XFS_BUF_BFLAGS(bp)),
 		     XFS_BUF_FSPRIVATE(bp, void *),
 		     XFS_BUF_FSPRIVATE2(bp, void *),
-		     (void *)XFS_BUF_ISPINNED(bp),
+		     (void *)(unsigned long)XFS_BUF_ISPINNED(bp),
 		     (void *)XFS_BUF_IODONE_FUNC(bp),
 		     (void *)((unsigned long)(XFS_BUF_VALUSEMA(bp))),
 		     (void *)bip->bli_item.li_desc,
