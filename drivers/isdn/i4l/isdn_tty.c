@@ -32,9 +32,21 @@ static void isdn_tty_cmd_ATA(modem_info *);
 static void isdn_tty_flush_buffer(struct tty_struct *);
 static void isdn_tty_modem_result(int, modem_info *);
 static int isdn_tty_stat_callback(int i, isdn_ctrl *c);
+static int isdn_tty_rcv_skb(int i, struct sk_buff *skb);
 #ifdef CONFIG_ISDN_AUDIO
 static int isdn_tty_countDLE(unsigned char *, int);
 #endif
+
+static int
+isdn_tty_event_callback(int sl, int pr, void *arg)
+{
+	switch (pr) {
+	case EV_DATA_IND:
+		return isdn_tty_rcv_skb(sl, arg);
+	default:
+		return isdn_tty_stat_callback(sl, arg);
+	}
+}
 
 /* Leave this unchanged unless you know what you do! */
 #define MODEM_PARANOIA_CHECK
@@ -755,7 +767,7 @@ isdn_tty_dial(char *n, modem_info * info, atemu * m)
 
 		info->isdn_slot = i;
 		isdn_slot_set_m_idx(i, info->line);
-		isdn_slot_set_priv(i, ISDN_USAGE_MODEM, info, isdn_tty_stat_callback, isdn_tty_rcv_skb);
+		isdn_slot_set_priv(i, ISDN_USAGE_MODEM, info, isdn_tty_event_callback);
 		info->last_dir = 1;
 		info->last_l2 = l2;
 		strcpy(info->last_num, n);
@@ -837,7 +849,7 @@ isdn_tty_modem_hup(modem_info * info, int local)
 	info->emu.mdmreg[REG_RINGCNT] = 0;
 	skb_queue_purge(&info->rpqueue);
 	isdn_slot_free(slot);
-	isdn_slot_set_priv(slot, 0, NULL, NULL, NULL);
+	isdn_slot_set_priv(slot, 0, NULL, NULL);
 	info->isdn_slot = -1;
 }
 
@@ -930,7 +942,7 @@ isdn_tty_resume(char *id, modem_info * info, atemu * m)
 	} else {
 		info->isdn_slot = i;
 		isdn_slot_set_m_idx(i, info->line);
-		isdn_slot_set_priv(i, ISDN_USAGE_MODEM, info, isdn_tty_stat_callback, isdn_tty_rcv_skb);
+		isdn_slot_set_priv(i, ISDN_USAGE_MODEM, info, isdn_tty_event_callback);
 		info->last_dir = 1;
 //		strcpy(info->last_num, n);
 		restore_flags(flags);
@@ -1005,7 +1017,7 @@ isdn_tty_send_msg(modem_info * info, atemu * m, char *msg)
 	} else {
 		info->isdn_slot = i;
 		isdn_slot_set_m_idx(i, info->line);
-		isdn_slot_set_priv(i, ISDN_USAGE_MODEM, info, isdn_tty_stat_callback, isdn_tty_rcv_skb);
+		isdn_slot_set_priv(i, ISDN_USAGE_MODEM, info, isdn_tty_event_callback);
 		info->last_dir = 1;
 		restore_flags(flags);
 		info->last_l2 = l2;
@@ -2282,7 +2294,7 @@ isdn_tty_find_icall(int di, int ch, int sl, setup_parm *setup)
 				if (!matchret) {                  /* EAZ is matching */
 					info->isdn_slot = sl;
 					isdn_slot_set_m_idx(sl, info->line);
-					isdn_slot_set_priv(sl, isdn_calc_usage(si1, info->emu.mdmreg[REG_L2PROT]), info, isdn_tty_stat_callback, isdn_tty_rcv_skb);
+					isdn_slot_set_priv(sl, isdn_calc_usage(si1, info->emu.mdmreg[REG_L2PROT]), info, isdn_tty_event_callback);
 					strcpy(isdn_slot_num(sl), nr);
 					strcpy(info->emu.cpn, eaz);
 					info->emu.mdmreg[REG_SI1I] = si2bit[si1];

@@ -90,9 +90,54 @@ extern int   isdn_slot_usage(int slot);
 extern char *isdn_slot_num(int slot);
 extern int   isdn_slot_m_idx(int slot);
 extern void  isdn_slot_set_m_idx(int slot, int midx);
-extern void  isdn_slot_set_priv(int sl, int usage, void *priv, int (*stat_cb)(int sl, isdn_ctrl *ctrl), int (*recv_cb)(int sl, struct sk_buff *skb));
+extern void  isdn_slot_set_priv(int sl, int usage, void *priv, 
+				int (*event_cb)(int sl, int pr, void *arg));
 extern void *isdn_slot_priv(int sl);
 extern int   isdn_hard_header_len(void);
 
 int   isdn_drv_lookup(char *drvid);
 char *isdn_drv_drvid(int di);
+
+enum {
+	ST_SLOT_NULL,
+	ST_SLOT_BOUND,
+	ST_SLOT_IN,
+	ST_SLOT_WAIT_DCONN,
+	ST_SLOT_DCONN,
+	ST_SLOT_WAIT_BCONN,
+	ST_SLOT_ACTIVE,
+	ST_SLOT_WAIT_BHUP,
+	ST_SLOT_WAIT_DHUP,
+};
+
+enum {
+	EV_DRV_REGISTER,
+	EV_STAT_RUN,
+	EV_STAT_STOP,
+	EV_STAT_UNLOAD,
+	EV_STAT_STAVAIL,
+	EV_STAT_ADDCH,
+	EV_STAT_ICALL,
+	EV_STAT_DCONN,
+	EV_STAT_BCONN,
+	EV_STAT_BHUP,
+	EV_STAT_DHUP,
+	EV_STAT_BSENT,
+	EV_STAT_CINF,
+	EV_STAT_CAUSE,
+	EV_STAT_DISPLAY,
+	EV_STAT_FAXIND,
+	EV_STAT_AUDIO,
+	EV_CMD_CLREAZ,
+	EV_CMD_SETEAZ,
+	EV_CMD_SETL2,
+	EV_CMD_SETL3,
+	EV_CMD_DIAL,
+	EV_CMD_ACCEPTD,
+	EV_CMD_ACCEPTB,
+	EV_CMD_HANGUP,
+	EV_DATA_REQ,
+	EV_DATA_IND,
+	EV_SLOT_BIND,
+	EV_SLOT_UNBIND,
+};
