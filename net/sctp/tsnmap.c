@@ -1,7 +1,7 @@
 /* SCTP kernel reference Implementation
  * Copyright (c) 1999-2000 Cisco, Inc.
  * Copyright (c) 1999-2001 Motorola, Inc.
- * Copyright (c) 2001 International Business Machines, Corp.
+ * Copyright (c) 2001-2003 International Business Machines, Corp.
  * Copyright (c) 2001 Intel Corp.
  *
  * This file is part of the SCTP kernel reference Implementation
@@ -194,6 +194,10 @@ int sctp_tsnmap_next_gap_ack(const struct sctp_tsnmap *map,
 	/* We haven't found a gap yet.  */
 	started = ended = 0;
 
+	/* If there are no more gap acks possible, get out fast.  */
+	if (TSN_lte(map->max_tsn_seen, iter->start))
+		return 0;
+
 	/* Search the first mapping array.  */
 	if (iter->start - map->base_tsn < map->len) {
 
@@ -281,7 +285,7 @@ static void sctp_tsnmap_update(struct sctp_tsnmap *map)
 	map->cumulative_tsn_ack_point = ctsn - 1; /* Back up one. */
 }
 
-/* How many data chunks  are we missing from our peer?  
+/* How many data chunks  are we missing from our peer?
  */
 __u16 sctp_tsnmap_pending(struct sctp_tsnmap *map)
 {
@@ -393,15 +397,15 @@ __u16 sctp_tsnmap_num_gabs(struct sctp_tsnmap *map)
 	if (sctp_tsnmap_has_gap(map)) {
 		sctp_tsnmap_iter_init(map, &iter);
 		while (sctp_tsnmap_next_gap_ack(map, &iter,
-						&map->gabs[gabs].start, 
+						&map->gabs[gabs].start,
 						&map->gabs[gabs].end)) {
-			
+
 			map->gabs[gabs].start = htons(map->gabs[gabs].start);
 			map->gabs[gabs].end = htons(map->gabs[gabs].end);
 			gabs++;
 			if (gabs >= SCTP_MAX_GABS)
 				break;
 		}
-	}	
+	}
 	return gabs;
 }
