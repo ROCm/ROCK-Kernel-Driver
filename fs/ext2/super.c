@@ -564,8 +564,9 @@ static int ext2_fill_super(struct super_block *sb, void *data, int silent)
 	struct ext2_sb_info * sbi;
 	struct ext2_super_block * es;
 	struct inode *root;
-	unsigned long block, sb_block = 1;
-	unsigned long logic_sb_block = get_sb_block(&data);
+	unsigned long block;
+	unsigned long sb_block = get_sb_block(&data);
+	unsigned long logic_sb_block;
 	unsigned long offset = 0;
 	unsigned long def_mount_opts;
 	int blocksize = BLOCK_SIZE;
@@ -598,6 +599,8 @@ static int ext2_fill_super(struct super_block *sb, void *data, int silent)
 	if (blocksize != BLOCK_SIZE) {
 		logic_sb_block = (sb_block*BLOCK_SIZE) / blocksize;
 		offset = (sb_block*BLOCK_SIZE) % blocksize;
+	} else {
+		logic_sb_block = sb_block;
 	}
 
 	if (!(bh = sb_bread(sb, logic_sb_block))) {
