@@ -71,6 +71,8 @@ u64 sn_partition_serial_number;
 
 short physical_node_map[MAX_PHYSNODE_ID];
 
+EXPORT_SYMBOL(physical_node_map);
+
 int	numionodes;
 /*
  * This is the address of the RRegs in the HSpace of the global

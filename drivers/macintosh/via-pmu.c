@@ -57,7 +57,6 @@
 #include <asm/mmu_context.h>
 #include <asm/cputable.h>
 #include <asm/time.h>
-#include <asm/xmon.h>
 #ifdef CONFIG_PMAC_BACKLIGHT
 #include <asm/backlight.h>
 #endif

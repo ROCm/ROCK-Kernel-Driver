@@ -45,13 +45,20 @@ extern void bad_page_fault(struct pt_regs *, unsigned long, int);
 extern int fwnmi_active;
 #endif
 
-#ifdef CONFIG_DEBUG_KERNEL
-void (*debugger)(struct pt_regs *regs);
-int (*debugger_bpt)(struct pt_regs *regs);
-int (*debugger_sstep)(struct pt_regs *regs);
-int (*debugger_iabr_match)(struct pt_regs *regs);
-int (*debugger_dabr_match)(struct pt_regs *regs);
-void (*debugger_fault_handler)(struct pt_regs *regs);
+#ifdef CONFIG_DEBUGGER
+int (*__debugger)(struct pt_regs *regs);
+int (*__debugger_bpt)(struct pt_regs *regs);
+int (*__debugger_sstep)(struct pt_regs *regs);
+int (*__debugger_iabr_match)(struct pt_regs *regs);
+int (*__debugger_dabr_match)(struct pt_regs *regs);
+int (*__debugger_fault_handler)(struct pt_regs *regs);
+
+EXPORT_SYMBOL(__debugger);
+EXPORT_SYMBOL(__debugger_bpt);
+EXPORT_SYMBOL(__debugger_sstep);
+EXPORT_SYMBOL(__debugger_iabr_match);
+EXPORT_SYMBOL(__debugger_dabr_match);
+EXPORT_SYMBOL(__debugger_fault_handler);
 #endif
 
 /*
@@ -88,10 +95,8 @@ static void
 _exception(int signr, siginfo_t *info, struct pt_regs *regs)
 {
 	if (!user_mode(regs)) {
-#ifdef CONFIG_DEBUG_KERNEL
-		if (debugger)
-			debugger(regs);
-#endif
+		if (debugger(regs))
+			return;
 		die("Exception in kernel mode\n", regs, signr);
 	}
 
@@ -146,12 +151,8 @@ SystemResetException(struct pt_regs *regs)
 	}
 #endif
 
-#ifdef CONFIG_DEBUG_KERNEL
-	if (debugger)
-		debugger(regs);
-	else
-#endif
-		panic("System Reset");
+	if (!debugger(regs))
+		die("System Reset", regs, 0);
 
 	/* Must die if the interrupt is not recoverable */
 	if (!(regs->msr & MSR_RI))
@@ -228,23 +229,12 @@ MachineCheckException(struct pt_regs *regs)
 	}
 #endif
 
-#ifdef CONFIG_DEBUG_KERNEL
-	if (debugger_fault_handler) {
-		debugger_fault_handler(regs);
+	if (debugger_fault_handler(regs))
 		return;
-	}
-	if (debugger)
-		debugger(regs);
-#endif
-	console_verbose();
-	spin_lock_irq(&die_lock);
-	bust_spinlocks(1);
-	printk("Machine check in kernel mode.\n");
-	printk("Caused by (from SRR1=%lx): ", regs->msr);
-	show_regs(regs);
-	bust_spinlocks(0);
-	spin_unlock_irq(&die_lock);
-	panic("Unrecoverable Machine Check");
+	if (debugger(regs))
+		return;
+
+	die("Machine check in kernel mode", regs, 0);
 }
 
 void
@@ -267,10 +257,8 @@ InstructionBreakpointException(struct pt_regs *regs)
 {
 	siginfo_t info;
 
-#ifdef CONFIG_DEBUG_KERNEL
-	if (debugger_iabr_match && debugger_iabr_match(regs))
+	if (debugger_iabr_match(regs))
 		return;
-#endif
 	info.si_signo = SIGTRAP;
 	info.si_errno = 0;
 	info.si_code = TRAP_BRKPT;
@@ -372,6 +360,9 @@ ProgramCheckException(struct pt_regs *regs)
 {
 	siginfo_t info;
 
+	if (debugger_fault_handler(regs))
+		return;
+
 	if (regs->msr & 0x100000) {
 		/* IEEE FP exception */
 
@@ -387,10 +378,9 @@ ProgramCheckException(struct pt_regs *regs)
 	} else if (regs->msr & 0x20000) {
 		/* trap exception */
 
-#ifdef CONFIG_DEBUG_KERNEL
-		if (debugger_bpt && debugger_bpt(regs))
+		if (debugger_bpt(regs))
 			return;
-#endif
+
 		if (check_bug_trap(regs)) {
 			regs->nip += 4;
 			return;
@@ -414,17 +404,13 @@ ProgramCheckException(struct pt_regs *regs)
 void
 KernelFPUnavailableException(struct pt_regs *regs)
 {
-	printk("Illegal floating point used in kernel (task=0x%p, "
-		"pc=0x%016lx, trap=0x%lx)\n", current, regs->nip, regs->trap);
-	panic("Unrecoverable FP Unavailable Exception in Kernel");
+	die("Unrecoverable FP Unavailable Exception in Kernel", regs, 0);
 }
 
 void
 KernelAltivecUnavailableException(struct pt_regs *regs)
 {
-	printk("Illegal VMX/Altivec used in kernel (task=0x%p, "
-		"pc=0x%016lx, trap=0x%lx)\n", current, regs->nip, regs->trap);
-	panic("Unrecoverable VMX/Altivec Unavailable Exception in Kernel");
+	die("Unrecoverable VMX/Altivec Unavailable Exception in Kernel", regs, 0);
 }
 
 void
@@ -434,10 +420,9 @@ SingleStepException(struct pt_regs *regs)
 
 	regs->msr &= ~MSR_SE;  /* Turn off 'trace' bit */
 
-#ifdef CONFIG_DEBUG_KERNEL
-	if (debugger_sstep && debugger_sstep(regs))
+	if (debugger_sstep(regs))
 		return;
-#endif
+
 	info.si_signo = SIGTRAP;
 	info.si_errno = 0;
 	info.si_code = TRAP_TRACE;

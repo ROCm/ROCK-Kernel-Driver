@@ -644,7 +644,8 @@ config FB_RADEON
 
 config FB_RADEON_I2C
 	bool "DDC/I2C for ATI Radeon support"
-	depends on FB_RADEON && (I2C_ALGOBIT=FB_RADEON || I2C_ALGOBIT=y)
+	depends on FB_RADEON && I2C
+	select I2C_ALGOBIT
 	default y
 	help
 	  Say Y here if you want DDC/I2C support for your Radeon board. 

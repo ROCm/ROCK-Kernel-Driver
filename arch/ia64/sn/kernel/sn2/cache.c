@@ -6,7 +6,7 @@
  * Copyright (C) 2001-2003 Silicon Graphics, Inc. All rights reserved.
  *
  */
-
+#include <linux/module.h>
 #include <asm/pgalloc.h>
 
 /**

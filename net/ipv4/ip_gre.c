@@ -276,7 +276,6 @@ static struct ip_tunnel * ipgre_tunnel_locate(struct ip_tunnel_parm *parms, int 
 	  return NULL;
 
 	dev->init = ipgre_tunnel_init;
-	dev->tx_queue_len = 1;
 	nt = dev->priv;
 	nt->parms = *parms;
 
@@ -1270,7 +1269,6 @@ int __init ipgre_init(void)
 	}
 
 	ipgre_fb_tunnel_dev->init = ipgre_fb_tunnel_init;
-	ipgre_fb_tunnel_dev->tx_queue_len = 1;
 
 	if ((err = register_netdev(ipgre_fb_tunnel_dev)))
 		goto fail;
