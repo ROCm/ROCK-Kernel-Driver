@@ -504,16 +504,9 @@ static int pci_bus_match(struct device * dev, struct device_driver * drv)
  */
 struct pci_dev *pci_dev_get(struct pci_dev *dev)
 {
-	struct device *tmp;
-
-	if (!dev)
-		return NULL;
-
-	tmp = get_device(&dev->dev);
-	if (tmp)        
-		return to_pci_dev(tmp);
-	else
-		return NULL;
+	if (dev)
+		get_device(&dev->dev);
+	return dev;
 }
 
 /**
