@@ -99,7 +99,7 @@ nfsd_cross_mnt(struct svc_rqst *rqstp, struct dentry **dpp,
 		mntput(mnt);
 		goto out;
 	}
-	if (exp2 && ((exp->ex_flags & NFSEXP_CROSSMNT) || EX_NOHIDE(exp2))) {
+	if (exp2 && ((exp->ex_flags & NFSEXP_CROSSMOUNT) || EX_NOHIDE(exp2))) {
 		/* successfully crossed mount point */
 		exp_put(exp);
 		*expp = exp2;
