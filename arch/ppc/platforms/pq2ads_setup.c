@@ -3,10 +3,10 @@
  *
  * PQ2ADS platform support
  *
- * Author: Kumar Gala <kumar.gala@motorola.com>
+ * Author: Kumar Gala <kumar.gala@freescale.com>
  * Derived from: est8260_setup.c by Allen Curtis
  *
- * Copyright 2004 Motorola Inc.
+ * Copyright 2004 Freescale Semiconductor, Inc.
  *
  * This program is free software; you can redistribute  it and/or modify it
  * under  the terms of  the GNU General  Public License as published by the

@@ -3,7 +3,7 @@
  *
  *  Driver for CPM (SCC/SMC) serial ports
  *
- *  Copyright (C) 2004 Motorola, Inc
+ *  Copyright (C) 2004 Freescale Semiconductor, Inc.
  *
  */
 #ifndef CPM_UART_H

@@ -3,10 +3,10 @@
  *
  *  Driver for CPM (SCC/SMC) serial ports; CPM2 definitions
  *
- *  Maintainer: Kumar Gala (kumar.gala@motorola.com)  (CPM2)
+ *  Maintainer: Kumar Gala (kumar.gala@freescale.com) (CPM2)
  *              Pantelis Antoniou (panto@intracom.gr) (CPM1)
  * 
- *  Copyright (C) 2004 Motorola, Inc
+ *  Copyright (C) 2004 Freescale Semiconductor, Inc.
  *            (C) 2004 Intracom, S.A.
  *
  * This program is free software; you can redistribute it and/or modify
