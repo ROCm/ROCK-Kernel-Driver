@@ -77,7 +77,7 @@
 #include "sbp2.h"
 
 static char version[] __devinitdata =
-	"$Rev: 1082 $ Ben Collins <bcollins@debian.org>";
+	"$Rev: 1096 $ Ben Collins <bcollins@debian.org>";
 
 /*
  * Module load parameter definitions
