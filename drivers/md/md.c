@@ -3412,12 +3412,13 @@ void __init md_setup_drive(void)
 				*p++ = 0;
 
 			dev = name_to_kdev_t(devname);
-			handle = devfs_find_handle(NULL, devname, major(dev), minor(dev),
-							DEVFS_SPECIAL_BLK, 1);
+			handle = devfs_get_handle(NULL, devname, major(dev), minor(dev),
+						  DEVFS_SPECIAL_BLK, 1);
 			if (handle != 0) {
 				unsigned major, minor;
 				devfs_get_maj_min(handle, &major, &minor);
 				dev = mk_kdev(major, minor);
+				devfs_put(handle);
 			}
 			if (kdev_none(dev)) {
 				printk(KERN_WARNING "md: Unknown device name: %s\n", devname);

@@ -1527,7 +1527,7 @@ static void __exit capi_exit(void)
 	proc_exit();
 
 	devfs_unregister_chrdev(capi_major, "capi20");
-	devfs_unregister(devfs_find_handle(NULL, "isdn/capi20", capi_major, 0, DEVFS_SPECIAL_CHR, 0));
+	devfs_find_and_unregister(NULL, "isdn/capi20", capi_major, 0, DEVFS_SPECIAL_CHR, 0);
 
 #ifdef CONFIG_ISDN_CAPI_MIDDLEWARE
 	capinc_tty_exit();

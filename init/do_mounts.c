@@ -356,11 +356,12 @@ static int __init create_dev(char *name, dev_t dev, char *devfs_name)
 	if (!do_devfs)
 		return sys_mknod(name, S_IFBLK|0600, dev);
 
-	handle = devfs_find_handle(NULL, !dev ? devfs_name : NULL,
-				MAJOR(dev), MINOR(dev), DEVFS_SPECIAL_BLK, 1);
+	handle = devfs_get_handle(NULL, !dev ? devfs_name : NULL,
+				  MAJOR(dev), MINOR(dev), DEVFS_SPECIAL_BLK, 1);
 	if (!handle)
 		return -1;
 	n = devfs_generate_path(handle, path + 5, sizeof (path) - 5);
+	devfs_put(handle);
 	if (n < 0)
 		return -1;
 	return sys_symlink(path + n + 5, name);

@@ -1700,8 +1700,8 @@ sony535_exit(void)
 	kfree(sony_buffer);
 	kfree(last_sony_subcode);
 	kfree(sony_toc);
-	devfs_unregister(devfs_find_handle(NULL, CDU535_HANDLE, 0, 0,
-					   DEVFS_SPECIAL_BLK, 0));
+	devfs_find_and_unregister(NULL, CDU535_HANDLE, 0, 0,
+				  DEVFS_SPECIAL_BLK, 0);
 	if (devfs_unregister_blkdev(MAJOR_NR, CDU535_HANDLE) == -EINVAL)
 		printk("Uh oh, couldn't unregister " CDU535_HANDLE "\n");
 	else

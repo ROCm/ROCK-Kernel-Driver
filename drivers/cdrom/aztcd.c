@@ -1957,8 +1957,7 @@ int __init aztcd_init(void)
 
 void __exit aztcd_exit(void)
 {
-	devfs_unregister(devfs_find_handle
-			 (NULL, "aztcd", 0, 0, DEVFS_SPECIAL_BLK, 0));
+	devfs_find_and_unregister(NULL, "aztcd", 0, 0, DEVFS_SPECIAL_BLK, 0);
 	if ((devfs_unregister_blkdev(MAJOR_NR, "aztcd") == -EINVAL)) {
 		printk("What's that: can't unregister aztcd\n");
 		return;
