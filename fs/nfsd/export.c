@@ -613,7 +613,7 @@ struct flags {
 	{ 0, {"", ""}}
 };
 
-static void exp_flags(struct seq_file *m, int flag, int fsid)
+static void exp_flags(struct seq_file *m, int flag, int fsid, uid_t anonu, uid_t anong)
 {
 	int first = 0;
 	struct flags *flg;
@@ -625,6 +625,10 @@ static void exp_flags(struct seq_file *m, int flag, int fsid)
 	}
 	if (flag & NFSEXP_FSID)
 		seq_printf(m, "%sfsid=%d", first++?",":"", fsid);
+	if (anonu != (uid_t)-2 && anonu != (0x10000-2))
+		seq_printf(m, "%sanonuid=%d", first++?",":"", anonu);
+	if (anong != (gid_t)-2 && anong != (0x10000-2))
+		seq_printf(m, "%sanongid=%d", first++?",":"", anong);
 }
 
 static inline void mangle(struct seq_file *m, const char *s)
@@ -650,7 +654,8 @@ static int e_show(struct seq_file *m, void *p)
 	seq_putc(m, '\t');
 	mangle(m, clp->cl_ident);
 	seq_putc(m, '(');
-	exp_flags(m, exp->ex_flags, exp->ex_fsid);
+	exp_flags(m, exp->ex_flags, exp->ex_fsid, 
+		  exp->ex_anon_uid, exp->ex_anon_gid);
 	seq_puts(m, ") # ");
 	for (j = 0; j < clp->cl_naddr; j++) {
 		struct svc_clnthash **hp, **head, *tmp;
