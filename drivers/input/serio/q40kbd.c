@@ -47,12 +47,24 @@ MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
 MODULE_DESCRIPTION("Q40 PS/2 keyboard controller driver");
 MODULE_LICENSE("GPL");
 
+
+static int q40kbd_open(struct serio *port)
+{
+	return 0;
+}
+static void q40kbd_close(struct serio *port)
+{
+	return 0;
+}
+
 static struct serio q40kbd_port =
 {
 	.type	= SERIO_8042,
+	.name	= "Q40 kbd port",
+	.phys	= "Q40",
 	.write	= NULL,
-	.name	= "Q40 PS/2 kbd port",
-	.phys	= "isa0060/serio0",
+	.open	= q40kbd_open,
+	.close	= q40kbd_close,
 };
 
 static void q40kbd_interrupt(int irq, void *dev_id, struct pt_regs *regs)
@@ -70,13 +82,10 @@ void __init q40kbd_init(void)
 {
 	int maxread = 100;
 
-	/* Get the keyboard controller registers (incomplete decode) */
-	request_region(0x60, 16, "q40kbd");
-
 	/* allocate the IRQ */
 	request_irq(Q40_IRQ_KEYBOARD, q40kbd_interrupt, 0, "q40kbd", NULL);
 
-	/* flush any pending input. */
+	/* flush any pending input */
 	while (maxread-- && (IRQ_KEYB_MASK & master_inb(INTERRUPT_REG)))
 		master_inb(KEYCODE_REG);
 	
@@ -84,15 +93,17 @@ void __init q40kbd_init(void)
 	master_outb(-1,KEYBOARD_UNLOCK_REG);
 	master_outb(1,KEY_IRQ_ENABLE_REG);
 
-	register_serio_port(&q40kbd_port);
-	printk(KERN_INFO "serio: Q40 PS/2 kbd port irq %d\n", Q40_IRQ_KEYBOARD);
+	serio_register_port(&q40kbd_port);
+	printk(KERN_INFO "serio: Q40 kbd registered\n");
 }
 
 void __exit q40kbd_exit(void)
 {
-	unregister_serio_port(&q40kbd_port);
+	master_outb(0,KEY_IRQ_ENABLE_REG);
+	master_outb(-1,KEYBOARD_UNLOCK_REG);
+
+	serio_unregister_port(&q40kbd_port);
 	free_irq(Q40_IRQ_KEYBOARD, NULL);
-	release_region(0x60, 16);	
 }
 
 module_init(q40kbd_init);
