@@ -83,7 +83,7 @@ int try_atm_clip_ops(void)
 
 #ifdef CONFIG_ATM_CLIP_MODULE
 EXPORT_SYMBOL(atm_clip_ops);
-EXPORT_SYMBOL(atm_clip_ops_mutex);
+EXPORT_SYMBOL(try_atm_clip_ops);
 EXPORT_SYMBOL(atm_clip_ops_set);
 #endif
 #endif

@@ -674,7 +674,7 @@ cleanup:
 	return -ENOMEM;
 }
 
-void __exit atm_proc_exit(void)
+void atm_proc_exit(void)
 {
 	atm_proc_cleanup();
 }
