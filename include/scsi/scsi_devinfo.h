@@ -19,4 +19,5 @@
 #define BLIST_MS_SKIP_PAGE_08	0x2000	/* do not send ms page 0x08 */
 #define BLIST_MS_SKIP_PAGE_3F	0x4000	/* do not send ms page 0x3f */
 #define BLIST_USE_10_BYTE_MS	0x8000	/* use 10 byte ms before 6 byte ms */
+#define BLIST_MS_192_BYTES_FOR_3F	0x10000	/*  192 byte ms page 0x3f request */
 #endif

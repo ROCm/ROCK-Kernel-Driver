@@ -1122,26 +1122,32 @@ sd_read_write_protect_flag(struct scsi_disk *sdkp, char *diskname,
 		return;
 	}
 
-	/*
-	 * First attempt: ask for all pages (0x3F), but only 4 bytes.
-	 * We have to start carefully: some devices hang if we ask
-	 * for more than is available.
-	 */
-	res = sd_do_mode_sense(SRpnt, 0, 0x3F, buffer, 4, &data);
+	if (sdkp->device->use_192_bytes_for_3f) {
+		res = sd_do_mode_sense(SRpnt, 0, 0x3F, buffer, 192, &data);
+	} else {
+		/*
+		 * First attempt: ask for all pages (0x3F), but only 4 bytes.
+		 * We have to start carefully: some devices hang if we ask
+		 * for more than is available.
+		 */
+		res = sd_do_mode_sense(SRpnt, 0, 0x3F, buffer, 4, &data);
 
-	/*
-	 * Second attempt: ask for page 0
-	 * When only page 0 is implemented, a request for page 3F may return
-	 * Sense Key 5: Illegal Request, Sense Code 24: Invalid field in CDB.
-	 */
-	if (!scsi_status_is_good(res))
-		res = sd_do_mode_sense(SRpnt, 0, 0, buffer, 4, &data);
+		/*
+		 * Second attempt: ask for page 0 When only page 0 is
+		 * implemented, a request for page 3F may return Sense Key
+		 * 5: Illegal Request, Sense Code 24: Invalid field in
+		 * CDB.
+		 */
+		if (!scsi_status_is_good(res))
+			res = sd_do_mode_sense(SRpnt, 0, 0, buffer, 4, &data);
 
-	/*
-	 * Third attempt: ask 255 bytes, as we did earlier.
-	 */
-	if (!scsi_status_is_good(res))
-		res = sd_do_mode_sense(SRpnt, 0, 0x3F, buffer, 255, &data);
+		/*
+		 * Third attempt: ask 255 bytes, as we did earlier.
+		 */
+		if (!scsi_status_is_good(res))
+			res = sd_do_mode_sense(SRpnt, 0, 0x3F, buffer, 255,
+					       &data);
+	}
 
 	if (!scsi_status_is_good(res)) {
 		printk(KERN_WARNING
