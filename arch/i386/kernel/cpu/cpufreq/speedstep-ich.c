@@ -549,8 +549,10 @@ static int speedstep_detect_speeds (void)
 	for (i=0; i<2; i++) {
 		/* read the current state */
 		result = speedstep_get_state(&state);
-		if (result)
+		if (result) {
+			local_irq_restore(flags);
 			return result;
+		}
 
 		/* save the correct value, and switch to other */
 		if (state == SPEEDSTEP_LOW) {
