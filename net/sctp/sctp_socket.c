@@ -85,8 +85,6 @@ static void sctp_wfree(struct sk_buff *skb);
 static int sctp_wait_for_sndbuf(sctp_association_t *asoc, long *timeo_p,
 				int msg_len);
 static int sctp_wait_for_packet(struct sock * sk, int *err, long *timeo_p);
-struct sk_buff * sctp_skb_recv_datagram(struct sock *sk, int flags,
-					int noblock, int *err);
 static inline void sctp_sk_memcpy_msgname(struct sock *sk, char * msgname,
 					  int *addr_len, struct sk_buff *skb);
 static inline void sctp_sk_addr_set(struct sock *,
@@ -1101,6 +1099,8 @@ do_interrupted:
  *  flags   - flags sent or received with the user message, see Section
  *            5 for complete description of the flags.
  */
+static struct sk_buff * sctp_skb_recv_datagram(struct sock *, int, int, int *);
+
 static int sctp_recvmsg(struct sock *sk, struct msghdr *msg, int len,
 			int noblock, int flags, int *addr_len)
 {
