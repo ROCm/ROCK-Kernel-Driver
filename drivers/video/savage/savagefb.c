@@ -719,7 +719,8 @@ static int savagefb_check_var (struct fb_var_screeninfo   *var,
 		return -EINVAL;
 	}
 
-	if (!fb_validate_mode(var, info))
+	if (!info->monspecs.hfmax || !info->monspecs.vfmax ||
+	    !info->monspecs.dclkmax || !fb_validate_mode(var, info))
 		mode_valid = 1;
 
 	/* calculate modeline if supported by monitor */
@@ -1797,23 +1798,23 @@ static int __devinit savage_init_fb_info (struct fb_info *info,
 	switch (info->fix.accel) {
 	case FB_ACCEL_SUPERSAVAGE:
 		par->chip = S3_SUPERSAVAGE;
-		snprintf (info->fix.id, 16, "S3 SuperSavage");
+		snprintf (info->fix.id, 16, "SuperSavage");
 		break;
 	case FB_ACCEL_SAVAGE4:
 		par->chip = S3_SAVAGE4;
-		snprintf (info->fix.id, 16, "S3 Savage4");
+		snprintf (info->fix.id, 16, "Savage4");
 		break;
 	case FB_ACCEL_SAVAGE3D:
 		par->chip = S3_SAVAGE3D;
-		snprintf (info->fix.id, 16, "S3 Savage3D");
+		snprintf (info->fix.id, 16, "Savage3D");
 		break;
 	case FB_ACCEL_SAVAGE3D_MV:
 		par->chip = S3_SAVAGE3D;
-		snprintf (info->fix.id, 16, "S3 Savage3D-MV");
+		snprintf (info->fix.id, 16, "Savage3D-MV");
 		break;
 	case FB_ACCEL_SAVAGE2000:
 		par->chip = S3_SAVAGE2000;
-		snprintf (info->fix.id, 16, "S3 Savage2000");
+		snprintf (info->fix.id, 16, "Savage2000");
 		break;
 	case FB_ACCEL_SAVAGE_MX_MV:
 		par->chip = S3_SAVAGE_MX;
@@ -1878,7 +1879,8 @@ static int __devinit savage_init_fb_info (struct fb_info *info,
 	info->fbops          = &savagefb_ops;
 	info->flags          = FBINFO_DEFAULT |
 		               FBINFO_HWACCEL_YPAN |
-		               FBINFO_HWACCEL_XPAN;
+		               FBINFO_HWACCEL_XPAN |
+	                       FBINFO_MISC_MODESWITCHLATE;
 
 	info->pseudo_palette = par->pseudo_palette;
 
