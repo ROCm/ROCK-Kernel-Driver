@@ -556,16 +556,16 @@ static void uart00_console_write(struct console *co, const char *s, unsigned cou
 	 *	Now, do each character
 	 */
 	for (i = 0; i < count; i++) {
-		do {
-			status = UART_GET_TSR(port);
-		} while (!UART_TX_READY(status));
-		UART_PUT_CHAR(port, s[i]);
 		if (s[i] == '\n') {
 			do {
 				status = UART_GET_TSR(port);
 			} while (!UART_TX_READY(status));
 			UART_PUT_CHAR(port, '\r');
 		}
+		do {
+			status = UART_GET_TSR(port);
+		} while (!UART_TX_READY(status));
+		UART_PUT_CHAR(port, s[i]);
 	}
 
 	/*

@@ -2724,12 +2724,6 @@ static void serial_console_write(struct console *co, const char *s,
 	write_zsreg(info->zs_channel, R5, info->curregs[5] | TxENAB | RTS | DTR);
 
 	for (i=0; i<count; i++) {
-		/* Wait for the transmit buffer to empty. */
-		while ((read_zsreg(info->zs_channel, 0) & Tx_BUF_EMP) == 0) {
-			eieio();
-		}
-
-		write_zsdata(info->zs_channel, s[i]);
 		if (s[i] == 10) {
 			while ((read_zsreg(info->zs_channel, 0) & Tx_BUF_EMP)
                                 == 0)
@@ -2737,6 +2731,12 @@ static void serial_console_write(struct console *co, const char *s,
 
 			write_zsdata(info->zs_channel, 13);
 		}
+		/* Wait for the transmit buffer to empty. */
+		while ((read_zsreg(info->zs_channel, 0) & Tx_BUF_EMP) == 0) {
+			eieio();
+		}
+
+		write_zsdata(info->zs_channel, s[i]);
 	}
 
 	/* Restore the values in the registers. */

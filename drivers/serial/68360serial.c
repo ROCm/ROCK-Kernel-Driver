@@ -2188,6 +2188,22 @@ static void my_console_write(int idx, const char *s,
 	 * buffer, but we would just wait longer between accesses......
 	 */
 	for (i = 0; i < count; i++, s++) {
+		/* if a LF, also do CR... */
+		if (*s == 10) {
+			while (bdp->status & BD_SC_READY);
+			/* cp = __va(bdp->buf); */
+			cp = bdp->buf;
+			*cp = 13;
+			bdp->length = 1;
+			bdp->status |= BD_SC_READY;
+
+			if (bdp->status & BD_SC_WRAP) {
+				bdp = bdbase;
+			}
+			else {
+				bdp++;
+			}
+		}
 		/* Wait for transmitter fifo to empty.
 		 * Ready indicates output is ready, and xmt is doing
 		 * that, not that it is ready for us to send.
@@ -2207,22 +2223,6 @@ static void my_console_write(int idx, const char *s,
 		else
 			bdp++;
 
-		/* if a LF, also do CR... */
-		if (*s == 10) {
-			while (bdp->status & BD_SC_READY);
-			/* cp = __va(bdp->buf); */
-			cp = bdp->buf;
-			*cp = 13;
-			bdp->length = 1;
-			bdp->status |= BD_SC_READY;
-
-			if (bdp->status & BD_SC_WRAP) {
-				bdp = bdbase;
-			}
-			else {
-				bdp++;
-			}
-		}
 	}
 
 	/*

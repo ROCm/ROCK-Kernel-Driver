@@ -1953,17 +1953,16 @@ serial8250_console_write(struct console *co, const char *s, unsigned int count)
 	 *	Now, do each character
 	 */
 	for (i = 0; i < count; i++, s++) {
-		wait_for_xmitr(up);
-
 		/*
 		 *	Send the character out.
 		 *	If a LF, also do CR...
 		 */
-		serial_out(up, UART_TX, *s);
 		if (*s == 10) {
 			wait_for_xmitr(up);
 			serial_out(up, UART_TX, 13);
 		}
+		wait_for_xmitr(up);
+		serial_out(up, UART_TX, *s);
 	}
 
 	/*

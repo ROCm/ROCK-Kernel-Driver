@@ -989,13 +989,16 @@ static void early_printk_uart(const char *str, size_t len)
 
 	while (len-- > 0) {
 		c = *str++;
+		if (c == '\n') {
+			while ((readb(uart + UART_LSR) & UART_LSR_TEMT) == 0)
+				cpu_relax(); /* spin */
+			writeb('\r', uart + UART_TX);
+		}
+
 		while ((readb(uart + UART_LSR) & UART_LSR_TEMT) == 0)
 			cpu_relax(); /* spin */
 
 		writeb(c, uart + UART_TX);
-
-		if (c == '\n')
-			writeb('\r', uart + UART_TX);
 	}
 }
 

@@ -1347,9 +1347,9 @@ sunzilog_console_write(struct console *con, const char *s, unsigned int count)
 
 	spin_lock_irqsave(&up->port.lock, flags);
 	for (i = 0; i < count; i++, s++) {
-		sunzilog_put_char(channel, *s);
 		if (*s == 10)
 			sunzilog_put_char(channel, 13);
+		sunzilog_put_char(channel, *s);
 	}
 	udelay(2);
 	spin_unlock_irqrestore(&up->port.lock, flags);
