@@ -475,17 +475,19 @@ static int mmap_zero(struct file * file, struct vm_area_struct * vma)
 static ssize_t read_zero(struct file * file, char * buf, 
 			 size_t count, loff_t *ppos)
 {
-	unsigned long left;
+	size_t todo = count;
 
-	if (!count)
-		return 0;
+	while (todo) {
+		size_t chunk = todo;
 
-	for (left = count; left > 0; left--, buf++) {
-		if (put_user(0, buf))
+		if (chunk > 4096)
+			chunk = 4096;	/* Just for latency reasons */
+		if (clear_user(buf, chunk))
 			return -EFAULT;
+		buf += chunk;
+		todo -= chunk;
 		cond_resched();
 	}
-
 	return count;
 }
 
