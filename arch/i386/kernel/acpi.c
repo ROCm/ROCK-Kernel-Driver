@@ -303,8 +303,7 @@ acpi_find_rsdp (void)
 
 
 int __init
-acpi_boot_init (
-	char			*cmdline)
+acpi_boot_init (void)
 {
 	int			result = 0;
 
@@ -317,7 +316,7 @@ acpi_boot_init (
 	/* 
 	 * Initialize the ACPI boot-time table parser.
 	 */
-	result = acpi_table_init(cmdline);
+	result = acpi_table_init();
 	if (result)
 		return result;
 
