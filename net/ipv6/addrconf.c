@@ -702,7 +702,7 @@ retry:
 	ift = ipv6_count_addresses(idev) < IPV6_MAX_ADDRESSES ?
 		ipv6_add_addr(idev, &addr, tmp_plen,
 			      ipv6_addr_type(&addr)&IPV6_ADDR_SCOPE_MASK, IFA_F_TEMPORARY) : 0;
-	if (IS_ERR(ift)) {
+	if (!ift || IS_ERR(ift)) {
 		in6_dev_put(idev);
 		in6_ifa_put(ifp);
 		printk(KERN_INFO
@@ -1410,7 +1410,7 @@ ok:
 				ifp = ipv6_add_addr(in6_dev, &addr, pinfo->prefix_len,
 						    addr_type&IPV6_ADDR_SCOPE_MASK, 0);
 
-			if (IS_ERR(ifp)) {
+			if (!ifp || IS_ERR(ifp)) {
 				in6_dev_put(in6_dev);
 				return;
 			}
