@@ -804,11 +804,11 @@ isdn_ppp_write(struct file *file, const char *buf, size_t count, loff_t *off)
 		if (proto != PPP_LCP)
 			lp->huptimer = 0;
 
-		if (lp->isdn_device < 0 || lp->isdn_channel < 0) {
+		if (lp->isdn_slot < 0) {
 			retval = 0;
 			goto out;
 		}
-		if ((dev->drv[lp->isdn_device]->flags & DRV_FLAG_RUNNING) &&
+		if ((dev->drv[isdn_slot_driver(lp->isdn_slot)]->flags & DRV_FLAG_RUNNING) &&
 			lp->dialstate == 0 &&
 		    (lp->flags & ISDN_NET_CONNECTED)) {
 			unsigned short hl;
@@ -818,7 +818,7 @@ isdn_ppp_write(struct file *file, const char *buf, size_t count, loff_t *off)
 			 * sk_buff. old call to dev_alloc_skb only reserved
 			 * 16 bytes, now we are looking what the driver want
 			 */
-			hl = dev->drv[lp->isdn_device]->interface->hl_hdrlen;
+			hl = isdn_slot_hdrlen(lp->isdn_slot);
 			skb = alloc_skb(hl+count, GFP_ATOMIC);
 			if (!skb) {
 				printk(KERN_WARNING "isdn_ppp_write: out of memory!\n");
@@ -1263,7 +1263,7 @@ isdn_ppp_xmit(struct sk_buff *skb, struct net_device *netdev)
 		 * sk_buff. old call to dev_alloc_skb only reserved
 		 * 16 bytes, now we are looking what the driver want.
 		 */
-		hl = dev->drv[lp->isdn_device]->interface->hl_hdrlen + IPPP_MAX_HEADER;
+		hl = isdn_slot_hdrlen(lp->isdn_slot) + IPPP_MAX_HEADER;;
 		/* 
 		 * Note: hl might still be insufficient because the method
 		 * above does not account for a possibible MPPP slave channel
@@ -2094,7 +2094,7 @@ static void isdn_ppp_ccp_xmit_reset(struct ippp_struct *is, int proto,
 	isdn_net_local *lp = is->lp;
 
 	/* Alloc large enough skb */
-	hl = dev->drv[lp->isdn_device]->interface->hl_hdrlen;
+	hl = isdn_slot_hdrlen(lp->isdn_slot);
 	skb = alloc_skb(len + hl + 16,GFP_ATOMIC);
 	if(!skb) {
 		printk(KERN_WARNING

@@ -44,6 +44,9 @@ MODULE_LICENSE("GPL");
 
 isdn_dev *dev;
 
+static int drvmap[ISDN_MAX_CHANNELS];  /* Map slot -> driver-index    */
+static int chanmap[ISDN_MAX_CHANNELS]; /* Map slot -> channel-index   */
+
 static char *isdn_revision = "$Revision: 1.114.6.16 $";
 
 extern char *isdn_net_revision;
@@ -230,7 +233,7 @@ isdn_dc2minor(int di, int ch)
 {
 	int i;
 	for (i = 0; i < ISDN_MAX_CHANNELS; i++)
-		if (dev->chanmap[i] == ch && dev->drvmap[i] == di)
+		if (chanmap[i] == ch && drvmap[i] == di)
 			return i;
 	return -1;
 }
@@ -458,8 +461,8 @@ isdn_status_callback(isdn_ctrl * c)
 		case ISDN_STAT_RUN:
 			dev->drv[di]->flags |= DRV_FLAG_RUNNING;
 			for (i = 0; i < ISDN_MAX_CHANNELS; i++)
-				if (dev->drvmap[i] == di)
-					isdn_all_eaz(di, dev->chanmap[i]);
+				if (drvmap[i] == di)
+					isdn_all_eaz(di, chanmap[i]);
 			set_global_features();
 			break;
 		case ISDN_STAT_STOP:
@@ -506,14 +509,10 @@ isdn_status_callback(isdn_ctrl * c)
 				case 1:
 					/* Schedule connection-setup */
 					isdn_net_dial();
-					cmd.driver = di;
-					cmd.arg = c->arg;
-					cmd.command = ISDN_CMD_ACCEPTD;
 					for ( p = dev->netdev; p; p = p->next )
-						if ( p->local->isdn_channel == cmd.arg )
-						{
+						if (p->local->isdn_slot == isdn_dc2minor(di, cmd.arg)) {
 							strcpy( cmd.parm.setup.eazmsn, p->local->msn );
-							isdn_command(&cmd);
+							isdn_slot_command(p->local->isdn_slot, ISDN_CMD_ACCEPTD, &cmd);
 							retval = 1;
 							break;
 						}
@@ -679,8 +678,8 @@ isdn_status_callback(isdn_ctrl * c)
 			save_flags(flags);
 			cli();
 			for (i = 0; i < ISDN_MAX_CHANNELS; i++)
-				if ((dev->drvmap[i] == di) &&
-				    (dev->chanmap[i] == c->arg)) {
+				if ((drvmap[i] == di) &&
+				    (chanmap[i] == c->arg)) {
 				    if (c->parm.num[0])
 				      dev->usage[i] &= ~ISDN_USAGE_DISABLED;
 				    else
@@ -707,9 +706,9 @@ isdn_status_callback(isdn_ctrl * c)
 			cli();
 			isdn_tty_stat_callback(i, c);
 			for (i = 0; i < ISDN_MAX_CHANNELS; i++)
-				if (dev->drvmap[i] == di) {
-					dev->drvmap[i] = -1;
-					dev->chanmap[i] = -1;
+				if (drvmap[i] == di) {
+					drvmap[i] = -1;
+					chanmap[i] = -1;
 					dev->usage[i] &= ~ISDN_USAGE_DISABLED;
 					isdn_unregister_devfs(i);
 				}
@@ -884,13 +883,13 @@ isdn_readbchan(int di, int channel, u_char * buf, u_char * fp, int len, wait_que
 static __inline int
 isdn_minor2drv(int minor)
 {
-	return (dev->drvmap[minor]);
+	return drvmap[minor];
 }
 
 static __inline int
 isdn_minor2chan(int minor)
 {
-	return (dev->chanmap[minor]);
+	return chanmap[minor];
 }
 
 static char *
@@ -903,19 +902,19 @@ isdn_statstr(void)
 	sprintf(istatbuf, "idmap:\t");
 	p = istatbuf + strlen(istatbuf);
 	for (i = 0; i < ISDN_MAX_CHANNELS; i++) {
-		sprintf(p, "%s ", (dev->drvmap[i] < 0) ? "-" : dev->drvid[dev->drvmap[i]]);
+		sprintf(p, "%s ", (drvmap[i] < 0) ? "-" : dev->drvid[drvmap[i]]);
 		p = istatbuf + strlen(istatbuf);
 	}
 	sprintf(p, "\nchmap:\t");
 	p = istatbuf + strlen(istatbuf);
 	for (i = 0; i < ISDN_MAX_CHANNELS; i++) {
-		sprintf(p, "%d ", dev->chanmap[i]);
+		sprintf(p, "%d ", chanmap[i]);
 		p = istatbuf + strlen(istatbuf);
 	}
 	sprintf(p, "\ndrmap:\t");
 	p = istatbuf + strlen(istatbuf);
 	for (i = 0; i < ISDN_MAX_CHANNELS; i++) {
-		sprintf(p, "%d ", dev->drvmap[i]);
+		sprintf(p, "%d ", drvmap[i]);
 		p = istatbuf + strlen(istatbuf);
 	}
 	sprintf(p, "\nusage:\t");
@@ -1761,10 +1760,10 @@ isdn_get_free_channel(int usage, int l2_proto, int l3_proto, int pre_dev
 	 */
 	for (i = 0; i < ISDN_MAX_CHANNELS; i++)
 		if (USG_NONE(dev->usage[i]) &&
-		    (dev->drvmap[i] != -1)) {
-			int d = dev->drvmap[i];
+		    (drvmap[i] != -1)) {
+			int d = drvmap[i];
 			if ((dev->usage[i] & ISDN_USAGE_EXCLUSIVE) &&
-			((pre_dev != d) || (pre_chan != dev->chanmap[i])))
+			((pre_dev != d) || (pre_chan != chanmap[i])))
 				continue;
 			if (!strcmp(isdn_map_eaz2msn(msn, d), "-"))
 				continue;
@@ -1781,7 +1780,7 @@ isdn_get_free_channel(int usage, int l2_proto, int l3_proto, int pre_dev
 						restore_flags(flags);
 						return i;
 					} else {
-						if ((pre_dev == d) && (pre_chan == dev->chanmap[i])) {
+						if ((pre_dev == d) && (pre_chan == chanmap[i])) {
 							dev->usage[i] &= ISDN_USAGE_EXCLUSIVE;
 							dev->usage[i] |= usage;
 							isdn_info_update();
@@ -1802,28 +1801,33 @@ isdn_get_free_channel(int usage, int l2_proto, int l3_proto, int pre_dev
 void
 isdn_free_channel(int di, int ch, int usage)
 {
-	int i;
-	ulong flags;
+	int slot;
+
+	slot = isdn_dc2minor(di, ch);
+	isdn_slot_free(slot, usage);
+}
+
+void
+isdn_slot_free(int slot, int usage)
+{
+	unsigned long flags;
 
 	save_flags(flags);
 	cli();
-	for (i = 0; i < ISDN_MAX_CHANNELS; i++)
-		if (((!usage) || ((dev->usage[i] & ISDN_USAGE_MASK) == usage)) &&
-		    (dev->drvmap[i] == di) &&
-		    (dev->chanmap[i] == ch)) {
-			dev->usage[i] &= (ISDN_USAGE_NONE | ISDN_USAGE_EXCLUSIVE);
-			strcpy(dev->num[i], "???");
-			dev->ibytes[i] = 0;
-			dev->obytes[i] = 0;
+	if (!usage || (dev->usage[slot] & ISDN_USAGE_MASK) == usage) {
+		dev->usage[slot] &= (ISDN_USAGE_NONE | ISDN_USAGE_EXCLUSIVE);
+		strcpy(dev->num[slot], "???");
+		dev->ibytes[slot] = 0;
+		dev->obytes[slot] = 0;
 // 20.10.99 JIM, try to reinitialize v110 !
-			dev->v110emu[i] = 0;
-			atomic_set(&(dev->v110use[i]), 0);
-			isdn_v110_close(dev->v110[i]);
-			dev->v110[i] = NULL;
+		dev->v110emu[slot] = 0;
+		atomic_set(&(dev->v110use[slot]), 0);
+		isdn_v110_close(dev->v110[slot]);
+		dev->v110[slot] = NULL;
 // 20.10.99 JIM, try to reinitialize v110 !
-			isdn_info_update();
-			skb_queue_purge(&dev->drv[di]->rpqueue[ch]);
-		}
+		isdn_info_update();
+		skb_queue_purge(&dev->drv[isdn_slot_driver(slot)]->rpqueue[isdn_slot_channel(slot)]);
+	}
 	restore_flags(flags);
 }
 
@@ -1839,8 +1843,8 @@ isdn_unexclusive_channel(int di, int ch)
 	save_flags(flags);
 	cli();
 	for (i = 0; i < ISDN_MAX_CHANNELS; i++)
-		if ((dev->drvmap[i] == di) &&
-		    (dev->chanmap[i] == ch)) {
+		if ((drvmap[i] == di) &&
+		    (chanmap[i] == ch)) {
 			dev->usage[i] &= ~ISDN_USAGE_EXCLUSIVE;
 			isdn_info_update();
 			restore_flags(flags);
@@ -1997,9 +2001,9 @@ isdn_add_channels(driver *d, int drvidx, int n, int adding)
 	cli();
 	for (j = d->channels; j < m; j++)
 		for (k = 0; k < ISDN_MAX_CHANNELS; k++)
-			if (dev->chanmap[k] < 0) {
-				dev->chanmap[k] = j;
-				dev->drvmap[k] = drvidx;
+			if (chanmap[k] < 0) {
+				chanmap[k] = j;
+				drvmap[k] = drvidx;
 				isdn_register_devfs(k);
 				break;
 			}
@@ -2140,6 +2144,75 @@ register_isdn(isdn_if * i)
 	return 1;
 }
 
+int
+isdn_slot_driver(int slot)
+{
+	BUG_ON(slot < 0);
+
+	return drvmap[slot];
+}
+
+int
+isdn_slot_channel(int slot)
+{
+	BUG_ON(slot < 0);
+
+	return chanmap[slot];
+}
+
+int
+isdn_slot_hdrlen(int slot)
+{
+	int di = isdn_slot_driver(slot);
+	
+	return dev->drv[di]->interface->hl_hdrlen;
+}
+
+char *
+isdn_slot_map_eaz2msn(int slot, char *msn)
+{
+	int di = isdn_slot_driver(slot);
+
+	return isdn_map_eaz2msn(msn, di);
+}
+
+int
+isdn_slot_command(int slot, int cmd, isdn_ctrl *ctrl)
+{
+	ctrl->command = cmd;
+	ctrl->driver = isdn_slot_driver(slot);
+	ctrl->arg &= 0xff; ctrl->arg |= isdn_slot_channel(slot);
+	
+	return isdn_command(ctrl);
+}
+
+void
+isdn_slot_all_eaz(int slot)
+{
+	isdn_ctrl cmd;
+
+	cmd.parm.num[0] = '\0';
+	isdn_slot_command(slot, ISDN_CMD_SETEAZ, &cmd);
+}
+
+int
+isdn_slot_readbchan(int slot, u_char *buf, u_char *fp, int len, wait_queue_head_t *sleep)
+{
+	int di = isdn_slot_driver(slot);
+	int ch = isdn_slot_channel(slot);
+
+	return isdn_readbchan(di, ch, buf, fp, len, sleep);
+}
+
+int
+isdn_slot_writebuf_skb_stub(int slot, int ack, struct sk_buff *skb)
+{
+	int di = isdn_slot_driver(slot);
+	int ch = isdn_slot_channel(slot);
+
+	return isdn_writebuf_skb_stub(di, ch, ack, skb);
+}
+
 /*
  *****************************************************************************
  * And now the modules code.
@@ -2261,8 +2334,8 @@ static int __init isdn_init(void)
 	init_MUTEX(&dev->sem);
 	init_waitqueue_head(&dev->info_waitq);
 	for (i = 0; i < ISDN_MAX_CHANNELS; i++) {
-		dev->drvmap[i] = -1;
-		dev->chanmap[i] = -1;
+		drvmap[i] = -1;
+		chanmap[i] = -1;
 		dev->m_idx[i] = -1;
 		strcpy(dev->num[i], "???");
 		init_waitqueue_head(&dev->mdm.info[i].open_wait);

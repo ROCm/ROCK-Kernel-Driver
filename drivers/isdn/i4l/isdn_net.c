@@ -280,8 +280,7 @@ isdn_net_bind_channel(isdn_net_local * lp, int idx)
 	save_flags(flags);
 	cli();
 	lp->flags |= ISDN_NET_CONNECTED;
-	lp->isdn_device = dev->drvmap[idx];
-	lp->isdn_channel = dev->chanmap[idx];
+	lp->isdn_slot = idx;
 	dev->rx_netdev[idx] = lp->netdev;
 	dev->st_netdev[idx] = lp->netdev;
 	restore_flags(flags);
@@ -307,12 +306,11 @@ isdn_net_unbind_channel(isdn_net_local * lp)
 		qdisc_reset(lp->netdev->dev.qdisc);
 	}
 	lp->dialstate = 0;
-	dev->rx_netdev[isdn_dc2minor(lp->isdn_device, lp->isdn_channel)] = NULL;
-	dev->st_netdev[isdn_dc2minor(lp->isdn_device, lp->isdn_channel)] = NULL;
-	isdn_free_channel(lp->isdn_device, lp->isdn_channel, ISDN_USAGE_NET);
+	dev->rx_netdev[lp->isdn_slot] = NULL;
+	dev->st_netdev[lp->isdn_slot] = NULL;
+	isdn_slot_free(lp->isdn_slot, ISDN_USAGE_NET);
 	lp->flags &= ~ISDN_NET_CONNECTED;
-	lp->isdn_device = -1;
-	lp->isdn_channel = -1;
+	lp->isdn_slot = -1;
 
 	restore_flags(flags);
 }
@@ -459,7 +457,7 @@ isdn_net_stat_callback(int idx, isdn_ctrl *c)
 						isdn_ppp_free(lp);
 #endif
 					isdn_net_lp_disconnected(lp);
-					isdn_all_eaz(lp->isdn_device, lp->isdn_channel);
+					isdn_slot_all_eaz(lp->isdn_slot);
 					printk(KERN_INFO "%s: remote hangup\n", lp->name);
 					printk(KERN_INFO "%s: Chargesum is %d\n", lp->name,
 					       lp->charge);
@@ -574,7 +572,6 @@ isdn_net_dial(void)
 {
 	isdn_net_dev *p = dev->netdev;
 	int anymore = 0;
-	int i;
 	unsigned long flags;
 	isdn_ctrl cmd;
         u_char *phone_number;
@@ -616,13 +613,9 @@ isdn_net_dial(void)
 				/* Fall through */
 			case 2:
 				/* Prepare dialing. Clear EAZ, then set EAZ. */
-				cmd.driver = lp->isdn_device;
-				cmd.arg = lp->isdn_channel;
-				cmd.command = ISDN_CMD_CLREAZ;
-				isdn_command(&cmd);
+				isdn_slot_command(lp->isdn_slot, ISDN_CMD_CLREAZ, &cmd);
 				sprintf(cmd.parm.num, "%s", isdn_map_eaz2msn(lp->msn, cmd.driver));
-				cmd.command = ISDN_CMD_SETEAZ;
-				isdn_command(&cmd);
+				isdn_slot_command(lp->isdn_slot, ISDN_CMD_SETEAZ, &cmd);
 				lp->dialretry = 0;
 				anymore = 1;
 				lp->dialstate++;
@@ -642,16 +635,10 @@ isdn_net_dial(void)
 					isdn_net_hangup(&p->dev);
 					break;
 				}
-				cmd.driver = lp->isdn_device;
-				cmd.command = ISDN_CMD_SETL2;
-				cmd.arg = lp->isdn_channel + (lp->l2_proto << 8);
-				isdn_command(&cmd);
-				cmd.driver = lp->isdn_device;
-				cmd.command = ISDN_CMD_SETL3;
-				cmd.arg = lp->isdn_channel + (lp->l3_proto << 8);
-				isdn_command(&cmd);
-				cmd.driver = lp->isdn_device;
-				cmd.arg = lp->isdn_channel;
+				cmd.arg = lp->l2_proto << 8;
+				isdn_slot_command(lp->isdn_slot, ISDN_CMD_SETL2, &cmd);
+				cmd.arg = lp->l3_proto << 8;
+				isdn_slot_command(lp->isdn_slot, ISDN_CMD_SETL3, &cmd);
 				save_flags(flags);
 				cli();
 				if (!lp->dial) {
@@ -676,8 +663,6 @@ isdn_net_dial(void)
 							break;
 						}
 
-					cmd.driver = lp->isdn_device;
-					cmd.command = ISDN_CMD_DIAL;
 					cmd.parm.setup.si2 = 0;
 
                                         /* check for DOV */
@@ -710,11 +695,10 @@ isdn_net_dial(void)
 					}
 					restore_flags(flags);
 					sprintf(cmd.parm.setup.eazmsn, "%s",
-						isdn_map_eaz2msn(lp->msn, cmd.driver));
-					i = isdn_dc2minor(lp->isdn_device, lp->isdn_channel);
-					if (i >= 0) {
-						strcpy(dev->num[i], cmd.parm.setup.phone);
-						dev->usage[i] |= ISDN_USAGE_OUTGOING;
+						isdn_slot_map_eaz2msn(lp->isdn_slot, lp->msn));
+					if (lp->isdn_slot >= 0) {
+						strcpy(dev->num[lp->isdn_slot], cmd.parm.setup.phone);
+						dev->usage[lp->isdn_slot] |= ISDN_USAGE_OUTGOING;
 						isdn_info_update();
 					}
 					printk(KERN_INFO "%s: dialing %d %s... %s\n", lp->name,
@@ -725,7 +709,7 @@ isdn_net_dial(void)
 					printk(KERN_DEBUG "dial: d=%d c=%d\n", lp->isdn_device,
 					       lp->isdn_channel);
 #endif
-					isdn_command(&cmd);
+					isdn_slot_command(lp->isdn_slot, ISDN_CMD_DIAL, &cmd);
 				}
 				lp->huptimer = 0;
 				lp->outgoing = 1;
@@ -752,13 +736,10 @@ isdn_net_dial(void)
 				break;
 			case 5:
 				/* Got D-Channel-Connect, send B-Channel-request */
-				cmd.driver = lp->isdn_device;
-				cmd.arg = lp->isdn_channel;
-				cmd.command = ISDN_CMD_ACCEPTB;
 				anymore = 1;
 				lp->dtimer = 0;
 				lp->dialstate++;
-				isdn_command(&cmd);
+				isdn_slot_command(lp->isdn_slot, ISDN_CMD_ACCEPTB, &cmd);
 				break;
 			case 6:
 				/* Wait for B- or D-Channel-connect. If timeout,
@@ -778,14 +759,10 @@ isdn_net_dial(void)
 #ifdef ISDN_DEBUG_NET_DIAL
 				printk(KERN_DEBUG "dialtimer4: %d\n", lp->dtimer);
 #endif
-				cmd.driver = lp->isdn_device;
-				cmd.command = ISDN_CMD_SETL2;
-				cmd.arg = lp->isdn_channel + (lp->l2_proto << 8);
-				isdn_command(&cmd);
-				cmd.driver = lp->isdn_device;
-				cmd.command = ISDN_CMD_SETL3;
-				cmd.arg = lp->isdn_channel + (lp->l3_proto << 8);
-				isdn_command(&cmd);
+				cmd.arg = lp->l2_proto << 8;
+				isdn_slot_command(lp->isdn_slot, ISDN_CMD_SETL2, &cmd);
+				cmd.arg = lp->l3_proto << 8;
+				isdn_slot_command(lp->isdn_slot, ISDN_CMD_SETL3, &cmd);
 				if (lp->dtimer++ > ISDN_TIMER_DTIMEOUT15)
 					isdn_net_hangup(&p->dev);
 				else {
@@ -795,10 +772,7 @@ isdn_net_dial(void)
 				break;
 			case 9:
 				/* Got incoming D-Channel-Connect, send B-Channel-request */
-				cmd.driver = lp->isdn_device;
-				cmd.arg = lp->isdn_channel;
-				cmd.command = ISDN_CMD_ACCEPTB;
-				isdn_command(&cmd);
+				isdn_slot_command(lp->isdn_slot, ISDN_CMD_ACCEPTB, &cmd);
 				anymore = 1;
 				lp->dtimer = 0;
 				lp->dialstate++;
@@ -829,11 +803,8 @@ isdn_net_dial(void)
 					printk(KERN_INFO "%s: hangup waiting for callback ...\n", lp->name);
 					lp->dtimer = 0;
 					lp->dialstate = 4;
-					cmd.driver = lp->isdn_device;
-					cmd.command = ISDN_CMD_HANGUP;
-					cmd.arg = lp->isdn_channel;
-					isdn_command(&cmd);
-					isdn_all_eaz(lp->isdn_device, lp->isdn_channel);
+					isdn_slot_command(lp->isdn_slot, ISDN_CMD_HANGUP, &cmd);
+					isdn_slot_all_eaz(lp->isdn_slot);
 				}
 				anymore = 1;
 				break;
@@ -883,12 +854,9 @@ isdn_net_hangup(struct net_device *d)
 		  pops -> disconn_ind(cprot);
 #endif /* CONFIG_ISDN_X25 */
 
-		cmd.driver = lp->isdn_device;
-		cmd.command = ISDN_CMD_HANGUP;
-		cmd.arg = lp->isdn_channel;
-		isdn_command(&cmd);
+		isdn_slot_command(lp->isdn_slot, ISDN_CMD_HANGUP, &cmd);
 		printk(KERN_INFO "%s: Chargesum is %d\n", lp->name, lp->charge);
-		isdn_all_eaz(lp->isdn_device, lp->isdn_channel);
+		isdn_slot_all_eaz(lp->isdn_slot);
 	}
 	isdn_net_unbind_channel(lp);
 }
@@ -1049,7 +1017,7 @@ void isdn_net_writebuf_skb(isdn_net_local *lp, struct sk_buff *skb)
 		printk("isdn BUG at %s:%d!\n", __FILE__, __LINE__);
 		goto error;
 	}
-	ret = isdn_writebuf_skb_stub(lp->isdn_device, lp->isdn_channel, 1, skb);
+	ret = isdn_slot_writebuf_skb_stub(lp->isdn_slot, 1, skb);
 	if (ret != len) {
 		/* we should never get here */
 		printk(KERN_WARNING "%s: HL driver queue full\n", lp->name);
@@ -1433,7 +1401,7 @@ isdn_net_type_trans(struct sk_buff *skb, struct net_device *dev)
 static struct sk_buff*
 isdn_net_ciscohdlck_alloc_skb(isdn_net_local *lp, int len)
 {
-	unsigned short hl = dev->drv[lp->isdn_device]->interface->hl_hdrlen;
+	unsigned short hl = isdn_slot_hdrlen(lp->isdn_slot);
 	struct sk_buff *skb;
 
 	skb = alloc_skb(hl + len, GFP_ATOMIC);
@@ -2161,6 +2129,7 @@ isdn_net_find_icall(int di, int ch, int idx, setup_parm *setup)
 	char nr[32];
 	char *my_eaz;
 
+	int slot = isdn_dc2minor(di, ch);
 	/* Search name in netdev-chain */
 	save_flags(flags);
 	cli();
@@ -2210,7 +2179,7 @@ p = dev->netdev;
 		}
 		swapped = 0;
                 /* check acceptable call types for DOV */
-                my_eaz = isdn_map_eaz2msn(lp->msn, di);
+                my_eaz = isdn_slot_map_eaz2msn(slot, lp->msn);
                 if (si1 == 1) { /* it's a DOV call, check if we allow it */
                         if (*my_eaz == 'v' || *my_eaz == 'V' ||
 			    *my_eaz == 'b' || *my_eaz == 'B')
@@ -2436,7 +2405,7 @@ p = dev->netdev;
 							isdn_ppp_free(lp);
 #endif
 						isdn_net_lp_disconnected(lp);
-						isdn_free_channel(lp->isdn_device, lp->isdn_channel,
+						isdn_slot_free(lp->isdn_slot,
 							 ISDN_USAGE_NET);
 					}
 					dev->usage[idx] &= ISDN_USAGE_EXCLUSIVE;
@@ -2444,8 +2413,7 @@ p = dev->netdev;
 					strcpy(dev->num[idx], nr);
 					isdn_info_update();
 					dev->st_netdev[idx] = lp->netdev;
-					lp->isdn_device = di;
-					lp->isdn_channel = ch;
+					lp->isdn_slot = slot;
 					lp->ppp_slot = -1;
 					lp->flags |= ISDN_NET_CONNECTED;
 					lp->dialstate = 7;
@@ -2471,7 +2439,7 @@ p = dev->netdev;
 	}
 	/* If none of configured EAZ/MSN matched and not verbose, be silent */
 	if (!ematch || dev->net_verbose)
-		printk(KERN_INFO "isdn_net: call from %s -> %d %s ignored\n", nr, di, eaz);
+		printk(KERN_INFO "isdn_net: call from %s -> %d %s ignored\n", nr, slot, eaz);
 	restore_flags(flags);
 	return (wret == 2)?5:0;
 }
@@ -2642,8 +2610,7 @@ isdn_net_new(char *name, struct net_device *master)
 	netdev->local->tqueue.data = netdev->local;
 	spin_lock_init(&netdev->local->xmit_lock);
 
-	netdev->local->isdn_device = -1;
-	netdev->local->isdn_channel = -1;
+	netdev->local->isdn_slot = -1;
 	netdev->local->pre_device = -1;
 	netdev->local->pre_channel = -1;
 	netdev->local->exclusive = -1;
@@ -3051,7 +3018,7 @@ int
 isdn_net_getpeer(isdn_net_ioctl_phone *phone, isdn_net_ioctl_phone *peer)
 {
 	isdn_net_dev *p = isdn_net_findif(phone->name);
-	int ch, dv, idx;
+	int idx;
 
 	if (!p) return -ENODEV;
 	/*
@@ -3060,11 +3027,8 @@ isdn_net_getpeer(isdn_net_ioctl_phone *phone, isdn_net_ioctl_phone *peer)
          * in (partially) wrong number copied to user. This race
 	 * currently ignored.
 	 */
-	ch = p->local->isdn_channel;
-	dv = p->local->isdn_device;
-	if(ch<0 && dv<0) return -ENOTCONN;
-	idx = isdn_dc2minor(dv, ch);
-	if (idx<0) return -ENODEV;
+	idx = p->local->isdn_slot;
+	if (idx<0) return -ENOTCONN;
 	/* for pre-bound channels, we need this extra check */
 	if ( strncmp(dev->num[idx],"???",3) == 0 ) return -ENOTCONN;
 	strncpy(phone->phone,dev->num[idx],ISDN_MSNLEN);
@@ -3147,7 +3111,7 @@ isdn_net_force_hangup(char *name)
 	struct net_device *q;
 
 	if (p) {
-		if (p->local->isdn_device < 0)
+		if (p->local->isdn_slot < 0)
 			return 1;
 		q = p->local->slave;
 		/* If this interface has slaves, do a hangup for them also. */

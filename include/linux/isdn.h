@@ -292,8 +292,7 @@ typedef struct isdn_net_local_s {
   ulong                  magic;
   char                   name[10];     /* Name of device                   */
   struct net_device_stats stats;       /* Ethernet Statistics              */
-  int                    isdn_device;  /* Index to isdn-device             */
-  int                    isdn_channel; /* Index to isdn-channel            */
+  int                    isdn_slot;    /* Index to isdn device/channel     */
   int			 ppp_slot;     /* PPPD device slot number          */
   int                    pre_device;   /* Preselected isdn-device          */
   int                    pre_channel;  /* Preselected isdn-channel         */
@@ -480,8 +479,7 @@ typedef struct modem_info {
 					 /* 2 = B-Channel is up, deliver d.*/
   int                   dialing;         /* Dial in progress or ATA        */
   int                   rcvsched;        /* Receive needs schedule         */
-  int                   isdn_driver;	 /* Index to isdn-driver           */
-  int                   isdn_channel;    /* Index to isdn-channel          */
+  int                   isdn_slot;	 /* Index to isdn-driver/channel   */
   int                   drv_index;       /* Index to dev->usage            */
   int                   ncarrier;        /* Flag: schedule NO CARRIER      */
   unsigned char         last_cause[8];   /* Last cause message             */
@@ -608,8 +606,6 @@ typedef struct isdn_devt {
 	infostruct        *infochain;                /* List of open info-devs.    */
 	wait_queue_head_t info_waitq;               /* Wait-Queue for isdninfo    */
 	struct timer_list timer;		       /* Misc.-function Timer       */
-	int               chanmap[ISDN_MAX_CHANNELS];/* Map minor->device-channel  */
-	int               drvmap[ISDN_MAX_CHANNELS]; /* Map minor->driver-index    */
 	int               usage[ISDN_MAX_CHANNELS];  /* Used by tty/ip/voice       */
 	char              num[ISDN_MAX_CHANNELS][ISDN_MSNLEN];
 	/* Remote number of active ch.*/

@@ -47,3 +47,13 @@ extern int isdn_add_channels(driver *, int, int, int);
 #if defined(ISDN_DEBUG_NET_DUMP) || defined(ISDN_DEBUG_MODEM_DUMP)
 extern void isdn_dumppkt(char *, u_char *, int, int);
 #endif
+
+extern void  isdn_slot_free(int slot, int usage);
+extern void  isdn_slot_all_eaz(int slot);
+extern int   isdn_slot_command(int slot, int cmd, isdn_ctrl *);
+extern char *isdn_slot_map_eaz2msn(int slot, char *msn);
+extern int   isdn_slot_writebuf_skb_stub(int slot, int, struct sk_buff *);
+extern int   isdn_slot_readbchan(int slot, u_char *, u_char *, int, wait_queue_head_t *);
+extern int   isdn_slot_hdrlen(int slot);
+extern int   isdn_slot_driver(int slot);
+extern int   isdn_slot_channel(int slot);
