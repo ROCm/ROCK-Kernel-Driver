@@ -415,6 +415,5 @@ static void __exit alsa_card_vortex_exit(void)
 	pci_unregister_driver(&driver);
 }
 
-EXPORT_NO_SYMBOLS;
-
-module_init(alsa_card_vortex_init) module_exit(alsa_card_vortex_exit)
+module_init(alsa_card_vortex_init)
+module_exit(alsa_card_vortex_exit)
