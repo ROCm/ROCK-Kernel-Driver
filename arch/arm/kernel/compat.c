@@ -8,7 +8,7 @@
  * published by the Free Software Foundation.
  *
  * We keep the old params compatibility cruft in one place (here)
- * so we don't end up with lots of 
+ * so we don't end up with lots of mess around other places.
  */
 #include <linux/config.h>
 #include <linux/types.h>

@@ -55,12 +55,18 @@
 #include "planb.h"
 #include "saa7196.h"
 
-
 /* Would you mind for some ugly debugging? */
-//#define DEBUG(x...) printk(KERN_DEBUG ## x) /* Debug driver */
-#define DEBUG(x...) 		/* Don't debug driver */	
-//#define IDEBUG(x...) printk(KERN_DEBUG ## x) /* Debug interrupt part */
+#if 0
+#define DEBUG(x...) printk(KERN_DEBUG ## x) /* Debug driver */
+#else
+#define DEBUG(x...) 		/* Don't debug driver */
+#endif
+
+#if 0
+#define IDEBUG(x...) printk(KERN_DEBUG ## x) /* Debug interrupt part */
+#endif
 #define IDEBUG(x...) 		/* Don't debug interrupt part */
+#endif
 
 /* Ever seen a Mac with more than 1 of these? */
 #define PLANB_MAX 1
@@ -2271,14 +2277,8 @@ static void release_planb(void)
 	}
 }
 
-#ifdef MODULE
-
-int init_module(void)
+static int __init init_planbs(void)
 {
-#else
-int __init init_planbs(struct video_init *unused)
-{
-#endif
 	int i;
   
 	if (find_planb()<=0)
@@ -2296,11 +2296,10 @@ int __init init_planbs(struct video_init *unused)
 	return 0;
 }
 
-#ifdef MODULE
-
-void cleanup_module(void)
+static void __exit exit_planbs(void)
 {
 	release_planb();
 }
 
-#endif
+module_init(init_planbs);
+module_exit(exit_planbs);

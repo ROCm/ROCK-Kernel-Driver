@@ -21,7 +21,7 @@
 /* With some changes from Kyösti Mälkki <kmalkki@cc.hut.fi> and even
    Frodo Looijaard <frodol@dds.nl> */
 
-/* $Id: i2c-elv.c,v 1.16 2000/01/18 23:54:07 frodo Exp $ */
+/* $Id: i2c-elv.c,v 1.17 2001/07/29 02:44:25 mds Exp $ */
 
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -115,7 +115,7 @@ static int bit_elv_init(void)
 	return 0;
 }
 
-static void bit_elv_exit(void)
+static void __exit bit_elv_exit(void)
 {
 	release_region( base , (base == 0x3bc)? 3 : 8 );
 }

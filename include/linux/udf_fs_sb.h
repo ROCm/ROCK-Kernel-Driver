@@ -18,10 +18,6 @@
 #if !defined(_LINUX_UDF_FS_SB_H)
 #define _LINUX_UDF_FS_SB_H
 
-#ifndef LINUX_VERSION_CODE
-#include <linux/version.h>
-#endif
-
 #pragma pack(1)
 
 #define UDF_MAX_BLOCK_LOADED	8
@@ -89,7 +85,7 @@ struct udf_sb_info
 	__u16			s_partition;
 
 	/* Sector headers */
-	__u32			s_session;
+	__s32			s_session;
 	__u32			s_anchor[4];
 	__u32			s_lastblock;
 

@@ -191,6 +191,7 @@ struct gdb_pt_regs
 	__u32 trap;
 	__u32 crs[16];
 	s390_fp_regs fp_regs;
+	__u32 old_ilc;
 };
 #endif
 

@@ -177,7 +177,7 @@ acpi_status
 tz_osl_add_device(
 	TZ_CONTEXT		*thermal_zone)
 {
-	struct proc_dir_entry	*proc_entry = NULL;
+	struct proc_dir_entry	*proc_entry = NULL, *proc;
 
 	if (!thermal_zone) {
 		return(AE_BAD_PARAMETER);
@@ -186,15 +186,18 @@ tz_osl_add_device(
 	printk("Thermal Zone: found\n");
 
 	proc_entry = proc_mkdir(thermal_zone->uid, tz_proc_root);
-	if (!proc_entry) {
+	if (!proc_entry)
 		return(AE_ERROR);
-	}
 
-	create_proc_read_entry(TZ_PROC_STATUS, S_IFREG | S_IRUGO,
+	proc = create_proc_read_entry(TZ_PROC_STATUS, S_IFREG | S_IRUGO,
 		proc_entry, tz_osl_proc_read_status, (void*)thermal_zone);
+	if (!proc)
+		return(AE_ERROR);
 
-	create_proc_read_entry(TZ_PROC_INFO, S_IFREG | S_IRUGO,
+	proc = create_proc_read_entry(TZ_PROC_INFO, S_IFREG | S_IRUGO,
 		proc_entry, tz_osl_proc_read_info, (void*)thermal_zone);
+	if (!proc)
+		return(AE_ERROR);
 
 	return(AE_OK);
 }

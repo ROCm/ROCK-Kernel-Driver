@@ -390,13 +390,11 @@ static int aha152x1[]  = {0, 11, 7, 1, 1, 1, DELAY_DEFAULT, 0, DEBUG_DEFAULT};
 #endif /* !defined(AHA152X_DEBUG) */
 
 #ifdef __ISAPNP__
-
 static struct isapnp_device_id id_table[] __devinitdata = {
 	{ ISAPNP_DEVICE_SINGLE('A','D','P',0x1505, 'A','D','P',0x1505), },
 	{ ISAPNP_DEVICE_SINGLE_END, }
 };
 MODULE_DEVICE_TABLE(isapnp, id_table);
-
 #endif /* ISAPNP */
 #endif /* MODULE */
 
@@ -981,28 +979,6 @@ int aha152x_detect(Scsi_Host_Template * tpnt)
 			}
 		printk("ok\n");
 	}
-#ifdef __ISAPNP__
-	while (setup_count <= 2 &&
-	       (dev = isapnp_find_dev (NULL, ISAPNP_VENDOR('A','D','P'),
-				       ISAPNP_FUNCTION(0x1505), dev))) {
-		if (dev->prepare(dev) < 0)
-			continue;
-		if (dev->active)
-			continue;
-		if (!(dev->resource[0].flags & IORESOURCE_IO))
-			continue;
-		dev->resource[0].flags |= IORESOURCE_AUTO;
-		if (dev->activate(dev) < 0)
-			continue;
-		setup[setup_count].io_port = dev->resource[0].start;
-		setup[setup_count].irq = dev->irq_resource[0].start;
-		pnpdev[num_pnpdevs++] = dev;
-		printk (KERN_INFO
-			"aha152x: found ISAPnP AVA-1505A at address 0x%03X, IRQ %d\n",
-			setup[setup_count].io_port, setup[setup_count].irq);
-		setup_count++;
-	}
-#endif
 
 #if defined(SETUP0)
 	if (setup_count < 2) {
@@ -1132,6 +1108,41 @@ int aha152x_detect(Scsi_Host_Template * tpnt)
 			       setup[setup_count].ext_trans);
 	}
 #endif
+
+#ifdef __ISAPNP__
+	while ( setup_count<2 && (dev=isapnp_find_dev(NULL, ISAPNP_VENDOR('A','D','P'), ISAPNP_FUNCTION(0x1505), dev)) ) {
+		if (dev->prepare(dev) < 0)
+			continue;
+		if (dev->active)
+			continue;
+		if (!(dev->resource[0].flags & IORESOURCE_IO))
+			continue;
+		dev->resource[0].flags |= IORESOURCE_AUTO;
+		if (dev->activate(dev) < 0)
+			continue;
+		if ( setup_count==1 && dev->resource[0].start==setup[0].io_port) {
+			dev->deactivate(dev);
+			continue;
+		}
+		setup[setup_count].io_port     = dev->resource[0].start;
+		setup[setup_count].irq         = dev->irq_resource[0].start;
+		setup[setup_count].scsiid      = 7;
+		setup[setup_count].reconnect   = 1;
+		setup[setup_count].parity      = 1;
+		setup[setup_count].synchronous = 1;
+		setup[setup_count].delay       = DELAY_DEFAULT;
+		setup[setup_count].ext_trans   = 0;
+#if defined(AHA152X_DEBUG)
+		setup[setup_count].debug       = DEBUG_DEFAULT;
+#endif
+		pnpdev[num_pnpdevs++] = dev;
+		printk (KERN_INFO
+			"aha152x: found ISAPnP AVA-1505A at io=0x%03x, irq=%d\n",
+			setup[setup_count].io_port, setup[setup_count].irq);
+		setup_count++;
+	}
+#endif
+
 
 #if defined(AUTOCONF)
 	if (setup_count < 2) {

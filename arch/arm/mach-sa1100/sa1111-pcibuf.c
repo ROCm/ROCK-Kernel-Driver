@@ -13,7 +13,6 @@
  *
  *  06/13/2001 - created.
  */
-
 #include <linux/config.h>
 #include <linux/module.h>
 #include <linux/init.h>
@@ -62,13 +61,6 @@ init_safe_buffers(struct pci_dev *dev)
 		return -1;
 
 	return 0;
-}
-
-static void
-free_safe_buffers(void)
-{
-	pci_pool_destroy(small_buffer_cache);
-	pci_pool_destroy(large_buffer_cache);
 }
 
 /* allocate a 'safe' buffer and keep track of it */
@@ -183,16 +175,10 @@ free_safe_buffer(char *buf)
  * we assume calls to map_single are symmetric with calls to unmap_single...
  */
 dma_addr_t
-pci_map_single(struct pci_dev *hwdev, void *virtptr,
+sa1111_map_single(struct pci_dev *hwdev, void *virtptr,
 	       size_t size, int direction)
 {
 	dma_addr_t busptr;
-
-	/* hack; usb-ohci.c never sends hwdev==NULL, all others do */
-	if (hwdev == NULL) {
-		consistent_sync(virtptr, size, direction);
-		return virt_to_bus(virtptr);
-	}
 
 	mapped_alloc_size += size;
 
@@ -235,7 +221,7 @@ pci_map_single(struct pci_dev *hwdev, void *virtptr,
  * (basically return things back to the way they should be)
  */
 void
-pci_unmap_single(struct pci_dev *hwdev, dma_addr_t dma_addr,
+sa1111_unmap_single(struct pci_dev *hwdev, dma_addr_t dma_addr,
 		 size_t size, int direction)
 {
 	char *safe, *unsafe;
@@ -267,13 +253,21 @@ pci_unmap_single(struct pci_dev *hwdev, dma_addr_t dma_addr,
 	}
 }
 
-EXPORT_SYMBOL(pci_map_single);
-EXPORT_SYMBOL(pci_unmap_single);
+EXPORT_SYMBOL(sa1111_map_single);
+EXPORT_SYMBOL(sa1111_unmap_single);
 
-static void __init sa1111_init_safe_buffers(void)
+static int __init sa1111_init_safe_buffers(void)
 {
 	printk("Initializing SA1111 buffer pool for DMA workaround\n");
 	init_safe_buffers(NULL);
+	return 0;
 }
 
-__initcall(sa1111_init_safe_buffers);
+static void free_safe_buffers(void)
+{
+	pci_pool_destroy(small_buffer_cache);
+	pci_pool_destroy(large_buffer_cache);
+}
+
+module_init(sa1111_init_safe_buffers);
+module_exit(free_safe_buffers);

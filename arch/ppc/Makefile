@@ -1,4 +1,4 @@
-# BK Id: SCCS/s.Makefile 1.21 08/19/01 20:06:47 paulus
+# BK Id: SCCS/s.Makefile 1.23 09/18/01 11:19:05 paulus
 #
 # This file is included by the global makefile so that you can add your own
 # architecture-specific flags and dependencies. Remember to do have actions

@@ -15,6 +15,8 @@
    Based on work
    	Copyleft  (C) 2001 by Wilfried Weissmann <wweissmann@gmx.at>
 	Copyright (C) 1994-96 Marc ZYNGIER <zyngier@ufr-info-p7.ibp.fr>
+   Based on work done by Søren Schmidt for FreeBSD
+
    
 */
 

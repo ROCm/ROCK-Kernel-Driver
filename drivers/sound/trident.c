@@ -36,6 +36,10 @@
  *	Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
  *  History
+ *  v0.14.9d
+ *  	October 8 2001 Arnaldo Carvalho de Melo <acme@conectiva.com.br>
+ *	use set_current_state, properly release resources on failure in
+ *	trident_probe, get rid of check_region
  *  v0.14.9c
  *	August 10 2001 Peter Wächtler <pwaechtler@loewe-komp.de>
  *	added support for Tvia (formerly Integraphics/IGST) CyberPro5050
@@ -176,7 +180,7 @@
 
 #include <linux/pm.h>
 
-#define DRIVER_VERSION "0.14.9c"
+#define DRIVER_VERSION "0.14.9d"
 
 /* magic numbers to protect our data structures */
 #define TRIDENT_CARD_MAGIC	0x5072696E /* "Prin" */
@@ -1358,7 +1362,7 @@ static int drain_dac(struct trident_state *state, int nonblock)
 	for (;;) {
 		/* It seems that we have to set the current state to TASK_INTERRUPTIBLE
 		   every time to make the process really go to sleep */
-		current->state = TASK_INTERRUPTIBLE;
+		set_current_state(TASK_INTERRUPTIBLE);
 
 		spin_lock_irqsave(&state->card->lock, flags);
 		count = dmabuf->count;
@@ -1372,7 +1376,7 @@ static int drain_dac(struct trident_state *state, int nonblock)
 
 		if (nonblock) {
 			remove_wait_queue(&dmabuf->wait, &wait);
-			current->state = TASK_RUNNING;
+			set_current_state(TASK_RUNNING);
 			return -EBUSY;
 		}
 
@@ -1395,7 +1399,7 @@ static int drain_dac(struct trident_state *state, int nonblock)
 		}
 	}
 	remove_wait_queue(&dmabuf->wait, &wait);
-	current->state = TASK_RUNNING;
+	set_current_state(TASK_RUNNING);
 	if (signal_pending(current))
 		return -ERESTARTSYS;
 
@@ -3695,7 +3699,7 @@ static void ali_free_other_states_resources(struct trident_state *state)
 }
 
 #ifdef CONFIG_PROC_FS
-struct proc_dir_entry *res = NULL;
+struct proc_dir_entry *res;
 static int ali_write_proc(struct file *file, const char *buffer, unsigned long count, void *data)
 {
 	struct trident_card *card = (struct trident_card *)data;
@@ -3936,14 +3940,15 @@ static int __init trident_probe(struct pci_dev *pci_dev, const struct pci_device
 	int i = 0;
 	u16 temp;
 	struct pci_dev *pci_dev_m1533 = NULL;
+	int rc = -ENODEV;
 
 	if (pci_enable_device(pci_dev))
-		return -ENODEV;
+		goto out;
 
 	if (pci_set_dma_mask(pci_dev, TRIDENT_DMA_MASK)) {
 		printk(KERN_ERR "trident: architecture does not support"
 		       " 30bit PCI busmaster DMA\n");
-		return -ENODEV;
+		goto out;
 	}
 	pci_read_config_byte(pci_dev, PCI_CLASS_REVISION, &revision);
 
@@ -3952,15 +3957,16 @@ static int __init trident_probe(struct pci_dev *pci_dev, const struct pci_device
 	else
 		iobase = pci_resource_start(pci_dev, 0);
 
-	if (check_region(iobase, 256)) {
+	if (!request_region(iobase, 256, card_names[pci_id->driver_data])) {
 		printk(KERN_ERR "trident: can't allocate I/O space at 0x%4.4lx\n",
 		       iobase);
-		return -ENODEV;
+		goto out;
 	}
 
+	rc = -ENOMEM;
 	if ((card = kmalloc(sizeof(struct trident_card), GFP_KERNEL)) == NULL) {
 		printk(KERN_ERR "trident: out of memory\n");
-		return -ENOMEM;
+		goto out_release_region;
 	}
 	memset(card, 0, sizeof(*card));
 
@@ -4014,8 +4020,9 @@ static int __init trident_probe(struct pci_dev *pci_dev, const struct pci_device
 		/* Add H/W Volume Control By Matt Wu Jul. 06, 2001 */
 		card->hwvolctl = 0;
 		pci_dev_m1533 = pci_find_device(PCI_VENDOR_ID_AL,PCI_DEVICE_ID_AL_M1533, pci_dev_m1533);
+		rc = -ENODEV;
 		if (pci_dev_m1533 == NULL)
-			return -ENODEV;
+			goto out_proc_fs;
 		pci_read_config_byte(pci_dev_m1533, 0x63, &bits);
 		if (bits & (1<<5))
 			card->hwvolctl = 1;
@@ -4044,22 +4051,17 @@ static int __init trident_probe(struct pci_dev *pci_dev, const struct pci_device
 		card->address_interrupt = trident_address_interrupt;
 	}
 
-	/* claim our iospace and irq */
-	request_region(card->iobase, 256, card_names[pci_id->driver_data]);
+	/* claim our irq */
+	rc = -ENODEV;
 	if (request_irq(card->irq, &trident_interrupt, SA_SHIRQ,
 			card_names[pci_id->driver_data], card)) {
 		printk(KERN_ERR "trident: unable to allocate irq %d\n", card->irq);
-		release_region(card->iobase, 256);
-		kfree(card);
-		return -ENODEV;
+		goto out_proc_fs;
 	}
 	/* register /dev/dsp */
 	if ((card->dev_audio = register_sound_dsp(&trident_audio_fops, -1)) < 0) {
 		printk(KERN_ERR "trident: couldn't register DSP device!\n");
-		release_region(iobase, 256);
-		free_irq(card->irq, card);
-		kfree(card);
-		return -ENODEV;
+		goto out_free_irq;
 	}
 	card->mixer_regs_ready = 0;
 	/* initialize AC97 codec and register /dev/mixer */
@@ -4071,11 +4073,7 @@ static int __init trident_probe(struct pci_dev *pci_dev, const struct pci_device
 				kfree (card->ac97_codec[i]);
 			}
 		}
-		unregister_sound_dsp(card->dev_audio);
-		release_region(iobase, 256);
-		free_irq(card->irq, card);
-		kfree(card);
-		return -ENODEV;
+		goto out_unregister_sound_dsp;
 	}
 	card->mixer_regs_ready = 1;
 	outl(0x00, TRID_REG(card, T4D_MUSICVOL_WAVEVOL));
@@ -4112,13 +4110,28 @@ static int __init trident_probe(struct pci_dev *pci_dev, const struct pci_device
 #endif
 		/* edited by HMSEO for GT sound*/
 	}
-
+	rc = 0;
 	pci_set_drvdata(pci_dev, card);
 
 	/* Enable Address Engine Interrupts */
 	trident_enable_loop_interrupts(card);
-
-	return 0;
+out:	return rc;
+out_unregister_sound_dsp:
+	unregister_sound_dsp(card->dev_audio);
+out_free_irq:
+	free_irq(card->irq, card);
+out_proc_fs:
+#ifdef CONFIG_PROC_FS
+	if (res) {
+		remove_proc_entry("ALi5451", NULL);
+		res = NULL;
+	}
+#endif
+	kfree(card);
+	devs = NULL;
+out_release_region:
+	release_region(iobase, 256);
+	goto out;
 }
 
 static void __exit trident_remove(struct pci_dev *pci_dev)

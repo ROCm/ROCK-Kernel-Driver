@@ -22,11 +22,7 @@
 #error SMP not supported
 #endif
 
-#ifdef CONFIG_ARCH_CO285
 typedef struct { volatile int counter; } atomic_t;
-#else
-typedef struct { int counter; } atomic_t;
-#endif
 
 #define ATOMIC_INIT(i)	{ (i) }
 

@@ -72,7 +72,7 @@
 #define	NR_IRQS		(IRQ_GPIO27 + 1)
 
 
-#if defined(CONFIG_SA1100_GRAPHICSCLIENT)
+#if defined(CONFIG_SA1100_GRAPHICSCLIENT) || defined(CONFIG_SA1100_GRAPHICSMASTER)
 #define ADS_EXT_IRQ(x)	(IRQ_GPIO27 + 1 + (x))
 #undef NR_IRQS
 #define NR_IRQS		(ADS_EXT_IRQ(15) + 1)
@@ -81,7 +81,11 @@
 
 #if defined(CONFIG_SA1111)
 
+#if defined(CONFIG_SA1100_GRAPHICSMASTER)
+#define	SA1111_IRQ(x)	(ADS_EXT_IRQ(15) + 1 + 1 + (x))
+#else
 #define SA1111_IRQ(x)	(IRQ_GPIO27 + 1 + (x))
+#endif
 
 #define GPAIN0		SA1111_IRQ(0)
 #define GPAIN1		SA1111_IRQ(1)

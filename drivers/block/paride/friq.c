@@ -281,3 +281,4 @@ void    cleanup_module(void)
 #endif
 
 /* end of friq.c */
+MODULE_LICENSE("GPL");

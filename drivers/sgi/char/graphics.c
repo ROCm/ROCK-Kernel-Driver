@@ -343,6 +343,8 @@ void __init gfx_init (const char **name)
 }
 
 #ifdef MODULE
+MODULE_LICENSE("GPL");
+
 int init_module(void) {
 	static int initiated = 0;
 

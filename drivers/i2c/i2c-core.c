@@ -20,7 +20,7 @@
 /* With some changes from Kyösti Mälkki <kmalkki@cc.hut.fi>.
    All SMBus-related things are written by Frodo Looijaard <frodol@dds.nl> */
 
-/* $Id: i2c-core.c,v 1.58 2000/10/29 22:57:38 frodo Exp $ */
+/* $Id: i2c-core.c,v 1.64 2001/08/13 01:35:56 mds Exp $ */
 
 #include <linux/module.h>
 #include <linux/kernel.h>
@@ -248,7 +248,7 @@ int i2c_del_adapter(struct i2c_adapter *adap)
 		     */
 			if ((res=client->driver->detach_client(client))) {
 				printk("i2c-core.o: adapter %s not "
-					"unregisted, because client at "
+					"unregistered, because client at "
 					"address %02x can't be detached. ",
 					adap->name, client->addr);
 				goto ERROR0;
@@ -563,6 +563,7 @@ struct i2c_client *i2c_get_client(int driver_id, int adapter_id,
 			if(adapters[j]->clients[i]->flags & I2C_CLIENT_ALLOW_USE)	
 				return adapters[j]->clients[i];
 		}
+		i = 0;
 	}
 
 	return 0;
@@ -658,7 +659,7 @@ ssize_t i2cproc_bus_read(struct file * file, char * buf,size_t count,
 	int i,j,k,order_nr,len=0,len_total;
 	int order[I2C_CLIENT_MAX];
 
-	if (count < 0)
+	if (count > 4000)
 		return -EINVAL; 
 	len_total = file->f_pos + count;
 	/* Too bad if this gets longer (unlikely) */
@@ -1277,14 +1278,41 @@ static int __init i2c_init(void)
 }
 
 #ifndef MODULE
+#ifdef CONFIG_I2C_CHARDEV
 	extern int i2c_dev_init(void);
+#endif
+#ifdef CONFIG_I2C_ALGOBIT
 	extern int i2c_algo_bit_init(void);
+#endif
+#ifdef CONFIG_I2C_CONFIG_I2C_PHILIPSPAR
 	extern int i2c_bitlp_init(void);
+#endif
+#ifdef CONFIG_I2C_ELV
 	extern int i2c_bitelv_init(void);
+#endif
+#ifdef CONFIG_I2C_VELLEMAN
 	extern int i2c_bitvelle_init(void);
+#endif
+#ifdef CONFIG_I2C_BITVIA
 	extern int i2c_bitvia_init(void);
+#endif
+
+#ifdef CONFIG_I2C_ALGOPCF
 	extern int i2c_algo_pcf_init(void);	
+#endif
+#ifdef CONFIG_I2C_ELEKTOR
 	extern int i2c_pcfisa_init(void);
+#endif
+
+#ifdef CONFIG_I2C_ALGO8XX
+	extern int i2c_algo_8xx_init(void);
+#endif
+#ifdef CONFIG_I2C_RPXLITE
+	extern int i2c_rpx_init(void);
+#endif
+#ifdef CONFIG_I2C_PROC
+	extern int sensors_init(void);
+#endif
 
 /* This is needed for automatic patch generation: sensors code starts here */
 /* This is needed for automatic patch generation: sensors code ends here   */
@@ -1317,6 +1345,19 @@ int __init i2c_init_all(void)
 #endif
 #ifdef CONFIG_I2C_ELEKTOR
 	i2c_pcfisa_init();
+#endif
+
+	/* --------------------- 8xx -------- */
+#ifdef CONFIG_I2C_ALGO8XX
+	i2c_algo_8xx_init();
+#endif
+#ifdef CONFIG_I2C_RPXLITE
+	i2c_rpx_init();
+#endif
+
+	/* -------------- proc interface ---- */
+#ifdef CONFIG_I2C_PROC
+	sensors_init();
 #endif
 /* This is needed for automatic patch generation: sensors code starts here */
 /* This is needed for automatic patch generation: sensors code ends here */

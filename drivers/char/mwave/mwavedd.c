@@ -71,6 +71,10 @@
 #define __exit
 #endif
 
+MODULE_DESCRIPTION("3780i Advanced Communications Processor (Mwave) driver");
+MODULE_AUTHOR("Mike Sullivan and Paul Schroeder");
+MODULE_LICENSE("GPL");
+
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
 static int mwave_get_info(char *buf, char **start, off_t offset, int len);
 #else

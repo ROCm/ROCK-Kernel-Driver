@@ -548,7 +548,7 @@ static int locks_conflict(struct file_lock *caller_fl, struct file_lock *sys_fl)
 		return (1);
 
 	default:
-		printk("locks_conflict(): impossible lock type - %d\n",
+		printk(KERN_ERR "locks_conflict(): impossible lock type - %d\n",
 		       caller_fl->fl_type);
 		break;
 	}
@@ -660,7 +660,7 @@ posix_test_lock(struct file *filp, struct file_lock *fl)
  * from a broken NFS client. But broken NFS clients have a lot more to
  * worry about than proper deadlock detection anyway... --okir
  */
-static int posix_locks_deadlock(struct file_lock *caller_fl,
+int posix_locks_deadlock(struct file_lock *caller_fl,
 				struct file_lock *block_fl)
 {
 	struct list_head *tmp;
@@ -714,6 +714,9 @@ int locks_mandatory_area(int read_write, struct inode *inode,
 	struct file_lock *fl;
 	struct file_lock *new_fl = locks_alloc_lock(0);
 	int error;
+
+	if (new_fl == NULL)
+		return -ENOMEM;
 
 	new_fl->fl_owner = current->files;
 	new_fl->fl_pid = current->pid;
@@ -1428,6 +1431,9 @@ int fcntl_setlk(unsigned int fd, unsigned int cmd, struct flock *l)
 	struct inode *inode;
 	int error;
 
+	if (file_lock == NULL)
+		return -ENOLCK;
+
 	/*
 	 * This might block, so we do it before checking the inode.
 	 */
@@ -1580,6 +1586,9 @@ int fcntl_setlk64(unsigned int fd, unsigned int cmd, struct flock64 *l)
 	struct flock64 flock;
 	struct inode *inode;
 	int error;
+
+	if (file_lock == NULL)
+		return -ENOLCK;
 
 	/*
 	 * This might block, so we do it before checking the inode.

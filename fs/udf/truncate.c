@@ -33,10 +33,9 @@
 #include "udf_sb.h"
 
 static void extent_trunc(struct inode * inode, lb_addr bloc, int extoffset,
-	lb_addr eloc, Uint8 etype, Uint32 elen, struct buffer_head *bh, Uint32 nelen)
+	lb_addr eloc, Sint8 etype, Uint32 elen, struct buffer_head *bh, Uint32 nelen)
 {
 	lb_addr neloc = { 0, 0 };
-	int blocks = inode->i_sb->s_blocksize / 512;
 	int last_block = (elen + inode->i_sb->s_blocksize - 1) >> inode->i_sb->s_blocksize_bits;
 	int first_block = (nelen + inode->i_sb->s_blocksize - 1) >> inode->i_sb->s_blocksize_bits;
 
@@ -52,12 +51,10 @@ static void extent_trunc(struct inode * inode, lb_addr bloc, int extoffset,
 		if (last_block - first_block > 0)
 		{
 			if (etype == EXTENT_RECORDED_ALLOCATED)
-			{
-				inode->i_blocks -= (blocks * (last_block - first_block));
 				mark_inode_dirty(inode);
-			}
+
 			if (etype != EXTENT_NOT_RECORDED_NOT_ALLOCATED)
-				udf_free_blocks(inode, eloc, first_block, last_block - first_block);
+				udf_free_blocks(inode->i_sb, inode, eloc, first_block, last_block - first_block);
 		}
 	}
 }
@@ -66,7 +63,7 @@ void udf_truncate_extents(struct inode * inode)
 {
 	lb_addr bloc, eloc, neloc = { 0, 0 };
 	Uint32 extoffset, elen, offset, nelen = 0, lelen = 0, lenalloc;
-	int etype;
+	Sint8 etype;
 	int first_block = inode->i_size >> inode->i_sb->s_blocksize_bits;
 	struct buffer_head *bh = NULL;
 	int adsize;
@@ -108,7 +105,7 @@ void udf_truncate_extents(struct inode * inode)
 						memset(bh->b_data, 0x00, udf_file_entry_alloc_offset(inode));
 					else
 						memset(bh->b_data, 0x00, sizeof(struct AllocExtDesc));
-					udf_free_blocks(inode, bloc, 0, lelen);
+					udf_free_blocks(inode->i_sb, inode, bloc, 0, lelen);
 				}
 				else
 				{
@@ -153,7 +150,7 @@ void udf_truncate_extents(struct inode * inode)
 				memset(bh->b_data, 0x00, udf_file_entry_alloc_offset(inode));
 			else
 				memset(bh->b_data, 0x00, sizeof(struct AllocExtDesc));
-			udf_free_blocks(inode, bloc, 0, lelen);
+			udf_free_blocks(inode->i_sb, inode, bloc, 0, lelen);
 		}
 		else
 		{

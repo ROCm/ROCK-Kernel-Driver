@@ -60,9 +60,6 @@
 #include "../../scsi/hosts.h"
 #include "fas216.h"
 
-MODULE_AUTHOR("Russell King");
-MODULE_DESCRIPTION("Generic FAS216/NCR53C9x driver");
-
 #define VER_MAJOR	0
 #define VER_MINOR	0
 #define VER_PATCH	5
@@ -2767,15 +2764,6 @@ EXPORT_SYMBOL(fas216_print_host);
 EXPORT_SYMBOL(fas216_print_stats);
 EXPORT_SYMBOL(fas216_print_device);
 
-#ifdef MODULE
-int __init init_module(void)
-{
-	return 0;
-}
-
-void __exit cleanup_module(void)
-{
-}
-#endif
-
+MODULE_AUTHOR("Russell King");
+MODULE_DESCRIPTION("Generic FAS216/NCR53C9x driver core");
 MODULE_LICENSE("GPL");

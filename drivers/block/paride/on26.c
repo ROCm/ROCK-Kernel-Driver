@@ -328,3 +328,4 @@ void    cleanup_module(void)
 
 /* end of on26.c */
 
+MODULE_LICENSE("GPL");

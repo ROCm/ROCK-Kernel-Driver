@@ -22,6 +22,7 @@
 #include <linux/personality.h>
 #include <linux/ptrace.h>
 #include <linux/elf.h>
+#include <linux/interrupt.h>
 #include <linux/init.h>
 
 #include <asm/atomic.h>
@@ -176,7 +177,7 @@ NORET_TYPE void die(const char *str, struct pt_regs *regs, int err)
 	printk("Process %s (pid: %d, stackpage=%08lx)\n",
 		current->comm, current->pid, 4096+(unsigned long)tsk);
 
-	if (!user_mode(regs)) {
+	if (!user_mode(regs) || in_interrupt()) {
 		mm_segment_t fs;
 
 		/*
@@ -209,7 +210,7 @@ void die_if_kernel(const char *str, struct pt_regs *regs, int err)
 
 asmlinkage void do_undefinstr(int address, struct pt_regs *regs, int mode)
 {
-	unsigned long addr;
+	unsigned long *pc;
 	siginfo_t info;
 
 	/*
@@ -217,11 +218,11 @@ asmlinkage void do_undefinstr(int address, struct pt_regs *regs, int mode)
 	 * whether we're in Thumb mode or not.
 	 */
 	regs->ARM_pc -= thumb_mode(regs) ? 2 : 4;
-	addr = instruction_pointer(regs);
+	pc = (unsigned long *)instruction_pointer(regs);
 
 #ifdef CONFIG_DEBUG_USER
-	printk(KERN_INFO "%s (%d): undefined instruction: pc=%08lx\n",
-		current->comm, current->pid, addr);
+	printk(KERN_INFO "%s (%d): undefined instruction: pc=%p\n",
+		current->comm, current->pid, pc);
 	dump_instr(regs);
 #endif
 
@@ -231,7 +232,7 @@ asmlinkage void do_undefinstr(int address, struct pt_regs *regs, int mode)
 	info.si_signo = SIGILL;
 	info.si_errno = 0;
 	info.si_code  = ILL_ILLOPC;
-	info.si_addr  = (void *)addr;
+	info.si_addr  = pc;
 
 	force_sig_info(SIGILL, &info, current);
 

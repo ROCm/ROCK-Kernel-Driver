@@ -12,13 +12,15 @@ $(TOPDIR)/include/asm-arm/mach-types.h: mach-types gen-mach-types
 
 # Generate the constants.h header file using the compiler.  We get
 # the compiler to spit out assembly code, and then mundge it into
-# what we want.
+# what we want.  We do this in several stages so make picks up on
+# any errors that occur along the way.
 
 $(TOPDIR)/include/asm-arm/constants.h: constants-hdr getconstants.c
-	$(CC) $(CFLAGS) -S -o - getconstants.c | \
-	 sed 's/^\(#define .* \)[#$$]\(.*\)/\1\2/;/^#define/!d' | \
-	 cat constants-hdr - > $@.tmp
-	cmp $@.tmp $@ >/dev/null 2>&1 || mv $@.tmp $@; $(RM) $@.tmp
+	$(CC) $(CFLAGS) -S -o - getconstants.c > $@.tmp.1
+	sed 's/^\(#define .* \)[#$$]\(.*\)/\1\2/;/^#define/!d' $@.tmp.1 > $@.tmp.2
+	cat constants-hdr $@.tmp.2 > $@.tmp
+	cmp $@.tmp $@ >/dev/null 2>&1 || mv $@.tmp $@
+	$(RM) $@.tmp*
 
 # Build our dependencies, and then generate the constants and
 # mach-types header files.  If we do it now, mkdep will pick

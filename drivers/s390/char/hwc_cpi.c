@@ -9,7 +9,7 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/errno.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/version.h>
 #include <asm/semaphore.h>
 #include <asm/ebcdic.h>

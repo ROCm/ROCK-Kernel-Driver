@@ -52,16 +52,6 @@ drivers/s390: dummy
 
 MAKEBOOT = $(MAKE) -C arch/$(ARCH)/boot
 
-MAKESILO = $(MAKE) -C arch/$(ARCH)/tools/silo
-
-MAKEDASDFMT = $(MAKE) -C arch/$(ARCH)/tools/dasdfmt
-
-silo:
-	@$(MAKE) -C arch/$(ARCH)/tools/silo
-
-dasdfmt:
-	@$(MAKE) -C arch/$(ARCH)/tools/dasdfmt
-
 image: vmlinux 
 	@$(MAKEBOOT) image
 

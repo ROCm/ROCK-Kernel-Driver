@@ -40,6 +40,24 @@
 #error "Config.in must define either CONFIG_53C700_IO_MAPPED or CONFIG_53C700_MEM_MAPPED to use this scsi core."
 #endif
 
+/* macros for consistent memory allocation */
+
+#ifdef CONFIG_53C700_USE_CONSISTENT
+#define NCR_700_dma_cache_wback(mem, size) \
+	if(!hostdata->consistent) \
+		dma_cache_wback(mem, size)
+#define NCR_700_dma_cache_inv(mem, size) \
+	if(!hostdata->consistent) \
+		dma_cache_inv(mem, size)
+#define NCR_700_dma_cache_wback_inv(mem, size) \
+	if(!hostdata->consistent) \
+		dma_cache_wback_inv(mem, size)
+#else
+#define NCR_700_dma_cache_wback(mem, size) dma_cache_wback(mem,size)
+#define NCR_700_dma_cache_inv(mem, size) dma_cache_inv(mem,size)
+#define NCR_700_dma_cache_wback_inv(mem, size) dma_cache_wback_inv(mem,size)
+#endif
+
 
 struct NCR_700_Host_Parameters;
 
@@ -86,6 +104,7 @@ struct NCR_700_SG_List {
 #define NCR_700_DEV_NEGOTIATED_SYNC	(1<<16)
 #define NCR_700_DEV_BEGIN_SYNC_NEGOTIATION	(1<<17)
 #define NCR_700_DEV_BEGIN_TAG_QUEUEING	(1<<18)
+#define NCR_700_DEV_TAG_STARVATION_WARNED (1<<19)
 
 static inline void
 NCR_700_set_SXFER(Scsi_Device *SDp, __u8 sxfer)
@@ -174,6 +193,8 @@ struct NCR_700_command_slot {
 	__u16	tag;
 	__u32	resume_offset;
 	Scsi_Cmnd	*cmnd;
+	/* The pci_mapped address of the actual command in cmnd */
+	dma_addr_t	pCmd;
 	__u32		temp;
 	/* if this command is a pci_single mapping, holds the dma address
 	 * for later unmapping in the done routine */
@@ -191,19 +212,22 @@ struct NCR_700_Host_Parameters {
 	int	clock;			/* board clock speed in MHz */
 	__u32	base;			/* the base for the port (copied to host) */
 	struct pci_dev	*pci_dev;
-	__u8	dmode_extra;	/* adjustable bus settings */
-	__u8	differential:1;	/* if we are differential */
+	__u32	dmode_extra;	/* adjustable bus settings */
+	__u32	differential:1;	/* if we are differential */
 #ifdef CONFIG_53C700_LE_ON_BE
 	/* This option is for HP only.  Set it if your chip is wired for
 	 * little endian on this platform (which is big endian) */
-	__u8	force_le_on_be:1;
+	__u32	force_le_on_be:1;
 #endif
-	__u8	chip710:1;	/* set if really a 710 not 700 */
-	__u8	burst_disable:1;	/* set to 1 to disable 710 bursting */
+	__u32	chip710:1;	/* set if really a 710 not 700 */
+	__u32	burst_disable:1;	/* set to 1 to disable 710 bursting */
 
 	/* NOTHING BELOW HERE NEEDS ALTERING */
-	__u8	fast:1;		/* if we can alter the SCSI bus clock
+	__u32	fast:1;		/* if we can alter the SCSI bus clock
                                    speed (so can negiotiate sync) */
+#ifdef CONFIG_53C700_USE_CONSISTENT
+	__u32	consistent:1;
+#endif
 
 	int	sync_clock;	/* The speed of the SYNC core */
 
@@ -216,15 +240,23 @@ struct NCR_700_Host_Parameters {
 	spinlock_t lock;
 	enum NCR_700_Host_State state; /* protected by state lock */
 	Scsi_Cmnd *cmd;
-
+	/* Note: pScript contains the single consistent block of
+	 * memory.  All the msgin, msgout and status are allocated in
+	 * this memory too (at separate cache lines).  TOTAL_MEM_SIZE
+	 * represents the total size of this area */
+#define	MSG_ARRAY_SIZE	8
+#define	MSGOUT_OFFSET	(L1_CACHE_ALIGN(sizeof(SCRIPT)))
 	__u8	*msgout;
-#define	MSG_ARRAY_SIZE	16
-	__u8	tag_negotiated;
-	__u8	*status;
+#define MSGIN_OFFSET	(MSGOUT_OFFSET + L1_CACHE_ALIGN(MSG_ARRAY_SIZE))
 	__u8	*msgin;
+#define STATUS_OFFSET	(MSGIN_OFFSET + L1_CACHE_ALIGN(MSG_ARRAY_SIZE))
+	__u8	*status;
+#define SLOTS_OFFSET	(STATUS_OFFSET + L1_CACHE_ALIGN(MSG_ARRAY_SIZE))
 	struct NCR_700_command_slot	*slots;
+#define	TOTAL_MEM_SIZE	(SLOTS_OFFSET + L1_CACHE_ALIGN(sizeof(struct NCR_700_command_slot) * NCR_700_COMMAND_SLOTS_PER_HOST))
 	int	saved_slot_position;
 	int	command_slot_count; /* protected by state lock */
+	__u8	tag_negotiated;
 	__u8	rev;
 	__u8	reselection_id;
 	/* flags for the host */

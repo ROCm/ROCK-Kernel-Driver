@@ -1,8 +1,6 @@
 /*
  *    QuickCam Driver For Video4Linux.
  *
- *	This version only works as a module.
- *
  *	Video4Linux conversion work by Alan Cox.
  *	Parport compatibility by Phil Blundell.
  *	Busy loop avoidance by Mark Cooke.
@@ -991,11 +989,20 @@ static char *parport[MAX_CAMS] = { NULL, };
 MODULE_PARM(parport, "1-" __MODULE_STRING(MAX_CAMS) "s");
 #endif
 
-#ifdef MODULE
-int init_module(void)
+static void __exit exit_bw_qcams(void)
+{
+	unsigned int i;
+
+	for (i = 0; i < num_cams; i++)
+		close_bwqcam(qcams[i]);
+}
+
+static int __init init_bw_qcams(void)
 {
 	struct parport *port;
+#ifdef MODULE
 	int n;
+	
 	if(parport[0] && strncmp(parport[0], "auto", 4)){
 		/* user gave parport parameters */
 		for(n=0; parport[n] && n<MAX_CAMS; n++){
@@ -1033,22 +1040,14 @@ int init_module(void)
 	}
 
 	return (num_cams)?0:-ENODEV;
-}
-
-void cleanup_module(void)
-{
-	unsigned int i;
-	for (i = 0; i < num_cams; i++)
-		close_bwqcam(qcams[i]);
-}
 #else
-int __init init_bw_qcams(struct video_init *unused)
-{
-	struct parport *port;
-
 	for (port = parport_enumerate(); port; port=port->next)
 		init_bwqcam(port);
 	return 0;
-}
 #endif
+}
+
+module_init(init_bw_qcams);
+module_exit(exit_bw_qcams);
+
 MODULE_LICENSE("GPL");

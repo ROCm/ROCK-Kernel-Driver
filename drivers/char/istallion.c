@@ -386,6 +386,8 @@ static stlibrdtype_t	stli_brdstr[] = {
  */
 MODULE_AUTHOR("Greg Ungerer");
 MODULE_DESCRIPTION("Stallion Intelligent Multiport Serial Driver");
+MODULE_LICENSE("GPL");
+
 
 MODULE_PARM(board0, "1-3s");
 MODULE_PARM_DESC(board0, "Board 0 config -> name[,ioaddr[,memaddr]");

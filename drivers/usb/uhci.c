@@ -2565,7 +2565,7 @@ static void release_uhci(struct uhci *uhci)
 static int alloc_uhci(struct pci_dev *dev, unsigned int io_addr, unsigned int io_size)
 {
 	struct uhci *uhci;
-	int retval = -EBUSY;
+	int retval;
 	char buf[8], *bufp = buf;
 	int i, port;
 	struct usb_bus *bus;
@@ -2574,27 +2574,27 @@ static int alloc_uhci(struct pci_dev *dev, unsigned int io_addr, unsigned int io
 	struct proc_dir_entry *ent;
 #endif
 
-	if (!request_region(io_addr, io_size, "usb-uhci")) {
-		err("couldn't allocate I/O range %x - %x", io_addr,
-			io_addr + io_size - 1);
-		goto err_request_region;
+	retval = -ENODEV;
+	if (pci_enable_device(dev) < 0) {
+		err("couldn't enable PCI device");
+		goto err_enable_device;
 	}
 
 	if (!dev->irq) {
 		err("found UHCI device with no IRQ assigned. check BIOS settings!");
-		retval = -EINVAL;
 		goto err_invalid_irq;
 	}
 
 	if (!pci_dma_supported(dev, 0xFFFFFFFF)) {
 		err("PCI subsystem doesn't support 32 bit addressing?");
-		retval = -ENODEV;
 		goto err_pci_dma_supported;
 	}
 
-	if (pci_enable_device(dev) < 0) {
-		err("couldn't enable PCI device");
-		goto err_enable_device;
+	retval = -EBUSY;
+	if (!request_region(io_addr, io_size, "usb-uhci")) {
+		err("couldn't allocate I/O range %x - %x", io_addr,
+			io_addr + io_size - 1);
+		goto err_request_region;
 	}
 
 	pci_set_master(dev);
@@ -2897,15 +2897,15 @@ err_create_proc_entry:
 err_alloc_uhci:
 
 err_pci_set_dma_mask:
+	release_region(io_addr, io_size);
 
-err_enable_device:
+err_request_region:
 
 err_pci_dma_supported:
-	release_region(io_addr, io_size);
 
 err_invalid_irq:
 
-err_request_region:
+err_enable_device:
 
 	return retval;
 }

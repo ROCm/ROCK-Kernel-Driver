@@ -599,10 +599,10 @@ do_DataAbort(unsigned long addr, int error_code, struct pt_regs *regs, int fsr)
 	if (!inf->fn(addr, error_code, regs))
 		return;
 bad:
-	force_sig(inf->sig, current);
 	printk(KERN_ALERT "Unhandled fault: %s (%X) at 0x%08lx\n",
 		inf->name, fsr, addr);
 	show_pte(current->mm, addr);
+	force_sig(inf->sig, current);
 	die_if_kernel("Oops", regs, 0);
 	return;
 

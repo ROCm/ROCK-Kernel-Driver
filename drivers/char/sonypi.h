@@ -35,26 +35,26 @@
 #ifdef __KERNEL__
 
 #define SONYPI_DRIVER_MAJORVERSION	1
-#define SONYPI_DRIVER_MINORVERSION	5
+#define SONYPI_DRIVER_MINORVERSION	6
 
 #include <linux/types.h>
 #include <linux/pci.h>
 #include "linux/sonypi.h"
 
-/* Normal models use those */
+/* type1 models use those */
 #define SONYPI_IRQ_PORT			0x8034
 #define SONYPI_IRQ_SHIFT		22
 #define SONYPI_BASE			0x50
 #define SONYPI_G10A			(SONYPI_BASE+0x14)
-#define SONYPI_NORMAL_REGION_SIZE	0x08
+#define SONYPI_TYPE1_REGION_SIZE	0x08
 
-/* R505 series specifics */
-#define SONYPI_SIRQ		0x9b
-#define SONYPI_SLOB		0x9c
-#define SONYPI_SHIB		0x9d
-#define SONYPI_R505_REGION_SIZE	0x20
+/* type2 series specifics */
+#define SONYPI_SIRQ			0x9b
+#define SONYPI_SLOB			0x9c
+#define SONYPI_SHIB			0x9d
+#define SONYPI_TYPE2_REGION_SIZE	0x20
 
-/* ioports used for brightness and R505 events */
+/* ioports used for brightness and type2 events */
 #define SONYPI_DATA_IOPORT	0x62
 #define SONYPI_CST_IOPORT	0x66
 
@@ -64,7 +64,7 @@ struct sonypi_ioport_list {
 	u16	port2;
 };
 
-static struct sonypi_ioport_list sonypi_normal_ioport_list[] = {
+static struct sonypi_ioport_list sonypi_type1_ioport_list[] = {
 	{ 0x10c0, 0x10c4 },	/* looks like the default on C1Vx */
 	{ 0x1080, 0x1084 },
 	{ 0x1090, 0x1094 },
@@ -73,7 +73,7 @@ static struct sonypi_ioport_list sonypi_normal_ioport_list[] = {
 	{ 0x0, 0x0 }
 };
 
-static struct sonypi_ioport_list sonypi_r505_ioport_list[] = {
+static struct sonypi_ioport_list sonypi_type2_ioport_list[] = {
 	{ 0x1080, 0x1084 },
 	{ 0x10a0, 0x10a4 },
 	{ 0x10c0, 0x10c4 },
@@ -87,14 +87,14 @@ struct sonypi_irq_list {
 	u16	bits;
 };
 
-static struct sonypi_irq_list sonypi_normal_irq_list[] = {
+static struct sonypi_irq_list sonypi_type1_irq_list[] = {
 	{ 11, 0x2 },	/* IRQ 11, GO22=0,GO23=1 in AML */
 	{ 10, 0x1 },	/* IRQ 10, GO22=1,GO23=0 in AML */
 	{  5, 0x0 },	/* IRQ  5, GO22=0,GO23=0 in AML */
 	{  0, 0x3 }	/* no IRQ, GO22=1,GO23=1 in AML */
 };
 
-static struct sonypi_irq_list sonypi_r505_irq_list[] = {
+static struct sonypi_irq_list sonypi_type2_irq_list[] = {
 	{ 11, 0x80 },	/* IRQ 11, 0x80 in SIRQ in AML */
 	{ 10, 0x40 },	/* IRQ 10, 0x40 in SIRQ in AML */
 	{  9, 0x20 },	/* IRQ  9, 0x20 in SIRQ in AML */
@@ -132,13 +132,15 @@ static struct sonypi_irq_list sonypi_r505_irq_list[] = {
 #define SONYPI_CAMERA_ROMVERSION 		9
 
 /* key press event data (ioport2) */
-#define SONYPI_NORMAL_JOGGER_EV	0x10
-#define SONYPI_R505_JOGGER_EV	0x08
+#define SONYPI_TYPE1_JOGGER_EV	0x10
+#define SONYPI_TYPE2_JOGGER_EV	0x08
 #define SONYPI_CAPTURE_EV	0x60
-#define SONYPI_NORMAL_FNKEY_EV	0x20
-#define SONYPI_R505_FNKEY_EV	0x08
+#define SONYPI_TYPE1_FNKEY_EV	0x20
+#define SONYPI_TYPE2_FNKEY_EV	0x08
 #define SONYPI_BLUETOOTH_EV	0x30
-#define SONYPI_NORMAL_PKEY_EV	0x40
+#define SONYPI_TYPE1_PKEY_EV	0x40
+#define SONYPI_BACK_EV		0x08
+#define SONYPI_LID_EV		0x38
 
 struct sonypi_event {
 	u8	data;
@@ -204,6 +206,19 @@ static struct sonypi_event sonypi_blueev[] = {
 	{ 0x00, 0x00 }
 };
 
+/* The set of possible back button events */
+static struct sonypi_event sonypi_backev[] = {
+	{ 0x20, SONYPI_EVENT_BACK_PRESSED },
+	{ 0x00, 0x00 }
+};
+
+/* The set of possible lid events */
+static struct sonypi_event sonypi_lidev[] = {
+	{ 0x51, SONYPI_EVENT_LID_CLOSED },
+	{ 0x50, SONYPI_EVENT_LID_OPENED },
+	{ 0x00, 0x00 }
+};
+
 #define SONYPI_BUF_SIZE	128
 struct sonypi_queue {
 	unsigned long head;
@@ -215,8 +230,8 @@ struct sonypi_queue {
 	unsigned char buf[SONYPI_BUF_SIZE];
 };
 
-#define SONYPI_DEVICE_MODEL_NORMAL	1
-#define SONYPI_DEVICE_MODEL_R505	2
+#define SONYPI_DEVICE_MODEL_TYPE1	1
+#define SONYPI_DEVICE_MODEL_TYPE2	2
 
 struct sonypi_device {
 	struct pci_dev *dev;
@@ -232,11 +247,11 @@ struct sonypi_device {
 	int model;
 };
 
-#define wait_on_command(command) { \
+#define wait_on_command(quiet, command) { \
 	unsigned int n = 10000; \
 	while (--n && (command)) \
 		udelay(1); \
-	if (!n) \
+	if (!n && (verbose || !quiet)) \
 		printk(KERN_WARNING "sonypi command failed at " __FILE__ " : " __FUNCTION__ "(line %d)\n", __LINE__); \
 }
 

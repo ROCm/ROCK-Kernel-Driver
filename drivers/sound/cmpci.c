@@ -74,6 +74,7 @@
  *    18/05/2001 - .bss nitpicks, fix a bug in set_dac_channels where it
  *    		   was calling prog_dmabuf with s->lock held, call missing
  *    		   unlock_kernel in cm_midi_release
+ *    08/10/2001 - use set_current_state in some more places
  *
  *	Carlos Eduardo Gorges <carlos@techlinux.com.br>
  *	Fri May 25 2001 
@@ -1483,7 +1484,7 @@ static int drain_dac(struct cm_state *s, int nonblock)
 
 	if (s->dma_dac.mapped || !s->dma_dac.ready)
 		return 0;
-        current->state = TASK_INTERRUPTIBLE;
+        set_current_state(TASK_INTERRUPTIBLE);
         add_wait_queue(&s->dma_dac.wait, &wait);
         for (;;) {
                 spin_lock_irqsave(&s->lock, flags);
@@ -1495,7 +1496,7 @@ static int drain_dac(struct cm_state *s, int nonblock)
                         break;
                 if (nonblock) {
                         remove_wait_queue(&s->dma_dac.wait, &wait);
-                        current->state = TASK_RUNNING;
+                        set_current_state(TASK_RUNNING);
                         return -EBUSY;
                 }
 		tmo = 3 * HZ * (count + s->dma_dac.fragsize) / 2 / s->ratedac;
@@ -1504,7 +1505,7 @@ static int drain_dac(struct cm_state *s, int nonblock)
 			printk(KERN_DEBUG "cmpci: dma timed out??\n");
         }
         remove_wait_queue(&s->dma_dac.wait, &wait);
-        current->state = TASK_RUNNING;
+        set_current_state(TASK_RUNNING);
         if (signal_pending(current))
                 return -ERESTARTSYS;
         return 0;

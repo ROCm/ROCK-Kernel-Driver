@@ -3,7 +3,7 @@
  *
  *  Copyright (C) 2001 Deep Blue Solutions Ltd.
  *
- *  $Id: cpu.c,v 1.1 2001/06/17 10:12:37 rmk Exp $
+ *  $Id: cpu.c,v 1.2 2001/09/22 12:11:17 rmk Exp $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -70,7 +70,7 @@ static struct vco freq_to_vco(unsigned int freq_khz, int factor)
  * Validate the speed in khz.  If it is outside our
  * range, then return the lowest.
  */
-unsigned int cpufreq_validatespeed(unsigned int freq_khz)
+unsigned int integrator_validatespeed(unsigned int freq_khz)
 {
 	struct vco vco;
 
@@ -87,7 +87,7 @@ unsigned int cpufreq_validatespeed(unsigned int freq_khz)
 	return vco_to_freq(vco, 1);
 }
 
-void cpufreq_setspeed(unsigned int freq_khz)
+void integrator_setspeed(unsigned int freq_khz)
 {
 	struct vco vco = freq_to_vco(freq_khz, 1);
 	u_int cm_osc;
@@ -122,6 +122,7 @@ static int __init cpu_init(void)
 
 #ifdef CONFIG_CPU_FREQ
 	cpufreq_init(cpu_freq_khz);
+	cpufreq_setfunctions(integrator_validatespeed, integrator_setspeed);
 #endif
 
 	cm_stat = __raw_readl(CM_STAT);

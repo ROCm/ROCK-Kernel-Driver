@@ -667,8 +667,7 @@ int add_to_page_cache_unique(struct page * page,
 static int FASTCALL(page_cache_read(struct file * file, unsigned long offset));
 static int page_cache_read(struct file * file, unsigned long offset)
 {
-	struct inode *inode = file->f_dentry->d_inode;
-	struct address_space *mapping = inode->i_mapping;
+	struct address_space *mapping = file->f_dentry->d_inode->i_mapping;
 	struct page **hash = page_hash(mapping, offset);
 	struct page *page; 
 
@@ -1589,8 +1588,8 @@ struct page * filemap_nopage(struct vm_area_struct * area,
 {
 	int error;
 	struct file *file = area->vm_file;
-	struct inode *inode = file->f_dentry->d_inode;
-	struct address_space *mapping = inode->i_mapping;
+	struct address_space *mapping = file->f_dentry->d_inode->i_mapping;
+	struct inode *inode = mapping->host;
 	struct page *page, **hash, *old_page;
 	unsigned long size, pgoff;
 
@@ -1851,15 +1850,14 @@ static struct vm_operations_struct generic_file_vm_ops = {
 
 int generic_file_mmap(struct file * file, struct vm_area_struct * vma)
 {
-	struct inode *inode = file->f_dentry->d_inode;
+	struct address_space *mapping = file->f_dentry->d_inode->i_mapping;
+	struct inode *inode = mapping->host;
 
 	if ((vma->vm_flags & VM_SHARED) && (vma->vm_flags & VM_MAYWRITE)) {
-		if (!inode->i_mapping->a_ops->writepage)
+		if (!mapping->a_ops->writepage)
 			return -EINVAL;
 	}
-	if (!inode->i_sb || !S_ISREG(inode->i_mode))
-		return -EACCES;
-	if (!inode->i_mapping->a_ops->readpage)
+	if (!mapping->a_ops->readpage)
 		return -ENOEXEC;
 	UPDATE_ATIME(inode);
 	vma->vm_ops = &generic_file_vm_ops;

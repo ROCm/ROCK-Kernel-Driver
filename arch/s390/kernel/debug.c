@@ -83,6 +83,9 @@ static int debug_prolog_level_fn(debug_info_t * id,
 static int debug_input_level_fn(debug_info_t * id, struct debug_view *view,
 				struct file *file, const char *user_buf,
 				size_t user_buf_size, loff_t * offset);
+static int debug_input_flush_fn(debug_info_t * id, struct debug_view *view,
+                                struct file *file, const char *user_buf,
+                                size_t user_buf_size, loff_t * offset);
 static int debug_hex_ascii_format_fn(debug_info_t * id, struct debug_view *view,
                                 char *out_buf, const char *in_buf);
 static int debug_raw_format_fn(debug_info_t * id,
@@ -121,6 +124,15 @@ struct debug_view debug_level_view = {
 	NULL,
 	&debug_input_level_fn,
 	NULL
+};
+
+struct debug_view debug_flush_view = {
+        "flush",
+        NULL,
+        NULL,
+        NULL,
+        &debug_input_flush_fn,
+        NULL
 };
 
 struct debug_view debug_sprintf_view = {
@@ -664,6 +676,7 @@ debug_info_t *debug_register
 	if(!rc) 
 		goto out;
 	debug_register_view(rc, &debug_level_view);
+        debug_register_view(rc, &debug_flush_view);
 	printk(KERN_INFO
 	       "debug: reserved %d areas of %d pages for debugging %s\n",
 	       nr_areas, 1 << page_order, rc->name);
@@ -1027,6 +1040,73 @@ static int debug_input_level_fn(debug_info_t * id, struct debug_view *view,
       out:
 	*offset += in_buf_size;
 	return rc;		/* number of input characters */
+}
+
+
+/*
+ * flushes debug areas
+ */
+ 
+void debug_flush(debug_info_t* id, int area)
+{
+        unsigned long flags;
+        int i;
+
+        if(!id)
+                return;
+        spin_lock_irqsave(&id->lock,flags);
+        if(area == DEBUG_FLUSH_ALL){
+                id->active_area = 0;
+                memset(id->active_entry, 0, id->nr_areas * sizeof(int));
+                for (i = 0; i < id->nr_areas; i++) 
+                        memset(id->areas[i], 0, PAGE_SIZE << id->page_order);
+                printk(KERN_INFO "debug: %s: all areas flushed\n",id->name);
+        } else if(area >= 0 && area < id->nr_areas) {
+                id->active_entry[area] = 0;
+                memset(id->areas[area], 0, PAGE_SIZE << id->page_order);
+                printk(KERN_INFO
+                        "debug: %s: area %i has been flushed\n",
+                        id->name, area);
+        } else {
+                printk(KERN_INFO
+                        "debug: %s: area %i cannot be flushed (range: %i - %i)\n",
+                        id->name, area, 0, id->nr_areas-1);
+        }
+        spin_unlock_irqrestore(&id->lock,flags);
+}
+
+/*
+ * view function: flushes debug areas 
+ */
+ 
+static int debug_input_flush_fn(debug_info_t * id, struct debug_view *view,
+                                struct file *file, const char *user_buf,
+                                size_t in_buf_size, loff_t * offset)
+{
+        char input_buf[1];
+        int rc = in_buf_size;
+ 
+        if (*offset != 0)
+                goto out;
+        if (copy_from_user(input_buf, user_buf, 1)){
+                rc = -EFAULT;
+                goto out;
+        }
+        if(input_buf[0] == '-') { 
+                debug_flush(id, DEBUG_FLUSH_ALL);
+                goto out;
+        }
+        if (isdigit(input_buf[0])) {
+                int area = ((int) input_buf[0] - (int) '0');
+                debug_flush(id, area);
+                goto out;
+        }
+
+        printk(KERN_INFO "debug: area `%c` is not valid\n", input_buf[0]);
+
+      out:
+        *offset += in_buf_size;
+        return rc;              /* number of input characters */
 }
 
 /*

@@ -342,6 +342,7 @@ MODULE_DEVICE_TABLE (pci, rng_pci_tbl);
 
 MODULE_AUTHOR("Jeff Garzik, Philipp Rumpf, Matt Sottek");
 MODULE_DESCRIPTION("Intel i8xx chipset Random Number Generator (RNG) driver");
+MODULE_LICENSE("GPL");
 
 
 /*

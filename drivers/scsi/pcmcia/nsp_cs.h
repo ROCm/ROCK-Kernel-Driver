@@ -6,22 +6,17 @@
     Ver 0.1 : Initial version.
 
     This software may be used and distributed according to the terms of
-    the GNU Public License.
+    the GNU General Public License.
 
 =========================================================*/
 
-/* $Id: nsp_cs.h,v 1.21 2001/07/04 14:45:31 elca Exp $ */
+/* $Id: nsp_cs.h,v 1.27 2001/09/10 10:31:13 elca Exp $ */
 
 #ifndef  __nsp_cs__
 #define  __nsp_cs__
 
 /* for debugging */
-/*
-#define DBG
-#define DBG_PRINT
-#define DBG_SHOWCOMMAND
-#define PCMCIA_DEBUG 9
-*/
+/*#define PCMCIA_DEBUG 9*/
 
 /*
 #define static
@@ -258,25 +253,36 @@ typedef struct _nsp_data {
 } nsp_hw_data;
 
 
+static void nsp_cs_release(u_long arg);
+static int nsp_cs_event(event_t event, int priority, event_callback_args_t *args);
+static dev_link_t *nsp_cs_attach(void);
+static void nsp_cs_detach(dev_link_t *);
+
 static unsigned int nsphw_start_selection(Scsi_Cmnd *SCpnt, nsp_hw_data *data);
 static void nsp_start_timer(Scsi_Cmnd *SCpnt, nsp_hw_data *data, int time);
+
+static int nsp_detect(Scsi_Host_Template * );
+static int nsp_release(struct Scsi_Host *shpnt);
+static const char * nsp_info(struct Scsi_Host *shpnt);
+static int nsp_queuecommand(Scsi_Cmnd *, void (* done)(Scsi_Cmnd *));
+
+static int nsp_abort(Scsi_Cmnd *);
+static int nsp_reset(Scsi_Cmnd *, unsigned int);
 
 static int nsp_eh_abort(Scsi_Cmnd * SCpnt);
 static int nsp_eh_device_reset(Scsi_Cmnd *SCpnt);
 static int nsp_eh_bus_reset(Scsi_Cmnd *SCpnt);
 static int nsp_eh_host_reset(Scsi_Cmnd *SCpnt);
 
-static int nsp_fifo_count(Scsi_Cmnd *SCpnt);
+static int  nsp_fifo_count(Scsi_Cmnd *SCpnt);
 static void nsp_pio_read(Scsi_Cmnd *SCpnt, nsp_hw_data *data);
-static int nsp_nexus(Scsi_Cmnd *SCpnt, nsp_hw_data *data);
+static int  nsp_nexus(Scsi_Cmnd *SCpnt, nsp_hw_data *data);
 
 #ifdef PCMCIA_DEBUG
-# ifdef DBG_SHOWCOMMAND
 static void show_command(Scsi_Cmnd *ptr);
 static void show_phase(Scsi_Cmnd *SCpnt);
 static void show_busphase(unsigned char stat);
 static void show_message(nsp_hw_data *data);
-# endif /* DBG_SHOWCOMMAND */
 #else
 # define show_command(ptr)   /* */
 # define show_phase(SCpnt)   /* */

@@ -36,6 +36,7 @@ typedef struct dasd_profile_info_t {
         unsigned int dasd_io_time2[32];	 /* histogram of time from start to irq */
         unsigned int dasd_io_time2ps[32]; /* histogram of time from start to irq */
         unsigned int dasd_io_time3[32];	 /* histogram of time from irq to end */
+        unsigned int dasd_io_nr_req[32]; /* histogram of # of requests in chanq */
 } dasd_profile_info_t;
 
 /* 

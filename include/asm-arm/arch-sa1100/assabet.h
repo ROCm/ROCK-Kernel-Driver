@@ -38,7 +38,7 @@
 #define BCR_DB1111 \
 	(BCR_SPK_OFF  | BCR_QMUTE     | BCR_LED_GREEN  | BCR_LED_RED   | \
 	 BCR_RS232EN  | BCR_LCD_12RGB | BCR_CF_BUS_OFF | BCR_STEREO_LB | \
-	 BCR_IRDA_MD1 | BCR_CF_RST)
+	 BCR_IRDA_MD0 | BCR_CF_RST)
 
 #define BCR_CF_PWR	(1<<0)	/* Compact Flash Power (1 = 3.3v, 0 = off) */
 #define BCR_CF_RST	(1<<1)	/* Compact Flash Reset (1 = power up reset) */
@@ -183,6 +183,10 @@ extern unsigned long BCR_value;
 #define NCR_A1VPP		(1<<6)
 
 #ifndef __ASSEMBLY__
+#ifdef CONFIG_ASSABET_NEPONSET
 #define machine_has_neponset()  ((SCR_value & SCR_SA1111) == 0)
+#else
+#define machine_has_neponset()	(0)
+#endif
 #endif
 

@@ -103,21 +103,20 @@ msdos_magic_present(unsigned char *p)
  */
 
 static void extended_partition(struct gendisk *hd, struct block_device *bdev,
-				int minor, int *current_minor)
+			int minor, unsigned long first_size, int *current_minor)
 {
 	struct partition *p;
 	Sector sect;
 	unsigned char *data;
-	unsigned long first_sector, first_size, this_sector, this_size;
+	unsigned long first_sector, this_sector, this_size;
 	int mask = (1 << hd->minor_shift) - 1;
 	int sector_size = get_hardsect_size(to_kdev_t(bdev->bd_dev)) / 512;
 	int loopct = 0;		/* number of links followed
 				   without finding a data partition */
 	int i;
 
-	first_sector = hd->part[minor].start_sect;
-	first_size = hd->part[minor].nr_sects;
-	this_sector = first_sector;
+	this_sector = first_sector = hd->part[minor].start_sect;
+	this_size = first_size;
 
 	while (1) {
 		if (++loopct > 100)
@@ -132,8 +131,6 @@ static void extended_partition(struct gendisk *hd, struct block_device *bdev,
 			goto done; 
 
 		p = (struct partition *) (data + 0x1be);
-
-		this_size = hd->part[minor].nr_sects;
 
 		/*
 		 * Usually, the first entry is the real data partition,
@@ -196,6 +193,7 @@ static void extended_partition(struct gendisk *hd, struct block_device *bdev,
 			goto done;	 /* nothing left to do */
 
 		this_sector = first_sector + START_SECT(p) * sector_size;
+		this_size = NR_SECTS(p) * sector_size;
 		minor = *current_minor;
 		put_dev_sector(sect);
 	}
@@ -586,12 +584,13 @@ int msdos_partition(struct gendisk *hd, struct block_device *bdev,
 		}
 #endif
 		if (is_extended_partition(p)) {
+			unsigned long size = hd->part[minor].nr_sects;
 			printk(" <");
 			/* prevent someone doing mkfs or mkswap on an
 			   extended partition, but leave room for LILO */
-			if (hd->part[minor].nr_sects > 2)
+			if (size > 2)
 				hd->part[minor].nr_sects = 2;
-			extended_partition(hd, bdev, minor, &current_minor);
+			extended_partition(hd, bdev, minor, size, &current_minor);
 			printk(" >");
 		}
 	}

@@ -30,7 +30,7 @@ static int			rpc_task_id;
 /*
  * We give RPC the same get_free_pages priority as NFS
  */
-#define GFP_RPC			GFP_NFS
+#define GFP_RPC			GFP_NOFS
 
 static void			__rpc_default_timer(struct rpc_task *task);
 static void			rpciod_killall(void);
@@ -744,7 +744,7 @@ __rpc_schedule(void)
  * for readahead):
  *
  *   sync user requests:	GFP_KERNEL
- *   async requests:		GFP_RPC		(== GFP_NFS)
+ *   async requests:		GFP_RPC		(== GFP_NOFS)
  *   swap requests:		GFP_ATOMIC	(or new GFP_SWAPPER)
  */
 void *
@@ -1067,8 +1067,6 @@ rpciod(void *ptr)
 	spin_unlock_irq(&current->sigmask_lock);
 
 	strcpy(current->comm, "rpciod");
-
-	current->flags |= PF_MEMALLOC;
 
 	dprintk("RPC: rpciod starting (pid %d)\n", rpciod_pid);
 	while (rpciod_users) {

@@ -75,9 +75,9 @@
 		stmia	sp, {r0 - r12}			@ Calling r0 - r12
 		add	r8, sp, #S_PC
 		stmdb	r8, {sp, lr}^			@ Calling sp, lr
-		mrs	r7, spsr
+		mrs	r8, spsr			@ called from non-FIQ mode, so ok.
 		str	lr, [sp, #S_PC]			@ Save calling PC
-		str	r7, [sp, #S_PSR]		@ Save CPSR
+		str	r8, [sp, #S_PSR]		@ Save CPSR
 		str	r0, [sp, #S_OLD_R0]		@ Save OLD_R0
 		.endm
 
@@ -186,16 +186,34 @@
 
 #endif
 
+
 /*
  * These are the registers used in the syscall handler, and allow us to
- * have in theory up to 7 arguments to a function.  Note that tbl == why
- * is intentional.
+ * have in theory up to 7 arguments to a function - r0 to r6.
+ *
+ * r7 is reserved for the system call number for thumb mode.
+ *
+ * Note that tbl == why is intentional.
  *
  * We must set at least "tsk" and "why" when calling ret_with_reschedule.
  */
-scno	.req	r9				@ syscall number
+scno	.req	r7				@ syscall number
 tbl	.req	r8				@ syscall table pointer
 why	.req	r8				@ Linux syscall (!= 0)
-tsk	.req	r7				@ current task
+tsk	.req	r9				@ current task
 
+/*
+ * Get the system call number.
+ */
+	.macro	get_scno
+#ifdef CONFIG_ARM_THUMB
+	tst	r8, #T_BIT		@ this is SPSR from save_user_regs
+	addne	scno, r7, #OS_NUMBER << 20 @ put OS number in
+	ldreq	scno, [lr, #-4]
+
+#else
+	mask_pc	lr, lr
+	ldr	scno, [lr, #-4]		@ get SWI instruction
+#endif
+	.endm
 

@@ -542,4 +542,6 @@ module_init(nbd_init);
 module_exit(nbd_cleanup);
 
 MODULE_DESCRIPTION("Network Block Device");
+MODULE_LICENSE("GPL");
+
 

@@ -227,3 +227,4 @@ void    cleanup_module(void)
 #endif
 
 /* end of comm.c */
+MODULE_LICENSE("GPL");

@@ -1092,9 +1092,11 @@ dasd_alloc_request (char *magic, int cplength, int datasize, dasd_device_t* devi
 		BUG ();
 		}
         if (device->lowmem_cqr==NULL) {
-                DASD_MESSAGE (KERN_WARNING, device, 
-                              "Low memory! Using emergency request %p",
-                              device->lowmem_ccws);
+                DASD_DRIVER_DEBUG_EVENT (2, dasd_alloc_request,
+                                         "(%04x) Low memory! Using emergency request %p.",
+                                         device->devinfo.devno,
+                                         device->lowmem_ccws);
+
                 device->lowmem_cqr=device->lowmem_ccws;
                 rv = device->lowmem_ccws;
 		memset (rv, 0, PAGE_SIZE);
@@ -1105,10 +1107,11 @@ dasd_alloc_request (char *magic, int cplength, int datasize, dasd_device_t* devi
 		rv->data = (void *) ((long) rv + PAGE_SIZE - datasize);
 		rv->cpaddr = (ccw1_t *) ((long) rv + sizeof (ccw_req_t));
         } else {
-                DASD_MESSAGE (KERN_WARNING, device,
-                              "Refusing emergency mem for request "
-                              "NULL, already in use at %p.",
-                              device->lowmem_ccws);
+                DASD_DRIVER_DEBUG_EVENT (2, dasd_alloc_request,
+                                         "(%04x) Refusing emergency mem for request "
+                                         "NULL, already in use at %p.",
+                                         device->devinfo.devno,
+                                         device->lowmem_ccws);
 	}
 	return rv;
 }
@@ -1219,6 +1222,7 @@ dasd_chanq_enq (dasd_chanq_t * q, ccw_req_t * cqr)
                         CQR_STATUS_QUEUED);
 
        
+#ifdef DASD_PROFILE
         /* save profile information for non erp cqr */
         if (cqr->refers == NULL) {
                 unsigned int  counter = 0;
@@ -1235,6 +1239,7 @@ dasd_chanq_enq (dasd_chanq_t * q, ccw_req_t * cqr)
                 dasd_global_profile.dasd_io_nr_req[counter]++;
                 device->profile.dasd_io_nr_req[counter]++;
         }
+#endif 
 }
 
 /*
@@ -1671,9 +1676,12 @@ dasd_process_queues (dasd_device_t * device)
 		    chanq_max_size > 0 || (req->nr_sectors >= chanq_min_size)) {
 			ccw_req_t *cqr = NULL;
                         if (is_read_only(device->kdev) && req->cmd == WRITE) {
-                            DASD_MESSAGE (KERN_WARNING, device,
-                                          "rejecting write request %p\n",
-                                          req);
+
+                                DASD_DRIVER_DEBUG_EVENT (3, dasd_int_handler,
+                                                         "(%04x) Rejecting write request %p\n",
+                                                         device->devinfo.devno,
+                                                         req);
+
                                 dasd_end_request (req, 0);
                                 dasd_dequeue_request (queue,req);
                         } else {
@@ -1683,9 +1691,12 @@ dasd_process_queues (dasd_device_t * device)
                                 part[MINOR (req->rq_dev)].start_sect;
                             cqr = device->discipline->build_cp_from_req (device, req);
                             if (cqr == NULL) {
-				    DASD_MESSAGE (KERN_WARNING, device,
-                                                  "CCW creation failed on request %p\n",
-                                                  req);
+
+                                    DASD_DRIVER_DEBUG_EVENT (3, dasd_int_handler,
+                                                             "(%04x) CCW creation failed "
+                                                             "on request %p\n",
+                                                             device->devinfo.devno,
+                                                             req);
                                     /* revert relocation of request */
                                     req->sector -=
                                         device->major_info->gendisk.
@@ -2032,7 +2043,7 @@ dasd_default_erp_action (ccw_req_t * cqr)
 	}
 
 	erp->cpaddr->cmd_code = CCW_CMD_TIC;
-	erp->cpaddr->cda = (__u32) (void *) cqr->cpaddr;
+	erp->cpaddr->cda = (__u32) (addr_t) cqr->cpaddr;
 	erp->function = dasd_default_erp_action;
 	erp->refers = cqr;
 	erp->device = cqr->device;
@@ -2232,13 +2243,7 @@ dasd_revalidate (dasd_device_t * device)
 	}
 	for (i = (1 << DASD_PARTN_BITS) - 1; i >= 0; i--) {
                 int major = device->major_info->gendisk.major;
-		int minor = start + i;
-		kdev_t devi = MKDEV (major, minor);
-		struct super_block *sb = get_super (devi);
-		//sync_dev (devi);
-		if (sb)
-			invalidate_inodes (sb);
-		invalidate_buffers (devi);
+		invalidate_device(MKDEV (major, start+i), 1);
 	}
         dasd_destroy_partitions(device);
         dasd_setup_partitions(device);
@@ -2285,20 +2290,20 @@ do_dasd_ioctl (struct inode *inp, /* unsigned */ int no, unsigned long data)
 #endif
 	switch (no) {
         case DASDAPIVER: {
-                       int ver = DASD_API_VERSION;
-                       rc = copy_to_user ((int *) data, &ver, sizeof (int));
-                       if (rc)
-                               rc = -EFAULT;
-                       break;
+			int ver = DASD_API_VERSION;
+			rc = put_user(ver, (int *) data);
+			break;
         }
 	case BLKGETSIZE:{	/* Return device size */
 			long blocks = major_info->gendisk.sizes 
                                       [MINOR (inp->i_rdev)] << 1;
-			rc =
-			    copy_to_user ((long *) data, &blocks,
-					  sizeof (long));
-			if (rc)
-				rc = -EFAULT;
+			rc = put_user(blocks, (long *) data);
+			break;
+		}
+	case BLKGETSIZE64:{
+			u64 blocks = major_info->gendisk.sizes 
+                                      [MINOR (inp->i_rdev)];
+			rc = put_user(blocks << 10, (u64 *) data);
 			break;
 		}
 	case BLKRRPART:{
@@ -3253,10 +3258,6 @@ dasd_state_accept_to_init (dasd_device_t *device)
         int rc = 0;
         unsigned long flags;
 
-        printk (KERN_ERR PRINTK_HEADER
-                "called dasd_state_accept_to_init for device %02x\n",
-                device->devinfo.devno);
-
         if ( device->discipline->init_analysis ) {
                 device->init_cqr=device->discipline->init_analysis (device);
                 if ( device->init_cqr != NULL ) {
@@ -3297,8 +3298,10 @@ dasd_state_init_to_ready (dasd_device_t *device )
                                 rc = -EMEDIUMTYPE;
                         }
         if ( device->init_cqr ) {
+                /* This pointer is no longer needed, BUT dont't free the       */ 
+                /* memory, because this is done in bh for finished request!!!! */
                 atomic_dec(&dasd_init_pending);
-                device->init_cqr = NULL; /* This one is no longer needed */
+                device->init_cqr = NULL; 
         }
         device->level = DASD_STATE_READY;
         return rc;
@@ -3378,7 +3381,6 @@ static void
 dasd_deactivate_queue (dasd_device_t *device)
 {
         int i;
-        int major = MAJOR(device->kdev);
         int minor = MINOR(device->kdev);
 
         for (i = 0; i < (1 << DASD_PARTN_BITS); i++) {
@@ -3764,7 +3766,14 @@ dasd_devices_write (struct file *file, const char *user_buf,
 		vfree (buffer);
 		return -EFAULT;
 	}
-	buffer[user_len] = 0;
+
+        /* replace LF with '\0' */
+        if (buffer[user_len -1] == '\n') {
+                buffer[user_len -1] = '\0';
+        } else {
+                buffer[user_len] = '\0';
+        }
+
 	printk (KERN_INFO PRINTK_HEADER "/proc/dasd/devices: '%s'\n", buffer);
 	if (strncmp (buffer, "set ", 4) && strncmp (buffer, "add ", 4)) {
 		printk (KERN_WARNING PRINTK_HEADER
@@ -3798,7 +3807,7 @@ dasd_devices_write (struct file *file, const char *user_buf,
             range.to   == -EINVAL   ) {
                 
                 printk (KERN_WARNING PRINTK_HEADER
-                        "/proc/dasd/devices: parse error in '%s'", 
+                        "/proc/dasd/devices: range parse error in '%s'\n", 
                         buffer);
         } else {
                 off = (long) temp - (long) buffer;
@@ -3814,7 +3823,8 @@ dasd_devices_write (struct file *file, const char *user_buf,
                                 dasd_disable_ranges (&range, NULL, 0, 1);
                         } else {
                                 printk (KERN_WARNING PRINTK_HEADER
-                                        "/proc/dasd/devices: parse error in '%s'", buffer);
+                                        "/proc/dasd/devices: parse error in '%s'\n",
+                                        buffer);
                         }
                 }
         }

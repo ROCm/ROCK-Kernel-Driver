@@ -8,9 +8,9 @@
 for Linux.
 
 2. My Linux environment
-Linux kernel: 2.4.0 / 2.2.18
-pcmcia-cs:    3.1.24
-gcc:          gcc-2.95.2
+Linux kernel: 2.4.7 / 2.2.19
+pcmcia-cs:    3.1.27
+gcc:          gcc-2.95.4
 PC card:      I-O data PCSC-F (NinjaSCSI-3)
               I-O data CBSC-II in 16 bit mode (NinjaSCSI-32Bi)
 SCSI device:  I-O data CDPS-PX24 (CD-ROM drive)
@@ -55,6 +55,8 @@ $ tar zxvf cs-pcmcia-cs-3.x.x.tar.gz
 [4] Extract this driver's archive somewhere, and edit Makefile, then do make.
 $ tar -zxvf nsp_cs-x.x.tar.gz
 $ cd nsp_cs-x.x
+$ emacs Makefile
+...
 $ make
 
 [5] Copy nsp_cs.o to suitable plase, like /lib/modules/<Kernel version>/pcmcia/ .
@@ -95,7 +97,7 @@ card "WorkBit NinjaSCSI-32Bi (16bit) / KME-4"
   bind "nsp_cs"
 -------------------------------------
 
-[7] Boot (or reboot) pcmcia-cs.
+[7] Start (or restart) pcmcia-cs.
 # /etc/rc.d/rc.pcmcia start        (BSD style)
 or
 # /etc/init.d/pcmcia start         (SYSV style)
@@ -111,7 +113,8 @@ your computer, you encount some *BAD* error like disk crash.
 your data. Please backup your data when you use this driver.
 
 6. Known Bugs
- Some write error occurs when you use slow device.
+ In 2.4 kernel, you can't use 640MB Optical disk. This error comes from
+high level SCSI driver.
 
 7. Testing
  Please send me some reports(bug reports etc..) of this software.
@@ -124,4 +127,4 @@ When you send report, please tell me these or more.
  See GPL.
 
 
-2001/02/01 yokota@netlab.is.tsukuba.ac.jp <YOKOTA Hiroshi>
+2001/08/08 yokota@netlab.is.tsukuba.ac.jp <YOKOTA Hiroshi>

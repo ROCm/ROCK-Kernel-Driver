@@ -27,7 +27,8 @@ struct machine_desc {
 	unsigned int		nr;		/* architecture number	*/
 	unsigned int		phys_ram;	/* start of physical ram */
 	unsigned int		phys_io;	/* start of physical io	*/
-	unsigned int		virt_io;	/* start of virtual io	*/
+	unsigned int		io_pg_offst;	/* byte offset for io 
+						 * page tabe entry	*/
 
 	const char		*name;		/* architecture name	*/
 	unsigned int		param_offset;	/* parameter page	*/
@@ -59,9 +60,9 @@ const struct machine_desc __mach_desc_##_type	\
 #define MAINTAINER(n)
 
 #define BOOT_MEM(_pram,_pio,_vio)		\
-	phys_ram:	_pram,			\
-	phys_io:	_pio,			\
-	virt_io:	_vio,
+	phys_ram:	_pram,	                \
+	phys_io:	_pio,  	                \
+	io_pg_offst:	((_vio)>>18)&0xfffc,
 
 #define BOOT_PARAMS(_params)			\
 	param_offset:	_params,

@@ -9,6 +9,7 @@
  */
 #ifndef __ASSEMBLY__
 
+#include <asm/memory.h>
 #include <asm/page.h>
 
 /* forward-declare task_struct */
@@ -155,5 +156,14 @@ extern const struct processor sa110_processor_functions;
 #define cpu_set_pte(ptep, pte)			processor.pgtable.set_pte(ptep, pte)
 
 #define cpu_switch_mm(pgd,tsk)			cpu_set_pgd(__virt_to_phys((unsigned long)(pgd)))
+
+#define cpu_get_pgd()	\
+	({						\
+		unsigned long pg;			\
+		__asm__("mrc p15, 0, %0, c2, c0, 0"	\
+			 : "=r" (pg));			\
+		pg &= ~0x3fff;				\
+		(pgd_t *)phys_to_virt(pg);		\
+	})
 
 #endif

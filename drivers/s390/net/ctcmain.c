@@ -1,5 +1,5 @@
 /*
- * $Id: ctcmain.c,v 1.49 2001/08/31 14:50:05 felfert Exp $
+ * $Id: ctcmain.c,v 1.51 2001/09/24 10:38:02 mschwide Exp $
  *
  * CTC / ESCON network driver
  *
@@ -35,7 +35,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
- * RELEASE-TAG: CTC/ESCON network driver $Revision: 1.49 $
+ * RELEASE-TAG: CTC/ESCON network driver $Revision: 1.51 $
  *
  */
 
@@ -43,7 +43,7 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/errno.h>
 #include <linux/types.h>
 #include <linux/interrupt.h>
@@ -96,6 +96,7 @@
 #ifdef MODULE
 MODULE_AUTHOR("(C) 2000 IBM Corp. by Fritz Elfert (felfert@millenux.com)");
 MODULE_DESCRIPTION("Linux for S/390 CTC/Escon Driver");
+MODULE_LICENSE("GPL");
 #ifndef CTC_CHANDEV
 MODULE_PARM(ctc, "s");
 MODULE_PARM_DESC(ctc,
@@ -296,6 +297,8 @@ typedef struct channel_t {
 	net_device          *netdev;
 
 	ctc_profile         prof;
+
+	unsigned char       *trans_skb_data;
 } channel;
 
 #define CHANNEL_FLAGS_READ            0
@@ -382,7 +385,7 @@ static __inline__ int ctc_test_and_set_busy(net_device *dev)
  */
 static void print_banner(void) {
 	static int printed = 0;
-	char vbuf[] = "$Revision: 1.49 $";
+	char vbuf[] = "$Revision: 1.51 $";
 	char *version = vbuf;
 
 	if (printed)
@@ -951,6 +954,7 @@ static __inline__ int ctc_checkalloc_buffer(channel *ch, int warn) {
 			return -ENOMEM;
 		}
 		ch->ccw[1].count = 0;
+		ch->trans_skb_data = ch->trans_skb->data;
 		ch->flags &= ~CHANNEL_FLAGS_BUFSIZE_CHANGED;
 	}
 	return 0;
@@ -1016,7 +1020,7 @@ static void ch_action_txdone(fsm_instance *fi, int event, void *arg)
 			spin_unlock(&ch->collect_lock);
 			return;
 		}
-		ch->trans_skb->tail = ch->trans_skb->data;
+		ch->trans_skb->tail = ch->trans_skb->data = ch->trans_skb_data;
 		ch->trans_skb->len = 0;
 		if (ch->prof.maxmulti < (ch->collect_len + 2))
 			ch->prof.maxmulti = ch->collect_len + 2;
@@ -1089,7 +1093,6 @@ static void ch_action_rx(fsm_instance *fi, int event, void *arg)
 	int            len = ch->max_bufsize - ch->devstat->rescnt;
 	struct sk_buff *skb = ch->trans_skb;
 	__u16          block_len = *((__u16*)skb->data);
-	char           *saved_data = skb->data;
 	int            check_len;
 	int            rc;
 
@@ -1138,7 +1141,7 @@ static void ch_action_rx(fsm_instance *fi, int event, void *arg)
 		ctc_unpack_skb(ch, skb);
 	}
  again:
-	skb->data = skb->tail = saved_data;
+	skb->data = skb->tail = ch->trans_skb_data;
 	skb->len = 0;
 	if (ctc_checkalloc_buffer(ch, 1))
 		return;
@@ -1548,9 +1551,9 @@ static void ch_action_restart(fsm_instance *fi, int event, void *arg)
 	channel *ch = (channel *)arg;
 	net_device *dev = ch->netdev;
 
+	fsm_deltimer(&ch->timer);
 	printk(KERN_DEBUG "%s: %s channel restart\n", dev->name,
 	       (CHANNEL_DIRECTION(ch->flags) == READ) ? "RX" : "TX");
-
 	fsm_addtimer(&ch->timer, CTC_TIMEOUT_5SEC, CH_EVENT_TIMER, ch);
 	oldstate = fsm_getstate(fi);
 	fsm_newstate(fi, CH_STATE_STARTWAIT);
@@ -1716,8 +1719,7 @@ static void ch_action_txretry(fsm_instance *fi, int event, void *arg)
 #ifdef DEBUG
 	printk(KERN_DEBUG "ccw[4].cda = %08x\n", ch->ccw[4].cda);
 #endif
-			rc = do_IO(ch->irq, &ch->ccw[3],
-				   (intparm_t)ch, 0xff, 0);
+			rc = do_IO(ch->irq, &ch->ccw[3], (intparm_t)ch, 0xff, 0);
 			if (event == CH_EVENT_TIMER)
 				s390irq_spin_unlock_irqrestore(ch->irq,
 							       saveflags);
@@ -2539,7 +2541,8 @@ static int transmit_skb(channel *ch, struct sk_buff *skb) {
 		if (rc != 0) {
 			fsm_deltimer(&ch->timer);
 			ccw_check_return_code(ch, rc);
-			skb_dequeue_tail(&ch->io_queue);
+			if (ccw_idx == 3)
+				skb_dequeue_tail(&ch->io_queue);
 			/**
 			 * Remove our header. It gets added
 			 * again on retransmit.

@@ -23,7 +23,7 @@
 
 ***********************************************************************/
 
-/* $Id: nsp_cs.c,v 1.35 2001/07/05 16:58:24 elca Exp $ */
+/* $Id: nsp_cs.c,v 1.42 2001/09/10 10:30:58 elca Exp $ */
 
 #ifdef NSP_KERNEL_2_2
 #include <pcmcia/config.h>
@@ -66,15 +66,14 @@
 
 MODULE_AUTHOR("YOKOTA Hiroshi <yokota@netlab.is.tsukuba.ac.jp>");
 MODULE_DESCRIPTION("WorkBit NinjaSCSI-3 / NinjaSCSI-32Bi(16bit) PCMCIA SCSI host adapter module");
-MODULE_LICENSE("GPL");
-
 MODULE_SUPPORTED_DEVICE("sd,sr,sg,st");
+MODULE_LICENSE("GPL");
 
 #ifdef PCMCIA_DEBUG
 static int pc_debug = PCMCIA_DEBUG;
 MODULE_PARM(pc_debug, "i");
 MODULE_PARM_DESC(pc_debug, "set debug level");
-static char *version = "$Id: nsp_cs.c,v 1.35 2001/07/05 16:58:24 elca Exp $";
+static char *version = "$Id: nsp_cs.c,v 1.42 2001/09/10 10:30:58 elca Exp $";
 #define DEBUG(n, args...) if (pc_debug>(n)) printk(KERN_DEBUG args)
 #else
 #define DEBUG(n, args...) /* */
@@ -92,18 +91,6 @@ typedef struct scsi_info_t {
 	int                    stop;
 	struct bus_operations *bus;
 } scsi_info_t;
-
-static void nsp_cs_release(u_long arg);
-static int nsp_cs_event(event_t event, int priority,
-		     event_callback_args_t *args);
-static dev_link_t *nsp_cs_attach(void);
-static void nsp_cs_detach(dev_link_t *);
-static int nsp_detect(Scsi_Host_Template * );
-static int nsp_release(struct Scsi_Host *shpnt);
-static const char * nsp_info(struct Scsi_Host *shpnt);
-static int nsp_queuecommand(Scsi_Cmnd *, void (* done)(Scsi_Cmnd *));
-static int nsp_abort(Scsi_Cmnd *);
-static int nsp_reset(Scsi_Cmnd *, unsigned int);
 
 
 /*----------------------------------------------------------------*/
@@ -191,7 +178,7 @@ static int nsp_queuecommand(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 		data->CurrentSC = NULL;
 		SCpnt->result   = DID_BAD_TARGET << 16;
 		done(SCpnt);
-		return FALSE;
+		return -1;
 	}
 
 	show_command(SCpnt);
@@ -229,12 +216,12 @@ static int nsp_queuecommand(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 		data->CurrentSC = NULL;
 		SCpnt->result   = DID_NO_CONNECT << 16;
 		done(SCpnt);
-		return FALSE;
+		return -1;
 	}
 
 
 	//DEBUG(0, __FUNCTION__ "() out\n");
-	return TRUE;
+	return 0;
 }
 
 /*
@@ -1185,7 +1172,7 @@ timer_out:
 	return;
 }
 
-#ifdef DBG_SHOWCOMMAND
+#ifdef PCMCIA_DEBUG
 #include "nsp_debug.c"
 #endif	/* DBG_SHOWCOMMAND */
 
@@ -1205,13 +1192,13 @@ static int nsp_detect(Scsi_Host_Template *sht)
 	host->unique_id	  = data->BaseAddress;
 	host->n_io_port	  = data->NumAddress;
 	host->irq	  = data->IrqNumber;
-	host->dma_channel = -1;
+	host->dma_channel = 0xff;             /* not use dms */
 
 	sprintf(nspinfo,
 /* Buffer size is 100 bytes */
 /*  0         1         2         3         4         5         6         7         8         9         0*/
 /*  01234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890*/
-   "NinjaSCSI-3/32Bi Driver version 2.7, I/O 0x%04lx-0x%04lx IRQ %2d",
+   "NinjaSCSI-3/32Bi Driver $Revision: 1.42 $, I/O 0x%04lx-0x%04lx IRQ %2d",
 		host->io_port, host->io_port + host->n_io_port,
 		host->irq);
 	sht->name	  = nspinfo;
@@ -1221,6 +1208,7 @@ static int nsp_detect(Scsi_Host_Template *sht)
 	return 1; /* detect done. */
 }
 
+/* nsp_cs requires own release handler because its uses dev_id (=data) */
 static int nsp_release(struct Scsi_Host *shpnt)
 {
 	nsp_hw_data *data = &nsp_data;
@@ -1228,7 +1216,7 @@ static int nsp_release(struct Scsi_Host *shpnt)
         if (shpnt->irq) {
                 free_irq(shpnt->irq, data);
 	}
-        if (shpnt->io_port) {
+        if (shpnt->io_port && shpnt->n_io_port) {
 		release_region(shpnt->io_port, shpnt->n_io_port);
 	}
 	return 0;
@@ -1249,7 +1237,9 @@ static int nsp_reset(Scsi_Cmnd *SCpnt, unsigned int why)
 {
 	DEBUG(0, __FUNCTION__ " SCpnt=0x%p why=%d\n", SCpnt, why);
 
-	return nsp_eh_bus_reset(SCpnt);
+	nsp_eh_bus_reset(SCpnt);
+
+	return SCSI_RESET_SUCCESS;
 }
 
 static int nsp_abort(Scsi_Cmnd *SCpnt)
@@ -1258,7 +1248,7 @@ static int nsp_abort(Scsi_Cmnd *SCpnt)
 
 	nsp_eh_bus_reset(SCpnt);
 
-	return SUCCESS;
+	return SCSI_ABORT_SUCCESS;
 }
 
 /*static int nsp_eh_strategy(struct Scsi_Host *Shost)
@@ -1271,6 +1261,7 @@ static int nsp_eh_abort(Scsi_Cmnd *SCpnt)
 	DEBUG(0, __FUNCTION__ " SCpnt=0x%p\n", SCpnt);
 
 	nsp_eh_bus_reset(SCpnt);
+
 	return SUCCESS;
 }
 
@@ -1309,9 +1300,8 @@ static int nsp_eh_host_reset(Scsi_Cmnd *SCpnt)
 	DEBUG(0, __FUNCTION__ "\n");
 
 	nsphw_init(data);
-	nsp_eh_bus_reset(SCpnt);
 
-	return SUCCESS;
+	return nsp_eh_bus_reset(SCpnt);
 }
 
 

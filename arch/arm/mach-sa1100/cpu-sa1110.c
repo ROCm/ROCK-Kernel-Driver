@@ -3,7 +3,7 @@
  *
  *  Copyright (C) 2001 Russell King
  *
- *  $Id: cpu-sa1110.c,v 1.3 2001/08/12 15:41:53 rmk Exp $
+ *  $Id: cpu-sa1110.c,v 1.5 2001/09/10 13:25:58 rmk Exp $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -258,14 +258,13 @@ static int __init sa1110_sdram_init(void)
 {
 	struct sdram_params *sdram = NULL;
 	unsigned int cur_freq = cpufreq_get(smp_processor_id());
-	int ret = -ENODEV;
 
 	if (machine_is_assabet())
 		sdram = &tc59sm716_cl3_params;
 
 	if (sdram) {
 		printk(KERN_DEBUG "SDRAM: tck: %d trcd: %d trp: %d"
-			" twr: %d refresh: %d cas_latency: %d",
+			" twr: %d refresh: %d cas_latency: %d\n",
 			sdram->tck, sdram->trcd, sdram->trp,
 			sdram->twr, sdram->refresh, sdram->cas_latency);
 

@@ -69,7 +69,7 @@ EXPORT_SYMBOL(get_cclk_frequency);
  * Validate the speed in khz.  If we can't generate the precise
  * frequency requested, round it down (to be on the safe side).
  */
-unsigned int cpufreq_validatespeed(unsigned int khz)
+unsigned int sa1100_validatespeed(unsigned int khz)
 {
 	int i;
 
@@ -87,7 +87,7 @@ unsigned int cpufreq_validatespeed(unsigned int khz)
  * above, we can match for an exact frequency.  If we don't find
  * an exact match, we will to set the lowest frequency to be safe.
  */
-void cpufreq_setspeed(unsigned int khz)
+void sa1100_setspeed(unsigned int khz)
 {
 	int i;
 
@@ -103,6 +103,7 @@ void cpufreq_setspeed(unsigned int khz)
 static int __init sa1100_init_clock(void)
 {
 	cpufreq_init(get_cclk_frequency() * 100);
+	cpufreq_setfunctions(sa1100_validatespeed, sa1100_setspeed);
 	return 0;
 }
 

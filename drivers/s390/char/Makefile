@@ -5,6 +5,7 @@
 O_TARGET := s390-char.o
 
 list-multi	:= tub3270.o tape390.o
+export-objs	:= hwc_rw.o
 
 tub3270-objs := tuball.o tubfs.o tubtty.o \
                      tubttyaid.o tubttybld.o tubttyscl.o \

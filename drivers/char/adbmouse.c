@@ -206,4 +206,4 @@ static void __exit adb_mouse_cleanup(void)
 module_init(adb_mouse_init);
 module_exit(adb_mouse_cleanup);
 
-MODULE_LICENSE("GPL"):
+MODULE_LICENSE("GPL");

@@ -15,6 +15,8 @@ generate, like:
 	- capture button events (only on Vaio Picturebook series)
 	- Fn keys
 	- bluetooth button (only on C1VR model)
+	- back button (PCG-GR7/K model)
+	- lid open/close events (Z600NE model)
 
 Those events (see linux/sonypi.h) can be polled using the character device node
 /dev/sonypi (major 10, minor auto allocated or specified as a option).
@@ -36,6 +38,14 @@ specs for its laptops. If someone convinces them to do so, drop me a note.
 Module options:
 ---------------
 
+Several options can be passed to the sonypi driver, either by adding them
+to /etc/modules.conf file, when the driver is compiled as a module or by
+adding the following to the kernel command line (in your bootloader):
+
+	sonypi=minor[[[[,camera],fnkeyinit],verbose],compat]
+
+where:
+
 	minor: 		minor number of the misc device /dev/sonypi, 
 			default is -1 (automatic allocation, see /proc/misc
 			or kernel logs)
@@ -48,6 +58,11 @@ Module options:
 			get enabled unless you set this parameter to 1
 
 	verbose:	print unknown events from the sonypi device
+
+	compat:		uses some compatibility code for enabling the sonypi
+			events. If the driver worked for you in the past
+			(prior to version 1.5) and does not work anymore,
+			add this option and report to the author.
 
 Module use:
 -----------

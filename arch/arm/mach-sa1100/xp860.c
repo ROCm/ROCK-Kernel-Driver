@@ -28,10 +28,27 @@ static void xp860_power_off(void)
 	while(1);
 }
 
+/*
+ * Note: I replaced the sa1111_init() without the full SA1111 initialisation
+ * because this machine doesn't appear to use the DMA features.  If this is
+ * wrong, please look at neponset.c to fix it properly.
+ */
 static int __init xp860_init(void)
 {
 	pm_power_off = xp860_power_off;
-	sa1111_init();
+
+	/*
+	 * Probe for SA1111.
+	 */
+	ret = sa1111_probe();
+	if (ret < 0)
+		return ret;
+
+	/*
+	 * We found it.  Wake the chip up.
+	 */
+	sa1111_wake();
+
 	return 0;
 }
 

@@ -542,3 +542,8 @@ static void __exit cleanup_vidc(void)
 
 module_init(init_vidc);
 module_exit(cleanup_vidc);
+
+MODULE_AUTHOR("Russell King");
+MODULE_DESCRIPTION("VIDC20 audio driver");
+MODULE_LICENSE("GPL");
+EXPORT_NO_SYMBOLS;

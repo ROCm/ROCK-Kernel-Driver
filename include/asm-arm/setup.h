@@ -126,7 +126,7 @@ struct tag_videotext {
 
 struct tag_ramdisk {
 	u32 flags;	/* bit 0 = load, bit 1 = prompt */
-	u32 size;	/* decompressed ramdisk size */
+	u32 size;	/* decompressed ramdisk size in _kilo_ bytes */
 	u32 start;	/* starting block of floppy-based RAM disk image */
 };
 
@@ -135,7 +135,7 @@ struct tag_ramdisk {
 
 struct tag_initrd {
 	u32 start;	/* physical start address */
-	u32 size;	/* size of compressed ramdisk image */
+	u32 size;	/* size of compressed ramdisk image in bytes */
 };
 
 /* board serial number. "64 bits should be enough for everybody" */

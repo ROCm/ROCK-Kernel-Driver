@@ -1838,7 +1838,7 @@ static void adpt_sparc_info(sysInfo_S* si)
 #endif
 
 #if defined __alpha__ 
-static void adpt_sparc_info(sysInfo_S* si)
+static void adpt_alpha_info(sysInfo_S* si)
 {
 	// This is all the info we need for now
 	// We will add more info as our new
@@ -3324,4 +3324,4 @@ static static void adpt_delay(int millisec)
 static Scsi_Host_Template driver_template = DPT_I2O;
 #include "scsi_module.c"
 EXPORT_NO_SYMBOLS;
-MODULE_LICENSE("BSD without advertising clause");
+MODULE_LICENSE("GPL");

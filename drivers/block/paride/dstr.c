@@ -242,3 +242,4 @@ void    cleanup_module(void)
 #endif
 
 /* end of dstr.c */
+MODULE_LICENSE("GPL");

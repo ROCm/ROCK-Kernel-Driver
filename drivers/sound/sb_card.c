@@ -53,6 +53,9 @@
  *
  * 28-10-2000 Added pnplegacy support
  * 	Daniel Church <dchurch@mbhs.edu>
+ *
+ * 01-10-2001 Added a new flavor of Creative SB AWE64 PnP (CTL00E9).
+ *      Jerome Cornet <jcornet@free.fr>
  */
 
 #include <linux/config.h>
@@ -434,6 +437,11 @@ static struct {
 		ISAPNP_VENDOR('C','T','L'), ISAPNP_FUNCTION(0x0045),
 		0,0,0,0,
 		0,1,1,-1},
+	{"Sound Blaster AWE 64",
+		ISAPNP_VENDOR('C','T','L'), ISAPNP_DEVICE(0x00E9), 
+		ISAPNP_VENDOR('C','T','L'), ISAPNP_FUNCTION(0x0045),
+		0,0,0,0,
+		0,1,1,-1},
 	{"ESS 1688",
 		ISAPNP_VENDOR('E','S','S'), ISAPNP_DEVICE(0x0968), 
 		ISAPNP_VENDOR('E','S','S'), ISAPNP_FUNCTION(0x0968),
@@ -621,6 +629,9 @@ static struct isapnp_device_id id_table[] __devinitdata = {
 		ISAPNP_VENDOR('C','T','L'), ISAPNP_FUNCTION(0x0045), 0 },
 
 	{	ISAPNP_VENDOR('C','T','L'), ISAPNP_DEVICE(0x00E4), 
+		ISAPNP_VENDOR('C','T','L'), ISAPNP_FUNCTION(0x0045), 0 },
+
+	{	ISAPNP_VENDOR('C','T','L'), ISAPNP_DEVICE(0x00E9),
 		ISAPNP_VENDOR('C','T','L'), ISAPNP_FUNCTION(0x0045), 0 },
 
 	{	ISAPNP_VENDOR('E','S','S'), ISAPNP_DEVICE(0x0968), 

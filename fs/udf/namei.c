@@ -835,7 +835,7 @@ static int empty_dir(struct inode *dir)
 static int udf_rmdir(struct inode * dir, struct dentry * dentry)
 {
 	int retval;
-	struct inode * inode;
+	struct inode * inode = dentry->d_inode;
 	struct udf_fileident_bh fibh;
 	struct FileIdentDesc *fi, cfi;
 
@@ -843,9 +843,6 @@ static int udf_rmdir(struct inode * dir, struct dentry * dentry)
 	fi = udf_find_entry(dir, dentry, &fibh, &cfi);
 	if (!fi)
 		goto out;
-
-	inode = dentry->d_inode;
-	DQUOT_INIT(inode);
 
 	retval = -EIO;
 	if (udf_get_lb_pblock(dir->i_sb, lelb_to_cpu(cfi.icb.extLocation), 0) != inode->i_ino)
@@ -881,7 +878,7 @@ out:
 static int udf_unlink(struct inode * dir, struct dentry * dentry)
 {
 	int retval;
-	struct inode * inode;
+	struct inode * inode = dentry->d_inode;
 	struct udf_fileident_bh fibh;
 	struct FileIdentDesc *fi;
 	struct FileIdentDesc cfi;
@@ -890,9 +887,6 @@ static int udf_unlink(struct inode * dir, struct dentry * dentry)
 	fi = udf_find_entry(dir, dentry, &fibh, &cfi);
 	if (!fi)
 		goto out;
-
-	inode = dentry->d_inode;
-	DQUOT_INIT(inode);
 
 	retval = -EIO;
 
@@ -954,7 +948,7 @@ static int udf_symlink(struct inode * dir, struct dentry * dentry, const char * 
 		lb_addr bloc, eloc;
 		Uint32 elen, extoffset;
 
-		block = udf_new_block(inode,
+		block = udf_new_block(inode->i_sb, inode,
 			UDF_I_LOCATION(inode).partitionReferenceNum,
 			UDF_I_LOCATION(inode).logicalBlockNum, &err);
 		if (!block)
@@ -968,7 +962,6 @@ static int udf_symlink(struct inode * dir, struct dentry * dentry, const char * 
 		udf_add_aext(inode, &bloc, &extoffset, eloc, elen, &bh, 0);
 		udf_release_data(bh);
 
-		inode->i_blocks = inode->i_sb->s_blocksize / 512;
 		block = udf_get_pblock(inode->i_sb, block,
 			UDF_I_LOCATION(inode).partitionReferenceNum, 0);
 		bh = udf_tread(inode->i_sb, block, inode->i_sb->s_blocksize);
@@ -1150,13 +1143,13 @@ static int udf_link(struct dentry * old_dentry, struct inode * dir,
 static int udf_rename (struct inode * old_dir, struct dentry * old_dentry,
 	struct inode * new_dir, struct dentry * new_dentry)
 {
-	struct inode * old_inode, * new_inode;
+	struct inode * old_inode = old_dentry->d_inode;
+	struct inode * new_inode = new_dentry->d_inode;
 	struct udf_fileident_bh ofibh, nfibh;
 	struct FileIdentDesc *ofi = NULL, *nfi = NULL, *dir_fi = NULL, ocfi, ncfi;
 	struct buffer_head *dir_bh = NULL;
 	int retval = -ENOENT;
 
-	old_inode = old_dentry->d_inode;
 	if ((ofi = udf_find_entry(old_dir, old_dentry, &ofibh, &ocfi)))
 	{
 		if (ofibh.sbh != ofibh.ebh)
@@ -1169,7 +1162,6 @@ static int udf_rename (struct inode * old_dir, struct dentry * old_dentry,
 		goto end_rename;
 	}
 
-	new_inode = new_dentry->d_inode;
 	nfi = udf_find_entry(new_dir, new_dentry, &nfibh, &ncfi);
 	if (nfi)
 	{
@@ -1179,10 +1171,6 @@ static int udf_rename (struct inode * old_dir, struct dentry * old_dentry,
 				udf_release_data(nfibh.ebh);
 			udf_release_data(nfibh.sbh);
 			nfi = NULL;
-		}
-		else
-		{
-			DQUOT_INIT(new_inode);
 		}
 	}
 	if (S_ISDIR(old_inode->i_mode))

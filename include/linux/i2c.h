@@ -23,10 +23,13 @@
 /* With some changes from Kyösti Mälkki <kmalkki@cc.hut.fi> and
    Frodo Looijaard <frodol@dds.nl> */
 
-/* $Id: i2c.h,v 1.42 2000/09/06 20:14:06 frodo Exp $ */
+/* $Id: i2c.h,v 1.46 2001/08/31 00:04:07 phil Exp $ */
 
 #ifndef I2C_H
 #define I2C_H
+
+#define I2C_DATE "20010830"
+#define I2C_VERSION "2.6.1"
 
 #include <linux/i2c-id.h>	/* id values of adapters et. al. 	*/
 #include <linux/types.h>
@@ -202,7 +205,7 @@ struct i2c_algorithm {
 	char name[32];				/* textual description 	*/
 	unsigned int id;
 
-	/* If a adapter algorithm can't to I2C-level access, set master_xfer
+	/* If an adapter algorithm can't to I2C-level access, set master_xfer
 	   to NULL. If an adapter algorithm can do SMBus access, set 
 	   smbus_xfer. If set to NULL, the SMBus protocol is simulated
 	   using common I2C messages */
@@ -344,7 +347,7 @@ extern int i2c_release_client(struct i2c_client *);
    you can cheat by simply not registering. Not recommended, of course! */
 extern int i2c_check_addr (struct i2c_adapter *adapter, int addr);
 
-/* Detect function. It itterates over all possible addresses itself.
+/* Detect function. It iterates over all possible addresses itself.
  * It will only call found_proc if some client is connected at the
  * specific address (unless a 'force' matched);
  */
@@ -360,7 +363,7 @@ extern int i2c_probe(struct i2c_adapter *adapter,
 extern int i2c_control(struct i2c_client *,unsigned int, unsigned long);
 
 /* This call returns a unique low identifier for each registered adapter,
- * or -1 if the adapter was not regisitered. 
+ * or -1 if the adapter was not registered. 
  */
 extern int i2c_adapter_id(struct i2c_adapter *adap);
 
@@ -454,8 +457,9 @@ union i2c_smbus_data {
  *	corresponding header files.
  */
 				/* -> bit-adapter specific ioctls	*/
-#define I2C_RETRIES	0x0701	/* number times a device address should	*/
-				/* be polled when not acknowledging 	*/
+#define I2C_RETRIES	0x0701	/* number of times a device address      */
+				/* should be polled when not            */
+                                /* acknowledging 			*/
 #define I2C_TIMEOUT	0x0702	/* set timeout - call with int 		*/
 
 
@@ -548,6 +552,13 @@ union i2c_smbus_data {
                                         probe, probe_range, \
                                         ignore, ignore_range, \
                                         force}
+
+/* Detect whether we are on the isa bus. If this returns true, all i2c
+   access will fail! */
+#define i2c_is_isa_client(clientptr) \
+        ((clientptr)->adapter->algo->id == I2C_ALGO_ISA)
+#define i2c_is_isa_adapter(adapptr) \
+        ((adapptr)->algo->id == I2C_ALGO_ISA)
 
 #endif /* def __KERNEL__ */
 #endif /* I2C_H */

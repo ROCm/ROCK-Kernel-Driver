@@ -13,15 +13,20 @@ obj-y		:= backtrace.o changebit.o csumipv6.o csumpartial.o   \
 		   copy_page.o delay.o findbit.o memchr.o memcpy.o    \
 		   memset.o memzero.o setbit.o strncpy_from_user.o    \
 		   strnlen_user.o strchr.o strrchr.o testchangebit.o  \
-		   testclearbit.o testsetbit.o uaccess.o
+		   testclearbit.o testsetbit.o uaccess.o getuser.o    \
+		   putuser.o ashldi3.o ashrdi3.o lshrdi3.o muldi3.o   \
+		   ucmpdi2.o udivdi3.o lib1funcs.o
 obj-m		:=
 obj-n		:=
+
+obj-$(CONFIG_VT)+= kbd.o
 
 obj-arc		:= ecard.o io-acorn.o floppydma.o
 obj-rpc		:= ecard.o io-acorn.o floppydma.o
 obj-clps7500	:= io-acorn.o
 obj-l7200     	:= io-acorn.o
 obj-shark	:= io-shark.o
+obj-edb7211	:= io-acorn.o
 
 obj-y		+= $(obj-$(MACHINE))
 

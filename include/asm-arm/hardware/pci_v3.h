@@ -102,6 +102,10 @@
 
 /*  PCI_CFG bits
  */
+#define V3_PCI_CFG_M_I2O_EN		(1 << 15)
+#define V3_PCI_CFG_M_IO_REG_DIS		(1 << 14)
+#define V3_PCI_CFG_M_IO_DIS		(1 << 13)
+#define V3_PCI_CFG_M_EN3V		(1 << 12)
 #define V3_PCI_CFG_M_RETRY_EN           (1 << 10)
 #define V3_PCI_CFG_M_AD_LOW1            (1 << 9)
 #define V3_PCI_CFG_M_AD_LOW0            (1 << 8)

@@ -6,6 +6,8 @@
 #include <asm/processor.h> 
 #include <asm/msr.h>
 
+static int mce_disabled __initdata = 0;
+
 /*
  *	Machine Check Handler For PII/PIII
  */
@@ -111,7 +113,7 @@ void do_machine_check(struct pt_regs * regs, long error_code)
  *	Set up machine check reporting for Intel processors
  */
 
-void __init intel_mcheck_init(struct cpuinfo_x86 *c)
+static void __init intel_mcheck_init(struct cpuinfo_x86 *c)
 {
 	u32 l, h;
 	int i;
@@ -130,6 +132,9 @@ void __init intel_mcheck_init(struct cpuinfo_x86 *c)
 	
 	if(c->x86 == 5)
 	{
+		/* Default P5 to off as its often misconnected */
+		if(mce_disabled != -1)
+			return;
 		machine_check_vector = pentium_machine_check;
 		wmb();
 		/* Read registers before enabling */
@@ -137,11 +142,8 @@ void __init intel_mcheck_init(struct cpuinfo_x86 *c)
 		rdmsr(MSR_IA32_P5_MC_TYPE, l, h);
 		if(done==0)
 			printk(KERN_INFO "Intel old style machine check architecture supported.\n");
-		/* Enable MCE */		
-		__asm__ __volatile__ (
-			"movl %%cr4, %%eax\n\t"
-			"orl $0x40, %%eax\n\t"
-			"movl %%eax, %%cr4\n\t" : : : "eax");
+ 		/* Enable MCE */
+		set_in_cr4(X86_CR4_MCE);
 		printk(KERN_INFO "Intel old style machine check reporting enabled on CPU#%d.\n", smp_processor_id());
 		return;
 	}
@@ -195,10 +197,7 @@ static void __init winchip_mcheck_init(struct cpuinfo_x86 *c)
 	lo|= (1<<2);	/* Enable EIERRINT (int 18 MCE) */
 	lo&= ~(1<<4);	/* Enable MCE */
 	wrmsr(MSR_IDT_FCR1, lo, hi);
-	__asm__ __volatile__ (
-		"movl %%cr4, %%eax\n\t"
-		"orl $0x40, %%eax\n\t"
-		"movl %%eax, %%cr4\n\t" : : : "eax");
+	set_in_cr4(X86_CR4_MCE);
 	printk(KERN_INFO "Winchip machine check reporting enabled on CPU#%d.\n", smp_processor_id());
 }
 
@@ -208,11 +207,10 @@ static void __init winchip_mcheck_init(struct cpuinfo_x86 *c)
  */
 
 
-static int mce_disabled = 0;
 
 void __init mcheck_init(struct cpuinfo_x86 *c)
 {
-	if(mce_disabled)
+	if(mce_disabled==1)
 		return;
 		
 	switch(c->x86_vendor)
@@ -230,6 +228,8 @@ void __init mcheck_init(struct cpuinfo_x86 *c)
 		case X86_VENDOR_CENTAUR:
 			winchip_mcheck_init(c);
 			break;
+		default:
+			break;
 	}
 }
 
@@ -238,4 +238,12 @@ static int __init mcheck_disable(char *str)
 	mce_disabled = 1;
 	return 0;
 }
+
+static int __init mcheck_enable(char *str)
+{
+	mce_disabled = -1;
+	return 0;
+}
+
 __setup("nomce", mcheck_disable);
+__setup("mce", mcheck_enable);

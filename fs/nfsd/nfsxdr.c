@@ -70,7 +70,6 @@ decode_filename(u32 *p, char **namp, int *lenp)
 			if (*name == '\0' || *name == '/')
 				return NULL;
 		}
-		*name = '\0';
 	}
 
 	return p;

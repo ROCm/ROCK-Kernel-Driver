@@ -65,7 +65,8 @@
  * $m0,10#2a               +$00010203040506070809101112131415#42
  *
  */
-
+#define TRUE 1
+#define FALSE 0
 #include <asm/gdb-stub.h>
 #include <linux/string.h>
 #include <linux/kernel.h>
@@ -74,14 +75,15 @@
 #include <linux/mm.h>
 #include <asm/pgtable.h>
 #include <asm/system.h>
+#include <linux/stddef.h>
 
+#define S390_REGS_COMMON_SIZE offsetof(struct gdb_pt_regs,orig_gpr2)
 
 /*
  * external low-level support routines
  */
 
-extern int putDebugChar(char c);    /* write a single character      */
-extern char getDebugChar(void);     /* read and return a single char */
+
 extern void fltr_set_mem_err(void);
 extern void trap_low(void);
 
@@ -247,8 +249,10 @@ static unsigned char *mem2hex(char *mem, char *buf, int count, int may_fault)
 
 	while (count-- > 0) {
 		ch = *(mem++);
+#if 0
 		if (mem_err)
 			return 0;
+#endif
 		*buf++ = hexchars[ch >> 4];
 		*buf++ = hexchars[ch & 0xf];
 	}
@@ -276,8 +280,10 @@ static char *hex2mem(char *buf, char *mem, int count, int may_fault)
 		ch = hex(*buf++) << 4;
 		ch |= hex(*buf++);
 		*(mem++) = ch;
+#if 0
 		if (mem_err)
 			return 0;
+#endif
 	}
 
 /*	set_mem_fault_trap(0); */
@@ -349,7 +355,7 @@ static int hexToInt(char **ptr, int *intValue)
 	return (numChars);
 }
 
-void gdb_stub_get_non_pt_regs(gdb_pt_regs *regs)
+void gdb_stub_get_non_pt_regs(struct gdb_pt_regs *regs)
 {
 	s390_fp_regs *fpregs=&regs->fp_regs;
 	int has_ieee=save_fp_regs1(fpregs);
@@ -365,7 +371,7 @@ void gdb_stub_get_non_pt_regs(gdb_pt_regs *regs)
 	}
 }
 
-void gdb_stub_set_non_pt_regs(gdb_pt_regs *regs)
+void gdb_stub_set_non_pt_regs(struct gdb_pt_regs *regs)
 {
 	restore_fp_regs1(&regs->fp_regs);
 }
@@ -390,7 +396,7 @@ void gdb_stub_send_signal(int sigval)
  * returns 1 if you should skip the instruction at the trap address, 0
  * otherwise.
  */
-void gdb_stub_handle_exception(gdb_pt_regs *regs,int sigval)
+void gdb_stub_handle_exception(struct gdb_pt_regs *regs,int sigval)
 {
 	int trap;			/* Trap type */
 	int addr;
@@ -402,19 +408,23 @@ void gdb_stub_handle_exception(gdb_pt_regs *regs,int sigval)
 	/*
 	 * reply to host that an exception has occurred
 	 */
+#if 0
 	send_signal(sigval);
-
+#endif
 	/*
 	 * Wait for input from remote GDB
 	 */
-	while (1) {
+	while (1) 
+	{
 		output_buffer[0] = 0;
 		getpacket(input_buffer);
 
 		switch (input_buffer[0])
 		{
 		case '?':
+#if 0
 			send_signal(sigval);
+#endif
 			continue;
 
 		case 'd':
@@ -427,9 +437,9 @@ void gdb_stub_handle_exception(gdb_pt_regs *regs,int sigval)
 		case 'g':
 			gdb_stub_get_non_pt_regs(regs);
 			ptr = output_buffer;
-			ptr=  mem2hex((char *)regs,ptr,sizeof(s390_regs_common),FALSE);
+			ptr=  mem2hex((char *)regs,ptr,S390_REGS_COMMON_SIZE,FALSE);
 			ptr=  mem2hex((char *)&regs->crs[0],ptr,NUM_CRS*CR_SIZE,FALSE);
-			ptr = mem2hex((char *)&regs->fp_regs, ptr,sizeof(s390_fp_regs));
+			ptr = mem2hex((char *)&regs->fp_regs, ptr,sizeof(s390_fp_regs),FALSE);
 			break;
 	  
 		/*
@@ -438,11 +448,11 @@ void gdb_stub_handle_exception(gdb_pt_regs *regs,int sigval)
 		 */
 		case 'G':
 			ptr=input_buffer;
-			hex2mem (ptr, (char *)regs,sizeof(s390_regs_common), FALSE);
-			ptr+=sizeof(s390_regs_common)*2;
+			hex2mem (ptr, (char *)regs,S390_REGS_COMMON_SIZE, FALSE);
+			ptr+=S390_REGS_COMMON_SIZE*2;
 			hex2mem (ptr, (char *)regs->crs[0],NUM_CRS*CR_SIZE, FALSE);
 			ptr+=NUM_CRS*CR_SIZE*2;
-			hex2mem (ptr, (char *)regs->fp_regs,sizeof(s390_fp_regs), FALSE);
+			hex2mem (ptr, (char *)&regs->fp_regs,sizeof(s390_fp_regs), FALSE);
 			gdb_stub_set_non_pt_regs(regs);
 			strcpy(output_buffer,"OK");
 		break;
@@ -472,7 +482,8 @@ void gdb_stub_handle_exception(gdb_pt_regs *regs,int sigval)
 			if (hexToInt(&ptr, &addr)
 				&& *ptr++ == ','
 				&& hexToInt(&ptr, &length)
-				&& *ptr++ == ':') {
+				&& *ptr++ == ':') 
+			{
 				if (hex2mem(ptr, (char *)addr, length, 1))
 					strcpy(output_buffer, "OK");
 				else
@@ -490,8 +501,7 @@ void gdb_stub_handle_exception(gdb_pt_regs *regs,int sigval)
 
 			ptr = &input_buffer[1];
 			if (hexToInt(&ptr, &addr))
-				regs->cp0_epc = addr;
-	  
+				regs->psw.addr = addr;
 			/*
 			 * Need to flush the instruction cache here, as we may
 			 * have deposited a breakpoint, and the icache probably
@@ -529,22 +539,22 @@ void gdb_stub_handle_exception(gdb_pt_regs *regs,int sigval)
 			 * There is no single step insn in the MIPS ISA, so we
 			 * use breakpoints and continue, instead.
 			 */
+#if 0
 			single_step(regs);
+#endif
 			flush_cache_all();
 			return;
 			/* NOTREACHED */
+			break;
 
-		}
-		break;
+		}      /* switch */
 
-		}			/* switch */
-
-		/*
-		 * reply to the request
-		 */
-
+	/*
+	 * reply to the request
+	 */
+	
 		putpacket(output_buffer);
-
+	
 	} /* while */
 }
 
@@ -558,13 +568,9 @@ void breakpoint(void)
 {
 	if (!gdb_stub_initialised)
 		return;
-	__asm__ __volatile__(
-			".globl	breakinst\n"
-			"breakinst:\t.word   %0\n\t"
-			:
-			: "i" (S390_BREAKPOINT_U16)
-				:
-				);
+	asm volatile (".globl	breakinst\n"
+		"breakinst:\t.word   %0"
+		: : "i" (S390_BREAKPOINT_U16) );
 }
 
 

@@ -11,7 +11,6 @@
 
 #include <linux/config.h>
 #include <linux/types.h>
-
 #include <linux/fs.h>
 
 #if !defined(CONFIG_UDF_FS) && !defined(CONFIG_UDF_FS_MODULE)
@@ -129,13 +128,13 @@ extern void udf_put_inode(struct inode *);
 extern void udf_delete_inode(struct inode *);
 extern void udf_write_inode(struct inode *, int);
 extern long udf_block_map(struct inode *, long);
-extern int inode_bmap(struct inode *, int, lb_addr *, Uint32 *, lb_addr *, Uint32 *, Uint32 *, struct buffer_head **);
-extern int udf_add_aext(struct inode *, lb_addr *, int *, lb_addr, Uint32, struct buffer_head **, int);
-extern int udf_write_aext(struct inode *, lb_addr, int *, lb_addr, Uint32, struct buffer_head *, int);
-extern int udf_insert_aext(struct inode *, lb_addr, int, lb_addr, Uint32, struct buffer_head *);
-extern int udf_delete_aext(struct inode *, lb_addr, int, lb_addr, Uint32, struct buffer_head *);
-extern int udf_next_aext(struct inode *, lb_addr *, int *, lb_addr *, Uint32 *, struct buffer_head **, int);
-extern int udf_current_aext(struct inode *, lb_addr *, int *, lb_addr *, Uint32 *, struct buffer_head **, int);
+extern Sint8 inode_bmap(struct inode *, int, lb_addr *, Uint32 *, lb_addr *, Uint32 *, Uint32 *, struct buffer_head **);
+extern Sint8 udf_add_aext(struct inode *, lb_addr *, int *, lb_addr, Uint32, struct buffer_head **, int);
+extern Sint8 udf_write_aext(struct inode *, lb_addr, int *, lb_addr, Uint32, struct buffer_head *, int);
+extern Sint8 udf_insert_aext(struct inode *, lb_addr, int, lb_addr, Uint32, struct buffer_head *);
+extern Sint8 udf_delete_aext(struct inode *, lb_addr, int, lb_addr, Uint32, struct buffer_head *);
+extern Sint8 udf_next_aext(struct inode *, lb_addr *, int *, lb_addr *, Uint32 *, struct buffer_head **, int);
+extern Sint8 udf_current_aext(struct inode *, lb_addr *, int *, lb_addr *, Uint32 *, struct buffer_head **, int);
 extern void udf_discard_prealloc(struct inode *);
 
 /* misc.c */
@@ -171,9 +170,9 @@ extern struct inode * udf_new_inode (struct inode *, int, int *);
 extern void udf_truncate_extents(struct inode *);
 
 /* balloc.c */
-extern void udf_free_blocks(struct inode *, lb_addr, Uint32, Uint32);
-extern int udf_prealloc_blocks(struct inode *, Uint16, Uint32, Uint32);
-extern int udf_new_block(struct inode *, Uint16, Uint32, int *);
+extern void udf_free_blocks(struct super_block *, struct inode *, lb_addr, Uint32, Uint32);
+extern int udf_prealloc_blocks(struct super_block *, struct inode *, Uint16, Uint32, Uint32);
+extern int udf_new_block(struct super_block *, struct inode *, Uint16, Uint32, int *);
 
 /* fsync.c */
 extern int udf_fsync_file(struct file *, struct dentry *, int);

@@ -1670,7 +1670,7 @@ tape34xx_rfo_init_done (tape_info_t * ti)
 	tapestate_set (ti, TS_DONE);
 	ti->rc = 0;
 	ti->wanna_wakeup=1;
-	wake_up_interruptible (&ti->wq);
+	wake_up (&ti->wq);
 }
 
 void
@@ -2274,6 +2274,8 @@ void tape34xx_error_recovery_has_failed (tape_info_t* ti,int error_id) {
 	ti->wanna_wakeup=1;
 	switch (tapestate_get(ti)) {
 	case TS_REW_RELEASE_INIT:
+	case TS_RFO_INIT:
+	case TS_RBA_INIT:
 	    tapestate_set(ti,TS_FAILED);
 	    wake_up (&ti->wq);
 	    break;

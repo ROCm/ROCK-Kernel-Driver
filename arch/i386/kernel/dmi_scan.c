@@ -10,6 +10,8 @@
 #include <linux/keyboard.h>
 #include <asm/keyboard.h>
 
+int is_sony_vaio_laptop;
+
 struct dmi_header
 {
 	u8	type;
@@ -322,8 +324,6 @@ static __init int broken_apm_power(struct dmi_blacklist *d)
  * This one isn't a bug detect for those who asked, we simply want to
  * activate Sony specific goodies like the camera and jogdial..
  */
-int is_sony_vaio_laptop;
-
 static __init int sony_vaio_laptop(struct dmi_blacklist *d)
 {
 	if (is_sony_vaio_laptop == 0)

@@ -2884,7 +2884,7 @@ static int copy_strings32(int argc, u32 * argv, struct linux_binprm *bprm)
 			err = copy_from_user(kaddr + offset, (char *)A(str),
 					     bytes_to_copy);
 			flush_page_to_ram(page);
-			kunmap((unsigned long)kaddr);
+			kunmap(page);
 
 			if (err)
 				return -EFAULT;
@@ -4038,57 +4038,55 @@ extern asmlinkage long sys32_sysctl(struct __sysctl_args32 *args)
 }
 
 struct stat64_emu31 {
-        unsigned short  st_dev;
-        unsigned char   __pad0[6];
-
-        long long	st_ino;
-        unsigned int    st_mode;
-        unsigned int    st_nlink;
-
-        __u32		st_uid;
-        __u32		st_gid;
-
-        unsigned short  st_rdev;
-        unsigned char   __pad3[10];
-
-        long long       st_size;
-        __u32		st_blksize;
-
-        __u32		st_blocks;      /* Number 512-byte blocks allocated. */
-        __u32		__pad4;         /* future possible st_blocks high bits */
-
-        __u32		st_atime;
-        __u32		__pad5;
-
-        __u32		st_mtime;
-        __u32		__pad6;
-
-        __u32		st_ctime;
-        __u32		__pad7;         /* will be high 32 bits of ctime someday */
-
-        __u32		__unused1;
-        __u32		__unused2;
-};
+	unsigned char   __pad0[6];
+	unsigned short  st_dev;
+	unsigned int    __pad1;
+#define STAT64_HAS_BROKEN_ST_INO        1
+	u32             __st_ino;
+	unsigned int    st_mode;
+	unsigned int    st_nlink;
+	u32             st_uid;
+	u32             st_gid;
+	unsigned char   __pad2[6];
+	unsigned short  st_rdev;
+	unsigned int    __pad3;
+	long            st_size;
+	u32             st_blksize;
+	unsigned char   __pad4[4];
+	u32             __pad5;     /* future possible st_blocks high bits */
+	u32             st_blocks;  /* Number 512-byte blocks allocated. */
+	u32             st_atime;
+	u32             __pad6;
+	u32             st_mtime;
+	u32             __pad7;
+	u32             st_ctime;
+	u32             __pad8;     /* will be high 32 bits of ctime someday */
+	unsigned long   st_ino;
+};	
 
 static inline int
 putstat64 (struct stat64_emu31 *ubuf, struct stat *kbuf)
 {
-    int err;
-    
-    err = put_user (kbuf->st_dev, &ubuf->st_dev);
-    err |= __put_user (kbuf->st_ino, &ubuf->st_ino);
-    err |= __put_user (kbuf->st_mode, &ubuf->st_mode);
-    err |= __put_user (kbuf->st_nlink, &ubuf->st_nlink);
-    err |= __put_user (kbuf->st_uid, &ubuf->st_uid);
-    err |= __put_user (kbuf->st_gid, &ubuf->st_gid);
-    err |= __put_user (kbuf->st_rdev, &ubuf->st_rdev);
-    err |= __put_user (kbuf->st_size, &ubuf->st_size);
-    err |= __put_user (kbuf->st_blksize, &ubuf->st_blksize);
-    err |= __put_user (kbuf->st_blocks, &ubuf->st_blocks);
-    err |= __put_user (kbuf->st_atime, &ubuf->st_atime);
-    err |= __put_user (kbuf->st_mtime, &ubuf->st_mtime);
-    err |= __put_user (kbuf->st_ctime, &ubuf->st_ctime);
-    return err;
+    struct stat64_emu31 tmp;
+   
+    memset(&tmp, 0, sizeof(tmp));
+
+    tmp.st_dev = (unsigned short)kbuf->st_dev;
+    tmp.st_ino = kbuf->st_ino;
+    tmp.__st_ino = (u32)kbuf->st_ino;
+    tmp.st_mode = kbuf->st_mode;
+    tmp.st_nlink = (unsigned int)kbuf->st_nlink;
+    tmp.st_uid = kbuf->st_uid;
+    tmp.st_gid = kbuf->st_gid;
+    tmp.st_rdev = (unsigned short)kbuf->st_rdev;
+    tmp.st_size = kbuf->st_size;
+    tmp.st_blksize = (u32)kbuf->st_blksize;
+    tmp.st_blocks = (u32)kbuf->st_blocks;
+    tmp.st_atime = (u32)kbuf->st_atime;
+    tmp.st_mtime = (u32)kbuf->st_mtime;
+    tmp.st_ctime = (u32)kbuf->st_ctime;
+
+    return copy_to_user(ubuf,&tmp,sizeof(tmp)) ? -EFAULT : 0; 
 }
 
 extern asmlinkage long sys_newstat(char * filename, struct stat * statbuf);
@@ -4131,7 +4129,7 @@ asmlinkage long sys32_lstat64(char * filename, struct stat64_emu31 * statbuf, lo
 	    return err;
 
     set_fs (KERNEL_DS);
-    ret = sys_newstat(tmp, &s);
+    ret = sys_newlstat(tmp, &s);
     set_fs (old_fs);
     putname(tmp);
     if (putstat64 (statbuf, &s)) 

@@ -97,17 +97,27 @@ entry_base:
  *    R15 - kernel stack pointer
  */
 
-        .macro  SAVE_ALL psworg           # system entry macro
+        .macro  SAVE_ALL psworg,sync      # system entry macro
         stm     %r13,%r15,__LC_SAVE_AREA
-        stam    %a2,%a4,__LC_SAVE_AREA+12
         basr    %r13,0                    #  temp base pointer
         l       %r13,.Lentry_base-.(%r13) # load &entry_base to %r13 
         tm      \psworg+1,0x01            # test problem state bit
-        bz      BASED(.+12)               # skip stack setup save
-        l       %r15,__LC_KERNEL_STACK    # problem state -> load ksp
-        lam     %a2,%a4,BASED(.Lc_ac)     # set ac.reg. 2 to primary space
-                                          # and access reg. 4 to home space
-0:      s       %r15,BASED(.Lc_spsize)    # make room for registers & psw
+        stam    %a2,%a4,__LC_SAVE_AREA+12
+	.if	\sync
+        bz      BASED(1f)                 # skip stack setup save
+	.else
+        bnz     BASED(0f)                 # from user -> load kernel stack
+	l	%r14,__LC_ASYNC_STACK	  # are we already on the async stack ?
+	slr     %r14,%r15
+	sra	%r14,13
+	be	BASED(1f)
+        l       %r15,__LC_ASYNC_STACK     # load async. stack
+	b	BASED(1f)
+	.endif
+0:      l       %r15,__LC_KERNEL_STACK    # problem state -> load ksp
+	lam	%a2,%a4,BASED(.Lc_ac)	  # set ac.reg. 2 to primary space
+					  # and ac.reg. 4 to home space
+1:      s       %r15,BASED(.Lc_spsize)    # make room for registers & psw
         n       %r15,BASED(.Lc0xfffffff8) # align stack pointer to 8
         stm     %r0,%r12,SP_R0(%r15)      # store gprs 0-12 to kernel stack
         st      %r2,SP_ORIG_R2(%r15)      # store original content of gpr 2
@@ -120,7 +130,7 @@ entry_base:
         xc      0(4,%r15),0(%r15)         # clear back chain
         .endm
 
-        .macro  RESTORE_ALL               # system exit macro
+        .macro  RESTORE_ALL sync          # system exit macro
         mvc     __LC_RETURN_PSW(8),SP_PSW(%r15)  # move user PSW to lowcore
         lam     %a0,%a15,SP_AREGS(%r15)   # load the access registers
         lm      %r0,%r15,SP_R0(%r15)      # load gprs 0-15 of user
@@ -129,8 +139,8 @@ entry_base:
         .endm
 
         .macro  GET_CURRENT
-        lr      %r9,%r15                  # load pointer to task_struct to %r9
-        n       %r9,BASED(.Lc0xffffe000)
+	l	%r9,BASED(.Lc0xffffe000)  # load pointer to task_struct to %r9
+	al	%r9,__LC_KERNEL_STACK
         .endm
 
 
@@ -171,13 +181,35 @@ resume_noper:
         br      %r14
 
 /*
+ * do_softirq calling function. We want to run the softirq functions on the
+ * asynchronous interrupt stack.
+ */
+	.global do_call_softirq
+do_call_softirq:
+	stm	%r12,%r15,24(%r15)
+	lr	%r12,%r15
+        basr    %r13,0
+do_call_base:
+	l	%r0,__LC_ASYNC_STACK
+	slr     %r0,%r15
+	sra	%r0,13
+	be	0f-do_call_base(%r13)
+	l	%r15,__LC_ASYNC_STACK
+0:	sl	%r15,.Lc_overhead-do_call_base(%r13)
+        st	%r12,0(%r15)	# store backchain
+	l	%r1,.Ldo_softirq-do_call_base(%r13)
+	basr	%r14,%r1
+	lm	%r12,%r15,24(%r12)
+	br	%r14
+	
+/*
  * SVC interrupt handler routine. System calls are synchronous events and
  * are executed with interrupts enabled.
  */
 
 	.globl  system_call
 system_call:
-        SAVE_ALL __LC_SVC_OLD_PSW
+        SAVE_ALL __LC_SVC_OLD_PSW,1
 	mvi     SP_PGM_OLD_ILC(%r15),1  # mark PGM_OLD_ILC as invalid
 pgm_system_call:	
         GET_CURRENT               # load pointer to task_struct to R9
@@ -207,7 +239,7 @@ sysc_leave:
 	tm      SP_PGM_OLD_ILC(%r15),0xff
         bz      BASED(pgm_svcret)
 	stnsm   24(%r15),0xfc            # disable I/O and ext. interrupts
-        RESTORE_ALL
+        RESTORE_ALL 1
 
 #
 # call do_signal before return
@@ -557,7 +589,10 @@ sys_call_table:
         .long  sys_madvise
 	.long  sys_getdents64		 /* 220 */
         .long  sys_fcntl64 
-	.rept  255-221
+	.long  sys_ni_syscall		 /* 222 - reserved for posix_acl */
+	.long  sys_ni_syscall		 /* 223 - reserved for posix_acl */
+	.long  sys_ni_syscall		 /* 224 - reserved for posix_acl */
+	.rept  255-224
 	.long  sys_ni_syscall
 	.endr
 
@@ -581,10 +616,10 @@ pgm_check_handler:
  * for LPSW?).
  */
 	stm     %r13,%r15,__LC_SAVE_AREA
-	stam    %a2,%a4,__LC_SAVE_AREA+12
 	basr    %r13,0                   # temp base pointer
 	l       %r13,.Lentry_base-.(%r13)# load &entry_base to %r13
         tm      __LC_PGM_INT_CODE+1,0x80 # check whether we got a per exception
+	stam    %a2,%a4,__LC_SAVE_AREA+12
         bz      BASED(pgm_sv)            # skip if not
         tm      __LC_PGM_OLD_PSW,0x40    # test if per event recording is on
         bnz     BASED(pgm_sv)            # skip if it is
@@ -677,7 +712,7 @@ pgm_return:
 
         .globl io_int_handler
 io_int_handler:
-        SAVE_ALL __LC_IO_OLD_PSW
+        SAVE_ALL __LC_IO_OLD_PSW,0
         GET_CURRENT               # load pointer to task_struct to R9
         la      %r2,SP_PTREGS(%r15) # address of register-save area
         sr      %r3,%r3
@@ -710,7 +745,7 @@ io_return_bh:
         bnz     BASED(io_signal_return)
 io_leave:
         stnsm   24(%r15),0xfc            # disable I/O and ext. interrupts
-        RESTORE_ALL
+        RESTORE_ALL 0
 
 #
 # call do_softirq
@@ -744,7 +779,7 @@ io_signal_return:
 
         .globl  ext_int_handler
 ext_int_handler:
-        SAVE_ALL __LC_EXT_OLD_PSW
+        SAVE_ALL __LC_EXT_OLD_PSW,0
         GET_CURRENT                    # load pointer to task_struct to R9
         la      %r2,SP_PTREGS(%r15)    # address of register-save area
         lh      %r3,__LC_EXT_INT_CODE  # error code
@@ -772,11 +807,11 @@ ext_int_found:
 
         .globl mcck_int_handler
 mcck_int_handler:
-        SAVE_ALL __LC_MCK_OLD_PSW
+        SAVE_ALL __LC_MCK_OLD_PSW,0
 	l       %r1,BASED(.Ls390_mcck)
 	basr    %r14,%r1	  # call machine check handler
 mcck_return:
-        RESTORE_ALL
+        RESTORE_ALL 0
 
 #ifdef CONFIG_SMP
 /*
@@ -784,7 +819,7 @@ mcck_return:
  */
         .globl restart_int_handler
 restart_int_handler:
-        l       %r15,__LC_KERNEL_STACK # load ksp
+        l       %r15,__LC_SAVE_AREA+60 # load ksp
         lctl    %c0,%c15,__LC_CREGS_SAVE_AREA # get new ctl regs
         lam     %a0,%a15,__LC_AREGS_SAVE_AREA
         stosm   0(%r15),0x04           # now we can turn dat on
@@ -817,6 +852,7 @@ restart_go:
 .Lc0xffffe000: .long  -8192        # to round stack pointer to &task_struct
 .Lc8191:       .long  8191
 .Lc_spsize:    .long  SP_SIZE
+.Lc_overhead:  .long  STACK_FRAME_OVERHEAD
 .Lc_ac:        .long  0,0,1
 .Lc_ENOSYS:    .long  -ENOSYS
 .Lc4:          .long  4

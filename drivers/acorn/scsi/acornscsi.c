@@ -3159,5 +3159,7 @@ static void __exit acornscsi_exit(void)
 module_init(acornscsi_init);
 module_exit(acornscsi_exit);
 
+MODULE_AUTHOR("Russell King");
+MODULE_DESCRIPTION("AcornSCSI driver");
 MODULE_LICENSE("GPL");
 EXPORT_NO_SYMBOLS;

@@ -6,21 +6,25 @@
  *    Author(s): Martin Schwidefsky (schwidefsky@de.ibm.com),
  */
 
-#include <linux/stddef.h>
-#include <linux/kernel.h>
 #include <linux/string.h>
-#include <asm/ebcdic.h>
+#include <linux/spinlock.h>
 #include <asm/cpcmd.h>
+#include <asm/ebcdic.h>
+#include <asm/system.h>
+
+static spinlock_t cpcmd_lock = SPIN_LOCK_UNLOCKED;
+static char cpcmd_buf[128];
 
 void cpcmd(char *cmd, char *response, int rlen)
 {
         const int mask = 0x40000000L;
-        char obuffer[128];
-        int olen;
+	unsigned long flags;
+        int cmdlen;
 
-        olen = strlen(cmd);
-        strcpy(obuffer, cmd);
-        ASCEBC(obuffer,olen);
+	spin_lock_irqsave(&cpcmd_lock, flags);
+        cmdlen = strlen(cmd);
+        strcpy(cpcmd_buf, cmd);
+        ASCEBC(cpcmd_buf, cmdlen);
 
         if (response != NULL && rlen > 0) {
                 asm volatile ("   lrag  2,0(%0)\n"
@@ -32,7 +36,7 @@ void cpcmd(char *cmd, char *response, int rlen)
                               "   .long 0x83240008 # Diagnose 83\n"
                               "   sam64"
                               : /* no output */
-                              : "a" (obuffer), "d" (olen),
+                              : "a" (cpcmd_buf), "d" (cmdlen),
                                 "a" (response), "d" (rlen), "m" (mask)
                               : "2", "3", "4", "5" );
                 EBCASC(response, rlen);
@@ -43,8 +47,9 @@ void cpcmd(char *cmd, char *response, int rlen)
                               "   .long 0x83230008 # Diagnose 83\n"
                               "   sam64"
                               : /* no output */
-                              : "a" (obuffer), "d" (olen)
+                              : "a" (cpcmd_buf), "d" (cmdlen)
                               : "2", "3"  );
         }
+	spin_unlock_irqrestore(&cpcmd_lock, flags);
 }
 

@@ -19,6 +19,7 @@
 #include <linux/init.h>
 #include <linux/unistd.h>
 #include <linux/signal.h>
+#include <linux/completion.h>
 
 static DECLARE_TASK_QUEUE(tq_context);
 static DECLARE_WAIT_QUEUE_HEAD(context_task_wq);
@@ -63,7 +64,7 @@ int schedule_task(struct tq_struct *task)
 	return ret;
 }
 
-static int context_thread(void *dummy)
+static int context_thread(void *startup)
 {
 	struct task_struct *curtask = current;
 	DECLARE_WAITQUEUE(wait, curtask);
@@ -78,6 +79,8 @@ static int context_thread(void *dummy)
 	siginitsetinv(&curtask->blocked, sigmask(SIGCHLD));
 	recalc_sigpending(curtask);
 	spin_unlock_irq(&curtask->sigmask_lock);
+
+	complete((struct completion *)startup);
 
 	/* Install a handler so SIGCLD is delivered */
 	sa.sa.sa_handler = SIG_IGN;
@@ -150,7 +153,10 @@ void flush_scheduled_tasks(void)
 	
 int start_context_thread(void)
 {
-	kernel_thread(context_thread, NULL, CLONE_FS | CLONE_FILES);
+	static struct completion startup __initdata = COMPLETION_INITIALIZER(startup);
+
+	kernel_thread(context_thread, &startup, CLONE_FS | CLONE_FILES);
+	wait_for_completion(&startup);
 	return 0;
 }
 

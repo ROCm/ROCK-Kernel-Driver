@@ -204,13 +204,9 @@ tape_read (struct file *filp, char *data, size_t count, loff_t * ppos)
 	    return rc;
 	}
 	s390irq_spin_unlock_irqrestore (ti->devinfo.irq, lockflags);
-	wait_event_interruptible (ti->wq,ti->wanna_wakeup);
+	wait_event (ti->wq,ti->wanna_wakeup);
 	ti->cqr = NULL;
 	ti->discipline->free_read_block (cqr, ti);
-	if (signal_pending (current)) {
-		tapestate_set (ti, TS_IDLE);
-		return -ERESTARTSYS;
-	}
 	s390irq_spin_lock_irqsave (ti->devinfo.irq, lockflags);
 	if (tapestate_get (ti) == TS_FAILED) {
 		tapestate_set (ti, TS_IDLE);

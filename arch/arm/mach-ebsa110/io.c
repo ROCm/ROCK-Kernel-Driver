@@ -279,6 +279,9 @@ void insb(unsigned int port, void *from, int len)
 	__raw_readsb(ISAIO_BASE + off, from, len);
 }
 
+EXPORT_SYMBOL(outsb);
+EXPORT_SYMBOL(insb);
+
 void outsw(unsigned int port, const void *from, int len)
 {
 	u32 off;
@@ -308,6 +311,9 @@ void insw(unsigned int port, void *from, int len)
 
 	__raw_readsw(ISAIO_BASE + off, from, len);
 }
+
+EXPORT_SYMBOL(outsw);
+EXPORT_SYMBOL(insw);
 
 void outsl(unsigned int port, const void *from, int len)
 {

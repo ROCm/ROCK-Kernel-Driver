@@ -10,9 +10,13 @@
 #define __S390_GDB_STUB__
 #include <linux/config.h>
 #if CONFIG_REMOTE_DEBUG
-#include <asm/s390-gdbregs.h>
 #include <asm/ptrace.h>
 extern int    gdb_stub_initialised;
-extern void gdb_stub_handle_exception(gdb_pt_regs *regs,int sigval);
+extern void gdb_stub_handle_exception(struct gdb_pt_regs *regs,int sigval);
+struct net_device;
+struct net_device *gdb_dev;
+void gdb_do_timers(void);
+extern int putDebugChar(char c);    /* write a single character      */
+extern char getDebugChar(void);     /* read and return a single char */
 #endif
 #endif

@@ -220,11 +220,6 @@
  */
  
 #include <linux/module.h>
-
-#if defined(PCMCIA)
-#  undef MODULE
-#endif
-
 #include <stdarg.h>
 #include <asm/io.h>
 #include <asm/irq.h>

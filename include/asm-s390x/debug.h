@@ -44,6 +44,7 @@ struct __debug_entry{
 
 #define DEBUG_MAX_LEVEL            6  /* debug levels range from 0 to 6 */
 #define DEBUG_OFF_LEVEL            -1 /* level where debug is switched off */
+#define DEBUG_FLUSH_ALL            -1 /* parameter to flush all areas */
 #define DEBUG_MAX_VIEWS            10 /* max number of views in proc fs */
 #define DEBUG_MAX_PROCF_LEN        16 /* max length for a proc file name */
 #define DEBUG_DEFAULT_LEVEL        3  /* initial debug level */

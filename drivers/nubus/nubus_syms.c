@@ -12,6 +12,8 @@ EXPORT_SYMBOL(nubus_proc_attach_device);
 EXPORT_SYMBOL(nubus_proc_detach_device);
 #endif
 
+MODULE_LICENSE("GPL");
+
 EXPORT_SYMBOL(nubus_find_device);
 EXPORT_SYMBOL(nubus_find_type);
 EXPORT_SYMBOL(nubus_find_slot);

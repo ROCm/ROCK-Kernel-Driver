@@ -68,26 +68,30 @@ static inline int start_sa1100_dma(sa1100_dma_t * dma, dma_addr_t dma_ptr, int s
 {
 	dma_regs_t *regs = dma->regs;
 	int status;
-	int use_bufa;
 
 	status = regs->RdDCSR;
 
 	/* If both DMA buffers are started, there's nothing else we can do. */
-	if ((status & DCSR_STRTA) && (status & DCSR_STRTB)) {
+	if ((status & (DCSR_STRTA | DCSR_STRTB)) == (DCSR_STRTA | DCSR_STRTB)) {
 		DPRINTK("start: st %#x busy\n", status);
 		return -EBUSY;
 	}
 
-	use_bufa = (((status & DCSR_BIU) && (status & DCSR_STRTB)) ||
-		    (!(status & DCSR_BIU) && !(status & DCSR_STRTA)));
-	if (use_bufa) {
-		regs->ClrDCSR = DCSR_DONEA | DCSR_STRTA;
+	if (((status & DCSR_BIU) && (status & DCSR_STRTB)) ||
+	    (!(status & DCSR_BIU) && !(status & DCSR_STRTA))) {
+		if (status & DCSR_DONEA) {
+			/* give a chance for the interrupt to be processed */
+			goto irq_pending;
+		}
 		regs->DBSA = dma_ptr;
 		regs->DBTA = size;
 		regs->SetDCSR = DCSR_STRTA | DCSR_IE | DCSR_RUN;
 		DPRINTK("start a=%#x s=%d on A\n", dma_ptr, size);
 	} else {
-		regs->ClrDCSR = DCSR_DONEB | DCSR_STRTB;
+		if (status & DCSR_DONEB) {
+			/* give a chance for the interrupt to be processed */
+			goto irq_pending;
+		}
 		regs->DBSB = dma_ptr;
 		regs->DBTB = size;
 		regs->SetDCSR = DCSR_STRTB | DCSR_IE | DCSR_RUN;
@@ -95,6 +99,9 @@ static inline int start_sa1100_dma(sa1100_dma_t * dma, dma_addr_t dma_ptr, int s
 	}
 
 	return 0;
+
+irq_pending:
+	return -EAGAIN;
 }
 
 
@@ -204,11 +211,16 @@ static void dma_irq_handler(int irq, void *dev_id, struct pt_regs *regs)
 
 	DPRINTK("IRQ: b=%#x st=%#x\n", (int) dma->curr->id, status);
 
-	dma->regs->ClrDCSR = DCSR_ERROR | DCSR_DONEA | DCSR_DONEB;
-	if (!(status & (DCSR_DONEA | DCSR_DONEB)))
-		return;
+	if (status & (DCSR_ERROR)) {
+		printk(KERN_ERR "DMA on \"%s\" caused an error\n", dma->device_id);
+		dma->regs->ClrDCSR = DCSR_ERROR;
+	}
 
-	sa1100_dma_done (dma);
+	dma->regs->ClrDCSR = status & (DCSR_DONEA | DCSR_DONEB);
+	if (status & DCSR_DONEA)
+		sa1100_dma_done (dma);
+	if (status & DCSR_DONEB)
+		sa1100_dma_done (dma);
 }
 
 
@@ -435,7 +447,7 @@ int sa1100_dma_stop(dmach_t channel)
 		dma->curr = NULL;
 	}
 	dma->spin_ref = 0;
-	dma->regs->ClrDCSR = DCSR_STRTA|DCSR_STRTB;
+	dma->regs->ClrDCSR = DCSR_STRTA|DCSR_STRTB|DCSR_DONEA|DCSR_DONEB;
 	process_dma(dma);
 	local_irq_restore(flags);
 	return 0;
@@ -455,7 +467,6 @@ int sa1100_dma_resume(dmach_t channel)
 	if (dma->stopped) {
 		int flags;
 		save_flags_cli(flags);
-		dma->regs->ClrDCSR = DCSR_STRTA|DCSR_STRTB|DCSR_RUN|DCSR_IE;
 		dma->stopped = 0;
 		dma->spin_ref = 0;
 		process_dma(dma);
@@ -478,7 +489,7 @@ int sa1100_dma_flush_all(dmach_t channel)
 	if (channel_is_sa1111_sac(channel))
 		sa1111_reset_sac_dma(channel);
 	else
-		dma->regs->ClrDCSR = DCSR_STRTA|DCSR_STRTB|DCSR_RUN|DCSR_IE;
+		dma->regs->ClrDCSR = DCSR_STRTA|DCSR_STRTB|DCSR_DONEA|DCSR_DONEB|DCSR_RUN|DCSR_IE;
 	buf = dma->curr;
 	if (!buf)
 		buf = dma->tail;

@@ -261,7 +261,7 @@ iplstart:
 	l     %r1,0xb8                         # load ipl subchannel number
         la    %r2,IPL_BS                       # load start address
         bas   %r14,.Lloader                    # load rest of ipl image
-        larl  %r12,parmarea                    # pointer to parameter area
+        larl  %r12,_pstart                     # pointer to parameter area
         st    %r1,IPL_DEVICE+4-PARMAREA(%r12)  # store ipl device number
 
 #
@@ -464,7 +464,7 @@ startup:basr  %r13,0                     # get base
         sigp  %r1,%r0,0x12               # switch to esame mode
 	sam64				 # switch to 64 bit mode
 	lctlg %c0,%c15,.Lctl-.LPG1(%r13) # load control registers
-	larl  %r12,parmarea              # pointer to parameter area
+	larl  %r12,_pstart               # pointer to parameter area
 					 # move IPL device to lowcore
         mvc   __LC_IPLDEV(4),IPL_DEVICE+4-PARMAREA(%r12)
 					 # set program check new psw mask
@@ -472,42 +472,64 @@ startup:basr  %r13,0                     # get base
 
 
 #
-# find out memory size.
+# find memory chunks.
 #
-	la    %r1,1f-.LPG1(%r13)         # set program check address
+	larl  %r1,.Lchkmem               # set program check address
 	stg   %r1,__LC_PGM_NEW_PSW+8
-        lghi  %r2,1
-        sllg  %r2,%r2,17                 # test in increments of 128KB
-	lgr   %r1,%r2
-	aghi  %r1,-8                     # test last word in the segment
-0:	lg    %r0,0(%r1)                 # test 128KB segment
-        stg   %r0,0(%r1)
-	algr  %r1,%r2                    # add 128KB
-	bc    12,0b-.LPG1(%r13)          # r1 < 2^64 -> loop
-1:	ng    %r1,.L4malign-.LPG1(%r13)  # align to multiples of 4M
-	larl  %r3,memory_size-.
-	stg   %r1,0(%r3)                 # store memory size
+	la    %r1,1                      # test in increments of 128KB
+	sllg  %r1,%r1,17
+	larl  %r3,memory_chunk
+	slgr  %r4,%r4                    # set start of chunk to zero
+	slgr  %r5,%r5                    # set end of chunk to zero
+	slr  %r6,%r6			 # set access code to zero
+.Lloop:
+	tprot 0(%r5),0			 # test protection of first byte
+	ipm   %r7
+	srl   %r7,28
+	clr   %r6,%r7			 # compare cc with last access code
+	je    .Lsame
+	clgr  %r4,%r5			 # chunk size > 0?
+	je    .Lsize0
+	stg   %r4,0(%r3)		 # store start address of chunk
+	lgr   %r0,%r5
+	slgr  %r0,%r4
+	stg   %r0,8(%r3)		 # store size of chunk
+	st    %r6,20(%r3)		 # store type of chunk
+	la    %r3,24(%r3)
+	lgr   %r4,%r5			 # set start to end
+	larl  %r8,memory_size
+	stg   %r5,0(%r8)                 # store memory size
+.Lsize0:
+	lr    %r6,%r7			 # set access code to last cc
+.Lsame:
+	algr  %r5,%r1			 # add 128KB to end of chunk
+	brc   12,.Lloop
+.Lchkmem:				 # > 16EB or tprot got a program check
+	clgr  %r4,%r5			 # chunk size > 0?
+	je    .Ldonemem
+	stg   %r4,0(%r3)		 # store start address of chunk
+	lgr   %r0,%r5
+	slgr  %r0,%r4
+	stg   %r0,8(%r3)		 # store size of chunk
+	st    %r6,20(%r3)		 # store type of chunk
+	la    %r3,24(%r3)
+	lgr   %r4,%r5
+	larl  %r8,memory_size
+	stg   %r5,0(%r8)                 # store memory size
 #
-# find out memory size part 2. Running native the HSA is located at
-# 2GB and we will get an addressing exception trying to access it.
-# We have to restart the scan at 2GB to find out if the machine has
-# more than 2GB of storage.
+# Running native the HSA is located at 2GB and we will get an
+# addressing exception trying to access it. We have to restart
+# the scan at 2GB to find out if the machine has more than 2GB.
 #
-	la    %r1,1f-.LPG1(%r13)         # set program check address
-	stg   %r1,__LC_PGM_NEW_PSW+8
-	lg    %r1,.Lscan2g-.LPG1(%r13)   # restart scanning @ 2GB + 128K - 8
-0:	lg    %r0,0(%r1)                 # test 128KB segment
-	stg   %r0,0(%r1)
-	algr  %r1,%r2                    # add 128 KB
-	bc    12,0b-.LPG1(%r13)          # r1 < 2^64 -> loop
-1:	clg   %r1,.Lscan2g-.LPG1(%r13)   # program check @ 2GB + 128K - 8 ?
-	be    2f-.LPG1(%r13)
-	ng    %r1,.L4malign-.LPG1(%r13)  # align to multiples of 4M
-	larl  %r3,memory_size-.
-	stg   %r1,0(%r3)                 # store memory size
-2:
+	lghi  %r4,1
+	sllg  %r4,%r4,31
+	clgr  %r5,%r4
+	jhe   .Ldonemem
+	lgr   %r5,%r4
+	j     .Lloop
+.Ldonemem:		
 
-	larl  %r12,machine_flags-.
+	larl  %r12,machine_flags
 #
 # find out if we are running under VM
 #
@@ -539,7 +561,7 @@ startup:basr  %r13,0                     # get base
 .Lentry:.quad  0x0000000180000000,_stext
 .Lctl:  .quad  0x04b50002               # cr0: various things
         .quad  0                        # cr1: primary space segment table
-        .quad  0                        # cr2: access register translation
+        .quad  .Lduct                   # cr2: dispatchable unit control table
         .quad  0                        # cr3: instruction authorization
         .quad  0                        # cr4: instruction authorization
         .quad  0                        # cr5:  various things
@@ -557,11 +579,16 @@ startup:basr  %r13,0                     # get base
 .L4malign:.quad 0xffffffffffc00000
 .Lscan2g:.quad 0x80000000 + 0x20000 - 8 # 2GB + 128K - 8
 
+	.org PARMAREA-64
+.Lduct:	.long 0,0,0,0,0,0,0,0
+	.long 0,0,0,0,0,0,0,0
+
 #
 # params at 10400 (setup.h)
 #
 	.org   PARMAREA
-parmarea:
+	.global _pstart
+_pstart:
 	.quad  0                        # IPL_DEVICE
         .quad  RAMDISK_ORIGIN           # INITRD_START
         .quad  RAMDISK_SIZE             # INITRD_SIZE
@@ -569,31 +596,28 @@ parmarea:
         .org   COMMAND_LINE
     	.byte  "root=/dev/ram0 ro"
         .byte  0
+	.org   0x11000
+	.global _pend
+_pend:	
 
+#ifdef CONFIG_SHARED_KERNEL
+	.org   0x100000
+#endif
+	
 #
 # startup-code, running in virtual mode
 #
-#ifdef CONFIG_SHARED_KERNEL
-	.org   0x100000
-#else
-        .org   0x10800
-#endif
         .globl _stext
 _stext:	basr  %r13,0                    # get base
 .LPG2:
 #
-# Setup lowcore
+# Setup stack
 #
-        l     %r1,__LC_IPLDEV           # load ipl device number
-        spx   .Lprefix-.LPG2(%r13)      # set prefix to linux lowcore
-        st    %r1,__LC_IPLDEV           # store ipl device number
 	larl  %r15,init_task_union
         aghi  %r15,16384                # init_task_union + 16384
         stg   %r15,__LC_KERNEL_STACK    # set end of kernel stack
         aghi  %r15,-160
         xc    0(8,%r15),0(%r15)         # set backchain to zero
-        lghi  %r0,-1
-        stg   %r0,__LC_KERNEL_LEVEL     # set interrupt count to -1
 #
 # clear bss memory
 #
@@ -621,6 +645,5 @@ _stext:	basr  %r13,0                    # get base
 #
             .align 8
 .Ldw:       .quad  0x0002000180000000,0x0000000000000000
-.Lprefix:   .long  init_S390_lowcore	
 .Laregs:    .long  0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0
 

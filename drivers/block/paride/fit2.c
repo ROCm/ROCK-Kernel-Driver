@@ -160,3 +160,4 @@ void    cleanup_module(void)
 #endif
 
 /* end of fit2.c */
+MODULE_LICENSE("GPL");

@@ -47,6 +47,7 @@ static int __init assabet_init(void)
 		 * or BCR_clear().
 		 */
 		BCR = BCR_value = BCR_DB1111;
+		NCR_0 = 0;
 
 #ifndef CONFIG_ASSABET_NEPONSET
 		printk( "Warning: Neponset detected but full support "
@@ -101,6 +102,8 @@ static void __init get_assabet_scr(void)
 	SCR_value = scr;
 }
 
+extern void convert_to_tag_list(struct param_struct *params, int mem_init);
+
 static void __init
 fixup_assabet(struct machine_desc *desc, struct param_struct *params,
 	      char **cmdline, struct meminfo *mi)
@@ -113,6 +116,12 @@ fixup_assabet(struct machine_desc *desc, struct param_struct *params,
 
 	if (machine_has_neponset())
 		printk("Neponset expansion board detected\n");
+
+	/*
+	 * Apparantly bootldr uses a param_struct.  Groan.
+	 */
+	if (t->hdr.tag != ATAG_CORE)
+		convert_to_tag_list(params, 1);
 
 	if (t->hdr.tag != ATAG_CORE) {
 		t->hdr.tag = ATAG_CORE;
@@ -265,7 +274,6 @@ static void __init assabet_map_io(void)
 	neponset_map_io();
 #endif
 
-	sa1100_register_uart(1, 2);
 	if (machine_has_neponset()) {
 		/*
 		 * When Neponset is attached, the first UART should be
@@ -295,7 +303,7 @@ static void __init assabet_map_io(void)
 	 * excessive power drain.  --rmk
 	 */
 	GPDR |= GPIO_SSP_TXD | GPIO_SSP_SCLK | GPIO_SSP_SFRM;
-	GPCR |= GPIO_SSP_TXD | GPIO_SSP_SCLK | GPIO_SSP_SFRM;
+	GPCR = GPIO_SSP_TXD | GPIO_SSP_SCLK | GPIO_SSP_SFRM;
 }
 
 

@@ -320,3 +320,4 @@ void	cleanup_module(void)
 #endif
 
 /* end of epat.c */
+MODULE_LICENSE("GPL");

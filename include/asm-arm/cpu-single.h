@@ -51,6 +51,7 @@
 
 #ifndef __ASSEMBLY__
 
+#include <asm/memory.h>
 #include <asm/page.h>
 
 /* forward declare task_struct */
@@ -85,5 +86,14 @@ extern void cpu_set_pte(pte_t *ptep, pte_t pte);
 extern volatile void cpu_reset(unsigned long addr);
 
 #define cpu_switch_mm(pgd,tsk) cpu_set_pgd(__virt_to_phys((unsigned long)(pgd)))
+
+#define cpu_get_pgd()	\
+	({						\
+		unsigned long pg;			\
+		__asm__("mrc p15, 0, %0, c2, c0, 0"	\
+			 : "=r" (pg));			\
+		pg &= ~0x3fff;				\
+		(pgd_t *)phys_to_virt(pg);		\
+	})
 
 #endif

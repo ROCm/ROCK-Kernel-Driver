@@ -186,7 +186,7 @@ do_udf_readdir(struct inode * dir, struct file *filp, filldir_t filldir, void *d
 				udf_release_data(fibh.ebh);
 			udf_release_data(fibh.sbh);
 			udf_release_data(bh);
-			return -ENOENT;
+			return 0;
 		}
 
 		liu = le16_to_cpu(cfi.lengthOfImpUse);

@@ -19,7 +19,7 @@ static inline struct task_struct * get_current(void)
 {
         struct task_struct *current;
         __asm__("lhi   %0,-8192\n\t"
-                "nr    %0,15"
+                "al    %0,0xc40"
                 : "=&r" (current) : : "cc" );
         return current;
  }

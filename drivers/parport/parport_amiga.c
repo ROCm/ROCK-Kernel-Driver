@@ -298,6 +298,7 @@ void __exit parport_amiga_exit(void)
 MODULE_AUTHOR("Joerg Dorchain <joerg@dorchain.net>");
 MODULE_DESCRIPTION("Parport Driver for Amiga builtin Port");
 MODULE_SUPPORTED_DEVICE("Amiga builtin Parallel Port");
+MODULE_LICENSE("GPL");
 
 module_init(parport_amiga_init)
 module_exit(parport_amiga_exit)

@@ -3,11 +3,11 @@
       By: YOKOTA Hiroshi <yokota@netlab.is.tsukuba.ac.jp>
  
   This software may be used and distributed according to the terms of
-  the GNU Public License.
+  the GNU General Public License.
 
   */
 
-/* $Id: nsp_io.h,v 1.8 2001/01/30 05:16:02 elca Exp $ */
+/* $Id: nsp_io.h,v 1.9 2001/09/07 04:32:42 elca Exp $ */
 
 #ifndef __NSP_IO_H__
 #define __NSP_IO_H__

@@ -20,14 +20,53 @@
 
 static int __init pfs168_init(void)
 {
-	if (sa1111_init() < 0)
-		return -EINVAL;
-	SMCR = (SMCR_DTIM | SMCR_MBGE |
-		FInsrt(FExtr(MDCNFG, MDCNFG_SA1110_DRAC0), SMCR_DRAC) |
-		((FExtr(MDCNFG, MDCNFG_SA1110_TDL0)==3) ? SMCR_CLAT : 0));
+	int ret;
+
+	if (!machine_is_pfs168())
+		return -ENODEV;
+
+	/*
+	 * Ensure that the memory bus request/grant signals are setup,
+	 * and the grant is held in its inactive state
+	 */
+	sa1110_mb_disable();
+
+	/*
+	 * Probe for SA1111.
+	 */
+	ret = sa1111_probe();
+	if (ret < 0)
+		return ret;
+
+	/*
+	 * We found it.  Wake the chip up.
+	 */
+	sa1111_wake();
+
+	/*
+	 * The SDRAM configuration of the SA1110 and the SA1111 must
+	 * match.  This is very important to ensure that SA1111 accesses
+	 * don't corrupt the SDRAM.  Note that this ungates the SA1111's
+	 * MBGNT signal, so we must have called sa1110_mb_disable()
+	 * beforehand.
+	 */
+	sa1111_configure_smc(1,
+			     FExtr(MDCNFG, MDCNFG_SA1110_DRAC0),
+			     FExtr(MDCNFG, MDCNFG_SA1110_TDL0));
+
+	/*
+	 * We only need to turn on DCLK whenever we want to use the
+	 * DMA.  It can otherwise be held firmly in the off position.
+	 */
 	SKPCR |= SKPCR_DCLKEN;
 
-	sa1111_init_irq(25);	/* SA1111 IRQ on GPIO 25 */
+	/*
+	 * Enable the SA1110 memory bus request and grant signals.
+	 */
+	sa1110_mb_enable();
+
+	set_GPIO_IRQ_edge(GPIO_GPIO(25), GPIO_RISING_EDGE);
+	sa1111_init_irq(SA1100_GPIO_TO_IRQ(25));	/* SA1111 IRQ on GPIO 25 */
 
 	return 0;
 }

@@ -1471,20 +1471,98 @@ static int emu_seb (int rx, float *val) {
 }
 
 /* Test data class long double */
-static int emu_tcxb (int rx, double *val) {
-        display_emulation_not_implemented("tcxb");
+static int emu_tcxb (int rx, long val) {
+        FP_DECL_Q(QA);
+	mathemu_ldcv cvt;
+	int bit;
+
+        cvt.w.high = current->thread.fp_regs.fprs[rx].ui;
+        cvt.w.low = current->thread.fp_regs.fprs[rx+2].ui;
+        FP_UNPACK_RAW_QP(QA, &cvt.ld);
+	switch (QA_e) {
+	default:
+		bit = 8;		/* normalized number */
+		break;
+	case 0:
+		if (_FP_FRAC_ZEROP_4(QA))
+			bit = 10;	/* zero */
+		else
+			bit = 6;	/* denormalized number */
+		break;
+	case _FP_EXPMAX_Q:
+		if (_FP_FRAC_ZEROP_4(QA))
+			bit = 4;	/* infinity */
+		else if (_FP_FRAC_HIGH_RAW_Q(QA) & _FP_QNANBIT_Q)
+			bit = 2;	/* quiet NAN */
+		else
+			bit = 0;	/* signaling NAN */
+		break;
+	}
+	if (!QA_s)
+		bit++;
+	emu_set_CC(((__u32) val >> bit) & 1);
         return 0;
 }
 
 /* Test data class double */
-static int emu_tcdb (int rx, double *val) {
-        display_emulation_not_implemented("tcdb");
+static int emu_tcdb (int rx, long val) {
+        FP_DECL_D(DA);
+	int bit;
+
+        FP_UNPACK_RAW_DP(DA, &current->thread.fp_regs.fprs[rx].d);
+	switch (DA_e) {
+	default:
+		bit = 8;		/* normalized number */
+		break;
+	case 0:
+		if (_FP_FRAC_ZEROP_2(DA))
+			bit = 10;	/* zero */
+		else
+			bit = 6;	/* denormalized number */
+		break;
+	case _FP_EXPMAX_D:
+		if (_FP_FRAC_ZEROP_2(DA))
+			bit = 4;	/* infinity */
+		else if (_FP_FRAC_HIGH_RAW_D(DA) & _FP_QNANBIT_D)
+			bit = 2;	/* quiet NAN */
+		else
+			bit = 0;	/* signaling NAN */
+		break;
+	}
+	if (!DA_s)
+		bit++;
+	emu_set_CC(((__u32) val >> bit) & 1);
         return 0;
 }
 
 /* Test data class float */
-static int emu_tceb (int rx, __u32 val) {
-        display_emulation_not_implemented("tceb");
+static int emu_tceb (int rx, long val) {
+        FP_DECL_S(SA);
+	int bit;
+
+        FP_UNPACK_RAW_SP(SA, &current->thread.fp_regs.fprs[rx].f);
+	switch (SA_e) {
+	default:
+		bit = 8;		/* normalized number */
+		break;
+	case 0:
+		if (_FP_FRAC_ZEROP_1(SA))
+			bit = 10;	/* zero */
+		else
+			bit = 6;	/* denormalized number */
+		break;
+	case _FP_EXPMAX_S:
+		if (_FP_FRAC_ZEROP_1(SA))
+			bit = 4;	/* infinity */
+		else if (_FP_FRAC_HIGH_RAW_S(SA) & _FP_QNANBIT_S)
+			bit = 2;	/* quiet NAN */
+		else
+			bit = 0;	/* signaling NAN */
+		break;
+	}
+	if (!SA_s)
+		bit++;
+	emu_set_CC(((__u32) val >> bit) & 1);
         return 0;
 }
 
@@ -1796,13 +1874,13 @@ int math_emu_ed(__u8 *opcode, struct pt_regs * regs) {
         int _fex = 0;
 
         static const __u8 format_table[256] = {
-                [0x04] = 0x08,[0x05] = 0x07,[0x06] = 0x09,[0x07] = 0x07,
-		[0x08] = 0x03,[0x09] = 0x03,[0x0a] = 0x03,[0x0b] = 0x03,
-		[0x0c] = 0x08,[0x0d] = 0x03,[0x0e] = 0x06,[0x0f] = 0x06,
-                [0x10] = 0x03,[0x11] = 0x02,[0x12] = 0x01,[0x14] = 0x03,
-		[0x15] = 0x02,[0x17] = 0x03,[0x18] = 0x02,[0x19] = 0x02,
-		[0x1a] = 0x02,[0x1b] = 0x02,[0x1c] = 0x02,[0x1d] = 0x02,
-                [0x1e] = 0x05,[0x1f] = 0x05,
+                [0x04] = 0x06,[0x05] = 0x05,[0x06] = 0x07,[0x07] = 0x05,
+		[0x08] = 0x02,[0x09] = 0x02,[0x0a] = 0x02,[0x0b] = 0x02,
+		[0x0c] = 0x06,[0x0d] = 0x02,[0x0e] = 0x04,[0x0f] = 0x04,
+                [0x10] = 0x08,[0x11] = 0x09,[0x12] = 0x0a,[0x14] = 0x02,
+		[0x15] = 0x01,[0x17] = 0x02,[0x18] = 0x01,[0x19] = 0x01,
+		[0x1a] = 0x01,[0x1b] = 0x01,[0x1c] = 0x01,[0x1d] = 0x01,
+                [0x1e] = 0x03,[0x1f] = 0x03,
         };
         static const void *jump_table[]= {
                 [0x04] = emu_ldeb,[0x05] = emu_lxdb,[0x06] = emu_lxeb,
@@ -1817,25 +1895,7 @@ int math_emu_ed(__u8 *opcode, struct pt_regs * regs) {
         };
 
         switch (format_table[opcode[5]]) {
-        case 1: /* RXE format, long double constant */ {
-                __u64 *dxb, temp[2];
-                __u32 opc;
-
-                if ((opcode[1] >> 4) & 2)
-			return SIGILL;
-                emu_store_regd((opcode[1] >> 4) & 15);
-                emu_store_regd(((opcode[1] >> 4) & 15) + 2);
-                opc = *((__u32 *) opcode);
-                dxb = (__u64 *) calc_addr(regs, opc >> 16, opc >> 12, opc);
-                mathemu_copy_from_user(&temp, dxb, 16);
-                /* call the emulation function */
-                _fex = ((int (*)(int, long double *)) jump_table[opcode[5]])
-                        (opcode[1] >> 4, (long double *) &temp);
-                emu_load_regd((opcode[1] >> 4) & 15);
-                emu_load_regd(((opcode[1] >> 4) & 15) + 2);
-                break;
-        }
-        case 2: /* RXE format, double constant */ {
+        case 1: /* RXE format, double constant */ {
                 __u64 *dxb, temp;
                 __u32 opc;
 
@@ -1849,7 +1909,7 @@ int math_emu_ed(__u8 *opcode, struct pt_regs * regs) {
                 emu_load_regd((opcode[1] >> 4) & 15);
                 break;
         }
-        case 3: /* RXE format, float constant */ {
+        case 2: /* RXE format, float constant */ {
                 __u32 *dxb, temp;
                 __u32 opc;
 
@@ -1863,27 +1923,7 @@ int math_emu_ed(__u8 *opcode, struct pt_regs * regs) {
                 emu_load_rege((opcode[1] >> 4) & 15);
                 break;
         }
-        case 4: /* RXF format, long double constant */ {
-                __u64 *dxb, temp[2];
-                __u32 opc;
-
-                if (((opcode[1] >> 4) & 0x20) || ((opcode[4] >> 4) & 0x20))
-			return SIGILL;
-                emu_store_regd((opcode[1] >> 4) & 15);
-                emu_store_regd(((opcode[1] >> 4) & 15) + 2);
-                emu_store_regd((opcode[4] >> 4) & 15);
-                emu_store_regd(((opcode[4] >> 4) & 15) + 2);
-                opc = *((__u32 *) opcode);
-                dxb = (__u64 *) calc_addr(regs, opc >> 16, opc >> 12, opc);
-                mathemu_copy_from_user(&temp, dxb, 16);
-                /* call the emulation function */
-                _fex = ((int (*)(int,long double *,int)) jump_table[opcode[5]])
-                        (opcode[1] >> 4, (double *) &temp, opcode[4] >> 4);
-                emu_load_regd((opcode[1] >> 4) & 15);
-                emu_load_regd(((opcode[1] >> 4) & 15) + 2);
-                break;
-        }
-        case 5: /* RXF format, double constant */ {
+        case 3: /* RXF format, double constant */ {
                 __u64 *dxb, temp;
                 __u32 opc;
 
@@ -1898,7 +1938,7 @@ int math_emu_ed(__u8 *opcode, struct pt_regs * regs) {
                 emu_load_regd((opcode[1] >> 4) & 15);
                 break;
         }
-        case 6: /* RXF format, float constant */ {
+        case 4: /* RXF format, float constant */ {
                 __u32 *dxb, temp;
                 __u32 opc;
 
@@ -1913,7 +1953,7 @@ int math_emu_ed(__u8 *opcode, struct pt_regs * regs) {
                 emu_load_rege((opcode[4] >> 4) & 15);
                 break;
         }
-        case 7: /* RXE format, double constant */
+        case 5: /* RXE format, double constant */
                 /* store double and load long double */ 
         {
                 __u64 *dxb, temp;
@@ -1931,7 +1971,7 @@ int math_emu_ed(__u8 *opcode, struct pt_regs * regs) {
                 emu_load_regd(((opcode[1] >> 4) & 15) + 2);
                 break;
         }
-        case 8: /* RXE format, float constant */
+        case 6: /* RXE format, float constant */
                 /* store float and load double */ 
         {
                 __u32 *dxb, temp;
@@ -1946,7 +1986,7 @@ int math_emu_ed(__u8 *opcode, struct pt_regs * regs) {
                 emu_load_regd((opcode[1] >> 4) & 15);
                 break;
         }
-        case 9: /* RXE format, float constant */
+        case 7: /* RXE format, float constant */
                 /* store float and load long double */ 
         {
                 __u32 *dxb, temp;
@@ -1962,6 +2002,45 @@ int math_emu_ed(__u8 *opcode, struct pt_regs * regs) {
                         (opcode[1] >> 4, (float *) &temp);
                 emu_load_regd((opcode[1] >> 4) & 15);
                 emu_load_regd(((opcode[1] >> 4) & 15) + 2);
+                break;
+        }
+        case 8: /* RXE format, RX address used as int value */ {
+                __u64 dxb;
+                __u32 opc;
+
+                emu_store_rege((opcode[1] >> 4) & 15);
+                opc = *((__u32 *) opcode);
+                dxb = (__u64) calc_addr(regs, opc >> 16, opc >> 12, opc);
+                /* call the emulation function */
+                _fex = ((int (*)(int, long)) jump_table[opcode[5]])
+                        (opcode[1] >> 4, dxb);
+                break;
+        }
+        case 9: /* RXE format, RX address used as int value */ {
+                __u64 dxb;
+                __u32 opc;
+
+                emu_store_regd((opcode[1] >> 4) & 15);
+                opc = *((__u32 *) opcode);
+                dxb = (__u64) calc_addr(regs, opc >> 16, opc >> 12, opc);
+                /* call the emulation function */
+                _fex = ((int (*)(int, long)) jump_table[opcode[5]])
+                        (opcode[1] >> 4, dxb);
+                break;
+        }
+        case 10: /* RXE format, RX address used as int value */ {
+                __u64 dxb;
+                __u32 opc;
+
+                if ((opcode[1] >> 4) & 2)
+			return SIGILL;
+                emu_store_regd((opcode[1] >> 4) & 15);
+                emu_store_regd(((opcode[1] >> 4) & 15) + 2);
+                opc = *((__u32 *) opcode);
+                dxb = (__u64) calc_addr(regs, opc >> 16, opc >> 12, opc);
+                /* call the emulation function */
+                _fex = ((int (*)(int, long)) jump_table[opcode[5]])
+                        (opcode[1] >> 4, dxb);
                 break;
         }
         default: /* invalid operation */

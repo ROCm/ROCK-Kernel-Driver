@@ -60,14 +60,16 @@ extern void pfault_fini(void);
 extern void pfault_interrupt(struct pt_regs *regs, __u16 error_code);
 #endif
 
-spinlock_t die_lock;
+spinlock_t die_lock = SPIN_LOCK_UNLOCKED;
 
 void die(const char * str, struct pt_regs * regs, long err)
 {
         console_verbose();
         spin_lock_irq(&die_lock);
+	bust_spinlocks(1);
         printk("%s: %04lx\n", str, err & 0xffff);
         show_regs(regs);
+	bust_spinlocks(0);
         spin_unlock_irq(&die_lock);
         do_exit(SIGSEGV);
 }
@@ -135,7 +137,7 @@ int do_debugger_trap(struct pt_regs *regs,int signal)
 #if CONFIG_REMOTE_DEBUG
 		if(gdb_stub_initialised)
 		{
-			gdb_stub_handle_exception((gdb_pt_regs *)regs,signal);
+			gdb_stub_handle_exception((struct gdb_pt_regs *)regs,signal);
 			return 0;
 		}
 #endif
@@ -211,7 +213,7 @@ asmlinkage void
 specification_exception(struct pt_regs * regs, long interruption_code)
 {
         __u8 opcode[6];
-	__u16 *location;
+	__u16 *location = NULL;
 	int signal = 0;
 
         if (regs->psw.mask & PSW_PROBLEM_STATE) {

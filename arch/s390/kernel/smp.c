@@ -57,6 +57,8 @@ static atomic_t  smp_commenced = ATOMIC_INIT(0);
 
 spinlock_t       kernel_flag = SPIN_LOCK_UNLOCKED;
 
+unsigned long	 cpu_online_map;
+
 /*
  *      Setup routine for controlling SMP activation
  *
@@ -91,6 +93,95 @@ extern char vmhalt_cmd[];
 extern char vmpoff_cmd[];
 
 extern void reipl(unsigned long devno);
+
+static sigp_ccode smp_ext_bitcall(int, ec_bit_sig);
+static void smp_ext_bitcall_others(ec_bit_sig);
+
+/*
+ * Structure and data for smp_call_function(). This is designed to minimise
+ * static memory requirements. It also looks cleaner.
+ */
+static spinlock_t call_lock = SPIN_LOCK_UNLOCKED;
+
+struct call_data_struct {
+	void (*func) (void *info);
+	void *info;
+	atomic_t started;
+	atomic_t finished;
+	int wait;
+};
+
+static struct call_data_struct * call_data;
+
+/*
+ * 'Call function' interrupt callback
+ */
+static void do_call_function(void)
+{
+	void (*func) (void *info) = call_data->func;
+	void *info = call_data->info;
+	int wait = call_data->wait;
+
+	atomic_inc(&call_data->started);
+	(*func)(info);
+	if (wait)
+		atomic_inc(&call_data->finished);
+}
+
+/*
+ * this function sends a 'generic call function' IPI to all other CPUs
+ * in the system.
+ */
+
+int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
+			int wait)
+/*
+ * [SUMMARY] Run a function on all other CPUs.
+ * <func> The function to run. This must be fast and non-blocking.
+ * <info> An arbitrary pointer to pass to the function.
+ * <nonatomic> currently unused.
+ * <wait> If true, wait (atomically) until function has completed on other CPUs.
+ * [RETURNS] 0 on success, else a negative status code. Does not return until
+ * remote CPUs are nearly ready to execute <<func>> or are or have executed.
+ *
+ * You must not call this function with disabled interrupts or from a
+ * hardware interrupt handler, you may call it from a bottom half handler.
+ */
+{
+	struct call_data_struct data;
+	int cpus = smp_num_cpus-1;
+
+	if (!cpus || !atomic_read(&smp_commenced))
+		return 0;
+
+	data.func = func;
+	data.info = info;
+	atomic_set(&data.started, 0);
+	data.wait = wait;
+	if (wait)
+		atomic_set(&data.finished, 0);
+
+	spin_lock_bh(&call_lock);
+	call_data = &data;
+	/* Send a message to all other CPUs and wait for them to respond */
+        smp_ext_bitcall_others(ec_call_function);
+
+	/* Wait for response */
+	while (atomic_read(&data.started) != cpus)
+		barrier();
+
+	if (wait)
+		while (atomic_read(&data.finished) != cpus)
+			barrier();
+	spin_unlock_bh(&call_lock);
+
+	return 0;
+}
+
+
+/*
+ * Various special callbacks
+ */
 
 void do_machine_restart(void)
 {
@@ -148,7 +239,6 @@ void machine_power_off(void)
 
 void do_ext_call_interrupt(struct pt_regs *regs, __u16 code)
 {
-        ec_ext_call *ec, *next;
         int bits;
 
         /*
@@ -169,131 +259,15 @@ void do_ext_call_interrupt(struct pt_regs *regs, __u16 code)
 		do_machine_halt();
         if (test_bit(ec_power_off, &bits))
 		do_machine_power_off();
-	if (test_bit(ec_ptlb, &bits))
-	        local_flush_tlb();
-
-        /*
-         * Handle external call commands with a parameter area
-         */
-        do {
-                ec = (ec_ext_call *) atomic_read(&S390_lowcore.ext_call_queue);
-        } while (atomic_compare_and_swap((int) ec, 0,
-                                         &S390_lowcore.ext_call_queue));
-        if (ec == NULL)
-                return;   /* no command signals */
-
-        /* Make a fifo out of the lifo */
-        next = ec->next;
-        ec->next = NULL;
-        while (next != NULL) {
-                ec_ext_call *tmp = next->next;
-                next->next = ec;
-                ec = next;
-                next = tmp;
-        }
-
-        /* Execute every sigp command on the queue */
-        while (ec != NULL) {
-                switch (ec->cmd) {
-                case ec_callback_async: {
-                        void (*func)(void *info);
-                        void *info;
-
-                        func = ec->func;
-                        info = ec->info;
-                        atomic_set(&ec->status,ec_executing);
-                        (func)(info);
-                        return;
-                }
-                case ec_callback_sync:
-                        atomic_set(&ec->status,ec_executing);
-                        (ec->func)(ec->info);
-                        atomic_set(&ec->status,ec_done);
-                        return;
-                default:
-                }
-                ec = ec->next;
-        }
-}
-
-/*
- * Send a callback sigp to another cpu.
- */
-sigp_ccode
-smp_ext_call(int cpu, void (*func)(void *info), void *info, int wait)
-{
-        struct _lowcore *lowcore = &get_cpu_lowcore(cpu);
-        sigp_ccode ccode;
-        ec_ext_call ec;
-
-        ec.cmd = wait ? ec_callback_sync : ec_callback_async;
-        atomic_set(&ec.status, ec_pending);
-	ec.func = func;
-        ec.info = info;
-        do {
-                ec.next = (ec_ext_call*) atomic_read(&lowcore->ext_call_queue);
-        } while (atomic_compare_and_swap((int) ec.next, (int)(&ec),
-                                         &lowcore->ext_call_queue));
-        /*
-         * We try once to deliver the signal. There are four possible
-         * return codes:
-         * 0) Order code accepted - can't show up on an external call
-         * 1) Status stored - fine, wait for completion.
-         * 2) Busy - there is another signal pending. Thats fine too, because
-         *    do_ext_call from the pending signal will execute all signals on
-         *    the queue. We wait for completion.
-         * 3) Not operational - something very bad has happened to the cpu.
-         *    do not wait for completion.
-         */
-        ccode = signal_processor(cpu, sigp_external_call);
-
-        if (ccode != sigp_not_operational)
-                /* wait for completion, FIXME: possible seed of a deadlock */
-                while (atomic_read(&ec.status) != (wait?ec_done:ec_executing));
-
-        return ccode;
-}
-
-/*
- * Send a callback sigp to every other cpu in the system.
- */
-void smp_ext_call_others(void (*func)(void *info), void *info, int wait)
-{
-        struct _lowcore *lowcore;
-        ec_ext_call ec[NR_CPUS];
-        sigp_ccode ccode;
-        int i;
-
-        for (i = 0; i < smp_num_cpus; i++) {
-                if (smp_processor_id() == i)
-                        continue;
-                lowcore = &get_cpu_lowcore(i);
-		ec[i].cmd = wait ? ec_callback_sync : ec_callback_async;
-		atomic_set(&ec[i].status, ec_pending);
-		ec[i].func = func;
-		ec[i].info = info;
-                do {
-                        ec[i].next = (ec_ext_call *)
-                                        atomic_read(&lowcore->ext_call_queue);
-                } while (atomic_compare_and_swap((int) ec[i].next, (int)(ec+i),
-                                                 &lowcore->ext_call_queue));
-                ccode = signal_processor(i, sigp_external_call);
-        }
-
-        /* wait for completion, FIXME: possible seed of a deadlock */
-        for (i = 0; i < smp_num_cpus; i++) {
-                if (smp_processor_id() == i)
-                        continue;
-                while (atomic_read(&ec[i].status) != 
-		       (wait ? ec_done:ec_executing));
-        }
+	if (test_bit(ec_call_function, &bits)) 
+		do_call_function();
 }
 
 /*
  * Send an external call sigp to another cpu and return without waiting
  * for its completion.
  */
-sigp_ccode smp_ext_bitcall(int cpu, ec_bit_sig sig)
+static sigp_ccode smp_ext_bitcall(int cpu, ec_bit_sig sig)
 {
         struct _lowcore *lowcore = &get_cpu_lowcore(cpu);
         sigp_ccode ccode;
@@ -310,7 +284,7 @@ sigp_ccode smp_ext_bitcall(int cpu, ec_bit_sig sig)
  * Send an external call sigp to every other cpu in the system and
  * return without waiting for its completion.
  */
-void smp_ext_bitcall_others(ec_bit_sig sig)
+static void smp_ext_bitcall_others(ec_bit_sig sig)
 {
         struct _lowcore *lowcore;
         sigp_ccode ccode;
@@ -326,51 +300,6 @@ void smp_ext_bitcall_others(ec_bit_sig sig)
                 atomic_set_mask(1<<sig, &lowcore->ext_call_fast);
                 ccode = signal_processor(i, sigp_external_call);
         }
-}
-
-/*
- * cycles through all the cpus,
- * returns early if info is not NULL & the processor has something
- * of intrest to report in the info structure.
- * it returns the next cpu to check if it returns early.
- * i.e. it should be used as follows if you wish to receive info.
- * next_cpu=0;
- * do
- * {
- *    info->cpu=next_cpu;
- *    next_cpu=smp_signal_others(order_code,parameter,1,info);
- *    ... check info here
- * } while(next_cpu<=smp_num_cpus)
- *
- *  if you are lazy just use it like
- * smp_signal_others(order_code,parameter,0,1,NULL);
- */
-int smp_signal_others(sigp_order_code order_code, u32 parameter,
-                      int spin, sigp_info *info)
-{
-        sigp_ccode   ccode;
-        u32          dummy;
-        u16          i;
-
-        if (info)
-                info->intresting = 0;
-        for (i = (info ? info->cpu : 0); i < smp_num_cpus; i++) {
-                if (smp_processor_id() != i) {
-                        do {
-                                ccode = signal_processor_ps(
-                                        (info ? &info->status : &dummy),
-                                        parameter, i, order_code);
-                        } while(spin && ccode == sigp_busy);
-                        if (info && ccode != sigp_order_code_accepted) {
-                                info->intresting = 1;
-                                info->cpu = i;
-                                info->ccode = ccode;
-                                i++;
-                                break;
-                        }
-                }
-        }
-        return i;
 }
 
 /*
@@ -390,7 +319,18 @@ void smp_send_stop(void)
 
         /* stop all processors */
 
-        smp_signal_others(sigp_stop, 0, 1, NULL);
+        for (i =  0; i < smp_num_cpus; i++) {
+                if (smp_processor_id() != i) {
+                        int ccode;
+                        do {
+                                ccode = signal_processor_ps(
+                                   &dummy,
+                                   0,
+                                   i,
+                                   sigp_stop);
+                        } while(ccode == sigp_busy);
+                }
+        }
 
         /* store status of all processors in their lowcores (real 0) */
 
@@ -419,7 +359,7 @@ void smp_ptlb_callback(void *info)
 
 void smp_ptlb_all(void)
 {
-        smp_ext_call_others(smp_ptlb_callback, NULL, 1);
+        smp_call_function(smp_ptlb_callback, NULL, 0, 1);
 	local_flush_tlb();
 }
 
@@ -482,7 +422,7 @@ void smp_ctl_set_bit(int cr, int bit) {
                 parms.end_ctl = cr;
                 parms.orvals[cr] = 1 << bit;
                 parms.andvals[cr] = 0xFFFFFFFF;
-                smp_ext_call_others(smp_ctl_bit_callback, &parms, 1);
+                smp_call_function(smp_ctl_bit_callback, &parms, 0, 1);
         }
         __ctl_set_bit(cr, bit);
 }
@@ -498,33 +438,9 @@ void smp_ctl_clear_bit(int cr, int bit) {
                 parms.end_ctl = cr;
                 parms.orvals[cr] = 0x00000000;
                 parms.andvals[cr] = ~(1 << bit);
-                smp_ext_call_others(smp_ctl_bit_callback, &parms, 1);
+                smp_call_function(smp_ctl_bit_callback, &parms, 0, 1);
         }
         __ctl_clear_bit(cr, bit);
-}
-
-/*
- * Call a function on all other processors
- */
-
-int
-smp_call_function(void (*func)(void *info), void *info, int retry, int wait)
-/*
- * [SUMMARY] Run a function on all other CPUs.
- * <func> The function to run. This must be fast and non-blocking.
- * <info> An arbitrary pointer to pass to the function.
- * <retry> currently unused.
- * <wait> If true, wait (atomically) until function has completed on other CPUs.
- * [RETURNS] 0 on success, else a negative status code. Does not return until
- * remote CPUs are nearly ready to execute <<func>> or are or have executed.
- *
- * You must not call this function with disabled interrupts or from a
- * hardware interrupt handler, you may call it from a bottom half handler.
- */
-{
-        if (atomic_read(&smp_commenced) != 0)
-                smp_ext_call_others(func, info, wait);
-        return 0;
 }
 
 /*
@@ -537,6 +453,7 @@ void smp_count_cpus(void)
 
         current->processor = 0;
         smp_num_cpus = 1;
+	cpu_online_map = 1;
         for (curr_cpu = 0;
              curr_cpu <= 65535 && smp_num_cpus < max_cpus; curr_cpu++) {
                 if ((__u16) curr_cpu == boot_cpu_addr)
@@ -556,6 +473,7 @@ void smp_count_cpus(void)
  *      Activate a secondary processor.
  */
 extern void init_100hz_timer(void);
+extern int pfault_init(void);
 extern int pfault_token(void);
 
 int __init start_secondary(void *cpuvoid)
@@ -620,15 +538,20 @@ static void __init do_boot_cpu(int cpu)
         init_tasks[cpu] = idle;
 
         cpu_lowcore=&get_cpu_lowcore(cpu);
-        cpu_lowcore->kernel_stack=idle->thread.ksp;
-        __asm__ __volatile__("stctl 0,15,%0\n\t"
-                             "stam  0,15,%1"
+	cpu_lowcore->save_area[15] = idle->thread.ksp;
+	cpu_lowcore->kernel_stack = (idle->thread.ksp | 8191) + 1;
+        __asm__ __volatile__("la    1,%0\n\t"
+			     "stctl 0,15,0(1)\n\t"
+			     "la    1,%1\n\t"
+                             "stam  0,15,0(1)"
                              : "=m" (cpu_lowcore->cregs_save_area[0]),
                                "=m" (cpu_lowcore->access_regs_save_area[0])
-                             : : "memory");
+                             : : "1", "memory");
 
         eieio();
         signal_processor(cpu,sigp_restart);
+	/* Mark this cpu as online */
+	set_bit(cpu, &cpu_online_map);
 }
 
 /*
@@ -650,12 +573,12 @@ void __init smp_commence(void)
 }
 
 /*
- *	Cycle through the processors sending APIC IPIs to boot each.
+ *	Cycle through the processors sending sigp_restart to boot each.
  */
 
 void __init smp_boot_cpus(void)
 {
-        struct _lowcore *curr_lowcore;
+	unsigned long async_stack;
         sigp_ccode   ccode;
         int i;
 
@@ -680,34 +603,37 @@ void __init smp_boot_cpus(void)
 
         for(i = 0; i < smp_num_cpus; i++)
         {
-                curr_lowcore = (struct _lowcore *)
-                                    __get_free_page(GFP_KERNEL|GFP_DMA);
-                if (curr_lowcore == NULL) {
-                        printk("smp_boot_cpus failed to allocate prefix memory\n");
-                        break;
-                }
-                lowcore_ptr[i] = curr_lowcore;
-                memcpy(curr_lowcore, &S390_lowcore, sizeof(struct _lowcore));
+		lowcore_ptr[i] = (struct _lowcore *)
+			__get_free_page(GFP_KERNEL|GFP_DMA);
+                if (lowcore_ptr[i] == NULL)
+                        panic("smp_boot_cpus failed to "
+			      "allocate prefix memory\n");
+		async_stack = __get_free_pages(GFP_KERNEL,1);
+		if (async_stack == 0)
+			panic("smp_boot_cpus failed to allocate "
+			      "asyncronous interrupt stack\n");
+
+                memcpy(lowcore_ptr[i], &S390_lowcore, sizeof(struct _lowcore));
+		lowcore_ptr[i]->async_stack = async_stack + (2 * PAGE_SIZE);
                 /*
                  * Most of the parameters are set up when the cpu is
                  * started up.
                  */
-                if (smp_processor_id() == i)
-                        set_prefix((u32) curr_lowcore);
-                else {
-                        ccode = signal_processor_p((u32)(curr_lowcore),
-                                                   i, sigp_set_prefix);
-                        if(ccode) {
-                                /* if this gets troublesome I'll have to do
-                                 * something about it. */
-                                printk("ccode %d for cpu %d  returned when "
-                                       "setting prefix in smp_boot_cpus not good.\n",
-                                       (int) ccode, (int) i);
-                        }
-                        else
-                                do_boot_cpu(i);
-                }
-        }
+		if (smp_processor_id() == i)
+			set_prefix((u32) lowcore_ptr[i]);
+		else {
+			ccode = signal_processor_p((u32)(lowcore_ptr[i]),
+						   i, sigp_set_prefix);
+			if (ccode)
+				/* if this gets troublesome I'll have to do
+				 * something about it. */
+				printk("ccode %d for cpu %d  returned when "
+				       "setting prefix in smp_boot_cpus not good.\n",
+				       (int) ccode, (int) i);
+			else
+				do_boot_cpu(i);
+		}
+	}
 }
 
 /*
@@ -746,8 +672,6 @@ void smp_local_timer_interrupt(struct pt_regs * regs)
                 s390_do_profile(regs->psw.addr);
 
         if (!--prof_counter[cpu]) {
-                int system = 1-user;
-                struct task_struct * p = current;
 
                 /*
                  * The multiplier may have changed since the last time we got
@@ -771,9 +695,7 @@ void smp_local_timer_interrupt(struct pt_regs * regs)
                  * WrongThing (tm) to do.
                  */
 
-                irq_enter(cpu, 0);
 		update_process_times(user);
-                irq_exit(cpu, 0);
         }
 }
 

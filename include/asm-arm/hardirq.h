@@ -2,6 +2,7 @@
 #define __ASM_HARDIRQ_H
 
 #include <linux/config.h>
+#include <linux/cache.h>
 #include <linux/threads.h>
 
 /* softirq.h is sensitive to the offsets of these fields */

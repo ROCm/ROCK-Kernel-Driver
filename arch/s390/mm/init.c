@@ -44,44 +44,23 @@ static unsigned long totalram_pages;
 pgd_t swapper_pg_dir[PTRS_PER_PGD] __attribute__((__aligned__(PAGE_SIZE)));
 char  empty_zero_page[PAGE_SIZE] __attribute__((__aligned__(PAGE_SIZE)));
 
-static int test_access(unsigned long loc)
-{
-	static const int ssm_mask = 0x07000000L;
-	int rc, i;
-
-        rc = 0;
-	for (i=0; i<4; i++) {
-		__asm__ __volatile__(
-                        "    slr   %0,%0\n"
-			"    ssm   %1\n"
-			"    tprot 0(%2),0\n"
-			"0:  jne   1f\n"
-			"    lhi   %0,1\n"
-			"1:  ssm   %3\n"
-                        ".section __ex_table,\"a\"\n"
-                        "   .align 4\n"
-                        "   .long  0b,1b\n"
-                        ".previous"
-			: "+&d" (rc) : "i" (0), "a" (loc), "m" (ssm_mask)
-			: "cc");
-		if (rc == 0)
-			break;
-		loc += 0x100000;
-	}
-	return rc;
-}
-
 int do_check_pgt_cache(int low, int high)
 {
         int freed = 0;
         if(pgtable_cache_size > high) {
                 do {
-                        if(pgd_quicklist)
-                                free_pgd_slow(get_pgd_fast()), freed += 2;
-                        if(pmd_quicklist)
-                                pmd_free_slow(pmd_alloc_one_fast(NULL, 0)), freed++;
-                        if(pte_quicklist)
-                                pte_free_slow(pte_alloc_one_fast(NULL, 0)), freed++;
+                        if(pgd_quicklist) {
+                                free_pgd_slow(get_pgd_fast());
+				freed += 2;
+			}
+                        if(pmd_quicklist) {
+                                pmd_free_slow(pmd_alloc_one_fast(NULL, 0));
+				freed++;
+			}
+                        if(pte_quicklist) {
+                                pte_free_slow(pte_alloc_one_fast(NULL, 0));
+				freed++;
+			}
                 } while(pgtable_cache_size > low);
         }
         return freed;
@@ -200,7 +179,6 @@ void __init paging_init(void)
 void __init mem_init(void)
 {
 	int codesize, reservedpages, datasize, initsize;
-        int tmp;
 
         max_mapnr = num_physpages = max_low_pfn;
         high_memory = (void *) __va(max_low_pfn * PAGE_SIZE);
@@ -211,24 +189,7 @@ void __init mem_init(void)
 	/* this will put all low memory onto the freelists */
 	totalram_pages += free_all_bootmem();
 
-        /* mark usable pages in the mem_map[] and count reserved pages */
 	reservedpages = 0;
-	tmp = 0;
-	do {
-		if (tmp && (tmp & 0x3ff) == 0 && 
-                    test_access(tmp * PAGE_SIZE) == 0) {
-                        printk("4M Segment %lX not available\n",tmp*PAGE_SIZE);
-			do {
-                                set_bit(PG_reserved, &mem_map[tmp].flags);
-				reservedpages++;
-				tmp++;
-			} while (tmp < max_low_pfn && (tmp & 0x3ff));
-		} else {
-			if (PageReserved(mem_map+tmp))
-				reservedpages++;
-			tmp++;
-		}
-	} while (tmp < max_low_pfn);
 
 	codesize =  (unsigned long) &_etext - (unsigned long) &_text;
 	datasize =  (unsigned long) &_edata - (unsigned long) &_etext;

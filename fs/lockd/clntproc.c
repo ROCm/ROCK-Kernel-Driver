@@ -6,6 +6,7 @@
  * Copyright (C) 1996, Olaf Kirch <okir@monad.swb.de>
  */
 
+#include <linux/config.h>
 #include <linux/types.h>
 #include <linux/errno.h>
 #include <linux/fs.h>
@@ -676,6 +677,18 @@ nlm_stat_to_errno(u32 status)
 	case NLM_LCK_BLOCKED:
 		printk(KERN_NOTICE "lockd: unexpected status NLM_BLOCKED\n");
 		return -ENOLCK;
+#ifdef CONFIG_LOCKD_V4
+	case NLM_DEADLCK:
+		return -EDEADLK;
+	case NLM_ROFS:
+		return -EROFS;
+	case NLM_STALE_FH:
+		return -ESTALE;
+	case NLM_FBIG:
+		return -EOVERFLOW;
+	case NLM_FAILED:
+		return -ENOLCK;
+#endif
 	}
 	printk(KERN_NOTICE "lockd: unexpected server status %d\n", status);
 	return -ENOLCK;

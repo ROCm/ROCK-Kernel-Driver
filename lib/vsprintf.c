@@ -18,6 +18,7 @@
 #include <linux/types.h>
 #include <linux/string.h>
 #include <linux/ctype.h>
+#include <linux/kernel.h>
 
 #include <asm/div64.h>
 
@@ -519,36 +520,44 @@ int vsscanf(const char * buf, const char * fmt, va_list args)
 	int num = 0;
 	int qualifier;
 	int base;
-	unsigned int field_width;
+	int field_width = -1;
 	int is_sign = 0;
 
-	for (; *fmt; fmt++) {
+	while(*fmt && *str) {
 		/* skip any white space in format */
+		/* white space in format matchs any amount of
+		 * white space, including none, in the input.
+		 */
 		if (isspace(*fmt)) {
-			continue;
+			while (isspace(*fmt))
+				++fmt;
+			while (isspace(*str))
+				++str;
 		}
 
 		/* anything that is not a conversion must match exactly */
-		if (*fmt != '%') {
+		if (*fmt != '%' && *fmt) {
 			if (*fmt++ != *str++)
-				return num;
+				break;
 			continue;
 		}
+
+		if (!*fmt)
+			break;
 		++fmt;
 		
 		/* skip this conversion.
 		 * advance both strings to next white space
 		 */
 		if (*fmt == '*') {
-			while (!isspace(*fmt))
+			while (!isspace(*fmt) && *fmt)
 				fmt++;
-			while(!isspace(*str))
+			while (!isspace(*str) && *str)
 				str++;
 			continue;
 		}
 
 		/* get field width */
-		field_width = 0xffffffffUL;
 		if (isdigit(*fmt))
 			field_width = skip_atoi(&fmt);
 
@@ -561,25 +570,32 @@ int vsscanf(const char * buf, const char * fmt, va_list args)
 		base = 10;
 		is_sign = 0;
 
-		switch(*fmt) {
+		if (!*fmt || !*str)
+			break;
+
+		switch(*fmt++) {
 		case 'c':
 		{
 			char *s = (char *) va_arg(args,char*);
+			if (field_width == -1)
+				field_width = 1;
 			do {
 				*s++ = *str++;
-			} while(field_width-- > 0);
+			} while(field_width-- > 0 && *str);
 			num++;
 		}
 		continue;
 		case 's':
 		{
 			char *s = (char *) va_arg(args, char *);
+			if(field_width == -1)
+				field_width = INT_MAX;
 			/* first, skip leading white space in buffer */
 			while (isspace(*str))
 				str++;
 
 			/* now copy until next white space */
-			while (!isspace(*str) && field_width--) {
+			while (*str && !isspace(*str) && field_width--) {
 				*s++ = *str++;
 			}
 			*s = '\0';
@@ -620,6 +636,9 @@ int vsscanf(const char * buf, const char * fmt, va_list args)
 		 */
 		while (isspace(*str))
 			str++;
+
+		if (!*str || !isdigit(*str))
+			break;
 
 		switch(qualifier) {
 		case 'h':

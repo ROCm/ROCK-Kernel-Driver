@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.config.c 1.7 05/21/01 00:48:24 cort
+ * BK Id: SCCS/s.config.c 1.12 09/18/01 11:19:06 paulus
  */
 #define m68k_debug_device debug_device
 

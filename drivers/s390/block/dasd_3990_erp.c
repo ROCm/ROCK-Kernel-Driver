@@ -761,7 +761,7 @@ dasd_3990_erp_action_5 (ccw_req_t *erp)
  * DASD_3990_HANDLE_ENV_DATA
  *
  * DESCRIPTION
- *   Handles 24 byte 'Enviromental data present'.
+ *   Handles 24 byte 'Environmental data present'.
  *   Does a analysis of the sense data (message Format)
  *   and prints the error messages.
  *

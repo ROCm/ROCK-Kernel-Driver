@@ -31,7 +31,6 @@
 #include <asm/uaccess.h>
 #include <asm/io.h>
 #include <asm/atomic.h>
-#include <asm/mathemu.h>
 #if CONFIG_REMOTE_DEBUG
 #include <asm/gdb-stub.h>
 #endif
@@ -59,14 +58,16 @@ extern void pfault_fini(void);
 extern void pfault_interrupt(struct pt_regs *regs, __u16 error_code);
 #endif
 
-spinlock_t die_lock;
+spinlock_t die_lock = SPIN_LOCK_UNLOCKED;
 
 void die(const char * str, struct pt_regs * regs, long err)
 {
         console_verbose();
         spin_lock_irq(&die_lock);
+	bust_spinlocks(1);
         printk("%s: %04lx\n", str, err & 0xffff);
         show_regs(regs);
+	bust_spinlocks(0);
         spin_unlock_irq(&die_lock);
         do_exit(SIGSEGV);
 }

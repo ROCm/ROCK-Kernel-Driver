@@ -77,12 +77,6 @@
 #define VER_MINOR	0
 #define VER_PATCH	5
 
-MODULE_AUTHOR("Russell King");
-MODULE_DESCRIPTION("Powertec SCSI driver");
-MODULE_PARM(term, "1-8i");
-MODULE_PARM_DESC(term, "SCSI bus termination");
-MODULE_LICENSE("GPL");
-
 static struct expansion_card *ecs[MAX_ECARDS];
 
 /*
@@ -502,3 +496,10 @@ static void __exit powertecscsi_exit(void)
 
 module_init(powertecscsi_init);
 module_exit(powertecscsi_exit);
+
+MODULE_AUTHOR("Russell King");
+MODULE_DESCRIPTION("Powertec SCSI driver");
+MODULE_PARM(term, "1-8i");
+MODULE_PARM_DESC(term, "SCSI bus termination");
+MODULE_LICENSE("GPL");
+EXPORT_NO_SYMBOLS;

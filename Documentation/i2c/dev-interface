@@ -70,6 +70,9 @@ the device supports them. Both are illustrated below.
     /* buf[0] contains the read byte */
   }
 
+IMPORTANT: because of the use of inline functions, you *have* to use
+'-O' or some variation when you compile your program!
+
 
 Full interface description
 ==========================

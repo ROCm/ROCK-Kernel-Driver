@@ -310,3 +310,4 @@ void    cleanup_module(void)
 #endif
 
 /* end of kbic.c */
+MODULE_LICENSE("GPL");

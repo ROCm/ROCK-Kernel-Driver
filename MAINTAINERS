@@ -1053,6 +1053,12 @@ M:     Andreas Mohr <100.30936@germany.net>
 L:     linux-net@vger.kernel.org
 S:     Maintained
 
+NINJA SCSI-3 / NINJA SCSI-32Bi PCMCIA SCSI HOST ADAPTER DRIVER
+P:	YOKOTA Hiroshi
+M:	yokota@netlab.is.tsukuba.ac.jp
+W:	http://www.netlab.is.tsukuba.ac.jp/~yokota/izumi/ninja/
+S:	Maintained
+
 NON-IDE/NON-SCSI CDROM DRIVERS [GENERAL] (come on, crew - mark your responsibility)
 P:	Eberhard Moenkeberg
 M:	emoenke@gwdg.de
@@ -1397,6 +1403,13 @@ M:	mikep@linuxtr.net
 L:	linux-net@vger.kernel.org
 L:	linux-tr@linuxtr.net
 W:	http://www.linuxtr.net
+S:	Maintained
+
+TOSHIBA SMM DRIVER
+P:	Jonathan Buzzard
+M:	jonathan@buzzard.org.uk
+L:	tlinux-users@tce.toshiba-dme.co.jp
+W:	http://www.buzzard.org.uk/toshiba/
 S:	Maintained
 
 TRIDENT 4DWAVE/SIS 7018 PCI AUDIO CORE

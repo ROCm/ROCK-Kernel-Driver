@@ -281,10 +281,19 @@ static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
  * I expect future Intel CPU's to have a weaker ordering,
  * but I'd also expect them to finally get their act together
  * and add some real memory barriers if so.
+ *
+ * Some non intel clones support out of order store. wmb() ceases to be a
+ * nop for these.
  */
+ 
 #define mb() 	__asm__ __volatile__ ("lock; addl $0,0(%%esp)": : :"memory")
 #define rmb()	mb()
+
+#ifdef CONFIG_X86_OOSTORE
+#define wmb() 	__asm__ __volatile__ ("lock; addl $0,0(%%esp)": : :"memory")
+#else
 #define wmb()	__asm__ __volatile__ ("": : :"memory")
+#endif
 
 #ifdef CONFIG_SMP
 #define smp_mb()	mb()

@@ -45,8 +45,6 @@ tune-$(CONFIG_CPU_SA1100)	:=-mtune=strongarm1100
 CFLAGS		+=$(apcs-y) $(arch-y) $(tune-y) -mshort-load-bytes -msoft-float
 AFLAGS		+=$(apcs-y) $(arch-y) -mno-fpu
 
-LIBGCC		:= $(shell $(CC) $(CFLAGS) --print-libgcc-file-name)
-
 ifeq ($(CONFIG_CPU_26),y)
 PROCESSOR	 = armo
   ifeq ($(CONFIG_ROM_KERNEL),y)
@@ -123,7 +121,7 @@ MACHINE		 = integrator
 endif
 
 ifeq ($(CONFIG_ARCH_CLPS711X),y)
-TEXTADDR	 = 0xc0018000
+TEXTADDR	 = 0xc0028000
 MACHINE		 = clps711x
 endif
 
@@ -131,7 +129,7 @@ ifeq ($(CONFIG_ARCH_ANAKIN),y)
 MACHINE		 = anakin
 endif
 
-export	LIBGCC MACHINE PROCESSOR TEXTADDR GZFLAGS
+export	MACHINE PROCESSOR TEXTADDR GZFLAGS
 
 # Only set INCDIR if its not already defined above
 # Grr, ?= doesn't work as all the other assignment operators do.  Make bug?
@@ -155,7 +153,7 @@ HEAD		:= arch/arm/kernel/head-$(PROCESSOR).o \
 SUBDIRS		+= arch/arm/kernel arch/arm/mm arch/arm/lib arch/arm/nwfpe \
 		   arch/arm/fastfpe
 CORE_FILES	:= arch/arm/kernel/kernel.o arch/arm/mm/mm.o $(CORE_FILES)
-LIBS		:= arch/arm/lib/lib.a $(LIBS) $(LIBGCC)
+LIBS		:= arch/arm/lib/lib.a $(LIBS)
 
 ifeq ($(CONFIG_FPE_NWFPE),y)
 LIBS		:= arch/arm/nwfpe/math-emu.o $(LIBS)

@@ -74,6 +74,7 @@
 #ifndef	LINUX_VERSION_CODE
 #include <linux/version.h>
 #endif
+#include <linux/types.h>
 
 #include "sd.h"
 
@@ -121,17 +122,13 @@ extern int i91u_biosparam(Scsi_Disk *, kdev_t, int *);	/*for linux v2.0 */
 #define ULONG   unsigned long
 #define USHORT  unsigned short
 #define UCHAR   unsigned char
-#define BYTE    unsigned char
+#define BYTE    u8
 #define WORD    unsigned short
 #define DWORD   unsigned long
-#define UBYTE   unsigned char
+#define UBYTE   u8
 #define UWORD   unsigned short
 #define UDWORD  unsigned long
-#ifdef ALPHA
-#define U32   unsigned int
-#else
-#define U32   unsigned long
-#endif
+#define U32   u32
 
 #ifndef NULL
 #define NULL     0		/* zero          */

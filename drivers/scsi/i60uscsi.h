@@ -61,6 +61,7 @@
  **************************************************************************/
 
 #include <linux/config.h>
+#include <linux/types.h>
 
 #define ULONG   unsigned long
 #define PVOID   void *
@@ -72,11 +73,7 @@
 #define UBYTE   unsigned char
 #define UWORD   unsigned short
 #define UDWORD  unsigned long
-#ifdef ALPHA
-#define U32     unsigned int
-#else
-#define U32     unsigned long
-#endif
+#define U32     u32
 
 #ifndef NULL
 #define NULL     0		/* zero          */

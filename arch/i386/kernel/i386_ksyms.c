@@ -170,8 +170,5 @@ EXPORT_SYMBOL(atomic_dec_and_lock);
 EXPORT_SYMBOL(do_BUG);
 #endif
 
-#if defined(CONFIG_SONYPI) || defined(CONFIG_SONYPI_MODULE)
 extern int is_sony_vaio_laptop;
 EXPORT_SYMBOL(is_sony_vaio_laptop);
-#endif
-

@@ -93,8 +93,8 @@ static struct console tub3270_con = {
 	NULL			/* next */
 };
 
-bcb_t tub3270_con_bcb;			/* Buffer that receives con writes */
-spinlock_t tub3270_con_bcblock;		/* Lock for the buffer */
+static bcb_t tub3270_con_bcb;		/* Buffer that receives con writes */
+static spinlock_t tub3270_con_bcblock;	/* Lock for the buffer */
 int tub3270_con_irq = -1;		/* set nonneg by _activate() */
 tub_t *tub3270_con_tubp;		/* set nonzero by _activate() */
 struct tty_driver tty3270_con_driver;	/* for /dev/console at 4, 64 */

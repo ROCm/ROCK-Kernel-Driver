@@ -25,6 +25,7 @@
 
 #define TC_DEBUG
 
+MODULE_LICENSE("GPL");
 slot_info tc_bus[MAX_SLOT];
 static int max_tcslot;
 static tcinfo *info;

@@ -139,6 +139,10 @@ chandev_msck_status prevstatus,chandev_msck_status newstatus);
  * not operational the previous status is sent in the prevstatus variable.
  * This can be used in cases when the default handling isn't quite adequete
  * e.g. if a ssch is needed to reinitialize long running channel programs.
+ *
+ * This returns the number of devices found or -ENOMEM if the code didn't
+ * have enough memory to allocate the chandev control block
+ * or -EPERM if a duplicate entry is found.
  */
 int chandev_register_and_probe(chandev_probefunc probefunc,
 			       chandev_shutdownfunc shutdownfunc,

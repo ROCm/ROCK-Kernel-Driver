@@ -1,6 +1,7 @@
 #ifndef __ARM_A_OUT_H__
 #define __ARM_A_OUT_H__
 
+#include <linux/personality.h>
 #include <asm/types.h>
 
 struct exec

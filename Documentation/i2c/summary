@@ -1,9 +1,9 @@
-This is an explanation of what i2c is, and what is supported.
+This is an explanation of what i2c is, and what is supported in this package.
 
 I2C and SMBus
 =============
 
-I2C (pronounce: I square C) is a protocol developed by Philips. It is a 
+I2C (pronounce: I squared C) is a protocol developed by Philips. It is a 
 slow two-wire protocol (10-100 kHz), but it suffices for many types of 
 devices.
 
@@ -25,6 +25,7 @@ When we talk about I2C, we use the following terms:
             Adapter
   Device -> Driver
             Client
+
 An Algorithm driver contains general code that can be used for a whole class
 of I2C adapters. Each specific adapter driver depends on one algorithm
 driver.
@@ -35,29 +36,40 @@ integrated than Algorithm and Adapter.
 
 For a given configuration, you will need a driver for your I2C bus (usually
 a separate Adapter and Algorithm driver), and drivers for your I2C devices
-(usually one driver for each device).
+(usually one driver for each device). There are no I2C device drivers
+in this package. See the lm_sensors project http://www.lm-sensors.nu
+for device drivers.
 
 
-Included Drivers
-================
+Included Bus Drivers
+====================
+Note that not only stable drivers are patched into the kernel by 'mkpatch'.
+
 
 Base modules
 ------------
 
 i2c-core: The basic I2C code, including the /proc interface
 i2c-dev:  The /dev interface
+i2c-proc: The /proc interface for device (client) drivers
 
 Algorithm drivers
 -----------------
 
-i2c-algo-bit: A bit-banging algorithm
-i2c-algo-pcf: A PCF 8584 style algorithm
+i2c-algo-8xx:    An algorithm for CPM's I2C device in Motorola 8xx processors (NOT BUILT BY DEFAULT)
+i2c-algo-bit:    A bit-banging algorithm
+i2c-algo-pcf:    A PCF 8584 style algorithm
+i2c-algo-ppc405: An algorithm for the I2C device in IBM 405xx processors (NOT BUILT BY DEFAULT)
 
 Adapter drivers
 ---------------
 
 i2c-elektor:     Elektor ISA card (uses i2c-algo-pcf)
 i2c-elv:         ELV parallel port adapter (uses i2c-algo-bit)
+i2c-pcf-epp:     PCF8584 on a EPP parallel port (uses i2c-algo-pcf) (BROKEN - missing i2c-pcf-epp.h)
 i2c-philips-par: Philips style parallel port adapter (uses i2c-algo-bit)
+i2c-ppc405:      IBM 405xx processor I2C device (uses i2c-algo-ppc405) (NOT BUILT BY DEFAULT)
+i2c-pport:       Primitive parallel port adapter (uses i2c-algo-bit)
+i2c-rpx:         RPX board Motorola 8xx I2C device (uses i2c-algo-8xx) (NOT BUILT BY DEFAULT)
 i2c-velleman:    Velleman K9000 parallel port adapter (uses i2c-algo-bit)
 

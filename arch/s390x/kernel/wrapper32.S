@@ -1069,3 +1069,23 @@ sys32_fcntl64_wrapper:
 	llgfr	%r4,%r4			# unsigned long
 	jg	sys32_fcntl64		# branch to system call
 
+	.globl	sys32_stat64_wrapper
+sys32_stat64_wrapper:
+	llgtr	%r2,%r2			# char *
+	llgtr	%r3,%r3			# struct stat64 *
+	llgfr	%r4,%r4			# long
+	jg	sys32_stat64		# branch to system call
+
+	.globl	sys32_lstat64_wrapper
+sys32_lstat64_wrapper:
+	llgtr	%r2,%r2			# char *
+	llgtr	%r3,%r3			# struct stat64 *
+	llgfr	%r4,%r4			# long
+	jg	sys32_lstat64		# branch to system call
+
+	.globl	sys32_fstat64_wrapper
+sys32_fstat64_wrapper:
+	llgfr	%r2,%r2			# unsigned long
+	llgtr	%r3,%r3			# struct stat64 *
+	llgfr	%r4,%r4			# long
+	jg	sys32_fstat64		# branch to system call

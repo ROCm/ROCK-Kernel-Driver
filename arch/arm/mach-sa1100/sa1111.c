@@ -15,7 +15,6 @@
  * All initialization functions provided here are intended to be called
  * from machine specific code with proper arguments when required.
  */
-
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/delay.h>
@@ -23,8 +22,6 @@
 #include <linux/interrupt.h>
 #include <linux/ptrace.h>
 #include <linux/errno.h>
-#include <linux/pci.h>
-#include <linux/mm.h>
 
 #include <asm/hardware.h>
 #include <asm/irq.h>
@@ -32,64 +29,6 @@
 #include <asm/arch/irq.h>
 
 #include "sa1111.h"
-
-static int sa1111_ohci_hcd_init(void);
-
-/*
- * SA1111 initialization
- */
-
-int __init sa1111_init(void)
-{
-	unsigned long id = SKID;
-
-	if((id & SKID_ID_MASK) == SKID_SA1111_ID)
-		printk( KERN_INFO "SA-1111 Microprocessor Companion Chip: "
-			"silicon revision %lx, metal revision %lx\n",
-			(id & SKID_SIREV_MASK)>>4, (id & SKID_MTREV_MASK));
-	else {
-		printk(KERN_ERR "Could not detect SA-1111!\n");
-		return -EINVAL;
-	}
-
-	/*
-	 * First, set up the 3.6864MHz clock on GPIO 27 for the SA-1111:
-	 * (SA-1110 Developer's Manual, section 9.1.2.1)
-	 */
-	GAFR |= GPIO_32_768kHz;
-	GPDR |= GPIO_32_768kHz;
-	TUCR = TUCR_3_6864MHz;
-
-	/* Now, set up the PLL and RCLK in the SA-1111: */
-	SKCR = SKCR_PLL_BYPASS | SKCR_RDYEN | SKCR_OE_EN;
-	udelay(100);
-	SKCR = SKCR_PLL_BYPASS | SKCR_RCLKEN | SKCR_RDYEN | SKCR_OE_EN;
-
-	/*
-	 * SA-1111 Register Access Bus should now be available. Clocks for
-	 * any other SA-1111 functional blocks must be enabled separately
-	 * using the SKPCR.
-	 */
-
-	/*
-	 * If the system is going to use the SA-1111 DMA engines, set up
-	 * the memory bus request/grant pins. Also configure the shared
-	 * memory controller on the SA-1111 (SA-1111 Developer's Manual,
-	 * section 3.2.3) and power up the DMA bus clock:
-	 */
-	GAFR |= (GPIO_MBGNT | GPIO_MBREQ);
-	GPDR |= GPIO_MBGNT;
-	GPDR &= ~GPIO_MBREQ;
-	TUCR |= TUCR_MR;
-
-#ifdef CONFIG_USB_OHCI
-	/* setup up sa1111 usb host controller h/w */
-	sa1111_ohci_hcd_init();
-#endif
-
-	return 0;
-}
-
 
 /*
  * SA1111  Interrupt support
@@ -159,7 +98,7 @@ static void sa1111_unmask_highirq(unsigned int irq)
 	INTEN1 |= 1 << ((irq - SA1111_IRQ(32)));
 }
 
-void __init sa1111_init_irq(int gpio_nr)
+void __init sa1111_init_irq(int irq_nr)
 {
 	int irq;
 
@@ -181,144 +120,146 @@ void __init sa1111_init_irq(int gpio_nr)
 
 	for (irq = SA1111_IRQ(0); irq <= SA1111_IRQ(26); irq++) {
 		irq_desc[irq].valid	= 1;
-		irq_desc[irq].probe_ok	= 1;
+		irq_desc[irq].probe_ok	= 0;
 		irq_desc[irq].mask_ack	= sa1111_mask_and_ack_lowirq;
 		irq_desc[irq].mask	= sa1111_mask_lowirq;
 		irq_desc[irq].unmask	= sa1111_unmask_lowirq;
 	}
 	for (irq = SA1111_IRQ(32); irq <= SA1111_IRQ(54); irq++) {
 		irq_desc[irq].valid	= 1;
-		irq_desc[irq].probe_ok	= 1;
+		irq_desc[irq].probe_ok	= 0;
 		irq_desc[irq].mask_ack	= sa1111_mask_and_ack_highirq;
 		irq_desc[irq].mask	= sa1111_mask_highirq;
 		irq_desc[irq].unmask	= sa1111_unmask_highirq;
 	}
 
-	/* Not every machines has the SA1111 interrupt routed to a GPIO */
-	if (gpio_nr >= 0) {
-		set_GPIO_IRQ_edge (GPIO_GPIO(gpio_nr), GPIO_RISING_EDGE);
-		setup_arm_irq (SA1100_GPIO_TO_IRQ(gpio_nr), &sa1111_irq);
+	/* Register SA1111 interrupt */
+	if (irq_nr >= 0)
+		setup_arm_irq(irq_nr, &sa1111_irq);
+}
+
+/*
+ * Probe for a SA1111 chip.
+ */
+
+int __init sa1111_probe(void)
+{
+	unsigned long id = SBI_SKID;
+	int ret = -ENODEV;
+
+	if ((id & SKID_ID_MASK) == SKID_SA1111_ID) {
+		printk(KERN_INFO "SA-1111 Microprocessor Companion Chip: "
+			"silicon revision %lx, metal revision %lx\n",
+			(id & SKID_SIREV_MASK)>>4, (id & SKID_MTREV_MASK));
+		ret = 0;
+	} else {
+		printk(KERN_DEBUG "SA-1111 not detected: ID = %08lx\n", id);
 	}
+
+	return ret;
 }
-
-/* ----------------- */
-
-#ifdef CONFIG_USB_OHCI
-
-#if defined(CONFIG_SA1100_XP860) || defined(CONFIG_ASSABET_NEPONSET) || defined(CONFIG_SA1100_PFS168)
-#define PwrSensePolLow  1
-#define PwrCtrlPolLow   1
-#else
-#define PwrSensePolLow  0
-#define PwrCtrlPolLow   0
-#endif
 
 /*
- * The SA-1111 errata says that the DMA hardware needs to be exercised
- * before the clocks are turned on to work properly.  This code does
- * a tiny dma transfer to prime to hardware.
+ * Bring the SA1111 out of reset.  This requires a set procedure:
+ *  1. nRESET asserted (by hardware)
+ *  2. CLK turned on from SA1110
+ *  3. nRESET deasserted
+ *  4. VCO turned on, PLL_BYPASS turned off
+ *  5. Wait lock time, then assert RCLKEn
+ *  7. PCR set to allow clocking of individual functions
+ *
+ * Until we've done this, the only registers we can access are:
+ *   SBI_SKCR
+ *   SBI_SMCR
+ *   SBI_SKID
  */
-static void __init sa1111_dma_setup(void)
+void sa1111_wake(void)
 {
-	dma_addr_t vbuf;
-	void * pbuf;
+	/*
+	 * First, set up the 3.6864MHz clock on GPIO 27 for the SA-1111:
+	 * (SA-1110 Developer's Manual, section 9.1.2.1)
+	 */
+	GAFR |= GPIO_32_768kHz;
+	GPDR |= GPIO_32_768kHz;
+	TUCR = TUCR_3_6864MHz;
 
-	/* DMA init & setup */
+	/*
+	 * Turn VCO on, and disable PLL Bypass.
+	 */
+	SBI_SKCR &= ~SKCR_VCO_OFF;
+	SBI_SKCR |= SKCR_PLL_BYPASS | SKCR_OE_EN;
 
-	/* WARNING: The SA-1111 L3 function is used as part of this
-	 * SA-1111 DMA errata workaround.
-	 *
-	 * N.B., When the L3 function is enabled, it uses GPIO_B<4:5>
-	 * and takes precedence over the PS/2 mouse and GPIO_B
-	 * functions. Refer to "Intel StrongARM SA-1111 Microprocessor
-	 * Companion Chip, Sect 10.2" for details.  So this "fix" may
-	 * "break" support of either PS/2 mouse or GPIO_B if
-	 * precautions are not taken to avoid collisions in
-	 * configuration and use of these pins. AFAIK, no precautions
-	 * are taken at this time. So it is likely that the action
-	 * taken here may cause problems in PS/2 mouse and/or GPIO_B
-	 * pin use elsewhere.
-	 *
-	 * But wait, there's more... What we're doing here is
-	 * obviously altogether a bad idea. We're indiscrimanately bit
-	 * flipping config for a few different functions here which
-	 * are "owned" by other drivers. This needs to be handled
-	 * better than it is being done here at this time.  */
-
-	/* prime the dma engine with a tiny dma */
-	SKPCR |= SKPCR_I2SCLKEN;
-	SKAUD |= SKPCR_L3CLKEN | SKPCR_SCLKEN;
-
-	SACR0 |= 0x00003305;
-	SACR1 = 0x00000000;
-
-	/* we need memory below 1mb */
-	pbuf = consistent_alloc(GFP_KERNEL | GFP_DMA, 4, &vbuf);
-
-	SADTSA = (unsigned long)pbuf;
-	SADTCA = 4;
-
-	SADTCS |= 0x00000011;
-	SKPCR |= SKPCR_DCLKEN;
-
-	/* wait */
+	/*
+	 * Wait lock time.  SA1111 manual _doesn't_
+	 * specify a figure for this!  We choose 100us.
+	 */
 	udelay(100);
 
-	SACR0 &= ~(0x00000002);
-	SACR0 &= ~(0x00000001);
+	/*
+	 * Enable RCLK.  We also ensure that RDYEN is set.
+	 */
+	SBI_SKCR |= SKCR_RCLKEN | SKCR_RDYEN;
 
-	/* */
-	SACR0 |= 0x00000004;
-	SACR0 &= ~(0x00000004);
+	/*
+	 * Wait 14 RCLK cycles for the chip to finish coming out
+	 * of reset. (RCLK=24MHz).  This is 590ns.
+	 */
+	udelay(1);
 
-	SKAUD &= ~(SKPCR_L3CLKEN | SKPCR_SCLKEN);
-
-	SKPCR &= ~SKPCR_I2SCLKEN;
-
-	consistent_free(pbuf, 4, vbuf);
+	/*
+	 * Ensure all clocks are initially off.
+	 */
+	SKPCR = 0;
 }
 
-#ifdef CONFIG_USB_OHCI
+void sa1111_doze(void)
+{
+	if (SKPCR & SKPCR_UCLKEN) {
+		printk("SA1111 doze mode refused\n");
+		return;
+	}
+	SBI_SKCR &= ~SKCR_RCLKEN;
+}
+
 /*
- * reset the SA-1111 usb controller and turn on it's clocks
+ * Configure the SA1111 shared memory controller.
  */
-static int __init sa1111_ohci_hcd_init(void)
+void sa1111_configure_smc(int sdram, unsigned int drac, unsigned int cas_latency)
 {
-	volatile unsigned long *Reset = (void *)SA1111_p2v(_SA1111(0x051c));
-	volatile unsigned long *Status = (void *)SA1111_p2v(_SA1111(0x0518));
+	unsigned int smcr = SMCR_DTIM | SMCR_MBGE | FInsrt(drac, SMCR_DRAC);
 
-	/* turn on clocks */
-	SKPCR |= SKPCR_UCLKEN;
-	udelay(100);
+	if (cas_latency == 3)
+		smcr |= SMCR_CLAT;
 
-	/* force a reset */
-	*Reset = 0x01;
-	*Reset |= 0x02;
-	udelay(100);
-
-	*Reset = 0;
-
-	/* take out of reset */
-	/* set power sense and control lines (this from the diags code) */
-        *Reset = ( PwrSensePolLow << 6 )
-               | ( PwrCtrlPolLow << 7 );
-
-	*Status = 0;
-
-	udelay(10);
-
-	/* compensate for dma bug */
-	sa1111_dma_setup();
-
-	return 0;
+	SBI_SMCR = smcr;
 }
 
-void sa1111_ohci_hcd_cleanup(void)
+/*
+ * Disable the memory bus request/grant signals on the SA1110 to
+ * ensure that we don't receive spurious memory requests.  We set
+ * the MBGNT signal false to ensure the SA1111 doesn't own the
+ * SDRAM bus.
+ */
+void __init sa1110_mb_disable(void)
 {
-	/* turn the USB clock off */
-	SKPCR &= ~SKPCR_UCLKEN;
+	PGSR &= ~GPIO_MBGNT;
+	GPCR = GPIO_MBGNT;
+	GPDR = (GPDR & ~GPIO_MBREQ) | GPIO_MBGNT;
+
+	GAFR &= ~(GPIO_MBGNT | GPIO_MBREQ);
+
 }
-#endif
 
+/*
+ * If the system is going to use the SA-1111 DMA engines, set up
+ * the memory bus request/grant pins.
+ */
+void __init sa1110_mb_enable(void)
+{
+	PGSR &= ~GPIO_MBGNT;
+	GPCR = GPIO_MBGNT;
+	GPDR = (GPDR & ~GPIO_MBREQ) | GPIO_MBGNT;
 
-#endif /* CONFIG_USB_OHCI */
+	GAFR |= (GPIO_MBGNT | GPIO_MBREQ);
+	TUCR |= TUCR_MR;
+}

@@ -62,34 +62,9 @@ typedef enum
         ec_restart,
         ec_halt,
         ec_power_off,
-        ec_ptlb,
+	ec_call_function,
 	ec_bit_last
 } ec_bit_sig;
-
-/* Signals which come with a parameter area, synchronous */
-typedef enum
-{
-        ec_callback_async,
-        ec_callback_sync
-} ec_cmd_sig;
-
-/* state information for synchronous signals */
-typedef enum
-{
-	ec_pending,
-	ec_executing,
-	ec_done
-} ec_state;
-
-/* header for the queuing of signals with a parameter area */
-typedef struct ec_ext_call
-{
-	ec_cmd_sig cmd;
-	atomic_t status;
-	struct ec_ext_call *next;
-        void (*func)(void *info);
-        void *info;
-} ec_ext_call;
 
 /*
  * Signal processor

@@ -95,7 +95,7 @@
  */
 
 /* This is used by platforms which might be able to set the ipconfig
- * variabled using firmware environment vars.  If this is set, it will
+ * variables using firmware environment vars.  If this is set, it will
  * ignore such firmware variables.
  */
 int ic_set_manually __initdata = 0;		/* IPconfig parameters set manually */

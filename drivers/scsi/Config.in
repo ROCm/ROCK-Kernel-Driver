@@ -122,10 +122,11 @@ if [ "$CONFIG_MCA" = "y" ]; then
    fi
 fi
 if [ "$CONFIG_PARISC" = "y" ]; then
-   dep_tristate 'HP LASI SCSI support for 53c700' CONFIG_SCSI_LASI700 $CONFIG_SCSI
+   dep_tristate 'HP LASI SCSI support for 53c700/710' CONFIG_SCSI_LASI700 $CONFIG_SCSI
    if [ "$CONFIG_SCSI_LASI700" != "n" ]; then
       define_bool CONFIG_53C700_MEM_MAPPED y
       define_bool CONFIG_53C700_LE_ON_BE y
+      define_bool CONFIG_53C700_USE_CONSISTENT y
    fi
 fi
 dep_tristate 'NCR53c7,8xx SCSI support'  CONFIG_SCSI_NCR53C7xx $CONFIG_SCSI $CONFIG_PCI

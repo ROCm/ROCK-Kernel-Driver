@@ -4,6 +4,7 @@
  *  S390 version
  *    Copyright (C) 1999 IBM Deutschland Entwicklung GmbH, IBM Corporation
  *    Author(s): Hartmut Penner (hp@de.ibm.com)
+ *               Ulrich Weigand (uweigand@de.ibm.com)
  *
  *  Derived from "arch/i386/mm/fault.c"
  *    Copyright (C) 1995  Linus Torvalds
@@ -22,6 +23,7 @@
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
 #include <linux/init.h>
+#include <linux/console.h>
 
 #include <asm/system.h>
 #include <asm/uaccess.h>
@@ -33,33 +35,33 @@ extern int sysctl_userprocess_debug;
 #endif
 
 extern void die(const char *,struct pt_regs *,long);
+static void force_sigsegv(struct task_struct *tsk, int code, void *address);
 
 extern spinlock_t timerlist_lock;
 
 /*
  * Unlock any spinlocks which will prevent us from getting the
- * message out
+ * message out (timerlist_lock is acquired through the
+ * console unblank code)
  */
 void bust_spinlocks(int yes)
 {
-        spin_lock_init(&timerlist_lock);
-        if (yes) {
-                oops_in_progress = 1;
-#ifdef CONFIG_SMP
-                atomic_set(&global_irq_lock,0);
-#endif
-        } else {
-                int loglevel_save = console_loglevel;
-                oops_in_progress = 0;
-                /*
-                 * OK, the message is on the console.  Now we call printk()
-                 * without oops_in_progress set so that printk will give klogd
-                 * a poke.  Hold onto your hats...
-                 */
-                console_loglevel = 15;          /* NMI oopser may have shut the console up */
-                printk(" ");
-                console_loglevel = loglevel_save;
-        }
+	spin_lock_init(&timerlist_lock);
+	if (yes) {
+		oops_in_progress = 1;
+	} else {
+		int loglevel_save = console_loglevel;
+		oops_in_progress = 0;
+		console_unblank();
+		/*
+		 * OK, the message is on the console.  Now we call printk()
+		 * without oops_in_progress set so that printk will give klogd
+		 * a poke.  Hold onto your hats...
+		 */
+		console_loglevel = 15;
+		printk(" ");
+		console_loglevel = loglevel_save;
+	}
 }
 
 /*
@@ -84,6 +86,29 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long error_code)
 	int si_code = SEGV_MAPERR;
 	int kernel_address = 0;
 
+        tsk = current;
+        mm = tsk->mm;
+	
+	/* 
+         * Check for low-address protection.  This needs to be treated
+	 * as a special case because the translation exception code 
+	 * field is not guaranteed to contain valid data in this case.
+	 */
+	if ((error_code & 0xff) == 4 && !(S390_lowcore.trans_exc_code & 4)) {
+
+		/* Low-address protection hit in kernel mode means 
+		   NULL pointer write access in kernel mode.  */
+ 		if (!(regs->psw.mask & PSW_PROBLEM_STATE)) {
+			address = 0;
+			kernel_address = 1;
+			goto no_context;
+		}
+
+		/* Low-address protection hit in user mode 'cannot happen'.  */
+		die ("Low-address protection", regs, error_code);
+        	do_exit(SIGKILL);
+	}
+
         /* 
          * get the failing address 
          * more specific the segment and page table portion of 
@@ -92,11 +117,6 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long error_code)
 
         address = S390_lowcore.trans_exc_code&-4096L;
 
-        tsk = current;
-        mm = tsk->mm;
-
-        if (in_interrupt() || !mm)
-                goto no_context;
 
 	/*
 	 * Check which address space the address belongs to
@@ -127,6 +147,7 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long error_code)
 			}
 		}
 		die("page fault via unknown access register", regs, error_code);
+        	do_exit(SIGKILL);
 		break;
 
 	case 2: /* Secondary Segment Table Descriptor */
@@ -135,6 +156,11 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long error_code)
 		break;
 	}
 
+	/*
+	 * Check whether we have a user MM in the first place.
+	 */
+        if (in_interrupt() || !mm)
+                goto no_context;
 
 	/*
 	 * When we get here, the fault happened in the current
@@ -144,10 +170,8 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long error_code)
         down_read(&mm->mmap_sem);
 
         vma = find_vma(mm, address);
-        if (!vma) {
-	        printk("no vma for address %lX\n",address);
+        if (!vma)
                 goto bad_area;
-        }
         if (vma->vm_start <= address) 
                 goto good_area;
         if (!(vma->vm_flags & VM_GROWSDOWN))
@@ -177,6 +201,7 @@ good_area:
                        goto bad_area;
         }
 
+ survive:
 	/*
 	 * If for any reason at all we couldn't handle the fault,
 	 * make sure we exit gracefully rather than endlessly redo
@@ -207,7 +232,6 @@ bad_area:
 
         /* User mode accesses just cause a SIGSEGV */
         if (regs->psw.mask & PSW_PROBLEM_STATE) {
-		struct siginfo si;
                 tsk->thread.prot_addr = address;
                 tsk->thread.trap_no = error_code;
 #ifndef CONFIG_SYSCTL
@@ -224,10 +248,8 @@ bad_area:
 			show_regs(regs);
 		}
 #endif
-		si.si_signo = SIGSEGV;
-		si.si_code = si_code;
-		si.si_addr = (void*) address;
-		force_sig_info(SIGSEGV, &si, tsk);
+
+		force_sigsegv(tsk, si_code, (void *)address);
                 return;
 	}
 
@@ -242,16 +264,13 @@ no_context:
  * Oops. The kernel tried to access some bad page. We'll have to
  * terminate things with extreme prejudice.
  */
+
         if (kernel_address)
                 printk(KERN_ALERT "Unable to handle kernel pointer dereference"
         	       " at virtual kernel address %016lx\n", address);
         else
                 printk(KERN_ALERT "Unable to handle kernel paging request"
 		       " at virtual user address %016lx\n", address);
-
-/*
- * need to define, which information is useful here
- */
 
         die("Oops", regs, error_code);
         do_exit(SIGKILL);
@@ -263,6 +282,12 @@ no_context:
 */
 out_of_memory:
 	up_read(&mm->mmap_sem);
+	if (tsk->pid == 1) {
+		tsk->policy |= SCHED_YIELD;
+		schedule();
+		down_read(&mm->mmap_sem);
+		goto survive;
+	}
 	printk("VM: killing process %s\n", tsk->comm);
 	if (regs->psw.mask & PSW_PROBLEM_STATE)
 		do_exit(SIGKILL);
@@ -283,6 +308,20 @@ do_sigbus:
 	if (!(regs->psw.mask & PSW_PROBLEM_STATE))
 		goto no_context;
 }
+
+/*
+ * Send SIGSEGV to task.  This is an external routine
+ * to keep the stack usage of do_page_fault small.
+ */
+static void force_sigsegv(struct task_struct *tsk, int code, void *address)
+{
+	struct siginfo si;
+	si.si_signo = SIGSEGV;
+	si.si_code = code;
+	si.si_addr = address;
+	force_sig_info(SIGSEGV, &si, tsk);
+}
+
 
 #ifdef CONFIG_PFAULT
 /*
@@ -316,13 +355,11 @@ typedef struct _pseudo_wait_t {
        int resolved;
 } pseudo_wait_t;
 
-static pseudo_wait_t *pseudo_lock_queue = NULL;
-static spinlock_t pseudo_wait_spinlock; /* spinlock to protect lock queue */
-
 int pfault_init(void)
 {
 	pfault_refbk_t refbk =
-	{ 0x258, 0, 5, 2, __LC_KERNEL_STACK, 1ULL << 48, 1ULL << 48, 0ULL };
+	{ 0x258, 0, 5, 2, __LC_KERNEL_STACK, 1ULL << 48, 1ULL << 48,
+          0x8000000000000000ULL };
         int rc;
 
 	if (pfault_disable)
@@ -362,7 +399,6 @@ void pfault_fini(void)
 asmlinkage void
 pfault_interrupt(struct pt_regs *regs, __u16 error_code)
 {
-        DECLARE_WAITQUEUE(wait, current);
 	struct task_struct *tsk;
 	wait_queue_head_t queue;
 	wait_queue_head_t *qp;
@@ -375,7 +411,7 @@ pfault_interrupt(struct pt_regs *regs, __u16 error_code)
          * external interrupt. 
 	 */
 	subcode = S390_lowcore.cpu_addr;
-	if ((subcode & 0xff00) != 0x06)
+	if ((subcode & 0xff00) != 0x0600)
 		return;
 
 	/*

@@ -31,8 +31,13 @@
 #include <linux/lockd/nlm.h>
 #include <linux/lockd/lockd.h>
 
-
 #define NLMDBG_FACILITY		NLMDBG_SVCLOCK
+
+#ifdef CONFIG_LOCKD_V4
+#define nlm_deadlock	nlm4_deadlock
+#else
+#define nlm_deadlock	nlm_lck_denied
+#endif
 
 static void	nlmsvc_insert_block(struct nlm_block *block, unsigned long);
 static int	nlmsvc_remove_block(struct nlm_block *block);
@@ -330,12 +335,7 @@ again:
 		case 0:
 			return nlm_granted;
 		case EDEADLK:
-#ifdef CONFIG_LOCKD_V4
-			return nlm4_deadlock; /* will be downgraded to lck_deined if this
-					       * is a NLMv1,3 request */
-#else
-			/* no applicable NLM status */
-#endif
+			return nlm_deadlock;
 		case EAGAIN:
 			return nlm_lck_denied;
 		default:			/* includes ENOLCK */
@@ -346,6 +346,11 @@ again:
 	if (!wait) {
 		up(&file->f_sema);
 		return nlm_lck_denied;
+	}
+
+	if (posix_locks_deadlock(&lock->fl, conflock)) {
+		up(&file->f_sema);
+		return nlm_deadlock;
 	}
 
 	/* If we don't have a block, create and initialize it. Then

@@ -47,6 +47,9 @@ unsigned int console_mode = 0;
 unsigned int console_device = -1;
 unsigned long memory_size = 0;
 unsigned long machine_flags = 0;
+struct { unsigned long addr, size, type; } memory_chunk[16];
+#define CHUNK_READ_WRITE 0
+#define CHUNK_READ_ONLY 1
 __u16 boot_cpu_addr;
 int cpus_initialized = 0;
 unsigned long cpu_initialized = 0;
@@ -258,6 +261,8 @@ void machine_power_off(void)
  * Setup function called from init/main.c just after the banner
  * was printed.
  */
+extern char _pstart, _pend, _stext;
+
 void __init setup_arch(char **cmdline_p)
 {
         unsigned long bootmap_size;
@@ -267,17 +272,12 @@ void __init setup_arch(char **cmdline_p)
 	unsigned long start_pfn, end_pfn;
         static unsigned int smptrap=0;
         unsigned long delay = 0;
+	struct _lowcore *lowcore;
+	int i;
 
         if (smptrap)
                 return;
         smptrap=1;
-
-        /*
-         * Setup lowcore information for boot cpu
-         */
-        cpu_init();
-        boot_cpu_addr = S390_lowcore.cpu_data.cpu_addr;
-        __cpu_logical_map[0] = boot_cpu_addr;
 
         /*
          * print what head.S has found out about the machine 
@@ -291,7 +291,7 @@ void __init setup_arch(char **cmdline_p)
 
         ROOT_DEV = to_kdev_t(0x0100);
         memory_start = (unsigned long) &_end;    /* fixit if use $CODELO etc*/
-	memory_end = memory_size;
+	memory_end = memory_size & ~0x400000UL;  /* align memory end to 4MB */
         /*
          * We need some free virtual space to be able to do vmalloc.
          * On a machine with 2GB memory we make sure that we have at
@@ -373,10 +373,25 @@ void __init setup_arch(char **cmdline_p)
 	bootmap_size = init_bootmem(start_pfn, end_pfn);
 
 	/*
-	 * Register RAM pages with the bootmem allocator.
+	 * Register RAM areas with the bootmem allocator.
 	 */
-	free_bootmem(start_pfn << PAGE_SHIFT, 
-		     (end_pfn - start_pfn) << PAGE_SHIFT);
+	for (i = 0; i < 16 && memory_chunk[i].size > 0; i++) {
+		unsigned long start_chunk, end_chunk;
+
+		if (memory_chunk[i].type != CHUNK_READ_WRITE)
+			continue;
+		start_chunk = (memory_chunk[i].addr + PAGE_SIZE - 1);
+		start_chunk >>= PAGE_SHIFT;
+		end_chunk = (memory_chunk[i].addr + memory_chunk[i].size);
+		end_chunk >>= PAGE_SHIFT;
+		if (start_chunk < start_pfn)
+			start_chunk = start_pfn;
+		if (end_chunk > end_pfn)
+			end_chunk = end_pfn;
+		if (start_chunk < end_chunk)
+			free_bootmem(start_chunk << PAGE_SHIFT,
+				     (end_chunk - start_chunk) << PAGE_SHIFT);
+	}
 
         /*
          * Reserve the bootmem bitmap itself as well. We do this in two
@@ -401,6 +416,36 @@ void __init setup_arch(char **cmdline_p)
         }
 #endif
 
+        /*
+         * Setup lowcore for boot cpu
+         */
+	lowcore = (struct _lowcore *)
+		__alloc_bootmem(PAGE_SIZE, PAGE_SIZE, 0);
+	memset(lowcore, 0, PAGE_SIZE);
+	lowcore->restart_psw.mask = _RESTART_PSW_MASK;
+	lowcore->restart_psw.addr = _ADDR_31 + (addr_t) &restart_int_handler;
+	lowcore->external_new_psw.mask = _EXT_PSW_MASK;
+	lowcore->external_new_psw.addr = _ADDR_31 + (addr_t) &ext_int_handler;
+	lowcore->svc_new_psw.mask = _SVC_PSW_MASK;
+	lowcore->svc_new_psw.addr = _ADDR_31 + (addr_t) &system_call;
+	lowcore->program_new_psw.mask = _PGM_PSW_MASK;
+	lowcore->program_new_psw.addr = _ADDR_31 + (addr_t) &pgm_check_handler;
+        lowcore->mcck_new_psw.mask = _MCCK_PSW_MASK;
+	lowcore->mcck_new_psw.addr = _ADDR_31 + (addr_t) &mcck_int_handler;
+	lowcore->io_new_psw.mask = _IO_PSW_MASK;
+	lowcore->io_new_psw.addr = _ADDR_31 + (addr_t) &io_int_handler;
+	lowcore->ipl_device = S390_lowcore.ipl_device;
+	lowcore->kernel_stack = ((__u32) &init_task_union) + 8192;
+	lowcore->async_stack = (__u32)
+		__alloc_bootmem(2*PAGE_SIZE, 2*PAGE_SIZE, 0) + 8192;
+	set_prefix((__u32) lowcore);
+        cpu_init();
+        boot_cpu_addr = S390_lowcore.cpu_data.cpu_addr;
+        __cpu_logical_map[0] = boot_cpu_addr;
+
+	/*
+	 * Create kernel page tables and switch to virtual addressing.
+	 */
         paging_init();
 
 	res = alloc_bootmem_low(sizeof(struct resource));
@@ -433,30 +478,49 @@ void print_cpu_info(struct cpuinfo_S390 *cpuinfo)
 }
 
 /*
- *	Get CPU information for use by the procfs.
+ * get_cpuinfo - Get information on one CPU for use by procfs.
+ *
+ *	Prints info on the next CPU into buffer.  Beware, doesn't check for
+ *	buffer overflow.  Current implementation of procfs assumes that the
+ *	resulting data is <= 1K.
+ *
+ * Args:
+ *	buffer	-- you guessed it, the data buffer
+ *	cpu_np	-- Input: next cpu to get (start at 0).  Output: Updated.
+ *
+ *	Returns number of bytes written to buffer.
  */
 
-int get_cpuinfo(char * buffer)
+int get_cpuinfo(char *buffer, unsigned *cpu_np)
 {
         struct cpuinfo_S390 *cpuinfo;
         char *p = buffer;
-        int i;
+	unsigned n;
 
-        p += sprintf(p,"vendor_id       : IBM/S390\n"
-                       "# processors    : %i\n"
-                       "bogomips per cpu: %lu.%02lu\n",
-                       smp_num_cpus, loops_per_jiffy/(500000/HZ),
-                       (loops_per_jiffy/(5000/HZ))%100);
-        for (i = 0; i < smp_num_cpus; i++) {
-                cpuinfo = &safe_get_cpu_lowcore(i).cpu_data;
-                p += sprintf(p,"processor %i: "
-                               "version = %02X,  "
-                               "identification = %06X,  "
-                               "machine = %04X\n",
-                               i, cpuinfo->cpu_id.version,
-                               cpuinfo->cpu_id.ident,
-                               cpuinfo->cpu_id.machine);
-        }
+	n = *cpu_np;
+	while (n < NR_CPUS && (cpu_online_map & (1 << n)) == 0)
+		n++;
+	if (n >= NR_CPUS) {
+		*cpu_np = NR_CPUS;
+		return (0);
+	}
+	*cpu_np = n + 1;
+
+	if (n == 0) {
+		p += sprintf(p,"vendor_id       : IBM/S390\n"
+			       "# processors    : %i\n"
+			       "bogomips per cpu: %lu.%02lu\n",
+			       smp_num_cpus, loops_per_jiffy/(500000/HZ),
+			       (loops_per_jiffy/(5000/HZ))%100);
+	}
+	cpuinfo = &safe_get_cpu_lowcore(n).cpu_data;
+	p += sprintf(p,"processor %i: "
+		       "version = %02X,  "
+		       "identification = %06X,  "
+		       "machine = %04X\n",
+		       n, cpuinfo->cpu_id.version,
+		       cpuinfo->cpu_id.ident,
+		       cpuinfo->cpu_id.machine);
         return p - buffer;
 }
 

@@ -404,6 +404,7 @@ ENTRY(soft_irq_mask)
 		.endm
 
 #elif defined(CONFIG_ARCH_L7200)
+#include <asm/hardware.h>
 	
 		.equ	irq_base_addr,	IO_BASE_2
 
@@ -625,8 +626,8 @@ __dabt_svc:	sub	sp, sp, #S_FRAME_SIZE
  * This routine must not corrupt r9
  */
 #ifdef MULTI_CPU
-		ldr	r2, .LCprocfns
-		mov	lr, pc
+		ldr	r2, .LCprocfns			@ pass r0, r3 to
+		mov	lr, pc				@ processor code
 		ldr	pc, [r2]			@ call processor specific code
 #else
 		bl	cpu_data_abort
@@ -722,16 +723,16 @@ __pabt_svc:	sub	sp, sp, #S_FRAME_SIZE
 		.align	5
 __dabt_usr:	sub	sp, sp, #S_FRAME_SIZE		@ Allocate frame size in one go
 		stmia	sp, {r0 - r12}			@ save r0 - r12
-		ldr	r4, .LCabt
-		add	r3, sp, #S_PC
-		ldmia	r4, {r0 - r2}			@ Get USR pc, cpsr
-		stmia	r3, {r0 - r2}			@ Save USR pc, cpsr, old_r0
-		stmdb	r3, {sp, lr}^
-		alignment_trap r4, r7, __temp_abt
+		ldr	r7, .LCabt
+		add	r5, sp, #S_PC
+		ldmia	r7, {r0, r3, r4}		@ Get USR pc, cpsr
+		stmia	r5, {r0, r3, r4}		@ Save USR pc, cpsr, old_r0
+		stmdb	r5, {sp, lr}^
+		alignment_trap r7, r7, __temp_abt
 		zero_fp
 #ifdef MULTI_CPU
-		ldr	r2, .LCprocfns
-		mov	lr, pc
+		ldr	r2, .LCprocfns			@ pass r0, r3 to
+		mov	lr, pc				@ processor code
 		ldr	pc, [r2]			@ call processor specific code
 #else
 		bl	cpu_data_abort

@@ -39,7 +39,7 @@
 #include <linux/version.h>
 #include <linux/spinlock.h>
 #include <linux/kernel.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/init.h>
 #include <linux/tqueue.h>
 #include <linux/interrupt.h>
@@ -52,10 +52,6 @@
 #include <asm/ebcdic.h>
 
 #undef DEBUG
-
-#ifndef min
-#define min(a,b) (((a)<(b))?(a):(b))
-#endif
 
 /* FLAGS:
  * All flags are defined in the field IPFLAGS1 of each function
@@ -1163,7 +1159,7 @@ iucv_receive (__u16 pathid, __u32 msgid, __u32 trgcls,
 
 	parm = (iparml_db *)grab_param();
 
-	parm->ipbfadr1 = (__u32) buffer;
+	parm->ipbfadr1 = (__u32) (addr_t) buffer;
 	parm->ipbfln1f = (__u32) ((ulong) buflen);
 	parm->ipmsgid = msgid;
 	parm->ippathid = pathid;
@@ -1186,7 +1182,7 @@ iucv_receive (__u16 pathid, __u32 msgid, __u32 trgcls,
 			if (residual_buffer)
 				*residual_buffer = parm->ipbfadr1;
 		} else {
-			moved = min (buflen, 8);
+			moved = min_t (unsigned long, buflen, 8);
 
 			memcpy ((char *) buffer,
 				(char *) &parm->ipbfadr1, moved);
@@ -1283,7 +1279,8 @@ iucv_receive_array (__u16 pathid,
 
 			while ((moved < 8) && (moved < buflen)) {
 				dyn_len =
-				    min ((buffer + i)->length, need_to_move);
+				    min_t (unsigned int,
+					 (buffer + i)->length, need_to_move);
 
 				memcpy ((char *)((ulong)((buffer + i)->address)),
 					((char *) &parm->ipbfadr1) + moved,

@@ -325,3 +325,4 @@ void    cleanup_module(void)
 
 /* end of epia.c */
 
+MODULE_LICENSE("GPL");

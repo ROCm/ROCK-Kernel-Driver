@@ -547,3 +547,4 @@ void	paride_init( void )
 #endif
 
 /* end of paride.c */
+MODULE_LICENSE("GPL");

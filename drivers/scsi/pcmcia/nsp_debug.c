@@ -6,7 +6,7 @@
     the GNU General Public License.
 =========================================================================*/
 
-/* $Id: nsp_debug.c,v 1.6 2001/07/04 14:43:53 elca Exp $ */
+/* $Id: nsp_debug.c,v 1.8 2001/09/07 04:32:28 elca Exp $ */
 
 /*
  * Show the command data of a command
@@ -85,7 +85,7 @@ static void print_opcodek(unsigned char opcode)
 	}
 }
 
-void print_commandk (unsigned char *command)
+static void print_commandk (unsigned char *command)
 {
 	int i,s;
 	printk(KERN_DEBUG);

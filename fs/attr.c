@@ -137,7 +137,7 @@ int notify_change(struct dentry * dentry, struct iattr * attr)
 			    (ia_valid & ATTR_GID && attr->ia_gid != inode->i_gid))
 				error = DQUOT_TRANSFER(inode, attr) ? -EDQUOT : 0;
 			if (!error)
-				inode_setattr(inode, attr);
+				error = inode_setattr(inode, attr);
 		}
 	}
 	unlock_kernel();

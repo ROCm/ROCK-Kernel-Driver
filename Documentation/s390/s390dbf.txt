@@ -336,7 +336,7 @@ proc-files:
 Example:
 
 > ls /proc/s390dbf/dasd
-hex_ascii  level      raw
+flush  hex_ascii  level      raw 
 > cat /proc/s390dbf/dasd/hex_ascii | sort +1
 00 00974733272:680099 2 - 02 0006ad7e  07 ea 4a 90 | ....
 00 00974733272:682210 2 - 02 0006ade6  46 52 45 45 | FREE
@@ -362,6 +362,20 @@ Example:
 > echo "5" > /proc/s390dbf/dasd/level
 > cat /proc/s390dbf/dasd/level
 5
+
+Flushing debug areas
+--------------------
+Debug areas can be flushed with piping the number of the desired
+area (0...n) to the proc file "flush". When using "-" all debug areas
+are flushed.
+
+Examples:
+
+1. Flush debug area 0:
+> echo "0" > /proc/s390dbf/dasd/flush  
+
+2. Flush all debug areas:
+> echo "-" > /proc/s390dbf/dasd/flush
 
 lcrash Interface
 ----------------

@@ -82,12 +82,6 @@
 
 static struct expansion_card *ecs[MAX_ECARDS];
 
-MODULE_AUTHOR("Russell King");
-MODULE_DESCRIPTION("Cumana SCSI II driver");
-MODULE_PARM(term, "1-8i");
-MODULE_PARM_DESC(term, "SCSI bus termination");
-MODULE_LICENSE("GPL");
-
 /*
  * Use term=0,1,0,0,0 to turn terminators on/off
  */
@@ -600,3 +594,10 @@ static void __exit cumanascsi2_exit(void)
 
 module_init(cumanascsi2_init);
 module_exit(cumanascsi2_exit);
+
+MODULE_AUTHOR("Russell King");
+MODULE_DESCRIPTION("Cumana SCSI-2 driver for Acorn machines");
+MODULE_PARM(term, "1-8i");
+MODULE_PARM_DESC(term, "SCSI bus termination");
+MODULE_LICENSE("GPL");
+EXPORT_NO_SYMBOLS;

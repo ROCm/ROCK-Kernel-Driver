@@ -123,9 +123,8 @@ ENTRY(ret_from_fork)
 	.align	5
 ENTRY(vector_swi)
 	save_user_regs
-	mask_pc	lr, lr
 	zero_fp
-	ldr	scno, [lr, #-4]			@ get SWI instruction
+	get_scno
 	arm710_bug_check scno, ip
 
 #ifdef CONFIG_ALIGNMENT_TRAP

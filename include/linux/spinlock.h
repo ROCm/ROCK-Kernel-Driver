@@ -30,6 +30,10 @@
 #define write_unlock_irqrestore(lock, flags)	do { write_unlock(lock); local_irq_restore(flags); } while (0)
 #define write_unlock_irq(lock)			do { write_unlock(lock); local_irq_enable();       } while (0)
 #define write_unlock_bh(lock)			do { write_unlock(lock); local_bh_enable();        } while (0)
+#define spin_trylock_bh(lock)			({ int __r; local_bh_disable();\
+						__r = spin_trylock(lock);      \
+						if (!__r) local_bh_enable();   \
+						__r; })
 
 #ifdef CONFIG_SMP
 #include <asm/spinlock.h>

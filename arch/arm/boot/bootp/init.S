@@ -39,7 +39,7 @@ splitify:	adr	r13, data
  * method by looking at the first word; this should either indicate a page
  * size of 4K, 16K or 32K.
  */
-		ldmia	r13, {r5-r8}		@ get size and addr of initrd
+		ldmia	r13, {r4-r8}		@ get size and addr of initrd
 						@ r5 = ATAG_INITRD
 						@ r6 = initrd start
 						@ r7 = initrd end
@@ -48,10 +48,25 @@ splitify:	adr	r13, data
 		teq	r9, #0x1000		@ 4K?
 		teqne	r9, #0x4000		@ 16K?
 		teqne	r9, #0x8000		@ 32K?
-		beq	no_taglist
+		beq	param_struct
+
+		ldr	r9, [r8, #4]		@ get first tag
+		teq	r9, r4
+		bne	taglist			@ ok, we have a tag list
+
+/*
+ * We didn't find a valid tag list - create one.
+ */
+		str	r4, [r8, #4]
+		mov	r4, #8
+		str	r4, [r8, #0]
+		mov	r4, #0
+		str	r4, [r8, #8]
 
 /*
  * find the end of the tag list, and then add an INITRD tag on the end.
+ * If there is already an INITRD tag, then we ignore it; the last INITRD
+ * tag takes precidence.
  */
 taglist:	ldr	r9, [r8, #0]		@ tag length
 		teq	r9, #0			@ last tag?
@@ -63,7 +78,10 @@ taglist:	ldr	r9, [r8, #0]		@ tag length
 		stmia	r8, {r4, r5, r6, r7, r9}
 		mov	pc, r12			@ call kernel
 
-no_taglist:	add	r8, r8, #16*4
+/*
+ * We found a param struct.  Modify the param struct for the initrd
+ */
+param_struct:	add	r8, r8, #16*4
 		stmia	r8, {r6,r7}		@ save in param_struct
 		mov	pc, r12			@ call kernel
 
@@ -83,6 +101,7 @@ data:		.word	initrd_start
 		.word	kernel_addr
 		.word	kernel_len
 
+		.word	0x54410001		@ r4 = ATAG_CORE
 		.word	0x54410005		@ r5 = ATAG_INITRD
 		.word	initrd_virt		@ r6
 		.word	initrd_len		@ r7

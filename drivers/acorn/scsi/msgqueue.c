@@ -16,10 +16,6 @@
 
 #include "msgqueue.h"
 
-MODULE_AUTHOR("Russell King");
-MODULE_DESCRIPTION("SCSI message queue handling");
-MODULE_LICENSE("GPL");
-
 /*
  * Function: struct msgqueue_entry *mqe_alloc(MsgQueue_t *msgq)
  * Purpose : Allocate a message queue entry
@@ -170,13 +166,6 @@ EXPORT_SYMBOL(msgqueue_getmsg);
 EXPORT_SYMBOL(msgqueue_addmsg);
 EXPORT_SYMBOL(msgqueue_flush);
 
-#ifdef MODULE
-int __init init_module(void)
-{
-	return 0;
-}
-
-void __exit cleanup_module(void)
-{
-}
-#endif
+MODULE_AUTHOR("Russell King");
+MODULE_DESCRIPTION("SCSI message queue handling");
+MODULE_LICENSE("GPL");

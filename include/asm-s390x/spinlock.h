@@ -32,20 +32,19 @@ extern inline void spin_lock(spinlock_t *lp)
         __asm__ __volatile("    bras  1,1f\n"
                            "0:  # diag  0,0,68\n"
                            "1:  slr   0,0\n"
-                           "    cs    0,1,%1\n"
+                           "    cs    0,1,0(%0)\n"
                            "    jl    0b\n"
-                           : "=m" (lp->lock)
-                           : "0" (lp->lock) : "0", "1", "cc" );
+                           : : "a" (&lp->lock) : "0", "1", "cc", "memory" );
 }
 
 extern inline int spin_trylock(spinlock_t *lp)
 {
 	unsigned int result;
-	__asm__ __volatile("    slr   %1,%1\n"
+	__asm__ __volatile("    slr   %0,%0\n"
 			   "    basr  1,0\n"
-			   "0:  cs    %1,1,%0"
-			   : "=m" (lp->lock), "=&d" (result)
-			   : "0" (lp->lock) : "1", "cc" );
+			   "0:  cs    %0,1,0(%1)"
+			   : "=&d" (result)
+			   : "a" (&lp->lock) : "1", "cc", "memory" );
 	return !result;
 }
 
@@ -53,7 +52,7 @@ extern inline void spin_unlock(spinlock_t *lp)
 {
 	__asm__ __volatile("    xc 0(4,%0),0(%0)\n"
                            "    bcr 15,0"
-			   : /* no output */ : "a" (lp) : "memory", "cc" );
+			   : : "a" (&lp->lock) : "memory", "cc" );
 }
 		
 /*
@@ -76,46 +75,42 @@ typedef struct {
 #define rwlock_init(x)	do { *(x) = RW_LOCK_UNLOCKED; } while(0)
 
 #define read_lock(rw)   \
-        asm volatile("   la    1,%0\n"   \
-                     "   lg    2,0(1)\n"   \
+        asm volatile("   lg    2,0(%0)\n"   \
                      "   j     1f\n"     \
                      "0: # diag  0,0,68\n" \
                      "1: nihh  2,0x7fff\n" /* clear high (=write) bit */ \
                      "   la    3,1(2)\n"   /* one more reader */  \
-                     "   csg   2,3,0(1)\n" /* try to write new value */ \
+                     "   csg   2,3,0(%0)\n" /* try to write new value */ \
                      "   jl    0b"       \
-                     : "+m" ((rw)->lock) : : "1", "2", "3", "cc" );
+                     : : "a" (&(rw)->lock) : "2", "3", "cc", "memory" );
 
 #define read_unlock(rw) \
-        asm volatile("   la    1,%0\n"   \
-                     "   lg    2,0(1)\n"   \
+        asm volatile("   lg    2,0(%0)\n"   \
                      "   j     1f\n"     \
                      "0: # diag  0,0,68\n" \
                      "1: lgr   3,2\n"    \
                      "   bctgr 3,0\n"    /* one less reader */ \
-                     "   csg   2,3,0(1)\n" \
+                     "   csg   2,3,0(%0)\n" \
                      "   jl    0b"       \
-                     : "+m" ((rw)->lock) : : "1", "2", "3", "cc" );
+                     : : "a" (&(rw)->lock) : "2", "3", "cc", "memory" );
 
 #define write_lock(rw) \
-        asm volatile("   la    1,%0\n"     \
-                     "   llihh 3,0x8000\n" /* new lock value = 0x80...0 */ \
+        asm volatile("   llihh 3,0x8000\n" /* new lock value = 0x80...0 */ \
                      "   j     1f\n"       \
                      "0: # diag  0,0,68\n"   \
                      "1: slgr  2,2\n"      /* old lock value must be 0 */ \
-                     "   csg   2,3,0(1)\n" \
+                     "   csg   2,3,0(%0)\n" \
                      "   jl    0b"         \
-                     : "+m" ((rw)->lock) : : "1", "2", "3", "cc" );
+                     : : "a" (&(rw)->lock) : "2", "3", "cc", "memory" );
 
 #define write_unlock(rw) \
-        asm volatile("   la    1,%0\n"     \
-                     "   slgr  3,3\n"      /* new lock value = 0 */ \
+        asm volatile("   slgr  3,3\n"      /* new lock value = 0 */ \
                      "   j     1f\n"       \
                      "0: # diag  0,0,68\n"   \
                      "1: llihh 2,0x8000\n" /* old lock value must be 0x8..0 */\
-                     "   csg   2,3,0(1)\n"   \
+                     "   csg   2,3,0(%0)\n"   \
                      "   jl    0b"         \
-                     : "+m" ((rw)->lock) : : "1", "2", "3", "cc" );
+                     : : "a" (&(rw)->lock) : "2", "3", "cc", "memory" );
 
 #endif /* __ASM_SPINLOCK_H */
 

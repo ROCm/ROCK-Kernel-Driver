@@ -11,6 +11,7 @@ define_bool CONFIG_MCA n
 define_bool CONFIG_UID16 y
 define_bool CONFIG_RWSEM_GENERIC_SPINLOCK y
 define_bool CONFIG_RWSEM_XCHGADD_ALGORITHM n
+define_bool CONFIG_GENERIC_BUST_SPINLOCK n
 
 
 mainmenu_option next_comment
@@ -68,12 +69,13 @@ mainmenu_option next_comment
 comment 'SA11x0 Implementations'
 dep_bool '  Assabet' CONFIG_SA1100_ASSABET $CONFIG_ARCH_SA1100
 dep_bool '    Include support for Neponset' CONFIG_ASSABET_NEPONSET $CONFIG_SA1100_ASSABET
+dep_bool '  ADS Bitsy' CONFIG_SA1100_ADSBITSY $CONFIG_ARCH_SA1100
 dep_bool '  Brutus' CONFIG_SA1100_BRUTUS $CONFIG_ARCH_SA1100
 dep_bool '  CerfBoard' CONFIG_SA1100_CERF $CONFIG_ARCH_SA1100
 if [ "$CONFIG_SA1100_CERF" = "y" ]; then
    bool '    32MB Cerf support' CONFIG_SA1100_CERF_32MB
 fi
-dep_bool '  Compaq iPAQ H3600 (Bitsy)' CONFIG_SA1100_BITSY $CONFIG_ARCH_SA1100
+dep_bool '  Compaq iPAQ H3600' CONFIG_SA1100_H3600 $CONFIG_ARCH_SA1100
 #dep_bool '  Empeg' CONFIG_SA1100_EMPEG $CONFIG_ARCH_SA1100
 dep_bool '  Extenex HandHeld Theater (Squashtail)' CONFIG_SA1100_EXTENEX1 $CONFIG_ARCH_SA1100
 if [ "$CONFIG_SA1100_EXTENEX1" = "y" ]; then
@@ -82,6 +84,7 @@ fi
 dep_bool '  FlexaNet' CONFIG_SA1100_FLEXANET $CONFIG_ARCH_SA1100
 dep_bool '  FreeBird-v1.1' CONFIG_SA1100_FREEBIRD $CONFIG_ARCH_SA1100
 dep_bool '  GraphicsClient Plus' CONFIG_SA1100_GRAPHICSCLIENT $CONFIG_ARCH_SA1100
+dep_bool '  GraphicsMaster' CONFIG_SA1100_GRAPHICSMASTER $CONFIG_ARCH_SA1100
 dep_bool '  HP Jornada 720' CONFIG_SA1100_JORNADA720 $CONFIG_ARCH_SA1100
 dep_bool '  HuW WebPanel' CONFIG_SA1100_HUW_WEBPANEL $CONFIG_ARCH_SA1100
 dep_bool '  Itsy' CONFIG_SA1100_ITSY $CONFIG_ARCH_SA1100
@@ -101,14 +104,38 @@ dep_bool '  Yopy' CONFIG_SA1100_YOPY $CONFIG_ARCH_SA1100
 if [ "$CONFIG_ASSABET_NEPONSET" = "y" -o \
      "$CONFIG_SA1100_JORNADA720" = "y" -o \
      "$CONFIG_SA1100_PFS168" = "y" -o \
-     "$CONFIG_SA1100_XP860" = "y" ]; then
+     "$CONFIG_SA1100_XP860" = "y" -o \
+     "$CONFIG_SA1100_GRAPHICSMASTER" = "y" -o \
+     "$CONFIG_SA1100_ADSBITSY" = "y" ]; then
    define_bool CONFIG_SA1111 y
+   define_int CONFIG_FORCE_MAX_ZONEORDER 9
 fi
 endmenu
 
 mainmenu_option next_comment
 comment 'CLPS711X/EP721X Implementations'
+dep_bool '  CDB89712' CONFIG_ARCH_CDB89712 $CONFIG_ARCH_CLPS711X
+dep_bool '  CLEP7312' CONFIG_ARCH_CLEP7312 $CONFIG_ARCH_CLPS711X
+dep_bool '  EDB7211' CONFIG_ARCH_EDB7211 $CONFIG_ARCH_CLPS711X
 dep_bool '  P720T' CONFIG_ARCH_P720T $CONFIG_ARCH_CLPS711X
+
+# XXX Maybe these should indicate register compatibility
+# instead of being mutually exclusive.
+if [ "$CONFIG_ARCH_EDB7211" = "y" ]; then
+   define_bool CONFIG_ARCH_EP7211 y
+else
+   define_bool CONFIG_ARCH_EP7211 n
+fi
+if [ "$CONFIG_ARCH_P720T" = "y" ]; then
+   define_bool CONFIG_ARCH_EP7212 y
+else
+   define_bool CONFIG_ARCH_EP7212 n
+fi
+
+if [ "$CONFIG_ARCH_EP7211" = "y" -o \
+     "$CONFIG_ARCH_EP7212" = "y" ]; then
+   bool '  EP72xx ROM boot' CONFIG_EP72XX_ROM_BOOT
+fi
 endmenu
 
 # Definitions to make life easier
@@ -196,7 +223,9 @@ else
 fi
 
 # ARM720T
-if [ "$CONFIG_ARCH_CLPS711X" = "y" -o "$CONFIG_ARCH_L7200" = "y" ]; then
+if [ "$CONFIG_ARCH_CLPS711X" = "y" -o \
+     "$CONFIG_ARCH_L7200"    = "y" -o \
+     "$CONFIG_ARCH_CDB89712" = "y" ]; then
    define_bool CONFIG_CPU_ARM720T y
 else
    if [ "$CONFIG_ARCH_INTEGRATOR" = "y" ]; then
@@ -255,12 +284,13 @@ else
    define_bool CONFIG_CPU_SA1100 n
 fi
 
-#if [ "$CONFIG_CPU_32" = "y" ]; then
-#   bool 'Support Thumb instructions' CONFIG_ARM_THUMB
-#fi
+if [ "$CONFIG_CPU_32" = "y" ]; then
+   dep_bool 'Support Thumb instructions (experimental)' CONFIG_ARM_THUMB $CONFIG_EXPERIMENTAL
+fi
 
 # Select various configuration options depending on the machine type
-if [ "$CONFIG_ARCH_SA1100" = "y" ]; then
+if [ "$CONFIG_ARCH_EDB7211" = "y" -o \
+     "$CONFIG_ARCH_SA1100" = "y" ]; then
    define_bool CONFIG_DISCONTIGMEM y
 else
    define_bool CONFIG_DISCONTIGMEM n
@@ -289,6 +319,8 @@ if [ "$CONFIG_FOOTBRIDGE_HOST" = "y" -o \
      "$CONFIG_ARCH_SHARK" = "y" -o \
      "$CONFIG_ARCH_CLPS7500" = "y" -o \
      "$CONFIG_ARCH_EBSA110" = "y" -o \
+     "$CONFIG_ARCH_CDB89712" = "y" -o \
+     "$CONFIG_ARCH_EDB7211" = "y" -o \
      "$CONFIG_ARCH_SA1100" = "y" ]; then
    define_bool CONFIG_ISA y
 else
@@ -318,6 +350,7 @@ bool 'Networking support' CONFIG_NET
 bool 'System V IPC' CONFIG_SYSVIPC
 bool 'BSD Process Accounting' CONFIG_BSD_PROCESS_ACCT
 bool 'Sysctl support' CONFIG_SYSCTL
+comment 'At least one math emulation must be selected'
 tristate 'NWFPE math emulation' CONFIG_FPE_NWFPE
 dep_tristate 'FastFPE math emulation (experimental)' CONFIG_FPE_FASTFPE $CONFIG_EXPERIMENTAL
 choice 'Kernel core (/proc/kcore) format' \
@@ -335,6 +368,7 @@ if [ "$CONFIG_ARCH_EBSA110" = "y" -o         \
      "$CONFIG_ARCH_PERSONAL_SERVER" = "y" -o \
      "$CONFIG_ARCH_CATS" = "y" -o            \
      "$CONFIG_ARCH_P720T" = "y" -o	     \
+     "$CONFIG_ARCH_CDB89712" = "y" -o	     \
      "$CONFIG_ARCH_ANAKIN" = "y" ]; then
    string 'Default kernel command string' CONFIG_CMDLINE ""
 fi
@@ -346,6 +380,7 @@ if [ "$CONFIG_ARCH_NETWINDER" = "y" -o  \
      "$CONFIG_ARCH_CO285" = "y" -o      \
      "$CONFIG_ARCH_SA1100" = "y" -o     \
      "$CONFIG_ARCH_INTEGRATOR" = "y" -o \
+     "$CONFIG_ARCH_CDB89712" = "y" -o   \
      "$CONFIG_ARCH_P720T" = "y" ]; then
    bool 'Timer and CPU usage LEDs' CONFIG_LEDS
    if [ "$CONFIG_LEDS" = "y" ]; then
@@ -429,7 +464,7 @@ fi
 
 source drivers/ieee1394/Config.in
 
-source drivers/i2o/Config.in
+source drivers/message/i2o/Config.in
 
 mainmenu_option next_comment
 comment 'ISDN subsystem'
@@ -509,6 +544,8 @@ if [ "$CONFIG_ARCH_ACORN" = "y" -o \
    fi
    endmenu
 fi
+
+source drivers/misc/Config.in
 
 source drivers/usb/Config.in
 

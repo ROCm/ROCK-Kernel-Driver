@@ -29,6 +29,12 @@
 #include <linux/sched.h>
 #include <linux/highuid.h>
 #include <linux/quotaops.h>
+#include <linux/module.h>
+
+MODULE_AUTHOR("Remy Card and others");
+MODULE_DESCRIPTION("Second Extended Filesystem");
+MODULE_LICENSE("GPL");
+
 
 static int ext2_update_inode(struct inode * inode, int do_sync);
 
@@ -592,7 +598,7 @@ struct address_space_operations ext2_aops = {
 	sync_page: block_sync_page,
 	prepare_write: ext2_prepare_write,
 	commit_write: generic_commit_write,
-	bmap: ext2_bmap,
+	bmap: ext2_bmap
 };
 
 /*

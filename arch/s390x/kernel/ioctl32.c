@@ -27,6 +27,7 @@
 #include <asm/types.h>
 #include <asm/uaccess.h>
 #include <asm/dasd.h>
+#include <asm/sockios.h>
 
 #include "linux32.h"
 
@@ -451,6 +452,8 @@ static struct ioctl32_list ioctl32_handler_table[] = {
 	IOCTL32_DEFAULT(VT_RESIZEX),
 	IOCTL32_DEFAULT(VT_LOCKSWITCH),
 	IOCTL32_DEFAULT(VT_UNLOCKSWITCH),
+
+	IOCTL32_DEFAULT(SIOCGSTAMP),
 
 	IOCTL32_HANDLER(SIOCGIFNAME, dev_ifname32),
 	IOCTL32_HANDLER(SIOCGIFCONF, dev_ifconf),

@@ -162,3 +162,4 @@ void    cleanup_module(void)
 #endif
 
 /* end of on20.c */
+MODULE_LICENSE("GPL");

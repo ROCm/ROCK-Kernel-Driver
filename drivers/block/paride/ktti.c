@@ -137,3 +137,4 @@ void    cleanup_module(void)
 #endif
 
 /* end of ktti.c */
+MODULE_LICENSE("GPL");

@@ -101,6 +101,17 @@ Command line parameters
   the device driver will be notified if possible, so the device will become
   available to the system.
 
+  You can also add ranges of devices to be ignored by piping to 
+  /proc/cio_ignore; "add <devnorange>, <devnorange>, ..." will ignore the 
+  specified devices.
+
+  Note: Already known devices cannot be ignored; this also applies to devices
+        which are gone after a machine check.
+
+  For example, if device abcd is already known and all other devices a000-afff 
+  are not known, "echo add 0xa000-0xaccc, 0xaf00-0xafff > /proc/cio_ignore" 
+  will add af00-afff to the list of ignored devices and skip a000-accc.
+
 
 * /proc/s390dbf/cio_*/ (S/390 debug feature)
 
@@ -122,3 +133,7 @@ Command line parameters
   /proc/s390dbf/cio_*/level a number between 0 and 6; see the documentation on
   the S/390 debug feature (Documentation/s390/s390dbf.txt) for details.
 
+* /proc/irq_count
+
+  This entry counts how many times s390_process_IRQ has been called for each 
+  CPU. This info is in /proc/interrupts on other architectures.

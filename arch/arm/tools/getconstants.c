@@ -14,8 +14,14 @@
 #include <asm/pgtable.h>
 #include <asm/uaccess.h>
 
-#ifndef __APCS_32__
-#error APCS-32 required
+/*
+ * Make sure that the compiler and target are compatible.
+ */
+#if defined(__APCS_32__) && defined(CONFIG_CPU_26)
+#error Your compiler targets APCS-32 but this kernel requires APCS-26
+#endif
+#if defined(__APCS_26__) && defined(CONFIG_CPU_32)
+#error Your compiler targets APCS-26 but this kernel requires APCS-32
 #endif
 
 #define OFF_TSK(n) (unsigned long)&(((struct task_struct *)0)->n)

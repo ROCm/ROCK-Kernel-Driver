@@ -306,7 +306,7 @@ int saa7110_command(struct i2c_device *device, unsigned int cmd, void *arg)
 				saa7110_write(decoder, 0x0D, 0x06);
 				saa7110_write(decoder, 0x11, 0x2C);
 				saa7110_write(decoder, 0x30, 0x81);
-saa7110_write(decoder, 0x2A, 0xDF);
+				saa7110_write(decoder, 0x2A, 0xDF);
 				break;
 			 case VIDEO_MODE_PAL:
 				saa7110_write(decoder, 0x0D, 0x06);

@@ -948,3 +948,4 @@ static int pcd_get_mcn (struct cdrom_device_info *cdi, struct cdrom_mcn *mcn)
 
 /* end of pcd.c */
 
+MODULE_LICENSE("GPL");

@@ -202,3 +202,4 @@ cleanup_module(void)
 	rpc_proc_exit();
 }
 #endif
+MODULE_LICENSE("GPL");

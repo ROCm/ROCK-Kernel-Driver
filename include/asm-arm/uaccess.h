@@ -63,11 +63,81 @@ static inline int verify_area(int type, const void * addr, unsigned long size)
  * error occurs, and leave it unchanged on success.  Note that these
  * versions are void (ie, don't return a value as such).
  */
-#define get_user(x,p)		__get_user_check((x),(p),sizeof(*(p)))
+
+extern int __get_user_1(void *);
+extern int __get_user_2(void *);
+extern int __get_user_4(void *);
+extern int __get_user_8(void *);
+extern int __get_user_bad(void);
+
+#define __get_user_x(__r1,__p,__e,__s,__i...)				\
+	   __asm__ __volatile__ ("bl	__get_user_" #__s		\
+		: "=&r" (__e), "=r" (__r1)				\
+		: "0" (__p)						\
+		: __i)
+
+#define get_user(x,p)							\
+	({								\
+		const register typeof(*(p)) *__p asm("r0") = (p);	\
+		register typeof(*(p)) __r1 asm("r1");			\
+		register int __e asm("r0");				\
+		switch (sizeof(*(p))) {					\
+		case 1:							\
+			__get_user_x(__r1, __p, __e, 1, "lr");		\
+	       		break;						\
+		case 2:							\
+			__get_user_x(__r1, __p, __e, 2, "r2", "lr");	\
+			break;						\
+		case 4:							\
+	       		__get_user_x(__r1, __p, __e, 4, "lr");		\
+			break;						\
+		case 8:							\
+			__get_user_x(__r1, __p, __e, 8, "lr");		\
+	       		break;						\
+		default: __e = __get_user_bad(); break;			\
+		}							\
+		x = __r1;						\
+		__e;							\
+	})
+
 #define __get_user(x,p)		__get_user_nocheck((x),(p),sizeof(*(p)))
 #define __get_user_error(x,p,e)	__get_user_nocheck_error((x),(p),sizeof(*(p)),(e))
 
-#define put_user(x,p)		__put_user_check((__typeof(*(p)))(x),(p),sizeof(*(p)))
+extern int __put_user_1(void *, unsigned int);
+extern int __put_user_2(void *, unsigned int);
+extern int __put_user_4(void *, unsigned int);
+extern int __put_user_8(void *, unsigned long long);
+extern int __put_user_bad(void);
+
+#define __put_user_x(__r1,__p,__e,__s,__i...)				\
+	   __asm__ __volatile__ ("bl	__put_user_" #__s		\
+		: "=&r" (__e)						\
+		: "0" (__p), "r" (__r1)					\
+		: __i)
+
+#define put_user(x,p)							\
+	({								\
+		const register typeof(*(p)) *__p asm("r0") = (p);	\
+		const register typeof(*(p)) __r1 asm("r1") = (x);	\
+		register int __e asm("r0");				\
+		switch (sizeof(*(p))) {					\
+		case 1:							\
+			__put_user_x(__r1, __p, __e, 1, "r2", "lr");	\
+			break;						\
+		case 2:							\
+			__put_user_x(__r1, __p, __e, 2, "r2", "lr");	\
+			break;						\
+		case 4:							\
+			__put_user_x(__r1, __p, __e, 4, "r2", "lr");	\
+			break;						\
+		case 8:							\
+			__put_user_x(__r1, __p, __e, 8, "ip", "lr");	\
+			break;						\
+		default: __e = __put_user_bad(); break;			\
+		}							\
+		__e;							\
+	})
+
 #define __put_user(x,p)		__put_user_nocheck((__typeof(*(p)))(x),(p),sizeof(*(p)))
 #define __put_user_error(x,p,e)	__put_user_nocheck_error((x),(p),sizeof(*(p)),(e))
 
@@ -142,6 +212,7 @@ static inline long strnlen_user(const char *s, long n)
 /*
  * These are the work horses of the get/put_user functions
  */
+#if 0
 #define __get_user_check(x,ptr,size)					\
 ({									\
 	long __gu_err = -EFAULT, __gu_val = 0;				\
@@ -153,6 +224,7 @@ static inline long strnlen_user(const char *s, long n)
 	(x) = (__typeof__(*(ptr)))__gu_val;				\
 	__gu_err;							\
 })
+#endif
 
 #define __get_user_nocheck(x,ptr,size)					\
 ({									\
@@ -195,8 +267,6 @@ static inline long strnlen_user(const char *s, long n)
 	(void) 0;							\
 })
 
-extern long __get_user_bad(void);
-
 #define __get_user_size(x,ptr,size,retval)				\
 do {									\
 	switch (size) {							\
@@ -206,8 +276,6 @@ do {									\
 	default: (x) = __get_user_bad();				\
 	}								\
 } while (0)
-
-extern long __put_user_bad(void);
 
 #define __put_user_size(x,ptr,size,retval)				\
 do {									\

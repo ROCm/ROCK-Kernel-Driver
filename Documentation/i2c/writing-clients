@@ -33,7 +33,7 @@ address.
     /* detach_client  */  &foo_detach_client,
     /* command        */  &foo_command,   /* May be NULL */
     /* inc_use        */  &foo_inc_use,   /* May be NULL */
-    /* dec_use        */  &foo_dev_use    /* May be NULL */
+    /* dec_use        */  &foo_dec_use    /* May be NULL */
   }
  
 The name can be chosen freely, and may be upto 40 characters long. Please
@@ -190,7 +190,7 @@ are defined in i2c.h to help you support them, as well as a generic
 detection algorithm.
 
 You do not have to use this parameter interface; but don't try to use
-function i2c_probe() (or sensors_detect()) if you don't.
+function i2c_probe() (or i2c_detect()) if you don't.
 
 NOTE: If you want to write a `sensors' driver, the interface is slightly
       different! See below.
@@ -344,17 +344,17 @@ detected at a specific address, another callback is called.
     return i2c_probe(adapter,&addr_data,&foo_detect_client);
   }
 
-For `sensors' drivers, use the sensors_detect function instead:
+For `sensors' drivers, use the i2c_detect function instead:
   
   int foo_attach_adapter(struct i2c_adapter *adapter)
   { 
-    return sensors_detect(adapter,&addr_data,&foo_detect_client);
+    return i2c_detect(adapter,&addr_data,&foo_detect_client);
   }
 
 Remember, structure `addr_data' is defined by the macros explained above,
 so you do not have to define it yourself.
 
-The i2c_probe or sensors_detect function will call the foo_detect_client
+The i2c_probe or i2c_detect function will call the foo_detect_client
 function only for those i2c addresses that actually have a device on
 them (unless a `force' parameter was used). In addition, addresses that
 are already in use (by some other registered client) are skipped.
@@ -363,9 +363,9 @@ are already in use (by some other registered client) are skipped.
 The detect client function
 --------------------------
 
-The detect client function is called by i2c_probe or sensors_detect.
+The detect client function is called by i2c_probe or i2c_detect.
 The `kind' parameter contains 0 if this call is due to a `force'
-parameter, and 0 otherwise (for sensors_detect, it contains 0 if
+parameter, and 0 otherwise (for i2c_detect, it contains 0 if
 this call is due to the generic `force' parameter, and the chip type
 number if it is due to a specific `force' parameter).
 
@@ -530,7 +530,7 @@ For now, you can ignore the `flags' parameter. It is there for future use.
     /* SENSORS ONLY BEGIN */
     /* Register a new directory entry with module sensors. See below for
        the `template' structure. */
-    if ((i = sensors_register_entry(new_client, type_name,
+    if ((i = i2c_register_entry(new_client, type_name,
                                     foo_dir_table_template,THIS_MODULE)) < 0) {
       err = i;
       goto ERROR4;
@@ -574,8 +574,8 @@ much simpler than the attachment code, fortunately!
     int err,i;
 
     /* SENSORS ONLY START */
-    /* Deregister with the `sensors' module. */
-    sensors_deregister_entry(((struct lm78_data *)(client->data))->sysctl_id);
+    /* Deregister with the `i2c-proc' module. */
+    i2c_deregister_entry(((struct lm78_data *)(client->data))->sysctl_id);
     /* SENSORS ONLY END */
 
     /* Try to detach the client from i2c space */
@@ -772,12 +772,12 @@ you call sensors_register_entry.
 
 First, I will give an example definition.
   static ctl_table foo_dir_table_template[] = {
-    { FOO_SYSCTL_FUNC1, "func1", NULL, 0, 0644, NULL, &sensors_proc_real,
-      &sensors_sysctl_real,NULL,&foo_func },
-    { FOO_SYSCTL_FUNC2, "func2", NULL, 0, 0644, NULL, &sensors_proc_real,
-      &sensors_sysctl_real,NULL,&foo_func },
-    { FOO_SYSCTL_DATA, "data", NULL, 0, 0644, NULL, &sensors_proc_real,
-      &sensors_sysctl_real,NULL,&foo_data },
+    { FOO_SYSCTL_FUNC1, "func1", NULL, 0, 0644, NULL, &i2c_proc_real,
+      &i2c_sysctl_real,NULL,&foo_func },
+    { FOO_SYSCTL_FUNC2, "func2", NULL, 0, 0644, NULL, &i2c_proc_real,
+      &i2c_sysctl_real,NULL,&foo_func },
+    { FOO_SYSCTL_DATA, "data", NULL, 0, 0644, NULL, &i2c_proc_real,
+      &i2c_sysctl_real,NULL,&foo_data },
     { 0 }
   };
 
@@ -791,8 +791,8 @@ The third, sixth and ninth parameters should always be NULL, and the
 fourth should always be 0. The fifth is the mode of the /proc file;
 0644 is safe, as the file will be owned by root:root. 
 
-The seventh and eighth parameters should be &sensors_proc_real and
-&sensors_sysctl_real if you want to export lists of reals (scaled
+The seventh and eighth parameters should be &i2c_proc_real and
+&i2c_sysctl_real if you want to export lists of reals (scaled
 integers). You can also use your own function for them, as usual.
 Finally, the last parameter is the call-back to gather the data
 (see below) if you use the *_proc_real functions. 

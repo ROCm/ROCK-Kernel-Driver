@@ -17,7 +17,9 @@
  *     0xfc15: Tom May <tom@you-bastards.com>
  *     0xfc17: Dave Konrad <konrad@xenia.it>
  *     0xfc1a: George Betzos <betzos@engr.colostate.edu>
+ *     0xfc1b: Munemasa Wada <munemasa@jnovel.co.jp>
  *     0xfc1d: Arthur Liu <armie@slap.mine.nu>
+ *     0xfc5a: Jacques L'helgoualc'h <lhh@free.fr>
  *     0xfcd1: Mr. Dave Konrad <konrad@xenia.it>
  *
  * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING
@@ -51,7 +53,7 @@
  *
  */
 
-#define TOSH_VERSION "1.9 22/3/2001"
+#define TOSH_VERSION "1.11 26/9/2001"
 #define TOSH_DEBUG 0
 
 #include <linux/module.h>
@@ -264,7 +266,7 @@ static int tosh_ioctl(struct inode *ip, struct file *fp, unsigned int cmd,
 	if (!arg)
 		return -EINVAL;
 
-	if(copy_from_user(&regs, (SMMRegisters *) arg, sizeof(SMMRegisters)))
+	if (copy_from_user(&regs, (SMMRegisters *) arg, sizeof(SMMRegisters)))
 		return -EFAULT;
 
 	switch (cmd) {
@@ -288,7 +290,7 @@ static int tosh_ioctl(struct inode *ip, struct file *fp, unsigned int cmd,
 			return -EINVAL;
 	}
 
-        if(copy_to_user((SMMRegisters *) arg, &regs, sizeof(SMMRegisters)))
+        if (copy_to_user((SMMRegisters *) arg, &regs, sizeof(SMMRegisters)))
         	return -EFAULT;
 
 	return (err==0) ? 0:-EINVAL;
@@ -335,7 +337,8 @@ static void tosh_set_fn_port(void)
 {
 	switch (tosh_id) {
 		case 0xfc02: case 0xfc04: case 0xfc09: case 0xfc0a: case 0xfc10:
-		case 0xfc11: case 0xfc13: case 0xfc15: case 0xfc1a:
+		case 0xfc11: case 0xfc13: case 0xfc15: case 0xfc1a: case 0xfc1b:
+		case 0xfc5a:
 			tosh_fn = 0x62;
 			break;
 		case 0xfc08: case 0xfc17: case 0xfc1d: case 0xfcd1: case 0xfce0:
@@ -412,8 +415,19 @@ static int tosh_get_machine_id(void)
  */
 int tosh_probe(void)
 {
-	int major,minor,day,year,month,flag;
+	int i,major,minor,day,year,month,flag;
+	unsigned char signature[7] = { 0x54,0x4f,0x53,0x48,0x49,0x42,0x41 };
 	SMMRegisters regs;
+
+	/* extra sanity check for the string "TOSHIBA" in the BIOS because
+	   some machines that are not Toshiba's pass the next test */
+
+	for (i=0;i<7;i++) {
+		if (isa_readb(0xfe010+i)!=signature[i]) {
+			printk("toshiba: not a supported Toshiba laptop\n");
+			return -ENODEV;
+		}
+	}
 
 	/* call the Toshiba SCI support check routine */
 	

@@ -46,7 +46,8 @@ static int __init jornada720_init(void)
 	PPDR |= PPC_LDD3 | PPC_LDD4;
 
 	/* initialize extra IRQs */
-	sa1111_init_irq(1);	/* chained on GPIO 1 */
+	set_GPIO_IRQ_edge(GPIO_GPIO(1), GPIO_RISING_EDGE);
+	sa1111_init_irq(SA1100_GPIO_TO_IRQ(1));	/* chained on GPIO 1 */
 
 	sa1100_register_uart(0, 3);
 	sa1100_register_uart(1, 1);

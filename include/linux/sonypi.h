@@ -67,9 +67,12 @@
 #define SONYPI_EVENT_FNKEY_S			29
 #define SONYPI_EVENT_FNKEY_B			30
 #define SONYPI_EVENT_BLUETOOTH_PRESSED		31
-#define SONYPI_EVENT_PKEY_P1                    32
-#define SONYPI_EVENT_PKEY_P2                    33
-#define SONYPI_EVENT_PKEY_P3                    34
+#define SONYPI_EVENT_PKEY_P1			32
+#define SONYPI_EVENT_PKEY_P2			33
+#define SONYPI_EVENT_PKEY_P3			34
+#define SONYPI_EVENT_BACK_PRESSED		35
+#define SONYPI_EVENT_LID_CLOSED			36
+#define SONYPI_EVENT_LID_OPENED			37
 
 
 /* brightness etc. ioctls */

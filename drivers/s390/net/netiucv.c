@@ -1,5 +1,5 @@
 /*
- * $Id: netiucv.c,v 1.11 2001/07/16 17:00:02 felfert Exp $
+ * $Id: netiucv.c,v 1.12 2001/09/24 10:38:02 mschwide Exp $
  *
  * IUCV network driver
  *
@@ -28,7 +28,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
- * RELEASE-TAG: IUCV network driver $Revision: 1.11 $
+ * RELEASE-TAG: IUCV network driver $Revision: 1.12 $
  *
  */
 
@@ -36,7 +36,7 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/errno.h>
 #include <linux/types.h>
 #include <linux/interrupt.h>
@@ -2002,7 +2002,7 @@ netiucv_free_netdevice(net_device *dev)
 static void
 netiucv_banner(void)
 {
-	char vbuf[] = "$Revision: 1.11 $";
+	char vbuf[] = "$Revision: 1.12 $";
 	char *version = vbuf;
 
 	if ((version = strchr(version, ':'))) {
@@ -2115,7 +2115,8 @@ netiucv_init(void)
 	return 0;
 }
 
-module_init(netiucv_init);
 #ifdef MODULE
+module_init(netiucv_init);
 module_exit(netiucv_exit);
+MODULE_LICENSE("GPL");
 #endif

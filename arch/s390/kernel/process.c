@@ -44,8 +44,6 @@
 #include <asm/processor.h>
 #include <asm/irq.h>
 
-spinlock_t semaphore_wake_lock = SPIN_LOCK_UNLOCKED;
-
 asmlinkage void ret_from_fork(void) __asm__("ret_from_fork");
 
 /*
@@ -209,7 +207,7 @@ static int sprintf_regs(int line, char *buff, struct task_struct *task, struct p
 void show_regs(struct pt_regs *regs)
 {
 	char buff[80];
-	int line;
+	int i, line;
 
         printk("CPU:    %d\n",smp_processor_id());
         printk("Process %s (pid: %d, stackpage=%08X)\n",
@@ -217,6 +215,17 @@ void show_regs(struct pt_regs *regs)
 	
 	for (line = 0; sprintf_regs(line, buff, current, regs); line++)
 		printk(buff);
+
+	if (regs->psw.mask & PSW_PROBLEM_STATE)
+	{
+		printk("User Code:\n");
+		memset(buff, 0, 20);
+		copy_from_user(buff,
+			       (char *) (regs->psw.addr & PSW_ADDR_MASK), 20);
+		for (i = 0; i < 20; i++)
+			printk("%02x ", buff[i]);
+		printk("\n");
+	}
 }
 
 char *task_show_regs(struct task_struct *task, char *buffer)
@@ -324,28 +333,19 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long new_stackp,
 
 asmlinkage int sys_fork(struct pt_regs regs)
 {
-        int ret;
-
-        lock_kernel();
-        ret = do_fork(SIGCHLD, regs.gprs[15], &regs, 0);
-        unlock_kernel();
-        return ret;
+        return do_fork(SIGCHLD, regs.gprs[15], &regs, 0);
 }
 
 asmlinkage int sys_clone(struct pt_regs regs)
 {
         unsigned long clone_flags;
         unsigned long newsp;
-        int ret;
 
-        lock_kernel();
         clone_flags = regs.gprs[3];
         newsp = regs.orig_gpr2;
         if (!newsp)
                 newsp = regs.gprs[15];
-        ret = do_fork(clone_flags, newsp, &regs, 0);
-        unlock_kernel();
-        return ret;
+        return do_fork(clone_flags, newsp, &regs, 0);
 }
 
 /*

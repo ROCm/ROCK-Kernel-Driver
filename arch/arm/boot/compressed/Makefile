@@ -51,7 +51,7 @@ OBJS		+= head-sa1100.o
 endif
 
 ifeq ($(CONFIG_ARCH_SA1100),y)
-OBJS		+= head-sa1100.o setup-sa1100.o
+OBJS		+= head-sa1100.o
 ifeq ($(CONFIG_SA1100_NANOENGINE),y)
   OBJS += hw-bse.o
 endif
@@ -64,6 +64,8 @@ SEDFLAGS	+= s/BSS_START/$(ZBSSADDR)/
 else
 SEDFLAGS	+= s/BSS_START/ALIGN(4)/
 endif
+
+LIBGCC		:= $(shell $(CC) $(CFLAGS) --print-libgcc-file-name)
 
 all:		vmlinux
 

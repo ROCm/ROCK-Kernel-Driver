@@ -44,7 +44,6 @@ pci_free_consistent(struct pci_dev *hwdev, size_t size, void *vaddr,
 	consistent_free(vaddr, size, dma_handle);
 }
 
-#if !defined(CONFIG_SA1111)
 /* Map a single buffer of the indicated size for DMA in streaming mode.
  * The 32-bit bus address to use is returned.
  *
@@ -54,6 +53,17 @@ pci_free_consistent(struct pci_dev *hwdev, size_t size, void *vaddr,
 static inline dma_addr_t
 pci_map_single(struct pci_dev *hwdev, void *ptr, size_t size, int direction)
 {
+#ifdef CONFIG_SA1111
+	extern dma_addr_t sa1111_map_single(struct pci_dev *, void *, size_t, int);
+
+	/*
+	 * for SA1111 these functions are "magic" and relocate buffers.  We
+	 * only need to do these if hwdev is non-null; otherwise we expect
+	 * the buffer to already be suitable for DMA.
+	 */
+	if (hwdev != NULL)
+		return sa1111_map_single(hwdev, ptr, size, direction);
+#endif
 	consistent_sync(ptr, size, direction);
 	return virt_to_bus(ptr);
 }
@@ -68,16 +78,14 @@ pci_map_single(struct pci_dev *hwdev, void *ptr, size_t size, int direction)
 static inline void
 pci_unmap_single(struct pci_dev *hwdev, dma_addr_t dma_addr, size_t size, int direction)
 {
+#ifdef CONFIG_SA1111
+	extern void sa1111_unmap_single(struct pci_dev *, dma_addr_t, size_t, int);
+
+	if (hwdev != NULL)
+		sa1111_unmap_single(hwdev, dma_addr, size, direction);
+#endif
 	/* nothing to do */
 }
-#else
-/* for SA1111 these functions are "magic" and relocate buffers */
-extern dma_addr_t pci_map_single(struct pci_dev *hwdev,
-				 void *ptr, size_t size, int direction);
-extern void pci_unmap_single(struct pci_dev *hwdev,
-			     dma_addr_t dma_addr,
-			     size_t size, int direction);
-#endif
 
 /* Map a set of buffers described by scatterlist in streaming
  * mode for DMA.  This is the scather-gather version of the

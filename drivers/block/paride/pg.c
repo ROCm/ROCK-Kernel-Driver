@@ -694,3 +694,4 @@ static ssize_t pg_read(struct file * filp, char * buf,
 
 /* end of pg.c */
 
+MODULE_LICENSE("GPL");

@@ -2884,6 +2884,8 @@ static const char *dma[PARPORT_PC_MAX_PORTS] = { NULL, };
 
 MODULE_AUTHOR("Phil Blundell, Tim Waugh, others");
 MODULE_DESCRIPTION("PC-style parallel port driver");
+MODULE_LICENSE("GPL");
+
 MODULE_PARM_DESC(io, "Base I/O address (SPP regs)");
 MODULE_PARM(io, "1-" __MODULE_STRING(PARPORT_PC_MAX_PORTS) "i");
 MODULE_PARM_DESC(io_hi, "Base I/O address (ECR)");

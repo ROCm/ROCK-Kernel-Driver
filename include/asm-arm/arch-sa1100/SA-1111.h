@@ -42,15 +42,15 @@
  *    SKID	ID Register
  */
 
-#define _SKCR		_SA1111( 0x0000 )
-#define _SMCR		_SA1111( 0x0004 )
-#define _SKID		_SA1111( 0x0008 )
+#define _SBI_SKCR	_SA1111( 0x0000 )
+#define _SBI_SMCR	_SA1111( 0x0004 )
+#define _SBI_SKID	_SA1111( 0x0008 )
 
 #if LANGUAGE == C
 
-#define SKCR		(*((volatile Word *) SA1111_p2v (_SKCR)))
-#define SMCR		(*((volatile Word *) SA1111_p2v (_SMCR)))
-#define SKID		(*((volatile Word *) SA1111_p2v (_SKID)))
+#define SBI_SKCR	(*((volatile Word *) SA1111_p2v (_SBI_SKCR)))
+#define SBI_SMCR	(*((volatile Word *) SA1111_p2v (_SBI_SMCR)))
+#define SBI_SKID	(*((volatile Word *) SA1111_p2v (_SBI_SKID)))
 
 #endif  /* LANGUAGE == C */
 
@@ -66,6 +66,18 @@
 #define SKCR_OPPC	(1<<9)
 #define SKCR_PLLTSTEN	(1<<10)
 #define SKCR_USBIOTSTEN	(1<<11)
+/*
+ * Don't believe the specs!  Take them, throw them outside.  Leave them
+ * there for a week.  Spit on them.  Walk on them.  Stamp on them.
+ * Pour gasoline over them and finally burn them.  Now think about coding.
+ *  - The October 1999 errata (278260-007) says its bit 13, 1 to enable.
+ *  - The Feb 2001 errata (278260-010) says that the previous errata
+ *    (278260-009) is wrong, and its bit actually 12, fixed in spec
+ *    278242-003.
+ *  - The SA1111 manual (278242) says bit 12, but 0 to enable.
+ *  - Reality is bit 13, 1 to enable.
+ *      -- rmk
+ */
 #define SKCR_OE_EN	(1<<13)
 
 #define SMCR_DTIM	(1<<0)
@@ -129,6 +141,34 @@
 #define SKPCR_PTCLKEN	(1<<6)
 #define SKPCR_DCLKEN	(1<<7)
 #define SKPCR_PWMCLKEN	(1<<8)
+
+/*
+ * USB Host controller
+ */
+#define _USB_OHCI_OP_BASE	_SA1111( 0x400 )
+#define _USB_STATUS		_SA1111( 0x518 )
+#define _USB_RESET		_SA1111( 0x51c )
+#define _USB_INTERRUPTEST	_SA1111( 0x520 )
+
+#define _USB_EXTENT		(_USB_INTERRUPTEST - _USB_OHCI_OP_BASE + 4)
+
+#if LANGUAGE == C
+
+#define USB_OHCI_OP_BASE	(*((volatile Word *) SA1111_p2v (_USB_OHCI_OP_BASE)))
+#define USB_STATUS		(*((volatile Word *) SA1111_p2v (_USB_STATUS)))
+#define USB_RESET		(*((volatile Word *) SA1111_p2v (_USB_RESET)))
+#define USB_INTERRUPTEST	(*((volatile Word *) SA1111_p2v (_USB_INTERRUPTEST)))
+
+#endif  /* LANGUAGE == C */
+
+#define USB_RESET_FORCEIFRESET	(1 << 0)
+#define USB_RESET_FORCEHCRESET	(1 << 1)
+#define USB_RESET_CLKGENRESET	(1 << 2)
+#define USB_RESET_SIMSCALEDOWN	(1 << 3)
+#define USB_RESET_USBINTTEST	(1 << 4)
+#define USB_RESET_SLEEPSTBYEN	(1 << 5)
+#define USB_RESET_PWRSENSELOW	(1 << 6)
+#define USB_RESET_PWRCTRLLOW	(1 << 7)
 
 /*
  * Serial Audio Controller

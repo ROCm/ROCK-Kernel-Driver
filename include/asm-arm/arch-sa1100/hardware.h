@@ -122,8 +122,8 @@ extern unsigned short get_cclk_frequency(void);
 #include "empeg.h"
 #endif
 
-#ifdef CONFIG_SA1100_BITSY
-#include "bitsy.h"
+#ifdef CONFIG_SA1100_H3600
+#include "h3600.h"
 #endif
 
 #ifdef CONFIG_SA1100_ITSY
@@ -152,6 +152,14 @@ extern unsigned short get_cclk_frequency(void);
 
 #ifdef CONFIG_SA1100_SIMPAD
 #include "simpad.h"
+#endif
+
+#if defined(CONFIG_SA1100_GRAPHICSMASTER)
+#include "graphicsmaster.h"
+#endif
+
+#if defined(CONFIG_SA1100_ADSBITSY)
+#include "adsbitsy.h"
 #endif
 
 #ifdef CONFIG_SA1101

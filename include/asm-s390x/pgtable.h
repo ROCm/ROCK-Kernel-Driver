@@ -54,13 +54,6 @@ extern char empty_zero_page[PAGE_SIZE];
 #endif /* !__ASSEMBLY__ */
 
 /*
- * Certain architectures need to do special things when PTEs
- * within a page table are directly modified.  Thus, the following
- * hook is made available.
- */
-#define set_pte(pteptr, pteval) ((*(pteptr)) = (pteval))
-
-/*
  * PMD_SHIFT determines the size of the area a second-level page
  * table can map
  */
@@ -164,6 +157,7 @@ extern char empty_zero_page[PAGE_SIZE];
 
 /* Bits in the page table entry */
 #define _PAGE_PRESENT   0x001          /* Software                         */
+#define _PAGE_MKCLEAR   0x002          /* Software                         */
 #define _PAGE_RO        0x200          /* HW read-only                     */
 #define _PAGE_INVALID   0x400          /* HW invalid                       */
 
@@ -180,7 +174,8 @@ extern char empty_zero_page[PAGE_SIZE];
  */
 #define _REGION_THIRD       0x4
 #define _REGION_THIRD_LEN   0x3 
-#define _REGION_TABLE       (_REGION_THIRD|_REGION_THIRD_LEN|0x40)
+#define _REGION_TABLE       (_REGION_THIRD|_REGION_THIRD_LEN|0x40|0x100)
+#define _KERN_REGION_TABLE  (_REGION_THIRD|_REGION_THIRD_LEN)
 
 /* Bits in the storage key */
 #define _PAGE_CHANGED    0x02          /* HW changed bit                   */
@@ -218,6 +213,25 @@ extern char empty_zero_page[PAGE_SIZE];
 #define __S101  PAGE_READONLY
 #define __S110  PAGE_SHARED
 #define __S111  PAGE_SHARED
+
+/*
+ * Certain architectures need to do special things when PTEs
+ * within a page table are directly modified.  Thus, the following
+ * hook is made available.
+ */
+extern inline void set_pte(pte_t *pteptr, pte_t pteval)
+{
+	if ((pte_val(pteval) & (_PAGE_MKCLEAR|_PAGE_INVALID))
+	    == _PAGE_MKCLEAR) 
+	{
+		pte_val(pteval) &= ~_PAGE_MKCLEAR;
+               
+		asm volatile ("sske %0,%1" 
+				: : "d" (0), "a" (pte_val(pteval)));
+	}
+
+	*pteptr = pteval;
+}
 
 /*
  * Permanent address of a page.
@@ -341,13 +355,10 @@ extern inline pte_t pte_mkwrite(pte_t pte)
 
 extern inline pte_t pte_mkclean(pte_t pte)
 {
-	/* We can't clear the changed bit atomically. The iske/and/sske
-         * sequence has a race condition with the page referenced bit.
-         * At the moment pte_mkclean is always followed by a pte_mkold.
-         * So its safe to ignore the problem for now. Hope this will
-         * never change ... */
-	asm volatile ("sske %0,%1" 
-	              : : "d" (0), "a" (pte_val(pte)));
+	/* The only user of pte_mkclean is the fork() code.
+	   We must *not* clear the *physical* page dirty bit
+	   just because fork() wants to clear the dirty bit in
+	   *one* of the page's mappings.  So we just do nothing. */
 	return pte;
 }
 
@@ -358,6 +369,8 @@ extern inline pte_t pte_mkdirty(pte_t pte)
 	asm volatile ("sske %0,%1" 
 	              : : "d" (_PAGE_CHANGED|_PAGE_REFERENCED),
 		          "a" (pte_val(pte)));
+
+	pte_val(pte) &= ~_PAGE_MKCLEAR;
 	return pte;
 }
 
@@ -429,7 +442,23 @@ extern inline pte_t mk_pte_phys(unsigned long physpage, pgprot_t pgprot)
 	pte_val(__pte) = physpage + pgprot_val(pgprot);
 	return __pte;
 }
-#define mk_pte(page,pgprot) mk_pte_phys(__pa(((page)-mem_map)<<PAGE_SHIFT),pgprot)
+
+#define mk_pte(pg, pgprot)                                                \
+({                                                                        \
+	struct page *__page = (pg);                                       \
+	unsigned long __physpage = __pa((__page-mem_map) << PAGE_SHIFT);  \
+	pte_t __pte = mk_pte_phys(__physpage, (pgprot));                  \
+	                                                                  \
+	if (__page != ZERO_PAGE(__physpage)) {                            \
+		int __users = page_count(__page);                         \
+		__users -= !!__page->buffers + !!__page->mapping;         \
+	                                                                  \
+		if (__users == 1)                                         \
+			pte_val(__pte) |= _PAGE_MKCLEAR;                  \
+        }                                                                 \
+	                                                                  \
+	__pte;                                                            \
+})
 
 #define pte_page(x) (mem_map+(unsigned long)((pte_val(x) >> PAGE_SHIFT)))
 
@@ -491,6 +520,11 @@ extern inline pte_t mk_swap_pte(unsigned long type, unsigned long offset)
 /* Needs to be defined here and not in linux/mm.h, as it is arch dependent */
 #define PageSkip(page)          (0)
 #define kern_addr_valid(addr)   (1)
+
+/*
+ * No page table caches to initialise
+ */
+#define pgtable_cache_init()	do { } while (0)
 
 #endif /* _S390_PAGE_H */
 

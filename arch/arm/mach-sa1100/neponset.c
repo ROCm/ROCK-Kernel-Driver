@@ -74,36 +74,73 @@ static void __init neponset_init_irq(void)
 
 static int __init neponset_init(void)
 {
-	/* only on assabet */
+	int ret;
+
+	/*
+	 * The Neponset is only present on the Assabet machine type.
+	 */
 	if (!machine_is_assabet())
-		return 0;
+		return -ENODEV;
 
-	if (machine_has_neponset()) {
-		LEDS = WHOAMI;
+	/*
+	 * Ensure that the memory bus request/grant signals are setup,
+	 * and the grant is held in its inactive state, whether or not
+	 * we actually have a Neponset attached.
+	 */
+	sa1110_mb_disable();
 
-		if (sa1111_init() < 0)
-			return -EINVAL;
-		/*
-		 * Assabet is populated by default with two Samsung
-		 * KM416S8030T-G8
-		 * 128Mb SDRAMs, which are organized as 12-bit (row addr) x
-		 * 9-bit
-		 * (column addr), according to the data sheet. Apparently, the
-		 * bank selects factor into the row address, as Angel sets up
-		 * the
-		 * SA-1110 to use 14x9 addresses. The SDRAM datasheet specifies
-		 * that when running at 100-125MHz, the CAS latency for -8
-		 * parts
-		 * is 3 cycles, which is consistent with Angel.
-		 */
-		SMCR = (SMCR_DTIM | SMCR_MBGE |
-			FInsrt(FExtr(MDCNFG, MDCNFG_SA1110_DRAC0), SMCR_DRAC) |
-			((FExtr(MDCNFG, MDCNFG_SA1110_TDL0)==3) ? SMCR_CLAT : 0));
-		SKPCR |= SKPCR_DCLKEN;
+	if (!machine_has_neponset()) {
+		printk(KERN_DEBUG "Neponset expansion board not present\n");
+		return -ENODEV;
+	}
 
-		neponset_init_irq();
-	} else
-		printk("Neponset expansion board not present\n");
+	if (WHOAMI != 0x11) {
+		printk(KERN_WARNING "Neponset board detected, but "
+			"wrong ID: %02x\n", WHOAMI);
+		return -ENODEV;
+	}
+
+	/*
+	 * Neponset has SA1111 connected to CS4.  We know that after
+	 * reset the chip will be configured for variable latency IO.
+	 */
+	/* FIXME: setup MSC2 */
+
+	/*
+	 * Probe for a SA1111.
+	 */
+	ret = sa1111_probe();
+	if (ret < 0)
+		return ret;
+
+	/*
+	 * We found it.  Wake the chip up.
+	 */
+	sa1111_wake();
+
+	/*
+	 * The SDRAM configuration of the SA1110 and the SA1111 must
+	 * match.  This is very important to ensure that SA1111 accesses
+	 * don't corrupt the SDRAM.  Note that this ungates the SA1111's
+	 * MBGNT signal, so we must have called sa1110_mb_disable()
+	 * beforehand.
+	 */
+	sa1111_configure_smc(1,
+			     FExtr(MDCNFG, MDCNFG_SA1110_DRAC0),
+			     FExtr(MDCNFG, MDCNFG_SA1110_TDL0));
+
+	/*
+	 * We only need to turn on DCLK whenever we want to use the
+	 * DMA.  It can otherwise be held firmly in the off position.
+	 */
+	SKPCR |= SKPCR_DCLKEN;
+
+	/*
+	 * Enable the SA1110 memory bus request and grant signals.
+	 */
+	sa1110_mb_enable();
+
+	neponset_init_irq();
 
 	return 0;
 }

@@ -10,6 +10,7 @@
 
 #include <linux/config.h>
 #include <linux/module.h>
+#include <linux/spinlock.h>
 #include <asm/uaccess.h>
 
 extern const struct exception_table_entry __start___ex_table[];
@@ -36,28 +37,37 @@ search_one_table(const struct exception_table_entry *first,
         return 0;
 }
 
+extern spinlock_t modlist_lock;
+
 unsigned long
 search_exception_table(unsigned long addr)
 {
-	unsigned long ret;
+	unsigned long ret = 0;
+	unsigned long flags;
 
 #ifndef CONFIG_MODULES
         addr &= 0x7fffffff;  /* remove amode bit from address */
 	/* There is only the kernel to search.  */
 	ret = search_one_table(__start___ex_table, __stop___ex_table-1, addr);
-	if (ret) return FIX_PSW(ret);
+	if (ret) ret = FIX_PSW(ret);
+	return ret;
 #else
 	/* The kernel is the last "module" -- no need to treat it special.  */
 	struct module *mp;
         addr &= 0x7fffffff;  /* remove amode bit from address */
+
+	spin_lock_irqsave(&modlist_lock, flags);
 	for (mp = module_list; mp != NULL; mp = mp->next) {
-		if (mp->ex_table_start == NULL)
+		if (mp->ex_table_start == NULL || !(mp->flags&(MOD_RUNNING|MOD_INITIALIZING)))
 			continue;
 		ret = search_one_table(mp->ex_table_start,
 				       mp->ex_table_end - 1, addr);
-		if (ret) return FIX_PSW(ret);
+		if (ret) {
+			ret = FIX_PSW(ret);
+			break;
+		}
 	}
+	spin_unlock_irqrestore(&modlist_lock, flags);
+	return ret;
 #endif
-
-	return 0;
 }

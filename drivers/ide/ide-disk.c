@@ -890,3 +890,4 @@ int idedisk_init (void)
 
 module_init(idedisk_init);
 module_exit(idedisk_exit);
+MODULE_LICENSE("GPL");

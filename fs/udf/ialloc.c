@@ -64,10 +64,9 @@ void udf_free_inode(struct inode * inode)
 		
 		mark_buffer_dirty(UDF_SB_LVIDBH(sb));
 	}
-
 	unlock_super(sb);
 
-	udf_free_blocks(inode, UDF_I_LOCATION(inode), 0, 1);
+	udf_free_blocks(sb, NULL, UDF_I_LOCATION(inode), 0, 1);
 }
 
 struct inode * udf_new_inode (struct inode *dir, int mode, int * err)
@@ -87,7 +86,7 @@ struct inode * udf_new_inode (struct inode *dir, int mode, int * err)
 	}
 	*err = -ENOSPC;
 
-	block = udf_new_block(dir, UDF_I_LOCATION(dir).partitionReferenceNum,
+	block = udf_new_block(dir->i_sb, NULL, UDF_I_LOCATION(dir).partitionReferenceNum,
 		start, err);
 	if (*err)
 	{

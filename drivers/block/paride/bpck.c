@@ -482,3 +482,4 @@ void	cleanup_module(void)
 #endif
 
 /* end of bpck.c */
+MODULE_LICENSE("GPL");

@@ -2116,3 +2116,4 @@ int idefloppy_init (void)
 
 module_init(idefloppy_init);
 module_exit(idefloppy_exit);
+MODULE_LICENSE("GPL");

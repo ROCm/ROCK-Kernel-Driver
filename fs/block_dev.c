@@ -24,29 +24,6 @@
 
 #define MAX_BUF_PER_PAGE (PAGE_CACHE_SIZE / 512)
 
-static inline unsigned int blksize_bits(unsigned int size)
-{
-	unsigned int bits = 8;
-	do {
-		bits++;
-		size >>= 1;
-	} while (size > 256);
-	return bits;
-}
-
-static inline unsigned int block_size(kdev_t dev)
-{
-	int retval = BLOCK_SIZE;
-	int major = MAJOR(dev);
-
-	if (blksize_size[major]) {
-		int minor = MINOR(dev);
-		if (blksize_size[major][minor])
-			retval = blksize_size[major][minor];
-	}
-	return retval;
-}
-
 static unsigned long max_block(kdev_t dev)
 {
 	unsigned int retval = ~0U;

@@ -78,6 +78,35 @@ extern unsigned long search_exception_table(unsigned long);
  * use the right size if we just have the right pointer type.
  */
 
+extern inline int __put_user_asm_8(__u64 x, void *ptr)
+{
+        int err;
+
+        __asm__ __volatile__ (  "   sr    %1,%1\n"
+				"   la    2,%2\n"
+				"   la    4,%0\n"
+                                "   sacf  512\n"
+                                "0: mvc   0(8,4),0(2)\n"
+                                "   sacf  0\n"
+				"1:\n"
+				".section .fixup,\"ax\"\n"
+				"2: sacf  0\n"
+				"   lhi   %1,%h3\n"
+				"   bras  4,3f\n"
+				"   .long 1b\n"
+				"3: l     4,0(4)\n"
+				"   br    4\n"
+				".previous\n"
+				".section __ex_table,\"a\"\n"
+				"   .align 4\n"
+				"   .long  0b,2b\n"
+				".previous"
+                                : "=m" (*((__u32*) ptr)), "=&d" (err)
+                                : "m" (x), "K" (-EFAULT)
+                                : "cc", "2", "4" );
+        return err;
+}
+
 extern inline int __put_user_asm_4(__u32 x, void *ptr)
 {
         int err;
@@ -179,6 +208,9 @@ extern inline int __put_user_asm_1(__u8 x, void *ptr)
                 case 4:                                         \
                         __pu_err = __put_user_asm_4((__u32) x,(ptr));\
                         break;                                  \
+		case 8:						\
+			__pu_err = __put_user_asm_8((__u64) x,(ptr));\
+			break;					\
                 default:                                        \
                 __pu_err = __put_user_bad();                    \
                 break;                                          \
@@ -200,6 +232,31 @@ extern inline int __put_user_asm_1(__u8 x, void *ptr)
 
 extern int __put_user_bad(void);
 
+#define __get_user_asm_8(x, ptr, err)                                      \
+({                                                                         \
+        __asm__ __volatile__ (  "   sr    %1,%1\n"                         \
+				"   la    2,%0\n"			   \
+                                "   la    4,%2\n"                          \
+                                "   sacf  512\n"                           \
+                                "0: mvc   0(8,2),0(4)\n"                   \
+                                "   sacf  0\n"                             \
+                                "1:\n"                                     \
+                                ".section .fixup,\"ax\"\n"                 \
+                                "2: sacf  0\n"                             \
+                                "   lhi   %1,%h3\n"                        \
+                                "   bras  4,3f\n"                          \
+                                "   .long 1b\n"                            \
+                                "3: l     4,0(4)\n"                        \
+                                "   br    4\n"                             \
+                                ".previous\n"                              \
+                                ".section __ex_table,\"a\"\n"              \
+                                "   .align 4\n"                            \
+                                "   .long 0b,2b\n"                         \
+                                ".previous"                                \
+                                : "=m" (x) , "=&d" (err)                   \
+                                : "m" (*(const __u64*)(ptr)),"K" (-EFAULT) \
+                                : "cc", "2", "4" );                        \
+})
 
 #define __get_user_asm_4(x, ptr, err)                                      \
 ({                                                                         \
@@ -290,6 +347,9 @@ extern int __put_user_bad(void);
                 case 4:                                         \
                         __get_user_asm_4(x,ptr,__gu_err);       \
                         break;                                  \
+                case 8:                                         \
+                        __get_user_asm_8(x,ptr,__gu_err);       \
+                        break;                                  \
                 default:                                        \
                         (x) = 0;                                \
                         __gu_err = __get_user_bad();            \
@@ -372,7 +432,7 @@ __copy_from_user_asm(void* to, const void* from,  long n)
                                 "0: mvcle 2,4,0\n"
                                 "   jo    0b\n"
                                 "   sacf  0\n"
-                                "   lr    %0,3\n"
+                                "   lr    %0,5\n"
 				".section __ex_table,\"a\"\n"
 				"   .align 4\n"
 				"   .long  0b,__copy_from_user_fixup\n"

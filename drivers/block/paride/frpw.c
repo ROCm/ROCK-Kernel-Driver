@@ -322,3 +322,4 @@ void    cleanup_module(void)
 #endif
 
 /* end of frpw.c */
+MODULE_LICENSE("GPL");

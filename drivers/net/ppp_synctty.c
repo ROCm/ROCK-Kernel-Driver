@@ -44,13 +44,6 @@
 #include <linux/init.h>
 #include <asm/uaccess.h>
 
-#ifndef spin_trylock_bh
-#define spin_trylock_bh(lock)	({ int __r; local_bh_disable();	\
-				   __r = spin_trylock(lock);	\
-				   if (!__r) local_bh_enable();	\
-				   __r; })
-#endif
-
 #define PPP_VERSION	"2.4.1"
 
 /* Structure for storing local state. */
@@ -708,3 +701,4 @@ ppp_sync_cleanup(void)
 
 module_init(ppp_sync_init);
 module_exit(ppp_sync_cleanup);
+MODULE_LICENSE("GPL");

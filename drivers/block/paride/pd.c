@@ -586,8 +586,7 @@ int     init_module(void)
 }
 
 void    cleanup_module(void)
-
-{       struct gendisk **gdp;
+{
 	int unit;
 
         devfs_unregister_blkdev(MAJOR_NR,name);
@@ -1069,3 +1068,4 @@ static void do_pd_write_done( void )
 
 /* end of pd.c */
 
+MODULE_LICENSE("GPL");

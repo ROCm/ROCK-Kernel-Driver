@@ -314,7 +314,7 @@ int sa1111_check_dma_bug(dma_addr_t addr){
 	if(physaddr<(1<<20))
 	  	return 0;
 
-	switch(FExtr(SMCR, SMCR_DRAC)){
+	switch(FExtr(SBI_SMCR, SMCR_DRAC)){
 	case 01: /* 10 row + bank address bits, A<20> must not be set */
 	  	if(physaddr & (1<<20))
 		  	return -1;
@@ -341,7 +341,7 @@ int sa1111_check_dma_bug(dma_addr_t addr){
 		break;
 	default:
 	  	printk(KERN_ERR "%s(): invalid SMCR DRAC value 0%o\n",
-		       __FUNCTION__, FExtr(SMCR, SMCR_DRAC));
+		       __FUNCTION__, FExtr(SBI_SMCR, SMCR_DRAC));
 		return -1;
 	}
 

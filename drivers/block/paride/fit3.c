@@ -220,3 +220,4 @@ void    cleanup_module(void)
 #endif
 
 /* end of fit3.c */
+MODULE_LICENSE("GPL");

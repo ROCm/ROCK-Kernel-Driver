@@ -59,7 +59,7 @@ static kmem_cache_t *nfs_rdata_cachep;
 static __inline__ struct nfs_read_data *nfs_readdata_alloc(void)
 {
 	struct nfs_read_data   *p;
-	p = kmem_cache_alloc(nfs_rdata_cachep, SLAB_NFS);
+	p = kmem_cache_alloc(nfs_rdata_cachep, SLAB_NOFS);
 	if (p) {
 		memset(p, 0, sizeof(*p));
 		INIT_LIST_HEAD(&p->pages);

@@ -54,22 +54,16 @@ extern int sys_exit(int);
  * compiler...  (prototypes are not correct though, but that
  * doesn't really matter since they're not versioned).
  */
-extern void __gcc_bcmp(void);
 extern void __ashldi3(void);
 extern void __ashrdi3(void);
-extern void __cmpdi2(void);
-extern void __divdi3(void);
 extern void __divsi3(void);
 extern void __lshrdi3(void);
-extern void __moddi3(void);
 extern void __modsi3(void);
 extern void __muldi3(void);
-extern void __negdi2(void);
 extern void __ucmpdi2(void);
 extern void __udivdi3(void);
 extern void __udivmoddi4(void);
 extern void __udivsi3(void);
-extern void __umoddi3(void);
 extern void __umodsi3(void);
 
 extern void ret_from_exception(void);
@@ -213,23 +207,27 @@ EXPORT_SYMBOL(uaccess_kernel);
 EXPORT_SYMBOL(uaccess_user);
 #endif
 
+EXPORT_SYMBOL_NOVERS(__get_user_1);
+EXPORT_SYMBOL_NOVERS(__get_user_2);
+EXPORT_SYMBOL_NOVERS(__get_user_4);
+EXPORT_SYMBOL_NOVERS(__get_user_8);
+
+EXPORT_SYMBOL_NOVERS(__put_user_1);
+EXPORT_SYMBOL_NOVERS(__put_user_2);
+EXPORT_SYMBOL_NOVERS(__put_user_4);
+EXPORT_SYMBOL_NOVERS(__put_user_8);
+
 	/* gcc lib functions */
-EXPORT_SYMBOL_NOVERS(__gcc_bcmp);
 EXPORT_SYMBOL_NOVERS(__ashldi3);
 EXPORT_SYMBOL_NOVERS(__ashrdi3);
-EXPORT_SYMBOL_NOVERS(__cmpdi2);
-EXPORT_SYMBOL_NOVERS(__divdi3);
 EXPORT_SYMBOL_NOVERS(__divsi3);
 EXPORT_SYMBOL_NOVERS(__lshrdi3);
-EXPORT_SYMBOL_NOVERS(__moddi3);
 EXPORT_SYMBOL_NOVERS(__modsi3);
 EXPORT_SYMBOL_NOVERS(__muldi3);
-EXPORT_SYMBOL_NOVERS(__negdi2);
 EXPORT_SYMBOL_NOVERS(__ucmpdi2);
 EXPORT_SYMBOL_NOVERS(__udivdi3);
 EXPORT_SYMBOL_NOVERS(__udivmoddi4);
 EXPORT_SYMBOL_NOVERS(__udivsi3);
-EXPORT_SYMBOL_NOVERS(__umoddi3);
 EXPORT_SYMBOL_NOVERS(__umodsi3);
 
 	/* bitops */

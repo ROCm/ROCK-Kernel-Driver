@@ -80,11 +80,6 @@
 
 static struct expansion_card *ecs[MAX_ECARDS];
 
-MODULE_AUTHOR("Russell King");
-MODULE_DESCRIPTION("EESOX SCSI driver");
-MODULE_PARM(term, "1-8i");
-MODULE_PARM_DESC(term, "SCSI bus termination");
-
 /*
  * Use term=0,1,0,0,0 to turn terminators on/off
  */
@@ -602,5 +597,9 @@ static void __exit eesox_exit(void)
 module_init(eesox_init);
 module_exit(eesox_exit);
 
-EXPORT_NO_SYMBOLS;
+MODULE_AUTHOR("Russell King");
+MODULE_DESCRIPTION("EESOX 'Fast' SCSI driver for Acorn machines");
+MODULE_PARM(term, "1-8i");
+MODULE_PARM_DESC(term, "SCSI bus termination");
 MODULE_LICENSE("GPL");
+EXPORT_NO_SYMBOLS;

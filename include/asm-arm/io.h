@@ -72,18 +72,22 @@ extern void __raw_readsl(unsigned int addr, void *data, int longlen);
 #include <asm/arch/io.h>
 
 /*
- * IO definitions.  We define {out,in,outs,ins}[bwl] if __io is
- * defined by the machine.  Otherwise, these definitions are left
- * for the machine specific header files to pick up.
+ * IO definitions.  We define {out,in,outs,ins}[bwl] if __io is defined
+ * by the machine.  Otherwise, these definitions are left for the machine
+ * specific header files to pick up.
+ *
+ * Note that we prevent GCC re-ordering or caching values in expressions
+ * by introducing sequence points into the in*() definitions.  Note that
+ * __raw_* do not guarantee this behaviour.
  */
 #ifdef __io
 #define outb(v,p)			__raw_writeb(v,__io(p))
 #define outw(v,p)			__raw_writew(v,__io(p))
 #define outl(v,p)			__raw_writel(v,__io(p))
 
-#define inb(p)				__raw_readb(__io(p))
-#define inw(p)				__raw_readw(__io(p))
-#define inl(p)				__raw_readl(__io(p))
+#define inb(p)		({ unsigned int __v = __raw_readb(__io(p)); __v; })
+#define inw(p)		({ unsigned int __v = __raw_readw(__io(p)); __v; })
+#define inl(p)		({ unsigned int __v = __raw_readl(__io(p)); __v; })
 
 #define outsb(p,d,l)			__raw_writesb(__io(p),d,l)
 #define outsw(p,d,l)			__raw_writesw(__io(p),d,l)
@@ -168,9 +172,10 @@ extern void __readwrite_bug(const char *fn);
  */
 #ifdef __mem_pci
 
-#define readb(addr)			__raw_readb(__mem_pci(addr))
-#define readw(addr)			__raw_readw(__mem_pci(addr))
-#define readl(addr)			__raw_readl(__mem_pci(addr))
+#define readb(addr) ({ unsigned int __v = __raw_readb(__mem_pci(addr)); __v; })
+#define readw(addr) ({ unsigned int __v = __raw_readw(__mem_pci(addr)); __v; })
+#define readl(addr) ({ unsigned int __v = __raw_readl(__mem_pci(addr)); __v; })
+
 #define writeb(val,addr)		__raw_writeb(val,__mem_pci(addr))
 #define writew(val,addr)		__raw_writew(val,__mem_pci(addr))
 #define writel(val,addr)		__raw_writel(val,__mem_pci(addr))

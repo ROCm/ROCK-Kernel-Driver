@@ -286,5 +286,7 @@ static void __exit oakscsi_exit(void)
 module_init(oakscsi_init);
 module_exit(oakscsi_exit);
 
+MODULE_AUTHOR("Russell King");
+MODULE_DESCRIPTION("Oak SCSI driver");
 MODULE_LICENSE("GPL");
 EXPORT_NO_SYMBOLS;

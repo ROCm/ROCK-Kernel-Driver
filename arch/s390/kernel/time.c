@@ -151,15 +151,14 @@ extern __u16 boot_cpu_addr;
 
 void do_timer_interrupt(struct pt_regs *regs, __u16 error_code)
 {
-        unsigned long flags;
+	int cpu = smp_processor_id();
+
+	irq_enter(cpu, 0);
 
         /*
          * reset timer to 10ms minus time already elapsed
          * since timer-interrupt pending
          */
- 
-        save_flags(flags);
-        cli();
 #ifdef CONFIG_SMP
 	if(S390_lowcore.cpu_data.cpu_addr==boot_cpu_addr) {
 		write_lock(&xtime_lock);
@@ -195,8 +194,8 @@ void do_timer_interrupt(struct pt_regs *regs, __u16 error_code)
 		write_unlock(&xtime_lock);
 #endif
 	}
-        restore_flags(flags);
 
+	irq_exit(cpu, 0);
 }
 
 /*
@@ -250,4 +249,7 @@ void __init time_init(void)
         init_timer_cc -= 0x8126d60e46000000LL -
                          (0x3c26700LL*1000000*4096);
         tod_to_timeval(init_timer_cc, &xtime);
+
+	/* Set do_get_fast_time function pointer.  */
+	do_get_fast_time = do_gettimeofday;
 }

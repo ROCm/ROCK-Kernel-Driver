@@ -83,3 +83,8 @@ static void __exit mouse_rpc_exit(void)
 
 module_init(mouse_rpc_init);
 module_exit(mouse_rpc_exit);
+
+MODULE_AUTHOR("Russell King");
+MODULE_DESCRIPTION("RiscPC mouse driver");
+MODULE_LICENSE("GPL");
+EXPORT_NO_SYMBOLS;

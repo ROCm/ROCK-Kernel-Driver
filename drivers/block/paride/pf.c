@@ -1111,3 +1111,4 @@ static void do_pf_write_done( void )
 
 /* end of pf.c */
 
+MODULE_LICENSE("GPL");

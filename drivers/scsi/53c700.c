@@ -51,6 +51,12 @@
 
 /* CHANGELOG
  *
+ * Version 2.6
+ *
+ * Following test of the 64 bit parisc kernel by Richard Hirst,
+ * several problems have now been corrected.  Also adds support for
+ * consistent memory allocation.
+ *
  * Version 2.5
  * 
  * More Compatibility changes for 710 (now actually works).  Enhanced
@@ -90,7 +96,7 @@
  * Initial modularisation from the D700.  See NCR_D700.c for the rest of
  * the changelog.
  * */
-#define NCR_700_VERSION "2.5"
+#define NCR_700_VERSION "2.6"
 
 #include <linux/config.h>
 #include <linux/version.h>
@@ -217,18 +223,39 @@ struct Scsi_Host * __init
 NCR_700_detect(Scsi_Host_Template *tpnt,
 	       struct NCR_700_Host_Parameters *hostdata)
 {
-	dma_addr_t pScript, pSlots;
+	dma_addr_t pScript, pMemory, pSlots;
+	__u8 *memory;
 	__u32 *script;
 	struct Scsi_Host *host;
 	static int banner = 0;
 	int j;
 
-	/* This separation of pScript and script is not strictly
-	 * necessay, but may be useful in architectures which can
-	 * allocate consistent memory on which virt_to_bus will not
-	 * work */
-	script = kmalloc(sizeof(SCRIPT), GFP_KERNEL);
-	pScript = virt_to_bus(script);
+#ifdef CONFIG_53C700_USE_CONSISTENT
+	memory = pci_alloc_consistent(hostdata->pci_dev, TOTAL_MEM_SIZE,
+				      &pMemory);
+	hostdata->consistent = 1;
+	if(memory == NULL ) {
+		printk(KERN_WARNING "53c700: consistent memory allocation failed\n");
+#endif
+		memory = kmalloc(TOTAL_MEM_SIZE, GFP_KERNEL);
+		if(memory == NULL) {
+			printk(KERN_ERR "53c700: Failed to allocate memory for driver, detatching\n");
+			return NULL;
+		}
+		pMemory = pci_map_single(hostdata->pci_dev, memory,
+					 TOTAL_MEM_SIZE, PCI_DMA_BIDIRECTIONAL);
+#ifdef CONFIG_53C700_USE_CONSISTENT
+		hostdata->consistent = 0;
+	}
+#endif
+	script = (__u32 *)memory;
+	pScript = pMemory;
+	hostdata->msgin = memory + MSGIN_OFFSET;
+	hostdata->msgout = memory + MSGOUT_OFFSET;
+	hostdata->status = memory + STATUS_OFFSET;
+	hostdata->slots = (struct NCR_700_command_slot *)(memory + SLOTS_OFFSET);
+		
+	pSlots = pMemory + SLOTS_OFFSET;
 
 	/* Fill in the missing routines from the host template */
 	tpnt->queuecommand = NCR_700_queuecommand;
@@ -251,29 +278,6 @@ NCR_700_detect(Scsi_Host_Template *tpnt,
 
 	if((host = scsi_register(tpnt, 4)) == NULL)
 		return NULL;
-	if(script == NULL) {
-		printk(KERN_ERR "53c700: Failed to allocate script, detatching\n");
-		scsi_unregister(host);
-		return NULL;
-	}
-
-	/* This separation of slots and pSlots may facilitate later
-	 * migration to consistent memory on architectures which
-	 * support it */
-	hostdata->slots = kmalloc(sizeof(struct NCR_700_command_slot)
-				  * NCR_700_COMMAND_SLOTS_PER_HOST,
-				  GFP_KERNEL);
-	pSlots = virt_to_bus(hostdata->slots);
-
-	hostdata->msgin = kmalloc(MSG_ARRAY_SIZE, GFP_KERNEL);
-	hostdata->msgout = kmalloc(MSG_ARRAY_SIZE, GFP_KERNEL);
-	hostdata->status = kmalloc(MSG_ARRAY_SIZE, GFP_KERNEL);
-	if(hostdata->slots == NULL || hostdata->msgin == NULL
-	   || hostdata->msgout == NULL || hostdata->status==NULL) {
-		printk(KERN_ERR "53c700: Failed to allocate command slots or message buffers, detatching\n");
-		scsi_unregister(host);
-		return NULL;
-	}
 	memset(hostdata->slots, 0, sizeof(struct NCR_700_command_slot)
 	       * NCR_700_COMMAND_SLOTS_PER_HOST);
 	for(j = 0; j < NCR_700_COMMAND_SLOTS_PER_HOST; j++) {
@@ -295,19 +299,17 @@ NCR_700_detect(Scsi_Host_Template *tpnt,
 	for(j = 0; j < PATCHES; j++) {
 		script[LABELPATCHES[j]] = bS_to_host(pScript + SCRIPT[LABELPATCHES[j]]);
 	}
-	/* now patch up fixed addresses. 
-	 * NOTE: virt_to_bus may be wrong if consistent memory is used
-	 * for these in the future */
+	/* now patch up fixed addresses. */
 	script_patch_32(script, MessageLocation,
-			virt_to_bus(&hostdata->msgout[0]));
+			pScript + MSGOUT_OFFSET);
 	script_patch_32(script, StatusAddress,
-			virt_to_bus(&hostdata->status[0]));
+			pScript + STATUS_OFFSET);
 	script_patch_32(script, ReceiveMsgAddress,
-			virt_to_bus(&hostdata->msgin[0]));
+			pScript + MSGIN_OFFSET);
 
 	hostdata->script = script;
 	hostdata->pScript = pScript;
-	dma_cache_wback((unsigned long)script, sizeof(SCRIPT));
+	NCR_700_dma_cache_wback((unsigned long)script, sizeof(SCRIPT));
 	hostdata->state = NCR_700_HOST_FREE;
 	spin_lock_init(&hostdata->lock);
 	hostdata->cmd = NULL;
@@ -344,13 +346,18 @@ NCR_700_release(struct Scsi_Host *host)
 	struct NCR_700_Host_Parameters *hostdata = 
 		(struct NCR_700_Host_Parameters *)host->hostdata[0];
 
-	/* NOTE: these may be NULL if we weren't fully initialised before
-	 * the scsi_unregister was called */
-	kfree(hostdata->script);
-	kfree(hostdata->slots);
-	kfree(hostdata->msgin);
-	kfree(hostdata->msgout);
-	kfree(hostdata->status);
+#ifdef CONFIG_53C700_USE_CONSISTENT
+	if(hostdata->consistent) {
+		pci_free_consistent(hostdata->pci_dev, TOTAL_MEM_SIZE,
+				    hostdata->script, hostdata->pScript);
+	} else {
+#endif
+		pci_unmap_single(hostdata->pci_dev, hostdata->pScript,
+				 TOTAL_MEM_SIZE, PCI_DMA_BIDIRECTIONAL);
+		kfree(hostdata->script);
+#ifdef CONFIG_53C700_USE_CONSISTENT
+	}
+#endif
 	return 1;
 }
 
@@ -620,7 +627,25 @@ NCR_700_offset_period_to_sxfer(struct NCR_700_Host_Parameters *hostdata,
 	}
 	return (offset & 0x0f) | (XFERP & 0x07)<<4;
 }
-	
+
+STATIC inline void
+NCR_700_unmap(struct NCR_700_Host_Parameters *hostdata, Scsi_Cmnd *SCp,
+	      struct NCR_700_command_slot *slot)
+{
+	if(SCp->sc_data_direction != SCSI_DATA_NONE &&
+	   SCp->sc_data_direction != SCSI_DATA_UNKNOWN) {
+		int pci_direction = scsi_to_pci_dma_dir(SCp->sc_data_direction);
+		if(SCp->use_sg) {
+			pci_unmap_sg(hostdata->pci_dev, SCp->buffer,
+				     SCp->use_sg, pci_direction);
+		} else {
+			pci_unmap_single(hostdata->pci_dev,
+					 slot->dma_handle,
+					 SCp->request_bufflen,
+					 pci_direction);
+		}
+	}
+}
 
 STATIC inline void
 NCR_700_scsi_done(struct NCR_700_Host_Parameters *hostdata,
@@ -632,29 +657,20 @@ NCR_700_scsi_done(struct NCR_700_Host_Parameters *hostdata,
 	if(SCp != NULL) {
 		struct NCR_700_command_slot *slot = 
 			(struct NCR_700_command_slot *)SCp->host_scribble;
-
+		
+		NCR_700_unmap(hostdata, SCp, slot);
+		pci_unmap_single(hostdata->pci_dev, slot->pCmd,
+				 sizeof(SCp->cmnd), PCI_DMA_TODEVICE);
 		if(SCp->cmnd[0] == REQUEST_SENSE && SCp->cmnd[6] == NCR_700_INTERNAL_SENSE_MAGIC) {
 #ifdef NCR_700_DEBUG
 			printk(" ORIGINAL CMD %p RETURNED %d, new return is %d sense is\n",
 			       SCp, SCp->cmnd[7], result);
 			print_sense("53c700", SCp);
+
 #endif
+			SCp->use_sg = SCp->cmnd[8];
 			if(result == 0)
 				result = SCp->cmnd[7];
-		}
-
-		if(SCp->sc_data_direction != SCSI_DATA_NONE &&
-		   SCp->sc_data_direction != SCSI_DATA_UNKNOWN) {
-			int pci_direction = scsi_to_pci_dma_dir(SCp->sc_data_direction);
-			if(SCp->use_sg) {
-				pci_unmap_sg(hostdata->pci_dev, SCp->buffer,
-					     SCp->use_sg, pci_direction);
-			} else {
-				pci_unmap_single(hostdata->pci_dev,
-						 slot->dma_handle,
-						 SCp->request_bufflen,
-						 pci_direction);
-			}
 		}
 
 		free_slot(slot, hostdata);
@@ -850,7 +866,7 @@ process_extended_message(struct Scsi_Host *host,
 			printk(KERN_WARNING "scsi%d Unexpected SDTR msg\n",
 			       host->host_no);
 			hostdata->msgout[0] = A_REJECT_MSG;
-			dma_cache_wback((unsigned long)hostdata->msgout, 1);
+			NCR_700_dma_cache_wback((unsigned long)hostdata->msgout, 1);
 			script_patch_16(hostdata->script, MessageCount, 1);
 			/* SendMsgOut returns, so set up the return
 			 * address */
@@ -862,7 +878,7 @@ process_extended_message(struct Scsi_Host *host,
 		printk(KERN_INFO "scsi%d: (%d:%d), Unsolicited WDTR after CMD, Rejecting\n",
 		       host->host_no, pun, lun);
 		hostdata->msgout[0] = A_REJECT_MSG;
-		dma_cache_wback((unsigned long)hostdata->msgout, 1);
+		NCR_700_dma_cache_wback((unsigned long)hostdata->msgout, 1);
 		script_patch_16(hostdata->script, MessageCount, 1);
 		resume_offset = hostdata->pScript + Ent_SendMessageWithATN;
 
@@ -876,7 +892,7 @@ process_extended_message(struct Scsi_Host *host,
 		printk("\n");
 		/* just reject it */
 		hostdata->msgout[0] = A_REJECT_MSG;
-		dma_cache_wback((unsigned long)hostdata->msgout, 1);
+		NCR_700_dma_cache_wback((unsigned long)hostdata->msgout, 1);
 		script_patch_16(hostdata->script, MessageCount, 1);
 		/* SendMsgOut returns, so set up the return
 		 * address */
@@ -954,7 +970,7 @@ process_message(struct Scsi_Host *host,	struct NCR_700_Host_Parameters *hostdata
 		printk("\n");
 		/* just reject it */
 		hostdata->msgout[0] = A_REJECT_MSG;
-		dma_cache_wback((unsigned long)hostdata->msgout, 1);
+		NCR_700_dma_cache_wback((unsigned long)hostdata->msgout, 1);
 		script_patch_16(hostdata->script, MessageCount, 1);
 		/* SendMsgOut returns, so set up the return
 		 * address */
@@ -964,7 +980,7 @@ process_message(struct Scsi_Host *host,	struct NCR_700_Host_Parameters *hostdata
 	}
 	NCR_700_writel(temp, host, TEMP_REG);
 	/* set us up to receive another message */
-	dma_cache_inv((unsigned long)hostdata->msgin, MSG_ARRAY_SIZE);
+	NCR_700_dma_cache_inv((unsigned long)hostdata->msgin, MSG_ARRAY_SIZE);
 	return resume_offset;
 }
 
@@ -1002,10 +1018,15 @@ process_script_interrupt(__u32 dsps, __u32 dsp, Scsi_Cmnd *SCp,
 				printk("  cmd %p has status %d, requesting sense\n",
 				       SCp, hostdata->status[0]);
 #endif
-				/* we can destroy the command here because the
-				 * contingent allegiance condition will cause a 
-				 * retry which will re-copy the command from the
-				 * saved data_cmnd */
+				/* we can destroy the command here
+				 * because the contingent allegiance
+				 * condition will cause a retry which
+				 * will re-copy the command from the
+				 * saved data_cmnd.  We also unmap any
+				 * data associated with the command
+				 * here */
+				NCR_700_unmap(hostdata, SCp, slot);
+
 				SCp->cmnd[0] = REQUEST_SENSE;
 				SCp->cmnd[1] = (SCp->lun & 0x7) << 5;
 				SCp->cmnd[2] = 0;
@@ -1013,21 +1034,29 @@ process_script_interrupt(__u32 dsps, __u32 dsp, Scsi_Cmnd *SCp,
 				SCp->cmnd[4] = sizeof(SCp->sense_buffer);
 				SCp->cmnd[5] = 0;
 				SCp->cmd_len = 6;
-				/* Here's a quiet hack: the REQUEST_SENSE command is
-				 * six bytes, so store a flag indicating that this
-				 * was an internal sense request and the original
-				 * status at the end of the command */
+				/* Here's a quiet hack: the
+				 * REQUEST_SENSE command is six bytes,
+				 * so store a flag indicating that
+				 * this was an internal sense request
+				 * and the original status at the end
+				 * of the command */
 				SCp->cmnd[6] = NCR_700_INTERNAL_SENSE_MAGIC;
 				SCp->cmnd[7] = hostdata->status[0];
+				SCp->cmnd[8] = SCp->use_sg;
+				SCp->use_sg = 0;
 				SCp->sc_data_direction = SCSI_DATA_READ;
-				dma_cache_wback((unsigned long)SCp->cmnd, SCp->cmd_len);
+				pci_dma_sync_single(hostdata->pci_dev,
+						    slot->pCmd,
+						    SCp->cmd_len,
+						    PCI_DMA_TODEVICE);
+				slot->dma_handle = pci_map_single(hostdata->pci_dev, SCp->sense_buffer, sizeof(SCp->sense_buffer), PCI_DMA_FROMDEVICE);
 				slot->SG[0].ins = bS_to_host(SCRIPT_MOVE_DATA_IN | sizeof(SCp->sense_buffer));
-				slot->SG[0].pAddr = bS_to_host(virt_to_bus(SCp->sense_buffer));
+				slot->SG[0].pAddr = bS_to_host(slot->dma_handle);
 				slot->SG[1].ins = bS_to_host(SCRIPT_RETURN);
 				slot->SG[1].pAddr = 0;
 				slot->resume_offset = hostdata->pScript;
-				dma_cache_wback((unsigned long)slot->SG, sizeof(slot->SG[0])*2);
-				dma_cache_inv((unsigned long)SCp->sense_buffer, sizeof(SCp->sense_buffer));
+				NCR_700_dma_cache_wback((unsigned long)slot->SG, sizeof(slot->SG[0])*2);
+				NCR_700_dma_cache_inv((unsigned long)SCp->sense_buffer, sizeof(SCp->sense_buffer));
 				
 				/* queue the command for reissue */
 				slot->state = NCR_700_SLOT_QUEUED;
@@ -1136,7 +1165,7 @@ process_script_interrupt(__u32 dsps, __u32 dsp, Scsi_Cmnd *SCp,
 
 			/* re-patch for this command */
 			script_patch_32_abs(hostdata->script, CommandAddress, 
-					    virt_to_bus(slot->cmnd->cmnd));
+					    slot->pCmd);
 			script_patch_16(hostdata->script,
 					CommandCount, slot->cmnd->cmd_len);
 			script_patch_32_abs(hostdata->script, SGScriptStartAddress,
@@ -1149,13 +1178,13 @@ process_script_interrupt(__u32 dsps, __u32 dsp, Scsi_Cmnd *SCp,
 			 * should therefore always clear ACK */
 			NCR_700_writeb(NCR_700_get_SXFER(hostdata->cmd->device),
 				       host, SXFER_REG);
-			dma_cache_inv((unsigned long)hostdata->msgin,
+			NCR_700_dma_cache_inv((unsigned long)hostdata->msgin,
 				      MSG_ARRAY_SIZE);
-			dma_cache_wback((unsigned long)hostdata->msgout,
+			NCR_700_dma_cache_wback((unsigned long)hostdata->msgout,
 					MSG_ARRAY_SIZE);
 			/* I'm just being paranoid here, the command should
 			 * already have been flushed from the cache */
-			dma_cache_wback((unsigned long)slot->cmnd->cmnd,
+			NCR_700_dma_cache_wback((unsigned long)slot->cmnd->cmnd,
 					slot->cmnd->cmd_len);
 
 
@@ -1219,7 +1248,8 @@ process_script_interrupt(__u32 dsps, __u32 dsp, Scsi_Cmnd *SCp,
 		hostdata->reselection_id = reselection_id;
 		/* just in case we have a stale simple tag message, clear it */
 		hostdata->msgin[1] = 0;
-		dma_cache_wback_inv((unsigned long)hostdata->msgin, MSG_ARRAY_SIZE);
+		NCR_700_dma_cache_wback_inv((unsigned long)hostdata->msgin,
+					    MSG_ARRAY_SIZE);
 		if(hostdata->tag_negotiated & (1<<reselection_id)) {
 			resume_offset = hostdata->pScript + Ent_GetReselectionWithTag;
 		} else {
@@ -1334,7 +1364,7 @@ process_selection(struct Scsi_Host *host, __u32 dsp)
 	hostdata->cmd = NULL;
 	/* clear any stale simple tag message */
 	hostdata->msgin[1] = 0;
-	dma_cache_wback_inv((unsigned long)hostdata->msgin, MSG_ARRAY_SIZE);
+	NCR_700_dma_cache_wback_inv((unsigned long)hostdata->msgin, MSG_ARRAY_SIZE);
 
 	if(id == 0xff) {
 		/* Selected as target, Ignore */
@@ -1404,7 +1434,7 @@ NCR_700_start_command(Scsi_Cmnd *SCp)
 	 * set up so we cannot take a selection interrupt */
 
 	hostdata->msgout[0] = NCR_700_identify(SCp->cmnd[0] != REQUEST_SENSE,
-					    SCp->lun);
+					       SCp->lun);
 	/* for INQUIRY or REQUEST_SENSE commands, we cannot be sure
 	 * if the negotiated transfer parameters still hold, so
 	 * always renegotiate them */
@@ -1437,7 +1467,7 @@ NCR_700_start_command(Scsi_Cmnd *SCp)
 			Device_ID, 1<<SCp->target);
 
 	script_patch_32_abs(hostdata->script, CommandAddress, 
-			virt_to_bus(SCp->cmnd));
+			    slot->pCmd);
 	script_patch_16(hostdata->script, CommandCount, SCp->cmd_len);
 	/* finally plumb the beginning of the SG list into the script
 	 * */
@@ -1448,10 +1478,10 @@ NCR_700_start_command(Scsi_Cmnd *SCp)
 	if(slot->resume_offset == 0)
 		slot->resume_offset = hostdata->pScript;
 	/* now perform all the writebacks and invalidates */
-	dma_cache_wback((unsigned long)hostdata->msgout, count);
-	dma_cache_inv((unsigned long)hostdata->msgin, MSG_ARRAY_SIZE);
-	dma_cache_wback((unsigned long)SCp->cmnd, SCp->cmd_len);
-	dma_cache_inv((unsigned long)hostdata->status, 1);
+	NCR_700_dma_cache_wback((unsigned long)hostdata->msgout, count);
+	NCR_700_dma_cache_inv((unsigned long)hostdata->msgin, MSG_ARRAY_SIZE);
+	NCR_700_dma_cache_wback((unsigned long)SCp->cmnd, SCp->cmd_len);
+	NCR_700_dma_cache_inv((unsigned long)hostdata->status, 1);
 
 	/* set the synchronous period/offset */
 	NCR_700_writeb(NCR_700_get_SXFER(SCp->device),
@@ -1519,7 +1549,7 @@ NCR_700_intr(int irq, void *dev_id, struct pt_regs *regs)
 
 		DEBUG(("scsi%d: istat %02x sstat0 %02x dstat %02x dsp %04x[%08x] dsps 0x%x\n",
 		       host->host_no, istat, sstat0, dstat,
-		       (dsp - (__u32)virt_to_bus(hostdata->script))/4,
+		       (dsp - (__u32)(hostdata->pScript))/4,
 		       dsp, dsps));
 
 		if(SCp != NULL) {
@@ -1632,7 +1662,7 @@ NCR_700_intr(int irq, void *dev_id, struct pt_regs *regs)
 					slot->SG[i].ins = bS_to_host(SCRIPT_NOP);
 					slot->SG[i].pAddr = 0;
 				}
-				dma_cache_wback((unsigned long)slot->SG, sizeof(slot->SG));
+				NCR_700_dma_cache_wback((unsigned long)slot->SG, sizeof(slot->SG));
 				/* and pretend we disconnected after
 				 * the command phase */
 				resume_offset = hostdata->pScript + Ent_MsgInDuringData;
@@ -1847,7 +1877,13 @@ NCR_700_queuecommand(Scsi_Cmnd *SCp, void (*done)(Scsi_Cmnd *))
 #endif
 		
 		if(old != NULL && old->tag == SCp->device->current_tag) {
-			printk(KERN_WARNING "scsi%d (%d:%d) Tag clock back to current, queueing\n", SCp->host->host_no, SCp->target, SCp->lun);
+			/* On some badly starving drives, this can be
+			 * a frequent occurance, so print the message
+			 * only once */
+			if(NCR_700_is_flag_clear(SCp->device, NCR_700_DEV_TAG_STARVATION_WARNED)) {
+				printk(KERN_WARNING "scsi%d (%d:%d) Target is suffering from tag starvation.\n", SCp->host->host_no, SCp->target, SCp->lun);
+				NCR_700_set_flag(SCp->device, NCR_700_DEV_TAG_STARVATION_WARNED);
+			}
 			return 1;
 		}
 		slot->tag = SCp->device->current_tag++;
@@ -1899,6 +1935,18 @@ NCR_700_queuecommand(Scsi_Cmnd *SCp, void (*done)(Scsi_Cmnd *))
 	else
 		hostdata->ITL_Hash_back[hash] = slot;
 	slot->ITL_back = NULL;
+
+	/* sanity check: some of the commands generated by the mid-layer
+	 * have an eccentric idea of their sc_data_direction */
+	if(!SCp->use_sg && !SCp->request_bufflen 
+	   && SCp->sc_data_direction != SCSI_DATA_NONE) {
+#ifdef NCR_700_DEBUG
+		printk("53c700: Command");
+		print_command(SCp->cmnd);
+		printk("Has wrong data direction %d\n", SCp->sc_data_direction);
+#endif
+		SCp->sc_data_direction = SCSI_DATA_NONE;
+	}
 
 	switch (SCp->cmnd[0]) {
 	case REQUEST_SENSE:
@@ -1965,12 +2013,14 @@ NCR_700_queuecommand(Scsi_Cmnd *SCp, void (*done)(Scsi_Cmnd *))
 		}
 		slot->SG[i].ins = bS_to_host(SCRIPT_RETURN);
 		slot->SG[i].pAddr = 0;
-		dma_cache_wback((unsigned long)slot->SG, sizeof(slot->SG));
+		NCR_700_dma_cache_wback((unsigned long)slot->SG, sizeof(slot->SG));
 		DEBUG((" SETTING %08lx to %x\n",
-		       virt_to_bus(&slot->SG[i].ins), 
+		       (&slot->pSG[i].ins), 
 		       slot->SG[i].ins));
 	}
 	slot->resume_offset = 0;
+	slot->pCmd = pci_map_single(hostdata->pci_dev, SCp->cmnd,
+				    sizeof(SCp->cmnd), PCI_DMA_TODEVICE);
 	NCR_700_start_command(SCp);
 	return 0;
 }

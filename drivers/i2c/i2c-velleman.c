@@ -103,7 +103,7 @@ static int bit_velle_init(void)
 	return 0;
 }
 
-static void bit_velle_exit(void)
+static void __exit bit_velle_exit(void)
 {	
 	release_region( base , (base == 0x3bc)? 3 : 8 );
 }

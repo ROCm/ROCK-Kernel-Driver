@@ -904,3 +904,4 @@ EXPORT_NO_SYMBOLS;
 
 module_init(socal_probe);
 module_exit(socal_cleanup);
+MODULE_LICENSE("GPL");

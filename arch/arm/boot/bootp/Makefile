@@ -3,7 +3,6 @@
 #
 
 ZSYSTEM		=$(TOPDIR)/arch/arm/boot/zImage
-INITRD		=$(ZSYSTEM)
 ZLDFLAGS	=-p -X -T bootp.lds \
 		 --defsym initrd_addr=$(INITRD_PHYS) \
 		 --defsym initrd_virt=$(INITRD_VIRT) \

@@ -30,6 +30,8 @@ search_one_table(const struct exception_table_entry *first,
         return 0;
 }
 
+extern spinlock_t modlist_lock;
+
 unsigned long
 search_exception_table(unsigned long addr)
 {
@@ -38,18 +40,24 @@ search_exception_table(unsigned long addr)
 #ifndef CONFIG_MODULES
 	/* There is only the kernel to search.  */
 	ret = search_one_table(__start___ex_table, __stop___ex_table-1, addr);
-	if (ret) return ret;
 #else
 	/* The kernel is the last "module" -- no need to treat it special.  */
+	unsigned long flags;
 	struct module *mp;
+
+	ret = 0;
+	spin_lock_irqsave(&modlist_lock, flags);
 	for (mp = module_list; mp != NULL; mp = mp->next) {
-		if (mp->ex_table_start == NULL)
+		if (mp->ex_table_start == NULL ||
+		    !(mp->flags & (MOD_RUNNING | MOD_INITIALIZING)))
 			continue;
 		ret = search_one_table(mp->ex_table_start,
 				       mp->ex_table_end - 1, addr);
-		if (ret) return ret;
+		if (ret)
+			break;
 	}
+	spin_unlock_irqrestore(&modlist_lock, flags);
 #endif
 
-	return 0;
+	return ret;
 }

@@ -421,6 +421,10 @@ void scan_scsis(struct Scsi_Host *shpnt,
 					 max_scsi_luns : shpnt->max_lun);
 					sparse_lun = 0;
 					for (lun = 0, lun0_sl = SCSI_2; lun < max_dev_lun; ++lun) {
+						/* don't probe further for luns > 7 for targets <= SCSI_2 */
+						if ((lun0_sl < SCSI_3) && (lun > 7))
+							break;
+
 						if (!scan_scsis_single(channel, order_dev, lun, lun0_sl,
 							 	       &max_dev_lun, &sparse_lun, &SDpnt, shpnt,
 								       scsi_result)

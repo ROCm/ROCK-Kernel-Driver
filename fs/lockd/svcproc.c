@@ -29,17 +29,20 @@ static void	nlmsvc_callback_exit(struct rpc_task *);
 static u32
 cast_to_nlm(u32 status, u32 vers)
 {
-
+	/* Note: status is assumed to be in network byte order !!! */
 	if (vers != 4){
-		switch(ntohl(status)){
-		case NLM_LCK_GRANTED:
-		case NLM_LCK_DENIED:
-		case NLM_LCK_DENIED_NOLOCKS:
-		case NLM_LCK_BLOCKED:
-		case NLM_LCK_DENIED_GRACE_PERIOD:
+		switch (status) {
+		case nlm_granted:
+		case nlm_lck_denied:
+		case nlm_lck_denied_nolocks:
+		case nlm_lck_blocked:
+		case nlm_lck_denied_grace_period:
+			break;
+		case nlm4_deadlock:
+			status = nlm_lck_denied;
 			break;
 		default:
-			status = NLM_LCK_DENIED_NOLOCKS;
+			status = nlm_lck_denied_nolocks;
 		}
 	}
 

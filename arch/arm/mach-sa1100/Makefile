@@ -14,31 +14,38 @@ obj-m :=
 obj-n :=
 obj-  :=
 
-export-objs :=	assabet.o bitsy.o freebird.o huw_webpanel.o yopy.o \
+export-objs :=	assabet.o h3600.o freebird.o huw_webpanel.o yopy.o \
 		generic.o hwtimer.o irq.o usb_ctl.o usb_recv.o usb_send.o \
-		dma-sa1100.o dma-sa1111.o pcipool.o
+		dma-sa1100.o dma-sa1111.o pcipool.o sa1111-pcibuf.o
 
 # Common support (must be linked before board specific support)
 obj-y += generic.o irq.o dma-sa1100.o
-obj-$(CONFIG_SA1111) += sa1111.o dma-sa1111.o sa1111-pcibuf.o pcipool.o
 
 # This needs to be cleaned up.  We probably need to have SA1100
 # and SA1110 config symbols.
+#
+# We link the CPU support next, so that RAM timings can be tuned.
 ifeq ($(CONFIG_CPU_FREQ),y)
 obj-$(CONFIG_SA1100_ASSABET) += cpu-sa1110.o
 obj-$(CONFIG_SA1100_LART) += cpu-sa1100.o
 endif
 
+# Next, the SA1111 stuff.
+obj-$(CONFIG_SA1111) += sa1111.o dma-sa1111.o
+obj-$(CONFIG_USB_OHCI_SA1111) += sa1111-pcibuf.o pcipool.o
+
 # Specific board support
+obj-$(CONFIG_SA1100_ADSBITSY) += adsbitsy.o
 obj-$(CONFIG_SA1100_ASSABET) += assabet.o
 obj-$(CONFIG_ASSABET_NEPONSET) += neponset.o
-obj-$(CONFIG_SA1100_BITSY) += bitsy.o
 obj-$(CONFIG_SA1100_BRUTUS) += brutus.o
 obj-$(CONFIG_SA1100_CERF) += cerf.o
 obj-$(CONFIG_SA1100_EMPEG) += empeg.o
 obj-$(CONFIG_SA1100_FLEXANET) += flexanet.o
 obj-$(CONFIG_SA1100_FREEBIRD) += freebird.o
 obj-$(CONFIG_SA1100_GRAPHICSCLIENT) += graphicsclient.o
+obj-$(CONFIG_SA1100_GRAPHICSMASTER) += graphicsmaster.o
+obj-$(CONFIG_SA1100_H3600) += h3600.o
 obj-$(CONFIG_SA1100_HUW_WEBPANEL) += huw_webpanel.o
 obj-$(CONFIG_SA1100_ITSY) += itsy.o
 obj-$(CONFIG_SA1100_JORNADA720) += jornada720.o
@@ -63,6 +70,7 @@ leds-$(CONFIG_SA1100_FLEXANET) += leds-flexanet.o
 leds-$(CONFIG_SA1100_GRAPHICSCLIENT) += leds-graphicsclient.o
 leds-$(CONFIG_SA1100_LART) += leds-lart.o
 leds-$(CONFIG_SA1100_PFS168) += leds-pfs168.o
+leds-$(CONFIG_SA1100_GRAPHICSMASTER) += leds-graphicsmaster.o
 obj-$(CONFIG_LEDS) += $(leds-y)
 
 include $(TOPDIR)/Rules.make

@@ -206,7 +206,7 @@ static ssize_t udf_file_write(struct file * file, const char * buf,
 int udf_ioctl(struct inode *inode, struct file *filp, unsigned int cmd,
 	unsigned long arg)
 {
-	int result = -1;
+	int result = -EINVAL;
 	struct buffer_head *bh = NULL;
 	long_ad eaicb;
 	Uint8 *ea = NULL;
@@ -228,16 +228,16 @@ int udf_ioctl(struct inode *inode, struct file *filp, unsigned int cmd,
 	switch (cmd)
 	{
 		case UDF_GETVOLIDENT:
-			if ( (result == verify_area(VERIFY_WRITE, (char *)arg, 32)) == 0)
-				result = copy_to_user((char *)arg, UDF_SB_VOLIDENT(inode->i_sb), 32);
-			return result;
+			return copy_to_user((char *)arg,
+				UDF_SB_VOLIDENT(inode->i_sb), 32) ? -EFAULT : 0;
 		case UDF_RELOCATE_BLOCKS:
 		{
 			long old, new;
 
 			if (!capable(CAP_SYS_ADMIN)) return -EACCES;
-			get_user(old, (long *)arg);
-			if ((result = udf_relocate_blocks(inode->i_sb, old, &new)) == 0)
+			if (get_user(old, (long *)arg)) return -EFAULT;
+			if ((result = udf_relocate_blocks(inode->i_sb,
+					old, &new)) == 0)
 				result = put_user(new, (long *)arg);
 
 			return result;
@@ -277,16 +277,12 @@ int udf_ioctl(struct inode *inode, struct file *filp, unsigned int cmd,
 	switch (cmd) 
 	{
 		case UDF_GETEASIZE:
-			if ( (result = verify_area(VERIFY_WRITE, (char *)arg, 4)) == 0) 
-				result = put_user(UDF_I_LENEATTR(inode), (int *)arg);
+			result = put_user(UDF_I_LENEATTR(inode), (int *)arg);
 			break;
 
 		case UDF_GETEABLOCK:
-			if ( (result = verify_area(VERIFY_WRITE, (char *)arg, UDF_I_LENEATTR(inode))) == 0) 
-				result = copy_to_user((char *)arg, ea, UDF_I_LENEATTR(inode));
-			break;
-
-		default:
+			result = copy_to_user((char *)arg, ea,
+				UDF_I_LENEATTR(inode)) ? -EFAULT : 0;
 			break;
 	}
 

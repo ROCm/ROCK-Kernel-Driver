@@ -3107,34 +3107,104 @@
 	0396  SDRAM controller
 	0397  BIOS scratchpad
 127a  Rockwell International
-	1002  HCF 56k V90 FaxModem
-		127a 1002  HCF 56k V90 Modem
-	1003  HCF 56k V90 FaxModem
-		127a 1003  PCI56RX Modem
-		13df 1003  PCI56RX Modem
-	1004  HCF 56k V90 FaxModem
-	1005  HCF 56k V90 FaxModem
-		122d 4008  MDP3858SP-A SVD Modem
-		127a 1005  PCI56RVP Modem 
-		13df 1005  PCI56RVP Modem 
-		1436 1005  WS-5614PS3G
-	1025  HCF 56k PCI Modem
-		127a 1025  HCF 56k PCI Modem
+	1002  HCF 56k Data/Fax Modem
+		122d 4002  HPG / MDP3858-U # Aztech
+		122d 4005  MDP3858-E # Aztech
+		122d 4007  MDP3858-A/-NZ # Aztech
+		122d 4012  MDP3858-SA # Aztech
+		122d 4017  MDP3858-W # Aztech
+		122d 4018  MDP3858-W # Aztech
+	1003  HCF 56k Data/Fax Modem
+		0e11 b0bc  229-DF Zephyr # Compaq
+		0e11 b114  229-DF Cheetah # Compaq
+		1033 802b  229-DF # NEC
+		13df 1003  PCI56RX Modem # E-Tech Inc
+		13e0 0117  IBM # GVC
+		13e0 0147  IBM # GVC
+		13e0 0197  IBM # GVC
+		13e0 01c7  IBM # GVC
+		13e0 01f7  IBM # GVC
+		1436 1003  IBM # CIS
+		1436 1103  IBM # CIS
+		1436 1602  Compaq 229-DF Ducati
+	1004  HCF 56k Data/Fax/Voice Modem
+		10cf 1059  Fujitsu 229-DFRT
+	1005  HCF 56k Data/Fax/Voice/Spkp (w/Handset) Modem
+		1033 8029  229-DFSV # NEC
+		1033 8054  Modem # NEC
+		10cf 103c  Fujitsu
+		10cf 1055  Fujitsu 229-DFSV
+		10cf 1056  Fujitsu 229-DFSV
+		122d 4003  MDP3858SP-U # Aztech
+		122d 4006  Packard Bell MDP3858V-E # Aztech
+		122d 4008  MDP3858SP-A/SP-NZ # Aztech
+		122d 4009  MDP3858SP-E # Aztech
+		122d 4010  MDP3858V-U # Aztech
+		122d 4011  MDP3858SP-SA # Aztech
+		122d 4013  MDP3858V-A/V-NZ # Aztech
+		122d 4015  MDP3858SP-W # Aztech
+		122d 4016  MDP3858V-W # Aztech
+		122d 4019  MDP3858V-SA # Aztech
+		13df 1005  PCI56RVP Modem  # E-Tech Inc
+		13e0 0187  IBM # GVC
+		13e0 01a7  IBM # GVC
+		13e0 01b7  IBM # GVC
+		13e0 01d7  IBM # GVC
+		1436 1005  IBM # CIS
+		1436 1105  IBM # CIS
+	1023  HCF 56k Data/Fax Modem
+		122d 4020  Packard Bell MDP3858-WE # Aztech
+		122d 4023  MDP3858-UE # Aztech
+		13e0 0247  IBM # GVC
+		13e0 0297  IBM # GVC
+		13e0 02c7  IBM # GVC
+		1436 1203  IBM # CIS
+		1436 1303  IBM # CIS
+	1024  HCF 56k Data/Fax/Voice Modem
+	1025  HCF 56k Data/Fax/Voice/Spkp (w/Handset) Modem
+		10cf 106a  Fujitsu 235-DFSV
+		122d 4021  Packard Bell MDP3858V-WE # Aztech
+		122d 4022  MDP3858SP-WE # Aztech
+		122d 4024  MDP3858V-UE # Aztech
+		122d 4025  MDP3858SP-UE # Aztech
 	1026  HCF 56k PCI Speakerphone Modem
-		127a 1026  HCF 56k PCI Speakerphone Modem
 	1035  HCF 56k PCI Speakerphone Modem
-		127a 1035  HCF 56k PCI Speakerphone Modem
-	1085  Volcano HCF 56k PCI Modem
-		127a 1085  Volcano HCF 56k PCI Modem
-	2005  HCF 56k V90 FaxModem
-		127a 2005  Conexant SoftK56 Speakerphone Modem
-	2015  Conexant SoftK56 Speakerphone Modem
-		127a 2015  Conexant SoftK56 Speakerphone Modem
-		14c8 2115  Conexant SoftK56 Speakerphone Modem
+	1085  HCF 56k Volcano PCI Modem
+	2005  HCF 56k Data/Fax Modem
+		104d 8044  229-DFSV # Sony
+		104d 8045  229-DFSV # Sony
+		104d 8055  PBE/Aztech 235W-DFSV # Sony
+		104d 8056  235-DFSV # Sony
+		104d 805a  Modem # Sony
+		104d 805f  Modem # Sony
+		104d 8074  Modem # Sony
+	2013  HSF 56k Data/Fax Modem
+		1179 0001  Modem # Toshiba
+		1179 ff00  Modem # Toshiba
+	2014  HSF 56k Data/Fax/Voice Modem
+		10cf 1057  Fujitsu Citicorp III
+		122d 4050  MSP3880-U # Aztech
+		122d 4055  MSP3880-W # Aztech
+	2015  HSF 56k Data/Fax/Voice/Spkp (w/Handset) Modem
+		10cf 1063  Fujitsu
+		10cf 1064  Fujitsu
+		1468 2015  Fujitsu
+	2016  HSF 56k Data/Fax/Voice/Spkp Modem
+		122d 4051  MSP3880V-W # Aztech
+		122d 4052  MSP3880SP-W # Aztech
+		122d 4054  MSP3880V-U # Aztech
+		122d 4056  MSP3880SP-U # Aztech
+		122d 4057  MSP3880SP-A # Aztech
+	4311  Riptide HSF 56k PCI Modem
+		127a 4311  Ring Modular? Riptide HSF RT HP Dom
+		13e0 0210  HP-GVC
 	4320  Riptide PCI Audio Controller
 		1235 4320  Riptide PCI Audio Controller
 	4321  Riptide HCF 56k PCI Modem
-		1235 4321  Riptide HCF 56k PCI Modem
+		1235 4321  Hewlett Packard DF
+		1235 4324  Hewlett Packard DF
+		13e0 0210  Hewlett Packard DF
+		144d 2321  Riptide # Samsung
 	4322  Riptide PCI Game Controller
 		1235 4322  Riptide PCI Game Controller
 	8234  RapidFire 616X ATM155 Adapter
@@ -3884,6 +3954,7 @@
 148b  INNOMEDIALOGIC Inc.
 148c  C.P. Technology Co. Ltd
 148d  DIGICOM Systems, Inc.
+	1003  HCF 56k Data/Fax Modem
 148e  OSI Plus Corporation
 148f  Plant Equipment, Inc.
 1490  Stone Microsystems PTY Ltd.
@@ -4021,30 +4092,123 @@
 14ee  MASPRO KENKOH Corp
 14ef  CARRY Computer ENG. CO Ltd
 14f0  CANON RESEACH CENTRE FRANCE
-14f1  CONEXANT
-	1033  56K Winmodem
-		13e0 02b0  56K Winmodem
-	1035  PCI Modem Enumerator
-	2003  SoftK56 Winmodem
-		14f1 2003  SoftK56 Winmodem
-	2004  SoftK56 RemoteTAM Winmodem
-		14f1 2004  SoftK56 RemoteTAM Winmodem
-	2005  SoftK56 Speakerphone Winmodem
-		14f1 2005  SoftK56 Speakerphone Winmodem
-	2006  SoftK56 Speakerphone Winmodem
-		14f1 2006  SoftK56 Speakerphone Winmodem
-	2013  HSP MicroModem 56K
-		14f1 2013  SoftK56 Winmodem
-	2014  SoftK56 RemoteTAM Winmodem
-		144f 101c  SoftK56 RemoteTAM Winmodem
-		144f 2014  SoftK56 RemoteTAM Winmodem
-	2015  SoftK56 Speakerphone Winmodem
-		14c8 2115  SoftK56 Speakerphone Winmodem
-		14f1 2015  SoftK56 Speakerphone Winmodem
-	2016  SoftK56 Speakerphone Winmodem
-		14f1 2016  SoftK56 Speakerphone Winmodem
-	2443  SoftK56 Speakerphone Winmodem
-		14f1 2443  SoftK56 Speakerphone Winmodem
+14f1  Conexant
+	1033  HCF 56k Data/Fax Modem
+		1033 8077  NEC
+		122d 4027  Dell Zeus - MDP3880-W(B) Data Fax Modem # Aztech
+		122d 4030  Dell Mercury - MDP3880-U(B) Data Fax Modem # Aztech
+		122d 4034  Dell Thor - MDP3880-W(U) Data Fax Modem # Aztech
+		13e0 020d  Dell Copper
+		13e0 020e  Dell Silver
+		13e0 0261  IBM # GVC
+		13e0 0290  Compaq Goldwing
+		13e0 02a0  IBM # GVC
+		13e0 02b0  IBM # GVC
+		13e0 02c0  Compaq Scooter
+		13e0 02d0  IBM # GVC
+		144f 1500  IBM P85-DF # Askey
+		144f 1501  IBM P85-DF # Askey
+		144f 150a  IBM P85-DF # Askey
+		144f 150b  IBM P85-DF Low Profile # Askey
+		144f 1510  IBM P85-DF Low Profile # Askey
+	1034  HCF 56k Data/Fax/Voice Modem
+	1035  HCF 56k Data/Fax/Voice/Spkp (w/Handset) Modem
+		10cf 1098  Fujitsu P85-DFSV
+	1036  HCF 56k Data/Fax/Voice/Spkp Modem
+		122d 4029  MDP3880SP-W # Aztech
+		122d 4031  MDP3880SP-U # Aztech
+		13e0 0209  Dell Titanium
+		13e0 020a  Dell Graphite
+		13e0 0260  Gateway Red Owl
+		13e0 0270  Gateway White Horse
+	1052  HCF 56k Data/Fax Modem (Worldwide)
+	1053  HCF 56k Data/Fax Modem (Worldwide)
+	1054  HCF 56k Data/Fax/Voice Modem (Worldwide)
+	1055  HCF 56k Data/Fax/Voice/Spkp (w/Handset) Modem (Worldwide)
+	1056  HCF 56k Data/Fax/Voice/Spkp Modem (Worldwide)
+	1057  HCF 56k Data/Fax/Voice/Spkp Modem (Worldwide)
+	1059  HCF 56k Data/Fax/Voice Modem (Worldwide)
+	1063  HCF 56k Data/Fax Modem
+	1064  HCF 56k Data/Fax/Voice Modem
+	1065  HCF 56k Data/Fax/Voice/Spkp (w/Handset) Modem
+	1066  HCF 56k Data/Fax/Voice/Spkp Modem
+		122d 4033  Dell Athena - MDP3900V-U # Aztech
+	1433  HCF 56k Data/Fax Modem
+	1434  HCF 56k Data/Fax/Voice Modem
+	1435  HCF 56k Data/Fax/Voice/Spkp (w/Handset) Modem
+	1436  HCF 56k Data/Fax Modem
+	1453  HCF 56k Data/Fax Modem
+		13e0 0240  IBM # GVC
+		13e0 0250  IBM # GVC
+		144f 1502  IBM P95-DF # Askey
+		144f 1503  IBM P95-DF # Askey
+	1454  HCF 56k Data/Fax/Voice Modem
+	1455  HCF 56k Data/Fax/Voice/Spkp (w/Handset) Modem
+	1456  HCF 56k Data/Fax/Voice/Spkp Modem
+		122d 4035  Dell Europa - MDP3900V-W # Aztech
+		122d 4302  MP3930V-W(C) MiniPCI # Aztech
+	1803  HCF 56k Modem
+		0e11 0023 623-LAN Grizzly # Compaq
+		0e11 0043 623-LAN Yogi # Compaq
+	1815  HCF 56k Modem
+		0e11 0022  Grizzly # Compaq
+		0e11 0042  Yogi # Compaq
+	2003  HSF 56k Data/Fax Modem
+	2004  HSF 56k Data/Fax/Voice Modem
+	2005  HSF 56k Data/Fax/Voice/Spkp (w/Handset) Modem
+	2006  HSF 56k Data/Fax/Voice/Spkp Modem
+	2013  HSF 56k Data/Fax Modem
+		0e11 b195  Bear # Compaq
+		0e11 b196  Seminole 1 # Compaq
+		0e11 b1be  Seminole 2 # Compaq
+		1025 8013  Acer
+		1033 809d  NEC
+		1033 80bc  NEC
+		155d 6793  HP
+		155d 8850  E Machines
+	2014  HSF 56k Data/Fax/Voice Modem
+	2015  HSF 56k Data/Fax/Voice/Spkp (w/Handset) Modem
+	2016  HSF 56k Data/Fax/Voice/Spkp Modem
+	2043  HSF 56k Data/Fax Modem (Worldwide SmartDAA)
+	2044  HSF 56k Data/Fax/Voice Modem (Worldwide SmartDAA)
+	2045  HSF 56k Data/Fax/Voice/Spkp (w/Handset) Modem (Worldwide SmartDAA)
+	2046  HSF 56k Data/Fax/Voice/Spkp Modem (Worldwide SmartDAA)
+	2063  HSF 56k Data/Fax Modem (SmartDAA)
+	2064  HSF 56k Data/Fax/Voice Modem (SmartDAA)
+	2065  HSF 56k Data/Fax/Voice/Spkp (w/Handset) Modem (SmartDAA)
+	2066  HSF 56k Data/Fax/Voice/Spkp Modem (SmartDAA)
+	2093  HSF 56k Modem
+		155d 2f07  Legend
+	2143  HSF 56k Data/Fax/Cell Modem (Mobile Worldwide SmartDAA)
+	2144  HSF 56k Data/Fax/Voice/Cell Modem (Mobile Worldwide SmartDAA)
+	2145  HSF 56k Data/Fax/Voice/Spkp (w/HS)/Cell Modem (Mob WW SmartDAA)
+	2146  HSF 56k Data/Fax/Voice/Spkp/Cell Modem (Mobile Worldwide SmartDAA)
+	2163  HSF 56k Data/Fax/Cell Modem (Mobile SmartDAA)
+	2164  HSF 56k Data/Fax/Voice/Cell Modem (Mobile SmartDAA)
+	2165  HSF 56k Data/Fax/Voice/Spkp (w/Handset)/Cell Modem (Mobile SmartDAA)
+	2166  HSF 56k Data/Fax/Voice/Spkp/Cell Modem (Mobile SmartDAA)
+	2343  HSF 56k Data/Fax CardBus Modem (Mobile Worldwide SmartDAA)
+	2344  HSF 56k Data/Fax/Voice CardBus Modem (Mobile Worldwide SmartDAA)
+	2345  HSF 56k Data/Fax/Voice/Spkp (w/HS) CardBus Modem (Mob WW SmartDAA)
+	2346  HSF 56k Data/Fax/Voice/Spkp CardBus Modem (Mobile Worldwide SmartDAA)
+	2363  HSF 56k Data/Fax CardBus Modem (Mobile SmartDAA)
+	2364  HSF 56k Data/Fax/Voice CardBus Modem (Mobile SmartDAA)
+	2365  HSF 56k Data/Fax/Voice/Spkp (w/HS) CardBus Modem (Mob SmartDAA)
+	2366  HSF 56k Data/Fax/Voice/Spkp CardBus Modem (Mobile SmartDAA)
+	2443  HSF 56k Data/Fax Modem (Mobile Worldwide SmartDAA)
+		104d 8075  Modem # Sony
+		104d 8083  Modem # Sony
+		104d 8097  Modem # Sony
+	2444  HSF 56k Data/Fax/Voice Modem (Mobile Worldwide SmartDAA)
+	2445  HSF 56k Data/Fax/Voice/Spkp (w/HS) Modem (Mobile WW SmartDAA)
+	2446  HSF 56k Data/Fax/Voice/Spkp Modem (Mobile Worldwide SmartDAA)
+	2463  HSF 56k Data/Fax Modem (Mobile SmartDAA)
+	2464  HSF 56k Data/Fax/Voice Modem (Mobile SmartDAA)
+	2465  HSF 56k Data/Fax/Voice/Spkp (w/Handset) Modem (Mobile SmartDAA)
+	2466  HSF 56k Data/Fax/Voice/Spkp Modem (Mobile SmartDAA)
+	2f00  HSF 56k HSFi Modem
+		13e0 8d84  IBM HSFi V.90
+		13e0 8d85  Compaq Stinger
 14f2  MOBILITY Electronics
 14f3  BROADLOGIC
 14f4  TOKYO Electronic Industry CO Ltd

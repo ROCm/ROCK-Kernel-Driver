@@ -246,3 +246,4 @@ module_exit(keybdev_exit);
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@suse.cz>");
 MODULE_DESCRIPTION("Input driver to keyboard driver binding");
 MODULE_PARM(jp_kbd_109, "i");
+MODULE_LICENSE("GPL");

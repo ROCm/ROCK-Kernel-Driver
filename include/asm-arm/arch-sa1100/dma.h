@@ -109,8 +109,13 @@ extern int sa1111_check_dma_bug( dma_addr_t addr );
 static inline void
 __arch_adjust_zones(int node, unsigned long *size, unsigned long *holes)
 {
-	size[1] = size[0] - 256;
-	size[0] = 256;
+	unsigned int sz = 256;
+
+	if (node != 0)
+		sz = 0;
+
+	size[1] = size[0] - sz;
+	size[0] = sz;
 }
 
 #define arch_adjust_zones(node,size,holes) __arch_adjust_zones(node,size,holes)

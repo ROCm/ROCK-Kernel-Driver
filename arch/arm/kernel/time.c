@@ -33,7 +33,6 @@
 #include <asm/hardware.h>
 
 extern int setup_arm_irq(int, struct irqaction *);
-extern void setup_timer(void);
 extern rwlock_t xtime_lock;
 extern unsigned long wall_jiffies;
 

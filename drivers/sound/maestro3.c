@@ -172,7 +172,7 @@
 #define SND_DEV_DSP16       5 
    
 #ifdef M_DEBUG
-static int debug=0;
+static int debug;
 #define DPMOD   1   /* per module load */
 #define DPSTR   2   /* per 'stream' */
 #define DPSYS   3   /* per syscall */
@@ -365,7 +365,7 @@ ld2(unsigned int x)
     return r;
 }
 
-static struct m3_card *devs = NULL;
+static struct m3_card *devs;
 
 /*
  * I'm not very good at laying out functions in a file :)
@@ -1289,7 +1289,7 @@ static int drain_dac(struct m3_state *s, int nonblock)
 
     if (s->dma_dac.mapped || !s->dma_dac.ready)
         return 0;
-    current->state = TASK_INTERRUPTIBLE;
+    set_current_state(TASK_INTERRUPTIBLE);
     add_wait_queue(&s->dma_dac.wait, &wait);
     for (;;) {
         spin_lock_irqsave(&s->lock, flags);
@@ -1301,7 +1301,7 @@ static int drain_dac(struct m3_state *s, int nonblock)
             break;
         if (nonblock) {
             remove_wait_queue(&s->dma_dac.wait, &wait);
-            current->state = TASK_RUNNING;
+            set_current_state(TASK_RUNNING);
             return -EBUSY;
         }
         tmo = (count * HZ) / s->ratedac;
@@ -1312,7 +1312,7 @@ static int drain_dac(struct m3_state *s, int nonblock)
             DPRINTK(DPCRAP,"dma timed out?? %ld\n",jiffies);
     }
     remove_wait_queue(&s->dma_dac.wait, &wait);
-    current->state = TASK_RUNNING;
+    set_current_state(TASK_RUNNING);
     if (signal_pending(current))
             return -ERESTARTSYS;
     return 0;
@@ -2251,7 +2251,7 @@ static void m3_codec_reset(struct m3_card *card, int busywait)
         if(busywait)  {
             mdelay(delay1);
         } else {
-            current->state = TASK_UNINTERRUPTIBLE;
+            set_current_state(TASK_UNINTERRUPTIBLE);
             schedule_timeout((delay1 * HZ) / 1000);
         }
 
@@ -2264,7 +2264,7 @@ static void m3_codec_reset(struct m3_card *card, int busywait)
         if(busywait) {
             mdelay(delay2);
         } else {
-            current->state = TASK_UNINTERRUPTIBLE;
+            set_current_state(TASK_UNINTERRUPTIBLE);
             schedule_timeout((delay2 * HZ) / 1000);
         }
         if(! try_read_vendor(card))
@@ -2958,8 +2958,8 @@ void check_suspend(struct m3_card *card)
 
     card->in_suspend++;
     add_wait_queue(&card->suspend_queue, &wait);
-    current->state = TASK_UNINTERRUPTIBLE;
+    set_current_state(TASK_UNINTERRUPTIBLE);
     schedule();
     remove_wait_queue(&card->suspend_queue, &wait);
-    current->state = TASK_RUNNING;
+    set_current_state(TASK_RUNNING);
 }

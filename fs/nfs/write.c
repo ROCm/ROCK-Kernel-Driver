@@ -109,7 +109,7 @@ static kmem_cache_t *nfs_wdata_cachep;
 static __inline__ struct nfs_page *nfs_page_alloc(void)
 {
 	struct nfs_page	*p;
-	p = kmem_cache_alloc(nfs_page_cachep, SLAB_KERNEL);
+	p = kmem_cache_alloc(nfs_page_cachep, SLAB_NOFS);
 	if (p) {
 		memset(p, 0, sizeof(*p));
 		INIT_LIST_HEAD(&p->wb_hash);
@@ -127,7 +127,7 @@ static __inline__ void nfs_page_free(struct nfs_page *p)
 static __inline__ struct nfs_write_data *nfs_writedata_alloc(void)
 {
 	struct nfs_write_data	*p;
-	p = kmem_cache_alloc(nfs_wdata_cachep, SLAB_NFS);
+	p = kmem_cache_alloc(nfs_wdata_cachep, SLAB_NOFS);
 	if (p) {
 		memset(p, 0, sizeof(*p));
 		INIT_LIST_HEAD(&p->pages);

@@ -964,3 +964,4 @@ static ssize_t pt_write(struct file * filp, const char * buf,
 
 /* end of pt.c */
 
+MODULE_LICENSE("GPL");

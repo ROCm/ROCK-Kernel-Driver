@@ -13,10 +13,8 @@ struct ucontext {
 	unsigned long	  uc_flags;
 	struct ucontext  *uc_link;
 	stack_t		  uc_stack;
+	_sigregs          uc_mcontext;
 	sigset_t	  uc_sigmask;	/* mask last for extensibility */
-	struct sigcontext *sc; /* Added for pthread support */
 };
-
-
 
 #endif /* !_ASM_S390_UCONTEXT_H */

@@ -11,14 +11,6 @@
  */
 #include <linux/config.h>
 
-#define cyber2000_outb(dat,reg)	writeb(dat, CyberRegs + reg)
-#define cyber2000_outw(dat,reg)	writew(dat, CyberRegs + reg)
-#define cyber2000_outl(dat,reg)	writel(dat, CyberRegs + reg)
-
-#define cyber2000_inb(reg)	readb(CyberRegs + reg)
-#define cyber2000_inw(reg)	readw(CyberRegs + reg)
-#define cyber2000_inl(reg)	readl(CyberRegs + reg)
-
 /*
  * Internal CyberPro sizes and offsets.
  */
@@ -30,6 +22,7 @@
 #if defined(DEBUG) && defined(CONFIG_DEBUG_LL)
 static void debug_printf(char *fmt, ...)
 {
+	extern void printascii(const char *);
 	char buffer[128];
 	va_list ap;
 
@@ -42,38 +35,6 @@ static void debug_printf(char *fmt, ...)
 #else
 #define debug_printf(x...) do { } while (0)
 #endif
-
-static inline void cyber2000_crtcw(int reg, int val)
-{
-	cyber2000_outb(reg, 0x3d4);
-	cyber2000_outb(val, 0x3d5);
-}
-
-static inline void cyber2000_grphw(int reg, int val)
-{
-	cyber2000_outb(reg, 0x3ce);
-	cyber2000_outb(val, 0x3cf);
-}
-
-static inline unsigned int cyber2000_grphr(int reg)
-{
-	cyber2000_outb(reg, 0x3ce);
-	return cyber2000_inb(0x3cf);
-}
-
-static inline void cyber2000_attrw(int reg, int val)
-{
-	cyber2000_inb(0x3da);
-	cyber2000_outb(reg, 0x3c0);
-	cyber2000_inb(0x3c1);
-	cyber2000_outb(val, 0x3c0);
-}
-
-static inline void cyber2000_seqw(int reg, int val)
-{
-	cyber2000_outb(reg, 0x3c4);
-	cyber2000_outb(val, 0x3c5);
-}
 
 #define PIXFORMAT_8BPP		0
 #define PIXFORMAT_16BPP		1
@@ -166,6 +127,7 @@ static inline void cyber2000_seqw(int reg, int val)
 
 #define DCLK_MULT		0xb0
 #define DCLK_DIV		0xb1
+#define DCLK_DIV_VFSEL			0x20
 #define MCLK_MULT		0xb2
 #define MCLK_DIV		0xb3
 

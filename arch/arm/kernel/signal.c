@@ -1,7 +1,7 @@
 /*
  *  linux/arch/arm/kernel/signal.c
  *
- *  Copyright (C) 1995, 1996 Russell King
+ *  Copyright (C) 1995-2001 Russell King
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -19,7 +19,9 @@
 #include <linux/ptrace.h>
 #include <linux/stddef.h>
 #include <linux/unistd.h>
+#include <linux/personality.h>
 #include <linux/tty.h>
+#include <linux/elf.h>
 
 #include <asm/pgalloc.h>
 #include <asm/ucontext.h>
@@ -29,8 +31,23 @@
 
 #define _BLOCKABLE (~(sigmask(SIGKILL) | sigmask(SIGSTOP)))
 
-#define SWI_SYS_SIGRETURN (0xef000000|(__NR_sigreturn))
-#define SWI_SYS_RT_SIGRETURN (0xef000000|(__NR_rt_sigreturn))
+/*
+ * For ARM syscalls, we encode the syscall number into the instruction.
+ */
+#define SWI_SYS_SIGRETURN	(0xef000000|(__NR_sigreturn))
+#define SWI_SYS_RT_SIGRETURN	(0xef000000|(__NR_rt_sigreturn))
+
+/*
+ * For Thumb syscalls, we pass the syscall number via r7.  We therefore
+ * need two 16-bit instructions.
+ */
+#define SWI_THUMB_SIGRETURN	(0xdf00 << 16 | 0x2700 | (__NR_sigreturn - __NR_SYSCALL_BASE))
+#define SWI_THUMB_RT_SIGRETURN	(0xdf00 << 16 | 0x2700 | (__NR_rt_sigreturn - __NR_SYSCALL_BASE))
+
+static const unsigned long retcodes[4] = {
+	SWI_SYS_SIGRETURN,	SWI_THUMB_SIGRETURN,
+	SWI_SYS_RT_SIGRETURN,	SWI_THUMB_RT_SIGRETURN
+};
 
 asmlinkage int do_signal(sigset_t *oldset, struct pt_regs * regs, int syscall);
 
@@ -208,11 +225,11 @@ asmlinkage int sys_sigreturn(struct pt_regs *regs)
 	sigset_t set;
 
 	/*
-	 * Since we stacked the signal on a word boundary,
+	 * Since we stacked the signal on a 64-bit boundary,
 	 * then 'sp' should be word aligned here.  If it's
 	 * not, then the user is trying to mess with us.
 	 */
-	if (regs->ARM_sp & 3)
+	if (regs->ARM_sp & 7)
 		goto badframe;
 
 	frame = (struct sigframe *)regs->ARM_sp;
@@ -251,11 +268,11 @@ asmlinkage int sys_rt_sigreturn(struct pt_regs *regs)
 	sigset_t set;
 
 	/*
-	 * Since we stacked the signal on a word boundary,
+	 * Since we stacked the signal on a 64-bit boundary,
 	 * then 'sp' should be word aligned here.  If it's
 	 * not, then the user is trying to mess with us.
 	 */
-	if (regs->ARM_sp & 3)
+	if (regs->ARM_sp & 7)
 		goto badframe;
 
 	frame = (struct rt_sigframe *)regs->ARM_sp;
@@ -319,8 +336,8 @@ setup_sigcontext(struct sigcontext *sc, /*struct _fpstate *fpstate,*/
 	return err;
 }
 
-static inline void *get_sigframe(struct k_sigaction *ka, struct pt_regs *regs,
-				 unsigned long framesize)
+static inline void *
+get_sigframe(struct k_sigaction *ka, struct pt_regs *regs, int framesize)
 {
 	unsigned long sp = regs->ARM_sp;
 
@@ -331,24 +348,80 @@ static inline void *get_sigframe(struct k_sigaction *ka, struct pt_regs *regs,
 		sp = current->sas_ss_sp + current->sas_ss_size;
 
 	/*
-	 * No matter what happens, 'sp' must be word
-	 * aligned otherwise nasty things could happen
+	 * ATPCS B01 mandates 8-byte alignment
 	 */
-	/* ATPCS B01 mandates 8-byte alignment */
 	return (void *)((sp - framesize) & ~7);
 }
 
-static void setup_frame(int sig, struct k_sigaction *ka,
-			sigset_t *set, struct pt_regs *regs)
+static int
+setup_return(struct pt_regs *regs, struct k_sigaction *ka,
+	     unsigned long *rc, void *frame, int usig)
 {
-	struct sigframe *frame;
+	unsigned long handler = (unsigned long)ka->sa.sa_handler;
 	unsigned long retcode;
+	int thumb = 0;
+#ifdef CONFIG_CPU_32
+	unsigned long cpsr = regs->ARM_cpsr;
+
+	/*
+	 * Maybe we need to deliver a 32-bit signal to a 26-bit task.
+	 */
+	if (ka->sa.sa_flags & SA_THIRTYTWO)
+		cpsr = (cpsr & ~MODE_MASK) | USR_MODE;
+
+#ifdef CONFIG_ARM_THUMB
+	if (elf_hwcap & HWCAP_THUMB) {
+		/*
+		 * The LSB of the handler determines if we're going to
+		 * be using THUMB or ARM mode for this signal handler.
+		 */
+		thumb = handler & 1;
+
+		if (thumb)
+			cpsr |= T_BIT;
+		else
+			cpsr &= ~T_BIT;
+	}
+#endif
+#endif
+
+	if (ka->sa.sa_flags & SA_RESTORER) {
+		retcode = (unsigned long)ka->sa.sa_restorer;
+	} else {
+		unsigned int idx = thumb;
+
+		if (ka->sa.sa_flags & SA_SIGINFO)
+			idx += 2;
+
+		if (__put_user(retcodes[idx], rc))
+			return 1;
+
+		flush_icache_range((unsigned long)rc,
+				   (unsigned long)(rc + 1));
+
+		retcode = ((unsigned long)rc) + thumb;
+	}
+
+	regs->ARM_r0 = usig;
+	regs->ARM_sp = (unsigned long)frame;
+	regs->ARM_lr = retcode;
+	regs->ARM_pc = handler & (thumb ? ~1 : ~3);
+
+#ifdef CONFIG_CPU_32
+	regs->ARM_cpsr = cpsr;
+#endif
+
+	return 0;
+}
+
+static int
+setup_frame(int usig, struct k_sigaction *ka, sigset_t *set, struct pt_regs *regs)
+{
+	struct sigframe *frame = get_sigframe(ka, regs, sizeof(*frame));
 	int err = 0;
 
-	frame = get_sigframe(ka, regs, sizeof(*frame));
-
 	if (!access_ok(VERIFY_WRITE, frame, sizeof (*frame)))
-		goto segv_and_exit;
+		return 1;
 
 	err |= setup_sigcontext(&frame->sc, /*&frame->fpstate,*/ regs, set->sig[0]);
 
@@ -357,51 +430,21 @@ static void setup_frame(int sig, struct k_sigaction *ka,
 				      sizeof(frame->extramask));
 	}
 
-	/* Set up to return from userspace.  If provided, use a stub
-	   already in userspace.  */
-	if (ka->sa.sa_flags & SA_RESTORER) {
-		retcode = (unsigned long)ka->sa.sa_restorer;
-	} else {
-		retcode = (unsigned long)&frame->retcode;
-		__put_user_error(SWI_SYS_SIGRETURN, &frame->retcode, err);
-		flush_icache_range(retcode, retcode + 4);
-	}
+	if (err == 0)
+		err = setup_return(regs, ka, &frame->retcode, frame, usig);
 
-	if (err)
-		goto segv_and_exit;
-
-	if (current->exec_domain && current->exec_domain->signal_invmap && sig < 32)
-		regs->ARM_r0 = current->exec_domain->signal_invmap[sig];
-	else
-		regs->ARM_r0 = sig;
-	regs->ARM_sp = (unsigned long)frame;
-	regs->ARM_lr = retcode;
-	regs->ARM_pc = (unsigned long)ka->sa.sa_handler;
-#if defined(CONFIG_CPU_32)
-	/* Maybe we need to deliver a 32-bit signal to a 26-bit task. */
-	if (ka->sa.sa_flags & SA_THIRTYTWO)
-		regs->ARM_cpsr = USR_MODE;
-#endif
-	if (valid_user_regs(regs))
-		return;
-
-segv_and_exit:
-	if (sig == SIGSEGV)
-		ka->sa.sa_handler = SIG_DFL;
-	force_sig(SIGSEGV, current);
+	return err;
 }
 
-static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
-			   sigset_t *set, struct pt_regs *regs)
+static int
+setup_rt_frame(int usig, struct k_sigaction *ka, siginfo_t *info,
+	       sigset_t *set, struct pt_regs *regs)
 {
-	struct rt_sigframe *frame;
-	unsigned long retcode;
+	struct rt_sigframe *frame = get_sigframe(ka, regs, sizeof(*frame));
 	int err = 0;
 
-	frame = get_sigframe(ka, regs, sizeof(struct rt_sigframe));
-
 	if (!access_ok(VERIFY_WRITE, frame, sizeof (*frame)))
-		goto segv_and_exit;
+		return 1;
 
 	__put_user_error(&frame->info, &frame->pinfo, err);
 	__put_user_error(&frame->uc, &frame->puc, err);
@@ -414,47 +457,20 @@ static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 				regs, set->sig[0]);
 	err |= __copy_to_user(&frame->uc.uc_sigmask, set, sizeof(*set));
 
-	/* Set up to return from userspace.  If provided, use a stub
-	   already in userspace.  */
-	if (ka->sa.sa_flags & SA_RESTORER) {
-		retcode = (unsigned long)ka->sa.sa_restorer;
-	} else {
-		retcode = (unsigned long)&frame->retcode;
-		__put_user_error(SWI_SYS_RT_SIGRETURN, &frame->retcode, err);
-		flush_icache_range(retcode, retcode + 4);
+	if (err == 0)
+		err = setup_return(regs, ka, &frame->retcode, frame, usig);
+
+	if (err == 0) {
+		/*
+		 * For realtime signals we must also set the second and third
+		 * arguments for the signal handler.
+		 *   -- Peter Maydell <pmaydell@chiark.greenend.org.uk> 2000-12-06
+		 */
+		regs->ARM_r1 = (unsigned long)frame->pinfo;
+		regs->ARM_r2 = (unsigned long)frame->puc;
 	}
 
-	if (err)
-		goto segv_and_exit;
-
-	if (current->exec_domain && current->exec_domain->signal_invmap && sig < 32)
-		regs->ARM_r0 = current->exec_domain->signal_invmap[sig];
-	else
-		regs->ARM_r0 = sig;
-
-	/*
-	 * For realtime signals we must also set the second and third
-	 * arguments for the signal handler.
-	 *   -- Peter Maydell <pmaydell@chiark.greenend.org.uk> 2000-12-06
-	 */
-	regs->ARM_r1 = (unsigned long)frame->pinfo;
-	regs->ARM_r2 = (unsigned long)frame->puc;
-
-	regs->ARM_sp = (unsigned long)frame;
-	regs->ARM_lr = retcode;
-	regs->ARM_pc = (unsigned long)ka->sa.sa_handler;
-#if defined(CONFIG_CPU_32)
-	/* Maybe we need to deliver a 32-bit signal to a 26-bit task. */
-	if (ka->sa.sa_flags & SA_THIRTYTWO)
-		regs->ARM_cpsr = USR_MODE;
-#endif
-	if (valid_user_regs(regs))
-		return;
-
-segv_and_exit:
-	if (sig == SIGSEGV)
-		ka->sa.sa_handler = SIG_DFL;
-	force_sig(SIGSEGV, current);
+	return err;
 }
 
 /*
@@ -464,22 +480,47 @@ static void
 handle_signal(unsigned long sig, struct k_sigaction *ka,
 	      siginfo_t *info, sigset_t *oldset, struct pt_regs * regs)
 {
-	/* Set up the stack frame */
+	struct task_struct *tsk = current;
+	int usig = sig;
+	int ret;
+
+	/*
+	 * translate the signal
+	 */
+	if (usig < 32 && tsk->exec_domain && tsk->exec_domain->signal_invmap)
+		usig = tsk->exec_domain->signal_invmap[usig];
+
+	/*
+	 * Set up the stack frame
+	 */
 	if (ka->sa.sa_flags & SA_SIGINFO)
-		setup_rt_frame(sig, ka, info, oldset, regs);
+		ret = setup_rt_frame(usig, ka, info, oldset, regs);
 	else
-		setup_frame(sig, ka, oldset, regs);
+		ret = setup_frame(usig, ka, oldset, regs);
 
-	if (ka->sa.sa_flags & SA_ONESHOT)
-		ka->sa.sa_handler = SIG_DFL;
+	/*
+	 * Check that the resulting registers are actually sane.
+	 */
+	ret |= !valid_user_regs(regs);
 
-	if (!(ka->sa.sa_flags & SA_NODEFER)) {
-		spin_lock_irq(&current->sigmask_lock);
-		sigorsets(&current->blocked,&current->blocked,&ka->sa.sa_mask);
-		sigaddset(&current->blocked,sig);
-		recalc_sigpending(current);
-		spin_unlock_irq(&current->sigmask_lock);
+	if (ret == 0) {
+		if (ka->sa.sa_flags & SA_ONESHOT)
+			ka->sa.sa_handler = SIG_DFL;
+
+		if (!(ka->sa.sa_flags & SA_NODEFER)) {
+			spin_lock_irq(&tsk->sigmask_lock);
+			sigorsets(&tsk->blocked, &tsk->blocked,
+				  &ka->sa.sa_mask);
+			sigaddset(&tsk->blocked, sig);
+			recalc_sigpending(tsk);
+			spin_unlock_irq(&tsk->sigmask_lock);
+		}
+		return;
 	}
+
+	if (sig == SIGSEGV)
+		ka->sa.sa_handler = SIG_DFL;
+	force_sig(SIGSEGV, tsk);
 }
 
 /*

@@ -63,29 +63,6 @@ LIST_HEAD(videodev_proc_list);
 #endif /* CONFIG_PROC_FS && CONFIG_VIDEO_PROC_FS */
 
 
-#ifdef CONFIG_VIDEO_BWQCAM
-extern int init_bw_qcams(struct video_init *);
-#endif
-#ifdef CONFIG_VIDEO_CPIA
-extern int cpia_init(struct video_init *);
-#endif
-#ifdef CONFIG_VIDEO_PLANB
-extern int init_planbs(struct video_init *);
-#endif
-
-static struct video_init video_init_list[]={
-#ifdef CONFIG_VIDEO_BWQCAM
-	{"bw-qcam", init_bw_qcams},
-#endif	
-#ifdef CONFIG_VIDEO_CPIA
-	{"cpia", cpia_init},
-#endif	
-#ifdef CONFIG_VIDEO_PLANB
-	{"planb", init_planbs},
-#endif
-	{"end", NULL}
-};
-
 /*
  *	Read will do some smarts later on. Buffer pin etc.
  */
@@ -118,7 +95,7 @@ static ssize_t video_write(struct file *file, const char *buf,
 
 /*
  *	Poll to see if we're readable, can probably be used for timing on incoming
- *  frames, etc..
+ *	frames, etc..
  */
 
 static unsigned int video_poll(struct file *file, poll_table * wait)
@@ -222,8 +199,7 @@ static int video_ioctl(struct inode *inode, struct file *file,
 /*
  *	We need to do MMAP support
  */
- 
- 
+  
 int video_mmap(struct file *file, struct vm_area_struct *vma)
 {
 	int ret = -EINVAL;
@@ -548,8 +524,6 @@ static struct file_operations video_fops=
  
 static int __init videodev_init(void)
 {
-	struct video_init *vfli = video_init_list;
-	
 	printk(KERN_INFO "Linux video capture interface: v1.00\n");
 	if(devfs_register_chrdev(VIDEO_MAJOR,"video_capture", &video_fops))
 	{
@@ -557,19 +531,10 @@ static int __init videodev_init(void)
 		return -EIO;
 	}
 
-	/*
-	 *	Init kernel installed video drivers
-	 */
-	 	
 #if defined(CONFIG_PROC_FS) && defined(CONFIG_VIDEO_PROC_FS)
 	videodev_proc_create ();
 #endif
 	
-	while(vfli->init!=NULL)
-	{
-		vfli->init(vfli);
-		vfli++;
-	}
 	return 0;
 }
 

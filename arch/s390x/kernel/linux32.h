@@ -237,8 +237,8 @@ struct ucontext32 {
 	__u32			uc_flags;
 	__u32			uc_link;	/* pointer */	
 	stack_t32		uc_stack;
+	_sigregs32		uc_mcontext;
 	sigset_t32		uc_sigmask;	/* mask last for extensibility */
-	__u32			sc;		/* pointer */
 };
 
 #endif /* !CONFIG_S390_SUPPORT */

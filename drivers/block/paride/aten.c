@@ -171,3 +171,4 @@ void    cleanup_module(void)
 #endif
 
 /* end of aten.c */
+MODULE_LICENSE("GPL");

@@ -108,6 +108,7 @@ ENTRY(cpu_arm720_tlb_invalidate_page)
  * Function: arm720_data_abort ()
  *
  * Params  : r0 = address of aborted instruction
+ *         : r3 = saved SPSR
  *
  * Purpose : obtain information about current aborted instruction
  *
@@ -143,6 +144,8 @@ Ldata_simple:	mrc	p15, 0, r0, c6, c0, 0		@ get FAR
 		mov	pc, lr
 
 ENTRY(cpu_arm720_data_abort)
+		tst	r3, #T_BIT
+		bne	.data_thumb_abort
 		ldr	r4, [r0]			@ read instruction causing problem
 		tst	r4, r4, lsr #21			@ C = bit 20
 		sbc	r1, r1, r1			@ r1 = C - 1
@@ -169,7 +172,7 @@ ENTRY(cpu_arm720_data_abort)
 Ldata_unknown:	@ Part of jumptable
 		mov	r0, r2
 		mov	r1, r4
-		mov	r2, r3
+		mov	r2, sp
 		bl	baddataabort
 		b	ret_from_exception
 
@@ -254,6 +257,77 @@ Ldata_lateldrpostreg:
 		subne	r7, r0, r2
 		addeq	r7, r0, r2
 		b	Ldata_saver7
+
+.data_thumb_abort:
+		ldrh	r4, [r0]			@ read instruction
+		tst	r4, r4, lsr #12			@ C = bit 11
+		sbc	r1, r1, r1			@ r1 = C - 1
+		and	r2, r4, #15 << 12
+		add	pc, pc, r2, lsr #10		@ lookup in table
+		nop
+
+/* 0 */		b	Ldata_unknown
+/* 1 */		b	Ldata_unknown
+/* 2 */		b	Ldata_unknown
+/* 3 */		b	Ldata_unknown
+/* 4 */		b	Ldata_unknown
+/* 5 */		b	.data_thumb_reg
+/* 6 */		b	Ldata_simple
+/* 7 */		b	Ldata_simple
+/* 8 */		b	Ldata_simple
+/* 9 */		b	Ldata_simple
+/* A */		b	Ldata_unknown
+/* B */		b	.data_thumb_pushpop
+/* C */		b	.data_thumb_ldmstm
+/* D */		b	Ldata_unknown
+/* E */		b	Ldata_unknown
+/* F */		b	Ldata_unknown
+
+.data_thumb_reg:
+		tst	r4, #1 << 9
+		beq	Ldata_simple
+		tst	r4, #1 << 10		@ If 'S' (signed) bit is set
+		movne	r1, #0			@ it must be a load instr
+		b	Ldata_simple
+
+.data_thumb_pushpop:
+		tst	r4, #1 << 10
+		beq	Ldata_unknown
+		mov	r7, #0x11
+		and	r0, r4, r7
+		and	r2, r4, r7, lsl #1
+		add	r0, r0, r2, lsr #1
+		and	r2, r4, r7, lsl #2
+		add	r0, r0, r2, lsr #2
+		and	r2, r4, r7, lsl #3
+		add	r0, r0, r2, lsr #3
+		add	r0, r0, r0, lsr #4
+		and	r2, r4, #0x0100			@ catch 'R' bit for push/pop
+		add	r0, r0, r2, lsr #8
+		and	r0, r0, #15			@ number of regs to transfer
+		ldr	r7, [sp, #13 << 2]
+		tst	r4, #1 << 11
+		addne	r7, r7, r0, lsl #2		@ increment SP if PUSH
+		subeq	r7, r7, r0, lsr #2		@ decrement SP if POP
+		str	r7, [sp, #13 << 2]
+		b	Ldata_simple
+
+.data_thumb_ldmstm:
+		mov	r7, #0x11
+		and	r0, r4, r7
+		and	r2, r4, r7, lsl #1
+		add	r0, r0, r2, lsr #1
+		and	r2, r4, r7, lsl #2
+		add	r0, r0, r2, lsr #2
+		and	r2, r4, r7, lsl #3
+		add	r0, r0, r2, lsr #3
+		add	r0, r0, r0, lsr #4
+		and	r0, r0, #15			@ number of regs to transfer
+		and	r5, r4, #7 << 8
+		ldr	r7, [sp, r5, lsr #6]
+		sub	r7, r7, r0, lsr #2		@ always decrement
+		str	r7, [sp, r5, lsr #6]
+		b	Ldata_simple
 
 /*
  * Function: arm720_check_bugs (void)
@@ -437,7 +511,7 @@ cpu_elf_name:	.asciz	"v4"
 		.align
 
 /*
- * See /include/asm-arm for a definition of this structure.
+ * See linux/include/asm-arm/procinfo.h for a definition of this structure.
  */
 	
 		.section ".proc.info", #alloc, #execinstr
@@ -450,7 +524,7 @@ __arm720_proc_info:
 		b	__arm720_setup				@ cpu_flush
 		.long	cpu_arch_name				@ arch_name
 		.long	cpu_elf_name				@ elf_name
-		.long	HWCAP_SWP | HWCAP_HALF | HWCAP_26BIT	@ elf_hwcap
+		.long	HWCAP_SWP | HWCAP_HALF | HWCAP_THUMB | HWCAP_26BIT	@ elf_hwcap
 		.long	cpu_arm720_info				@ info
 		.long	arm720_processor_functions
 		.size	__arm720_proc_info, . - __arm720_proc_info

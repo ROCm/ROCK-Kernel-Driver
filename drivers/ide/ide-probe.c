@@ -928,4 +928,5 @@ void cleanup_module (void)
 {
 	ide_probe = NULL;
 }
+MODULE_LICENSE("GPL");
 #endif /* MODULE */

@@ -418,5 +418,4 @@ __lookup_architecture_type:
 		mov	r7, #0				@ unknown architecture
 		mov	pc, lr
 2:		ldmib	r4, {r5, r6, r7}		@ found, get results
-		mov	r7, r7, lsr #18			@ pagetable byte offset
 		mov	pc, lr

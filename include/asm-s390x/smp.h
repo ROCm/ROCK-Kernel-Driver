@@ -26,6 +26,8 @@ typedef struct
 	__u16      cpu;
 } sigp_info;
 
+extern unsigned long cpu_online_map;
+
 #define NO_PROC_ID		0xFF		/* No processor magic marker */
 
 /*
@@ -64,12 +66,5 @@ extern __inline__ __u16 hard_smp_processor_id(void)
 
 void smp_local_timer_interrupt(struct pt_regs * regs);
 
-sigp_ccode smp_ext_call(int cpu, void (*cb)(void *info), void *info, int wait);
-void smp_ext_call_others(void (*cb)(void *info), void *info, int wait);
-sigp_ccode smp_ext_bitcall(int cpu, ec_bit_sig sig);
-void smp_ext_bitcall_others(ec_bit_sig sig);
-
-int smp_signal_others(sigp_order_code order_code,__u32 parameter,
-                      int spin,sigp_info *info);
 #endif
 #endif
