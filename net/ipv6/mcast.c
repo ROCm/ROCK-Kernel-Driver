@@ -141,6 +141,8 @@ int unregister_multicast6_notifier(struct notifier_block *nb)
         return notifier_chain_unregister(&multicast_chain,nb);
 }
 
+EXPORT_SYMBOL(register_multicast6_notifier);
+EXPORT_SYMBOL(unregister_multicast6_notifier);
 
 static void igmp6_join_group(struct ifmcaddr6 *ma);
 static void igmp6_leave_group(struct ifmcaddr6 *ma);
