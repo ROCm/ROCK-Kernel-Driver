@@ -50,10 +50,8 @@ LDFLAGS_vmlinux     += -e _stext
 
 ifdef CONFIG_CPU_LITTLE_ENDIAN
 LDFLAGS_vmlinux     +=  --defsym 'jiffies=jiffies_64' -EL
-LDFLAGS_BLOB    :=--format binary --oformat elf32-sh-linux
 else
 LDFLAGS_vmlinux     +=  --defsym 'jiffies=jiffies_64+4' -EB
-LDFLAGS_BLOB    :=--format binary --oformat elf32-shbig-linux
 endif
 
 CFLAGS		+= -pipe $(cpu-y)

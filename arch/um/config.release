@@ -329,7 +329,7 @@ CONFIG_NLS_DEFAULT="iso8859-1"
 # Kernel hacking
 #
 # CONFIG_DEBUG_SLAB is not set
-# CONFIG_DEBUGSYM is not set
+# CONFIG_DEBUG_INFO is not set
 # CONFIG_PT_PROXY is not set
 # CONFIG_GPROF is not set
 # CONFIG_GCOV is not set

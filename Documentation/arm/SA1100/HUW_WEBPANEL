@@ -7,7 +7,6 @@ To build the kernel:
 	make huw_webpanel_config
 	make oldconfig
 	[accept all defaults]
-	make dep
 	make zImage
 
 Mostly of the work is done by:

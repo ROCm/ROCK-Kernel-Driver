@@ -2981,6 +2981,14 @@ S: #102, 686 W. Maude Ave
 S: Sunyvale, CA 94086
 S: USA
 
+N: Michael Still
+E: mikal@stillhq.com
+W: http://www.stillhq.com
+D: Various janitorial patches
+D: mandocs and mandocs_install build targets
+S: (Email me and ask)
+S: Australia
+
 N: Henrik Storner
 E: storner@image.dk
 W: http://www.image.dk/~storner/

@@ -597,7 +597,6 @@ replacing "/usr/src" with wherever you keep your Linux kernel source tree:
   patch -p0 < BusLogic.patch (only for 2.0.33 and below)
   cd linux
   make config
-  make depend
   make zImage
 
 Then install "arch/i386/boot/zImage" as your standard kernel, run lilo if
