@@ -79,7 +79,7 @@ typedef struct pmac_gpio {
 #ifdef CONFIG_PPC_HAS_FEATURE_CALLS
 	unsigned int addr;
 #else
-	void *addr;
+	void __iomem *addr;
 #endif
 	int active_state;
 } pmac_gpio_t;
@@ -162,7 +162,7 @@ static inline void tumbler_gpio_free(pmac_gpio_t *gp)
 {
 	if (gp->addr) {
 		iounmap(gp->addr);
-		gp->addr = 0;
+		gp->addr = NULL;
 	}
 }
 #endif /* CONFIG_PPC_HAS_FEATURE_CALLS */
@@ -968,7 +968,7 @@ static unsigned long tumbler_find_device(const char *device, pmac_gpio_t *gp, in
 #ifdef CONFIG_PPC_HAS_FEATURE_CALLS
 	gp->addr = (*base) & 0x0000ffff;
 #else
-	gp->addr = (void*)ioremap((unsigned long)(*base), 1);
+	gp->addr = ioremap((unsigned long)(*base), 1);
 #endif
 	base = (u32 *)get_property(node, "audio-gpio-active-state", NULL);
 	if (base)

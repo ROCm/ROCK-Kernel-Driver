@@ -18,7 +18,7 @@
  *
  *
  * This file registers the converters from 32-bit ioctls to 64-bit ones.
- * The converter assumes that a 32-bit user-pointer can be casted by A(x)
+ * The converter assumes that a 32-bit user-pointer can be casted by compat_ptr(x)
  * macro to a valid 64-bit pointer which is accessible via copy_from/to_user.
  *
  */
@@ -47,7 +47,7 @@
 
 
 #define DEFINE_ALSA_IOCTL(type) \
-static int _snd_ioctl32_##type(unsigned int fd, unsigned int cmd, unsigned long arg, struct file *file, unsigned int native_ctl)\
+static inline int _snd_ioctl32_##type(unsigned int fd, unsigned int cmd, unsigned long arg, struct file *file, unsigned int native_ctl)\
 {\
 	struct sndrv_##type##32 data32;\
 	struct sndrv_##type data;\
@@ -72,7 +72,7 @@ static int _snd_ioctl32_##type(unsigned int fd, unsigned int cmd, unsigned long 
 }
 
 #define DEFINE_ALSA_IOCTL_BIG(type) \
-static int _snd_ioctl32_##type(unsigned int fd, unsigned int cmd, unsigned long arg, struct file *file, unsigned int native_ctl)\
+static inline int _snd_ioctl32_##type(unsigned int fd, unsigned int cmd, unsigned long arg, struct file *file, unsigned int native_ctl)\
 {\
 	struct sndrv_##type##32 *data32;\
 	struct sndrv_##type *data;\

@@ -1092,6 +1092,7 @@ static int snd_emu10k1_pcm_efx_voices_mask_put(snd_kcontrol_t * kcontrol, snd_ct
 	emu10k1_t *emu = snd_kcontrol_chip(kcontrol);
 	unsigned int nval[2], bits;
 	int nefx = emu->audigy ? 64 : 32;
+	int nefxb = emu->audigy ? 7 : 6;
 	int change, idx;
 	
 	nval[0] = nval[1] = 0;
@@ -1100,8 +1101,14 @@ static int snd_emu10k1_pcm_efx_voices_mask_put(snd_kcontrol_t * kcontrol, snd_ct
 			nval[idx / 32] |= 1 << (idx % 32);
 			bits++;
 		}
-	if (bits != 1 && bits != 2 && bits != 4 && bits != 8)
+		
+	for (idx = 0; idx < nefxb; idx++)
+		if (1 << idx == bits)
+			break;
+	
+	if (idx >= nefxb)
 		return -EINVAL;
+
 	spin_lock_irq(&emu->reg_lock);
 	change = (nval[0] != emu->efx_voices_mask[0]) ||
 		(nval[1] != emu->efx_voices_mask[1]);
@@ -1185,7 +1192,7 @@ static void fx8010_pb_trans_copy(snd_pcm_substream_t *substream,
 	}
 	snd_emu10k1_fx8010_playback_tram_poke1((unsigned short *)emu->fx8010.etram_pages.area + tram_pos,
 					       (unsigned short *)emu->fx8010.etram_pages.area + tram_pos + tram_size / 2,
-					       src, frames, tram_shift++);
+					       src, frames, tram_shift);
 	tram_pos -= frames;
 	pcm->tram_pos = tram_pos;
 	pcm->tram_shift = tram_shift;
