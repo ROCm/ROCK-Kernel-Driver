@@ -172,7 +172,7 @@ struct alpha_machine_vector sx164_mv __initmv = {
 	init_irq:		sx164_init_irq,
 	init_rtc:		common_init_rtc,
 	init_pci:		sx164_init_pci,
-	kill_arch:		NULL,
+	kill_arch:		cia_kill_arch,
 	pci_map_irq:		sx164_map_irq,
 	pci_swizzle:		common_swizzle,
 };

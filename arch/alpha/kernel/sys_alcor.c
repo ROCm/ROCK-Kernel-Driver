@@ -221,6 +221,8 @@ alcor_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 static void
 alcor_kill_arch(int mode)
 {
+	cia_kill_arch(mode);
+
 	switch(mode) {
 	case LINUX_REBOOT_CMD_RESTART:
 		/* Who said DEC engineer's have no sense of humor? ;-)  */

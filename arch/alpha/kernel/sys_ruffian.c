@@ -85,6 +85,7 @@ ruffian_init_rtc(void)
 static void
 ruffian_kill_arch (int mode)
 {
+	cia_kill_arch(mode);
 #if 0
 	/* This only causes re-entry to ARCSBIOS */
 	/* Perhaps this works for other PYXIS as well?  */

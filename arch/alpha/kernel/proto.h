@@ -24,6 +24,7 @@ extern struct pci_ops cia_pci_ops;
 extern void cia_init_pci(void);
 extern void cia_init_arch(void);
 extern void pyxis_init_arch(void);
+extern void cia_kill_arch(int);
 extern void cia_machine_check(u64, u64, struct pt_regs *);
 extern void cia_pci_tbi(struct pci_controller *, dma_addr_t, dma_addr_t);
 
