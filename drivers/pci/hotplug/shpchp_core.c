@@ -193,7 +193,7 @@ error:
 	return result;
 }
 
-static void cleanup_slots(const struct controller *ctrl)
+static void cleanup_slots(struct controller *ctrl)
 {
 	struct slot *old_slot;
 
