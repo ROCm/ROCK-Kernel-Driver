@@ -20,12 +20,26 @@ extern int isdn_ppp_free(isdn_net_local *);
 extern int isdn_ppp_bind(isdn_net_local *);
 extern int isdn_ppp_xmit(struct sk_buff *, struct net_device *);
 extern void isdn_ppp_receive(isdn_net_dev *, isdn_net_local *, struct sk_buff *);
-extern int isdn_ppp_dev_ioctl(struct net_device *, struct ifreq *, int);
 extern int isdn_ppp_dial_slave(char *);
 extern void isdn_ppp_wakeup_daemon(isdn_net_local *);
 
 extern int isdn_ppp_register_compressor(struct isdn_ppp_compressor *ipc);
 extern int isdn_ppp_unregister_compressor(struct isdn_ppp_compressor *ipc);
+
+#ifdef CONFIG_ISDN_PPP
+
+int isdn_ppp_setup_dev(isdn_net_dev *p);
+
+#else
+
+static inline int
+isdn_ppp_setup_dev(isdn_net_dev *p)
+{
+	printk(KERN_WARNING "ISDN: SyncPPP support not configured\n");
+	return -EINVAL;
+}
+
+#endif
 
 #define IPPP_OPEN	0x01
 #define IPPP_CONNECT	0x02
