@@ -84,7 +84,7 @@
 void pnic2_timer(unsigned long data)
 {
 	struct net_device *dev = (struct net_device *)data;
-	struct tulip_private *tp = (struct tulip_private *)dev->priv;
+	struct tulip_private *tp = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 	int next_tick = 60*HZ;
 
@@ -100,7 +100,7 @@ void pnic2_timer(unsigned long data)
 
 void pnic2_start_nway(struct net_device *dev)
 {
-	struct tulip_private *tp = (struct tulip_private *)dev->priv;
+	struct tulip_private *tp = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
         int csr14;
         int csr12;
@@ -175,7 +175,7 @@ void pnic2_start_nway(struct net_device *dev)
 
 void pnic2_lnk_change(struct net_device *dev, int csr5)
 {
-	struct tulip_private *tp = (struct tulip_private *)dev->priv;
+	struct tulip_private *tp = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
         int csr14;
 
