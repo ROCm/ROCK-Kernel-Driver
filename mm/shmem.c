@@ -1013,7 +1013,7 @@ static int shmem_mmap(struct file *file, struct vm_area_struct *vma)
 	ops = &shmem_vm_ops;
 	if (!inode->i_sb || !S_ISREG(inode->i_mode))
 		return -EACCES;
-	UPDATE_ATIME(inode);
+	update_atime(inode);
 	vma->vm_ops = ops;
 	return 0;
 }
@@ -1307,7 +1307,7 @@ static void do_shmem_file_read(struct file *filp, loff_t *ppos, read_descriptor_
 	}
 
 	*ppos = ((loff_t) index << PAGE_CACHE_SHIFT) + offset;
-	UPDATE_ATIME(inode);
+	update_atime(inode);
 }
 
 static ssize_t shmem_file_read(struct file *filp, char *buf, size_t count, loff_t *ppos)

@@ -1736,7 +1736,7 @@ err_out:
  * @vi:		inode to mark dirty
  *
  * This is called from fs/inode.c::__mark_inode_dirty(), when the inode itself
- * is being marked dirty. An example is when UPDATE_ATIME() is invoked.
+ * is being marked dirty. An example is when update_atime() is invoked.
  *
  * We mark the inode dirty by setting both the page in which the mft record
  * resides and the buffer heads in that page which correspond to the mft record

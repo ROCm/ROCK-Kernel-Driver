@@ -206,8 +206,8 @@ extern int leases_enable, dir_notify_enable, lease_break_time;
 #include <asm/semaphore.h>
 #include <asm/byteorder.h>
 
+/* Used to be a macro which just called the function, now just a function */
 extern void update_atime (struct inode *);
-#define UPDATE_ATIME(inode) update_atime (inode)
 
 extern void inode_init(unsigned long);
 extern void mnt_init(unsigned long);

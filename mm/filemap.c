@@ -681,7 +681,7 @@ no_cached_page:
 	*ppos = ((loff_t) index << PAGE_CACHE_SHIFT) + offset;
 	if (cached_page)
 		page_cache_release(cached_page);
-	UPDATE_ATIME(inode);
+	update_atime(inode);
 }
 
 int file_read_actor(read_descriptor_t *desc, struct page *page,
@@ -774,7 +774,7 @@ __generic_file_aio_read(struct kiocb *iocb, const struct iovec *iov,
 			if (retval > 0)
 				*ppos = pos + retval;
 		}
-		UPDATE_ATIME(filp->f_dentry->d_inode);
+		update_atime(filp->f_dentry->d_inode);
 		goto out;
 	}
 
@@ -1259,7 +1259,7 @@ int generic_file_mmap(struct file * file, struct vm_area_struct * vma)
 
 	if (!mapping->a_ops->readpage)
 		return -ENOEXEC;
-	UPDATE_ATIME(inode);
+	update_atime(inode);
 	vma->vm_ops = &generic_file_vm_ops;
 	return 0;
 }

@@ -166,7 +166,7 @@ revalidate:
 		offset = 0;
 		brelse (bh);
 	}
-	UPDATE_ATIME(inode);
+	update_atime(inode);
 	unlock_kernel();
 	return 0;
 }
