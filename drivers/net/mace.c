@@ -172,15 +172,12 @@ static int __devinit mace_probe(struct macio_dev *mdev, const struct of_match *m
 	}
 	dev->irq = macio_irq(mdev, 0);
 
-	printk(KERN_INFO "%s: MACE at", dev->name);
 	rev = addr[0] == 0 && addr[1] == 0xA0;
 	for (j = 0; j < 6; ++j) {
 		dev->dev_addr[j] = rev? bitrev(addr[j]): addr[j];
-		printk("%c%.2x", (j? ':': ' '), dev->dev_addr[j]);
 	}
 	mp->chipid = (in_8(&mp->mace->chipid_hi) << 8) |
 			in_8(&mp->mace->chipid_lo);
-	printk(", chip revision %d.%d\n", mp->chipid >> 8, mp->chipid & 0xff);
 		
 
 	mp = (struct mace_data *) dev->priv;
@@ -259,9 +256,15 @@ static int __devinit mace_probe(struct macio_dev *mdev, const struct of_match *m
 
 	rc = register_netdev(dev);
 	if (rc) {
-		printk(KERN_ERR "Cannot register net device, aborting.\n");
+		printk(KERN_ERR "MACE: Cannot register net device, aborting.\n");
 		goto err_free_rx_irq;
 	}
+
+	printk(KERN_INFO "%s: MACE at", dev->name);
+	for (j = 0; j < 6; ++j) {
+		printk("%c%.2x", (j? ':': ' '), dev->dev_addr[j]);
+	}
+	printk(", chip revision %d.%d\n", mp->chipid >> 8, mp->chipid & 0xff);
 
 	return 0;
  
