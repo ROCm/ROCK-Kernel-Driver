@@ -2349,8 +2349,10 @@ int ide_register_subdriver (ide_drive_t *drive, ide_driver_t *driver, int versio
 	}
 	drive->suspend_reset = 0;
 #ifdef CONFIG_PROC_FS
-	ide_add_proc_entries(drive->proc, generic_subdriver_entries, drive);
-	ide_add_proc_entries(drive->proc, driver->proc, drive);
+	if (drive->driver != &idedefault_driver) {
+		ide_add_proc_entries(drive->proc, generic_subdriver_entries, drive);
+		ide_add_proc_entries(drive->proc, driver->proc, drive);
+	}
 #endif
 	return 0;
 }

@@ -712,7 +712,6 @@ void create_proc_ide_drives(ide_hwif_t *hwif)
 
 	for (d = 0; d < MAX_DRIVES; d++) {
 		ide_drive_t *drive = &hwif->drives[d];
-		ide_driver_t *driver = drive->driver;
 
 		if (!drive->present)
 			continue;
@@ -720,13 +719,8 @@ void create_proc_ide_drives(ide_hwif_t *hwif)
 			continue;
 
 		drive->proc = proc_mkdir(drive->name, parent);
-		if (drive->proc) {
+		if (drive->proc)
 			ide_add_proc_entries(drive->proc, generic_drive_entries, drive);
-			if (driver) {
-				ide_add_proc_entries(drive->proc, generic_subdriver_entries, drive);
-				ide_add_proc_entries(drive->proc, driver->proc, drive);
-			}
-		}
 		sprintf(name,"ide%d/%s", (drive->name[2]-'a')/2, drive->name);
 		ent = proc_symlink(drive->name, proc_ide_root, name);
 		if (!ent) return;
