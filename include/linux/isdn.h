@@ -250,8 +250,6 @@ typedef struct {
 #define ISDN_ASYNC_SPLIT_TERMIOS      0x0008 /* Sep. termios for dialin/out  */
 #define ISDN_SERIAL_XMIT_SIZE           1024 /* Default bufsize for write    */
 #define ISDN_SERIAL_XMIT_MAX            4000 /* Maximum bufsize for write    */
-#define ISDN_SERIAL_TYPE_NORMAL            1
-#define ISDN_SERIAL_TYPE_CALLOUT           2
 
 #ifdef CONFIG_ISDN_AUDIO
 /* For using sk_buffs with audio we need some private variables
@@ -348,7 +346,6 @@ typedef struct modem_info {
   struct timer_list     connect_timer;   /* waiting for CONNECT            */
   struct timer_list     read_timer;      /* read incoming data             */
   struct termios	normal_termios;  /* For saving termios structs     */
-  struct termios	callout_termios;
   wait_queue_head_t	open_wait, close_wait;
   struct semaphore      write_sem;
 } modem_info;
