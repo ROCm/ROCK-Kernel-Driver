@@ -100,8 +100,8 @@ MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("VIA Networking Velocity Family Gigabit Ethernet Adapter Driver");
 
 #define VELOCITY_PARAM(N,D) \
-        static const int N[MAX_UNITS]=OPTION_DEFAULT;\
-        MODULE_PARM(N, "1-" __MODULE_STRING(MAX_UNITS) "i");\
+        static int N[MAX_UNITS]=OPTION_DEFAULT;\
+	module_param_array(N, int, NULL, 0); \
         MODULE_PARM_DESC(N, D);
 
 #define RX_DESC_MIN     64
@@ -229,7 +229,7 @@ VELOCITY_PARAM(wol_opts, "Wake On Lan options");
 VELOCITY_PARAM(int_works, "Number of packets per interrupt services");
 
 static int rx_copybreak = 200;
-MODULE_PARM(rx_copybreak, "i");
+module_param(rx_copybreak, int, 0644);
 MODULE_PARM_DESC(rx_copybreak, "Copy breakpoint for copy-only-tiny-frames");
 
 static void velocity_init_info(struct pci_dev *pdev, struct velocity_info *vptr, struct velocity_info_tbl *info);

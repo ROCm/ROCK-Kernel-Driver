@@ -859,7 +859,7 @@ static int __devinit rhine_init_one(struct pci_dev *pdev,
 #ifdef USE_MMIO
 		memaddr
 #else
-		ioaddr
+		(long)ioaddr
 #endif
 		 );
 
