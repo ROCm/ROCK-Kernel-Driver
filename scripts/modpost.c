@@ -16,7 +16,7 @@
 
 /* Are we using CONFIG_MODVERSIONS? */
 int modversions = 0;
-/* Do we have vmlinux? */
+/* Warn about undefined symbols? (do so if we have vmlinux) */
 int have_vmlinux = 0;
 
 void
@@ -57,6 +57,17 @@ void *do_nofail(void *ptr, const char *file, int line, const char *expr)
 /* A list of all modules we processed */
 
 static struct module *modules;
+
+struct module *
+find_module(char *modname)
+{
+	struct module *mod;
+
+	for (mod = modules; mod; mod = mod->next)
+		if (strcmp(mod->name, modname) == 0)
+			break;
+	return mod;
+}
 
 struct module *
 new_module(char *modname)
@@ -181,7 +192,7 @@ grab_file(const char *filename, unsigned long *size)
 	int fd;
 
 	fd = open(filename, O_RDONLY);
-	if (fstat(fd, &st) != 0)
+	if (fd < 0 || fstat(fd, &st) != 0)
 		return NULL;
 
 	*size = st.st_size;
@@ -402,6 +413,8 @@ read_symbols(char *modname)
 		/* May not have this if !CONFIG_MODULE_UNLOAD: fake it.
 		   If it appears, we'll get the real CRC. */
 		add_exported_symbol("cleanup_module", mod, &fake_crc);
+		add_exported_symbol("struct_module", mod, &fake_crc);
+		mod->skip = 1;
 	}
 
 	for (sym = info.symtab_start; sym < info.symtab_stop; sym++) {
@@ -604,19 +617,106 @@ write_if_changed(struct buffer *b, const char *fname)
 	fclose(file);
 }
 
+void
+read_dump(const char *fname)
+{
+	unsigned long size, pos = 0;
+	void *file = grab_file(fname, &size);
+	char *line;
+
+        if (!file) {
+                perror(fname);
+                abort();
+        }
+
+	while ((line = get_next_line(&pos, file, size))) {
+		char *symname, *modname, *d;
+		unsigned int crc;
+		struct module *mod;
+
+		if (!(symname = strchr(line, '\t')))
+			goto fail;
+		*symname++ = '\0';
+		if (!(modname = strchr(symname, '\t')))
+			goto fail;
+		*modname++ = '\0';
+		if (strchr(modname, '\t'))
+			goto fail;
+		crc = strtoul(line, &d, 16);
+		if (*symname == '\0' || *modname == '\0' || *d != '\0')
+			goto fail;
+
+		if (!(mod = find_module(modname))) {
+			if (is_vmlinux(modname)) {
+				modversions = 1;
+				have_vmlinux = 1;
+			}
+			mod = new_module(NOFAIL(strdup(modname)));
+			mod->skip = 1;
+		}
+		add_exported_symbol(symname, mod, &crc);
+	}
+	return;
+fail:
+	fatal("parse error in symbol dump file\n");
+}
+
+void
+write_dump(const char *fname)
+{
+	struct buffer buf = { };
+	struct symbol *symbol;
+	int n;
+
+	for (n = 0; n < SYMBOL_HASH_SIZE ; n++) {
+		symbol = symbolhash[n];
+		while (symbol) {
+			symbol = symbol->next;
+		}
+	}
+
+	for (n = 0; n < SYMBOL_HASH_SIZE ; n++) {
+		symbol = symbolhash[n];
+		while (symbol) {
+			buf_printf(&buf, "0x%08x\t%s\t%s\n", symbol->crc,
+				symbol->name, symbol->module->name);
+			symbol = symbol->next;
+		}
+	}
+	write_if_changed(&buf, fname);
+}
+
 int
 main(int argc, char **argv)
 {
 	struct module *mod;
 	struct buffer buf = { };
 	char fname[SZ];
+	char *dump_read = NULL, *dump_write = NULL;
+	int opt;
 
-	for (; argv[1]; argv++) {
-		read_symbols(argv[1]);
+	while ((opt = getopt(argc, argv, "i:o:")) != -1) {
+		switch(opt) {
+			case 'i':
+				dump_read = optarg;
+				break;
+			case 'o':
+				dump_write = optarg;
+				break;
+			default:
+				exit(1);
+		}
+	}
+
+	if (dump_read)
+		read_dump(dump_read);
+
+	while (optind < argc) {
+		read_symbols(argv[optind++]);
 	}
 
 	for (mod = modules; mod; mod = mod->next) {
-		if (is_vmlinux(mod->name))
+		if (mod->skip)
 			continue;
 
 		buf.pos = 0;
@@ -629,6 +729,10 @@ main(int argc, char **argv)
 		sprintf(fname, "%s.mod.c", mod->name);
 		write_if_changed(&buf, fname);
 	}
+
+	if (dump_write)
+		write_dump(dump_write);
+
 	return 0;
 }
 
