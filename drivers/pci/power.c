@@ -1,5 +1,6 @@
 #include <linux/pci.h>
 #include <linux/pm.h>
+#include <linux/init.h>
 
 /*
  * PCI Power management..
