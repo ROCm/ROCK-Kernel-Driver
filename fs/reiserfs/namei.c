@@ -630,7 +630,7 @@ static int reiserfs_mknod (struct inode * dir, struct dentry *dentry, int mode, 
         goto out_failed;
     }
 
-    init_special_inode(inode, mode, rdev) ;
+    init_special_inode(inode, inode->i_mode, rdev) ;
 
     //FIXME: needed for block and char devices only
     reiserfs_update_sd (&th, inode);
