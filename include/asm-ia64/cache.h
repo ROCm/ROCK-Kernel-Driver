@@ -5,7 +5,7 @@
 
 /*
  * Copyright (C) 1998-2000 Hewlett-Packard Co
- * Copyright (C) 1998-2000 David Mosberger-Tang <davidm@hpl.hp.com>
+ *	David Mosberger-Tang <davidm@hpl.hp.com>
  */
 
 /* Bytes per L1 (data) cache line.  */

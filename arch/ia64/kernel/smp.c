@@ -78,6 +78,9 @@ static volatile struct call_data_struct *call_data;
 #define IPI_CALL_FUNC		0
 #define IPI_CPU_STOP		1
 
+/* This needs to be cacheline aligned because it is written to by *other* CPUs.  */
+static __u64 ipi_operation __per_cpu_data ____cacheline_aligned;
+
 static void
 stop_this_cpu (void)
 {
@@ -95,7 +98,7 @@ void
 handle_IPI (int irq, void *dev_id, struct pt_regs *regs)
 {
 	int this_cpu = smp_processor_id();
-	unsigned long *pending_ipis = &local_cpu_data->ipi_operation;
+	unsigned long *pending_ipis = &ipi_operation;
 	unsigned long ops;
 
 	/* Count this now; we may make a call that never returns. */
@@ -155,7 +158,7 @@ handle_IPI (int irq, void *dev_id, struct pt_regs *regs)
 static inline void
 send_IPI_single (int dest_cpu, int op)
 {
-	set_bit(op, &cpu_data(dest_cpu)->ipi_operation);
+	set_bit(op, &ipi_operation);
 	platform_send_ipi(dest_cpu, IA64_IPI_VECTOR, IA64_IPI_DM_INT, 0);
 }
 
