@@ -1871,7 +1871,6 @@ xfs_lookup(
 	cred_t			*credp)
 {
 	xfs_inode_t		*dp, *ip;
-	struct vnode		*vp;
 	xfs_ino_t		e_inum;
 	int			error;
 	uint			lock_mode;
@@ -1887,20 +1886,12 @@ xfs_lookup(
 
 	lock_mode = xfs_ilock_map_shared(dp);
 	error = xfs_dir_lookup_int(dir_bdp, lock_mode, dentry, &e_inum, &ip);
-	if (error) {
-		xfs_iunlock_map_shared(dp, lock_mode);
-		return error;
+	if (!error) {
+		*vpp = XFS_ITOV(ip);
+		ITRACE(ip);
 	}
-
-	vp = XFS_ITOV(ip);
-
-	ITRACE(ip);
-
 	xfs_iunlock_map_shared(dp, lock_mode);
-
-	*vpp = vp;
-
-	return 0;
+	return error;
 }
 
 
@@ -2188,16 +2179,7 @@ int xfs_rm_attempts;
  * vnode ref count will still include that from the .. entry in
  * this case.
  *
- * The inode passed in will have been looked up using xfs_get_dir_entry().
- * Since that lookup the directory lock will have been dropped, so
- * we need to validate that the inode given is still pointed to by the
- * directory.  We use the directory inode in memory generation count
- * as an optimization to tell if a new lookup is necessary.  If the
- * directory no longer points to the given inode with the given name,
- * then we drop the directory lock, set the entry_changed parameter to 1,
- * and return.	It is up to the caller to drop the reference to the inode.
- *
- * There is a dealock we need to worry about. If the locked directory is
+ * There is a deadlock we need to worry about. If the locked directory is
  * in the AIL, it might be blocking up the log. The next inode we lock
  * could be already locked by another thread waiting for log space (e.g
  * a permanent log reservation with a long running transaction (see
@@ -2210,8 +2192,7 @@ STATIC int
 xfs_lock_dir_and_entry(
 	xfs_inode_t	*dp,
 	vname_t		*dentry,
-	xfs_inode_t	*ip,	/* inode of entry 'name' */
-	int		*entry_changed)
+	xfs_inode_t	*ip)	/* inode of entry 'name' */
 {
 	int		attempts;
 	xfs_ino_t	e_inum;
@@ -2224,7 +2205,6 @@ xfs_lock_dir_and_entry(
 	attempts = 0;
 
 again:
-	*entry_changed = 0;
 	xfs_ilock(dp, XFS_ILOCK_EXCL);
 
 	e_inum = ip->i_ino;
@@ -2438,7 +2418,6 @@ xfs_remove(
 	xfs_fsblock_t		first_block;
 	int			cancel_flags;
 	int			committed;
-	int			entry_changed;
 	int			dm_di_mode = 0;
 	int			link_zero;
 	uint			resblks;
@@ -2465,7 +2444,6 @@ xfs_remove(
 	}
 
 	/* From this point on, return through std_return */
- retry:
 	ip = NULL;
 
 	/*
@@ -2532,23 +2510,12 @@ xfs_remove(
 		return error;
 	}
 
-	error = xfs_lock_dir_and_entry(dp, dentry, ip, &entry_changed);
+	error = xfs_lock_dir_and_entry(dp, dentry, ip);
 	if (error) {
 		REMOVE_DEBUG_TRACE(__LINE__);
 		xfs_trans_cancel(tp, cancel_flags);
 		IRELE(ip);
 		goto std_return;
-	}
-
-	/*
-	 * If the inode we found in the first pass is no longer
-	 * the entry with the given name, then drop our transaction and
-	 * inode reference and start over.
-	 */
-	if (entry_changed) {
-		xfs_trans_cancel(tp, cancel_flags);
-		IRELE(ip);
-		goto retry;
 	}
 
 	/*
@@ -2569,28 +2536,6 @@ xfs_remove(
 	if ((error = _MAC_XFS_IACCESS(ip, MACWRITE, credp))) {
 		REMOVE_DEBUG_TRACE(__LINE__);
 		goto error_return;
-	}
-
-	if ((ip->i_d.di_mode & IFMT) == IFDIR) {
-		error = XFS_ERROR(EPERM);
-		REMOVE_DEBUG_TRACE(__LINE__);
-		goto error_return;
-	}
-
-	/*
-	 * Return error when removing . and ..
-	 */
-	if (name[0] == '.') {
-		if (name[1] == '\0') {
-			error = XFS_ERROR(EINVAL);
-			REMOVE_DEBUG_TRACE(__LINE__);
-			goto error_return;
-		}
-		else if (name[1] == '.' && name[2] == '\0') {
-			error = XFS_ERROR(EEXIST);
-			REMOVE_DEBUG_TRACE(__LINE__);
-			goto error_return;
-		}
 	}
 
 	/*
@@ -2657,8 +2602,7 @@ xfs_remove(
 	IRELE(ip);
 
 /*	Fall through to std_return with error = 0 */
-
-std_return:
+ std_return:
 	if (DM_EVENT_ENABLED(dir_vp->v_vfsp, dp,
 						DM_EVENT_POSTREMOVE)) {
 		(void) dm_send_namesp_event(DM_EVENT_POSTREMOVE,
@@ -3142,7 +3086,6 @@ xfs_rmdir(
 	xfs_fsblock_t		first_block;
 	int			cancel_flags;
 	int			committed;
-	int			entry_changed;
 	vnode_t			*dir_vp;
 	int			dm_di_mode = 0;
 	int			last_cdp_link;
@@ -3171,7 +3114,6 @@ xfs_rmdir(
 
 	/* Return through std_return after this point. */
 
- retry:
 	cdp = NULL;
 
 	/*
@@ -3243,22 +3185,11 @@ xfs_rmdir(
 	 * that the directory entry for the child directory inode has
 	 * not changed while we were obtaining a log reservation.
 	 */
-	error = xfs_lock_dir_and_entry(dp, dentry, cdp, &entry_changed);
+	error = xfs_lock_dir_and_entry(dp, dentry, cdp);
 	if (error) {
 		xfs_trans_cancel(tp, cancel_flags);
 		IRELE(cdp);
 		goto std_return;
-	}
-
-	/*
-	 * If the inode we found in the first pass is no longer
-	 * the entry with the given name, then drop our transaction and
-	 * inode reference and start over.
-	 */
-	if (entry_changed) {
-		xfs_trans_cancel(tp, cancel_flags);
-		IRELE(cdp);
-		goto retry;
 	}
 
 	xfs_trans_ijoin(tp, dp, XFS_ILOCK_EXCL);
@@ -3417,20 +3348,12 @@ xfs_readdir(
 	}
 
 	lock_mode = xfs_ilock_map_shared(dp);
-
-	if ((dp->i_d.di_mode & IFMT) != IFDIR) {
-		xfs_iunlock_map_shared(dp, lock_mode);
-		return XFS_ERROR(ENOTDIR);
-	}
-
 	start_offset = uiop->uio_offset;
 	error = XFS_DIR_GETDENTS(dp->i_mount, tp, dp, uiop, eofp);
 	if (start_offset != uiop->uio_offset) {
 		xfs_ichgtime(dp, XFS_ICHGTIME_ACC);
 	}
-
 	xfs_iunlock_map_shared(dp, lock_mode);
-
 	return error;
 }
 
