@@ -163,7 +163,7 @@ __asm__ __volatile__(							\
 	".previous\n\n\t"						\
        : "=r" (foo) : "r" (x), "r" (__m(addr)));			\
 else									\
-__asm__ __volatile(							\
+__asm__ __volatile__(							\
 	"/* Put user asm ret, inline. */\n"				\
 "1:\t"	"st"#size "a %1, [%2] %%asi\n\n\t"				\
 	".section .fixup,#alloc,#execinstr\n\t"				\

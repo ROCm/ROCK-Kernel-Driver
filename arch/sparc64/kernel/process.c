@@ -694,24 +694,24 @@ pid_t kernel_thread(int (*fn)(void *), void * arg, unsigned long flags)
 	 * So we stash 'fn' and 'arg' into global registers which
 	 * will not be modified by the parent.
 	 */
-	__asm__ __volatile("mov %4, %%g2\n\t"	   /* Save FN into global */
-			   "mov %5, %%g3\n\t"	   /* Save ARG into global */
-			   "mov %1, %%g1\n\t"	   /* Clone syscall nr. */
-			   "mov %2, %%o0\n\t"	   /* Clone flags. */
-			   "mov 0, %%o1\n\t"	   /* usp arg == 0 */
-			   "t 0x6d\n\t"		   /* Linux/Sparc clone(). */
-			   "brz,a,pn %%o1, 1f\n\t" /* Parent, just return. */
-			   " mov %%o0, %0\n\t"
-			   "jmpl %%g2, %%o7\n\t"   /* Call the function. */
-			   " mov %%g3, %%o0\n\t"   /* Set arg in delay. */
-			   "mov %3, %%g1\n\t"
-			   "t 0x6d\n\t"		   /* Linux/Sparc exit(). */
-			   /* Notreached by child. */
-			   "1:" :
-			   "=r" (retval) :
-			   "i" (__NR_clone), "r" (flags | CLONE_VM | CLONE_UNTRACED),
-			   "i" (__NR_exit),  "r" (fn), "r" (arg) :
-			   "g1", "g2", "g3", "o0", "o1", "memory", "cc");
+	__asm__ __volatile__("mov %4, %%g2\n\t"	   /* Save FN into global */
+			     "mov %5, %%g3\n\t"	   /* Save ARG into global */
+			     "mov %1, %%g1\n\t"	   /* Clone syscall nr. */
+			     "mov %2, %%o0\n\t"	   /* Clone flags. */
+			     "mov 0, %%o1\n\t"	   /* usp arg == 0 */
+			     "t 0x6d\n\t"	   /* Linux/Sparc clone(). */
+			     "brz,a,pn %%o1, 1f\n\t" /* Parent, just return. */
+			     " mov %%o0, %0\n\t"
+			     "jmpl %%g2, %%o7\n\t"   /* Call the function. */
+			     " mov %%g3, %%o0\n\t"   /* Set arg in delay. */
+			     "mov %3, %%g1\n\t"
+			     "t 0x6d\n\t"	   /* Linux/Sparc exit(). */
+			     /* Notreached by child. */
+			     "1:" :
+			     "=r" (retval) :
+			     "i" (__NR_clone), "r" (flags | CLONE_VM | CLONE_UNTRACED),
+			     "i" (__NR_exit),  "r" (fn), "r" (arg) :
+			     "g1", "g2", "g3", "o0", "o1", "memory", "cc");
 	return retval;
 }
 
