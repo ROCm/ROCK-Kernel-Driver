@@ -18,7 +18,7 @@
 
 #include <asm/uaccess.h>
 
-#define DM_DRIVER_EMAIL "dm@uk.sistina.com"
+#define DM_DRIVER_EMAIL "dm-devel@redhat.com"
 
 /*-----------------------------------------------------------------
  * The ioctl interface needs to be able to look up devices by
@@ -225,6 +225,7 @@ static int dm_hash_insert(const char *name, const char *uuid, struct mapped_devi
 	}
 	register_with_devfs(cell);
 	dm_get(md);
+	dm_set_mdptr(md, cell);
 	up_write(&_hash_lock);
 
 	return 0;
@@ -241,6 +242,7 @@ static void __hash_remove(struct hash_cell *hc)
 	list_del(&hc->uuid_list);
 	list_del(&hc->name_list);
 	unregister_with_devfs(hc);
+	dm_set_mdptr(hc->md, NULL);
 	dm_put(hc->md);
 	if (hc->new_map)
 		dm_table_put(hc->new_map);
@@ -580,12 +582,16 @@ static int dev_create(struct dm_ioctl *param, size_t param_size)
 }
 
 /*
- * Always use UUID for lookups if it's present, otherwise use name.
+ * Always use UUID for lookups if it's present, otherwise use name or dev.
  */
 static inline struct hash_cell *__find_device_hash_cell(struct dm_ioctl *param)
 {
-	return *param->uuid ?
-	    __get_uuid_cell(param->uuid) : __get_name_cell(param->name);
+	if (*param->uuid)
+		return __get_uuid_cell(param->uuid);
+	else if (*param->name)
+		return __get_name_cell(param->name);
+	else
+		return dm_get_mdptr(huge_decode_dev(param->dev));
 }
 
 static inline struct mapped_device *find_device(struct dm_ioctl *param)
@@ -597,6 +603,7 @@ static inline struct mapped_device *find_device(struct dm_ioctl *param)
 	hc = __find_device_hash_cell(param);
 	if (hc) {
 		md = hc->md;
+		dm_get(md);
 
 		/*
 		 * Sneakily write in both the name and the uuid
@@ -612,8 +619,6 @@ static inline struct mapped_device *find_device(struct dm_ioctl *param)
 			param->flags |= DM_INACTIVE_PRESENT_FLAG;
 		else
 			param->flags &= ~DM_INACTIVE_PRESENT_FLAG;
-
-		dm_get(md);
 	}
 	up_read(&_hash_lock);
 
@@ -1266,14 +1271,14 @@ static int validate_params(uint cmd, struct dm_ioctl *param)
 	    cmd == DM_LIST_VERSIONS_CMD)
 		return 0;
 
-	/* Unless creating, either name or uuid but not both */
-	if (cmd != DM_DEV_CREATE_CMD) {
-		if ((!*param->uuid && !*param->name) ||
-		    (*param->uuid && *param->name)) {
-			DMWARN("one of name or uuid must be supplied, cmd(%u)",
-			       cmd);
+	if ((cmd == DM_DEV_CREATE_CMD)) {
+		if (!*param->name) {
+			DMWARN("name not supplied when creating device");
 			return -EINVAL;
 		}
+	} else if ((*param->uuid && *param->name)) {
+		DMWARN("only supply one of name or uuid, cmd(%u)", cmd);
+		return -EINVAL;
 	}
 
 	/* Ensure strings are terminated */

@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2001, 2002 Sistina Software (UK) Limited.
+ * Copyright (C) 2004 Red Hat, Inc. All rights reserved.
  *
  * This file is released under the GPL.
  */
@@ -58,6 +59,8 @@ struct mapped_device {
 
 	request_queue_t *queue;
 	struct gendisk *disk;
+
+	void *interface_ptr;
 
 	/*
 	 * A list of ios that arrived while we were suspended.
@@ -640,7 +643,7 @@ static void free_minor(unsigned int minor)
 /*
  * See if the device with a specific minor # is free.
  */
-static int specific_minor(unsigned int minor)
+static int specific_minor(struct mapped_device *md, unsigned int minor)
 {
 	int r, m;
 
@@ -660,7 +663,7 @@ static int specific_minor(unsigned int minor)
 		goto out;
 	}
 
-	r = idr_get_new_above(&_minor_idr, specific_minor, minor, &m);
+	r = idr_get_new_above(&_minor_idr, md, minor, &m);
 	if (r) {
 		goto out;
 	}
@@ -676,7 +679,7 @@ out:
 	return r;
 }
 
-static int next_free_minor(unsigned int *minor)
+static int next_free_minor(struct mapped_device *md, unsigned int *minor)
 {
 	int r;
 	unsigned int m;
@@ -689,7 +692,7 @@ static int next_free_minor(unsigned int *minor)
 		goto out;
 	}
 
-	r = idr_get_new(&_minor_idr, next_free_minor, &m);
+	r = idr_get_new(&_minor_idr, md, &m);
 	if (r) {
 		goto out;
 	}
@@ -723,7 +726,7 @@ static struct mapped_device *alloc_dev(unsigned int minor, int persistent)
 	}
 
 	/* get a minor number for the dev */
-	r = persistent ? specific_minor(minor) : next_free_minor(&minor);
+	r = persistent ? specific_minor(md, minor) : next_free_minor(md, &minor);
 	if (r < 0)
 		goto bad1;
 
@@ -878,6 +881,32 @@ int dm_create(struct mapped_device **result)
 int dm_create_with_minor(unsigned int minor, struct mapped_device **result)
 {
 	return create_aux(minor, 1, result);
+}
+
+void *dm_get_mdptr(dev_t dev)
+{
+	struct mapped_device *md;
+	void *mdptr = NULL;
+	unsigned minor = MINOR(dev);
+
+	if (MAJOR(dev) != _major || minor >= (1 << MINORBITS))
+		return NULL;
+
+	down(&_minor_lock);
+
+	md = idr_find(&_minor_idr, minor);
+
+	if (md && (dm_disk(md)->first_minor == minor))
+		mdptr = md->interface_ptr;
+
+	up(&_minor_lock);
+
+	return mdptr;
+}
+
+void dm_set_mdptr(struct mapped_device *md, void *ptr)
+{
+	md->interface_ptr = ptr;
 }
 
 void dm_get(struct mapped_device *md)
@@ -1139,5 +1168,5 @@ module_exit(dm_exit);
 module_param(major, uint, 0);
 MODULE_PARM_DESC(major, "The major number of the device mapper");
 MODULE_DESCRIPTION(DM_NAME " driver");
-MODULE_AUTHOR("Joe Thornber <thornber@sistina.com>");
+MODULE_AUTHOR("Joe Thornber <dm-devel@redhat.com>");
 MODULE_LICENSE("GPL");
