@@ -1065,8 +1065,6 @@ static int snd_sonicvibes_put_double(snd_kcontrol_t * kcontrol, snd_ctl_elem_val
 	return change;
 }
 
-#define SONICVIBES_CONTROLS (sizeof(snd_sonicvibes_controls)/sizeof(snd_kcontrol_new_t))
-
 static snd_kcontrol_new_t snd_sonicvibes_controls[] __devinitdata = {
 SONICVIBES_DOUBLE("Capture Volume", 0, SV_IREG_LEFT_ADC, SV_IREG_RIGHT_ADC, 0, 0, 15, 0),
 SONICVIBES_DOUBLE("Aux Playback Switch", 0, SV_IREG_LEFT_AUX1, SV_IREG_RIGHT_AUX1, 7, 7, 1, 1),
@@ -1109,7 +1107,7 @@ static int __devinit snd_sonicvibes_mixer(sonicvibes_t * sonic)
 	card = sonic->card;
 	strcpy(card->mixername, "S3 SonicVibes");
 
-	for (idx = 0; idx < SONICVIBES_CONTROLS; idx++) {
+	for (idx = 0; idx < ARRAY_SIZE(snd_sonicvibes_controls); idx++) {
 		if ((err = snd_ctl_add(card, kctl = snd_ctl_new1(&snd_sonicvibes_controls[idx], sonic))) < 0)
 			return err;
 		switch (idx) {
@@ -1348,8 +1346,6 @@ static int __devinit snd_sonicvibes_create(snd_card_t * card,
  *  MIDI section
  */
 
-#define SONICVIBES_MIDI_CONTROLS (sizeof(snd_sonicvibes_midi_controls)/sizeof(snd_kcontrol_new_t))
-
 static snd_kcontrol_new_t snd_sonicvibes_midi_controls[] __devinitdata = {
 SONICVIBES_SINGLE("SonicVibes Wave Source RAM", 0, SV_IREG_WAVE_SOURCE, 0, 1, 0),
 SONICVIBES_SINGLE("SonicVibes Wave Source RAM+ROM", 0, SV_IREG_WAVE_SOURCE, 1, 1, 0),
@@ -1383,7 +1379,7 @@ static int __devinit snd_sonicvibes_midi(sonicvibes_t * sonic, snd_rawmidi_t * r
 	mpu->open_input = snd_sonicvibes_midi_input_open;
 	mpu->close_input = snd_sonicvibes_midi_input_close;
 	dir = &rmidi->streams[SNDRV_RAWMIDI_STREAM_OUTPUT];
-	for (idx = 0; idx < SONICVIBES_MIDI_CONTROLS; idx++)
+	for (idx = 0; idx < ARRAY_SIZE(snd_sonicvibes_midi_controls); idx++)
 		if ((err = snd_ctl_add(card, snd_ctl_new1(&snd_sonicvibes_midi_controls[idx], sonic))) < 0)
 			return err;
 	return 0;

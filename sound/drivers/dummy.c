@@ -544,8 +544,6 @@ static int snd_dummy_capsrc_put(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t 
 	return change;
 }
 
-#define DUMMY_CONTROLS (sizeof(snd_dummy_controls)/sizeof(snd_kcontrol_new_t))
-
 static snd_kcontrol_new_t snd_dummy_controls[] = {
 DUMMY_VOLUME("Master Volume", 0, MIXER_ADDR_MASTER),
 DUMMY_CAPSRC("Master Capture Switch", 0, MIXER_ADDR_MASTER),
@@ -569,7 +567,7 @@ int __init snd_card_dummy_new_mixer(snd_card_dummy_t * dummy)
 	spin_lock_init(&dummy->mixer_lock);
 	strcpy(card->mixername, "Dummy Mixer");
 
-	for (idx = 0; idx < DUMMY_CONTROLS; idx++) {
+	for (idx = 0; idx < ARRAY_SIZE(snd_dummy_controls); idx++) {
 		if ((err = snd_ctl_add(card, snd_ctl_new1(&snd_dummy_controls[idx], dummy))) < 0)
 			return err;
 	}

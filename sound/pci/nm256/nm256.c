@@ -403,9 +403,8 @@ snd_nm256_load_coefficient(nm256_t *chip, int stream, int number)
 static unsigned int samplerates[8] = {
 	8000, 11025, 16000, 22050, 24000, 32000, 44100, 48000,
 };
-#define NUM_SAMPLERATES (sizeof(samplerates) / sizeof(samplerates[0]))
 static snd_pcm_hw_constraint_list_t constraints_rates = {
-	.count = NUM_SAMPLERATES, 
+	.count = ARRAY_SIZE(samplerates), 
 	.list = samplerates,
 	.mask = 0,
 };
@@ -417,7 +416,7 @@ static int
 snd_nm256_fixed_rate(unsigned int rate)
 {
 	unsigned int i;
-	for (i = 0; i < NUM_SAMPLERATES; i++) {
+	for (i = 0; i < ARRAY_SIZE(samplerates); i++) {
 		if (rate == samplerates[i])
 			return i;
 	}

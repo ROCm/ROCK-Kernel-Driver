@@ -257,8 +257,6 @@ static int snd_tea6330t_put_treble(snd_kcontrol_t * kcontrol, snd_ctl_elem_value
 	return change;
 }
 
-#define TEA6330T_CONTROLS (sizeof(snd_tea6330t_controls)/sizeof(snd_kcontrol_new_t))
-
 static snd_kcontrol_new_t snd_tea6330t_controls[] = {
 TEA6330T_MASTER_SWITCH("Master Playback Switch", 0),
 TEA6330T_MASTER_VOLUME("Master Playback Volume", 0),
@@ -334,7 +332,7 @@ int snd_tea6330t_update_mixer(snd_card_t * card,
 	if ((err = snd_component_add(card, "TEA6330T")) < 0)
 		goto __error;
 
-	for (idx = 0; idx < TEA6330T_CONTROLS; idx++) {
+	for (idx = 0; idx < ARRAY_SIZE(snd_tea6330t_controls); idx++) {
 		knew = &snd_tea6330t_controls[idx];
 		if (tea->treble == 0 && !strcmp(knew->name, "Tone Control - Treble"))
 			continue;

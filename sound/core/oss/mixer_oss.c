@@ -1212,7 +1212,7 @@ static void snd_mixer_oss_build(snd_mixer_oss_t *mixer)
 	};
 	unsigned int idx;
 	
-	for (idx = 0; idx < sizeof(table) / sizeof(struct snd_mixer_oss_assign_table); idx++)
+	for (idx = 0; idx < ARRAY_SIZE(table); idx++)
 		snd_mixer_oss_build_input(mixer, &table[idx], 0, 0);
 	if (mixer->mask_recsrc) {
 		mixer->get_recsrc = snd_mixer_oss_get_recsrc2;

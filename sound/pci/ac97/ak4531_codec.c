@@ -250,8 +250,6 @@ static int snd_ak4531_put_input_sw(snd_kcontrol_t * kcontrol, snd_ctl_elem_value
 	return change;
 }
 
-#define AK4531_CONTROLS (sizeof(snd_ak4531_controls)/sizeof(snd_kcontrol_new_t))
-
 static snd_kcontrol_new_t snd_ak4531_controls[] = {
 
 AK4531_DOUBLE("Master Playback Switch", 0, AK4531_LMASTER, AK4531_RMASTER, 7, 7, 1, 1),
@@ -383,7 +381,7 @@ int snd_ak4531_mixer(snd_card_t * card, ak4531_t * _ak4531, ak4531_t ** rak4531)
 			continue;
 		ak4531->write(ak4531, idx, ak4531->regs[idx] = snd_ak4531_initial_map[idx]);	/* recording source is mixer */
 	}
-	for (idx = 0; idx < AK4531_CONTROLS; idx++) {
+	for (idx = 0; idx < ARRAY_SIZE(snd_ak4531_controls); idx++) {
 		if ((err = snd_ctl_add(card, snd_ctl_new1(&snd_ak4531_controls[idx], ak4531))) < 0) {
 			snd_ak4531_free(ak4531);
 			return err;

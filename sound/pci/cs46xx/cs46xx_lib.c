@@ -1285,10 +1285,8 @@ static snd_pcm_hardware_t snd_cs46xx_capture =
 
 static unsigned int period_sizes[] = { 32, 64, 128, 256, 512, 1024, 2048 };
 
-#define PERIOD_SIZES sizeof(period_sizes) / sizeof(period_sizes[0])
-
 static snd_pcm_hw_constraint_list_t hw_constraints_period_sizes = {
-	.count = PERIOD_SIZES,
+	.count = ARRAY_SIZE(period_sizes),
 	.list = period_sizes,
 	.mask = 0
 };

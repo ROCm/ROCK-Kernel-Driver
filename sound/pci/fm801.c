@@ -300,10 +300,8 @@ static unsigned int rates[] = {
   38400, 44100, 48000
 };
 
-#define RATES sizeof(rates) / sizeof(rates[0])
-
 static snd_pcm_hw_constraint_list_t hw_constraints_rates = {
-	.count = RATES,
+	.count = ARRAY_SIZE(rates),
 	.list = rates,
 	.mask = 0,
 };
@@ -328,11 +326,11 @@ static unsigned short snd_fm801_rate_bits(unsigned int rate)
 {
 	unsigned int idx;
 
-	for (idx = 0; idx < 11; idx++)
+	for (idx = 0; idx < ARRAY_SIZE(rates); idx++)
 		if (rates[idx] == rate)
 			return idx;
 	snd_BUG();
-	return RATES - 1;
+	return ARRAY_SIZE(rates) - 1;
 }
 
 /*

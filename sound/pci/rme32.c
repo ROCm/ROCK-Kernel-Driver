@@ -856,10 +856,8 @@ snd_rme32_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 static unsigned int period_bytes[] = { RME32_BLOCK_SIZE };
 
 
-#define PERIOD_BYTES sizeof(period_bytes) / sizeof(period_bytes[0])
-
 static snd_pcm_hw_constraint_list_t hw_constraints_period_bytes = {
-	.count = PERIOD_BYTES,
+	.count = ARRAY_SIZE(period_bytes),
 	.list = period_bytes,
 	.mask = 0
 };

@@ -3163,10 +3163,6 @@ HDSP_PASSTHRU("Passthru", 0),
 HDSP_LINE_OUT("Line Out", 0),
 };
 
-#define HDSP_CONTROLS (sizeof(snd_hdsp_controls)/sizeof(snd_kcontrol_new_t))
-
-#define HDSP_9632_CONTROLS (sizeof(snd_hdsp_9632_controls)/sizeof(snd_kcontrol_new_t))
-
 static snd_kcontrol_new_t snd_hdsp_96xx_aeb = HDSP_AEB("Analog Extension Board", 0);
 static snd_kcontrol_new_t snd_hdsp_adat_sync_check = HDSP_ADAT_SYNC_CHECK;
 
@@ -3176,7 +3172,7 @@ int snd_hdsp_create_controls(snd_card_t *card, hdsp_t *hdsp)
 	int err;
 	snd_kcontrol_t *kctl;
 
-	for (idx = 0; idx < HDSP_CONTROLS; idx++) {
+	for (idx = 0; idx < ARRAY_SIZE(snd_hdsp_controls); idx++) {
 		if ((err = snd_ctl_add(card, kctl = snd_ctl_new1(&snd_hdsp_controls[idx], hdsp))) < 0) {
 			return err;
 		}
@@ -3201,7 +3197,7 @@ int snd_hdsp_create_controls(snd_card_t *card, hdsp_t *hdsp)
 	
 	/* DA, AD and Phone gain and XLR breakout cable controls for H9632 cards */
 	if (hdsp->io_type == H9632) {
-		for (idx = 0; idx < HDSP_9632_CONTROLS; idx++) {
+		for (idx = 0; idx < ARRAY_SIZE(snd_hdsp_9632_controls); idx++) {
 			if ((err = snd_ctl_add(card, kctl = snd_ctl_new1(&snd_hdsp_9632_controls[idx], hdsp))) < 0) {
 				return err;
 			}
@@ -4152,20 +4148,16 @@ static snd_pcm_hardware_t snd_hdsp_capture_subinfo =
 
 static unsigned int hdsp_period_sizes[] = { 64, 128, 256, 512, 1024, 2048, 4096, 8192 };
 
-#define HDSP_PERIOD_SIZES sizeof(hdsp_period_sizes) / sizeof(hdsp_period_sizes[0])
-
 static snd_pcm_hw_constraint_list_t hdsp_hw_constraints_period_sizes = {
-	.count = HDSP_PERIOD_SIZES,
+	.count = ARRAY_SIZE(hdsp_period_sizes),
 	.list = hdsp_period_sizes,
 	.mask = 0
 };
 
 static unsigned int hdsp_9632_sample_rates[] = { 32000, 44100, 48000, 64000, 88200, 96000, 128000, 176400, 192000 };
 
-#define HDSP_9632_SAMPLE_RATES sizeof(hdsp_9632_sample_rates) / sizeof(hdsp_9632_sample_rates[0])
-
 static snd_pcm_hw_constraint_list_t hdsp_hw_constraints_9632_sample_rates = {
-	.count = HDSP_9632_SAMPLE_RATES,
+	.count = ARRAY_SIZE(hdsp_9632_sample_rates),
 	.list = hdsp_9632_sample_rates,
 	.mask = 0
 };

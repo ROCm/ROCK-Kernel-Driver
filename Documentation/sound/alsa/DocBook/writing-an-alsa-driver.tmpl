@@ -3176,7 +3176,7 @@ struct _snd_pcm_runtime {
   static unsigned int rates[] =
           {4000, 10000, 22050, 44100};
   static snd_pcm_hw_constraint_list_t constraints_rates = {
-          .count = sizeof(rates) / sizeof(rates[0]),
+          .count = ARRAY_SIZE(rates),
           .list = rates,
           .mask = 0,
   };

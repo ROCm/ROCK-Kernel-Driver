@@ -1551,8 +1551,6 @@ static int snd_rme9652_get_tc_value(void *private_data,
 
 #endif				/* ALSA_HAS_STANDARD_WAY_OF_RETURNING_TIMECODE */
 
-#define RME9652_CONTROLS (sizeof(snd_rme9652_controls)/sizeof(snd_kcontrol_new_t))
-
 static snd_kcontrol_new_t snd_rme9652_controls[] = {
 {
 	.iface =	SNDRV_CTL_ELEM_IFACE_PCM,
@@ -1620,7 +1618,7 @@ int snd_rme9652_create_controls(snd_card_t *card, rme9652_t *rme9652)
 	int err;
 	snd_kcontrol_t *kctl;
 
-	for (idx = 0; idx < RME9652_CONTROLS; idx++) {
+	for (idx = 0; idx < ARRAY_SIZE(snd_rme9652_controls); idx++) {
 		if ((err = snd_ctl_add(card, kctl = snd_ctl_new1(&snd_rme9652_controls[idx], rme9652))) < 0)
 			return err;
 		if (idx == 1)	/* IEC958 (S/PDIF) Stream */
@@ -2297,10 +2295,8 @@ static snd_pcm_hardware_t snd_rme9652_capture_subinfo =
 
 static unsigned int period_sizes[] = { 64, 128, 256, 512, 1024, 2048, 4096, 8192 };
 
-#define PERIOD_SIZES sizeof(period_sizes) / sizeof(period_sizes[0])
-
 static snd_pcm_hw_constraint_list_t hw_constraints_period_sizes = {
-	.count = PERIOD_SIZES,
+	.count = ARRAY_SIZE(period_sizes),
 	.list = period_sizes,
 	.mask = 0
 };

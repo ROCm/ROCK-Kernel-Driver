@@ -21,7 +21,7 @@
  *                              merged HAL layer (patches from Brian)
  */
 
-/* $Id: sa11xx-uda1341.c,v 1.17 2004/07/01 08:33:41 tiwai Exp $ */
+/* $Id: sa11xx-uda1341.c,v 1.18 2004/07/20 15:54:09 cladisch Exp $ */
 
 /***************************************************************************************************
 *
@@ -149,10 +149,8 @@ static unsigned int rates[] = {
 	29400, 32000, 44100, 48000,
 };
 
-#define RATES sizeof(rates) / sizeof(rates[0])
-
 static snd_pcm_hw_constraint_list_t hw_constraints_rates = {
-	.count	= RATES,
+	.count	= ARRAY_SIZE(rates),
 	.list	= rates,
 	.mask	= 0,
 };

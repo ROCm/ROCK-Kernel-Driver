@@ -1106,10 +1106,8 @@ static unsigned int channels4[] = {
 	2, 4,
 };
 
-#define CHANNELS4 sizeof(channels4) / sizeof(channels4[0])
-
 static snd_pcm_hw_constraint_list_t hw_constraints_channels4 = {
-	.count = CHANNELS4,
+	.count = ARRAY_SIZE(channels4),
 	.list = channels4,
 	.mask = 0,
 };
@@ -1118,10 +1116,8 @@ static unsigned int channels6[] = {
 	2, 4, 6,
 };
 
-#define CHANNELS6 sizeof(channels6) / sizeof(channels6[0])
-
 static snd_pcm_hw_constraint_list_t hw_constraints_channels6 = {
-	.count = CHANNELS6,
+	.count = ARRAY_SIZE(channels6),
 	.list = channels6,
 	.mask = 0,
 };

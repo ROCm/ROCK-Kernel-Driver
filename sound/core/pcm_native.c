@@ -1659,13 +1659,12 @@ static int snd_pcm_hw_rule_sample_bits(snd_pcm_hw_params_t *params,
 static unsigned int rates[] = { 5512, 8000, 11025, 16000, 22050, 32000, 44100,
                                  48000, 64000, 88200, 96000, 176400, 192000 };
 
-#define RATES (sizeof(rates) / sizeof(rates[0]))
-
 static int snd_pcm_hw_rule_rate(snd_pcm_hw_params_t *params,
 				snd_pcm_hw_rule_t *rule)
 {
 	snd_pcm_hardware_t *hw = rule->private;
-	return snd_interval_list(hw_param_interval(params, rule->var), RATES, rates, hw->rates);
+	return snd_interval_list(hw_param_interval(params, rule->var),
+				 ARRAY_SIZE(rates), rates, hw->rates);
 }		
 
 static int snd_pcm_hw_rule_buffer_bytes_max(snd_pcm_hw_params_t *params,
@@ -3116,7 +3115,7 @@ static void snd_pcm_hw_convert_from_old_params(snd_pcm_hw_params_t *params, stru
 
 	memset(params, 0, sizeof(*params));
 	params->flags = oparams->flags;
-	for (i = 0; i < sizeof(oparams->masks) / sizeof(unsigned int); i++)
+	for (i = 0; i < ARRAY_SIZE(oparams->masks); i++)
 		params->masks[i].bits[0] = oparams->masks[i];
 	memcpy(params->intervals, oparams->intervals, sizeof(oparams->intervals));
 	params->rmask = __OLD_TO_NEW_MASK(oparams->rmask);
@@ -3134,7 +3133,7 @@ static void snd_pcm_hw_convert_to_old_params(struct sndrv_pcm_hw_params_old *opa
 
 	memset(oparams, 0, sizeof(*oparams));
 	oparams->flags = params->flags;
-	for (i = 0; i < sizeof(oparams->masks) / sizeof(unsigned int); i++)
+	for (i = 0; i < ARRAY_SIZE(oparams->masks); i++)
 		oparams->masks[i] = params->masks[i].bits[0];
 	memcpy(oparams->intervals, params->intervals, sizeof(oparams->intervals));
 	oparams->rmask = __NEW_TO_OLD_MASK(params->rmask);

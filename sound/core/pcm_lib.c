@@ -907,7 +907,7 @@ int snd_pcm_hw_rule_add(snd_pcm_runtime_t *runtime, unsigned int cond,
 	c->private = private;
 	k = 0;
 	while (1) {
-		snd_assert(k < sizeof(c->deps) / sizeof(c->deps[0]), return -EINVAL);
+		snd_assert(k < ARRAY_SIZE(c->deps), return -EINVAL);
 		c->deps[k++] = dep;
 		if (dep < 0)
 			break;
@@ -1105,7 +1105,7 @@ static int snd_pcm_hw_rule_pow2(snd_pcm_hw_params_t *params, snd_pcm_hw_rule_t *
 		1<<24, 1<<25, 1<<26, 1<<27, 1<<28, 1<<29, 1<<30
 	};
 	return snd_interval_list(hw_param_interval(params, rule->var),
-				 sizeof(pow2_sizes)/sizeof(int), pow2_sizes, 0);
+				 ARRAY_SIZE(pow2_sizes), pow2_sizes, 0);
 }		
 
 /**

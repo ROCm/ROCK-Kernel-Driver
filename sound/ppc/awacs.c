@@ -600,8 +600,6 @@ static snd_kcontrol_new_t snd_pmac_awacs_speaker_sw __initdata =
 AWACS_SWITCH("PC Speaker Playback Switch", 1, SHIFT_SPKMUTE, 1);
 
 
-#define num_controls(ary) (sizeof(ary) / sizeof(snd_kcontrol_new_t))
-
 /*
  * add new mixer elements to the card
  */
@@ -816,7 +814,7 @@ snd_pmac_awacs_init(pmac_t *chip)
 	 */
 	strcpy(chip->card->mixername, "PowerMac AWACS");
 
-	if ((err = build_mixers(chip, num_controls(snd_pmac_awacs_mixers),
+	if ((err = build_mixers(chip, ARRAY_SIZE(snd_pmac_awacs_mixers),
 				snd_pmac_awacs_mixers)) < 0)
 		return err;
 	chip->master_sw_ctl = snd_ctl_new1(&snd_pmac_awacs_master_sw, chip);
@@ -830,7 +828,7 @@ snd_pmac_awacs_init(pmac_t *chip)
 		 * screamer registers.
 		 * in this case, it seems the route C is not used.
 		 */
-		if ((err = build_mixers(chip, num_controls(snd_pmac_awacs_amp_vol),
+		if ((err = build_mixers(chip, ARRAY_SIZE(snd_pmac_awacs_amp_vol),
 					snd_pmac_awacs_amp_vol)) < 0)
 			return err;
 		/* overwrite */
@@ -844,7 +842,7 @@ snd_pmac_awacs_init(pmac_t *chip)
 #endif /* PMAC_AMP_AVAIL */
 	{
 		/* route A = headphone, route C = speaker */
-		if ((err = build_mixers(chip, num_controls(snd_pmac_awacs_speaker_vol),
+		if ((err = build_mixers(chip, ARRAY_SIZE(snd_pmac_awacs_speaker_vol),
 					snd_pmac_awacs_speaker_vol)) < 0)
 			return err;
 		chip->speaker_sw_ctl = snd_ctl_new1(&snd_pmac_awacs_speaker_sw, chip);
@@ -853,11 +851,11 @@ snd_pmac_awacs_init(pmac_t *chip)
 	}
 
 	if (chip->model == PMAC_SCREAMER) {
-		if ((err = build_mixers(chip, num_controls(snd_pmac_screamer_mic_boost),
+		if ((err = build_mixers(chip, ARRAY_SIZE(snd_pmac_screamer_mic_boost),
 					snd_pmac_screamer_mic_boost)) < 0)
 			return err;
 	} else {
-		if ((err = build_mixers(chip, num_controls(snd_pmac_awacs_mic_boost),
+		if ((err = build_mixers(chip, ARRAY_SIZE(snd_pmac_awacs_mic_boost),
 					snd_pmac_awacs_mic_boost)) < 0)
 			return err;
 	}

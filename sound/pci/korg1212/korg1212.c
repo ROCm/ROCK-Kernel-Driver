@@ -2047,8 +2047,6 @@ static snd_kcontrol_new_t snd_korg1212_controls[] = {
         }
 };
 
-#define K1212_CONTROL_ELEMENTS (sizeof(snd_korg1212_controls) / sizeof(snd_korg1212_controls[0]))
-
 /*
  * proc interface
  */
@@ -2395,7 +2393,7 @@ static int __devinit snd_korg1212_create(snd_card_t * card, struct pci_dev *pci,
 	//snd_pcm_lib_preallocate_pages_for_all(korg1212->pcm,
 	//			K1212_MAX_BUF_SIZE, K1212_MAX_BUF_SIZE, GFP_KERNEL);
 
-        for (i = 0; i < K1212_CONTROL_ELEMENTS; i++) {
+        for (i = 0; i < ARRAY_SIZE(snd_korg1212_controls); i++) {
                 err = snd_ctl_add(korg1212->card, snd_ctl_new1(&snd_korg1212_controls[i], korg1212));
                 if (err < 0)
                         return err;

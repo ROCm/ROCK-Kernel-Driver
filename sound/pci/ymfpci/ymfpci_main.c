@@ -1576,8 +1576,6 @@ static int snd_ymfpci_put_dup4ch(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t
 }
 
 
-#define YMFPCI_CONTROLS (sizeof(snd_ymfpci_controls)/sizeof(snd_kcontrol_new_t))
-
 static snd_kcontrol_new_t snd_ymfpci_controls[] __devinitdata = {
 YMFPCI_DOUBLE("Wave Playback Volume", 0, YDSXGR_NATIVEDACOUTVOL),
 YMFPCI_DOUBLE("Wave Capture Volume", 0, YDSXGR_NATIVEDACLOOPVOL),
@@ -1722,7 +1720,7 @@ int __devinit snd_ymfpci_mixer(ymfpci_t *chip, int rear_switch)
 	if ((err = snd_ac97_mixer(chip->ac97_bus, &ac97, &chip->ac97)) < 0)
 		return err;
 
-	for (idx = 0; idx < YMFPCI_CONTROLS; idx++) {
+	for (idx = 0; idx < ARRAY_SIZE(snd_ymfpci_controls); idx++) {
 		if ((err = snd_ctl_add(chip->card, snd_ctl_new1(&snd_ymfpci_controls[idx], chip))) < 0)
 			return err;
 	}

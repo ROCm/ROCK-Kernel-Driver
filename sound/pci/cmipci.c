@@ -2067,8 +2067,6 @@ static int snd_cmipci_put_native_mixer_sensitive(snd_kcontrol_t *kcontrol, snd_c
 }
 
 
-#define num_controls(ary) (sizeof(ary) / sizeof(snd_kcontrol_new_t))
-
 static snd_kcontrol_new_t snd_cmipci_mixers[] __devinitdata = {
 	CMIPCI_SB_VOL_STEREO("Master Playback Volume", SB_DSP4_MASTER_DEV, 3, 31),
 	CMIPCI_MIXER_SW_MONO("3D Control - Switch", CM_REG_MIXER1, CM_X3DEN_SHIFT, 0),
@@ -2348,14 +2346,14 @@ static int __devinit snd_cmipci_mixer_new(cmipci_t *cm, int pcm_spdif_device)
 	snd_cmipci_mixer_write(cm, 0x00, 0x00);		/* mixer reset */
 	spin_unlock_irq(&cm->reg_lock);
 
-	for (idx = 0; idx < num_controls(snd_cmipci_mixers); idx++) {
+	for (idx = 0; idx < ARRAY_SIZE(snd_cmipci_mixers); idx++) {
 		if ((err = snd_ctl_add(card, snd_ctl_new1(&snd_cmipci_mixers[idx], cm))) < 0)
 			return err;
 	}
 
 	/* mixer switches */
 	sw = snd_cmipci_mixer_switches;
-	for (idx = 0; idx < num_controls(snd_cmipci_mixer_switches); idx++, sw++) {
+	for (idx = 0; idx < ARRAY_SIZE(snd_cmipci_mixer_switches); idx++, sw++) {
 		err = snd_ctl_add(cm->card, snd_ctl_new1(sw, cm));
 		if (err < 0)
 			return err;
@@ -2368,7 +2366,7 @@ static int __devinit snd_cmipci_mixer_new(cmipci_t *cm, int pcm_spdif_device)
 	if (cm->device == PCI_DEVICE_ID_CMEDIA_CM8738 ||
 	    cm->device == PCI_DEVICE_ID_CMEDIA_CM8738B) {
 		sw = snd_cmipci_8738_mixer_switches;
-		for (idx = 0; idx < num_controls(snd_cmipci_8738_mixer_switches); idx++, sw++) {
+		for (idx = 0; idx < ARRAY_SIZE(snd_cmipci_8738_mixer_switches); idx++, sw++) {
 			err = snd_ctl_add(cm->card, snd_ctl_new1(sw, cm));
 			if (err < 0)
 				return err;
@@ -2386,7 +2384,7 @@ static int __devinit snd_cmipci_mixer_new(cmipci_t *cm, int pcm_spdif_device)
 		}
 		if (cm->chip_version <= 37) {
 			sw = snd_cmipci_old_mixer_switches;
-			for (idx = 0; idx < num_controls(snd_cmipci_old_mixer_switches); idx++, sw++) {
+			for (idx = 0; idx < ARRAY_SIZE(snd_cmipci_old_mixer_switches); idx++, sw++) {
 				err = snd_ctl_add(cm->card, snd_ctl_new1(sw, cm));
 				if (err < 0)
 					return err;
@@ -2395,7 +2393,7 @@ static int __devinit snd_cmipci_mixer_new(cmipci_t *cm, int pcm_spdif_device)
 	}
 	if (cm->chip_version >= 39) {
 		sw = snd_cmipci_extra_mixer_switches;
-		for (idx = 0; idx < num_controls(snd_cmipci_extra_mixer_switches); idx++, sw++) {
+		for (idx = 0; idx < ARRAY_SIZE(snd_cmipci_extra_mixer_switches); idx++, sw++) {
 			err = snd_ctl_add(cm->card, snd_ctl_new1(sw, cm));
 			if (err < 0)
 				return err;
@@ -2404,7 +2402,7 @@ static int __devinit snd_cmipci_mixer_new(cmipci_t *cm, int pcm_spdif_device)
 
 	/* card switches */
 	sw = snd_cmipci_control_switches;
-	for (idx = 0; idx < num_controls(snd_cmipci_control_switches); idx++, sw++) {
+	for (idx = 0; idx < ARRAY_SIZE(snd_cmipci_control_switches); idx++, sw++) {
 		err = snd_ctl_add(cm->card, snd_ctl_new1(sw, cm));
 		if (err < 0)
 			return err;

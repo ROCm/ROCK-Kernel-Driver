@@ -798,7 +798,7 @@ static unsigned int snd_opti93x_get_count(unsigned char format,
 static unsigned int rates[] = {  5512,  6615,  8000,  9600, 11025, 16000, 
 				18900, 22050, 27428, 32000, 33075, 37800,
 				44100, 48000 };
-#define RATES sizeof(rates) / sizeof(rates[0])
+#define RATES ARRAY_SIZE(rates)
 
 static snd_pcm_hw_constraint_list_t hw_constraints_rates = {
 	.count = RATES,
@@ -1577,8 +1577,6 @@ static int snd_opti93x_put_double(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_
 	return change;
 }
 
-#define OPTi93X_CONTROLS (sizeof(snd_opti93x_controls)/sizeof(snd_kcontrol_new_t))
-
 static snd_kcontrol_new_t snd_opti93x_controls[] = {
 OPTi93X_DOUBLE("Master Playback Switch", 0, OPTi93X_OUT_LEFT, OPTi93X_OUT_RIGHT, 7, 7, 1, 1),
 OPTi93X_DOUBLE("Master Playback Volume", 0, OPTi93X_OUT_LEFT, OPTi93X_OUT_RIGHT, 1, 1, 31, 1), 
@@ -1618,7 +1616,7 @@ int snd_opti93x_mixer(opti93x_t *chip)
 
 	strcpy(card->mixername, snd_opti93x_chip_id(chip));
 
-	for (idx = 0; idx < OPTi93X_CONTROLS; idx++) {
+	for (idx = 0; idx < ARRAY_SIZE(snd_opti93x_controls); idx++) {
 		knew = snd_opti93x_controls[idx];
 		if (chip->hardware == OPTi9XX_HW_82C930) {
 			if (strstr(knew.name, "FM"))	/* skip FM controls */

@@ -470,7 +470,6 @@ static __const__ __u16 ger_coeff[] = {
 	0x000b, /* 16.9 dB */
 	0x000f  /* 18. dB */
 };
-#define NR_GER_COEFFS (sizeof(ger_coeff) / sizeof(ger_coeff[0]))
 
 /* Update amd7930_map settings and program them into the hardware.
  * The amd->lock is held and local interrupts are disabled.
@@ -482,7 +481,7 @@ static void __amd7930_update_map(amd7930_t *amd)
 
 	map->gx = gx_coeff[amd->rgain];
 	map->stgr = gx_coeff[amd->mgain];
-	level = (amd->pgain * (256 + NR_GER_COEFFS)) >> 8;
+	level = (amd->pgain * (256 + ARRAY_SIZE(ger_coeff))) >> 8;
 	if (level >= 256) {
 		map->ger = ger_coeff[level - 256];
 		map->gr = gx_coeff[255];
@@ -911,8 +910,6 @@ static snd_kcontrol_new_t amd7930_controls[] __initdata = {
 	},
 };
 
-#define NUM_AMD7930_CONTROLS (sizeof(amd7930_controls)/sizeof(snd_kcontrol_new_t))
-
 static int __init snd_amd7930_mixer(amd7930_t *amd)
 {
 	snd_card_t *card;
@@ -923,7 +920,7 @@ static int __init snd_amd7930_mixer(amd7930_t *amd)
 	card = amd->card;
 	strcpy(card->mixername, card->shortname);
 
-	for (idx = 0; idx < NUM_AMD7930_CONTROLS; idx++) {
+	for (idx = 0; idx < ARRAY_SIZE(amd7930_controls); idx++) {
 		if ((err = snd_ctl_add(card,
 				       snd_ctl_new1(&amd7930_controls[idx], amd))) < 0)
 			return err;

@@ -542,8 +542,6 @@ static int snd_azf3328_put_mixer_enum(snd_kcontrol_t * kcontrol, snd_ctl_elem_va
 	return (nreg != oreg);
 }
 
-#define NUM_CONTROLS(ary) (sizeof(ary) / sizeof(snd_kcontrol_new_t))
-
 static snd_kcontrol_new_t snd_azf3328_mixer_controls[] __devinitdata = {
 	AZF3328_MIXER_SWITCH("Master Playback Switch", IDX_MIXER_PLAY_MASTER, 15, 1),
 	AZF3328_MIXER_VOL_STEREO("Master Playback Volume", IDX_MIXER_PLAY_MASTER, 0x1f, 1),
@@ -639,7 +637,7 @@ static int __devinit snd_azf3328_mixer_new(azf3328_t *chip)
 	
 	/* add mixer controls */
 	sw = snd_azf3328_mixer_controls;
-	for (idx = 0; idx < NUM_CONTROLS(snd_azf3328_mixer_controls); idx++, sw++) {
+	for (idx = 0; idx < ARRAY_SIZE(snd_azf3328_mixer_controls); idx++, sw++) {
 		if ((err = snd_ctl_add(chip->card, snd_ctl_new1(sw, chip))) < 0)
 			return err;
 	}

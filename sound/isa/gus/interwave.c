@@ -418,7 +418,7 @@ static void __devinit snd_interwave_detect_memory(snd_gus_card_t * gus)
 #if 0
 		printk("lmct = 0x%08x\n", lmct);
 #endif
-		for (i = 0; i < sizeof(lmc) / sizeof(unsigned int); i++)
+		for (i = 0; i < ARRAY_SIZE(lmc); i++)
 			if (lmct == lmc[i]) {
 #if 0
 				printk("found !!! %i\n", i);
@@ -427,7 +427,7 @@ static void __devinit snd_interwave_detect_memory(snd_gus_card_t * gus)
 				snd_interwave_bank_sizes(gus, psizes);
 				break;
 			}
-		if (i >= sizeof(lmc) / sizeof(unsigned int) && !gus->gf1.enh_mode)
+		if (i >= ARRAY_SIZE(lmc) && !gus->gf1.enh_mode)
 			 snd_gf1_write16(gus, SNDRV_GF1_GW_MEMORY_CONFIG, (snd_gf1_look16(gus, SNDRV_GF1_GW_MEMORY_CONFIG) & 0xfff0) | 2);
 		for (i = 0; i < 4; i++) {
 			gus->gf1.mem_alloc.banks_8[i].address =
@@ -503,8 +503,6 @@ static void __devinit snd_interwave_init(int dev, snd_gus_card_t * gus)
 
 }
 
-#define INTERWAVE_CONTROLS (sizeof(snd_interwave_controls)/sizeof(snd_kcontrol_new_t))
-
 static snd_kcontrol_new_t snd_interwave_controls[] = {
 CS4231_DOUBLE("Master Playback Switch", 0, CS4231_LINE_LEFT_OUTPUT, CS4231_LINE_RIGHT_OUTPUT, 7, 7, 1, 1),
 CS4231_DOUBLE("Master Playback Volume", 0, CS4231_LINE_LEFT_OUTPUT, CS4231_LINE_RIGHT_OUTPUT, 0, 0, 31, 1),
@@ -532,7 +530,7 @@ static int __devinit snd_interwave_mixer(cs4231_t *chip)
 		return err;
 #endif
 	/* add new master and mic controls */
-	for (idx = 0; idx < INTERWAVE_CONTROLS; idx++)
+	for (idx = 0; idx < ARRAY_SIZE(snd_interwave_controls); idx++)
 		if ((err = snd_ctl_add(card, snd_ctl_new1(&snd_interwave_controls[idx], chip))) < 0)
 			return err;
 	snd_cs4231_out(chip, CS4231_LINE_LEFT_OUTPUT, 0x9f);

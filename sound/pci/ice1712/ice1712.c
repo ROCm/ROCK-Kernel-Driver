@@ -946,10 +946,8 @@ static int __devinit snd_ice1712_pcm_ds(ice1712_t * ice, int device, snd_pcm_t *
 static unsigned int rates[] = { 8000, 9600, 11025, 12000, 16000, 22050, 24000,
 				32000, 44100, 48000, 64000, 88200, 96000 };
 
-#define RATES sizeof(rates) / sizeof(rates[0])
-
 static snd_pcm_hw_constraint_list_t hw_constraints_rates = {
-	.count = RATES,
+	.count = ARRAY_SIZE(rates),
 	.list = rates,
 	.mask = 0,
 };

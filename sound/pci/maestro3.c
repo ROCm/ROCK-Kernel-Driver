@@ -2155,7 +2155,7 @@ static void __devinit snd_m3_assp_init(m3_t *chip)
 			  KDATA_DMA_XFER0);
 
 	/* write kernel into code memory.. */
-	for (i = 0 ; i < sizeof(assp_kernel_image) / 2; i++) {
+	for (i = 0 ; i < ARRAY_SIZE(assp_kernel_image); i++) {
 		snd_m3_assp_write(chip, MEMTYPE_INTERNAL_CODE, 
 				  REV_B_CODE_MEMORY_BEGIN + i, 
 				  assp_kernel_image[i]);
@@ -2167,7 +2167,7 @@ static void __devinit snd_m3_assp_init(m3_t *chip)
 	 * drop it there.  It seems that the minisrc doesn't
 	 * need vectors, so we won't bother with them..
 	 */
-	for (i = 0; i < sizeof(assp_minisrc_image) / 2; i++) {
+	for (i = 0; i < ARRAY_SIZE(assp_minisrc_image); i++) {
 		snd_m3_assp_write(chip, MEMTYPE_INTERNAL_CODE, 
 				  0x400 + i, 
 				  assp_minisrc_image[i]);

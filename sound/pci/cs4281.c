@@ -2007,8 +2007,6 @@ static int saved_regs[SUSPEND_REGISTERS] = {
 	BA0_PPRVC,
 };
 
-#define number_of(array)	(sizeof(array) / sizeof(array[0]))
-
 #define CLKCR1_CKRA                             0x00010000L
 
 static int cs4281_suspend(snd_card_t *card, unsigned int state)
@@ -2032,7 +2030,7 @@ static int cs4281_suspend(snd_card_t *card, unsigned int state)
 	snd_cs4281_pokeBA0(chip, BA0_HICR, BA0_HICR_CHGM);
 
 	/* remember the status registers */
-	for (i = 0; i < number_of(saved_regs); i++)
+	for (i = 0; i < ARRAY_SIZE(saved_regs); i++)
 		if (saved_regs[i])
 			chip->suspend_regs[i] = snd_cs4281_peekBA0(chip, saved_regs[i]);
 
@@ -2071,7 +2069,7 @@ static int cs4281_resume(snd_card_t *card, unsigned int state)
 	snd_cs4281_chip_init(chip);
 
 	/* restore the status registers */
-	for (i = 0; i < number_of(saved_regs); i++)
+	for (i = 0; i < ARRAY_SIZE(saved_regs); i++)
 		if (saved_regs[i])
 			snd_cs4281_pokeBA0(chip, saved_regs[i], chip->suspend_regs[i]);
 
