@@ -7,7 +7,7 @@
  *
  * This code is covered by the GPL.
  *
- * $Id: cfi_util.c,v 1.7 2004/11/05 22:41:05 nico Exp $
+ * $Id: cfi_util.c,v 1.8 2004/12/14 19:55:56 nico Exp $
  *
  */
 
@@ -165,7 +165,6 @@ int cfi_varsize_frob(struct mtd_info *mtd, varsize_frob_t frob,
 	i=first;
 
 	while(len) {
-		unsigned long chipmask;
 		int size = regions[i].erasesize;
 
 		ret = (*frob)(map, &cfi->chips[chipnum], adr, size, thunk);
@@ -174,10 +173,10 @@ int cfi_varsize_frob(struct mtd_info *mtd, varsize_frob_t frob,
 			return ret;
 
 		adr += size;
+		ofs += size;
 		len -= size;
 
-		chipmask = (1 << cfi->chipshift) - 1;
-		if ((adr & chipmask) == ((regions[i].offset + size * regions[i].numblocks) & chipmask))
+		if (ofs == regions[i].offset + size * regions[i].numblocks)
 			i++;
 
 		if (adr >> cfi->chipshift) {
