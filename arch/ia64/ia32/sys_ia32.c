@@ -3479,12 +3479,6 @@ sys32_fstat64 (unsigned int fd, struct stat64 *statbuf)
 	return ret;
 }
 
-asmlinkage long
-sys32_sigpending (unsigned int *set)
-{
-	return do_sigpending(set, sizeof(*set));
-}
-
 struct sysinfo32 {
 	s32 uptime;
 	u32 loads[3];

@@ -271,7 +271,7 @@ ia32_syscall_table:
 	data8 sys_setreuid	/* 16-bit version */	  /* 70 */
 	data8 sys_setregid	/* 16-bit version */
 	data8 sys32_sigsuspend
-	data8 sys32_sigpending
+	data8 compat_sys_sigpending
 	data8 sys_sethostname
 	data8 sys32_setrlimit	  /* 75 */
 	data8 sys32_old_getrlimit
@@ -324,7 +324,7 @@ ia32_syscall_table:
 	data8 sys32_modify_ldt
 	data8 sys32_ni_syscall	/* adjtimex */
 	data8 sys32_mprotect	  /* 125 */
-	data8 sys32_sigprocmask
+	data8 compat_sys_sigprocmask
 	data8 sys32_ni_syscall	/* create_module */
 	data8 sys32_ni_syscall	/* init_module */
 	data8 sys32_ni_syscall	/* delete_module */

@@ -587,12 +587,6 @@ sys32_rt_sigprocmask (int how, compat_sigset_t *set, compat_sigset_t *oset, unsi
 }
 
 asmlinkage long
-sys32_sigprocmask (int how, unsigned int *set, unsigned int *oset)
-{
-	return sys32_rt_sigprocmask(how, (compat_sigset_t *) set, (compat_sigset_t *) oset, sizeof(*set));
-}
-
-asmlinkage long
 sys32_rt_sigtimedwait (compat_sigset_t *uthese, siginfo_t32 *uinfo,
 		struct compat_timespec *uts, unsigned int sigsetsize)
 {
