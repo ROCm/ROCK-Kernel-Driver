@@ -43,6 +43,8 @@
 #include <linux/vmalloc.h>
 #include <linux/timex.h>
 #include <linux/mm.h>
+#include <linux/ioctl32.h>
+#include <linux/compat.h>
 
 #include "ieee1394.h"
 #include "ieee1394_types.h"
@@ -1338,24 +1340,152 @@ MODULE_DESCRIPTION("driver for digital video on OHCI board");
 MODULE_SUPPORTED_DEVICE(VIDEO1394_DRIVER_NAME);
 MODULE_LICENSE("GPL");
 
+#ifdef CONFIG_COMPAT
+
+#define VIDEO1394_IOC32_LISTEN_QUEUE_BUFFER     \
+	_IOW ('#', 0x12, struct video1394_wait32)
+#define VIDEO1394_IOC32_LISTEN_WAIT_BUFFER      \
+	_IOWR('#', 0x13, struct video1394_wait32)
+#define VIDEO1394_IOC32_TALK_WAIT_BUFFER        \
+	_IOW ('#', 0x17, struct video1394_wait32)
+#define VIDEO1394_IOC32_LISTEN_POLL_BUFFER      \
+	_IOWR('#', 0x18, struct video1394_wait32)
+
+struct video1394_wait32 {
+	u32 channel;
+	u32 buffer;
+	struct compat_timeval filltime;
+};
+
+static int video1394_wr_wait32(unsigned int fd, unsigned int cmd, unsigned long arg,
+			       struct file *file)
+{
+        struct video1394_wait32 wait32;
+        struct video1394_wait wait;
+        mm_segment_t old_fs;
+        int ret;
+
+	if (file->f_op->ioctl != video1394_ioctl)
+		return -EFAULT;
+
+        if (copy_from_user(&wait32, (void *)arg, sizeof(wait32)))
+                return -EFAULT;
+
+        wait.channel = wait32.channel;
+        wait.buffer = wait32.buffer;
+        wait.filltime.tv_sec = (time_t)wait32.filltime.tv_sec;
+        wait.filltime.tv_usec = (suseconds_t)wait32.filltime.tv_usec;
+
+        old_fs = get_fs();
+        set_fs(KERNEL_DS);
+        if (cmd == VIDEO1394_IOC32_LISTEN_WAIT_BUFFER)
+		ret = video1394_ioctl(file->f_dentry->d_inode, file,
+				      VIDEO1394_IOC_LISTEN_WAIT_BUFFER,
+				      (unsigned long) &wait);
+        else
+		ret = video1394_ioctl(file->f_dentry->d_inode, file,
+				      VIDEO1394_IOC_LISTEN_POLL_BUFFER,
+				      (unsigned long) &wait);
+        set_fs(old_fs);
+
+        if (!ret) {
+                wait32.channel = wait.channel;
+                wait32.buffer = wait.buffer;
+                wait32.filltime.tv_sec = (int)wait.filltime.tv_sec;
+                wait32.filltime.tv_usec = (int)wait.filltime.tv_usec;
+
+                if (copy_to_user((struct video1394_wait32 *)arg, &wait32, sizeof(wait32)))
+                        ret = -EFAULT;
+        }
+
+        return ret;
+}
+
+static int video1394_w_wait32(unsigned int fd, unsigned int cmd, unsigned long arg,
+			      struct file *file)
+{
+        struct video1394_wait32 wait32;
+        struct video1394_wait wait;
+        mm_segment_t old_fs;
+        int ret;
+
+	if (file->f_op->ioctl != video1394_ioctl)
+		return -EFAULT;
+
+        if (copy_from_user(&wait32, (void *)arg, sizeof(wait32)))
+                return -EFAULT;
+
+        wait.channel = wait32.channel;
+        wait.buffer = wait32.buffer;
+        wait.filltime.tv_sec = (time_t)wait32.filltime.tv_sec;
+        wait.filltime.tv_usec = (suseconds_t)wait32.filltime.tv_usec;
+
+        old_fs = get_fs();
+        set_fs(KERNEL_DS);
+        if (cmd == VIDEO1394_IOC32_LISTEN_QUEUE_BUFFER)
+		ret = video1394_ioctl(file->f_dentry->d_inode, file,
+				      VIDEO1394_IOC_LISTEN_QUEUE_BUFFER,
+				      (unsigned long) &wait);
+        else
+		ret = video1394_ioctl(file->f_dentry->d_inode, file,
+				      VIDEO1394_IOC_TALK_WAIT_BUFFER,
+				      (unsigned long) &wait);
+        set_fs(old_fs);
+
+        return ret;
+}
+
+static int video1394_queue_buf32(unsigned int fd, unsigned int cmd, unsigned long arg,
+				 struct file *file)
+{
+	if (file->f_op->ioctl != video1394_ioctl)
+		return -EFAULT;
+
+        return -EFAULT;
+
+	return video1394_ioctl(file->f_dentry->d_inode, file,
+				VIDEO1394_IOC_TALK_QUEUE_BUFFER, arg);
+}
+
+#endif /* CONFIG_COMPAT */
+
 static void __exit video1394_exit_module (void)
 {
+#ifdef CONFIG_COMPAT
+	int ret;
+
+	ret = unregister_ioctl32_conversion(VIDEO1394_IOC_LISTEN_CHANNEL);
+	ret |= unregister_ioctl32_conversion(VIDEO1394_IOC_UNLISTEN_CHANNEL);
+	ret |= unregister_ioctl32_conversion(VIDEO1394_IOC_TALK_CHANNEL);
+	ret |= unregister_ioctl32_conversion(VIDEO1394_IOC_UNTALK_CHANNEL);
+	ret |= unregister_ioctl32_conversion(VIDEO1394_IOC32_LISTEN_QUEUE_BUFFER);
+	ret |= unregister_ioctl32_conversion(VIDEO1394_IOC32_LISTEN_WAIT_BUFFER);
+	ret |= unregister_ioctl32_conversion(VIDEO1394_IOC_TALK_QUEUE_BUFFER);
+	ret |= unregister_ioctl32_conversion(VIDEO1394_IOC32_TALK_WAIT_BUFFER);
+	ret |= unregister_ioctl32_conversion(VIDEO1394_IOC32_LISTEN_POLL_BUFFER);
+	if (ret)
+		PRINT_G(KERN_INFO, "Error unregistering ioctl32 translations");
+#endif
+
 	hpsb_unregister_highlevel (hl_handle);
 
 	devfs_unregister(devfs_handle);
 	ieee1394_unregister_chardev(IEEE1394_MINOR_BLOCK_VIDEO1394);
-	
+
 	PRINT_G(KERN_INFO, "Removed " VIDEO1394_DRIVER_NAME " module");
 }
 
 static int __init video1394_init_module (void)
 {
-	if (ieee1394_register_chardev(IEEE1394_MINOR_BLOCK_VIDEO1394,
-				      THIS_MODULE, &video1394_fops)) {
+	int ret;
+
+	ret = ieee1394_register_chardev(IEEE1394_MINOR_BLOCK_VIDEO1394,
+					THIS_MODULE, &video1394_fops);
+	if (ret) {
 		PRINT_G(KERN_ERR, "video1394: unable to get minor device block");
- 		return -EIO;
- 	}
-	
+		return -EIO;
+        }
+
 	devfs_handle = devfs_mk_dir(NULL, VIDEO1394_DRIVER_NAME, NULL);
 
 	hl_handle = hpsb_register_highlevel (VIDEO1394_DRIVER_NAME, &hl_ops);
@@ -1366,9 +1496,32 @@ static int __init video1394_init_module (void)
 		return -ENOMEM;
 	}
 
+#ifdef CONFIG_COMPAT
+	/* First the compatible ones */
+	ret = register_ioctl32_conversion(VIDEO1394_IOC_LISTEN_CHANNEL, NULL);
+	ret |= register_ioctl32_conversion(VIDEO1394_IOC_UNLISTEN_CHANNEL, NULL);
+	ret |= register_ioctl32_conversion(VIDEO1394_IOC_TALK_CHANNEL, NULL);
+	ret |= register_ioctl32_conversion(VIDEO1394_IOC_UNTALK_CHANNEL, NULL);
+
+	/* These need translation */
+	ret |= register_ioctl32_conversion(VIDEO1394_IOC32_LISTEN_QUEUE_BUFFER,
+				    video1394_w_wait32);
+	ret |= register_ioctl32_conversion(VIDEO1394_IOC32_LISTEN_WAIT_BUFFER,
+				    video1394_wr_wait32);
+	ret |= register_ioctl32_conversion(VIDEO1394_IOC_TALK_QUEUE_BUFFER,
+				    video1394_queue_buf32);
+	ret |= register_ioctl32_conversion(VIDEO1394_IOC32_TALK_WAIT_BUFFER,
+				    video1394_w_wait32);
+	ret |= register_ioctl32_conversion(VIDEO1394_IOC32_LISTEN_POLL_BUFFER,
+				    video1394_wr_wait32);
+	if (ret)
+		PRINT_G(KERN_INFO, "Error registering ioctl32 translations");
+#endif
+
 	PRINT_G(KERN_INFO, "Installed " VIDEO1394_DRIVER_NAME " module");
 	return 0;
 }
+
 
 module_init(video1394_init_module);
 module_exit(video1394_exit_module);

@@ -18,13 +18,6 @@ obj-$(CONFIG_IEEE1394_CMP) += cmp.o
 
 clean-files := oui.c
 
-ieee1394.o: $(ieee1394-objs)
-	$(LD) $(LDFLAGS) -r -o $@ $(ieee1394-objs)
-
-ifeq ($(obj),)
-obj = .
-endif
-
 $(obj)/oui.o: $(obj)/oui.c
 $(obj)/oui.c: $(obj)/oui.db $(obj)/oui2c.sh
 	$(CONFIG_SHELL) $(obj)/oui2c.sh < $(obj)/oui.db > $(obj)/oui.c

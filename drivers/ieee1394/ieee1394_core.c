@@ -361,7 +361,7 @@ void hpsb_selfid_received(struct hpsb_host *host, quadlet_t sid)
                 host->topology_map[host->selfid_count++] = sid;
         } else {
                 HPSB_NOTICE("Spurious SelfID packet (0x%08x) received from bus %d",
-			    sid, (host->node_id & BUS_MASK) >> 6);
+			    sid, NODEID_TO_BUS(host->node_id));
         }
 }
 
@@ -396,9 +396,6 @@ void hpsb_selfid_complete(struct hpsb_host *host, int phyid, int isroot)
         /* irm_id is kept up to date by check_selfids() */
         if (host->irm_id == host->node_id) {
                 host->is_irm = 1;
-                host->is_busmgr = 1;
-                host->busmgr_id = host->node_id;
-                host->csr.bus_manager_id = host->node_id;
         } else {
                 host->is_busmgr = 0;
                 host->is_irm = 0;
@@ -535,8 +532,8 @@ int hpsb_send_packet(struct hpsb_packet *packet)
 
         if (packet->type == hpsb_async && packet->node_id != ALL_NODES) {
                 packet->speed_code =
-                        host->speed_map[(host->node_id & NODE_MASK) * 64
-                                       + (packet->node_id & NODE_MASK)];
+                        host->speed_map[NODEID_TO_NODE(host->node_id) * 64
+                                       + NODEID_TO_NODE(packet->node_id)];
         }
 
 #ifdef CONFIG_IEEE1394_VERBOSEDEBUG
@@ -748,7 +745,7 @@ static void handle_incoming_packet(struct hpsb_host *host, int tcode,
 					addr, 4, flags);
 
                 if (!write_acked
-                    && (((data[0] >> 16) & NODE_MASK) != NODE_MASK)
+                    && (NODEID_TO_NODE(data[0] >> 16) != NODE_MASK)
                     && (rcode >= 0)) {
                         /* not a broadcast write, reply */
                         PREP_REPLY_PACKET(0);
@@ -763,7 +760,7 @@ static void handle_incoming_packet(struct hpsb_host *host, int tcode,
 					addr, data[3]>>16, flags);
 
                 if (!write_acked
-                    && (((data[0] >> 16) & NODE_MASK) != NODE_MASK)
+                    && (NODEID_TO_NODE(data[0] >> 16) != NODE_MASK)
                     && (rcode >= 0)) {
                         /* not a broadcast write, reply */
                         PREP_REPLY_PACKET(0);
@@ -1248,6 +1245,7 @@ EXPORT_SYMBOL(hpsb_read);
 EXPORT_SYMBOL(hpsb_write);
 EXPORT_SYMBOL(hpsb_lock);
 EXPORT_SYMBOL(hpsb_lock64);
+EXPORT_SYMBOL(hpsb_send_gasp);
 EXPORT_SYMBOL(hpsb_packet_success);
 
 /** highlevel.c **/
