@@ -23,7 +23,7 @@ typedef elf_greg_t elf_gregset_t[ELF_NGREG];
 #define ELF_DATA        ELFDATA2LSB
 #define ELF_ARCH        EM_386
 
-#define ELF_PLAT_INIT(regs) do { \
+#define ELF_PLAT_INIT(regs, load_addr) do { \
 	PT_REGS_EBX(regs) = 0; \
 	PT_REGS_ECX(regs) = 0; \
 	PT_REGS_EDX(regs) = 0; \
