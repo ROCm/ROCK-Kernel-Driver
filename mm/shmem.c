@@ -1191,24 +1191,24 @@ static int shmem_rmdir(struct inode * dir, struct dentry *dentry)
  */
 static int shmem_rename(struct inode * old_dir, struct dentry *old_dentry, struct inode * new_dir,struct dentry *new_dentry)
 {
-	struct inode *inode;
+	struct inode *inode = old_dentry->d_inode;
+	int they_are_dirs = S_ISDIR(inode->i_mode);
 
 	if (!shmem_empty(new_dentry)) 
 		return -ENOTEMPTY;
 
-	inode = new_dentry->d_inode;
-	if (inode) {
-		inode->i_ctime = CURRENT_TIME;
-		inode->i_nlink--;
-		dput(new_dentry);
-	}
-	inode = old_dentry->d_inode;
-	if (S_ISDIR(inode->i_mode)) {
+	if (new_dentry->d_inode) {
+		(void) shmem_unlink(new_dir, new_dentry);
+		if (they_are_dirs)
+			old_dir->i_nlink--;
+	} else if (they_are_dirs) {
 		old_dir->i_nlink--;
 		new_dir->i_nlink++;
 	}
 
-	inode->i_ctime = old_dir->i_ctime = old_dir->i_mtime = CURRENT_TIME;
+	old_dir->i_ctime = old_dir->i_mtime =
+	new_dir->i_ctime = new_dir->i_mtime =
+	inode->i_ctime = CURRENT_TIME;
 	return 0;
 }
 
