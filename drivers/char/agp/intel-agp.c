@@ -1782,16 +1782,8 @@ static struct pci_driver agp_intel_pci_driver = {
 	.resume		= agp_intel_resume,
 };
 
-/* intel_agp_init() must not be declared static for explicit
-   early initialization to work (ie i810fb) */
-int __init agp_intel_init(void)
+static int __init agp_intel_init(void)
 {
-	static int agp_initialised=0;
-
-	if (agp_initialised == 1)
-		return 0;
-	agp_initialised=1;
-
 	return pci_module_init(&agp_intel_pci_driver);
 }
 
