@@ -150,10 +150,10 @@ DECLARE_MUTEX(debug_lock);
 static int initialized;
 
 static struct file_operations debug_file_ops = {
-	read:    debug_output,
-	write:   debug_input,	
-	open:    debug_open,
-	release: debug_close,
+	.read    = debug_output,
+	.write   = debug_input,	
+	.open    = debug_open,
+	.release = debug_close,
 };
 
 static struct proc_dir_entry *debug_proc_root_entry;
