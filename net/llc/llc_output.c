@@ -61,7 +61,7 @@ int llc_mac_hdr_init(struct sk_buff *skb, unsigned char *sa, unsigned char *da)
 		struct ethhdr *eth;
 
 		skb->mac.raw = skb_push(skb, sizeof(*eth));
-		eth = (struct ethhdr *)skb->mac.raw;
+		eth = eth_hdr(skb);
 		eth->h_proto = htons(len);
 		memcpy(eth->h_dest, da, ETH_ALEN);
 		memcpy(eth->h_source, sa, ETH_ALEN);
