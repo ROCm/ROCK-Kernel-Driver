@@ -38,7 +38,6 @@ static int __cpufreq_governor(struct cpufreq_policy *policy, unsigned int event)
 static void handle_update(void *data);
 static inline void adjust_jiffies(unsigned long val, struct cpufreq_freqs *ci);
 
-
 /**
  * Two notifier lists: the "policy" list is involved in the 
  * validation process for a new CPU frequency policy; the 
@@ -1049,6 +1048,22 @@ void cpufreq_notify_transition(struct cpufreq_freqs *freqs, unsigned int state)
 	down_read(&cpufreq_notifier_rwsem);
 	switch (state) {
 	case CPUFREQ_PRECHANGE:
+		/* detect if the driver reported a value as "old frequency" which
+		 * is not equal to what the cpufreq core thinks is "old frequency".
+		 */
+		if (!(cpufreq_driver->flags & CPUFREQ_CONST_LOOPS)) {
+			if ((likely(cpufreq_cpu_data[freqs->cpu]->cur)) &&
+			    (unlikely(freqs->old != cpufreq_cpu_data[freqs->cpu]->cur)))
+			{
+				if (cpufreq_driver->flags & CPUFREQ_PANIC_OUTOFSYNC)
+					panic("CPU Frequency is out of sync.");
+
+				printk(KERN_WARNING "Warning: CPU frequency out of sync: "
+				       "cpufreq and timing core thinks of %u, is %u kHz.\n", 
+				       cpufreq_cpu_data[freqs->cpu]->cur, freqs->old);
+				freqs->old = cpufreq_cpu_data[freqs->cpu]->cur;
+			}
+		}
 		notifier_call_chain(&cpufreq_transition_notifier_list, CPUFREQ_PRECHANGE, freqs);
 		adjust_jiffies(CPUFREQ_PRECHANGE, freqs);
 		break;
