@@ -574,7 +574,7 @@ int reiserfs_journal_in_proc( char *buffer, char **start, off_t offset,
 
 
 static struct proc_dir_entry *proc_info_root = NULL;
-static const char *proc_info_root_name = "fs/reiserfs";
+static const char proc_info_root_name[] = "fs/reiserfs";
 
 int reiserfs_proc_info_init( struct super_block *sb )
 {
