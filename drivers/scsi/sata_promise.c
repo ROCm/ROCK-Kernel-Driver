@@ -319,7 +319,6 @@ static void pdc_sata_set_udmamode (struct ata_port *ap, struct ata_device *adev,
 enum pdc_packet_bits {
 	PDC_PKT_READ		= (1 << 2),
 	PDC_PKT_NODATA		= (1 << 3),
-	PDC20621_PKT_READ	= (1 << 4),
 
 	PDC_PKT_SIZEMASK	= (1 << 7) | (1 << 6) | (1 << 5),
 	PDC_PKT_CLEAR_BSY	= (1 << 4),
@@ -557,7 +556,7 @@ static inline void pdc20621_host_pkt(struct ata_taskfile *tf, u8 *buf,
 	 * Set up Host DMA packet
 	 */
 	if (tf->protocol == ATA_PROT_DMA_READ)
-		tmp = PDC20621_PKT_READ;
+		tmp = PDC_PKT_READ;
 	else
 		tmp = 0;
 	tmp |= ((portno + 1 + 4) << 16);
@@ -617,7 +616,10 @@ static void pdc20621_fill_sg(struct ata_queued_cmd *qc)
 
 	/* copy three S/G tables and two packets to DIMM MMIO window */
 	memcpy_toio(dimm_mmio + (portno * PDC_DIMM_WINDOW_STEP),
-		    &pp->dimm_buf, PDC_DIMM_HEADER_SZ + sgt_len);
+		    &pp->dimm_buf, PDC_DIMM_HEADER_SZ);
+	memcpy_toio(dimm_mmio + (portno * PDC_DIMM_WINDOW_STEP) +
+		    PDC_DIMM_HOST_PRD,
+		    &pp->dimm_buf[PDC_DIMM_HEADER_SZ], sgt_len);
 	VPRINTK("ata pkt buf ofs %u, prd size %u, mmio copied\n", i, sgt_len);
 }
 
