@@ -270,8 +270,15 @@ struct tcp6_sock {
 	struct ipv6_pinfo inet6;
 };
 
-#define inet6_sk(__sk) ((struct raw6_sock *)__sk)->pinet6
-#define raw6_sk(__sk) (&((struct raw6_sock *)__sk)->raw6)
+static inline struct ipv6_pinfo * inet6_sk(const struct sock *__sk)
+{
+	return ((struct raw6_sock *)__sk)->pinet6;
+}
+
+static inline struct raw6_opt * raw6_sk(const struct sock *__sk)
+{
+	return &((struct raw6_sock *)__sk)->raw6;
+}
 
 #if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
 #define __ipv6_only_sock(sk)	(inet6_sk(sk)->ipv6only)
