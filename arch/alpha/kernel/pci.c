@@ -128,7 +128,8 @@ struct pci_fixup pcibios_fixups[] __initdata = {
 #define GB			(1024*MB)
 
 void
-pcibios_align_resource(void *data, struct resource *res, unsigned long size)
+pcibios_align_resource(void *data, struct resource *res,
+		       unsigned long size, unsigned long align)
 {
 	struct pci_dev *dev = data;
 	struct pci_controller *hose = dev->sysdata;
@@ -168,7 +169,7 @@ pcibios_align_resource(void *data, struct resource *res, unsigned long size)
 		 */
 
 		/* Align to multiple of size of minimum base.  */
-		alignto = MAX(0x1000, size);
+		alignto = MAX(0x1000, align);
 		start = ALIGN(start, alignto);
 		if (hose->sparse_mem_base && size <= 7 * 16*MB) {
 			if (((start / (16*MB)) & 0x7) == 0) {

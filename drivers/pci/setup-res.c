@@ -69,6 +69,7 @@ static int pci_assign_bus_resource(const struct pci_bus *bus,
 	unsigned int type_mask,
 	int resno)
 {
+	unsigned long align;
 	int i;
 
 	type_mask |= IORESOURCE_IO | IORESOURCE_MEM;
@@ -81,12 +82,20 @@ static int pci_assign_bus_resource(const struct pci_bus *bus,
 		if ((res->flags ^ r->flags) & type_mask)
 			continue;
 
-		/* We cannot allocate a non-prefetching resource from a pre-fetching area */
-		if ((r->flags & IORESOURCE_PREFETCH) && !(res->flags & IORESOURCE_PREFETCH))
+		/* We cannot allocate a non-prefetching resource
+		   from a pre-fetching area */
+		if ((r->flags & IORESOURCE_PREFETCH) &&
+		    !(res->flags & IORESOURCE_PREFETCH))
 			continue;
 
+		/* The bridge resources are special, as their
+		   size != alignment. Sizing routines return
+		   required alignment in the "start" field. */
+		align = (resno < PCI_BRIDGE_RESOURCES) ? size : res->start;
+
 		/* Ok, try it out.. */
-		if (allocate_resource(r, res, size, min, -1, size, pcibios_align_resource, dev) < 0)
+		if (allocate_resource(r, res, size, min, -1, align,
+				      pcibios_align_resource, dev) < 0)
 			continue;
 
 		/* Update PCI config space.  */

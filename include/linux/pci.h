@@ -500,7 +500,8 @@ int pcibios_enable_device(struct pci_dev *);
 char *pcibios_setup (char *str);
 
 /* Used only when drivers/pci/setup.c is used */
-void pcibios_align_resource(void *, struct resource *, unsigned long);
+void pcibios_align_resource(void *, struct resource *,
+			    unsigned long, unsigned long);
 void pcibios_update_resource(struct pci_dev *, struct resource *,
 			     struct resource *, int);
 void pcibios_update_irq(struct pci_dev *, int irq);

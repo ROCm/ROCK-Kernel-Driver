@@ -886,7 +886,7 @@ void pcibios_update_resource(struct pci_dev *dev, struct resource *root,
 }
 
 void pcibios_align_resource(void *data, struct resource *res,
-			    unsigned long size)
+			    unsigned long size, unsigned long align)
 {
 	struct pci_dev *dev = data;
 
