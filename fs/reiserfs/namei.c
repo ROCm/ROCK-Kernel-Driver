@@ -677,6 +677,7 @@ static int reiserfs_mknod (struct inode * dir, struct dentry *dentry, int mode, 
         goto out_failed;
     }
 
+    inode->i_op = &reiserfs_special_inode_operations;
     init_special_inode(inode, inode->i_mode, rdev) ;
 
     //FIXME: needed for block and char devices only
@@ -1390,6 +1391,20 @@ struct inode_operations reiserfs_dir_inode_operations = {
 struct inode_operations reiserfs_symlink_inode_operations = {
     .readlink       = page_readlink,
     .follow_link    = page_follow_link,
+    .setattr        = reiserfs_setattr,
+    .setxattr       = reiserfs_setxattr,
+    .getxattr       = reiserfs_getxattr,
+    .listxattr      = reiserfs_listxattr,
+    .removexattr    = reiserfs_removexattr,
+    .permission     = reiserfs_permission,
+
+};
+
+
+/*
+ * special file operations.. just xattr/acl stuff
+ */
+struct inode_operations reiserfs_special_inode_operations = {
     .setattr        = reiserfs_setattr,
     .setxattr       = reiserfs_setxattr,
     .getxattr       = reiserfs_getxattr,

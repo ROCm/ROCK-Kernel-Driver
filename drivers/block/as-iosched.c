@@ -1498,13 +1498,20 @@ as_insert_request(request_queue_t *q, struct request *rq, int where)
 	struct as_data *ad = q->elevator.elevator_data;
 	struct as_rq *arq = RQ_DATA(rq);
 
-	if (arq)
+	if (arq) {
+		if (arq->state != AS_RQ_PRESCHED) {
+			printk("arq->state: %d\n", arq->state);
+			WARN_ON(1);
+		}
 		arq->state = AS_RQ_NEW;
+	}
 
 	/* barriers must flush the reorder queue */
 	if (unlikely(rq->flags & (REQ_SOFTBARRIER | REQ_HARDBARRIER)
-			&& where == ELEVATOR_INSERT_SORT))
+			&& where == ELEVATOR_INSERT_SORT)) {
+		WARN_ON(1);
 		where = ELEVATOR_INSERT_BACK;
+	}
 
 	switch (where) {
 		case ELEVATOR_INSERT_BACK:
@@ -1519,8 +1526,6 @@ as_insert_request(request_queue_t *q, struct request *rq, int where)
 			break;
 		case ELEVATOR_INSERT_FRONT:
 			list_add(&rq->queuelist, ad->dispatch);
-			if (blk_fs_request(rq))
-				ad->nr_dispatched++;
 			as_antic_stop(ad);
 			break;
 		case ELEVATOR_INSERT_SORT:

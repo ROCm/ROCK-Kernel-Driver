@@ -636,8 +636,6 @@ wait_for_iobuf:
 	{
 		struct buffer_head *bh = jh2bh(descriptor);
 		set_buffer_uptodate(bh);
-		if (journal->j_flags & JFS_BARRIER)
-			set_buffer_ordered(bh);
 		sync_dirty_buffer(bh);
 		if (unlikely(!buffer_uptodate(bh)))
 			err = -EIO;

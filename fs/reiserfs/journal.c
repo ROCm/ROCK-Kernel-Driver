@@ -126,12 +126,6 @@ static int reiserfs_clean_and_file_buffer(struct buffer_head *bh) {
   return 0 ;
 }
 
-static void disable_barrier(struct super_block *s)
-{
-    REISERFS_SB(s)->s_mount_opt &= ~(1 << REISERFS_BARRIER_FLUSH); 
-    printk("reiserfs: disabling flush barriers on %s\n", reiserfs_bdevname(s));
-}
-
 static struct reiserfs_bitmap_node *
 allocate_bitmap_node(struct super_block *p_s_sb) {
   struct reiserfs_bitmap_node *bn ;
@@ -645,15 +639,6 @@ static void submit_ordered_buffer(struct buffer_head *bh) {
     submit_bh(WRITE, bh) ;
 }
 
-static int submit_barrier_buffer(struct buffer_head *bh) {
-    get_bh(bh) ;
-    bh->b_end_io = reiserfs_end_ordered_io;
-    clear_buffer_dirty(bh) ;
-    if (!buffer_uptodate(bh))
-        BUG();
-    return submit_bh(WRITE_BARRIER, bh) ;
-}
-
 #define CHUNK_SIZE 32
 struct buffer_chunk {
     struct buffer_head *bh[CHUNK_SIZE];
@@ -923,7 +908,6 @@ static int flush_commit_list(struct super_block *s, struct reiserfs_journal_list
   int bn ;
   struct buffer_head *tbh = NULL ;
   unsigned long trans_id = jl->j_trans_id;
-  int barrier = 0;
 
   reiserfs_check_lock_depth(s, "flush_commit_list") ;
 
@@ -988,20 +972,7 @@ static int flush_commit_list(struct super_block *s, struct reiserfs_journal_list
   }
   atomic_dec(&SB_JOURNAL(s)->j_async_throttle);
 
-  /* wait on everything written so far before writing the commit 
-   * if we are in barrier mode, send the commit down now
-   */
-  barrier = reiserfs_barrier_flush(s);
-  if (barrier) {
-      int ret;
-      lock_buffer(jl->j_commit_bh);
-      ret = submit_barrier_buffer(jl->j_commit_bh);
-      if (ret == -EOPNOTSUPP) {
-	  set_buffer_uptodate(jl->j_commit_bh);
-          disable_barrier(s);
-	  barrier = 0;
-      }
-  }
+  /* wait on everything written so far before writing the commit */
   for (i = 0 ;  i < (jl->j_len + 1) ; i++) {  
     bn = SB_ONDISK_JOURNAL_1st_BLOCK(s) + 
 	 (jl->j_start + i) % SB_ONDISK_JOURNAL_SIZE(s) ;
@@ -1023,14 +994,10 @@ static int flush_commit_list(struct super_block *s, struct reiserfs_journal_list
   if (atomic_read(&(jl->j_commit_left)) != 1)
     BUG();
 
-  if (!barrier) {
-      if (buffer_dirty(jl->j_commit_bh))
-	BUG();
-      mark_buffer_dirty(jl->j_commit_bh) ;
-      sync_dirty_buffer(jl->j_commit_bh) ;
-  } else
-      wait_on_buffer(jl->j_commit_bh);
-
+  if (buffer_dirty(jl->j_commit_bh))
+    BUG();
+  mark_buffer_dirty(jl->j_commit_bh) ;
+  sync_dirty_buffer(jl->j_commit_bh) ;
   if (!buffer_uptodate(jl->j_commit_bh)) {
     reiserfs_panic(s, "journal-615: buffer write failed\n") ;
   }
@@ -1131,22 +1098,8 @@ static int _update_journal_header_block(struct super_block *p_s_sb, unsigned lon
     jh->j_last_flush_trans_id = cpu_to_le32(trans_id) ;
     jh->j_first_unflushed_offset = cpu_to_le32(offset) ;
     jh->j_mount_id = cpu_to_le32(SB_JOURNAL(p_s_sb)->j_mount_id) ;
-
-    if (reiserfs_barrier_flush(p_s_sb)) {
-	int ret;
-	lock_buffer(SB_JOURNAL(p_s_sb)->j_header_bh);
-	ret = submit_barrier_buffer(SB_JOURNAL(p_s_sb)->j_header_bh);
-	if (ret == -EOPNOTSUPP) {
-	    set_buffer_uptodate(SB_JOURNAL(p_s_sb)->j_header_bh);
-	    disable_barrier(p_s_sb);
-	    goto sync;
-	}
-	wait_on_buffer(SB_JOURNAL(p_s_sb)->j_header_bh);
-    } else {
-sync:
-	set_buffer_dirty(SB_JOURNAL(p_s_sb)->j_header_bh) ;
-	sync_dirty_buffer(SB_JOURNAL(p_s_sb)->j_header_bh) ;
-    }
+    set_buffer_dirty(SB_JOURNAL(p_s_sb)->j_header_bh) ;
+    sync_dirty_buffer(SB_JOURNAL(p_s_sb)->j_header_bh) ;
     if (!buffer_uptodate(SB_JOURNAL(p_s_sb)->j_header_bh)) {
       reiserfs_warning (p_s_sb, "journal-837: IO error during journal replay");
       return -EIO ;
@@ -2752,7 +2705,7 @@ int journal_mark_dirty(struct reiserfs_transaction_handle *th, struct super_bloc
   ** a dirty or journal_dirty or locked buffer to be logged, as some changes
   ** could get to disk too early.  NOT GOOD.
   */
-  if (!prepared || buffer_locked(bh) || buffer_dirty(bh)) {
+  if (!prepared || buffer_dirty(bh)) {
     reiserfs_warning (p_s_sb, "journal-1777: buffer %llu bad state "
 		      "%cPREPARED %cLOCKED %cDIRTY %cJDIRTY_WAIT",
 		      (unsigned long long)bh->b_blocknr, prepared ? ' ' : '!', 
@@ -3200,16 +3153,11 @@ void reiserfs_update_inode_transaction(struct inode *inode) {
   REISERFS_I(inode)->i_trans_id = SB_JOURNAL(inode->i_sb)->j_trans_id ;
 }
 
-/*
- * returns -1 on error, 0 if no commits/barriers were done and 1
- * if a transaction was actually committed and the barrier was done
- */
-static int __commit_trans_jl(struct inode *inode, unsigned long id,
+static void __commit_trans_jl(struct inode *inode, unsigned long id,
                                  struct reiserfs_journal_list *jl) 
 {
     struct reiserfs_transaction_handle th ;
     struct super_block *sb = inode->i_sb ;
-    int ret = 0;
 
     /* is it from the current transaction, or from an unknown transaction? */
     if (id == SB_JOURNAL(sb)->j_trans_id) {
@@ -3231,7 +3179,6 @@ static int __commit_trans_jl(struct inode *inode, unsigned long id,
 	}
 
 	journal_end_sync(&th, sb, 1) ;
-	ret = 1;
 	
     } else {
 	/* this gets tricky, we have to make sure the journal list in
@@ -3240,21 +3187,13 @@ static int __commit_trans_jl(struct inode *inode, unsigned long id,
 	 */
 flush_commit_only:
 	if (journal_list_still_alive(inode->i_sb, id)) {
-	    /* 
-	     * we only set ret to 1 when we know for sure
-	     * the barrier hasn't been started yet on the commit
-	     * block.
-	     */
-	    if (atomic_read(&jl->j_commit_left) > 1)
-	        ret = 1;
 	    flush_commit_list(sb, jl, 1) ;
 	}
     }
     /* otherwise the list is gone, and long since committed */
-    return ret;
 }
 
-int reiserfs_commit_for_inode(struct inode *inode) {
+void reiserfs_commit_for_inode(struct inode *inode) {
     unsigned long id = REISERFS_I(inode)->i_trans_id;
     struct reiserfs_journal_list *jl = REISERFS_I(inode)->i_jl;
 
@@ -3267,7 +3206,7 @@ int reiserfs_commit_for_inode(struct inode *inode) {
 	/* jl will be updated in __commit_trans_jl */
     }
 
-   return __commit_trans_jl(inode, id, jl);
+    __commit_trans_jl(inode, id, jl);
 }
 
 void reiserfs_restore_prepared_buffer(struct super_block *p_s_sb, 
