@@ -98,7 +98,6 @@ MODULE_DEVICE_TABLE (usb, skel_table);
 struct usb_skel {
 	struct usb_device *	udev;			/* save off the usb device pointer */
 	struct usb_interface *	interface;		/* the interface for this device */
-	devfs_handle_t		devfs;			/* devfs device node */
 	unsigned char		minor;			/* the starting minor number for this device */
 	unsigned char		num_ports;		/* the number of ports this device has */
 	char			num_interrupt_in;	/* number of interrupt in endpoints we have */
@@ -610,7 +609,7 @@ static int skel_probe(struct usb_interface *interface, const struct usb_device_i
 	/* initialize the devfs node for this device and register it */
 	sprintf(name, "usb/skel%d", dev->minor);
 
-	dev->devfs = devfs_register(NULL, name,
+	devfs = devfs_register(NULL, name,
 				     DEVFS_FL_DEFAULT, USB_MAJOR,
 				     dev->minor,
 				     S_IFCHR | S_IRUSR | S_IWUSR |
@@ -674,7 +673,7 @@ static void skel_disconnect(struct usb_interface *interface)
 	minor = dev->minor;
 
 	/* remove our devfs node */
-	devfs_unregister (dev->devfs);
+	devfs_remove("usb/skel%d", dev->minor);
 
 	/* give back our dynamic minor */
 	usb_deregister_dev (1, minor);

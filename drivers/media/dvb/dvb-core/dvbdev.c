@@ -45,7 +45,6 @@
 static int dvbdev_debug = 0;
 #define dprintk if (dvbdev_debug) printk
 
-static devfs_handle_t dvb_devfs_handle;
 static LIST_HEAD(dvb_adapter_list);
 static DECLARE_MUTEX(dvbdev_register_lock);
 
@@ -221,10 +220,8 @@ int dvb_register_device(struct dvb_adapter *adap, struct dvb_device **pdvbdev,
 	list_add_tail (&dvbdev->list_head, &adap->device_list);
 
 	sprintf(name, "dvb/adapter%d%s%d", adap->num, dnames[type], id);
-	dvbdev->devfs_handle = devfs_register(NULL, name, 0, DVB_MAJOR,
-					      nums2minor(adap->num, type, id),
-					      S_IFCHR | S_IRUSR | S_IWUSR,
-					      dvbdev->fops, dvbdev);
+	devfs_register(NULL, name, 0, DVB_MAJOR, nums2minor(adap->num, type, id),
+			S_IFCHR | S_IRUSR | S_IWUSR, dvbdev->fops, dvbdev);
 
 	dprintk("DVB: register adapter%d/%s @ minor: %i (0x%02x)\n",
 		adap->num, name, nums2minor(adap->num, type, id),
@@ -236,12 +233,12 @@ int dvb_register_device(struct dvb_adapter *adap, struct dvb_device **pdvbdev,
 
 void dvb_unregister_device(struct dvb_device *dvbdev)
 {
-	if (!dvbdev)
-		return;
-
-	devfs_unregister(dvbdev->devfs_handle);
-	list_del (&dvbdev->list_head);
-	kfree (dvbdev);
+	if (dvbdev) {
+		devfs_remove("dvb/adapter%d%s%d", dvbdev->adapter->num,
+				dnames[dvbdev->type], dvbdev->id);
+		list_del(&dvbdev->list_head);
+		kfree(dvbdev);
+	}
 }
 
 
@@ -289,11 +286,12 @@ int dvb_register_adapter(struct dvb_adapter **padap, const char *name)
 	INIT_LIST_HEAD (&adap->device_list);
 
  	/* fixme: is this correct? */
+	/* No */
 	try_module_get(THIS_MODULE);
 
 	printk ("DVB: registering new adapter (%s).\n", name);
 	
-	adap->devfs_handle = devfs_mk_dir("dvb/adapter%d", num);
+	devfs_mk_dir("dvb/adapter%d", num);
 	adap->num = num;
 	adap->name = name;
 
@@ -307,13 +305,14 @@ int dvb_register_adapter(struct dvb_adapter **padap, const char *name)
 
 int dvb_unregister_adapter(struct dvb_adapter *adap)
 {
-        devfs_unregister (adap->devfs_handle);
 	if (down_interruptible (&dvbdev_register_lock))
 		return -ERESTARTSYS;
+        devfs_remove("dvb/adapter%d", adap->num);
 	list_del (&adap->list_head);
 	up (&dvbdev_register_lock);
 	kfree (adap);
 	/* fixme: is this correct? */
+	/* No. */
 	module_put(THIS_MODULE);
 	return 0;
 }
@@ -322,7 +321,7 @@ int dvb_unregister_adapter(struct dvb_adapter *adap)
 static
 int __init init_dvbdev(void)
 {
-	dvb_devfs_handle = devfs_mk_dir ("dvb");
+	devfs_mk_dir("dvb");
 #ifndef CONFIG_DVB_DEVFS_ONLY
 	if(register_chrdev(DVB_MAJOR,"DVB", &dvb_device_fops)) {
 		printk("video_dev: unable to get major %d\n", DVB_MAJOR);
@@ -339,7 +338,7 @@ void __exit exit_dvbdev(void)
 #ifndef CONFIG_DVB_DEVFS_ONLY
 	unregister_chrdev(DVB_MAJOR, "DVB");
 #endif
-        devfs_unregister(dvb_devfs_handle);
+        devfs_remove("dvb");
 }
 
 module_init(init_dvbdev);

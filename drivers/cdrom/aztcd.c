@@ -180,7 +180,6 @@
 #include <linux/ioport.h>
 #include <linux/string.h>
 #include <linux/major.h>
-#include <linux/devfs_fs_kernel.h>
 
 #include <linux/init.h>
 
@@ -1922,12 +1921,9 @@ static int __init aztcd_init(void)
 	azt_disk->first_minor = 0;
 	azt_disk->fops = &azt_fops;
 	sprintf(azt_disk->disk_name, "aztcd");
+	sprintf(azt_disk->devfs_name, "aztcd");
 	azt_disk->queue = &azt_queue;
 	add_disk(azt_disk);
-	devfs_register(NULL, "aztcd", DEVFS_FL_DEFAULT,
-		       azt_disk->major, azt_disk->first_minor,
-		       S_IFBLK | S_IRUGO | S_IWUGO, azt_disk->fops, NULL);
-
 	azt_invalidate_buffers();
 	aztPresent = 1;
 	aztCloseDoor();
@@ -1946,7 +1942,6 @@ err_out:
 
 static void __exit aztcd_exit(void)
 {
-	devfs_remove("aztcd");
 	del_gendisk(azt_disk);
 	put_disk(azt_disk);
 	if ((unregister_blkdev(MAJOR_NR, "aztcd") == -EINVAL)) {

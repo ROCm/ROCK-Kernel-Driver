@@ -1143,7 +1143,6 @@ int __init loop_init(void)
 	}
 
 	for (i = 0; i < max_loop; i++) {
-		char name[16];
 		struct loop_device *lo = &loop_dev[i];
 		struct gendisk *disk = disks[i];
 		memset(lo, 0, sizeof(*lo));
@@ -1156,14 +1155,10 @@ int __init loop_init(void)
 		disk->first_minor = i;
 		disk->fops = &lo_fops;
 		sprintf(disk->disk_name, "loop%d", i);
+		sprintf(disk->devfs_name, "loop/%d", i);
 		disk->private_data = lo;
 		disk->queue = &lo->lo_queue;
 		add_disk(disk);
-		sprintf(name, "loop/%d", i);
-		devfs_register(NULL, name, DEVFS_FL_DEFAULT,
-			      disk->major, disk->first_minor,
-			      S_IFBLK | S_IRUSR | S_IWUSR | S_IRGRP,
-			      disk->fops, NULL);
 	}
 	printk(KERN_INFO "loop: loaded (max %d devices)\n", max_loop);
 	return 0;
@@ -1184,7 +1179,6 @@ void loop_exit(void)
 	for (i = 0; i < max_loop; i++) {
 		del_gendisk(disks[i]);
 		put_disk(disks[i]);
-		devfs_remove("loop/%d", i);
 	}
 	devfs_remove("loop");
 	if (unregister_blkdev(LOOP_MAJOR, "loop"))

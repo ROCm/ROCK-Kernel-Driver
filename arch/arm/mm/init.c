@@ -20,7 +20,7 @@
 #include <linux/smp.h>
 #include <linux/init.h>
 #include <linux/bootmem.h>
-#include <linux/blk.h>
+#include <linux/initrd.h>
 
 #include <asm/segment.h>
 #include <asm/mach-types.h>

@@ -39,7 +39,7 @@ struct video_device
 	/* for videodev.c intenal usage -- don't touch */
 	int users;
 	struct semaphore lock;
-	devfs_handle_t devfs_handle;
+	char devfs_name[64];	/* devfs */
 };
 
 #define VIDEO_MAJOR	81

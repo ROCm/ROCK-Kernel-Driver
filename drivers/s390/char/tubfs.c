@@ -34,10 +34,6 @@ static struct file_operations fs3270_fops = {
 };
 
 #ifdef CONFIG_DEVFS_FS
-static devfs_handle_t fs3270_devfs_dir;
-static devfs_handle_t fs3270_devfs_tub;
-extern struct file_operations tty_fops;
-
 void fs3270_devfs_register(tub_t *tubp)
 {
 	char name[16];
@@ -48,7 +44,7 @@ void fs3270_devfs_register(tub_t *tubp)
 		       S_IFCHR | S_IRUSR | S_IWUSR, &fs3270_fops, NULL);
 	sprintf(name, "tty%.4x", tubp->devno);
 	tty_register_devfs_name(&tty3270_driver, 0, tubp->minor,
-				fs3270_devfs_dir, name);
+				NULL, name);
 }
 
 void fs3270_devfs_unregister(tub_t *tubp)
@@ -72,13 +68,11 @@ fs3270_init(void)
 			IBM_FS3270_MAJOR, rc);
 		return -1;
 	}
-#ifdef CONFIG_DEVFS_FS
-	fs3270_devfs_dir = devfs_mk_dir("3270");
-	fs3270_devfs_tub = devfs_register(NULL, "3270/tub", 0,
+	devfs_mk_dir("3270");
+	devfs_register(NULL, "3270/tub", 0,
 			       IBM_FS3270_MAJOR, 0,
 			       S_IFCHR | S_IRUGO | S_IWUGO, 
 			       &fs3270_fops, NULL);
-#endif
 	fs3270_major = IBM_FS3270_MAJOR;
 	return 0;
 }
@@ -90,10 +84,8 @@ void
 fs3270_fini(void)
 {
 	if (fs3270_major != -1) {
-#ifdef CONFIG_DEVFS_FS
-		devfs_unregister(fs3270_devfs_tub);
-		devfs_unregister(fs3270_devfs_dir);
-#endif
+		devfs_remove("3270");
+		devfs_remove("3270/tub");
 		unregister_chrdev(fs3270_major, "fs3270");
 		fs3270_major = -1;
 	}

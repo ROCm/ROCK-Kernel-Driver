@@ -258,7 +258,7 @@ static inline void update_head_pos(int disk, r1bio_t *r1_bio)
 		r1_bio->sector + (r1_bio->master_bio->bi_size >> 9);
 }
 
-static int end_request(struct bio *bio, unsigned int bytes_done, int error)
+static int raid1_end_request(struct bio *bio, unsigned int bytes_done, int error)
 {
 	int uptodate = test_bit(BIO_UPTODATE, &bio->bi_flags);
 	r1bio_t * r1_bio = (r1bio_t *)(bio->bi_private);
@@ -496,7 +496,7 @@ static int make_request(request_queue_t *q, struct bio * bio)
 
 		read_bio->bi_sector = r1_bio->sector + mirror->rdev->data_offset;
 		read_bio->bi_bdev = mirror->rdev->bdev;
-		read_bio->bi_end_io = end_request;
+		read_bio->bi_end_io = raid1_end_request;
 		read_bio->bi_rw = r1_bio->cmd;
 		read_bio->bi_private = r1_bio;
 
@@ -531,7 +531,7 @@ static int make_request(request_queue_t *q, struct bio * bio)
 
 		mbio->bi_sector	= r1_bio->sector + conf->mirrors[i].rdev->data_offset;
 		mbio->bi_bdev = conf->mirrors[i].rdev->bdev;
-		mbio->bi_end_io	= end_request;
+		mbio->bi_end_io	= raid1_end_request;
 		mbio->bi_rw = r1_bio->cmd;
 		mbio->bi_private = r1_bio;
 
@@ -551,11 +551,11 @@ static int make_request(request_queue_t *q, struct bio * bio)
 	/*
 	 * We have to be a bit careful about the semaphore above, thats
 	 * why we start the requests separately. Since generic_make_request()
-	 * can sleep, this is the safer solution. Imagine, end_request
+	 * can sleep, this is the safer solution. Imagine, raid1_end_request
 	 * decreasing the semaphore before we could have set it up ...
 	 * We could play tricks with the semaphore (presetting it and
 	 * correcting at the end if sum_bios is not 'n' but we have to
-	 * do end_request by hand if all requests finish until we had a
+	 * do raid1_end_request by hand if all requests finish until we had a
 	 * chance to set up the semaphore correctly ... lots of races).
 	 */
 

@@ -20,7 +20,7 @@
 #include <linux/init.h>
 #include <linux/ide.h>
 #include <linux/seq_file.h>
-#include <linux/blk.h>
+#include <linux/initrd.h>
 #include <linux/console.h>
 #include <linux/root_dev.h>
 

@@ -141,38 +141,15 @@ dasd_free_device(struct dasd_device *device)
 static inline int
 dasd_state_new_to_known(struct dasd_device *device)
 {
-	umode_t devfs_perm;
-	kdev_t kdev;
-	char buf[20];
-
-	kdev = dasd_get_kdev(device);
-	if (kdev_none(kdev))
-		return -ENODEV;
-
 	/*
 	 * As long as the device is not in state DASD_STATE_NEW we want to 
 	 * keep the reference count > 0.
 	 */
 	dasd_get_device(device);
 
-#ifdef CONFIG_DEVFS_FS
-	/* Add a proc directory and the dasd device entry to devfs. */
  	sprintf(device->gdp->devfs_name, "dasd/%04x",
 		_ccw_device_get_device_number(device->cdev));
-#endif
 
-	if (device->ro_flag)
-		devfs_perm = S_IFBLK | S_IRUSR;
-	else
-		devfs_perm = S_IFBLK | S_IRUSR | S_IWUSR;
-
-	snprintf(buf, sizeof(buf), "dasd/%04x/device",
-		 _ccw_device_get_device_number(device->cdev));
-	device->devfs_entry = devfs_register(NULL, buf, 0,
-					     major(kdev),
-					     minor(kdev) << DASD_PARTN_BITS,
-					     devfs_perm,
-					     &dasd_device_operations, NULL);
 	device->state = DASD_STATE_KNOWN;
 	return 0;
 }
@@ -183,10 +160,6 @@ dasd_state_new_to_known(struct dasd_device *device)
 static inline void
 dasd_state_known_to_new(struct dasd_device * device)
 {
-	/* Remove device entry and devfs directory. */
-	devfs_unregister(device->devfs_entry);
-	devfs_unregister(device->gdp->de);
-
 	/* Forget the discipline information. */
 	device->discipline = NULL;
 	device->state = DASD_STATE_NEW;
