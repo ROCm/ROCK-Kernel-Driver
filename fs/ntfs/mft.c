@@ -102,7 +102,7 @@ extern int ntfs_mst_readpage(struct file *, struct page *);
  * ntfs_mft_aops - address space operations for access to $MFT
  *
  * Address space operations for access to $MFT. This allows us to simply use
- * read_cache_page() in map_mft_record().
+ * ntfs_map_page() in map_mft_record_page().
  */
 struct address_space_operations ntfs_mft_aops = {
 	writepage:	NULL,			/* Write dirty page to disk. */
