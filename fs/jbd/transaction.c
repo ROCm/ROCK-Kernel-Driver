@@ -688,7 +688,9 @@ done_locked:
 
 	/* If we are about to journal a buffer, then any revoke pending
            on it is no longer valid. */
+	lock_kernel();
 	journal_cancel_revoke(handle, jh);
+	unlock_kernel();
 
 out_unlocked:
 	if (frozen_buffer)
@@ -720,9 +722,7 @@ int journal_get_write_access (handle_t *handle, struct buffer_head *bh)
 	 * log thread also manipulates.  Make sure that the buffer
 	 * completes any outstanding IO before proceeding. */
 	lock_journal(journal);
-	lock_kernel();
 	rc = do_get_write_access(handle, jh, 0);
-	unlock_kernel();
 	journal_unlock_journal_head(jh);
 	unlock_journal(journal);
 	return rc;
@@ -846,11 +846,14 @@ int journal_get_undo_access (handle_t *handle, struct buffer_head *bh)
 	/* Do this first --- it can drop the journal lock, so we want to
 	 * make sure that obtaining the committed_data is done
 	 * atomically wrt. completion of any outstanding commits. */
-	lock_kernel();
 	err = do_get_write_access (handle, jh, 1);
 	if (err)
 		goto out;
-	
+
+	/*
+	 * lock_journal() prevents jh->b_committed_data from getting set
+	 * by two CPUs at the same time.
+	 */
 	if (!jh->b_committed_data) {
 		/* Copy out the current buffer contents into the
 		 * preserved, committed copy. */
@@ -870,7 +873,6 @@ int journal_get_undo_access (handle_t *handle, struct buffer_head *bh)
 	}
 
 out:
-	unlock_kernel();
 	if (!err)
 		J_ASSERT_JH(jh, jh->b_committed_data);
 	journal_unlock_journal_head(jh);
