@@ -779,7 +779,7 @@ void __init find_intel_smp (void)
 
 /*
  * The Visual Workstation is Intel MP compliant in the hardware
- * sense, but it doesnt have a BIOS(-configuration table).
+ * sense, but it doesn't have a BIOS(-configuration table).
  * No problem for Linux.
  */
 void __init find_visws_smp(void)
