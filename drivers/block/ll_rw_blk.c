@@ -1141,8 +1141,6 @@ static inline void __generic_unplug_device(request_queue_t *q)
 	if (!blk_remove_plug(q))
 		return;
 
-	del_timer(&q->unplug_timer);
-
 	/*
 	 * was plugged, fire request_fn if queue has stuff to do
 	 */
