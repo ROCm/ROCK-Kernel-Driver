@@ -313,16 +313,16 @@ EXPORT_SYMBOL(uart_update_timeout);
 /**
  *	uart_get_baud_rate - return baud rate for a particular port
  *	@port: uart_port structure describing the port in question.
- *	@tty: the tty structure corresponding to this port
+ *	@termios: desired termios settings.
  *
  *	Decode the termios structure into a numeric baud rate,
  *	taking account of the magic 38400 baud rate (with spd_*
  *	flags), and mapping the %B0 rate to 9600 baud.
  */
-static unsigned int
-uart_get_baud_rate(struct uart_port *port, struct tty_struct *tty)
+unsigned int
+uart_get_baud_rate(struct uart_port *port, struct termios *termios)
 {
-	unsigned int baud = tty_get_baud_rate(tty);
+	unsigned int baud = tty_termios_baud_rate(termios);
 
 	/*
 	 * The spd_hi, spd_vhi, spd_shi, spd_warp kludge...
@@ -350,8 +350,10 @@ uart_get_baud_rate(struct uart_port *port, struct tty_struct *tty)
 	return baud;
 }
 
-static inline
-unsigned int uart_calculate_quot(struct uart_port *port, unsigned int baud)
+EXPORT_SYMBOL(uart_get_baud_rate);
+
+static inline unsigned int
+uart_calculate_quot(struct uart_port *port, unsigned int baud)
 {
 	unsigned int quot;
 
@@ -369,7 +371,7 @@ unsigned int uart_calculate_quot(struct uart_port *port, unsigned int baud)
 /**
  *	uart_get_divisor - return uart clock divisor
  *	@port: uart_port structure describing the port.
- *	@tty: desired tty settings
+ *	@termios: desired termios settings
  *	@old_termios: the original port settings, or NULL
  *
  *	Calculate the uart clock divisor for the port.  If the
@@ -381,8 +383,8 @@ unsigned int uart_calculate_quot(struct uart_port *port, unsigned int baud)
  *
  *	If 9600 baud fails, we return a zero divisor.
  */
-static unsigned int
-uart_get_divisor(struct uart_port *port, struct tty_struct *tty,
+unsigned int
+uart_get_divisor(struct uart_port *port, struct termios *termios,
 		 struct termios *old_termios)
 {
 	unsigned int quot, try;
@@ -391,7 +393,7 @@ uart_get_divisor(struct uart_port *port, struct tty_struct *tty,
 		unsigned int baud;
 
 		/* Determine divisor based on baud rate */
-		baud = uart_get_baud_rate(port, tty);
+		baud = uart_get_baud_rate(port, termios);
 		quot = uart_calculate_quot(port, baud);
 		if (quot)
 			break;
@@ -400,10 +402,9 @@ uart_get_divisor(struct uart_port *port, struct tty_struct *tty,
 		 * Oops, the quotient was zero.  Try again with
 		 * the old baud rate if possible.
 		 */
-		tty->termios->c_cflag &= ~CBAUD;
+		termios->c_cflag &= ~CBAUD;
 		if (old_termios) {
-			tty->termios->c_cflag |=
-				 (old_termios->c_cflag & CBAUD);
+			termios->c_cflag |= old_termios->c_cflag & CBAUD;
 			old_termios = NULL;
 			continue;
 		}
@@ -412,43 +413,48 @@ uart_get_divisor(struct uart_port *port, struct tty_struct *tty,
 		 * As a last resort, if the quotient is zero,
 		 * default to 9600 bps
 		 */
-		tty->termios->c_cflag |= B9600;
+		termios->c_cflag |= B9600;
 	}
 
 	return quot;
 }
 
+EXPORT_SYMBOL(uart_get_divisor);
+
 static void
 uart_change_speed(struct uart_info *info, struct termios *old_termios)
 {
+	struct tty_struct *tty = info->tty;
 	struct uart_port *port = info->port;
-	unsigned int quot, cflag, bits, try;
+	struct termios *termios;
+	unsigned int quot;
 
 	/*
 	 * If we have no tty, termios, or the port does not exist,
 	 * then we can't set the parameters for this port.
 	 */
-	if (!info->tty || !info->tty->termios || port->type == PORT_UNKNOWN)
+	if (!tty || !tty->termios || port->type == PORT_UNKNOWN)
 		return;
+
+	termios = tty->termios;
 
 	/*
 	 * Set flags based on termios cflag
 	 */
-	cflag = info->tty->termios->c_cflag;
-
-	quot = uart_get_divisor(port, tty, old_termios);
-	uart_update_timeout(port, cflag, quot);
-
-	if (cflag & CRTSCTS)
+	if (termios->c_cflag & CRTSCTS)
 		info->flags |= UIF_CTS_FLOW;
 	else
 		info->flags &= ~UIF_CTS_FLOW;
-	if (cflag & CLOCAL)
+
+	if (termios->c_cflag & CLOCAL)
 		info->flags &= ~UIF_CHECK_CD;
 	else
 		info->flags |= UIF_CHECK_CD;
 
-	port->ops->change_speed(port, cflag, info->tty->termios->c_iflag, quot);
+	quot = uart_get_divisor(port, termios, old_termios);
+	uart_update_timeout(port, termios->c_cflag, quot);
+
+	port->ops->change_speed(port, termios->c_cflag, termios->c_iflag, quot);
 }
 
 static inline void
