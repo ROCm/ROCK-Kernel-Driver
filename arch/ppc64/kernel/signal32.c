@@ -227,13 +227,17 @@ static long restore_user_regs(struct pt_regs *regs,
 				     sizeof(sr->mc_vregs)))
 			return 1;
 	} else if (current->thread.used_vr)
-		memset(&current->thread.vr, 0, ELF_NVRREG32 * sizeof(vector128));
+		memset(current->thread.vr, 0, ELF_NVRREG32 * sizeof(vector128));
 
 	/* Always get VRSAVE back */
 	if (__get_user(current->thread.vrsave, (u32 __user *)&sr->mc_vregs[32]))
 		return 1;
 #endif /* CONFIG_ALTIVEC */
 
+#ifndef CONFIG_SMP
+	last_task_used_math = NULL;
+	last_task_used_altivec = NULL;
+#endif
 	return 0;
 }
 
