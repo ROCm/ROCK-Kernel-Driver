@@ -64,7 +64,6 @@ struct svc_export {
 	struct list_head	ex_fsid_hash;
 	struct list_head	ex_list;
 	char			ex_path[NFS_MAXPATHLEN+1];
-	struct svc_export *	ex_parent;
 	struct svc_client *	ex_client;
 	int			ex_flags;
 	struct vfsmount *	ex_mnt;

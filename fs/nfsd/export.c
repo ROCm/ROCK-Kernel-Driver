@@ -169,19 +169,6 @@ exp_child(svc_client *clp, struct super_block *sb, struct dentry *dentry)
 	return NULL;
 }
 
-/* Update parent pointers of all exports */
-static void exp_change_parents(svc_client *clp, svc_export *old, svc_export *new)
-{
-	struct list_head *head = &clp->cl_list;
-	struct list_head *p;
-
-	list_for_each(p, head) {
-		svc_export *exp = list_entry(p, svc_export, ex_list);
-		if (exp->ex_parent == old)
-			exp->ex_parent = new;
-	}
-}
-
 /*
  * Hashtable locking. Write locks are placed only by user processes
  * wanting to modify export information.
@@ -245,7 +232,7 @@ int
 exp_export(struct nfsctl_export *nxp)
 {
 	svc_client	*clp;
-	svc_export	*exp = NULL, *parent;
+	svc_export	*exp = NULL;
 	svc_export	*fsid_exp;
 	struct nameidata nd;
 	struct inode	*inode = NULL;
@@ -332,12 +319,12 @@ exp_export(struct nfsctl_export *nxp)
 		inode->i_sb->s_export_op->find_exported_dentry =
 			find_exported_dentry;
 
-	if ((parent = exp_child(clp, inode->i_sb, nd.dentry)) != NULL) {
+	if (exp_child(clp, inode->i_sb, nd.dentry) != NULL) {
 		dprintk("exp_export: export not valid (Rule 3).\n");
 		goto finish;
 	}
 	/* Is this is a sub-export, must be a proper subset of FS */
-	if ((parent = exp_parent(clp, inode->i_sb, nd.dentry)) != NULL) {
+	if (exp_parent(clp, inode->i_sb, nd.dentry) != NULL) {
 		dprintk("exp_export: sub-export not valid (Rule 2).\n");
 		goto finish;
 	}
@@ -349,7 +336,6 @@ exp_export(struct nfsctl_export *nxp)
 
 	strcpy(exp->ex_path, nxp->ex_path);
 	exp->ex_client = clp;
-	exp->ex_parent = parent;
 	exp->ex_mnt = mntget(nd.mnt);
 	exp->ex_dentry = dget(nd.dentry);
 	exp->ex_flags = nxp->ex_flags;
@@ -358,11 +344,6 @@ exp_export(struct nfsctl_export *nxp)
 	exp->ex_anon_uid = nxp->ex_anon_uid;
 	exp->ex_anon_gid = nxp->ex_anon_gid;
 	exp->ex_fsid = nxp->ex_dev;
-
-
-	/* Update parent pointers of all exports */
-	if (parent)
-		exp_change_parents(clp, parent, exp);
 
 	list_add(&exp->ex_hash, clp->cl_export + EXPORT_HASH(dev));
 	list_add_tail(&exp->ex_list, &clp->cl_list);
@@ -393,8 +374,6 @@ exp_do_unexport(svc_export *unexp)
 	list_del(&unexp->ex_list);
 	list_del(&unexp->ex_hash);
 	exp_fsid_unhash(unexp);
-	/* Update parent pointers. */
-	exp_change_parents(unexp->ex_client, unexp, unexp->ex_parent);
 	dentry = unexp->ex_dentry;
 	mnt = unexp->ex_mnt;
 	inode = dentry->d_inode;
