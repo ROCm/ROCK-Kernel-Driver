@@ -532,8 +532,8 @@ static int __init i8042_check_mux(struct i8042_values *values)
 		return -1;
 	
 	/* Workaround for broken chips which seem to support MUX, but in reality don't. */
-	/* They all report version 12.10 */
-	if (mux_version == 0xCA)
+	/* They all report version 10.12 */
+	if (mux_version == 0xAC)
 		return -1;
 
 	printk(KERN_INFO "i8042.c: Detected active multiplexing controller, rev %d.%d.\n",
