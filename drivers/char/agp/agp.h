@@ -46,28 +46,6 @@ int agp_generic_suspend(void);
 void agp_generic_resume(void);
 void agp_free_key(int key);
 
-/* chipset specific init routines. */
-/*
-int __init ali_generic_setup (struct pci_dev *pdev);
-int __init amd_irongate_setup (struct pci_dev *pdev);
-int __init amd_8151_setup (struct pci_dev *pdev);
-int __init hp_zx1_setup (struct pci_dev *pdev);
-int __init intel_i460_setup (struct pci_dev *pdev);
-int __init intel_generic_setup (struct pci_dev *pdev);
-int __init intel_i810_setup(struct pci_dev *i810_dev);
-int __init intel_815_setup(struct pci_dev *pdev);
-int __init intel_i830_setup(struct pci_dev *i830_dev);
-int __init intel_820_setup (struct pci_dev *pdev);
-int __init intel_830mp_setup (struct pci_dev *pdev);
-int __init intel_840_setup (struct pci_dev *pdev);
-int __init intel_845_setup (struct pci_dev *pdev);
-int __init intel_850_setup (struct pci_dev *pdev);
-int __init intel_860_setup (struct pci_dev *pdev);
-int __init serverworks_setup (struct pci_dev *pdev);
-int __init sis_generic_setup (struct pci_dev *pdev);
-int __init via_generic_setup (struct pci_dev *pdev);
-*/
-
 #define PFX "agpgart: "
 
 int agp_register_driver (struct pci_dev *dev);

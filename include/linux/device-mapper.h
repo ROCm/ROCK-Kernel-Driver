@@ -7,13 +7,6 @@
 #ifndef _LINUX_DEVICE_MAPPER_H
 #define _LINUX_DEVICE_MAPPER_H
 
-#define DM_DIR "mapper"	/* Slashes not supported */
-#define DM_MAX_TYPE_NAME 16
-#define DM_NAME_LEN 128
-#define DM_UUID_LEN 129
-
-#ifdef __KERNEL__
-
 struct dm_target;
 struct dm_table;
 struct dm_dev;
@@ -100,7 +93,5 @@ struct dm_target {
 
 int dm_register_target(struct target_type *t);
 int dm_unregister_target(struct target_type *t);
-
-#endif				/* __KERNEL__ */
 
 #endif				/* _LINUX_DEVICE_MAPPER_H */

@@ -138,8 +138,8 @@ static int amd_create_gatt_table(void)
 		return retval;
 	}
 
-	agp_bridge.gatt_table_real = (u32 *)page_dir.real;
-	agp_bridge.gatt_table = (u32 *)page_dir.remapped;
+	agp_bridge.gatt_table_real = (unsigned long *)page_dir.real;
+	agp_bridge.gatt_table = (unsigned long *)page_dir.remapped;
 	agp_bridge.gatt_bus_addr = virt_to_phys(page_dir.real);
 
 	/* Get the address for the gart region.
@@ -165,8 +165,8 @@ static int amd_free_gatt_table(void)
 {
 	struct amd_page_map page_dir;
    
-	page_dir.real = (u32 *)agp_bridge.gatt_table_real;
-	page_dir.remapped = (u32 *)agp_bridge.gatt_table;
+	page_dir.real = (unsigned long *)agp_bridge.gatt_table_real;
+	page_dir.remapped = (unsigned long *)agp_bridge.gatt_table;
 
 	amd_free_gatt_pages();
 	amd_free_page_map(&page_dir);

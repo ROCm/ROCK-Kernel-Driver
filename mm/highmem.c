@@ -452,8 +452,6 @@ inline void blk_queue_bounce(request_queue_t *q, struct bio **bio_orig)
 	mempool_t *pool;
 	int bio_gfp;
 
-	BUG_ON((*bio_orig)->bi_idx);
-
 	/*
 	 * for non-isa bounce case, just check if the bounce pfn is equal
 	 * to or bigger than the highest pfn in the system -- in that case,
