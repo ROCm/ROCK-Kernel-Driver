@@ -154,8 +154,28 @@ new_range:
 		if (max_domain < numa_domain)
 			max_domain = numa_domain;
 
-		node_data[numa_domain].node_start_pfn = start / PAGE_SIZE;
-		node_data[numa_domain].node_size = size / PAGE_SIZE;
+		/* 
+		 * For backwards compatibility, OF splits the first node
+		 * into two regions (the first being 0-4GB). Check for
+		 * this simple case and complain if there is a gap in
+		 * memory
+		 */
+		if (node_data[numa_domain].node_size) {
+			unsigned long shouldstart =
+				node_data[numa_domain].node_start_pfn + 
+				node_data[numa_domain].node_size;
+			if (shouldstart != (start / PAGE_SIZE)) {
+				printk(KERN_ERR "Hole in node, disabling "
+						"region start %lx length %lx\n",
+						start, size);
+				continue;
+			}
+			node_data[numa_domain].node_size += size / PAGE_SIZE;
+		} else {
+			node_data[numa_domain].node_start_pfn =
+				start / PAGE_SIZE;
+			node_data[numa_domain].node_size = size / PAGE_SIZE;
+		}
 
 		for (i = start ; i < (start+size); i += MEMORY_INCREMENT)
 			numa_memory_lookup_table[i >> MEMORY_INCREMENT_SHIFT] =
