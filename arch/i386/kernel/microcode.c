@@ -211,7 +211,7 @@ static void do_update_one(void *unused)
 	req->err = 1; /* assume update will fail on this cpu */
 
 	if (c->x86_vendor != X86_VENDOR_INTEL || c->x86 < 6 ||
-		test_bit(X86_FEATURE_IA64, &c->x86_capability)){
+		test_bit(X86_FEATURE_IA64, c->x86_capability)){
 		printk(KERN_ERR "microcode: CPU%d not a capable Intel processor\n", cpu_num);
 		return;
 	}
