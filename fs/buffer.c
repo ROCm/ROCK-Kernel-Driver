@@ -221,7 +221,6 @@ int sync_blockdev(struct block_device *bdev)
 		err = filemap_fdatawait(bdev->bd_inode->i_mapping);
 		if (!ret)
 			ret = err;
-		blkdev_issue_flush(bdev, NULL);
 	}
 	return ret;
 }
