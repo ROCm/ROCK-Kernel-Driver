@@ -113,7 +113,7 @@ ENTRY(__do_div64)
 
 	@ The top part of remainder became zero.  If carry is set
 	@ (the 33th bit) this is a false positive so resume the loop.
-	@ Otherwise, if lower part is also null then we're done.
+	@ Otherwise, if lower part is also null then we are done.
 6:	bcs	5b
 	cmp	xl, #0
 	moveq	pc, lr
@@ -135,10 +135,10 @@ ENTRY(__do_div64)
 
 #endif
 
-	@ Current remainder is now 1.  It's worthless to compare with
-	@ divisor at this point since divisor can't be smaller than 3 here.
+	@ Current remainder is now 1.  It is worthless to compare with
+	@ divisor at this point since divisor can not be smaller than 3 here.
 	@ If possible, branch for another shift in the division loop.
-	@ If no bit position left then we're done.
+	@ If no bit position left then we are done.
 	movs	ip, ip, lsr #1
 	mov	xh, #1
 	bne	4b
