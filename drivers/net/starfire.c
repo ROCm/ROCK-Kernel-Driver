@@ -905,6 +905,7 @@ static int netdev_open(struct net_device *dev)
 		return -ENOMEM;
 	}
 
+	netif_carrier_off(dev);
 	init_ring(dev);
 	/* Set the size of the Rx buffers. */
 	writel((np->rx_buf_sz << RxBufferLenShift) |
@@ -1587,6 +1588,7 @@ static void netdev_media_change(struct net_device *dev)
 			else
 				np->mii_if.full_duplex = 0;
 		}
+		netif_carrier_on(dev);
 		printk(KERN_DEBUG "%s: Link is up, running at %sMbit %s-duplex\n",
 		       dev->name,
 		       np->speed100 ? "100" : "10",
@@ -1602,6 +1604,7 @@ static void netdev_media_change(struct net_device *dev)
 			writel(np->tx_mode, ioaddr + TxMode);
 		}
 	} else {
+		netif_carrier_off(dev);
 		printk(KERN_DEBUG "%s: Link is down\n", dev->name);
 	}
 }
