@@ -67,6 +67,7 @@ struct psmouse {
 int psmouse_command(struct psmouse *psmouse, unsigned char *param, int command);
 
 extern int psmouse_smartscroll;
+extern unsigned int psmouse_rate;
 extern unsigned int psmouse_resetafter;
 
 #endif /* _PSMOUSE_H */

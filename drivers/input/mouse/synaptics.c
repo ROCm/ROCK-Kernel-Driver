@@ -214,7 +214,9 @@ static int synaptics_set_mode(struct psmouse *psmouse, int mode)
 {
 	struct synaptics_data *priv = psmouse->private;
 
-	mode |= SYN_BIT_ABSOLUTE_MODE | SYN_BIT_HIGH_RATE;
+	mode |= SYN_BIT_ABSOLUTE_MODE;
+	if (psmouse_rate >= 80)
+		mode |= SYN_BIT_HIGH_RATE;
 	if (SYN_ID_MAJOR(priv->identity) >= 4)
 		mode |= SYN_BIT_DISABLE_GESTURE;
 	if (SYN_CAP_EXTENDED(priv->capabilities))
