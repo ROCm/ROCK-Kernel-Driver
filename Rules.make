@@ -12,7 +12,7 @@ space   := $(empty) $(empty)
 # ---------------------------------------------------------------------------
 
 ifdef O_TARGET
-$(error kbuild: $(obj)/Makefile - Usage of O_TARGET := $(O_TARGET) is obsolete in 2.5. Please fix!
+$(error kbuild: $(obj)/Makefile - Usage of O_TARGET := $(O_TARGET) is obsolete in 2.5. Please fix!)
 endif
 
 ifdef L_TARGET
@@ -402,6 +402,7 @@ targets += $(multi-used-y) $(multi-used-m)
 host-progs-single     := $(foreach m,$(host-progs),$(if $($(m)-objs),,$(m)))
 host-progs-multi      := $(foreach m,$(host-progs),$(if $($(m)-objs),$(m)))
 host-progs-multi-objs := $(foreach m,$(host-progs-multi),$($(m)-objs))
+host-progs	      := $(addprefix $(obj)/,$(host-progs))
 host-progs-single     := $(addprefix $(obj)/,$(host-progs-single))
 host-progs-multi      := $(addprefix $(obj)/,$(host-progs-multi))
 host-progs-multi-objs := $(addprefix $(obj)/,$(host-progs-multi-objs))

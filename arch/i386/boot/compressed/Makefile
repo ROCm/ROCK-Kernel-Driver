@@ -27,4 +27,4 @@ $(obj)/piggy.o: $(obj)/vmlinux.scr $(obj)/vmlinux.bin.gz FORCE
 
 clean:
 	@echo 'Cleaning up (boot/compressed)'
-	@rm -f $(addprefix $(obj)/,vmlinux vmlinux.bin vmlinux.bin.gz)
+	@rm -f $(EXTRA_TARGETS)
