@@ -111,8 +111,6 @@ tlan.txt
 	- ThunderLAN (Compaq Netelligent 10/100, Olicom OC-2xxx) driver info.
 tms380tr.txt
 	- SysKonnect Token Ring ISA/PCI adapter driver info.
-tulip.txt
-	- info on using DEC 21040/21041/21140 based PCI Ethernet cards.
 tuntap.txt
 	- TUN/TAP device driver, allowing user space Rx/Tx of packets.
 vortex.txt
