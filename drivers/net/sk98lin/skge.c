@@ -409,9 +409,6 @@ static int __init skge_probe (void)
 		printk("%s\n", BootString);
 	}
 
-	if (!pci_present())		/* is PCI support present? */
-		return -ENODEV;
-
 	while((pdev = pci_find_device(PCI_VENDOR_ID_SYSKONNECT,
 				      PCI_DEVICE_ID_SYSKONNECT_GE, pdev)) != NULL) {
 

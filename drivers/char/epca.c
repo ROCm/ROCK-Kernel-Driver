@@ -1639,16 +1639,9 @@ int __init pc_init(void)
 	--------------------------------------------------------------------- */
   
 	pci_boards_found = 0;
-	if (pci_present())
-	{
-		if(num_cards < MAXBOARDS)
-			pci_boards_found += init_PCI();
-		num_cards += pci_boards_found;
-	}
-	else 
-	{
-		printk(KERN_ERR "<Error> - No PCI BIOS found\n");
-	}
+	if(num_cards < MAXBOARDS)
+		pci_boards_found += init_PCI();
+	num_cards += pci_boards_found;
 
 #endif /* ENABLE_PCI */
 

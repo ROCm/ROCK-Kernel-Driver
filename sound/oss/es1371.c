@@ -3043,8 +3043,6 @@ static struct pci_driver es1371_driver = {
 
 static int __init init_es1371(void)
 {
-	if (!pci_present())   /* No PCI bus in this machine! */
-		return -ENODEV;
 	printk(KERN_INFO PFX "version v0.32 time " __TIME__ " " __DATE__ "\n");
 	return pci_module_init(&es1371_driver);
 }

@@ -493,8 +493,6 @@ typedef unsigned int pcidev_t;
 #define PciDeviceFn(d)		((d)&0xff)
 #define __PciDev(busn, devfn)	(((busn)<<8)+(devfn))
 
-#define pci_present pcibios_present
-
 #define pci_read_config_byte(d, w, v) \
 	pcibios_read_config_byte(PciBusNumber(d), PciDeviceFn(d), w, v)
 #define pci_read_config_word(d, w, v) \
@@ -12903,12 +12901,6 @@ int __init sym53c8xx_detect(Scsi_Host_Template *tpnt)
 #ifdef SCSI_NCR_NVRAM_SUPPORT
 	ncr_nvram  nvram0, nvram, *nvp;
 #endif
-
-	/*
-	**    PCI is required.
-	*/
-	if (!pci_present())
-		return 0;
 
 	/*
 	**    Initialize driver general stuff.

@@ -2460,69 +2460,68 @@ static int __init sx_init(void)
 	}
 
 #ifdef CONFIG_PCI
-	if (pci_present ()) {
 #ifndef TWO_ZERO
-		while ((pdev = pci_find_device (PCI_VENDOR_ID_SPECIALIX, 
-		                                PCI_DEVICE_ID_SPECIALIX_SX_XIO_IO8, 
-			                              pdev))) {
-			if (pci_enable_device(pdev))
-				continue;
+	while ((pdev = pci_find_device (PCI_VENDOR_ID_SPECIALIX, 
+					PCI_DEVICE_ID_SPECIALIX_SX_XIO_IO8, 
+					      pdev))) {
+		if (pci_enable_device(pdev))
+			continue;
 #else
-			for (i=0;i< SX_NBOARDS;i++) {
-				if (pcibios_find_device (PCI_VENDOR_ID_SPECIALIX, 
-				                         PCI_DEVICE_ID_SPECIALIX_SX_XIO_IO8, i,
-					                       &pci_bus, &pci_fun)) break;
+	for (i=0;i< SX_NBOARDS;i++) {
+		if (pcibios_find_device (PCI_VENDOR_ID_SPECIALIX, 
+					 PCI_DEVICE_ID_SPECIALIX_SX_XIO_IO8, i,
+					       &pci_bus, &pci_fun))
+			break;
 #endif
-			/* Specialix has a whole bunch of cards with
-			   0x2000 as the device ID. They say its because
-			   the standard requires it. Stupid standard. */
-			/* It seems that reading a word doesn't work reliably on 2.0.
-			   Also, reading a non-aligned dword doesn't work. So we read the
-			   whole dword at 0x2c and extract the word at 0x2e (SUBSYSTEM_ID)
-			   ourselves */
-			/* I don't know why the define doesn't work, constant 0x2c does --REW */ 
-			pci_read_config_dword (pdev, 0x2c, &tint);
-			tshort = (tint >> 16) & 0xffff;
-			sx_dprintk (SX_DEBUG_PROBE, "Got a specialix card: %x.\n", tint);
-			/* sx_dprintk (SX_DEBUG_PROBE, "pdev = %d/%d	(%x)\n", pdev, tint); */ 
-			if ((tshort != 0x0200) && (tshort != 0x0300)) {
-				sx_dprintk (SX_DEBUG_PROBE, "But it's not an SX card (%d)...\n", 
-				            tshort);
-				continue;
-			}
-			board = &boards[found];
-
-			board->flags &= ~SX_BOARD_TYPE;
-			board->flags |= (tshort == 0x200)?SX_PCI_BOARD:
-			                                  SX_CFPCI_BOARD;
-
-			/* CF boards use base address 3.... */
-			if (IS_CF_BOARD (board))
-				board->hw_base = pci_resource_start (pdev, 3);
-			else
-				board->hw_base = pci_resource_start (pdev, 2);
-			board->base2 = 
-			board->base = (ulong) ioremap(board->hw_base, WINDOW_LEN (board));
-			if (!board->base) {
-				printk(KERN_ERR "ioremap failed\n");
-				/* XXX handle error */
-			}
-
-			/* Most of the stuff on the CF board is offset by
-			   0x18000 ....  */
-			if (IS_CF_BOARD (board)) board->base += 0x18000;
-
-			board->irq = pdev->irq;
-
-			sx_dprintk (SX_DEBUG_PROBE, "Got a specialix card: %x/%lx(%d) %x.\n", 
-			            tint, boards[found].base, board->irq, board->flags);
-
-			if (probe_sx (board)) {
-				found++;
-				fix_sx_pci (pdev, board);
-			} else 
-				iounmap ((char *) (board->base));
+		/* Specialix has a whole bunch of cards with
+		   0x2000 as the device ID. They say its because
+		   the standard requires it. Stupid standard. */
+		/* It seems that reading a word doesn't work reliably on 2.0.
+		   Also, reading a non-aligned dword doesn't work. So we read the
+		   whole dword at 0x2c and extract the word at 0x2e (SUBSYSTEM_ID)
+		   ourselves */
+		/* I don't know why the define doesn't work, constant 0x2c does --REW */ 
+		pci_read_config_dword (pdev, 0x2c, &tint);
+		tshort = (tint >> 16) & 0xffff;
+		sx_dprintk (SX_DEBUG_PROBE, "Got a specialix card: %x.\n", tint);
+		/* sx_dprintk (SX_DEBUG_PROBE, "pdev = %d/%d	(%x)\n", pdev, tint); */ 
+		if ((tshort != 0x0200) && (tshort != 0x0300)) {
+			sx_dprintk (SX_DEBUG_PROBE, "But it's not an SX card (%d)...\n", 
+				    tshort);
+			continue;
 		}
+		board = &boards[found];
+
+		board->flags &= ~SX_BOARD_TYPE;
+		board->flags |= (tshort == 0x200)?SX_PCI_BOARD:
+						  SX_CFPCI_BOARD;
+
+		/* CF boards use base address 3.... */
+		if (IS_CF_BOARD (board))
+			board->hw_base = pci_resource_start (pdev, 3);
+		else
+			board->hw_base = pci_resource_start (pdev, 2);
+		board->base2 = 
+		board->base = (ulong) ioremap(board->hw_base, WINDOW_LEN (board));
+		if (!board->base) {
+			printk(KERN_ERR "ioremap failed\n");
+			/* XXX handle error */
+		}
+
+		/* Most of the stuff on the CF board is offset by
+		   0x18000 ....  */
+		if (IS_CF_BOARD (board)) board->base += 0x18000;
+
+		board->irq = pdev->irq;
+
+		sx_dprintk (SX_DEBUG_PROBE, "Got a specialix card: %x/%lx(%d) %x.\n", 
+			    tint, boards[found].base, board->irq, board->flags);
+
+		if (probe_sx (board)) {
+			found++;
+			fix_sx_pci (pdev, board);
+		} else 
+			iounmap ((char *) (board->base));
 	}
 #endif
 
@@ -2648,4 +2647,5 @@ static void __exit sx_exit (void)
 
 module_init(sx_init);
 module_exit(sx_exit);
+
 

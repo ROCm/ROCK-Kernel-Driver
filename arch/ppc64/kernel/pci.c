@@ -371,11 +371,11 @@ int pcibios_enable_device(struct pci_dev *dev, int mask)
 }
 
 /*
- * Return the index of the PCI controller for device pdev.
+ * Return the domain number for this bus.
  */
-int pci_controller_num(struct pci_dev *dev)
+int pci_domain_nr(struct pci_bus *bus)
 {
-	struct pci_controller *hose = PCI_GET_PHB_PTR(dev);
+	struct pci_controller *hose = PCI_GET_PHB_PTR(bus);
 
 	return hose->global_number;
 }

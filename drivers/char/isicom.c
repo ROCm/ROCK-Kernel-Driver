@@ -1905,7 +1905,7 @@ int init_module(void)
 		}
 	}	
 	
-	if (pci_present() && (card < BOARD_COUNT)) {
+	if (card < BOARD_COUNT) {
 		for (idx=0; idx < DEVID_COUNT; idx++) {
 			dev = NULL;
 			for (;;){

@@ -2713,12 +2713,8 @@ int __init rp_init(void)
 	}
 
 #ifdef CONFIG_PCI
-	if (pci_present()) {
-		if (isa_boards_found < NUM_BOARDS)
-			pci_boards_found = init_PCI(isa_boards_found);
-	} else {
-		printk(KERN_INFO "No PCI BIOS found\n");
-	}
+	if (isa_boards_found < NUM_BOARDS)
+		pci_boards_found = init_PCI(isa_boards_found);
 #endif
 
 	max_board = pci_boards_found + isa_boards_found;

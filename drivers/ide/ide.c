@@ -332,7 +332,7 @@ int ide_system_bus_speed (void)
 		if (idebus_parameter) {
 			/* user supplied value */
 			system_bus_speed = idebus_parameter;
-		} else if (pci_present()) {
+		} else if (pci_find_device(PCI_ANY_ID, PCI_ANY_ID, NULL) != NULL) {
 			/* safe default value for PCI */
 			system_bus_speed = 33;
 		} else {
@@ -2115,10 +2115,7 @@ done:
 static void __init probe_for_hwifs (void)
 {
 #ifdef CONFIG_BLK_DEV_IDEPCI
-	if (pci_present())
-	{
-		ide_scan_pcibus(ide_scan_direction);
-	}
+	ide_scan_pcibus(ide_scan_direction);
 #endif /* CONFIG_BLK_DEV_IDEPCI */
 
 #ifdef CONFIG_ETRAX_IDE

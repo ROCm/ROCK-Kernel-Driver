@@ -47,7 +47,7 @@ static void * r1bio_pool_alloc(int gfp_flags, void *data)
 	r1_bio = kmalloc(sizeof(r1bio_t) + sizeof(struct bio*)*mddev->raid_disks,
 			 gfp_flags);
 	if (r1_bio)
-		memset(r1_bio, 0, sizeof(*r1_bio));
+		memset(r1_bio, 0, sizeof(*r1_bio) + sizeof(struct bio*)*mddev->raid_disks);
 
 	return r1_bio;
 }
@@ -1057,6 +1057,7 @@ static int run(mddev_t *mddev)
 		       mdidx(mddev));
 		goto out_free_conf;
 	}
+	memset(conf->mirrors, 0, sizeof(struct mirror_info)*mddev->raid_disks);
 
 	conf->r1bio_pool = mempool_create(NR_RAID1_BIOS, r1bio_pool_alloc,
 						r1bio_pool_free, mddev);

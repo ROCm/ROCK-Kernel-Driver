@@ -44,7 +44,7 @@ proc_bus_pci_lseek(struct file *file, loff_t off, int whence)
 }
 
 static ssize_t
-proc_bus_pci_read(struct file *file, char *buf, size_t nbytes, loff_t *ppos)
+proc_bus_pci_read(struct file *file, char __user *buf, size_t nbytes, loff_t *ppos)
 {
 	const struct inode *ino = file->f_dentry->d_inode;
 	const struct proc_dir_entry *dp = PDE(ino);
@@ -126,7 +126,7 @@ proc_bus_pci_read(struct file *file, char *buf, size_t nbytes, loff_t *ppos)
 }
 
 static ssize_t
-proc_bus_pci_write(struct file *file, const char *buf, size_t nbytes, loff_t *ppos)
+proc_bus_pci_write(struct file *file, const char __user *buf, size_t nbytes, loff_t *ppos)
 {
 	const struct inode *ino = file->f_dentry->d_inode;
 	const struct proc_dir_entry *dp = PDE(ino);
@@ -210,7 +210,7 @@ static int proc_bus_pci_ioctl(struct inode *inode, struct file *file, unsigned i
 
 	switch (cmd) {
 	case PCIIOC_CONTROLLER:
-		ret = pci_controller_num(dev);
+		ret = pci_domain_nr(dev->bus);
 		break;
 
 #ifdef HAVE_PCI_MMAP
@@ -323,7 +323,7 @@ static void *pci_seq_next(struct seq_file *m, void *v, loff_t *pos)
 {
 	struct list_head *p = v;
 	(*pos)++;
-	return p->next != &pci_devices ? p->next : NULL;
+	return p->next != &pci_devices ? (void *)p->next : NULL;
 }
 static void pci_seq_stop(struct seq_file *m, void *v)
 {
@@ -579,19 +579,17 @@ static struct file_operations proc_bus_pci_dev_operations = {
 
 static int __init pci_proc_init(void)
 {
-	if (pci_present()) {
-		struct proc_dir_entry *entry;
-		struct pci_dev *dev = NULL;
-		proc_bus_pci_dir = proc_mkdir("pci", proc_bus);
-		entry = create_proc_entry("devices", 0, proc_bus_pci_dir);
-		if (entry)
-			entry->proc_fops = &proc_bus_pci_dev_operations;
-		proc_initialized = 1;
-		while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
-			pci_proc_attach_device(dev);
-		}
-		legacy_proc_init();
+	struct proc_dir_entry *entry;
+	struct pci_dev *dev = NULL;
+	proc_bus_pci_dir = proc_mkdir("pci", proc_bus);
+	entry = create_proc_entry("devices", 0, proc_bus_pci_dir);
+	if (entry)
+		entry->proc_fops = &proc_bus_pci_dev_operations;
+	proc_initialized = 1;
+	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
+		pci_proc_attach_device(dev);
 	}
+	legacy_proc_init();
 	return 0;
 }
 

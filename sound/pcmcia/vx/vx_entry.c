@@ -371,10 +371,6 @@ static int vxpocket_event(event_t event, int priority, event_callback_args_t *ar
 	return 0;
 }
 
-/* we link this module statically with the card modules
- * due to the pcmcia symbol problems...
- */
-#if 0
 /*
  * exported stuffs
  */
@@ -382,4 +378,3 @@ EXPORT_SYMBOL(snd_vxpocket_ops);
 EXPORT_SYMBOL(snd_vxpocket_attach);
 EXPORT_SYMBOL(snd_vxpocket_detach);
 EXPORT_SYMBOL(snd_vxpocket_detach_all);
-#endif

@@ -4460,9 +4460,7 @@ GDTH_INITFUNC(int, gdth_detect(Scsi_Host_Template *shtp))
     }
 
     /* scanning for PCI controllers */
-#if LINUX_VERSION_CODE >= 0x2015C
-    if (pci_present())
-#else
+#if LINUX_VERSION_CODE < 0x2015C
     if (pcibios_present())
 #endif
     {

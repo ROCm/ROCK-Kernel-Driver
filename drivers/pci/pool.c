@@ -29,7 +29,8 @@ struct pci_page {	/* cacheable header for 'allocation' bytes */
 };
 
 #define	POOL_TIMEOUT_JIFFIES	((100 /* msec */ * HZ) / 1000)
-#define	POOL_POISON_BYTE	0xa7
+#define	POOL_POISON_FREED	0xa7	/* !inuse */
+#define	POOL_POISON_ALLOCATED	0xa9	/* !initted */
 
 static DECLARE_MUTEX (pools_lock);
 
@@ -172,7 +173,7 @@ pool_alloc_page (struct pci_pool *pool, int mem_flags)
 	if (page->vaddr) {
 		memset (page->bitmap, 0xff, mapsize);	// bit set == free
 #ifdef	CONFIG_DEBUG_SLAB
-		memset (page->vaddr, POOL_POISON_BYTE, pool->allocation);
+		memset (page->vaddr, POOL_POISON_FREED, pool->allocation);
 #endif
 		list_add (&page->page_list, &pool->page_list);
 		page->in_use = 0;
@@ -201,7 +202,7 @@ pool_free_page (struct pci_pool *pool, struct pci_page *page)
 	dma_addr_t	dma = page->dma;
 
 #ifdef	CONFIG_DEBUG_SLAB
-	memset (page->vaddr, POOL_POISON_BYTE, pool->allocation);
+	memset (page->vaddr, POOL_POISON_FREED, pool->allocation);
 #endif
 	pci_free_consistent (pool->dev, pool->allocation, page->vaddr, dma);
 	list_del (&page->page_list);
@@ -309,6 +310,9 @@ ready:
 	page->in_use++;
 	retval = offset + page->vaddr;
 	*handle = offset + page->dma;
+#ifdef	CONFIG_DEBUG_SLAB
+	memset (retval, POOL_POISON_ALLOCATED, pool->size);
+#endif
 done:
 	spin_unlock_irqrestore (&pool->lock, flags);
 	return retval;
@@ -378,7 +382,7 @@ pci_pool_free (struct pci_pool *pool, void *vaddr, dma_addr_t dma)
 			pool->name, (unsigned long long)dma);
 		return;
 	}
-	memset (vaddr, POOL_POISON_BYTE, pool->size);
+	memset (vaddr, POOL_POISON_FREED, pool->size);
 #endif
 
 	spin_lock_irqsave (&pool->lock, flags);

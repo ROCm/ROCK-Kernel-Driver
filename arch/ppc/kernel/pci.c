@@ -1483,16 +1483,6 @@ pci_resource_to_bus(struct pci_dev *pdev, struct resource *res)
 }
 
 /*
- * Return the index of the PCI controller for device pdev.
- */
-int pci_controller_num(struct pci_dev *dev)
-{
-	struct pci_controller *hose = (struct pci_controller *) dev->sysdata;
-
-	return hose->index;
-}
-
-/*
  * Platform support for /proc/bus/pci/X/Y mmap()s,
  * modelled on the sparc64 implementation by Dave Miller.
  *  -- paulus.

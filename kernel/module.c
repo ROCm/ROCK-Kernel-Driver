@@ -1366,7 +1366,7 @@ static struct module *load_module(void __user *umod,
 	long arglen;
 	struct module *mod;
 	long err = 0;
-	void *ptr = NULL; /* Stops spurious gcc uninitialized warning */
+	void *percpu = NULL, *ptr = NULL; /* Stops spurious gcc warning */
 
 	DEBUGP("load_module: umod=%p, len=%lu, uargs=%p\n",
 	       umod, len, uargs);
@@ -1496,13 +1496,14 @@ static struct module *load_module(void __user *umod,
 
 	if (pcpuindex) {
 		/* We have a special allocation for this section. */
-		mod->percpu = percpu_modalloc(sechdrs[pcpuindex].sh_size,
-					      sechdrs[pcpuindex].sh_addralign);
-		if (!mod->percpu) {
+		percpu = percpu_modalloc(sechdrs[pcpuindex].sh_size,
+					 sechdrs[pcpuindex].sh_addralign);
+		if (!percpu) {
 			err = -ENOMEM;
 			goto free_mod;
 		}
 		sechdrs[pcpuindex].sh_flags &= ~(unsigned long)SHF_ALLOC;
+		mod->percpu = percpu;
 	}
 
 	/* Determine total sizes, and put offsets in sh_entsize.  For now
@@ -1643,8 +1644,8 @@ static struct module *load_module(void __user *umod,
  free_core:
 	module_free(mod, mod->module_core);
  free_percpu:
-	if (mod->percpu)
-		percpu_modfree(mod->percpu);
+	if (percpu)
+		percpu_modfree(percpu);
  free_mod:
 	kfree(args);
  free_hdr:

@@ -298,12 +298,6 @@ int cpqfcTS_detect(Scsi_Host_Template *ScsiHostTemplate)
   ScsiHostTemplate->proc_name = "cpqfcTS";
 #endif
 
-  if( pci_present() == 0) // no PCI busses?
-  {
-    printk( "  no PCI bus?@#!\n");
-    return NumberOfAdapters;
-  }
-
   for( i=0; i < HBA_TYPES; i++)
   {
     // look for all HBAs of each type

@@ -285,8 +285,6 @@ int __init maestro_radio_init(void)
 {
 	register __u16 found=0;
 	struct pci_dev *pcidev = NULL;
-	if(!pci_present())
-		return -ENODEV;
 	while(!found && (pcidev = pci_find_device(PCI_VENDOR_ESS, 
 						  PCI_DEVICE_ID_ESS_ESS1968,
 						  pcidev)))

@@ -218,7 +218,7 @@ int orc_ReturnNumberOfAdapters(void)
 	/*
 	 * PCI-bus probe.
 	 */
-	if (pci_present()) {
+	{
 		/*
 		 * Note: I removed the struct pci_device_list stuff since this
 		 * driver only cares about one device ID.  If that changes in

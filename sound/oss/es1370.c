@@ -2739,8 +2739,6 @@ static struct pci_driver es1370_driver = {
 
 static int __init init_es1370(void)
 {
-	if (!pci_present())   /* No PCI bus in this machine! */
-		return -ENODEV;
 	printk(KERN_INFO "es1370: version v0.38 time " __TIME__ " " __DATE__ "\n");
 	return pci_module_init(&es1370_driver);
 }

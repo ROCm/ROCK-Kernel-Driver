@@ -19,7 +19,7 @@
 #ifndef _LINUX_CPU_H_
 #define _LINUX_CPU_H_
 
-#include <linux/device.h>
+#include <linux/sysdev.h>
 #include <linux/node.h>
 #include <asm/semaphore.h>
 
@@ -29,8 +29,6 @@ struct cpu {
 };
 
 extern int register_cpu(struct cpu *, int, struct node *);
-extern struct class cpu_class;
-
 struct notifier_block;
 
 #ifdef CONFIG_SMP
@@ -48,6 +46,7 @@ static inline void unregister_cpu_notifier(struct notifier_block *nb)
 {
 }
 #endif /* CONFIG_SMP */
+extern struct sysdev_class cpu_sysdev_class;
 
 /* Stop CPUs going up and down. */
 extern struct semaphore cpucontrol;

@@ -1034,14 +1034,6 @@ int lmc_probe (struct net_device *dev) /*fold00*/
     u8 intcf = 0;
     struct pci_dev *pdev = NULL;
 
-    /* The card is only available on PCI, so if we don't have a
-     * PCI bus, we are in trouble.
-     */
-
-    if (!pci_present()) {
-/*        printk ("%s: We really want a pci bios!\n", dev->name);*/
-        return -1;
-    }
     /* Loop basically until we don't find anymore. */
     while ((pdev = pci_find_class (PCI_CLASS_NETWORK_ETHERNET << 8, pdev))) {
 	if (pci_enable_device(pdev))

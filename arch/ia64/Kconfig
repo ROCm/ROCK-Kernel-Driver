@@ -543,6 +543,10 @@ config PCI
 	  information about which PCI hardware does work under Linux and which
 	  doesn't.
 
+config PCI_DOMAINS
+	bool
+	default PCI
+
 source "drivers/pci/Kconfig"
 
 config HOTPLUG

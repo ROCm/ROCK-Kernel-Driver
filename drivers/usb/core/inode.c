@@ -282,13 +282,13 @@ static int usbfs_rmdir(struct inode *dir, struct dentry *dentry)
 
 
 /* default file operations */
-static ssize_t default_read_file (struct file *file, char *buf,
+static ssize_t default_read_file (struct file *file, char __user *buf,
 				  size_t count, loff_t *ppos)
 {
 	return 0;
 }
 
-static ssize_t default_write_file (struct file *file, const char *buf,
+static ssize_t default_write_file (struct file *file, const char __user *buf,
 				   size_t count, loff_t *ppos)
 {
 	return count;

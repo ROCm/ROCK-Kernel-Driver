@@ -226,9 +226,6 @@ static inline int pci_dma_supported(struct pci_dev *hwdev, u64 mask)
  */
 #define pci_dac_dma_supported(pci_dev, mask) (0)
 
-/* Return the index of the PCI controller for device PDEV. */
-#define pci_controller_num(PDEV)	(0)
-
 /* These macros should be used after a pci_map_sg call has been done
  * to get bus addresses of each of the SG entries and their lengths.
  * You should only work with the number of sg entries pci_map_sg

@@ -1889,7 +1889,7 @@ sba_connect_bus(struct pci_bus *bus)
 		handle = parent;
 	} while (ACPI_SUCCESS(status));
 
-	printk(KERN_WARNING "No IOC for PCI Bus %02x:%02x in ACPI\n", PCI_SEGMENT(bus), bus->number);
+	printk(KERN_WARNING "No IOC for PCI Bus %04x:%02x in ACPI\n", pci_domain_nr(bus), bus->number);
 }
 
 static int __init
@@ -1939,8 +1939,8 @@ sba_init(void)
 
 #ifdef CONFIG_PCI
 	{
-		struct pci_bus *b;
-		pci_for_each_bus(b)
+		struct pci_bus *b = NULL;
+		while ((b = pci_find_next_bus(b)) != NULL)
 			sba_connect_bus(b);
 	}
 #endif

@@ -7821,9 +7821,6 @@ int __init ixj_probe_pci(int *cnt)
 	IXJ *j = NULL;
 	int result;
 
-	if(!pci_present())
-		return 0;
-
 	for (i = 0; i < IXJMAX - *cnt; i++) {
 		pci = pci_find_device(0x15E2, 0x0500, pci);
 		if (!pci)
@@ -7869,10 +7866,8 @@ int __init ixj_init(void)
 	if ((probe = ixj_probe_isa(&cnt)) < 0) {
 		return probe;
 	}
-	if (pci_present()) {
-		if ((probe = ixj_probe_pci(&cnt)) < 0) {
-			return probe;
-		}
+	if ((probe = ixj_probe_pci(&cnt)) < 0) {
+		return probe;
 	}
 	printk("%s\n", ixj_c_rcsid);
 	create_proc_read_entry ("ixj", 0, NULL, ixj_read_proc, NULL);

@@ -50,17 +50,9 @@ divas_init(void)
 
 	DivasInitDpc();
 
-	if (pci_present())
+	if (DivasCardsDiscover() < 0)
 	{
-		if (DivasCardsDiscover() < 0)
-		{
-			printk(KERN_WARNING "Divas: Not loaded\n");
-			return -ENODEV;
-		}
-	}
-	else
-	{
-		printk(KERN_WARNING "Divas: No PCI bus present\n");
+		printk(KERN_WARNING "Divas: Not loaded\n");
 		return -ENODEV;
 	}
 

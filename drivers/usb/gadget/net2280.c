@@ -20,10 +20,12 @@
  * short OUT transfers happen.)  Drivers can use the req->no_interrupt
  * hint to completely eliminate some IRQs, if a later IRQ is guaranteed
  * and DMA chaining is enabled.
+ *
+ * Note that almost all the errata workarounds here are only needed for
+ * rev1 chips.  Rev1a silicon (0110) fixes almost all of them.
  */
 
-// #define NET2280_DMA_OUT_WORKAROUND
-// #define USE_DMA_CHAINING
+#define USE_DMA_CHAINING
 
 
 /*
@@ -180,6 +182,13 @@ net2280_enable (struct usb_ep *_ep, const struct usb_endpoint_descriptor *desc)
 		 * kicking in the "toggle-irrelevant" mode.
 		 */
 		tmp = USB_ENDPOINT_XFER_BULK;
+	} else if (tmp == USB_ENDPOINT_XFER_BULK) {
+		/* catch some particularly blatant driver bugs */
+		if ((dev->gadget.speed == USB_SPEED_HIGH
+					&& max != 512)
+				|| (dev->gadget.speed == USB_SPEED_FULL
+					&& max > 64))
+			return -ERANGE;
 	}
 	ep->is_iso = (tmp == USB_ENDPOINT_XFER_ISOC) ? 1 : 0;
 	tmp <<= ENDPOINT_TYPE;
@@ -252,9 +261,6 @@ static int handshake (u32 *ptr, u32 mask, u32 done, int usec)
 		udelay (1);
 		usec--;
 	} while (usec > 0);
-#ifdef DEBUG
-	if (done == 0) dump_stack (); 		/* ignore out_flush timeout */
-#endif
 	return -ETIMEDOUT;
 }
 
@@ -917,6 +923,8 @@ net2280_queue (struct usb_ep *_ep, struct usb_request *_req, int gfp_flags)
 					 */
 					if (read_fifo (ep, req)) {
 						done (ep, req, 0);
+						if (ep->num == 0)
+							allow_status (ep);
 						/* don't queue it */
 						req = 0;
 					} else
@@ -1194,9 +1202,12 @@ net2280_set_halt (struct usb_ep *_ep, int value)
 	VDEBUG (ep->dev, "%s %s halt\n", _ep->name, value ? "set" : "clear");
 
 	/* set/clear, then synch memory views with the device */
-	if (value)
-		set_halt (ep);
-	else
+	if (value) {
+		if (ep->num == 0)
+			ep->dev->protocol_stall = 1;
+		else
+			set_halt (ep);
+	} else
 		clear_halt (ep);
 	(void) readl (&ep->regs->ep_rsp);
 
@@ -2042,7 +2053,8 @@ static void handle_ep_small (struct net2280_ep *ep)
 			 * can decide to stall ep0 after that done() returns,
 			 * from non-irq context
 			 */
-			allow_status (ep);
+			if (!ep->stopped)
+				allow_status (ep);
 			req = 0;
 		} else {
 			if (!list_empty (&ep->queue) && !ep->stopped)

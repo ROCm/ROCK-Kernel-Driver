@@ -2002,8 +2002,6 @@ static struct pci_driver vrc5477_ac97_driver = {
 
 static int __init init_vrc5477_ac97(void)
 {
-	if (!pci_present())   /* No PCI bus in this machine! */
-		return -ENODEV;
 	printk("Vrc5477 AC97 driver: version v0.2 time " __TIME__ " " __DATE__ " by Jun Sun\n");
 	return pci_module_init(&vrc5477_ac97_driver);
 }

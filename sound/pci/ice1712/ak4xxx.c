@@ -168,3 +168,7 @@ int __devinit snd_ice1712_akm4xxx_build_controls(ice1712_t *ice)
 	}
 	return 0;
 }
+
+EXPORT_SYMBOL(snd_ice1712_akm4xxx_init);
+EXPORT_SYMBOL(snd_ice1712_akm4xxx_free);
+EXPORT_SYMBOL(snd_ice1712_akm4xxx_build_controls);

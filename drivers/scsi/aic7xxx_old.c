@@ -9033,7 +9033,6 @@ aic7xxx_detect(Scsi_Host_Template *template)
   /*
    * PCI-bus probe.
    */
-  if (pci_present())
   {
     struct
     {
@@ -9692,7 +9691,7 @@ skip_pci_controller:
         }
       } /* while(pdev=....) */
     } /* for PCI_DEVICES */
-  } /* PCI BIOS present */
+  }
 #endif /* CONFIG_PCI */
 
 #if defined(__i386__) || defined(__alpha__)

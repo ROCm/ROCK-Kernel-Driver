@@ -23,6 +23,7 @@
 #include <linux/mc146818rtc.h>
 #include <linux/kernel_stat.h>
 #include <linux/module.h>
+#include <linux/sysdev.h>
 
 #include <asm/smp.h>
 #include <asm/mtrr.h>
@@ -180,53 +181,48 @@ void enable_lapic_nmi_watchdog(void)
 
 #ifdef CONFIG_PM
 
-#include <linux/device.h>
 static int nmi_pm_active; /* nmi_active before suspend */
 
-static int lapic_nmi_suspend(struct device *dev, u32 state, u32 level)
+static int lapic_nmi_suspend(struct sys_device *dev, u32 state)
 {
-	if (level != SUSPEND_POWER_DOWN)
-		return 0;
 	nmi_pm_active = nmi_active;
 	disable_lapic_nmi_watchdog();
 	return 0;
 }
 
-static int lapic_nmi_resume(struct device *dev, u32 level)
+static int lapic_nmi_resume(struct sys_device *dev)
 {
-	if (level != RESUME_POWER_ON)
-		return 0;
 	if (nmi_pm_active > 0)
 		enable_lapic_nmi_watchdog();
 	return 0;
 }
 
-static struct device_driver lapic_nmi_driver = {
-	.name		= "lapic_nmi",
-	.bus		= &system_bus_type,
+
+static struct sysdev_class nmi_sysclass = {
+	set_kset_name("lapic_nmi"),
 	.resume		= lapic_nmi_resume,
 	.suspend	= lapic_nmi_suspend,
 };
 
 static struct sys_device device_lapic_nmi = {
-	.name		= "lapic_nmi",
-	.id		= 0,
-	.dev		= {
-		.name	= "lapic_nmi",
-		.driver	= &lapic_nmi_driver,
-		.parent = &device_lapic.dev,
-	},
+	.id	= 0,
+	.cls	= &nmi_sysclass,
 };
 
-static int __init init_lapic_nmi_devicefs(void)
+static int __init init_lapic_nmi_sysfs(void)
 {
+	int error;
+
 	if (nmi_active == 0)
 		return 0;
-	driver_register(&lapic_nmi_driver);
-	return sys_device_register(&device_lapic_nmi);
+
+	error = sysdev_class_register(&nmi_sysclass);
+	if (!error)
+		error = sys_device_register(&device_lapic_nmi);
+	return error;
 }
 /* must come after the local APIC's device_initcall() */
-late_initcall(init_lapic_nmi_devicefs);
+late_initcall(init_lapic_nmi_sysfs);
 
 #endif	/* CONFIG_PM */
 

@@ -298,10 +298,6 @@ int skfp_probe(struct net_device *dev)
 	printk("%s\n", boot_msg);
 
 	/* Scan for Syskonnect FDDI PCI controllers */
-	if (!pci_present()) {	/* is PCI BIOS even present? */
-		printk("no PCI BIOS present\n");
-		return (-ENODEV);
-	}
 	for (i = 0; i < SKFP_MAX_NUM_BOARDS; i++) {	// scan for PCI cards
 		PRINTK(KERN_INFO "Check device %d\n", i);
 		if ((pdev=pci_find_device(PCI_VENDOR_ID_SK, PCI_DEVICE_ID_SK_FP,

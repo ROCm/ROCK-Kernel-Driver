@@ -318,6 +318,10 @@ config PCI
 	  information about which PCI hardware does work under Linux and which
 	  doesn't.
 
+config PCI_DOMAINS
+	bool
+	default PCI
+
 config RTC
 	tristate
 	depends on PCI

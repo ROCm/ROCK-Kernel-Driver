@@ -2379,12 +2379,6 @@ int tw_scsi_detect(Scsi_Host_Template *tw_host)
 
 	printk(KERN_WARNING "3ware Storage Controller device driver for Linux v%s.\n", tw_driver_version);
 
-	/* Check if the kernel has PCI interface compiled in */
-	if (!pci_present()) {
-		printk(KERN_WARNING "3w-xxxx: tw_scsi_detect(): No pci interface present.\n");
-		return 0;
-	}
-
 	ret = tw_findcards(tw_host);
 
 	return ret;

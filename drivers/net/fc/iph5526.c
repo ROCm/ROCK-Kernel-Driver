@@ -232,7 +232,7 @@ static int iph5526_probe_pci(struct net_device *dev);
 
 int __init iph5526_probe(struct net_device *dev)
 {
-	if (pci_present() && (iph5526_probe_pci(dev) == 0))
+	if (iph5526_probe_pci(dev) == 0)
 		return 0;
 	return -ENODEV;
 }
@@ -3720,10 +3720,6 @@ int iph5526_detect(Scsi_Host_Template *tmpt)
 	unsigned long timeout;
 
 	tmpt->proc_name = "iph5526";
-	if (pci_present() == 0) {
-		printk("iph5526: PCI not present\n");
-		return 0;
-	}
 
 	for (i = 0; i <= MAX_FC_CARDS; i++) 
 		fc[i] = NULL;

@@ -1028,6 +1028,7 @@ int isapnp_cfg_end(void)
  */
 
 
+EXPORT_SYMBOL(isapnp_protocol);
 EXPORT_SYMBOL(isapnp_present);
 EXPORT_SYMBOL(isapnp_cfg_begin);
 EXPORT_SYMBOL(isapnp_cfg_end);
