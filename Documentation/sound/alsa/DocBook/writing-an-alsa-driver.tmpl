@@ -18,8 +18,8 @@
       </affiliation>
      </author>
 
-     <date>June 29, 2004</date>
-     <edition>0.3.2</edition>
+     <date>July 11, 2004</date>
+     <edition>0.3.3</edition>
 
     <abstract>
       <para>
@@ -5450,14 +5450,14 @@ struct _snd_pcm_runtime {
   SND_TOPDIR=../..
   endif
 
-  include $(TOPDIR)/toplevel.config
-  include $(TOPDIR)/Makefile.conf
+  include $(SND_TOPDIR)/toplevel.config
+  include $(SND_TOPDIR)/Makefile.conf
 
   snd-xyz-objs := xyz.o abc.o def.o
 
   obj-$(CONFIG_SND_XYZ) += snd-xyz.o
 
-  include $(TOPDIR)/Rules.make
+  include $(SND_TOPDIR)/Rules.make
 ]]>
         </programlisting>
       </example>
