@@ -775,6 +775,12 @@ Module parameters
     Note: One miXart8 board will be represented as 4 alsa cards.
           See MIXART.txt for details.
 
+    When the driver is compiled as a module and the hotplug firmware
+    is supported, the firmware data is loaded via hotplug automatically.
+    Install the necessary firmware files in alsa-firmware package.
+    When no hotplug fw loader is available, you need to load the
+    firmware via mixartoader utility in alsa-tools package.
+
   Module snd-mpu401
   -----------------
 
@@ -1213,9 +1219,12 @@ Module parameters
 
     Module supports up to 8 cards.
 
-    For loading the firmware, use vxloader utility in alsa-tools
-    and alsa-firmware packages.  You can load the firmware automatically
-    by adding the following to /etc/modprobe.conf
+    When the driver is compiled as a module and the hotplug firmware
+    is supported, the firmware data is loaded via hotplug automatically.
+    Install the necessary firmware files in alsa-firmware package.
+    When no hotplug fw loader is available, you need to load the
+    firmware via vxloader utility in alsa-tools package.  To invoke
+    vxloader automatically, add the following to /etc/modprobe.conf
 
 	install snd-vx222 /sbin/modprobe --first-time -i snd-vx222 && /usr/bin/vxloader
 
@@ -1244,8 +1253,11 @@ Module parameters
     To activate the driver via the card manager, you'll need to set
     up /etc/pcmcia/vxpocket.conf.  See the sound/pcmcia/vx/vxpocket.c.
 
-    For loading the firmware, use vxloader utility in alsa-tools
-    and alsa-firmware packages.
+    When the driver is compiled as a module and the hotplug firmware
+    is supported, the firmware data is loaded via hotplug automatically.
+    Install the necessary firmware files in alsa-firmware package.
+    When no hotplug fw loader is available, you need to load the
+    firmware via vxloader utility in alsa-tools package.
 
     The irq_mask and irq_list are provided to avoid allocation of
     specific IRQs.  Usually you don't need to specify them.
@@ -1270,8 +1282,11 @@ Module parameters
     To activate the driver via the card manager, you'll need to set
     up /etc/pcmcia/vxp440.conf.  See the sound/pcmcia/vx/vxp440.c.
 
-    For loading the firmware, use vxloader utility in alsa-tools
-    and alsa-firmware packages.
+    When the driver is compiled as a module and the hotplug firmware
+    is supported, the firmware data is loaded via hotplug automatically.
+    Install the necessary firmware files in alsa-firmware package.
+    When no hotplug fw loader is available, you need to load the
+    firmware via vxloader utility in alsa-tools package.
 
     The irq_mask and irq_list are provided to avoid allocation of
     specific IRQs.  Usually you don't need to specify them.
