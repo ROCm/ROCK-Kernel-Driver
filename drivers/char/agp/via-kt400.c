@@ -147,7 +147,7 @@ static int __init agp_via_probe (struct pci_dev *dev, const struct pci_device_id
 	agp_bridge.cant_use_aperture = 0;
 
 	/* Fill in the mode register */
-	pci_read_config_dword(agp_bridge.dev, agp_bridge.capndx+4, &agp_bridge.mode);
+	pci_read_config_dword(agp_bridge.dev, agp_bridge.capndx+PCI_AGP_STATUS, &agp_bridge.mode);
 
 	agp_register_driver(dev);
 	return 0;
