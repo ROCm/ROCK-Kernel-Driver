@@ -1424,7 +1424,7 @@ static u32 __set_rx_mode(struct net_device *dev)
 			 i++, mclist = mclist->next) {
 			int filterbit = (ether_crc(ETH_ALEN, mclist->dmi_addr) >> 26) ^ 0x3F;
 			filterbit &= 0x3f;
-			mc_filter[filterbit >> 5] |= cpu_to_le32(1 << (filterbit & 31));
+			mc_filter[filterbit >> 5] |= 1 << (filterbit & 31);
 		}
 		rx_mode = AcceptBroadcast | AcceptMulticast | AcceptMyPhys;
 	}
