@@ -264,7 +264,10 @@ int pcmcia_register_socket(struct pcmcia_socket *socket)
 		goto err;
 
 	wait_for_completion(&socket->thread_done);
-	BUG_ON(!socket->thread);
+	if(!socket->thread) {
+		printk(KERN_WARNING "PCMCIA: warning: socket thread for socket %p did not start\n", socket);
+		return -EIO;
+	}
 	pcmcia_parse_events(socket, SS_DETECT);
 
 	return 0;
@@ -678,9 +681,8 @@ static int pccardd(void *__skt)
 	int ret;
 
 	daemonize("pccardd");
-	skt->thread = current;
-	complete(&skt->thread_done);
 
+	skt->thread = current;
 	skt->socket = dead_socket;
 	skt->ops->init(skt);
 	skt->ops->set_socket(skt, &skt->socket);
@@ -690,7 +692,10 @@ static int pccardd(void *__skt)
 	if (ret) {
 		printk(KERN_WARNING "PCMCIA: unable to register socket 0x%p\n",
 			skt);
+		skt->thread = NULL;
+		complete_and_exit(&skt->thread_done, 0);
 	}
+	complete(&skt->thread_done);
 
 	add_wait_queue(&skt->thread_wait, &wait);
 	for (;;) {
