@@ -13,6 +13,7 @@
  *            Stefan Bader <stefan.bader@de.ibm.com> 
  *            Heiko Carstens <heiko.carstens@de.ibm.com> 
  *            Andreas Herrmann <aherrman@de.ibm.com>
+ *            Volker Sameske <sameske@de.ibm.com>
  * 
  * This program is free software; you can redistribute it and/or modify 
  * it under the terms of the GNU General Public License as published by 
@@ -378,6 +379,9 @@ struct zfcp_rc_entry {
 
 #define ZFCP_NAME               "zfcp"
 
+/* read-only LUN sharing switch initial value */
+#define ZFCP_RO_LUN_SHARING_DEFAULTS 0
+
 /* independent log areas */
 #define ZFCP_LOG_AREA_OTHER	0
 #define ZFCP_LOG_AREA_SCSI	1
@@ -528,6 +532,7 @@ do { \
 #define ZFCP_STATUS_PORT_NO_WWPN		0x00000008
 #define ZFCP_STATUS_PORT_NO_SCSI_ID		0x00000010
 #define ZFCP_STATUS_PORT_INVALID_WWPN		0x00000020
+#define ZFCP_STATUS_PORT_ACCESS_DENIED		0x00000040
 
 /* for ports with well known addresses */
 #define ZFCP_STATUS_PORT_WKA \
@@ -536,6 +541,9 @@ do { \
 
 /* logical unit status */
 #define ZFCP_STATUS_UNIT_NOTSUPPUNITRESET       0x00000001
+#define ZFCP_STATUS_UNIT_ACCESS_DENIED          0x00000002
+#define ZFCP_STATUS_UNIT_ACCESS_SHARED          0x00000004
+#define ZFCP_STATUS_UNIT_ACCESS_READONLY        0x00000008
 #define ZFCP_STATUS_UNIT_TEMPORARY		0x00000010
 
 

@@ -2810,7 +2810,8 @@ zfcp_erp_port_strategy_clearstati(struct zfcp_port *port)
 			  ZFCP_STATUS_COMMON_CLOSING |
 			  ZFCP_STATUS_PORT_DID_DID |
 			  ZFCP_STATUS_PORT_PHYS_CLOSING |
-			  ZFCP_STATUS_PORT_INVALID_WWPN, &port->status);
+			  ZFCP_STATUS_PORT_INVALID_WWPN |
+			  ZFCP_STATUS_PORT_ACCESS_DENIED, &port->status);
 	return retval;
 }
 
@@ -3014,7 +3015,10 @@ zfcp_erp_unit_strategy_clearstati(struct zfcp_unit *unit)
 	debug_event(adapter->erp_dbf, 5, &unit->fcp_lun, sizeof (fcp_lun_t));
 
 	atomic_clear_mask(ZFCP_STATUS_COMMON_OPENING |
-			  ZFCP_STATUS_COMMON_CLOSING, &unit->status);
+			  ZFCP_STATUS_COMMON_CLOSING |
+			  ZFCP_STATUS_UNIT_ACCESS_DENIED |
+			  ZFCP_STATUS_UNIT_ACCESS_SHARED |
+			  ZFCP_STATUS_UNIT_ACCESS_READONLY, &unit->status);
 
 	return retval;
 }
