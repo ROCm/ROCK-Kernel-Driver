@@ -635,7 +635,7 @@ typedef struct {
 	u16 SSIDlen;
 	char SSID[32];
 	char apName[16];
-	char bssid[4][ETH_ALEN];
+	u8 bssid[4][ETH_ALEN];
 	u16 beaconPeriod;
 	u16 dimPeriod;
 	u16 atimDuration;
@@ -5192,7 +5192,7 @@ static int airo_get_aplist(struct net_device *dev,
 			      & status_rid.bssid[i][2]
 			      & status_rid.bssid[i][3]
 			      & status_rid.bssid[i][4]
-			      & status_rid.bssid[i][5])!=-1 &&
+			      & status_rid.bssid[i][5])!=0xff &&
 			     (status_rid.bssid[i][0]
 			      | status_rid.bssid[i][1]
 			      | status_rid.bssid[i][2]
