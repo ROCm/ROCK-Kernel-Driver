@@ -1599,6 +1599,7 @@ void show_trace_task(struct task_struct *tsk)
 
 void die_if_kernel(char *str, struct pt_regs *regs)
 {
+	static int die_counter;
 	extern void __show_regs(struct pt_regs * regs);
 	extern void smp_report_regs(void);
 	int count = 0;
@@ -1611,7 +1612,7 @@ void die_if_kernel(char *str, struct pt_regs *regs)
 "              /_| \\__/ |_\\\n"
 "                 \\__U_/\n");
 
-	printk("%s(%d): %s\n", current->comm, current->pid, str);
+	printk("%s(%d): %s [#%d]\n", current->comm, current->pid, str, ++die_counter);
 	__asm__ __volatile__("flushw");
 	__show_regs(regs);
 	if (regs->tstate & TSTATE_PRIV) {
