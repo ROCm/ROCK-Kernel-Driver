@@ -2442,7 +2442,6 @@ static int __init serial8250_init(void)
 static void __exit serial8250_exit(void)
 {
 	struct platform_device *isa_dev = serial8250_isa_devs;
-	int i;
 
 	/*
 	 * This tells serial8250_unregister_port() not to re-register
@@ -2520,7 +2519,7 @@ int register_serial(struct serial_struct *req)
 	 */
 	if (port.uartclk == 0) {
 		printk(KERN_WARNING
-		       "Serial: registering port at [%08lx,%08lx,%p] irq %d with zero baud_base\n",
+		       "Serial: registering port at [%08x,%08lx,%p] irq %d with zero baud_base\n",
 		       port.iobase, port.mapbase, port.membase, port.irq);
 		printk(KERN_WARNING "Serial: see %s:%d for more information\n",
 		       __FILE__, __LINE__);
