@@ -3020,15 +3020,17 @@ wait_for_completion_timeout(struct completion *x, unsigned long timeout)
 			__set_current_state(TASK_UNINTERRUPTIBLE);
 			spin_unlock_irq(&x->wait.lock);
 			timeout = schedule_timeout(timeout);
-			if (!timeout)
-				goto out;
 			spin_lock_irq(&x->wait.lock);
+			if (!timeout) {
+				__remove_wait_queue(&x->wait, &wait);
+				goto out;
+			}
 		} while (!x->done);
 		__remove_wait_queue(&x->wait, &wait);
 	}
 	x->done--;
-	spin_unlock_irq(&x->wait.lock);
 out:
+	spin_unlock_irq(&x->wait.lock);
 	return timeout;
 }
 EXPORT_SYMBOL(wait_for_completion_timeout);
@@ -3048,6 +3050,7 @@ int fastcall __sched wait_for_completion_interruptible(struct completion *x)
 		do {
 			if (signal_pending(current)) {
 				ret = -ERESTARTSYS;
+				__remove_wait_queue(&x->wait, &wait);
 				goto out;
 			}
 			__set_current_state(TASK_INTERRUPTIBLE);
@@ -3080,21 +3083,23 @@ wait_for_completion_interruptible_timeout(struct completion *x,
 		do {
 			if (signal_pending(current)) {
 				timeout = -ERESTARTSYS;
-				goto out_unlock;
+				__remove_wait_queue(&x->wait, &wait);
+				goto out;
 			}
 			__set_current_state(TASK_INTERRUPTIBLE);
 			spin_unlock_irq(&x->wait.lock);
 			timeout = schedule_timeout(timeout);
-			if (!timeout)
-				goto out;
 			spin_lock_irq(&x->wait.lock);
+			if (!timeout) {
+				__remove_wait_queue(&x->wait, &wait);
+				goto out;
+			}
 		} while (!x->done);
 		__remove_wait_queue(&x->wait, &wait);
 	}
 	x->done--;
-out_unlock:
-	spin_unlock_irq(&x->wait.lock);
 out:
+	spin_unlock_irq(&x->wait.lock);
 	return timeout;
 }
 EXPORT_SYMBOL(wait_for_completion_interruptible_timeout);
