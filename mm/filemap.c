@@ -450,7 +450,7 @@ int fail_writepage(struct page *page)
 	}
 
 	/* Set the page dirty again, unlock */
-	SetPageDirty(page);
+	set_page_dirty(page);
 	unlock_page(page);
 	return 0;
 }

@@ -854,7 +854,7 @@ shmem_file_write(struct file *file,const char *buf,size_t count,loff_t *ppos)
 
 		flush_dcache_page(page);
 		if (bytes > 0) {
-			SetPageDirty(page);
+			set_page_dirty(page);
 			written += bytes;
 			count -= bytes;
 			pos += bytes;
@@ -1139,7 +1139,7 @@ static int shmem_symlink(struct inode * dir, struct dentry *dentry, const char *
 		kaddr = kmap(page);
 		memcpy(kaddr, symname, len);
 		kunmap(page);
-		SetPageDirty(page);
+		set_page_dirty(page);
 		unlock_page(page);
 		page_cache_release(page);
 		up(&info->sem);
