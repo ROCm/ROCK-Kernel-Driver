@@ -4373,28 +4373,9 @@ xfs_bmap_read_extents(
 			break;
 		pp = XFS_BTREE_PTR_ADDR(mp->m_sb.sb_blocksize, xfs_bmbt, block,
 			1, mp->m_bmap_dmxr[1]);
-#ifndef __KERNEL__
 		XFS_WANT_CORRUPTED_GOTO(
 			XFS_FSB_SANITY_CHECK(mp, INT_GET(*pp, ARCH_CONVERT)),
 			error0);
-#else	/* additional, temporary, debugging code */
-		if (!(XFS_FSB_SANITY_CHECK(mp, INT_GET(*pp, ARCH_CONVERT)))) {
-			cmn_err(CE_NOTE,
-			"xfs_bmap_read_extents: FSB Sanity Check:");
-			if (!(XFS_FSB_TO_AGNO(mp, INT_GET(*pp, ARCH_CONVERT)) < mp->m_sb.sb_agcount))
-				cmn_err(CE_NOTE,
-					"bad AG count %d < agcount %d",
-					XFS_FSB_TO_AGNO(mp, INT_GET(*pp, ARCH_CONVERT)),
-					mp->m_sb.sb_agcount);
-			if (!(XFS_FSB_TO_AGBNO(mp, INT_GET(*pp, ARCH_CONVERT)) < mp->m_sb.sb_agblocks))
-				cmn_err(CE_NOTE,
-					"bad AG BNO %d < %d",
-					XFS_FSB_TO_AGBNO(mp, INT_GET(*pp, ARCH_CONVERT)),
-					mp->m_sb.sb_agblocks);
-			error = XFS_ERROR(EFSCORRUPTED);
-			goto error0;
-		}
-#endif
 		bno = INT_GET(*pp, ARCH_CONVERT);
 		xfs_trans_brelse(tp, bp);
 	}
@@ -4422,35 +4403,9 @@ xfs_bmap_read_extents(
 				(unsigned long long) ip->i_ino);
 			goto error0;
 		}
-#ifndef __KERNEL__
 		XFS_WANT_CORRUPTED_GOTO(
 			XFS_BMAP_SANITY_CHECK(mp, block, 0),
 			error0);
-#else	/* additional, temporary, debugging code */
-		if (!(XFS_BMAP_SANITY_CHECK(mp, block, 0))) {
-			cmn_err(CE_NOTE,
-			"xfs_bmap_read_extents: BMAP Sanity Check:");
-			if (!(INT_GET(block->bb_magic, ARCH_CONVERT) == XFS_BMAP_MAGIC))
-				cmn_err(CE_NOTE,
-					"bb_magic 0x%x",
-					INT_GET(block->bb_magic, ARCH_CONVERT));
-			if (!(INT_GET(block->bb_level, ARCH_CONVERT) == level))
-				cmn_err(CE_NOTE,
-					"bb_level %d",
-					INT_GET(block->bb_level, ARCH_CONVERT));
-			if (!(INT_GET(block->bb_numrecs, ARCH_CONVERT) > 0))
-				cmn_err(CE_NOTE,
-					"bb_numrecs %d",
-					INT_GET(block->bb_numrecs, ARCH_CONVERT));
-			if (!(INT_GET(block->bb_numrecs, ARCH_CONVERT) <= (mp)->m_bmap_dmxr[(level) != 0]))
-				cmn_err(CE_NOTE,
-					"bb_numrecs %d < m_bmap_dmxr[] %d",
-					INT_GET(block->bb_numrecs, ARCH_CONVERT),
-					(mp)->m_bmap_dmxr[(level) != 0]);
-			error = XFS_ERROR(EFSCORRUPTED);
-			goto error0;
-		}
-#endif
 		/*
 		 * Read-ahead the next leaf block, if any.
 		 */
@@ -4650,11 +4605,6 @@ xfs_bmapi(
 	if (XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_EXTENTS &&
 	    XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_BTREE &&
 	    XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_LOCAL) {
-#ifdef __KERNEL__	/* additional, temporary, debugging code */
-		cmn_err(CE_NOTE,
-			"EFSCORRUPTED returned from file %s line %d",
-			__FILE__, __LINE__);
-#endif
 		return XFS_ERROR(EFSCORRUPTED);
 	}
 	mp = ip->i_mount;
@@ -5150,11 +5100,6 @@ xfs_bmapi_single(
 	ifp = XFS_IFORK_PTR(ip, whichfork);
 	if (XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_BTREE &&
 	    XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_EXTENTS) {
-#ifdef __KERNEL__	/* additional, temporary, debugging code */
-		cmn_err(CE_NOTE,
-			"EFSCORRUPTED returned from file %s line %d",
-			__FILE__, __LINE__);
-#endif
 	       return XFS_ERROR(EFSCORRUPTED);
 	}
 	if (XFS_FORCED_SHUTDOWN(ip->i_mount))
@@ -5228,11 +5173,6 @@ xfs_bunmapi(
 	ifp = XFS_IFORK_PTR(ip, whichfork);
 	if (XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_EXTENTS &&
 	    XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_BTREE) {
-#ifdef __KERNEL__	/* additional, temporary, debugging code */
-		cmn_err(CE_NOTE,
-			"EFSCORRUPTED returned from file %s line %d",
-			__FILE__, __LINE__);
-#endif
 		return XFS_ERROR(EFSCORRUPTED);
 	}
 	mp = ip->i_mount;
