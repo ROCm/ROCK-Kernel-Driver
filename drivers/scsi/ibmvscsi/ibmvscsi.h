@@ -66,7 +66,7 @@ struct srp_event_struct {
 	void (*done) (struct srp_event_struct *);
 	struct VIOSRP_CRQ crq;
 	struct ibmvscsi_host_data *hostdata;
-	char in_use;
+	atomic_t in_use;
 	struct SRP_CMD cmd;
 	void (*cmnd_done) (struct scsi_cmnd *);
 	struct completion comp;
@@ -76,6 +76,7 @@ struct srp_event_struct {
 struct event_pool {
 	struct srp_event_struct *events;
 	u32 size;
+	int next;
 	union VIOSRP_IU *iu_storage;
 	dma_addr_t iu_token;
 };

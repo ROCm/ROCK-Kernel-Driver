@@ -85,10 +85,12 @@ static int max_channel = 3;
 static int init_timeout = 5;
 static int max_requests = 50;
 
+#define IBMVSCSI_VERSION "1.3"
+
 MODULE_DESCRIPTION("IBM Virtual SCSI");
 MODULE_AUTHOR("Dave Boutcher");
 MODULE_LICENSE("GPL");
-MODULE_VERSION("1.2");
+MODULE_VERSION(IBMVSCSI_VERSION);
 
 module_param_named(max_id, max_id, int, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(max_id, "Largest ID value for each channel");
@@ -117,6 +119,7 @@ static int initialize_event_pool(struct event_pool *pool,
 
 	pool->size = size;
 	pool->events = kmalloc(pool->size * sizeof(*pool->events), GFP_KERNEL);
+	pool->next = 0;
 	if (!pool->events)
 		return -ENOMEM;
 	memset(pool->events, 0x00, pool->size * sizeof(*pool->events));
@@ -133,6 +136,7 @@ static int initialize_event_pool(struct event_pool *pool,
 	for (i = 0; i < pool->size; ++i) {
 		struct srp_event_struct *evt = &pool->events[i];
 		memset(&evt->crq, 0x00, sizeof(evt->crq));
+		atomic_set(&evt->in_use,1);
 		evt->crq.valid = 0x80;
 		evt->crq.IU_length = sizeof(*evt->evt);
 		evt->crq.IU_data_ptr = pool->iu_token + sizeof(*evt->evt) * i;
@@ -155,7 +159,7 @@ static void release_event_pool(struct event_pool *pool,
 {
 	int i, in_use = 0;
 	for (i = 0; i < pool->size; ++i)
-		if (pool->events[i].in_use)
+		if (atomic_read(&pool->events[i].in_use) != 1)
 			++in_use;
 	if (in_use)
 		printk(KERN_WARNING
@@ -200,13 +204,12 @@ static void ibmvscsi_free_event_struct(struct event_pool *pool,
 		       "(not in pool %p)\n", evt, pool->events);
 		return;
 	}
-	if (!evt->in_use) {
+	if (atomic_inc_return(&evt->in_use) != 1) {
 		printk(KERN_ERR
 		       "ibmvscsi: Freeing event_struct %p "
 		       "which is not in use!\n", evt);
 		return;
 	}
-	evt->in_use = 0;
 }
 
 /**
@@ -220,20 +223,20 @@ static void ibmvscsi_free_event_struct(struct event_pool *pool,
 static
 struct srp_event_struct *ibmvscsi_get_event_struct(struct event_pool *pool)
 {
-	struct srp_event_struct *cur, *last = pool->events + pool->size;
-
-	for (cur = pool->events; cur < last; ++cur)
-		if (!cur->in_use) {
-			cur->in_use = 1;
-			break;
+	int i;
+	int poolsize = pool->size;
+	int offset = pool->next;
+	
+	for (i=0; i < poolsize; i++) {
+		offset = (offset + 1) % poolsize;
+		if (!atomic_dec_if_positive(&pool->events[offset].in_use)) {
+			pool->next = offset;
+			return &pool->events[offset];
 		}
-
-	if (cur >= last) {
-		printk(KERN_ERR "ibmvscsi: found no event struct in pool!\n");
-		return NULL;
 	}
 
-	return cur;
+	printk(KERN_ERR "ibmvscsi: found no event struct in pool!\n");
+	return NULL;
 }
 
 /**
@@ -1269,7 +1272,7 @@ static struct class_device_attribute *ibmvscsi_attrs[] = {
  */
 static struct scsi_host_template driver_template = {
 	.module = THIS_MODULE,
-	.name = "SCSI host adapter emulator for RPA/iSeries Virtual I/O",
+	.name = "SCSI host adapter emulator for RPA/iSeries Virtual I/O " IBMVSCSI_VERSION,
 	.proc_name = "ibmvscsi",
 	.queuecommand = ibmvscsi_queuecommand,
 	.eh_abort_handler = ibmvscsi_eh_abort_handler,
