@@ -90,7 +90,7 @@ static int end_swap_bio_read(struct bio *bio, unsigned int bytes_done, int err)
 int swap_writepage(struct page *page, struct writeback_control *wbc)
 {
 	struct bio *bio;
-	int ret = 0;
+	int ret = 0, rw = WRITE;
 
 	if (remove_exclusive_swap_page(page)) {
 		unlock_page(page);
@@ -103,10 +103,12 @@ int swap_writepage(struct page *page, struct writeback_control *wbc)
 		ret = -ENOMEM;
 		goto out;
 	}
+	if (wbc->sync_mode == WB_SYNC_ALL)
+		rw |= (1 << BIO_RW_SYNC);
 	inc_page_state(pswpout);
 	set_page_writeback(page);
 	unlock_page(page);
-	submit_bio(WRITE, bio);
+	submit_bio(rw, bio);
 out:
 	return ret;
 }
