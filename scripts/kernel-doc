@@ -1206,7 +1206,7 @@ sub dump_struct($$) {
         my $members = $3;
 
 	# ignore embedded structs or unions
-	$members =~ s/{.*}//g;
+	$members =~ s/{.*?}//g;
 
 	create_parameterlist($members, ';', $file);
 
