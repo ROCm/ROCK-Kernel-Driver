@@ -77,7 +77,7 @@ static struct i2c_driver pcf8574_driver = {
 	.detach_client	= pcf8574_detach_client,
 };
 
-static int pcf8574_id = 0;
+static int pcf8574_id;
 
 /* following are the sysfs callback functions */
 static ssize_t show_read(struct device *dev, char *buf)
