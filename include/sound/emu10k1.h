@@ -901,9 +901,7 @@ typedef struct {
 	unsigned short extout_mask;	/* used external outputs (bitmask) */
 	unsigned short pad1;
 	unsigned int itram_size;	/* internal TRAM size in samples */
-	unsigned int etram_size;	/* external TRAM size in samples */
-	void *etram_pages;		/* allocated pages for external TRAM */
-	dma_addr_t etram_pages_dmaaddr;
+	struct snd_dma_buffer etram_pages; /* external TRAM pages and size */
 	unsigned int dbg;		/* FX debugger register */
 	unsigned char name[128];
 	int gpr_size;			/* size of allocated GPR controls */
@@ -947,11 +945,10 @@ struct _snd_emu10k1 {
 	unsigned int card_type;			/* EMU10K1_CARD_* */
 	unsigned int ecard_ctrl;		/* ecard control bits */
 	unsigned long dma_mask;			/* PCI DMA mask */
+	struct snd_dma_device dma_dev;		/* DMA device description */
 	int max_cache_pages;			/* max memory size / PAGE_SIZE */
-	void *silent_page;			/* silent page */
-	dma_addr_t silent_page_dmaaddr;
-	volatile u32 *ptb_pages;		/* page table pages */
-	dma_addr_t ptb_pages_dmaaddr;
+	struct snd_dma_buffer silent_page;	/* silent page */
+	struct snd_dma_buffer ptb_pages;	/* page table pages */
 	snd_util_memhdr_t *memhdr;		/* page allocation list */
 	emu10k1_memblk_t *reserved_page;	/* reserved page */
 

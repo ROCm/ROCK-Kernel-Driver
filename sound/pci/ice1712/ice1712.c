@@ -886,7 +886,8 @@ static int __devinit snd_ice1712_pcm(ice1712_t * ice, int device, snd_pcm_t ** r
 	strcpy(pcm->name, "ICE1712 consumer");
 	ice->pcm = pcm;
 
-	snd_pcm_lib_preallocate_pci_pages_for_all(ice->pci, pcm, 64*1024, 64*1024);
+	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_PCI,
+					      ice->pci, 64*1024, 64*1024);
 
 	if (rpcm)
 		*rpcm = pcm;
@@ -922,7 +923,8 @@ static int __devinit snd_ice1712_pcm_ds(ice1712_t * ice, int device, snd_pcm_t *
 	strcpy(pcm->name, "ICE1712 consumer (DS)");
 	ice->pcm_ds = pcm;
 
-	snd_pcm_lib_preallocate_pci_pages_for_all(ice->pci, pcm, 64*1024, 128*1024);
+	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_PCI,
+					      ice->pci, 64*1024, 128*1024);
 
 	if (rpcm)
 		*rpcm = pcm;
@@ -1269,7 +1271,8 @@ static int __devinit snd_ice1712_pcm_profi(ice1712_t * ice, int device, snd_pcm_
 	pcm->info_flags = 0;
 	strcpy(pcm->name, "ICE1712 multi");
 
-	snd_pcm_lib_preallocate_pci_pages_for_all(ice->pci, pcm, 256*1024, 256*1024);
+	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_PCI,
+					      ice->pci, 256*1024, 256*1024);
 
 	ice->pcm_pro = pcm;
 	if (rpcm)

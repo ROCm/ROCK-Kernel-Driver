@@ -1742,7 +1742,8 @@ static int __devinit snd_ali_pcm(ali_t * codec, int device, snd_pcm_t ** rpcm)
 	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_PLAYBACK, &snd_ali_playback_ops);
 	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_CAPTURE, &snd_ali_capture_ops);
 
-	snd_pcm_lib_preallocate_pci_pages_for_all(codec->pci, pcm, 64*1024, 128*1024);
+	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_PCI,
+					      codec->pci, 64*1024, 128*1024);
 
 	pcm->info_flags = 0;
 	pcm->dev_subclass = SNDRV_PCM_SUBCLASS_GENERIC_MIX;

@@ -9,9 +9,6 @@ ifeq ($(CONFIG_SND_SEQUENCER_OSS),y)
 snd-opl3-synth-objs += opl3_oss.o
 endif
 
-OPL3_OBJS = snd-opl3-lib.o
-OPL3_SYNTH_OBJS = snd-opl3-synth.o
-
 #
 # this function returns:
 #   "m" - CONFIG_SND_SEQUENCER is m
@@ -20,56 +17,5 @@ OPL3_SYNTH_OBJS = snd-opl3-synth.o
 #
 sequencer = $(if $(subst y,,$(CONFIG_SND_SEQUENCER)),$(if $(1),m),$(if $(CONFIG_SND_SEQUENCER),$(1)))
 
-# Toplevel Module Dependency
-obj-$(CONFIG_SND_ALS100) += $(OPL3_OBJS)
-obj-$(call sequencer,$(CONFIG_SND_ALS100)) += $(OPL3_SYNTH_OBJS)
-obj-$(CONFIG_SND_AZT2320) += $(OPL3_OBJS)
-obj-$(call sequencer,$(CONFIG_SND_AZT2320)) += $(OPL3_SYNTH_OBJS)
-obj-$(CONFIG_SND_AZT3328) += $(OPL3_OBJS)
-obj-$(call sequencer,$(CONFIG_SND_AZT3328)) += $(OPL3_SYNTH_OBJS)
-obj-$(CONFIG_SND_DT019X) += $(OPL3_OBJS)
-obj-$(call sequencer,$(CONFIG_SND_DT019X)) += $(OPL3_SYNTH_OBJS)
-obj-$(CONFIG_SND_ES18XX) += $(OPL3_OBJS)
-obj-$(call sequencer,$(CONFIG_SND_ES18XX)) += $(OPL3_SYNTH_OBJS)
-obj-$(CONFIG_SND_OPL3SA2) += $(OPL3_OBJS)
-obj-$(call sequencer,$(CONFIG_SND_OPL3SA2)) += $(OPL3_SYNTH_OBJS)
-obj-$(CONFIG_SND_AD1816A) += $(OPL3_OBJS)
-obj-$(call sequencer,$(CONFIG_SND_AD1816A)) += $(OPL3_SYNTH_OBJS)
-obj-$(CONFIG_SND_CS4232) += $(OPL3_OBJS)
-obj-$(call sequencer,$(CONFIG_SND_CS4232)) += $(OPL3_SYNTH_OBJS)
-obj-$(CONFIG_SND_PC98_CS4232) += $(OPL3_OBJS)
-obj-$(call sequencer,$(CONFIG_SND_PC98_CS4232)) += $(OPL3_SYNTH_OBJS)
-obj-$(CONFIG_SND_CS4236) += $(OPL3_OBJS)
-obj-$(call sequencer,$(CONFIG_SND_CS4236)) += $(OPL3_SYNTH_OBJS)
-obj-$(CONFIG_SND_ES1688) += $(OPL3_OBJS)
-obj-$(call sequencer,$(CONFIG_SND_GUSEXTREME)) += $(OPL3_SYNTH_OBJS)
-obj-$(CONFIG_SND_OPTI92X_AD1848) += $(OPL3_OBJS)
-obj-$(call sequencer,$(CONFIG_SND_OPTI92X_AD1848)) += $(OPL3_SYNTH_OBJS)
-obj-$(CONFIG_SND_OPTI92X_CS4231) += $(OPL3_OBJS)
-obj-$(call sequencer,$(CONFIG_SND_OPTI92X_CS4231)) += $(OPL3_SYNTH_OBJS)
-obj-$(CONFIG_SND_OPTI93X) += $(OPL3_OBJS)
-obj-$(call sequencer,$(CONFIG_SND_OPTI93X)) += $(OPL3_SYNTH_OBJS)
-obj-$(CONFIG_SND_SB8) += $(OPL3_OBJS)
-obj-$(call sequencer,$(CONFIG_SND_SB8)) += $(OPL3_SYNTH_OBJS)
-obj-$(CONFIG_SND_SB16) += $(OPL3_OBJS)
-obj-$(call sequencer,$(CONFIG_SND_SB16)) += $(OPL3_SYNTH_OBJS)
-obj-$(CONFIG_SND_SBAWE) += $(OPL3_OBJS)
-obj-$(call sequencer,$(CONFIG_SND_SBAWE)) += $(OPL3_SYNTH_OBJS)
-obj-$(CONFIG_SND_WAVEFRONT) += $(OPL3_OBJS)
-obj-$(call sequencer,$(CONFIG_SND_WAVEFRONT)) += $(OPL3_SYNTH_OBJS)
-obj-$(CONFIG_SND_ALS4000) += $(OPL3_OBJS)
-obj-$(call sequencer,$(CONFIG_SND_ALS4000)) += $(OPL3_SYNTH_OBJS)
-obj-$(CONFIG_SND_CMIPCI) += $(OPL3_OBJS)
-obj-$(call sequencer,$(CONFIG_SND_CMIPCI)) += $(OPL3_SYNTH_OBJS)
-obj-$(CONFIG_SND_CS4281) += $(OPL3_OBJS)
-obj-$(call sequencer,$(CONFIG_SND_CS4281)) += $(OPL3_SYNTH_OBJS)
-obj-$(CONFIG_SND_ES1938) += $(OPL3_OBJS)
-obj-$(call sequencer,$(CONFIG_SND_ES1938)) += $(OPL3_SYNTH_OBJS)
-obj-$(CONFIG_SND_FM801) += $(OPL3_OBJS)
-obj-$(call sequencer,$(CONFIG_SND_FM801)) += $(OPL3_SYNTH_OBJS)
-obj-$(CONFIG_SND_SONICVIBES) += $(OPL3_OBJS)
-obj-$(call sequencer,$(CONFIG_SND_SONICVIBES)) += $(OPL3_SYNTH_OBJS)
-obj-$(CONFIG_SND_YMFPCI) += $(OPL3_OBJS)
-obj-$(call sequencer,$(CONFIG_SND_YMFPCI)) += $(OPL3_SYNTH_OBJS)
-
-obj-m := $(sort $(obj-m))
+obj-$(CONFIG_SND_OPL3_LIB) += snd-opl3-lib.o
+obj-$(call sequencer,$(CONFIG_SND_OPL3_LIB)) += snd-opl3-synth.o

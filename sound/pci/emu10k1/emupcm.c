@@ -323,7 +323,7 @@ static void snd_emu10k1_pcm_init_voice(emu10k1_t *emu,
 	snd_emu10k1_ptr_write(emu, Z1, voice, 0);
 	snd_emu10k1_ptr_write(emu, Z2, voice, 0);
 	// invalidate maps
-	silent_page = ((unsigned int)emu->silent_page_dmaaddr << 1) | MAP_PTI_MASK;
+	silent_page = ((unsigned int)emu->silent_page.addr << 1) | MAP_PTI_MASK;
 	snd_emu10k1_ptr_write(emu, MAPA, voice, silent_page);
 	snd_emu10k1_ptr_write(emu, MAPB, voice, silent_page);
 	// modulation envelope
@@ -998,11 +998,11 @@ int __devinit snd_emu10k1_pcm(emu10k1_t * emu, int device, snd_pcm_t ** rpcm)
 	emu->pcm = pcm;
 
 	for (substream = pcm->streams[SNDRV_PCM_STREAM_PLAYBACK].substream; substream; substream = substream->next)
-		if ((err = snd_pcm_lib_preallocate_sg_pages(emu->pci, substream, 64*1024, 64*1024)) < 0)
+		if ((err = snd_pcm_lib_preallocate_pages(substream, SNDRV_DMA_TYPE_PCI_SG, emu->pci, 64*1024, 64*1024)) < 0)
 			return err;
 
 	for (substream = pcm->streams[SNDRV_PCM_STREAM_CAPTURE].substream; substream; substream = substream->next)
-		snd_pcm_lib_preallocate_pci_pages(emu->pci, substream, 64*1024, 64*1024);
+		snd_pcm_lib_preallocate_pages(substream, SNDRV_DMA_TYPE_PCI, emu->pci, 64*1024, 64*1024);
 
 	if (rpcm)
 		*rpcm = pcm;
@@ -1048,7 +1048,7 @@ int __devinit snd_emu10k1_pcm_mic(emu10k1_t * emu, int device, snd_pcm_t ** rpcm
 	strcpy(pcm->name, "EMU10K1 MIC");
 	emu->pcm_mic = pcm;
 
-	snd_pcm_lib_preallocate_pci_pages_for_all(emu->pci, pcm, 64*1024, 64*1024);
+	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_PCI, emu->pci, 64*1024, 64*1024);
 
 	if (rpcm)
 		*rpcm = pcm;
@@ -1157,7 +1157,7 @@ int __devinit snd_emu10k1_pcm_efx(emu10k1_t * emu, int device, snd_pcm_t ** rpcm
 	emu->efx_voices_mask[1] = 0;
 	snd_ctl_add(emu->card, snd_ctl_new1(&snd_emu10k1_pcm_efx_voices_mask, emu));
 
-	snd_pcm_lib_preallocate_pci_pages_for_all(emu->pci, pcm, 64*1024, 64*1024);
+	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_PCI, emu->pci, 64*1024, 64*1024);
 
 	return 0;
 }

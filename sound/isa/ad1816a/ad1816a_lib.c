@@ -684,7 +684,9 @@ int snd_ad1816a_pcm(ad1816a_t *chip, int device, snd_pcm_t **rpcm)
 	strcpy(pcm->name, snd_ad1816a_chip_id(chip));
 	snd_ad1816a_init(chip);
 
-	snd_pcm_lib_preallocate_isa_pages_for_all(pcm, 64*1024, chip->dma1 > 3 || chip->dma2 > 3 ? 128*1024 : 64*1024);
+	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_ISA,
+					      snd_pcm_dma_flags(0),
+					      64*1024, chip->dma1 > 3 || chip->dma2 > 3 ? 128*1024 : 64*1024);
 
 	chip->pcm = pcm;
 	if (rpcm)

@@ -904,52 +904,23 @@ void snd_pcm_timer_done(snd_pcm_substream_t * substream);
  *  Memory
  */
 
+#define snd_pcm_dma_flags(x) ((void *)(unsigned long)(x))
+
 int snd_pcm_lib_preallocate_free(snd_pcm_substream_t *substream);
 int snd_pcm_lib_preallocate_free_for_all(snd_pcm_t *pcm);
 int snd_pcm_lib_preallocate_pages(snd_pcm_substream_t *substream,
-				  size_t size, size_t max,
-				  unsigned int flags);
+				  int type, void *data,
+				  size_t size, size_t max);
 int snd_pcm_lib_preallocate_pages_for_all(snd_pcm_t *pcm,
-					  size_t size, size_t max,
-					  unsigned int flags);
+					  int type, void *data,
+					  size_t size, size_t max);
 int snd_pcm_lib_malloc_pages(snd_pcm_substream_t *substream, size_t size);
 int snd_pcm_lib_free_pages(snd_pcm_substream_t *substream);
 
-#ifdef CONFIG_ISA
-int snd_pcm_lib_preallocate_isa_pages(snd_pcm_substream_t *substream,
-				      size_t size, size_t max);
-int snd_pcm_lib_preallocate_isa_pages_for_all(snd_pcm_t *pcm,
-					      size_t size, size_t max);
-#endif
-#ifdef CONFIG_PCI
-int snd_pcm_lib_preallocate_pci_pages(struct pci_dev *pci,
-				      snd_pcm_substream_t *substream,
-				      size_t size, size_t max);
-int snd_pcm_lib_preallocate_pci_pages_for_all(struct pci_dev *pci,
-					      snd_pcm_t *pcm,
-					      size_t size,
-					      size_t max);
-int snd_pcm_lib_preallocate_sg_pages(struct pci_dev *pci,
-				     snd_pcm_substream_t *substream,
-				     size_t size, size_t max);
-int snd_pcm_lib_preallocate_sg_pages_for_all(struct pci_dev *pci,
-					     snd_pcm_t *pcm,
-					     size_t size, size_t max);
 #define snd_pcm_substream_sgbuf(substream) ((substream)->runtime->dma_private)
 #define snd_pcm_sgbuf_pages(size) snd_sgbuf_aligned_pages(size)
 #define snd_pcm_sgbuf_get_addr(sgbuf,ofs) snd_sgbuf_get_addr(sgbuf,ofs)
 struct page *snd_pcm_sgbuf_ops_page(snd_pcm_substream_t *substream, unsigned long offset);
-#endif
-
-#ifdef CONFIG_SBUS
-int snd_pcm_lib_preallocate_sbus_pages(struct sbus_dev *sdev,
-				       snd_pcm_substream_t *substream,
-				       size_t size, size_t max);
-int snd_pcm_lib_preallocate_sbus_pages_for_all(struct sbus_dev *sdev,
-					       snd_pcm_t *pcm,
-					       size_t size,
-					       size_t max);
-#endif
 
 static inline void snd_pcm_limit_isa_dma_size(int dma, size_t *max)
 {
