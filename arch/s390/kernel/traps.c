@@ -35,6 +35,7 @@
 #include <asm/mathemu.h>
 #include <asm/cpcmd.h>
 #include <asm/s390_ext.h>
+#include <asm/lowcore.h>
 
 /* Called from entry.S only */
 extern void handle_per_exception(struct pt_regs *regs);

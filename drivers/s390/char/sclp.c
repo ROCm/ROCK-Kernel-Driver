@@ -489,8 +489,8 @@ do_machine_quiesce(void)
 {
 	psw_t quiesce_psw;
 
-	quiesce_psw.mask = _DW_PSW_MASK;
-	queisce_psw.addr = 0xfff;
+	quiesce_psw.mask = PSW_BASE_BITS | PSW_MASK_WAIT;
+	quiesce_psw.addr = 0xfff;
 	__load_psw(quiesce_psw);
 }
 #endif

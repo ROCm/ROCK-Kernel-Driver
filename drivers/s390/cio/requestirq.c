@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/requestirq.c
  *   S/390 common I/O routines -- enabling and disabling of devices
- *   $Revision: 1.42 $
+ *   $Revision: 1.44 $
  *
  *    Copyright (C) 1999-2002 IBM Deutschland Entwicklung GmbH,
  *			      IBM Corporation
@@ -14,6 +14,7 @@
 #include <linux/config.h>
 #include <linux/device.h>
 #include <linux/init.h>
+#include <asm/lowcore.h>
 
 #include "css.h"
 

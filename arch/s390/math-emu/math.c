@@ -14,6 +14,7 @@
 #include <linux/sched.h>
 #include <linux/mm.h>
 #include <asm/uaccess.h>
+#include <asm/lowcore.h>
 
 #include "sfp-util.h"
 #include <math-emu/soft-fp.h>

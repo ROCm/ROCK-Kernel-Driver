@@ -16,6 +16,7 @@
 #include <asm/ccwdev.h>
 #include <asm/cio.h>
 #include <asm/delay.h>
+#include <asm/lowcore.h>
 
 #include "cio.h"
 #include "cio_debug.h"

@@ -41,6 +41,7 @@
 #include <asm/smp.h>
 #include <asm/mmu_context.h>
 #include <asm/cpcmd.h>
+#include <asm/lowcore.h>
 
 /*
  * Machine setup..
@@ -534,10 +535,14 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 			       (loops_per_jiffy/(5000/HZ))%100);
 	}
 	if (cpu_online_map & (1 << n)) {
+#ifdef CONFIG_SMP
 		if (smp_processor_id() == n)
 			cpuinfo = &S390_lowcore.cpu_data;
 		else
 			cpuinfo = &lowcore_ptr[n]->cpu_data;
+#else
+		cpuinfo = &S390_lowcore.cpu_data;
+#endif
 		seq_printf(m, "processor %li: "
 			       "version = %02X,  "
 			       "identification = %06X,  "

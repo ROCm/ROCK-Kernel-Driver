@@ -29,6 +29,7 @@
 #include <linux/binfmts.h>
 #include <asm/ucontext.h>
 #include <asm/uaccess.h>
+#include <asm/lowcore.h>
 
 #define _BLOCKABLE (~(sigmask(SIGKILL) | sigmask(SIGSTOP)))
 
