@@ -119,7 +119,7 @@ section 2 for details on frequency table helpers.
 
 You need to make sure that at least one valid frequency (or operating
 range) is within policy->min and policy->max. If necessary, increase
-policy->max fist, and only if this is no solution, decreas policy->min.
+policy->max first, and only if this is no solution, decrease policy->min.
 
 
 1.4 target or setpolicy?
