@@ -427,6 +427,18 @@ static int tg3_writephy(struct tg3 *tp, int reg, u32 val)
 	return ret;
 }
 
+static void tg3_phy_set_wirespeed(struct tg3 *tp)
+{
+	u32 val;
+
+	if (tp->tg3_flags2 & TG3_FLG2_NO_ETH_WIRE_SPEED)
+		return;
+
+	tg3_writephy(tp, MII_TG3_AUX_CTRL, 0x7007);
+	tg3_readphy(tp, MII_TG3_AUX_CTRL, &val);
+	tg3_writephy(tp, MII_TG3_AUX_CTRL, (val | (1 << 15) | (1 << 4)));
+}
+
 /* This will reset the tigon3 PHY if there is no valid
  * link unless the FORCE argument is non-zero.
  */
@@ -462,12 +474,16 @@ static int tg3_phy_reset(struct tg3 *tp, int force)
 
 		if ((phy_control & BMCR_RESET) == 0) {
 			udelay(40);
-			return 0;
+			goto out;
 		}
 		udelay(10);
 	}
 
 	return -EBUSY;
+
+out:
+	tg3_phy_set_wirespeed(tp);
+	return 0;
 }
 
 static void tg3_frob_aux_power(struct tg3 *tp)
@@ -6090,9 +6106,7 @@ static int __devinit tg3_phy_probe(struct tg3 *tp)
 	}
 
 	/* Enable Ethernet@WireSpeed */
-	tg3_writephy(tp, MII_TG3_AUX_CTRL, 0x7007);
-	tg3_readphy(tp, MII_TG3_AUX_CTRL, &val);
-	tg3_writephy(tp, MII_TG3_AUX_CTRL, (val | (1 << 15) | (1 << 4)));
+	tg3_phy_set_wirespeed(tp);
 
 	if (!err && ((tp->phy_id & PHY_ID_MASK) == PHY_ID_BCM5401)) {
 		err = tg3_init_5401phy_dsp(tp);
@@ -6389,6 +6403,13 @@ static int __devinit tg3_get_invariants(struct tg3 *tp)
 	} else {
 		tp->tg3_flags |= TG3_FLAG_WOL_SPEED_100MB;
 	}
+
+	/* A few boards don't want Ethernet@WireSpeed phy feature */
+	if ((GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5700) ||
+	    ((GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705) &&
+	     (tp->pci_chip_rev_id != CHIPREV_ID_5705_A0) &&
+	     (tp->pci_chip_rev_id != CHIPREV_ID_5705_A1)))
+		tp->tg3_flags2 |= TG3_FLG2_NO_ETH_WIRE_SPEED;
 
 	/* Only 5701 and later support tagged irq status mode.
 	 *
