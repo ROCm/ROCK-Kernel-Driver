@@ -494,6 +494,7 @@ static unsigned int ppp_poll(struct file *file, poll_table *wait)
 	return mask;
 }
 
+#ifdef CONFIG_PPP_FILTER
 static int get_filter(void __user *arg, struct sock_filter **p)
 {
 	struct sock_fprog uprog;
@@ -530,6 +531,7 @@ static int get_filter(void __user *arg, struct sock_filter **p)
 	*p = code;
 	return uprog.len;
 }
+#endif /* CONFIG_PPP_FILTER */
 
 static int ppp_ioctl(struct inode *inode, struct file *file,
 		     unsigned int cmd, unsigned long arg)
