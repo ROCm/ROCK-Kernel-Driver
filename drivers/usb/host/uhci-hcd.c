@@ -1392,7 +1392,7 @@ static void uhci_unlink_generic(struct uhci_hcd *uhci, struct urb *urb)
 	struct list_head *head;
 	struct uhci_td *td;
 	struct urb_priv *urbp = (struct urb_priv *)urb->hcpriv;
-	int prevactive = 1;
+	int prevactive = 0;
 
 	uhci_dec_fsbr(uhci, urb);	/* Safe since it checks */
 
@@ -1400,20 +1400,28 @@ static void uhci_unlink_generic(struct uhci_hcd *uhci, struct urb *urb)
 	 * Now we need to find out what the last successful toggle was
 	 * so we can update the local data toggle for the next transfer
 	 *
-	 * There's 3 way's the last successful completed TD is found:
+	 * There are 2 ways the last successful completed TD is found:
 	 *
 	 * 1) The TD is NOT active and the actual length < expected length
 	 * 2) The TD is NOT active and it's the last TD in the chain
+	 *
+	 * and a third way the first uncompleted TD is found:
+	 *
 	 * 3) The TD is active and the previous TD is NOT active
 	 *
 	 * Control and Isochronous ignore the toggle, so this is safe
 	 * for all types
+	 *
+	 * FIXME: The toggle fixups won't be 100% reliable until we
+	 * change over to using a single queue for each endpoint and
+	 * stop the queue before unlinking.
 	 */
 	head = &urbp->td_list;
 	list_for_each_entry(td, head, list) {
 		if (!(td_status(td) & TD_CTRL_ACTIVE) &&
-		    (uhci_actual_length(td_status(td)) < uhci_expected_length(td_token(td)) ||
-		    td->list.next == head))
+				(uhci_actual_length(td_status(td)) <
+				 uhci_expected_length(td_token(td)) ||
+				td->list.next == head))
 			usb_settoggle(urb->dev, uhci_endpoint(td_token(td)),
 				uhci_packetout(td_token(td)),
 				uhci_toggle(td_token(td)) ^ 1);
