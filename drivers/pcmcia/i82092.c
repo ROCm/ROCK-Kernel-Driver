@@ -122,7 +122,7 @@ static int __devinit i82092aa_pci_probe(struct pci_dev *dev, const struct pci_de
 	}
 	printk(KERN_INFO "i82092aa: configured as a %d socket device.\n", socket_count);
 
-	if (request_region(pci_resource_start(dev, 0), 2, "i82092aa")) {
+	if (!request_region(pci_resource_start(dev, 0), 2, "i82092aa")) {
 		ret = -EBUSY;
 		goto err_out_disable;
 	}
