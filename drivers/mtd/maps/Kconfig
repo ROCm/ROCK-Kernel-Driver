@@ -1,5 +1,5 @@
 # drivers/mtd/maps/Kconfig
-# $Id: Kconfig,v 1.37 2004/10/20 22:57:18 dwmw2 Exp $
+# $Id: Kconfig,v 1.38 2004/11/24 19:42:51 rpurdie Exp $
 
 menu "Mapping drivers for chip access"
 	depends on MTD!=n
@@ -644,6 +644,12 @@ config MTD_BAST_MAXSIZE
 	int "Maximum size for BAST flash area (MiB)"
 	depends on MTD_BAST
 	default "4"
+
+config MTD_SHARP_SL
+	bool "ROM maped on Sharp SL Series"
+	depends on MTD && ARCH_PXA
+	help
+	  This enables access to the flash chip on the Sharp SL Series of PDAs.
 
 endmenu
 
