@@ -45,6 +45,7 @@
 #include <linux/usbdevice_fs.h>
 #include <asm/uaccess.h>
 #include <asm/byteorder.h>
+#include <linux/moduleparam.h>
 
 #include "hcd.h"	/* for usbcore internals */
 #include "usb.h"
