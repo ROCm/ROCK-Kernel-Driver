@@ -39,23 +39,23 @@
 static unsigned int fmax = 515633;
 
 static void
-mmci_request_end(struct mmci_host *host, struct mmc_request *req)
+mmci_request_end(struct mmci_host *host, struct mmc_request *mrq)
 {
 	writel(0, host->base + MMCICOMMAND);
-	host->req = NULL;
+	host->mrq = NULL;
 	host->cmd = NULL;
 	host->data = NULL;
 	host->buffer = NULL;
 
-	if (req->data)
-		req->data->bytes_xfered = host->data_xfered;
+	if (mrq->data)
+		mrq->data->bytes_xfered = host->data_xfered;
 
 	/*
 	 * Need to drop the host lock here; mmc_request_done may call
 	 * back into the driver...
 	 */
 	spin_unlock(&host->lock);
-	mmc_request_done(host->mmc, req);
+	mmc_request_done(host->mmc, mrq);
 	spin_lock(&host->lock);
 }
 
@@ -73,7 +73,7 @@ static void mmci_start_data(struct mmci_host *host, struct mmc_data *data)
 		datactrl |= MCI_DPSM_DIRECTION;
 
 	host->data = data;
-	host->buffer = data->rq->buffer;
+	host->buffer = data->req->buffer;
 	host->size = data->blocks << data->blksz_bits;
 	host->data_xfered = 0;
 
@@ -136,7 +136,7 @@ mmci_data_irq(struct mmci_host *host, struct mmc_data *data,
 	if (status & MCI_DATAEND) {
 		host->data = NULL;
 		if (!data->stop) {
-			mmci_request_end(host, data->req);
+			mmci_request_end(host, data->mrq);
 		} else /*if (readl(host->base + MMCIDATACNT) > 6)*/ {
 			mmci_start_command(host, data->stop, 0);
 		}
@@ -161,7 +161,7 @@ mmci_cmd_irq(struct mmci_host *host, struct mmc_command *cmd,
 	}
 
 	if (!cmd->data || cmd->error != MMC_ERR_NONE) {
-		mmci_request_end(host, cmd->req);
+		mmci_request_end(host, cmd->mrq);
 	} else if (!(cmd->data->flags & MMC_DATA_READ)) {
 		mmci_start_data(host, cmd->data);
 	}
@@ -262,20 +262,20 @@ static irqreturn_t mmci_irq(int irq, void *dev_id, struct pt_regs *regs)
 	return IRQ_RETVAL(ret);
 }
 
-static void mmci_request(struct mmc_host *mmc, struct mmc_request *req)
+static void mmci_request(struct mmc_host *mmc, struct mmc_request *mrq)
 {
 	struct mmci_host *host = mmc_priv(mmc);
 
-	WARN_ON(host->req != NULL);
+	WARN_ON(host->mrq != NULL);
 
 	spin_lock_irq(&host->lock);
 
-	host->req = req;
+	host->mrq = mrq;
 
-	if (req->data && req->data->flags & MMC_DATA_READ)
-		mmci_start_data(host, req->data);
+	if (mrq->data && mrq->data->flags & MMC_DATA_READ)
+		mmci_start_data(host, mrq->data);
 
-	mmci_start_command(host, req->cmd, 0);
+	mmci_start_command(host, mrq->cmd, 0);
 
 	spin_unlock_irq(&host->lock);
 }

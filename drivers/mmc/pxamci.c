@@ -21,6 +21,7 @@
 #include <linux/init.h>
 #include <linux/ioport.h>
 #include <linux/device.h>
+#include <linux/delay.h>
 #include <linux/interrupt.h>
 #include <linux/blkdev.h>
 #include <linux/dma-mapping.h>
@@ -52,7 +53,7 @@ struct pxamci_host {
 	unsigned int		imask;
 	unsigned int		power_mode;
 
-	struct mmc_request	*req;
+	struct mmc_request	*mrq;
 	struct mmc_command	*cmd;
 	struct mmc_data		*data;
 
@@ -148,7 +149,7 @@ static void pxamci_setup_data(struct pxamci_host *host, struct mmc_data *data)
 	dcmd |= DCMD_BURST32 | DCMD_WIDTH1;
 
 	host->dma_size = data->blocks << data->blksz_bits;
-	host->dma_buf = dma_map_single(mmc_dev(host->mmc), data->rq->buffer,
+	host->dma_buf = dma_map_single(mmc_dev(host->mmc), data->req->buffer,
 				       host->dma_size, host->dma_dir);
 
 	for (i = 0, size = host->dma_size, dma = host->dma_buf; size; i++) {
@@ -215,13 +216,13 @@ static void pxamci_start_cmd(struct pxamci_host *host, struct mmc_command *cmd, 
 	pxamci_enable_irq(host, END_CMD_RES);
 }
 
-static void pxamci_finish_request(struct pxamci_host *host, struct mmc_request *req)
+static void pxamci_finish_request(struct pxamci_host *host, struct mmc_request *mrq)
 {
 	DBG("PXAMCI: request done\n");
-	host->req = NULL;
+	host->mrq = NULL;
 	host->cmd = NULL;
 	host->data = NULL;
-	mmc_request_done(host->mmc, req);
+	mmc_request_done(host->mmc, mrq);
 }
 
 static int pxamci_cmd_done(struct pxamci_host *host, unsigned int stat)
@@ -257,7 +258,7 @@ static int pxamci_cmd_done(struct pxamci_host *host, unsigned int stat)
 	if (host->data && cmd->error == MMC_ERR_NONE) {
 		pxamci_enable_irq(host, DATA_TRAN_DONE);
 	} else {
-		pxamci_finish_request(host, host->req);
+		pxamci_finish_request(host, host->mrq);
 	}
 
 	return 1;
@@ -290,11 +291,11 @@ static int pxamci_data_done(struct pxamci_host *host, unsigned int stat)
 	pxamci_disable_irq(host, DATA_TRAN_DONE);
 
 	host->data = NULL;
-	if (host->req->stop && data->error == MMC_ERR_NONE) {
+	if (host->mrq->stop && data->error == MMC_ERR_NONE) {
 		pxamci_stop_clock(host);
-		pxamci_start_cmd(host, host->req->stop, 0);
+		pxamci_start_cmd(host, host->mrq->stop, 0);
 	} else {
-		pxamci_finish_request(host, host->req);
+		pxamci_finish_request(host, host->mrq);
 	}
 
 	return 1;
@@ -324,33 +325,33 @@ static irqreturn_t pxamci_irq(int irq, void *devid, struct pt_regs *regs)
 	return IRQ_RETVAL(handled);
 }
 
-static void pxamci_request(struct mmc_host *mmc, struct mmc_request *req)
+static void pxamci_request(struct mmc_host *mmc, struct mmc_request *mrq)
 {
 	struct pxamci_host *host = mmc_priv(mmc);
 	unsigned int cmdat;
 
-	WARN_ON(host->req != NULL);
+	WARN_ON(host->mrq != NULL);
 
-	host->req = req;
+	host->mrq = mrq;
 
 	pxamci_stop_clock(host);
 
 	cmdat = host->cmdat;
 	host->cmdat &= ~CMDAT_INIT;
 
-	if (req->data) {
-		pxamci_setup_data(host, req->data);
+	if (mrq->data) {
+		pxamci_setup_data(host, mrq->data);
 
 		cmdat &= ~CMDAT_BUSY;
 		cmdat |= CMDAT_DATAEN | CMDAT_DMAEN;
-		if (req->data->flags & MMC_DATA_WRITE)
+		if (mrq->data->flags & MMC_DATA_WRITE)
 			cmdat |= CMDAT_WRITE;
 
-		if (req->data->flags & MMC_DATA_STREAM)
+		if (mrq->data->flags & MMC_DATA_STREAM)
 			cmdat |= CMDAT_STREAM;
 	}
 
-	pxamci_start_cmd(host, req->cmd, cmdat);
+	pxamci_start_cmd(host, mrq->cmd, cmdat);
 }
 
 static void pxamci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)

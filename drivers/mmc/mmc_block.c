@@ -139,7 +139,7 @@ static struct block_device_operations mmc_bdops = {
 };
 
 struct mmc_blk_request {
-	struct mmc_request	req;
+	struct mmc_request	mrq;
 	struct mmc_command	cmd;
 	struct mmc_command	stop;
 	struct mmc_data		data;
@@ -173,58 +173,58 @@ static int mmc_blk_issue_rq(struct mmc_queue *mq, struct request *req)
 		goto cmd_err;
 
 	do {
-		struct mmc_blk_request rq;
+		struct mmc_blk_request brq;
 		struct mmc_command cmd;
 
-		memset(&rq, 0, sizeof(struct mmc_blk_request));
-		rq.req.cmd = &rq.cmd;
-		rq.req.data = &rq.data;
+		memset(&brq, 0, sizeof(struct mmc_blk_request));
+		brq.mrq.cmd = &brq.cmd;
+		brq.mrq.data = &brq.data;
 
-		rq.cmd.arg = req->sector << 9;
-		rq.cmd.flags = MMC_RSP_SHORT | MMC_RSP_CRC;
-		rq.data.rq = req;
-		rq.data.timeout_ns = card->csd.tacc_ns * 10;
-		rq.data.timeout_clks = card->csd.tacc_clks * 10;
-		rq.data.blksz_bits = md->block_bits;
-		rq.data.blocks = req->current_nr_sectors >> (md->block_bits - 9);
-		rq.stop.opcode = MMC_STOP_TRANSMISSION;
-		rq.stop.arg = 0;
-		rq.stop.flags = MMC_RSP_SHORT | MMC_RSP_CRC | MMC_RSP_BUSY;
+		brq.cmd.arg = req->sector << 9;
+		brq.cmd.flags = MMC_RSP_SHORT | MMC_RSP_CRC;
+		brq.data.req = req;
+		brq.data.timeout_ns = card->csd.tacc_ns * 10;
+		brq.data.timeout_clks = card->csd.tacc_clks * 10;
+		brq.data.blksz_bits = md->block_bits;
+		brq.data.blocks = req->current_nr_sectors >> (md->block_bits - 9);
+		brq.stop.opcode = MMC_STOP_TRANSMISSION;
+		brq.stop.arg = 0;
+		brq.stop.flags = MMC_RSP_SHORT | MMC_RSP_CRC | MMC_RSP_BUSY;
 
 		if (rq_data_dir(req) == READ) {
-			rq.cmd.opcode = rq.data.blocks > 1 ? MMC_READ_MULTIPLE_BLOCK : MMC_READ_SINGLE_BLOCK;
-			rq.data.flags |= MMC_DATA_READ;
+			brq.cmd.opcode = brq.data.blocks > 1 ? MMC_READ_MULTIPLE_BLOCK : MMC_READ_SINGLE_BLOCK;
+			brq.data.flags |= MMC_DATA_READ;
 		} else {
-			rq.cmd.opcode = MMC_WRITE_BLOCK;
-			rq.cmd.flags |= MMC_RSP_BUSY;
-			rq.data.flags |= MMC_DATA_WRITE;
-			rq.data.blocks = 1;
+			brq.cmd.opcode = MMC_WRITE_BLOCK;
+			brq.cmd.flags |= MMC_RSP_BUSY;
+			brq.data.flags |= MMC_DATA_WRITE;
+			brq.data.blocks = 1;
 		}
-		rq.req.stop = rq.data.blocks > 1 ? &rq.stop : NULL;
+		brq.mrq.stop = brq.data.blocks > 1 ? &brq.stop : NULL;
 
-		mmc_wait_for_req(card->host, &rq.req);
-		if (rq.cmd.error) {
-			err = rq.cmd.error;
+		mmc_wait_for_req(card->host, &brq.mrq);
+		if (brq.cmd.error) {
+			err = brq.cmd.error;
 			printk(KERN_ERR "%s: error %d sending read/write command\n",
 			       req->rq_disk->disk_name, err);
 			goto cmd_err;
 		}
 
 		if (rq_data_dir(req) == READ) {
-			sz = rq.data.bytes_xfered;
+			sz = brq.data.bytes_xfered;
 		} else {
 			sz = 0;
 		}
 
-		if (rq.data.error) {
-			err = rq.data.error;
+		if (brq.data.error) {
+			err = brq.data.error;
 			printk(KERN_ERR "%s: error %d transferring data\n",
 			       req->rq_disk->disk_name, err);
 			goto cmd_err;
 		}
 
-		if (rq.stop.error) {
-			err = rq.stop.error;
+		if (brq.stop.error) {
+			err = brq.stop.error;
 			printk(KERN_ERR "%s: error %d sending stop command\n",
 			       req->rq_disk->disk_name, err);
 			goto cmd_err;
@@ -251,7 +251,7 @@ static int mmc_blk_issue_rq(struct mmc_queue *mq, struct request *req)
 			goto cmd_err;
 #endif
 
-		sz = rq.data.bytes_xfered;
+		sz = brq.data.bytes_xfered;
 	} while (end_that_request_chunk(req, 1, sz));
 
 	mmc_card_release_host(card);

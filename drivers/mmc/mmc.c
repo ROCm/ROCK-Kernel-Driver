@@ -62,26 +62,25 @@ static const unsigned int tacc_mant[] = {
 /**
  *	mmc_request_done - finish processing an MMC command
  *	@host: MMC host which completed command
- *	@cmd: MMC command which completed
- *	@err: MMC error code
+ *	@mrq: MMC request which completed
  *
  *	MMC drivers should call this function when they have completed
  *	their processing of a command.  This should be called before the
  *	data part of the command has completed.
  */
-void mmc_request_done(struct mmc_host *host, struct mmc_request *req)
+void mmc_request_done(struct mmc_host *host, struct mmc_request *mrq)
 {
-	struct mmc_command *cmd = req->cmd;
-	int err = req->cmd->error;
+	struct mmc_command *cmd = mrq->cmd;
+	int err = mrq->cmd->error;
 	DBG("MMC: req done (%02x): %d: %08x %08x %08x %08x\n", cmd->opcode,
 	    err, cmd->resp[0], cmd->resp[1], cmd->resp[2], cmd->resp[3]);
 
 	if (err && cmd->retries) {
 		cmd->retries--;
 		cmd->error = 0;
-		host->ops->request(host, req);
-	} else if (req->done) {
-		req->done(req);
+		host->ops->request(host, mrq);
+	} else if (mrq->done) {
+		mrq->done(mrq);
 	}
 }
 
@@ -90,49 +89,49 @@ EXPORT_SYMBOL(mmc_request_done);
 /**
  *	mmc_start_request - start a command on a host
  *	@host: MMC host to start command on
- *	@cmd: MMC command to start
+ *	@mrq: MMC request to start
  *
  *	Queue a command on the specified host.  We expect the
  *	caller to be holding the host lock with interrupts disabled.
  */
 void
-mmc_start_request(struct mmc_host *host, struct mmc_request *req)
+mmc_start_request(struct mmc_host *host, struct mmc_request *mrq)
 {
 	DBG("MMC: starting cmd %02x arg %08x flags %08x\n",
-	    req->cmd->opcode, req->cmd->arg, req->cmd->flags);
+	    mrq->cmd->opcode, mrq->cmd->arg, mrq->cmd->flags);
 
 	WARN_ON(host->card_busy == NULL);
 
-	req->cmd->error = 0;
-	req->cmd->req = req;
-	if (req->data) {
-		req->cmd->data = req->data;
-		req->data->error = 0;
-		req->data->req = req;
-		if (req->stop) {
-			req->data->stop = req->stop;
-			req->stop->error = 0;
-			req->stop->req = req;
+	mrq->cmd->error = 0;
+	mrq->cmd->mrq = mrq;
+	if (mrq->data) {
+		mrq->cmd->data = mrq->data;
+		mrq->data->error = 0;
+		mrq->data->mrq = mrq;
+		if (mrq->stop) {
+			mrq->data->stop = mrq->stop;
+			mrq->stop->error = 0;
+			mrq->stop->mrq = mrq;
 		}
 	}
-	host->ops->request(host, req);
+	host->ops->request(host, mrq);
 }
 
 EXPORT_SYMBOL(mmc_start_request);
 
-static void mmc_wait_done(struct mmc_request *req)
+static void mmc_wait_done(struct mmc_request *mrq)
 {
-	complete(req->done_data);
+	complete(mrq->done_data);
 }
 
-int mmc_wait_for_req(struct mmc_host *host, struct mmc_request *req)
+int mmc_wait_for_req(struct mmc_host *host, struct mmc_request *mrq)
 {
 	DECLARE_COMPLETION(complete);
 
-	req->done_data = &complete;
-	req->done = mmc_wait_done;
+	mrq->done_data = &complete;
+	mrq->done = mmc_wait_done;
 
-	mmc_start_request(host, req);
+	mmc_start_request(host, mrq);
 
 	wait_for_completion(&complete);
 
@@ -153,19 +152,19 @@ EXPORT_SYMBOL(mmc_wait_for_req);
  */
 int mmc_wait_for_cmd(struct mmc_host *host, struct mmc_command *cmd, int retries)
 {
-	struct mmc_request req;
+	struct mmc_request mrq;
 
 	BUG_ON(host->card_busy == NULL);
 
-	memset(&req, 0, sizeof(struct mmc_request));
+	memset(&mrq, 0, sizeof(struct mmc_request));
 
 	memset(cmd->resp, 0, sizeof(cmd->resp));
 	cmd->retries = retries;
 
-	req.cmd = cmd;
+	mrq.cmd = cmd;
 	cmd->data = NULL;
 
-	mmc_wait_for_req(host, &req);
+	mmc_wait_for_req(host, &mrq);
 
 	return cmd->error;
 }

@@ -39,7 +39,7 @@ struct mmc_command {
 #define MMC_ERR_INVALID	5
 
 	struct mmc_data		*data;		/* data segment associated with cmd */
-	struct mmc_request	*req;		/* assoicated request */
+	struct mmc_request	*mrq;		/* assoicated request */
 };
 
 struct mmc_data {
@@ -47,7 +47,7 @@ struct mmc_data {
 	unsigned int		timeout_clks;	/* data timeout (in clocks) */
 	unsigned int		blksz_bits;	/* data block size */
 	unsigned int		blocks;		/* number of blocks */
-	struct request		*rq;		/* request structure */
+	struct request		*req;		/* request structure */
 	unsigned int		error;		/* data error */
 	unsigned int		flags;
 
@@ -58,7 +58,7 @@ struct mmc_data {
 	unsigned int		bytes_xfered;
 
 	struct mmc_command	*stop;		/* stop command */
-	struct mmc_request	*req;		/* assoicated request */
+	struct mmc_request	*mrq;		/* assoicated request */
 };
 
 struct mmc_request {

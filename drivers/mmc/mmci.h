@@ -122,7 +122,7 @@ struct clk;
 
 struct mmci_host {
 	void			*base;
-	struct mmc_request	*req;
+	struct mmc_request	*mrq;
 	struct mmc_command	*cmd;
 	struct mmc_data		*data;
 	struct mmc_host		*mmc;
