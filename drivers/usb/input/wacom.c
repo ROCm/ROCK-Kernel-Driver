@@ -1,7 +1,7 @@
 /*
  *  USB Wacom Graphire and Wacom Intuos tablet support
  *
- *  Copyright (c) 2000-2002 Vojtech Pavlik	<vojtech@ucw.cz>
+ *  Copyright (c) 2000-2004 Vojtech Pavlik	<vojtech@ucw.cz>
  *  Copyright (c) 2000 Andreas Bach Aaen	<abach@stofanet.dk>
  *  Copyright (c) 2000 Clifford Wolf		<clifford@clifford.at>
  *  Copyright (c) 2000 Sam Mosel		<sam.mosel@computer.org>
@@ -9,6 +9,7 @@
  *  Copyright (c) 2000 Daniel Egger		<egger@suse.de>
  *  Copyright (c) 2001 Frederic Lepied		<flepied@mandrakesoft.com>
  *  Copyright (c) 2002 Ping Cheng		<pingc@wacom.com>
+ *  Copyright (c) 2004 Panagiotis Issaris	<panagiotis.issaris@mech.kuleuven.ac.be>
  *
  *  ChangeLog:
  *      v0.1 (vp)  - Initial release
@@ -48,6 +49,7 @@
  *	v1.30 (vp) - Merge 2.4 and 2.5 drivers
  *		   - Since 2.5 now has input_sync(), remove MSC_SERIAL abuse
  *		   - Cleanups here and there
+ *    v1.30.1 (pi) - Added Graphire3 support
  */
 
 /*
