@@ -2517,7 +2517,7 @@ check_task_state(struct task_struct *task)
 	return ret;
 }
 
-asmlinkage int
+asmlinkage long
 sys_perfmonctl (pid_t pid, int cmd, void *arg, int count, long arg5, long arg6, long arg7, 
 		long arg8, long stack)
 {
@@ -3977,6 +3977,11 @@ pfm_inherit(struct task_struct *task, struct pt_regs *regs)
 	 */
 	nctx->ctx_saved_psr = pfm_get_psr();
 
+	/*
+	 * propagate kernel psr in new context (used for first ctxsw in
+	 */
+	nctx->ctx_saved_psr = pfm_get_psr();
+
 	/* link with new task */
 	thread->pfm_context = nctx;
 
@@ -4430,7 +4435,7 @@ pfm_init_percpu(void)
 
 #else /* !CONFIG_PERFMON */
 
-asmlinkage int
+asmlinkage long
 sys_perfmonctl (int pid, int cmd, void *req, int count, long arg5, long arg6, 
 		long arg7, long arg8, long stack)
 {

@@ -161,7 +161,7 @@ typedef struct {
 	unsigned long   reserved;		/* unused */
 } perfmon_smpl_entry_t;
 
-extern int perfmonctl(pid_t pid, int cmd, void *arg, int narg);
+extern long perfmonctl(pid_t pid, int cmd, void *arg, int narg);
 
 #ifdef __KERNEL__
 
