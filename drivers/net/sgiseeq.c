@@ -19,11 +19,11 @@
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
+#include <linux/bitops.h>
 
 #include <asm/byteorder.h>
 #include <asm/io.h>
 #include <asm/system.h>
-#include <asm/bitops.h>
 #include <asm/page.h>
 #include <asm/pgtable.h>
 #include <asm/sgi/hpc3.h>

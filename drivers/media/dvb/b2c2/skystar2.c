@@ -30,14 +30,16 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  */
+
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/delay.h>
 #include <linux/pci.h>
 #include <linux/init.h>
+#include <linux/version.h>
 
 #include <asm/io.h>
 
-#include "dvb_i2c.h"
 #include "dvb_frontend.h"
 
 #include <linux/dvb/frontend.h>
@@ -49,12 +51,17 @@
 #include "demux.h"
 #include "dvb_net.h"
 
-#include "dvb_functions.h"
 
-static int debug = 0;
+static int debug;
+static int enable_hw_filters = 2;
+
+module_param(debug, int, 0644);
+MODULE_PARM_DESC(debug, "Set debugging level (0 = default, 1 = most messages, 2 = all messages).");
+module_param(enable_hw_filters, int, 0444);
+MODULE_PARM_DESC(enable_hw_filters, "enable hardware filters: supported values: 0 (none), 1, 2");
+
 #define dprintk(x...)	do { if (debug>=1) printk(x); } while (0)
 #define ddprintk(x...)	do { if (debug>=2) printk(x); } while (0)
-static int enable_hw_filters = 2;
 
 #define SIZE_OF_BUF_DMA1	0x3ac00
 #define SIZE_OF_BUF_DMA2	0x758
@@ -79,7 +86,7 @@ struct adapter {
 	u32 pid_filter_max;
 	u32 mac_filter_max;
 	u32 irq;
-	unsigned long io_mem;
+	void __iomem *io_mem;
 	unsigned long io_port;
 	u8 mac_addr[8];
 	u32 dw_sram_type;
@@ -89,7 +96,7 @@ struct adapter {
 	struct dmxdev dmxdev;
 	struct dmx_frontend hw_frontend;
 	struct dmx_frontend mem_frontend;
-	struct dvb_i2c_bus *i2c_bus;
+	struct i2c_adapter i2c_adap;
 	struct dvb_net dvbnet;
 
 	struct semaphore i2c_sem;
@@ -277,9 +284,9 @@ static u32 flex_i2c_write(struct adapter *adapter, u32 device, u32 bus, u32 addr
 	return buf - start;
 }
 
-static int master_xfer(struct dvb_i2c_bus *i2c, const struct i2c_msg *msgs, int num)
+static int master_xfer(struct i2c_adapter* adapter, struct i2c_msg msgs[], int num)
 {
-	struct adapter *tmp = i2c->data;
+	struct adapter *tmp = i2c_get_adapdata(adapter);
 	int i, ret = 0;
 
 	if (down_interruptible(&tmp->i2c_sem))
@@ -291,10 +298,10 @@ static int master_xfer(struct dvb_i2c_bus *i2c, const struct i2c_msg *msgs, int 
 		ddprintk("message %d: flags=0x%x, addr=0x%x, buf=0x%x, len=%d \n", i,
 			 msgs[i].flags, msgs[i].addr, msgs[i].buf[0], msgs[i].len);
 	
-		/* allow only the mt312 and stv0299 frontends to access the bus */
-		if ((msgs[i].addr != 0x0e) && (msgs[i].addr != 0x68) && (msgs[i].addr != 0x61)) {
+		/* allow only the mt312, mt352 and stv0299 frontends to access the bus */
+		if ((msgs[i].addr != 0x0e) && (msgs[i].addr != 0x68) &&
+		    (msgs[i].addr != 0x61) && (msgs[i].addr != 0x0f)) {
 		up(&tmp->i2c_sem);
-
 		return -EREMOTEIO;
 	}
 	}
@@ -1763,11 +1770,10 @@ static void free_adapter_object(struct adapter *adapter)
 
 	free_dma_queue(adapter);
 
-	if (adapter->io_mem != 0)
-		iounmap((void *) adapter->io_mem);
+	if (adapter->io_mem)
+		iounmap(adapter->io_mem);
 
-	if (adapter != 0)
-		kfree(adapter);
+	kfree(adapter);
 }
 
 static struct pci_driver skystar2_pci_driver;
@@ -1798,15 +1804,15 @@ static int claim_adapter(struct adapter *adapter)
 
 	adapter->io_port = pdev->resource[1].start;
 
-	adapter->io_mem = (unsigned long) ioremap(pdev->resource[0].start, 0x800);
+	adapter->io_mem = ioremap(pdev->resource[0].start, 0x800);
 
-	if (adapter->io_mem == 0) {
+	if (!adapter->io_mem) {
 		dprintk("%s: can not map io memory\n", __FUNCTION__);
 
 		return 2;
 	}
 
-	dprintk("%s: io memory maped at %lx\n", __FUNCTION__, adapter->io_mem);
+	dprintk("%s: io memory maped at %p\n", __FUNCTION__, adapter->io_mem);
 
 	return 1;
 }
@@ -2122,7 +2128,7 @@ static int send_diseqc_msg(struct adapter *adapter, int len, u8 *msg, unsigned l
 			udelay(12500);
 			set_tuner_tone(adapter, 0);
 		}
-		dvb_delay(20);
+		msleep(20);
 	}
 
 	return 0;
@@ -2228,6 +2234,44 @@ static int flexcop_diseqc_ioctl(struct dvb_frontend *fe, unsigned int cmd, void 
 	return 0;
 }
 
+
+static int client_register(struct i2c_client *client)
+{
+	struct adapter *adapter = (struct adapter*)i2c_get_adapdata(client->adapter);
+
+	dprintk("client_register\n");
+
+	if (client->driver->command)
+		return client->driver->command(client, FE_REGISTER, adapter->dvb_adapter);
+	return 0;
+}
+
+static int client_unregister(struct i2c_client *client)
+{
+	struct adapter *adapter = (struct adapter*)i2c_get_adapdata(client->adapter);
+
+	dprintk("client_unregister\n");
+
+	if (client->driver->command)
+		return client->driver->command(client, FE_UNREGISTER, adapter->dvb_adapter);
+	return 0;
+}
+
+u32 flexcop_i2c_func(struct i2c_adapter *adapter)
+{
+	printk("flexcop_i2c_func\n");
+
+	return I2C_FUNC_I2C;
+}
+
+static struct i2c_algorithm    flexcop_algo = {
+	.name		= "flexcop i2c algorithm",
+	.id		= I2C_ALGO_BIT,
+	.master_xfer	= master_xfer,
+	.functionality	= flexcop_i2c_func,
+};
+
+
 static int skystar2_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 {
 	struct adapter *adapter;
@@ -2258,10 +2302,27 @@ static int skystar2_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	init_MUTEX(&adapter->i2c_sem);
 
-	adapter->i2c_bus = dvb_register_i2c_bus(master_xfer, adapter, adapter->dvb_adapter, 0);
 
-	if (!adapter->i2c_bus)
+	memset(&adapter->i2c_adap, 0, sizeof(struct i2c_adapter));
+	strcpy(adapter->i2c_adap.name, "SkyStar2");
+
+	i2c_set_adapdata(&adapter->i2c_adap, adapter);
+
+#ifdef I2C_ADAP_CLASS_TV_DIGITAL
+	adapter->i2c_adap.class 	    = I2C_ADAP_CLASS_TV_DIGITAL;
+#else
+	adapter->i2c_adap.class 	    = I2C_CLASS_TV_DIGITAL;
+#endif
+	adapter->i2c_adap.algo              = &flexcop_algo;
+	adapter->i2c_adap.algo_data         = NULL;
+	adapter->i2c_adap.id                = I2C_ALGO_BIT;
+	adapter->i2c_adap.client_register   = client_register;
+	adapter->i2c_adap.client_unregister = client_unregister;
+
+	if (i2c_add_adapter(&adapter->i2c_adap) < 0) {
+		dvb_unregister_adapter (adapter->dvb_adapter);
 		return -ENOMEM;
+	}
 
 	dvb_add_frontend_ioctls(adapter->dvb_adapter, flexcop_diseqc_ioctl, NULL, adapter);
 
@@ -2327,8 +2388,7 @@ static void skystar2_remove(struct pci_dev *pdev)
 		if (adapter->dvb_adapter != NULL) {
 			dvb_remove_frontend_ioctls(adapter->dvb_adapter, flexcop_diseqc_ioctl, NULL);
 
-			if (adapter->i2c_bus != NULL)
-				dvb_unregister_i2c_bus(master_xfer, adapter->i2c_bus->adapter, adapter->i2c_bus->id);
+			i2c_del_adapter(&adapter->i2c_adap);
 
 			dvb_unregister_adapter(adapter->dvb_adapter);
 		}
@@ -2363,11 +2423,6 @@ static void skystar2_cleanup(void)
 
 module_init(skystar2_init);
 module_exit(skystar2_cleanup);
-
-MODULE_PARM(debug, "i");
-MODULE_PARM_DESC(debug, "enable verbose debug messages: supported values: 1 and 2");
-MODULE_PARM(enable_hw_filters, "i");
-MODULE_PARM_DESC(enable_hw_filters, "enable hardware filters: supported values: 0 (none), 1, 2");
 
 MODULE_DESCRIPTION("Technisat SkyStar2 DVB PCI Driver");
 MODULE_LICENSE("GPL");

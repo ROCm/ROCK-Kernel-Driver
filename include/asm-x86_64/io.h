@@ -135,6 +135,8 @@ extern inline void * phys_to_virt(unsigned long address)
 #define page_to_phys(page)	((page - mem_map) << PAGE_SHIFT)
 #endif
 
+#include <asm-generic/iomap.h>
+
 extern void __iomem *__ioremap(unsigned long offset, unsigned long size, unsigned long flags);
 
 extern inline void __iomem * ioremap (unsigned long offset, unsigned long size)
@@ -148,7 +150,7 @@ extern inline void __iomem * ioremap (unsigned long offset, unsigned long size)
  * or read caching is not desirable:
  */
 extern void __iomem * ioremap_nocache (unsigned long offset, unsigned long size);
-extern void iounmap(void __iomem *addr);
+extern void iounmap(volatile void __iomem *addr);
 
 /*
  * ISA I/O bus memory addresses are 1:1 with the physical address.
@@ -173,10 +175,26 @@ extern void iounmap(void __iomem *addr);
  * memory location directly.
  */
 
-#define readb(addr) (*(__force volatile __u8 *) (__u8 __iomem *)(addr))
-#define readw(addr) (*(__force volatile __u16 *) (__u16 __iomem *)(addr))
-#define readl(addr) (*(__force volatile __u32 *) (__u32 __iomem *)(addr))
-#define readq(addr) (*(__force volatile __u64 *) (__u64 __iomem *)(addr))
+static inline __u8 __readb(volatile void __iomem *addr)
+{
+	return *(__force volatile __u8 *)addr;
+}
+static inline __u16 __readw(volatile void __iomem *addr)
+{
+	return *(__force volatile __u16 *)addr;
+}
+static inline __u32 __readl(volatile void __iomem *addr)
+{
+	return *(__force volatile __u32 *)addr;
+}
+static inline __u64 __readq(volatile void __iomem *addr)
+{
+	return *(__force volatile __u64 *)addr;
+}
+#define readb(x) __readb(x)
+#define readw(x) __readw(x)
+#define readl(x) __readl(x)
+#define readq(x) __readq(x)
 #define readb_relaxed(a) readb(a)
 #define readw_relaxed(a) readw(a)
 #define readl_relaxed(a) readl(a)
@@ -187,7 +205,7 @@ extern void iounmap(void __iomem *addr);
 #define __raw_readq readq
 
 #ifdef CONFIG_UNORDERED_IO
-static inline void __writel(__u32 val, void __iomem *addr)
+static inline void __writel(__u32 val, volatile void __iomem *addr)
 {
 	volatile __u32 __iomem *target = addr;
 	asm volatile("movnti %1,%0"
@@ -195,21 +213,35 @@ static inline void __writel(__u32 val, void __iomem *addr)
 		     : "r" (val) : "memory");
 }
 
-static inline void __writeq(__u64 val, void __iomem *addr)
+static inline void __writeq(__u64 val, volatile void __iomem *addr)
 {
-	volatile __u64 *target = addr;
+	volatile __u64 __iomem *target = addr;
 	asm volatile("movnti %1,%0"
 		     : "=m" (*target)
 		     : "r" (val) : "memory");
 }
-#define writeq(val,addr) __writeq((val),(void __iomem *)(addr))
-#define writel(val,addr) __writel((val),(void __iomem *)(addr))
 #else
-#define writel(b,addr) (*(__force volatile __u32 *)(__u32 __iomem *)(addr) = (b))
-#define writeq(b,addr) (*(__force volatile __u64 *)(__u64 __iomem *)(addr) = (b))
+static inline void __writel(__u32 b, volatile void __iomem *addr)
+{
+	*(__force volatile __u32 *)addr = b;
+}
+static inline void __writeq(__u64 b, volatile void __iomem *addr)
+{
+	*(__force volatile __u64 *)addr = b;
+}
 #endif
-#define writeb(b,addr) (*(__force volatile __u8 *)(__u8 __iomem *)(addr) = (b))
-#define writew(b,addr) (*(__force volatile __u16 *)(__u16 __iomem *)(addr) = (b))
+static inline void __writeb(__u8 b, volatile void __iomem *addr)
+{
+	*(__force volatile __u8 *)addr = b;
+}
+static inline void __writew(__u16 b, volatile void __iomem *addr)
+{
+	*(__force volatile __u16 *)addr = b;
+}
+#define writeq(val,addr) __writeq((val),(addr))
+#define writel(val,addr) __writel((val),(addr))
+#define writew(val,addr) __writew((val),(addr))
+#define writeb(val,addr) __writeb((val),(addr))
 #define __raw_writeb writeb
 #define __raw_writew writew
 #define __raw_writel writel
@@ -218,11 +250,18 @@ static inline void __writeq(__u64 val, void __iomem *addr)
 void *__memcpy_fromio(void*,unsigned long,unsigned);
 void *__memcpy_toio(unsigned long,const void*,unsigned);
 
-#define memcpy_fromio(to,from,len) \
-  __memcpy_fromio((to),(unsigned long)(void __iomem *)(from),(len))
-#define memcpy_toio(to,from,len) \
-  __memcpy_toio((unsigned long)(void __iomem *)(to),(from),(len))
-#define memset_io(a,b,c)	memset((__force void *)(void __iomem *)(a),(b),(c))
+static inline void *memcpy_fromio(void *to, volatile void __iomem *from, unsigned len)
+{
+	return __memcpy_fromio(to,(unsigned long)from,len);
+}
+static inline void *memcpy_toio(volatile void __iomem *to, const void *from, unsigned len)
+{
+	return __memcpy_toio((unsigned long)to,from,len);
+}
+static inline void *memset_io(volatile void __iomem *a, int b, size_t c)
+{
+	return memset((__force void *)a,b,c);
+}
 
 /*
  * ISA space is 'always mapped' on a typical x86 system, no need to
@@ -263,7 +302,7 @@ void *__memcpy_toio(unsigned long,const void*,unsigned);
  *	Returns 1 on a match.
  */
  
-static inline int check_signature(unsigned long io_addr,
+static inline int check_signature(void __iomem *io_addr,
 	const unsigned char *signature, int length)
 {
 	int retval = 0;

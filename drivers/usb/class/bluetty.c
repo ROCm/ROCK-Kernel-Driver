@@ -207,7 +207,7 @@ struct usb_bluetooth {
 /* local function prototypes */
 static int  bluetooth_open		(struct tty_struct *tty, struct file *filp);
 static void bluetooth_close		(struct tty_struct *tty, struct file *filp);
-static int  bluetooth_write		(struct tty_struct *tty, int from_user, const unsigned char *buf, int count);
+static int  bluetooth_write		(struct tty_struct *tty, const unsigned char *buf, int count);
 static int  bluetooth_write_room	(struct tty_struct *tty);
 static int  bluetooth_chars_in_buffer	(struct tty_struct *tty);
 static void bluetooth_throttle		(struct tty_struct *tty);
@@ -433,7 +433,7 @@ static void bluetooth_close (struct tty_struct *tty, struct file * filp)
 }
 
 
-static int bluetooth_write (struct tty_struct * tty, int from_user, const unsigned char *buf, int count)
+static int bluetooth_write (struct tty_struct * tty, const unsigned char *buf, int count)
 {
 	struct usb_bluetooth *bluetooth = get_usb_bluetooth ((struct usb_bluetooth *)tty->driver_data, __FUNCTION__);
 	struct urb *urb = NULL;
@@ -471,21 +471,7 @@ static int bluetooth_write (struct tty_struct * tty, int from_user, const unsign
 	printk ("\n");
 #endif
 
-	if (from_user) {
-		temp_buffer = kmalloc (count, GFP_KERNEL);
-		if (temp_buffer == NULL) {
-			err ("%s - out of memory.", __FUNCTION__);
-			retval = -ENOMEM;
-			goto exit;
-		}
-		if (copy_from_user (temp_buffer, (void __user *)buf, count)) {
-			retval = -EFAULT;
-			goto exit;
-		}
-		current_buffer = temp_buffer;
-	} else {
-		current_buffer = buf;
-	}
+	current_buffer = buf;
 
 	switch (*current_buffer) {
 		/* First byte indicates the type of packet */

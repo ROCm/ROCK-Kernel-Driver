@@ -1995,7 +1995,7 @@ static void edge_close (struct usb_serial_port *port, struct file * filp)
 	dbg("%s - exited", __FUNCTION__);
 }
 
-static int edge_write (struct usb_serial_port *port, int from_user, const unsigned char *data, int count)
+static int edge_write (struct usb_serial_port *port, const unsigned char *data, int count)
 {
 	struct edgeport_port *edge_port = usb_get_serial_port_data(port);
 	int result;
@@ -2019,12 +2019,7 @@ static int edge_write (struct usb_serial_port *port, int from_user, const unsign
 
 	count = min (count, port->bulk_out_size);
 
-	if (from_user) {
-		if (copy_from_user(port->write_urb->transfer_buffer, data, count))
-			return -EFAULT;
-	} else {
-		memcpy (port->write_urb->transfer_buffer, data, count);
-	}
+	memcpy (port->write_urb->transfer_buffer, data, count);
 
 	usb_serial_debug_data(debug, &port->dev, __FUNCTION__, count, port->write_urb->transfer_buffer);
 
@@ -2110,7 +2105,7 @@ static void edge_throttle (struct usb_serial_port *port)
 	/* if we are implementing XON/XOFF, send the stop character */
 	if (I_IXOFF(tty)) {
 		unsigned char stop_char = STOP_CHAR(tty);
-		status = edge_write (port, 0, &stop_char, 1);
+		status = edge_write (port, &stop_char, 1);
 		if (status <= 0) {
 			return;
 		}
@@ -2144,7 +2139,7 @@ static void edge_unthrottle (struct usb_serial_port *port)
 	/* if we are implementing XON/XOFF, send the start character */
 	if (I_IXOFF(tty)) {
 		unsigned char start_char = START_CHAR(tty);
-		status = edge_write (port, 0, &start_char, 1);
+		status = edge_write (port, &start_char, 1);
 		if (status <= 0) {
 			return;
 		}

@@ -368,7 +368,6 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long esp,
 	*childregs = *regs;
 	childregs->eax = 0;
 	childregs->esp = esp;
-	p->set_child_tid = p->clear_child_tid = NULL;
 
 	p->thread.esp = (unsigned long) childregs;
 	p->thread.esp0 = (unsigned long) (childregs+1);

@@ -494,7 +494,7 @@ static int pdc202xx_quirkproc (ide_drive_t *drive)
 	return ((int) check_in_drive_lists(drive, pdc_quirk_drives));
 }
 
-static int pdc202xx_old_ide_dma_begin(ide_drive_t *drive)
+static void pdc202xx_old_ide_dma_start(ide_drive_t *drive)
 {
 	if (drive->current_speed > XFER_UDMA_2)
 		pdc_old_enable_66MHz_clock(drive->hwif);
@@ -515,7 +515,7 @@ static int pdc202xx_old_ide_dma_begin(ide_drive_t *drive)
 					word_count | 0x06000000;
 		hwif->OUTL(word_count, atapi_reg);
 	}
-	return __ide_dma_begin(drive);
+	ide_dma_start(drive);
 }
 
 static int pdc202xx_old_ide_dma_end(ide_drive_t *drive)
@@ -736,7 +736,7 @@ static void __devinit init_hwif_pdc202xx(ide_hwif_t *hwif)
 	if (hwif->pci_dev->device != PCI_DEVICE_ID_PROMISE_20246) {
 		if (!(hwif->udma_four))
 			hwif->udma_four = (pdc202xx_old_cable_detect(hwif)) ? 0 : 1;
-		hwif->ide_dma_begin = &pdc202xx_old_ide_dma_begin;
+		hwif->dma_start = &pdc202xx_old_ide_dma_start;
 		hwif->ide_dma_end = &pdc202xx_old_ide_dma_end;
 	} 
 	hwif->ide_dma_test_irq = &pdc202xx_old_ide_dma_test_irq;

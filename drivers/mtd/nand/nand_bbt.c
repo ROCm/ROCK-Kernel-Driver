@@ -6,7 +6,7 @@
  *   
  *  Copyright (C) 2004 Thomas Gleixner (tglx@linutronix.de)
  *
- * $Id: nand_bbt.c,v 1.24 2004/06/28 08:25:35 gleixner Exp $
+ * $Id: nand_bbt.c,v 1.26 2004/10/05 13:50:20 gleixner Exp $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -114,6 +114,7 @@ static int check_pattern (uint8_t *buf, int len, int paglen, struct nand_bbt_des
  * @num:	the number of bbt descriptors to read
  * @bits:	number of bits per block
  * @offs:	offset in the memory table
+ * @reserved_block_code:	Pattern to identify reserved blocks
  *
  * Read the bad block table starting from page.
  *
@@ -796,7 +797,7 @@ int nand_scan_bbt (struct mtd_info *mtd, struct nand_bbt_descr *bd)
 
 	len = mtd->size >> (this->bbt_erase_shift + 2);
 	/* Allocate memory (2bit per block) */
-	this->bbt = (uint8_t *) kmalloc (len, GFP_KERNEL);
+	this->bbt = kmalloc (len, GFP_KERNEL);
 	if (!this->bbt) {
 		printk (KERN_ERR "nand_scan_bbt: Out of memory\n");
 		return -ENOMEM;

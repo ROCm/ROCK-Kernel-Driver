@@ -33,8 +33,6 @@
 
 #include "common.h"
 
-extern void __init omap_init_time(void);
-
 #ifdef CONFIG_ARCH_OMAP1510
 
 extern int omap_gpio_init(void);
@@ -203,5 +201,5 @@ MACHINE_START(OMAP_INNOVATOR, "TI-Innovator")
 	MAPIO(innovator_map_io)
 	INITIRQ(innovator_init_irq)
 	INIT_MACHINE(innovator_init)
-	INITTIME(omap_init_time)
+	.timer		= &omap_timer,
 MACHINE_END

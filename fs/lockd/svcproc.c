@@ -571,10 +571,10 @@ struct nlm_void			{ int dummy; };
    .pc_xdrressize = respsize,				\
  }
 
-#define	Ck	(1+8)	/* cookie */
-#define	St	1	/* status */
-#define	No	(1+1024/4) /* Net Obj */
-#define	Rg	2	/* range - offset + size */
+#define	Ck	(1+XDR_QUADLEN(NLM_MAXCOOKIELEN))	/* cookie */
+#define	St	1				/* status */
+#define	No	(1+1024/4)			/* Net Obj */
+#define	Rg	2				/* range - offset + size */
 
 struct svc_procedure		nlmsvc_procedures[] = {
   PROC(null,		void,		void,		void,	void, 1),

@@ -34,7 +34,7 @@ MODULE_DESCRIPTION("ftp NAT helper");
 static int ports[MAX_PORTS];
 static int ports_c;
 
-module_param_array(ports, int, ports_c, 0400);
+module_param_array(ports, int, &ports_c, 0400);
 
 /* FIXME: Time out? --RR */
 

@@ -76,7 +76,6 @@
 #include <linux/nvram.h>
 #include <linux/tty.h>
 #include <linux/vt_kern.h>
-#include <linux/irq.h>
 #include <linux/spinlock.h>
 #include <linux/kmod.h>
 #include <linux/interrupt.h>

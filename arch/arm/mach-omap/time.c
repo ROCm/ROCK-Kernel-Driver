@@ -177,6 +177,8 @@ omap_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	unsigned long now, ilatency;
 
+	write_seqlock(&xtime_lock);
+
 	/*
 	 * Mark the time at which the timer interrupt ocurred using
 	 * timer1. We need to remove interrupt latency, which we can
@@ -190,6 +192,8 @@ omap_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 	timer_tick(regs);
 
+	write_sequnlock(&xtime_lock);
+
 	return IRQ_HANDLED;
 }
 
@@ -199,11 +203,9 @@ static struct irqaction omap_timer_irq = {
 	.handler	= omap_timer_interrupt
 };
 
-void __init omap_init_time(void)
+static void __init omap_timer_init(void)
 {
 	/* Since we don't call request_irq, we must init the structure */
-	gettimeoffset = omap_gettimeoffset;
-
 #ifdef OMAP1510_USE_32KHZ_TIMER
 	timer32k_write(TIMER32k_CR, 0x0);
 	timer32k_write(TIMER32k_TVR,TIMER32k_PERIOD);
@@ -215,3 +217,7 @@ void __init omap_init_time(void)
 #endif
 }
 
+struct sys_timer omap_timer = {
+	.init		= omap_timer_init,
+	.offset		= omap_gettimeoffset,
+};

@@ -50,8 +50,8 @@ static char version[] = "sb1000.c:v1.1.2 6/01/98 (fventuri@mediaone.net)\n";
 #include <linux/etherdevice.h>
 #include <linux/pnp.h>
 #include <linux/init.h>
+#include <linux/bitops.h>
 
-#include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/processor.h>
 #include <asm/uaccess.h>

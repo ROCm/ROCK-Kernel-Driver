@@ -15,16 +15,16 @@
 #include <asm/hw_irq.h>
 #include <asm/system.h>
 
+#include "shub.h"
 #include <asm/sn/leds.h>
+#include <asm/sn/shub_mmr.h>
 #include <asm/sn/clksupport.h>
-
 
 extern unsigned long sn_rtc_cycles_per_second;
 
 static struct time_interpolator sn2_interpolator;
 
-void __init
-sn_timer_init(void)
+void __init sn_timer_init(void)
 {
 	sn2_interpolator.frequency = sn_rtc_cycles_per_second;
 	sn2_interpolator.drift = -1;	/* unknown */

@@ -560,7 +560,7 @@ struct vm_area_struct *find_extend_vma(struct mm_struct *mm, unsigned long addr)
 	return NULL;
 }
 
-int remap_page_range(struct vm_area_struct *vma, unsigned long from,
+int remap_pfn_range(struct vm_area_struct *vma, unsigned long from,
 		unsigned long to, unsigned long size, pgprot_t prot)
 {
 	return -EPERM;

@@ -448,39 +448,37 @@ _get_posix_acl(struct dentry *dentry, char *key)
 	int buflen, error = 0;
 	struct posix_acl *pacl = NULL;
 
-	down(&inode->i_sem);
+	error = -EOPNOTSUPP;
+	if (inode->i_op == NULL)
+		goto out_err;
+	if (inode->i_op->getxattr == NULL)
+		goto out_err;
+
+	error = security_inode_getxattr(dentry, key);
+	if (error)
+		goto out_err;
 
 	buflen = inode->i_op->getxattr(dentry, key, NULL, 0);
 	if (buflen <= 0) {
 		error = buflen < 0 ? buflen : -ENODATA;
-		goto out_sem;
+		goto out_err;
 	}
 
 	buf = kmalloc(buflen, GFP_KERNEL);
 	if (buf == NULL) {
 		error = -ENOMEM;
-		goto out_sem;
+		goto out_err;
 	}
 
-	error = -EOPNOTSUPP;
-	if (inode->i_op && inode->i_op->getxattr) {
-		error = security_inode_getxattr(dentry, key);
-		if (error)
-			goto out_sem;
-		error = inode->i_op->getxattr(dentry, key, buf, buflen);
-	}
+	error = inode->i_op->getxattr(dentry, key, buf, buflen);
 	if (error < 0)
-		goto out_sem;
-
-	error = 0;
-	up(&inode->i_sem);
+		goto out_err;
 
 	pacl = posix_acl_from_xattr(buf, buflen);
  out:
 	kfree(buf);
 	return pacl;
- out_sem:
-	up(&inode->i_sem);
+ out_err:
 	pacl = ERR_PTR(error);
 	goto out;
 }

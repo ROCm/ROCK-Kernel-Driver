@@ -1005,9 +1005,10 @@ static void l2cap_chan_del(struct sock *sk, int err)
 	if (err)
 		sk->sk_err = err;
 
-	if (parent)
+	if (parent) {
+		bt_accept_unlink(sk);
 		parent->sk_data_ready(parent, 0);
-	else
+	} else
 		sk->sk_state_change(sk);
 }
 
@@ -1303,7 +1304,7 @@ static int l2cap_build_conf_req(struct sock *sk, void *data)
 	if (pi->imtu != L2CAP_DEFAULT_MTU)
 		l2cap_add_conf_opt(&ptr, L2CAP_CONF_MTU, 2, pi->imtu);
 
-	/* FIXME. Need actual value of the flush timeout */
+	/* FIXME: Need actual value of the flush timeout */
 	//if (flush_to != L2CAP_DEFAULT_FLUSH_TO)
 	//   l2cap_add_conf_opt(&ptr, L2CAP_CONF_FLUSH_TO, 2, pi->flush_to);
 

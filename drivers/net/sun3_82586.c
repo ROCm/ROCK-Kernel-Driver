@@ -39,7 +39,7 @@ static int fifo=0x8;	/* don't change */
 #include <linux/interrupt.h>
 #include <linux/delay.h>
 #include <linux/init.h>
-#include <asm/bitops.h>
+#include <linux/bitops.h>
 #include <asm/io.h>
 #include <asm/idprom.h>
 #include <asm/machines.h>

@@ -23,13 +23,13 @@
 
 #ifdef CONFIG_ARCH_IQ80321
 extern void iq80321_map_io(void);
-extern void iop321_init_irq(void);
+extern struct sys_timer iop321_timer;
 extern void iop321_init_time(void);
 #endif
 
 #ifdef CONFIG_ARCH_IQ31244
 extern void iq31244_map_io(void);
-extern void iop321_init_irq(void);
+extern struct sys_timer iop321_timer;
 extern void iop321_init_time(void);
 #endif
 
@@ -46,7 +46,7 @@ MACHINE_START(IQ80321, "Intel IQ80321")
 	FIXUP(fixup_iop321)
 	MAPIO(iq80321_map_io)
 	INITIRQ(iop321_init_irq)
-	INITTIME(iop321_init_time)
+	.timer		= &iop331_timer,
     BOOT_PARAMS(0xa0000100)
 MACHINE_END
 #elif defined(CONFIG_ARCH_IQ31244)
@@ -55,7 +55,7 @@ MACHINE_END
     BOOT_MEM(PHYS_OFFSET, IQ31244_UART, IQ31244_UART)
     MAPIO(iq31244_map_io)
     INITIRQ(iop321_init_irq)
-	INITTIME(iop321_init_time)
+	.timer		= &iop331_timer,
     BOOT_PARAMS(0xa0000100)
 MACHINE_END
 #else

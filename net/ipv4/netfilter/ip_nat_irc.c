@@ -42,7 +42,7 @@ static int ports_c;
 MODULE_AUTHOR("Harald Welte <laforge@gnumonks.org>");
 MODULE_DESCRIPTION("IRC (DCC) NAT helper");
 MODULE_LICENSE("GPL");
-module_param_array(ports, int, ports_c, 0400);
+module_param_array(ports, int, &ports_c, 0400);
 MODULE_PARM_DESC(ports, "port numbers of IRC servers");
 
 /* FIXME: Time out? --RR */

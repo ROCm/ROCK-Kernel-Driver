@@ -264,7 +264,7 @@ static int __init ohci_hcd_pci_init (void)
 
 	pr_debug ("%s: block sizes: ed %Zd td %Zd\n", hcd_name,
 		sizeof (struct ed), sizeof (struct td));
-	return pci_module_init (&ohci_pci_driver);
+	return pci_register_driver (&ohci_pci_driver);
 }
 module_init (ohci_hcd_pci_init);
 

@@ -96,7 +96,7 @@ static struct i2c_driver ds1621_driver = {
 	.detach_client	= ds1621_detach_client,
 };
 
-static int ds1621_id = 0;
+static int ds1621_id;
 
 /* All registers are word-sized, except for the configuration register.
    DS1621 uses a high-byte first convention, which is exactly opposite to

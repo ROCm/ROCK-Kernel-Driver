@@ -56,8 +56,8 @@ static const char version[] = "lance.c:v1.15ac 1999/11/13 dplatt@3do.com, becker
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
+#include <linux/bitops.h>
 
-#include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/dma.h>
 

@@ -25,9 +25,9 @@
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
 
-extern void clps711x_init_irq(void);
+#include "common.h"
+
 extern void edb7211_map_io(void);
-extern void clps711x_init_time(void);
 
 static void __init
 fixup_edb7211(struct machine_desc *desc, struct tag *tags,
@@ -57,5 +57,5 @@ MACHINE_START(EDB7211, "CL-EDB7211 (EP7211 eval board)")
 	FIXUP(fixup_edb7211)
 	MAPIO(edb7211_map_io)
 	INITIRQ(clps711x_init_irq)
-	INITTIME(clps711x_init_time)
+	.timer		= &clps711x_timer,
 MACHINE_END

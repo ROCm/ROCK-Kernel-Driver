@@ -7,7 +7,7 @@
  *
  * This code is covered by the GPL.
  *
- * $Id: cfi_util.c,v 1.4 2004/07/14 08:38:44 dwmw2 Exp $
+ * $Id: cfi_util.c,v 1.5 2004/08/12 06:40:23 eric Exp $
  *
  */
 
@@ -22,6 +22,7 @@
 #include <linux/slab.h>
 #include <linux/delay.h>
 #include <linux/interrupt.h>
+#include <linux/mtd/mtd.h>
 #include <linux/mtd/map.h>
 #include <linux/mtd/cfi.h>
 #include <linux/mtd/compatmac.h>
@@ -74,19 +75,114 @@ out:
 
 EXPORT_SYMBOL(cfi_read_pri);
 
-void cfi_fixup(struct map_info *map, struct cfi_fixup* fixups)
+void cfi_fixup(struct mtd_info *mtd, struct cfi_fixup *fixups)
 {
+	struct map_info *map = mtd->priv;
 	struct cfi_private *cfi = map->fldrv_priv;
 	struct cfi_fixup *f;
 
 	for (f=fixups; f->fixup; f++) {
 		if (((f->mfr == CFI_MFR_ANY) || (f->mfr == cfi->mfr)) &&
 		    ((f->id  == CFI_ID_ANY)  || (f->id  == cfi->id))) {
-			f->fixup(map, f->param);
+			f->fixup(mtd, f->param);
 		}
 	}
 }
 
 EXPORT_SYMBOL(cfi_fixup);
+
+int cfi_varsize_frob(struct mtd_info *mtd, varsize_frob_t frob,
+				     loff_t ofs, size_t len, void *thunk)
+{
+	struct map_info *map = mtd->priv;
+	struct cfi_private *cfi = map->fldrv_priv;
+	unsigned long adr;
+	int chipnum, ret = 0;
+	int i, first;
+	struct mtd_erase_region_info *regions = mtd->eraseregions;
+
+	if (ofs > mtd->size)
+		return -EINVAL;
+
+	if ((len + ofs) > mtd->size)
+		return -EINVAL;
+
+	/* Check that both start and end of the requested erase are
+	 * aligned with the erasesize at the appropriate addresses.
+	 */
+
+	i = 0;
+
+	/* Skip all erase regions which are ended before the start of 
+	   the requested erase. Actually, to save on the calculations,
+	   we skip to the first erase region which starts after the
+	   start of the requested erase, and then go back one.
+	*/
+	
+	while (i < mtd->numeraseregions && ofs >= regions[i].offset)
+	       i++;
+	i--;
+
+	/* OK, now i is pointing at the erase region in which this 
+	   erase request starts. Check the start of the requested
+	   erase range is aligned with the erase size which is in
+	   effect here.
+	*/
+
+	if (ofs & (regions[i].erasesize-1))
+		return -EINVAL;
+
+	/* Remember the erase region we start on */
+	first = i;
+
+	/* Next, check that the end of the requested erase is aligned
+	 * with the erase region at that address.
+	 */
+
+	while (i<mtd->numeraseregions && (ofs + len) >= regions[i].offset)
+		i++;
+
+	/* As before, drop back one to point at the region in which
+	   the address actually falls
+	*/
+	i--;
+	
+	if ((ofs + len) & (regions[i].erasesize-1))
+		return -EINVAL;
+
+	chipnum = ofs >> cfi->chipshift;
+	adr = ofs - (chipnum << cfi->chipshift);
+
+	i=first;
+
+	while(len) {
+		unsigned long chipmask;
+		int size = regions[i].erasesize;
+
+		ret = (*frob)(map, &cfi->chips[chipnum], adr, size, thunk);
+		
+		if (ret)
+			return ret;
+
+		adr += size;
+		len -= size;
+
+		chipmask = (1 << cfi->chipshift) - 1;
+		if ((adr & chipmask) == ((regions[i].offset + size * regions[i].numblocks) & chipmask))
+			i++;
+
+		if (adr >> cfi->chipshift) {
+			adr = 0;
+			chipnum++;
+			
+			if (chipnum >= cfi->numchips)
+			break;
+		}
+	}
+
+	return 0;
+}
+
+EXPORT_SYMBOL(cfi_varsize_frob);
 
 MODULE_LICENSE("GPL");

@@ -5,7 +5,7 @@
  *
  *	(C) Copyright 2002, Greg Ungerer (gerg@snapgear.com)
  *
- * 	$Id: uclinux.c,v 1.7 2004/07/12 21:59:45 dwmw2 Exp $
+ * 	$Id: uclinux.c,v 1.8 2004/09/16 23:27:14 gleixner Exp $
  */
 
 /****************************************************************************/
@@ -69,9 +69,10 @@ int __init uclinux_mtd_init(void)
 	printk("uclinux[mtd]: RAM probe address=0x%x size=0x%x\n",
 	       	(int) mapp->map_priv_2, (int) mapp->size);
 
-	mapp->virt = ioremap_nocache(mapp->phys, mapp->size);
+	mapp->virt = (void __iomem *)
+		ioremap_nocache(mapp->phys, mapp->size);
 
-	if (!mapp->virt) {
+	if (mapp->virt == 0) {
 		printk("uclinux[mtd]: ioremap_nocache() failed\n");
 		return(-EIO);
 	}
@@ -81,7 +82,7 @@ int __init uclinux_mtd_init(void)
 	mtd = do_map_probe("map_ram", mapp);
 	if (!mtd) {
 		printk("uclinux[mtd]: failed to find a mapping?\n");
-		iounmap(mapp->virt);
+		iounmap((void *) mapp->virt);
 		return(-ENXIO);
 	}
 		

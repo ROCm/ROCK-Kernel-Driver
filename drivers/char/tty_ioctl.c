@@ -19,9 +19,9 @@
 #include <linux/string.h>
 #include <linux/mm.h>
 #include <linux/module.h>
+#include <linux/bitops.h>
 
 #include <asm/io.h>
-#include <asm/bitops.h>
 #include <asm/uaccess.h>
 #include <asm/system.h>
 
@@ -382,7 +382,7 @@ void send_prio_char(struct tty_struct *tty, char ch)
 	}
 	if (was_stopped)
 		start_tty(tty);
-	tty->driver->write(tty, 0, &ch, 1);
+	tty->driver->write(tty, &ch, 1);
 	if (was_stopped)
 		stop_tty(tty);
 }

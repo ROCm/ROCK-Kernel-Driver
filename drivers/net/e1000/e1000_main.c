@@ -2867,7 +2867,7 @@ e1000_suspend(struct pci_dev *pdev, uint32_t state)
 		pci_enable_wake(pdev, 4, 0); /* 4 == D3 cold */
 	}
 
-	pci_save_state(pdev, adapter->pci_state);
+	pci_save_state(pdev);
 
 	if(adapter->hw.mac_type >= e1000_82540 &&
 	   adapter->hw.media_type == e1000_media_type_copper) {
@@ -2898,7 +2898,7 @@ e1000_resume(struct pci_dev *pdev)
 
 	pci_enable_device(pdev);
 	pci_set_power_state(pdev, 0);
-	pci_restore_state(pdev, adapter->pci_state);
+	pci_restore_state(pdev);
 
 	pci_enable_wake(pdev, 3, 0);
 	pci_enable_wake(pdev, 4, 0); /* 4 == D3 cold */

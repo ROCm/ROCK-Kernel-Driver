@@ -88,18 +88,17 @@ static int i2o_cfg_getiops(unsigned long arg)
 	struct i2o_controller *c;
 	u8 __user *user_iop_table = (void __user *)arg;
 	u8 tmp[MAX_I2O_CONTROLLERS];
+	int ret = 0;
 
 	memset(tmp, 0, MAX_I2O_CONTROLLERS);
-
-	if (!access_ok(VERIFY_WRITE, user_iop_table, MAX_I2O_CONTROLLERS))
-		return -EFAULT;
 
 	list_for_each_entry(c, &i2o_controllers, list)
 	    tmp[c->unit] = 1;
 
-	__copy_to_user(user_iop_table, tmp, MAX_I2O_CONTROLLERS);
+	if (copy_to_user(user_iop_table, tmp, MAX_I2O_CONTROLLERS))
+		ret = -EFAULT;
 
-	return 0;
+	return ret;
 };
 
 static int i2o_cfg_gethrt(unsigned long arg)
@@ -326,24 +325,25 @@ static int i2o_cfg_swul(unsigned long arg)
 	u32 m;
 	unsigned int status = 0, swlen = 0, fragsize = 8192;
 	struct i2o_controller *c;
+	int ret = 0;
 
 	if (copy_from_user(&kxfer, pxfer, sizeof(struct i2o_sw_xfer)))
-		return -EFAULT;
+		goto return_fault;
 
 	if (get_user(swlen, kxfer.swlen) < 0)
-		return -EFAULT;
+		goto return_fault;
 
 	if (get_user(maxfrag, kxfer.maxfrag) < 0)
-		return -EFAULT;
+		goto return_fault;
 
 	if (get_user(curfrag, kxfer.curfrag) < 0)
-		return -EFAULT;
+		goto return_fault;
 
 	if (curfrag == maxfrag)
 		fragsize = swlen - (maxfrag - 1) * 8192;
 
-	if (!kxfer.buf || !access_ok(VERIFY_WRITE, kxfer.buf, fragsize))
-		return -EFAULT;
+	if (!kxfer.buf)
+		goto return_fault;
 
 	c = i2o_find_iop(kxfer.iop);
 	if (!c)
@@ -384,10 +384,16 @@ static int i2o_cfg_swul(unsigned long arg)
 		return status;
 	}
 
-	__copy_to_user(kxfer.buf, buffer.virt, fragsize);
+	if (copy_to_user(kxfer.buf, buffer.virt, fragsize))
+		ret = -EFAULT;
+
 	i2o_dma_free(&c->pdev->dev, &buffer);
 
-	return 0;
+return_ret:
+	return ret;
+return_fault:
+	ret = -EFAULT;
+	goto return_ret;
 };
 
 static int i2o_cfg_swdel(unsigned long arg)

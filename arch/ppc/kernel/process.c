@@ -422,8 +422,6 @@ copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 	unsigned long sp = (unsigned long)p->thread_info + THREAD_SIZE;
 	unsigned long childframe;
 
-	p->set_child_tid = p->clear_child_tid = NULL;
-
 	CHECK_FULL_REGS(regs);
 	/* Copy registers */
 	sp -= sizeof(struct pt_regs);

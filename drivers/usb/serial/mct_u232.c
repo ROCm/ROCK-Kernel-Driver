@@ -110,7 +110,6 @@ static void mct_u232_close	         (struct usb_serial_port *port,
 					  struct file *filp);
 #ifdef FIX_WRITE_RETURN_CODE_PROBLEM
 static int  mct_u232_write	         (struct usb_serial_port *port,
-					  int from_user,
 					  const unsigned char *buf,
 					  int count);
 static void mct_u232_write_bulk_callback (struct urb *urb, struct pt_regs *regs);
@@ -490,7 +489,7 @@ static void mct_u232_close (struct usb_serial_port *port, struct file *filp)
 #ifdef FIX_WRITE_RETURN_CODE_PROBLEM
 /* The generic routines work fine otherwise */
 
-static int mct_u232_write (struct usb_serial_port *port, int from_user,
+static int mct_u232_write (struct usb_serial_port *port,
 			   const unsigned char *buf, int count)
 {
 	struct usb_serial *serial = port->serial;
@@ -519,14 +518,7 @@ static int mct_u232_write (struct usb_serial_port *port, int from_user,
 		
 		usb_serial_debug_data(debug, &port->dev, __FUNCTION__, size, buf);
 		
-		if (from_user) {
-			if (copy_from_user(port->write_urb->transfer_buffer, buf, size)) {
-				return -EFAULT;
-			}
-		}
-		else {
-			memcpy (port->write_urb->transfer_buffer, buf, size);
-		}
+		memcpy (port->write_urb->transfer_buffer, buf, size);
 		
 		/* set up our urb */
 		usb_fill_bulk_urb(port->write_urb, serial->dev,

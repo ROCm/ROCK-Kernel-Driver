@@ -107,8 +107,7 @@ static int flush_buffer(struct line *line)
 	return(line->head == line->tail);
 }
 
-int line_write(struct line *lines, struct tty_struct *tty, int from_user,
-	       const char *buf, int len)
+int line_write(struct line *lines, struct tty_struct *tty, const char *buf, int len)
 {
 	struct line *line;
 	char *new;
@@ -116,20 +115,6 @@ int line_write(struct line *lines, struct tty_struct *tty, int from_user,
 	int n, err, i, ret = 0;
 
 	if(tty->stopped) return 0;
-
-	if(from_user){
-		new = kmalloc(len, GFP_KERNEL);
-		if(new == NULL)
-			return(0);
-		n = copy_from_user(new, buf, len);
-		buf = new;
-		if(n == len){
-			len = -EFAULT;
-			goto out_free;
-		}
-
-		len -= n;
-	}
 
 	i = tty->index;
 	line = &lines[i];
@@ -159,8 +144,6 @@ int line_write(struct line *lines, struct tty_struct *tty, int from_user,
  out_up:
 	up(&line->sem);
  out_free:
-	if(from_user)
-		kfree(buf);
 	return(ret);
 }
 

@@ -69,9 +69,9 @@ static const char *version =
 #include <linux/delay.h>	/* For udelay() */
 #include <linux/atalk.h>
 #include <linux/spinlock.h>
+#include <linux/bitops.h>
 
 #include <asm/system.h>
-#include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/dma.h>
 

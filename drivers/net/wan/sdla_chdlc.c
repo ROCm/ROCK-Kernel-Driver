@@ -3739,8 +3739,7 @@ static int wanpipe_tty_open(struct tty_struct *tty, struct file * filp)
 	return 0;
 }
 
-static int wanpipe_tty_write(struct tty_struct * tty, int from_user,
-		    const unsigned char *buf, int count)
+static int wanpipe_tty_write(struct tty_struct * tty, const unsigned char *buf, int count)
 {
 	unsigned long smp_flags=0;
 	sdla_t *card=NULL;
@@ -3784,58 +3783,16 @@ static int wanpipe_tty_write(struct tty_struct * tty, int from_user,
 		return -EINVAL; 
 	}
 	
-	if (from_user) {
-		
-		unsigned char *tmp_buf;
-		
-		if ((tmp_buf=card->tty_buf)==NULL){
-			dbg_printk(KERN_INFO "No TTY BUF in Write\n");
-			
-			clear_bit(SEND_CRIT,(void*)&card->wandev.critical);
-			
-			if(card->hw.type != SDLA_S514)
-				s508_unlock(card,&smp_flags);
-			
-			return -ENOMEM;
-		}
-		
-		if (copy_from_user(tmp_buf,buf,count)){
-			dbg_printk(KERN_INFO "%s: Failed to copy from user!\n",
-					card->devname);
-			
-			clear_bit(SEND_CRIT,(void*)&card->wandev.critical);
-			
-			if(card->hw.type != SDLA_S514)
-				s508_unlock(card,&smp_flags);
-			
-			return -EINVAL;
-		}
+ 	if (chdlc_send(card,(void*)buf,count)){
+		dbg_printk(KERN_INFO "%s: Failed to send, retry later: kernel!\n",
+				card->devname);
+		clear_bit(SEND_CRIT,(void*)&card->wandev.critical);
 
-		if (chdlc_send(card,(void*)tmp_buf,count)){
-			dbg_printk(KERN_INFO "%s: Failed to send, retry later: user!\n",
-					card->devname);
-			
-			clear_bit(SEND_CRIT,(void*)&card->wandev.critical);
-			
-			wanpipe_tty_trigger_tx_irq(card);
-			
-			if(card->hw.type != SDLA_S514)
-				s508_unlock(card,&smp_flags);
-			return 0;
-		}
-
-	}else{
-	 	if (chdlc_send(card,(void*)buf,count)){
-			dbg_printk(KERN_INFO "%s: Failed to send, retry later: kernel!\n",
-					card->devname);
-			clear_bit(SEND_CRIT,(void*)&card->wandev.critical);
-	
-			wanpipe_tty_trigger_tx_irq(card);
-			
-			if(card->hw.type != SDLA_S514)
-				s508_unlock(card,&smp_flags);
-			return 0;
-		}
+		wanpipe_tty_trigger_tx_irq(card);
+		
+		if(card->hw.type != SDLA_S514)
+			s508_unlock(card,&smp_flags);
+		return 0;
 	}
 	dbg_printk(KERN_INFO "%s: Packet sent OK: %i\n",card->devname,count);
 	clear_bit(SEND_CRIT,(void*)&card->wandev.critical);

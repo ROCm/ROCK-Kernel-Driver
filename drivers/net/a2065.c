@@ -52,8 +52,8 @@
 #include <linux/init.h>
 #include <linux/crc32.h>
 #include <linux/zorro.h>
+#include <linux/bitops.h>
 
-#include <asm/bitops.h>
 #include <asm/irq.h>
 #include <asm/amigaints.h>
 #include <asm/amigahw.h>

@@ -73,7 +73,7 @@ config CRYPTO_WP512
 	help
 	  Whirlpool hash algorithm 512, 384 and 256-bit hashes
 
-	  Whirlpool-512 is part of the NESSIE cryptographic primtives.
+	  Whirlpool-512 is part of the NESSIE cryptographic primitives.
 	  Whirlpool will be part of the ISO/IEC 10118-3:2003(E) standard
 
 	  See also:
@@ -125,7 +125,8 @@ config CRYPTO_SERPENT
 	  Serpent cipher algorithm, by Anderson, Biham & Knudsen.
 
 	  Keys are allowed to be from 0 to 256 bits in length, in steps
-	  of 8 bits.
+	  of 8 bits.  Also includes the 'Tnepres' algorithm, a reversed
+	  variant of Serpent for compatibility with old kerneli code.
 
 	  See also:
 	  http://www.cl.cam.ac.uk/~rja14/serpent.html

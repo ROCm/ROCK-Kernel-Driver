@@ -27,7 +27,7 @@
 
 #include "w1.h"
 
-struct w1_master * w1_alloc_dev(int, struct device_driver *, struct device *);
+struct w1_master * w1_alloc_dev(u32, int, int, struct device_driver *, struct device *);
 void w1_free_dev(struct w1_master *dev);
 int w1_add_master_device(struct w1_bus_master *);
 void w1_remove_master_device(struct w1_bus_master *);

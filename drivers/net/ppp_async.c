@@ -238,6 +238,18 @@ ppp_asynctty_close(struct tty_struct *tty)
 }
 
 /*
+ * Called on tty hangup in process context.
+ *
+ * Wait for I/O to driver to complete and unregister PPP channel.
+ * This is already done by the close routine, so just call that.
+ */
+static int ppp_asynctty_hangup(struct tty_struct *tty)
+{
+	ppp_asynctty_close(tty);
+	return 0;
+}
+
+/*
  * Read does nothing - no data is ever available this way.
  * Pppd reads and writes packets via /dev/ppp instead.
  */
@@ -254,7 +266,7 @@ ppp_asynctty_read(struct tty_struct *tty, struct file *file,
  */
 static ssize_t
 ppp_asynctty_write(struct tty_struct *tty, struct file *file,
-		   const unsigned char __user *buf, size_t count)
+		   const unsigned char *buf, size_t count)
 {
 	return -EAGAIN;
 }
@@ -380,6 +392,7 @@ static struct tty_ldisc ppp_ldisc = {
 	.name	= "ppp",
 	.open	= ppp_asynctty_open,
 	.close	= ppp_asynctty_close,
+	.hangup	= ppp_asynctty_hangup,
 	.read	= ppp_asynctty_read,
 	.write	= ppp_asynctty_write,
 	.ioctl	= ppp_asynctty_ioctl,
@@ -673,7 +686,7 @@ ppp_async_push(struct asyncppp *ap)
 		if (!tty_stuffed && ap->optr < ap->olim) {
 			avail = ap->olim - ap->optr;
 			set_bit(TTY_DO_WRITE_WAKEUP, &tty->flags);
-			sent = tty->driver->write(tty, 0, ap->optr, avail);
+			sent = tty->driver->write(tty, ap->optr, avail);
 			if (sent < 0)
 				goto flush;	/* error, e.g. loss of CD */
 			ap->optr += sent;

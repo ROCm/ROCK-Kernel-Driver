@@ -221,6 +221,8 @@ static unsigned long ixp4xx_gettimeoffset(void)
 
 static irqreturn_t ixp4xx_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
+	write_seqlock(&xtime_lock);
+
 	/* Clear Pending Interrupt by writing '1' to it */
 	*IXP4XX_OSST = IXP4XX_OSST_TIMER_1_PEND;
 
@@ -232,6 +234,8 @@ static irqreturn_t ixp4xx_timer_interrupt(int irq, void *dev_id, struct pt_regs 
 		last_jiffy_time += LATCH;
 	} while((*IXP4XX_OSTS - last_jiffy_time) > LATCH);
 
+	write_sequnlock(&xtime_lock);
+
 	return IRQ_HANDLED;
 }
 
@@ -241,10 +245,8 @@ static struct irqaction ixp4xx_timer_irq = {
 	.handler	= ixp4xx_timer_interrupt
 };
 
-void __init ixp4xx_init_time(void)
+static void __init ixp4xx_timer_init(void)
 {
-	gettimeoffset = ixp4xx_gettimeoffset;
-
 	/* Clear Pending Interrupt by writing '1' to it */
 	*IXP4XX_OSST = IXP4XX_OSST_TIMER_1_PEND;
 
@@ -259,4 +261,7 @@ void __init ixp4xx_init_time(void)
 	setup_irq(IRQ_IXP4XX_TIMER1, &ixp4xx_timer_irq);
 }
 
-
+struct ixp4xx_timer = {
+	.init		= ixp4xx_timer_init,
+	.offset		= ixp4xx_gettimeoffset,
+};

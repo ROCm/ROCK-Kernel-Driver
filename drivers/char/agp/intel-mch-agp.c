@@ -573,7 +573,7 @@ static int agp_intelmch_resume(struct pci_dev *pdev)
 {
 	struct agp_bridge_data *bridge = pci_get_drvdata(pdev);
 	
-	pci_restore_state(pdev, pdev->saved_config_space);
+	pci_restore_state(pdev);
 
 	if (bridge->driver == &intel_845_driver)
 		intel_845_configure();

@@ -7175,8 +7175,8 @@ ips_init_phase1(struct pci_dev *pci_dev, int *indexPtr)
 	int j;
 	int index;
 	dma_addr_t dma_address;
-	char *ioremap_ptr;
-	char *mem_ptr;
+	char __iomem *ioremap_ptr;
+	char __iomem *mem_ptr;
 	uint32_t IsDead;
 
 	METHOD_TRACE("ips_init_phase1", 1);

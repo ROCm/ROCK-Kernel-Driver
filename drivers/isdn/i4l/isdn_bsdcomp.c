@@ -68,9 +68,9 @@
 #include <linux/errno.h>
 #include <linux/string.h>	/* used in new tty drivers */
 #include <linux/signal.h>	/* used in new tty drivers */
+#include <linux/bitops.h>
 
 #include <asm/system.h>
-#include <asm/bitops.h>
 #include <asm/byteorder.h>
 #include <asm/types.h>
 
@@ -364,7 +364,7 @@ static void *bsd_alloc (struct isdn_ppp_comp_data *data)
 		db->lens = (unsigned short *) vmalloc ((maxmaxcode + 1) *
 			sizeof (db->lens[0]));
 		if (!db->lens) {
-			bsd_free (db); /* calls MOD_DEC_USE_COUNT; */
+			bsd_free (db);
 			return (NULL);
 		}
 	}

@@ -395,8 +395,7 @@ sclp_tty_write_string(const unsigned char *str, int count)
  * routine will return the number of characters actually accepted for writing.
  */
 static int
-sclp_tty_write(struct tty_struct *tty, int from_user,
-	       const unsigned char *buf, int count)
+sclp_tty_write(struct tty_struct *tty, const unsigned char *buf, int count)
 {
 	int length, ret;
 
@@ -404,27 +403,8 @@ sclp_tty_write(struct tty_struct *tty, int from_user,
 		sclp_tty_write_string(sclp_tty_chars, sclp_tty_chars_count);
 		sclp_tty_chars_count = 0;
 	}
-	if (!from_user) {
-		sclp_tty_write_string(buf, count);
-		return count;
-	}
-	ret = 0;
-	while (count > 0) {
-		length = count < SCLP_TTY_BUF_SIZE ?
-			count : SCLP_TTY_BUF_SIZE;
-		length -= copy_from_user(sclp_tty_chars,
-				(const unsigned char __user *)buf, length);
-		if (length == 0) {
-			if (!ret)
-				ret = -EFAULT;
-			break;
-		}
-		sclp_tty_write_string(sclp_tty_chars, length);
-		buf += length;
-		count -= length;
-		ret += length;
-	}
-	return ret;
+	sclp_tty_write_string(buf, count);
+	return count;
 }
 
 /*

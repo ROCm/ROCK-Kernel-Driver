@@ -371,6 +371,8 @@ static struct pci_device_id sis5595_ids[] __devinitdata = {
 	{ 0, }
 };
 
+MODULE_DEVICE_TABLE (pci, sis5595_ids);
+
 static int __devinit sis5595_probe(struct pci_dev *dev, const struct pci_device_id *id)
 {
 	if (sis5595_setup(dev)) {
@@ -401,7 +403,7 @@ static struct pci_driver sis5595_driver = {
 
 static int __init i2c_sis5595_init(void)
 {
-	return pci_module_init(&sis5595_driver);
+	return pci_register_driver(&sis5595_driver);
 }
 
 static void __exit i2c_sis5595_exit(void)

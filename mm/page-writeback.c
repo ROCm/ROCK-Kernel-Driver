@@ -504,6 +504,11 @@ void __init page_writeback_init(void)
 		dirty_background_ratio /= 100;
 		vm_dirty_ratio *= correction;
 		vm_dirty_ratio /= 100;
+
+		if (dirty_background_ratio <= 0)
+			dirty_background_ratio = 1;
+		if (vm_dirty_ratio <= 0)
+			vm_dirty_ratio = 1;
 	}
 	mod_timer(&wb_timer, jiffies + (dirty_writeback_centisecs * HZ) / 100);
 	set_ratelimit();

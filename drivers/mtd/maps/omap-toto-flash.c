@@ -5,7 +5,7 @@
  *
  *  (C) 2002 MontVista Software, Inc.
  *
- * $Id: omap-toto-flash.c,v 1.2 2004/07/12 21:59:44 dwmw2 Exp $
+ * $Id: omap-toto-flash.c,v 1.3 2004/09/16 23:27:13 gleixner Exp $
  */
 
 #include <linux/config.h>
@@ -35,7 +35,7 @@
 static struct map_info omap_toto_map_flash = {
 	.name =		"OMAP Toto flash",
 	.bankwidth =	2,
-	.virt =		OMAP_TOTO_FLASH_BASE,
+	.virt =		(void __iomem *)OMAP_TOTO_FLASH_BASE,
 };
 
  

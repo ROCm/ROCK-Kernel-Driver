@@ -502,6 +502,45 @@ static inline void i2o_flush_reply(struct i2o_controller *c, u32 m)
 };
 
 /**
+ *	i2o_out_to_virt - Turn an I2O message to a virtual address
+ *	@c: controller
+ *	@m: message engine value
+ *
+ *	Turn a receive message from an I2O controller bus address into
+ *	a Linux virtual address. The shared page frame is a linear block
+ *	so we simply have to shift the offset. This function does not
+ *	work for sender side messages as they are ioremap objects
+ *	provided by the I2O controller.
+ */
+static inline struct i2o_message *i2o_msg_out_to_virt(struct i2o_controller *c,
+						      u32 m)
+{
+	if (unlikely
+	    (m < c->out_queue.phys
+	     || m >= c->out_queue.phys + c->out_queue.len))
+		BUG();
+
+	return c->out_queue.virt + (m - c->out_queue.phys);
+};
+
+/**
+ *	i2o_msg_in_to_virt - Turn an I2O message to a virtual address
+ *	@c: controller
+ *	@m: message engine value
+ *
+ *	Turn a send message from an I2O controller bus address into
+ *	a Linux virtual address. The shared page frame is a linear block
+ *	so we simply have to shift the offset. This function does not
+ *	work for receive side messages as they are kmalloc objects
+ *	in a different pool.
+ */
+static inline struct i2o_message *i2o_msg_in_to_virt(struct i2o_controller *c,
+						     u32 m)
+{
+	return c->in_queue.virt + m;
+};
+
+/**
  *	i2o_dma_alloc - Allocate DMA memory
  *	@dev: struct device pointer to the PCI device of the I2O controller
  *	@addr: i2o_dma struct which should get the DMA buffer

@@ -179,17 +179,6 @@ static inline int dup_mmap(struct mm_struct * mm, struct mm_struct * oldmm)
 	rb_parent = NULL;
 	pprev = &mm->mmap;
 
-	/*
-	 * Add it to the mmlist after the parent.
-	 * Doing it this way means that we can order the list,
-	 * and fork() won't mess up the ordering significantly.
-	 * Add it first so that swapoff can see any swap entries.
-	 */
-	spin_lock(&mmlist_lock);
-	list_add(&mm->mmlist, &current->mm->mmlist);
-	mmlist_nr++;
-	spin_unlock(&mmlist_lock);
-
 	for (mpnt = current->mm->mmap ; mpnt ; mpnt = mpnt->vm_next) {
 		struct file *file;
 
@@ -289,7 +278,6 @@ static inline void mm_free_pgd(struct mm_struct * mm)
 #endif /* CONFIG_MMU */
 
 spinlock_t mmlist_lock __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
-int mmlist_nr;
 
 #define allocate_mm()	(kmem_cache_alloc(mm_cachep, SLAB_KERNEL))
 #define free_mm(mm)	(kmem_cache_free(mm_cachep, (mm)))
@@ -301,6 +289,7 @@ static struct mm_struct * mm_init(struct mm_struct * mm)
 	atomic_set(&mm->mm_users, 1);
 	atomic_set(&mm->mm_count, 1);
 	init_rwsem(&mm->mmap_sem);
+	INIT_LIST_HEAD(&mm->mmlist);
 	mm->core_waiters = 0;
 	mm->nr_ptes = 0;
 	mm->page_table_lock = SPIN_LOCK_UNLOCKED;
@@ -350,12 +339,14 @@ void fastcall __mmdrop(struct mm_struct *mm)
  */
 void mmput(struct mm_struct *mm)
 {
-	if (atomic_dec_and_lock(&mm->mm_users, &mmlist_lock)) {
-		list_del(&mm->mmlist);
-		mmlist_nr--;
-		spin_unlock(&mmlist_lock);
+	if (atomic_dec_and_test(&mm->mm_users)) {
 		exit_aio(mm);
 		exit_mmap(mm);
+		if (!list_empty(&mm->mmlist)) {
+			spin_lock(&mmlist_lock);
+			list_del(&mm->mmlist);
+			spin_unlock(&mmlist_lock);
+		}
 		put_swap_token(mm);
 		mmdrop(mm);
 	}
@@ -365,15 +356,11 @@ EXPORT_SYMBOL_GPL(mmput);
 /**
  * get_task_mm - acquire a reference to the task's mm
  *
- * Returns %NULL if the task has no mm.  Checks if the use count
- * of the mm is non-zero and if so returns a reference to it, after
+ * Returns %NULL if the task has no mm.  Checks PF_BORROWED_MM (meaning
+ * this kernel workthread has transiently adopted a user mm with use_mm,
+ * to do its AIO) is not set and if so returns a reference to it, after
  * bumping up the use count.  User must release the mm via mmput()
  * after use.  Typically used by /proc and ptrace.
- *
- * If the use count is zero, it means that this mm is going away,
- * so return %NULL.  This only happens in the case of an AIO daemon
- * which has temporarily adopted an mm (see use_mm), in the course
- * of its final mmput, before exit_aio has completed.
  */
 struct mm_struct *get_task_mm(struct task_struct *task)
 {
@@ -382,12 +369,10 @@ struct mm_struct *get_task_mm(struct task_struct *task)
 	task_lock(task);
 	mm = task->mm;
 	if (mm) {
-		spin_lock(&mmlist_lock);
-		if (!atomic_read(&mm->mm_users))
+		if (task->flags & PF_BORROWED_MM)
 			mm = NULL;
 		else
 			atomic_inc(&mm->mm_users);
-		spin_unlock(&mmlist_lock);
 	}
 	task_unlock(task);
 	return mm;

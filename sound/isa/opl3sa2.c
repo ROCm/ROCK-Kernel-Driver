@@ -58,35 +58,34 @@ static int irq[SNDRV_CARDS] = SNDRV_DEFAULT_IRQ;	/* 0,1,3,5,9,11,12,15 */
 static int dma1[SNDRV_CARDS] = SNDRV_DEFAULT_DMA;	/* 1,3,5,6,7 */
 static int dma2[SNDRV_CARDS] = SNDRV_DEFAULT_DMA;	/* 1,3,5,6,7 */
 static int opl3sa3_ymode[SNDRV_CARDS] = { [0 ... (SNDRV_CARDS-1)] = 0 };   /* 0,1,2,3 */ /*SL Added*/
-static int boot_devs;
 
-module_param_array(index, int, boot_devs, 0444);
+module_param_array(index, int, NULL, 0444);
 MODULE_PARM_DESC(index, "Index value for OPL3-SA soundcard.");
-module_param_array(id, charp, boot_devs, 0444);
+module_param_array(id, charp, NULL, 0444);
 MODULE_PARM_DESC(id, "ID string for OPL3-SA soundcard.");
-module_param_array(enable, bool, boot_devs, 0444);
+module_param_array(enable, bool, NULL, 0444);
 MODULE_PARM_DESC(enable, "Enable OPL3-SA soundcard.");
 #ifdef CONFIG_PNP
-module_param_array(isapnp, bool, boot_devs, 0444);
+module_param_array(isapnp, bool, NULL, 0444);
 MODULE_PARM_DESC(isapnp, "PnP detection for specified soundcard.");
 #endif
-module_param_array(port, long, boot_devs, 0444);
+module_param_array(port, long, NULL, 0444);
 MODULE_PARM_DESC(port, "Port # for OPL3-SA driver.");
-module_param_array(sb_port, long, boot_devs, 0444);
+module_param_array(sb_port, long, NULL, 0444);
 MODULE_PARM_DESC(sb_port, "SB port # for OPL3-SA driver.");
-module_param_array(wss_port, long, boot_devs, 0444);
+module_param_array(wss_port, long, NULL, 0444);
 MODULE_PARM_DESC(wss_port, "WSS port # for OPL3-SA driver.");
-module_param_array(fm_port, long, boot_devs, 0444);
+module_param_array(fm_port, long, NULL, 0444);
 MODULE_PARM_DESC(fm_port, "FM port # for OPL3-SA driver.");
-module_param_array(midi_port, long, boot_devs, 0444);
+module_param_array(midi_port, long, NULL, 0444);
 MODULE_PARM_DESC(midi_port, "MIDI port # for OPL3-SA driver.");
-module_param_array(irq, int, boot_devs, 0444);
+module_param_array(irq, int, NULL, 0444);
 MODULE_PARM_DESC(irq, "IRQ # for OPL3-SA driver.");
-module_param_array(dma1, int, boot_devs, 0444);
+module_param_array(dma1, int, NULL, 0444);
 MODULE_PARM_DESC(dma1, "DMA1 # for OPL3-SA driver.");
-module_param_array(dma2, int, boot_devs, 0444);
+module_param_array(dma2, int, NULL, 0444);
 MODULE_PARM_DESC(dma2, "DMA2 # for OPL3-SA driver.");
-module_param_array(opl3sa3_ymode, int, boot_devs, 0444);
+module_param_array(opl3sa3_ymode, int, NULL, 0444);
 MODULE_PARM_DESC(opl3sa3_ymode, "Speaker size selection for 3D Enhancement mode: Desktop/Large Notebook/Small Notebook/HiFi.");
 
 /* control ports */

@@ -3,43 +3,122 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000-2003 Silicon Graphics, Inc. All rights reserved.
+ * Copyright (C) 1992 - 1997, 2000-2004 Silicon Graphics, Inc. All rights reserved.
  */
 
 #ifndef _ASM_IA64_SN_GEO_H
 #define _ASM_IA64_SN_GEO_H
 
-/* Include a platform-specific geo.h.  It must define at least:
- *   geoid_t:		Geographic identifier data type
- *   geo_type_t:	Data type for the kind of geoid this is
- *   GEO_TYPE_xxx:	Values for geo_type_t vars, eg. GEO_TYPE_NODE
- *   GEO_MAX_LEN:	The maximum length of a geoid, formatted for printing
- */
+/* The geoid_t implementation below is based loosely on the pcfg_t
+   implementation in sys/SN/promcfg.h. */
 
-#include <asm/sn/sn2/geo.h>
+/* Type declaractions */
 
-/* Declarations applicable to all platforms */
+/* Size of a geoid_t structure (must be before decl. of geoid_u) */
+#define GEOID_SIZE	8	/* Would 16 be better?  The size can
+				   be different on different platforms. */
 
-/* parameter for hwcfg_format_geoid() */
-#define GEO_FORMAT_HWGRAPH	1
-#define GEO_FORMAT_BRIEF	2
+#define MAX_SLABS	0xe	/* slabs per module */
 
-/* (the parameter for hwcfg_format_geoid_compt() is defined in the
- * platform-specific geo.h file) */
+typedef unsigned char	geo_type_t;
 
-/* Routines for manipulating geoid_t values */
+/* Fields common to all substructures */
+typedef struct geo_any_s {
+    moduleid_t	module;		/* The module (box) this h/w lives in */
+    geo_type_t	type;		/* What type of h/w is named by this geoid_t */
+    slabid_t	slab;		/* The logical assembly within the module */
+} geo_any_t;
 
-extern moduleid_t geo_module(geoid_t g);
-extern slabid_t geo_slab(geoid_t g);
-extern geo_type_t geo_type(geoid_t g);
-extern int geo_valid(geoid_t g);
-extern int geo_cmp(geoid_t g0, geoid_t g1);
-extern geoid_t geo_new(geo_type_t type, ...);
+/* Additional fields for particular types of hardware */
+typedef struct geo_node_s {
+    geo_any_t	any;		/* No additional fields needed */
+} geo_node_t;
 
-extern geoid_t hwcfg_parse_geoid(char *buffer);
-extern void hwcfg_format_geoid(char *buffer, geoid_t m, int fmt);
-extern void hwcfg_format_geoid_compt(char *buffer, geoid_t m, int compt);
-extern geoid_t hwcfg_geo_get_self(geo_type_t type);
-extern geoid_t hwcfg_geo_get_by_nasid(geo_type_t type, nasid_t nasid);
+typedef struct geo_rtr_s {
+    geo_any_t	any;		/* No additional fields needed */
+} geo_rtr_t;
+
+typedef struct geo_iocntl_s {
+    geo_any_t	any;		/* No additional fields needed */
+} geo_iocntl_t;
+
+typedef struct geo_pcicard_s {
+    geo_iocntl_t	any;
+    char		bus;	/* Bus/widget number */
+    char		slot;	/* PCI slot number */
+} geo_pcicard_t;
+
+/* Subcomponents of a node */
+typedef struct geo_cpu_s {
+    geo_node_t	node;
+    char	slice;		/* Which CPU on the node */
+} geo_cpu_t;
+
+typedef struct geo_mem_s {
+    geo_node_t	node;
+    char	membus;		/* The memory bus on the node */
+    char	memslot;	/* The memory slot on the bus */
+} geo_mem_t;
+
+
+typedef union geoid_u {
+    geo_any_t	any;
+    geo_node_t	node;
+    geo_iocntl_t	iocntl;
+    geo_pcicard_t	pcicard;
+    geo_rtr_t	rtr;
+    geo_cpu_t	cpu;
+    geo_mem_t	mem;
+    char	padsize[GEOID_SIZE];
+} geoid_t;
+
+
+/* Preprocessor macros */
+
+#define GEO_MAX_LEN	48	/* max. formatted length, plus some pad:
+				   module/001c07/slab/5/node/memory/2/slot/4 */
+
+/* Values for geo_type_t */
+#define GEO_TYPE_INVALID	0
+#define GEO_TYPE_MODULE		1
+#define GEO_TYPE_NODE		2
+#define GEO_TYPE_RTR		3
+#define GEO_TYPE_IOCNTL		4
+#define GEO_TYPE_IOCARD		5
+#define GEO_TYPE_CPU		6
+#define GEO_TYPE_MEM		7
+#define GEO_TYPE_MAX		(GEO_TYPE_MEM+1)
+
+/* Parameter for hwcfg_format_geoid_compt() */
+#define GEO_COMPT_MODULE	1
+#define GEO_COMPT_SLAB		2
+#define GEO_COMPT_IOBUS		3
+#define GEO_COMPT_IOSLOT	4
+#define GEO_COMPT_CPU		5
+#define GEO_COMPT_MEMBUS	6
+#define GEO_COMPT_MEMSLOT	7
+
+#define GEO_INVALID_STR		"<invalid>"
+
+#define INVALID_NASID           ((nasid_t)-1)
+#define INVALID_CNODEID         ((cnodeid_t)-1)
+#define INVALID_PNODEID         ((pnodeid_t)-1)
+#define INVALID_SLAB            (slabid_t)-1
+#define INVALID_MODULE          ((moduleid_t)-1)
+#define INVALID_PARTID          ((partid_t)-1)
+
+static inline slabid_t geo_slab(geoid_t g)
+{
+	return (g.any.type == GEO_TYPE_INVALID) ?
+		INVALID_SLAB : g.any.slab;
+}
+
+static inline moduleid_t geo_module(geoid_t g)
+{
+	return (g.any.type == GEO_TYPE_INVALID) ?
+		INVALID_MODULE : g.any.module;
+}
+
+extern geoid_t cnodeid_get_geoid(cnodeid_t cnode);
 
 #endif /* _ASM_IA64_SN_GEO_H */

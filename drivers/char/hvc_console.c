@@ -221,6 +221,7 @@ static int hvc_open(struct tty_struct *tty, struct file * filp)
 		spin_unlock_irqrestore(&hp->lock, flags);
 		tty->driver_data = NULL;
 		kobject_put(kobjp);
+		printk(KERN_ERR "hvc_open: request_irq failed with rc %d.\n", rc);
 	}
 	/* Force wakeup of the polling thread */
 	hvc_kick();
@@ -240,7 +241,7 @@ static void hvc_close(struct tty_struct *tty, struct file * filp)
 
 	/*
 	 * No driver_data means that this close was issued after a failed
-	 * hvcs_open by the tty layer's release_dev() function and we can just
+	 * hvc_open by the tty layer's release_dev() function and we can just
 	 * exit cleanly because the kobject reference wasn't made.
 	 */
 	if (!tty->driver_data)
@@ -266,13 +267,6 @@ static void hvc_close(struct tty_struct *tty, struct file * filp)
 		 */
 		tty_wait_until_sent(tty, HVC_CLOSE_WAIT);
 
-		/*
-		 * Since the line disc doesn't block writes during tty close
-		 * operations we'll set driver_data to NULL and then make sure
-		 * to check tty->driver_data for NULL in hvc_write().
-		 */
-		tty->driver_data = NULL;
-
 		if (irq != NO_IRQ)
 			free_irq(irq, hp);
 
@@ -294,7 +288,21 @@ static void hvc_hangup(struct tty_struct *tty)
 	int temp_open_count;
 	struct kobject *kobjp;
 
+	if (!hp)
+		return;
+
 	spin_lock_irqsave(&hp->lock, flags);
+
+	/*
+	 * The N_TTY line discipline has problems such that in a close vs
+	 * open->hangup case this can be called after the final close so prevent
+	 * that from happening for now.
+	 */
+	if (hp->count <= 0) {
+		spin_unlock_irqrestore(&hp->lock, flags);
+		return;
+	}
+
 	kobjp = &hp->kobj;
 	temp_open_count = hp->count;
 	hp->count = 0;
@@ -336,62 +344,6 @@ static void hvc_push(struct hvc_struct *hp)
 		hp->do_wakeup = 1;
 }
 
-static inline int __hvc_write_user(struct hvc_struct *hp,
-				   const unsigned char *buf, int count)
-{
-	char *tbuf, *p;
-	int tbsize, rsize, written = 0;
-	unsigned long flags;
-
-	tbsize = min(count, (int)PAGE_SIZE);
-	if (!(tbuf = kmalloc(tbsize, GFP_KERNEL)))
-		return -ENOMEM;
-
-	while ((rsize = count - written) > 0) {
-		int wsize;
-		if (rsize > tbsize)
-			rsize = tbsize;
-
-		p = tbuf;
-		rsize -= copy_from_user(p, buf, rsize);
-		if (!rsize) {
-			if (written == 0)
-				written = -EFAULT;
-			break;
-		}
-		buf += rsize;
-
-		spin_lock_irqsave(&hp->lock, flags);
-
-		/* Push pending writes: make some room in buffer */
-		if (hp->n_outbuf > 0)
-			hvc_push(hp);
-
-		for (wsize = N_OUTBUF - hp->n_outbuf; rsize && wsize;
-		     wsize = N_OUTBUF - hp->n_outbuf) {
-			if (wsize > rsize)
-				wsize = rsize;
-			memcpy(hp->outbuf + hp->n_outbuf, p, wsize);
-			hp->n_outbuf += wsize;
-			hvc_push(hp);
-			rsize -= wsize;
-			p += wsize;
-			written += wsize;
-		}
-		spin_unlock_irqrestore(&hp->lock, flags);
-
-		if (rsize)
-			break;
-
-		if (count < tbsize)
-			tbsize = count;
-	}
-
-	kfree(tbuf);
-
-	return written;
-}
-
 static inline int __hvc_write_kernel(struct hvc_struct *hp,
 				   const unsigned char *buf, int count)
 {
@@ -418,8 +370,7 @@ static inline int __hvc_write_kernel(struct hvc_struct *hp,
 
 	return written;
 }
-static int hvc_write(struct tty_struct *tty, int from_user,
-		     const unsigned char *buf, int count)
+static int hvc_write(struct tty_struct *tty, const unsigned char *buf, int count)
 {
 	struct hvc_struct *hp = tty->driver_data;
 	int written;
@@ -428,10 +379,10 @@ static int hvc_write(struct tty_struct *tty, int from_user,
 	if (!hp)
 		return -EPIPE;
 
-	if (from_user)
-		written = __hvc_write_user(hp, buf, count);
-	else
-		written = __hvc_write_kernel(hp, buf, count);
+	if (hp->count <= 0)
+		return -EIO;
+
+	written = __hvc_write_kernel(hp, buf, count);
 
 	/*
 	 * Racy, but harmless, kick thread if there is still pending data.
@@ -630,7 +581,7 @@ char hvc_driver_name[] = "hvc_console";
 
 static struct vio_device_id hvc_driver_table[] __devinitdata= {
 	{"serial", "hvterm1"},
-	{ 0, }
+	{ NULL, }
 };
 MODULE_DEVICE_TABLE(vio, hvc_driver_table);
 

@@ -331,7 +331,7 @@ MACHINE_START(STORK, "Stork Technologies prototype")
 	BOOT_PARAMS(0xc0000100)
 	MAPIO(stork_map_io)
 	INITIRQ(sa1100_init_irq)
-	INITTIME(sa1100_init_time)
+	.timer		= &sa1100_timer,
 MACHINE_END
 
 

@@ -55,10 +55,15 @@ void ixdp2400_init_irq(void)
  * IXDP2800 timer tick
  *************************************************************************/
 
-static void __init ixdp2800_init_time(void)
+static void __init ixdp2800_timer_init(void)
 {
 	ixp2000_init_time(50000000);
 }
+
+static struct sys_timer ixdp2800_timer = {
+	.init		= ixdp2800_timer_init,
+	.offset		= ixp2000_gettimeoffset,
+};
 
 /*************************************************************************
  * IXDP2800 PCI
@@ -172,7 +177,7 @@ MACHINE_START(IXDP2800, "Intel IXDP2800 Development Platform")
 	BOOT_PARAMS(0x00000100)
 	MAPIO(ixdp2x00_map_io)
 	INITIRQ(ixdp2800_init_irq)
-	INITTIME(ixdp2800_init_time)
+	.timer		= &ixdp2800_timer,
 	INIT_MACHINE(ixdp2x00_init_machine)
 MACHINE_END
 

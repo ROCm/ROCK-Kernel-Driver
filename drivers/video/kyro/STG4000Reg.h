@@ -21,8 +21,8 @@
 #if defined(__KERNEL__)
 #include <asm/page.h>
 #include <asm/io.h>
-#define STG_WRITE_REG(reg,data) (writel(data,(unsigned long)&pSTGReg->reg))
-#define STG_READ_REG(reg)      (readl((unsigned long)&pSTGReg->reg))
+#define STG_WRITE_REG(reg,data) (writel(data,&pSTGReg->reg))
+#define STG_READ_REG(reg)      (readl(&pSTGReg->reg))
 #else
 #define STG_WRITE_REG(reg,data) (pSTGReg->reg = data)
 #define STG_READ_REG(reg)      (pSTGReg->reg)

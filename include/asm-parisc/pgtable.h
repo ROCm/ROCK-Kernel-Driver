@@ -505,7 +505,8 @@ static inline void ptep_mkdirty(pte_t *ptep)
 
 #endif /* !__ASSEMBLY__ */
 
-#define io_remap_page_range remap_page_range
+#define io_remap_page_range(vma, vaddr, paddr, size, prot)		\
+		remap_pfn_range(vma, vaddr, (paddr) >> PAGE_SHIFT, size, prot)
 
 /* We provide our own get_unmapped_area to provide cache coherency */
 

@@ -212,7 +212,7 @@ void __iomem *ioremap_nocache (unsigned long phys_addr, unsigned long size)
 	return p;					
 }
 
-void iounmap(void __iomem *addr)
+void iounmap(volatile void __iomem *addr)
 {
 	struct vm_struct *p;
 	if (addr <= high_memory) 

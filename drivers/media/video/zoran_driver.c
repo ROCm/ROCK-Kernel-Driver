@@ -4448,12 +4448,6 @@ static struct vm_operations_struct zoran_vm_ops = {
 	.close = zoran_vm_close,
 };
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-#define zr_remap_page_range(a,b,c,d,e) remap_page_range(b,c,d,e)
-#else
-#define zr_remap_page_range(a,b,c,d,e) remap_page_range(a,b,c,d,e)
-#endif
-
 static int
 zoran_mmap (struct file           *file,
 	    struct vm_area_struct *vma)
@@ -4553,12 +4547,14 @@ zoran_mmap (struct file           *file,
 				pos =
 				    (unsigned long) fh->jpg_buffers.
 				    buffer[i].frag_tab[2 * j];
-				page = virt_to_phys(bus_to_virt(pos));	/* should just be pos on i386 */
-				if (zr_remap_page_range
-				    (vma, start, page, todo, PAGE_SHARED)) {
+				/* should just be pos on i386 */
+				page = virt_to_phys(bus_to_virt(pos))
+								>> PAGE_SHIFT;
+				if (remap_pfn_range(vma, start, page,
+							todo, PAGE_SHARED)) {
 					dprintk(1,
 						KERN_ERR
-						"%s: zoran_mmap(V4L) - remap_page_range failed\n",
+						"%s: zoran_mmap(V4L) - remap_pfn_range failed\n",
 						ZR_DEVNAME(zr));
 					res = -EAGAIN;
 					goto jpg_mmap_unlock_and_return;
@@ -4639,11 +4635,11 @@ zoran_mmap (struct file           *file,
 			if (todo > fh->v4l_buffers.buffer_size)
 				todo = fh->v4l_buffers.buffer_size;
 			page = fh->v4l_buffers.buffer[i].fbuffer_phys;
-			if (zr_remap_page_range
-			    (vma, start, page, todo, PAGE_SHARED)) {
+			if (remap_pfn_range(vma, start, page >> PAGE_SHIFT,
+							todo, PAGE_SHARED)) {
 				dprintk(1,
 					KERN_ERR
-					"%s: zoran_mmap(V4L)i - remap_page_range failed\n",
+					"%s: zoran_mmap(V4L)i - remap_pfn_range failed\n",
 					ZR_DEVNAME(zr));
 				res = -EAGAIN;
 				goto v4l_mmap_unlock_and_return;

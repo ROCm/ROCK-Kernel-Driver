@@ -79,7 +79,6 @@ static int  klsi_105_open	         (struct usb_serial_port *port,
 static void klsi_105_close	         (struct usb_serial_port *port,
 					  struct file *filp);
 static int  klsi_105_write	         (struct usb_serial_port *port,
-					  int from_user,
 					  const unsigned char *buf,
 					  int count);
 static void klsi_105_write_bulk_callback (struct urb *urb, struct pt_regs *regs);
@@ -484,7 +483,7 @@ static void klsi_105_close (struct usb_serial_port *port, struct file *filp)
 #define KLSI_105_DATA_OFFSET	2   /* in the bulk urb data block */
 
 
-static int klsi_105_write (struct usb_serial_port *port, int from_user,
+static int klsi_105_write (struct usb_serial_port *port,
 			   const unsigned char *buf, int count)
 {
 	struct klsi_105_private *priv = usb_get_serial_port_data(port);
@@ -525,15 +524,7 @@ static int klsi_105_write (struct usb_serial_port *port, int from_user,
 		size = min (count, port->bulk_out_size - KLSI_105_DATA_OFFSET);
 		size = min (size, URB_TRANSFER_BUFFER_SIZE - KLSI_105_DATA_OFFSET);
 
-		if (from_user) {
-			if (copy_from_user(urb->transfer_buffer
-					   + KLSI_105_DATA_OFFSET, buf, size)) {
-				return -EFAULT;
-			}
-		} else {
-			memcpy (urb->transfer_buffer + KLSI_105_DATA_OFFSET,
-			       	buf, size);
-		}
+		memcpy (urb->transfer_buffer + KLSI_105_DATA_OFFSET, buf, size);
 
 		/* write payload size into transfer buffer */
 		((__u8 *)urb->transfer_buffer)[0] = (__u8) (size & 0xFF);

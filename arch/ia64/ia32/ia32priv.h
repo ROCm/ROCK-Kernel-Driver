@@ -559,6 +559,10 @@ struct user_regs_struct32 {
 extern int save_ia32_fpstate (struct task_struct *, struct ia32_user_i387_struct __user *);
 extern int save_ia32_fpxstate (struct task_struct *, struct ia32_user_fxsr_struct __user *);
 
+/* Prototypes for use in sys_ia32.c */
+int copy_siginfo_to_user32 (siginfo_t32 __user *to, siginfo_t *from);
+int copy_siginfo_from_user32 (siginfo_t *to, siginfo_t32 __user *from);
+
 #endif /* !CONFIG_IA32_SUPPORT */
 
 #endif /* _ASM_IA64_IA32_PRIV_H */

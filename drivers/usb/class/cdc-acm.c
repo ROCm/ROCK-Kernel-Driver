@@ -335,11 +335,11 @@ static void acm_tty_close(struct tty_struct *tty, struct file *filp)
 	up(&open_sem);
 }
 
-static int acm_tty_write(struct tty_struct *tty, int from_user, const unsigned char *buf, int count)
+static int acm_tty_write(struct tty_struct *tty, const unsigned char *buf, int count)
 {
 	struct acm *acm = tty->driver_data;
 	int stat;
-	dbg("Entering acm_tty_write to write %d bytes from %s space,\n", count, from_user ? "user" : "kernel");
+	dbg("Entering acm_tty_write to write %d bytes,\n", count);
 
 	if (!ACM_READY(acm))
 		return -EINVAL;
@@ -350,19 +350,15 @@ static int acm_tty_write(struct tty_struct *tty, int from_user, const unsigned c
 
 	count = (count > acm->writesize) ? acm->writesize : count;
 
-	dbg("Get %d bytes from %s space...", count, from_user ? "user" : "kernel");
-	if (from_user) {
-		if (copy_from_user(acm->write_buffer, (void __user *)buf, count))
-			return -EFAULT;
-	} else
-		memcpy(acm->write_buffer, buf, count);
+	dbg("Get %d bytes...", count);
+	memcpy(acm->write_buffer, buf, count);
 	dbg("  Successfully copied.\n");
 
 	acm->writeurb->transfer_buffer_length = count;
 	acm->writeurb->dev = acm->dev;
 
 	acm->ready_for_write = 0;
-	stat = usb_submit_urb(acm->writeurb, from_user ? GFP_KERNEL : GFP_ATOMIC);
+	stat = usb_submit_urb(acm->writeurb, GFP_ATOMIC);
 	if (stat < 0) {
 		dbg("usb_submit_urb(write bulk) failed");
 		acm->ready_for_write = 1;

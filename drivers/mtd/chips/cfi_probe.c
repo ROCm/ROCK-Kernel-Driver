@@ -1,7 +1,7 @@
 /* 
    Common Flash Interface probe code.
    (C) 2000 Red Hat. GPL'd.
-   $Id: cfi_probe.c,v 1.77 2004/07/14 08:38:44 dwmw2 Exp $
+   $Id: cfi_probe.c,v 1.79 2004/10/20 23:04:01 dwmw2 Exp $
 */
 
 #include <linux/config.h>
@@ -243,12 +243,27 @@ static char *vendorname(__u16 vendor)
 		
 	case P_ID_AMD_EXT:
 		return "AMD/Fujitsu Extended";
+
+	case P_ID_WINBOND:
+		return "Winbond Standard";
 		
+	case P_ID_ST_ADV:
+		return "ST Advanced";
+
 	case P_ID_MITSUBISHI_STD:
 		return "Mitsubishi Standard";
 		
 	case P_ID_MITSUBISHI_EXT:
 		return "Mitsubishi Extended";
+
+	case P_ID_SST_PAGE:
+		return "SST Page Write";
+
+	case P_ID_INTEL_PERFORMANCE:
+		return "Intel Performance Code";
+		
+	case P_ID_INTEL_DATA:
+		return "Intel Data";
 		
 	case P_ID_RESERVED:
 		return "Not Allowed / Reserved for Future Use";
@@ -325,6 +340,10 @@ static void print_cfi_ident(struct cfi_ident *cfip)
 		
 	case 3:
 		printk("  - x32-only asynchronous interface\n");
+		break;
+		
+	case 4:
+		printk("  - supports x16 and x32 via Word# with asynchronous interface\n");
 		break;
 		
 	case 65535:

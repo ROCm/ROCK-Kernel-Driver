@@ -55,10 +55,15 @@
 /*************************************************************************
  * ENP-2611 timer tick configuration
  *************************************************************************/
-static void __init enp2611_init_time(void)
+static void __init enp2611_timer_init(void)
 {
 	ixp2000_init_time(50 * 1000 * 1000);
 }
+
+static struct enp2611_timer = {
+	.init		= enp2611_timer_init,
+	.offset		= ixp2000_gettimeoffset,
+};
 
 
 /*************************************************************************
@@ -202,7 +207,7 @@ MACHINE_START(ENP2611, "Radisys ENP-2611 PCI network processor board")
 	BOOT_PARAMS(0x00000100)
 	MAPIO(ixp2000_map_io)
 	INITIRQ(ixp2000_init_irq)
-	INITTIME(enp2611_init_time)
+	.timer		= &enp2611_timer,
 	INIT_MACHINE(enp2611_init_machine)
 MACHINE_END
 #endif

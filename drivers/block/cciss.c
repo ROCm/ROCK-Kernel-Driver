@@ -185,9 +185,10 @@ static inline CommandList_struct *removeQ(CommandList_struct **Qptr,
         }
         return c;
 }
-#ifdef CONFIG_PROC_FS
 
 #include "cciss_scsi.c"		/* For SCSI tape support */
+
+#ifdef CONFIG_PROC_FS
 
 /*
  * Report information about this controller.

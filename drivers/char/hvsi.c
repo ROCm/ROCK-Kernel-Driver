@@ -999,26 +999,14 @@ static int hvsi_chars_in_buffer(struct tty_struct *tty)
 	return hp->n_outbuf;
 }
 
-static int hvsi_write(struct tty_struct *tty, int from_user,
+static int hvsi_write(struct tty_struct *tty,
 		     const unsigned char *buf, int count)
 {
 	struct hvsi_struct *hp = tty->driver_data;
 	const char *source = buf;
-	char *kbuf = NULL;
 	unsigned long flags;
 	int total = 0;
 	int origcount = count;
-
-	if (from_user) {
-		kbuf = kmalloc(count, GFP_KERNEL);
-		if (kbuf == NULL)
-			return -ENOMEM;
-		if (copy_from_user(kbuf, buf, count)) {
-			kfree(kbuf);
-			return -EFAULT;
-		}
-		source = kbuf;
-	}
 
 	spin_lock_irqsave(&hp->lock, flags);
 
@@ -1056,9 +1044,6 @@ static int hvsi_write(struct tty_struct *tty, int from_user,
 
 out:
 	spin_unlock_irqrestore(&hp->lock, flags);
-
-	if (from_user)
-		kfree(kbuf);
 
 	if (total != origcount)
 		pr_debug("%s: wanted %i, only wrote %i\n", __FUNCTION__, origcount,

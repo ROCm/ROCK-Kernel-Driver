@@ -38,6 +38,7 @@ o Frontends drivers:
                		  Comtech DVBT-6k07 (SP5730 PLL)
                		  (NxtWave Communications NXT6000 demodulator)
    - sp887x		: Microtune 7202D
+   - dib3000mb	: DiBcom 3000-MB Frontend
   DVB-S/C/T:
    - dst		: TwinHan DST Frontend
 
@@ -49,7 +50,7 @@ o Cards based on the Phillips saa7146 multimedia PCI bridge chip:
   - "budget" cards (i.e. without hardware MPEG decoder):
     - Technotrend Budget / Hauppauge WinTV-Nova PCI Cards
     - SATELCO Multimedia PCI
-    - KNC1 DVB-S
+    - KNC1 DVB-S, Typhoon DVB-S, Terratec Cinergy 1200 DVB-S (no CI support)
     - Typhoon DVB-S budget
     - Fujitsu-Siemens Activy DVB-S budget card
 
@@ -65,5 +66,10 @@ o Cards based on the Conexant Bt8xx PCI bridge:
 o Technotrend / Hauppauge DVB USB devices:
   - Nova USB
   - DEC 2000-T, 3000-S, 2540-T
+
+o DiBcom DVB-T USB based devices:
+  - Twinhan VisionPlus VisionDTV USB-Ter DVB-T Device
+  - KWorld V-Stream XPERT DTV - DVB-T USB
+  - HAMA DVB-T USB device
 
 o Experimental support for the analog module of the Siemens DVB-C PCI card

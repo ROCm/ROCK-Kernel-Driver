@@ -249,7 +249,7 @@ int pcmcia_register_socket(struct pcmcia_socket *socket)
 	/* base address = 0, map = 0 */
 	socket->cis_mem.flags = 0;
 	socket->cis_mem.speed = cis_speed;
-	socket->erase_busy.next = socket->erase_busy.prev = &socket->erase_busy;
+
 	INIT_LIST_HEAD(&socket->cis_cache);
 	spin_lock_init(&socket->lock);
 
@@ -846,23 +846,18 @@ static void release_io_space(struct pcmcia_socket *s, ioaddr_t base,
     
 ======================================================================*/
 
-int pcmcia_access_configuration_register(client_handle_t handle,
+int pccard_access_configuration_register(struct pcmcia_socket *s,
+					 unsigned int function,
 					 conf_reg_t *reg)
 {
-    struct pcmcia_socket *s;
     config_t *c;
     int addr;
     u_char val;
-    
-    if (CHECK_HANDLE(handle))
-	return CS_BAD_HANDLE;
-    s = SOCKET(handle);
-    if (handle->Function == BIND_FN_ALL) {
-	if (reg->Function >= s->functions)
-	    return CS_BAD_ARGS;
-	c = &s->config[reg->Function];
-    } else
-	c = CONFIG(handle);
+
+    if (!s || !s->config)
+	return CS_NO_CARD;    
+
+    c = &s->config[function];
 
     if (c == NULL)
 	return CS_NO_CARD;
@@ -887,7 +882,7 @@ int pcmcia_access_configuration_register(client_handle_t handle,
     }
     return CS_SUCCESS;
 } /* access_configuration_register */
-
+EXPORT_SYMBOL(pccard_access_configuration_register);
 
 /*====================================================================*/
 
@@ -895,7 +890,6 @@ int pcmcia_deregister_client(client_handle_t handle)
 {
     client_t **client;
     struct pcmcia_socket *s;
-    memory_handle_t region;
     u_long flags;
     int i;
     
@@ -912,14 +906,6 @@ int pcmcia_deregister_client(client_handle_t handle)
 	if (handle->state & CLIENT_WIN_REQ(i))
 	    return CS_IN_USE;
 
-    /* Disconnect all MTD links */
-    if (handle->mtd_count) {
-	for (region = s->a_region; region; region = region->info.next)
-	    if (region->mtd == handle) region->mtd = NULL;
-	for (region = s->c_region; region; region = region->info.next)
-	    if (region->mtd == handle) region->mtd = NULL;
-    }
-    
     if ((handle->state & CLIENT_STALE) ||
 	(handle->Attributes & INFO_MASTER_CLIENT)) {
 	spin_lock_irqsave(&s->lock, flags);
@@ -936,7 +922,6 @@ int pcmcia_deregister_client(client_handle_t handle)
 	spin_unlock_irqrestore(&s->lock, flags);
     } else {
 	handle->state = CLIENT_UNBOUND;
-	handle->mtd_count = 0;
 	handle->event_handler = NULL;
     }
 
@@ -945,29 +930,20 @@ int pcmcia_deregister_client(client_handle_t handle)
 
 /*====================================================================*/
 
-int pcmcia_get_configuration_info(client_handle_t handle,
+int pccard_get_configuration_info(struct pcmcia_socket *s,
+				  unsigned int function,
 				  config_info_t *config)
 {
-    struct pcmcia_socket *s;
     config_t *c;
     
-    if (CHECK_HANDLE(handle))
-	return CS_BAD_HANDLE;
-    s = SOCKET(handle);
     if (!(s->state & SOCKET_PRESENT))
 	return CS_NO_CARD;
 
-    if (handle->Function == BIND_FN_ALL) {
-	if (config->Function && (config->Function >= s->functions))
-	    return CS_BAD_ARGS;
-    } else
-	config->Function = handle->Function;
-    
+    config->Function = function;
+
 #ifdef CONFIG_CARDBUS
     if (s->state & SOCKET_CARDBUS) {
-	u_char fn = config->Function;
 	memset(config, 0, sizeof(config_info_t));
-	config->Function = fn;
 	config->Vcc = s->socket.Vcc;
 	config->Vpp1 = config->Vpp2 = s->socket.Vpp;
 	config->Option = s->cb_dev->subordinate->number;
@@ -984,7 +960,7 @@ int pcmcia_get_configuration_info(client_handle_t handle,
     }
 #endif
     
-    c = (s->config != NULL) ? &s->config[config->Function] : NULL;
+    c = (s->config != NULL) ? &s->config[function] : NULL;
     
     if ((c == NULL) || !(c->state & CONFIG_LOCKED)) {
 	config->Attributes = 0;
@@ -1009,6 +985,7 @@ int pcmcia_get_configuration_info(client_handle_t handle,
     
     return CS_SUCCESS;
 } /* get_configuration_info */
+EXPORT_SYMBOL(pccard_get_configuration_info);
 
 /*======================================================================
 
@@ -1033,6 +1010,8 @@ int pcmcia_get_card_services_info(servinfo_t *info)
     return CS_SUCCESS;
 } /* get_card_services_info */
 
+#ifdef CONFIG_PCMCIA_OBSOLETE
+
 /*======================================================================
 
     Note that get_first_client() *does* recognize the Socket field
@@ -1056,6 +1035,7 @@ int pcmcia_get_first_client(client_handle_t *handle, client_req_t *req)
     *handle = socket->clients;
     return CS_SUCCESS;
 } /* get_first_client */
+EXPORT_SYMBOL(pcmcia_get_first_client);
 
 /*====================================================================*/
 
@@ -1075,20 +1055,17 @@ int pcmcia_get_next_client(client_handle_t *handle, client_req_t *req)
 	*handle = (*handle)->next;
     return CS_SUCCESS;
 } /* get_next_client */
+EXPORT_SYMBOL(pcmcia_get_next_client);
+#endif /* CONFIG_PCMCIA_OBSOLETE */
 
 /*====================================================================*/
 
-int pcmcia_get_window(window_handle_t *handle, int idx, win_req_t *req)
+int pcmcia_get_window(struct pcmcia_socket *s, window_handle_t *handle, int idx, win_req_t *req)
 {
-    struct pcmcia_socket *s;
     window_t *win;
     int w;
 
-    if (idx == 0)
-	s = ((client_handle_t)*handle)->Socket;
-    else
-	s = (*handle)->sock;
-    if (!(s->state & SOCKET_PRESENT))
+    if (!s || !(s->state & SOCKET_PRESENT))
 	return CS_NO_CARD;
     for (w = idx; w < MAX_WIN; w++)
 	if (s->state & SOCKET_WIN_REQ(w)) break;
@@ -1110,20 +1087,7 @@ int pcmcia_get_window(window_handle_t *handle, int idx, win_req_t *req)
     *handle = win;
     return CS_SUCCESS;
 } /* get_window */
-
-int pcmcia_get_first_window(window_handle_t *win, win_req_t *req)
-{
-    if ((win == NULL) || ((*win)->magic != WINDOW_MAGIC))
-	return CS_BAD_HANDLE;
-    return pcmcia_get_window(win, 0, req);
-}
-
-int pcmcia_get_next_window(window_handle_t *win, win_req_t *req)
-{
-    if ((win == NULL) || ((*win)->magic != WINDOW_MAGIC))
-	return CS_BAD_HANDLE;
-    return pcmcia_get_window(win, (*win)->index+1, req);
-}
+EXPORT_SYMBOL(pcmcia_get_window);
 
 /*=====================================================================
 
@@ -1133,14 +1097,9 @@ int pcmcia_get_next_window(window_handle_t *win, win_req_t *req)
 
 #ifdef CONFIG_CARDBUS
 
-struct pci_bus *pcmcia_lookup_bus(client_handle_t handle)
+struct pci_bus *pcmcia_lookup_bus(struct pcmcia_socket *s)
 {
-	struct pcmcia_socket *s;
-
-	if (CHECK_HANDLE(handle))
-		return NULL;
-	s = SOCKET(handle);
-	if (!(s->state & SOCKET_CARDBUS))
+	if (!s || !(s->state & SOCKET_CARDBUS))
 		return NULL;
 
 	return s->cb_dev->subordinate;
@@ -1157,15 +1116,11 @@ EXPORT_SYMBOL(pcmcia_lookup_bus);
     
 ======================================================================*/
 
-int pcmcia_get_status(client_handle_t handle, cs_status_t *status)
+int pccard_get_status(struct pcmcia_socket *s, unsigned int function, cs_status_t *status)
 {
-    struct pcmcia_socket *s;
     config_t *c;
     int val;
     
-    if (CHECK_HANDLE(handle))
-	return CS_BAD_HANDLE;
-    s = SOCKET(handle);
     s->ops->get_status(s, &val);
     status->CardState = status->SocketState = 0;
     status->CardState |= (val & SS_DETECT) ? CS_EVENT_CARD_DETECT : 0;
@@ -1177,13 +1132,7 @@ int pcmcia_get_status(client_handle_t handle, cs_status_t *status)
     if (!(s->state & SOCKET_PRESENT))
 	return CS_NO_CARD;
     
-    /* Get info from the PRR, if necessary */
-    if (handle->Function == BIND_FN_ALL) {
-	if (status->Function && (status->Function >= s->functions))
-	    return CS_BAD_ARGS;
-	c = (s->config != NULL) ? &s->config[status->Function] : NULL;
-    } else
-	c = CONFIG(handle);
+    c = (s->config != NULL) ? &s->config[function] : NULL;
     if ((c != NULL) && (c->state & CONFIG_LOCKED) &&
 	(c->IntType & (INT_MEMORY_AND_IO | INT_ZOOMED_VIDEO))) {
 	u_char reg;
@@ -1218,6 +1167,7 @@ int pcmcia_get_status(client_handle_t handle, cs_status_t *status)
 	(val & SS_READY) ? CS_EVENT_READY_CHANGE : 0;
     return CS_SUCCESS;
 } /* get_status */
+EXPORT_SYMBOL(pccard_get_status);
 
 /*======================================================================
 
@@ -1297,6 +1247,8 @@ int pcmcia_modify_configuration(client_handle_t handle,
     return CS_SUCCESS;
 } /* modify_configuration */
 
+#ifdef CONFIG_PCMCIA_OBSOLETE
+
 /*======================================================================
 
     Modify the attributes of a window returned by RequestWindow.
@@ -1322,6 +1274,10 @@ int pcmcia_modify_window(window_handle_t win, modwin_t *req)
     
     return CS_SUCCESS;
 } /* modify_window */
+EXPORT_SYMBOL(pcmcia_modify_window);
+
+#endif /* CONFIG_PCMCIA_OBSOLETE */
+
 
 /*======================================================================
 
@@ -1371,7 +1327,7 @@ int pcmcia_register_client(client_handle_t *handle, client_reg_t *req)
     if ((!(s->state & SOCKET_CARDBUS)) && (s->functions == 0) &&
 	(client->Function != BIND_FN_ALL)) {
 	cistpl_longlink_mfc_t mfc;
-	if (read_tuple(client, CISTPL_LONGLINK_MFC, &mfc)
+	if (pccard_read_tuple(s, client->Function, CISTPL_LONGLINK_MFC, &mfc)
 	    == CS_SUCCESS)
 	    s->functions = mfc.nfn;
 	else
@@ -1915,14 +1871,10 @@ int pcmcia_request_window(client_handle_t *handle, win_req_t *req, window_handle
     
 ======================================================================*/
 
-int pcmcia_reset_card(client_handle_t handle, client_req_t *req)
+int pccard_reset_card(struct pcmcia_socket *skt)
 {
-	struct pcmcia_socket *skt;
 	int ret;
     
-	if (CHECK_HANDLE(handle))
-		return CS_BAD_HANDLE;
-	skt = SOCKET(handle);
 	cs_dbg(skt, 1, "resetting socket\n");
 
 	down(&skt->skt_sem);
@@ -1947,15 +1899,13 @@ int pcmcia_reset_card(client_handle_t handle, client_req_t *req)
 				send_event(skt, CS_EVENT_CARD_RESET, CS_EVENT_PRI_LOW);
 		}
 
-		handle->event_callback_args.info = (void *)(u_long)ret;
-		EVENT(handle, CS_EVENT_RESET_COMPLETE, CS_EVENT_PRI_LOW);
-
 		ret = CS_SUCCESS;
 	} while (0);
 	up(&skt->skt_sem);
 
 	return ret;
 } /* reset_card */
+EXPORT_SYMBOL(pccard_reset_card);
 
 /*======================================================================
 
@@ -2073,6 +2023,7 @@ int pcmcia_insert_card(struct pcmcia_socket *skt)
     
 ======================================================================*/
 
+#ifdef CONFIG_PCMCIA_OBSOLETE
 int pcmcia_set_event_mask(client_handle_t handle, eventmask_t *mask)
 {
     u_int events, bit;
@@ -2090,6 +2041,9 @@ int pcmcia_set_event_mask(client_handle_t handle, eventmask_t *mask)
     }
     return CS_SUCCESS;
 } /* set_event_mask */
+EXPORT_SYMBOL(pcmcia_set_event_mask);
+
+#endif /* CONFIG_PCMCIA_OBSOLETE */
 
 /*======================================================================
 
@@ -2097,37 +2051,14 @@ int pcmcia_set_event_mask(client_handle_t handle, eventmask_t *mask)
     
 ======================================================================*/
 /* in alpha order */
-EXPORT_SYMBOL(pcmcia_access_configuration_register);
-EXPORT_SYMBOL(pcmcia_adjust_resource_info);
-EXPORT_SYMBOL(pcmcia_check_erase_queue);
-EXPORT_SYMBOL(pcmcia_close_memory);
-EXPORT_SYMBOL(pcmcia_copy_memory);
 EXPORT_SYMBOL(pcmcia_deregister_client);
-EXPORT_SYMBOL(pcmcia_deregister_erase_queue);
 EXPORT_SYMBOL(pcmcia_eject_card);
-EXPORT_SYMBOL(pcmcia_get_first_client);
 EXPORT_SYMBOL(pcmcia_get_card_services_info);
-EXPORT_SYMBOL(pcmcia_get_configuration_info);
 EXPORT_SYMBOL(pcmcia_get_mem_page);
-EXPORT_SYMBOL(pcmcia_get_next_client);
-EXPORT_SYMBOL(pcmcia_get_first_region);
-EXPORT_SYMBOL(pcmcia_get_first_tuple);
-EXPORT_SYMBOL(pcmcia_get_first_window);
-EXPORT_SYMBOL(pcmcia_get_next_region);
-EXPORT_SYMBOL(pcmcia_get_next_tuple);
-EXPORT_SYMBOL(pcmcia_get_next_window);
-EXPORT_SYMBOL(pcmcia_get_status);
-EXPORT_SYMBOL(pcmcia_get_tuple_data);
 EXPORT_SYMBOL(pcmcia_insert_card);
 EXPORT_SYMBOL(pcmcia_map_mem_page);
 EXPORT_SYMBOL(pcmcia_modify_configuration);
-EXPORT_SYMBOL(pcmcia_modify_window);
-EXPORT_SYMBOL(pcmcia_open_memory);
-EXPORT_SYMBOL(pcmcia_parse_tuple);
-EXPORT_SYMBOL(pcmcia_read_memory);
 EXPORT_SYMBOL(pcmcia_register_client);
-EXPORT_SYMBOL(pcmcia_register_erase_queue);
-EXPORT_SYMBOL(pcmcia_register_mtd);
 EXPORT_SYMBOL(pcmcia_release_configuration);
 EXPORT_SYMBOL(pcmcia_release_io);
 EXPORT_SYMBOL(pcmcia_release_irq);
@@ -2137,15 +2068,10 @@ EXPORT_SYMBOL(pcmcia_request_configuration);
 EXPORT_SYMBOL(pcmcia_request_io);
 EXPORT_SYMBOL(pcmcia_request_irq);
 EXPORT_SYMBOL(pcmcia_request_window);
-EXPORT_SYMBOL(pcmcia_reset_card);
 EXPORT_SYMBOL(pcmcia_resume_card);
-EXPORT_SYMBOL(pcmcia_set_event_mask);
 EXPORT_SYMBOL(pcmcia_suspend_card);
-EXPORT_SYMBOL(pcmcia_validate_cis);
-EXPORT_SYMBOL(pcmcia_write_memory);
 
 EXPORT_SYMBOL(dead_socket);
-EXPORT_SYMBOL(MTDHelperEntry);
 EXPORT_SYMBOL(pcmcia_parse_events);
 
 struct class pcmcia_socket_class = {

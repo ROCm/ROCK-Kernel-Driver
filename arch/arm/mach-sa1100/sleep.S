@@ -70,12 +70,12 @@ ENTRY(sa1100_cpu_suspend)
 	@ delay 90us and set CPU PLL to lowest speed
 	@ fixes resume problem on high speed SA1110
 	mov	r0, #90
-	bl	udelay
+	bl	__udelay
 	ldr	r0, =PPCR
 	mov	r1, #0
 	str	r1, [r0]
 	mov	r0, #90
-	bl	udelay
+	bl	__udelay
 
 	/*
 	 * SA1110 SDRAM controller workaround.  register values:

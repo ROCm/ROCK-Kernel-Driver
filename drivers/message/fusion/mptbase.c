@@ -1096,7 +1096,7 @@ static int __devinit
 mptbase_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 {
 	MPT_ADAPTER	*ioc;
-	u8		*mem;
+	u8		__iomem *mem;
 	unsigned long	 mem_phys;
 	unsigned long	 port;
 	u32		 msize;
@@ -1211,13 +1211,13 @@ mptbase_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 			&ioc->facts, &ioc->pfacts[0]));
 
 	ioc->mem_phys = mem_phys;
-	ioc->chip = (SYSIF_REGS*)mem;
+	ioc->chip = (SYSIF_REGS __iomem *)mem;
 
 	/* Save Port IO values in case we need to do downloadboot */
 	{
 		u8 *pmem = (u8*)port;
 		ioc->pio_mem_phys = port;
-		ioc->pio_chip = (SYSIF_REGS*)pmem;
+		ioc->pio_chip = (SYSIF_REGS __iomem *)pmem;
 	}
 
 	ioc->chip_type = FCUNK;
@@ -1483,7 +1483,7 @@ mptbase_suspend(struct pci_dev *pdev, u32 state)
 		}
 	}
 
-	pci_save_state(pdev, ioc->PciState);
+	pci_save_state(pdev);
 
 	/* put ioc into READY_STATE */
 	if(SendIocReset(ioc, MPI_FUNCTION_IOC_MESSAGE_UNIT_RESET, CAN_SLEEP)) {
@@ -1523,7 +1523,7 @@ mptbase_resume(struct pci_dev *pdev)
 		ioc->name, pdev, pci_name(pdev), device_state);
 
 	pci_set_power_state(pdev, 0);
-	pci_restore_state(pdev, ioc->PciState);
+	pci_restore_state(pdev);
 	pci_enable_device(pdev);
 
 	/* enable interrupts */
@@ -2000,7 +2000,7 @@ mpt_adapter_dispose(MPT_ADAPTER *ioc)
 		}
 
 		if (ioc->memmap != NULL)
-			iounmap((u8 *) ioc->memmap);
+			iounmap(ioc->memmap);
 
 #if defined(CONFIG_MTRR) && 0
 		if (ioc->mtrr_reg > 0) {

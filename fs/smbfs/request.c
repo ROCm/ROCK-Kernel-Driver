@@ -634,6 +634,7 @@ static int smb_recv_trans2(struct smb_sb_info *server, struct smb_request *req)
 		req->rq_trans2buffer = smb_kmalloc(buf_len, GFP_NOFS);
 		if (!req->rq_trans2buffer)
 			goto out_no_mem;
+		memset(req->rq_trans2buffer, 0, buf_len);
 
 		req->rq_parm = req->rq_trans2buffer;
 		req->rq_data = req->rq_trans2buffer + parm_tot;
@@ -657,8 +658,11 @@ static int smb_recv_trans2(struct smb_sb_info *server, struct smb_request *req)
 	 * Check whether we've received all of the data. Note that
 	 * we use the packet totals -- total lengths might shrink!
 	 */
-	if (req->rq_ldata >= data_tot && req->rq_lparm >= parm_tot)
+	if (req->rq_ldata >= data_tot && req->rq_lparm >= parm_tot) {
+		req->rq_ldata = data_tot;
+		req->rq_lparm = parm_tot;
 		return 0;
+	}
 	return 1;
 
 out_too_long:

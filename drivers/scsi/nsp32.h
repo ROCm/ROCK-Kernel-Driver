@@ -563,7 +563,7 @@ typedef struct _nsp32_hw_data {
 	int           IrqNumber;
 	int           BaseAddress;
 	int           NumAddress;
-	unsigned long MmioAddress;
+	void __iomem *MmioAddress;
 #define NSP32_MMIO_OFFSET 0x0800
 	unsigned long MmioLength;
 
@@ -605,9 +605,6 @@ typedef struct _nsp32_hw_data {
 	unsigned char msginbuf [MSGINBUF_MAX];	/* megin buffer     */
 	char	      msgin_len;		/* msginbuf length  */
 
-#ifdef CONFIG_PM
-	u32           PciState[16];     /* save PCI state to this area */
-#endif
 } nsp32_hw_data;
 
 /*

@@ -49,7 +49,9 @@ static unsigned long clps711x_gettimeoffset(void)
 static irqreturn_t
 p720t_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
+	write_seqlock(&xtime_lock);
 	timer_tick(regs);
+	write_sequnlock(&xtime_lock);
 	return IRQ_HANDLED;
 }
 
@@ -59,7 +61,7 @@ static struct irqaction clps711x_timer_irq = {
 	.handler	= p720t_timer_interrupt
 };
 
-void __init clps711x_init_time(void)
+static void __init clps711x_timer_init(void)
 {
 	struct timespec tv;
 	unsigned int syscon;
@@ -71,9 +73,13 @@ void __init clps711x_init_time(void)
 	clps_writel(LATCH-1, TC2D); /* 512kHz / 100Hz - 1 */
 
 	setup_irq(IRQ_TC2OI, &clps711x_timer_irq);
-	gettimeoffset = clps711x_gettimeoffset;
 
 	tv.tv_nsec = 0;
 	tv.tv_sec = clps_readl(RTCDR);
 	do_settimeofday(&tv);
 }
+
+struct sys_timer clps711x_timer = {
+	.init		= clps711x_timer_init,
+	.offset		= clps711x_gettimeoffset,
+};

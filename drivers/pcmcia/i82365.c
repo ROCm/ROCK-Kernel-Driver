@@ -48,9 +48,9 @@
 #include <linux/workqueue.h>
 #include <linux/interrupt.h>
 #include <linux/device.h>
+#include <linux/bitops.h>
 #include <asm/irq.h>
 #include <asm/io.h>
-#include <asm/bitops.h>
 #include <asm/system.h>
 
 #include <pcmcia/version.h>
@@ -134,7 +134,7 @@ module_param(i365_base, int, 0444);
 module_param(ignore, int, 0444);
 module_param(extra_sockets, int, 0444);
 module_param(irq_mask, int, 0444);
-module_param_array(irq_list, int, irq_list_count, 0444);
+module_param_array(irq_list, int, &irq_list_count, 0444);
 module_param(cs_irq, int, 0444);
 module_param(async_clock, int, 0444);
 module_param(cable_mode, int, 0444);

@@ -124,7 +124,7 @@ pci_write (struct pci_bus *bus, unsigned int devfn, int where, int size, u32 val
 				  devfn, where, size, value);
 }
 
-static struct pci_ops pci_root_ops = {
+struct pci_ops pci_root_ops = {
 	.read = pci_read,
 	.write = pci_write,
 };
@@ -275,7 +275,7 @@ add_window (struct acpi_resource *res, void *data)
 			return AE_OK;
 
 		window = &info->controller->window[info->controller->windows++];
-		window->resource.flags |= flags;
+		window->resource.flags	= flags;
 		window->resource.start  = addr.min_address_range;
 		window->resource.end    = addr.max_address_range;
 		window->offset		= offset;
@@ -365,10 +365,10 @@ pcibios_fixup_device_resources (struct pci_dev *dev, struct pci_bus *bus)
 void __devinit
 pcibios_fixup_bus (struct pci_bus *b)
 {
-	struct list_head *ln;
+	struct pci_dev *dev;
 
-	for (ln = b->devices.next; ln != &b->devices; ln = ln->next)
-		pcibios_fixup_device_resources(pci_dev_b(ln), b);
+	list_for_each_entry(dev, &b->devices, bus_list)
+		pcibios_fixup_device_resources(dev, b);
 
 	return;
 }
@@ -474,7 +474,7 @@ pci_mmap_page_range (struct pci_dev *dev, struct vm_area_struct *vma,
 	else
 		vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
 
-	if (remap_page_range(vma, vma->vm_start, vma->vm_pgoff << PAGE_SHIFT,
+	if (remap_pfn_range(vma, vma->vm_start, vma->vm_pgoff,
 			     vma->vm_end - vma->vm_start, vma->vm_page_prot))
 		return -EAGAIN;
 

@@ -561,7 +561,7 @@ typedef struct _MPT_ADAPTER
 	u32			 sense_buf_low_dma;
 	int			 mtrr_reg;
 	struct pci_dev		*pcidev;	/* struct pci_dev pointer */
-	u8			*memmap;	/* mmap address */
+	u8			__iomem *memmap;	/* mmap address */
 	struct Scsi_Host	*sh;		/* Scsi Host pointer */
 	ScsiCfgData		spi_data;	/* Scsi config. data */
 	MPT_IOCTL		*ioctl;		/* ioctl data pointer */
@@ -597,9 +597,6 @@ typedef struct _MPT_ADAPTER
 	FCPortPage0_t		 fc_port_page0[2];
 	LANPage0_t		 lan_cnfg_page0;
 	LANPage1_t		 lan_cnfg_page1;
-#ifdef CONFIG_PM
-	u32           		 PciState[64];     /* save PCI state to this area */
-#endif
 	u8			 FirstWhoInit;
 	u8			 upload_fw;	/* If set, do a fw upload */
 	u8			 reload_fw;	/* Force a FW Reload on next reset */

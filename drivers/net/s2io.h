@@ -667,7 +667,6 @@ typedef struct s2io_nic {
 	u8 cache_line;
 	u32 rom_expansion;
 	u16 pcix_cmd;
-	u32 config_space[256 / sizeof(u32)];
 	u32 irq;
 	atomic_t rx_bufs_left[MAX_RX_RINGS];
 

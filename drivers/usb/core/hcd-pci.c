@@ -307,7 +307,7 @@ int usb_hcd_pci_suspend (struct pci_dev *dev, u32 state)
 					retval);
 		else {
 			hcd->state = HCD_STATE_SUSPENDED;
-			pci_save_state (dev, hcd->pci_state);
+			pci_save_state (dev);
 #ifdef	CONFIG_USB_SUSPEND
 			pci_enable_wake (dev, state, hcd->remote_wakeup);
 			pci_enable_wake (dev, 4, hcd->remote_wakeup);
@@ -367,7 +367,7 @@ int usb_hcd_pci_resume (struct pci_dev *dev)
 		return retval;
 	}
 	pci_set_master (dev);
-	pci_restore_state (dev, hcd->pci_state);
+	pci_restore_state (dev);
 #ifdef	CONFIG_USB_SUSPEND
 	pci_enable_wake (dev, dev->current_state, 0);
 	pci_enable_wake (dev, 4, 0);

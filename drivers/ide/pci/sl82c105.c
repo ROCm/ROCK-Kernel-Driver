@@ -236,15 +236,13 @@ static int sl82c105_ide_dma_lost_irq(ide_drive_t *drive)
  * The generic IDE core will have disabled the BMEN bit before this
  * function is called.
  */
-static int sl82c105_ide_dma_begin(ide_drive_t *drive)
+static void sl82c105_ide_dma_start(ide_drive_t *drive)
 {
 	ide_hwif_t *hwif = HWIF(drive);
 	struct pci_dev *dev = hwif->pci_dev;
 
-//	DBG(("sl82c105_ide_dma_begin(drive:%s)\n", drive->name));
-
 	sl82c105_reset_host(dev);
-	return __ide_dma_begin(drive);
+	ide_dma_start(drive);
 }
 
 static int sl82c105_ide_dma_timeout(ide_drive_t *drive)
@@ -469,7 +467,7 @@ static void __init init_hwif_sl82c105(ide_hwif_t *hwif)
 	hwif->ide_dma_on = &sl82c105_ide_dma_on;
 	hwif->ide_dma_off_quietly = &sl82c105_ide_dma_off_quietly;
 	hwif->ide_dma_lostirq = &sl82c105_ide_dma_lost_irq;
-	hwif->ide_dma_begin = &sl82c105_ide_dma_begin;
+	hwif->dma_start = &sl82c105_ide_dma_start;
 	hwif->ide_dma_timeout = &sl82c105_ide_dma_timeout;
 
 	if (!noautodma)

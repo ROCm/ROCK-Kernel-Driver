@@ -30,8 +30,8 @@
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
 #include <linux/threads.h>
+#include <linux/bitops.h>
 
-#include <asm/bitops.h>
 #include <asm/delay.h>
 #include <asm/intrinsics.h>
 #include <asm/io.h>

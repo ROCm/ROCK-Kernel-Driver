@@ -234,7 +234,7 @@ static int irtty_do_write(struct sir_dev *dev, const unsigned char *ptr, size_t 
 	}
 	else
 		writelen = len;
-	return tty->driver->write(tty, 0, ptr, writelen);
+	return tty->driver->write(tty, ptr, writelen);
 }
 
 /* ------------------------------------------------------- */

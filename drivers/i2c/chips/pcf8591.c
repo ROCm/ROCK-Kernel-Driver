@@ -99,7 +99,7 @@ static struct i2c_driver pcf8591_driver = {
 	.detach_client	= pcf8591_detach_client,
 };
 
-static int pcf8591_id = 0;
+static int pcf8591_id;
 
 /* following are the sysfs callback functions */
 #define show_in_channel(channel)					\

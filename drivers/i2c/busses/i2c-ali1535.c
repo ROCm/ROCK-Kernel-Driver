@@ -496,6 +496,8 @@ static struct pci_device_id ali1535_ids[] = {
 	{ },
 };
 
+MODULE_DEVICE_TABLE (pci, ali1535_ids);
+
 static int __devinit ali1535_probe(struct pci_dev *dev, const struct pci_device_id *id)
 {
 	if (ali1535_setup(dev)) {
@@ -527,7 +529,7 @@ static struct pci_driver ali1535_driver = {
 
 static int __init i2c_ali1535_init(void)
 {
-	return pci_module_init(&ali1535_driver);
+	return pci_register_driver(&ali1535_driver);
 }
 
 static void __exit i2c_ali1535_exit(void)

@@ -865,20 +865,14 @@ static ide_startstop_t cdrom_start_packet_command(ide_drive_t *drive,
 {
 	ide_startstop_t startstop;
 	struct cdrom_info *info = drive->driver_data;
+	ide_hwif_t *hwif = drive->hwif;
 
 	/* Wait for the controller to be idle. */
 	if (ide_wait_stat(&startstop, drive, 0, BUSY_STAT, WAIT_READY))
 		return startstop;
 
-	if (info->dma) {
-		if (info->cmd == READ) {
-			info->dma = !HWIF(drive)->ide_dma_read(drive);
-		} else if (info->cmd == WRITE) {
-			info->dma = !HWIF(drive)->ide_dma_write(drive);
-		} else {
-			printk("ide-cd: DMA set, but not allowed\n");
-		}
-	}
+	if (info->dma)
+		info->dma = !hwif->dma_setup(drive);
 
 	/* Set up the controller registers. */
 	/* FIXME: for Virtual DMA we must check harder */
@@ -916,6 +910,7 @@ static ide_startstop_t cdrom_transfer_packet_command (ide_drive_t *drive,
 					  struct request *rq,
 					  ide_handler_t *handler)
 {
+	ide_hwif_t *hwif = drive->hwif;
 	int cmd_len;
 	struct cdrom_info *info = drive->driver_data;
 	ide_startstop_t startstop;
@@ -947,7 +942,7 @@ static ide_startstop_t cdrom_transfer_packet_command (ide_drive_t *drive,
 
 	/* Start the DMA if need be */
 	if (info->dma)
-		(void) HWIF(drive)->ide_dma_begin(drive);
+		hwif->dma_start(drive);
 
 	return ide_started;
 }

@@ -145,7 +145,7 @@ typedef enum {
 
 typedef union {
 	u_long		  ioport;
-	volatile uint8_t *maddr;
+	volatile uint8_t __iomem *maddr;
 } bus_space_handle_t;
 
 typedef struct bus_dma_segment

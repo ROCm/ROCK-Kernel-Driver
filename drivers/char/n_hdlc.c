@@ -103,9 +103,9 @@
 #include <linux/string.h>	/* used in new tty drivers */
 #include <linux/signal.h>	/* used in new tty drivers */
 #include <linux/if.h>
+#include <linux/bitops.h>
 
 #include <asm/system.h>
-#include <asm/bitops.h>
 #include <asm/termios.h>
 #include <asm/uaccess.h>
 
@@ -184,7 +184,7 @@ static ssize_t maxframe = 4096;
 static ssize_t n_hdlc_tty_read(struct tty_struct *tty, struct file *file,
 			   __u8 __user *buf, size_t nr);
 static ssize_t n_hdlc_tty_write(struct tty_struct *tty, struct file *file,
-			    const __u8 __user *buf, size_t nr);
+			    const unsigned char *buf, size_t nr);
 static int n_hdlc_tty_ioctl(struct tty_struct *tty, struct file *file,
 			    unsigned int cmd, unsigned long arg);
 static unsigned int n_hdlc_tty_poll(struct tty_struct *tty, struct file *filp,
@@ -402,7 +402,7 @@ static void n_hdlc_send_frames(struct n_hdlc *n_hdlc, struct tty_struct *tty)
 			
 		/* Send the next block of data to device */
 		tty->flags |= (1 << TTY_DO_WRITE_WAKEUP);
-		actual = tty->driver->write(tty, 0, tbuf->buf, tbuf->count);
+		actual = tty->driver->write(tty, tbuf->buf, tbuf->count);
 		    
 		/* if transmit error, throw frame away by */
 		/* pretending it was accepted by driver */
@@ -649,7 +649,7 @@ static ssize_t n_hdlc_tty_read(struct tty_struct *tty, struct file *file,
  * Returns the number of bytes written (or error code).
  */
 static ssize_t n_hdlc_tty_write(struct tty_struct *tty, struct file *file,
-			    const __u8 __user *data, size_t count)
+			    const unsigned char *data, size_t count)
 {
 	struct n_hdlc *n_hdlc = tty2n_hdlc (tty);
 	int error = 0;
@@ -704,16 +704,12 @@ static ssize_t n_hdlc_tty_write(struct tty_struct *tty, struct file *file,
 
 	if (!error) {		
 		/* Retrieve the user's buffer */
-		if (copy_from_user(tbuf->buf, data, count)) {
-			/* return tx buffer to free list */
-			n_hdlc_buf_put(&n_hdlc->tx_free_buf_list,tbuf);
-			error = -EFAULT;
-		} else {
-			/* Send the data */
-			tbuf->count = error = count;
-			n_hdlc_buf_put(&n_hdlc->tx_buf_list,tbuf);
-			n_hdlc_send_frames(n_hdlc,tty);
-		}
+		memcpy(tbuf->buf, data, count);
+
+		/* Send the data */
+		tbuf->count = error = count;
+		n_hdlc_buf_put(&n_hdlc->tx_buf_list,tbuf);
+		n_hdlc_send_frames(n_hdlc,tty);
 	}
 
 	return error;

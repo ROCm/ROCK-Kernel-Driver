@@ -3,7 +3,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000-2003 Silicon Graphics, Inc. All rights reserved.
+ * Copyright (C) 1992 - 1997, 2000-2004 Silicon Graphics, Inc. All rights reserved.
  */
 
 #ifndef _ASM_IA64_SN_ROUTER_H
@@ -17,10 +17,7 @@
 
 #ifndef __ASSEMBLY__
 
-#include <asm/sn/vector.h>
-#include <asm/sn/slotnum.h>
 #include <asm/sn/arch.h>
-#include <asm/sn/sgi.h>
 
 typedef uint64_t	router_reg_t;
 
@@ -411,7 +408,7 @@ typedef signed char port_no_t;	 /* Type for router port number      */
 typedef struct router_map_ent_s {
 	uint64_t	nic;
 	moduleid_t	module;
-	slotid_t	slot;
+	char		slot;
 } router_map_ent_t;
 
 struct rr_status_error_fmt {
@@ -479,16 +476,16 @@ typedef struct router_info_s {
 	char		ri_leds;	/* Current LED bitmap		    */
 	char		ri_portmask;	/* Active port bitmap		    */
 	router_reg_t	ri_stat_rev_id;	/* Status rev ID value		    */
-	net_vec_t	ri_vector;	/* vector from guardian to router   */
+	uint64_t	ri_vector;	/* vector from guardian to router   */
 	int		ri_writeid;	/* router's vector write ID	    */
 	int64_t	ri_timebase;	/* Time of first sample		    */
 	int64_t	ri_timestamp;	/* Time of last sample		    */
 	router_port_info_t ri_port[MAX_ROUTER_PORTS]; /* per port info      */
 	moduleid_t	ri_module;	/* Which module are we in?	    */
-	slotid_t	ri_slotnum;	/* Which slot are we in?	    */
+	char		ri_slotnum;	/* Which slot are we in?	    */
 	router_reg_t	ri_glbl_parms[GLBL_PARMS_REGS];
 					/* Global parms0&1 register contents*/
-	vertex_hdl_t	ri_vertex;	/* hardware graph vertex            */
+	void *		ri_vertex;	/* hardware graph vertex            */
 	router_reg_t	ri_prot_conf;	/* protection config. register	    */
 	int64_t	ri_per_minute;	/* Ticks per minute		    */
 
@@ -500,7 +497,7 @@ typedef struct router_info_s {
  	 * the bottom of the structure, below the user stuff.
 	 */
 	char		ri_hist_type;   /* histogram type		    */
-	vertex_hdl_t	ri_guardian;	/* guardian node for the router	    */
+	void *		ri_guardian;	/* guardian node for the router	    */
 	int64_t	ri_last_print;	/* When did we last print	    */
 	char		ri_print;	/* Should we print 		    */
 	char 		ri_just_blink;	/* Should we blink the LEDs         */
@@ -509,7 +506,7 @@ typedef struct router_info_s {
 	int64_t	ri_deltatime;	/* Time it took to sample	    */
 #endif
 	spinlock_t	ri_lock;	/* Lock for access to router info   */
-	net_vec_t	*ri_vecarray;	/* Pointer to array of vectors	    */
+	uint64_t	*ri_vecarray;	/* Pointer to array of vectors	    */
 	struct lboard_s	*ri_brd;	/* Pointer to board structure	    */
 	char *		ri_name;	/* This board's hwg path 	    */
         unsigned char	ri_port_maint[MAX_ROUTER_PORTS]; /* should we send a 
@@ -526,13 +523,13 @@ typedef struct router_info_s {
  * Router info hanging in the nodepda 
  */
 typedef struct nodepda_router_info_s {
-	vertex_hdl_t 	router_vhdl;	/* vertex handle of the router 	    */
+	void *	 	router_vhdl;	/* vertex handle of the router 	    */
 	short		router_port;	/* port thru which we entered       */
 	short		router_portmask;
 	moduleid_t	router_module;	/* module in which router is there  */
-	slotid_t	router_slot;	/* router slot			    */
+	char		router_slot;	/* router slot			    */
 	unsigned char	router_type;	/* kind of router 		    */
-	net_vec_t	router_vector;	/* vector from the guardian node    */
+	uint64_t	router_vector;	/* vector from the guardian node    */
 
 	router_info_t	*router_infop;	/* info hanging off the hwg vertex  */
 	struct nodepda_router_info_s *router_next;
@@ -560,7 +557,7 @@ typedef struct router_elt_s {
 			/* vector route from the master hub to 
 			 * this router.
 			 */
-			net_vec_t	vec;	
+			uint64_t	vec;	
 			/* port status */
 			uint64_t	status;	
 			char		port_status[MAX_ROUTER_PORTS + 1];
@@ -570,11 +567,11 @@ typedef struct router_elt_s {
 		 */
 		struct {
 			/* vertex handle for the router */
-			vertex_hdl_t	vhdl;
+			void *		vhdl;
 			/* guardian for this router */
-			vertex_hdl_t	guard;	
+			void *		guard;	
 			/* vector router from the guardian to the router */
-			net_vec_t	vec;
+			uint64_t	vec;
 		} k_elt;
 	} u;
 	                        /* easy to use port status interpretation */
@@ -617,25 +614,5 @@ typedef struct router_queue_s {
 
 #define RTABLE_SHFT(_L)		(4 * ((_L) - 1))
 #define RTABLE_MASK(_L)		(0x7UL << RTABLE_SHFT(_L))
-
-
-#define	ROUTERINFO_STKSZ	4096
-
-#ifndef __ASSEMBLY__
-
-int router_reg_read(router_info_t *rip, int regno, router_reg_t *val);
-int router_reg_write(router_info_t *rip, int regno, router_reg_t val);
-int router_get_info(vertex_hdl_t routerv, router_info_t *, int);
-int router_set_leds(router_info_t *rip);
-void router_print_state(router_info_t *rip, int level,
-		   void (*pf)(int, char *, ...),int print_where);
-void capture_router_stats(router_info_t *rip);
-
-
-int 	probe_routers(void);
-void 	get_routername(unsigned char brd_type,char *rtrname);
-void 	router_guardians_set(vertex_hdl_t hwgraph_root);
-int 	router_hist_reselect(router_info_t *, int64_t);
-#endif /* __ASSEMBLY__ */
 
 #endif /* _ASM_IA64_SN_ROUTER_H */

@@ -102,8 +102,8 @@ static int options[] = {-1, -1, -1, -1, -1, -1, -1, -1};
 #include <linux/init.h>
 #include <linux/mii.h>
 #include <linux/delay.h>
+#include <linux/bitops.h>
 
-#include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>
 #include <asm/irq.h>
@@ -490,9 +490,6 @@ struct speedo_private {
 	unsigned short partner;			/* Link partner caps. */
 	struct mii_if_info mii_if;		/* MII API hooks, info */
 	u32 msg_enable;				/* debug message level */
-#ifdef CONFIG_PM
-	u32 pm_state[16];
-#endif
 };
 
 /* The parameters for a CmdConfigure operation.
@@ -2320,7 +2317,7 @@ static int eepro100_suspend(struct pci_dev *pdev, u32 state)
 	struct speedo_private *sp = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 
-	pci_save_state(pdev, sp->pm_state);
+	pci_save_state(pdev);
 
 	if (!netif_running(dev))
 		return 0;
@@ -2340,7 +2337,7 @@ static int eepro100_resume(struct pci_dev *pdev)
 	struct speedo_private *sp = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 
-	pci_restore_state(pdev, sp->pm_state);
+	pci_restore_state(pdev);
 
 	if (!netif_running(dev))
 		return 0;

@@ -31,6 +31,7 @@
 
 #include <linux/types.h>
 #include <linux/pci.h>
+#include <linux/delay.h>
 #include <asm/semaphore.h>
 #include <asm/io.h>		
 #include "pci_hotplug.h"
@@ -261,14 +262,12 @@ static inline int wait_for_ctrl_irq(struct controller *ctrl)
 
 	dbg("%s : start\n", __FUNCTION__);
 	add_wait_queue(&ctrl->queue, &wait);
-	set_current_state(TASK_INTERRUPTIBLE);
-	if (!pciehp_poll_mode) {
+	if (!pciehp_poll_mode)
 		/* Sleep for up to 1 second */
-		schedule_timeout(1*HZ);
-	} else
-		schedule_timeout(2.5*HZ);
+		msleep_interruptible(1000);
+	else
+		msleep_interruptible(2500);
 	
-	set_current_state(TASK_RUNNING);
 	remove_wait_queue(&ctrl->queue, &wait);
 	if (signal_pending(current))
 		retval =  -EINTR;

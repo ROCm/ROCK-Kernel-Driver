@@ -83,8 +83,8 @@
 #include <linux/init.h>
 #include <linux/pci.h>
 #include <linux/types.h>
+#include <linux/bitops.h>
 
-#include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/pgtable.h>
 #include <asm/irq.h>

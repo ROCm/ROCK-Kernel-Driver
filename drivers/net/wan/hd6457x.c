@@ -38,9 +38,9 @@
 #include <linux/errno.h>
 #include <linux/init.h>
 #include <linux/ioport.h>
+#include <linux/bitops.h>
 
 #include <asm/system.h>
-#include <asm/bitops.h>
 #include <asm/uaccess.h>
 #include <asm/io.h>
 

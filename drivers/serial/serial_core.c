@@ -528,8 +528,7 @@ static void uart_flush_chars(struct tty_struct *tty)
 }
 
 static int
-uart_write(struct tty_struct *tty, int from_user, const unsigned char * buf,
-	   int count)
+uart_write(struct tty_struct *tty, const unsigned char * buf, int count)
 {
 	struct uart_state *state = tty->driver_data;
 	int ret;
@@ -537,12 +536,8 @@ uart_write(struct tty_struct *tty, int from_user, const unsigned char * buf,
 	if (!state->info->xmit.buf)
 		return 0;
 
-	if (from_user)
-		ret = __uart_user_write(state->port, &state->info->xmit,
-				(const unsigned char __user *)buf, count);
-	else
-		ret = __uart_kern_write(state->port, &state->info->xmit,
-					buf, count);
+	ret = __uart_kern_write(state->port, &state->info->xmit,
+				buf, count);
 
 	uart_start(tty);
 	return ret;
@@ -2224,6 +2219,15 @@ int uart_add_one_port(struct uart_driver *drv, struct uart_port *port)
 	 * setserial to be used to alter this ports parameters.
 	 */
 	tty_register_device(drv->tty_driver, port->line, port->dev);
+
+	/*
+	 * If this driver supports console, and it hasn't been
+	 * successfully registered yet, try to re-register it.
+	 * It may be that the port was not available.
+	 */
+	if (port->type != PORT_UNKNOWN &&
+	    port->cons && !(port->cons->flags & CON_ENABLED))
+		register_console(port->cons);
 
  out:
 	up(&port_sem);

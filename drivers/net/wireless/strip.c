@@ -85,9 +85,9 @@ static const char StripVersion[] = "1.3A-STUART.CHESHIRE";
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/init.h>
+#include <linux/bitops.h>
 #include <asm/system.h>
 #include <asm/uaccess.h>
-#include <asm/bitops.h>
 
 # include <linux/ctype.h>
 #include <linux/string.h>
@@ -1250,7 +1250,7 @@ static void ResetRadio(struct strip *strip_info)
 			set_baud(tty, strip_info->user_baud);
 	}
 
-	tty->driver->write(tty, 0, s.string, s.length);
+	tty->driver->write(tty, s.string, s.length);
 #ifdef EXT_COUNTERS
 	strip_info->tx_ebytes += s.length;
 #endif
@@ -1272,7 +1272,7 @@ static void strip_write_some_more(struct tty_struct *tty)
 
 	if (strip_info->tx_left > 0) {
 		int num_written =
-		    tty->driver->write(tty, 0, strip_info->tx_head,
+		    tty->driver->write(tty, strip_info->tx_head,
 				      strip_info->tx_left);
 		strip_info->tx_left -= num_written;
 		strip_info->tx_head += num_written;

@@ -9,7 +9,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: compr.c,v 1.41 2004/06/24 09:51:38 havasi Exp $
+ * $Id: compr.c,v 1.42 2004/08/07 21:56:08 dwmw2 Exp $
  *
  */
 
@@ -180,6 +180,11 @@ int jffs2_decompress(struct jffs2_sb_info *c, struct jffs2_inode_info *f,
         struct jffs2_compressor *this;
         int ret;
 
+	/* Older code had a bug where it would write non-zero 'usercompr'
+	   fields. Deal with it. */
+	if ((comprtype & 0xff) <= JFFS2_COMPR_ZLIB)
+		comprtype &= 0xff;
+
 	switch (comprtype & 0xff) {
 	case JFFS2_COMPR_NONE:
 		/* This should be special-cased elsewhere, but we might as well deal with it */
@@ -208,7 +213,7 @@ int jffs2_decompress(struct jffs2_sb_info *c, struct jffs2_inode_info *f,
                                 return ret;
                         }
                 }
-		printk(KERN_WARNING "JFFS2 compression type 0x%02x not avaiable.\n", comprtype);
+		printk(KERN_WARNING "JFFS2 compression type 0x%02x not available.\n", comprtype);
                 spin_unlock(&jffs2_compressor_list_lock);
 		return -EIO;
 	}

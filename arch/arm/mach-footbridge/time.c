@@ -19,74 +19,17 @@
 
 #include <linux/timex.h>
 #include <linux/init.h>
-#include <linux/interrupt.h>
 #include <linux/sched.h>
 #include <linux/mc146818rtc.h>
 #include <linux/bcd.h>
 
-#include <asm/hardware/dec21285.h>
-
 #include <asm/hardware.h>
-#include <asm/irq.h>
-#include <asm/leds.h>
-#include <asm/mach-types.h>
 #include <asm/io.h>
-#include <asm/hardware/clps7111.h>
 
 #include <asm/mach/time.h>
+#include "common.h"
 
 static int rtc_base;
-
-#define mSEC_10_from_14 ((14318180 + 100) / 200)
-
-static unsigned long isa_gettimeoffset(void)
-{
-	int count;
-
-	static int count_p = (mSEC_10_from_14/6);    /* for the first call after boot */
-	static unsigned long jiffies_p = 0;
-
-	/*
-	 * cache volatile jiffies temporarily; we have IRQs turned off. 
-	 */
-	unsigned long jiffies_t;
-
-	/* timer count may underflow right here */
-	outb_p(0x00, 0x43);	/* latch the count ASAP */
-
-	count = inb_p(0x40);	/* read the latched count */
-
-	/*
-	 * We do this guaranteed double memory access instead of a _p 
-	 * postfix in the previous port access. Wheee, hackady hack
-	 */
- 	jiffies_t = jiffies;
-
-	count |= inb_p(0x40) << 8;
-
-	/* Detect timer underflows.  If we haven't had a timer tick since 
-	   the last time we were called, and time is apparently going
-	   backwards, the counter must have wrapped during this routine. */
-	if ((jiffies_t == jiffies_p) && (count > count_p))
-		count -= (mSEC_10_from_14/6);
-	else
-		jiffies_p = jiffies_t;
-
-	count_p = count;
-
-	count = (((mSEC_10_from_14/6)-1) - count) * (tick_nsec / 1000);
-	count = (count + (mSEC_10_from_14/6)/2) / (mSEC_10_from_14/6);
-
-	return count;
-}
-
-static irqreturn_t
-isa_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
-{
-	timer_tick(regs);
-
-	return IRQ_HANDLED;
-}
 
 static unsigned long __init get_isa_cmos_time(void)
 {
@@ -133,8 +76,7 @@ static unsigned long __init get_isa_cmos_time(void)
 	return mktime(year, mon, day, hour, min, sec);
 }
 
-static int
-set_isa_cmos_time(void)
+static int set_isa_cmos_time(void)
 {
 	int retval = 0;
 	int real_seconds, real_minutes, cmos_minutes;
@@ -186,34 +128,7 @@ set_isa_cmos_time(void)
 	return retval;
 }
 
-
-static unsigned long timer1_latch;
-
-static unsigned long timer1_gettimeoffset (void)
-{
-	unsigned long value = timer1_latch - *CSR_TIMER1_VALUE;
-
-	return ((tick_nsec / 1000) * value) / timer1_latch;
-}
-
-static irqreturn_t
-timer1_interrupt(int irq, void *dev_id, struct pt_regs *regs)
-{
-	*CSR_TIMER1_CLR = 0;
-
-	timer_tick(regs);
-
-	return IRQ_HANDLED;
-}
-
-static struct irqaction footbridge_timer_irq = {
-	.flags	= SA_INTERRUPT
-};
-
-/*
- * Set up timer interrupt.
- */
-void __init footbridge_init_time(void)
+void __init isa_rtc_init(void)
 {
 	if (machine_is_co285() ||
 	    machine_is_personal_server())
@@ -261,36 +176,5 @@ void __init footbridge_init_time(void)
 			set_rtc = set_isa_cmos_time;
 		} else
 			rtc_base = 0;
-	}
-
-	if (machine_is_ebsa285() ||
-	    machine_is_co285() ||
-	    machine_is_personal_server()) {
-		gettimeoffset = timer1_gettimeoffset;
-
-		timer1_latch = (mem_fclk_21285 + 8 * HZ) / (16 * HZ);
-
-		*CSR_TIMER1_CLR  = 0;
-		*CSR_TIMER1_LOAD = timer1_latch;
-		*CSR_TIMER1_CNTL = TIMER_CNTL_ENABLE | TIMER_CNTL_AUTORELOAD | TIMER_CNTL_DIV16;
-
-		footbridge_timer_irq.name = "Timer1 Timer Tick";
-		footbridge_timer_irq.handler = timer1_interrupt;
-		
-		setup_irq(IRQ_TIMER1, &footbridge_timer_irq);
-
-	} else {
-		/* enable PIT timer */
-		/* set for periodic (4) and LSB/MSB write (0x30) */
-		outb(0x34, 0x43);
-		outb((mSEC_10_from_14/6) & 0xFF, 0x40);
-		outb((mSEC_10_from_14/6) >> 8, 0x40);
-
-		gettimeoffset = isa_gettimeoffset;
-
-		footbridge_timer_irq.name = "ISA Timer Tick";
-		footbridge_timer_irq.handler = isa_timer_interrupt;
-		
-		setup_irq(IRQ_ISA_TIMER, &footbridge_timer_irq);
 	}
 }

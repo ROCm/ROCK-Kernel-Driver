@@ -24,8 +24,8 @@
 #include <linux/mm.h>
 #include <linux/swap.h>
 #include <linux/smp.h>
+#include <linux/bitops.h>
 
-#include <asm/bitops.h>
 #include <asm/pgtable.h>
 
 #define PEDANTIC

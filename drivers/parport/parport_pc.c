@@ -3016,10 +3016,10 @@ static int __init parport_pc_find_ports (int autoirq, int autodma)
 	count += parport_pc_find_nonpci_ports (autoirq, autodma);
 
 	r = pci_register_driver (&parport_pc_pci_driver);
-	if (r >= 0) {
-		pci_registered_parport = 1;
-		count += r;
-	}
+	if (r)
+		return r;
+	pci_registered_parport = 1;
+	count += 1;
 
 	return count;
 }

@@ -193,8 +193,8 @@ static const int multicast_filter_limit = 32;
 #include <linux/mii.h>
 #include <linux/ethtool.h>
 #include <linux/crc32.h>
+#include <linux/bitops.h>
 #include <asm/processor.h>	/* Processor type for cache alignment. */
-#include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/uaccess.h>
@@ -1951,7 +1951,7 @@ static int rhine_suspend(struct pci_dev *pdev, u32 state)
 		return 0;
 
 	netif_device_detach(dev);
-	pci_save_state(pdev, pdev->saved_config_space);
+	pci_save_state(pdev);
 
 	spin_lock_irqsave(&rp->lock, flags);
 	rhine_shutdown(&pdev->dev);
@@ -1975,7 +1975,7 @@ static int rhine_resume(struct pci_dev *pdev)
 		printk(KERN_INFO "%s: Entering power state D0 %s (%d).\n",
 			dev->name, ret ? "failed" : "succeeded", ret);
 
-	pci_restore_state(pdev, pdev->saved_config_space);
+	pci_restore_state(pdev);
 
 	spin_lock_irqsave(&rp->lock, flags);
 #ifdef USE_MMIO

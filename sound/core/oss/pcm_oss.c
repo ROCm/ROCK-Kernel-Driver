@@ -47,14 +47,13 @@
 static int dsp_map[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS-1)] = 0};
 static int adsp_map[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS-1)] = 1};
 static int nonblock_open;
-static int boot_devs;
 
 MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>, Abramo Bagnara <abramo@alsa-project.org>");
 MODULE_DESCRIPTION("PCM OSS emulation for ALSA.");
 MODULE_LICENSE("GPL");
-module_param_array(dsp_map, int, boot_devs, 0444);
+module_param_array(dsp_map, int, NULL, 0444);
 MODULE_PARM_DESC(dsp_map, "PCM device number assigned to 1st OSS device.");
-module_param_array(adsp_map, int, boot_devs, 0444);
+module_param_array(adsp_map, int, NULL, 0444);
 MODULE_PARM_DESC(adsp_map, "PCM device number assigned to 2nd OSS device.");
 module_param(nonblock_open, bool, 0644);
 MODULE_PARM_DESC(nonblock_open, "Don't block opening busy PCM devices.");

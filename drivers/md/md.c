@@ -3395,7 +3395,7 @@ static void md_do_sync(mddev_t *mddev)
 	 * Tune reconstruction:
 	 */
 	window = 32*(PAGE_SIZE/512);
-	printk(KERN_INFO "md: using %dk window, over a total of %Lu blocks.\n",
+	printk(KERN_INFO "md: using %dk window, over a total of %llu blocks.\n",
 		window/2,(unsigned long long) max_sectors/2);
 
 	atomic_set(&mddev->recovery_active, 0);

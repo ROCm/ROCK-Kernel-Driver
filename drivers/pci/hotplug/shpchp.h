@@ -31,6 +31,7 @@
 
 #include <linux/types.h>
 #include <linux/pci.h>
+#include <linux/delay.h>
 #include <asm/semaphore.h>
 #include <asm/io.h>		
 #include "pci_hotplug.h"
@@ -311,7 +312,7 @@ struct php_ctlr_state_s {
 	php_intr_callback_t presence_change_callback;
 	php_intr_callback_t power_fault_callback;
 	void *callback_instance_id;
-	void *creg;				/* Ptr to controller register space */
+	void __iomem *creg;			/* Ptr to controller register space */
 };
 /* Inline functions */
 
@@ -381,16 +382,14 @@ static inline int wait_for_ctrl_irq (struct controller *ctrl)
 	dbg("%s : start\n",__FUNCTION__);
 
 	add_wait_queue(&ctrl->queue, &wait);
-	set_current_state(TASK_INTERRUPTIBLE);
 
 	if (!shpchp_poll_mode) {
 		/* Sleep for up to 1 second */
-		schedule_timeout(1*HZ);
+		msleep_interruptible(1000);
 	} else {
 		/* Sleep for up to 2 seconds */
-		schedule_timeout(2*HZ);
+		msleep_interruptible(2000);
 	}
-	set_current_state(TASK_RUNNING);
 	remove_wait_queue(&ctrl->queue, &wait);
 	if (signal_pending(current))
 		retval =  -EINTR;

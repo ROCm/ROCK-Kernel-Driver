@@ -42,12 +42,12 @@
 #include <linux/pci.h>
 #include <linux/fs.h>
 #include <linux/poll.h>
-#include <linux/irq.h>
 #include <linux/kdev_t.h>
 #include <asm/byteorder.h>
 #include <asm/atomic.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>
+#include <asm/irq.h>
 
 #include "csr1212.h"
 #include "ieee1394.h"

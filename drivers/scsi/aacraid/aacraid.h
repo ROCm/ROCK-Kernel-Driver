@@ -863,9 +863,9 @@ struct aac_dev
 	 */
 	union
 	{
-		struct sa_registers *sa;
-		struct rx_registers *rx;
-		struct rkt_registers *rkt;
+		struct sa_registers __iomem *sa;
+		struct rx_registers __iomem *rx;
+		struct rkt_registers __iomem *rkt;
 	} regs;
 	u32			OIMR; /* Mask Register Cache */
 	/*

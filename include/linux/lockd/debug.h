@@ -45,4 +45,13 @@
 #define NLMDBG_ALL		0x7fff
 
 
+/*
+ * Support for printing NLM cookies in dprintk()
+ */
+#ifdef RPC_DEBUG
+struct nlm_cookie;
+/* Call this function with the BKL held (it uses a static buffer) */
+extern const char *nlmdbg_cookie2a(const struct nlm_cookie *);
+#endif
+
 #endif /* LINUX_LOCKD_DEBUG_H */

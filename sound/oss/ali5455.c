@@ -311,7 +311,6 @@ struct ali_card {
 	u16 pci_id;
 #ifdef CONFIG_PM
 	u16 pm_suspended;
-	u32 pm_save_state[64 / sizeof(u32)];
 	int pm_saved_mixer_settings[SOUND_MIXER_NRDEVICES][NR_AC97];
 #endif
 	/* soundcore stuff */
@@ -934,7 +933,7 @@ static int alloc_dmabuf(struct ali_state *state)
 	dmabuf->rawbuf = rawbuf;
 	dmabuf->buforder = order;
 
-	/* now mark the pages as reserved; otherwise remap_page_range doesn't do what we want */
+	/* now mark the pages as reserved; otherwise remap_pfn_range doesn't do what we want */
 	pend = virt_to_page(rawbuf + (PAGE_SIZE << order) - 1);
 	for (page = virt_to_page(rawbuf); page <= pend; page++)
 		SetPageReserved(page);
@@ -1955,7 +1954,9 @@ static int ali_mmap(struct file *file, struct vm_area_struct *vma)
 	if (size > (PAGE_SIZE << dmabuf->buforder))
 		goto out;
 	ret = -EAGAIN;
-	if (remap_page_range(vma, vma->vm_start, virt_to_phys(dmabuf->rawbuf), size, vma->vm_page_prot))
+	if (remap_pfn_range(vma, vma->vm_start,
+				virt_to_phys(dmabuf->rawbuf) >> PAGE_SHIFT,
+				size, vma->vm_page_prot))
 		goto out;
 	dmabuf->mapped = 1;
 	dmabuf->trigger = 0;
@@ -3576,7 +3577,7 @@ static int ali_pm_suspend(struct pci_dev *dev, u32 pm_state)
 			}
 		}
 	}
-	pci_save_state(dev, card->pm_save_state);	/* XXX do we need this? */
+	pci_save_state(dev);	/* XXX do we need this? */
 	pci_disable_device(dev);	/* disable busmastering */
 	pci_set_power_state(dev, 3);	/* Zzz. */
 	return 0;
@@ -3588,7 +3589,7 @@ static int ali_pm_resume(struct pci_dev *dev)
 	int num_ac97, i = 0;
 	struct ali_card *card = pci_get_drvdata(dev);
 	pci_enable_device(dev);
-	pci_restore_state(dev, card->pm_save_state);
+	pci_restore_state(dev);
 	/* observation of a toshiba portege 3440ct suggests that the 
 	   hardware has to be more or less completely reinitialized from
 	   scratch after an apm suspend.  Works For Me.   -dan */
@@ -3714,11 +3715,7 @@ static int __init ali_init_module(void)
 			controller_pcmout_share_spdif_locked = 0;
 		}
 	}
-	if (!pci_register_driver(&ali_pci_driver)) {
-		pci_unregister_driver(&ali_pci_driver);
-		return -ENODEV;
-	}
-	return 0;
+	return pci_register_driver(&ali_pci_driver);
 }
 
 static void __exit ali_cleanup_module(void)

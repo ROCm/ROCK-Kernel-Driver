@@ -1739,10 +1739,6 @@ struct velocity_info {
 	struct net_device *dev;
 	struct net_device_stats stats;
 
-#ifdef CONFIG_PM
-	u32 pci_state[16];
-#endif
-
 	dma_addr_t rd_pool_dma;
 	dma_addr_t td_pool_dma[TX_QUEUE_NO];
 

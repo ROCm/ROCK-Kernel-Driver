@@ -176,7 +176,8 @@ static int page_map_mmap( struct file *file, struct vm_area_struct *vma )
 	if ((vma->vm_end - vma->vm_start) > dp->size)
 		return -EINVAL;
 
-	remap_page_range( vma, vma->vm_start, __pa(dp->data), dp->size, vma->vm_page_prot );
+	remap_pfn_range(vma, vma->vm_start, __pa(dp->data) >> PAGE_SHIFT,
+						dp->size, vma->vm_page_prot);
 	return 0;
 }
 

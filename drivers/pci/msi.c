@@ -66,7 +66,7 @@ static void msi_set_mask_bit(unsigned int vector, int flag)
 		int		pos;
 		u32		mask_bits;
 
-		pos = entry->mask_base;
+		pos = (int)entry->mask_base;
 		pci_read_config_dword(entry->dev, pos, &mask_bits);
 		mask_bits &= ~(1);
 		mask_bits |= flag;
@@ -548,7 +548,7 @@ static int msi_capability_init(struct pci_dev *dev)
 	dev->irq = vector;
 	entry->dev = dev;
 	if (is_mask_bit_support(control)) {
-		entry->mask_base = msi_mask_bits_reg(pos,
+		entry->mask_base = (void __iomem *)msi_mask_bits_reg(pos,
 				is_64bit_address(control));
 	}
 	/* Replace with MSI handler */
@@ -606,7 +606,7 @@ static int msix_capability_init(struct pci_dev *dev,
 	u32 phys_addr, table_offset;
  	u16 control;
 	u8 bir;
-	void *base;
+	void __iomem *base;
 
    	pos = pci_find_capability(dev, PCI_CAP_ID_MSIX);
 	/* Request & Map MSI-X table region */
@@ -642,7 +642,7 @@ static int msix_capability_init(struct pci_dev *dev,
 		entry->msi_attrib.maskbit = 1;
 		entry->msi_attrib.default_vector = dev->irq;
 		entry->dev = dev;
-		entry->mask_base = (unsigned long)base;
+		entry->mask_base = base;
 		if (!head) {
 			entry->link.head = vector;
 			entry->link.tail = vector;
@@ -806,7 +806,7 @@ static int msi_free_vector(struct pci_dev* dev, int vector, int reassign)
 {
 	struct msi_desc *entry;
 	int head, entry_nr, type;
-	unsigned long base = 0L;
+	void __iomem *base;
 	unsigned long flags;
 
 	spin_lock_irqsave(&msi_lock, flags);
@@ -857,7 +857,7 @@ static int msi_free_vector(struct pci_dev* dev, int vector, int reassign)
 			phys_addr = pci_resource_start (dev, bir);
 			phys_addr += (u32)(table_offset &
 				~PCI_MSIX_FLAGS_BIRMASK);
-			iounmap((void*)base);
+			iounmap(base);
 			release_mem_region(phys_addr,
 				nr_entries * PCI_MSIX_ENTRY_SIZE);
 		}
@@ -869,8 +869,8 @@ static int msi_free_vector(struct pci_dev* dev, int vector, int reassign)
 static int reroute_msix_table(int head, struct msix_entry *entries, int *nvec)
 {
 	int vector = head, tail = 0;
-	int i = 0, j = 0, nr_entries = 0;
-	unsigned long base = 0L;
+	int i, j = 0, nr_entries = 0;
+	void __iomem *base;
 	unsigned long flags;
 
 	spin_lock_irqsave(&msi_lock, flags);
@@ -1099,7 +1099,7 @@ void msi_remove_pci_irq_vectors(struct pci_dev* dev)
    	if ((pos = pci_find_capability(dev, PCI_CAP_ID_MSIX)) > 0 &&
 		!msi_lookup_vector(dev, PCI_CAP_ID_MSIX)) {
 		int vector, head, tail = 0, warning = 0;
-		unsigned long base = 0L;
+		void __iomem *base = NULL;
 
 		vector = head = dev->irq;
 		while (head != tail) {
@@ -1129,7 +1129,7 @@ void msi_remove_pci_irq_vectors(struct pci_dev* dev)
 			phys_addr = pci_resource_start (dev, bir);
 			phys_addr += (u32)(table_offset &
 				~PCI_MSIX_FLAGS_BIRMASK);
-			iounmap((void*)base);
+			iounmap(base);
 			release_mem_region(phys_addr, PCI_MSIX_ENTRY_SIZE *
 				multi_msix_capable(control));
 			printk(KERN_DEBUG "Driver[%d:%d:%d] unloaded wo doing free_irq on all vectors\n",

@@ -30,14 +30,12 @@
  * the project's page is at http://www.linuxtv.org/dvb/
  */
 
-#include <media/saa7146_vv.h>
-
 #include "budget.h"
-#include "dvb_functions.h"
+#include <media/saa7146_vv.h>
 
 struct budget_av {
 	struct budget budget;
-	struct video_device vd;
+	struct video_device *vd;
 	int cur_input;
 	int has_saa7113;
 };
@@ -47,7 +45,7 @@ struct budget_av {
  ****************************************************************************/
 
 
-static u8 i2c_readreg (struct dvb_i2c_bus *i2c, u8 id, u8 reg)
+static u8 i2c_readreg (struct i2c_adapter *i2c, u8 id, u8 reg)
 {
 	u8 mm1[] = {0x00};
 	u8 mm2[] = {0x00};
@@ -60,12 +58,12 @@ static u8 i2c_readreg (struct dvb_i2c_bus *i2c, u8 id, u8 reg)
 	msgs[0].len = 1; msgs[1].len = 1;
 	msgs[0].buf = mm1; msgs[1].buf = mm2;
 
-	i2c->xfer(i2c, msgs, 2);
+	i2c_transfer(i2c, msgs, 2);
 
 	return mm2[0];
 }
 
-static int i2c_readregs(struct dvb_i2c_bus *i2c, u8 id, u8 reg, u8 *buf, u8 len)
+static int i2c_readregs(struct i2c_adapter *i2c, u8 id, u8 reg, u8 *buf, u8 len)
 {
         u8 mm1[] = { reg };
         struct i2c_msg msgs[2] = {
@@ -73,13 +71,14 @@ static int i2c_readregs(struct dvb_i2c_bus *i2c, u8 id, u8 reg, u8 *buf, u8 len)
 		{ .addr = id/2, .flags = I2C_M_RD, .buf = buf, .len = len }
 	};
 
-        if (i2c->xfer(i2c, msgs, 2) != 2)
+        if (i2c_transfer(i2c, msgs, 2) != 2)
 		return -EIO;
+
 	return 0;
 }
 
 
-static int i2c_writereg (struct dvb_i2c_bus *i2c, u8 id, u8 reg, u8 val)
+static int i2c_writereg (struct i2c_adapter *i2c, u8 id, u8 reg, u8 val)
 {
         u8 msg[2]={ reg, val }; 
         struct i2c_msg msgs;
@@ -88,7 +87,7 @@ static int i2c_writereg (struct dvb_i2c_bus *i2c, u8 id, u8 reg, u8 val)
         msgs.addr=id/2;
         msgs.len=2;
         msgs.buf=msg;
-        return i2c->xfer (i2c, &msgs, 1);
+        return i2c_transfer(i2c, &msgs, 1);
 }
 
 
@@ -127,7 +126,7 @@ static int saa7113_init (struct budget_av *budget_av)
 	struct budget *budget = &budget_av->budget;
 	const u8 *data = saa7113_tab;
 
-        if (i2c_writereg (budget->i2c_bus, 0x4a, 0x01, 0x08) != 1) {
+        if (i2c_writereg (&budget->i2c_adap, 0x4a, 0x01, 0x08) != 1) {
                 DEB_D(("saa7113: not found on KNC card\n"));
                 return -ENODEV;
         }
@@ -135,12 +134,12 @@ static int saa7113_init (struct budget_av *budget_av)
         INFO(("saa7113: detected and initializing\n"));
 
 	while (*data != 0xff) {
-                i2c_writereg(budget->i2c_bus, 0x4a, *data, *(data+1));
+                i2c_writereg(&budget->i2c_adap, 0x4a, *data, *(data+1));
                 data += 2;
         }
 
 	DEB_D(("saa7113: status=%02x\n",
-	      i2c_readreg(budget->i2c_bus, 0x4a, 0x1f)));
+	      i2c_readreg(&budget->i2c_adap, 0x4a, 0x1f)));
 
 	return 0;
 }
@@ -154,11 +153,11 @@ static int saa7113_setinput (struct budget_av *budget_av, int input)
 		return -ENODEV;
 
 	if (input == 1) {
-		i2c_writereg(budget->i2c_bus, 0x4a, 0x02, 0xc7);
-		i2c_writereg(budget->i2c_bus, 0x4a, 0x09, 0x80);
+		i2c_writereg(&budget->i2c_adap, 0x4a, 0x02, 0xc7);
+		i2c_writereg(&budget->i2c_adap, 0x4a, 0x09, 0x80);
 	} else if (input == 0) {
-		i2c_writereg(budget->i2c_bus, 0x4a, 0x02, 0xc0);
-		i2c_writereg(budget->i2c_bus, 0x4a, 0x09, 0x00);
+		i2c_writereg(&budget->i2c_adap, 0x4a, 0x02, 0xc0);
+		i2c_writereg(&budget->i2c_adap, 0x4a, 0x09, 0x00);
 	} else
 		return -EINVAL;
 
@@ -177,7 +176,7 @@ static int budget_av_detach (struct saa7146_dev *dev)
 	if ( 1 == budget_av->has_saa7113 ) {
 	saa7146_setgpio(dev, 0, SAA7146_GPIO_OUTLO);
 
-	dvb_delay(200);
+		msleep(200);
 
 	saa7146_unregister_device (&budget_av->vd, dev);
 	}
@@ -201,7 +200,7 @@ static int budget_av_attach (struct saa7146_dev* dev,
 
 	DEB_EE(("dev: %p\n",dev));
 
-	if (bi->type != BUDGET_KNC1) {
+	if (bi->type != BUDGET_KNC1 && bi->type != BUDGET_CIN1200) {
 		return -ENODEV;
 	}
 
@@ -210,12 +209,12 @@ static int budget_av_attach (struct saa7146_dev* dev,
 
 	memset(budget_av, 0, sizeof(struct budget_av));
 
+	dev->ext_priv = budget_av;
+
 	if ((err = ttpci_budget_init(&budget_av->budget, dev, info))) {
 		kfree(budget_av);
 		return err;
 	}
-
-	dev->ext_priv = budget_av;
 
 	/* knc1 initialization */
 	saa7146_write(dev, DD1_STREAM_B, 0x04000000);
@@ -225,7 +224,7 @@ static int budget_av_attach (struct saa7146_dev* dev,
 	//test_knc_ci(av7110);
 
 	saa7146_setgpio(dev, 0, SAA7146_GPIO_OUTHI);
-	dvb_delay(500);
+	msleep(500);
 
 	if ( 0 == saa7113_init(budget_av) ) {
 		budget_av->has_saa7113 = 1;
@@ -259,7 +258,7 @@ static int budget_av_attach (struct saa7146_dev* dev,
 	saa7146_write(dev, PCI_BT_V1, 0x1c00101f);
 
 	mac = budget_av->budget.dvb_adapter->proposed_mac;
-	if (i2c_readregs(budget_av->budget.i2c_bus, 0xa0, 0x30, mac, 6)) {
+	if (i2c_readregs(&budget_av->budget.i2c_adap, 0xa0, 0x30, mac, 6)) {
 		printk("KNC1-%d: Could not read MAC from KNC1 card\n",
 				budget_av->budget.dvb_adapter->num);
 		memset(mac, 0, 6);
@@ -361,9 +360,11 @@ static struct saa7146_extension budget_extension;
 
 
 MAKE_BUDGET_INFO(knc1, "KNC1 DVB-S", BUDGET_KNC1);
+MAKE_BUDGET_INFO(cin1200, "TerraTec Cinergy 1200 DVB-S", BUDGET_CIN1200);
 
 static struct pci_device_id pci_tbl [] = {
 	MAKE_EXTENSION_PCI(knc1, 0x1131, 0x4f56),
+	MAKE_EXTENSION_PCI(cin1200, 0x153b, 0x1154),
 	{
 		.vendor    = 0,
 	}

@@ -23,7 +23,8 @@ extern void s3c2410_init_uarts(struct s3c2410_uartcfg *, int no);
 
 extern void s3c2410_init_irq(void);
 
-extern void s3c2410_init_time(void);
+struct sys_timer;
+extern struct sys_timer s3c2410_timer;
 
 /* the board structure is used at first initialsation time
  * to get info such as the devices to register for this

@@ -27,12 +27,6 @@
 #include <linux/blkdev.h>
 #include <linux/cdrom.h>
 #include <asm/uaccess.h>
-#include <scsi/scsi.h>
-
-typedef struct scsi_device Scsi_Device;
-typedef struct scsi_cmnd   Scsi_Cmnd;
-
-#include <scsi/scsi_ioctl.h>
 
 #include <linux/udf_fs.h>
 #include "udf_sb.h"

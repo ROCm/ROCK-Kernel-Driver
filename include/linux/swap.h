@@ -230,6 +230,7 @@ extern spinlock_t swaplock;
 
 /* linux/mm/thrash.c */
 extern struct mm_struct * swap_token_mm;
+extern unsigned long swap_token_default_timeout;
 extern void grab_swap_token(void);
 extern void __put_swap_token(struct mm_struct *);
 

@@ -1053,7 +1053,7 @@ static void rs_8xx_put_char(struct tty_struct *tty, unsigned char ch)
 
 }
 
-static int rs_8xx_write(struct tty_struct * tty, int from_user,
+static int rs_8xx_write(struct tty_struct * tty,
 		    const unsigned char *buf, int count)
 {
 	int	c, ret = 0;
@@ -1087,15 +1087,7 @@ static int rs_8xx_write(struct tty_struct * tty, int from_user,
 		}
 
 		cp = info->tx_va_base + ((bdp - info->tx_bd_base) * TX_BUF_SIZE);
-		if (from_user) {
-			if (copy_from_user((void *)cp, buf, c)) {
-				if (!ret)
-					ret = -EFAULT;
-				break;
-			}
-		} else {
-			memcpy((void *)cp, buf, c);
-		}
+		memcpy((void *)cp, buf, c);
 
 		bdp->cbd_datlen = c;
 		bdp->cbd_sc |= BD_SC_READY;

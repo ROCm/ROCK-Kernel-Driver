@@ -1023,9 +1023,9 @@ static int yenta_dev_suspend (struct pci_dev *dev, u32 state)
 			socket->type->save_state(socket);
 
 		/* FIXME: pci_save_state needs to have a better interface */
-		pci_save_state(dev, socket->saved_state);
-		pci_read_config_dword(dev, 16*4, &socket->saved_state[16]);
-		pci_read_config_dword(dev, 17*4, &socket->saved_state[17]);
+		pci_save_state(dev);
+		pci_read_config_dword(dev, 16*4, &socket->saved_state[0]);
+		pci_read_config_dword(dev, 17*4, &socket->saved_state[1]);
 		pci_set_power_state(dev, 3);
 	}
 
@@ -1040,9 +1040,9 @@ static int yenta_dev_resume (struct pci_dev *dev)
 	if (socket) {
 		pci_set_power_state(dev, 0);
 		/* FIXME: pci_restore_state needs to have a better interface */
-		pci_restore_state(dev, socket->saved_state);
-		pci_write_config_dword(dev, 16*4, socket->saved_state[16]);
-		pci_write_config_dword(dev, 17*4, socket->saved_state[17]);
+		pci_restore_state(dev);
+		pci_write_config_dword(dev, 16*4, socket->saved_state[0]);
+		pci_write_config_dword(dev, 17*4, socket->saved_state[1]);
 
 		if (socket->type && socket->type->restore_state)
 			socket->type->restore_state(socket);

@@ -42,10 +42,9 @@ MODULE_LICENSE("GPL");
 #ifdef CONFIG_SND_OSSEMUL
 static int midi_map[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS-1)] = 0};
 static int amidi_map[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS-1)] = 1};
-static int boot_devs;
-module_param_array(midi_map, int, boot_devs, 0444);
+module_param_array(midi_map, int, NULL, 0444);
 MODULE_PARM_DESC(midi_map, "Raw MIDI device number assigned to 1st OSS device.");
-module_param_array(amidi_map, int, boot_devs, 0444);
+module_param_array(amidi_map, int, NULL, 0444);
 MODULE_PARM_DESC(amidi_map, "Raw MIDI device number assigned to 2nd OSS device.");
 #endif /* CONFIG_SND_OSSEMUL */
 

@@ -88,8 +88,9 @@ static unsigned long s3c2410_gettimeoffset (void)
 static irqreturn_t
 s3c2410_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
+	write_seqlock(&xtime_lock);
 	timer_tick(regs);
-
+	write_sequnlock(&xtime_lock);
 	return IRQ_HANDLED;
 }
 
@@ -105,14 +106,12 @@ static struct irqaction s3c2410_timer_irq = {
  * Currently we only use timer4, as it is the only timer which has no
  * other function that can be exploited externally
  */
-void __init s3c2410_init_time (void)
+static void __init s3c2410_timer_init (void)
 {
 	unsigned long tcon;
 	unsigned long tcnt;
 	unsigned long tcfg1;
 	unsigned long tcfg0;
-
-	gettimeoffset = s3c2410_gettimeoffset;
 
 	tcnt = 0xffff;  /* default value for tcnt */
 
@@ -186,5 +185,7 @@ void __init s3c2410_init_time (void)
 	__raw_writel(tcon, S3C2410_TCON);
 }
 
-
-
+struct sys_timer s3c2410_timer = {
+	.init		= s3c2410_timer_init,
+	.offset		= s3c2410_gettimeoffset,
+};

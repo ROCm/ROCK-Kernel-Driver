@@ -32,6 +32,7 @@
 #include <linux/console.h>
 #endif
 #include <linux/slab.h>
+#include <linux/bitops.h>
 
 #include <asm/sections.h>
 #include <asm/io.h>
@@ -40,7 +41,6 @@
 #include <asm/prom.h>
 #include <asm/system.h>
 #include <asm/segment.h>
-#include <asm/bitops.h>
 #include <asm/machdep.h>
 #include <asm/pmac_feature.h>
 #include <linux/adb.h>
@@ -1461,7 +1461,7 @@ static void rs_flush_chars(struct tty_struct *tty)
 	spin_unlock_irqrestore(&info->lock, flags);
 }
 
-static int rs_write(struct tty_struct * tty, int from_user,
+static int rs_write(struct tty_struct * tty,
 		    const unsigned char *buf, int count)
 {
 	int	c, ret = 0;
@@ -1474,51 +1474,22 @@ static int rs_write(struct tty_struct * tty, int from_user,
 	if (!tty || !info->xmit_buf || !tmp_buf)
 		return 0;
 
-	if (from_user) {
-		down(&tmp_buf_sem);
-		while (1) {
-			c = min_t(int, count, min(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
-						  SERIAL_XMIT_SIZE - info->xmit_head));
-			if (c <= 0)
-				break;
-
-			c -= copy_from_user(tmp_buf, buf, c);
-			if (!c) {
-				if (!ret)
-					ret = -EFAULT;
-				break;
-			}
-			spin_lock_irqsave(&info->lock, flags);
-			c = min_t(int, c, min(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
-					      SERIAL_XMIT_SIZE - info->xmit_head));
-			memcpy(info->xmit_buf + info->xmit_head, tmp_buf, c);
-			info->xmit_head = ((info->xmit_head + c) &
-					   (SERIAL_XMIT_SIZE-1));
-			info->xmit_cnt += c;
+	while (1) {
+		spin_lock_irqsave(&info->lock, flags);
+		c = min_t(int, count, min(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
+					  SERIAL_XMIT_SIZE - info->xmit_head));
+		if (c <= 0) {
 			spin_unlock_irqrestore(&info->lock, flags);
-			buf += c;
-			count -= c;
-			ret += c;
+			break;
 		}
-		up(&tmp_buf_sem);
-	} else {
-		while (1) {
-			spin_lock_irqsave(&info->lock, flags);
-			c = min_t(int, count, min(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
-						  SERIAL_XMIT_SIZE - info->xmit_head));
-			if (c <= 0) {
-				spin_unlock_irqrestore(&info->lock, flags);
-				break;
-			}
-			memcpy(info->xmit_buf + info->xmit_head, buf, c);
-			info->xmit_head = ((info->xmit_head + c) &
-					   (SERIAL_XMIT_SIZE-1));
-			info->xmit_cnt += c;
-			spin_unlock_irqrestore(&info->lock, flags);
-			buf += c;
-			count -= c;
-			ret += c;
-		}
+		memcpy(info->xmit_buf + info->xmit_head, buf, c);
+		info->xmit_head = ((info->xmit_head + c) &
+				   (SERIAL_XMIT_SIZE-1));
+		info->xmit_cnt += c;
+		spin_unlock_irqrestore(&info->lock, flags);
+		buf += c;
+		count -= c;
+		ret += c;
 	}
 	spin_lock_irqsave(&info->lock, flags);
 	if (info->xmit_cnt && !tty->stopped && !info->tx_stopped

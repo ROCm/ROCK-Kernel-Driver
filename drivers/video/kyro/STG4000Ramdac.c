@@ -18,9 +18,9 @@
 
 static u32 STG_PIXEL_BUS_WIDTH = 128;	/* 128 bit bus width      */
 static u32 REF_CLOCK = 14318;
-STG4000REG *pSTGReg;
+STG4000REG __iomem *pSTGReg;
 
-int InitialiseRamdac(volatile STG4000REG * pSTGReg,
+int InitialiseRamdac(volatile STG4000REG __iomem * pSTGReg,
 		     u32 displayDepth,
 		     u32 displayWidth,
 		     u32 displayHeight,
@@ -145,7 +145,7 @@ int InitialiseRamdac(volatile STG4000REG * pSTGReg,
 }
 
 /* Ramdac control, turning output to the screen on and off */
-void DisableRamdacOutput(volatile STG4000REG * pSTGReg)
+void DisableRamdacOutput(volatile STG4000REG __iomem * pSTGReg)
 {
 	u32 tmp;
 
@@ -154,7 +154,7 @@ void DisableRamdacOutput(volatile STG4000REG * pSTGReg)
 	STG_WRITE_REG(DACStreamCtrl, tmp);
 }
 
-void EnableRamdacOutput(volatile STG4000REG * pSTGReg)
+void EnableRamdacOutput(volatile STG4000REG __iomem * pSTGReg)
 {
 	u32 tmp;
 

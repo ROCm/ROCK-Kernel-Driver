@@ -31,6 +31,7 @@
 #include <linux/stringify.h>
 #include <linux/delay.h>
 #include <linux/initrd.h>
+#include <linux/bitops.h>
 #include <asm/prom.h>
 #include <asm/rtas.h>
 #include <asm/abs_addr.h>
@@ -42,7 +43,6 @@
 #include <asm/system.h>
 #include <asm/mmu.h>
 #include <asm/pgtable.h>
-#include <asm/bitops.h>
 #include <asm/naca.h>
 #include <asm/pci.h>
 #include <asm/iommu.h>

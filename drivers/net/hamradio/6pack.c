@@ -16,7 +16,7 @@
 #include <linux/module.h>
 #include <asm/system.h>
 #include <asm/uaccess.h>
-#include <asm/bitops.h>
+#include <linux/bitops.h>
 #include <linux/string.h>
 #include <linux/mm.h>
 #include <linux/interrupt.h>
@@ -152,13 +152,13 @@ static void sp_xmit_on_air(unsigned long channel)
 
 	if (((sp->status1 & SIXP_DCD_MASK) == 0) && (random < sp->persistence)) {
 		sp->led_state = 0x70;
-		sp->tty->driver->write(sp->tty, 0, &sp->led_state, 1);
+		sp->tty->driver->write(sp->tty, &sp->led_state, 1);
 		sp->tx_enable = 1;
-		actual = sp->tty->driver->write(sp->tty, 0, sp->xbuff, sp->status2);
+		actual = sp->tty->driver->write(sp->tty, sp->xbuff, sp->status2);
 		sp->xleft -= actual;
 		sp->xhead += actual;
 		sp->led_state = 0x60;
-		sp->tty->driver->write(sp->tty, 0, &sp->led_state, 1);
+		sp->tty->driver->write(sp->tty, &sp->led_state, 1);
 		sp->status2 = 0;
 	} else
 		sp_start_tx_timer(sp);
@@ -229,13 +229,13 @@ static void sp_encaps(struct sixpack *sp, unsigned char *icp, int len)
 	 */
 	if (sp->duplex == 1) {
 		sp->led_state = 0x70;
-		sp->tty->driver->write(sp->tty, 0, &sp->led_state, 1);
+		sp->tty->driver->write(sp->tty, &sp->led_state, 1);
 		sp->tx_enable = 1;
-		actual = sp->tty->driver->write(sp->tty, 0, sp->xbuff, count);
+		actual = sp->tty->driver->write(sp->tty, sp->xbuff, count);
 		sp->xleft = count - actual;
 		sp->xhead = sp->xbuff + actual;
 		sp->led_state = 0x60;
-		sp->tty->driver->write(sp->tty, 0, &sp->led_state, 1);
+		sp->tty->driver->write(sp->tty, &sp->led_state, 1);
 	} else {
 		sp->xleft = count;
 		sp->xhead = sp->xbuff;
@@ -493,7 +493,7 @@ static void sixpack_write_wakeup(struct tty_struct *tty)
 	}
 
 	if (sp->tx_enable == 1) {
-		actual = tty->driver->write(tty, 0, sp->xhead, sp->xleft);
+		actual = tty->driver->write(tty, sp->xhead, sp->xleft);
 		sp->xleft -= actual;
 		sp->xhead += actual;
 	}
@@ -652,8 +652,8 @@ static void resync_tnc(unsigned long channel)
 	/* resync the TNC */
 
 	sp->led_state = 0x60;
-	sp->tty->driver->write(sp->tty, 0, &sp->led_state, 1);
-	sp->tty->driver->write(sp->tty, 0, &resync_cmd, 1);
+	sp->tty->driver->write(sp->tty, &sp->led_state, 1);
+	sp->tty->driver->write(sp->tty, &resync_cmd, 1);
 
 
 	/* Start resync timer again -- the TNC might be still absent */
@@ -669,7 +669,7 @@ static inline int tnc_init(struct sixpack *sp)
 {
 	unsigned char inbyte = 0xe8;
 
-	sp->tty->driver->write(sp->tty, 0, &inbyte, 1);
+	sp->tty->driver->write(sp->tty, &inbyte, 1);
 
 	del_timer(&sp->resync_t);
 	sp->resync_t.data = (unsigned long) sp;
@@ -954,9 +954,9 @@ static void decode_prio_command(unsigned char cmd, struct sixpack *sp)
 	} else { /* output watchdog char if idle */
 		if ((sp->status2 != 0) && (sp->duplex == 1)) {
 			sp->led_state = 0x70;
-			sp->tty->driver->write(sp->tty, 0, &sp->led_state, 1);
+			sp->tty->driver->write(sp->tty, &sp->led_state, 1);
 			sp->tx_enable = 1;
-			actual = sp->tty->driver->write(sp->tty, 0, sp->xbuff, sp->status2);
+			actual = sp->tty->driver->write(sp->tty, sp->xbuff, sp->status2);
 			sp->xleft -= actual;
 			sp->xhead += actual;
 			sp->led_state = 0x60;
@@ -966,7 +966,7 @@ static void decode_prio_command(unsigned char cmd, struct sixpack *sp)
 	}
 
 	/* needed to trigger the TNC watchdog */
-	sp->tty->driver->write(sp->tty, 0, &sp->led_state, 1);
+	sp->tty->driver->write(sp->tty, &sp->led_state, 1);
 
         /* if the state byte has been received, the TNC is present,
            so the resync timer can be reset. */
@@ -996,12 +996,12 @@ static void decode_std_command(unsigned char cmd, struct sixpack *sp)
 			if ((sp->status & SIXP_RX_DCD_MASK) ==
 				SIXP_RX_DCD_MASK) {
 				sp->led_state = 0x68;
-				sp->tty->driver->write(sp->tty, 0, &sp->led_state, 1);
+				sp->tty->driver->write(sp->tty, &sp->led_state, 1);
 			}
 		} else {
 			sp->led_state = 0x60;
 			/* fill trailing bytes with zeroes */
-			sp->tty->driver->write(sp->tty, 0, &sp->led_state, 1);
+			sp->tty->driver->write(sp->tty, &sp->led_state, 1);
 			rest = sp->rx_count;
 			if (rest != 0)
 				 for (i = rest; i <= 3; i++)

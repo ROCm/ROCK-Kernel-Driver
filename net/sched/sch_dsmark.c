@@ -241,11 +241,11 @@ static int dsmark_enqueue(struct sk_buff *skb,struct Qdisc *sch)
 #endif
 
 	    ((ret = p->q->enqueue(skb,p->q)) != 0)) {
-		sch->stats.drops++;
+		sch->qstats.drops++;
 		return ret;
 	}
-	sch->stats.bytes += skb->len;
-	sch->stats.packets++;
+	sch->bstats.bytes += skb->len;
+	sch->bstats.packets++;
 	sch->q.qlen++;
 	return ret;
 }
@@ -299,7 +299,7 @@ static int dsmark_requeue(struct sk_buff *skb,struct Qdisc *sch)
 		sch->q.qlen++;
 		return 0;
 	}
-	sch->stats.drops++;
+	sch->qstats.drops++;
 	return ret;
 }
 

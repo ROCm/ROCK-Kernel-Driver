@@ -65,29 +65,28 @@ static int irq[SNDRV_CARDS] = SNDRV_DEFAULT_IRQ;	/* Pnp setup */
 static int mpu_irq[SNDRV_CARDS] = SNDRV_DEFAULT_IRQ;	/* Pnp setup */
 static int dma1[SNDRV_CARDS] = SNDRV_DEFAULT_DMA;	/* PnP setup */
 static int dma2[SNDRV_CARDS] = SNDRV_DEFAULT_DMA;	/* PnP setup */
-static int boot_devs;
 
-module_param_array(index, int, boot_devs, 0444);
+module_param_array(index, int, NULL, 0444);
 MODULE_PARM_DESC(index, "Index value for azt2320 based soundcard.");
-module_param_array(id, charp, boot_devs, 0444);
+module_param_array(id, charp, NULL, 0444);
 MODULE_PARM_DESC(id, "ID string for azt2320 based soundcard.");
-module_param_array(enable, bool, boot_devs, 0444);
+module_param_array(enable, bool, NULL, 0444);
 MODULE_PARM_DESC(enable, "Enable azt2320 based soundcard.");
-module_param_array(port, long, boot_devs, 0444);
+module_param_array(port, long, NULL, 0444);
 MODULE_PARM_DESC(port, "Port # for azt2320 driver.");
-module_param_array(wss_port, long, boot_devs, 0444);
+module_param_array(wss_port, long, NULL, 0444);
 MODULE_PARM_DESC(wss_port, "WSS Port # for azt2320 driver.");
-module_param_array(mpu_port, long, boot_devs, 0444);
+module_param_array(mpu_port, long, NULL, 0444);
 MODULE_PARM_DESC(mpu_port, "MPU-401 port # for azt2320 driver.");
-module_param_array(fm_port, long, boot_devs, 0444);
+module_param_array(fm_port, long, NULL, 0444);
 MODULE_PARM_DESC(fm_port, "FM port # for azt2320 driver.");
-module_param_array(irq, int, boot_devs, 0444);
+module_param_array(irq, int, NULL, 0444);
 MODULE_PARM_DESC(irq, "IRQ # for azt2320 driver.");
-module_param_array(mpu_irq, int, boot_devs, 0444);
+module_param_array(mpu_irq, int, NULL, 0444);
 MODULE_PARM_DESC(mpu_irq, "MPU-401 IRQ # for azt2320 driver.");
-module_param_array(dma1, int, boot_devs, 0444);
+module_param_array(dma1, int, NULL, 0444);
 MODULE_PARM_DESC(dma1, "1st DMA # for azt2320 driver.");
-module_param_array(dma2, int, boot_devs, 0444);
+module_param_array(dma2, int, NULL, 0444);
 MODULE_PARM_DESC(dma2, "2nd DMA # for azt2320 driver.");
 
 struct snd_card_azt2320 {

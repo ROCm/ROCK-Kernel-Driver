@@ -78,33 +78,32 @@ static int sbdma16[SNDRV_CARDS] = SNDRV_DEFAULT_DMA;
 static long wssport[SNDRV_CARDS] = SNDRV_DEFAULT_PORT;
 static int wssirq[SNDRV_CARDS] = SNDRV_DEFAULT_IRQ;
 static int wssdma[SNDRV_CARDS] = SNDRV_DEFAULT_DMA;
-static int boot_devs;
 
-module_param_array(index, int, boot_devs, 0444);
+module_param_array(index, int, NULL, 0444);
 MODULE_PARM_DESC(index, "Index value for CMI8330 soundcard.");
-module_param_array(id, charp, boot_devs, 0444);
+module_param_array(id, charp, NULL, 0444);
 MODULE_PARM_DESC(id, "ID string  for CMI8330 soundcard.");
-module_param_array(enable, bool, boot_devs, 0444);
+module_param_array(enable, bool, NULL, 0444);
 MODULE_PARM_DESC(enable, "Enable CMI8330 soundcard.");
 #ifdef CONFIG_PNP
-module_param_array(isapnp, bool, boot_devs, 0444);
+module_param_array(isapnp, bool, NULL, 0444);
 MODULE_PARM_DESC(isapnp, "PnP detection for specified soundcard.");
 #endif
 
-module_param_array(sbport, long, boot_devs, 0444);
+module_param_array(sbport, long, NULL, 0444);
 MODULE_PARM_DESC(sbport, "Port # for CMI8330 SB driver.");
-module_param_array(sbirq, int, boot_devs, 0444);
+module_param_array(sbirq, int, NULL, 0444);
 MODULE_PARM_DESC(sbirq, "IRQ # for CMI8330 SB driver.");
-module_param_array(sbdma8, int, boot_devs, 0444);
+module_param_array(sbdma8, int, NULL, 0444);
 MODULE_PARM_DESC(sbdma8, "DMA8 for CMI8330 SB driver.");
-module_param_array(sbdma16, int, boot_devs, 0444);
+module_param_array(sbdma16, int, NULL, 0444);
 MODULE_PARM_DESC(sbdma16, "DMA16 for CMI8330 SB driver.");
 
-module_param_array(wssport, long, boot_devs, 0444);
+module_param_array(wssport, long, NULL, 0444);
 MODULE_PARM_DESC(wssport, "Port # for CMI8330 WSS driver.");
-module_param_array(wssirq, int, boot_devs, 0444);
+module_param_array(wssirq, int, NULL, 0444);
 MODULE_PARM_DESC(wssirq, "IRQ # for CMI8330 WSS driver.");
-module_param_array(wssdma, int, boot_devs, 0444);
+module_param_array(wssdma, int, NULL, 0444);
 MODULE_PARM_DESC(wssdma, "DMA for CMI8330 WSS driver.");
 
 #define CMI8330_RMUX3D    16

@@ -509,7 +509,10 @@ static int dmabuf_mmap(struct vm_area_struct *vma, struct dmabuf *db, unsigned l
 			return -EINVAL;
 	db->mapped = 1;
 	for(nr = 0; nr < size; nr++) {
-		if (remap_page_range(vma, start, virt_to_phys(db->sgbuf[nr]), PAGE_SIZE, prot))
+		unsigned long pfn;
+
+		pfn = virt_to_phys(db->sgbuf[nr]) >> PAGE_SHIFT;
+		if (remap_pfn_range(vma, start, pfn, PAGE_SIZE, prot))
 			return -EAGAIN;
 		start += PAGE_SIZE;
 	}

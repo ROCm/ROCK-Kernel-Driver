@@ -332,7 +332,7 @@ static int mxser_get_ISA_conf(int, struct mxser_hwconf *);
 static void mxser_do_softint(void *);
 static int mxser_open(struct tty_struct *, struct file *);
 static void mxser_close(struct tty_struct *, struct file *);
-static int mxser_write(struct tty_struct *, int, const unsigned char *, int);
+static int mxser_write(struct tty_struct *, const unsigned char *, int);
 static int mxser_write_room(struct tty_struct *);
 static void mxser_flush_buffer(struct tty_struct *);
 static int mxser_chars_in_buffer(struct tty_struct *);
@@ -829,7 +829,7 @@ static void mxser_close(struct tty_struct *tty, struct file *filp)
 
 }
 
-static int mxser_write(struct tty_struct *tty, int from_user,
+static int mxser_write(struct tty_struct *tty,
 		       const unsigned char *buf, int count)
 {
 	int c, total = 0;
@@ -840,53 +840,23 @@ static int mxser_write(struct tty_struct *tty, int from_user,
 		return (0);
 
 	save_flags(flags);
-	if (from_user) {
-		down(&mxvar_tmp_buf_sem);
-		while (1) {
-			c = min_t(int, count, min(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
-					   SERIAL_XMIT_SIZE - info->xmit_head));
-			if (c <= 0)
-				break;
-
-			c -= copy_from_user(mxvar_tmp_buf, buf, c);
-			if (!c) {
-				if (!total)
-					total = -EFAULT;
-				break;
-			}
-
-			cli();
-			c = min_t(int, c, min(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
-				       SERIAL_XMIT_SIZE - info->xmit_head));
-			memcpy(info->xmit_buf + info->xmit_head, mxvar_tmp_buf, c);
-			info->xmit_head = (info->xmit_head + c) & (SERIAL_XMIT_SIZE - 1);
-			info->xmit_cnt += c;
+	while (1) {
+		cli();
+		c = min_t(int, count, min(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
+				   SERIAL_XMIT_SIZE - info->xmit_head));
+		if (c <= 0) {
 			restore_flags(flags);
-
-			buf += c;
-			count -= c;
-			total += c;
+			break;
 		}
-		up(&mxvar_tmp_buf_sem);
-	} else {
-		while (1) {
-			cli();
-			c = min_t(int, count, min(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
-					   SERIAL_XMIT_SIZE - info->xmit_head));
-			if (c <= 0) {
-				restore_flags(flags);
-				break;
-			}
 
-			memcpy(info->xmit_buf + info->xmit_head, buf, c);
-			info->xmit_head = (info->xmit_head + c) & (SERIAL_XMIT_SIZE - 1);
-			info->xmit_cnt += c;
-			restore_flags(flags);
+		memcpy(info->xmit_buf + info->xmit_head, buf, c);
+		info->xmit_head = (info->xmit_head + c) & (SERIAL_XMIT_SIZE - 1);
+		info->xmit_cnt += c;
+		restore_flags(flags);
 
-			buf += c;
-			count -= c;
-			total += c;
-		}
+		buf += c;
+		count -= c;
+		total += c;
 	}
 
 	cli();

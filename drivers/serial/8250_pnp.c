@@ -25,8 +25,8 @@
 #include <linux/serial.h>
 #include <linux/serialP.h>
 #include <linux/serial_core.h>
+#include <linux/bitops.h>
 
-#include <asm/bitops.h>
 #include <asm/byteorder.h>
 #include <asm/serial.h>
 
@@ -293,6 +293,8 @@ static const struct pnp_device_id pnp_dev_table[] = {
 	{	"USR0006",		0	},
 	/* U.S. Robotics 33.6K Voice EXT PnP */
 	{	"USR0007",		0	},
+	/* U.S. Robotics Courier V.Everything INT PnP */
+	{	"USR0009",		0	},
 	/* U.S. Robotics 33.6K Voice INT PnP */
 	{	"USR2002",		0	},
 	/* U.S. Robotics 56K Voice INT PnP */

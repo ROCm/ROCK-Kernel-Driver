@@ -329,9 +329,6 @@ struct xircom_private {
 	int saved_if_port;
 	struct pci_dev *pdev;
 	spinlock_t lock;
-#ifdef CONFIG_PM
-	u32 pci_state[16];
-#endif
 };
 
 static int mdio_read(struct net_device *dev, int phy_id, int location);
@@ -1663,7 +1660,7 @@ static int xircom_suspend(struct pci_dev *pdev, u32 state)
 	if (tp->open)
 		xircom_down(dev);
 
-	pci_save_state(pdev, tp->pci_state);
+	pci_save_state(pdev);
 	pci_disable_device(pdev);
 	pci_set_power_state(pdev, 3);
 
@@ -1679,7 +1676,7 @@ static int xircom_resume(struct pci_dev *pdev)
 
 	pci_set_power_state(pdev,0);
 	pci_enable_device(pdev);
-	pci_restore_state(pdev, tp->pci_state);
+	pci_restore_state(pdev);
 
 	/* Bring the chip out of sleep mode.
 	   Caution: Snooze mode does not work with some boards! */

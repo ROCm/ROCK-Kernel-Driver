@@ -555,6 +555,7 @@ static ide_startstop_t idescsi_pc_intr (ide_drive_t *drive)
 
 static ide_startstop_t idescsi_transfer_pc(ide_drive_t *drive)
 {
+	ide_hwif_t *hwif = drive->hwif;
 	idescsi_scsi_t *scsi = drive_to_idescsi(drive);
 	idescsi_pc_t *pc = scsi->pc;
 	atapi_ireason_t ireason;
@@ -579,7 +580,7 @@ static ide_startstop_t idescsi_transfer_pc(ide_drive_t *drive)
 	atapi_output_bytes(drive, scsi->pc->c, 12);
 	if (test_bit (PC_DMA_OK, &pc->flags)) {
 		set_bit (PC_DMA_IN_PROGRESS, &pc->flags);
-		(void) (HWIF(drive)->ide_dma_begin(drive));
+		hwif->dma_start(drive);
 	}
 	return ide_started;
 }
@@ -590,6 +591,7 @@ static ide_startstop_t idescsi_transfer_pc(ide_drive_t *drive)
 static ide_startstop_t idescsi_issue_pc (ide_drive_t *drive, idescsi_pc_t *pc)
 {
 	idescsi_scsi_t *scsi = drive_to_idescsi(drive);
+	ide_hwif_t *hwif = drive->hwif;
 	atapi_feature_t feature;
 	atapi_bcount_t bcount;
 	struct request *rq = pc->rq;
@@ -600,12 +602,8 @@ static ide_startstop_t idescsi_issue_pc (ide_drive_t *drive, idescsi_pc_t *pc)
 	bcount.all = min(pc->request_transfer, 63 * 1024);		/* Request to transfer the entire buffer at once */
 
 	feature.all = 0;
-	if (drive->using_dma && rq->bio) {
-		if (test_bit(PC_WRITING, &pc->flags))
-			feature.b.dma = !HWIF(drive)->ide_dma_write(drive);
-		else
-			feature.b.dma = !HWIF(drive)->ide_dma_read(drive);
-	}
+	if (drive->using_dma && rq->bio)
+		feature.b.dma = !hwif->dma_setup(drive);
 
 	SELECT_DRIVE(drive);
 	if (IDE_CONTROL_REG)

@@ -73,7 +73,7 @@
 #define TIMEOUT			(HZ / 2)
 
 
-static void *ioaddr;
+static void __iomem *ioaddr;
 
 /* The sav GPIO registers don't have individual masks for each bit
    so we always have to read before writing. */
@@ -157,6 +157,8 @@ static struct pci_device_id savage4_ids[] __devinitdata = {
 	{ 0, }
 };
 
+MODULE_DEVICE_TABLE (pci, savage4_ids);
+
 static int __devinit savage4_probe(struct pci_dev *dev, const struct pci_device_id *id)
 {
 	int retval;
@@ -186,7 +188,7 @@ static struct pci_driver savage4_driver = {
 
 static int __init i2c_savage4_init(void)
 {
-	return pci_module_init(&savage4_driver);
+	return pci_register_driver(&savage4_driver);
 }
 
 static void __exit i2c_savage4_exit(void)

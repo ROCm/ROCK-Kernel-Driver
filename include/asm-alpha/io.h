@@ -658,6 +658,16 @@ isa_check_signature(unsigned long offset, const unsigned char *sig, long len)
 #define dma_cache_wback(_start,_size)		do { } while (0)
 #define dma_cache_wback_inv(_start,_size)	do { } while (0)
 
+/*
+ * Some mucking forons use if[n]def writeq to check if platform has it.
+ * It's a bloody bad idea and we probably want ARCH_HAS_WRITEQ for them
+ * to play with; for now just use cpp anti-recursion logics and make sure
+ * that damn thing is defined and expands to itself.
+ */
+
+#define writeq writeq
+#define readq readq
+
 #endif /* __KERNEL__ */
 
 #endif /* __ALPHA_IO_H */

@@ -26,10 +26,10 @@
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
 #include <linux/profile.h>
+#include <linux/bitops.h>
 
 #include <asm/system.h>
 #include <asm/io.h>
-#include <asm/bitops.h>
 #include <asm/uaccess.h>
 
 /*

@@ -780,7 +780,6 @@ struct amd8111e_priv{
 	
 	struct amd8111e_link_config link_config;
 	int pm_cap;
-	u32 pm_state[12];
 
 	struct net_device *next;
 	int mii;

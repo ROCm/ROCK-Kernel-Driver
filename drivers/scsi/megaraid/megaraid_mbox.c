@@ -872,8 +872,7 @@ megaraid_init_mbox(adapter_t *adapter)
 		goto out_free_raid_dev;
 	}
 
-	raid_dev->baseaddr = (unsigned long)
-			ioremap_nocache(raid_dev->baseport, 128);
+	raid_dev->baseaddr = ioremap_nocache(raid_dev->baseport, 128);
 
 	if (!raid_dev->baseaddr) {
 
@@ -996,7 +995,7 @@ out_alloc_cmds:
 out_free_irq:
 	free_irq(adapter->irq, adapter);
 out_iounmap:
-	iounmap((caddr_t)raid_dev->baseaddr);
+	iounmap(raid_dev->baseaddr);
 out_release_regions:
 	pci_release_regions(pdev);
 out_free_raid_dev:
@@ -1024,7 +1023,7 @@ megaraid_fini_mbox(adapter_t *adapter)
 
 	free_irq(adapter->irq, adapter);
 
-	iounmap((caddr_t)raid_dev->baseaddr);
+	iounmap(raid_dev->baseaddr);
 
 	pci_release_regions(adapter->pdev);
 
@@ -1554,12 +1553,12 @@ mbox_post_cmd(adapter_t *adapter, scb_t *scb)
 
 	if (scb->dma_direction == PCI_DMA_TODEVICE) {
 		if (!scb->scp->use_sg) {	// sg list not used
-			pci_dma_sync_single(adapter->pdev, ccb->buf_dma_h,
+			pci_dma_sync_single_for_cpu(adapter->pdev, ccb->buf_dma_h,
 					scb->scp->request_bufflen,
 					PCI_DMA_TODEVICE);
 		}
 		else {
-			pci_dma_sync_sg(adapter->pdev, scb->scp->request_buffer,
+			pci_dma_sync_sg_for_cpu(adapter->pdev, scb->scp->request_buffer,
 				scb->scp->use_sg, PCI_DMA_TODEVICE);
 		}
 	}
@@ -2332,7 +2331,7 @@ megaraid_mbox_sync_scb(adapter_t *adapter, scb_t *scb)
 
 	case MRAID_DMA_WBUF:
 		if (scb->dma_direction == PCI_DMA_FROMDEVICE) {
-			pci_dma_sync_single(adapter->pdev,
+			pci_dma_sync_single_for_cpu(adapter->pdev,
 					ccb->buf_dma_h,
 					scb->scp->request_bufflen,
 					PCI_DMA_FROMDEVICE);
@@ -2345,7 +2344,7 @@ megaraid_mbox_sync_scb(adapter_t *adapter, scb_t *scb)
 
 	case MRAID_DMA_WSG:
 		if (scb->dma_direction == PCI_DMA_FROMDEVICE) {
-			pci_dma_sync_sg(adapter->pdev,
+			pci_dma_sync_sg_for_cpu(adapter->pdev,
 					scb->scp->request_buffer,
 					scb->scp->use_sg, PCI_DMA_FROMDEVICE);
 		}

@@ -9,7 +9,7 @@
  * tables.
  */
 #include <linux/types.h>
-#include <asm/bitops.h>
+#include <linux/bitops.h>
 
 #if BITS_PER_LONG == 32
 # define IDR_BITS 5

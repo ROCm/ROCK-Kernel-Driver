@@ -25,9 +25,12 @@
 #include <linux/devfs_fs_kernel.h>
 #include <linux/mmtimer.h>
 #include <linux/miscdevice.h>
+#include <linux/posix-timers.h>
+
 #include <asm/uaccess.h>
 #include <asm/sn/addrs.h>
 #include <asm/sn/clksupport.h>
+#include <asm/sn/shub_mmr.h>
 
 MODULE_AUTHOR("Jesse Barnes <jbarnes@sgi.com>");
 MODULE_DESCRIPTION("Multimedia timer support");
@@ -139,7 +142,7 @@ static int mmtimer_ioctl(struct inode *inode, struct file *file,
  * @file: file structure for the device
  * @vma: VMA to map the registers into
  *
- * Calls remap_page_range() to map the clock's registers into
+ * Calls remap_pfn_range() to map the clock's registers into
  * the calling process' address space.
  */
 static int mmtimer_mmap(struct file *file, struct vm_area_struct *vma)
@@ -162,9 +165,9 @@ static int mmtimer_mmap(struct file *file, struct vm_area_struct *vma)
 	mmtimer_addr &= ~(PAGE_SIZE - 1);
 	mmtimer_addr &= 0xfffffffffffffffUL;
 
-	if (remap_page_range(vma, vma->vm_start, mmtimer_addr, PAGE_SIZE,
-			     vma->vm_page_prot)) {
-		printk(KERN_ERR "remap_page_range failed in mmtimer.c\n");
+	if (remap_pfn_range(vma, vma->vm_start, mmtimer_addr >> PAGE_SHIFT,
+					PAGE_SIZE, vma->vm_page_prot)) {
+		printk(KERN_ERR "remap_pfn_range failed in mmtimer.c\n");
 		return -EAGAIN;
 	}
 
@@ -175,6 +178,45 @@ static struct miscdevice mmtimer_miscdev = {
 	SGI_MMTIMER,
 	MMTIMER_NAME,
 	&mmtimer_fops
+};
+
+static struct timespec sgi_clock_offset;
+static int sgi_clock_period;
+
+static int sgi_clock_get(struct timespec *tp) {
+	u64 nsec;
+
+	nsec = readq(RTC_COUNTER_ADDR) * sgi_clock_period
+			+ sgi_clock_offset.tv_nsec;
+	tp->tv_sec = div_long_long_rem(nsec, NSEC_PER_SEC, &tp->tv_nsec)
+			+ sgi_clock_offset.tv_sec;
+	return 0;
+};
+
+static int sgi_clock_set(struct timespec *tp) {
+
+	u64 nsec;
+	u64 rem;
+
+	nsec = readq(RTC_COUNTER_ADDR) * sgi_clock_period;
+
+	sgi_clock_offset.tv_sec = tp->tv_sec - div_long_long_rem(nsec, NSEC_PER_SEC, &rem);
+
+	if (rem <= tp->tv_nsec)
+		sgi_clock_offset.tv_nsec = tp->tv_sec - rem;
+	else {
+		sgi_clock_offset.tv_nsec = tp->tv_sec + NSEC_PER_SEC - rem;
+		sgi_clock_offset.tv_sec--;
+	}
+	return 0;
+}
+
+static struct k_clock sgi_clock = {
+	.res = 0,
+	.clock_set = sgi_clock_set,
+	.clock_get = sgi_clock_get,
+	.timer_create = do_posix_clock_notimer_create,
+	.nsleep = do_posix_clock_nonanosleep
 };
 
 /**
@@ -205,6 +247,9 @@ static int __init mmtimer_init(void)
 		       MMTIMER_NAME);
 		return -1;
 	}
+
+	sgi_clock_period = sgi_clock.res = NSEC_PER_SEC / sn_rtc_cycles_per_second;
+	register_posix_clock(CLOCK_SGI_CYCLE, &sgi_clock);
 
 	printk(KERN_INFO "%s: v%s, %ld MHz\n", MMTIMER_DESC, MMTIMER_VERSION,
 	       sn_rtc_cycles_per_second/(unsigned long)1E6);
