@@ -1029,7 +1029,22 @@ static struct seq_operations raw6_seq_ops = {
 
 static int raw6_seq_open(struct inode *inode, struct file *file)
 {
-	return seq_open(file, &raw6_seq_ops);
+	struct seq_file *seq;
+	int rc = -ENOMEM;
+	struct raw6_iter_state *s = kmalloc(sizeof(*s), GFP_KERNEL);
+	if (!s)
+		goto out;
+	rc = seq_open(file, &raw6_seq_ops);
+	if (rc)
+		goto out_kfree;
+	seq = file->private_data;
+	seq->private = s;
+	memset(s, 0, sizeof(*s));
+out:
+	return rc;
+out_kfree:
+	kfree(s);
+	goto out;
 }
 
 static struct file_operations raw6_seq_fops = {
@@ -1037,7 +1052,7 @@ static struct file_operations raw6_seq_fops = {
 	.open =		raw6_seq_open,
 	.read =		seq_read,
 	.llseek =	seq_lseek,
-	.release =	seq_release,
+	.release =	seq_release_private,
 };
 
 int __init raw6_proc_init(void)
