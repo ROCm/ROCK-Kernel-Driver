@@ -273,8 +273,8 @@ void __init do_init_bootmem(void)
 					physbase = start_paddr;
 				}
 
-				if (size > end_paddr - start_paddr)
-					size = end_paddr - start_paddr;
+				if (size > end_paddr - physbase)
+					size = end_paddr - physbase;
 
 				dbg("free_bootmem %lx %lx\n", physbase, size);
 				free_bootmem_node(NODE_DATA(nid), physbase,
@@ -294,8 +294,8 @@ void __init do_init_bootmem(void)
 					physbase = start_paddr;
 				}
 
-				if (size > end_paddr - start_paddr)
-					size = end_paddr - start_paddr;
+				if (size > end_paddr - physbase)
+					size = end_paddr - physbase;
 
 				dbg("reserve_bootmem %lx %lx\n", physbase,
 				    size);
