@@ -111,9 +111,6 @@ ippp_mp_receive(isdn_net_dev *idev, struct sk_buff *skb, u16 proto)
 {
 	isdn_net_local *lp = idev->mlp;
 
-	{static int cnt; if (cnt++ % 7 == 0) return;}
-
-
  	if (lp->mp_cfg & SC_REJ_MP_PROT)
 		goto out;
 
