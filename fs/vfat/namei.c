@@ -106,7 +106,7 @@ vfat_toupper(struct nls_table *t, unsigned char c)
 	return nc ? nc : c;
 }
 
-static int
+static inline int
 vfat_strnicmp(struct nls_table *t, const unsigned char *s1,
 					const unsigned char *s2, int len)
 {
