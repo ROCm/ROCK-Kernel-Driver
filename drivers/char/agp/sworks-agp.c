@@ -596,6 +596,8 @@ static int __init agp_find_supported_device(struct pci_dev *dev)
 		return -ENODEV;
 	}
 
+	agp_bridge.dev = dev;
+
 	switch (dev->device) {
 	case PCI_DEVICE_ID_SERVERWORKS_HE:
 		agp_bridge.type = SVWRKS_HE;
@@ -620,7 +622,6 @@ static int __init agp_find_supported_device(struct pci_dev *dev)
 static int __init agp_serverworks_probe (struct pci_dev *dev, const struct pci_device_id *ent)
 {
 	if (agp_find_supported_device(dev) == 0) {
-		agp_bridge.dev = dev;
 		agp_register_driver(dev);
 		return 0;
 	}
