@@ -204,6 +204,7 @@ struct class_device {
 	void			* class_data;	/* class-specific data */
 
 	char	class_id[BUS_ID_SIZE];	/* unique to this class */
+	void	(*release)(struct class_device * class_dev);
 };
 
 static inline void *
