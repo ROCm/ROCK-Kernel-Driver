@@ -212,7 +212,7 @@ static int orinoco_pci_init_one(struct pci_dev *pdev,
 		err = -ENOMEM;
 		goto fail;
 	}
-	priv = dev->priv;
+	priv = netdev_priv(dev);
 
 	dev->base_addr = (unsigned long) pci_ioaddr;
 	dev->mem_start = pci_iorange;
@@ -275,7 +275,7 @@ static int orinoco_pci_init_one(struct pci_dev *pdev,
 static void __devexit orinoco_pci_remove_one(struct pci_dev *pdev)
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
-	struct orinoco_private *priv = dev->priv;
+	struct orinoco_private *priv = netdev_priv(dev);
 
 	unregister_netdev(dev);
 
@@ -294,7 +294,7 @@ static void __devexit orinoco_pci_remove_one(struct pci_dev *pdev)
 static int orinoco_pci_suspend(struct pci_dev *pdev, u32 state)
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
-	struct orinoco_private *priv = dev->priv;
+	struct orinoco_private *priv = netdev_priv(dev);
 	unsigned long flags;
 	int err;
 	
@@ -325,7 +325,7 @@ static int orinoco_pci_suspend(struct pci_dev *pdev, u32 state)
 static int orinoco_pci_resume(struct pci_dev *pdev)
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
-	struct orinoco_private *priv = dev->priv;
+	struct orinoco_private *priv = netdev_priv(dev);
 	unsigned long flags;
 	int err;
 

@@ -163,7 +163,7 @@ orinoco_cs_attach(void)
 	dev = alloc_orinocodev(sizeof(*card), orinoco_cs_hard_reset);
 	if (! dev)
 		return NULL;
-	priv = dev->priv;
+	priv = netdev_priv(dev);
 	card = priv->card;
 
 	/* Link both structures together */
@@ -266,7 +266,7 @@ orinoco_cs_config(dev_link_t *link)
 {
 	struct net_device *dev = link->priv;
 	client_handle_t handle = link->handle;
-	struct orinoco_private *priv = dev->priv;
+	struct orinoco_private *priv = netdev_priv(dev);
 	struct orinoco_pccard *card = priv->card;
 	hermes_t *hw = &priv->hw;
 	int last_fn, last_ret;
@@ -499,7 +499,7 @@ static void
 orinoco_cs_release(dev_link_t *link)
 {
 	struct net_device *dev = link->priv;
-	struct orinoco_private *priv = dev->priv;
+	struct orinoco_private *priv = netdev_priv(dev);
 	unsigned long flags;
 
 	/* We're committed to taking the device away now, so mark the
@@ -527,7 +527,7 @@ orinoco_cs_event(event_t event, int priority,
 {
 	dev_link_t *link = args->client_data;
 	struct net_device *dev = link->priv;
-	struct orinoco_private *priv = dev->priv;
+	struct orinoco_private *priv = netdev_priv(dev);
 	struct orinoco_pccard *card = priv->card;
 	int err = 0;
 	unsigned long flags;

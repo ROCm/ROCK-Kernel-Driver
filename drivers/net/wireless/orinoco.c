@@ -2341,7 +2341,7 @@ struct net_device *alloc_orinocodev(int sizeof_card, int (*hard_reset)(struct or
 	priv = netdev_priv(dev);
 	priv->ndev = dev;
 	if (sizeof_card)
-		priv->card = (void *)((unsigned long)dev->priv + sizeof(struct orinoco_private));
+		priv->card = (void *)((unsigned long)netdev_priv(dev) + sizeof(struct orinoco_private));
 	else
 		priv->card = NULL;
 

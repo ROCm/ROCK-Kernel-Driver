@@ -50,7 +50,7 @@ static int
 airport_suspend(struct macio_dev *mdev, u32 state)
 {
 	struct net_device *dev = dev_get_drvdata(&mdev->ofdev.dev);
-	struct orinoco_private *priv = dev->priv;
+	struct orinoco_private *priv = netdev_priv(dev);
 	unsigned long flags;
 	int err;
 
@@ -84,7 +84,7 @@ static int
 airport_resume(struct macio_dev *mdev)
 {
 	struct net_device *dev = dev_get_drvdata(&mdev->ofdev.dev);
-	struct orinoco_private *priv = dev->priv;
+	struct orinoco_private *priv = netdev_priv(dev);
 	unsigned long flags;
 	int err;
 
@@ -126,7 +126,7 @@ static int
 airport_detach(struct macio_dev *mdev)
 {
 	struct net_device *dev = dev_get_drvdata(&mdev->ofdev.dev);
-	struct orinoco_private *priv = dev->priv;
+	struct orinoco_private *priv = netdev_priv(dev);
 	struct airport *card = priv->card;
 
 	if (card->ndev_registered)
@@ -204,7 +204,7 @@ airport_attach(struct macio_dev *mdev, const struct of_match *match)
 		printk(KERN_ERR "airport: can't allocate device datas\n");
 		return -ENODEV;
 	}
-	priv = dev->priv;
+	priv = netdev_priv(dev);
 	card = priv->card;
 
 	hw = &priv->hw;
