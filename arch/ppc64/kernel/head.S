@@ -1834,8 +1834,6 @@ _GLOBAL(__secondary_start)
 	sldi	r28,r24,3		/* get current_set[cpu#]	 */
 	ldx	r1,r3,r28
 	addi	r1,r1,THREAD_SIZE-STACK_FRAME_OVERHEAD
-	li	r0,0
-	std	r0,0(r1)
 	std	r1,PACAKSAVE(r13)
 
 	ld	r3,PACASTABREAL(r13)	/* get raddr of segment table	 */
