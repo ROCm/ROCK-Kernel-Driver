@@ -350,6 +350,12 @@ int b1pciv4_detect(avmcard *card)
 	return 0;
 }
 
+static void b1dma_queue_tx(avmcard *card, struct sk_buff *skb)
+{
+	skb_queue_tail(&card->dma->send_queue, skb);
+	b1dma_dispatch_tx(card);
+}
+
 /* ------------------------------------------------------------- */
 
 static void b1dma_dispatch_tx(avmcard *card)
@@ -449,8 +455,7 @@ static void queue_pollack(avmcard *card)
 	_put_byte(&p, SEND_POLLACK);
 	skb_put(skb, (u8 *)p - (u8 *)skb->data);
 
-	skb_queue_tail(&card->dma->send_queue, skb);
-	b1dma_dispatch_tx(card);
+	b1dma_queue_tx(card, skb);
 }
 
 /* ------------------------------------------------------------- */
@@ -697,8 +702,7 @@ static void b1dma_send_init(avmcard *card)
 	_put_word(&p, card->cardnr - 1);
 	skb_put(skb, (u8 *)p - (u8 *)skb->data);
 
-	skb_queue_tail(&card->dma->send_queue, skb);
-	b1dma_dispatch_tx(card);
+	b1dma_queue_tx(card, skb);
 }
 
 int b1dma_load_firmware(struct capi_ctr *ctrl, capiloaddata *data)
@@ -803,8 +807,7 @@ void b1dma_register_appl(struct capi_ctr *ctrl,
 	_put_word(&p, rp->datablklen);
 	skb_put(skb, (u8 *)p - (u8 *)skb->data);
 
-	skb_queue_tail(&card->dma->send_queue, skb);
-	b1dma_dispatch_tx(card);
+	b1dma_queue_tx(card, skb);
 
 	ctrl->appl_registered(ctrl, appl);
 }
@@ -831,8 +834,8 @@ void b1dma_release_appl(struct capi_ctr *ctrl, u16 appl)
 	_put_word(&p, appl);
 
 	skb_put(skb, (u8 *)p - (u8 *)skb->data);
-	skb_queue_tail(&card->dma->send_queue, skb);
-	b1dma_dispatch_tx(card);
+
+	b1dma_queue_tx(card, skb);
 }
 
 /* ------------------------------------------------------------- */
@@ -841,8 +844,8 @@ void b1dma_send_message(struct capi_ctr *ctrl, struct sk_buff *skb)
 {
 	avmctrl_info *cinfo = (avmctrl_info *)(ctrl->driverdata);
 	avmcard *card = cinfo->card;
-	skb_queue_tail(&card->dma->send_queue, skb);
-	b1dma_dispatch_tx(card);
+
+	b1dma_queue_tx(card, skb);
 }
 
 /* ------------------------------------------------------------- */
