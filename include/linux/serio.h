@@ -50,6 +50,7 @@ struct serio {
 	unsigned short idversion;
 
 	unsigned long type;
+	unsigned long event;
 
 	int (*write)(struct serio *, unsigned char);
 	int (*open)(struct serio *);

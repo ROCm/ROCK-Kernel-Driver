@@ -32,6 +32,11 @@
 #include <linux/module.h>
 #include <linux/serio.h>
 #include <linux/errno.h>
+#include <linux/wait.h>
+#include <linux/completion.h>
+#include <linux/sched.h>
+#include <linux/smp_lock.h>
+#include <linux/suspend.h>
 
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
 MODULE_DESCRIPTION("Serio abstraction core");
@@ -47,6 +52,7 @@ EXPORT_SYMBOL(serio_rescan);
 
 static struct serio *serio_list;
 static struct serio_dev *serio_dev;
+static int serio_pid;
 
 static void serio_find_dev(struct serio *serio)
 {
@@ -59,11 +65,49 @@ static void serio_find_dev(struct serio *serio)
         }
 }
 
+#define SERIO_RESCAN	1
+
+static DECLARE_WAIT_QUEUE_HEAD(serio_wait);
+static DECLARE_COMPLETION(serio_exited);
+
+void serio_handle_events(void)
+{
+	struct serio *serio = serio_list;
+
+	while (serio) {
+		if (serio->event & SERIO_RESCAN) {
+			if (serio->dev && serio->dev->disconnect)
+				serio->dev->disconnect(serio);
+			serio_find_dev(serio);
+		}
+
+		serio->event = 0;
+	}
+}
+
+static int serio_thread(void *nothing)
+{
+	lock_kernel();
+	daemonize();
+	strcpy(current->comm, "kseriod");
+
+	do {
+		serio_handle_events();
+		if (current->flags & PF_FREEZE)
+			refrigerator(PF_IOTHREAD);
+		wait_event_interruptible(serio_wait, 1); 
+	} while (!signal_pending(current));
+
+	printk(KERN_DEBUG "serio: kseriod exiting");
+
+	unlock_kernel();
+	complete_and_exit(&serio_exited, 0);
+}
+
 void serio_rescan(struct serio *serio)
 {
-	if (serio->dev && serio->dev->disconnect)
-		serio->dev->disconnect(serio);
-	serio_find_dev(serio);
+	serio->event |= SERIO_RESCAN;
+	wake_up(&serio_wait);
 }
 
 void serio_register_port(struct serio *serio)
@@ -127,3 +171,29 @@ void serio_close(struct serio *serio)
 	serio->close(serio);
 	serio->dev = NULL;
 }
+
+int serio_init(void)
+{
+	int pid;
+
+	pid = kernel_thread(serio_thread, NULL,
+		CLONE_FS | CLONE_FILES | CLONE_SIGHAND);
+
+	if (!pid) {
+		printk(KERN_WARNING "serio: Failed to start kseriod\n");
+		return -1;
+	}
+
+	serio_pid = pid;
+
+	return 0;
+}
+
+void serio_exit(void)
+{
+	kill_proc(serio_pid, SIGTERM, 1);
+	wait_for_completion(&serio_exited);
+}
+
+module_init(serio_init);
+module_exit(serio_exit);
