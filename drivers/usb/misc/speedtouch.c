@@ -610,6 +610,9 @@ made_progress:
 		else
 			kfree_skb (skb);
 		instance->current_skb = NULL;
+
+		if (vcc->stats)
+			atomic_inc (&vcc->stats->tx);
 	}
 
 	goto made_progress;
@@ -732,14 +735,6 @@ static int udsl_atm_proc_read (struct atm_dev *atm_dev, loff_t *pos, char *page)
 				instance->usb_dev->bus->bus_name, instance->usb_dev->devpath,
 				atm_dev->esi[0], atm_dev->esi[1], atm_dev->esi[2],
 				atm_dev->esi[3], atm_dev->esi[4], atm_dev->esi[5]);
-
-	if (!left--)
-		return sprintf (page, "AAL0: tx %d ( %d err ), rx %d ( %d err, %d drop )\n",
-				atomic_read (&atm_dev->stats.aal0.tx),
-				atomic_read (&atm_dev->stats.aal0.tx_err),
-				atomic_read (&atm_dev->stats.aal0.rx),
-				atomic_read (&atm_dev->stats.aal0.rx_err),
-				atomic_read (&atm_dev->stats.aal0.rx_drop));
 
 	if (!left--)
 		return sprintf (page, "AAL5: tx %d ( %d err ), rx %d ( %d err, %d drop )\n",
