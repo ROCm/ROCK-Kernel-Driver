@@ -78,7 +78,7 @@ static int longhaul_get_cpu_mult (void)
 
 	rdmsr (MSR_IA32_EBL_CR_POWERON, lo, hi);
 	invalue = (lo & (1<<22|1<<23|1<<24|1<<25)) >>22;
-	if (longhaul_version==2 || longhaul_version==4) {
+	if (longhaul_version==2 || longhaul_version==3) {
 		if (lo & (1<<27))
 			invalue+=16;
 	}
@@ -157,7 +157,7 @@ static void longhaul_setstate (unsigned int clock_ratio_index)
 		longhaul.bits.RevisionKey = 3;
 		wrmsrl (MSR_VIA_LONGHAUL, longhaul.val);
 		break;
-	case 4:
+	case 3:
 		rdmsrl (MSR_VIA_LONGHAUL, longhaul.val);
 		longhaul.bits.SoftBusRatio = clock_ratio_index & 0xf;
 		longhaul.bits.SoftBusRatio4 = (clock_ratio_index & 0x10) >> 4;
@@ -264,7 +264,7 @@ static int __init longhaul_get_ranges (void)
 		fsb = eblcr_fsb_table_v2[longhaul.bits.MaxMHzFSB];
 		break;
 
-	case 4:
+	case 3:
 		rdmsrl (MSR_VIA_LONGHAUL, longhaul.val);
 
 		/*
@@ -461,7 +461,7 @@ static int __init longhaul_cpu_init (struct cpufreq_policy *policy)
 		break;
 
 	case 9:
-		longhaul_version=4;
+		longhaul_version=3;
 		numscales=32;
 		switch (c->x86_mask) {
 		case 0 ... 1:
