@@ -488,6 +488,65 @@ static inline struct ipt_target *find_target_lock(const char *name, u8 revision)
 	return ERR_PTR(-EPROTOTYPE);
 }
 
+static int match_revfn(const char *name, u8 revision, int *bestp)
+{
+	struct ipt_match *m;
+	int have_rev = 0;
+
+	list_for_each_entry(m, &ipt_match, list) {
+		if (strcmp(m->name, name) == 0) {
+			if (m->revision > *bestp)
+				*bestp = m->revision;
+			if (m->revision == revision)
+				have_rev = 1;
+		}
+	}
+	return have_rev;
+}
+
+static int target_revfn(const char *name, u8 revision, int *bestp)
+{
+	struct ipt_target *t;
+	int have_rev = 0;
+
+	list_for_each_entry(t, &ipt_target, list) {
+		if (strcmp(t->name, name) == 0) {
+			if (t->revision > *bestp)
+				*bestp = t->revision;
+			if (t->revision == revision)
+				have_rev = 1;
+		}
+	}
+	return have_rev;
+}
+
+/* Returns true or false (if no such extension at all) */
+static inline int find_revision(const char *name, u8 revision,
+				int (*revfn)(const char *, u8, int *),
+				int *err)
+{
+	int have_rev, best = -1;
+
+	if (down_interruptible(&ipt_mutex) != 0) {
+		*err = -EINTR;
+		return 1;
+	}
+	have_rev = revfn(name, revision, &best);
+	up(&ipt_mutex);
+
+	/* Nothing at all?  Return 0 to try loading module. */
+	if (best == -1) {
+		*err = -ENOENT;
+		return 0;
+	}
+
+	*err = best;
+	if (!have_rev)
+		*err = -EPROTONOSUPPORT;
+	return 1;
+}
+
+
 /* All zeroes == unconditional rule. */
 static inline int
 unconditional(const struct ipt_ip *ip)
@@ -1313,6 +1372,31 @@ do_ipt_get_ctl(struct sock *sk, int cmd, void __user *user, int *len)
 			ret = -EINVAL;
 		} else
 			ret = get_entries(&get, user);
+		break;
+	}
+
+	case IPT_SO_GET_REVISION_MATCH:
+	case IPT_SO_GET_REVISION_TARGET: {
+		struct ipt_get_revision rev;
+		int (*revfn)(const char *, u8, int *);
+
+		if (*len != sizeof(rev)) {
+			ret = -EINVAL;
+			break;
+		}
+		if (copy_from_user(&rev, user, sizeof(rev)) != 0) {
+			ret = -EFAULT;
+			break;
+		}
+
+		if (cmd == IPT_SO_GET_REVISION_TARGET)
+			revfn = target_revfn;
+		else
+			revfn = match_revfn;
+
+		try_then_request_module(find_revision(rev.name, rev.revision,
+						      revfn, &ret),
+					"ipt_%s", rev.name);
 		break;
 	}
 
