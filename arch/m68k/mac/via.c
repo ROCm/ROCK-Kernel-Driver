@@ -23,7 +23,6 @@
 #include <linux/mm.h>
 #include <linux/delay.h>
 #include <linux/init.h>
-
 #include <linux/ide.h>
 
 #include <asm/traps.h>
@@ -33,6 +32,7 @@
 #include <asm/machw.h> 
 #include <asm/mac_via.h>
 #include <asm/mac_psc.h>
+#include <asm/unistd.h>
 
 volatile __u8 *via1, *via2;
 #if 0

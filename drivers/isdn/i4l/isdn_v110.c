@@ -535,13 +535,15 @@ isdn_v110_stat_callback(int idx, isdn_ctrl * c)
 			if (!(v = dev->v110[idx]))
 				return 0;
 			atomic_inc(&dev->v110use[idx]);
-			if (v->skbidle > 0) {
-				v->skbidle--;
-				ret = 1;
-			} else {
-				if (v->skbuser > 0)
-					v->skbuser--;
-				ret = 0;
+			for (i=0; i * v->framelen < c->parm.length; i++) {
+				if (v->skbidle > 0) {
+					v->skbidle--;
+					ret = 1;
+				} else {
+					if (v->skbuser > 0)
+						v->skbuser--;
+					ret = 0;
+				}
 			}
 			for (i = v->skbuser + v->skbidle; i < 2; i++) {
 				struct sk_buff *skb;

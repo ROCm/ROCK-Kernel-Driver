@@ -45,7 +45,7 @@ get_fixed_ranges(mtrr_type * frs)
 }
 
 /*  Grab all of the MTRR state for this CPU into *state  */
-void get_mtrr_state(void)
+void __init get_mtrr_state(void)
 {
 	unsigned int i;
 	struct mtrr_var_range *vrs;
@@ -142,7 +142,7 @@ void generic_get_mtrr(unsigned int reg, unsigned long *base,
 	*type = base_lo & 0xff;
 }
 
-static int __init set_fixed_ranges(mtrr_type * frs)
+static int set_fixed_ranges(mtrr_type * frs)
 {
 	unsigned int *p = (unsigned int *) frs;
 	int changed = FALSE;
@@ -177,7 +177,7 @@ static int __init set_fixed_ranges(mtrr_type * frs)
 
 /*  Set the MSR pair relating to a var range. Returns TRUE if
     changes are made  */
-static int __init set_mtrr_var_ranges(unsigned int index, struct mtrr_var_range *vr)
+static int set_mtrr_var_ranges(unsigned int index, struct mtrr_var_range *vr)
 {
 	unsigned int lo, hi;
 	int changed = FALSE;

@@ -22,6 +22,7 @@
 #include <linux/config.h>
 #include <linux/fs.h>
 #include <linux/seq_file.h>
+#include <linux/syscalls.h>
 #include <linux/kdev_t.h>
 #include <linux/major.h>
 #include <linux/string.h>
@@ -66,7 +67,6 @@ struct screen_info screen_info = {
 
 extern unsigned long trapbase;
 void (*prom_palette)(int);
-asmlinkage void sys_sync(void);	/* it's really int */
 
 /* Pretty sick eh? */
 void prom_sync_me(void)
@@ -74,7 +74,7 @@ void prom_sync_me(void)
 	unsigned long prom_tbr, flags;
 
 	/* XXX Badly broken. FIX! - Anton */
-	save_and_cli(flags);
+	local_irq_save(flags);
 	__asm__ __volatile__("rd %%tbr, %0\n\t" : "=r" (prom_tbr));
 	__asm__ __volatile__("wr %0, 0x0, %%tbr\n\t"
 			     "nop\n\t"
@@ -86,9 +86,9 @@ void prom_sync_me(void)
 	prom_printf("PROM SYNC COMMAND...\n");
 	show_free_areas();
 	if(current->pid != 0) {
-		sti();
+		local_irq_enable();
 		sys_sync();
-		cli();
+		local_irq_disable();
 	}
 	prom_printf("Returning to prom\n");
 
@@ -96,7 +96,7 @@ void prom_sync_me(void)
 			     "nop\n\t"
 			     "nop\n\t"
 			     "nop\n\t" : : "r" (prom_tbr));
-	restore_flags(flags);
+	local_irq_restore(flags);
 
 	return;
 }
@@ -390,7 +390,7 @@ static int __init set_preferred_console(void)
 }
 console_initcall(set_preferred_console);
 
-asmlinkage int sys_ioperm(unsigned long from, unsigned long num, int on)
+asmlinkage long sys_ioperm(unsigned long from, unsigned long num, int on)
 {
 	return -EIO;
 }

@@ -67,7 +67,7 @@ static __inline__ __u32 ___arch__swab32(__u32 x)
 	
 	__asm__ __volatile__ (
 		"   lrvr  %0,%1"
-		: "=d" (result) : "d" (x), "m" (x) );
+		: "=d" (result) : "d" (x) );
 	return result;
 #endif /* __s390x__ */
 }

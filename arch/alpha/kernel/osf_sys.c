@@ -17,6 +17,7 @@
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
 #include <linux/stddef.h>
+#include <linux/syscalls.h>
 #include <linux/unistd.h>
 #include <linux/ptrace.h>
 #include <linux/slab.h>
@@ -46,7 +47,6 @@
 #include <asm/processor.h>
 
 extern int do_pipe(int *);
-extern asmlinkage unsigned long sys_brk(unsigned long);
 
 /*
  * Brk needs to return an error.  Still support Linux's brk(0) query idiom,
@@ -464,7 +464,7 @@ osf_shmat(int shmid, void *shmaddr, int shmflg)
 	unsigned long raddr;
 	long err;
 
-	err = sys_shmat(shmid, shmaddr, shmflg, &raddr);
+	err = do_shmat(shmid, shmaddr, shmflg, &raddr);
 
 	/*
 	 * This works because all user-level addresses are
@@ -821,7 +821,6 @@ osf_setsysinfo(unsigned long op, void *buffer, unsigned long nbytes,
    affects all sorts of things, like timeval and itimerval.  */
 
 extern struct timezone sys_tz;
-extern asmlinkage int sys_utimes(char *, struct timeval *);
 extern int do_adjtimex(struct timex *);
 
 struct timeval32
@@ -1315,8 +1314,6 @@ arch_get_unmapped_area(struct file *filp, unsigned long addr,
 }
 
 #ifdef CONFIG_OSF4_COMPAT
-extern ssize_t sys_readv(unsigned long, const struct iovec *, unsigned long);
-extern ssize_t sys_writev(unsigned long, const struct iovec *, unsigned long);
 
 /* Clear top 32 bits of iov_len in the user's buffer for
    compatibility with old versions of OSF/1 where iov_len

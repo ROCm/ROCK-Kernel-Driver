@@ -110,15 +110,6 @@ jiffies_to_compat_timeval(unsigned long jiffies, struct compat_timeval *value)
 
 #define ELF_CORE_EFLAGS EF_MIPS_ABI2
 
-#undef CONFIG_BINFMT_ELF
-#ifdef CONFIG_BINFMT_ELF32
-#define CONFIG_BINFMT_ELF CONFIG_BINFMT_ELF32
-#endif
-#undef CONFIG_BINFMT_ELF_MODULE
-#ifdef CONFIG_BINFMT_ELF32_MODULE
-#define CONFIG_BINFMT_ELF_MODULE CONFIG_BINFMT_ELF32_MODULE
-#endif
-
 MODULE_DESCRIPTION("Binary format loader for compatibility with n32 Linux/MIPS binaries");
 MODULE_AUTHOR("Ralf Baechle (ralf@linux-mips.org)");
 

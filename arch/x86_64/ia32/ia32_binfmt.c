@@ -272,16 +272,6 @@ do {							\
 
 #define load_elf_binary load_elf32_binary
 
-#undef CONFIG_BINFMT_ELF
-#ifdef CONFIG_BINFMT_ELF32
-# define CONFIG_BINFMT_ELF		CONFIG_BINFMT_ELF32
-#endif
-
-#undef CONFIG_BINFMT_ELF_MODULE
-#ifdef CONFIG_BINFMT_ELF32_MODULE
-# define CONFIG_BINFMT_ELF_MODULE	CONFIG_BINFMT_ELF32_MODULE
-#endif
-
 #define ELF_PLAT_INIT(r, load_addr)	elf32_init(r)
 #define setup_arg_pages(bprm)		ia32_setup_arg_pages(bprm)
 int ia32_setup_arg_pages(struct linux_binprm *bprm);
@@ -408,3 +398,26 @@ elf32_map (struct file *filep, unsigned long addr, struct elf_phdr *eppnt, int p
 	return(map_addr);
 }
 
+#ifdef CONFIG_SYSCTL
+/* Register vsyscall32 into the ABI table */
+#include <linux/sysctl.h>
+
+static ctl_table abi_table2[] = {
+	{ 99, "vsyscall32", &sysctl_vsyscall32, sizeof(int), 0644, NULL,
+	  proc_dointvec },
+	{ 0, }
+}; 
+
+static ctl_table abi_root_table2[] = { 
+	{ .ctl_name = CTL_ABI, .procname = "abi", .mode = 0555, 
+	  .child = abi_table2 }, 
+	{ 0 }, 
+}; 
+
+static __init int ia32_binfmt_init(void)
+{ 
+	register_sysctl_table(abi_root_table2, 1);
+	return 0;
+}
+__initcall(ia32_binfmt_init);
+#endif

@@ -39,7 +39,7 @@
 #define _FP_EMU_H
 
 #ifdef __ASSEMBLY__
-#include "../kernel/m68k_defs.h"
+#include <asm/offsets.h>
 #endif
 #include <asm/math-emu.h>
 

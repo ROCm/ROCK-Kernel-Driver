@@ -129,6 +129,8 @@ enum
 	KERN_HPPA_UNALIGNED=59,	/* int: hppa unaligned-trap enable */
 	KERN_PRINTK_RATELIMIT=60, /* int: tune printk ratelimiting */
 	KERN_PRINTK_RATELIMIT_BURST=61,	/* int: tune printk ratelimiting */
+	KERN_PTY=62,		/* dir: pty driver */
+	KERN_NGROUPS_MAX=63,	/* int: NGROUPS_MAX */
 };
 
 
@@ -190,6 +192,13 @@ enum
 	RANDOM_WRITE_THRESH=4,
 	RANDOM_BOOT_ID=5,
 	RANDOM_UUID=6
+};
+
+/* /proc/sys/kernel/pty */
+enum
+{
+	PTY_MAX=1,
+	PTY_NR=2
 };
 
 /* /proc/sys/bus/isa */
@@ -725,7 +734,6 @@ enum
 
 #ifdef __KERNEL__
 
-extern asmlinkage long sys_sysctl(struct __sysctl_args __user *);
 extern void sysctl_init(void);
 
 typedef struct ctl_table ctl_table;

@@ -49,7 +49,7 @@ neponset_pcmcia_configure_socket(struct sa1100_pcmcia_socket *skt, const socket_
 
 	switch (skt->nr) {
 	case 0:
-		pa_dwr_mask = GPIO_GPIO0 | GPIO_GPIO1;
+		pa_dwr_mask = GPIO_A0 | GPIO_A1;
 		ncr_mask = NCR_A0VPP | NCR_A1VPP;
 
 		if (state->Vpp == 0)
@@ -66,7 +66,7 @@ neponset_pcmcia_configure_socket(struct sa1100_pcmcia_socket *skt, const socket_
 		break;
 
 	case 1:
-		pa_dwr_mask = GPIO_GPIO2 | GPIO_GPIO3;
+		pa_dwr_mask = GPIO_A2 | GPIO_A3;
 		ncr_mask = 0;
 		ncr_set = 0;
 
@@ -87,9 +87,9 @@ neponset_pcmcia_configure_socket(struct sa1100_pcmcia_socket *skt, const socket_
 	 */
 	switch (state->Vcc) {
 	default:
-	case 0:  pa_dwr_set = 0;			break;
-	case 33: pa_dwr_set = GPIO_GPIO1|GPIO_GPIO2;	break;
-	case 50: pa_dwr_set = GPIO_GPIO0|GPIO_GPIO3;	break;
+	case 0:  pa_dwr_set = 0;		break;
+	case 33: pa_dwr_set = GPIO_A1|GPIO_A2;	break;
+	case 50: pa_dwr_set = GPIO_A0|GPIO_A3;	break;
 	}
 
 	ret = sa1111_pcmcia_configure_socket(skt, state);
@@ -99,8 +99,8 @@ neponset_pcmcia_configure_socket(struct sa1100_pcmcia_socket *skt, const socket_
 		local_irq_save(flags);
 		NCR_0 = (NCR_0 & ~ncr_mask) | ncr_set;
 
-		PA_DWR = (PA_DWR & ~pa_dwr_mask) | (pa_dwr_set & pa_dwr_mask);
 		local_irq_restore(flags);
+		sa1111_set_io(SA1111_DEV(skt->dev), pa_dwr_mask, pa_dwr_set);
 	}
 
 	return 0;
@@ -111,33 +111,32 @@ static void neponset_pcmcia_socket_init(struct sa1100_pcmcia_socket *skt)
 	if (skt->nr == 0)
 		NCR_0 &= ~(NCR_A0VPP | NCR_A1VPP);
 
-        sa1111_pcmcia_socket_init(skt);
+	sa1111_pcmcia_socket_init(skt);
 }
 
 static struct pcmcia_low_level neponset_pcmcia_ops = {
-        .owner                  = THIS_MODULE,
-        .hw_init                = sa1111_pcmcia_hw_init,
-        .hw_shutdown            = sa1111_pcmcia_hw_shutdown,
-        .socket_state           = sa1111_pcmcia_socket_state,
-        .configure_socket       = neponset_pcmcia_configure_socket,
-        .socket_init            = neponset_pcmcia_socket_init,
-        .socket_suspend         = sa1111_pcmcia_socket_suspend,
+	.owner			= THIS_MODULE,
+	.hw_init		= sa1111_pcmcia_hw_init,
+	.hw_shutdown		= sa1111_pcmcia_hw_shutdown,
+	.socket_state		= sa1111_pcmcia_socket_state,
+	.configure_socket	= neponset_pcmcia_configure_socket,
+	.socket_init		= neponset_pcmcia_socket_init,
+	.socket_suspend 	= sa1111_pcmcia_socket_suspend,
 };
 
-int __init pcmcia_neponset_init(struct device *dev)
+int __init pcmcia_neponset_init(struct sa1111_dev *sadev)
 {
-        int ret = -ENODEV;
+	int ret = -ENODEV;
 
-        if (machine_is_assabet()) {
-                /*
-                 * Set GPIO_A<3:0> to be outputs for the MAX1600,
-                 * and switch to standby mode.
-                 */
-                PA_DDR = 0;
-                PA_DWR = 0;
-		PA_SDR = 0;
-		PA_SSR = 0;
-		ret = sa11xx_drv_pcmcia_probe(dev, &neponset_pcmcia_ops, 0, 2);
+	if (machine_is_assabet()) {
+		/*
+		 * Set GPIO_A<3:0> to be outputs for the MAX1600,
+		 * and switch to standby mode.
+		 */
+		sa1111_set_io_dir(sadev, GPIO_A0|GPIO_A1|GPIO_A2|GPIO_A3, 0, 0);
+		sa1111_set_io(sadev, GPIO_A0|GPIO_A1|GPIO_A2|GPIO_A3, 0);
+		sa1111_set_sleep_io(sadev, GPIO_A0|GPIO_A1|GPIO_A2|GPIO_A3, 0);
+		ret = sa11xx_drv_pcmcia_probe(&sadev->dev, &neponset_pcmcia_ops, 0, 2);
 	}
 
 	return ret;

@@ -49,14 +49,20 @@
 #include <asm/hardirq.h>
 #include <asm/cputable.h>
 #include <asm/sections.h>
+#include <asm/tlbflush.h>
 
 #ifndef CONFIG_SMP
 struct task_struct *last_task_used_math = NULL;
 struct task_struct *last_task_used_altivec = NULL;
 #endif
 
-struct mm_struct ioremap_mm = { pgd             : ioremap_dir  
-                               ,page_table_lock : SPIN_LOCK_UNLOCKED };
+struct mm_struct ioremap_mm = {
+	.pgd		= ioremap_dir,
+	.mm_users	= ATOMIC_INIT(2),
+	.mm_count	= ATOMIC_INIT(1),
+	.cpu_vm_mask	= CPU_MASK_ALL,
+	.page_table_lock = SPIN_LOCK_UNLOCKED,
+};
 
 char *sysmap = NULL;
 unsigned long sysmap_size = 0;
@@ -146,6 +152,8 @@ struct task_struct *__switch_to(struct task_struct *prev,
 		new->thread.regs->msr |= MSR_VEC;
 #endif /* CONFIG_ALTIVEC */
 
+	flush_tlb_pending();
+
 	new_thread = &new->thread;
 	old_thread = &current->thread;
 
@@ -162,7 +170,7 @@ struct task_struct *__switch_to(struct task_struct *prev,
 	 * for that first.
 	 */
 	if ((cur_cpu_spec->cpu_features & CPU_FTR_SLB) &&
-	    GET_ESID((unsigned long)_get_SP()) != GET_ESID(PAGE_OFFSET)) {
+	    GET_ESID(__get_SP()) != GET_ESID(PAGE_OFFSET)) {
 		union {
 			unsigned long word0;
 			slb_dword0 data;
@@ -171,7 +179,7 @@ struct task_struct *__switch_to(struct task_struct *prev,
 		esid_data.word0 = 0;
 		/* class bit is in valid field for slbie instruction */
 		esid_data.data.v = 1;
-		esid_data.data.esid = GET_ESID((unsigned long)_get_SP());
+		esid_data.data.esid = GET_ESID(__get_SP());
 		asm volatile("isync; slbie %0; isync" : : "r" (esid_data));
 	}
 	local_irq_restore(flags);
@@ -202,13 +210,11 @@ void show_regs(struct pt_regs * regs)
 #endif /* CONFIG_SMP */
 
 	for (i = 0; i < 32; i++) {
-		long r;
 		if ((i % 4) == 0) {
 			printk("\n" KERN_INFO "GPR%02d: ", i);
 		}
-		if (__get_user(r, &(regs->gpr[i])))
-		    return;
-		printk("%016lX ", r);
+
+		printk("%016lX ", regs->gpr[i]);
 	}
 	printk("\n");
 	/*
@@ -473,6 +479,20 @@ out:
 	return error;
 }
 
+static int kstack_depth_to_print = 64;
+
+static inline int validate_sp(unsigned long sp, struct task_struct *p)
+{
+	unsigned long stack_page = (unsigned long)p->thread_info;
+
+	if (sp < stack_page + sizeof(struct thread_struct))
+		return 0;
+	if (sp >= stack_page + THREAD_SIZE)
+		return 0;
+
+	return 1;
+}
+
 /*
  * These bracket the sleeping functions..
  */
@@ -484,24 +504,23 @@ extern void scheduling_functions_end_here(void);
 unsigned long get_wchan(struct task_struct *p)
 {
 	unsigned long ip, sp;
-	unsigned long stack_page = (unsigned long)p->thread_info;
 	int count = 0;
+
 	if (!p || p == current || p->state == TASK_RUNNING)
 		return 0;
+
 	sp = p->thread.ksp;
+	if (!validate_sp(sp, p))
+		return 0;
+
 	do {
 		sp = *(unsigned long *)sp;
-		if (sp < (stack_page + sizeof(struct thread_struct)) ||
-		    sp >= (stack_page + THREAD_SIZE))
+		if (!validate_sp(sp, p))
 			return 0;
 		if (count > 0) {
 			ip = *(unsigned long *)(sp + 16);
-			/*
-			 * XXX we mask the upper 32 bits until procps
-			 * gets fixed.
-			 */
 			if (ip < first_sched || ip >= last_sched)
-				return (ip & 0xFFFFFFFF);
+				return ip;
 		}
 	} while (count++ < 16);
 	return 0;
@@ -510,33 +529,35 @@ unsigned long get_wchan(struct task_struct *p)
 void show_stack(struct task_struct *p, unsigned long *_sp)
 {
 	unsigned long ip;
-	unsigned long stack_page = (unsigned long)p->thread_info;
 	int count = 0;
 	unsigned long sp = (unsigned long)_sp;
 
-	if (!p)
+	if (sp == 0) {
+		if (p) {
+			sp = p->thread.ksp;
+		} else {
+			sp = __get_SP();
+			p = current;
+		}
+	}
+
+	if (!validate_sp(sp, p))
 		return;
 
-	if (sp == 0)
-		sp = p->thread.ksp;
 	printk("Call Trace:\n");
 	do {
-		if (__get_user(sp, (unsigned long *)sp))
-			break;
-		if (sp < stack_page + sizeof(struct thread_struct))
-			break;
-		if (sp >= stack_page + THREAD_SIZE)
-			break;
-		if (__get_user(ip, (unsigned long *)(sp + 16)))
-			break;
+		sp = *(unsigned long *)sp;
+		if (!validate_sp(sp, p))
+			return;
+		ip = *(unsigned long *)(sp + 16);
 		printk("[%016lx] ", ip);
 		print_symbol("%s\n", ip);
-	} while (count++ < 32);
+	} while (count++ < kstack_depth_to_print);
 }
 
 void dump_stack(void)
 {
-	show_stack(current, (unsigned long *)_get_SP());
+	show_stack(current, (unsigned long *)__get_SP());
 }
 
 EXPORT_SYMBOL(dump_stack);

@@ -54,6 +54,8 @@
 #include <linux/ipv6.h>
 #include <linux/in.h>
 #include <linux/icmpv6.h>
+#include <linux/syscalls.h>
+#include <linux/unistd.h>
 #include <linux/sysctl.h>
 #include <linux/binfmts.h>
 #include <linux/dnotify.h>
@@ -65,6 +67,7 @@
 #include <asm/types.h>
 #include <asm/ipc.h>
 #include <asm/uaccess.h>
+#include <asm/unistd.h>
 
 #include <asm/semaphore.h>
 
@@ -778,8 +781,6 @@ int cp_compat_stat(struct kstat *stat, struct compat_stat *statbuf)
 	return err;
 }
 
-extern asmlinkage long sys_sysfs(int option, unsigned long arg1, unsigned long arg2);
-
 /* Note: it is necessary to treat option as an unsigned int,
  * with the corresponding cast to a signed int to insure that the 
  * proper conversion (sign extension) between the register representation of a signed int (msr in 32-bit mode)
@@ -1154,8 +1155,6 @@ struct sysinfo32 {
 	u32 mem_unit;
 	char _f[20-2*sizeof(int)-sizeof(int)];
 };
-
-extern asmlinkage long sys_sysinfo(struct sysinfo *info);
 
 asmlinkage long sys32_sysinfo(struct sysinfo32 *info)
 {
@@ -1649,7 +1648,7 @@ do_sys32_shmat(int first, int second, int third, int version, void *uptr)
 
 	if (version == 1)
 		return err;
-	err = sys_shmat(first, uptr, second, &raddr);
+	err = do_shmat(first, uptr, second, &raddr);
 	if (err)
 		return err;
 	err = put_user(raddr, uaddr);
@@ -1868,8 +1867,6 @@ asmlinkage long sys32_ipc(u32 call, u32 first_parm, u32 second_parm, u32 third_p
 	return err;
 }
 
-extern asmlinkage ssize_t sys_sendfile(int out_fd, int in_fd, off_t* offset, size_t count);
-
 /* Note: it is necessary to treat out_fd and in_fd as unsigned ints, 
  * with the corresponding cast to a signed int to insure that the 
  * proper conversion (sign extension) between the register representation of a signed int (msr in 32-bit mode)
@@ -1893,8 +1890,6 @@ asmlinkage long sys32_sendfile(u32 out_fd, u32 in_fd, compat_off_t* offset, u32 
 		
 	return ret;
 }
-
-extern asmlinkage ssize_t sys_sendfile64(int out_fd, int in_fd, loff_t *offset, size_t count);
 
 asmlinkage int sys32_sendfile64(int out_fd, int in_fd, compat_loff_t *offset, s32 count)
 {
@@ -2158,9 +2153,6 @@ void start_thread32(struct pt_regs* regs, unsigned long nip, unsigned long sp)
 #endif /* CONFIG_ALTIVEC */
 }
 
-extern asmlinkage int sys_prctl(int option, unsigned long arg2, unsigned long arg3,
-				unsigned long arg4, unsigned long arg5);
-
 /* Note: it is necessary to treat option as an unsigned int, 
  * with the corresponding cast to a signed int to insure that the 
  * proper conversion (sign extension) between the register representation of a signed int (msr in 32-bit mode)
@@ -2175,14 +2167,12 @@ asmlinkage long sys32_prctl(u32 option, u32 arg2, u32 arg3, u32 arg4, u32 arg5)
 			 (unsigned long) arg5);
 }
 
-extern asmlinkage int sys_sched_rr_get_interval(pid_t pid, struct timespec *interval);
-
 /* Note: it is necessary to treat pid as an unsigned int, 
  * with the corresponding cast to a signed int to insure that the 
  * proper conversion (sign extension) between the register representation of a signed int (msr in 32-bit mode)
  * and the register representation of a signed int (msr in 64-bit mode) is performed.
  */
-asmlinkage int sys32_sched_rr_get_interval(u32 pid, struct compat_timespec *interval)
+asmlinkage long sys32_sched_rr_get_interval(u32 pid, struct compat_timespec *interval)
 {
 	struct timespec t;
 	int ret;
@@ -2196,9 +2186,6 @@ asmlinkage int sys32_sched_rr_get_interval(u32 pid, struct compat_timespec *inte
 	return ret;
 }
 
-extern asmlinkage int sys_pciconfig_read(unsigned long bus, unsigned long dfn, unsigned long off,
-					 unsigned long len, unsigned char *buf);
-
 asmlinkage int sys32_pciconfig_read(u32 bus, u32 dfn, u32 off, u32 len, u32 ubuf)
 {
 	return sys_pciconfig_read((unsigned long) bus,
@@ -2207,12 +2194,6 @@ asmlinkage int sys32_pciconfig_read(u32 bus, u32 dfn, u32 off, u32 len, u32 ubuf
 				  (unsigned long) len,
 				  (unsigned char *)AA(ubuf));
 }
-
-
-
-
-extern asmlinkage int sys_pciconfig_write(unsigned long bus, unsigned long dfn, unsigned long off,
-					  unsigned long len, unsigned char *buf);
 
 asmlinkage int sys32_pciconfig_write(u32 bus, u32 dfn, u32 off, u32 len, u32 ubuf)
 {
@@ -2281,8 +2262,6 @@ asmlinkage int sys32_pciconfig_iobase(u32 which, u32 in_bus, u32 in_devfn)
 }
 
 
-extern asmlinkage int sys_newuname(struct new_utsname * name);
-
 asmlinkage int ppc64_newuname(struct new_utsname * name)
 {
 	int errno = sys_newuname(name);
@@ -2294,8 +2273,6 @@ asmlinkage int ppc64_newuname(struct new_utsname * name)
 	}
 	return errno;
 }
-
-extern asmlinkage long sys_personality(unsigned long);
 
 asmlinkage int ppc64_personality(unsigned long personality)
 {
@@ -2310,8 +2287,6 @@ asmlinkage int ppc64_personality(unsigned long personality)
 
 
 
-extern asmlinkage long sys_access(const char * filename, int mode);
-
 /* Note: it is necessary to treat mode as an unsigned int,
  * with the corresponding cast to a signed int to insure that the 
  * proper conversion (sign extension) between the register representation of a signed int (msr in 32-bit mode)
@@ -2322,8 +2297,6 @@ asmlinkage long sys32_access(const char * filename, u32 mode)
 	return sys_access(filename, (int)mode);
 }
 
-
-extern asmlinkage long sys_creat(const char * pathname, int mode);
 
 /* Note: it is necessary to treat mode as an unsigned int,
  * with the corresponding cast to a signed int to insure that the 
@@ -2336,8 +2309,6 @@ asmlinkage long sys32_creat(const char * pathname, u32 mode)
 }
 
 
-extern asmlinkage long sys_waitpid(pid_t pid, unsigned int * stat_addr, int options);
-
 /* Note: it is necessary to treat pid and options as unsigned ints,
  * with the corresponding cast to a signed int to insure that the 
  * proper conversion (sign extension) between the register representation of a signed int (msr in 32-bit mode)
@@ -2348,8 +2319,6 @@ asmlinkage long sys32_waitpid(u32 pid, unsigned int * stat_addr, u32 options)
 	return sys_waitpid((int)pid, stat_addr, (int)options);
 }
 
-
-extern asmlinkage long sys_getgroups(int gidsetsize, gid_t *grouplist);
 
 /* Note: it is necessary to treat gidsetsize as an unsigned int,
  * with the corresponding cast to a signed int to insure that the 
@@ -2362,8 +2331,6 @@ asmlinkage long sys32_getgroups(u32 gidsetsize, gid_t *grouplist)
 }
 
 
-extern asmlinkage long sys_getpgid(pid_t pid);
-
 /* Note: it is necessary to treat pid as an unsigned int,
  * with the corresponding cast to a signed int to insure that the 
  * proper conversion (sign extension) between the register representation of a signed int (msr in 32-bit mode)
@@ -2374,8 +2341,6 @@ asmlinkage long sys32_getpgid(u32 pid)
 	return sys_getpgid((int)pid);
 }
 
-
-extern asmlinkage long sys_getpriority(int which, int who);
 
 /* Note: it is necessary to treat which and who as unsigned ints,
  * with the corresponding cast to a signed int to insure that the 
@@ -2388,8 +2353,6 @@ asmlinkage long sys32_getpriority(u32 which, u32 who)
 }
 
 
-extern asmlinkage long sys_getsid(pid_t pid);
-
 /* Note: it is necessary to treat pid as an unsigned int,
  * with the corresponding cast to a signed int to insure that the 
  * proper conversion (sign extension) between the register representation of a signed int (msr in 32-bit mode)
@@ -2400,7 +2363,6 @@ asmlinkage long sys32_getsid(u32 pid)
 	return sys_getsid((int)pid);
 }
 
-extern asmlinkage long sys_kill(int pid, int sig);
 
 /* Note: it is necessary to treat pid and sig as unsigned ints,
  * with the corresponding cast to a signed int to insure that the 
@@ -2413,8 +2375,6 @@ asmlinkage long sys32_kill(u32 pid, u32 sig)
 }
 
 
-extern asmlinkage long sys_mkdir(const char * pathname, int mode);
-
 /* Note: it is necessary to treat mode as an unsigned int,
  * with the corresponding cast to a signed int to insure that the 
  * proper conversion (sign extension) between the register representation of a signed int (msr in 32-bit mode)
@@ -2425,15 +2385,11 @@ asmlinkage long sys32_mkdir(const char * pathname, u32 mode)
 	return sys_mkdir(pathname, (int)mode);
 }
 
-extern asmlinkage long sys_nice(int increment);
-
 long sys32_nice(u32 increment)
 {
 	/* sign extend increment */
 	return sys_nice((int)increment);
 }
-
-extern off_t sys_lseek(unsigned int fd, off_t offset, unsigned int origin);
 
 off_t ppc32_lseek(unsigned int fd, u32 offset, unsigned int origin)
 {
@@ -2472,8 +2428,6 @@ out_error:
 	goto out;
 }
 
-extern asmlinkage long sys_readlink(const char * path, char * buf, int bufsiz);
-
 /* Note: it is necessary to treat bufsiz as an unsigned int,
  * with the corresponding cast to a signed int to insure that the 
  * proper conversion (sign extension) between the register representation of a signed int (msr in 32-bit mode)
@@ -2483,8 +2437,6 @@ asmlinkage long sys32_readlink(const char * path, char * buf, u32 bufsiz)
 {
 	return sys_readlink(path, buf, (int)bufsiz);
 }
-
-extern asmlinkage long sys_sched_get_priority_max(int policy);
 
 /* Note: it is necessary to treat option as an unsigned int,
  * with the corresponding cast to a signed int to insure that the 
@@ -2497,8 +2449,6 @@ asmlinkage long sys32_sched_get_priority_max(u32 policy)
 }
 
 
-extern asmlinkage long sys_sched_get_priority_min(int policy);
-
 /* Note: it is necessary to treat policy as an unsigned int,
  * with the corresponding cast to a signed int to insure that the 
  * proper conversion (sign extension) between the register representation of a signed int (msr in 32-bit mode)
@@ -2509,8 +2459,6 @@ asmlinkage long sys32_sched_get_priority_min(u32 policy)
 	return sys_sched_get_priority_min((int)policy);
 }
 
-
-extern asmlinkage long sys_sched_getparam(pid_t pid, struct sched_param *param);
 
 /* Note: it is necessary to treat pid as an unsigned int,
  * with the corresponding cast to a signed int to insure that the 
@@ -2523,8 +2471,6 @@ asmlinkage long sys32_sched_getparam(u32 pid, struct sched_param *param)
 }
 
 
-extern asmlinkage long sys_sched_getscheduler(pid_t pid);
-
 /* Note: it is necessary to treat pid as an unsigned int,
  * with the corresponding cast to a signed int to insure that the 
  * proper conversion (sign extension) between the register representation of a signed int (msr in 32-bit mode)
@@ -2535,8 +2481,6 @@ asmlinkage long sys32_sched_getscheduler(u32 pid)
 	return sys_sched_getscheduler((int)pid);
 }
 
-
-extern asmlinkage long sys_sched_setparam(pid_t pid, struct sched_param *param);
 
 /* Note: it is necessary to treat pid as an unsigned int,
  * with the corresponding cast to a signed int to insure that the 
@@ -2549,8 +2493,6 @@ asmlinkage long sys32_sched_setparam(u32 pid, struct sched_param *param)
 }
 
 
-extern asmlinkage long sys_sched_setscheduler(pid_t pid, int policy, struct sched_param *param);
-
 /* Note: it is necessary to treat pid and policy as unsigned ints,
  * with the corresponding cast to a signed int to insure that the 
  * proper conversion (sign extension) between the register representation of a signed int (msr in 32-bit mode)
@@ -2561,8 +2503,6 @@ asmlinkage long sys32_sched_setscheduler(u32 pid, u32 policy, struct sched_param
 	return sys_sched_setscheduler((int)pid, (int)policy, param);
 }
 
-
-extern asmlinkage long sys_setdomainname(char *name, int len);
 
 /* Note: it is necessary to treat len as an unsigned int,
  * with the corresponding cast to a signed int to insure that the 
@@ -2575,8 +2515,6 @@ asmlinkage long sys32_setdomainname(char *name, u32 len)
 }
 
 
-extern asmlinkage long sys_setgroups(int gidsetsize, gid_t *grouplist);
-
 /* Note: it is necessary to treat gidsetsize as an unsigned int,
  * with the corresponding cast to a signed int to insure that the 
  * proper conversion (sign extension) between the register representation of a signed int (msr in 32-bit mode)
@@ -2588,16 +2526,12 @@ asmlinkage long sys32_setgroups(u32 gidsetsize, gid_t *grouplist)
 }
 
 
-extern asmlinkage long sys_sethostname(char *name, int len);
-
 asmlinkage long sys32_sethostname(char *name, u32 len)
 {
 	/* sign extend len */
 	return sys_sethostname(name, (int)len);
 }
 
-
-extern asmlinkage long sys_setpgid(pid_t pid, pid_t pgid);
 
 /* Note: it is necessary to treat pid and pgid as unsigned ints,
  * with the corresponding cast to a signed int to insure that the 
@@ -2610,15 +2544,11 @@ asmlinkage long sys32_setpgid(u32 pid, u32 pgid)
 }
 
 
-extern asmlinkage long sys_setpriority(int which, int who, int niceval);
-
 long sys32_setpriority(u32 which, u32 who, u32 niceval)
 {
 	/* sign extend which, who and niceval */
 	return sys_setpriority((int)which, (int)who, (int)niceval);
 }
-
-extern asmlinkage long sys_ssetmask(int newmask);
 
 /* Note: it is necessary to treat newmask as an unsigned int,
  * with the corresponding cast to a signed int to insure that the 
@@ -2630,16 +2560,12 @@ asmlinkage long sys32_ssetmask(u32 newmask)
 	return sys_ssetmask((int) newmask);
 }
 
-extern asmlinkage long sys_syslog(int type, char * buf, int len);
-
 long sys32_syslog(u32 type, char * buf, u32 len)
 {
 	/* sign extend len */
 	return sys_syslog(type, buf, (int)len);
 }
 
-
-extern asmlinkage long sys_umask(int mask);
 
 /* Note: it is necessary to treat mask as an unsigned int,
  * with the corresponding cast to a signed int to insure that the 
@@ -2651,8 +2577,6 @@ asmlinkage long sys32_umask(u32 mask)
 	return sys_umask((int)mask);
 }
 
-
-extern asmlinkage long sys_umount(char * name, int flags);
 
 /* Note: it is necessary to treat flags as an unsigned int,
  * with the corresponding cast to a signed int to insure that the 
@@ -2756,10 +2680,6 @@ int sys32_olduname(struct oldold_utsname * name)
 	return error;
 }
 
-extern unsigned long sys_mmap(unsigned long addr, size_t len,
-			      unsigned long prot, unsigned long flags,
-			      unsigned long fd, off_t offset);
-
 unsigned long sys32_mmap2(unsigned long addr, size_t len,
 			  unsigned long prot, unsigned long flags,
 			  unsigned long fd, unsigned long pgoff)
@@ -2801,8 +2721,6 @@ long sys32_utimes(char *filename, struct compat_timeval *tvs)
 	return ret;
 }
 
-extern long sys_tgkill(int tgid, int pid, int sig);
-
 long sys32_tgkill(u32 tgid, u32 pid, int sig)
 {
 	/* sign extend tgid, pid */
@@ -2813,11 +2731,6 @@ long sys32_tgkill(u32 tgid, u32 pid, int sig)
  * long long munging:
  * The 32 bit ABI passes long longs in an odd even register pair.
  */
-extern ssize_t sys_pread64(unsigned int fd, char *buf, size_t count,
-			   loff_t pos);
-
-extern ssize_t sys_pwrite64(unsigned int fd, const char *buf, size_t count,
-			    loff_t pos);
 
 compat_ssize_t sys32_pread64(unsigned int fd, char *ubuf, compat_size_t count,
 			     u32 reg6, u32 poshi, u32 poslo)
@@ -2831,15 +2744,10 @@ compat_ssize_t sys32_pwrite64(unsigned int fd, char *ubuf, compat_size_t count,
 	return sys_pwrite64(fd, ubuf, count, ((loff_t)poshi << 32) | poslo);
 }
 
-extern ssize_t sys_readahead(int fd, loff_t offset, size_t count);
-
 compat_ssize_t sys32_readahead(int fd, u32 r4, u32 offhi, u32 offlo, u32 count)
 {
 	return sys_readahead(fd, ((loff_t)offhi << 32) | offlo, count);
 }
-
-extern asmlinkage long sys_truncate(const char * path, unsigned long length);
-extern asmlinkage long sys_ftruncate(unsigned int fd, unsigned long length);
 
 asmlinkage int sys32_truncate64(const char * path, u32 reg4,
 				unsigned long high, unsigned long low)
@@ -2853,16 +2761,12 @@ asmlinkage int sys32_ftruncate64(unsigned int fd, u32 reg4, unsigned long high,
 	return sys_ftruncate(fd, (high << 32) | low);
 }
 
-extern long sys_lookup_dcookie(u64 cookie64, char *buf, size_t len);
-
 long ppc32_lookup_dcookie(u32 cookie_high, u32 cookie_low, char *buf,
 			  size_t len)
 {
 	return sys_lookup_dcookie((u64)cookie_high << 32 | cookie_low,
 				  buf, len);
 }
-
-extern int sys_fadvise64(int fd, loff_t offset, size_t len, int advice);
 
 long ppc32_fadvise64(int fd, u32 unused, u32 offset_high, u32 offset_low,
 		     size_t len, int advice)

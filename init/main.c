@@ -12,10 +12,12 @@
 #define __KERNEL_SYSCALLS__
 
 #include <linux/config.h>
+#include <linux/types.h>
 #include <linux/module.h>
 #include <linux/proc_fs.h>
 #include <linux/devfs_fs_kernel.h>
 #include <linux/kernel.h>
+#include <linux/syscalls.h>
 #include <linux/unistd.h>
 #include <linux/string.h>
 #include <linux/ctype.h>
@@ -348,7 +350,7 @@ static void __init setup_per_cpu_areas(void)
 static void __init smp_init(void)
 {
 	unsigned int i;
-	unsigned j = 0;
+	unsigned j = 1;
 
 	/* FIXME: This should be done in userspace --RR */
 	for (i = 0; i < NR_CPUS; i++) {

@@ -155,7 +155,7 @@ void __init disable_early_printk(void)
 void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
 		  unsigned long r6, unsigned long r7)
 {
-#ifdef CONFIG_PPC_PSERIES
+#if defined(CONFIG_SMP) && defined(CONFIG_PPC_PSERIES)
 	unsigned int ret, i;
 #endif
 
@@ -232,8 +232,8 @@ void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
 				systemcfg->processorCount++;
 			}
 		}
-	}
 #endif /* CONFIG_SMP */
+	}
 #endif /* CONFIG_PPC_PSERIES */
 
 #ifdef CONFIG_PPC_PMAC
@@ -477,7 +477,7 @@ static int __init set_preferred_console(void)
 	char *name;
 
 	/* The user has requested a console so this is already set up. */
-	if (strstr(cmd_line, "console="))
+	if (strstr(saved_command_line, "console="))
 		return -EBUSY;
 
 	prom_stdout = find_path_device(of_stdout_device);

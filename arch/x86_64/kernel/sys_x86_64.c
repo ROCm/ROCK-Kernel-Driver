@@ -4,6 +4,7 @@
 
 #include <linux/errno.h>
 #include <linux/sched.h>
+#include <linux/syscalls.h>
 #include <linux/mm.h>
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
@@ -155,8 +156,8 @@ asmlinkage long sys_uname(struct new_utsname * name)
 asmlinkage long wrap_sys_shmat(int shmid, char *shmaddr, int shmflg)
 {
 	unsigned long raddr;
-	return sys_shmat(shmid,shmaddr,shmflg,&raddr) ?: (long)raddr;
-} 
+	return do_shmat(shmid,shmaddr,shmflg,&raddr) ?: (long)raddr;
+}
 
 asmlinkage long sys_time64(long * tloc)
 {

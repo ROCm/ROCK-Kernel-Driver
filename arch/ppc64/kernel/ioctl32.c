@@ -23,6 +23,7 @@
 #define INCLUDES
 #include "compat_ioctl.c"
 #include <linux/ncp_fs.h>
+#include <linux/syscalls.h>
 #include <asm/ppc32.h>
 
 #define CODE

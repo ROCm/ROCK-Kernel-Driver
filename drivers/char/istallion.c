@@ -1991,6 +1991,61 @@ static int stli_setserial(stliport_t *portp, struct serial_struct *sp)
 
 /*****************************************************************************/
 
+static int stli_tiocmget(struct tty_struct *tty, struct file *file)
+{
+	stliport_t *portp = tty->driver_data;
+	stlibrd_t *brdp;
+	int rc;
+
+	if (portp == (stliport_t *) NULL)
+		return(-ENODEV);
+	if ((portp->brdnr < 0) || (portp->brdnr >= stli_nrbrds))
+		return(0);
+	brdp = stli_brds[portp->brdnr];
+	if (brdp == (stlibrd_t *) NULL)
+		return(0);
+	if (tty->flags & (1 << TTY_IO_ERROR))
+		return(-EIO);
+
+	if ((rc = stli_cmdwait(brdp, portp, A_GETSIGNALS,
+			       &portp->asig, sizeof(asysigs_t), 1)) < 0)
+		return(rc);
+
+	return stli_mktiocm(portp->asig.sigvalue);
+}
+
+static int stli_tiocmset(struct tty_struct *tty, struct file *file,
+			 unsigned int set, unsigned int clear)
+{
+	stliport_t *portp = tty->driver_data;
+	stlibrd_t *brdp;
+	int rts = -1, dtr = -1;
+
+	if (portp == (stliport_t *) NULL)
+		return(-ENODEV);
+	if ((portp->brdnr < 0) || (portp->brdnr >= stli_nrbrds))
+		return(0);
+	brdp = stli_brds[portp->brdnr];
+	if (brdp == (stlibrd_t *) NULL)
+		return(0);
+	if (tty->flags & (1 << TTY_IO_ERROR))
+		return(-EIO);
+
+	if (set & TIOCM_RTS)
+		rts = 1;
+	if (set & TIOCM_DTR)
+		dtr = 1;
+	if (clear & TIOCM_RTS)
+		rts = 0;
+	if (clear & TIOCM_DTR)
+		dtr = 0;
+
+	stli_mkasysigs(&portp->asig, dtr, rts);
+
+	return stli_cmdwait(brdp, portp, A_SETSIGNALS, &portp->asig,
+			    sizeof(asysigs_t), 0);
+}
+
 static int stli_ioctl(struct tty_struct *tty, struct file *file, unsigned int cmd, unsigned long arg)
 {
 	stliport_t	*portp;
@@ -2033,43 +2088,6 @@ static int stli_ioctl(struct tty_struct *tty, struct file *file, unsigned int cm
 			tty->termios->c_cflag =
 				(tty->termios->c_cflag & ~CLOCAL) |
 				(ival ? CLOCAL : 0);
-		break;
-	case TIOCMGET:
-		if ((rc = verify_area(VERIFY_WRITE, (void *) arg,
-		    sizeof(unsigned int))) == 0) {
-			if ((rc = stli_cmdwait(brdp, portp, A_GETSIGNALS,
-			    &portp->asig, sizeof(asysigs_t), 1)) < 0)
-				return(rc);
-			lval = stli_mktiocm(portp->asig.sigvalue);
-			put_user(lval, (unsigned int *) arg);
-		}
-		break;
-	case TIOCMBIS:
-		if ((rc = get_user(ival, (unsigned int *) arg)) == 0) {
-			stli_mkasysigs(&portp->asig,
-				((ival & TIOCM_DTR) ? 1 : -1),
-				((ival & TIOCM_RTS) ? 1 : -1));
-			rc = stli_cmdwait(brdp, portp, A_SETSIGNALS,
-				&portp->asig, sizeof(asysigs_t), 0);
-		}
-		break;
-	case TIOCMBIC:
-		if ((rc = get_user(ival, (unsigned int *) arg)) == 0) {
-			stli_mkasysigs(&portp->asig,
-				((ival & TIOCM_DTR) ? 0 : -1),
-				((ival & TIOCM_RTS) ? 0 : -1));
-			rc = stli_cmdwait(brdp, portp, A_SETSIGNALS,
-				&portp->asig, sizeof(asysigs_t), 0);
-		}
-		break;
-	case TIOCMSET:
-		if ((rc = get_user(ival, (unsigned int *) arg)) == 0) {
-			stli_mkasysigs(&portp->asig,
-				((ival & TIOCM_DTR) ? 1 : 0),
-				((ival & TIOCM_RTS) ? 1 : 0));
-			rc = stli_cmdwait(brdp, portp, A_SETSIGNALS,
-				&portp->asig, sizeof(asysigs_t), 0);
-		}
 		break;
 	case TIOCGSERIAL:
 		if ((rc = verify_area(VERIFY_WRITE, (void *) arg,
@@ -5255,6 +5273,8 @@ static struct tty_operations stli_ops = {
 	.wait_until_sent = stli_waituntilsent,
 	.send_xchar = stli_sendxchar,
 	.read_proc = stli_readproc,
+	.tiocmget = stli_tiocmget,
+	.tiocmset = stli_tiocmset,
 };
 
 /*****************************************************************************/

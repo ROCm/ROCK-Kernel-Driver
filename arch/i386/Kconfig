@@ -828,7 +828,7 @@ config EFI
 
 config IRQBALANCE
  	bool "Enable kernel irq balancing"
-	depends on SMP
+	depends on SMP && X86_IO_APIC
 	default y
 	help
  	  The defalut yes will allow the kernel to do irq load balancing.
@@ -1094,7 +1094,7 @@ config PCI_DIRECT
 	default y
 
 config PCI_USE_VECTOR
-	bool "Vector-based interrupt indexing"
+	bool "Vector-based interrupt indexing (MSI)"
 	depends on X86_LOCAL_APIC && X86_IO_APIC
 	default n
 	help
@@ -1104,11 +1104,11 @@ config PCI_USE_VECTOR
 	   1) Support MSI implementation.
 	   2) Support future IOxAPIC hotplug
 
-	   Note that this enables MSI, Message Signaled Interrupt, on all
-	   MSI capable device functions detected if users also install the
-	   MSI patch. Message Signal Interrupt enables an MSI-capable
-	   hardware device to send an inbound Memory Write on its PCI bus
-	   instead of asserting IRQ signal on device IRQ pin.
+	   Note that this allows the device drivers to enable MSI, Message
+	   Signaled Interrupt, on all MSI capable device functions detected.
+	   Message Signal Interrupt enables an MSI-capable hardware device to
+	   send an inbound Memory Write on its PCI bus instead of asserting
+	   IRQ signal on device IRQ pin.
 
 	   If you don't know what to do here, say N.
 

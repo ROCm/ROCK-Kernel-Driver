@@ -120,6 +120,8 @@ setup_irq(unsigned int irq, struct irqaction * new)
 	if (!shared) {
 		desc->depth = 0;
 		desc->status &= ~(IRQ_DISABLED | IRQ_AUTODETECT | IRQ_WAITING | IRQ_INPROGRESS);
+		if (desc->handler && desc->handler->startup)
+			desc->handler->startup(irq);
 		unmask_irq(irq);
 	}
 	spin_unlock_irqrestore(&desc->lock,flags);
@@ -476,8 +478,18 @@ void ppc_irq_dispatch_handler(struct pt_regs *regs, int irq)
 	struct irqaction *action;
 	int cpu = smp_processor_id();
 	irq_desc_t *desc = irq_desc + irq;
+	irqreturn_t action_ret;
 
 	kstat_cpu(cpu).irqs[irq]++;
+
+	if (desc->status & IRQ_PER_CPU) {
+		/* no locking required for CPU-local interrupts: */
+		ack_irq(irq);
+		action_ret = handle_irq_event(irq, regs, desc->action);
+		desc->handler->end(irq);
+		return;
+	}
+
 	spin_lock(&desc->lock);
 	ack_irq(irq);	
 	/*
@@ -485,8 +497,7 @@ void ppc_irq_dispatch_handler(struct pt_regs *regs, int irq)
 	   WAITING is used by probe to mark irqs that are being tested
 	   */
 	status = desc->status & ~(IRQ_REPLAY | IRQ_WAITING);
-	if (!(status & IRQ_PER_CPU))
-		status |= IRQ_PENDING; /* we _want_ to handle it */
+	status |= IRQ_PENDING; /* we _want_ to handle it */
 
 	/*
 	 * If the IRQ is disabled for whatever reason, we cannot
@@ -509,8 +520,7 @@ void ppc_irq_dispatch_handler(struct pt_regs *regs, int irq)
 			goto out;
 		}
 		status &= ~IRQ_PENDING; /* we commit to handling */
-		if (!(status & IRQ_PER_CPU))
-			status |= IRQ_INPROGRESS; /* we are handling it */
+		status |= IRQ_INPROGRESS; /* we are handling it */
 	}
 	desc->status = status;
 
@@ -534,8 +544,6 @@ void ppc_irq_dispatch_handler(struct pt_regs *regs, int irq)
 	 * SMP environment.
 	 */
 	for (;;) {
-		irqreturn_t action_ret;
-
 		spin_unlock(&desc->lock);
 		action_ret = handle_irq_event(irq, regs, action);
 		spin_lock(&desc->lock);
@@ -567,6 +575,21 @@ int do_IRQ(struct pt_regs *regs)
 	struct ItLpQueue *lpq;
 
 	irq_enter();
+
+#ifdef CONFIG_DEBUG_STACKOVERFLOW
+	/* Debugging check for stack overflow: is there less than 8KB free? */
+	{
+		long sp;
+
+		sp = __get_SP() & (THREAD_SIZE-1);
+
+		if (unlikely(sp < (sizeof(struct thread_info) + 8192))) {
+			printk("do_IRQ: stack overflow: %ld\n",
+				sp - sizeof(struct thread_info));
+			dump_stack();
+		}
+	}
+#endif
 
 	lpaca = get_paca();
 #ifdef CONFIG_SMP
@@ -802,3 +825,79 @@ irqreturn_t no_action(int irq, void *dev, struct pt_regs *regs)
 {
 	return IRQ_NONE;
 }
+
+#ifndef CONFIG_PPC_ISERIES
+/*
+ * Virtual IRQ mapping code, used on systems with XICS interrupt controllers.
+ */
+
+#define UNDEFINED_IRQ 0xffffffff
+unsigned int virt_irq_to_real_map[NR_IRQS];
+
+/*
+ * Don't use virtual irqs 0, 1, 2 for devices.
+ * The pcnet32 driver considers interrupt numbers < 2 to be invalid,
+ * and 2 is the XICS IPI interrupt.
+ * We limit virtual irqs to 17 less than NR_IRQS so that when we
+ * offset them by 16 (to reserve the first 16 for ISA interrupts)
+ * we don't end up with an interrupt number >= NR_IRQS.
+ */
+#define MIN_VIRT_IRQ	3
+#define MAX_VIRT_IRQ	(NR_IRQS - NUM_8259_INTERRUPTS - 1)
+#define NR_VIRT_IRQS	(MAX_VIRT_IRQ - MIN_VIRT_IRQ + 1)
+
+void
+virt_irq_init(void)
+{
+	int i;
+	for (i = 0; i < NR_IRQS; i++)
+		virt_irq_to_real_map[i] = UNDEFINED_IRQ;
+}
+
+/* Create a mapping for a real_irq if it doesn't already exist.
+ * Return the virtual irq as a convenience.
+ */
+int virt_irq_create_mapping(unsigned int real_irq)
+{
+	unsigned int virq, first_virq;
+	static int warned;
+
+	if (naca->interrupt_controller == IC_OPEN_PIC)
+		return real_irq;	/* no mapping for openpic (for now) */
+
+	/* don't map interrupts < MIN_VIRT_IRQ */
+	if (real_irq < MIN_VIRT_IRQ) {
+		virt_irq_to_real_map[real_irq] = real_irq;
+		return real_irq;
+	}
+
+	/* map to a number between MIN_VIRT_IRQ and MAX_VIRT_IRQ */
+	virq = real_irq;
+	if (virq > MAX_VIRT_IRQ)
+		virq = (virq % NR_VIRT_IRQS) + MIN_VIRT_IRQ;
+
+	/* search for this number or a free slot */
+	first_virq = virq;
+	while (virt_irq_to_real_map[virq] != UNDEFINED_IRQ) {
+		if (virt_irq_to_real_map[virq] == real_irq)
+			return virq;
+		if (++virq > MAX_VIRT_IRQ)
+			virq = MIN_VIRT_IRQ;
+		if (virq == first_virq)
+			goto nospace;	/* oops, no free slots */
+	}
+
+	virt_irq_to_real_map[virq] = real_irq;
+	return virq;
+
+ nospace:
+	if (!warned) {
+		printk(KERN_CRIT "Interrupt table is full\n");
+		printk(KERN_CRIT "Increase NR_IRQS (currently %d) "
+		       "in your kernel sources and rebuild.\n", NR_IRQS);
+		warned = 1;
+	}
+	return NO_IRQ;
+}
+
+#endif

@@ -49,9 +49,6 @@
 #include <asm/pcic.h>
 #include <asm/cacheflush.h>
 
-/* Used to protect the IRQ action lists */
-spinlock_t irq_action_lock = SPIN_LOCK_UNLOCKED;
-
 #ifdef CONFIG_SMP
 #define SMP_NOP2 "nop; nop;\n\t"
 #define SMP_NOP3 "nop; nop; nop;\n\t"
@@ -159,9 +156,11 @@ struct irqaction static_irqaction[MAX_STATIC_ALLOC];
 int static_irq_count;
 
 struct irqaction *irq_action[NR_IRQS] = {
-	  NULL, NULL, NULL, NULL, NULL, NULL , NULL, NULL,
-	  NULL, NULL, NULL, NULL, NULL, NULL , NULL, NULL
+	[0 ... (NR_IRQS-1)] = NULL
 };
+
+/* Used to protect the IRQ action lists */
+spinlock_t irq_action_lock = SPIN_LOCK_UNLOCKED;
 
 int show_interrupts(struct seq_file *p, void *v)
 {
@@ -177,11 +176,11 @@ int show_interrupts(struct seq_file *p, void *v)
 		
 		return show_sun4d_interrupts(p, v);
 	}
+	spin_lock_irqsave(&irq_action_lock, flags);
 	if (i < NR_IRQS) {
-		local_irq_save(flags);
 	        action = *(i + irq_action);
 		if (!action) 
-		        goto skip;
+			goto out_unlock;
 		seq_printf(p, "%3d: ", i);
 #ifndef CONFIG_SMP
 		seq_printf(p, "%10u ", kstat_irqs(i));
@@ -201,9 +200,9 @@ int show_interrupts(struct seq_file *p, void *v)
 				action->name);
 		}
 		seq_putc(p, '\n');
-skip:
-		local_irq_restore(flags);
 	}
+out_unlock:
+	spin_unlock_irqrestore(&irq_action_lock, flags);
 	return 0;
 }
 
@@ -220,14 +219,18 @@ void free_irq(unsigned int irq, void *dev_id)
 		return sun4d_free_irq(irq, dev_id);
 	}
 	cpu_irq = irq & (NR_IRQS - 1);
-	action = *(cpu_irq + irq_action);
         if (cpu_irq > 14) {  /* 14 irq levels on the sparc */
                 printk("Trying to free bogus IRQ %d\n", irq);
                 return;
         }
+
+	spin_lock_irqsave(&irq_action_lock, flags);
+
+	action = *(cpu_irq + irq_action);
+
 	if (!action->handler) {
 		printk("Trying to free free IRQ%d\n",irq);
-		return;
+		goto out_unlock;
 	}
 	if (dev_id) {
 		for (; action; action = action->next) {
@@ -237,80 +240,43 @@ void free_irq(unsigned int irq, void *dev_id)
 		}
 		if (!action) {
 			printk("Trying to free free shared IRQ%d\n",irq);
-			return;
+			goto out_unlock;
 		}
 	} else if (action->flags & SA_SHIRQ) {
 		printk("Trying to free shared IRQ%d with NULL device ID\n", irq);
-		return;
+		goto out_unlock;
 	}
 	if (action->flags & SA_STATIC_ALLOC)
 	{
-	    /* This interrupt is marked as specially allocated
-	     * so it is a bad idea to free it.
-	     */
-	    printk("Attempt to free statically allocated IRQ%d (%s)\n",
-		   irq, action->name);
-	    return;
+		/* This interrupt is marked as specially allocated
+		 * so it is a bad idea to free it.
+		 */
+		printk("Attempt to free statically allocated IRQ%d (%s)\n",
+		       irq, action->name);
+		goto out_unlock;
 	}
 	
-        save_and_cli(flags);
 	if (action && tmp)
 		tmp->next = action->next;
 	else
 		*(cpu_irq + irq_action) = action->next;
+
+	spin_unlock_irqrestore(&irq_action_lock, flags);
+
+	synchronize_irq(irq);
+
+	spin_lock_irqsave(&irq_action_lock, flags);
 
 	kfree(action);
 
 	if (!(*(cpu_irq + irq_action)))
 		disable_irq(irq);
 
-        restore_flags(flags);
+out_unlock:
+	spin_unlock_irqrestore(&irq_action_lock, flags);
 }
 
 EXPORT_SYMBOL(free_irq);
-
-#ifdef CONFIG_SMP
-
-/* Who has the global irq brlock */
-unsigned char global_irq_holder = NO_PROC_ID;
-
-void smp_show_backtrace_all_cpus(void);
-void show_backtrace(void);
-
-#define VERBOSE_DEBUG_IRQLOCK
-#define MAXCOUNT 100000000
-
-static void show(char * str)
-{
-	int cpu = smp_processor_id();
-	int i;
-
-	printk("\n%s, CPU %d:\n", str, cpu);
-	printk("irq:  %d [ ", irqs_running());
-	for (i = 0; i < NR_CPUS; i++) {
-		if (cpu_online(i))
-			printk("%u ", __brlock_array[i][BR_GLOBALIRQ_LOCK]);
-	}
-	printk("]\nbh:   %d [ ",
-	       (spin_is_locked(&global_bh_lock) ? 1 : 0));
-	for (i = 0; i < NR_CPUS; i++) {
-		if (cpu_online(i))
-			printk("%u ", local_bh_count(i));
-	}
-	printk("]\n");
-
-#ifdef VERBOSE_DEBUG_IRQLOCK
-	smp_show_backtrace_all_cpus();
-#else
-	show_backtrace();
-#endif
-}
-
-
-/*
- * We have to allow irqs to arrive between local_irq_enable and local_irq_disable
- */
-#define SYNC_OTHER_CORES(x) barrier()
 
 /*
  * This is called when we want to synchronize with
@@ -319,140 +285,13 @@ static void show(char * str)
  * are no interrupts that are executing on another
  * CPU we need to call this function.
  */
-void synchronize_irq(void)
+#ifdef CONFIG_SMP
+void synchronize_irq(unsigned int irq)
 {
-	if (irqs_running()) {
-		cli();
-		sti();
-	}
+	printk("synchronize_irq says: implement me!\n");
+	BUG();
 }
-
-static inline void get_irqlock(int cpu)
-{
-	int count;
-
-	if ((unsigned char)cpu == global_irq_holder)
-		return;
-
-	count = MAXCOUNT;
-again:
-	br_write_lock(BR_GLOBALIRQ_LOCK);
-	for (;;) {
-		spinlock_t *lock;
-
-		if (!irqs_running() &&
-		    (local_bh_count(smp_processor_id()) || !spin_is_locked(&global_bh_lock)))
-			break;
-
-		br_write_unlock(BR_GLOBALIRQ_LOCK);
-		lock = &__br_write_locks[BR_GLOBALIRQ_LOCK].lock;
-		while (irqs_running() ||
-		       spin_is_locked(lock) ||
-		       (!local_bh_count(smp_processor_id()) && spin_is_locked(&global_bh_lock))) {
-			if (!--count) {
-				show("get_irqlock");
-				count = (~0 >> 1);
-			}
-			local_irq_enable();
-			SYNC_OTHER_CORES(cpu);
-			local_irq_disable();
-		}
-		goto again;
-	}
-
-	global_irq_holder = cpu;
-}
-
-/*
- * A global "cli()" while in an interrupt context
- * turns into just a local cli(). Interrupts
- * should use spinlocks for the (very unlikely)
- * case that they ever want to protect against
- * each other.
- *
- * If we already have local interrupts disabled,
- * this will not turn a local disable into a
- * global one (problems with spinlocks: this makes
- * save_flags+cli+sti usable inside a spinlock).
- */
-void __global_cli(void)
-{
-	unsigned long flags;
-
-	local_save_flags(flags);
-
-	if ((flags & PSR_PIL) != PSR_PIL) {
-		int cpu = smp_processor_id();
-		local_irq_disable();
-		if (!local_irq_count(cpu))
-			get_irqlock(cpu);
-	}
-}
-
-void __global_sti(void)
-{
-	int cpu = smp_processor_id();
-
-	if (!local_irq_count(cpu))
-		release_irqlock(cpu);
-	local_irq_enable();
-}
-
-/*
- * SMP flags value to restore to:
- * 0 - global cli
- * 1 - global sti
- * 2 - local cli
- * 3 - local sti
- */
-unsigned long __global_save_flags(void)
-{
-	unsigned long flags, retval;
-	unsigned long local_enabled = 0;
-
-	local_save_flags(flags);
-
-	if ((flags & PSR_PIL) != PSR_PIL)
-		local_enabled = 1;
-
-	/* default to local */
-	retval = 2 + local_enabled;
-
-	/* check for global flags if we're not in an interrupt */
-	if (!local_irq_count(smp_processor_id())) {
-		if (local_enabled)
-			retval = 1;
-		if (global_irq_holder == (unsigned char) smp_processor_id())
-			retval = 0;
-	}
-	return retval;
-}
-
-void __global_restore_flags(unsigned long flags)
-{
-	switch (flags) {
-	case 0:
-		__global_cli();
-		break;
-	case 1:
-		__global_sti();
-		break;
-	case 2:
-		local_irq_disable();
-		break;
-	case 3:
-		local_irq_enable();
-		break;
-	default:
-	{
-		unsigned long pc;
-		__asm__ __volatile__("mov %%i7, %0" : "=r" (pc));
-		printk("global_restore_flags: Bogon flags(%08lx) caller %08lx\n", flags, pc);
-	}
-	}
-}
-
-#endif /* CONFIG_SMP */
+#endif /* SMP */
 
 void unexpected_irq(int irq, void *dev_id, struct pt_regs * regs)
 {
@@ -533,16 +372,24 @@ int request_fast_irq(unsigned int irq,
 	struct irqaction *action;
 	unsigned long flags;
 	unsigned int cpu_irq;
+	int ret;
 #ifdef CONFIG_SMP
 	struct tt_entry *trap_table;
 	extern struct tt_entry trapbase_cpu1, trapbase_cpu2, trapbase_cpu3;
 #endif
 	
 	cpu_irq = irq & (NR_IRQS - 1);
-	if(cpu_irq > 14)
-		return -EINVAL;
-	if(!handler)
-		return -EINVAL;
+	if(cpu_irq > 14) {
+		ret = -EINVAL;
+		goto out;
+	}
+	if(!handler) {
+		ret = -EINVAL;
+		goto out;
+	}
+
+	spin_lock_irqsave(&irq_action_lock, flags);
+
 	action = *(cpu_irq + irq_action);
 	if(action) {
 		if(action->flags & SA_SHIRQ)
@@ -552,10 +399,9 @@ int request_fast_irq(unsigned int irq,
 
 		/* Anyway, someone already owns it so cannot be made fast. */
 		printk("request_fast_irq: Trying to register yet already owned.\n");
-		return -EBUSY;
+		ret = -EBUSY;
+		goto out_unlock;
 	}
-
-	spin_lock_irqsave(&irq_action_lock, flags);
 
 	/* If this is flagged as statically allocated then we use our
 	 * private struct which is never freed.
@@ -573,8 +419,8 @@ int request_fast_irq(unsigned int irq,
 						 GFP_ATOMIC);
 	
 	if (!action) { 
-		spin_unlock_irqrestore(&irq_action_lock, flags);
-		return -ENOMEM;
+		ret = -ENOMEM;
+		goto out_unlock;
 	}
 
 	/* Dork with trap table if we get this far. */
@@ -610,8 +456,12 @@ int request_fast_irq(unsigned int irq,
 	*(cpu_irq + irq_action) = action;
 
 	enable_irq(irq);
+
+	ret = 0;
+out_unlock:
 	spin_unlock_irqrestore(&irq_action_lock, flags);
-	return 0;
+out:
+	return ret;
 }
 
 int request_irq(unsigned int irq,
@@ -621,6 +471,7 @@ int request_irq(unsigned int irq,
 	struct irqaction * action, *tmp = NULL;
 	unsigned long flags;
 	unsigned int cpu_irq;
+	int ret;
 	
 	if (sparc_cpu_model == sun4d) {
 		extern int sun4d_request_irq(unsigned int, 
@@ -629,45 +480,50 @@ int request_irq(unsigned int irq,
 		return sun4d_request_irq(irq, handler, irqflags, devname, dev_id);
 	}
 	cpu_irq = irq & (NR_IRQS - 1);
-	if(cpu_irq > 14)
-		return -EINVAL;
-
-	if (!handler)
-	    return -EINVAL;
+	if(cpu_irq > 14) {
+		ret = -EINVAL;
+		goto out;
+	}
+	if (!handler) {
+		ret = -EINVAL;
+		goto out;
+	}
 	    
+	spin_lock_irqsave(&irq_action_lock, flags);
+
 	action = *(cpu_irq + irq_action);
 	if (action) {
 		if ((action->flags & SA_SHIRQ) && (irqflags & SA_SHIRQ)) {
 			for (tmp = action; tmp->next; tmp = tmp->next);
 		} else {
-			return -EBUSY;
+			ret = -EBUSY;
+			goto out_unlock;
 		}
 		if ((action->flags & SA_INTERRUPT) ^ (irqflags & SA_INTERRUPT)) {
 			printk("Attempt to mix fast and slow interrupts on IRQ%d denied\n", irq);
-			return -EBUSY;
+			ret = -EBUSY;
+			goto out_unlock;
 		}   
 		action = NULL;		/* Or else! */
 	}
-
-	spin_lock_irqsave(&irq_action_lock, flags);
 
 	/* If this is flagged as statically allocated then we use our
 	 * private struct which is never freed.
 	 */
 	if (irqflags & SA_STATIC_ALLOC) {
-	    if (static_irq_count < MAX_STATIC_ALLOC)
-		action = &static_irqaction[static_irq_count++];
-	    else
-		printk("Request for IRQ%d (%s) SA_STATIC_ALLOC failed using kmalloc\n",irq, devname);
+		if (static_irq_count < MAX_STATIC_ALLOC)
+			action = &static_irqaction[static_irq_count++];
+		else
+			printk("Request for IRQ%d (%s) SA_STATIC_ALLOC failed using kmalloc\n", irq, devname);
 	}
 	
 	if (action == NULL)
-	    action = (struct irqaction *)kmalloc(sizeof(struct irqaction),
-						 GFP_ATOMIC);
+		action = (struct irqaction *)kmalloc(sizeof(struct irqaction),
+						     GFP_ATOMIC);
 	
 	if (!action) { 
-		spin_unlock_irqrestore(&irq_action_lock, flags);
-		return -ENOMEM;
+		ret = -ENOMEM;
+		goto out_unlock;
 	}
 
 	action->handler = handler;
@@ -683,8 +539,12 @@ int request_irq(unsigned int irq,
 		*(cpu_irq + irq_action) = action;
 
 	enable_irq(irq);
+
+	ret = 0;
+out_unlock:
 	spin_unlock_irqrestore(&irq_action_lock, flags);
-	return 0;
+out:
+	return ret;
 }
 
 EXPORT_SYMBOL(request_irq);

@@ -1,5 +1,5 @@
 /*
- * linux/drivers/ide/pci/alim15x3.c		Version 0.16	2003/01/02
+ * linux/drivers/ide/pci/alim15x3.c		Version 0.17	2003/01/02
  *
  *  Copyright (C) 1998-2000 Michel Aubry, Maintainer
  *  Copyright (C) 1998-2000 Andrzej Krzysztofowicz, Maintainer
@@ -19,6 +19,7 @@
  *	Don't use LBA48 mode on ALi <= 0xC4
  *	Don't poke 0x79 with a non ALi northbridge
  *	Don't flip undefined bits on newer chipsets (fix Fujitsu laptop hang)
+ *	Allow UDMA6 on revisions > 0xC4
  *
  *  Documentation
  *	Chipset documentation available under NDA only
@@ -406,7 +407,9 @@ static u8 ali15x3_ratemask (ide_drive_t *drive)
 {
 	u8 mode = 0, can_ultra	= ali15x3_can_ultra(drive);
 
-	if (m5229_revision >= 0xC4 && can_ultra) {
+	if (m5229_revision > 0xC4 && can_ultra) {
+		mode = 4;
+	} else if (m5229_revision == 0xC4 && can_ultra) {
 		mode = 3;
 	} else if (m5229_revision >= 0xC2 && can_ultra) {
 		mode = 2;
@@ -439,10 +442,14 @@ static int ali15x3_tune_chipset (ide_drive_t *drive, u8 xferspeed)
 {
 	ide_hwif_t *hwif	= HWIF(drive);
 	struct pci_dev *dev	= hwif->pci_dev;
-	u8 speed	= ide_rate_filter(ali15x3_ratemask(drive), xferspeed);
+	u8 speed		= ide_rate_filter(ali15x3_ratemask(drive), xferspeed);
+	u8 speed1		= speed;
 	u8 unit			= (drive->select.b.unit & 0x01);
 	u8 tmpbyte		= 0x00;
 	int m5229_udma		= (hwif->channel) ? 0x57 : 0x56;
+
+	if (speed == XFER_UDMA_6)
+		speed1 = 0x47;
 
 	if (speed < XFER_UDMA_0) {
 		u8 ultra_enable	= (unit) ? 0x7f : 0xf7;
@@ -461,7 +468,7 @@ static int ali15x3_tune_chipset (ide_drive_t *drive, u8 xferspeed)
 		/*
 		 * enable ultra dma and set timing
 		 */
-		tmpbyte |= ((0x08 | ((4-speed)&0x07)) << (unit << 2));
+		tmpbyte |= ((0x08 | ((4-speed1)&0x07)) << (unit << 2));
 		pci_write_config_byte(dev, m5229_udma, tmpbyte);
 		if (speed >= XFER_UDMA_3) {
 			pci_read_config_byte(dev, 0x4b, &tmpbyte);
@@ -757,7 +764,7 @@ static void __init init_hwif_common_ali15x3 (ide_hwif_t *hwif)
 	hwif->atapi_dma = 1;
 
 	if (m5229_revision > 0x20)
-		hwif->ultra_mask = 0x3f;
+		hwif->ultra_mask = 0x7f;
 	hwif->mwdma_mask = 0x07;
 	hwif->swdma_mask = 0x07;
 
@@ -845,9 +852,6 @@ static void __init init_dma_ali15x3 (ide_hwif_t *hwif, unsigned long dmabase)
 		hwif->OUTB(hwif->INB(dmabase+2) & 0x60, dmabase+2);
 	ide_setup_dma(hwif, dmabase, 8);
 }
-
-extern void ide_setup_pci_device(struct pci_dev *, ide_pci_device_t *);
-
 
 /**
  *	alim15x3_init_one	-	set up an ALi15x3 IDE controller

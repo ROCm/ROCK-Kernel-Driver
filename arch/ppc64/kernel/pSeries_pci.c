@@ -39,7 +39,7 @@
 #include <asm/pci-bridge.h>
 #include <asm/ppcdebug.h>
 #include <asm/naca.h>
-#include <asm/pci_dma.h>
+#include <asm/iommu.h>
 
 #include "open_pic.h"
 #include "pci.h"
@@ -699,7 +699,7 @@ void __init pSeries_final_fixup(void)
 	phbs_fixup_io();
 	chrp_request_regions();
 	pci_fix_bus_sysdata();
-	create_tce_tables();
+	iommu_setup_pSeries();
 }
 
 /*********************************************************************** 

@@ -357,7 +357,9 @@ svcauth_null_accept(struct svc_rqst *rqstp, u32 *authp)
 	/* Signal that mapping to nobody uid/gid is required */
 	rqstp->rq_cred.cr_uid = (uid_t) -1;
 	rqstp->rq_cred.cr_gid = (gid_t) -1;
-	rqstp->rq_cred.cr_groups[0] = NOGROUP;
+	rqstp->rq_cred.cr_group_info = groups_alloc(0);
+	if (rqstp->rq_cred.cr_group_info == NULL)
+		return SVC_DROP; /* kmalloc failure - client must retry */
 
 	/* Put NULL verifier */
 	svc_putu32(resv, RPC_AUTH_NULL);
@@ -424,6 +426,9 @@ svcauth_unix_accept(struct svc_rqst *rqstp, u32 *authp)
 	int		rv=0;
 	struct ip_map key, *ipm;
 
+	cred->cr_group_info = NULL;
+	rqstp->rq_client = NULL;
+
 	if ((len -= 3*4) < 0)
 		return SVC_GARBAGE;
 
@@ -440,13 +445,11 @@ svcauth_unix_accept(struct svc_rqst *rqstp, u32 *authp)
 	slen = ntohl(svc_getu32(argv));			/* gids length */
 	if (slen > 16 || (len -= (slen + 2)*4) < 0)
 		goto badcred;
+	cred->cr_group_info = groups_alloc(slen);
+	if (cred->cr_group_info == NULL)
+		return SVC_DROP;
 	for (i = 0; i < slen; i++)
-		if (i < SVC_CRED_NGROUPS)
-			cred->cr_groups[i] = ntohl(svc_getu32(argv));
-		else
-			svc_getu32(argv);
-	if (i < SVC_CRED_NGROUPS)
-		cred->cr_groups[i] = NOGROUP;
+		GROUP_AT(cred->cr_group_info, i) = ntohl(svc_getu32(argv));
 
 	if (svc_getu32(argv) != RPC_AUTH_NULL || svc_getu32(argv) != 0) {
 		*authp = rpc_autherr_badverf;
@@ -460,7 +463,6 @@ svcauth_unix_accept(struct svc_rqst *rqstp, u32 *authp)
 
 	ipm = ip_map_lookup(&key, 0);
 
-	rqstp->rq_client = NULL;
 	if (ipm)
 		switch (cache_check(&ip_map_cache, &ipm->h, &rqstp->rq_chandle)) {
 		case -EAGAIN:
@@ -501,6 +503,9 @@ svcauth_unix_release(struct svc_rqst *rqstp)
 	if (rqstp->rq_client)
 		auth_domain_put(rqstp->rq_client);
 	rqstp->rq_client = NULL;
+	if (rqstp->rq_cred.cr_group_info)
+		put_group_info(rqstp->rq_cred.cr_group_info);
+	rqstp->rq_cred.cr_group_info = NULL;
 
 	return 0;
 }

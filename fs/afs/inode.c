@@ -147,7 +147,7 @@ static int afs_iget5_set(struct inode *inode, void *opaque)
 inline int afs_iget(struct super_block *sb, struct afs_fid *fid,
 		    struct inode **_inode)
 {
-	struct afs_iget_data data = { fid: *fid };
+	struct afs_iget_data data = { .fid = *fid };
 	struct afs_super_info *as;
 	struct afs_vnode *vnode;
 	struct inode *inode;

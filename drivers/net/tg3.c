@@ -56,8 +56,8 @@
 
 #define DRV_MODULE_NAME		"tg3"
 #define PFX DRV_MODULE_NAME	": "
-#define DRV_MODULE_VERSION	"2.7"
-#define DRV_MODULE_RELDATE	"February 17, 2004"
+#define DRV_MODULE_VERSION	"2.8"
+#define DRV_MODULE_RELDATE	"February 23, 2004"
 
 #define TG3_DEF_MAC_MODE	0
 #define TG3_DEF_RX_MODE		0
@@ -191,6 +191,8 @@ static struct pci_device_id tg3_pci_tbl[] = {
 	{ PCI_VENDOR_ID_ALTIMA, PCI_DEVICE_ID_ALTIMA_AC1003,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
 	{ PCI_VENDOR_ID_ALTIMA, PCI_DEVICE_ID_ALTIMA_AC9100,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
+	{ PCI_VENDOR_ID_APPLE, PCI_DEVICE_ID_APPLE_TIGON3,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
 	{ 0, }
 };
@@ -7425,6 +7427,7 @@ static int __devinit tg3_test_dma(struct tg3 *tp)
 			break;
 		}
 
+#if 0
 		/* validate data reached card RAM correctly. */
 		for (i = 0; i < TEST_BUFFER_SIZE / sizeof(u32); i++) {
 			u32 val;
@@ -7435,7 +7438,7 @@ static int __devinit tg3_test_dma(struct tg3 *tp)
 			}
 			p[i] = 0;
 		}
-
+#endif
 		/* Now read it back. */
 		ret = tg3_do_test_dma(tp, buf, buf_dma, TEST_BUFFER_SIZE, 0);
 		if (ret) {

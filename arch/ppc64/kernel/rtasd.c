@@ -18,6 +18,7 @@
 #include <linux/init.h>
 #include <linux/vmalloc.h>
 #include <linux/spinlock.h>
+#include <linux/cpu.h>
 
 #include <asm/uaccess.h>
 #include <asm/io.h>
@@ -336,15 +337,31 @@ static int get_eventscan_parms(void)
 	return 0;
 }
 
-extern long sys_sched_get_priority_max(int policy);
+static void do_event_scan(int event_scan)
+{
+	int error;
+	do {
+		memset(logdata, 0, rtas_error_log_max);
+		error = rtas_call(event_scan, 4, 1, NULL,
+				  RTAS_EVENT_SCAN_ALL_EVENTS, 0,
+				  __pa(logdata), rtas_error_log_max);
+		if (error == -1) {
+			printk(KERN_ERR "event-scan failed\n");
+			break;
+		}
+
+		if (error == 0)
+			pSeries_log_error(logdata, ERR_TYPE_RTAS_LOG, 0);
+
+	} while(error == 0);
+}
 
 static int rtasd(void *unused)
 {
 	unsigned int err_type;
 	int cpu = 0;
-	int error;
-	int first_pass = 1;
 	int event_scan = rtas_token("event-scan");
+	cpumask_t all = CPU_MASK_ALL;
 	int rc;
 
 	daemonize("rtasd");
@@ -375,48 +392,45 @@ static int rtasd(void *unused)
 		}
 	}
 
-repeat:
-	for (cpu = 0; cpu < NR_CPUS; cpu++) {
-		if (!cpu_online(cpu))
-			continue;
-
+	/* First pass. */
+	lock_cpu_hotplug();
+	for_each_online_cpu(cpu) {
 		DEBUG("scheduling on %d\n", cpu);
 		set_cpus_allowed(current, cpumask_of_cpu(cpu));
 		DEBUG("watchdog scheduled on cpu %d\n", smp_processor_id());
 
-		do {
-			memset(logdata, 0, rtas_error_log_max);
-			error = rtas_call(event_scan, 4, 1, NULL,
-					RTAS_EVENT_SCAN_ALL_EVENTS, 0,
-					__pa(logdata), rtas_error_log_max);
-			if (error == -1) {
-				printk(KERN_ERR "event-scan failed\n");
-				break;
-			}
-
-			if (error == 0)
-				pSeries_log_error(logdata, ERR_TYPE_RTAS_LOG, 0);
-
-		} while(error == 0);
-
-		/*
-		 * Check all cpus for pending events quickly, sleeping for
-		 * at least one second since some machines have problems
-		 * if we call event-scan too quickly
-		 */
+		do_event_scan(event_scan);
 		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout(first_pass ? HZ : (HZ*60/rtas_event_scan_rate) / 2);
+		schedule_timeout(HZ);
 	}
+	unlock_cpu_hotplug();
 
-	if (first_pass && (surveillance_timeout != -1)) {
+	if (surveillance_timeout != -1) {
 		DEBUG("enabling surveillance\n");
 		if (enable_surveillance(surveillance_timeout))
 			goto error_vfree;
 		DEBUG("surveillance enabled\n");
 	}
 
-	first_pass = 0;
-	goto repeat;
+	lock_cpu_hotplug();
+	cpu = first_cpu_const(mk_cpumask_const(cpu_online_map));
+	for (;;) {
+		set_cpus_allowed(current, cpumask_of_cpu(cpu));
+		do_event_scan(event_scan);
+		set_cpus_allowed(current, all);
+
+		/* Drop hotplug lock, and sleep for a bit (at least
+		 * one second since some machines have problems if we
+		 * call event-scan too quickly). */
+		unlock_cpu_hotplug();
+		set_current_state(TASK_INTERRUPTIBLE);
+		schedule_timeout((HZ*60/rtas_event_scan_rate) / 2);
+		lock_cpu_hotplug();
+
+		cpu = next_cpu_const(cpu, mk_cpumask_const(cpu_online_map));
+		if (cpu == NR_CPUS)
+			cpu = first_cpu_const(mk_cpumask_const(cpu_online_map));
+	}
 
 error_vfree:
 	if (rtas_log_buf)

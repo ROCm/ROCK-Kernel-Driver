@@ -21,24 +21,12 @@
 #include "ia32priv.h"
 #include "elfcore32.h"
 
-#define CONFIG_BINFMT_ELF32
-
 /* Override some function names */
 #undef start_thread
 #define start_thread			ia32_start_thread
 #define elf_format			elf32_format
 #define init_elf_binfmt			init_elf32_binfmt
 #define exit_elf_binfmt			exit_elf32_binfmt
-
-#undef CONFIG_BINFMT_ELF
-#ifdef CONFIG_BINFMT_ELF32
-# define CONFIG_BINFMT_ELF		CONFIG_BINFMT_ELF32
-#endif
-
-#undef CONFIG_BINFMT_ELF_MODULE
-#ifdef CONFIG_BINFMT_ELF32_MODULE
-# define CONFIG_BINFMT_ELF_MODULE	CONFIG_BINFMT_ELF32_MODULE
-#endif
 
 #undef CLOCKS_PER_SEC
 #define CLOCKS_PER_SEC	IA32_CLOCKS_PER_SEC

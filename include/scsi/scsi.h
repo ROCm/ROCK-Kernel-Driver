@@ -12,11 +12,18 @@
 
 
 /*
- * SCSI command lengths
+ *	SCSI command lengths
  */
 
 extern const unsigned char scsi_command_size[8];
 #define COMMAND_SIZE(opcode) scsi_command_size[((opcode) >> 5) & 7]
+
+/*
+ *	SCSI device types
+ */
+
+#define MAX_SCSI_DEVICE_CODE 14
+extern const char *const scsi_device_types[MAX_SCSI_DEVICE_CODE];
 
 /*
  *      SCSI opcodes
@@ -310,6 +317,42 @@ struct scsi_lun {
 #define SCSI_MLQUEUE_HOST_BUSY   0x1055
 #define SCSI_MLQUEUE_DEVICE_BUSY 0x1056
 #define SCSI_MLQUEUE_EH_RETRY    0x1057
+
+/*
+ *  Use these to separate status msg and our bytes
+ *
+ *  These are set by:
+ *
+ *      status byte = set from target device
+ *      msg_byte    = return status from host adapter itself.
+ *      host_byte   = set by low-level driver to indicate status.
+ *      driver_byte = set by mid-level.
+ */
+#define status_byte(result) (((result) >> 1) & 0x1f)
+#define msg_byte(result)    (((result) >> 8) & 0xff)
+#define host_byte(result)   (((result) >> 16) & 0xff)
+#define driver_byte(result) (((result) >> 24) & 0xff)
+#define suggestion(result)  (driver_byte(result) & SUGGEST_MASK)
+
+#define sense_class(sense)  (((sense) >> 4) & 0x7)
+#define sense_error(sense)  ((sense) & 0xf)
+#define sense_valid(sense)  ((sense) & 0x80);
+
+
+#define IDENTIFY_BASE       0x80
+#define IDENTIFY(can_disconnect, lun)   (IDENTIFY_BASE |\
+		     ((can_disconnect) ?  0x40 : 0) |\
+		     ((lun) & 0x07))
+
+/*
+ *  SCSI command sets
+ */
+
+#define SCSI_UNKNOWN    0
+#define SCSI_1          1
+#define SCSI_1_CCS      2
+#define SCSI_2          3
+#define SCSI_3          4
 
 
 /*

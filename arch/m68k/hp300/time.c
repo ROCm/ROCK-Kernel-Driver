@@ -17,6 +17,7 @@
 #include <asm/io.h>
 #include <asm/system.h>
 #include <asm/traps.h>
+#include <asm/unistd.h>
 #include "ints.h"
 
 /* Clock hardware definitions */

@@ -34,6 +34,7 @@
 #include <linux/swap.h>
 #include <linux/smp_lock.h>
 #include <linux/spinlock.h>
+#include <linux/syscalls.h>
 #include <linux/file.h>
 #include <linux/namei.h>
 #include <linux/mount.h>
@@ -2127,7 +2128,7 @@ static int selinux_inode_setxattr(struct dentry *dentry, char *name, void *value
 
 	sbsec = inode->i_sb->s_security;
 	if (sbsec->behavior == SECURITY_FS_USE_MNTPOINT)
-		return -ENOTSUPP;
+		return -EOPNOTSUPP;
 
 	AVC_AUDIT_DATA_INIT(&ad,FS);
 	ad.u.fs.dentry = dentry;
@@ -2185,7 +2186,7 @@ static int selinux_inode_getxattr (struct dentry *dentry, char *name)
 	struct superblock_security_struct *sbsec = inode->i_sb->s_security;
 
 	if (sbsec->behavior == SECURITY_FS_USE_MNTPOINT)
-		return -ENOTSUPP;
+		return -EOPNOTSUPP;
 
 	return dentry_has_perm(current, NULL, dentry, FILE__GETATTR);
 }

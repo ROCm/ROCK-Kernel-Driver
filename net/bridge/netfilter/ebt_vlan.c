@@ -25,13 +25,13 @@
 #include <linux/netfilter_bridge/ebt_vlan.h>
 
 static unsigned char debug;
-#define MODULE_VERSION "0.6"
+#define MODULE_VERS "0.6"
 
 MODULE_PARM(debug, "0-1b");
 MODULE_PARM_DESC(debug, "debug=1 is turn on debug messages");
 MODULE_AUTHOR("Nick Fedchik <nick@fedchik.org.ua>");
 MODULE_DESCRIPTION("802.1Q match module (ebtables extension), v"
-		   MODULE_VERSION);
+		   MODULE_VERS);
 MODULE_LICENSE("GPL");
 
 
@@ -179,7 +179,7 @@ static struct ebt_match filter_vlan = {
 static int __init init(void)
 {
 	DEBUG_MSG("ebtables 802.1Q extension module v"
-		  MODULE_VERSION "\n");
+		  MODULE_VERS "\n");
 	DEBUG_MSG("module debug=%d\n", !!debug);
 	return ebt_register_match(&filter_vlan);
 }

@@ -15,12 +15,12 @@
 struct pt_regs;
 struct pci_bus;	
 struct device_node;
-struct TceTable;
+struct iommu_table;
 struct rtc_time;
 
 #ifdef CONFIG_SMP
 struct smp_ops_t {
-	void  (*message_pass)(int target, int msg, unsigned long data, int wait);
+	void  (*message_pass)(int target, int msg);
 	int   (*probe)(void);
 	void  (*kick_cpu)(int nr);
 	void  (*setup_cpu)(int nr);
@@ -53,12 +53,15 @@ struct machdep_calls {
 					    unsigned long number,
 					    int local);
 
-	void		(*tce_build)(struct TceTable * tbl,
-				     long tcenum,
+	void		(*tce_build)(struct iommu_table * tbl,
+				     long index,
+				     long npages,
 				     unsigned long uaddr,
 				     int direction);
-	void		(*tce_free_one)(struct TceTable *tbl,
-				        long tcenum);    
+	void		(*tce_free)(struct iommu_table *tbl,
+				    long index,
+				    long npages);
+	void		(*tce_flush)(struct iommu_table *tbl);
 
 	void		(*setup_arch)(void);
 	/* Optional, may be NULL. */
@@ -111,6 +114,7 @@ struct machdep_calls {
 extern struct machdep_calls ppc_md;
 #define COMMAND_LINE_SIZE 512
 extern char cmd_line[COMMAND_LINE_SIZE];
+extern char saved_command_line[COMMAND_LINE_SIZE];
 
 /* Functions to produce codes on the leds.
  * The SRC code should be unique for the message category and should

@@ -50,6 +50,7 @@ static unsigned long ndump = 64;
 static unsigned long nidump = 16;
 static unsigned long ncsum = 4096;
 static int termch;
+static char tmpstr[128];
 
 static u_int bus_error_jmp[100];
 #define setjmp xmon_setjmp
@@ -115,6 +116,7 @@ static void cpu_cmd(void);
 static void csum(void);
 static void bootcmds(void);
 void dump_segments(void);
+static void symbol_lookup(void);
 
 static void debug_trace(void);
 
@@ -160,6 +162,8 @@ Commands:\n\
   dd	dump double values\n\
   e	print exception information\n\
   f	flush cache\n\
+  la	lookup symbol+offset of specified address\n\
+  ls	lookup address of specified symbol\n\
   m	examine/change memory\n\
   mm	move a block of memory\n\
   ms	set a block of memory\n\
@@ -176,11 +180,9 @@ Commands:\n\
   x	exit monitor\n\
   u	dump segment table or SLB\n\
   ?	help\n"
-#ifndef CONFIG_PPC_ISERIES
   "\
   zr	reboot\n\
   zh	halt\n"
-#endif
 ;
 
 static int xmon_trace[NR_CPUS];
@@ -537,6 +539,9 @@ cmds(struct pt_regs *excp)
 		case 'd':
 			dump();
 			break;
+		case 'l':
+			symbol_lookup();
+			break;
 		case 'r':
 			if (excp != NULL)
 				prregs(excp);	/* print regs */
@@ -577,10 +582,8 @@ cmds(struct pt_regs *excp)
 			cpu_cmd();
 			break;
 #endif /* CONFIG_SMP */
-#ifndef CONFIG_PPC_ISERIES
 		case 'z':
 			bootcmds();
-#endif
 		case 'T':
 			debug_trace();
 			break;
@@ -1148,7 +1151,6 @@ super_regs()
 	int cmd;
 	unsigned long val;
 #ifdef CONFIG_PPC_ISERIES
-	int i;
 	struct paca_struct *ptrPaca = NULL;
 	struct ItLpPaca *ptrLpPaca = NULL;
 	struct ItLpRegSave *ptrLpRegSave = NULL;
@@ -1641,8 +1643,21 @@ ppc_inst_dump(unsigned long adr, long count)
 void
 print_address(unsigned long addr)
 {
-	printf("0x%lx", addr);
+	const char *name;
+	char *modname;
+	long size, offset;
+
+	name = kallsyms_lookup(addr, &size, &offset, &modname, tmpstr);
+
+	if (name) {
+		if (modname)
+			printf("0x%lx\t# %s:%s+0x%lx", addr, modname, name, offset);
+		else
+			printf("0x%lx\t# %s+0x%lx", addr, name, offset);
+	} else
+		printf("0x%lx", addr);
 }
+
 
 /*
  * Memory operations - move, set, print differences
@@ -1822,8 +1837,33 @@ unsigned long *vp;
 		return 0;
 	}
 
+	/* skip leading "0x" if any */
+
+	if (c == '0') {
+		c = inchar();
+		if (c == 'x')
+			c = inchar();
+	} else if (c == '$') {
+		int i;
+		for (i=0; i<63; i++) {
+			c = inchar();
+			if (isspace(c)) {
+				termch = c;
+				break;
+			}
+			tmpstr[i] = c;
+		}
+		tmpstr[i++] = 0;
+		*vp = kallsyms_lookup_name(tmpstr);
+		if (!(*vp)) {
+			printf("unknown symbol '%s'\n", tmpstr);
+			return 0;
+		}
+		return 1;
+	}
+
 	d = hexdigit(c);
-	if( d == EOF ){
+	if (d == EOF) {
 		termch = c;
 		return 0;
 	}
@@ -1832,7 +1872,7 @@ unsigned long *vp;
 		v = (v << 4) + d;
 		c = inchar();
 		d = hexdigit(c);
-	} while( d != EOF );
+	} while (d != EOF);
 	termch = c;
 	*vp = v;
 	return 1;
@@ -1907,19 +1947,53 @@ char *str;
 	lineptr = str;
 }
 
+
+static void
+symbol_lookup(void)
+{
+	int type = inchar();
+	unsigned long addr;
+	static char tmp[64];
+
+	switch (type) {
+	case 'a':
+		if (scanhex(&addr)) {
+			printf("%lx: ", addr);
+			xmon_print_symbol("%s\n", addr);
+		}
+		termch = 0;
+		break;
+	case 's':
+		getstring(tmp, 64);
+		if (setjmp(bus_error_jmp) == 0) {
+			__debugger_fault_handler = handle_fault;
+			sync();
+			addr = kallsyms_lookup_name(tmp);
+			if (addr)
+				printf("%s: %lx\n", tmp, addr);
+			else
+				printf("Symbol '%s' not found.\n", tmp);
+			sync();
+		}
+		__debugger_fault_handler = 0;
+		termch = 0;
+		break;
+	}
+}
+
+
 /* xmon version of __print_symbol */
 void __xmon_print_symbol(const char *fmt, unsigned long address)
 {
 	char *modname;
 	const char *name;
 	unsigned long offset, size;
-	char namebuf[128];
 
 	if (setjmp(bus_error_jmp) == 0) {
 		__debugger_fault_handler = handle_fault;
 		sync();
 		name = kallsyms_lookup(address, &size, &offset, &modname,
-				       namebuf);
+				       tmpstr);
 		sync();
 		/* wait a little while to see if we get a machine check */
 		__delay(200);

@@ -37,8 +37,11 @@
  * that document.
  */
 
+#include <linux/types.h>
+
 #include <asm/io.h>
 #include <asm/string.h>		/* Gets rid of memcpy warning */
+#include <asm/system.h>
 
 #include "ipmi_kcs_sm.h"
 

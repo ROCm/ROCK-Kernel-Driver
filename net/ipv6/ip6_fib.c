@@ -1239,6 +1239,8 @@ void __init fib6_init(void)
 					   sizeof(struct fib6_node),
 					   0, SLAB_HWCACHE_ALIGN,
 					   NULL, NULL);
+	if (!fib6_node_kmem)
+		panic("cannot create fib6_nodes cache");
 }
 
 void __exit fib6_gc_cleanup(void)

@@ -122,10 +122,6 @@ struct saa5249_device
 #define FALSE 0
 #define TRUE 1
 #endif
-#ifndef MIN
-#define MIN(a, b) ((a) < (b) ? (a) : (b))
-#define MAX(a, b) ((a) > (b) ? (a) : (b))
-#endif
 
 #define RESCHED do { cond_resched(); } while(0)
 
@@ -518,8 +514,8 @@ static int do_saa5249_ioctl(struct inode *inode, struct file *file,
 			{
 				int len;
 				char buf[16];  
-				start = MAX(req->start, 32);
-				end = MIN(req->end, 39);
+				start = max(req->start, 32);
+				end = min(req->end, 39);
 				len=end-start+1;
 				if (i2c_senddata(t, 8, 0, 0, start, -1) ||
 					i2c_getdata(t, len, buf))
@@ -532,8 +528,8 @@ static int do_saa5249_ioctl(struct inode *inode, struct file *file,
 			{
 				char buf[32];
 				int len;
-				start = MAX(req->start, 7);
-				end = MIN(req->end, 31);
+				start = max(req->start, 7);
+				end = min(req->end, 31);
 				len=end-start+1;
 				if (i2c_senddata(t, 8, 0, 0, start, -1) ||
 					i2c_getdata(t, len, buf))

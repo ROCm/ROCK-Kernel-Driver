@@ -17,6 +17,8 @@
 #include <linux/interrupt.h>
 #include <linux/signal.h>
 #include <linux/init.h>
+#include <linux/gfp.h>
+#include <linux/radix-tree.h>
 #include <asm/prom.h>
 #include <asm/io.h>
 #include <asm/pgtable.h>
@@ -30,32 +32,30 @@
 
 #include "i8259.h"
 
-void xics_enable_irq(u_int irq);
-void xics_disable_irq(u_int irq);
-void xics_mask_and_ack_irq(u_int irq);
-void xics_end_irq(u_int irq);
-void xics_set_affinity(unsigned int irq_nr, cpumask_t cpumask);
+static unsigned int xics_startup(unsigned int irq);
+static void xics_enable_irq(unsigned int irq);
+static void xics_disable_irq(unsigned int irq);
+static void xics_mask_and_ack_irq(unsigned int irq);
+static void xics_end_irq(unsigned int irq);
+static void xics_set_affinity(unsigned int irq_nr, cpumask_t cpumask);
 
 struct hw_interrupt_type xics_pic = {
-	" XICS     ",
-	NULL,
-	NULL,
-	xics_enable_irq,
-	xics_disable_irq,
-	xics_mask_and_ack_irq,
-	xics_end_irq,
-	xics_set_affinity
+	.typename = " XICS     ",
+	.startup = xics_startup,
+	.enable = xics_enable_irq,
+	.disable = xics_disable_irq,
+	.ack = xics_mask_and_ack_irq,
+	.end = xics_end_irq,
+	.set_affinity = xics_set_affinity
 };
 
 struct hw_interrupt_type xics_8259_pic = {
-	" XICS/8259",
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	xics_mask_and_ack_irq,
-	NULL
+	.typename = " XICS/8259",
+	.ack = xics_mask_and_ack_irq,
 };
+
+/* This is used to map real irq numbers to virtual */
+static struct radix_tree_root irq_map = RADIX_TREE_INIT(GFP_KERNEL);
 
 #define XICS_IPI		2
 #define XICS_IRQ_OFFSET		0x10
@@ -214,9 +214,30 @@ xics_ops pSeriesLP_ops = {
 	pSeriesLP_qirr_info
 };
 
-void xics_enable_irq(u_int virq)
+static unsigned int xics_startup(unsigned int virq)
 {
-	u_int irq;
+	virq -= XICS_IRQ_OFFSET;
+	if (radix_tree_insert(&irq_map, virt_irq_to_real(virq),
+			      &virt_irq_to_real_map[virq]) == -ENOMEM)
+		printk(KERN_CRIT "Out of memory creating real -> virtual"
+		       " IRQ mapping for irq %u (real 0x%x)\n",
+		       virq, virt_irq_to_real(virq));
+	return 0;	/* return value is ignored */
+}
+
+static unsigned int real_irq_to_virt(unsigned int real_irq)
+{
+	unsigned int *ptr;
+
+	ptr = radix_tree_lookup(&irq_map, real_irq);
+	if (ptr == NULL)
+		return NO_IRQ;
+	return ptr - virt_irq_to_real_map;
+}
+
+static void xics_enable_irq(unsigned int virq)
+{
+	unsigned int irq;
 	long call_status;
 	unsigned int server;
 
@@ -237,34 +258,31 @@ void xics_enable_irq(u_int virq)
 	call_status = rtas_call(ibm_set_xive, 3, 1, NULL, irq, server,
 				DEFAULT_PRIORITY);
 	if (call_status != 0) {
-		printk("xics_enable_irq: irq=%x: ibm_set_xive returned %lx\n",
-		       irq, call_status);
+		printk(KERN_ERR "xics_enable_irq: irq=%x: ibm_set_xive "
+		       "returned %lx\n", irq, call_status);
 		return;
 	}
 
 	/* Now unmask the interrupt (often a no-op) */
 	call_status = rtas_call(ibm_int_on, 1, 1, NULL, irq);
 	if (call_status != 0) {
-		printk("xics_enable_irq: irq=%x: ibm_int_on returned %lx\n",
-		       irq, call_status);
+		printk(KERN_ERR "xics_enable_irq: irq=%x: ibm_int_on "
+		       "returned %lx\n", irq, call_status);
 		return;
 	}
 }
 
-void xics_disable_irq(u_int virq)
+static void xics_disable_real_irq(unsigned int irq)
 {
-	u_int irq;
 	long call_status;
 
-	virq -= XICS_IRQ_OFFSET;
-	irq = virt_irq_to_real(virq);
 	if (irq == XICS_IPI)
 		return;
 
 	call_status = rtas_call(ibm_int_off, 1, 1, NULL, irq);
 	if (call_status != 0) {
-		printk("xics_disable_irq: irq=%x: ibm_int_off returned %lx\n",
-		       irq, call_status);
+		printk(KERN_ERR "xics_disable_real_irq: irq=%x: "
+		       "ibm_int_off returned %lx\n", irq, call_status);
 		return;
 	}
 
@@ -272,13 +290,22 @@ void xics_disable_irq(u_int virq)
 	call_status = rtas_call(ibm_set_xive, 3, 1, NULL, irq, default_server,
 				0xff);
 	if (call_status != 0) {
-	printk("xics_disable_irq: irq=%x: ibm_set_xive(0xff) returned %lx\n",
-	       irq, call_status);
+		printk(KERN_ERR "xics_disable_irq: irq=%x: ibm_set_xive(0xff)"
+		       " returned %lx\n", irq, call_status);
 		return;
 	}
 }
 
-void xics_end_irq(u_int	irq)
+static void xics_disable_irq(unsigned int virq)
+{
+	unsigned int irq;
+
+	virq -= XICS_IRQ_OFFSET;
+	irq = virt_irq_to_real(virq);
+	xics_disable_real_irq(irq);
+}
+
+static void xics_end_irq(unsigned int	irq)
 {
 	int cpu = smp_processor_id();
 
@@ -287,7 +314,7 @@ void xics_end_irq(u_int	irq)
 				 (virt_irq_to_real(irq-XICS_IRQ_OFFSET))));
 }
 
-void xics_mask_and_ack_irq(u_int irq)
+static void xics_mask_and_ack_irq(unsigned int irq)
 {
 	int cpu = smp_processor_id();
 
@@ -302,8 +329,8 @@ void xics_mask_and_ack_irq(u_int irq)
 
 int xics_get_irq(struct pt_regs *regs)
 {
-	u_int cpu = smp_processor_id();
-	u_int vec;
+	unsigned int cpu = smp_processor_id();
+	unsigned int vec;
 	int irq;
 
 	vec = ops->xirr_info_get(cpu);
@@ -321,7 +348,13 @@ int xics_get_irq(struct pt_regs *regs)
 	} else if (vec == XICS_IRQ_SPURIOUS) {
 		irq = -1;
 	} else {
-		irq = real_irq_to_virt(vec) + XICS_IRQ_OFFSET;
+		irq = real_irq_to_virt(vec);
+		if (irq == NO_IRQ) {
+			printk(KERN_ERR "Interrupt 0x%x (real) is invalid,"
+			       " disabling it.\n", vec);
+			xics_disable_real_irq(vec);
+		} else
+			irq += XICS_IRQ_OFFSET;
 	}
 	return irq;
 }
@@ -469,15 +502,14 @@ nextnode:
 			while (1);
 		}
 		xics_irq_8259_cascade_real = *ireg;
-		xics_irq_8259_cascade = virt_irq_create_mapping(xics_irq_8259_cascade_real);
+		xics_irq_8259_cascade
+			= virt_irq_create_mapping(xics_irq_8259_cascade_real);
 		of_node_put(np);
 	}
 
 	if (systemcfg->platform == PLATFORM_PSERIES) {
 #ifdef CONFIG_SMP
-		for (i = 0; i < NR_CPUS; ++i) {
-			if (!cpu_possible(i))
-				continue;
+		for_each_cpu(i) {
 			xics_per_cpu[i] = __ioremap((ulong)inodes[get_hard_smp_processor_id(i)].addr, 
 						    (ulong)inodes[get_hard_smp_processor_id(i)].size,
 						    _PAGE_NO_CACHE);
@@ -528,8 +560,8 @@ arch_initcall(xics_setup_i8259);
 #ifdef CONFIG_SMP
 void xics_request_IPIs(void)
 {
-	real_irq_to_virt_map[XICS_IPI] = virt_irq_to_real_map[XICS_IPI] =
-		XICS_IPI;
+	virt_irq_to_real_map[XICS_IPI] = XICS_IPI;
+
 	/* IPIs are marked SA_INTERRUPT as they must run with irqs disabled */
 	request_irq(XICS_IPI + XICS_IRQ_OFFSET, xics_ipi_action, SA_INTERRUPT,
 		    "IPI", 0);
@@ -537,7 +569,7 @@ void xics_request_IPIs(void)
 }
 #endif
 
-void xics_set_affinity(unsigned int virq, cpumask_t cpumask)
+static void xics_set_affinity(unsigned int virq, cpumask_t cpumask)
 {
         irq_desc_t *desc = irq_desc + virq;
 	unsigned int irq;
@@ -558,8 +590,8 @@ void xics_set_affinity(unsigned int virq, cpumask_t cpumask)
 	status = rtas_call(ibm_get_xive, 1, 3, (void *)&xics_status, irq);
 
 	if (status) {
-		printk("xics_set_affinity: irq=%d ibm,get-xive returns %ld\n",
-			irq, status);
+		printk(KERN_ERR "xics_set_affinity: irq=%d ibm,get-xive "
+		       "returns %ld\n", irq, status);
 		goto out;
 	}
 
@@ -577,8 +609,8 @@ void xics_set_affinity(unsigned int virq, cpumask_t cpumask)
 				irq, newmask, xics_status[1]);
 
 	if (status) {
-		printk("xics_set_affinity irq=%d ibm,set-xive returns %ld\n",
-			irq, status);
+		printk(KERN_ERR "xics_set_affinity irq=%d ibm,set-xive "
+		       "returns %ld\n", irq, status);
 		goto out;
 	}
 

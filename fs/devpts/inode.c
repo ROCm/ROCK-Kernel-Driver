@@ -2,7 +2,7 @@
  *
  * linux/fs/devpts/inode.c
  *
- *  Copyright 1998 H. Peter Anvin -- All Rights Reserved
+ *  Copyright 1998-2004 H. Peter Anvin -- All Rights Reserved
  *
  * This file is part of the Linux kernel and is made available under
  * the terms of the GNU General Public License, version 2, or at your
@@ -16,6 +16,8 @@
 #include <linux/sched.h>
 #include <linux/namei.h>
 #include <linux/mount.h>
+#include <linux/tty.h>
+#include <linux/devpts_fs.h>
 #include "xattr.h"
 
 #define DEVPTS_SUPER_MAGIC 0x1cd1
@@ -126,7 +128,7 @@ static struct file_system_type devpts_fs_type = {
 
 static struct dentry *get_node(int num)
 {
-	char s[10];
+	char s[12];
 	struct dentry *root = devpts_root;
 	down(&root->d_inode->i_sem);
 	return lookup_one_len(s, root, sprintf(s, "%d", num));
@@ -139,12 +141,21 @@ static struct inode_operations devpts_file_inode_operations = {
 	.removexattr	= devpts_removexattr,
 };
 
-void devpts_pty_new(int number, dev_t device)
+int devpts_pty_new(struct tty_struct *tty)
 {
+	int number = tty->index;
+	struct tty_driver *driver = tty->driver;
+	dev_t device = MKDEV(driver->major, driver->minor_start+number);
 	struct dentry *dentry;
 	struct inode *inode = new_inode(devpts_mnt->mnt_sb);
+
+	/* We're supposed to be given the slave end of a pty */
+	BUG_ON(driver->type != TTY_DRIVER_TYPE_PTY);
+	BUG_ON(driver->subtype != PTY_TYPE_SLAVE);
+
 	if (!inode)
-		return;
+		return -ENOMEM;
+
 	inode->i_ino = number+2;
 	inode->i_blksize = 1024;
 	inode->i_uid = config.setuid ? config.uid : current->fsuid;
@@ -152,11 +163,28 @@ void devpts_pty_new(int number, dev_t device)
 	inode->i_mtime = inode->i_atime = inode->i_ctime = CURRENT_TIME;
 	init_special_inode(inode, S_IFCHR|config.mode, device);
 	inode->i_op = &devpts_file_inode_operations;
+	inode->u.generic_ip = tty;
 
 	dentry = get_node(number);
 	if (!IS_ERR(dentry) && !dentry->d_inode)
 		d_instantiate(dentry, inode);
+
 	up(&devpts_root->d_inode->i_sem);
+
+	return 0;
+}
+
+struct tty_struct *devpts_get_tty(int number)
+{
+	struct dentry *dentry = get_node(number);
+	struct tty_struct *tty;
+
+	tty = (IS_ERR(dentry) || !dentry->d_inode) ? NULL :
+			dentry->d_inode->u.generic_ip;
+
+	up(&devpts_root->d_inode->i_sem);
+
+	return tty;
 }
 
 void devpts_pty_kill(int number)

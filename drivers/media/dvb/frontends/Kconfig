@@ -154,8 +154,8 @@ config DVB_VES1X93
 	  right one will get autodetected.
 
 config DVB_TDA1004X
-	tristate "Frontends with external TDA1004X demodulators (OFDM)"
-	depends on DVB_CORE && !STANDALONE
+	tristate "Frontends with external TDA10045H or TDA10046H demodulators (OFDM)"
+	depends on DVB_CORE
 	help
 	  A DVB-T tuner module. Say Y when you want to support this frontend.
 
@@ -173,3 +173,15 @@ config DVB_TDA1004X_FIRMWARE_FILE
             wget http://www.technotrend.de/new/215/TTweb_215a_budget_20_05_2003.zip
             unzip -j TTweb_215a_budget_20_05_2003.zip Software/Oem/PCI/App/ttlcdacc.dll
             mv ttlcdacc.dll /usr/lib/hotplug/firmware/tda1004x.bin
+	  Note: even if you're using a USB device, you MUST get the file from the
+	  TechnoTrend PCI drivers.
+
+config DVB_NXT6000
+	tristate "Frontends with NxtWave Communications NXT6000 demodulator (OFDM)"
+	depends on DVB_CORE
+	help
+	  A DVB-T tuner module. Say Y when you want to support this frontend.
+
+	  If you don't know what tuner module is soldered on your
+	  DVB adapter simply enable all supported frontends, the
+	  right one will get autodetected.

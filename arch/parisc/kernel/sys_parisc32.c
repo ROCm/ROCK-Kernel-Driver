@@ -47,6 +47,7 @@
 #include <linux/vfs.h>
 #include <linux/ptrace.h>
 #include <linux/swap.h>
+#include <linux/syscalls.h>
 
 #include <asm/types.h>
 #include <asm/uaccess.h>
@@ -357,7 +358,6 @@ asmlinkage long sys32_sched_rr_get_interval(pid_t pid,
 {
 	struct timespec t;
 	int ret;
-	extern asmlinkage long sys_sched_rr_get_interval(pid_t pid, struct timespec *interval);
 	
 	KERNEL_SYSCALL(ret, sys_sched_rr_get_interval, pid, &t);
 	if (put_compat_timespec(&t, interval))
@@ -1089,7 +1089,6 @@ asmlinkage long sys32_msgrcv(int msqid,
 }
 
 
-extern asmlinkage ssize_t sys_sendfile(int out_fd, int in_fd, off_t *offset, size_t count);
 asmlinkage int sys32_sendfile(int out_fd, int in_fd, compat_off_t *offset, s32 count)
 {
         mm_segment_t old_fs = get_fs();
@@ -1197,7 +1196,6 @@ asmlinkage int sys32_nfsservctl(int cmd, void *argp, void *resp)
 	return ret;
 }
 
-extern asmlinkage ssize_t sys_sendfile64(int out_fd, int in_fd, loff_t *offset, size_t count);
 typedef long __kernel_loff_t32;		/* move this to asm/posix_types.h? */
 
 asmlinkage int sys32_sendfile64(int out_fd, int in_fd, __kernel_loff_t32 *offset, s32 count)
@@ -1345,8 +1343,6 @@ asmlinkage int sys32_sysinfo(struct sysinfo32 *info)
  * half of the argument has been zeroed by syscall.S.
  */
 
-extern asmlinkage off_t sys_lseek(unsigned int fd, off_t offset, unsigned int origin);
-
 asmlinkage int sys32_lseek(unsigned int fd, int offset, unsigned int origin)
 {
 	return sys_lseek(fd, offset, origin);
@@ -1366,8 +1362,6 @@ asmlinkage long sys32_semctl(int semid, int semnum, int cmd, union semun arg)
 	}
 	return sys_semctl (semid, semnum, cmd, arg);
 }
-
-extern long sys_lookup_dcookie(u64 cookie64, char *buf, size_t len);
 
 long sys32_lookup_dcookie(u32 cookie_high, u32 cookie_low, char *buf,
 			  size_t len)

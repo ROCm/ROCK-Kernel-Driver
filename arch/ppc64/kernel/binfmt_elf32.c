@@ -73,7 +73,4 @@ extern void start_thread32(struct pt_regs *, unsigned long, unsigned long);
 #define start_thread start_thread32
 #define init_elf_binfmt init_elf32_binfmt
 
-#undef CONFIG_BINFMT_ELF
-#define CONFIG_BINFMT_ELF 1
-
 #include "../../../fs/binfmt_elf.c"

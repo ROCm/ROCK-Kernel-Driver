@@ -54,7 +54,7 @@
 
 #define dbg(format, arg...)					\
 	do {							\
-		if (rpaphp_debug)				\
+		if (debug)					\
 			printk(KERN_DEBUG "%s: " format,	\
 				MY_NAME , ## arg); 		\
 	} while (0)

@@ -27,7 +27,7 @@
  *
  * $Id: af_bluetooth.c,v 1.3 2002/04/17 17:37:15 maxk Exp $
  */
-#define VERSION "2.3"
+#define VERSION "2.4"
 
 #include <linux/config.h>
 #include <linux/module.h>
@@ -331,8 +331,9 @@ struct net_proto_family bt_sock_family_ops = {
 
 extern int hci_sock_init(void);
 extern int hci_sock_cleanup(void);
-extern int hci_proc_init(void);
-extern int hci_proc_cleanup(void);
+
+extern int bt_sysfs_init(void);
+extern int bt_sysfs_cleanup(void);
 
 static int __init bt_init(void)
 {
@@ -356,15 +357,18 @@ static int __init bt_init(void)
 
 	BT_INFO("HCI device and connection manager initialized");
 
-	hci_proc_init();
+	bt_sysfs_init();
+
 	hci_sock_init();
+
 	return 0;
 }
 
 static void __exit bt_cleanup(void)
 {
 	hci_sock_cleanup();
-	hci_proc_cleanup();
+
+	bt_sysfs_cleanup();
 
 	sock_unregister(PF_BLUETOOTH);
 	kmem_cache_destroy(bt_sock_cache);
@@ -375,7 +379,7 @@ static void __exit bt_cleanup(void)
 subsys_initcall(bt_init);
 module_exit(bt_cleanup);
 
-MODULE_AUTHOR("Maxim Krasnyansky <maxk@qualcomm.com>");
+MODULE_AUTHOR("Maxim Krasnyansky <maxk@qualcomm.com>, Marcel Holtmann <marcel@holtmann.org>");
 MODULE_DESCRIPTION("Bluetooth Core ver " VERSION);
 MODULE_LICENSE("GPL");
 MODULE_ALIAS_NETPROTO(PF_BLUETOOTH);

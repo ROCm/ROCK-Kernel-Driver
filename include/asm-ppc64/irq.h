@@ -15,6 +15,9 @@ extern void disable_irq(unsigned int);
 extern void disable_irq_nosync(unsigned int);
 extern void enable_irq(unsigned int);
 
+/* this number is used when no interrupt has been assigned */
+#define NO_IRQ			(-1)
+
 /*
  * this is the maximum number of virtual irqs we will use.
  */
@@ -25,19 +28,16 @@ extern void enable_irq(unsigned int);
 /* Interrupt numbers are virtual in case they are sparsely
  * distributed by the hardware.
  */
-#define NR_HW_IRQS		8192
-extern unsigned short real_irq_to_virt_map[NR_HW_IRQS];
-extern unsigned short virt_irq_to_real_map[NR_IRQS];
+extern unsigned int virt_irq_to_real_map[NR_IRQS];
+
 /* Create a mapping for a real_irq if it doesn't already exist.
  * Return the virtual irq as a convenience.
  */
-unsigned long virt_irq_create_mapping(unsigned long real_irq);
+int virt_irq_create_mapping(unsigned int real_irq);
+void virt_irq_init(void);
 
-/* These funcs map irqs between real and virtual */
-static inline unsigned long real_irq_to_virt(unsigned long real_irq) {
-	return real_irq_to_virt_map[real_irq];
-}
-static inline unsigned long virt_irq_to_real(unsigned long virt_irq) {
+static inline unsigned int virt_irq_to_real(unsigned int virt_irq)
+{
 	return virt_irq_to_real_map[virt_irq];
 }
 

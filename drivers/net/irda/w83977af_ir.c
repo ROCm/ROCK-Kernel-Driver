@@ -202,8 +202,6 @@ int w83977af_open(int i, unsigned int iobase, unsigned int irq,
 	self->qos.min_turn_time.bits = qos_mtt_bits;
 	irda_qos_bits_to_value(&self->qos);
 	
-	self->flags = IFF_FIR|IFF_MIR|IFF_SIR|IFF_DMA|IFF_PIO;
-
 	/* Max DMA buffer size needed = (data_size + 6) * (window_size) + 6; */
 	self->rx_buff.truesize = 14384; 
 	self->tx_buff.truesize = 4000;
@@ -611,8 +609,8 @@ static void w83977af_dma_write(struct w83977af_ir *self, int iobase)
 	set_dma_addr(self->io.dma, isa_virt_to_bus(self->tx_buff.data));
 	set_dma_count(self->io.dma, self->tx_buff.len);
 #else
-	setup_dma(self->io.dma, self->tx_buff.data, self->tx_buff.len, 
-		  DMA_MODE_WRITE);	
+	irda_setup_dma(self->io.dma, self->tx_buff.data, self->tx_buff.len, 
+		       DMA_MODE_WRITE);	
 #endif
 	self->io.direction = IO_XMIT;
 	
@@ -679,7 +677,7 @@ static int w83977af_pio_write(int iobase, __u8 *buf, int len, int fifo_size)
  *
  *    
  */
-void w83977af_dma_xmit_complete(struct w83977af_ir *self)
+static void w83977af_dma_xmit_complete(struct w83977af_ir *self)
 {
 	int iobase;
 	__u8 set;
@@ -768,8 +766,8 @@ int w83977af_dma_receive(struct w83977af_ir *self)
 	set_dma_addr(self->io.dma, isa_virt_to_bus(self->rx_buff.data));
 	set_dma_count(self->io.dma, self->rx_buff.truesize);
 #else
-	setup_dma(self->io.dma, self->rx_buff.data, self->rx_buff.truesize, 
-		  DMA_MODE_READ);
+	irda_setup_dma(self->io.dma, self->rx_buff.data, self->rx_buff.truesize, 
+		       DMA_MODE_READ);
 #endif
 	/* 
 	 * Reset Rx FIFO. This will also flush the ST_FIFO, it's very 

@@ -188,38 +188,33 @@ ENTRY(v4t_late_abort)
 .data_thumb_pushpop:
 	tst	r8, #1 << 10
 	beq	.data_unknown
-	mov	r7, #0x11
-	and	r6, r8, r7
-	and	r2, r8, r7, lsl #1
+	and	r6, r8, #0x55			@ hweight8(r8) + R bit
+	and	r2, r8, #0xaa
 	add	r6, r6, r2, lsr #1
-	and	r2, r8, r7, lsl #2
+	and	r2, r6, #0xcc
+	and	r6, r6, #0x33
 	add	r6, r6, r2, lsr #2
-	and	r2, r8, r7, lsl #3
-	add	r6, r6, r2, lsr #3
-	add	r6, r6, r6, lsr #4
-	and	r2, r8, #0x0100			@ catch 'R' bit for push/pop
-	add	r6, r6, r2, lsr #8
+	movs	r7, r8, lsr #9			@ C = r8 bit 8 (R bit)
+	adc	r6, r6, r6, lsr #4		@ high + low nibble + R bit
 	and	r6, r6, #15			@ number of regs to transfer
 	ldr	r7, [sp, #13 << 2]
 	tst	r8, #1 << 11
-	addne	r7, r7, r6, lsl #2		@ increment SP if PUSH
-	subeq	r7, r7, r6, lsl #2		@ decrement SP if POP
+	addeq	r7, r7, r6, lsl #2		@ increment SP if PUSH
+	subne	r7, r7, r6, lsl #2		@ decrement SP if POP
 	str	r7, [sp, #13 << 2]
 	mov	pc, lr
 
 .data_thumb_ldmstm:
-	mov	r7, #0x11
-	and	r6, r8, r7
-	and	r2, r8, r7, lsl #1
+	and	r6, r8, #0x55			@ hweight8(r8)
+	and	r2, r8, #0xaa
 	add	r6, r6, r2, lsr #1
-	and	r2, r8, r7, lsl #2
+	and	r2, r6, #0xcc
+	and	r6, r6, #0x33
 	add	r6, r6, r2, lsr #2
-	and	r2, r8, r7, lsl #3
-	add	r6, r6, r2, lsr #3
 	add	r6, r6, r6, lsr #4
-	and	r6, r6, #15			@ number of regs to transfer
 	and	r5, r8, #7 << 8
 	ldr	r7, [sp, r5, lsr #6]
-	sub	r7, r7, r6, lsr #2		@ always decrement
+	and	r6, r6, #15			@ number of regs to transfer
+	sub	r7, r7, r6, lsl #2		@ always decrement
 	str	r7, [sp, r5, lsr #6]
 	mov	pc, lr

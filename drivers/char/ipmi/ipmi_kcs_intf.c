@@ -55,6 +55,7 @@
 #include <linux/rcupdate.h>
 #include <linux/ipmi_smi.h>
 #include <asm/io.h>
+#include <asm/irq.h>
 #include "ipmi_kcs_sm.h"
 #include <linux/init.h>
 

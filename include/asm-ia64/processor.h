@@ -655,24 +655,13 @@ ia64_get_dbr (__u64 regnum)
 	return retval;
 }
 
-/* XXX remove the handcoded version once we have a sufficiently clever compiler... */
-#ifdef SMART_COMPILER
-# define ia64_rotr(w,n)						\
-  ({								\
-	__u64 __ia64_rotr_w = (w), _n = (n);			\
-								\
-	(__ia64_rotr_w >> _n) | (__ia64_rotr_w << (64 - _n));	\
-  })
-#else
-# define ia64_rotr(w,n)					\
-  ({							\
-	__u64 __ia64_rotr_w;				\
-	__ia64_rotr_w = ia64_shrp((w), (w), (n));	\
-	__ia64_rotr_w;					\
-  })
-#endif
+static inline __u64
+ia64_rotr (__u64 w, __u64 n)
+{
+	return (w >> n) | (w << (64 - n));
+}
 
-#define ia64_rotl(w,n)	ia64_rotr((w),(64)-(n))
+#define ia64_rotl(w,n)	ia64_rotr((w), (64) - (n))
 
 /*
  * Take a mapped kernel address and return the equivalent address

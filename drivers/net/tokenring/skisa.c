@@ -69,8 +69,8 @@ static int dmalist[] __initdata = {
 
 static char isa_cardname[] = "SK NET TR 4/16 ISA\0";
 
+struct net_device *sk_isa_probe(int unit);
 static int sk_isa_open(struct net_device *dev);
-static int sk_isa_close(struct net_device *dev);
 static void sk_isa_read_eeprom(struct net_device *dev);
 static unsigned short sk_isa_setnselout_pins(struct net_device *dev);
 
@@ -133,21 +133,15 @@ static int __init sk_isa_probe1(struct net_device *dev, int ioaddr)
 	return 0;
 }
 
-struct net_device * __init sk_isa_probe(int unit)
+static int __init setup_card(struct net_device *dev)
 {
-	struct net_device *dev = alloc_trdev(sizeof(struct net_local));
 	struct net_local *tp;
         static int versionprinted;
 	const unsigned *port;
 	int j, err = 0;
 
 	if (!dev)
-		return ERR_PTR(-ENOMEM);
-
-	if (unit >= 0) {
-		sprintf(dev->name, "tr%d", unit);
-		netdev_boot_setup_check(dev);
-	}
+		return -ENOMEM;
 
 	SET_MODULE_OWNER(dev);
 	if (dev->base_addr)	/* probe specific location */
@@ -194,7 +188,7 @@ struct net_device * __init sk_isa_probe(int unit)
 	tp->tmspriv = NULL;
 
 	dev->open = sk_isa_open;
-	dev->stop = sk_isa_close;
+	dev->stop = tms380tr_close;
 
 	if (dev->irq == 0)
 	{
@@ -273,7 +267,7 @@ struct net_device * __init sk_isa_probe(int unit)
 	if (err)
 		goto out;
 
-	return dev;
+	return 0;
 out:
 	free_dma(dev->dma);
 out2:
@@ -282,6 +276,28 @@ out3:
 	tmsdev_term(dev);
 out4:
 	release_region(dev->base_addr, SK_ISA_IO_EXTENT); 
+	return err;
+}
+
+struct net_device * __init sk_isa_probe(int unit)
+{
+	struct net_device *dev = alloc_trdev(sizeof(struct net_local));
+	int err = 0;
+
+	if (!dev)
+		return ERR_PTR(-ENOMEM);
+
+	if (unit >= 0) {
+		sprintf(dev->name, "tr%d", unit);
+		netdev_boot_setup_check(dev);
+	}
+
+	err = setup_card(dev);
+	if (err)
+		goto out;
+
+	return dev;
+out:
 	free_netdev(dev);
 	return ERR_PTR(err);
 }
@@ -342,21 +358,12 @@ static int sk_isa_open(struct net_device *dev)
 	val &= oldval;
 	sk_isa_sifwriteb(dev, val, POSREG);
 
-	tms380tr_open(dev);
-	return 0;
-}
-
-static int sk_isa_close(struct net_device *dev)
-{
-	tms380tr_close(dev);
-	return 0;
+	return tms380tr_open(dev);
 }
 
 #ifdef MODULE
 
 #define ISATR_MAX_ADAPTERS 3
-
-static struct net_device *sk_isa_dev[ISATR_MAX_ADAPTERS];
 
 static int io[ISATR_MAX_ADAPTERS];
 static int irq[ISATR_MAX_ADAPTERS];
@@ -368,51 +375,28 @@ MODULE_PARM(io, "1-" __MODULE_STRING(ISATR_MAX_ADAPTERS) "i");
 MODULE_PARM(irq, "1-" __MODULE_STRING(ISATR_MAX_ADAPTERS) "i");
 MODULE_PARM(dma, "1-" __MODULE_STRING(ISATR_MAX_ADAPTERS) "i");
 
-static struct net_device * __init setup_card(unsigned long io, unsigned irq, unsigned char dma)
-{
-	struct net_device *dev = alloc_trdev(sizeof(struct net_local));
-	int err;
-
-	if (!dev)
-		return ERR_PTR(-ENOMEM);
-
-	dev->base_addr = io;
-	dev->irq       = irq;
-	dev->dma       = dma;
-
-	err = sk_isa_probe1(dev, io);
-	if (err)
-		goto out;
-
-	err = register_netdev(dev);
-	if (err)
-		goto out1;
-	return dev;
-
- out1:
-	release_region(dev->base_addr, SK_ISA_IO_EXTENT);
-	free_irq(dev->irq, dev);
-	free_dma(dev->dma);
-	tmsdev_term(dev);
- out:
-	free_netdev(dev);
-	return ERR_PTR(err);
-}
+static struct net_device *sk_isa_dev[ISATR_MAX_ADAPTERS];
 
 int init_module(void)
 {
 	struct net_device *dev;
-	int i, num;
+	int i, num = 0, err = 0;
 
-	num = 0;
 	for (i = 0; i < ISATR_MAX_ADAPTERS ; i++) {
-		if (io[0])  /* Only probe addresses from command line */
-			dev = setup_card(io[i], irq[i], dma[i]);
-		else
-			dev = sk_isa_probe(-1);
-		if (!IS_ERR(dev)) {
+		dev = alloc_trdev(sizeof(struct net_local));
+		if (!dev)
+			continue;
+
+		dev->base_addr = io[i];
+		dev->irq = irq[i];
+		dev->dma = dma[i];
+		err = setup_card(dev);
+
+		if (!err) {
 			sk_isa_dev[i] = dev;
 			++num;
+		} else {
+			free_netdev(dev);
 		}
 	}
 

@@ -5,7 +5,8 @@
  *
  * CCW driver related routines
  *
- * Copyright (C) 2003 IBM Entwicklung GmbH, IBM Corporation
+ * (C) Copyright IBM Corp. 2003, 2004
+ *
  * Authors:
  *      Martin Peschke <mpeschke@de.ibm.com>
  *	Heiko Carstens <heiko.carstens@de.ibm.com>
@@ -25,7 +26,7 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#define ZFCP_CCW_C_REVISION "$Revision: 1.36 $"
+#define ZFCP_CCW_C_REVISION "$Revision: 1.48 $"
 
 #include <linux/init.h>
 #include <linux/module.h>
@@ -34,18 +35,22 @@
 #include "zfcp_def.h"
 
 #define ZFCP_LOG_AREA                   ZFCP_LOG_AREA_CONFIG
-#define ZFCP_LOG_AREA_PREFIX            ZFCP_LOG_AREA_PREFIX_CONFIG
 
 static int zfcp_ccw_probe(struct ccw_device *);
 static void zfcp_ccw_remove(struct ccw_device *);
 static int zfcp_ccw_set_online(struct ccw_device *);
 static int zfcp_ccw_set_offline(struct ccw_device *);
+static int zfcp_ccw_notify(struct ccw_device *, int);
 
 static struct ccw_device_id zfcp_ccw_device_id[] = {
 	{CCW_DEVICE_DEVTYPE(ZFCP_CONTROL_UNIT_TYPE,
 			    ZFCP_CONTROL_UNIT_MODEL,
 			    ZFCP_DEVICE_TYPE,
 			    ZFCP_DEVICE_MODEL)},
+	{CCW_DEVICE_DEVTYPE(ZFCP_CONTROL_UNIT_TYPE,
+			    ZFCP_CONTROL_UNIT_MODEL,
+			    ZFCP_DEVICE_TYPE,
+			    ZFCP_DEVICE_MODEL_PRIV)},
 	{},
 };
 
@@ -56,6 +61,7 @@ static struct ccw_driver zfcp_ccw_driver = {
 	.remove      = zfcp_ccw_remove,
 	.set_online  = zfcp_ccw_set_online,
 	.set_offline = zfcp_ccw_set_offline,
+	.notify      = zfcp_ccw_notify,
 };
 
 MODULE_DEVICE_TABLE(ccw, zfcp_ccw_device_id);
@@ -80,6 +86,9 @@ zfcp_ccw_probe(struct ccw_device *ccw_device)
 	adapter = zfcp_adapter_enqueue(ccw_device);
 	if (!adapter)
 		retval = -EINVAL;
+	else
+		ZFCP_LOG_DEBUG("Probed adapter %s\n",
+			       zfcp_get_busid_by_adapter(adapter));
 	up(&zfcp_data.config_sema);
 	return retval;
 }
@@ -104,6 +113,8 @@ zfcp_ccw_remove(struct ccw_device *ccw_device)
 	down(&zfcp_data.config_sema);
 	adapter = dev_get_drvdata(&ccw_device->dev);
 
+	ZFCP_LOG_DEBUG("Removing adapter %s\n",
+		       zfcp_get_busid_by_adapter(adapter));
 	write_lock_irq(&zfcp_data.config_lock);
 	list_for_each_entry_safe(port, p, &adapter->port_list_head, list) {
 		list_for_each_entry_safe(unit, u, &port->unit_list_head, list) {
@@ -152,13 +163,26 @@ zfcp_ccw_set_online(struct ccw_device *ccw_device)
 	down(&zfcp_data.config_sema);
 	adapter = dev_get_drvdata(&ccw_device->dev);
 
+	retval = zfcp_erp_thread_setup(adapter);
+	if (retval) {
+		ZFCP_LOG_INFO("error: out of resources. "
+			      "error recovery thread for adapter %s "
+			      "could not be started\n",
+			      zfcp_get_busid_by_adapter(adapter));
+		goto out;
+	}
+
 	retval = zfcp_adapter_scsi_register(adapter);
 	if (retval)
-		goto out;
+		goto out_scsi_register;
 	zfcp_erp_modify_adapter_status(adapter, ZFCP_STATUS_COMMON_RUNNING,
 				       ZFCP_SET);
 	zfcp_erp_adapter_reopen(adapter, ZFCP_STATUS_COMMON_ERP_FAILED);
 	zfcp_erp_wait(adapter);
+	goto out;
+
+ out_scsi_register:
+	zfcp_erp_thread_kill(adapter);
  out:
 	up(&zfcp_data.config_sema);
 	return retval;
@@ -183,8 +207,47 @@ zfcp_ccw_set_offline(struct ccw_device *ccw_device)
 	zfcp_erp_adapter_shutdown(adapter, 0);
 	zfcp_erp_wait(adapter);
 	zfcp_adapter_scsi_unregister(adapter);
+	zfcp_erp_thread_kill(adapter);
 	up(&zfcp_data.config_sema);
 	return 0;
+}
+
+/**
+ * zfcp_ccw_notify
+ * @ccw_device: pointer to belonging ccw device
+ * @event: indicates if adapter was detached or attached
+ *
+ * This function gets called by the common i/o layer if an adapter has gone
+ * or reappeared.
+ */
+static int
+zfcp_ccw_notify(struct ccw_device *ccw_device, int event)
+{
+	struct zfcp_adapter *adapter;
+
+	down(&zfcp_data.config_sema);
+	adapter = dev_get_drvdata(&ccw_device->dev);
+	switch (event) {
+	case CIO_GONE:
+		ZFCP_LOG_NORMAL("Adapter %s: device gone.\n",
+				zfcp_get_busid_by_adapter(adapter));
+		break;
+	case CIO_NO_PATH:
+		ZFCP_LOG_NORMAL("Adapter %s: no path.\n",
+				zfcp_get_busid_by_adapter(adapter));
+		break;
+	case CIO_OPER:
+		ZFCP_LOG_NORMAL("Adapter %s: operational again.\n",
+				zfcp_get_busid_by_adapter(adapter));
+		zfcp_erp_modify_adapter_status(adapter,
+					       ZFCP_STATUS_COMMON_RUNNING,
+					       ZFCP_SET);
+		zfcp_erp_adapter_reopen(adapter,
+					ZFCP_STATUS_COMMON_ERP_FAILED);
+		break;
+	}
+	up(&zfcp_data.config_sema);
+	return 1;
 }
 
 /**
@@ -222,4 +285,3 @@ zfcp_ccw_unregister(void)
 }
 
 #undef ZFCP_LOG_AREA
-#undef ZFCP_LOG_AREA_PREFIX

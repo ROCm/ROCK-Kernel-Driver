@@ -28,6 +28,7 @@
 #include <linux/smp_lock.h>
 #include <linux/init.h>
 #include <linux/sched.h>
+#include <linux/syscalls.h>
 #include <linux/types.h>
 #include <linux/errno.h>
 
@@ -92,9 +93,6 @@ get_sigset32(compat_sigset_t *up, sigset_t *set, size_t sz)
 int sys32_rt_sigprocmask(int how, compat_sigset_t *set, compat_sigset_t *oset,
 				    unsigned int sigsetsize)
 {
-	extern long sys_rt_sigprocmask(int how,
-				    sigset_t *set, sigset_t *oset,
-				   size_t sigsetsize);
 	sigset_t old_set, new_set;
 	int ret;
 
@@ -115,7 +113,6 @@ int sys32_rt_sigpending(compat_sigset_t *uset, unsigned int sigsetsize)
 {
 	int ret;
 	sigset_t set;
-	extern long sys_rt_sigpending(sigset_t *set, size_t sigsetsize);
 
 	KERNEL_SYSCALL(ret, sys_rt_sigpending, &set, sigsetsize);
 

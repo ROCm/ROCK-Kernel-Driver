@@ -19,8 +19,6 @@
 #define PCIBIOS_MIN_IO		0x1000
 #define PCIBIOS_MIN_MEM		0x10000000
 
-extern int pcibios_scan_all_fns(struct pci_bus *bus, int devfn);
-
 #ifdef CONFIG_PPC_ISERIES
 #define pcibios_scan_all_fns(a, b)	0
 #else
@@ -72,6 +70,8 @@ struct pci_dma_ops {
 				      int nents, int direction);
 	void		(*pci_unmap_sg)(struct pci_dev *hwdev, struct scatterlist *sg,
 					int nents, int direction);
+	int		(*pci_dma_supported)(struct pci_dev *hwdev, u64 mask);
+	int		(*pci_dac_dma_supported)(struct pci_dev *hwdev, u64 mask);
 };
 
 extern struct pci_dma_ops pci_dma_ops;
@@ -132,10 +132,25 @@ static inline void pci_dma_sync_sg(struct pci_dev *hwdev,
  * be supported properly.  For example, if your device can
  * only drive the low 24-bits during PCI bus mastering, then
  * you would pass 0x00ffffff as the mask to this function.
+ * We default to supporting only 32 bits DMA unless we have
+ * an explicit override of this function in pci_dma_ops for
+ * the platform
  */
 static inline int pci_dma_supported(struct pci_dev *hwdev, u64 mask)
 {
-	return 1;
+	if (pci_dma_ops.pci_dma_supported)
+		return pci_dma_ops.pci_dma_supported(hwdev, mask);
+	return (mask < 0x100000000ull);
+}
+
+/* For DAC DMA, we currently don't support it by default, but
+ * we let the platform override this
+ */
+static inline int pci_dac_dma_supported(struct pci_dev *hwdev,u64 mask)
+{
+	if (pci_dma_ops.pci_dac_dma_supported)
+		return pci_dma_ops.pci_dac_dma_supported(hwdev, mask);
+	return 0;
 }
 
 extern int pci_domain_nr(struct pci_bus *bus);
@@ -150,9 +165,6 @@ int pci_mmap_page_range(struct pci_dev *pdev, struct vm_area_struct *vma,
 
 /* Tell drivers/pci/proc.c that we have pci_mmap_page_range() */
 #define HAVE_PCI_MMAP	1
-
-#define sg_dma_address(sg)	((sg)->dma_address)
-#define sg_dma_len(sg)		((sg)->dma_length)
 
 #define pci_map_page(dev, page, off, size, dir) \
 		pci_map_single(dev, (page_address(page) + (off)), size, dir)
@@ -171,8 +183,6 @@ int pci_mmap_page_range(struct pci_dev *pdev, struct vm_area_struct *vma,
 	((PTR)->LEN_NAME)
 #define pci_unmap_len_set(PTR, LEN_NAME, VAL)		\
 	(((PTR)->LEN_NAME) = (VAL))
-
-#define pci_dac_dma_supported(pci_dev, mask)	(0)
 
 /* The PCI address space does equal the physical memory
  * address space.  The networking and block device layers use

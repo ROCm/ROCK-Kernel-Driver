@@ -5,12 +5,6 @@
 #include <linux/cache.h>
 #include <linux/config.h>
 
-/* No comment. */
-#if defined(CONFIG_NFSD) || defined(CONFIG_NFSD_MODULE)
-#else
-#define sys_nfsservctl		sys_ni_syscall
-#endif
-
 #define __NO_STUBS
 
 #define __SYSCALL(nr, sym) extern asmlinkage void sym(void) ; 

@@ -208,7 +208,7 @@ void __init iommu_hole_init(void)
 		if (read_pci_config(0, num, 3, 0x00) != NB_ID_3) 
 			continue;	
 
-		iommu_aperture = 1;; 
+		iommu_aperture = 1; 
 
 		aper_order = (read_pci_config(0, num, 3, 0x90) >> 1) & 7; 
 		aper_size = (32 * 1024 * 1024) << aper_order; 

@@ -15,6 +15,7 @@
 
 #include <linux/config.h>
 #include <linux/kernel.h>
+#include <linux/syscalls.h>
 #include <linux/sysctl.h>
 #include <linux/sched.h>
 #include <linux/fs.h>
@@ -55,6 +56,7 @@
 #include <asm/semaphore.h>
 #include <asm/types.h>
 #include <asm/uaccess.h>
+#include <asm/unistd.h>
 
 #include "ia32priv.h"
 
@@ -81,15 +83,8 @@
 #define high2lowuid(uid) ((uid) > 65535 ? 65534 : (uid))
 #define high2lowgid(gid) ((gid) > 65535 ? 65534 : (gid))
 
-extern asmlinkage long sys_execve (char *, char **, char **, struct pt_regs *);
-extern asmlinkage long sys_mprotect (unsigned long, size_t, unsigned long);
-extern asmlinkage long sys_munmap (unsigned long, size_t);
 extern unsigned long arch_get_unmapped_area (struct file *, unsigned long, unsigned long,
 					     unsigned long, unsigned long);
-
-/* forward declaration: */
-asmlinkage long sys32_mprotect (unsigned int, unsigned int, int);
-asmlinkage unsigned long sys_brk(unsigned long);
 
 /*
  * Anything that modifies or inspects ia32 user virtual memory must hold this semaphore
@@ -949,9 +944,6 @@ sys32_old_select (struct sel_arg_struct *arg)
 			    (struct compat_timeval *) A(a.tvp));
 }
 
-asmlinkage ssize_t sys_readv (unsigned long,const struct iovec *,unsigned long);
-asmlinkage ssize_t sys_writev (unsigned long,const struct iovec *,unsigned long);
-
 static struct iovec *
 get_compat_iovec (struct compat_iovec *iov32, struct iovec *iov_buf, u32 count, int type)
 {
@@ -1447,7 +1439,7 @@ shmat32 (int first, int second, int third, int version, void *uptr)
 
 	if (version == 1)
 		return -EINVAL;	/* iBCS2 emulator entry point: unsupported */
-	err = sys_shmat(first, uptr, second, &raddr);
+	err = do_shmat(first, uptr, second, &raddr);
 	if (err)
 		return err;
 	return put_user(raddr, uaddr);
@@ -2023,9 +2015,6 @@ restore_ia32_fpxstate (struct task_struct *tsk, struct ia32_user_fxsr_struct *sa
 	return 0;
 }
 
-extern asmlinkage long sys_ptrace (long, pid_t, unsigned long, unsigned long, long, long, long,
-				   long, long);
-
 /*
  *  Note that the IA32 version of `ptrace' calls the IA64 routine for
  *    many of the requests.  This will only work for requests that do
@@ -2284,8 +2273,6 @@ sys32_pause (void)
 	return -ERESTARTNOHAND;
 }
 
-asmlinkage long sys_msync (unsigned long start, size_t len, int flags);
-
 asmlinkage int
 sys32_msync (unsigned int start, unsigned int len, int flags)
 {
@@ -2306,8 +2293,6 @@ struct sysctl32 {
 	unsigned int	newlen;
 	unsigned int	__unused[4];
 };
-
-extern asmlinkage long sys_sysctl(struct __sysctl_args *args);
 
 asmlinkage long
 sys32_sysctl (struct sysctl32 *args)
@@ -2358,7 +2343,6 @@ sys32_sysctl (struct sysctl32 *args)
 asmlinkage long
 sys32_newuname (struct new_utsname *name)
 {
-	extern asmlinkage long sys_newuname(struct new_utsname * name);
 	int ret = sys_newuname(name);
 
 	if (!ret)
@@ -2366,8 +2350,6 @@ sys32_newuname (struct new_utsname *name)
 			ret = -EFAULT;
 	return ret;
 }
-
-extern asmlinkage long sys_getresuid (uid_t *ruid, uid_t *euid, uid_t *suid);
 
 asmlinkage long
 sys32_getresuid16 (u16 *ruid, u16 *euid, u16 *suid)
@@ -2384,8 +2366,6 @@ sys32_getresuid16 (u16 *ruid, u16 *euid, u16 *suid)
 		return -EFAULT;
 	return ret;
 }
-
-extern asmlinkage long sys_getresgid (gid_t *rgid, gid_t *egid, gid_t *sgid);
 
 asmlinkage long
 sys32_getresgid16 (u16 *rgid, u16 *egid, u16 *sgid)
@@ -2407,8 +2387,6 @@ sys32_getresgid16 (u16 *rgid, u16 *egid, u16 *sgid)
 asmlinkage long
 sys32_lseek (unsigned int fd, int offset, unsigned int whence)
 {
-	extern off_t sys_lseek (unsigned int fd, off_t offset, unsigned int origin);
-
 	/* Sign-extension of "offset" is important here... */
 	return sys_lseek(fd, offset, whence);
 }
@@ -2497,16 +2475,12 @@ sys32_setgroups16 (int gidsetsize, short *grouplist)
 asmlinkage long
 sys32_truncate64 (unsigned int path, unsigned int len_lo, unsigned int len_hi)
 {
-	extern asmlinkage long sys_truncate (const char *path, unsigned long length);
-
 	return sys_truncate((const char *) A(path), ((unsigned long) len_hi << 32) | len_lo);
 }
 
 asmlinkage long
 sys32_ftruncate64 (int fd, unsigned int len_lo, unsigned int len_hi)
 {
-	extern asmlinkage long sys_ftruncate (int fd, unsigned long length);
-
 	return sys_ftruncate(fd, ((unsigned long) len_hi << 32) | len_lo);
 }
 
@@ -2595,7 +2569,6 @@ struct sysinfo32 {
 asmlinkage long
 sys32_sysinfo (struct sysinfo32 *info)
 {
-	extern asmlinkage long sys_sysinfo (struct sysinfo *);
 	struct sysinfo s;
 	long ret, err;
 	int bitcount = 0;
@@ -2647,7 +2620,6 @@ sys32_sysinfo (struct sysinfo32 *info)
 asmlinkage long
 sys32_sched_rr_get_interval (pid_t pid, struct compat_timespec *interval)
 {
-	extern asmlinkage long sys_sched_rr_get_interval (pid_t, struct timespec *);
 	mm_segment_t old_fs = get_fs();
 	struct timespec t;
 	long ret;
@@ -2663,21 +2635,18 @@ sys32_sched_rr_get_interval (pid_t pid, struct compat_timespec *interval)
 asmlinkage long
 sys32_pread (unsigned int fd, void *buf, unsigned int count, u32 pos_lo, u32 pos_hi)
 {
-	extern asmlinkage long sys_pread64 (unsigned int, char *, size_t, loff_t);
 	return sys_pread64(fd, buf, count, ((unsigned long) pos_hi << 32) | pos_lo);
 }
 
 asmlinkage long
 sys32_pwrite (unsigned int fd, void *buf, unsigned int count, u32 pos_lo, u32 pos_hi)
 {
-	extern asmlinkage long sys_pwrite64 (unsigned int, const char *, size_t, loff_t);
 	return sys_pwrite64(fd, buf, count, ((unsigned long) pos_hi << 32) | pos_lo);
 }
 
 asmlinkage long
 sys32_sendfile (int out_fd, int in_fd, int *offset, unsigned int count)
 {
-	extern asmlinkage long sys_sendfile (int, int, off_t *, size_t);
 	mm_segment_t old_fs = get_fs();
 	long ret;
 	off_t of;
@@ -2698,7 +2667,6 @@ sys32_sendfile (int out_fd, int in_fd, int *offset, unsigned int count)
 asmlinkage long
 sys32_personality (unsigned int personality)
 {
-	extern asmlinkage long sys_personality (unsigned long);
 	long ret;
 
 	if (current->personality == PER_LINUX32 && personality == PER_LINUX)
@@ -2990,8 +2958,6 @@ sys32_timer_create(u32 clock, struct sigevent32 *se32, timer_t *timer_id)
 	return err;
 }
 
-extern long sys_fadvise64_64(int fd, loff_t offset, loff_t len, int advice);
-
 long sys32_fadvise64_64(int fd, __u32 offset_low, __u32 offset_high, 
 			__u32 len_low, __u32 len_high, int advice)
 { 
@@ -3090,9 +3056,6 @@ copy_mount_stuff_to_kernel(const void *user, unsigned long *kernel)
 	return 0;
 }
 
-extern asmlinkage long sys_mount(char * dev_name, char * dir_name, char * type,
-				unsigned long new_flags, void *data);
-
 #define SMBFS_NAME	"smbfs"
 #define NCPFS_NAME	"ncpfs"
 
@@ -3157,8 +3120,6 @@ sys32_mount(char *dev_name, char *dir_name, char *type,
 	}
 }
 
-extern asmlinkage long sys_setreuid(uid_t ruid, uid_t euid);
-
 asmlinkage long sys32_setreuid(compat_uid_t ruid, compat_uid_t euid)
 {
 	uid_t sruid, seuid;
@@ -3167,8 +3128,6 @@ asmlinkage long sys32_setreuid(compat_uid_t ruid, compat_uid_t euid)
 	seuid = (euid == (compat_uid_t)-1) ? ((uid_t)-1) : ((uid_t)euid);
 	return sys_setreuid(sruid, seuid);
 }
-
-extern asmlinkage long sys_setresuid(uid_t ruid, uid_t euid, uid_t suid);
 
 asmlinkage long
 sys32_setresuid(compat_uid_t ruid, compat_uid_t euid,
@@ -3182,8 +3141,6 @@ sys32_setresuid(compat_uid_t ruid, compat_uid_t euid,
 	return sys_setresuid(sruid, seuid, ssuid);
 }
 
-extern asmlinkage long sys_setregid(gid_t rgid, gid_t egid);
-
 asmlinkage long
 sys32_setregid(compat_gid_t rgid, compat_gid_t egid)
 {
@@ -3193,8 +3150,6 @@ sys32_setregid(compat_gid_t rgid, compat_gid_t egid)
 	segid = (egid == (compat_gid_t)-1) ? ((gid_t)-1) : ((gid_t)egid);
 	return sys_setregid(srgid, segid);
 }
-
-extern asmlinkage long sys_setresgid(gid_t rgid, gid_t egid, gid_t sgid);
 
 asmlinkage long
 sys32_setresgid(compat_gid_t rgid, compat_gid_t egid,
@@ -3324,8 +3279,6 @@ nfs_getfh32_res_trans(union nfsctl_res *kres, union nfsctl_res32 *res32)
 	err |= __put_user(kres->cr_debug, &res32->cr32_debug);
 	return err;
 }
-
-extern asmlinkage long sys_nfsservctl(int cmd, void *arg, void *resp);
 
 int asmlinkage
 sys32_nfsservctl(int cmd, struct nfsctl_arg32 *arg32, union nfsctl_res32 *res32)

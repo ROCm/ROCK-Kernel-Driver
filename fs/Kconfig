@@ -797,8 +797,7 @@ config DEVFS_FS
 	  the file README there.
 
 	  Note that devfs no longer manages /dev/pts!  If you are using UNIX98
-	  ptys, you will also need to enable (and mount) the /dev/pts
-	  filesystem (CONFIG_DEVPTS_FS).
+	  ptys, you will also need to mount the /dev/pts filesystem (devpts).
 
 	  Note that devfs has been obsoleted by udev,
 	  <http://www.kernel.org/pub/linux/utils/kernel/hotplug/>.
@@ -831,32 +830,9 @@ config DEVFS_DEBUG
 
 	  If unsure, say N.
 
-config DEVPTS_FS
-# It compiles as a module for testing only.  It should not be used
-# as a module in general.  If we make this "tristate", a bunch of people
-# who don't know what they are doing turn it on and complain when it
-# breaks.
-	bool "/dev/pts file system for Unix98 PTYs"
-	depends on UNIX98_PTYS
-	---help---
-	  You should say Y here if you said Y to "Unix98 PTY support" above.
-	  You'll then get a virtual file system which can be mounted on
-	  /dev/pts with "mount -t devpts". This, together with the pseudo
-	  terminal master multiplexer /dev/ptmx, is used for pseudo terminal
-	  support as described in The Open Group's Unix98 standard: in order
-	  to acquire a pseudo terminal, a process opens /dev/ptmx; the number
-	  of the pseudo terminal is then made available to the process and the
-	  pseudo terminal slave can be accessed as /dev/pts/<number>. What was
-	  traditionally /dev/ttyp2 will then be /dev/pts/2, for example.
-
-	  The GNU C library glibc 2.1 contains the requisite support for this
-	  mode of operation; you also need client programs that use the Unix98
-	  API. Please read <file:Documentation/Changes> for more information
-	  about the Unix98 pty devices.
-
 config DEVPTS_FS_XATTR
 	bool "/dev/pts Extended Attributes"
-	depends on DEVPTS_FS
+	depends on UNIX98_PTYS
 	help
 	  Extended attributes are name:value pairs associated with inodes by
 	  the kernel or by users (see the attr(5) manual page, or visit
@@ -974,6 +950,18 @@ config HFS_FS
 
 	  To compile this file system support as a module, choose M here: the
 	  module will be called hfs.
+
+config HFSPLUS_FS
+	tristate "Apple Extended HFS file system support"
+	select NLS
+	help
+	  If you say Y here, you will be able to mount extended format
+	  Macintosh-formatted hard drive partitions with full read-write access.
+
+	  This file system is often called HFS+ and was introduced with
+	  MacOS 8. It includes all Mac specific filesystem data such as
+	  data forks and creator codes, but it also has several UNIX
+	  style features such as file ownership and permissions.
 
 config BEFS_FS
 	tristate "BeOS file systemv(BeFS) support (read only) (EXPERIMENTAL)"

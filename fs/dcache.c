@@ -895,7 +895,7 @@ struct dentry *d_splice_alias(struct inode *inode, struct dentry *dentry)
 			new = list_entry(inode->i_dentry.next, struct dentry, d_alias);
 			__dget_locked(new);
 			spin_unlock(&dcache_lock);
-			security_d_instantiate(dentry, inode);
+			security_d_instantiate(new, inode);
 			d_rehash(dentry);
 			d_move(new, dentry);
 			iput(inode);

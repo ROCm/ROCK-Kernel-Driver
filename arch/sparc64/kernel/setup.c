@@ -21,6 +21,7 @@
 #include <linux/config.h>
 #include <linux/fs.h>
 #include <linux/seq_file.h>
+#include <linux/syscalls.h>
 #include <linux/kdev_t.h>
 #include <linux/major.h>
 #include <linux/string.h>
@@ -71,7 +72,6 @@ struct screen_info screen_info = {
 
 void (*prom_palette)(int);
 void (*prom_keyboard)(void);
-asmlinkage void sys_sync(void);	/* it's really int */
 
 static void
 prom_console_write(struct console *con, const char *s, unsigned n)
@@ -603,7 +603,7 @@ static int __init set_preferred_console(void)
 }
 console_initcall(set_preferred_console);
 
-asmlinkage int sys_ioperm(unsigned long from, unsigned long num, int on)
+asmlinkage long sys_ioperm(unsigned long from, unsigned long num, int on)
 {
 	return -EIO;
 }
@@ -689,7 +689,7 @@ void sun_do_break(void)
 	if (!stop_a_enabled)
 		return;
 
-	printk("\n");
+	prom_printf("\n");
 	flush_user_windows();
 
 	prom_cmdline();

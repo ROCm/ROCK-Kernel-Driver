@@ -27,6 +27,7 @@
 #include <linux/config.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
+#include <linux/syscalls.h>
 
 #include <linux/string.h>
 EXPORT_SYMBOL(memchr);
@@ -83,10 +84,6 @@ EXPORT_SYMBOL(__memcpy_fromio);
 EXPORT_SYMBOL(__memset_io);
 
 #include <asm/unistd.h>
-extern long sys_open(const char *, int, int);
-extern off_t sys_lseek(int, off_t, int);
-extern int sys_read(int, char *, int);
-extern int sys_write(int, const char *, int);
 EXPORT_SYMBOL(sys_open);
 EXPORT_SYMBOL(sys_lseek);
 EXPORT_SYMBOL(sys_read);

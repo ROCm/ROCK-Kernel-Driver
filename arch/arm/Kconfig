@@ -336,14 +336,12 @@ config CPU_FREQ_SA1100
 	bool
 	depends on CPU_FREQ && SA1100_LART
 	default y
-	select CPU_FREQ_DEFAULT_GOV_USERSPACE
 	select CPU_FREQ_24_API if SYSCTL
 
 config CPU_FREQ_SA1110
 	bool
 	depends on CPU_FREQ && (SA1100_ASSABET || SA1100_CERF || SA1100_PT_SYSTEM3)
 	default y
-	select CPU_FREQ_DEFAULT_GOV_USERSPACE
 	select CPU_FREQ_24_API if SYSCTL
 
 config CPU_FREQ_INTEGRATOR
@@ -615,7 +613,7 @@ source "drivers/char/Kconfig"
 
 source "drivers/i2c/Kconfig"
 
-source "drivers/l3/Kconfig"
+#source "drivers/l3/Kconfig"
 
 source "drivers/media/Kconfig"
 

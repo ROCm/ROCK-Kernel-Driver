@@ -16,20 +16,3 @@ obj-$(CONFIG_PCI)	+= bios32.o
 obj-$(CONFIG_MODULES)	+= module.o
 
 EXTRA_AFLAGS := -traditional
-
-$(obj)/head.o: $(obj)/head.S $(obj)/m68k_defs.h
-
-$(obj)/entry.o: $(obj)/entry.S $(obj)/m68k_defs.h
-
-$(obj)/sun3-head.o: $(obj)/sun3-head.S $(obj)/m68k_defs.h
-
-$(obj)/m68k_defs.h: $(src)/m68k_defs.c $(src)/m68k_defs.head
-	rm -f $(obj)/m68k_defs.d
-	SUNPRO_DEPENDENCIES="$(obj)/m68k_defs.d $(obj)/m68k_defs.h" \
-	$(CC) $(filter-out -MD,$(CFLAGS)) -S $(src)/m68k_defs.c -o \
-	$(obj)/m68k_defs.s
-	cp $(src)/m68k_defs.head $(obj)/m68k_defs.h
-	grep '^#define' $(obj)/m68k_defs.s >> $(obj)/m68k_defs.h
-	rm $(obj)/m68k_defs.s
--include $(obj)/m68k_defs.d
-

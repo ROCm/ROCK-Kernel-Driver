@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/css.c
  *  driver for channel subsystem
- *   $Revision: 1.65 $
+ *   $Revision: 1.69 $
  *
  *    Copyright (C) 2002 IBM Deutschland Entwicklung GmbH,
  *			 IBM Corporation
@@ -13,6 +13,7 @@
 #include <linux/device.h>
 #include <linux/slab.h>
 #include <linux/errno.h>
+#include <linux/list.h>
 
 #include "css.h"
 #include "cio.h"
@@ -20,6 +21,7 @@
 #include "ioasm.h"
 
 unsigned int highest_subchannel;
+int need_rescan = 0;
 int css_init_done = 0;
 
 struct device css_bus_device = {
@@ -130,7 +132,7 @@ __get_subchannel_by_stsch(int irq)
 	struct schib schib;
 
 	cc = stsch(irq, &schib);
-	if (cc)
+	if (cc || !schib.pmcw.dnv)
 		return NULL;
 	sch = (struct subchannel *)(unsigned long)schib.pmcw.intparm;
 	if (!sch)
@@ -154,15 +156,18 @@ get_subchannel_by_schid(int irq)
 	sch = __get_subchannel_by_stsch(irq);
 	if (sch)
 		goto out;
-	if (!get_driver(&io_subchannel_driver.drv))
-		goto out;
 	down_read(&css_bus_type.subsys.rwsem);
 
-	list_for_each(entry, &io_subchannel_driver.drv.devices) {
+	list_for_each(entry, &css_bus_type.devices.list) {
 		dev = get_device(container_of(entry,
-					      struct device, driver_list));
+					      struct device, bus_list));
 		if (!dev)
 			continue;
+		/* Skip channel paths. */
+		if (dev->release != &css_subchannel_release) {
+			put_device(dev);
+			continue;
+		}
 		sch = to_subchannel(dev);
 		if (sch->irq == irq)
 			break;
@@ -170,7 +175,6 @@ get_subchannel_by_schid(int irq)
 		sch = NULL;
 	}
 	up_read(&css_bus_type.subsys.rwsem);
-	put_driver(&io_subchannel_driver.drv);
 out:
 	put_bus(&css_bus_type);
 
@@ -188,19 +192,24 @@ css_get_subchannel_status(struct subchannel *sch, int schid)
 		return CIO_GONE;
 	if (!schib.pmcw.dnv)
 		return CIO_GONE;
-	if (sch && (schib.pmcw.dev != sch->schib.pmcw.dev))
+	if (sch && sch->schib.pmcw.dnv &&
+	    (schib.pmcw.dev != sch->schib.pmcw.dev))
 		return CIO_REVALIDATE;
 	return CIO_OPER;
 }
 	
 static inline int
-css_evaluate_subchannel(int irq)
+css_evaluate_subchannel(int irq, int slow)
 {
 	int event, ret, disc;
 	struct subchannel *sch;
 
 	sch = get_subchannel_by_schid(irq);
 	disc = sch ? device_is_disconnected(sch) : 0;
+	if (disc && slow)
+		return 0; /* Already processed. */
+	if (!disc && !slow)
+		return -EAGAIN; /* Will be done on the slow path. */
 	event = css_get_subchannel_status(sch, irq);
 	switch (event) {
 	case CIO_GONE:
@@ -252,18 +261,13 @@ css_evaluate_subchannel(int irq)
 	return ret;
 }
 
-/*
- * Rescan for new devices. FIXME: This is slow.
- * This function is called when we have lost CRWs due to overflows and we have
- * to do subchannel housekeeping.
- */
-void
-css_reiterate_subchannels(void)
+static void
+css_rescan_devices(void)
 {
 	int irq, ret;
 
 	for (irq = 0; irq <= __MAX_SUBCHANNELS; irq++) {
-		ret = css_evaluate_subchannel(irq);
+		ret = css_evaluate_subchannel(irq, 1);
 		/* No more memory. It doesn't make sense to continue. No
 		 * panic because this can happen in midflight and just
 		 * because we can't use a new device is no reason to crash
@@ -276,20 +280,61 @@ css_reiterate_subchannels(void)
 	}
 }
 
+static void
+css_evaluate_slow_subchannel(unsigned long schid)
+{
+	css_evaluate_subchannel(schid, 1);
+}
+
+void
+css_trigger_slow_path(void)
+{
+	if (need_rescan) {
+		need_rescan = 0;
+		css_rescan_devices();
+		return;
+	}
+	css_walk_subchannel_slow_list(css_evaluate_slow_subchannel);
+}
+
+/*
+ * Rescan for new devices. FIXME: This is slow.
+ * This function is called when we have lost CRWs due to overflows and we have
+ * to do subchannel housekeeping.
+ */
+void
+css_reiterate_subchannels(void)
+{
+	css_clear_subchannel_slow_list();
+	need_rescan = 1;
+}
+
 /*
  * Called from the machine check handler for subchannel report words.
  */
-void
+int
 css_process_crw(int irq)
 {
+	int ret;
+
 	CIO_CRW_EVENT(2, "source is subchannel %04X\n", irq);
 
+	if (need_rescan)
+		/* We need to iterate all subchannels anyway. */
+		return -EAGAIN;
 	/* 
 	 * Since we are always presented with IPI in the CRW, we have to
 	 * use stsch() to find out if the subchannel in question has come
 	 * or gone.
 	 */
-	css_evaluate_subchannel(irq);
+	ret = css_evaluate_subchannel(irq, 0);
+	if (ret == -EAGAIN) {
+		if (css_enqueue_subchannel_slow(irq)) {
+			css_clear_subchannel_slow_list();
+			need_rescan = 1;
+		}
+	}
+	return ret;
 }
 
 /*
@@ -410,6 +455,73 @@ s390_root_dev_unregister(struct device *dev)
 {
 	if (dev)
 		device_unregister(dev);
+}
+
+struct slow_subchannel {
+	struct list_head slow_list;
+	unsigned long schid;
+};
+
+static LIST_HEAD(slow_subchannels_head);
+static spinlock_t slow_subchannel_lock = SPIN_LOCK_UNLOCKED;
+
+int
+css_enqueue_subchannel_slow(unsigned long schid)
+{
+	struct slow_subchannel *new_slow_sch;
+	unsigned long flags;
+
+	new_slow_sch = kmalloc(sizeof(struct slow_subchannel), GFP_ATOMIC);
+	if (!new_slow_sch)
+		return -ENOMEM;
+	new_slow_sch->schid = schid;
+	spin_lock_irqsave(&slow_subchannel_lock, flags);
+	list_add_tail(&new_slow_sch->slow_list, &slow_subchannels_head);
+	spin_unlock_irqrestore(&slow_subchannel_lock, flags);
+	return 0;
+}
+
+void
+css_clear_subchannel_slow_list(void)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&slow_subchannel_lock, flags);
+	while (!list_empty(&slow_subchannels_head)) {
+		struct slow_subchannel *slow_sch =
+			list_entry(slow_subchannels_head.next,
+				   struct slow_subchannel, slow_list);
+
+		list_del_init(slow_subchannels_head.next);
+		kfree(slow_sch);
+	}
+	spin_unlock_irqrestore(&slow_subchannel_lock, flags);
+}
+
+void
+css_walk_subchannel_slow_list(void (*fn)(unsigned long))
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&slow_subchannel_lock, flags);
+	while (!list_empty(&slow_subchannels_head)) {
+		struct slow_subchannel *slow_sch =
+			list_entry(slow_subchannels_head.next,
+				   struct slow_subchannel, slow_list);
+
+		list_del_init(slow_subchannels_head.next);
+		spin_unlock_irqrestore(&slow_subchannel_lock, flags);
+		fn(slow_sch->schid);
+		spin_lock_irqsave(&slow_subchannel_lock, flags);
+		kfree(slow_sch);
+	}
+	spin_unlock_irqrestore(&slow_subchannel_lock, flags);
+}
+
+int
+css_slow_subchannels_exist(void)
+{
+	return (!list_empty(&slow_subchannels_head));
 }
 
 MODULE_LICENSE("GPL");

@@ -21,6 +21,8 @@
 
 #define check_pgt_cache()	do {} while (0)
 
+extern void diag10(unsigned long addr);
+
 /*
  * Allocate and free page tables. The xxx_kernel() versions are
  * used to allocate a kernel page table - this turns on ASN bits

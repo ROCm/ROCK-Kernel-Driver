@@ -160,9 +160,10 @@ struct tty_driver {
 	const char	*devfs_name;
 	const char	*name;
 	int	name_base;	/* offset of printed name */
-	short	major;		/* major device number */
-	short	minor_start;	/* start of minor device number*/
-	short	num;		/* number of devices */
+	int	major;		/* major device number */
+	int	minor_start;	/* start of minor device number */
+	int	minor_num;	/* number of *possible* devices */
+	int	num;		/* number of devices allocated */
 	short	type;		/* type of tty driver */
 	short	subtype;	/* subtype of tty driver */
 	struct termios init_termios; /* Initial termios */
@@ -244,11 +245,15 @@ void tty_set_operations(struct tty_driver *driver, struct tty_operations *op);
  * TTY_DRIVER_NO_DEVFS --- if set, do not create devfs entries. This
  *	is only used by tty_register_driver().
  *
+ * TTY_DRIVER_DEVPTS_MEM -- don't use the standard arrays, instead
+ *	use dynamic memory keyed through the devpts filesystem.  This
+ *	is only applicable to the pty driver.
  */
 #define TTY_DRIVER_INSTALLED		0x0001
 #define TTY_DRIVER_RESET_TERMIOS	0x0002
 #define TTY_DRIVER_REAL_RAW		0x0004
 #define TTY_DRIVER_NO_DEVFS		0x0008
+#define TTY_DRIVER_DEVPTS_MEM		0x0010
 
 /* tty driver types */
 #define TTY_DRIVER_TYPE_SYSTEM		0x0001
@@ -270,6 +275,5 @@ void tty_set_operations(struct tty_driver *driver, struct tty_operations *op);
 
 /* serial subtype definitions */
 #define SERIAL_TYPE_NORMAL	1
-#define SERIAL_TYPE_CALLOUT	2
 
 #endif /* #ifdef _LINUX_TTY_DRIVER_H */

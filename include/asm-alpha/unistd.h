@@ -546,17 +546,18 @@ type name (type1 arg1,type2 arg2,type3 arg3,type4 arg4,type5 arg5, type6 arg6)\
 
 #ifdef __KERNEL_SYSCALLS__
 
+#include <linux/compiler.h>
+#include <linux/types.h>
 #include <linux/string.h>
 #include <linux/signal.h>
+#include <linux/syscalls.h>
 #include <asm/ptrace.h>
 
-extern long sys_open(const char *, int, int);
 static inline long open(const char * name, int mode, int flags)
 {
 	return sys_open(name, mode, flags);
 }
 
-extern long sys_dup(int);
 static inline long dup(int fd)
 {
 	return sys_dup(fd);
@@ -564,17 +565,14 @@ static inline long dup(int fd)
 
 static inline long close(int fd)
 {
-	extern long sys_close(unsigned int);
 	return sys_close(fd);
 }
 
-extern off_t sys_lseek(int, off_t, int);
 static inline off_t lseek(int fd, off_t off, int whence)
 {
 	return sys_lseek(fd, off, whence);
 }
 
-extern long sys_exit(int);
 static inline long _exit(int value)
 {
 	return sys_exit(value);
@@ -582,13 +580,11 @@ static inline long _exit(int value)
 
 #define exit(x) _exit(x)
 
-extern long sys_write(int, const char *, size_t);
 static inline long write(int fd, const char * buf, size_t nr)
 {
 	return sys_write(fd, buf, nr);
 }
 
-extern long sys_read(int, char *, size_t);
 static inline long read(int fd, char * buf, size_t nr)
 {
 	return sys_read(fd, buf, nr);
@@ -596,18 +592,24 @@ static inline long read(int fd, char * buf, size_t nr)
 
 extern long execve(char *, char **, char **);
 
-extern long sys_setsid(void);
 static inline long setsid(void)
 {
 	return sys_setsid();
 }
 
-struct rusage;
-extern asmlinkage long sys_wait4(pid_t, unsigned int *, int, struct rusage *);
 static inline pid_t waitpid(int pid, int * wait_stat, int flags)
 {
 	return sys_wait4(pid, wait_stat, flags, NULL);
 }
+
+asmlinkage int sys_execve(char *ufilename, char **argv, char **envp,
+			unsigned long a3, unsigned long a4, unsigned long a5,
+			struct pt_regs regs);
+asmlinkage long sys_rt_sigaction(int sig,
+				const struct sigaction __user *act,
+				struct sigaction __user *oact,
+				size_t sigsetsize,
+				void *restorer);
 
 #endif /* __KERNEL_SYSCALLS__ */
 

@@ -921,11 +921,7 @@ static int openpromfs_unlink (struct inode *dir, struct dentry *dentry)
 }
 
 /* {{{ init section */
-#ifndef MODULE
 static int __init check_space (u16 n)
-#else
-static int check_space (u16 n)
-#endif
 {
 	unsigned long pages;
 
@@ -945,11 +941,7 @@ static int check_space (u16 n)
 	return 0;
 }
 
-#ifndef MODULE
 static u16 __init get_nodes (u16 parent, u32 node)
-#else
-static u16 get_nodes (u16 parent, u32 node)
-#endif
 {
 	char *p;
 	u16 n = last_node++, i;
@@ -1035,6 +1027,7 @@ static int openprom_fill_super(struct super_block *s, void *data, int silent)
 {
 	struct inode * root_inode;
 
+	s->s_flags |= MS_NODIRATIME;
 	s->s_blocksize = 1024;
 	s->s_blocksize_bits = 10;
 	s->s_magic = OPENPROM_SUPER_MAGIC;

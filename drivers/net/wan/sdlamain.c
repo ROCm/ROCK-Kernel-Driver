@@ -50,6 +50,7 @@
 #include <linux/stddef.h>	/* offsetof(), etc. */
 #include <linux/errno.h>	/* return codes */
 #include <linux/string.h>	/* inline memset(), etc. */
+#include <linux/init.h>
 #include <linux/slab.h>	/* kmalloc(), kfree() */
 #include <linux/kernel.h>	/* printk(), and other useful stuff */
 #include <linux/module.h>	/* support for loadable modules */
@@ -232,7 +233,7 @@ static int wanpipe_bh_critical;
  * Context:	process
  */
  
-int wanpipe_init(void)
+static int __init wanpipe_init(void)
 {
 	int cnt, err = 0;
 
@@ -297,13 +298,12 @@ int wanpipe_init(void)
 	return err;
 }
 
-#ifdef MODULE
 /*============================================================================
  * Module 'remove' entry point.
  * o unregister all adapters from the WAN router
  * o release all remaining system resources
  */
-static void wanpipe_cleanup(void)
+static void __exit wanpipe_cleanup(void)
 {
 	int i;
 
@@ -322,7 +322,6 @@ static void wanpipe_cleanup(void)
 
 module_init(wanpipe_init);
 module_exit(wanpipe_cleanup);
-#endif
 
 /******* WAN Device Driver Entry Points *************************************/
 
@@ -1161,7 +1160,6 @@ STATIC irqreturn_t sdla_isr (int irq, void* dev_id, struct pt_regs *regs)
 void wanpipe_open (sdla_t* card)
 {
 	++card->open_cnt;
-	MOD_INC_USE_COUNT;
 }
 
 /*============================================================================
@@ -1173,7 +1171,6 @@ void wanpipe_open (sdla_t* card)
 void wanpipe_close (sdla_t* card)
 {
 	--card->open_cnt;
-	MOD_DEC_USE_COUNT;
 }
 
 /*============================================================================

@@ -314,7 +314,7 @@ acpi_ns_lookup (
 	else {
 		prefix_node = scope_info->scope.node;
 		if (ACPI_GET_DESCRIPTOR_TYPE (prefix_node) != ACPI_DESC_TYPE_NAMED) {
-			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "%p Not a namespace node [%s]\n",
+			ACPI_REPORT_ERROR (("ns_lookup: %p is not a namespace node [%s]\n",
 					prefix_node, acpi_ut_get_descriptor_name (prefix_node)));
 			return_ACPI_STATUS (AE_AML_INTERNAL);
 		}

@@ -59,6 +59,8 @@ struct rtas_t rtas = {
 	.lock = SPIN_LOCK_UNLOCKED
 };
 
+char rtas_err_buf[RTAS_ERROR_LOG_MAX];
+
 extern unsigned long reloc_offset(void);
 
 spinlock_t rtas_data_buf_lock = SPIN_LOCK_UNLOCKED;
@@ -126,6 +128,34 @@ rtas_token(const char *service)
 	return tokp ? *tokp : RTAS_UNKNOWN_SERVICE;
 }
 
+void
+log_rtas_error(struct rtas_args	*rtas_args)
+{
+	struct rtas_args err_args;
+
+	err_args.token = rtas_token("rtas-last-error");
+	err_args.nargs = 2;
+	err_args.nret = 1;
+	err_args.rets = (rtas_arg_t *)&(err_args.args[2]);
+
+	err_args.args[0] = (rtas_arg_t)__pa(rtas_err_buf);
+	err_args.args[1] = RTAS_ERROR_LOG_MAX;
+	err_args.args[2] = 0;
+
+	get_paca()->xRtas = err_args;
+
+	PPCDBG(PPCDBG_RTAS, "\tentering rtas with 0x%lx\n",
+	       (void *)__pa((unsigned long)&err_args));
+	enter_rtas((void *)__pa((unsigned long)&get_paca()->xRtas));
+	PPCDBG(PPCDBG_RTAS, "\treturned from rtas ...\n");
+
+	err_args = get_paca()->xRtas;
+	get_paca()->xRtas = *rtas_args;
+
+	if (err_args.rets[0] == 0)
+		log_error(rtas_err_buf, ERR_TYPE_RTAS_LOG, 0);
+}
+
 long
 rtas_call(int token, int nargs, int nret,
 	  unsigned long *outputs, ...)
@@ -166,6 +196,10 @@ rtas_call(int token, int nargs, int nret,
 		(void *)__pa((unsigned long)rtas_args));
 	enter_rtas((void *)__pa((unsigned long)rtas_args));
 	PPCDBG(PPCDBG_RTAS, "\treturned from rtas ...\n");
+
+	if (rtas_args->rets[0] == -1)
+		log_rtas_error(rtas_args);
+
 #if 0   /* Gotta do something different here, use global lock for now... */
 	spin_unlock_irqrestore(&rtas_args->lock, s);
 #else
@@ -410,9 +444,14 @@ asmlinkage int ppc_rtas(struct rtas_args __user *uargs)
 		return -EFAULT;
 
 	spin_lock_irqsave(&rtas.lock, flags);
+
 	get_paca()->xRtas = args;
 	enter_rtas((void *)__pa((unsigned long)&get_paca()->xRtas));
 	args = get_paca()->xRtas;
+
+	if (args.rets[0] == -1)
+		log_rtas_error(&args);
+
 	spin_unlock_irqrestore(&rtas.lock, flags);
 
 	/* Copy out args. */

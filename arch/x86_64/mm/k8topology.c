@@ -48,6 +48,7 @@ int __init k8_scan_nodes(unsigned long start, unsigned long end)
 	int nodeid, i, nb; 
 	int found = 0;
 	u32 reg;
+	int rr;
 
 	nb = find_northbridge(); 
 	if (nb < 0) 
@@ -160,7 +161,7 @@ int __init k8_scan_nodes(unsigned long start, unsigned long end)
 	   mapping. To avoid this fill in the mapping for all possible
 	   CPUs, as the number of CPUs is not known yet. 
 	   We round robin the existing nodes. */
-	int rr = 0;
+	rr = 0;
 	for (i = 0; i < MAXNODE; i++) {
 		if (nodes_present & (1UL<<i))
 			continue;

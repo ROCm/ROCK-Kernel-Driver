@@ -350,7 +350,7 @@ acpi_evaluate_reference (
 	if ((buffer.length == 0) || !package) {
 		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, 
 			"No return object (len %X ptr %p)\n", 
-			buffer.length, package));
+			(unsigned)buffer.length, package));
 		status = AE_BAD_DATA;
 		acpi_util_eval_error(handle, pathname, status);
 		goto end;

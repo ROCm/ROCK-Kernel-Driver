@@ -1545,6 +1545,7 @@ config 8139TOO
 
 config 8139TOO_PIO
 	bool "Use PIO instead of MMIO"
+	default y
 	depends on 8139TOO
 	help
 	  This instructs the driver to use programmed I/O ports (PIO) instead
@@ -1675,8 +1676,8 @@ config VIA_RHINE
 	select CRC32
 	select MII
 	help
-	  If you have a VIA "rhine" based network card (Rhine-I (3043) or
-	  Rhine-2 (VT86c100A)), say Y here.
+	  If you have a VIA "rhine" based network card (Rhine-I (3043),
+	  Rhine-2 (VT86c100A) or Rhine-III (VT6105)), say Y here.
 
 	  To compile this driver as a module, choose M here and read
 	  <file:Documentation/networking/net-modules.txt>. The module
@@ -2170,6 +2171,17 @@ config HIPPI
 	  and have a HIPPI network card in your computer that you want to use
 	  under Linux, say Y here (you must also remember to enable the driver
 	  for your HIPPI card below). Most people will say N here.
+
+config IBMVETH
+	tristate "IBM LAN Virtual Ethernet support"
+	depends on NETDEVICES && NET_ETHERNET && PPC_PSERIES
+	---help---
+	  This driver supports virtual ethernet adapters on newer IBM iSeries
+	  and pSeries systems.
+
+	  To compile this driver as a module, choose M here and read
+	  <file:Documentation/networking/net-modules.txt>. The module will
+	  be called ibmveth.
 
 config ROADRUNNER
 	tristate "Essential RoadRunner HIPPI PCI adapter support (EXPERIMENTAL)"

@@ -42,6 +42,8 @@
 #include <net/bluetooth/hci_core.h>
 
 /* HCI Core */
+EXPORT_SYMBOL(hci_alloc_dev);
+EXPORT_SYMBOL(hci_free_dev);
 EXPORT_SYMBOL(hci_register_dev);
 EXPORT_SYMBOL(hci_unregister_dev);
 EXPORT_SYMBOL(hci_suspend_dev);

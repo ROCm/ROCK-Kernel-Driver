@@ -87,7 +87,7 @@
  * or more messages on the receive channels have gone to the MSG_NEW state.
  *
  * Since each channel handles only one message we have to implement a small
- * interrupt-driven queue on our end. Messages to e sent are placed on the
+ * interrupt-driven queue on our end. Messages to be sent are placed on the
  * queue for sending and contain a pointer to an optional callback function.
  * The handler for a message is called when the message state goes to
  * MSG_COMPLETE.
@@ -118,6 +118,7 @@
 #include <asm/macints.h> 
 #include <asm/mac_iop.h>
 #include <asm/mac_oss.h>
+#include <asm/unistd.h>
 
 /*#define DEBUG_IOP*/
 

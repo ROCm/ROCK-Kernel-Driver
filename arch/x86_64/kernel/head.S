@@ -341,7 +341,7 @@ gdt32_end:
 	
 ENTRY(cpu_gdt_table)
 	.quad	0x0000000000000000	/* NULL descriptor */
-	.quad	0x00af9a000000ffff ^ (1<<21)	/* __KERNEL_COMPAT32_CS */	
+	.quad	0x008f9a000000ffff	/* __KERNEL_COMPAT32_CS */	
 	.quad	0x00af9a000000ffff	/* __KERNEL_CS */
 	.quad	0x00cf92000000ffff	/* __KERNEL_DS */
 	.quad	0x00cffe000000ffff	/* __USER32_CS */
@@ -358,7 +358,7 @@ gdt_end:
 	/* asm/segment.h:GDT_ENTRIES must match this */	
 	/* This should be a multiple of the cache line size */
 	/* GDTs of other CPUs: */	
-	.fill (L1_CACHE_BYTES * NR_CPUS) - (gdt_end - cpu_gdt_table) 
+	.fill (GDT_SIZE * NR_CPUS) - (gdt_end - cpu_gdt_table)
 
 	.align  L1_CACHE_BYTES
 ENTRY(idt_table)	

@@ -154,6 +154,7 @@ ccw_device_call_handler(struct ccw_device *cdev)
 {
 	struct subchannel *sch;
 	unsigned int stctl;
+	int ending_status;
 
 	sch = to_subchannel(cdev->dev.parent);
 
@@ -166,7 +167,10 @@ ccw_device_call_handler(struct ccw_device *cdev)
 	 *  - unsolicited interrupts
 	 */
 	stctl = cdev->private->irb.scsw.stctl;
-	if (sch->schib.scsw.actl != 0 &&
+	ending_status = (stctl & SCSW_STCTL_SEC_STATUS) ||
+		(stctl == (SCSW_STCTL_ALERT_STATUS | SCSW_STCTL_STATUS_PEND)) ||
+		(stctl == SCSW_STCTL_STATUS_PEND);
+	if (!ending_status &&
 	    !cdev->private->options.repall &&
 	    !(stctl & SCSW_STCTL_INTER_STATUS) &&
 	    !(cdev->private->options.fast &&
@@ -469,6 +473,7 @@ ccw_device_stlck(struct ccw_device *cdev)
 		cio_disable_subchannel(sch); //FIXME: return code?
 		goto out_unlock;
 	}
+	cdev->private->irb.scsw.actl |= SCSW_ACTL_START_PEND;
 	spin_unlock_irqrestore(&sch->lock, flags);
 	wait_event(cdev->private->wait_q, cdev->private->irb.scsw.actl == 0);
 	spin_lock_irqsave(&sch->lock, flags);

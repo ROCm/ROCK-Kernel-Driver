@@ -106,7 +106,7 @@ ia64_sal_init (struct ia64_sal_systab *systab)
 	/*
 	 * revisions are coded in BCD, so %x does the job for us
 	 */
-	printk(KERN_INFO "SAL v%x.%02x: oem=%.32s, product=%.32s\n",
+	printk(KERN_INFO "SAL v%x.%x: oem=%.32s, product=%.32s\n",
 	       systab->sal_rev_major, systab->sal_rev_minor,
 	       systab->oem_id, systab->product_id);
 

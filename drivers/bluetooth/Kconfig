@@ -4,7 +4,7 @@ menu "Bluetooth device drivers"
 
 config BT_HCIUSB
 	tristate "HCI USB driver"
-	depends on BT && USB
+	depends on USB
 	help
 	  Bluetooth HCI USB driver.
 	  This driver is required if you want to use Bluetooth devices with
@@ -24,7 +24,6 @@ config BT_HCIUSB_SCO
 
 config BT_HCIUART
 	tristate "HCI UART driver"
-	depends on BT
 	help
 	  Bluetooth HCI UART driver.
 	  This driver is required if you want to use Bluetooth devices with
@@ -66,7 +65,7 @@ config BT_HCIUART_BCSP_TXCRC
 
 config BT_HCIBCM203X
 	tristate "HCI BCM203x USB driver"
-	depends on USB && BT
+	depends on USB
 	select FW_LOADER
 	help
 	  Bluetooth HCI BCM203x USB driver.
@@ -78,7 +77,7 @@ config BT_HCIBCM203X
 
 config BT_HCIBFUSB
 	tristate "HCI BlueFRITZ! USB driver"
-	depends on USB && BT
+	depends on USB
 	select FW_LOADER
 	help
 	  Bluetooth HCI BlueFRITZ! USB driver.
@@ -91,7 +90,7 @@ config BT_HCIBFUSB
 
 config BT_HCIDTL1
 	tristate "HCI DTL1 (PC Card) driver"
-	depends on PCMCIA && BT
+	depends on PCMCIA
 	help
 	  Bluetooth HCI DTL1 (PC Card) driver.
 	  This driver provides support for Bluetooth PCMCIA devices with
@@ -104,7 +103,7 @@ config BT_HCIDTL1
 
 config BT_HCIBT3C
 	tristate "HCI BT3C (PC Card) driver"
-	depends on PCMCIA && BT
+	depends on PCMCIA
 	help
 	  Bluetooth HCI BT3C (PC Card) driver.
 	  This driver provides support for Bluetooth PCMCIA devices with
@@ -120,7 +119,7 @@ config BT_HCIBT3C
 
 config BT_HCIBLUECARD
 	tristate "HCI BlueCard (PC Card) driver"
-	depends on PCMCIA && BT
+	depends on PCMCIA
 	help
 	  Bluetooth HCI BlueCard (PC Card) driver.
 	  This driver provides support for Bluetooth PCMCIA devices with
@@ -129,11 +128,11 @@ config BT_HCIBLUECARD
 	     Anycom Bluetooth CF Card
 
 	  Say Y here to compile support for HCI BlueCard devices into the
-	  kernel or say M to compile it as module (bluecard_cs.o).
+	  kernel or say M to compile it as module (bluecard_cs).
 
 config BT_HCIBTUART
 	tristate "HCI UART (PC Card) device driver"
-	depends on PCMCIA && BT
+	depends on PCMCIA
 	help
 	  Bluetooth HCI UART (PC Card) driver.
 	  This driver provides support for Bluetooth PCMCIA devices with
@@ -145,11 +144,10 @@ config BT_HCIBTUART
 	     Cyber-blue Compact Flash Card
 
 	  Say Y here to compile support for HCI UART devices into the
-	  kernel or say M to compile it as module (bluecard_cs).
+	  kernel or say M to compile it as module (btuart_cs).
 
 config BT_HCIVHCI
 	tristate "HCI VHCI (Virtual HCI device) driver"
-	depends on BT
 	help
 	  Bluetooth Virtual HCI device driver.
 	  This driver is required if you want to use HCI Emulation software.

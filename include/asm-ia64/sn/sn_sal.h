@@ -58,6 +58,7 @@
 #define  SN_SAL_MEMPROTECT                         0x0200003e
 #define  SN_SAL_SYSCTL_FRU_CAPTURE		   0x0200003f
 
+#define  SN_SAL_SYSCTL_IOBRICK_PCI_OP		   0x02000042	// reentrant
 
 /*
  * Service-specific constants
@@ -72,6 +73,16 @@
 #define SAL_CONSOLE_INTR_XMIT	1	/* output interrupt */
 #define SAL_CONSOLE_INTR_RECV	2	/* input interrupt */
 
+#ifdef CONFIG_HOTPLUG_PCI_SGI
+/* power up / power down / reset a PCI slot or bus */
+#define SAL_SYSCTL_PCI_POWER_UP         0
+#define SAL_SYSCTL_PCI_POWER_DOWN       1
+#define SAL_SYSCTL_PCI_RESET            2
+
+/* what type of I/O brick? */
+#define SAL_SYSCTL_IO_XTALK	0       /* connected via a compute node */
+
+#endif	/* CONFIG_HOTPLUG_PCI_SGI */
 
 /*
  * SN_SAL_GET_PARTITION_ADDR return constants
@@ -639,6 +650,24 @@ ia64_sn_fru_capture(void)
         if (isrv.status)
                 return 0;
         return isrv.v0;
+}
+
+/*
+ * Performs an operation on a PCI bus or slot -- power up, power down
+ * or reset.
+ */
+static inline u64
+ia64_sn_sysctl_iobrick_pci_op(nasid_t n, u64 connection_type, 
+			      u64 bus, slotid_t slot, 
+			      u64 action)
+{
+	struct ia64_sal_retval rv = {0, 0, 0, 0};
+
+	SAL_CALL_NOLOCK(rv, SN_SAL_SYSCTL_IOBRICK_PCI_OP, connection_type, n, action,
+		 bus, (u64) slot, 0, 0);
+	if (rv.status)
+	    	return rv.v0;
+	return 0;
 }
 
 #endif /* _ASM_IA64_SN_SN_SAL_H */

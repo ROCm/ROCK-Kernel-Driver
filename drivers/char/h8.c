@@ -30,9 +30,6 @@
 #include <linux/init.h>
 #include <linux/slab.h>
 
-#define __KERNEL_SYSCALLS__
-#include <asm/unistd.h>
-
 #include "h8.h"
 
 #define DEBUG_H8

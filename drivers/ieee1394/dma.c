@@ -26,11 +26,11 @@ void dma_prog_region_init(struct dma_prog_region *prog)
 int  dma_prog_region_alloc(struct dma_prog_region *prog, unsigned long n_bytes, struct pci_dev *dev)
 {
 	/* round up to page size */
-	n_bytes = round_up_to_page(n_bytes);
+	n_bytes = PAGE_ALIGN(n_bytes);
 
-	prog->n_pages = n_bytes / PAGE_SIZE;
+	prog->n_pages = n_bytes >> PAGE_SHIFT;
 
-	prog->kvirt = pci_alloc_consistent(dev, prog->n_pages * PAGE_SIZE, &prog->bus_addr);
+	prog->kvirt = pci_alloc_consistent(dev, n_bytes, &prog->bus_addr);
 	if (!prog->kvirt) {
 		printk(KERN_ERR "dma_prog_region_alloc: pci_alloc_consistent() failed\n");
 		dma_prog_region_free(prog);
@@ -45,7 +45,7 @@ int  dma_prog_region_alloc(struct dma_prog_region *prog, unsigned long n_bytes, 
 void dma_prog_region_free(struct dma_prog_region *prog)
 {
 	if (prog->kvirt) {
-		pci_free_consistent(prog->dev, prog->n_pages * PAGE_SIZE, prog->kvirt, prog->bus_addr);
+		pci_free_consistent(prog->dev, prog->n_pages << PAGE_SHIFT, prog->kvirt, prog->bus_addr);
 	}
 
 	prog->kvirt = NULL;
@@ -67,44 +67,42 @@ void dma_region_init(struct dma_region *dma)
 
 int dma_region_alloc(struct dma_region *dma, unsigned long n_bytes, struct pci_dev *dev, int direction)
 {
-	unsigned int i, n_pages;
+	unsigned int i;
 
 	/* round up to page size */
-	n_bytes = round_up_to_page(n_bytes);
+	n_bytes = PAGE_ALIGN(n_bytes);
 
-	n_pages = n_bytes / PAGE_SIZE;
+	dma->n_pages = n_bytes >> PAGE_SHIFT;
 
-	dma->kvirt = vmalloc_32(n_pages * PAGE_SIZE);
+	dma->kvirt = vmalloc_32(n_bytes);
 	if (!dma->kvirt) {
 		printk(KERN_ERR "dma_region_alloc: vmalloc_32() failed\n");
 		goto err;
 	}
 
-	dma->n_pages = n_pages;
-
 	/* Clear the ram out, no junk to the user */
-	memset(dma->kvirt, 0, n_pages * PAGE_SIZE);
+	memset(dma->kvirt, 0, n_bytes);
 
 	/* allocate scatter/gather list */
-	dma->sglist = kmalloc(dma->n_pages * sizeof(struct scatterlist), GFP_KERNEL);
+	dma->sglist = vmalloc(dma->n_pages * sizeof(*dma->sglist));
 	if (!dma->sglist) {
-		printk(KERN_ERR "dma_region_alloc: kmalloc(sglist) failed\n");
+		printk(KERN_ERR "dma_region_alloc: vmalloc(sglist) failed\n");
 		goto err;
 	}
 
 	/* just to be safe - this will become unnecessary once sglist->address goes away */
-	memset(dma->sglist, 0, dma->n_pages * sizeof(struct scatterlist));
+	memset(dma->sglist, 0, dma->n_pages * sizeof(*dma->sglist));
 
 	/* fill scatter/gather list with pages */
 	for (i = 0; i < dma->n_pages; i++) {
-		unsigned long va = (unsigned long) dma->kvirt + i * PAGE_SIZE;
+		unsigned long va = (unsigned long) dma->kvirt + (i << PAGE_SHIFT);
 			
 		dma->sglist[i].page = vmalloc_to_page((void *)va);
 		dma->sglist[i].length = PAGE_SIZE;
 	}
 
 	/* map sglist to the IOMMU */
-	dma->n_dma_pages = pci_map_sg(dev, &dma->sglist[0], dma->n_pages, direction);
+	dma->n_dma_pages = pci_map_sg(dev, dma->sglist, dma->n_pages, direction);
 
 	if (dma->n_dma_pages == 0) {
 		printk(KERN_ERR "dma_region_alloc: pci_map_sg() failed\n");
@@ -130,7 +128,7 @@ void dma_region_free(struct dma_region *dma)
 	}
 
 	if (dma->sglist) {
-		kfree(dma->sglist);
+		vfree(dma->sglist);
 		dma->sglist = NULL;
 	}
 
@@ -199,7 +197,7 @@ dma_region_pagefault(struct vm_area_struct *area, unsigned long address, int *ty
 		goto out;
 
 	if ( (address < (unsigned long) area->vm_start) ||
-	    (address > (unsigned long) area->vm_start + (PAGE_SIZE * dma->n_pages)) )
+	    (address > (unsigned long) area->vm_start + (dma->n_pages << PAGE_SHIFT)) )
 		goto out;
 
 	if (type)
@@ -229,7 +227,7 @@ int dma_region_mmap(struct dma_region *dma, struct file *file, struct vm_area_st
 
 	/* check the length */
 	size = vma->vm_end - vma->vm_start;
-	if (size > (PAGE_SIZE * dma->n_pages))
+	if (size > (dma->n_pages << PAGE_SHIFT))
 		return -EINVAL;
 
 	vma->vm_ops = &dma_region_vm_ops;

@@ -30,6 +30,7 @@
 #include <linux/mman.h>
 #include <linux/shm.h>
 #include <linux/smp_lock.h>
+#include <linux/syscalls.h>
 
 int sys_pipe(int *fildes)
 {
@@ -173,7 +174,7 @@ long sys_shmat_wrapper(int shmid, char *shmaddr, int shmflag)
 	unsigned long raddr;
 	int r;
 
-	r = sys_shmat(shmid, shmaddr, shmflag, &raddr);
+	r = do_shmat(shmid, shmaddr, shmflag, &raddr);
 	if (r < 0)
 		return r;
 	return raddr;
@@ -182,10 +183,6 @@ long sys_shmat_wrapper(int shmid, char *shmaddr, int shmflag)
 /* Fucking broken ABI */
 
 #ifdef CONFIG_PARISC64
-extern asmlinkage long sys_truncate(const char *, unsigned long);
-extern asmlinkage long sys_ftruncate(unsigned int, unsigned long);
-extern asmlinkage long sys_fcntl(unsigned int, unsigned int, unsigned long);
-
 asmlinkage long parisc_truncate64(const char * path,
 					unsigned int high, unsigned int low)
 {
@@ -214,9 +211,6 @@ asmlinkage long sys_fcntl64(unsigned int fd, unsigned int cmd, unsigned long arg
 }
 #else
 
-extern asmlinkage long sys_truncate64(const char *, loff_t);
-extern asmlinkage long sys_ftruncate64(unsigned int, loff_t);
-
 asmlinkage long parisc_truncate64(const char * path,
 					unsigned int high, unsigned int low)
 {
@@ -229,12 +223,6 @@ asmlinkage long parisc_ftruncate64(unsigned int fd,
 	return sys_ftruncate64(fd, (loff_t)high << 32 | low);
 }
 #endif
-
-extern asmlinkage ssize_t sys_pread64(unsigned int fd, char *buf,
-					size_t count, loff_t pos);
-extern asmlinkage ssize_t sys_pwrite64(unsigned int fd, const char *buf,
-					size_t count, loff_t pos);
-extern asmlinkage ssize_t sys_readahead(int fd, loff_t offset, size_t count);
 
 asmlinkage ssize_t parisc_pread64(unsigned int fd, char *buf, size_t count,
 					unsigned int high, unsigned int low)
@@ -257,7 +245,7 @@ asmlinkage ssize_t parisc_readahead(int fd, unsigned int high, unsigned int low,
 /*
  * This changes the io permissions bitmap in the current task.
  */
-asmlinkage int sys_ioperm(unsigned long from, unsigned long num, int turn_on)
+asmlinkage long sys_ioperm(unsigned long from, unsigned long num, int turn_on)
 {
 	return -ENOSYS;
 }

@@ -20,9 +20,8 @@ struct exec
 #define N_SYMSIZE(a)	((a).a_syms)
 
 #ifdef __KERNEL__
-
-#define STACK_TOP	0xc0000000
-
+#include <linux/thread_info.h>
+#define STACK_TOP (test_thread_flag(TIF_IA32) ? IA32_PAGE_OFFSET : TASK_SIZE)
 #endif
 
 #endif /* __A_OUT_GNU_H__ */

@@ -389,15 +389,29 @@ static int __init powernow_cpu_init (struct cpufreq_policy *policy)
 
 	policy->cur = maximum_speed;
 
+	cpufreq_frequency_table_get_attr(powernow_table, policy->cpu);
+
 	return cpufreq_frequency_table_cpuinfo(policy, powernow_table);
 }
+
+static int powernow_cpu_exit (struct cpufreq_policy *policy) {
+	cpufreq_frequency_table_put_attr(policy->cpu);
+	return 0;
+}
+
+static struct freq_attr* powernow_table_attr[] = {
+	&cpufreq_freq_attr_scaling_available_freqs,
+	NULL,
+};
 
 static struct cpufreq_driver powernow_driver = {
 	.verify 	= powernow_verify,
 	.target 	= powernow_target,
 	.init		= powernow_cpu_init,
+	.exit		= powernow_cpu_exit,
 	.name		= "powernow-k7",
 	.owner		= THIS_MODULE,
+	.attr		= powernow_table_attr,
 };
 
 static int __init powernow_init (void)

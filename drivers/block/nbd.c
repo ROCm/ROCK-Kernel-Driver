@@ -36,7 +36,7 @@
  * 03-06-24 Remove unneeded blksize_bits field from nbd_device struct.
  *   <ldl@aros.net>
  * 03-06-24 Cleanup PARANOIA usage & code. <ldl@aros.net>
- *
+ * 04-02-19 Remove PARANOIA, plus various cleanups (Paul Clements)
  * possible FIXME: make set_sock / set_blksize / set_size / do_it one syscall
  * why not: would need verify_area and friends, would share yet another 
  *          structure with userland
@@ -61,12 +61,9 @@
 #include <asm/uaccess.h>
 #include <asm/types.h>
 
-/* Define PARANOIA in linux/nbd.h to turn on extra sanity checking */
 #include <linux/nbd.h>
 
-#ifdef PARANOIA
 #define LO_MAGIC 0x68797548
-#endif
 
 #ifdef NDEBUG
 #define dprintk(flags, fmt...)
@@ -96,11 +93,6 @@ static struct nbd_device nbd_dev[MAX_NBD];
  * Thanks go to Jens Axboe and Al Viro for their LKML emails explaining this!
  */
 static spinlock_t nbd_lock = SPIN_LOCK_UNLOCKED;
-
-#ifdef PARANOIA
-static int requests_in;
-static int requests_out;
-#endif
 
 #ifndef NDEBUG
 static const char *ioctl_cmd_to_ascii(int cmd)
@@ -153,9 +145,6 @@ static void nbd_end_request(struct request *req)
 	}
 	spin_unlock(&lo->queue_lock);
 
-#ifdef PARANOIA
-	requests_out++;
-#endif
 	spin_lock_irqsave(q->queue_lock, flags);
 	if (!end_that_request_first(req, uptodate, req->nr_sectors)) {
 		end_that_request_last(req);
@@ -217,10 +206,8 @@ static int sock_xmit(struct socket *sock, int send, void *buf, int size,
 		}
 
 		if (result <= 0) {
-#ifdef PARANOIA
-			printk(KERN_ERR "nbd: %s - sock=%p at buf=%p, size=%d returned %d.\n",
-			       send? "send": "receive", sock, buf, size, result);
-#endif
+			if (result == 0)
+				result = -EPIPE; /* short read */
 			break;
 		}
 		size -= result;
@@ -309,7 +296,7 @@ void nbd_send_req(struct nbd_device *lo, struct request *req)
 	up(&lo->tx_lock);
 	return;
 
-      error_out:
+error_out:
 	up(&lo->tx_lock);
 	req->errors++;
 }
@@ -358,23 +345,22 @@ struct request *nbd_read_stat(struct nbd_device *lo)
 	if (result <= 0) {
 		printk(KERN_ERR "%s: Receive control failed (result %d)\n",
 				lo->disk->disk_name, result);
-		lo->harderror = result;
-		return NULL;
+		goto harderror;
 	}
 	req = nbd_find_request(lo, reply.handle);
 	if (req == NULL) {
 		printk(KERN_ERR "%s: Unexpected reply (%p)\n",
 				lo->disk->disk_name, reply.handle);
-		lo->harderror = result;
-		return NULL;
+		result = -EBADR;
+		goto harderror;
 	}
 
 	if (ntohl(reply.magic) != NBD_REPLY_MAGIC) {
 		printk(KERN_ERR "%s: Wrong magic (0x%lx)\n",
 				lo->disk->disk_name,
 				(unsigned long)ntohl(reply.magic));
-		lo->harderror = result;
-		return NULL;
+		result = -EPROTO;
+		goto harderror;
 	}
 	if (ntohl(reply.error)) {
 		printk(KERN_ERR "%s: Other side returned error (%d)\n",
@@ -396,8 +382,7 @@ struct request *nbd_read_stat(struct nbd_device *lo)
 					printk(KERN_ERR "%s: Receive data failed (result %d)\n",
 							lo->disk->disk_name,
 							result);
-					lo->harderror = result;
-					return NULL;
+					goto harderror;
 				}
 				dprintk(DBG_RX, "%s: request %p: got %d bytes data\n",
 					lo->disk->disk_name, req, bvec->bv_len);
@@ -405,19 +390,19 @@ struct request *nbd_read_stat(struct nbd_device *lo)
 		}
 	}
 	return req;
+harderror:
+	lo->harderror = result;
+	return NULL;
 }
 
 void nbd_do_it(struct nbd_device *lo)
 {
 	struct request *req;
 
-#ifdef PARANOIA
 	BUG_ON(lo->magic != LO_MAGIC);
-#endif
+
 	while ((req = nbd_read_stat(lo)) != NULL)
 		nbd_end_request(req);
-	printk(KERN_NOTICE "%s: req should never be null\n",
-			lo->disk->disk_name);
 	return;
 }
 
@@ -425,9 +410,7 @@ void nbd_clear_que(struct nbd_device *lo)
 {
 	struct request *req;
 
-#ifdef PARANOIA
 	BUG_ON(lo->magic != LO_MAGIC);
-#endif
 
 	do {
 		req = NULL;
@@ -466,9 +449,9 @@ static void do_nbd_request(request_queue_t * q)
 			goto error_out;
 
 		lo = req->rq_disk->private_data;
-#ifdef PARANOIA
+
 		BUG_ON(lo->magic != LO_MAGIC);
-#endif
+
 		if (!lo->file) {
 			printk(KERN_ERR "%s: Request when not-ready\n",
 					lo->disk->disk_name);
@@ -483,9 +466,6 @@ static void do_nbd_request(request_queue_t * q)
 				goto error_out;
 			}
 		}
-#ifdef PARANOIA
-		requests_in++;
-#endif
 
 		req->errors = 0;
 		spin_unlock_irq(q->queue_lock);
@@ -526,7 +506,7 @@ static void do_nbd_request(request_queue_t * q)
 		spin_lock_irq(q->queue_lock);
 		continue;
 
-	      error_out:
+error_out:
 		req->errors++;
 		spin_unlock(q->queue_lock);
 		nbd_end_request(req);
@@ -544,9 +524,9 @@ static int nbd_ioctl(struct inode *inode, struct file *file,
 
 	if (!capable(CAP_SYS_ADMIN))
 		return -EPERM;
-#ifdef PARANOIA
+
 	BUG_ON(lo->magic != LO_MAGIC);
-#endif
+
 	/* Anyone capable of this syscall can do *real bad* things */
 	dprintk(DBG_IOCTL, "%s: nbd_ioctl cmd=%s(0x%x) arg=%lu\n",
 			lo->disk->disk_name, ioctl_cmd_to_ascii(cmd), cmd, arg);
@@ -662,15 +642,10 @@ static int nbd_ioctl(struct inode *inode, struct file *file,
 		nbd_clear_que(lo);
 		return 0;
 	case NBD_PRINT_DEBUG:
-#ifdef PARANOIA
-		printk(KERN_INFO "%s: next = %p, prev = %p. Global: in %d, out %d\n",
-			inode->i_bdev->bd_disk->disk_name, lo->queue_head.next,
-			lo->queue_head.prev, requests_in, requests_out);
-#else
-		printk(KERN_INFO "%s: next = %p, prev = %p\n",
+		printk(KERN_INFO "%s: next = %p, prev = %p, head = %p\n",
 			inode->i_bdev->bd_disk->disk_name,
-			lo->queue_head.next, lo->queue_head.prev);
-#endif
+			lo->queue_head.next, lo->queue_head.prev,
+			&lo->queue_head);
 		return 0;
 	}
 	return -EINVAL;
@@ -692,12 +667,10 @@ static int __init nbd_init(void)
 	int err = -ENOMEM;
 	int i;
 
-#ifdef PARANOIA
 	if (sizeof(struct nbd_request) != 28) {
-		printk(KERN_CRIT "nbd: Sizeof nbd_request needs to be 28 in order to work!\n" );
+		printk(KERN_CRIT "nbd: sizeof nbd_request needs to be 28 in order to work!\n" );
 		return -EIO;
 	}
-#endif
 
 	for (i = 0; i < MAX_NBD; i++) {
 		struct gendisk *disk = alloc_disk(1);
@@ -728,15 +701,13 @@ static int __init nbd_init(void)
 	for (i = 0; i < MAX_NBD; i++) {
 		struct gendisk *disk = nbd_dev[i].disk;
 		nbd_dev[i].file = NULL;
-#ifdef PARANOIA
 		nbd_dev[i].magic = LO_MAGIC;
-#endif
 		nbd_dev[i].flags = 0;
 		spin_lock_init(&nbd_dev[i].queue_lock);
 		INIT_LIST_HEAD(&nbd_dev[i].queue_head);
 		init_MUTEX(&nbd_dev[i].tx_lock);
 		nbd_dev[i].blksize = 1024;
-		nbd_dev[i].bytesize = ((u64)0x7ffffc00) << 10; /* 2TB */
+		nbd_dev[i].bytesize = 0x7ffffc00ULL << 10; /* 2TB */
 		disk->major = NBD_MAJOR;
 		disk->first_minor = i;
 		disk->fops = &nbd_fops;
@@ -744,15 +715,14 @@ static int __init nbd_init(void)
 		disk->flags |= GENHD_FL_SUPPRESS_PARTITION_INFO;
 		sprintf(disk->disk_name, "nbd%d", i);
 		sprintf(disk->devfs_name, "nbd/%d", i);
-		set_capacity(disk, 0x3ffffe);
+		set_capacity(disk, 0x7ffffc00ULL << 1); /* 2 TB */
 		add_disk(disk);
 	}
 
 	return 0;
 out:
 	while (i--) {
-		if (nbd_dev[i].disk->queue)
-			blk_cleanup_queue(nbd_dev[i].disk->queue);
+		blk_cleanup_queue(nbd_dev[i].disk->queue);
 		put_disk(nbd_dev[i].disk);
 	}
 	return err;
@@ -764,9 +734,8 @@ static void __exit nbd_cleanup(void)
 	for (i = 0; i < MAX_NBD; i++) {
 		struct gendisk *disk = nbd_dev[i].disk;
 		if (disk) {
-			if (disk->queue)
-				blk_cleanup_queue(disk->queue);
 			del_gendisk(disk);
+			blk_cleanup_queue(disk->queue);
 			put_disk(disk);
 		}
 	}

@@ -10,12 +10,9 @@
  *		to allow signals to be sent reliably.
  */
 
-#define __KERNEL_SYSCALLS__
-
 #include <linux/config.h>
 #include <linux/slab.h>
 #include <linux/module.h>
-#include <linux/unistd.h>
 #include <linux/smp_lock.h>
 #include <linux/init.h>
 #include <linux/sched.h>

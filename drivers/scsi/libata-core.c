@@ -1,8 +1,8 @@
 /*
    libata-core.c - helper library for ATA
 
-   Copyright 2003 Red Hat, Inc.  All rights reserved.
-   Copyright 2003 Jeff Garzik
+   Copyright 2003-2004 Red Hat, Inc.  All rights reserved.
+   Copyright 2003-2004 Jeff Garzik
 
    The contents of this file are subject to the Open
    Software License version 1.1 that can be found at
@@ -1653,18 +1653,41 @@ void ata_fill_sg(struct ata_queued_cmd *qc)
 {
 	struct scatterlist *sg = qc->sg;
 	struct ata_port *ap = qc->ap;
-	unsigned int i;
+	unsigned int idx, nelem;
 
 	assert(sg != NULL);
 	assert(qc->n_elem > 0);
 
-	for (i = 0; i < qc->n_elem; i++) {
-		ap->prd[i].addr = cpu_to_le32(sg_dma_address(&sg[i]));
-		ap->prd[i].flags_len = cpu_to_le32(sg_dma_len(&sg[i]));
-		VPRINTK("PRD[%u] = (0x%X, 0x%X)\n",
-			i, le32_to_cpu(ap->prd[i].addr), le32_to_cpu(ap->prd[i].flags_len));
+	idx = 0;
+	for (nelem = qc->n_elem; nelem; nelem--,sg++) {
+		u32 addr, boundary;
+		u32 sg_len, len;
+
+		/* determine if physical DMA addr spans 64K boundary.
+		 * Note h/w doesn't support 64-bit, so we unconditionally
+		 * truncate dma_addr_t to u32.
+		 */
+		addr = (u32) sg_dma_address(sg);
+		sg_len = sg_dma_len(sg);
+
+		while (sg_len) {
+			boundary = (addr & ~0xffff) + (0xffff + 1);
+			len = sg_len;
+			if ((addr + sg_len) > boundary)
+				len = boundary - addr;
+
+			ap->prd[idx].addr = cpu_to_le32(addr);
+			ap->prd[idx].flags_len = cpu_to_le32(len & 0xffff);
+			VPRINTK("PRD[%u] = (0x%X, 0x%X)\n", idx, addr, len);
+
+			idx++;
+			sg_len -= len;
+			addr += len;
+		}
 	}
-	ap->prd[qc->n_elem - 1].flags_len |= cpu_to_le32(ATA_PRD_EOT);
+
+	if (idx)
+		ap->prd[idx - 1].flags_len |= cpu_to_le32(ATA_PRD_EOT);
 }
 
 /**
@@ -2386,41 +2409,6 @@ static inline unsigned int ata_host_intr (struct ata_port *ap,
 }
 
 /**
- *	ata_chk_spurious_int - Check for spurious interrupts
- *	@ap: port to which command is being issued
- *
- *	Examines the DMA status registers and clears
- *      unexpected interrupts.  Created to work around
- *	hardware bug on Intel ICH5, but is applied to all
- *	chipsets using the standard irq handler, just for safety.
- *	If the bug is not present, this is simply a single
- *	PIO or MMIO read addition to the irq handler.
- *
- *	LOCKING:
- */
-static inline void ata_chk_spurious_int(struct ata_port *ap) {
-	int host_stat;
-	
-	if (ap->flags & ATA_FLAG_MMIO) {
-		void *mmio = (void *) ap->ioaddr.bmdma_addr;
-		host_stat = readb(mmio + ATA_DMA_STATUS);
-	} else
-		host_stat = inb(ap->ioaddr.bmdma_addr + ATA_DMA_STATUS);
-	
-	if ((host_stat & (ATA_DMA_INTR | ATA_DMA_ERR | ATA_DMA_ACTIVE)) == ATA_DMA_INTR) {
-		if (ap->flags & ATA_FLAG_MMIO) {
-			void *mmio = (void *) ap->ioaddr.bmdma_addr;
-			writeb(host_stat & ~ATA_DMA_ERR, mmio + ATA_DMA_STATUS);
-		} else
-			outb(host_stat & ~ATA_DMA_ERR, ap->ioaddr.bmdma_addr + ATA_DMA_STATUS);
-		
-		DPRINTK("ata%u: Caught spurious interrupt, status 0x%X\n", ap->id, host_stat);
-		udelay(1);
-	}
-}
-
-
-/**
  *	ata_interrupt -
  *	@irq:
  *	@dev_instance:
@@ -2452,7 +2440,6 @@ irqreturn_t ata_interrupt (int irq, void *dev_instance, struct pt_regs *regs)
 			qc = ata_qc_from_tag(ap, ap->active_tag);
 			if (qc && ((qc->flags & ATA_QCFLAG_POLL) == 0))
 				handled += ata_host_intr(ap, qc);
-			ata_chk_spurious_int(ap);
 		}
 	}
 

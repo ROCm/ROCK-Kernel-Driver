@@ -60,13 +60,6 @@ typedef __u8 BOOL;
 #define TRUE 1
 #define FALSE 0
 
-#ifndef min
-#define min(a,b) (((a)<(b))?(a):(b))
-#endif
-#ifndef max
-#define max(a,b) (((a)>(b))?(a):(b))
-#endif
-
 /******************************************************************************
 *
 *  This structure when unioned with the structures below makes simple byte

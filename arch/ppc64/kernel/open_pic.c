@@ -76,7 +76,6 @@ static u_int NumSources;
 static int NumISUs;
 static int open_pic_irq_offset;
 static volatile unsigned char* chrp_int_ack_special;
-static int broken_ipi_registers;
 
 OpenPIC_SourcePtr ISU[OPENPIC_MAX_ISU];
 
@@ -248,6 +247,9 @@ static void openpic_safe_writefield(volatile u_int *addr, u_int mask,
 }
 
 #ifdef CONFIG_SMP
+
+static int broken_ipi_registers;
+
 static u_int openpic_read_IPI(volatile u_int* addr)
 {
         u_int val = 0;

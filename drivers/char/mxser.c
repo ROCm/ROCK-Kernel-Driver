@@ -350,8 +350,8 @@ static int mxser_get_serial_info(struct mxser_struct *, struct serial_struct *);
 static int mxser_set_serial_info(struct mxser_struct *, struct serial_struct *);
 static int mxser_get_lsr_info(struct mxser_struct *, unsigned int *);
 static void mxser_send_break(struct mxser_struct *, int);
-static int mxser_get_modem_info(struct mxser_struct *, unsigned int *);
-static int mxser_set_modem_info(struct mxser_struct *, unsigned int, unsigned int *);
+static int mxser_tiocmget(struct tty_struct *, struct file *);
+static int mxser_tiocmset(struct tty_struct *, struct file *, unsigned int, unsigned int);
 
 /*
  * The MOXA C168/C104 serial driver boot-time initialization code!
@@ -492,6 +492,8 @@ static struct tty_operations mxser_ops = {
 	.stop = mxser_stop,
 	.start = mxser_start,
 	.hangup = mxser_hangup,
+	.tiocmget = mxser_tiocmget,
+	.tiocmset = mxser_tiocmset,
 };
 
 static int __init mxser_module_init(void)
@@ -1009,12 +1011,6 @@ static int mxser_ioctl(struct tty_struct *tty, struct file *file,
 		tty->termios->c_cflag = ((tty->termios->c_cflag & ~CLOCAL) |
 					 (arg ? CLOCAL : 0));
 		return (0);
-	case TIOCMGET:
-		return (mxser_get_modem_info(info, (unsigned int *) arg));
-	case TIOCMBIS:
-	case TIOCMBIC:
-	case TIOCMSET:
-		return (mxser_set_modem_info(info, cmd, (unsigned int *) arg));
 	case TIOCGSERIAL:
 		return (mxser_get_serial_info(info, (struct serial_struct *) arg));
 	case TIOCSSERIAL:
@@ -2150,12 +2146,17 @@ static void mxser_send_break(struct mxser_struct *info, int duration)
 	restore_flags(flags);
 }
 
-static int mxser_get_modem_info(struct mxser_struct *info,
-				unsigned int *value)
+static int mxser_tiocmget(struct tty_struct *tty, struct file *file)
 {
+	struct mxser_struct *info = (struct mxser_struct *) tty->driver_data;
 	unsigned char control, status;
 	unsigned int result;
 	unsigned long flags;
+
+	if (PORTNO(tty) == MXSER_PORTS)
+		return (-ENOIOCTLCMD);
+	if (tty->flags & (1 << TTY_IO_ERROR))
+		return (-EIO);
 
 	control = info->MCR;
 	save_flags(flags);
@@ -2164,46 +2165,38 @@ static int mxser_get_modem_info(struct mxser_struct *info,
 	if (status & UART_MSR_ANY_DELTA)
 		mxser_check_modem_status(info, status);
 	restore_flags(flags);
-	result = ((control & UART_MCR_RTS) ? TIOCM_RTS : 0) |
+	return ((control & UART_MCR_RTS) ? TIOCM_RTS : 0) |
 	    ((control & UART_MCR_DTR) ? TIOCM_DTR : 0) |
 	    ((status & UART_MSR_DCD) ? TIOCM_CAR : 0) |
 	    ((status & UART_MSR_RI) ? TIOCM_RNG : 0) |
 	    ((status & UART_MSR_DSR) ? TIOCM_DSR : 0) |
 	    ((status & UART_MSR_CTS) ? TIOCM_CTS : 0);
-	return put_user(result, value);
 }
 
-static int mxser_set_modem_info(struct mxser_struct *info, unsigned int cmd,
-				unsigned int *value)
+static int mxser_tiocmset(struct tty_struct *tty, struct file *file,
+			  unsigned int set, unsigned int clear)
 {
+	struct mxser_struct *info = (struct mxser_struct *) tty->driver_data;
 	unsigned int arg;
 	unsigned long flags;
 
-	if(get_user(arg, value))
-		return -EFAULT;
-	switch (cmd) {
-	case TIOCMBIS:
-		if (arg & TIOCM_RTS)
-			info->MCR |= UART_MCR_RTS;
-		if (arg & TIOCM_DTR)
-			info->MCR |= UART_MCR_DTR;
-		break;
-	case TIOCMBIC:
-		if (arg & TIOCM_RTS)
-			info->MCR &= ~UART_MCR_RTS;
-		if (arg & TIOCM_DTR)
-			info->MCR &= ~UART_MCR_DTR;
-		break;
-	case TIOCMSET:
-		info->MCR = ((info->MCR & ~(UART_MCR_RTS | UART_MCR_DTR)) |
-			     ((arg & TIOCM_RTS) ? UART_MCR_RTS : 0) |
-			     ((arg & TIOCM_DTR) ? UART_MCR_DTR : 0));
-		break;
-	default:
-		return (-EINVAL);
-	}
+	if (PORTNO(tty) == MXSER_PORTS)
+		return (-ENOIOCTLCMD);
+	if (tty->flags & (1 << TTY_IO_ERROR))
+		return (-EIO);
+
 	save_flags(flags);
 	cli();
+	if (set & TIOCM_RTS)
+		info->MCR |= UART_MCR_RTS;
+	if (set & TIOCM_DTR)
+		info->MCR |= UART_MCR_DTR;
+
+	if (clear & TIOCM_RTS)
+		info->MCR &= ~UART_MCR_RTS;
+	if (clear & TIOCM_DTR)
+		info->MCR &= ~UART_MCR_DTR;
+
 	outb(info->MCR, info->base + UART_MCR);
 	restore_flags(flags);
 	return (0);

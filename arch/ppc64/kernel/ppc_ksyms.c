@@ -20,6 +20,7 @@
 #include <linux/pci.h>
 #include <linux/delay.h>
 #include <linux/smp_lock.h>
+#include <linux/syscalls.h>
 
 #include <asm/page.h>
 #include <asm/semaphore.h>
@@ -48,13 +49,9 @@
 #include <asm/iSeries/HvLpConfig.h>
 #endif
 
-extern int sys_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg);
 extern int do_signal(sigset_t *, struct pt_regs *);
 
 int abs(int);
-
-extern struct pci_dev * iSeries_veth_dev;
-extern struct pci_dev * iSeries_vio_dev;
 
 EXPORT_SYMBOL(do_signal);
 EXPORT_SYMBOL(sys_ioctl);
@@ -156,9 +153,6 @@ EXPORT_SYMBOL(eeh_check_failure);
 EXPORT_SYMBOL(eeh_total_mmio_ffs);
 #endif /* CONFIG_PPC_ISERIES */
 #endif /* CONFIG_PCI */
-
-EXPORT_SYMBOL(iSeries_veth_dev);
-EXPORT_SYMBOL(iSeries_vio_dev);
 
 EXPORT_SYMBOL(start_thread);
 EXPORT_SYMBOL(kernel_thread);

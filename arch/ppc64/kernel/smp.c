@@ -28,6 +28,8 @@
 #include <linux/spinlock.h>
 #include <linux/cache.h>
 #include <linux/err.h>
+#include <linux/sysdev.h>
+#include <linux/cpu.h>
 
 #include <asm/ptrace.h>
 #include <asm/atomic.h>
@@ -54,10 +56,9 @@
 int smp_threads_ready;
 unsigned long cache_decay_ticks;
 
-/* Initialised so it doesn't end up in bss */
-cpumask_t cpu_possible_map    = CPU_MASK_NONE;
+cpumask_t cpu_possible_map = CPU_MASK_NONE;
 cpumask_t cpu_online_map = CPU_MASK_NONE;
-cpumask_t cpu_available_map   = CPU_MASK_NONE;
+cpumask_t cpu_available_map = CPU_MASK_NONE;
 cpumask_t cpu_present_at_boot = CPU_MASK_NONE;
 
 EXPORT_SYMBOL(cpu_online_map);
@@ -71,14 +72,12 @@ extern unsigned char stab_array[];
 
 extern int cpu_idle(void *unused);
 void smp_call_function_interrupt(void);
-void smp_message_pass(int target, int msg, unsigned long data, int wait);
 extern long register_vpa(unsigned long flags, unsigned long proc,
 			 unsigned long vpa);
 
-#define smp_message_pass(t,m,d,w) smp_ops->message_pass((t),(m),(d),(w))
-
 /* Low level assembly function used to backup CPU 0 state */
 extern void __save_cpu_setup(void);
+
 #ifdef CONFIG_PPC_ISERIES
 static unsigned long iSeries_smp_message[NR_CPUS];
 
@@ -95,20 +94,24 @@ void iSeries_smp_message_recv( struct pt_regs * regs )
 			smp_message_recv( msg, regs );
 }
 
-static void smp_iSeries_message_pass(int target, int msg, unsigned long data, int wait)
+static inline void smp_iSeries_do_message(int cpu, int msg)
+{
+	set_bit(msg, &iSeries_smp_message[cpu]);
+	HvCall_sendIPI(&(paca[cpu]));
+}
+
+static void smp_iSeries_message_pass(int target, int msg)
 {
 	int i;
 
-	for (i = 0; i < NR_CPUS; ++i) {
-		if (!cpu_online(i))
-			continue;
-
-		if ((target == MSG_ALL) || 
-		    (target == i) || 
-		    ((target == MSG_ALL_BUT_SELF) &&
-		     (i != smp_processor_id())) ) {
-			set_bit(msg, &iSeries_smp_message[i]);
-			HvCall_sendIPI(&(paca[i]));
+	if (target < NR_CPUS)
+		smp_iSeries_do_message(target, msg);
+	else {
+		for_each_online_cpu(i) {
+			if (target == MSG_ALL_BUT_SELF
+			    && i == smp_processor_id())
+				continue;
+			smp_iSeries_do_message(i, msg);
 		}
 	}
 }
@@ -150,21 +153,14 @@ static int smp_iSeries_probe(void)
 
 static void smp_iSeries_kick_cpu(int nr)
 {
-	struct ItLpPaca * lpPaca;
-	/* Verify we have a Paca for processor nr */
-	if ( ( nr <= 0 ) ||
-	     ( nr >= NR_CPUS ) )
-		return;
+	struct ItLpPaca *lpPaca;
+
+	BUG_ON(nr < 0 || nr >= NR_CPUS);
+
 	/* Verify that our partition has a processor nr */
 	lpPaca = paca[nr].xLpPacaPtr;
-	if ( lpPaca->xDynProcStatus >= 2 )
+	if (lpPaca->xDynProcStatus >= 2)
 		return;
-
-	/* The information for processor bringup must
-	 * be written out to main store before we release
-	 * the processor.
-	 */
-	mb();
 
 	/* The processor is currently spinning, waiting
 	 * for the xProcStart field to become non-zero
@@ -194,7 +190,7 @@ void __init smp_init_iSeries(void)
 #endif
 
 #ifdef CONFIG_PPC_PSERIES
-void smp_openpic_message_pass(int target, int msg, unsigned long data, int wait)
+void smp_openpic_message_pass(int target, int msg)
 {
 	/* make sure we're sending something that translates to an IPI */
 	if ( msg > 0x3 ){
@@ -219,13 +215,9 @@ void smp_openpic_message_pass(int target, int msg, unsigned long data, int wait)
 
 static int __init smp_openpic_probe(void)
 {
-	int i;
-	int nr_cpus = 0;
+	int nr_cpus;
 
-	for (i = 0; i < NR_CPUS; i++) {
-		if (cpu_possible(i))
-			nr_cpus++;
-	}
+	nr_cpus = cpus_weight(cpu_possible_map);
 
 	if (nr_cpus > 1)
 		openpic_request_IPIs();
@@ -240,16 +232,7 @@ static void __devinit smp_openpic_setup_cpu(int cpu)
 
 static void smp_pSeries_kick_cpu(int nr)
 {
-	/* Verify we have a Paca for processor nr */
-	if ( ( nr <= 0 ) ||
-	     ( nr >= NR_CPUS ) )
-		return;
-
-	/* The information for processor bringup must
-	 * be written out to main store before we release
-	 * the processor.
-	 */
-	mb();
+	BUG_ON(nr < 0 || nr >= NR_CPUS);
 
 	/* The processor is currently spinning, waiting
 	 * for the xProcStart field to become non-zero
@@ -266,8 +249,8 @@ static void __init smp_space_timers(unsigned int max_cpus)
 	unsigned long offset = tb_ticks_per_jiffy / max_cpus;
 	unsigned long previous_tb = paca[boot_cpuid].next_jiffy_update_tb;
 
-	for (i = 0; i < NR_CPUS; i++) {
-		if (cpu_possible(i) && i != boot_cpuid) {
+	for_each_cpu(i) {
+		if (i != boot_cpuid) {
 			paca[i].next_jiffy_update_tb =
 				previous_tb + offset;
 			previous_tb = paca[i].next_jiffy_update_tb;
@@ -287,20 +270,25 @@ void vpa_init(int cpu)
 	register_vpa(flags, cpu, __pa((unsigned long)&(paca[cpu].xLpPaca))); 
 }
 
-static void smp_xics_message_pass(int target, int msg, unsigned long data, int wait)
+static inline void smp_xics_do_message(int cpu, int msg)
 {
-	int i;
+	set_bit(msg, &xics_ipi_message[cpu].value);
+	mb();
+	xics_cause_IPI(cpu);
+}
 
-	for (i = 0; i < NR_CPUS; ++i) {
-		if (!cpu_online(i))
-			continue;
+static void smp_xics_message_pass(int target, int msg)
+{
+	unsigned int i;
 
-		if (target == MSG_ALL || target == i
-		    || (target == MSG_ALL_BUT_SELF
-			&& i != smp_processor_id())) {
-			set_bit(msg, &xics_ipi_message[i].value);
-			mb();
-			xics_cause_IPI(i);
+	if (target < NR_CPUS) {
+		smp_xics_do_message(target, msg);
+	} else {
+		for_each_online_cpu(i) {
+			if (target == MSG_ALL_BUT_SELF
+			    && i == smp_processor_id())
+				continue;
+			smp_xics_do_message(i, msg);
 		}
 	}
 }
@@ -309,18 +297,11 @@ extern void xics_request_IPIs(void);
 
 static int __init smp_xics_probe(void)
 {
-	int i;
-	int nr_cpus = 0;
-
-	for (i = 0; i < NR_CPUS; i++) {
-		if (cpu_possible(i))
-			nr_cpus++;
-	}
 #ifdef CONFIG_SMP
 	xics_request_IPIs();
 #endif
 
-	return nr_cpus;
+	return cpus_weight(cpu_possible_map);
 }
 
 static void __devinit smp_xics_setup_cpu(int cpu)
@@ -422,13 +403,13 @@ void smp_message_recv(int msg, struct pt_regs *regs)
 
 void smp_send_reschedule(int cpu)
 {
-	smp_message_pass(cpu, PPC_MSG_RESCHEDULE, 0, 0);
+	smp_ops->message_pass(cpu, PPC_MSG_RESCHEDULE);
 }
 
 #ifdef CONFIG_DEBUGGER
 void smp_send_debugger_break(int cpu)
 {
-	smp_message_pass(cpu, PPC_MSG_DEBUGGER_BREAK, 0, 0);
+	smp_ops->message_pass(cpu, PPC_MSG_DEBUGGER_BREAK);
 }
 #endif
 
@@ -498,7 +479,7 @@ int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
 	call_data = &data;
 	wmb();
 	/* Send a message to all other CPUs and wait for them to respond */
-	smp_message_pass(MSG_ALL_BUT_SELF, PPC_MSG_CALL_FUNCTION, 0, 0);
+	smp_ops->message_pass(MSG_ALL_BUT_SELF, PPC_MSG_CALL_FUNCTION);
 
 	/* Wait for response */
 	timeout = SMP_CALL_TIMEOUT;
@@ -554,6 +535,9 @@ void smp_call_function_interrupt(void)
 	info = call_data->info;
 	wait = call_data->wait;
 
+	if (!wait)
+		smp_mb__before_atomic_inc();
+
 	/*
 	 * Notify initiating CPU that I've grabbed the data and am
 	 * about to execute the function
@@ -563,8 +547,10 @@ void smp_call_function_interrupt(void)
 	 * At this point the info structure may be out of scope unless wait==1
 	 */
 	(*func)(info);
-	if (wait)
+	if (wait) {
+		smp_mb__before_atomic_inc();
 		atomic_inc(&call_data->finished);
+	}
 }
 
 extern unsigned long decr_overclock;
@@ -660,6 +646,12 @@ int __devinit __cpu_up(unsigned int cpu)
 	paca[cpu].xCurrent = (u64)p;
 	current_set[cpu] = p->thread_info;
 
+	/* The information for processor bringup must
+	 * be written out to main store before we release
+	 * the processor.
+	 */
+	mb();
+
 	/* wake up cpus */
 	smp_ops->kick_cpu(cpu);
 
@@ -736,3 +728,71 @@ void __init smp_cpus_done(unsigned int max_cpus)
 
 	set_cpus_allowed(current, old_mask);
 }
+
+#ifdef CONFIG_NUMA
+static struct node node_devices[MAX_NUMNODES];
+
+static void register_nodes(void)
+{
+	int i;
+	int ret;
+
+	for (i = 0; i < MAX_NUMNODES; i++) {
+		if (node_online(i)) {
+			int p_node = parent_node(i);
+			struct node *parent = NULL;
+
+			if (p_node != i)
+				parent = &node_devices[p_node];
+
+			ret = register_node(&node_devices[i], i, parent);
+			if (ret)
+				printk(KERN_WARNING "register_nodes: "
+				       "register_node %d failed (%d)", i, ret);
+		}
+	}
+}
+#else
+static void register_nodes(void)
+{
+	return;
+}
+#endif
+
+/* Only valid if CPU is online. */
+static ssize_t show_physical_id(struct sys_device *dev, char *buf)
+{
+	struct cpu *cpu = container_of(dev, struct cpu, sysdev);
+
+	return sprintf(buf, "%u\n", get_hard_smp_processor_id(cpu->sysdev.id));
+}
+static SYSDEV_ATTR(physical_id, 0444, show_physical_id, NULL);
+
+static DEFINE_PER_CPU(struct cpu, cpu_devices);
+
+static int __init topology_init(void)
+{
+	int cpu;
+	struct node *parent = NULL;
+	int ret;
+
+	register_nodes();
+
+	for_each_cpu(cpu) {
+#ifdef CONFIG_NUMA
+		parent = &node_devices[cpu_to_node(cpu)];
+#endif
+		ret = register_cpu(&per_cpu(cpu_devices, cpu), cpu, parent);
+		if (ret)
+			printk(KERN_WARNING "topology_init: register_cpu %d "
+			       "failed (%d)\n", cpu, ret);
+
+		ret = sysdev_create_file(&per_cpu(cpu_devices, cpu).sysdev,
+					 &attr_physical_id);
+		if (ret)
+			printk(KERN_WARNING "toplogy_init: sysdev_create_file "
+			       "%d failed (%d)\n", cpu, ret);
+	}
+	return 0;
+}
+__initcall(topology_init);

@@ -49,7 +49,7 @@ Card) hardware, for example, you probably needn't concern yourself
 with pcmcia-cs.
 
 o  Gnu C                  2.95.3                  # gcc --version
-o  Gnu make               3.78                    # make --version
+o  Gnu make               3.79.1                  # make --version
 o  binutils               2.12                    # ld -v
 o  util-linux             2.10o                   # fdformat --version
 o  module-init-tools      0.9.10                  # depmod -V
@@ -62,7 +62,7 @@ o  quota-tools            3.09                    # quota -V
 o  PPP                    2.4.0                   # pppd --version
 o  isdn4k-utils           3.1pre1                 # isdnctrl 2>&1|grep version
 o  nfs-utils              1.0.5                   # showmount --version
-o  procps                 3.1.13                  # ps --version
+o  procps                 3.2.0                   # ps --version
 o  oprofile               0.5.3                   # oprofiled --version
 
 Kernel compilation
@@ -96,7 +96,7 @@ your version of gcc 2.95.x, may necessitate using -fno-strict-aliasing).
 Make
 ----
 
-You will need Gnu make 3.78 or later to build the kernel.
+You will need Gnu make 3.79.1 or later to build the kernel.
 
 Binutils
 --------
@@ -301,9 +301,9 @@ gcc 2.95.3
 ----------
 o  <ftp://ftp.gnu.org/gnu/gcc/gcc-2.95.3.tar.gz>
 
-Make 3.78
----------
-o  <ftp://ftp.gnu.org/gnu/make/make-3.78.1.tar.gz>
+Make
+----
+o  <ftp://ftp.gnu.org/gnu/make/>
 
 Binutils
 --------

@@ -376,7 +376,7 @@ struct MATRIX
   u_char external_frequency_divider;
   u_char internal_frequency_divider;
 };
-#define matrix (*(volatile struct MATRIX *)MATRIX_BASE)
+#define falcon_matrix (*(volatile struct MATRIX *)MATRIX_BASE)
 
 #define CODEC_BASE (0xffff8936)
 struct CODEC
@@ -405,7 +405,7 @@ struct CODEC
   u_char unused6;
   u_char gpio_data;
 };
-#define codec (*(volatile struct CODEC *)CODEC_BASE)
+#define falcon_codec (*(volatile struct CODEC *)CODEC_BASE)
 
 /*
 ** Falcon Blitter

@@ -162,7 +162,7 @@ do_lcall:
 	movl %eax,EFLAGS(%ebp)	#
 	movl %edx,EIP(%ebp)	# Now we move them to their "normal" places
 	movl %ecx,CS(%ebp)	#
-	andl $-8192, %ebp	# GET_THREAD_INFO
+	GET_THREAD_INFO_WITH_ESP(%ebp)	# GET_THREAD_INFO
 	movl TI_EXEC_DOMAIN(%ebp), %edx	# Get the execution domain
 	call *4(%edx)		# Call the lcall7 handler for the domain
 	addl $4, %esp

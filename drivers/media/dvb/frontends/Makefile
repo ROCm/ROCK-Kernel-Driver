@@ -17,3 +17,4 @@ obj-$(CONFIG_DVB_VES1820) += ves1820.o
 obj-$(CONFIG_DVB_VES1X93) += ves1x93.o
 obj-$(CONFIG_DVB_TDA1004X) += tda1004x.o
 obj-$(CONFIG_DVB_SP887X) += sp887x.o
+obj-$(CONFIG_DVB_NXT6000) += nxt6000.o

@@ -27,6 +27,7 @@
 #include <linux/list.h>
 #include <linux/hash.h>
 #include <linux/spinlock.h>
+#include <linux/syscalls.h>
 #include <linux/rwsem.h>
 #include <linux/wait.h>
 #include <linux/eventpoll.h>

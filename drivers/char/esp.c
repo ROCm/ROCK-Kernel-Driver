@@ -1753,55 +1753,52 @@ static int get_lsr_info(struct esp_struct * info, unsigned int *value)
 }
 
 
-static int get_modem_info(struct esp_struct * info, unsigned int *value)
+static int esp_tiocmget(struct tty_struct *tty, struct file *file)
 {
+	struct esp_struct * info = (struct esp_struct *)tty->driver_data;
 	unsigned char control, status;
-	unsigned int result;
+
+	if (serial_paranoia_check(info, tty->name, __FUNCTION__))
+		return -ENODEV;
+	if (tty->flags & (1 << TTY_IO_ERROR))
+		return -EIO;
 
 	control = info->MCR;
 	cli();
 	serial_out(info, UART_ESI_CMD1, ESI_GET_UART_STAT);
 	status = serial_in(info, UART_ESI_STAT2);
 	sti();
-	result =  ((control & UART_MCR_RTS) ? TIOCM_RTS : 0)
+	return    ((control & UART_MCR_RTS) ? TIOCM_RTS : 0)
 		| ((control & UART_MCR_DTR) ? TIOCM_DTR : 0)
 		| ((status  & UART_MSR_DCD) ? TIOCM_CAR : 0)
 		| ((status  & UART_MSR_RI) ? TIOCM_RNG : 0)
 		| ((status  & UART_MSR_DSR) ? TIOCM_DSR : 0)
 		| ((status  & UART_MSR_CTS) ? TIOCM_CTS : 0);
-	return put_user(result,value);
 }
 
-static int set_modem_info(struct esp_struct * info, unsigned int cmd,
-			  unsigned int *value)
+static int esp_tiocmset(struct tty_struct *tty, struct file *file,
+			unsigned int set, unsigned int clear)
 {
+	struct esp_struct * info = (struct esp_struct *)tty->driver_data;
 	unsigned int arg;
 
-	if (get_user(arg, value))
-		return -EFAULT;
+	if (serial_paranoia_check(info, tty->name, __FUNCTION__))
+		return -ENODEV;
+	if (tty->flags & (1 << TTY_IO_ERROR))
+		return -EIO;
 
-	switch (cmd) {
-	case TIOCMBIS: 
-		if (arg & TIOCM_RTS)
-			info->MCR |= UART_MCR_RTS;
-		if (arg & TIOCM_DTR)
-			info->MCR |= UART_MCR_DTR;
-		break;
-	case TIOCMBIC:
-		if (arg & TIOCM_RTS)
-			info->MCR &= ~UART_MCR_RTS;
-		if (arg & TIOCM_DTR)
-			info->MCR &= ~UART_MCR_DTR;
-		break;
-	case TIOCMSET:
-		info->MCR = ((info->MCR & ~(UART_MCR_RTS | UART_MCR_DTR))
-			     | ((arg & TIOCM_RTS) ? UART_MCR_RTS : 0)
-			     | ((arg & TIOCM_DTR) ? UART_MCR_DTR : 0));
-		break;
-	default:
-		return -EINVAL;
-	}
 	cli();
+
+	if (set & TIOCM_RTS)
+		info->MCR |= UART_MCR_RTS;
+	if (set & TIOCM_DTR)
+		info->MCR |= UART_MCR_DTR;
+
+	if (clear & TIOCM_RTS)
+		info->MCR &= ~UART_MCR_RTS;
+	if (clear & TIOCM_DTR)
+		info->MCR &= ~UART_MCR_DTR;
+
 	serial_out(info, UART_ESI_CMD1, ESI_WRITE_UART);
 	serial_out(info, UART_ESI_CMD2, UART_MCR);
 	serial_out(info, UART_ESI_CMD2, info->MCR);
@@ -1853,12 +1850,6 @@ static int rs_ioctl(struct tty_struct *tty, struct file * file,
 	}
 	
 	switch (cmd) {
-		case TIOCMGET:
-			return get_modem_info(info, (unsigned int *) arg);
-		case TIOCMBIS:
-		case TIOCMBIC:
-		case TIOCMSET:
-			return set_modem_info(info, cmd, (unsigned int *) arg);
 		case TIOCGSERIAL:
 			return get_serial_info(info,
 					       (struct serial_struct *) arg);
@@ -2444,6 +2435,8 @@ static struct tty_operations esp_ops = {
 	.hangup = esp_hangup,
 	.break_ctl = esp_break,
 	.wait_until_sent = rs_wait_until_sent,
+	.tiocmget = esp_tiocmget,
+	.tiocmset = esp_tiocmset,
 };
 
 /*

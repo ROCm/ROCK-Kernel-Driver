@@ -57,7 +57,7 @@ extern void pmac_secondary_start_1(void);
 extern void pmac_secondary_start_2(void);
 extern void pmac_secondary_start_3(void);
 
-extern void smp_openpic_message_pass(int target, int msg, unsigned long data, int wait);
+extern void smp_openpic_message_pass(int target, int msg);
 
 extern struct smp_ops_t *smp_ops;
 

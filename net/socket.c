@@ -78,6 +78,7 @@
 #include <linux/divert.h>
 #include <linux/mount.h>
 #include <linux/security.h>
+#include <linux/syscalls.h>
 #include <linux/compat.h>
 #include <linux/kmod.h>
 
@@ -1927,10 +1928,6 @@ int sock_unregister(int family)
 
 extern void sk_init(void);
 
-#ifdef CONFIG_WAN_ROUTER
-extern void wanrouter_init(void);
-#endif
-
 void __init sock_init(void)
 {
 	int i;
@@ -1953,14 +1950,6 @@ void __init sock_init(void)
 	 *	Initialize skbuff SLAB cache 
 	 */
 	skb_init();
-#endif
-
-	/*
-	 *	Wan router layer. 
-	 */
-
-#ifdef CONFIG_WAN_ROUTER	 
-	wanrouter_init();
 #endif
 
 	/*

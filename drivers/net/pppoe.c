@@ -1075,6 +1075,20 @@ static struct file_operations pppoe_seq_fops = {
 	.llseek		= seq_lseek,
 	.release	= seq_release,
 };
+
+static int __init pppoe_proc_init(void)
+{
+	struct proc_dir_entry *p;
+
+	p = create_proc_entry("pppoe", S_IRUGO, proc_net);
+	if (!p)
+		return -ENOMEM;
+
+	p->proc_fops = &pppoe_seq_fops;
+	return 0;
+}
+#else /* CONFIG_PROC_FS */
+static inline int pppoe_proc_init(void) { return 0; }
 #endif /* CONFIG_PROC_FS */
 
 /* ->ioctl are set at pppox_create */
@@ -1111,26 +1125,18 @@ static int __init pppoe_init(void)
 
 	if (err)
 		goto out;
-#ifdef CONFIG_PROC_FS
-{
-	struct proc_dir_entry *p = create_proc_entry("pppoe", S_IRUGO,
-						     proc_net);
-	err = -ENOMEM;
-	if (!p)
-		goto out_unregister;
+
+	err = pppoe_proc_init();
+	if (err) {
+		unregister_pppox_proto(PX_PROTO_OE);
+		goto out;
+	}
 	
-	p->proc_fops = &pppoe_seq_fops;
-	err = 0;
-}
-#endif /* CONFIG_PROC_FS */
 	dev_add_pack(&pppoes_ptype);
 	dev_add_pack(&pppoed_ptype);
 	register_netdevice_notifier(&pppoe_notifier);
 out:
 	return err;
-out_unregister:
-	unregister_pppox_proto(PX_PROTO_OE);
-	goto out;
 }
 
 static void __exit pppoe_exit(void)
@@ -1139,9 +1145,7 @@ static void __exit pppoe_exit(void)
 	dev_remove_pack(&pppoes_ptype);
 	dev_remove_pack(&pppoed_ptype);
 	unregister_netdevice_notifier(&pppoe_notifier);
-#ifdef CONFIG_PROC_FS
 	remove_proc_entry("pppoe", proc_net);
-#endif
 }
 
 module_init(pppoe_init);

@@ -300,6 +300,38 @@ static void aac_sa_start_adapter(struct aac_dev *dev)
 }
 
 /**
+ *	aac_sa_check_health
+ *	@dev: device to check if healthy
+ *
+ *	Will attempt to determine if the specified adapter is alive and
+ *	capable of handling requests, returning 0 if alive.
+ */
+static int aac_sa_check_health(struct aac_dev *dev)
+{
+	long status = sa_readl(dev, Mailbox7);
+
+	/*
+	 *	Check to see if the board failed any self tests.
+	 */
+	if (status & SELF_TEST_FAILED)
+		return -1;
+	/*
+	 *	Check to see if the board panic'd while booting.
+	 */
+	if (status & KERNEL_PANIC)
+		return -2;
+	/*
+	 *	Wait for the adapter to be up and running. Wait up to 3 minutes
+	 */
+	if (!(status & KERNEL_UP_AND_RUNNING))
+		return -3;
+	/*
+	 *	Everything is OK
+	 */
+	return 0;
+} /* aac_sa_check_health */
+
+/**
  *	aac_sa_init	-	initialize an ARM based AAC card
  *	@dev: device to configure
  *	@devnum: adapter number

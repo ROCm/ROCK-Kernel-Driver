@@ -31,6 +31,7 @@
 #include <linux/seq_file.h>
 #include <linux/errno.h>
 #include <linux/list.h>
+#include <linux/kallsyms.h>
 
 #include <asm/irq.h>
 #include <asm/system.h>
@@ -225,6 +226,34 @@ static int check_irq_lock(struct irqdesc *desc, int irq, struct pt_regs *regs)
 }
 
 static void
+report_bad_irq(unsigned int irq, struct pt_regs *regs, struct irqdesc *desc, int ret)
+{
+	static int count = 100;
+	struct irqaction *action;
+
+	if (!count)
+		return;
+
+	count--;
+
+	if (ret != IRQ_HANDLED && ret != IRQ_NONE) {
+		printk("irq%u: bogus retval mask %x\n", irq, ret);
+	} else {
+		printk("irq%u: nobody cared\n", irq);
+	}
+	show_regs(regs);
+	dump_stack();
+	printk(KERN_ERR "handlers:");
+	action = desc->action;
+	do {
+		printk("\n" KERN_ERR "[<%p>]", action->handler);
+		print_symbol(" (%s)", (unsigned long)action->handler);
+		action = action->next;
+	} while (action);
+	printk("\n");
+}
+
+static int
 __do_irq(unsigned int irq, struct irqaction *action, struct pt_regs *regs)
 {
 	unsigned int status;
@@ -247,18 +276,7 @@ __do_irq(unsigned int irq, struct irqaction *action, struct pt_regs *regs)
 
 	spin_lock_irq(&irq_controller_lock);
 
-	if (retval != 1) {
-		static int count = 100;
-		if (count) {
-			count--;
-			if (retval) {
-				printk("irq event %d: bogus retval mask %x\n",
-					irq, retval);
-			} else {
-				printk("irq %d: nobody cared\n", irq);
-			}
-		}
-	}
+	return retval;
 }
 
 /*
@@ -276,8 +294,11 @@ do_simple_IRQ(unsigned int irq, struct irqdesc *desc, struct pt_regs *regs)
 	kstat_cpu(cpu).irqs[irq]++;
 
 	action = desc->action;
-	if (action)
-		__do_irq(irq, desc->action, regs);
+	if (action) {
+		int ret = __do_irq(irq, action, regs);
+		if (ret != IRQ_HANDLED)
+			report_bad_irq(irq, regs, desc, ret);
+	}
 }
 
 /*
@@ -313,6 +334,7 @@ do_edge_IRQ(unsigned int irq, struct irqdesc *desc, struct pt_regs *regs)
 
 	do {
 		struct irqaction *action;
+		int ret;
 
 		action = desc->action;
 		if (!action)
@@ -323,7 +345,9 @@ do_edge_IRQ(unsigned int irq, struct irqdesc *desc, struct pt_regs *regs)
 			desc->chip->unmask(irq);
 		}
 
-		__do_irq(irq, action, regs);
+		ret = __do_irq(irq, action, regs);
+		if (ret != IRQ_HANDLED)
+			report_bad_irq(irq, regs, desc, ret);
 	} while (desc->pending && !desc->disable_depth);
 
 	desc->running = 0;
@@ -368,7 +392,10 @@ do_level_IRQ(unsigned int irq, struct irqdesc *desc, struct pt_regs *regs)
 		 */
 		action = desc->action;
 		if (action) {
-			__do_irq(irq, desc->action, regs);
+			int ret = __do_irq(irq, desc->action, regs);
+
+			if (ret != IRQ_HANDLED)
+				report_bad_irq(irq, regs, desc, ret);
 
 			if (likely(!desc->disable_depth &&
 				   !check_irq_lock(desc, irq, regs)))

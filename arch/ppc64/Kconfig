@@ -89,6 +89,17 @@ config PPC_PMAC
 	bool "Apple PowerMac G5 support"
 	select ADB_PMU
 
+config PMAC_DART
+	bool "Enable DART/IOMMU on PowerMac (allow >2G of RAM)"
+	depends on PPC_PMAC
+	depends on EXPERIMENTAL
+	default n
+	help
+	  Enabling DART makes it possible to boot a PowerMac G5 with more
+	  than 2GB of memory. Note that the code is very new and untested
+	  at this time, so it has to be considered experimental. Enabling
+	  this might result in data loss.
+
 config PPC_PMAC64
 	bool
 	depends on PPC_PMAC
@@ -108,6 +119,18 @@ config POWER4_ONLY
 	  Cause the compiler to optimize for POWER4 processors. The resulting
 	  binary will not work on POWER3 or RS64 processors when compiled with
 	  binutils 2.15 or later.
+
+config IOMMU_VMERGE
+	bool "Enable IOMMU virtual merging (EXPERIMENTAL)"
+	depends on EXPERIMENTAL
+	default n
+	help
+	  Cause IO segments sent to a device for DMA to be merged virtually
+	  by the IOMMU when they happen to have been allocated contiguously.
+	  This doesn't add pressure to the IOMMU allocator. However, some
+	  drivers don't support getting large merged segments coming back
+	  from *_map_sg(). Say Y if you know the drivers you are using are
+	  properly handling this case.
 
 config SMP
 	bool "Symmetric multi-processing support"
@@ -271,15 +294,6 @@ config VIODASD
 	  If you are running on an iSeries system and you want to use
  	  virtual disks created and managed by OS/400, say Y.
 
-config VIODASD_IDE
-	bool "iSeries Virtual disk IDE emulation"
-	depends on VIODASD
-	help
-	  This causes the iSeries virtual disks to look like IDE disks.
-	  If you have programs or utilities that only support certain
-	  kinds of disks, this option will cause iSeries virtual disks
-	  to pretend to be IDE disks, which may satisfy the program.
-
 config VIOCD
 	tristate "iSeries Virtual I/O CD support"
 	help
@@ -295,9 +309,6 @@ config VIOTAPE
 	help
 	  If you are running Linux on an iSeries system and you want Linux
 	  to read and/or write a tape drive owned by OS/400, say Y here.
-
-config VETH
-	tristate "iSeries Virtual Ethernet driver support"
 
 endmenu
 
@@ -315,6 +326,19 @@ config DEBUG_KERNEL
 	help
 	  Say Y here if you are developing drivers or trying to debug and
 	  identify kernel problems.
+
+config DEBUG_STACKOVERFLOW
+	bool "Check for stack overflows"
+	depends on DEBUG_KERNEL
+
+config DEBUG_STACK_USAGE
+	bool "Stack utilization instrumentation"
+	depends on DEBUG_KERNEL
+	help
+	  Enables the display of the minimum amount of free stack which each
+	  task has ever had available in the sysrq-T and sysrq-P debug output.
+
+	  This option will slow down process creation somewhat.
 
 config DEBUG_SLAB
 	bool "Debug memory allocations"

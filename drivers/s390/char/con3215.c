@@ -454,7 +454,7 @@ raw3215_irq(struct ccw_device *cdev, unsigned long intparm, struct irb *irb)
 				memcpy(tty->flip.char_buf_ptr,
 				       raw->inbuf, count);
 				if (count < 2 ||
-				    (strncmp(raw->inbuf+count-2, "^n", 2) ||
+				    (strncmp(raw->inbuf+count-2, "^n", 2) &&
 				    strncmp(raw->inbuf+count-2, "\252n", 2)) ) {
 					/* don't add the auto \n */
 					tty->flip.char_buf_ptr[count] = '\n';
