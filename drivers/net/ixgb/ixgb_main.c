@@ -1819,6 +1819,12 @@ ixgb_clean_rx_irq(struct ixgb_adapter *adapter)
 
 	while (rx_desc->status & IXGB_RX_DESC_STATUS_DD) {
 
+#ifdef CONFIG_IXGB_NAPI
+		if(*work_done >= work_to_do)
+			break;
+
+		(*work_done)++;
+#endif
 		skb = buffer_info->skb;
 		prefetch(skb->data);
 
@@ -1836,12 +1842,6 @@ ixgb_clean_rx_irq(struct ixgb_adapter *adapter)
 		next_skb = next_buffer->skb;
 		prefetch(next_skb);
 
-#ifdef CONFIG_IXGB_NAPI
-		if (*work_done >= work_to_do)
-			break;
-
-		(*work_done)++;
-#endif
 
 		cleaned = TRUE;
 
