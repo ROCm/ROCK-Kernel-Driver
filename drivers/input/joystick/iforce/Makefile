@@ -1,42 +1,30 @@
 #
 # Makefile for the I-Force driver
 #
+# By Johann Deneux <deneux@ifrance.com>
+#
 
-# I-Force may need both USB and RS-232
-
-CONFIG_JOYSTICK_IFORCE := n
-
-ifeq ($(CONFIG_JOYSTICK_IFORCE_232),y)
-	ifeq ($(CONFIG_JOYSTICK_IFORCE_USB),y)
-		CONFIG_JOYSTICK_IFORCE := y
-	endif
-endif
-
-ifeq ($(CONFIG_JOYSTICK_IFORCE_232),m)
-	CONFIG_JOYSTICK_IFORCE := m
-endif
-
-ifeq ($(CONFIG_JOYSTICK_IFORCE_USB),m)
-	CONFIG_JOYSTICK_IFORCE := m
-endif
+# Goal definition
+list-multi	:= iforce.o
+iforce-objs	:= iforce-ff.o iforce-main.o iforce-packets.o
 
 obj-$(CONFIG_JOYSTICK_IFORCE)	+= iforce.o 
+
+ifeq ($(CONFIG_JOYSTICK_IFORCE_232),y)
+	iforce-objs += iforce-serio.o 
+endif
+
+ifeq ($(CONFIG_JOYSTICK_IFORCE_USB),y)
+	iforce-objs += iforce-usb.o 
+endif
+
+EXTRA_CFLAGS = -Werror-implicit-function-declaration
 
 # The global Rules.make.
 
 include $(TOPDIR)/Rules.make
 
-# iforce.o is a multipart module.
+# Additional rules
+iforce.o: $(iforce-objs)
+	$(LD) -r -o $@ $(iforce-objs)
 
-IFORCEOBJS = iforce-ff.o iforce-main.o iforce-packets.o
-
-ifneq ($(CONFIG_JOYSTICK_IFORCE_232),)
-	IFORCEOBJS += iforce-serio.o 
-endif
-
-ifneq ($(CONFIG_JOYSTICK_IFORCE_USB),)
-	IFORCEOBJS += iforce-usb.o 
-endif
-
-iforce.o: $(IFORCEOBJS) 
-	$(LD) -i $(IFORCEOBJS) -o $@

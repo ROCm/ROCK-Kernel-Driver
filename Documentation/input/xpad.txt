@@ -1,0 +1,84 @@
+usb-xpad - Linux USB driver for XBOX HID gamecontrollers
+
+This is the very first release of a driver for XBOX gamecontrollers.
+Basically, this was hacked away in just a few hours, so don't expect
+miracles.
+
+0. Status
+---------
+
+For now, this driver has only been tested on just one Linux-Box.
+This one is running a 2.4.18 kernel with usb-uhci on an amd athlon 600.
+
+The jstest-program from joystick-1.2.15 (jstest-version 2.1.0) reports
+8 axes and 10 buttons.
+
+Alls 8 axes work, though they all have the same range (-32768..32767)
+and the zero-setting is not correct for the triggers.
+9 of the 10 buttons work (my black button does not work, though I can
+see no reason for it not to), all of them are in digital mode, though
+(the six buttons on the right side are "analog" ones).
+
+
+1. USB adapter
+--------------
+
+Before you can actually use the driver, you need to get yourself an
+adapter cable to connect the XBOX-controller to your Linux-Box.
+
+Such a cable is pretty easy to build. The Controller itself is a USB device
+(a hub with three ports; two expansion slots and the controller device)
+with the only differnce in a nonstandard connector (5 pins vs. 4 on
+standard USB connector).
+
+You just need to solder an USB connector onto the cable and keep the
+yellow wire unconnected. The other pins have the same order on both
+connectors so there no magic to it. Detailed info on these matters can be found
+on the net.
+
+Thanks to the trip splitter found on the cable you don't even need to cut the
+original cable, you can buy an extension cable and cut that instead. That way,
+you can still use the controller with your XBOX, if you have one ;)
+
+
+2. driver installation
+----------------------
+
+Once you have the adapter cable and the controller is connected, you need
+to load your USB subsystem and should cat /proc/bus/usb/devices.
+There should be an entry like the one in InterAct_german.dump.
+
+Don't worry if the vendor and/or product ID don't match, those are easy to
+add to the driver. You could do it yourself, just add the appropriate line
+into the list after the line
+    '} xpad_device[] = {'
+, but before the line that says
+    '{ 0x0000, 0x0000, "unknown...." }'.
+
+In theory, the driver should work with other controllers than mine
+(InterAct PowerPad pro, bought in Germany) just fine, but see for yourself.
+
+If you compiled and installed the driver, test the functionality:
+> modprobe usb-xpad
+> modprobe joydev
+> jstest /dev/input/js0
+
+There should be a single line showing 18 inputs (8 axes, 10 buttons), and
+it's values should change if you move the sticks and push the buttons.
+
+It works? Voila, your done ;)
+
+
+3. Thanks
+---------
+
+I have to thank ITO Takayuki for the detailed info on his site
+ http://euc.jp/periphs/xbox-controller.ja.html.
+ 
+His useful info and both the usb-skeleton as well as the iforce input driver
+helped a lot in rapid prototyping the basic functionality.
+
+
+-- 
+Marko Friedemann <mfr@bmx-chemnitz.de>
+2002-07-02

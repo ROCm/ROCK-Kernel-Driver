@@ -556,7 +556,7 @@ static void cdrom_end_request(struct ata_device *drive, struct request *rq, int 
 	if ((rq->flags & REQ_CMD) && !rq->current_nr_sectors)
 		uptodate = 1;
 
-	ata_end_request(drive, rq, uptodate);
+	__ata_end_request(drive, rq, uptodate, 0);
 }
 
 
@@ -581,7 +581,7 @@ static int cdrom_decode_status(ide_startstop_t *startstop, struct ata_device *dr
 
 	if (rq == NULL) {
 		printk("%s: missing rq in %s\n", drive->name, __FUNCTION__);
-		*startstop = ide_stopped;
+		*startstop = ATA_OP_FINISHED;
 		return 1;
 	}
 
@@ -688,14 +688,12 @@ static int cdrom_decode_status(ide_startstop_t *startstop, struct ata_device *dr
 		blk_dump_rq_flags(rq, "ide-cd bad flags");
 
 	/* Retry, or handle the next request. */
-	*startstop = ide_stopped;
+	*startstop = ATA_OP_FINISHED;
 	return 1;
 }
 
-static int cdrom_timer_expiry(struct ata_device *drive, struct request *rq)
+static ide_startstop_t cdrom_timer_expiry(struct ata_device *drive, struct request *rq, unsigned long *wait)
 {
-	unsigned long wait = 0;
-
 	/*
 	 * Some commands are *slow* and normally take a long time to
 	 * complete. Usually we can use the ATAPI "disconnect" to bypass
@@ -706,14 +704,14 @@ static int cdrom_timer_expiry(struct ata_device *drive, struct request *rq)
 		case GPCMD_BLANK:
 		case GPCMD_FORMAT_UNIT:
 		case GPCMD_RESERVE_RZONE_TRACK:
-			wait = WAIT_CMD;
-			break;
+			*wait = WAIT_CMD;
+			return ATA_OP_CONTINUES;
 		default:
-			wait = 0;
+			*wait = 0;
 			break;
 	}
 
-	return wait;
+	return ATA_OP_FINISHED;
 }
 
 /* Set up the device registers for transferring a packet command on DEV,
@@ -728,51 +726,40 @@ static ide_startstop_t cdrom_start_packet_command(struct ata_device *drive,
 						  int xferlen,
 						  ata_handler_t handler)
 {
-	unsigned long flags;
-	struct ata_channel *ch = drive->channel;
-	ide_startstop_t startstop;
 	struct cdrom_info *info = drive->driver_data;
 	int ret;
 
-	spin_lock_irqsave(ch->lock, flags);
 	/* Wait for the controller to be idle. */
-	if (ata_status_poll(drive, 0, BUSY_STAT, WAIT_READY, rq, &startstop))
-		ret = startstop;
-	else {
-		if (info->dma) {
-			if (info->cmd == READ || info->cmd == WRITE)
-				info->dma = udma_init(drive, rq);
-			else
-				printk("ide-cd: DMA set, but not allowed\n");
-		}
+	ret = ata_status_poll(drive, 0, BUSY_STAT, WAIT_READY, rq);
+	if (ret != ATA_OP_READY)
+		return ret;
 
-		/* Set up the controller registers. */
-		OUT_BYTE(info->dma, IDE_FEATURE_REG);
-		OUT_BYTE(0, IDE_NSECTOR_REG);
-		OUT_BYTE(0, IDE_SECTOR_REG);
-
-		OUT_BYTE(xferlen & 0xff, IDE_LCYL_REG);
-		OUT_BYTE(xferlen >> 8  , IDE_HCYL_REG);
-		ata_irq_enable(drive, 1);
-		if (info->dma)
-			udma_start(drive, rq);
-
-		if (CDROM_CONFIG_FLAGS (drive)->drq_interrupt) {
-			ata_set_handler(drive, handler, WAIT_CMD, cdrom_timer_expiry);
-			OUT_BYTE (WIN_PACKETCMD, IDE_COMMAND_REG); /* packet command */
-			ret = ide_started;
-		} else {
-			OUT_BYTE (WIN_PACKETCMD, IDE_COMMAND_REG); /* packet command */
-
-			/* FIXME: Oj kurwa! We have to ungrab the lock before
-			 * the IRQ handler gets called.
-			 */
-			spin_unlock_irqrestore(ch->lock, flags);
-			ret = handler(drive, rq);
-			spin_lock_irqsave(ch->lock, flags);
-		}
+	if (info->dma) {
+		if (info->cmd == READ || info->cmd == WRITE)
+			info->dma = udma_init(drive, rq);
+		else
+			printk("ide-cd: DMA set, but not allowed\n");
 	}
-	spin_unlock_irqrestore(ch->lock, flags);
+
+	/* Set up the controller registers. */
+	OUT_BYTE(info->dma, IDE_FEATURE_REG);
+	OUT_BYTE(0, IDE_NSECTOR_REG);
+	OUT_BYTE(0, IDE_SECTOR_REG);
+
+	OUT_BYTE(xferlen & 0xff, IDE_LCYL_REG);
+	OUT_BYTE(xferlen >> 8  , IDE_HCYL_REG);
+	ata_irq_enable(drive, 1);
+	if (info->dma)
+		udma_start(drive, rq);
+
+	if (CDROM_CONFIG_FLAGS (drive)->drq_interrupt) {
+		ata_set_handler(drive, handler, WAIT_CMD, cdrom_timer_expiry);
+		OUT_BYTE (WIN_PACKETCMD, IDE_COMMAND_REG); /* packet command */
+		ret = ATA_OP_CONTINUES;
+	} else {
+		OUT_BYTE (WIN_PACKETCMD, IDE_COMMAND_REG); /* packet command */
+		ret = handler(drive, rq);
+	}
 
 	return ret;
 }
@@ -787,8 +774,6 @@ static ide_startstop_t cdrom_transfer_packet_command(struct ata_device *drive,
 		unsigned char *cmd, unsigned long timeout,
 		ata_handler_t handler)
 {
-	unsigned long flags;
-	struct ata_channel *ch = drive->channel;
 	ide_startstop_t startstop;
 
 	if (CDROM_CONFIG_FLAGS (drive)->drq_interrupt) {
@@ -800,26 +785,18 @@ static ide_startstop_t cdrom_transfer_packet_command(struct ata_device *drive,
 		if (cdrom_decode_status(&startstop, drive, rq, DRQ_STAT, &stat_dum))
 			return startstop;
 	} else {
-		/* FIXME: make this locking go away */
-		spin_lock_irqsave(ch->lock, flags);
 		/* Otherwise, we must wait for DRQ to get set. */
-		if (ata_status_poll(drive, DRQ_STAT, BUSY_STAT,
-					WAIT_READY, rq, &startstop)) {
-			spin_unlock_irqrestore(ch->lock, flags);
-
+		startstop = ata_status_poll(drive, DRQ_STAT, BUSY_STAT,
+				WAIT_READY, rq);
+		if (startstop != ATA_OP_READY)
 			return startstop;
-		}
-		spin_unlock_irqrestore(ch->lock, flags);
 	}
 
 	/* Arm the interrupt handler and send the command to the device. */
-	/* FIXME: make this locking go away */
-	spin_lock_irqsave(ch->lock, flags);
 	ata_set_handler(drive, handler, timeout, cdrom_timer_expiry);
 	atapi_write(drive, cmd, CDROM_PACKET_SIZE);
-	spin_unlock_irqrestore(ch->lock, flags);
 
-	return ide_started;
+	return ATA_OP_CONTINUES;
 }
 
 /****************************************************************************
@@ -917,8 +894,6 @@ int cdrom_read_check_ireason(struct ata_device *drive, struct request *rq, int l
  */
 static ide_startstop_t cdrom_read_intr(struct ata_device *drive, struct request *rq)
 {
-	unsigned long flags;
-	struct ata_channel *ch = drive->channel;
 	int stat;
 	int ireason, len, sectors_to_transfer, nskip;
 	struct cdrom_info *info = drive->driver_data;
@@ -937,15 +912,9 @@ static ide_startstop_t cdrom_read_intr(struct ata_device *drive, struct request 
 
 	if (dma) {
 		if (!dma_error) {
-			/* FIXME: this locking should encompass the above register
-			 * file access too.
-			 */
-
-			spin_lock_irqsave(ch->lock, flags);
 			__ata_end_request(drive, rq, 1, rq->nr_sectors);
-			spin_unlock_irqrestore(ch->lock, flags);
 
-			return ide_stopped;
+			return ATA_OP_FINISHED;
 		} else
 			return ata_error(drive, rq, "dma error");
 	}
@@ -964,12 +933,12 @@ static ide_startstop_t cdrom_read_intr(struct ata_device *drive, struct request 
 			cdrom_end_request(drive, rq, 0);
 		} else
 			cdrom_end_request(drive, rq, 1);
-		return ide_stopped;
+		return ATA_OP_FINISHED;
 	}
 
 	/* Check that the drive is expecting to do the same thing we are. */
 	if (cdrom_read_check_ireason(drive, rq, len, ireason))
-		return ide_stopped;
+		return ATA_OP_FINISHED;
 
 	/* Assume that the drive will always provide data in multiples
 	   of at least SECTOR_SIZE, as it gets hairy to keep track
@@ -984,7 +953,7 @@ static ide_startstop_t cdrom_read_intr(struct ata_device *drive, struct request 
 			CDROM_CONFIG_FLAGS (drive)->limit_nframes = 1;
 		}
 		cdrom_end_request(drive, rq, 0);
-		return ide_stopped;
+		return ATA_OP_FINISHED;
 	}
 
 	/* The number of sectors we need to read from the drive. */
@@ -1040,11 +1009,9 @@ static ide_startstop_t cdrom_read_intr(struct ata_device *drive, struct request 
 	}
 
 	/* Done moving data! Wait for another interrupt. */
-	spin_lock_irqsave(ch->lock, flags);
 	ata_set_handler(drive, cdrom_read_intr, WAIT_CMD, NULL);
-	spin_unlock_irqrestore(ch->lock, flags);
 
-	return ide_started;
+	return ATA_OP_CONTINUES;
 }
 
 /*
@@ -1132,7 +1099,7 @@ static ide_startstop_t cdrom_start_read_continuation(struct ata_device *drive, s
 			printk ("%s: %s: buffer botch (%u)\n",
 				drive->name, __FUNCTION__, rq->current_nr_sectors);
 			cdrom_end_request(drive, rq, 0);
-			return ide_stopped;
+			return ATA_OP_FINISHED;
 		}
 		sector -= nskip;
 		nsect += nskip;
@@ -1181,7 +1148,7 @@ static ide_startstop_t cdrom_seek_intr(struct ata_device *drive, struct request 
 			drive->dsc_overlap = 0;
 		}
 	}
-	return ide_stopped;
+	return ATA_OP_FINISHED;
 }
 
 static ide_startstop_t cdrom_start_seek_continuation(struct ata_device *drive, struct request *rq)
@@ -1243,7 +1210,7 @@ static ide_startstop_t cdrom_start_read(struct ata_device *drive, struct request
 
 	/* Satisfy whatever we can of this request from our cached sector. */
 	if (cdrom_read_from_buffer(drive, rq))
-		return ide_stopped;
+		return ATA_OP_FINISHED;
 
 	blk_attempt_remerge(&drive->queue, rq);
 
@@ -1269,8 +1236,6 @@ static ide_startstop_t cdrom_start_read(struct ata_device *drive, struct request
 /* Interrupt routine for packet command completion. */
 static ide_startstop_t cdrom_pc_intr(struct ata_device *drive, struct request *rq)
 {
-	unsigned long flags;
-	struct ata_channel *ch = drive->channel;
 	int ireason, len, stat, thislen;
 
 	/* FIXME --mdcki */
@@ -1312,7 +1277,7 @@ static ide_startstop_t cdrom_pc_intr(struct ata_device *drive, struct request *r
 			pc->stat = 1;
 			cdrom_end_request(drive, rq, 1);
 		}
-		return ide_stopped;
+		return ATA_OP_FINISHED;
 	}
 
 	/* Figure out how much data to transfer. */
@@ -1363,11 +1328,9 @@ static ide_startstop_t cdrom_pc_intr(struct ata_device *drive, struct request *r
 	}
 
 	/* Now we wait for another interrupt. */
-	spin_lock_irqsave(ch->lock, flags);
 	ata_set_handler(drive, cdrom_pc_intr, WAIT_CMD, cdrom_timer_expiry);
-	spin_unlock_irqrestore(ch->lock, flags);
 
-	return ide_started;
+	return ATA_OP_CONTINUES;
 }
 
 static ide_startstop_t cdrom_do_pc_continuation(struct ata_device *drive, struct request *rq)
@@ -1508,8 +1471,6 @@ static inline int cdrom_write_check_ireason(struct ata_device *drive, struct req
 
 static ide_startstop_t cdrom_write_intr(struct ata_device *drive, struct request *rq)
 {
-	unsigned long flags;
-	struct ata_channel *ch = drive->channel;
 	int stat, ireason, len, sectors_to_transfer, uptodate;
 	struct cdrom_info *info = drive->driver_data;
 	int dma_error = 0, dma = info->dma;
@@ -1536,15 +1497,9 @@ static ide_startstop_t cdrom_write_intr(struct ata_device *drive, struct request
 		if (dma_error)
 			return ata_error(drive, rq, "dma error");
 
-		/* FIXME: this locking should encompass the above register
-		 * file access too.
-		 */
-
-		spin_lock_irqsave(ch->lock, flags);
 		__ata_end_request(drive, rq, 1, rq->nr_sectors);
-		spin_unlock_irqrestore(ch->lock, flags);
 
-		return ide_stopped;
+		return ATA_OP_FINISHED;
 	}
 
 	/* Read the interrupt reason and the transfer length. */
@@ -1563,13 +1518,13 @@ static ide_startstop_t cdrom_write_intr(struct ata_device *drive, struct request
 			uptodate = 0;
 		}
 		cdrom_end_request(drive, rq, uptodate);
-		return ide_stopped;
+		return ATA_OP_FINISHED;
 	}
 
 	/* Check that the drive is expecting to do the same thing we are. */
 	if (ireason & 3)
 		if (cdrom_write_check_ireason(drive, rq, len, ireason))
-			return ide_stopped;
+			return ATA_OP_FINISHED;
 
 	sectors_to_transfer = len / SECTOR_SIZE;
 
@@ -1607,11 +1562,9 @@ static ide_startstop_t cdrom_write_intr(struct ata_device *drive, struct request
 	}
 
 	/* re-arm handler */
-	spin_lock_irqsave(ch->lock, flags);
 	ata_set_handler(drive, cdrom_write_intr, 5 * WAIT_CMD, NULL);
-	spin_unlock_irqrestore(ch->lock, flags);
 
-	return ide_started;
+	return ATA_OP_CONTINUES;
 }
 
 static ide_startstop_t cdrom_start_write_cont(struct ata_device *drive, struct request *rq)
@@ -1628,7 +1581,7 @@ static ide_startstop_t cdrom_start_write(struct ata_device *drive, struct reques
 	 */
 	if ((rq->nr_sectors & 3) || (rq->sector & 3)) {
 		cdrom_end_request(drive, rq, 0);
-		return ide_stopped;
+		return ATA_OP_FINISHED;
 	}
 
 	/*
@@ -1658,7 +1611,6 @@ static ide_startstop_t cdrom_start_write(struct ata_device *drive, struct reques
 static ide_startstop_t
 ide_cdrom_do_request(struct ata_device *drive, struct request *rq, sector_t block)
 {
-	struct ata_channel *ch = drive->channel;
 	int ret;
 	struct cdrom_info *info = drive->driver_data;
 
@@ -1669,14 +1621,12 @@ ide_cdrom_do_request(struct ata_device *drive, struct request *rq, sector_t bloc
 			if (!ata_status(drive, SEEK_STAT, 0)) {
 				if (elpased < IDECD_SEEK_TIMEOUT) {
 					ide_stall_queue(drive, IDECD_SEEK_TIMER);
-					return ide_stopped;
+					return ATA_OP_FINISHED;
 				}
 				printk ("%s: DSC timeout\n", drive->name);
 			}
 			CDROM_CONFIG_FLAGS(drive)->seeking = 0;
 		}
-		/* FIXME: make this unlocking go away*/
-		spin_unlock_irq(ch->lock);
 		if (IDE_LARGE_SEEK(info->last_block, block, IDECD_SEEK_THRESHOLD) && drive->dsc_overlap) {
 			ret = cdrom_start_seek(drive, rq, block);
 		} else {
@@ -1686,13 +1636,9 @@ ide_cdrom_do_request(struct ata_device *drive, struct request *rq, sector_t bloc
 				ret = cdrom_start_write(drive, rq);
 		}
 		info->last_block = block;
-		spin_lock_irq(ch->lock);
 		return ret;
 	} else if (rq->flags & (REQ_PC | REQ_SENSE)) {
-		/* FIXME: make this unlocking go away*/
-		spin_unlock_irq(ch->lock);
 		ret = cdrom_do_packet_command(drive, rq);
-		spin_lock_irq(ch->lock);
 
 		return ret;
 	} else if (rq->flags & REQ_SPECIAL) {
@@ -1703,12 +1649,9 @@ ide_cdrom_do_request(struct ata_device *drive, struct request *rq, sector_t bloc
 		 * right now this can only be a reset...
 		 */
 
-	        /* FIXME: make this unlocking go away*/
-		spin_unlock_irq(ch->lock);
 		cdrom_end_request(drive, rq, 1);
-		spin_lock_irq(ch->lock);
 
-		return ide_stopped;
+		return ATA_OP_FINISHED;
 	} else if (rq->flags & REQ_BLOCK_PC) {
 		struct packet_command pc;
 		ide_startstop_t startstop;
@@ -1720,10 +1663,7 @@ ide_cdrom_do_request(struct ata_device *drive, struct request *rq, sector_t bloc
 		/* FIXME --mdcki */
 		rq->special = (char *) &pc;
 
-		/* FIXME: make this unlocking go away*/
-		spin_unlock_irq(ch->lock);
 		startstop = cdrom_do_packet_command(drive, rq);
-		spin_lock_irq(ch->lock);
 
 		if (pc.stat)
 			++rq->errors;
@@ -1732,12 +1672,10 @@ ide_cdrom_do_request(struct ata_device *drive, struct request *rq, sector_t bloc
 	}
 
 	blk_dump_rq_flags(rq, "ide-cd bad flags");
-	/* FIXME: make this unlocking go away*/
-	spin_unlock_irq(ch->lock);
-	cdrom_end_request(drive, rq, 0);
-	spin_lock_irq(ch->lock);
 
-	return ide_stopped;
+	cdrom_end_request(drive, rq, 0);
+
+	return ATA_OP_FINISHED;
 }
 
 

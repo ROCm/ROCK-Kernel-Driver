@@ -86,7 +86,7 @@ Private API:
 
 	MEYEIOC_SYNC
 		Takes as an argument the buffer number you want to sync.
-		This ioctl blocks untils the buffer is filled and ready
+		This ioctl blocks until the buffer is filled and ready
 		for the application to use. It returns the buffer size.
 
 	MEYEIOC_STILLCAPT
@@ -106,7 +106,7 @@ Bugs / Todo:
 		
 	- mjpeg hardware playback doesn't work (depends on overlay...)
 
-	- rewrite the driver to use some commun video4linux API for snapshot
+	- rewrite the driver to use some common video4linux API for snapshot
 	  and mjpeg capture. Unfortunately, video4linux1 does not permit it,
 	  the BUZ API seems to be targeted to TV cards only. The video4linux 2
 	  API may be an option, if it goes into the kernel (maybe 2.5 

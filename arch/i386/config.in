@@ -407,7 +407,7 @@ source net/bluetooth/Config.in
 mainmenu_option next_comment
 comment 'Kernel hacking'
 if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
-   dep_bool 'Software Suspend' CONFIG_SOFTWARE_SUSPEND $CONFIG_PM
+   dep_bool 'Software Suspend (EXPERIMENTAL)' CONFIG_SOFTWARE_SUSPEND $CONFIG_PM
 fi
 
 bool 'Kernel debugging' CONFIG_DEBUG_KERNEL

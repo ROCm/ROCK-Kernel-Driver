@@ -2989,7 +2989,7 @@ int jfs_sync(void)
 	return 0;
 }
 
-#if CONFIG_PROC_FS
+#if defined(CONFIG_PROC_FS) && defined(CONFIG_JFS_DEBUG)
 int jfs_txanchor_read(char *buffer, char **start, off_t offset, int length,
 		      int *eof, void *data)
 {

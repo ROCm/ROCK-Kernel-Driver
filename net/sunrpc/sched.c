@@ -73,7 +73,7 @@ static int			rpc_inhibit;
  * Spinlock for wait queues. Access to the latter also has to be
  * interrupt-safe in order to allow timers to wake up sleeping tasks.
  */
-spinlock_t rpc_queue_lock = SPIN_LOCK_UNLOCKED;
+static spinlock_t rpc_queue_lock = SPIN_LOCK_UNLOCKED;
 /*
  * Spinlock for other critical sections of code.
  */
@@ -157,7 +157,7 @@ __rpc_add_timer(struct rpc_task *task, rpc_action timer)
 void rpc_add_timer(struct rpc_task *task, rpc_action timer)
 {
 	spin_lock_bh(&rpc_queue_lock);
-	if (!(RPC_IS_RUNNING(task) || task->tk_wakeup))
+	if (!RPC_IS_RUNNING(task))
 		__rpc_add_timer(task, timer);
 	spin_unlock_bh(&rpc_queue_lock);
 }
@@ -358,26 +358,9 @@ rpc_sleep_on(struct rpc_wait_queue *q, struct rpc_task *task,
 	spin_unlock_bh(&rpc_queue_lock);
 }
 
-void
-rpc_sleep_locked(struct rpc_wait_queue *q, struct rpc_task *task,
-		 rpc_action action, rpc_action timer)
-{
-	/*
-	 * Protect the queue operations.
-	 */
-	spin_lock_bh(&rpc_queue_lock);
-	__rpc_sleep_on(q, task, action, timer);
-	__rpc_lock_task(task);
-	spin_unlock_bh(&rpc_queue_lock);
-}
-
 /**
  * __rpc_wake_up_task - wake up a single rpc_task
  * @task: task to be woken up
- *
- * If the task is locked, it is merely removed from the queue, and
- * 'task->tk_wakeup' is set. rpc_unlock_task() will then ensure
- * that it is woken up as soon as the lock count goes to zero.
  *
  * Caller must hold rpc_queue_lock
  */
@@ -406,14 +389,6 @@ __rpc_wake_up_task(struct rpc_task *task)
 	__rpc_disable_timer(task);
 	if (task->tk_rpcwait != &schedq)
 		__rpc_remove_wait_queue(task);
-
-	/* If the task has been locked, then set tk_wakeup so that
-	 * rpc_unlock_task() wakes us up... */
-	if (task->tk_lock) {
-		task->tk_wakeup = 1;
-		return;
-	} else
-		task->tk_wakeup = 0;
 
 	rpc_make_runnable(task);
 
@@ -498,30 +473,6 @@ rpc_wake_up_status(struct rpc_wait_queue *queue, int status)
 			__rpc_wake_up_task(task);
 		}
 	}
-	spin_unlock_bh(&rpc_queue_lock);
-}
-
-/*
- * Lock down a sleeping task to prevent it from waking up
- * and disappearing from beneath us.
- *
- * This function should always be called with the
- * rpc_queue_lock held.
- */
-int
-__rpc_lock_task(struct rpc_task *task)
-{
-	if (!RPC_IS_RUNNING(task))
-		return ++task->tk_lock;
-	return 0;
-}
-
-void
-rpc_unlock_task(struct rpc_task *task)
-{
-	spin_lock_bh(&rpc_queue_lock);
-	if (task->tk_lock && !--task->tk_lock && task->tk_wakeup)
-		__rpc_wake_up_task(task);
 	spin_unlock_bh(&rpc_queue_lock);
 }
 
@@ -707,15 +658,6 @@ __rpc_schedule(void)
 		spin_lock_bh(&rpc_queue_lock);
 
 		task_for_first(task, &schedq.tasks) {
-			if (task->tk_lock) {
-				spin_unlock_bh(&rpc_queue_lock);
-				printk(KERN_ERR "RPC: Locked task was scheduled !!!!\n");
-#ifdef RPC_DEBUG			
-				rpc_debug = ~0;
-				rpc_show_tasks();
-#endif			
-				break;
-			}
 			__rpc_remove_wait_queue(task);
 			spin_unlock_bh(&rpc_queue_lock);
 

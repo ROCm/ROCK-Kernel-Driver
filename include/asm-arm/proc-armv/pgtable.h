@@ -144,13 +144,13 @@ static inline pte_t *pmd_page_kernel(pmd_t pmd)
  * The following macros handle the cache and bufferable bits...
  */
 #define _L_PTE_DEFAULT	L_PTE_PRESENT | L_PTE_YOUNG
-#define _L_PTE_READ	L_PTE_USER | L_PTE_CACHEABLE | L_PTE_BUFFERABLE
+#define _L_PTE_READ	L_PTE_USER | L_PTE_EXEC | L_PTE_CACHEABLE | L_PTE_BUFFERABLE
 
 #define PAGE_NONE       __pgprot(_L_PTE_DEFAULT)
 #define PAGE_COPY       __pgprot(_L_PTE_DEFAULT | _L_PTE_READ)
 #define PAGE_SHARED     __pgprot(_L_PTE_DEFAULT | _L_PTE_READ | L_PTE_WRITE)
 #define PAGE_READONLY   __pgprot(_L_PTE_DEFAULT | _L_PTE_READ)
-#define PAGE_KERNEL     __pgprot(_L_PTE_DEFAULT | L_PTE_CACHEABLE | L_PTE_BUFFERABLE | L_PTE_DIRTY | L_PTE_WRITE)
+#define PAGE_KERNEL     __pgprot(_L_PTE_DEFAULT | L_PTE_CACHEABLE | L_PTE_BUFFERABLE | L_PTE_DIRTY | L_PTE_WRITE | L_PTE_EXEC)
 
 #define _PAGE_CHG_MASK	(PAGE_MASK | L_PTE_DIRTY | L_PTE_YOUNG)
 

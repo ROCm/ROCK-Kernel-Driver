@@ -1110,7 +1110,7 @@ MODULE_LICENSE("GPL");
 
 static int __init amdtp_init_module (void)
 {
-	if (ieee1394_register_chardev(IEEE1394_MINOR_BLOCK_EXPERIMENTAL,
+	if (ieee1394_register_chardev(IEEE1394_MINOR_BLOCK_AMDTP,
 				      THIS_MODULE, &amdtp_fops)) {
 		HPSB_ERR("amdtp: unable to get minor device block");
  		return -EIO;
@@ -1120,7 +1120,7 @@ static int __init amdtp_init_module (void)
 						   &amdtp_highlevel_ops);
 	if (amdtp_highlevel == NULL) {
 		HPSB_ERR("amdtp: unable to register highlevel ops");
-		ieee1394_unregister_chardev(IEEE1394_MINOR_BLOCK_EXPERIMENTAL);
+		ieee1394_unregister_chardev(IEEE1394_MINOR_BLOCK_AMDTP);
 		return -EIO;
 	}
 
@@ -1132,7 +1132,7 @@ static int __init amdtp_init_module (void)
 static void __exit amdtp_exit_module (void)
 {
         hpsb_unregister_highlevel(amdtp_highlevel);
-        ieee1394_unregister_chardev(IEEE1394_MINOR_BLOCK_EXPERIMENTAL);
+        ieee1394_unregister_chardev(IEEE1394_MINOR_BLOCK_AMDTP);
 
 	HPSB_INFO("Unloaded AMDTP driver");
 }

@@ -1,5 +1,5 @@
 /*
- *  pci_link.c - ACPI PCI Interrupt Link Device Driver ($Revision: 31 $)
+ *  pci_link.c - ACPI PCI Interrupt Link Device Driver ($Revision: 33 $)
  *
  *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
  *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
@@ -110,6 +110,10 @@ acpi_pci_link_get_possible (
 
 	resource = (acpi_resource *) buffer.pointer;
 
+	/* skip past dependent function resource (if present) */
+	if (resource->id == ACPI_RSTYPE_START_DPF)
+		resource = ACPI_NEXT_RESOURCE(resource);
+
 	switch (resource->id) {
 	case ACPI_RSTYPE_IRQ:
 	{
@@ -160,7 +164,7 @@ acpi_pci_link_get_possible (
 		"Found %d possible IRQs\n", link->irq.possible_count));
 
 end:
-	kfree(buffer.pointer);
+	acpi_os_free(buffer.pointer);
 
 	return_VALUE(result);
 }
@@ -255,7 +259,7 @@ acpi_pci_link_get_current (
 	ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Link at IRQ %d \n", link->irq.active));
 
 end:
-	kfree(buffer.pointer);
+	acpi_os_free(buffer.pointer);
 
 	return_VALUE(result);
 }
@@ -393,7 +397,7 @@ acpi_pci_link_check (void)
 
 		if (link->irq.active)
 			acpi_irq_penalty[link->irq.active] += 100;
-		else {
+		else if (link->irq.possible_count) {
 			int penalty = 100 / link->irq.possible_count;
 			for (i=0; i<link->irq.possible_count; i++) {
 				if (link->irq.possible[i] < ACPI_MAX_ISA_IRQ)
@@ -410,7 +414,7 @@ acpi_pci_link_check (void)
 		int		i = 0;
 
 		link = list_entry(node, struct acpi_pci_link, node);
-		if (!link) {
+		if (!link || !link->irq.possible_count) {
 			ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Invalid link context\n"));
 			continue;
 		}
@@ -435,8 +439,8 @@ acpi_pci_link_check (void)
 		acpi_irq_penalty[link->irq.active] += 100;
 
 		printk(PREFIX "%s [%s] enabled at IRQ %d\n", 
-			acpi_device_name(link->device), 
-			acpi_device_bid(link->device), irq);
+			acpi_device_name(link->device),
+			acpi_device_bid(link->device), link->irq.active);
 	}
 
 	return_VALUE(0);

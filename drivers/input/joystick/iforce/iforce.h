@@ -1,5 +1,5 @@
 /*
- * $Id: iforce.h,v 1.12 2002/06/09 11:08:04 jdeneux Exp $
+ * $Id: iforce.h,v 1.13 2002/07/07 10:22:50 jdeneux Exp $
  *
  *  Copyright (c) 2000-2002 Vojtech Pavlik <vojtech@ucw.cz>
  *  Copyright (c) 2001-2002 Johann Deneux <deneux@ifrance.com>
@@ -39,7 +39,7 @@
 #include <linux/circ_buf.h>
 #include <asm/semaphore.h>
 
-/* FF: This module provides arbitrary resource management routines.
+/* This module provides arbitrary resource management routines.
  * I use it to manage the device's memory.
  * Despite the name of this module, I am *not* going to access the ioports.
  */
@@ -47,12 +47,9 @@
 
 #define IFORCE_MAX_LENGTH	16
 
-#if defined(CONFIG_JOYSTICK_IFORCE_232)
+/* iforce::bus */
 #define IFORCE_232	1
-#endif
-#if defined(CONFIG_JOYSTICK_IFORCE_USB)
 #define IFORCE_USB	2
-#endif
 
 #define FALSE 0
 #define TRUE 1
@@ -129,12 +126,12 @@ struct iforce {
 	u16 ecmd;
 	u16 expect_packet;
 
-#ifdef IFORCE_232
+#ifdef CONFIG_JOYSTICK_IFORCE_232
 	struct serio *serio;		/* RS232 transfer */
 	int idx, pkt, len, id;
 	unsigned char csum;
 #endif
-#ifdef IFORCE_USB
+#ifdef CONFIG_JOYSTICK_IFORCE_USB
 	struct usb_device *usbdev;	/* USB transfer */
 	struct urb *irq, *out, *ctrl;
 	struct usb_ctrlrequest cr;

@@ -796,7 +796,7 @@ static void sppp_cp_send (struct sppp *sp, u16 proto, u8 type,
 		printk (">\n");
 	}
 	sp->obytes += skb->len;
-	/* Control is high priority so it doesnt get queued behind data */
+	/* Control is high priority so it doesn't get queued behind data */
 	skb->priority=TC_PRIO_CONTROL;
 	skb->dev = dev;
 	dev_queue_xmit(skb);

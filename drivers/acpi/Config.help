@@ -91,3 +91,25 @@ CONFIG_ACPI_DEBUG
   of verbosity. Saying Y enables these statements. This will increase
   your kernel size by around 50K.
 
+CONFIG_ACPI_TOSHIBA
+  This driver adds support for access to certain system settings
+  on "legacy free" Toshiba laptops.  These laptops can be recognized by
+  their lack of a BIOS setup menu and APM support.
+
+  On these machines, all system configuration is handled through the
+  ACPI.  This driver is required for access to controls not covered
+  by the general ACPI drivers, such as LCD brightness, video output,
+  etc.
+
+  This driver differs from the non-ACPI Toshiba laptop driver (located
+  under "Processor type and features") in several aspects.
+  Configuration is accessed by reading and writing text files in the
+  /proc tree instead of by program interface to /dev.  Furthermore, no
+  power management functions are exposed, as those are handled by the
+  general ACPI drivers.
+
+  More information about this driver is available at
+  <http://memebeam.org/toys/ToshibaAcpiDriver>.
+
+  If you have a legacy free Toshiba laptop (such as the Libretto L1
+  series), say Y.

@@ -130,7 +130,7 @@ static int config_for_dma(struct ata_device *drive)
  * Check to see if the drive and
  * chipset is capable of DMA mode
  */
-static int sl82c105_dma_setup(struct ata_device *drive)
+static int sl82c105_dma_setup(struct ata_device *drive, int map)
 {
 	int on = 0;
 
@@ -333,7 +333,6 @@ static void __init sl82c105_init_dma(struct ata_channel *ch, unsigned long dma_b
 		dma_state &= ~0x60;
 	} else {
 		dma_state |= 0x60;
-		ch->autodma = 1;
 	}
 	outb(dma_state, dma_base + 2);
 

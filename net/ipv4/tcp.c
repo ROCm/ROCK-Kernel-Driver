@@ -1519,7 +1519,7 @@ int tcp_recvmsg(struct sock *sk, struct msghdr *msg,
 			break;
 
 		/* We need to check signals first, to get correct SIGURG
-		 * handling. FIXME: Need to check this doesnt impact 1003.1g
+		 * handling. FIXME: Need to check this doesn't impact 1003.1g
 		 * and move it down to the bottom of the loop
 		 */
 		if (signal_pending(current)) {

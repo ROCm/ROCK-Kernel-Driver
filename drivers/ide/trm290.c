@@ -209,7 +209,7 @@ static int trm290_udma_init(struct ata_device *drive, struct request *rq)
 #ifdef TRM290_NO_DMA_WRITES
 		trm290_prepare_drive(drive, 0);	/* select PIO xfer */
 
-		return ide_stopped;
+		return ATA_OP_FINISHED;
 #endif
 	} else {
 		reading = 2;
@@ -218,7 +218,7 @@ static int trm290_udma_init(struct ata_device *drive, struct request *rq)
 
 	if (!(count = udma_new_table(drive, rq))) {
 		trm290_prepare_drive(drive, 0);	/* select PIO xfer */
-		return ide_stopped;	/* try PIO instead of DMA */
+		return ATA_OP_FINISHED;	/* try PIO instead of DMA */
 	}
 
 	trm290_prepare_drive(drive, 1);	/* select DMA xfer */
@@ -231,7 +231,7 @@ static int trm290_udma_init(struct ata_device *drive, struct request *rq)
 		outb(reading ? WIN_READDMA : WIN_WRITEDMA, IDE_COMMAND_REG);
 	}
 
-	return ide_started;
+	return ATA_OP_CONTINUES;
 }
 
 static int trm290_udma_irq_status(struct ata_device *drive)
@@ -239,9 +239,9 @@ static int trm290_udma_irq_status(struct ata_device *drive)
 	return (inw(drive->channel->dma_base + 2) == 0x00ff);
 }
 
-static int trm290_udma_setup(struct ata_device *drive)
+static int trm290_udma_setup(struct ata_device *drive, int map)
 {
-	return udma_pci_setup(drive);
+	return udma_pci_setup(drive, map);
 }
 #endif
 
@@ -303,7 +303,6 @@ static void __init trm290_init_channel(struct ata_channel *hwif)
 #endif
 
 	hwif->selectproc = &trm290_selectproc;
-	hwif->autodma = 0;				/* play it safe for now */
 #if 1
 	{
 		/*

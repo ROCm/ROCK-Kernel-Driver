@@ -13,7 +13,7 @@ fi
 
 dep_tristate '  Classic ISA and PnP gameport support' CONFIG_GAMEPORT_NS558 $CONFIG_GAMEPORT
 dep_tristate '  PDPI Lightning 4 gamecard support' CONFIG_GAMEPORT_L4 $CONFIG_GAMEPORT
-dep_tristate '  SB Live and Audigy gameport support' CONFIG_INPUT_EMU10K1 $CONFIG_GAMEPORT
+dep_tristate '  SB Live and Audigy gameport support' CONFIG_GAMEPORT_EMU10K1 $CONFIG_GAMEPORT
 dep_tristate '  Aureal Vortex, Vortex 2 gameport support' CONFIG_GAMEPORT_VORTEX $CONFIG_GAMEPORT
 dep_tristate '  ForteMedia FM801 gameport support' CONFIG_GAMEPORT_FM801 $CONFIG_GAMEPORT
 dep_tristate '  Crystal SoundFusion gameport support' CONFIG_GAMEPORT_CS461x $CONFIG_GAMEPORT

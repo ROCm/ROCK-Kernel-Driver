@@ -59,15 +59,6 @@
 extern void abort(void);
 extern void ppc4xx_find_bridges(void);
 
-extern int pckbd_setkeycode(unsigned int scancode, unsigned int keycode);
-extern int pckbd_getkeycode(unsigned int scancode);
-extern int pckbd_pretranslate(unsigned char scancode, char raw_mode);
-extern int pckbd_translate(unsigned char scancode, unsigned char *keycode,
-			   char raw_mode);
-extern char pckbd_unexpected_up(unsigned char keycode);
-extern void pckbd_leds(unsigned char leds);
-extern void pckbd_init_hw(void);
-
 extern void ppc4xx_wdt_heartbeat(void);
 extern int wdt_enable;
 extern unsigned long wdt_period;
@@ -357,13 +348,6 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 #if defined(CONFIG_VT) && defined(CONFIG_PC_KEYBOARD)
 #if defined(CONFIG_REDWOOD_4) && defined(CONFIG_STB_KB)
 	redwood_irkb_init();
-#else
-	ppc_md.kbd_setkeycode = pckbd_setkeycode;
-	ppc_md.kbd_getkeycode = pckbd_getkeycode;
-	ppc_md.kbd_translate = pckbd_translate;
-	ppc_md.kbd_unexpected_up = pckbd_unexpected_up;
-	ppc_md.kbd_leds = pckbd_leds;
-	ppc_md.kbd_init_hw = pckbd_init_hw;
 #endif
 #endif
 

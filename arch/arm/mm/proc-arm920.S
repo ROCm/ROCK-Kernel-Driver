@@ -539,7 +539,7 @@ __arm920_proc_info:
 	b	__arm920_setup
 	.long	cpu_arch_name
 	.long	cpu_elf_name
-	.long	HWCAP_SWP | HWCAP_HALF | HWCAP_26BIT
+	.long	HWCAP_SWP | HWCAP_HALF | HWCAP_THUMB
 	.long	cpu_arm920_info
 	.long	arm920_processor_functions
 	.long	v4wbi_tlb_fns

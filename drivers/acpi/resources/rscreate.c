@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: rscreate - Create resource lists/tables
- *              $Revision: 57 $
+ *              $Revision: 58 $
  *
  ******************************************************************************/
 
@@ -39,7 +39,6 @@
  *
  * PARAMETERS:  Byte_stream_buffer      - Pointer to the resource byte stream
  *              Output_buffer           - Pointer to the user's buffer
- *              Output_buffer_length    - Pointer to the size of Output_buffer
  *
  * RETURN:      Status  - AE_OK if okay, else a valid acpi_status code
  *              If Output_buffer is not large enough, Output_buffer_length
@@ -116,7 +115,6 @@ acpi_rs_create_resource_list (
  * PARAMETERS:  Package_object          - Pointer to an acpi_operand_object
  *                                        package
  *              Output_buffer           - Pointer to the user's buffer
- *              Output_buffer_length    - Size of Output_buffer
  *
  * RETURN:      Status  AE_OK if okay, else a valid acpi_status code.
  *              If the Output_buffer is too small, the error will be
@@ -244,7 +242,7 @@ acpi_rs_create_pci_routing_table (
 		case INTERNAL_TYPE_REFERENCE:
 
 			if ((*sub_object_list)->reference.opcode != AML_INT_NAMEPATH_OP) {
-			   ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Need name, found reference op %X\n",
+				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Need name, found reference op %X\n",
 					(*sub_object_list)->reference.opcode));
 				return_ACPI_STATUS (AE_BAD_DATA);
 			}

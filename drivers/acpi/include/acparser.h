@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: acparser.h - AML Parser subcomponent prototypes and defines
- *       $Revision: 59 $
+ *       $Revision: 60 $
  *
  *****************************************************************************/
 
@@ -265,6 +265,10 @@ acpi_ps_delete_completed_op (
 
 
 /* psutils - parser utilities */
+
+acpi_parse_object *
+acpi_ps_create_scope_op (
+	void);
 
 void
 acpi_ps_init_op (

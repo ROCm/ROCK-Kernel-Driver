@@ -923,7 +923,7 @@ static void apm_power_off(void)
  */
 
 static void handle_poweroff (int key, struct pt_regs *pt_regs,
-		struct kbd_struct *kbd, struct tty_struct *tty)
+			     struct tty_struct *tty)
 {
         apm_power_off();
 }

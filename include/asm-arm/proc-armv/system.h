@@ -182,12 +182,12 @@ static inline unsigned long __xchg(unsigned long x, volatile void *ptr, int size
 			break;
 #else
 		case 1:	__asm__ __volatile__ ("swpb %0, %1, [%2]"
-					: "=r" (ret)
+					: "=&r" (ret)
 					: "r" (x), "r" (ptr)
 					: "memory");
 			break;
 		case 4:	__asm__ __volatile__ ("swp %0, %1, [%2]"
-					: "=r" (ret)
+					: "=&r" (ret)
 					: "r" (x), "r" (ptr)
 					: "memory");
 			break;

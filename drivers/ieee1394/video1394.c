@@ -168,86 +168,35 @@ static struct hpsb_highlevel *hl_handle = NULL;
 /* Memory management functions */
 /*******************************/
 
-#define MDEBUG(x)	do { } while(0)		/* Debug memory management */
-
-/* [DaveM] I've recoded most of this so that:
- * 1) It's easier to tell what is happening
- * 2) It's more portable, especially for translating things
- *    out of vmalloc mapped areas in the kernel.
- * 3) Less unnecessary translations happen.
- *
- * The code used to assume that the kernel vmalloc mappings
- * existed in the page tables of every process, this is simply
- * not guaranteed.  We now use pgd_offset_k which is the
- * defined way to get at the kernel page tables.
- */
-
-/* Given PGD from the address space's page table, return the kernel
- * virtual mapping of the physical memory mapped at ADR.
- */
-static inline unsigned long uvirt_to_kva(pgd_t *pgd, unsigned long adr)
+static inline unsigned long kvirt_to_bus(unsigned long adr) 
 {
-        unsigned long ret = 0UL;
-	pmd_t *pmd;
-	pte_t *ptep, pte;
-  
-	if (!pgd_none(*pgd)) {
-                pmd = pmd_offset(pgd, adr);
-                if (!pmd_none(*pmd)) {
-                        ptep = pte_offset_kernel(pmd, adr);
-                        pte = *ptep;
-                        if(pte_present(pte)) {
-				ret = (unsigned long) 
-					page_address(pte_page(pte));
-                                ret |= (adr & (PAGE_SIZE - 1));
-			}
-                }
-        }
-        MDEBUG(printk("uv2kva(%lx-->%lx)", adr, ret));
+	unsigned long kva, ret;
+
+	kva = (unsigned long) page_address(vmalloc_to_page((void *)adr));
+	kva |= adr & (PAGE_SIZE-1); /* restore the offset */
+	ret = virt_to_bus((void *)kva);
 	return ret;
 }
 
-static inline unsigned long uvirt_to_bus(unsigned long adr) 
-{
-        unsigned long kva, ret;
-
-        kva = uvirt_to_kva(pgd_offset(current->mm, adr), adr);
-	ret = virt_to_bus((void *)kva);
-        MDEBUG(printk("uv2b(%lx-->%lx)", adr, ret));
-        return ret;
-}
-
-static inline unsigned long kvirt_to_bus(unsigned long adr) 
-{
-        unsigned long va, kva, ret;
-
-        va = VMALLOC_VMADDR(adr);
-        kva = uvirt_to_kva(pgd_offset_k(va), va);
-	ret = virt_to_bus((void *)kva);
-        MDEBUG(printk("kv2b(%lx-->%lx)", adr, ret));
-        return ret;
-}
-
 /* Here we want the physical address of the memory.
- * This is used when initializing the contents of the
- * area and marking the pages as reserved.
+ * This is used when initializing the contents of the area.
  */
 static inline unsigned long kvirt_to_pa(unsigned long adr) 
 {
-        unsigned long va, kva, ret;
+        unsigned long kva, ret;
 
-        va = VMALLOC_VMADDR(adr);
-        kva = uvirt_to_kva(pgd_offset_k(va), va);
+	kva = (unsigned long) page_address(vmalloc_to_page((void *)adr));
+	kva |= adr & (PAGE_SIZE-1); /* restore the offset */
 	ret = __pa(kva);
-        MDEBUG(printk("kv2pa(%lx-->%lx)", adr, ret));
         return ret;
 }
 
 static void * rvmalloc(unsigned long size)
 {
 	void * mem;
-	unsigned long adr, page;
-        
+	unsigned long adr;
+
+	size=PAGE_ALIGN(size);
 	mem=vmalloc_32(size);
 	if (mem) 
 	{
@@ -256,8 +205,7 @@ static void * rvmalloc(unsigned long size)
 	        adr=(unsigned long) mem;
 		while (size > 0) 
                 {
-	                page = kvirt_to_pa(adr);
-			mem_map_reserve(virt_to_page(__va(page)));
+			mem_map_reserve(vmalloc_to_page((void *)adr));
 			adr+=PAGE_SIZE;
 			size-=PAGE_SIZE;
 		}
@@ -267,15 +215,14 @@ static void * rvmalloc(unsigned long size)
 
 static void rvfree(void * mem, unsigned long size)
 {
-        unsigned long adr, page;
-        
+        unsigned long adr;
+
 	if (mem) 
 	{
 	        adr=(unsigned long) mem;
-		while (size > 0) 
+		while ((long) size > 0) 
                 {
-	                page = kvirt_to_pa(adr);
-			mem_map_unreserve(virt_to_page(__va(page)));
+			mem_map_unreserve(vmalloc_to_page((void *)adr));
 			adr+=PAGE_SIZE;
 			size-=PAGE_SIZE;
 		}
@@ -520,11 +467,11 @@ alloc_dma_iso_ctx(struct ti_ohci *ohci, int type, int num_desc,
 static void reset_ir_status(struct dma_iso_ctx *d, int n)
 {
 	int i;
-	d->ir_prg[n][0].status = 4;
-	d->ir_prg[n][1].status = PAGE_SIZE-4;
+	d->ir_prg[n][0].status = cpu_to_le32(4);
+	d->ir_prg[n][1].status = cpu_to_le32(PAGE_SIZE-4);
 	for (i=2;i<d->nb_cmd-1;i++)
-		d->ir_prg[n][i].status = PAGE_SIZE;
-	d->ir_prg[n][i].status = d->left_size;
+		d->ir_prg[n][i].status = cpu_to_le32(PAGE_SIZE);
+	d->ir_prg[n][i].status = cpu_to_le32(d->left_size);
 }
 
 static void initialize_dma_ir_prg(struct dma_iso_ctx *d, int n, int flags)
@@ -534,38 +481,38 @@ static void initialize_dma_ir_prg(struct dma_iso_ctx *d, int n, int flags)
 	int i;
 
 	/* the first descriptor will read only 4 bytes */
-	ir_prg[0].control = DMA_CTL_INPUT_MORE | DMA_CTL_UPDATE |
-		DMA_CTL_BRANCH | 4;
+	ir_prg[0].control = cpu_to_le32(DMA_CTL_INPUT_MORE | DMA_CTL_UPDATE |
+		DMA_CTL_BRANCH | 4);
 
 	/* set the sync flag */
 	if (flags & VIDEO1394_SYNC_FRAMES)
-		ir_prg[0].control |= DMA_CTL_WAIT;
+		ir_prg[0].control |= cpu_to_le32(DMA_CTL_WAIT);
 
-	ir_prg[0].address = kvirt_to_bus(buf);
-	ir_prg[0].branchAddress =  (virt_to_bus(&(ir_prg[1].control)) 
-				    & 0xfffffff0) | 0x1;
+	ir_prg[0].address = cpu_to_le32(kvirt_to_bus(buf));
+	ir_prg[0].branchAddress =  cpu_to_le32((virt_to_bus(&(ir_prg[1].control)) 
+				    & 0xfffffff0) | 0x1);
 
 	/* the second descriptor will read PAGE_SIZE-4 bytes */
-	ir_prg[1].control = DMA_CTL_INPUT_MORE | DMA_CTL_UPDATE |
-		DMA_CTL_BRANCH | (PAGE_SIZE-4);
-	ir_prg[1].address = kvirt_to_bus(buf+4);
-	ir_prg[1].branchAddress =  (virt_to_bus(&(ir_prg[2].control)) 
-				    & 0xfffffff0) | 0x1;
+	ir_prg[1].control = cpu_to_le32(DMA_CTL_INPUT_MORE | DMA_CTL_UPDATE |
+		DMA_CTL_BRANCH | (PAGE_SIZE-4));
+	ir_prg[1].address = cpu_to_le32(kvirt_to_bus(buf+4));
+	ir_prg[1].branchAddress =  cpu_to_le32((virt_to_bus(&(ir_prg[2].control)) 
+				    & 0xfffffff0) | 0x1);
 	
 	for (i=2;i<d->nb_cmd-1;i++) {
-		ir_prg[i].control = DMA_CTL_INPUT_MORE | DMA_CTL_UPDATE | 
-			DMA_CTL_BRANCH | PAGE_SIZE;
-		ir_prg[i].address = kvirt_to_bus(buf+(i-1)*PAGE_SIZE);
+		ir_prg[i].control = cpu_to_le32(DMA_CTL_INPUT_MORE | DMA_CTL_UPDATE | 
+			DMA_CTL_BRANCH | PAGE_SIZE);
+		ir_prg[i].address = cpu_to_le32(kvirt_to_bus(buf+(i-1)*PAGE_SIZE));
 
 		ir_prg[i].branchAddress =  
-			(virt_to_bus(&(ir_prg[i+1].control)) 
-			 & 0xfffffff0) | 0x1;
+			cpu_to_le32((virt_to_bus(&(ir_prg[i+1].control)) 
+			 & 0xfffffff0) | 0x1);
 	}
 
 	/* the last descriptor will generate an interrupt */
-	ir_prg[i].control = DMA_CTL_INPUT_MORE | DMA_CTL_UPDATE | 
-		DMA_CTL_IRQ | DMA_CTL_BRANCH | d->left_size;
-	ir_prg[i].address = kvirt_to_bus(buf+(i-1)*PAGE_SIZE);
+	ir_prg[i].control = cpu_to_le32(DMA_CTL_INPUT_MORE | DMA_CTL_UPDATE | 
+		DMA_CTL_IRQ | DMA_CTL_BRANCH | d->left_size);
+	ir_prg[i].address = cpu_to_le32(kvirt_to_bus(buf+(i-1)*PAGE_SIZE));
 }
 	
 static void initialize_dma_ir_ctx(struct dma_iso_ctx *d, int tag, int flags)
@@ -628,7 +575,7 @@ int wakeup_dma_ir_ctx(struct ti_ohci *ohci, struct dma_iso_ctx *d)
 
 	spin_lock(&d->lock);
 	for (i=0;i<d->num_desc;i++) {
-		if (d->ir_prg[i][d->nb_cmd-1].status & 0xFFFF0000) {
+		if (d->ir_prg[i][d->nb_cmd-1].status & cpu_to_le32(0xFFFF0000)) {
 			reset_ir_status(d, i);
 			d->buffer_status[i] = VIDEO1394_BUFFER_READY;
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,18)
@@ -664,7 +611,7 @@ static inline void put_timestamp(struct ti_ohci *ohci, struct dma_iso_ctx * d,
 	buf[7] = timeStamp & 0xff; 
 
     /* if first packet is empty packet, then put timestamp into the next full one too */
-    if ( (d->it_prg[n][0].data[1] >>16) == 0x008) {
+    if ( (le32_to_cpu(d->it_prg[n][0].data[1]) >>16) == 0x008) {
    	    buf += d->packet_size;
     	buf[6] = timeStamp >> 8;
 	    buf[7] = timeStamp & 0xff;
@@ -683,7 +630,7 @@ static inline void put_timestamp(struct ti_ohci *ohci, struct dma_iso_ctx * d,
 	buf[7] = timeStamp & 0xff;
 
     /* if first packet is empty packet, then put timestamp into the next full one too */
-    if ( (d->it_prg[n][0].data[1] >>16) == 0x008) {
+    if ( (le32_to_cpu(d->it_prg[n][0].data[1]) >>16) == 0x008) {
    	    buf += d->packet_size;
     	buf[6] = timeStamp >> 8;
 	    buf[7] = timeStamp & 0xff;
@@ -707,7 +654,8 @@ int wakeup_dma_it_ctx(struct ti_ohci *ohci, struct dma_iso_ctx *d)
 
 	spin_lock(&d->lock);
 	for (i=0;i<d->num_desc;i++) {
-		if (d->it_prg[i][d->last_used_cmd[i]].end.status& 0xFFFF0000) {
+		if (d->it_prg[i][d->last_used_cmd[i]].end.status& 
+			cpu_to_le32(0xFFFF0000)) {
 			int next = d->next_buffer[i];
 			put_timestamp(ohci, d, next);
 			d->it_prg[i][d->last_used_cmd[i]].end.status = 0;
@@ -727,39 +675,40 @@ static void initialize_dma_it_prg(struct dma_iso_ctx *d, int n, int sync_tag)
 	d->last_used_cmd[n] = d->nb_cmd - 1;
 	for (i=0;i<d->nb_cmd;i++) {
 				 
-		it_prg[i].begin.control = DMA_CTL_OUTPUT_MORE |
-			DMA_CTL_IMMEDIATE | 8 ;
+		it_prg[i].begin.control = cpu_to_le32(DMA_CTL_OUTPUT_MORE |
+			DMA_CTL_IMMEDIATE | 8) ;
 		it_prg[i].begin.address = 0;
 		
 		it_prg[i].begin.status = 0;
 		
-		it_prg[i].data[0] = 
+		it_prg[i].data[0] = cpu_to_le32(
 			(SPEED_100 << 16) 
 			| (/* tag */ 1 << 14)
 			| (d->channel << 8) 
-			| (TCODE_ISO_DATA << 4);
-		if (i==0) it_prg[i].data[0] |= sync_tag;
-		it_prg[i].data[1] = d->packet_size << 16;
+			| (TCODE_ISO_DATA << 4));
+		if (i==0) it_prg[i].data[0] |= cpu_to_le32(sync_tag);
+		it_prg[i].data[1] = cpu_to_le32(d->packet_size << 16);
 		it_prg[i].data[2] = 0;
 		it_prg[i].data[3] = 0;
 		
-		it_prg[i].end.control = DMA_CTL_OUTPUT_LAST | DMA_CTL_BRANCH;
+		it_prg[i].end.control = cpu_to_le32(DMA_CTL_OUTPUT_LAST |
+			    	    	     DMA_CTL_BRANCH);
 		it_prg[i].end.address =
-			kvirt_to_bus(buf+i*d->packet_size);
+			cpu_to_le32(kvirt_to_bus(buf+i*d->packet_size));
 
 		if (i<d->nb_cmd-1) {
-			it_prg[i].end.control |= d->packet_size;
+			it_prg[i].end.control |= cpu_to_le32(d->packet_size);
 			it_prg[i].begin.branchAddress = 
-				(virt_to_bus(&(it_prg[i+1].begin.control)) 
-				 & 0xfffffff0) | 0x3;
+				cpu_to_le32((virt_to_bus(&(it_prg[i+1].begin.control)) 
+				 & 0xfffffff0) | 0x3);
 			it_prg[i].end.branchAddress = 
-				(virt_to_bus(&(it_prg[i+1].begin.control)) 
-				 & 0xfffffff0) | 0x3;
+				cpu_to_le32((virt_to_bus(&(it_prg[i+1].begin.control)) 
+				 & 0xfffffff0) | 0x3);
 		}
 		else {
 			/* the last prg generates an interrupt */
-			it_prg[i].end.control |= DMA_CTL_UPDATE | 
-				DMA_CTL_IRQ | d->left_size;
+			it_prg[i].end.control |= cpu_to_le32(DMA_CTL_UPDATE | 
+				DMA_CTL_IRQ | d->left_size);
 			/* the last prg doesn't branch */
 			it_prg[i].begin.branchAddress = 0;
 			it_prg[i].end.branchAddress = 0;
@@ -798,21 +747,21 @@ static void initialize_dma_it_prg_var_packet_queue(
 		} else {
 			size = packet_sizes[i];
 		}
-		it_prg[i].data[1] = size << 16; 
-		it_prg[i].end.control = DMA_CTL_OUTPUT_LAST | DMA_CTL_BRANCH;
+		it_prg[i].data[1] = cpu_to_le32(size << 16); 
+		it_prg[i].end.control = cpu_to_le32(DMA_CTL_OUTPUT_LAST | DMA_CTL_BRANCH);
 
 		if (i < d->nb_cmd-1 && packet_sizes[i+1] != 0) {
-			it_prg[i].end.control |= size;
+			it_prg[i].end.control |= cpu_to_le32(size);
 			it_prg[i].begin.branchAddress = 
-				(virt_to_bus(&(it_prg[i+1].begin.control)) 
-				 & 0xfffffff0) | 0x3;
+				cpu_to_le32((virt_to_bus(&(it_prg[i+1].begin.control)) 
+				 & 0xfffffff0) | 0x3);
 			it_prg[i].end.branchAddress = 
-				(virt_to_bus(&(it_prg[i+1].begin.control)) 
-				 & 0xfffffff0) | 0x3;
+				cpu_to_le32((virt_to_bus(&(it_prg[i+1].begin.control)) 
+				 & 0xfffffff0) | 0x3);
 		} else {
 			/* the last prg generates an interrupt */
-			it_prg[i].end.control |= DMA_CTL_UPDATE | 
-				DMA_CTL_IRQ | size;
+			it_prg[i].end.control |= cpu_to_le32(DMA_CTL_UPDATE | 
+				DMA_CTL_IRQ | size);
 			/* the last prg doesn't branch */
 			it_prg[i].begin.branchAddress = 0;
 			it_prg[i].end.branchAddress = 0;
@@ -1057,8 +1006,8 @@ static int video1394_ioctl(struct inode *inode, struct file *file,
 
 		if (d->last_buffer>=0) 
 			d->ir_prg[d->last_buffer][d->nb_cmd-1].branchAddress = 
-				(virt_to_bus(&(d->ir_prg[v.buffer][0].control)) 
-				 & 0xfffffff0) | 0x1;
+				cpu_to_le32((virt_to_bus(&(d->ir_prg[v.buffer][0].control)) 
+				 & 0xfffffff0) | 0x1);
 
 		d->last_buffer = v.buffer;
 
@@ -1217,14 +1166,14 @@ static int video1394_ioctl(struct inode *inode, struct file *file,
 			d->it_prg[d->last_buffer]
 				[ d->last_used_cmd[d->last_buffer]
 					].end.branchAddress = 
-				(virt_to_bus(&(d->it_prg[v.buffer][0].begin.control)) 
-				 & 0xfffffff0) | 0x3;
+				cpu_to_le32((virt_to_bus(&(d->it_prg[v.buffer][0].begin.control)) 
+				 & 0xfffffff0) | 0x3);
 
 			d->it_prg[d->last_buffer]
 				[d->last_used_cmd[d->last_buffer]
 					].begin.branchAddress = 
-				(virt_to_bus(&(d->it_prg[v.buffer][0].begin.control)) 
-				 & 0xfffffff0) | 0x3;
+				cpu_to_le32((virt_to_bus(&(d->it_prg[v.buffer][0].begin.control)) 
+				 & 0xfffffff0) | 0x3);
 			d->next_buffer[d->last_buffer] = v.buffer;
 		}
 		d->last_buffer = v.buffer;

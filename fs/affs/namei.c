@@ -338,19 +338,10 @@ affs_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 int
 affs_rmdir(struct inode *dir, struct dentry *dentry)
 {
-	int res;
 	pr_debug("AFFS: rmdir(dir=%u, \"%.*s\")\n", (u32)dir->i_ino,
 		 (int)dentry->d_name.len, dentry->d_name.name);
 
-	lock_kernel();
-
-	/* WTF??? */
-	if (!dentry->d_inode)
-		return -ENOENT;
-
-	res = affs_remove_header(dentry);
-	unlock_kernel();
-	return res;
+	return affs_remove_header(dentry);
 }
 
 int

@@ -607,11 +607,10 @@ static int ext2_bmap(struct address_space *mapping, long block)
 }
 
 static int
-ext2_direct_IO(int rw, struct inode *inode, struct kiobuf *iobuf,
-			unsigned long blocknr, int blocksize)
+ext2_direct_IO(int rw, struct inode *inode, char *buf,
+			loff_t offset, size_t count)
 {
-	return generic_direct_IO(rw, inode, iobuf, blocknr,
-				blocksize, ext2_get_block);
+	return generic_direct_IO(rw, inode, buf, offset, count, ext2_get_block);
 }
 
 static int
@@ -1106,7 +1105,7 @@ static int ext2_update_inode(struct inode * inode, int do_sync)
 	raw_inode->i_frag = ei->i_frag_no;
 	raw_inode->i_fsize = ei->i_frag_size;
 	raw_inode->i_file_acl = cpu_to_le32(ei->i_file_acl);
-	if (S_ISDIR(inode->i_mode))
+	if (!S_ISREG(inode->i_mode))
 		raw_inode->i_dir_acl = cpu_to_le32(ei->i_dir_acl);
 	else {
 		raw_inode->i_size_high = cpu_to_le32(inode->i_size >> 32);

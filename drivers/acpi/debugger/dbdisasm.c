@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dbdisasm - parser op tree display routines
- *              $Revision: 66 $
+ *              $Revision: 67 $
  *
  ******************************************************************************/
 
@@ -674,7 +674,8 @@ acpi_db_display_opcode (
 			(walk_state) &&
 			(walk_state->results) &&
 			(walk_state->results->results.num_results)) {
-			acpi_db_decode_internal_object (walk_state->results->results.obj_desc [walk_state->results->results.num_results-1]);
+			acpi_db_decode_internal_object (
+				walk_state->results->results.obj_desc [walk_state->results->results.num_results-1]);
 		}
 #endif
 		break;

@@ -69,8 +69,21 @@ vbi_buffer_risc(struct bttv *btv, struct bttv_buffer *buf)
 	return 0;
 }
 
-static int vbi_buffer_prepare(struct bttv *btv, struct bttv_buffer *buf)
+static int vbi_buffer_setup(struct file *file, int *count, int *size)
 {
+	struct bttv *btv = file->private_data;
+
+	if (0 == *count)
+		*count = vbibufs;
+	*size = btv->vbi.lines * 2 * 2048;
+	return 0;
+}
+
+static int vbi_buffer_prepare(struct file *file, struct videobuf_buffer *vb,
+			      int fields)
+{
+	struct bttv *btv = file->private_data;
+	struct bttv_buffer *buf = (struct bttv_buffer*)vb;
 	int rc;
 	
 	buf->vb.size = btv->vbi.lines * 2 * 2048;
@@ -84,7 +97,8 @@ static int vbi_buffer_prepare(struct bttv *btv, struct bttv_buffer *buf)
 			goto fail;
 	}
 	buf->vb.state = STATE_PREPARED;
-	dprintk("buf prepare ok: odd=%p even=%p\n",&buf->odd,&buf->even);
+	dprintk("buf prepare %p: odd=%p even=%p\n",
+		vb,&buf->odd,&buf->even);
 	return 0;
 
  fail:
@@ -93,93 +107,34 @@ static int vbi_buffer_prepare(struct bttv *btv, struct bttv_buffer *buf)
 }
 
 static void
-vbi_buffer_queue(struct bttv *btv, struct bttv_buffer *buf)
+vbi_buffer_queue(struct file *file, struct videobuf_buffer *vb)
 {
-	unsigned long flags;
+	struct bttv *btv = file->private_data;
+	struct bttv_buffer *buf = (struct bttv_buffer*)vb;
 	
+	dprintk("queue %p\n",vb);
 	buf->vb.state = STATE_QUEUED;
-	spin_lock_irqsave(&btv->s_lock,flags);
 	list_add_tail(&buf->vb.queue,&btv->vcapture);
 	bttv_set_dma(btv,0x0c,1);
-	spin_unlock_irqrestore(&btv->s_lock,flags);
 }
 
 static void vbi_buffer_release(struct file *file, struct videobuf_buffer *vb)
 {
 	struct bttv *btv = file->private_data;
 	struct bttv_buffer *buf = (struct bttv_buffer*)vb;
-
+	
+	dprintk("free %p\n",vb);
 	bttv_dma_free(btv,buf);
 }
 
-static void
-vbi_cancel_all(struct bttv *btv)
-{
-	unsigned long flags;
-	int i;
-
-	/* remove queued buffers from list */
-	spin_lock_irqsave(&btv->s_lock,flags);
-	for (i = 0; i < VIDEO_MAX_FRAME; i++) {
-		if (NULL == btv->vbi.bufs[i])
-			continue;
-		if (btv->vbi.bufs[i]->vb.state == STATE_QUEUED) {
-			list_del(&btv->vbi.bufs[i]->vb.queue);
-			btv->vbi.bufs[i]->vb.state = STATE_ERROR;
-		}
-	}
-	spin_unlock_irqrestore(&btv->s_lock,flags);
-
-	/* free all buffers + clear queue */
-	for (i = 0; i < VIDEO_MAX_FRAME; i++) {
-		if (NULL == btv->vbi.bufs[i])
-			continue;
-		bttv_dma_free(btv,btv->vbi.bufs[i]);
-	}
-	INIT_LIST_HEAD(&btv->vbi.stream);
-}
+struct videobuf_queue_ops vbi_qops = {
+	buf_setup:    vbi_buffer_setup,
+	buf_prepare:  vbi_buffer_prepare,
+	buf_queue:    vbi_buffer_queue,
+	buf_release:  vbi_buffer_release,
+};
 
 /* ----------------------------------------------------------------------- */
-
-static int vbi_read_start(struct file *file, struct bttv *btv)
-{
-	int err,size,count,i;
-	
-	if (vbibufs < 2 || vbibufs > VIDEO_MAX_FRAME)
-		vbibufs = 2;
-
-	count = vbibufs;
-	size  = btv->vbi.lines * 2 * 2048;
-	err = videobuf_mmap_setup(file,
-				  (struct videobuf_buffer**)btv->vbi.bufs,
-				  sizeof(struct bttv_buffer),
-				  count,size,V4L2_BUF_TYPE_VBI,
-				  vbi_buffer_release);
-	if (err)
-		return err;
-	for (i = 0; i < count; i++) {
-		err = vbi_buffer_prepare(btv,btv->vbi.bufs[i]);
-		if (err)
-			return err;
-		list_add_tail(&btv->vbi.bufs[i]->vb.stream,&btv->vbi.stream);
-		vbi_buffer_queue(btv,btv->vbi.bufs[i]);
-	}
-	btv->vbi.reading = 1;
-	return 0;
-}
-
-static void vbi_read_stop(struct bttv *btv)
-{
-	int i;
-
-	vbi_cancel_all(btv);
-	INIT_LIST_HEAD(&btv->vbi.stream);
-	for (i = 0; i < vbibufs; i++) {
-		kfree(btv->vbi.bufs[i]);
-		btv->vbi.bufs[i] = NULL;
-	}
-	btv->vbi.reading = 0;
-}
 
 static void vbi_setlines(struct bttv *btv, int lines)
 {
@@ -234,7 +189,6 @@ static int vbi_open(struct inode *inode, struct file *file)
 	struct bttv *btv = NULL;
 	int i;
 
-
 	for (i = 0; i < bttv_num; i++) {
 		if (bttvs[i].vbi_dev.minor == minor) {
 			btv = &bttvs[i];
@@ -244,18 +198,18 @@ static int vbi_open(struct inode *inode, struct file *file)
 	if (NULL == btv)
 		return -ENODEV;
 
-	down(&btv->vbi.lock);
+	down(&btv->vbi.q.lock);
 	if (btv->vbi.users) {
-		up(&btv->vbi.lock);
+		up(&btv->vbi.q.lock);
 		return -EBUSY;
 	}
 	dprintk("open minor=%d\n",minor);
 	file->private_data = btv;
 	btv->vbi.users++;
-	bttv_field_count(btv);
 	vbi_setlines(btv,VBI_DEFLINES);
+	bttv_field_count(btv);
 	
-	up(&btv->vbi.lock);
+	up(&btv->vbi.q.lock);
 	
 	return 0;
 }
@@ -264,15 +218,15 @@ static int vbi_release(struct inode *inode, struct file *file)
 {
 	struct bttv    *btv = file->private_data;
 
-	down(&btv->vbi.lock);
-	if (btv->vbi.reading) {
-		vbi_read_stop(btv);
-		btv->vbi.read_buf = NULL;
-	}
+	if (btv->vbi.q.streaming)
+		videobuf_streamoff(file,&btv->vbi.q);
+	down(&btv->vbi.q.lock);
+	if (btv->vbi.q.reading)
+		videobuf_read_stop(file,&btv->vbi.q);
 	btv->vbi.users--;
 	bttv_field_count(btv);
 	vbi_setlines(btv,0);
-	up(&btv->vbi.lock);
+	up(&btv->vbi.q.lock);
 	return 0;
 }
 
@@ -280,10 +234,6 @@ static int vbi_do_ioctl(struct inode *inode, struct file *file,
 			unsigned int cmd, void *arg)
 {
 	struct bttv *btv = file->private_data;
-#ifdef HAVE_V4L2
-	unsigned long flags;
-	int err;
-#endif
 	
 	if (btv->errors)
 		bttv_reinit_bt848(btv);
@@ -334,7 +284,7 @@ static int vbi_do_ioctl(struct inode *inode, struct file *file,
 	{
 		struct v4l2_format *f = arg;
 
-		if (btv->vbi.reading || btv->vbi.streaming)
+		if (btv->vbi.q.reading || btv->vbi.q.streaming)
 			return -EBUSY;
 		vbi_setlines(btv,f->fmt.vbi.count[0]);
 		vbi_fmt(btv,f);
@@ -342,145 +292,22 @@ static int vbi_do_ioctl(struct inode *inode, struct file *file,
 	}
 
 	case VIDIOC_REQBUFS:
-	{
-		struct v4l2_requestbuffers *req = arg;
-		int size,count;
+		return videobuf_reqbufs(file,&btv->vbi.q,arg);
 
-		if ((req->type & V4L2_BUF_TYPE_field) != V4L2_BUF_TYPE_VBI)
-			return -EINVAL;
-		if (req->count < 1)
-			return -EINVAL;
-
-		down(&btv->vbi.lock);
-		err = -EINVAL;
-
-		size  = btv->vbi.lines * 2 * 2048;
-		size  = (size + PAGE_SIZE - 1) & PAGE_MASK;
-		count = req->count;
-		if (count > VIDEO_MAX_FRAME)
-			count = VIDEO_MAX_FRAME;
-		err = videobuf_mmap_setup(file,
-					  (struct videobuf_buffer**)btv->vbi.bufs,
-					  sizeof(struct bttv_buffer),
-					  count,size,V4L2_BUF_TYPE_CAPTURE,
-					  vbi_buffer_release);
-		if (err < 0)
-			goto fh_unlock_and_return;
-		req->type  = V4L2_BUF_TYPE_VBI;
-		req->count = count;
-		up(&btv->vbi.lock);
-		return 0;
-	}
 	case VIDIOC_QUERYBUF:
-	{
-		struct v4l2_buffer *b = arg;
+		return videobuf_querybuf(&btv->vbi.q, arg);
 
-		if ((b->type & V4L2_BUF_TYPE_field) != V4L2_BUF_TYPE_VBI)
-			return -EINVAL;
-		if (b->index < 0 || b->index > VIDEO_MAX_FRAME)
-			return -EINVAL;
-		if (NULL == btv->vbi.bufs[b->index])
-			return -EINVAL;
-		videobuf_status(b,&btv->vbi.bufs[b->index]->vb);
-		return 0;
-	}
 	case VIDIOC_QBUF:
-	{
-		struct v4l2_buffer *b = arg;
-		struct bttv_buffer *buf;
-		
-		if ((b->type & V4L2_BUF_TYPE_field) != V4L2_BUF_TYPE_VBI)
-			return -EINVAL;
-		if (b->index < 0 || b->index > VIDEO_MAX_FRAME)
-			return -EINVAL;
+		return videobuf_qbuf(file, &btv->vbi.q, arg);
 
-		down(&btv->vbi.lock);
-		err = -EINVAL;
-		buf = btv->vbi.bufs[b->index];
-		if (NULL == buf)
-			goto fh_unlock_and_return;
-		if (0 == buf->vb.baddr)
-			goto fh_unlock_and_return;
-		if (buf->vb.state == STATE_QUEUED ||
-		    buf->vb.state == STATE_ACTIVE)
-			goto fh_unlock_and_return;
-		err = vbi_buffer_prepare(btv,buf);
-		if (0 != err)
-			goto fh_unlock_and_return;
-
-		list_add_tail(&buf->vb.stream,&btv->vbi.stream);
-		if (btv->vbi.streaming)
-			vbi_buffer_queue(btv,buf);
-		up(&btv->vbi.lock);
-		return 0;
-	}
 	case VIDIOC_DQBUF:
-	{
-		struct v4l2_buffer *b = arg;
-		struct bttv_buffer *buf;
+		return videobuf_dqbuf(file, &btv->vbi.q, arg);
 
-		if ((b->type & V4L2_BUF_TYPE_field) != V4L2_BUF_TYPE_VBI)
-			return -EINVAL;
-
-		down(&btv->vbi.lock);
-		err = -EINVAL;
-		if (list_empty(&btv->vbi.stream))
-			goto fh_unlock_and_return;
-		buf = list_entry(btv->vbi.stream.next,
-				 struct bttv_buffer, vb.stream);
-		err = videobuf_waiton(&buf->vb,0,1);
-		if (err < 0)
-			goto fh_unlock_and_return;
-		switch (buf->vb.state) {
-		case STATE_ERROR:
-			err = -EIO;
-			/* fall through */
-		case STATE_DONE:
-			videobuf_dma_pci_sync(btv->dev,&buf->vb.dma);
-			buf->vb.state = STATE_IDLE;
-			break;
-		default:
-			err = -EINVAL;
-			goto fh_unlock_and_return;
-		}
-		list_del(&buf->vb.stream);
-		memset(b,0,sizeof(*b));
-		videobuf_status(b,&buf->vb);
-		up(&btv->vbi.lock);
-		return err;
-	}
 	case VIDIOC_STREAMON:
-	{
-		struct list_head *list;
-		struct bttv_buffer *buf;
+		return videobuf_streamon(file, &btv->vbi.q);
 
-		down(&btv->vbi.lock);
-		err = -EBUSY;
-		if (btv->vbi.reading)
-			goto fh_unlock_and_return;
-		spin_lock_irqsave(&btv->s_lock,flags);
-		list_for_each(list,&btv->vbi.stream) {
-			buf = list_entry(list, struct bttv_buffer, vb.stream);
-			if (buf->vb.state == STATE_PREPARED)
-				vbi_buffer_queue(btv,buf);
-		}
-		spin_unlock_irqrestore(&btv->s_lock,flags);
-		btv->vbi.streaming = 1;
-		up(&btv->vbi.lock);
-		return 0;
-	}
 	case VIDIOC_STREAMOFF:
-	{
-		down(&btv->vbi.lock);
-		err = -EINVAL;
-		if (!btv->vbi.streaming)
-			goto fh_unlock_and_return;
-		vbi_cancel_all(btv);
-		INIT_LIST_HEAD(&btv->vbi.stream);
-		btv->vbi.streaming = 0;
-		up(&btv->vbi.lock);
-		return 0;
-	}
+		return videobuf_streamoff(file, &btv->vbi.q);
 
 	case VIDIOC_ENUMSTD:
 	case VIDIOC_G_STD:
@@ -499,12 +326,6 @@ static int vbi_do_ioctl(struct inode *inode, struct file *file,
 		return -ENOIOCTLCMD;
 	}
 	return 0;
-
-#ifdef HAVE_V4L2
- fh_unlock_and_return:
-	up(&btv->vbi.lock);
-	return err;
-#endif
 }
 
 static int vbi_ioctl(struct inode *inode, struct file *file,
@@ -516,123 +337,30 @@ static int vbi_ioctl(struct inode *inode, struct file *file,
 static ssize_t vbi_read(struct file *file, char *data,
 			size_t count, loff_t *ppos)
 {
-	unsigned int *fc;
 	struct bttv *btv = file->private_data;
-	int err, bytes, retval = 0;
 
 	if (btv->errors)
 		bttv_reinit_bt848(btv);
-	down(&btv->vbi.lock);
-	if (!btv->vbi.reading) {
-		retval = vbi_read_start(file,btv);
-		if (retval < 0)
-			goto done;
-	}
-
-	while (count > 0) {
-		/* get / wait for data */
-		if (NULL == btv->vbi.read_buf) {
-			btv->vbi.read_buf = list_entry(btv->vbi.stream.next,
-						       struct bttv_buffer,
-						       vb.stream);
-			list_del(&btv->vbi.read_buf->vb.stream);
-			btv->vbi.read_off = 0;
-		}
-		err = videobuf_waiton(&btv->vbi.read_buf->vb,
-				      file->f_flags & O_NONBLOCK,1);
-		if (err < 0) {
-			if (0 == retval)
-				retval = err;
-			break;
-		}
-
-#if 1
-		/* dirty, undocumented hack -- pass the frame counter
-		 * within the last four bytes of each vbi data block.
-		 * We need that one to maintain backward compatibility
-		 * to all vbi decoding software out there ... */
-		fc  = (unsigned int*)btv->vbi.read_buf->vb.dma.vmalloc;
-		fc += (btv->vbi.read_buf->vb.size>>2) -1;
-		*fc = btv->vbi.read_buf->vb.field_count >> 1;
-#endif
-
-		/* copy stuff */
-		bytes = count;
-		if (bytes > btv->vbi.read_buf->vb.size - btv->vbi.read_off)
-			bytes = btv->vbi.read_buf->vb.size - btv->vbi.read_off;
-		if (copy_to_user(data + retval,btv->vbi.read_buf->vb.dma.vmalloc +
-				 btv->vbi.read_off,bytes)) {
-			if (0 == retval)
-				retval = -EFAULT;
-			break;
-		}
-		count             -= bytes;
-		retval            += bytes;
-		btv->vbi.read_off += bytes;
-		dprintk("read: %d bytes\n",bytes);
-
-		/* requeue buffer when done with copying */
-		if (btv->vbi.read_off == btv->vbi.read_buf->vb.size) {
-			list_add_tail(&btv->vbi.read_buf->vb.stream,
-				      &btv->vbi.stream);
-			vbi_buffer_queue(btv,btv->vbi.read_buf);
-			btv->vbi.read_buf = NULL;
-		}
-	}
- done:
-	up(&btv->vbi.lock);
-	return retval;
+	dprintk("read %d\n",count);
+	return videobuf_read_stream(file, &btv->vbi.q, data, count, ppos, 1);
 }
 
 static unsigned int vbi_poll(struct file *file, poll_table *wait)
 {
 	struct bttv *btv = file->private_data;
-	struct bttv_buffer *buf = NULL;
-	unsigned int rc = 0;
 
-	down(&btv->vbi.lock);
-	if (btv->vbi.streaming) {
-		if (!list_empty(&btv->vbi.stream))
-			buf = list_entry(btv->vbi.stream.next,
-					 struct bttv_buffer, vb.stream);
-	} else {
-		if (!btv->vbi.reading)
-			vbi_read_start(file,btv);
-		if (!btv->vbi.reading) {
-			rc = POLLERR;
-		} else if (NULL == btv->vbi.read_buf) {
-			btv->vbi.read_buf = list_entry(btv->vbi.stream.next,
-						       struct bttv_buffer,
-						       vb.stream);
-			list_del(&btv->vbi.read_buf->vb.stream);
-			btv->vbi.read_off = 0;
-		}
-		buf = btv->vbi.read_buf;
-	}
-	if (!buf)
-		rc = POLLERR;
-
-	if (0 == rc) {
-		poll_wait(file, &buf->vb.done, wait);
-		if (buf->vb.state == STATE_DONE ||
-		    buf->vb.state == STATE_ERROR)
-			rc = POLLIN|POLLRDNORM;
-	}
-	up(&btv->vbi.lock);
-	return rc;
+	dprintk("poll%s\n","");
+	return videobuf_poll_stream(file, &btv->vbi.q, wait);
 }
 
 static int
 vbi_mmap(struct file *file, struct vm_area_struct * vma)
 {
 	struct bttv *btv = file->private_data;
-	int err;
-
-	down(&btv->vbi.lock);
-	err = videobuf_mmap_mapper
-		(vma,(struct videobuf_buffer**)btv->vbi.bufs);
-	up(&btv->vbi.lock);
-	return err;
+	
+	dprintk("mmap 0x%lx+%ld\n",vma->vm_start,
+		vma->vm_end - vma->vm_start);
+	return videobuf_mmap_mapper(vma, &btv->vbi.q);
 }
 
 static struct file_operations vbi_fops =

@@ -633,37 +633,6 @@ CONFIG_BUSMOUSE
   The module will be called busmouse.o. If you want to compile it as a
   module, say M here and read <file:Documentation/modules.txt>.
 
-CONFIG_MOUSE
-  This is for machines with a mouse which is neither a serial nor a
-  bus mouse. Examples are PS/2 mice (such as the track balls on some
-  laptops) and some digitizer pads. Most people have a regular serial
-  MouseSystem or Microsoft mouse (made by Logitech) that plugs into a
-  COM port (rectangular with 9 or 25 pins). These people say N here.
-  If you have something else, read the Busmouse-HOWTO, available from
-  <http://www.linuxdoc.org/docs.html#howto>. This HOWTO contains
-  information about all non-serial mice, not just bus mice.
-
-  If you have a laptop, you either have to check the documentation or
-  experiment a bit to find out whether the trackball is a serial mouse
-  or not; it's best to say Y here for you.
-
-  Note that the answer to this question won't directly affect the
-  kernel: saying N will just cause the configurator to skip all
-  the questions about non-serial mice. If unsure, say Y.
-
-CONFIG_LOGIBUSMOUSE
-  Logitech mouse connected to a proprietary interface card.  It's
-  generally a round connector with 9 pins. Note that the newer mice
-  made by Logitech don't use the Logitech protocol anymore; for those,
-  you don't need this option.  You want to read the Busmouse-HOWTO,
-  available from <http://www.linuxdoc.org/docs.html#howto>.
-
-  If you want to compile this as a module ( = code which can be
-  inserted in and removed from the running kernel whenever you want),
-  say M here and read <file:Documentation/modules.txt>.  The module
-  will be called busmouse.o.  If you are unsure, say N and read the
-  HOWTO nevertheless: it will tell you what you have.
-
 CONFIG_PSMOUSE
   The PS/2 mouse connects to a special mouse port that looks much like
   the keyboard port (small circular connector with 6 pins). This way,
@@ -682,64 +651,6 @@ CONFIG_PSMOUSE
   of the Linux mouse managing program gpm (available from
   <ftp://gnu.systemy.it/pub/gpm/>) solves this problem, or you can get
   the "mconv2" utility from <ftp://ibiblio.org/pub/Linux/system/mouse/>.
-
-CONFIG_82C710_MOUSE
-  This is a certain kind of PS/2 mouse used on the TI Travelmate. If
-  you are unsure, try first to say N here and come back if the mouse
-  doesn't work. Read the Busmouse-HOWTO, available from
-  <http://www.linuxdoc.org/docs.html#howto>.
-
-CONFIG_PC110_PAD
-  This drives the digitizer pad on the IBM PC110 palmtop.  It can turn
-  the digitizer pad into a PS/2 mouse emulation with tap gestures or
-  into an absolute pad.
-
-  If you want to compile this as a module ( = code which can be
-  inserted in and removed from the running kernel whenever you want),
-  say M here and read <file:Documentation/modules.txt>.  The module
-  will be called pc110pad.o.
-
-CONFIG_MS_BUSMOUSE
-  These animals (also called Inport mice) are connected to an
-  expansion board using a round connector with 9 pins. If this is what
-  you have, say Y and read the Busmouse-HOWTO, available from
-  <http://www.linuxdoc.org/docs.html#howto>.
-
-  If you are unsure, say N and read the HOWTO nevertheless: it will
-  tell you what you have. Also be aware that several vendors talk
-  about 'Microsoft busmouse' and actually mean PS/2 busmouse -- so
-  count the pins on the connector.
-
-  If you want to compile this as a module ( = code which can be
-  inserted in and removed from the running kernel whenever you want),
-  say M here and read <file:Documentation/modules.txt>.  The module
-  will be called msbusmouse.o.
-
-CONFIG_ADBMOUSE
-  Say Y here if you have this type of bus mouse (4 pin connector) as
-  is common on Macintoshes.  You may want to read the Busmouse-HOWTO,
-  available from <http://www.linuxdoc.org/docs.html#howto>.
-
-  If you want to compile this as a module ( = code which can be
-  inserted in and removed from the running kernel whenever you want),
-  say M here and read <file:Documentation/modules.txt>.  The module
-  will be called adbmouse.o.
-
-CONFIG_ATIXL_BUSMOUSE
-  This is a rare type of busmouse that is connected to the back of an
-  ATI video card.  Say Y if you have one of those. Note however that
-  most mice by ATI are actually Microsoft busmice; you should say Y to
-  "Microsoft busmouse support" above if you have one of those.  Read
-  the Busmouse-HOWTO, available from
-  <http://www.linuxdoc.org/docs.html#howto>.
-
-  If you want to compile this as a module ( = code which can be
-  inserted in and removed from the running kernel whenever you want),
-  say M here and read <file:Documentation/modules.txt>.  The module
-  will be called atixlmouse.o.
-
-  If you are unsure, say N and read the HOWTO nevertheless: it will
-  tell you what you have.
 
 CONFIG_QIC02_TAPE
   If you have a non-SCSI tape drive like that, say Y. Or, if you want

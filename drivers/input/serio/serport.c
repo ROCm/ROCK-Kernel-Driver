@@ -138,8 +138,7 @@ static void serport_ldisc_receive(struct tty_struct *tty, const unsigned char *c
 	struct serport *serport = (struct serport*) tty->disc_data;
 	int i;
 	for (i = 0; i < count; i++)
-		if (serport->serio.dev)
-			serport->serio.dev->interrupt(&serport->serio, cp[i], 0);
+		serio_interrupt(&serport->serio, cp[i], 0);
 }
 
 /*

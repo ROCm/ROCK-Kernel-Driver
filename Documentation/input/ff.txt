@@ -1,6 +1,7 @@
 Force feedback for Linux.
 By Johann Deneux <deneux@ifrance.com> on 2001/04/22.
-
+You can redistribute this file, provided you include shape.fig and
+interactive.fig.
 ----------------------------------------------------------------------------
 
 0. Introduction
@@ -38,13 +39,10 @@ You also need inputattach.
 
 You then need to insert the modules into the following order:
 % modprobe joydev
-% modprobe serport
+% modprobe serport		# Only for serial
 % modprobe iforce
 % modprobe evdev
 % ./inputattach -ifor $2 &	# Only for serial
-For convenience, you may use the shell script named "ff" available from
-the cvs tree of the Linux Console Project at sourceforge. You can also
-retrieve it from http://www.esil.univ-mrs.fr/~jdeneux/projects/ff/.
 If you are using USB, you don't need the inputattach step.
 
 Please check that you have all the /dev/input entries needed:
@@ -68,7 +66,7 @@ mknod input/event3 c 13 67
 2.1 Does it work ?
 ~~~~~~~~~~~~~~~~~~
 There is an utility called fftest that will allow you to test the driver.
-% fftest /dev/eventXX
+% fftest /dev/input/eventXX
 
 3. Instructions to the developper
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -81,22 +79,28 @@ and write() on /dev/input/eventXX.
 #include <linux/input.h>
 #include <sys/ioctl.h>
 
+unsigned long features[1 + FF_MAX/sizeof(unsigned long)];
 int ioctl(int file_descriptor, int request, unsigned long *features);
 
-"request" must be EVIOCGBIT(EV_FF, sizeof(unsigned long))
+"request" must be EVIOCGBIT(EV_FF, size of features array in bytes )
 
 Returns the features supported by the device. features is a bitfield with the
 following bits:
-- FF_X		has an X axis (should allways be the case)
-- FF_Y		has an Y axis (usually not the case for wheels)
+- FF_X		has an X axis (usually joysticks)
+- FF_Y		has an Y axis (usually joysticks)
+- FF_WHEEL	has a wheel (usually sterring wheels)
 - FF_CONSTANT	can render constant force effects
 - FF_PERIODIC	can render periodic effects (sine, ramp, square...)
 - FF_SPRING	can simulate the presence of a spring
-- FF_FRICTION	can simulate friction (aka drag, damper effect...)
+- FF_FRICTION	can simulate friction 
+- FF_DAMPER	can simulate damper effects
 - FF_RUMBLE	rumble effects (normally the only effect supported by rumble
 		pads)
-- 8 bits from FF_N_EFFECTS_0 containing the number of effects that can be
-		simultaneously played.
+
+
+int ioctl(int fd, EVIOCGEFFECTS, int *n);
+
+Returns the number of effects the device can keep in its memory.
 
 3.2 Uploading effects to the device
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -112,7 +116,11 @@ uploaded, but not played.
 The content of effect may be modified. In particular, its field "id" is set
 to the unique id assigned by the driver. This data is required for performing
 some operations (removing an effect, controlling the playback).
-See <linux/input.h> for a description of the ff_effect stuct.
+This if field must be set to -1 by the user in order to tell the driver to
+allocate a new effect.
+See <linux/input.h> for a description of the ff_effect stuct. You should also
+find help in a few sketches, contained in files shape.fig and interactive.fig.
+You need xfig to visualize these files.
 
 3.3 Removing an effect from the device
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -187,8 +195,31 @@ A value of 0 means "no auto-center".
 
 3.7 Dynamic update of an effect
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-This consists in changing some parameters of an effect while it's playing. The
-driver currently does not support that. You still have the brute-force method,
-which consists in erasing the effect and uploading the updated version. It
-actually works pretty well. You don't need to stop-and-start the effect.
+Proceed as if you wanted to upload a new effect, except that instead of
+setting the id field to -1, you set it to the wanted effect id.
+Normally, the effect is not stopped and restarted. However, depending on the
+type of device, not all paramaters can be dynamically updated. For example,
+the direction of an effect cannot be updated with iforce devices. In this
+case, the driver stops the effect, up-load it, and restart it.
 
+
+3.8 Information about the status of effects
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Every time the status of an effect is changed, an event is sent. The values
+and meanings of the fields of the event are as follows:
+struct input_event {
+/* When the status of the effect changed */
+	struct timeval time;
+
+/* Set to EV_FF_STATUS */
+	unsigned short type;
+
+/* Contains the id of the effect */
+	unsigned short code;
+
+/* Indicates the status */
+	unsigned int value;
+};
+
+FF_STATUS_STOPPED	The effect stopped playing
+FF_STATUS_PLAYING	The effect started to play

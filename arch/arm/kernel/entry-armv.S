@@ -712,7 +712,6 @@ __dabt_svc:	sub	sp, sp, #S_FRAME_SIZE
 		mrs	r9, cpsr			@ Enable interrupts if they were
 		tst	r3, #PSR_I_BIT
 		biceq	r9, r9, #PSR_I_BIT		@ previously
-		mov	r0, r2				@ *** remove once everyones in sync
 /*
  * This routine must not corrupt r9
  */
@@ -855,7 +854,6 @@ __dabt_usr:	sub	sp, sp, #S_FRAME_SIZE		@ Allocate frame size in one go
 		stmdb	r5, {sp, lr}^
 		alignment_trap r7, r7, __temp_abt
 		zero_fp
-		mov	r0, r2				@ remove once everyones in sync
 #ifdef MULTI_ABORT
 		ldr	r4, .LCprocfns			@ pass r0, r3 to
 		mov	lr, pc				@ processor code
@@ -913,10 +911,13 @@ __und_usr:	sub	sp, sp, #S_FRAME_SIZE		@ Allocate frame size in one go
 		stmdb	r8, {sp, lr}^			@ Save user sp, lr
 		alignment_trap r4, r7, __temp_und
 		zero_fp
+		tst	r6, #PSR_T_BIT			@ Thumb mode?
+		bne	fpundefinstr			@ ignore FP
 		adrsvc	al, r9, ret_from_exception	@ r9  = normal FP return
 		adrsvc	al, lr, fpundefinstr		@ lr  = undefined instr return
 
-call_fpe:	get_thread_info r10			@ get current thread
+call_fpe:	set_cpsr_c r0, #MODE_SVC		@ Enable interrupts
+		get_thread_info r10			@ get current thread
 		ldr	r4, [r10, #TI_TASK]		@ get current task
 		mov	r8, #1
 		strb	r8, [r4, #TSK_USED_MATH]	@ set current->used_math
@@ -924,8 +925,7 @@ call_fpe:	get_thread_info r10			@ get current thread
 		add	r10, r10, #TI_FPSTATE		@ r10 = workspace
 		ldr	pc, [r4]			@ Call FP module USR entry point
 
-fpundefinstr:	set_cpsr_c r0, #MODE_SVC		@ Enable interrupts
-		mov	r0, sp
+fpundefinstr:	mov	r0, sp
 		adrsvc	al, lr, ret_from_exception
 		b	do_undefinstr
 

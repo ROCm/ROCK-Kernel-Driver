@@ -176,7 +176,6 @@ static int hci_usb_rx_submit(struct hci_usb *husb, struct urb *urb)
         pipe = usb_rcvbulkpipe(husb->udev, husb->bulk_in_ep);
 
         FILL_BULK_URB(urb, husb->udev, pipe, skb->data, size, hci_usb_rx_complete, skb);
-        urb->transfer_flags = USB_QUEUE_BULK;
 
 	skb_queue_tail(&husb->pending_q, skb);
 	err = usb_submit_urb(urb, GFP_ATOMIC);
@@ -318,7 +317,7 @@ static inline int hci_usb_send_bulk(struct hci_usb *husb, struct sk_buff *skb)
         
 	FILL_BULK_URB(urb, husb->udev, pipe, skb->data, skb->len,
 	              hci_usb_tx_complete, skb);
-	urb->transfer_flags = USB_QUEUE_BULK | USB_ZERO_PACKET;
+	urb->transfer_flags = USB_ZERO_PACKET;
 
 	BT_DBG("%s urb %p len %d", husb->hdev.name, urb, skb->len);
 

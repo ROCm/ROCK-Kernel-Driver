@@ -805,14 +805,8 @@ do_cdu535_request(request_queue_t * q)
 	Byte cmd[2];
 
 	while (1) {
-		/*
-		 * The beginning here is stolen from the hard disk driver.  I hope
-		 * it's right.
-		 */
-		if (blk_queue_empty(QUEUE)) {
-			CLEAR_INTR;
+		if (blk_queue_empty(QUEUE))
 			return;
-		}
 
 		dev = minor(CURRENT->rq_dev);
 		block = CURRENT->sector;
@@ -828,7 +822,6 @@ do_cdu535_request(request_queue_t * q)
 				 * If the block address is invalid or the request goes beyond the end of
 				 * the media, return an error.
 				 */
-				
 				if (sony_toc->lead_out_start_lba <= (block / 4)) {
 					end_request(CURRENT, 0);
 					return;

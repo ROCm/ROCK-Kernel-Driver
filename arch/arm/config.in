@@ -153,18 +153,15 @@ if [ "$CONFIG_ARCH_EP7211" = "y" -o \
 fi
 endmenu
 
-if [ "$CONFIG_ARCH_IOP310" = "y" ]; then
-   mainmenu_option next_comment
-   comment 'IOP310 Implementation Options'
-   choice 'IOP310 System Type' \
-   	"IQ80310	CONFIG_ARCH_IQ80310" IQ80310
-   comment 'IOP310 Chipset Features'
-   bool 'Support Intel 80312 Application Accelerator Unit (EXPERIMENTAL)' CONFIG_IOP310_AAU
-   bool 'Support Intel 80312 DMA (EXPERIMENTAL)' CONFIG_IOP310_DMA
-   bool 'Support Intel 80312 Messaging Unit (EXPERIMENTAL)' CONFIG_IOP310_MU
-   bool 'Support Intel 80312 Performance Monitor (EXPERIMENTAL)' CONFIG_IOP310_PMON
-   endmenu
-fi
+mainmenu_option next_comment
+comment 'IOP310 Implementation Options'
+dep_bool '  IQ80310' CONFIG_ARCH_IQ80310 $CONFIG_ARCH_IOP310
+comment 'IOP310 Chipset Features'
+dep_bool 'Support Intel 80312 Application Accelerator Unit (EXPERIMENTAL)' CONFIG_IOP310_AAU $CONFIG_ARCH_IOP310 $CONFIG_EXPERIMENTAL
+dep_bool 'Support Intel 80312 DMA (EXPERIMENTAL)' CONFIG_IOP310_DMA $CONFIG_ARCH_IOP310 $CONFIG_EXPERIMENTAL
+dep_bool 'Support Intel 80312 Messaging Unit (EXPERIMENTAL)' CONFIG_IOP310_MU $CONFIG_ARCH_IOP310 $CONFIG_EXPERIMENTAL
+dep_bool 'Support Intel 80312 Performance Monitor (EXPERIMENTAL)' CONFIG_IOP310_PMON $CONFIG_ARCH_IOP310 $CONFIG_EXPERIMENTAL
+endmenu
 
 # Definitions to make life easier
 if [ "$CONFIG_ARCH_ARCA5K" = "y" -o \

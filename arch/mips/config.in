@@ -12,13 +12,13 @@ source init/Config.in
 mainmenu_option next_comment
 comment 'Machine selection'
 if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
-   bool 'Support for Acer PICA 1 chipset' CONFIG_ACER_PICA_61
+   bool 'Support for Acer PICA 1 chipset (EXPERIMENTAL)' CONFIG_ACER_PICA_61
    bool 'Support for Algorithmics P4032 (EXPERIMENTAL)' CONFIG_ALGOR_P4032
    bool 'Support for BAGET MIPS series (EXPERIMENTAL)' CONFIG_BAGET_MIPS
    bool 'Support for DECstations (EXPERIMENTAL)' CONFIG_DECSTATION
    bool 'Support for NEC DDB Vrc-5074 (EXPERIMENTAL)' CONFIG_DDB5074
-   bool 'Support for Galileo EV96100 Evaluation board' CONFIG_MIPS_EV96100
-   bool 'Support for Galileo EV64120 Evaluation board' CONFIG_MIPS_EV64120
+   bool 'Support for Galileo EV96100 Evaluation board (EXPERIMENTAL)' CONFIG_MIPS_EV96100
+   bool 'Support for Galileo EV64120 Evaluation board (EXPERIMENTAL)' CONFIG_MIPS_EV64120
    if [ "$CONFIG_MIPS_EV64120" = "y" ]; then
 		  bool 'Enable Second PCI (PCI1)' CONFIG_EVB_PCI1
       choice 'Galileo Chip Clock' \
@@ -26,8 +26,8 @@ if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
          83.3 CONFIG_SYSCLK_83\
          100 CONFIG_SYSCLK_100" CONFIG_SYSCLK_83
    fi
-   bool 'Support for MIPS Atlas board' CONFIG_MIPS_ATLAS
-   bool 'Support for MIPS Malta board' CONFIG_MIPS_MALTA
+   bool 'Support for MIPS Atlas board (EXPERIMENTAL)' CONFIG_MIPS_ATLAS
+   bool 'Support for MIPS Malta board (EXPERIMENTAL)' CONFIG_MIPS_MALTA
    bool 'Support for Philips Nino (EXPERIMENTAL)' CONFIG_NINO
    if [ "$CONFIG_NINO" = "y" ]; then
       choice 'Nino Model Number' \

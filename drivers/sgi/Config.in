@@ -11,7 +11,7 @@ fi
 bool 'SGI DS1286  RTC support' CONFIG_SGI_DS1286
 
 if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then  
-   tristate 'SGI Newport Graphics support' CONFIG_SGI_NEWPORT_GFX
+   tristate 'SGI Newport Graphics support (EXPERIMENTAL)' CONFIG_SGI_NEWPORT_GFX
 fi
 
 endmenu

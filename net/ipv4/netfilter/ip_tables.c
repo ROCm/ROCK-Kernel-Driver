@@ -9,6 +9,7 @@
  * 	  a table
  */
 #include <linux/config.h>
+#include <linux/cache.h>
 #include <linux/skbuff.h>
 #include <linux/kmod.h>
 #include <linux/vmalloc.h>
@@ -97,7 +98,7 @@ struct ipt_table_info
 	unsigned int underflow[NF_IP_NUMHOOKS];
 
 	/* ipt_entry tables: one per CPU */
-	char entries[0] __attribute__((aligned(SMP_CACHE_BYTES)));
+	char entries[0] ____cacheline_aligned;
 };
 
 static LIST_HEAD(ipt_target);

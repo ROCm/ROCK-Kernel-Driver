@@ -216,8 +216,7 @@ static void psmouse_interrupt(struct serio *serio, unsigned char data, unsigned 
 	}
 
 	if (psmouse->pktcnt == 1 && psmouse->packet[0] == PSMOUSE_RET_BAT) {
-		queue_task(&psmouse->tq, &tq_immediate);
-		mark_bh(IMMEDIATE_BH);
+		serio_rescan(serio);
 		return;
 	}	
 }
@@ -558,22 +557,6 @@ static void psmouse_disconnect(struct serio *serio)
 }
 
 /*
- * psmouse_powerup() is called when we get the powerup
- * sequence - 0xaa [0x00], so that the mouse/kbd is re-probed.
- */
-
-static void psmouse_powerup(void *data)
-{
-        struct psmouse *psmouse = data;
-
-	if (psmouse->packet[0] == PSMOUSE_RET_BAT && (psmouse->pktcnt == 1 ||
-	   (psmouse->pktcnt == 2 && psmouse->packet[1] == 0x00))) {
-		mdelay(40); /* FIXME!!! Wait some nicer way */
-		serio_rescan(psmouse->serio);
-	}
-}
-
-/*
  * psmouse_connect() is a callback form the serio module when
  * an unhandled serio port is found.
  */
@@ -596,8 +579,6 @@ static void psmouse_connect(struct serio *serio, struct serio_dev *dev)
 
 	psmouse->serio = serio;
 	psmouse->dev.private = psmouse;
-	psmouse->tq.routine = psmouse_powerup;
-	psmouse->tq.data = psmouse;
 
 	serio->private = psmouse;
 

@@ -199,12 +199,10 @@ S: Notre Dame, Indiana
 S: USA
 
 N: Greg Banks
-E: gnb@linuxfan.com
+E: gnb@alphalink.com.au
 D: IDT77105 ATM network driver
-S: NEC Australia
-S: 649-655 Springvale Rd
-S: Mulgrave, Victoria 3170
-S: Australia
+D: some SuperH port work
+D: some trivial futzing with kconfig
 
 N: James Banks
 E: james@sovereign.org
@@ -501,6 +499,14 @@ D: cron, at(1) developer
 S: 48287 Sawleaf
 S: Fremont, California 94539
 S: USA
+
+N: Florent Chabaud
+E: florent.chabaud@polytechnique.org
+D: software suspend
+S: SGDN/DCSSI/SDS/LTI
+S: 58, Bd Latour-Maubourg
+S: 75700 Paris 07 SP
+S: France
 
 N: Gordon Chaffee
 E: chaffee@cs.berkeley.edu
@@ -1708,7 +1714,7 @@ S: Germany
 N: Gabor Kuti
 M: seasons@falcon.sch.bme.hu
 M: seasons@makosteszta.sote.hu
-D: Software suspend
+D: Original author of software suspend
 
 N: Jaroslav Kysela
 E: perex@suse.cz
@@ -2582,11 +2588,11 @@ S: The Australian National University, ACT 0200
 S: Australia
 
 N: Aristeu Sergio Rozanski Filho
-E: aris@conectiva.com.br
+E: aris@cathedrallabs.org
 D: Support for EtherExpress 10 ISA (i82595) in eepro driver
-S: Conectiva S.A.
-S: R. Tocantins, 89 - Cristo Rei
-S: 80050-430 - Curitiba - Paraná
+D: User level driver support for input
+S: R. Jose Serrato, 130 - Santa Candida
+S: 82640-320 - Curitiba - Paraná
 S: Brazil
 
 N: Alessandro Rubini

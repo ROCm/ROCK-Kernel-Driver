@@ -1,5 +1,5 @@
 /*
- * $Id: hid-input.c,v 1.18 2001/11/07 09:01:18 vojtech Exp $
+ * $Id: hid-input.c,v 1.2 2002/04/23 00:59:25 rdamazio Exp $
  *
  *  Copyright (c) 2000-2001 Vojtech Pavlik
  *
@@ -273,9 +273,53 @@ static void hidinput_configure_usage(struct hid_device *device, struct hid_field
 
 			usage->type = EV_KEY; bit = input->keybit; max = KEY_MAX;
 			break;
+			
+		case HID_UP_PID:
 
+			usage->type = EV_FF; bit = input->ffbit; max = FF_MAX;
+			
+			switch(usage->hid & HID_USAGE) {
+				case 0x26: set_bit(FF_CONSTANT, input->ffbit); break;
+				case 0x27: set_bit(FF_RAMP,     input->ffbit); break;
+				case 0x28: set_bit(FF_CUSTOM,   input->ffbit); break;
+				case 0x30: set_bit(FF_SQUARE,   input->ffbit);
+				           set_bit(FF_PERIODIC, input->ffbit); break;
+				case 0x31: set_bit(FF_SINE,     input->ffbit);
+				           set_bit(FF_PERIODIC, input->ffbit); break;
+				case 0x32: set_bit(FF_TRIANGLE, input->ffbit);
+				           set_bit(FF_PERIODIC, input->ffbit); break;
+				case 0x33: set_bit(FF_SAW_UP,   input->ffbit);
+				           set_bit(FF_PERIODIC, input->ffbit); break;
+				case 0x34: set_bit(FF_SAW_DOWN, input->ffbit);
+				           set_bit(FF_PERIODIC, input->ffbit); break;
+				case 0x40: set_bit(FF_SPRING,   input->ffbit); break;
+				case 0x41: set_bit(FF_DAMPER,   input->ffbit); break;
+				case 0x42: set_bit(FF_INERTIA , input->ffbit); break;
+				case 0x43: set_bit(FF_FRICTION, input->ffbit); break;
+				case 0x7e: usage->code = FF_GAIN;       break;
+				case 0x83:  /* Simultaneous Effects Max */
+					input->ff_effects_max = (field->value[0]);
+					dbg("Maximum Effects - %d",input->ff_effects_max);
+					break;
+				case 0x98:  /* Device Control */
+					usage->code = FF_AUTOCENTER;    break;
+				case 0xa4:  /* Safety Switch */
+					usage->code = BTN_DEAD;
+					bit = input->keybit;
+					usage->type = EV_KEY;
+					max = KEY_MAX;
+					dbg("Safety Switch Report\n");
+					break;
+				case 0x9f: /* Device Paused */
+				case 0xa0: /* Actuators Enabled */
+					dbg("Not telling the input API about ");
+					resolv_usage(usage->hid);
+					return;
+			}
+			break;
 		default:
 		unknown:
+			resolv_usage(usage->hid);
 
 			if (field->report_size == 1) {
 
@@ -365,6 +409,16 @@ void hidinput_hid_event(struct hid_device *hid, struct hid_field *field, struct 
 		input_event(input, EV_KEY, BTN_TOUCH, value > a + ((b - a) >> 3));
 	}
 
+	if (usage->hid == (HID_UP_PID | 0x83UL)) { /* Simultaneous Effects Max */
+		input->ff_effects_max = value;
+		dbg("Maximum Effects - %d",input->ff_effects_max);
+		return;
+	}
+	if (usage->hid == (HID_UP_PID | 0x7fUL)) {
+		dbg("PID Pool Report\n");
+		return;
+	}
+
 	if((usage->type == EV_KEY) && (usage->code == 0)) /* Key 0 is "unassigned", not KEY_UKNOWN */
 		return;
 
@@ -379,6 +433,9 @@ static int hidinput_input_event(struct input_dev *dev, unsigned int type, unsign
 	struct hid_device *hid = dev->private;
 	struct hid_field *field = NULL;
 	int offset;
+
+	if (type == EV_FF)
+		return hid_ff_event(hid, dev, type, code, value);
 
 	if ((offset = hid_find_field(hid, type, code, &field)) == -1) {
 		warn("event field not found");
@@ -417,11 +474,12 @@ int hidinput_connect(struct hid_device *hid)
 	struct list_head *list;
 	int i, j, k;
 
-	for (i = 0; i < hid->maxapplication; i++)
-		if (IS_INPUT_APPLICATION(hid->application[i]))
+	for (i = 0; i < hid->maxcollection; i++)
+		if (hid->collection[i].type == HID_COLLECTION_APPLICATION &&
+		    IS_INPUT_APPLICATION(hid->collection[i].usage))
 			break;
 
-	if (i == hid->maxapplication)
+	if (i == hid->maxcollection)
 		return -1;
 
 	hid->input.private = hid;

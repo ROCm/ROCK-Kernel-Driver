@@ -31,6 +31,7 @@ if [ "$CONFIG_X86" = "y" ]; then
       tristate     '  Fan'		CONFIG_ACPI_FAN
       tristate     '  Processor'	CONFIG_ACPI_PROCESSOR
       dep_tristate '  Thermal Zone' 	CONFIG_ACPI_THERMAL $CONFIG_ACPI_PROCESSOR
+      tristate     '  Toshiba Laptop Extras'	CONFIG_ACPI_TOSHIBA
       bool         '  Debug Statements'	CONFIG_ACPI_DEBUG
     fi
   fi

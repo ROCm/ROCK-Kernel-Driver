@@ -156,8 +156,7 @@ static struct serio ct82c710_port =
 
 static void ct82c710_interrupt(int cpl, void *dev_id, struct pt_regs * regs)
 {
-	if (ct82c710_port.dev)
-		ct82c710_port.dev->interrupt(&ct82c710_port, inb(ct82c710_data), 0);
+	serio_interrupt(&ct82c710_port, inb(ct82c710_data), 0);
 }
 
 /*

@@ -73,7 +73,7 @@ int pm_do_suspend(void)
 {
 	unsigned long sleep_save[SLEEP_SAVE_SIZE];
 
-	cli();
+	local_irq_disable();
 
 	leds_event(led_stop);
 
@@ -157,7 +157,7 @@ int pm_do_suspend(void)
 
 	leds_event(led_start);
 
-	sti();
+	local_irq_enable();
 
 	/*
 	 * Restore the CPU frequency settings.

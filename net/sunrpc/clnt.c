@@ -104,6 +104,8 @@ rpc_create_client(struct rpc_xprt *xprt, char *servname,
 	if (!clnt->cl_port)
 		clnt->cl_autobind = 1;
 
+	rpc_init_rtt(&clnt->cl_rtt, xprt->timeout.to_initval);
+
 	if (!rpcauth_create(flavor, clnt))
 		goto out_no_auth;
 
@@ -595,13 +597,16 @@ call_status(struct rpc_task *task)
 	dprintk("RPC: %4d call_status (status %d)\n", 
 				task->tk_pid, task->tk_status);
 
+	req = task->tk_rqstp;
+	if (req->rq_received != 0)
+		status = req->rq_received;
 	if (status >= 0) {
+		req->rq_received = 0;
 		task->tk_action = call_decode;
 		return;
 	}
 
 	task->tk_status = 0;
-	req = task->tk_rqstp;
 	switch(status) {
 	case -ETIMEDOUT:
 		task->tk_action = call_timeout;
@@ -666,7 +671,7 @@ call_timeout(struct rpc_task *task)
 		rpc_exit(task, -EIO);
 		return;
 	}
-	if (clnt->cl_chatty && !(task->tk_flags & RPC_CALL_MAJORSEEN)) {
+	if (clnt->cl_chatty && !(task->tk_flags & RPC_CALL_MAJORSEEN) && rpc_ntimeo(&clnt->cl_rtt) > 7) {
 		task->tk_flags |= RPC_CALL_MAJORSEEN;
 		if (req)
 			printk(KERN_NOTICE "%s: server %s not responding, still trying\n",

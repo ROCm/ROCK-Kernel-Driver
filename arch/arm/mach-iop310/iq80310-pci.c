@@ -25,10 +25,11 @@
  * format for those systems that do not already have PCI
  * interrupts properly routed.  We assume 1 <= pin <= 4
  */
-#define PCI_IRQ_TABLE_LOOKUP(minid,maxid)			 \
-({ int _ctl_ = -1;						 \
-   if (idsel >= minid && idsel <= maxid && pin >= 1 && pin <= 4) \
-      _ctl_ = pci_irq_table[idsel - minid][pin-1];		 \
+#define PCI_IRQ_TABLE_LOOKUP(minid,maxid)	\
+({ int _ctl_ = -1;				\
+   unsigned int _idsel = idsel - minid;		\
+   if (_idsel <= maxid)				\
+      _ctl_ = pci_irq_table[_idsel][pin-1];	\
    _ctl_; })
 
 #define INTA	IRQ_IQ80310_INTA
@@ -64,6 +65,8 @@ iq80310_pri_map_irq(struct pci_dev *dev, u8 idsel, u8 pin)
 {
 	irq_table *pci_irq_table;
 
+	BUG_ON(pin < 1 || pin > 4);
+
 	if (!system_rev) {
 		pci_irq_table = pci_pri_d_irq_table;
 	} else {
@@ -98,6 +101,8 @@ static int __init
 iq80310_sec_map_irq(struct pci_dev *dev, u8 idsel, u8 pin)
 {
 	irq_table *pci_irq_table;
+
+	BUG_ON(pin < 1 || pin > 4);
 
 	if (!system_rev) {
 		pci_irq_table = pci_sec_d_irq_table;

@@ -59,7 +59,7 @@ typedef struct mddev_s mddev_t;
 typedef struct mdk_rdev_s mdk_rdev_t;
 
 #if (MINORBITS != 8)
-#error MD doesnt handle bigger kdev yet
+#error MD does not handle bigger kdev yet
 #endif
 
 #define MAX_MD_DEVS  (1<<MINORBITS)	/* Max number of md dev */

@@ -29,7 +29,7 @@ bttv.o
 		irq_debug=0/1	irq handler debug messages.
 				default is 0 (off).
 		gbuffers=2-32	number of capture buffers for mmap'ed capture.
-				default is 2.
+				default is 4.
 		gbufsize=	size of capture buffers. default and
 				maximum value is 0x208000 (~2MB)
 		no_overlay=0	Enable overlay on broken hardware.  There

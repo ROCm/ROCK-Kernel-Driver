@@ -566,12 +566,11 @@ nlm4clt_decode_res(struct rpc_rqst *req, u32 *p, struct nlm_res *resp)
  */
 #define nlm4clt_decode_norep	NULL
 
-#define PROC(proc, argtype, restype)				\
-    { "nlm4_" #proc,						\
-      (kxdrproc_t) nlm4clt_encode_##argtype,			\
-      (kxdrproc_t) nlm4clt_decode_##restype,			\
-      MAX(NLM4_##argtype##_sz, NLM4_##restype##_sz) << 2,	\
-      0								\
+#define PROC(proc, argtype, restype)					\
+    { .p_procname  = "nlm4_" #proc,					\
+      .p_encode    = (kxdrproc_t) nlm4clt_encode_##argtype,		\
+      .p_decode    = (kxdrproc_t) nlm4clt_decode_##restype,		\
+      .p_bufsiz    = MAX(NLM4_##argtype##_sz, NLM4_##restype##_sz) << 2	\
     }
 
 static struct rpc_procinfo	nlm4_procedures[] = {

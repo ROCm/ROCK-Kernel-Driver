@@ -321,19 +321,6 @@ CONFIG_CD_NO_IDESCSI
   answer will get "defaulted" for you if you enable any of the Linux
   CD-ROM drivers).
 
-CONFIG_INPUT_ADBHID
-  Say Y here if you want to have ADB (Apple Desktop Bus) HID devices
-  such as keyboards, mice, joysticks, or graphic tablets handled by
-  the input layer.  If you say Y here, make sure to say Y to the
-  corresponding drivers "Keyboard support" (CONFIG_INPUT_KEYBDEV),
-  "Mouse Support" (CONFIG_INPUT_MOUSEDEV) and "Event interface
-  support" (CONFIG_INPUT_EVDEV) as well.
-
-  If you say N here, you still have the option of using the old ADB
-  keyboard and mouse drivers.
-
-  If unsure, say Y.
-
 CONFIG_PREP_RESIDUAL
   Some PReP systems have residual data passed to the kernel by the
   firmware.  This allows detection of memory size, devices present and
@@ -382,14 +369,26 @@ CONFIG_ADB_MACIO
   also includes a MESH II SCSI controller, DBDMA controller, VIA chip,
   OpenPIC controller and two RS422/Geoports.)
 
-CONFIG_ADB_KEYBOARD
-  This option allows you to use an ADB keyboard attached to your
-  machine. Note that this disables any other (ie. PS/2) keyboard
-  support, even if your machine is physically capable of using both at
-  the same time.
+CONFIG_INPUT_ADBHID
+  Say Y here if you want to have ADB (Apple Desktop Bus) HID devices
+  such as keyboards, mice, joysticks, trackpads  or graphic tablets
+  handled by the input layer.  If you say Y here, make sure to say Y to
+  the corresponding drivers "Keyboard support" (CONFIG_INPUT_KEYBDEV),
+  "Mouse Support" (CONFIG_INPUT_MOUSEDEV) and "Event interface
+  support" (CONFIG_INPUT_EVDEV) as well.
 
-  If you use an ADB keyboard (4 pin connector), say Y here.
-  If you use a PS/2 keyboard (6 pin connector), say N here.
+  If unsure, say Y.
+
+CONFIG_MAC_EMUMOUSEBTN
+  This provides generic support for emulating the 2nd and 3rd mouse
+  button with keypresses.  If you say Y here, the emulation is still
+  disabled by default.  The emulation is controlled by these sysctl
+  entries:
+      /proc/sys/dev/mac_hid/mouse_button_emulation
+      /proc/sys/dev/mac_hid/mouse_button2_keycode
+      /proc/sys/dev/mac_hid/mouse_button3_keycode
+
+  If you have an Apple machine with a 1-button mouse, say Y here.
 
 CONFIG_SERIAL_CONSOLE
   If you say Y here, it will be possible to use a serial port as the
@@ -885,28 +884,6 @@ CONFIG_EST8260
     Date of Release: early 2001 (?)
     End of life: -
     URL: <http://www.microsys.de/html/cu824.html>
-
-CONFIG_MAC_ADBKEYCODES
-  This provides support for sending ADB keycodes to console devices in
-  raw mode, rather than generic "Linux" keycodes.  This is the default
-  up to 2.4.0, but in future this may be phased out in favor of
-  generic Linux keycodes.  If you say Y here, you can dynamically
-  switch via the /proc/sys/dev/mac_hid/keyboard_sends_linux_keycodes
-  sysctl and with the "keyboard_sends_linux_keycodes=" kernel
-  argument.
-
-  If unsure, say Y here.
-
-CONFIG_MAC_EMUMOUSEBTN
-  This provides generic support for emulating the 2nd and 3rd mouse
-  button with keypresses.  If you say Y here, the emulation is still
-  disabled by default.  The emulation is controlled by these sysctl
-  entries:
-      /proc/sys/dev/mac_hid/mouse_button_emulation
-      /proc/sys/dev/mac_hid/mouse_button2_keycode
-      /proc/sys/dev/mac_hid/mouse_button3_keycode
-
-  If you have an Apple machine with a 1-button mouse, say Y here.
 
 CONFIG_PPC_RTC
   If you say Y here and create a character special file /dev/rtc with

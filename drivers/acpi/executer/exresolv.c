@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exresolv - AML Interpreter object resolution
- *              $Revision: 114 $
+ *              $Revision: 115 $
  *
  *****************************************************************************/
 
@@ -227,9 +227,11 @@ acpi_ex_resolve_object_to_value (
 			break;
 
 
+		case AML_REF_OF_OP:
 		case AML_DEBUG_OP:
 
 			/* Just leave the object as-is */
+
 			break;
 
 

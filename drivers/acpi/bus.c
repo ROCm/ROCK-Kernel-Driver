@@ -1,5 +1,5 @@
 /*
- *  acpi_bus.c - ACPI Bus Driver ($Revision: 77 $)
+ *  acpi_bus.c - ACPI Bus Driver ($Revision: 79 $)
  *
  *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
  *
@@ -1052,11 +1052,17 @@ acpi_bus_match (
 			break;
 		}
 
-		if (!cid[0])
+		if (!cid[0]) {
+			acpi_os_free(buffer.pointer);
 			return -ENOENT;
+		}
 
-		if (strstr(driver->ids, cid))
+		if (strstr(driver->ids, cid)) {
+			acpi_os_free(buffer.pointer);
 			return 0;
+		}
+
+		acpi_os_free(buffer.pointer);
 	}
 
 	return -ENOENT;
@@ -1802,7 +1808,7 @@ acpi_bus_scan_fixed (
 	int			result = 0;
 	struct acpi_device	*device = NULL;
 
-	ACPI_FUNCTION_TRACE("acpi_bus_scan");
+	ACPI_FUNCTION_TRACE("acpi_bus_scan_fixed");
 
 	if (!root)
 		return_VALUE(-ENODEV);
@@ -1929,116 +1935,99 @@ acpi_bus_init (void)
 	int			result = 0;
 	acpi_status		status = AE_OK;
 	acpi_buffer		buffer = {sizeof(acpi_fadt), &acpi_fadt};
-	int			progress = 0;
 
 	ACPI_FUNCTION_TRACE("acpi_bus_init");
 
-	/*
-	 * [0] Initailize the ACPI Core Subsystem.
-	 */
 	status = acpi_initialize_subsystem();
 	if (ACPI_FAILURE(status)) {
 		printk(KERN_ERR PREFIX "Unable to initialize the ACPI Interpreter\n");
-		result = -ENODEV;
-		goto end;
+		goto error0;
 	}
 
-	progress++;
-
-	/*
-	 * [1] Load the ACPI tables.
-	 */
 	status = acpi_load_tables();
 	if (ACPI_FAILURE(status)) {
 		printk(KERN_ERR PREFIX "Unable to load the System Description Tables\n");
-		result = -ENODEV;
-		goto end;
+		goto error0;
 	}
 
-	progress++;
-
-	/*
-	 * [2] Check the blacklist
-	 */
 	if (acpi_blacklisted()) {
-		result = -ENODEV;
-		goto end;
+		goto error1;
 	}
 
-	progress++;
-
 	/*
-	 * [3] Get a separate copy of the FADT for use by other drivers.
+	 * Get a separate copy of the FADT for use by other drivers.
 	 */
 	status = acpi_get_table(ACPI_TABLE_FADT, 1, &buffer);
 	if (ACPI_FAILURE(status)) {
 		printk(KERN_ERR PREFIX "Unable to get the FADT\n");
-		result = -ENODEV;
-		goto end;
+		goto error1;
 	}
 
-	progress++;
-
-	/*
-	 * [4] Enable the ACPI Core Subsystem.
-	 */
 	status = acpi_enable_subsystem(ACPI_FULL_INITIALIZATION);
 	if (ACPI_FAILURE(status)) {
 		printk(KERN_ERR PREFIX "Unable to start the ACPI Interpreter\n");
-		result = -ENODEV;
-		goto end;
+		goto error1;
+	}
+
+#ifdef CONFIG_ACPI_EC
+	/*
+	 * ACPI 2.0 requires the EC driver to be loaded and work before
+	 * the EC device is found in the namespace. This is accomplished
+	 * by looking for the ECDT table, and getting the EC parameters out
+	 * of that.
+	 */
+	result = acpi_ec_ecdt_probe();
+	if (result) {
+		goto error1;
+	}
+#endif
+
+	status = acpi_initialize_objects(ACPI_FULL_INITIALIZATION);
+	if (ACPI_FAILURE(status)) {
+		printk(KERN_ERR PREFIX "Unable to initialize ACPI objects\n");
+		goto error1;
 	}
 
 	printk(KERN_INFO PREFIX "Interpreter enabled\n");
 
-	progress++;
-
 	/*
-	 * [5] Get the system interrupt model and evaluate \_PIC.
+	 * Get the system interrupt model and evaluate \_PIC.
 	 */
 	result = acpi_bus_init_irq();
 	if (result)
-		goto end;
-
-	progress++;
+		goto error1;
 
 	/*
-	 * [6] Register for all standard device notifications.
+	 * Register the for all standard device notifications.
 	 */
 	status = acpi_install_notify_handler(ACPI_ROOT_OBJECT, ACPI_SYSTEM_NOTIFY, &acpi_bus_notify, NULL);
 	if (ACPI_FAILURE(status)) {
 		printk(KERN_ERR PREFIX "Unable to register for device notifications\n");
 		result = -ENODEV;
-		goto end;
+		goto error1;
 	}
 
-	progress++;
-
 	/*
-	 * [7] Create the root device.
+	 * Create the root device in the bus's device tree
 	 */
 	result = acpi_bus_add(&acpi_root, NULL, ACPI_ROOT_OBJECT, 
 		ACPI_BUS_TYPE_SYSTEM);
 	if (result)
-		goto end;
-
-	progress++;
+		goto error2;
 
 	/*
-	 * [8] Create the root file system.
+	 * Create the top ACPI proc directory
 	 */
 	acpi_device_dir(acpi_root) = proc_mkdir(ACPI_BUS_FILE_ROOT, NULL);
 	if (!acpi_root) {
 		result = -ENODEV;
-		goto end;
+		goto error3;
 	}
 	acpi_root_dir = acpi_device_dir(acpi_root);
 
-	progress++;
-
 	/*
-	 * [9] Install drivers required for proper enumeration of the
-	 *     ACPI namespace.
+	 * Install drivers required for proper enumeration of the
+	 * ACPI namespace.
 	 */
 	acpi_system_init();	/* ACPI System */
 	acpi_power_init();	/* ACPI Bus Power Management */
@@ -2049,41 +2038,30 @@ acpi_bus_init (void)
 	acpi_pci_link_init();	/* ACPI PCI Interrupt Link */
 	acpi_pci_root_init();	/* ACPI PCI Root Bridge */
 #endif
-	progress++;
-
 	/*
-	 * [10] Enumerate devices in the ACPI namespace.
+	 * Enumerate devices in the ACPI namespace.
 	 */
 	result = acpi_bus_scan_fixed(acpi_root);
 	if (result)
-		goto end;
+		goto error4;
 	result = acpi_bus_scan(acpi_root);
 	if (result)
-		goto end;
-
-end:
-	/*
-	 * Clean up if anything went awry.
-	 */
-	if (result) {
-		switch (progress) {
-		case 10:
-		case 9: remove_proc_entry("ACPI", NULL);
-		case 8: acpi_bus_remove(acpi_root, ACPI_BUS_REMOVAL_NORMAL);
-		case 7: acpi_remove_notify_handler(ACPI_ROOT_OBJECT,
-				ACPI_SYSTEM_NOTIFY, &acpi_bus_notify);
-		case 6:
-		case 5:
-		case 4:
-		case 3:
-		case 2: acpi_terminate();
-		case 1:
-		case 0:
-		default: return_VALUE(-ENODEV);
-		}
-	}
+		goto error4;
 
 	return_VALUE(0);
+
+	/* Mimic structured exception handling */
+error4:
+	remove_proc_entry("ACPI", NULL);
+error3:
+	acpi_bus_remove(acpi_root, ACPI_BUS_REMOVAL_NORMAL);
+error2:
+	acpi_remove_notify_handler(ACPI_ROOT_OBJECT,
+		ACPI_SYSTEM_NOTIFY, &acpi_bus_notify);
+error1:
+	acpi_terminate();
+error0:
+	return_VALUE(-ENODEV);
 }
 
 

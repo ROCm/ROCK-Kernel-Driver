@@ -22,9 +22,8 @@ USB-specific:
 
 -ENODEV		specified USB-device or bus doesn't exist
 
--ENXIO		a control or interrupt URB is already queued to this endpoint;
-		or (UHCI only) a bulk URB is already queued to this endpoint
-		and USB_QUEUE_BULK wasn't used
+-ENXIO		host controller driver does not support queuing of this type
+		of urb.  (treat as a host controller bug.)
 
 -EINVAL		a) Invalid transfer type specified (or not supported)
 		b) Invalid interrupt interval (0<=n<256)
@@ -90,9 +89,9 @@ one or more packets could finish before an error stops further endpoint I/O.
 			greater than either the max packet size of the
 			endpoint or the remaining buffer size.  "Babble".
 
--EREMOTEIO		The endpoint returned less than max packet size
-			and that amount did not fill the specified buffer
-			(and USB_DISBLE_SPD was not set in transfer_flags)
+-EREMOTEIO		The data read from the endpoint did not fill the
+			specified buffer, and URB_SHORT_NOT_OK was set in
+			urb->transfer_flags.
 
 -ETIMEDOUT		transfer timed out, NAK
 

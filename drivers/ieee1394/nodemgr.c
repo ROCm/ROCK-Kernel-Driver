@@ -177,7 +177,7 @@ static int nodemgr_read_quadlet(struct hpsb_host *host,
 
 	for (i = 0; i < 3; i++) {
 		ret = hpsb_read(host, nodeid, generation, address, quad, 4);
-		if (ret != -EAGAIN)
+		if (!ret)
 			break;
 	}
 	*quad = be32_to_cpu(*quad);
@@ -985,12 +985,26 @@ static int read_businfo_block(struct hpsb_host *host, nodeid_t nodeid, unsigned 
 	HPSB_INFO("Initiating ConfigROM request for node " NODE_BUS_FMT,
 		  NODE_BUS_ARGS(nodeid));
 #endif
+	/* 
+	 * Must retry a few times if config rom read returns zero (how long?). Will
+	 * not normally occur, but we should do the right thing. For example, with
+	 * some sbp2 devices, the bridge chipset cannot return valid config rom reads
+	 * immediately after power-on, since they need to detect the type of 
+	 * device attached (disk or CD-ROM).
+	 */
+	for (i = 0; i < 4; i++) {
+		if (nodemgr_read_quadlet(host, nodeid, generation,
+					 addr, &buffer[0]) < 0) {
+			HPSB_ERR("ConfigROM quadlet transaction error for node "
+				 NODE_BUS_FMT, NODE_BUS_ARGS(nodeid));
+			return -1;
+		}
+		if (buffer[0])
+			break;
 
-	if (nodemgr_read_quadlet(host, nodeid, generation,
-				 addr, &buffer[0]) < 0) {
-		HPSB_ERR("ConfigROM quadlet transaction error for node "
-			 NODE_BUS_FMT, NODE_BUS_ARGS(nodeid));
-		return -1;
+		set_current_state(TASK_INTERRUPTIBLE);
+		if (schedule_timeout (HZ/4))
+			return -1;
 	}
 
 	header_size = buffer[0] >> 24;
@@ -1051,10 +1065,15 @@ static void nodemgr_node_probe_one(struct hpsb_host *host,
 		return;
 
 	if (buffer[1] != IEEE1394_BUSID_MAGIC) {
-		/* This isn't a 1394 device */
-		HPSB_ERR("Node " NODE_BUS_FMT " isn't an IEEE 1394 device",
-			 NODE_BUS_ARGS(nodeid));
-		return;
+		/* This isn't a 1394 device, but we let it slide. There
+		 * was a report of a device with broken firmware which
+		 * reported '2394' instead of '1394', which is obviously a
+		 * mistake. One would hope that a non-1394 device never
+		 * gets connected to Firewire bus. If someone does, we
+		 * shouldn't be held responsible, so we'll allow it with a
+		 * warning.  */
+		HPSB_WARN("Node " NODE_BUS_FMT " has invalid busID magic [0x%08x]",
+			 NODE_BUS_ARGS(nodeid), buffer[1]);
 	}
 
 	guid = ((u64)buffer[3] << 32) | buffer[4];
@@ -1103,11 +1122,11 @@ static void nodemgr_node_probe(struct hpsb_host *host)
 	nodeid_t nodeid = LOCAL_BUS;
 	unsigned int generation;
 
-	/* Pause for 1 second, to make sure things settle down. If
+	/* Pause for 1/4 second, to make sure things settle down. If
 	 * schedule_timeout returns non-zero, it means we caught a signal
 	 * and need to return. */
 	set_current_state(TASK_INTERRUPTIBLE);
-	if (schedule_timeout (HZ))
+	if (schedule_timeout (HZ/4))
 		return;
 
 	/* Now get the generation in which the node ID's we collect

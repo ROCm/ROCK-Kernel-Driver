@@ -414,7 +414,7 @@ static int invalidate_list_pages2(struct address_space * mapping,
  * free the pages because they're mapped.
  * @mapping: the address_space which pages we want to invalidate
  */
-void invalidate_inode_pages2(struct address_space * mapping)
+void invalidate_inode_pages2(struct address_space *mapping)
 {
 	int unlocked;
 
@@ -1102,6 +1102,7 @@ no_cached_page:
 	UPDATE_ATIME(inode);
 }
 
+#if 0
 static ssize_t generic_file_direct_IO(int rw, struct file * filp, char * buf, size_t count, loff_t offset)
 {
 	ssize_t retval;
@@ -1182,6 +1183,7 @@ static ssize_t generic_file_direct_IO(int rw, struct file * filp, char * buf, si
  out:	
 	return retval;
 }
+#endif
 
 int file_read_actor(read_descriptor_t * desc, struct page *page, unsigned long offset, unsigned long size)
 {
@@ -1209,15 +1211,36 @@ int file_read_actor(read_descriptor_t * desc, struct page *page, unsigned long o
  * This is the "read()" routine for all filesystems
  * that can use the page cache directly.
  */
-ssize_t generic_file_read(struct file * filp, char * buf, size_t count, loff_t *ppos)
+ssize_t
+generic_file_read(struct file *filp, char *buf, size_t count, loff_t *ppos)
 {
 	ssize_t retval;
 
 	if ((ssize_t) count < 0)
 		return -EINVAL;
 
-	if (filp->f_flags & O_DIRECT)
-		goto o_direct;
+	if (filp->f_flags & O_DIRECT) {
+		loff_t pos = *ppos, size;
+		struct address_space *mapping;
+		struct inode *inode;
+
+		mapping = filp->f_dentry->d_inode->i_mapping;
+		inode = mapping->host;
+		retval = 0;
+		if (!count)
+			goto out; /* skip atime */
+		size = inode->i_size;
+		if (pos < size) {
+			if (pos + count > size)
+				count = size - pos;
+			retval = generic_file_direct_IO(READ, inode,
+							buf, pos, count);
+			if (retval > 0)
+				*ppos = pos + retval;
+		}
+		UPDATE_ATIME(filp->f_dentry->d_inode);
+		goto out;
+	}
 
 	retval = -EFAULT;
 	if (access_ok(VERIFY_WRITE, buf, count)) {
@@ -1230,39 +1253,17 @@ ssize_t generic_file_read(struct file * filp, char * buf, size_t count, loff_t *
 			desc.count = count;
 			desc.buf = buf;
 			desc.error = 0;
-			do_generic_file_read(filp, ppos, &desc, file_read_actor);
-
+			do_generic_file_read(filp,ppos,&desc,file_read_actor);
 			retval = desc.written;
 			if (!retval)
 				retval = desc.error;
 		}
 	}
- out:
+out:
 	return retval;
-
- o_direct:
-	{
-		loff_t pos = *ppos, size;
-		struct address_space *mapping = filp->f_dentry->d_inode->i_mapping;
-		struct inode *inode = mapping->host;
-
-		retval = 0;
-		if (!count)
-			goto out; /* skip atime */
-		size = inode->i_size;
-		if (pos < size) {
-			if (pos + count > size)
-				count = size - pos;
-			retval = generic_file_direct_IO(READ, filp, buf, count, pos);
-			if (retval > 0)
-				*ppos = pos + retval;
-		}
-		UPDATE_ATIME(filp->f_dentry->d_inode);
-		goto out;
-	}
 }
 
-static int file_send_actor(read_descriptor_t * desc, struct page *page, unsigned long offset , unsigned long size)
+static int file_send_actor(read_descriptor_t * desc, struct page *page, unsigned long offset, unsigned long size)
 {
 	ssize_t written;
 	unsigned long count = desc->count;
@@ -1271,22 +1272,8 @@ static int file_send_actor(read_descriptor_t * desc, struct page *page, unsigned
 	if (size > count)
 		size = count;
 
- 	if (file->f_op->sendpage) {
- 		written = file->f_op->sendpage(file, page, offset,
-					       size, &file->f_pos, size<count);
-	} else {
-		char *kaddr;
-		mm_segment_t old_fs;
-
-		old_fs = get_fs();
-		set_fs(KERNEL_DS);
-
-		kaddr = kmap(page);
-		written = file->f_op->write(file, kaddr + offset, size, &file->f_pos);
-		kunmap(page);
-
-		set_fs(old_fs);
-	}
+	written = file->f_op->sendpage(file, page, offset,
+				       size, &file->f_pos, size<count);
 	if (written < 0) {
 		desc->error = written;
 		written = 0;
@@ -1331,7 +1318,7 @@ static ssize_t common_sendfile(int out_fd, int in_fd, loff_t *offset, size_t cou
 	if (!(out_file->f_mode & FMODE_WRITE))
 		goto fput_out;
 	retval = -EINVAL;
-	if (!out_file->f_op || !out_file->f_op->write)
+	if (!out_file->f_op || !out_file->f_op->sendpage)
 		goto fput_out;
 	out_inode = out_file->f_dentry->d_inode;
 	retval = locks_verify_area(FLOCK_VERIFY_WRITE, out_inode, out_file, out_file->f_pos, count);
@@ -2200,8 +2187,8 @@ generic_file_write(struct file *file, const char *buf,
 	}
 
 	if (unlikely(file->f_flags & O_DIRECT)) {
-		written = generic_file_direct_IO(WRITE, file,
-						(char *) buf, count, pos);
+		written = generic_file_direct_IO(WRITE, inode,
+						(char *)buf, pos, count);
 		if (written > 0) {
 			loff_t end = pos + written;
 			if (end > inode->i_size && !S_ISBLK(inode->i_mode)) {
@@ -2209,7 +2196,8 @@ generic_file_write(struct file *file, const char *buf,
 				mark_inode_dirty(inode);
 			}
 			*ppos = end;
-			invalidate_inode_pages2(mapping);
+			if (mapping->nrpages)
+				invalidate_inode_pages2(mapping);
 		}
 		/*
 		 * Sync the fs metadata but not the minor inode changes and

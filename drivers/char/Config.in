@@ -113,22 +113,8 @@ source drivers/i2c/Config.in
 
 mainmenu_option next_comment
 comment 'Mice'
-tristate 'Bus Mouse Support' CONFIG_BUSMOUSE
-if [ "$CONFIG_BUSMOUSE" != "n" ]; then
-   dep_tristate '  ATIXL busmouse support' CONFIG_ATIXL_BUSMOUSE $CONFIG_BUSMOUSE
-   dep_tristate '  Logitech busmouse support' CONFIG_LOGIBUSMOUSE $CONFIG_BUSMOUSE
-   dep_tristate '  Microsoft busmouse support' CONFIG_MS_BUSMOUSE $CONFIG_BUSMOUSE
-   if [ "$CONFIG_ADB" = "y" -a "$CONFIG_ADB_KEYBOARD" = "y" ]; then
-      dep_tristate '  Apple Desktop Bus mouse support (old driver)' CONFIG_ADBMOUSE $CONFIG_BUSMOUSE
-   fi
-fi
-
-tristate 'Mouse Support (not serial and bus mice)' CONFIG_MOUSE
-if [ "$CONFIG_MOUSE" != "n" ]; then
-   bool '  PS/2 mouse (aka "auxiliary device") support' CONFIG_PSMOUSE
-   tristate '  C&T 82C710 mouse port support (as on TI Travelmate)' CONFIG_82C710_MOUSE
-   tristate '  PC110 digitizer pad support' CONFIG_PC110_PAD
-fi
+   tristate 'Bus Mouse Support' CONFIG_BUSMOUSE
+   bool 'PS/2 mouse (aka "auxiliary device") support' CONFIG_PSMOUSE
 endmenu
 
 tristate 'QIC-02 tape support' CONFIG_QIC02_TAPE
@@ -185,7 +171,9 @@ if [ "$CONFIG_ARCH_NETWINDER" = "y" ]; then
    tristate 'NetWinder flash support' CONFIG_NWFLASH
 fi
 
-dep_tristate 'Intel i8x0 Random Number Generator support' CONFIG_INTEL_RNG $CONFIG_PCI
+if [ "$CONFIG_X86" = "y" -o "$CONFIG_IA64" = "y" ]; then
+   dep_tristate 'Intel i8x0 Random Number Generator support' CONFIG_INTEL_RNG $CONFIG_PCI
+fi
 tristate '/dev/nvram support' CONFIG_NVRAM
 tristate 'Enhanced Real Time Clock Support' CONFIG_RTC
 if [ "$CONFIG_IA64" = "y" ]; then

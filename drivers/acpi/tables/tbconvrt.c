@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: tbconvrt - ACPI Table conversion utilities
- *              $Revision: 41 $
+ *              $Revision: 42 $
  *
  *****************************************************************************/
 
@@ -90,8 +90,7 @@ acpi_tb_get_table_count (
 
 acpi_status
 acpi_tb_convert_to_xsdt (
-	acpi_table_desc         *table_info,
-	u32                     *number_of_tables)
+	acpi_table_desc         *table_info)
 {
 	ACPI_SIZE               table_size;
 	u32                     i;
@@ -101,13 +100,10 @@ acpi_tb_convert_to_xsdt (
 	ACPI_FUNCTION_ENTRY ();
 
 
-	/* Get the number of tables defined in the RSDT or XSDT */
-
-	*number_of_tables = acpi_tb_get_table_count (acpi_gbl_RSDP, table_info->pointer);
-
 	/* Compute size of the converted XSDT */
 
-	table_size = ((ACPI_SIZE) *number_of_tables * sizeof (u64)) + sizeof (acpi_table_header);
+	table_size = ((ACPI_SIZE) acpi_gbl_rsdt_table_count * sizeof (u64)) +
+			  sizeof (acpi_table_header);
 
 	/* Allocate an XSDT */
 
@@ -123,7 +119,7 @@ acpi_tb_convert_to_xsdt (
 
 	/* Copy the table pointers */
 
-	for (i = 0; i < *number_of_tables; i++) {
+	for (i = 0; i < acpi_gbl_rsdt_table_count; i++) {
 		if (acpi_gbl_RSDP->revision < 2) {
 			ACPI_STORE_ADDRESS (new_table->table_offset_entry[i],
 				((RSDT_DESCRIPTOR_REV1 *) table_info->pointer)->table_offset_entry[i]);

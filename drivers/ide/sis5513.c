@@ -207,9 +207,9 @@ static byte cycle_time_value[][XFER_UDMA_5 - XFER_UDMA_0 + 1] = {
 
 static struct pci_dev *host_dev = NULL;
 
-static int sis5513_ratemask(struct ata_device *drive)
+static int __init sis5513_modes_map(struct ata_channel *ch)
 {
-	int map = 0;
+	int map = XFER_EPIO | XFER_SWDMA | XFER_MWDMA;
 
 	switch(chipset_family) {
 		case ATA_133:	/* map |= XFER_UDMA_133; */
@@ -221,14 +221,7 @@ static int sis5513_ratemask(struct ata_device *drive)
 		case ATA_33:
 			map |= XFER_UDMA;
 			break;
-		case ATA_16:
-		case ATA_00:
-		default:
-			return 0;
 	}
-
-	if (!eighty_ninty_three(drive))
-		return XFER_UDMA;
 
 	return map;
 }
@@ -279,9 +272,6 @@ static int config_art_rwp_pio(struct ata_device *drive, u8 pio)
 	printk("SIS5513: config_drive_art_rwp_pio, drive %d, pio %d, timing %d\n",
 	       drive->dn, pio, timing);
 #endif
-
-	if (drive->dn > 3)	/* FIXME: remove this  --bkz */
-		return 1;
 
 	drive_pci = 0x40 + (drive->dn << 1);
 
@@ -404,86 +394,6 @@ static void sis5513_tune_drive(struct ata_device *drive, u8 pio)
 	(void)config_art_rwp_pio(drive, min_t(u8, pio, 4));
 }
 
-#ifdef CONFIG_BLK_DEV_IDEDMA
-static int config_chipset_for_dma(struct ata_device *drive, u8 udma)
-{
-	int map;
-	u8 mode;
-
-#ifdef DEBUG
-	printk("SIS5513: config_chipset_for_dma, drive %d, udma %d\n",
-	       drive->dn, udma);
-#endif
-
-	if (udma)
-		map = sis5513_ratemask(drive);
-	else
-		map = XFER_SWDMA | XFER_MWDMA;
-
-	mode = ata_timing_mode(drive, map);
-	if (mode < XFER_SW_DMA_0)
-		return 0;
-
-	return !sis5513_tune_chipset(drive, mode);
-}
-
-static int sis5513_udma_setup(struct ata_device *drive)
-{
-	struct hd_driveid *id = drive->id;
-	int on = 0;
-	int verbose = 1;
-
-	config_drive_art_rwp(drive);
-	sis5513_tune_drive(drive, 255);
-
-	if (id && (id->capability & 1) && drive->channel->autodma) {
-		/* Consult the list of known "bad" drives */
-		if (udma_black_list(drive)) {
-			on = 0;
-			goto fast_ata_pio;
-		}
-		on = 0;
-		verbose = 0;
-		if (id->field_valid & 4) {
-			if (id->dma_ultra & 0x003F) {
-				/* Force if Capable UltraDMA */
-				on = config_chipset_for_dma(drive, 1);
-				if ((id->field_valid & 2) &&
-				    (!on))
-					goto try_dma_modes;
-			}
-		} else if (id->field_valid & 2) {
-try_dma_modes:
-			if ((id->dma_mword & 0x0007) ||
-			    (id->dma_1word & 0x0007)) {
-				/* Force if Capable regular DMA modes */
-				on = config_chipset_for_dma(drive, 0);
-				if (!on)
-					goto no_dma_set;
-			}
-		} else if ((udma_white_list(drive)) &&
-			   (id->eide_dma_time > 150)) {
-			/* Consult the list of known "good" drives */
-			on = config_chipset_for_dma(drive, 0);
-			if (!on)
-				goto no_dma_set;
-		} else {
-			goto fast_ata_pio;
-		}
-	} else if ((id->capability & 8) || (id->field_valid & 2)) {
-fast_ata_pio:
-		on = 0;
-		verbose = 0;
-no_dma_set:
-		sis5513_tune_drive(drive, 255);
-	}
-
-	udma_enable(drive, on, verbose);
-
-	return 0;
-}
-#endif
-
 /* Chip detection and general config */
 static unsigned int __init pci_init_sis5513(struct pci_dev *dev)
 {
@@ -576,25 +486,19 @@ static void __init ide_init_sis5513(struct ata_channel *hwif)
 
 	hwif->irq = hwif->unit ? 15 : 14;
 
+	hwif->udma_four = ata66_sis5513(hwif);
+
 	hwif->tuneproc = &sis5513_tune_drive;
 	hwif->speedproc = &sis5513_tune_chipset;
 
-	if (!(hwif->dma_base))
-		return;
-
-	if (host_dev) {
 #ifdef CONFIG_BLK_DEV_IDEDMA
-		if (chipset_family > ATA_16) {
-			hwif->autodma = noautodma ? 0 : 1;
-			hwif->highmem = 1;
-			hwif->udma_setup = sis5513_udma_setup;
-		} else {
-#endif
-			hwif->autodma = 0;
-#ifdef CONFIG_BLK_DEV_IDEDMA
-		}
-#endif
+	if (hwif->dma_base && host_dev && chipset_family > ATA_16) {
+		hwif->highmem = 1;
+		hwif->modes_map = sis5513_modes_map(hwif);
+		hwif->udma_setup = udma_generic_setup;
 	}
+#endif
+
 	return;
 }
 
@@ -604,11 +508,9 @@ static struct ata_pci_device chipset __initdata = {
 	vendor: PCI_VENDOR_ID_SI,
 	device: PCI_DEVICE_ID_SI_5513,
 	init_chipset: pci_init_sis5513,
-	ata66_check: ata66_sis5513,
 	init_channel: ide_init_sis5513,
 	enablebits: {{0x4a,0x02,0x02}, {0x4a,0x04,0x04} },
 	bootable: ON_BOARD,
-	flags: ATA_F_NOADMA
 };
 
 int __init init_sis5513(void)

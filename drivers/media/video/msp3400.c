@@ -1266,6 +1266,7 @@ static int msp_attach(struct i2c_adapter *adap, int addr,
 
 	if (-1 == msp3400c_reset(c)) {
 		kfree(msp);
+		kfree(c);
 		dprintk("msp3400: no chip found\n");
 		return -1;
 	}
@@ -1275,6 +1276,7 @@ static int msp_attach(struct i2c_adapter *adap, int addr,
 		rev2 = msp3400c_read(c, I2C_MSP3400C_DFP, 0x1f);
 	if ((-1 == rev1) || (0 == rev1 && 0 == rev2)) {
 		kfree(msp);
+		kfree(c);
 		printk("msp3400: error while reading chip version\n");
 		return -1;
 	}

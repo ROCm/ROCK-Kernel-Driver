@@ -99,15 +99,11 @@ static long bytes_out = 0;
 static uch *output_data;
 static unsigned long output_ptr = 0;
 
- 
 static void *malloc(int size);
 static void free(void *where);
-static void error(char *m);
-static void gzip_mark(void **);
-static void gzip_release(void **);
- 
+
 static void puts(const char *);
-  
+
 extern int end;
 static long free_mem_ptr = (long)&end;
 static long free_mem_end_ptr;

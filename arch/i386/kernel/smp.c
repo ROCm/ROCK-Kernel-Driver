@@ -67,7 +67,7 @@
  *	an L1cache=Writethrough or L1cache=off option.
  *
  *		B stepping CPUs may hang. There are hardware work arounds
- *	for this. We warn about it in case your board doesnt have the work
+ *	for this. We warn about it in case your board doesn't have the work
  *	arounds. Basically thats so I can tell anyone with a B stepping
  *	CPU and SMP problems "tough".
  *

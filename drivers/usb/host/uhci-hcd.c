@@ -491,7 +491,7 @@ static int uhci_fixup_toggle(struct urb *urb, unsigned int toggle)
 }
 
 /* This function will append one URB's QH to another URB's QH. This is for */
-/*  USB_QUEUE_BULK support for bulk transfers and soon implicitily for */
+/* queuing bulk transfers and soon implicitily for */
 /*  control transfers */
 static void uhci_append_queued_urb(struct uhci_hcd *uhci, struct urb *eurb, struct urb *urb)
 {
@@ -840,7 +840,7 @@ static int uhci_submit_control(struct uhci_hcd *uhci, struct urb *urb)
 	 */
 	destination ^= (USB_PID_SETUP ^ usb_packetid(urb->pipe));
 
-	if (!(urb->transfer_flags & USB_DISABLE_SPD))
+	if (!(urb->transfer_flags & URB_SHORT_NOT_OK))
 		status |= TD_CTRL_SPD;
 
 	/*
@@ -1006,7 +1006,7 @@ static int uhci_result_control(struct uhci_hcd *uhci, struct urb *urb)
 
 		/* Check to see if we received a short packet */
 		if (uhci_actual_length(td_status(td)) < uhci_expected_length(td_token(td))) {
-			if (urb->transfer_flags & USB_DISABLE_SPD) {
+			if (urb->transfer_flags & URB_SHORT_NOT_OK) {
 				ret = -EREMOTEIO;
 				goto err;
 			}
@@ -1128,7 +1128,7 @@ static int uhci_result_interrupt(struct uhci_hcd *uhci, struct urb *urb)
 			goto td_error;
 
 		if (uhci_actual_length(td_status(td)) < uhci_expected_length(td_token(td))) {
-			if (urb->transfer_flags & USB_DISABLE_SPD) {
+			if (urb->transfer_flags & URB_SHORT_NOT_OK) {
 				ret = -EREMOTEIO;
 				goto err;
 			} else
@@ -1210,7 +1210,7 @@ static int uhci_submit_bulk(struct uhci_hcd *uhci, struct urb *urb, struct urb *
 
 	/* 3 errors */
 	status = TD_CTRL_ACTIVE | uhci_maxerr(3);
-	if (!(urb->transfer_flags & USB_DISABLE_SPD))
+	if (!(urb->transfer_flags & URB_SHORT_NOT_OK))
 		status |= TD_CTRL_SPD;
 
 	/*
@@ -1276,7 +1276,7 @@ static int uhci_submit_bulk(struct uhci_hcd *uhci, struct urb *urb, struct urb *
 	/* Always assume breadth first */
 	uhci_insert_tds_in_qh(qh, urb, 1);
 
-	if (urb->transfer_flags & USB_QUEUE_BULK && eurb)
+	if (eurb)
 		uhci_append_queued_urb(uhci, eurb, urb);
 	else
 		uhci_insert_qh(uhci, uhci->skel_bulk_qh, urb);
@@ -1470,10 +1470,6 @@ static int uhci_urb_enqueue(struct usb_hcd *hcd, struct urb *urb, int mem_flags)
 	spin_lock_irqsave(&uhci->urb_list_lock, flags);
 
 	eurb = uhci_find_urb_ep(uhci, urb);
-	if (eurb && !(urb->transfer_flags & USB_QUEUE_BULK)) {
-		spin_unlock_irqrestore(&uhci->urb_list_lock, flags);
-		return -ENXIO;
-	}
 
 	if (!uhci_alloc_urb_priv(uhci, urb)) {
 		spin_unlock_irqrestore(&uhci->urb_list_lock, flags);
@@ -1482,10 +1478,15 @@ static int uhci_urb_enqueue(struct usb_hcd *hcd, struct urb *urb, int mem_flags)
 
 	switch (usb_pipetype(urb->pipe)) {
 	case PIPE_CONTROL:
-		ret = uhci_submit_control(uhci, urb);
+		if (eurb)
+			ret = -ENXIO;		/* no control queueing yet */
+		else
+			ret = uhci_submit_control(uhci, urb);
 		break;
 	case PIPE_INTERRUPT:
-		if (urb->bandwidth == 0) {	/* not yet checked/allocated */
+		if (eurb)
+			ret = -ENXIO;		/* no interrupt queueing yet */
+		else if (urb->bandwidth == 0) {	/* not yet checked/allocated */
 			bustime = usb_check_bandwidth(urb->dev, urb);
 			if (bustime < 0)
 				ret = bustime;
@@ -2406,7 +2407,7 @@ err_pci_set_dma_mask:
 	return retval;
 }
 
-static void __devexit uhci_stop(struct usb_hcd *hcd)
+static void uhci_stop(struct usb_hcd *hcd)
 {
 	struct uhci_hcd *uhci = hcd_to_uhci(hcd);
 
@@ -2487,7 +2488,7 @@ static const struct hc_driver uhci_driver = {
 	suspend:		uhci_suspend,
 	resume:			uhci_resume,
 #endif
-	stop:			__devexit_p(uhci_stop),
+	stop:			uhci_stop,
 
 	hcd_alloc:		uhci_hcd_alloc,
 	hcd_free:		uhci_hcd_free,
