@@ -16,11 +16,10 @@ obj-$(CONFIG_IEEE1394_ETH1394) += eth1394.o
 obj-$(CONFIG_IEEE1394_AMDTP) += amdtp.o
 obj-$(CONFIG_IEEE1394_CMP) += cmp.o
 
-clean-files := oui.c
-
 quiet_cmd_oui2c = OUI2C   $@
-      cmd_oui2c = $(CONFIG_SHELL) $(obj)/oui2c.sh < $(obj)/oui.db > $@
+      cmd_oui2c = $(CONFIG_SHELL) $(srctree)/$(src)/oui2c.sh < $< > $@
 
+targets := oui.c
 $(obj)/oui.o: $(obj)/oui.c
-$(obj)/oui.c: $(obj)/oui.db $(obj)/oui2c.sh
+$(obj)/oui.c: $(src)/oui.db $(src)/oui2c.sh FORCE
 	$(call if_changed,oui2c)
