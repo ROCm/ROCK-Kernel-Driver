@@ -253,6 +253,21 @@ static inline void sctp_ulpq_store_reasm(struct sctp_ulpq *ulpq,
 
 	tsn = event->sndrcvinfo.sinfo_tsn;
 
+	/* See if it belongs at the end. */
+	pos = skb_peek_tail(&ulpq->reasm);
+	if (!pos) {
+		__skb_queue_tail(&ulpq->reasm, sctp_event2skb(event));
+		return;
+	}
+
+	/* Short circuit just dropping it at the end. */
+	cevent = sctp_skb2event(pos);
+	ctsn = cevent->sndrcvinfo.sinfo_tsn;
+	if (TSN_lt(ctsn, tsn)) {
+		__skb_queue_tail(&ulpq->reasm, sctp_event2skb(event));
+		return;
+	}
+
 	/* Find the right place in this list. We store them by TSN.  */
 	skb_queue_walk(&ulpq->reasm, pos) {
 		cevent = sctp_skb2event(pos);
@@ -262,12 +277,9 @@ static inline void sctp_ulpq_store_reasm(struct sctp_ulpq *ulpq,
 			break;
 	}
 
-	/* If the queue is empty, we have a different function to call.  */
-	if (skb_peek(&ulpq->reasm))
-		__skb_insert(sctp_event2skb(event), pos->prev, pos,
-			     &ulpq->reasm);
-	else
-		__skb_queue_tail(&ulpq->reasm, sctp_event2skb(event));
+	/* Insert before pos. */
+	__skb_insert(sctp_event2skb(event), pos->prev, pos, &ulpq->reasm);
+
 }
 
 /* Helper function to return an event corresponding to the reassembled
@@ -592,8 +604,27 @@ static inline void sctp_ulpq_store_ordered(struct sctp_ulpq *ulpq,
 	__u16 sid, csid;
 	__u16 ssn, cssn;
 
+	pos = skb_peek_tail(&ulpq->lobby);
+	if (!pos) {
+		__skb_queue_tail(&ulpq->lobby, sctp_event2skb(event));
+		return;
+	}
+
 	sid = event->sndrcvinfo.sinfo_stream;
 	ssn = event->sndrcvinfo.sinfo_ssn;
+	
+	cevent = (struct sctp_ulpevent *) pos->cb;
+	csid = cevent->sndrcvinfo.sinfo_stream;
+	cssn = cevent->sndrcvinfo.sinfo_ssn;
+	if (sid > csid) {
+		__skb_queue_tail(&ulpq->lobby, sctp_event2skb(event));
+		return;
+	}
+
+	if ((sid == csid) && SSN_lt(cssn, ssn)) {
+		__skb_queue_tail(&ulpq->lobby, sctp_event2skb(event));
+		return;
+	}
 
 	/* Find the right place in this list.  We store them by
 	 * stream ID and then by SSN.
@@ -609,12 +640,10 @@ static inline void sctp_ulpq_store_ordered(struct sctp_ulpq *ulpq,
 			break;
 	}
 
-	/* If the queue is empty, we have a different function to call.  */
-	if (skb_peek(&ulpq->lobby))
-		__skb_insert(sctp_event2skb(event), pos->prev, pos,
-			     &ulpq->lobby);
-	else
-		__skb_queue_tail(&ulpq->lobby, sctp_event2skb(event));
+
+	/* Insert before pos. */
+	__skb_insert(sctp_event2skb(event), pos->prev, pos, &ulpq->lobby);
+
 }
 
 static inline struct sctp_ulpevent *sctp_ulpq_order(struct sctp_ulpq *ulpq,
