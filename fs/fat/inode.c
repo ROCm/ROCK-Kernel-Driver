@@ -465,32 +465,17 @@ out:
 
 static int fat_calc_dir_size(struct inode *inode)
 {
-	struct super_block *sb = inode->i_sb;
-	int nr;
+	struct msdos_sb_info *sbi = MSDOS_SB(inode->i_sb);
+	int ret, fclus, dclus;
 
 	inode->i_size = 0;
 	if (MSDOS_I(inode)->i_start == 0)
 		return 0;
 
-	nr = MSDOS_I(inode)->i_start;
-	do {
-		inode->i_size += 1 << MSDOS_SB(sb)->cluster_bits;
-		nr = fat_access(sb, nr, -1);
-		if (nr < 0)
-			return nr;
-		else if (nr == FAT_ENT_FREE) {
-			fat_fs_panic(sb, "Directory %lu: invalid cluster chain",
-				     inode->i_ino);
-			return -EIO;
-		}
-		if (inode->i_size > FAT_MAX_DIR_SIZE) {
-			fat_fs_panic(sb, "Directory %lu: "
-				     "exceeded the maximum size of directory",
-				     inode->i_ino);
-			inode->i_size = FAT_MAX_DIR_SIZE;
-			break;
-		}
-	} while (nr != FAT_ENT_EOF);
+	ret = fat_get_cluster(inode, FAT_ENT_EOF, &fclus, &dclus);
+	if (ret < 0)
+		return ret;
+	inode->i_size = (fclus + 1) << sbi->cluster_bits;
 
 	return 0;
 }

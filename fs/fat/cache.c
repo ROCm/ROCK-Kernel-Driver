@@ -232,6 +232,8 @@ void fat_cache_add(struct inode *inode, int f_clu, int d_clu)
 	struct fat_cache *walk, *last;
 	int first, prev_f_clu, prev_d_clu;
 
+	if (f_clu == 0)
+		return;
 	first = MSDOS_I(inode)->i_start;
 	if (!first)
 		return;
@@ -380,41 +382,47 @@ int fat_bmap(struct inode *inode, sector_t sector, sector_t *phys)
 	return 0;
 }
 
-
-/* Free all clusters after the skip'th cluster. Doesn't use the cache,
-   because this way we get an additional sanity check. */
-
-int fat_free(struct inode *inode,int skip)
+/* Free all clusters after the skip'th cluster. */
+int fat_free(struct inode *inode, int skip)
 {
 	struct super_block *sb = inode->i_sb;
-	int nr,last;
+	int nr, ret, fclus, dclus;
 
-	if (!(nr = MSDOS_I(inode)->i_start)) return 0;
-	last = 0;
-	while (skip--) {
-		last = nr;
-		nr = fat_access(sb, nr, -1);
+	if (MSDOS_I(inode)->i_start == 0)
+		return 0;
+
+	if (skip) {
+		ret = fat_get_cluster(inode, skip - 1, &fclus, &dclus);
+		if (ret < 0)
+			return ret;
+		else if (ret == FAT_ENT_EOF)
+			return 0;
+
+		nr = fat_access(sb, dclus, -1);
 		if (nr == FAT_ENT_EOF)
 			return 0;
-		else if (nr == FAT_ENT_FREE) {
-			fat_fs_panic(sb, "%s: invalid cluster chain (ino %lu)",
-				     __FUNCTION__, inode->i_ino);
-			return -EIO;
-		} else if (nr < 0)
+		else if (nr > 0) {
+			/*
+			 * write a new EOF, and get the remaining cluster
+			 * chain for freeing.
+			 */
+			nr = fat_access(sb, dclus, FAT_ENT_EOF);
+		}
+		if (nr < 0)
 			return nr;
-	}
-	if (last) {
-		fat_access(sb, last, FAT_ENT_EOF);
+
 		fat_cache_inval_inode(inode);
 	} else {
 		fat_cache_inval_inode(inode);
+
+		nr = MSDOS_I(inode)->i_start;
 		MSDOS_I(inode)->i_start = 0;
 		MSDOS_I(inode)->i_logstart = 0;
 		mark_inode_dirty(inode);
 	}
 
 	lock_fat(sb);
-	while (nr != FAT_ENT_EOF) {
+	do {
 		nr = fat_access(sb, nr, FAT_ENT_FREE);
 		if (nr < 0)
 			goto error;
@@ -427,7 +435,7 @@ int fat_free(struct inode *inode,int skip)
 		if (MSDOS_SB(sb)->free_clusters != -1)
 			MSDOS_SB(sb)->free_clusters++;
 		inode->i_blocks -= (1 << MSDOS_SB(sb)->cluster_bits) >> 9;
-	}
+	} while (nr != FAT_ENT_EOF);
 	fat_clusters_flush(sb);
 	nr = 0;
 error:

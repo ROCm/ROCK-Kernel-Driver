@@ -88,41 +88,25 @@ void fat_clusters_flush(struct super_block *sb)
 int fat_add_cluster(struct inode *inode)
 {
 	struct super_block *sb = inode->i_sb;
-	int count, nr, limit, last, curr, file_cluster;
+	int count, limit, new_dclus, new_fclus, last;
 	int cluster_bits = MSDOS_SB(sb)->cluster_bits;
 	
 	/* 
 	 * We must locate the last cluster of the file to add this new
-	 * one (nr) to the end of the link list (the FAT).
+	 * one (new_dclus) to the end of the link list (the FAT).
 	 *
 	 * In order to confirm that the cluster chain is valid, we
 	 * find out EOF first.
 	 */
-	nr = -EIO;
-	last = file_cluster = 0;
-	if ((curr = MSDOS_I(inode)->i_start) != 0) {
-		int max_cluster = MSDOS_I(inode)->mmu_private >> cluster_bits;
+	last = new_fclus = 0;
+	if (MSDOS_I(inode)->i_start) {
+		int ret, fclus, dclus;
 
-		fat_cache_lookup(inode, INT_MAX, &last, &curr);
-		file_cluster = last;
-		while (curr && curr != FAT_ENT_EOF) {
-			file_cluster++;
-			curr = fat_access(sb, last = curr, -1);
-			if (curr < 0)
-				return curr;
-			else if (curr == FAT_ENT_FREE) {
-				fat_fs_panic(sb, "%s: invalid cluster chain"
-					     " (ino %lu)",
-					     __FUNCTION__, inode->i_ino);
-				goto out;
-			}
-			if (file_cluster > max_cluster) {
-				fat_fs_panic(sb, "%s: bad cluster counts"
-					     " (ino %lu)",
-					     __FUNCTION__, inode->i_ino);
-				goto out;
-			}
-		}
+		ret = fat_get_cluster(inode, FAT_ENT_EOF, &fclus, &dclus);
+		if (ret < 0)
+			return ret;
+		new_fclus = fclus + 1;
+		last = dclus;
 	}
 
 	/* find free FAT entry */
@@ -134,12 +118,12 @@ int fat_add_cluster(struct inode *inode)
 	}
 
 	limit = MSDOS_SB(sb)->clusters + 2;
-	nr = MSDOS_SB(sb)->prev_free + 1;
-	for (count = 0; count < MSDOS_SB(sb)->clusters; count++, nr++) {
-		nr = nr % limit;
-		if (nr < 2)
-			nr = 2;
-		if (fat_access(sb, nr, -1) == FAT_ENT_FREE)
+	new_dclus = MSDOS_SB(sb)->prev_free + 1;
+	for (count = 0; count < MSDOS_SB(sb)->clusters; count++, new_dclus++) {
+		new_dclus = new_dclus % limit;
+		if (new_dclus < 2)
+			new_dclus = 2;
+		if (fat_access(sb, new_dclus, -1) == FAT_ENT_FREE)
 			break;
 	}
 	if (count >= MSDOS_SB(sb)->clusters) {
@@ -147,9 +131,9 @@ int fat_add_cluster(struct inode *inode)
 		unlock_fat(sb);
 		return -ENOSPC;
 	}
-	MSDOS_SB(sb)->prev_free = nr;
+	MSDOS_SB(sb)->prev_free = new_dclus;
 
-	fat_access(sb, nr, FAT_ENT_EOF);
+	fat_access(sb, new_dclus, FAT_ENT_EOF);
 	if (MSDOS_SB(sb)->free_clusters != -1)
 		MSDOS_SB(sb)->free_clusters--;
 	fat_clusters_flush(sb);
@@ -158,22 +142,21 @@ int fat_add_cluster(struct inode *inode)
 
 	/* add new one to the last of the cluster chain */
 	if (last) {
-		fat_access(sb, last, nr);
-		fat_cache_add(inode, file_cluster, nr);
+		fat_access(sb, last, new_dclus);
+		fat_cache_add(inode, new_fclus, new_dclus);
 	} else {
-		MSDOS_I(inode)->i_start = nr;
-		MSDOS_I(inode)->i_logstart = nr;
+		MSDOS_I(inode)->i_start = new_dclus;
+		MSDOS_I(inode)->i_logstart = new_dclus;
 		mark_inode_dirty(inode);
 	}
-	if (file_cluster != (inode->i_blocks >> (cluster_bits - 9))) {
-		printk (KERN_ERR "file_cluster badly computed!!! %d <> %ld\n",
-			file_cluster, inode->i_blocks >> (cluster_bits - 9));
+	if (new_fclus != (inode->i_blocks >> (cluster_bits - 9))) {
+		fat_fs_panic(sb, "clusters badly computed (%d != %ld)",
+			new_fclus, inode->i_blocks >> (cluster_bits - 9));
 		fat_cache_inval_inode(inode);
 	}
 	inode->i_blocks += (1 << cluster_bits) >> 9;
 
-out:
-	return nr;
+	return new_dclus;
 }
 
 struct buffer_head *fat_extend_dir(struct inode *inode)
