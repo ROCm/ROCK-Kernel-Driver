@@ -41,7 +41,6 @@
 #include <linux/usb.h>
 #include <linux/moduleparam.h>
 
-#include <linux/version.h>
 #include "../core/hcd.h"
 
 #include <asm/byteorder.h>
@@ -232,7 +231,6 @@ static void ehci_ready (struct ehci_hcd *ehci)
 		ehci->hcd.state = USB_STATE_HALT;
 		return;
 	}
-	ehci->hcd.state = USB_STATE_READY;
 }
 
 /*-------------------------------------------------------------------------*/
@@ -482,7 +480,7 @@ done2:
 	ehci->reboot_notifier.notifier_call = ehci_reboot;
 	register_reboot_notifier (&ehci->reboot_notifier);
 
-	ehci->hcd.state = USB_STATE_READY;
+	ehci->hcd.state = USB_STATE_RUNNING;
 	writel (FLAG_CF, &ehci->regs->configured_flag);
 	readl (&ehci->regs->command);	/* unblock posted write */
 
@@ -626,7 +624,7 @@ static int ehci_resume (struct usb_hcd *hcd)
 	/* resume HC and each port */
 // restore pci FLADJ value
 	// khubd and drivers will set HC running, if needed;
-	hcd->state = USB_STATE_READY;
+	hcd->state = USB_STATE_RUNNING;
 	// FIXME Philips/Intel/... etc don't really have a "READY"
 	// state ... turn on CMD_RUN too
 	for (i = 0; i < ports; i++) {
@@ -979,21 +977,12 @@ static const struct hc_driver ehci_driver = {
 /* EHCI spec says PCI is required. */
 
 /* PCI driver selection metadata; PCI hotplugging uses this */
-static struct pci_device_id pci_ids [] = { {
-
+static const struct pci_device_id pci_ids [] = { {
 	/* handle any USB 2.0 EHCI controller */
-
-	.class = 		((PCI_CLASS_SERIAL_USB << 8) | 0x20),
-	.class_mask = 	~0,
+	PCI_DEVICE_CLASS(((PCI_CLASS_SERIAL_USB << 8) | 0x20), ~0),
 	.driver_data =	(unsigned long) &ehci_driver,
-
-	/* no matter who makes it */
-	.vendor =	PCI_ANY_ID,
-	.device =	PCI_ANY_ID,
-	.subvendor =	PCI_ANY_ID,
-	.subdevice =	PCI_ANY_ID,
-
-}, { /* end: all zeroes */ }
+	},
+	{ /* end: all zeroes */ }
 };
 MODULE_DEVICE_TABLE (pci, pci_ids);
 

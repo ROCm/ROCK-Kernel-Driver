@@ -7,7 +7,7 @@
  *
  ************************************************************************
  *
- *	Copyright (c) 1998 Inside Out Networks, Inc.
+ *	Copyright (C) 1998 Inside Out Networks, Inc.
  *	This program is free software; you can redistribute it and/or modify
  *	it under the terms of the GNU General Public License as published by
  *	the Free Software Foundation; either version 2 of the License, or
@@ -118,6 +118,7 @@
 #define ION_DEVICE_ID_TI_EDGEPORT_1		0x0215	/* Edgeport/1 RS232 */
 #define ION_DEVICE_ID_TI_EDGEPORT_42		0x0217	/* Edgeport/42 4 hub 2 RS232 */
 #define ION_DEVICE_ID_TI_EDGEPORT_22		0x021A	/* Edgeport/22  Edgeport/22I is an Edgeport/4 with ports 1&2 RS422 and ports 3&4 RS232 */
+#define ION_DEVICE_ID_TI_EDGEPORT_2C		0x021B	/* Edgeport/2c RS232 */
 
 #define ION_DEVICE_ID_TI_EDGEPORT_421_BOOT	0x0240	/* Edgeport/421 in boot mode */
 #define ION_DEVICE_ID_TI_EDGEPORT_421_DOWN	0x0241	/* Edgeport/421 in download mode first interface is 2 RS232 (Note that the second interface of this multi interface device should be a standard USB class 7 printer port) */

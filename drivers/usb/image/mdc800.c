@@ -977,8 +977,9 @@ static struct usb_driver mdc800_usb_driver =
 #define try_free_mem(A)  if (A != 0) { kfree (A); A=0; }
 #define try_free_urb(A)  if (A != 0) { usb_free_urb (A); A=0; }
 
-int __init usb_mdc800_init (void)
+static int __init usb_mdc800_init (void)
 {
+	int retval = -ENODEV;
 	/* Allocate Memory */
 	try (mdc800=kmalloc (sizeof (struct mdc800_data), GFP_KERNEL));
 
@@ -1005,7 +1006,8 @@ int __init usb_mdc800_init (void)
 	try (mdc800->write_urb=usb_alloc_urb (0, GFP_KERNEL));
 
 	/* Register the driver */
-	if (usb_register (&mdc800_usb_driver) < 0)
+	retval = usb_register(&mdc800_usb_driver);
+	if (retval)
 		goto cleanup_on_fail;
 
 	info (DRIVER_VERSION ":" DRIVER_DESC);
@@ -1031,11 +1033,11 @@ cleanup_on_fail:
 		kfree (mdc800);
 	}
 	mdc800=0;
-	return -1;
+	return retval;
 }
 
 
-void __exit usb_mdc800_cleanup (void)
+static void __exit usb_mdc800_cleanup (void)
 {
 	usb_deregister (&mdc800_usb_driver);
 

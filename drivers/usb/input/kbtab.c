@@ -216,9 +216,13 @@ static struct usb_driver kbtab_driver = {
 
 static int __init kbtab_init(void)
 {
-	usb_register(&kbtab_driver);
+	int retval;
+	retval = usb_register(&kbtab_driver);
+	if (retval)
+		goto out;
 	info(DRIVER_VERSION ":" DRIVER_DESC);
-	return 0;
+out:
+	return retval;
 }
 
 static void __exit kbtab_exit(void)

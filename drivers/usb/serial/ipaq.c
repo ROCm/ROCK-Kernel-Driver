@@ -570,16 +570,25 @@ static void ipaq_shutdown(struct usb_serial *serial)
 
 static int __init ipaq_init(void)
 {
+	int retval;
 	spin_lock_init(&write_list_lock);
-	usb_serial_register(&ipaq_device);
+	retval = usb_serial_register(&ipaq_device);
+	if (retval) 
+		goto failed_usb_serial_register;
 	info(DRIVER_DESC " " DRIVER_VERSION);
 	if (vendor) {
 		ipaq_id_table[0].idVendor = vendor;
 		ipaq_id_table[0].idProduct = product;
 	}
-	usb_register(&ipaq_driver);
-
+	retval = usb_register(&ipaq_driver);
+	if (retval)
+		goto failed_usb_register;
+		  
 	return 0;
+failed_usb_register:
+	usb_serial_deregister(&ipaq_device);
+failed_usb_serial_register:
+	return retval;
 }
 
 
