@@ -1,8 +1,8 @@
 /* SCTP kernel reference Implementation
  * Copyright (c) 1999-2000 Cisco, Inc.
  * Copyright (c) 1999-2001 Motorola, Inc.
- * Copyright (c) 2001 Intel Corp.
- * Copyright (c) 2001 International Business Machines Corp.
+ * Copyright (c) 2001-2002 Intel Corp.
+ * Copyright (c) 2001-2002 International Business Machines Corp.
  *
  * This file is part of the SCTP kernel reference Implementation
  *
@@ -166,7 +166,7 @@ sctp_chunk_t *sctp_make_init(const sctp_association_t *asoc,
 			     int priority)
 {
 	sctp_inithdr_t init;
-	sctpParam_t addrs;
+	union sctp_params addrs;
 	size_t chunksize;
 	sctp_chunk_t *retval = NULL;
 	int addrs_len = 0;
@@ -228,7 +228,7 @@ sctp_chunk_t *sctp_make_init_ack(const sctp_association_t *asoc,
 {
 	sctp_inithdr_t initack;
 	sctp_chunk_t *retval;
-	sctpParam_t addrs;
+	union sctp_params addrs;
 	int addrs_len;
 	sctp_cookie_param_t *cookie;
 	int cookie_len;
@@ -1489,21 +1489,17 @@ int sctp_verify_init(const sctp_association_t *asoc,
 		     sctp_chunk_t *chunk,
 		     sctp_chunk_t **err_chk_p)
 {
-	sctpParam_t param;
-	uint8_t *end;
+	union sctp_params param;
 
 	/* FIXME - Verify the fixed fields of the INIT chunk. Also, verify
 	 * the mandatory parameters somewhere here and generate either the
 	 * "Missing mandatory parameter" error or the "Invalid mandatory
-	 * parameter" error. */
+	 * parameter" error.
+	 */
 
 	/* Find unrecognized parameters. */
 
-	end = ((uint8_t *)peer_init + ntohs(peer_init->chunk_hdr.length));
-
-	for (param.v = peer_init->init_hdr.params;
-	     param.v < end;
-	     param.v += WORD_ROUND(ntohs(param.p->length))) {
+	sctp_walk_params(param, peer_init, init_hdr.params) {
 
 		if (!sctp_verify_param(asoc, param, cid, chunk, err_chk_p))
 			return 0;
@@ -1520,7 +1516,7 @@ int sctp_verify_init(const sctp_association_t *asoc,
  * 	1 - continue with the chunk
  */
 int sctp_verify_param(const sctp_association_t *asoc,
-		      sctpParam_t param,
+		      union sctp_params param,
 		      sctp_cid_t cid,
 		      sctp_chunk_t *chunk,
 		      sctp_chunk_t **err_chk_p)
@@ -1583,7 +1579,7 @@ int sctp_verify_param(const sctp_association_t *asoc,
  * 	1 - continue with the chunk
  */
 int sctp_process_unk_param(const sctp_association_t *asoc,
-			   sctpParam_t param,
+			   union sctp_params param,
 			   sctp_chunk_t *chunk,
 			   sctp_chunk_t **err_chk_p)
 {
@@ -1647,8 +1643,7 @@ void sctp_process_init(sctp_association_t *asoc, sctp_cid_t cid,
 		       sctp_init_chunk_t *peer_init,
 		       int priority)
 {
-	sctpParam_t param;
-	__u8 *end;
+	union sctp_params param;
 	sctp_transport_t *transport;
 	struct list_head *pos, *temp;
 	char *cookie;
@@ -1667,10 +1662,9 @@ void sctp_process_init(sctp_association_t *asoc, sctp_cid_t cid,
 		sctp_assoc_add_peer(asoc, peer_addr, priority);
 
 	/* Process the initialization parameters.  */
-	end = ((__u8 *)peer_init + ntohs(peer_init->chunk_hdr.length));
-	for (param.v = peer_init->init_hdr.params;
-	     param.v < end;
-	     param.v += WORD_ROUND(ntohs(param.p->length))) {
+
+	sctp_walk_params(param, peer_init, init_hdr.params) {
+
 		if (!sctp_process_param(asoc, param, peer_addr, cid,
 					priority))
                         goto clean_up;
@@ -1760,7 +1754,7 @@ clean_up:
  * work we do.  In particular, we should not build transport
  * structures for the addresses.
  */
-int sctp_process_param(sctp_association_t *asoc, sctpParam_t param,
+int sctp_process_param(sctp_association_t *asoc, union sctp_params param,
 		       const sockaddr_storage_t *peer_addr,
 		       sctp_cid_t cid, int priority)
 {
@@ -1799,7 +1793,7 @@ int sctp_process_param(sctp_association_t *asoc, sctpParam_t param,
 
 	case SCTP_PARAM_COOKIE_PRESERVATIVE:
 		asoc->cookie_preserve =
-			ntohl(param.bht->lifespan_increment);
+			ntohl(param.life->lifespan_increment);
 		break;
 
 	case SCTP_PARAM_HOST_NAME_ADDRESS:
@@ -1926,11 +1920,8 @@ void sctp_param2sockaddr(sockaddr_storage_t *addr, sctp_addr_param_t *param,
 
 /* Convert an IP address in an SCTP param into a sockaddr_in.  */
 /* Returns true if a valid conversion was possible.  */
-int sctp_addr2sockaddr(sctpParam_t p, sockaddr_storage_t *sa)
+int sctp_addr2sockaddr(union sctp_params p, sockaddr_storage_t *sa)
 {
-        if (!p.v)
-		return 0;
-
 	switch (p.p->type) {
 	case SCTP_PARAM_IPV4_ADDRESS:
 		sa->v4.sin_addr = *((struct in_addr *)&p.v4->addr);
@@ -1971,7 +1962,7 @@ int ipver2af(__u8 ipver)
 }
 
 /* Convert a sockaddr_in to an IP address in an SCTP param.
- * Returns len if a valid conversion was possible.  
+ * Returns len if a valid conversion was possible.
  */
 int sockaddr2sctp_addr(const sockaddr_storage_t *sa, sctp_addr_param_t *p)
 {

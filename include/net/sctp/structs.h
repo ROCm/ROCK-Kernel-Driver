@@ -359,20 +359,6 @@ typedef struct sctp_signed_cookie {
 } sctp_signed_cookie_t;
 
 
-/* This convenience type allows us to avoid casting when walking
- * through a parameter list.
- */
-typedef union {
-	__u8 *v;
-	sctp_paramhdr_t *p;
-
-	sctp_cookie_preserve_param_t *bht;
-	sctp_hostname_param_t *dns;
-	sctp_cookie_param_t *cookie;
-	sctp_supported_addrs_param_t *sat;
-	sctp_ipv4addr_param_t *v4;
-	sctp_ipv6addr_param_t *v6;
-} sctpParam_t;
 
 /* This is another convenience type to allocate memory for address
  * params for the maximum size and pass such structures around
@@ -382,6 +368,21 @@ typedef union {
 	sctp_ipv4addr_param_t v4;
 	sctp_ipv6addr_param_t v6;
 } sctp_addr_param_t;
+
+/* A convenience type to allow walking through the various
+ * parameters and avoid casting all over the place.
+ */
+union sctp_params {
+	void *v;
+	sctp_paramhdr_t *p;	
+	sctp_cookie_preserve_param_t *life;
+	sctp_hostname_param_t *dns;
+	sctp_cookie_param_t *cookie;
+	sctp_supported_addrs_param_t *sat;
+	sctp_ipv4addr_param_t *v4;
+	sctp_ipv6addr_param_t *v6;
+	sctp_addr_param_t *addr;
+};
 
 /* RFC 2960.  Section 3.3.5 Heartbeat.
  *    Heartbeat Information: variable length
@@ -433,7 +434,7 @@ struct SCTP_chunk {
 	 */
 
 	/* We point this at the FIRST TLV parameter to chunk_hdr.  */
-	sctpParam_t param_hdr;
+	union sctp_params param_hdr;
 	union {
 		__u8 *v;
 		sctp_datahdr_t *data_hdr;
@@ -894,9 +895,9 @@ int sctp_add_bind_addr(sctp_bind_addr_t *, sockaddr_storage_t *,
 		       int priority);
 int sctp_del_bind_addr(sctp_bind_addr_t *, sockaddr_storage_t *);
 int sctp_bind_addr_has_addr(sctp_bind_addr_t *, const sockaddr_storage_t *);
-sctpParam_t sctp_bind_addrs_to_raw(const sctp_bind_addr_t *bp,
-				   int *addrs_len,
-				   int priority);
+union sctp_params sctp_bind_addrs_to_raw(const sctp_bind_addr_t *bp,
+					 int *addrs_len,
+					 int priority);
 int sctp_raw_to_bind_addrs(sctp_bind_addr_t *bp,
 			   __u8 *raw_addr_list,
 			   int addrs_len,
@@ -1062,19 +1063,19 @@ int sctp_verify_init(const sctp_association_t *asoc,
 		     sctp_chunk_t *chunk,
 		     sctp_chunk_t **err_chunk);
 int sctp_verify_param(const sctp_association_t *asoc,
-		      sctpParam_t param,
+		      union sctp_params param,
 		      sctp_cid_t cid,
 		      sctp_chunk_t *chunk,
 		      sctp_chunk_t **err_chunk);
 int sctp_process_unk_param(const sctp_association_t *asoc,
-			   sctpParam_t param,
+			   union sctp_params param,
 			   sctp_chunk_t *chunk,
 			   sctp_chunk_t **err_chunk);
 void sctp_process_init(sctp_association_t *asoc, sctp_cid_t cid,
 		       const sockaddr_storage_t *peer_addr,
 		       sctp_init_chunk_t  *peer_init, int priority);
 int sctp_process_param(sctp_association_t *asoc,
-		       sctpParam_t param,
+		       union sctp_params param,
 		       const sockaddr_storage_t *peer_addr,
 		       sctp_cid_t cid, int priority);
 __u32 sctp_generate_tag(const sctp_endpoint_t *ep);
