@@ -605,7 +605,7 @@ _GLOBAL(sys_call_table32)
 	.llong .sys_ni_syscall			/* old profil syscall holder */
 	.llong .sys32_statfs
 	.llong .sys32_fstatfs	/* 100 */
-	.llong .sys32_ioperm
+	.llong .sys_ni_syscall		/* old ioperm syscall holder */
 	.llong .sys32_socketcall
 	.llong .sys32_syslog
 	.llong .sys32_setitimer
@@ -614,10 +614,10 @@ _GLOBAL(sys_call_table32)
 	.llong .sys32_newlstat
 	.llong .sys32_newfstat
 	.llong .sys_uname
-	.llong .sys32_iopl		/* 110 */
+	.llong .sys_ni_syscall		/* 110 old iopl syscall holder */
 	.llong .sys_vhangup
-	.llong .sys_ni_syscall	/* old 'idle' syscall */
-	.llong .sys32_vm86
+	.llong .sys_ni_syscall		/* old 'idle' syscall */
+	.llong .sys_ni_syscall		/* old vm86 syscall holder */
 	.llong .sys32_wait4
 	.llong .sys_swapoff	/* 115 */
 	.llong .sys32_sysinfo
@@ -627,7 +627,7 @@ _GLOBAL(sys_call_table32)
 	.llong .sys32_clone		/* 120 */
 	.llong .sys32_setdomainname
 	.llong .ppc64_newuname
-	.llong .sys32_modify_ldt
+	.llong .sys_ni_syscall		/* old modify_ldt syscall holder */
 	.llong .sys32_adjtimex
 	.llong .sys_mprotect	/* 125 */
 	.llong .sys32_sigprocmask
@@ -839,7 +839,7 @@ _GLOBAL(sys_call_table)
 	.llong .sys_ni_syscall			/* old profil syscall holder */
 	.llong .sys_statfs
 	.llong .sys_fstatfs	/* 100 */
-	.llong .sys_ioperm
+	.llong .sys_ni_syscall		/* old ioperm syscall holder */
 	.llong .sys_socketcall
 	.llong .sys_syslog
 	.llong .sys_setitimer
@@ -848,10 +848,10 @@ _GLOBAL(sys_call_table)
 	.llong .sys_newlstat
 	.llong .sys_newfstat
 	.llong .sys_uname
-	.llong .sys_iopl		/* 110 */
+	.llong .sys_ni_syscall		/* 110 old iopl syscall holder */
 	.llong .sys_vhangup
 	.llong .sys_ni_syscall	/* old 'idle' syscall */
-	.llong .sys_vm86
+	.llong .sys_ni_syscall		/* old vm86 syscall holder */
 	.llong .sys_wait4
 	.llong .sys_swapoff	/* 115 */
 	.llong .sys_sysinfo
@@ -861,7 +861,7 @@ _GLOBAL(sys_call_table)
 	.llong .sys_clone		/* 120 */
 	.llong .sys_setdomainname
 	.llong .ppc64_newuname
-	.llong .sys_modify_ldt
+	.llong .sys_ni_syscall		/* old modify_ldt syscall */
 	.llong .sys_adjtimex
 	.llong .sys_mprotect	/* 125 */
 	.llong .sys_sigprocmask

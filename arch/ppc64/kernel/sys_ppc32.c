@@ -3923,30 +3923,6 @@ asmlinkage long sys32_getsid(u32 pid)
 }
 
 
-extern asmlinkage long sys_ioperm(unsigned long from, unsigned long num, int on);
-
-/* Note: it is necessary to treat on as an unsigned int,
- * with the corresponding cast to a signed int to insure that the 
- * proper conversion (sign extension) between the register representation of a signed int (msr in 32-bit mode)
- * and the register representation of a signed int (msr in 64-bit mode) is performed.
- */
-asmlinkage long sys32_ioperm(unsigned long from, unsigned long num, u32 on)
-{
-	return sys_ioperm(from, num, (int)on);
-}
-
-
-extern asmlinkage int sys_iopl(int a1, int a2, int a3, int a4);
-
-/* Note: it is necessary to treat a1, a2, a3, and a4 as unsigned ints,
- * with the corresponding cast to a signed int to insure that the 
- * proper conversion (sign extension) between the register representation of a signed int (msr in 32-bit mode)
- * and the register representation of a signed int (msr in 64-bit mode) is performed.
- */
-asmlinkage int sys32_iopl(u32 a1, u32 a2, u32 a3, u32 a4)
-{
-	return sys_iopl((int)a1, (int)a2, (int)a3, (int)a4);
-}
 
 
 extern asmlinkage long sys_kill(int pid, int sig);
@@ -3985,19 +3961,6 @@ extern asmlinkage long sys_mlockall(int flags);
 asmlinkage long sys32_mlockall(u32 flags)
 {
 	return sys_mlockall((int)flags);
-}
-
-
-extern asmlinkage int sys_modify_ldt(int a1, int a2, int a3, int a4);
-
-/* Note: it is necessary to treat a1, a2, a3, and a4 as unsigned ints,
- * with the corresponding cast to a signed int to insure that the 
- * proper conversion (sign extension) between the register representation of a signed int (msr in 32-bit mode)
- * and the register representation of a signed int (msr in 64-bit mode) is performed.
- */
-asmlinkage int sys32_modify_ldt(u32 a1, u32 a2, u32 a3, u32 a4)
-{
-	return sys_modify_ldt((int)a1, (int)a2, (int)a3, (int)a4);
 }
 
 
@@ -4286,18 +4249,6 @@ asmlinkage int sys32_vfork(u32 p1, u32 p2, u32 p3, u32 p4, u32 p5, u32 p6, struc
 	return sys_vfork((int)p1, (int)p2, (int)p3, (int)p4, (int)p5, (int)p6, regs);
 }
 
-
-extern asmlinkage int sys_vm86(int a1, int a2, int a3, int a4);
-
-/* Note: it is necessary to treat a1, a2, a3, and a4 as unsigned ints,
- * with the corresponding cast to a signed int to insure that the 
- * proper conversion (sign extension) between the register representation of a signed int (msr in 32-bit mode)
- * and the register representation of a signed int (msr in 64-bit mode) is performed.
- */
-asmlinkage int sys32_vm86(u32 a1, u32 a2, u32 a3, u32 a4)
-{
-	return sys_vm86((int)a1, (int)a2, (int)a3, (int)a4);
-}
 
 extern ssize_t sys_pread64(unsigned int fd, char *buf, size_t count,
 			   loff_t pos);

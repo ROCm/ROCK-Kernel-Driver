@@ -52,28 +52,9 @@ check_bugs(void)
 {
 }
 
-asmlinkage int sys_ioperm(unsigned long from, unsigned long num, int on)
+int sys_ioperm(unsigned long from, unsigned long num, int on)
 {
-	printk(KERN_ERR "sys_ioperm()\n");
 	return -EIO;
-}
-
-int sys_iopl(int a1, int a2, int a3, int a4)
-{
-	printk(KERN_ERR "sys_iopl(%x, %x, %x, %x)!\n", a1, a2, a3, a4);
-	return (-ENOSYS);
-}
-
-int sys_vm86(int a1, int a2, int a3, int a4)
-{
-	printk(KERN_ERR "sys_vm86(%x, %x, %x, %x)!\n", a1, a2, a3, a4);
-	return (-ENOSYS);
-}
-
-int sys_modify_ldt(int a1, int a2, int a3, int a4)
-{
-	printk(KERN_ERR "sys_modify_ldt(%x, %x, %x, %x)!\n", a1, a2, a3, a4);
-	return (-ENOSYS);
 }
 
 /*
@@ -193,9 +174,9 @@ asmlinkage int sys_pipe(int *fildes)
 	return error;
 }
 
-asmlinkage unsigned long sys_mmap(unsigned long addr, size_t len,
-				  unsigned long prot, unsigned long flags,
-				  unsigned long fd, off_t offset)
+unsigned long sys_mmap(unsigned long addr, size_t len,
+		       unsigned long prot, unsigned long flags,
+		       unsigned long fd, off_t offset)
 {
 	struct file * file = NULL;
 	unsigned long ret = -EBADF;
@@ -204,7 +185,7 @@ asmlinkage unsigned long sys_mmap(unsigned long addr, size_t len,
 		if (!(file = fget(fd)))
 			goto out;
 	}
-	
+
 	flags &= ~(MAP_EXECUTABLE | MAP_DENYWRITE);
 	down_write(&current->mm->mmap_sem);
 	ret = do_mmap(file, addr, len, prot, flags, offset);
