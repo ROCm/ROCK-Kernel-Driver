@@ -337,6 +337,7 @@ struct epic_private {
 	/* Ring pointers. */
 	spinlock_t lock;				/* Group with Tx control cache line. */
 	spinlock_t napi_lock;
+	unsigned int reschedule_in_poll;
 	unsigned int cur_tx, dirty_tx;
 
 	unsigned int cur_rx, dirty_rx;
@@ -472,7 +473,9 @@ static int __devinit epic_init_one (struct pci_dev *pdev,
 	dev->base_addr = ioaddr;
 	dev->irq = irq;
 
-	spin_lock_init (&ep->lock);
+	spin_lock_init(&ep->lock);
+	spin_lock_init(&ep->napi_lock);
+	ep->reschedule_in_poll = 0;
 
 	/* Bring the chip out of low-power mode. */
 	outl(0x4200, ioaddr + GENCTL);
@@ -981,8 +984,6 @@ static void epic_init_ring(struct net_device *dev)
 	int i;
 
 	ep->tx_full = 0;
-	spin_lock_init(&ep->lock);
-	spin_lock_init(&ep->napi_lock);
 	ep->dirty_tx = ep->cur_tx = 0;
 	ep->cur_rx = ep->dirty_rx = 0;
 	ep->rx_buf_sz = (dev->mtu <= 1500 ? PKT_BUF_SZ : dev->mtu + 32);
@@ -1152,7 +1153,6 @@ static void epic_tx(struct net_device *dev, struct epic_private *ep)
 	}
 }
 
-
 /* The interrupt handler does all of the Rx thread work and cleans up
    after the Tx thread. */
 static irqreturn_t epic_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
@@ -1177,14 +1177,16 @@ static irqreturn_t epic_interrupt(int irq, void *dev_instance, struct pt_regs *r
 			break;
 		handled = 1;
 
-		if (status & EpicNapiEvent) {
+		if ((status & EpicNapiEvent) && !ep->reschedule_in_poll) {
 			spin_lock(&ep->napi_lock);
 			if (netif_rx_schedule_prep(dev)) {
 				epic_napi_irq_off(dev, ep);
 				__netif_rx_schedule(dev);
-			}
+			} else
+				ep->reschedule_in_poll++;
 			spin_unlock(&ep->napi_lock);
 		}
+		status &= ~EpicNapiEvent;
 
 		/* Check uncommon events all at once. */
 		if (status &
@@ -1211,7 +1213,7 @@ static irqreturn_t epic_interrupt(int irq, void *dev_instance, struct pt_regs *r
 			/* Clear all error sources. */
 			outl(status & 0x7f18, ioaddr + INTSTAT);
 		}
-		if (status & EpicNormalEvent)
+		if (!(status & EpicNormalEvent))
 			break;
 		if (--boguscnt < 0) {
 			printk(KERN_ERR "%s: Too much work at interrupt, "
@@ -1356,7 +1358,6 @@ static int epic_poll(struct net_device *dev, int *budget)
 	orig_budget = (*budget > dev->quota) ? dev->quota : *budget;
 
 rx_action:
-	outl(EpicNapiEvent, ioaddr + INTSTAT);
 
 	epic_tx(dev, ep);
 
@@ -1369,18 +1370,20 @@ rx_action:
 
 	if (netif_running(dev) && (work_done < orig_budget)) {
 		unsigned long flags;
-		int status;
 
 		spin_lock_irqsave(&ep->napi_lock, flags);
-		epic_napi_irq_on(dev, ep);
-		__netif_rx_complete(dev);
-		spin_unlock_irqrestore(&ep->napi_lock, flags);
 
-		status = inl(ioaddr + INTSTAT);
-		if (status & EpicNapiEvent) {
-			epic_napi_irq_off(dev, ep);
+		if (ep->reschedule_in_poll) {
+			ep->reschedule_in_poll--;
+			spin_unlock_irqrestore(&ep->napi_lock, flags);
 			goto rx_action;
 		}
+
+		outl(EpicNapiEvent, ioaddr + INTSTAT);
+		epic_napi_irq_on(dev, ep);
+		__netif_rx_complete(dev);
+
+		spin_unlock_irqrestore(&ep->napi_lock, flags);
 	}
 
 	return (work_done >= orig_budget);
