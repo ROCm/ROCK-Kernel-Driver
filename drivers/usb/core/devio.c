@@ -862,7 +862,7 @@ static int proc_submiturb(struct dev_state *ps, void __user *arg)
 		isofrmlen = sizeof(struct usbdevfs_iso_packet_desc) * uurb.number_of_packets;
 		if (!(isopkt = kmalloc(isofrmlen, GFP_KERNEL)))
 			return -ENOMEM;
-		if (copy_from_user(isopkt, &((struct usbdevfs_urb *)arg)->iso_frame_desc, isofrmlen)) {
+		if (copy_from_user(isopkt, &((struct usbdevfs_urb __user *)arg)->iso_frame_desc, isofrmlen)) {
 			kfree(isopkt);
 			return -EFAULT;
 		}
@@ -1023,7 +1023,7 @@ static int proc_reapurb(struct dev_state *ps, void __user *arg)
 		free_async(as);
 		if (ret)
 			return ret;
-		if (put_user(addr, (void **)arg))
+		if (put_user(addr, (void __user * __user *)arg))
 			return -EFAULT;
 		return 0;
 	}
@@ -1045,7 +1045,7 @@ static int proc_reapurbnonblock(struct dev_state *ps, void __user *arg)
 	free_async(as);
 	if (ret)
 		return ret;
-	if (put_user(addr, (void **)arg))
+	if (put_user(addr, (void __user * __user *)arg))
 		return -EFAULT;
 	return 0;
 }
@@ -1174,6 +1174,7 @@ static int usbdev_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 {
 	struct dev_state *ps = (struct dev_state *)file->private_data;
 	struct usb_device *dev = ps->dev;
+	void __user *p = (void __user *)arg;
 	int ret = -ENOTTY;
 
 	if (!(file->f_mode & FMODE_WRITE))
@@ -1187,21 +1188,21 @@ static int usbdev_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 	switch (cmd) {
 	case USBDEVFS_CONTROL:
 		snoop(&dev->dev, "%s: CONTROL\n", __FUNCTION__);
-		ret = proc_control(ps, (void __user *)arg);
+		ret = proc_control(ps, p);
 		if (ret >= 0)
 			inode->i_mtime = CURRENT_TIME;
 		break;
 
 	case USBDEVFS_BULK:
 		snoop(&dev->dev, "%s: BULK\n", __FUNCTION__);
-		ret = proc_bulk(ps, (void __user *)arg);
+		ret = proc_bulk(ps, p);
 		if (ret >= 0)
 			inode->i_mtime = CURRENT_TIME;
 		break;
 
 	case USBDEVFS_RESETEP:
 		snoop(&dev->dev, "%s: RESETEP\n", __FUNCTION__);
-		ret = proc_resetep(ps, (void __user *)arg);
+		ret = proc_resetep(ps, p);
 		if (ret >= 0)
 			inode->i_mtime = CURRENT_TIME;
 		break;
@@ -1213,71 +1214,71 @@ static int usbdev_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 
 	case USBDEVFS_CLEAR_HALT:
 		snoop(&dev->dev, "%s: CLEAR_HALT\n", __FUNCTION__);
-		ret = proc_clearhalt(ps, (void __user *)arg);
+		ret = proc_clearhalt(ps, p);
 		if (ret >= 0)
 			inode->i_mtime = CURRENT_TIME;
 		break;
 
 	case USBDEVFS_GETDRIVER:
 		snoop(&dev->dev, "%s: GETDRIVER\n", __FUNCTION__);
-		ret = proc_getdriver(ps, (void __user *)arg);
+		ret = proc_getdriver(ps, p);
 		break;
 
 	case USBDEVFS_CONNECTINFO:
 		snoop(&dev->dev, "%s: CONNECTINFO\n", __FUNCTION__);
-		ret = proc_connectinfo(ps, (void __user *)arg);
+		ret = proc_connectinfo(ps, p);
 		break;
 
 	case USBDEVFS_SETINTERFACE:
 		snoop(&dev->dev, "%s: SETINTERFACE\n", __FUNCTION__);
-		ret = proc_setintf(ps, (void __user *)arg);
+		ret = proc_setintf(ps, p);
 		break;
 
 	case USBDEVFS_SETCONFIGURATION:
 		snoop(&dev->dev, "%s: SETCONFIGURATION\n", __FUNCTION__);
-		ret = proc_setconfig(ps, (void __user *)arg);
+		ret = proc_setconfig(ps, p);
 		break;
 
 	case USBDEVFS_SUBMITURB:
 		snoop(&dev->dev, "%s: SUBMITURB\n", __FUNCTION__);
-		ret = proc_submiturb(ps, (void __user *)arg);
+		ret = proc_submiturb(ps, p);
 		if (ret >= 0)
 			inode->i_mtime = CURRENT_TIME;
 		break;
 
 	case USBDEVFS_DISCARDURB:
 		snoop(&dev->dev, "%s: DISCARDURB\n", __FUNCTION__);
-		ret = proc_unlinkurb(ps, (void __user *)arg);
+		ret = proc_unlinkurb(ps, p);
 		break;
 
 	case USBDEVFS_REAPURB:
 		snoop(&dev->dev, "%s: REAPURB\n", __FUNCTION__);
-		ret = proc_reapurb(ps, (void __user *)arg);
+		ret = proc_reapurb(ps, p);
 		break;
 
 	case USBDEVFS_REAPURBNDELAY:
 		snoop(&dev->dev, "%s: REAPURBDELAY\n", __FUNCTION__);
-		ret = proc_reapurbnonblock(ps, (void __user *)arg);
+		ret = proc_reapurbnonblock(ps, p);
 		break;
 
 	case USBDEVFS_DISCSIGNAL:
 		snoop(&dev->dev, "%s: DISCSIGNAL\n", __FUNCTION__);
-		ret = proc_disconnectsignal(ps, (void __user *)arg);
+		ret = proc_disconnectsignal(ps, p);
 		break;
 
 	case USBDEVFS_CLAIMINTERFACE:
 		snoop(&dev->dev, "%s: CLAIMINTERFACE\n", __FUNCTION__);
-		ret = proc_claiminterface(ps, (void __user *)arg);
+		ret = proc_claiminterface(ps, p);
 		break;
 
 	case USBDEVFS_RELEASEINTERFACE:
 		snoop(&dev->dev, "%s: RELEASEINTERFACE\n", __FUNCTION__);
-		ret = proc_releaseinterface(ps, (void __user *)arg);
+		ret = proc_releaseinterface(ps, p);
 		break;
 
 	case USBDEVFS_IOCTL:
 		snoop(&dev->dev, "%s: IOCTL\n", __FUNCTION__);
-		ret = proc_ioctl(ps, (void __user *) arg);
+		ret = proc_ioctl(ps, p);
 		break;
 	}
 	up(&dev->serialize);
