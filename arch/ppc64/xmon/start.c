@@ -27,7 +27,7 @@ static void sysrq_handle_xmon(int key, struct pt_regs *pt_regs,
 			      struct tty_struct *tty) 
 {
 	/* ensure xmon is enabled */
-	xmon_init();
+	xmon_become_debugger();
 	debugger(pt_regs);
 }
 

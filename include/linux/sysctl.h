@@ -140,6 +140,7 @@ enum
 	KERN_SHMUSEHUGEPAGES=70,/* int: back shm with huge pages */
 	KERN_MMAPUSEHUGEPAGES=71,       /* int: back anon mmap with hpages */
 	KERN_HPAGES_MAP_SZ=72,  /* int: min size (MB) of mapping */
+	KERN_XMON=73,		/* int: xmon debugger enabled */
 
 };
 

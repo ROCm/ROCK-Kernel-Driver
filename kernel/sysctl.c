@@ -43,6 +43,9 @@
 #ifdef	CONFIG_KDB
 #include <linux/kdb.h>
 #endif	/* CONFIG_KDB */
+#ifdef CONFIG_XMON
+#include <asm/system.h>
+#endif
 
 #ifdef CONFIG_ROOT_NFS
 #include <linux/nfs_fs.h>
@@ -525,6 +528,16 @@ static ctl_table kern_table[] = {
 		.proc_handler	= &proc_dointvec,
 	},
 #endif	/* CONFIG_KDB */
+#ifdef CONFIG_XMON
+	{
+		.ctl_name	= KERN_XMON,
+		.procname	= "xmon",
+		.data		= &xmon_enabled,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},
+#endif /* CONFIG_XMON */
 	{
 		.ctl_name	= KERN_CADPID,
 		.procname	= "cad_pid",

@@ -26,7 +26,9 @@
 	 * is intended to be used from interrupt level, it must  use
 	 * a non-maskable entry method.
 	 */
-#define KDB_ENTER()	kdb(KDB_REASON_CALL,0,0);
+extern void kdb_become_debugger(void);
+#define KDB_ENTER()	do {	kdb_become_debugger();			\
+				kdb(KDB_REASON_CALL,0,0); } while (0)
 
 #ifndef ElfW
 # if ELFCLASSM == ELFCLASS32

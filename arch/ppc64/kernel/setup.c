@@ -169,10 +169,6 @@ void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
 	unsigned int ret, i;
 #endif
 
-#ifdef CONFIG_XMON_DEFAULT
-	xmon_init();
-#endif
-
 #ifdef CONFIG_PPC_ISERIES
 	/* pSeries systems are identified in prom.c via OF. */
 	if ( itLpNaca.xLparInstalled == 1 )
@@ -604,10 +600,11 @@ void __init setup_arch(char **cmdline_p)
 	ppc64_boot_msg(0x12, "Setup Arch");
 
 #ifdef CONFIG_XMON
-	if (strstr(cmd_line, "xmon")) {
+	if (strstr(cmd_line, "xmon=on") || strstr(cmd_line, "xmon=early")) {
 		/* ensure xmon is enabled */
-		xmon_init();
-		debugger(0);
+		xmon_become_debugger();
+		if (strstr(cmd_line, "xmon=early"))
+			debugger(0);
 	}
 #endif /* CONFIG_XMON */
 

@@ -84,21 +84,22 @@ extern int kdb_parse(const char *cmdstr, struct pt_regs *regs);
 static void
 sysrq_handle_kdb(int key, struct pt_regs *pt_regs, struct kbd_struct *kbd, struct tty_struct *tty) 
 {
-  kdb(KDB_REASON_KEYBOARD,0,pt_regs);
+	kdb_become_debugger();
+	kdb(KDB_REASON_KEYBOARD,0,pt_regs);
 }
 
 static struct sysrq_key_op sysrq_kdb_op = 
 {
 	handler:	(void*)sysrq_handle_kdb,
-	help_msg:	"(x)kdb",
+	help_msg:	"kDb",
 	action_msg:	"Entering kdb\n",
 };
 
 void
 kdb_map_scc(void)
 {
-	/* register sysrq 'x' */
-	__sysrq_put_key_op('x', &sysrq_kdb_op);
+	/* register sysrq 'd' */
+	__sysrq_put_key_op('d', &sysrq_kdb_op);
 }
 #endif
 
@@ -1872,6 +1873,23 @@ kdba_state(int argc, const char **argv, const char **envp, struct pt_regs *fp)
 }
 
 
+void kdb_become_debugger(void)
+{
+	__debugger = kdb_debugger;
+	__debugger_ipi = NULL;		/* not used by kdb */
+	__debugger_bpt = kdb_debugger_bpt;
+	__debugger_sstep = kdb_debugger_sstep;
+	__debugger_iabr_match = kdb_debugger_iabr_match;
+	__debugger_dabr_match = kdb_debugger_dabr_match;
+	__debugger_fault_handler = NULL; /* this guy is normally off. */
+				    /* = kdb_debugger_fault_handler; */
+
+	if (__debugger_on != NULL)
+		*__debugger_on = 0;
+	__debugger_on = &kdb_on;
+	kdb_on = 1;
+}
+
 /*
  * kdba_init
  * 	Architecture specific initialization.
@@ -1894,14 +1912,6 @@ kdba_init(void)
 #ifdef CONFIG_MAGIC_SYSRQ
 	kdb_map_scc();		/* map sysrq key */
 #endif
-
-	__debugger = kdb_debugger;
-	__debugger_bpt = kdb_debugger_bpt;
-	__debugger_sstep = kdb_debugger_sstep;
-	__debugger_iabr_match = kdb_debugger_iabr_match;
-	__debugger_dabr_match = kdb_debugger_dabr_match;
-	__debugger_fault_handler = NULL; /* this guy is normally off. */
-				    /* = kdb_debugger_fault_handler; */
 
 	kdba_enable_lbr();
 	kdb_register("excp", kdba_excprint, "excp", "print exception info", 0);

@@ -60,11 +60,13 @@ struct pt_regs;
 #ifdef CONFIG_DEBUGGER
 
 extern int (*__debugger)(struct pt_regs *regs);
+extern int (*__debugger_ipi)(struct pt_regs *regs);
 extern int (*__debugger_bpt)(struct pt_regs *regs);
 extern int (*__debugger_sstep)(struct pt_regs *regs);
 extern int (*__debugger_iabr_match)(struct pt_regs *regs);
 extern int (*__debugger_dabr_match)(struct pt_regs *regs);
 extern int (*__debugger_fault_handler)(struct pt_regs *regs);
+extern int *__debugger_on;
 
 #define DEBUGGER_BOILERPLATE(__NAME) \
 static inline int __NAME(struct pt_regs *regs) \
@@ -74,19 +76,21 @@ static inline int __NAME(struct pt_regs *regs) \
 	return 0; \
 }
 
-DEBUGGER_BOILERPLATE(debugger)
+extern int debugger(struct pt_regs *regs);
+DEBUGGER_BOILERPLATE(debugger_ipi)
 DEBUGGER_BOILERPLATE(debugger_bpt)
 DEBUGGER_BOILERPLATE(debugger_sstep)
 DEBUGGER_BOILERPLATE(debugger_iabr_match)
 DEBUGGER_BOILERPLATE(debugger_dabr_match)
 DEBUGGER_BOILERPLATE(debugger_fault_handler)
 
-#ifdef CONFIG_XMON
 extern void xmon_init(void);
-#endif
+extern void xmon_become_debugger(void);
+extern int xmon_enabled;
 
 #else
 static inline int debugger(struct pt_regs *regs) { return 0; }
+static inline int debugger_ipi(struct pt_regs *regs) { return 0; }
 static inline int debugger_bpt(struct pt_regs *regs) { return 0; }
 static inline int debugger_sstep(struct pt_regs *regs) { return 0; }
 static inline int debugger_iabr_match(struct pt_regs *regs) { return 0; }

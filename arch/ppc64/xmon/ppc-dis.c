@@ -22,30 +22,20 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.  *
 #include "ansidecl.h"
 #include "ppc.h"
 
-static int print_insn_powerpc PARAMS ((FILE *, unsigned long insn,
-				       unsigned long memaddr, int dialect));
-
-extern void print_address PARAMS((unsigned long memaddr));
-
-/* Print a big endian PowerPC instruction.  For convenience, also
-   disassemble instructions supported by the Motorola PowerPC 601.  */
-
-int
-print_insn_big_powerpc (FILE *out, unsigned long insn, unsigned long memaddr)
-{
-  return print_insn_powerpc (out, insn, memaddr,
-			     PPC_OPCODE_PPC | PPC_OPCODE_601);
-}
+extern void print_address (unsigned long memaddr);
 
 /* Print a PowerPC or POWER instruction.  */
 
-static int
-print_insn_powerpc (FILE *out, unsigned long insn, unsigned long memaddr,
-		    int dialect)
+int
+print_insn_powerpc (unsigned long insn, unsigned long memaddr, int dialect)
 {
   const struct powerpc_opcode *opcode;
   const struct powerpc_opcode *opcode_end;
   unsigned long op;
+
+  if (dialect == 0)
+    dialect = PPC_OPCODE_PPC | PPC_OPCODE_CLASSIC | PPC_OPCODE_COMMON
+	      | PPC_OPCODE_64 | PPC_OPCODE_POWER4 | PPC_OPCODE_ALTIVEC;
 
   /* Get the major opcode of the instruction.  */
   op = PPC_OP (insn);
@@ -53,6 +43,7 @@ print_insn_powerpc (FILE *out, unsigned long insn, unsigned long memaddr,
   /* Find the first match in the opcode table.  We could speed this up
      a bit by doing a binary search on the major opcode.  */
   opcode_end = powerpc_opcodes + powerpc_num_opcodes;
+ again:
   for (opcode = powerpc_opcodes; opcode < opcode_end; opcode++)
     {
       unsigned long table_op;
@@ -64,109 +55,106 @@ print_insn_powerpc (FILE *out, unsigned long insn, unsigned long memaddr,
 
       table_op = PPC_OP (opcode->opcode);
       if (op < table_op)
-		break;
+	break;
       if (op > table_op)
-		continue;
+	continue;
 
       if ((insn & opcode->mask) != opcode->opcode
 	  || (opcode->flags & dialect) == 0)
-		continue;
+	continue;
 
       /* Make two passes over the operands.  First see if any of them
-		 have extraction functions, and, if they do, make sure the
-		 instruction is valid.  */
+	 have extraction functions, and, if they do, make sure the
+	 instruction is valid.  */
       invalid = 0;
       for (opindex = opcode->operands; *opindex != 0; opindex++)
-		{
-		  operand = powerpc_operands + *opindex;
-		  if (operand->extract)
-		    (*operand->extract) (insn, &invalid);
-		}
+	{
+	  operand = powerpc_operands + *opindex;
+	  if (operand->extract)
+	    (*operand->extract) (insn, dialect, &invalid);
+	}
       if (invalid)
-		continue;
+	continue;
 
       /* The instruction is valid.  */
-      fprintf(out, "%s", opcode->name);
+      printf("%s", opcode->name);
       if (opcode->operands[0] != 0)
-		fprintf(out, "\t");
+	printf("\t");
 
       /* Now extract and print the operands.  */
       need_comma = 0;
       need_paren = 0;
       for (opindex = opcode->operands; *opindex != 0; opindex++)
+	{
+	  long value;
+
+	  operand = powerpc_operands + *opindex;
+
+	  /* Operands that are marked FAKE are simply ignored.  We
+	     already made sure that the extract function considered
+	     the instruction to be valid.  */
+	  if ((operand->flags & PPC_OPERAND_FAKE) != 0)
+	    continue;
+
+	  /* Extract the value from the instruction.  */
+	  if (operand->extract)
+	    value = (*operand->extract) (insn, dialect, &invalid);
+	  else
+	    {
+	      value = (insn >> operand->shift) & ((1 << operand->bits) - 1);
+	      if ((operand->flags & PPC_OPERAND_SIGNED) != 0
+		  && (value & (1 << (operand->bits - 1))) != 0)
+		value -= 1 << operand->bits;
+	    }
+
+	  /* If the operand is optional, and the value is zero, don't
+	     print anything.  */
+	  if ((operand->flags & PPC_OPERAND_OPTIONAL) != 0
+	      && (operand->flags & PPC_OPERAND_NEXT) == 0
+	      && value == 0)
+	    continue;
+
+	  if (need_comma)
+	    {
+	      printf(",");
+	      need_comma = 0;
+	    }
+
+	  /* Print the operand as directed by the flags.  */
+	  if ((operand->flags & PPC_OPERAND_GPR) != 0)
+	    printf("r%ld", value);
+	  else if ((operand->flags & PPC_OPERAND_FPR) != 0)
+	    printf("f%ld", value);
+	  else if ((operand->flags & PPC_OPERAND_VR) != 0)
+	    printf("v%ld", value);
+	  else if ((operand->flags & PPC_OPERAND_RELATIVE) != 0)
+	    print_address (memaddr + value);
+	  else if ((operand->flags & PPC_OPERAND_ABSOLUTE) != 0)
+	    print_address (value & 0xffffffff);
+	  else if ((operand->flags & PPC_OPERAND_CR) == 0
+		   || (dialect & PPC_OPCODE_PPC) == 0)
+	    printf("%ld", value);
+	  else
+	    {
+	      if (operand->bits == 3)
+		printf("cr%d", value);
+	      else
 		{
-		  long value;
+		  static const char *cbnames[4] = { "lt", "gt", "eq", "so" };
+		  int cr;
+		  int cc;
 
-		  operand = powerpc_operands + *opindex;
-
-		  /* Operands that are marked FAKE are simply ignored.  We
-		     already made sure that the extract function considered
-		     the instruction to be valid.  */
-		  if ((operand->flags & PPC_OPERAND_FAKE) != 0)
-		    continue;
-
-		  /* Extract the value from the instruction.  */
-		  if (operand->extract)
-		    value = (*operand->extract) (insn, (int *) 0);
-		  else
-		    {
-		      value = (insn >> operand->shift) & ((1 << operand->bits) - 1);
-		      if ((operand->flags & PPC_OPERAND_SIGNED) != 0
-			  && (value & (1 << (operand->bits - 1))) != 0)
-			value -= 1 << operand->bits;
-		    }
-
-		  /* If the operand is optional, and the value is zero, don't
-		     print anything.  */
-		  if ((operand->flags & PPC_OPERAND_OPTIONAL) != 0
-		      && (operand->flags & PPC_OPERAND_NEXT) == 0
-		      && value == 0)
-		    continue;
-
-		  if (need_comma)
-		    {
-		      fprintf(out, ",");
-		      need_comma = 0;
-		    }
-
-		  /* Print the operand as directed by the flags.  */
-		  if ((operand->flags & PPC_OPERAND_GPR) != 0)
-		    fprintf(out, "r%ld", value);
-		  else if ((operand->flags & PPC_OPERAND_FPR) != 0)
-		    fprintf(out, "f%ld", value);
-		  else if ((operand->flags & PPC_OPERAND_RELATIVE) != 0)
-		    print_address (memaddr + value);
-		  else if ((operand->flags & PPC_OPERAND_ABSOLUTE) != 0)
-		    print_address (value & 0xffffffff);
-		  else if ((operand->flags & PPC_OPERAND_CR) == 0
-			   || (dialect & PPC_OPCODE_PPC) == 0)
-		    fprintf(out, "%ld", value);
-		  else
-		    {
-		      if (operand->bits == 3)
-				fprintf(out, "cr%d", value);
-		      else
-			{
-			  static const char *cbnames[4] = { "lt", "gt", "eq", "so" };
-			  int cr;
-			  int cc;
-
-			  cr = value >> 2;
-			  if (cr != 0)
-			    fprintf(out, "4*cr%d", cr);
-			  cc = value & 3;
-			  if (cc != 0)
-			    {
-			      if (cr != 0)
-					fprintf(out, "+");
-			      fprintf(out, "%s", cbnames[cc]);
-			    }
-			}
+		  cr = value >> 2;
+		  if (cr != 0)
+		    printf("4*cr%d+", cr);
+		  cc = value & 3;
+		  printf("%s", cbnames[cc]);
+		}
 	    }
 
 	  if (need_paren)
 	    {
-	      fprintf(out, ")");
+	      printf(")");
 	      need_paren = 0;
 	    }
 
@@ -174,7 +162,7 @@ print_insn_powerpc (FILE *out, unsigned long insn, unsigned long memaddr,
 	    need_comma = 1;
 	  else
 	    {
-	      fprintf(out, "(");
+	      printf("(");
 	      need_paren = 1;
 	    }
 	}
@@ -183,8 +171,14 @@ print_insn_powerpc (FILE *out, unsigned long insn, unsigned long memaddr,
       return 4;
     }
 
+  if ((dialect & PPC_OPCODE_ANY) != 0)
+    {
+      dialect = ~PPC_OPCODE_ANY;
+      goto again;
+    }
+
   /* We could not find a match.  */
-  fprintf(out, ".long 0x%lx", insn);
+  printf(".long 0x%lx", insn);
 
   return 4;
 }

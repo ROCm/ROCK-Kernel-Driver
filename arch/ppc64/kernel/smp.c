@@ -651,7 +651,7 @@ void smp_message_recv(int msg, struct pt_regs *regs)
 		}
 #ifdef CONFIG_DEBUGGER
 		else
-			debugger(regs);
+			debugger_ipi(regs);
 #endif
 		break;
 #endif

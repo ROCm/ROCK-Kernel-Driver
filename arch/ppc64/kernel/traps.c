@@ -30,6 +30,9 @@
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/dump.h>
+#ifdef CONFIG_KDB
+#include <linux/kdb.h>
+#endif
 
 #include <asm/pgtable.h>
 #include <asm/uaccess.h>
@@ -45,18 +48,42 @@ extern int fwnmi_active;
 
 #ifdef CONFIG_DEBUGGER
 int (*__debugger)(struct pt_regs *regs);
+int (*__debugger_ipi)(struct pt_regs *regs);
 int (*__debugger_bpt)(struct pt_regs *regs);
 int (*__debugger_sstep)(struct pt_regs *regs);
 int (*__debugger_iabr_match)(struct pt_regs *regs);
 int (*__debugger_dabr_match)(struct pt_regs *regs);
 int (*__debugger_fault_handler)(struct pt_regs *regs);
+int *__debugger_on;
 
 EXPORT_SYMBOL(__debugger);
+EXPORT_SYMBOL(__debugger_ipi);
 EXPORT_SYMBOL(__debugger_bpt);
 EXPORT_SYMBOL(__debugger_sstep);
 EXPORT_SYMBOL(__debugger_iabr_match);
 EXPORT_SYMBOL(__debugger_dabr_match);
 EXPORT_SYMBOL(__debugger_fault_handler);
+EXPORT_SYMBOL(__debugger_on);
+
+int debugger(struct pt_regs *regs)
+{
+	if (__debugger_on == NULL || *__debugger_on == 0) {
+		/* pick a debugger */
+#ifdef CONFIG_KDB
+		if (kdb_on)
+			kdb_become_debugger();
+#endif
+#ifdef CONFIG_XMON
+		if (xmon_enabled)
+			xmon_become_debugger();
+#endif
+		if (__debugger_on == NULL || *__debugger_on == 0)
+			return 0;
+	}
+	if (__debugger)
+		return __debugger(regs);
+	return 0;
+}
 #endif
 
 /*
@@ -69,9 +96,6 @@ int die(const char *str, struct pt_regs *regs, long err)
 {
 	static int die_counter;
 	int nl = 0;
-
-	if (debugger_fault_handler(regs))
-		return 1;
 
 	if (debugger(regs))
 		return 1;
@@ -268,6 +292,8 @@ MachineCheckException(struct pt_regs *regs)
 	}
 #endif
 
+	if (debugger_fault_handler(regs))
+		return;
 	die("Machine check", regs, 0);
 
 	/* Must die if the interrupt is not recoverable */
@@ -390,6 +416,7 @@ check_bug_trap(struct pt_regs *regs)
 	}
 	printk(KERN_CRIT "kernel BUG in %s at %s:%d!\n",
 	       bug->function, bug->file, (unsigned int)bug->line);
+	regs->nip += 4;		/* step over the twi instruction */
 	return 0;
 }
 
