@@ -131,3 +131,10 @@ config AGP_ALPHA_CORE
 	depends on AGP && (ALPHA_GENERIC || ALPHA_TITAN || ALPHA_MARVEL)
 	default AGP
 
+config AGP_UNINORTH
+	tristate "Apple UniNorth AGP support"
+	depends on AGP && ALL_PPC
+	help
+	  This option gives you AGP support for Apple machines with a
+	  UniNorth bridge.
+
