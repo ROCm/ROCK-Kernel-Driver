@@ -1135,7 +1135,8 @@ void pci_unmap_single( struct pci_dev *hwdev, dma_addr_t dma_handle, size_t size
  	/* Client asked for way to much space.  This is checked later anyway */
 	/* It is easier to debug here for the drivers than in the tce tables.*/
  	if(order >= NUM_TCE_LEVELS) {
- 		printk("PCI_DMA: pci_unmap_single 0x%lx size to large: 0x%lx \n",dma_handle,size);
+ 		printk("PCI_DMA: pci_unmap_single 0x%lx size too"
+			" large: 0x%lx \n", (long)dma_handle, (long)size);
  		return;
  	}
 	
