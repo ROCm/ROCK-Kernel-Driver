@@ -172,6 +172,14 @@ void journal_commit_transaction(journal_t *journal)
 	while (commit_transaction->t_reserved_list) {
 		jh = commit_transaction->t_reserved_list;
 		JBUFFER_TRACE(jh, "reserved, unused: refile");
+		/*
+		 * A journal_get_undo_access()+journal_release_buffer() may
+		 * leave undo-committed data.
+		 */
+		if (jh->b_committed_data) {
+			kfree(jh->b_committed_data);
+			jh->b_committed_data = NULL;
+		}
 		journal_refile_buffer(journal, jh);
 	}
 
