@@ -82,6 +82,7 @@ struct file_operations jffs2_file_operations =
 	ioctl:		jffs2_ioctl,
 	mmap:		generic_file_mmap,
 	fsync:		jffs2_fsync
+	sendfile:	generic_file_sendfile,
 };
 
 /* jffs2_file_inode_operations */

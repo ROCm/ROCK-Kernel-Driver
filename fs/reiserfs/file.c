@@ -147,6 +147,7 @@ struct file_operations reiserfs_file_operations = {
     mmap:	generic_file_mmap,
     release:	reiserfs_file_release,
     fsync:	reiserfs_sync_file,
+    sendfile:	generic_file_sendfile,
 };
 
 

@@ -21,6 +21,7 @@ struct file_operations minix_file_operations = {
 	write:		generic_file_write,
 	mmap:		generic_file_mmap,
 	fsync:		minix_sync_file,
+	sendfile:	generic_file_sendfile,
 };
 
 struct inode_operations minix_file_inode_operations = {

@@ -791,6 +791,7 @@ struct file_operations def_blk_fops = {
 	mmap:		generic_file_mmap,
 	fsync:		block_fsync,
 	ioctl:		blkdev_ioctl,
+	sendfile:	generic_file_sendfile,
 };
 
 int ioctl_by_bdev(struct block_device *bdev, unsigned cmd, unsigned long arg)

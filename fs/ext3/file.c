@@ -84,6 +84,7 @@ struct file_operations ext3_file_operations = {
 	.open		= ext3_open_file,		/* BKL not held.  Don't need */
 	.release	= ext3_release_file,	/* BKL not held.  Don't need */
 	.fsync		= ext3_sync_file,		/* BKL held */
+	.sendfile	= generic_file_sendfile,	/* BKL not held.  Don't need */
 };
 
 struct inode_operations ext3_file_inode_operations = {

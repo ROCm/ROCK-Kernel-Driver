@@ -276,6 +276,7 @@ static struct file_operations ramfs_file_operations = {
 	write:		generic_file_write,
 	mmap:		generic_file_mmap,
 	fsync:		ramfs_sync_file,
+	sendfile:	generic_file_sendfile,
 };
 
 static struct inode_operations ramfs_dir_inode_operations = {
