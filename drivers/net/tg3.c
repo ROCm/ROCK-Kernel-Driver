@@ -6663,7 +6663,7 @@ static void tg3_get_ethtool_stats (struct net_device *dev,
 				   struct ethtool_stats *estats, u64 *tmp_stats)
 {
 	struct tg3 *tp = dev->priv;
-	memcpy(tmp_stats, &tp->estats, sizeof(tp->estats));
+	memcpy(tmp_stats, tg3_get_estats(tp), sizeof(tp->estats));
 }
 
 static int tg3_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
