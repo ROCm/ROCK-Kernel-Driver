@@ -1,6 +1,5 @@
 ToDo:
 	- Find and fix bugs.
-	- Enable NFS exporting of NTFS.
 	- Implement aops->set_page_dirty() in order to take control of buffer
 	  dirtying. Not having it means if page_has_buffers(), all buffers
 	  will be dirtied with the page. And if not they won't be. That is
@@ -19,6 +18,24 @@ ToDo:
 	  OTOH, perhaps i_sem, which is held accross generic_file_write is
 	  sufficient for synchronisation here. We then just need to make sure
 	  ntfs_readpage/writepage/truncate interoperate properly with us.
+
+2.1.7 - Enable NFS exporting of mounted NTFS volumes.
+
+	- Set i_generation in the VFS inode from the seq_no of the NTFS inode.
+	- Make ntfs_lookup() NFS export safe, i.e. use d_splice_alias(), etc.
+	- Implement ->get_dentry() in fs/ntfs/namei.c::ntfs_get_dentry() as the
+	  default doesn't allow inode number 0 which is a valid inode on NTFS
+	  and even if it did allow that it uses iget() instead of ntfs_iget()
+	  which makes it useless for us.
+	- Implement ->get_parent() in fs/ntfs/namei.c::ntfs_get_parent() as the
+	  default just returns -EACCES which is not very useful.
+	- Define export operations (->s_export_op) for NTFS (ntfs_export_ops)
+	  and set them up in the super block at mount time (super.c) this
+	  allows mounted NTFS volumes to be exported via NFS.
+	- Add missing return -EOPNOTSUPP; in
+	  fs/ntfs/aops.c::ntfs_commit_nonresident_write().
+	- Enforce no atime and no dir atime updates at mount/remount time as
+	  they are not implemented yet anyway.
 
 2.1.6 - Fix minor bug in handling of compressed directories.
 
@@ -60,6 +77,10 @@ ToDo:
 	- Reduce function local stack usage from 0x3d4 bytes to just noise in
 	  fs/ntfs/upcase.c. (Randy Dunlap <rddunlap@osdl.ord>)
 	- Remove compiler warnings for newer gcc.
+	- Pages are no longer kmapped by mm/filemap.c::generic_file_write()
+	  around calls to ->{prepare,commit}_write.  Adapt NTFS appropriately
+	  in fs/ntfs/aops.c::ntfs_prepare_nonresident_write() by using
+	  kmap_atomic(KM_USER0).
 
 2.1.0 - First steps towards write support: implement file overwrite.
 
