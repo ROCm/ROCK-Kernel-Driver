@@ -533,6 +533,11 @@ int __devinit snd_emu10k1_mixer(emu10k1_t *emu)
 			snd_ac97_write(emu->ac97, AC97_REC_SEL, 0x0000);
 			c = audigy_remove_ctls;
 		} else {
+			/*
+			 * Credits for cards based on STAC9758:
+			 *   James Courtier-Dutton <James@superbug.demon.co.uk>
+			 *   Voluspa <voluspa@comhem.se>
+			 */
 			if (emu->ac97->id == AC97_ID_STAC9758) {
 				emu->rear_ac97 = 1;
 				snd_emu10k1_ptr_write(emu, AC97SLOT, 0, AC97SLOT_CNTR|AC97SLOT_LFE|AC97SLOT_REAR_LEFT|AC97SLOT_REAR_RIGHT);
