@@ -295,11 +295,6 @@ static struct inet_protosw sctpv6_protosw = {
 static struct inet6_protocol sctpv6_protocol = {
 	.handler      = sctp_rcv,
 	.err_handler  = sctp_v6_err,
-	.next         = NULL,
-	.protocol     = IPPROTO_SCTP,
-	.copy         = 0,
-	.data         = NULL,
-	.name         = "SCTPv6"
 };
 
 static sctp_func_t sctp_ipv6_specific = {
@@ -320,10 +315,12 @@ static sctp_pf_t sctp_pf_inet6_specific = {
 /* Initialize IPv6 support and register with inet6 stack.  */
 int sctp_v6_init(void)
 {
+	/* Register inet6 protocol. */
+	if (inet6_add_protocol(&sctpv6_protocol, IPPROTO_SCTP) < 0)
+		return -EAGAIN;
+
 	/* Add SCTPv6 to inetsw6 linked list. */
 	inet6_register_protosw(&sctpv6_protosw);
-	/* Register inet6 protocol. */
-	inet6_add_protocol(&sctpv6_protocol);
 
 	/* Register the SCTP specfic PF_INET6 functions. */
 	sctp_set_pf_specific(PF_INET6, &sctp_pf_inet6_specific);
@@ -339,6 +336,6 @@ int sctp_v6_init(void)
 void sctp_v6_exit(void)
 {
 	list_del(&sctp_ipv6_specific.list);
-	inet6_del_protocol(&sctpv6_protocol);
+	inet6_del_protocol(&sctpv6_protocol, IPPROTO_SCTP);
 	inet6_unregister_protosw(&sctpv6_protosw);
 }

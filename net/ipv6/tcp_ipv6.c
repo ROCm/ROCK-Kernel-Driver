@@ -2156,12 +2156,9 @@ struct proto tcpv6_prot = {
 	.get_port =	tcp_v6_get_port,
 };
 
-static struct inet6_protocol tcpv6_protocol =
-{
-	.handler =	tcp_v6_rcv,
-	.err_handler =	tcp_v6_err,
-	.protocol =	IPPROTO_TCP,
-	.name =		"TCPv6",
+static struct inet6_protocol tcpv6_protocol = {
+	.handler	=	tcp_v6_rcv,
+	.err_handler	=	tcp_v6_err,
 };
 
 extern struct proto_ops inet6_stream_ops;
@@ -2179,6 +2176,7 @@ static struct inet_protosw tcpv6_protosw = {
 void __init tcpv6_init(void)
 {
 	/* register inet6 protocol */
-	inet6_add_protocol(&tcpv6_protocol);
+	if (inet6_add_protocol(&tcpv6_protocol, IPPROTO_TCP) < 0)
+		printk(KERN_ERR "tcpv6_init: Could not register protocol\n");
 	inet6_register_protosw(&tcpv6_protosw);
 }

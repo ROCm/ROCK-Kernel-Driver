@@ -42,77 +42,42 @@
 
 struct inet6_protocol *inet6_protos[MAX_INET_PROTOS];
 
-void inet6_add_protocol(struct inet6_protocol *prot)
+int inet6_add_protocol(struct inet6_protocol *prot, unsigned char protocol)
 {
-	unsigned char hash;
-	struct inet6_protocol *p2;
+	int ret, hash = protocol & (MAX_INET_PROTOS - 1);
 
-	hash = prot->protocol & (MAX_INET_PROTOS - 1);
 	br_write_lock_bh(BR_NETPROTO_LOCK);
-	prot->next = inet6_protos[hash];
-	inet6_protos[hash] = prot;
-	prot->copy = 0;
 
-	/*
-	 *	Set the copy bit if we need to. 
-	 */
-	 
-	p2 = (struct inet6_protocol *) prot->next;
-	while(p2 != NULL) {
-		if (p2->protocol == prot->protocol) {
-			prot->copy = 1;
-			break;
-		}
-		p2 = (struct inet6_protocol *) p2->next;
+	if (inet6_protos[hash]) {
+		ret = -1;
+	} else {
+		inet6_protos[hash] = prot;
+		ret = 0;
 	}
+
 	br_write_unlock_bh(BR_NETPROTO_LOCK);
+
+	return ret;
 }
 
 /*
  *	Remove a protocol from the hash tables.
  */
  
-int inet6_del_protocol(struct inet6_protocol *prot)
+int inet6_del_protocol(struct inet6_protocol *prot, unsigned char protocol)
 {
-	struct inet6_protocol *p;
-	struct inet6_protocol *lp = NULL;
-	unsigned char hash;
+	int ret, hash = protocol & (MAX_INET_PROTOS - 1);
 
-	hash = prot->protocol & (MAX_INET_PROTOS - 1);
 	br_write_lock_bh(BR_NETPROTO_LOCK);
-	if (prot == inet6_protos[hash]) {
-		inet6_protos[hash] = (struct inet6_protocol *) inet6_protos[hash]->next;
-		br_write_unlock_bh(BR_NETPROTO_LOCK);
-		return(0);
+
+	if (inet6_protos[hash] != prot) {
+		ret = -1;
+	} else {
+		inet6_protos[hash] = NULL;
+		ret = 0;
 	}
 
-	p = (struct inet6_protocol *) inet6_protos[hash];
-
-        if (p != NULL && p->protocol == prot->protocol)
-                lp = p;
-
-	while(p != NULL) {
-		/*
-		 * We have to worry if the protocol being deleted is
-		 * the last one on the list, then we may need to reset
-		 * someone's copied bit.
-		 */
-		if (p->next != NULL && p->next == prot) {
-			/*
-			 * if we are the last one with this protocol and
-			 * there is a previous one, reset its copy bit.
-			 */
-			if (prot->copy == 0 && lp != NULL)
-				lp->copy = 0;
-			p->next = prot->next;
-			br_write_unlock_bh(BR_NETPROTO_LOCK);
-			return(0);
-		}
-		if (p->next != NULL && p->next->protocol == prot->protocol) 
-			lp = p->next;
-
-		p = (struct inet6_protocol *) p->next;
-	}
 	br_write_unlock_bh(BR_NETPROTO_LOCK);
-	return(-1);
+
+	return ret;
 }

@@ -1093,6 +1093,25 @@ void inet_unregister_protosw(struct inet_protosw *p)
 	}
 }
 
+#ifdef CONFIG_IP_MULTICAST
+static struct inet_protocol igmp_protocol = {
+	.handler =	igmp_rcv,
+};
+#endif
+
+static struct inet_protocol tcp_protocol = {
+	.handler =	tcp_v4_rcv,
+	.err_handler =	tcp_v4_err,
+};
+
+static struct inet_protocol udp_protocol = {
+	.handler =	udp_rcv,
+	.err_handler =	udp_err,
+};
+
+static struct inet_protocol icmp_protocol = {
+	.handler =	icmp_rcv,
+};
 
 /*
  *	Called by socket.c on kernel startup.  
@@ -1101,7 +1120,6 @@ void inet_unregister_protosw(struct inet_protosw *p)
 static int __init inet_init(void)
 {
 	struct sk_buff *dummy_skb;
-	struct inet_protocol *p;
 	struct inet_protosw *q;
 	struct list_head *r;
 
@@ -1131,16 +1149,19 @@ static int __init inet_init(void)
   	(void)sock_register(&inet_family_ops);
 
 	/*
-	 *	Add all the protocols. 
+	 *	Add all the base protocols.
 	 */
 
-	printk(KERN_INFO "IP Protocols: ");
-	for (p = inet_protocol_base; p;) {
-		struct inet_protocol *tmp = (struct inet_protocol *)p->next;
-		inet_add_protocol(p);
-		printk("%s%s", p->name, tmp ? ", " : "\n");
-		p = tmp;
-	}
+	if (inet_add_protocol(&icmp_protocol, IPPROTO_ICMP) < 0)
+		printk(KERN_CRIT "inet_init: Cannot add ICMP protocol\n");
+	if (inet_add_protocol(&udp_protocol, IPPROTO_UDP) < 0)
+		printk(KERN_CRIT "inet_init: Cannot add UDP protocol\n");
+	if (inet_add_protocol(&tcp_protocol, IPPROTO_TCP) < 0)
+		printk(KERN_CRIT "inet_init: Cannot add TCP protocol\n");
+#ifdef CONFIG_IP_MULTICAST
+	if (inet_add_protocol(&igmp_protocol, IPPROTO_IGMP) < 0)
+		printk(KERN_CRIT "inet_init: Cannot add TCP protocol\n");
+#endif
 
 	/* Register the socket-side information for inet_create. */
 	for (r = &inetsw[0]; r < &inetsw[SOCK_MAX]; ++r)

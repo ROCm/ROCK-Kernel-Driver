@@ -835,19 +835,14 @@ int __init ipip6_fb_tunnel_init(struct net_device *dev)
 }
 
 static struct inet_protocol sit_protocol = {
-	ipip6_rcv,
-	ipip6_err,
-	0,
-	IPPROTO_IPV6,
-	0,
-	NULL,
-	"IPv6"
+	.handler	=	ipip6_rcv,
+	.err_handler	=	ipip6_err,
 };
 
 #ifdef MODULE
 void sit_cleanup(void)
 {
-	inet_del_protocol(&sit_protocol);
+	inet_del_protocol(&sit_protocol, IPPROTO_IPV6);
 	unregister_netdev(&ipip6_fb_tunnel_dev);
 }
 #endif
@@ -856,9 +851,13 @@ int __init sit_init(void)
 {
 	printk(KERN_INFO "IPv6 over IPv4 tunneling driver\n");
 
+	if (inet_add_protocol(&sit_protocol, IPPROTO_IPV6) < 0) {
+		printk(KERN_INFO "sit init: Can't add protocol\n");
+		return -EAGAIN;
+	}
+
 	ipip6_fb_tunnel_dev.priv = (void*)&ipip6_fb_tunnel;
 	strcpy(ipip6_fb_tunnel_dev.name, ipip6_fb_tunnel.parms.name);
 	register_netdev(&ipip6_fb_tunnel_dev);
-	inet_add_protocol(&sit_protocol);
 	return 0;
 }

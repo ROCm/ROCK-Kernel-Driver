@@ -133,12 +133,14 @@ static __inline__ int icmpv6_filter(struct sock *sk, struct sk_buff *skb)
  *	demultiplex raw sockets.
  *	(should consider queueing the skb in the sock receive_queue
  *	without calling rawv6.c)
+ *
+ *	Caller owns SKB so we must make clones.
  */
-struct sock * ipv6_raw_deliver(struct sk_buff *skb, int nexthdr)
+void ipv6_raw_deliver(struct sk_buff *skb, int nexthdr)
 {
 	struct in6_addr *saddr;
 	struct in6_addr *daddr;
-	struct sock *sk, *sk2;
+	struct sock *sk;
 	__u8 hash;
 
 	saddr = &skb->nh.ipv6h->saddr;
@@ -159,30 +161,18 @@ struct sock * ipv6_raw_deliver(struct sk_buff *skb, int nexthdr)
 
 	sk = __raw_v6_lookup(sk, nexthdr, daddr, saddr);
 
-	if (sk) {
-		sk2 = sk;
+	while (sk) {
+		if (nexthdr != IPPROTO_ICMPV6 || !icmpv6_filter(sk, skb)) {
+			struct sk_buff *clone = skb_clone(skb, GFP_ATOMIC);
 
-		while ((sk2 = __raw_v6_lookup(sk2->next, nexthdr, daddr, saddr))) {
-			struct sk_buff *buff;
-
-			if (nexthdr == IPPROTO_ICMPV6 &&
-			    icmpv6_filter(sk2, skb))
-				continue;
-
-			buff = skb_clone(skb, GFP_ATOMIC);
-			if (buff)
-				rawv6_rcv(sk2, buff);
+			/* Not releasing hash table! */
+			if (clone)
+				rawv6_rcv(sk, clone);
 		}
+		sk = __raw_v6_lookup(sk->next, nexthdr, daddr, saddr);
 	}
-
-	if (sk && nexthdr == IPPROTO_ICMPV6 && icmpv6_filter(sk, skb))
-		sk = NULL;
-
 out:
-	if (sk)
-		sock_hold(sk);
 	read_unlock(&raw_v6_lock);
-	return sk;
 }
 
 /* This cleans up af_inet6 a bit. -DaveM */

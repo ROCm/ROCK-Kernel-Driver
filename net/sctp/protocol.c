@@ -434,10 +434,8 @@ struct inet_protosw sctp_protosw = {
 
 /* Register with IP layer.  */
 static struct inet_protocol sctp_protocol = {
-	.handler     = sctp_rcv,               /* SCTP input handler.  */
-	.err_handler = sctp_v4_err,            /* SCTP error control   */
-	.protocol    = IPPROTO_SCTP,           /* protocol ID          */
-	.name        = "SCTP"                  /* name                 */
+	.handler     = sctp_rcv,
+	.err_handler = sctp_v4_err,
 };
 
 /* IPv4 address related functions.  */
@@ -485,11 +483,12 @@ int sctp_init(void)
 	int i;
 	int status = 0;
 
+	/* Add SCTP to inet_protos hash table.  */
+	if (inet_add_protocol(&sctp_protocol, IPPROTO_SCTP) < 0)
+		return -EAGAIN;
+
 	/* Add SCTP to inetsw linked list.  */
 	inet_register_protosw(&sctp_protosw);
-
-	/* Add SCTP to inet_protos hash table.  */
-	inet_add_protocol(&sctp_protocol);
 
 	/* Initialize proc fs directory.  */
 	sctp_proc_init();
@@ -626,7 +625,7 @@ err_ehash_alloc:
 err_ahash_alloc:
 	sctp_dbg_objcnt_exit();
 	sctp_proc_exit();
-	inet_del_protocol(&sctp_protocol);
+	inet_del_protocol(&sctp_protocol, IPPROTO_SCTP);
 	inet_unregister_protosw(&sctp_protosw);
 	return status;
 }
@@ -656,7 +655,7 @@ void sctp_exit(void)
 	sctp_dbg_objcnt_exit();
 	sctp_proc_exit();
 
-	inet_del_protocol(&sctp_protocol);
+	inet_del_protocol(&sctp_protocol, IPPROTO_SCTP);
 	inet_unregister_protosw(&sctp_protosw);
 }
 

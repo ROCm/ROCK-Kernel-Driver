@@ -135,13 +135,12 @@ static __inline__ int icmp_filter(struct sock *sk, struct sk_buff *skb)
 }
 
 /* IP input processing comes here for RAW socket delivery.
- * This is fun as to avoid copies we want to make no surplus
- * copies.
+ * Caller owns SKB, so we must make clones.
  *
  * RFC 1122: SHOULD pass TOS value up to the transport layer.
  * -> It does. And not only TOS, but all IP header.
  */
-struct sock *raw_v4_input(struct sk_buff *skb, struct iphdr *iph, int hash)
+void raw_v4_input(struct sk_buff *skb, struct iphdr *iph, int hash)
 {
 	struct sock *sk;
 
@@ -153,28 +152,19 @@ struct sock *raw_v4_input(struct sk_buff *skb, struct iphdr *iph, int hash)
 			     skb->dev->ifindex);
 
 	while (sk) {
-		struct sock *sknext = __raw_v4_lookup(sk->next, iph->protocol,
-						      iph->saddr, iph->daddr,
-						      skb->dev->ifindex);
-		if (iph->protocol != IPPROTO_ICMP ||
-		    !icmp_filter(sk, skb)) {
-			struct sk_buff *clone;
+		if (iph->protocol != IPPROTO_ICMP || !icmp_filter(sk, skb)) {
+			struct sk_buff *clone = skb_clone(skb, GFP_ATOMIC);
 
-			if (!sknext)
-				break;
-			clone = skb_clone(skb, GFP_ATOMIC);
 			/* Not releasing hash table! */
 			if (clone)
 				raw_rcv(sk, clone);
 		}
-		sk = sknext;
+		sk = __raw_v4_lookup(sk->next, iph->protocol,
+				     iph->saddr, iph->daddr,
+				     skb->dev->ifindex);
 	}
 out:
-	if (sk)
-		sock_hold(sk);
 	read_unlock(&raw_v4_lock);
-
-	return sk;
 }
 
 void raw_err (struct sock *sk, struct sk_buff *skb, u32 info)

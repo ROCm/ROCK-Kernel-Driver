@@ -907,10 +907,8 @@ static int udpv6_sendmsg(struct sock *sk, struct msghdr *msg, int ulen)
 }
 
 static struct inet6_protocol udpv6_protocol = {
-	.handler =	udpv6_rcv,
-	.err_handler =	udpv6_err,
-	.protocol =	IPPROTO_UDP,
-	.name =		"UDPv6",
+	.handler	=	udpv6_rcv,
+	.err_handler	=	udpv6_err,
 };
 
 #define LINE_LEN 190
@@ -1020,6 +1018,7 @@ static struct inet_protosw udpv6_protosw = {
 
 void __init udpv6_init(void)
 {
-	inet6_add_protocol(&udpv6_protocol);
+	if (inet6_add_protocol(&udpv6_protocol, IPPROTO_UDP) < 0)
+		printk(KERN_ERR "udpv6_init: Could not register protocol\n");
 	inet6_register_protosw(&udpv6_protosw);
 }
