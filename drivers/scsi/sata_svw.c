@@ -245,7 +245,7 @@ static int k2_sata_proc_info(struct Scsi_Host *shost, char *page, char **start,
 		return 0;
 
 	/* Find the OF node for the PCI device proper */
-	np = pci_device_to_OF_node(ap->host_set->pdev);
+	np = pci_device_to_OF_node(to_pci_dev(ap->host_set->dev));
 	if (np == NULL)
 		return 0;
 
