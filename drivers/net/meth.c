@@ -95,7 +95,6 @@ typedef struct meth_private {
     spinlock_t meth_lock;
 } meth_private;
 
-extern struct net_device meth_devs[];
 void meth_tx_timeout (struct net_device *dev);
 void meth_interrupt(int irq, void *dev_id, struct pt_regs *pregs);
         
@@ -762,17 +761,16 @@ struct net_device_stats *meth_stats(struct net_device *dev)
 
 /*
  * The init function (sometimes called probe).
- * It is invoked by register_netdev()
  */
-int meth_init(struct net_device *dev)
+static struct net_device *meth_init(struct net_device *dev)
 {
+	struct net_device *dev;
 	meth_private *priv;
 	int ret;
-	/* 
-	 * Then, assign other fields in dev, using ether_setup() and some
-	 * hand assignments
-	 */
-	ether_setup(dev); /* assign some of the fields */
+
+	dev = alloc_etherdev(sizeof(struct meth_private));
+	if (!dev)
+		return ERR_PTR(-ENOMEM);
 
 	dev->open            = meth_open;
 	dev->stop            = meth_release;
@@ -787,16 +785,8 @@ int meth_init(struct net_device *dev)
 	dev->irq		 = MACE_ETHERNET_IRQ;
 	SET_MODULE_OWNER(dev);
 
-	/*
-	 * Then, allocate the priv field. This encloses the statistics
-	 * and a few private fields.
-	 */
-	priv = kmalloc(sizeof(struct meth_private), GFP_KERNEL);
-	if (priv == NULL)
-		return -ENOMEM;
-	dev->priv=priv;
-	memset(priv, 0, sizeof(struct meth_private));
-	spin_lock_init(&((struct meth_private *) dev->priv)->meth_lock);
+	priv = dev->priv;
+	spin_lock_init(&priv->meth_lock);
 	/*
 	 * Make the usual checks: check_region(), probe irq, ...  -ENODEV
 	 * should be returned if no device found.  No resource should be
@@ -807,28 +797,41 @@ int meth_init(struct net_device *dev)
 	priv->phy_addr = -1; /* No phy is known yet... */
 
 	/* Initialize the hardware */
-	if((ret=meth_reset(dev)) < 0)
-	        return ret;
+	ret = meth_reset(dev);
+	if (ret < 0)
+		goto out;
 
 	/* Allocate the ring buffers */
-	if((ret=meth_init_tx_ring(priv))<0||(ret=meth_init_rx_ring(priv))<0){
-		meth_free_tx_ring(priv);
-		meth_free_rx_ring(priv);
-		return ret;
-	}
+	ret = meth_init_tx_ring(priv);
+	if (ret < 0)
+		goto out;
+
+	ret = meth_init_rx_ring(priv);
+	if (ret < 0)
+		goto out1;
+
+	ret = register_netdev(dev);
+	if (ret)
+		goto out2;
 
 	printk("SGI O2 Fast Ethernet rev. %ld\n", priv->regs->mac_ctrl >> 29);
 
-    return 0;
+	return ret;
+
+out2:
+	meth_free_rx_ring(priv);
+out1:
+	meth_free_tx_ring(priv);
+out:
+	free_netdev(dev);
+	return ERR_PTR(ret);
 }
 
 /*
  * The devices
  */
 
-struct net_device meth_devs[1] = {
-    { init: meth_init, }  /* init, nothing more */
-};
+struct net_device *meth_dev;
 
 /*
  * Finally, the module stuff
@@ -836,23 +839,19 @@ struct net_device meth_devs[1] = {
 
 int meth_init_module(void)
 {
-	int result, device_present = 0;
-
-	strcpy(meth_devs[0].name, "eth%d");
-
-	if ( (result = register_netdev(meth_devs)) )
-		printk("meth: error %i registering device \"%s\"\n",
-		       result, meth_devs->name);
-	else device_present++;
-	
-	return device_present ? 0 : -ENODEV;
+	meth_dev = meth_init();
+	if (IS_ERR(meth_dev))
+		return PTR_ERR(meth_dev);
+	return 0;
 }
 
 void meth_cleanup(void)
 {
-    kfree(meth_devs->priv);
-    unregister_netdev(meth_devs);
-    return;
+	meth_private *priv = meth_dev->priv;
+	unregister_netdev(meth_dev);
+	meth_free_rx_ring(priv);
+	meth_free_tx_ring(priv);
+	free_netdev(meth_dev);
 }
 
 module_init(meth_init_module);
