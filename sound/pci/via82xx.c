@@ -1959,13 +1959,14 @@ static struct via823x_info via823x_cards[] __devinitdata = {
 struct dxs_whitelist {
 	unsigned short vendor;
 	unsigned short device; 
-	int action;	/* new dxs_support value */
+	unsigned short mask; 
+	short action;	/* new dxs_support value */
 };
 
 static int __devinit check_dxs_list(struct pci_dev *pci)
 {
 	static struct dxs_whitelist whitelist[] = {
-		// { .vendor = xxxx, .device = yyyy, .action = x },
+		{ .vendor = 0x1019, .device = 0x0996, .action = VIA_DXS_48K },
 		{ } /* terminator */
 	};
 	struct dxs_whitelist *w;
@@ -1975,10 +1976,17 @@ static int __devinit check_dxs_list(struct pci_dev *pci)
 	pci_read_config_word(pci, PCI_SUBSYSTEM_VENDOR_ID, &subsystem_vendor);
 	pci_read_config_word(pci, PCI_SUBSYSTEM_ID, &subsystem_device);
 
-	for (w = whitelist; w->vendor; w++)
-		if (w->vendor == subsystem_vendor &&
-		    w->device == subsystem_device)
-			return w->action;
+	for (w = whitelist; w->vendor; w++) {
+		if (w->vendor != subsystem_vendor)
+			continue;
+		if (w->mask) {
+			if ((w->mask & subsystem_device) == w->device)
+				return w->action;
+		} else {
+			if (subsystem_device == w->device)
+				return w->action;
+		}
+	}
 
 	/*
 	 * not detected, try 48k rate only to be sure.
