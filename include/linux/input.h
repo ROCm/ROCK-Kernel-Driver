@@ -77,6 +77,8 @@ struct input_absinfo {
 #define EVIOCRMFF		_IOW('E', 0x81, int)			/* Erase a force effect */
 #define EVIOCGEFFECTS		_IOR('E', 0x84, int)			/* Report number of effects playable at the same time */
 
+#define EVIOCGRAB		_IOW('E', 0x90, int)			/* Grab/Release device */
+
 /*
  * Event types
  */
@@ -798,6 +800,8 @@ struct input_dev {
 	int (*upload_effect)(struct input_dev *dev, struct ff_effect *effect);
 	int (*erase_effect)(struct input_dev *dev, int effect_id);
 
+	struct input_handle *grab;
+
 	struct list_head	h_list;
 	struct list_head	node;
 };
@@ -887,6 +891,9 @@ void input_unregister_device(struct input_dev *);
 
 void input_register_handler(struct input_handler *);
 void input_unregister_handler(struct input_handler *);
+
+int input_grab_device(struct input_handle *);
+void input_release_device(struct input_handle *);
 
 int input_open_device(struct input_handle *);
 void input_close_device(struct input_handle *);
