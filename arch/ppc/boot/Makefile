@@ -19,7 +19,7 @@ OBJCOPY_ARGS = -O elf32-powerpc
 
 MKIMAGE				:= ./utils/mkimage.wrapper
 
-lib/zlib.a: lib/zlib.c
+lib/lib.a: lib/zlib.c
 	$(MAKE) -C lib
 
 images/vmlinux.gz: $(TOPDIR)/vmlinux
@@ -55,7 +55,7 @@ maketools:
 # The targets all boards support for boot images.
 BOOT_TARGETS = zImage zImage.initrd znetboot znetboot.initrd
 
-$(BOOT_TARGETS): vmapus lib/zlib.a images/vmlinux.gz maketools
+$(BOOT_TARGETS): vmapus lib/lib.a images/vmlinux.gz maketools
 ifneq ($(BOOTDIRS),)
 	for d in $(BOOTDIRS); do $(MAKE) -C $$d $@; done
 endif

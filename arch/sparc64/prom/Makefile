@@ -5,7 +5,7 @@
 
 EXTRA_AFLAGS := -ansi
 
-L_TARGET = promlib.a
+L_TARGET = lib.a
 obj-y   := bootstr.o devops.o init.o memory.o misc.o \
 	   tree.o console.o printf.o p1275.o map.o
 

@@ -72,7 +72,7 @@ endif
 
 CORE_FILES += arch/sparc64/math-emu/math-emu.o
 
-LIBS := $(TOPDIR)/lib/lib.a $(LIBS) $(TOPDIR)/arch/sparc64/prom/promlib.a \
+LIBS := $(TOPDIR)/lib/lib.a $(LIBS) $(TOPDIR)/arch/sparc64/prom/lib.a \
 	$(TOPDIR)/arch/sparc64/lib/lib.a
 
 vmlinux.aout: vmlinux
