@@ -8,9 +8,20 @@ us to generate 'watchdog NMI interrupts'.  (NMI: Non Maskable Interrupt
 which get executed even if the system is otherwise locked up hard).
 This can be used to debug hard kernel lockups.  By executing periodic
 NMI interrupts, the kernel can monitor whether any CPU has locked up,
-and print out debugging messages if so.  You must enable the NMI
-watchdog at boot time with the 'nmi_watchdog=n' boot parameter.  Eg.
-the relevant lilo.conf entry:
+and print out debugging messages if so.  
+
+In order to use the NMI watchdoc, you need to have APIC support in your
+kernel. For SMP kernels, APIC support gets compiled in automatically. For
+UP, enable either CONFIG_X86_UP_APIC (Processor type and features -> Local
+APIC support on uniprocessors) or CONFIG_X86_UP_IOAPIC (Processor type and
+features -> IO-APIC support on uniprocessors) in your kernel config.
+CONFIG_X86_UP_APIC is for uniprocessor machines without an IO-APIC.
+CONFIG_X86_UP_IOAPIC is for uniprocessor with an IO-APIC. [Note: certain
+kernel debugging options, such as Kernel Stack Meter or Kernel Tracer,
+may implicitly disable the NMI watchdog.]
+
+To actually enable the NMI watchdog, use the 'nmi_watchdog=N' boot
+parameter.  Eg. the relevant lilo.conf entry:
 
         append="nmi_watchdog=1"
 
