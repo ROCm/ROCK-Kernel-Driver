@@ -472,8 +472,7 @@ config SANDPOINT
 	bool "Motorola-Sandpoint"
 	help
 	  Select SANDPOINT if configuring for a Motorola Sandpoint X3
-	  or X3(b).
-	  X3 (any flavor).
+	  (any flavor).
 
 config ADIR
 	bool "SBS-Adirondack"
@@ -692,6 +691,11 @@ config CPU_FREQ
 	  at <http://www.brodo.de/cpufreq/>
 
 	  If in doubt, say N.
+
+config CPU_FREQ_TABLE
+	bool
+	depends on CPU_FREQ
+	default y
 
 config CPU_FREQ_PROC_INTF
 	bool "/proc/cpufreq interface (DEPRECATED)"
