@@ -521,6 +521,16 @@ check_ip(struct iphdr *iph, size_t length, int embedded)
 		return 0;
 	}
 
+	/* CHECK: Do not use what is unused.
+	 * First bit of fragmentation flags should be unused.
+	 * May be used by OS fingerprinting tools.
+	 * 04 Jun 2002, Maciej Soltysiak, solt@dns.toxicfilms.tv
+	 */
+	if (ntohs(iph->frag_off)>>15) {
+		limpk("IP unused bit set\n");
+		return 0;
+	}
+
 	/* Per-protocol checks. */
 	switch (iph->protocol) {
 	case IPPROTO_ICMP:
