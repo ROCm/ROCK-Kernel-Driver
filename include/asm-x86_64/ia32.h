@@ -160,7 +160,6 @@ struct ustat32 {
 	char			f_fpack[6];
 };
 
-#define IA32_PAGE_OFFSET 0xffffe000
 #define IA32_STACK_TOP IA32_PAGE_OFFSET
 
 #ifdef __KERNEL__
