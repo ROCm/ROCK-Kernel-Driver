@@ -56,6 +56,7 @@ struct bus_type {
 	char			* name;
 	rwlock_t		lock;
 	atomic_t		refcount;
+	u32			present;
 
 	struct list_head	node;
 	struct list_head	devices;
@@ -73,14 +74,9 @@ struct bus_type {
 
 
 extern int bus_register(struct bus_type * bus);
+extern void bus_unregister(struct bus_type * bus);
 
-static inline struct bus_type * get_bus(struct bus_type * bus)
-{
-	BUG_ON(!atomic_read(&bus->refcount));
-	atomic_inc(&bus->refcount);
-	return bus;
-}
-
+extern struct bus_type * get_bus(struct bus_type * bus);
 extern void put_bus(struct bus_type * bus);
 
 extern int bus_for_each_dev(struct bus_type * bus, void * data, 

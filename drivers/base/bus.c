@@ -136,12 +136,35 @@ void bus_remove_device(struct device * dev)
 	}
 }
 
+struct bus_type * get_bus(struct bus_type * bus)
+{
+	struct bus_type * ret = bus;
+	spin_lock(&device_lock);
+	if (bus && bus->present && atomic_read(&bus->refcount))
+		atomic_inc(&bus->refcount);
+	else
+		ret = NULL;
+	spin_unlock(&device_lock);
+	return ret;
+}
+
+void put_bus(struct bus_type * bus)
+{
+	if (!atomic_dec_and_lock(&bus->refcount,&device_lock))
+		return;
+	list_del_init(&bus->node);
+	spin_unlock(&device_lock);
+	BUG_ON(bus->present);
+	bus_remove_dir(bus);
+}
+
 int bus_register(struct bus_type * bus)
 {
 	rwlock_init(&bus->lock);
 	INIT_LIST_HEAD(&bus->devices);
 	INIT_LIST_HEAD(&bus->drivers);
 	atomic_set(&bus->refcount,2);
+	bus->present = 1;
 
 	spin_lock(&device_lock);
 	list_add_tail(&bus->node,&bus_driver_list);
@@ -156,13 +179,14 @@ int bus_register(struct bus_type * bus)
 	return 0;
 }
 
-void put_bus(struct bus_type * bus)
+void bus_unregister(struct bus_type * bus)
 {
-	if (!atomic_dec_and_lock(&bus->refcount,&device_lock))
-		return;
-	list_del_init(&bus->node);
+	spin_lock(&device_lock);
+	bus->present = 0;
 	spin_unlock(&device_lock);
-	bus_remove_dir(bus);
+
+	pr_debug("bus %s: unregistering\n",bus->name);
+	put_bus(bus);
 }
 
 EXPORT_SYMBOL(bus_for_each_dev);
@@ -170,4 +194,6 @@ EXPORT_SYMBOL(bus_for_each_drv);
 EXPORT_SYMBOL(bus_add_device);
 EXPORT_SYMBOL(bus_remove_device);
 EXPORT_SYMBOL(bus_register);
+EXPORT_SYMBOL(bus_unregister);
+EXPORT_SYMBOL(get_bus);
 EXPORT_SYMBOL(put_bus);
