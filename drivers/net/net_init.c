@@ -330,29 +330,6 @@ static int hippi_mac_addr(struct net_device *dev, void *p)
 	return 0;
 }
 
-
-/**
- * init_hippi_dev - Register HIPPI device
- * @dev: A HIPPI device structure to be filled in, or %NULL if a new
- *	struct should be allocated.
- * @sizeof_priv: Size of additional driver-private structure to be allocated
- *	for this ethernet device
- *
- * Fill in the fields of the device structure with HIPPI-generic values.
- *
- * If no device structure is passed, a new one is constructed, complete with
- * a private data area of size @sizeof_priv.  A 32-byte (not bit)
- * alignment is enforced for this private data area.
- *
- * If an empty string area is passed as dev->name, or a new structure is made,
- * a new name string is constructed.
- */
-
-struct net_device *init_hippi_dev(struct net_device *dev, int sizeof_priv)
-{
-	return init_netdev(dev, sizeof_priv, "hip%d", hippi_setup);
-}
-
 /**
  * alloc_hippi_dev - Register HIPPI device
  * @sizeof_priv: Size of additional driver-private structure to be allocated
@@ -370,20 +347,7 @@ struct net_device *alloc_hippi_dev(int sizeof_priv)
 	return alloc_netdev(sizeof_priv, "hip%d", hippi_setup);
 }
 
-int register_hipdev(struct net_device *dev)
-{
-	return __register_netdev(dev);
-}
-
-void unregister_hipdev(struct net_device *dev)
-{
-	unregister_netdev(dev);
-}
-
-EXPORT_SYMBOL(init_hippi_dev);
 EXPORT_SYMBOL(alloc_hippi_dev);
-EXPORT_SYMBOL(register_hipdev);
-EXPORT_SYMBOL(unregister_hipdev);
 
 static int hippi_neigh_setup_dev(struct net_device *dev, struct neigh_parms *p)
 {
@@ -456,7 +420,7 @@ EXPORT_SYMBOL(fddi_setup);
 #endif /* CONFIG_FDDI */
 
 #ifdef CONFIG_HIPPI
-void hippi_setup(struct net_device *dev)
+static void hippi_setup(struct net_device *dev)
 {
 	dev->set_multicast_list	= NULL;
 	dev->change_mtu			= hippi_change_mtu;
@@ -487,7 +451,6 @@ void hippi_setup(struct net_device *dev)
 	 */
 	dev->flags = 0; 
 }
-EXPORT_SYMBOL(hippi_setup);
 #endif /* CONFIG_HIPPI */
 
 #if defined(CONFIG_ATALK) || defined(CONFIG_ATALK_MODULE)
