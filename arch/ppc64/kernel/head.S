@@ -37,6 +37,12 @@
 #endif
 
 /*
+ * hcall interface to pSeries LPAR
+ */
+#define HSC .long 0x44000022
+#define H_SET_ASR		0x30
+
+/*
  * We layout physical memory as follows:
  * 0x0000 - 0x00ff : Secondary processor spin code
  * 0x0100 - 0x2fff : pSeries Interrupt prologs
@@ -152,7 +158,7 @@ _GLOBAL(__secondary_hold)
  */
 
 /*
- * This is the start of the interrupt handlers for Pseries
+ * This is the start of the interrupt handlers for pSeries
  * This code runs with relocation off.
  */
 #define EX_SRR0		0
@@ -1024,7 +1030,18 @@ SLB_NUM_ENTRIES = 64
 #ifndef CONFIG_PPC_ISERIES
 	ori	r20,r20,256    /* map kernel region with large ptes */
 #endif
-	
+
+	/*
+	 * XXX we should handle this in the exception exit path in 2.5,
+	 * we need to make this path quick - Anton
+	 */
+	/* Invalidate the old entry */
+	slbmfee	r21,r22
+	lis	r23,-2049
+	ori	r23,r23,65535
+	and	r21,r21,r23
+	slbie	r21
+
 	/* Put together the esid portion of the entry. */
 	mfspr	r21,DAR        /* Get the new esid                     */
 	rldicl  r21,r21,36,28  /* Permits a full 36b of ESID           */
@@ -1522,7 +1539,17 @@ _GLOBAL(__secondary_start)
 	ori	r3,r3,4			/* 0x8000000000000004 */
 	sc				/* HvCall_setASR */
 #else
+	/* set the ASR */
+	addi  r3,0,0x4000     /* r3 = ptr to naca */
+	lhz   r3,PLATFORM(r3) /* r3 = platform flags */
+	cmpldi r3,PLATFORM_PSERIES_LPAR
+	bne   98f
+	li	r3,H_SET_ASR  /* hcall = H_SET_ASR */
+	HSC     			    /* Invoking hcall */
+	b     99f
+98:             /* This is not a hypervisor machine */
 	mtasr	r4			/* set the stab location            */
+99:
 #endif
 	li	r7,0
 	mtlr	r7
@@ -1651,17 +1678,34 @@ _STATIC(start_here_pSeries)
 	mtspr	SPRG3,r6		/* PPPBBB: Temp... -Peter */
 	ld	r3,PACASTABREAL(r6)
 	ori	r4,r3,1			/* turn on valid bit                */
+	
+	/* set the ASR */
+	addi  r3,0,0x4000     /* r3 = ptr to naca */
+	lhz   r3,PLATFORM(r3) /* r3 = platform flags */
+	cmpldi r3,PLATFORM_PSERIES_LPAR
+	bne   98f
+	li	r3,H_SET_ASR  /* hcall = H_SET_ASR */
+	HSC     			    /* Invoking hcall */
+	b     99f
+98:                 /* This is not a hypervisor machine */
 	mtasr	r4			/* set the stab location            */
+99:
+	mfspr	r6,SPRG3
+	ld	r3,PACASTABREAL(r6)     /* restore r3 for stab_initialize */
 
 	/* Initialize an initial memory mapping and turn on relocation.   */
 	bl	.stab_initialize
 	bl	.htab_initialize
 
-	LOADADDR(r6,_SDR1)
+	addi  r3,0,0x4000     /* r3 = ptr to naca */
+	lhz   r3,PLATFORM(r3) /* r3 = platform flags */
+	cmpldi r3,PLATFORM_PSERIES
+	bne    98f
+	LOADADDR(r6,_SDR1)		/* Only if NOT LPAR */
 	sub	r6,r6,r26
 	ld	r6,0(r6)		/* get the value of _SDR1 */
 	mtspr	SDR1,r6			/* set the htab location  */
-
+98: 
 	LOADADDR(r3,.start_here_common)
 	SET_REG_TO_CONST(r4, MSR_KERNEL)
 	mtspr	SRR0,r3
