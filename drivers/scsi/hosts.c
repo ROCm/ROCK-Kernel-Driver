@@ -390,8 +390,9 @@ struct Scsi_Host * scsi_register(Scsi_Host_Template *shost_tp, int xtr_bytes)
 	 */
 	shost->max_cmd_len = 12;
 	shost->hostt = shost_tp;
-	shost->host_blocked = FALSE;
+	shost->host_blocked = 0;
 	shost->host_self_blocked = FALSE;
+	shost->max_host_blocked = shost_tp->max_host_blocked ? shost_tp->max_host_blocked : SCSI_DEFAULT_HOST_BLOCKED;
 
 #ifdef DEBUG
 	printk("%s: %x %x: %d\n", __FUNCTION_ (int)shost,
