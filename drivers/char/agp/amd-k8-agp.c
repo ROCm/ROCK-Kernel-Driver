@@ -50,13 +50,13 @@ static int x86_64_insert_memory(agp_memory * mem, off_t pg_start, int type)
 
 	/* gatt table should be empty. */
 	while (j < (pg_start + mem->page_count)) {
-		if (!PGE_EMPTY(agp_bridge->gatt_table[j]))
+		if (!PGE_EMPTY(agp_bridge, agp_bridge->gatt_table[j]))
 			return -EBUSY;
 		j++;
 	}
 
 	if (mem->is_flushed == FALSE) {
-		CACHE_FLUSH();
+		global_cache_flush();
 		mem->is_flushed = TRUE;
 	}
 
@@ -296,6 +296,11 @@ static int __init agp_amdk8_probe(struct pci_dev *pdev,
 	return 0;
 }
 
+static void __exit agp_amdk8_remove(struct pci_dev *pdev)
+{
+	agp_unregister_driver(&amd_k8_agp_driver);
+}
+
 static struct pci_device_id agp_amdk8_pci_table[] __initdata = {
 	{
 	.class		= (PCI_CLASS_BRIDGE_HOST << 8),
@@ -314,6 +319,7 @@ static struct __initdata pci_driver agp_amdk8_pci_driver = {
 	.name		= "agpgart-amd-k8",
 	.id_table	= agp_amdk8_pci_table,
 	.probe		= agp_amdk8_probe,
+	.remove		= agp_amdk8_remove,
 };
 
 /* Not static due to IOMMU code calling it early. */
@@ -324,7 +330,6 @@ int __init agp_amdk8_init(void)
 
 static void __exit agp_amdk8_cleanup(void)
 {
-	agp_unregister_driver(&amd_k8_agp_driver);
 	pci_unregister_driver(&agp_amdk8_pci_driver);
 }
 

@@ -294,7 +294,7 @@ static int i460_insert_memory_small_io_page (agp_memory *mem, off_t pg_start, in
 
 	j = io_pg_start;
 	while (j < (io_pg_start + I460_IOPAGES_PER_KPAGE * mem->page_count)) {
-		if (!PGE_EMPTY(RD_GATT(j))) {
+		if (!PGE_EMPTY(agp_bridge, RD_GATT(j))) {
 			pr_debug("i460_insert_memory_small_io_page: GATT[%d]=0x%x is busy\n",
 				 j, RD_GATT(j));
 			return -EBUSY;

@@ -285,7 +285,7 @@ static int hp_zx1_insert_memory(agp_memory * mem, off_t pg_start, int type)
 	}
 
 	if (mem->is_flushed == FALSE) {
-		CACHE_FLUSH();
+		global_cache_flush();
 		mem->is_flushed = TRUE;
 	}
 

@@ -147,12 +147,12 @@ static int nvidia_insert_memory(agp_memory * mem, off_t pg_start, int type)
 		return -EINVAL;
 	
 	for(j = pg_start; j < (pg_start + mem->page_count); j++) {
-		if (!PGE_EMPTY(agp_bridge->gatt_table[nvidia_private.pg_offset + j]))
+		if (!PGE_EMPTY(agp_bridge, agp_bridge->gatt_table[nvidia_private.pg_offset + j]))
 			return -EBUSY;
 	}
 
 	if (mem->is_flushed == FALSE) {
-		CACHE_FLUSH();
+		global_cache_flush();
 		mem->is_flushed = TRUE;
 	}
 	for (i = 0, j = pg_start; i < mem->page_count; i++, j++)

@@ -147,20 +147,17 @@ struct agp_bridge_data {
 #define MB(x)	(KB (KB (x)))
 #define GB(x)	(MB (KB (x)))
 
-#define CACHE_FLUSH	agp_bridge->cache_flush
 #define A_SIZE_8(x)	((struct aper_size_info_8 *) x)
 #define A_SIZE_16(x)	((struct aper_size_info_16 *) x)
 #define A_SIZE_32(x)	((struct aper_size_info_32 *) x)
 #define A_SIZE_LVL2(x)	((struct aper_size_info_lvl2 *) x)
 #define A_SIZE_FIX(x)	((struct aper_size_info_fixed *) x)
-#define A_IDX8()	(A_SIZE_8(agp_bridge->aperture_sizes) + i)
-#define A_IDX16()	(A_SIZE_16(agp_bridge->aperture_sizes) + i)
-#define A_IDX32()	(A_SIZE_32(agp_bridge->aperture_sizes) + i)
-#define A_IDXLVL2()	(A_SIZE_LVL2(agp_bridge->aperture_sizes) + i)
-#define A_IDXFIX()	(A_SIZE_FIX(agp_bridge->aperture_sizes) + i)
+#define A_IDX8(bridge)	(A_SIZE_8((bridge)->aperture_sizes) + i)
+#define A_IDX16(bridge)	(A_SIZE_16((bridge)->aperture_sizes) + i)
+#define A_IDX32(bridge)	(A_SIZE_32((bridge)->aperture_sizes) + i)
 #define MAXKEY		(4096 * 32)
 
-#define PGE_EMPTY(p)	(!(p) || (p) == (unsigned long) agp_bridge->scratch_page)
+#define PGE_EMPTY(b, p)	(!(p) || (p) == (unsigned long) (b)->scratch_page)
 
 /* intel register */
 #define INTEL_APBASE	0x10

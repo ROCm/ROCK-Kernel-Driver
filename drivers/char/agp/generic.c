@@ -318,7 +318,7 @@ int agp_bind_memory(agp_memory * curr, off_t pg_start)
 		return -EINVAL;
 	}
 	if (curr->is_flushed == FALSE) {
-		CACHE_FLUSH();
+		agp_bridge->cache_flush();
 		curr->is_flushed = TRUE;
 	}
 	ret_val = agp_bridge->insert_memory(curr, pg_start, curr->type);
@@ -537,17 +537,15 @@ int agp_generic_create_gatt_table(void)
 				i++;
 				switch (agp_bridge->size_type) {
 				case U8_APER_SIZE:
-					agp_bridge->current_size = A_IDX8();
+					agp_bridge->current_size = A_IDX8(agp_bridge);
 					break;
 				case U16_APER_SIZE:
-					agp_bridge->current_size = A_IDX16();
+					agp_bridge->current_size = A_IDX16(agp_bridge);
 					break;
 				case U32_APER_SIZE:
-					agp_bridge->current_size = A_IDX32();
+					agp_bridge->current_size = A_IDX32(agp_bridge);
 					break;
-					/* This case will never really 
-					 * happen. 
-					 */
+					/* This case will never really happen. */
 				case FIXED_APER_SIZE:
 				case LVL2_APER_SIZE:
 				default:
@@ -577,10 +575,11 @@ int agp_generic_create_gatt_table(void)
 
 	agp_bridge->gatt_table_real = (u32 *) table;
 	agp_gatt_table = (void *)table; 
-	CACHE_FLUSH();
+
+	agp_bridge->cache_flush();
 	agp_bridge->gatt_table = ioremap_nocache(virt_to_phys(table),
 					(PAGE_SIZE * (1 << page_order)));
-	CACHE_FLUSH();
+	agp_bridge->cache_flush();
 
 	if (agp_bridge->gatt_table == NULL) {
 		for (page = virt_to_page(table); page <= virt_to_page(table_end); page++)
@@ -709,14 +708,14 @@ int agp_generic_insert_memory(agp_memory * mem, off_t pg_start, int type)
 	j = pg_start;
 
 	while (j < (pg_start + mem->page_count)) {
-		if (!PGE_EMPTY(agp_bridge->gatt_table[j])) {
+		if (!PGE_EMPTY(agp_bridge, agp_bridge->gatt_table[j])) {
 			return -EBUSY;
 		}
 		j++;
 	}
 
 	if (mem->is_flushed == FALSE) {
-		CACHE_FLUSH();
+		agp_bridge->cache_flush();
 		mem->is_flushed = TRUE;
 	}
 

@@ -89,7 +89,7 @@ static int intel_i810_configure(void)
 	agp_bridge->gart_bus_addr = (temp & PCI_BASE_ADDRESS_MEM_MASK);
 	OUTREG32(intel_i810_private.registers, I810_PGETBL_CTL,
 		 agp_bridge->gatt_bus_addr | I810_PGETBL_ENABLED);
-	CACHE_FLUSH();
+	global_cache_flush();
 
 	if (agp_bridge->needs_scratch_page == TRUE) {
 		for (i = 0; i < current_size->num_entries; i++) {
@@ -130,22 +130,21 @@ static int intel_i810_insert_entries(agp_memory * mem, off_t pg_start,
 		return -EINVAL;
 	}
 	for (j = pg_start; j < (pg_start + mem->page_count); j++) {
-		if (!PGE_EMPTY(agp_bridge->gatt_table[j])) {
+		if (!PGE_EMPTY(agp_bridge, agp_bridge->gatt_table[j]))
 			return -EBUSY;
-		}
 	}
 
 	if (type != 0 || mem->type != 0) {
 		if ((type == AGP_DCACHE_MEMORY) && (mem->type == AGP_DCACHE_MEMORY)) {
 			/* special insert */
-			CACHE_FLUSH();
+			global_cache_flush();
 			for (i = pg_start; i < (pg_start + mem->page_count); i++) {
 				OUTREG32(intel_i810_private.registers,
 					 I810_PTE_BASE + (i * 4),
 					 (i * 4096) | I810_PTE_LOCAL |
 					 I810_PTE_VALID);
 			}
-			CACHE_FLUSH();
+			global_cache_flush();
 			agp_bridge->tlb_flush(mem);
 			return 0;
 		}
@@ -155,13 +154,13 @@ static int intel_i810_insert_entries(agp_memory * mem, off_t pg_start,
 	}
 
 insert:
-	CACHE_FLUSH();
+	global_cache_flush();
 	for (i = 0, j = pg_start; i < mem->page_count; i++, j++) {
 		OUTREG32(intel_i810_private.registers,
 			I810_PTE_BASE + (j * 4),
 			agp_bridge->mask_memory(mem->memory[i], mem->type));
 	}
-	CACHE_FLUSH();
+	global_cache_flush();
 
 	agp_bridge->tlb_flush(mem);
 	return 0;
@@ -178,7 +177,7 @@ static int intel_i810_remove_entries(agp_memory * mem, off_t pg_start,
 			 agp_bridge->scratch_page);
 	}
 
-	CACHE_FLUSH();
+	global_cache_flush();
 	agp_bridge->tlb_flush(mem);
 	return 0;
 }
@@ -350,7 +349,7 @@ static int intel_i830_create_gatt_table(void)
 	if (!intel_i830_private.registers) return (-ENOMEM);
 
 	temp = INREG32(intel_i830_private.registers,I810_PGETBL_CTL) & 0xfffff000;
-	CACHE_FLUSH();
+	global_cache_flush();
 
 	/* we have to call this as early as possible after the MMIO base address is known */
 	intel_i830_init_gtt_entries();
@@ -417,7 +416,7 @@ static int intel_i830_configure(void)
 	pci_write_config_word(agp_bridge->dev,I830_GMCH_CTRL,gmch_ctrl);
 
 	OUTREG32(intel_i830_private.registers,I810_PGETBL_CTL,agp_bridge->gatt_bus_addr | I810_PGETBL_ENABLED);
-	CACHE_FLUSH();
+	global_cache_flush();
 
 	if (agp_bridge->needs_scratch_page == TRUE)
 		for (i = intel_i830_private.gtt_entries; i < current_size->num_entries; i++)
@@ -458,13 +457,13 @@ static int intel_i830_insert_entries(agp_memory *mem,off_t pg_start,int type)
 		(mem->type != 0 && mem->type != AGP_PHYS_MEMORY))
 		return (-EINVAL);
 
-	CACHE_FLUSH();
+	global_cache_flush();
 
 	for (i = 0, j = pg_start; i < mem->page_count; i++, j++)
 		OUTREG32(intel_i830_private.registers,I810_PTE_BASE + (j * 4),
 			agp_bridge->mask_memory(mem->memory[i], mem->type));
 
-	CACHE_FLUSH();
+	global_cache_flush();
 
 	agp_bridge->tlb_flush(mem);
 
@@ -475,7 +474,7 @@ static int intel_i830_remove_entries(agp_memory *mem,off_t pg_start,int type)
 {
 	int i;
 
-	CACHE_FLUSH ();
+	global_cache_flush();
 
 	if (pg_start < intel_i830_private.gtt_entries) {
 		printk ("Trying to disable local/stolen memory\n");
@@ -485,7 +484,7 @@ static int intel_i830_remove_entries(agp_memory *mem,off_t pg_start,int type)
 	for (i = pg_start; i < (mem->page_count + pg_start); i++)
 		OUTREG32(intel_i830_private.registers,I810_PTE_BASE + (i * 4),agp_bridge->scratch_page);
 
-	CACHE_FLUSH();
+	global_cache_flush();
 
 	agp_bridge->tlb_flush(mem);
 

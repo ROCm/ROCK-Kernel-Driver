@@ -33,7 +33,7 @@ static int amd_create_page_map(struct amd_page_map *page_map)
 		return -ENOMEM;
 	}
 	SetPageReserved(virt_to_page(page_map->real));
-	CACHE_FLUSH();
+	global_cache_flush();
 	page_map->remapped = ioremap_nocache(virt_to_phys(page_map->real), 
 					    PAGE_SIZE);
 	if (page_map->remapped == NULL) {
@@ -42,7 +42,7 @@ static int amd_create_page_map(struct amd_page_map *page_map)
 		page_map->real = NULL;
 		return -ENOMEM;
 	}
-	CACHE_FLUSH();
+	global_cache_flush();
 
 	for(i = 0; i < PAGE_SIZE / sizeof(unsigned long); i++) {
 		page_map->remapped[i] = agp_bridge->scratch_page;
@@ -297,14 +297,13 @@ static int amd_insert_memory(agp_memory * mem,
 	while (j < (pg_start + mem->page_count)) {
 		addr = (j * PAGE_SIZE) + agp_bridge->gart_bus_addr;
 		cur_gatt = GET_GATT(addr);
-		if (!PGE_EMPTY(cur_gatt[GET_GATT_OFF(addr)])) {
+		if (!PGE_EMPTY(agp_bridge, cur_gatt[GET_GATT_OFF(addr)]))
 			return -EBUSY;
-		}
 		j++;
 	}
 
 	if (mem->is_flushed == FALSE) {
-		CACHE_FLUSH();
+		global_cache_flush();
 		mem->is_flushed = TRUE;
 	}
 
@@ -402,7 +401,6 @@ static struct agp_driver amd_k7_agp_driver = {
 	.owner = THIS_MODULE,
 };
 
-/* Supported Device Scanning routine */
 static int __init agp_amdk7_probe(struct pci_dev *pdev,
 				  const struct pci_device_id *ent)
 {
