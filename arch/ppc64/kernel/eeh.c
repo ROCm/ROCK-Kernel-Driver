@@ -782,7 +782,7 @@ EXPORT_SYMBOL(iowrite32_rep);
 
 void __iomem *ioport_map(unsigned long port, unsigned int len)
 {
-	if (_IO_IS_VALID(port))
+	if (!_IO_IS_VALID(port))
 		return NULL;
 	return (void __iomem *) IO_ADDR_TO_TOKEN(port+pci_io_base);
 }
