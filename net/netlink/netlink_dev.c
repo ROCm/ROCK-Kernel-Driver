@@ -176,39 +176,47 @@ static struct {
 } entries[] = {
 	{
 		.name	= "route",
-		.minor	= 0,
+		.minor	= NETLINK_ROUTE,
 	},
 	{
 		.name	= "skip",
-		.minor	= 1,
+		.minor	= NETLINK_SKIP,
 	},
 	{
 		.name	= "usersock",
-		.minor	= 2,
+		.minor	= NETLINK_USERSOCK,
 	},
 	{
 		.name	= "fwmonitor",
-		.minor	= 3,
+		.minor	= NETLINK_FIREWALL,
 	},
 	{
 		.name	= "tcpdiag",
-		.minor	= 4,
+		.minor	= NETLINK_TCPDIAG,
+	},
+	{
+		.name	= "nflog",
+		.minor	= NETLINK_NFLOG,
+	},
+	{
+		.name	= "xfrm",
+		.minor	= NETLINK_XFRM,
 	},
 	{
 		.name	= "arpd",
-		.minor	= 8,
+		.minor	= NETLINK_ARPD,
 	},
 	{
 		.name	= "route6",
-		.minor	= 11,
+		.minor	= NETLINK_ROUTE6,
 	},
 	{
 		.name	= "ip6_fw",
-		.minor	= 13,
+		.minor	= NETLINK_IP6_FW,
 	},
 	{
 		.name	= "dnrtmsg",
-		.minor	= 13,
+		.minor	= NETLINK_DNRTMSG,
 	},
 };
 
