@@ -411,7 +411,7 @@ __cheetah_flush_tlb_range: /* 20 insns */
 9:	retl
 	 wrpr		%g5, 0x0, %pstate
 
-flush_dcpage_cheetah: /* 9 insns */
+flush_dcpage_cheetah: /* 11 insns */
 	sethi		%uhi(PAGE_OFFSET), %g1
 	sllx		%g1, 32, %g1
 	sub		%o0, %g1, %o0
@@ -465,7 +465,7 @@ cheetah_patch_cachetlbops:
 	sethi		%hi(flush_dcpage_cheetah), %o1
 	or		%o1, %lo(flush_dcpage_cheetah), %o1
 	call		cheetah_patch_one
-	 mov		9, %o2
+	 mov		11, %o2
 
 	ret
 	 restore
@@ -573,7 +573,7 @@ xcall_report_regs:
 	rdpr		%pil, %g2
 	wrpr		%g0, 15, %pil
 	sethi		%hi(109f), %g7
-	b,pt		%xcc, etrap
+	b,pt		%xcc, etrap_irq
 109:	 or		%g7, %lo(109b), %g7
 	call		__show_regs
 	 add		%sp, STACK_BIAS + REGWIN_SZ, %o0
@@ -636,7 +636,7 @@ xcall_promstop:
 	rdpr		%pil, %g2
 	wrpr		%g0, 15, %pil
 	sethi		%hi(109f), %g7
-	b,pt		%xcc, etrap
+	b,pt		%xcc, etrap_irq
 109:	 or		%g7, %lo(109b), %g7
 	flushw
 	call		prom_stopself
