@@ -1746,10 +1746,6 @@ isdn_net_ciscohdlck_receive(isdn_net_local *lp, struct sk_buff *skb)
 	}
 
 	switch (type) {
-	case CISCO_TYPE_INET:
-		skb->protocol = htons(ETH_P_IP);
-		netif_rx(skb);
-		break;
 	case CISCO_TYPE_SLARP:
 		isdn_net_ciscohdlck_slarp_in(lp, skb);
 		goto out_free;
@@ -1759,11 +1755,11 @@ isdn_net_ciscohdlck_receive(isdn_net_local *lp, struct sk_buff *skb)
 				"\"no cdp enable\" on cisco.\n", lp->name);
 		goto out_free;
 	default:
-		printk(KERN_WARNING "%s: Unknown Cisco type 0x%04x\n",
-		       lp->name, type);
-		goto out_free;
+		/* no special cisco protocol */
+		skb->protocol = htons(type);
+		netif_rx(skb);
+		return;
 	}
-	return;
 
  out_free:
 	kfree_skb(skb);

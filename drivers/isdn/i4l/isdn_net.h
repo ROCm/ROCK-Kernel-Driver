@@ -26,7 +26,6 @@
 #define CISCO_ADDR_BROADCAST  0x8f
 #define CISCO_CTRL            0x00
 #define CISCO_TYPE_CDP        0x2000
-#define CISCO_TYPE_INET       0x0800
 #define CISCO_TYPE_SLARP      0x8035
 #define CISCO_SLARP_REQUEST   0
 #define CISCO_SLARP_REPLY     1
