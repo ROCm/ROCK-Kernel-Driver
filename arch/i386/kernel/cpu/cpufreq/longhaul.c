@@ -42,7 +42,6 @@ static int vrmrev;
 /* Module parameters */
 static int dont_scale_voltage;
 static int debug;
-static int debug;
 
 static void dprintk(const char *msg, ...)
 {
