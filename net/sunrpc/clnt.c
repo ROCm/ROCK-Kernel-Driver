@@ -379,20 +379,12 @@ call_start(struct rpc_task *task)
 {
 	struct rpc_clnt	*clnt = task->tk_client;
 
-	if (task->tk_msg.rpc_proc > clnt->cl_maxproc) {
-		printk(KERN_ERR "%s (vers %d): bad procedure number %d\n",
-				clnt->cl_protname, clnt->cl_vers,
-				task->tk_msg.rpc_proc);
-		rpc_exit(task, -EIO);
-		return;
-	}
-
 	dprintk("RPC: %4d call_start %s%d proc %d (%s)\n", task->tk_pid,
-		clnt->cl_protname, clnt->cl_vers, task->tk_msg.rpc_proc,
+		clnt->cl_protname, clnt->cl_vers, task->tk_msg.rpc_proc->p_proc,
 		(RPC_IS_ASYNC(task) ? "async" : "sync"));
 
 	/* Increment call count */
-	rpcproc_count(clnt, task->tk_msg.rpc_proc)++;
+	task->tk_msg.rpc_proc->p_count++;
 	clnt->cl_stats->rpccnt++;
 	task->tk_action = call_reserve;
 }
@@ -474,7 +466,6 @@ call_reserveresult(struct rpc_task *task)
 static void
 call_allocate(struct rpc_task *task)
 {
-	struct rpc_clnt	*clnt = task->tk_client;
 	unsigned int	bufsiz;
 
 	dprintk("RPC: %4d call_allocate (status %d)\n", 
@@ -485,7 +476,7 @@ call_allocate(struct rpc_task *task)
 
 	/* FIXME: compute buffer requirements more exactly using
 	 * auth->au_wslack */
-	bufsiz = rpcproc_bufsiz(clnt, task->tk_msg.rpc_proc) + RPC_SLACK_SPACE;
+	bufsiz = task->tk_msg.rpc_proc->p_bufsiz + RPC_SLACK_SPACE;
 
 	if (rpc_malloc(task, bufsiz << 1) != NULL)
 		return;
@@ -538,7 +529,7 @@ call_encode(struct rpc_task *task)
 	memset(task->tk_buffer, 0, bufsiz);
 
 	/* Encode header and provided arguments */
-	encode = rpcproc_encode(clnt, task->tk_msg.rpc_proc);
+	encode = task->tk_msg.rpc_proc->p_encode;
 	if (!(p = call_header(task))) {
 		printk(KERN_INFO "RPC: call_header failed, exit EIO\n");
 		rpc_exit(task, -EIO);
@@ -620,8 +611,6 @@ child_connect_status(struct rpc_task *task)
 static void
 call_transmit(struct rpc_task *task)
 {
-	struct rpc_clnt	*clnt = task->tk_client;
-
 	dprintk("RPC: %4d call_transmit (status %d)\n", 
 				task->tk_pid, task->tk_status);
 
@@ -629,7 +618,7 @@ call_transmit(struct rpc_task *task)
 	if (task->tk_status < 0)
 		return;
 	xprt_transmit(task);
-	if (!rpcproc_decode(clnt, task->tk_msg.rpc_proc) && task->tk_status >= 0) {
+	if (!task->tk_msg.rpc_proc->p_decode && task->tk_status >= 0) {
 		task->tk_action = NULL;
 		rpc_wake_up_task(task);
 	}
@@ -732,7 +721,7 @@ call_decode(struct rpc_task *task)
 {
 	struct rpc_clnt	*clnt = task->tk_client;
 	struct rpc_rqst	*req = task->tk_rqstp;
-	kxdrproc_t	decode = rpcproc_decode(clnt, task->tk_msg.rpc_proc);
+	kxdrproc_t	decode = task->tk_msg.rpc_proc->p_decode;
 	u32		*p;
 
 	dprintk("RPC: %4d call_decode (status %d)\n", 
@@ -832,7 +821,7 @@ call_header(struct rpc_task *task)
 	*p++ = htonl(RPC_VERSION);	/* RPC version */
 	*p++ = htonl(clnt->cl_prog);	/* program number */
 	*p++ = htonl(clnt->cl_vers);	/* program version */
-	*p++ = htonl(task->tk_msg.rpc_proc);	/* procedure */
+	*p++ = htonl(task->tk_msg.rpc_proc->p_proc);	/* procedure */
 	return rpcauth_marshcred(task, p);
 }
 

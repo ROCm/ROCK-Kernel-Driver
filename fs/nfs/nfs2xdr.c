@@ -663,31 +663,29 @@ nfs_stat_to_errno(int stat)
 #endif
 
 #define PROC(proc, argtype, restype, timer)				\
-    { .p_procname =  "nfs_" #proc,					\
-      .p_encode   =  (kxdrproc_t) nfs_xdr_##argtype,			\
-      .p_decode   =  (kxdrproc_t) nfs_xdr_##restype,			\
-      .p_bufsiz   =  MAX(NFS_##argtype##_sz,NFS_##restype##_sz) << 2,	\
-      .p_timer    =  timer						\
-    }
-static struct rpc_procinfo	nfs_procedures[18] = {
-    PROC(null,		enc_void,	dec_void, 0),
-    PROC(getattr,	fhandle,	attrstat, 1),
-    PROC(setattr,	sattrargs,	attrstat, 0),
-    PROC(root,		enc_void,	dec_void, 0),
-    PROC(lookup,	diropargs,	diropres, 2),
-    PROC(readlink,	readlinkargs,	readlinkres, 3),
-    PROC(read,		readargs,	readres, 3),
-    PROC(writecache,	enc_void,	dec_void, 0),
-    PROC(write,		writeargs,	writeres, 4),
-    PROC(create,	createargs,	diropres, 0),
-    PROC(remove,	diropargs,	stat, 0),
-    PROC(rename,	renameargs,	stat, 0),
-    PROC(link,		linkargs,	stat, 0),
-    PROC(symlink,	symlinkargs,	stat, 0),
-    PROC(mkdir,		createargs,	diropres, 0),
-    PROC(rmdir,		diropargs,	stat, 0),
-    PROC(readdir,	readdirargs,	readdirres, 3),
-    PROC(statfs,	fhandle,	statfsres, 0),
+[NFSPROC_##proc] = {							\
+	.p_proc	    =  NFSPROC_##proc,					\
+	.p_encode   =  (kxdrproc_t) nfs_xdr_##argtype,			\
+	.p_decode   =  (kxdrproc_t) nfs_xdr_##restype,			\
+	.p_bufsiz   =  MAX(NFS_##argtype##_sz,NFS_##restype##_sz) << 2,	\
+	.p_timer    =  timer						\
+	}
+struct rpc_procinfo	nfs_procedures[] = {
+    PROC(GETATTR,	fhandle,	attrstat, 1),
+    PROC(SETATTR,	sattrargs,	attrstat, 0),
+    PROC(LOOKUP,	diropargs,	diropres, 2),
+    PROC(READLINK,	readlinkargs,	readlinkres, 3),
+    PROC(READ,		readargs,	readres, 3),
+    PROC(WRITE,		writeargs,	writeres, 4),
+    PROC(CREATE,	createargs,	diropres, 0),
+    PROC(REMOVE,	diropargs,	stat, 0),
+    PROC(RENAME,	renameargs,	stat, 0),
+    PROC(LINK,		linkargs,	stat, 0),
+    PROC(SYMLINK,	symlinkargs,	stat, 0),
+    PROC(MKDIR,		createargs,	diropres, 0),
+    PROC(RMDIR,		diropargs,	stat, 0),
+    PROC(READDIR,	readdirargs,	readdirres, 3),
+    PROC(STATFS,	fhandle,	statfsres, 0),
 };
 
 struct rpc_version		nfs_version2 = {

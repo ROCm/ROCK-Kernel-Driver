@@ -66,8 +66,6 @@
 
 extern int			nfs_stat_to_errno(int);
 
-#define NFS4_enc_void_sz	0
-#define NFS4_dec_void_sz	0
 #define NFS4_enc_compound_sz	1024  /* XXX: large enough? */
 #define NFS4_dec_compound_sz	1024  /* XXX: large enough? */
 
@@ -722,6 +720,7 @@ encode_write(struct nfs4_compound *cp, struct nfs4_write *write, struct rpc_rqst
 	ENCODE_TAIL;
 }
 
+/* FIXME: this sucks */
 static int
 encode_compound(struct nfs4_compound *cp, struct rpc_rqst *req)
 {
@@ -824,16 +823,6 @@ encode_compound(struct nfs4_compound *cp, struct rpc_rqst *req)
  * END OF "GENERIC" ENCODE ROUTINES.
  */
 
-
-/*
- * Encode void argument
- */
-static int
-nfs4_xdr_enc_void(struct rpc_rqst *req, u32 *p, void *dummy)
-{
-	req->rq_slen = xdr_adjust_iovec(req->rq_svec, p);
-	return 0;
-}
 
 /*
  * Encode COMPOUND argument
@@ -1546,6 +1535,7 @@ decode_write(struct nfs4_compound *cp, int nfserr, struct nfs4_write *write)
 	DECODE_TAIL;
 }
 
+/* FIXME: this sucks */
 static int
 decode_compound(struct nfs4_compound *cp, struct rpc_rqst *req)
 {
@@ -1680,15 +1670,6 @@ decode_compound(struct nfs4_compound *cp, struct rpc_rqst *req)
  */
 
 /*
- * Decode void reply
- */
-static int
-nfs4_xdr_dec_void(struct rpc_rqst *req, u32 *p, void *dummy)
-{
-	return 0;
-}
-
-/*
  * Decode COMPOUND response
  */
 static int
@@ -1753,16 +1734,15 @@ nfs4_decode_dirent(u32 *p, struct nfs_entry *entry, int plus)
 #endif
 
 #define PROC(proc, argtype, restype)				\
-    { "nfs4_" #proc,						\
-      (kxdrproc_t) nfs4_xdr_##argtype,				\
-      (kxdrproc_t) nfs4_xdr_##restype,				\
-      MAX(NFS4_##argtype##_sz,NFS4_##restype##_sz) << 2,	\
-      0							\
+[NFSPROC4_##proc] = {						\
+	.p_proc   = NFSPROC4_##proc,				\
+	.p_encode = (kxdrproc_t) nfs4_xdr_##argtype,		\
+	.p_decode = (kxdrproc_t) nfs4_xdr_##restype,		\
+	.p_bufsiz = MAX(NFS4_##argtype##_sz,NFS4_##restype##_sz) << 2,	\
     }
 
-static struct rpc_procinfo	nfs4_procedures[] = {
-  PROC(null,		enc_void,	dec_void),
-  PROC(compound,	enc_compound,	dec_compound)
+struct rpc_procinfo	nfs4_procedures[] = {
+  PROC(COMPOUND,	enc_compound,	dec_compound)
 };
 
 struct rpc_version		nfs_version4 = {

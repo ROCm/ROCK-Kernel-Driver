@@ -52,6 +52,7 @@
 #define OPNUM(cp)		cp->ops[cp->req_nops].opnum
 
 extern u32 *nfs4_decode_dirent(u32 *p, struct nfs_entry *entry, int plus);
+extern struct rpc_procinfo nfs4_procedures[];
 
 static nfs4_stateid zero_stateid =
   { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
@@ -642,7 +643,7 @@ nfs4_call_compound(struct nfs4_compound *cp, struct rpc_cred *cred, int flags)
 {
 	int status;
 	struct rpc_message msg = {
-		.rpc_proc = NFSPROC4_COMPOUND,
+		.rpc_proc = &nfs4_procedures[NFSPROC4_COMPOUND],
 		.rpc_argp = cp,
 		.rpc_resp = cp,
 		.rpc_cred = cred,
@@ -1106,7 +1107,7 @@ nfs4_proc_unlink_setup(struct rpc_message *msg, struct dentry *dir, struct qstr 
 	nfs4_setup_remove(cp, name, &up->cinfo);
 	nfs4_setup_getattr(cp, &up->attrs, bmres);
 	
-	msg->rpc_proc = NFSPROC4_COMPOUND;
+	msg->rpc_proc = &nfs4_procedures[NFSPROC4_COMPOUND];
 	msg->rpc_argp = cp;
 	msg->rpc_resp = cp;
 	return 0;
@@ -1367,7 +1368,7 @@ nfs4_proc_read_setup(struct nfs_read_data *data, unsigned int count)
 	struct rpc_task	*task = &data->task;
 	struct nfs4_compound *cp = &data->u.v4.compound;
 	struct rpc_message msg = {
-		.rpc_proc = NFSPROC4_COMPOUND,
+		.rpc_proc = &nfs4_procedures[NFSPROC4_COMPOUND],
 		.rpc_argp = cp,
 		.rpc_resp = cp,
 		.rpc_cred = data->cred,
@@ -1411,7 +1412,7 @@ nfs4_proc_write_setup(struct nfs_write_data *data, unsigned int count, int how)
 	struct rpc_task	*task = &data->task;
 	struct nfs4_compound *cp = &data->u.v4.compound;
 	struct rpc_message msg = {
-		.rpc_proc = NFSPROC4_COMPOUND,
+		.rpc_proc = &nfs4_procedures[NFSPROC4_COMPOUND],
 		.rpc_argp = cp,
 		.rpc_resp = cp,
 		.rpc_cred = data->cred,
@@ -1462,7 +1463,7 @@ nfs4_proc_commit_setup(struct nfs_write_data *data, u64 start, u32 len, int how)
 	struct rpc_task	*task = &data->task;
 	struct nfs4_compound *cp = &data->u.v4.compound;
 	struct rpc_message msg = {
-		.rpc_proc = NFSPROC4_COMPOUND,
+		.rpc_proc = &nfs4_procedures[NFSPROC4_COMPOUND],
 		.rpc_argp = cp,
 		.rpc_resp = cp,
 		.rpc_cred = data->cred,
@@ -1516,7 +1517,9 @@ nfs4_proc_renew(struct nfs_server *server)
 	struct renew_desc *rp;
 	struct rpc_task *task;
 	struct nfs4_compound *cp;
-	struct rpc_message msg;
+	struct rpc_message msg = {
+		.rpc_proc	= &nfs4_procedures[NFSPROC4_COMPOUND],
+	};
 
 	rp = (struct renew_desc *) kmalloc(sizeof(*rp), GFP_KERNEL);
 	if (!rp)
@@ -1527,10 +1530,8 @@ nfs4_proc_renew(struct nfs_server *server)
 	nfs4_setup_compound(cp, rp->ops, server, "renew");
 	nfs4_setup_renew(cp);
 	
-	msg.rpc_proc = NFSPROC4_COMPOUND;
 	msg.rpc_argp = cp;
 	msg.rpc_resp = cp;
-	msg.rpc_cred = NULL;
 	rpc_init_task(task, server->client, renew_done, RPC_TASK_ASYNC);
 	rpc_call_setup(task, &msg, 0);
 	task->tk_calldata = rp;

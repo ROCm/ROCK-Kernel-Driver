@@ -16,8 +16,9 @@
 /*
  * This is the actual RPC procedure call info.
  */
+struct rpc_procinfo;
 struct rpc_message {
-	__u32			rpc_proc;	/* Procedure number */
+	struct rpc_procinfo *	rpc_proc;	/* Procedure information */
 	void *			rpc_argp;	/* Arguments */
 	void *			rpc_resp;	/* Result */
 	struct rpc_cred *	rpc_cred;	/* Credentials */

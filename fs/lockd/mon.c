@@ -134,11 +134,6 @@ out_destroy:
 /*
  * XDR functions for NSM.
  */
-static int
-xdr_error(struct rpc_rqst *rqstp, u32 *p, void *dummy)
-{
-	return -EACCES;
-}
 
 static int
 xdr_encode_mon(struct rpc_rqst *rqstp, u32 *p, struct nsm_args *argp)
@@ -206,42 +201,17 @@ xdr_decode_stat(struct rpc_rqst *rqstp, u32 *p, struct nsm_res *resp)
 #endif
 
 static struct rpc_procinfo	nsm_procedures[] = {
-        {
-		.p_procname	= "sm_null",
-		.p_encode	= (kxdrproc_t) xdr_error,
-		.p_decode	= (kxdrproc_t) xdr_error,
-	},
-        {
-		.p_procname	= "sm_stat",
-		.p_encode	= (kxdrproc_t) xdr_error,
-		.p_decode	= (kxdrproc_t) xdr_error,
-	},
-        {
-		.p_procname	= "sm_mon",
+[SM_MON] = {
+		.p_proc		= SM_MON,
 		.p_encode	= (kxdrproc_t) xdr_encode_mon,
 		.p_decode	= (kxdrproc_t) xdr_decode_stat_res,
 		.p_bufsiz	= MAX(SM_mon_sz, SM_monres_sz) << 2,
 	},
-        {
-		.p_procname	= "sm_unmon",
+[SM_UNMON] = {
+		.p_proc		= SM_UNMON,
 		.p_encode	= (kxdrproc_t) xdr_encode_mon,
 		.p_decode	= (kxdrproc_t) xdr_decode_stat,
 		.p_bufsiz	= MAX(SM_mon_id_sz, SM_unmonres_sz) << 2,
-	},
-        {
-		.p_procname	= "sm_unmon_all",
-		.p_encode	= (kxdrproc_t) xdr_error,
-		.p_decode	= (kxdrproc_t) xdr_error,
-	},
-        {
-		.p_procname	= "sm_simu_crash",
-		.p_encode	= (kxdrproc_t) xdr_error,
-		.p_decode	= (kxdrproc_t) xdr_error,
-	},
-        {
-		.p_procname	= "sm_notify",
-		.p_encode	= (kxdrproc_t) xdr_error,
-		.p_decode	= (kxdrproc_t) xdr_error,
 	},
 };
 
