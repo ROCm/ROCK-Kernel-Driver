@@ -65,6 +65,10 @@ extern int del_timer(struct timer_list * timer);
 extern int __mod_timer(struct timer_list *timer, unsigned long expires);
 extern int mod_timer(struct timer_list *timer, unsigned long expires);
 
+#ifdef CONFIG_NO_IDLE_HZ
+extern unsigned long next_timer_interrupt(void);
+#endif
+
 /***
  * add_timer - start a timer
  * @timer: the timer to be added

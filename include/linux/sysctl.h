@@ -132,7 +132,8 @@ enum
 	KERN_PTY=62,		/* dir: pty driver */
 	KERN_NGROUPS_MAX=63,	/* int: NGROUPS_MAX */
 	KERN_KDB=64,		/* int: kdb on/off */
-	KERN_DUMP=65,		/* directory: dump parameters */
+	KERN_S390_HZ_TIMER=65,  /* int: hz timer on or off */
+	KERN_DUMP=66,		/* directory: dump parameters */
 };
 
 
