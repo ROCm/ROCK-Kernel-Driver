@@ -1327,6 +1327,8 @@ e100_sw_init(struct e100_private *bdp)
 	spin_lock_init(&(bdp->bd_non_tx_lock));
 	spin_lock_init(&(bdp->config_lock));
 	spin_lock_init(&(bdp->mdi_access_lock));
+	/* Initialize configuration data */
+	e100_config_init(bdp);
 
 	return 1;
 }
