@@ -1118,6 +1118,18 @@ void __init setup_arch(char **cmdline_p)
 #endif
 	paging_init();
 
+#ifdef CONFIG_EARLY_PRINTK
+	{
+		char *s = strstr(*cmdline_p, "earlyprintk=");
+		if (s) {
+			extern void setup_early_printk(char *);
+			setup_early_printk(s+12);
+			printk("early console enabled\n");
+		}
+	}
+#endif
+
+
 	dmi_scan_machine();
 
 #ifdef CONFIG_X86_GENERICARCH

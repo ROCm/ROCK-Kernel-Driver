@@ -310,6 +310,23 @@ running once the system is up.
 
 	dtc3181e=	[HW,SCSI]
 
+	earlyprintk=	[x86, x86_64]
+			earlyprintk=vga
+			earlyprintk=serial[,ttySn[,baudrate]]
+
+			Append ,keep to not disable it when the real console
+			takes over.
+
+			Only vga or serial at a time, not both.
+
+			Currently only ttyS0 and ttyS1 are supported.
+
+			Interaction with the standard serial driver is not
+			very good.
+
+			The VGA output is eventually overwritten by the real
+			console.
+
 	eata=		[HW,SCSI]
 
 	eda=		[HW,PS2]
