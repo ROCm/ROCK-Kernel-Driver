@@ -104,6 +104,8 @@
  * 		disconnect; other cleanups. (db)  Flush net1080 fifos
  * 		after several sequential framing errors. (Johannes Erdfelt)
  * 22-aug-2003	AX8817X support (Dave Hollis).
+ * 14-jun-2004  Trivial patch for AX8817X based Buffalo LUA-U2-KTX in Japan
+ *		(Neil Bortnak)
  *
  *-------------------------------------------------------------------------*/
 
@@ -3204,6 +3206,10 @@ static const struct usb_device_id	products [] = {
 }, {
 	// ATEN UC210T
 	USB_DEVICE (0x0557, 0x2009),
+	.driver_info =  (unsigned long) &ax8817x_info,
+}, {
+	// Buffalo LUA-U2-KTX
+	USB_DEVICE (0x0411, 0x003d),
 	.driver_info =  (unsigned long) &ax8817x_info,
 },
 #endif
