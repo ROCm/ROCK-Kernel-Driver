@@ -314,8 +314,8 @@ static void uart00_break_ctl(struct uart_port *port, int break_state)
 }
 
 static void
-uart00_settermios(struct uart_port *port, struct termios *termios,
-		  struct termios *old)
+uart00_set_termios(struct uart_port *port, struct termios *termios,
+		   struct termios *old)
 {
 	unsigned int uart_mc, old_ies, quot;
 	unsigned long flags;
@@ -511,7 +511,7 @@ static struct uart_ops uart00_pops = {
 	.break_ctl	= uart00_break_ctl,
 	.startup	= uart00_startup,
 	.shutdown	= uart00_shutdown,
-	.settermios	= uart00_settermios,
+	.set_termios	= uart00_set_termios,
 	.type		= uart00_type,
 	.release_port	= uart00_release_port,
 	.request_port	= uart00_request_port,

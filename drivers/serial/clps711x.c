@@ -317,8 +317,8 @@ static void clps711xuart_shutdown(struct uart_port *port)
 }
 
 static void
-clps711xuart_settermios(struct uart_port *port, struct termios *termios,
-			struct termios *old)
+clps711xuart_set_termios(struct uart_port *port, struct termios *termios,
+			 struct termios *old)
 {
 	unsigned int ubrlcr, quot;
 	unsigned long flags;
@@ -424,7 +424,7 @@ static struct uart_ops clps711x_pops = {
 	.break_ctl	= clps711xuart_break_ctl,
 	.startup	= clps711xuart_startup,
 	.shutdown	= clps711xuart_shutdown,
-	.settermios	= clps711xuart_settermios,
+	.set_termios	= clps711xuart_set_termios,
 	.type		= clps711xuart_type,
 	.config_port	= clps711xuart_config_port,
 	.release_port	= clps711xuart_release_port,

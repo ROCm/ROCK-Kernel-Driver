@@ -451,7 +451,7 @@ uart_change_speed(struct uart_info *info, struct termios *old_termios)
 	else
 		info->flags |= UIF_CHECK_CD;
 
-	port->ops->settermios(port, termios, old_termios);
+	port->ops->set_termios(port, termios, old_termios);
 }
 
 static inline void
@@ -1887,7 +1887,7 @@ uart_set_options(struct uart_port *port, struct console *co,
 	if (flow == 'r')
 		termios.c_cflag |= CRTSCTS;
 
-	port->ops->settermios(port, &termios, NULL);
+	port->ops->set_termios(port, &termios, NULL);
 	co->cflag = termios.c_cflag;
 
 	return 0;

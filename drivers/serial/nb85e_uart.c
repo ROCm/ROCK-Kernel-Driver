@@ -440,8 +440,8 @@ static void nb85e_uart_shutdown (struct uart_port *port)
 }
 
 static void
-nb85e_uart_settermios (struct uart_port *port, struct termios *termios,
-		       struct termios *old)
+nb85e_uart_set_termios (struct uart_port *port, struct termios *termios,
+		        struct termios *old)
 {
 	/* FIXME: Which termios flags does this driver support? --rmk */
 
@@ -481,7 +481,7 @@ static struct uart_ops nb85e_uart_ops = {
 	.break_ctl	= nb85e_uart_break_ctl,
 	.startup	= nb85e_uart_startup,
 	.shutdown	= nb85e_uart_shutdown,
-	.settermios	= nb85e_uart_settermios,
+	.set_termios	= nb85e_uart_set_termios,
 	.type		= nb85e_uart_type,
 	.release_port	= nb85e_uart_nop,
 	.request_port	= nb85e_uart_success,

@@ -233,8 +233,8 @@ static void serial21285_shutdown(struct uart_port *port)
 }
 
 static void
-serial21285_settermios(struct uart_port *port, struct termios *termios,
-		       struct termios *old)
+serial21285_set_termios(struct uart_port *port, struct termios *termios,
+			struct termios *old)
 {
 	unsigned long flags;
 	unsigned int quot, h_lcr;
@@ -369,7 +369,7 @@ static struct uart_ops serial21285_ops = {
 	.break_ctl	= serial21285_break_ctl,
 	.startup	= serial21285_startup,
 	.shutdown	= serial21285_shutdown,
-	.settermios	= serial21285_settermios,
+	.set_termios	= serial21285_set_termios,
 	.type		= serial21285_type,
 	.release_port	= serial21285_release_port,
 	.request_port	= serial21285_request_port,

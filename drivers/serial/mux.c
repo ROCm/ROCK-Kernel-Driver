@@ -268,7 +268,7 @@ static void mux_shutdown(struct uart_port *port)
 }
 
 /**
- * mux_settermios - Chane port parameters.
+ * mux_set_termios - Chane port parameters.
  * @port: Ptr to the uart_port.
  * @termios: new termios settings.
  * @old: old termios settings.
@@ -276,8 +276,8 @@ static void mux_shutdown(struct uart_port *port)
  * The Serial Mux does not support this function.
  */
 static void
-mux_settermios(struct uart_port *port, struct termios *termios,
-	       struct termios *old)
+mux_set_termios(struct uart_port *port, struct termios *termios,
+	        struct termios *old)
 {
 }
 
@@ -387,7 +387,7 @@ static struct uart_ops mux_pops = {
 	.break_ctl =		mux_break_ctl,
 	.startup =		mux_startup,
 	.shutdown =		mux_shutdown,
-	.settermios =		mux_settermios,
+	.set_termios =		mux_set_termios,
 	.type =			mux_type,
 	.release_port =		mux_release_port,
 	.request_port =		mux_request_port,

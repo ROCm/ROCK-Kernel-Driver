@@ -660,7 +660,7 @@ static int sunsu_startup(struct uart_port *port)
 
 	/*
 	 * Clear the FIFO buffers and disable them.
-	 * (they will be reeanbled in settermios())
+	 * (they will be reeanbled in set_termios())
 	 */
 	if (uart_config[up->port.type].flags & UART_CLEAR_FIFO) {
 		serial_outp(up, UART_FCR, UART_FCR_ENABLE_FIFO);
@@ -714,7 +714,7 @@ static int sunsu_startup(struct uart_port *port)
 
 	/*
 	 * Finally, enable interrupts.  Note: Modem status interrupts
-	 * are set via settermios(), which will be occuring imminently
+	 * are set via set_termios(), which will be occuring imminently
 	 * anyway, so we don't enable them here.
 	 */
 	up->ier = UART_IER_RLSI | UART_IER_RDI;
@@ -917,8 +917,8 @@ sunsu_change_speed(struct uart_port *port, unsigned int cflag,
 }
 
 static void
-sunsu_settermios(struct uart_port *port, struct termios *termios,
-		 struct termios *old)
+sunsu_set_termios(struct uart_port *port, struct termios *termios,
+		  struct termios *old)
 {
 	unsigned int quot;
 
@@ -980,7 +980,7 @@ static struct uart_ops sunsu_pops = {
 	.break_ctl	= sunsu_break_ctl,
 	.startup	= sunsu_startup,
 	.shutdown	= sunsu_shutdown,
-	.settermios	= sunsu_settermios,
+	.set_termios	= sunsu_set_termios,
 	.type		= sunsu_type,
 	.release_port	= sunsu_release_port,
 	.request_port	= sunsu_request_port,

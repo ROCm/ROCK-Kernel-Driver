@@ -1174,7 +1174,7 @@ static int serial8250_startup(struct uart_port *port)
 
 	/*
 	 * Clear the FIFO buffers and disable them.
-	 * (they will be reeanbled in settermios())
+	 * (they will be reeanbled in set_termios())
 	 */
 	if (uart_config[up->port.type].flags & UART_CLEAR_FIFO) {
 		serial_outp(up, UART_FCR, UART_FCR_ENABLE_FIFO);
@@ -1241,7 +1241,7 @@ static int serial8250_startup(struct uart_port *port)
 
 	/*
 	 * Finally, enable interrupts.  Note: Modem status interrupts
-	 * are set via settermios(), which will be occuring imminently
+	 * are set via set_termios(), which will be occuring imminently
 	 * anyway, so we don't enable them here.
 	 */
 	up->ier = UART_IER_RLSI | UART_IER_RDI;
@@ -1319,8 +1319,8 @@ static void serial8250_shutdown(struct uart_port *port)
 }
 
 static void
-serial8250_settermios(struct uart_port *port, struct termios *termios,
-		      struct termios *old)
+serial8250_set_termios(struct uart_port *port, struct termios *termios,
+		       struct termios *old)
 {
 	struct uart_8250_port *up = (struct uart_8250_port *)port;
 	unsigned char cval, fcr = 0;
@@ -1740,7 +1740,7 @@ static struct uart_ops serial8250_pops = {
 	.break_ctl	= serial8250_break_ctl,
 	.startup	= serial8250_startup,
 	.shutdown	= serial8250_shutdown,
-	.settermios	= serial8250_settermios,
+	.set_termios	= serial8250_set_termios,
 	.pm		= serial8250_pm,
 	.type		= serial8250_type,
 	.release_port	= serial8250_release_port,

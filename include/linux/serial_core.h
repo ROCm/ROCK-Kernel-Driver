@@ -86,8 +86,8 @@ struct uart_ops {
 	void		(*break_ctl)(struct uart_port *, int ctl);
 	int		(*startup)(struct uart_port *);
 	void		(*shutdown)(struct uart_port *);
-	void		(*settermios)(struct uart_port *, struct termios *new,
-				      struct termios *old);
+	void		(*set_termios)(struct uart_port *, struct termios *new,
+				       struct termios *old);
 	void		(*pm)(struct uart_port *, unsigned int state,
 			      unsigned int oldstate);
 	int		(*set_wake)(struct uart_port *, unsigned int state);

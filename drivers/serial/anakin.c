@@ -283,8 +283,8 @@ static void anakin_shutdown(struct uart_port *port)
 }
 
 static void
-anakin_settermios(struct uart_port *port, struct termios *termios,
-		  struct termios *old)
+anakin_set_termios(struct uart_port *port, struct termios *termios,
+		   struct termios *old)
 {
 	unsigned long flags;
 	unsigned int quot;
@@ -337,7 +337,7 @@ static struct uart_ops anakin_pops = {
 	.break_ctl	= anakin_break_ctl,
 	.startup	= anakin_startup,
 	.shutdown	= anakin_shutdown,
-	.settermios	= anakin_settermios,
+	.set_termios	= anakin_set_termios,
 	.type		= anakin_type,
 };
 

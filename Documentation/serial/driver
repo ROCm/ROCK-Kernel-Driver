@@ -176,7 +176,7 @@ hardware.
 	Locking: port_sem taken.
 	Interrupts: caller dependent.
 
-  settermios(port,termios,oldtermios)
+  set_termios(port,termios,oldtermios)
 	Change the port parameters, including word length, parity, stop
 	bits.  Update read_status_mask and ignore_status_mask to indicate
 	the types of events we are interested in receiving.  Relevant

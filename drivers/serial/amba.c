@@ -403,8 +403,8 @@ static void ambauart_shutdown(struct uart_port *port)
 }
 
 static void
-ambauart_settermios(struct uart_port *port, struct termios *termios,
-		    struct termios *old)
+ambauart_set_termios(struct uart_port *port, struct termios *termios,
+		     struct termios *old)
 {
 	unsigned int lcr_h, old_cr;
 	unsigned long flags;
@@ -557,7 +557,7 @@ static struct uart_ops amba_pops = {
 	.break_ctl	= ambauart_break_ctl,
 	.startup	= ambauart_startup,
 	.shutdown	= ambauart_shutdown,
-	.settermios	= ambauart_settermios,
+	.set_termios	= ambauart_set_termios,
 	.type		= ambauart_type,
 	.release_port	= ambauart_release_port,
 	.request_port	= ambauart_request_port,

@@ -436,8 +436,8 @@ static void sa1100_shutdown(struct uart_port *port)
 }
 
 static void
-sa1100_settermios(struct uart_port *port, struct termios *termios,
-		  struct termios *old)
+sa1100_set_termios(struct uart_port *port, struct termios *termios,
+		   struct termios *old)
 {
 	struct sa1100_port *sport = (struct sa1100_port *)port;
 	unsigned long flags;
@@ -618,7 +618,7 @@ static struct uart_ops sa1100_pops = {
 	.break_ctl	= sa1100_break_ctl,
 	.startup	= sa1100_startup,
 	.shutdown	= sa1100_shutdown,
-	.settermios	= sa1100_settermios,
+	.set_termios	= sa1100_set_termios,
 	.type		= sa1100_type,
 	.release_port	= sa1100_release_port,
 	.request_port	= sa1100_request_port,
