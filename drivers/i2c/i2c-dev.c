@@ -37,9 +37,7 @@
 #include <linux/slab.h>
 #include <linux/version.h>
 #include <linux/smp_lock.h>
-#ifdef CONFIG_DEVFS_FS
 #include <linux/devfs_fs_kernel.h>
-#endif
 
 
 /* If you want debugging uncomment: */
@@ -80,10 +78,6 @@ static struct file_operations i2cdev_fops = {
 
 #define I2CDEV_ADAPS_MAX I2C_ADAP_MAX
 static struct i2c_adapter *i2cdev_adaps[I2CDEV_ADAPS_MAX];
-#ifdef CONFIG_DEVFS_FS
-static devfs_handle_t devfs_i2c[I2CDEV_ADAPS_MAX];
-static devfs_handle_t devfs_handle = NULL;
-#endif
 
 static struct i2c_driver i2cdev_driver = {
 	.name		= "i2c-dev dummy driver",
@@ -100,8 +94,6 @@ static struct i2c_client i2cdev_client_template = {
 	.addr		= -1,
 	.driver		= &i2cdev_driver,
 };
-
-static int i2cdev_initialized;
 
 static ssize_t i2cdev_read (struct file *file, char *buf, size_t count,
                             loff_t *offset)
@@ -399,7 +391,7 @@ static int i2cdev_release (struct inode *inode, struct file *file)
 int i2cdev_attach_adapter(struct i2c_adapter *adap)
 {
 	int i;
-	char name[8];
+	char name[12];
 
 	if ((i = i2c_adapter_id(adap)) < 0) {
 		printk(KERN_DEBUG "i2c-dev.o: Unknown adapter ?!?\n");
@@ -410,21 +402,17 @@ int i2cdev_attach_adapter(struct i2c_adapter *adap)
 		return -ENODEV;
 	}
 
-	sprintf (name, "%d", i);
+	sprintf (name, "i2c/%d", i);
 	if (! i2cdev_adaps[i]) {
 		i2cdev_adaps[i] = adap;
-#ifdef CONFIG_DEVFS_FS
-		devfs_i2c[i] = devfs_register (devfs_handle, name,
+		devfs_register (NULL, name,
 			DEVFS_FL_DEFAULT, I2C_MAJOR, i,
 			S_IFCHR | S_IRUSR | S_IWUSR,
 			&i2cdev_fops, NULL);
-#endif
 		printk(KERN_DEBUG "i2c-dev.o: Registered '%s' as minor %d\n",adap->name,i);
 	} else {
 		/* This is actually a detach_adapter call! */
-#ifdef CONFIG_DEVFS_FS
-		devfs_unregister(devfs_i2c[i]);
-#endif
+		devfs_remove("i2c/%d", i);
 		i2cdev_adaps[i] = NULL;
 #ifdef DEBUG
 		printk(KERN_DEBUG "i2c-dev.o: Adapter unregistered: %s\n",adap->name);
@@ -449,24 +437,13 @@ static void i2cdev_cleanup(void)
 {
 	int res;
 
-	if (i2cdev_initialized >= 2) {
-		if ((res = i2c_del_driver(&i2cdev_driver))) {
-			printk(KERN_ERR "i2c-dev.o: Driver deregistration failed, "
-			       "module not removed.\n");
-		}
-	i2cdev_initialized --;
+	if ((res = i2c_del_driver(&i2cdev_driver))) {
+		printk(KERN_ERR "i2c-dev.o: Driver deregistration failed, "
+		       "module not removed.\n");
 	}
 
-	if (i2cdev_initialized >= 1) {
-#ifdef CONFIG_DEVFS_FS
-		devfs_unregister(devfs_handle);
-#endif
-		if ((res = unregister_chrdev(I2C_MAJOR,"i2c"))) {
-			printk(KERN_ERR "i2c-dev.o: unable to release major %d for i2c bus\n",
-			       I2C_MAJOR);
-		}
-		i2cdev_initialized --;
-	}
+	devfs_remove("i2c");
+	unregister_chrdev(I2C_MAJOR,"i2c");
 }
 
 int __init i2c_dev_init(void)
@@ -475,23 +452,18 @@ int __init i2c_dev_init(void)
 
 	printk(KERN_INFO "i2c-dev.o: i2c /dev entries driver module version %s (%s)\n", I2C_VERSION, I2C_DATE);
 
-	i2cdev_initialized = 0;
 	if (register_chrdev(I2C_MAJOR,"i2c",&i2cdev_fops)) {
 		printk(KERN_ERR "i2c-dev.o: unable to get major %d for i2c bus\n",
 		       I2C_MAJOR);
 		return -EIO;
 	}
-#ifdef CONFIG_DEVFS_FS
-	devfs_handle = devfs_mk_dir(NULL, "i2c", NULL);
-#endif
-	i2cdev_initialized ++;
-
+	devfs_mk_dir(NULL, "i2c", NULL);
 	if ((res = i2c_add_driver(&i2cdev_driver))) {
 		printk(KERN_ERR "i2c-dev.o: Driver registration failed, module not inserted.\n");
-		i2cdev_cleanup();
+		devfs_remove("i2c");
+		unregister_chrdev(I2C_MAJOR,"i2c");
 		return res;
 	}
-	i2cdev_initialized ++;
 	return 0;
 }
 
