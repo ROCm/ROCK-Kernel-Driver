@@ -5,14 +5,19 @@
  *  Licensed under the terms of the GNU GPL License version 2.
  *  Based upon datasheets & sample CPUs kindly provided by VIA.
  *
- *  VIA have currently 2 different versions of Longhaul.
+ *  VIA have currently 3 different versions of Longhaul.
  *  Version 1 (Longhaul) uses the BCR2 MSR at 0x1147.
- *   It is present only in Samuel 1, Samuel 2 and Ezra.
- *  Version 2 (Powersaver) uses the POWERSAVER MSR at 0x110a.
- *   It is present in Ezra-T, Nehemiah and above.
- *   In addition to scaling multiplier, it can also scale voltage.
- *   There is provision for scaling FSB too, but this doesn't work
- *   too well in practice.
+ *   It is present only in Samuel 1 (C5A), Samuel 2 (C5B) stepping 0.
+ *  Version 2 of longhaul is the same as v1, but adds voltage scaling.
+ *   Present in Samuel 2 (steppings 1-7 only) (C5B), and Ezra (C5C)
+ *   voltage scaling support has currently been disabled in this driver
+ *   until we have code that gets it right.
+ *  Version 3 of longhaul got renamed to Powersaver and redesigned
+ *   to use the POWERSAVER MSR at 0x110a.
+ *   It is present in Ezra-T (C5M), Nehemiah (C5X) and above.
+ *   It's pretty much the same feature wise to longhaul v2, though
+ *   there is provision for scaling FSB too, but this doesn't work
+ *   too well in practice so we don't even try to use this.
  *
  *  BIG FAT DISCLAIMER: Work in progress code. Possibly *dangerous*
  */
@@ -126,6 +131,11 @@ static void longhaul_setstate(unsigned int clock_ratio_index)
 	dprintk (KERN_INFO PFX "FSB:%d Mult:%d.%dx\n", fsb, mult/10, mult%10);
 
 	switch (longhaul_version) {
+
+	/*
+	 * Longhaul v1. (Samuel[C5A] and Samuel2 stepping 0[C5B])
+	 * Software controlled multipliers only.
+	 */
 	case 1:
 		rdmsrl (MSR_VIA_BCR2, bcr2.val);
 		/* Enable software clock multiplier */
@@ -166,6 +176,7 @@ static void longhaul_setstate(unsigned int clock_ratio_index)
 		longhaul.bits.RevisionKey = 3;
 		wrmsrl (MSR_VIA_LONGHAUL, longhaul.val);
 		break;
+
 	case 3:
 		rdmsrl (MSR_VIA_LONGHAUL, longhaul.val);
 		longhaul.bits.SoftBusRatio = clock_ratio_index & 0xf;
