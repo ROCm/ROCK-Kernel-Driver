@@ -9,6 +9,7 @@
  * 07/10/00 Fixed detection of CMS formatted disks     
  * 02/13/00 VTOC partition support added
  * 12/27/01 fixed PL030593 (CMS reserved minidisk not detected on 64 bit)
+ * 07/24/03 no longer using contents of freed page for CMS label recognition (BZ3611)
  */
 
 #include <linux/config.h>
@@ -98,7 +99,7 @@ ibm_partition(struct parsed_partitions *state, struct block_device *bdev)
 		/*
 		 * VM style CMS1 labeled disk
 		 */
-		int *label = (int *) data;
+		int *label = (int *) vlabel;
 
 		if (label[13] != 0) {
 			printk("CMS1/%8s(MDSK):", name);
