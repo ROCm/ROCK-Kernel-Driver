@@ -42,8 +42,8 @@ tape_std_assign_timeout(unsigned long data)
 
 	spin_lock_irq(get_ccwdev_lock(device->cdev));
 	if (request->callback != NULL) {
-		DBF_EVENT(3, "%s: Assignment timeout. Device busy.\n",
-			device->cdev->dev.bus_id);
+		DBF_EVENT(3, "%08x: Assignment timeout. Device busy.\n",
+			device->cdev_id);
 		PRINT_ERR("%s: Assignment timeout. Device busy.\n",
 			device->cdev->dev.bus_id);
 		ccw_device_clear(device->cdev, (long) request);
@@ -84,10 +84,10 @@ tape_std_assign(struct tape_device *device)
 	if (rc != 0) {
 		PRINT_WARN("%s: assign failed - device might be busy\n",
 			device->cdev->dev.bus_id);
-		DBF_EVENT(3, "%s: assign failed - device might be busy\n",
-			device->cdev->dev.bus_id);
+		DBF_EVENT(3, "%08x: assign failed - device might be busy\n",
+			device->cdev_id);
 	} else {
-		DBF_EVENT(3, "%s: Tape assigned\n", device->cdev->dev.bus_id);
+		DBF_EVENT(3, "%08x: Tape assigned\n", device->cdev_id);
 	}
 	tape_free_request(request);
 	return rc;
@@ -102,6 +102,14 @@ tape_std_unassign (struct tape_device *device)
 	int                  rc;
 	struct tape_request *request;
 
+	if (device->tape_state == TS_NOT_OPER) {
+		DBF_EVENT(3, "(%08x): Can't unassign device\n",
+			device->cdev_id);
+		PRINT_WARN("(%s): Can't unassign device - device gone\n",
+			device->cdev->dev.bus_id);
+		return -EIO;
+	}
+
 	request = tape_alloc_request(2, 11);
 	if (IS_ERR(request))
 		return PTR_ERR(request);
@@ -111,10 +119,10 @@ tape_std_unassign (struct tape_device *device)
 	tape_ccw_end(request->cpaddr + 1, NOP, 0, NULL);
 
 	if ((rc = tape_do_io(device, request)) != 0) {
-		DBF_EVENT(3, "%s: Unassign failed\n", device->cdev->dev.bus_id);
+		DBF_EVENT(3, "%08x: Unassign failed\n", device->cdev_id);
 		PRINT_WARN("%s: Unassign failed\n", device->cdev->dev.bus_id);
 	} else {
-		DBF_EVENT(3, "%s: Tape unassigned\n", device->cdev->dev.bus_id);
+		DBF_EVENT(3, "%08x: Tape unassigned\n", device->cdev_id);
 	}
 	tape_free_request(request);
 	return rc;
