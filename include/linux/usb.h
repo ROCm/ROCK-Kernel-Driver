@@ -317,6 +317,223 @@ int __usb_get_extra_descriptor(char *buffer, unsigned size,
 	__usb_get_extra_descriptor((ifpoint)->extra,(ifpoint)->extralen,\
 		type,(void**)ptr)
 
+/* -------------------------------------------------------------------------- */
+
+/* Host Controller Driver (HCD) support */
+
+struct usb_operations;
+
+#define DEVNUM_ROUND_ROBIN	/***** OPTION *****/
+
+/*
+ * Allocated per bus we have
+ */
+struct usb_bus {
+	int busnum;			/* Bus number (in order of reg) */
+	char *bus_name;			/* stable id (PCI slot_name etc) */
+
+#ifdef DEVNUM_ROUND_ROBIN
+	int devnum_next;                /* Next open device number in round-robin allocation */
+#endif /* DEVNUM_ROUND_ROBIN */
+
+	struct usb_devmap devmap;       /* device address allocation map */
+	struct usb_operations *op;      /* Operations (specific to the HC) */
+	struct usb_device *root_hub;    /* Root hub */
+	struct list_head bus_list;	/* list of busses */
+	void *hcpriv;                   /* Host Controller private data */
+
+	int bandwidth_allocated;	/* on this bus: how much of the time
+					 * reserved for periodic (intr/iso)
+					 * requests is used, on average?
+					 * Units: microseconds/frame.
+					 * Limits: Full/low speed reserve 90%,
+					 * while high speed reserves 80%.
+					 */
+	int bandwidth_int_reqs;		/* number of Interrupt requests */
+	int bandwidth_isoc_reqs;	/* number of Isoc. requests */
+
+	struct dentry *dentry;		/* usbfs dentry entry for the bus */
+
+	atomic_t refcnt;
+};
+
+// FIXME:  root_hub_string vanishes when "usb_hcd" conversion is done,
+// along with pre-hcd versions of the OHCI and UHCI drivers.
+extern int usb_root_hub_string(int id, int serial,
+		char *type, __u8 *data, int len);
+
+/*
+ * As of USB 2.0, full/low speed devices are segregated into trees.
+ * One type grows from USB 1.1 host controllers (OHCI, UHCI etc).
+ * The other type grows from high speed hubs when they connect to
+ * full/low speed devices using "Transaction Translators" (TTs).
+ *
+ * TTs should only be known to the hub driver, and high speed bus
+ * drivers (only EHCI for now).  They affect periodic scheduling and
+ * sometimes control/bulk error recovery.
+ */
+struct usb_tt {
+	struct usb_device	*hub;	/* upstream highspeed hub */
+	int			multi;	/* true means one TT per port */
+};
+
+
+/* -------------------------------------------------------------------------- */
+
+/* This is arbitrary.
+ * From USB 2.0 spec Table 11-13, offset 7, a hub can
+ * have up to 255 ports. The most yet reported is 10.
+ */
+#define USB_MAXCHILDREN		(16)
+
+struct usb_device {
+	int		devnum;		/* Address on USB bus */
+	char		devpath [16];	/* Use in messages: /port/port/... */
+
+	enum {
+		USB_SPEED_UNKNOWN = 0,			/* enumerating */
+		USB_SPEED_LOW, USB_SPEED_FULL,		/* usb 1.1 */
+		USB_SPEED_HIGH				/* usb 2.0 */
+	} speed;
+
+	struct usb_tt	*tt; 		/* low/full speed dev, highspeed hub */
+	int		ttport;		/* device port on that tt hub */
+
+	atomic_t refcnt;		/* Reference count */
+	struct semaphore serialize;
+
+	unsigned int toggle[2];		/* one bit for each endpoint ([0] = IN, [1] = OUT) */
+	unsigned int halted[2];		/* endpoint halts; one bit per endpoint # & direction; */
+					/* [0] = IN, [1] = OUT */
+	int epmaxpacketin[16];		/* INput endpoint specific maximums */
+	int epmaxpacketout[16];		/* OUTput endpoint specific maximums */
+
+	struct usb_device *parent;	/* our hub, unless we're the root */
+	struct usb_bus *bus;		/* Bus we're part of */
+
+	struct device dev;		/* Generic device interface */
+
+	struct usb_device_descriptor descriptor;/* Descriptor */
+	struct usb_config_descriptor *config;	/* All of the configs */
+	struct usb_config_descriptor *actconfig;/* the active configuration */
+
+	char **rawdescriptors;		/* Raw descriptors for each config */
+
+	int have_langid;		/* whether string_langid is valid yet */
+	int string_langid;		/* language ID for strings */
+  
+	void *hcpriv;			/* Host Controller private data */
+	
+	struct list_head filelist;
+	struct dentry *dentry;		/* usbfs dentry entry for the device */
+
+	/*
+	 * Child devices - these can be either new devices
+	 * (if this is a hub device), or different instances
+	 * of this same device.
+	 *
+	 * Each instance needs its own set of data structures.
+	 */
+
+	int maxchild;			/* Number of ports if hub */
+	struct usb_device *children[USB_MAXCHILDREN];
+};
+
+/* for when layers above USB add new non-USB drivers */
+extern void usb_scan_devices(void);
+
+/* mostly for devices emulating SCSI over USB */
+extern int usb_reset_device(struct usb_device *dev);
+
+/* for drivers using iso endpoints */
+extern int usb_get_current_frame_number (struct usb_device *usb_dev);
+
+/**
+ * usb_inc_dev_use - record another reference to a device
+ * @dev: the device being referenced
+ *
+ * Each live reference to a device should be refcounted.
+ *
+ * Drivers for USB interfaces should normally record such references in
+ * their probe() methods, when they bind to an interface, and release
+ * them usb_dec_dev_use(), in their disconnect() methods.
+ */
+static inline void usb_inc_dev_use (struct usb_device *dev)
+{
+	atomic_inc (&dev->refcnt);
+}
+
+/**
+ * usb_dec_dev_use - drop a reference to a device
+ * @dev: the device no longer being referenced
+ *
+ * Each live reference to a device should be refcounted.
+ *
+ * Drivers for USB interfaces should normally release such references in
+ * their disconnect() methods, and record them in probe().
+ *
+ * Note that driver disconnect() methods must guarantee that when they
+ * return, all of their outstanding references to the device (and its
+ * interfaces) are cleaned up.  That means that all pending URBs from
+ * this driver must have completed, and that no more copies of the device
+ * handle are saved in driver records (including other kernel threads).
+ */
+static inline void usb_dec_dev_use (struct usb_device *dev)
+{
+	if (atomic_dec_and_test (&dev->refcnt)) {
+		/* May only go to zero when usbcore finishes
+		 * usb_disconnect() processing:  khubd or HCDs.
+		 *
+		 * If you hit this BUG() it's likely a problem
+		 * with some driver's disconnect() routine.
+		 */
+		BUG ();
+	}
+}
+
+
+/* used these for multi-interface device registration */
+extern int usb_find_interface_driver_for_ifnum(struct usb_device *dev, unsigned int ifnum);
+extern void usb_driver_claim_interface(struct usb_driver *driver,
+			struct usb_interface *iface, void* priv);
+extern int usb_interface_claimed(struct usb_interface *iface);
+extern void usb_driver_release_interface(struct usb_driver *driver,
+			struct usb_interface *iface);
+const struct usb_device_id *usb_match_id(struct usb_device *dev,
+					 struct usb_interface *interface,
+					 const struct usb_device_id *id);
+
+/**
+ * usb_make_path - returns stable device path in the usb tree
+ * @dev: the device whose path is being constructed
+ * @buf: where to put the string
+ * @size: how big is "buf"?
+ *
+ * Returns length of the string (> 0) or negative if size was too small.
+ *
+ * This identifier is intended to be "stable", reflecting physical paths in
+ * hardware such as physical bus addresses for host controllers or ports on
+ * USB hubs.  That makes it stay the same until systems are physically
+ * reconfigured, by re-cabling a tree of USB devices or by moving USB host
+ * controllers.  Adding and removing devices, including virtual root hubs
+ * in host controller driver modules, does not change these path identifers;
+ * neither does rebooting or re-enumerating.  These are more useful identifiers
+ * than changeable ("unstable") ones like bus numbers or device addresses.
+ * 
+ * With a partial exception for devices connected to USB 2.0 root hubs, these
+ * identifiers are also predictable:  so long as the device tree isn't changed,
+ * plugging any USB device into a given hub port always gives it the same path.
+ * Because of the use of "companion" controllers, devices connected to ports on
+ * USB 2.0 root hubs (EHCI host controllers) will get one path ID if they are
+ * high speed, and a different one if they are full or low speed.
+ */
+static inline int usb_make_path (struct usb_device *dev, char *buf, size_t size)
+{
+	int actual;
+	actual = snprintf (buf, size, "usb-%s-%s", dev->bus->bus_name, dev->devpath);
+	return (actual >= size) ? -1 : actual;
+}
+
 /*-------------------------------------------------------------------------*/
 
 /*
@@ -826,10 +1043,14 @@ static inline void usb_fill_bulk_urb (struct urb *urb,
  * @buffer_length: length of the transfer buffer
  * @complete: pointer to the usb_complete_t function
  * @context: what to set the urb context to.
- * @interval: what to set the urb interval to.
+ * @interval: what to set the urb interval to, encoded like
+ *	the endpoint descriptor's bInterval value.
  *
  * Initializes a interrupt urb with the proper information needed to submit
  * it to a device.
+ * Note that high speed interrupt endpoints use a logarithmic encoding of
+ * the endpoint interval, and express polling intervals in microframes
+ * (eight per millisecond) rather than in frames (one per millisecond).
  */
 static inline void usb_fill_int_urb (struct urb *urb,
 				     struct usb_device *dev,
@@ -847,7 +1068,10 @@ static inline void usb_fill_int_urb (struct urb *urb,
 	urb->transfer_buffer_length = buffer_length;
 	urb->complete = complete;
 	urb->context = context;
-	urb->interval = interval;
+	if (dev->speed == USB_SPEED_HIGH)
+		urb->interval = 1 << (interval - 1);
+	else
+		urb->interval = interval;
 	urb->start_frame = -1;
 }
 
@@ -905,221 +1129,6 @@ extern int usb_set_interface(struct usb_device *dev, int ifnum, int alternate);
 #endif
 
 #define USB_CTRL_SET_TIMEOUT 3
-
-/* -------------------------------------------------------------------------- */
-
-/* Host Controller Driver (HCD) support */
-
-struct usb_operations;
-
-#define DEVNUM_ROUND_ROBIN	/***** OPTION *****/
-
-/*
- * Allocated per bus we have
- */
-struct usb_bus {
-	int busnum;			/* Bus number (in order of reg) */
-	char *bus_name;			/* stable id (PCI slot_name etc) */
-
-#ifdef DEVNUM_ROUND_ROBIN
-	int devnum_next;                /* Next open device number in round-robin allocation */
-#endif /* DEVNUM_ROUND_ROBIN */
-
-	struct usb_devmap devmap;       /* Device map */
-	struct usb_operations *op;      /* Operations (specific to the HC) */
-	struct usb_device *root_hub;    /* Root hub */
-	struct list_head bus_list;
-	void *hcpriv;                   /* Host Controller private data */
-
-	int bandwidth_allocated;	/* on this Host Controller; */
-					  /* applies to Int. and Isoc. pipes; */
-					  /* measured in microseconds/frame; */
-					  /* range is 0..900, where 900 = */
-					  /* 90% of a 1-millisecond frame */
-	int bandwidth_int_reqs;		/* number of Interrupt requesters */
-	int bandwidth_isoc_reqs;	/* number of Isoc. requesters */
-
-	struct dentry *dentry;		/* usbfs dentry entry for the bus */
-
-	atomic_t refcnt;
-};
-
-// FIXME:  root_hub_string vanishes when "usb_hcd" conversion is done,
-// along with pre-hcd versions of the OHCI and UHCI drivers.
-extern int usb_root_hub_string(int id, int serial,
-		char *type, __u8 *data, int len);
-
-/*
- * As of USB 2.0, full/low speed devices are segregated into trees.
- * One type grows from USB 1.1 host controllers (OHCI, UHCI etc).
- * The other type grows from high speed hubs when they connect to
- * full/low speed devices using "Transaction Translators" (TTs).
- *
- * TTs should only be known to the hub driver, and high speed bus
- * drivers (only EHCI for now).  They affect periodic scheduling and
- * sometimes control/bulk error recovery.
- */
-struct usb_tt {
-	struct usb_device	*hub;	/* upstream highspeed hub */
-	int			multi;	/* true means one TT per port */
-};
-
-
-/* -------------------------------------------------------------------------- */
-
-/* This is arbitrary.
- * From USB 2.0 spec Table 11-13, offset 7, a hub can
- * have up to 255 ports. The most yet reported is 10.
- */
-#define USB_MAXCHILDREN		(16)
-
-struct usb_device {
-	int		devnum;		/* Address on USB bus */
-	char		devpath [16];	/* Use in messages: /port/port/... */
-
-	enum {
-		USB_SPEED_UNKNOWN = 0,			/* enumerating */
-		USB_SPEED_LOW, USB_SPEED_FULL,		/* usb 1.1 */
-		USB_SPEED_HIGH				/* usb 2.0 */
-	} speed;
-
-	struct usb_tt	*tt; 		/* low/full speed dev, highspeed hub */
-	int		ttport;		/* device port on that tt hub */
-
-	atomic_t refcnt;		/* Reference count */
-	struct semaphore serialize;
-
-	unsigned int toggle[2];		/* one bit for each endpoint ([0] = IN, [1] = OUT) */
-	unsigned int halted[2];		/* endpoint halts; one bit per endpoint # & direction; */
-					/* [0] = IN, [1] = OUT */
-	int epmaxpacketin[16];		/* INput endpoint specific maximums */
-	int epmaxpacketout[16];		/* OUTput endpoint specific maximums */
-
-	struct usb_device *parent;
-	struct usb_bus *bus;		/* Bus we're part of */
-
-	struct device dev;		/* Generic device interface */
-
-	struct usb_device_descriptor descriptor;/* Descriptor */
-	struct usb_config_descriptor *config;	/* All of the configs */
-	struct usb_config_descriptor *actconfig;/* the active configuration */
-
-	char **rawdescriptors;		/* Raw descriptors for each config */
-
-	int have_langid;		/* whether string_langid is valid yet */
-	int string_langid;		/* language ID for strings */
-  
-	void *hcpriv;			/* Host Controller private data */
-	
-	struct list_head filelist;
-	struct dentry *dentry;		/* usbfs dentry entry for the device */
-
-	/*
-	 * Child devices - these can be either new devices
-	 * (if this is a hub device), or different instances
-	 * of this same device.
-	 *
-	 * Each instance needs its own set of data structures.
-	 */
-
-	int maxchild;			/* Number of ports if hub */
-	struct usb_device *children[USB_MAXCHILDREN];
-};
-
-/* for when layers above USB add new non-USB drivers */
-extern void usb_scan_devices(void);
-
-/* mostly for devices emulating SCSI over USB */
-extern int usb_reset_device(struct usb_device *dev);
-
-/* for drivers using iso endpoints */
-extern int usb_get_current_frame_number (struct usb_device *usb_dev);
-
-/**
- * usb_inc_dev_use - record another reference to a device
- * @dev: the device being referenced
- *
- * Each live reference to a device should be refcounted.
- *
- * Drivers for USB interfaces should normally record such references in
- * their probe() methods, when they bind to an interface, and release
- * them usb_dec_dev_use(), in their disconnect() methods.
- */
-static inline void usb_inc_dev_use (struct usb_device *dev)
-{
-	atomic_inc (&dev->refcnt);
-}
-
-/**
- * usb_dec_dev_use - drop a reference to a device
- * @dev: the device no longer being referenced
- *
- * Each live reference to a device should be refcounted.
- *
- * Drivers for USB interfaces should normally release such references in
- * their disconnect() methods, and record them in probe().
- *
- * Note that driver disconnect() methods must guarantee that when they
- * return, all of their outstanding references to the device (and its
- * interfaces) are cleaned up.  That means that all pending URBs from
- * this driver must have completed, and that no more copies of the device
- * handle are saved in driver records (including other kernel threads).
- */
-static inline void usb_dec_dev_use (struct usb_device *dev)
-{
-	if (atomic_dec_and_test (&dev->refcnt)) {
-		/* May only go to zero when usbcore finishes
-		 * usb_disconnect() processing:  khubd or HCDs.
-		 *
-		 * If you hit this BUG() it's likely a problem
-		 * with some driver's disconnect() routine.
-		 */
-		BUG ();
-	}
-}
-
-
-/* used these for multi-interface device registration */
-extern int usb_find_interface_driver_for_ifnum(struct usb_device *dev, unsigned int ifnum);
-extern void usb_driver_claim_interface(struct usb_driver *driver,
-			struct usb_interface *iface, void* priv);
-extern int usb_interface_claimed(struct usb_interface *iface);
-extern void usb_driver_release_interface(struct usb_driver *driver,
-			struct usb_interface *iface);
-const struct usb_device_id *usb_match_id(struct usb_device *dev,
-					 struct usb_interface *interface,
-					 const struct usb_device_id *id);
-
-/**
- * usb_make_path - returns stable device path in the usb tree
- * @dev: the device whose path is being constructed
- * @buf: where to put the string
- * @size: how big is "buf"?
- *
- * Returns length of the string (> 0) or negative if size was too small.
- *
- * This identifier is intended to be "stable", reflecting physical paths in
- * hardware such as physical bus addresses for host controllers or ports on
- * USB hubs.  That makes it stay the same until systems are physically
- * reconfigured, by re-cabling a tree of USB devices or by moving USB host
- * controllers.  Adding and removing devices, including virtual root hubs
- * in host controller driver modules, does not change these path identifers;
- * neither does rebooting or re-enumerating.  These are more useful identifiers
- * than changeable ("unstable") ones like bus numbers or device addresses.
- * 
- * With a partial exception for devices connected to USB 2.0 root hubs, these
- * identifiers are also predictable:  so long as the device tree isn't changed,
- * plugging any USB device into a given hub port always gives it the same path.
- * Because of the use of "companion" controllers, devices connected to ports on
- * USB 2.0 root hubs (EHCI host controllers) will get one path ID if they are
- * high speed, and a different one if they are full or low speed.
- */
-static inline int usb_make_path (struct usb_device *dev, char *buf, size_t size)
-{
-	int actual;
-	actual = snprintf (buf, size, "usb-%s-%s", dev->bus->bus_name, dev->devpath);
-	return (actual >= size) ? -1 : actual;
-}
 
 /* -------------------------------------------------------------------------- */
 

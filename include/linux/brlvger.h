@@ -31,7 +31,7 @@
 #define BRLVGER_BUZZ		4
 
 /* Number of supported devices, and range of covered minors */
-#define MAX_NR_BRLVGER_DEVS	2
+#define MAX_NR_BRLVGER_DEVS	4
 
 /* Base minor for the char devices */
 #define BRLVGER_MINOR		128

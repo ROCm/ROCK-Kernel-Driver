@@ -96,7 +96,10 @@ ohci_hub_status_data (struct usb_hcd *hcd, char *buf)
 				| RH_PS_OCIC | RH_PS_PRSC;
 		if (status) {
 			changed = 1;
-			set_bit (i + 1, buf);
+			if (i < 7)
+			    buf [0] |= 1 << (i + 1);
+			else
+			    buf [1] |= 1 << (i - 7);
 		}
 	}
 	return changed ? length : 0;

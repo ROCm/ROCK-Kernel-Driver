@@ -2625,7 +2625,6 @@ EXPORT_SYMBOL(usb_scan_devices);
 
 EXPORT_SYMBOL(usb_alloc_dev);
 EXPORT_SYMBOL(usb_free_dev);
-EXPORT_SYMBOL(usb_inc_dev_use);
 
 EXPORT_SYMBOL(usb_find_interface_driver_for_ifnum);
 EXPORT_SYMBOL(usb_driver_claim_interface);
