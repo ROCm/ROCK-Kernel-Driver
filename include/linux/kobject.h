@@ -27,7 +27,7 @@
 #define KOBJ_NAME_LEN	20
 
 /* counter to tag the hotplug event, read only except for the kobject core */
-extern unsigned long hotplug_seqnum;
+extern u64 hotplug_seqnum;
 
 struct kobject {
 	char			* k_name;

@@ -118,7 +118,7 @@ char * kobject_get_path(struct kset *kset, struct kobject *kobj, int gfp_mask)
 	return path;
 }
 
-unsigned long hotplug_seqnum;
+u64 hotplug_seqnum;
 #ifdef CONFIG_HOTPLUG
 
 #define BUFFER_SIZE	1024	/* should be enough memory for the env */
