@@ -36,7 +36,7 @@
 
 #define ELEMENTS(arr) (sizeof (arr)/sizeof (arr[0]))
 
-extern struct sparc_phys_banks sp_banks[SPARC_PHYS_BANKS];
+extern struct sparc_phys_banks sp_banks[SPARC_PHYS_BANKS+1];
 extern int prom_node_root;
 
 /* At boot time we determine these two values necessary for setting
@@ -72,7 +72,7 @@ int prom_probe_memory (void)
 		mlist = mlist->theres_more;
 		bytes = mlist->num_bytes;
 		tally += bytes;
-		if (i >= SPARC_PHYS_BANKS-1) {
+		if (i > SPARC_PHYS_BANKS-1) {
 			printk ("The machine has more banks than "
 				"this kernel can support\n"
 				"Increase the SPARC_PHYS_BANKS "

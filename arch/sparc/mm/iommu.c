@@ -405,7 +405,7 @@ static struct page *iommu_translate_dvma(unsigned long busa)
 	iopte_t *iopte = iommu->page_table;
 
 	iopte += ((busa - iommu->start) >> PAGE_SHIFT);
-	return pfn_to_page((pte_val(*iopte) & IOPTE_PAGE) >> (PAGE_SHIFT-4));
+	return pfn_to_page((iopte_val(*iopte) & IOPTE_PAGE) >> (PAGE_SHIFT-4));
 }
 #endif
 
