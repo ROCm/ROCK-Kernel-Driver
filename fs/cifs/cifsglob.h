@@ -110,7 +110,8 @@ struct TCP_Server_Info {
 		struct sockaddr_in sockAddr;
 		struct sockaddr_in6 sockAddr6;
 	} addr;
-	wait_queue_head_t response_q;
+	wait_queue_head_t response_q; 
+	wait_queue_head_t request_q; /* if more than maxmpx to srvr must block*/
 	struct list_head pending_mid_q;
 	void *Server_NlsInfo;	/* BB - placeholder for future NLS info  */
 	unsigned short server_codepage;	/* codepage for the server    */
@@ -119,7 +120,8 @@ struct TCP_Server_Info {
 	char versionMajor;
 	char versionMinor;
 	int svlocal:1;		/* local server or remote */
-	atomic_t socketUseCount;	/* indicates if the server has any open cifs sessions */
+	atomic_t socketUseCount; /* number of open cifs sessions on socket */
+	atomic_t inFlight;  /* number of requests on the wire to server */
 	enum statusEnum tcpStatus; /* what we think the status is */
 	struct semaphore tcpSem;
 	struct task_struct *tsk;
@@ -163,7 +165,7 @@ struct cifsSesInfo {
 	struct semaphore sesSem;
 	struct cifsUidInfo *uidInfo;	/* pointer to user info */
 	struct TCP_Server_Info *server;	/* pointer to server info */
-	atomic_t inUse;		/* # of CURRENT users of this ses */
+	atomic_t inUse; /* # of mounts (tree connections) on this ses */
 	enum statusEnum status;
 	__u32 sequence_number;  /* needed for CIFS PDU signature */
 	__u16 ipc_tid;		/* special tid for connection to IPC share */

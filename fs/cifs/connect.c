@@ -165,6 +165,7 @@ cifs_reconnect(struct TCP_Server_Info *server)
 		} else {
 			atomic_inc(&tcpSesReconnectCount);
 			server->tcpStatus = CifsGood;
+			atomic_set(&server->inFlight,0);
 			wake_up(&server->response_q);
 		}
 	}
@@ -390,8 +391,14 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 			}
 		}
 	}
-   
 	server->tcpStatus = CifsExiting;
+	atomic_set(&server->inFlight, 0);
+	/* Although there should not be any requests blocked on 
+	this queue it can not hurt to be paranoid and try to wake up requests
+	that may haven been blocked when more than 50 at time were on the wire 
+	to the same server - they now will see the session is in exit state
+	and get out of SendReceive.  */
+	wake_up_all(&server->request_q);   
 	server->tsk = NULL;
 	if(server->ssocket) {
 		sock_release(csocket);
@@ -1211,8 +1218,9 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 			return rc;
 		} else {
 			memset(srvTcp, 0, sizeof (struct TCP_Server_Info));
-			memcpy(&srvTcp->addr.sockAddr, &sin_server, sizeof (struct sockaddr_in));	
-            /* BB Add code for ipv6 case too */
+			memcpy(&srvTcp->addr.sockAddr, &sin_server, sizeof (struct sockaddr_in));
+			atomic_set(&srvTcp->inFlight,0);
+			/* BB Add code for ipv6 case too */
 			srvTcp->ssocket = csocket;
 			srvTcp->protocolType = IPV4;
 			init_waitqueue_head(&srvTcp->response_q);
@@ -2752,6 +2760,7 @@ cifs_umount(struct super_block *sb, struct cifs_sb_info *cifs_sb)
 				FreeXid(xid);
 				return 0;
 			}
+ 
 			set_current_state(TASK_INTERRUPTIBLE);
 			schedule_timeout(HZ / 4);	/* give captive thread time to exit */
 			if((ses->server) && (ses->server->ssocket)) {            
