@@ -147,7 +147,9 @@ int DRM(addmap)( struct inode *inode, struct file *filp,
 					      MTRR_TYPE_WRCOMB, 1 );
 		}
 #endif
-		map->handle = DRM(ioremap)( map->offset, map->size, dev );
+		if (map->type == _DRM_REGISTERS)
+			map->handle = DRM(ioremap)( map->offset, map->size,
+						    dev );
 		break;
 
 	case _DRM_SHM:
