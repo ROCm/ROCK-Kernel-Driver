@@ -890,14 +890,22 @@ dc390_DataIO_Comm( struct dc390_acb* pACB, struct dc390_srb* pSRB, u8 ioDir)
 
     if (pSRB == pACB->pTmpSRB)
     {
-	if (pDCB) printk (KERN_ERR "DC390: pSRB == pTmpSRB! (TagQ Error?) (%02i-%i)\n",
-			  pDCB->TargetID, pDCB->TargetLUN);
-	else printk (KERN_ERR "DC390: pSRB == pTmpSRB! (TagQ Error?) (DCB 0!)\n");
+	if (pDCB)
+		printk(KERN_ERR "DC390: pSRB == pTmpSRB! (TagQ Error?) (%02i-%i)\n", pDCB->TargetID, pDCB->TargetLUN);
+	else
+		printk(KERN_ERR "DC390: pSRB == pTmpSRB! (TagQ Error?) (DCB 0!)\n");
 
-	pSRB->pSRBDCB = pDCB;
-	dc390_EnableMsgOut_Abort (pACB, pSRB);
-	if (pDCB) pDCB->DCBFlag |= ABORT_DEV;
-	return;
+	/* Try to recover - some broken disks react badly to tagged INQUIRY */
+	if (pDCB && pACB->scan_devices && pDCB->GoingSRBCnt == 1) {
+		pSRB = pDCB->pGoingSRB;
+		pDCB->pActiveSRB = pSRB;
+	} else {
+		pSRB->pSRBDCB = pDCB;
+		dc390_EnableMsgOut_Abort(pACB, pSRB);
+		if (pDCB)
+			pDCB->DCBFlag |= ABORT_DEV;
+		return;
+	}
     }
 
     if( pSRB->SGIndex < pSRB->SGcount )
