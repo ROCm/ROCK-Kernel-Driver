@@ -81,29 +81,29 @@ do {	(s)->imask = (i); \
  * That's why here are the following inline functions...
  */
  
-typedef unsigned long xram_p;
+typedef void __iomem *xram_p;
 
 /* Get 32bit number from XRAM */
-static inline u32 xram_get_32 (xram_p x)
+static inline u32 xram_get_32(xram_p x)
 {
 	return ((sbus_readw(x + 0x00UL) << 16) |
 		(sbus_readw(x + 0x02UL)));
 }
 
 /* Like the above, but when we don't care about the high 16 bits */
-static inline u32 xram_get_32low (xram_p x)
+static inline u32 xram_get_32low(xram_p x)
 {
 	return (u32) sbus_readw(x + 0x02UL);
 }
 
-static inline u16 xram_get_16 (xram_p x)
+static inline u16 xram_get_16(xram_p x)
 {
 	return sbus_readw(x);
 }
 
-static inline u8 xram_get_8 (xram_p x)
+static inline u8 xram_get_8(xram_p x)
 {
-	if (x & (xram_p)0x1) {
+	if ((unsigned long)x & 0x1UL) {
 		x = x - 1;
 		return (u8) sbus_readw(x);
 	} else {
@@ -111,7 +111,7 @@ static inline u8 xram_get_8 (xram_p x)
 	}
 }
 
-static inline void xram_copy_from (void *p, xram_p x, int len)
+static inline void xram_copy_from(void *p, xram_p x, int len)
 {
 	for (len >>= 2; len > 0; len--, x += sizeof(u32)) {
 		u32 val, *p32 = p;
@@ -123,7 +123,7 @@ static inline void xram_copy_from (void *p, xram_p x, int len)
 	}
 }
 
-static inline void xram_copy_to (xram_p x, void *p, int len)
+static inline void xram_copy_to(xram_p x, void *p, int len)
 {
 	for (len >>= 2; len > 0; len--, x += sizeof(u32)) {
 		u32 tmp, *p32 = p;
@@ -135,7 +135,7 @@ static inline void xram_copy_to (xram_p x, void *p, int len)
 	}
 }
 
-static inline void xram_bzero (xram_p x, int len)
+static inline void xram_bzero(xram_p x, int len)
 {
 	for (len >>= 1; len > 0; len--, x += sizeof(u16))
 		sbus_writew(0, x);
@@ -274,7 +274,7 @@ struct soc {
 	soc_cq			req[2]; /* Request CQs */
 	soc_cq			rsp[2]; /* Response CQs */
 	int			soc_no;
-	unsigned long		regs;
+	void __iomem		*regs;
 	xram_p			xram;
 	fc_wwn			wwn;
 	u32			imask;	/* Our copy of regs->imask */

@@ -314,7 +314,7 @@ struct amd7930_map {
 
 typedef struct snd_amd7930 {
 	spinlock_t		lock;
-	unsigned long		regs;
+	void __iomem		*regs;
 	u32			flags;
 #define AMD7930_FLAG_PLAYBACK	0x00000001
 #define AMD7930_FLAG_CAPTURE	0x00000002

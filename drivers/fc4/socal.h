@@ -295,9 +295,9 @@ struct socal {
 	socal_cq		req[4]; /* Request CQs */
 	socal_cq		rsp[4]; /* Response CQs */
 	int			socal_no;
-	unsigned long		regs;
-	unsigned long		xram;
-	unsigned long		eeprom;
+	void __iomem		*regs;
+	void __iomem		*xram;
+	void __iomem		*eeprom;
 	fc_wwn			wwn;
 	u32			imask;	/* Our copy of regs->imask */
 	u32			cfg;	/* Our copy of regs->cfg */

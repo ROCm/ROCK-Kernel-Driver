@@ -203,12 +203,12 @@ MODULE_DEVICE_TABLE(pci, happymeal_pci_ids);
  */
 
 #if defined(CONFIG_SBUS) && defined(CONFIG_PCI)
-static void sbus_hme_write32(unsigned long reg, u32 val)
+static void sbus_hme_write32(void __iomem *reg, u32 val)
 {
 	sbus_writel(val, reg);
 }
 
-static u32 sbus_hme_read32(unsigned long reg)
+static u32 sbus_hme_read32(void __iomem *reg)
 {
 	return sbus_readl(reg);
 }
@@ -232,12 +232,12 @@ static u32 sbus_hme_read_desc32(u32 *p)
 	return *p;
 }
 
-static void pci_hme_write32(unsigned long reg, u32 val)
+static void pci_hme_write32(void __iomem *reg, u32 val)
 {
 	writel(val, reg);
 }
 
-static u32 pci_hme_read32(unsigned long reg)
+static u32 pci_hme_read32(void __iomem *reg)
 {
 	return readl(reg);
 }
@@ -354,7 +354,7 @@ do {	(__txd)->tx_addr = cpu_to_le32(__addr); \
 
 
 /* Oh yes, the MIF BitBang is mighty fun to program.  BitBucket is more like it. */
-static void BB_PUT_BIT(struct happy_meal *hp, unsigned long tregs, int bit)
+static void BB_PUT_BIT(struct happy_meal *hp, void __iomem *tregs, int bit)
 {
 	hme_write32(hp, tregs + TCVR_BBDATA, bit);
 	hme_write32(hp, tregs + TCVR_BBCLOCK, 0);
@@ -362,7 +362,7 @@ static void BB_PUT_BIT(struct happy_meal *hp, unsigned long tregs, int bit)
 }
 
 #if 0
-static u32 BB_GET_BIT(struct happy_meal *hp, unsigned long tregs, int internal)
+static u32 BB_GET_BIT(struct happy_meal *hp, void __iomem *tregs, int internal)
 {
 	u32 ret;
 
@@ -378,7 +378,7 @@ static u32 BB_GET_BIT(struct happy_meal *hp, unsigned long tregs, int internal)
 }
 #endif
 
-static u32 BB_GET_BIT2(struct happy_meal *hp, unsigned long tregs, int internal)
+static u32 BB_GET_BIT2(struct happy_meal *hp, void __iomem *tregs, int internal)
 {
 	u32 retval;
 
@@ -397,7 +397,7 @@ static u32 BB_GET_BIT2(struct happy_meal *hp, unsigned long tregs, int internal)
 #define TCVR_FAILURE      0x80000000     /* Impossible MIF read value */
 
 static int happy_meal_bb_read(struct happy_meal *hp,
-			      unsigned long tregs, int reg)
+			      void __iomem *tregs, int reg)
 {
 	u32 tmp;
 	int retval = 0;
@@ -443,7 +443,7 @@ static int happy_meal_bb_read(struct happy_meal *hp,
 }
 
 static void happy_meal_bb_write(struct happy_meal *hp,
-				unsigned long tregs, int reg,
+				void __iomem *tregs, int reg,
 				unsigned short value)
 {
 	u32 tmp;
@@ -488,7 +488,7 @@ static void happy_meal_bb_write(struct happy_meal *hp,
 #define TCVR_READ_TRIES   16
 
 static int happy_meal_tcvr_read(struct happy_meal *hp,
-				unsigned long tregs, int reg)
+				void __iomem *tregs, int reg)
 {
 	int tries = TCVR_READ_TRIES;
 	int retval;
@@ -520,7 +520,7 @@ static int happy_meal_tcvr_read(struct happy_meal *hp,
 #define TCVR_WRITE_TRIES  16
 
 static void happy_meal_tcvr_write(struct happy_meal *hp,
-				  unsigned long tregs, int reg,
+				  void __iomem *tregs, int reg,
 				  unsigned short value)
 {
 	int tries = TCVR_WRITE_TRIES;
@@ -579,7 +579,7 @@ static void happy_meal_tcvr_write(struct happy_meal *hp,
  * service routine, and the chip is reset, or the link is ifconfig'd down
  * and then back up, this entire process repeats itself all over again.
  */
-static int try_next_permutation(struct happy_meal *hp, unsigned long tregs)
+static int try_next_permutation(struct happy_meal *hp, void __iomem *tregs)
 {
 	hp->sw_bmcr = happy_meal_tcvr_read(hp, tregs, MII_BMCR);
 
@@ -603,7 +603,7 @@ static int try_next_permutation(struct happy_meal *hp, unsigned long tregs)
 	return -1;
 }
 
-static void display_link_mode(struct happy_meal *hp, unsigned long tregs)
+static void display_link_mode(struct happy_meal *hp, void __iomem *tregs)
 {
 	printk(KERN_INFO "%s: Link is up using ", hp->dev->name);
 	if (hp->tcvr_type == external)
@@ -625,7 +625,7 @@ static void display_link_mode(struct happy_meal *hp, unsigned long tregs)
 	}
 }
 
-static void display_forced_link_mode(struct happy_meal *hp, unsigned long tregs)
+static void display_forced_link_mode(struct happy_meal *hp, void __iomem *tregs)
 {
 	printk(KERN_INFO "%s: Link has been forced up using ", hp->dev->name);
 	if (hp->tcvr_type == external)
@@ -644,7 +644,7 @@ static void display_forced_link_mode(struct happy_meal *hp, unsigned long tregs)
 		printk("Half Duplex.\n");
 }
 
-static int set_happy_link_modes(struct happy_meal *hp, unsigned long tregs)
+static int set_happy_link_modes(struct happy_meal *hp, void __iomem *tregs)
 {
 	int full;
 
@@ -708,7 +708,7 @@ static int happy_meal_init(struct happy_meal *hp);
 
 static int is_lucent_phy(struct happy_meal *hp)
 {
-	unsigned long tregs = hp->tcvregs;
+	void __iomem *tregs = hp->tcvregs;
 	unsigned short mr2, mr3;
 	int ret = 0;
 
@@ -724,7 +724,7 @@ static int is_lucent_phy(struct happy_meal *hp)
 static void happy_meal_timer(unsigned long data)
 {
 	struct happy_meal *hp = (struct happy_meal *) data;
-	unsigned long tregs = hp->tcvregs;
+	void __iomem *tregs = hp->tcvregs;
 	int restart_timer = 0;
 
 	spin_lock_irq(&hp->happy_lock);
@@ -905,7 +905,7 @@ out:
 #define RX_RESET_TRIES     32
 
 /* hp->happy_lock must be held */
-static void happy_meal_tx_reset(struct happy_meal *hp, unsigned long bregs)
+static void happy_meal_tx_reset(struct happy_meal *hp, void __iomem *bregs)
 {
 	int tries = TX_RESET_TRIES;
 
@@ -925,7 +925,7 @@ static void happy_meal_tx_reset(struct happy_meal *hp, unsigned long bregs)
 }
 
 /* hp->happy_lock must be held */
-static void happy_meal_rx_reset(struct happy_meal *hp, unsigned long bregs)
+static void happy_meal_rx_reset(struct happy_meal *hp, void __iomem *bregs)
 {
 	int tries = RX_RESET_TRIES;
 
@@ -947,7 +947,7 @@ static void happy_meal_rx_reset(struct happy_meal *hp, unsigned long bregs)
 #define STOP_TRIES         16
 
 /* hp->happy_lock must be held */
-static void happy_meal_stop(struct happy_meal *hp, unsigned long gregs)
+static void happy_meal_stop(struct happy_meal *hp, void __iomem *gregs)
 {
 	int tries = STOP_TRIES;
 
@@ -967,7 +967,7 @@ static void happy_meal_stop(struct happy_meal *hp, unsigned long gregs)
 }
 
 /* hp->happy_lock must be held */
-static void happy_meal_get_counters(struct happy_meal *hp, unsigned long bregs)
+static void happy_meal_get_counters(struct happy_meal *hp, void __iomem *bregs)
 {
 	struct net_device_stats *stats = &hp->net_stats;
 
@@ -990,7 +990,7 @@ static void happy_meal_get_counters(struct happy_meal *hp, unsigned long bregs)
 }
 
 /* hp->happy_lock must be held */
-static void happy_meal_poll_stop(struct happy_meal *hp, unsigned long tregs)
+static void happy_meal_poll_stop(struct happy_meal *hp, void __iomem *tregs)
 {
 	ASD(("happy_meal_poll_stop: "));
 
@@ -1025,7 +1025,7 @@ static void happy_meal_poll_stop(struct happy_meal *hp, unsigned long tregs)
 #define TCVR_UNISOLATE_TRIES   32 /* Dis-isolation can take longer. */
 
 /* hp->happy_lock must be held */
-static int happy_meal_tcvr_reset(struct happy_meal *hp, unsigned long tregs)
+static int happy_meal_tcvr_reset(struct happy_meal *hp, void __iomem *tregs)
 {
 	u32 tconfig;
 	int result, tries = TCVR_RESET_TRIES;
@@ -1123,7 +1123,7 @@ static int happy_meal_tcvr_reset(struct happy_meal *hp, unsigned long tregs)
  *
  * hp->happy_lock must be held
  */
-static void happy_meal_transceiver_check(struct happy_meal *hp, unsigned long tregs)
+static void happy_meal_transceiver_check(struct happy_meal *hp, void __iomem *tregs)
 {
 	unsigned long tconfig = hme_read32(hp, tregs + TCVR_CFG);
 
@@ -1318,7 +1318,7 @@ static void happy_meal_init_rings(struct happy_meal *hp)
 
 /* hp->happy_lock must be held */
 static void happy_meal_begin_auto_negotiation(struct happy_meal *hp,
-					      unsigned long tregs,
+					      void __iomem *tregs,
 					      struct ethtool_cmd *ep)
 {
 	int timeout;
@@ -1443,11 +1443,11 @@ force_link:
 /* hp->happy_lock must be held */
 static int happy_meal_init(struct happy_meal *hp)
 {
-	unsigned long gregs        = hp->gregs;
-	unsigned long etxregs      = hp->etxregs;
-	unsigned long erxregs      = hp->erxregs;
-	unsigned long bregs        = hp->bigmacregs;
-	unsigned long tregs        = hp->tcvregs;
+	void __iomem *gregs        = hp->gregs;
+	void __iomem *etxregs      = hp->etxregs;
+	void __iomem *erxregs      = hp->erxregs;
+	void __iomem *bregs        = hp->bigmacregs;
+	void __iomem *tregs        = hp->tcvregs;
 	u32 regtmp, rxcfg;
 	unsigned char *e = &hp->dev->dev_addr[0];
 
@@ -1736,9 +1736,9 @@ static int happy_meal_init(struct happy_meal *hp)
 /* hp->happy_lock must be held */
 static void happy_meal_set_initial_advertisement(struct happy_meal *hp)
 {
-	unsigned long tregs	= hp->tcvregs;
-	unsigned long bregs	= hp->bigmacregs;
-	unsigned long gregs	= hp->gregs;
+	void __iomem *tregs	= hp->tcvregs;
+	void __iomem *bregs	= hp->bigmacregs;
+	void __iomem *gregs	= hp->gregs;
 
 	happy_meal_stop(hp, gregs);
 	hme_write32(hp, tregs + TCVR_IMASK, 0xffff);
@@ -1910,7 +1910,7 @@ static int happy_meal_is_not_so_happy(struct happy_meal *hp, u32 status)
 /* hp->happy_lock must be held */
 static void happy_meal_mif_interrupt(struct happy_meal *hp)
 {
-	unsigned long tregs = hp->tcvregs;
+	void __iomem *tregs = hp->tcvregs;
 
 	printk(KERN_INFO "%s: Link status change.\n", hp->dev->name);
 	hp->sw_bmcr = happy_meal_tcvr_read(hp, tregs, MII_BMCR);
@@ -2390,7 +2390,7 @@ static struct net_device_stats *happy_meal_get_stats(struct net_device *dev)
 static void happy_meal_set_multicast(struct net_device *dev)
 {
 	struct happy_meal *hp = dev->priv;
-	unsigned long bregs = hp->bigmacregs;
+	void __iomem *bregs = hp->bigmacregs;
 	struct dev_mc_list *dmi = dev->mc_list;
 	char *addrs;
 	int i;
@@ -3025,7 +3025,8 @@ static int __init happy_meal_pci_init(struct pci_dev *pdev)
 #endif
 	struct happy_meal *hp;
 	struct net_device *dev;
-	unsigned long hpreg_base;
+	void __iomem *hpreg_base;
+	unsigned long hpreg_res;
 	int i, qfe_slot = -1;
 	char prom_name[64];
 	int err;
@@ -3084,7 +3085,7 @@ static int __init happy_meal_pci_init(struct pci_dev *pdev)
 		qp->happy_meals[qfe_slot] = dev;
 	}		
 
-	hpreg_base = pci_resource_start(pdev, 0);
+	hpreg_res = pci_resource_start(pdev, 0);
 	err = -ENODEV;
 	if ((pci_resource_flags(pdev, 0) & IORESOURCE_IO) != 0) {
 		printk(KERN_ERR "happymeal(PCI): Cannot find proper PCI device base address.\n");
@@ -3096,7 +3097,7 @@ static int __init happy_meal_pci_init(struct pci_dev *pdev)
 		goto err_out_clear_quattro;
 	}
 
-	if ((hpreg_base = (unsigned long) ioremap(hpreg_base, 0x8000)) == 0) {
+	if ((hpreg_base = ioremap(hpreg_res, 0x8000)) == 0) {
 		printk(KERN_ERR "happymeal(PCI): Unable to remap card memory.\n");
 		goto err_out_free_res;
 	}

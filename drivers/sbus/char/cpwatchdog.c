@@ -118,40 +118,26 @@
  * UNKNOWN, MAGICAL MYSTERY REGISTER
  *
  */
-struct wd_timer_regblk {
-	volatile __u16	dcntr;		/* down counter		- hw	*/
-	volatile __u16	dcntr_pad;
-	volatile __u16	limit;		/* limit register	- hw	*/
-	volatile __u16	limit_pad;
-	volatile __u8	status;		/* status register	- b		*/
-	volatile __u8	status_pad;
-	volatile __u16	status_pad2;
-	volatile __u32	pad32;		/* yet more padding			*/
-};
+#define WD_TIMER_REGSZ	16
+#define WD0_OFF		0
+#define WD1_OFF		(WD_TIMER_REGSZ * 1)
+#define WD2_OFF		(WD_TIMER_REGSZ * 2)
+#define PLD_OFF		(WD_TIMER_REGSZ * 3)
 
-struct wd_pld_regblk {
-	volatile __u8	intr_mask;	/* interrupt mask	- b		*/
-	volatile __u8	intr_mask_pad;
-	volatile __u16	intr_mask_pad2;
-	volatile __u8	status;		/* device status	- b		*/
-	volatile __u8	status_pad;
-	volatile __u16	status_pad2;
-};
+#define WD_DCNTR	0x00
+#define WD_LIMIT	0x04
+#define WD_STATUS	0x08
 
-struct wd_regblk {
-	volatile struct wd_timer_regblk		wd0_regs;
-	volatile struct wd_timer_regblk		wd1_regs;
-	volatile struct wd_timer_regblk		wd2_regs;
-	volatile struct wd_pld_regblk		pld_regs;
-};
+#define PLD_IMASK	(PLD_OFF + 0x00)
+#define PLD_STATUS	(PLD_OFF + 0x04)
 
 /* Individual timer structure 
  */
 struct wd_timer {
 	__u16			timeout;
 	__u8			intr_mask;
-	unsigned char	runstatus;
-	volatile struct wd_timer_regblk* regs;
+	unsigned char		runstatus;
+	void __iomem		*regs;
 };
 
 /* Device structure
@@ -165,7 +151,7 @@ struct wd_device {
 	unsigned short	opt_timeout;
 	unsigned char	initialized;
 	struct wd_timer	watchdog[WD_NUMDEVS];
-	volatile struct	wd_regblk* regs;
+	void __iomem	*regs;
 };
 
 static struct wd_device wd_dev = { 
@@ -495,12 +481,12 @@ static void wd_dumpregs(void)
 				i,
 				wd_getstatus(&wd_dev.watchdog[i]));
 	}
-	printk("\tintr_mask  at 0x%lx: 0x%x\n", 
-		(unsigned long)(&wd_dev.regs->pld_regs.intr_mask), 
-		readb(&wd_dev.regs->pld_regs.intr_mask));
-	printk("\tpld_status at 0x%lx: 0x%x\n", 
-		(unsigned long)(&wd_dev.regs->pld_regs.status), 
-		readb(&wd_dev.regs->pld_regs.status));
+	printk("\tintr_mask  at %p: 0x%x\n", 
+		wd_dev.regs + PLD_IMASK,
+		readb(wd_dev.regs + PLD_IMASK));
+	printk("\tpld_status at %p: 0x%x\n", 
+		wd_dev.regs + PLD_STATUS, 
+		readb(wd_dev.regs + PLD_STATUS));
 }
 #endif
 
@@ -513,7 +499,7 @@ static void wd_dumpregs(void)
  */
 static void wd_toggleintr(struct wd_timer* pTimer, int enable)
 {
-	unsigned char curregs = wd_readb(&wd_dev.regs->pld_regs.intr_mask);
+	unsigned char curregs = wd_readb(wd_dev.regs + PLD_IMASK);
 	unsigned char setregs = 
 		(NULL == pTimer) ? 
 			(WD0_INTR_MASK | WD1_INTR_MASK | WD2_INTR_MASK) : 
@@ -523,7 +509,7 @@ static void wd_toggleintr(struct wd_timer* pTimer, int enable)
 		(curregs &= ~setregs):
 		(curregs |=  setregs);
 
-	wd_writeb(curregs, &wd_dev.regs->pld_regs.intr_mask);
+	wd_writeb(curregs, wd_dev.regs + PLD_IMASK);
 	return;
 }
 
@@ -534,8 +520,8 @@ static void wd_toggleintr(struct wd_timer* pTimer, int enable)
  */
 static void wd_pingtimer(struct wd_timer* pTimer)
 {
-	if(wd_readb(&pTimer->regs->status) & WD_S_RUNNING) {
-		wd_readw(&pTimer->regs->dcntr);
+	if (wd_readb(pTimer->regs + WD_STATUS) & WD_S_RUNNING) {
+		wd_readw(pTimer->regs + WD_DCNTR);
 	}
 }
 
@@ -547,7 +533,7 @@ static void wd_pingtimer(struct wd_timer* pTimer)
  */
 static void wd_stoptimer(struct wd_timer* pTimer)
 {
-	if(wd_readb(&pTimer->regs->status) & WD_S_RUNNING) {
+	if(wd_readb(pTimer->regs + WD_STATUS) & WD_S_RUNNING) {
 		wd_toggleintr(pTimer, WD_INTR_OFF);
 
 		if(wd_dev.isbaddoggie) {
@@ -574,7 +560,7 @@ static void wd_starttimer(struct wd_timer* pTimer)
 	}
 	pTimer->runstatus &= ~WD_STAT_SVCD;
 
-	wd_writew(pTimer->timeout, &pTimer->regs->limit);
+	wd_writew(pTimer->timeout, pTimer->regs + WD_LIMIT);
 	wd_toggleintr(pTimer, WD_INTR_ON);
 }
 
@@ -584,7 +570,7 @@ static void wd_starttimer(struct wd_timer* pTimer)
 static void wd_resetbrokentimer(struct wd_timer* pTimer)
 {
 	wd_toggleintr(pTimer, WD_INTR_ON);
-	wd_writew(WD_BLIMIT, &pTimer->regs->limit);
+	wd_writew(WD_BLIMIT, pTimer->regs + WD_LIMIT);
 }
 
 /* Timer device initialization helper.
@@ -593,7 +579,7 @@ static void wd_resetbrokentimer(struct wd_timer* pTimer)
 static int wd_inittimer(int whichdog)
 {
 	struct miscdevice 				*whichmisc;
-	volatile struct wd_timer_regblk	*whichregs;
+	void __iomem *whichregs;
 	char 							whichident[8];
 	int								whichmask;
 	__u16							whichlimit;
@@ -603,7 +589,7 @@ static int wd_inittimer(int whichdog)
 		case WD0_ID:
 			whichmisc = &wd0_miscdev;
 			strcpy(whichident, "RIC");
-			whichregs = &wd_dev.regs->wd0_regs;
+			whichregs = wd_dev.regs + WD0_OFF;
 			whichmask = WD0_INTR_MASK;
 			whichlimit= (0 == wd0_timeout) 	? 
 						(wd_dev.opt_timeout): 
@@ -612,7 +598,7 @@ static int wd_inittimer(int whichdog)
 		case WD1_ID:
 			whichmisc = &wd1_miscdev;
 			strcpy(whichident, "XIR");
-			whichregs = &wd_dev.regs->wd1_regs;
+			whichregs = wd_dev.regs + WD1_OFF;
 			whichmask = WD1_INTR_MASK;
 			whichlimit= (0 == wd1_timeout) 	? 
 						(wd_dev.opt_timeout): 
@@ -621,7 +607,7 @@ static int wd_inittimer(int whichdog)
 		case WD2_ID:
 			whichmisc = &wd2_miscdev;
 			strcpy(whichident, "POR");
-			whichregs = &wd_dev.regs->wd2_regs;
+			whichregs = wd_dev.regs + WD2_OFF;
 			whichmask = WD2_INTR_MASK;
 			whichlimit= (0 == wd2_timeout) 	? 
 						(wd_dev.opt_timeout): 
@@ -686,8 +672,8 @@ static void wd_brokentimer(unsigned long data)
 
 static int wd_getstatus(struct wd_timer* pTimer)
 {
-	unsigned char stat = wd_readb(&pTimer->regs->status);
-	unsigned char intr = wd_readb(&wd_dev.regs->pld_regs.intr_mask);
+	unsigned char stat = wd_readb(pTimer->regs + WD_STATUS);
+	unsigned char intr = wd_readb(wd_dev.regs + PLD_IMASK);
 	unsigned char ret  = WD_STOPPED;
 
 	/* determine STOPPED */
@@ -805,7 +791,7 @@ static void __exit wd_cleanup(void)
 	 * also now eventually trip. 
 	 */
 	for(id = WD0_ID; id < WD_NUMDEVS; ++id) {
-		if(WD_S_RUNNING == wd_readb(&wd_dev.watchdog[id].regs->status)) {
+		if(WD_S_RUNNING == wd_readb(wd_dev.watchdog[id].regs + WD_STATUS)) {
 			if(wd_dev.opt_enable) {
 				printk(KERN_WARNING "%s%i: timer not stopped at release\n",
 					WD_OBPNAME, id);
@@ -818,7 +804,7 @@ static void __exit wd_cleanup(void)
 							"%s%i: defect workaround disabled at release, "\
 							"timer expires in ~%01i sec\n",
 							WD_OBPNAME, id, 
-							wd_readw(&wd_dev.watchdog[id].regs->limit) / 10);
+							wd_readw(wd_dev.watchdog[id].regs + WD_LIMIT) / 10);
 				}
 			}
 		}

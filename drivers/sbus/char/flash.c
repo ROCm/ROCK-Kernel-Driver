@@ -22,6 +22,7 @@
 #include <asm/io.h>
 #include <asm/sbus.h>
 #include <asm/ebus.h>
+#include <asm/upa.h>
 
 static spinlock_t flash_lock = SPIN_LOCK_UNLOCKED;
 static struct {
@@ -115,7 +116,7 @@ flash_read(struct file * file, char __user * buf,
 		count = flash.read_size - p;
 
 	for (i = 0; i < count; i++) {
-		u8 data = readb(flash.read_base + p + i);
+		u8 data = upa_readb(flash.read_base + p + i);
 		if (put_user(data, buf))
 			return -EFAULT;
 		buf++;

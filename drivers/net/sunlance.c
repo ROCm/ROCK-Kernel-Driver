@@ -230,9 +230,9 @@ struct lance_init_block {
 ((__u32)(((unsigned long)(&(((struct lance_init_block *)0)->rt[elem][0])))))
 
 struct lance_private {
-	unsigned long	lregs;		/* Lance RAP/RDP regs.		*/
-	unsigned long	dregs;		/* DMA controller regs.		*/
-	volatile struct lance_init_block *init_block;
+	void __iomem	*lregs;		/* Lance RAP/RDP regs.		*/
+	void __iomem	*dregs;		/* DMA controller regs.		*/
+	struct lance_init_block *init_block;
     
 	spinlock_t	lock;
 
@@ -270,7 +270,7 @@ struct lance_private {
 #define LANCE_REG_SIZE	0x04UL
 
 #define STOP_LANCE(__lp) \
-do {	unsigned long __base = (__lp)->lregs; \
+do {	void __iomem *__base = (__lp)->lregs; \
 	sbus_writew(LE_CSR0,	__base + RAP); \
 	sbus_writew(LE_C0_STOP,	__base + RDP); \
 } while (0)
@@ -314,7 +314,7 @@ static void load_csrs(struct lance_private *lp)
 static void lance_init_ring_dvma(struct net_device *dev)
 {
 	struct lance_private *lp = netdev_priv(dev);
-	volatile struct lance_init_block *ib = lp->init_block;
+	struct lance_init_block *ib = lp->init_block;
 	dma_addr_t aib = lp->init_block_dvma;
 	__u32 leptr;
 	int i;
@@ -371,7 +371,7 @@ static void lance_init_ring_dvma(struct net_device *dev)
 static void lance_init_ring_pio(struct net_device *dev)
 {
 	struct lance_private *lp = netdev_priv(dev);
-	volatile struct lance_init_block *ib = lp->init_block;
+	struct lance_init_block *ib = lp->init_block;
 	u32 leptr;
 	int i;
     
@@ -501,8 +501,8 @@ static int init_restart_lance(struct lance_private *lp)
 static void lance_rx_dvma(struct net_device *dev)
 {
 	struct lance_private *lp = netdev_priv(dev);
-	volatile struct lance_init_block *ib = lp->init_block;
-	volatile struct lance_rx_desc *rd;
+	struct lance_init_block *ib = lp->init_block;
+	struct lance_rx_desc *rd;
 	u8 bits;
 	int len, entry = lp->rx_new;
 	struct sk_buff *skb;
@@ -564,14 +564,14 @@ static void lance_rx_dvma(struct net_device *dev)
 static void lance_tx_dvma(struct net_device *dev)
 {
 	struct lance_private *lp = netdev_priv(dev);
-	volatile struct lance_init_block *ib = lp->init_block;
+	struct lance_init_block *ib = lp->init_block;
 	int i, j;
 
 	spin_lock(&lp->lock);
 
 	j = lp->tx_old;
 	for (i = j; i != lp->tx_new; i = j) {
-		volatile struct lance_tx_desc *td = &ib->btx_ring [i];
+		struct lance_tx_desc *td = &ib->btx_ring [i];
 		u8 bits = td->tmd1_bits;
 
 		/* If we hit a packet not owned by us, stop */
@@ -641,12 +641,12 @@ out:
 	spin_unlock(&lp->lock);
 }
 
-static void lance_piocopy_to_skb(struct sk_buff *skb, volatile void *piobuf, int len)
+static void lance_piocopy_to_skb(struct sk_buff *skb, void __iomem *piobuf, int len)
 {
 	u16 *p16 = (u16 *) skb->data;
 	u32 *p32;
 	u8 *p8;
-	unsigned long pbuf = (unsigned long) piobuf;
+	void __iomem *pbuf = piobuf;
 
 	/* We know here that both src and dest are on a 16bit boundary. */
 	*p16++ = sbus_readw(pbuf);
@@ -674,8 +674,8 @@ static void lance_piocopy_to_skb(struct sk_buff *skb, volatile void *piobuf, int
 static void lance_rx_pio(struct net_device *dev)
 {
 	struct lance_private *lp = netdev_priv(dev);
-	volatile struct lance_init_block *ib = lp->init_block;
-	volatile struct lance_rx_desc *rd;
+	struct lance_init_block *ib = lp->init_block;
+	struct lance_rx_desc *rd;
 	unsigned char bits;
 	int len, entry;
 	struct sk_buff *skb;
@@ -736,14 +736,14 @@ static void lance_rx_pio(struct net_device *dev)
 static void lance_tx_pio(struct net_device *dev)
 {
 	struct lance_private *lp = netdev_priv(dev);
-	volatile struct lance_init_block *ib = lp->init_block;
+	struct lance_init_block *ib = lp->init_block;
 	int i, j;
 
 	spin_lock(&lp->lock);
 
 	j = lp->tx_old;
 	for (i = j; i != lp->tx_new; i = j) {
-		volatile struct lance_tx_desc *td = &ib->btx_ring [i];
+		struct lance_tx_desc *td = &ib->btx_ring [i];
 		u8 bits = sbus_readb(&td->tmd1_bits);
 
 		/* If we hit a packet not owned by us, stop */
@@ -880,7 +880,7 @@ static irqreturn_t lance_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 static void build_fake_packet(struct lance_private *lp)
 {
 	struct net_device *dev = lp->dev;
-	volatile struct lance_init_block *ib = lp->init_block;
+	struct lance_init_block *ib = lp->init_block;
 	u16 *packet;
 	struct ethhdr *eth;
 	int i, entry;
@@ -916,7 +916,7 @@ struct net_device *last_dev;
 static int lance_open(struct net_device *dev)
 {
 	struct lance_private *lp = netdev_priv(dev);
-	volatile struct lance_init_block *ib = lp->init_block;
+	struct lance_init_block *ib = lp->init_block;
 	int status = 0;
 
 	last_dev = dev;
@@ -1006,9 +1006,9 @@ static int lance_reset(struct net_device *dev)
 	return status;
 }
 
-static void lance_piocopy_from_skb(volatile void *dest, unsigned char *src, int len)
+static void lance_piocopy_from_skb(void __iomem *dest, unsigned char *src, int len)
 {
-	unsigned long piobuf = (unsigned long) dest;
+	void __iomem *piobuf = dest;
 	u32 *p32;
 	u16 *p16;
 	u8 *p8;
@@ -1064,11 +1064,11 @@ static void lance_piocopy_from_skb(volatile void *dest, unsigned char *src, int 
 		sbus_writeb(src[0], piobuf);
 }
 
-static void lance_piozero(volatile void *dest, int len)
+static void lance_piozero(void __iomem *dest, int len)
 {
-	unsigned long piobuf = (unsigned long) dest;
+	void __iomem *piobuf = dest;
 
-	if (piobuf & 1) {
+	if ((unsigned long)piobuf & 1) {
 		sbus_writeb(0, piobuf);
 		piobuf += 1;
 		len -= 1;
@@ -1079,7 +1079,7 @@ static void lance_piozero(volatile void *dest, int len)
 		sbus_writeb(0, piobuf);
 		return;
 	}
-	if (piobuf & 2) {
+	if ((unsigned long)piobuf & 2) {
 		sbus_writew(0, piobuf);
 		piobuf += 2;
 		len -= 2;
@@ -1113,7 +1113,7 @@ static void lance_tx_timeout(struct net_device *dev)
 static int lance_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	struct lance_private *lp = netdev_priv(dev);
-	volatile struct lance_init_block *ib = lp->init_block;
+	struct lance_init_block *ib = lp->init_block;
 	int entry, skblen, len;
 
 	skblen = skb->len;
@@ -1174,8 +1174,8 @@ static struct net_device_stats *lance_get_stats(struct net_device *dev)
 static void lance_load_multicast(struct net_device *dev)
 {
 	struct lance_private *lp = netdev_priv(dev);
-	volatile struct lance_init_block *ib = lp->init_block;
-	volatile u16 *mcast_table = (u16 *) &ib->filter;
+	struct lance_init_block *ib = lp->init_block;
+	u16 *mcast_table = (u16 *) &ib->filter;
 	struct dev_mc_list *dmi = dev->mc_list;
 	char *addrs;
 	int i;
@@ -1224,7 +1224,7 @@ static void lance_load_multicast(struct net_device *dev)
 static void lance_set_multicast(struct net_device *dev)
 {
 	struct lance_private *lp = netdev_priv(dev);
-	volatile struct lance_init_block *ib = lp->init_block;
+	struct lance_init_block *ib = lp->init_block;
 	u16 mode;
 
 	if (!netif_running(dev))
@@ -1277,12 +1277,12 @@ static void lance_free_hwresources(struct lance_private *lp)
 		sbus_iounmap(lp->lregs, LANCE_REG_SIZE);
 	if (lp->init_block != NULL) {
 		if (lp->pio_buffer) {
-			sbus_iounmap((unsigned long)lp->init_block,
+			sbus_iounmap(lp->init_block,
 				     sizeof(struct lance_init_block));
 		} else {
 			sbus_free_consistent(lp->sdev,
 					     sizeof(struct lance_init_block),
-					     (void *)lp->init_block,
+					     lp->init_block,
 					     lp->init_block_dvma);
 		}
 	}
@@ -1349,7 +1349,7 @@ static int __init sparc_lance_init(struct sbus_dev *sdev,
 
 	lp->sdev = sdev;
 	if (lebuffer) {
-		lp->init_block = (volatile struct lance_init_block *)
+		lp->init_block =
 			sbus_ioremap(&lebuffer->resource[0], 0,
 				     sizeof(struct lance_init_block), "lebuffer");
 		if (lp->init_block == NULL) {
@@ -1362,7 +1362,7 @@ static int __init sparc_lance_init(struct sbus_dev *sdev,
 		lp->rx = lance_rx_pio;
 		lp->tx = lance_tx_pio;
 	} else {
-		lp->init_block = (volatile struct lance_init_block *)
+		lp->init_block =
 			sbus_alloc_consistent(sdev, sizeof(struct lance_init_block),
 					      &lp->init_block_dvma);
 		if (lp->init_block == NULL ||

@@ -581,8 +581,8 @@ typedef struct _MPT_ADAPTER
 	int			 pci_irq;	/* This irq           */
 	char			 name[MPT_NAME_LENGTH];	/* "iocN"             */
 	char			*prod_name;	/* "LSIFC9x9"         */
-	volatile SYSIF_REGS	*chip;		/* == c8817000 (mmap) */
-	volatile SYSIF_REGS	*pio_chip;	/* Programmed IO (downloadboot) */
+	SYSIF_REGS __iomem	*chip;		/* == c8817000 (mmap) */
+	SYSIF_REGS __iomem	*pio_chip;	/* Programmed IO (downloadboot) */
 	u32			 mem_phys;	/* == f4020000 (mmap) */
 	u32			 pio_mem_phys;	/* Programmed IO (downloadboot) */
 	int			 mem_size;	/* mmap memory size */

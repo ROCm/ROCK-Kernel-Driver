@@ -60,7 +60,7 @@ static char *version =
 #define for_each_socal(s) for (s = socals; s; s = s->next)
 struct socal *socals = NULL;
 
-static void socal_copy_from_xram(void *d, unsigned long xram, long size)
+static void socal_copy_from_xram(void *d, void __iomem *xram, long size)
 {
 	u32 *dp = (u32 *) d;
 	while (size) {
@@ -70,7 +70,7 @@ static void socal_copy_from_xram(void *d, unsigned long xram, long size)
 	}
 }
 
-static void socal_copy_to_xram(unsigned long xram, void *s, long size)
+static void socal_copy_to_xram(void __iomem *xram, void *s, long size)
 {
 	u32 *sp = (u32 *) s;
 	while (size) {
