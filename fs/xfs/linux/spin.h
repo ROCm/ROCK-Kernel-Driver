@@ -49,7 +49,7 @@ typedef spinlock_t lock_t;
 #define spinlock_init(lock, name)	spin_lock_init(lock)
 #define	spinlock_destroy(lock)
 #define mutex_spinlock(lock)		({ spin_lock(lock); 0; })
-#define mutex_spinunlock(lock, s)	spin_unlock(lock)
+#define mutex_spinunlock(lock, s)	do { spin_unlock(lock); (void)s; } while (0)
 #define nested_spinlock(lock)		spin_lock(lock)
 #define nested_spinunlock(lock)		spin_unlock(lock)
 
