@@ -1262,6 +1262,8 @@ P:	Alexey Kuznetsov
 M:	kuznet@ms2.inr.ac.ru
 P:	Pekka Savola (ipv6)
 M:	pekkas@netcore.fi
+P:	James Morris
+M:	jmorris@intercode.com.au
 L:	netdev@oss.sgi.com
 S:	Maintained
 

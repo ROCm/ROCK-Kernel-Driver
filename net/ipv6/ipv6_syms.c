@@ -1,4 +1,5 @@
 
+#include <linux/config.h>
 #include <linux/module.h>
 #include <net/protocol.h>
 #include <net/ipv6.h>
@@ -11,6 +12,9 @@ EXPORT_SYMBOL(ndisc_mc_map);
 EXPORT_SYMBOL(register_inet6addr_notifier);
 EXPORT_SYMBOL(unregister_inet6addr_notifier);
 EXPORT_SYMBOL(ip6_route_output);
+#ifdef CONFIG_NETFILTER
+EXPORT_SYMBOL(ip6_route_me_harder);
+#endif
 EXPORT_SYMBOL(addrconf_lock);
 EXPORT_SYMBOL(ipv6_setsockopt);
 EXPORT_SYMBOL(ipv6_getsockopt);
