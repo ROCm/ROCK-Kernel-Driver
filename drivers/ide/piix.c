@@ -99,7 +99,7 @@ static unsigned char piix_enabled;
 static unsigned int piix_80w;
 static unsigned int piix_clock;
 
-static char *piix_dma[] = { "MWDMA16", "UDMA33", "UDMA66", "UDMA133" };
+static char *piix_dma[] = { "MWDMA16", "UDMA33", "UDMA66", "UDMA100", "UDMA133" };
 
 /*
  * PIIX/ICH /proc entry.
