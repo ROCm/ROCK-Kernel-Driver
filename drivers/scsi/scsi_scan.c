@@ -483,6 +483,35 @@ static int get_device_flags(unsigned char *vendor, unsigned char *model)
 }
 
 /**
+ * scsi_initialize_merge_fn() -ƣinitialize merge function for a host
+ * @sd:		host descriptor
+ */
+static void scsi_initialize_merge_fn(struct scsi_device *sd)
+{
+	request_queue_t *q = &sd->request_queue;
+	struct Scsi_Host *sh = sd->host;
+	u64 bounce_limit;
+
+	if (sh->highmem_io) {
+		if (sh->pci_dev && PCI_DMA_BUS_IS_PHYS) {
+			bounce_limit = sh->pci_dev->dma_mask;
+		} else {
+			/*
+			 * Platforms with virtual-DMA translation
+ 			 * hardware have no practical limit.
+			 */
+			bounce_limit = BLK_BOUNCE_ANY;
+		}
+	} else if (sh->unchecked_isa_dma) {
+		bounce_limit = BLK_BOUNCE_ISA;
+	} else {
+		bounce_limit = BLK_BOUNCE_HIGH;
+	}
+
+	blk_queue_bounce_limit(q, bounce_limit);
+}
+
+/**
  * scsi_alloc_sdev - allocate and setup a Scsi_Device
  *
  * Description:
