@@ -338,8 +338,8 @@ void svcauth_unix_purge(void)
 static int
 svcauth_null_accept(struct svc_rqst *rqstp, u32 *authp)
 {
-	struct iovec	*argv = &rqstp->rq_arg.head[0];
-	struct iovec	*resv = &rqstp->rq_res.head[0];
+	struct kvec	*argv = &rqstp->rq_arg.head[0];
+	struct kvec	*resv = &rqstp->rq_res.head[0];
 	int		rv=0;
 	struct ip_map key, *ipm;
 
@@ -422,8 +422,8 @@ struct auth_ops svcauth_null = {
 int
 svcauth_unix_accept(struct svc_rqst *rqstp, u32 *authp)
 {
-	struct iovec	*argv = &rqstp->rq_arg.head[0];
-	struct iovec	*resv = &rqstp->rq_res.head[0];
+	struct kvec	*argv = &rqstp->rq_arg.head[0];
+	struct kvec	*resv = &rqstp->rq_res.head[0];
 	struct svc_cred	*cred = &rqstp->rq_cred;
 	u32		slen, i;
 	int		len   = argv->iov_len;

@@ -48,7 +48,7 @@ typedef int	(*kxdrproc_t)(void *rqstp, u32 *data, void *obj);
  * operations and/or has a need for scatter/gather involving pages.
  */
 struct xdr_buf {
-	struct iovec	head[1],	/* RPC header + non-page data */
+	struct kvec	head[1],	/* RPC header + non-page data */
 			tail[1];	/* Appended after page data */
 
 	struct page **	pages;		/* Array of contiguous pages */
@@ -127,15 +127,15 @@ xdr_decode_hyper(u32 *p, __u64 *valp)
 }
 
 /*
- * Adjust iovec to reflect end of xdr'ed data (RPC client XDR)
+ * Adjust kvec to reflect end of xdr'ed data (RPC client XDR)
  */
 static inline int
-xdr_adjust_iovec(struct iovec *iov, u32 *p)
+xdr_adjust_iovec(struct kvec *iov, u32 *p)
 {
 	return iov->iov_len = ((u8 *) p - (u8 *) iov->iov_base);
 }
 
-void xdr_shift_iovec(struct iovec *, int, size_t);
+void xdr_shift_iovec(struct kvec *, int, size_t);
 
 /*
  * Maximum number of iov's we use.
@@ -145,11 +145,11 @@ void xdr_shift_iovec(struct iovec *, int, size_t);
 /*
  * XDR buffer helper functions
  */
-extern int xdr_kmap(struct iovec *, struct xdr_buf *, size_t);
+extern int xdr_kmap(struct kvec *, struct xdr_buf *, size_t);
 extern void xdr_kunmap(struct xdr_buf *, size_t);
 extern void xdr_shift_buf(struct xdr_buf *, size_t);
 extern void _copy_from_pages(char *, struct page **, size_t, size_t);
-extern void xdr_buf_from_iov(struct iovec *, struct xdr_buf *);
+extern void xdr_buf_from_iov(struct kvec *, struct xdr_buf *);
 extern int xdr_buf_subsegment(struct xdr_buf *, struct xdr_buf *, int, int);
 extern int xdr_buf_read_netobj(struct xdr_buf *, struct xdr_netobj *, int);
 extern int read_bytes_from_xdr_buf(struct xdr_buf *buf, int base, void *obj, int len);
@@ -182,7 +182,7 @@ struct xdr_stream {
 	struct xdr_buf *buf;	/* XDR buffer to read/write */
 
 	uint32_t *end;		/* end of available buffer space */
-	struct iovec *iov;	/* pointer to the current iovec */
+	struct kvec *iov;	/* pointer to the current kvec */
 };
 
 extern void xdr_init_encode(struct xdr_stream *xdr, struct xdr_buf *buf, uint32_t *p);
