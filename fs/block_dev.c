@@ -643,6 +643,7 @@ int blkdev_get(struct block_device *bdev, mode_t mode, unsigned flags, int kind)
 int blkdev_open(struct inode * inode, struct file * filp)
 {
 	struct block_device *bdev;
+	int res;
 
 	/*
 	 * Preserve backwards compatibility and allow large file access
@@ -655,7 +656,18 @@ int blkdev_open(struct inode * inode, struct file * filp)
 	bd_acquire(inode);
 	bdev = inode->i_bdev;
 
-	return do_open(bdev, inode, filp);
+	res = do_open(bdev, inode, filp);
+	if (res)
+		return res;
+
+	if (!(filp->f_flags & O_EXCL) )
+		return 0;
+
+	if (!(res = bd_claim(bdev, filp)))
+		return 0;
+
+	blkdev_put(bdev, BDEV_FILE);
+	return res;
 }
 
 int blkdev_put(struct block_device *bdev, int kind)
@@ -704,6 +716,8 @@ int blkdev_put(struct block_device *bdev, int kind)
 
 int blkdev_close(struct inode * inode, struct file * filp)
 {
+	if (inode->i_bdev->bd_holder == filp)
+		bd_release(inode->i_bdev);
 	return blkdev_put(inode->i_bdev, BDEV_FILE);
 }
 
