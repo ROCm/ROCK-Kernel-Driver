@@ -9,7 +9,7 @@
 ({									\
 	__typeof__ (*(ptr)) __x;					\
 	__copy_from_user(&__x, (ptr), sizeof(*(ptr))) ? -EFAULT : 0;	\
-	(x) = _x;							\
+	(x) = __x;							\
 })
 
 
