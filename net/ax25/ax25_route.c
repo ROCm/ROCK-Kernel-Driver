@@ -66,7 +66,7 @@
 #include <linux/init.h>
 
 static ax25_route *ax25_route_list;
-static spinlock_t ax25_route_lock = SPIN_LOCK_UNLOCKED;
+static rwlock_t ax25_route_lock = RW_LOCK_UNLOCKED;
 
 static ax25_route *ax25_find_route(ax25_address *, struct net_device *);
 
@@ -89,9 +89,8 @@ static inline void ax25_route_invert(ax25_digi *in, ax25_digi *out)
 void ax25_rt_device_down(struct net_device *dev)
 {
 	ax25_route *s, *t, *ax25_rt;
-	unsigned long flags;
 
-	spin_lock_irqsave(&ax25_route_lock, flags);
+	write_lock(&ax25_route_lock);
 	ax25_rt = ax25_route_list;
 	while (ax25_rt != NULL) {
 		s       = ax25_rt;
@@ -116,12 +115,11 @@ void ax25_rt_device_down(struct net_device *dev)
 			}
 		}
 	}
-	spin_unlock_irqrestore(&ax25_route_lock, flags);
+	write_unlock(&ax25_route_lock);
 }
 
 int ax25_rt_ioctl(unsigned int cmd, void *arg)
 {
-	unsigned long flags;
 	ax25_route *s, *t, *ax25_rt;
 	struct ax25_routes_struct route;
 	struct ax25_route_opt_struct rt_option;
@@ -129,115 +127,122 @@ int ax25_rt_ioctl(unsigned int cmd, void *arg)
 	int i;
 
 	switch (cmd) {
-		case SIOCADDRT:
-			if (copy_from_user(&route, arg, sizeof(route)))
-				return -EFAULT;
-			if ((ax25_dev = ax25_addr_ax25dev(&route.port_addr)) == NULL)
-				return -EINVAL;
-			if (route.digi_count > AX25_MAX_DIGIS)
-				return -EINVAL;
-			for (ax25_rt = ax25_route_list; ax25_rt != NULL; ax25_rt = ax25_rt->next) {
-				if (ax25cmp(&ax25_rt->callsign, &route.dest_addr) == 0 && ax25_rt->dev == ax25_dev->dev) {
-					if (ax25_rt->digipeat != NULL) {
-						kfree(ax25_rt->digipeat);
-						ax25_rt->digipeat = NULL;
-					}
-					if (route.digi_count != 0) {
-						if ((ax25_rt->digipeat = kmalloc(sizeof(ax25_digi), GFP_ATOMIC)) == NULL)
-							return -ENOMEM;
-						ax25_rt->digipeat->lastrepeat = -1;
-						ax25_rt->digipeat->ndigi      = route.digi_count;
-						for (i = 0; i < route.digi_count; i++) {
-							ax25_rt->digipeat->repeated[i] = 0;
-							ax25_rt->digipeat->calls[i]    = route.digi_addr[i];
-						}
-					}
-					return 0;
-				}
-			}
-			if ((ax25_rt = kmalloc(sizeof(ax25_route), GFP_ATOMIC)) == NULL)
-				return -ENOMEM;
-			ax25_rt->callsign     = route.dest_addr;
-			ax25_rt->dev          = ax25_dev->dev;
-			ax25_rt->digipeat     = NULL;
-			ax25_rt->ip_mode      = ' ';
-			if (route.digi_count != 0) {
-				if ((ax25_rt->digipeat = kmalloc(sizeof(ax25_digi), GFP_ATOMIC)) == NULL) {
-					kfree(ax25_rt);
-					return -ENOMEM;
-				}
-				ax25_rt->digipeat->lastrepeat = -1;
-				ax25_rt->digipeat->ndigi      = route.digi_count;
-				for (i = 0; i < route.digi_count; i++) {
-					ax25_rt->digipeat->repeated[i] = 0;
-					ax25_rt->digipeat->calls[i]    = route.digi_addr[i];
-				}
-			}
-			spin_lock_irqsave(&ax25_route_lock, flags);
-			ax25_rt->next   = ax25_route_list;
-			ax25_route_list = ax25_rt;
-			spin_unlock_irqrestore(&ax25_route_lock, flags);
-
-			break;
-
-		case SIOCDELRT:
-			if (copy_from_user(&route, arg, sizeof(route)))
-				return -EFAULT;
-			if ((ax25_dev = ax25_addr_ax25dev(&route.port_addr)) == NULL)
-				return -EINVAL;
-			ax25_rt = ax25_route_list;
-			while (ax25_rt != NULL) {
-				s       = ax25_rt;
-				ax25_rt = ax25_rt->next;
-				if (s->dev == ax25_dev->dev && ax25cmp(&route.dest_addr, &s->callsign) == 0) {
-					if (ax25_route_list == s) {
-						ax25_route_list = s->next;
-						if (s->digipeat != NULL)
-							kfree(s->digipeat);
-						kfree(s);
-					} else {
-						for (t = ax25_route_list; t != NULL; t = t->next) {
-							if (t->next == s) {
-								t->next = s->next;
-								if (s->digipeat != NULL)
-									kfree(s->digipeat);
-								kfree(s);
-								break;
-							}
-						}				
-					}
-				}
-			}
-			break;
-
-		case SIOCAX25OPTRT:
-			if (copy_from_user(&rt_option, arg, sizeof(rt_option)))
-				return -EFAULT;
-			if ((ax25_dev = ax25_addr_ax25dev(&rt_option.port_addr)) == NULL)
-				return -EINVAL;
-			for (ax25_rt = ax25_route_list; ax25_rt != NULL; ax25_rt = ax25_rt->next) {
-				if (ax25_rt->dev == ax25_dev->dev && ax25cmp(&rt_option.dest_addr, &ax25_rt->callsign) == 0) {
-					switch (rt_option.cmd) {
-						case AX25_SET_RT_IPMODE:
-							switch (rt_option.arg) {
-								case ' ':
-								case 'D':
-								case 'V':
-									ax25_rt->ip_mode = rt_option.arg;
-									break;
-								default:
-									return -EINVAL;
-							}
-							break;
-						default:
-							return -EINVAL;
-					}
-				}
-			}
-			break;
-
-		default:
+	case SIOCADDRT:
+		if (copy_from_user(&route, arg, sizeof(route)))
+			return -EFAULT;
+		if ((ax25_dev = ax25_addr_ax25dev(&route.port_addr)) == NULL)
 			return -EINVAL;
+		if (route.digi_count > AX25_MAX_DIGIS)
+			return -EINVAL;
+		write_lock(ax25_route_lock);
+		for (ax25_rt = ax25_route_list; ax25_rt != NULL; ax25_rt = ax25_rt->next) {
+			if (ax25cmp(&ax25_rt->callsign, &route.dest_addr) == 0 && ax25_rt->dev == ax25_dev->dev) {
+				if (ax25_rt->digipeat != NULL) {
+					kfree(ax25_rt->digipeat);
+					ax25_rt->digipeat = NULL;
+				}
+				if (route.digi_count != 0) {
+					if ((ax25_rt->digipeat = kmalloc(sizeof(ax25_digi), GFP_ATOMIC)) == NULL) {
+						write_unlock(ax25_route_lock);
+						return -ENOMEM;
+					}
+					ax25_rt->digipeat->lastrepeat = -1;
+					ax25_rt->digipeat->ndigi      = route.digi_count;
+					for (i = 0; i < route.digi_count; i++) {
+						ax25_rt->digipeat->repeated[i] = 0;
+						ax25_rt->digipeat->calls[i]    = route.digi_addr[i];
+					}
+				}
+				return 0;
+			}
+		}
+		if ((ax25_rt = kmalloc(sizeof(ax25_route), GFP_ATOMIC)) == NULL) {
+			write_unlock(ax25_route_lock);
+			return -ENOMEM;
+		}
+		ax25_rt->callsign     = route.dest_addr;
+		ax25_rt->dev          = ax25_dev->dev;
+		ax25_rt->digipeat     = NULL;
+		ax25_rt->ip_mode      = ' ';
+		if (route.digi_count != 0) {
+			if ((ax25_rt->digipeat = kmalloc(sizeof(ax25_digi), GFP_ATOMIC)) == NULL) {
+				write_unlock(ax25_route_lock);
+				kfree(ax25_rt);
+				return -ENOMEM;
+			}
+			ax25_rt->digipeat->lastrepeat = -1;
+			ax25_rt->digipeat->ndigi      = route.digi_count;
+			for (i = 0; i < route.digi_count; i++) {
+				ax25_rt->digipeat->repeated[i] = 0;
+				ax25_rt->digipeat->calls[i]    = route.digi_addr[i];
+			}
+		}
+		ax25_rt->next   = ax25_route_list;
+		ax25_route_list = ax25_rt;
+		write_unlock(ax25_route_lock);
+
+		break;
+
+	case SIOCDELRT:
+		if (copy_from_user(&route, arg, sizeof(route)))
+			return -EFAULT;
+		if ((ax25_dev = ax25_addr_ax25dev(&route.port_addr)) == NULL)
+			return -EINVAL;
+		ax25_rt = ax25_route_list;
+		while (ax25_rt != NULL) {
+			s       = ax25_rt;
+			ax25_rt = ax25_rt->next;
+			if (s->dev == ax25_dev->dev && ax25cmp(&route.dest_addr, &s->callsign) == 0) {
+				if (ax25_route_list == s) {
+					ax25_route_list = s->next;
+					if (s->digipeat != NULL)
+						kfree(s->digipeat);
+					kfree(s);
+				} else {
+					for (t = ax25_route_list; t != NULL; t = t->next) {
+						if (t->next == s) {
+							t->next = s->next;
+							if (s->digipeat != NULL)
+								kfree(s->digipeat);
+							kfree(s);
+							break;
+						}
+					}				
+				}
+			}
+		}
+		break;
+
+	case SIOCAX25OPTRT:
+		if (copy_from_user(&rt_option, arg, sizeof(rt_option)))
+			return -EFAULT;
+		if ((ax25_dev = ax25_addr_ax25dev(&rt_option.port_addr)) == NULL)
+			return -EINVAL;
+		write_lock(ax25_route_lock);
+		for (ax25_rt = ax25_route_list; ax25_rt != NULL; ax25_rt = ax25_rt->next) {
+			if (ax25_rt->dev == ax25_dev->dev && ax25cmp(&rt_option.dest_addr, &ax25_rt->callsign) == 0) {
+				switch (rt_option.cmd) {
+					case AX25_SET_RT_IPMODE:
+						switch (rt_option.arg) {
+							case ' ':
+							case 'D':
+							case 'V':
+								ax25_rt->ip_mode = rt_option.arg;
+								break;
+							default:
+								return -EINVAL;
+						}
+						break;
+					default:
+						return -EINVAL;
+				}
+			}
+		}
+		write_unlock(ax25_route_lock);
+		break;
+
+	default:
+		return -EINVAL;
 	}
 
 	return 0;
@@ -246,14 +251,13 @@ int ax25_rt_ioctl(unsigned int cmd, void *arg)
 int ax25_rt_get_info(char *buffer, char **start, off_t offset, int length)
 {
 	ax25_route *ax25_rt;
-	unsigned long flags;
 	int len     = 0;
 	off_t pos   = 0;
 	off_t begin = 0;
 	char *callsign;
 	int i;
   
-	spin_lock_irqsave(&ax25_route_lock, flags);
+	read_lock(&ax25_route_lock);
 
 	len += sprintf(buffer, "callsign  dev  mode digipeaters\n");
 
@@ -267,15 +271,15 @@ int ax25_rt_get_info(char *buffer, char **start, off_t offset, int length)
 			ax25_rt->dev ? ax25_rt->dev->name : "???");
 
 		switch (ax25_rt->ip_mode) {
-			case 'V':
-				len += sprintf(buffer + len, "   vc");
-				break;
-			case 'D':
-				len += sprintf(buffer + len, "   dg");
-				break;
-			default:
-				len += sprintf(buffer + len, "    *");
-				break;
+		case 'V':
+			len += sprintf(buffer + len, "   vc");
+			break;
+		case 'D':
+			len += sprintf(buffer + len, "   dg");
+			break;
+		default:
+			len += sprintf(buffer + len, "    *");
+			break;
 		}
 
 		if (ax25_rt->digipeat != NULL)
@@ -294,7 +298,7 @@ int ax25_rt_get_info(char *buffer, char **start, off_t offset, int length)
 		if (pos > offset + length)
 			break;
 	}
-	spin_unlock_irqrestore(&ax25_route_lock, flags);
+	read_unlock(&ax25_route_lock);
 
 	*start = buffer + (offset - begin);
 	len   -= (offset - begin);
@@ -314,6 +318,7 @@ static ax25_route *ax25_find_route(ax25_address *addr, struct net_device *dev)
 	ax25_route *ax25_def_rt = NULL;
 	ax25_route *ax25_rt;
 
+	read_lock(&ax25_route_lock);
 	/*
 	 *	Bind to the physical interface we heard them on, or the default
 	 *	route if none is found;
@@ -331,6 +336,7 @@ static ax25_route *ax25_find_route(ax25_address *addr, struct net_device *dev)
 				ax25_def_rt = ax25_rt;
 		}
 	}
+	read_unlock(&ax25_route_lock);
 
 	if (ax25_spe_rt != NULL)
 		return ax25_spe_rt;
@@ -448,6 +454,7 @@ void __exit ax25_rt_free(void)
 {
 	ax25_route *s, *ax25_rt = ax25_route_list;
 
+	write_unlock(&ax25_route_lock);
 	while (ax25_rt != NULL) {
 		s       = ax25_rt;
 		ax25_rt = ax25_rt->next;
@@ -457,4 +464,5 @@ void __exit ax25_rt_free(void)
 
 		kfree(s);
 	}
+	write_unlock(&ax25_route_lock);
 }

@@ -104,18 +104,18 @@ ax25_cb *ax25_send_frame(struct sk_buff *skb, int paclen, ax25_address *src, ax2
 	}
 
 	switch (ax25->ax25_dev->values[AX25_VALUES_PROTOCOL]) {
-		case AX25_PROTO_STD_SIMPLEX:
-		case AX25_PROTO_STD_DUPLEX:
-			ax25_std_establish_data_link(ax25);
-			break;
+	case AX25_PROTO_STD_SIMPLEX:
+	case AX25_PROTO_STD_DUPLEX:
+		ax25_std_establish_data_link(ax25);
+		break;
 
 #ifdef CONFIG_AX25_DAMA_SLAVE
-		case AX25_PROTO_DAMA_SLAVE:
-			if (ax25_dev->dama.slave)
-				ax25_ds_establish_data_link(ax25);
-			else
-				ax25_std_establish_data_link(ax25);
-			break;
+	case AX25_PROTO_DAMA_SLAVE:
+		if (ax25_dev->dama.slave)
+			ax25_ds_establish_data_link(ax25);
+		else
+			ax25_std_establish_data_link(ax25);
+		break;
 #endif
 	}
 
@@ -203,19 +203,19 @@ void ax25_output(ax25_cb *ax25, int paclen, struct sk_buff *skb)
 	}
 
 	switch (ax25->ax25_dev->values[AX25_VALUES_PROTOCOL]) {
-		case AX25_PROTO_STD_SIMPLEX:
-		case AX25_PROTO_STD_DUPLEX:
-			ax25_kick(ax25);
-			break;
+	case AX25_PROTO_STD_SIMPLEX:
+	case AX25_PROTO_STD_DUPLEX:
+		ax25_kick(ax25);
+		break;
 
 #ifdef CONFIG_AX25_DAMA_SLAVE
-		/* 
-		 * A DAMA slave is _required_ to work as normal AX.25L2V2
-		 * if no DAMA master is available.
-		 */
-		case AX25_PROTO_DAMA_SLAVE:
-			if (!ax25->ax25_dev->dama.slave) ax25_kick(ax25);
-			break;
+	/* 
+	 * A DAMA slave is _required_ to work as normal AX.25L2V2
+	 * if no DAMA master is available.
+	 */
+	case AX25_PROTO_DAMA_SLAVE:
+		if (!ax25->ax25_dev->dama.slave) ax25_kick(ax25);
+		break;
 #endif
 	}
 }
@@ -306,15 +306,15 @@ void ax25_kick(ax25_cb *ax25)
 		 * in DAMA mode.
 		 */
 		switch (ax25->ax25_dev->values[AX25_VALUES_PROTOCOL]) {
-			case AX25_PROTO_STD_SIMPLEX:
-			case AX25_PROTO_STD_DUPLEX:
-				ax25_send_iframe(ax25, skbn, (last) ? AX25_POLLON : AX25_POLLOFF);
-				break;
+		case AX25_PROTO_STD_SIMPLEX:
+		case AX25_PROTO_STD_DUPLEX:
+			ax25_send_iframe(ax25, skbn, (last) ? AX25_POLLON : AX25_POLLOFF);
+			break;
 
 #ifdef CONFIG_AX25_DAMA_SLAVE
-			case AX25_PROTO_DAMA_SLAVE:
-				ax25_send_iframe(ax25, skbn, AX25_POLLOFF);
-				break;
+		case AX25_PROTO_DAMA_SLAVE:
+			ax25_send_iframe(ax25, skbn, AX25_POLLOFF);
+			break;
 #endif
 		}
 

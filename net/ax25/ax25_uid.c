@@ -48,7 +48,7 @@
  */
 
 static ax25_uid_assoc *ax25_uid_list;
-static spinlock_t ax25_uid_lock = SPIN_LOCK_UNLOCKED;
+static rwlock_t ax25_uid_lock = RW_LOCK_UNLOCKED;
 
 int ax25_uid_policy = 0;
 
@@ -56,16 +56,15 @@ ax25_address *ax25_findbyuid(uid_t uid)
 {
 	ax25_uid_assoc *ax25_uid;
 	ax25_address *res = NULL;
-	unsigned long flags;
 
-	spin_lock_irqsave(&ax25_uid_lock, flags);
+	read_lock(&ax25_uid_lock);
 	for (ax25_uid = ax25_uid_list; ax25_uid != NULL; ax25_uid = ax25_uid->next) {
 		if (ax25_uid->uid == uid) {
 			res = &ax25_uid->call;
 			break;
 		}
 	}
-	spin_lock_irqsave(&ax25_uid_lock, flags);
+	read_unlock(&ax25_uid_lock);
 
 	return NULL;
 }
@@ -73,78 +72,77 @@ ax25_address *ax25_findbyuid(uid_t uid)
 int ax25_uid_ioctl(int cmd, struct sockaddr_ax25 *sax)
 {
 	ax25_uid_assoc *s, *ax25_uid;
-	unsigned long flags;
 	unsigned long res;
 
 	switch (cmd) {
-		case SIOCAX25GETUID:
-			res = -ENOENT;
-			spin_lock_irqsave(&ax25_uid_lock, flags);
-			for (ax25_uid = ax25_uid_list; ax25_uid != NULL; ax25_uid = ax25_uid->next) {
-				if (ax25cmp(&sax->sax25_call, &ax25_uid->call) == 0) {
-					res = ax25_uid->uid;
-					break;
-				}
+	case SIOCAX25GETUID:
+		res = -ENOENT;
+		read_lock(&ax25_uid_lock);
+		for (ax25_uid = ax25_uid_list; ax25_uid != NULL; ax25_uid = ax25_uid->next) {
+			if (ax25cmp(&sax->sax25_call, &ax25_uid->call) == 0) {
+				res = ax25_uid->uid;
+				break;
 			}
-			spin_lock_irqsave(&ax25_uid_lock, flags);
+		}
+		read_unlock(&ax25_uid_lock);
 
-			return res;
+		return res;
 
-		case SIOCAX25ADDUID:
-			if (!capable(CAP_NET_ADMIN))
-				return -EPERM;
-			if (ax25_findbyuid(sax->sax25_uid))
-				return -EEXIST;
-			if (sax->sax25_uid == 0)
-				return -EINVAL;
-			if ((ax25_uid = kmalloc(sizeof(*ax25_uid), GFP_KERNEL)) == NULL)
-				return -ENOMEM;
+	case SIOCAX25ADDUID:
+		if (!capable(CAP_NET_ADMIN))
+			return -EPERM;
+		if (ax25_findbyuid(sax->sax25_uid))
+			return -EEXIST;
+		if (sax->sax25_uid == 0)
+			return -EINVAL;
+		if ((ax25_uid = kmalloc(sizeof(*ax25_uid), GFP_KERNEL)) == NULL)
+			return -ENOMEM;
 
-			ax25_uid->uid  = sax->sax25_uid;
-			ax25_uid->call = sax->sax25_call;
+		ax25_uid->uid  = sax->sax25_uid;
+		ax25_uid->call = sax->sax25_call;
 
-			spin_lock_irqsave(&ax25_uid_lock, flags);
-			ax25_uid->next = ax25_uid_list;
-			ax25_uid_list  = ax25_uid;
-			spin_unlock_irqrestore(&ax25_uid_lock, flags);
+		write_lock(&ax25_uid_lock);
+		ax25_uid->next = ax25_uid_list;
+		ax25_uid_list  = ax25_uid;
+		write_unlock(&ax25_uid_lock);
 
+		return 0;
+
+	case SIOCAX25DELUID:
+		if (!capable(CAP_NET_ADMIN))
+			return -EPERM;
+
+		write_lock(&ax25_uid_lock);
+		for (ax25_uid = ax25_uid_list; ax25_uid != NULL; ax25_uid = ax25_uid->next) {
+			if (ax25cmp(&sax->sax25_call, &ax25_uid->call) == 0) {
+				break;
+			}
+		}
+		if (ax25_uid == NULL) {
+			write_unlock(&ax25_uid_lock);
+			return -ENOENT;
+		}
+		if ((s = ax25_uid_list) == ax25_uid) {
+			ax25_uid_list = s->next;
+			write_unlock(&ax25_uid_lock);
+			kfree(ax25_uid);
 			return 0;
-
-		case SIOCAX25DELUID:
-			if (!capable(CAP_NET_ADMIN))
-				return -EPERM;
-
-			spin_lock_irqsave(&ax25_uid_lock, flags);
-			for (ax25_uid = ax25_uid_list; ax25_uid != NULL; ax25_uid = ax25_uid->next) {
-				if (ax25cmp(&sax->sax25_call, &ax25_uid->call) == 0) {
-					break;
-				}
-			}
-			if (ax25_uid == NULL) {
-				spin_unlock_irqrestore(&ax25_uid_lock, flags);
-				return -ENOENT;
-			}
-			if ((s = ax25_uid_list) == ax25_uid) {
-				ax25_uid_list = s->next;
-				spin_unlock_irqrestore(&ax25_uid_lock, flags);
+		}
+		while (s != NULL && s->next != NULL) {
+			if (s->next == ax25_uid) {
+				s->next = ax25_uid->next;
+				write_unlock(&ax25_uid_lock);
 				kfree(ax25_uid);
 				return 0;
 			}
-			while (s != NULL && s->next != NULL) {
-				if (s->next == ax25_uid) {
-					s->next = ax25_uid->next;
-					spin_unlock_irqrestore(&ax25_uid_lock, flags);
-					kfree(ax25_uid);
-					return 0;
-				}
-				s = s->next;
-			}
-			spin_unlock_irqrestore(&ax25_uid_lock, flags);
+			s = s->next;
+		}
+		write_unlock(&ax25_uid_lock);
 
-			return -ENOENT;
+		return -ENOENT;
 
-		default:
-			return -EINVAL;
+	default:
+		return -EINVAL;
 	}
 
 	return -EINVAL;	/*NOTREACHED */
@@ -152,13 +150,12 @@ int ax25_uid_ioctl(int cmd, struct sockaddr_ax25 *sax)
 
 int ax25_uid_get_info(char *buffer, char **start, off_t offset, int length)
 {
-	unsigned long flags;
 	ax25_uid_assoc *pt;
 	int len     = 0;
 	off_t pos   = 0;
 	off_t begin = 0;
 
-	spin_lock_irqsave(&ax25_uid_lock, flags);
+	read_lock(&ax25_uid_lock);
 	len += sprintf(buffer, "Policy: %d\n", ax25_uid_policy);
 
 	for (pt = ax25_uid_list; pt != NULL; pt = pt->next) {
@@ -174,7 +171,7 @@ int ax25_uid_get_info(char *buffer, char **start, off_t offset, int length)
 		if (pos > offset + length)
 			break;
 	}
-	spin_unlock_irqrestore(&ax25_uid_lock, flags);
+	read_unlock(&ax25_uid_lock);
 
 	*start = buffer + (offset - begin);
 	len   -= offset - begin;
@@ -191,9 +188,8 @@ int ax25_uid_get_info(char *buffer, char **start, off_t offset, int length)
 void __exit ax25_uid_free(void)
 {
 	ax25_uid_assoc *s, *ax25_uid;
-	unsigned long flags;
 
-	spin_lock_irqsave(&ax25_uid_lock, flags);
+	write_lock(&ax25_uid_lock);
 	ax25_uid = ax25_uid_list;
 	while (ax25_uid != NULL) {
 		s        = ax25_uid;
@@ -202,5 +198,5 @@ void __exit ax25_uid_free(void)
 		kfree(s);
 	}
 	ax25_uid_list = NULL;
-	spin_unlock_irqrestore(&ax25_uid_lock, flags);
+	write_unlock(&ax25_uid_lock);
 }

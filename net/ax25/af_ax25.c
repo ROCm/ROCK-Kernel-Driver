@@ -231,16 +231,16 @@ static int ax25_device_event(struct notifier_block *this,unsigned long event, vo
 		return NOTIFY_DONE;
 
 	switch (event) {
-		case NETDEV_UP:
-			ax25_dev_device_up(dev);
-			break;
-		case NETDEV_DOWN:
-			ax25_kill_by_device(dev);
-			ax25_rt_device_down(dev);
-			ax25_dev_device_down(dev);
-			break;
-		default:
-			break;
+	case NETDEV_UP:
+		ax25_dev_device_up(dev);
+		break;
+	case NETDEV_DOWN:
+		ax25_kill_by_device(dev);
+		ax25_rt_device_down(dev);
+		ax25_dev_device_down(dev);
+		break;
+	default:
+		break;
 	}
 
 	return NOTIFY_DONE;
@@ -479,66 +479,66 @@ static int ax25_ctl_ioctl(const unsigned int cmd, void *arg)
 		return -ENOTCONN;
 
 	switch (ax25_ctl.cmd) {
-		case AX25_KILL:
-			ax25_send_control(ax25, AX25_DISC, AX25_POLLON, AX25_COMMAND);
+	case AX25_KILL:
+		ax25_send_control(ax25, AX25_DISC, AX25_POLLON, AX25_COMMAND);
 #ifdef CONFIG_AX25_DAMA_SLAVE
-			if (ax25_dev->dama.slave && ax25->ax25_dev->values[AX25_VALUES_PROTOCOL] == AX25_PROTO_DAMA_SLAVE)
-				ax25_dama_off(ax25);
+		if (ax25_dev->dama.slave && ax25->ax25_dev->values[AX25_VALUES_PROTOCOL] == AX25_PROTO_DAMA_SLAVE)
+			ax25_dama_off(ax25);
 #endif
-			ax25_disconnect(ax25, ENETRESET);
-			break;
+		ax25_disconnect(ax25, ENETRESET);
+		break;
 
-	  	case AX25_WINDOW:
-	  		if (ax25->modulus == AX25_MODULUS) {
-	  			if (ax25_ctl.arg < 1 || ax25_ctl.arg > 7)
-	  				return -EINVAL;
-	  		} else {
-	  			if (ax25_ctl.arg < 1 || ax25_ctl.arg > 63)
-	  				return -EINVAL;
-	  		}
-	  		ax25->window = ax25_ctl.arg;
-	  		break;
-
-	  	case AX25_T1:
-  			if (ax25_ctl.arg < 1)
+  	case AX25_WINDOW:
+  		if (ax25->modulus == AX25_MODULUS) {
+  			if (ax25_ctl.arg < 1 || ax25_ctl.arg > 7)
   				return -EINVAL;
-  			ax25->rtt = (ax25_ctl.arg * HZ) / 2;
-  			ax25->t1  = ax25_ctl.arg * HZ;
-  			break;
+  		} else {
+  			if (ax25_ctl.arg < 1 || ax25_ctl.arg > 63)
+  				return -EINVAL;
+  		}
+  		ax25->window = ax25_ctl.arg;
+  		break;
 
-	  	case AX25_T2:
-	  		if (ax25_ctl.arg < 1)
-	  			return -EINVAL;
-	  		ax25->t2 = ax25_ctl.arg * HZ;
-	  		break;
+  	case AX25_T1:
+		if (ax25_ctl.arg < 1)
+  			return -EINVAL;
+  		ax25->rtt = (ax25_ctl.arg * HZ) / 2;
+  		ax25->t1  = ax25_ctl.arg * HZ;
+  		break;
 
-	  	case AX25_N2:
-	  		if (ax25_ctl.arg < 1 || ax25_ctl.arg > 31)
-	  			return -EINVAL;
-	  		ax25->n2count = 0;
-	  		ax25->n2 = ax25_ctl.arg;
-	  		break;
+  	case AX25_T2:
+  		if (ax25_ctl.arg < 1)
+  			return -EINVAL;
+  		ax25->t2 = ax25_ctl.arg * HZ;
+  		break;
 
-	  	case AX25_T3:
-	  		if (ax25_ctl.arg < 0)
-	  			return -EINVAL;
-	  		ax25->t3 = ax25_ctl.arg * HZ;
-	  		break;
+  	case AX25_N2:
+  		if (ax25_ctl.arg < 1 || ax25_ctl.arg > 31)
+  			return -EINVAL;
+  		ax25->n2count = 0;
+  		ax25->n2 = ax25_ctl.arg;
+  		break;
 
-	  	case AX25_IDLE:
-	  		if (ax25_ctl.arg < 0)
-	  			return -EINVAL;
-	  		ax25->idle = ax25_ctl.arg * 60 * HZ;
-	  		break;
+  	case AX25_T3:
+  		if (ax25_ctl.arg < 0)
+  			return -EINVAL;
+  		ax25->t3 = ax25_ctl.arg * HZ;
+  		break;
 
-	  	case AX25_PACLEN:
-	  		if (ax25_ctl.arg < 16 || ax25_ctl.arg > 65535)
-	  			return -EINVAL;
-	  		ax25->paclen = ax25_ctl.arg;
-	  		break;
+  	case AX25_IDLE:
+  		if (ax25_ctl.arg < 0)
+  			return -EINVAL;
+  		ax25->idle = ax25_ctl.arg * 60 * HZ;
+  		break;
 
-	  	default:
-	  		return -EINVAL;
+  	case AX25_PACLEN:
+  		if (ax25_ctl.arg < 16 || ax25_ctl.arg > 65535)
+  			return -EINVAL;
+  		ax25->paclen = ax25_ctl.arg;
+  		break;
+
+  	default:
+  		return -EINVAL;
 	  }
 
 	  return 0;
@@ -647,115 +647,116 @@ static int ax25_setsockopt(struct socket *sock, int level, int optname, char *op
 	ax25 = ax25_sk(sk);
 
 	switch (optname) {
-		case AX25_WINDOW:
-			if (ax25->modulus == AX25_MODULUS) {
-				if (opt < 1 || opt > 7) {
-					res = -EINVAL;
-					break;
-				}
-			} else {
-				if (opt < 1 || opt > 63) {
-					res = -EINVAL;
-					break;
-				}
-			}
-			ax25->window = opt;
-			break;
-
-		case AX25_T1:
-			if (opt < 1) {
+	case AX25_WINDOW:
+		if (ax25->modulus == AX25_MODULUS) {
+			if (opt < 1 || opt > 7) {
 				res = -EINVAL;
 				break;
 			}
-			ax25->rtt = (opt * HZ) / 2;
-			ax25->t1  = opt * HZ;
-			break;
-
-		case AX25_T2:
-			if (opt < 1) {
+		} else {
+			if (opt < 1 || opt > 63) {
 				res = -EINVAL;
 				break;
 			}
-			ax25->t2 = opt * HZ;
+		}
+		ax25->window = opt;
+		break;
+
+	case AX25_T1:
+		if (opt < 1) {
+			res = -EINVAL;
 			break;
+		}
+		ax25->rtt = (opt * HZ) / 2;
+		ax25->t1  = opt * HZ;
+		break;
 
-		case AX25_N2:
-			if (opt < 1 || opt > 31) {
-				res = -EINVAL;
-				break;
-			}
-			ax25->n2 = opt;
+	case AX25_T2:
+		if (opt < 1) {
+			res = -EINVAL;
 			break;
+		}
+		ax25->t2 = opt * HZ;
+		break;
 
-		case AX25_T3:
-			if (opt < 1) {
-				res = -EINVAL;
-				break;
-			}
-			ax25->t3 = opt * HZ;
+	case AX25_N2:
+		if (opt < 1 || opt > 31) {
+			res = -EINVAL;
 			break;
+		}
+		ax25->n2 = opt;
+		break;
 
-		case AX25_IDLE:
-			if (opt < 0) {
-				res = -EINVAL;
-				break;
-			}
-			ax25->idle = opt * 60 * HZ;
+	case AX25_T3:
+		if (opt < 1) {
+			res = -EINVAL;
 			break;
+		}
+		ax25->t3 = opt * HZ;
+		break;
 
-		case AX25_BACKOFF:
-			if (opt < 0 || opt > 2) {
-				res = -EINVAL;
-				break;
-			}
-			ax25->backoff = opt;
+	case AX25_IDLE:
+		if (opt < 0) {
+			res = -EINVAL;
 			break;
+		}
+		ax25->idle = opt * 60 * HZ;
+		break;
 
-		case AX25_EXTSEQ:
-			ax25->modulus = opt ? AX25_EMODULUS : AX25_MODULUS;
+	case AX25_BACKOFF:
+		if (opt < 0 || opt > 2) {
+			res = -EINVAL;
 			break;
+		}
+		ax25->backoff = opt;
+		break;
 
-		case AX25_PIDINCL:
-			ax25->pidincl = opt ? 1 : 0;
+	case AX25_EXTSEQ:
+		ax25->modulus = opt ? AX25_EMODULUS : AX25_MODULUS;
+		break;
+
+	case AX25_PIDINCL:
+		ax25->pidincl = opt ? 1 : 0;
+		break;
+
+	case AX25_IAMDIGI:
+		ax25->iamdigi = opt ? 1 : 0;
+		break;
+
+	case AX25_PACLEN:
+		if (opt < 16 || opt > 65535) {
+			res = -EINVAL;
 			break;
+		}
+		ax25->paclen = opt;
+		break;
 
-		case AX25_IAMDIGI:
-			ax25->iamdigi = opt ? 1 : 0;
+	case SO_BINDTODEVICE:
+		if (optlen > IFNAMSIZ)
+			optlen=IFNAMSIZ;
+		if (copy_from_user(devname, optval, optlen)) {
+		res = -EFAULT;
 			break;
+		}
 
-		case AX25_PACLEN:
-			if (opt < 16 || opt > 65535) {
-				res = -EINVAL;
-				break;
-			}
-			ax25->paclen = opt;
+		dev = dev_get_by_name(devname);
+		if (dev == NULL) {
+			res = -ENODEV;
 			break;
+		}
 
-		case SO_BINDTODEVICE:
-			if (optlen > IFNAMSIZ) optlen=IFNAMSIZ;
-			if (copy_from_user(devname, optval, optlen)) {
-				res = -EFAULT;
-				break;
-			}
-
-			dev = dev_get_by_name(devname);
-			if (dev == NULL) {
-				res = -ENODEV;
-				break;
-			}
-
-			if (sk->type == SOCK_SEQPACKET && 
-			   (sock->state != SS_UNCONNECTED || sk->state == TCP_LISTEN)) {
-				res = -EADDRNOTAVAIL;
-				break;
-			}
+		if (sk->type == SOCK_SEQPACKET && 
+		   (sock->state != SS_UNCONNECTED || sk->state == TCP_LISTEN)) {
+			res = -EADDRNOTAVAIL;
+			break;
+		}
 		
-			ax25->ax25_dev = ax25_dev_ax25dev(dev);
-			ax25_fillin_cb(ax25, ax25->ax25_dev);
-			break;
+		ax25->ax25_dev = ax25_dev_ax25dev(dev);
+		ax25_fillin_cb(ax25, ax25->ax25_dev);
+		break;
 
-		default:
-			res = -ENOPROTOOPT;
+	default:
+		res = -ENOPROTOOPT;
 	}
 	unlock_kernel();
 
@@ -788,68 +789,68 @@ static int ax25_getsockopt(struct socket *sock, int level, int optname, char *op
 	ax25 = ax25_sk(sk);
 
 	switch (optname) {
-		case AX25_WINDOW:
-			val = ax25->window;
-			break;
+	case AX25_WINDOW:
+		val = ax25->window;
+		break;
 
-		case AX25_T1:
-			val = ax25->t1 / HZ;
-			break;
+	case AX25_T1:
+		val = ax25->t1 / HZ;
+		break;
 
-		case AX25_T2:
-			val = ax25->t2 / HZ;
-			break;
+	case AX25_T2:
+		val = ax25->t2 / HZ;
+		break;
 
-		case AX25_N2:
-			val = ax25->n2;
-			break;
+	case AX25_N2:
+		val = ax25->n2;
+		break;
 
-		case AX25_T3:
-			val = ax25->t3 / HZ;
-			break;
+	case AX25_T3:
+		val = ax25->t3 / HZ;
+		break;
 
-		case AX25_IDLE:
-			val = ax25->idle / (60 * HZ);
-			break;
+	case AX25_IDLE:
+		val = ax25->idle / (60 * HZ);
+		break;
 
-		case AX25_BACKOFF:
-			val = ax25->backoff;
-			break;
+	case AX25_BACKOFF:
+		val = ax25->backoff;
+		break;
 
-		case AX25_EXTSEQ:
-			val = (ax25->modulus == AX25_EMODULUS);
-			break;
+	case AX25_EXTSEQ:
+		val = (ax25->modulus == AX25_EMODULUS);
+		break;
 
-		case AX25_PIDINCL:
-			val = ax25->pidincl;
-			break;
+	case AX25_PIDINCL:
+		val = ax25->pidincl;
+		break;
 
-		case AX25_IAMDIGI:
-			val = ax25->iamdigi;
-			break;
+	case AX25_IAMDIGI:
+		val = ax25->iamdigi;
+		break;
 
-		case AX25_PACLEN:
-			val = ax25->paclen;
-			break;
-			
-		case SO_BINDTODEVICE:
-			ax25_dev = ax25->ax25_dev;
+	case AX25_PACLEN:
+		val = ax25->paclen;
+		break;
 
-			if (ax25_dev != NULL && ax25_dev->dev != NULL) {
-				strncpy(devname, ax25_dev->dev->name, IFNAMSIZ);
-				length = min_t(unsigned int, strlen(ax25_dev->dev->name)+1, maxlen);
-				devname[length-1] = '\0';
-			} else {
-				*devname = '\0';
-				length = 1;
-			}
+	case SO_BINDTODEVICE:
+		ax25_dev = ax25->ax25_dev;
 
-			valptr = (void *) devname;
-			break;
+		if (ax25_dev != NULL && ax25_dev->dev != NULL) {
+			strncpy(devname, ax25_dev->dev->name, IFNAMSIZ);
+			length = min_t(unsigned int, strlen(ax25_dev->dev->name)+1, maxlen);
+			devname[length-1] = '\0';
+		} else {
+			*devname = '\0';
+			length = 1;
+		}
 
-		default:
-			unlock_kernel();
-			return -ENOPROTOOPT;
+		valptr = (void *) devname;
+		break;
+
+	default:
+		unlock_kernel();
+		return -ENOPROTOOPT;
 	}
 	unlock_kernel();
 
@@ -881,46 +882,48 @@ int ax25_create(struct socket *sock, int protocol)
 	ax25_cb *ax25;
 
 	switch (sock->type) {
-		case SOCK_DGRAM:
-			if (protocol == 0 || protocol == PF_AX25)
-				protocol = AX25_P_TEXT;
+	case SOCK_DGRAM:
+		if (protocol == 0 || protocol == PF_AX25)
+			protocol = AX25_P_TEXT;
+		break;
+
+	case SOCK_SEQPACKET:
+		switch (protocol) {
+		case 0:
+		case PF_AX25:	/* For CLX */
+			protocol = AX25_P_TEXT;
 			break;
-		case SOCK_SEQPACKET:
-			switch (protocol) {
-				case 0:
-				case PF_AX25:	/* For CLX */
-					protocol = AX25_P_TEXT;
-					break;
-				case AX25_P_SEGMENT:
+		case AX25_P_SEGMENT:
 #ifdef CONFIG_INET
-				case AX25_P_ARP:
-				case AX25_P_IP:
+		case AX25_P_ARP:
+		case AX25_P_IP:
 #endif
 #ifdef CONFIG_NETROM
-				case AX25_P_NETROM:
+		case AX25_P_NETROM:
 #endif
 #ifdef CONFIG_ROSE
-				case AX25_P_ROSE:
+		case AX25_P_ROSE:
 #endif
-					return -ESOCKTNOSUPPORT;
+			return -ESOCKTNOSUPPORT;
 #ifdef CONFIG_NETROM_MODULE
-				case AX25_P_NETROM:
-					if (ax25_protocol_is_registered(AX25_P_NETROM))
-						return -ESOCKTNOSUPPORT;
+		case AX25_P_NETROM:
+			if (ax25_protocol_is_registered(AX25_P_NETROM))
+				return -ESOCKTNOSUPPORT;
 #endif
 #ifdef CONFIG_ROSE_MODULE
-				case AX25_P_ROSE:
-					if (ax25_protocol_is_registered(AX25_P_ROSE))
-						return -ESOCKTNOSUPPORT;
+		case AX25_P_ROSE:
+			if (ax25_protocol_is_registered(AX25_P_ROSE))
+				return -ESOCKTNOSUPPORT;
 #endif
-				default:
-					break;
-			}
-			break;
-		case SOCK_RAW:
-			break;
 		default:
-			return -ESOCKTNOSUPPORT;
+			break;
+		}
+		break;
+
+	case SOCK_RAW:
+		break;
+	default:
+		return -ESOCKTNOSUPPORT;
 	}
 
 	if ((sk = sk_alloc(PF_AX25, GFP_ATOMIC, 1, NULL)) == NULL)
@@ -957,14 +960,14 @@ struct sock *ax25_make_new(struct sock *osk, struct ax25_dev *ax25_dev)
 	}
 
 	switch (osk->type) {
-		case SOCK_DGRAM:
-			break;
-		case SOCK_SEQPACKET:
-			break;
-		default:
-			sk_free(sk);
-			ax25_free_cb(ax25);
-			return NULL;
+	case SOCK_DGRAM:
+		break;
+	case SOCK_SEQPACKET:
+		break;
+	default:
+		sk_free(sk);
+		ax25_free_cb(ax25);
+		return NULL;
 	}
 
 	sock_init_data(NULL, sk);
@@ -1029,52 +1032,52 @@ static int ax25_release(struct socket *sock)
 
 	if (sk->type == SOCK_SEQPACKET) {
 		switch (ax25->state) {
-			case AX25_STATE_0:
-				ax25_disconnect(ax25, 0);
-				ax25_destroy_socket(ax25);
-				break;
+		case AX25_STATE_0:
+			ax25_disconnect(ax25, 0);
+			ax25_destroy_socket(ax25);
+			break;
 
-			case AX25_STATE_1:
-			case AX25_STATE_2:
-				ax25_send_control(ax25, AX25_DISC, AX25_POLLON, AX25_COMMAND);
-				ax25_disconnect(ax25, 0);
-				ax25_destroy_socket(ax25);
-				break;
+		case AX25_STATE_1:
+		case AX25_STATE_2:
+			ax25_send_control(ax25, AX25_DISC, AX25_POLLON, AX25_COMMAND);
+			ax25_disconnect(ax25, 0);
+			ax25_destroy_socket(ax25);
+			break;
 
-			case AX25_STATE_3:
-			case AX25_STATE_4:
-				ax25_clear_queues(ax25);
-				ax25->n2count = 0;
-				switch (ax25->ax25_dev->values[AX25_VALUES_PROTOCOL]) {
-					case AX25_PROTO_STD_SIMPLEX:
-					case AX25_PROTO_STD_DUPLEX:
-						ax25_send_control(ax25,
-								  AX25_DISC,
-								  AX25_POLLON,
-								  AX25_COMMAND);
-						ax25_stop_t2timer(ax25);
-						ax25_stop_t3timer(ax25);
-						ax25_stop_idletimer(ax25);
-						break;
+		case AX25_STATE_3:
+		case AX25_STATE_4:
+			ax25_clear_queues(ax25);
+			ax25->n2count = 0;
+			switch (ax25->ax25_dev->values[AX25_VALUES_PROTOCOL]) {
+			case AX25_PROTO_STD_SIMPLEX:
+			case AX25_PROTO_STD_DUPLEX:
+				ax25_send_control(ax25,
+						  AX25_DISC,
+						  AX25_POLLON,
+						  AX25_COMMAND);
+				ax25_stop_t2timer(ax25);
+				ax25_stop_t3timer(ax25);
+				ax25_stop_idletimer(ax25);
+				break;
 #ifdef CONFIG_AX25_DAMA_SLAVE
-					case AX25_PROTO_DAMA_SLAVE:
-						ax25_stop_t3timer(ax25);
-						ax25_stop_idletimer(ax25);
-						break;
+			case AX25_PROTO_DAMA_SLAVE:
+				ax25_stop_t3timer(ax25);
+				ax25_stop_idletimer(ax25);
+				break;
 #endif
-				}
-				ax25_calculate_t1(ax25);
-				ax25_start_t1timer(ax25);
-				ax25->state = AX25_STATE_2;
-				sk->state                = TCP_CLOSE;
-				sk->shutdown            |= SEND_SHUTDOWN;
-				sk->state_change(sk);
-				sk->dead                 = 1;
-				sk->destroy              = 1;
-				break;
+			}
+			ax25_calculate_t1(ax25);
+			ax25_start_t1timer(ax25);
+			ax25->state = AX25_STATE_2;
+			sk->state                = TCP_CLOSE;
+			sk->shutdown            |= SEND_SHUTDOWN;
+			sk->state_change(sk);
+			sk->dead                 = 1;
+			sk->destroy              = 1;
+			break;
 
-			default:
-				break;
+		default:
+			break;
 		}
 	} else {
 		sk->state     = TCP_CLOSE;
@@ -1317,21 +1320,20 @@ static int ax25_connect(struct socket *sock, struct sockaddr *uaddr, int addr_le
 	sk->state          = TCP_SYN_SENT;
 
 	switch (ax25->ax25_dev->values[AX25_VALUES_PROTOCOL]) {
-		case AX25_PROTO_STD_SIMPLEX:
-		case AX25_PROTO_STD_DUPLEX:
-			ax25_std_establish_data_link(ax25);
-			break;
+	case AX25_PROTO_STD_SIMPLEX:
+	case AX25_PROTO_STD_DUPLEX:
+		ax25_std_establish_data_link(ax25);
+		break;
 
 #ifdef CONFIG_AX25_DAMA_SLAVE
-		case AX25_PROTO_DAMA_SLAVE:
-			ax25->modulus = AX25_MODULUS;
-			ax25->window  =
-				ax25->ax25_dev->values[AX25_VALUES_WINDOW];
-			if (ax25->ax25_dev->dama.slave)
-				ax25_ds_establish_data_link(ax25);
-			else
-				ax25_std_establish_data_link(ax25);
-			break;
+	case AX25_PROTO_DAMA_SLAVE:
+		ax25->modulus = AX25_MODULUS;
+		ax25->window  = ax25->ax25_dev->values[AX25_VALUES_WINDOW];
+		if (ax25->ax25_dev->dama.slave)
+			ax25_ds_establish_data_link(ax25);
+		else
+			ax25_std_establish_data_link(ax25);
+		break;
 #endif
 	}
 
@@ -1740,165 +1742,165 @@ static int ax25_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 
 	lock_kernel();
 	switch (cmd) {
-		case TIOCOUTQ: {
-			long amount;
-			amount = sk->sndbuf - atomic_read(&sk->wmem_alloc);
-			if (amount < 0)
-				amount = 0;
-			res = put_user(amount, (int *)arg);
-			break;
-		}
+	case TIOCOUTQ: {
+		long amount;
+		amount = sk->sndbuf - atomic_read(&sk->wmem_alloc);
+		if (amount < 0)
+			amount = 0;
+		res = put_user(amount, (int *)arg);
+		break;
+	}
 
-		case TIOCINQ: {
-			struct sk_buff *skb;
-			long amount = 0L;
-			/* These two are safe on a single CPU system as only user tasks fiddle here */
-			if ((skb = skb_peek(&sk->receive_queue)) != NULL)
-				amount = skb->len;
-			res = put_user(amount, (int *)arg);
-			break;
-		}
+	case TIOCINQ: {
+		struct sk_buff *skb;
+		long amount = 0L;
+		/* These two are safe on a single CPU system as only user tasks fiddle here */
+		if ((skb = skb_peek(&sk->receive_queue)) != NULL)
+			amount = skb->len;
+		res = put_user(amount, (int *)arg);
+		break;
+	}
 
-		case SIOCGSTAMP:
-			if (sk != NULL) {
-				if (sk->stamp.tv_sec == 0) {
-					res = -ENOENT;
-					break;
-				}
-				res = copy_to_user((void *)arg, &sk->stamp, sizeof(struct timeval)) ? -EFAULT : 0;
+	case SIOCGSTAMP:
+		if (sk != NULL) {
+			if (sk->stamp.tv_sec == 0) {
+				res = -ENOENT;
 				break;
-	 		}
+			}
+			res = copy_to_user((void *)arg, &sk->stamp, sizeof(struct timeval)) ? -EFAULT : 0;
+			break;
+	 	}
+		res = -EINVAL;
+		break;
+
+	case SIOCAX25ADDUID:	/* Add a uid to the uid/call map table */
+	case SIOCAX25DELUID:	/* Delete a uid from the uid/call map table */
+	case SIOCAX25GETUID: {
+		struct sockaddr_ax25 sax25;
+		if (copy_from_user(&sax25, (void *)arg, sizeof(sax25))) {
+			res = -EFAULT;
+			break;
+		}
+		res = ax25_uid_ioctl(cmd, &sax25);
+		break;
+	}
+
+	case SIOCAX25NOUID: {	/* Set the default policy (default/bar) */
+		long amount;
+		if (!capable(CAP_NET_ADMIN)) {
+			res = -EPERM;
+			break;
+		}
+		if (get_user(amount, (long *)arg)) {
+			res = -EFAULT;
+			break;
+		}
+		if (amount > AX25_NOUID_BLOCK) {
 			res = -EINVAL;
 			break;
+		}
+		ax25_uid_policy = amount;
+		res = 0;
+		break;
+	}
 
-		case SIOCAX25ADDUID:	/* Add a uid to the uid/call map table */
-		case SIOCAX25DELUID:	/* Delete a uid from the uid/call map table */
-		case SIOCAX25GETUID: {
-			struct sockaddr_ax25 sax25;
-			if (copy_from_user(&sax25, (void *)arg, sizeof(sax25))) {
-				res = -EFAULT;
-				break;
-			}
-			res = ax25_uid_ioctl(cmd, &sax25);
+	case SIOCADDRT:
+	case SIOCDELRT:
+	case SIOCAX25OPTRT:
+		if (!capable(CAP_NET_ADMIN)) {
+			res = -EPERM;
 			break;
 		}
+		res = ax25_rt_ioctl(cmd, (void *)arg);
+		break;
 
-		case SIOCAX25NOUID: {	/* Set the default policy (default/bar) */
-			long amount;
-			if (!capable(CAP_NET_ADMIN)) {
-				res = -EPERM;
-				break;
+	case SIOCAX25CTLCON:
+		if (!capable(CAP_NET_ADMIN)) {
+			res = -EPERM;
+			break;
+		}
+		res = ax25_ctl_ioctl(cmd, (void *)arg);
+		break;
+
+	case SIOCAX25GETINFO: 
+	case SIOCAX25GETINFOOLD: {
+		ax25_cb *ax25 = ax25_sk(sk);
+		struct ax25_info_struct ax25_info;
+
+		ax25_info.t1        = ax25->t1   / HZ;
+		ax25_info.t2        = ax25->t2   / HZ;
+		ax25_info.t3        = ax25->t3   / HZ;
+		ax25_info.idle      = ax25->idle / (60 * HZ);
+		ax25_info.n2        = ax25->n2;
+		ax25_info.t1timer   = ax25_display_timer(&ax25->t1timer)   / HZ;
+		ax25_info.t2timer   = ax25_display_timer(&ax25->t2timer)   / HZ;
+		ax25_info.t3timer   = ax25_display_timer(&ax25->t3timer)   / HZ;
+		ax25_info.idletimer = ax25_display_timer(&ax25->idletimer) / (60 * HZ);
+		ax25_info.n2count   = ax25->n2count;
+		ax25_info.state     = ax25->state;
+		ax25_info.rcv_q     = atomic_read(&sk->rmem_alloc);
+		ax25_info.snd_q     = atomic_read(&sk->wmem_alloc);
+		ax25_info.vs        = ax25->vs;
+		ax25_info.vr        = ax25->vr;
+		ax25_info.va        = ax25->va;
+		ax25_info.vs_max    = ax25->vs; /* reserved */
+		ax25_info.paclen    = ax25->paclen;
+		ax25_info.window    = ax25->window;
+
+		/* old structure? */
+		if (cmd == SIOCAX25GETINFOOLD) {
+			static int warned = 0;
+			if (!warned) {
+				printk(KERN_INFO "%s uses old SIOCAX25GETINFO\n",
+					current->comm);
+				warned=1;
 			}
-			if (get_user(amount, (long *)arg)) {
+
+			if (copy_to_user((void *)arg, &ax25_info, sizeof(struct ax25_info_struct_depreciated))) {
 				res = -EFAULT;
 				break;
 			}
-			if (amount > AX25_NOUID_BLOCK) {
+		} else {
+			if (copy_to_user((void *)arg, &ax25_info, sizeof(struct ax25_info_struct))) {
 				res = -EINVAL;
 				break;
 			}
-			ax25_uid_policy = amount;
-			res = 0;
+		} 
+		res = 0;
+		break;
+	}
+
+	case SIOCAX25ADDFWD:
+	case SIOCAX25DELFWD: {
+		struct ax25_fwd_struct ax25_fwd;
+		if (!capable(CAP_NET_ADMIN)) {
+			res = -EPERM;
 			break;
 		}
-
-		case SIOCADDRT:
-		case SIOCDELRT:
-		case SIOCAX25OPTRT:
-			if (!capable(CAP_NET_ADMIN)) {
-				res = -EPERM;
-				break;
-			}
-			res = ax25_rt_ioctl(cmd, (void *)arg);
-			break;
-
-		case SIOCAX25CTLCON:
-			if (!capable(CAP_NET_ADMIN)) {
-				res = -EPERM;
-				break;
-			}
-			res = ax25_ctl_ioctl(cmd, (void *)arg);
-			break;
-
-		case SIOCAX25GETINFO: 
-		case SIOCAX25GETINFOOLD: {
-			ax25_cb *ax25 = ax25_sk(sk);
-			struct ax25_info_struct ax25_info;
-
-			ax25_info.t1        = ax25->t1   / HZ;
-			ax25_info.t2        = ax25->t2   / HZ;
-			ax25_info.t3        = ax25->t3   / HZ;
-			ax25_info.idle      = ax25->idle / (60 * HZ);
-			ax25_info.n2        = ax25->n2;
-			ax25_info.t1timer   = ax25_display_timer(&ax25->t1timer)   / HZ;
-			ax25_info.t2timer   = ax25_display_timer(&ax25->t2timer)   / HZ;
-			ax25_info.t3timer   = ax25_display_timer(&ax25->t3timer)   / HZ;
-			ax25_info.idletimer = ax25_display_timer(&ax25->idletimer) / (60 * HZ);
-			ax25_info.n2count   = ax25->n2count;
-			ax25_info.state     = ax25->state;
-			ax25_info.rcv_q     = atomic_read(&sk->rmem_alloc);
-			ax25_info.snd_q     = atomic_read(&sk->wmem_alloc);
-			ax25_info.vs        = ax25->vs;
-			ax25_info.vr        = ax25->vr;
-			ax25_info.va        = ax25->va;
-			ax25_info.vs_max    = ax25->vs; /* reserved */
-			ax25_info.paclen    = ax25->paclen;
-			ax25_info.window    = ax25->window;
-
-			/* old structure? */
-			if (cmd == SIOCAX25GETINFOOLD) {
-				static int warned = 0;
-				if (!warned) {
-					printk(KERN_INFO "%s uses old SIOCAX25GETINFO\n",
-						current->comm);
-					warned=1;
-				}
-
-				if (copy_to_user((void *)arg, &ax25_info, sizeof(struct ax25_info_struct_depreciated))) {
-					res = -EFAULT;
-					break;
-				}
-			} else {
-				if (copy_to_user((void *)arg, &ax25_info, sizeof(struct ax25_info_struct))) {
-					res = -EINVAL;
-					break;
-				}
-			} 
-			res = 0;
+		if (copy_from_user(&ax25_fwd, (void *)arg, sizeof(ax25_fwd))) {
+			res = -EFAULT;
 			break;
 		}
+		res = ax25_fwd_ioctl(cmd, &ax25_fwd);
+		break;
+	}
 
-		case SIOCAX25ADDFWD:
-		case SIOCAX25DELFWD: {
-			struct ax25_fwd_struct ax25_fwd;
-			if (!capable(CAP_NET_ADMIN)) {
-				res = -EPERM;
-				break;
-			}
-			if (copy_from_user(&ax25_fwd, (void *)arg, sizeof(ax25_fwd))) {
-				res = -EFAULT;
-				break;
-			}
-			res = ax25_fwd_ioctl(cmd, &ax25_fwd);
-			break;
-		}
+	case SIOCGIFADDR:
+	case SIOCSIFADDR:
+	case SIOCGIFDSTADDR:
+	case SIOCSIFDSTADDR:
+	case SIOCGIFBRDADDR:
+	case SIOCSIFBRDADDR:
+	case SIOCGIFNETMASK:
+	case SIOCSIFNETMASK:
+	case SIOCGIFMETRIC:
+	case SIOCSIFMETRIC:
+		res = -EINVAL;
+		break;
 
-		case SIOCGIFADDR:
-		case SIOCSIFADDR:
-		case SIOCGIFDSTADDR:
-		case SIOCSIFDSTADDR:
-		case SIOCGIFBRDADDR:
-		case SIOCSIFBRDADDR:
-		case SIOCGIFNETMASK:
-		case SIOCSIFNETMASK:
-		case SIOCGIFMETRIC:
-		case SIOCSIFMETRIC:
-			res = -EINVAL;
-			break;
-
-		default:
-			res = dev_ioctl(cmd, (void *)arg);
-			break;
+	default:
+		res = dev_ioctl(cmd, (void *)arg);
+		break;
 	}
 
 	unlock_kernel();
