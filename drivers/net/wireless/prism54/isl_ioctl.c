@@ -334,9 +334,10 @@ prism54_get_freq(struct net_device *ndev, struct iw_request_info *info,
 	int rvalue;
 
 	rvalue = mgt_get_request(priv, DOT11_OID_CHANNEL, 0, NULL, &r);
-
+	fwrq->i = r.u;
+	rvalue |= mgt_get_request(priv, DOT11_OID_FREQUENCY, 0, NULL, &r);
 	fwrq->m = r.u;
-	fwrq->e = 0;
+	fwrq->e = 3;
 
 	return rvalue;
 }
