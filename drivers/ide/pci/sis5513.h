@@ -25,17 +25,15 @@ static ide_pci_host_proc_t sis_procs[] __initdata = {
 };
 #endif /* defined(DISPLAY_SIS_TIMINGS) && defined(CONFIG_PROC_FS) */
 
-static void init_setup_sis5513(struct pci_dev *, ide_pci_device_t *);
 static unsigned int init_chipset_sis5513(struct pci_dev *, const char *);
 static void init_hwif_sis5513(ide_hwif_t *);
 static void init_dma_sis5513(ide_hwif_t *, unsigned long);
 
 static ide_pci_device_t sis5513_chipsets[] __initdata = {
-	{
+	{	/* 0 */
 		vendor:		PCI_VENDOR_ID_SI,
 		device:		PCI_DEVICE_ID_SI_5513,
 		name:		"SIS5513",
-		init_setup:	init_setup_sis5513,
 		init_chipset:	init_chipset_sis5513,
 		init_iops:	NULL,
 		init_hwif:	init_hwif_sis5513,

@@ -25,7 +25,6 @@ static ide_pci_host_proc_t nforce_procs[] __initdata = {
 };
 #endif  /* defined(DISPLAY_NFORCE_TIMINGS) && defined(CONFIG_PROC_FS) */
 
-static void init_setup_nforce(struct pci_dev *, ide_pci_device_t *);
 static unsigned int init_chipset_nforce(struct pci_dev *, const char *);
 static void init_hwif_nforce(ide_hwif_t *);
 static void init_dma_nforce(ide_hwif_t *, unsigned long);
@@ -35,7 +34,6 @@ static ide_pci_device_t nvidia_chipsets[] __initdata = {
 		vendor:		PCI_VENDOR_ID_NVIDIA,
 		device:		PCI_DEVICE_ID_NVIDIA_NFORCE_IDE,
 		name:		"NFORCE",
-		init_setup:	init_setup_nforce,
 		init_chipset:	init_chipset_nforce,
 		init_iops:	NULL,
 		init_hwif:	init_hwif_nforce,
@@ -45,12 +43,8 @@ static ide_pci_device_t nvidia_chipsets[] __initdata = {
 		enablebits:	{{0x50,0x01,0x01}, {0x50,0x02,0x02}},
 		bootable:	ON_BOARD,
 		extra:		0,
-	},{
-		vendor:		0,
-		device:		0,
-		channels:	0,
-		bootable:	EOL,
 	}
 };
+
 
 #endif /* NFORCE_H */

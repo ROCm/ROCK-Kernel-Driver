@@ -1,5 +1,5 @@
 /*
- * linux/drivers/ide/serverworks.c		Version 0.6	05 April 2002
+ * linux/drivers/ide/serverworks.c		Version 0.7	10 Sept 2002
  *
  * Copyright (C) 1998-2000 Michel Aubry
  * Copyright (C) 1998-2000 Andrzej Krzysztofowicz
@@ -25,6 +25,7 @@
 
 #include <linux/config.h>
 #include <linux/types.h>
+#include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/ioport.h>
 #include <linux/pci.h>
@@ -766,21 +767,73 @@ static void __init init_setup_csb6 (struct pci_dev *dev, ide_pci_device_t *d)
 	ide_setup_pci_device(dev, d);
 }
 
-int __init serverworks_scan_pcidev (struct pci_dev *dev)
+
+/**
+ *	svwks_init_one	-	called when a OSB/CSB is found
+ *	@dev: the svwks device
+ *	@id: the matching pci id
+ *
+ *	Called when the PCI registration layer (or the IDE initialization)
+ *	finds a device matching our IDE device tables.
+ */
+ 
+static int __devinit svwks_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 {
-	ide_pci_device_t *d;
+	ide_pci_device_t *d = &serverworks_chipsets[id->driver_data];
 
-	if (dev->vendor != PCI_VENDOR_ID_SERVERWORKS)
-		return 0;
-
-	for (d = serverworks_chipsets; d && d->vendor && d->device; ++d) {
-		if (((d->vendor == dev->vendor) &&
-		     (d->device == dev->device)) &&
-		    (d->init_setup)) {
-			d->init_setup(dev, d);
-			return 1;
-		}
-	}
+	if (dev->device != d->device)
+		BUG();
+	d->init_setup(dev, d);
 	return 0;
 }
+
+/**
+ *	svwks_remove_one	-	called when an OSB/CSB is unplugged
+ *	@dev: the device that was removed
+ *
+ *	Disconnect a SVWKS device that has been unplugged either by hotplug
+ *	or by a more civilized notification scheme. Not yet supported.
+ */
  
+static void svwks_remove_one(struct pci_dev *dev)
+{
+	panic("SVWKS removal not yet supported");
+}
+
+static struct pci_device_id svwks_pci_tbl[] __devinitdata = {
+	{ PCI_VENDOR_ID_SERVERWORKS, PCI_DEVICE_ID_SERVERWORKS_OSB4IDE, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+	{ PCI_VENDOR_ID_SERVERWORKS, PCI_DEVICE_ID_SERVERWORKS_CSB5IDE, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 1},
+	{ PCI_VENDOR_ID_SERVERWORKS, PCI_DEVICE_ID_SERVERWORKS_CSB6IDE, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 2},
+	{ PCI_VENDOR_ID_SERVERWORKS, PCI_DEVICE_ID_SERVERWORKS_CSB6IDE2, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 3},
+	{ 0, },
+};
+
+static struct pci_driver driver = {
+	name:		"Serverworks IDE",
+	id_table:	svwks_pci_tbl,
+	probe:		svwks_init_one,
+	remove:		__devexit_p(svwks_remove_one),
+#if 0	/* FIXME: implement */
+	suspend:	,
+	resume:		,
+#endif
+};
+
+static int svwks_ide_init(void)
+{
+	return ide_pci_register_driver(&driver);
+}
+
+static void svwks_ide_exit(void)
+{
+	ide_pci_unregister_driver(&driver);
+}
+
+module_init(svwks_ide_init);
+module_exit(svwks_ide_exit);
+
+MODULE_AUTHOR("Michael Aubry. Andrzej Krzysztofowicz, Andre Hedrick");
+MODULE_DESCRIPTION("PCI driver module for Serverworks OSB4/CSB5/CSB6 IDE");
+MODULE_LICENSE("GPL");
+
+EXPORT_NO_SYMBOLS;

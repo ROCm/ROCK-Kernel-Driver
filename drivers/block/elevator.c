@@ -177,14 +177,9 @@ int elevator_linus_merge(request_queue_t *q, struct request **req,
 
 		if (__rq->flags & (REQ_BARRIER | REQ_STARTED))
 			break;
-
-		/*
-		 * simply "aging" of requests in queue
-		 */
-		if (elv_linus_sequence(__rq)-- <= 0)
-			break;
 		if (!(__rq->flags & REQ_CMD))
 			continue;
+
 		if (elv_linus_sequence(__rq) < bio_sectors(bio))
 			break;
 
@@ -200,24 +195,20 @@ int elevator_linus_merge(request_queue_t *q, struct request **req,
 		}
 	}
 
-	return ret;
-}
-
-void elevator_linus_merge_cleanup(request_queue_t *q, struct request *req, int count)
-{
-	struct list_head *entry;
-
-	BUG_ON(req->q != q);
-
 	/*
-	 * second pass scan of requests that got passed over, if any
+	 * if *req, it's either a seek or merge in the middle of the queue
 	 */
-	entry = &req->queuelist;
-	while ((entry = entry->next) != &q->queue_head) {
-		struct request *tmp;
-		tmp = list_entry_rq(entry);
-		elv_linus_sequence(tmp) -= count;
+	if (*req) {
+		struct list_head *entry = &(*req)->queuelist;
+		int cost = ret ? 1 : ELV_LINUS_SEEK_COST;
+
+		while ((entry = entry->next) != &q->queue_head) {
+			__rq = list_entry_rq(entry);
+			elv_linus_sequence(__rq) -= cost;
+		}
 	}
+
+	return ret;
 }
 
 void elevator_linus_merge_req(request_queue_t *q, struct request *req,
@@ -260,8 +251,8 @@ int elevator_linus_init(request_queue_t *q, elevator_t *e)
 	if (!latency)
 		return -ENOMEM;
 
-	latency[READ] = 8192;
-	latency[WRITE] = 16384;
+	latency[READ] = 1024;
+	latency[WRITE] = 2048;
 
 	e->elevator_data = latency;
 	return 0;
@@ -353,15 +344,6 @@ void elevator_exit(request_queue_t *q, elevator_t *e)
 int elevator_global_init(void)
 {
 	return 0;
-}
-
-void elv_merge_cleanup(request_queue_t *q, struct request *rq,
-		       int nr_sectors)
-{
-	elevator_t *e = &q->elevator;
-
-	if (e->elevator_merge_cleanup_fn)
-		e->elevator_merge_cleanup_fn(q, rq, nr_sectors);
 }
 
 int elv_merge(request_queue_t *q, struct request **rq, struct bio *bio)
@@ -460,7 +442,6 @@ inline struct list_head *elv_get_sort_head(request_queue_t *q,
 
 elevator_t elevator_linus = {
 	elevator_merge_fn:		elevator_linus_merge,
-	elevator_merge_cleanup_fn:	elevator_linus_merge_cleanup,
 	elevator_merge_req_fn:		elevator_linus_merge_req,
 	elevator_next_req_fn:		elevator_noop_next_request,
 	elevator_add_req_fn:		elevator_linus_add_request,

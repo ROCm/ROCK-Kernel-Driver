@@ -25,17 +25,15 @@ static ide_pci_host_proc_t via_procs[] __initdata = {
 };
 #endif /* DISPLAY_VIA_TIMINGS && CONFIG_PROC_FS */
 
-static void init_setup_via82cxxx(struct pci_dev *, ide_pci_device_t *);
 static unsigned int init_chipset_via82cxxx(struct pci_dev *, const char *);
 static void init_hwif_via82cxxx(ide_hwif_t *);
 static void init_dma_via82cxxx(ide_hwif_t *, unsigned long);
 
 static ide_pci_device_t via82cxxx_chipsets[] __initdata = {
-	{
+	{	/* 0 */
 		vendor:		PCI_VENDOR_ID_VIA,
 		device:		PCI_DEVICE_ID_VIA_82C576_1,
 		name:		"VP_IDE",
-		init_setup:	init_setup_via82cxxx,
 		init_chipset:	init_chipset_via82cxxx,
 		init_iops:	NULL,
 		init_hwif:	init_hwif_via82cxxx,
@@ -45,11 +43,10 @@ static ide_pci_device_t via82cxxx_chipsets[] __initdata = {
 		enablebits:	{{0x40,0x02,0x02}, {0x40,0x01,0x01}},
 		bootable:	ON_BOARD,
 		extra:		0,
-	},{
+	},{	/* 1 */
 		vendor:		PCI_VENDOR_ID_VIA,
 		device:		PCI_DEVICE_ID_VIA_82C586_1,
 		name:		"VP_IDE",
-		init_setup:	init_setup_via82cxxx,
 		init_chipset:	init_chipset_via82cxxx,
 		init_iops:	NULL,
 		init_hwif:	init_hwif_via82cxxx,
