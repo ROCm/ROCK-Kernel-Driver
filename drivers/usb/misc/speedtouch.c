@@ -582,7 +582,6 @@ static void udsl_usb_send_data_complete (struct urb *urb, struct pt_regs *regs)
 	struct udsl_usb_send_data_context *ctx = (struct udsl_usb_send_data_context *) urb->context;
 	struct udsl_instance_data *instance = ctx->instance;
 	int err;
-	unsigned long flags;
 
 	PDEBUG ("udsl_usb_send_data_completion (vcc = %p, skb = %p, status %d)\n", ctx->vcc,
 		ctx->skb, urb->status);
@@ -590,15 +589,15 @@ static void udsl_usb_send_data_complete (struct urb *urb, struct pt_regs *regs)
 	ctx->vcc->pop (ctx->vcc, ctx->skb);
 	ctx->skb = NULL;
 
-	spin_lock_irqsave (&instance->sndqlock, flags);
+	spin_lock (&instance->sndqlock);
 	if (skb_queue_empty (&instance->sndqueue)) {
-		spin_unlock_irqrestore (&instance->sndqlock, flags);
+		spin_unlock (&instance->sndqlock);
 		return;
 	}
 	/* submit next skb */
 	ctx->skb = skb_dequeue (&(instance->sndqueue));
 	ctx->vcc = ((struct udsl_cb *) (ctx->skb->cb))->vcc;
-	spin_unlock_irqrestore (&instance->sndqlock, flags);
+	spin_unlock (&instance->sndqlock);
 	usb_fill_bulk_urb (urb,
 		       instance->usb_dev,
 		       usb_sndbulkpipe (instance->usb_dev, UDSL_ENDPOINT_DATA_OUT),
