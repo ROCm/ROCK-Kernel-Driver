@@ -76,7 +76,7 @@ static int reiserfs_readdir (struct file * filp, void * dirent, filldir_t filldi
 		
 	/* we must have found item, that is item of this directory, */
 	RFALSE( COMP_SHORT_KEYS (&(ih->ih_key), &pos_key),
-		"vs-9000: found item %h does not match to dir we readdir %k",
+		"vs-9000: found item %h does not match to dir we readdir %K",
 		ih, &pos_key);
 	RFALSE( item_num > B_NR_ITEMS (bh) - 1,
 		"vs-9005 item_num == %d, item amount == %d", 

@@ -470,7 +470,7 @@ static int reiserfs_add_entry (struct reiserfs_transaction_handle *th, struct in
     if (gen_number != 0) {	/* we need to re-search for the insertion point */
       if (search_by_entry_key (dir->i_sb, &entry_key, &path, &de) != NAME_NOT_FOUND) {
             reiserfs_warning ("vs-7032: reiserfs_add_entry: "
-                            "entry with this key (%k) already exists\n", &entry_key);
+                            "entry with this key (%K) already exists\n", &entry_key);
 
 	    if (buffer != small_buf)
 		reiserfs_kfree (buffer, buflen, dir->i_sb);
