@@ -147,6 +147,8 @@ svc_sock_enqueue(struct svc_sock *svsk)
 	if (!(svsk->sk_flags &
 	      ( (1<<SK_CONN)|(1<<SK_DATA)|(1<<SK_CLOSE)|(1<<SK_DEFERRED)) ))
 		return;
+	if (test_bit(SK_DEAD, &svsk->sk_flags))
+		return;
 
 	spin_lock_bh(&serv->sv_lock);
 
@@ -1028,6 +1030,9 @@ svc_tcp_sendto(struct svc_rqst *rqstp)
 	 */
 	reclen = htonl(0x80000000|((xbufp->len ) - 4));
 	memcpy(xbufp->head[0].iov_base, &reclen, 4);
+
+	if (test_bit(SK_DEAD, &rqstp->rq_sock->sk_flags))
+		return -ENOTCONN;
 
 	sent = svc_sendto(rqstp, &rqstp->rq_res);
 	if (sent != xbufp->len) {
