@@ -255,7 +255,6 @@ void scsi_wait_req(struct scsi_request *sreq, const void *cmnd, void *buffer,
 	sreq->sr_request->rq_status = RQ_SCSI_BUSY;
 	scsi_do_req(sreq, cmnd, buffer, bufflen, scsi_wait_done,
 			timeout, retries);
-	generic_unplug_device(sreq->sr_device->request_queue);
 	wait_for_completion(&wait);
 	sreq->sr_request->waiting = NULL;
 	if (sreq->sr_request->rq_status != RQ_SCSI_DONE)

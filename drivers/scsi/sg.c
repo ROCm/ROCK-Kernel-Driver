@@ -718,7 +718,6 @@ sg_common_write(Sg_fd * sfp, Sg_request * srp,
 		    (void *) SRpnt->sr_buffer, hp->dxfer_len,
 		    sg_cmd_done, timeout, SG_DEFAULT_RETRIES);
 	/* dxfer_len overwrites SRpnt->sr_bufflen, hence need for b_malloc_len */
-	generic_unplug_device(q);
 	return 0;
 }
 
