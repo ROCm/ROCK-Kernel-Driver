@@ -202,7 +202,7 @@ void ata_write(ide_drive_t *drive, void *buffer, unsigned int wcount)
 			ata_write_slow(drive, buffer, wcount);
 		else
 #endif
-			ata_write_16(drive, buffer, wcount<<1);
+			ata_write_16(drive, buffer, wcount);
 	}
 }
 
