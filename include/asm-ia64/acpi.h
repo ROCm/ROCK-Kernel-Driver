@@ -55,19 +55,19 @@
 #define ACPI_FLUSH_CPU_CACHE()
 
 static inline int
-acpi_acquire_global_lock (unsigned int *lock)
+ia64_acpi_acquire_global_lock (unsigned int *lock)
 {
 	unsigned int old, new, val;
 	do {
 		old = *lock;
 		new = (((old & ~0x3) + 2) + ((old >> 1) & 0x1));
-		val = ia64_cmpxchg4_acq(GLptr, new, old);
+		val = ia64_cmpxchg4_acq(lock, new, old);
 	} while (unlikely (val != old));
 	return (new < 3) ? -1 : 0;
 }
 
 static inline int
-acpi_release_global_lock (unsigned int *lock)
+ia64_acpi_release_global_lock (unsigned int *lock)
 {
 	unsigned int old, new, val;
 	do {
@@ -79,10 +79,10 @@ acpi_release_global_lock (unsigned int *lock)
 }
 
 #define ACPI_ACQUIRE_GLOBAL_LOCK(GLptr, Acq)				\
-	((Acq) = acpi_acquire_global_lock((unsigned int *) GLptr))
+	((Acq) = ia64_acpi_acquire_global_lock((unsigned int *) GLptr))
 
 #define ACPI_RELEASE_GLOBAL_LOCK(GLptr, Acq)				\
-	((Acq) = acpi_release_global_lock((unsigned int *) GLptr))
+	((Acq) = ia64_acpi_release_global_lock((unsigned int *) GLptr))
 
 const char *acpi_get_sysname (void);
 int acpi_request_vector (u32 int_type);
