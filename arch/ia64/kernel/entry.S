@@ -36,6 +36,7 @@
 #include <asm/kregs.h>
 #include <asm/offsets.h>
 #include <asm/pgtable.h>
+#include <asm/percpu.h>
 #include <asm/processor.h>
 #include <asm/thread_info.h>
 #include <asm/unistd.h>
@@ -214,62 +215,80 @@ GLOBAL_ENTRY(save_switch_stack)
 	.save @priunat,r17
 	mov r17=ar.unat		// preserve caller's
 	.body
-	adds r3=80,sp
-	;;
-	lfetch.fault.excl.nt1 [r3],128
-	mov ar.rsc=0		// put RSE in mode: enforced lazy, little endian, pl 0
+#ifdef CONFIG_ITANIUM
 	adds r2=16+128,sp
+	adds r3=16+64,sp
+	adds r14=SW(R4)+16,sp
+	;;
+	st8.spill [r14]=r4,16		// spill r4
+	lfetch.fault.excl.nt1 [r3],128
 	;;
 	lfetch.fault.excl.nt1 [r2],128
 	lfetch.fault.excl.nt1 [r3],128
-	adds r14=SW(R4)+16,sp
 	;;
 	lfetch.fault.excl [r2]
 	lfetch.fault.excl [r3]
 	adds r15=SW(R5)+16,sp
+#else
+	add r2=16+3*128,sp
+	add r3=16,sp
+	add r14=SW(R4)+16,sp
 	;;
-	mov r18=ar.fpsr		// preserve fpsr
-	mov r19=ar.rnat
-	add r2=SW(F2)+16,sp	// r2 = &sw->f2
-.mem.offset 0,0; st8.spill [r14]=r4,16		// spill r4
-.mem.offset 8,0; st8.spill [r15]=r5,16		// spill r5
-	add r3=SW(F3)+16,sp	// r3 = &sw->f3
+	st8.spill [r14]=r4,SW(R6)-SW(R4)	// spill r4 and prefetch offset 0x1c0
+	lfetch.fault.excl.nt1 [r3],128	//		prefetch offset 0x010
+	;;
+	lfetch.fault.excl.nt1 [r3],128	//		prefetch offset 0x090
+	lfetch.fault.excl.nt1 [r2],128	//		prefetch offset 0x190
+	;;
+	lfetch.fault.excl.nt1 [r3]	//		prefetch offset 0x110
+	lfetch.fault.excl.nt1 [r2]	//		prefetch offset 0x210
+	adds r15=SW(R5)+16,sp
+#endif
+	;;
+	st8.spill [r15]=r5,SW(R7)-SW(R5)	// spill r5
+	mov.m ar.rsc=0			// put RSE in mode: enforced lazy, little endian, pl 0
+	add r2=SW(F2)+16,sp		// r2 = &sw->f2
+	;;
+	st8.spill [r14]=r6,SW(B0)-SW(R6)	// spill r6
+	mov.m r18=ar.fpsr		// preserve fpsr
+	add r3=SW(F3)+16,sp		// r3 = &sw->f3
 	;;
 	stf.spill [r2]=f2,32
-	stf.spill [r3]=f3,32
+	mov.m r19=ar.rnat
 	mov r21=b0
-.mem.offset 0,0; st8.spill [r14]=r6,16		// spill r6
-.mem.offset 8,0; st8.spill [r15]=r7,16		// spill r7
+
+	stf.spill [r3]=f3,32
+	st8.spill [r15]=r7,SW(B2)-SW(R7)	// spill r7
 	mov r22=b1
 	;;
 	// since we're done with the spills, read and save ar.unat:
-	mov r29=ar.unat		// M-unit
-	mov r20=ar.bspstore	// M-unit
+	mov.m r29=ar.unat
+	mov.m r20=ar.bspstore
 	mov r23=b2
 	stf.spill [r2]=f4,32
 	stf.spill [r3]=f5,32
 	mov r24=b3
 	;;
-	st8 [r14]=r21,16	// save b0
-	st8 [r15]=r22,16	// save b1
+	st8 [r14]=r21,SW(B1)-SW(B0)		// save b0
+	st8 [r15]=r23,SW(B3)-SW(B2)		// save b2
 	mov r25=b4
 	stf.spill [r2]=f10,32
 	stf.spill [r3]=f11,32
 	mov r26=b5
 	;;
-	st8 [r14]=r23,16	// save b2
-	st8 [r15]=r24,16	// save b3
+	st8 [r14]=r22,SW(B4)-SW(B1)		// save b1
+	st8 [r15]=r24,SW(AR_PFS)-SW(B3)		// save b3
 	mov r21=ar.lc		// I-unit
 	stf.spill [r2]=f12,32
 	stf.spill [r3]=f13,32
 	;;
-	st8 [r14]=r25,16	// save b4
-	st8 [r15]=r26,16	// save b5
+	st8 [r14]=r25,SW(B5)-SW(B4)		// save b4
+	st8 [r15]=r16,SW(AR_LC)-SW(AR_PFS)	// save ar.pfs
 	stf.spill [r2]=f14,32
 	stf.spill [r3]=f15,32
 	;;
-	st8 [r14]=r16		// save ar.pfs
-	st8 [r15]=r21		// save ar.lc
+	st8 [r14]=r26				// save b5
+	st8 [r15]=r21				// save ar.lc
 	stf.spill [r2]=f16,32
 	stf.spill [r3]=f17,32
 	;;
@@ -284,26 +303,26 @@ GLOBAL_ENTRY(save_switch_stack)
 	;;
 	stf.spill [r2]=f24,32
 	stf.spill [r3]=f25,32
-	add r14=SW(CALLER_UNAT)+16,sp
 	;;
 	stf.spill [r2]=f26,32
 	stf.spill [r3]=f27,32
-	add r15=SW(AR_FPSR)+16,sp
 	;;
 	stf.spill [r2]=f28,32
 	stf.spill [r3]=f29,32
-	st8 [r14]=r17		// save caller_unat
-	st8 [r15]=r18		// save fpsr
+	;;
+	stf.spill [r2]=f30,SW(AR_UNAT)-SW(F30)
+	stf.spill [r3]=f31,SW(PR)-SW(F31)
+	add r14=SW(CALLER_UNAT)+16,sp
+	;;
+	st8 [r2]=r29,SW(AR_RNAT)-SW(AR_UNAT)	// save ar.unat
+	st8 [r14]=r17,SW(AR_FPSR)-SW(CALLER_UNAT) // save caller_unat
 	mov r21=pr
 	;;
-	stf.spill [r2]=f30,(SW(AR_UNAT)-SW(F30))
-	stf.spill [r3]=f31,(SW(AR_RNAT)-SW(F31))
+	st8 [r2]=r19,SW(AR_BSPSTORE)-SW(AR_RNAT) // save ar.rnat
+	st8 [r3]=r21				// save predicate registers
 	;;
-	st8 [r2]=r29,16		// save ar.unat
-	st8 [r3]=r19,16		// save ar.rnat
-	;;
-	st8 [r2]=r20		// save ar.bspstore
-	st8 [r3]=r21		// save predicate registers
+	st8 [r2]=r20				// save ar.bspstore
+	st8 [r14]=r18				// save fpsr
 	mov ar.rsc=3		// put RSE back into eager mode, pl 0
 	br.cond.sptk.many b7
 END(save_switch_stack)
@@ -647,23 +666,38 @@ dont_preserve_current_frame:
 	/*
 	 * To prevent leaking bits between the kernel and user-space,
 	 * we must clear the stacked registers in the "invalid" partition here.
-	 * Not pretty, but at least it's fast (3.34 registers/cycle).
-	 * Architecturally, this loop could go at 4.67 registers/cycle, but that would
-	 * oversubscribe Itanium.
+	 * Not pretty, but at least it's fast (3.34 registers/cycle on Itanium,
+	 * 5 registers/cycle on McKinley).
 	 */
 #	define pRecurse	p6
 #	define pReturn	p7
+#ifdef CONFIG_ITANIUM
 #	define Nregs	10
+#else
+#	define Nregs	14
+#endif
 	alloc loc0=ar.pfs,2,Nregs-2,2,0
 	shr.u loc1=r18,9		// RNaTslots <= dirtySize / (64*8) + 1
 	sub r17=r17,r18			// r17 = (physStackedSize + 8) - dirtySize
 	;;
+#if 1
+	.align 32		// see comment below about gas bug...
+#endif
 	mov ar.rsc=r19			// load ar.rsc to be used for "loadrs"
 	shladd in0=loc1,3,r17
 	mov in1=0
+#if 0
+	// gas-2.12.90 is unable to generate a stop bit after .align, which is bad,
+	// because alloc must be at the beginning of an insn-group.
+	.align 32
+#else
+	nop 0
+	nop 0
+	nop 0
+#endif
 	;;
-//	.align 32	// gas-2.11.90 is unable to generate a stop bit after .align
 rse_clear_invalid:
+#ifdef CONFIG_ITANIUM
 	// cycle 0
  { .mii
 	alloc loc0=ar.pfs,2,Nregs-2,2,0
@@ -692,9 +726,31 @@ rse_clear_invalid:
 	mov loc7=0
 (pReturn) br.ret.sptk.many b6
 }
+#else /* !CONFIG_ITANIUM */
+	alloc loc0=ar.pfs,2,Nregs-2,2,0
+	cmp.lt pRecurse,p0=Nregs*8,in0	// if more than Nregs regs left to clear, (re)curse
+	add out0=-Nregs*8,in0
+	add out1=1,in1			// increment recursion count
+	mov loc1=0
+	mov loc2=0
+	;;
+	mov loc3=0
+	mov loc4=0
+	mov loc9=0
+	mov loc5=0
+	mov loc6=0
+(pRecurse) br.call.sptk.many b6=rse_clear_invalid
+	;;
+	mov loc7=0
+	mov loc8=0
+	cmp.ne pReturn,p0=r0,in1	// if recursion count != 0, we need to do a br.ret
+	mov loc10=0
+	mov loc11=0
+(pReturn) br.ret.sptk.many b6
+#endif /* !CONFIG_ITANIUM */
 #	undef pRecurse
 #	undef pReturn
-
+	;;
 	alloc r17=ar.pfs,0,0,0,0	// drop current register frame
 	;;
 	loadrs
@@ -1087,7 +1143,11 @@ sys_call_table:
 	data8 sys_sched_get_priority_min
 	data8 sys_sched_rr_get_interval
 	data8 sys_nanosleep
+#if defined(CONFIG_NFSD) || defined(CONFIG_NFSD_MODULE)
 	data8 sys_nfsservctl
+#else
+	data8 sys_ni_syscall
+#endif
 	data8 sys_prctl				// 1170
 	data8 sys_getpagesize
 	data8 sys_mmap2
@@ -1147,14 +1207,10 @@ sys_call_table:
 	data8 sys_removexattr
 	data8 sys_lremovexattr
 	data8 sys_fremovexattr
-#if 0
 	data8 sys_tkill
-#else
-	data8 ia64_ni_syscall
-#endif
-	data8 ia64_ni_syscall			// 1230
-	data8 ia64_ni_syscall
-	data8 ia64_ni_syscall
+	data8 sys_futex				// 1230
+	data8 sys_sched_setaffinity
+	data8 sys_sched_getaffinity
 	data8 ia64_ni_syscall
 	data8 ia64_ni_syscall
 	data8 ia64_ni_syscall			// 1235

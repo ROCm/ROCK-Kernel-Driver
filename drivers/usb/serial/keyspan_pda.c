@@ -798,6 +798,7 @@ static void keyspan_pda_shutdown (struct usb_serial *serial)
 
 #ifdef KEYSPAN
 static struct usb_serial_device_type keyspan_pda_fake_device = {
+	owner:			THIS_MODULE,
 	name:			"Keyspan PDA - (prerenumeration)",
 	id_table:		id_table_fake,
 	num_interrupt_in:	NUM_DONT_CARE,
@@ -810,17 +811,19 @@ static struct usb_serial_device_type keyspan_pda_fake_device = {
 
 #ifdef XIRCOM
 static struct usb_serial_device_type xircom_pgs_fake_device = {
-        name:                   "Xircom / Entregra PGS - (prerenumeration)",
-        id_table:               id_table_fake_xircom,
-        num_interrupt_in:       NUM_DONT_CARE,
-        num_bulk_in:            NUM_DONT_CARE,
-        num_bulk_out:           NUM_DONT_CARE,
-        num_ports:              1,
-        startup:                keyspan_pda_fake_startup,
+	owner:			THIS_MODULE,
+	name:			"Xircom / Entregra PGS - (prerenumeration)",
+	id_table:		id_table_fake_xircom,
+	num_interrupt_in:	NUM_DONT_CARE,
+	num_bulk_in:		NUM_DONT_CARE,
+	num_bulk_out:		NUM_DONT_CARE,
+	num_ports:		1,
+	startup:		keyspan_pda_fake_startup,
 };
 #endif
 
 static struct usb_serial_device_type keyspan_pda_device = {
+	owner:			THIS_MODULE,
 	name:			"Keyspan PDA",
 	id_table:		id_table_std,
 	num_interrupt_in:	1,

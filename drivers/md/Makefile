@@ -5,7 +5,6 @@
 O_TARGET	:= mddev.o
 
 export-objs	:= md.o xor.o
-list-multi	:= lvm-mod.o
 lvm-mod-objs	:= lvm.o lvm-snap.o lvm-fs.o
 
 # Note: link order is important.  All raid personalities
@@ -22,6 +21,3 @@ obj-$(CONFIG_BLK_DEV_MD)	+= md.o
 obj-$(CONFIG_BLK_DEV_LVM)	+= lvm-mod.o
 
 include $(TOPDIR)/Rules.make
-
-lvm-mod.o: $(lvm-mod-objs)
-	$(LD) -r -o $@ $(lvm-mod-objs)

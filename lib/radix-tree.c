@@ -24,6 +24,7 @@
 #include <linux/module.h>
 #include <linux/radix-tree.h>
 #include <linux/slab.h>
+#include <linux/string.h>
 
 /*
  * Radix tree node definition.
@@ -49,11 +50,27 @@ struct radix_tree_path {
 static kmem_cache_t *radix_tree_node_cachep;
 static mempool_t *radix_tree_node_pool;
 
-#define radix_tree_node_alloc(root) \
-	mempool_alloc(radix_tree_node_pool, (root)->gfp_mask)
-#define radix_tree_node_free(node) \
-	mempool_free((node), radix_tree_node_pool);
+/*
+ * mempool scribbles on the first eight bytes of the managed
+ * memory.  Here we implement a temp workaround for that.
+ */
+#include <linux/list.h>
+static inline struct radix_tree_node *
+radix_tree_node_alloc(struct radix_tree_root *root)
+{
+	struct radix_tree_node *ret;
 
+	ret = mempool_alloc(radix_tree_node_pool, root->gfp_mask);
+	if (ret)
+		memset(ret, 0, sizeof(struct list_head));
+	return ret;
+}
+
+static inline void
+radix_tree_node_free(struct radix_tree_node *node)
+{
+	mempool_free(node, radix_tree_node_pool);
+}
 
 /*
  *	Return the maximum key which can be store into a

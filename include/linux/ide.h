@@ -14,8 +14,8 @@
 #include <linux/device.h>
 #include <linux/devfs_fs_kernel.h>
 #include <linux/interrupt.h>
+#include <linux/bitops.h>
 #include <asm/hdreg.h>
-#include <asm/bitops.h>
 
 /*
  * This is the multiple IDE interface driver, as evolved from hd.c.
@@ -313,9 +313,11 @@ typedef struct ide_tag_info_s {
 #define IDE_CUR_AR(drive)	(HWGROUP((drive))->rq->special)
 
 struct ide_settings_s;
-
-typedef struct ide_drive_s {
-	struct ata_channel *channel;	/* parent pointer to the channel we are attached to  */
+/* structure describing an ATA/ATAPI device */
+typedef
+struct ata_device {
+	struct ata_channel *	channel;
+	char			name[6];	/* device name */
 
 	unsigned int usage;		/* current "open()" count for drive */
 	char type; /* distingiush different devices: disk, cdrom, tape, floppy, ... */
@@ -324,11 +326,11 @@ typedef struct ide_drive_s {
 	 * could move this to the channel and many sync problems would
 	 * magically just go away.
 	 */
-	request_queue_t	queue;	/* per device request queue */
+	request_queue_t	queue;		/* per device request queue */
 
-	struct list_head free_req; /* free ata requests */
+	struct list_head free_req;	/* free ata requests */
 
-	struct ide_drive_s	*next;	/* circular list of hwgroup drives */
+	struct ata_device *next;	/* circular list of hwgroup drives */
 
 	/* Those are directly injected jiffie values. They should go away and
 	 * we should use generic timers instead!!!
@@ -340,14 +342,10 @@ typedef struct ide_drive_s {
 	unsigned long PADAM_timeout;		/* max time to wait for irq */
 
 	special_t	special;	/* special action flags */
-	byte     keep_settings;		/* restore settings after drive reset */
 	byte     using_dma;		/* disk is using dma for read/write */
 	byte	 using_tcq;		/* disk is using queued dma operations*/
 	byte	 retry_pio;		/* retrying dma capable host in pio */
 	byte	 state;			/* retry state */
-	byte     unmask;		/* flag: okay to unmask other irqs */
-	byte     slow;			/* flag: slow data port */
-	byte     bswap;			/* flag: byte swap data */
 	byte     dsc_overlap;		/* flag: DSC overlap */
 
 	unsigned waiting_for_dma: 1;	/* dma currently in progress */
@@ -358,8 +356,6 @@ typedef struct ide_drive_s {
 	unsigned noprobe	: 1;	/* from:  hdx=noprobe */
 	unsigned removable	: 1;	/* 1 if need to do check_media_change */
 	unsigned forced_geom	: 1;	/* 1 if hdx=c,h,s was given at boot */
-	unsigned no_unmask	: 1;	/* disallow setting unmask bit */
-	unsigned no_io_32bit	: 1;	/* disallow enabling 32bit I/O */
 	unsigned nobios		: 1;	/* flag: do not probe bios for drive */
 	unsigned revalidate	: 1;	/* request revalidation */
 	unsigned atapi_overlap	: 1;	/* flag: ATAPI overlap (not supported) */
@@ -367,7 +363,6 @@ typedef struct ide_drive_s {
 	unsigned autotune	: 2;	/* 1=autotune, 2=noautotune, 0=default */
 	unsigned remap_0_to_1	: 2;	/* 0=remap if ezdrive, 1=remap, 2=noremap */
 	unsigned ata_flash	: 1;	/* 1=present, 0=default */
-	unsigned service_pending: 1;
 	unsigned	addressing;	/* : 2; 0=28-bit, 1=48-bit, 2=64-bit */
 	byte		scsi;		/* 0=default, 1=skip current ide-subdriver for ide-scsi emulation */
 	select_t	select;		/* basic drive/head select reg value */
@@ -376,7 +371,6 @@ typedef struct ide_drive_s {
 	byte		mult_count;	/* current multiple sector setting */
 	byte		mult_req;	/* requested multiple sector setting */
 	byte		tune_req;	/* requested drive tuning setting */
-	byte		io_32bit;	/* 0=16-bit, 1=32-bit, 2/3=32bit+sync */
 	byte		bad_wstat;	/* used for ignoring WRERR_STAT */
 	byte		nowerr;		/* used for ignoring WRERR_STAT */
 	byte		sect0;		/* offset of first sector for DM6:DDO */
@@ -395,7 +389,6 @@ typedef struct ide_drive_s {
 	struct hd_driveid *id;		/* drive model identification info */
 	struct hd_struct  *part;	/* drive partition table */
 
-	char		name[6];	/* drive name, such as "hda" */
 	struct ata_operations *driver;
 
 	void		*driver_data;	/* extra driver data */
@@ -447,47 +440,6 @@ typedef enum {	ide_dma_read,	ide_dma_write,		ide_dma_begin,
 
 typedef int (ide_dmaproc_t)(ide_dma_action_t, ide_drive_t *);
 
-/*
- * An ide_ideproc_t() performs CPU-polled transfers to/from a drive.
- * Arguments are: the drive, the buffer pointer, and the length (in bytes or
- * words depending on if it's an IDE or ATAPI call).
- *
- * If it is not defined for a controller, standard-code is used from ide.c.
- *
- * Controllers which are not memory-mapped in the standard way need to
- * override that mechanism using this function to work.
- *
- */
-typedef enum { ideproc_ide_input_data,    ideproc_ide_output_data,
-	       ideproc_atapi_input_bytes, ideproc_atapi_output_bytes
-} ide_ide_action_t;
-
-typedef void (ide_ideproc_t)(ide_ide_action_t, ide_drive_t *, void *, unsigned int);
-
-/*
- * An ide_tuneproc_t() is used to set the speed of an IDE interface
- * to a particular PIO mode.  The "byte" parameter is used
- * to select the PIO mode by number (0,1,2,3,4,5), and a value of 255
- * indicates that the interface driver should "auto-tune" the PIO mode
- * according to the drive capabilities in drive->id;
- *
- * Not all interface types support tuning, and not all of those
- * support all possible PIO settings.  They may silently ignore
- * or round values as they see fit.
- */
-typedef void (ide_tuneproc_t) (ide_drive_t *, byte);
-typedef int (ide_speedproc_t) (ide_drive_t *, byte);
-
-/*
- * This is used to provide support for strange interfaces
- */
-typedef void (ide_selectproc_t) (ide_drive_t *);
-typedef void (ide_resetproc_t) (ide_drive_t *);
-typedef int (ide_quirkproc_t) (ide_drive_t *);
-typedef void (ide_intrproc_t) (ide_drive_t *);
-typedef void (ide_maskproc_t) (ide_drive_t *, int);
-typedef void (ide_rw_proc_t) (ide_drive_t *, ide_dma_action_t);
-
 enum {
 	ATA_PRIMARY	= 0,
 	ATA_SECONDARY	= 1
@@ -507,15 +459,40 @@ struct ata_channel {
 #endif
 	ide_drive_t	drives[MAX_DRIVES];	/* drive info */
 	struct gendisk	*gd;		/* gendisk structure */
-	ide_tuneproc_t	*tuneproc;	/* routine to tune PIO mode for drives */
-	ide_speedproc_t	*speedproc;	/* routine to retune DMA modes for drives */
-	ide_selectproc_t *selectproc;	/* tweaks hardware to select drive */
-	ide_resetproc_t	*resetproc;	/* routine to reset controller after a disk reset */
-	ide_intrproc_t	*intrproc;	/* special interrupt handling for shared pci interrupts */
-	ide_maskproc_t	*maskproc;	/* special host masking for drive selection */
-	ide_quirkproc_t	*quirkproc;	/* check host's drive quirk list */
-	ide_rw_proc_t	*rwproc;	/* adjust timing based upon rq->cmd direction */
-	ide_ideproc_t   *ideproc;       /* CPU-polled transfer routine */
+
+	/*
+	 * Routines to tune PIO and DMA mode for drives.
+	 *
+	 * A value of 255 indicates that the function should choose the optimal
+	 * mode itself.
+	 */
+	void (*tuneproc) (ide_drive_t *, byte pio);
+	int (*speedproc) (ide_drive_t *, byte pio);
+
+	/* tweaks hardware to select drive */
+	void (*selectproc) (ide_drive_t *);
+
+	/* routine to reset controller after a disk reset */
+	void (*resetproc) (ide_drive_t *);
+
+	/* special interrupt handling for shared pci interrupts */
+	void (*intrproc) (ide_drive_t *);
+
+	/* special host masking for drive selection */
+	void (*maskproc) (ide_drive_t *, int);
+
+	/* adjust timing based upon rq->cmd direction */
+	void (*rwproc) (ide_drive_t *, ide_dma_action_t);
+
+	/* check host's drive quirk list */
+	int (*quirkproc) (ide_drive_t *);
+
+	/* CPU-polled transfer routines */
+	void (*ata_read)(ide_drive_t *, void *, unsigned int);
+	void (*ata_write)(ide_drive_t *, void *, unsigned int);
+	void (*atapi_read)(ide_drive_t *, void *, unsigned int);
+	void (*atapi_write)(ide_drive_t *, void *, unsigned int);
+
 	ide_dmaproc_t	*dmaproc;	/* dma read/write/abort routine */
 	unsigned long	dma_base;	/* base addr for dma ports */
 	unsigned	dma_extra;	/* extra addr for dma ports */
@@ -535,6 +512,12 @@ struct ata_channel {
 	unsigned	autodma    : 1;	/* automatically try to enable DMA at boot */
 	unsigned	udma_four  : 1;	/* 1=ATA-66 capable, 0=default */
 	unsigned	highmem	   : 1; /* can do full 32-bit dma */
+	byte		slow;		/* flag: slow data port */
+	unsigned no_io_32bit	   : 1;	/* disallow enabling 32bit I/O */
+	byte		io_32bit;	/* 0=16-bit, 1=32-bit, 2/3=32bit+sync */
+	unsigned no_unmask	   : 1;	/* disallow setting unmask bit */
+	byte		unmask;		/* flag: okay to unmask other irqs */
+	unsigned	auto_poll  : 1; /* supports nop auto-poll */
 #if (DISK_RECOVERY_TIME > 0)
 	unsigned long	last_time;	/* time when previous rq was done */
 #endif
@@ -829,7 +812,7 @@ struct ata_taskfile {
  */
 struct ata_request {
 	struct request		*ar_rq;		/* real request */
-	struct ide_drive_s	*ar_drive;	/* associated drive */
+	struct ata_device	*ar_drive;	/* associated drive */
 	unsigned long		ar_flags;	/* ATA_AR_* flags */
 	int			ar_tag;		/* tag number, if any */
 	struct list_head	ar_queue;	/* pending list */
@@ -848,12 +831,11 @@ struct ata_request {
 
 #define AR_TASK_CMD(ar)	((ar)->ar_task.taskfile.command)
 
-void ata_input_data (ide_drive_t *drive, void *buffer, unsigned int wcount);
-void ata_output_data (ide_drive_t *drive, void *buffer, unsigned int wcount);
-void atapi_input_bytes (ide_drive_t *drive, void *buffer, unsigned int bytecount);
-void atapi_output_bytes (ide_drive_t *drive, void *buffer, unsigned int bytecount);
-void taskfile_input_data (ide_drive_t *drive, void *buffer, unsigned int wcount);
-void taskfile_output_data (ide_drive_t *drive, void *buffer, unsigned int wcount);
+extern void ata_read(ide_drive_t *drive, void *buffer, unsigned int wcount);
+extern void ata_write(ide_drive_t *drive, void *buffer, unsigned int wcount);
+
+extern void atapi_read(ide_drive_t *drive, void *buffer, unsigned int bytecount);
+extern void atapi_write(ide_drive_t *drive, void *buffer, unsigned int bytecount);
 
 extern ide_startstop_t ata_taskfile(ide_drive_t *drive,
 		struct ata_taskfile *args, struct request *rq);
@@ -985,9 +967,9 @@ extern void revalidate_drives(void);
 /*
  * ata_request flag bits
  */
-#define ATA_AR_QUEUED	1
-#define ATA_AR_SETUP	2
-#define ATA_AR_RETURN	4
+#define ATA_AR_QUEUED	1	/* was queued */
+#define ATA_AR_SETUP	2	/* dma table mapped */
+#define ATA_AR_POOL	4	/* originated from drive pool */
 
 /*
  * if turn-around time is longer than this, halve queue depth
@@ -1019,8 +1001,10 @@ static inline struct ata_request *ata_ar_get(ide_drive_t *drive)
 
 	if (!list_empty(&drive->free_req)) {
 		ar = list_ata_entry(drive->free_req.next);
+
 		list_del(&ar->ar_queue);
 		ata_ar_init(drive, ar);
+		ar->ar_flags |= ATA_AR_POOL;
 	}
 
 	return ar;
@@ -1028,7 +1012,8 @@ static inline struct ata_request *ata_ar_get(ide_drive_t *drive)
 
 static inline void ata_ar_put(ide_drive_t *drive, struct ata_request *ar)
 {
-	list_add(&ar->ar_queue, &drive->free_req);
+	if (ar->ar_flags & ATA_AR_POOL)
+		list_add(&ar->ar_queue, &drive->free_req);
 
 	if (ar->ar_flags & ATA_AR_QUEUED) {
 		/* clear the tag */

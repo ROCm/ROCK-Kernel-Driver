@@ -91,32 +91,6 @@ static inline void lock_metapage(struct metapage *mp)
 		__lock_metapage(mp);
 }
 
-/* We're currently re-evaluating the method we use to write metadata
- * pages.  Currently, we have to make sure there no dirty buffer_heads
- * hanging around after we free the metadata page, since the same
- * physical disk blocks may be used in a different address space and we
- * can't write old data over the good data.
- *
- * The best way to do this now is with block_invalidate_page.  However,
- * this is only available in the newer kernels and is not exported
- * to modules.  block_flushpage is the next best, but it too is not exported
- * to modules.
- *
- * In a module, about the best we have is generic_buffer_fdatasync.  This
- * synchronously writes any dirty buffers.  This is not optimal, but it will
- * keep old dirty buffers from overwriting newer data.
- */
-static inline void invalidate_page(metapage_t *mp)
-{
-#ifdef MODULE
-	generic_buffer_fdatasync(mp->mapping->host, mp->index, mp->index + 1);
-#else
-	lock_page(mp->page);
-	block_flushpage(mp->page, 0);
-	UnlockPage(mp->page);
-#endif
-}
-
 int __init metapage_init(void)
 {
 	int i;
@@ -515,7 +489,7 @@ static inline void sync_metapage(metapage_t *mp)
 	lock_page(page);
 
 	/* we're done with this page - no need to check for errors */
-	if (page->buffers) {
+	if (page_has_buffers(page)) {
 		writeout_one_page(page);
 		waitfor_one_page(page);
 	}
@@ -559,8 +533,11 @@ void release_metapage(metapage_t * mp)
 				clear_bit(META_sync, &mp->flag);
 			}
 
-			if (test_bit(META_discard, &mp->flag))
-				invalidate_page(mp);
+			if (test_bit(META_discard, &mp->flag)) {
+				lock_page(mp->page);
+				block_flushpage(mp->page, 0);
+				UnlockPage(mp->page);
+			}
 
 			page_cache_release(mp->page);
 			INCREMENT(mpStat.pagefree);
@@ -593,9 +570,7 @@ void invalidate_metapages(struct inode *ip, unsigned long addr,
 	int l2BlocksPerPage = PAGE_CACHE_SHIFT - ip->i_sb->s_blocksize_bits;
 	struct address_space *mapping = ip->i_mapping;
 	metapage_t *mp;
-#ifndef MODULE
 	struct page *page;
-#endif
 
 	/*
 	 * First, mark metapages to discard.  They will eventually be
@@ -612,27 +587,14 @@ void invalidate_metapages(struct inode *ip, unsigned long addr,
 			/*
 			 * If in the metapage cache, we've got the page locked
 			 */
-#ifdef MODULE
-			UnlockPage(mp->page);
-			generic_buffer_fdatasync(mp->mapping->host, mp->index,
-						 mp->index+1);
-			lock_page(mp->page);
-#else
 			block_flushpage(mp->page, 0);
-#endif
 		} else {
 			spin_unlock(&meta_lock);
-#ifdef MODULE
-			generic_buffer_fdatasync(ip, lblock << l2BlocksPerPage,
-					(lblock + 1) << l2BlocksPerPage);
-#else
-			page = find_lock_page(mapping,
-					      lblock >> l2BlocksPerPage);
+			page = find_lock_page(mapping, lblock>>l2BlocksPerPage);
 			if (page) {
 				block_flushpage(page, 0);
 				UnlockPage(page);
 			}
-#endif
 		}
 	}
 }

@@ -338,7 +338,7 @@ static ssize_t microcode_write(struct file *file, const char *buf, size_t len, l
 		return -EINVAL;
 	}
 	if ((len >> PAGE_SHIFT) > num_physpages) {
-		printk(KERN_ERR "microcode: too much data (max %d pages)\n", num_physpages);
+		printk(KERN_ERR "microcode: too much data (max %ld pages)\n", num_physpages);
 		return -EINVAL;
 	}
 	down_write(&microcode_rwsem);

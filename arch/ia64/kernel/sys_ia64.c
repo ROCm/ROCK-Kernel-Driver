@@ -47,7 +47,7 @@ arch_get_unmapped_area (struct file *filp, unsigned long addr, unsigned long len
 		/* At this point:  (!vmm || addr < vmm->vm_end). */
 		if (TASK_SIZE - len < addr)
 			return -ENOMEM;
-		if (rgn_offset(addr) + len > RGN_MAP_LIMIT)	/* no risk of overflow here... */
+		if (REGION_OFFSET(addr) + len > RGN_MAP_LIMIT)	/* no risk of overflow here... */
 			return -ENOMEM;
 		if (!vmm || addr + len <= vmm->vm_start)
 			return addr;
@@ -126,7 +126,7 @@ ia64_brk (unsigned long brk, long arg1, long arg2, long arg3,
 	}
 
 	/* Check against unimplemented/unmapped addresses: */
-	if ((newbrk - oldbrk) > RGN_MAP_LIMIT || rgn_offset(newbrk) > RGN_MAP_LIMIT)
+	if ((newbrk - oldbrk) > RGN_MAP_LIMIT || REGION_OFFSET(newbrk) > RGN_MAP_LIMIT)
 		goto out;
 
 	/* Check against rlimit.. */
@@ -206,7 +206,7 @@ do_mmap2 (unsigned long addr, unsigned long len, int prot, int flags, int fd, un
 	 * or across a region boundary.  Note: RGN_MAP_LIMIT is equal to 2^n-PAGE_SIZE
 	 * (for some integer n <= 61) and len > 0.
 	 */
-	roff = rgn_offset(addr);
+	roff = REGION_OFFSET(addr);
 	if ((len > RGN_MAP_LIMIT) || (roff > (RGN_MAP_LIMIT - len))) {
 		addr = -EINVAL;
 		goto out;

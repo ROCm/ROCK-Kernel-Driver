@@ -1,8 +1,8 @@
 /*
- * linux/drivers/ide/ide-floppy.c	Version 0.97.sv	Jan 14 2001
+ * linux/drivers/ide/ide-floppy.c	Version 0.99	Feb 24 2002
  *
  * Copyright (C) 1996 - 1999 Gadi Oxman <gadio@netvision.net.il>
- * Copyright (C) 2000 - 2001 Paul Bristow <paul@paulbristow.net>
+ * Copyright (C) 2000 - 2002 Paul Bristow <paul@paulbristow.net>
  */
 
 /*
@@ -13,7 +13,7 @@
  *
  * This driver supports the following IDE floppy drives:
  *
- * LS-120 SuperDisk
+ * LS-120/240 SuperDisk
  * Iomega Zip 100/250
  * Iomega PC Card Clik!/PocketZip
  *
@@ -76,9 +76,11 @@
  *                        bit was being deasserted by my IOMEGA ATAPI ZIP 100
  *                        drive before the drive was actually ready.
  * Ver 0.98a Oct 29 01   Expose delay value so we can play.
+ * Ver 0.99  Feb 24 02   Remove duplicate code, modify clik! detection code
+ *                       to support new PocketZip drives
  */
 
-#define IDEFLOPPY_VERSION "0.98a"
+#define IDEFLOPPY_VERSION "0.99"
 
 #include <linux/config.h>
 #include <linux/module.h>
@@ -717,7 +719,7 @@ static void idefloppy_input_buffers (ide_drive_t *drive, idefloppy_pc_t *pc, uns
 			return;
 		}
 		count = IDEFLOPPY_MIN (bio->bi_size - pc->b_count, bcount);
-		atapi_input_bytes (drive, bio_data(bio) + pc->b_count, count);
+		atapi_read(drive, bio_data(bio) + pc->b_count, count);
 		bcount -= count; pc->b_count += count;
 	}
 }
@@ -744,7 +746,7 @@ static void idefloppy_output_buffers (ide_drive_t *drive, idefloppy_pc_t *pc, un
 			return;
 		}
 		count = IDEFLOPPY_MIN (pc->b_count, bcount);
-		atapi_output_bytes (drive, pc->b_data, count);
+		atapi_write(drive, pc->b_data, count);
 		bcount -= count; pc->b_data += count; pc->b_count -= count;
 	}
 }
@@ -979,12 +981,12 @@ static ide_startstop_t idefloppy_pc_intr (ide_drive_t *drive)
 	}
 	if (test_bit (PC_WRITING, &pc->flags)) {
 		if (pc->buffer != NULL)
-			atapi_output_bytes (drive,pc->current_position,bcount.all);	/* Write the current buffer */
+			atapi_write(drive,pc->current_position,bcount.all);	/* Write the current buffer */
 		else
 			idefloppy_output_buffers (drive, pc, bcount.all);
 	} else {
 		if (pc->buffer != NULL)
-			atapi_input_bytes (drive,pc->current_position,bcount.all);	/* Read the current buffer */
+			atapi_read(drive,pc->current_position,bcount.all);	/* Read the current buffer */
 		else
 			idefloppy_input_buffers (drive, pc, bcount.all);
 	}
@@ -1020,7 +1022,7 @@ static ide_startstop_t idefloppy_transfer_pc (ide_drive_t *drive)
 
 	BUG_ON(HWGROUP(drive)->handler);
 	ide_set_handler (drive, &idefloppy_pc_intr, IDEFLOPPY_WAIT_CMD, NULL);	/* Set the interrupt routine */
-	atapi_output_bytes (drive, floppy->pc->c, 12); /* Send the actual packet */
+	atapi_write(drive, floppy->pc->c, 12); /* Send the actual packet */
 
 	return ide_started;
 }
@@ -1042,7 +1044,7 @@ static int idefloppy_transfer_pc2 (ide_drive_t *drive)
 {
 	idefloppy_floppy_t *floppy = drive->driver_data;
 
-	atapi_output_bytes (drive, floppy->pc->c, 12); /* Send the actual packet */
+	atapi_write(drive, floppy->pc->c, 12); /* Send the actual packet */
 	return IDEFLOPPY_WAIT_CMD;		/* Timeout for the packet command */
 }
 
@@ -1070,8 +1072,8 @@ static ide_startstop_t idefloppy_transfer_pc1 (ide_drive_t *drive)
 	 */
 	BUG_ON(HWGROUP(drive)->handler);
 	ide_set_handler (drive,
-	  &idefloppy_pc_intr,		/* service routine for packet command */
-	  floppy->ticks,			/* wait this long before "failing" */
+	  &idefloppy_pc_intr, 		/* service routine for packet command */
+	  floppy->ticks,		/* wait this long before "failing" */
 	  &idefloppy_transfer_pc2);	/* fail == transfer_pc2 */
 
 	return ide_started;
@@ -2005,7 +2007,7 @@ static void idefloppy_setup (ide_drive_t *drive, idefloppy_floppy_t *floppy)
 	*      above fix.  It makes nasty clicking noises without
 	*      it, so please don't remove this.
 	*/
-	if (strcmp(drive->id->model, "IOMEGA Clik! 40 CZ ATAPI") == 0) {
+	if (strncmp(drive->id->model, "IOMEGA Clik!", 11) == 0) {
 		blk_queue_max_sectors(&drive->queue, 64);
 		set_bit(IDEFLOPPY_CLIK_DRIVE, &floppy->flags);
 	}

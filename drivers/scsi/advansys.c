@@ -1,4 +1,4 @@
-#define ASC_VERSION "3.3GG"    /* AdvanSys Driver Version */
+#define ASC_VERSION "3.3GJ"    /* AdvanSys Driver Version */
 
 /*
  * advansys.c - Linux Host Driver for AdvanSys SCSI Adapters
@@ -670,7 +670,7 @@
          1. Return an error from narrow boards if passed a 16 byte
             CDB. The wide board can already handle 16 byte CDBs.
 
-     3.3GG (01/02/02):
+     3.3GJ (4/15/02):
 	 1. hacks for lk 2.5 series (D. Gilbert)
 
   I. Known Problems/Fix List (XXX)
@@ -752,7 +752,6 @@
 
 */
 
-#error Please convert me to Documentation/DMA-mapping.txt
 
 /*
  * --- Linux Version
@@ -3614,23 +3613,6 @@ typedef struct {
 #define ASC_MIN(a, b) (((a) < (b)) ? (a) : (b))
 #endif /* CONFIG_PROC_FS */
 
-/*
- * XXX - Release and acquire the io_request_lock. These macros are needed
- * because the 2.4 kernel SCSI mid-level driver holds the 'io_request_lock'
- * on entry to SCSI low-level drivers.
- *
- * These definitions and all code that uses code should be removed when the
- * SCSI mid-level driver no longer holds the 'io_request_lock' on entry to
- * SCSI low-level driver detect, queuecommand, and reset entrypoints.
- *
- * The interrupt flags values doesn't matter in the macros because the
- * SCSI mid-level will save and restore the flags values before and after
- * calling advansys_detect, advansys_queuecommand, and advansys_reset where
- * these macros are used. We do want interrupts enabled after the lock is
- * released so an explicit sti() is done. The driver only needs interrupts
- * disabled when it acquires the per board lock.
- */
-
 /* Asc Library return codes */
 #define ASC_TRUE        1
 #define ASC_FALSE       0
@@ -4822,7 +4804,7 @@ advansys_detect(Scsi_Host_Template *tpnt)
             boardp->id = asc_board_count - 1;
 
             /* Initialize spinlock. */
-            boardp->lock = SPIN_LOCK_UNLOCKED; /* replaced by host_lock dpg */
+            boardp->lock = SPIN_LOCK_UNLOCKED;
 
             /*
              * Handle both narrow and wide boards.
@@ -5872,7 +5854,7 @@ advansys_queuecommand(Scsi_Cmnd *scp, void (*done)(Scsi_Cmnd *))
 
     /* host_lock taken by mid-level prior to call but need to protect */
     /* against own ISR */
-    spin_lock_irqsave(boardp->lock, flags);
+    spin_lock_irqsave(&boardp->lock, flags);
 
     /*
      * Block new commands while handling a reset or abort request.
@@ -6751,8 +6733,7 @@ asc_build_req(asc_board_t *boardp, Scsi_Cmnd *scp)
         slp = (struct scatterlist *) scp->request_buffer;
         for (sgcnt = 0; sgcnt < scp->use_sg; sgcnt++, slp++) {
             asc_sg_head.sg_list[sgcnt].addr =
-                cpu_to_le32(virt_to_bus(slp->address ? 
-		(unsigned char *)slp->address :
+                cpu_to_le32(virt_to_bus(
 		(unsigned char *)page_address(slp->page) + slp->offset));
             asc_sg_head.sg_list[sgcnt].bytes = cpu_to_le32(slp->length);
             ASC_STATS_ADD(scp->host, sg_xfer, ASC_CEILING(slp->length, 512));
@@ -7011,9 +6992,8 @@ adv_get_sglist(asc_board_t *boardp, adv_req_t *reqp, Scsi_Cmnd *scp)
         for (i = 0; i < NO_OF_SG_PER_BLOCK; i++)
         {
             sg_block->sg_list[i].sg_addr =
-                cpu_to_le32(virt_to_bus(slp->address ? 
-		(unsigned char *)slp->address :
-                (unsigned char *)page_address(slp->page) + slp->offset));
+                cpu_to_le32(virt_to_bus(
+                   (unsigned char *)page_address(slp->page) + slp->offset));
             sg_block->sg_list[i].sg_count = cpu_to_le32(slp->length);
             ASC_STATS_ADD(scp->host, sg_xfer, ASC_CEILING(slp->length, 512));
 
@@ -9415,8 +9395,8 @@ asc_prt_scsi_host(struct Scsi_Host *s)
 
     printk("Scsi_Host at addr 0x%lx\n", (ulong) s);
     printk(
-" next 0x%lx, extra_bytes %u, host_busy %u, host_no %d, last_reset %d,\n",
-        (ulong) s->next, s->extra_bytes, s->host_busy, s->host_no,
+" next 0x%lx, host_busy %u, host_no %d, last_reset %d,\n",
+        (ulong) s->next, s->host_busy, s->host_no,
         (unsigned) s->last_reset);
 
 #if ASC_LINUX_KERNEL24

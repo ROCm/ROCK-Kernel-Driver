@@ -297,7 +297,9 @@ static void destroy_all_async(struct dev_state *ps)
 }
 
 /*
- * interface claiming
+ * interface claims are made only at the request of user level code,
+ * which can also release them (explicitly or by closing files).
+ * they're also undone when devices disconnect.
  */
 
 static void *driver_probe(struct usb_device *dev, unsigned int intf,
@@ -310,8 +312,20 @@ static void driver_disconnect(struct usb_device *dev, void *context)
 {
 	struct dev_state *ps = (struct dev_state *)context;
 
-	if (ps)
-		ps->ifclaimed = 0;
+	if (!ps)
+		return;
+
+	/* this waits till synchronous requests complete */
+	down_write (&ps->devsem);
+
+	/* prevent new I/O requests */
+	ps->dev = 0;
+	ps->ifclaimed = 0;
+
+	/* force async requests to complete */
+	destroy_all_async (ps);
+
+	up_write (&ps->devsem);
 }
 
 struct usb_driver usbdevfs_driver = {

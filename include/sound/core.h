@@ -252,6 +252,7 @@ void *snd_malloc_isa_pages_fallback(unsigned long size, dma_addr_t *dma_addr, un
 #define snd_free_isa_pages(size, ptr, dma_addr) snd_free_pages(ptr, size)
 #endif
 #ifdef CONFIG_PCI
+struct pci_dev;
 void *snd_malloc_pci_pages(struct pci_dev *pci, unsigned long size, dma_addr_t *dma_addr);
 void *snd_malloc_pci_pages_fallback(struct pci_dev *pci, unsigned long size, dma_addr_t *dma_addr, unsigned long *res_size);
 void snd_free_pci_pages(struct pci_dev *pci, unsigned long size, void *ptr, dma_addr_t dma_addr);

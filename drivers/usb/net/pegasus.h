@@ -22,8 +22,7 @@
 #define	PEGASUS_II		0x80000000
 #define	HAS_HOME_PNA		0x40000000
 
-#define	PEGASUS_MTU		1500
-#define	PEGASUS_MAX_MTU		1536
+#define	PEGASUS_MTU		1536
 
 #define	EPROM_WRITE		0x01
 #define	EPROM_READ		0x02
@@ -45,6 +44,7 @@
 #define	CTRL_URB_RUNNING	0x00000010
 #define	CTRL_URB_SLEEP		0x00000020
 #define	PEGASUS_UNPLUG		0x00000040
+#define	PEGASUS_RX_URB_FAIL	0x00000080
 #define	ETH_REGS_CHANGE		0x40000000
 #define	ETH_REGS_CHANGED	0x80000000
 
@@ -98,13 +98,14 @@ typedef struct pegasus {
 	unsigned		features;
 	int			dev_index;
 	int			intr_interval;
+	struct tasklet_struct	rx_tl;
 	struct urb		*ctrl_urb, *rx_urb, *tx_urb, *intr_urb;
+	struct sk_buff		*rx_skb;
 	struct usb_ctrlrequest	dr;
 	wait_queue_head_t	ctrl_wait;
 	struct semaphore	sem;
-	unsigned char		rx_buff[PEGASUS_MAX_MTU];
-	unsigned char		tx_buff[PEGASUS_MAX_MTU];
 	unsigned char		intr_buff[8];
+	__u8			tx_buff[PEGASUS_MTU];
 	__u8			eth_regs[4];
 	__u8			phy;
 	__u8			gpio_res;
@@ -236,7 +237,7 @@ PEGASUS_DEV( "Linksys USB100TX", VENDOR_LINKSYS, 0x2204,
 		LINKSYS_GPIO_RESET | HAS_HOME_PNA )
 PEGASUS_DEV( "Linksys USB Ethernet Adapter", VENDOR_LINKSYS, 0x2206,
 		LINKSYS_GPIO_RESET )
-PEGASUS_DEV( "Linksys USB USB10TX", VENDOR_LINKSYS, 0x400b,
+PEGASUS_DEV( "Linksys USB USB100TX", VENDOR_LINKSYS, 0x400b,
 		LINKSYS_GPIO_RESET | PEGASUS_II )
 PEGASUS_DEV( "Linksys USB10TX", VENDOR_LINKSYS, 0x200c,
 		LINKSYS_GPIO_RESET | PEGASUS_II )	

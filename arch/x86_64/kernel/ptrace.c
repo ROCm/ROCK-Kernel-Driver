@@ -3,6 +3,8 @@
 /*
  * Pentium III FXSR, SSE support
  *	Gareth Hughes <gareth@valinux.com>, May 2000
+ * 
+ * x86-64 port 2000-2002 Andi Kleen
  */
 
 #include <linux/kernel.h>
@@ -88,42 +90,67 @@ static int putreg(struct task_struct *child,
 	unsigned long regno, unsigned long value)
 {
 	unsigned long tmp; 
-	switch (regno >> 2) {
-		// XXX: add 64bit setting. 
-		case FS:
+	switch (regno) {
+		case offsetof(struct user_regs_struct,fs):
 			if (value && (value & 3) != 3)
 				return -EIO;
+			child->thread.fsindex = value & 0xffff; 
+			return 0;
+		case offsetof(struct user_regs_struct,gs):
+			if (value && (value & 3) != 3)
+				return -EIO;
+			child->thread.gsindex = value & 0xffff;
+			return 0;
+		case offsetof(struct user_regs_struct,ds):
+			if (value && (value & 3) != 3)
+				return -EIO;
+			child->thread.ds = value & 0xffff;
+			return 0;
+		case offsetof(struct user_regs_struct,es): 
+			if (value && (value & 3) != 3)
+				return -EIO;
+			child->thread.es = value & 0xffff;
+			return 0;
+		case offsetof(struct user_regs_struct,fs_base):
+			if (!((value >> 48) == 0 || (value >> 48) == 0xffff))
+				return -EIO; 
 			child->thread.fs = value;
 			return 0;
-		case GS:
-			if (value && (value & 3) != 3)
-				return -EIO;
+		case offsetof(struct user_regs_struct,gs_base):
+			if (!((value >> 48) == 0 || (value >> 48) == 0xffff))
+				return -EIO; 
 			child->thread.gs = value;
 			return 0;
-		case EFLAGS:
+		case offsetof(struct user_regs_struct, eflags):
 			value &= FLAG_MASK;
 			tmp = get_stack_long(child, EFL_OFFSET); 
 			tmp &= ~FLAG_MASK; 
 			value |= tmp;
 			break;
+		case offsetof(struct user_regs_struct,cs): 
+			if (value && (value & 3) != 3)
+				return -EIO;
+			value &= 0xffff;
+			break;
 	}
-	/* assumption about sizes... */
-	if (regno > GS*4)
-		regno -= 2*4;
-	/* This has to be changes to put_stack_64() */
-	/* Hmm, with 32 bit applications being around... this will be
-	   rather funny */
 	put_stack_long(child, regno - sizeof(struct pt_regs), value);
 	return 0;
 }
 
-static unsigned long getreg(struct task_struct *child,
-	unsigned long regno)
+static unsigned long getreg(struct task_struct *child, unsigned long regno)
 {
-	switch (regno >> 3) {
-		case FS:
+	switch (regno) {
+		case offsetof(struct user_regs_struct, fs):
+			return child->thread.fsindex;
+		case offsetof(struct user_regs_struct, gs):
+			return child->thread.gsindex;
+		case offsetof(struct user_regs_struct, ds):
+			return child->thread.ds;
+		case offsetof(struct user_regs_struct, es):
+			return child->thread.es; 
+		case offsetof(struct user_regs_struct, fs_base):
 			return child->thread.fs;
-		case GS:
+		case offsetof(struct user_regs_struct, gs_base):
 			return child->thread.gs;
 		default:
 			regno = regno - sizeof(struct pt_regs);
@@ -167,15 +194,10 @@ asmlinkage long sys_ptrace(long request, long pid, long addr, long data)
 		ret = ptrace_attach(child);
 		goto out_tsk;
 	}
-	ret = -ESRCH;
-	if (!(child->ptrace & PT_PTRACED))
+	ret = ptrace_check_attach(child, request == PTRACE_KILL); 
+	if (ret < 0) 
 		goto out_tsk;
-	if (child->state != TASK_STOPPED) {
-		if (request != PTRACE_KILL)
-			goto out_tsk;
-	}
-	if (child->p_pptr != current)
-		goto out_tsk;
+
 	switch (request) {
 	/* when I and D space are separate, these will need to be fixed. */
 	case PTRACE_PEEKTEXT: /* read word at location addr. */ 
@@ -201,7 +223,7 @@ asmlinkage long sys_ptrace(long request, long pid, long addr, long data)
 			break;
 
 		tmp = 0;  /* Default return condition */
-		if(addr < 20*sizeof(long))
+		if(addr < sizeof(struct user_regs_struct))
 			tmp = getreg(child, addr);
 		if(addr >= (long) &dummy->u_debugreg[0] &&
 		   addr <= (long) &dummy->u_debugreg[7]){
@@ -228,7 +250,7 @@ asmlinkage long sys_ptrace(long request, long pid, long addr, long data)
 		    addr > sizeof(struct user) - 3)
 			break;
 
-		if (addr < 20*sizeof(long)) {
+		if (addr < sizeof(struct user_regs_struct)) {
 			ret = putreg(child, addr, data);
 			break;
 		}
@@ -267,12 +289,10 @@ asmlinkage long sys_ptrace(long request, long pid, long addr, long data)
 		ret = -EIO;
 		if ((unsigned long) data > _NSIG)
 			break;
-		if (request == PTRACE_SYSCALL) {
-			set_tsk_thread_flag(child, TIF_SYSCALL_TRACE);
-		}
-		else {
-			clear_tsk_thread_flag(child, TIF_SYSCALL_TRACE);
-		}
+		if (request == PTRACE_SYSCALL)
+			set_tsk_thread_flag(child,TIF_SYSCALL_TRACE);
+		else
+			clear_tsk_thread_flag(child,TIF_SYSCALL_TRACE);
 		child->exit_code = data;
 	/* make sure the single step bit is not set. */
 		tmp = get_stack_long(child, EFL_OFFSET);
@@ -308,7 +328,7 @@ asmlinkage long sys_ptrace(long request, long pid, long addr, long data)
 		ret = -EIO;
 		if ((unsigned long) data > _NSIG)
 			break;
-		clear_tsk_thread_flag(child, TIF_SYSCALL_TRACE);
+		clear_tsk_thread_flag(child,TIF_SYSCALL_TRACE);
 		if ((child->ptrace & PT_DTRACE) == 0) {
 			/* Spurious delayed TF traps may occur */
 			child->ptrace |= PT_DTRACE;
@@ -332,7 +352,7 @@ asmlinkage long sys_ptrace(long request, long pid, long addr, long data)
 			ret = -EIO;
 			break;
 		}
-		for ( i = 0; i < FRAME_SIZE; i += sizeof(long) ) {
+		for ( i = 0; i < sizeof(struct user_regs_struct); i += sizeof(long) ) {
 			__put_user(getreg(child, i),(unsigned long *) data);
 			data += sizeof(long);
 		}
@@ -346,7 +366,7 @@ asmlinkage long sys_ptrace(long request, long pid, long addr, long data)
 			ret = -EIO;
 			break;
 		}
-		for ( i = 0; i < FRAME_SIZE; i += sizeof(long) ) {
+		for ( i = 0; i < sizeof(struct user_regs_struct); i += sizeof(long) ) {
 			__get_user(tmp, (unsigned long *) data);
 			putreg(child, i, tmp);
 			data += sizeof(long);
@@ -360,13 +380,6 @@ asmlinkage long sys_ptrace(long request, long pid, long addr, long data)
 			       sizeof(struct user_i387_struct))) {
 			ret = -EIO;
 			break;
-		}
-		if ( !child->used_math ) {
-			/* Simulate an empty FPU. */
-			set_fpu_cwd(child, 0x037f);
-			set_fpu_swd(child, 0x0000);
-			set_fpu_twd(child, 0xffff);
-			set_fpu_mxcsr(child, 0x1f80);
 		}
 		ret = get_fpregs((struct user_i387_struct *)data, child);
 		break;
@@ -420,11 +433,9 @@ asmlinkage void syscall_trace(struct pt_regs *regs)
 	
 	current->exit_code = SIGTRAP | ((current->ptrace & PT_TRACESYSGOOD)
 					? 0x80 : 0);
-	preempt_disable();
 	current->state = TASK_STOPPED;
 	notify_parent(current, SIGCHLD);
 	schedule();
-	preempt_enable();
 	/*
 	 * this isn't the same as continuing with a signal, but it will do
 	 * for normal use.  strace only continues with a signal if the

@@ -51,6 +51,7 @@ static struct super_block *alloc_super(void)
 		INIT_LIST_HEAD(&s->s_locked_inodes);
 		INIT_LIST_HEAD(&s->s_files);
 		INIT_LIST_HEAD(&s->s_instances);
+		INIT_LIST_HEAD(&s->s_anon);
 		init_rwsem(&s->s_umount);
 		sema_init(&s->s_lock, 1);
 		down_write(&s->s_umount);
@@ -192,6 +193,7 @@ void generic_shutdown_super(struct super_block *sb)
 	if (root) {
 		sb->s_root = NULL;
 		shrink_dcache_parent(root);
+		shrink_dcache_anon(&sb->s_anon);
 		dput(root);
 		fsync_super(sb);
 		lock_super(sb);

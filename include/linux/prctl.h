@@ -20,4 +20,10 @@
 #define PR_GET_KEEPCAPS   7
 #define PR_SET_KEEPCAPS   8
 
+/* Get/set floating-point emulation control bits (if meaningful) */
+#define PR_GET_FPEMU  9
+#define PR_SET_FPEMU 10
+# define PR_FPEMU_NOPRINT	1	/* silently emulate fp operations accesses */
+# define PR_FPEMU_SIGFPE	2	/* don't emulate fp operations, send SIGFPE instead */
+
 #endif /* _LINUX_PRCTL_H */

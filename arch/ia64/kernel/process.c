@@ -24,7 +24,7 @@
 #include <asm/efi.h>
 #include <asm/elf.h>
 #include <asm/perfmon.h>
-#include <asm/pgtable.h>
+#include <asm/pgalloc.h>
 #include <asm/processor.h>
 #include <asm/sal.h>
 #include <asm/uaccess.h>
@@ -145,7 +145,7 @@ do_notify_resume_user (sigset_t *oldset, struct sigscratch *scr, long in_syscall
 /*
  * We use this if we don't have any better idle routine..
  */
-static void
+void
 default_idle (void)
 {
 	/* may want to do PAL_LIGHT_HALT here... */
@@ -660,7 +660,7 @@ dup_task_struct(struct task_struct *orig)
 {
 	struct task_struct *tsk;
 
-	tsk = __get_free_pages(GFP_KERNEL, KERNEL_STACK_SIZE_ORDER);
+	tsk = (void *) __get_free_pages(GFP_KERNEL, KERNEL_STACK_SIZE_ORDER);
 	if (!tsk)
 		return NULL;
 

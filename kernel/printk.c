@@ -39,6 +39,10 @@
 
 #define LOG_BUF_MASK	(LOG_BUF_LEN-1)
 
+#ifndef arch_consoles_callable
+#define arch_consoles_callable() (1)
+#endif
+
 /* printk's without a loglevel use this.. */
 #define DEFAULT_MESSAGE_LOGLEVEL 4 /* KERN_WARNING */
 
@@ -439,6 +443,14 @@ asmlinkage int printk(const char *fmt, ...)
 			log_level_unknown = 1;
 	}
 
+	if (!arch_consoles_callable()) {
+		/*
+		 * On some architectures, the consoles are not usable
+		 * on secondary CPUs early in the boot process.
+		 */
+		spin_unlock_irqrestore(&logbuf_lock, flags);
+		goto out;
+	}
 	if (!down_trylock(&console_sem)) {
 		/*
 		 * We own the drivers.  We can drop the spinlock and let
@@ -455,6 +467,7 @@ asmlinkage int printk(const char *fmt, ...)
 		 */
 		spin_unlock_irqrestore(&logbuf_lock, flags);
 	}
+out:
 	return printed_len;
 }
 EXPORT_SYMBOL(printk);

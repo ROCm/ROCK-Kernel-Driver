@@ -31,14 +31,14 @@ static __inline__ int
 ide_default_irq (ide_ioreg_t base)
 {
 	switch (base) {
-		case 0x1f0: return isa_irq_to_vector(14);
-		case 0x170: return isa_irq_to_vector(15);
-		case 0x1e8: return isa_irq_to_vector(11);
-		case 0x168: return isa_irq_to_vector(10);
-		case 0x1e0: return isa_irq_to_vector(8);
-		case 0x160: return isa_irq_to_vector(12);
-		default:
-			return 0;
+	      case 0x1f0: return isa_irq_to_vector(14);
+	      case 0x170: return isa_irq_to_vector(15);
+	      case 0x1e8: return isa_irq_to_vector(11);
+	      case 0x168: return isa_irq_to_vector(10);
+	      case 0x1e0: return isa_irq_to_vector(8);
+	      case 0x160: return isa_irq_to_vector(12);
+	      default:
+		return 0;
 	}
 }
 
@@ -46,14 +46,14 @@ static __inline__ ide_ioreg_t
 ide_default_io_base (int index)
 {
 	switch (index) {
-		case 0:	return 0x1f0;
-		case 1:	return 0x170;
-		case 2: return 0x1e8;
-		case 3: return 0x168;
-		case 4: return 0x1e0;
-		case 5: return 0x160;
-		default:
-			return 0;
+	      case 0: return 0x1f0;
+	      case 1: return 0x170;
+	      case 2: return 0x1e8;
+	      case 3: return 0x168;
+	      case 4: return 0x1e0;
+	      case 5: return 0x160;
+	      default:
+		return 0;
 	}
 }
 

@@ -1905,3 +1905,10 @@ Changes for patch v209
 - Fixed bitfield data type for <devfs_*alloc_devnum>
 
 - Made major bitfield type and initialiser 64 bit safe
+===============================================================================
+Changes for patch v210
+
+- Updated fs/devfs/util.c to fix shift warning on 64 bit machines
+  Thanks to Anton Blanchard <anton@samba.org>
+
+- Updated README from master HTML file

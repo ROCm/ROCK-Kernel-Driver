@@ -90,7 +90,7 @@ int kick_wdog(void)
 static int wdt977_open(struct inode *inode, struct file *file)
 {
 
-	if(timer_alive)
+	if( test_and_set_bit(0,&timer_alive) )
 		return -EBUSY;
 
 	/* convert seconds to minutes, rounding up */
@@ -104,7 +104,6 @@ static int wdt977_open(struct inode *inode, struct file *file)
 		/* do not permit disabling the watchdog by writing 0 to reg. 0xF2 */
 		if (!timeoutM) timeoutM = DEFAULT_TIMEOUT;
 	}
-	timer_alive++;
 
 	if (machine_is_netwinder())
 	{
@@ -165,8 +164,6 @@ static int wdt977_release(struct inode *inode, struct file *file)
 	 */
 	if (!nowayout)
 	{
-		lock_kernel();
-
 		/* unlock the SuperIO chip */
 		outb(0x87,0x370);
 		outb(0x87,0x370);
@@ -196,8 +193,7 @@ static int wdt977_release(struct inode *inode, struct file *file)
 		/* lock the SuperIO chip */
 		outb(0xAA,0x370);
 
-		timer_alive=0;
-		unlock_kernel();
+		clear_bit(0,&timer_alive);
 
 		printk(KERN_INFO "Wdt977 Watchdog: shutdown\n");
 	}

@@ -192,7 +192,7 @@ struct dentry *presto_ilookup(struct inode *dir, struct dentry *dentry,
         }
 
         d_instantiate(dentry, inode);
-        dentry->d_flags |= DCACHE_NFSD_DISCONNECTED; /* NFS hack */
+        dentry->d_flags |= DCACHE_DISCONNECTED; /* NFS hack */
 
         EXIT;
         return NULL;

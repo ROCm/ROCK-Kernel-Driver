@@ -209,6 +209,16 @@ static struct super_operations ext2_sops = {
 	remount_fs:	ext2_remount,
 };
 
+/* Yes, most of these are left as NULL!!
+ * A NULL value implies the default, which works with ext2-like file
+ * systems, but can be improved upon.
+ * Currently only get_parent is required.
+ */
+struct dentry *ext2_get_parent(struct dentry *child);
+static struct export_operations ext2_export_ops = {
+	get_parent: ext2_get_parent,
+};
+
 /*
  * This function has been shamelessly adapted from the msdos fs
  */
@@ -687,6 +697,7 @@ static int ext2_fill_super(struct super_block *sb, void *data, int silent)
 	 * set up enough so that it can read an inode
 	 */
 	sb->s_op = &ext2_sops;
+	sb->s_export_op = &ext2_export_ops;
 	sb->s_root = d_alloc_root(iget(sb, EXT2_ROOT_INO));
 	if (!sb->s_root || !S_ISDIR(sb->s_root->d_inode->i_mode) ||
 	    !sb->s_root->d_inode->i_blocks || !sb->s_root->d_inode->i_size) {

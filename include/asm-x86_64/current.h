@@ -13,6 +13,13 @@ static inline struct task_struct *get_current(void)
 } 
 
 
+#define stack_current() \
+({								\
+	struct thread_info *ti;					\
+	__asm__("andq %%rsp,%0; ":"=r" (ti) : "0" (~8191UL));	\
+	ti->task;					\
+})
+
 
 #define current get_current()
 

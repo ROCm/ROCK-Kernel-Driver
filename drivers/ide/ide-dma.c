@@ -372,10 +372,10 @@ int ide_build_dmatable(ide_drive_t *drive, struct request *rq,
 }
 
 /* Teardown mappings after DMA has completed.  */
-void ide_destroy_dmatable (ide_drive_t *drive)
+void ide_destroy_dmatable(struct ata_device *d)
 {
-	struct pci_dev *dev = drive->channel->pci_dev;
-	struct ata_request *ar = IDE_CUR_AR(drive);
+	struct pci_dev *dev = d->channel->pci_dev;
+	struct ata_request *ar = IDE_CUR_AR(d);
 
 	pci_unmap_sg(dev, ar->ar_sg_table, ar->ar_sg_nents, ar->ar_sg_ddir);
 }
@@ -599,13 +599,19 @@ int ide_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 			printk("%s: DMA disabled\n", drive->name);
 		case ide_dma_off_quietly:
 			set_high = 0;
-			drive->using_tcq = 0;
 			outb(inb(dma_base+2) & ~(1<<(5+unit)), dma_base+2);
+#ifdef CONFIG_BLK_DEV_IDE_TCQ
+			hwif->dmaproc(ide_dma_queued_off, drive);
+#endif
 		case ide_dma_on:
 			ide_toggle_bounce(drive, set_high);
 			drive->using_dma = (func == ide_dma_on);
-			if (drive->using_dma)
+			if (drive->using_dma) {
 				outb(inb(dma_base+2)|(1<<(5+unit)), dma_base+2);
+#ifdef CONFIG_BLK_DEV_IDE_TCQ_DEFAULT
+				hwif->dmaproc(ide_dma_queued_on, drive);
+#endif
+			}
 			return 0;
 		case ide_dma_check:
 			return config_drive_for_dma (drive);

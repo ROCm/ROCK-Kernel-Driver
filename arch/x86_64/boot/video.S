@@ -66,7 +66,6 @@
 #define VIDEO_80x30 0x0f05
 #define VIDEO_80x34 0x0f06
 #define VIDEO_80x60 0x0f07
-#define VIDEO_GFX_HACK 0x0f08
 #define VIDEO_LAST_SPECIAL 0x0f09
 
 /* Video modes given by resolution */
@@ -741,15 +740,7 @@ set_80x60:
 	movw	$0x503c, force_size
 	jmp	setvde
 
-# Special hack for ThinkPad graphics
 set_gfx:
-#ifdef CONFIG_VIDEO_GFX_HACK
-	movw	$VIDEO_GFX_BIOS_AX, %ax
-	movw	$VIDEO_GFX_BIOS_BX, %bx
-	int	$0x10
-	movw	$VIDEO_GFX_DUMMY_RESOLUTION, force_size
-	stc
-#endif
 	ret
 
 #ifdef CONFIG_VIDEO_RETAIN
@@ -974,10 +965,6 @@ vga_modes:
 	.word	0x5022				# 80x34
 	.word	VIDEO_80x60
 	.word	0x503c				# 80x60
-#ifdef CONFIG_VIDEO_GFX_HACK
-	.word	VIDEO_GFX_HACK
-	.word	VIDEO_GFX_DUMMY_RESOLUTION
-#endif
 
 vga_modes_end:
 # Detect VESA modes.

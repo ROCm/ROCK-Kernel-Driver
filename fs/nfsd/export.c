@@ -233,6 +233,10 @@ static void exp_fsid_hash(struct svc_client *clp, struct svc_export *exp)
 	list_add(&exp->ex_fsid_hash, head);
 }
 
+extern struct dentry *
+find_exported_dentry(struct super_block *sb, void *obj, void *parent,
+		     int (*acceptable)(void *context, struct dentry *de),
+		     void *context);
 /*
  * Export a file system.
  */
@@ -316,12 +320,17 @@ exp_export(struct nfsctl_export *nxp)
 	      || (nxp->ex_flags & NFSEXP_FSID))
 	    &&
 	    (inode->i_sb->s_op->read_inode
+	     || inode->i_sb->s_export_op
 	     || inode->i_sb->s_op->fh_to_dentry)) 
 		/* Ok, we can export it */;
 	else {
 		dprintk("exp_export: export of invalid fs type.\n");
 		goto finish;
 	}
+	if (inode->i_sb->s_export_op &&
+	    !inode->i_sb->s_export_op->find_exported_dentry)
+		inode->i_sb->s_export_op->find_exported_dentry =
+			find_exported_dentry;
 
 	if ((parent = exp_child(clp, inode->i_sb, nd.dentry)) != NULL) {
 		dprintk("exp_export: export not valid (Rule 3).\n");

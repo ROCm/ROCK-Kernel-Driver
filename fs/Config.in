@@ -124,6 +124,7 @@ if [ "$CONFIG_NET" = "y" ]; then
    if [ "$CONFIG_NFSD_V3" = "y" -o "$CONFIG_NFS_V3" = "y" ]; then
      define_bool CONFIG_LOCKD_V4 y
    fi
+   define_tristate CONFIG_EXPORTFS $CONFIG_NFSD
 
    dep_tristate 'SMB file system support (to mount Windows shares etc.)' CONFIG_SMB_FS $CONFIG_INET
    if [ "$CONFIG_SMB_FS" != "n" ]; then

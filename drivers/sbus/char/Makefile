@@ -12,7 +12,6 @@ O_TARGET := sunchar.o
 export-objs := su.o bbc_i2c.o
 obj-y := sunkbd.o sunkbdmap.o sunmouse.o sunserial.o zs.o
 
-list-multi := vfc.o bbc.o
 vfc-objs := vfc_dev.o vfc_i2c.o
 bbc-objs := bbc_i2c.o bbc_envctrl.o
 
@@ -36,9 +35,3 @@ obj-$(CONFIG_BBC_I2C)			+= bbc.o
 include $(TOPDIR)/Rules.make
 
 sunkbdmap.o: sunkeymap.c
-
-vfc.o: $(vfc-objs)
-	$(LD) -r -o $@ $(vfc-objs)
-
-bbc.o: $(bbc-objs)
-	$(LD) -r -o $@ $(bbc-objs)

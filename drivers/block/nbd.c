@@ -240,11 +240,11 @@ void nbd_do_it(struct nbd_device *lo)
 {
 	struct request *req;
 
-	down (&lo->queue_lock);
+	down (&lo->tx_lock);
 	while (1) {
-		up (&lo->queue_lock);
+		up (&lo->tx_lock);
 		req = nbd_read_stat(lo);
-		down (&lo->queue_lock);
+		down (&lo->tx_lock);
 
 		if (!req) {
 			printk(KERN_ALERT "req should never be null\n" );
@@ -264,14 +264,14 @@ void nbd_do_it(struct nbd_device *lo)
 		}
 #endif
 		blkdev_dequeue_request(req);
-		up (&lo->queue_lock);
+		up (&lo->tx_lock);
 		
 		nbd_end_request(req);
 
-		down (&lo->queue_lock);
+		down (&lo->tx_lock);
 	}
  out:
-	up (&lo->queue_lock);
+	up (&lo->tx_lock);
 }
 
 void nbd_clear_que(struct nbd_device *lo)
@@ -299,11 +299,11 @@ void nbd_clear_que(struct nbd_device *lo)
 #endif
 		req->errors++;
 		blkdev_dequeue_request(req);
-		up(&lo->queue_lock);
+		up(&lo->tx_lock);
 
 		nbd_end_request(req);
 
-		down(&lo->queue_lock);
+		down(&lo->tx_lock);
 	}
 }
 
@@ -351,10 +351,10 @@ static void do_nbd_request(request_queue_t * q)
 		blkdev_dequeue_request(req);
 		spin_unlock_irq(q->queue_lock);
 
-		down (&lo->queue_lock);
+		down (&lo->tx_lock);
 		list_add(&req->queuelist, &lo->queue_head);
 		nbd_send_req(lo->sock, req);	/* Why does this block?         */
-		up (&lo->queue_lock);
+		up (&lo->tx_lock);
 
 		spin_lock_irq(q->queue_lock);
 		continue;
@@ -396,14 +396,14 @@ static int nbd_ioctl(struct inode *inode, struct file *file,
                 return 0 ;
  
 	case NBD_CLEAR_SOCK:
-		down(&lo->queue_lock);
+		down(&lo->tx_lock);
 		nbd_clear_que(lo);
 		if (!list_empty(&lo->queue_head)) {
-			up(&lo->queue_lock);
+			up(&lo->tx_lock);
 			printk(KERN_ERR "nbd: Some requests are in progress -> can not turn off.\n");
 			return -EBUSY;
 		}
-		up(&lo->queue_lock);
+		up(&lo->tx_lock);
 		file = lo->file;
 		if (!file)
 			return -EINVAL;
@@ -527,7 +527,7 @@ static int __init nbd_init(void)
 		nbd_dev[i].magic = LO_MAGIC;
 		nbd_dev[i].flags = 0;
 		INIT_LIST_HEAD(&nbd_dev[i].queue_head);
-		init_MUTEX(&nbd_dev[i].queue_lock);
+		init_MUTEX(&nbd_dev[i].tx_lock);
 		nbd_blksizes[i] = 1024;
 		nbd_blksize_bits[i] = 10;
 		nbd_bytesizes[i] = 0x7ffffc00; /* 2GB */

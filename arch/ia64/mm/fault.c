@@ -120,15 +120,15 @@ ia64_do_page_fault (unsigned long address, unsigned long isr, struct pt_regs *re
 	if (!(prev_vma && (prev_vma->vm_flags & VM_GROWSUP) && (address == prev_vma->vm_end))) {
 		if (!(vma->vm_flags & VM_GROWSDOWN))
 			goto bad_area;
-		if (rgn_index(address) != rgn_index(vma->vm_start)
-		    || rgn_offset(address) >= RGN_MAP_LIMIT)
+		if (REGION_NUMBER(address) != REGION_NUMBER(vma->vm_start)
+		    || REGION_OFFSET(address) >= RGN_MAP_LIMIT)
 			goto bad_area;
 		if (expand_stack(vma, address))
 			goto bad_area;
 	} else {
 		vma = prev_vma;
-		if (rgn_index(address) != rgn_index(vma->vm_start)
-		    || rgn_offset(address) >= RGN_MAP_LIMIT)
+		if (REGION_NUMBER(address) != REGION_NUMBER(vma->vm_start)
+		    || REGION_OFFSET(address) >= RGN_MAP_LIMIT)
 			goto bad_area;
 		if (expand_backing_store(vma, address))
 			goto bad_area;

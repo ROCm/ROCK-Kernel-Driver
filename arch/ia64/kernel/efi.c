@@ -155,10 +155,10 @@ efi_memmap_walk (efi_freemem_callback_t callback, void *arg)
 		      case EFI_CONVENTIONAL_MEMORY:
 			if (!(md->attribute & EFI_MEMORY_WB))
 				continue;
-			if (md->phys_addr + (md->num_pages << 12) > mem_limit) {
+			if (md->phys_addr + (md->num_pages << EFI_PAGE_SHIFT) > mem_limit) {
 				if (md->phys_addr > mem_limit)
 					continue;
-				md->num_pages = (mem_limit - md->phys_addr) >> 12;
+				md->num_pages = (mem_limit - md->phys_addr) >> EFI_PAGE_SHIFT;
 			}
 			if (md->num_pages == 0) {
 				printk("efi_memmap_walk: ignoring empty region at 0x%lx",
@@ -167,7 +167,7 @@ efi_memmap_walk (efi_freemem_callback_t callback, void *arg)
 			}
 
 			curr.start = PAGE_OFFSET + md->phys_addr;
-			curr.end   = curr.start + (md->num_pages << 12);
+			curr.end   = curr.start + (md->num_pages << EFI_PAGE_SHIFT);
 
 			if (!prev_valid) {
 				prev = curr;
@@ -250,16 +250,17 @@ efi_map_pal_code (void)
 		 * dedicated ITR for the PAL code.
 		 */
 		if ((vaddr & mask) == (KERNEL_START & mask)) {
-			printk(__FUNCTION__ ": no need to install ITR for PAL code\n");
+			printk("%s: no need to install ITR for PAL code\n", __FUNCTION__);
 			continue;
 		}
 
-		if (md->num_pages << 12 > IA64_GRANULE_SIZE)
+		if (md->num_pages << EFI_PAGE_SHIFT > IA64_GRANULE_SIZE)
 			panic("Woah!  PAL code size bigger than a granule!");
 
 		mask  = ~((1 << IA64_GRANULE_SHIFT) - 1);
 		printk("CPU %d: mapping PAL code [0x%lx-0x%lx) into [0x%lx-0x%lx)\n",
-		       smp_processor_id(), md->phys_addr, md->phys_addr + (md->num_pages << 12),
+		       smp_processor_id(), md->phys_addr,
+		       md->phys_addr + (md->num_pages << EFI_PAGE_SHIFT),
 		       vaddr & mask, (vaddr & mask) + IA64_GRANULE_SIZE);
 
 		/*
@@ -375,7 +376,8 @@ efi_init (void)
 			md = p;
 			printk("mem%02u: type=%u, attr=0x%lx, range=[0x%016lx-0x%016lx) (%luMB)\n",
 			       i, md->type, md->attribute, md->phys_addr,
-			       md->phys_addr + (md->num_pages<<12) - 1, md->num_pages >> 8);
+			       md->phys_addr + (md->num_pages << EFI_PAGE_SHIFT) - 1,
+			       md->num_pages >> (20 - EFI_PAGE_SHIFT));
 		}
 	}
 #endif
@@ -482,8 +484,50 @@ efi_get_iobase (void)
 	return 0;
 }
 
+u32
+efi_mem_type (u64 phys_addr)
+{
+	void *efi_map_start, *efi_map_end, *p;
+	efi_memory_desc_t *md;
+	u64 efi_desc_size;
+
+	efi_map_start = __va(ia64_boot_param->efi_memmap);
+	efi_map_end   = efi_map_start + ia64_boot_param->efi_memmap_size;
+	efi_desc_size = ia64_boot_param->efi_memdesc_size;
+
+	for (p = efi_map_start; p < efi_map_end; p += efi_desc_size) {
+		md = p;
+
+		if ((md->phys_addr <= phys_addr) && (phys_addr <=
+		    (md->phys_addr + (md->num_pages << EFI_PAGE_SHIFT) - 1)))
+			 return md->type;
+	}
+	return 0;
+}
+
+u64
+efi_mem_attributes (u64 phys_addr)
+{
+	void *efi_map_start, *efi_map_end, *p;
+	efi_memory_desc_t *md;
+	u64 efi_desc_size;
+
+	efi_map_start = __va(ia64_boot_param->efi_memmap);
+	efi_map_end   = efi_map_start + ia64_boot_param->efi_memmap_size;
+	efi_desc_size = ia64_boot_param->efi_memdesc_size;
+
+	for (p = efi_map_start; p < efi_map_end; p += efi_desc_size) {
+		md = p;
+
+		if ((md->phys_addr <= phys_addr) && (phys_addr <=
+		    (md->phys_addr + (md->num_pages << EFI_PAGE_SHIFT) - 1)))
+			return md->attribute;
+	}
+	return 0;
+}
+
 static void __exit
-efivars_exit(void)
+efivars_exit (void)
 {
 #ifdef CONFIG_PROC_FS
  	remove_proc_entry(efi_dir->name, NULL);

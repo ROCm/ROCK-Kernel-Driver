@@ -17,6 +17,7 @@
 #include <linux/smp_lock.h>
 #include <linux/msdos_fs.h>
 #include <linux/fat_cvf.h>
+#include <linux/bitops.h>
 
 //#include <asm/uaccess.h>
 #include <asm/unaligned.h>
@@ -430,7 +431,6 @@ struct dentry *fat_fh_to_dentry(struct super_block *sb, __u32 *fh,
 				int len, int fhtype, int parent)
 {
 	struct inode *inode = NULL;
-	struct list_head *lp;
 	struct dentry *result;
 
 	if (fhtype != 3)
@@ -480,31 +480,14 @@ struct dentry *fat_fh_to_dentry(struct super_block *sb, __u32 *fh,
 	
 	/* now to find a dentry.
 	 * If possible, get a well-connected one
-	 *
-	 * Given the way that we found the inode, it *MUST* be
-	 * well-connected, but it is easiest to just copy the
-	 * code.
 	 */
-	spin_lock(&dcache_lock);
-	list_for_each(lp, &inode->i_dentry) {
-		result = list_entry(lp,struct dentry, d_alias);
-		if (! (result->d_flags & DCACHE_NFSD_DISCONNECTED)) {
-			dget_locked(result);
-			result->d_vfs_flags |= DCACHE_REFERENCED;
-			spin_unlock(&dcache_lock);
-			iput(inode);
-			return result;
-		}
-	}
-	spin_unlock(&dcache_lock);
-	result = d_alloc_root(inode);
+	result = d_alloc_anon(inode);
 	if (result == NULL) {
 		iput(inode);
 		return ERR_PTR(-ENOMEM);
 	}
-	result->d_flags |= DCACHE_NFSD_DISCONNECTED;
+	result->d_vfs_flags |= DCACHE_REFERENCED;
 	return result;
-
 		
 }
 

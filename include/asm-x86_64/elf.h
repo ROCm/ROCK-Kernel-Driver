@@ -36,7 +36,7 @@ typedef struct user_fxsr_struct elf_fpxregset_t;
 
    A value of 0 tells we have no such handler. 
 
-   We might as well make sure everything else is cleared too (except for %rsp),
+   We might as well make sure everything else is cleared too (except for %esp),
    just to make things more deterministic.
  */
 #define ELF_PLAT_INIT(_r)	do { \
@@ -55,6 +55,7 @@ typedef struct user_fxsr_struct elf_fpxregset_t;
         cur->thread.fs = 0; cur->thread.gs = 0; \
 	cur->thread.fsindex = 0; cur->thread.gsindex = 0; \
         cur->thread.ds = 0; cur->thread.es = 0;  \
+	clear_thread_flag(TIF_IA32); \
 } while (0)
 
 #define USE_ELF_CORE_DUMP
@@ -68,9 +69,11 @@ typedef struct user_fxsr_struct elf_fpxregset_t;
 #define ELF_ET_DYN_BASE         (2 * TASK_SIZE / 3)
 
 /* regs is struct pt_regs, pr_reg is elf_gregset_t (which is
-   now struct_user_regs, they are different) */
+   now struct_user_regs, they are different). Assumes current is the process
+   getting dumped. */
 
-#define ELF_CORE_COPY_REGS(pr_reg, regs)		\
+#define ELF_CORE_COPY_REGS(pr_reg, regs)  do { \
+	unsigned v;						\
 	(pr_reg)[0] = (regs)->r15;				\
 	(pr_reg)[1] = (regs)->r14;				\
 	(pr_reg)[2] = (regs)->r13;				\
@@ -92,8 +95,13 @@ typedef struct user_fxsr_struct elf_fpxregset_t;
 	(pr_reg)[18] = (regs)->eflags;			\
 	(pr_reg)[19] = (regs)->rsp;			\
 	(pr_reg)[20] = (regs)->ss;			\
-	rdmsrl(MSR_FS_BASE, (pr_reg)[21]);		\
-	rdmsrl(MSR_KERNEL_GS_BASE, (pr_reg)[22]);
+	(pr_reg)[21] = current->thread.fs;			\
+	(pr_reg)[22] = current->thread.gs;			\
+	asm("movl %%ds,%0" : "=r" (v)); (pr_reg)[23] = v;	\
+	asm("movl %%es,%0" : "=r" (v)); (pr_reg)[24] = v;	\
+	asm("movl %%fs,%0" : "=r" (v)); (pr_reg)[25] = v;	\
+	asm("movl %%gs,%0" : "=r" (v)); (pr_reg)[26] = v;	\
+} while(0);
 
 /* This yields a mask that user programs can use to figure out what
    instruction set this CPU supports.  This could be done in user space,

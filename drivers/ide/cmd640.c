@@ -21,7 +21,7 @@
  *
  *  A.Hartgers@stud.tue.nl, JZDQC@CUNYVM.CUNY.edu, abramov@cecmow.enet.dec.com,
  *  bardj@utopia.ppp.sn.no, bart@gaga.tue.nl, bbol001@cs.auckland.ac.nz,
- *  chrisc@dbass.demon.co.uk, dalecki@evision-ventures.com,
+ *  chrisc@dbass.demon.co.uk, martin@dalecki.de,
  *  derekn@vw.ece.cmu.edu, florian@btp2x3.phy.uni-bayreuth.de,
  *  flynn@dei.unipd.it, gadio@netvision.net.il, godzilla@futuris.net,
  *  j@pobox.com, jkemp1@mises.uni-paderborn.de, jtoppe@hiwaay.net,
@@ -403,19 +403,19 @@ void cmd640_dump_regs (void)
  */
 static void __init check_prefetch (unsigned int index)
 {
-	ide_drive_t *drive = cmd_drives[index];
+	struct ata_device *drive = cmd_drives[index];
 	byte b = get_cmd640_reg(prefetch_regs[index]);
 
 	if (b & prefetch_masks[index]) {	/* is prefetch off? */
-		drive->no_unmask = 0;
-		drive->no_io_32bit = 1;
-		drive->io_32bit = 0;
+		drive->channel->no_unmask = 0;
+		drive->channel->no_io_32bit = 1;
+		drive->channel->io_32bit = 0;
 	} else {
 #if CMD640_PREFETCH_MASKS
-		drive->no_unmask = 1;
-		drive->unmask = 0;
+		drive->channel->no_unmask = 1;
+		drive->channel->unmask = 0;
 #endif
-		drive->no_io_32bit = 0;
+		drive->channel->no_io_32bit = 0;
 	}
 }
 
@@ -460,15 +460,15 @@ static void set_prefetch_mode (unsigned int index, int mode)
 	b = get_cmd640_reg(reg);
 	if (mode) {	/* want prefetch on? */
 #if CMD640_PREFETCH_MASKS
-		drive->no_unmask = 1;
-		drive->unmask = 0;
+		drive->channel->no_unmask = 1;
+		drive->channel->unmask = 0;
 #endif
-		drive->no_io_32bit = 0;
+		drive->channel->no_io_32bit = 0;
 		b &= ~prefetch_masks[index];	/* enable prefetch */
 	} else {
-		drive->no_unmask = 0;
-		drive->no_io_32bit = 1;
-		drive->io_32bit = 0;
+		drive->channel->no_unmask = 0;
+		drive->channel->no_io_32bit = 1;
+		drive->channel->io_32bit = 0;
 		b |= prefetch_masks[index];	/* disable prefetch */
 	}
 	put_cmd640_reg(reg, b);
@@ -827,7 +827,7 @@ int __init ide_probe_for_cmd640x(void)
 			retrieve_drive_counts (index);
 			check_prefetch (index);
 			printk("cmd640: drive%d timings/prefetch(%s) preserved",
-				index, drive->no_io_32bit ? "off" : "on");
+				index, drive->channel->no_io_32bit ? "off" : "on");
 			display_clocks(index);
 		}
 #else
@@ -836,7 +836,7 @@ int __init ide_probe_for_cmd640x(void)
 		 */
 		check_prefetch (index);
 		printk("cmd640: drive%d timings/prefetch(%s) preserved\n",
-			index, drive->no_io_32bit ? "off" : "on");
+			index, drive->channel->no_io_32bit ? "off" : "on");
 #endif /* CONFIG_BLK_DEV_CMD640_ENHANCED */
 	}
 

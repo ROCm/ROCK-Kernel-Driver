@@ -239,12 +239,15 @@ struct dentry * dget_locked(struct dentry *dentry)
  * return it. Otherwise return NULL. Notice that if inode is a directory
  * there can be only one alias and it can be unhashed only if it has
  * no children.
+ *
+ * If the inode has a DCACHE_DISCONNECTED alias, then prefer
+ * any other hashed alias over that one.
  */
 
 struct dentry * d_find_alias(struct inode *inode)
 {
 	struct list_head *head, *next, *tmp;
-	struct dentry *alias;
+	struct dentry *alias, *discon_alias=NULL;
 
 	spin_lock(&dcache_lock);
 	head = &inode->i_dentry;
@@ -254,13 +257,19 @@ struct dentry * d_find_alias(struct inode *inode)
 		next = tmp->next;
 		alias = list_entry(tmp, struct dentry, d_alias);
 		if (!list_empty(&alias->d_hash)) {
-			__dget_locked(alias);
-			spin_unlock(&dcache_lock);
-			return alias;
+			if (alias->d_flags & DCACHE_DISCONNECTED)
+				discon_alias = alias;
+			else {
+				__dget_locked(alias);
+				spin_unlock(&dcache_lock);
+				return alias;
+			}
 		}
 	}
+	if (discon_alias)
+		__dget_locked(discon_alias);
 	spin_unlock(&dcache_lock);
-	return NULL;
+	return discon_alias;
 }
 
 /*
@@ -537,6 +546,33 @@ void shrink_dcache_parent(struct dentry * parent)
 		prune_dcache(found);
 }
 
+/**
+ * shrink_dcache_anon - further prune the cache
+ * @head: head of d_hash list of dentries to prune
+ *
+ * Prune the dentries that are anonymous
+ *
+ */
+void shrink_dcache_anon(struct list_head *head)
+{
+	struct list_head *lp;
+	int found;
+	do {
+		found = 0;
+		spin_lock(&dcache_lock);
+		list_for_each(lp, head) {
+			struct dentry *this = list_entry(lp, struct dentry, d_hash);
+			if (!atomic_read(&this->d_count)) {
+				list_del(&this->d_lru);
+				list_add_tail(&this->d_lru, &dentry_unused);
+				found++;
+			}
+		}
+		spin_unlock(&dcache_lock);
+		prune_dcache(found);
+	} while(found);
+}
+
 /*
  * This is called from kswapd when we think we need some
  * more memory, but aren't really sure how much. So we
@@ -690,6 +726,112 @@ static inline struct list_head * d_hash(struct dentry * parent, unsigned long ha
 	hash = hash ^ (hash >> D_HASHBITS);
 	return dentry_hashtable + (hash & D_HASHMASK);
 }
+
+/**
+ * d_alloc_anon - allocate an anonymous dentry
+ * @inode: inode to allocate the dentry for
+ *
+ * This is similar to d_alloc_root.  It is used by filesystems when
+ * creating a dentry for a given inode, often in the process of 
+ * mapping a filehandle to a dentry.  The returned dentry may be
+ * anonymous, or may have a full name (if the inode was already
+ * in the cache).  The file system may need to make further
+ * efforts to connect this dentry into the dcache properly.
+ *
+ * When called on a directory inode, we must ensure that
+ * the inode only ever has one dentry.  If a dentry is
+ * found, that is returned instead of allocating a new one.
+ *
+ * On successful return, the reference to the inode has been transferred
+ * to the dentry.  If %NULL is returned (indicating kmalloc failure),
+ * the reference on the inode has not been released.
+ */
+
+struct dentry * d_alloc_anon(struct inode *inode)
+{
+	struct dentry *tmp;
+	struct dentry *res;
+
+	if ((res = d_find_alias(inode))) {
+		iput(inode);
+		return res;
+	}
+
+	tmp = d_alloc(NULL, &(const struct qstr) {"",0,0});
+	tmp->d_parent = tmp; /* make sure dput doesn't croak */
+	
+	spin_lock(&dcache_lock);
+	if (S_ISDIR(inode->i_mode) && !list_empty(&inode->i_dentry)) {
+		/* A directory can only have one dentry.
+		 * This (now) has one, so use it.
+		 */
+		res = list_entry(inode->i_dentry.next, struct dentry, d_alias);
+		__dget_locked(res);
+	} else {
+		/* attach a disconnected dentry */
+		res = tmp;
+		tmp = NULL;
+		if (res) {
+			res->d_sb = inode->i_sb;
+			res->d_parent = res;
+			res->d_inode = inode;
+			res->d_flags |= DCACHE_DISCONNECTED;
+			list_add(&res->d_alias, &inode->i_dentry);
+			list_add(&res->d_hash, &inode->i_sb->s_anon);
+		}
+		inode = NULL; /* don't drop reference */
+	}
+	spin_unlock(&dcache_lock);
+
+	if (inode)
+		iput(inode);
+	if (tmp)
+		dput(tmp);
+	return res;
+}
+
+
+/**
+ * d_splice_alias - splice a disconnected dentry into the tree if one exists
+ * @inode:  the inode which may have a disconnected dentry
+ * @dentry: a negative dentry which we want to point to the inode.
+ *
+ * If inode is a directory and has a 'disconnected' dentry (i.e. IS_ROOT and
+ * DCACHE_DISCONNECTED), then d_move that in place of the given dentry
+ * and return it, else simply d_add the inode to the dentry and return NULL.
+ *
+ * This is (will be) needed in the lookup routine of any filesystem that is exportable
+ * (via knfsd) so that we can build dcache paths to directories effectively.
+ *
+ * If a dentry was found and moved, then it is returned.  Otherwise NULL
+ * is returned.  This matches the expected return value of ->lookup.
+ *
+ */
+struct dentry *d_splice_alias(struct inode *inode, struct dentry *dentry)
+{
+	struct dentry *new = NULL;
+
+	if (inode && S_ISDIR(inode->i_mode)) {
+		spin_lock(&dcache_lock);
+		if (!list_empty(&inode->i_dentry)) {
+			new = list_entry(inode->i_dentry.next, struct dentry, d_alias);
+			__dget_locked(new);
+			spin_unlock(&dcache_lock);
+			d_rehash(dentry);
+			d_move(new, dentry);
+			iput(inode);
+		} else {
+			/* d_instantiate takes dcache_lock, so we do it by hand */
+			list_add(&dentry->d_alias, &inode->i_dentry);
+			dentry->d_inode = inode;
+			spin_unlock(&dcache_lock);
+			d_rehash(dentry);
+		}
+	} else
+		d_add(dentry, inode);
+	return new;
+}
+
 
 /**
  * d_lookup - search for a dentry
@@ -915,16 +1057,24 @@ void d_move(struct dentry * dentry, struct dentry * target)
 	list_del(&dentry->d_child);
 	list_del(&target->d_child);
 
-	/* Switch the parents and the names.. */
+	/* Switch the names.. */
 	switch_names(dentry, target);
-	write_lock(&dparent_lock);
-	do_switch(dentry->d_parent, target->d_parent);
-	write_unlock(&dparent_lock);
 	do_switch(dentry->d_name.len, target->d_name.len);
 	do_switch(dentry->d_name.hash, target->d_name.hash);
+	/* ... and switch the parents */
+	write_lock(&dparent_lock);
+	if (IS_ROOT(dentry)) {
+		dentry->d_parent = target->d_parent;
+		target->d_parent = target;
+		INIT_LIST_HEAD(&target->d_child);
+	} else {
+		do_switch(dentry->d_parent, target->d_parent);
 
-	/* And add them back to the (new) parent lists */
-	list_add(&target->d_child, &target->d_parent->d_subdirs);
+		/* And add them back to the (new) parent lists */
+		list_add(&target->d_child, &target->d_parent->d_subdirs);
+	}
+	write_unlock(&dparent_lock);
+
 	list_add(&dentry->d_child, &dentry->d_parent->d_subdirs);
 	spin_unlock(&dcache_lock);
 }

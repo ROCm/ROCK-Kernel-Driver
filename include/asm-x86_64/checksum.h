@@ -1,6 +1,7 @@
 #ifndef _X86_64_CHECKSUM_H
 #define _X86_64_CHECKSUM_H
 
+#include <linux/in6.h>
 
 /*
  *	This is a version of ip_compute_csum() optimized for IP headers,

@@ -56,8 +56,9 @@
  * address TASK_SIZE is never valid.  We also need to make sure that the address doesn't
  * point inside the virtually mapped linear page table.
  */
-#define __access_ok(addr,size,segment)	(((unsigned long) (addr)) <= (segment).seg		\
-	 && ((segment).seg == KERNEL_DS.seg || rgn_offset((unsigned long) (addr)) < RGN_MAP_LIMIT))
+#define __access_ok(addr,size,segment)	(((unsigned long) (addr)) <= (segment).seg	\
+	 && ((segment).seg == KERNEL_DS.seg						\
+	     || REGION_OFFSET((unsigned long) (addr)) < RGN_MAP_LIMIT))
 #define access_ok(type,addr,size)	__access_ok((addr),(size),get_fs())
 
 static inline int

@@ -1,7 +1,7 @@
 /*
  * linux/drivers/char/synclink.c
  *
- * $Id: synclink.c,v 3.12 2001/07/18 19:14:21 paulkf Exp $
+ * $Id: synclink.c,v 4.2 2002/04/10 20:45:13 paulkf Exp $
  *
  * Device driver for Microgate SyncLink ISA and PCI
  * high speed multiprotocol serial adapters.
@@ -60,8 +60,6 @@
 #  define BREAKPOINT() { }
 #endif
 
-#error Please convert me to Documentation/DMA-mapping.txt
-
 #define MAX_ISA_DEVICES 10
 #define MAX_PCI_DEVICES 10
 #define MAX_TOTAL_DEVICES 20
@@ -109,11 +107,7 @@
 #endif
 
 #ifdef CONFIG_SYNCLINK_SYNCPPP
-#if LINUX_VERSION_CODE < VERSION(2,4,3) 
-#include "../net/wan/syncppp.h"
-#else
 #include <net/syncppp.h>
-#endif
 #endif
 
 #define GET_USER(error,value,addr) error = get_user(value,addr)
@@ -923,7 +917,7 @@ MODULE_PARM(txdmabufs,"1-" __MODULE_STRING(MAX_TOTAL_DEVICES) "i");
 MODULE_PARM(txholdbufs,"1-" __MODULE_STRING(MAX_TOTAL_DEVICES) "i");
 
 static char *driver_name = "SyncLink serial driver";
-static char *driver_version = "$Revision: 3.12 $";
+static char *driver_version = "$Revision: 4.2 $";
 
 static int synclink_init_one (struct pci_dev *dev,
 				     const struct pci_device_id *ent);
@@ -3985,7 +3979,7 @@ int mgsl_alloc_buffer_list_memory( struct mgsl_struct *info )
 		if ( info->buffer_list == NULL )
 			return -ENOMEM;
 			
-		info->buffer_list_phys = virt_to_bus(info->buffer_list);
+		info->buffer_list_phys = isa_virt_to_bus(info->buffer_list);
 	}
 
 	/* We got the memory for the buffer entry lists. */
@@ -4096,7 +4090,7 @@ int mgsl_alloc_frame_memory(struct mgsl_struct *info,DMABUFFERENTRY *BufferList,
 				kmalloc(DMABUFFERSIZE, GFP_KERNEL | GFP_DMA);
 			if ( BufferList[i].virt_addr == NULL )
 				return -ENOMEM;
-			phys_addr = virt_to_bus(BufferList[i].virt_addr);
+			phys_addr = isa_virt_to_bus(BufferList[i].virt_addr);
 		}
 		BufferList[i].phys_addr = phys_addr;
 	}
@@ -7990,10 +7984,6 @@ void mgsl_sppp_init(struct mgsl_struct *info)
 	d->get_stats = mgsl_net_stats;
 	d->tx_timeout = mgsl_sppp_tx_timeout;
 	d->watchdog_timeo = 10*HZ;
-
-#if LINUX_VERSION_CODE < VERSION(2,4,4) 
-	dev_init_buffers(d);
-#endif
 
 	if (register_netdev(d) == -1) {
 		printk(KERN_WARNING "%s: register_netdev failed.\n", d->name);

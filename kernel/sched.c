@@ -1237,11 +1237,11 @@ out_unlock:
 /**
  * sys_sched_setaffinity - set the cpu affinity of a process
  * @pid: pid of the process
- * @len: length of new_mask
- * @new_mask: user-space pointer to the new cpu mask
+ * @len: length of the bitmask pointed to by user_mask_ptr
+ * @user_mask_ptr: user-space pointer to the new cpu mask
  */
 asmlinkage int sys_sched_setaffinity(pid_t pid, unsigned int len,
-				      unsigned long *new_mask_ptr)
+				      unsigned long *user_mask_ptr)
 {
 	unsigned long new_mask;
 	task_t *p;
@@ -1250,7 +1250,7 @@ asmlinkage int sys_sched_setaffinity(pid_t pid, unsigned int len,
 	if (len < sizeof(new_mask))
 		return -EINVAL;
 
-	if (copy_from_user(&new_mask, new_mask_ptr, sizeof(new_mask)))
+	if (copy_from_user(&new_mask, user_mask_ptr, sizeof(new_mask)))
 		return -EFAULT;
 
 	new_mask &= cpu_online_map;
@@ -1289,8 +1289,8 @@ out_unlock:
 /**
  * sys_sched_getaffinity - get the cpu affinity of a process
  * @pid: pid of the process
- * @len: length of the new mask
- * @user_mask_ptr: userspace pointer to the mask
+ * @len: length of the bitmask pointed to by user_mask_ptr
+ * @user_mask_ptr: user-space pointer to hold the current cpu mask
  */
 asmlinkage int sys_sched_getaffinity(pid_t pid, unsigned int len,
 				      unsigned long *user_mask_ptr)
@@ -1649,6 +1649,7 @@ void set_cpus_allowed(task_t *p, unsigned long new_mask)
 	if (!new_mask)
 		BUG();
 
+	preempt_disable();
 	rq = task_rq_lock(p, &flags);
 	p->cpus_allowed = new_mask;
 	/*
@@ -1657,7 +1658,7 @@ void set_cpus_allowed(task_t *p, unsigned long new_mask)
 	 */
 	if (new_mask & (1UL << p->thread_info->cpu)) {
 		task_rq_unlock(rq, &flags);
-		return;
+		goto out;
 	}
 
 	init_MUTEX_LOCKED(&req.sem);
@@ -1667,12 +1668,13 @@ void set_cpus_allowed(task_t *p, unsigned long new_mask)
 	wake_up_process(rq->migration_thread);
 
 	down(&req.sem);
+out:
+	preempt_enable();
 }
 
-static volatile unsigned long migration_mask;
-
-static int migration_thread(void * unused)
+static int migration_thread(void * bind_cpu)
 {
+	int cpu = cpu_logical_map((int) (long) bind_cpu);
 	struct sched_param param = { sched_priority: 99 };
 	runqueue_t *rq;
 	int ret;
@@ -1680,36 +1682,20 @@ static int migration_thread(void * unused)
 	daemonize();
 	sigfillset(&current->blocked);
 	set_fs(KERNEL_DS);
+	/*
+	 * The first migration thread is started on CPU #0. This one can migrate
+	 * the other migration threads to their destination CPUs.
+	 */
+	if (cpu != 0) {
+		while (!cpu_rq(cpu_logical_map(0))->migration_thread)
+			yield();
+		set_cpus_allowed(current, 1UL << cpu);
+	}
+	printk("migration_task %d on cpu=%d\n",cpu,smp_processor_id());
 	ret = setscheduler(0, SCHED_FIFO, &param);
 
-	/*
-	 * We have to migrate manually - there is no migration thread
-	 * to do this for us yet :-)
-	 *
-	 * We use the following property of the Linux scheduler. At
-	 * this point no other task is running, so by keeping all
-	 * migration threads running, the load-balancer will distribute
-	 * them between all CPUs equally. At that point every migration
-	 * task binds itself to the current CPU.
-	 */
-
-	/* wait for all migration threads to start up. */
-	while (!migration_mask)
-		yield();
-
-	for (;;) {
-		preempt_disable();
-		if (test_and_clear_bit(smp_processor_id(), &migration_mask))
-			current->cpus_allowed = 1 << smp_processor_id();
-		if (test_thread_flag(TIF_NEED_RESCHED))
-			schedule();
-		if (!migration_mask)
-			break;
-		preempt_enable();
-	}
 	rq = this_rq();
 	rq->migration_thread = current;
-	preempt_enable();
 
 	sprintf(current->comm, "migration_CPU%d", smp_processor_id());
 
@@ -1740,9 +1726,11 @@ repeat:
 		cpu_src = p->thread_info->cpu;
 		rq_src = cpu_rq(cpu_src);
 
+		local_irq_save(flags);
 		double_rq_lock(rq_src, rq_dest);
 		if (p->thread_info->cpu != cpu_src) {
 			double_rq_unlock(rq_src, rq_dest);
+			local_irq_restore(flags);
 			goto repeat;
 		}
 		if (rq_src == rq) {
@@ -1753,6 +1741,7 @@ repeat:
 			}
 		}
 		double_rq_unlock(rq_src, rq_dest);
+		local_irq_restore(flags);
 
 		up(&req->sem);
 	}
@@ -1760,33 +1749,18 @@ repeat:
 
 void __init migration_init(void)
 {
-	unsigned long tmp, orig_cache_decay_ticks;
 	int cpu;
 
-	tmp = 0;
+	current->cpus_allowed = 1UL << cpu_logical_map(0);
 	for (cpu = 0; cpu < smp_num_cpus; cpu++) {
-		if (kernel_thread(migration_thread, NULL,
+		if (kernel_thread(migration_thread, (void *) (long) cpu,
 				CLONE_FS | CLONE_FILES | CLONE_SIGNAL) < 0)
 			BUG();
-		tmp |= (1UL << cpu_logical_map(cpu));
 	}
+	current->cpus_allowed = -1L;
 
-	migration_mask = tmp;
-
-	orig_cache_decay_ticks = cache_decay_ticks;
-	cache_decay_ticks = 0;
-
-	for (cpu = 0; cpu < smp_num_cpus; cpu++) {
-		int logical = cpu_logical_map(cpu);
-
-		while (!cpu_rq(logical)->migration_thread) {
-			set_current_state(TASK_INTERRUPTIBLE);
+	for (cpu = 0; cpu < smp_num_cpus; cpu++)
+		while (!cpu_rq(cpu)->migration_thread)
 			schedule_timeout(2);
-		}
-	}
-	if (migration_mask)
-		BUG();
-
-	cache_decay_ticks = orig_cache_decay_ticks;
 }
 #endif

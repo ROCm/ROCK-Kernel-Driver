@@ -1784,7 +1784,7 @@ void usb_disconnect(struct usb_device **pdev)
 
 	/* Free the device number and remove the /proc/bus/usb entry */
 	if (dev->devnum > 0) {
-		clear_bit(dev->devnum, &dev->bus->devmap.devicemap);
+		clear_bit(dev->devnum, dev->bus->devmap.devicemap);
 		usbfs_remove_device(dev);
 		put_device(&dev->dev);
 	}
@@ -2407,56 +2407,6 @@ int usb_string(struct usb_device *dev, int index, char *buf, size_t size)
 	return err;
 }
 
-/**
- * usb_make_path - returns device path in the hub tree
- * @dev: the device whose path is being constructed
- * @buf: where to put the string
- * @size: how big is "buf"?
- * Context: !in_interrupt ()
- *
- * Returns length of the string (>= 0) or out of memory status (< 0).
- *
- * NOTE:  prefer to use use dev->devpath directly.
- */
-int usb_make_path(struct usb_device *dev, char *buf, size_t size)
-{
-	struct usb_device *pdev = dev->parent;
-	char *tmp;
-	char *port;
-	int i;
-
-	if (!(port = kmalloc(size, GFP_KERNEL)))
-		return -ENOMEM;
-	if (!(tmp = kmalloc(size, GFP_KERNEL))) {
-		kfree(port);
-		return -ENOMEM;
-	}
-
-	*port = 0;
-	while (pdev) {
-		for (i = 0; i < pdev->maxchild; i++)
-			if (pdev->children[i] == dev)
-				break;
-
-		if (pdev->children[i] != dev) {
-			kfree(port);
-			kfree(tmp);
-			return -ENODEV;
-		}
-
-		strcpy(tmp, port);
-		snprintf(port, size, strlen(port) ? "%d.%s" : "%d", i + 1, tmp);
-
-		dev = pdev;
-		pdev = dev->parent;
-	}
-
-	snprintf(buf, size, "usb%d:%s", dev->bus->busnum, port);
-	kfree(port);
-	kfree(tmp);
-	return strlen(buf);
-}
-
 /*
  * By the time we get here, the device has gotten a new device ID
  * and is in the default state. We need to identify the thing and
@@ -2484,7 +2434,7 @@ int usb_new_device(struct usb_device *dev)
 	if (err < 0) {
 		err("USB device not accepting new address=%d (error=%d)",
 			dev->devnum, err);
-		clear_bit(dev->devnum, &dev->bus->devmap.devicemap);
+		clear_bit(dev->devnum, dev->bus->devmap.devicemap);
 		dev->devnum = -1;
 		return 1;
 	}
@@ -2497,7 +2447,7 @@ int usb_new_device(struct usb_device *dev)
 			err("USB device not responding, giving up (error=%d)", err);
 		else
 			err("USB device descriptor short read (expected %i, got %i)", 8, err);
-		clear_bit(dev->devnum, &dev->bus->devmap.devicemap);
+		clear_bit(dev->devnum, dev->bus->devmap.devicemap);
 		dev->devnum = -1;
 		return 1;
 	}
@@ -2512,7 +2462,7 @@ int usb_new_device(struct usb_device *dev)
 			err("USB device descriptor short read (expected %Zi, got %i)",
 				sizeof(dev->descriptor), err);
 	
-		clear_bit(dev->devnum, &dev->bus->devmap.devicemap);
+		clear_bit(dev->devnum, dev->bus->devmap.devicemap);
 		dev->devnum = -1;
 		return 1;
 	}
@@ -2521,7 +2471,7 @@ int usb_new_device(struct usb_device *dev)
 	if (err < 0) {
 		err("unable to get device %d configuration (error=%d)",
 			dev->devnum, err);
-		clear_bit(dev->devnum, &dev->bus->devmap.devicemap);
+		clear_bit(dev->devnum, dev->bus->devmap.devicemap);
 		dev->devnum = -1;
 		return 1;
 	}
@@ -2531,7 +2481,7 @@ int usb_new_device(struct usb_device *dev)
 	if (err) {
 		err("failed to set device %d default configuration (error=%d)",
 			dev->devnum, err);
-		clear_bit(dev->devnum, &dev->bus->devmap.devicemap);
+		clear_bit(dev->devnum, dev->bus->devmap.devicemap);
 		dev->devnum = -1;
 		return 1;
 	}
