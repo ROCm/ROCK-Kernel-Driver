@@ -1,11 +1,9 @@
 /*
- * $Id: mousedev.c,v 1.24 2000/11/15 10:57:45 vojtech Exp $
+ * $Id: mousedev.c,v 1.38 2001/12/26 21:08:33 jsimmons Exp $
  *
- *  Copyright (c) 1999-2000 Vojtech Pavlik
+ *  Copyright (c) 1999-2001 Vojtech Pavlik
  *
- *  Input driver to ImExPS/2 device driver module.
- *
- *  Sponsored by SuSE
+ *  Input driver to ExplorerPS/2 device driver module.
  */
 
 /*
@@ -24,8 +22,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
  * 
  * Should you need to contact me, the author, you can do so either by
- * e-mail - mail your message to <vojtech@suse.cz>, or by paper mail:
- * Vojtech Pavlik, Ucitelska 1576, Prague 8, 182 00 Czech Republic
+ * e-mail - mail your message to <vojtech@ucw.cz>, or by paper mail:
+ * Vojtech Pavlik, Simunkova 1594, Prague 8, 182 00 Czech Republic
  */
 
 #define MOUSEDEV_MINOR_BASE 	32
@@ -41,6 +39,10 @@
 #include <linux/smp_lock.h>
 #include <linux/random.h>
 
+MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
+MODULE_DESCRIPTION("Mouse (ExplorerPS/2) device interfaces");
+MODULE_LICENSE("GPL");
+
 #ifndef CONFIG_INPUT_MOUSEDEV_SCREEN_X
 #define CONFIG_INPUT_MOUSEDEV_SCREEN_X	1024
 #endif
@@ -52,6 +54,7 @@ struct mousedev {
 	int exist;
 	int open;
 	int minor;
+	char name[16];
 	wait_queue_head_t wait;
 	struct mousedev_list *list;
 	struct input_handle handle;
@@ -89,8 +92,6 @@ static void mousedev_event(struct input_handle *handle, unsigned int type, unsig
 	struct mousedev_list *list;
 	int index, size;
 
-	add_mouse_randomness((type << 4) ^ code ^ (code >> 4) ^ value);
-
 	while (*mousedev) {
 		list = (*mousedev)->list;
 		while (list) {
@@ -101,13 +102,23 @@ static void mousedev_event(struct input_handle *handle, unsigned int type, unsig
 					switch (code) {
 						case ABS_X:	
 							size = handle->dev->absmax[ABS_X] - handle->dev->absmin[ABS_X];
-							list->dx += (value * xres - list->oldx) / size;
-							list->oldx += list->dx * size;
+							if (size != 0) {
+								list->dx += (value * xres - list->oldx) / size;
+								list->oldx += list->dx * size;
+							} else {
+								list->dx += value - list->oldx;
+								list->oldx += list->dx;
+							}
 							break;
 						case ABS_Y:
 							size = handle->dev->absmax[ABS_Y] - handle->dev->absmin[ABS_Y];
-							list->dy -= (value * yres - list->oldy) / size;
-							list->oldy -= list->dy * size;
+							if (size != 0) {
+								list->dy -= (value * yres - list->oldy) / size;
+								list->oldy -= list->dy * size;
+							} else {
+								list->dy -= value - list->oldy;
+								list->oldy -= list->dy;
+							}
 							break;
 					}
 					break;
@@ -169,7 +180,7 @@ static int mousedev_release(struct inode * inode, struct file * file)
 {
 	struct mousedev_list *list = file->private_data;
 	struct mousedev_list **listptr;
-	
+
 	listptr = &list->mousedev->list;
 	mousedev_fasync(-1, file, 0);
 
@@ -344,7 +355,7 @@ static ssize_t mousedev_read(struct file * file, char * buffer, size_t count, lo
 	if (!list->ready && !list->buffer) {
 
 		add_wait_queue(&list->mousedev->wait, &wait);
-		current->state = TASK_INTERRUPTIBLE;
+		set_current_state(TASK_INTERRUPTIBLE);
 
 		while (!list->ready) {
 
@@ -360,7 +371,7 @@ static ssize_t mousedev_read(struct file * file, char * buffer, size_t count, lo
 			schedule();
 		}
 
-		current->state = TASK_RUNNING;
+		set_current_state(TASK_RUNNING);
 		remove_wait_queue(&list->mousedev->wait, &wait);
 	}
 
@@ -401,18 +412,10 @@ struct file_operations mousedev_fops = {
 	fasync:		mousedev_fasync,
 };
 
-static struct input_handle *mousedev_connect(struct input_handler *handler, struct input_dev *dev)
+static struct input_handle *mousedev_connect(struct input_handler *handler, struct input_dev *dev, struct input_device_id *id)
 {
 	struct mousedev *mousedev;
 	int minor = 0;
-
-	if (!test_bit(EV_KEY, dev->evbit) ||
-	   (!test_bit(BTN_LEFT, dev->keybit) && !test_bit(BTN_TOUCH, dev->keybit)))
-		return NULL;
-
-	if ((!test_bit(EV_REL, dev->evbit) || !test_bit(REL_X, dev->relbit)) &&
-	    (!test_bit(EV_ABS, dev->evbit) || !test_bit(ABS_X, dev->absbit)))
-		return NULL;
 
 	for (minor = 0; minor < MOUSEDEV_MINORS && mousedev_table[minor]; minor++);
 	if (minor == MOUSEDEV_MINORS) {
@@ -425,11 +428,12 @@ static struct input_handle *mousedev_connect(struct input_handler *handler, stru
 	memset(mousedev, 0, sizeof(struct mousedev));
 	init_waitqueue_head(&mousedev->wait);
 
-	mousedev->exist = 1;
 	mousedev->minor = minor;
 	mousedev_table[minor] = mousedev;
+	sprintf(mousedev->name, "mouse%d", minor);
 
 	mousedev->handle.dev = dev;
+	mousedev->handle.name = mousedev->name;
 	mousedev->handle.handler = handler;
 	mousedev->handle.private = mousedev;
 
@@ -438,7 +442,7 @@ static struct input_handle *mousedev_connect(struct input_handler *handler, stru
 	if (mousedev_mix.open)
 		input_open_device(&mousedev->handle);
 
-//	printk(KERN_INFO "mouse%d: PS/2 mouse device for input%d\n", minor, dev->number);
+	mousedev->exist = 1;
 
 	return &mousedev->handle;
 }
@@ -459,6 +463,26 @@ static void mousedev_disconnect(struct input_handle *handle)
 		kfree(mousedev);
 	}
 }
+
+static struct input_device_id mousedev_ids[] = {
+	{
+		flags: INPUT_DEVICE_ID_MATCH_EVBIT | INPUT_DEVICE_ID_MATCH_KEYBIT | INPUT_DEVICE_ID_MATCH_RELBIT,
+		evbit: { BIT(EV_KEY) | BIT(EV_REL) },
+		keybit: { [LONG(BTN_LEFT)] = BIT(BTN_LEFT) },
+		relbit: { BIT(REL_X) | BIT(REL_Y) },
+	},	/* A mouse like device, at least one button, two relative axes */
+
+	{
+		flags: INPUT_DEVICE_ID_MATCH_EVBIT | INPUT_DEVICE_ID_MATCH_KEYBIT | INPUT_DEVICE_ID_MATCH_ABSBIT,
+		evbit: { BIT(EV_KEY) | BIT(EV_ABS) },
+		keybit: { [LONG(BTN_TOUCH)] = BIT(BTN_TOUCH) },
+		absbit: { BIT(ABS_X) | BIT(ABS_Y) },
+	},	/* A tablet like device, at least touch detection, two absolute axes */
+
+	{ }, 	/* Terminating entry */
+};
+
+MODULE_DEVICE_TABLE(input, mousedev_ids);
 	
 static struct input_handler mousedev_handler = {
 	event:		mousedev_event,
@@ -466,6 +490,8 @@ static struct input_handler mousedev_handler = {
 	disconnect:	mousedev_disconnect,
 	fops:		&mousedev_fops,
 	minor:		MOUSEDEV_MINOR_BASE,
+	name:		"mousedev",
+	id_table:	mousedev_ids,
 };
 
 static int __init mousedev_init(void)
@@ -492,10 +518,6 @@ static void __exit mousedev_exit(void)
 
 module_init(mousedev_init);
 module_exit(mousedev_exit);
-
-MODULE_AUTHOR("Vojtech Pavlik <vojtech@suse.cz>");
-MODULE_DESCRIPTION("Input driver to PS/2 or ImPS/2 device driver");
-MODULE_LICENSE("GPL");
 
 MODULE_PARM(xres, "i");
 MODULE_PARM_DESC(xres, "Horizontal screen resolution");

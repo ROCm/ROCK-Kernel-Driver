@@ -641,7 +641,7 @@ static int iforce_upload_periodic(struct iforce* iforce, struct ff_effect* effec
 		effect->replay.delay,
 		effect->trigger.button,
 		effect->trigger.interval,
-		effect->u.periodic.direction);
+		effect->direction);
 
 	return err;
 }
@@ -680,7 +680,7 @@ static int iforce_upload_constant(struct iforce* iforce, struct ff_effect* effec
 		effect->replay.delay,
 		effect->trigger.button,
 		effect->trigger.interval,
-		effect->u.constant.direction);
+		effect->direction);
 
 	return err;
 }
@@ -722,7 +722,7 @@ static int iforce_upload_interactive(struct iforce* iforce, struct ff_effect* ef
 		case 0: /* Only one axis, choose orientation */
 			mod1 = mod_chunk->start;
 			mod2 = 0xffff;
-			direction = effect->u.interactive.direction;
+			direction = effect->direction;
 			axes = 0x20;
 			break;
 

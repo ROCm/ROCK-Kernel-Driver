@@ -2,11 +2,9 @@
 #define _GAMEPORT_H
 
 /*
- * $Id: gameport.h,v 1.11 2001/04/26 10:24:46 vojtech Exp $
+ * $Id: gameport.h,v 1.20 2002/01/03 08:55:05 vojtech Exp $
  *
- *  Copyright (c) 1999-2000 Vojtech Pavlik
- *
- *  Sponsored by SuSE
+ *  Copyright (c) 1999-2001 Vojtech Pavlik
  */
 
 /*
@@ -26,20 +24,26 @@
  *
  * Should you need to contact me, the author, you can do so either by
  * e-mail - mail your message to <vojtech@ucw.cz>, or by paper mail:
- * Vojtech Pavlik, Ucitelska 1576, Prague 8, 182 00 Czech Republic
+ * Vojtech Pavlik, Simunkova 1594, Prague 8, 182 00 Czech Republic
  */
 
-#include <linux/sched.h>
-#include <linux/delay.h>
 #include <asm/io.h>
+#include <linux/input.h>
 
 struct gameport;
 
 struct gameport {
 
-	void *private;
-
+	void *private;	/* Private pointer for joystick drivers */
+	void *driver;	/* Private pointer for gameport drivers */
+	char *name;
+	char *phys;
 	int number;
+
+	unsigned short idbus;
+	unsigned short idvendor;
+	unsigned short idproduct;
+	unsigned short idversion;
 
 	int io;
 	int speed;
@@ -59,6 +63,7 @@ struct gameport {
 struct gameport_dev {
 
 	void *private;
+	char *name;
 
 	void (*connect)(struct gameport *, struct gameport_dev *dev);
 	void (*disconnect)(struct gameport *);
@@ -74,8 +79,8 @@ void gameport_rescan(struct gameport *gameport);
 void gameport_register_port(struct gameport *gameport);
 void gameport_unregister_port(struct gameport *gameport);
 #else
-static void __inline__ gameport_register_port(struct gameport *gameport) { return; }
-static void __inline__ gameport_unregister_port(struct gameport *gameport) { return; }
+void __inline__ gameport_register_port(struct gameport *gameport) { return; }
+void __inline__ gameport_unregister_port(struct gameport *gameport) { return; }
 #endif
 
 void gameport_register_device(struct gameport_dev *dev);
@@ -94,6 +99,7 @@ void gameport_unregister_device(struct gameport_dev *dev);
 #define GAMEPORT_ID_VENDOR_MICROSOFT	0x0007
 #define GAMEPORT_ID_VENDOR_THRUSTMASTER	0x0008
 #define GAMEPORT_ID_VENDOR_GRAVIS	0x0009
+#define GAMEPORT_ID_VENDOR_GUILLEMOT	0x000a
 
 static __inline__ void gameport_trigger(struct gameport *gameport)
 {
@@ -134,7 +140,7 @@ static __inline__ int gameport_time(struct gameport *gameport, int time)
 
 static __inline__ void wait_ms(unsigned int ms)
 {
-	current->state = TASK_UNINTERRUPTIBLE;
+	set_current_state(TASK_UNINTERRUPTIBLE);
 	schedule_timeout(1 + ms * HZ / 1000);
 }
 

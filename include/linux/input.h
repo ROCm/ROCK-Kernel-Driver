@@ -2,11 +2,9 @@
 #define _INPUT_H
 
 /*
- * $Id: input.h,v 1.34 2001/05/28 09:06:44 vojtech Exp $
+ * $Id: input.h,v 1.57 2002/01/02 11:59:56 vojtech Exp $
  *
- *  Copyright (c) 1999-2000 Vojtech Pavlik
- *
- *  Sponsored by SuSE
+ *  Copyright (c) 1999-2001 Vojtech Pavlik
  */
 
 /*
@@ -17,7 +15,7 @@
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
@@ -25,8 +23,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
  *
  * Should you need to contact me, the author, you can do so either by
- * e-mail - mail your message to <vojtech@suse.cz>, or by paper mail:
- * Vojtech Pavlik, Ucitelska 1576, Prague 8, 182 00 Czech Republic
+ * e-mail - mail your message to <vojtech@ucw.cz>, or by paper mail:
+ * Vojtech Pavlik, Simunkova 1594, Prague 8, 182 00 Czech Republic
  */
 
 #ifdef __KERNEL__
@@ -64,17 +62,20 @@ struct input_event {
 #define EVIOCSREP		_IOW('E', 0x03, int[2])			/* get repeat settings */
 #define EVIOCGKEYCODE		_IOR('E', 0x04, int[2])			/* get keycode */
 #define EVIOCSKEYCODE		_IOW('E', 0x04, int[2])			/* set keycode */
-#define EVIOCGKEY		_IOR('E', 0x05, int[2])			/* get key value */
+
 #define EVIOCGNAME(len)		_IOC(_IOC_READ, 'E', 0x06, len)		/* get device name */
-#define EVIOCGBUS		_IOR('E', 0x07, short[4])		/* get bus address */
+#define EVIOCGPHYS(len)		_IOC(_IOC_READ, 'E', 0x07, len)		/* get physical location */
+#define EVIOCGUNIQ(len)		_IOC(_IOC_READ, 'E', 0x08, len)		/* get unique identifier */
+
+#define EVIOCGKEY(len)		_IOC(_IOC_READ, 'E', 0x18, len)		/* get global keystate */
+#define EVIOCGLED(len)		_IOC(_IOC_READ, 'E', 0x19, len)		/* get all LEDs */
+#define EVIOCGSND(len)		_IOC(_IOC_READ, 'E', 0x1a, len)		/* get all sounds status */
 
 #define EVIOCGBIT(ev,len)	_IOC(_IOC_READ, 'E', 0x20 + ev, len)	/* get event bits */
 #define EVIOCGABS(abs)		_IOR('E', 0x40 + abs, int[5])		/* get abs value/limits */
 
 #define EVIOCSFF		_IOC(_IOC_WRITE, 'E', 0x80, sizeof(struct ff_effect))	/* send a force effect to a force feedback device */
 #define EVIOCRMFF		_IOW('E', 0x81, int)			/* Erase a force effect */
-#define EVIOCSGAIN		_IOW('E', 0x82, unsigned short)		/* Set overall gain */
-#define EVIOCSAUTOCENTER	_IOW('E', 0x83, unsigned short)		/* Enable or disable auto-centering */
 #define EVIOCGEFFECTS		_IOR('E', 0x84, int)			/* Report number of effects playable at the same time */
 
 /*
@@ -90,6 +91,8 @@ struct input_event {
 #define EV_SND			0x12
 #define EV_REP			0x14
 #define EV_FF			0x15
+#define EV_PWR			0x16
+#define EV_FF_STATUS		0x17
 #define EV_MAX			0x1f
 
 /*
@@ -304,8 +307,23 @@ struct input_event {
 #define KEY_PROG4		203
 #define KEY_SUSPEND		205
 #define KEY_CLOSE		206
+#define KEY_PLAY		207
+#define KEY_FASTFORWARD		208
+#define KEY_BASSBOOST		209
+#define KEY_PRINT		210
+#define KEY_HP			211
+#define KEY_CAMERA		212
+#define KEY_SOUND		213
+#define KEY_QUESTION		214
+#define KEY_EMAIL		215
+#define KEY_CHAT		216
+#define KEY_SEARCH		217
+#define KEY_CONNECT		218
+#define KEY_FINANCE		219
+#define KEY_SPORT		220
+#define KEY_SHOP		221
 
-#define KEY_UNKNOWN		220
+#define KEY_UNKNOWN		240
 
 #define BTN_MISC		0x100
 #define BTN_0			0x100
@@ -415,14 +433,16 @@ struct input_event {
 #define ABS_DISTANCE		0x19
 #define ABS_TILT_X		0x1a
 #define ABS_TILT_Y		0x1b
-#define ABS_MISC		0x1c
-#define ABS_MAX			0x1f
+#define ABS_VOLUME		0x20
+#define ABS_MISC		0x28
+#define ABS_MAX			0x3f
 
 /*
  * Misc events
  */
 
 #define MSC_SERIAL		0x00
+#define MSC_PULSELED		0x01
 #define MSC_MAX			0x07
 
 /*
@@ -468,6 +488,7 @@ struct input_event {
 #define BUS_PCI			0x01
 #define BUS_ISAPNP		0x02
 #define BUS_USB			0x03
+#define BUS_HIL			0x04
 
 #define BUS_ISA			0x10
 #define BUS_I8042		0x11
@@ -480,32 +501,42 @@ struct input_event {
 #define BUS_I2C			0x18
 
 /*
+ * Values describing the status of an effect
+ */
+#define FF_STATUS_STOPPED	0x00
+#define FF_STATUS_PLAYING	0x01
+#define FF_STATUS_MAX		0x01
+
+/*
  * Structures used in ioctls to upload effects to a device
  * The first structures are not passed directly by using ioctls.
  * They are sub-structures of the actually sent structure (called ff_effect)
+ *
+ * Ranges:
+ *  0 <= __u16 <= 65535
+ *  -32767 <= __s16 <= +32767     ! Not -32768 for lower bound !
  */
 
 struct ff_replay {
-	__u16 length;		/* Duration of an effect */
+	__u16 length;		/* Duration of an effect in ms. All other times are also expressed in ms */
 	__u16 delay;		/* Time to wait before to start playing an effect */
 };
 
 struct ff_trigger {
 	__u16 button;		/* Number of button triggering an effect */
-	__u16 interval;		/* Time to wait before an effect can be re-triggered */
+	__u16 interval;		/* Time to wait before an effect can be re-triggered (ms) */
 };
 
 struct ff_shape {
-	__u16 attack_length;	/* Duration of attack */
-	__s16 attack_level;	/* Level at beginning of attack */
-	__u16 fade_length;	/* Duration of fade */
-	__s16 fade_level;	/* Level at end of fade */
+	__u16 attack_length;	/* Duration of attack (ms) */
+	__u16 attack_level;	/* Level at beginning of attack */
+	__u16 fade_length;	/* Duration of fade (ms) */
+	__u16 fade_level;	/* Level at end of fade */
 };
 
 /* FF_CONSTANT */
 struct ff_constant_effect {
-	__s16 level;		/* Strength of effect */
-	__u16 direction;	/* Direction of effect (see periodic effects) */
+	__s16 level;		/* Strength of effect. Negative values are OK */
 	struct ff_shape shape;
 };
 
@@ -514,12 +545,13 @@ struct ff_interactive_effect {
 /* Axis along which effect must be created. If null, the field named direction
  * is used
  * It is a bit array (ie to enable axes X and Y, use BIT(ABS_X) | BIT(ABS_Y)
+ * It overrides the value of ff_effect::direction, which is used only if
+ * axis == 0
  */
 	__u16 axis;
-	__u16 direction;
 
-	__s16 right_saturation; /* Max level when joystick is on the right */
-	__s16 left_saturation;  /* Max level when joystick in on the left */
+	__u16 right_saturation; /* Max level when joystick is on the right */
+	__u16 left_saturation;	/* Max level when joystick in on the left */
 
 	__s16 right_coeff;	/* Indicates how fast the force grows when the
 				   joystick moves to the right */
@@ -533,12 +565,10 @@ struct ff_interactive_effect {
 /* FF_PERIODIC */
 struct ff_periodic_effect {
 	__u16 waveform;		/* Kind of wave (sine, square...) */
-	__u16 period;
+	__u16 period;		/* in ms */
 	__s16 magnitude;	/* Peak value */
 	__s16 offset;		/* Mean value of wave (roughly) */
 	__u16 phase;		/* 'Horizontal' shift */
-	__u16 direction;	/* Direction. 0 deg -> 0x0000
-					     90 deg -> 0x4000 */
 
 	struct ff_shape shape;
 };
@@ -549,9 +579,16 @@ struct ff_periodic_effect {
 struct ff_effect {
 	__u16 type;
 /* Following field denotes the unique id assigned to an effect.
- * It is set by the driver.
+ * If user sets if to -1, a new effect is created, and its id is returned in the same field
+ * Else, the user sets it to the effect id it wants to update.
  */
 	__s16 id;
+
+	__u16 direction;	/* Direction. 0 deg -> 0x0000 (down)
+					     90 deg -> 0x4000 (left)
+					    180 deg -> 0x8000 (up)
+					    270 deg -> 0xC000 (right)
+				*/
 
 	struct ff_trigger trigger;
 	struct ff_replay replay;
@@ -564,7 +601,7 @@ struct ff_effect {
 };
 
 /*
- * Buttons that can trigger effects.  Use for example FF_BTN(BTN_TRIGGER) to
+ * Buttons that can trigger effects. Use for example FF_BTN(BTN_TRIGGER) to
  * access the bitmap.
  */
 
@@ -625,8 +662,11 @@ struct input_dev {
 
 	void *private;
 
-	int number;
 	char *name;
+	char *phys;
+	char *uniq;
+	int number;
+
 	unsigned short idbus;
 	unsigned short idvendor;
 	unsigned short idproduct;
@@ -649,6 +689,9 @@ struct input_dev {
 	unsigned int repeat_key;
 	struct timer_list timer;
 
+	struct pm_dev *pm_dev;
+	int state;
+
 	int abs[ABS_MAX + 1];
 	int rep[REP_MAX + 1];
 
@@ -661,8 +704,12 @@ struct input_dev {
 	int absfuzz[ABS_MAX + 1];
 	int absflat[ABS_MAX + 1];
 
+	int only_one_writer;
+
 	int (*open)(struct input_dev *dev);
 	void (*close)(struct input_dev *dev);
+	int (*accept)(struct input_dev *dev, struct file *file);
+	int (*flush)(struct input_dev *dev, struct file *file);
 	int (*event)(struct input_dev *dev, unsigned int type, unsigned int code, int value);
 	int (*upload_effect)(struct input_dev *dev, struct ff_effect *effect);
 	int (*erase_effect)(struct input_dev *dev, int effect_id);
@@ -671,16 +718,63 @@ struct input_dev {
 	struct input_dev *next;
 };
 
+/*
+ * Structure for hotplug & device<->driver matching.
+ */
+
+#define INPUT_DEVICE_ID_MATCH_BUS	1
+#define INPUT_DEVICE_ID_MATCH_VENDOR	2
+#define INPUT_DEVICE_ID_MATCH_PRODUCT	4
+#define INPUT_DEVICE_ID_MATCH_VERSION	8
+
+#define INPUT_DEVICE_ID_MATCH_EVBIT	0x010
+#define INPUT_DEVICE_ID_MATCH_KEYBIT	0x020
+#define INPUT_DEVICE_ID_MATCH_RELBIT	0x040
+#define INPUT_DEVICE_ID_MATCH_ABSBIT	0x080
+#define INPUT_DEVICE_ID_MATCH_MSCIT	0x100
+#define INPUT_DEVICE_ID_MATCH_LEDBIT	0x200
+#define INPUT_DEVICE_ID_MATCH_SNDBIT	0x400
+#define INPUT_DEVICE_ID_MATCH_FFBIT	0x800
+
+#define INPUT_DEVICE_ID_MATCH_DEVICE\
+	(INPUT_DEVICE_ID_MATCH_BUS | INPUT_DEVICE_ID_MATCH_VENDOR | INPUT_DEVICE_ID_MATCH_PRODUCT)
+#define INPUT_DEVICE_ID_MATCH_DEVICE_AND_VERSION\
+	(INPUT_DEVICE_ID_MATCH_DEVICE | INPUT_DEVICE_ID_MATCH_VERSION)
+
+struct input_device_id {
+
+	unsigned long flags;
+
+	unsigned short idbus;
+	unsigned short idvendor;
+	unsigned short idproduct;
+	unsigned short idversion;
+
+	unsigned long evbit[NBITS(EV_MAX)];
+	unsigned long keybit[NBITS(KEY_MAX)];
+	unsigned long relbit[NBITS(REL_MAX)];
+	unsigned long absbit[NBITS(ABS_MAX)];
+	unsigned long mscbit[NBITS(MSC_MAX)];
+	unsigned long ledbit[NBITS(LED_MAX)];
+	unsigned long sndbit[NBITS(SND_MAX)];
+	unsigned long ffbit[NBITS(FF_MAX)];
+
+	unsigned long driver_info;
+};
+
 struct input_handler {
 
 	void *private;
 
 	void (*event)(struct input_handle *handle, unsigned int type, unsigned int code, int value);
-	struct input_handle* (*connect)(struct input_handler *handler, struct input_dev *dev);
+	struct input_handle* (*connect)(struct input_handler *handler, struct input_dev *dev, struct input_device_id *id);
 	void (*disconnect)(struct input_handle *handle);
 
 	struct file_operations *fops;
 	int minor;
+	char *name;
+
+	struct input_device_id *id_table;
 
 	struct input_handle *handle;
 	struct input_handler *next;
@@ -691,6 +785,7 @@ struct input_handle {
 	void *private;
 
 	int open;
+	char *name;
 
 	struct input_dev *dev;
 	struct input_handler *handler;
@@ -708,6 +803,9 @@ void input_unregister_handler(struct input_handler *);
 int input_open_device(struct input_handle *);
 void input_close_device(struct input_handle *);
 
+int input_accept_process(struct input_handle *handle, struct file *file);
+int input_flush_device(struct input_handle* handle, struct file* file);
+
 devfs_handle_t input_register_minor(char *name, int minor, int minor_base);
 void input_unregister_minor(devfs_handle_t handle);
 
@@ -716,6 +814,8 @@ void input_event(struct input_dev *dev, unsigned int type, unsigned int code, in
 #define input_report_key(a,b,c) input_event(a, EV_KEY, b, !!(c))
 #define input_report_rel(a,b,c) input_event(a, EV_REL, b, c)
 #define input_report_abs(a,b,c) input_event(a, EV_ABS, b, c)
+#define input_report_ff(a,b,c)	input_event(a, EV_FF, b, c)
+#define input_report_ff_status(a,b,c)	input_event(a, EV_FF_STATUS, b, c)
 
 #endif
 #endif
