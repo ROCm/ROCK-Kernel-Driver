@@ -520,13 +520,6 @@ ide_startstop_t task_mulout_intr (ide_drive_t *drive)
 		msect -= nsect;
 		taskfile_output_data(drive, pBuf, nsect * SECTOR_WORDS);
 		rq->current_nr_sectors -= nsect;
-
-		/* FIXME: check drive status */
-		if (!rq->current_nr_sectors) {
-			if (!DRIVER(drive)->end_request(drive, 1, 0))
-				if (!rq->bio)
-					return ide_stopped;
-		}
 	} while (msect);
 	rq->errors = 0;
 	if (HWGROUP(drive)->handler == NULL)
