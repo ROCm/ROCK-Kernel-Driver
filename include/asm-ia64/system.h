@@ -217,13 +217,11 @@ extern void ia64_load_extra (struct task_struct *task);
 	 || IS_IA32_PROCESS(ia64_task_regs(t)) || PERFMON_IS_SYSWIDE())
 
 #define __switch_to(prev,next,last) do {							 \
-	struct task_struct *__fpu_owner = ia64_get_fpu_owner();					 \
 	if (IA64_HAS_EXTRA_STATE(prev))								 \
 		ia64_save_extra(prev);								 \
 	if (IA64_HAS_EXTRA_STATE(next))								 \
 		ia64_load_extra(next);								 \
-	ia64_psr(ia64_task_regs(next))->dfh =							 \
-		!(__fpu_owner == (next) && ((next)->thread.last_fph_cpu == smp_processor_id())); \
+	ia64_psr(ia64_task_regs(next))->dfh = !ia64_is_local_fpu_owner(next);			 \
 	(last) = ia64_switch_to((next));							 \
 } while (0)
 
@@ -239,7 +237,6 @@ extern void ia64_load_extra (struct task_struct *task);
 		ia64_psr(ia64_task_regs(prev))->mfh = 0;			\
 		(prev)->thread.flags |= IA64_THREAD_FPH_VALID;			\
 		__ia64_save_fpu((prev)->thread.fph);				\
-		(prev)->thread.last_fph_cpu = smp_processor_id();		\
 	}									\
 	__switch_to(prev, next, last);						\
 } while (0)

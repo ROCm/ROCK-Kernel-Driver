@@ -598,18 +598,13 @@ inline void
 ia64_flush_fph (struct task_struct *task)
 {
 	struct ia64_psr *psr = ia64_psr(ia64_task_regs(task));
-#ifdef CONFIG_SMP
-	struct task_struct *fpu_owner = current;
-#else
-	struct task_struct *fpu_owner = ia64_get_fpu_owner();
-#endif
 
-	if (task == fpu_owner && psr->mfh) {
+	if (ia64_is_local_fpu_owner(task) && psr->mfh) {
 		psr->mfh = 0;
-		ia64_save_fpu(&task->thread.fph[0]);
 		task->thread.flags |= IA64_THREAD_FPH_VALID;
-		task->thread.last_fph_cpu = smp_processor_id();
+		ia64_save_fpu(&task->thread.fph[0]);
 	}
+	ia64_drop_fpu(task);
 }
 
 /*
@@ -628,11 +623,8 @@ ia64_sync_fph (struct task_struct *task)
 	ia64_flush_fph(task);
 	if (!(task->thread.flags & IA64_THREAD_FPH_VALID)) {
 		task->thread.flags |= IA64_THREAD_FPH_VALID;
-		task->thread.last_fph_cpu = -1;		/* force reload */
 		memset(&task->thread.fph, 0, sizeof(task->thread.fph));
 	}
-	if (ia64_get_fpu_owner() == task)
-		ia64_set_fpu_owner(0);
 	psr->dfh = 1;
 }
 
