@@ -667,7 +667,7 @@ static snd_pcm_uframes_t snd_emu10k1_fx8010_playback_pointer(snd_pcm_substream_t
 	pcm->hw_io = ptr;
 	pcm->hw_ready -= frames;
 	pcm->sw_io += frames;
-	if (pcm->sw_io > runtime->buffer_size)
+	if (pcm->sw_io >= runtime->buffer_size)
 		pcm->sw_io -= runtime->buffer_size;
 	snd_emu10k1_fx8010_playback_transfer(substream);
 	return pcm->sw_io;
