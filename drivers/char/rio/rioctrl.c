@@ -764,7 +764,7 @@ RIO_DEBUG_CTRL, 				if (su)
 							PortP->Config &= ~RIO_WAITDRAIN;
 					 	}
 					 /*
-					 ** Store setings if locking or unlocking port or if the
+					 ** Store settings if locking or unlocking port or if the
 					 ** port is not locked, when setting the store option.
 					 */
 					 if (PortP->Mapped &&

@@ -198,7 +198,7 @@
  * Architecture : 
  * This driver is built around a Linux queue of commands waiting to 
  * be executed, and a shared Linux/NCR array of commands to start.  Commands
- * are transfered to the array  by the run_process_issue_queue() function 
+ * are transferred to the array  by the run_process_issue_queue() function 
  * which is called whenever a command completes.
  *
  * As commands are completed, the interrupt routine is triggered,
@@ -1077,19 +1077,18 @@ NCR53c7x0_init (struct Scsi_Host *host) {
     {
 	printk("scsi%d : IRQ%d not free, detaching\n",
 		host->host_no, host->irq);
-	scsi_unregister (host);
-	return -1;
+	goto err_unregister;
     } 
 
     if ((hostdata->run_tests && hostdata->run_tests(host) == -1) ||
         (hostdata->options & OPTION_DEBUG_TESTS_ONLY)) {
     	/* XXX Should disable interrupts, etc. here */
-	scsi_unregister (host);
-    	return -1;
+	goto err_free_irq;
     } else {
 	if (host->io_port)  {
 	    host->n_io_port = 128;
-	    request_region (host->io_port, host->n_io_port, "ncr53c7xx");
+	    if (!request_region (host->io_port, host->n_io_port, "ncr53c7xx"))
+		goto err_free_irq;
 	}
     }
     
@@ -1098,6 +1097,12 @@ NCR53c7x0_init (struct Scsi_Host *host) {
 	hard_reset (host);
     }
     return 0;
+
+ err_free_irq:
+    free_irq(host->irq,  NCR53c7x0_intr);
+ err_unregister:
+    scsi_unregister(host);
+    return -1;
 }
 
 /* 
@@ -1206,8 +1211,11 @@ ncr53c7xx_init (Scsi_Host_Template *tpnt, int board, int chip,
     size += 256;
 #endif
     /* Size should be < 8K, so we can fit it in two pages. */
-    if (size > 8192)
-      panic("53c7xx: hostdata > 8K");
+    if (size > 8192) {
+      printk(KERN_ERR "53c7xx: hostdata > 8K\n");
+      return -1;
+    }
+
     instance = scsi_register (tpnt, 4);
     if (!instance)
     {
@@ -3091,8 +3099,10 @@ allocate_cmd (Scsi_Cmnd *cmd) {
 #endif
 /* FIXME: for ISA bus '7xx chips, we need to or GFP_DMA in here */
 
-        if (size > 4096)
-            panic ("53c7xx: allocate_cmd size > 4K");
+        if (size > 4096) {
+            printk (KERN_ERR "53c7xx: allocate_cmd size > 4K\n");
+	    return NULL;
+	}
         real = get_free_page(GFP_ATOMIC);
         if (real == 0)
         	return NULL;
@@ -3272,7 +3282,7 @@ create_cmd (Scsi_Cmnd *cmd) {
 
     /*
      * The saved data pointer is set up so that a RESTORE POINTERS message 
-     * will start the data transfer over at the begining.
+     * will start the data transfer over at the beginning.
      */
 
     tmp->saved_data_pointer = virt_to_bus (hostdata->script) + 
@@ -4965,7 +4975,7 @@ intr_dma (struct Scsi_Host *host, struct NCR53c7x0_cmd *cmd) {
      * chances of this happening, and handle it if it occurs anyway.
      *
      * Simply continue with what we were doing, and control should
-     * be transfered to the schedule routine which will ultimately
+     * be transferred to the schedule routine which will ultimately
      * pass control onto the reselection or selection (not yet)
      * code.
      */

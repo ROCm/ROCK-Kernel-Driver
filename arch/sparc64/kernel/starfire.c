@@ -2,7 +2,7 @@
  * starfire.c: Starfire/E10000 support.
  *
  * Copyright (C) 1998 David S. Miller (davem@redhat.com)
- * Copyright (C) 2000 Anton Blanchard (anton@linuxcare.com)
+ * Copyright (C) 2000 Anton Blanchard (anton@samba.org)
  */
 
 #include <linux/kernel.h>

@@ -2,7 +2,7 @@
  *  linux/arch/sparc/kernel/setup.c
  *
  *  Copyright (C) 1995  David S. Miller (davem@caip.rutgers.edu)
- *  Copyright (C) 2000  Anton Blanchard (anton@linuxcare.com)
+ *  Copyright (C) 2000  Anton Blanchard (anton@samba.org)
  */
 
 #include <linux/errno.h>

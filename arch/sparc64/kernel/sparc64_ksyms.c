@@ -1,4 +1,4 @@
-/* $Id: sparc64_ksyms.c,v 1.104 2001/04/05 11:08:11 davem Exp $
+/* $Id: sparc64_ksyms.c,v 1.105 2001/04/14 01:12:02 davem Exp $
  * arch/sparc64/kernel/sparc64_ksyms.c: Sparc64 specific ksyms support.
  *
  * Copyright (C) 1996 David S. Miller (davem@caip.rutgers.edu)
@@ -159,21 +159,16 @@ EXPORT_SYMBOL(__down_interruptible);
 EXPORT_SYMBOL(__down_trylock);
 EXPORT_SYMBOL(__up);
 
-/* rw semaphores */
-EXPORT_SYMBOL_NOVERS(__down_read_failed);
-EXPORT_SYMBOL_NOVERS(__down_write_failed);
-EXPORT_SYMBOL_NOVERS(__rwsem_wake);
-
 /* Atomic counter implementation. */
 EXPORT_SYMBOL(__atomic_add);
 EXPORT_SYMBOL(__atomic_sub);
 
 /* Atomic bit operations. */
-EXPORT_SYMBOL(__test_and_set_bit);
-EXPORT_SYMBOL(__test_and_clear_bit);
-EXPORT_SYMBOL(__test_and_change_bit);
-EXPORT_SYMBOL(__test_and_set_le_bit);
-EXPORT_SYMBOL(__test_and_clear_le_bit);
+EXPORT_SYMBOL(___test_and_set_bit);
+EXPORT_SYMBOL(___test_and_clear_bit);
+EXPORT_SYMBOL(___test_and_change_bit);
+EXPORT_SYMBOL(___test_and_set_le_bit);
+EXPORT_SYMBOL(___test_and_clear_le_bit);
 
 EXPORT_SYMBOL(ivector_table);
 EXPORT_SYMBOL(enable_irq);

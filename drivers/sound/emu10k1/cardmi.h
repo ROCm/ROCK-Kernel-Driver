@@ -34,6 +34,7 @@
 #define _CARDMI_H
 
 #include "icardmid.h"
+#include <linux/sched.h>
 #include <linux/interrupt.h>
 
 typedef enum

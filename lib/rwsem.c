@@ -18,7 +18,7 @@ struct rw_semaphore *rwsem_down_read_failed(struct rw_semaphore *sem)
 	DECLARE_WAITQUEUE(wait,tsk);
 	signed long count;
 
-	rwsemdebug("[%d] Entering rwsem_down_read_failed(%08lx)\n",current->pid,sem->count);
+	rwsemtrace(sem,"Entering rwsem_down_read_failed");
 
 	/* this waitqueue context flag will be cleared when we are granted the lock */
 	__set_bit(RWSEM_WAITING_FOR_READ,&wait.flags);
@@ -28,7 +28,6 @@ struct rw_semaphore *rwsem_down_read_failed(struct rw_semaphore *sem)
 
 	/* note that we're now waiting on the lock, but no longer actively read-locking */
 	count = rwsem_atomic_update(RWSEM_WAITING_BIAS-RWSEM_ACTIVE_BIAS,sem);
-	rwsemdebug("X(%08lx)\n",count);
 
 	/* if there are no longer active locks, wake the front queued process(es) up
 	 * - it might even be this process, since the waker takes a more active part
@@ -47,8 +46,7 @@ struct rw_semaphore *rwsem_down_read_failed(struct rw_semaphore *sem)
 	remove_wait_queue(&sem->wait,&wait);
 	tsk->state = TASK_RUNNING;
 
-	rwsemdebug("[%d] Leaving rwsem_down_read_failed(%08lx)\n",current->pid,sem->count);
-
+	rwsemtrace(sem,"Leaving rwsem_down_read_failed");
 	return sem;
 }
 
@@ -61,7 +59,7 @@ struct rw_semaphore *rwsem_down_write_failed(struct rw_semaphore *sem)
 	DECLARE_WAITQUEUE(wait,tsk);
 	signed long count;
 
-	rwsemdebug("[%d] Entering rwsem_down_write_failed(%08lx)\n",current->pid,sem->count);
+	rwsemtrace(sem,"Entering rwsem_down_write_failed");
 
 	/* this waitqueue context flag will be cleared when we are granted the lock */
 	__set_bit(RWSEM_WAITING_FOR_WRITE,&wait.flags);
@@ -71,7 +69,6 @@ struct rw_semaphore *rwsem_down_write_failed(struct rw_semaphore *sem)
 
 	/* note that we're waiting on the lock, but no longer actively locking */
 	count = rwsem_atomic_update(-RWSEM_ACTIVE_BIAS,sem);
-	rwsemdebug("[%d] updated(%08lx)\n",current->pid,count);
 
 	/* if there are no longer active locks, wake the front queued process(es) up
 	 * - it might even be this process, since the waker takes a more active part
@@ -90,8 +87,7 @@ struct rw_semaphore *rwsem_down_write_failed(struct rw_semaphore *sem)
 	remove_wait_queue(&sem->wait,&wait);
 	tsk->state = TASK_RUNNING;
 
-	rwsemdebug("[%d] Leaving rwsem_down_write_failed(%08lx)\n",current->pid,sem->count);
-
+	rwsemtrace(sem,"Leaving rwsem_down_write_failed");
 	return sem;
 }
 
@@ -106,7 +102,7 @@ struct rw_semaphore *rwsem_wake(struct rw_semaphore *sem)
 	signed long count;
 	int woken;
 
-	rwsemdebug("[%d] Entering rwsem_wake(%08lx)\n",current->pid,sem->count);
+	rwsemtrace(sem,"Entering rwsem_wake");
 
  try_again:
 	/* try to grab an 'activity' marker
@@ -115,7 +111,7 @@ struct rw_semaphore *rwsem_wake(struct rw_semaphore *sem)
 	 * - be horribly naughty, and only deal with the LSW of the atomic counter
 	 */
 	if (rwsem_cmpxchgw(sem,0,RWSEM_ACTIVE_BIAS)!=0) {
-		rwsemdebug("[%d] rwsem_wake: abort wakeup due to renewed activity\n",current->pid);
+		rwsemtrace(sem,"rwsem_wake: abort wakeup due to renewed activity");
 		goto out;
 	}
 
@@ -139,13 +135,13 @@ struct rw_semaphore *rwsem_wake(struct rw_semaphore *sem)
 	rwsem_atomic_update(woken,sem);
 
  out:
-	rwsemdebug("[%d] Leaving rwsem_wake(%08lx)\n",current->pid,sem->count);
+	rwsemtrace(sem,"Leaving rwsem_wake");
 	return sem;
 
 	/* come here if we need to correct the counter for odd SMP-isms */
  counter_correction:
 	count = rwsem_atomic_update(-RWSEM_ACTIVE_BIAS,sem);
-	rwsemdebug("[%d] corrected(%08lx)\n",current->pid,count);
+	rwsemtrace(sem,"corrected count");
 	if (!(count & RWSEM_ACTIVE_MASK))
 		goto try_again;
 	goto out;

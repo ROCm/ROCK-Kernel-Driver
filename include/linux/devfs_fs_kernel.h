@@ -96,7 +96,6 @@ extern void devfs_register_series (devfs_handle_t dir, const char *format,
 				   unsigned int minor_start,
 				   umode_t mode, void *ops, void *info);
 
-extern int init_devfs_fs (void);
 extern void mount_devfs_fs (void);
 extern void devfs_make_root (const char *name);
 #else  /*  CONFIG_DEVFS_FS  */
@@ -233,10 +232,6 @@ static inline void devfs_register_series (devfs_handle_t dir,
     return;
 }
 
-static inline int init_devfs_fs (void)
-{
-    return 0;
-}
 static inline void mount_devfs_fs (void)
 {
     return;

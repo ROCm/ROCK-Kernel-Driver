@@ -18,8 +18,6 @@
 
 #ifdef __KERNEL__
 
-#define CONFIG_USING_SPINLOCK_BASED_RWSEM 1
-
 /*
  * the semaphore definition
  */

@@ -93,7 +93,7 @@ if [ "$CONFIG_SOUND_OSS" = "y" -o "$CONFIG_SOUND_OSS" = "m" ]; then
    fi
    dep_tristate '    Aztech Sound Galaxy (non-PnP) cards' CONFIG_SOUND_SGALAXY $CONFIG_SOUND_OSS
    dep_tristate '    Adlib Cards' CONFIG_SOUND_ADLIB $CONFIG_SOUND_OSS
-   dep_tristate '    ACI mixer (miroPCM12)' CONFIG_SOUND_ACI_MIXER $CONFIG_SOUND_OSS
+   dep_tristate '    ACI mixer (miroSOUND PCM1-pro/PCM12/PCM20)' CONFIG_SOUND_ACI_MIXER $CONFIG_SOUND_OSS
    dep_tristate '    Crystal CS4232 based (PnP) cards' CONFIG_SOUND_CS4232 $CONFIG_SOUND_OSS
    dep_tristate '    Ensoniq SoundScape support' CONFIG_SOUND_SSCAPE $CONFIG_SOUND_OSS
    dep_tristate '    Gravis Ultrasound support' CONFIG_SOUND_GUS $CONFIG_SOUND_OSS
@@ -171,8 +171,10 @@ if [ "$CONFIG_SOUND_OSS" = "y" -o "$CONFIG_SOUND_OSS" = "m" ]; then
    fi
 	 
    if [ "$CONFIG_ARM" = "y" ]; then
-      dep_tristate '    VIDC 16-bit sound' CONFIG_SOUND_VIDC $CONFIG_SOUND_OSS
-      dep_tristate '    Netwinder WaveArtist' CONFIG_SOUND_WAVEARTIST $CONFIG_SOUND_OSS
+      if [ "$CONFIG_ARCH_ACORN" = "y" -o "$CONFIG_ARCH_CLPS7500" = "y" ]; then
+         dep_tristate '    VIDC 16-bit sound' CONFIG_SOUND_VIDC $CONFIG_SOUND_OSS
+      fi
+      dep_tristate '    Netwinder WaveArtist' CONFIG_SOUND_WAVEARTIST $CONFIG_SOUND_OSS $CONFIG_ARCH_NETWINDER
    fi
 
 fi

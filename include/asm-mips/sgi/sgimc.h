@@ -200,7 +200,7 @@ struct sgimc_dma_ctrl {
 	u32 _unused7;
 	volatile u32 dmamode;     /* DMA mode config bit settings */
 	u32 _unused8;
-	volatile u32 dmacount;    /* Zoom and byte count for DMA */
+	volatile u32 dmaccount;    /* Zoom and byte count for DMA */
 	u32 _unused9;
 	volatile u32 dmastart;    /* Pedal to the metal. */
 	u32 _unused10;

@@ -1,16 +1,13 @@
-/* $Id: bootinfo.h,v 1.11 2000/03/06 11:14:32 raiko Exp $
- *
- * bootinfo.h -- Definition of the Linux/MIPS boot information structure
- *
- * Copyright (C) 1995, 1996 by Ralf Baechle, Andreas Busse,
- *                             Stoned Elipot and Paul M. Antoine.
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file COPYING in the main directory of this archive
  * for more details.
+ *
+ * Copyright (C) 1995, 1996 by Ralf Baechle, Andreas Busse,
+ *                             Stoned Elipot and Paul M. Antoine.
  */
-#ifndef __ASM_MIPS_BOOTINFO_H
-#define __ASM_MIPS_BOOTINFO_H
+#ifndef _ASM_BOOTINFO_H
+#define _ASM_BOOTINFO_H
 
 /*
  * Values for machgroup
@@ -105,8 +102,9 @@
  * Valid machtype for group NEC DDB
  */
 #define MACH_NEC_DDB5074	 0	/* NEC DDB Vrc-5074 */
+#define MACH_NEC_DDB5476         1      /* NEC DDB Vrc-5476 */
 
-#define GROUP_NEC_DDB_NAMES { "Vrc-5074" }
+#define GROUP_NEC_DDB_NAMES { "Vrc-5074", "Vrc-5476"}
 
 /*
  * Valid machtype for group BAGET

@@ -23,7 +23,7 @@ if [ "$CONFIG_RADIO_GEMTEK" = "y" ]; then
 fi
 dep_tristate '  Guillemot MAXI Radio FM 2000 radio' CONFIG_RADIO_MAXIRADIO $CONFIG_VIDEO_DEV
 dep_tristate '  Maestro on board radio' CONFIG_RADIO_MAESTRO $CONFIG_VIDEO_DEV
-dep_tristate '  Miro PCM20 Radio' CONFIG_RADIO_MIROPCM20 $CONFIG_VIDEO_DEV
+dep_tristate '  miroSOUND PCM20 radio' CONFIG_RADIO_MIROPCM20 $CONFIG_VIDEO_DEV $CONFIG_SOUND_ACI_MIXER
 dep_tristate '  SF16FMI Radio' CONFIG_RADIO_SF16FMI $CONFIG_VIDEO_DEV
 if [ "$CONFIG_RADIO_SF16FMI" = "y" ]; then
    hex '    SF16FMI I/O port (0x284 or 0x384)' CONFIG_RADIO_SF16FMI_PORT 284

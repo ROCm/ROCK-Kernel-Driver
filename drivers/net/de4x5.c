@@ -429,11 +429,17 @@
                            <mporter@eng.mcd.mot.com>
                           Remove double checking for DEBUG_RX in de4x5_dbg_rx()
 			   from report by <geert@linux-m68k.org>
- 
+      0.546  22-Feb-01    Fixes Alpha XP1000 oops.  The srom_search function
+                           was causing a page fault when initializing the
+                           variable 'pb', on a non de4x5 PCI device, in this
+                           case a PCI bridge (DEC chip 21152). The value of
+                           'pb' is now only initialized if a de4x5 chip is
+                           present. 
+                           <france@handhelds.org>  
     =========================================================================
 */
 
-static const char *version = "de4x5.c:V0.545 1999/11/28 davies@maniac.ultranet.com\n";
+static const char *version = "de4x5.c:V0.546 2001/02/22 davies@maniac.ultranet.com\n";
 
 #include <linux/config.h>
 #include <linux/module.h>
@@ -2304,12 +2310,12 @@ srom_search(struct pci_dev *dev)
 	/* Skip the pci_bus list entry */
 	if (list_entry(walk, struct pci_bus, devices) == dev->bus) continue;
 
-	pb = this_dev->bus->number;
 	vendor = this_dev->vendor;
 	device = this_dev->device << 8;
 	if (!(is_DC21040 || is_DC21041 || is_DC21140 || is_DC2114x)) continue;
 
 	/* Get the chip configuration revision register */
+	pb = this_dev->bus->number;
 	pcibios_read_config_dword(pb, this_dev->devfn, PCI_REVISION_ID, &cfrv);
 
 	/* Set the device number information */

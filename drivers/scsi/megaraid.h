@@ -27,7 +27,7 @@
 #define M_RD_IOCTL_CMD_NEW		0x81
 #define M_RD_DRIVER_IOCTL_INTERFACE	0x82
 
-#define MEGARAID_VERSION "v1.14g (Release Date: Feb 5, 2001; 11:42)"
+#define MEGARAID_VERSION "v1.14g-ac2 (Release Date: Mar 22, 2001; 19:34:02)"
 #define MEGARAID_IOCTL_VERSION 	114
 
 /* Methods */

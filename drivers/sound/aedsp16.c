@@ -257,9 +257,9 @@
 
 #define VERSION "1.3"		/* Version of Audio Excel DSP 16 driver */
 
-#undef	AEDSP16_DEBUG 1		/* Define this to enable debug code     */
-#undef	AEDSP16_DEBUG_MORE 1	/* Define this to enable more debug     */
-#undef	AEDSP16_INFO  1		/* Define this to enable info code      */
+#undef	AEDSP16_DEBUG 		/* Define this to 1 to enable debug code     */
+#undef	AEDSP16_DEBUG_MORE 	/* Define this to 1 to enable more debug     */
+#undef	AEDSP16_INFO 		/* Define this to 1 to enable info code      */
 
 #if defined(AEDSP16_DEBUG)
 # define DBG(x)  printk x

@@ -59,11 +59,6 @@
 #define _PAGE_FOW	0x0004	/* used for page protection (fault on write) */
 #define _PAGE_FOE	0x0008	/* used for page protection (fault on exec) */
 #define _PAGE_ASM	0x0010
-#if defined(CONFIG_ALPHA_EV6) && !defined(CONFIG_SMP)
-#define _PAGE_MBE	0x0080	/* MB disable bit for EV6.  */
-#else
-#define _PAGE_MBE	0x0000
-#endif
 #define _PAGE_KRE	0x0100	/* xxx - see below on the "accessed" bit */
 #define _PAGE_URE	0x0200	/* xxx */
 #define _PAGE_KWE	0x1000	/* used to do the dirty bit in software */
@@ -90,20 +85,19 @@
 #define _PFN_MASK	0xFFFFFFFF00000000
 
 #define _PAGE_TABLE	(_PAGE_VALID | __DIRTY_BITS | __ACCESS_BITS)
-#define _PAGE_CHG_MASK	(_PFN_MASK | __DIRTY_BITS | __ACCESS_BITS | _PAGE_MBE)
+#define _PAGE_CHG_MASK	(_PFN_MASK | __DIRTY_BITS | __ACCESS_BITS)
 
 /*
- * All the normal masks have the "page accessed" bits on, as any time they
- * are used, the page is accessed.  They are cleared only by the page-out
- * routines. 
+ * All the normal masks have the "page accessed" bits on, as any time they are used,
+ * the page is accessed. They are cleared only by the page-out routines
  */
 #define PAGE_NONE	__pgprot(_PAGE_VALID | __ACCESS_BITS | _PAGE_FOR | _PAGE_FOW | _PAGE_FOE)
 #define PAGE_SHARED	__pgprot(_PAGE_VALID | __ACCESS_BITS)
 #define PAGE_COPY	__pgprot(_PAGE_VALID | __ACCESS_BITS | _PAGE_FOW)
 #define PAGE_READONLY	__pgprot(_PAGE_VALID | __ACCESS_BITS | _PAGE_FOW)
-#define PAGE_KERNEL	__pgprot(_PAGE_VALID | _PAGE_ASM | _PAGE_KRE | _PAGE_KWE | _PAGE_MBE)
+#define PAGE_KERNEL	__pgprot(_PAGE_VALID | _PAGE_ASM | _PAGE_KRE | _PAGE_KWE)
 
-#define _PAGE_NORMAL(x) __pgprot(_PAGE_VALID | __ACCESS_BITS | _PAGE_MBE | (x))
+#define _PAGE_NORMAL(x) __pgprot(_PAGE_VALID | __ACCESS_BITS | (x))
 
 #define _PAGE_P(x) _PAGE_NORMAL((x) | (((x) & _PAGE_FOW)?0:_PAGE_FOW))
 #define _PAGE_S(x) _PAGE_NORMAL(x)
@@ -195,7 +189,6 @@ extern unsigned long __zero_page(void);
  * Conversion functions:  convert a page and protection to a page entry,
  * and a page entry and page directory to the page they refer to.
  */
-
 #define mk_pte(page, pgprot)						\
 ({									\
 	pte_t pte;							\
@@ -206,7 +199,7 @@ extern unsigned long __zero_page(void);
 })
 
 extern inline pte_t mk_pte_phys(unsigned long physpage, pgprot_t pgprot)
-{ pte_t pte; pte_val(pte) = (PHYS_TWIDDLE(physpage) << (32-PAGE_SHIFT)) | (pgprot_val(pgprot) & ~_PAGE_MBE); return pte; }
+{ pte_t pte; pte_val(pte) = (PHYS_TWIDDLE(physpage) << (32-PAGE_SHIFT)) | pgprot_val(pgprot); return pte; }
 
 extern inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 { pte_val(pte) = (pte_val(pte) & _PAGE_CHG_MASK) | pgprot_val(newprot); return pte; }

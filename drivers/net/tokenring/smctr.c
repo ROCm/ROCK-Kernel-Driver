@@ -5269,7 +5269,7 @@ static int smctr_set_phy_drop(struct net_device *dev, MAC_SUB_VECTOR *rsv)
         return (POSITIVE_ACK);
 }
 
-/* Reset the ring speed to the oposite of what it was. This auto-pilot
+/* Reset the ring speed to the opposite of what it was. This auto-pilot
  * mode requires a complete reset and re-init of the adapter.
  */
 static int smctr_set_ring_speed(struct net_device *dev)

@@ -1,10 +1,10 @@
-/*  $Id: init.c,v 1.97 2001/02/26 02:57:34 anton Exp $
+/*  $Id: init.c,v 1.96 2000/11/30 08:51:50 anton Exp $
  *  linux/arch/sparc/mm/init.c
  *
  *  Copyright (C) 1995 David S. Miller (davem@caip.rutgers.edu)
  *  Copyright (C) 1995 Eddie C. Dost (ecd@skynet.be)
  *  Copyright (C) 1998 Jakub Jelinek (jj@sunsite.mff.cuni.cz)
- *  Copyright (C) 2000 Anton Blanchard (anton@linuxcare.com.au)
+ *  Copyright (C) 2000 Anton Blanchard (anton@samba.org)
  */
 
 #include <linux/config.h>

@@ -176,6 +176,7 @@ restart_scan:
 		preferred = 0;
 		goto restart_scan;
 	}
+	return NULL;
 found:
 	if (start >= eidx)
 		BUG();
@@ -316,7 +317,8 @@ void * __init __alloc_bootmem (unsigned long size, unsigned long align, unsigned
 	/*
 	 * Whoops, we cannot satisfy the allocation request.
 	 */
-	BUG();
+	printk(KERN_ALERT "bootmem alloc of %lu bytes failed!\n", size);
+	panic("Out of memory");
 	return NULL;
 }
 

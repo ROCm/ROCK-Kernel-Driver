@@ -23,6 +23,8 @@ define_bool CONFIG_ISA n
 define_bool CONFIG_EISA n
 define_bool CONFIG_MCA n
 define_bool CONFIG_SBUS n
+define_bool CONFIG_RWSEM_GENERIC_SPINLOCK y
+define_bool CONFIG_RWSEM_XCHGADD_ALGORITHM n
 
 choice 'IA-64 processor type' \
 	"Itanium			CONFIG_ITANIUM \

@@ -380,7 +380,7 @@ inline	struct  key * get_rkey  (
     /* Parent at the path is not in the tree now. */
     if ( ! B_IS_IN_TREE(p_s_parent = PATH_OFFSET_PBUFFER(p_s_chk_path, n_path_offset)) )
       return &MIN_KEY;
-    /* Check whether position in the parrent is correct. */
+    /* Check whether position in the parent is correct. */
     if ( (n_position = PATH_OFFSET_POSITION(p_s_chk_path, n_path_offset)) > B_NR_ITEMS(p_s_parent) )
       return &MIN_KEY;
     /* Check whether parent at the path really points to the child. */

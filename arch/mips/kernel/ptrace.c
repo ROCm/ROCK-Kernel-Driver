@@ -1,14 +1,16 @@
-/* $Id: ptrace.c,v 1.17 1999/09/28 22:25:47 ralf Exp $
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
  * Copyright (C) 1992 Ross Biro
  * Copyright (C) Linus Torvalds
- * Copyright (C) 1994, 1995, 1996, 1997, 1998 Ralf Baechle
+ * Copyright (C) 1994, 95, 96, 97, 98, 2000 Ralf Baechle
  * Copyright (C) 1996 David S. Miller
+ * Kevin D. Kissell, kevink@mips.com and Carsten Langgaard, carstenl@mips.com
+ * Copyright (C) 1999 MIPS Technologies, Inc.
  */
+#include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/mm.h>
@@ -24,6 +26,8 @@
 #include <asm/page.h>
 #include <asm/system.h>
 #include <asm/uaccess.h>
+#include <asm/bootinfo.h>
+#include <asm/cpu.h>
 
 asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 {
@@ -131,13 +135,22 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 			break;
 		case FPR_BASE ... FPR_BASE + 31:
 			if (child->used_math) {
+			        unsigned long long *fregs
+					= (unsigned long long *)
+					    &child->thread.fpu.hard.fp_regs[0];
+#ifdef CONFIG_MIPS_FPU_EMULATOR
+			    if(!(mips_cpu.options & MIPS_CPU_FPU)) {
+				    fregs = (unsigned long long *)
+					&child->thread.fpu.soft.regs[0];
+			    } else 
+#endif
 				if (last_task_used_math == child) {
 					enable_cp1();
 					save_fp(child);
 					disable_cp1();
 					last_task_used_math = NULL;
 				}
-				tmp = child->thread.fpu.hard.fp_regs[addr - 32];
+				tmp = (unsigned long) fregs[(addr - 32)];
 			} else {
 				tmp = -1;	/* FP not yet used  */
 			}
@@ -158,6 +171,11 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 			tmp = regs->lo;
 			break;
 		case FPC_CSR:
+#ifdef CONFIG_MIPS_FPU_EMULATOR
+			if(!(mips_cpu.options & MIPS_CPU_FPU))
+				tmp = child->thread.fpu.soft.sr;
+			else
+#endif
 			tmp = child->thread.fpu.hard.control;
 			break;
 		case FPC_EIR: {	/* implementation / version register */
@@ -198,9 +216,17 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 			regs->regs[addr] = data;
 			break;
 		case FPR_BASE ... FPR_BASE + 31: {
-			unsigned int *fregs;
+			unsigned long long *fregs;
+			fregs = (unsigned long long *)&child->thread.fpu.hard.fp_regs[0];
 			if (child->used_math) {
-				if (last_task_used_math == child) {
+				if (last_task_used_math == child)
+#ifdef CONFIG_MIPS_FPU_EMULATOR
+				    if(!(mips_cpu.options & MIPS_CPU_FPU)) {
+					fregs = (unsigned long long *)
+					    &child->thread.fpu.soft.regs[0];
+				    } else
+#endif
+				{
 					enable_cp1();
 					save_fp(child);
 					disable_cp1();
@@ -213,7 +239,6 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 				       sizeof(child->thread.fpu.hard));
 				child->thread.fpu.hard.control = 0;
 			}
-			fregs = child->thread.fpu.hard.fp_regs;
 			fregs[addr - FPR_BASE] = data;
 			break;
 		}
@@ -227,6 +252,11 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 			regs->lo = data;
 			break;
 		case FPC_CSR:
+#ifdef CONFIG_MIPS_FPU_EMULATOR
+			if(!(mips_cpu.options & MIPS_CPU_FPU)) 
+				child->thread.fpu.soft.sr = data;
+			else
+#endif
 			child->thread.fpu.hard.control = data;
 			break;
 		default:

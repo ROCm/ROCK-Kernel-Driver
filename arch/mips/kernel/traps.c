@@ -7,6 +7,9 @@
  * Modified for R3000 by Paul M. Antoine, 1995, 1996
  * Complete output from die() by Ulf Carlsson, 1998
  * Copyright (C) 1999 Silicon Graphics, Inc.
+ *
+ * Kevin D. Kissell, kevink@mips.com and Carsten Langgaard, carstenl@mips.com
+ * Copyright (C) 2000 MIPS Technologies, Inc.  All rights reserved.
  */
 #include <linux/config.h>
 #include <linux/init.h>
@@ -16,12 +19,15 @@
 #include <linux/smp_lock.h>
 #include <linux/spinlock.h>
 
+#include <asm/bootinfo.h>
 #include <asm/branch.h>
+#include <asm/cpu.h>
 #include <asm/cachectl.h>
+#include <asm/inst.h>
 #include <asm/jazz.h>
 #include <asm/pgtable.h>
 #include <asm/io.h>
-#include <asm/bootinfo.h>
+#include <asm/siginfo.h>
 #include <asm/watch.h>
 #include <asm/system.h>
 #include <asm/uaccess.h>
@@ -51,13 +57,15 @@ extern asmlinkage void handle_ov(void);
 extern asmlinkage void handle_tr(void);
 extern asmlinkage void handle_fpe(void);
 extern asmlinkage void handle_watch(void);
+extern asmlinkage void handle_mcheck(void);
 extern asmlinkage void handle_reserved(void);
+
+extern int fpu_emulator_cop1Handler(int, struct pt_regs *);
 
 static char *cpu_names[] = CPU_NAMES;
 
 char watch_available = 0;
 char dedicated_iv_available = 0;
-char vce_available = 0;
 
 void (*ibe_board_handler)(struct pt_regs *regs);
 void (*dbe_board_handler)(struct pt_regs *regs);
@@ -308,9 +316,11 @@ int unregister_fpe(void (*handler)(struct pt_regs *regs, unsigned int fcr31))
  */
 void do_fpe(struct pt_regs *regs, unsigned long fcr31)
 {
-	unsigned long pc;
-	unsigned int insn;
-	extern void simfp(unsigned int);
+
+#ifdef CONFIG_MIPS_FPU_EMULATOR
+	if(!(mips_cpu.options & MIPS_CPU_FPU))
+		panic("Floating Point Exception with No FPU");
+#endif
 
 #ifdef CONFIG_MIPS_FPE_MODULE
 	if (fpe_handler != NULL) {
@@ -318,12 +328,52 @@ void do_fpe(struct pt_regs *regs, unsigned long fcr31)
 		return;
 	}
 #endif
-	if (fcr31 & 0x20000) {
+
+	if (fcr31 & FPU_CSR_UNI_X) {
+#ifdef CONFIG_MIPS_FPU_EMULATOR
+		extern void save_fp(struct task_struct *);
+		extern void restore_fp(struct task_struct *);
+		int sig;
+		/*
+	 	 * Unimplemented operation exception.  If we've got the
+	 	 * Full software emulator on-board, let's use it...
+		 *
+		 * Force FPU to dump state into task/thread context.
+		 * We're moving a lot of data here for what is probably
+		 * a single instruction, but the alternative is to 
+		 * pre-decode the FP register operands before invoking
+		 * the emulator, which seems a bit extreme for what
+		 * should be an infrequent event.
+		 */
+		save_fp(current);
+	
+		/* Run the emulator */
+		sig = fpu_emulator_cop1Handler(0, regs);
+
+		/* 
+		 * We can't allow the emulated instruction to leave the
+		 * Unimplemented Operation bit set in the FCR31 fp-register.
+		 */
+		current->thread.fpu.soft.sr &= ~FPU_CSR_UNI_X;
+
+		/* Restore the hardware register state */
+		restore_fp(current);
+
+		/* If something went wrong, signal */
+		if (sig)
+			force_sig(sig, current);
+#else
+		/* Else use mini-emulator */
+
+		extern void simfp(int);
+		unsigned long pc;
+		unsigned int insn;
+
 		/* Retry instruction with flush to zero ...  */
 		if (!(fcr31 & (1<<24))) {
 			printk("Setting flush to zero for %s.\n",
 			       current->comm);
-			fcr31 &= ~0x20000;
+			fcr31 &= ~FPU_CSR_UNI_X;
 			fcr31 |= (1<<24);
 			__asm__ __volatile__(
 				"ctc1\t%0,$31"
@@ -332,20 +382,26 @@ void do_fpe(struct pt_regs *regs, unsigned long fcr31)
 			return;
 		}
 		pc = regs->cp0_epc + ((regs->cp0_cause & CAUSEF_BD) ? 4 : 0);
-		if (get_user(insn, (unsigned int *)pc)) {
+		if(pc & 0x80000000) insn = *(unsigned int *)pc;
+		else if (get_user(insn, (unsigned int *)pc)) {
 			/* XXX Can this happen?  */
 			force_sig(SIGSEGV, current);
 		}
 
 		printk(KERN_DEBUG "Unimplemented exception for insn %08x at 0x%08lx in %s.\n",
 		       insn, regs->cp0_epc, current->comm);
-		simfp(insn);
+		simfp(MIPSInst(insn));
+		compute_return_epc(regs);
+#endif /* CONFIG_MIPS_FPU_EMULATOR */
+
+		return;
 	}
 
 	if (compute_return_epc(regs))
 		return;
-	//force_sig(SIGFPE, current);
-	printk(KERN_DEBUG "Should send SIGFPE to %s\n", current->comm);
+
+	force_sig(SIGFPE, current);
+	printk(KERN_DEBUG "Sent send SIGFPE to %s\n", current->comm);
 }
 
 static inline int get_insn_opcode(struct pt_regs *regs, unsigned int *opcode)
@@ -382,12 +438,28 @@ void do_bp(struct pt_regs *regs)
 	 * (A short test says that IRIX 5.3 sends SIGTRAP for all break
 	 * insns, even for break codes that indicate arithmetic failures.
 	 * Weird ...)
+	 * But should we continue the brokenness???  --macro
 	 */
-	force_sig(SIGTRAP, current);
+	switch (bcode) {
+	case 6:
+	case 7:
+		if (bcode == 7)
+			info.si_code = FPE_INTDIV;
+		else
+			info.si_code = FPE_INTOVF;
+		info.si_signo = SIGFPE;
+		info.si_errno = 0;
+		info.si_addr = (void *)compute_return_epc(regs);
+		force_sig_info(SIGFPE, &info, current);
+		break;
+	default:
+		force_sig(SIGTRAP, current);
+	}
 }
 
 void do_tr(struct pt_regs *regs)
 {
+	siginfo_t info;
 	unsigned int opcode, bcode;
 
 	if (get_insn_opcode(regs, &opcode))
@@ -398,8 +470,23 @@ void do_tr(struct pt_regs *regs)
 	 * (A short test says that IRIX 5.3 sends SIGTRAP for all break
 	 * insns, even for break codes that indicate arithmetic failures.
 	 * Weird ...)
+	 * But should we continue the brokenness???  --macro
 	 */
-	force_sig(SIGTRAP, current);
+	switch (bcode) {
+	case 6:
+	case 7:
+		if (bcode == 7)
+			info.si_code = FPE_INTDIV;
+		else
+			info.si_code = FPE_INTOVF;
+		info.si_signo = SIGFPE;
+		info.si_errno = 0;
+		info.si_addr = (void *)compute_return_epc(regs);
+		force_sig_info(SIGFPE, &info, current);
+		break;
+	default:
+		force_sig(SIGTRAP, current);
+	}
 }
 
 #if !defined(CONFIG_CPU_HAS_LLSC)
@@ -520,10 +607,32 @@ void do_cpu(struct pt_regs *regs)
 	unsigned int cpid;
 	extern void lazy_fpu_switch(void*);
 	extern void init_fpu(void);
-
+#ifdef CONFIG_MIPS_FPU_EMULATOR
+	void fpu_emulator_init_fpu(void);
+	int sig;
+#endif
 	cpid = (regs->cp0_cause >> CAUSEB_CE) & 3;
 	if (cpid != 1)
 		goto bad_cid;
+
+#ifdef CONFIG_MIPS_FPU_EMULATOR
+	if(!(mips_cpu.options & MIPS_CPU_FPU)) {
+	    if (last_task_used_math != current) {
+		if(!current->used_math) {
+		    fpu_emulator_init_fpu();
+		    current->used_math = 1;
+		}
+	    }
+	    sig = fpu_emulator_cop1Handler(0, regs);
+	    last_task_used_math = current;
+	    if(sig) {
+		force_sig(sig, current);
+	    }
+	    return;
+	}
+#else
+	if(!(mips_cpu.options & MIPS_CPU_FPU)) goto bad_cid;
+#endif
 
 	regs->cp0_status |= ST0_CU1;
 	if (last_task_used_math == current)

@@ -11002,16 +11002,16 @@ CONFIG_USB_USS720
 USB device file system
 CONFIG_USB_DEVICEFS
   If you say Y here (and to "/proc file system support" below), you
-  will get a file /proc/usb/devices which lists the devices currently
-  connected to your USB busses, a file /proc/usb/drivers which lists
-  the USB kernel client drivers currently loaded, and for every
-  connected device a file named "/proc/usb/xxx/yyy", where xxx is the
-  bus number and yyy the device number; the latter files can be used
-  by user space programs to talk directly to the device. These files
-  are "virtual", meaning they are generated on the fly and not stored
-  on the hard drive.
+  will get a file /proc/bus/usb/devices which lists the devices
+  currently connected to your USB busses, a file /proc/bus/usb/drivers
+  which lists the USB kernel client drivers currently loaded, and for
+  every connected device a file named "/proc/bus/usb/xxx/yyy", where
+  xxx is the bus number and yyy the device number; the latter files
+  can be used by user space programs to talk directly to the device.
+  These files are "virtual", meaning they are generated on the fly
+  and not stored on the hard drive.
   
-  For the format of the /proc/usb/ files, please read
+  For the format of the /proc/bus/usb/ files, please read
   Documentation/usb/proc_usb_info.txt. 
 
   Please note that this code is completely unrelated to devfs, the

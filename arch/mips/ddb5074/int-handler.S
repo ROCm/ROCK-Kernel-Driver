@@ -7,54 +7,50 @@
  *
  *  Copyright (C) 2000 Geert Uytterhoeven <geert@sonycom.com>
  *                     Sony Software Development Center Europe (SDCE), Brussels
- *
- *  $Id: int-handler.S,v 1.1 2000/01/26 00:07:44 ralf Exp $
  */
-
 #include <asm/asm.h>
 #include <asm/mipsregs.h>
 #include <asm/regdef.h>
 #include <asm/stackframe.h>
 
-	/* A lot of complication here is taken away because:
-	 *
-	 * 1) We handle one interrupt and return, sitting in a loop
-	 *    and moving across all the pending IRQ bits in the cause
-	 *    register is _NOT_ the answer, the common case is one
-	 *    pending IRQ so optimize in that direction.
-	 *
-	 * 2) We need not check against bits in the status register
-	 *    IRQ mask, that would make this routine slow as hell.
-	 *
-	 * 3) Linux only thinks in terms of all IRQs on or all IRQs
-	 *    off, nothing in between like BSD spl() brain-damage.
-	 *
-	 * Furthermore, the IRQs on the INDY look basically (barring
-	 * software IRQs which we don't use at all) like:
-	 *
-	 *	MIPS IRQ	Source
-	 *      --------        ------
-	 *             0	Software (ignored)
-	 *             1        Software (ignored)
-	 *             2        Local IRQ level zero
-	 *             3        Local IRQ level one
-	 *             4        8254 Timer zero
-	 *             5        8254 Timer one
-	 *             6        Bus Error
-	 *             7        R4k timer (what we use)
-	 *
-	 * We handle the IRQ according to _our_ priority which is:
-	 *
-	 * Highest ----     R4k Timer
-	 *                  Local IRQ zero
-	 *                  Local IRQ one
-	 *                  Bus Error
-	 *                  8254 Timer zero
-	 * Lowest  ----     8254 Timer one
-	 *
-	 * then we just return, if multiple IRQs are pending then
-	 * we will just take another exception, big deal.
-	 */
+/* A lot of complication here is taken away because:
+ *
+ * 1) We handle one interrupt and return, sitting in a loop and moving across
+ *    all the pending IRQ bits in the cause register is _NOT_ the answer, the
+ *    common case is one pending IRQ so optimize in that direction.
+ *
+ * 2) We need not check against bits in the status register IRQ mask, that
+ *    would make this routine slow as hell.
+ *
+ * 3) Linux only thinks in terms of all IRQs on or all IRQs off, nothing in
+ *    between like BSD spl() brain-damage.
+ *
+ * Furthermore, the IRQs on the INDY look basically (barring software IRQs
+ * which we don't use at all) like:
+ *
+ *	MIPS IRQ	Source
+ *      --------        ------
+ *             0	Software (ignored)
+ *             1        Software (ignored)
+ *             2        Local IRQ level zero
+ *             3        Local IRQ level one
+ *             4        8254 Timer zero
+ *             5        8254 Timer one
+ *             6        Bus Error
+ *             7        R4k timer (what we use)
+ *
+ * We handle the IRQ according to _our_ priority which is:
+ *
+ * Highest ----     R4k Timer
+ *                  Local IRQ zero
+ *                  Local IRQ one
+ *                  Bus Error
+ *                  8254 Timer zero
+ * Lowest  ----     8254 Timer one
+ *
+ * then we just return, if multiple IRQs are pending then we will just take
+ * another exception, big deal.
+ */
 
 	.text
 	.set	noreorder

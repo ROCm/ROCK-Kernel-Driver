@@ -42,21 +42,29 @@
 #include <asm/atomic.h>
 #include <linux/wait.h>
 
-#if RWSEM_DEBUG
-#define rwsemdebug(FMT, ARGS...) do { if (sem->debug) printk(FMT,##ARGS); } while(0)
+#ifdef CONFIG_RWSEM_GENERIC_SPINLOCK
+#include <linux/rwsem-spinlock.h> /* use a generic implementation */
 #else
-#define rwsemdebug(FMT, ARGS...)
+#include <asm/rwsem.h> /* use an arch-specific implementation */
 #endif
 
+/* defined contention handler functions for the generic case
+ * - these are also used for the exchange-and-add based algorithm
+ */
+#if defined(CONFIG_RWSEM_GENERIC) || defined(CONFIG_RWSEM_XCHGADD_ALGORITHM)
 /* we use FASTCALL convention for the helpers */
 extern struct rw_semaphore *FASTCALL(rwsem_down_read_failed(struct rw_semaphore *sem));
 extern struct rw_semaphore *FASTCALL(rwsem_down_write_failed(struct rw_semaphore *sem));
 extern struct rw_semaphore *FASTCALL(rwsem_wake(struct rw_semaphore *sem));
+#endif
 
-#include <asm/rwsem.h> /* find the arch specific bits */
-
-#ifndef __HAVE_ARCH_SPECIFIC_RWSEM_IMPLEMENTATION
-#include <linux/rwsem-spinlock.h>
+#ifndef rwsemtrace
+#if RWSEM_DEBUG
+#include <asm/current.h>
+#define rwsemtrace(SEM,FMT) do { if ((SEM)->debug) printk("[%d] "FMT"(count=%08lx)\n",current->pid,(SEM)->count); } while(0)
+#else
+#define rwsemtrace(SEM,FMT)
+#endif
 #endif
 
 /*
@@ -64,7 +72,7 @@ extern struct rw_semaphore *FASTCALL(rwsem_wake(struct rw_semaphore *sem));
  */
 static inline void down_read(struct rw_semaphore *sem)
 {
-	rwsemdebug("Entering down_read(count=%08lx)\n",sem->count);
+	rwsemtrace(sem,"Entering down_read");
 
 #if RWSEM_DEBUG_MAGIC
 	if (sem->__magic != (long)&sem->__magic)
@@ -79,7 +87,7 @@ static inline void down_read(struct rw_semaphore *sem)
 	atomic_inc(&sem->readers);
 #endif
 
-	rwsemdebug("Leaving down_read(count=%08lx)\n",sem->count);
+	rwsemtrace(sem,"Leaving down_read");
 }
 
 /*
@@ -87,7 +95,7 @@ static inline void down_read(struct rw_semaphore *sem)
  */
 static inline void down_write(struct rw_semaphore *sem)
 {
-	rwsemdebug("Entering down_write(count=%08lx)\n",sem->count);
+	rwsemtrace(sem,"Entering down_write");
 
 #if RWSEM_DEBUG_MAGIC
 	if (sem->__magic != (long)&sem->__magic)
@@ -104,7 +112,7 @@ static inline void down_write(struct rw_semaphore *sem)
 	atomic_inc(&sem->writers);
 #endif
 
-	rwsemdebug("Leaving down_write(count=%08lx)\n",sem->count);
+	rwsemtrace(sem,"Leaving down_write");
 }
 
 /*
@@ -112,7 +120,7 @@ static inline void down_write(struct rw_semaphore *sem)
  */
 static inline void up_read(struct rw_semaphore *sem)
 {
-	rwsemdebug("Entering up_read(count=%08lx)\n",sem->count);
+	rwsemtrace(sem,"Entering up_read");
 
 #if RWSEM_DEBUG_MAGIC
 	if (atomic_read(&sem->writers))
@@ -121,7 +129,7 @@ static inline void up_read(struct rw_semaphore *sem)
 #endif
 	__up_read(sem);
 
-	rwsemdebug("Leaving up_read(count=%08lx)\n",sem->count);
+	rwsemtrace(sem,"Leaving up_read");
 }
 
 /*
@@ -129,7 +137,7 @@ static inline void up_read(struct rw_semaphore *sem)
  */
 static inline void up_write(struct rw_semaphore *sem)
 {
-	rwsemdebug("Entering up_write(count=%08lx)\n",sem->count);
+	rwsemtrace(sem,"Entering up_write");
 
 #if RWSEM_DEBUG_MAGIC
 	if (atomic_read(&sem->readers))
@@ -140,7 +148,7 @@ static inline void up_write(struct rw_semaphore *sem)
 #endif
 	__up_write(sem);
 
-	rwsemdebug("Leaving up_write(count=%08lx)\n",sem->count);
+	rwsemtrace(sem,"Leaving up_write");
 }
 
 

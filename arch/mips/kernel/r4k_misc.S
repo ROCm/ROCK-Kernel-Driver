@@ -7,6 +7,13 @@
  * Multi-cpu abstraction and reworking:
  * Copyright (C) 1996 David S. Miller (dm@engr.sgi.com)
  */
+/**************************************************************************
+ *  14 Nov, 2000.
+ *  Made support for MIPS32 CPUs.
+ *
+ *  Carsten Langgaard, carstenl@mips.com
+ *  Copyright (C) 2000 MIPS Technologies, Inc.  All rights reserved.
+ *************************************************************************/
 #include <asm/asm.h>
 #include <asm/current.h>
 #include <asm/offset.h>
@@ -102,7 +109,6 @@
 	sw	pte, (ptr);
 
 	.set	noreorder
-	.set	mips3
 
 /*
  * From the IDT errata for the QED RM5230 (Nevada), processor revision 1.0:
@@ -147,7 +153,9 @@ invalid_tlbl:
 	 tlbwi
 1:
 	nop
+	.set	mips3	
 	eret
+	.set	mips0
 #endif
 
 nopage_tlbl:
@@ -169,7 +177,9 @@ nopage_tlbl:
 	 tlbwi
 1:
 	nop
+	.set	mips3	
 	eret
+	.set	mips0
 #endif
 
 nopage_tlbs:
@@ -201,7 +211,9 @@ nopage_tlbs:
 	 tlbwi
 1:
 	nop
+	.set	mips3
 	eret
+	.set	mips0
 #endif
 
 nowrite_mod:

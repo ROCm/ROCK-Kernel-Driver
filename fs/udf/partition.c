@@ -162,6 +162,10 @@ void udf_fill_spartable(struct super_block *sb, struct udf_sparing_data *sdata, 
 					mapsize = (rtl * sizeof(Uint32)) +
 						((partlen/(1 << sdata->s_spar_pshift)) * sizeof(Uint8) * num);
 					sdata->s_spar_map = kmalloc(mapsize, GFP_KERNEL);
+					if (!sdata->s_spar_map) {
+						printk("couldnt allocate UDF s_spar_map!\n");
+						return;
+					}
 					sdata->s_spar_remap.s_spar_remap32 = &sdata->s_spar_map[rtl];
 					memset(sdata->s_spar_map, 0xFF, mapsize);
 				}

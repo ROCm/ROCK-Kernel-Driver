@@ -58,7 +58,7 @@ extern plat_pg_data_t *plat_node_data[];
 
 /*
  * Given a kaddr, ADDR_TO_MAPBASE finds the owning node of the memory
- * and returns the the mem_map of that node.
+ * and returns the mem_map of that node.
  */
 #define ADDR_TO_MAPBASE(kaddr) \
 			NODE_MEM_MAP(KVADDR_TO_NID((unsigned long)(kaddr)))

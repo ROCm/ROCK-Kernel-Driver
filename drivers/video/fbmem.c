@@ -120,7 +120,10 @@ extern int stifb_init(void);
 extern int stifb_setup(char*);
 extern int radeonfb_init(void);
 extern int radeonfb_setup(char*);
-
+extern int e1355fb_init(void);
+extern int e1355fb_setup(char*);
+extern int dcfb_init(void);
+  
 static struct {
 	const char *name;
 	int (*init)(void);
@@ -199,6 +202,9 @@ static struct {
 #ifdef CONFIG_FB_SIS
 	{ "sisfb", sisfb_init, sisfb_setup },
 #endif
+#ifdef CONFIG_FB_E1355
+	{ "e1355fb", e1355fb_init, e1355fb_setup },
+#endif
 
 	/*
 	 * Generic drivers that are used as fallbacks
@@ -263,6 +269,9 @@ static struct {
 #endif
 #ifdef CONFIG_FB_HIT
 	{ "hitfb", hitfb_init, NULL },
+#endif
+#ifdef CONFIG_FB_DC
+	{ "dcfb", dcfb_init, NULL },
 #endif
 
 	/*

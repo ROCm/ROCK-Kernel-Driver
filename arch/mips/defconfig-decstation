@@ -16,13 +16,14 @@ CONFIG_EXPERIMENTAL=y
 # CONFIG_COBALT_MICRO_SERVER is not set
 CONFIG_DECSTATION=y
 # CONFIG_DDB5074 is not set
-# CONFIG_ORION is not set
 # CONFIG_MIPS_MAGNUM_4000 is not set
 # CONFIG_OLIVETTI_M700 is not set
 # CONFIG_SGI_IP22 is not set
 # CONFIG_SNI_RM200_PCI is not set
+# CONFIG_MCA is not set
 # CONFIG_SBUS is not set
 # CONFIG_ISA is not set
+# CONFIG_EISA is not set
 # CONFIG_PCI is not set
 
 #
@@ -80,17 +81,23 @@ CONFIG_TC=y
 # CONFIG_BLK_DEV_XD is not set
 # CONFIG_PARIDE is not set
 # CONFIG_BLK_CPQ_DA is not set
+# CONFIG_BLK_CPQ_CISS_DA is not set
 # CONFIG_BLK_DEV_DAC960 is not set
 # CONFIG_BLK_DEV_LOOP is not set
 # CONFIG_BLK_DEV_NBD is not set
-# CONFIG_BLK_DEV_LVM is not set
+# CONFIG_BLK_DEV_RAM is not set
+# CONFIG_BLK_DEV_INITRD is not set
+
+#
+# Multi-device support (RAID and LVM)
+#
+# CONFIG_MD is not set
 # CONFIG_BLK_DEV_MD is not set
 # CONFIG_MD_LINEAR is not set
 # CONFIG_MD_RAID0 is not set
 # CONFIG_MD_RAID1 is not set
 # CONFIG_MD_RAID5 is not set
-# CONFIG_BLK_DEV_RAM is not set
-# CONFIG_BLK_DEV_INITRD is not set
+# CONFIG_BLK_DEV_LVM is not set
 
 #
 # Networking options
@@ -107,10 +114,8 @@ CONFIG_INET=y
 CONFIG_IP_PNP=y
 CONFIG_IP_PNP_BOOTP=y
 # CONFIG_IP_PNP_RARP is not set
-# CONFIG_IP_ROUTER is not set
 # CONFIG_NET_IPIP is not set
 # CONFIG_NET_IPGRE is not set
-# CONFIG_IP_ALIAS is not set
 # CONFIG_INET_ECN is not set
 # CONFIG_SYN_COOKIES is not set
 # CONFIG_IPV6 is not set
@@ -127,6 +132,7 @@ CONFIG_IP_PNP_BOOTP=y
 # CONFIG_X25 is not set
 # CONFIG_LAPB is not set
 # CONFIG_LLC is not set
+# CONFIG_NET_DIVERT is not set
 # CONFIG_ECONET is not set
 # CONFIG_WAN_ROUTER is not set
 # CONFIG_NET_FASTROUTE is not set
@@ -148,6 +154,7 @@ CONFIG_SCSI=y
 CONFIG_BLK_DEV_SD=y
 CONFIG_SD_EXTRA_DEVS=40
 # CONFIG_CHR_DEV_ST is not set
+# CONFIG_CHR_DEV_OSST is not set
 # CONFIG_BLK_DEV_SR is not set
 # CONFIG_CHR_DEV_SG is not set
 
@@ -170,6 +177,7 @@ CONFIG_SCSI_DECNCR=y
 # CONFIG_SCSI_AHA1542 is not set
 # CONFIG_SCSI_AHA1740 is not set
 # CONFIG_SCSI_AIC7XXX is not set
+# CONFIG_SCSI_AIC7XXX_OLD is not set
 # CONFIG_SCSI_ADVANSYS is not set
 # CONFIG_SCSI_IN2000 is not set
 # CONFIG_SCSI_AM53C974 is not set
@@ -186,14 +194,14 @@ CONFIG_SCSI_DECNCR=y
 # CONFIG_SCSI_INITIO is not set
 # CONFIG_SCSI_INIA100 is not set
 # CONFIG_SCSI_NCR53C406A is not set
-# CONFIG_SCSI_SYM53C416 is not set
-# CONFIG_SCSI_SIM710 is not set
 # CONFIG_SCSI_NCR53C7xx is not set
 # CONFIG_SCSI_PAS16 is not set
 # CONFIG_SCSI_PCI2000 is not set
 # CONFIG_SCSI_PCI2220I is not set
 # CONFIG_SCSI_PSI240I is not set
 # CONFIG_SCSI_QLOGIC_FAS is not set
+# CONFIG_SCSI_SIM710 is not set
+# CONFIG_SCSI_SYM53C416 is not set
 # CONFIG_SCSI_T128 is not set
 # CONFIG_SCSI_U14_34F is not set
 # CONFIG_SCSI_DEBUG is not set
@@ -224,6 +232,8 @@ CONFIG_SERIAL_CONSOLE=y
 # CONFIG_QUOTA is not set
 # CONFIG_AUTOFS_FS is not set
 # CONFIG_AUTOFS4_FS is not set
+# CONFIG_REISERFS_FS is not set
+# CONFIG_REISERFS_CHECK is not set
 # CONFIG_ADFS_FS is not set
 # CONFIG_ADFS_FS_RW is not set
 # CONFIG_AFFS_FS is not set
@@ -278,8 +288,6 @@ CONFIG_EXT2_FS=y
 # CONFIG_NCPFS_NFS_NS is not set
 # CONFIG_NCPFS_OS2_NS is not set
 # CONFIG_NCPFS_SMALLDOS is not set
-# CONFIG_NCPFS_MOUNT_SUBDIR is not set
-# CONFIG_NCPFS_NDS_DOMAINS is not set
 # CONFIG_NCPFS_NLS is not set
 # CONFIG_NCPFS_EXTRAS is not set
 
@@ -294,17 +302,24 @@ CONFIG_OSF_PARTITION=y
 # CONFIG_MAC_PARTITION is not set
 CONFIG_MSDOS_PARTITION=y
 # CONFIG_BSD_DISKLABEL is not set
+# CONFIG_MINIX_SUBPARTITION is not set
 # CONFIG_SOLARIS_X86_PARTITION is not set
 # CONFIG_UNIXWARE_DISKLABEL is not set
 # CONFIG_SGI_PARTITION is not set
 CONFIG_ULTRIX_PARTITION=y
 # CONFIG_SUN_PARTITION is not set
+# CONFIG_SMB_NLS is not set
 # CONFIG_NLS is not set
 
 #
 # USB support
 #
 # CONFIG_USB is not set
+
+#
+# Input core support
+#
+# CONFIG_INPUT is not set
 
 #
 # Kernel hacking

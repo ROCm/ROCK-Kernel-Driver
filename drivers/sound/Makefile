@@ -10,7 +10,7 @@
 export-objs	:=  ad1848.o audio_syms.o midi_syms.o mpu401.o \
 		    msnd.o opl3.o sb_common.o sequencer_syms.o \
 		    sound_core.o sound_syms.o uart401.o	\
-		    nm256_audio.o ac97.o ac97_codec.o
+		    nm256_audio.o ac97.o ac97_codec.o aci.o
 
 # Each configuration option enables a list of files.
 
@@ -29,7 +29,7 @@ obj-$(CONFIG_SOUND_MAD16)	+= mad16.o ad1848.o sb_lib.o uart401.o
 obj-$(CONFIG_SOUND_CS4232)	+= cs4232.o uart401.o
 obj-$(CONFIG_SOUND_OPL3SA2)	+= opl3sa2.o ad1848.o mpu401.o
 obj-$(CONFIG_SOUND_MSS)		+= ad1848.o
-obj-$(CONFIG_SOUND_PAS)		+= pas2.o sb_lib.o uart401.o
+obj-$(CONFIG_SOUND_PAS)		+= pas2.o sb.o sb_lib.o uart401.o
 obj-$(CONFIG_SOUND_SB)		+= sb.o sb_lib.o uart401.o
 obj-$(CONFIG_SOUND_WAVEFRONT)	+= wavefront.o
 obj-$(CONFIG_SOUND_MAUI)	+= maui.o mpu401.o

@@ -220,7 +220,7 @@ void devpts_pty_kill(int number)
 	}
 }
 
-int __init init_devpts_fs(void)
+static int __init init_devpts_fs(void)
 {
 	int err = register_filesystem(&devpts_fs_type);
 	if (!err) {
@@ -228,28 +228,25 @@ int __init init_devpts_fs(void)
 		err = PTR_ERR(devpts_mnt);
 		if (!IS_ERR(devpts_mnt))
 			err = 0;
-	}
-	return err;
-}
-
 #ifdef MODULE
-
-int init_module(void)
-{
-	int err = init_devpts_fs();
-	if ( !err ) {
-		devpts_upcall_new  = devpts_pty_new;
-		devpts_upcall_kill = devpts_pty_kill;
+		if ( !err ) {
+			devpts_upcall_new  = devpts_pty_new;
+			devpts_upcall_kill = devpts_pty_kill;
+		}
+#endif
 	}
 	return err;
 }
 
-void cleanup_module(void)
+static void __exit exit_devpts_fs(void)
 {
+#ifdef MODULE
 	devpts_upcall_new  = NULL;
 	devpts_upcall_kill = NULL;
+#endif
 	unregister_filesystem(&devpts_fs_type);
 	kern_umount(devpts_mnt);
 }
 
-#endif
+module_init(init_devpts_fs)
+module_exit(exit_devpts_fs)

@@ -1,4 +1,3 @@
-# $Id: Makefile,v 1.3 1999/08/13 17:07:26 harald Exp $
 #
 # Makefile for the Baget specific kernel interface routines
 # under Linux.
@@ -12,22 +11,12 @@
 all: baget.a 
 
 O_TARGET := baget.a
-O_OBJS   := baget.o print.o setup.o time.o irq.o bagetIRQ.o reset.o wbflush.o
 
-ifeq ($(CONFIG_SERIAL),y)
-	OX_OBJS += vacserial.o
-else
-	ifeq ($(CONFIG_SERIAL),m)
-		MX_OBJS += vacserial.o
-	endif
-endif
-ifeq ($(CONFIG_VAC_RTC),y)
-	OX_OBJS += vacrtc.o
-else
-	ifeq ($(CONFIG_VAC_RTC),m)
-		MX_OBJS += vacrtc.o
-	endif
-endif
+export-objs		:= vacserial.o vacrtc.o
+obj-y			:= baget.o print.o setup.o time.o irq.o bagetIRQ.o \
+			   reset.o wbflush.o
+obj-$(CONFIG_SERIAL)	+= vacserial.o
+obj-$(CONFIG_VAC_RTC)	+= vacrtc.o
 
 bagetIRQ.o : bagetIRQ.S
 	$(CC) $(CFLAGS) -c -o $@ $<

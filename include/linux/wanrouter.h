@@ -5,6 +5,7 @@
 *
 * Author: 	Nenad Corbic <ncorbic@sangoma.com>
 *		Gideon Hack 	
+* Additions:	Arnaldo Melo
 *
 * Copyright:	(c) 1995-2000 Sangoma Technologies Inc.
 *
@@ -18,6 +19,8 @@
 * Jan 28, 2000  Nenad Corbic    Added support for the ASYNC protocol.
 * Oct 04, 1999  Nenad Corbic 	Updated for 2.1.0 release
 * Jun 02, 1999  Gideon Hack	Added support for the S514 adapter.
+* May 23, 1999	Arnaldo Melo	Added local_addr to wanif_conf_t
+*				WAN_DISCONNECTING state added
 * Jul 20, 1998	David Fong	Added Inverse ARP options to 'wanif_conf_t'
 * Jun 12, 1998	David Fong	Added Cisco HDLC support.
 * Dec 16, 1997	Jaspreet Singh	Moved 'enable_IPX' and 'network_number' to
@@ -423,6 +426,9 @@ typedef struct wanif_conf
 	unsigned inarp_interval;	/* sec, between InARP requests */
 	unsigned long network_number;	/* Network Number for IPX */
 	char mc;			/* Multicast on or off */
+	char local_addr[WAN_ADDRESS_SZ+1];/* local media address, ASCIIZ */
+	unsigned char port;		/* board port */
+	unsigned char protocol;		/* prococol used in this channel (TCPOX25 or X25) */
 	char pap;			/* PAP enabled or disabled */
 	char chap;			/* CHAP enabled or disabled */
 	unsigned char userid[511];	/* List of User Id */
@@ -432,7 +438,6 @@ typedef struct wanif_conf
 	unsigned char ignore_cts;	/*  Ignore these to determine */
 	unsigned char ignore_keepalive;	/*  link status (Yes or No) */
 	unsigned char hdlc_streaming;	/*  Hdlc streaming mode (Y/N) */
-	unsigned char receive_only;	/*  no transmit buffering (Y/N) */
 	unsigned keepalive_tx_tmr;	/* transmit keepalive timer */
 	unsigned keepalive_rx_tmr;	/* receive  keepalive timer */
 	unsigned keepalive_err_margin;	/* keepalive_error_tolerance */
@@ -462,7 +467,7 @@ typedef struct wanif_conf
 	unsigned rx_complete_length;
 	unsigned xon_char;
 	unsigned xoff_char;
-
+	unsigned char receive_only;	/*  no transmit buffering (Y/N) */
 } wanif_conf_t;
 
 #ifdef	__KERNEL__
@@ -508,11 +513,11 @@ typedef struct wan_device
 					/****** status and statistics *******/
 	char state;			/* device state */
 	char api_status;		/* device api status */
-      #if defined(LINUX_2_1) || defined(LINUX_2_4)
+#if defined(LINUX_2_1) || defined(LINUX_2_4)
 	struct net_device_stats stats; 	/* interface statistics */
-      #else
+#else
 	struct enet_statistics stats;	/* interface statistics */
-      #endif
+#endif
 	unsigned reserved[16];		/* reserved for future use */
 	unsigned long critical;		/* critical section flag */
 	spinlock_t lock;                /* Support for SMP Locking */
@@ -530,11 +535,11 @@ typedef struct wan_device
 	struct wan_device* next;	/* -> next device */
 	netdevice_t* dev;		/* list of network interfaces */
 	unsigned ndev;			/* number of interfaces */
-      #ifdef LINUX_2_4
+#ifdef LINUX_2_4
 	struct proc_dir_entry *dent;	/* proc filesystem entry */
-      #else
+#else
 	struct proc_dir_entry dent;	/* proc filesystem entry */
-      #endif
+#endif
 } wan_device_t;
 
 /* Public functions available for device drivers */

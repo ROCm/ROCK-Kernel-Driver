@@ -10,15 +10,17 @@
  * The main function of the ACI is to control the mixer and to get a
  * product identification. On the PCM20, ACI also controls the radio
  * tuner on this card, this is supported in the Video for Linux 
- * radio-miropcm20 driver.
- * 
- * This Voxware ACI driver currently only supports the ACI functions
- * on the miroSOUND PCM12 and PCM20 card. Support for miro sound cards 
- * with additional ACI functions can easily be added later.
+ * miropcm20 driver.
+ * -
+ * This is a fullfeatured implementation. Unsupported features
+ * are bugs... (:
  *
- * / NOTE / When compiling as a module, make sure to load the module 
- * after loading the mad16 module. The initialisation code expects the
- * MAD16 default mixer to be already available.
+ * It is not longer necessary to load the mad16 module first. The
+ * user is currently responsible to set the mad16 mixer correctly.
+ *
+ * To toggle the solo mode for full duplex operation just use the OSS
+ * record switch for the pcm ('wave') controller.           Robert
+ * -
  *
  * Revision history:
  *
@@ -34,72 +36,78 @@
  *   1998-08-18  Ruurd Reitsma <R.A.Reitsma@wbmt.tudelft.nl>
  *	  Small modification to export ACI functions and 
  *	  complete modularisation.
+ *   2000-06-20  Robert Siemer <Robert.Siemer@gmx.de>
+ *        Don't initialize the CS4231A mixer anymore, so the code is
+ *        working again, and other small changes to fit in todays
+ *        kernels.
+ *   2000-08-26  Robert Siemer
+ *        Clean up and rewrite for 2.4.x. Maybe it's SMP safe now... (:
+ *        ioctl bugfix, and integration of solo-mode into OSS-API,
+ *        added (OSS-limited) equalizer support, return value bugfix,
+ *        changed param aci_reset to reset, new params: ide, wss.
  */
 
-/*
- * Some driver specific information and features:
- *
- * This mixer driver identifies itself to applications as "ACI" in
- * mixer_info.id as retrieved by ioctl(fd, SOUND_MIXER_INFO, &mixer_info).
- *
- * Proprietary mixer features that go beyond the standard OSS mixer
- * interface are:
- * 
- * Full duplex solo configuration:
- *
- *   int solo_mode;
- *   ioctl(fd, SOUND_MIXER_PRIVATE1, &solo_mode);
- *
- *   solo_mode = 0: deactivate solo mode (default)
- *   solo_mode > 0: activate solo mode
- *                  With activated solo mode, the PCM input can not any
- *                  longer hear the signals produced by the PCM output.
- *                  Activating solo mode is important in duplex mode in order
- *                  to avoid feedback distortions.
- *   solo_mode < 0: do not change solo mode (just retrieve the status)
- *
- *   When the ioctl() returns 0, solo_mode contains the previous
- *   status (0 = deactivated, 1 = activated). If solo mode is not
- *   implemented on this card, ioctl() returns -1 and sets errno to
- *   EINVAL.
- *
- */
-
+#include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/module.h> 
-
+#include <linux/proc_fs.h>
+#include <linux/slab.h>
+#include <asm/semaphore.h>
+#include <asm/io.h>
+#include <asm/uaccess.h>
 #include "sound_config.h"
 
-#undef  DEBUG		/* if defined, produce a verbose report via syslog */
+int aci_port;	/* as determined by bit 4 in the OPTi 929 MC4 register */
+int aci_idcode[2];	/* manufacturer and product ID */
+int aci_version;	/* ACI firmware version	*/
 
-int aci_port = 0x354;	/* as determined by bit 4 in the OPTi 929 MC4 register */
-unsigned char aci_idcode[2] = {0, 0};	/* manufacturer and product ID */
-unsigned char aci_version = 0;		/* ACI firmware version	*/
-int aci_solo;		/* status bit of the card that can't be		*
+EXPORT_SYMBOL(aci_port);
+EXPORT_SYMBOL(aci_idcode);
+EXPORT_SYMBOL(aci_version);
+
+#include "aci.h"
+
+
+static int aci_solo=0;	/* status bit of the card that can't be		*
+			 * checked with ACI versions prior to 0xb0	*/
+static int aci_amp=0;   /* status bit for power-amp/line-out level
+			   but I have no docs about what is what... */
+static int aci_micpreamp=3; /* microphone preamp-level that can't be    *
 			 * checked with ACI versions prior to 0xb0	*/
 
-static int aci_present = 0;
+static int mixer_device;
+static struct semaphore aci_sem;
 
-#ifdef MODULE                  /* Whether the aci mixer is to be reset.    */
-int aci_reset = 0;             /* Default: don't reset if the driver is a  */
-MODULE_PARM(aci_reset,"i");
-#else                          /* module; use "insmod aci.o aci_reset=1" */
-int aci_reset = 1;             /* to override.                             */
+#ifdef MODULE
+static int reset = 0;
+MODULE_PARM(reset,"i");
+MODULE_PARM_DESC(reset,"When set to 1, reset aci mixer.");
+#else
+static int reset = 1;
 #endif
 
+static int ide=-1;
+MODULE_PARM(ide,"i");
+MODULE_PARM_DESC(ide,"1 enable, 0 disable ide-port - untested"
+		 " default: do nothing");
+static int wss=-1;
+MODULE_PARM(wss,"i");
+MODULE_PARM_DESC(wss,"change between ACI/WSS-mixer; use 0 and 1 - untested"
+		 " default: do nothing; for PCM1-pro only");
 
-#define COMMAND_REGISTER    (aci_port)
-#define STATUS_REGISTER     (aci_port + 1)
-#define BUSY_REGISTER       (aci_port + 2)
+static void print_bits(unsigned char c)
+{
+	int j;
+	printk(KERN_DEBUG "aci: ");
+
+	for (j=7; j>=0; j--) {
+		printk(KERN_DEBUG "%d", (c >> j) & 0x1);
+	}
+
+	printk(KERN_DEBUG "\n");
+}
 
 /*
- * Wait until the ACI microcontroller has set the READYFLAG in the
- * Busy/IRQ Source Register to 0. This is required to avoid
- * overrunning the sound card microcontroller. We do a busy wait here,
- * because the microcontroller is not supposed to signal a busy
- * condition for more than a few clock cycles. In case of a time-out,
- * this function returns -1.
- *
  * This busy wait code normally requires less than 15 loops and
  * practically always less than 100 loops on my i486/DX2 66 MHz.
  *
@@ -107,459 +115,476 @@ int aci_reset = 1;             /* to override.                             */
  * function can take a VERY long time, because the PCM12 does some kind
  * of fade-in effect. For this reason, access to the MUTE function has
  * not been implemented at all.
+ *
+ * - The OSS interface has no mute option. It takes about 3 seconds to
+ * fade-in on my PCM20. busy_wait() handles it great now...     Robert
  */
 
 static int busy_wait(void)
 {
+	#define MINTIME 500
 	long timeout;
+	unsigned char byte;
 
-	for (timeout = 0; timeout < 10000000L; timeout++)
-		if ((inb_p(BUSY_REGISTER) & 1) == 0)
-			return 0;
-
-#ifdef DEBUG
-	printk("ACI: READYFLAG timed out.\n");
-#endif
-
-	return -1;
-}
-
-
-/*
- * Read the GENERAL STATUS register.
- */
-
-static int read_general_status(void)
-{
-	unsigned long flags;
-	int status;
-
-	save_flags(flags);
-	cli();
-	
-	if (busy_wait()) {
-		restore_flags(flags);
-		return -1;
-	}
-	
-	status = (unsigned) inb_p(STATUS_REGISTER);
-	restore_flags(flags);
-	return status;
-}
-
-
-/*
- * The four ACI command types (implied, write, read and indexed) can
- * be sent to the microcontroller using the following four functions.
- * If a problem occurred, they return -1.
- */
-
-int aci_implied_cmd(unsigned char opcode)
-{
-	unsigned long flags;
-
-#ifdef DEBUG
-	printk("ACI: aci_implied_cmd(0x%02x)\n", opcode);
-#endif
-
-	save_flags(flags);
-	cli();
-  
-  	if (read_general_status() < 0 || busy_wait()) {
-		restore_flags(flags);
-		return -1;
-	}
-	
-	outb_p(opcode, COMMAND_REGISTER);
-
-	restore_flags(flags);
-	return 0;
-}
-
-
-int aci_write_cmd(unsigned char opcode, unsigned char parameter)
-{
-	unsigned long flags;
-	int status;
-
-#ifdef DEBUG
-	printk("ACI: aci_write_cmd(0x%02x, 0x%02x)\n", opcode, parameter);
-#endif
-
-	save_flags(flags);
-	cli();
-	
-	if (read_general_status() < 0 || busy_wait()) {
-		restore_flags(flags);
-		return -1;
-	}
-
-	outb_p(opcode, COMMAND_REGISTER);
-	if (busy_wait()) {
-		restore_flags(flags);
-		return -1;
-	}
-
-	outb_p(parameter, COMMAND_REGISTER);
-
-	if ((status = read_general_status()) < 0) {
-		restore_flags(flags);
-		return -1;
-	}
-
-	/* polarity of the INVALID flag depends on ACI version */
-	if ((aci_version <  0xb0 && (status & 0x40) != 0) ||
-	  (aci_version >= 0xb0 && (status & 0x40) == 0)) {
-	  	restore_flags(flags);
-		printk("ACI: invalid write command 0x%02x, 0x%02x.\n",
-			opcode, parameter);
-		return -1;
-	}
-
-	restore_flags(flags);
-	return 0;
-}
-
-/*
- * This write command send 2 parameters instead of one.
- * Only used in PCM20 radio frequency tuning control
- */
-
-int aci_write_cmd_d(unsigned char opcode, unsigned char parameter, unsigned char parameter2)
-{
-	unsigned long flags;
-	int status;
-
-#ifdef DEBUG
-	printk("ACI: aci_write_cmd_d(0x%02x, 0x%02x)\n", opcode, parameter, parameter2);
-#endif
-
-	save_flags(flags);
-	cli();
-	
-	if (read_general_status() < 0 || busy_wait()) {
-		restore_flags(flags);
-		return -1;
-	}
-
-	outb_p(opcode, COMMAND_REGISTER);
-	if (busy_wait()) {
-		restore_flags(flags);
-		return -1;
-	}
-
-	outb_p(parameter, COMMAND_REGISTER);
-	if (busy_wait()) {
-		restore_flags(flags);
-		return -1;
-	}
-	
-	outb_p(parameter2, COMMAND_REGISTER);
-	
-	if ((status = read_general_status()) < 0) {
-		restore_flags(flags);
-		return -1;
-	}
-	
-	/* polarity of the INVALID flag depends on ACI version */
-	if ((aci_version <  0xb0 && (status & 0x40) != 0) ||
-	  (aci_version >= 0xb0 && (status & 0x40) == 0)) {
-		restore_flags(flags);
-#if 0	/* Frequency tuning works, but the INVALID flag is set ??? */
-		printk("ACI: invalid write (double) command 0x%02x, 0x%02x, 0x%02x.\n",
-			opcode, parameter, parameter2);
-#endif
-		return -1;
-  	}
-	
-	restore_flags(flags);
-	return 0;
-}
-
-int aci_read_cmd(unsigned char opcode, int length, unsigned char *parameter)
-{
-	unsigned long flags;
-	int i = 0;
-	
-	save_flags(flags);
-	cli();
- 
- 	if (read_general_status() < 0) {
-		restore_flags(flags);
-		return -1;
-	}
-	while (i < length) {
-		if (busy_wait()) {
-			restore_flags(flags);
-			return -1;
+	for (timeout = 1; timeout <= MINTIME+30; timeout++) {
+		if (((byte=inb(BUSY_REGISTER)) & 1) == 0) {
+			if (timeout >= MINTIME)
+				printk(KERN_DEBUG "aci: Got READYFLAG in round %ld.\n", timeout-MINTIME);
+			return byte;
 		}
-			
-		outb_p(opcode, COMMAND_REGISTER);
-		if (busy_wait()) {
-			restore_flags(flags);
-			return -1;
+		if (timeout >= MINTIME) {
+			long out=10*HZ;
+			switch (timeout-MINTIME) {
+			case 0 ... 9:
+				out /= 10;
+			case 10 ... 19:
+				out /= 10;
+			case 20 ... 30:
+				out /= 10;
+			default:
+				current->state=TASK_UNINTERRUPTIBLE;
+				schedule_timeout(out);
+				break;
+			}
 		}
-			
-		parameter[i++] = inb_p(STATUS_REGISTER);
-#ifdef DEBUG
-		if (i == 1)
-			printk("ACI: aci_read_cmd(0x%02x, %d) = 0x%02x\n",
-				opcode, length, parameter[i-1]);
+	}
+	printk(KERN_WARNING "aci: busy_wait() time out.\n");
+	return -EBUSY;
+}
+
+/* The four ACI command types are fucked up. [-:
+ * implied is: 1w      - special case for INIT
+ * write   is: 2w1r
+ * read    is: x(1w1r) where x is 1 or 2 (1 CHECK_SIG, 1 CHECK_STER,
+ *                                        1 VERSION, 2 IDCODE)
+ *  the command is only in the first write, rest is protocol overhead
+ *
+ * indexed is technically a write and used for STATUS
+ * and the special case for TUNE is: 3w1r
+ * 
+ * Here the new general sheme: TUNE --> aci_rw_cmd(x,  y,  z)
+ *                indexed and write --> aci_rw_cmd(x,  y, -1)
+ *           implied and read (x=1) --> aci_rw_cmd(x, -1, -1)
+ *
+ * Read (x>=2) is not implemented (only used during initialization).
+ * Use aci_idcode[2] and aci_version...                    Robert
+ */
+
+/* Some notes for error detection: theoretically it is possible.
+ * But it doubles the I/O-traffic from ww(r) to wwwrw(r) in the normal 
+ * case and doesn't seem to be designed for that...        Robert
+ */
+
+static inline int aci_rawwrite(unsigned char byte)
+{
+	if (busy_wait() >= 0) {
+#if DEBUG
+		printk(KERN_DEBUG "aci_rawwrite(%d)\n", byte);
+#endif
+		outb(byte, COMMAND_REGISTER);
+		return 0;
+	} else
+		return -EBUSY;
+}
+
+static inline int aci_rawread(void)
+{
+	unsigned char byte;
+
+	if (busy_wait() >= 0) {
+		byte=inb(STATUS_REGISTER);
+#if DEBUG
+		printk(KERN_DEBUG "%d = aci_rawread()\n", byte);
+#endif
+		return byte;
+	} else
+		return -EBUSY;
+}
+
+
+int aci_rw_cmd(int write1, int write2, int write3)
+{
+	int write[] = {write1, write2, write3};
+	int read, i;
+
+	if (down_interruptible(&aci_sem))
+		return -EINTR;
+
+	for (i=0; i<3; i++) {
+		if (write[i]< 0 || write[i] > 255)
+			break;
 		else
-			printk("ACI: aci_read_cmd cont.: 0x%02x\n", parameter[i-1]);
-#endif
+			if (aci_rawwrite(write[i])<0) {
+				up(&aci_sem);
+				return -EBUSY;
+			}
+	}
+	
+	if ((read=aci_rawread())<0) {
+		up(&aci_sem);
+		return -EBUSY;
 	}
 
-	restore_flags(flags);
-	return 0;
+	up(&aci_sem);
+	return read;
 }
 
+EXPORT_SYMBOL(aci_rw_cmd);
 
-int aci_indexed_cmd(unsigned char opcode, unsigned char index,
-		       unsigned char *parameter)
+static int setvolume(caddr_t arg, 
+		     unsigned char left_index, unsigned char right_index)
 {
-	unsigned long flags;
+	int vol, ret, uservol, buf;
 
-	save_flags(flags);
-	cli();
-  
-	if (read_general_status() < 0 || busy_wait()) {
-	  	restore_flags(flags);
-		return -1;
-	}
-	
-	outb_p(opcode, COMMAND_REGISTER);
-	if (busy_wait()) {
-		restore_flags(flags);
-		return -1;
-	}
-	
-	outb_p(index, COMMAND_REGISTER);
-	if (busy_wait()) {
-		restore_flags(flags);
-		return -1;
-	}
-	
-	*parameter = inb_p(STATUS_REGISTER);
-#ifdef DEBUG
-	printk("ACI: aci_indexed_cmd(0x%02x, 0x%02x) = 0x%02x\n", opcode, index,
-		*parameter);
-#endif
+	__get_user(uservol, (int *)arg);
 
-	restore_flags(flags);
+	/* left channel */
+	vol = uservol & 0xff;
+	if (vol > 100)
+		vol = 100;
+	vol = SCALE(100, 0x20, vol);
+	if ((buf=aci_write_cmd(left_index, 0x20 - vol))<0)
+		return buf;
+	ret = SCALE(0x20, 100, vol);
+
+
+	/* right channel */
+	vol = (uservol >> 8) & 0xff;
+	if (vol > 100)
+		vol = 100;
+	vol = SCALE(100, 0x20, vol);
+	if ((buf=aci_write_cmd(right_index, 0x20 - vol))<0)
+		return buf;
+	ret |= SCALE(0x20, 100, vol) << 8;
+ 
+	__put_user(ret, (int *)arg);
+
 	return 0;
 }
-
-
-/*
- * The following macro SCALE can be used to scale one integer volume
- * value into another one using only integer arithmetic. If the input
- * value x is in the range 0 <= x <= xmax, then the result will be in
- * the range 0 <= SCALE(xmax,ymax,x) <= ymax.
- *
- * This macro has for all xmax, ymax > 0 and all 0 <= x <= xmax the
- * following nice properties:
- *
- * - SCALE(xmax,ymax,xmax) = ymax
- * - SCALE(xmax,ymax,0) = 0
- * - SCALE(xmax,ymax,SCALE(ymax,xmax,SCALE(xmax,ymax,x))) = SCALE(xmax,ymax,x)
- *
- * In addition, the rounding error is minimal and nicely distributed.
- * The proofs are left as an exercise to the reader.
- */
-
-#define SCALE(xmax,ymax,x) (((x)*(ymax)+(xmax)/2)/(xmax))
-
 
 static int getvolume(caddr_t arg,
 		     unsigned char left_index, unsigned char right_index)
 {
 	int vol;
-	unsigned char buf;
+	int buf;
 
 	/* left channel */
-	if (aci_indexed_cmd(0xf0, left_index, &buf))
-		return -EIO;
+	if ((buf=aci_indexed_cmd(0xf0, left_index))<0)
+		return buf;
 	vol = SCALE(0x20, 100, buf < 0x20 ? 0x20-buf : 0);
 	
 	/* right channel */
-	if (aci_indexed_cmd(0xf0, right_index, &buf))
-		return -EIO;
+	if ((buf=aci_indexed_cmd(0xf0, right_index))<0)
+		return buf;
 	vol |= SCALE(0x20, 100, buf < 0x20 ? 0x20-buf : 0) << 8;
 
-	return (*(int *) arg = vol);
+	__put_user(vol, (int *)arg);
+
+	return 0;
 }
 
 
-static int setvolume(caddr_t arg, 
-		     unsigned char left_index, unsigned char right_index)
+/* The equalizer is somewhat strange on the ACI. From -12dB to +12dB
+ * write:  0xff..down.to..0x80==0x00..up.to..0x7f
+ */
+
+static inline unsigned int eq_oss2aci(unsigned int vol)
 {
-	int vol, ret;
+	int boost=0;
+	unsigned int ret;
+
+	if (vol > 100)
+		vol = 100;
+	if (vol > 50) {
+		vol -= 51;
+		boost=1;
+	}
+	if (boost)
+		ret=SCALE(49, 0x7e, vol)+1;
+	else
+		ret=0xff - SCALE(50, 0x7f, vol);
+	return ret;
+}
+
+static inline unsigned int eq_aci2oss(unsigned int vol)
+{
+	if (vol < 0x80)
+		return SCALE(0x7f, 50, vol) + 50;
+	else
+		return SCALE(0x7f, 50, 0xff-vol);
+}
+
+
+static int setequalizer(caddr_t arg, 
+			unsigned char left_index, unsigned char right_index)
+{
+	int buf;
+	unsigned int vol;
+
+	__get_user(vol, (int *)arg);
 
 	/* left channel */
-	vol = *(int *)arg & 0xff;
-	if (vol > 100)
-		vol = 100;
-	vol = SCALE(100, 0x20, vol);
-	if (aci_write_cmd(left_index, 0x20 - vol))
-		return -EIO;
-	ret = SCALE(0x20, 100, vol);
-
+	if ((buf=aci_write_cmd(left_index, eq_oss2aci(vol & 0xff)))<0)
+		return buf;
 
 	/* right channel */
-	vol = (*(int *)arg >> 8) & 0xff;
-	if (vol > 100)
-		vol = 100;
-	vol = SCALE(100, 0x20, vol);
-	if (aci_write_cmd(right_index, 0x20 - vol))
-		return -EIO;
-	ret |= SCALE(0x20, 100, vol) << 8;
- 
-	return (*(int *) arg = ret);
+	if ((buf=aci_write_cmd(right_index, eq_oss2aci((vol>>8) & 0xff)))<0)
+		return buf;
+
+	/* the ACI equalizer is more precise */
+	return 0;
 }
 
-
-static int
-aci_mixer_ioctl (int dev, unsigned int cmd, caddr_t arg)
+static int getequalizer(caddr_t arg,
+			unsigned char left_index, unsigned char right_index)
 {
-	int status, vol;
-	unsigned char buf;
+	int buf;
+	unsigned int vol;
 
-	/* handle solo mode control */
-	if (cmd == SOUND_MIXER_PRIVATE1) {
-		if (*(int *) arg >= 0) {
-			aci_solo = !!*(int *) arg;
-			if (aci_write_cmd(0xd2, aci_solo))
-				return -EIO;
-		} else if (aci_version >= 0xb0) {
-			if ((status = read_general_status()) < 0)
-				return -EIO;
-			return (*(int *) arg = (status & 0x20) == 0);
+	/* left channel */
+	if ((buf=aci_indexed_cmd(0xf0, left_index))<0)
+		return buf;
+	vol = eq_aci2oss(buf);
+	
+	/* right channel */
+	if ((buf=aci_indexed_cmd(0xf0, right_index))<0)
+		return buf;
+	vol |= eq_aci2oss(buf) << 8;
+
+	__put_user(vol, (int *)arg);
+
+	return 0;
+}
+
+static int aci_mixer_ioctl (int dev, unsigned int cmd, caddr_t arg)
+{
+	int vol, buf;
+
+	switch (cmd) {
+	case SOUND_MIXER_WRITE_VOLUME:
+		return setvolume(arg, 0x01, 0x00);
+	case SOUND_MIXER_WRITE_CD:
+		return setvolume(arg, 0x3c, 0x34);
+	case SOUND_MIXER_WRITE_MIC:
+		return setvolume(arg, 0x38, 0x30);
+	case SOUND_MIXER_WRITE_LINE:
+		return setvolume(arg, 0x39, 0x31);
+	case SOUND_MIXER_WRITE_SYNTH:
+		return setvolume(arg, 0x3b, 0x33);
+	case SOUND_MIXER_WRITE_PCM:
+		return setvolume(arg, 0x3a, 0x32);
+	case MIXER_WRITE(SOUND_MIXER_RADIO): /* fall through */
+	case SOUND_MIXER_WRITE_LINE1:  /* AUX1 or radio */
+		return setvolume(arg, 0x3d, 0x35);
+	case SOUND_MIXER_WRITE_LINE2:  /* AUX2 */
+		return setvolume(arg, 0x3e, 0x36);
+	case SOUND_MIXER_WRITE_BASS:   /* set band one and two */
+		if (aci_idcode[1]=='C') {
+			if ((buf=setequalizer(arg, 0x48, 0x40)) || 
+			    (buf=setequalizer(arg, 0x49, 0x41)));
+			return buf;
 		}
-		
-		return (*(int *) arg = aci_solo);
-	}
-	
-	if (((cmd >> 8) & 0xff) == 'M') {
-		if (cmd & SIOC_IN)
-			/* read and write */
-			switch (cmd & 0xff) {
-				case SOUND_MIXER_VOLUME:
-					return setvolume(arg, 0x01, 0x00);
-				case SOUND_MIXER_CD:
-					return setvolume(arg, 0x3c, 0x34);
-				case SOUND_MIXER_MIC:
-					return setvolume(arg, 0x38, 0x30);
-				case SOUND_MIXER_LINE:
-					return setvolume(arg, 0x39, 0x31);
-				case SOUND_MIXER_SYNTH:
-					return setvolume(arg, 0x3b, 0x33);
-				case SOUND_MIXER_PCM:
-					return setvolume(arg, 0x3a, 0x32);
-				case SOUND_MIXER_LINE1:  /* AUX1 */
-					return setvolume(arg, 0x3d, 0x35);
-				case SOUND_MIXER_LINE2:  /* AUX2 */
-					return setvolume(arg, 0x3e, 0x36);
-				case SOUND_MIXER_IGAIN:  /* MIC pre-amp */
-					vol = *(int *) arg & 0xff;
-					if (vol > 100)
-						vol = 100;
-					vol = SCALE(100, 3, vol);
-					if (aci_write_cmd(0x03, vol))
-						return -EIO;
-					vol = SCALE(3, 100, vol);
-					return (*(int *) arg = vol | (vol << 8));
-				case SOUND_MIXER_RECSRC:
-					return (*(int *) arg = 0);
-					break;
-				default:
-					return -EINVAL;
-			}
+		break;
+	case SOUND_MIXER_WRITE_TREBLE: /* set band six and seven */
+		if (aci_idcode[1]=='C') {
+			if ((buf=setequalizer(arg, 0x4d, 0x45)) || 
+			    (buf=setequalizer(arg, 0x4e, 0x46)));
+			return buf;
+		}
+		break;
+	case SOUND_MIXER_WRITE_IGAIN:  /* MIC pre-amp */
+		if (aci_idcode[1]=='B' || aci_idcode[1]=='C') {
+			__get_user(vol, (int *)arg);
+			vol = vol & 0xff;
+			if (vol > 100)
+				vol = 100;
+			vol = SCALE(100, 3, vol);
+			if ((buf=aci_write_cmd(0x03, vol))<0)
+				return buf;
+			aci_micpreamp = vol;
+			vol = SCALE(3, 100, vol);
+			vol |= (vol << 8);
+			__put_user(vol, (int *)arg);
+			return 0;
+		}
+		break;
+	case SOUND_MIXER_WRITE_OGAIN:  /* Power-amp/line-out level */
+		if (aci_idcode[1]=='A' || aci_idcode[1]=='B') {
+			__get_user(buf, (int *)arg);
+			buf = buf & 0xff;
+			if (buf > 50)
+				vol = 1;
+			else
+				vol = 0;
+			if ((buf=aci_write_cmd(0x0f, vol))<0)
+				return buf;
+			aci_amp = vol;
+			if (aci_amp)
+				buf = (100 || 100<<8);
+			else
+				buf = 0;
+			__put_user(buf, (int *)arg);
+			return 0;
+		}
+		break;
+	case SOUND_MIXER_WRITE_RECSRC:
+		/* handle solo mode control */
+		__get_user(buf, (int *)arg);
+		/* unset solo when RECSRC for PCM is requested */
+		if (aci_idcode[1]=='B' || aci_idcode[1]=='C') {
+			vol = !(buf & SOUND_MASK_PCM);
+			if ((buf=aci_write_cmd(0xd2, vol))<0)
+				return buf;
+			aci_solo = vol;
+		}
+		buf = (SOUND_MASK_CD| SOUND_MASK_MIC| SOUND_MASK_LINE|
+		       SOUND_MASK_SYNTH| SOUND_MASK_LINE2);
+		if (aci_idcode[1] == 'C') /* PCM20 radio */
+			buf |= SOUND_MASK_RADIO;
 		else
-			/* only read */
-			switch (cmd & 0xff) {
-				case SOUND_MIXER_DEVMASK:
-					return (*(int *) arg =
-				 SOUND_MASK_VOLUME | SOUND_MASK_CD    |
-				 SOUND_MASK_MIC    | SOUND_MASK_LINE  |
-				 SOUND_MASK_SYNTH  | SOUND_MASK_PCM   |
-#if 0
-				 SOUND_MASK_IGAIN  |
-#endif
-				 SOUND_MASK_LINE1  | SOUND_MASK_LINE2);
-				 	break;
-				case SOUND_MIXER_STEREODEVS:
-					return (*(int *) arg =
-				 SOUND_MASK_VOLUME | SOUND_MASK_CD   |
-				 SOUND_MASK_MIC    | SOUND_MASK_LINE |
-				 SOUND_MASK_SYNTH  | SOUND_MASK_PCM  |
-				 SOUND_MASK_LINE1  | SOUND_MASK_LINE2);
-				 	break;
-				case SOUND_MIXER_RECMASK:
-					return (*(int *) arg = 0);
-					break;
-				case SOUND_MIXER_RECSRC:
-					return (*(int *) arg = 0);
-					break;
-				case SOUND_MIXER_CAPS:
-					return (*(int *) arg = 0);
-					break;
-				case SOUND_MIXER_VOLUME:
-					return getvolume(arg, 0x04, 0x03);
-				case SOUND_MIXER_CD:
-					return getvolume(arg, 0x0a, 0x09);
-				case SOUND_MIXER_MIC:
-					return getvolume(arg, 0x06, 0x05);
-				case SOUND_MIXER_LINE:
-					return getvolume(arg, 0x08, 0x07);
-				case SOUND_MIXER_SYNTH:
-					return getvolume(arg, 0x0c, 0x0b);
-				case SOUND_MIXER_PCM:
-					return getvolume(arg, 0x0e, 0x0d);
-				case SOUND_MIXER_LINE1:  /* AUX1 */
-					return getvolume(arg, 0x11, 0x10);
-				case SOUND_MIXER_LINE2:  /* AUX2 */
-					return getvolume(arg, 0x13, 0x12);
-				case SOUND_MIXER_IGAIN:  /* MIC pre-amp */
-					if (aci_indexed_cmd(0xf0, 0x21, &buf))
-						return -EIO;
-					vol = SCALE(3, 100, buf <= 3 ? buf : 3);
-					vol |= vol << 8;
-					return (*(int *) arg = vol);
-				default:
-					return -EINVAL;
+			buf |= SOUND_MASK_LINE1;
+		if (!aci_solo)
+			buf |= SOUND_MASK_PCM;
+		__put_user(buf, (int *)arg);
+		return 0;
+	case SOUND_MIXER_READ_DEVMASK:
+		buf = (SOUND_MASK_VOLUME | SOUND_MASK_CD    |
+		       SOUND_MASK_MIC    | SOUND_MASK_LINE  |
+		       SOUND_MASK_SYNTH  | SOUND_MASK_PCM   |
+		       SOUND_MASK_LINE2);
+		switch (aci_idcode[1]) {
+		case 'C': /* PCM20 radio */
+			buf |= (SOUND_MASK_RADIO | SOUND_MASK_IGAIN |
+				SOUND_MASK_BASS  | SOUND_MASK_TREBLE);
+			break;
+		case 'B': /* PCM12 */
+			buf |= (SOUND_MASK_LINE1 | SOUND_MASK_IGAIN |
+				SOUND_MASK_OGAIN);
+			break;
+		case 'A': /* PCM1-pro */
+			buf |= (SOUND_MASK_LINE1 | SOUND_MASK_OGAIN);
+			break;
+		default:
+			buf |= SOUND_MASK_LINE1;
+		}
+		__put_user(buf, (int *)arg);
+		return 0;
+	case SOUND_MIXER_READ_STEREODEVS:
+		buf = (SOUND_MASK_VOLUME | SOUND_MASK_CD    |
+		       SOUND_MASK_MIC    | SOUND_MASK_LINE  |
+		       SOUND_MASK_SYNTH  | SOUND_MASK_PCM   |
+		       SOUND_MASK_LINE2);
+		switch (aci_idcode[1]) {
+		case 'C': /* PCM20 radio */
+			buf |= (SOUND_MASK_RADIO |
+				SOUND_MASK_BASS  | SOUND_MASK_TREBLE);
+			break;
+		default:
+			buf |= SOUND_MASK_LINE1;
+		}
+		__put_user(buf, (int *)arg);
+		return 0;
+	case SOUND_MIXER_READ_RECMASK:
+		buf = (SOUND_MASK_CD| SOUND_MASK_MIC| SOUND_MASK_LINE|
+		       SOUND_MASK_SYNTH| SOUND_MASK_LINE2| SOUND_MASK_PCM);
+		if (aci_idcode[1] == 'C') /* PCM20 radio */
+			buf |= SOUND_MASK_RADIO;
+		else
+			buf |= SOUND_MASK_LINE1;
+
+		__put_user(buf, (int *)arg);
+		return 0;
+	case SOUND_MIXER_READ_RECSRC:
+		buf = (SOUND_MASK_CD    | SOUND_MASK_MIC   | SOUND_MASK_LINE  |
+		       SOUND_MASK_SYNTH | SOUND_MASK_LINE2);
+		/* do we need aci_solo or can I get it from the ACI? */
+		switch (aci_idcode[1]) {
+		case 'B': /* PCM12 */
+		case 'C': /* PCM20 radio */
+			if (aci_version >= 0xb0) {
+				if ((vol=aci_rw_cmd(0xf0, 0x00, -1))<0)
+					return vol;
+				if (vol & 0x20)
+					buf |= SOUND_MASK_PCM;
 			}
+			else
+				if (!aci_solo)
+					buf |= SOUND_MASK_PCM;
+			break;
+		default:
+			buf |= SOUND_MASK_PCM;
+		}
+		if (aci_idcode[1] == 'C') /* PCM20 radio */
+			buf |= SOUND_MASK_RADIO;
+		else
+			buf |= SOUND_MASK_LINE1;
+
+		__put_user(buf, (int *)arg);
+		return 0;
+	case SOUND_MIXER_READ_CAPS:
+		__put_user(0, (int *)arg);
+		return 0;
+	case SOUND_MIXER_READ_VOLUME:
+		return getvolume(arg, 0x04, 0x03);
+	case SOUND_MIXER_READ_CD:
+		return getvolume(arg, 0x0a, 0x09);
+	case SOUND_MIXER_READ_MIC:
+		return getvolume(arg, 0x06, 0x05);
+	case SOUND_MIXER_READ_LINE:
+		return getvolume(arg, 0x08, 0x07);
+	case SOUND_MIXER_READ_SYNTH:
+		return getvolume(arg, 0x0c, 0x0b);
+	case SOUND_MIXER_READ_PCM:
+		return getvolume(arg, 0x0e, 0x0d);
+	case MIXER_READ(SOUND_MIXER_RADIO): /* fall through */
+	case SOUND_MIXER_READ_LINE1:  /* AUX1 */
+		return getvolume(arg, 0x11, 0x10);
+	case SOUND_MIXER_READ_LINE2:  /* AUX2 */
+		return getvolume(arg, 0x13, 0x12);
+	case SOUND_MIXER_READ_BASS:   /* get band one */
+		if (aci_idcode[1]=='C') {
+			return getequalizer(arg, 0x23, 0x22);
+		}
+		break;
+	case SOUND_MIXER_READ_TREBLE: /* get band seven */
+		if (aci_idcode[1]=='C') {
+			return getequalizer(arg, 0x2f, 0x2e);
+		}
+		break;
+	case SOUND_MIXER_READ_IGAIN:  /* MIC pre-amp */
+		if (aci_idcode[1]=='B' || aci_idcode[1]=='C') {
+			/* aci_micpreamp or ACI? */
+			if (aci_version >= 0xb0) {
+				if ((buf=aci_indexed_cmd(0xf0, 0x21))<0)
+					return buf;
+			}
+			else
+				buf=aci_micpreamp;
+			vol = SCALE(3, 100, buf <= 3 ? buf : 3);
+			vol |= vol << 8;
+			__put_user(vol, (int *)arg);
+			return 0;
+		}
+		break;
+	case SOUND_MIXER_READ_OGAIN:
+		if (aci_amp)
+			buf = (100 || 100<<8);
+		else
+			buf = 0;
+		__put_user(buf, (int *)arg);
+		return 0;
 	}
-	
 	return -EINVAL;
 }
 
-
 static struct mixer_operations aci_mixer_operations =
 {
-	owner:	THIS_MODULE,
-	id:	"ACI",
-	name:	"ACI mixer",
-	ioctl:	aci_mixer_ioctl
+	owner: THIS_MODULE,
+	id:    "ACI",
+	ioctl: aci_mixer_ioctl
 };
 
-static unsigned char
-mad_read (int port)
-{
-	outb (0xE3, 0xf8f); /* Write MAD16 password */
-	return inb (port);  /* Read from port */
-}
-
-
 /*
- * Check, whether there actually is any ACI port operational and if
- * one was found, then initialize the ACI interface, reserve the I/O
- * addresses and attach the new mixer to the relevant VoxWare data
- * structures.
- *
- * Returns:  1   ACI mixer detected
- *           0   nothing there
- *
  * There is also an internal mixer in the codec (CS4231A or AD1845),
  * that deserves no purpose in an ACI based system which uses an
  * external ACI controlled stereo mixer. Make sure that this codec
@@ -570,153 +595,108 @@ mad_read (int port)
 
 static int __init attach_aci(void)
 {
-	char *boardname = "unknown";
-	int volume;
+	char *boardname;
+	int i;
 
-#define MC4_PORT	0xf90
+	init_MUTEX(&aci_sem);
 
-	aci_port =
-		(mad_read(MC4_PORT) & 0x10) ? 0x344 : 0x354;
+	outb(0xE3, 0xf8f); /* Write MAD16 password */
+	aci_port = (inb(0xf90) & 0x10) ?
+		0x344: 0x354; /* Get aci_port from MC4_PORT */
 
 	if (check_region(aci_port, 3)) {
-#ifdef DEBUG
-		printk("ACI: I/O area 0x%03x-0x%03x already used.\n",
-			aci_port, aci_port+2);
-#endif
-		return 0;
-	}
-	
-	if (aci_read_cmd(0xf2, 2, aci_idcode)) {
-#ifdef DEBUG
-		printk("ACI: Failed to read idcode.\n");
-#endif
-		return 0;
-	}
-	
-	if (aci_read_cmd(0xf1, 1, &aci_version)) {
-#ifdef DEBUG
-		printk("ACI: Failed to read version.\n");
-#endif
-		return 0;
+		printk(KERN_NOTICE "aci: I/O area 0x%03x-0x%03x already used.\n",
+		       aci_port, aci_port+2);
+		return -EBUSY;
 	}
 
-	if (aci_idcode[0] == 0x6d) {
+	/* force ACI into a known state */
+	for (i=0; i<3; i++)
+		if (aci_rw_cmd(0xdf, -1, -1)<0)
+			return -EFAULT;
+
+	/* official this is one aci read call: */
+	if ((aci_idcode[0]=aci_rw_cmd(0xf2, -1, -1))<0 ||
+	    (aci_idcode[1]=aci_rw_cmd(0xf2, -1, -1))<0) {
+		printk(KERN_ERR "aci: Failed to read idcode on 0x%03x.\n", aci_port);
+		return -EFAULT;
+	}
+
+	if ((aci_version=aci_rw_cmd(0xf1, -1, -1))<0) {
+		printk(KERN_ERR "aci: Failed to read version on 0x%03x.\n", aci_port);
+		return -EFAULT;
+	}
+
+	if (aci_idcode[0] == 'm') {
 		/* It looks like a miro sound card. */
 		switch (aci_idcode[1]) {
-			case 0x41:
-				boardname = "PCM1 pro / early PCM12";
-				break;
-			case 0x42:
-				boardname = "PCM12";
-				break;
-			case 0x43:
-				boardname = "PCM20";
-				break;
-			default:
-				boardname = "unknown miro";
+		case 'A':
+			boardname = "PCM1 pro / early PCM12";
+			break;
+		case 'B':
+			boardname = "PCM12";
+			break;
+		case 'C':
+			boardname = "PCM20 radio";
+			break;
+		default:
+			boardname = "unknown miro";
 		}
-	} else
-#ifndef DEBUG
-	return 0;
-#endif
-  
-  	printk("<ACI %02x, id %02x %02x (%s)> at 0x%03x\n",
-		aci_version, aci_idcode[0], aci_idcode[1], boardname, aci_port);
-
-	if (aci_reset) {
-		/* initialize ACI mixer */
-		aci_implied_cmd(0xff);
-		aci_solo = 0;
+	} else {
+		printk(KERN_WARNING "aci: Warning: unsupported card! - "
+		       "no hardware, no specs...\n");
+		boardname = "unknown Cardinal Technologies";
 	}
 
-	/* attach the mixer */
-	request_region(aci_port, 3, "sound mixer (ACI)");
-	if (num_mixers < MAX_MIXER_DEV) {
-		if (num_mixers > 0 &&
-		  !strncmp("MAD16 WSS", mixer_devs[num_mixers-1]->name, 9)) {
-			/*
-			 * The previously registered mixer device is the CS4231A which
-			 * has no function on an ACI card. Make the ACI mixer the first
-			 * of the two mixer devices.
-			 */
-			mixer_devs[num_mixers] = mixer_devs[num_mixers-1];
-			mixer_devs[num_mixers-1] = &aci_mixer_operations;
-			/*
-			 * Initialize the CS4231A mixer with reasonable values. It is
-			 * unlikely that the user ever will want to change these as all
-			 * channels can be mixed via ACI.
-			 */
-			volume = 0x6464;
-			mixer_devs[num_mixers]->ioctl(num_mixers,
-				SOUND_MIXER_WRITE_PCM, (caddr_t) &volume);
-			volume = 0x6464;
-			mixer_devs[num_mixers]->ioctl(num_mixers,
-				SOUND_MIXER_WRITE_IGAIN,   (caddr_t) &volume);
-			volume = 0;
-			mixer_devs[num_mixers]->ioctl(num_mixers,
-				SOUND_MIXER_WRITE_SPEAKER, (caddr_t) &volume);
-			volume = 0;
-			mixer_devs[num_mixers]->ioctl(num_mixers,
-				SOUND_MIXER_WRITE_MIC, (caddr_t) &volume);
-			volume = 0;
-			mixer_devs[num_mixers]->ioctl(num_mixers,
-				SOUND_MIXER_WRITE_IMIX, (caddr_t) &volume);
-			volume = 0;
-			mixer_devs[num_mixers]->ioctl(num_mixers,
-				SOUND_MIXER_WRITE_LINE1, (caddr_t) &volume);
-			volume = 0;
-			mixer_devs[num_mixers]->ioctl(num_mixers,
-				SOUND_MIXER_WRITE_LINE2, (caddr_t) &volume);
-			volume = 0;
-			mixer_devs[num_mixers]->ioctl(num_mixers,
-				SOUND_MIXER_WRITE_LINE3, (caddr_t) &volume);
-			volume = SOUND_MASK_LINE1;
-			mixer_devs[num_mixers]->ioctl(num_mixers,
-				SOUND_MIXER_WRITE_RECSRC, (caddr_t) &volume);
-			num_mixers++;
-		} else
-			mixer_devs[num_mixers++] = &aci_mixer_operations;
+	printk(KERN_INFO "<ACI 0x%02x, id %02x/%02x \"%c/%c\", (%s)> at 0x%03x\n",
+	       aci_version,
+	       aci_idcode[0], aci_idcode[1],
+	       aci_idcode[0], aci_idcode[1],
+	       boardname, aci_port);
+
+	if (reset) {
+		/* first write()s after reset fail with my PCM20 */
+		if (aci_rw_cmd(0xff, -1, -1)<0 ||
+		    aci_rw_cmd(0xdf, 0xdf, 0xdf)<0 ||
+		    aci_rw_cmd(0xdf, 0xdf, 0xdf)<0)
+			return -EBUSY;
 	}
 
-	/* Just do something; otherwise the first write command fails, at
-	 * least with my PCM20.
-	 */
-	aci_mixer_ioctl(num_mixers-1, SOUND_MIXER_READ_VOLUME, (caddr_t) &volume);
+	/* the PCM20 is muted after reset (and reboot) */
+	if (aci_rw_cmd(0x0d, 0x00, -1)<0)
+		return -EBUSY;
+
+	if (ide>=0)
+		if (aci_rw_cmd(0xd0, !ide, -1)<0)
+			return -EBUSY;
 	
-	if (aci_reset) {
-		/* Initialize ACI mixer with reasonable power-up values */
-		volume = 0x3232;
-		aci_mixer_ioctl(num_mixers-1, SOUND_MIXER_WRITE_VOLUME, (caddr_t) &volume);
-		volume = 0x3232;
-		aci_mixer_ioctl(num_mixers-1, SOUND_MIXER_WRITE_SYNTH,  (caddr_t) &volume);
-		volume = 0x3232;
-		aci_mixer_ioctl(num_mixers-1, SOUND_MIXER_WRITE_PCM,    (caddr_t) &volume);
-		volume = 0x3232;
-		aci_mixer_ioctl(num_mixers-1, SOUND_MIXER_WRITE_LINE,   (caddr_t) &volume);
-		volume = 0x3232;
-		aci_mixer_ioctl(num_mixers-1, SOUND_MIXER_WRITE_MIC,    (caddr_t) &volume);
-		volume = 0x3232;
-		aci_mixer_ioctl(num_mixers-1, SOUND_MIXER_WRITE_CD,     (caddr_t) &volume);
-		volume = 0x3232;
-		aci_mixer_ioctl(num_mixers-1, SOUND_MIXER_WRITE_LINE1,  (caddr_t) &volume);
-		volume = 0x3232;
-		aci_mixer_ioctl(num_mixers-1, SOUND_MIXER_WRITE_LINE2,  (caddr_t) &volume);
+	if (wss>=0 && aci_idcode[1]=='A')
+		if (aci_rw_cmd(0xd1, !!wss, -1)<0)
+			return -EBUSY;
+
+	if (!request_region(aci_port, 3, "sound mixer (ACI)"))
+		return -ENOMEM;
+
+	if ((mixer_device = sound_install_mixer(MIXER_DRIVER_VERSION,
+						boardname,
+						&aci_mixer_operations,
+						sizeof(aci_mixer_operations),
+						NULL)) >= 0) {
+		/* Maybe initialize the CS4231A mixer here... */
+	} else {
+		printk(KERN_ERR "aci: Failed to install mixer.\n");
+		release_region(aci_port, 3);
+		return mixer_device;
 	}
 
-	aci_present = 1;
-
-	return 1;
+	return 0;
 }
 
 static void __exit unload_aci(void)
 {
-	if (aci_present)
-		release_region(aci_port, 3);
+	sound_unload_mixerdev(mixer_device);
+	release_region(aci_port, 3);
 }
-
-EXPORT_SYMBOL(aci_write_cmd);
-EXPORT_SYMBOL(aci_indexed_cmd);
-EXPORT_SYMBOL(aci_write_cmd_d);
 
 module_init(attach_aci);
 module_exit(unload_aci);

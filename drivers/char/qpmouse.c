@@ -24,9 +24,8 @@
  */
 
 #include <linux/module.h>
- 
-#include <linux/sched.h>
 #include <linux/kernel.h>
+#include <linux/sched.h>
 #include <linux/interrupt.h>
 #include <linux/fcntl.h>
 #include <linux/errno.h>
@@ -146,11 +145,11 @@ static int release_qp(struct inode * inode, struct file * file)
 	fasync_qp(-1, file, 0);
 	if (!--qp_count) {
 		if (!poll_qp_status())
-			printk("Warning: Mouse device busy in release_qp()\n");
+			printk(KERN_WARNING "Warning: Mouse device busy in release_qp()\n");
 		status = inb_p(qp_status);
 		outb_p(status & ~(QP_ENABLE|QP_INTS_ON), qp_status);
 		if (!poll_qp_status())
-			printk("Warning: Mouse device busy in release_qp()\n");
+			printk(KERN_WARNING "Warning: Mouse device busy in release_qp()\n");
 		free_irq(QP_IRQ, NULL);
 	}
 	unlock_kernel();
@@ -188,7 +187,7 @@ static int open_qp(struct inode * inode, struct file * file)
 	outb_p(status, qp_status);              /* Enable interrupts */
 
 	while (!poll_qp_status()) {
-		printk("Error: Mouse device busy in open_qp()\n");
+		printk(KERN_ERR "Error: Mouse device busy in open_qp()\n");
 		qp_count--;
 		status &= ~(QP_ENABLE|QP_INTS_ON);
 		outb_p(status, qp_status);
@@ -303,7 +302,9 @@ struct file_operations qp_fops = {
  * Initialize driver.
  */
 static struct miscdevice qp_mouse = {
-	PSMOUSE_MINOR, "QPmouse", &qp_fops
+	minor:		PSMOUSE_MINOR,
+	name:		"QPmouse",
+	fops:		&qp_fops,
 };
 
 /*
@@ -337,37 +338,36 @@ static int __init probe_qp(void)
 	return 1;
 }
 
-int __init qpmouse_init(void)
+static const char msg_banner[] __initdata = KERN_INFO "82C710 type pointing device detected -- driver installed.\n";
+static const char msg_nomem[]  __initdata = KERN_ERR "qpmouse: no queue memory.\n";
+
+static int __init qpmouse_init_driver(void)
 {
 	if (!probe_qp())
 		return -EIO;
 
-	printk(KERN_INFO "82C710 type pointing device detected -- driver installed.\n");
+	printk(msg_banner);
+
 /*	printk("82C710 address = %x (should be 0x310)\n", qp_data); */
 	queue = (struct qp_queue *) kmalloc(sizeof(*queue), GFP_KERNEL);
-	if(queue==NULL)
-	{
-		printk(KERN_ERR "qpmouse: no queue memory.\n");
+	if (queue == NULL) {
+		printk(msg_nomem);
 		return -ENOMEM;
-	}	
+	}
 	qp_present = 1;
 	misc_register(&qp_mouse);
 	memset(queue, 0, sizeof(*queue));
 	queue->head = queue->tail = 0;
 	init_waitqueue_head(&queue->proc_list);
-
 	return 0;
 }
 
-#ifdef MODULE
-int init_module(void)
-{
-	return qpmouse_init();
-}
-
-void cleanup_module(void)
+static void __exit qpmouse_exit_driver(void)
 {
 	misc_deregister(&qp_mouse);
 	kfree(queue);
 }
-#endif
+
+module_init(qpmouse_init_driver);
+module_exit(qpmouse_exit_driver);
+

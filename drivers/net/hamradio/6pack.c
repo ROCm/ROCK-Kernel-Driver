@@ -711,10 +711,6 @@ static int __init sixpack_init_driver(void)
 	/* Do sanity checks on maximum device parameter. */
 	if (sixpack_maxdev < 4)
 		sixpack_maxdev = 4;
-	if (sixpack_maxdev * sizeof(void*) >= KMALLOC_MAXSIZE) {
-	        printk(msg_invparm);
-		return -ENFILE;
-	}
 
 	printk(msg_banner, sixpack_maxdev);
 

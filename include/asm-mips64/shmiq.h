@@ -153,7 +153,7 @@ struct shmiqsetcpos {
 /* get time since last event */
 #define QIOCGETITIME    _IOR('Q', 11, time_t)
 
-/* set curent screen */
+/* set current screen */
 #define QIOCSETSCRN     _IOW('Q',6,int)
 
 

@@ -1,15 +1,15 @@
-/* $Id: r4k_fpu.S,v 1.8 1999/09/28 22:25:47 ralf Exp $
- *
- * r4k_fpu.S: Save/restore floating point context for signal handlers.
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1996, 1998 by Ralf Baechle
+ * Copyright (C) 1996, 1998, 2000 by Ralf Baechle
  *
  * Multi-arch abstraction and asm macros for easier reading:
  * Copyright (C) 1996 David S. Miller (dm@engr.sgi.com)
+ *
+ *  Carsten Langgaard, carstenl@mips.com
+ *  Copyright (C) 2000 MIPS Technologies, Inc.
  */
 #include <asm/asm.h>
 #include <asm/errno.h>
@@ -19,7 +19,7 @@
 #include <asm/regdef.h>
 
 #define EX(a,b)							\
-9:	a,##b;							\
+9:	a,b;							\
 	.section __ex_table,"a";				\
 	PTR	9b, fault;					\
 	.previous
@@ -27,7 +27,7 @@
 	.set	noreorder
 	.set	mips3
 	/* Save floating point context */
-LEAF(save_fp_context)
+LEAF(_save_fp_context)
 	li	v0, 0					# assume success
 	cfc1	t1,fcr31
 
@@ -55,7 +55,7 @@ LEAF(save_fp_context)
 	.set	nomacro
 	 EX(sw	t0,SC_FPC_EIR(a0))
 	.set	macro
-	END(save_fp_context)
+	END(_save_fp_context)
 
 /*
  * Restore FPU state:
@@ -66,7 +66,7 @@ LEAF(save_fp_context)
  * frame on the current content of c0_status, not on the content of the
  * stack frame which might have been changed by the user.
  */
-LEAF(restore_fp_context)
+LEAF(_restore_fp_context)
 	li	v0, 0					# assume success
 	EX(lw	t0,SC_FPC_CSR(a0))
 
@@ -92,7 +92,7 @@ LEAF(restore_fp_context)
 	EX(ldc1	$f30,(SC_FPREGS+240)(a0))
 	jr	ra
 	 ctc1	t0,fcr31
-	END(restore_fp_context)
+	END(_restore_fp_context)
 
 	.type	fault@function
 	.ent	fault

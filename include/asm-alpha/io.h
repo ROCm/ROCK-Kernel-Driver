@@ -1,10 +1,6 @@
 #ifndef __ALPHA_IO_H
 #define __ALPHA_IO_H
 
-#include <linux/config.h>
-#include <linux/kernel.h>
-#include <asm/system.h>
-
 /* We don't use IO slowdowns on the Alpha, but.. */
 #define __SLOW_DOWN_IO	do { } while (0)
 #define SLOW_DOWN_IO	do { } while (0)
@@ -19,6 +15,9 @@
 #endif
 
 #ifdef __KERNEL__
+#include <linux/config.h>
+#include <linux/kernel.h>
+#include <asm/system.h>
 #include <asm/machvec.h>
 
 /*

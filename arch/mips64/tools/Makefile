@@ -1,4 +1,3 @@
-# $Id: Makefile,v 1.1 1999/08/18 21:46:53 ralf Exp $
 #
 # Makefile for MIPS kernel build tools.
 #

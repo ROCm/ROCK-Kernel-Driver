@@ -355,7 +355,7 @@ typedef elf_fpreg_t elf_fpregset_t[ELF_NFPREG];
 		(granularity << IA32_SEG_G)		       |       \
 		(((base >> 24) & 0xFF) << IA32_SEG_HIGH_BASE)) 
 
-#define IA32_IOBASE    0x2000000000000000 /* Virtual addres for I/O space */
+#define IA32_IOBASE    0x2000000000000000 /* Virtual address for I/O space */
 
 #define IA32_CR0       0x80000001      /* Enable PG and PE bits */
 #define IA32_CR4       0	       /* No architectural extensions */

@@ -122,7 +122,7 @@ static void SA5_submit_command( ctlr_info_t *h, CommandList_struct *c)
 }
 
 /*  
- *  This card is the oposite of the other cards.  
+ *  This card is the opposite of the other cards.  
  *   0 turns interrupts on... 
  *   0x08 turns them off... 
  */
@@ -138,7 +138,7 @@ static void SA5_intr_mask(ctlr_info_t *h, unsigned long val)
 	}
 }
 /*
- *  This card is the oposite of the other cards.
+ *  This card is the opposite of the other cards.
  *   0 turns interrupts on...
  *   0x04 turns them off...
  */

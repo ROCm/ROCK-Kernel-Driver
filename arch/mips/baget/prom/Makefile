@@ -1,4 +1,4 @@
-# $Id$
+#
 # Makefile for the Baget/MIPS prom emulator library routines.
 #
 # Note! Dependencies are done automagically by 'make dep', which also
@@ -7,9 +7,8 @@
 #
 # Note 2! The CFLAGS definitions are now in the main makefile...
 
-O_TARGET := bagetlib.a
-O_OBJS   := init.o
+L_TARGET := bagetlib.a
 
-all: 	$(O_TARGET)
+obj-y	:= init.o
 
 include $(TOPDIR)/Rules.make

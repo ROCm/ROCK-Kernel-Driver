@@ -769,20 +769,6 @@ static int amiga_wait_key (struct console *co)
     return 0;
 }
 
-void dbprintf(const char *fmt , ...)
-{
-	static char buf[1024];
-	va_list args;
-	extern void console_print (const char *str);
-	extern int vsprintf(char * buf, const char * fmt, va_list args);
-
-	va_start(args, fmt);
-	vsprintf(buf, fmt, args);
-	va_end(args);
-
-	console_print (buf);
-}
-
 static NORET_TYPE void amiga_reset( void )
     ATTRIB_NORET;
 

@@ -9,6 +9,8 @@ define_bool CONFIG_EISA n
 define_bool CONFIG_SBUS n
 define_bool CONFIG_MCA n
 define_bool CONFIG_UID16 y
+define_bool CONFIG_RWSEM_GENERIC_SPINLOCK y
+define_bool CONFIG_RWSEM_XCHGADD_ALGORITHM n
 
 
 mainmenu_option next_comment
@@ -44,7 +46,7 @@ choice 'ARM system type'	\
 mainmenu_option next_comment
 comment 'Archimedes/A5000 Implementations'
 # These architectures will be combined.  However, until this
-# is complete...  Note that the ARC will take precidence over
+# is complete...  Note that the ARC will take precedence over
 # A5K
 comment 'Archimedes/A5000 Implementations (select only ONE)'
 dep_bool '  Archimedes' CONFIG_ARCH_ARC $CONFIG_ARCH_ARCA5K

@@ -1,4 +1,4 @@
-/* $Id: sys_sparc.c,v 1.69 2001/03/27 02:36:37 davem Exp $
+/* $Id: sys_sparc.c,v 1.70 2001/04/14 01:12:02 davem Exp $
  * linux/arch/sparc/kernel/sys_sparc.c
  *
  * This file contains various random system calls that
@@ -299,7 +299,6 @@ asmlinkage unsigned long sparc_mremap(unsigned long addr,
 	} else if ((ARCH_SUN4C_SUN4 && addr < 0xe0000000 &&
 		    addr + new_len > 0x20000000) ||
 		   addr + new_len > TASK_SIZE - PAGE_SIZE) {
-		unsigned long (*get_addr)(struct file *, unsigned long, unsigned long, unsigned long, unsigned long);
 		unsigned long map_flags = 0;
 		struct file *file = NULL;
 

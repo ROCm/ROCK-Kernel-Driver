@@ -18,6 +18,7 @@
 #include <linux/spinlock.h>
 #include <linux/wait.h>
 #include <linux/config.h>
+#include <linux/rwsem.h>
 
 struct semaphore {
 #ifdef __MIPSEB__
@@ -215,7 +216,7 @@ struct rw_semaphore {
 	atomic_t		count;
 	/* bit 0 means read bias granted;
 	   bit 1 means write bias granted.  */
-	unsigned		granted;
+	unsigned long		granted; /* pedant: long req'd for set_bit */
 	wait_queue_head_t	wait;
 	wait_queue_head_t	write_bias_wait;
 #if WAITQUEUE_DEBUG

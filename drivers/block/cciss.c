@@ -583,13 +583,15 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 		if (iocommand.Request.Type.Direction == XFER_WRITE)
 		{
 			/* Copy the data into the buffer we created */ 
-			if (copy_from_user(buff, iocommand.buf, iocommand.buf_size))
+			if (copy_from_user(buff, iocommand.buf,
+						iocommand.buf_size)) {
+				kfree(buff);
 				return -EFAULT;
+			}
 		}
 		if ((c = cmd_alloc(NULL)) == NULL)
 		{
-			if(buff!=NULL)
-				kfree(buff);
+			kfree(buff);
 			return -ENOMEM;
 		}
 			// Fill in the command type 
@@ -636,8 +638,7 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 		if ( copy_to_user((void *) arg, &iocommand, sizeof( IOCTL_Command_struct) ) )
 		{
 			cmd_free(NULL, c);
-			if (buff != NULL) 
-				kfree(buff);
+			kfree(buff);
 			return( -EFAULT);	
 		} 	
 
@@ -648,11 +649,11 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 			{
 			             cmd_free(NULL, c);
 			             kfree(buff);
+				     return -EFAULT;	
 			}
                 }
 		cmd_free(NULL, c);
-                if (buff != NULL)
-                	kfree(buff);
+                kfree(buff);
                 return(0);
 	} 
 
@@ -761,7 +762,7 @@ static int revalidate_allvol(kdev_t dev)
         hba[ctlr]->gendisk.nr_real = 0;
 
         /*
-         * Tell the array controller not to give us any interupts while
+         * Tell the array controller not to give us any interrupts while
          * we check the new geometry.  Then turn interrupts back on when
          * we're done.
          */
@@ -1087,7 +1088,7 @@ static inline void complete_command( CommandList_struct *cmd, int timeout)
 	if (timeout)
 		status = 0; 
 	if(cmd->err_info->CommandStatus != 0) 
-	{ /* an error has occured */ 
+	{ /* an error has occurred */ 
 		switch(cmd->err_info->CommandStatus)
 		{
 			case CMD_TARGET_STATUS:
@@ -1846,12 +1847,9 @@ int __init cciss_init(void)
 			|| (hba[i]->errinfo_pool == NULL))
                 {
                         nr_ctlr = i;
-			if(hba[i]->cmd_pool_bits)
-                                kfree(hba[i]->cmd_pool_bits);
-                        if(hba[i]->cmd_pool)
-                                kfree(hba[i]->cmd_pool);
-			if(hba[i]->errinfo_pool)
-				kfree(hba[i]->errinfo_pool);
+			kfree(hba[i]->cmd_pool_bits);
+			kfree(hba[i]->cmd_pool);
+			kfree(hba[i]->errinfo_pool);
                         free_irq(hba[i]->intr, hba[i]);
                         unregister_blkdev(MAJOR_NR+i, hba[i]->devname);
                         num_cntlrs_reg--;

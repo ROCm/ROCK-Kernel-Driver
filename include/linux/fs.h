@@ -1295,7 +1295,6 @@ extern int dcache_readdir(struct file *, void *, filldir_t);
 
 extern struct file_system_type *get_fs_type(const char *name);
 extern struct super_block *get_super(kdev_t);
-struct super_block *get_empty_super(void);
 extern void put_super(kdev_t);
 unsigned long generate_cluster(kdev_t, int b[], int);
 unsigned long generate_cluster_swab32(kdev_t, int b[], int);

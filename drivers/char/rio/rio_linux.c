@@ -1031,8 +1031,10 @@ static int rio_init_datastructures (void)
  free2:kfree (p->RIOHosts);
  free1:kfree (p);
  free0:
-  rio_dprintk (RIO_DEBUG_INIT, "Not enough memory! %p %p %p %p %p\n", 
-               p, p->RIOHosts, p->RIOPortp, rio_termios, rio_termios);
+  if (p) {
+	rio_dprintk (RIO_DEBUG_INIT, "Not enough memory! %p %p %p %p %p\n", 
+        	       p, p->RIOHosts, p->RIOPortp, rio_termios, rio_termios);
+  }
   return -ENOMEM;
 }
 

@@ -7,17 +7,13 @@
 #
 # Note 2! The CFLAGS definitions are now in the main makefile...
 
-SUB_DIRS     :=
-MOD_SUB_DIRS := $(SUB_DIRS) char
-ALL_SUB_DIRS := $(SUB_DIRS) char
-
-
-L_OBJS   := 
 L_TARGET := sgi.a
 
+#
 # Character and Audio devices for SGI machines.
 #
-SUB_DIRS += char
-L_OBJS += char/sgichar.o
+subdir-y	+= char
+subdir-m	+= char
+obj-y		+= char/sgichar.o
 
 include $(TOPDIR)/Rules.make

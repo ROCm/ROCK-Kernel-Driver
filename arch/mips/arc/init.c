@@ -1,4 +1,4 @@
-/* $Id: init.c,v 1.5 2000/03/07 15:45:27 ralf Exp $
+/*
  * This file is subject to the terms and conditions of the GNU General Public+ 
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
@@ -23,7 +23,9 @@ unsigned short prom_vers, prom_rev;
 
 extern void prom_testtree(void);
 
-int __init prom_init(int argc, char **argv, char **envp, int *prom_vec)
+extern void arc_setup_console(void);
+
+void __init prom_init(int argc, char **argv, char **envp, int *prom_vec)
 {
 	struct linux_promblock *pb;
 
@@ -33,7 +35,20 @@ int __init prom_init(int argc, char **argv, char **envp, int *prom_vec)
 	prom_argv = argv;
 	prom_envp = envp;
 
-	if(pb->magic != 0x53435241) {
+#if 0
+	/* arc_printf should not use prom_printf as soon as we free
+	 * the prom buffers - This horribly breaks on Indys with framebuffer
+	 * as it simply stops after initialising swap - On the Indigo2 serial
+	 * console you will get A LOT illegal instructions - Only enable
+	 * this for early init crashes - This also brings up artefacts of
+	 * printing everything twice on serial console and on GFX Console
+	 * this has the effect of having the prom printing everything
+	 * in the small rectangle and the kernel printing around.
+	 */
+
+	arc_setup_console();
+#endif
+	if (pb->magic != 0x53435241) {
 		prom_printf("Aieee, bad prom vector magic %08lx\n", pb->magic);
 		while(1)
 			;
@@ -55,5 +70,4 @@ int __init prom_init(int argc, char **argv, char **envp, int *prom_vec)
 		romvec->imode();
 	}
 #endif
-	return 0;
 }

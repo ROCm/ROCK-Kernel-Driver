@@ -2456,12 +2456,13 @@ generic_file_write(struct file *file,const char *buf,size_t count,loff_t *ppos)
 	unsigned long	written;
 	long		status;
 	int		err;
+	unsigned	bytes;
 
 	cached_page = NULL;
 
 	if (!access_ok(VERIFY_READ, buf, count))
 		return -EFAULT;
-
+		
 	down(&inode->i_sem);
 
 	pos = *ppos;
@@ -2484,26 +2485,64 @@ generic_file_write(struct file *file,const char *buf,size_t count,loff_t *ppos)
 	 * Check whether we've reached the file size limit.
 	 */
 	err = -EFBIG;
+	
 	if (limit != RLIM_INFINITY) {
 		if (pos >= limit) {
 			send_sig(SIGXFSZ, current, 0);
 			goto out;
 		}
-		if (count > limit - pos) {
-			send_sig(SIGXFSZ, current, 0);
-			count = limit - pos;
+		if (pos > 0xFFFFFFFFULL || count > limit - (u32)pos) {
+			/* send_sig(SIGXFSZ, current, 0); */
+			count = limit - (u32)pos;
 		}
 	}
 
-	status  = 0;
-	if (count) {
-		remove_suid(inode);
-		inode->i_ctime = inode->i_mtime = CURRENT_TIME;
-		mark_inode_dirty_sync(inode);
+	/*
+	 *	LFS rule 
+	 */
+	if ( pos + count > MAX_NON_LFS && !(file->f_flags&O_LARGEFILE)) {
+		if (pos >= MAX_NON_LFS) {
+			send_sig(SIGXFSZ, current, 0);
+			goto out;
+		}
+		if (count > MAX_NON_LFS - (u32)pos) {
+			/* send_sig(SIGXFSZ, current, 0); */
+			count = MAX_NON_LFS - (u32)pos;
+		}
 	}
 
+	/*
+	 *	Are we about to exceed the fs block limit ?
+	 *
+	 *	If we have written data it becomes a short write
+	 *	If we have exceeded without writing data we send
+	 *	a signal and give them an EFBIG.
+	 *
+	 *	Linus frestrict idea will clean these up nicely..
+	 */
+	 
+	if (pos > inode->i_sb->s_maxbytes)
+	{
+		send_sig(SIGXFSZ, current, 0);
+		err = -EFBIG;
+		goto out;	
+	}
+
+	if (pos + count > inode->i_sb->s_maxbytes)
+		count = inode->i_sb->s_maxbytes - pos;
+
+	if (count == 0) {
+		err = 0;
+		goto out;
+	}
+
+	status  = 0;
+	remove_suid(inode);
+	inode->i_ctime = inode->i_mtime = CURRENT_TIME;
+	mark_inode_dirty_sync(inode);
+
 	while (count) {
-		unsigned long bytes, index, offset;
+		unsigned long index, offset;
 		char *kaddr;
 		int deactivate = 1;
 

@@ -142,7 +142,6 @@
  */
 #define ENOMEDIUM	159	/* No medium found */
 #define EMEDIUMTYPE	160	/* Wrong medium type */
-#define EHASHCOLLISION	125	/* Number of hash collisons exceeds maximum generation counter value.  */
 
 #define EDQUOT		1133	/* Quota exceeded */
 

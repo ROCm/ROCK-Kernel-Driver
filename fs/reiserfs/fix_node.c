@@ -479,7 +479,7 @@ static int get_num_ver (int mode, struct tree_balance * tb, int h,
     // do not count last 'end_bytes' units of 'end_item'-th item
     end_bytes = (to_bytes != -1) ? to_bytes : 0;
 
-    /* go through all item begining from the start_item-th item and ending by
+    /* go through all item beginning from the start_item-th item and ending by
        the end_item-th item. Do not count first 'start_bytes' units of
        'start_item'-th item and last 'end_bytes' of 'end_item'-th item */
     

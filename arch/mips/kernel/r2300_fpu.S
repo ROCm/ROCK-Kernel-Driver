@@ -1,7 +1,4 @@
-/* $Id: r2300_fpu.S,v 1.6 1999/08/09 19:43:14 harald Exp $
- *
- * r2300_fpu.S: Save/restore floating point context for signal handlers.
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
@@ -30,7 +27,7 @@
 	.set	noreorder
 	.set	mips1
 	/* Save floating point context */
-LEAF(save_fp_context)
+LEAF(_save_fp_context)
 	li	v0, 0					# assume success
 	cfc1	t1,fcr31
 	EX(swc1	$f0,(SC_FPREGS+0)(a0))
@@ -65,13 +62,13 @@ LEAF(save_fp_context)
 	EX(swc1	$f29,(SC_FPREGS+232)(a0))
 	EX(swc1	$f30,(SC_FPREGS+240)(a0))
 	EX(swc1	$f31,(SC_FPREGS+248)(a0))
-	EX(sw	t1,SC_FPC_CSR(a0))
+	EX(sw	t1,(SC_FPC_CSR)(a0))
 	cfc1	t0,$0				# implementation/version
 	jr	ra
 	.set	nomacro
-	 EX(sw	t0,SC_FPC_EIR(a0))
+	 EX(sw	t0,(SC_FPC_EIR)(a0))
 	.set	macro
-	END(save_fp_context)
+	END(_save_fp_context)
 
 /*
  * Restore FPU state:
@@ -82,9 +79,9 @@ LEAF(save_fp_context)
  * frame on the current content of c0_status, not on the content of the
  * stack frame which might have been changed by the user.
  */
-LEAF(restore_fp_context)
+LEAF(_restore_fp_context)
 	li	v0, 0					# assume success
-	EX(lw t0,SC_FPC_CSR(a0))
+	EX(lw t0,(SC_FPC_CSR)(a0))
 	EX(lwc1	$f0,(SC_FPREGS+0)(a0))
 	EX(lwc1	$f1,(SC_FPREGS+8)(a0))
 	EX(lwc1	$f2,(SC_FPREGS+16)(a0))
@@ -119,7 +116,7 @@ LEAF(restore_fp_context)
 	EX(lwc1	$f31,(SC_FPREGS+248)(a0))
 	jr	ra
 	 ctc1	t0,fcr31
-	END(restore_fp_context)
+	END(_restore_fp_context)
 
 	.type	fault@function
 	.ent	fault

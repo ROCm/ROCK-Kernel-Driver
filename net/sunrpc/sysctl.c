@@ -63,7 +63,7 @@ proc_dodebug(ctl_table *table, int write, struct file *file,
 {
 	char		tmpbuf[20], *p, c;
 	unsigned int	value;
-	int		left, len;
+	size_t		left, len;
 
 	if ((file->f_pos && !write) || !*lenp) {
 		*lenp = 0;

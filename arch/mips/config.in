@@ -28,6 +28,9 @@ bool 'Support for Olivetti M700-10' CONFIG_OLIVETTI_M700
 bool 'Support for SGI IP22' CONFIG_SGI_IP22
 bool 'Support for SNI RM200 PCI' CONFIG_SNI_RM200_PCI
 
+define_bool CONFIG_RWSEM_GENERIC_SPINLOCK y
+define_bool CONFIG_RWSEM_XCHGADD_ALGORITHM n
+
 #
 # Select some configuration options automatically for certain systems.
 #
@@ -329,7 +332,10 @@ if [ "$CONFIG_DECSTATION" = "y" ]; then
 #   if [ "$CONFIG_ACCESSBUS" = "y" ]; then
 #      bool 'MAXINE Access.Bus mouse (VSXXX-BB/GB) support' CONFIG_DTOP_MOUSE
 #   fi
-   bool 'Enhanced Real Time Clock Support' CONFIG_RTC
+   bool 'Enhanced Real Time Clock Support' CONFIG_MIPS_RTC
+
+   define_tristate CONFIG_RTC $CONFIG_MIPS_RTC
+
    endmenu
 fi
 

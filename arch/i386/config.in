@@ -9,6 +9,8 @@ define_bool CONFIG_ISA y
 define_bool CONFIG_SBUS n
 
 define_bool CONFIG_UID16 y
+define_bool CONFIG_RWSEM_GENERIC_SPINLOCK n
+define_bool CONFIG_RWSEM_XCHGADD_ALGORITHM y
 
 mainmenu_option next_comment
 comment 'Code maturity level options'

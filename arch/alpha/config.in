@@ -5,6 +5,8 @@
 
 define_bool CONFIG_ALPHA y
 define_bool CONFIG_UID16 n
+define_bool CONFIG_RWSEM_GENERIC_SPINLOCK y
+define_bool CONFIG_RWSEM_XCHGADD_ALGORITHM n
 
 mainmenu_name "Kernel configuration of Linux for Alpha machines"
 

@@ -37,7 +37,8 @@
 #include <linux/module.h>
 #include <linux/kbd_kern.h>
 
-#if defined(CONFIG_X86) || defined(CONFIG_IA64) || defined(__alpha__) || defined(__mips__) || defined(CONFIG_SPARC64)
+#if defined(CONFIG_X86) || defined(CONFIG_IA64) || defined(__alpha__) || \
+    defined(__mips__) || defined(CONFIG_SPARC64) || defined(CONFIG_SUPERH)
 
 static int x86_sysrq_alt = 0;
 #ifdef CONFIG_SPARC64

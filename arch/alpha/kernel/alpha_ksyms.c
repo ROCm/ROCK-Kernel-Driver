@@ -190,7 +190,6 @@ EXPORT_SYMBOL(kernel_flag);
 EXPORT_SYMBOL(synchronize_irq);
 EXPORT_SYMBOL(flush_tlb_all);
 EXPORT_SYMBOL(flush_tlb_mm);
-EXPORT_SYMBOL(flush_tlb_page);
 EXPORT_SYMBOL(flush_tlb_range);
 EXPORT_SYMBOL(smp_imb);
 EXPORT_SYMBOL(cpu_data);

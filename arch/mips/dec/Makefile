@@ -7,30 +7,20 @@
 #
 
 .S.s:
-	$(CPP) $(CFLAGS) $< -o $*.s
+	$(CPP) $(AFLAGS) $< -o $@
 .S.o:
-	$(CC) $(CFLAGS) -c $< -o $*.o
+	$(CC) $(AFLAGS) -c $< -o $@
+
+O_TARGET := dec.o
 
 all: dec.o
-O_TARGET := dec.o
-O_OBJS	 := int-handler.o setup.o irq.o time.o reset.o rtc-dec.o
 
-ifdef CONFIG_PROM_CONSOLE
-O_OBJS   += promcon.o
-endif
+export-objs := wbflush.o
+obj-y	 := int-handler.o setup.o irq.o time.o reset.o rtc-dec.o wbflush.o
 
-ifdef CONFIG_SERIAL
-O_OBJS   += serial.o
-endif
-
-ifeq ($(CONFIG_MODULES),y)
- OX_OBJS  = wbflush.o
-else
- O_OBJS   += wbflush.o
-endif
+obj-$(CONFIG_PROM_CONSOLE)	+= promcon.o
+obj-$(CONFIG_SERIAL)		+= serial.o
 
 int-handler.o:	int-handler.S
-
-clean:
 
 include $(TOPDIR)/Rules.make

@@ -16,13 +16,14 @@ CONFIG_EXPERIMENTAL=y
 # CONFIG_COBALT_MICRO_SERVER is not set
 # CONFIG_DECSTATION is not set
 # CONFIG_DDB5074 is not set
-CONFIG_ORION=y
 # CONFIG_MIPS_MAGNUM_4000 is not set
 # CONFIG_OLIVETTI_M700 is not set
 # CONFIG_SGI_IP22 is not set
 # CONFIG_SNI_RM200_PCI is not set
+# CONFIG_MCA is not set
 # CONFIG_SBUS is not set
 # CONFIG_ISA is not set
+# CONFIG_EISA is not set
 # CONFIG_PCI is not set
 
 #
@@ -79,18 +80,24 @@ CONFIG_NET=y
 # CONFIG_BLK_DEV_XD is not set
 # CONFIG_PARIDE is not set
 # CONFIG_BLK_CPQ_DA is not set
+# CONFIG_BLK_CPQ_CISS_DA is not set
 # CONFIG_BLK_DEV_DAC960 is not set
 # CONFIG_BLK_DEV_LOOP is not set
 # CONFIG_BLK_DEV_NBD is not set
-# CONFIG_BLK_DEV_LVM is not set
+CONFIG_BLK_DEV_RAM=y
+CONFIG_BLK_DEV_RAM_SIZE=4096
+CONFIG_BLK_DEV_INITRD=y
+
+#
+# Multi-device support (RAID and LVM)
+#
+# CONFIG_MD is not set
 # CONFIG_BLK_DEV_MD is not set
 # CONFIG_MD_LINEAR is not set
 # CONFIG_MD_RAID0 is not set
 # CONFIG_MD_RAID1 is not set
 # CONFIG_MD_RAID5 is not set
-CONFIG_BLK_DEV_RAM=y
-CONFIG_BLK_DEV_RAM_SIZE=4096
-CONFIG_BLK_DEV_INITRD=y
+# CONFIG_BLK_DEV_LVM is not set
 
 #
 # Networking options
@@ -113,6 +120,7 @@ CONFIG_BLK_DEV_INITRD=y
 # CONFIG_X25 is not set
 # CONFIG_LAPB is not set
 # CONFIG_LLC is not set
+# CONFIG_NET_DIVERT is not set
 # CONFIG_ECONET_AUNUDP is not set
 # CONFIG_ECONET_NATIVE is not set
 # CONFIG_WAN_ROUTER is not set
@@ -180,6 +188,10 @@ CONFIG_BLK_DEV_INITRD=y
 # Joysticks
 #
 # CONFIG_JOYSTICK is not set
+
+#
+# Input core support is needed for joysticks
+#
 # CONFIG_QIC02_TAPE is not set
 
 #
@@ -189,11 +201,6 @@ CONFIG_BLK_DEV_INITRD=y
 # CONFIG_INTEL_RNG is not set
 # CONFIG_NVRAM is not set
 # CONFIG_RTC is not set
-
-#
-# Video For Linux
-#
-# CONFIG_VIDEO_DEV is not set
 # CONFIG_DTLK is not set
 # CONFIG_R3964 is not set
 # CONFIG_APPLICOM is not set
@@ -202,8 +209,13 @@ CONFIG_BLK_DEV_INITRD=y
 # Ftape, the floppy tape device driver
 #
 # CONFIG_FTAPE is not set
-# CONFIG_DRM is not set
 # CONFIG_AGP is not set
+# CONFIG_DRM is not set
+
+#
+# Multimedia devices
+#
+# CONFIG_VIDEO_DEV is not set
 
 #
 # File systems
@@ -211,6 +223,8 @@ CONFIG_BLK_DEV_INITRD=y
 # CONFIG_QUOTA is not set
 # CONFIG_AUTOFS_FS is not set
 # CONFIG_AUTOFS4_FS is not set
+# CONFIG_REISERFS_FS is not set
+# CONFIG_REISERFS_CHECK is not set
 # CONFIG_ADFS_FS is not set
 # CONFIG_ADFS_FS_RW is not set
 # CONFIG_AFFS_FS is not set
@@ -265,6 +279,7 @@ CONFIG_EXT2_FS=y
 #
 # CONFIG_PARTITION_ADVANCED is not set
 CONFIG_MSDOS_PARTITION=y
+# CONFIG_SMB_NLS is not set
 # CONFIG_NLS is not set
 
 #
@@ -276,6 +291,11 @@ CONFIG_MSDOS_PARTITION=y
 # USB support
 #
 # CONFIG_USB is not set
+
+#
+# Input core support
+#
+# CONFIG_INPUT is not set
 
 #
 # Kernel hacking

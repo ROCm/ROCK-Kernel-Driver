@@ -27,6 +27,7 @@
 #ifndef _TIMER_H
 #define _TIMER_H
 
+#include <linux/sched.h>
 #include <linux/interrupt.h>
 #include "hwaccess.h"
 

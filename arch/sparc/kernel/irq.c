@@ -8,7 +8,7 @@
  *  Copyright (C) 1995 Miguel de Icaza (miguel@nuclecu.unam.mx)
  *  Copyright (C) 1995 Pete A. Zaitcev (zaitcev@metabyte.com)
  *  Copyright (C) 1996 Dave Redman (djhr@tadpole.co.uk)
- *  Copyright (C) 1998-2000 Anton Blanchard (anton@linuxcare.com)
+ *  Copyright (C) 1998-2000 Anton Blanchard (anton@samba.org)
  */
 
 #include <linux/config.h>

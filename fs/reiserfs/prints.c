@@ -259,14 +259,14 @@ void reiserfs_warning (const char * fmt, ...)
 {
   do_reiserfs_warning;
   /* console_print (error_buf); */
-  printk ("%s", error_buf);
+  printk (KERN_WARNING "%s", error_buf);
 }
 
 void reiserfs_debug (struct super_block *s, int level, const char * fmt, ...)
 {
 #ifdef CONFIG_REISERFS_CHECK
   do_reiserfs_warning;
-  printk ("%s", error_buf);
+  printk (KERN_DEBUG "%s", error_buf);
 #else
   ; 
 #endif

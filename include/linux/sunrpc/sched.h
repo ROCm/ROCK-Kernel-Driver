@@ -80,7 +80,7 @@ struct rpc_task {
 	unsigned short		tk_lock;	/* Task lock counter */
 	unsigned char		tk_active   : 1,/* Task has been activated */
 				tk_wakeup   : 1;/* Task waiting to wake up */
-	unsigned int		tk_runstate;	/* Task run status */
+	unsigned long		tk_runstate;	/* Task run status */
 #ifdef RPC_DEBUG
 	unsigned short		tk_pid;		/* debugging aid */
 #endif

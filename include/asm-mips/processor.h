@@ -98,15 +98,20 @@ extern struct task_struct *last_task_used_math;
 #define NUM_FPU_REGS	32
 
 struct mips_fpu_hard_struct {
-	unsigned int fp_regs[NUM_FPU_REGS];
+	double fp_regs[NUM_FPU_REGS];
 	unsigned int control;
-} __attribute__((aligned(8)));
+};
 
 /*
- * FIXME: no fpu emulator yet (but who cares anyway?)
+ * It would be nice to add some more fields for emulator statistics, but there
+ * are a number of fixed offsets in offset.h and elsewhere that would have to
+ * be recalculated by hand.  So the additional information will be private to
+ * the FPU emulator for now.  See asm-mips/fpu_emulator.h.
  */
+typedef u64 fpureg_t;
 struct mips_fpu_soft_struct {
-	long	dummy;
+	fpureg_t	regs[NUM_FPU_REGS];
+	unsigned int	sr;
 };
 
 union mips_fpu_union {
@@ -148,6 +153,21 @@ struct thread_struct {
 	mm_segment_t current_ds;
 	unsigned long irix_trampoline;  /* Wheee... */
 	unsigned long irix_oldctx;
+
+	/*
+	 * These are really only needed if the full FPU emulator is configured.
+	 * Would be made conditional on MIPS_FPU_EMULATOR if it weren't for the
+	 * fact that having offset.h rebuilt differently for different config
+	 * options would be asking for trouble.
+	 *
+	 * Saved EPC during delay-slot emulation (see math-emu/cp1emu.c)
+	 */
+	unsigned long dsemul_epc;
+
+	/*
+	 * Pointer to instruction used to induce address error
+	 */
+	unsigned long dsemul_aerpc;
 };
 
 #endif /* !defined (_LANGUAGE_ASSEMBLY) */
@@ -176,7 +196,12 @@ struct thread_struct {
 	/* \
 	 * For now the default is to fix address errors \
 	 */ \
-	MF_FIXADE, { 0 }, 0, 0 \
+	MF_FIXADE, { 0 }, 0, 0, \
+	/* \
+	 * dsemul_epc and dsemul_aerpc should never be used uninitialized, \
+	 * but... \
+	 */ \
+	0 ,0 \
 }
 
 #ifdef __KERNEL__

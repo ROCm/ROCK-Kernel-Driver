@@ -1,4 +1,4 @@
-/* $Id: sys_sparc32.c,v 1.175 2001/03/27 02:36:37 davem Exp $
+/* $Id: sys_sparc32.c,v 1.176 2001/04/14 01:12:02 davem Exp $
  * sys_sparc32.c: Conversion between 32bit and 64bit native syscalls.
  *
  * Copyright (C) 1997,1998 Jakub Jelinek (jj@sunsite.mff.cuni.cz)
@@ -4138,7 +4138,6 @@ asmlinkage unsigned long sys32_mremap(unsigned long addr,
 		if (new_addr > 0xf0000000UL - new_len)
 			goto out_sem;
 	} else if (addr > 0xf0000000UL - new_len) {
-		unsigned long (*get_addr)(struct file *, unsigned long, unsigned long, unsigned long, unsigned long);
 		unsigned long map_flags = 0;
 		struct file *file = NULL;
 
@@ -4154,7 +4153,7 @@ asmlinkage unsigned long sys32_mremap(unsigned long addr,
 		}
 
 		/* MREMAP_FIXED checked above. */
-		new_addr = get_unmapped_addr(file, addr, new_len,
+		new_addr = get_unmapped_area(file, addr, new_len,
 				    vma ? vma->vm_pgoff : 0,
 				    map_flags);
 		ret = new_addr;

@@ -14,6 +14,7 @@
 #include <asm/system.h>
 #include <asm/atomic.h>
 #include <linux/wait.h>
+#include <linux/rwsem.h>
 
 struct semaphore {
 	atomic_t count;
@@ -89,103 +90,6 @@ static inline void up(struct semaphore * sem)
 {
 	if (atomic_inc_return(&sem->count) <= 0)
 		__up(sem);
-}
-
-/* rw mutexes (should that be mutices? =) -- throw rw
- * spinlocks and semaphores together, and this is what we
- * end up with...
- *
- * The lock is initialized to BIAS.  This way, a writer
- * subtracts BIAS ands gets 0 for the case of an uncontended
- * lock.  Readers decrement by 1 and see a positive value
- * when uncontended, negative if there are writers waiting
- * (in which case it goes to sleep).
- *
- * The value 0x01000000 supports up to 128 processors and
- * lots of processes.  BIAS must be chosen such that subl'ing
- * BIAS once per CPU will result in the long remaining
- * negative.
- *
- * In terms of fairness, this should result in the lock
- * flopping back and forth between readers and writers
- * under heavy use.
- *
- *		-ben
- */
-struct rw_semaphore {
-	atomic_t		count;
-	volatile unsigned int	write_bias_granted;
-	volatile unsigned int	read_bias_granted;
-	wait_queue_head_t	wait;
-	wait_queue_head_t	write_bias_wait;
-};
-
-#define RW_LOCK_BIAS		 0x01000000
-
-#define __RWSEM_DEBUG_INIT	/* */
-
-#define __RWSEM_INITIALIZER(name,count) \
-{ ATOMIC_INIT(count), 0, 0, __WAIT_QUEUE_HEAD_INITIALIZER((name).wait), \
-	__WAIT_QUEUE_HEAD_INITIALIZER((name).write_bias_wait) \
-	__SEM_DEBUG_INIT(name) __RWSEM_DEBUG_INIT }
-
-#define __DECLARE_RWSEM_GENERIC(name,count) \
-	struct rw_semaphore name = __RWSEM_INITIALIZER(name,count)
-
-#define DECLARE_RWSEM(name) __DECLARE_RWSEM_GENERIC(name,RW_LOCK_BIAS)
-#define DECLARE_RWSEM_READ_LOCKED(name) __DECLARE_RWSEM_GENERIC(name,RW_LOCK_BIAS-1)
-#define DECLARE_RWSEM_WRITE_LOCKED(name) __DECLARE_RWSEM_GENERIC(name,0)
-
-static inline void init_rwsem(struct rw_semaphore *sem)
-{
-	atomic_set(&sem->count, RW_LOCK_BIAS);
-	sem->read_bias_granted = 0;
-	sem->write_bias_granted = 0;
-	init_waitqueue_head(&sem->wait);
-	init_waitqueue_head(&sem->write_bias_wait);
-}
-
-extern void __down_read_failed(int, struct rw_semaphore *);
-extern void __down_write_failed(int, struct rw_semaphore *);
-extern void __rwsem_wake(int, struct rw_semaphore *);
-
-static inline void down_read(struct rw_semaphore *sem)
-{
-	int count;
-	count = atomic_dec_return(&sem->count);
-	if (count < 0)
-		__down_read_failed(count, sem);
-}
-
-static inline void down_write(struct rw_semaphore *sem)
-{
-	int count;
-	count = atomic_add_return (-RW_LOCK_BIAS, &sem->count);
-	if (count < 0)
-		__down_write_failed(count, sem);
-}
-
-/* When a reader does a release, the only significant
- * case is when there was a writer waiting, and we've
- * bumped the count to 0: we must wake the writer up.
- */
-static inline void up_read(struct rw_semaphore *sem)
-{
-	int count;
-	count = atomic_inc_return(&sem->count);
-	if (count == 0)
-		__rwsem_wake(count, sem);
-}
-
-/* releasing the writer is easy -- just release it and
- * wake up any sleepers.
- */
-static inline void up_write(struct rw_semaphore *sem)
-{
-	int count;
-	count = atomic_add_return(RW_LOCK_BIAS, &sem->count);
-	if (count >= 0 && count < RW_LOCK_BIAS)
-		__rwsem_wake(count, sem);
 }
 
 #endif

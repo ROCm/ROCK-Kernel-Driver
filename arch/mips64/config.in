@@ -25,6 +25,9 @@ if [ "$CONFIG_SGI_IP27" = "y" ]; then
 fi
 endmenu
 
+define_bool CONFIG_RWSEM_GENERIC_SPINLOCK y
+define_bool CONFIG_RWSEM_XCHGADD_ALGORITHM n
+
 #
 # Select some configuration options automatically based on user selections
 #

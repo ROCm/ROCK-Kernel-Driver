@@ -17,8 +17,10 @@
 #
 ifdef CONFIG_CPU_LITTLE_ENDIAN
 tool-prefix	= mipsel-linux-
+output-format	= elf32-littlemips
 else
 tool-prefix	= mips-linux-
+output-format	= elf32-bigmips
 endif
 
 ifdef CONFIG_CROSSCOMPILE
@@ -26,16 +28,16 @@ CROSS_COMPILE  = $(tool-prefix)
 endif
 
 #
-# The ELF GCC uses -G0 -mabicalls -fpic as default.  We don't need PIC
-# code in the kernel since it only slows down the whole thing.  For the
-# old GCC these options are just the defaults.  At some point we might
-# make use of global pointer optimizations.
+# GCC uses -G0 -mabicalls -fpic as default.  We don't want PIC in the kernel
+# code since it only slows down the whole thing.  At some point we might make
+# use of global pointer optimizations but their use of $28 conflicts with
+# the current pointer optimization.
 #
 # The DECStation requires an ECOFF kernel for remote booting, other MIPS
 # machines may also.  Since BFD is incredibly buggy with respect to
 # crossformat linking we rely on the elf2ecoff tool for format conversion.
 #
-CFLAGS		+= -G 0 -mno-abicalls -fno-pic
+GCCFLAGS	:= -G 0 -mno-abicalls -fno-pic
 LINKFLAGS	+= -static -G 0
 MODFLAGS	+= -mlong-calls
 
@@ -47,29 +49,55 @@ endif
 # CPU-dependent compiler/assembler options for optimization.
 #
 ifdef CONFIG_CPU_R3000
-CFLAGS		:= $(CFLAGS) -mcpu=r3000 -mips1
+GCCFLAGS	+= -mcpu=r3000 -mips1
+endif
+ifdef CONFIG_CPU_R3912
+GCCFLAGS	+= -mcpu=r3000 -mips1
 endif
 ifdef CONFIG_CPU_R6000
-CFLAGS		:= $(CFLAGS) -mcpu=r6000 -mips2 -Wa,--trap
+GCCFLAGS	+= -mcpu=r6000 -mips2 -Wa,--trap
 endif
 ifdef CONFIG_CPU_R4300
-CFLAGS		:= $(CFLAGS) -mcpu=r4300 -mips2 -Wa,--trap
+GCCFLAGS	+= -mcpu=r4300 -mips2 -Wa,--trap
 endif
 ifdef CONFIG_CPU_R4X00
-CFLAGS		:= $(CFLAGS) -mcpu=r4600 -mips2 -Wa,--trap
+GCCFLAGS	+= -mcpu=r4600 -mips2 -Wa,--trap
+endif
+ifdef CONFIG_CPU_MIPS32
+GCCFLAGS	+= -mcpu=r4600 -mips2 -Wa,--trap
 endif
 ifdef CONFIG_CPU_R5000
-CFLAGS		:= $(CFLAGS) -mcpu=r8000 -mips2 -Wa,--trap
+GCCFLAGS	+= -mcpu=r8000 -mips2 -Wa,--trap
+endif
+ifdef CONFIG_CPU_R5432
+GCCFLAGS        += -mcpu=r8000 -mips2 -Wa,--trap
 endif
 ifdef CONFIG_CPU_NEVADA
-CFLAGS		:= $(CFLAGS) -mcpu=r8000 -mips2 -Wa,--trap -mmad
+GCCFLAGS	+= -mcpu=r8000 -mips2 -Wa,--trap -mmad
+endif
+ifdef CONFIG_CPU_RM7000
+GCCFLAGS	+= -mcpu=r8000 -mips2 -Wa,--trap
 endif
 ifdef CONFIG_CPU_R8000
-CFLAGS		:= $(CFLAGS) -mcpu=r8000 -mips2 -Wa,--trap
+GCCFLAGS	+= -mcpu=r8000 -mips2 -Wa,--trap
 endif
 ifdef CONFIG_CPU_R10000
-CFLAGS		:= $(CFLAGS) -mcpu=r8000 -mips2 -Wa,--trap
+GCCFLAGS	+= -mcpu=r8000 -mips2 -Wa,--trap
 endif
+
+ifdef CONFIG_MIPS_FPU_EMULATOR
+CORE_FILES	+=arch/mips/math-emu/fpu_emulator.o
+SUBDIRS		+=arch/mips/math-emu
+endif
+
+#
+# The pipe options is bad for my low-mem machine
+# Uncomment this if you want this.
+#
+GCCFLAGS	+= -pipe
+
+CFLAGS		:= -I $(TOPDIR)/include/asm/gcc $(CFLAGS) $(GCCFLAGS)
+AFLAGS		+= $(GCCFLAGS)
 
 #
 # Board-dependent options and extra files
@@ -77,7 +105,7 @@ endif
 ifdef CONFIG_ALGOR_P4032
 CORE_FILES    += arch/mips/algor/algor.o
 SUBDIRS       += arch/mips/algor
-#LOADADDR      += 0x80000000
+LOADADDR      += 0x80000000
 endif
 
 #
@@ -90,6 +118,18 @@ LIBS          += arch/mips/dec/prom/rexlib.a
 LOADADDR      += 0x80040000
 endif
 
+ifdef CONFIG_MIPS_ATLAS
+LIBS          += arch/mips/mips-boards/atlas/atlas.o arch/mips/mips-boards/generic/mipsboards.o
+SUBDIRS       += arch/mips/mips-boards/generic arch/mips/mips-boards/atlas
+LOADADDR      += 0x80100000
+endif
+
+ifdef CONFIG_MIPS_MALTA
+LIBS          += arch/mips/mips-boards/malta/malta.o arch/mips/mips-boards/generic/mipsboards.o
+SUBDIRS       += arch/mips/mips-boards/malta arch/mips/mips-boards/generic
+LOADADDR      += 0x80100000
+endif
+
 #
 # Acer PICA 61, Mips Magnum 4000 and Olivetti M700.
 #
@@ -100,12 +140,6 @@ LIBS          += arch/mips/arc/arclib.a
 LOADADDR      += 0x80080000
 endif
 
-ifdef CONFIG_COBALT_MICRO_SERVER
-ARCHIVES      += arch/mips/cobalt/cobalt.o
-SUBDIRS       += arch/mips/cobalt
-LOADADDR      += 0x80000000
-endif
-
 ifdef CONFIG_SNI_RM200_PCI
 CORE_FILES    += arch/mips/sni/sni.o
 SUBDIRS       += arch/mips/sni arch/mips/arc
@@ -114,7 +148,8 @@ LOADADDR      += 0x80080000
 endif
 
 ifdef CONFIG_SGI_IP22
-LIBS          += arch/mips/sgi/kernel/sgikern.a arch/mips/arc/arclib.a
+CORE_FILES    += arch/mips/sgi/kernel/ip22-kern.o
+LIBS          += arch/mips/arc/arclib.a
 SUBDIRS       += arch/mips/sgi/kernel arch/mips/arc
 #
 # Set LOADADDR to >= 0x88069000 if you want to leave space for symmon,
@@ -152,28 +187,74 @@ LINKSCRIPT    = arch/mips/orion/ld.script.orion
 endif
 
 #
+#
+# NEC DDB Vrc-5476
+#
+ifdef CONFIG_DDB5476
+SUBDIRS       += arch/mips/ddb5476
+LIBS          += arch/mips/ddb5476/ddb5476.a
+LOADADDR      += 0x80080000
+endif
+
+#
+# Galileo EV64120 Board
+#
+ifdef CONFIG_MIPS_EV64120
+LIBS          += arch/mips/galileo-boards/ev64120/ev64120.o
+SUBDIRS       += arch/mips/galileo-boards/ev64120
+LOADADDR      += 0x80100000
+endif
+
+#
+# Galileo EV96100 Board
+#
+ifdef CONFIG_MIPS_EV96100
+LIBS          += arch/mips/galileo-boards/ev96100/ev96100.o arch/mips/galileo-boards/generic/galboards.o
+SUBDIRS       += arch/mips/galileo-boards/generic arch/mips/galileo-boards/ev96100
+LOADADDR      += 0x80100000
+endif
+
+#
+# Momentum Ocelot board
+#
+ifdef CONFIG_MOMENCO_OCELOT
+LIBS          += arch/mips/gt64120/common/gt64120.o arch/mips/gt64120/momenco_ocelot/momenco_ocelot.o
+SUBDIRS       += arch/mips/gt64120/common arch/mips/gt64120/momenco_ocelot
+LOADADDR      += 0x80100000
+endif
+
+#
+# Philips Nino
+#
+ifdef CONFIG_NINO
+CORE_FILES    += arch/mips/philips/nino/nino.o \
+		 arch/mips/philips/drivers/drivers.o
+SUBDIRS       += arch/mips/philips/nino arch/mips/philips/drivers
+LOADADDR      += 0x80000000
+endif
+
+#
+# ITE 8172 eval board with QED 5231 CPU
+#
+ifdef CONFIG_MIPS_ITE8172
+LIBS		+= arch/mips/ite-boards/qed-4n-s01b/ite.o		     \
+		   arch/mips/ite-boards/generic/it8172.o
+SUBDIRS		+= arch/mips/ite-boards/generic				     \
+		   arch/mips/ite-boards/qed-4n-s01b
+LOADADDR	+= 0x80100000
+endif
+
+#
 # Choosing incompatible machines durings configuration will result in
 # error messages during linking.  Select a default linkscript if
 # none has been choosen above.
 #
-ifndef LINKSCRIPT
-ifndef CONFIG_CPU_LITTLE_ENDIAN
-LINKSCRIPT    = arch/mips/ld.script.big
-else
-LINKSCRIPT    = arch/mips/ld.script.little
-endif
-endif
-LINKFLAGS     += -T $(word 1,$(LINKSCRIPT))
+vmlinux: arch/$(ARCH)/ld.script
 
-ifdef LOADADDR
-LINKFLAGS     += -Ttext $(word 1,$(LOADADDR))
-endif
-
-#
-# The pipe options is bad for my low-mem machine
-# Uncomment this if you want this.
-#
-CFLAGS		+= -pipe
+arch/$(ARCH)/ld.script: arch/$(ARCH)/ld.script.in arch/$(ARCH)/Makefile
+	sed -e 's/@@OUTPUT_FORMAT@@/$(output-format)/' \
+	    -e 's/@@LOADADDR@@/$(LOADADDR)/' <$< >$@
+LINKFLAGS	+= -T arch/$(ARCH)/ld.script
 
 HEAD := arch/mips/kernel/head.o arch/mips/kernel/init_task.o
 
@@ -197,7 +278,17 @@ orionboot:
 	$(ORIONBOOT) orionboot
 endif
 
+ifdef CONFIG_MIPS_EV64120
+GALILEOBOOT = $(MAKE) -C arch/$(ARCH)/galileo-boards/ev64120
+
+gboot: vmlinux
+	$(MAKE) -C arch/$(ARCH)/galileo-boards/ev64120/compressed 
+endif
+
 MAKEBOOT = $(MAKE) -C arch/$(ARCH)/boot
+
+vmlinux.ecoff: vmlinux
+	@$(MAKEBOOT) $@
 
 zImage: vmlinux
 	@$(MAKEBOOT) zImage
@@ -209,7 +300,7 @@ zdisk: vmlinux
 
 archclean:
 	@$(MAKEBOOT) clean
-	$(MAKE) -C arch/$(ARCH)/kernel clean
+	rm -f arch/$(ARCH)/ld.script
 	$(MAKE) -C arch/$(ARCH)/tools clean
 	$(MAKE) -C arch/mips/baget clean
 

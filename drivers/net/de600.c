@@ -597,7 +597,6 @@ de600_rx_intr(struct net_device *dev)
 	}
 
 	skb = dev_alloc_skb(size+2);
-	restore_flags(flags);
 	if (skb == NULL) {
 		printk("%s: Couldn't allocate a sk_buff of size %d.\n",
 			dev->name, size);

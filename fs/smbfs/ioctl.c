@@ -45,7 +45,7 @@ smb_ioctl(struct inode *inode, struct file *filp,
 		if (!copy_from_user(&opt, (void *)arg, sizeof(opt)))
 			result = smb_newconn(server, &opt);
 		break;
-	default:
+	default:;
 	}
 
 	return result;

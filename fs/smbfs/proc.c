@@ -697,7 +697,7 @@ smb_retry(struct smb_sb_info *server)
 #else
 	/*
 	 * We don't want to be interrupted. For example, what if 'current'
-	 * already has recieved a signal? sleep_on would terminate immediately
+	 * already has received a signal? sleep_on would terminate immediately
 	 * and smbmount would not be able to re-establish connection.
 	 *
 	 * smbmount should be able to reconnect later, but it can't because
@@ -712,7 +712,7 @@ smb_retry(struct smb_sb_info *server)
 	if (server->state == CONN_VALID) {
 		/* This should be changed to VERBOSE, except many smbfs
 		   problems is with the userspace daemon not reconnecting. */
-		PARANOIA("sucessful, new pid=%d, generation=%d\n",
+		PARANOIA("successful, new pid=%d, generation=%d\n",
 			 server->conn_pid, server->generation);
 		result = 1;
 	}

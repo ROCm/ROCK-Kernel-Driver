@@ -403,9 +403,11 @@ romfs_readpage(struct file *file, struct page * page)
 	void *buf;
 	int result = -EIO;
 
+	page_cache_get(page);
 	lock_kernel();
-	get_page(page);
-	buf = page_address(page);
+	buf = kmap(page);
+	if (!buf)
+		goto err_out;
 
 	/* 32 bit warning -- but not for us :) */
 	offset = page->index << PAGE_CACHE_SHIFT;
@@ -428,7 +430,9 @@ romfs_readpage(struct file *file, struct page * page)
 
 	UnlockPage(page);
 
-	__free_page(page);
+	kunmap(page);
+err_out:
+	page_cache_release(page);
 	unlock_kernel();
 
 	return result;

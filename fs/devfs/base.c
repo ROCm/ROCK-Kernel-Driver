@@ -3339,7 +3339,7 @@ static int devfsd_close (struct inode *inode, struct file *file)
 }   /*  End Function devfsd_close  */
 
 
-int __init init_devfs_fs (void)
+static int __init init_devfs_fs (void)
 {
     int err;
 
@@ -3369,3 +3369,5 @@ void __init mount_devfs_fs (void)
     if (err == 0) printk ("Mounted devfs on /dev\n");
     else printk ("Warning: unable to mount devfs, err: %d\n", err);
 }   /*  End Function mount_devfs_fs  */
+
+module_init(init_devfs_fs)

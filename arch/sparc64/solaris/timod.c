@@ -611,7 +611,7 @@ int timod_putmsg(unsigned int fd, char *ctl_buf, int ctl_len,
 		return 0;
 	}
 	default:
-		printk("timod_putmsg: unsuported command %u.\n", ret);
+		printk("timod_putmsg: unsupported command %u.\n", ret);
 		break;
 	}
 	return -EINVAL;

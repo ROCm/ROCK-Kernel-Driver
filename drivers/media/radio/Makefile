@@ -23,7 +23,9 @@ O_TARGET := radio.o
 
 export-objs     :=	
 
-list-multi	:=	
+list-multi	:= miropcm20.o
+
+miropcm20-objs	:= radio-miropcm20.o rds-miropcm20.o
 
 obj-$(CONFIG_RADIO_AZTECH) += radio-aztech.o
 obj-$(CONFIG_RADIO_RTRACK2) += radio-rtrack2.o
@@ -34,9 +36,12 @@ obj-$(CONFIG_RADIO_TERRATEC) += radio-terratec.o
 obj-$(CONFIG_RADIO_MAXIRADIO) += radio-maxiradio.o
 obj-$(CONFIG_RADIO_RTRACK) += radio-aimslab.o
 obj-$(CONFIG_RADIO_ZOLTRIX) += radio-zoltrix.o
-obj-$(CONFIG_RADIO_MIROPCM20) += radio-miropcm20.o
+obj-$(CONFIG_RADIO_MIROPCM20) += miropcm20.o
 obj-$(CONFIG_RADIO_GEMTEK) += radio-gemtek.o
 obj-$(CONFIG_RADIO_TRUST) += radio-trust.o
 obj-$(CONFIG_RADIO_MAESTRO) += radio-maestro.o
 
 include $(TOPDIR)/Rules.make
+
+miropcm20.o: $(miropcm20-objs)
+	$(LD) -r -o $@ $(miropcm20-objs)

@@ -222,7 +222,7 @@ typedef struct _CommandList_struct {
   ErrDescriptor_struct     ErrDesc;
   SGDescriptor_struct      SG[MAXSGENTRIES];
 	/* information associated with the command */ 
-  __u32			   busaddr; /* physical addres of this record */
+  __u32			   busaddr; /* physical address of this record */
   ErrorInfo_struct * 	   err_info; /* pointer to the allocated mem */ 
   int			   cmd_type; 
   struct _CommandList_struct *prev;

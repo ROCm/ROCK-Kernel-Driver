@@ -377,7 +377,7 @@ int vsprintf(char *buf, const char *fmt, va_list args)
  * sprintf - Format a string and place it in a buffer
  * @buf: The buffer to place the result into
  * @fmt: The format string to use
- * @args: Arguments for the format string
+ * @...: Arguments for the format string
  */
 int sprintf(char * buf, const char *fmt, ...)
 {

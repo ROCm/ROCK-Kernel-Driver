@@ -1136,7 +1136,7 @@ command_complete_msgin:
 #if (CHIP == 710)
 #if defined(MVME16x_INTFLY)
 ; For MVME16x (ie CHIP=710) we will force an INTFLY by triggering a software
-; interupt (SW7).  We can use SCRATCH, as we are about to jump to
+; interrupt (SW7).  We can use SCRATCH, as we are about to jump to
 ; schedule, which corrupts it anyway.  Will probably remove this later,
 ; but want to check performance effects first.
 

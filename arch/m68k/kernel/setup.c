@@ -39,10 +39,6 @@
 #include <linux/blk.h>
 #endif
 
-#ifndef CONFIG_AMIGA
-#define dbprintf	printk
-#endif
-
 unsigned long m68k_machtype;
 unsigned long m68k_cputype;
 unsigned long m68k_fputype;

@@ -9,8 +9,6 @@
  *
  * Multi-arch abstraction and asm macros for easier reading:
  * Copyright (C) 1996 David S. Miller (dm@engr.sgi.com)
- *
- * $Id: r6000_fpu.S,v 1.5 1999/05/01 22:40:37 ralf Exp $
  */
 #include <asm/asm.h>
 #include <asm/fpregdef.h>
@@ -21,7 +19,7 @@
 	.set	noreorder
 	.set	mips2
 	/* Save floating point context */
-	LEAF(save_fp_context)
+	LEAF(_save_fp_context)
 	mfc0	t0,CP0_STATUS
 	sll	t0,t0,2
 	bgez	t0,1f
@@ -49,7 +47,7 @@
 	 sw	t0,SC_FPC_CSR(a0)
 1:	jr	ra
 	 nop
-	END(save_fp_context)
+	END(_save_fp_context)
 
 /* Restore FPU state:
  *  - fp gp registers
@@ -59,7 +57,7 @@
  * frame on the current content of c0_status, not on the content of the
  * stack frame which might have been changed by the user.
  */
-	LEAF(restore_fp_context)
+	LEAF(_restore_fp_context)
 	mfc0	t0,CP0_STATUS
 	sll	t0,t0,2
 
@@ -86,4 +84,4 @@
 	 ctc1	t0,fcr31
 1:	jr	ra
 	 nop
-	END(restore_fp_context)
+	END(_restore_fp_context)

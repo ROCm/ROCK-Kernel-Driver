@@ -40,7 +40,7 @@ extern inline void pcibios_penalize_isa_irq(int irq)
 #include <linux/string.h>
 #include <asm/io.h>
 
-#ifdef CONFIG_DDB5074
+#if (defined(CONFIG_DDB5074) || defined(CONFIG_DDB5476))
 #undef PCIBIOS_MIN_IO
 #undef PCIBIOS_MIN_MEM
 #define PCIBIOS_MIN_IO		0x0100000

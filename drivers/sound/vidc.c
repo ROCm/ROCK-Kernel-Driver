@@ -17,6 +17,7 @@
  * We currently support a mixer device, but it is currently non-functional.
  */
 
+#include <linux/config.h>
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
@@ -82,6 +83,7 @@ static unsigned int	vidc_audio_volume_r;	/* right PCM vol, 0 - 65536 */
 static void	(*old_mksound)(unsigned int hz, unsigned int ticks);
 extern void	(*kd_mksound)(unsigned int hz, unsigned int ticks);
 extern void	vidc_update_filler(int bits, int channels);
+extern int	softoss_dev;
 
 static void
 vidc_mksound(unsigned int hz, unsigned int ticks)
@@ -214,8 +216,8 @@ static int vidc_audio_set_speed(int dev, int rate)
 			rate = VIDC_SOUND_CLOCK / hwrate;
 		}
 
-		outl(0xb0000000 | (hwrate - 2), IO_VIDC_BASE);
-		outl(0xb1000000 | hwctrl, IO_VIDC_BASE);
+		vidc_writel(0xb0000000 | (hwrate - 2));
+		vidc_writel(0xb1000000 | hwctrl);
 
 		newsize = (10000 / hwrate) & ~3;
 		if (newsize < 208)
@@ -354,7 +356,7 @@ static void vidc_audio_trigger(int dev, int enable_bits)
 
 			dma_interrupt = vidc_audio_dma_interrupt;
 			vidc_sound_dma_irq(0, NULL, NULL);
-			outb(DMA_CR_E | 0x10, IOMD_SD0CR);
+			iomd_writeb(DMA_CR_E | 0x10, IOMD_SD0CR);
 
 			local_irq_restore(flags);
 		}
@@ -473,6 +475,9 @@ static void __init attach_vidc(struct address_info *hw_config)
 	vidc_adev = adev;
 	vidc_mixer_set(SOUND_MIXER_VOLUME, (85 | 85 << 8));
 
+#if defined(CONFIG_SOUND_SOFTOSS) || defined(CONFIG_SOUND_SOFTOSS_MODULE)
+	softoss_dev = adev;
+#endif
 	return;
 
 irq_failed:

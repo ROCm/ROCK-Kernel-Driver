@@ -7,27 +7,36 @@
 #
 # Note 2! The CFLAGS definitions are now in the main makefile...
 
-SUB_DIRS     :=
-MOD_SUB_DIRS := 
-ALL_SUB_DIRS := 
+# All of the (potential) objects that export symbols.
+# This list comes from 'grep -l EXPORT_SYMBOL *.[hc]'.
 
-L_TARGET := tc.a
-L_OBJS   := tc.o
+export-objs	:= tc.o
 
-# Nasty trick as nobody references tcsyms.o, but we still want it linked.
-# Stolen from pci Makefile
-ifeq ($(CONFIG_MODULES),y)
-O_TARGET = tc_syms.o
-OX_OBJS  = tcsyms.o
-O_OBJS   = tc.o
-L_OBJS   := tc_syms.o
-else
-L_OBJS   := tc.o
-endif
+# Object file lists.
 
-ifdef CONFIG_ZS
-L_OBJS   += zs.o
-endif
+obj-y		:=
+obj-m		:=
+obj-n		:=
+obj-		:=
+
+obj-$(CONFIG_TC) += tc.o
+obj-$(CONFIG_ZS) += zs.o
+obj-$(CONFIG_VT) += lk201.o lk201-map.o lk201-remap.o
+
+# Files that are both resident and modular: remove from modular.
+
+obj-m		:= $(filter-out $(obj-y), $(obj-m))
+
+# Translate to Rules.make lists.
+
+L_TARGET	:= tc.a
+
+L_OBJS		:= $(sort $(filter-out $(export-objs), $(obj-y)))
+LX_OBJS		:= $(sort $(filter     $(export-objs), $(obj-y)))
+M_OBJS		:= $(sort $(filter-out $(export-objs), $(obj-m)))
+MX_OBJS		:= $(sort $(filter     $(export-objs), $(obj-m)))
 
 include $(TOPDIR)/Rules.make
 
+lk201-map.c: lk201-map.map
+	loadkeys --mktable lk201-map.map > lk201-map.c

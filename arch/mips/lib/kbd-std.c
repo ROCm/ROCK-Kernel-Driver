@@ -8,6 +8,7 @@
  *
  * Copyright (C) 1998, 1999 by Ralf Baechle
  */
+#include <linux/config.h>
 #include <linux/ioport.h>
 #include <linux/sched.h>
 #include <linux/pc_keyb.h>
@@ -19,11 +20,17 @@
 
 static void std_kbd_request_region(void)
 {
+#ifdef CONFIG_MIPS_ITE8172
+	printk("std_kbd_request_region\n");
+	request_region(0x14000060, 16, "keyboard");
+#else
 	request_region(0x60, 16, "keyboard");
+#endif
 }
 
 static int std_kbd_request_irq(void (*handler)(int, void *, struct pt_regs *))
 {
+	printk("std_kbd_request_irq\n");
 	return request_irq(KEYBOARD_IRQ, handler, 0, "keyboard", NULL);
 }
 

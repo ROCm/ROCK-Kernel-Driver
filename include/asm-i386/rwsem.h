@@ -1,4 +1,4 @@
-/* rwsem.h: R/W semaphores based on spinlocks
+/* rwsem.h: R/W semaphores optimised using i386 assembly
  *
  * Written by David Howells (dhowells@redhat.com).
  *
@@ -14,7 +14,6 @@
 
 #ifdef __KERNEL__
 
-#define __HAVE_ARCH_SPECIFIC_RWSEM_IMPLEMENTATION 1
 #ifdef CONFIG_X86_XADD
 #include <asm/rwsem-xadd.h> /* use XADD based semaphores if possible */
 #else

@@ -98,6 +98,14 @@ if [ "$CONFIG_FB" = "y" ]; then
          bool '    CGsix (GX,TurboGX) support' CONFIG_FB_CGSIX
       fi
    fi
+   bool '  Epson 1355 framebuffer support' CONFIG_FB_E1355
+   if [ "$CONFIG_FB_E1355" = "y" ]; then
+      hex '    Register Base Address' CONFIG_E1355_REG_BASE a8000000
+      hex '    Framebuffer Base Address' CONFIG_E1355_FB_BASE a8200000
+   fi
+   if [ "$CONFIG_SH_DREAMCAST" = "y" ]; then
+      tristate '  Dreamcast Frame Buffer support' CONFIG_FB_DC
+   fi
    if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
       if [ "$CONFIG_PCI" != "n" ]; then
 	 tristate '  Matrox acceleration (EXPERIMENTAL)' CONFIG_FB_MATROX

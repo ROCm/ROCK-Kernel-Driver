@@ -769,7 +769,7 @@ static int pc_write(struct tty_struct * tty, int from_user,
 		globalwinon(ch);
 
 		/* -----------------------------------------------------------------	
-			Anding against size will wrap the pointer back to its begining 
+			Anding against size will wrap the pointer back to its beginning 
 			position if it is necessary.  This will only work if size is
 			a power of 2 which should always be the case.  Size is determined 
 			by the cards on board FEP/OS.
@@ -789,7 +789,7 @@ static int pc_write(struct tty_struct * tty, int from_user,
 			tail = bc->tout;
 
 		/* ------------------------------------------------------------------	
-			Anding against size will wrap the pointer back to its begining 
+			Anding against size will wrap the pointer back to its beginning 
 			position if it is necessary.  This will only work if size is
 			a power of 2 which should always be the case.  Size is determined 
 			by the cards on board FEP/OS.
@@ -818,7 +818,7 @@ static int pc_write(struct tty_struct * tty, int from_user,
 		                tail                               head
 
 			The above diagram shows that buffer locations 2,3,4,5 and 6 have
-			data to be transmited, while head points at the next empty
+			data to be transmitted, while head points at the next empty
 			location.  To calculate how much space is available first we have
 			to determine if the head pointer (tin) has wrapped.  To do this
 			compare the head pointer to the tail pointer,  If head is equal
@@ -827,9 +827,9 @@ static int pc_write(struct tty_struct * tty, int from_user,
 			that value from the buffers size.  A one is subtracted from the
 			new value to indicate how much space is available between the 
 			head pointer and end of buffer; as well as the space between the
-			begining of the buffer and the tail.  If the head is not greater
+			beginning of the buffer and the tail.  If the head is not greater
 			or equal to the tail this indicates that the head has wrapped
-			around to the begining of the buffer.  To calculate the space 
+			around to the beginning of the buffer.  To calculate the space 
 			available in this case simply subtract head from tail.  This new 
 			value minus one represents the space available betwwen the head 
 			and tail pointers.  In this example head (7) is greater than tail (2)
@@ -849,7 +849,7 @@ static int pc_write(struct tty_struct * tty, int from_user,
 		                head                               tail
 
 			The above diagram shows that buffer locations 7,8,9,0 and 1 have
-			data to be transmited, while head points at the next empty
+			data to be transmitted, while head points at the next empty
 			location.  To find the space available we compare head to tail.  If
 			head is not equal to, or greater than tail this indicates that head
 			has wrapped around. In this case head (2) is not equal to, or
@@ -1339,7 +1339,7 @@ static int block_til_ready(struct tty_struct *tty,
 		}
 
 		/* ---------------------------------------------------------------
-			Allow someone else to be scheduled.  We will occasionaly go
+			Allow someone else to be scheduled.  We will occasionally go
 			through this loop until one of the above conditions change.
 			The below schedule call will allow other processes to enter and
 			prevent this loop from hogging the cpu.
@@ -1685,7 +1685,7 @@ int __init pc_init(void)
 		       the boards array is correct.  This could be wrong if
 		       the card in question is PCI (And therefore has no ports 
 		       entry in the boards structure.)  The rest of the 
-		       information will be valid for PCI because the begining
+		       information will be valid for PCI because the beginning
 		       of pc_init scans for PCI and determines i/o and base
 		       memory addresses.  I am not sure if it is possible to 
 		       read the number of ports supported by the card prior to
@@ -1937,7 +1937,7 @@ static void post_fep_init(unsigned int crd)
  
 	/*  -------------------------------------------------------------
 		This call is made by the user via. the ioctl call DIGI_INIT.
-		It is resposible for setting up all the card specific stuff.
+		It is responsible for setting up all the card specific stuff.
 	---------------------------------------------------------------- */
 	bd = &boards[crd];
 

@@ -75,7 +75,7 @@
  *     Changed megaraid_command to use wait_queue.
  *
  * Version 1.00:
- *     Checks to see if an irq ocurred while in isr, and runs through
+ *     Checks to see if an irq occurred while in isr, and runs through
  *       routine again.
  *     Copies mailbox to temp area before processing in isr
  *     Added barrier() in busy wait to fix volatility bug
@@ -293,6 +293,9 @@
  *	Left 2.0 support but removed 2.1.x support.
  *	Collected much of the compat glue into one spot
  *
+ *	Version 1.14g-ac2 - 22/03/01
+ *	Fixed a non obvious dereference after free in the driver unload path
+ *
  * BUGS:
  *     Some older 2.1 kernels (eg. 2.1.90) have a bug in pci.c that
  *     fails to detect the controller as a pci device on the system.
@@ -392,17 +395,19 @@ static void WROUTDOOR (mega_host_config * megaCfg, ulong value)
 }
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,2,0)	/* 0x020200 */
+#include <linux/smp.h>
+#define cpuid smp_processor_id()
+#endif
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)	/* 0x020100 */
 
 /*
- *	Linux 2.2 and higher
+ *	Linux 2.4 and higher
  *
  *	No driver private lock
  *	Use the io_request_lock not cli/sti
  *	queue task is a simple api without irq forms
  */
- 
-#include <linux/smp.h>
-#define cpuid smp_processor_id()
 
 MODULE_AUTHOR ("American Megatrends Inc.");
 MODULE_DESCRIPTION ("AMI MegaRAID driver");
@@ -415,18 +420,42 @@ MODULE_DESCRIPTION ("AMI MegaRAID driver");
 #define IO_LOCK spin_lock_irqsave(&io_request_lock,io_flags);
 #define IO_UNLOCK spin_unlock_irqrestore(&io_request_lock,io_flags);
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,0)	/* 0x020400 */
+#define queue_task_irq(a,b)     queue_task(a,b)
+#define queue_task_irq_off(a,b) queue_task(a,b)
+
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(2,2,0)	/* 0x020200 */
+
+/*
+ *	Linux 2.2 and higher
+ *
+ *	No driver private lock
+ *	Use the io_request_lock not cli/sti
+ *	No pci region api
+ *	queue_task is now a single simple API
+ */
+
+static char kernel_version[] = UTS_RELEASE;
+MODULE_AUTHOR ("American Megatrends Inc.");
+MODULE_DESCRIPTION ("AMI MegaRAID driver");
+
+#define DRIVER_LOCK_T
+#define DRIVER_LOCK_INIT(p)
+#define DRIVER_LOCK(p)
+#define DRIVER_UNLOCK(p)
+#define IO_LOCK_T unsigned long io_flags = 0;
+#define IO_LOCK spin_lock_irqsave(&io_request_lock,io_flags);
+#define IO_UNLOCK spin_unlock_irqrestore(&io_request_lock,io_flags);
+
 #define pci_free_consistent(a,b,c,d)
 #define pci_unmap_single(a,b,c,d,e)
 
 #define init_MUTEX_LOCKED(x)	((x)=MUTEX_LOCKED)
 #define init_MUTEX(x)		((x)=MUTEX)
 
-#define DECLARE_WAIT_QUEUE_HEAD(x)	struct wait_queue *x = NULL
-#endif
-
 #define queue_task_irq(a,b)     queue_task(a,b)
 #define queue_task_irq_off(a,b) queue_task(a,b)
+
+#define DECLARE_WAIT_QUEUE_HEAD(x)	struct wait_queue *x = NULL
 #else
 
 /*
@@ -2738,7 +2767,6 @@ static int megaraid_release (struct Scsi_Host *pSHost)
 			     sizeof (mega_mailbox64),
 			     (void *) megaCfg->mailbox64ptr,
 			     megaCfg->dma_handle64);
-	scsi_unregister (pSHost);
 
 #ifdef CONFIG_PROC_FS
 	if (megaCfg->controller_proc_dir_entry) {
@@ -2759,12 +2787,21 @@ static int megaraid_release (struct Scsi_Host *pSHost)
 #endif
 
 	/*
+	 *	Release the controller memory. A word of warning this frees
+	 *	hostdata and that includes megaCfg-> so be careful what you
+	 *	dereference beyond this point
+	 */
+	 
+	scsi_unregister (pSHost);
+
+	/*
 	 * Unregister the character device interface to the driver. Ideally this
 	 * should have been done in cleanup_module routine. Since this is hidden
 	 * in file "scsi_module.c", we do it here.
 	 * major is the major number of the character device returned by call to
 	 * register_chrdev() routine.
 	 */
+
 	unregister_chrdev (major, "megadev");
 	unregister_reboot_notifier (&mega_notifier);
 
@@ -4274,8 +4311,9 @@ megadev_close (struct inode *inode, struct file *filep)
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
 static
-#endif
+#endif				/* LINUX VERSION 2.4.XX */
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0) || defined(MODULE)
 Scsi_Host_Template driver_template = MEGARAID;
+
 #include "scsi_module.c"
-#endif
+#endif				/* LINUX VERSION 2.4.XX || MODULE */

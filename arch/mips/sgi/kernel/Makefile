@@ -13,21 +13,13 @@
 .S.o:
 	$(CC) $(CFLAGS) -c $< -o $*.o
 
-OBJS  = indy_mc.o indy_sc.o indy_hpc.o indy_int.o indy_rtc.o \
-        system.o indyIRQ.o reset.o setup.o time.o
-ifdef CONFIG_SGI_PROM_CONSOLE
-OBJS += promcon.o
-endif
+O_TARGET := ip22-kern.o
 
-all: sgikern.a
+all: ip22-kern.o indyIRQ.o
 
-sgikern.a: $(OBJS)
-	$(AR) rcs sgikern.a $(OBJS)
-	sync
+obj-y	+= indy_mc.o indy_sc.o indy_hpc.o indy_int.o indy_rtc.o system.o \
+	   indyIRQ.o reset.o setup.o time.o
 
 indyIRQ.o: indyIRQ.S
-
-dep:
-	$(CPP) $(CPPFLAGS) -M *.c > .depend
 
 include $(TOPDIR)/Rules.make

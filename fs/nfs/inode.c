@@ -15,6 +15,7 @@
 
 #include <linux/config.h>
 #include <linux/module.h>
+#include <linux/init.h>
 
 #include <linux/sched.h>
 #include <linux/kernel.h>
@@ -1060,8 +1061,7 @@ extern int nfs_destroy_readpagecache(void);
 /*
  * Initialize NFS
  */
-int
-init_nfs_fs(void)
+static int __init init_nfs_fs(void)
 {
 	int err;
 
@@ -1079,23 +1079,7 @@ init_nfs_fs(void)
         return register_filesystem(&nfs_fs_type);
 }
 
-/*
- * Every kernel module contains stuff like this.
- */
-#ifdef MODULE
-
-EXPORT_NO_SYMBOLS;
-/* Not quite true; I just maintain it */
-MODULE_AUTHOR("Olaf Kirch <okir@monad.swb.de>");
-
-int
-init_module(void)
-{
-	return init_nfs_fs();
-}
-
-void
-cleanup_module(void)
+static void __exit exit_nfs_fs(void)
 {
 	nfs_destroy_readpagecache();
 	nfs_destroy_nfspagecache();
@@ -1104,4 +1088,10 @@ cleanup_module(void)
 #endif
 	unregister_filesystem(&nfs_fs_type);
 }
-#endif
+
+EXPORT_NO_SYMBOLS;
+/* Not quite true; I just maintain it */
+MODULE_AUTHOR("Olaf Kirch <okir@monad.swb.de>");
+
+module_init(init_nfs_fs)
+module_exit(exit_nfs_fs)

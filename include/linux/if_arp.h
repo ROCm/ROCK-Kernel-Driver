@@ -73,7 +73,7 @@
 #define ARPHRD_ECONET	782		/* Acorn Econet			*/
 #define ARPHRD_IRDA 	783		/* Linux-IrDA			*/
 /* ARP works differently on different FC media .. so  */
-#define ARPHRD_FCPP	784		/* Point to point fibrechanel	*/
+#define ARPHRD_FCPP	784		/* Point to point fibrechannel	*/
 #define ARPHRD_FCAL	785		/* Fibrechannel arbitrated loop */
 #define ARPHRD_FCPL	786		/* Fibrechannel public loop	*/
 #define ARPHRD_FCFABRIC	787		/* Fibrechannel fabric		*/

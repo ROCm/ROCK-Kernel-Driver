@@ -21,6 +21,7 @@ obj-$(CONFIG_PROC_FS) += proc.o
 #
 obj-$(CONFIG_ALPHA) += setup-bus.o setup-irq.o
 obj-$(CONFIG_ARM) += setup-bus.o setup-irq.o
+obj-$(CONFIG_SUPERH) += setup-bus.o setup-irq.o
 
 ifndef CONFIG_X86
 obj-y += syscall.o

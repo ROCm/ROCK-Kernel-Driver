@@ -96,7 +96,6 @@ extern int init_pcmcia_ds(void);
 extern void net_notifier_init(void);
 
 extern void free_initmem(void);
-extern void filesystem_setup(void);
 
 #ifdef CONFIG_TC
 extern void tc_init(void);
@@ -722,9 +721,6 @@ static void __init do_basic_setup(void)
 
 	start_context_thread();
 	do_initcalls();
-
-	/* .. filesystems .. */
-	filesystem_setup();
 
 #ifdef CONFIG_IRDA
 	irda_device_init(); /* Must be done after protocol initialization */

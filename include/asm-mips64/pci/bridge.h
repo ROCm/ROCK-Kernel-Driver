@@ -276,7 +276,7 @@ typedef struct bridge_err_cmdword_s {
 				ds:2,		/* Data size	  */
 				gbr:1,		/* GBR enable	  */
 				vbpm:1,		/* VBPM message	  */
-				error:1,	/* Error occured  */
+				error:1,	/* Error occurred  */
 				barr:1,		/* Barrier op	  */
 				rsvd:8;
 		} berr_st;

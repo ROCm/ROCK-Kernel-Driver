@@ -691,7 +691,7 @@ out:
  *	the request.
  */
  
-struct super_block *get_empty_super(void)
+static struct super_block *get_empty_super(void)
 {
 	struct super_block *s;
 
@@ -738,6 +738,7 @@ static struct super_block * read_super(kdev_t dev, struct block_device *bdev,
 	sema_init(&s->s_dquot.dqio_sem, 1);
 	sema_init(&s->s_dquot.dqoff_sem, 1);
 	s->s_dquot.flags = 0;
+	s->s_maxbytes = MAX_NON_LFS;
 	lock_super(s);
 	if (!type->read_super(s, data, silent))
 		goto out_fail;

@@ -110,6 +110,11 @@ CONFIG_IP_PNP_BOOTP=y
 # CONFIG_BRIDGE is not set
 
 #
+# QoS and/or fair queueing
+#
+# CONFIG_NET_SCHED is not set
+
+#
 # Telephony Support
 #
 # CONFIG_PHONE is not set

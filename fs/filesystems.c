@@ -7,36 +7,10 @@
  */
 
 #include <linux/config.h>
-#include <linux/fs.h>
-
-#include <linux/devfs_fs_kernel.h>
-#include <linux/nfs_fs.h>
-#include <linux/auto_fs.h>
-#include <linux/devpts_fs.h>
-#include <linux/major.h>
-#include <linux/smp.h>
+#include <linux/sched.h>
 #include <linux/smp_lock.h>
 #include <linux/kmod.h>
-#include <linux/init.h>
-#include <linux/module.h>
 #include <linux/nfsd/interface.h>
-
-#ifdef CONFIG_DEVPTS_FS
-extern int init_devpts_fs(void);
-#endif
-
-void __init filesystem_setup(void)
-{
-	init_devfs_fs();  /*  Header file may make this empty  */
-
-#ifdef CONFIG_NFS_FS
-	init_nfs_fs();
-#endif
-
-#ifdef CONFIG_DEVPTS_FS
-	init_devpts_fs();
-#endif
-}
 
 #if defined(CONFIG_NFSD_MODULE)
 struct nfsd_linkage *nfsd_linkage = NULL;

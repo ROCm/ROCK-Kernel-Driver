@@ -1,12 +1,12 @@
-/* $Id: process.c,v 1.18 2000/01/29 01:41:59 ralf Exp $
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1994 - 1999 by Ralf Baechle and others.
+ * Copyright (C) 1994 - 2000 by Ralf Baechle and others.
  * Copyright (C) 1999 Silicon Graphics, Inc.
  */
+#include <linux/config.h>
 #include <linux/errno.h>
 #include <linux/sched.h>
 #include <linux/kernel.h>
@@ -21,6 +21,7 @@
 #include <linux/a.out.h>
 
 #include <asm/bootinfo.h>
+#include <asm/cpu.h>
 #include <asm/pgtable.h>
 #include <asm/system.h>
 #include <asm/mipsregs.h>
@@ -55,7 +56,7 @@ void exit_thread(void)
 {
 	/* Forget lazy fpu state */
 	if (last_task_used_math == current) {
-		set_cp0_status(ST0_CU1, ST0_CU1);
+		set_cp0_status(ST0_CU1);
 		__asm__ __volatile__("cfc1\t$0,$31");
 		last_task_used_math = NULL;
 	}
@@ -65,7 +66,7 @@ void flush_thread(void)
 {
 	/* Forget lazy fpu state */
 	if (last_task_used_math == current) {
-		set_cp0_status(ST0_CU1, ST0_CU1);
+		set_cp0_status(ST0_CU1);
 		__asm__ __volatile__("cfc1\t$0,$31");
 		last_task_used_math = NULL;
 	}
@@ -81,9 +82,13 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 
 	childksp = (unsigned long)p + KERNEL_STACK_SIZE - 32;
 
-	if (last_task_used_math == current) {
-		set_cp0_status(ST0_CU1, ST0_CU1);
-		save_fp(p);
+	if (last_task_used_math == current)
+#ifdef CONFIG_MIPS_FPU_EMULATOR
+		if (mips_cpu.options & MIPS_CPU_FPU)
+#endif
+	{
+			set_cp0_status(ST0_CU1);
+			save_fp(p);
 	}
 	/* set up new TSS. */
 	childregs = (struct pt_regs *) childksp - 1;

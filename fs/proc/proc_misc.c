@@ -274,8 +274,10 @@ static int kstat_read_proc(char *page, char **start, off_t off,
 		user += kstat.per_cpu_user[cpu];
 		nice += kstat.per_cpu_nice[cpu];
 		system += kstat.per_cpu_system[cpu];
+#if !defined(CONFIG_ARCH_S390)
 		for (j = 0 ; j < NR_IRQS ; j++)
 			sum += kstat.irqs[cpu][j];
+#endif
 	}
 
 	len = sprintf(page, "cpu  %u %u %u %lu\n", user, nice, system,
@@ -299,8 +301,10 @@ static int kstat_read_proc(char *page, char **start, off_t off,
 			kstat.pswpout,
 			sum
 	);
+#if !defined(CONFIG_ARCH_S390)
 	for (i = 0 ; i < NR_IRQS ; i++)
 		len += sprintf(page + len, " %u", kstat_irqs(i));
+#endif
 
 	len += sprintf(page + len, "\ndisk_io: ");
 

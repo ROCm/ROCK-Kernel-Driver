@@ -44,7 +44,7 @@ struct kbd_ops {
 	void (*kbd_request_region)(void);
 	int (*kbd_request_irq)(void (*handler)(int, void *, struct pt_regs *));
 
-	/* PSaux driver resource managment  */
+	/* PSaux driver resource management  */
 	int (*aux_request_irq)(void (*handler)(int, void *, struct pt_regs *));
 	void (*aux_free_irq)(void);
 

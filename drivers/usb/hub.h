@@ -109,7 +109,7 @@ struct usb_hub {
 
 	struct usb_hub_descriptor *descriptor;
 
-	struct semaphore khubd_sem;
+	atomic_t refcnt;
 };
 
 #endif

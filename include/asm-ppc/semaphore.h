@@ -14,6 +14,7 @@
 #include <asm/atomic.h>
 #include <asm/system.h>
 #include <linux/wait.h>
+#include <linux/rwsem.h>
 
 struct semaphore {
 	atomic_t count;
@@ -105,99 +106,6 @@ extern inline void up(struct semaphore * sem)
 	if (atomic_inc_return(&sem->count) <= 0)
 		__up(sem);
 }	
-
-
-/* RW spinlock-based semaphores */
-
-struct rw_semaphore
-{
-	spinlock_t lock;
-	int rd, wr;
-	wait_queue_head_t wait;
-#if WAITQUEUE_DEBUG
-	long __magic;
-#endif
-};
-
-#define RW_LOCK_BIAS	2	/* XXX bogus */
-#define __RWSEM_INITIALIZER(name, count)		\
-{							\
-	SPIN_LOCK_UNLOCKED,				\
-	(count) == 1, (count) == 0,			\
-	__WAIT_QUEUE_HEAD_INITIALIZER((name).wait)	\
-	__SEM_DEBUG_INIT(name)				\
-}
-
-#define __DECLARE_RWSEM_GENERIC(name, count)		\
-	struct rw_semaphore name = __RWSEM_INITIALIZER(name, count)
-
-#define DECLARE_RWSEM(name) __DECLARE_RWSEM_GENERIC(name, RW_LOCK_BIAS)
-#define DECLARE_RWSEM_READ_LOCKED(name) __DECLARE_RWSEM_GENERIC(name, RW_LOCK_BIAS-1)
-#define DECLARE_RWSEM_WRITE_LOCKED(name) __DECLARE_RWSEM_GENERIC(name, 0)
-
-extern inline void init_rwsem(struct rw_semaphore *sem)
-{
-	spin_lock_init(&sem->lock);
-	sem->rd = sem->wr = 0;
-	init_waitqueue_head(&sem->wait);
-#if WAITQUEUE_DEBUG
-	sem->__magic = (long)&sem->__magic;
-#endif
-}
-
-#ifndef CHECK_MAGIC
-#define CHECK_MAGIC(x)
-#endif
-
-extern void down_read_failed(struct rw_semaphore *);
-extern void down_write_failed(struct rw_semaphore *);
-
-extern inline void down_read(struct rw_semaphore *sem)
-{
-	CHECK_MAGIC(sem->__magic);
-
-	spin_lock_irq(&sem->lock);
-	if (sem->wr)
-		down_read_failed(sem);
-	sem->rd++;
-	spin_unlock_irq(&sem->lock);
-}
-
-extern inline void down_write(struct rw_semaphore *sem)
-{
-	CHECK_MAGIC(sem->__magic);
-
-	spin_lock(&sem->lock);
-	if(sem->rd || sem->wr)
-		down_write_failed(sem);
-	sem->wr = 1;
-	spin_unlock(&sem->lock);
-}
-
-#define up_read(sem)							\
-	do {								\
-		unsigned long flags;					\
-									\
-		CHECK_MAGIC((sem)->__magic);				\
-									\
-		spin_lock_irqsave(&(sem)->lock, flags);			\
-		if (!--(sem)->rd && waitqueue_active(&(sem)->wait))	\
-			wake_up(&(sem)->wait);				\
-		spin_unlock_irqrestore(&(sem)->lock, flags);		\
-	} while (0)
-
-#define up_write(sem)							\
-	do {								\
-		unsigned long flags;					\
-									\
-		CHECK_MAGIC((sem)->__magic);				\
-									\
-		spin_lock_irqsave(&(sem)->lock, flags);			\
-		(sem)->wr = 0;						\
-		if (waitqueue_active(&(sem)->wait))			\
-			wake_up(&(sem)->wait);				\
-		spin_unlock_irqrestore(&(sem)->lock, flags);		\
-	} while (0)
 
 
 #endif /* __KERNEL__ */

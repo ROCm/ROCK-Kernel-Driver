@@ -179,12 +179,14 @@ static dev_link_t *awc_attach(void)
 	link = kmalloc(sizeof(struct dev_link_t), GFP_KERNEL);
 	if (!link)
 		return NULL;
+	memset(link, 0, sizeof(struct dev_link_t));
+
 	link->dev = kmalloc(sizeof(struct dev_node_t), GFP_KERNEL);
 	if (!link->dev) {
 		kfree(link);
 		return NULL;
 	}
-	memset(link, 0, sizeof(struct dev_link_t));
+
 	memset(link->dev, 0, sizeof(struct dev_node_t));
 
 	link->release.function = &awc_release;

@@ -18,7 +18,8 @@ netboot: all
 all: dec_boot.o
 
 O_TARGET := dec_boot.o
-O_OBJS	 := decstation.o
+
+obj-y	 := decstation.o
 
 clean:
 	rm -f nbImage
