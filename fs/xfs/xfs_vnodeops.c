@@ -578,7 +578,8 @@ xfs_setattr(
 		/*
 		 * Can't change extent size if any extents are allocated.
 		 */
-		if (ip->i_d.di_nextents && (mask & XFS_AT_EXTSIZE) &&
+		if ((ip->i_d.di_nextents || ip->i_delayed_blks) &&
+		    (mask & XFS_AT_EXTSIZE) &&
 		    ((ip->i_d.di_extsize << mp->m_sb.sb_blocklog) !=
 		     vap->va_extsize) ) {
 			code = XFS_ERROR(EINVAL);	/* EFBIG? */
