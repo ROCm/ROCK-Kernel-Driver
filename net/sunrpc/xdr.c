@@ -176,7 +176,7 @@ void xdr_shift_iovec(struct iovec *iov, int nr, size_t len)
 /*
  * Map a struct xdr_buf into an iovec array.
  */
-int xdr_kmap(struct iovec *iov_base, struct xdr_buf *xdr, unsigned int base)
+int xdr_kmap(struct iovec *iov_base, struct xdr_buf *xdr, size_t base)
 {
 	struct iovec	*iov = iov_base;
 	struct page	**ppage = xdr->pages;
@@ -226,7 +226,7 @@ map_tail:
 	return (iov - iov_base);
 }
 
-void xdr_kunmap(struct xdr_buf *xdr, unsigned int base)
+void xdr_kunmap(struct xdr_buf *xdr, size_t base)
 {
 	struct page	**ppage = xdr->pages;
 	unsigned int	pglen = xdr->page_len;

@@ -44,6 +44,6 @@ static int sys_bus_init(void)
        return device_register(&system_bus);
 }
 
-subsys_initcall(sys_bus_init);
+postcore_initcall(sys_bus_init);
 EXPORT_SYMBOL(register_sys_device);
 EXPORT_SYMBOL(unregister_sys_device);

@@ -17,20 +17,10 @@
 
 static inline void forget_pte(pte_t page)
 {
-	if (pte_none(page))
-		return;
-	if (pte_present(page)) {
-		unsigned long pfn = pte_pfn(page);
-		struct page *ptpage;
-		if (!pfn_valid(pfn))
-			return;
-		ptpage = pfn_to_page(page);
-		if (PageReserved(ptpage))
-			return;
-		page_cache_release(ptpage);
-		return;
+	if (!pte_none(page)) {
+		printk("forget_pte: old mapping existed!\n");
+		BUG();
 	}
-	swap_free(pte_to_swp_entry(page));
 }
 
 /* Remap IO memory, the same way as remap_page_range(), but use

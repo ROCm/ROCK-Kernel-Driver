@@ -54,8 +54,8 @@
 
 #define clear_page(page)	 memset((void *)(page), 0, PAGE_SIZE)
 #define copy_page(to,from) 	memcpy((void *)(to), (void *)(from), PAGE_SIZE)
-#define clear_user_page(page, vaddr)	clear_page(page)
-#define copy_user_page(to, from, vaddr)	copy_page(to, from)
+#define clear_user_page(addr, vaddr, page)	clear_page(addr)
+#define copy_user_page(to, from, vaddr, page)	copy_page(to, from)
 
 /* The following structure is used to hold the physical
  * memory configuration of the machine.  This is filled in

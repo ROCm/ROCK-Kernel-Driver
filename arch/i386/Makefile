@@ -133,6 +133,7 @@ bzdisk: vmlinux
 	@$(MAKEBOOT) BOOTIMAGE=bzImage zdisk
 
 install: vmlinux
+	@echo 'Cleaning up (arch)'
 	@$(MAKEBOOT) BOOTIMAGE=bzImage install
 
 archclean:
