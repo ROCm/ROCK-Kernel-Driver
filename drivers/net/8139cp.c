@@ -1,6 +1,6 @@
 /* 8139cp.c: A Linux PCI Ethernet driver for the RealTek 8139C+ chips. */
 /*
-	Copyright 2001,2002 Jeff Garzik <jgarzik@pobox.com>
+	Copyright 2001-2004 Jeff Garzik <jgarzik@pobox.com>
 
 	Copyright (C) 2001, 2002 David S. Miller (davem@redhat.com) [tg3.c]
 	Copyright (C) 2000, 2001 David S. Miller (davem@redhat.com) [sungem.c]
@@ -48,8 +48,8 @@
  */
 
 #define DRV_NAME		"8139cp"
-#define DRV_VERSION		"1.1"
-#define DRV_RELDATE		"Aug 30, 2003"
+#define DRV_VERSION		"1.2"
+#define DRV_RELDATE		"Mar 22, 2004"
 
 
 #include <linux/config.h>
@@ -1680,12 +1680,6 @@ static int cp_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 	if (rc)
 		goto err_out_mwi;
 
-	if (pdev->irq < 2) {
-		rc = -EIO;
-		printk(KERN_ERR PFX "invalid irq (%d) for pci dev %s\n",
-		       pdev->irq, pci_name(pdev));
-		goto err_out_res;
-	}
 	pciaddr = pci_resource_start(pdev, 1);
 	if (!pciaddr) {
 		rc = -EIO;
@@ -1717,7 +1711,7 @@ static int cp_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 	cp->cpcmd = (pci_using_dac ? PCIDAC : 0) |
 		    PCIMulRW | RxChkSum | CpRxOn | CpTxOn;
 
-	regs = ioremap_nocache(pciaddr, CP_REGS_SIZE);
+	regs = ioremap(pciaddr, CP_REGS_SIZE);
 	if (!regs) {
 		rc = -EIO;
 		printk(KERN_ERR PFX "Cannot map PCI MMIO (%lx@%lx) on pci dev %s\n",
