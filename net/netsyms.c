@@ -285,6 +285,8 @@ EXPORT_SYMBOL(unregister_inetaddr_notifier);
 #ifdef CONFIG_PROC_FS
 EXPORT_SYMBOL(udp_proc_register);
 EXPORT_SYMBOL(udp_proc_unregister);
+EXPORT_SYMBOL(tcp_proc_register);
+EXPORT_SYMBOL(tcp_proc_unregister);
 #endif
 
 /* needed for ip_gre -cw */
