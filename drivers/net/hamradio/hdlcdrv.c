@@ -728,25 +728,15 @@ static int hdlcdrv_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 /* --------------------------------------------------------------------- */
 
 /*
- * Check for a network adaptor of this type, and return '0' if one exists.
- * If dev->base_addr == 0, probe all likely locations.
- * If dev->base_addr == 1, always return failure.
- * If dev->base_addr == 2, allocate space for the device and return success
- * (detachable devices only).
+ * Initialize fields in hdlcdrv
  */
-static int hdlcdrv_probe(struct net_device *dev)
+static void hdlcdrv_setup(struct net_device *dev)
 {
-	const struct hdlcdrv_channel_params dflt_ch_params = { 
+	static const struct hdlcdrv_channel_params dflt_ch_params = { 
 		20, 2, 10, 40, 0 
 	};
-	struct hdlcdrv_state *s;
+	struct hdlcdrv_state *s = dev->priv;;
 
-	if (!dev)
-		return -ENXIO;
-	/*
-	 * not a real probe! only initialize data structures
-	 */
-	s = (struct hdlcdrv_state *)dev->priv;
 	/*
 	 * initialize the hdlcdrv_state struct
 	 */
@@ -805,72 +795,60 @@ static int hdlcdrv_probe(struct net_device *dev)
 	memcpy(dev->broadcast, ax25_bcast, AX25_ADDR_LEN);
 	memcpy(dev->dev_addr, ax25_nocall, AX25_ADDR_LEN);
 	dev->tx_queue_len = 16;
-
-	/* New style flags */
-	dev->flags = 0;
-
-	return 0;
 }
 
 /* --------------------------------------------------------------------- */
-
-int hdlcdrv_register_hdlcdrv(struct net_device *dev, const struct hdlcdrv_ops *ops,
-			     unsigned int privsize, char *ifname,
-			     unsigned int baseaddr, unsigned int irq, 
-			     unsigned int dma) 
+struct net_device *hdlcdrv_register(const struct hdlcdrv_ops *ops,
+				    unsigned int privsize, const char *ifname,
+				    unsigned int baseaddr, unsigned int irq, 
+				    unsigned int dma) 
 {
+	struct net_device *dev;
 	struct hdlcdrv_state *s;
+	int err;
 
-	if (!dev || !ops)
-		return -EACCES;
+	BUG_ON(ops == NULL);
+
 	if (privsize < sizeof(struct hdlcdrv_state))
 		privsize = sizeof(struct hdlcdrv_state);
-	memset(dev, 0, sizeof(struct net_device));
-	if (!(s = dev->priv = kmalloc(privsize, GFP_KERNEL)))
-		return -ENOMEM;
+
+	dev = alloc_netdev(privsize, ifname, hdlcdrv_setup);
+	if (!dev)
+		return ERR_PTR(-ENOMEM);
+
 	/*
 	 * initialize part of the hdlcdrv_state struct
 	 */
-	memset(s, 0, privsize);
+	s = dev->priv;
 	s->magic = HDLCDRV_MAGIC;
-	strncpy(dev->name, ifname, sizeof(dev->name));
 	s->ops = ops;
-	/*
-	 * initialize part of the device struct
-	 */
-	dev->if_port = 0;
-	dev->init = hdlcdrv_probe;
 	dev->base_addr = baseaddr;
 	dev->irq = irq;
 	dev->dma = dma;
-	if (register_netdev(dev)) {
+
+	err = register_netdev(dev);
+	if (err < 0) {
 		printk(KERN_WARNING "hdlcdrv: cannot register net "
 		       "device %s\n", dev->name);
-		kfree(dev->priv);
-		return -ENXIO;
+		kfree(dev);
+		dev = ERR_PTR(err);
 	}
-	MOD_INC_USE_COUNT;
-	return 0;
+	return dev;
 }
 
 /* --------------------------------------------------------------------- */
 
-int hdlcdrv_unregister_hdlcdrv(struct net_device *dev) 
+void hdlcdrv_unregister(struct net_device *dev) 
 {
-	struct hdlcdrv_state *s;
+	struct hdlcdrv_state *s = dev->priv;
 
-	if (!dev)
-		return -EINVAL;
-	if (!(s = (struct hdlcdrv_state *)dev->priv))
-		return -EINVAL;
-	if (s->magic != HDLCDRV_MAGIC)
-		return -EINVAL;
+	BUG_ON(s->magic != HDLCDRV_MAGIC);
+
 	if (s->ops->close)
 		s->ops->close(dev);
 	unregister_netdev(dev);
-	kfree(s);
-	MOD_DEC_USE_COUNT;
-	return 0;
+	
+	free_netdev(dev);
 }
 
 /* --------------------------------------------------------------------- */
@@ -878,8 +856,8 @@ int hdlcdrv_unregister_hdlcdrv(struct net_device *dev)
 EXPORT_SYMBOL(hdlcdrv_receiver);
 EXPORT_SYMBOL(hdlcdrv_transmitter);
 EXPORT_SYMBOL(hdlcdrv_arbitrate);
-EXPORT_SYMBOL(hdlcdrv_register_hdlcdrv);
-EXPORT_SYMBOL(hdlcdrv_unregister_hdlcdrv);
+EXPORT_SYMBOL(hdlcdrv_register);
+EXPORT_SYMBOL(hdlcdrv_unregister);
 
 /* --------------------------------------------------------------------- */
 

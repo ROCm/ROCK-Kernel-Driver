@@ -107,7 +107,7 @@ KERN_INFO "baycom_par: version 0.9 compiled " __TIME__ " " __DATE__ "\n";
 
 #define NR_PORTS 4
 
-static struct net_device baycom_device[NR_PORTS];
+static struct net_device *baycom_device[NR_PORTS];
 
 /* --------------------------------------------------------------------- */
 
@@ -352,7 +352,6 @@ static int par96_open(struct net_device *dev)
 	pp->ops->enable_irq(pp);
 	printk(KERN_INFO "%s: par96 at iobase 0x%lx irq %u options 0x%x\n",
 	       bc_drvname, dev->base_addr, dev->irq, bc->options);
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
@@ -374,7 +373,6 @@ static int par96_close(struct net_device *dev)
 	parport_unregister_device(bc->pdev);
 	printk(KERN_INFO "%s: close par96 at iobase 0x%lx irq %u\n",
 	       bc_drvname, dev->base_addr, dev->irq);
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
@@ -498,35 +496,38 @@ MODULE_LICENSE("GPL");
 
 static int __init init_baycompar(void)
 {
-	int i, j, found = 0;
+	int i, found = 0;
 	char set_hw = 1;
-	struct baycom_state *bc;
 
 	printk(bc_drvinfo);
 	/*
 	 * register net devices
 	 */
 	for (i = 0; i < NR_PORTS; i++) {
-		struct net_device *dev = baycom_device+i;
+		struct net_device *dev;
+		struct baycom_state *bc;
 		char ifname[IFNAMSIZ];
 
 		sprintf(ifname, "bcp%d", i);
+
 		if (!mode[i])
 			set_hw = 0;
 		if (!set_hw)
 			iobase[i] = 0;
-		j = hdlcdrv_register_hdlcdrv(dev, &par96_ops, sizeof(struct baycom_state),
-					     ifname, iobase[i], 0, 0);
-		if (!j) {
-			bc = (struct baycom_state *)dev->priv;
-			if (set_hw && baycom_setmode(bc, mode[i]))
-				set_hw = 0;
-			found++;
-		} else {
-			printk(KERN_WARNING "%s: cannot register net device\n",
-			       bc_drvname);
-		}
+
+		dev = hdlcdrv_register(&par96_ops,
+				       sizeof(struct baycom_state),
+				       ifname, iobase[i], 0, 0);
+		if (IS_ERR(dev)) 
+			break;
+
+		bc = (struct baycom_state *)dev->priv;
+		if (set_hw && baycom_setmode(bc, mode[i]))
+			set_hw = 0;
+		found++;
+		baycom_device[i] = dev;
 	}
+
 	if (!found)
 		return -ENXIO;
 	return 0;
@@ -537,16 +538,10 @@ static void __exit cleanup_baycompar(void)
 	int i;
 
 	for(i = 0; i < NR_PORTS; i++) {
-		struct net_device *dev = baycom_device+i;
-		struct baycom_state *bc = (struct baycom_state *)dev->priv;
+		struct net_device *dev = baycom_device[i];
 
-		if (bc) {
-			if (bc->hdrv.magic != HDLCDRV_MAGIC)
-				printk(KERN_ERR "baycom: invalid magic in "
-				       "cleanup_module\n");
-			else
-				hdlcdrv_unregister_hdlcdrv(dev);
-		}
+		if (dev)
+			hdlcdrv_unregister(dev);
 	}
 }
 
