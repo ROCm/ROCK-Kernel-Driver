@@ -16,6 +16,7 @@
 #include <linux/dma-mapping.h>
 #include <linux/device.h>
 #include <linux/init.h>
+#include <linux/scatterlist.h>
 
 #include <asm/dma.h>
 #include <asm/ecard.h>
@@ -223,10 +224,7 @@ static void icside_build_sglist(ide_drive_t *drive, struct request *rq)
 		else
 			hwif->sg_dma_direction = DMA_FROM_DEVICE;
 
-		memset(sg, 0, sizeof(*sg));
-		sg->page   = virt_to_page(rq->buffer);
-		sg->offset = offset_in_page(rq->buffer);
-		sg->length = rq->nr_sectors * SECTOR_SIZE;
+		sg_init_one(sg, rq->buffer, rq->nr_sectors * SECTOR_SIZE);
 		nents = 1;
 	} else {
 		nents = blk_rq_map_sg(drive->queue, rq, sg);

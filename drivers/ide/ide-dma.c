@@ -85,6 +85,7 @@
 #include <linux/init.h>
 #include <linux/ide.h>
 #include <linux/delay.h>
+#include <linux/scatterlist.h>
 
 #include <asm/io.h>
 #include <asm/irq.h>
@@ -253,18 +254,12 @@ int ide_raw_build_sglist(ide_drive_t *drive, struct request *rq)
 #else
 	while (sector_count > 128) {
 #endif
-		memset(&sg[nents], 0, sizeof(*sg));
-		sg[nents].page = virt_to_page(virt_addr);
-		sg[nents].offset = offset_in_page(virt_addr);
-		sg[nents].length = 128  * SECTOR_SIZE;
+		sg_init_one(&sg[nents], virt_addr, 128 * SECTOR_SIZE);
 		nents++;
 		virt_addr = virt_addr + (128 * SECTOR_SIZE);
 		sector_count -= 128;
 	}
-	memset(&sg[nents], 0, sizeof(*sg));
-	sg[nents].page = virt_to_page(virt_addr);
-	sg[nents].offset = offset_in_page(virt_addr);
-	sg[nents].length =  sector_count  * SECTOR_SIZE;
+	sg_init_one(&sg[nents], virt_addr, sector_count * SECTOR_SIZE);
 	nents++;
 
 	return pci_map_sg(hwif->pci_dev, sg, nents, hwif->sg_dma_direction);

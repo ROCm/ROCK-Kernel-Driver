@@ -30,6 +30,7 @@
 #include <linux/hdreg.h>
 #include <linux/ide.h>
 #include <linux/init.h>
+#include <linux/scatterlist.h>
 
 #include <asm/io.h>
 #include <asm/arch/svinto.h>
@@ -624,12 +625,7 @@ static int e100_ide_build_dmatable (ide_drive_t *drive)
 	ata_tot_size = 0;
 
 	if (HWGROUP(drive)->rq->flags & REQ_DRIVE_TASKFILE) {
-		u8 *virt_addr = rq->buffer;
-		int sector_count = rq->nr_sectors;
-		memset(&sg[0], 0, sizeof(*sg));
-		sg[0].page = virt_to_page(virt_addr);
-		sg[0].offset = offset_in_page(virt_addr);
-		sg[0].length =  sector_count  * SECTOR_SIZE;
+		sg_init_one(&sg[0], rq->buffer, rq->nr_sectors * SECTOR_SIZE);
 		hwif->sg_nents = i = 1;
 	}
 	else
