@@ -47,6 +47,7 @@
 #include <net/inet_common.h>
 #include <net/tcp.h>
 #include <net/udp.h>
+#include <net/xfrm.h>
 
 #include <asm/uaccess.h>
 
@@ -403,6 +404,10 @@ done:
 		break;
 	case IPV6_FLOWLABEL_MGR:
 		retv = ipv6_flowlabel_opt(sk, optval, optlen);
+		break;
+	case IPV6_IPSEC_POLICY:
+	case IPV6_XFRM_POLICY:
+		retv = xfrm_user_policy(sk, optname, optval, optlen);
 		break;
 
 #ifdef CONFIG_NETFILTER

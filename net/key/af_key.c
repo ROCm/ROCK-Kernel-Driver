@@ -2416,8 +2416,23 @@ static struct xfrm_policy *pfkey_compile_policy(u16 family, int opt,
 	struct xfrm_policy *xp;
 	struct sadb_x_policy *pol = (struct sadb_x_policy*)data;
 
-	if (opt != IP_IPSEC_POLICY) {
-		*dir = -EOPNOTSUPP;
+	switch (family) {
+	case AF_INET:
+		if (opt != IP_IPSEC_POLICY) {
+			*dir = -EOPNOTSUPP;
+			return NULL;
+		}
+		break;
+#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
+	case AF_INET6:
+		if (opt != IPV6_IPSEC_POLICY) {
+			*dir = -EOPNOTSUPP;
+			return NULL;
+		}
+		break;
+#endif
+	default:
+		*dir = -EINVAL;
 		return NULL;
 	}
 
