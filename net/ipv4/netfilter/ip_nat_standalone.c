@@ -180,6 +180,29 @@ ip_nat_fn(unsigned int hooknum,
 }
 
 static unsigned int
+ip_nat_in(unsigned int hooknum,
+          struct sk_buff **pskb,
+          const struct net_device *in,
+          const struct net_device *out,
+          int (*okfn)(struct sk_buff *))
+{
+	u_int32_t saddr, daddr;
+	unsigned int ret;
+
+	saddr = (*pskb)->nh.iph->saddr;
+	daddr = (*pskb)->nh.iph->daddr;
+
+	ret = ip_nat_fn(hooknum, pskb, in, out, okfn);
+	if (ret != NF_DROP && ret != NF_STOLEN
+	    && ((*pskb)->nh.iph->saddr != saddr
+	        || (*pskb)->nh.iph->daddr != daddr)) {
+		dst_release((*pskb)->dst);
+		(*pskb)->dst = NULL;
+	}
+	return ret;
+}
+
+static unsigned int
 ip_nat_out(unsigned int hooknum,
 	   struct sk_buff **pskb,
 	   const struct net_device *in,
@@ -243,7 +266,7 @@ ip_nat_local_fn(unsigned int hooknum,
 
 /* Before packet filtering, change destination */
 static struct nf_hook_ops ip_nat_in_ops = {
-	.hook		= ip_nat_fn,
+	.hook		= ip_nat_in,
 	.owner		= THIS_MODULE,
 	.pf		= PF_INET,
 	.hooknum	= NF_IP_PRE_ROUTING,
