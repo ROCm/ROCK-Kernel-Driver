@@ -37,6 +37,8 @@
 
 #define PREFIX			"ACPI: "
 
+extern int			acpi_disabled;
+
 /* TBD: Make dynamic */
 #define ACPI_MAX_HANDLES	10
 struct acpi_handle_list {
@@ -291,9 +293,6 @@ int acpi_bus_receive_event (struct acpi_bus_event *event);
 int acpi_bus_register_driver (struct acpi_driver *driver);
 int acpi_bus_unregister_driver (struct acpi_driver *driver);
 int acpi_bus_scan (struct acpi_device *device);
-int acpi_init (void);
-void acpi_exit (void);
-
 
 #endif /*CONFIG_ACPI_BUS*/
 

@@ -49,8 +49,6 @@ MODULE_LICENSE("GPL");
 
 extern void eisa_set_level_irq(unsigned int irq);
 
-extern int			acpi_disabled;
-
 FADT_DESCRIPTOR			acpi_fadt;
 struct acpi_device		*acpi_root;
 struct proc_dir_entry		*acpi_root_dir;
@@ -1813,44 +1811,7 @@ error0:
 }
 
 
-static void __exit
-acpi_bus_exit (void)
-{
-	acpi_status		status = AE_OK;
-
-	ACPI_FUNCTION_TRACE("acpi_bus_exit");
-
-	status = acpi_remove_notify_handler(ACPI_ROOT_OBJECT,
-		ACPI_SYSTEM_NOTIFY, acpi_bus_notify);
-	if (ACPI_FAILURE(status))
-		ACPI_DEBUG_PRINT((ACPI_DB_ERROR,
-			"Error removing notify handler\n"));
-
-#ifdef CONFIG_ACPI_PCI
-	acpi_pci_root_exit();
-	acpi_pci_link_exit();
-#endif
-#ifdef CONFIG_ACPI_EC
-	acpi_ec_exit();
-#endif
-	acpi_power_exit();
-
-	acpi_bus_remove(acpi_root, ACPI_BUS_REMOVAL_NORMAL);
-
-	remove_proc_entry(ACPI_BUS_FILE_ROOT, NULL);
-
-	status = acpi_terminate();
-	if (ACPI_FAILURE(status))
-		printk(KERN_ERR PREFIX "Unable to terminate the ACPI Interpreter\n");
-	else
-		printk(KERN_ERR PREFIX "Interpreter disabled\n");
-
-	return_VOID;
-}
-
-
-int __init
-acpi_init (void)
+static int __init acpi_init (void)
 {
 	int			result = 0;
 
@@ -1867,42 +1828,23 @@ acpi_init (void)
 		return -ENODEV;
 	}
 
+	result = acpi_bus_init();
+
 #ifdef CONFIG_PM
-	if (PM_IS_ACTIVE()) {
-		printk(KERN_INFO PREFIX "APM is already active, exiting\n");
-		return -ENODEV;
+	if (!result) {
+		if (!PM_IS_ACTIVE())
+			pm_active = 1;
+		else {
+			printk(KERN_INFO PREFIX "APM is already active, exiting\n");
+			result = -ENODEV;
+		}
 	}
 #endif
-
-	result = acpi_bus_init();
-	if (result)
-		return_VALUE(result);
-
-#ifdef CONFIG_PM
-	pm_active = 1;
-#endif
-
-	return_VALUE(0);
+	return_VALUE(result);
 }
 
 
-void __exit
-acpi_exit (void)
-{
-	ACPI_FUNCTION_TRACE("acpi_exit");
-
-#ifdef CONFIG_PM
-	pm_active = 0;
-#endif
-
-	acpi_bus_exit();
-
-	return_VOID;
-}
-
-
-int __init
-acpi_setup(char *str)
+static int __init acpi_setup(char *str)
 {
 	while (str && *str) {
 		if (strncmp(str, "off", 3) == 0)
