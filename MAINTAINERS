@@ -922,15 +922,13 @@ M:	drivers@neukum.org
 S:	Maintained
 
 I2C AND SENSORS DRIVERS
-P:      Frodo Looijaard
-M:      frodol@dds.nl
-P:      Philip Edelbrock
-M:      phil@netroedge.com
 P:	Greg Kroah-Hartman
 M:	greg@kroah.com
-L:      sensors@stimpy.netroedge.com
-W:      http://www.lm-sensors.nu/
-S:      Maintained
+P:	Philip Edelbrock
+M:	phil@netroedge.com
+L:	sensors@stimpy.netroedge.com
+W:	http://www.lm-sensors.nu/
+S:	Maintained
 
 i386 BOOT CODE
 P:	Riley H. Williams
