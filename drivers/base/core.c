@@ -33,7 +33,7 @@ int device_add(struct device *dev)
 		return -EINVAL;
 
 	down(&device_sem);
-	dev->present = 1;
+	dev->state = DEVICE_REGISTERED;
 	if (dev->parent) {
 		list_add_tail(&dev->g_list,&dev->parent->g_list);
 		list_add_tail(&dev->node,&dev->parent->children);
@@ -77,6 +77,7 @@ void device_initialize(struct device *dev)
 	INIT_LIST_HEAD(&dev->intf_list);
 	spin_lock_init(&dev->lock);
 	atomic_set(&dev->refcount,1);
+	dev->state = DEVICE_INITIALIZED;
 	if (dev->parent)
 		get_device(dev->parent);
 }
@@ -112,7 +113,7 @@ struct device * get_device(struct device * dev)
 {
 	struct device * ret = dev;
 	down(&device_sem);
-	if (dev && dev->present && atomic_read(&dev->refcount) > 0)
+	if (device_present(dev) && atomic_read(&dev->refcount) > 0)
 		atomic_inc(&dev->refcount);
 	else
 		ret = NULL;
@@ -135,7 +136,7 @@ void put_device(struct device * dev)
 	list_del_init(&dev->g_list);
 	up(&device_sem);
 
-	BUG_ON(dev->present);
+	BUG_ON((dev->state != DEVICE_GONE));
 
 	device_del(dev);
 }
@@ -177,7 +178,7 @@ void device_del(struct device * dev)
 void device_unregister(struct device * dev)
 {
 	down(&device_sem);
-	dev->present = 0;
+	dev->state = DEVICE_GONE;
 	up(&device_sem);
 
 	pr_debug("DEV: Unregistering device. ID = '%s', name = '%s'\n",

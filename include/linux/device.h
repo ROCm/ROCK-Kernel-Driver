@@ -48,6 +48,13 @@ enum {
 	RESUME_ENABLE,
 };
 
+enum device_state {
+	DEVICE_UNINITIALIZED	= 0,
+	DEVICE_INITIALIZED	= 1,
+	DEVICE_REGISTERED	= 2,
+	DEVICE_GONE		= 3,
+};
+
 struct device;
 struct device_driver;
 struct device_class;
@@ -288,8 +295,8 @@ struct device {
 	void		*platform_data;	/* Platform specific data (e.g. ACPI,
 					   BIOS data relevant to device) */
 
-	u32		present;
-	u32		current_state;  /* Current operating state. In
+	enum device_state state;
+	u32		power_state;  /* Current operating state. In
 					   ACPI-speak, this is D0-D3, D0
 					   being fully functional, and D3
 					   being off. */
@@ -363,7 +370,7 @@ extern int (*platform_notify_remove)(struct device * dev);
 
 static inline int device_present(struct device * dev)
 {
-	return (dev && dev->present == 1);
+	return (dev && (dev->state == DEVICE_INITIALIZED || dev->state == DEVICE_REGISTERED));
 }
 
 /* device and bus locking helpers.
