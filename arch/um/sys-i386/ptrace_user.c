@@ -102,7 +102,7 @@ void update_debugregs(int seq)
 	if(seq == debugregs_seq) return;
 
 	me = os_getpid();
-	tracing_cb(update_debugregs_cb, &me);
+	initial_thread_cb(update_debugregs_cb, &me);
 }
 
 /*

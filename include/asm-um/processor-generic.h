@@ -12,9 +12,9 @@ struct task_struct;
 
 #include "linux/config.h"
 #include "linux/signal.h"
-#include "asm/segment.h"
 #include "asm/ptrace.h"
 #include "asm/siginfo.h"
+#include "choose-mode.h"
 
 struct mm_struct;
 
@@ -22,9 +22,24 @@ struct mm_struct;
 
 #define cpu_relax()	do ; while (0)
 
-struct thread_struct {
+#ifdef CONFIG_MODE_TT
+struct proc_tt_mode {
 	int extern_pid;
 	int tracing;
+	int switch_pipe[2];
+	int singlestep_syscall;
+	int vm_seq;
+};
+#endif
+
+#ifdef CONFIG_MODE_SKAS
+struct proc_skas_mode {
+	void *switch_buf;
+	void *fork_buf;
+};
+#endif
+
+struct thread_struct {
 	int forking;
 	unsigned long kernel_stack;
 	int nsyscalls;
@@ -33,13 +48,18 @@ struct thread_struct {
 	int err;
 	void *fault_addr;
 	void *fault_catcher;
-	int vm_seq;
 	struct task_struct *prev_sched;
 	unsigned long temp_stack;
-	int switch_pipe[2];
-	void *jmp;
+	void *exec_buf;
 	struct arch_thread arch;
-	int singlestep_syscall;
+	union {
+#ifdef CONFIG_MODE_TT
+		struct proc_tt_mode tt;
+#endif
+#ifdef CONFIG_MODE_SKAS
+		struct proc_skas_mode skas;
+#endif
+	} mode;
 	struct {
 		int op;
 		union {
@@ -60,8 +80,6 @@ struct thread_struct {
 
 #define INIT_THREAD \
 { \
-	extern_pid:		-1, \
-	tracing:		0, \
 	forking:		0, \
 	kernel_stack:		0, \
 	nsyscalls:		0, \
@@ -69,13 +87,10 @@ struct thread_struct {
 	cr2:			0, \
 	err:			0, \
 	fault_addr:		NULL, \
-	vm_seq:			0, \
 	prev_sched:		NULL, \
 	temp_stack:		0, \
-	switch_pipe:		{ -1, -1 }, \
-	jmp:			NULL, \
+	exec_buf:		NULL, \
 	arch:			INIT_ARCH_THREAD, \
-	singlestep_syscall:	0, \
 	request:		{ 0 } \
 }
 

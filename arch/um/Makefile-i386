@@ -21,13 +21,13 @@ prepare: $(SYS_HEADERS)
 $(SYS_DIR)/sc.h: $(SYS_UTIL_DIR)/mk_sc
 	$< > $@
 
-$(SYS_DIR)/thread.h: $(SYS_UTIL_DIR)/mk_thread
+$(SYS_DIR)/thread.h: $(SYS_UTIL_DIR)/mk_thread 
 	$< > $@
 
 $(SYS_UTIL_DIR)/mk_sc: FORCE ; 
 	@$(call descend,$(SYS_UTIL_DIR),$@)
 
-$(SYS_UTIL_DIR)/mk_thread: $(ARCH_SYMLINKS) FORCE ; 
+$(SYS_UTIL_DIR)/mk_thread: $(ARCH_SYMLINKS) $(GEN_HEADERS) FORCE ; 
 	@$(call descend,$(SYS_UTIL_DIR),$@)
 
 $(SYS_UTIL_DIR): include/asm FORCE
