@@ -1359,14 +1359,14 @@ isdn_tty_unthrottle(struct tty_struct *tty)
  *          allows RS485 driver to be written in user space.
  */
 static int
-isdn_tty_get_lsr_info(modem_info * info, uint * value)
+isdn_tty_get_lsr_info(modem_info * info, uint __user * value)
 {
 	u_char status;
 	uint result;
 
 	status = info->lsr;
 	result = ((status & UART_LSR_TEMT) ? TIOCSER_TEMT : 0);
-	return put_user(result, (uint *) value);
+	return put_user(result, value);
 }
 
 
@@ -1468,12 +1468,12 @@ isdn_tty_ioctl(struct tty_struct *tty, struct file *file,
 #ifdef ISDN_DEBUG_MODEM_IOCTL
 			printk(KERN_DEBUG "ttyI%d ioctl TIOCGSOFTCAR\n", info->line);
 #endif
-			return put_user(C_CLOCAL(tty) ? 1 : 0, (ulong *) arg);
+			return put_user(C_CLOCAL(tty) ? 1 : 0, (ulong __user *) arg);
 		case TIOCSSOFTCAR:
 #ifdef ISDN_DEBUG_MODEM_IOCTL
 			printk(KERN_DEBUG "ttyI%d ioctl TIOCSSOFTCAR\n", info->line);
 #endif
-			if (get_user(arg, (ulong *) arg))
+			if (get_user(arg, (ulong __user *) arg))
 				return -EFAULT;
 			tty->termios->c_cflag =
 			    ((tty->termios->c_cflag & ~CLOCAL) |

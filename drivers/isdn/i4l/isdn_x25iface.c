@@ -79,7 +79,7 @@ static int pdata_is_bad( ix25_pdata_t * pda ){
 
 /* create a new x25 interface protocol instance
  */
-struct concap_proto * isdn_x25iface_proto_new()
+struct concap_proto * isdn_x25iface_proto_new(void)
 {
 	ix25_pdata_t * tmp = kmalloc(sizeof(ix25_pdata_t),GFP_KERNEL);
 	IX25DEBUG("isdn_x25iface_proto_new\n");
@@ -275,8 +275,7 @@ int isdn_x25iface_disconn_ind(struct concap_proto *cprot)
 int isdn_x25iface_xmit(struct concap_proto *cprot, struct sk_buff *skb)
 {
 	unsigned char firstbyte = skb->data[0];
-	unsigned *state = 
-		&( ( (ix25_pdata_t*) (cprot -> proto_data) ) -> state  );
+	enum wan_states *state = &((ix25_pdata_t*)cprot->proto_data)->state;
 	int ret = 0;
 	IX25DEBUG( "isdn_x25iface_xmit: %s first=%x state=%d \n", MY_DEVNAME(cprot -> net_dev), firstbyte, *state );
 	switch ( firstbyte ){
