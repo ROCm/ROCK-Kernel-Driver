@@ -599,6 +599,8 @@ out:
 	return XFS_ERROR(error);
 }
 
+#define REMOUNT_READONLY_FLAGS	(SYNC_REMOUNT|SYNC_ATTR|SYNC_WAIT)
+
 STATIC int
 xfs_mntupdate(
 	bhv_desc_t			*bdp,
@@ -623,7 +625,7 @@ xfs_mntupdate(
 		xfs_finish_reclaim_all(mp, 0);
 
 		do {
-			VFS_SYNC(vfsp, SYNC_ATTR|SYNC_WAIT, NULL, error);
+			VFS_SYNC(vfsp, REMOUNT_READONLY_FLAGS, NULL, error);
 			pagebuf_delwri_flush(mp->m_ddev_targp, PBDF_WAIT,
 								&pincount);
 		} while (pincount);
@@ -1483,7 +1485,7 @@ xfs_syncsub(
 	/*
 	 * Now check to see if the log needs a "dummy" transaction.
 	 */
-	if (xfs_log_need_covered(mp)) {
+	if (!(flags & SYNC_REMOUNT) && xfs_log_need_covered(mp)) {
 		xfs_trans_t *tp;
 		xfs_inode_t *ip;
 

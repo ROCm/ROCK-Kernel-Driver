@@ -90,7 +90,7 @@ typedef enum {
 #define SYNC_BDFLUSH		0x0010	/* BDFLUSH is calling -- don't block */
 #define SYNC_FSDATA		0x0020	/* flush fs data (e.g. superblocks) */
 #define SYNC_REFCACHE		0x0040  /* prune some of the nfs ref cache */
-
+#define SYNC_REMOUNT		0x0080  /* remount readonly, no dummy LRs */
 
 typedef int	(*vfs_mount_t)(bhv_desc_t *,
 				struct xfs_mount_args *, struct cred *);
