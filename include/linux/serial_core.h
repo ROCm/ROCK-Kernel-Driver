@@ -83,6 +83,9 @@
 #define PORT_SCIF	53
 #define PORT_IRDA	54
 
+/* Samsung S3C2410 SoC and derivatives thereof */
+#define PORT_S3C2410    55
+
 #ifdef __KERNEL__
 
 #include <linux/config.h>
