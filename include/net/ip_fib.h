@@ -129,7 +129,6 @@ struct fib_table
 	int		(*tb_dump)(struct fib_table *table, struct sk_buff *skb,
 				     struct netlink_callback *cb);
 	int		(*tb_flush)(struct fib_table *table);
-	int		(*tb_seq_show)(struct fib_table *table, struct seq_file *seq);
 	void		(*tb_select_default)(struct fib_table *table,
 					     const struct flowi *flp, struct fib_result *res);
 
@@ -277,5 +276,6 @@ static inline void fib_res_put(struct fib_result *res)
 #endif
 }
 
+extern int fib_proc_init(void);
 
 #endif  /* _NET_FIB_H */

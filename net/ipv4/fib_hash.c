@@ -745,37 +745,6 @@ static int fn_hash_flush(struct fib_table *tb)
 }
 
 
-#ifdef CONFIG_PROC_FS
-
-static int fn_hash_seq_show(struct fib_table *tb, struct seq_file *seq)
-{
-	struct fn_hash *table = (struct fn_hash *)tb->tb_data;
-	struct fn_zone *fz;
-
-	read_lock(&fib_hash_lock);
-	for (fz = table->fn_zone_list; fz; fz = fz->fz_next) {
-		int i;
-		struct fib_node *f;
-		int maxslot = fz->fz_divisor;
-		struct fib_node **fp = fz->fz_hash;
-
-		if (!fz->fz_nent)
-			continue;
-
-		for (i = 0; i < maxslot; i++, fp++)
-			for (f = *fp; f; f = f->fn_next)
-				fib_node_seq_show(seq, f->fn_type,
-						  f->fn_state & FN_S_ZOMBIE,
-						  FIB_INFO(f),
-						  fz_prefix(f->fn_key, fz),
-						  FZ_MASK(fz));
-	}
-	read_unlock(&fib_hash_lock);
-  	return 0;
-}
-#endif
-
-
 static __inline__ int
 fn_hash_dump_bucket(struct sk_buff *skb, struct netlink_callback *cb,
 		     struct fib_table *tb,
@@ -897,9 +866,229 @@ struct fib_table * __init fib_hash_init(int id)
 	tb->tb_flush = fn_hash_flush;
 	tb->tb_select_default = fn_hash_select_default;
 	tb->tb_dump = fn_hash_dump;
-#ifdef CONFIG_PROC_FS
-	tb->tb_seq_show = fn_hash_seq_show;
-#endif
 	memset(tb->tb_data, 0, sizeof(struct fn_hash));
 	return tb;
 }
+
+/* ------------------------------------------------------------------------ */
+#ifdef CONFIG_PROC_FS
+
+struct fib_iter_state {
+	struct fn_zone	*zone;
+	int		bucket;
+	struct fib_node **hash;
+	struct fib_node *node;
+};
+
+static __inline__ struct fib_node *fib_get_first(struct seq_file *seq)
+{
+	struct fib_iter_state* iter = seq->private;
+	struct fn_hash *table = (struct fn_hash *)ip_fib_main_table->tb_data;
+
+	iter->bucket = 0;
+	iter->hash   = NULL;
+	iter->node   = NULL;
+
+	for (iter->zone = table->fn_zone_list; iter->zone;
+	     iter->zone = iter->zone->fz_next) {
+		int maxslot;
+
+		if (!iter->zone->fz_next)
+			continue;
+
+		iter->hash = iter->zone->fz_hash;
+		maxslot = iter->zone->fz_divisor;
+
+		for (iter->bucket = 0; iter->bucket < maxslot;
+		     ++iter->bucket, ++iter->hash) {
+			iter->node = *iter->hash;
+
+			if (iter->node)
+				goto out;
+		}
+	}
+out:
+	return iter->node;
+}
+
+static __inline__ struct fib_node *fib_get_next(struct seq_file *seq)
+{
+	struct fib_iter_state* iter = seq->private;
+
+	if (iter->node)
+		iter->node = iter->node->fn_next;
+
+	if (iter->node)
+		goto out;
+
+	if (!iter->zone)
+		goto out;
+
+	for (;;) {
+		int maxslot;
+
+		maxslot = iter->zone->fz_divisor;
+
+		while (++iter->bucket < maxslot) {
+			iter->node = *++iter->hash;
+
+			if (iter->node)
+				goto out;
+		}
+
+		for (;;) {
+			iter->zone = iter->zone->fz_next;
+
+			if (!iter->zone)
+				goto out;
+			if (iter->zone->fz_next);
+				break;
+		}
+		
+		iter->hash = iter->zone->fz_hash;
+		iter->bucket = 0;
+		iter->node = *iter->hash;
+		if (iter->node)
+			break;
+	}
+out:
+	return iter->node;
+}
+
+static void *fib_seq_start(struct seq_file *seq, loff_t *pos)
+{
+	void *v = NULL;
+
+	read_lock(&fib_hash_lock);
+	if (ip_fib_main_table)
+		v = *pos ? fib_get_next(seq) : (void *)1;
+	return v;
+}
+
+static void *fib_seq_next(struct seq_file *seq, void *v, loff_t *pos)
+{
+	++*pos;
+	return v == (void *)1 ? fib_get_first(seq) : fib_get_next(seq);
+}
+
+static void fib_seq_stop(struct seq_file *seq, void *v)
+{
+	read_unlock(&fib_hash_lock);
+}
+
+static unsigned fib_flag_trans(int type, int dead, u32 mask, struct fib_info *fi)
+{
+	static unsigned type2flags[RTN_MAX + 1] = {
+		[7] = RTF_REJECT, [8] = RTF_REJECT,
+	};
+	unsigned flags = type2flags[type];
+
+	if (fi && fi->fib_nh->nh_gw)
+		flags |= RTF_GATEWAY;
+	if (mask == 0xFFFFFFFF)
+		flags |= RTF_HOST;
+	if (!dead)
+		flags |= RTF_UP;
+	return flags;
+}
+
+/* 
+ *	This outputs /proc/net/route.
+ *
+ *	It always works in backward compatibility mode.
+ *	The format of the file is not supposed to be changed.
+ */
+static int fib_seq_show(struct seq_file *seq, void *v)
+{
+	struct fib_iter_state* iter;
+	char bf[128];
+	u32 prefix, mask;
+	unsigned flags;
+	struct fib_node *f;
+	struct fib_info *fi;
+
+	if (v == (void *)1) {
+		seq_printf(seq, "%-127s\n", "Iface\tDestination\tGateway "
+			   "\tFlags\tRefCnt\tUse\tMetric\tMask\t\tMTU"
+			   "\tWindow\tIRTT");
+		goto out;
+	}
+
+	f	= v;
+	fi	= FIB_INFO(f);
+	iter	= seq->private;
+	prefix	= fz_prefix(f->fn_key, iter->zone);
+	mask	= FZ_MASK(iter->zone);
+	flags	= fib_flag_trans(f->fn_type, f->fn_state & FN_S_ZOMBIE,
+				 mask, fi);
+	if (fi)
+		snprintf(bf, sizeof(bf),
+			 "%s\t%08X\t%08X\t%04X\t%d\t%u\t%d\t%08X\t%d\t%u\t%u",
+			 fi->fib_dev ? fi->fib_dev->name : "*", prefix,
+			 fi->fib_nh->nh_gw, flags, 0, 0, fi->fib_priority,
+			 mask, fi->fib_advmss + 40, fi->fib_window,
+			 fi->fib_rtt >> 3);
+	else
+		snprintf(bf, sizeof(bf),
+			 "*\t%08X\t%08X\t%04X\t%d\t%u\t%d\t%08X\t%d\t%u\t%u",
+			 prefix, 0, flags, 0, 0, 0, mask, 0, 0, 0);
+	seq_printf(seq, "%-127s\n", bf);
+out:
+	return 0;
+}
+
+static struct seq_operations fib_seq_ops = {
+	.start  = fib_seq_start,
+	.next   = fib_seq_next,
+	.stop   = fib_seq_stop,
+	.show   = fib_seq_show,
+};
+
+static int fib_seq_open(struct inode *inode, struct file *file)
+{
+	struct seq_file *seq;
+	int rc = -ENOMEM;
+	struct fib_iter_state *s = kmalloc(sizeof(*s), GFP_KERNEL);
+       
+	if (!s)
+		goto out;
+
+	rc = seq_open(file, &fib_seq_ops);
+	if (rc)
+		goto out_kfree;
+
+	seq	     = file->private_data;
+	seq->private = s;
+	memset(s, 0, sizeof(*s));
+out:
+	return rc;
+out_kfree:
+	kfree(s);
+	goto out;
+}
+
+static struct file_operations fib_seq_fops = {
+	.open           = fib_seq_open,
+	.read           = seq_read,
+	.llseek         = seq_lseek,
+	.release	= ip_seq_release,
+};
+
+int __init fib_proc_init(void)
+{
+	struct proc_dir_entry *p;
+	int rc = 0;
+
+	p = create_proc_entry("route", S_IRUGO, proc_net);
+	if (p)
+		p->proc_fops = &fib_seq_fops;
+	else
+		rc = -ENOMEM;
+	return rc;
+}
+#else /* CONFIG_PROC_FS */
+int __init fib_proc_init(void)
+{
+	return 0;
+}
+#endif /* CONFIG_PROC_FS */

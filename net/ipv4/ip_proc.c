@@ -21,7 +21,6 @@
 #include <net/udp.h>
 #include <linux/rtnetlink.h>
 #include <linux/route.h>
-#include <net/ip_fib.h>
 #include <linux/seq_file.h>
 #include <linux/proc_fs.h>
 
@@ -250,38 +249,6 @@ static int arp_seq_show(struct seq_file *seq, void *v)
 
 /* ------------------------------------------------------------------------ */
 
-static void *fib_seq_start(struct seq_file *seq, loff_t *pos)
-{
-	return *pos ? NULL : (void *)1;
-}
-
-static void *fib_seq_next(struct seq_file *seq, void *v, loff_t *pos)
-{
-	return NULL;
-}
-
-static void fib_seq_stop(struct seq_file *seq, void *v)
-{
-}
-/* 
- *	This outputs /proc/net/route.
- *
- *	It always works in backward compatibility mode.
- *	The format of the file is not supposed to be changed.
- */
-static int fib_seq_show(struct seq_file *seq, void *v)
-{
-	seq_printf(seq, "%-127s\n", "Iface\tDestination\tGateway "
-			"\tFlags\tRefCnt\tUse\tMetric\tMask\t\tMTU"
-			"\tWindow\tIRTT");
-	if (ip_fib_main_table)
-		ip_fib_main_table->tb_seq_show(ip_fib_main_table, seq);
-
-	return 0;
-}
-
-/* ------------------------------------------------------------------------ */
-
 struct udp_iter_state {
 	int bucket;
 };
@@ -384,13 +351,6 @@ static struct seq_operations arp_seq_ops = {
 	.show   = arp_seq_show,
 };
 
-static struct seq_operations fib_seq_ops = {
-	.start  = fib_seq_start,
-	.next   = fib_seq_next,
-	.stop   = fib_seq_stop,
-	.show   = fib_seq_show,
-};
-
 static struct seq_operations udp_seq_ops = {
 	.start  = udp_seq_start,
 	.next   = udp_seq_next,
@@ -421,7 +381,7 @@ out_kfree:
 	goto out;
 }
 
-static int arp_seq_release(struct inode *inode, struct file *file)
+int ip_seq_release(struct inode *inode, struct file *file)
 {
 	struct seq_file *seq = (struct seq_file *)file->private_data;
 
@@ -429,11 +389,6 @@ static int arp_seq_release(struct inode *inode, struct file *file)
 	seq->private = NULL;
 
 	return seq_release(inode, file);
-}
-
-static int fib_seq_open(struct inode *inode, struct file *file)
-{
-	return seq_open(file, &fib_seq_ops);
 }
 
 static int udp_seq_open(struct inode *inode, struct file *file)
@@ -459,35 +414,18 @@ out_kfree:
 	goto out;
 }
 
-static int udp_seq_release(struct inode *inode, struct file *file)
-{
-	struct seq_file *seq = (struct seq_file *)file->private_data;
-
-	kfree(seq->private);
-	seq->private = NULL;
-
-	return seq_release(inode, file);
-}
-
 static struct file_operations arp_seq_fops = {
 	.open           = arp_seq_open,
 	.read           = seq_read,
 	.llseek         = seq_lseek,
-	.release	= arp_seq_release,
-};
-
-static struct file_operations fib_seq_fops = {
-	.open           = fib_seq_open,
-	.read           = seq_read,
-	.llseek         = seq_lseek,
-	.release	= seq_release,
+	.release	= ip_seq_release,
 };
 
 static struct file_operations udp_seq_fops = {
 	.open           = udp_seq_open,
 	.read           = seq_read,
 	.llseek         = seq_lseek,
-	.release	= udp_seq_release,
+	.release	= ip_seq_release,
 };
 
 /* ------------------------------------------------------------------------ */
@@ -522,14 +460,8 @@ int __init ipv4_proc_init(void)
 		goto out_arp;
 	p->proc_fops = &arp_seq_fops;
 
-	p = create_proc_entry("route", S_IRUGO, proc_net);
-	if (!p)
-		goto out_route;
-	p->proc_fops = &fib_seq_fops;
 out:
 	return rc;
-out_route:
-	remove_proc_entry("route", proc_net);
 out_arp:
 	remove_proc_entry("udp", proc_net);
 out_udp:
