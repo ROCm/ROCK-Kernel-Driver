@@ -249,7 +249,7 @@ struct ipv6_txoptions *fl6_merge_options(struct ipv6_txoptions * opt_space,
 	return opt_space;
 }
 
-static __u32 check_linger(__u16 ttl)
+static unsigned long check_linger(unsigned long ttl)
 {
 	if (ttl < FL_MIN_LINGER)
 		return FL_MIN_LINGER*HZ;
@@ -258,7 +258,7 @@ static __u32 check_linger(__u16 ttl)
 	return ttl*HZ;
 }
 
-static int fl6_renew(struct ip6_flowlabel *fl, unsigned linger, unsigned expires)
+static int fl6_renew(struct ip6_flowlabel *fl, unsigned long linger, unsigned long expires)
 {
 	linger = check_linger(linger);
 	if (!linger)
