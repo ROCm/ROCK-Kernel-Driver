@@ -42,6 +42,7 @@
  * POSSIBILITY OF SUCH DAMAGES.
  */
 
+#include <linux/module.h>
 
 #include <acpi/acpi.h>
 #include <acpi/acnamesp.h>
@@ -439,5 +440,5 @@ acpi_get_table (
 	ACPI_MEMCPY ((void *) ret_buffer->pointer, (void *) tbl_ptr, table_length);
 	return_ACPI_STATUS (AE_OK);
 }
-
+EXPORT_SYMBOL(acpi_get_table);
 

@@ -42,6 +42,7 @@
  * POSSIBILITY OF SUCH DAMAGES.
  */
 
+#include <linux/module.h>
 
 #include <acpi/acpi.h>
 #include <acpi/acnamesp.h>
@@ -354,6 +355,7 @@ acpi_evaluate_object (
 
 	return_ACPI_STATUS (status);
 }
+EXPORT_SYMBOL(acpi_evaluate_object);
 
 
 /*******************************************************************************
@@ -426,6 +428,7 @@ acpi_walk_namespace (
 	(void) acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
 	return_ACPI_STATUS (status);
 }
+EXPORT_SYMBOL(acpi_walk_namespace);
 
 
 /*******************************************************************************
@@ -599,6 +602,7 @@ acpi_get_devices (
 	(void) acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
 	return_ACPI_STATUS (status);
 }
+EXPORT_SYMBOL(acpi_get_devices);
 
 
 /*******************************************************************************

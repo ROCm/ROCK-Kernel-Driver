@@ -42,6 +42,7 @@
  * POSSIBILITY OF SUCH DAMAGES.
  */
 
+#include <linux/module.h>
 
 #include <acpi/acpi.h>
 #include <acpi/acnamesp.h>
@@ -106,6 +107,7 @@ acpi_get_type (
 	status = acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
 	return (status);
 }
+EXPORT_SYMBOL(acpi_get_type);
 
 
 /*******************************************************************************
@@ -171,6 +173,7 @@ unlock_and_exit:
 	(void) acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
 	return (status);
 }
+EXPORT_SYMBOL(acpi_get_parent);
 
 
 /*******************************************************************************
@@ -255,5 +258,5 @@ unlock_and_exit:
 	(void) acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
 	return (status);
 }
-
+EXPORT_SYMBOL(acpi_get_next_object);
 

@@ -12,8 +12,6 @@ endif
 
 EXTRA_CFLAGS	+= $(ACPI_CFLAGS)
 
-obj-$(CONFIG_ACPI)		:= acpi_ksyms.o 
-
 #
 # ACPI Boot-Time Table Parsing
 #
