@@ -43,6 +43,8 @@
 #include <net/sock.h>
 #include <net/ip_fib.h>
 
+#include "fib_lookup.h"
+
 #define FSprintk(a...)
 
 static rwlock_t fib_info_lock = RW_LOCK_UNLOCKED;

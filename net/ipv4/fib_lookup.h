@@ -16,4 +16,18 @@ struct fib_alias {
 
 #define FA_S_ACCESSED	0x01
 
+/* Exported by fib_semantics.c */
+extern int fib_semantic_match(int type, struct fib_info *,
+			      const struct flowi *, struct fib_result *);
+extern void fib_release_info(struct fib_info *);
+extern struct fib_info *fib_create_info(const struct rtmsg *r,
+					struct kern_rta *rta,
+					const struct nlmsghdr *,
+					int *err);
+extern int fib_nh_match(struct rtmsg *r, struct nlmsghdr *,
+			struct kern_rta *rta, struct fib_info *fi);
+extern int fib_dump_info(struct sk_buff *skb, u32 pid, u32 seq, int event,
+			 u8 tb_id, u8 type, u8 scope, void *dst,
+			 int dst_len, u8 tos, struct fib_info *fi);
+
 #endif /* _FIB_LOOKUP_H */
