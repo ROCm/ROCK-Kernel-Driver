@@ -229,60 +229,11 @@ find_initrd (void)
 #endif
 }
 
-#ifdef CONFIG_SERIAL_8250_CONSOLE
 static void __init
-setup_serial_legacy (void)
-{
-	struct uart_port port;
-	unsigned int i, iobase[] = {0x3f8, 0x2f8};
-
-	printk(KERN_INFO "Registering legacy COM ports for serial console\n");
-	memset(&port, 0, sizeof(port));
-	port.iotype = SERIAL_IO_PORT;
-	port.uartclk = BASE_BAUD * 16;
-	for (i = 0; i < ARRAY_SIZE(iobase); i++) {
-		port.line = i;
-		port.iobase = iobase[i];
-		early_serial_setup(&port);
-	}
-}
-#endif
-
-void __init
-setup_arch (char **cmdline_p)
+io_port_init (void)
 {
 	extern unsigned long ia64_iobase;
 	unsigned long phys_iobase;
-
-	unw_init();
-
-	ia64_patch_vtop((u64) __start___vtop_patchlist, (u64) __end___vtop_patchlist);
-
-	*cmdline_p = __va(ia64_boot_param->command_line);
-	strlcpy(saved_command_line, *cmdline_p, sizeof(saved_command_line));
-
-	efi_init();
-
-#ifdef CONFIG_ACPI_BOOT
-	/* Initialize the ACPI boot-time table parser */
-	acpi_table_init();
-# ifdef CONFIG_ACPI_NUMA
-	acpi_numa_init();
-# endif
-#else
-# ifdef CONFIG_SMP
-	smp_build_cpu_map();	/* happens, e.g., with the Ski simulator */
-# endif
-#endif /* CONFIG_APCI_BOOT */
-
-	find_memory();
-
-	/* process SAL system table: */
-	ia64_sal_init(efi.sal_systab);
-
-#ifdef CONFIG_IA64_GENERIC
-	machvec_init(acpi_get_sysname());
-#endif
 
 	/*
 	 *  Set `iobase' to the appropriate address in region 6 (uncached access range).
@@ -308,6 +259,60 @@ setup_arch (char **cmdline_p)
 	io_space[0].mmio_base = ia64_iobase;
 	io_space[0].sparse = 1;
 	num_io_spaces = 1;
+}
+
+#ifdef CONFIG_SERIAL_8250_CONSOLE
+static void __init
+setup_serial_legacy (void)
+{
+	struct uart_port port;
+	unsigned int i, iobase[] = {0x3f8, 0x2f8};
+
+	printk(KERN_INFO "Registering legacy COM ports for serial console\n");
+	memset(&port, 0, sizeof(port));
+	port.iotype = SERIAL_IO_PORT;
+	port.uartclk = BASE_BAUD * 16;
+	for (i = 0; i < ARRAY_SIZE(iobase); i++) {
+		port.line = i;
+		port.iobase = iobase[i];
+		early_serial_setup(&port);
+	}
+}
+#endif
+
+void __init
+setup_arch (char **cmdline_p)
+{
+	unw_init();
+
+	ia64_patch_vtop((u64) __start___vtop_patchlist, (u64) __end___vtop_patchlist);
+
+	*cmdline_p = __va(ia64_boot_param->command_line);
+	strlcpy(saved_command_line, *cmdline_p, sizeof(saved_command_line));
+
+	efi_init();
+	io_port_init();
+
+#ifdef CONFIG_IA64_GENERIC
+	machvec_init(acpi_get_sysname());
+#endif
+
+#ifdef CONFIG_ACPI_BOOT
+	/* Initialize the ACPI boot-time table parser */
+	acpi_table_init();
+# ifdef CONFIG_ACPI_NUMA
+	acpi_numa_init();
+# endif
+#else
+# ifdef CONFIG_SMP
+	smp_build_cpu_map();	/* happens, e.g., with the Ski simulator */
+# endif
+#endif /* CONFIG_APCI_BOOT */
+
+	find_memory();
+
+	/* process SAL system table: */
+	ia64_sal_init(efi.sal_systab);
 
 #ifdef CONFIG_SMP
 	cpu_physical_id(0) = hard_smp_processor_id();
