@@ -306,6 +306,10 @@ static void smc_reset(struct net_device *dev)
 
 	DBG(2, "%s: %s\n", dev->name, __FUNCTION__);
 
+	/* Disable all interrupts */
+	SMC_SELECT_BANK(2);
+	SMC_SET_INT_MASK(0);
+
 	/*
 	 * This resets the registers mostly to defaults, but doesn't
 	 * affect EEPROM.  That seems unnecessary
@@ -367,11 +371,8 @@ static void smc_reset(struct net_device *dev)
 		ctl &= ~CTL_AUTO_RELEASE;
 	SMC_SET_CTL(ctl);
 
-	/* Disable all interrupts */
-	SMC_SELECT_BANK(2);
-	SMC_SET_INT_MASK(0);
-
 	/* Reset the MMU */
+	SMC_SELECT_BANK(2);
 	SMC_SET_MMU_CMD(MC_RESET);
 	SMC_WAIT_MMU_BUSY();
 }
@@ -401,6 +402,13 @@ static void smc_enable(struct net_device *dev)
 		mask |= IM_MDINT;
 	SMC_SELECT_BANK(2);
 	SMC_SET_INT_MASK(mask);
+
+	/*
+	 * From this point the register bank must _NOT_ be switched away
+	 * to something else than bank 2 without proper locking against
+	 * races with any tasklet or interrupt handlers until smc_shutdown()
+	 * or smc_reset() is called.
+	 */
 }
 
 /*
@@ -580,7 +588,7 @@ static int smc_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	struct smc_local *lp = netdev_priv(dev);
 	unsigned long ioaddr = dev->base_addr;
-	unsigned int numPages, poll_count, status, saved_bank;
+	unsigned int numPages, poll_count, status;
 
 	DBG(3, "%s: %s\n", dev->name, __FUNCTION__);
 
@@ -609,8 +617,6 @@ static int smc_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	}
 
 	/* now, try to allocate the memory */
-	saved_bank = SMC_CURRENT_BANK();
-	SMC_SELECT_BANK(2);
 	SMC_SET_MMU_CMD(MC_ALLOC | numPages);
 
 	/*
@@ -651,7 +657,6 @@ static int smc_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		SMC_ENABLE_INT(IM_TX_INT | IM_TX_EMPTY_INT);
 	}
 
-	SMC_SELECT_BANK(saved_bank);
 	return 0;
 }
 
@@ -765,10 +770,8 @@ static unsigned int smc_mii_in(struct net_device *dev, int bits)
 static int smc_phy_read(struct net_device *dev, int phyaddr, int phyreg)
 {
 	unsigned long ioaddr = dev->base_addr;
-	unsigned int phydata, old_bank;
+	unsigned int phydata;
 
-	/* Save the current bank, and select bank 3 */
-	old_bank = SMC_CURRENT_BANK();
 	SMC_SELECT_BANK(3);
 
 	/* Idle - 32 ones */
@@ -783,12 +786,10 @@ static int smc_phy_read(struct net_device *dev, int phyaddr, int phyreg)
 	/* Return to idle state */
 	SMC_SET_MII(SMC_GET_MII() & ~(MII_MCLK|MII_MDOE|MII_MDO));
 
-	/* And select original bank */
-	SMC_SELECT_BANK(old_bank);
-
 	DBG(3, "%s: phyaddr=0x%x, phyreg=0x%x, phydata=0x%x\n",
 		__FUNCTION__, phyaddr, phyreg, phydata);
 
+	SMC_SELECT_BANK(2);
 	return phydata;
 }
 
@@ -799,10 +800,7 @@ static void smc_phy_write(struct net_device *dev, int phyaddr, int phyreg,
 			  int phydata)
 {
 	unsigned long ioaddr = dev->base_addr;
-	unsigned int old_bank;
 
-	/* Save the current bank, and select bank 3 */
-	old_bank = SMC_CURRENT_BANK();
 	SMC_SELECT_BANK(3);
 
 	/* Idle - 32 ones */
@@ -814,11 +812,10 @@ static void smc_phy_write(struct net_device *dev, int phyaddr, int phyreg,
 	/* Return to idle state */
 	SMC_SET_MII(SMC_GET_MII() & ~(MII_MCLK|MII_MDOE|MII_MDO));
 
-	/* And select original bank */
-	SMC_SELECT_BANK(old_bank);
-
 	DBG(3, "%s: phyaddr=0x%x, phyreg=0x%x, phydata=0x%x\n",
 		__FUNCTION__, phyaddr, phyreg, phydata);
+
+	SMC_SELECT_BANK(2);
 }
 
 /*
@@ -891,7 +888,9 @@ static int smc_phy_fixed(struct net_device *dev)
 	smc_phy_write(dev, phyaddr, MII_BMCR, bmcr);
 
 	/* Re-Configure the Receive/Phy Control register */
+	SMC_SELECT_BANK(0);
 	SMC_SET_RPC(lp->rpc_cur_mode);
+	SMC_SELECT_BANK(2);
 
 	return 1;
 }
@@ -962,8 +961,6 @@ static void smc_phy_check_media(struct net_device *dev, int init)
 	unsigned long ioaddr = dev->base_addr;
 
 	if (mii_check_media(&lp->mii, netif_msg_link(lp), init)) {
-		unsigned int old_bank;
-
 		/* duplex state has changed */
 		if (lp->mii.full_duplex) {
 			lp->tcr_cur_mode |= TCR_SWFDUP;
@@ -971,10 +968,8 @@ static void smc_phy_check_media(struct net_device *dev, int init)
 			lp->tcr_cur_mode &= ~TCR_SWFDUP;
 		}
 
-		old_bank = SMC_CURRENT_BANK();
 		SMC_SELECT_BANK(0);
 		SMC_SET_TCR(lp->tcr_cur_mode);
-		SMC_SELECT_BANK(old_bank);
 	}
 }
 
@@ -1115,12 +1110,13 @@ static void smc_10bt_check_media(struct net_device *dev, int init)
 {
 	struct smc_local *lp = netdev_priv(dev);
 	unsigned long ioaddr = dev->base_addr;
-	unsigned int old_carrier, new_carrier, old_bank;
+	unsigned int old_carrier, new_carrier;
 
-	old_bank = SMC_CURRENT_BANK();
-	SMC_SELECT_BANK(0);
 	old_carrier = netif_carrier_ok(dev) ? 1 : 0;
+
+	SMC_SELECT_BANK(0);
 	new_carrier = SMC_inw(ioaddr, EPH_STATUS_REG) & ES_LINK_OK ? 1 : 0;
+	SMC_SELECT_BANK(2);
 
 	if (init || (old_carrier != new_carrier)) {
 		if (!new_carrier) {
@@ -1132,24 +1128,20 @@ static void smc_10bt_check_media(struct net_device *dev, int init)
 			printk(KERN_INFO "%s: link %s\n", dev->name,
 			       new_carrier ? "up" : "down");
 	}
-	SMC_SELECT_BANK(old_bank);
 }
 
 static void smc_eph_interrupt(struct net_device *dev)
 {
 	unsigned long ioaddr = dev->base_addr;
-	unsigned int old_bank, ctl;
+	unsigned int ctl;
 
 	smc_10bt_check_media(dev, 0);
 
-	old_bank = SMC_CURRENT_BANK();
 	SMC_SELECT_BANK(1);
-
 	ctl = SMC_GET_CTL();
 	SMC_SET_CTL(ctl & ~CTL_LE_ENABLE);
 	SMC_SET_CTL(ctl);
-
-	SMC_SELECT_BANK(old_bank);
+	SMC_SELECT_BANK(2);
 }
 
 /*
@@ -1162,12 +1154,10 @@ static irqreturn_t smc_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	unsigned long ioaddr = dev->base_addr;
 	struct smc_local *lp = netdev_priv(dev);
 	int status, mask, timeout, card_stats;
-	int saved_bank, saved_pointer;
+	int saved_pointer;
 
 	DBG(3, "%s: %s\n", dev->name, __FUNCTION__);
 
-	saved_bank = SMC_CURRENT_BANK();
-	SMC_SELECT_BANK(2);
 	saved_pointer = SMC_GET_PTR();
 	mask = SMC_GET_INT_MASK();
 	SMC_SET_INT_MASK(0);
@@ -1241,9 +1231,8 @@ static irqreturn_t smc_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	} while (--timeout);
 
 	/* restore register states */
-	SMC_SET_INT_MASK(mask);
 	SMC_SET_PTR(saved_pointer);
-	SMC_SELECT_BANK(saved_bank);
+	SMC_SET_INT_MASK(mask);
 
 	DBG(3, "%s: Interrupt done (%d loops)\n", dev->name, 8-timeout);
 
