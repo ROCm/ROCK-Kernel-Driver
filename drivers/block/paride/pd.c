@@ -350,9 +350,6 @@ static int pd_open(struct inode *inode, struct file *file)
 	int unit = DEVICE_NR(inode->i_rdev);
 	struct pd_unit *disk = pd + unit;
 
-	if (unit >= PD_UNITS || !disk->present)
-		return -ENODEV;
-
 	disk->access++;
 
 	if (disk->removable) {

@@ -331,9 +331,6 @@ static int pf_open(struct inode *inode, struct file *file)
 	int unit = DEVICE_NR(inode->i_rdev);
 	struct pf_unit *pf = units + unit;
 
-	if ((unit >= PF_UNITS) || (!pf->present))
-		return -ENODEV;
-
 	pf_identify(pf);
 
 	if (pf->media_status == PF_NM)

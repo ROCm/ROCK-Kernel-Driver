@@ -1186,14 +1186,6 @@ static int mfm_ioctl(struct inode *inode, struct file *file, u_int cmd, u_long a
 	return 0;
 }
 
-static int mfm_open(struct inode *inode, struct file *file)
-{
-	int dev = DEVICE_NR(minor(inode->i_rdev));
-	if (dev >= mfm_drives)
-		return -ENODEV;
-	return 0;
-}
-
 /*
  * This is to handle various kernel command line parameters
  * specific to this driver.
@@ -1239,7 +1231,6 @@ void xd_set_geometry(struct block_device *bdev, unsigned char secsptrack,
 static struct block_device_operations mfm_fops =
 {
 	.owner		= THIS_MODULE,
-	.open		= mfm_open,
 	.ioctl		= mfm_ioctl,
 };
 

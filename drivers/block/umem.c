@@ -864,18 +864,6 @@ static int mm_check_change(kdev_t i_rdev)
 
 	return 0;
 }
-
-/*
------------------------------------------------------------------------------------
---                            mm_open
------------------------------------------------------------------------------------
-*/
-static int mm_open(struct inode *i, struct file *filp)
-{
-	if (DEVICE_NR(i->i_rdev) >= num_cards)
-		return -ENXIO;
-	return 0;
-}
 /*
 -----------------------------------------------------------------------------------
 --                             mm_fops
@@ -883,7 +871,6 @@ static int mm_open(struct inode *i, struct file *filp)
 */
 static struct block_device_operations mm_fops = {
 	owner:		THIS_MODULE,
-	open:		mm_open,
 	ioctl:		mm_ioctl,
 	revalidate:	mm_revalidate,
 	check_media_change: mm_check_change,

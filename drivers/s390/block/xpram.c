@@ -324,24 +324,12 @@ fail:
 	return 0;
 }
 
-/*
- * The file operations
- */
-static int xpram_open (struct inode *inode, struct file *filp)
-{
-	if (minor(inode->i_rdev) >= xpram_devs)
-		return -ENODEV;
-	return 0;
-}
-
 static int xpram_ioctl (struct inode *inode, struct file *filp,
 		 unsigned int cmd, unsigned long arg)
 {
 	struct hd_geometry *geo;
 	unsigned long size;
 	int idx = minor(inode->i_rdev);
-	if (idx >= xpram_devs)
-		return -ENODEV;
  	if (cmd != HDIO_GETGEO)
 		return -EINVAL;
 	/*
@@ -350,8 +338,6 @@ static int xpram_ioctl (struct inode *inode, struct file *filp,
 	 * whatever cylinders. Tell also that data starts at sector. 4.
 	 */
 	geo = (struct hd_geometry *) arg;
-	if (geo == NULL)
-		return -EINVAL;
 	size = (xpram_pages * 8) & ~0x3f;
 	put_user(size >> 6, &geo->cylinders);
 	put_user(4, &geo->heads);
@@ -364,7 +350,6 @@ static struct block_device_operations xpram_devops =
 {
 	owner:   THIS_MODULE,
 	ioctl:   xpram_ioctl,
-	open:    xpram_open,
 };
 
 /*

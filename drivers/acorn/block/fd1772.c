@@ -1470,9 +1470,6 @@ static int floppy_open(struct inode *inode, struct file *filp)
 	int drive = minor(inode->i_rdev) & 3;
 	int old_dev;
 
-	if ((minor(inode->i_rdev) >> 2) > NUM_DISK_TYPES)
-		return -ENXIO;
-
 	old_dev = fd_device[drive];
 
 	if (fd_ref[drive])

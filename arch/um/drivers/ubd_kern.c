@@ -648,14 +648,10 @@ static int ubd_open_dev(struct ubd *dev)
 
 static int ubd_open(struct inode *inode, struct file *filp)
 {
-	struct ubd *dev;
-	int n, offset, err;
+	int n = DEVICE_NR(inode->i_rdev);
+	struct ubd *dev = &ubd_dev[n];
+	int err;
 
-	n = DEVICE_NR(inode->i_rdev);
-	dev = &ubd_dev[n];
-	if(n > MAX_DEV)
-		return -ENODEV;
-	offset = n << UBD_SHIFT;
 	if(dev->is_dir == 1)
 		return(0);
 
@@ -680,16 +676,9 @@ static int ubd_open(struct inode *inode, struct file *filp)
 
 static int ubd_release(struct inode * inode, struct file * file)
 {
-        int n, offset;
-
-	n = DEVICE_NR(inode->i_rdev);
-	offset = n << UBD_SHIFT;
-	if(n > MAX_DEV)
-		return -ENODEV;
-
+        int n = DEVICE_NR(inode->i_rdev);
 	if(--ubd_dev[n].count == 0)
 		ubd_close(&ubd_dev[n]);
-
 	return(0);
 }
 

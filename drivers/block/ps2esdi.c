@@ -89,9 +89,6 @@ static void (*current_int_handler) (u_int) = NULL;
 static void ps2esdi_normal_interrupt_handler(u_int);
 static void ps2esdi_initial_reset_int_handler(u_int);
 static void ps2esdi_geometry_int_handler(u_int);
-
-static int ps2esdi_open(struct inode *inode, struct file *file);
-
 static int ps2esdi_ioctl(struct inode *inode, struct file *file,
 			 u_int cmd, u_long arg);
 
@@ -141,7 +138,6 @@ static struct ps2esdi_i_struct ps2esdi_info[MAX_HD] =
 static struct block_device_operations ps2esdi_fops =
 {
 	.owner		= THIS_MODULE,
-	.open		= ps2esdi_open,
 	.ioctl		= ps2esdi_ioctl,
 };
 
@@ -1073,15 +1069,6 @@ static void dump_cmd_complete_status(u_int int_ret_code)
 
 #undef WAIT_FOR_STATUS
 
-}
-
-
-static int ps2esdi_open(struct inode *inode, struct file *file)
-{
-	int dev = DEVICE_NR(inode->i_rdev);
-	if (dev >= ps2esdi_drives)
-		return -ENODEV;
-	return 0;
 }
 
 static int ps2esdi_ioctl(struct inode *inode,

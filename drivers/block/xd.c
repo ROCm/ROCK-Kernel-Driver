@@ -130,7 +130,6 @@ static struct gendisk *xd_gendisk[2];
 
 static struct block_device_operations xd_fops = {
 	owner:		THIS_MODULE,
-	open:		xd_open,
 	ioctl:		xd_ioctl,
 };
 static DECLARE_WAIT_QUEUE_HEAD(xd_wait_int);
@@ -283,15 +282,6 @@ static u_char __init xd_detect (u_char *controller, unsigned int *address)
 	return (found);
 }
 
-/* xd_open: open a device */
-static int xd_open (struct inode *inode,struct file *file)
-{
-	int dev = DEVICE_NR(inode->i_rdev);
-	if (dev >= xd_drives)
-		return -ENXIO;
-	return 0;
-}
-
 /* do_xd_request: handle an incoming request */
 static void do_xd_request (request_queue_t * q)
 {
@@ -336,8 +326,6 @@ static void do_xd_request (request_queue_t * q)
 static int xd_ioctl (struct inode *inode,struct file *file,u_int cmd,u_long arg)
 {
 	int dev = DEVICE_NR(inode->i_rdev);
-
-	if (dev >= xd_drives) return -EINVAL;
 	switch (cmd) {
 		case HDIO_GETGEO:
 		{

@@ -1086,8 +1086,6 @@ static int acsi_ioctl( struct inode *inode, struct file *file,
 					   unsigned int cmd, unsigned long arg )
 {
 	int dev = DEVICE_NR(inode->i_rdev);
-	if (dev >= NDevices)
-		return -EINVAL;
 	switch (cmd) {
 	  case HDIO_GETGEO:
 		/* HDIO_GETGEO is supported more for getting the partition's
@@ -1130,13 +1128,8 @@ static int acsi_ioctl( struct inode *inode, struct file *file,
 
 static int acsi_open( struct inode * inode, struct file * filp )
 {
-	int  device;
-	struct acsi_info_struct *aip;
-
-	device = DEVICE_NR(inode->i_rdev);
-	if (device >= NDevices)
-		return -ENXIO;
-	aip = &acsi_info[device];
+	int device = DEVICE_NR(inode->i_rdev);
+	struct acsi_info_struct *aip = &acsi_info[device];
 
 	if (access_count[device] == 0 && aip->removable) {
 #if 0

@@ -1021,8 +1021,6 @@ static int stram_open( struct inode *inode, struct file *filp )
 		printk( KERN_NOTICE "Only kernel can open ST-RAM device\n" );
 		return( -EPERM );
 	}
-	if (MINOR(inode->i_rdev) != STRAM_MINOR)
-		return( -ENXIO );
 	if (refcnt)
 		return( -EBUSY );
 	++refcnt;
