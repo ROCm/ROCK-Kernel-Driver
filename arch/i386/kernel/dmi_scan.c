@@ -15,6 +15,9 @@
 unsigned long dmi_broken;
 EXPORT_SYMBOL(dmi_broken);
 
+unsigned int i8042_dmi_noloop = 0;
+EXPORT_SYMBOL(i8042_dmi_noloop);
+
 int is_sony_vaio_laptop;
 int is_unsafe_smbus;
 int es7000_plat = 0;
@@ -397,6 +400,17 @@ static __init int sony_vaio_laptop(struct dmi_blacklist *d)
 		is_sony_vaio_laptop = 1;
 		printk(KERN_INFO "%s laptop detected.\n", d->ident);
 	}
+	return 0;
+}
+
+/*
+ * Several HP Proliant (and maybe other OSB4/ProFusion) systems
+ * shouldn't use the AUX LoopBack command, or they crash or reboot.
+ */
+
+static __init int set_8042_noloop(struct dmi_blacklist *d)
+{
+	i8042_dmi_noloop = 1;
 	return 0;
 }
 
@@ -874,6 +888,23 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 			MATCH(DMI_BIOS_VERSION, "3A71"),
 			NO_MATCH, NO_MATCH,
 			} },
+
+	/*      
+	 * Several HP Proliant (and maybe other OSB4/ProFusion) systems
+	 * can't use i8042 in mux mode, or they crash or reboot.
+	 */                     
+
+	{ set_8042_noloop, "Compaq Proliant 8500", {
+			MATCH(DMI_SYS_VENDOR, "Compaq"),
+			MATCH(DMI_PRODUCT_NAME , "ProLiant"),
+			MATCH(DMI_PRODUCT_VERSION, "8500"),
+			NO_MATCH }},
+
+	{ set_8042_noloop, "Compaq Proliant DL760", {
+			MATCH(DMI_SYS_VENDOR, "Compaq"),
+			MATCH(DMI_PRODUCT_NAME , "ProLiant"),
+			MATCH(DMI_PRODUCT_VERSION, "DL760"),
+			NO_MATCH }},
 
 #ifdef	CONFIG_ACPI_BOOT
 	/*
