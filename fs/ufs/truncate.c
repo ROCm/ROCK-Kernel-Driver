@@ -82,7 +82,7 @@ static int ufs_trunc_direct (struct inode * inode)
 	UFSD(("ENTER\n"))
 
 	sb = inode->i_sb;
-	uspi = sb->u.ufs_sb.s_uspi;
+	uspi = UFS_SB(sb)->s_uspi;
 	
 	frag_to_free = 0;
 	free_count = 0;
@@ -212,7 +212,7 @@ static int ufs_trunc_indirect (struct inode * inode, unsigned offset, u32 * p)
 	UFSD(("ENTER\n"))
 		
 	sb = inode->i_sb;
-	uspi = sb->u.ufs_sb.s_uspi;
+	uspi = UFS_SB(sb)->s_uspi;
 
 	frag_to_free = 0;
 	free_count = 0;
@@ -306,7 +306,7 @@ static int ufs_trunc_dindirect (struct inode * inode, unsigned offset, u32 * p)
 	UFSD(("ENTER\n"))
 	
 	sb = inode->i_sb;
-	uspi = sb->u.ufs_sb.s_uspi;
+	uspi = UFS_SB(sb)->s_uspi;
 
 	dindirect_block = (DIRECT_BLOCK > offset) 
 		? ((DIRECT_BLOCK - offset) >> uspi->s_apbshift) : 0;
@@ -374,7 +374,7 @@ static int ufs_trunc_tindirect (struct inode * inode)
 	UFSD(("ENTER\n"))
 
 	sb = inode->i_sb;
-	uspi = sb->u.ufs_sb.s_uspi;
+	uspi = UFS_SB(sb)->s_uspi;
 	retry = 0;
 	
 	tindirect_block = (DIRECT_BLOCK > (UFS_NDADDR + uspi->s_apb + uspi->s_2apb))
@@ -435,7 +435,7 @@ void ufs_truncate (struct inode * inode)
 	
 	UFSD(("ENTER\n"))
 	sb = inode->i_sb;
-	uspi = sb->u.ufs_sb.s_uspi;
+	uspi = UFS_SB(sb)->s_uspi;
 
 	if (!(S_ISREG(inode->i_mode) || S_ISDIR(inode->i_mode) || S_ISLNK(inode->i_mode)))
 		return;

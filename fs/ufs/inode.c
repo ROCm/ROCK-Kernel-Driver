@@ -52,7 +52,7 @@
 
 static int ufs_block_to_path(struct inode *inode, long i_block, int offsets[4])
 {
-	struct ufs_sb_private_info *uspi = inode->i_sb->u.ufs_sb.s_uspi;
+	struct ufs_sb_private_info *uspi = UFS_SB(inode->i_sb)->s_uspi;
 	int ptrs = uspi->s_apb;
 	int ptrs_bits = uspi->s_apbshift;
 	const long direct_blocks = UFS_NDADDR,
@@ -86,7 +86,7 @@ int ufs_frag_map(struct inode *inode, int frag)
 {
 	struct ufs_inode_info *ufsi = UFS_I(inode);
 	struct super_block *sb = inode->i_sb;
-	struct ufs_sb_private_info *uspi = sb->u.ufs_sb.s_uspi;
+	struct ufs_sb_private_info *uspi = UFS_SB(sb)->s_uspi;
 	int mask = uspi->s_apbmask>>uspi->s_fpbshift;
 	int shift = uspi->s_apbshift-uspi->s_fpbshift;
 	int offsets[4], *p;
@@ -137,7 +137,7 @@ static struct buffer_head * ufs_inode_getfrag (struct inode *inode,
 		inode->i_ino, fragment, new_fragment, required))         
 
 	sb = inode->i_sb;
-	uspi = sb->u.ufs_sb.s_uspi;
+	uspi = UFS_SB(sb)->s_uspi;
 	block = ufs_fragstoblks (fragment);
 	blockoff = ufs_fragnum (fragment);
 	p = ufsi->i_u1.i_data + block;
@@ -243,7 +243,7 @@ static struct buffer_head * ufs_block_getfrag (struct inode *inode,
 	u32 * p;
 
 	sb = inode->i_sb;
-	uspi = sb->u.ufs_sb.s_uspi;
+	uspi = UFS_SB(sb)->s_uspi;
 	block = ufs_fragstoblks (fragment);
 	blockoff = ufs_fragnum (fragment);
 
@@ -313,7 +313,7 @@ out:
 static int ufs_getfrag_block (struct inode *inode, sector_t fragment, struct buffer_head *bh_result, int create)
 {
 	struct super_block * sb = inode->i_sb;
-	struct ufs_sb_private_info * uspi = sb->u.ufs_sb.s_uspi;
+	struct ufs_sb_private_info * uspi = UFS_SB(sb)->s_uspi;
 	struct buffer_head * bh;
 	int ret, err, new;
 	unsigned long ptr, phys;
@@ -483,8 +483,8 @@ void ufs_read_inode (struct inode * inode)
 	UFSD(("ENTER, ino %lu\n", inode->i_ino))
 	
 	sb = inode->i_sb;
-	uspi = sb->u.ufs_sb.s_uspi;
-	flags = sb->u.ufs_sb.s_flags;
+	uspi = UFS_SB(sb)->s_uspi;
+	flags = UFS_SB(sb)->s_flags;
 
 	if (inode->i_ino < UFS_ROOTINO || 
 	    inode->i_ino > (uspi->s_ncg * uspi->s_ipg)) {
@@ -579,8 +579,8 @@ static int ufs_update_inode(struct inode * inode, int do_sync)
 	UFSD(("ENTER, ino %lu\n", inode->i_ino))
 
 	sb = inode->i_sb;
-	uspi = sb->u.ufs_sb.s_uspi;
-	flags = sb->u.ufs_sb.s_flags;
+	uspi = UFS_SB(sb)->s_uspi;
+	flags = UFS_SB(sb)->s_flags;
 
 	if (inode->i_ino < UFS_ROOTINO || 
 	    inode->i_ino > (uspi->s_ncg * uspi->s_ipg)) {
