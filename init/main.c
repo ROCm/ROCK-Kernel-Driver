@@ -83,6 +83,12 @@ extern void ipc_init(void);
 #endif
 
 /*
+ * Are we up and running (ie do we have all the infrastructure
+ * set up)
+ */
+int system_running = 0;
+
+/*
  * Boot command-line arguments
  */
 #define MAX_INIT_ARGS 8
@@ -559,6 +565,7 @@ static int init(void * unused)
 	 */
 	free_initmem();
 	unlock_kernel();
+	system_running = 1;
 
 	kstat.pgfree = 0;
 

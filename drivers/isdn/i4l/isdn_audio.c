@@ -1,9 +1,9 @@
-/* $Id: isdn_audio.c,v 1.21.6.2 2001/09/23 22:24:31 kai Exp $
+/* $Id: isdn_audio.c,v 1.21.6.3 2002/08/13 09:45:33 keil Exp $
  *
  * Linux ISDN subsystem, audio conversion and compression (linklevel).
  *
  * Copyright 1994-1999 by Fritz Elfert (fritz@isdn4linux.de)
- * DTMF code (c) 1996 by Christian Mock (cm@kukuruz.ping.at)
+ * DTMF code (c) 1996 by Christian Mock (cm@tahina.priv.at)
  * Silence detection (c) 1998 by Armin Schindler (mac@gismo.telekom.de)
  *
  * This software may be used and distributed according to the terms
@@ -15,7 +15,7 @@
 #include "isdn_audio.h"
 #include "isdn_common.h"
 
-char *isdn_audio_revision = "$Revision: 1.21.6.2 $";
+char *isdn_audio_revision = "$Revision: 1.21.6.3 $";
 
 /*
  * Misc. lookup-tables.

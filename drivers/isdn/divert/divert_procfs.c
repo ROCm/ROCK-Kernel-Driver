@@ -261,14 +261,14 @@ isdn_divert_ioctl(struct inode *inode, struct file *file,
 #ifdef CONFIG_PROC_FS
 static struct file_operations isdn_fops =
 {
-	owner:          THIS_MODULE,
-	llseek:         no_llseek,
-	read:           isdn_divert_read,
-	write:          isdn_divert_write,
-	poll:           isdn_divert_poll,
-	ioctl:          isdn_divert_ioctl,
-	open:           isdn_divert_open,
-	release:        isdn_divert_close,                                      
+	.owner          = THIS_MODULE,
+	.llseek         = no_llseek,
+	.read           = isdn_divert_read,
+	.write          = isdn_divert_write,
+	.poll           = isdn_divert_poll,
+	.ioctl          = isdn_divert_ioctl,
+	.open           = isdn_divert_open,
+	.release        = isdn_divert_close,                                      
 };
 
 /****************************/
