@@ -23,32 +23,39 @@ struct notifier_block br_device_notifier = {
 	.notifier_call = br_device_event
 };
 
+/*
+ * Handle changes in state of network devices enslaved to a bridge.
+ * 
+ * Note: don't care about up/down if bridge itself is down, because
+ *     port state is checked when bridge is brought up.
+ */
 static int br_device_event(struct notifier_block *unused, unsigned long event, void *ptr)
 {
 	struct net_device *dev = ptr;
 	struct net_bridge_port *p = dev->br_port;
 	struct net_bridge *br;
 
+	/* not a port of a bridge */
 	if (p == NULL)
 		return NOTIFY_DONE;
 
 	br = p->br;
-	if ( !(br->dev->flags & IFF_UP))
-		return NOTIFY_DONE;
-
-	if (event == NETDEV_CHANGEMTU) {
-		dev_set_mtu(br->dev, br_min_mtu(br));
-		return NOTIFY_DONE;
-	}
 
 	spin_lock_bh(&br->lock);
 	switch (event) {
+	case NETDEV_CHANGEMTU:
+		dev_set_mtu(br->dev, br_min_mtu(br));
+		break;
+
 	case NETDEV_CHANGEADDR:
 		br_fdb_changeaddr(p, dev->dev_addr);
 		br_stp_recalculate_bridge_id(br);
 		break;
 
 	case NETDEV_CHANGE:	/* device is up but carrier changed */
+		if (!(br->dev->flags & IFF_UP))
+			break;
+
 		if (netif_carrier_ok(dev)) {
 			if (p->state == BR_STATE_DISABLED)
 				br_stp_enable_port(p);
@@ -59,11 +66,12 @@ static int br_device_event(struct notifier_block *unused, unsigned long event, v
 		break;
 
 	case NETDEV_DOWN:
-		br_stp_disable_port(p);
+		if (br->dev->flags & IFF_UP)
+			br_stp_disable_port(p);
 		break;
 
 	case NETDEV_UP:
-		if (netif_carrier_ok(dev)) 
+		if (netif_carrier_ok(dev) && (br->dev->flags & IFF_UP)) 
 			br_stp_enable_port(p);
 		break;
 
