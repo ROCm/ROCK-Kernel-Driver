@@ -683,11 +683,6 @@ extern void ibmphp_hpc_stop_poll_thread (void);
 #define ENABLE		1
 #define DISABLE		0
 
-#define ADD		0
-#define REMOVE		1
-#define DETAIL		2
-
-#define MAX_OPS		3
 #define CARD_INFO	0x07
 #define PCIX133		0x07
 #define PCIX66		0x05

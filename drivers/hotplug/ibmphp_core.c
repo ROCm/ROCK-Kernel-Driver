@@ -55,7 +55,6 @@ MODULE_PARM_DESC (debug, "Debugging mode enabled or not");
 MODULE_LICENSE ("GPL");
 MODULE_DESCRIPTION (DRIVER_DESC);
 
-static int *ops[MAX_OPS + 1];
 struct pci_bus *ibmphp_pci_bus;
 static int max_slots;
 
@@ -550,20 +549,6 @@ static int __init init_ops (void)
 	struct list_head *tmp;
 	int retval;
 	int rc;
-	int j;
-
-	for (j = 0; j < MAX_OPS; j++) {
-		ops[j] = (int *) kmalloc ((max_slots + 1) * sizeof (int), GFP_KERNEL);
-		memset (ops[j], 0, (max_slots + 1) * sizeof (int));
-		if (!ops[j]) {
-			err ("out of system memory \n");
-			return -ENOMEM;
-		}
-	}
-
-	ops[ADD][0] = 0;
-	ops[REMOVE][0] = 0;
-	ops[DETAIL][0] = 0;
 
 	list_for_each (tmp, &ibmphp_slot_head) {
 		slot_cur = list_entry (tmp, struct slot, ibm_slot_list);
@@ -588,24 +573,15 @@ static int __init init_ops (void)
 		if (retval)
 			return retval;
 
-		debug ("status = %x, ext_status = %x\n", slot_cur->status, slot_cur->ext_status);
-		debug ("SLOT_POWER = %x, SLOT_PRESENT = %x, SLOT_LATCH = %x\n", SLOT_POWER (slot_cur->status), SLOT_PRESENT (slot_cur->status), SLOT_LATCH (slot_cur->status));
+		debug ("status = %x\n", slot_cur->status);
+		debug ("ext_status = %x\n", slot_cur->ext_status);
+		debug ("SLOT_POWER = %x\n", SLOT_POWER (slot_cur->status));
+		debug ("SLOT_PRESENT = %x\n", SLOT_PRESENT (slot_cur->status));
+		debug ("SLOT_LATCH = %x\n", SLOT_LATCH (slot_cur->status));
 
-		if (!(SLOT_PWRGD (slot_cur->status)) && (SLOT_PRESENT (slot_cur->status)) && !(SLOT_LATCH (slot_cur->status)))
-			/* No power, adapter, and latch closed */
-			ops[ADD][slot_cur->number] = 1;
-		else
-			ops[ADD][slot_cur->number] = 0;
-
-		ops[DETAIL][slot_cur->number] = 1;
-
-		if ((SLOT_PWRGD (slot_cur->status)) && (SLOT_PRESENT (slot_cur->status)) && !(SLOT_LATCH (slot_cur->status)))
-			/*Power,adapter,latch closed */
-			ops[REMOVE][slot_cur->number] = 1;
-		else
-			ops[REMOVE][slot_cur->number] = 0;
-
-		if ((SLOT_PWRGD (slot_cur->status)) && !(SLOT_PRESENT (slot_cur->status)) && !(SLOT_LATCH (slot_cur->status))) {
+		if ((SLOT_PWRGD (slot_cur->status)) && 
+		    !(SLOT_PRESENT (slot_cur->status)) && 
+		    !(SLOT_LATCH (slot_cur->status))) {
 			debug ("BEFORE POWER OFF COMMAND\n");
 				rc = power_off (slot_cur);
 				if (rc)
@@ -643,35 +619,20 @@ static int validate (struct slot *slot_cur, int opn)
 	if (retval)
 		return retval;
 
-	if (!(SLOT_PWRGD (slot_cur->status)) && (SLOT_PRESENT (slot_cur->status))
-	    && !(SLOT_LATCH (slot_cur->status)))
-		ops[ADD][number] = 1;
-	else
-		ops[ADD][number] = 0;
-
-	ops[DETAIL][number] = 1;
-
-	if ((SLOT_PWRGD (slot_cur->status)) && (SLOT_PRESENT (slot_cur->status))
-	    && !(SLOT_LATCH (slot_cur->status)))
-		ops[REMOVE][number] = 1;
-	else
-		ops[REMOVE][number] = 0;
-
 	switch (opn) {
 		case ENABLE:
-			if (ops[ADD][number])
+			if (!(SLOT_PWRGD (slot_cur->status)) && 
+			     (SLOT_PRESENT (slot_cur->status)) && 
+			     !(SLOT_LATCH (slot_cur->status)))
 				return 0;
 			break;
 		case DISABLE:
-			if (ops[REMOVE][number])
-				return 0;
-			break;
-		case DETAIL:
-			if (ops[DETAIL][number])
+			if ((SLOT_PWRGD (slot_cur->status)) && 
+			    (SLOT_PRESENT (slot_cur->status)) &&
+			    !(SLOT_LATCH (slot_cur->status)))
 				return 0;
 			break;
 		default:
-			return -EINVAL;
 			break;
 	}
 	err ("validate failed....\n");
