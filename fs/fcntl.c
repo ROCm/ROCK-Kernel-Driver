@@ -12,6 +12,7 @@
 #include <linux/slab.h>
 #include <linux/module.h>
 #include <linux/security.h>
+#include <linux/ptrace.h>
 
 #include <asm/poll.h>
 #include <asm/siginfo.h>
@@ -318,6 +319,7 @@ static long do_fcntl(unsigned int fd, unsigned int cmd,
 			 * to fix this will be in libc.
 			 */
 			err = filp->f_owner.pid;
+			force_successful_syscall_return();
 			break;
 		case F_SETOWN:
 			err = f_setown(filp, arg, 1);
