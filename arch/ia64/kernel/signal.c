@@ -376,9 +376,11 @@ setup_frame (int sig, struct k_sigaction *ka, siginfo_t *info, sigset_t *set,
 	frame = (void *) scr->pt.r12;
 	tramp_addr = GATE_ADDR + (ia64_sigtramp - __start_gate_section);
 	if (ka->sa.sa_flags & SA_ONSTACK) {
-		/* We need to check the memory and register stacks separately, because
-		   they're switched separately (memory stack is switched in the kernel,
-		   register stack is switched in the signal trampoline.  */
+		/*
+		 * We need to check the memory and register stacks separately, because
+		 * they're switched separately (memory stack is switched in the kernel,
+		 * register stack is switched in the signal trampoline).
+		 */
 		if (!on_sig_stack((unsigned long) frame))
 			frame = (void *) ((current->sas_ss_sp + current->sas_ss_size)
 					  & ~(STACK_ALIGN - 1));
