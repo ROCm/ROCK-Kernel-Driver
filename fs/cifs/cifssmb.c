@@ -183,6 +183,7 @@ CIFSSMBNegotiate(unsigned int xid, struct cifsSesInfo *ses)
 	int rc = 0;
 	int bytes_returned;
 	struct TCP_Server_Info * server;
+	u16 count;
 
 	if(ses->server)
 		server = ses->server;
@@ -199,12 +200,12 @@ CIFSSMBNegotiate(unsigned int xid, struct cifsSesInfo *ses)
 	if (extended_security)
 		pSMB->hdr.Flags2 |= SMBFLG2_EXT_SEC;
 
-	pSMB->ByteCount = strlen(protocols[0].name) + 1;
+	count = strlen(protocols[0].name) + 1;
 	strncpy(pSMB->DialectsArray, protocols[0].name, 30);	
     /* null guaranteed to be at end of source and target buffers anyway */
 
-	pSMB->hdr.smb_buf_length += pSMB->ByteCount;
-	pSMB->ByteCount = cpu_to_le16(pSMB->ByteCount);
+	pSMB->hdr.smb_buf_length += count;
+	pSMB->ByteCount = cpu_to_le16(count);
 
 	rc = SendReceive(xid, ses, (struct smb_hdr *) pSMB,
 			 (struct smb_hdr *) pSMBr, &bytes_returned, 0);
@@ -236,7 +237,7 @@ CIFSSMBNegotiate(unsigned int xid, struct cifsSesInfo *ses)
 
 		if ((pSMBr->hdr.Flags2 & SMBFLG2_EXT_SEC) && 
 			(server->capabilities & CAP_EXTENDED_SECURITY)) {
-			__u16 count = le16_to_cpu(pSMBr->ByteCount);
+			count = pSMBr->ByteCount;
 			if (count < 16)
 				rc = -EIO;
 			else if (count == 16) {

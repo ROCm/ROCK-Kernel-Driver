@@ -373,23 +373,23 @@ struct smb_hdr {
 
 typedef struct negotiate_req {
 	struct smb_hdr hdr;	/* wct = 0 */
-	__u16 ByteCount;
+	__le16 ByteCount;
 	unsigned char DialectsArray[1];
 } NEGOTIATE_REQ;
 
 typedef struct negotiate_rsp {
 	struct smb_hdr hdr;	/* wct = 17 */
-	__u16 DialectIndex;
+	__le16 DialectIndex;
 	__u8 SecurityMode;
-	__u16 MaxMpxCount;
-	__u16 MaxNumberVcs;
-	__u32 MaxBufferSize;
-	__u32 MaxRawSize;
-	__u32 SessionKey;
-	__u32 Capabilities;	/* see below */
-	__u32 SystemTimeLow;
-	__u32 SystemTimeHigh;
-	__u16 ServerTimeZone;
+	__le16 MaxMpxCount;
+	__le16 MaxNumberVcs;
+	__le32 MaxBufferSize;
+	__le32 MaxRawSize;
+	__le32 SessionKey;
+	__le32 Capabilities;	/* see below */
+	__le32 SystemTimeLow;
+	__le32 SystemTimeHigh;
+	__le16 ServerTimeZone;
 	__u8 EncryptionKeyLength;
 	__u16 ByteCount;
 	union {
