@@ -4689,8 +4689,41 @@ xfs_bmapi(
 					}
 					break;
 				}
+
+				/*
+				 * Split changing sb for alen and indlen since
+				 * they could be coming from different places.
+				 */
+				if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME) {
+					xfs_extlen_t	extsz;
+					xfs_extlen_t	ralen;
+					if (!(extsz = ip->i_d.di_extsize))
+						extsz = mp->m_sb.sb_rextsize;
+					ralen = roundup(alen, extsz);
+					ralen = ralen / mp->m_sb.sb_rextsize;
+					if (xfs_mod_incore_sb(mp,
+						XFS_SBS_FREXTENTS,
+						-(ralen), rsvd)) {
+						if (XFS_IS_QUOTA_ON(ip->i_mount))
+							XFS_TRANS_UNRESERVE_BLKQUOTA(
+						     		mp, NULL, ip,
+								(long)alen);
+						break;
+					}
+				} else {
+					if (xfs_mod_incore_sb(mp,
+							      XFS_SBS_FDBLOCKS,
+							      -(alen), rsvd)) {
+						if (XFS_IS_QUOTA_ON(ip->i_mount))
+							XFS_TRANS_UNRESERVE_BLKQUOTA(
+								mp, NULL, ip,
+								(long)alen);
+						break;
+					}
+				}
+
 				if (xfs_mod_incore_sb(mp, XFS_SBS_FDBLOCKS,
-						-(alen + indlen), rsvd)) {
+						-(indlen), rsvd)) {
 					XFS_TRANS_UNRESERVE_BLKQUOTA(
 						mp, NULL, ip, (long)alen);
 					break;

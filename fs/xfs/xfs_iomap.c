@@ -621,7 +621,8 @@ write_map:
 	 * request to a stripe width boundary if the file size is >=
 	 * stripe width and we are allocating past the allocation eof.
 	 */
-	if (mp->m_swidth && (mp->m_flags & XFS_MOUNT_SWALLOC)
+	if (!(io->io_flags & XFS_IOCORE_RT) && mp->m_swidth 
+	    && (mp->m_flags & XFS_MOUNT_SWALLOC)
 	    && (isize >= XFS_FSB_TO_B(mp, mp->m_swidth)) && aeof) {
 		int eof;
 		xfs_fileoff_t new_last_fsb;
@@ -639,8 +640,8 @@ write_map:
 	 * if the file size is >= stripe unit size, and we are allocating past
 	 * the allocation eof.
 	 */
-	} else if (mp->m_dalign && (isize >= XFS_FSB_TO_B(mp, mp->m_dalign))
-		   && aeof) {
+	} else if (!(io->io_flags & XFS_IOCORE_RT) && mp->m_dalign &&
+		   (isize >= XFS_FSB_TO_B(mp, mp->m_dalign)) && aeof) {
 		int eof;
 		xfs_fileoff_t new_last_fsb;
 		new_last_fsb = roundup_64(last_fsb, mp->m_dalign);
@@ -651,8 +652,22 @@ write_map:
 		if (eof) {
 			last_fsb = new_last_fsb;
 		}
-	}
+	/*
+	 * Round up the allocation request to a real-time extent boundary
+	 * if the file is on the real-time subvolume.
+	 */
+	} else if (io->io_flags & XFS_IOCORE_RT && aeof) {
+		int eof;
+		xfs_fileoff_t new_last_fsb;
 
+		new_last_fsb = roundup_64(last_fsb, mp->m_sb.sb_rextsize);
+		error = XFS_BMAP_EOF(mp, io, new_last_fsb, XFS_DATA_FORK, &eof);
+		if (error) {
+			return error;
+		}
+		if (eof)
+			last_fsb = new_last_fsb;
+	}
 	error = xfs_bmapi(NULL, ip, offset_fsb,
 			  (xfs_filblks_t)(last_fsb - offset_fsb),
 			  XFS_BMAPI_DELAY | XFS_BMAPI_WRITE |
