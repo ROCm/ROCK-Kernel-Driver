@@ -1358,8 +1358,8 @@ int do_munmap(struct mm_struct *mm, unsigned long start, size_t len)
 	/*
 	 * Remove the vma's, and unmap the actual pages
 	 */
-	spin_lock(&mm->page_table_lock);
 	detach_vmas_to_be_unmapped(mm, mpnt, prev, end);
+	spin_lock(&mm->page_table_lock);
 	unmap_region(mm, mpnt, prev, start, end);
 	spin_unlock(&mm->page_table_lock);
 

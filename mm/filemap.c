@@ -64,6 +64,9 @@
  *  ->i_sem
  *    ->i_shared_sem		(truncate->invalidate_mmap_range)
  *
+ *  ->lock_page
+ *    ->i_shared_sem		(page_convert_anon)
+ *
  *  ->mmap_sem
  *    ->i_shared_sem		(various places)
  *
@@ -72,9 +75,6 @@
  *
  *  ->mmap_sem
  *    ->i_sem			(msync)
- *
- *  ->lock_page
- *    ->i_shared_sem		(page_convert_anon)
  *
  *  ->i_sem
  *    ->i_alloc_sem             (various)

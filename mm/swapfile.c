@@ -551,6 +551,7 @@ static int unuse_process(struct mm_struct * mm,
 	/*
 	 * Go through process' page directory.
 	 */
+	down_read(&mm->mmap_sem);
 	spin_lock(&mm->page_table_lock);
 	for (vma = mm->mmap; vma; vma = vma->vm_next) {
 		pgd_t * pgd = pgd_offset(mm, vma->vm_start);
@@ -558,6 +559,7 @@ static int unuse_process(struct mm_struct * mm,
 			break;
 	}
 	spin_unlock(&mm->page_table_lock);
+	up_read(&mm->mmap_sem);
 	return 0;
 }
 
