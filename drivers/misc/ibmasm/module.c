@@ -199,6 +199,13 @@ static int __init ibmasm_init(void)
 	}
 	ibmasm_register_panic_notifier();
 	info(DRIVER_DESC " version " DRIVER_VERSION " loaded");
+	info("WARNING: This software may not be supported or function");
+	info("correctly on your IBM server. Please consult the IBM");
+	info("ServerProven website");
+	info("http://www.pc.ibm.com/ww/eserver/xseries/serverproven");
+	info("for information on the specific driver level and support");
+	info("statement for your IBM server.");
+
 	return 0;
 }
 
