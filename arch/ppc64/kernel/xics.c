@@ -267,6 +267,15 @@ void xics_disable_irq(u_int virq)
 		       irq, call_status);
 		return;
 	}
+
+	/* Have to set XIVE to 0xff to be able to remove a slot */
+	call_status = rtas_call(ibm_set_xive, 3, 1, NULL, irq, default_server,
+				0xff);
+	if (call_status != 0) {
+	printk("xics_disable_irq: irq=%x: ibm_set_xive(0xff) returned %lx\n",
+	       irq, call_status);
+		return;
+	}
 }
 
 void xics_end_irq(u_int	irq)
@@ -375,12 +384,12 @@ void xics_init_IRQ(void)
 	int i;
 	unsigned long intr_size = 0;
 	struct device_node *np;
-	uint *ireg, ilen, indx=0;
+	uint *ireg, ilen, indx = 0;
 	unsigned long intr_base = 0;
 	struct xics_interrupt_node {
-		unsigned long long addr;
-		unsigned long long size;
-	} inodes[NR_CPUS*2]; 
+		unsigned long addr;
+		unsigned long size;
+	} inodes[NR_CPUS]; 
 
 	ppc64_boot_msg(0x20, "XICS Init");
 

@@ -137,4 +137,9 @@ SECTIONS
   . = ALIGN(4096);
   _end = . ;
   PROVIDE (end = .);
+
+  /* Sections to be discarded. */
+  /DISCARD/ : {
+    *(.exitcall.exit)
+  }
 }

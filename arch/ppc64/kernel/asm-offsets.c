@@ -83,9 +83,7 @@ int main(void)
         DEFINE(PACALPQUEUE, offsetof(struct paca_struct, lpQueuePtr));
 	DEFINE(PACATOC, offsetof(struct paca_struct, xTOC));
 	DEFINE(PACAEXCSP, offsetof(struct paca_struct, exception_sp));
-	DEFINE(PACAHRDWINTSTACK, offsetof(struct paca_struct, xHrdIntStack));
 	DEFINE(PACAPROCENABLED, offsetof(struct paca_struct, xProcEnabled));
-	DEFINE(PACAHRDWINTCOUNT, offsetof(struct paca_struct, xHrdIntCount));
 	DEFINE(PACADEFAULTDECR, offsetof(struct paca_struct, default_decr));
 	DEFINE(PACAPROFENABLED, offsetof(struct paca_struct, prof_enabled));
 	DEFINE(PACAPROFLEN, offsetof(struct paca_struct, prof_len));

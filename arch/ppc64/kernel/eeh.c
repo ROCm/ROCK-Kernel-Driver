@@ -115,8 +115,17 @@ unsigned long eeh_check_failure(void *token, unsigned long val)
 		ret = rtas_call(ibm_read_slot_reset_state, 3, 3, rets,
 				dn->eeh_config_addr, BUID_HI(dn->phb->buid), BUID_LO(dn->phb->buid));
 		if (ret == 0 && rets[1] == 1 && rets[0] >= 2) {
-			panic("EEH:  MMIO failure (%ld) on device:\n  %s %s\n",
-			      rets[0], pci_name(dev), dev->dev.name);
+			/*
+			 * XXX We should create a separate sysctl for this.
+			 *
+			 * Since the panic_on_oops sysctl is used to halt
+			 * the system in light of potential corruption, we
+			 * can use it here.
+			 */
+			if (panic_on_oops)
+				panic("EEH: MMIO failure (%ld) on device:\n%s\n", rets[0], pci_name(dev));
+			else
+				printk("EEH: MMIO failure (%ld) on device:\n%s\n", rets[0], pci_name(dev));
 		}
 	}
 	eeh_false_positives++;

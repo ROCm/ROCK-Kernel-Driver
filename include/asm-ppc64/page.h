@@ -22,6 +22,39 @@
 #define PAGE_MASK	(~(PAGE_SIZE-1))
 #define PAGE_OFFSET_MASK (PAGE_SIZE-1)
 
+#ifdef CONFIG_HUGETLB_PAGE
+
+#define HPAGE_SHIFT	24
+#define HPAGE_SIZE	((1UL) << HPAGE_SHIFT)
+#define HPAGE_MASK	(~(HPAGE_SIZE - 1))
+#define HUGETLB_PAGE_ORDER	(HPAGE_SHIFT - PAGE_SHIFT)
+
+/* For 64-bit processes the hugepage range is 1T-1.5T */
+#define TASK_HPAGE_BASE 	(0x0000010000000000UL)
+#define TASK_HPAGE_END 	(0x0000018000000000UL)
+/* For 32-bit processes the hugepage range is 2-3G */
+#define TASK_HPAGE_BASE_32	(0x80000000UL)
+#define TASK_HPAGE_END_32	(0xc0000000UL)
+
+#define ARCH_HAS_HUGEPAGE_ONLY_RANGE
+#define is_hugepage_only_range(addr, len) \
+	( ((addr > (TASK_HPAGE_BASE-len)) && (addr < TASK_HPAGE_END)) || \
+	  ((current->mm->context & CONTEXT_LOW_HPAGES) && \
+	   (addr > (TASK_HPAGE_BASE_32-len)) && (addr < TASK_HPAGE_END_32)) )
+#define HAVE_ARCH_HUGETLB_UNMAPPED_AREA
+
+#define in_hugepage_area(context, addr) \
+	((cur_cpu_spec->cpu_features & CPU_FTR_16M_PAGE) && \
+	 ((((addr) >= TASK_HPAGE_BASE) && ((addr) < TASK_HPAGE_END)) || \
+	  (((context) & CONTEXT_LOW_HPAGES) && \
+	   (((addr) >= TASK_HPAGE_BASE_32) && ((addr) < TASK_HPAGE_END_32)))))
+
+#else /* !CONFIG_HUGETLB_PAGE */
+
+#define in_hugepage_area(mm, addr)	0
+
+#endif /* !CONFIG_HUGETLB_PAGE */
+
 #define SID_SHIFT       28
 #define SID_MASK        0xfffffffff
 #define GET_ESID(x)     (((x) >> SID_SHIFT) & SID_MASK)

@@ -197,7 +197,7 @@ pte_t *find_linux_pte(pgd_t *pgdir, unsigned long ea)
 	if (!pgd_none(*pg)) {
 
 		pm = pmd_offset(pg, ea);
-		if (!pmd_none(*pm)) { 
+		if (pmd_present(*pm)) { 
 			pt = pte_offset_kernel(pm, ea);
 			pte = *pt;
 			if (!pte_present(pte))
@@ -436,8 +436,12 @@ int hash_page(unsigned long ea, unsigned long access, unsigned long trap)
 	if (user_region && cpus_equal(mm->cpu_vm_mask, tmp))
 		local = 1;
 
-	ptep = find_linux_pte(pgdir, ea);
-	ret = __hash_page(ea, access, vsid, ptep, trap, local);
+	ret = hash_huge_page(mm, access, ea, vsid, local);
+	if (ret < 0) {
+		ptep = find_linux_pte(pgdir, ea);
+		ret = __hash_page(ea, access, vsid, ptep, trap, local);
+	}
+
 	spin_unlock(&mm->page_table_lock);
 
 	return ret;
