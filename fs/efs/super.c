@@ -95,6 +95,10 @@ static struct super_operations efs_superblock_operations = {
 	.remount_fs	= efs_remount,
 };
 
+static struct export_operations efs_export_ops = {
+	.get_parent	= efs_get_parent,
+};
+
 static int __init init_efs_fs(void) {
 	int err;
 	printk("EFS: "EFS_VERSION" - http://aeschi.ch.eu.org/efs/\n");
@@ -278,6 +282,7 @@ static int efs_fill_super(struct super_block *s, void *d, int silent)
 		s->s_flags |= MS_RDONLY;
 	}
 	s->s_op   = &efs_superblock_operations;
+	s->s_export_op = &efs_export_ops;
 	root = iget(s, EFS_ROOTINODE);
 	s->s_root = d_alloc_root(root);
  
