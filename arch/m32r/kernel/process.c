@@ -27,8 +27,8 @@
 #include <linux/ptrace.h>
 #include <linux/unistd.h>
 #include <linux/slab.h>
+#include <linux/hardirq.h>
 
-#include <asm/hardirq.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>
 #include <asm/mmu_context.h>
@@ -298,8 +298,7 @@ asmlinkage int sys_clone(unsigned long clone_flags, unsigned long newsp,
 	if (!newsp)
 		newsp = regs.spu;
 
-	return do_fork(clone_flags & ~CLONE_IDLETASK, newsp, &regs, 0, NULL,
-			NULL);
+	return do_fork(clone_flags, newsp, &regs, 0, NULL, NULL);
 }
 
 /*

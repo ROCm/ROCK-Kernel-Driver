@@ -1,6 +1,5 @@
 /*
  *  linux/arch/m32r/kernel/signal.c
- *    orig : i386 2.5.67
  *
  *  Copyright (c) 2003  Hitoshi Yamamoto
  *
@@ -37,9 +36,10 @@ int do_signal(struct pt_regs *, sigset_t *);
 /*
  * Atomically swap in the new signal mask, and wait for a signal.
  */
-asmlinkage int sys_sigsuspend(old_sigset_t mask, unsigned long r1,
-	unsigned long r2, unsigned long r3, unsigned long r4,
-	unsigned long r5, unsigned long r6, struct pt_regs regs)
+asmlinkage int
+sys_sigsuspend(old_sigset_t mask, unsigned long r1,
+	       unsigned long r2, unsigned long r3, unsigned long r4,
+	       unsigned long r5, unsigned long r6, struct pt_regs regs)
 {
 	sigset_t saveset;
 
@@ -59,9 +59,10 @@ asmlinkage int sys_sigsuspend(old_sigset_t mask, unsigned long r1,
 	}
 }
 
-asmlinkage int sys_rt_sigsuspend(sigset_t *unewset, size_t sigsetsize,
-	unsigned long r2, unsigned long r3, unsigned long r4,
-	unsigned long r5, unsigned long r6, struct pt_regs regs)
+asmlinkage int
+sys_rt_sigsuspend(sigset_t *unewset, size_t sigsetsize,
+		  unsigned long r2, unsigned long r3, unsigned long r4,
+		  unsigned long r5, unsigned long r6, struct pt_regs regs)
 {
 	sigset_t saveset, newset;
 
@@ -88,7 +89,8 @@ asmlinkage int sys_rt_sigsuspend(sigset_t *unewset, size_t sigsetsize,
 	}
 }
 
-asmlinkage int sys_sigaction(int sig, const struct old_sigaction __user *act,
+asmlinkage int
+sys_sigaction(int sig, const struct old_sigaction __user *act,
 	      struct old_sigaction __user *oact)
 {
 	struct k_sigaction new_ka, old_ka;
@@ -119,9 +121,10 @@ asmlinkage int sys_sigaction(int sig, const struct old_sigaction __user *act,
 	return ret;
 }
 
-asmlinkage int sys_sigaltstack(const stack_t __user *uss, stack_t __user *uoss,
-	unsigned long r2, unsigned long r3, unsigned long r4,
-	unsigned long r5, unsigned long r6, struct pt_regs regs)
+asmlinkage int
+sys_sigaltstack(const stack_t __user *uss, stack_t __user *uoss,
+		unsigned long r2, unsigned long r3, unsigned long r4,
+		unsigned long r5, unsigned long r6, struct pt_regs regs)
 {
 	return do_sigaltstack(uss, uoss, regs.spu);
 }
@@ -153,8 +156,9 @@ struct rt_sigframe
 	char retcode[8];
 };
 
-static int restore_sigcontext(struct pt_regs *regs, struct sigcontext __user *sc,
-	int *r0_p)
+static int
+restore_sigcontext(struct pt_regs *regs, struct sigcontext __user *sc,
+		   int *r0_p)
 {
 	unsigned int err = 0;
 
@@ -203,9 +207,10 @@ static int restore_sigcontext(struct pt_regs *regs, struct sigcontext __user *sc
 	return err;
 }
 
-asmlinkage int sys_sigreturn(unsigned long r0, unsigned long r1,
-	unsigned long r2, unsigned long r3, unsigned long r4,
-	unsigned long r5, unsigned long r6, struct pt_regs regs)
+asmlinkage int
+sys_sigreturn(unsigned long r0, unsigned long r1,
+	      unsigned long r2, unsigned long r3, unsigned long r4,
+	      unsigned long r5, unsigned long r6, struct pt_regs regs)
 {
 	struct sigframe __user *frame = (struct sigframe __user *)regs.spu;
 	sigset_t set;
@@ -234,9 +239,10 @@ badframe:
 	return 0;
 }
 
-asmlinkage int sys_rt_sigreturn(unsigned long r0, unsigned long r1,
-	unsigned long r2, unsigned long r3, unsigned long r4,
-	unsigned long r5, unsigned long r6, struct pt_regs regs)
+asmlinkage int
+sys_rt_sigreturn(unsigned long r0, unsigned long r1,
+		 unsigned long r2, unsigned long r3, unsigned long r4,
+		 unsigned long r5, unsigned long r6, struct pt_regs regs)
 {
 	struct rt_sigframe __user *frame = (struct rt_sigframe __user *)regs.spu;
 	sigset_t set;
@@ -274,8 +280,9 @@ badframe:
  * Set up a signal frame.
  */
 
-static int setup_sigcontext(struct sigcontext __user *sc, struct pt_regs *regs,
-	unsigned long mask)
+static int
+setup_sigcontext(struct sigcontext __user *sc, struct pt_regs *regs,
+	         unsigned long mask)
 {
 	int err = 0;
 
@@ -323,8 +330,8 @@ static int setup_sigcontext(struct sigcontext __user *sc, struct pt_regs *regs,
 /*
  * Determine which stack to use..
  */
-static __inline__ void __user *get_sigframe(struct k_sigaction *ka, unsigned long sp,
-	size_t frame_size)
+static inline void __user *
+get_sigframe(struct k_sigaction *ka, unsigned long sp, size_t frame_size)
 {
 	/* This is the X/Open sanctioned signal stack switching.  */
 	if (ka->sa.sa_flags & SA_ONSTACK) {
@@ -336,7 +343,7 @@ static __inline__ void __user *get_sigframe(struct k_sigaction *ka, unsigned lon
 }
 
 static void setup_frame(int sig, struct k_sigaction *ka,
-	sigset_t *set, struct pt_regs *regs)
+			sigset_t *set, struct pt_regs *regs)
 {
 	struct sigframe __user *frame;
 	int err = 0;
@@ -403,7 +410,7 @@ give_sigsegv:
 }
 
 static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
-	sigset_t *set, struct pt_regs *regs)
+			   sigset_t *set, struct pt_regs *regs)
 {
 	struct rt_sigframe __user *frame;
 	int err = 0;
@@ -484,10 +491,10 @@ give_sigsegv:
  * OK, we're invoking a handler
  */
 
-static void handle_signal(unsigned long sig, siginfo_t *info, sigset_t *oldset,
-	struct pt_regs *regs)
+static void
+handle_signal(unsigned long sig, struct k_sigaction *ka, siginfo_t *info,
+	      sigset_t *oldset, struct pt_regs *regs)
 {
-	struct k_sigaction *ka = &current->sighand->action[sig-1];
 	unsigned short inst;
 
 	/* Are we from a system call? */
@@ -542,6 +549,7 @@ int do_signal(struct pt_regs *regs, sigset_t *oldset)
 {
 	siginfo_t info;
 	int signr;
+	struct k_sigaction ka;
 	unsigned short inst;
 
 	/*
@@ -561,7 +569,7 @@ int do_signal(struct pt_regs *regs, sigset_t *oldset)
 	if (!oldset)
 		oldset = &current->blocked;
 
-	signr = get_signal_to_deliver(&info, regs, NULL);
+	signr = get_signal_to_deliver(&info, &ka, regs, NULL);
 	if (signr > 0) {
 		/* Reenable any watchpoints before delivering the
 		 * signal to user space. The processor register will
@@ -570,7 +578,7 @@ int do_signal(struct pt_regs *regs, sigset_t *oldset)
 		 */
 
 		/* Whee!  Actually deliver the signal.  */
-		handle_signal(signr, &info, oldset, regs);
+		handle_signal(signr, &ka, &info, oldset, regs);
 		return 1;
 	}
 
