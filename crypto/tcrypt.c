@@ -48,7 +48,7 @@ static char *tvmem;
 
 static char *check[] = {
 	"des", "md5", "des3_ede", "rot13", "sha1", "sha256", "blowfish",
-	"twofish", "serpent",
+	"twofish", "serpent", "sha384", "sha512",
 	 NULL
 };
 
@@ -546,6 +546,110 @@ test_sha256(void)
 	       memcmp(result, sha256_tv[1].digest,
 		      crypto_tfm_alg_digestsize(tfm)) ? "fail" : "pass");
 		     
+	crypto_free_tfm(tfm);
+}
+
+static void
+test_sha384(void)
+{
+	char *p;
+	unsigned int i;
+	struct crypto_tfm *tfm;
+	struct sha384_testvec *sha384_tv;
+	struct scatterlist sg[2];
+	unsigned int tsize;
+	char result[SHA384_DIGEST_SIZE];
+
+	printk("\ntesting sha384\n");
+
+	tsize = sizeof (sha384_tv_template);
+	if (tsize > TVMEMSIZE) {
+		printk("template (%u) too big for tvmem (%u)\n", tsize,
+		       TVMEMSIZE);
+		return;
+	}
+
+	memcpy(tvmem, sha384_tv_template, tsize);
+	sha384_tv = (void *) tvmem;
+
+	tfm = crypto_alloc_tfm("sha384", 0);
+	if (tfm == NULL) {
+		printk("failed to load transform for sha384\n");
+		return;
+	}
+
+	for (i = 0; i < SHA384_TEST_VECTORS; i++) {
+		printk("test %u:\n", i + 1);
+		memset(result, 0, sizeof (result));
+
+		p = sha384_tv[i].plaintext;
+		sg[0].page = virt_to_page(p);
+		sg[0].offset = ((long) p & ~PAGE_MASK);
+		sg[0].length = strlen(sha384_tv[i].plaintext);
+
+		crypto_digest_init(tfm);
+		crypto_digest_update(tfm, sg, 1);
+		crypto_digest_final(tfm, result);
+
+		hexdump(result, crypto_tfm_alg_digestsize(tfm));
+		printk("%s\n",
+		       memcmp(result, sha384_tv[i].digest,
+			      crypto_tfm_alg_digestsize(tfm)) ? "fail" :
+		       "pass");
+	}
+
+	crypto_free_tfm(tfm);
+}
+
+static void
+test_sha512(void)
+{
+	char *p;
+	unsigned int i;
+	struct crypto_tfm *tfm;
+	struct sha512_testvec *sha512_tv;
+	struct scatterlist sg[2];
+	unsigned int tsize;
+	char result[SHA512_DIGEST_SIZE];
+
+	printk("\ntesting sha512\n");
+
+	tsize = sizeof (sha512_tv_template);
+	if (tsize > TVMEMSIZE) {
+		printk("template (%u) too big for tvmem (%u)\n", tsize,
+		       TVMEMSIZE);
+		return;
+	}
+
+	memcpy(tvmem, sha512_tv_template, tsize);
+	sha512_tv = (void *) tvmem;
+
+	tfm = crypto_alloc_tfm("sha512", 0);
+	if (tfm == NULL) {
+		printk("failed to load transform for sha512\n");
+		return;
+	}
+
+	for (i = 0; i < SHA512_TEST_VECTORS; i++) {
+		printk("test %u:\n", i + 1);
+		memset(result, 0, sizeof (result));
+
+		p = sha512_tv[i].plaintext;
+		sg[0].page = virt_to_page(p);
+		sg[0].offset = ((long) p & ~PAGE_MASK);
+		sg[0].length = strlen(sha512_tv[i].plaintext);
+
+		crypto_digest_init(tfm);
+		crypto_digest_update(tfm, sg, 1);
+		crypto_digest_final(tfm, result);
+
+		hexdump(result, crypto_tfm_alg_digestsize(tfm));
+		printk("%s\n",
+		       memcmp(result, sha512_tv[i].digest,
+			      crypto_tfm_alg_digestsize(tfm)) ? "fail" :
+		       "pass");
+	}
+
 	crypto_free_tfm(tfm);
 }
 
@@ -2117,6 +2221,8 @@ do_test(void)
 		test_twofish();
 		test_serpent();
 		test_aes();
+		test_sha384();
+		test_sha512();
 #ifdef CONFIG_CRYPTO_HMAC
 		test_hmac_md5();
 		test_hmac_sha1();
@@ -2163,7 +2269,15 @@ do_test(void)
 	case 10:
 		test_aes();
 		break;
+
+	case 11:
+		test_sha384();
+		break;
 		
+	case 12:
+		test_sha512();
+		break;
+
 #ifdef CONFIG_CRYPTO_HMAC
 	case 100:
 		test_hmac_md5();
