@@ -778,6 +778,9 @@ cifs_writepage(struct page* page, struct writeback_control *wbc)
 	xid = GetXid();
 /* BB add check for wbc flags */
 	page_cache_get(page);
+        if (!PageUptodate(page)) {
+		cFYI(1,("ppw - page not up to date"));
+	}
 	
 	rc = cifs_partialpagewrite(page,0,PAGE_CACHE_SIZE);
 	SetPageUptodate(page); /* BB add check for error and Clearuptodate? */
@@ -795,8 +798,7 @@ cifs_commit_write(struct file *file, struct page *page, unsigned offset,
 	int rc = 0;
 	struct inode *inode = page->mapping->host;
 	loff_t position = ((loff_t)page->index << PAGE_CACHE_SHIFT) + to;
-	/* struct cifsFileInfo *open_file;
-	struct cifs_sb_info *cifs_sb; */
+	char * page_data;
 
 	xid = GetXid();
 	cFYI(1,("commit write for page %p up to position %lld for %d",page,position,to));
@@ -827,7 +829,31 @@ cifs_commit_write(struct file *file, struct page *page, unsigned offset,
 			cFYI(1,(" SetEOF (commit write) rc = %d",rc));
 		}*/
 	}
-	set_page_dirty(page);
+        if (!PageUptodate(page)) {
+		position =  ((loff_t)page->index << PAGE_CACHE_SHIFT) + offset;
+		/* can not rely on (or let) writepage write this data */
+		if(to < offset) {
+			cFYI(1,("Illegal offsets, can not copy from %d to %d",
+				offset,to));
+			FreeXid(xid);
+			return rc;
+		}
+		/* this is probably better than directly calling 
+		partialpage_write since in this function
+		the file handle is known which we might as well
+		leverage */
+		/* BB check if anything else missing out of ppw */
+		/* such as updating last write time */
+		page_data = kmap(page);
+		rc = cifs_write(file, page_data+offset,to-offset,
+                                        &position);
+		if(rc > 0)
+			rc = 0;
+		/* else if rc < 0 should we set writebehind rc? */
+		kunmap(page);
+	} else {	
+		set_page_dirty(page);
+	}
 
 	FreeXid(xid);
 	return rc;
@@ -2003,10 +2029,14 @@ int cifs_prepare_write(struct file *file, struct page *page,
 			SetPageUptodate(page);
 
 		/* might as well read a page, it is fast enough */
-		rc = cifs_readpage_worker(file,page,&offset);
-		/* if this returns an error should we try using another
+		if((file->f_flags & O_ACCMODE) != O_WRONLY) {
+			rc = cifs_readpage_worker(file,page,&offset);
+		} else {
+		/* should we try using another
 		file handle if there is one - how would we lock it
 		to prevent close of that handle racing with this read? */
+		/* In any case this will be written out by commit_write */
+		}
 	}
 
 	/* BB should we pass any errors back? e.g. if we do not have read access to the file */
