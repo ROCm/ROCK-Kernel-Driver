@@ -21,8 +21,8 @@
 #ifdef CONFIG_PPC_STD_MMU
 /* Classic PPC with hash-table based MMU... */
 
-struct free_pte_ctx;
-extern void tlb_flush(struct free_pte_ctx *tlb);
+struct mmu_gather;
+extern void tlb_flush(struct mmu_gather *tlb);
 
 /* Get the generic bits... */
 #include <asm-generic/tlb.h>
@@ -44,10 +44,6 @@ static inline void __tlb_remove_tlb_entry(struct mmu_gather *tlb, pte_t *ptep,
 #else
 /* Embedded PPC with software-loaded TLB, very simple... */
 
-struct flush_tlb_arch { };
-
-#define tlb_init_arch(tlb, full_flush)	do { } while (0)
-#define tlb_finish_arch(tlb)		do { } while (0)
 #define tlb_start_vma(tlb, vma)		do { } while (0)
 #define tlb_end_vma(tlb, vma)		do { } while (0)
 #define __tlb_remove_tlb_entry(tlb, pte, address) do { } while (0)

@@ -2412,7 +2412,8 @@ static void tcp_seq_stop(struct seq_file *seq, void *v)
 			read_unlock_bh(&tp->syn_wait_lock);
 		}
 	case TCP_SEQ_STATE_LISTENING:
-		tcp_listen_unlock();
+		if (v != (void *)1)
+			tcp_listen_unlock();
 		break;
 	case TCP_SEQ_STATE_TIME_WAIT:
 	case TCP_SEQ_STATE_ESTABLISHED:
