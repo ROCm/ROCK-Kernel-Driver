@@ -551,7 +551,7 @@ static int __init powernow_cpu_init (struct cpufreq_policy *policy)
 	rdmsrl (MSR_K7_FID_VID_STATUS, fidvidstatus.val);
 
 	/* A K7 with powernow technology is set to max frequency by BIOS */
-	fsb = (10 * cpu_khz) / fid_codes[fidvidstatus.bits.MFID];
+	fsb = (10 * cpu_khz) / fid_codes[fidvidstatus.bits.CFID];
 	if (!fsb) {
 		printk(KERN_WARNING PFX "can not determine bus frequency\n");
 		return -EINVAL;
