@@ -1335,6 +1335,9 @@ isdnloop_command(isdn_ctrl * c, isdnloop_card * card)
 						case ISDN_PROTO_L2_HDLC:
 							sprintf(cbuf, "%02d;BTRA\n", (int) (a & 255) + 1);
 							break;
+						case ISDN_PROTO_L2_TRANS:
+							sprintf(cbuf, "%02d;BTRA\n", (int) (a & 255) + 1);
+							break;
 						default:
 							return -EINVAL;
 					}

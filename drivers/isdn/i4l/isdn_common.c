@@ -2724,7 +2724,7 @@ isdn_v110_data_req(struct isdn_slot *slot, struct sk_buff *skb)
 	dev_kfree_skb(skb);
 
 	atomic_inc(&slot->iv110.v110use);
-	slots->iv110.v110->skbuser++;
+	slot->iv110.v110->skbuser++;
 	atomic_dec(&slot->iv110.v110use);
 
 	/* For V.110 return unencoded data length */
