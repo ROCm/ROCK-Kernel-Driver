@@ -133,6 +133,7 @@
 #include <linux/blk.h>
 #include <linux/module.h>
 #include <linux/pci.h>
+#include <linux/interrupt.h>
 
 #include "scsi.h"
 #include "hosts.h"
