@@ -299,6 +299,7 @@ static int do8bitIO = 0;
 #define CMD_DEALLOCATETX 0x000c
 #define NOP		0x0010
 #define CMD_WORKAROUND	0x0011
+#define CMD_ALLOCATEAUX 0x0020
 #define CMD_ACCESS	0x0021
 #define CMD_PCIBAP	0x0022
 #define CMD_PCIAUX	0x0023
@@ -403,6 +404,7 @@ static int do8bitIO = 0;
 #define EV_ALLOC 0x08
 #define EV_LINK 0x80
 #define EV_AWAKE 0x100
+#define EV_TXCPY 0x400
 #define EV_UNKNOWN 0x800
 #define EV_MIC 0x1000 /* Message Integrity Check Interrupt */
 #define STATUS_INTS ( EV_AWAKE | EV_LINK | EV_TXEXC | EV_TX | EV_RX | EV_MIC )
