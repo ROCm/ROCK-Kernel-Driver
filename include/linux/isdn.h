@@ -294,17 +294,17 @@ struct isdn_netif_ops {
 	unsigned short		flags;	/* interface flags (a la BSD)	*/
 	unsigned short		type;	/* interface hardware type	*/
 	unsigned char		addr_len;/* hardware address length	*/
-	void                    (*receive)(struct isdn_net_local_s *lp,
-					   struct isdn_net_dev_s *idev,
-					   struct sk_buff *skb);
-	void                    (*connected)(struct isdn_net_local_s *lp);
-	void                    (*disconnected)(struct isdn_net_local_s *lp);
-	int                     (*bind)(struct isdn_net_local_s *lp);
-	void                    (*unbind)(struct isdn_net_local_s *lp);
-	int                     (*init)(struct isdn_net_local_s *lp);
-	void                    (*cleanup)(struct isdn_net_local_s *lp);
-	int                     (*open)(struct isdn_net_local_s *lp);
-	void                    (*close)(struct isdn_net_local_s *lp);
+	void                    (*receive)(struct isdn_net_local_s *,
+					   struct isdn_net_dev_s *,
+					   struct sk_buff *);
+	void                    (*connected)(struct isdn_net_dev_s *);
+	void                    (*disconnected)(struct isdn_net_dev_s *);
+	int                     (*bind)(struct isdn_net_dev_s *);
+	void                    (*unbind)(struct isdn_net_dev_s *);
+	int                     (*init)(struct isdn_net_local_s *);
+	void                    (*cleanup)(struct isdn_net_local_s *);
+	int                     (*open)(struct isdn_net_local_s *);
+	void                    (*close)(struct isdn_net_local_s *);
 };
 
 /* Local interface-data */
@@ -313,7 +313,6 @@ typedef struct isdn_net_local_s {
   spinlock_t             lock;
   struct net_device_stats stats;       /* Ethernet Statistics              */
   int                    flags;        /* Connection-flags                 */
-  int                    dialretry;    /* Counter for Dialout-retries      */
   int                    dialmax;      /* Max. Number of Dial-retries      */
   int	        	 dialtimeout;  /* How long shall we try on dialing */
   int			 dialwait;     /* wait after failed attempt        */
@@ -334,8 +333,8 @@ typedef struct isdn_net_local_s {
   struct list_head       phone[2];     /* List of remote-phonenumbers      */
 				       /* phone[0] = Incoming Numbers      */
 				       /* phone[1] = Outgoing Numbers      */
-  struct isdn_net_dev_s  *netdev;      /* Ptr to netdev                    */
 
+  struct list_head       slaves;       /* list of all bundled channels     */
   struct list_head       online;       /* circular list of all bundled
 					  channels, which are currently
 					  online                           */
@@ -361,8 +360,6 @@ typedef struct isdn_net_local_s {
 
 /* the interface itself */
 typedef struct isdn_net_dev_s {
-  isdn_net_local         local;
-
   int                    isdn_slot;    /* Index to isdn device/channel     */
   int                    pre_device;   /* Preselected isdn-device          */
   int                    pre_channel;  /* Preselected isdn-channel         */
@@ -375,6 +372,7 @@ typedef struct isdn_net_dev_s {
   int                    outgoing;     /* Flag: outgoing call              */
   unsigned long		 dialstarted;	/* first dialing-attempt           */
   unsigned long		 dialwait_timer;/* earliest next dialing-attempt   */
+  int                    dialretry;    /* Counter for Dialout-retries      */
 
   int                    cps;          /* current speed of this interface  */
   int                    transcount;   /* byte-counter for cps-calculation */
@@ -401,9 +399,10 @@ typedef struct isdn_net_dev_s {
                         	       /* queued in HL driver              */
   struct tasklet_struct  tlet;
 
-  isdn_net_local        *master;       /* Ptr to Master device for slaves  */
+  isdn_net_local        *mlp;          /* Ptr to master device for all devs*/
   struct isdn_net_dev_s *slave;        /* Ptr to Slave device for masters  */
 
+  struct list_head       slaves;       /* Members of local->slaves         */
   struct list_head       online;       /* Members of local->online         */
 
   char                   name[10];     /* Name of device                   */

@@ -34,7 +34,7 @@
 
 extern void isdn_net_init_module(void);
 
-extern int isdn_net_new(char *, struct net_device *);
+extern int isdn_net_new(char *, isdn_net_local *);
 extern int isdn_net_newslave(char *);
 extern int isdn_net_rm(char *);
 extern int isdn_net_rmall(void);
@@ -56,13 +56,6 @@ extern int isdn_net_dial_req(isdn_net_dev *);
 extern void isdn_net_writebuf_skb(isdn_net_dev *, struct sk_buff *skb);
 extern void isdn_net_write_super(isdn_net_dev *, struct sk_buff *skb);
 extern int isdn_net_online(isdn_net_dev *);
-
-static inline void
-isdn_net_reset_huptimer(isdn_net_local *lp, isdn_net_dev *idev)
-{
-	lp->netdev->huptimer = 0;
-	idev->huptimer = 0;
-}
 
 #define ISDN_NET_MAX_QUEUE_LENGTH 2
 
@@ -125,13 +118,8 @@ isdn_net_add_to_bundle(isdn_net_local *mlp, isdn_net_dev *idev)
 static inline void
 isdn_net_rm_from_bundle(isdn_net_dev *idev)
 {
-	isdn_net_local *mlp;
+	isdn_net_local *mlp = idev->mlp;
 	unsigned long flags;
-
-	if (idev->master)
-		mlp = idev->master;
-	else
-		mlp = &idev->local;
 
 	spin_lock_irqsave(&mlp->online_lock, flags);
 	list_del(&idev->online);
@@ -145,10 +133,7 @@ isdn_net_rm_from_bundle(isdn_net_dev *idev)
 static inline void
 isdn_net_dev_wake_queue(isdn_net_dev *idev)
 {
-	if (idev->master) 
-		netif_wake_queue(&idev->master->dev);
-	else
-		netif_wake_queue(&idev->local.dev);
+	netif_wake_queue(&idev->mlp->dev);
 }
 
 static inline int
