@@ -705,6 +705,16 @@ config MPC10X_BRIDGE
 	depends on PCORE || POWERPMC250 || LOPEC || SANDPOINT
 	default y
 
+config FSL_OCP
+	bool
+	depends on MPC10X_BRIDGE
+	default y
+
+config MPC10X_OPENPIC
+	bool
+	depends on POWERPMC250 || LOPEC || SANDPOINT
+	default y
+
 config MPC10X_STORE_GATHERING
 	bool "Enable MPC10x store gathering"
 	depends on MPC10X_BRIDGE
