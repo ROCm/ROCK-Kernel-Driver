@@ -2156,8 +2156,8 @@ static int
 rtl8169_rx_interrupt(struct net_device *dev, struct rtl8169_private *tp,
 		     void __iomem *ioaddr)
 {
-	unsigned int cur_rx, rx_left, count;
-	int delta;
+	unsigned int cur_rx, rx_left;
+	unsigned int delta, count;
 
 	assert(dev != NULL);
 	assert(tp != NULL);
@@ -2225,10 +2225,8 @@ rtl8169_rx_interrupt(struct net_device *dev, struct rtl8169_private *tp,
 	tp->cur_rx = cur_rx;
 
 	delta = rtl8169_rx_fill(tp, dev, tp->dirty_rx, tp->cur_rx);
-	if (delta < 0) {
+	if (!delta && count)
 		printk(KERN_INFO "%s: no Rx buffer allocated\n", dev->name);
-		delta = 0;
-	}
 	tp->dirty_rx += delta;
 
 	/*
