@@ -36,6 +36,7 @@
 #include <asm/unistd.h>
 #include <asm/div64.h>
 #include <asm/timex.h>
+#include <asm/io.h>
 
 #ifdef CONFIG_TIME_INTERPOLATION
 static void time_interpolator_update(long delta_nsec);
