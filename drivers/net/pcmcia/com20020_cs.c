@@ -179,7 +179,7 @@ static dev_link_t *com20020_attach(void)
 
     memset(info, 0, sizeof(struct com20020_dev_t));
     memset(link, 0, sizeof(struct dev_link_t));
-    lp = dev->priv;
+    lp = netdev_priv(dev);
     lp->timeout = timeout;
     lp->backplane = backplane;
     lp->clockp = clockp;
@@ -394,7 +394,7 @@ static void com20020_config(dev_link_t *link)
 	goto failed;
     }
     
-    lp = dev->priv;
+    lp = netdev_priv(dev);
     lp->card_name = "PCMCIA COM20020";
     lp->card_flags = ARC_CAN_10MBIT; /* pretend all of them can 10Mbit */
 
@@ -492,7 +492,7 @@ static int com20020_event(event_t event, int priority,
             pcmcia_request_configuration(link->handle, &link->conf);
             if (link->open) {
 		int ioaddr = dev->base_addr;
-		struct arcnet_local *lp = (struct arcnet_local *)dev->priv;
+		struct arcnet_local *lp = netdev_priv(dev);
 		ARCRESET;
             }
         }
