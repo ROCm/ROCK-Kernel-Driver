@@ -77,8 +77,6 @@ static struct platform_device corgiscoop_device = {
  * also use scoop functions and this makes the power up/down order
  * work correctly.
  */
-extern void corgi_ssp_lcdtg_send (u8 adrs, u8 data);
-
 static struct platform_device corgissp_device = {
 	.name		= "corgi-ssp",
 	.dev		= {
@@ -150,16 +148,16 @@ static int corgi_mci_init(struct device *dev, irqreturn_t (*unused_detect_int)(i
 	pxa_gpio_mode(CORGI_GPIO_nSD_DETECT | GPIO_IN);
 	pxa_gpio_mode(CORGI_GPIO_SD_PWR | GPIO_OUT);
 
+	init_timer(&mmc_detect.detect_timer);
+	mmc_detect.detect_timer.function = mmc_detect_callback;
+	mmc_detect.detect_timer.data = (unsigned long) &mmc_detect;
+
 	err = request_irq(CORGI_IRQ_GPIO_nSD_DETECT, corgi_mmc_detect_int, SA_INTERRUPT,
 			     "MMC card detect", data);
 	if (err) {
 		printk(KERN_ERR "corgi_mci_init: MMC/SD: can't request MMC card detect IRQ\n");
 		return -1;
 	}
-
-	init_timer(&mmc_detect.detect_timer);
-	mmc_detect.detect_timer.function = mmc_detect_callback;
-	mmc_detect.detect_timer.data = (unsigned long) &mmc_detect;
 
 	set_irq_type(CORGI_IRQ_GPIO_nSD_DETECT, IRQT_BOTHEDGE);
 
