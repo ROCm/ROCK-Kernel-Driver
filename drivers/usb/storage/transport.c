@@ -669,19 +669,19 @@ void usb_stor_invoke_transport(Scsi_Cmnd *srb, struct us_data *us)
 #endif
 
 		/* set the result so the higher layers expect this data */
-		srb->result = CHECK_CONDITION << 1;
+		srb->result = SAM_STAT_CHECK_CONDITION;
 
 		/* If things are really okay, then let's show that */
 		if ((srb->sense_buffer[2] & 0xf) == 0x0)
-			srb->result = GOOD << 1;
+			srb->result = SAM_STAT_GOOD;
 	} else /* if (need_auto_sense) */
-		srb->result = GOOD << 1;
+		srb->result = SAM_STAT_GOOD;
 
 	/* Regardless of auto-sense, if we _know_ we have an error
 	 * condition, show that in the result code
 	 */
 	if (result == USB_STOR_TRANSPORT_FAILED)
-		srb->result = CHECK_CONDITION << 1;
+		srb->result = SAM_STAT_CHECK_CONDITION;
 
 	/* If we think we're good, then make sure the sense data shows it.
 	 * This is necessary because the auto-sense for some devices always

@@ -611,7 +611,7 @@ int jumpshot_transport(Scsi_Cmnd * srb, struct us_data *us)
 			srb->result = SUCCESS;
 		} else {
 			info->sense_key = UNIT_ATTENTION;
-			srb->result = CHECK_CONDITION << 1;
+			srb->result = SAM_STAT_CHECK_CONDITION;
 		}
 		return rc;
 	}

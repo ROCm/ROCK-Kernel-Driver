@@ -374,7 +374,7 @@ static int usb_stor_control_thread(void * __us)
 				memcpy(us->srb->sense_buffer, 
 				       usb_stor_sense_invalidCDB, 
 				       sizeof(usb_stor_sense_invalidCDB));
-				us->srb->result = CHECK_CONDITION << 1;
+				us->srb->result = SAM_STAT_CHECK_CONDITION;
 		}
 
 		/* Handle those devices which need us to fake 
@@ -387,7 +387,7 @@ static int usb_stor_control_thread(void * __us)
 
 			US_DEBUGP("Faking INQUIRY command\n");
 			fill_inquiry_response(us, data_ptr, 36);
-			us->srb->result = GOOD << 1;
+			us->srb->result = SAM_STAT_GOOD;
 		}
 
 		/* we've got a command, let's do it! */
