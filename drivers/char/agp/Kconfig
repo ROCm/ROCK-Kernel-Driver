@@ -63,8 +63,7 @@ config AGP_AMD
 	  You should say Y here if you use XFree86 3.3.6 or 4.x and want to
 	  use GLX or DRI.  If unsure, say N.
 
-# RED-PEN this option is misnamed, it's not 8151 specific
-config AGP_AMD_8151
+config AGP_AMD64
 	tristate "AMD Opteron/Athlon64 on-CPU GART support" if !GART_IOMMU
 	depends on AGP && X86
 	default y if GART_IOMMU

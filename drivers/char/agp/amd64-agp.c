@@ -14,7 +14,7 @@
 #include <linux/agp_backend.h>
 #include "agp.h"
 
-/* Will need to be increased if hammer ever goes >8-way. */
+/* Will need to be increased if AMD64 ever goes >8-way. */
 #ifdef CONFIG_SMP
 #define MAX_HAMMER_GARTS   8
 #else
@@ -42,7 +42,7 @@ static int __initdata agp_try_unsupported;
 static int gart_iterator;
 #define for_each_nb() for(gart_iterator=0;gart_iterator<nr_garts;gart_iterator++)
 
-static void flush_x86_64_tlb(struct pci_dev *dev)
+static void flush_amd64_tlb(struct pci_dev *dev)
 {
 	u32 tmp;
 
@@ -51,13 +51,13 @@ static void flush_x86_64_tlb(struct pci_dev *dev)
 	pci_write_config_dword (dev, AMD64_GARTCACHECTL, tmp);
 }
 
-static void amd_x86_64_tlbflush(struct agp_memory *temp)
+static void amd64_tlbflush(struct agp_memory *temp)
 {
 	for_each_nb()
-		flush_x86_64_tlb(hammers[gart_iterator]);
+		flush_amd64_tlb(hammers[gart_iterator]);
 }
 
-static int x86_64_insert_memory(struct agp_memory *mem, off_t pg_start, int type)
+static int amd64_insert_memory(struct agp_memory *mem, off_t pg_start, int type)
 {
 	int i, j, num_entries;
 	long tmp;
@@ -97,7 +97,7 @@ static int x86_64_insert_memory(struct agp_memory *mem, off_t pg_start, int type
 
 		agp_bridge->gatt_table[j] = pte;
 	}
-	amd_x86_64_tlbflush(mem);
+	amd64_tlbflush(mem);
 	return 0;
 }
 
@@ -106,7 +106,7 @@ static int x86_64_insert_memory(struct agp_memory *mem, off_t pg_start, int type
  * to the size of a long. It sucks. I totally disown this, even
  * though it does appear to work for the most part.
  */
-static struct aper_size_info_32 x86_64_aperture_sizes[7] =
+static struct aper_size_info_32 amd64_aperture_sizes[7] =
 {
 	{32,   8192,   3+(sizeof(long)/8), 0 },
 	{64,   16384,  4+(sizeof(long)/8), 1<<1 },
@@ -124,7 +124,7 @@ static struct aper_size_info_32 x86_64_aperture_sizes[7] =
  * the value from the first one we find. The set_size functions
  * keep the rest coherent anyway. Or at least should do.
  */
-static int amd_x86_64_fetch_size(void)
+static int amd64_fetch_size(void)
 {
 	struct pci_dev *dev;
 	int i;
@@ -137,7 +137,7 @@ static int amd_x86_64_fetch_size(void)
 
 	pci_read_config_dword(dev, AMD64_GARTAPERTURECTL, &temp);
 	temp = (temp & 0xe);
-	values = A_SIZE_32(x86_64_aperture_sizes);
+	values = A_SIZE_32(amd64_aperture_sizes);
 
 	for (i = 0; i < agp_bridge->driver->num_aperture_sizes; i++) {
 		if (temp == values[i].size_value) {
@@ -155,7 +155,7 @@ static int amd_x86_64_fetch_size(void)
  * In a multiprocessor x86-64 system, this function gets
  * called once for each CPU.
  */
-static u64 amd_x86_64_configure (struct pci_dev *hammer, u64 gatt_table)
+static u64 amd64_configure (struct pci_dev *hammer, u64 gatt_table)
 {
 	u64 aperturebase;
 	u32 tmp;
@@ -180,7 +180,7 @@ static u64 amd_x86_64_configure (struct pci_dev *hammer, u64 gatt_table)
 	pci_write_config_dword(hammer, AMD64_GARTAPERTURECTL, tmp);
 
 	/* keep CPU's coherent. */
-	flush_x86_64_tlb (hammer);
+	flush_amd64_tlb (hammer);
 	
 	return aper_base;
 }
@@ -204,13 +204,13 @@ static int amd_8151_configure(void)
 	/* Configure AGP regs in each x86-64 host bridge. */
 	for_each_nb() {
 		agp_bridge->gart_bus_addr =
-				amd_x86_64_configure(hammers[gart_iterator],gatt_bus);
+				amd64_configure(hammers[gart_iterator],gatt_bus);
 	}
 	return 0;
 }
 
 
-static void amd_8151_cleanup(void)
+static void amd64_cleanup(void)
 {
 	u32 tmp;
 
@@ -229,16 +229,16 @@ struct agp_bridge_driver amd_8151_driver = {
 	.size_type		= U32_APER_SIZE,
 	.num_aperture_sizes	= 7,
 	.configure		= amd_8151_configure,
-	.fetch_size		= amd_x86_64_fetch_size,
-	.cleanup		= amd_8151_cleanup,
-	.tlb_flush		= amd_x86_64_tlbflush,
+	.fetch_size		= amd64_fetch_size,
+	.cleanup		= amd64_cleanup,
+	.tlb_flush		= amd64_tlbflush,
 	.mask_memory		= agp_generic_mask_memory,
 	.masks			= NULL,
 	.agp_enable		= agp_generic_enable,
 	.cache_flush		= global_cache_flush,
 	.create_gatt_table	= agp_generic_create_gatt_table,
 	.free_gatt_table	= agp_generic_free_gatt_table,
-	.insert_memory		= x86_64_insert_memory,
+	.insert_memory		= amd64_insert_memory,
 	.remove_memory		= agp_generic_remove_memory,
 	.alloc_by_type		= agp_generic_alloc_by_type,
 	.free_by_type		= agp_generic_free_by_type,
@@ -364,13 +364,13 @@ static __init int cache_nbs (struct pci_dev *pdev, u32 cap_ptr)
 	return i == 0 ? -1 : 0;
 }
 
-static int __init agp_amdk8_probe(struct pci_dev *pdev,
+static int __init agp_amd64_probe(struct pci_dev *pdev,
 				  const struct pci_device_id *ent)
 {
 	struct agp_bridge_data *bridge;
 	u8 rev_id;
 	u8 cap_ptr;
-	char *revstring="  ";
+	char *revstring=NULL;
 
 	cap_ptr = pci_find_capability(pdev, PCI_CAP_ID_AGP);
 	if (!cap_ptr)
@@ -431,17 +431,17 @@ static int __init agp_amdk8_probe(struct pci_dev *pdev,
 	return agp_add_bridge(bridge);
 }
 
-static void __devexit agp_amdk8_remove(struct pci_dev *pdev)
+static void __devexit agp_amd64_remove(struct pci_dev *pdev)
 {
 	struct agp_bridge_data *bridge = pci_get_drvdata(pdev);
 
 	release_mem_region(virt_to_phys(bridge->gatt_table_real), 
-			   x86_64_aperture_sizes[bridge->aperture_size_idx].size); 
+			   amd64_aperture_sizes[bridge->aperture_size_idx].size); 
 	agp_remove_bridge(bridge);
 	agp_put_bridge(bridge);
 }
 
-static struct pci_device_id agp_amdk8_pci_table[] = {
+static struct pci_device_id agp_amd64_pci_table[] = {
 	{
 	.class		= (PCI_CLASS_BRIDGE_HOST << 8),
 	.class_mask	= ~0,
@@ -479,23 +479,23 @@ static struct pci_device_id agp_amdk8_pci_table[] = {
 	{ }
 };
 
-MODULE_DEVICE_TABLE(pci, agp_amdk8_pci_table);
+MODULE_DEVICE_TABLE(pci, agp_amd64_pci_table);
 
-static struct pci_driver agp_amdk8_pci_driver = {
-	.name		= "agpgart-amd-k8",
-	.id_table	= agp_amdk8_pci_table,
-	.probe		= agp_amdk8_probe,
-	.remove		= agp_amdk8_remove,
+static struct pci_driver agp_amd64_pci_driver = {
+	.name		= "agpgart-amd64",
+	.id_table	= agp_amd64_pci_table,
+	.probe		= agp_amd64_probe,
+	.remove		= agp_amd64_remove,
 };
 
 
 /* Not static due to IOMMU code calling it early. */
-int __init agp_amdk8_init(void)
+int __init agp_amd64_init(void)
 {
 	int err = 0;
 	if (agp_off)
 		return -EINVAL;
-	if (pci_module_init(&agp_amdk8_pci_driver) == 0) { 
+	if (pci_module_init(&agp_amd64_pci_driver) == 0) { 
 		struct pci_dev *dev;
 		if (!agp_try_unsupported && !agp_try_unsupported_boot) { 
 			printk(KERN_INFO "No supported AGP bridge found.\n");
@@ -507,7 +507,7 @@ int __init agp_amdk8_init(void)
 			return -ENODEV;
 		}
 
-		/* First check that we have at least one K8 NB */
+		/* First check that we have at least one AMD64 NB */
 		if (!pci_find_device(PCI_VENDOR_ID_AMD, 0x1103, NULL))
 			return -ENODEV;
 
@@ -518,7 +518,7 @@ int __init agp_amdk8_init(void)
 			if (!pci_find_capability(dev, PCI_CAP_ID_AGP))
 				continue;
 			/* Only one bridge supported right now */	
-			if (agp_amdk8_probe(dev, NULL) == 0) {
+			if (agp_amd64_probe(dev, NULL) == 0) {
 				err = 0;
 				break;
 			}	
@@ -527,16 +527,16 @@ int __init agp_amdk8_init(void)
 	return err;
 }
 
-static void __exit agp_amdk8_cleanup(void)
+static void __exit agp_amd64_cleanup(void)
 {
-	pci_unregister_driver(&agp_amdk8_pci_driver);
+	pci_unregister_driver(&agp_amd64_pci_driver);
 }
 
-/* On x86-64 the PCI driver needs to initialize this driver early
+/* On AMD64 the PCI driver needs to initialize this driver early
    for the IOMMU, so it has to be called via a backdoor. */
 #ifndef CONFIG_GART_IOMMU
-module_init(agp_amdk8_init);
-module_exit(agp_amdk8_cleanup);
+module_init(agp_amd64_init);
+module_exit(agp_amd64_cleanup);
 #endif
 
 MODULE_AUTHOR("Dave Jones <davej@codemonkey.org.uk>, Andi Kleen");
