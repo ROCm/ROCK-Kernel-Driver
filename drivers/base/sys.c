@@ -125,7 +125,7 @@ int sys_device_register(struct sys_device * sysdev)
 void sys_device_unregister(struct sys_device * sysdev)
 {
 	if (sysdev)
-		put_device(&sysdev->dev);
+		device_unregister(&sysdev->dev);
 }
 
 struct bus_type system_bus_type = {
