@@ -101,7 +101,7 @@ int rows, cols;
 char *execute_command;
 
 /* Setup configured maximum number of CPUs to activate */
-static unsigned int max_cpus = UINT_MAX;
+static unsigned int max_cpus = NR_CPUS;
 
 /*
  * Setup routine for controlling SMP activation
