@@ -513,6 +513,8 @@ static int mmc_send_op_cond(struct mmc_host *host, u32 ocr, u32 *rocr)
 			break;
 
 		err = MMC_ERR_TIMEOUT;
+
+		mmc_delay(10);
 	}
 
 	if (rocr)
