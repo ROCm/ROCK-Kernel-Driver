@@ -625,66 +625,62 @@ int ip_route_me_harder(struct sk_buff **pskb)
 {
 	struct iphdr *iph = (*pskb)->nh.iph;
 	struct rtable *rt;
-	struct flowi fl = { .nl_u = { .ip4_u =
-				      { .daddr = iph->daddr,
-					.saddr = iph->saddr,
-					.tos = RT_TOS(iph->tos)|RTO_CONN,
-#ifdef CONFIG_IP_ROUTE_FWMARK
-					.fwmark = (*pskb)->nfmark
-#endif
-				      } },
-			    .oif = (*pskb)->sk ? (*pskb)->sk->sk_bound_dev_if : 0,
-			    };
-	struct net_device *dev_src = NULL;
-	int err;
+	struct flowi fl = {};
+	struct dst_entry *odst;
+	unsigned int hh_len;
 
-	/* accommodate ip_route_output_slow(), which expects the key src to be
-	   0 or a local address; however some non-standard hacks like
-	   ipt_REJECT.c:send_reset() can cause packets with foreign
-           saddr to be appear on the NF_IP_LOCAL_OUT hook -MB */
-	if(fl.fl4_src && !(dev_src = ip_dev_find(fl.fl4_src)))
-		fl.fl4_src = 0;
-
-	if ((err=ip_route_output_key(&rt, &fl)) != 0) {
-		printk("route_me_harder: ip_route_output_key(dst=%u.%u.%u.%u, src=%u.%u.%u.%u, oif=%d, tos=0x%x, fwmark=0x%lx) error %d\n",
-			NIPQUAD(iph->daddr), NIPQUAD(iph->saddr),
-			(*pskb)->sk ? (*pskb)->sk->sk_bound_dev_if : 0,
-			RT_TOS(iph->tos)|RTO_CONN,
+	/* some non-standard hacks like ipt_REJECT.c:send_reset() can cause
+	 * packets with foreign saddr to appear on the NF_IP_LOCAL_OUT hook.
+	 */
+	if (inet_addr_type(iph->saddr) == RTN_LOCAL) {
+		fl.nl_u.ip4_u.daddr = iph->daddr;
+		fl.nl_u.ip4_u.saddr = iph->saddr;
+		fl.nl_u.ip4_u.tos = RT_TOS(iph->tos);
+		fl.oif = (*pskb)->sk ? (*pskb)->sk->sk_bound_dev_if : 0;
 #ifdef CONFIG_IP_ROUTE_FWMARK
-			(*pskb)->nfmark,
-#else
-			0UL,
+		fl.nl_u.ip4_u.fwmark = (*pskb)->nfmark;
 #endif
-			err);
-		goto out;
+		if (ip_route_output_key(&rt, &fl) != 0)
+			return -1;
+
+		/* Drop old route. */
+		dst_release((*pskb)->dst);
+		(*pskb)->dst = &rt->u.dst;
+	} else {
+		/* non-local src, find valid iif to satisfy
+		 * rp-filter when calling ip_route_input. */
+		fl.nl_u.ip4_u.daddr = iph->saddr;
+		if (ip_route_output_key(&rt, &fl) != 0)
+			return -1;
+
+		odst = (*pskb)->dst;
+		if (ip_route_input(*pskb, iph->daddr, iph->saddr,
+				   RT_TOS(iph->tos), rt->u.dst.dev) != 0) {
+			dst_release(&rt->u.dst);
+			return -1;
+		}
+		dst_release(&rt->u.dst);
+		dst_release(odst);
 	}
-
-	/* Drop old route. */
-	dst_release((*pskb)->dst);
-
-	(*pskb)->dst = &rt->u.dst;
+	
+	if ((*pskb)->dst->error)
+		return -1;
 
 	/* Change in oif may mean change in hh_len. */
-	if (skb_headroom(*pskb) < (*pskb)->dst->dev->hard_header_len) {
+	hh_len = (*pskb)->dst->dev->hard_header_len;
+	if (skb_headroom(*pskb) < hh_len) {
 		struct sk_buff *nskb;
 
-		nskb = skb_realloc_headroom(*pskb,
-					    (*pskb)->dst->dev->hard_header_len);
-		if (!nskb) {
-			err = -ENOMEM;
-			goto out;
-		}
+		nskb = skb_realloc_headroom(*pskb, hh_len);
+		if (!nskb) 
+			return -1;
 		if ((*pskb)->sk)
 			skb_set_owner_w(nskb, (*pskb)->sk);
 		kfree_skb(*pskb);
 		*pskb = nskb;
 	}
 
-out:
-	if (dev_src)
-		dev_put(dev_src);
-
-	return err;
+	return 0;
 }
 
 int skb_ip_make_writable(struct sk_buff **pskb, unsigned int writable_len)

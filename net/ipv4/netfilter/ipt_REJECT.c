@@ -35,6 +35,46 @@ static void connection_attach(struct sk_buff *new_skb, struct nf_ct_info *nfct)
 	}
 }
 
+static inline struct rtable *route_reverse(struct sk_buff *skb, int local)
+{
+	struct iphdr *iph = skb->nh.iph;
+	struct dst_entry *odst;
+	struct flowi fl = {};
+	struct rtable *rt;
+
+	if (local) {
+		fl.nl_u.ip4_u.daddr = iph->saddr;
+		fl.nl_u.ip4_u.saddr = iph->daddr;
+		fl.nl_u.ip4_u.tos = RT_TOS(iph->tos);
+
+		if (ip_route_output_key(&rt, &fl) != 0)
+			return NULL;
+	} else {
+		/* non-local src, find valid iif to satisfy
+		 * rp-filter when calling ip_route_input. */
+		fl.nl_u.ip4_u.daddr = iph->daddr;
+		if (ip_route_output_key(&rt, &fl) != 0)
+			return NULL;
+
+		odst = skb->dst;
+		if (ip_route_input(skb, iph->saddr, iph->daddr,
+		                   RT_TOS(iph->tos), rt->u.dst.dev) != 0) {
+			dst_release(&rt->u.dst);
+			return NULL;
+		}
+		dst_release(&rt->u.dst);
+		rt = (struct rtable *)skb->dst;
+		skb->dst = odst;
+	}
+
+	if (rt->u.dst.error) {
+		dst_release(&rt->u.dst);
+		rt = NULL;
+	}
+
+	return rt;
+}
+
 /* Send RST reply */
 static void send_reset(struct sk_buff *oldskb, int local)
 {
@@ -69,18 +109,9 @@ static void send_reset(struct sk_buff *oldskb, int local)
 			 csum_partial((char *)otcph, otcplen, 0)) != 0)
 		return;
 
-	{
-		struct flowi fl = { .nl_u = { .ip4_u =
-					      { .daddr = oldskb->nh.iph->saddr,
-						.saddr = (local ?
-							  oldskb->nh.iph->daddr :
-							  0),
-						.tos = RT_TOS(oldskb->nh.iph->tos) } } };
-
-	/* Routing: if not headed for us, route won't like source */
-	if (ip_route_output_key(&rt, &fl))
+	if ((rt = route_reverse(oldskb, local)) == NULL)
 		return;
-	}		
+
 	hh_len = (rt->u.dst.dev->hard_header_len + 15)&~15;
 
 	/* Copy skb (even if skb is about to be dropped, we can't just

@@ -12,6 +12,9 @@
 	18 Jul 2003 Harald Welte <laforge@netfilter.org>
 		- merge Patrick McHardy's mirror fixes from 2.4.22 to
 		  2.6.0-test1
+	19 Jul 2003 Harald Welte <laforge@netfilter.org>
+		- merge Patrick McHardy's rp_filter fixes from 2.4.22 to
+		  2.6.0-test1
 
   This program is free software; you can redistribute it and/or modify it
   under the terms of the GNU General Public License as published by the
@@ -43,17 +46,42 @@
 #define DEBUGP(format, args...)
 #endif
 
-static inline struct rtable *route_mirror(struct sk_buff *skb)
+static inline struct rtable *route_mirror(struct sk_buff *skb, int local)
 {
         struct iphdr *iph = skb->nh.iph;
-	struct flowi fl = { .nl_u = { .ip4_u = { .daddr = iph->saddr,
-						 .saddr = iph->daddr,
-						 .tos = RT_TOS(iph->tos) } } };
+	struct dst_entry *odst;
+	struct flowi fl = {};
 	struct rtable *rt;
 
-	/* Backwards */
-	if (ip_route_output_key(&rt, &fl))
-		return NULL;
+	if (local) {
+		fl.nl_u.ip4_u.daddr = iph->saddr;
+		fl.nl_u.ip4_u.saddr = iph->daddr;
+		fl.nl_u.ip4_u.tos = RT_TOS(iph->tos);
+
+		if (ip_route_output_key(&rt, &fl) != 0)
+			return NULL;
+	} else {
+		/* non-local src, find valid iif to satisfy
+		 * rp-filter when calling ip_route_input(). */
+		fl.nl_u.ip4_u.daddr = iph->daddr;
+		if (ip_route_output_key(&rt, &fl) != 0)
+			return NULL;
+
+		odst = skb->dst;
+		if (ip_route_input(skb, iph->saddr, iph->daddr,
+					RT_TOS(iph->tos), rt->u.dst.dev) != 0) {
+			dst_release(&rt->u.dst);
+			return NULL;
+		}
+		dst_release(&rt->u.dst);
+		rt = (struct rtable *)skb->dst;
+		skb->dst = odst;
+	}
+
+	if (rt->u.dst.error) {
+		dst_release(&rt->u.dst);
+		rt = NULL;
+	}
 
 	return rt;
 }
@@ -123,7 +151,7 @@ static unsigned int ipt_mirror_target(struct sk_buff **pskb,
 		ip_decrease_ttl((*pskb)->nh.iph);
 	}
 
-	if ((rt = route_mirror(*pskb)) == NULL)
+	if ((rt = route_mirror(*pskb, hooknum == NF_IP_LOCAL_IN)) == NULL)
 		return NF_DROP;
 
 	hh_len = (rt->u.dst.dev->hard_header_len + 15) & ~15;
