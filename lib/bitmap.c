@@ -51,8 +51,9 @@ EXPORT_SYMBOL(bitmap_equal);
 void bitmap_complement(unsigned long *bitmap, int bits)
 {
 	int k;
+	int nr = BITS_TO_LONGS(bits);
 
-	for (k = 0; k < BITS_TO_LONGS(bits); ++k)
+	for (k = 0; k < nr; ++k)
 		bitmap[k] = ~bitmap[k];
 }
 EXPORT_SYMBOL(bitmap_complement);
