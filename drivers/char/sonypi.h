@@ -222,6 +222,7 @@ static struct sonypi_event sonypi_fnkeyev[] = {
 	{ 0x1a, SONYPI_EVENT_FNKEY_F10 },
 	{ 0x1b, SONYPI_EVENT_FNKEY_F11 },
 	{ 0x1c, SONYPI_EVENT_FNKEY_F12 },
+	{ 0x1f, SONYPI_EVENT_FNKEY_RELEASED },
 	{ 0x21, SONYPI_EVENT_FNKEY_1 },
 	{ 0x22, SONYPI_EVENT_FNKEY_2 },
 	{ 0x31, SONYPI_EVENT_FNKEY_D },
@@ -340,17 +341,48 @@ struct sonypi_eventtypes {
 
 #define SONYPI_BUF_SIZE	128
 
-/* We enable input subsystem event forwarding if the input 
- * subsystem is compiled in, but only if sonypi is not into the
- * kernel and input as a module... */
-#if defined(CONFIG_INPUT) || defined(CONFIG_INPUT_MODULE)
-#if ! (defined(CONFIG_SONYPI) && defined(CONFIG_INPUT_MODULE))
-#define SONYPI_USE_INPUT
-#endif
-#endif
+/* The name of the devices for the input device drivers */
+#define SONYPI_JOG_INPUTNAME	"Sony Vaio Jogdial"
+#define SONYPI_KEY_INPUTNAME	"Sony Vaio Keys"
 
-/* The name of the Jog Dial for the input device drivers */
-#define SONYPI_INPUTNAME	"Sony VAIO Jog Dial"
+/* Correspondance table between sonypi events and input layer events */
+struct {
+	int sonypiev;
+	int inputev;
+} sonypi_inputkeys[] = {
+	{ SONYPI_EVENT_CAPTURE_PRESSED,	 	KEY_CAMERA },
+	{ SONYPI_EVENT_FNKEY_ONLY, 		KEY_FN },
+	{ SONYPI_EVENT_FNKEY_ESC, 		KEY_FN_ESC },
+	{ SONYPI_EVENT_FNKEY_F1, 		KEY_FN_F1 },
+	{ SONYPI_EVENT_FNKEY_F2, 		KEY_FN_F2 },
+	{ SONYPI_EVENT_FNKEY_F3, 		KEY_FN_F3 },
+	{ SONYPI_EVENT_FNKEY_F4, 		KEY_FN_F4 },
+	{ SONYPI_EVENT_FNKEY_F5, 		KEY_FN_F5 },
+	{ SONYPI_EVENT_FNKEY_F6, 		KEY_FN_F6 },
+	{ SONYPI_EVENT_FNKEY_F7, 		KEY_FN_F7 },
+	{ SONYPI_EVENT_FNKEY_F8, 		KEY_FN_F8 },
+	{ SONYPI_EVENT_FNKEY_F9,		KEY_FN_F9 },
+	{ SONYPI_EVENT_FNKEY_F10,		KEY_FN_F10 },
+	{ SONYPI_EVENT_FNKEY_F11, 		KEY_FN_F11 },
+	{ SONYPI_EVENT_FNKEY_F12,		KEY_FN_F12 },
+	{ SONYPI_EVENT_FNKEY_1, 		KEY_FN_1 },
+	{ SONYPI_EVENT_FNKEY_2, 		KEY_FN_2 },
+	{ SONYPI_EVENT_FNKEY_D,			KEY_FN_D },
+	{ SONYPI_EVENT_FNKEY_E,			KEY_FN_E },
+	{ SONYPI_EVENT_FNKEY_F,			KEY_FN_F },
+	{ SONYPI_EVENT_FNKEY_S,			KEY_FN_S },
+	{ SONYPI_EVENT_FNKEY_B,			KEY_FN_B },
+	{ SONYPI_EVENT_BLUETOOTH_PRESSED, 	KEY_BLUE },
+	{ SONYPI_EVENT_BLUETOOTH_ON, 		KEY_BLUE },
+	{ SONYPI_EVENT_PKEY_P1, 		KEY_PROG1 },
+	{ SONYPI_EVENT_PKEY_P2, 		KEY_PROG2 },
+	{ SONYPI_EVENT_PKEY_P3, 		KEY_PROG3 },
+	{ SONYPI_EVENT_BACK_PRESSED, 		KEY_BACK },
+	{ SONYPI_EVENT_HELP_PRESSED, 		KEY_HELP },
+	{ SONYPI_EVENT_ZOOM_PRESSED, 		KEY_ZOOM },
+	{ SONYPI_EVENT_THUMBPHRASE_PRESSED, 	BTN_THUMB },
+	{ 0, 0 },
+};
 
 struct sonypi_device {
 	struct pci_dev *dev;
@@ -370,9 +402,11 @@ struct sonypi_device {
 	struct fasync_struct *fifo_async;
 	int open_count;
 	int model;
-#ifdef SONYPI_USE_INPUT
-	struct input_dev jog_dev;
-#endif
+	struct input_dev input_jog_dev;
+	struct input_dev input_key_dev;
+	struct work_struct input_work;
+	struct kfifo *input_fifo;
+	spinlock_t input_fifo_lock;
 };
 
 #define ITERATIONS_LONG		10000
