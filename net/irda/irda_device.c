@@ -47,8 +47,6 @@
 #include <asm/dma.h>
 #include <asm/io.h>
 
-#include <net/pkt_sched.h>
-
 #include <net/irda/irda_device.h>
 #include <net/irda/irlap.h>
 #include <net/irda/timer.h>
@@ -396,22 +394,6 @@ void irda_device_setup(struct net_device *dev)
 struct net_device *alloc_irdadev(int sizeof_priv)
 {
 	return alloc_netdev(sizeof_priv, "irda%d", irda_device_setup);
-}
-
-
-/*
- * Function irda_device_txqueue_empty (dev)
- *
- *    Check if there is still some frames in the transmit queue for this
- *    device. Maybe we should use: q->q.qlen == 0.
- *
- */
-int irda_device_txqueue_empty(struct net_device *dev)
-{
-	if (skb_queue_len(&dev->qdisc->q))
-		return FALSE;
-
-	return TRUE;
 }
 
 /*

@@ -45,6 +45,7 @@
 #include <linux/skbuff.h>		/* struct sk_buff */
 #include <linux/irda.h>
 
+#include <net/pkt_sched.h>
 #include <net/irda/irda.h>
 #include <net/irda/qos.h>		/* struct qos_info */
 #include <net/irda/irqueue.h>		/* irda_queue_t */
@@ -219,7 +220,10 @@ int  irda_device_is_media_busy(struct net_device *dev);
 int  irda_device_is_receiving(struct net_device *dev);
 
 /* Interface for internal use */
-int  irda_device_txqueue_empty(struct net_device *dev);
+static inline int irda_device_txqueue_empty(const struct net_device *dev)
+{
+	return (skb_queue_len(&dev->qdisc->q) == 0);
+}
 int  irda_device_set_raw_mode(struct net_device* self, int status);
 int  irda_device_set_dtr_rts(struct net_device *dev, int dtr, int rts);
 int  irda_device_change_speed(struct net_device *dev, __u32 speed);
