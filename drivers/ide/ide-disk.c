@@ -1334,7 +1334,8 @@ enum {
 	idedisk_pm_flush_cache	= ide_pm_state_start_suspend,
 	idedisk_pm_standby,
 
-	idedisk_pm_restore_dma	= ide_pm_state_start_resume,
+	idedisk_pm_idle		= ide_pm_state_start_resume,
+	idedisk_pm_restore_dma,
 };
 
 static void idedisk_complete_power_step (ide_drive_t *drive, struct request *rq, u8 stat, u8 error)
@@ -1348,6 +1349,9 @@ static void idedisk_complete_power_step (ide_drive_t *drive, struct request *rq,
 		break;
 	case idedisk_pm_standby:	/* Suspend step 2 (standby) complete */
 		rq->pm->pm_step = ide_pm_state_completed;
+		break;
+	case idedisk_pm_idle:		/* Resume step 1 (idle) complete */
+		rq->pm->pm_step = idedisk_pm_restore_dma;
 		break;
 	}
 }
@@ -1372,13 +1376,20 @@ static ide_startstop_t idedisk_start_power_step (ide_drive_t *drive, struct requ
 		args->command_type = IDE_DRIVE_TASK_NO_DATA;
 		args->handler	   = &task_no_data_intr;
 		return do_rw_taskfile(drive, args);
+
 	case idedisk_pm_standby:	/* Suspend step 2 (standby) */
 		args->tfRegister[IDE_COMMAND_OFFSET] = WIN_STANDBYNOW1;
 		args->command_type = IDE_DRIVE_TASK_NO_DATA;
 		args->handler	   = &task_no_data_intr;
 		return do_rw_taskfile(drive, args);
 
-	case idedisk_pm_restore_dma:	/* Resume step 1 (restore DMA) */
+	case idedisk_pm_idle:		/* Resume step 1 (idle) */
+		args->tfRegister[IDE_COMMAND_OFFSET] = WIN_IDLEIMMEDIATE;
+		args->command_type = IDE_DRIVE_TASK_NO_DATA;
+		args->handler = task_no_data_intr;
+		return do_rw_taskfile(drive, args);
+
+	case idedisk_pm_restore_dma:	/* Resume step 2 (restore DMA) */
 		/*
 		 * Right now, all we do is call hwif->ide_dma_check(drive),
 		 * we could be smarter and check for current xfer_speed
