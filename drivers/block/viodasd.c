@@ -175,6 +175,13 @@ static int viodasd_open(struct inode *ino, struct file *fil)
 	struct viodasd_device *d = ino->i_bdev->bd_disk->private_data;
 	HvLpEvent_Rc hvrc;
 	struct viodasd_waitevent we;
+	u16 flags = 0;
+
+	if (d->read_only) {
+		if ((fil != NULL) && (fil->f_mode & FMODE_WRITE))
+			return -EROFS;
+		flags = vioblockflags_ro;
+	}
 
 	init_completion(&we.com);
 
@@ -186,7 +193,7 @@ static int viodasd_open(struct inode *ino, struct file *fil)
 			viopath_sourceinst(viopath_hostLp),
 			viopath_targetinst(viopath_hostLp),
 			(u64)(unsigned long)&we, VIOVERSION << 16,
-			((u64)DEVICE_NO(d) << 48) /* | ((u64)flags << 32) */,
+			((u64)DEVICE_NO(d) << 48) | ((u64)flags << 32),
 			0, 0, 0);
 	if (hvrc != 0) {
 		printk(VIOD_KERN_WARNING "HV open failed %d\n", (int)hvrc);
@@ -456,7 +463,9 @@ static void probe_disk(struct viodasd_device *d)
 	int dev_no = DEVICE_NO(d);
 	struct gendisk *g;
 	struct request_queue *q;
+	u16 flags = 0;
 
+retry:
 	init_completion(&we.com);
 
 	/* Send the open event to OS/400 */
@@ -467,7 +476,7 @@ static void probe_disk(struct viodasd_device *d)
 			viopath_sourceinst(viopath_hostLp),
 			viopath_targetinst(viopath_hostLp),
 			(u64)(unsigned long)&we, VIOVERSION << 16,
-			((u64)dev_no << 48) | ((u64)vioblockflags_ro << 32),
+			((u64)dev_no << 48) | ((u64)flags<< 32),
 			0, 0, 0);
 	if (hvrc != 0) {
 		printk(VIOD_KERN_WARNING "bad rc on HV open %d\n", (int)hvrc);
@@ -476,8 +485,13 @@ static void probe_disk(struct viodasd_device *d)
 
 	wait_for_completion(&we.com);
 
-	if (we.rc != 0)
-		return;
+	if (we.rc != 0) {
+		if (flags != 0)
+			return;
+		/* try again with read only flag set */
+		flags = vioblockflags_ro;
+		goto retry;
+	}
 	if (we.max_disk > (MAX_DISKNO - 1)) {
 		static int warned;
 
@@ -498,7 +512,7 @@ static void probe_disk(struct viodasd_device *d)
 			viopath_sourceinst(viopath_hostLp),
 			viopath_targetinst(viopath_hostLp),
 			0, VIOVERSION << 16,
-			((u64)dev_no << 48) | ((u64)vioblockflags_ro << 32),
+			((u64)dev_no << 48) | ((u64)flags << 32),
 			0, 0, 0);
 	if (hvrc != 0) {
 		printk(VIOD_KERN_WARNING
@@ -506,11 +520,12 @@ static void probe_disk(struct viodasd_device *d)
 		return;
 	}
 	printk(VIOD_KERN_INFO "disk %d: %lu sectors (%lu MB) "
-			"CHS=%d/%d/%d sector size %d\n",
+			"CHS=%d/%d/%d sector size %d%s\n",
 			dev_no, (unsigned long)(d->size >> 9),
 			(unsigned long)(d->size >> 20),
 			(int)d->cylinders, (int)d->tracks,
-			(int)d->sectors, (int)d->bytes_per_sector);
+			(int)d->sectors, (int)d->bytes_per_sector,
+			d->read_only ? " (RO)" : "");
 	/* create the request queue for the disk */
 	spin_lock_init(&d->q_lock);
 	q = blk_init_queue(do_viodasd_request, &d->q_lock);
