@@ -45,7 +45,7 @@ the dcache that are not needed for normal filesystem access.
    to already have a (non-connected) dentry, and must be able to move
    that dentry into place (based on the parent and name in the
    ->lookup).   This is particuarly needed for directories as
-   it is a dcache invarient that directories only have one dentry.
+   it is a dcache invariant that directories only have one dentry.
 
 To implement these features, the dcache has:
 

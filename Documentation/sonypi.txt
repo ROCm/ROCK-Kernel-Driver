@@ -130,7 +130,7 @@ Bugs:
 	  tested) when using the driver with the fnkeyinit parameter. I cannot
 	  reproduce it on my laptop and not all users have this problem.
 	  This happens because the fnkeyinit parameter enables the ACPI 
-	  mode (but without additionnal ACPI control, like processor 
+	  mode (but without additional ACPI control, like processor 
 	  speed handling etc). Use ACPI instead of APM if it works on your
 	  laptop.
 	

@@ -53,7 +53,7 @@ This is done in several steps.
 
 a. Each driver can provide one or more parameter interfaces where parameters can
    be specified. These interfaces are also in the driver's responsibility.
-b. After a. has been performed, if neccessary, the device is finally brought up
+b. After a. has been performed, if necessary, the device is finally brought up
    via the 'online' interface.
 
 
@@ -145,7 +145,7 @@ Parameters:   cdev       - the device to be deactivated. The common layer has
 
 
 The handler field of the struct ccw_device is meant to be set to the interrupt
-handler for the device. In order to accomodate drivers which use several 
+handler for the device. In order to accommodate drivers which use several 
 distinct handlers (e.g. multi subchannel devices), this is a member of ccw_device
 instead of ccw_driver.
 The handler is registered with the common layer during set_online() processing

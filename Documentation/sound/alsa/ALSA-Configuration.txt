@@ -659,7 +659,7 @@ Module parameters
     Module supports autoprobe and multiple chips (max 8).
     Note: on some notebooks the buffer address cannot be detected
     automatically, or causes hang-up during initialization.
-    In such a case, specify the buffer top address explicity via
+    In such a case, specify the buffer top address explicitly via
     buffer_top option.
     For example,
       Sony F250: buffer_top=0x25a800

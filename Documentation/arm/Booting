@@ -47,7 +47,7 @@ which serial port it should use for the kernel console (generally
 used for debugging purposes, or communication with the target.)
 
 As an alternative, the boot loader can pass the relevant 'console='
-option to the kernel via the tagged lists specifing the port, and
+option to the kernel via the tagged lists specifying the port, and
 serial format options as described in
 
        linux/Documentation/kernel-parameters.txt.

@@ -635,9 +635,9 @@ to the numbers of sectors in the current segment being processed which could
 be one of the many segments in the current bio (i.e i/o completion unit).
 The nr_sectors value refers to the total number of sectors in the whole
 request that remain to be transferred (no change). The purpose of the
-hard_xxx values is for block to remember these counts everytime it hands
+hard_xxx values is for block to remember these counts every time it hands
 over the request to the driver. These values are updated by block on
-end_that_request_first, i.e. everytime the driver completes a part of the
+end_that_request_first, i.e. every time the driver completes a part of the
 transfer and invokes block end*request helpers to mark this. The
 driver should not modify these values. The block layer sets up the
 nr_sectors and current_nr_sectors fields (based on the corresponding

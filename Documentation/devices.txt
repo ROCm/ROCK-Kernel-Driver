@@ -898,7 +898,7 @@ Your cooperation is appreciated.
 		    ...
 
 		Network Block Device is somehow similar to loopback
-		devices: If you read from it, it sends packet accross
+		devices: If you read from it, it sends packet across
 		network asking server for data. If you write to it, it
 		sends packet telling server to write. It could be used
 		to mounting filesystems over the net, swapping over

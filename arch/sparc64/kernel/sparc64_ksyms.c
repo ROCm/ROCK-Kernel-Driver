@@ -137,6 +137,11 @@ extern void mcount(void);
 EXPORT_SYMBOL_NOVERS(mcount);
 #endif
 
+/* Uniprocessor clock frequency */
+#ifndef CONFIG_SMP
+EXPORT_SYMBOL(up_clock_tick);
+#endif
+
 /* Per-CPU information table */
 EXPORT_SYMBOL(cpu_data);
 

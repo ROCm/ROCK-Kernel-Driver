@@ -3492,9 +3492,9 @@ S: Italy
 
 N: Marc Zyngier
 E: maz@wild-wind.fr.eu.org
+W: http://www.misterjones.org
 D: MD driver
-S: 11 rue Victor HUGO
-S: 95560 Montsoult
+D: EISA/sysfs subsystem
 S: France
 
 # Don't add your name here, unless you really _are_ after Marc

@@ -316,35 +316,6 @@ asmlinkage long sys32_unimplemented(int r26, int r25, int r24, int r23,
     return -ENOSYS;
 }
 
-extern asmlinkage long sys_fcntl(unsigned int fd, unsigned int cmd, unsigned long arg);
-
-asmlinkage long sys32_fcntl(unsigned int fd, unsigned int cmd, unsigned long arg)
-{
-	switch (cmd) {
-	case F_GETLK:
-	case F_SETLK:
-	case F_SETLKW:
-		{
-			struct flock f;
-			long ret;
-			
-			if (get_compat_flock(&f, (struct compat_flock *)arg))
-				return -EFAULT;
-			KERNEL_SYSCALL(ret, sys_fcntl, fd, cmd, (unsigned long)&f);
-			if (ret) return ret;
-			if (f.l_start >= 0x7fffffffUL ||
-			    f.l_len >= 0x7fffffffUL ||
-			    f.l_start + f.l_len >= 0x7fffffffUL)
-				return -EOVERFLOW;
-			if (put_compat_flock(&f, (struct compat_flock *)arg))
-				return -EFAULT;
-			return 0;
-		}
-	default:
-		return sys_fcntl(fd, cmd, (unsigned long)arg);
-	}
-}
-
 #ifdef CONFIG_SYSCTL
 
 struct __sysctl_args32 {
@@ -1298,28 +1269,6 @@ asmlinkage long sys32_msgrcv(int msqid,
 
 	kfree(mb);
 	return err;
-}
-
-/* LFS */
-
-extern asmlinkage long sys_fcntl(unsigned int, unsigned int, unsigned long);
-
-asmlinkage long sys32_fcntl64(unsigned int fd, unsigned int cmd, unsigned long arg)
-{
-	switch (cmd) {
-		case F_GETLK64:
-			cmd = F_GETLK;
-			break;
-		case F_SETLK64:
-			cmd = F_SETLK;
-			break;
-		case F_SETLKW64:
-			cmd = F_SETLKW;
-			break;
-		default:
-			break;
-	}
-	return sys32_fcntl(fd, cmd, arg);
 }
 
 /* EXPORT/UNEXPORT */

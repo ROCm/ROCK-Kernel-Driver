@@ -561,7 +561,7 @@ located in the same directory as the makefile.
 
 Usually kbuild descends down in subdirectories due to "obj-* := dir/",
 but in the architecture makefiles where the kbuild infrastructure
-is not sufficent this sometimes needs to be explicit.
+is not sufficient this sometimes needs to be explicit.
 
 	Example:
 		#arch/i386/boot/Makefile

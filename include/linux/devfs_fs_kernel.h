@@ -49,7 +49,6 @@ extern int devfs_mk_symlink (devfs_handle_t dir, const char *name,
 extern devfs_handle_t devfs_mk_dir (devfs_handle_t dir, const char *name,
 				    void *info);
 extern int devfs_generate_path (devfs_handle_t de, char *path, int buflen);
-extern int devfs_set_file_size (devfs_handle_t de, unsigned long size);
 extern int devfs_register_tape (devfs_handle_t de);
 extern void devfs_unregister_tape(int num);
 extern int devfs_alloc_unique_number (struct unique_numspace *space);
@@ -101,10 +100,6 @@ static inline void devfs_remove(const char *fmt, ...)
 }
 static inline int devfs_generate_path (devfs_handle_t de, char *path,
 				       int buflen)
-{
-    return -ENOSYS;
-}
-static inline int devfs_set_file_size (devfs_handle_t de, unsigned long size)
 {
     return -ENOSYS;
 }

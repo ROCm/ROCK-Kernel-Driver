@@ -78,7 +78,7 @@ additional printfs to be active.  Comment out the following line in the
 driver to disable compilation of the CS_DBGOUT print statements:
 #define CSDEBUG 1
  
-Please see the defintions for cs_debuglevel and cs_debugmask for additional
+Please see the definitions for cs_debuglevel and cs_debugmask for additional
 information on the debug levels and sections.
 
 There is also a csdbg executable to allow runtime manipulation of these 

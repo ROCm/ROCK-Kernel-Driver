@@ -238,7 +238,7 @@ Queuing more than 1 command at a time to a device allows it to perform
 optimizations based on actual head positions and its mechanical 
 characteristics. This feature may also reduce average command latency.
 In order to really gain advantage of this feature, devices must have 
-a reasonnable cache size (No miracle is to be expected for a low-end 
+a reasonable cache size (No miracle is to be expected for a low-end 
 hard disk with 128 KB or less).
 Some kown SCSI devices do not properly support tagged command queuing.
 Generally, firmware revisions that fix this kind of problems are available 
@@ -592,7 +592,7 @@ CONFIG_SCSI_NCR53C8XX_FORCE_SYNC_NEGO (default answer: n)
     Some SCSI-2 devices do not report this feature in byte 7 of inquiry 
     response but do support it properly (TAMARACK scanners for example).
 
-CONFIG_SCSI_NCR53C8XX_NO_DISCONNECT   (default and only reasonnable answer: n)
+CONFIG_SCSI_NCR53C8XX_NO_DISCONNECT   (default and only reasonable answer: n)
     If you suspect a device of yours does not properly support disconnections,
     you can answer "y". Then, all SCSI devices will never disconnect the bus 
     even while performing long SCSI operations.
@@ -827,7 +827,7 @@ port address 0x1400.
 
     Available option bits:
         0x0:   No check.
-        0x1:   Check and donnot attach the controller on error.  
+        0x1:   Check and do not attach the controller on error.  
         0x2:   Check and just warn on error.
         0x4:   Disable SCSI bus integrity checking.
 
@@ -850,7 +850,7 @@ port address 0x1400.
 
 10.2.22 Enable use of IMMEDIATE ARBITRATION
         (only supported by the sym53c8xx driver. See 10.7 for more details)
-        iarb:0    donnot use this feature.
+        iarb:0    do not use this feature.
         iarb:#x   use this feature according to bit fields as follow:
 
     bit 0 (1) : enable IARB each time the initiator has been reselected 
@@ -880,7 +880,7 @@ Boot fail safe
   settle time			10 seconds		settle:10
   differential support		from BIOS settings	diff:1
   irq mode			from BIOS settings	irqm:1
-  SCSI BUS check		donnot attach on error	buschk:1
+  SCSI BUS check		do not attach on error	buschk:1
   immediate arbitration		disabled		iarb:0
 
 10.3 Advised boot setup commands
@@ -1272,7 +1272,7 @@ following things:
 - terminations at both end of the SCSI chain
 - linux syslog messages (some of them may help you)
 
-If you donnot find the source of problems, you can configure the
+If you do not find the source of problems, you can configure the
 driver with no features enabled.
 
 - only asynchronous data transfers
@@ -1345,14 +1345,14 @@ Field B : DSTAT io register (DMA STATUS)
 Field C : SIST io register (SCSI Interrupt Status)
   Bit 0x08 : SGE  SCSI GROSS ERROR
              Indicates that the chip detected a severe error condition 
-             on the SCSI BUS that prevents the SCSI protocol from functionning
+             on the SCSI BUS that prevents the SCSI protocol from functioning
              properly.
-  Bit 0x04 : UDC  Undexpected Disconnection
+  Bit 0x04 : UDC  Unexpected Disconnection
              Indicates that the device released the SCSI BUS when the chip 
              was not expecting this to happen. A device may behave so to 
              indicate the SCSI initiator that an error condition not reportable              using the SCSI protocol has occurred.
   Bit 0x02 : RST  SCSI BUS Reset
-             Generally SCSI targets donnot reset the SCSI BUS, although any 
+             Generally SCSI targets do not reset the SCSI BUS, although any 
              device on the BUS can reset it at any time.
   Bit 0x01 : PAR  Parity
              SCSI parity error detected.

@@ -86,7 +86,7 @@ URBs are allocated with the following call
 
 Return value is a pointer to the allocated URB, 0 if allocation failed.
 The parameter isoframes specifies the number of isochronous transfer frames
-you want to schedule. For CTRL/BULK/INT, use 0.  The mem_flags paramter
+you want to schedule. For CTRL/BULK/INT, use 0.  The mem_flags parameter
 holds standard memory allocation flags, letting you control (among other
 things) whether the underlying code may block or not.
 

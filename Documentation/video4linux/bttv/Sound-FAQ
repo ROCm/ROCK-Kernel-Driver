@@ -15,18 +15,18 @@ log, telling which card type is used.  Like this one:
 
 	bttv0: model: BT848(Hauppauge old) [autodetected]
 
-You should verify this is correct.  If it is'nt, you have to pass the
+You should verify this is correct.  If it isn't, you have to pass the
 correct board type as insmod argument, "insmod bttv card=2" for
 example.  The file CARDLIST has a list of valid arguments for card.
-If your card is'nt listed there, you might check the source code for
-new entries which are not listed yet.  If there is'nt one for your
+If your card isn't listed there, you might check the source code for
+new entries which are not listed yet.  If there isn't one for your
 card, you can check if one of the existing entries does work for you
 (just trial and error...).
 
 Some boards have an extra processor for sound to do stereo decoding
 and other nice features.  The msp34xx chips are used by Hauppauge for
 example.  If your board has one, you might have to load a helper
-module like msp3400.o to make sound work.  If there is'nt one for the
+module like msp3400.o to make sound work.  If there isn't one for the
 chip used on your board:  Bad luck.  Start writing a new one.  Well,
 you might want to check the video4linux mailing list archive first...
 

@@ -84,6 +84,9 @@ ENTRY(reschedule)
 	jmp	schedule
 
 ENTRY(ret_from_fork)
+	movel	%d1,%sp@-
+	jsr	schedule_tail
+	addql	#4,%sp
 	jra	ret_from_exception
 
 ENTRY(sys_fork)

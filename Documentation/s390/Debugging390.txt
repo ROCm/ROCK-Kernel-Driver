@@ -52,7 +52,7 @@ The current architectures have the following registers.
  
 16  General propose registers, 32 bit on s/390 64 bit on z/Architecture, r0-r15 or gpr0-gpr15 used for arithmetic & addressing. 
 
-16 Control registers, 32 bit on s/390 64 bit on z/Architecture, ( cr0-cr15 kernel usage only ) used for memory managment,
+16 Control registers, 32 bit on s/390 64 bit on z/Architecture, ( cr0-cr15 kernel usage only ) used for memory management,
 interrupt control,debugging control etc.
 
 16 Access registers ( ar0-ar15 ) 32 bit on s/390 & z/Architecture
@@ -243,7 +243,7 @@ of our 32 bit addresses,however, we use entirely separate address
 spaces for the user & kernel.
 
 This means we can support 2GB of non Extended RAM on s/390, & more
-with the Extended memory managment swap device & 
+with the Extended memory management swap device & 
 currently 4TB of physical memory currently on z/Architecture.
 
 
@@ -385,7 +385,7 @@ This is a built in compiler function for runtime allocation
 of extra space on the callers stack which is obviously freed
 up on function exit ( e.g. the caller may choose to allocate nothing
 of a buffer of 4k if required for temporary purposes ), it generates 
-very efficent code ( a few cycles  ) when compared to alternatives 
+very efficient code ( a few cycles  ) when compared to alternatives 
 like malloc.
 
 automatics: These are local variables on the stack,
@@ -1091,7 +1091,7 @@ e.g. The address range  0x2000 to 0x3000 can be described described as
 The VM Debugger is case insensitive.
 
 VM's strengths are usually other debuggers weaknesses you can get at any resource
-no matter how sensitive e.g. memory managment resources,change address translation
+no matter how sensitive e.g. memory management resources,change address translation
 in the PSW. For kernel hacking you will reap dividends if you get good at it.
 
 The VM Debugger displays operators but not operands, probably because some
@@ -1194,7 +1194,7 @@ displays the gprs on each step.
 Displaying & modifying Registers
 --------------------------------
 D G will display all the gprs
-Adding a extra G to all the commands is neccessary to access the full 64 bit 
+Adding a extra G to all the commands is necessary to access the full 64 bit 
 content in VM on z/Architecture obviously this isn't required for access registers
 as these are still 32 bit.
 e.g. DGG instead of DG 
@@ -1280,7 +1280,7 @@ so it would be foolish to use this as the default on a production machine.
 
 Tracing particular processes
 ----------------------------
-The kernels text segment is intentionally at an address in memory that it will
+The kernel's text segment is intentionally at an address in memory that it will
 very seldom collide with text segments of user programs ( thanks Martin ),
 this simplifies debugging the kernel.
 However it is quite common for user processes to have addresses which collide
@@ -1425,7 +1425,7 @@ from the bash prompt issue
 shutdown -h now or halt.
 do a Q CPUS to find out how many cpus you have
 detach each one of them from cp except cpu 0 
-by issueing a 
+by issuing a 
 DETACH CPU 01-(number of cpus in configuration)
 & boot linux again.
 TR SIGP will trace inter processor signal processor instructions.
@@ -1671,7 +1671,7 @@ compatibility & Format 1 ( 31 bit ). These are typically used to issue read & wr
 ( & many other instructions ) they consist of a length field & an absolute address field.
 For each IO typically get 1 or 2 interrupts one for channel end ( primary status ) when the
 channel is idle & the second for device end ( secondary status ) sometimes you get both
-concurrently, you check how the IO went on by issueing a TEST SUBCHANNEL at each interrupt,
+concurrently, you check how the IO went on by issuing a TEST SUBCHANNEL at each interrupt,
 from which you receive an Interruption response block (IRB). If you get channel & device end 
 status in the IRB without channel checks etc. your IO probably went okay. If you didn't you
 probably need a doctorto examine the IRB & extended status word etc.
@@ -2153,14 +2153,14 @@ program as if it just crashed on your system, it is usually called core & create
 current working directory.
 This is very useful in that a customer can mail a core dump to a technical support department
 & the technical support department can reconstruct what happened.
-Provided the have an indentical copy of this program with debugging symbols compiled in & 
+Provided the have an identical copy of this program with debugging symbols compiled in & 
 the source base of this build is available.
 In short it is far more useful than something like a crash log could ever hope to be.
 
 In theory all that is missing to restart a core dumped program is a kernel patch which
 will do the following.
 1) Make a new kernel task structure
-2) Reload all the dumped pages back into the kernels memory managment structures.
+2) Reload all the dumped pages back into the kernel's memory management structures.
 3) Do the required clock fixups
 4) Get all files & network connections for the process back into an identical state ( really difficult ).
 5) A few more difficult things I haven't thought of.
@@ -2374,7 +2374,7 @@ for more info.
 e.g. 
 to switch on the lcs "debug feature"
 echo 5 > /proc/s390dbf/lcs/level
-& then after the error occured.
+& then after the error occurred.
 cat /proc/s390dbf/lcs/sprintf >/logfile
 the logfile now contains some information which may help
 tech support resolve a problem in the field.
@@ -2462,9 +2462,9 @@ Michael Holzheu & others here at IBM have a fairly mature port of
 SGI's lcrash tool which allows one to look at kernel structures in a
 running kernel.
 
-It also complements a tool called dumptool which dumps all the kernels
+It also complements a tool called dumptool which dumps all the kernel's
 memory pages & registers to either a tape or a disk.
-This can be used by tech support or an ambitous end user do
+This can be used by tech support or an ambitious end user do
 post mortem debugging of a machine like gdb core dumps.
 
 Going into how to use this tool in detail will be explained

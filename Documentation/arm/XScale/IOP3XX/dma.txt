@@ -142,7 +142,7 @@ void dma_test(void)
 	/* User's responsibility to keep buffers cached coherent */
 	cpu_dcache_clean(sgl->data, sgl->data + 1024);
 
-    	/* queing the buffer, this function will sleep since no callback */
+    	/* queuing the buffer, this function will sleep since no callback */
     	err = dma_queue_buffer(channel, sgl_head);
 
     	/* now we are woken from DMA complete */
@@ -186,7 +186,7 @@ dma_suspend().
 int dma_flush_all(dmach_t channel);
 
 This completely flushes all queued buffers and on-going DMA transfers on a
-given channel. This is called when DMA channel errors have occured.
+given channel. This is called when DMA channel errors have occurred.
 
 
 void dma_free(dmach_t channel);

@@ -20,7 +20,8 @@
 
 /* The EISA signature, in ASCII form, null terminated */
 struct eisa_device_id {
-	char sig[EISA_SIG_LEN];
+	char          sig[EISA_SIG_LEN];
+	unsigned long driver_data;
 };
 
 /* There is not much we can say about an EISA device, apart from

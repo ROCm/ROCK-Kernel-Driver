@@ -55,20 +55,12 @@
 #include <linux/module.h>
 #include <linux/delay.h>
 #include <linux/slab.h>
-#include <linux/version.h>
 #include <linux/init.h>
-#include <asm/uaccess.h>
-#include <linux/ioport.h>
 #include <linux/errno.h>
 #include <linux/sched.h>
-
 #include <linux/i2c.h>
-#include "i2c-algo-ibm_ocp.h"
-//ACC#include <asm/ocp.h>
-
-#ifdef MODULE_LICENSE
-MODULE_LICENSE("GPL");
-#endif
+#include <linux/i2c-algo-ibm_ocp.h>
+#include <asm/ocp.h>
 
 
 /* ----- global defines ----------------------------------------------- */
@@ -79,26 +71,13 @@ MODULE_LICENSE("GPL");
  	/* debug the protocol by showing transferred bits */
 #define DEF_TIMEOUT 5
 
-/* debugging - slow down transfer to have a look at the data .. 	*/
-/* I use this with two leds&resistors, each one connected to sda,scl 	*/
-/* respectively. This makes sure that the algorithm works. Some chips   */
-/* might not like this, as they have an internal timeout of some mils	*/
-/*
-#define SLO_IO      jif=jiffies;while(time_before_eq(jiffies,jif+i2c_table[minor].veryslow))\
-                        if (need_resched) schedule();
-*/
-
 
 /* ----- global variables ---------------------------------------------	*/
 
-#ifdef SLO_IO
-	int jif;
-#endif
 
 /* module parameters:
  */
 static int i2c_debug=0;
-static int iic_scan=0;	/* have a look at what's hanging 'round		*/
 
 /* --- setting states on the bus with the right timing: ---------------	*/
 
@@ -758,7 +737,7 @@ static int iic_xfer(struct i2c_adapter *i2c_adap,
         // Check to see if the bus is busy
         //
         ret = iic_inb(adap, iic->extsts);
-        // Mask off the irrelevant bits
+        // Mask off the irrelevent bits
         ret = ret & 0x70;
         // When the bus is free, the BCS bits in the EXTSTS register are 0b100
         if(ret != 0x40) return IIC_ERR_LOST_ARB;
@@ -858,16 +837,12 @@ static u32 iic_func(struct i2c_adapter *adap)
 /* -----exported algorithm data: -------------------------------------	*/
 
 static struct i2c_algorithm iic_algo = {
-	"IBM on-chip IIC algorithm",
-	I2C_ALGO_OCP,
-	iic_xfer,
-	NULL,
-	NULL,				/* slave_xmit		*/
-	NULL,				/* slave_recv		*/
-	algo_control,			/* ioctl		*/
-	iic_func,			/* functionality	*/
+	.name		= "IBM on-chip IIC algorithm",
+	.id		= I2C_ALGO_OCP,
+	.master_xfer	= iic_xfer,
+	.algo_control	= algo_control,
+	.functionality	= iic_func,
 };
-
 
 /* 
  * registering functions to load algorithms at runtime 
@@ -892,19 +867,8 @@ int i2c_ocp_add_bus(struct i2c_adapter *adap)
 	adap->timeout = 100;	/* default values, should	*/
 	adap->retries = 3;		/* be replaced by defines	*/
 
-#ifdef MODULE
-	MOD_INC_USE_COUNT;
-#endif
-
 	iic_init(iic_adap);
 	i2c_add_adapter(adap);
-
-	/* scan bus */
-	/* By default scanning the bus is turned off. */
-	if (iic_scan) {
-		printk(KERN_INFO " i2c-algo-iic.o: scanning bus %s.\n",
-		       adap->name);
-	}
 	return 0;
 }
 
@@ -914,31 +878,7 @@ int i2c_ocp_add_bus(struct i2c_adapter *adap)
 //
 int i2c_ocp_del_bus(struct i2c_adapter *adap)
 {
-	int res;
-	if ((res = i2c_del_adapter(adap)) < 0)
-		return res;
-	DEB2(printk(KERN_DEBUG "i2c-algo-iic.o: adapter unregistered: %s\n",adap->name));
-
-#ifdef MODULE
-	MOD_DEC_USE_COUNT;
-#endif
-	return 0;
-}
-
-
-//
-// Done
-//
-int __init i2c_algo_iic_init (void)
-{
-	printk(KERN_INFO "IBM On-chip iic (i2c) algorithm module 2002.27.03\n");
-	return 0;
-}
-
-
-void i2c_algo_iic_exit(void)
-{
-	return;
+	return i2c_del_adapter(adap);
 }
 
 
@@ -951,16 +891,10 @@ EXPORT_SYMBOL(i2c_ocp_del_bus);
 //
 MODULE_AUTHOR("MontaVista Software <www.mvista.com>");
 MODULE_DESCRIPTION("PPC 405 iic algorithm");
+MODULE_LICENSE("GPL");
 
-MODULE_PARM(iic_test, "i");
-MODULE_PARM(iic_scan, "i");
 MODULE_PARM(i2c_debug,"i");
 
-MODULE_PARM_DESC(iic_test, "Test if the I2C bus is available");
-MODULE_PARM_DESC(iic_scan, "Scan for active chips on the bus");
 MODULE_PARM_DESC(i2c_debug,
         "debug level - 0 off; 1 normal; 2,3 more verbose; 9 iic-protocol");
 
-
-module_init(i2c_algo_iic_init);
-module_exit(i2c_algo_iic_exit);

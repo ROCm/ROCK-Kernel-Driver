@@ -31,7 +31,7 @@
 # define TryLockPage TestSetPageLocked
 #endif
 
-#include "video-buf.h"
+#include <media/video-buf.h>
 
 static int debug = 0;
 

@@ -106,7 +106,7 @@ For versions of the driver v1.18c and above, the available transceiver types are
 8  transceiver type and duplex mode taken from card's EEPROM config settings
 12 10baseT (RJ-45 connector); force full-duplex mode
 
-Prior to driver version 1.18c, only tranceiver codes 0-4 were supported. Note
+Prior to driver version 1.18c, only transceiver codes 0-4 were supported. Note
 that the new transceiver codes 8 and 12 are the *only* ones that will enable
 full-duplex mode, no matter what the card's detected EEPROM settings might be.
 This insured that merely upgrading the driver from an earlier version would
@@ -146,7 +146,7 @@ you have a routing problem.
 Tx Carrier Errors Reported in /proc/net/dev 
 If an EtherLink III appears to transmit packets, but the "Tx carrier errors"
 field in /proc/net/dev increments as quickly as the Tx packet count, you
-likely have an unterminated network or the incorrect media tranceiver selected. 
+likely have an unterminated network or the incorrect media transceiver selected. 
 
 3c509B card is not detected on machines with an ISA PnP BIOS. 
 While the updated driver works with most PnP BIOS programs, it does not work

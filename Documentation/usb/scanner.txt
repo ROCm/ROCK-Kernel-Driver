@@ -282,7 +282,7 @@ main(void) {
 	}
 
 	if((fpout=fopen("out.dat", "w+")) == NULL) {
-		perror("Unable to open ouput file");
+		perror("Unable to open output file");
 		exit(1);
 	}
 

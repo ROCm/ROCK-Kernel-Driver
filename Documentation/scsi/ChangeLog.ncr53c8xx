@@ -247,7 +247,7 @@ Wed Oct 21 21:00 1998 Gerard Roudier (groudier@club-internet.fr)
 	- Add the 53c876 description to the chip table. This is only useful 
 	  for printing the right name of the controller.
 	- DEL-441 Item 2 work-around for the 53c876 rev <= 5 (0x15).
-	- Add additionnal checking of INQUIRY data:
+	- Add additional checking of INQUIRY data:
 	  Check INQUIRY data received length is at least 7. Byte 7 of 
 	  inquiry data contains device features bits and the driver might 
 	  be confused by garbage. Also check peripheral qualifier.
@@ -420,7 +420,7 @@ Sat Apr 4 20:00 1998 Gerard Roudier (groudier@club-internet.fr)
 	- Split DATA_IN and DATA_OUT scripts into 2 sub-scripts.
 	  64 segments are moved from on-chip RAM scripts.
 	  If more segments, a script in main memory is used for the 
-	  additionnal segments.
+	  additional segments.
 	- Since the SCRIPTS processor continues SCRIPTS execution after 
 	  having won arbitration, do some stuff prior to testing any SCSI 
 	  phase on reselection. This should have the vertue to process 
@@ -475,7 +475,7 @@ Sun Jan 11 22:00 1998 Gerard Roudier (groudier@club-internet.fr)
         ------------------------------
 	- Use FAST-5 instead of SLOW for slow scsi devices according to 
 	  new SPI-2 draft.
-	- Make some changes in order to accomodate with 875 rev <= 3 
+	- Make some changes in order to accommodate with 875 rev <= 3 
 	  device errata listing 397. Minor consequences are:
 	  . Leave use of PCI Write and Invalidate under user control.
 	    Now, by default the driver does not enable PCI MWI and option

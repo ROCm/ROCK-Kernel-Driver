@@ -56,7 +56,7 @@
 #define __KERNEL_SYSCALLS__
 #include <linux/unistd.h>
 
-#include "audiochip.h"
+#include <media/audiochip.h>
 #include "msp3400.h"
 
 /* Addresses to scan */
@@ -1495,8 +1495,8 @@ static int msp_command(struct i2c_client *client, unsigned int cmd, void *arg)
 			VIDEO_AUDIO_MUTABLE;
 		if (msp->muted)
 			va->flags |= VIDEO_AUDIO_MUTE;
-		va->volume=MAX(msp->left,msp->right);
-		va->balance=(32768*MIN(msp->left,msp->right))/
+		va->volume=max(msp->left,msp->right);
+		va->balance=(32768*min(msp->left,msp->right))/
 			(va->volume ? va->volume : 1);
 		va->balance=(msp->left<msp->right)?
 			(65535-va->balance) : va->balance;
@@ -1517,9 +1517,9 @@ static int msp_command(struct i2c_client *client, unsigned int cmd, void *arg)
 
 		dprintk(KERN_DEBUG "msp34xx: VIDIOCSAUDIO\n");
 		msp->muted = (va->flags & VIDEO_AUDIO_MUTE);
-		msp->left = (MIN(65536 - va->balance,32768) *
+		msp->left = (min(65536 - va->balance,32768) *
 			     va->volume) / 32768;
-		msp->right = (MIN(va->balance,32768) *
+		msp->right = (min(va->balance,(__u16)32768) *
 			      va->volume) / 32768;
 		msp->bass = va->bass;
 		msp->treble = va->treble;
