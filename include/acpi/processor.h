@@ -16,9 +16,11 @@
 
 /* Power Management */
 
+struct acpi_processor_cx;
+
 struct acpi_processor_cx_policy {
 	u32			count;
-	u32			state;
+	struct acpi_processor_cx *state;
 	struct {
 		u32			time;
 		u32			ticks;

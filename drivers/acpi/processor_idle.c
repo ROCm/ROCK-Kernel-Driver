@@ -97,15 +97,14 @@ ticks_elapsed (
 static void
 acpi_processor_power_activate (
 	struct acpi_processor	*pr,
-	int			state)
+	struct acpi_processor_cx  *new)
 {
-	struct acpi_processor_cx *old, *new;
+	struct acpi_processor_cx  *old;
 
-	if (!pr)
+	if (!pr || !new)
 		return;
 
 	old = pr->power.state;
-	new = &pr->power.states[state];
 
 	if (old)
 		old->promotion.count = 0;
@@ -141,7 +140,7 @@ void acpi_processor_idle (void)
 {
 	struct acpi_processor	*pr = NULL;
 	struct acpi_processor_cx *cx = NULL;
-	int			next_state = 0;
+	struct acpi_processor_cx *next_state = NULL;
 	int			sleep_ticks = 0;
 	u32			t1, t2 = 0;
 
@@ -281,7 +280,7 @@ void acpi_processor_idle (void)
 		return;
 	}
 
-	next_state = pr->power.state - pr->power.states;
+	next_state = pr->power.state;
 
 	/*
 	 * Promotion?
@@ -291,7 +290,7 @@ void acpi_processor_idle (void)
 	 * mastering activity may prevent promotions.
 	 * Do not promote above max_cstate.
 	 */
-	if (cx->promotion.state && (cx->promotion.state <= max_cstate)) {
+	if (cx->promotion.state && (cx->promotion.state->type <= max_cstate)) {
 		if (sleep_ticks > cx->promotion.threshold.ticks) {
 			cx->promotion.count++;
  			cx->demotion.count = 0;
@@ -342,7 +341,7 @@ end:
 	 * If we're going to start using a new Cx state we must clean up
 	 * from the previous and prepare to use the new.
 	 */
-	if (&pr->power.states[next_state] != pr->power.state)
+	if (next_state != pr->power.state)
 		acpi_processor_power_activate(pr, next_state);
 
 	return;
@@ -361,7 +360,16 @@ static int
 acpi_processor_set_power_policy (
 	struct acpi_processor	*pr)
 {
-	ACPI_FUNCTION_TRACE("acpi_processor_set_power_policy");
+	unsigned int i;
+	unsigned int state_is_set = 0;
+	struct acpi_processor_cx *lower = NULL;
+	struct acpi_processor_cx *higher = NULL;
+	struct acpi_processor_cx *cx;
+
+ 	ACPI_FUNCTION_TRACE("acpi_processor_set_power_policy");
+
+	if (!pr)
+		return_VALUE(-EINVAL);
 
 	/*
 	 * This function sets the default Cx state policy (OS idle handler).
@@ -372,67 +380,62 @@ acpi_processor_set_power_policy (
 	 * customizable and can be altered dynamically.
 	 */
 
-	if (!pr)
-		return_VALUE(-EINVAL);
+	/* startup state */
+	for (i=1; i < ACPI_PROCESSOR_MAX_POWER; i++) {
+		cx = &pr->power.states[i];
+		if (!cx->valid)
+			continue;
 
-	/*
-	 * C0/C1
-	 * -----
-	 */
-	pr->power.state = &pr->power.states[ACPI_STATE_C1];
+		if (!state_is_set)
+			pr->power.state = cx;
+		state_is_set++;
+		break;
+ 	}
 
-	/*
-	 * C1/C2
-	 * -----
-	 * Set the default C1 promotion and C2 demotion policies, where we
-	 * promote from C1 to C2 after several (10) successive C1 transitions,
-	 * as we cannot (currently) measure the time spent in C1. Demote from
-	 * C2 to C1 anytime we experience a 'short' (time spent in C2 is less
-	 * than the C2 transtion latency).  Note the simplifying assumption
-	 * that the 'cost' of a transition is amortized when we sleep for at
-	 * least as long as the transition's latency (thus the total transition
-	 * time is two times the latency).
-	 *
-	 * TBD: Measure C1 sleep times by instrumenting the core IRQ handler.
-	 * TBD: Demote to default C-State after long periods of activity.
-	 * TBD: Investigate policy's use of CPU utilization -vs- sleep duration.
-	 */
-	if (pr->power.states[ACPI_STATE_C2].valid) {
-		pr->power.states[ACPI_STATE_C1].promotion.threshold.count = 10;
-		pr->power.states[ACPI_STATE_C1].promotion.threshold.ticks =
-			pr->power.states[ACPI_STATE_C2].latency_ticks;
-		pr->power.states[ACPI_STATE_C1].promotion.state = ACPI_STATE_C2;
+	if (!state_is_set)
+		return_VALUE(-ENODEV);
 
-		pr->power.states[ACPI_STATE_C2].demotion.threshold.count = 1;
-		pr->power.states[ACPI_STATE_C2].demotion.threshold.ticks =
-			pr->power.states[ACPI_STATE_C2].latency_ticks;
-		pr->power.states[ACPI_STATE_C2].demotion.state = ACPI_STATE_C1;
+	/* demotion */
+	for (i=1; i < ACPI_PROCESSOR_MAX_POWER; i++) {
+		cx = &pr->power.states[i];
+		if (!cx->valid)
+			continue;
+
+		if (lower) {
+			cx->demotion.state = lower;
+			cx->demotion.threshold.ticks = cx->latency_ticks;
+			cx->demotion.threshold.count = 1;
+			if (cx->type == ACPI_STATE_C3)
+				cx->demotion.threshold.bm = 0x0F;
+		}
+
+		/* from C3 we always demote to C2, even if there are multiple
+		 * states of type C3 available. */
+		if (cx->type < ACPI_STATE_C3)
+			lower = cx;
 	}
 
-	/*
-	 * C2/C3
-	 * -----
-	 * Set default C2 promotion and C3 demotion policies, where we promote
-	 * from C2 to C3 after several (4) cycles of no bus mastering activity
-	 * while maintaining sleep time criteria.  Demote immediately on a
-	 * short or whenever bus mastering activity occurs.
-	 */
-	if ((pr->power.states[ACPI_STATE_C2].valid) &&
-		(pr->power.states[ACPI_STATE_C3].valid)) {
-		pr->power.states[ACPI_STATE_C2].promotion.threshold.count = 4;
-		pr->power.states[ACPI_STATE_C2].promotion.threshold.ticks =
-			pr->power.states[ACPI_STATE_C3].latency_ticks;
-		pr->power.states[ACPI_STATE_C2].promotion.threshold.bm = 0x0F;
-		pr->power.states[ACPI_STATE_C2].promotion.state = ACPI_STATE_C3;
+	/* promotion */
+	for (i = (ACPI_PROCESSOR_MAX_POWER - 1); i > 0; i--) {
+		cx = &pr->power.states[i];
+		if (!cx->valid)
+			continue;
 
-		pr->power.states[ACPI_STATE_C3].demotion.threshold.count = 1;
-		pr->power.states[ACPI_STATE_C3].demotion.threshold.ticks =
-			pr->power.states[ACPI_STATE_C3].latency_ticks;
-		pr->power.states[ACPI_STATE_C3].demotion.threshold.bm = 0x0F;
-		pr->power.states[ACPI_STATE_C3].demotion.state = ACPI_STATE_C2;
+		if (higher) {
+			cx->promotion.state  = higher;
+			cx->demotion.threshold.ticks = cx->latency_ticks;
+			if (cx->type >= ACPI_STATE_C2)
+				cx->promotion.threshold.count = 4;
+			else
+				cx->promotion.threshold.count = 10;
+			if (higher->type == ACPI_STATE_C3)
+				cx->demotion.threshold.bm = 0x0F;
+		}
+
+		higher = cx;
 	}
 
-	return_VALUE(0);
+ 	return_VALUE(0);
 }
 
 
@@ -684,13 +687,15 @@ static int acpi_processor_power_seq_show(struct seq_file *seq, void *offset)
 
 		if (pr->power.states[i].promotion.state)
 			seq_printf(seq, "promotion[%d] ",
-				pr->power.states[i].promotion.state);
+				(pr->power.states[i].promotion.state -
+				 pr->power.states));
 		else
 			seq_puts(seq, "promotion[-] ");
 
 		if (pr->power.states[i].demotion.state)
 			seq_printf(seq, "demotion[%d] ",
-				pr->power.states[i].demotion.state);
+				(pr->power.states[i].demotion.state -
+				 pr->power.states));
 		else
 			seq_puts(seq, "demotion[-] ");
 
