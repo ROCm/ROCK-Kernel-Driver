@@ -52,16 +52,7 @@ static struct cpufreq_frequency_table speedstep_freqs[] = {
 };
 
 
-/* DEBUG
- *   Define it if you want verbose debug output, e.g. for bug reporting
- */
-//#define SPEEDSTEP_DEBUG
-
-#ifdef SPEEDSTEP_DEBUG
-#define dprintk(msg...) printk(msg)
-#else
-#define dprintk(msg...) do { } while(0)
-#endif
+#define dprintk(msg...) cpufreq_debug_printk(CPUFREQ_DEBUG_DRIVER, "speedstep-ich", msg)
 
 
 /**
@@ -83,13 +74,13 @@ static void speedstep_set_state (unsigned int state)
 	/* get PMBASE */
 	pci_read_config_dword(speedstep_chipset_dev, 0x40, &pmbase);
 	if (!(pmbase & 0x01)) {
-		printk(KERN_ERR "cpufreq: could not find speedstep register\n");
+		printk(KERN_ERR "speedstep-ich: could not find speedstep register\n");
 		return;
 	}
 
 	pmbase &= 0xFFFFFFFE;
 	if (!pmbase) {
-		printk(KERN_ERR "cpufreq: could not find speedstep register\n");
+		printk(KERN_ERR "speedstep-ich: could not find speedstep register\n");
 		return;
 	}
 
@@ -99,13 +90,13 @@ static void speedstep_set_state (unsigned int state)
 	/* read state */
 	value = inb(pmbase + 0x50);
 
-	dprintk(KERN_DEBUG "cpufreq: read at pmbase 0x%x + 0x50 returned 0x%x\n", pmbase, value);
+	dprintk("read at pmbase 0x%x + 0x50 returned 0x%x\n", pmbase, value);
 
 	/* write new state */
 	value &= 0xFE;
 	value |= state;
 
-	dprintk(KERN_DEBUG "cpufreq: writing 0x%x to pmbase 0x%x + 0x50\n", value, pmbase);
+	dprintk("writing 0x%x to pmbase 0x%x + 0x50\n", value, pmbase);
 
 	/* Disable bus master arbitration */
 	pm2_blk = inb(pmbase + 0x20);
@@ -125,10 +116,10 @@ static void speedstep_set_state (unsigned int state)
 	/* Enable IRQs */
 	local_irq_restore(flags);
 
-	dprintk(KERN_DEBUG "cpufreq: read at pmbase 0x%x + 0x50 returned 0x%x\n", pmbase, value);
+	dprintk("read at pmbase 0x%x + 0x50 returned 0x%x\n", pmbase, value);
 
 	if (state == (value & 0x1)) {
-		dprintk (KERN_INFO "cpufreq: change to %u MHz succeeded\n", (speedstep_get_processor_frequency(speedstep_processor) / 1000));
+		dprintk("change to %u MHz succeeded\n", (speedstep_get_processor_frequency(speedstep_processor) / 1000));
 	} else {
 		printk (KERN_ERR "cpufreq: change failed - I/O error\n");
 	}
@@ -153,7 +144,7 @@ static int speedstep_activate (void)
 	pci_read_config_word(speedstep_chipset_dev, 0x00A0, &value);
 	if (!(value & 0x08)) {
 		value |= 0x08;
-		dprintk(KERN_DEBUG "cpufreq: activating SpeedStep (TM) registers\n");
+		dprintk("activating SpeedStep (TM) registers\n");
 		pci_write_config_word(speedstep_chipset_dev, 0x00A0, value);
 	}
 
@@ -212,7 +203,7 @@ static unsigned int speedstep_detect_chipset (void)
 
 		pci_read_config_byte(hostbridge, PCI_REVISION_ID, &rev);
 		if (rev < 5) {
-			dprintk(KERN_INFO "cpufreq: hostbridge does not support speedstep\n");
+			dprintk("hostbridge does not support speedstep\n");
 			speedstep_chipset_dev = NULL;
 			pci_dev_put(hostbridge);
 			return 0;
@@ -234,6 +225,7 @@ static unsigned int _speedstep_get(cpumask_t cpus)
 	set_cpus_allowed(current, cpus);
 	speed = speedstep_get_processor_frequency(speedstep_processor);
 	set_cpus_allowed(current, cpus_allowed);
+	dprintk("detected %u kHz as current frequency\n", speed);
 	return speed;
 }
 
@@ -265,6 +257,8 @@ static int speedstep_target (struct cpufreq_policy *policy,
 	freqs.old = _speedstep_get(policy->cpus);
 	freqs.new = speedstep_freqs[newstate].frequency;
 	freqs.cpu = policy->cpu;
+
+	dprintk("transiting from %u to %u kHz\n", freqs.old, freqs.new);
 
 	/* no transition necessary */
 	if (freqs.old == freqs.new)
@@ -335,7 +329,7 @@ static int speedstep_cpu_init(struct cpufreq_policy *policy)
 	if (!speed)
 		return -EIO;
 
-	dprintk(KERN_INFO "cpufreq: currently at %s speed setting - %i MHz\n",
+	dprintk("currently at %s speed setting - %i MHz\n",
 		(speed == speedstep_freqs[SPEEDSTEP_LOW].frequency) ? "low" : "high",
 		(speed / 1000));
 
@@ -389,12 +383,14 @@ static int __init speedstep_init(void)
 {
 	/* detect processor */
 	speedstep_processor = speedstep_detect_processor();
-	if (!speedstep_processor)
+	if (!speedstep_processor) {
+		dprintk("Intel(R) SpeedStep(TM) capable processor not found\n");
 		return -ENODEV;
+	}
 
 	/* detect chipset */
 	if (!speedstep_detect_chipset()) {
-		printk(KERN_INFO "cpufreq: Intel(R) SpeedStep(TM) for this chipset not (yet) available.\n");
+		dprintk("Intel(R) SpeedStep(TM) for this chipset not (yet) available.\n");
 		return -ENODEV;
 	}
 
