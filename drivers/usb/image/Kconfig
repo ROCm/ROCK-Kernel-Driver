@@ -14,10 +14,8 @@ config USB_MDC800
 	  To use it create a device node with "mknod /dev/mustek c 180 32" and
 	  configure it in your software.
 
-	  This code is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called mdc800. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called mdc800.
 
 config USB_SCANNER
 	tristate "USB Scanner support"
@@ -27,10 +25,8 @@ config USB_SCANNER
 	  USB port. Please read <file:Documentation/usb/scanner.txt> for more
 	  information.
 
-	  This code is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called scanner. If you want to compile it as
-	  a module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called scanner.
 
 config USB_MICROTEK
 	tristate "Microtek X6USB scanner support"

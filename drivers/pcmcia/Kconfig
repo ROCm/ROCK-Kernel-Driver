@@ -23,11 +23,8 @@ config PCMCIA
 	  for location).  Please also read the PCMCIA-HOWTO, available from
 	  <http://www.tldp.org/docs.html#howto>.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  When compiled this way, there will be modules called pcmcia_core
-	  and ds.  If you want to compile it as a module, say M here and
-	  read <file:Documentation/modules.txt>.
+	  To compile this driver as modules, choose M here: the
+	  modules will be called pcmcia_core and ds.
 
 config YENTA
 	tristate "CardBus yenta-compatible bridge support"

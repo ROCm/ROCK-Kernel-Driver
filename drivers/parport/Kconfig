@@ -24,13 +24,11 @@ config PARPORT
 
 	  It is possible to share a single parallel port among several devices
 	  and it is safe to compile all the corresponding drivers into the
-	  kernel.  If you want to compile parallel port support as a module
-	  ( = code which can be inserted in and removed from the running
-	  kernel whenever you want), say M here and read
-	  <file:Documentation/modules.txt>.  The module will be called
-	  parport.  If you have more than one parallel port and want to
-	  specify which port and IRQ to be used by this driver at module load
-	  time, take a look at <file:Documentation/parport.txt>.
+	  kernel. To compile parallel port support as a module, choose M here:
+	  the module will be called parport.
+	  If you have more than one parallel port and want to specify which
+	  port and IRQ to be used by this driver at module load time, take a
+	  look at <file:Documentation/parport.txt>.
 
 	  If unsure, say Y.
 
@@ -43,11 +41,8 @@ config PARPORT_PC
 	  parallel ports.  PA-RISC owners should only say Y here if they
 	  have a SuperIO parallel port.
 
-	  This code is also available as a module.  If you want to compile it
-	  as a module ( = code which can be inserted in and removed from the
-	  running kernel whenever you want), say M here and read
-	  <file:Documentation/modules.txt>.  The module will be called
-	  parport_pc.
+	  To compile this driver as a module, choose M here: the
+	  module will be called parport_pc.
 
 	  If unsure, say Y.
 

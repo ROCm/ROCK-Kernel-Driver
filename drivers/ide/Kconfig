@@ -43,10 +43,8 @@ config IDE
 	  number of user programs such as smart that can query the status of
 	  SMART parameters from disk drives.
 
-	  If you want to compile this driver as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt>. The module
-	  will be called ide.
+	  To compile this driver as a module, choose M here: the
+	  module will be called ide.
 
 	  For further information, please read <file:Documentation/ide.txt>.
 
@@ -83,9 +81,7 @@ config BLK_DEV_IDE
 	  performance, look for the hdparm package at
 	  <ftp://ibiblio.org/pub/Linux/system/hardware/>.
 
-	  If you want to compile this driver as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt> and
+	  To compile this driver as a module, choose M here and read
 	  <file:Documentation/ide.txt>. The module will be called ide-mod.
 	  Do not compile this driver as a module if your root file system (the
 	  one containing the directory /) is located on an IDE device.
@@ -143,12 +139,12 @@ config BLK_DEV_IDEDISK
 	  the old hard disk driver instead, say Y.  If you have an SCSI-only
 	  system, you can say N here.
 
-	  If you want to compile this driver as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called ide-disk.  Do not compile this driver as a module
-	  if your root file system (the one containing the directory /) is
-	  located on the IDE disk. If unsure, say Y.
+	  To compile this driver as a module, choose M here: the
+	  module will be called ide-disk.
+	  Do not compile this driver as a module if your root file system
+	  (the one containing the directory /) is located on the IDE disk.
+
+	  If unsure, say Y.
 
 config IDEDISK_MULTI_MODE
 	bool "Use multi-mode by default"
@@ -201,10 +197,8 @@ config BLK_DEV_IDECD
 	  with IDE/ATAPI CD-ROMs, so install LILO 16 or higher, available from
 	  <ftp://brun.dyndns.org/pub/linux/lilo/>.
 
-	  If you want to compile the driver as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called ide-cd.
+	  To compile this driver as a module, choose M here: the
+	  module will be called ide-cd.
 
 config BLK_DEV_IDETAPE
 	tristate "Include IDE/ATAPI TAPE support (EXPERIMENTAL)"
@@ -226,10 +220,8 @@ config BLK_DEV_IDETAPE
 	  <file:drivers/ide/ide-tape.c> and <file:Documentation/ide.txt> files
 	  for usage information.
 
-	  If you want to compile the driver as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called ide-tape.o.
+	  To compile this driver as a module, choose M here: the
+	  module will be called ide-tape.
 
 config BLK_DEV_IDEFLOPPY
 	tristate "Include IDE/ATAPI FLOPPY support"
@@ -250,10 +242,8 @@ config BLK_DEV_IDEFLOPPY
 	  other IDE devices, as "hdb" or "hdc", or something similar (check
 	  the boot messages with dmesg).
 
-	  If you want to compile the driver as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called ide-floppy.
+	  To compile this driver as a module, choose M here: the
+	  module will be called ide-floppy.
 
 config BLK_DEV_IDESCSI
 	tristate "SCSI emulation support"

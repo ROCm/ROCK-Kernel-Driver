@@ -723,10 +723,8 @@ config APM
 	  11) exchange RAM chips
 	  12) exchange the motherboard.
 
-	  To compile this driver as a module ( = code which can be inserted in
-	  and removed from the running kernel whenever you want), say M here
-	  and read <file:Documentation/modules.txt>. The module will be called
-	  apm.
+	  To compile this driver as a module, choose M here: the
+	  module will be called apm.
 
 config ARTHUR
 	tristate "RISC OS personality"

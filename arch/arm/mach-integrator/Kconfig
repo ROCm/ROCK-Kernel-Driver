@@ -8,9 +8,7 @@ config INTEGRATOR_IMPD1
 	  allows ARM(R) Ltd PrimeCells to be developed and evaluated.
 	  The IM-PD1 can be found on the Integrator/PP2 platform.
 
-	  If you want to compile this as a module (=code which can be
-	  inserted into and removed from the running kernel), say M
-	  here and read <file:Documentation/modules.txt>.  The module
-	  will be called impd1.
+	  To compile this driver as a module, choose M here: the
+	  module will be called impd1.
 
 endmenu

@@ -25,10 +25,8 @@ config MOUSE_PS2
 
 	  If unsure, say Y.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called psmouse. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called psmouse.
 
 config MOUSE_SERIAL
 	tristate "Serial mouse"
@@ -40,10 +38,8 @@ config MOUSE_SERIAL
 
 	  If unsure, say N.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called sermouse. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called sermouse.
 
 config MOUSE_INPORT
 	tristate "InPort/MS/ATIXL busmouse"
@@ -52,10 +48,8 @@ config MOUSE_INPORT
 	  Say Y here if you have an InPort, Microsoft or ATI XL busmouse.
 	  They are rather rare these days.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called inport. If you want to compile it as a
-	  module, say M here and read <file.:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called inport.
 
 config MOUSE_ATIXL
 	bool "ATI XL variant"
@@ -70,10 +64,8 @@ config MOUSE_LOGIBM
 	  Say Y here if you have a Logitech busmouse.
 	  They are rather rare these days.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called logibm. If you want to compile it as a
-	  module, say M here and read <file.:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called logibm.
 
 config MOUSE_PC110PAD
 	tristate "IBM PC110 touchpad"
@@ -82,10 +74,8 @@ config MOUSE_PC110PAD
 	  Say Y if you have the IBM PC-110 micro-notebook and want its
 	  touchpad supported.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called pc110pad. If you want to compile it as a
-	  module, say M here and read <file.:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called pc110pad.
 
 config MOUSE_MAPLE
 	tristate "Maple bus mouse"
@@ -94,10 +84,8 @@ config MOUSE_MAPLE
 	  Say Y if you have a DreamCast console and a mouse attached to
 	  its Maple bus.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called maplemouse. If you want to compile it as a
-	  module, say M here and read <file.:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called maplemouse.
 
 config MOUSE_AMIGA
 	tristate "Amiga mouse"
@@ -106,10 +94,8 @@ config MOUSE_AMIGA
 	  Say Y here if you have an Amiga and want its native mouse
 	  supported by the kernel.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called amimouse. If you want to compile it as a
-	  module, say M here and read <file.:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called amimouse.
 
 config MOUSE_RISCPC
 	tristate "Acorn RiscPC mouse"
@@ -118,10 +104,8 @@ config MOUSE_RISCPC
 	  Say Y here if you have the Acorn RiscPC computer and want its
 	  native mouse supported.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called rpcmouse. If you want to compile it as a
-	  module, say M here and read <file.:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called rpcmouse.
 
 config MOUSE_PC9800
 	tristate "NEC PC-9800 busmouse"
@@ -130,8 +114,6 @@ config MOUSE_PC9800
 	  Say Y here if you have NEC PC-9801/PC-9821 computer and want its
 	  native mouse supported.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called logibm.o. If you want to compile it as a
-	  module, say M here and read <file.:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called 98busmouse.
 

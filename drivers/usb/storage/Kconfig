@@ -15,10 +15,8 @@ config USB_STORAGE
 	  similar devices. This driver may also be used for some cameras and
 	  card readers.
 
-	  This code is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called usb-storage. If you want to compile it
-	  as a module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called usb-storage.
 
 config USB_STORAGE_DEBUG
 	bool "USB Mass Storage verbose debug"

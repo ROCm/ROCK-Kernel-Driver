@@ -65,10 +65,8 @@ config IPDDP
 	  decapsulation, but not both. With the following two questions, you
 	  decide which one you want.
 
-	  If you say M here, the AppleTalk-IP support will be compiled as a
-	  module ( = code which can be inserted in and removed from the
-	  running kernel whenever you want, read
-	  <file:Documentation/modules.txt>).  The module is called ipddp.
+	  To compile the AppleTalk-IP support as a module, choose M here: the
+	  module will be called ipddp.
 	  In this case, you will be able to use both encapsulation and
 	  decapsulation simultaneously, by loading two copies of the module
 	  and specifying different values for the module option ipddp_mode.

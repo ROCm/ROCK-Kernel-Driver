@@ -6,9 +6,8 @@ config ISDN_DRV_SC
 	depends on ISDN && ISA
 	help
 	  This enables support for the Spellcaster BRI ISDN boards.  This
-	  driver currently builds only in a modularized version ( = code which
-	  can be inserted in and removed from the running kernel whenever you
-	  want, details in <file:Documentation/modules.txt>); the module will
-	  be called sc.  See <file:Documentation/isdn/README.sc> and
+	  driver currently builds only in a modularized version.
+	  To build it, choose M here: the module will be called sc.
+	  See <file:Documentation/isdn/README.sc> and
 	  <http://www.spellcast.com/> for more information.
 

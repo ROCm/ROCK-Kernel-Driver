@@ -21,9 +21,8 @@ config SERIAL_8250
 	  serial port drivers do not need this driver built in for them to
 	  work.)
 
-	  If you want to compile this driver as a module, say M here and read
-	  <file:Documentation/modules.txt>.  The module will be called
-	  serial.
+	  To compile this driver as a module, choose M here: the
+	  module will be called serial.
 	  [WARNING: Do not compile this driver as a module if you are using
 	  non-standard serial ports, since the configuration information will
 	  be lost when the driver is unloaded.  This limitation may be lifted
@@ -72,10 +71,9 @@ config SERIAL_8250_CS
 	  multi-function Ethernet/modem cards. (PCMCIA- or PC-cards are
 	  credit-card size devices often used with laptops.)
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called serial_cs.  If you want to compile it as
-	  a module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called serial_cs.
+
 	  If unsure, say N.
 
 config SERIAL_8250_ACPI

@@ -12,9 +12,7 @@ config MKISS
 	  the advantage that it is already supported by most modern TNCs
 	  without the need for a firmware upgrade.
 
-	  If you want to compile this driver as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt>.  The module
+	  To compile this driver as a module, choose M here: the module
 	  will be called mkiss.
 
 config 6PACK
@@ -32,9 +30,7 @@ config 6PACK
 	  problems. For details about the features and the usage of the
 	  driver, read <file:Documentation/networking/6pack.txt>.
 
-	  If you want to compile this driver as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt>.  The module
+	  To compile this driver as a module, choose M here: the module
 	  will be called 6pack.
 
 config BPQETHER
@@ -91,9 +87,7 @@ config SCC
 	  <http://www.tldp.org/docs.html#howto>. Also make sure to say Y
 	  to "Amateur Radio AX.25 Level 2" support.
 
-	  If you want to compile this as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt>.  The module
+	  To compile this driver as a module, choose M here: the module
 	  will be called scc.
 
 config SCC_DELAY
@@ -129,10 +123,8 @@ config BAYCOM_SER_FDX
 	  information on the modems, see <http://www.baycom.de/> and
 	  <file:Documentation/networking/baycom.txt>.
 
-	  If you want to compile this driver as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt>.  This is
-	  recommended.  The module will be called baycom_ser_fdx.
+	  To compile this driver as a module, choose M here: the module
+	  will be called baycom_ser_fdx.  This is recommended.
 
 config BAYCOM_SER_HDX
 	tristate "BAYCOM ser12 halfduplex driver for AX.25"
@@ -148,10 +140,8 @@ config BAYCOM_SER_HDX
 	  <http://www.baycom.de/> and
 	  <file:Documentation/networking/baycom.txt>.
 
-	  If you want to compile this driver as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt>.  This is
-	  recommended.  The module will be called baycom_ser_hdx.
+	  To compile this driver as a module, choose M here: the module
+	  will be called baycom_ser_hdx.  This is recommended.
 
 config BAYCOM_PAR
 	tristate "BAYCOM picpar and par96 driver for AX.25"
@@ -164,10 +154,8 @@ config BAYCOM_PAR
 	  the modems, see <http://www.baycom.de/> and the file
 	  <file:Documentation/networking/baycom.txt>.
 
-	  If you want to compile this driver as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt>.  This is
-	  recommended.  The module will be called baycom_par.
+	  To compile this driver as a module, choose M here: the module
+	  will be called baycom_par.  This is recommended.
 
 config BAYCOM_EPP
 	tristate "BAYCOM epp driver for AX.25"
@@ -180,10 +168,8 @@ config BAYCOM_EPP
 	  modems, see <http://www.baycom.de/> and the file
 	  <file:Documentation/networking/baycom.txt>.
 
-	  If you want to compile this driver as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt>.  This is
-	  recommended.  The module will be called baycom_par.
+	  To compile this driver as a module, choose M here: the module
+	  will be called baycom_epp.  This is recommended.
 
 config YAM
 	tristate "YAM driver for AX.25"
@@ -193,7 +179,6 @@ config YAM
 	  port and includes some of the functions of a Terminal Node
 	  Controller. If you have one of those, say Y here.
 
-	  If you want to compile this as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the module
+	  will be called yam.
 

@@ -30,10 +30,8 @@ config IBMTR
 	  Warning: this driver will almost definitely fail if more than one
 	  active Token Ring card is present.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called ibmtr. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the module will be
+	  called ibmtr.
 
 config IBMOL
 	tristate "IBM Olympic chipset PCI adapter support"
@@ -46,10 +44,8 @@ config IBMOL
 	  If you have such an adapter, say Y and read the Token-Ring
 	  mini-HOWTO, available from <http://www.tldp.org/docs.html#howto>.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called olympic. If you want to compile it
-	  as a module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the module will be
+	  called olympic.
 
 	  Also read <file:Documentation/networking/olympic.txt> or check the
 	  Linux Token Ring Project site for the latest information at
@@ -64,10 +60,8 @@ config IBMLS
 	  If you have such an adapter, say Y and read the Token-Ring
 	  mini-HOWTO, available from <http://www.tldp.org/docs.html#howto>.
 
-	  This driver is also available as a modules ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The modules will be called lanstreamer. If you want to compile it
-	  as a module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the module will be
+	  called lanstreamer.
 
 config 3C359
 	tristate "3Com 3C359 Token Link Velocity XL adapter support"
@@ -80,10 +74,8 @@ config 3C359
 	  If you have such an adapter, say Y and read the Token-Ring
 	  mini-HOWTO, available from <http://www.tldp.org/docs.html#howto>.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will will be called 3c359. If you want to compile it
-	  as a module, say M here and read Documentation/modules.txt.
+	  To compile this driver as a module, choose M here: the module will be
+	  called 3c359.
 
 	  Also read the file <file:Documentation/networking/3c359.txt> or check the 
 	  Linux Token Ring Project site for the latest information at
@@ -109,10 +101,8 @@ config TMS380TR
 	  Also read the file <file:Documentation/networking/tms380tr.txt> or
 	  check <http://www.auk.cx/tms380tr/>.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called tms380tr. If you want to compile it
-	  as a module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the module will be
+	  called tms380tr.
 
 config TMSPCI
 	tristate "Generic TMS380 PCI support"
@@ -126,10 +116,8 @@ config TMSPCI
 	  - Thomas-Conrad TC4048 PCI 4/16
 	  - 3Com Token Link Velocity
 
-	  This driver is available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called tmspci. If you want to compile it
-	  as a module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the module will be
+	  called tmspci.
 
 config SKISA
 	tristate "SysKonnect TR4/16 ISA support"
@@ -140,10 +128,8 @@ config SKISA
 	  These cards are known to work:
 	  - SysKonnect TR4/16 ISA (SK-4190)
 
-	  This driver is available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called skisa. If you want to compile it
-	  as a module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the module will be
+	  called skisa.
 
 config PROTEON
 	tristate "Proteon ISA support"
@@ -155,10 +141,8 @@ config PROTEON
 	  - Proteon 1392
 	  - Proteon 1392 plus
 
-	  This driver is available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called proteon. If you want to compile it
-	  as a module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the module will be
+	  called proteon.
 
 config ABYSS
 	tristate "Madge Smart 16/4 PCI Mk2 support"
@@ -167,10 +151,8 @@ config ABYSS
 	  This tms380 module supports the Madge Smart 16/4 PCI Mk2
 	  cards (51-02).
 
-	  This driver is available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called abyss. If you want to compile it
-	  as a module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the module will be
+	  called abyss.
 
 config MADGEMC
 	tristate "Madge Smart 16/4 Ringnode MicroChannel"
@@ -179,10 +161,8 @@ config MADGEMC
 	  This tms380 module supports the Madge Smart 16/4 MC16 and MC32
 	  MicroChannel adapters.
 
-	  This driver is available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called madgemc. If you want to compile it
-	  as a module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the module will be
+	  called madgemc.
 
 config SMCTR
 	tristate "SMC ISA/MCA adapter support"
@@ -197,10 +177,8 @@ config SMCTR
 	  <http://www.tldp.org/docs.html#howto> and the file
 	  <file:Documentation/networking/smctr.txt>.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called smctr. If you want to compile it
-	  as a module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the module will be
+	  called smctr.
 
 endmenu
 

@@ -20,10 +20,8 @@ config RADIO_CADET
 	  Further documentation on this driver can be found on the WWW at
 	  <http://linux.blackhawke.net/cadet.html>.
 
-	  If you want to compile this driver as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called radio-cadet.
+	  To compile this driver as a module, choose M here: the
+	  module will be called radio-cadet.
 
 config RADIO_RTRACK
 	tristate "AIMSlab RadioTrack (aka RadioReveal) support"
@@ -48,10 +46,8 @@ config RADIO_RTRACK
 	  information is contained in the file
 	  <file:Documentation/video4linux/radiotrack.txt>.
 
-	  If you want to compile this driver as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called radio-aimslab.
+	  To compile this driver as a module, choose M here: the
+	  module will be called radio-aimslab.
 
 config RADIO_RTRACK_PORT
 	hex "RadioTrack i/o port (0x20f or 0x30f)"
@@ -73,10 +69,8 @@ config RADIO_RTRACK2
 	  this API and pointers to "v4l" programs may be found on the WWW at
 	  <http://roadrunner.swansea.uk.linux.org/v4l.shtml>.
 
-	  If you want to compile this driver as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called radio-rtrack2.
+	  To compile this driver as a module, choose M here: the
+	  module will be called radio-rtrack2.
 
 config RADIO_RTRACK2_PORT
 	hex "RadioTrack II i/o port (0x20c or 0x30c)"
@@ -98,10 +92,8 @@ config RADIO_AZTECH
 	  this API and pointers to "v4l" programs may be found on the WWW at
 	  <http://roadrunner.swansea.uk.linux.org/v4l.shtml>.
 
-	  If you want to compile this driver as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called radio-aztech.
+	  To compile this driver as a module, choose M here: the
+	  module will be called radio-aztech.
 
 config RADIO_AZTECH_PORT
 	hex "Aztech/Packard Bell I/O port (0x350 or 0x358)"
@@ -124,10 +116,8 @@ config RADIO_GEMTEK
 	  this API and pointers to "v4l" programs may be found on the WWW at
 	  <http://roadrunner.swansea.uk.linux.org/v4l.shtml>.
 
-	  If you want to compile this driver as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called radio-gemtek.
+	  To compile this driver as a module, choose M here: the
+	  module will be called radio-gemtek.
 
 config RADIO_GEMTEK_PORT
 	hex "GemTek i/o port (0x20c, 0x30c, 0x24c or 0x34c)"
@@ -150,10 +140,8 @@ config RADIO_GEMTEK_PCI
 	  this API and pointers to "v4l" programs may be found on the WWW at
 	  <http://roadrunner.swansea.uk.linux.org/v4l.shtml>.
 
-	  If you want to compile this driver as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called radio-gemtek-pci.
+	  To compile this driver as a module, choose M here: the
+	  module will be called radio-gemtek-pci.
 
 config RADIO_MAXIRADIO
 	tristate "Guillemot MAXI Radio FM 2000 radio"
@@ -167,10 +155,8 @@ config RADIO_MAXIRADIO
 	  this API and pointers to "v4l" programs may be found on the WWW at
 	  <http://roadrunner.swansea.uk.linux.org/v4l.shtml>.
 
-	  If you want to compile this driver as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called radio-maxiradio.
+	  To compile this driver as a module, choose M here: the
+	  module will be called radio-maxiradio.
 
 config RADIO_MAESTRO
 	tristate "Maestro on board radio"
@@ -184,10 +170,8 @@ config RADIO_MAESTRO
 	  this API and pointers to "v4l" programs may be found on the WWW at
 	  <http://roadrunner.swansea.uk.linux.org/v4l.shtml>.
 
-	  If you want to compile this driver as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called radio-maestro.
+	  To compile this driver as a module, choose M here: the
+	  module will be called radio-maestro.
 
 config RADIO_MIROPCM20
 	tristate "miroSOUND PCM20 radio"
@@ -202,10 +186,8 @@ config RADIO_MIROPCM20
 	  this API and pointers to "v4l" programs may be found on the WWW at
 	  <http://roadrunner.swansea.uk.linux.org/v4l.shtml>.
 
-	  If you want to compile this driver as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called miropcm20.
+	  To compile this driver as a module, choose M here: the
+	  module will be called miropcm20.
 
 config RADIO_MIROPCM20_RDS
 	tristate "miroSOUND PCM20 radio RDS user interface (EXPERIMENTAL)"
@@ -221,7 +203,8 @@ config RADIO_MIROPCM20_RDS
 	  availability of RDS is reported over V4L by the basic driver
 	  already.  Here RDS can be read from files in /dev/v4l/rds.
 
-	  As module the driver will be called miropcm20-rds.
+	  To compile this driver as a module, choose M here: the
+	  module will be called miropcm20-rds.
 
 config RADIO_SF16FMI
 	tristate "SF16FMI Radio"
@@ -237,10 +220,8 @@ config RADIO_SF16FMI
 	  this API and pointers to "v4l" programs may be found on the WWW at
 	  <http://roadrunner.swansea.uk.linux.org/v4l.shtml>.
 
-	  If you want to compile this driver as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called radio-sf16fmi.
+	  To compile this driver as a module, choose M here: the
+	  module will be called radio-sf16fmi.
 
 config RADIO_TERRATEC
 	tristate "TerraTec ActiveRadio ISA Standalone"
@@ -260,10 +241,8 @@ config RADIO_TERRATEC
 	  this API and pointers to "v4l" programs may be found on the WWW at
 	  <http://roadrunner.swansea.uk.linux.org/v4l.shtml>.
 
-	  If you want to compile this driver as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called radio-terratec.
+	  To compile this driver as a module, choose M here: the
+	  module will be called radio-terratec.
 
 config RADIO_TERRATEC_PORT
 	hex "Terratec i/o port (normally 0x590)"
@@ -280,10 +259,8 @@ config RADIO_TRUST
 	  This is a driver for the Trust FM radio cards. Say Y if you have
 	  such a card and want to use it under Linux.
 
-	  This driver is also available as a module called radio-trust ( =
-	  code which can be inserted in and removed from the running kernel
-	  whenever you want). If you want to compile it as a module, say M
-	  here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called radio-trust.
 
 config RADIO_TRUST_PORT
 	hex "Trust i/o port (usually 0x350 or 0x358)"
@@ -305,10 +282,8 @@ config RADIO_TYPHOON
 	  this API and pointers to "v4l" programs may be found on the WWW at
 	  <http://roadrunner.swansea.uk.linux.org/v4l.shtml>.
 
-	  If you want to compile this driver as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called radio-typhoon.
+	  To compile this driver as a module, choose M here: the
+	  module will be called radio-typhoon.
 
 config RADIO_TYPHOON_PROC_FS
 	bool "Support for /proc/radio-typhoon"
@@ -351,10 +326,8 @@ config RADIO_ZOLTRIX
 	  this API and pointers to "v4l" programs may be found on the WWW at
 	  <http://roadrunner.swansea.uk.linux.org/v4l.shtml>.
 
-	  If you want to compile this driver as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called radio-zoltrix.
+	  To compile this driver as a module, choose M here: the
+	  module will be called radio-zoltrix.
 
 config RADIO_ZOLTRIX_PORT
 	hex "ZOLTRIX I/O port (0x20c or 0x30c)"
