@@ -746,16 +746,14 @@ setup_avm_pcipnp(struct IsdnCard *card)
 	}
 ready:
 	cs->hw.avm.isac = cs->hw.avm.cfg_reg + 0x10;
-	if (check_region((cs->hw.avm.cfg_reg), 32)) {
+	if (!request_region((cs->hw.avm.cfg_reg), 32, (cs->subtyp == AVM_FRITZ_PCI)
+			 ? "avm PCI" : "avm PnP")) {
 		printk(KERN_WARNING
 		       "HiSax: %s config port %x-%x already in use\n",
 		       CardType[card->typ],
 		       cs->hw.avm.cfg_reg,
 		       cs->hw.avm.cfg_reg + 31);
 		return (0);
-	} else {
-		request_region(cs->hw.avm.cfg_reg, 32,
-			(cs->subtyp == AVM_FRITZ_PCI) ? "avm PCI" : "avm PnP");
 	}
 	switch (cs->subtyp) {
 	  case AVM_FRITZ_PCI:
