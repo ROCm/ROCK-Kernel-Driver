@@ -1336,37 +1336,26 @@ static int el3_close(struct net_device *dev)
 	return 0;
 }
 
-static int __init init_3c574_cs(void)
-{
-	servinfo_t serv;
+static struct pcmcia_driver tc574_driver = {
+	.owner		= THIS_MODULE,
+	.drv		= {
+		.name	= "3c574_cs",
+	},
+	.attach		= tc574_attach,
+	.detach		= tc574_detach,
+};
 
-	DEBUG(0, "%s\n", version);
-	CardServices(GetCardServicesInfo, &serv);
-	if (serv.Revision != CS_RELEASE_CODE) {
-		printk(KERN_NOTICE "3c574_cs: Card Services release "
-			   "does not match!\n");
-		return -1;
-	}
-	register_pccard_driver(&dev_info, &tc574_attach, &tc574_detach);
-	return 0;
+static int __init init_tc574(void)
+{
+	return pcmcia_register_driver(&tc574_driver);
 }
 
-static void __exit exit_3c574_cs(void)
+static void __exit exit_tc574(void)
 {
-	DEBUG(0, "3c574_cs: unloading\n");
-	unregister_pccard_driver(&dev_info);
+	pcmcia_unregister_driver(&tc574_driver);
 	while (dev_list != NULL)
 		tc574_detach(dev_list);
 }
 
-module_init(init_3c574_cs);
-module_exit(exit_3c574_cs);
-
-/*
- * Local variables:
- *  compile-command: "make 3c574_cs.o"
- *  c-indent-level: 4
- *  c-basic-offset: 4
- *  tab-width: 4
- * End:
- */
+module_init(init_tc574);
+module_exit(exit_tc574);

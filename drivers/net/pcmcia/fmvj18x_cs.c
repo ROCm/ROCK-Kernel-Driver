@@ -829,28 +829,25 @@ static int fmvj18x_event(event_t event, int priority,
     return 0;
 } /* fmvj18x_event */
 
-/*====================================================================*/
+static struct pcmcia_driver fmvj18x_cs_driver = {
+	.owner		= THIS_MODULE,
+	.drv		= {
+		.name	= "fmvj18x_cs",
+	},
+	.attach		= fmvj18x_attach,
+	.detach		= fmvj18x_detach,
+};
 
 static int __init init_fmvj18x_cs(void)
 {
-    servinfo_t serv;
-    DEBUG(0, "%s\n", version);
-    CardServices(GetCardServicesInfo, &serv);
-    if (serv.Revision != CS_RELEASE_CODE) {
-	printk(KERN_NOTICE "fmvj18x: Card Services release "
-	       "does not match!\n");
-	return -EINVAL;
-    }
-    register_pccard_driver(&dev_info, &fmvj18x_attach, &fmvj18x_detach);
-    return 0;
+	return pcmcia_register_driver(&fmvj18x_cs_driver);
 }
 
 static void __exit exit_fmvj18x_cs(void)
 {
-    DEBUG(0, "fmvj18x_cs: unloading\n");
-    unregister_pccard_driver(&dev_info);
-    while (dev_list != NULL)
-	fmvj18x_detach(dev_list);
+	pcmcia_unregister_driver(&fmvj18x_cs_driver);
+	while (dev_list != NULL)
+		fmvj18x_detach(dev_list);
 }
 
 module_init(init_fmvj18x_cs);
