@@ -129,8 +129,10 @@ struct scsi_device {
 #define transport_class_to_sdev(class_dev) \
 	container_of(class_dev, struct scsi_device, transport_classdev)
 
-extern struct scsi_device *scsi_add_device(struct Scsi_Host *,
-		uint, uint, uint);
+extern struct scsi_device *__scsi_add_device(struct Scsi_Host *,
+		uint, uint, uint, void *hostdata);
+#define scsi_add_device(host, channel, target, lun) \
+	__scsi_add_device(host, channel, target, lun, NULL)
 extern void scsi_remove_device(struct scsi_device *);
 extern int scsi_device_cancel(struct scsi_device *, int);
 

@@ -71,7 +71,7 @@ EXPORT_SYMBOL(scsi_free_host_dev);
 
 EXPORT_SYMBOL(scsi_io_completion);
 
-EXPORT_SYMBOL(scsi_add_device);
+EXPORT_SYMBOL(__scsi_add_device);
 EXPORT_SYMBOL(scsi_remove_device);
 EXPORT_SYMBOL(scsi_device_cancel);
 
