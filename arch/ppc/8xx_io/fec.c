@@ -1570,7 +1570,7 @@ static int __init fec_enet_init(void)
 {
 	struct net_device *dev;
 	struct fec_enet_private *fep;
-	int i, j, k;
+	int i, j, k, err;
 	unsigned char	*eap, *iap, *ba;
 	unsigned long	mem_addr;
 	volatile	cbd_t	*bdp;
@@ -1586,17 +1586,11 @@ static int __init fec_enet_init(void)
 
 	bd = (bd_t *)__res;
 
-	/* Allocate some private information.
-	*/
-	fep = (struct fec_enet_private *)kmalloc(sizeof(*fep), GFP_KERNEL);
-	if (fep == NULL)
+	dev = alloc_etherdev(sizeof(*fep));
+	if (!dev)
 		return -ENOMEM;
 
-	__clear_user(fep,sizeof(*fep));
-
-	/* Create an Ethernet device instance.
-	*/
-	dev = init_etherdev(0, 0);
+	fep = dev->priv;
 
 	fecp = &(immap->im_cpm.cp_fec);
 
@@ -1661,6 +1655,7 @@ static int __init fec_enet_init(void)
 		/* Allocate a page.
 		*/
 		ba = (unsigned char *)consistent_alloc(GFP_KERNEL, PAGE_SIZE, &mem_addr);
+		/* BUG: no check for failure */
 
 		/* Initialize the BD for every fragment in the page.
 		*/
@@ -1715,7 +1710,6 @@ static int __init fec_enet_init(void)
 #endif
 
 	dev->base_addr = (unsigned long)fecp;
-	dev->priv = fep;
 
 	/* The FEC Ethernet specific entries in the device structure. */
 	dev->open = fec_enet_open;
@@ -1751,6 +1745,12 @@ static int __init fec_enet_init(void)
 #else
 	fecp->fec_mii_speed = 0;	/* turn off MDIO */
 #endif	/* CONFIG_USE_MDIO */
+
+	err = register_netdev(dev);
+	if (err) {
+		kfree(dev);
+		return err;
+	}
 
 	printk ("%s: FEC ENET Version 0.2, FEC irq %d"
 #ifdef PHY_INTERRUPT
