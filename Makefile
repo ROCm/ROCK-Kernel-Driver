@@ -909,8 +909,8 @@ tags: FORCE
 
 .PHONY: rpm
 
-# Remove hyphens since they have special meaning in RPM filenames
-KERNELPATH=kernel-$(subst -,,$(KERNELRELEASE))
+# Replace hyphens since they have special meaning in RPM filenames
+KERNELPATH=kernel-$(subst -,_,$(KERNELRELEASE))
 
 #	If you do a make spec before packing the tarball you can rpm -ta it
 
