@@ -1136,7 +1136,7 @@ start_tx (struct sk_buff *skb, struct net_device *dev)
 static int
 reset_tx (struct net_device *dev)
 {
-	struct netdev_private *np = (struct netdev_private*) dev->priv;
+	struct netdev_private *np = dev->priv;
 	long ioaddr = dev->base_addr;
 	struct sk_buff *skb;
 	int i;
