@@ -1,4 +1,4 @@
-/* orinoco_cs.c 0.13e	- (formerly known as dldwd_cs.c)
+/* orinoco_cs.c (formerly known as dldwd_cs.c)
  *
  * A driver for "Hermes" chipset based PCMCIA wireless adaptors, such
  * as the Lucent WavelanIEEE/Orinoco cards and their OEM (Cabletron/
@@ -9,6 +9,9 @@
  * 
  * Copyright notice & release notes in file orinoco.c
  */
+
+#define DRIVER_NAME "orinoco_cs"
+#define PFX DRIVER_NAME ": "
 
 #include <linux/config.h>
 #ifdef  __IN_PCMCIA_PACKAGE__
@@ -47,9 +50,7 @@
 
 MODULE_AUTHOR("David Gibson <hermes@gibson.dropbear.id.au>");
 MODULE_DESCRIPTION("Driver for PCMCIA Lucent Orinoco, Prism II based and similar wireless cards");
-#ifdef MODULE_LICENSE
 MODULE_LICENSE("Dual MPL/GPL");
-#endif
 
 /* Module parameters */
 
@@ -76,7 +77,7 @@ MODULE_PARM(ignore_cis_vcc, "i");
  * device driver with appropriate cards, through the card
  * configuration database.
  */
-static dev_info_t dev_info = "orinoco_cs";
+static dev_info_t dev_info = DRIVER_NAME;
 
 /********************************************************************/
 /* Data structures						    */
@@ -144,15 +145,6 @@ orinoco_cs_hard_reset(struct orinoco_private *priv)
 /* PCMCIA stuff     						    */
 /********************************************************************/
 
-/* In 2.5 (as of 2.5.69 at least) there is a cs_error exported which
- * does this, but it's not in 2.4 so we do our own for now. */
-static void
-orinoco_cs_error(client_handle_t handle, int func, int ret)
-{
-	error_info_t err = { func, ret };
-	pcmcia_report_error(handle, &err);
-}
-
 /*
  * This creates an "instance" of the driver, allocating local data
  * structures for one device.  The device is registered with Card
@@ -174,7 +166,7 @@ orinoco_cs_attach(void)
 	dev = alloc_orinocodev(sizeof(*card), orinoco_cs_hard_reset);
 	if (! dev)
 		return NULL;
-	priv = dev->priv;
+	priv = netdev_priv(dev);
 	card = priv->card;
 
 	/* Link both structures together */
@@ -216,7 +208,7 @@ orinoco_cs_attach(void)
 
 	ret = pcmcia_register_client(&link->handle, &client_reg);
 	if (ret != CS_SUCCESS) {
-		orinoco_cs_error(link->handle, RegisterClient, ret);
+		cs_error(link->handle, RegisterClient, ret);
 		orinoco_cs_detach(link);
 		return NULL;
 	}
@@ -230,8 +222,7 @@ orinoco_cs_attach(void)
  * are freed.  Otherwise, the structures will be freed when the device
  * is released.
  */
-static void
-orinoco_cs_detach(dev_link_t * link)
+static void orinoco_cs_detach(dev_link_t *link)
 {
 	dev_link_t **linkp;
 	struct net_device *dev = link->priv;
@@ -240,10 +231,8 @@ orinoco_cs_detach(dev_link_t * link)
 	for (linkp = &dev_list; *linkp; linkp = &(*linkp)->next)
 		if (*linkp == link)
 			break;
-	if (*linkp == NULL) {
-		BUG();
-		return;
-	}
+
+	BUG_ON(*linkp == NULL);
 
 	if (link->state & DEV_CONFIG)
 		orinoco_cs_release(link);
@@ -254,9 +243,9 @@ orinoco_cs_detach(dev_link_t * link)
 
 	/* Unlink device structure, and free it */
 	*linkp = link->next;
-	DEBUG(0, "orinoco_cs: detach: link=%p link->dev=%p\n", link, link->dev);
+	DEBUG(0, PFX "detach: link=%p link->dev=%p\n", link, link->dev);
 	if (link->dev) {
-		DEBUG(0, "orinoco_cs: About to unregister net device %p\n",
+		DEBUG(0, PFX "About to unregister net device %p\n",
 		      dev);
 		unregister_netdev(dev);
 	}
@@ -269,15 +258,16 @@ orinoco_cs_detach(dev_link_t * link)
  * device available to the system.
  */
 
-#define CS_CHECK(fn, ret) \
-do { last_fn = (fn); if ((last_ret = (ret)) != 0) goto cs_failed; } while (0)
+#define CS_CHECK(fn, ret) do { \
+		last_fn = (fn); if ((last_ret = (ret)) != 0) goto cs_failed; \
+	} while (0)
 
 static void
 orinoco_cs_config(dev_link_t *link)
 {
 	struct net_device *dev = link->priv;
 	client_handle_t handle = link->handle;
-	struct orinoco_private *priv = dev->priv;
+	struct orinoco_private *priv = netdev_priv(dev);
 	struct orinoco_pccard *card = priv->card;
 	hermes_t *hw = &priv->hw;
 	int last_fn, last_ret;
@@ -308,7 +298,8 @@ orinoco_cs_config(dev_link_t *link)
 	link->state |= DEV_CONFIG;
 
 	/* Look up the current Vcc */
-	CS_CHECK(GetConfigurationInfo, pcmcia_get_configuration_info(handle, &conf));
+	CS_CHECK(GetConfigurationInfo,
+		 pcmcia_get_configuration_info(handle, &conf));
 	link->conf.Vcc = conf.Vcc;
 
 	/*
@@ -412,8 +403,9 @@ orinoco_cs_config(dev_link_t *link)
 			pcmcia_release_io(link->handle, &link->io);
 		last_ret = pcmcia_get_next_tuple(handle, &tuple);
 		if (last_ret  == CS_NO_MORE_ITEMS) {
-			printk(KERN_ERR "GetNextTuple().  No matching CIS configuration, "
-			       "maybe you need the ignore_cis_vcc=1 parameter.\n");
+			printk(KERN_ERR PFX "GetNextTuple(): No matching "
+			       "CIS configuration, maybe you need the "
+			       "ignore_cis_vcc=1 parameter.\n");
 			goto cs_failed;
 		}
 	}
@@ -451,7 +443,8 @@ orinoco_cs_config(dev_link_t *link)
 	 * the I/O windows and the interrupt mapping, and putting the
 	 * card and host interface into "Memory and IO" mode.
 	 */
-	CS_CHECK(RequestConfiguration, pcmcia_request_configuration(link->handle, &link->conf));
+	CS_CHECK(RequestConfiguration,
+		 pcmcia_request_configuration(link->handle, &link->conf));
 
 	/* Ok, we have the configuration, prepare to register the netdev */
 	dev->base_addr = link->io.BasePort1;
@@ -463,7 +456,7 @@ orinoco_cs_config(dev_link_t *link)
 	dev->name[0] = '\0';
 	/* Tell the stack we exist */
 	if (register_netdev(dev) != 0) {
-		printk(KERN_ERR "orinoco_cs: register_netdev() failed\n");
+		printk(KERN_ERR PFX "register_netdev() failed\n");
 		goto failed;
 	}
 
@@ -495,7 +488,7 @@ orinoco_cs_config(dev_link_t *link)
 	return;
 
  cs_failed:
-	orinoco_cs_error(link->handle, last_fn, last_ret);
+	cs_error(link->handle, last_fn, last_ret);
 
  failed:
 	orinoco_cs_release(link);
@@ -510,7 +503,7 @@ static void
 orinoco_cs_release(dev_link_t *link)
 {
 	struct net_device *dev = link->priv;
-	struct orinoco_private *priv = dev->priv;
+	struct orinoco_private *priv = netdev_priv(dev);
 	unsigned long flags;
 
 	/* We're committed to taking the device away now, so mark the
@@ -538,7 +531,7 @@ orinoco_cs_event(event_t event, int priority,
 {
 	dev_link_t *link = args->client_data;
 	struct net_device *dev = link->priv;
-	struct orinoco_private *priv = dev->priv;
+	struct orinoco_private *priv = netdev_priv(dev);
 	struct orinoco_pccard *card = priv->card;
 	int err = 0;
 	unsigned long flags;
@@ -635,12 +628,14 @@ orinoco_cs_event(event_t event, int priority,
 
 /* Can't be declared "const" or the whole __initdata section will
  * become const */
-static char version[] __initdata = "orinoco_cs.c 0.13e (David Gibson <hermes@gibson.dropbear.id.au> and others)";
+static char version[] __initdata = DRIVER_NAME " " DRIVER_VERSION
+	" (David Gibson <hermes@gibson.dropbear.id.au>, "
+	"Pavel Roskin <proski@gnu.org>, et al)";
 
 static struct pcmcia_driver orinoco_driver = {
 	.owner		= THIS_MODULE,
 	.drv		= {
-		.name	= "orinoco_cs",
+		.name	= DRIVER_NAME,
 	},
 	.attach		= orinoco_cs_attach,
 	.detach		= orinoco_cs_detach,
@@ -660,7 +655,7 @@ exit_orinoco_cs(void)
 	pcmcia_unregister_driver(&orinoco_driver);
 
 	if (dev_list)
-		DEBUG(0, "orinoco_cs: Removing leftover devices.\n");
+		DEBUG(0, PFX "Removing leftover devices.\n");
 	while (dev_list != NULL) {
 		if (dev_list->state & DEV_CONFIG)
 			orinoco_cs_release(dev_list);
@@ -670,4 +665,3 @@ exit_orinoco_cs(void)
 
 module_init(init_orinoco_cs);
 module_exit(exit_orinoco_cs);
-

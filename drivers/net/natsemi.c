@@ -750,6 +750,9 @@ static void netdev_error(struct net_device *dev, int intr_status);
 static void netdev_rx(struct net_device *dev);
 static void netdev_tx_done(struct net_device *dev);
 static int natsemi_change_mtu(struct net_device *dev, int new_mtu);
+#ifdef CONFIG_NET_POLL_CONTROLLER
+static void natsemi_poll_controller(struct net_device *dev);
+#endif
 static void __set_rx_mode(struct net_device *dev);
 static void set_rx_mode(struct net_device *dev);
 static void __get_stats(struct net_device *dev);
@@ -920,6 +923,9 @@ static int __devinit natsemi_probe1 (struct pci_dev *pdev,
 	dev->do_ioctl = &netdev_ioctl;
 	dev->tx_timeout = &tx_timeout;
 	dev->watchdog_timeo = TX_TIMEOUT;
+#ifdef CONFIG_NET_POLL_CONTROLLER
+	dev->poll_controller = &natsemi_poll_controller;
+#endif
 
 	if (mtu)
 		dev->mtu = mtu;
@@ -2363,6 +2369,15 @@ static struct net_device_stats *get_stats(struct net_device *dev)
 
 	return &np->stats;
 }
+
+#ifdef CONFIG_NET_POLL_CONTROLLER
+static void natsemi_poll_controller(struct net_device *dev)
+{
+	disable_irq(dev->irq);
+	intr_handler(dev->irq, dev, NULL);
+	enable_irq(dev->irq);
+}
+#endif
 
 #define HASH_TABLE	0x200
 static void __set_rx_mode(struct net_device *dev)
