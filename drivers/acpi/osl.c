@@ -237,7 +237,7 @@ acpi_os_table_override (struct acpi_table_header *existing_table,
 static irqreturn_t
 acpi_irq(int irq, void *dev_id, struct pt_regs *regs)
 {
-	return (*acpi_irq_handler)(acpi_irq_context);
+	return (*acpi_irq_handler)(acpi_irq_context) ? IRQ_HANDLED : IRQ_NONE;
 }
 
 acpi_status
@@ -1006,7 +1006,7 @@ acpi_os_name_setup(char *str)
 		return 0;
 
 	for (; count-- && str && *str; str++) {
-		if (isalnum(*str) || *str == ' ')
+		if (isalnum(*str) || *str == ' ' || *str == ':')
 			*p++ = *str;
 		else if (*str == '\'' || *str == '"')
 			continue;

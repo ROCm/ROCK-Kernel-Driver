@@ -290,6 +290,8 @@ acpi_ds_call_control_method (
 		return_ACPI_STATUS (AE_NULL_OBJECT);
 	}
 
+	obj_desc->method.owning_id = acpi_ut_allocate_owner_id (ACPI_OWNER_TYPE_METHOD);
+
 	/* Init for new method, wait on concurrency semaphore */
 
 	status = acpi_ds_begin_method_execution (method_node, obj_desc,

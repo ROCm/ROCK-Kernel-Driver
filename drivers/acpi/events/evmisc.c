@@ -156,10 +156,10 @@ acpi_ev_queue_notify_request (
 		case ACPI_TYPE_POWER:
 
 			if (notify_value <= ACPI_MAX_SYS_NOTIFY) {
-				handler_obj = obj_desc->common_notify.sys_handler;
+				handler_obj = obj_desc->common_notify.system_notify;
 			}
 			else {
-				handler_obj = obj_desc->common_notify.drv_handler;
+				handler_obj = obj_desc->common_notify.device_notify;
 			}
 			break;
 
@@ -171,8 +171,8 @@ acpi_ev_queue_notify_request (
 
 	/* If there is any handler to run, schedule the dispatcher */
 
-	if ((acpi_gbl_sys_notify.handler && (notify_value <= ACPI_MAX_SYS_NOTIFY)) ||
-		(acpi_gbl_drv_notify.handler && (notify_value > ACPI_MAX_SYS_NOTIFY)) ||
+	if ((acpi_gbl_system_notify.handler && (notify_value <= ACPI_MAX_SYS_NOTIFY)) ||
+		(acpi_gbl_device_notify.handler && (notify_value > ACPI_MAX_SYS_NOTIFY)) ||
 		handler_obj) {
 		notify_info = acpi_ut_create_generic_state ();
 		if (!notify_info) {
@@ -235,17 +235,17 @@ acpi_ev_notify_dispatch (
 	if (notify_info->notify.value <= ACPI_MAX_SYS_NOTIFY) {
 		/* Global system notification handler */
 
-		if (acpi_gbl_sys_notify.handler) {
-			global_handler = acpi_gbl_sys_notify.handler;
-			global_context = acpi_gbl_sys_notify.context;
+		if (acpi_gbl_system_notify.handler) {
+			global_handler = acpi_gbl_system_notify.handler;
+			global_context = acpi_gbl_system_notify.context;
 		}
 	}
 	else {
 		/* Global driver notification handler */
 
-		if (acpi_gbl_drv_notify.handler) {
-			global_handler = acpi_gbl_drv_notify.handler;
-			global_context = acpi_gbl_drv_notify.context;
+		if (acpi_gbl_device_notify.handler) {
+			global_handler = acpi_gbl_device_notify.handler;
+			global_context = acpi_gbl_device_notify.context;
 		}
 	}
 
@@ -259,8 +259,8 @@ acpi_ev_notify_dispatch (
 
 	handler_obj = notify_info->notify.handler_obj;
 	if (handler_obj) {
-		handler_obj->notify_handler.handler (notify_info->notify.node, notify_info->notify.value,
-				  handler_obj->notify_handler.context);
+		handler_obj->notify.handler (notify_info->notify.node, notify_info->notify.value,
+				  handler_obj->notify.context);
 	}
 
 	/* All done with the info object */

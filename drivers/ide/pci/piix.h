@@ -291,10 +291,10 @@ static ide_pci_device_t piix_pci_info[] __devinitdata = {
 		.enablebits	= {{0x41,0x80,0x80}, {0x43,0x80,0x80}},
 		.bootable	= ON_BOARD,
 		.extra		= 0,
-	},{	/* 17 */
+	},{	/* 18 */
 		.vendor		= PCI_VENDOR_ID_INTEL,
-		.device		= PCI_DEVICE_ID_INTEL_82801DB_10,
-		.name		= "ICH4",
+		.device		= PCI_DEVICE_ID_INTEL_82801EB_1,
+		.name		= "ICH5-SATA",
 		.init_setup	= init_setup_piix,
 		.init_chipset	= init_chipset_piix,
 		.init_iops	= NULL,
