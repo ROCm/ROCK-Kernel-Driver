@@ -62,11 +62,15 @@
 	- Add CONFIG_SUNDANCE_MMIO config option (jgarzik)
 	- Better rx buf size calculation (Donald Becker)
 
+	Version LK1.05 (D-Link):
+	- fix DFE-580TX packet drop issue
+	- fix reset_tx logic
+
 */
 
 #define DRV_NAME	"sundance"
-#define DRV_VERSION	"1.01+LK1.04d"
-#define DRV_RELDATE	"19-Sep-2002"
+#define DRV_VERSION	"1.01+LK1.05"
+#define DRV_RELDATE	"28-Sep-2002"
 
 
 /* The user-configurable values.
@@ -146,18 +150,21 @@ static char *media[MAX_UNITS];
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
 #include <linux/init.h>
-#include <linux/ethtool.h>
-#include <linux/mii.h>
 #include <asm/uaccess.h>
 #include <asm/processor.h>		/* Processor type for cache alignment. */
 #include <asm/bitops.h>
 #include <asm/io.h>
 #include <linux/delay.h>
 #include <linux/spinlock.h>
-#ifndef _LOCAL_CRC32
+#ifndef _COMPAT_WITH_OLD_KERNEL
 #include <linux/crc32.h>
+#include <linux/ethtool.h>
+#include <linux/mii.h>
 #else
 #include "crc32.h"
+#include "ethtool.h"
+#include "mii.h"
+#include "compat.h"
 #endif
 
 /* These identify the driver base version and may not be removed. */
@@ -319,6 +326,8 @@ enum alta_offsets {
 	TxDMAPollPeriod = 0x0a,
 	RxDMAStatus = 0x0c,
 	RxListPtr = 0x10,
+	DebugCtrl0 = 0x1a,
+	DebugCtrl1 = 0x1c,
 	RxDMABurstThresh = 0x14,
 	RxDMAUrgentThresh = 0x15,
 	RxDMAPollPeriod = 0x16,
@@ -477,7 +486,7 @@ static void netdev_timer(unsigned long data);
 static void tx_timeout(struct net_device *dev);
 static void init_ring(struct net_device *dev);
 static int  start_tx(struct sk_buff *skb, struct net_device *dev);
-static int reset_tx (struct net_device *dev, int irq);
+static int reset_tx (struct net_device *dev);
 static void intr_handler(int irq, void *dev_instance, struct pt_regs *regs);
 static void rx_poll(unsigned long data);
 static void refill_rx (struct net_device *dev);
@@ -564,6 +573,8 @@ static int __devinit sundance_probe1 (struct pci_dev *pdev,
 	np->mii_if.dev = dev;
 	np->mii_if.mdio_read = mdio_read;
 	np->mii_if.mdio_write = mdio_write;
+	np->mii_if.phy_id_mask = 0x1f;
+	np->mii_if.reg_num_mask = 0x1f;
 
 	/* The chip-specific entries in the device structure. */
 	dev->open = &netdev_open;
@@ -855,6 +866,8 @@ static int netdev_open(struct net_device *dev)
 	/* Set the chip to poll every N*320nsec. */
 	writeb(100, ioaddr + RxDMAPollPeriod);
 	writeb(127, ioaddr + TxDMAPollPeriod);
+	/* Fix DFE-580TX packet drop issue */
+	writeb(0x01, ioaddr + DebugCtrl1);
 	netif_start_queue(dev);
 
 	writew(StatsEnable | RxEnable | TxEnable, ioaddr + MACCtrl1);
@@ -931,6 +944,7 @@ static void tx_timeout(struct net_device *dev)
 	long ioaddr = dev->base_addr;
 	long flag;
 
+	writew(0, ioaddr + IntrEnable);
 	printk(KERN_WARNING "%s: Transmit timed out, TxStatus %2.2x "
 		   "TxFrameId %2.2x,"
 		   " resetting...\n", dev->name, readb(ioaddr + TxStatus),
@@ -945,9 +959,11 @@ static void tx_timeout(struct net_device *dev)
 		for (i = 0; i < TX_RING_SIZE; i++)
 			printk(" %8.8x", np->tx_ring[i].status);
 		printk("\n");
+		printk(KERN_DEBUG "cur_tx=%d dirty_tx=%d\n", np->cur_tx, np->dirty_tx);
+		printk(KERN_DEBUG "cur_rx=%d dirty_rx=%d\n", np->cur_rx, np->dirty_rx);
 	}
 	spin_lock_irqsave(&np->lock, flag);
-	reset_tx(dev, 0);
+	reset_tx(dev);
 	spin_unlock_irqrestore(&np->lock, flag);
 
 	/* Perhaps we should reinitialize the hardware here. */
@@ -959,7 +975,6 @@ static void tx_timeout(struct net_device *dev)
 
 	dev->trans_start = jiffies;
 	np->stats.tx_errors++;
-
 	if (!netif_queue_stopped(dev))
 		netif_wake_queue(dev);
 }
@@ -1064,15 +1079,18 @@ start_tx (struct sk_buff *skb, struct net_device *dev)
 		writel (1000, ioaddr + DownCounter);
 	return 0;
 }
+/* Reset hardware tx and reset TxListPtr to TxFrameId */
 static int
-reset_tx (struct net_device *dev, int irq)
+reset_tx (struct net_device *dev)
 {
 	struct netdev_private *np = (struct netdev_private*) dev->priv;
 	long ioaddr = dev->base_addr;
+	struct sk_buff *skb;
 	int i;
-	int frame_id;
-
-	frame_id = readb(ioaddr + TxFrameId);
+	int irq = in_interrupt();
+	
+	/* reset tx logic */
+	writel (0, dev->base_addr + TxListPtr);
 	writew (TxReset | DMAReset | FIFOReset | NetworkReset,
 			ioaddr + ASICCtrl + 2);
 	for (i=50; i > 0; i--) {
@@ -1080,25 +1098,22 @@ reset_tx (struct net_device *dev, int irq)
 			break;
 		mdelay(1);
 	}
-	for (; np->cur_tx - np->dirty_tx > 0; np->dirty_tx++) {
-		int entry = np->dirty_tx % TX_RING_SIZE;
-		struct sk_buff *skb;
-		if (!(np->tx_ring[entry].status & 0x00010000))
-			break;
-		skb = np->tx_skbuff[entry];
-		/* Free the original skb. */
-		pci_unmap_single(np->pci_dev,
-			np->tx_ring[entry].frag[0].addr,
-			skb->len, PCI_DMA_TODEVICE);
-		if (irq)
-			dev_kfree_skb_irq (np->tx_skbuff[entry]);
-		else
-			dev_kfree_skb (np->tx_skbuff[entry]);
-
-		np->tx_skbuff[entry] = 0;
+	/* free all tx skbuff */
+	for (i = 0; i < TX_RING_SIZE; i++) {
+		skb = np->tx_skbuff[i];
+		if (skb) {
+			pci_unmap_single(np->pci_dev, 
+				np->tx_ring[i].frag[0].addr, skb->len,
+				PCI_DMA_TODEVICE);
+			if (irq)
+				dev_kfree_skb_irq (skb);
+			else
+				dev_kfree_skb (skb);
+			np->tx_skbuff[i] = 0;
+			np->stats.tx_dropped++;
+		}
 	}
-	writel (np->tx_ring_dma + frame_id * sizeof(*np->tx_ring),
-			dev->base_addr + TxListPtr);
+	np->cur_tx = np->dirty_tx = 0;
 	return 0;
 }
 
@@ -1110,6 +1125,7 @@ static void intr_handler(int irq, void *dev_instance, struct pt_regs *rgs)
 	struct netdev_private *np;
 	long ioaddr;
 	int boguscnt = max_interrupt_work;
+	int hw_frame_id;
 
 	ioaddr = dev->base_addr;
 	np = dev->priv;
@@ -1153,7 +1169,7 @@ static void intr_handler(int irq, void *dev_instance, struct pt_regs *rgs)
 					if (tx_status & 0x10) {	/* Reset the Tx. */
 						np->stats.tx_fifo_errors++;
 						spin_lock(&np->lock);
-						reset_tx(dev, 1);
+						reset_tx(dev);
 						spin_unlock(&np->lock);
 					}
 					if (tx_status & 0x1e)	/* Restart the Tx. */
@@ -1168,10 +1184,14 @@ static void intr_handler(int irq, void *dev_instance, struct pt_regs *rgs)
 			}
 		}
 		spin_lock(&np->lock);
+		hw_frame_id = readb(ioaddr + TxFrameId);
 		for (; np->cur_tx - np->dirty_tx > 0; np->dirty_tx++) {
 			int entry = np->dirty_tx % TX_RING_SIZE;
 			struct sk_buff *skb;
-			if (!(np->tx_ring[entry].status & 0x00010000))
+			int sw_frame_id;
+			sw_frame_id = (np->tx_ring[entry].status >> 2) & 0xff;
+			
+			if (sw_frame_id == hw_frame_id)
 				break;
 			skb = np->tx_skbuff[entry];
 			/* Free the original skb. */
@@ -1532,27 +1552,23 @@ static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
 
 static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
-	struct mii_ioctl_data *data = (struct mii_ioctl_data *)&rq->ifr_data;
+	struct netdev_private *np = dev->priv;
+	struct mii_ioctl_data *data = (struct mii_ioctl_data *) & rq->ifr_data;
+	int rc;
 
-	switch(cmd) {
-	case SIOCETHTOOL:
-		return netdev_ethtool_ioctl(dev, (void *) rq->ifr_data);
-	case SIOCGMIIPHY:		/* Get address of MII PHY in use. */
-		data->phy_id = ((struct netdev_private *)dev->priv)->phys[0] & 0x1f;
-		/* Fall Through */
+	if (!netif_running(dev))
+		return -EINVAL;
 
-	case SIOCGMIIREG:		/* Read MII PHY register. */
-		data->val_out = mdio_read(dev, data->phy_id & 0x1f, data->reg_num & 0x1f);
-		return 0;
+	if (cmd == SIOCETHTOOL)
+		rc = netdev_ethtool_ioctl(dev, (void *) rq->ifr_data);
 
-	case SIOCSMIIREG:		/* Write MII PHY register. */
-		if (!capable(CAP_NET_ADMIN))
-			return -EPERM;
-		mdio_write(dev, data->phy_id & 0x1f, data->reg_num & 0x1f, data->val_in);
-		return 0;
-	default:
-		return -EOPNOTSUPP;
+	else {
+		spin_lock_irq(&np->lock);
+		rc = generic_mii_ioctl(&np->mii_if, data, cmd, NULL);
+		spin_unlock_irq(&np->lock);
 	}
+
+	return rc;
 }
 
 static int netdev_close(struct net_device *dev)

@@ -31,6 +31,7 @@
 #include <linux/init.h>
 #include <linux/pci.h>
 #include <linux/slab.h>
+#include <linux/vmalloc.h>
 #include <sound/core.h>
 #include <sound/control.h>
 #include <sound/info.h>
@@ -1560,30 +1561,36 @@ YMFPCI_SINGLE(SNDRV_CTL_NAME_IEC958("",CAPTURE,SWITCH), 0, YDSXGR_SPDIFINCTRL),
 
 static int snd_ymfpci_get_gpio_out(ymfpci_t *chip, int pin)
 {
-	u16 reg, ctrl;
+	u16 reg, mode;
 	unsigned long flags;
 
-	reg = ~(1 << pin) & 0xff;
-	ctrl = 0xff00 | reg;
 	spin_lock_irqsave(&chip->reg_lock, flags);
-	snd_ymfpci_writew(chip, YDSXGR_GPIOFUNCENABLE, ctrl);
-	ctrl = snd_ymfpci_readw(chip, YDSXGR_GPIOINSTATUS);
+	reg = snd_ymfpci_readw(chip, YDSXGR_GPIOFUNCENABLE);
+	reg &= ~(1 << (pin + 8));
+	reg |= (1 << pin);
+	snd_ymfpci_writew(chip, YDSXGR_GPIOFUNCENABLE, reg);
+	/* set the level mode for input line */
+	mode = snd_ymfpci_readw(chip, YDSXGR_GPIOTYPECONFIG);
+	mode &= ~(3 << (pin * 2));
+	snd_ymfpci_writew(chip, YDSXGR_GPIOTYPECONFIG, mode);
+	snd_ymfpci_writew(chip, YDSXGR_GPIOFUNCENABLE, reg | (1 << (pin + 8)));
+	mode = snd_ymfpci_readw(chip, YDSXGR_GPIOINSTATUS);
 	spin_unlock_irqrestore(&chip->reg_lock, flags);
-	return (ctrl >> pin) & 1;
+	return (mode >> pin) & 1;
 }
 
 static int snd_ymfpci_set_gpio_out(ymfpci_t *chip, int pin, int enable)
 {
-	u16 reg, ctrl;
+	u16 reg;
 	unsigned long flags;
 
-	reg = ~(1 << pin) & 0xff;
-	ctrl = (reg << 8) | reg;
 	spin_lock_irqsave(&chip->reg_lock, flags);
-	snd_ymfpci_writew(chip, YDSXGR_GPIOFUNCENABLE, ctrl);
+	reg = snd_ymfpci_readw(chip, YDSXGR_GPIOFUNCENABLE);
+	reg &= ~(1 << pin);
+	reg &= ~(1 << (pin + 8));
+	snd_ymfpci_writew(chip, YDSXGR_GPIOFUNCENABLE, reg);
 	snd_ymfpci_writew(chip, YDSXGR_GPIOOUTCTRL, enable << pin);
-	ctrl = 0xff00 | reg;
-	snd_ymfpci_writew(chip, YDSXGR_GPIOFUNCENABLE, ctrl);
+	snd_ymfpci_writew(chip, YDSXGR_GPIOFUNCENABLE, reg | (1 << (pin + 8)));
 	spin_unlock_irqrestore(&chip->reg_lock, flags);
 
 	return 0;
@@ -1639,7 +1646,7 @@ static void snd_ymfpci_mixer_free_ac97(ac97_t *ac97)
 	chip->ac97 = NULL;
 }
 
-int __devinit snd_ymfpci_mixer(ymfpci_t *chip)
+int __devinit snd_ymfpci_mixer(ymfpci_t *chip, int rear_switch)
 {
 	ac97_t ac97;
 	snd_kcontrol_t *kctl;
@@ -1673,10 +1680,11 @@ int __devinit snd_ymfpci_mixer(ymfpci_t *chip)
 
 	/*
 	 * shared rear/line-in
-	 * FIXME: should be only on supported models - checking subdevice
 	 */
-	if ((err = snd_ctl_add(chip->card, snd_ctl_new1(&snd_ymfpci_rear_shared, chip))) < 0)
-		return err;
+	if (rear_switch) {
+		if ((err = snd_ctl_add(chip->card, snd_ctl_new1(&snd_ymfpci_rear_shared, chip))) < 0)
+			return err;
+	}
 
 	return 0;
 }

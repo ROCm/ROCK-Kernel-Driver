@@ -13,91 +13,50 @@
 
 #define PARPORT_PC_MAX_PORTS	PARPORT_MAX
 
-static struct linux_ebus_dma *sparc_ebus_dmas[PARPORT_PC_MAX_PORTS];
+static struct sparc_ebus_info {
+	struct ebus_dma_info info;
+	unsigned int addr;
+	unsigned int count;
+} sparc_ebus_dmas[PARPORT_PC_MAX_PORTS];
 
-static __inline__ void
-reset_dma(unsigned int dmanr)
+static __inline__ void enable_dma(unsigned int dmanr)
 {
-	unsigned int dcsr;
+	if (ebus_dma_request(&sparc_ebus_dmas[dmanr].info,
+			     sparc_ebus_dmas[dmanr].addr,
+			     sparc_ebus_dmas[dmanr].count))
+		BUG();
 
-	writel(EBUS_DCSR_RESET, &sparc_ebus_dmas[dmanr]->dcsr);
-	udelay(1);
-	dcsr = EBUS_DCSR_BURST_SZ_16 | EBUS_DCSR_TCI_DIS |
-	       EBUS_DCSR_EN_CNT | EBUS_DCSR_INT_EN;
-	writel(dcsr, &sparc_ebus_dmas[dmanr]->dcsr);
+	ebus_dma_enable(&sparc_ebus_dmas[dmanr].info, 1);
 }
 
-static __inline__ void
-enable_dma(unsigned int dmanr)
+static __inline__ void disable_dma(unsigned int dmanr)
 {
-	unsigned int dcsr;
-
-	dcsr = readl(&sparc_ebus_dmas[dmanr]->dcsr);
-	dcsr |= EBUS_DCSR_EN_DMA;
-	writel(dcsr, &sparc_ebus_dmas[dmanr]->dcsr);
+	ebus_dma_enable(&sparc_ebus_dmas[dmanr].info, 0);
 }
 
-static __inline__ void
-disable_dma(unsigned int dmanr)
-{
-	unsigned int dcsr;
-
-	dcsr = readl(&sparc_ebus_dmas[dmanr]->dcsr);
-	if (dcsr & EBUS_DCSR_EN_DMA) {
-		while (dcsr & EBUS_DCSR_DRAIN) {
-			udelay(1);
-			dcsr = readl(&sparc_ebus_dmas[dmanr]->dcsr);
-		}
-		dcsr &= ~(EBUS_DCSR_EN_DMA);
-		writel(dcsr, &sparc_ebus_dmas[dmanr]->dcsr);
-
-		dcsr = readl(&sparc_ebus_dmas[dmanr]->dcsr);
-		if (dcsr & EBUS_DCSR_ERR_PEND)
-			reset_dma(dmanr);
-	}
-}
-
-static __inline__ void
-clear_dma_ff(unsigned int dmanr)
+static __inline__ void clear_dma_ff(unsigned int dmanr)
 {
 	/* nothing */
 }
 
-static __inline__ void
-set_dma_mode(unsigned int dmanr, char mode)
+static __inline__ void set_dma_mode(unsigned int dmanr, char mode)
 {
-	unsigned int dcsr;
-
-	dcsr = readl(&sparc_ebus_dmas[dmanr]->dcsr);
-	dcsr |= EBUS_DCSR_EN_CNT | EBUS_DCSR_TC;
-	if (mode == DMA_MODE_WRITE)
-		dcsr &= ~(EBUS_DCSR_WRITE);
-	else
-		dcsr |= EBUS_DCSR_WRITE;
-	writel(dcsr, &sparc_ebus_dmas[dmanr]->dcsr);
+	ebus_dma_prepare(&sparc_ebus_dmas[dmanr].info, (mode != DMA_MODE_WRITE));
 }
 
-static __inline__ void
-set_dma_addr(unsigned int dmanr, unsigned int addr)
+static __inline__ void set_dma_addr(unsigned int dmanr, unsigned int addr)
 {
-	writel(addr, &sparc_ebus_dmas[dmanr]->dacr);
+	sparc_ebus_dmas[dmanr].addr = addr;
 }
 
-static __inline__ void
-set_dma_count(unsigned int dmanr, unsigned int count)
+static __inline__ void set_dma_count(unsigned int dmanr, unsigned int count)
 {
-	writel(count, &sparc_ebus_dmas[dmanr]->dbcr);
+	sparc_ebus_dmas[dmanr].count = count;
 }
 
-static __inline__ int
-get_dma_residue(unsigned int dmanr)
+static __inline__ unsigned int get_dma_residue(unsigned int dmanr)
 {
-	int res;
-
-	res = readl(&sparc_ebus_dmas[dmanr]->dbcr);
-	if (res != 0)
-		reset_dma(dmanr);
-	return res;
+	return ebus_dma_residue(&sparc_ebus_dmas[dmanr].info);
 }
 
 static int ebus_ecpp_p(struct linux_ebus_device *edev)
@@ -171,10 +130,19 @@ static int parport_pc_find_nonpci_ports (int autoirq, int autodma)
 				unsigned long base = edev->resource[0].start;
 				unsigned long config = edev->resource[1].start;
 
-				sparc_ebus_dmas[count] =
-						(struct linux_ebus_dma *)
-							edev->resource[2].start;
-				reset_dma(count);
+				spin_lock_init(&sparc_ebus_dmas[count].info);
+				sparc_ebus_dmas[count].info.regs =
+					edev->resource[2].start;
+				if (!sparc_ebus_dmas[count].info.regs)
+					continue;
+				sparc_ebus_dmas[count].info.flags = 0;
+				sparc_ebus_dmas[count].info.callback = NULL;
+				sparc_ebus_dmas[count].info.client_cookie = NULL;
+				sparc_ebus_dmas[count].info.irq = 0xdeadbeef;
+				strcpy(sparc_ebus_dmas[count].info.name, "parport");
+				if (ebus_dma_register(&sparc_ebus_dmas[count].info))
+					continue;
+				ebus_dma_irq_enable(&sparc_ebus_dmas[count].info, 1);
 
 				/* Configure IRQ to Push Pull, Level Low */
 				/* Enable ECP, set bit 2 of the CTR first */

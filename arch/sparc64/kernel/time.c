@@ -617,9 +617,6 @@ try_isa_clock:
 	local_irq_restore(flags);
 }
 
-extern void init_timers(void (*func)(int, void *, struct pt_regs *),
-			unsigned long *);
-
 void __init time_init(void)
 {
 	/* clock_probe() is now done at end of [se]bus_init on sparc64
@@ -628,7 +625,7 @@ void __init time_init(void)
 	 */
 	unsigned long clock;
 
-	init_timers(timer_interrupt, &clock);
+	sparc64_init_timers(timer_interrupt, &clock);
 	timer_ticks_per_usec_quotient = ((1UL<<32) / (clock / 1000020));
 }
 

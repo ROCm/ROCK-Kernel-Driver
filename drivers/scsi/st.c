@@ -12,13 +12,13 @@
    Copyright 1992 - 2002 Kai Makisara
    email Kai.Makisara@metla.fi
 
-   Last modified: Thu Aug 22 21:57:07 2002 by makisara
+   Last modified: Sun Sep 29 22:29:16 2002 by makisara
    Some small formal changes - aeb, 950809
 
    Last modified: 18-JAN-1998 Richard Gooch <rgooch@atnf.csiro.au> Devfs support
  */
 
-static char *verstr = "20020822";
+static char *verstr = "20020929";
 
 #include <linux/module.h>
 
@@ -3738,51 +3738,6 @@ static int st_attach(Scsi_Device * SDp)
 	scsi_tapes[i] = tpnt;
 	dev_num = i;
 
-	for (mode = 0; mode < ST_NBR_MODES; ++mode) {
-	    char name[8];
-	    static char *formats[ST_NBR_MODES] ={"", "l", "m", "a"};
-
-	    /*  Rewind entry  */
-	    sprintf (name, "mt%s", formats[mode]);
-	    sprintf(tpnt->driverfs_dev_r[mode].bus_id, "%s:%s", 
-		    SDp->sdev_driverfs_dev.bus_id, name);
-	    sprintf(tpnt->driverfs_dev_r[mode].name, "%s%s", 
-		    SDp->sdev_driverfs_dev.name, name);
-	    tpnt->driverfs_dev_r[mode].parent = &SDp->sdev_driverfs_dev;
-	    tpnt->driverfs_dev_r[mode].bus = &scsi_driverfs_bus_type;
-	    tpnt->driverfs_dev_r[mode].driver_data =
-			(void *)(long)__mkdev(MAJOR_NR, i + (mode << 5));
-	    device_register(&tpnt->driverfs_dev_r[mode]);
-	    device_create_file(&tpnt->driverfs_dev_r[mode], 
-			       &dev_attr_type);
-	    device_create_file(&tpnt->driverfs_dev_r[mode], &dev_attr_kdev);
-	    tpnt->de_r[mode] =
-		devfs_register (SDp->de, name, DEVFS_FL_DEFAULT,
-				MAJOR_NR, i + (mode << 5),
-				S_IFCHR | S_IRUGO | S_IWUGO,
-				&st_fops, NULL);
-	    /*  No-rewind entry  */
-	    sprintf (name, "mt%sn", formats[mode]);
-	    sprintf(tpnt->driverfs_dev_n[mode].bus_id, "%s:%s", 
-		    SDp->sdev_driverfs_dev.bus_id, name);
-	    sprintf(tpnt->driverfs_dev_n[mode].name, "%s%s", 
-		    SDp->sdev_driverfs_dev.name, name);
-	    tpnt->driverfs_dev_n[mode].parent= &SDp->sdev_driverfs_dev;
-	    tpnt->driverfs_dev_n[mode].bus = &scsi_driverfs_bus_type;
-	    tpnt->driverfs_dev_n[mode].driver_data =
-			(void *)(long)__mkdev(MAJOR_NR, i + (mode << 5) + 128);
-	    device_register(&tpnt->driverfs_dev_n[mode]);
-	    device_create_file(&tpnt->driverfs_dev_n[mode], 
-			       &dev_attr_type);
-	    device_create_file(&tpnt->driverfs_dev_n[mode], 
-			       &dev_attr_kdev);
-	    tpnt->de_n[mode] =
-		devfs_register (SDp->de, name, DEVFS_FL_DEFAULT,
-				MAJOR_NR, i + (mode << 5) + 128,
-				S_IFCHR | S_IRUGO | S_IWUGO,
-				&st_fops, NULL);
-	}
-	devfs_register_tape (tpnt->de_r[0]);
 	tpnt->device = SDp;
 	if (SDp->scsi_level <= 2)
 		tpnt->tape_type = MT_ISSCSI1;
@@ -3863,6 +3818,53 @@ static int st_attach(Scsi_Device * SDp)
 
 	st_template.nr_dev++;
 	write_unlock(&st_dev_arr_lock);
+
+	for (mode = 0; mode < ST_NBR_MODES; ++mode) {
+	    char name[8];
+	    static char *formats[ST_NBR_MODES] ={"", "l", "m", "a"};
+
+	    /*  Rewind entry  */
+	    sprintf (name, "mt%s", formats[mode]);
+	    sprintf(tpnt->driverfs_dev_r[mode].bus_id, "%s:%s", 
+		    SDp->sdev_driverfs_dev.bus_id, name);
+	    sprintf(tpnt->driverfs_dev_r[mode].name, "%s%s", 
+		    SDp->sdev_driverfs_dev.name, name);
+	    tpnt->driverfs_dev_r[mode].parent = &SDp->sdev_driverfs_dev;
+	    tpnt->driverfs_dev_r[mode].bus = &scsi_driverfs_bus_type;
+	    tpnt->driverfs_dev_r[mode].driver_data =
+			(void *)(long)__mkdev(MAJOR_NR, i + (mode << 5));
+	    device_register(&tpnt->driverfs_dev_r[mode]);
+	    device_create_file(&tpnt->driverfs_dev_r[mode], 
+			       &dev_attr_type);
+	    device_create_file(&tpnt->driverfs_dev_r[mode], &dev_attr_kdev);
+	    tpnt->de_r[mode] =
+		devfs_register (SDp->de, name, DEVFS_FL_DEFAULT,
+				MAJOR_NR, i + (mode << 5),
+				S_IFCHR | S_IRUGO | S_IWUGO,
+				&st_fops, NULL);
+	    /*  No-rewind entry  */
+	    sprintf (name, "mt%sn", formats[mode]);
+	    sprintf(tpnt->driverfs_dev_n[mode].bus_id, "%s:%s", 
+		    SDp->sdev_driverfs_dev.bus_id, name);
+	    sprintf(tpnt->driverfs_dev_n[mode].name, "%s%s", 
+		    SDp->sdev_driverfs_dev.name, name);
+	    tpnt->driverfs_dev_n[mode].parent= &SDp->sdev_driverfs_dev;
+	    tpnt->driverfs_dev_n[mode].bus = &scsi_driverfs_bus_type;
+	    tpnt->driverfs_dev_n[mode].driver_data =
+			(void *)(long)__mkdev(MAJOR_NR, i + (mode << 5) + 128);
+	    device_register(&tpnt->driverfs_dev_n[mode]);
+	    device_create_file(&tpnt->driverfs_dev_n[mode], 
+			       &dev_attr_type);
+	    device_create_file(&tpnt->driverfs_dev_n[mode], 
+			       &dev_attr_kdev);
+	    tpnt->de_n[mode] =
+		devfs_register (SDp->de, name, DEVFS_FL_DEFAULT,
+				MAJOR_NR, i + (mode << 5) + 128,
+				S_IFCHR | S_IRUGO | S_IWUGO,
+				&st_fops, NULL);
+	}
+	devfs_register_tape (tpnt->de_r[0]);
+
 	printk(KERN_WARNING
 	"Attached scsi tape st%d at scsi%d, channel %d, id %d, lun %d\n",
 	       dev_num, SDp->host->host_no, SDp->channel, SDp->id, SDp->lun);
@@ -3893,13 +3895,21 @@ static void st_detach(Scsi_Device * SDp)
 			for (mode = 0; mode < ST_NBR_MODES; ++mode) {
 				devfs_unregister (tpnt->de_r[mode]);
 				tpnt->de_r[mode] = NULL;
+				devfs_unregister (tpnt->de_n[mode]);
+				tpnt->de_n[mode] = NULL;
+			}
+			scsi_tapes[i] = 0;
+			SDp->attached--;
+			st_template.nr_dev--;
+			st_template.dev_noticed--;
+			write_unlock(&st_dev_arr_lock);
+
+			for (mode = 0; mode < ST_NBR_MODES; ++mode) {
 				device_remove_file(&tpnt->driverfs_dev_r[mode],
 						   &dev_attr_type);
 				device_remove_file(&tpnt->driverfs_dev_r[mode],
 						   &dev_attr_kdev);
 				put_device(&tpnt->driverfs_dev_r[mode]);
-				devfs_unregister (tpnt->de_n[mode]);
-				tpnt->de_n[mode] = NULL;
 				device_remove_file(&tpnt->driverfs_dev_n[mode],
 						   &dev_attr_type);
 				device_remove_file(&tpnt->driverfs_dev_n[mode],
@@ -3912,11 +3922,6 @@ static void st_detach(Scsi_Device * SDp)
 				kfree(tpnt->buffer);
 			}
 			kfree(tpnt);
-			scsi_tapes[i] = 0;
-			SDp->attached--;
-			st_template.nr_dev--;
-			st_template.dev_noticed--;
-			write_unlock(&st_dev_arr_lock);
 			return;
 		}
 	}
@@ -4020,7 +4025,7 @@ static int sgl_map_user_pages(struct scatterlist *sgl, const unsigned int max_pa
 	if (count == 0)
 		return 0;
 
-	if ((pages = kmalloc(max_pages * sizeof(*pages), GFP_ATOMIC)) == NULL)
+	if ((pages = kmalloc(max_pages * sizeof(*pages), GFP_KERNEL)) == NULL)
 		return -ENOMEM;
 
         /* Try to fault in all of the necessary pages */

@@ -26,6 +26,15 @@
 #ifndef __ALSA_IOCTL32_H
 #define __ALSA_IOCTL32_H
 
+#ifndef A
+#ifdef CONFIG_PPC64
+#include <asm/ppc32.h>
+#else
+/* x86-64, sparc64 */
+#define A(__x) ((void *)(unsigned long)(__x))
+#endif
+#endif
+
 #define TO_PTR(x)  A(x)
 
 #define COPY(x)  (dst->x = src->x)
@@ -47,25 +56,38 @@
 
 
 #define DEFINE_ALSA_IOCTL(type) \
-static int snd_ioctl32_##type(unsigned int fd, unsigned int cmd, unsigned long arg, struct file *file)\
+static int _snd_ioctl32_##type(unsigned int fd, unsigned int cmd, unsigned long arg, struct file *file, unsigned int native_ctl)\
 {\
 	struct sndrv_##type##32 data32;\
 	struct sndrv_##type data;\
+	mm_segment_t oldseg = get_fs();\
 	int err;\
-	if (copy_from_user(&data32, (void*)arg, sizeof(data32)))\
-		return -EFAULT;\
+	set_fs(KERNEL_DS);\
+	if (copy_from_user(&data32, (void*)arg, sizeof(data32))) {\
+		err = -EFAULT;\
+		goto __err;\
+	}\
 	memset(&data, 0, sizeof(data));\
 	convert_from_32(type, &data, &data32);\
-	err = file->f_op->ioctl(file->f_dentry->d_inode, file, cmd, (unsigned long)&data);\
-	if (err < 0)\
-		return err;\
-	if (cmd & (_IOC_READ << _IOC_DIRSHIFT)) {\
+	err = file->f_op->ioctl(file->f_dentry->d_inode, file, native_ctl, (unsigned long)&data);\
+	if (err < 0) \
+		goto __err;\
+	if (native_ctl & (_IOC_READ << _IOC_DIRSHIFT)) {\
 		convert_to_32(type, &data32, &data);\
-		if (copy_to_user((void*)arg, &data32, sizeof(data32)))\
-			return -EFAULT;\
+		if (copy_to_user((void*)arg, &data32, sizeof(data32))) {\
+			err = -EFAULT;\
+			goto __err;\
+		}\
 	}\
+ __err: set_fs(oldseg);\
 	return err;\
 }
+
+#define DEFINE_ALSA_IOCTL_ENTRY(name,type,native_ctl) \
+static int snd_ioctl32_##name(unsigned int fd, unsigned int cmd, unsigned long arg, struct file *file) {\
+	return _snd_ioctl32_##type(fd, cmd, arg, file, native_ctl);\
+}
+
 
 struct ioctl32_mapper {
 	unsigned int cmd;

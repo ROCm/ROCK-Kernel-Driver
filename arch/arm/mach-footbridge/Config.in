@@ -1,0 +1,9 @@
+mainmenu_option next_comment
+comment 'Footbridge Implementations'
+dep_bool '  CATS' CONFIG_ARCH_CATS $CONFIG_ARCH_FOOTBRIDGE
+dep_bool '  Compaq Personal Server' CONFIG_ARCH_PERSONAL_SERVER $CONFIG_ARCH_FOOTBRIDGE
+dep_bool '  EBSA285 (addin mode)' CONFIG_ARCH_EBSA285_ADDIN $CONFIG_ARCH_FOOTBRIDGE
+dep_bool '  EBSA285 (host mode)' CONFIG_ARCH_EBSA285_HOST $CONFIG_ARCH_FOOTBRIDGE
+dep_bool '  NetWinder' CONFIG_ARCH_NETWINDER $CONFIG_ARCH_FOOTBRIDGE
+endmenu
+

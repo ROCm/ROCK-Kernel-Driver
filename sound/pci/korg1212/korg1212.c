@@ -29,6 +29,7 @@
 #include <sound/info.h>
 #include <sound/control.h>
 #include <sound/pcm.h>
+#include <sound/pcm_params.h>
 #define SNDRV_GET_ID
 #include <sound/initval.h>
 

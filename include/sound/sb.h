@@ -36,6 +36,7 @@ enum sb_hw_type {
 	SB_HW_16CSP,		/* SB16 with CSP chip */
 	SB_HW_ALS100,		/* Avance Logic ALS100 chip */
 	SB_HW_ALS4000,		/* Avance Logic ALS4000 chip */
+	SB_HW_DT019X,		/* Diamond Tech. DT-019X / Avance Logic ALS-007 */
 };
 
 #define SB_OPEN_PCM		0x01
@@ -214,6 +215,24 @@ typedef struct _snd_sb sb_t;
 #define SB_DSP4_MPUSETUP	0x84
 
 #define SB_DSP4_3DSE		0x90
+
+/* Registers for DT-019x / ALS-007 mixer */
+#define SB_DT019X_MASTER_DEV	0x62
+#define SB_DT019X_PCM_DEV	0x64
+#define SB_DT019X_SYNTH_DEV	0x66
+#define SB_DT019X_CD_DEV	0x68
+#define SB_DT019X_MIC_DEV	0x6a
+#define SB_DT019X_SPKR_DEV	0x6a
+#define SB_DT019X_LINE_DEV	0x6e
+#define SB_DT019X_OUTPUT_SW1	0x3c
+#define SB_DT019X_OUTPUT_SW2	0x4c
+#define SB_DT019X_CAPTURE_SW	0x6c
+
+#define SB_DT019X_CAP_CD	0x02
+#define SB_DT019X_CAP_MIC	0x04
+#define SB_DT019X_CAP_LINE	0x06
+#define SB_DT019X_CAP_SYNTH	0x07
+#define SB_DT019X_CAP_MAIN	0x07
 
 /* IRQ setting bitmap */
 #define SB_IRQSETUP_IRQ9	0x01

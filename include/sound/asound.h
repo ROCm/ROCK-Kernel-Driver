@@ -128,7 +128,7 @@ enum {
  *                                                                           *
  *****************************************************************************/
 
-#define SNDRV_PCM_VERSION		SNDRV_PROTOCOL_VERSION(2, 0, 1)
+#define SNDRV_PCM_VERSION		SNDRV_PROTOCOL_VERSION(2, 0, 2)
 
 typedef unsigned long sndrv_pcm_uframes_t;
 typedef long sndrv_pcm_sframes_t;
@@ -191,7 +191,19 @@ enum sndrv_pcm_format {
 	SNDRV_PCM_FORMAT_MPEG,
 	SNDRV_PCM_FORMAT_GSM,
 	SNDRV_PCM_FORMAT_SPECIAL = 31,
-	SNDRV_PCM_FORMAT_LAST = 31,
+	SNDRV_PCM_FORMAT_S24_3LE = 32,	/* in three bytes */
+	SNDRV_PCM_FORMAT_S24_3BE,	/* in three bytes */
+	SNDRV_PCM_FORMAT_U24_3LE,	/* in three bytes */
+	SNDRV_PCM_FORMAT_U24_3BE,	/* in three bytes */
+	SNDRV_PCM_FORMAT_S20_3LE,	/* in three bytes */
+	SNDRV_PCM_FORMAT_S20_3BE,	/* in three bytes */
+	SNDRV_PCM_FORMAT_U20_3LE,	/* in three bytes */
+	SNDRV_PCM_FORMAT_U20_3BE,	/* in three bytes */
+	SNDRV_PCM_FORMAT_S18_3LE,	/* in three bytes */
+	SNDRV_PCM_FORMAT_S18_3BE,	/* in three bytes */
+	SNDRV_PCM_FORMAT_U18_3LE,	/* in three bytes */
+	SNDRV_PCM_FORMAT_U18_3BE,	/* in three bytes */
+	SNDRV_PCM_FORMAT_LAST = SNDRV_PCM_FORMAT_U18_3BE,
 
 #ifdef SNDRV_LITTLE_ENDIAN
 	SNDRV_PCM_FORMAT_S16 = SNDRV_PCM_FORMAT_S16_LE,
@@ -284,7 +296,7 @@ enum sndrv_pcm_hw_param {
 	SNDRV_PCM_HW_PARAM_SUBFORMAT,	/* Subformat */
 	SNDRV_PCM_HW_PARAM_LAST_MASK = SNDRV_PCM_HW_PARAM_SUBFORMAT,
 
-	SNDRV_PCM_HW_PARAM_SAMPLE_BITS, /* Bits per sample */
+	SNDRV_PCM_HW_PARAM_SAMPLE_BITS = 8, /* Bits per sample */
 	SNDRV_PCM_HW_PARAM_FIRST_INTERVAL = SNDRV_PCM_HW_PARAM_SAMPLE_BITS,
 	SNDRV_PCM_HW_PARAM_FRAME_BITS,	/* Bits per frame */
 	SNDRV_PCM_HW_PARAM_CHANNELS,	/* Channels */
@@ -298,8 +310,7 @@ enum sndrv_pcm_hw_param {
 	SNDRV_PCM_HW_PARAM_BUFFER_SIZE,	/* Size of buffer in frames */
 	SNDRV_PCM_HW_PARAM_BUFFER_BYTES, /* Size of buffer in bytes */
 	SNDRV_PCM_HW_PARAM_TICK_TIME,	/* Approx tick duration in us */
-	SNDRV_PCM_HW_PARAM_LAST_INTERVAL = SNDRV_PCM_HW_PARAM_TICK_TIME,
-	SNDRV_PCM_HW_PARAM_LAST = SNDRV_PCM_HW_PARAM_LAST_INTERVAL,
+	SNDRV_PCM_HW_PARAM_LAST_INTERVAL = SNDRV_PCM_HW_PARAM_TICK_TIME
 };
 
 #define SNDRV_PCM_HW_PARAMS_RUNTIME		(1<<0)
@@ -312,20 +323,28 @@ struct sndrv_interval {
 		     empty:1;
 };
 
+#define SNDRV_MASK_MAX	256
+
+struct sndrv_mask {
+	u_int32_t bits[(SNDRV_MASK_MAX+31)/32];
+};
+
 struct sndrv_pcm_hw_params {
 	unsigned int flags;
-	unsigned int masks[SNDRV_PCM_HW_PARAM_LAST_MASK - 
-			   SNDRV_PCM_HW_PARAM_FIRST_MASK + 1];
+	struct sndrv_mask masks[SNDRV_PCM_HW_PARAM_LAST_MASK - 
+			       SNDRV_PCM_HW_PARAM_FIRST_MASK + 1];
+	struct sndrv_mask mres[5];	/* reserved masks */
 	struct sndrv_interval intervals[SNDRV_PCM_HW_PARAM_LAST_INTERVAL -
 				        SNDRV_PCM_HW_PARAM_FIRST_INTERVAL + 1];
-	unsigned int rmask;
-	unsigned int cmask;
+	struct sndrv_interval ires[9];	/* reserved intervals */
+	unsigned int rmask;		/* W: requested masks */
+	unsigned int cmask;		/* R: changed masks */
 	unsigned int info;		/* R: Info flags for returned setup */
 	unsigned int msbits;		/* R: used most significant bits */
 	unsigned int rate_num;		/* R: rate numerator */
 	unsigned int rate_den;		/* R: rate denominator */
 	sndrv_pcm_uframes_t fifo_size;	/* R: chip FIFO size in frames */
-	unsigned char reserved[64];
+	unsigned char reserved[64];	/* reserved for future */
 };
 
 enum sndrv_pcm_tstamp {
@@ -345,7 +364,7 @@ struct sndrv_pcm_sw_params {
 	sndrv_pcm_uframes_t silence_threshold;	/* min distance from noise for silence filling */
 	sndrv_pcm_uframes_t silence_size;	/* silence block size */
 	sndrv_pcm_uframes_t boundary;		/* pointers wrap point */
-	unsigned char reserved[64];
+	unsigned char reserved[64];		/* reserved for future */
 };
 
 struct sndrv_pcm_channel_info {

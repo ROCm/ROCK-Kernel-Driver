@@ -18,6 +18,3 @@ EXTRA_CFLAGS += -I. $(DBGDEF)
 
 include $(TOPDIR)/Rules.make
 
-clean:
-	rm -f core *.o *.a *.s
-

@@ -13,7 +13,7 @@ snd-ainstr-iw-objs := ainstr_iw.o
 # Toplevel Module Dependency
 obj-$(CONFIG_SND_ALS100) += snd-ainstr-fm.o
 obj-$(CONFIG_SND_AZT2320) += snd-ainstr-fm.o
-obj-$(CONFIG_SND_DT0197H) += snd-ainstr-fm.o
+obj-$(CONFIG_SND_DT019X) += snd-ainstr-fm.o
 obj-$(CONFIG_SND_ES18XX) += snd-ainstr-fm.o
 obj-$(CONFIG_SND_OPL3SA2) += snd-ainstr-fm.o
 obj-$(CONFIG_SND_AD1816A) += snd-ainstr-fm.o

@@ -24,10 +24,10 @@
 #define MAX_ORDER CONFIG_FORCE_MAX_ZONEORDER
 #endif
 
-typedef struct free_area_struct {
+struct free_area {
 	struct list_head	free_list;
 	unsigned long		*map;
-} free_area_t;
+};
 
 struct pglist_data;
 
@@ -78,7 +78,7 @@ struct zone {
 	/*
 	 * free areas of different sizes
 	 */
-	free_area_t		free_area[MAX_ORDER];
+	struct free_area	free_area[MAX_ORDER];
 
 	/*
 	 * wait_table		-- the array holding the hash table
@@ -168,6 +168,7 @@ typedef struct pglist_data {
 	unsigned long node_size;
 	int node_id;
 	struct pglist_data *pgdat_next;
+	wait_queue_head_t       kswapd_wait;
 } pg_data_t;
 
 extern int numnodes;
@@ -248,13 +249,23 @@ static inline struct zone *next_zone(struct zone *zone)
 #define for_each_zone(zone) \
 	for (zone = pgdat_list->node_zones; zone; zone = next_zone(zone))
 
+#ifdef CONFIG_NUMA
+#define MAX_NR_MEMBLKS	BITS_PER_LONG /* Max number of Memory Blocks */
+#else /* !CONFIG_NUMA */
+#define MAX_NR_MEMBLKS	1
+#endif /* CONFIG_NUMA */
+
+#include <asm/topology.h>
+/* Returns the number of the current Node. */
+#define numa_node_id()		(__cpu_to_node(smp_processor_id()))
+
 #ifndef CONFIG_DISCONTIGMEM
 
 #define NODE_DATA(nid)		(&contig_page_data)
 #define NODE_MEM_MAP(nid)	mem_map
 #define MAX_NR_NODES		1
 
-#else /* !CONFIG_DISCONTIGMEM */
+#else /* CONFIG_DISCONTIGMEM */
 
 #include <asm/mmzone.h>
 

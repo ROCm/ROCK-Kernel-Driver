@@ -71,9 +71,9 @@ static int bfs_readdir(struct file * f, void * dirent, filldir_t filldir)
 }
 
 struct file_operations bfs_dir_operations = {
-	read:		generic_read_dir,
-	readdir:	bfs_readdir,
-	fsync:		file_fsync,
+	.read		= generic_read_dir,
+	.readdir	= bfs_readdir,
+	.fsync		= file_fsync,
 };
 
 extern void dump_imap(const char *, struct super_block *);
@@ -263,11 +263,11 @@ end_rename:
 }
 
 struct inode_operations bfs_dir_inops = {
-	create:			bfs_create,
-	lookup:			bfs_lookup,
-	link:			bfs_link,
-	unlink:			bfs_unlink,
-	rename:			bfs_rename,
+	.create			= bfs_create,
+	.lookup			= bfs_lookup,
+	.link			= bfs_link,
+	.unlink			= bfs_unlink,
+	.rename			= bfs_rename,
 };
 
 static int bfs_add_entry(struct inode * dir, const char * name, int namelen, int ino)

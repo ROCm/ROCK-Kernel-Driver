@@ -27,16 +27,67 @@
 #include <sound/asequencer.h>
 #include "ioctl32.h"
 
+struct sndrv_seq_port_info32 {
+	struct sndrv_seq_addr addr;	/* client/port numbers */
+	char name[64];			/* port name */
+
+	u32 capability;	/* port capability bits */
+	u32 type;		/* port type bits */
+	s32 midi_channels;		/* channels per MIDI port */
+	s32 midi_voices;		/* voices per MIDI port */
+	s32 synth_voices;		/* voices per SYNTH port */
+
+	s32 read_use;			/* R/O: subscribers for output (from this port) */
+	s32 write_use;			/* R/O: subscribers for input (to this port) */
+
+	u32 kernel;			/* reserved for kernel use (must be NULL) */
+	u32 flags;		/* misc. conditioning */
+	char reserved[60];		/* for future use */
+};
+
+#define CVT_sndrv_seq_port_info()\
+{\
+	COPY(addr);\
+	memcpy(dst->name, src->name, sizeof(dst->name));\
+	COPY(capability);\
+	COPY(type);\
+	COPY(midi_channels);\
+	COPY(midi_voices);\
+	COPY(synth_voices);\
+	COPY(read_use);\
+	COPY(write_use);\
+	COPY(flags);\
+}
+
+DEFINE_ALSA_IOCTL(seq_port_info);
+DEFINE_ALSA_IOCTL_ENTRY(create_port, seq_port_info, SNDRV_SEQ_IOCTL_CREATE_PORT);
+DEFINE_ALSA_IOCTL_ENTRY(delete_port, seq_port_info, SNDRV_SEQ_IOCTL_DELETE_PORT);
+DEFINE_ALSA_IOCTL_ENTRY(get_port_info, seq_port_info, SNDRV_SEQ_IOCTL_GET_PORT_INFO);
+DEFINE_ALSA_IOCTL_ENTRY(set_port_info, seq_port_info, SNDRV_SEQ_IOCTL_SET_PORT_INFO);
+DEFINE_ALSA_IOCTL_ENTRY(query_next_port, seq_port_info, SNDRV_SEQ_IOCTL_QUERY_NEXT_PORT);
+
+/*
+ */
+#define AP(x) snd_ioctl32_##x
+
+enum {
+  SNDRV_SEQ_IOCTL_CREATE_PORT32 = _IOWR('S', 0x20, struct sndrv_seq_port_info32),
+  SNDRV_SEQ_IOCTL_DELETE_PORT32 = _IOW ('S', 0x21, struct sndrv_seq_port_info32),
+  SNDRV_SEQ_IOCTL_GET_PORT_INFO32 = _IOWR('S', 0x22, struct sndrv_seq_port_info32),
+  SNDRV_SEQ_IOCTL_SET_PORT_INFO32 = _IOW ('S', 0x23, struct sndrv_seq_port_info32),
+  SNDRV_SEQ_IOCTL_QUERY_NEXT_PORT32 = _IOWR('S', 0x52, struct sndrv_seq_port_info32),
+};
+
 struct ioctl32_mapper seq_mappers[] = {
 	{ SNDRV_SEQ_IOCTL_PVERSION, NULL },
 	{ SNDRV_SEQ_IOCTL_CLIENT_ID, NULL },
 	{ SNDRV_SEQ_IOCTL_SYSTEM_INFO, NULL },
 	{ SNDRV_SEQ_IOCTL_GET_CLIENT_INFO, NULL },
 	{ SNDRV_SEQ_IOCTL_SET_CLIENT_INFO, NULL },
-	{ SNDRV_SEQ_IOCTL_CREATE_PORT, NULL },
-	{ SNDRV_SEQ_IOCTL_DELETE_PORT, NULL },
-	{ SNDRV_SEQ_IOCTL_GET_PORT_INFO, NULL },
-	{ SNDRV_SEQ_IOCTL_SET_PORT_INFO, NULL },
+	{ SNDRV_SEQ_IOCTL_CREATE_PORT32, AP(create_port) },
+	{ SNDRV_SEQ_IOCTL_DELETE_PORT32, AP(delete_port) },
+	{ SNDRV_SEQ_IOCTL_GET_PORT_INFO32, AP(get_port_info) },
+	{ SNDRV_SEQ_IOCTL_SET_PORT_INFO32, AP(set_port_info) },
 	{ SNDRV_SEQ_IOCTL_SUBSCRIBE_PORT, NULL },
 	{ SNDRV_SEQ_IOCTL_UNSUBSCRIBE_PORT, NULL },
 	{ SNDRV_SEQ_IOCTL_CREATE_QUEUE, NULL },
@@ -47,8 +98,6 @@ struct ioctl32_mapper seq_mappers[] = {
 	{ SNDRV_SEQ_IOCTL_GET_QUEUE_STATUS, NULL },
 	{ SNDRV_SEQ_IOCTL_GET_QUEUE_TEMPO, NULL },
 	{ SNDRV_SEQ_IOCTL_SET_QUEUE_TEMPO, NULL },
-	{ SNDRV_SEQ_IOCTL_GET_QUEUE_OWNER, NULL },
-	{ SNDRV_SEQ_IOCTL_SET_QUEUE_OWNER, NULL },
 	{ SNDRV_SEQ_IOCTL_GET_QUEUE_TIMER, NULL },
 	{ SNDRV_SEQ_IOCTL_SET_QUEUE_TIMER, NULL },
 	{ SNDRV_SEQ_IOCTL_GET_QUEUE_CLIENT, NULL },
@@ -59,6 +108,7 @@ struct ioctl32_mapper seq_mappers[] = {
 	{ SNDRV_SEQ_IOCTL_QUERY_SUBS, NULL },
 	{ SNDRV_SEQ_IOCTL_GET_SUBSCRIPTION, NULL },
 	{ SNDRV_SEQ_IOCTL_QUERY_NEXT_CLIENT, NULL },
-	{ SNDRV_SEQ_IOCTL_QUERY_NEXT_PORT, NULL },
+	{ SNDRV_SEQ_IOCTL_QUERY_NEXT_PORT32, AP(query_next_port) },
+	{ SNDRV_SEQ_IOCTL_RUNNING_MODE, NULL },
 	{ 0 },
 };

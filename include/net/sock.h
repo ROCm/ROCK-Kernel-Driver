@@ -309,7 +309,8 @@ static __inline__ void sock_prot_dec_use(struct proto *prot)
 extern void __lock_sock(struct sock *sk);
 extern void __release_sock(struct sock *sk);
 #define lock_sock(__sk) \
-do {	spin_lock_bh(&((__sk)->lock.slock)); \
+do {	might_sleep(); \
+	spin_lock_bh(&((__sk)->lock.slock)); \
 	if ((__sk)->lock.users != 0) \
 		__lock_sock(__sk); \
 	(__sk)->lock.users = 1; \

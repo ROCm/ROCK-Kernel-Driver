@@ -341,14 +341,14 @@ static int snd_mixer_oss_ioctl1(snd_mixer_oss_file_t *fmixer, unsigned int cmd, 
 			return put_user(tmp, (int *)arg) ? -EFAULT : 0;
 		}
 	}
-	if (cmd & IOC_IN) {
+	if (cmd & SIOC_IN) {
 		if (get_user(tmp, (int *)arg))
 			return -EFAULT;
 		tmp = snd_mixer_oss_set_volume(fmixer, cmd & 0xff, tmp);
 		if (tmp < 0)
 			return tmp;
 		return put_user(tmp, (int *)arg) ? -EFAULT : 0;
-	} else if (cmd & IOC_OUT) {
+	} else if (cmd & SIOC_OUT) {
 		tmp = snd_mixer_oss_get_volume(fmixer, cmd & 0xff);
 		if (tmp < 0)
 			return tmp;

@@ -82,7 +82,7 @@ static inline int bad_range(struct zone *zone, struct page *page)
 void __free_pages_ok (struct page *page, unsigned int order)
 {
 	unsigned long index, page_idx, mask, flags;
-	free_area_t *area;
+	struct free_area *area;
 	struct page *base;
 	struct zone *zone;
 
@@ -155,7 +155,7 @@ out:
 
 static inline struct page *
 expand(struct zone *zone, struct page *page,
-	 unsigned long index, int low, int high, free_area_t * area)
+	 unsigned long index, int low, int high, struct free_area *area)
 {
 	unsigned long size = 1 << high;
 
@@ -194,7 +194,7 @@ static inline void prep_new_page(struct page *page)
 
 static struct page *rmqueue(struct zone *zone, unsigned int order)
 {
-	free_area_t * area = zone->free_area + order;
+	struct free_area *area = zone->free_area + order;
 	unsigned int curr_order = order;
 	struct list_head *head, *curr;
 	unsigned long flags;
@@ -348,8 +348,12 @@ __alloc_pages(unsigned int gfp_mask, unsigned int order,
 	classzone->need_balance = 1;
 	mb();
 	/* we're somewhat low on memory, failed to find what we needed */
-	if (waitqueue_active(&kswapd_wait))
-		wake_up_interruptible(&kswapd_wait);
+	for (i = 0; zones[i] != NULL; i++) {
+		struct zone *z = zones[i];
+		if (z->free_pages <= z->pages_low &&
+		    waitqueue_active(&z->zone_pgdat->kswapd_wait))
+			wake_up_interruptible(&z->zone_pgdat->kswapd_wait);
+	}
 
 	/* Go through the zonelist again, taking __GFP_HIGH into account */
 	min = 1UL << order;
@@ -836,6 +840,8 @@ void __init free_area_init_core(pg_data_t *pgdat,
 	unsigned long zone_start_pfn = pgdat->node_start_pfn;
 
 	pgdat->nr_zones = 0;
+	init_waitqueue_head(&pgdat->kswapd_wait);
+	
 	local_offset = 0;                /* offset within lmem_map */
 	for (j = 0; j < MAX_NR_ZONES; j++) {
 		struct zone *zone = pgdat->node_zones + j;
@@ -975,3 +981,71 @@ static int __init setup_mem_frac(char *str)
 }
 
 __setup("memfrac=", setup_mem_frac);
+
+#ifdef CONFIG_PROC_FS
+
+#include <linux/seq_file.h>
+
+static void *frag_start(struct seq_file *m, loff_t *pos)
+{
+	pg_data_t *pgdat;
+	loff_t node = *pos;
+
+	for (pgdat = pgdat_list; pgdat && node; pgdat = pgdat->pgdat_next)
+		--node;
+
+	return pgdat;
+}
+
+static void *frag_next(struct seq_file *m, void *arg, loff_t *pos)
+{
+	pg_data_t *pgdat = (pg_data_t *)arg;
+
+	(*pos)++;
+	return pgdat->pgdat_next;
+}
+
+static void frag_stop(struct seq_file *m, void *arg)
+{
+}
+
+/* 
+ * This walks the freelist for each zone. Whilst this is slow, I'd rather 
+ * be slow here than slow down the fast path by keeping stats - mjbligh
+ */
+static int frag_show(struct seq_file *m, void *arg)
+{
+	pg_data_t *pgdat = (pg_data_t *)arg;
+	struct zone *zone;
+	struct zone *node_zones = pgdat->node_zones;
+	unsigned long flags;
+	int order;
+
+	for (zone = node_zones; zone - node_zones < MAX_NR_ZONES; ++zone) {
+		if (!zone->size)
+			continue;
+
+		spin_lock_irqsave(&zone->lock, flags);
+		seq_printf(m, "Node %d, zone %8s ", pgdat->node_id, zone->name);
+		for (order = 0; order < MAX_ORDER; ++order) {
+			unsigned long nr_bufs = 0;
+			struct list_head *elem;
+
+			list_for_each(elem, &(zone->free_area[order].free_list))
+				++nr_bufs;
+			seq_printf(m, "%6lu ", nr_bufs);
+		}
+		spin_unlock_irqrestore(&zone->lock, flags);
+		seq_putc(m, '\n');
+	}
+	return 0;
+}
+
+struct seq_operations fragmentation_op = {
+	.start	= frag_start,
+	.next	= frag_next,
+	.stop	= frag_stop,
+	.show	= frag_show,
+};
+
+#endif /* CONFIG_PROC_FS */

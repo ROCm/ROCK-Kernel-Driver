@@ -19,9 +19,10 @@
 
 /* comment out following if you have a rev01 board */
 #define PXA_IDP_REV02	1
-//#undef PXA_IDP_REV02
 
 #ifdef PXA_IDP_REV02
+//Use this as well for 0017-x004 and greater pcb's:
+#define PXA_IDP_REV04 1
 
 #define IDP_FLASH_PHYS		(PXA_CS0_PHYS)
 #define IDP_ALT_FLASH_PHYS	(PXA_CS1_PHYS)
@@ -38,6 +39,7 @@
 
 #define IDP_IDE_BASE		(0xf0000000)
 #define IDP_IDE_SIZE		(1*1024*1024)
+#define IDE_REG_STRIDE		4
 
 #define IDP_ETH_BASE		(IDP_IDE_BASE + IDP_IDE_SIZE)
 #define IDP_ETH_SIZE		(1*1024*1024)
@@ -111,6 +113,33 @@
  * Bit masks for various registers
  */
 
+// IDP_CPLD_PCCARD_PWR
+#define PCC0_PWR0	(1 << 0)
+#define PCC0_PWR1	(1 << 1)
+#define PCC0_PWR2	(1 << 2)
+#define PCC0_PWR3	(1 << 3)
+#define PCC1_PWR0	(1 << 4)
+#define PCC1_PWR1	(1 << 5)
+#define PCC1_PWR2	(1 << 6)
+#define PCC1_PWR3	(1 << 7)
+
+// IDP_CPLD_PCCARD_EN
+#define PCC0_RESET	(1 << 6)
+#define PCC1_RESET	(1 << 7)
+#define PCC0_ENABLE	(1 << 0)
+#define PCC1_ENABLE	(1 << 1)
+
+// IDP_CPLD_PCCARDx_STATUS
+#define _PCC_WRPROT	(1 << 7) // 7-4 read as low true
+#define _PCC_RESET	(1 << 6)
+#define _PCC_IRQ	(1 << 5)
+#define _PCC_INPACK	(1 << 4)
+#define PCC_BVD2	(1 << 3)
+#define PCC_BVD1	(1 << 2)
+#define PCC_VS2		(1 << 1)
+#define PCC_VS1		(1 << 0)
+
+#define PCC_DETECT(x)	(GPLR(7 + (x)) & GPIO_bit(7 + (x)))
 
 /*
  * Macros for LCD Driver
@@ -128,6 +157,32 @@
 #define FB_VLCD_OFF() 		(IDP_CPLD_LCD &= ~(1<<2))
 
 #endif
+
+/* A listing of interrupts used by external hardware devices */
+
+#ifdef PXA_IDP_REV04
+#define TOUCH_PANEL_IRQ			IRQ_GPIO(5)
+#define IDE_IRQ				IRQ_GPIO(21)
+#else
+#define TOUCH_PANEL_IRQ			IRQ_GPIO(21)
+#define IDE_IRQ				IRQ_GPIO(5)
+#endif
+
+#define TOUCH_PANEL_IRQ_EDGE		IRQT_FALLING
+
+#define ETHERNET_IRQ			IRQ_GPIO(4)
+#define ETHERNET_IRQ_EDGE		IRQT_RISING
+
+#define IDE_IRQ_EDGE			IRQT_RISING
+
+#define PCMCIA_S0_CD_VALID		IRQ_GPIO(7)
+#define PCMCIA_S0_CD_VALID_EDGE		IRQT_BOTHEDGE
+
+#define PCMCIA_S1_CD_VALID		IRQ_GPIO(8)
+#define PCMCIA_S1_CD_VALID_EDGE		IRQT_BOTHEDGE
+
+#define PCMCIA_S0_RDYINT		IRQ_GPIO(19)
+#define PCMCIA_S1_RDYINT		IRQ_GPIO(22)
 
 
 /*
@@ -172,14 +227,6 @@
 {\
 	inputs = (IDP_CPLD_KB_ROW & 0x7f);\
 }
-
-/* A listing of interrupts used by external hardware devices */
-
-#define TOUCH_PANEL_IRQ			IRQ_GPIO(21)
-#define TOUCH_PANEL_IRQ_EGDE		GPIO_FALLING_EDGE
-
-#define ETHERNET_IRQ			IRQ_GPIO(4)
-#define ETHERNET_IRQ_EDGE		GPIO_RISING_EDGE
 
 #else
 
@@ -286,7 +333,7 @@ extern unsigned int idp_control_port_shadow;
 
 #define WRITE_IDP_CPLD_LED_CONTROL(value, mask) \
 {\
-	idp_cpld_led_control_shadow = ((value & mask) | (idp_cpld_led_control_shadow & ~mask));\
+	idp_cpld_led_control_shadow = (((value & mask) | (idp_cpld_led_control_shadow & ~mask)));\
 	IDP_CPLD_LED_CONTROL = idp_cpld_led_control_shadow;\
 }
 #define WRITE_IDP_CPLD_PERIPH_PWR(value, mask) \
@@ -346,10 +393,10 @@ extern unsigned int idp_control_port_shadow;
 /* A listing of interrupts used by external hardware devices */
 
 #define TOUCH_PANEL_IRQ			IRQ_GPIO(21)
-#define TOUCH_PANEL_IRQ_EGDE		GPIO_FALLING_EDGE
+#define TOUCH_PANEL_IRQ_EGDE		IRQT_FALLING
 
 #define ETHERNET_IRQ			IRQ_GPIO(4)
-#define ETHERNET_IRQ_EDGE		GPIO_RISING_EDGE
+#define ETHERNET_IRQ_EDGE		IRQT_RISING
 
 /*
  * Bit masks for various registers

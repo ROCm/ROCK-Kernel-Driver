@@ -128,7 +128,7 @@ int snmp_get_info(char *buffer, char **start, off_t offset, int length)
 	len += sprintf (buffer + len,
 		"\nIcmp: InMsgs InErrors InDestUnreachs InTimeExcds InParmProbs InSrcQuenchs InRedirects InEchos InEchoReps InTimestamps InTimestampReps InAddrMasks InAddrMaskReps OutMsgs OutErrors OutDestUnreachs OutTimeExcds OutParmProbs OutSrcQuenchs OutRedirects OutEchos OutEchoReps OutTimestamps OutTimestampReps OutAddrMasks OutAddrMaskReps\n"
 		  "Icmp:");
-	for (i=0; i<offsetof(struct icmp_mib, __pad)/sizeof(unsigned long); i++)
+	for (i=0; i<offsetof(struct icmp_mib, dummy)/sizeof(unsigned long); i++)
 		len += sprintf(buffer+len, " %lu", fold_field((unsigned long*)icmp_statistics, sizeof(struct icmp_mib), i));
 
 	len += sprintf (buffer + len,

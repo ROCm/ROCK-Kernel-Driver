@@ -44,7 +44,7 @@
 #include <linux/if_arp.h>
 #include <net/x25.h>
 
-static int x25_receive_data(struct sk_buff *skb, struct x25_neigh *neigh)
+static int x25_receive_data(struct sk_buff *skb, struct x25_neigh *nb)
 {
 	struct sock *sk;
 	unsigned short frametype;
@@ -58,14 +58,14 @@ static int x25_receive_data(struct sk_buff *skb, struct x25_neigh *neigh)
 	 *	frame.
 	 */
 	if (lci == 0) {
-		x25_link_control(skb, neigh, frametype);
+		x25_link_control(skb, nb, frametype);
 		return 0;
 	}
 
 	/*
 	 *	Find an existing socket.
 	 */
-	if ((sk = x25_find_socket(lci, neigh)) != NULL) {
+	if ((sk = x25_find_socket(lci, nb)) != NULL) {
 		int queued = 1;
 
 		skb->h.raw = skb->data;
@@ -83,91 +83,87 @@ static int x25_receive_data(struct sk_buff *skb, struct x25_neigh *neigh)
 	 *	Is is a Call Request ? if so process it.
 	 */
 	if (frametype == X25_CALL_REQUEST)
-		return x25_rx_call_request(skb, neigh, lci);
+		return x25_rx_call_request(skb, nb, lci);
 
 	/*
 	 *	Its not a Call Request, nor is it a control frame.
 	 *      Let caller throw it away.
 	 */
 /*
-	x25_transmit_clear_request(neigh, lci, 0x0D);
+	x25_transmit_clear_request(nb, lci, 0x0D);
 */
 	printk(KERN_DEBUG "x25_receive_data(): unknown frame type %2x\n",frametype);
 
 	return 0;
 }
 
-int x25_lapb_receive_frame(struct sk_buff *skb, struct net_device *dev, struct packet_type *ptype)
+int x25_lapb_receive_frame(struct sk_buff *skb, struct net_device *dev,
+			   struct packet_type *ptype)
 {
-	struct x25_neigh *neigh;
-	int queued;
+	struct x25_neigh *nb;
 
 	skb->sk = NULL;
 
 	/*
-	 *	Packet received from unrecognised device, throw it away.
+	 * Packet received from unrecognised device, throw it away.
 	 */
-	if ((neigh = x25_get_neigh(dev)) == NULL) {
+	nb = x25_get_neigh(dev);
+	if (!nb) {
 		printk(KERN_DEBUG "X.25: unknown neighbour - %s\n", dev->name);
-		kfree_skb(skb);
-		return 0;
+		goto drop;
 	}
 
 	switch (skb->data[0]) {
 		case 0x00:
 			skb_pull(skb, 1);
-			queued = x25_receive_data(skb, neigh);
-			if( ! queued )
-				/* We need to free the skb ourselves because
-				 * net_bh() won't care about our return code.
-				 */
-				kfree_skb(skb);
-			return 0;
-
+			if (x25_receive_data(skb, nb)) {
+				x25_neigh_put(nb);
+				goto out;
+			}
+			break;
 		case 0x01:
-			x25_link_established(neigh);
-			kfree_skb(skb);
-			return 0;
-
+			x25_link_established(nb);
+			break;
 		case 0x02:
-			x25_link_terminated(neigh);
-			kfree_skb(skb);
-			return 0;
-
-		case 0x03:
-			kfree_skb(skb);
-			return 0;
-
-		default:
-			kfree_skb(skb);
-			return 0;
+			x25_link_terminated(nb);
+			break;
 	}
+	x25_neigh_put(nb);
+drop:
+	kfree_skb(skb);
+out:
+	return 0;
 }
 
-int x25_llc_receive_frame(struct sk_buff *skb, struct net_device *dev, struct packet_type *ptype)
+int x25_llc_receive_frame(struct sk_buff *skb, struct net_device *dev,
+			  struct packet_type *ptype)
 {
-	struct x25_neigh *neigh;
+	struct x25_neigh *nb;
+	int rc = 0;
 
 	skb->sk = NULL;
 
 	/*
-	 *	Packet received from unrecognised device, throw it away.
+	 * Packet received from unrecognised device, throw it away.
 	 */
-	if ((neigh = x25_get_neigh(dev)) == NULL) {
+	nb = x25_get_neigh(dev);
+	if (!nb) {
 		printk(KERN_DEBUG "X.25: unknown_neighbour - %s\n", dev->name);
 		kfree_skb(skb);
-		return 0;
+	} else {
+		rc = x25_receive_data(skb, nb);
+		x25_neigh_put(nb);
 	}
 
-	return x25_receive_data(skb, neigh);
+	return rc;
 }
 
-void x25_establish_link(struct x25_neigh *neigh)
+void x25_establish_link(struct x25_neigh *nb)
 {
 	struct sk_buff *skb;
 	unsigned char *ptr;
 
-	switch (neigh->dev->type) {
+	switch (nb->dev->type) {
 		case ARPHRD_X25:
 			if ((skb = alloc_skb(1, GFP_ATOMIC)) == NULL) {
 				printk(KERN_ERR "x25_dev: out of memory\n");
@@ -186,47 +182,44 @@ void x25_establish_link(struct x25_neigh *neigh)
 	}
 
 	skb->protocol = htons(ETH_P_X25);
-	skb->dev      = neigh->dev;
+	skb->dev      = nb->dev;
 
 	dev_queue_xmit(skb);
 }
 
-void x25_terminate_link(struct x25_neigh *neigh)
+void x25_terminate_link(struct x25_neigh *nb)
 {
 	struct sk_buff *skb;
 	unsigned char *ptr;
 
-	switch (neigh->dev->type) {
-		case ARPHRD_X25:
-			if ((skb = alloc_skb(1, GFP_ATOMIC)) == NULL) {
-				printk(KERN_ERR "x25_dev: out of memory\n");
-				return;
-			}
-			ptr  = skb_put(skb, 1);
-			*ptr = 0x02;
-			break;
-
 #if defined(CONFIG_LLC) || defined(CONFIG_LLC_MODULE)
-		case ARPHRD_ETHER:
-			return;
+	if (nb->dev->type == ARPHRD_ETHER)
+		return;
 #endif
-		default:
-			return;
+	if (nb->dev->type != ARPHRD_X25)
+		return;
+
+	skb = alloc_skb(1, GFP_ATOMIC);
+	if (!skb) {
+		printk(KERN_ERR "x25_dev: out of memory\n");
+		return;
 	}
 
-	skb->protocol = htons(ETH_P_X25);
-	skb->dev      = neigh->dev;
+	ptr  = skb_put(skb, 1);
+	*ptr = 0x02;
 
+	skb->protocol = htons(ETH_P_X25);
+	skb->dev      = nb->dev;
 	dev_queue_xmit(skb);
 }
 
-void x25_send_frame(struct sk_buff *skb, struct x25_neigh *neigh)
+void x25_send_frame(struct sk_buff *skb, struct x25_neigh *nb)
 {
 	unsigned char *dptr;
 
 	skb->nh.raw = skb->data;
 
-	switch (neigh->dev->type) {
+	switch (nb->dev->type) {
 		case ARPHRD_X25:
 			dptr  = skb_push(skb, 1);
 			*dptr = 0x00;
@@ -243,7 +236,7 @@ void x25_send_frame(struct sk_buff *skb, struct x25_neigh *neigh)
 	}
 
 	skb->protocol = htons(ETH_P_X25);
-	skb->dev      = neigh->dev;
+	skb->dev      = nb->dev;
 
 	dev_queue_xmit(skb);
 }

@@ -226,21 +226,21 @@ void rpc_clnt_sigmask(struct rpc_clnt *clnt, sigset_t *oldset)
 		if (action[SIGQUIT-1].sa.sa_handler == SIG_DFL)
 			sigallow |= sigmask(SIGQUIT);
 	}
-	spin_lock_irqsave(&current->sigmask_lock, irqflags);
+	spin_lock_irqsave(&current->sig->siglock, irqflags);
 	*oldset = current->blocked;
 	siginitsetinv(&current->blocked, sigallow & ~oldset->sig[0]);
 	recalc_sigpending();
-	spin_unlock_irqrestore(&current->sigmask_lock, irqflags);
+	spin_unlock_irqrestore(&current->sig->siglock, irqflags);
 }
 
 void rpc_clnt_sigunmask(struct rpc_clnt *clnt, sigset_t *oldset)
 {
 	unsigned long	irqflags;
 	
-	spin_lock_irqsave(&current->sigmask_lock, irqflags);
+	spin_lock_irqsave(&current->sig->siglock, irqflags);
 	current->blocked = *oldset;
 	recalc_sigpending();
-	spin_unlock_irqrestore(&current->sigmask_lock, irqflags);
+	spin_unlock_irqrestore(&current->sig->siglock, irqflags);
 }
 
 /*

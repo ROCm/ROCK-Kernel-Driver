@@ -420,12 +420,8 @@ EXPORT_SYMBOL(probe_irq_off);
 EXPORT_SYMBOL(del_timer_sync);
 #endif
 EXPORT_SYMBOL(mod_timer);
-EXPORT_SYMBOL(tq_timer);
-EXPORT_SYMBOL(tq_immediate);
 
 #ifdef CONFIG_SMP
-/* Various random spinlocks we want to export */
-EXPORT_SYMBOL(tqueue_lock);
 
 /* Big-Reader lock implementation */
 EXPORT_SYMBOL(__brlock_array);
@@ -592,12 +588,8 @@ EXPORT_SYMBOL(strspn);
 EXPORT_SYMBOL(strsep);
 
 /* software interrupts */
-EXPORT_SYMBOL(bh_task_vec);
-EXPORT_SYMBOL(init_bh);
-EXPORT_SYMBOL(remove_bh);
 EXPORT_SYMBOL(tasklet_init);
 EXPORT_SYMBOL(tasklet_kill);
-EXPORT_SYMBOL(__run_task_queue);
 EXPORT_SYMBOL(do_softirq);
 EXPORT_SYMBOL(raise_softirq);
 EXPORT_SYMBOL(open_softirq);

@@ -53,7 +53,7 @@ static int __init jornada720_init(void)
 	return 0;
 }
 
-__initcall(jornada720_init);
+arch_initcall(jornada720_init);
 
 static struct map_desc jornada720_io_desc[] __initdata = {
  /* virtual     physical    length      type */

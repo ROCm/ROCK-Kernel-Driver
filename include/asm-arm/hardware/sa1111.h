@@ -611,10 +611,13 @@ struct sa1111_device {
 
 extern struct sa1111_device *sa1111;
 
+int sa1111_check_dma_bug(dma_addr_t addr);
+
 /*
  * These frob the SKPCR register.
  */
 void sa1111_enable_device(unsigned int mask);
 void sa1111_disable_device(unsigned int mask);
+
 
 #endif  /* _ASM_ARCH_SA1111 */

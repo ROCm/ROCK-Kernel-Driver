@@ -1041,15 +1041,15 @@ static void destroy_inodecache(void)
 }
 
 static struct super_operations ufs_super_ops = {
-	alloc_inode:	ufs_alloc_inode,
-	destroy_inode:	ufs_destroy_inode,
-	read_inode:	ufs_read_inode,
-	write_inode:	ufs_write_inode,
-	delete_inode:	ufs_delete_inode,
-	put_super:	ufs_put_super,
-	write_super:	ufs_write_super,
-	statfs:		ufs_statfs,
-	remount_fs:	ufs_remount,
+	.alloc_inode	= ufs_alloc_inode,
+	.destroy_inode	= ufs_destroy_inode,
+	.read_inode	= ufs_read_inode,
+	.write_inode	= ufs_write_inode,
+	.delete_inode	= ufs_delete_inode,
+	.put_super	= ufs_put_super,
+	.write_super	= ufs_write_super,
+	.statfs		= ufs_statfs,
+	.remount_fs	= ufs_remount,
 };
 
 static struct super_block *ufs_get_sb(struct file_system_type *fs_type,
@@ -1059,11 +1059,11 @@ static struct super_block *ufs_get_sb(struct file_system_type *fs_type,
 }
 
 static struct file_system_type ufs_fs_type = {
-	owner:		THIS_MODULE,
-	name:		"ufs",
-	get_sb:		ufs_get_sb,
-	kill_sb:	kill_block_super,
-	fs_flags:	FS_REQUIRES_DEV,
+	.owner		= THIS_MODULE,
+	.name		= "ufs",
+	.get_sb		= ufs_get_sb,
+	.kill_sb	= kill_block_super,
+	.fs_flags	= FS_REQUIRES_DEV,
 };
 
 static int __init init_ufs_fs(void)

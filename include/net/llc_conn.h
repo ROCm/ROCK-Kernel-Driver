@@ -21,7 +21,6 @@ struct llc_timer {
 };
 
 struct llc_opt {
-	struct list_head    node;		/* entry in sap->sk_list.list */
 	struct sock	    *sk;		/* sock that has this llc_opt */
 	struct sockaddr_llc addr;		/* address sock is bound to */
 	u8		    state;		/* state of connection */

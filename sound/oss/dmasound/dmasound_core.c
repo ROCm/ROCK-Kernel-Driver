@@ -597,9 +597,9 @@ static ssize_t sq_write(struct file *file, const char *src, size_t uLeft,
 	   is drained - and if we get here in time then it does not apply.
 	*/
 
-	save_flags(flags) ; cli() ;
+	spin_lock_irqsave(&dmasound.lock, flags);
 	write_sq.syncing &= ~2 ; /* take out POST status */
-	restore_flags(flags) ;
+	spin_unlock_irqrestore(&dmasound.lock, flags);
 
 	if (write_sq.count > 0 &&
 	    (bLeft = write_sq.block_size-write_sq.rear_size) > 0) {
@@ -1347,6 +1347,7 @@ static int __init sq_init(void)
 	if (dmasound.mach.record)
 		sq_fops.read = sq_read ;
 #endif
+	spin_lock_init(&dmasound.lock);
 	sq_unit = register_sound_dsp(&sq_fops, -1);
 	if (sq_unit < 0) {
 		printk(KERN_ERR "dmasound_core: couldn't register fops\n") ;

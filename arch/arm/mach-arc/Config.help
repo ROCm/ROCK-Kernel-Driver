@@ -1,0 +1,24 @@
+CONFIG_ARCH_ARCA5K
+  This selects what ARM system you wish to build the kernel for. It
+  also selects to some extent the CPU type. If you are unsure what
+  to set this option to, please consult any information supplied with
+  your system.
+
+CONFIG_ARCH_A5K
+  Say Y here to to support the Acorn A5000.  Linux can support the
+  internal IDE disk and CD-ROM interface, serial and parallel port,
+  and the floppy drive.  Note that on some A5000s the floppy is
+  plugged into the wrong socket on the motherboard.
+
+CONFIG_ARCH_ARC
+  The Acorn Archimedes was an personal computer based on an 8K ARM2
+  processor, released in 1987.  It supported 512K of RAM and 2 800K
+  floppy disks.  Picture and more detailed specifications at
+  <http://www.computingmuseum.com/museum/archi.htm>.
+
+CONFIG_PAGESIZE_16
+  Say Y here if your Archimedes or A5000 system has only 2MB of
+  memory, otherwise say N.  The resulting kernel will not run on a
+  machine with 4MB of memory.
+
+

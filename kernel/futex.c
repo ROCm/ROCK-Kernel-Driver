@@ -151,13 +151,13 @@ static void futex_vcache_callback(vcache_t *vcache, struct page *new_page)
 	struct futex_q *q = container_of(vcache, struct futex_q, vcache);
 	struct list_head *head = hash_futex(new_page, q->offset);
 
-	BUG_ON(list_empty(&q->list));
-
 	spin_lock(&futex_lock);
 
-	q->page = new_page;
-	list_del_init(&q->list);
-	list_add_tail(&q->list, head);
+	if (!list_empty(&q->list)) {
+		q->page = new_page;
+		list_del(&q->list);
+		list_add_tail(&q->list, head);
+	}
 
 	spin_unlock(&futex_lock);
 }

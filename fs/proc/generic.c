@@ -33,9 +33,9 @@ int proc_match(int len, const char *name,struct proc_dir_entry * de)
 }
 
 static struct file_operations proc_file_operations = {
-	llseek:		proc_file_lseek,
-	read:		proc_file_read,
-	write:		proc_file_write,
+	.llseek		= proc_file_lseek,
+	.read		= proc_file_read,
+	.write		= proc_file_write,
 };
 
 #ifndef MIN
@@ -230,8 +230,8 @@ static int proc_follow_link(struct dentry *dentry, struct nameidata *nd)
 }
 
 static struct inode_operations proc_link_inode_operations = {
-	readlink:	proc_readlink,
-	follow_link:	proc_follow_link,
+	.readlink	= proc_readlink,
+	.follow_link	= proc_follow_link,
 };
 
 /*
@@ -247,7 +247,7 @@ static int proc_delete_dentry(struct dentry * dentry)
 
 static struct dentry_operations proc_dentry_operations =
 {
-	d_delete:	proc_delete_dentry,
+	.d_delete	= proc_delete_dentry,
 };
 
 /*
@@ -359,15 +359,15 @@ out:	unlock_kernel();
  * the /proc directory.
  */
 static struct file_operations proc_dir_operations = {
-	read:			generic_read_dir,
-	readdir:		proc_readdir,
+	.read			= generic_read_dir,
+	.readdir		= proc_readdir,
 };
 
 /*
  * proc directories can do almost nothing..
  */
 static struct inode_operations proc_dir_inode_operations = {
-	lookup:		proc_lookup,
+	.lookup		= proc_lookup,
 };
 
 static int proc_register(struct proc_dir_entry * dir, struct proc_dir_entry * dp)

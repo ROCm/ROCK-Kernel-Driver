@@ -340,10 +340,8 @@ MODULE_PARM_DESC(unit,"Ethertap device number");
 
 static struct net_device dev_ethertap =
 {
-	" ",
-	0, 0, 0, 0,
-	1, 5,
-	0, 0, 0, NULL, ethertap_probe
+	.name		=	" ",
+	.init		=	 ethertap_probe
 };
 
 int init_module(void)

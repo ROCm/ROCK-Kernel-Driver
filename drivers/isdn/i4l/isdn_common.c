@@ -507,7 +507,7 @@ isdn_status_callback(isdn_ctrl * c)
 				case 1:
 					list_for_each(l, &isdn_net_devs) {
 						isdn_net_dev *p = list_entry(l, isdn_net_dev, global_list);
-						if (p->local.isdn_slot == i) {
+						if (p->isdn_slot == i) {
 							strcpy(cmd.parm.setup.eazmsn, p->local.msn);
 							isdn_slot_command(i, ISDN_CMD_ACCEPTD, &cmd);
 							retval = 1;
@@ -611,11 +611,9 @@ isdn_status_callback(isdn_ctrl * c)
 			dbg_statcallb("BHUP: %d\n", i);
 			dev->drv[di]->online &= ~(1 << (c->arg));
 			isdn_info_update();
-#ifdef CONFIG_ISDN_X25
 			/* Signal hangup to network-devices */
 			if (isdn_net_stat_callback(i, c))
 				break;
-#endif
 			isdn_v110_stat_callback(&slot[i].iv110, c);
 			if (isdn_tty_stat_callback(i, c))
 				break;
@@ -2251,6 +2249,21 @@ isdn_slot_st_netdev(int sl)
 	return slot[sl].st_netdev;
 }
 
+int
+isdn_hard_header_len(void)
+{
+	int drvidx;
+	int max = 0;
+	
+	for (drvidx = 0; drvidx < ISDN_MAX_DRIVERS; drvidx++) {
+		if (dev->drv[drvidx] && 
+		    max < dev->drv[drvidx]->interface->hl_hdrlen) {
+			max = dev->drv[drvidx]->interface->hl_hdrlen;
+		}
+	}
+	return max;
+}
+
 /*
  *****************************************************************************
  * And now the modules code.
@@ -2417,6 +2430,7 @@ static int __init isdn_init(void)
 	printk("\n");
 #endif
 	isdn_info_update();
+	isdn_net_init_module();
 	return 0;
 
  err_tty_modem:

@@ -139,7 +139,7 @@ nlmclnt_proc(struct inode *inode, int cmd, struct file_lock *fl)
 	}
 
 	/* Keep the old signal mask */
-	spin_lock_irqsave(&current->sigmask_lock, flags);
+	spin_lock_irqsave(&current->sig->siglock, flags);
 	oldset = current->blocked;
 
 	/* If we're cleaning up locks because the process is exiting,
@@ -149,7 +149,7 @@ nlmclnt_proc(struct inode *inode, int cmd, struct file_lock *fl)
 	    && (current->flags & PF_EXITING)) {
 		sigfillset(&current->blocked);	/* Mask all signals */
 		recalc_sigpending();
-		spin_unlock_irqrestore(&current->sigmask_lock, flags);
+		spin_unlock_irqrestore(&current->sig->siglock, flags);
 
 		call = nlmclnt_alloc_call();
 		if (!call) {
@@ -158,7 +158,7 @@ nlmclnt_proc(struct inode *inode, int cmd, struct file_lock *fl)
 		}
 		call->a_flags = RPC_TASK_ASYNC;
 	} else {
-		spin_unlock_irqrestore(&current->sigmask_lock, flags);
+		spin_unlock_irqrestore(&current->sig->siglock, flags);
 		memset(call, 0, sizeof(*call));
 		locks_init_lock(&call->a_args.lock.fl);
 		locks_init_lock(&call->a_res.lock.fl);
@@ -183,10 +183,10 @@ nlmclnt_proc(struct inode *inode, int cmd, struct file_lock *fl)
 		kfree(call);
 
  out_restore:
-	spin_lock_irqsave(&current->sigmask_lock, flags);
+	spin_lock_irqsave(&current->sig->siglock, flags);
 	current->blocked = oldset;
 	recalc_sigpending();
-	spin_unlock_irqrestore(&current->sigmask_lock, flags);
+	spin_unlock_irqrestore(&current->sig->siglock, flags);
 
 done:
 	dprintk("lockd: clnt proc returns %d\n", status);
@@ -592,11 +592,11 @@ nlmclnt_cancel(struct nlm_host *host, struct file_lock *fl)
 	int		status;
 
 	/* Block all signals while setting up call */
-	spin_lock_irqsave(&current->sigmask_lock, flags);
+	spin_lock_irqsave(&current->sig->siglock, flags);
 	oldset = current->blocked;
 	sigfillset(&current->blocked);
 	recalc_sigpending();
-	spin_unlock_irqrestore(&current->sigmask_lock, flags);
+	spin_unlock_irqrestore(&current->sig->siglock, flags);
 
 	req = nlmclnt_alloc_call();
 	if (!req)
@@ -611,10 +611,10 @@ nlmclnt_cancel(struct nlm_host *host, struct file_lock *fl)
 	if (status < 0)
 		kfree(req);
 
-	spin_lock_irqsave(&current->sigmask_lock, flags);
+	spin_lock_irqsave(&current->sig->siglock, flags);
 	current->blocked = oldset;
 	recalc_sigpending();
-	spin_unlock_irqrestore(&current->sigmask_lock, flags);
+	spin_unlock_irqrestore(&current->sig->siglock, flags);
 
 	return status;
 }

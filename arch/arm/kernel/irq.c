@@ -18,12 +18,12 @@
  *  Naturally it's not a 1:1 relation, but there are similarities.
  */
 #include <linux/config.h>
-#include <linux/ptrace.h>
 #include <linux/kernel_stat.h>
 #include <linux/signal.h>
 #include <linux/sched.h>
 #include <linux/ioport.h>
 #include <linux/interrupt.h>
+#include <linux/ptrace.h>
 #include <linux/slab.h>
 #include <linux/random.h>
 #include <linux/smp.h>
@@ -217,14 +217,11 @@ do_simple_IRQ(unsigned int irq, struct irqdesc *desc, struct pt_regs *regs)
 
 	desc->triggered = 1;
 
-	irq_enter();
 	kstat.irqs[cpu][irq]++;
 
 	action = desc->action;
 	if (action)
 		__do_irq(irq, desc->action, regs);
-
-	irq_exit();
 }
 
 /*
@@ -256,7 +253,6 @@ do_edge_IRQ(unsigned int irq, struct irqdesc *desc, struct pt_regs *regs)
 	 */
 	desc->running = 1;
 
-	irq_enter();
 	kstat.irqs[cpu][irq]++;
 
 	do {
@@ -272,9 +268,7 @@ do_edge_IRQ(unsigned int irq, struct irqdesc *desc, struct pt_regs *regs)
 		}
 
 		__do_irq(irq, action, regs);
-	} while (desc->pending);
-
-	irq_exit();
+	} while (desc->pending && desc->enabled);
 
 	desc->running = 0;
 
@@ -311,7 +305,6 @@ do_level_IRQ(unsigned int irq, struct irqdesc *desc, struct pt_regs *regs)
 	desc->chip->ack(irq);
 
 	if (likely(desc->enabled)) {
-		irq_enter();
 		kstat.irqs[cpu][irq]++;
 
 		/*
@@ -325,7 +318,6 @@ do_level_IRQ(unsigned int irq, struct irqdesc *desc, struct pt_regs *regs)
 				   !check_irq_lock(desc, irq, regs)))
 				desc->chip->unmask(irq);
 		}
-		irq_exit();
 	}
 }
 
@@ -345,12 +337,11 @@ asmlinkage void asm_do_IRQ(int irq, struct pt_regs *regs)
 	if (irq >= NR_IRQS)
 		desc = &bad_irq_desc;
 
+	irq_enter();
 	spin_lock(&irq_controller_lock);
 	desc->handle(irq, desc, regs);
 	spin_unlock(&irq_controller_lock);
-
-	if (softirq_pending(smp_processor_id()))
-		do_softirq();
+	irq_exit();
 }
 
 void __set_irq_handler(unsigned int irq, irq_handler_t handle, int is_chained)

@@ -15,9 +15,9 @@ typedef struct minix_dir_entry minix_dirent;
 static int minix_readdir(struct file *, void *, filldir_t);
 
 struct file_operations minix_dir_operations = {
-	read:		generic_read_dir,
-	readdir:	minix_readdir,
-	fsync:		minix_sync_file,
+	.read		= generic_read_dir,
+	.readdir	= minix_readdir,
+	.fsync		= minix_sync_file,
 };
 
 static inline void dir_put_page(struct page *page)

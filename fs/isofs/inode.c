@@ -124,11 +124,11 @@ static void destroy_inodecache(void)
 }
 
 static struct super_operations isofs_sops = {
-	alloc_inode:	isofs_alloc_inode,
-	destroy_inode:	isofs_destroy_inode,
-	read_inode:	isofs_read_inode,
-	put_super:	isofs_put_super,
-	statfs:		isofs_statfs,
+	.alloc_inode	= isofs_alloc_inode,
+	.destroy_inode	= isofs_destroy_inode,
+	.read_inode	= isofs_read_inode,
+	.put_super	= isofs_put_super,
+	.statfs		= isofs_statfs,
 };
 
 /* the export_operations structure for describing
@@ -148,21 +148,21 @@ static struct export_operations isofs_export_ops = {
 
 static struct dentry_operations isofs_dentry_ops[] = {
 	{
-		d_hash:		isofs_hash,
-		d_compare:	isofs_dentry_cmp,
+		.d_hash		= isofs_hash,
+		.d_compare	= isofs_dentry_cmp,
 	},
 	{
-		d_hash:		isofs_hashi,
-		d_compare:	isofs_dentry_cmpi,
+		.d_hash		= isofs_hashi,
+		.d_compare	= isofs_dentry_cmpi,
 	},
 #ifdef CONFIG_JOLIET
 	{
-		d_hash:		isofs_hash_ms,
-		d_compare:	isofs_dentry_cmp_ms,
+		.d_hash		= isofs_hash_ms,
+		.d_compare	= isofs_dentry_cmp_ms,
 	},
 	{
-		d_hash:		isofs_hashi_ms,
-		d_compare:	isofs_dentry_cmpi_ms,
+		.d_hash		= isofs_hashi_ms,
+		.d_compare	= isofs_dentry_cmpi_ms,
 	}
 #endif
 };
@@ -1063,9 +1063,9 @@ static int _isofs_bmap(struct address_space *mapping, long block)
 }
 
 static struct address_space_operations isofs_aops = {
-	readpage: isofs_readpage,
-	sync_page: block_sync_page,
-	bmap: _isofs_bmap
+	.readpage = isofs_readpage,
+	.sync_page = block_sync_page,
+	.bmap = _isofs_bmap
 };
 
 static inline void test_and_set_uid(uid_t *p, uid_t value)
@@ -1430,11 +1430,11 @@ static struct super_block *isofs_get_sb(struct file_system_type *fs_type,
 }
 
 static struct file_system_type iso9660_fs_type = {
-	owner:		THIS_MODULE,
-	name:		"iso9660",
-	get_sb:		isofs_get_sb,
-	kill_sb:	kill_block_super,
-	fs_flags:	FS_REQUIRES_DEV,
+	.owner		= THIS_MODULE,
+	.name		= "iso9660",
+	.get_sb		= isofs_get_sb,
+	.kill_sb	= kill_block_super,
+	.fs_flags	= FS_REQUIRES_DEV,
 };
 
 static int __init init_iso9660_fs(void)

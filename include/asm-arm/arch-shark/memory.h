@@ -40,6 +40,4 @@
 
 #define isa_virt_to_bus		virt_to_bus
 
-#define PHYS_TO_NID(addr)	(0)
-
 #endif

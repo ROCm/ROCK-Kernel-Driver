@@ -22,6 +22,7 @@
  *	Alexey Kuznetsov		:	state machine reworked
  *						and moved to net/core.
  *	Pekka Savola			:	RFC2461 validation
+ *	YOSHIFUJI Hideaki @USAGI	:	Verify ND options properly
  */
 
 /* Set to 3 to get tracing... */

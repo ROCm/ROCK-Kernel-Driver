@@ -438,6 +438,13 @@ S: Kopmansg 2
 S: 411 13  Goteborg
 S: Sweden
 
+N: Dominik Brodowski
+E: linux@brodo.de
+W: http://www.brodo.de/
+P: 1024D/725B37C6  190F 3E77 9C89 3B6D BECD  46EE 67C3 0308 725B 37C6
+D: parts of CPUFreq code, ACPI bugfixes
+S: Tuebingen, Germany
+
 N: Andries Brouwer
 E: aeb@cwi.nl
 D: random Linux hacker

@@ -18,7 +18,14 @@ int sun_partition(struct parsed_partitions *state, struct block_device *bdev)
 	Sector sect;
 	struct sun_disklabel {
 		unsigned char info[128];   /* Informative text string */
-		unsigned char spare[292];  /* Boot information etc. */
+		unsigned char spare0[14];
+		struct sun_info {
+			unsigned char spare1;
+			unsigned char id;
+			unsigned char spare2;
+			unsigned char flags;
+		} infos[8];
+		unsigned char spare[246];  /* Boot information etc. */
 		unsigned short rspeed;     /* Disk rotational speed */
 		unsigned short pcylcount;  /* Physical cylinder count */
 		unsigned short sparecyl;   /* extra sects per cylinder */
@@ -54,22 +61,27 @@ int sun_partition(struct parsed_partitions *state, struct block_device *bdev)
 	ush = ((unsigned short *) (label+1)) - 1;
 	for (csum = 0; ush >= ((unsigned short *) label);)
 		csum ^= *ush--;
-	if(csum) {
+	if (csum) {
 		printk("Dev %s Sun disklabel: Csum bad, label corrupted\n",
 		       bdevname(bdev));
 		put_dev_sector(sect);
 		return 0;
 	}
+
 	/* All Sun disks have 8 partition entries */
 	spc = be16_to_cpu(label->ntrks) * be16_to_cpu(label->nsect);
-	for(i=0; i < 8; i++, p++) {
+	for (i = 0; i < 8; i++, p++) {
 		unsigned long st_sector;
 		int num_sectors;
 
 		st_sector = be32_to_cpu(p->start_cylinder) * spc;
 		num_sectors = be32_to_cpu(p->num_sectors);
-		if (num_sectors)
-			put_partition(state, slot++, st_sector, num_sectors);
+		if (num_sectors) {
+			put_partition(state, slot, st_sector, num_sectors);
+			if (label->infos[i].id == LINUX_RAID_PARTITION)
+				state->parts[slot].flags = 1;
+			slot++;
+		}
 	}
 	printk("\n");
 	put_dev_sector(sect);

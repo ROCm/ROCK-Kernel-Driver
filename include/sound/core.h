@@ -22,9 +22,8 @@
  *
  */
 
-#ifdef CONFIG_PM
-#include <linux/sched.h>		/* wake_up() and struct semaphore */
-#endif
+#include <linux/sched.h>		/* wake_up() */
+#include <asm/semaphore.h>		/* struct semaphore */
 
 /* Typedef's */
 typedef struct timeval snd_timestamp_t;
@@ -37,6 +36,9 @@ typedef struct sndrv_xferv snd_xferv_t;
 /* forward declarations */
 #ifdef CONFIG_PCI
 struct pci_dev;
+#endif
+#ifdef CONFIG_SBUS
+struct sbus_dev;
 #endif
 
 /* device allocation stuff */
@@ -243,8 +245,10 @@ void snd_hidden_vfree(void *obj);
 #define kfree_nocheck(obj) snd_wrapper_kfree(obj)
 #define vmalloc(size) snd_hidden_vmalloc(size)
 #define vfree(obj) snd_hidden_vfree(obj)
+#define vfree_nocheck(obj) snd_wrapper_vfree(obj)
 #else
 #define kfree_nocheck(obj) kfree(obj)
+#define vfree_nocheck(obj) vfree(obj)
 #endif
 void *snd_kcalloc(size_t size, int flags);
 char *snd_kmalloc_strdup(const char *string, int flags);
@@ -255,6 +259,11 @@ void snd_free_pages(void *ptr, unsigned long size);
 void *snd_malloc_pci_pages(struct pci_dev *pci, unsigned long size, dma_addr_t *dma_addr);
 void *snd_malloc_pci_pages_fallback(struct pci_dev *pci, unsigned long size, dma_addr_t *dma_addr, unsigned long *res_size);
 void snd_free_pci_pages(struct pci_dev *pci, unsigned long size, void *ptr, dma_addr_t dma_addr);
+#endif
+#ifdef CONFIG_SBUS
+void *snd_malloc_sbus_pages(struct sbus_dev *sdev, unsigned long size, dma_addr_t *dma_addr);
+void *snd_malloc_sbus_pages_fallback(struct sbus_dev *sdev, unsigned long size, dma_addr_t *dma_addr, unsigned long *res_size);
+void snd_free_sbus_pages(struct sbus_dev *sdev, unsigned long size, void *ptr, dma_addr_t dma_addr);
 #endif
 #ifdef CONFIG_ISA
 #ifdef CONFIG_PCI

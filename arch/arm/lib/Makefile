@@ -17,8 +17,6 @@ obj-y		:= backtrace.o changebit.o csumipv6.o csumpartial.o   \
 obj-m		:=
 obj-n		:=
 
-obj-$(CONFIG_VT)+= kbd.o
-
 obj-arc		:= ecard.o io-acorn.o floppydma.o
 obj-rpc		:= ecard.o io-acorn.o floppydma.o
 obj-clps7500	:= io-acorn.o

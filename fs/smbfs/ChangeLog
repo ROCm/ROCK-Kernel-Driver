@@ -1,5 +1,10 @@
 ChangeLog for smbfs.
 
+2002-04-19 John Newbigin <jn@it.swin.edu.au>
+
+	* Implementation of CIFS Extensions for UNIX systems, including soft
+	  and hard links.
+
 2001-08-03 Urban Widmark <urban@teststation.com>
 
 	* *.c: Unicode support

@@ -31,9 +31,9 @@ static struct super_block *proc_get_sb(struct file_system_type *fs_type,
 }
 
 static struct file_system_type proc_fs_type = {
-	name:		"proc",
-	get_sb:		proc_get_sb,
-	kill_sb:	kill_anon_super,
+	.name		= "proc",
+	.get_sb		= proc_get_sb,
+	.kill_sb	= kill_anon_super,
 };
 
 extern int __init proc_init_inodecache(void);
@@ -122,29 +122,29 @@ static int proc_root_readdir(struct file * filp,
  * directory handling functions for that..
  */
 static struct file_operations proc_root_operations = {
-	read:		 generic_read_dir,
-	readdir:	 proc_root_readdir,
+	.read		 = generic_read_dir,
+	.readdir	 = proc_root_readdir,
 };
 
 /*
  * proc root can do almost nothing..
  */
 static struct inode_operations proc_root_inode_operations = {
-	lookup:		proc_root_lookup,
+	.lookup		= proc_root_lookup,
 };
 
 /*
  * This is the root "inode" in the /proc tree..
  */
 struct proc_dir_entry proc_root = {
-	low_ino:	PROC_ROOT_INO, 
-	namelen:	5, 
-	name:		"/proc",
-	mode:		S_IFDIR | S_IRUGO | S_IXUGO, 
-	nlink:		2, 
-	proc_iops:	&proc_root_inode_operations, 
-	proc_fops:	&proc_root_operations,
-	parent:		&proc_root,
+	.low_ino	= PROC_ROOT_INO, 
+	.namelen	= 5, 
+	.name		= "/proc",
+	.mode		= S_IFDIR | S_IRUGO | S_IXUGO, 
+	.nlink		= 2, 
+	.proc_iops	= &proc_root_inode_operations, 
+	.proc_fops	= &proc_root_operations,
+	.parent		= &proc_root,
 };
 
 #ifdef CONFIG_SYSCTL

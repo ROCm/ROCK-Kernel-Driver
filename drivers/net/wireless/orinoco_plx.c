@@ -1,4 +1,4 @@
-/* orinoco_plx.c 0.13
+/* orinoco_plx.c 0.13a
  * 
  * Driver for Prism II devices which would usually be driven by orinoco_cs,
  * but are connected to the PCI bus by a PLX9052. 
@@ -341,7 +341,7 @@ static struct pci_driver orinoco_plx_driver = {
 	.resume		= 0,
 };
 
-static char version[] __initdata = "orinoco_plx.c 0.13 (Daniel Barlow <dan@telent.net>, David Gibson <hermes@gibson.dropbear.id.au>)";
+static char version[] __initdata = "orinoco_plx.c 0.13a (Daniel Barlow <dan@telent.net>, David Gibson <hermes@gibson.dropbear.id.au>)";
 MODULE_AUTHOR("Daniel Barlow <dan@telent.net>");
 MODULE_DESCRIPTION("Driver for wireless LAN cards using the PLX9052 PCI bridge");
 #ifdef MODULE_LICENSE
