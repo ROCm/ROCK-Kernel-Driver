@@ -76,12 +76,11 @@ int mcfrs_console_cbaud = DEFAULT_CBAUD;
 /*
  *	Driver data structures.
  */
-struct tty_driver	mcfrs_serial_driver, mcfrs_callout_driver;
+struct tty_driver	mcfrs_serial_driver;
 static int		mcfrs_serial_refcount;
 
 /* serial subtype definitions */
 #define SERIAL_TYPE_NORMAL	1
-#define SERIAL_TYPE_CALLOUT	2
   
 /* number of characters left in xmit buffer before we ask for more */
 #define WAKEUP_CHARS 256
@@ -450,12 +449,10 @@ void mcfrs_modem_change(struct mcf_serial *info, int dcd)
 		return;
 
 	if (info->flags & ASYNC_CHECK_CD) {
-		if (dcd) {
+		if (dcd)
 			wake_up_interruptible(&info->open_wait);
-		} else if (!((info->flags & ASYNC_CALLOUT_ACTIVE) &&
-		    (info->flags & ASYNC_CALLOUT_NOHUP))) {
+		else 
 			schedule_work(&info->tqueue_hangup);
-		}
 	}
 }
 
@@ -1198,8 +1195,6 @@ static void mcfrs_close(struct tty_struct *tty, struct file * filp)
 	 */
 	if (info->flags & ASYNC_NORMAL_ACTIVE)
 		info->normal_termios = *tty->termios;
-	if (info->flags & ASYNC_CALLOUT_ACTIVE)
-		info->callout_termios = *tty->termios;
 
 	/*
 	 * Now we wait for the transmit buffer to clear; and we notify 
@@ -1248,8 +1243,7 @@ static void mcfrs_close(struct tty_struct *tty, struct file * filp)
 		}
 		wake_up_interruptible(&info->open_wait);
 	}
-	info->flags &= ~(ASYNC_NORMAL_ACTIVE|ASYNC_CALLOUT_ACTIVE|
-			 ASYNC_CLOSING);
+	info->flags &= ~(ASYNC_NORMAL_ACTIVE|ASYNC_CLOSING);
 	wake_up_interruptible(&info->close_wait);
 	local_irq_restore(flags);
 }
@@ -1268,7 +1262,7 @@ void mcfrs_hangup(struct tty_struct *tty)
 	shutdown(info);
 	info->event = 0;
 	info->count = 0;
-	info->flags &= ~(ASYNC_NORMAL_ACTIVE|ASYNC_CALLOUT_ACTIVE);
+	info->flags &= ~ASYNC_NORMAL_ACTIVE;
 	info->tty = 0;
 	wake_up_interruptible(&info->open_wait);
 }
@@ -1300,25 +1294,6 @@ static int block_til_ready(struct tty_struct *tty, struct file * filp,
 		return -EAGAIN;
 #endif
 	}
-
-	/*
-	 * If this is a callout device, then just make sure the normal
-	 * device isn't being used.
-	 */
-	if (tty->driver->subtype == SERIAL_TYPE_CALLOUT) {
-		if (info->flags & ASYNC_NORMAL_ACTIVE)
-			return -EBUSY;
-		if ((info->flags & ASYNC_CALLOUT_ACTIVE) &&
-		    (info->flags & ASYNC_SESSION_LOCKOUT) &&
-		    (info->session != current->session))
-		    return -EBUSY;
-		if ((info->flags & ASYNC_CALLOUT_ACTIVE) &&
-		    (info->flags & ASYNC_PGRP_LOCKOUT) &&
-		    (info->pgrp != current->pgrp))
-		    return -EBUSY;
-		info->flags |= ASYNC_CALLOUT_ACTIVE;
-		return 0;
-	}
 	
 	/*
 	 * If non-blocking mode is set, or the port is not enabled,
@@ -1326,20 +1301,13 @@ static int block_til_ready(struct tty_struct *tty, struct file * filp,
 	 */
 	if ((filp->f_flags & O_NONBLOCK) ||
 	    (tty->flags & (1 << TTY_IO_ERROR))) {
-		if (info->flags & ASYNC_CALLOUT_ACTIVE)
-			return -EBUSY;
 		info->flags |= ASYNC_NORMAL_ACTIVE;
 		return 0;
 	}
 
-	if (info->flags & ASYNC_CALLOUT_ACTIVE) {
-		if (info->normal_termios.c_cflag & CLOCAL)
-			do_clocal = 1;
-	} else {
-		if (tty->termios->c_cflag & CLOCAL)
-			do_clocal = 1;
-	}
-	
+	if (tty->termios->c_cflag & CLOCAL)
+		do_clocal = 1;
+
 	/*
 	 * Block waiting for the carrier detect and the line to become
 	 * free (i.e., not in use by the callout).  While we are in
@@ -1357,8 +1325,7 @@ static int block_til_ready(struct tty_struct *tty, struct file * filp,
 	info->blocked_open++;
 	while (1) {
 		local_irq_disable();
-		if (!(info->flags & ASYNC_CALLOUT_ACTIVE))
-			mcfrs_setsignals(info, 1, 1);
+		mcfrs_setsignals(info, 1, 1);
 		local_irq_enable();
 		current->state = TASK_INTERRUPTIBLE;
 		if (tty_hung_up_p(filp) ||
@@ -1373,8 +1340,7 @@ static int block_til_ready(struct tty_struct *tty, struct file * filp,
 #endif
 			break;
 		}
-		if (!(info->flags & ASYNC_CALLOUT_ACTIVE) &&
-		    !(info->flags & ASYNC_CLOSING) &&
+		if (!(info->flags & ASYNC_CLOSING) &&
 		    (do_clocal || (mcfrs_getsignals(info) & TIOCM_CD)))
 			break;
 		if (signal_pending(current)) {
@@ -1443,15 +1409,9 @@ int mcfrs_open(struct tty_struct *tty, struct file * filp)
 	}
 
 	if ((info->count == 1) && (info->flags & ASYNC_SPLIT_TERMIOS)) {
-		if (tty->driver->subtype == SERIAL_TYPE_NORMAL)
-			*tty->termios = info->normal_termios;
-		else 
-			*tty->termios = info->callout_termios;
+		*tty->termios = info->normal_termios;
 		mcfrs_change_speed(info);
 	}
-
-	info->session = current->session;
-	info->pgrp = current->pgrp;
 
 #ifdef SERIAL_DEBUG_OPEN
 	printk("mcfrs_open %s successful...\n", tty->name);
@@ -1658,26 +1618,11 @@ mcfrs_init(void)
 	mcfrs_serial_driver.read_proc = mcfrs_readproc;
 	mcfrs_serial_driver.driver_name = "serial";
 
-	/*
-	 * The callout device is just like normal device except for
-	 * major number and the subtype code.
-	 */
-	mcfrs_callout_driver = mcfrs_serial_driver;
-	mcfrs_callout_driver.name = "cua";
-	mcfrs_callout_driver.major = TTYAUX_MAJOR;
-	mcfrs_callout_driver.subtype = SERIAL_TYPE_CALLOUT;
-	mcfrs_callout_driver.read_proc = 0;
-	mcfrs_callout_driver.proc_entry = 0;
-
 	if (tty_register_driver(&mcfrs_serial_driver)) {
 		printk("MCFRS: Couldn't register serial driver\n");
 		return(-EBUSY);
 	}
-	if (tty_register_driver(&mcfrs_callout_driver)) {
-		printk("MCFRS: Couldn't register callout driver\n");
-		return(-EBUSY);
-	}
-	
+
 	local_irq_save(flags);
 
 	/*
@@ -1696,7 +1641,6 @@ mcfrs_init(void)
 		info->blocked_open = 0;
 		INIT_WORK(&info->tqueue, mcfrs_offintr, info);
 		INIT_WORK(&info->tqueue_hangup, do_serial_hangup, info);
-		info->callout_termios = mcfrs_callout_driver.init_termios;
 		info->normal_termios = mcfrs_serial_driver.init_termios;
 		init_waitqueue_head(&info->open_wait);
 		init_waitqueue_head(&info->close_wait);
