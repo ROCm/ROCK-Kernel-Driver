@@ -133,7 +133,7 @@ static int __init usb_console_setup(struct console *co, char *options)
 	co->cflag = cflag;
 
 	/* grab the first serial port that happens to be connected */
-	serial = usb_serial_get_by_minor (0);
+	serial = usb_serial_get_by_index(0);
 	if (serial_paranoia_check (serial, __FUNCTION__)) {
 		/* no device is connected yet, sorry :( */
 		err ("No USB device connected to ttyUSB0");

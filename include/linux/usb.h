@@ -73,12 +73,20 @@ struct usb_host_interface {
 /**
  * struct usb_interface - what usb device drivers talk to
  * @altsetting: array of interface descriptors, one for each alternate
- * 	setting that may be selected.  each one includes a set of
- * 	endpoint configurations.
+ * 	setting that may be selected.  Each one includes a set of
+ * 	endpoint configurations and will be in numberic order,
+ * 	0..num_altsetting.
  * @num_altsetting: number of altsettings defined.
  * @act_altsetting: index of current altsetting.  this number is always
  *	less than num_altsetting.  after the device is configured, each
  *	interface uses its default setting of zero.
+ * @max_altsetting:
+ * @minor: the minor number assigned to this interface, if this
+ *	interface is bound to a driver that uses the USB major number.
+ *	If this interface does not use the USB major, this field should
+ *	be unused.  The driver should set this value in the probe()
+ *	function of the driver, after it has been assigned a minor
+ *	number from the USB core by calling usb_register_dev().
  * @dev: driver model's view of this device
  *
  * USB device drivers attach to interfaces on a physical device.  Each
@@ -111,7 +119,7 @@ struct usb_interface {
 	unsigned max_altsetting;	/* total memory allocated */
 
 	struct usb_driver *driver;	/* driver */
-	kdev_t kdev;			/* node this interface is bound to */
+	int minor;			/* minor number this interface is bound to */
 	struct device dev;		/* interface specific device info */
 };
 #define	to_usb_interface(d) container_of(d, struct usb_interface, dev)
@@ -279,7 +287,7 @@ extern void usb_driver_release_interface(struct usb_driver *driver,
 const struct usb_device_id *usb_match_id(struct usb_interface *interface,
 					 const struct usb_device_id *id);
 
-extern struct usb_interface *usb_find_interface(struct usb_driver *drv, kdev_t kdev);
+extern struct usb_interface *usb_find_interface(struct usb_driver *drv, int minor);
 extern struct usb_interface *usb_ifnum_to_if(struct usb_device *dev, unsigned ifnum);
 
 

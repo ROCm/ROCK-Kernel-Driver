@@ -330,7 +330,7 @@ static int usblp_open(struct inode *inode, struct file *file)
 	lock_kernel();
 
 	retval = -ENODEV;
-	intf = usb_find_interface(&usblp_driver, mk_kdev(USB_MAJOR,minor));
+	intf = usb_find_interface(&usblp_driver, minor);
 	if (!intf) {
 		goto out;
 	}
@@ -920,9 +920,7 @@ static int usblp_probe(struct usb_interface *intf,
 		usblp->dev->descriptor.idProduct);
 
 	usb_set_intfdata (intf, usblp);
-
-	/* add device id so the device works when advertised */
-	intf->kdev = mk_kdev(USB_MAJOR,usblp->minor);
+	intf->minor = usblp->minor;
 
 	return 0;
 
@@ -1109,7 +1107,7 @@ static void usblp_disconnect(struct usb_interface *intf)
 	struct usblp *usblp = usb_get_intfdata (intf);
 
 	/* remove device id to disable open() */
-	intf->kdev = NODEV;
+	intf->minor = -1;
 
 	if (!usblp || !usblp->dev) {
 		err("bogus disconnect");

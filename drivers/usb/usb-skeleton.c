@@ -87,12 +87,8 @@ static struct usb_device_id skel_table [] = {
 MODULE_DEVICE_TABLE (usb, skel_table);
 
 
-#ifdef CONFIG_USB_DYNAMIC_MINORS
-#define USB_SKEL_MINOR_BASE	0
-#else
 /* Get a minor range for your devices from the usb maintainer */
 #define USB_SKEL_MINOR_BASE	192
-#endif
 
 /* Structure to hold all of our device specific stuff */
 struct usb_skel {
@@ -153,16 +149,6 @@ static struct file_operations skel_fops = {
 	 * This also means that the kernel can decrement
 	 * the use-counter again before calling release()
 	 * or should the open() function fail.
-	 *
-	 * Not all device structures have an "owner" field
-	 * yet. "struct file_operations" and "struct net_device"
-	 * do, while "struct tty_driver" does not. If the struct
-	 * has an "owner" field, then initialize it to the value
-	 * THIS_MODULE and the kernel will handle all module
-	 * locking for you automatically. Otherwise, you must
-	 * increment the use-counter in the open() function
-	 * and decrement it again in the release() function
-	 * yourself.
 	 */
 	.owner =	THIS_MODULE,
 
@@ -236,8 +222,7 @@ static int skel_open (struct inode *inode, struct file *file)
 	/* prevent disconnects */
 	down (&disconnect_sem);
 
-	interface = usb_find_interface (&skel_driver,
-					mk_kdev(USB_MAJOR, subminor));
+	interface = usb_find_interface (&skel_driver, subminor);
 	if (!interface) {
 		err ("%s - error, can't find device for minor %d",
 		     __FUNCTION__, subminor);
@@ -619,8 +604,8 @@ static int skel_probe(struct usb_interface *interface, const struct usb_device_i
 	/* let the user know what node this device is now attached to */
 	info ("USB Skeleton device now attached to USBSkel-%d", dev->minor);
 
-	/* add device id so the device works when advertised */
-	interface->kdev = mk_kdev(USB_MAJOR, dev->minor);
+	/* set the minor of the interface, so open() works */
+	interface->minor = dev->minor;
 
 	goto exit;
 
@@ -667,8 +652,8 @@ static void skel_disconnect(struct usb_interface *interface)
 
 	down (&dev->sem);
 
-	/* remove device id to disable open() */
-	interface->kdev = NODEV;
+	/* disable open() */
+	interface->minor = -1;
 
 	minor = dev->minor;
 

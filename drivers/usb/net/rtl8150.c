@@ -160,7 +160,7 @@ static void ctrl_callback(struct urb *urb, struct pt_regs *regs)
 	clear_bit(RX_REG_SET, &dev->flags);
 }
 
-static int async_set_registers(rtl8150_t * dev, u16 indx, u16 size, void *data)
+static int async_set_registers(rtl8150_t * dev, u16 indx, u16 size)
 {
 	int ret;
 
@@ -537,7 +537,8 @@ static int enable_net_traffic(rtl8150_t * dev)
 		warn("%s - device reset failed", __FUNCTION__);
 	}
 	/* RCR bit7=1 attach Rx info at the end;  =0 HW CRC (which is broken) */
-	dev->rx_creg = rcr = 0x9e;
+	rcr = 0x9e;	/* bit7=1 attach Rx info at the end */
+	dev->rx_creg = cpu_to_le16(rcr);
 	tcr = 0xd8;
 	cr = 0x0c;
 	if (!(rcr & 0x80))
@@ -584,18 +585,18 @@ static void rtl8150_set_multicast(struct net_device *netdev)
 	dev = netdev->priv;
 	netif_stop_queue(netdev);
 	if (netdev->flags & IFF_PROMISC) {
-		dev->rx_creg |= 0x0001;
+		dev->rx_creg |= cpu_to_le16(0x0001);
 		info("%s: promiscuous mode", netdev->name);
 	} else if ((netdev->mc_count > multicast_filter_limit) ||
 		   (netdev->flags & IFF_ALLMULTI)) {
-		dev->rx_creg &= 0xfffe;
-		dev->rx_creg |= 0x0002;
+		dev->rx_creg &= cpu_to_le16(0xfffe);
+		dev->rx_creg |= cpu_to_le16(0x0002);
 		info("%s: allmulti set", netdev->name);
 	} else {
 		/* ~RX_MULTICAST, ~RX_PROMISCUOUS */
-		dev->rx_creg &= 0x00fc;
+		dev->rx_creg &= cpu_to_le16(0x00fc);
 	}
-	async_set_registers(dev, RCR, 2, &dev->rx_creg);
+	async_set_registers(dev, RCR, 2);
 	netif_wake_queue(netdev);
 }
 

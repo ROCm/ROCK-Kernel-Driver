@@ -116,8 +116,10 @@ static const char	hcd_name [] = "ehci-hcd";
 #define	EHCI_TUNE_MULT_TT	1
 #define	EHCI_TUNE_FLS		2	/* (small) 256 frame schedule */
 
-#define EHCI_WATCHDOG_JIFFIES	(HZ/100)	/* arbitrary; ~10 msec */
+#define EHCI_IAA_JIFFIES	(HZ/100)	/* arbitrary; ~10 msec */
+#define EHCI_IO_JIFFIES		(HZ/10)		/* io watchdog > irq_thresh */
 #define EHCI_ASYNC_JIFFIES	(HZ/20)		/* async idle timeout */
+#define EHCI_SHRINK_JIFFIES	(HZ/200)	/* async qh unlink delay */
 
 /* Initial IRQ latency:  lower than default */
 static int log2_irq_thresh = 0;		// 0 to 6
@@ -266,16 +268,13 @@ static void ehci_watchdog (unsigned long param)
 		}
 	}
 
-	ehci_work (ehci, NULL);
-	if (ehci->reclaim && !timer_pending (&ehci->watchdog))
-		mod_timer (&ehci->watchdog,
-				jiffies + EHCI_WATCHDOG_JIFFIES);
-
- 	/* stop async processing after it's idled a while */
-	else if (ehci->async_idle) {
+ 	/* stop async processing after it's idled a bit */
+	if (test_bit (TIMER_ASYNC_OFF, &ehci->actions))
  		start_unlink_async (ehci, ehci->async);
- 		ehci->async_idle = 0;
-	}
+
+	/* ehci could run by timer, without IRQs ... */
+	ehci_work (ehci, NULL);
+
 	spin_unlock_irqrestore (&ehci->lock, flags);
 }
 
@@ -658,11 +657,18 @@ static int ehci_resume (struct usb_hcd *hcd)
  */
 static void ehci_work (struct ehci_hcd *ehci, struct pt_regs *regs)
 {
+	timer_action_done (ehci, TIMER_IO_WATCHDOG);
 	if (ehci->reclaim_ready)
 		end_unlink_async (ehci, regs);
 	scan_async (ehci, regs);
 	if (ehci->next_uframe != -1)
 		scan_periodic (ehci, regs);
+
+	/* the IO watchdog guards against hardware or driver bugs that
+	 * misplace IRQs, and should let us run completely without IRQs.
+	 */
+	if ((ehci->async->qh_next.ptr != 0) || (ehci->periodic_sched != 0))
+		timer_action (ehci, TIMER_IO_WATCHDOG);
 }
 
 /*-------------------------------------------------------------------------*/

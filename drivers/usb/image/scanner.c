@@ -464,7 +464,7 @@ open_scanner(struct inode * inode, struct file * file)
 
 	dbg("open_scanner: scn_minor:%d", scn_minor);
 
-	intf = usb_find_interface(&scanner_driver, mk_kdev(USB_MAJOR,scn_minor));
+	intf = usb_find_interface(&scanner_driver, scn_minor);
 	if (!intf) {
 		up(&scn_mutex);
 		err("open_scanner(%d): Unable to access minor data", scn_minor);
@@ -1118,9 +1118,7 @@ probe_scanner(struct usb_interface *intf,
 	up(&scn_mutex);
 
 	usb_set_intfdata(intf, scn);
-
-	/* add device id so the device works when advertised */
-	intf->kdev = mk_kdev(USB_MAJOR,scn->scn_minor);
+	intf->minor = scn_minor;
 
 	return 0;
 }
@@ -1130,8 +1128,8 @@ disconnect_scanner(struct usb_interface *intf)
 {
 	struct scn_usb_data *scn = usb_get_intfdata(intf);
 
-	/* remove device id to disable open() */
-	intf->kdev = NODEV;
+	/* disable open() */
+	intf->minor = -1;
 
 	usb_set_intfdata(intf, NULL);
 	if(scn->intr_ep) {
