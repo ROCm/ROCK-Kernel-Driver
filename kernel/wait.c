@@ -127,3 +127,26 @@ int autoremove_wake_function(wait_queue_t *wait, unsigned mode, int sync, void *
 	return ret;
 }
 EXPORT_SYMBOL(autoremove_wake_function);
+
+int wake_bit_function(wait_queue_t *wait, unsigned mode, int sync, void *arg)
+{
+	struct wait_bit_key *key = arg;
+	struct wait_bit_queue *wait_bit
+		= container_of(wait, struct wait_bit_queue, wait);
+
+	if (wait_bit->key.flags != key->flags ||
+			wait_bit->key.bit_nr != key->bit_nr ||
+			test_bit(key->bit_nr, key->flags))
+		return 0;
+	else
+		return autoremove_wake_function(wait, mode, sync, key);
+}
+EXPORT_SYMBOL(wake_bit_function);
+
+void fastcall __wake_up_bit(wait_queue_head_t *wq, void *word, int bit)
+{
+	struct wait_bit_key key = __WAIT_BIT_KEY_INITIALIZER(word, bit);
+	if (waitqueue_active(wq))
+		__wake_up(wq, TASK_INTERRUPTIBLE|TASK_UNINTERRUPTIBLE, 1, &key);
+}
+EXPORT_SYMBOL(__wake_up_bit);

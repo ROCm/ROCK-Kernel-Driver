@@ -45,26 +45,6 @@ static void invalidate_bh_lrus(void);
 
 #define BH_ENTRY(list) list_entry((list), struct buffer_head, b_assoc_buffers)
 
-struct bh_wait_queue {
-	struct buffer_head *bh;
-	wait_queue_t wait;
-};
-
-#define __DEFINE_BH_WAIT(name, b, f)					\
-	struct bh_wait_queue name = {					\
-		.bh	= b,						\
-		.wait	= {						\
-				.task	= current,			\
-				.flags	= f,				\
-				.func	= bh_wake_function,		\
-				.task_list =				\
-					LIST_HEAD_INIT(name.wait.task_list),\
-			},						\
-	}
-#define DEFINE_BH_WAIT(name, bh)	__DEFINE_BH_WAIT(name, bh, 0)
-#define DEFINE_BH_WAIT_EXCLUSIVE(name, bh) \
-		__DEFINE_BH_WAIT(name, bh, WQ_FLAG_EXCLUSIVE)
-
 /*
  * Hashed waitqueue_head's for wait_on_buffer()
  */
@@ -95,23 +75,9 @@ void wake_up_buffer(struct buffer_head *bh)
 	wait_queue_head_t *wq = bh_waitq_head(bh);
 
 	smp_mb();
-	if (waitqueue_active(wq))
-		__wake_up(wq, TASK_INTERRUPTIBLE|TASK_UNINTERRUPTIBLE, 1, bh);
+	__wake_up_bit(wq, &bh->b_state, BH_Lock);
 }
 EXPORT_SYMBOL(wake_up_buffer);
-
-static int bh_wake_function(wait_queue_t *wait, unsigned mode,
-				int sync, void *key)
-{
-	struct buffer_head *bh = key;
-	struct bh_wait_queue *wq;
-
-	wq = container_of(wait, struct bh_wait_queue, wait);
-	if (wq->bh != bh || buffer_locked(bh))
-		return 0;
-	else
-		return autoremove_wake_function(wait, mode, sync, key);
-}
 
 static void sync_buffer(struct buffer_head *bh)
 {
@@ -126,7 +92,7 @@ static void sync_buffer(struct buffer_head *bh)
 void fastcall __lock_buffer(struct buffer_head *bh)
 {
 	wait_queue_head_t *wqh = bh_waitq_head(bh);
-	DEFINE_BH_WAIT_EXCLUSIVE(wait, bh);
+	DEFINE_WAIT_BIT(wait, &bh->b_state, BH_Lock);
 
 	do {
 		prepare_to_wait_exclusive(wqh, &wait.wait,
@@ -155,15 +121,13 @@ void fastcall unlock_buffer(struct buffer_head *bh)
 void __wait_on_buffer(struct buffer_head * bh)
 {
 	wait_queue_head_t *wqh = bh_waitq_head(bh);
-	DEFINE_BH_WAIT(wait, bh);
+	DEFINE_WAIT_BIT(wait, &bh->b_state, BH_Lock);
 
-	do {
-		prepare_to_wait(wqh, &wait.wait, TASK_UNINTERRUPTIBLE);
-		if (buffer_locked(bh)) {
-			sync_buffer(bh);
-			io_schedule();
-		}
-	} while (buffer_locked(bh));
+	prepare_to_wait(wqh, &wait.wait, TASK_UNINTERRUPTIBLE);
+	if (buffer_locked(bh)) {
+		sync_buffer(bh);
+		io_schedule();
+	}
 	finish_wait(wqh, &wait.wait);
 }
 

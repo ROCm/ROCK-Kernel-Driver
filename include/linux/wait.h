@@ -37,6 +37,16 @@ struct __wait_queue {
 	struct list_head task_list;
 };
 
+struct wait_bit_key {
+	void *flags;
+	int bit_nr;
+};
+
+struct wait_bit_queue {
+	struct wait_bit_key key;
+	wait_queue_t wait;
+};
+
 struct __wait_queue_head {
 	spinlock_t lock;
 	struct list_head task_list;
@@ -62,6 +72,9 @@ typedef struct __wait_queue_head wait_queue_head_t;
 
 #define DECLARE_WAIT_QUEUE_HEAD(name) \
 	wait_queue_head_t name = __WAIT_QUEUE_HEAD_INITIALIZER(name)
+
+#define __WAIT_BIT_KEY_INITIALIZER(word, bit)				\
+	{ .flags = word, .bit_nr = bit, }
 
 static inline void init_waitqueue_head(wait_queue_head_t *q)
 {
@@ -125,6 +138,7 @@ static inline void __remove_wait_queue(wait_queue_head_t *head,
 void FASTCALL(__wake_up(wait_queue_head_t *q, unsigned int mode, int nr, void *key));
 extern void FASTCALL(__wake_up_locked(wait_queue_head_t *q, unsigned int mode));
 extern void FASTCALL(__wake_up_sync(wait_queue_head_t *q, unsigned int mode, int nr));
+void FASTCALL(__wake_up_bit(wait_queue_head_t *, void *, int));
 
 #define wake_up(x)			__wake_up(x, TASK_UNINTERRUPTIBLE | TASK_INTERRUPTIBLE, 1, NULL)
 #define wake_up_nr(x, nr)		__wake_up(x, TASK_UNINTERRUPTIBLE | TASK_INTERRUPTIBLE, nr, NULL)
@@ -300,6 +314,7 @@ void FASTCALL(prepare_to_wait_exclusive(wait_queue_head_t *q,
 				wait_queue_t *wait, int state));
 void FASTCALL(finish_wait(wait_queue_head_t *q, wait_queue_t *wait));
 int autoremove_wake_function(wait_queue_t *wait, unsigned mode, int sync, void *key);
+int wake_bit_function(wait_queue_t *wait, unsigned mode, int sync, void *key);
 
 #define DEFINE_WAIT(name)						\
 	wait_queue_t name = {						\
@@ -308,6 +323,17 @@ int autoremove_wake_function(wait_queue_t *wait, unsigned mode, int sync, void *
 		.task_list	= {	.next = &name.task_list,	\
 					.prev = &name.task_list,	\
 				},					\
+	}
+
+#define DEFINE_WAIT_BIT(name, word, bit)				\
+	struct wait_bit_queue name = {					\
+		.key = __WAIT_BIT_KEY_INITIALIZER(word, bit),		\
+		.wait	= {						\
+			.task		= current,			\
+			.func		= wake_bit_function,		\
+			.task_list	=				\
+				LIST_HEAD_INIT(name.wait.task_list),	\
+		},							\
 	}
 
 #define init_wait(wait)							\

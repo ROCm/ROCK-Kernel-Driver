@@ -360,40 +360,6 @@ int add_to_page_cache_lru(struct page *page, struct address_space *mapping,
  * at a cost of "thundering herd" phenomena during rare hash
  * collisions.
  */
-struct page_wait_queue {
-	struct page *page;
-	int bit;
-	wait_queue_t wait;
-};
-
-static int page_wake_function(wait_queue_t *wait, unsigned mode, int sync, void *key)
-{
-	struct page *page = key;
-	struct page_wait_queue *wq;
-
-	wq = container_of(wait, struct page_wait_queue, wait);
-	if (wq->page != page || test_bit(wq->bit, &page->flags))
-		return 0;
-	else
-		return autoremove_wake_function(wait, mode, sync, NULL);
-}
-
-#define __DEFINE_PAGE_WAIT(name, p, b, f)				\
-	struct page_wait_queue name = {					\
-		.page	= p,						\
-		.bit	= b,						\
-		.wait	= {						\
-			.task	= current,				\
-			.func	= page_wake_function,			\
-			.flags	= f,					\
-			.task_list = LIST_HEAD_INIT(name.wait.task_list),\
-		},							\
-	}
-
-#define DEFINE_PAGE_WAIT(name, p, b)	__DEFINE_PAGE_WAIT(name, p, b, 0)
-#define DEFINE_PAGE_WAIT_EXCLUSIVE(name, p, b)				\
-		__DEFINE_PAGE_WAIT(name, p, b, WQ_FLAG_EXCLUSIVE)
-
 static wait_queue_head_t *page_waitqueue(struct page *page)
 {
 	const struct zone *zone = page_zone(page);
@@ -401,27 +367,16 @@ static wait_queue_head_t *page_waitqueue(struct page *page)
 	return &zone->wait_table[hash_ptr(page, zone->wait_table_bits)];
 }
 
-static void wake_up_page(struct page *page)
-{
-	const unsigned int mode = TASK_UNINTERRUPTIBLE | TASK_INTERRUPTIBLE;
-	wait_queue_head_t *waitqueue = page_waitqueue(page);
-
-	if (waitqueue_active(waitqueue))
-		__wake_up(waitqueue, mode, 1, page);
-}
-
 void fastcall wait_on_page_bit(struct page *page, int bit_nr)
 {
 	wait_queue_head_t *waitqueue = page_waitqueue(page);
-	DEFINE_PAGE_WAIT(wait, page, bit_nr);
+	DEFINE_WAIT_BIT(wait, &page->flags, bit_nr);
 
-	do {
-		prepare_to_wait(waitqueue, &wait.wait, TASK_UNINTERRUPTIBLE);
-		if (test_bit(bit_nr, &page->flags)) {
-			sync_page(page);
-			io_schedule();
-		}
-	} while (test_bit(bit_nr, &page->flags));
+	prepare_to_wait(waitqueue, &wait.wait, TASK_UNINTERRUPTIBLE);
+	if (test_bit(bit_nr, &page->flags)) {
+		sync_page(page);
+		io_schedule();
+	}
 	finish_wait(waitqueue, &wait.wait);
 }
 
@@ -448,7 +403,7 @@ void fastcall unlock_page(struct page *page)
 	if (!TestClearPageLocked(page))
 		BUG();
 	smp_mb__after_clear_bit(); 
-	wake_up_page(page);
+	__wake_up_bit(page_waitqueue(page), &page->flags, PG_locked);
 }
 
 EXPORT_SYMBOL(unlock_page);
@@ -464,7 +419,7 @@ void end_page_writeback(struct page *page)
 			BUG();
 		smp_mb__after_clear_bit();
 	}
-	wake_up_page(page);
+	__wake_up_bit(page_waitqueue(page), &page->flags, PG_writeback);
 }
 
 EXPORT_SYMBOL(end_page_writeback);
@@ -480,7 +435,7 @@ EXPORT_SYMBOL(end_page_writeback);
 void fastcall __lock_page(struct page *page)
 {
 	wait_queue_head_t *wqh = page_waitqueue(page);
-	DEFINE_PAGE_WAIT_EXCLUSIVE(wait, page, PG_locked);
+	DEFINE_WAIT_BIT(wait, &page->flags, PG_locked);
 
 	while (TestSetPageLocked(page)) {
 		prepare_to_wait_exclusive(wqh, &wait.wait, TASK_UNINTERRUPTIBLE);
