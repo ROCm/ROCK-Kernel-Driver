@@ -48,28 +48,43 @@ pmd_free(pmd_t *pmd)
 	pmd_populate_kernel(mm, pmd, page_address(pte_page))
 
 static inline pte_t *
-pte_alloc_one_kernel(struct mm_struct *mm, unsigned long addr)
+pte_alloc_one_kernel(struct mm_struct *mm, unsigned long address)
 {
-	return kmem_cache_alloc(zero_cache, GFP_KERNEL|__GFP_REPEAT);
+	pte_t *pte;
+	pte = kmem_cache_alloc(zero_cache, GFP_KERNEL|__GFP_REPEAT);
+	if (pte) {
+		struct page *ptepage = virt_to_page(pte);
+		ptepage->mapping = (void *) mm;
+		ptepage->index = address & PMD_MASK;
+	}
+	return pte;
 }
 
 static inline struct page *
 pte_alloc_one(struct mm_struct *mm, unsigned long address)
 {
-	pte_t *pte = pte_alloc_one_kernel(mm, address);
-
-	if (pte)
-		return virt_to_page(pte);
-
+	pte_t *pte;
+	pte = kmem_cache_alloc(zero_cache, GFP_KERNEL|__GFP_REPEAT);
+	if (pte) {
+		struct page *ptepage = virt_to_page(pte);
+		ptepage->mapping = (void *) mm;
+		ptepage->index = address & PMD_MASK;
+		return ptepage;
+	}
 	return NULL;
 }
 		
 static inline void pte_free_kernel(pte_t *pte)
 {
+	virt_to_page(pte)->mapping = NULL;
 	kmem_cache_free(zero_cache, pte);
 }
 
-#define pte_free(pte_page)	pte_free_kernel(page_address(pte_page))
+static inline void pte_free(struct page *ptepage)
+{
+	ptepage->mapping = NULL;
+	kmem_cache_free(zero_cache, page_address(ptepage));
+}
 
 struct pte_freelist_batch
 {
