@@ -312,7 +312,7 @@ static void intr_deschedule (
 
 	do {
 		periodic_unlink (ehci, frame, qh);
-		qh_put (ehci, qh);
+		qh_put (qh);
 		frame += qh->period;
 	} while (frame < ehci->periodic_size);
 
@@ -355,7 +355,7 @@ static void intr_deschedule (
 
 	dbg ("descheduled qh %p, period = %d frame = %d count = %d, urbs = %d",
 		qh, qh->period, frame,
-		atomic_read (&qh->refcount), ehci->periodic_sched);
+		atomic_read (&qh->kref.refcount), ehci->periodic_sched);
 }
 
 static int check_period (
@@ -1846,7 +1846,7 @@ restart:
 				modified = qh_completions (ehci, temp.qh, regs);
 				if (unlikely (list_empty (&temp.qh->qtd_list)))
 					intr_deschedule (ehci, temp.qh, 0);
-				qh_put (ehci, temp.qh);
+				qh_put (temp.qh);
 				break;
 			case Q_TYPE_FSTN:
 				/* for "save place" FSTNs, look at QH entries
