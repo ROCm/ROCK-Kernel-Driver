@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acmacros.h - C macros for the entire subsystem.
- *       $Revision: 132 $
+ *       $Revision: 133 $
  *
  *****************************************************************************/
 
@@ -398,7 +398,7 @@
 
 #ifdef ACPI_DEBUG_OUTPUT
 
-#define ACPI_MODULE_NAME(name)               static char *_THIS_MODULE = name;
+#define ACPI_MODULE_NAME(name)               static char ACPI_UNUSED_VAR *_THIS_MODULE = name;
 
 /*
  * Function entry tracing.
