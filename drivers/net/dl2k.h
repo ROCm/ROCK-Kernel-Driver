@@ -1,0 +1,729 @@
+/*  D-Link DL2000-based Gigabit Ethernet Adapter Linux driver */
+/*  
+    Copyright (c) 2001 by D-Link Corporation
+    Written by Edward Peng.<edward_peng@dlink.com.tw>
+    Created 03-May-2001, base on Linux' sundance.c.
+
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation; either version 2 of the License, or
+    (at your option) any later version.
+*/
+
+#ifndef __DL2K_H__
+#define __DL2K_H__
+
+#include <linux/module.h>
+#include <linux/kernel.h>
+#include <linux/string.h>
+#include <linux/timer.h>
+#include <linux/errno.h>
+#include <linux/ioport.h>
+#include <linux/slab.h>
+#include <linux/interrupt.h>
+#include <linux/pci.h>
+#include <linux/netdevice.h>
+#include <linux/etherdevice.h>
+#include <linux/skbuff.h>
+#include <linux/init.h>
+#include <asm/processor.h>	/* Processor type for cache alignment. */
+#include <asm/bitops.h>
+#include <asm/io.h>
+#include <linux/delay.h>
+#include <linux/spinlock.h>
+
+#define TX_RING_SIZE	16
+#define TX_QUEUE_LEN	10	/* Limit ring entries actually used.  */
+#define RX_RING_SIZE	16
+
+#define virt_to_le64desc(addr)  cpu_to_le64(virt_to_bus(addr))
+#define le64desc_to_virt(addr)  bus_to_virt(le64_to_cpu(addr))
+/* This driver was written to use PCI memory space, however x86-oriented
+   hardware often uses I/O space accesses. */
+#ifdef USE_IO_OPS
+#undef readb
+#undef readw
+#undef readl
+#undef writeb
+#undef writew
+#undef writel
+#define readb inb
+#define readw inw
+#define readl inl
+#define writeb outb
+#define writew outw
+#define writel outl
+#endif
+
+/* Offsets to the device registers.
+   Unlike software-only systems, device drivers interact with complex hardware.
+   It's not useful to define symbolic names for every register bit in the
+   device.  The name can only partially document the semantics and make
+   the driver longer and more difficult to read.
+   In general, only the important configuration values or bits changed
+   multiple times should be defined symbolically.
+*/
+enum dl2x_offsets {
+	/* I/O register offsets */
+	DMACtrl = 0x00,
+	RxDMAStatus = 0x08,
+	TFDListPtr0 = 0x10,
+	TFDListPtr1 = 0x14,
+	TxDMABurstThresh = 0x18,
+	TxDMAUrgentThresh = 0x19,
+	TxDMAPollPeriod = 0x1a,
+	RFDListPtr0 = 0x1c,
+	RFDListPtr1 = 0x20,
+	RxDMABurstThresh = 0x24,
+	RxDMAUrgentThresh = 0x25,
+	RxDMAPollPeriod = 0x26,
+	RxDMAIntCtrl = 0x28,
+	DebugCtrl = 0x2c,
+	ASICCtrl = 0x30,
+	FifoCtrl = 0x38,
+	RxEarlyThresh = 0x3a,
+	FlowOffThresh = 0x3c,
+	FlowOnThresh = 0x3e,
+	TxStartThresh = 0x44,
+	EepromData = 0x48,
+	EepromCtrl = 0x4a,
+	ExpromAddr = 0x4c,
+	Exprodata = 0x50,
+	WakeEvent0x51,
+	CountDown = 0x54,
+	IntStatusAck = 0x5a,
+	IntEnable = 0x5c,
+	IntStatus = 0x5e,
+	TxStatus = 0x60,
+	MACCtrl = 0x6c,
+	VLANTag = 0x70,
+	PhyCtrl = 0x76,
+	StationAddr0 = 0x78,
+	StationAddr1 = 0x7a,
+	StationAddr2 = 0x7c,
+	VLANId = 0x80,
+	MaxFrameSize = 0x86,
+	ReceiveMode = 0x88,
+	HashTable0 = 0x8c,
+	HashTable1 = 0x90,
+	RmonStatMask = 0x98,
+	StatMask = 0x9c,
+	RxJumboFrames = 0xbc,
+	TCPCheckSumErrors = 0xc0,
+	IPCheckSumErrors = 0xc2,
+	UDPCheckSumErrors = 0xc4,
+	TxJumboFrames = 0xf4,
+	/* Ethernet MIB statistic register offsets */
+	OctetRcvOk = 0xa8,
+	McstOctetRcvOk = 0xac,
+	BcstOctetRcvOk = 0xb0,
+	FramesRcvOk = 0xb4,
+	McstFramesRcvOk = 0xb8,
+	BcstFramesRcvOk = 0xbe,
+	MacControlFramesRcvd = 0xc6,
+	FrameTooLongErrors = 0xc8,
+	InRangeLengthErrors = 0xca,
+	FrameCheckSeqError = 0xcc,
+	FrameLostRxError = 0xce,
+	OctetXmtOk = 0xd0,
+	McstOctetXmtOk = 0xd4,
+	BcstOctetXmtOk = 0xd8,
+	FramesXmtOk = 0xdc,
+	McstFramesXmtdOk = 0xe0,
+	FramesWDeferredXmt = 0xe4,
+	LateCollisions = 0xe8,
+	MultiColFrames = 0xec,
+	SingleColFrames = 0xf0,
+	BcstFramesXmtdOk = 0xf6,
+	CarrierSenseErrors = 0xf8,
+	MacControlFramesXmtd = 0xfa,
+	FramesAbortXSColls = 0xfc,
+	FramesWEXDeferal = 0xfe,
+	/* RMON statistic register offsets */
+	EtherStatsCollisions = 0x100,
+	EtherStatsOctetsTransmit = 0x104,
+	EtherStatsPktsTransmit = 0x108,
+	EtherStatsPkts64OctetTransmit = 0x10c,
+	EtherStats65to127OctetsTransmit = 0x110,
+	EtherStatsPkts128to255OctetsTransmit = 0x114,
+	EtherStatsPkts256to511OctetsTransmit = 0x118,
+	EtherStatsPkts512to1023OctetsTransmit = 0x11c,
+	EtherStatsPkts1024to1518OctetsTransmit = 0x120,
+	EtherStatsCRCAlignErrors = 0x124,
+	EtherStatsUndersizePkts = 0x128,
+	EtherStatsFragments = 0x12c,
+	EtherStatsJabbers = 0x130,
+	EtherStatsOctets = 0x134,
+	EtherStatsPkts = 0x138,
+	EtherStats64Octets = 0x13c,
+	EtherStatsPkts65to127Octets = 0x140,
+	EtherStatsPkts128to255Octets = 0x144,
+	EtherStatsPkts256to511Octets = 0x148,
+	EtherStatsPkts512to1023Octets = 0x14c,
+	EtherStatsPkts1024to1518Octets = 0x150,
+};
+
+/* Bits in the interrupt status/mask registers. */
+enum IntStatus_bits {
+	InterruptStatus = 0x0001,
+	HostError = 0x0002,
+	MACCtrlFrame = 0x0008,
+	TxComplete = 0x0004,
+	RxComplete = 0x0010,
+	RxEarly = 0x0020,
+	IntRequested = 0x0040,
+	UpdateStats = 0x0080,
+	LinkEvent = 0x0100,
+	TxDMAComplete = 0x0200,
+	RxDMAComplete = 0x0400,
+	RFDListEnd = 0x0800,
+	RxDMAPriority = 0x1000,
+};
+
+/* Bits in the ReceiveMode register. */
+enum ReceiveMode_bits {
+	ReceiveIPMulticast = 0x0020,
+	ReceiveMulticastHash = 0x0010,
+	ReceiveAllFrames = 0x0008,
+	ReceiveBroadcast = 0x0004,
+	ReceiveMulticast = 0x0002,
+	ReceiveUnicast = 0x0001,
+	ReceiveVLANMatch = 0x0100,
+	ReceiveVLANHash = 0x0200,
+};
+/* Bits in MACCtrl. */
+enum MACCtrl_bits {
+	DuplexSelect = 0x20,
+	RcvFCS = 0x200,
+	AutoVLANtagging = 0x1000,
+	AutoVLANuntagging = 0x2000,
+	StatsEnable = 0x00200000,
+	StatsDisable = 0x00400000,
+	StatsEnabled = 0x00800000,
+	TxEnable = 0x01000000,
+	TxDisable = 0x02000000,
+	TxEnabled = 0x04000000,
+	RxEnable = 0x08000000,
+	RxDisable = 0x10000000,
+	RxEnabled = 0x20000000,
+};
+enum ASICCtrl_HiWord_bits {
+	GlobalReset = 0x0001,
+	RxReset = 0x0002,
+	TxReset = 0x0004,
+	DMAReset = 0x0008,
+	FIFOReset = 0x0010,
+	NetworkReset = 0x0020,
+	HostReset = 0x0040,
+	ResetBusy = 0x0400,
+};
+
+/* Transmit Frame Control bits */
+enum TFC_bits {
+	DwordAlign = 0x00000000,
+	WordAlignDisable = 0x00030000,
+	WordAlign = 0x00020000,
+	TCPChecksumEnable = 0x00040000,
+	UDPChecksumEnable = 0x00080000,
+	IPChecksumEnable = 0x00100000,
+	FCSAppendDisable = 0x00200000,
+	TxIndicate = 0x00400000,
+	TxDMAIndicate = 0x00800000,
+	FragCountShift = 24,
+	VLANTagInsert = 0x0000000010000000,
+	TFDDone = 0x80000000,
+	VIDShift = 32,
+	CFI = 0x0000100000000000,
+	UsePriorityShift = 48,
+};
+
+/* Receive Frames Status bits */
+enum RFS_bits {
+	RxFIFOOverrun = 0x00010000,
+	RxRuntFrame = 0x00020000,
+	RxAlignmentError = 0x00040000,
+	RxFCSError = 0x00080000,
+	RxOverSizedFrame = 0x00100000,
+	RxLengthError = 0x00200000,
+	VLANDetected = 0x00400000,
+	TCPDetected = 0x00800000,
+	TCPError = 0x01000000,
+	UDPDetected = 0x02000000,
+	UDPError = 0x04000000,
+	IPDetected = 0x08000000,
+	IPError = 0x10000000,
+	FrameStart = 0x20000000,
+	FrameEnd = 0x40000000,
+	RFDDone = 0x80000000,
+	TCIShift = 32,
+};
+
+#define MII_RESET_TIME_OUT		10000
+/* MII register */
+enum _mii_reg {
+	MII_BMCR = 0,
+	MII_BMSR = 1,
+	MII_PHY_ID1 = 2,
+	MII_PHY_ID2 = 3,
+	MII_ANAR = 4,
+	MII_ANLPAR = 5,
+	MII_ANER = 6,
+	MII_ANNPT = 7,
+	MII_ANLPRNP = 8,
+	MII_MSCR = 9,
+	MII_MSSR = 10,
+	MII_ESR = 15,
+	MII_PHY_SCR = 16,
+};
+
+/* Basic Mode Control Register */
+typedef union t_MII_BMCR {
+	u16 image;
+	struct {
+		u16 _bit_5_0:6;	// bit 5:0
+		u16 speed1000:1;	// bit 6
+		u16 col_test_enable:1;	// bit 7
+		u16 duplex_mode:1;	// bit 8
+		u16 restart_an:1;	// bit 9
+		u16 isolate:1;	// bit 10
+		u16 power_down:1;	// bit 11
+		u16 an_enable:1;	// bit 12
+		u16 speed100:1;	// bit 13
+		u16 loopback:1;	// bit 14
+		u16 reset:1;	// bit 15
+	} bits;
+} BMCR_t, *PBMCR_t;
+
+enum _mii_bmcr {
+	MII_BMCR_RESET = 0x8000,
+	MII_BMCR_LOOP_BACK = 0x4000,
+	MII_BMCR_SPEED_LSB = 0x2000,
+	MII_BMCR_AN_ENABLE = 0x1000,
+	MII_BMCR_POWER_DOWN = 0x0800,
+	MII_BMCR_ISOLATE = 0x0400,
+	MII_BMCR_RESTART_AN = 0x0200,
+	MII_BMCR_DUPLEX_MODE = 0x0100,
+	MII_BMCR_COL_TEST = 0x0080,
+	MII_BMCR_SPEED_MSB = 0x0040,
+	MII_BMCR_SPEED_RESERVED = 0x003f,
+	MII_BMCR_SPEED_10 = 0,
+	MII_BMCR_SPEED_100 = MII_BMCR_SPEED_LSB,
+	MII_BMCR_SPEED_1000 = MII_BMCR_SPEED_MSB,
+};
+
+/* Basic Mode Status Register */
+typedef union t_MII_BMSR {
+	u16 image;
+	struct {
+		u16 ext_capability:1;	// bit 0
+		u16 japper_detect:1;	// bit 1
+		u16 link_status:1;	// bit 2
+		u16 an_ability:1;	// bit 3
+		u16 remote_fault:1;	// bit 4
+		u16 an_complete:1;	// bit 5
+		u16 preamble_supp:1;	// bit 6
+		u16 _bit_7:1;	// bit 7
+		u16 ext_status:1;	// bit 8
+		u16 media_100BT2_HD:1;	// bit 9
+		u16 media_100BT2_FD:1;	// bit 10
+		u16 media_10BT_HD:1;	// bit 11
+		u16 media_10BT_FD:1;	// bit 12
+		u16 media_100BX_HD:1;	// bit 13
+		u16 media_100BX_FD:1;	// bit 14
+		u16 media_100BT4:1;	// bit 15
+	} bits;
+} BMSR_t, *PBMSR_t;
+
+enum _mii_bmsr {
+	MII_BMSR_100BT4 = 0x8000,
+	MII_BMSR_100BX_FD = 0x4000,
+	MII_BMSR_100BX_HD = 0x2000,
+	MII_BMSR_10BT_FD = 0x1000,
+	MII_BMSR_10BT_HD = 0x0800,
+	MII_BMSR_100BT2_FD = 0x0400,
+	MII_BMSR_100BT2_HD = 0x0200,
+	MII_BMSR_EXT_STATUS = 0x0100,
+	MII_BMSR_PREAMBLE_SUPP = 0x0040,
+	MII_BMSR_AN_COMPLETE = 0x0020,
+	MII_BMSR_REMOTE_FAULT = 0x0010,
+	MII_BMSR_AN_ABILITY = 0x0008,
+	MII_BMSR_LINK_STATUS = 0x0004,
+	MII_BMSR_JABBER_DETECT = 0x0002,
+	MII_BMSR_EXT_CAP = 0x0001,
+};
+
+/* ANAR */
+typedef union t_MII_ANAR {
+	u16 image;
+	struct {
+		u16 selector:5;	// bit 4:0
+		u16 media_10BT_HD:1;	// bit 5
+		u16 media_10BT_FD:1;	// bit 6
+		u16 media_100BX_HD:1;	// bit 7
+		u16 media_100BX_FD:1;	// bit 8
+		u16 media_100BT4:1;	// bit 9
+		u16 pause:1;	// bit 10
+		u16 asymmetric:1;	// bit 11
+		u16 _bit12:1;	// bit 12
+		u16 remote_fault:1;	// bit 13
+		u16 _bit14:1;	// bit 14
+		u16 next_page:1;	// bit 15
+	} bits;
+} ANAR_t, *PANAR_t;
+
+enum _mii_anar {
+	MII_ANAR_NEXT_PAGE = 0x8000,
+	MII_ANAR_REMOTE_FAULT = 0x4000,
+	MII_ANAR_ASYMMETRIC = 0x0800,
+	MII_ANAR_PAUSE = 0x0400,
+	MII_ANAR_100BT4 = 0x0200,
+	MII_ANAR_100BX_FD = 0x0100,
+	MII_ANAR_100BX_HD = 0x0080,
+	MII_ANAR_10BT_FD = 0x0020,
+	MII_ANAR_10BT_HD = 0x0010,
+	MII_ANAR_SELECTOR = 0x001f,
+	MII_IEEE8023_CSMACD = 0x0001,
+};
+
+/* ANLPAR */
+typedef union t_MII_ANLPAR {
+	u16 image;
+	struct {
+		u16 selector:5;	// bit 4:0
+		u16 media_10BT_HD:1;	// bit 5
+		u16 media_10BT_FD:1;	// bit 6
+		u16 media_100BX_HD:1;	// bit 7
+		u16 media_100BX_FD:1;	// bit 8
+		u16 media_100BT4:1;	// bit 9
+		u16 pause:1;	// bit 10
+		u16 asymmetric:1;	// bit 11
+		u16 _bit12:1;	// bit 12
+		u16 remote_fault:1;	// bit 13
+		u16 _bit14:1;	// bit 14
+		u16 next_page:1;	// bit 15
+	} bits;
+} ANLPAR_t, *PANLPAR_t;
+
+enum _mii_anlpar {
+	MII_ANLPAR_NEXT_PAGE = MII_ANAR_NEXT_PAGE,
+	MII_ANLPAR_REMOTE_FAULT = MII_ANAR_REMOTE_FAULT,
+	MII_ANLPAR_ASYMMETRIC = MII_ANAR_ASYMMETRIC,
+	MII_ANLPAR_PAUSE = MII_ANAR_PAUSE,
+	MII_ANLPAR_100BT4 = MII_ANAR_100BT4,
+	MII_ANLPAR_100BX_FD = MII_ANAR_100BX_FD,
+	MII_ANLPAR_100BX_HD = MII_ANAR_100BX_HD,
+	MII_ANLPAR_10BT_FD = MII_ANAR_10BT_FD,
+	MII_ANLPAR_10BT_HD = MII_ANAR_10BT_HD,
+	MII_ANLPAR_SELECTOR = MII_ANAR_SELECTOR,
+};
+
+/* Auto-Negotiation Expansion Register */
+typedef union t_MII_ANER {
+	u16 image;
+	struct {
+		u16 lp_negotiable:1;	// bit 0
+		u16 page_received:1;	// bit 1
+		u16 nextpagable:1;	// bit 2
+		u16 lp_nextpagable:1;	// bit 3
+		u16 pdetect_fault:1;	// bit 4
+		u16 _bit15_5:11;	// bit 15:5
+	} bits;
+} ANER_t, *PANER_t;
+
+enum _mii_aner {
+	MII_ANER_PAR_DETECT_FAULT = 0x0010,
+	MII_ANER_LP_NEXTPAGABLE = 0x0008,
+	MII_ANER_NETXTPAGABLE = 0x0004,
+	MII_ANER_PAGE_RECEIVED = 0x0002,
+	MII_ANER_LP_NEGOTIABLE = 0x0001,
+};
+
+/* MASTER-SLAVE Control Register */
+typedef union t_MII_MSCR {
+	u16 image;
+	struct {
+		u16 _bit_7_0:8;	// bit 7:0
+		u16 media_1000BT_HD:1;	// bit 8
+		u16 media_1000BT_FD:1;	// bit 9
+		u16 port_type:1;	// bit 10
+		u16 cfg_value:1;	// bit 11
+		u16 cfg_enable:1;	// bit 12
+		u16 test_mode:3;	// bit 15:13
+	} bits;
+} MSCR_t, *PMSCR_t;
+
+enum _mii_mscr {
+	MII_MSCR_TEST_MODE = 0xe000,
+	MII_MSCR_CFG_ENABLE = 0x1000,
+	MII_MSCR_CFG_VALUE = 0x0800,
+	MII_MSCR_PORT_VALUE = 0x0400,
+	MII_MSCR_1000BT_FD = 0x0200,
+	MII_MSCR_1000BT_HD = 0X0100,
+};
+
+/* MASTER-SLAVE Status Register */
+typedef union t_MII_MSSR {
+	u16 image;
+	struct {
+		u16 idle_err_count:8;	// bit 7:0
+		u16 _bit_9_8:2;	// bit 9:8
+		u16 lp_1000BT_HD:1;	// bit 10
+		u16 lp_1000BT_FD:1;	// bit 11
+		u16 remote_rcv_status:1;	// bit 12
+		u16 local_rcv_status:1;	// bit 13
+		u16 cfg_resolution:1;	// bit 14
+		u16 cfg_fault:1;	// bit 15
+	} bits;
+} MSSR_t, *PMSSR_t;
+
+enum _mii_mssr {
+	MII_MSSR_CFG_FAULT = 0x8000,
+	MII_MSSR_CFG_RES = 0x4000,
+	MII_MSSR_LOCAL_RCV_STATUS = 0x2000,
+	MII_MSSR_REMOTE_RCVR = 0x1000,
+	MII_MSSR_LP_1000BT_HD = 0x0800,
+	MII_MSSR_LP_1000BT_FD = 0x0400,
+	MII_MSSR_IDLE_ERR_COUNT = 0x00ff,
+};
+
+/* IEEE Extened Status Register */
+typedef union t_MII_ESR {
+	u16 image;
+	struct {
+		u16 _bit_11_0:12;	// bit 11:0
+		u16 media_1000BT_HD:2;	// bit 12
+		u16 media_1000BT_FD:1;	// bit 13
+		u16 media_1000BX_HD:1;	// bit 14
+		u16 media_1000BX_FD:1;	// bit 15
+	} bits;
+} ESR_t, *PESR_t;
+
+enum _mii_esr {
+	MII_ESR_1000BX_FD = 0x8000,
+	MII_ESR_1000BX_HD = 0x4000,
+	MII_ESR_1000BT_FD = 0x2000,
+	MII_ESR_1000BT_HD = 0x1000,
+};
+/* PHY Specific Control Register */
+typedef union t_MII_PHY_SCR {
+	u16 image;
+	struct {
+		u16 disable_jabber:1;	// bit 0
+		u16 polarity_reversal:1;	// bit 1
+		u16 SEQ_test:1;	// bit 2
+		u16 _bit_3:1;	// bit 3
+		u16 disable_CLK125:1;	// bit 4
+		u16 mdi_crossover_mode:2;	// bit 6:5
+		u16 enable_ext_dist:1;	// bit 7
+		u16 _bit_8_9:2;	// bit 9:8
+		u16 force_link:1;	// bit 10
+		u16 assert_CRS:1;	// bit 11
+		u16 rcv_fifo_depth:2;	// bit 13:12
+		u16 xmit_fifo_depth:2;	// bit 15:14
+	} bits;
+} PHY_SCR_t, *PPHY_SCR_t;
+
+typedef enum t_MII_ADMIN_STATUS {
+	adm_reset,
+	adm_operational,
+	adm_loopback,
+	adm_power_down,
+	adm_isolate
+} MII_ADMIN_t, *PMII_ADMIN_t;
+
+typedef struct t_SROM {
+	u16 config_param;	/* 0x00 */
+	u16 asic_ctrl;		/* 0x02 */
+	u16 sub_vendor_id;	/* 0x04 */
+	u16 sub_system_id;	/* 0x06 */
+	u16 reserved1[12];	/* 0x08-0x1f */
+	u8 mac_addr[6];		/* 0x20-0x25 */
+	u8 reserved2[10];	/* 0x26-0x2f */
+	u8 sib[204];		/* 0x30-0xfb */
+	u32 crc;		/* 0xfc-0xff */
+} SROM_t, *PSROM_t;
+
+/* Ioctl custom data */
+struct ioctl_data {
+	char signature[10];
+	int cmd;
+	int len;
+	char *data;
+};
+
+struct mii_data {
+	__u16 reserved;
+	__u16 reg_num;
+	__u16 in_value;
+	__u16 out_value;
+};
+
+/* The Rx and Tx buffer descriptors. */
+struct netdev_desc {
+	u64 next_desc;
+	u64 status;
+	u64 fraginfo;
+};
+
+#define PRIV_ALIGN	15	/* Required alignment mask */
+/* Use  __attribute__((aligned (L1_CACHE_BYTES)))  to maintain alignment
+   within the structure. */
+struct netdev_private {
+	/* Descriptor rings first for alignment. */
+	struct netdev_desc rx_ring[RX_RING_SIZE];
+	struct netdev_desc tx_ring[TX_RING_SIZE];
+	/* The addresses of receive-in-place skbuffs. */
+	struct sk_buff *rx_skbuff[RX_RING_SIZE];
+	/* The saved address of a sent-in-place packet/buffer, for later free(). */
+	struct sk_buff *tx_skbuff[TX_RING_SIZE];
+	struct net_device_stats stats;
+	spinlock_t lock;
+	struct netdev_desc *rx_head_desc;
+	unsigned int rx_buf_sz;	/* Based on MTU+slack. */
+	unsigned int tx_full:1;	/* The Tx queue is full. */
+	unsigned int full_duplex:1;	/* Full-duplex operation requested. */
+	unsigned int speed;	/* Operating speed */
+	unsigned int vlan;	/* VLAN Id */
+	unsigned int an_enable;	/* Auto-Negotiated Enable */
+	unsigned int chip_id;	/* PCI table chip id */
+	unsigned int jumbo;
+	struct netdev_desc *last_tx;	/* Last Tx descriptor used. */
+	u64 cur_rx, old_rx;	/* Producer/consumer ring indices */
+	u64 cur_tx, old_tx;
+	int wake_polarity;
+	char name[256];		/* net device description */
+	u8 duplex_polarity;
+	u16 mcast_filter[4];
+	u16 advertising;	/* NWay media advertisement */
+	u16 negotiate;		/* Negotiated media */
+	int phy_addr;		/* PHY addresses. */
+	int tx_debug;
+	int rx_debug;
+};
+
+/* The station address location in the EEPROM. */
+#ifdef USE_IO_OPS
+#define PCI_IOTYPE (PCI_USES_MASTER | PCI_USES_IO  | PCI_ADDR0)
+#else
+#define PCI_IOTYPE (PCI_USES_MASTER | PCI_USES_MEM | PCI_ADDR1)
+#endif
+/* The struct pci_device_id consist of:
+        vendor, device          Vendor and device ID to match (or PCI_ANY_ID)
+        subvendor, subdevice    Subsystem vendor and device ID to match (or PCI_ANY_ID)
+        class                   Device class to match. The class_mask tells which bits
+        class_mask              of the class are honored during the comparison.
+        driver_data             Data private to the driver.
+*/
+static struct pci_device_id rio_pci_tbl[] __devinitdata = {
+	{0x1186, 0x4000, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+	{0,}
+};
+MODULE_DEVICE_TABLE (pci, rio_pci_tbl);
+#define TX_TIMEOUT  (4*HZ)
+#define PACKET_SIZE		1536
+#define RIO_IO_SIZE             340
+#ifdef RIO_DEBUG
+#define DEBUG_TFD_DUMP(x) debug_tfd_dump(x)
+#define DEBUG_RFD_DUMP(x,flag) debug_rfd_dump(x,flag)
+#define DEBUG_PKT_DUMP(x,len) debug_pkt_dump(x,len)
+#define DEBUG_PRINT printk
+
+static inline void
+debug_tfd_dump (struct netdev_private *np)
+{
+	int i;
+	struct netdev_desc *desc;
+
+	if (np->tx_debug == 6) {
+		printk ("TFDone Dump: ");
+		for (i = 0; i < TX_RING_SIZE; i++) {
+			desc = &np->tx_ring[i];
+			if ((desc->fraginfo & 0xffffffffff) == 0)
+				printk ("X");
+			else
+				printk ("%d", (desc->status & TFDDone) ? 1 : 0);
+		}
+		printk ("\n");
+	}
+	if (np->tx_debug == 5) {
+		for (i = 0; i < TX_RING_SIZE; i++) {
+			desc = &np->tx_ring[i];
+			printk
+			    ("cur:%08x next:%08x status:%08x frag1:%08x frag0:%08x",
+			     (u32) virt_to_bus (desc), (u32) desc->next_desc,
+			     (u32) desc->status, (u32) (desc->fraginfo >> 32),
+			     (u32) desc->fraginfo);
+			printk ("\n");
+		}
+		printk ("\n");
+	}
+}
+static inline void
+debug_rfd_dump (struct netdev_private *np, int flag)
+{
+	int i;
+	struct netdev_desc *desc;
+	int entry = np->cur_rx % RX_RING_SIZE;
+
+	if (np->rx_debug == 5) {
+		for (i = 0; i < RX_RING_SIZE; i++) {
+			desc = &np->rx_ring[i];
+			printk
+			    ("cur:%08x next:%08x status:%08x frag1:%08x frag0:%08x",
+			     (u32) virt_to_bus (desc), (u32) desc->next_desc,
+			     (u32) desc->status, (u32) (desc->fraginfo >> 32),
+			     (u32) desc->fraginfo);
+			printk ("\n");
+		}
+		printk ("\n");
+	}
+
+	if (np->rx_debug == 6) {
+		if (flag == 1)
+			printk ("RFDone Dump: ");
+		else if (flag == 2)
+			printk ("Re-Filling:  ");
+		for (i = 0; i < RX_RING_SIZE; i++) {
+			desc = &np->rx_ring[i];
+			printk ("%d", (desc->status & RFDDone) ? 1 : 0);
+		}
+		printk ("\n");
+	}
+	if (np->rx_debug == 7) {
+		printk (" In rcv_pkt(), entry %d status %4.4x %4.4x.\n",
+			entry, (u32) (np->rx_ring[entry].status >> 32),
+			(u32) np->rx_ring[entry].status);
+	}
+
+}
+
+static inline void
+debug_pkt_dump (struct netdev_private *np, int pkt_len)
+{
+	int i;
+	struct netdev_desc *desc = np->rx_head_desc;
+	unsigned char *pchar;
+	unsigned char *phead;
+	u64 frame_status = le64_to_cpu (desc->status);
+
+	if (np->rx_debug == 4) {
+		printk ("  rcv_pkt: status was %4.4x %4.4x.\n",
+			(u32) (frame_status >> 32), (u32) frame_status);
+	}
+	if (np->rx_debug == 7) {
+		phead = le64desc_to_virt ((desc->fraginfo & 0xffffffffff));
+		for (pchar = phead, i = 0; i < pkt_len; i++, pchar++) {
+			printk ("%02x ", *pchar);
+			if ((i + 1) % 20 == 0)
+				printk ("\n");
+		}
+	}
+}
+#else
+#define DEBUG_TFD_DUMP(x) {}
+#define DEBUG_RFD_DUMP(x,flag) {}
+#define DEBUG_PKT_DUMP(x,len) {}
+#define DEBUG_PRINT() {}
+#endif
+
+#endif /* __DL2K_H__ */

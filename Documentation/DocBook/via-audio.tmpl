@@ -17,7 +17,7 @@
   </authorgroup>
 
   <copyright>
-   <year>2000</year>
+   <year>1999-2001</year>
    <holder>Jeff Garzik</holder>
   </copyright>
 
@@ -149,23 +149,6 @@
      <title>Known Bugs And Assumptions</title>
   <para>
   <variablelist>
-    <varlistentry><term>MMAP support</term>
-    <listitem>
-    <para>
-    	MMAP support is currently missing.  Make sure to
-	test with Quake.
-    </para>
-    </listitem></varlistentry>
-
-    <varlistentry><term>AC97 codec timeout during init</term>
-    <listitem>
-    <para>
-    	A warning message "via82cxxx: timeout while reading AC97
-	codec" is printed during driver initialization.  This
-	message can safely be ignored.
-    </para>
-    </listitem></varlistentry>
-
     <varlistentry><term>Low volume</term>
     <listitem>
     <para>
@@ -198,6 +181,16 @@
   <para>
 	AC97 mixer interface fixes and debugging by Ron Cemer <email>roncemer@gte.net</email>.
   </para>
+  <para>
+	Rui Sousa <email>rui.sousa@conexant.com</email>, for bugfixing
+	MMAP support, and several other notable fixes that resulted from
+	his hard work and testing.
+  </para>
+  <para>
+	Adrian Cox <email>adrian@humboldt.co.uk</email>, for bugfixing
+	MMAP support, and several other notable fixes that resulted from
+	his hard work and testing.
+  </para>
   </chapter>
   
   <chapter id="notes">
@@ -219,7 +212,10 @@
 	and device ids are not examined.
   </para>
   <para>
-	GNU indent formatting options:  -kr -i8 -pcs
+	GNU indent formatting options:
+  <programlisting>
+-kr -i8 -ts8 -br -ce -bap -sob -l80 -pcs -cs -ss -bs -di1 -nbc -lp -psl
+  </programlisting>
   </para>
   <para>
 	Via has graciously donated e-mail support and source code to help further
@@ -237,6 +233,79 @@
 
   <chapter id="changelog">
       <title>Driver ChangeLog</title>
+
+<sect1 id="version1115"><title>
+Version 1.1.15
+</title>
+  <itemizedlist spacing=compact>
+   <listitem>
+    <para>
+    Support for variable fragment size and variable fragment number (Rui
+    Sousa)
+    </para>
+   </listitem>
+
+   <listitem>
+    <para>
+    Fixes for the SPEED, STEREO, CHANNELS, FMT ioctls when in read &
+    write mode (Rui Sousa)
+    </para>
+   </listitem>
+
+   <listitem>
+    <para>
+    Mmaped sound is now fully functional. (Rui Sousa)
+    </para>
+   </listitem>
+
+   <listitem>
+    <para>
+    Make sure to enable PCI device before reading any of its PCI
+    config information. (fixes potential hotplug problems)
+    </para>
+   </listitem>
+
+   <listitem>
+    <para>
+    Clean up code a bit and add more internal function documentation.
+    </para>
+   </listitem>
+
+   <listitem>
+    <para>
+    AC97 codec access fixes (Adrian Cox)
+    </para>
+   </listitem>
+
+   <listitem>
+    <para>
+    Big endian fixes (Adrian Cox)
+    </para>
+   </listitem>
+
+   <listitem>
+    <para>
+    MIDI support (Adrian Cox)
+    </para>
+   </listitem>
+
+   <listitem>
+    <para>
+    Detect and report locked-rate AC97 codecs.  If your hardware only
+    supports 48Khz (locked rate), then your recording/playback software
+    must upsample or downsample accordingly.  The hardware cannot do it.
+    </para>
+   </listitem>
+
+   <listitem>
+    <para>
+    Use new pci_request_regions and pci_disable_device functions in
+    kernel 2.4.6.
+    </para>
+   </listitem>
+
+  </itemizedlist>
+</sect1>
 
 <sect1 id="version1114"><title>
 Version 1.1.14

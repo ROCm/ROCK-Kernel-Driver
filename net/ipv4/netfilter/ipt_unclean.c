@@ -268,6 +268,7 @@ check_tcp(const struct iphdr *iph,
 	  int embedded)
 {
 	u_int8_t *opt = (u_int8_t *)tcph;
+	u_int8_t *endhdr = (u_int8_t *)tcph + tcph->doff * 4;
 	u_int8_t tcpflags;
 	int end_of_options = 0;
 	size_t i;
@@ -373,7 +374,7 @@ check_tcp(const struct iphdr *iph,
 				return 0;
 			}
 			/* CHECK: oversize options. */
-			else if (opt[i+1] + i >= tcph->doff * 4) {
+			else if (&opt[i] + opt[i+1] > endhdr) {
 				limpk("TCP option %u at %Zu too long\n",
 				      (unsigned int) opt[i], i);
 				return 0;
@@ -392,6 +393,7 @@ static int
 check_ip(struct iphdr *iph, size_t length, int embedded)
 {
 	u_int8_t *opt = (u_int8_t *)iph;
+	u_int8_t *endhdr = (u_int8_t *)iph + iph->ihl * 4;
 	int end_of_options = 0;
 	void *protoh;
 	size_t datalen;
@@ -444,7 +446,7 @@ check_ip(struct iphdr *iph, size_t length, int embedded)
 				return 0;
 			}
 			/* CHECK: oversize options. */
-			else if (opt[i+1] + i > iph->ihl * 4) {
+			else if (&opt[i] + opt[i+1] > endhdr) {
 				limpk("IP option %u at %u too long\n",
 				      opt[i], i);
 				return 0;

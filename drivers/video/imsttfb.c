@@ -1278,10 +1278,11 @@ imsttfb_setcolreg (u_int regno, u_int red, u_int green, u_int blue,
 				break;
 #endif
 #ifdef FBCON_HAS_CFB32
-			case 32:
-				i = (regno << 8) | regno;
+			case 32: {
+				int i = (regno << 8) | regno;
 				p->fbcon_cmap.cfb32[regno] = (i << 16) | i;
 				break;
+			}
 #endif
 		}
 

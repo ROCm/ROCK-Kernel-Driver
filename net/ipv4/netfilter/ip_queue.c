@@ -24,19 +24,28 @@
 #include <linux/sysctl.h>
 #include <linux/proc_fs.h>
 #include <net/sock.h>
+#include <net/route.h>
 
 #include <linux/netfilter_ipv4/ip_queue.h>
+#include <linux/netfilter_ipv4/ip_tables.h>
 
 #define IPQ_QMAX_DEFAULT 1024
 #define IPQ_PROC_FS_NAME "ip_queue"
 #define NET_IPQ_QMAX 2088
 #define NET_IPQ_QMAX_NAME "ip_queue_maxlen"
 
+typedef struct ipq_rt_info {
+	__u8 tos;
+	__u32 daddr;
+	__u32 saddr;
+} ipq_rt_info_t;
+
 typedef struct ipq_queue_element {
 	struct list_head list;		/* Links element into queue */
 	int verdict;			/* Current verdict */
 	struct nf_info *info;		/* Extra info from netfilter */
 	struct sk_buff *skb;		/* Packet inside */
+	ipq_rt_info_t rt_info;		/* May need post-mangle routing */
 } ipq_queue_element_t;
 
 typedef int (*ipq_send_cb_t)(ipq_queue_element_t *e);
@@ -64,7 +73,6 @@ typedef struct ipq_queue {
  * Packet queue
  *
  ****************************************************************************/
-
 /* Dequeue a packet if matched by cmp, or the next available if cmp is NULL */
 static ipq_queue_element_t *
 ipq_dequeue(ipq_queue_t *q,
@@ -150,9 +158,19 @@ static int ipq_enqueue(ipq_queue_t *q,
 		printk(KERN_ERR "ip_queue: OOM in enqueue\n");
 		return -ENOMEM;
 	}
+
 	e->verdict = NF_DROP;
 	e->info = info;
 	e->skb = skb;
+
+	if (e->info->hook == NF_IP_LOCAL_OUT) {
+		struct iphdr *iph = skb->nh.iph;
+
+		e->rt_info.tos = iph->tos;
+		e->rt_info.daddr = iph->daddr;
+		e->rt_info.saddr = iph->saddr;
+	}
+
 	spin_lock_bh(&q->lock);
 	if (q->len >= *q->maxlen) {
 		spin_unlock_bh(&q->lock);
@@ -198,6 +216,32 @@ static void ipq_destroy_queue(ipq_queue_t *q)
 	kfree(q);
 }
 
+/* With a chainsaw... */
+static int route_me_harder(struct sk_buff *skb)
+{
+	struct iphdr *iph = skb->nh.iph;
+	struct rtable *rt;
+
+	struct rt_key key = {
+				dst:iph->daddr, src:iph->saddr,
+				oif:skb->sk ? skb->sk->bound_dev_if : 0,
+				tos:RT_TOS(iph->tos)|RTO_CONN,
+#ifdef CONFIG_IP_ROUTE_FWMARK
+				fwmark:skb->nfmark
+#endif
+			};
+
+	if (ip_route_output_key(&rt, &key) != 0) {
+		printk("route_me_harder: No more route.\n");
+		return -EINVAL;
+	}
+
+	/* Drop old route. */
+	dst_release(skb->dst);
+	skb->dst = &rt->u.dst;
+	return 0;
+}
+
 static int ipq_mangle_ipv4(ipq_verdict_msg_t *v, ipq_queue_element_t *e)
 {
 	int diff;
@@ -223,6 +267,8 @@ static int ipq_mangle_ipv4(ipq_verdict_msg_t *v, ipq_queue_element_t *e)
 				      "in mangle, dropping packet\n");
 				return -ENOMEM;
 			}
+			if (e->skb->sk)
+				skb_set_owner_w(newskb, e->skb->sk);
 			kfree_skb(e->skb);
 			e->skb = newskb;
 		}
@@ -230,6 +276,19 @@ static int ipq_mangle_ipv4(ipq_verdict_msg_t *v, ipq_queue_element_t *e)
 	}
 	memcpy(e->skb->data, v->payload, v->data_len);
 	e->skb->nfcache |= NFC_ALTERED;
+
+	/*
+	 * Extra routing may needed on local out, as the QUEUE target never
+	 * returns control to the table.
+	 */
+	if (e->info->hook == NF_IP_LOCAL_OUT) {
+		struct iphdr *iph = e->skb->nh.iph;
+
+		if (!(iph->tos == e->rt_info.tos
+		      && iph->daddr == e->rt_info.daddr
+		      && iph->saddr == e->rt_info.saddr))
+			return route_me_harder(e->skb);
+	}
 	return 0;
 }
 
@@ -400,6 +459,13 @@ static struct sk_buff *netlink_build_message(ipq_queue_element_t *e, int *errp)
 	if (e->info->outdev) strcpy(pm->outdev_name, e->info->outdev->name);
 	else pm->outdev_name[0] = '\0';
 	pm->hw_protocol = e->skb->protocol;
+	if (e->info->indev && e->skb->dev) {
+		pm->hw_type = e->skb->dev->type;
+		if (e->skb->dev->hard_header_parse)
+			pm->hw_addrlen =
+				e->skb->dev->hard_header_parse(e->skb,
+				                               pm->hw_addr);
+	}
 	if (data_len)
 		memcpy(pm->payload, e->skb->data, data_len);
 	nlh->nlmsg_len = skb->tail - old_tail;
@@ -431,10 +497,15 @@ extern __inline__ void netlink_receive_user_skb(struct sk_buff *skb)
 	int status, type;
 	struct nlmsghdr *nlh;
 
+	if (skb->len < sizeof(struct nlmsghdr))
+		return;
+
 	nlh = (struct nlmsghdr *)skb->data;
-	if (nlh->nlmsg_len < sizeof(*nlh)
-	    || skb->len < nlh->nlmsg_len
-	    || nlh->nlmsg_pid <= 0
+	if (nlh->nlmsg_len < sizeof(struct nlmsghdr)
+	    || skb->len < nlh->nlmsg_len)
+	    	return;
+
+	if(nlh->nlmsg_pid <= 0
 	    || !(nlh->nlmsg_flags & NLM_F_REQUEST)
 	    || nlh->nlmsg_flags & NLM_F_MULTI)
 		RCV_SKB_FAIL(-EINVAL);

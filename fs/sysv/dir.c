@@ -211,7 +211,7 @@ got_it:
 	if (err)
 		goto out_unlock;
 	memcpy (de->name, name, namelen);
-	memset (de->name + namelen, 0, SYSV_DIRSIZE - namelen);
+	memset (de->name + namelen, 0, SYSV_DIRSIZE - namelen - 2);
 	de->inode = cpu_to_fs16(inode->i_sb, inode->i_ino);
 	err = dir_commit_chunk(page, from, to);
 	dir->i_mtime = dir->i_ctime = CURRENT_TIME;

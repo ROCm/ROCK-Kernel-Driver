@@ -1,4 +1,4 @@
-/* $Id: isdnif.h,v 1.37.6.4 2001/06/09 15:14:19 kai Exp $
+/* $Id: isdnif.h,v 1.37.6.5 2001/06/11 22:08:38 kai Exp $
 
  * Linux ISDN subsystem
  *

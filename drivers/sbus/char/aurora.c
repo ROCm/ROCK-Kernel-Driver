@@ -1,4 +1,4 @@
-/*	$Id: aurora.c,v 1.13 2001/05/10 01:45:38 davem Exp $
+/*	$Id: aurora.c,v 1.14 2001/06/29 23:07:37 davem Exp $
  *	linux/drivers/sbus/char/aurora.c -- Aurora multiport driver
  *
  *	Copyright (c) 1999 by Oliver Aldulea (oli@bv.ro)
@@ -1851,7 +1851,6 @@ static int aurora_get_modem_info(struct Aurora_port * port, unsigned int *value)
 static int aurora_set_modem_info(struct Aurora_port * port, unsigned int cmd,
 				 unsigned int *value)
 {
-	int error;
 	unsigned int arg;
 	unsigned long flags;
 	struct Aurora_board *bp = port_Board(port);
@@ -1860,9 +1859,8 @@ static int aurora_set_modem_info(struct Aurora_port * port, unsigned int cmd,
 #ifdef AURORA_DEBUG
 	printk("aurora_set_modem_info: start\n");
 #endif
-	error = get_user(arg, value);
-	if (error) 
-		return error;
+	if (get_user(arg, value))
+		return -EFAULT;
 	chip = AURORA_CD180(port_No(port));
 	switch (cmd) {
 	 case TIOCMBIS: 
@@ -1940,16 +1938,12 @@ static int aurora_set_serial_info(struct Aurora_port * port,
 	struct Aurora_board *bp = port_Board(port);
 	int change_speed;
 	unsigned long flags;
-	int error;
 
 #ifdef AURORA_DEBUG
 	printk("aurora_set_serial_info: start\n");
 #endif
-	error = verify_area(VERIFY_READ, (void *) newinfo, sizeof(tmp));
-	if (error)
-		return error;
-	copy_from_user(&tmp, newinfo, sizeof(tmp));
-	
+	if (copy_from_user(&tmp, newinfo, sizeof(tmp)))
+		return -EFAULT;
 #if 0	
 	if ((tmp.irq != bp->irq) ||
 	    (tmp.port != bp->base) ||
@@ -2025,7 +2019,6 @@ static int aurora_ioctl(struct tty_struct * tty, struct file * filp,
 		    
 {
 	struct Aurora_port *port = (struct Aurora_port *) tty->driver_data;
-	int error;
 	int retval;
 
 #ifdef AURORA_DEBUG
@@ -2051,25 +2044,19 @@ static int aurora_ioctl(struct tty_struct * tty, struct file * filp,
 		aurora_send_break(port, arg ? arg*(HZ/10) : HZ/4);
 		return 0;
 	case TIOCGSOFTCAR:
-		error = verify_area(VERIFY_WRITE, (void *) arg, sizeof(long));
-		if (error)
-			return error;
-		put_user(C_CLOCAL(tty) ? 1 : 0,
-			 (unsigned long *) arg);
-		return 0;
+		return put_user(C_CLOCAL(tty) ? 1 : 0, (unsigned long *)arg);
 	case TIOCSSOFTCAR:
-		retval = get_user(arg,(unsigned long *) arg);
-		if (retval)
-			return retval;
+		if (get_user(arg,(unsigned long *)arg))
+			return -EFAULT;
 		tty->termios->c_cflag =
 			((tty->termios->c_cflag & ~CLOCAL) |
 			 (arg ? CLOCAL : 0));
 		return 0;
 	case TIOCMGET:
-		error = verify_area(VERIFY_WRITE, (void *) arg,
+		retval = verify_area(VERIFY_WRITE, (void *) arg,
 				    sizeof(unsigned int));
-		if (error)
-			return error;
+		if (retval)
+			return retval;
 		return aurora_get_modem_info(port, (unsigned int *) arg);
 	case TIOCMBIS:
 	case TIOCMBIC:

@@ -2749,7 +2749,7 @@ static int ohci_sleep_notify (struct pmu_sleep_notifier * self, int when)
 
 		switch (when) {
 		case PBOOK_SLEEP_NOW:
-			ohci_pci_suspend (ohci->ohci_dev);
+			ohci_pci_suspend (ohci->ohci_dev, 3);
 			break;
 		case PBOOK_WAKE:
 			ohci_pci_resume (ohci->ohci_dev);

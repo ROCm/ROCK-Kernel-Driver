@@ -967,6 +967,7 @@ static void end_buffer_io_sync(struct buffer_head *bh, int uptodate)
 {
 	mark_buffer_uptodate(bh, uptodate);
 	unlock_buffer(bh);
+	atomic_dec(&bh->b_count);
 }
 
 /**
@@ -1055,6 +1056,7 @@ void ll_rw_block(int rw, int nr, struct buffer_head * bhs[])
 			continue;
 
 		/* We have the buffer lock */
+		atomic_inc(&bh->b_count);
 		bh->b_end_io = end_buffer_io_sync;
 
 		switch(rw) {

@@ -49,7 +49,7 @@
 
 #ifdef MODULE
 
-#define INCLUDE_LINUX_LOGOBW
+#define INCLUDE_LINUX_LOGO_DATA
 #include <linux/linux_logo.h>
 
 #endif /* MODULE */

@@ -1108,9 +1108,6 @@ static int do_swap_page(struct mm_struct * mm,
 			spin_lock(&mm->page_table_lock);
 			return -1;
 		}
-		wait_on_page(page);
-		flush_page_to_ram(page);
-		flush_icache_page(vma, page);
 	}
 
 	/*
@@ -1140,6 +1137,8 @@ static int do_swap_page(struct mm_struct * mm,
 		pte = pte_mkwrite(pte_mkdirty(pte));
 	UnlockPage(page);
 
+	flush_page_to_ram(page);
+	flush_icache_page(vma, page);
 	set_pte(page_table, pte);
 
 	/* No need to invalidate - it was non-present before */

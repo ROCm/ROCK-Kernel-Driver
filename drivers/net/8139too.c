@@ -137,7 +137,7 @@ an MMIO register read.
 */
 
 #define DRV_NAME	"8139too"
-#define DRV_VERSION	"0.9.18-pre4"
+#define DRV_VERSION	"0.9.18"
 
 
 #include <linux/config.h>
@@ -209,7 +209,7 @@ static int multicast_filter_limit = 32;
 #define RX_BUF_PAD 16
 #define RX_BUF_WRAP_PAD 2048 /* spare padding to handle lack of packet wrap */
 #define RX_BUF_TOT_LEN (RX_BUF_LEN + RX_BUF_PAD + RX_BUF_WRAP_PAD)
-#define RX_EARLY_THRESH 2
+#define RX_EARLY_THRESH 14
 
 /* Number of Tx descriptor registers. */
 #define NUM_TX_DESC	4

@@ -1649,10 +1649,13 @@ static inline int filemap_sync_pte(pte_t * ptep, struct vm_area_struct *vma,
 {
 	pte_t pte = *ptep;
 
-	if (pte_present(pte) && ptep_test_and_clear_dirty(ptep)) {
+	if (pte_present(pte)) {
 		struct page *page = pte_page(pte);
-		flush_tlb_page(vma, address);
-		set_page_dirty(page);
+		if (VALID_PAGE(page) && !PageReserved(page) && ptep_test_and_clear_dirty(ptep)) {
+			flush_tlb_page(vma, address);
+			if (page->mapping)
+				set_page_dirty(page);
+		}
 	}
 	return 0;
 }

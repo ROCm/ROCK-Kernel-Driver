@@ -207,6 +207,7 @@ comment 'Ethernet (1000 Mbit)'
 
 dep_tristate 'Alteon AceNIC/3Com 3C985/NetGear GA620 Gigabit support' CONFIG_ACENIC $CONFIG_PCI
 dep_mbool '  Omit support for old Tigon I based AceNICs' CONFIG_ACENIC_OMIT_TIGON_I $CONFIG_ACENIC
+dep_tristate 'D-Link 2000-based Gigabit Ethernet support' CONFIG_DL2K $CONFIG_PCI
 dep_tristate 'MyriCOM Gigabit Ethernet support' CONFIG_MYRI_SBUS $CONFIG_SBUS
 dep_tristate 'Packet Engines Hamachi GNIC-II support' CONFIG_HAMACHI $CONFIG_PCI
 dep_tristate 'Packet Engines Yellowfin Gigabit-NIC support (EXPERIMENTAL)' CONFIG_YELLOWFIN $CONFIG_PCI $CONFIG_EXPERIMENTAL

@@ -247,7 +247,6 @@ static int empeg_open (struct usb_serial_port *port, struct file *filp)
 static void empeg_close (struct usb_serial_port *port, struct file * filp)
 {
 	struct usb_serial *serial;
-	unsigned char *transfer_buffer;
 
 	if (port_paranoia_check (port, __FUNCTION__))
 		return;
@@ -263,14 +262,6 @@ static void empeg_close (struct usb_serial_port *port, struct file * filp)
 	--port->open_count;
 
 	if (port->open_count <= 0) {
-		transfer_buffer =  kmalloc (0x12, GFP_KERNEL);
-
-		if (!transfer_buffer) {
-			err(__FUNCTION__ " - kmalloc(%d) failed.", 0x12);
-		} else {
-			kfree (transfer_buffer);
-		}
-
 		/* shutdown our bulk read */
 		usb_unlink_urb (port->read_urb);
 		port->active = 0;

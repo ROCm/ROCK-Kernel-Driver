@@ -68,106 +68,77 @@ static void dn_send_ptp_hello(struct net_device *dev);
 
 static struct dn_dev_parms dn_dev_list[] =  {
 {
-	ARPHRD_ETHER, /* Ethernet */
-	DN_DEV_BCAST,
-	DN_DEV_S_RU,
-	0,
-	1498,
-	1,
-	10,
-	0,
-	"ethernet",
-	NET_DECNET_CONF_ETHER,
-	dn_eth_up,
-	NULL,
-	dn_send_brd_hello,
-	NULL
+	type:		ARPHRD_ETHER, /* Ethernet */
+	mode:		DN_DEV_BCAST,
+	state:		DN_DEV_S_RU,
+	blksize:	1498,
+	t2:		1,
+	t3:		10,
+	name:		"ethernet",
+	ctl_name:	NET_DECNET_CONF_ETHER,
+	up:		dn_eth_up,
+	timer3:		dn_send_brd_hello,
 },
 {
-	ARPHRD_IPGRE, /* DECnet tunneled over GRE in IP */
-	DN_DEV_BCAST,
-	DN_DEV_S_RU,
-	0,
-	1400,
-	1,
-	10,
-	0,
-	"ipgre",
-	NET_DECNET_CONF_GRE,
-	NULL,
-	NULL,
-	dn_send_brd_hello,
-	NULL
+	type:		ARPHRD_IPGRE, /* DECnet tunneled over GRE in IP */
+	mode:		DN_DEV_BCAST,
+	state:		DN_DEV_S_RU,
+	blksize:	1400,
+	t2:		1,
+	t3:		10,
+	name:		"ipgre",
+	ctl_name:	NET_DECNET_CONF_GRE,
+	timer3:		dn_send_brd_hello,
 },
 #if 0
 {
-	ARPHRD_X25, /* Bog standard X.25 */
-	DN_DEV_UCAST,
-	DN_DEV_S_DS,
-	0,
-	230,
-	1,
-	120,
-	0,
-	"x25",
-	NET_DECNET_CONF_X25,
-	NULL,
-	NULL,
-	dn_send_ptp_hello,
-	NULL
+	type:		ARPHRD_X25, /* Bog standard X.25 */
+	mode:		DN_DEV_UCAST,
+	state:		DN_DEV_S_DS,
+	blksize:	230,
+	t2:		1,
+	t3:		120,
+	name:		"x25",
+	ctl_name:	NET_DECNET_CONF_X25,
+	timer3:		dn_send_ptp_hello,
 },
 #endif
 #if 0
 {
-	ARPHRD_PPP, /* DECnet over PPP */
-	DN_DEV_BCAST,
-	DN_DEV_S_RU,
-	0,
-	230,
-	1,
-	10,
-	0,
-	"ppp",
-	NET_DECNET_CONF_PPP,
-	NULL,
-	NULL,
-	dn_send_brd_hello,
-	NULL
+	type:		ARPHRD_PPP, /* DECnet over PPP */
+	mode:		DN_DEV_BCAST,
+	state:		DN_DEV_S_RU,
+	blksize:	230,
+	t2:		1,
+	t3:		10,
+	name:		"ppp",
+	ctl_name:	NET_DECNET_CONF_PPP,
+	timer3:		dn_send_brd_hello,
 },
 #endif
 #if 0
 {
-	ARPHRD_DDCMP, /* DECnet over DDCMP */
-	DN_DEV_UCAST,
-	DN_DEV_S_DS,
-	0,
-	230,
-	1,
-	120,
-	0,
-	"ddcmp",
-	NET_DECNET_CONF_DDCMP,
-	NULL,
-	NULL,
-	dn_send_ptp_hello,
-	NULL
+	type:		ARPHRD_DDCMP, /* DECnet over DDCMP */
+	mode:		DN_DEV_UCAST,
+	state:		DN_DEV_S_DS,
+	blksize:	230,
+	t2:		1,
+	t3:		120,
+	name:		"ddcmp",
+	ctl_name:	NET_DECNET_CONF_DDCMP,
+	timer3:		dn_send_ptp_hello,
 },
 #endif
 {
-	ARPHRD_LOOPBACK, /* Loopback interface - always last */
-	DN_DEV_BCAST,
-	DN_DEV_S_RU,
-	0,
-	1498,
-	1,
-	10,
-	0,
-	"loopback",
-	NET_DECNET_CONF_LOOPBACK,
-	NULL,
-	NULL,
-	dn_send_brd_hello,
-	NULL
+	type:		ARPHRD_LOOPBACK, /* Loopback interface - always last */
+	mode:		DN_DEV_BCAST,
+	state:		DN_DEV_S_RU,
+	blksize:	1498,
+	t2:		1,
+	t3:		10,
+	name:		"loopback",
+	ctl_name:	NET_DECNET_CONF_LOOPBACK,
+	timer3:		dn_send_brd_hello,
 }
 };
 
@@ -182,7 +153,7 @@ static int max_t2[] = { 60 }; /* No max specified, but this seems sensible */
 static int min_t3[] = { 1 };
 static int max_t3[] = { 8191 }; /* Must fit in 16 bits when multiplied by BCT3MULT or T3MULT */
 
-static int min_priority[] = { 0 };
+static int min_priority[1];
 static int max_priority[] = { 127 }; /* From DECnet spec */
 
 static int dn_forwarding_proc(ctl_table *, int, struct file *,
@@ -344,7 +315,8 @@ static int dn_forwarding_sysctl(ctl_table *table, int *name, int nlen,
 		if (newlen != sizeof(int))
 			return -EINVAL;
 
-		get_user(value, (int *)newval);
+		if (get_user(value, (int *)newval))
+			return -EFAULT;
 		if (value < 0)
 			return -EINVAL;
 		if (value > 2)

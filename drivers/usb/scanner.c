@@ -909,7 +909,7 @@ ioctl_scanner(struct inode *inode, struct file *file,
 		return result;
 	}
 	default:
-		return -ENOIOCTLCMD;
+		return -ENOTTY;
 	}
 	return 0;
 }

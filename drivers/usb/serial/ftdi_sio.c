@@ -902,7 +902,8 @@ static int ftdi_sio_ioctl (struct usb_serial_port *port, struct file * file, uns
 
 	case TIOCMSET: /* Turns on and off the lines as specified by the mask */
 		dbg(__FUNCTION__ " TIOCMSET");
-		if ((ret = get_user(mask, (unsigned long *) arg))) return ret;
+		if (get_user(mask, (unsigned long *) arg))
+			return -EFAULT;
 		urb_value = ((mask & TIOCM_DTR) ? HIGH : LOW);
 		if (set_dtr(serial->dev, usb_sndctrlpipe(serial->dev, 0),urb_value) < 0){
 			err("Error from DTR set urb (TIOCMSET)");
@@ -915,7 +916,8 @@ static int ftdi_sio_ioctl (struct usb_serial_port *port, struct file * file, uns
 					
 	case TIOCMBIS: /* turns on (Sets) the lines as specified by the mask */
 		dbg(__FUNCTION__ " TIOCMBIS");
- 	        if ((ret = get_user(mask, (unsigned long *) arg))) return ret;
+ 	        if (get_user(mask, (unsigned long *) arg))
+			return -EFAULT;
   	        if (mask & TIOCM_DTR){
 			if ((ret = set_dtr(serial->dev, 
 					   usb_sndctrlpipe(serial->dev, 0),
@@ -936,7 +938,8 @@ static int ftdi_sio_ioctl (struct usb_serial_port *port, struct file * file, uns
 
 	case TIOCMBIC: /* turns off (Clears) the lines as specified by the mask */
 		dbg(__FUNCTION__ " TIOCMBIC");
- 	        if ((ret = get_user(mask, (unsigned long *) arg))) return ret;
+ 	        if (get_user(mask, (unsigned long *) arg))
+			return -EFAULT;
   	        if (mask & TIOCM_DTR){
 			if ((ret = set_dtr(serial->dev, 
 					   usb_sndctrlpipe(serial->dev, 0),

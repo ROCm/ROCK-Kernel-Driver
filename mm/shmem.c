@@ -223,7 +223,7 @@ static void shmem_delete_inode(struct inode * inode)
  */
 static int shmem_writepage(struct page * page)
 {
-	int error = 0;
+	int error;
 	struct shmem_inode_info *info;
 	swp_entry_t *entry, swap;
 	struct inode *inode;
@@ -231,17 +231,14 @@ static int shmem_writepage(struct page * page)
 	if (!PageLocked(page))
 		BUG();
 	
-	/* Only move to the swap cache if there are no other users of
-	 * the page. */
-	if (atomic_read(&page->count) > 2)
-		goto out;
-	
 	inode = page->mapping->host;
 	info = &inode->u.shmem_i;
 	swap = __get_swap_page(2);
 	error = -ENOMEM;
-	if (!swap.val)
+	if (!swap.val) {
+		activate_page(page);
 		goto out;
+	}
 
 	spin_lock(&info->lock);
 	entry = shmem_swp_entry(info, page->index);

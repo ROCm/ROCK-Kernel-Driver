@@ -71,6 +71,9 @@ static char buffersize_index[65] =
 
 #define BH_ENTRY(list) list_entry((list), struct buffer_head, b_inode_buffers)
 
+#define get_bh(bh)	atomic_inc(&(bh)->b_count)
+#define put_bh(bh)	atomic_dec(&(bh)->b_count)
+
 /*
  * Hash table gook..
  */
@@ -133,6 +136,21 @@ union bdflush_param {
 int bdflush_min[N_PARAM] = {  0,  10,    5,   25,  0,   1*HZ,   0, 0, 0};
 int bdflush_max[N_PARAM] = {100,50000, 20000, 20000,600*HZ, 6000*HZ, 100, 0, 0};
 
+static inline void __unlock_buffer(struct buffer_head *bh)
+{
+	clear_bit(BH_Lock, &bh->b_state);
+	smp_mb__after_clear_bit();
+	if (waitqueue_active(&bh->b_wait))
+		wake_up(&bh->b_wait);
+}
+
+void unlock_buffer(struct buffer_head *bh)
+{
+	get_bh(bh);
+	__unlock_buffer(bh);
+	put_bh(bh);
+}
+
 /*
  * Rewrote the wait-routines to use the "new" wait-queue functionality,
  * and getting rid of the cli-sti pairs. The wait-queue routines still
@@ -147,7 +165,7 @@ void __wait_on_buffer(struct buffer_head * bh)
 	struct task_struct *tsk = current;
 	DECLARE_WAITQUEUE(wait, tsk);
 
-	atomic_inc(&bh->b_count);
+	get_bh(bh);
 	add_wait_queue(&bh->b_wait, &wait);
 	do {
 		run_task_queue(&tq_disk);
@@ -158,14 +176,15 @@ void __wait_on_buffer(struct buffer_head * bh)
 	} while (buffer_locked(bh));
 	tsk->state = TASK_RUNNING;
 	remove_wait_queue(&bh->b_wait, &wait);
-	atomic_dec(&bh->b_count);
+	put_bh(bh);
 }
 
 /* End-of-write handler.. Just mark it up-to-date and unlock the buffer. */
 static void end_buffer_write(struct buffer_head *bh, int uptodate)
 {
 	mark_buffer_uptodate(bh, uptodate);
-	unlock_buffer(bh);
+	__unlock_buffer(bh);
+	put_bh(bh);
 }
 
 /*
@@ -179,14 +198,14 @@ static void end_buffer_write(struct buffer_head *bh, int uptodate)
 static void write_locked_buffers(struct buffer_head **array, unsigned int count)
 {
 	struct buffer_head *wait = *array;
-	atomic_inc(&wait->b_count);
+	get_bh(wait);
 	do {
 		struct buffer_head * bh = *array++;
 		bh->b_end_io = end_buffer_write;
 		submit_bh(WRITE, bh);
 	} while (--count);
 	wait_on_buffer(wait);
-	atomic_dec(&wait->b_count);
+	put_bh(wait);
 }
 
 #define NRSYNC (32)
@@ -210,6 +229,7 @@ repeat:
 			continue;
 		if (test_and_set_bit(BH_Lock, &bh->b_state))
 			continue;
+		get_bh(bh);
 		if (atomic_set_buffer_clean(bh)) {
 			__refile_buffer(bh);
 			array[count++] = bh;
@@ -220,7 +240,8 @@ repeat:
 			write_locked_buffers(array, count);
 			goto repeat;
 		}
-		unlock_buffer(bh);
+		__unlock_buffer(bh);
+		put_bh(bh);
 	}
 	spin_unlock(&lru_list_lock);
 
@@ -249,10 +270,10 @@ repeat:
 		if (dev && bh->b_dev != dev)
 			continue;
 
-		atomic_inc(&bh->b_count);
+		get_bh(bh);
 		spin_unlock(&lru_list_lock);
 		wait_on_buffer (bh);
-		atomic_dec(&bh->b_count);
+		put_bh(bh);
 		goto repeat;
 	}
 	spin_unlock(&lru_list_lock);
@@ -552,7 +573,7 @@ static inline struct buffer_head * __get_hash_table(kdev_t dev, int block, int s
 		    bh->b_dev     == dev)
 			break;
 	if (bh)
-		atomic_inc(&bh->b_count);
+		get_bh(bh);
 
 	return bh;
 }
@@ -646,12 +667,12 @@ void __invalidate_buffers(kdev_t dev, int destroy_dirty_buffers)
 			if (!bh->b_pprev)
 				continue;
 			if (buffer_locked(bh)) {
-				atomic_inc(&bh->b_count);
+				get_bh(bh);
 				spin_unlock(&lru_list_lock);
 				wait_on_buffer(bh);
 				slept = 1;
 				spin_lock(&lru_list_lock);
-				atomic_dec(&bh->b_count);
+				put_bh(bh);
 			}
 
 			write_lock(&hash_table_lock);
@@ -711,12 +732,12 @@ void set_blocksize(kdev_t dev, int size)
 			if (!bh->b_pprev)
 				continue;
 			if (buffer_locked(bh)) {
-				atomic_inc(&bh->b_count);
+				get_bh(bh);
 				spin_unlock(&lru_list_lock);
 				wait_on_buffer(bh);
 				slept = 1;
 				spin_lock(&lru_list_lock);
-				atomic_dec(&bh->b_count);
+				put_bh(bh);
 			}
 
 			write_lock(&hash_table_lock);
@@ -802,8 +823,7 @@ static void end_buffer_io_async(struct buffer_head * bh, int uptodate)
 	 * that unlock the page..
 	 */
 	spin_lock_irqsave(&page_uptodate_lock, flags);
-	unlock_buffer(bh);
-	atomic_dec(&bh->b_count);
+	__unlock_buffer(bh);
 	tmp = bh->b_this_page;
 	while (tmp != bh) {
 		if (tmp->b_end_io == end_buffer_io_async && buffer_locked(tmp))
@@ -813,6 +833,7 @@ static void end_buffer_io_async(struct buffer_head * bh, int uptodate)
 
 	/* OK, the async IO on this page is complete. */
 	spin_unlock_irqrestore(&page_uptodate_lock, flags);
+	put_bh(bh);
 
 	/*
 	 * if none of the buffers had errors then we can set the
@@ -832,6 +853,7 @@ static void end_buffer_io_async(struct buffer_head * bh, int uptodate)
 	return;
 
 still_busy:
+	put_bh(bh);
 	spin_unlock_irqrestore(&page_uptodate_lock, flags);
 	return;
 }
@@ -879,7 +901,7 @@ int fsync_inode_buffers(struct inode *inode)
 			bh->b_inode = &tmp;
 			list_add(&bh->b_inode_buffers, &tmp.i_dirty_buffers);
 			if (buffer_dirty(bh)) {
-				atomic_inc(&bh->b_count);
+				get_bh(bh);
 				spin_unlock(&lru_list_lock);
 				ll_rw_block(WRITE, 1, &bh);
 				brelse(bh);
@@ -891,7 +913,7 @@ int fsync_inode_buffers(struct inode *inode)
 	while (!list_empty(&tmp.i_dirty_buffers)) {
 		bh = BH_ENTRY(tmp.i_dirty_buffers.prev);
 		remove_inode_queue(bh);
-		atomic_inc(&bh->b_count);
+		get_bh(bh);
 		spin_unlock(&lru_list_lock);
 		wait_on_buffer(bh);
 		if (!buffer_uptodate(bh))
@@ -935,7 +957,7 @@ int osync_inode_buffers(struct inode *inode)
 	     bh = BH_ENTRY(list), list != &inode->i_dirty_buffers;
 	     list = bh->b_inode_buffers.prev) {
 		if (buffer_locked(bh)) {
-			atomic_inc(&bh->b_count);
+			get_bh(bh);
 			spin_unlock(&lru_list_lock);
 			wait_on_buffer(bh);
 			if (!buffer_uptodate(bh))
@@ -1130,7 +1152,7 @@ void refile_buffer(struct buffer_head *bh)
 void __brelse(struct buffer_head * buf)
 {
 	if (atomic_read(&buf->b_count)) {
-		atomic_dec(&buf->b_count);
+		put_bh(buf);
 		return;
 	}
 	printk("VFS: brelse: Trying to free free buffer\n");
@@ -1528,7 +1550,7 @@ static int __block_write_full_page(struct inode *inode, struct page *page, get_b
 	do {
 		lock_buffer(bh);
 		bh->b_end_io = end_buffer_io_async;
-		atomic_inc(&bh->b_count);
+		get_bh(bh);
 		set_bit(BH_Uptodate, &bh->b_state);
 		clear_bit(BH_Dirty, &bh->b_state);
 		bh = bh->b_this_page;
@@ -1536,8 +1558,9 @@ static int __block_write_full_page(struct inode *inode, struct page *page, get_b
 
 	/* Stage 3: submit the IO */
 	do {
+		struct buffer_head *next = bh->b_this_page;
 		submit_bh(WRITE, bh);
-		bh = bh->b_this_page;		
+		bh = next;
 	} while (bh != head);
 
 	/* Done - end_buffer_io_async will unlock */
@@ -1729,7 +1752,7 @@ int block_read_full_page(struct page *page, get_block_t *get_block)
 		struct buffer_head * bh = arr[i];
 		lock_buffer(bh);
 		bh->b_end_io = end_buffer_io_async;
-		atomic_inc(&bh->b_count);
+		get_bh(bh);
 	}
 
 	/* Stage 3: start the IO */
@@ -1982,7 +2005,8 @@ static void end_buffer_io_kiobuf(struct buffer_head *bh, int uptodate)
 	mark_buffer_uptodate(bh, uptodate);
 
 	kiobuf = bh->b_private;
-	unlock_buffer(bh);
+	__unlock_buffer(bh);
+	put_bh(bh);
 	end_kio_request(kiobuf, uptodate);
 }
 
@@ -2107,7 +2131,7 @@ int brw_kiovec(int rw, int nr, struct kiobuf *iovec[],
 				offset += size;
 
 				atomic_inc(&iobuf->io_count);
-
+				get_bh(tmp);
 				submit_bh(rw, tmp);
 				/* 
 				 * Wait for IO if we have got too much 
@@ -2175,14 +2199,15 @@ int brw_page(int rw, struct page *page, kdev_t dev, int b[], int size)
 		bh->b_blocknr = *(b++);
 		set_bit(BH_Mapped, &bh->b_state);
 		bh->b_end_io = end_buffer_io_async;
-		atomic_inc(&bh->b_count);
+		get_bh(bh);
 		bh = bh->b_this_page;
 	} while (bh != head);
 
 	/* Stage 2: start the IO */
 	do {
+		struct buffer_head *next = bh->b_this_page;
 		submit_bh(rw, bh);
-		bh = bh->b_this_page;
+		bh = next;
 	} while (bh != head);
 	return 0;
 }
@@ -2554,10 +2579,10 @@ static int flush_dirty_buffers(int check_flushtime)
 		}
 
 		/* OK, now we are committed to write it out. */
-		atomic_inc(&bh->b_count);
+		get_bh(bh);
 		spin_unlock(&lru_list_lock);
 		ll_rw_block(WRITE, 1, &bh);
-		atomic_dec(&bh->b_count);
+		put_bh(bh);
 
 		if (current->need_resched)
 			schedule();

@@ -8842,6 +8842,18 @@ CONFIG_MYRI_SBUS
   say M here and read Documentation/modules.txt. This is recommended.
   The module will be called myri_sbus.o.
 
+D-Link 2000-based Gigabit Ethernet support
+CONFIG_DL2K
+  This driver supports D-Link 2000-based gigabit ethernet cards, which
+  includes
+	D-Link DGE-550T Gigabit Ethernet Adapter.
+	D-Link DL2000-based Gigabit Ethernet Adapter.
+
+  If you want to compile this driver as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read Documentation/modules.txt. This is recommended.
+  The module will be called dl2k.o.
+
 AMD LANCE and PCnet (AT1500 and NE2100) support
 CONFIG_LANCE
   If you have a network (Ethernet) card of this type, say Y and read

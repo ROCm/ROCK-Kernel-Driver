@@ -26,13 +26,7 @@ extern inline void lock_buffer(struct buffer_head * bh)
 		__wait_on_buffer(bh);
 }
 
-extern inline void unlock_buffer(struct buffer_head *bh)
-{
-	clear_bit(BH_Lock, &bh->b_state);
-	smp_mb__after_clear_bit();
-	if (waitqueue_active(&bh->b_wait))
-		wake_up(&bh->b_wait);
-}
+extern void unlock_buffer(struct buffer_head *bh);
 
 /*
  * super-block locking. Again, interrupts may only unlock

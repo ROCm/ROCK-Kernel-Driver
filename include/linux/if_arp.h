@@ -35,6 +35,7 @@
 #define	ARPHRD_IEEE802	6		/* IEEE 802.2 Ethernet/TR/TB	*/
 #define	ARPHRD_ARCNET	7		/* ARCnet			*/
 #define	ARPHRD_APPLETLK	8		/* APPLEtalk			*/
+#define	ARPHRD_IEEE1394	9		/* IEEE 1394 IPv4 - RFC 2734	*/
 #define ARPHRD_DLCI	15		/* Frame Relay DLCI		*/
 #define ARPHRD_ATM	19		/* ATM 				*/
 #define ARPHRD_METRICOM	23		/* Metricom STRIP (new IANA id)	*/

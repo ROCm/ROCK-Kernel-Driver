@@ -15,6 +15,13 @@
  *
  * See Documentation/usb/usb-serial.txt for more information on using this driver
  * 
+ * (07/03/2001) gkh
+ *	Fixed module paramater size.  Thanks to John Brockmeyer for the pointer.
+ *	Fixed vendor and product getting defined through the MODULE_PARM macro
+ *	if the Generic driver wasn't compiled in.
+ *	Fixed problem with generic_shutdown() not being called for drivers that
+ *	don't have a shutdown() function.
+ *
  * (06/06/2001) gkh
  *	added evil hack that is needed for the prolific pl2303 device due to the
  *	crazy way its endpoints are set up.
@@ -296,7 +303,7 @@
 /*
  * Version Information
  */
-#define DRIVER_VERSION "v1.2"
+#define DRIVER_VERSION "v1.3"
 #define DRIVER_AUTHOR "Greg Kroah-Hartman, greg@kroah.com, http://www.kroah.com/linux-usb/"
 #define DRIVER_DESC "USB Serial Driver core"
 
@@ -347,6 +354,7 @@ static void serial_throttle (struct tty_struct * tty);
 static void serial_unthrottle (struct tty_struct * tty);
 static int  serial_ioctl (struct tty_struct *tty, struct file * file, unsigned int cmd, unsigned long arg);
 static void serial_set_termios (struct tty_struct *tty, struct termios * old);
+static void serial_shutdown (struct usb_serial *serial);
 
 static void * usb_serial_probe(struct usb_device *dev, unsigned int ifnum,
 			       const struct usb_device_id *id);
@@ -732,6 +740,16 @@ static void serial_break (struct tty_struct *tty, int break_state)
            available */
 	if (serial->type->break_ctl) {
 		serial->type->break_ctl(port, break_state);
+	}
+}
+
+
+static void serial_shutdown (struct usb_serial *serial)
+{
+	if (serial->type->shutdown) {
+		serial->type->shutdown(serial);
+	} else {
+		generic_shutdown(serial);
 	}
 }
 
@@ -1311,8 +1329,7 @@ static void usb_serial_disconnect(struct usb_device *dev, void *ptr)
 				serial->port[i].tty->driver_data = NULL;
 		}
 
-		if (serial->type->shutdown)
-			serial->type->shutdown(serial);
+		serial_shutdown (serial);
 
 		for (i = 0; i < serial->num_ports; ++i)
 			serial->port[i].active = 0;
@@ -1426,7 +1443,7 @@ int usb_serial_init(void)
 		return -1;
 	}
 
-	info(DRIVER_VERSION ":" DRIVER_DESC);
+	info(DRIVER_DESC " " DRIVER_VERSION);
 
 	return 0;
 }
@@ -1500,9 +1517,11 @@ MODULE_DESCRIPTION( DRIVER_DESC );
 MODULE_PARM(debug, "i");
 MODULE_PARM_DESC(debug, "Debug enabled or not");
 
-MODULE_PARM(vendor, "i");
+#ifdef CONFIG_USB_SERIAL_GENERIC
+MODULE_PARM(vendor, "h");
 MODULE_PARM_DESC(vendor, "User specified USB idVendor");
 
-MODULE_PARM(product, "i");
+MODULE_PARM(product, "h");
 MODULE_PARM_DESC(product, "User specified USB idProduct");
+#endif
 

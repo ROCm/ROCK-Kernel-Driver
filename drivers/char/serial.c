@@ -59,8 +59,8 @@
  *
  */
 
-static char *serial_version = "5.05b";
-static char *serial_revdate = "2001-05-03";
+static char *serial_version = "5.05c";
+static char *serial_revdate = "2001-07-08";
 
 /*
  * Serial driver configuration section.  Here are the various options:
@@ -3512,7 +3512,7 @@ static void autoconfig_startech_uarts(struct async_struct *info,
 				      struct serial_state *state,
 				      unsigned long flags)
 {
-	unsigned char scratch, scratch2, scratch3;
+	unsigned char scratch, scratch2, scratch3, scratch4;
 
 	/*
 	 * First we check to see if it's an Oxford Semiconductor UART.
@@ -3556,17 +3556,32 @@ static void autoconfig_startech_uarts(struct async_struct *info,
 	 * XR16C854.
 	 * 
 	 */
+
+	/* Save the DLL and DLM */
+
 	serial_outp(info, UART_LCR, UART_LCR_DLAB);
+	scratch3 = serial_inp(info, UART_DLL);
+	scratch4 = serial_inp(info, UART_DLM);
+
 	serial_outp(info, UART_DLL, 0);
 	serial_outp(info, UART_DLM, 0);
-	state->revision = serial_inp(info, UART_DLL);
+	scratch2 = serial_inp(info, UART_DLL);
 	scratch = serial_inp(info, UART_DLM);
 	serial_outp(info, UART_LCR, 0);
+
 	if (scratch == 0x10 || scratch == 0x14) {
+		if (scratch == 0x10)
+			state->revision = scratch2;
 		state->type = PORT_16850;
 		return;
 	}
 
+	/* Restore the DLL and DLM */
+
+	serial_outp(info, UART_LCR, UART_LCR_DLAB);
+	serial_outp(info, UART_DLL, scratch3);
+	serial_outp(info, UART_DLM, scratch4);
+	serial_outp(info, UART_LCR, 0);
 	/*
 	 * We distinguish between the '654 and the '650 by counting
 	 * how many bytes are in the FIFO.  I'm using this for now,
@@ -3979,10 +3994,7 @@ static void __devinit start_pci_pnp_board(struct pci_dev *dev,
  * seems to be mainly needed on card using the PLX which also use I/O
  * mapped memory.
  */
-static int
-#ifndef MODULE
-__devinit
-#endif
+static int __devinit
 pci_plx9050_fn(struct pci_dev *dev, struct pci_board *board, int enable)
 {
 	u8 data, *p, irq_config;
@@ -4046,10 +4058,7 @@ pci_plx9050_fn(struct pci_dev *dev, struct pci_board *board, int enable)
 #define PCI_DEVICE_ID_SIIG_1S_10x (PCI_DEVICE_ID_SIIG_1S_10x_550 & 0xfffc)
 #define PCI_DEVICE_ID_SIIG_2S_10x (PCI_DEVICE_ID_SIIG_2S_10x_550 & 0xfff8)
 
-static int
-#ifndef MODULE
-__devinit
-#endif
+static int __devinit
 pci_siig10x_fn(struct pci_dev *dev, struct pci_board *board, int enable)
 {
        u16 data, *p;
@@ -4078,10 +4087,7 @@ pci_siig10x_fn(struct pci_dev *dev, struct pci_board *board, int enable)
 #define PCI_DEVICE_ID_SIIG_2S_20x (PCI_DEVICE_ID_SIIG_2S_20x_550 & 0xfffc)
 #define PCI_DEVICE_ID_SIIG_2S1P_20x (PCI_DEVICE_ID_SIIG_2S1P_20x_550 & 0xfffc)
 
-static int
-#ifndef MODULE
-__devinit
-#endif
+static int __devinit
 pci_siig20x_fn(struct pci_dev *dev, struct pci_board *board, int enable)
 {
        u8 data;
@@ -4102,10 +4108,7 @@ pci_siig20x_fn(struct pci_dev *dev, struct pci_board *board, int enable)
 }
 
 /* Added for EKF Intel i960 serial boards */
-static int
-#ifndef MODULE
-__devinit
-#endif
+static int __devinit
 pci_inteli960ni_fn(struct pci_dev *dev,
 		   struct pci_board *board,
 		   int enable)
@@ -4163,10 +4166,7 @@ static struct timedia_struct {
 	{ 0, 0 }
 };
 
-static int
-#ifndef MODULE
-__devinit
-#endif
+static int __devinit
 pci_timedia_fn(struct pci_dev *dev, struct pci_board *board, int enable)
 {
 	int	i, j;
@@ -4187,10 +4187,7 @@ pci_timedia_fn(struct pci_dev *dev, struct pci_board *board, int enable)
 	return 0;
 }
 
-static int
-#ifndef MODULE
-__devinit
-#endif
+static int __devinit
 pci_xircom_fn(struct pci_dev *dev, struct pci_board *board, int enable)
 {
 	__set_current_state(TASK_UNINTERRUPTIBLE);

@@ -456,7 +456,7 @@ void handle_vm86_fault(struct kernel_vm86_regs * regs, long error_code)
 	if (VMPI.vm86dbg_active && VMPI.vm86dbg_TFpendig) \
 		pushw(ssp,sp,popw(ssp,sp) | TF_MASK);
 #define VM86_FAULT_RETURN \
-	if (VMPI.force_return_for_pic  && (VEFLAGS & IF_MASK)) \
+	if (VMPI.force_return_for_pic  && (VEFLAGS & (IF_MASK | VIF_MASK))) \
 		return_to_32bit(regs, VM86_PICRETURN); \
 	return;
 	                                   
