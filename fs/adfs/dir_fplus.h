@@ -18,27 +18,27 @@
 struct adfs_bigdirheader {
 	__u8	startmasseq;
 	__u8	bigdirversion[3];
-	__u32	bigdirstartname;
-	__u32	bigdirnamelen;
-	__u32	bigdirsize;
-	__u32	bigdirentries;
-	__u32	bigdirnamesize;
-	__u32	bigdirparent;
+	__le32	bigdirstartname;
+	__le32	bigdirnamelen;
+	__le32	bigdirsize;
+	__le32	bigdirentries;
+	__le32	bigdirnamesize;
+	__le32	bigdirparent;
 	char	bigdirname[1];
 };
 
 struct adfs_bigdirentry {
-	__u32	bigdirload;
-	__u32	bigdirexec;
-	__u32	bigdirlen;
-	__u32	bigdirindaddr;
-	__u32	bigdirattr;
-	__u32	bigdirobnamelen;
-	__u32	bigdirobnameptr;
+	__le32	bigdirload;
+	__le32	bigdirexec;
+	__le32	bigdirlen;
+	__le32	bigdirindaddr;
+	__le32	bigdirattr;
+	__le32	bigdirobnamelen;
+	__le32	bigdirobnameptr;
 };
 
 struct adfs_bigdirtail {
-	__u32	bigdirendname;
+	__le32	bigdirendname;
 	__u8	bigdirendmasseq;
 	__u8	reserved[2];
 	__u8	bigdircheckbyte;

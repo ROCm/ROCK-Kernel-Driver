@@ -727,8 +727,7 @@ static unsigned int setup_mmio_siimage (struct pci_dev *dev, const char *name)
 	unsigned long bar5	= pci_resource_start(dev, 5);
 	unsigned long barsize	= pci_resource_len(dev, 5);
 	u8 tmpbyte	= 0;
-	unsigned long addr;
-	void *ioaddr;
+	void __iomem *ioaddr;
 
 	/*
 	 *	Drop back to PIO if we can't map the mmio. Some
@@ -751,22 +750,21 @@ static unsigned int setup_mmio_siimage (struct pci_dev *dev, const char *name)
 	}
 
 	pci_set_master(dev);
-	pci_set_drvdata(dev, ioaddr);
-	addr = (unsigned long) ioaddr;
+	pci_set_drvdata(dev, (void *) ioaddr);
 
 	if (pdev_is_sata(dev)) {
-		writel(0, addr + 0x148);
-		writel(0, addr + 0x1C8);
+		writel(0, ioaddr + 0x148);
+		writel(0, ioaddr + 0x1C8);
 	}
 
-	writeb(0, addr + 0xB4);
-	writeb(0, addr + 0xF4);
-	tmpbyte = readb(addr + 0x4A);
+	writeb(0, ioaddr + 0xB4);
+	writeb(0, ioaddr + 0xF4);
+	tmpbyte = readb(ioaddr + 0x4A);
 
 	switch(tmpbyte & 0x30) {
 		case 0x00:
 			/* In 100 MHz clocking, try and switch to 133 */
-			writeb(tmpbyte|0x10, addr + 0x4A);
+			writeb(tmpbyte|0x10, ioaddr + 0x4A);
 			break;
 		case 0x10:
 			/* On 133Mhz clocking */
@@ -777,29 +775,29 @@ static unsigned int setup_mmio_siimage (struct pci_dev *dev, const char *name)
 		case 0x30:
 			/* Clocking is disabled */
 			/* 133 clock attempt to force it on */
-			writeb(tmpbyte & ~0x20, addr + 0x4A);
+			writeb(tmpbyte & ~0x20, ioaddr + 0x4A);
 			break;
 	}
 	
-	writeb(      0x72, addr + 0xA1);
-	writew(    0x328A, addr + 0xA2);
-	writel(0x62DD62DD, addr + 0xA4);
-	writel(0x43924392, addr + 0xA8);
-	writel(0x40094009, addr + 0xAC);
-	writeb(      0x72, addr + 0xE1);
-	writew(    0x328A, addr + 0xE2);
-	writel(0x62DD62DD, addr + 0xE4);
-	writel(0x43924392, addr + 0xE8);
-	writel(0x40094009, addr + 0xEC);
+	writeb(      0x72, ioaddr + 0xA1);
+	writew(    0x328A, ioaddr + 0xA2);
+	writel(0x62DD62DD, ioaddr + 0xA4);
+	writel(0x43924392, ioaddr + 0xA8);
+	writel(0x40094009, ioaddr + 0xAC);
+	writeb(      0x72, ioaddr + 0xE1);
+	writew(    0x328A, ioaddr + 0xE2);
+	writel(0x62DD62DD, ioaddr + 0xE4);
+	writel(0x43924392, ioaddr + 0xE8);
+	writel(0x40094009, ioaddr + 0xEC);
 
 	if (pdev_is_sata(dev)) {
-		writel(0xFFFF0000, addr + 0x108);
-		writel(0xFFFF0000, addr + 0x188);
-		writel(0x00680000, addr + 0x148);
-		writel(0x00680000, addr + 0x1C8);
+		writel(0xFFFF0000, ioaddr + 0x108);
+		writel(0xFFFF0000, ioaddr + 0x188);
+		writel(0x00680000, ioaddr + 0x148);
+		writel(0x00680000, ioaddr + 0x1C8);
 	}
 
-	tmpbyte = readb(addr + 0x4A);
+	tmpbyte = readb(ioaddr + 0x4A);
 
 	proc_reports_siimage(dev, (tmpbyte>>4), name);
 	return 1;

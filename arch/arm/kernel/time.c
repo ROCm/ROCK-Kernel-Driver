@@ -57,8 +57,7 @@ unsigned long profile_pc(struct pt_regs *regs)
 {
 	unsigned long fp, pc = instruction_pointer(regs);
 
-	if (pc >= (unsigned long)&__lock_text_start &&
-	    pc <= (unsigned long)&__lock_text_end) {
+	if (in_lock_functions(pc)) {
 		fp = thread_saved_fp(current);
 		pc = pc_pointer(((unsigned long *)fp)[-1]);
 	}

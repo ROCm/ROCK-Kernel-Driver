@@ -33,12 +33,52 @@ int __lockfunc _write_trylock(rwlock_t *lock)
 }
 EXPORT_SYMBOL(_write_trylock);
 
-#if defined(CONFIG_SMP) && defined(CONFIG_PREEMPT)
+#ifdef CONFIG_PREEMPT
+/*
+ * This could be a long-held lock.  If another CPU holds it for a long time,
+ * and that CPU is not asked to reschedule then *this* CPU will spin on the
+ * lock for a long time, even if *this* CPU is asked to reschedule.
+ *
+ * So what we do here, in the slow (contended) path is to spin on the lock by
+ * hand while permitting preemption.
+ *
+ * Called inside preempt_disable().
+ */
+static inline void __preempt_spin_lock(spinlock_t *lock)
+{
+	if (preempt_count() > 1) {
+		_raw_spin_lock(lock);
+		return;
+	}
+
+	do {
+		preempt_enable();
+		while (spin_is_locked(lock))
+			cpu_relax();
+		preempt_disable();
+	} while (!_raw_spin_trylock(lock));
+}
+
 void __lockfunc _spin_lock(spinlock_t *lock)
 {
 	preempt_disable();
 	if (unlikely(!_raw_spin_trylock(lock)))
 		__preempt_spin_lock(lock);
+}
+
+static inline void __preempt_write_lock(rwlock_t *lock)
+{
+	if (preempt_count() > 1) {
+		_raw_write_lock(lock);
+		return;
+	}
+
+	do {
+		preempt_enable();
+		while (rwlock_is_locked(lock))
+			cpu_relax();
+		preempt_disable();
+	} while (!_raw_write_trylock(lock));
 }
 
 void __lockfunc _write_lock(rwlock_t *lock)
@@ -256,3 +296,13 @@ int __lockfunc _spin_trylock_bh(spinlock_t *lock)
 	return 0;
 }
 EXPORT_SYMBOL(_spin_trylock_bh);
+
+int in_lock_functions(unsigned long addr)
+{
+	/* Linker adds these: start and end of __lockfunc functions */
+	extern char __lock_text_start[], __lock_text_end[];
+
+	return addr >= (unsigned long)__lock_text_start
+	&& addr < (unsigned long)__lock_text_end;
+}
+EXPORT_SYMBOL(in_lock_functions);

@@ -212,9 +212,8 @@ tcf_hash_search(struct tc_action *a, u32 index)
 	if (p != NULL) {
 		a->priv = p;
 		return 1;
-	} else {
-		return 0;
 	}
+	return 0;
 }
 
 #ifdef CONFIG_NET_ACT_INIT

@@ -345,6 +345,23 @@ static int do_setlink(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg)
 		dev->weight = *((u32 *) RTA_DATA(ida[IFLA_WEIGHT - 1]));
 	}
 
+	if (ida[IFLA_IFNAME - 1]) {
+		char ifname[IFNAMSIZ];
+
+		if (ida[IFLA_IFNAME - 1]->rta_len > RTA_LENGTH(sizeof(ifname)))
+			goto out;
+
+		memset(ifname, 0, sizeof(ifname));
+		memcpy(ifname, RTA_DATA(ida[IFLA_IFNAME - 1]),
+			RTA_PAYLOAD(ida[IFLA_IFNAME - 1]));
+		ifname[IFNAMSIZ - 1] = '\0';
+
+		err = dev_change_name(dev, ifname);
+
+		if (err)
+			goto out;
+	}
+
 	err = 0;
 
 out:
@@ -401,6 +418,10 @@ static int rtnetlink_done(struct netlink_callback *cb)
 	return 0;
 }
 
+/* Protected by RTNL sempahore.  */
+static struct rtattr **rta_buf;
+static int rtattr_max;
+
 /* Process one rtnetlink message. */
 
 static __inline__ int
@@ -408,8 +429,6 @@ rtnetlink_rcv_msg(struct sk_buff *skb, struct nlmsghdr *nlh, int *errp)
 {
 	struct rtnetlink_link *link;
 	struct rtnetlink_link *link_tab;
-	struct rtattr	*rta[RTATTR_MAX];
-
 	int sz_idx, kind;
 	int min_len;
 	int family;
@@ -476,7 +495,7 @@ rtnetlink_rcv_msg(struct sk_buff *skb, struct nlmsghdr *nlh, int *errp)
 		return -1;
 	}
 
-	memset(&rta, 0, sizeof(rta));
+	memset(rta_buf, 0, (rtattr_max * sizeof(struct rtattr *)));
 
 	min_len = rtm_min[sz_idx];
 	if (nlh->nlmsg_len < min_len)
@@ -491,7 +510,7 @@ rtnetlink_rcv_msg(struct sk_buff *skb, struct nlmsghdr *nlh, int *errp)
 			if (flavor) {
 				if (flavor > rta_max[sz_idx])
 					goto err_inval;
-				rta[flavor-1] = attr;
+				rta_buf[flavor-1] = attr;
 			}
 			attr = RTA_NEXT(attr, attrlen);
 		}
@@ -501,7 +520,7 @@ rtnetlink_rcv_msg(struct sk_buff *skb, struct nlmsghdr *nlh, int *errp)
 		link = &(rtnetlink_links[PF_UNSPEC][type]);
 	if (link->doit == NULL)
 		goto err_inval;
-	err = link->doit(skb, nlh, (void *)&rta);
+	err = link->doit(skb, nlh, (void *)&rta_buf[0]);
 
 	*errp = err;
 	return err;
@@ -621,6 +640,16 @@ static struct notifier_block rtnetlink_dev_notifier = {
 
 void __init rtnetlink_init(void)
 {
+	int i;
+
+	rtattr_max = 0;
+	for (i = 0; i < ARRAY_SIZE(rta_max); i++)
+		if (rta_max[i] > rtattr_max)
+			rtattr_max = rta_max[i];
+	rta_buf = kmalloc(rtattr_max * sizeof(struct rtattr *), GFP_KERNEL);
+	if (!rta_buf)
+		panic("rtnetlink_init: cannot allocate rta_buf\n");
+
 	rtnl = netlink_kernel_create(NETLINK_ROUTE, rtnetlink_rcv);
 	if (rtnl == NULL)
 		panic("rtnetlink_init: cannot initialize rtnetlink\n");

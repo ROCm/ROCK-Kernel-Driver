@@ -171,11 +171,11 @@ acpi_os_get_root_pointer(u32 flags, struct acpi_pointer *addr)
 }
 
 acpi_status
-acpi_os_map_memory(acpi_physical_address phys, acpi_size size, void **virt)
+acpi_os_map_memory(acpi_physical_address phys, acpi_size size, void __iomem **virt)
 {
 	if (efi_enabled) {
 		if (EFI_MEMORY_WB & efi_mem_attributes(phys)) {
-			*virt = phys_to_virt(phys);
+			*virt = (void __iomem *) phys_to_virt(phys);
 		} else {
 			*virt = ioremap(phys, size);
 		}
@@ -197,7 +197,7 @@ acpi_os_map_memory(acpi_physical_address phys, acpi_size size, void **virt)
 }
 
 void
-acpi_os_unmap_memory(void *virt, acpi_size size)
+acpi_os_unmap_memory(void __iomem *virt, acpi_size size)
 {
 	iounmap(virt);
 }
@@ -376,30 +376,31 @@ acpi_os_read_memory(
 	u32			width)
 {
 	u32			dummy;
-	void			*virt_addr;
+	void __iomem		*virt_addr;
 	int			iomem = 0;
 
 	if (efi_enabled) {
 		if (EFI_MEMORY_WB & efi_mem_attributes(phys_addr)) {
-			virt_addr = phys_to_virt(phys_addr);
+			/* HACK ALERT! We can use readb/w/l on real memory too.. */
+			virt_addr = (void __iomem *) phys_to_virt(phys_addr);
 		} else {
 			iomem = 1;
 			virt_addr = ioremap(phys_addr, width);
 		}
 	} else
-		virt_addr = phys_to_virt(phys_addr);
+		virt_addr = (void __iomem *) phys_to_virt(phys_addr);
 	if (!value)
 		value = &dummy;
 
 	switch (width) {
 	case 8:
-		*(u8*) value = *(u8*) virt_addr;
+		*(u8*) value = readb(virt_addr);
 		break;
 	case 16:
-		*(u16*) value = *(u16*) virt_addr;
+		*(u16*) value = readw(virt_addr);
 		break;
 	case 32:
-		*(u32*) value = *(u32*) virt_addr;
+		*(u32*) value = readl(virt_addr);
 		break;
 	default:
 		BUG();
@@ -419,28 +420,29 @@ acpi_os_write_memory(
 	u32			value,
 	u32			width)
 {
-	void			*virt_addr;
+	void __iomem		*virt_addr;
 	int			iomem = 0;
 
 	if (efi_enabled) {
 		if (EFI_MEMORY_WB & efi_mem_attributes(phys_addr)) {
-			virt_addr = phys_to_virt(phys_addr);
+			/* HACK ALERT! We can use writeb/w/l on real memory too */
+			virt_addr = (void __iomem *) phys_to_virt(phys_addr);
 		} else {
 			iomem = 1;
 			virt_addr = ioremap(phys_addr, width);
 		}
 	} else
-		virt_addr = phys_to_virt(phys_addr);
+		virt_addr = (void __iomem *) phys_to_virt(phys_addr);
 
 	switch (width) {
 	case 8:
-		*(u8*) virt_addr = value;
+		writeb(value, virt_addr);
 		break;
 	case 16:
-		*(u16*) virt_addr = value;
+		writew(value, virt_addr);
 		break;
 	case 32:
-		*(u32*) virt_addr = value;
+		writel(value, virt_addr);
 		break;
 	default:
 		BUG();
@@ -962,7 +964,7 @@ acpi_os_readable(void *ptr, acpi_size len)
 {
 #if defined(__i386__) || defined(__x86_64__) 
 	char tmp;
-	return !__get_user(tmp, (char *)ptr) && !__get_user(tmp, (char *)ptr + len - 1);
+	return !__get_user(tmp, (char __user *)ptr) && !__get_user(tmp, (char __user *)ptr + len - 1);
 #endif
 	return 1;
 }

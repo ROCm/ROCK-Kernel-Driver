@@ -257,7 +257,7 @@ static __inline__ u16 tcp_select_window(struct sock *sk)
  * We are working here with either a clone of the original
  * SKB, or a fresh unique copy made by the retransmit engine.
  */
-int tcp_transmit_skb(struct sock *sk, struct sk_buff *skb)
+static int tcp_transmit_skb(struct sock *sk, struct sk_buff *skb)
 {
 	if (skb != NULL) {
 		struct inet_opt *inet = inet_sk(sk);
@@ -422,8 +422,7 @@ void tcp_push_one(struct sock *sk, unsigned cur_mss)
 	}
 }
 
-void tcp_set_skb_tso_factor(struct sk_buff *skb, unsigned int mss,
-			    unsigned int mss_std)
+void tcp_set_skb_tso_factor(struct sk_buff *skb, unsigned int mss_std)
 {
 	if (skb->len <= mss_std) {
 		/* Avoid the costly divide in the normal
@@ -434,7 +433,7 @@ void tcp_set_skb_tso_factor(struct sk_buff *skb, unsigned int mss,
 		unsigned int factor;
 
 		factor = skb->len + (mss_std - 1);
-		factor /= mss;
+		factor /= mss_std;
 		TCP_SKB_CB(skb)->tso_factor = factor;
 	}
 }
@@ -474,10 +473,6 @@ static int tcp_fragment(struct sock *sk, struct sk_buff *skb, u32 len)
 	TCP_SKB_CB(buff)->sacked =
 		(TCP_SKB_CB(skb)->sacked &
 		 (TCPCB_LOST | TCPCB_EVER_RETRANS | TCPCB_AT_TAIL));
-	if (TCP_SKB_CB(buff)->sacked&TCPCB_LOST) {
-		tcp_inc_pcount(&tp->lost_out, buff);
-		tcp_inc_pcount(&tp->left_out, buff);
-	}
 	TCP_SKB_CB(skb)->sacked &= ~TCPCB_AT_TAIL;
 
 	if (!skb_shinfo(skb)->nr_frags && skb->ip_summed != CHECKSUM_HW) {
@@ -501,8 +496,13 @@ static int tcp_fragment(struct sock *sk, struct sk_buff *skb, u32 len)
 	TCP_SKB_CB(buff)->when = TCP_SKB_CB(skb)->when;
 
 	/* Fix up tso_factor for both original and new SKB.  */
-	tcp_set_skb_tso_factor(skb, tp->mss_cache, tp->mss_cache_std);
-	tcp_set_skb_tso_factor(buff, tp->mss_cache, tp->mss_cache_std);
+	tcp_set_skb_tso_factor(skb, tp->mss_cache_std);
+	tcp_set_skb_tso_factor(buff, tp->mss_cache_std);
+
+	if (TCP_SKB_CB(buff)->sacked&TCPCB_LOST) {
+		tcp_inc_pcount(&tp->lost_out, buff);
+		tcp_inc_pcount(&tp->left_out, buff);
+	}
 
 	/* Link BUFF into the send queue. */
 	__skb_append(skb, buff);
@@ -681,8 +681,12 @@ int tcp_write_xmit(struct sock *sk, int nonagle)
 			TCP_SKB_CB(skb)->when = tcp_time_stamp;
 			if (tcp_transmit_skb(sk, skb_clone(skb, GFP_ATOMIC)))
 				break;
-			/* Advance the send_head.  This one is sent out. */
+
+			/* Advance the send_head.  This one is sent out.
+			 * This call will increment packets_out.
+			 */
 			update_send_head(sk, tp, skb);
+
 			tcp_minshall_update(tp, mss_now, skb);
 			sent_pkts = 1;
 		}
@@ -968,11 +972,17 @@ int tcp_retransmit_skb(struct sock *sk, struct sk_buff *skb)
 		return -EAGAIN;
 
 	if (skb->len > cur_mss) {
+		int old_factor = TCP_SKB_CB(skb)->tso_factor;
+		int new_factor;
+
 		if (tcp_fragment(sk, skb, cur_mss))
 			return -ENOMEM; /* We'll try again later. */
 
 		/* New SKB created, account for it. */
-		tcp_inc_pcount(&tp->packets_out, skb);
+		new_factor = TCP_SKB_CB(skb)->tso_factor;
+		tcp_dec_pcount_explicit(&tp->packets_out,
+					new_factor - old_factor);
+		tcp_inc_pcount(&tp->packets_out, skb->next);
 	}
 
 	/* Collapse two adjacent packets if worthwhile and we can. */
@@ -1055,12 +1065,15 @@ void tcp_xmit_retransmit_queue(struct sock *sk)
 	if (packet_cnt) {
 		sk_stream_for_retrans_queue(skb, sk) {
 			__u8 sacked = TCP_SKB_CB(skb)->sacked;
-			int pkts = TCP_SKB_CB(skb)->tso_factor;
 
-			BUG_ON(!pkts);
-
-			if ((tcp_packets_in_flight(tp) + (pkts-1)) >=
-			    tp->snd_cwnd)
+			/* Assume this retransmit will generate
+			 * only one packet for congestion window
+			 * calculation purposes.  This works because
+			 * tcp_retransmit_skb() will chop up the
+			 * packet to be MSS sized and all the
+			 * packet counting works out.
+			 */
+			if (tcp_packets_in_flight(tp) >= tp->snd_cwnd)
 				return;
 
 			if (sacked&TCPCB_LOST) {
@@ -1107,15 +1120,16 @@ void tcp_xmit_retransmit_queue(struct sock *sk)
 	packet_cnt = 0;
 
 	sk_stream_for_retrans_queue(skb, sk) {
-		int pkts = TCP_SKB_CB(skb)->tso_factor;
-
-		BUG_ON(!pkts);
-
-		packet_cnt += pkts;
-		if (packet_cnt > tcp_get_pcount(&tp->fackets_out))
+		/* Similar to the retransmit loop above we
+		 * can pretend that the retransmitted SKB
+		 * we send out here will be composed of one
+		 * real MSS sized packet because tcp_retransmit_skb()
+		 * will fragment it if necessary.
+		 */
+		if (++packet_cnt > tcp_get_pcount(&tp->fackets_out))
 			break;
 
-		if ((tcp_packets_in_flight(tp) + (pkts-1)) >= tp->snd_cwnd)
+		if (tcp_packets_in_flight(tp) >= tp->snd_cwnd)
 			break;
 
 		if (TCP_SKB_CB(skb)->sacked & TCPCB_TAGBITS)
@@ -1561,7 +1575,7 @@ int tcp_write_wakeup(struct sock *sk)
 					tp->mss_cache = tp->mss_cache_std;
 				}
 			} else if (!TCP_SKB_CB(skb)->tso_factor)
-				tcp_set_skb_tso_factor(skb, mss, tp->mss_cache_std);
+				tcp_set_skb_tso_factor(skb, tp->mss_cache_std);
 
 			TCP_SKB_CB(skb)->flags |= TCPCB_FLAG_PSH;
 			TCP_SKB_CB(skb)->when = tcp_time_stamp;
@@ -1624,6 +1638,5 @@ EXPORT_SYMBOL(tcp_make_synack);
 EXPORT_SYMBOL(tcp_send_synack);
 EXPORT_SYMBOL(tcp_simple_retransmit);
 EXPORT_SYMBOL(tcp_sync_mss);
-EXPORT_SYMBOL(tcp_transmit_skb);
 EXPORT_SYMBOL(tcp_write_wakeup);
 EXPORT_SYMBOL(tcp_write_xmit);

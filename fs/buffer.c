@@ -895,9 +895,8 @@ void mark_buffer_dirty_inode(struct buffer_head *bh, struct inode *inode)
 		spin_lock(&buffer_mapping->private_lock);
 		list_move_tail(&bh->b_assoc_buffers,
 				&mapping->private_list);
-		spin_lock(&buffer_mapping->private_lock);
-}
-
+		spin_unlock(&buffer_mapping->private_lock);
+	}
 }
 EXPORT_SYMBOL(mark_buffer_dirty_inode);
 

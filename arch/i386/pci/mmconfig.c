@@ -9,7 +9,7 @@
 /* The physical address of the MMCONFIG aperture.  Set from ACPI tables. */
 u32 pci_mmcfg_base_addr;
 
-#define mmcfg_virt_addr (fix_to_virt(FIX_PCIE_MCFG))
+#define mmcfg_virt_addr ((void __iomem *) fix_to_virt(FIX_PCIE_MCFG))
 
 /* The base address of the last MMCONFIG device accessed */
 static u32 mmcfg_last_accessed_device;

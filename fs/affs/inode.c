@@ -201,7 +201,7 @@ affs_write_inode(struct inode *inode, int unused)
 		return;
 	}
 	tail = AFFS_TAIL(sb, bh);
-	if (tail->stype == be32_to_cpu(ST_ROOT)) {
+	if (tail->stype == cpu_to_be32(ST_ROOT)) {
 		secs_to_datestamp(inode->i_mtime.tv_sec,&AFFS_ROOT_TAIL(sb, bh)->root_change);
 	} else {
 		tail->protect = cpu_to_be32(AFFS_I(inode)->i_protect);
@@ -396,7 +396,7 @@ affs_add_entry(struct inode *dir, struct inode *inode, struct dentry *dentry, s3
 	AFFS_TAIL(sb, bh)->parent = cpu_to_be32(dir->i_ino);
 
 	if (inode_bh) {
-		u32 chain;
+		__be32 chain;
 	       	chain = AFFS_TAIL(sb, inode_bh)->link_chain;
 		AFFS_TAIL(sb, bh)->original = cpu_to_be32(inode->i_ino);
 		AFFS_TAIL(sb, bh)->link_chain = chain;

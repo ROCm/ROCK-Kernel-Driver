@@ -2,6 +2,8 @@
 #define _ASM_IO_H
 
 #include <linux/config.h>
+#include <linux/string.h>
+#include <linux/compiler.h>
 
 /*
  * This file contains the definitions for the x86 IO instructions
@@ -86,7 +88,7 @@ static inline void * phys_to_virt(unsigned long address)
  */
 #define page_to_phys(page)    ((dma_addr_t)page_to_pfn(page) << PAGE_SHIFT)
 
-extern void * __ioremap(unsigned long offset, unsigned long size, unsigned long flags);
+extern void __iomem * __ioremap(unsigned long offset, unsigned long size, unsigned long flags);
 
 /**
  * ioremap     -   map bus memory into CPU space
@@ -100,13 +102,13 @@ extern void * __ioremap(unsigned long offset, unsigned long size, unsigned long 
  * address. 
  */
 
-static inline void * ioremap (unsigned long offset, unsigned long size)
+static inline void __iomem * ioremap(unsigned long offset, unsigned long size)
 {
 	return __ioremap(offset, size, 0);
 }
 
-extern void * ioremap_nocache (unsigned long offset, unsigned long size);
-extern void iounmap(void *addr);
+extern void __iomem * ioremap_nocache(unsigned long offset, unsigned long size);
+extern void iounmap(volatile void __iomem *addr);
 
 /*
  * bt_ioremap() and bt_iounmap() are for temporary early boot-time
@@ -139,9 +141,18 @@ extern void bt_iounmap(void *addr, unsigned long size);
  * memory location directly.
  */
 
-#define readb(addr) (*(volatile unsigned char *) (addr))
-#define readw(addr) (*(volatile unsigned short *) (addr))
-#define readl(addr) (*(volatile unsigned int *) (addr))
+static inline unsigned char readb(const volatile void __iomem *addr)
+{
+	return *(volatile unsigned char __force *) addr;
+}
+static inline unsigned short readw(const volatile void __iomem *addr)
+{
+	return *(volatile unsigned short __force *) addr;
+}
+static inline unsigned int readl(const volatile void __iomem *addr)
+{
+	return *(volatile unsigned int __force *) addr;
+}
 #define readb_relaxed(addr) readb(addr)
 #define readw_relaxed(addr) readw(addr)
 #define readl_relaxed(addr) readl(addr)
@@ -149,16 +160,34 @@ extern void bt_iounmap(void *addr, unsigned long size);
 #define __raw_readw readw
 #define __raw_readl readl
 
-#define writeb(b,addr) (*(volatile unsigned char *) (addr) = (b))
-#define writew(b,addr) (*(volatile unsigned short *) (addr) = (b))
-#define writel(b,addr) (*(volatile unsigned int *) (addr) = (b))
+static inline void writeb(unsigned char b, volatile void __iomem *addr)
+{
+	*(volatile unsigned char __force *) addr = b;
+}
+static inline void writew(unsigned short b, volatile void __iomem *addr)
+{
+	*(volatile unsigned short __force *) addr = b;
+}
+static inline void writel(unsigned int b, volatile void __iomem *addr)
+{
+	*(volatile unsigned int __force *) addr = b;
+}
 #define __raw_writeb writeb
 #define __raw_writew writew
 #define __raw_writel writel
 
-#define memset_io(a,b,c)	memset((void *)(a),(b),(c))
-#define memcpy_fromio(a,b,c)	__memcpy((a),(void *)(b),(c))
-#define memcpy_toio(a,b,c)	__memcpy((void *)(a),(b),(c))
+static inline void memset_io(volatile void __iomem *addr, unsigned char val, int count)
+{
+	memset((void __force *) addr, val, count);
+}
+static inline void memcpy_fromio(void *dst, volatile void __iomem *src, int count)
+{
+	__memcpy(dst, (void __force *) src, count);
+}
+static inline void memcpy_toio(volatile void __iomem *dst, void *src, int count)
+{
+	__memcpy((void __force *) dst, src, count);
+}
 
 /*
  * ISA space is 'always mapped' on a typical x86 system, no need to
@@ -168,7 +197,7 @@ extern void bt_iounmap(void *addr, unsigned long size);
  * used as the IO-area pointer (it can be iounmapped as well, so the
  * analogy with PCI is quite large):
  */
-#define __ISA_IO_base ((char *)(PAGE_OFFSET))
+#define __ISA_IO_base ((char __iomem *)(PAGE_OFFSET))
 
 #define isa_readb(a) readb(__ISA_IO_base + (a))
 #define isa_readw(a) readw(__ISA_IO_base + (a))
@@ -185,8 +214,8 @@ extern void bt_iounmap(void *addr, unsigned long size);
  * Again, i386 does not require mem IO specific function.
  */
 
-#define eth_io_copy_and_sum(a,b,c,d)		eth_copy_and_sum((a),(void *)(b),(c),(d))
-#define isa_eth_io_copy_and_sum(a,b,c,d)	eth_copy_and_sum((a),(void *)(__ISA_IO_base + (b)),(c),(d))
+#define eth_io_copy_and_sum(a,b,c,d)		eth_copy_and_sum((a),(void __force *)(b),(c),(d))
+#define isa_eth_io_copy_and_sum(a,b,c,d)	eth_copy_and_sum((a),(void __force *)(__ISA_IO_base + (b)),(c),(d))
 
 /**
  *	check_signature		-	find BIOS signatures
@@ -199,7 +228,7 @@ extern void bt_iounmap(void *addr, unsigned long size);
  *	Returns 1 on a match.
  */
  
-static inline int check_signature(unsigned long io_addr,
+static inline int check_signature(volatile void __iomem * io_addr,
 	const unsigned char *signature, int length)
 {
 	int retval = 0;

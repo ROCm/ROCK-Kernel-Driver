@@ -45,7 +45,7 @@ struct udf_inode_info
 {
 	struct timespec		i_crtime;
 	/* Physical address of inode */
-	lb_addr			i_location;
+	kernel_lb_addr		i_location;
 	__u64			i_unique;
 	__u32			i_lenEAttr;
 	__u32			i_lenAlloc;

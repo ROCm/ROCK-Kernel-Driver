@@ -163,7 +163,7 @@ struct ti_ohci {
 	} init_state;
 
         /* remapped memory spaces */
-        void *registers;
+        void __iomem *registers;
 
 	/* dma buffer for self-id packets */
         quadlet_t *selfid_buf_cpu;

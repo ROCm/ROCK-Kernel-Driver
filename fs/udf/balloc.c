@@ -44,7 +44,7 @@
 #define xleNUM_to_cpup(x,y) (le ## x ## _to_cpup(y))
 #define uintBPL_t uint(BITS_PER_LONG)
 #define uint(x) xuint(x)
-#define xuint(x) uint ## x ## _t
+#define xuint(x) __le ## x
 
 extern inline int find_next_one_bit (void * addr, int size, int offset)
 {
@@ -91,7 +91,7 @@ static int read_block_bitmap(struct super_block * sb,
 {
 	struct buffer_head *bh = NULL;
 	int retval = 0;
-	lb_addr loc;
+	kernel_lb_addr loc;
 
 	loc.logicalBlockNum = bitmap->s_extPosition;
 	loc.partitionReferenceNum = UDF_SB_PARTITION(sb);
@@ -145,7 +145,8 @@ static inline int load_block_bitmap(struct super_block * sb,
 
 static void udf_bitmap_free_blocks(struct super_block * sb,
 	struct inode * inode,
-	struct udf_bitmap *bitmap, lb_addr bloc, uint32_t offset, uint32_t count)
+	struct udf_bitmap *bitmap,
+	kernel_lb_addr bloc, uint32_t offset, uint32_t count)
 {
 	struct buffer_head * bh = NULL;
 	unsigned long block;
@@ -424,11 +425,12 @@ error_return:
 
 static void udf_table_free_blocks(struct super_block * sb,
 	struct inode * inode,
-	struct inode * table, lb_addr bloc, uint32_t offset, uint32_t count)
+	struct inode * table,
+	kernel_lb_addr bloc, uint32_t offset, uint32_t count)
 {
 	uint32_t start, end;
 	uint32_t nextoffset, oextoffset, elen;
-	lb_addr nbloc, obloc, eloc;
+	kernel_lb_addr nbloc, obloc, eloc;
 	struct buffer_head *obh, *nbh;
 	int8_t etype;
 	int i;
@@ -678,7 +680,7 @@ static int udf_table_prealloc_blocks(struct super_block * sb,
 {
 	int alloc_count = 0;
 	uint32_t extoffset, elen, adsize;
-	lb_addr bloc, eloc;
+	kernel_lb_addr bloc, eloc;
 	struct buffer_head *bh;
 	int8_t etype = -1;
 
@@ -748,7 +750,7 @@ static int udf_table_new_block(struct super_block * sb,
 	uint32_t spread = 0xFFFFFFFF, nspread = 0xFFFFFFFF;
 	uint32_t newblock = 0, adsize;
 	uint32_t extoffset, goal_extoffset, elen, goal_elen = 0;
-	lb_addr bloc, goal_bloc, eloc, goal_eloc;
+	kernel_lb_addr bloc, goal_bloc, eloc, goal_eloc;
 	struct buffer_head *bh, *goal_bh;
 	int8_t etype;
 
@@ -854,7 +856,7 @@ static int udf_table_new_block(struct super_block * sb,
 
 inline void udf_free_blocks(struct super_block * sb,
 	struct inode * inode,
-	lb_addr bloc, uint32_t offset, uint32_t count)
+	kernel_lb_addr bloc, uint32_t offset, uint32_t count)
 {
 	uint16_t partition = bloc.partitionReferenceNum;
 

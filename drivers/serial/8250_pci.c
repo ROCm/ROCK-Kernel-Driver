@@ -83,7 +83,7 @@ struct pci_serial_quirk {
 
 struct serial_private {
 	unsigned int		nr;
-	void			*remapped_bar[PCI_NUM_BAR_RESOURCES];
+	void __iomem		*remapped_bar[PCI_NUM_BAR_RESOURCES];
 	struct pci_serial_quirk	*quirk;
 	int			line[0];
 };
@@ -243,7 +243,8 @@ static int __devinit pci_inteli960ni_init(struct pci_dev *dev)
  */
 static int __devinit pci_plx9050_init(struct pci_dev *dev)
 {
-	u8 *p, irq_config;
+	u8 irq_config;
+	void __iomem *p;
 
 	if ((pci_resource_flags(dev, 0) & IORESOURCE_MEM) == 0) {
 		moan_device("no memory in bar 0", dev);
@@ -272,12 +273,12 @@ static int __devinit pci_plx9050_init(struct pci_dev *dev)
 	p = ioremap(pci_resource_start(dev, 0), 0x80);
 	if (p == NULL)
 		return -ENOMEM;
-	writel(irq_config, (unsigned long)p + 0x4c);
+	writel(irq_config, p + 0x4c);
 
 	/*
 	 * Read the register back to ensure that it took effect.
 	 */
-	readl((unsigned long)p + 0x4c);
+	readl(p + 0x4c);
 	iounmap(p);
 
 	return 0;
@@ -397,7 +398,8 @@ static void __devexit sbs_exit(struct pci_dev *dev)
 
 static int pci_siig10x_init(struct pci_dev *dev)
 {
-	u16 data, *p;
+	u16 data;
+	void __iomem *p;
 
 	switch (dev->device & 0xfff8) {
 	case PCI_DEVICE_ID_SIIG_1S_10x:	/* 1S */
@@ -415,8 +417,8 @@ static int pci_siig10x_init(struct pci_dev *dev)
 	if (p == NULL)
 		return -ENOMEM;
 
-	writew(readw((unsigned long) p + 0x28) & data, (unsigned long) p + 0x28);
-	readw((unsigned long)p + 0x28);
+	writew(readw(p + 0x28) & data, p + 0x28);
+	readw(p + 0x28);
 	iounmap(p);
 	return 0;
 }

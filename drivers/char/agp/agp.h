@@ -123,7 +123,7 @@ struct agp_bridge_data {
 	void *current_size;
 	void *dev_private_data;
 	struct pci_dev *dev;
-	u32 *gatt_table;
+	u32 __iomem *gatt_table;
 	u32 *gatt_table_real;
 	unsigned long scratch_page;
 	unsigned long scratch_page_real;

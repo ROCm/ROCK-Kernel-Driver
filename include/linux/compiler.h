@@ -6,13 +6,17 @@
 # define __kernel	/* default address space */
 # define __safe		__attribute__((safe))
 # define __force	__attribute__((force))
+# define __iomem	__attribute__((noderef, address_space(2)))
 extern void __chk_user_ptr(void __user *);
+extern void __chk_io_ptr(void __iomem *);
 #else
 # define __user
 # define __kernel
 # define __safe
 # define __force
+# define __iomem
 # define __chk_user_ptr(x) (void)0
+# define __chk_io_ptr(x) (void)0
 #endif
 
 #ifdef __KERNEL__

@@ -664,8 +664,7 @@ int hpet_control(struct hpet_task *tp, unsigned int cmd, unsigned long arg)
 
 static struct time_interpolator hpet_interpolator = {
 	.source = TIME_SOURCE_MMIO64,
-	.shift = 10,
-	.addr = MC
+	.shift = 10
 };
 
 #endif
@@ -953,11 +952,10 @@ static int __init hpet_init(void)
 			struct hpet *hpet;
 
 			hpet = hpets->hp_hpet;
-			hpet_cycles_per_sec = hpet_time_div(hpets->hp_period);
-			hpet_interpolator.frequency = hpet_cycles_per_sec;
-			hpet_interpolator.drift = hpet_cycles_per_sec *
+			hpet_interpolator.addr = &hpets->hp_hpet->hpet_mc;
+			hpet_interpolator.frequency = hpet_time_div(hpets->hp_period);
+			hpet_interpolator.drift = hpet_interpolator.frequency *
 			    HPET_DRIFT / 1000000;
-			hpet_nsecs_per_cycle = 1000000000 / hpet_cycles_per_sec;
 			register_time_interpolator(&hpet_interpolator);
 		}
 #endif

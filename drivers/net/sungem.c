@@ -651,7 +651,7 @@ static __inline__ void gem_tx(struct net_device *dev, struct gem *gp, u32 gem_st
 		}
 
 		gp->net_stats.tx_packets++;
-		dev_kfree_skb(skb);
+		dev_kfree_skb_irq(skb);
 	}
 	gp->tx_old = entry;
 
@@ -2656,7 +2656,7 @@ static void find_eth_addr_in_vpd(void *rom_base, int len, unsigned char *dev_add
 static void get_gem_mac_nonobp(struct pci_dev *pdev, unsigned char *dev_addr)
 {
 	u32 rom_reg_orig;
-	void *p;
+	void __iomem *p;
 
 	if (pdev->resource[PCI_ROM_RESOURCE].parent == NULL) {
 		if (pci_assign_resource(pdev, PCI_ROM_RESOURCE) < 0)
@@ -2825,7 +2825,7 @@ static int __devinit gem_init_one(struct pci_dev *pdev,
 	gp->timer_ticks = 0;
 	netif_carrier_off(dev);
 
-	gp->regs = (unsigned long) ioremap(gemreg_base, gemreg_len);
+	gp->regs = ioremap(gemreg_base, gemreg_len);
 	if (gp->regs == 0UL) {
 		printk(KERN_ERR PFX "Cannot map device registers, "
 		       "aborting.\n");
@@ -2944,7 +2944,7 @@ err_out_iounmap:
 		gem_shutdown(gp);
 	up(&gp->pm_sem);
 
-	iounmap((void *) gp->regs);
+	iounmap(gp->regs);
 
 err_out_free_res:
 	pci_release_regions(pdev);
@@ -2978,7 +2978,7 @@ static void __devexit gem_remove_one(struct pci_dev *pdev)
 				    sizeof(struct gem_init_block),
 				    gp->init_block,
 				    gp->gblock_dvma);
-		iounmap((void *) gp->regs);
+		iounmap(gp->regs);
 		pci_release_regions(pdev);
 		free_netdev(dev);
 

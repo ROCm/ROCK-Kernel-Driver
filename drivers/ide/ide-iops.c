@@ -112,57 +112,57 @@ EXPORT_SYMBOL(default_hwif_iops);
 
 static u8 ide_mm_inb (unsigned long port)
 {
-	return (u8) readb(port);
+	return (u8) readb((void __iomem *) port);
 }
 
 static u16 ide_mm_inw (unsigned long port)
 {
-	return (u16) readw(port);
+	return (u16) readw((void __iomem *) port);
 }
 
 static void ide_mm_insw (unsigned long port, void *addr, u32 count)
 {
-	__ide_mm_insw(port, addr, count);
+	__ide_mm_insw((void __iomem *) port, addr, count);
 }
 
 static u32 ide_mm_inl (unsigned long port)
 {
-	return (u32) readl(port);
+	return (u32) readl((void __iomem *) port);
 }
 
 static void ide_mm_insl (unsigned long port, void *addr, u32 count)
 {
-	__ide_mm_insl(port, addr, count);
+	__ide_mm_insl((void __iomem *) port, addr, count);
 }
 
 static void ide_mm_outb (u8 value, unsigned long port)
 {
-	writeb(value, port);
+	writeb(value, (void __iomem *) port);
 }
 
 static void ide_mm_outbsync (ide_drive_t *drive, u8 value, unsigned long port)
 {
-	writeb(value, port);	
+	writeb(value, (void __iomem *) port);
 }
 
 static void ide_mm_outw (u16 value, unsigned long port)
 {
-	writew(value, port);
+	writew(value, (void __iomem *) port);
 }
 
 static void ide_mm_outsw (unsigned long port, void *addr, u32 count)
 {
-	__ide_mm_outsw(port, addr, count);
+	__ide_mm_outsw((void __iomem *) port, addr, count);
 }
 
 static void ide_mm_outl (u32 value, unsigned long port)
 {
-	writel(value, port);
+	writel(value, (void __iomem *) port);
 }
 
 static void ide_mm_outsl (unsigned long port, void *addr, u32 count)
 {
-	__ide_mm_outsl(port, addr, count);
+	__ide_mm_outsl((void __iomem *) port, addr, count);
 }
 
 void default_hwif_mmiops (ide_hwif_t *hwif)
@@ -1096,7 +1096,6 @@ static ide_startstop_t reset_pollfunc (ide_drive_t *drive)
 			drive->failures = 0;
 		} else {
 			drive->failures++;
-#if FANCY_STATUS_DUMPS
 			printk("master: ");
 			switch (tmp & 0x7f) {
 				case 1: printk("passed");
@@ -1114,9 +1113,6 @@ static ide_startstop_t reset_pollfunc (ide_drive_t *drive)
 			if (tmp & 0x80)
 				printk("; slave: failed");
 			printk("\n");
-#else
-			printk("failed\n");
-#endif /* FANCY_STATUS_DUMPS */
 		}
 	}
 	hwgroup->poll_timeout = 0;	/* done polling */

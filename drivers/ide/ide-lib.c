@@ -465,7 +465,6 @@ byte ide_dump_atapi_status (ide_drive_t *drive, const char *msg, byte stat)
 	status.all = stat;
 	local_irq_set(flags);
 	printk("%s: %s: status=0x%02x", drive->name, msg, stat);
-#if FANCY_STATUS_DUMPS
 	printk(" { ");
 	if (status.b.bsy)
 		printk("Busy ");
@@ -479,19 +478,16 @@ byte ide_dump_atapi_status (ide_drive_t *drive, const char *msg, byte stat)
 		if (status.b.check)	printk("Error ");
 	}
 	printk("}");
-#endif	/* FANCY_STATUS_DUMPS */
 	printk("\n");
 	if ((status.all & (status.b.bsy|status.b.check)) == status.b.check) {
 		error.all = HWIF(drive)->INB(IDE_ERROR_REG);
 		printk("%s: %s: error=0x%02x", drive->name, msg, error.all);
-#if FANCY_STATUS_DUMPS
 		if (error.b.ili)	printk("IllegalLengthIndication ");
 		if (error.b.eom)	printk("EndOfMedia ");
 		if (error.b.abrt)	printk("Aborted Command ");
 		if (error.b.mcr)	printk("MediaChangeRequested ");
 		if (error.b.sense_key)	printk("LastFailedSense 0x%02x ",
 						error.b.sense_key);
-#endif	/* FANCY_STATUS_DUMPS */
 		printk("\n");
 	}
 	local_irq_restore(flags);

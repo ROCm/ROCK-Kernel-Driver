@@ -660,10 +660,6 @@ enum
 #define TCA_PAYLOAD(n) NLMSG_PAYLOAD(n,sizeof(struct tcmsg))
 
 
-/* SUMMARY: maximal rtattr understood by kernel */
-
-#define RTATTR_MAX		RTA_MAX
-
 /* RTnetlink multicast groups */
 
 #define RTMGRP_LINK		1

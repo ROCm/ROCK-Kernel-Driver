@@ -904,8 +904,12 @@ static int ide_init_queue(ide_drive_t *drive)
 	q->queuedata = drive;
 	blk_queue_segment_boundary(q, 0xffff);
 
-	if (!hwif->rqsize)
-		hwif->rqsize = hwif->no_lba48 ? 256 : 65536;
+	if (!hwif->rqsize) {
+		if (hwif->no_lba48 || hwif->no_lba48_dma)
+			hwif->rqsize = 256;
+		else
+			hwif->rqsize = 65536;
+	}
 	if (hwif->rqsize < max_sectors)
 		max_sectors = hwif->rqsize;
 	blk_queue_max_sectors(q, max_sectors);
@@ -914,11 +918,11 @@ static int ide_init_queue(ide_drive_t *drive)
 	/* When we have an IOMMU, we may have a problem where pci_map_sg()
 	 * creates segments that don't completely match our boundary
 	 * requirements and thus need to be broken up again. Because it
-	 * doesn't align properly neither, we may actually have to break up
+	 * doesn't align properly either, we may actually have to break up
 	 * to more segments than what was we got in the first place, a max
 	 * worst case is twice as many.
 	 * This will be fixed once we teach pci_map_sg() about our boundary
-	 * requirements, hopefully soon
+	 * requirements, hopefully soon. *FIXME*
 	 */
 	if (!PCI_DMA_BUS_IS_PHYS)
 		max_sg_entries >>= 1;

@@ -5,8 +5,7 @@
 
 struct ipcomp_data {
 	u16 threshold;
-	u8 *scratch;
-	struct crypto_tfm *tfm;
+	struct crypto_tfm **tfms;
 };
 
 #endif

@@ -81,20 +81,22 @@ struct intersil *intersil_clock;
 
 unsigned long profile_pc(struct pt_regs *regs)
 {
-	extern int __copy_user_begin, __copy_user_end;
-	extern int __atomic_begin, __atomic_end;
-	extern int __bzero_begin, __bzero_end;
-	extern int __bitops_begin, __bitops_end;
+	extern char __copy_user_begin[], __copy_user_end[];
+	extern char __atomic_begin[], __atomic_end[];
+	extern char __bzero_begin[], __bzero_end[];
+	extern char __bitops_begin[], __bitops_end[];
+
 	unsigned long pc = regs->pc;
 
-	if ((pc >= (unsigned long) &__copy_user_begin &&
-	     pc < (unsigned long) &__copy_user_end) ||
-	    (pc >= (unsigned long) &__atomic_begin &&
-	     pc < (unsigned long) &__atomic_end) ||
-	    (pc >= (unsigned long) &__bzero_begin &&
-	     pc < (unsigned long) &__bzero_end) ||
-	    (pc >= (unsigned long) &__bitops_begin &&
-	     pc < (unsigned long) &__bitops_end))
+	if (in_lock_functions(pc) ||
+	    (pc >= (unsigned long) __copy_user_begin &&
+	     pc < (unsigned long) __copy_user_end) ||
+	    (pc >= (unsigned long) __atomic_begin &&
+	     pc < (unsigned long) __atomic_end) ||
+	    (pc >= (unsigned long) __bzero_begin &&
+	     pc < (unsigned long) __bzero_end) ||
+	    (pc >= (unsigned long) __bitops_begin &&
+	     pc < (unsigned long) __bitops_end))
 		pc = regs->u_regs[UREG_RETPC];
 	return pc;
 }

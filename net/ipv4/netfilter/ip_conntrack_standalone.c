@@ -48,6 +48,8 @@ MODULE_LICENSE("GPL");
 extern atomic_t ip_conntrack_count;
 DECLARE_PER_CPU(struct ip_conntrack_stat, ip_conntrack_stat);
 
+unsigned int ip_ct_log_invalid = 0;
+
 static int kill_proto(const struct ip_conntrack *i, void *data)
 {
 	return (i->tuplehash[IP_CT_DIR_ORIGINAL].tuple.dst.protonum == 
@@ -524,7 +526,6 @@ extern unsigned long ip_ct_icmp_timeout;
 extern unsigned long ip_ct_generic_timeout;
 
 /* Log invalid packets of a given protocol */
-unsigned int ip_ct_log_invalid = 0;
 static int log_invalid_proto_min = 0;
 static int log_invalid_proto_max = 255;
 

@@ -445,6 +445,15 @@ struct cpu_spec	cpu_specs[] = {
 	128, 128,
 	__setup_cpu_ppc970
     },
+    {	/* PPC970FX */
+	0xffff0000, 0x003c0000, "PPC970FX",
+	CPU_FTR_COMMON |
+	CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_USE_TB | CPU_FTR_HPTE_TABLE |
+	CPU_FTR_ALTIVEC_COMP | CPU_FTR_CAN_NAP,
+	COMMON_PPC | PPC_FEATURE_64 | PPC_FEATURE_ALTIVEC_COMP,
+	128, 128,
+	__setup_cpu_ppc970
+    },
 #endif /* CONFIG_POWER4 */
 #ifdef CONFIG_8xx
     {	/* 8xx */

@@ -117,7 +117,7 @@ do_udf_readdir(struct inode * dir, struct file *filp, filldir_t filldir, void *d
 	uint8_t lfi;
 	loff_t size = (udf_ext0_offset(dir) + dir->i_size) >> 2;
 	struct buffer_head * bh = NULL, * tmp, * bha[16];
-	lb_addr bloc, eloc;
+	kernel_lb_addr bloc, eloc;
 	uint32_t extoffset, elen, offset;
 	int i, num;
 	unsigned int dt_type;
@@ -237,7 +237,7 @@ do_udf_readdir(struct inode * dir, struct file *filp, filldir_t filldir, void *d
 		}
 		else
 		{
-			lb_addr tloc = lelb_to_cpu(cfi.icb.extLocation);
+			kernel_lb_addr tloc = lelb_to_cpu(cfi.icb.extLocation);
 
 			iblock = udf_get_lb_pblock(dir->i_sb, tloc, 0);
 			flen = udf_get_filename(dir->i_sb, nameptr, fname, lfi);
