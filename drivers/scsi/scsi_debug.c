@@ -867,7 +867,7 @@ static int resp_report_luns(unsigned char * cmd, unsigned char * buff,
 static void timer_intr_handler(unsigned long indx)
 {
 	struct sdebug_queued_cmd * sqcp;
-	unsigned int iflags;
+	unsigned long iflags;
 
 	if (indx >= SCSI_DEBUG_CANQUEUE) {
 		printk(KERN_ERR "scsi_debug:timer_intr_handler: indx too "
