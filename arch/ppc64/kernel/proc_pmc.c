@@ -39,6 +39,7 @@
 #include <asm/pmc.h>
 #include <asm/uaccess.h>
 #include <asm/naca.h>
+#include <asm/rtas.h>
 
 
 static int proc_pmc_control_mode = 0;
@@ -99,6 +100,9 @@ void proc_ppc64_init(void)
 	proc_ppc64_root = proc_mkdir("ppc64", 0);
 	if (!proc_ppc64_root) return;
 	spin_unlock(&proc_ppc64_lock);
+
+	/* Placeholder for rtas interfaces. */
+	rtas_proc_dir = proc_mkdir("rtas", proc_ppc64_root);
 
 
 	proc_ppc64_pmc_root = proc_mkdir("pmc", proc_ppc64_root);
@@ -321,6 +325,7 @@ void pmc_proc_init(struct proc_dir_entry *iSeries_proc)
     if (!ent) return;
     ent->nlink = 1;
     ent->data = (void *)0;
+    ent->size = 0;
     ent->read_proc = proc_get_titanTod;
     ent->write_proc = NULL;
 
