@@ -1151,8 +1151,8 @@ void neigh_table_init(struct neigh_table *tbl)
 	tasklet_init(&tbl->gc_task, SMP_TIMER_NAME(neigh_periodic_timer),
 		     (unsigned long)tbl);
 #endif
-	init_timer(&tbl->gc_timer);
 	tbl->lock	       = RW_LOCK_UNLOCKED;
+	init_timer(&tbl->gc_timer);
 	tbl->gc_timer.data     = (unsigned long)tbl;
 	tbl->gc_timer.function = neigh_periodic_timer;
 	tbl->gc_timer.expires  = now + tbl->gc_interval +

@@ -541,10 +541,10 @@ static int rif_get_info(char *buffer,char **start, off_t offset, int length)
 
 static int __init rif_init(void)
 {
+	init_timer(&rif_timer);
 	rif_timer.expires  = RIF_TIMEOUT;
 	rif_timer.data     = 0L;
 	rif_timer.function = rif_check_expire;
-	init_timer(&rif_timer);
 	add_timer(&rif_timer);
 
 	proc_net_create("tr_rif",0,rif_get_info);

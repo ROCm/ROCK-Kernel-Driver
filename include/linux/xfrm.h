@@ -91,6 +91,22 @@ struct xfrm_stats {
 	__u32	integrity_failed;
 };
 
+enum
+{
+	XFRM_POLICY_IN	= 0,
+	XFRM_POLICY_OUT	= 1,
+	XFRM_POLICY_FWD	= 2,
+	XFRM_POLICY_MAX	= 3
+};
+
+enum
+{
+	XFRM_SHARE_ANY,		/* No limitations */
+	XFRM_SHARE_SESSION,	/* For this session only */
+	XFRM_SHARE_USER,	/* For this user only */
+	XFRM_SHARE_UNIQUE	/* Use once */
+};
+
 /* Netlink configuration messages.  */
 #define XFRM_MSG_BASE		0x10
 
@@ -104,8 +120,9 @@ struct xfrm_stats {
 
 #define XFRM_MSG_ALLOCSPI	(RTM_BASE + 6)
 #define XFRM_MSG_ACQUIRE	(RTM_BASE + 7)
+#define XFRM_MSG_EXPIRE		(RTM_BASE + 8)
 
-#define XFRM_MSG_MAX		(XFRM_MSG_ACQUIRE+1)
+#define XFRM_MSG_MAX		(XFRM_MSG_EXPIRE+1)
 
 struct xfrm_user_tmpl {
 	struct xfrm_id		id;
@@ -113,6 +130,7 @@ struct xfrm_user_tmpl {
 	__u16			reqid;
 	__u8			mode;
 	__u8			share;
+	__u8			optional;
 	__u32			aalgos;
 	__u32			ealgos;
 	__u32			calgos;
@@ -135,9 +153,9 @@ struct xfrm_usersa_info {
 	struct xfrm_lifetime_cfg	lft;
 	struct xfrm_lifetime_cur	curlft;
 	struct xfrm_stats		stats;
+	__u32				seq;
 	__u16				family;
 	__u16				reqid;
-	__u8				sa_type;
 	__u8				mode; /* 0=transport,1=tunnel */
 	__u8				replay_window;
 };
@@ -148,15 +166,26 @@ struct xfrm_usersa_id {
 	__u8				proto;
 };
 
+struct xfrm_userspi_info {
+	struct xfrm_usersa_info		info;
+	u32				min;
+	u32				max;
+};
+
 struct xfrm_userpolicy_info {
 	struct xfrm_selector		sel;
-	struct xfrm_id			id;
 	struct xfrm_lifetime_cfg	lft;
 	struct xfrm_lifetime_cur	curlft;
+	__u32				priority;
 	__u32				index;
 	__u16				family;
 	__u8				dir;
 	__u8				action;
+#define XFRM_POLICY_ALLOW	0
+#define XFRM_POLICY_BLOCK	1
+	__u8				flags;
+#define XFRM_POLICY_LOCALOK	1	/* Allow user to override global policy */
+	__u8				share;
 };
 
 struct xfrm_userpolicy_id {
@@ -164,5 +193,23 @@ struct xfrm_userpolicy_id {
 	__u32				index;
 	__u8				dir;
 };
+
+struct xfrm_user_acquire {
+	struct xfrm_id			id;
+	xfrm_address_t			saddr;
+	struct xfrm_userpolicy_info	policy;
+	__u32				aalgos;
+	__u32				ealgos;
+	__u32				calgos;
+	__u32				seq;
+};
+
+struct xfrm_user_expire {
+	struct xfrm_usersa_info		state;
+	__u8				hard;
+};
+
+#define XFRMGRP_ACQUIRE		1
+#define XFRMGRP_EXPIRE		2
 
 #endif /* _LINUX_XFRM_H */

@@ -242,6 +242,13 @@ static inline void module_put(struct module *module)
 
 #endif /* CONFIG_MODULE_UNLOAD */
 
+/* This is a #define so the string doesn't get put in every .o file */
+#define module_name(mod)			\
+({						\
+	struct module *__mod = (mod);		\
+	__mod ? __mod->name : "kernel";		\
+})
+
 #define __unsafe(mod)							     \
 do {									     \
 	if (mod && !(mod)->unsafe) {					     \
@@ -264,6 +271,8 @@ do {									     \
 
 #define try_module_get(module) 1
 #define module_put(module) do { } while(0)
+
+#define module_name(mod) "kernel"
 
 #define __unsafe(mod)
 #endif /* CONFIG_MODULES */

@@ -2364,6 +2364,7 @@ bed:
 
 			/* Set watchdog timer to expire in <val> ms. */
 			self->errno = 0;
+			init_timer(&self->watchdog);
 			self->watchdog.function = irda_discovery_timeout;
 			self->watchdog.data = (unsigned long) self;
 			self->watchdog.expires = jiffies + (val * HZ/1000);

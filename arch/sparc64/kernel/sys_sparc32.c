@@ -3113,24 +3113,18 @@ out:
 
 #ifdef CONFIG_MODULES
 
-extern asmlinkage long sys_init_module(const char *name_user,
-				       struct module *mod_user);
+extern asmlinkage long sys_init_module(void *, unsigned long, const char *);
 
-/* Hey, when you're trying to init module, take time and prepare us a nice
- * 64bit module structure, even if from 32bit modutils... Why to pollute
- * kernel... :))
- */
-asmlinkage int sys32_init_module(const char *name_user,
-				 struct module *mod_user)
+asmlinkage int sys32_init_module(void *umod, u32 len, const char *uargs)
 {
-	return sys_init_module(name_user, mod_user);
+	return sys_init_module(umod, len, uargs);
 }
 
-extern asmlinkage long sys_delete_module(const char *name_user);
+extern asmlinkage long sys_delete_module(const char *, unsigned int);
 
-asmlinkage int sys32_delete_module(const char *name_user)
+asmlinkage int sys32_delete_module(const char *name_user, unsigned int flags)
 {
-	return sys_delete_module(name_user);
+	return sys_delete_module(name_user, flags);
 }
 
 #else /* CONFIG_MODULES */
