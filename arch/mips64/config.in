@@ -123,8 +123,6 @@ endmenu
 
 source drivers/pci/Config.in
 
-endmenu
-
 source drivers/mtd/Config.in
 
 source drivers/parport/Config.in
