@@ -2055,8 +2055,7 @@ static int migration_call(struct notifier_block *nfb,
 	case CPU_ONLINE:
 		printk("Starting migration thread for cpu %li\n",
 		       (long)hcpu);
-		kernel_thread(migration_thread, hcpu,
-			      CLONE_FS | CLONE_FILES | CLONE_SIGNAL);
+		kernel_thread(migration_thread, hcpu, CLONE_KERNEL);
 		while (!cpu_rq((long)hcpu)->migration_thread)
 			yield();
 		break;

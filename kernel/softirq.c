@@ -395,8 +395,7 @@ static int __devinit cpu_callback(struct notifier_block *nfb,
 	int hotcpu = (unsigned long)hcpu;
 
 	if (action == CPU_ONLINE) {
-		if (kernel_thread(ksoftirqd, hcpu,
-				  CLONE_FS | CLONE_FILES | CLONE_SIGNAL) < 0) {
+		if (kernel_thread(ksoftirqd, hcpu, CLONE_KERNEL) < 0) {
 			printk("ksoftirqd for %i failed\n", hotcpu);
 			return NOTIFY_BAD;
 		}

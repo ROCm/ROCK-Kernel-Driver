@@ -371,7 +371,7 @@ static void __init smp_init(void)
 
 static void rest_init(void)
 {
-	kernel_thread(init, NULL, CLONE_FS | CLONE_FILES | CLONE_SIGNAL);
+	kernel_thread(init, NULL, CLONE_KERNEL);
 	unlock_kernel();
  	cpu_idle();
 } 

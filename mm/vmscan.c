@@ -705,7 +705,7 @@ static int __init kswapd_init(void)
 {
 	printk("Starting kswapd\n");
 	swap_setup();
-	kernel_thread(kswapd, NULL, CLONE_FS | CLONE_FILES | CLONE_SIGNAL);
+	kernel_thread(kswapd, NULL, CLONE_KERNEL);
 	return 0;
 }
 

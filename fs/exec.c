@@ -522,7 +522,7 @@ static inline void put_proc_dentry(struct dentry *dentry)
  * This function makes sure the current process has its own signal table,
  * so that flush_signal_handlers can later reset the handlers without
  * disturbing other processes.  (Other processes might share the signal
- * table via the CLONE_SIGNAL option to clone().)
+ * table via the CLONE_SIGHAND option to clone().)
  */
 static inline int de_thread(struct signal_struct *oldsig)
 {
