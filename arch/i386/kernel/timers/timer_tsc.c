@@ -139,7 +139,7 @@ unsigned long long sched_clock(void)
 	 * synchronized across all CPUs.
 	 */
 #ifndef CONFIG_NUMA
-	if (unlikely(!cpu_has_tsc))
+	if (!use_tsc)
 #endif
 		return (unsigned long long)jiffies * (1000000000 / HZ);
 
