@@ -37,7 +37,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/aic7xxx/aic79xx.h#78 $
+ * $Id: //depot/aic7xxx/aic7xxx/aic79xx.h#79 $
  *
  * $FreeBSD$
  */
@@ -309,7 +309,17 @@ typedef enum {
 	 * Controller write to INTSTAT will lose to a host
 	 * write to CLRINT.
 	 */
-	AHD_INTCOLLISION_BUG	= 0x100000
+	AHD_INTCOLLISION_BUG	= 0x100000,
+	/*
+	 * The GEM318 violates the SCSI spec by not waiting
+	 * the mandated bus settle delay between phase changes
+	 * in some situations.  Some aic79xx chip revs. are more
+	 * strict in this regard and will treat REQ assertions
+	 * that fall within the bus settle delay window as
+	 * glitches.  This flag enables causes the firmware
+	 * to tolerate early REQ assertions.
+	 */
+	AHD_EARLY_REQ_BUG	= 0x200000
 } ahd_bug;
 
 /*

@@ -38,7 +38,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/aic7xxx/aic79xx_pci.c#63 $
+ * $Id: //depot/aic7xxx/aic7xxx/aic79xx_pci.c#65 $
  *
  * $FreeBSD$
  */
@@ -698,14 +698,14 @@ static const char *pci_status_source[] =
 
 static const char *split_status_strings[] =
 {
-	"%s: Received split response in %s.\n"
+	"%s: Received split response in %s.\n",
 	"%s: Received split completion error message in %s\n",
 	"%s: Receive overrun in %s\n",
 	"%s: Count not complete in %s\n",
 	"%s: Split completion data bucket in %s\n",
 	"%s: Split completion address error in %s\n",
 	"%s: Split completion byte count error in %s\n",
-	"%s: Signaled Target-abort to early terminate a split in %s\n",
+	"%s: Signaled Target-abort to early terminate a split in %s\n"
 };
 
 static const char *pci_status_strings[] =
@@ -905,7 +905,7 @@ ahd_aic7902_setup(struct ahd_softc *ahd)
 		ahd->features |= AHD_RTI|AHD_NEW_IOCELL_OPTS
 			      |  AHD_NEW_DFCNTRL_OPTS;
 		ahd->bugs |= AHD_LQOOVERRUN_BUG|AHD_ABORT_LQI_BUG
-			  |  AHD_INTCOLLISION_BUG;
+			  |  AHD_INTCOLLISION_BUG|AHD_EARLY_REQ_BUG;
 
 		/*
 		 * IO Cell paramter setup.

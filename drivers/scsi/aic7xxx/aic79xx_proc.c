@@ -37,7 +37,7 @@
  * String handling code courtesy of Gerard Roudier's <groudier@club-internet.fr>
  * sym driver.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_proc.c#11 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_proc.c#12 $
  */
 #include "aic79xx_osm.h"
 #include "aic79xx_inline.h"
@@ -311,6 +311,7 @@ ahd_linux_proc_info(char *buffer, char **start, off_t offset,
 
 	copy_info(&info, "Adaptec AIC79xx driver version: %s\n",
 		  AIC79XX_DRIVER_VERSION);
+	copy_info(&info, "%s\n", ahd->description);
 	ahd_controller_info(ahd, ahd_info);
 	copy_info(&info, "%s\n\n", ahd_info);
 

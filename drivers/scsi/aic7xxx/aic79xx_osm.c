@@ -1,7 +1,7 @@
 /*
  * Adaptec AIC79xx device driver for Linux.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.c#115 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.c#123 $
  *
  * --------------------------------------------------------------------------
  * Copyright (c) 1994-2000 Justin T. Gibbs.
@@ -992,9 +992,13 @@ ahd_linux_queue(Scsi_Cmnd * cmd, void (*scsi_done) (Scsi_Cmnd *))
 				   cmd->device->id, cmd->device->lun,
 				   /*alloc*/TRUE);
 	if (dev == NULL) {
+		ahd_cmd_set_transaction_status(cmd, CAM_RESRC_UNAVAIL);
+		ahd_linux_queue_cmd_complete(ahd, cmd);
+		ahd_schedule_completeq(ahd, NULL);
 		ahd_midlayer_entrypoint_unlock(ahd, &flags);
-		printf("aic79xx_linux_queue: Unable to allocate device!\n");
-		return (-ENOMEM);
+		printf("%s: aic79xx_linux_queue - Unable to allocate device!\n",
+		       ahd_name(ahd));
+		return (0);
 	}
 	if (cmd->cmd_len > MAX_CDB_LEN)
 		return (-EINVAL);
@@ -1213,6 +1217,7 @@ ahd_linux_abort(Scsi_Cmnd *cmd)
 	u_int  saved_scbptr;
 	u_int  active_scbptr;
 	u_int  last_phase;
+	u_int  cdb_byte;
 	int    retval;
 	int    paused;
 	int    wait;
@@ -1225,9 +1230,12 @@ ahd_linux_abort(Scsi_Cmnd *cmd)
 	ahd = *(struct ahd_softc **)cmd->device->host->hostdata;
 	acmd = (struct ahd_cmd *)cmd;
 
-	printf("%s:%d:%d:%d: Attempting to abort cmd %p\n",
+	printf("%s:%d:%d:%d: Attempting to abort cmd %p:",
 	       ahd_name(ahd), cmd->device->channel, cmd->device->id,
 	       cmd->device->lun, cmd);
+	for (cdb_byte = 0; cdb_byte < cmd->cmd_len; cdb_byte++)
+		printf(" 0x%x", cmd->cmnd[cdb_byte]);
+	printf("\n");
 
 	/*
 	 * In all versions of Linux, we have to work around
@@ -1560,7 +1568,7 @@ ahd_linux_dev_reset(Scsi_Cmnd *cmd)
 	hscb = scb->hscb;
 	hscb->control = 0;
 	hscb->scsiid = BUILD_SCSIID(ahd, cmd);
-	hscb->lun = cmd->lun;
+	hscb->lun = cmd->device->lun;
 	hscb->cdb_len = 0;
 	hscb->task_management = SIU_TASKMGMT_LUN_RESET;
 	scb->flags |= SCB_DEVICE_RESET|SCB_RECOVERY_SCB|SCB_ACTIVE;
@@ -2403,8 +2411,23 @@ ahd_linux_register_host(struct ahd_softc *ahd, Scsi_Host_Template *template)
 	 * negotiation will occur for the first command, and DV
 	 * will comence should that first command be successful.
 	 */
-	for (target = 0; target < host->max_id; target++)
+	for (target = 0; target < host->max_id; target++) {
+
+		/*
+		 * Skip our own ID.  Some Compaq/HP storage devices
+		 * have enclosure management devices that respond to
+		 * single bit selection (i.e. selecting ourselves).
+		 * It is expected that either an external application
+		 * or a modified kernel will be used to probe this
+		 * ID if it is appropriate.  To accomodate these installations,
+		 * ahc_linux_alloc_target() will allocate for our ID if
+		 * asked to do so.
+		 */
+		if (target == ahd->our_id) 
+			continue;
+
 		ahd_linux_alloc_target(ahd, 0, target);
+	}
 	ahd_intr_enable(ahd, TRUE);
 	ahd_linux_start_dv(ahd);
 	ahd_unlock(ahd, &s);
@@ -2846,15 +2869,20 @@ ahd_linux_dv_thread(void *data)
 #endif
 
 	/*
+	 * Complete thread creation.
+	 */
+	lock_kernel();
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,60)
+	/*
 	 * Don't care about any signals.
 	 */
 	siginitsetinv(&current->blocked, 0);
 
-	/*
-	 * Complete thread creation.
-	 */
-	lock_kernel();
+	daemonize();
+	sprintf(current->comm, "ahd_dv_%d", ahd->unit);
+#else
 	daemonize("ahd_dv_%d", ahd->unit);
+#endif
 	unlock_kernel();
 
 	while (1) {
@@ -4268,6 +4296,7 @@ ahd_linux_run_device_queue(struct ahd_softc *ahd, struct ahd_linux_device *dev)
 		 */
 		hscb->control = 0;
 		hscb->scsiid = BUILD_SCSIID(ahd, cmd);
+		hscb->lun = cmd->device->lun;
 		scb->hscb->task_management = 0;
 		mask = SCB_GET_TARGET_MASK(ahd, scb);
 
@@ -4430,17 +4459,6 @@ static struct ahd_linux_target*
 ahd_linux_alloc_target(struct ahd_softc *ahd, u_int channel, u_int target)
 {
 	struct ahd_linux_target *targ;
-	u_int target_offset;
-
-	target_offset = target;
-	/*
-	 * Never allow allocation of a target object for
-	 * our own SCSIID.
-	 */
-	if (target == ahd->our_id) {
-		ahd->platform_data->targets[target_offset] = NULL;
-		return (NULL);
-	}
 
 	targ = malloc(sizeof(*targ), M_DEVBUF, M_NOWAIT);
 	if (targ == NULL)
@@ -4450,7 +4468,7 @@ ahd_linux_alloc_target(struct ahd_softc *ahd, u_int channel, u_int target)
 	targ->target = target;
 	targ->ahd = ahd;
 	targ->flags = AHD_DV_REQUIRED;
-	ahd->platform_data->targets[target_offset] = targ;
+	ahd->platform_data->targets[target] = targ;
 	return (targ);
 }
 
@@ -4692,6 +4710,14 @@ ahd_done(struct ahd_softc *ahd, struct scb *scb)
 #endif
 			ahd_set_transaction_status(scb, CAM_UNCOR_PARITY);
 		} else if (amount_xferred < scb->io_ctx->underflow) {
+			u_int i;
+
+			ahd_print_path(ahd, scb);
+			printf("CDB:");
+			for (i = 0; i < scb->io_ctx->cmd_len; i++)
+				printf(" 0x%x", scb->io_ctx->cmnd[i]);
+			printf("\n");
+			ahd_print_path(ahd, scb);
 			printf("Saw underflow (%ld of %ld bytes). "
 			       "Treated as error\n",
 				ahd_get_residual(scb),
