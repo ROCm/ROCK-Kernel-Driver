@@ -4,4 +4,7 @@
 
 bool 'Touchscreens' CONFIG_INPUT_TOUCHSCREEN
 
+if [ "$CONFIG_SA1100_BITSY" = "y" ]; then
+   dep_tristate '  Compaq iPAQ H3600 (Bitsy) touchscreen input driver' CONFIG_TOUCHSCREEN_BITSY $CONFIG_INPUT $CONFIG_INPUT_TOUCHSCREEN $CONFIG_SERIO
+fi
 dep_tristate '  Gunze AHL-51S touchscreen' CONFIG_TOUCHSCREEN_GUNZE $CONFIG_INPUT $CONFIG_INPUT_TOUCHSCREEN $CONFIG_SERIO

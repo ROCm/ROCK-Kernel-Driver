@@ -1,5 +1,5 @@
 /*
- *  acpi_utils.c - ACPI Utility Functions ($Revision: 7 $)
+ *  acpi_utils.c - ACPI Utility Functions ($Revision: 10 $)
  *
  *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
  *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
@@ -236,59 +236,6 @@ acpi_extract_package (
 
 
 acpi_status
-acpi_evaluate (
-	acpi_handle		handle,
-	acpi_string		pathname,
-	acpi_object_list	*arguments,
-	acpi_buffer		*buffer)
-{
-	acpi_status		status = AE_OK;
-
-	ACPI_FUNCTION_TRACE("acpi_evaluate");
-
-	/* If caller provided a buffer it must be unallocated/zero'd. */
-	if (buffer && (buffer->length != 0 || buffer->pointer))
-		return_ACPI_STATUS(AE_BAD_PARAMETER);
-
-	/*
-	 * Evalute object. The first attempt is just to get the size of the
-	 * object data (that is unless there's no return data); the second
-	 * gets the data.
-	 */
-	status = acpi_evaluate_object(handle, pathname, arguments, buffer);
-
-	if (ACPI_SUCCESS(status)) {
-		return_ACPI_STATUS(status);
-	}
-
-	else if (buffer && (status == AE_BUFFER_OVERFLOW)) {
-
-		/* Gotta allocate - CALLER MUST FREE! */
-		buffer->pointer = kmalloc(buffer->length, GFP_KERNEL);
-		if (!buffer->pointer) {
-			return_ACPI_STATUS(AE_NO_MEMORY);
-		}
-		memset(buffer->pointer, 0, buffer->length);
-
-		/* Re-evaluate - this time it should work. */
-		status = acpi_evaluate_object(handle, pathname, arguments,
-			buffer);
-	}
-
-	if (ACPI_FAILURE(status)) {
-		if (status != AE_NOT_FOUND)
-			acpi_util_eval_error(handle, pathname, status);
-		if (buffer && buffer->pointer) {
-			kfree(buffer->pointer);
-			buffer->length = 0;
-		}
-	}
-
-	return_ACPI_STATUS(status);
-}
-
-
-acpi_status
 acpi_evaluate_integer (
 	acpi_handle		handle,
 	acpi_string		pathname,
@@ -366,6 +313,8 @@ acpi_evaluate_string (
 
 	ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Return value [%s]\n", *data));
 
+	acpi_os_free(buffer.pointer);
+
 	return_ACPI_STATUS(AE_OK);
 }
 #endif
@@ -381,7 +330,7 @@ acpi_evaluate_reference (
 	acpi_status		status = AE_OK;
 	acpi_object		*package = NULL;
 	acpi_object		*element = NULL;
-	acpi_buffer		buffer = {0, NULL};
+	acpi_buffer		buffer = {ACPI_ALLOCATE_BUFFER, NULL};
 	u32			i = 0;
 
 	ACPI_FUNCTION_TRACE("acpi_evaluate_reference");
@@ -392,42 +341,53 @@ acpi_evaluate_reference (
 
 	/* Evaluate object. */
 
-	status = acpi_evaluate(handle, pathname, arguments, &buffer);
+	status = acpi_evaluate_object(handle, pathname, arguments, &buffer);
 	if (ACPI_FAILURE(status))
 		goto end;
 
 	package = (acpi_object *) buffer.pointer;
 
-	if (!package || (package->type != ACPI_TYPE_PACKAGE)
-		|| (package->package.count == 0)) {
+	if ((buffer.length == 0) || !package) {
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, 
+			"No return object (len %X ptr %p)\n", 
+			buffer.length, package));
+		status = AE_BAD_DATA;
+		acpi_util_eval_error(handle, pathname, status);
+		goto end;
+	}
+	if (package->type != ACPI_TYPE_PACKAGE) {
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, 
+			"Expecting a [Package], found type %X\n", 
+			package->type));
+		status = AE_BAD_DATA;
+		acpi_util_eval_error(handle, pathname, status);
+		goto end;
+	}
+	if (!package->package.count) {
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, 
+			"[Package] has zero elements (%p)\n", 
+			package));
 		status = AE_BAD_DATA;
 		acpi_util_eval_error(handle, pathname, status);
 		goto end;
 	}
 
-	/* Allocate list - CALLER MUST FREE! */
-	list->count = package->package.count;
-	if (list->count > 10) {
+	if (package->package.count > ACPI_MAX_HANDLES) {
 		return AE_NO_MEMORY;
 	}
-	/* TBD: dynamically allocate */
-	/*
-	list->handles = kmalloc(sizeof(acpi_handle)*(list->count), GFP_KERNEL);
-	if (!list->handles) {
-		return_ACPI_STATUS(AE_NO_MEMORY);
-	}
-	memset(list->handles, 0, sizeof(acpi_handle)*(list->count));
-	*/
+	list->count = package->package.count;
 
-	/* Parse package data. */
+	/* Extract package data. */
 
 	for (i = 0; i < list->count; i++) {
 
 		element = &(package->package.elements[i]);
 
-		if (!element || (element->type != ACPI_TYPE_ANY)) {
+		if (element->type != ACPI_TYPE_ANY) {
 			status = AE_BAD_DATA;
-			ACPI_DEBUG_PRINT((ACPI_DB_WARN, "Invalid element in package (not a device reference)\n"));
+			ACPI_DEBUG_PRINT((ACPI_DB_ERROR, 
+				"Expecting a [Reference] package element, found type %X\n",
+				element->type));
 			acpi_util_eval_error(handle, pathname, status);
 			break;
 		}
@@ -435,7 +395,8 @@ acpi_evaluate_reference (
 		/* Get the  acpi_handle. */
 
 		list->handles[i] = element->reference.handle;
-		ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Resolved reference [%s]->[%p]\n", element->string.pointer, list->handles[i]));
+		ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Found reference [%p]\n",
+			list->handles[i]));
 	}
 
 end:
@@ -444,7 +405,7 @@ end:
 		//kfree(list->handles);
 	}
 
-	kfree(buffer.pointer);
+	acpi_os_free(buffer.pointer);
 
 	return_ACPI_STATUS(status);
 }

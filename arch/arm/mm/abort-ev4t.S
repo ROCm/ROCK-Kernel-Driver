@@ -7,7 +7,7 @@
  *         : r3 = saved SPSR
  *
  * Returns : r0 = address of abort
- *	   : r1 = FSR, bit 8 = write
+ *	   : r1 = FSR, bit 11 = write
  *	   : r2-r8 = corrupted
  *	   : r9 = preserved
  *	   : sp = pointer to registers
@@ -24,8 +24,8 @@ ENTRY(v4t_early_abort)
 	tst	r3, #PSR_T_BIT
 	ldrneh	r3, [r2]			@ read aborted thumb instruction
 	ldreq	r3, [r2]			@ read aborted ARM instruction
-	bic	r1, r1, #1 << 8
+	bic	r1, r1, #1 << 11 | 1 << 10	@ clear bits 11 and 10 of FSR
 	movne	r3, r3, lsl #(21 - 12)		@ move thumb bit 11 to ARM bit 20
 	tst	r3, #1 << 20			@ check write
-	orreq	r1, r1, #1 << 8
+	orreq	r1, r1, #1 << 11
 	mov	pc, lr

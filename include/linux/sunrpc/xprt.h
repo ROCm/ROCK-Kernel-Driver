@@ -83,7 +83,9 @@ struct rpc_rqst {
 	struct rpc_task *	rq_task;	/* RPC task data */
 	__u32			rq_xid;		/* request XID */
 	struct rpc_rqst *	rq_next;	/* free list */
-	volatile unsigned char	rq_received : 1;/* receive completed */
+	int			rq_received;	/* receive completed */
+
+	struct list_head	rq_list;
 
 	/*
 	 * For authentication (e.g. auth_des)
@@ -148,6 +150,8 @@ struct rpc_xprt {
 	spinlock_t		sock_lock;	/* lock socket info */
 	spinlock_t		xprt_lock;	/* lock xprt info */
 	struct rpc_task *	snd_task;	/* Task blocked in send */
+
+	struct list_head	recv;
 
 
 	void			(*old_data_ready)(struct sock *, int);

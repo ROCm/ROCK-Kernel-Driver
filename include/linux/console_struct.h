@@ -33,6 +33,7 @@ struct vc_data {
 	unsigned int	vc_top, vc_bottom;	/* Scrolling region */
 	unsigned int	vc_state;		/* Escape sequence parser state */
 	unsigned int	vc_npar,vc_par[NPAR];	/* Parameters of current escape sequence */
+	struct tty_struct *vc_tty;		/* TTY we are attached to */
 	unsigned long	vc_origin;		/* [!] Start of real screen */
 	unsigned long	vc_scr_end;		/* [!] End of real screen */
 	unsigned long	vc_visible_origin;	/* [!] Top of visible window */

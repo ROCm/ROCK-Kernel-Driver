@@ -88,9 +88,21 @@ static int __init assabet_init(void)
 		return -EINVAL;
 
 	/*
-	 * Set the IRQ edges
+	 * Ensure that these pins are set as outputs and are driving
+	 * logic 0.  This ensures that we won't inadvertently toggle
+	 * the WS latch in the CPLD, and we don't float causing
+	 * excessive power drain.  --rmk
 	 */
-	set_irq_type(IRQ_GPIO23, IRQT_RISING);	/* UCB1300 */
+	GPDR |= GPIO_SSP_TXD | GPIO_SSP_SCLK | GPIO_SSP_SFRM;
+	GPCR = GPIO_SSP_TXD | GPIO_SSP_SCLK | GPIO_SSP_SFRM;
+
+	/*
+	 * Set up registers for sleep mode.
+	 */
+	PWER = PWER_GPIO0;
+	PGSR = 0;
+	PCFR = 0;
+	PSDR = 0;
 
 	sa1100fb_lcd_power = assabet_lcd_power;
 	sa1100fb_backlight_power = assabet_backlight_power;
@@ -254,13 +266,19 @@ static struct map_desc assabet_io_desc[] __initdata = {
 
 static void __init assabet_map_io(void)
 {
-	extern void neponset_map_io(void);
-
 	sa1100_map_io();
 	iotable_init(assabet_io_desc, ARRAY_SIZE(assabet_io_desc));
 
+	/*
+	 * Set SUS bit in SDCR0 so serial port 1 functions.
+	 * Its called GPCLKR0 in my SA1110 manual.
+	 */
+	Ser1SDCR0 |= SDCR0_SUS;
+
 	if (machine_has_neponset()) {
 #ifdef CONFIG_ASSABET_NEPONSET
+		extern void neponset_map_io(void);
+
 		/*
 		 * We map Neponset registers even if it isn't present since
 		 * many drivers will try to probe their stuff (and fail).
@@ -279,33 +297,11 @@ static void __init assabet_map_io(void)
 		 */
 		sa1100_register_uart(0, 3);
 		sa1100_register_uart(2, 1);
-		/*
-		 * Set SUS bit in SDCR0 so serial port 1 functions.
-		 * Its called GPCLKR0 in my SA1110 manual.
-		 */
-		Ser1SDCR0 |= SDCR0_SUS;
 	} else {
 		sa1100_register_uart_fns(&assabet_port_fns);
 		sa1100_register_uart(0, 1);	/* com port */
 		sa1100_register_uart(2, 3);	/* radio module */
 	}
-
-	/*
-	 * Ensure that these pins are set as outputs and are driving
-	 * logic 0.  This ensures that we won't inadvertently toggle
-	 * the WS latch in the CPLD, and we don't float causing
-	 * excessive power drain.  --rmk
-	 */
-	GPDR |= GPIO_SSP_TXD | GPIO_SSP_SCLK | GPIO_SSP_SFRM;
-	GPCR = GPIO_SSP_TXD | GPIO_SSP_SCLK | GPIO_SSP_SFRM;
-
-	/*
-	 * Set up registers for sleep mode.
-	 */
-	PWER = PWER_GPIO0;
-	PGSR = 0;
-	PCFR = 0;
-	PSDR = 0;
 }
 
 

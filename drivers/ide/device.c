@@ -80,29 +80,7 @@ void ata_mask(struct ata_device *drive)
 }
 
 /*
- * Spin until the drive is no longer busy.
- *
- * Not exported, since it's not used within any modules.
- */
-int ata_busy_poll(struct ata_device *drive, unsigned long timeout)
-{
-	/* spec allows drive 400ns to assert "BUSY" */
-	udelay(1);
-	if (!ata_status(drive, 0, BUSY_STAT)) {
-		timeout += jiffies;
-		while (!ata_status(drive, 0, BUSY_STAT)) {
-			if (time_after(jiffies, timeout))
-				return 1;
-		}
-	}
-
-	return 0;
-}
-
-/*
  * Check the state of the status register.
- *
- * FIXME: Channel lock should be held.
  */
 int ata_status(struct ata_device *drive, u8 good, u8 bad)
 {
@@ -120,31 +98,33 @@ EXPORT_SYMBOL(ata_status);
  * all of the "good" bits and none of the "bad" bits, and if all is okay it
  * returns 0.  All other cases return 1 after invoking error handler -- caller
  * should just return.
- *
- * This routine should get fixed to not hog the cpu during extra long waits..
- * That could be done by busy-waiting for the first jiffy or two, and then
- * setting a timer to wake up at half second intervals thereafter, until
- * timeout is achieved, before timing out.
- *
- * Channel lock should be held.
  */
 int ata_status_poll(struct ata_device *drive, u8 good, u8 bad,
-		unsigned long timeout,
-		struct request *rq, ide_startstop_t *startstop)
+		unsigned long timeout, struct request *rq)
 {
 	int i;
 
 	/* bail early if we've exceeded max_failures */
-	if (drive->max_failures && (drive->failures > drive->max_failures)) {
-		*startstop = ide_stopped;
+	if (drive->max_failures && (drive->failures > drive->max_failures))
+		return ATA_OP_FINISHED;
+	/*
+	 * Spin until the drive is no longer busy.
+	 * Spec allows drive 400ns to assert "BUSY"
+	 */
+	udelay(1);
+	if (!ata_status(drive, 0, BUSY_STAT)) {
+		unsigned long flags;
 
-		return 1;
-	}
-
-	if (ata_busy_poll(drive, timeout)) {
-		*startstop = ata_error(drive, rq, "status timeout");
-
-		return 1;
+		__save_flags(flags);
+		ide__sti();
+		timeout += jiffies;
+		while (!ata_status(drive, 0, BUSY_STAT)) {
+			if (time_after(jiffies, timeout)) {
+				__restore_flags(flags);
+				return ata_error(drive, rq, "status timeout");
+			}
+		}
+		__restore_flags(flags);
 	}
 
 	/*
@@ -156,12 +136,10 @@ int ata_status_poll(struct ata_device *drive, u8 good, u8 bad,
 	for (i = 0; i < 10; i++) {
 		udelay(1);
 		if (ata_status(drive, good, bad))
-			return 0;
+			return ATA_OP_READY;
 	}
 
-	*startstop = ata_error(drive, rq, "status error");
-
-	return 1;
+	return ata_error(drive, rq, "status error");
 }
 
 EXPORT_SYMBOL(ata_status_poll);

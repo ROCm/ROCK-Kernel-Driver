@@ -36,6 +36,9 @@
  *	Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
  *  History
+ *  v0.14.9e
+ *      January 2 2002 Vojtech Pavlik <vojtech@ucw.cz> added gameport
+ *      support to avoid resource conflict with pcigame.c
  *  v0.14.9d
  *  	October 8 2001 Arnaldo Carvalho de Melo <acme@conectiva.com.br>
  *	use set_current_state, properly release resources on failure in
@@ -171,6 +174,7 @@
 #include <linux/bitops.h>
 #include <linux/proc_fs.h>
 #include <linux/interrupt.h>
+#include <linux/gameport.h>
 
 #if defined CONFIG_ALPHA_NAUTILUS || CONFIG_ALPHA_GENERIC
 #include <asm/hwrpb.h>
@@ -180,7 +184,7 @@
 
 #include <linux/pm.h>
 
-#define DRIVER_VERSION "0.14.9d"
+#define DRIVER_VERSION "0.14.9e"
 
 /* magic numbers to protect our data structures */
 #define TRIDENT_CARD_MAGIC	0x5072696E /* "Prin" */
@@ -382,6 +386,9 @@ struct trident_card {
 	/* Added for hardware volume control */
 	int hwvolctl;
 	struct timer_list timer;
+
+	/* Game port support */
+	struct gameport gameport;
 };
 
 /* table to map from CHANNELMASK to channel attribute for SiS 7018 */
@@ -3938,6 +3945,55 @@ static int __init trident_ac97_init(struct trident_card *card)
 	return num_ac97+1;
 }
 
+/* Gameport functions for the cards ADC gameport */
+
+static unsigned char trident_game_read(struct gameport *gameport)
+{
+	struct trident_card *card = gameport->driver;
+	return inb(TRID_REG(card, T4D_GAME_LEG));
+}
+
+static void trident_game_trigger(struct gameport *gameport)
+{
+	struct trident_card *card = gameport->driver;
+	outb(0xff, TRID_REG(card, T4D_GAME_LEG));
+}
+
+static int trident_game_cooked_read(struct gameport *gameport, int *axes, int *buttons)
+{
+        struct trident_card *card = gameport->driver;
+	int i;
+
+	*buttons = (~inb(TRID_REG(card, T4D_GAME_LEG)) >> 4) & 0xf;
+
+	for (i = 0; i < 4; i++) {
+		axes[i] = inw(TRID_REG(card, T4D_GAME_AXD) + i * sizeof(u16));
+		if (axes[i] == 0xffff) axes[i] = -1;
+	}
+        
+        return 0;
+}
+
+static int trident_game_open(struct gameport *gameport, int mode)
+{
+	struct trident_card *card = gameport->driver;
+
+	switch (mode) {
+		case GAMEPORT_MODE_COOKED:
+			outb(0x80, TRID_REG(card, T4D_GAME_CR));
+			wait_ms(20);
+			return 0;
+		case GAMEPORT_MODE_RAW:
+			outb(0x00, TRID_REG(card, T4D_GAME_CR));
+			return 0;
+		default:
+			return -1;
+	}
+
+	return 0;
+}
+
+
 /* install the driver, we do not allocate hardware channel nor DMA buffer now, they are defered 
    until "ACCESS" time (in prog_dmabuf called by open/read/write/ioctl/mmap) */
 static int __init trident_probe(struct pci_dev *pci_dev, const struct pci_device_id *pci_id)
@@ -3997,6 +4053,13 @@ static int __init trident_probe(struct pci_dev *pci_dev, const struct pci_device
 	card->banks[BANK_A].bitmap = 0UL;
 	card->banks[BANK_B].addresses = &bank_b_addrs;
 	card->banks[BANK_B].bitmap = 0UL;
+
+	card->gameport.driver = card;
+	card->gameport.fuzz = 64;
+	card->gameport.read = trident_game_read;
+	card->gameport.trigger = trident_game_trigger;
+	card->gameport.cooked_read = trident_game_cooked_read;
+	card->gameport.open = trident_game_open;
 
 	init_MUTEX(&card->open_sem);
 	spin_lock_init(&card->lock);
@@ -4131,6 +4194,10 @@ static int __init trident_probe(struct pci_dev *pci_dev, const struct pci_device
 
 	/* Enable Address Engine Interrupts */
 	trident_enable_loop_interrupts(card);
+
+	/* Register gameport */
+	gameport_register_port(&card->gameport);
+
 out:	return rc;
 out_unregister_sound_dsp:
 	unregister_sound_dsp(card->dev_audio);
@@ -4171,6 +4238,9 @@ static void __devexit trident_remove(struct pci_dev *pci_dev)
 		remove_proc_entry("ALi5451", NULL);
 #endif
 	}
+
+	/* Unregister gameport */
+	gameport_unregister_port(&card->gameport);
 
 	/* Kill interrupts, and SP/DIF */
 	trident_disable_loop_interrupts(card);

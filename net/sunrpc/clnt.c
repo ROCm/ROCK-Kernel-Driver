@@ -595,13 +595,16 @@ call_status(struct rpc_task *task)
 	dprintk("RPC: %4d call_status (status %d)\n", 
 				task->tk_pid, task->tk_status);
 
+	req = task->tk_rqstp;
+	if (req->rq_received != 0)
+		status = req->rq_received;
 	if (status >= 0) {
+		req->rq_received = 0;
 		task->tk_action = call_decode;
 		return;
 	}
 
 	task->tk_status = 0;
-	req = task->tk_rqstp;
 	switch(status) {
 	case -ETIMEDOUT:
 		task->tk_action = call_timeout;

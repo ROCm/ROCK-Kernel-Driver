@@ -1093,14 +1093,17 @@ __nfs_refresh_inode(struct inode *inode, struct nfs_fattr *fattr)
  	}
  
 	/* Update attrtimeo value */
-	if (!invalid && time_after(jiffies, NFS_ATTRTIMEO_UPDATE(inode)+NFS_ATTRTIMEO(inode))) {
+	if (invalid) {
+		NFS_ATTRTIMEO(inode) = NFS_MINATTRTIMEO(inode);
+		NFS_ATTRTIMEO_UPDATE(inode) = jiffies;
+		invalidate_inode_pages(inode);
+		memset(NFS_COOKIEVERF(inode), 0, sizeof(NFS_COOKIEVERF(inode)));
+	} else if (time_after(jiffies, NFS_ATTRTIMEO_UPDATE(inode)+NFS_ATTRTIMEO(inode))) {
 		if ((NFS_ATTRTIMEO(inode) <<= 1) > NFS_MAXATTRTIMEO(inode))
 			NFS_ATTRTIMEO(inode) = NFS_MAXATTRTIMEO(inode);
 		NFS_ATTRTIMEO_UPDATE(inode) = jiffies;
 	}
 
-	if (invalid)
-		nfs_zap_caches(inode);
 	return 0;
  out_nochange:
 	if (new_atime - inode->i_atime > 0)

@@ -91,6 +91,46 @@ static int __init P4_disable_ht(char *s)
 }
 __setup("noht", P4_disable_ht);
 
+#define LVL_1_INST	1
+#define LVL_1_DATA	2
+#define LVL_2		3
+#define LVL_3		4
+
+struct _cache_table
+{
+	unsigned char descriptor;
+	char cache_type;
+	short size;
+};
+
+/* all the cache descriptor types we care about (no TLB or trace cache entries) */
+static struct _cache_table cache_table[] __initdata =
+{
+	{ 0x06, LVL_1_INST, 8 },
+	{ 0x08, LVL_1_INST, 16 },
+	{ 0x0A, LVL_1_DATA, 8 },
+	{ 0x0C, LVL_1_DATA, 16 },
+	{ 0x22, LVL_3,      512 },
+	{ 0x23, LVL_3,      1024 },
+	{ 0x25, LVL_3,      2048 },
+	{ 0x29, LVL_3,      4096 },
+	{ 0x41, LVL_2,      128 },
+	{ 0x42, LVL_2,      256 },
+	{ 0x43, LVL_2,      512 },
+	{ 0x44, LVL_2,      1024 },
+	{ 0x45, LVL_2,      2048 },
+	{ 0x66, LVL_1_DATA, 8 },
+	{ 0x67, LVL_1_DATA, 16 },
+	{ 0x68, LVL_1_DATA, 32 },
+	{ 0x79, LVL_2,      128 },
+	{ 0x7A, LVL_2,      256 },
+	{ 0x7B, LVL_2,      512 },
+	{ 0x7C, LVL_2,      1024 },
+	{ 0x82, LVL_2,      256 },
+	{ 0x84, LVL_2,      1024 },
+	{ 0x85, LVL_2,      2048 },
+	{ 0x00, 0, 0}
+};
 
 static void __init init_intel(struct cpuinfo_x86 *c)
 {
@@ -137,83 +177,31 @@ static void __init init_intel(struct cpuinfo_x86 *c)
 			/* Byte 0 is level count, not a descriptor */
 			for ( j = 1 ; j < 16 ; j++ ) {
 				unsigned char des = dp[j];
-				unsigned char dl, dh;
-				unsigned int cs;
+				unsigned char k = 0;
 
-				dh = des >> 4;
-				dl = des & 0x0F;
-
-				/* Black magic... */
-
-				switch ( dh )
+				/* look up this descriptor in the table */
+				while (cache_table[k].descriptor != 0)
 				{
-				case 0:
-					switch ( dl ) {
-					case 6:
-						/* L1 I cache */
-						l1i += 8;
-						break;
-					case 8:
-						/* L1 I cache */
-						l1i += 16;
-						break;
-					case 10:
-						/* L1 D cache */
-						l1d += 8;
-						break;
-					case 12:
-						/* L1 D cache */
-						l1d += 16;
-						break;
-					default:;
-						/* TLB, or unknown */
-					}
-					break;
-				case 2:
-					if ( dl ) {
-						/* L3 cache */
-						cs = (dl-1) << 9;
-						l3 += cs;
-					}
-					break;
-				case 4:
-					if ( c->x86 > 6 && dl ) {
-						/* P4 family */
-						/* L3 cache */
-						cs = 128 << (dl-1);
-						l3 += cs;
+					if (cache_table[k].descriptor == des) {
+						switch (cache_table[k].cache_type) {
+						case LVL_1_INST:
+							l1i += cache_table[k].size;
+							break;
+						case LVL_1_DATA:
+							l1d += cache_table[k].size;
+							break;
+						case LVL_2:
+							l2 += cache_table[k].size;
+							break;
+						case LVL_3:
+							l3 += cache_table[k].size;
+							break;
+						}
+
 						break;
 					}
-					/* else same as 8 - fall through */
-				case 8:
-					if ( dl ) {
-						/* L2 cache */
-						cs = 128 << (dl-1);
-						l2 += cs;
-					}
-					break;
-				case 6:
-					if (dl > 5) {
-						/* L1 D cache */
-						cs = 8<<(dl-6);
-						l1d += cs;
-					}
-					break;
-				case 7:
-					if ( dl >= 8 ) 
-					{
-						/* L2 cache */
-						cs = 64<<(dl-8);
-						l2 += cs;
-					} else {
-						/* L0 I cache, count as L1 */
-						cs = dl ? (16 << (dl-1)) : 12;
-						l1i += cs;
-					}
-					break;
-				default:
-					/* TLB, or something else we don't know about */
-					break;
+
+					k++;
 				}
 			}
 		}

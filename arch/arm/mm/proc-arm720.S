@@ -135,8 +135,6 @@ ENTRY(cpu_arm720_set_pmd)
  */
 		.align	5
 ENTRY(cpu_arm720_set_pte)
-		tst	r0, #2048
-		streq	r0, [r0, -r0]			@ BUG_ON
 		str	r1, [r0], #-2048		@ linux version
 
 		eor	r1, r1, #LPTE_PRESENT | LPTE_YOUNG | LPTE_WRITE | LPTE_DIRTY
@@ -257,7 +255,7 @@ __arm720_proc_info:
 		b	__arm720_setup				@ cpu_flush
 		.long	cpu_arch_name				@ arch_name
 		.long	cpu_elf_name				@ elf_name
-		.long	HWCAP_SWP | HWCAP_HALF | HWCAP_THUMB | HWCAP_26BIT	@ elf_hwcap
+		.long	HWCAP_SWP | HWCAP_HALF | HWCAP_THUMB	@ elf_hwcap
 		.long	cpu_arm720_info				@ info
 		.long	arm720_processor_functions
 		.long	v4_tlb_fns

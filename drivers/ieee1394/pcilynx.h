@@ -25,6 +25,8 @@
 #define CHANNEL_ASYNC_SEND       3
 #define CHANNEL_ISO_SEND         4
 
+#define PCILYNX_CONFIG_ROM_LENGTH   1024
+
 typedef int pcl_t;
 
 struct ti_lynx {
@@ -48,7 +50,7 @@ struct ti_lynx {
         void *local_rom;
         void *local_ram;
         void *aux_port;
-
+        quadlet_t config_rom[PCILYNX_CONFIG_ROM_LENGTH/4];
 
 #ifdef CONFIG_IEEE1394_PCILYNX_PORTS
         atomic_t aux_intr_seen;
@@ -109,6 +111,8 @@ struct ti_lynx {
                 struct tasklet_struct tq;
                 spinlock_t lock;
         } iso_rcv;
+
+	u32 i2c_driven_state; /* the state we currently drive the Serial EEPROM Control register */
 };
 
 /* the per-file data structure for mem space access */
@@ -155,6 +159,8 @@ static inline void reg_clear_bits(const struct ti_lynx *lynx, int offset,
 
 #define MISC_CONTROL                      0x40
 #define MISC_CONTROL_SWRESET              (1<<0)
+
+#define SERIAL_EEPROM_CONTROL             0x44
 
 #define PCI_INT_STATUS                    0x48
 #define PCI_INT_ENABLE                    0x4c               

@@ -37,7 +37,7 @@
  * . DMA error recovery
  *
  * Known bugs:
- * . Apple PowerBook detected but not working yet (still true?)
+ * . devctl BUS_RESET arg confusion (reset type or root holdoff?)
  */
 
 /* 
@@ -75,12 +75,6 @@
  *  . Updated to 2.4.x module scheme (PCI aswell)
  *  . Removed procfs support since it trashes random mem
  *  . Config ROM generation
- */
-
-/* Issues:
- *
- * - devctl BUS_RESET should treat arg as reset type
- *
  */
 
 #include <linux/config.h>
@@ -160,17 +154,21 @@ printk(level "%s: " fmt "\n" , OHCI1394_DRIVER_NAME , ## args)
 printk(level "%s_%d: " fmt "\n" , OHCI1394_DRIVER_NAME, card , ## args)
 
 static char version[] __devinitdata =
-	"$Revision: 1.101 $ Ben Collins <bcollins@debian.org>";
+	"$Rev: 504 $ Ben Collins <bcollins@debian.org>";
 
 /* Module Parameters */
 MODULE_PARM(attempt_root,"i");
-MODULE_PARM_DESC(attempt_root, "Attempt to make the host root.");
+MODULE_PARM_DESC(attempt_root, "Attempt to make the host root (default = 0).");
 static int attempt_root = 0;
+
+MODULE_PARM(phys_dma,"i");
+MODULE_PARM_DESC(phys_dma, "Enable physical dma (default = 1).");
+static int phys_dma = 1;
 
 static void dma_trm_tasklet(unsigned long data);
 static void dma_trm_reset(struct dma_trm_ctx *d);
 
-static void __devexit ohci1394_pci_remove(struct pci_dev *pdev);
+static void ohci1394_pci_remove(struct pci_dev *pdev);
 
 static inline void ohci1394_run_irq_hooks(struct ti_ohci *ohci,
 					  quadlet_t isoRecvEvent, 
@@ -224,7 +222,7 @@ static u8 get_phy_reg(struct ti_ohci *ohci, u8 addr)
 
 	spin_lock_irqsave (&ohci->phy_reg_lock, flags);
 
-	reg_write(ohci, OHCI1394_PhyControl, (((u16)addr << 8) & 0x00000f00) | 0x00008000);
+	reg_write(ohci, OHCI1394_PhyControl, (addr << 8) | 0x00008000);
 
 	for (i = 0; i < OHCI_LOOP_COUNT; i++) {
 		if (reg_read(ohci, OHCI1394_PhyControl) & 0x80000000)
@@ -252,7 +250,7 @@ static void set_phy_reg(struct ti_ohci *ohci, u8 addr, u8 data)
 
 	spin_lock_irqsave (&ohci->phy_reg_lock, flags);
 
-	reg_write(ohci, OHCI1394_PhyControl, 0x00004000 | (((u16)addr << 8) & 0x00000f00) | data);
+	reg_write(ohci, OHCI1394_PhyControl, (addr << 8) | data | 0x00004000);
 
 	for (i = 0; i < OHCI_LOOP_COUNT; i++) {
 		r = reg_read(ohci, OHCI1394_PhyControl);
@@ -290,8 +288,6 @@ static void handle_selfid(struct ti_ohci *ohci, struct hpsb_host *host,
 	quadlet_t self_id_count=reg_read(ohci, OHCI1394_SelfIDCount);
 	size_t size;
 	quadlet_t q0, q1;
-
-	mdelay(10);
 
 	/* Check status of self-id reception */
 
@@ -363,13 +359,6 @@ static void ohci_soft_reset(struct ti_ohci *ohci) {
 			break;
 		mdelay(1);
 	}
-
-	/* Now reenable LPS, since that's usually what we want after a
-	 * softreset anyway. Wait 50msec to make sure we have full link
-	 * enabled.  */
-	reg_write(ohci, OHCI1394_HCControlSet, 0x00080000);
-	mdelay(50);
-
 	DBGMSG (ohci->id, "Soft reset finished");
 }
 
@@ -488,14 +477,42 @@ static void ohci_initialize(struct ti_ohci *ohci)
 {
 	quadlet_t buf;
 
+	/* Start off with a soft reset, to clear everything to a sane
+	 * state. */
+	ohci_soft_reset(ohci);
+
+	/* Now enable LPS, which we need in order to start accessing
+	 * most of the registers.  In fact, on some cards (ALI M5251),
+	 * accessing registers in the SClk domain without LPS enabled
+	 * will lock up the machine.  Wait 50msec to make sure we have
+	 * full link enabled.  */
+	reg_write(ohci, OHCI1394_HCControlSet, 0x00080000);
+	mdelay(50);
+
+	/* Determine the number of available IR and IT contexts. */
+	ohci->nb_iso_rcv_ctx =
+		get_nb_iso_ctx(ohci, OHCI1394_IsoRecvIntMaskSet);
+	DBGMSG(ohci->id, "%d iso receive contexts available",
+	       ohci->nb_iso_rcv_ctx);
+
+	ohci->nb_iso_xmit_ctx = 
+		get_nb_iso_ctx(ohci, OHCI1394_IsoXmitIntMaskSet);
+	DBGMSG(ohci->id, "%d iso transmit contexts available",
+	       ohci->nb_iso_xmit_ctx);
+
+	/* Set the usage bits for non-existent contexts so they can't
+	 * be allocated */
+	ohci->ir_ctx_usage |= ~0 << ohci->nb_iso_rcv_ctx;
+	ohci->it_ctx_usage |= ~0 << ohci->nb_iso_xmit_ctx;
+	
 	spin_lock_init(&ohci->phy_reg_lock);
 	spin_lock_init(&ohci->event_lock);
   
 	/* Put some defaults to these undefined bus options */
 	buf = reg_read(ohci, OHCI1394_BusOptions);
-	buf |=  0x60000000; /* Enable CMC and ISC */
+	buf |=  0xE0000000; /* Enable IRMC, CMC and ISC */
 	buf &= ~0x00ff0000; /* XXX: Set cyc_clk_acc to zero for now */
-	buf &= ~0x98000000; /* Disable PMC, IRMC and BMC */
+	buf &= ~0x18000000; /* Disable PMC and BMC */
 	reg_write(ohci, OHCI1394_BusOptions, buf);
 
 	/* Set the bus number */
@@ -507,8 +524,10 @@ static void ohci_initialize(struct ti_ohci *ohci)
 	/* Clear link control register */
 	reg_write(ohci, OHCI1394_LinkControlClear, 0xffffffff);
   
-	/* Enable cycle timer and cycle master */
+	/* Enable cycle timer and cycle master and set the IRM
+	 * contender bit in our self ID packets. */
 	reg_write(ohci, OHCI1394_LinkControlSet, 0x00300000);
+	set_phy_reg_mask(ohci, 4, 0xc0);
 
 	/* Clear interrupt registers */
 	reg_write(ohci, OHCI1394_IntMaskClear, 0xffffffff);
@@ -610,7 +629,7 @@ static void ohci_initialize(struct ti_ohci *ohci)
 	      ((((buf) >> 16) & 0xf) + (((buf) >> 20) & 0xf) * 10),
 	      ((((buf) >> 4) & 0xf) + ((buf) & 0xf) * 10), ohci->dev->irq,
 	      pci_resource_start(ohci->dev, 0),
-	      pci_resource_start(ohci->dev, 0) + pci_resource_len(ohci->dev, 0),
+	      pci_resource_start(ohci->dev, 0) + OHCI1394_REGISTER_SIZE,
 	      ohci->max_packet_size);
 }
 
@@ -1242,15 +1261,6 @@ static void ohci_irq_handler(int irq, void *dev_id,
 				  0xffffffff);
 			reg_write(ohci,OHCI1394_AsReqFilterLoSet, 
 				  0xffffffff);
-			/* Turn on phys dma reception. We should
-			 * probably manage the filtering somehow, 
-			 * instead of blindly turning it on.  */
-			reg_write(ohci,OHCI1394_PhyReqFilterHiSet,
-				  0xffffffff);
-			reg_write(ohci,OHCI1394_PhyReqFilterLoSet,
-				  0xffffffff);
-                       	reg_write(ohci,OHCI1394_PhyUpperBound,
-				  0xffff0000);
 		} else
 			PRINT(KERN_ERR, ohci->id, 
 			      "SelfID received outside of bus reset sequence");
@@ -1262,6 +1272,31 @@ static void ohci_irq_handler(int irq, void *dev_id,
 		reg_write(ohci, OHCI1394_IntMaskSet, OHCI1394_busReset); 
 		spin_unlock_irqrestore(&ohci->event_lock, flags);
 		event &= ~OHCI1394_selfIDComplete;	
+
+		/* Turn on phys dma reception. We should
+		 * probably manage the filtering somehow, 
+		 * instead of blindly turning it on.  */
+
+		/*
+		 * CAUTION!
+		 * Some chips (TI TSB43AB22) won't take a value in
+		 * the PhyReqFilter register until after the IntEvent
+		 * is cleared for bus reset, and even then a short
+		 * delay is required.
+		 */
+		if (phys_dma) {
+			mdelay(1);
+			reg_write(ohci,OHCI1394_PhyReqFilterHiSet,
+				  0xffffffff);
+			reg_write(ohci,OHCI1394_PhyReqFilterLoSet,
+				  0xffffffff);
+			reg_write(ohci,OHCI1394_PhyUpperBound,
+				  0xffff0000);
+		}
+
+		DBGMSG(ohci->id, "PhyReqFilter=%08x%08x\n",
+		       reg_read(ohci,OHCI1394_PhyReqFilterHiSet),
+		       reg_read(ohci,OHCI1394_PhyReqFilterLoSet));
 	}
 
 	/* Make sure we handle everything, just in case we accidentally
@@ -1831,7 +1866,7 @@ static u16 ohci_crc16 (u32 *ptr, int length)
 
 	crc = 0;
 	for (; length > 0; length--) {
-		data = *ptr++;
+		data = be32_to_cpu(*ptr++);
 		for (shift = 28; shift >= 0; shift -= 4) {
 			sum = ((crc >> 12) ^ (data >> shift)) & 0x000f;
 			crc = (crc << 4) ^ (sum << 12) ^ (sum << 5) ^ sum;
@@ -2023,7 +2058,7 @@ static int __devinit ohci1394_pci_probe(struct pci_dev *dev,
 
 	struct hpsb_host *host;
 	struct ti_ohci *ohci;	/* shortcut to currently handled device */
-	unsigned long ohci_base, ohci_len;
+	unsigned long ohci_base;
 	int i;
 	
 	if (version_printed++ == 0)
@@ -2041,6 +2076,7 @@ static int __devinit ohci1394_pci_probe(struct pci_dev *dev,
 	ohci->id = card_id_counter++;
 	ohci->dev = dev;
 	ohci->host = host;
+	ohci->init_state = OHCI_INIT_ALLOC_HOST;
 	host->pdev = dev;
 	pci_set_drvdata(dev, ohci);
 
@@ -2056,76 +2092,54 @@ static int __devinit ohci1394_pci_probe(struct pci_dev *dev,
 	 * zero. Should this work? Obviously it's not defined what these
 	 * registers will read when they aren't supported. Bleh! */
 	if (dev->vendor == PCI_VENDOR_ID_APPLE && 
-		dev->device == PCI_DEVICE_ID_APPLE_UNI_N_FW) {
-			ohci->no_swap_incoming = 1;
-			ohci->selfid_swap = 0;
+	    dev->device == PCI_DEVICE_ID_APPLE_UNI_N_FW) {
+		ohci->no_swap_incoming = 1;
+		ohci->selfid_swap = 0;
 	} else
 		ohci->selfid_swap = 1;
 #endif
 
+	/* We hardwire the MMIO length, since some CardBus adaptors
+	 * fail to report the right length.  Anyway, the ohci spec
+	 * clearly says it's 2kb, so this shouldn't be a problem. */ 
+	ohci_base = pci_resource_start(dev, 0);
+	if (pci_resource_len(dev, 0) != OHCI1394_REGISTER_SIZE)
+		PRINT(KERN_WARNING, ohci->id, "Unexpected PCI resource length of %lx!",
+		      pci_resource_len(dev, 0));
+
+	/* Seems PCMCIA handles this internally. Not sure why. Seems
+	 * pretty bogus to force a driver to special case this.  */
+#ifndef PCMCIA
+	if (!request_mem_region (ohci_base, OHCI1394_REGISTER_SIZE, OHCI1394_DRIVER_NAME))
+		FAIL(-ENOMEM, "MMIO resource (0x%lx - 0x%lx) unavailable",
+		     ohci_base, ohci_base + OHCI1394_REGISTER_SIZE);
+#endif
+	ohci->init_state = OHCI_INIT_HAVE_MEM_REGION;
+
+	ohci->registers = ioremap(ohci_base, OHCI1394_REGISTER_SIZE);
+	if (ohci->registers == NULL)
+		FAIL(-ENXIO, "Failed to remap registers - card not accessible");
+	ohci->init_state = OHCI_INIT_HAVE_IOMAPPING;
+	DBGMSG(ohci->id, "Remapped memory spaces reg 0x%p", ohci->registers);
+
 	/* csr_config rom allocation */
-	ohci->csr_config_rom_cpu = 
+	ohci->csr_config_rom_cpu =
 		pci_alloc_consistent(ohci->dev, OHCI_CONFIG_ROM_LEN,
 				     &ohci->csr_config_rom_bus);
 	OHCI_DMA_ALLOC("consistent csr_config_rom");
 	if (ohci->csr_config_rom_cpu == NULL)
 		FAIL(-ENOMEM, "Failed to allocate buffer config rom");
+	ohci->init_state = OHCI_INIT_HAVE_CONFIG_ROM_BUFFER;
 
-
-	ohci_base = pci_resource_start(dev, 0);
-	ohci_len = pci_resource_len(dev, 0);
-
-	if (!request_mem_region (ohci_base, ohci_len, OHCI1394_DRIVER_NAME))
-		FAIL(-ENOMEM, "MMIO resource (0x%lx@0x%lx) unavailable, aborting.",
-		     ohci_base, ohci_len);
-
-	ohci->registers = ioremap(ohci_base, ohci_len);
-
-	if (ohci->registers == NULL)
-		FAIL(-ENXIO, "Failed to remap registers - card not accessible");
-
-	DBGMSG(ohci->id, "Remapped memory spaces reg 0x%p", ohci->registers);
-
-
-	/* Start off with a softreset, to clear everything to a sane
-	 * state.  This will also set Link Power State (LPS), which we
-	 * need in order to start accessing most of the registers.  */
-	ohci_soft_reset(ohci);
-
-	/* determinte the number of available IR and IT contexts right away,
-	   because they need to be known for alloc_dma_*_ctx() */
-	ohci->nb_iso_rcv_ctx = 
-		get_nb_iso_ctx(ohci, OHCI1394_IsoRecvIntMaskSet);
-	DBGMSG(ohci->id, "%d iso receive contexts available",
-	       ohci->nb_iso_rcv_ctx);
-
-	ohci->ir_ctx_usage = 0;
-	
-	/* set the usage bits for non-existent contexts so they can't be allocated */
-	for(i = ohci->nb_iso_rcv_ctx; i < sizeof(ohci->ir_ctx_usage)*8; i++)
-		__set_bit(i, &ohci->ir_ctx_usage);
-	
-	ohci->nb_iso_xmit_ctx = 
-		get_nb_iso_ctx(ohci, OHCI1394_IsoXmitIntMaskSet);
-	DBGMSG(ohci->id, "%d iso transmit contexts available",
-	       ohci->nb_iso_xmit_ctx);
-
-	ohci->it_ctx_usage = 0;
-	
-	/* set the usage bits for non-existent contexts so they can't be allocated */
-	for(i = ohci->nb_iso_xmit_ctx; i < sizeof(ohci->it_ctx_usage)*8; i++)
-		__set_bit(i, &ohci->it_ctx_usage);
-
-	
-	/* 
-	 * self-id dma buffer allocation
-	 */
+	/* self-id dma buffer allocation */
 	ohci->selfid_buf_cpu = 
 		pci_alloc_consistent(ohci->dev, OHCI1394_SI_DMA_BUF_SIZE,
                       &ohci->selfid_buf_bus);
 	OHCI_DMA_ALLOC("consistent selfid_buf");
+	
 	if (ohci->selfid_buf_cpu == NULL)
 		FAIL(-ENOMEM, "Failed to allocate DMA buffer for self-id packets");
+	ohci->init_state = OHCI_INIT_HAVE_SELFID_BUFFER;
 
 	if ((unsigned long)ohci->selfid_buf_cpu & 0x1fff)
 		PRINT(KERN_INFO, ohci->id, "SelfID buffer %p is not aligned on "
@@ -2135,6 +2149,7 @@ static int __devinit ohci1394_pci_probe(struct pci_dev *dev,
 	/* No self-id errors at startup */
 	ohci->self_id_errors = 0;
 
+	ohci->init_state = OHCI_INIT_HAVE_TXRX_BUFFERS__MAYBE;
 	/* AR DMA request context allocation */
 	ohci->ar_req_context = 
 		alloc_dma_rcv_ctx(ohci, DMA_CTX_ASYNC_REQ, 0, AR_REQ_NUM_DESC,
@@ -2169,6 +2184,9 @@ static int __devinit ohci1394_pci_probe(struct pci_dev *dev,
 	if (ohci->at_resp_context == NULL)
 		FAIL(-ENOMEM, "Failed to allocate AT Resp context");
 
+	ohci->ir_ctx_usage = 0;
+	ohci->it_ctx_usage = 0;
+	
 	/* IR DMA context */
 	ohci->ir_context =
 		alloc_dma_rcv_ctx(ohci, DMA_CTX_ISO, 0, IR_NUM_DESC,
@@ -2199,85 +2217,76 @@ static int __devinit ohci1394_pci_probe(struct pci_dev *dev,
 			 OHCI1394_DRIVER_NAME, ohci))
 		FAIL(-ENOMEM, "Failed to allocate shared interrupt %d", dev->irq);
 
+	ohci->init_state = OHCI_INIT_HAVE_IRQ;
 	ohci_initialize(ohci);
 
 	/* Tell the highlevel this host is ready */
 	hpsb_add_host(host);
+	ohci->init_state = OHCI_INIT_DONE;
 
 	return 0;
 #undef FAIL
 }
 
-static void __devexit ohci1394_pci_remove(struct pci_dev *pdev)
+static void ohci1394_pci_remove(struct pci_dev *pdev)
 {
 	struct ti_ohci *ohci;
-	quadlet_t buf;
 
 	ohci = pci_get_drvdata(pdev);
 	if (!ohci)
 		return;
 
-	if (ohci->host)
+	switch (ohci->init_state) {
+	case OHCI_INIT_DONE:
 		hpsb_remove_host(ohci->host);
 
-	/* Soft reset before we start */
-	ohci_soft_reset(ohci);
+	case OHCI_INIT_HAVE_IRQ:
+		/* Soft reset before we start - this disables
+		 * interrupts and clears linkEnable and LPS. */
+		ohci_soft_reset(ohci);
+		free_irq(ohci->dev->irq, ohci);
 
-	/* Free AR dma */
-	free_dma_rcv_ctx(&ohci->ar_req_context);
-	free_dma_rcv_ctx(&ohci->ar_resp_context);
+	case OHCI_INIT_HAVE_TXRX_BUFFERS__MAYBE:
+		/* Free AR dma */
+		free_dma_rcv_ctx(&ohci->ar_req_context);
+		free_dma_rcv_ctx(&ohci->ar_resp_context);
 
-	/* Free AT dma */
-	free_dma_trm_ctx(&ohci->at_req_context);
-	free_dma_trm_ctx(&ohci->at_resp_context);
+		/* Free AT dma */
+		free_dma_trm_ctx(&ohci->at_req_context);
+		free_dma_trm_ctx(&ohci->at_resp_context);
 
-	/* Free IR dma */
-	free_dma_rcv_ctx(&ohci->ir_context);
-
-        /* Free IT dma */
-        free_dma_trm_ctx(&ohci->it_context);
-
-	/* Disable all interrupts */
-	reg_write(ohci, OHCI1394_IntMaskClear, 0x80000000);
-	free_irq(ohci->dev->irq, ohci);
-
-	/* Free self-id buffer */
-	if (ohci->selfid_buf_cpu) {
+		/* Free IR dma */
+		free_dma_rcv_ctx(&ohci->ir_context);
+		
+		/* Free IT dma */
+		free_dma_trm_ctx(&ohci->it_context);
+	
+	case OHCI_INIT_HAVE_SELFID_BUFFER:
 		pci_free_consistent(ohci->dev, OHCI1394_SI_DMA_BUF_SIZE, 
 				    ohci->selfid_buf_cpu,
 				    ohci->selfid_buf_bus);
 		OHCI_DMA_FREE("consistent selfid_buf");
-	}
-	
-	/* Free config rom */
-	if (ohci->csr_config_rom_cpu) {
+		
+	case OHCI_INIT_HAVE_CONFIG_ROM_BUFFER:
 		pci_free_consistent(ohci->dev, OHCI_CONFIG_ROM_LEN,
-				    ohci->csr_config_rom_cpu, 
+				    ohci->csr_config_rom_cpu,
 				    ohci->csr_config_rom_bus);
 		OHCI_DMA_FREE("consistent csr_config_rom");
-	}
 
-	/* Disable our bus options */
-	buf = reg_read(ohci, OHCI1394_BusOptions);
-	buf &= ~0xf8000000;
-	buf |=  0x00ff0000;
-	reg_write(ohci, OHCI1394_BusOptions, buf);
-
-	/* Clear LinkEnable and LPS */
-	reg_write(ohci, OHCI1394_HCControlClear, 0x000a0000);
-
-	if (ohci->registers)
+	case OHCI_INIT_HAVE_IOMAPPING:
 		iounmap(ohci->registers);
 
-	release_mem_region (pci_resource_start(ohci->dev, 0),
-			    pci_resource_len(ohci->dev, 0));
+	case OHCI_INIT_HAVE_MEM_REGION:
+#ifndef PCMCIA
+		release_mem_region(pci_resource_start(ohci->dev, 0),
+				   OHCI1394_REGISTER_SIZE);
+#endif
 
 #ifdef CONFIG_ALL_PPC
-	/* On UniNorth, power down the cable and turn off the
-	 * chip clock when the module is removed to save power
-	 * on laptops. Turning it back ON is done by the arch
-	 * code when pci_enable_device() is called
-	 */
+	/* On UniNorth, power down the cable and turn off the chip
+	 * clock when the module is removed to save power on
+	 * laptops. Turning it back ON is done by the arch code when
+	 * pci_enable_device() is called */
 	{
 		struct device_node* of_node;
 
@@ -2289,8 +2298,10 @@ static void __devexit ohci1394_pci_remove(struct pci_dev *pdev)
 	}
 #endif /* CONFIG_ALL_PPC */
 
-	pci_set_drvdata(ohci->dev, NULL);
-	hpsb_unref_host(ohci->host);
+	case OHCI_INIT_ALLOC_HOST:
+		pci_set_drvdata(ohci->dev, NULL);
+		hpsb_unref_host(ohci->host);
+	}
 }
 
 #define PCI_CLASS_FIREWIRE_OHCI     ((PCI_CLASS_SERIAL_FIREWIRE << 8) | 0x10)
@@ -2313,7 +2324,7 @@ static struct pci_driver ohci1394_pci_driver = {
 	name:		OHCI1394_DRIVER_NAME,
 	id_table:	ohci1394_pci_tbl,
 	probe:		ohci1394_pci_probe,
-	remove:		__devexit_p(ohci1394_pci_remove),
+	remove:		ohci1394_pci_remove,
 };
 
 

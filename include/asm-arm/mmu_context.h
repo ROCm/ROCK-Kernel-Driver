@@ -13,13 +13,10 @@
 #ifndef __ASM_ARM_MMU_CONTEXT_H
 #define __ASM_ARM_MMU_CONTEXT_H
 
-#include <asm/bitops.h>
-#include <asm/pgtable.h>
-#include <asm/arch/memory.h>
 #include <asm/proc-fns.h>
 
-#define destroy_context(mm)		do { } while(0)
 #define init_new_context(tsk,mm)	0
+#define destroy_context(mm)		do { } while(0)
 
 /*
  * This is called when "tsk" is about to enter lazy TLB mode.
@@ -30,7 +27,8 @@
  *
  * tsk->mm will be NULL
  */
-static inline void enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk, unsigned cpu)
+static inline void
+enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk, unsigned cpu)
 {
 }
 
@@ -42,11 +40,12 @@ static inline void
 switch_mm(struct mm_struct *prev, struct mm_struct *next,
 	  struct task_struct *tsk, unsigned int cpu)
 {
-	if (prev != next)
-		cpu_switch_mm(next->pgd, next);
+	cpu_switch_mm(next->pgd, next);
 }
 
-#define activate_mm(prev, next) \
-	switch_mm((prev),(next),NULL,smp_processor_id())
+static inline void activate_mm(struct mm_struct *prev, struct mm_struct *next)
+{
+	cpu_switch_mm(next->pgd, next);
+}
 
 #endif

@@ -1937,14 +1937,6 @@ void reiserfs_unmap_buffer(struct buffer_head *) ;
 extern struct inode_operations reiserfs_file_inode_operations;
 extern struct file_operations reiserfs_file_operations;
 extern struct address_space_operations reiserfs_address_space_operations ;
-int get_new_buffer (struct reiserfs_transaction_handle *th, struct buffer_head *,
-		    struct buffer_head **, struct path *);
-
-
-/* buffer2.c */
-struct buffer_head * reiserfs_getblk (struct super_block *super, int n_block);
-void wait_buffer_until_released (const struct buffer_head * bh);
-struct buffer_head * reiserfs_bread (struct super_block *super, int n_block);
 
 /* fix_nodes.c */
 #ifdef CONFIG_REISERFS_CHECK

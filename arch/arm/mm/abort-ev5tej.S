@@ -1,13 +1,13 @@
 #include <linux/linkage.h>
 #include <asm/assembler.h>
 /*
- * Function: v5ej_early_abort
+ * Function: v5tej_early_abort
  *
  * Params  : r2 = address of aborted instruction
  *         : r3 = saved SPSR
  *
  * Returns : r0 = address of abort
- *	   : r1 = FSR, bit 8 = write
+ *	   : r1 = FSR, bit 11 = write
  *	   : r2-r8 = corrupted
  *	   : r9 = preserved
  *	   : sp = pointer to registers
@@ -18,18 +18,19 @@
  * picture.  Unfortunately, this does happen.  We live with it.
  */
 	.align	5
-ENTRY(v5ej_early_abort)
+ENTRY(v5tej_early_abort)
 	mrc	p15, 0, r1, c5, c0, 0		@ get FSR
 	mrc	p15, 0, r0, c6, c0, 0		@ get FAR
+	bic	r1, r1, #1 << 11 | 1 << 10	@ clear bits 11 and 10 of FSR
 	tst	r3, #PSR_J_BIT
-	orrne	r1, r1, #1 << 8			@ always assume write
+	orrne	r1, r1, #1 << 11		@ always assume write
 	bne	1f
 	tst	r3, #PSR_T_BIT
 	ldrneh	r3, [r2]			@ read aborted thumb instruction
 	ldreq	r3, [r2]			@ read aborted ARM instruction
 	movne	r3, r3, lsl #(21 - 12)		@ move thumb bit 11 to ARM bit 20
 	tst	r3, #1 << 20			@ L = 1 -> write
-	orreq	r1, r1, #1 << 8			@ yes.
+	orreq	r1, r1, #1 << 11		@ yes.
 1:	mov	pc, lr
 
 

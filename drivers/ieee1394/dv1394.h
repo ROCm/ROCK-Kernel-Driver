@@ -123,6 +123,67 @@
    frame 0. Then call DV1394_SUBMIT_FRAMES to inform the device that
    it may transmit the new frames.
 
+   ERROR HANDLING
+
+   An error (buffer underflow/overflow or a break in the DV stream due
+   to a 1394 bus reset) can be detected by checking the dropped_frames
+   field of struct dv1394_status (obtained through the
+   DV1394_GET_STATUS ioctl).
+
+   The best way to recover from such an error is to re-initialize
+   dv1394, either by using the DV1394_INIT ioctl call, or closing the
+   file descriptor and opening it again. (note that you must unmap all
+   ringbuffer mappings when closing the file descriptor, or else
+   dv1394 will still be considered 'in use').
+
+   MAIN LOOP
+
+   For maximum efficiency and robustness against bus errors, you are
+   advised to model the main loop of your application after the
+   following pseudo-code example:
+
+   (checks of system call return values omitted for brevity; always
+   check return values in your code!)
+   
+   while( frames left ) {
+   
+    struct pollfd *pfd = ...;
+
+    pfd->fd = dv1394_fd;
+    pfd->revents = 0;
+    pfd->events = POLLOUT | POLLIN; (OUT for transmit, IN for receive)
+
+    (add other sources of I/O here)
+    
+    poll(pfd, 1, -1); (or select(); add a timeout if you want)
+
+    if(pfd->revents) {
+         struct dv1394_status status;
+	 
+         ioctl(dv1394_fd, DV1394_GET_STATUS, &status);
+
+	 if(status.dropped_frames > 0) {
+	      reset_dv1394();
+         } else {
+              for(int i = 0; i < status.n_clear_frames; i++) {
+	          copy_DV_frame();
+              }
+         }
+    }
+   }
+
+   where copy_DV_frame() reads or writes on the dv1394 file descriptor
+   (read/write mode) or copies data to/from the mmap ringbuffer and
+   then calls ioctl(DV1394_SUBMIT_FRAMES) to notify dv1394 that new
+   frames are availble (mmap mode).
+
+   reset_dv1394() is called in the event of a buffer
+   underflow/overflow or a halt in the DV stream (e.g. due to a 1394
+   bus reset). To guarantee recovery from the error, this function
+   should close the dv1394 file descriptor (and munmap() all
+   ringbuffer mappings, if you are using them), then re-open the
+   dv1394 device (and re-map the ringbuffer).
+   
 */
 
 
@@ -218,6 +279,13 @@ struct dv1394_init {
 	unsigned int syt_offset;
 };
 
+/* NOTE: you may only allocate the DV frame ringbuffer once each time
+   you open the dv1394 device. DV1394_INIT will fail if you call it a
+   second time with different 'n_frames' or 'format' arguments (which
+   would imply a different size for the ringbuffer). If you need a
+   different buffer size, simply close and re-open the device, then
+   initialize it with your new settings. */
+   
 /* Q: What are cip_n and cip_d? */
 
 /*
@@ -262,8 +330,9 @@ struct dv1394_status {
 	   ready to be filled with data */
 	unsigned int n_clear_frames;
 
-	/* how many times the DV output has underflowed
-	   since the last call to DV1394_GET_STATUS */
+	/* how many times the DV stream has underflowed, overflowed,
+	   or otherwise encountered an error, since the previous call
+	   to DV1394_GET_STATUS */
 	unsigned int dropped_frames;
 
 	/* N.B. The dropped_frames counter is only a lower bound on the actual

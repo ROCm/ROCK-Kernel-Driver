@@ -57,16 +57,10 @@ struct machdep_calls {
 	void		(*nvram_write_val)(int addr, unsigned char val);
 
 	/* Tons of keyboard stuff. */
-	int		(*kbd_setkeycode)(unsigned int scancode,
-				unsigned int keycode);
-	int		(*kbd_getkeycode)(unsigned int scancode);
 	int		(*kbd_translate)(unsigned char scancode,
 				unsigned char *keycode,
 				char raw_mode);
 	char		(*kbd_unexpected_up)(unsigned char keycode);
-	void		(*kbd_leds)(unsigned char leds);
-	void		(*kbd_init_hw)(void);
-	unsigned char 	*ppc_kbd_sysrq_xlate;
 
 	/*
 	 * optional PCI "hooks"

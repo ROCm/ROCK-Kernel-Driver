@@ -21,12 +21,6 @@
  *
  * Special thanks to Ensoniq
  *
- *
- * Module command line parameters:
- *   joystick must be set to the base I/O-Port to be used for
- *   the gameport. Legal values are 0x200, 0x208, 0x210 and 0x218.         
- *   The gameport is mirrored eight times.
- *        
  *  Supported devices:
  *  /dev/dsp    standard /dev/dsp device, (mostly) OSS compatible
  *  /dev/mixer  standard /dev/mixer device, (mostly) OSS compatible
@@ -2744,20 +2738,17 @@ static int proc_es1371_dump (char *buf, char **start, off_t fpos, int length, in
 /* maximum number of devices; only used for command line params */
 #define NR_DEVICE 5
 
-static int joystick[NR_DEVICE] = { 0, };
 static int spdif[NR_DEVICE] = { 0, };
 static int nomix[NR_DEVICE] = { 0, };
+static int amplifier[NR_DEVICE] = { 0, };
 
 static unsigned int devindex = 0;
-static int amplifier = 0;
 
-MODULE_PARM(joystick, "1-" __MODULE_STRING(NR_DEVICE) "i");
-MODULE_PARM_DESC(joystick, "sets address and enables joystick interface (still need separate driver)");
 MODULE_PARM(spdif, "1-" __MODULE_STRING(NR_DEVICE) "i");
 MODULE_PARM_DESC(spdif, "if 1 the output is in S/PDIF digital mode");
 MODULE_PARM(nomix, "1-" __MODULE_STRING(NR_DEVICE) "i");
 MODULE_PARM_DESC(nomix, "if 1 no analog audio is mixed to the digital output");
-MODULE_PARM(amplifier, "i");
+MODULE_PARM(amplifier, "1-" __MODULE_STRING(NR_DEVICE) "i");
 MODULE_PARM_DESC(amplifier, "Set to 1 if the machine needs the amp control enabling (many laptops)");
 
 MODULE_AUTHOR("Thomas M. Sailer, sailer@ife.ee.ethz.ch, hb9jnx@hb9w.che.eu");
@@ -2856,8 +2847,8 @@ static int __devinit es1371_probe(struct pci_dev *pcidev, const struct pci_devic
 		printk(KERN_ERR PFX "irq %u in use\n", s->irq);
 		goto err_irq;
 	}
-	printk(KERN_INFO PFX "found es1371 rev %d at io %#lx irq %u\n"
-	       KERN_INFO PFX "features: joystick 0x%x\n", s->rev, s->io, s->irq, joystick[devindex]);
+	printk(KERN_INFO PFX "found es1371 rev %d at io %#lx irq %u joystick %#x\n",
+	       s->rev, s->io, s->irq, s->gameport.io);
 	/* register devices */
 	if ((res=(s->dev_audio = register_sound_dsp(&es1371_audio_fops,-1))<0))
 		goto err_dev1;
@@ -2877,7 +2868,7 @@ static int __devinit es1371_probe(struct pci_dev *pcidev, const struct pci_devic
 
 	/* Check amplifier requirements */
 	
-	if(amplifier)
+	if (amplifier[devindex])
 		s->ctrl |= CTRL_GPIO_OUT0;
 	else for(idx = 0; amplifier_needed[idx].svid != PCI_ANY_ID; idx++)
 	{
@@ -2889,24 +2880,16 @@ static int __devinit es1371_probe(struct pci_dev *pcidev, const struct pci_devic
 		}
 	}
 	s->gameport.io = 0;
-	if ((joystick[devindex] & ~0x18) == 0x200) {
-		if (!request_region(joystick[devindex], JOY_EXTENT, "es1371"))
-			printk(KERN_ERR PFX "joystick address 0x%x already in use\n", joystick[devindex]);
-		else {
-			s->ctrl |= CTRL_JYSTK_EN | (((joystick[devindex] >> 3) & CTRL_JOY_MASK) << CTRL_JOY_SHIFT);
-			s->gameport.io = joystick[devindex];
+	for (i = 0x218; i >= 0x200; i -= 0x08) {
+		if (request_region(i, JOY_EXTENT, "es1371")) {
+			s->ctrl |= CTRL_JYSTK_EN | (((i >> 3) & CTRL_JOY_MASK) << CTRL_JOY_SHIFT);
+			s->gameport.io = i;
+			break;
 		}
-	} else if (joystick[devindex] == 1) {
-		for (i = 0x218; i >= 0x200; i -= 0x08) {
-			if (request_region(i, JOY_EXTENT, "es1371")) {
-				s->ctrl |= CTRL_JYSTK_EN | (((i >> 3) & CTRL_JOY_MASK) << CTRL_JOY_SHIFT);
-				s->gameport.io = i;
-				break;
-			}
-		}
-		if (!s->gameport.io)
-			printk(KERN_ERR PFX "no free joystick address found\n");
 	}
+	if (!s->gameport.io)
+		printk(KERN_ERR PFX "no free joystick address found\n");
+
 	s->sctrl = 0;
 	cssr = 0;
 	s->spdif_volume = -1;
@@ -2926,7 +2909,7 @@ static int __devinit es1371_probe(struct pci_dev *pcidev, const struct pci_devic
 	/* initialize the chips */
 	outl(s->ctrl, s->io+ES1371_REG_CONTROL);
 	outl(s->sctrl, s->io+ES1371_REG_SERIAL_CONTROL);
-	outl(0, s->io+ES1371_REG_LEGACY);
+	outl(LEGACY_JFAST, s->io+ES1371_REG_LEGACY);
 	pci_set_master(pcidev);  /* enable bus mastering */
 	/* if we are a 5880 turn on the AC97 */
 	if (s->vendor == PCI_VENDOR_ID_ENSONIQ &&
@@ -3070,7 +3053,7 @@ module_exit(cleanup_es1371);
 
 #ifndef MODULE
 
-/* format is: es1371=[joystick] */
+/* format is: es1371=[spdif,[nomix,[amplifier]]] */
 
 static int __init es1371_setup(char *str)
 {
@@ -3078,8 +3061,12 @@ static int __init es1371_setup(char *str)
 
 	if (nr_dev >= NR_DEVICE)
 		return 0;
-	if (get_option(&str, &joystick[nr_dev]) == 2)
-		(void)get_option(&str, &spdif[nr_dev]);
+
+	(void)
+        ((get_option(&str, &spdif[nr_dev]) == 2)
+         && (get_option(&str, &nomix[nr_dev]) == 2)
+         && (get_option(&str, &amplifier[nr_dev])));
+
 	nr_dev++;
 	return 1;
 }

@@ -142,9 +142,6 @@ void FPA11_CheckInit(void)
 unsigned int EmulateAll(unsigned int opcode)
 {
   unsigned int nRc = 1, code;
-  unsigned long flags;
-
-  save_flags(flags); sti();
 
   code = opcode & 0x00000f00;
   if (code == 0x00000100 || code == 0x00000200)
@@ -179,8 +176,6 @@ unsigned int EmulateAll(unsigned int opcode)
       nRc = 0;
     }
   }
-
-  restore_flags(flags);
 
   return(nRc);
 }

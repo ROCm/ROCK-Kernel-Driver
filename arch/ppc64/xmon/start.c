@@ -52,7 +52,7 @@ void buf_access(void)
 }
 #endif
 
-static void sysrq_handle_xmon(int key, struct pt_regs *pt_regs, struct kbd_struct *kbd, struct tty_struct *tty) 
+static void sysrq_handle_xmon(int key, struct pt_regs *pt_regs, struct tty_struct *tty) 
 {
   xmon(pt_regs);
 }

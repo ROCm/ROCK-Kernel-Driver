@@ -2,7 +2,7 @@
  * dir.c - NTFS kernel directory operations. Part of the Linux-NTFS project.
  *
  * Copyright (c) 2001,2002 Anton Altaparmakov.
- * Copyright (C) 2002 Richard Russon.
+ * Copyright (c) 2002 Richard Russon.
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -1052,8 +1052,8 @@ static inline int ntfs_filldir(ntfs_volume *vol, struct file *filp,
  */
 static int ntfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 {
-	s64 ia_pos, ia_start, prev_ia_pos;
-	struct inode *vdir = filp->f_dentry->d_inode;
+	s64 ia_pos, ia_start, prev_ia_pos, bmp_pos;
+	struct inode *bmp_vi, *vdir = filp->f_dentry->d_inode;
 	struct super_block *sb = vdir->i_sb;
 	ntfs_inode *ndir = NTFS_I(vdir);
 	ntfs_volume *vol = NTFS_SB(sb);
@@ -1061,10 +1061,10 @@ static int ntfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 	INDEX_ROOT *ir;
 	INDEX_ENTRY *ie;
 	INDEX_ALLOCATION *ia;
-	u8 *name;
-	int rc, err, ir_pos, bmp_pos;
-	struct address_space *ia_mapping;
-	struct page *page;
+	u8 *name = NULL;
+	int rc, err, ir_pos, cur_bmp_pos;
+	struct address_space *ia_mapping, *bmp_mapping;
+	struct page *bmp_page = NULL, *ia_page = NULL;
 	u8 *kaddr, *bmp, *index_end;
 	attr_search_context *ctx;
 
@@ -1093,17 +1093,20 @@ static int ntfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 			goto done;
 		filp->f_pos++;
 	}
+
 	/* Get hold of the mft record for the directory. */
 	m = map_mft_record(READ, ndir);
-	if (IS_ERR(m)) {
+	if (unlikely(IS_ERR(m))) {
 		err = PTR_ERR(m);
+		m = NULL;
+		ctx = NULL;
 		goto err_out;
 	}
 
 	ctx = get_attr_search_ctx(ndir, m);
-	if (!ctx) {
+	if (unlikely(!ctx)) {
 		err = -ENOMEM;
-		goto unm_err_out;
+		goto err_out;
 	}
 
 	/*
@@ -1112,9 +1115,9 @@ static int ntfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 	 */
 	name = (u8*)kmalloc(NTFS_MAX_NAME_LEN * NLS_MAX_CHARSET_SIZE + 1,
 			GFP_NOFS);
-	if (!name) {
+	if (unlikely(!name)) {
 		err = -ENOMEM;
-		goto put_unm_err_out;
+		goto err_out;
 	}
 	/* Are we jumping straight into the index allocation attribute? */
 	if (filp->f_pos >= vol->mft_record_size)
@@ -1122,12 +1125,11 @@ static int ntfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 	/* Get the offset into the index root attribute. */
 	ir_pos = (s64)filp->f_pos;
 	/* Find the index root attribute in the mft record. */
-	if (!lookup_attr(AT_INDEX_ROOT, I30, 4, CASE_SENSITIVE, 0, NULL, 0,
-			ctx)) {
+	if (unlikely(!lookup_attr(AT_INDEX_ROOT, I30, 4, CASE_SENSITIVE, 0,
+			NULL, 0, ctx))) {
 		ntfs_error(sb, "Index root attribute missing in directory "
 				"inode 0x%lx.", vdir->i_ino);
-		err = -EIO;
-		goto kf_unm_err_out;
+		goto err_out;
 	}
 	/* Get to the index root value (it's been verified in read_inode). */
 	ir = (INDEX_ROOT*)((u8*)ctx->attr +
@@ -1144,11 +1146,11 @@ static int ntfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 	for (;; ie = (INDEX_ENTRY*)((u8*)ie + le16_to_cpu(ie->_IEH(length)))) {
 		ntfs_debug("In index root, offset 0x%x.", (u8*)ie - (u8*)ir);
 		/* Bounds checks. */
-		if ((u8*)ie < (u8*)ctx->mrec || (u8*)ie +
+		if (unlikely((u8*)ie < (u8*)ctx->mrec || (u8*)ie +
 				sizeof(INDEX_ENTRY_HEADER) > index_end ||
 				(u8*)ie + le16_to_cpu(ie->_IEH(key_length)) >
-				index_end)
-			goto dir_err_out;
+				index_end))
+			goto err_out;
 		/* The last entry cannot contain a name. */
 		if (ie->_IEH(flags) & INDEX_ENTRY_END)
 			break;
@@ -1166,80 +1168,99 @@ static int ntfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 		goto EOD;
 	/* Advance f_pos to the beginning of the index allocation. */
 	filp->f_pos = vol->mft_record_size;
-	/* Reinitialize the search context. */
-	reinit_attr_search_ctx(ctx);
 skip_index_root:
-	if (NInoBmpNonResident(ndir)) {
-		/*
-		 * Read the page of the bitmap that contains the current index
-		 * block.
-		 */
-		// TODO: FIXME: Implement this!
-		ntfs_error(sb, "Index bitmap is non-resident, which is not "
-				"supported yet. Pretending that end of "
-				"directory has been reached.\n");
-		goto EOD;
-	} else {
-		/* Find the index bitmap attribute in the mft record. */
-		if (!lookup_attr(AT_BITMAP, I30, 4, CASE_SENSITIVE, 0, NULL, 0,
-				ctx)) {
-			ntfs_error(sb, "Index bitmap attribute missing in "
-					"directory inode 0x%lx.", vdir->i_ino);
-			err = -EIO;
-			goto kf_unm_err_out;
-		}
-		bmp = (u8*)ctx->attr +
-				le16_to_cpu(ctx->attr->_ARA(value_offset));
-	}
+	kaddr = NULL;
+	prev_ia_pos = -1LL;
 	/* Get the offset into the index allocation attribute. */
 	ia_pos = (s64)filp->f_pos - vol->mft_record_size;
 	ia_mapping = vdir->i_mapping;
-	/* If the index block is not in use find the next one that is. */
+	bmp_vi = ndir->_IDM(bmp_ino);
+	if (unlikely(!bmp_vi)) {
+		ntfs_debug("Inode %lu, regetting index bitmap.", vdir->i_ino);
+		bmp_vi = ntfs_attr_iget(vdir, AT_BITMAP, I30, 4);
+		if (unlikely(IS_ERR(bmp_vi))) {
+			ntfs_error(sb, "Failed to get bitmap attribute.");
+			err = PTR_ERR(bmp_vi);
+			goto err_out;
+		}
+		ndir->_IDM(bmp_ino) = bmp_vi;
+	}
+	bmp_mapping = bmp_vi->i_mapping;
+	/* Get the starting bitmap bit position and sanity check it. */
 	bmp_pos = ia_pos >> ndir->_IDM(index_block_size_bits);
-	page = NULL;
-	kaddr = NULL;
-	prev_ia_pos = -1LL;
-	if (bmp_pos >> 3 >= ndir->_IDM(bmp_size)) {
+	if (unlikely(bmp_pos >> 3 >= bmp_vi->i_size)) {
 		ntfs_error(sb, "Current index allocation position exceeds "
 				"index bitmap size.");
-		goto kf_unm_err_out;
+		goto err_out;
 	}
-	while (!(bmp[bmp_pos >> 3] & (1 << (bmp_pos & 7)))) {
+	/* Get the starting bit position in the current bitmap page. */
+	cur_bmp_pos = bmp_pos & ((PAGE_CACHE_SIZE * 8) - 1);
+	bmp_pos &= ~((PAGE_CACHE_SIZE * 8) - 1);
+get_next_bmp_page:
+	ntfs_debug("Reading bitmap with page index 0x%Lx, bit ofs 0x%Lx",
+			(long long)bmp_pos >> (3 + PAGE_CACHE_SHIFT),
+			(long long)bmp_pos & ((PAGE_CACHE_SIZE * 8) - 1));
+	bmp_page = ntfs_map_page(bmp_mapping,
+			bmp_pos >> (3 + PAGE_CACHE_SHIFT));
+	if (unlikely(IS_ERR(bmp_page))) {
+		ntfs_error(sb, "Reading index bitmap failed.");
+		err = PTR_ERR(bmp_page);
+		bmp_page = NULL;
+		goto err_out;
+	}
+	bmp = (u8*)page_address(bmp_page);
+	/* Find next index block in use. */
+	while (!(bmp[cur_bmp_pos >> 3] & (1 << (cur_bmp_pos & 7)))) {
 find_next_index_buffer:
-		bmp_pos++;
+		cur_bmp_pos++;
+		/*
+		 * If we have reached the end of the bitmap page, get the next
+		 * page, and put away the old one.
+		 */
+		if (unlikely((cur_bmp_pos >> 3) >= PAGE_CACHE_SIZE)) {
+			ntfs_unmap_page(bmp_page);
+			bmp_pos += PAGE_CACHE_SIZE * 8;
+			cur_bmp_pos = 0;
+			goto get_next_bmp_page;
+		}
 		/* If we have reached the end of the bitmap, we are done. */
-		if (bmp_pos >> 3 >= ndir->_IDM(bmp_size))
-			goto EOD;
-		ia_pos = (s64)bmp_pos << ndir->_IDM(index_block_size_bits);
+		if (unlikely(((bmp_pos + cur_bmp_pos) >> 3) >= vdir->i_size))
+			goto unm_EOD;
+		ia_pos = (bmp_pos + cur_bmp_pos) <<
+				ndir->_IDM(index_block_size_bits);
 	}
-	ntfs_debug("Handling index buffer 0x%x.", bmp_pos);
+	ntfs_debug("Handling index buffer 0x%Lx.",
+			(long long)bmp_pos + cur_bmp_pos);
 	/* If the current index buffer is in the same page we reuse the page. */
 	if ((prev_ia_pos & PAGE_CACHE_MASK) != (ia_pos & PAGE_CACHE_MASK)) {
 		prev_ia_pos = ia_pos;
-		if (page)
-			ntfs_unmap_page(page);
+		if (likely(ia_page != NULL))
+			ntfs_unmap_page(ia_page);
 		/*
 		 * Map the page cache page containing the current ia_pos,
 		 * reading it from disk if necessary.
 		 */
-		page = ntfs_map_page(ia_mapping, ia_pos >> PAGE_CACHE_SHIFT);
-		if (IS_ERR(page))
-			goto map_page_err_out;
-		kaddr = (u8*)page_address(page);
+		ia_page = ntfs_map_page(ia_mapping, ia_pos >> PAGE_CACHE_SHIFT);
+		if (unlikely(IS_ERR(ia_page))) {
+			ntfs_error(sb, "Reading index allocation data failed.");
+			err = PTR_ERR(ia_page);
+			ia_page = NULL;
+			goto err_out;
+		}
+		kaddr = (u8*)page_address(ia_page);
 	}
 	/* Get the current index buffer. */
 	ia = (INDEX_ALLOCATION*)(kaddr + (ia_pos & ~PAGE_CACHE_MASK &
 			~(s64)(ndir->_IDM(index_block_size) - 1)));
 	/* Bounds checks. */
-	if ((u8*)ia < kaddr || (u8*)ia > kaddr + PAGE_CACHE_SIZE) {
+	if (unlikely((u8*)ia < kaddr || (u8*)ia > kaddr + PAGE_CACHE_SIZE)) {
 		ntfs_error(sb, "Out of bounds check failed. Corrupt directory "
 				"inode 0x%lx or driver bug.", vdir->i_ino);
-		err = -EIO;
-		goto unm_dir_err_out;
+		goto err_out;
 	}
-	if (sle64_to_cpu(ia->index_block_vcn) != (ia_pos &
+	if (unlikely(sle64_to_cpu(ia->index_block_vcn) != (ia_pos &
 			~(s64)(ndir->_IDM(index_block_size) - 1)) >>
-			ndir->_IDM(index_vcn_size_bits)) {
+			ndir->_IDM(index_vcn_size_bits))) {
 		ntfs_error(sb, "Actual VCN (0x%Lx) of index buffer is "
 				"different from expected VCN (0x%Lx). "
 				"Directory inode 0x%lx is corrupt or driver "
@@ -1247,11 +1268,10 @@ find_next_index_buffer:
 				(long long)sle64_to_cpu(ia->index_block_vcn),
 				(long long)ia_pos >>
 				ndir->_IDM(index_vcn_size_bits), vdir->i_ino);
-		err = -EIO;
-		goto unm_dir_err_out;
+		goto err_out;
 	}
-	if (le32_to_cpu(ia->index.allocated_size) + 0x18 !=
-			ndir->_IDM(index_block_size)) {
+	if (unlikely(le32_to_cpu(ia->index.allocated_size) + 0x18 !=
+			ndir->_IDM(index_block_size))) {
 		ntfs_error(sb, "Index buffer (VCN 0x%Lx) of directory inode "
 				"0x%lx has a size (%u) differing from the "
 				"directory specified size (%u). Directory "
@@ -1260,28 +1280,25 @@ find_next_index_buffer:
 				ndir->_IDM(index_vcn_size_bits), vdir->i_ino,
 				le32_to_cpu(ia->index.allocated_size) + 0x18,
 				ndir->_IDM(index_block_size));
-		err = -EIO;
-		goto unm_dir_err_out;
+		goto err_out;
 	}
 	index_end = (u8*)ia + ndir->_IDM(index_block_size);
-	if (index_end > kaddr + PAGE_CACHE_SIZE) {
+	if (unlikely(index_end > kaddr + PAGE_CACHE_SIZE)) {
 		ntfs_error(sb, "Index buffer (VCN 0x%Lx) of directory inode "
 				"0x%lx crosses page boundary. Impossible! "
 				"Cannot access! This is probably a bug in the "
 				"driver.", (long long)ia_pos >>
 				ndir->_IDM(index_vcn_size_bits), vdir->i_ino);
-		err = -EIO;
-		goto unm_dir_err_out;
+		goto err_out;
 	}
 	ia_start = ia_pos & ~(s64)(ndir->_IDM(index_block_size) - 1);
 	index_end = (u8*)&ia->index + le32_to_cpu(ia->index.index_length);
-	if (index_end > (u8*)ia + ndir->_IDM(index_block_size)) {
+	if (unlikely(index_end > (u8*)ia + ndir->_IDM(index_block_size))) {
 		ntfs_error(sb, "Size of index buffer (VCN 0x%Lx) of directory "
 				"inode 0x%lx exceeds maximum size.",
 				(long long)ia_pos >>
 				ndir->_IDM(index_vcn_size_bits), vdir->i_ino);
-		err = -EIO;
-		goto unm_dir_err_out;
+		goto err_out;
 	}
 	/* The first index entry in this index buffer. */
 	ie = (INDEX_ENTRY*)((u8*)&ia->index +
@@ -1295,11 +1312,11 @@ find_next_index_buffer:
 		ntfs_debug("In index allocation, offset 0x%Lx.",
 				(long long)ia_start + ((u8*)ie - (u8*)ia));
 		/* Bounds checks. */
-		if ((u8*)ie < (u8*)ia || (u8*)ie +
+		if (unlikely((u8*)ie < (u8*)ia || (u8*)ie +
 				sizeof(INDEX_ENTRY_HEADER) > index_end ||
 				(u8*)ie + le16_to_cpu(ie->_IEH(key_length)) >
-				index_end)
-			goto unm_dir_err_out;
+				index_end))
+			goto err_out;
 		/* The last entry cannot contain a name. */
 		if (ie->_IEH(flags) & INDEX_ENTRY_END)
 			break;
@@ -1310,11 +1327,16 @@ find_next_index_buffer:
 		rc = ntfs_filldir(vol, filp, ndir, INDEX_TYPE_ALLOCATION, ia,
 				ie, name, dirent, filldir);
 		if (rc) {
-			ntfs_unmap_page(page);
+			ntfs_unmap_page(ia_page);
+			ntfs_unmap_page(bmp_page);
 			goto abort;
 		}
 	}
 	goto find_next_index_buffer;
+unm_EOD:
+	if (ia_page)
+		ntfs_unmap_page(ia_page);
+	ntfs_unmap_page(bmp_page);
 EOD:
 	/* We are finished, set f_pos to EOD. */
 	filp->f_pos = vdir->i_size + vol->mft_record_size;
@@ -1331,24 +1353,21 @@ done:
 				rc, filp->f_pos);
 #endif
 	return 0;
-map_page_err_out:
-	ntfs_error(sb, "Reading index allocation data failed.");
-	err = PTR_ERR(page);
-kf_unm_err_out:
-	kfree(name);
-put_unm_err_out:
-	put_attr_search_ctx(ctx);
-unm_err_out:
-	unmap_mft_record(READ, ndir);
 err_out:
+	if (bmp_page)
+		ntfs_unmap_page(bmp_page);
+	if (ia_page)
+		ntfs_unmap_page(ia_page);
+	if (name)
+		kfree(name);
+	if (ctx)
+		put_attr_search_ctx(ctx);
+	if (m)
+		unmap_mft_record(READ, ndir);
+	if (!err)
+		err = -EIO;
 	ntfs_debug("Failed. Returning error code %i.", -err);
 	return err;
-unm_dir_err_out:
-	ntfs_unmap_page(page);
-dir_err_out:
-	ntfs_error(sb, "Corrupt directory. Aborting. You should run chkdsk.");
-	err = -EIO;
-	goto kf_unm_err_out;
 }
 
 struct file_operations ntfs_dir_ops = {

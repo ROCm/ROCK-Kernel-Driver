@@ -11,24 +11,15 @@ Original driver (sg.h):
 Version 2 and 3 extensions to driver:
 *       Copyright (C) 1998 - 2002 Douglas Gilbert
 
-    Version: 3.5.25 (20020504)
+    Version: 3.5.26 (20020708)
     This version is for 2.5 series kernels.
 
-    Changes since 3.5.24 (20020319)
-	- off by one fix for last scatter gather element
-	- if possible compact kiobuf_map into scatter gather list
-	- use Scsi_Request::upper_private_data
-	- zero buffers for non-root users
-    Changes since 3.5.23 (20011231)
-	- change EACCES to EPERM when O_RDONLY is insufficient
-	- suppress newlines in host string
-	- fix xfer direction, old interface, short reply_len [Travers Carter]
-    Changes since 3.1.22 (20011208)
-    	- branch sg driver for lk 2.5 series
-    	- remove lock_kernel() from sg_close()
-    	- remove code based on scsi mid level dma pool
-    	- change scatterlist 'address' to use page + offset
-    	- add SG_INTERFACE_ID_ORIG
+    Changes since 3.5.25 (20020504)
+	- driverfs additions
+	- copy_to/from_user() fixes [William Stinson]
+	- disable kiobufs support
+
+    For a full changelog see http://www.torque.net/sg
 
 Map of SG verions to the Linux kernels in which they appear:
        ----------        ----------------------------------

@@ -69,14 +69,6 @@ void rtas_indicator_progress(char *, unsigned short);
 void btext_progress(char *, unsigned short);
 
 extern unsigned long pmac_find_end_of_memory(void);
-extern int pckbd_setkeycode(unsigned int scancode, unsigned int keycode);
-extern int pckbd_getkeycode(unsigned int scancode);
-extern int pckbd_translate(unsigned char scancode, unsigned char *keycode,
-			   char raw_mode);
-extern char pckbd_unexpected_up(unsigned char keycode);
-extern void pckbd_leds(unsigned char leds);
-extern void pckbd_init_hw(void);
-extern unsigned char pckbd_sysrq_xlate[128];
 extern void select_adb_keyboard(void);
 extern int of_show_percpuinfo(struct seq_file *, int);
 
@@ -389,7 +381,7 @@ void __init chrp_init_IRQ(void)
 	int i;
 	unsigned long chrp_int_ack;
 	unsigned char init_senses[NR_IRQS - NUM_8259_INTERRUPTS];
-#if defined(CONFIG_VT) && defined(CONFIG_ADB_KEYBOARD) && defined(XMON)	
+#if defined(CONFIG_VT) && defined(CONFIG_INPUT_ADBHID) && defined(XMON)	
 	struct device_node *kbd;
 #endif
 
@@ -417,7 +409,7 @@ void __init chrp_init_IRQ(void)
 		irq_desc[i].handler = &i8259_pic;
 	i8259_init(chrp_int_ack);
 
-#if defined(CONFIG_VT) && defined(CONFIG_ADB_KEYBOARD) && defined(XMON)
+#if defined(CONFIG_VT) && defined(CONFIG_INPUT_ADBHID) && defined(XMON)
 	/* see if there is a keyboard in the device tree
 	   with a parent of type "adb" */
 	for (kbd = find_devices("keyboard"); kbd; kbd = kbd->next)
@@ -447,7 +439,7 @@ chrp_init2(void)
 	if (ppc_md.progress)
 		ppc_md.progress("  Have fun!    ", 0x7777);
 
-#if defined(CONFIG_VT) && (defined(CONFIG_ADB_KEYBOARD) || defined(CONFIG_INPUT))
+#if defined(CONFIG_VT) && defined(CONFIG_INPUT)
 	/* see if there is a keyboard in the device tree
 	   with a parent of type "adb" */
 	{
@@ -461,7 +453,7 @@ chrp_init2(void)
 			}
 		}
 	}
-#endif /* CONFIG_VT && (CONFIG_ADB_KEYBOARD || CONFIG_INPUT) */
+#endif /* CONFIG_VT && CONFIG_INPUT */
 }
 
 void __init
@@ -501,20 +493,6 @@ chrp_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_md.calibrate_decr = chrp_calibrate_decr;
 
 	ppc_md.find_end_of_memory = pmac_find_end_of_memory;
-
-#ifdef CONFIG_VT
-	/* these are adjusted in chrp_init2 if we have an ADB keyboard */
-	ppc_md.kbd_setkeycode    = pckbd_setkeycode;
-	ppc_md.kbd_getkeycode    = pckbd_getkeycode;
-	ppc_md.kbd_translate     = pckbd_translate;
-	ppc_md.kbd_unexpected_up = pckbd_unexpected_up;
-	ppc_md.kbd_leds          = pckbd_leds;
-	ppc_md.kbd_init_hw       = pckbd_init_hw;
-#ifdef CONFIG_MAGIC_SYSRQ
-	ppc_md.ppc_kbd_sysrq_xlate	 = pckbd_sysrq_xlate;
-	SYSRQ_KEY = 0x54;
-#endif /* CONFIG_MAGIC_SYSRQ */
-#endif /* CONFIG_VT */
 
 	if (rtas_data) {
 		struct device_node *rtas;

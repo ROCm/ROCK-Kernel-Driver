@@ -2083,12 +2083,12 @@ static void azt_poll(void)
 				}
 				azt_state = AZT_S_IDLE;
 				while (current_valid())
-					end_request(0);
+					end_request(CURRENT, 0);
 				return;
 			}
 
 /*	  if (aztSendCmd(ACMD_SET_MODE)) RETURN("azt_poll 3");
-	  outb(0x01, DATA_PORT);          
+	  outb(0x01, DATA_PORT);
 	  PA_OK;
 	  STEN_LOW;
 */
@@ -2138,7 +2138,7 @@ static void azt_poll(void)
 				}
 				azt_state = AZT_S_IDLE;
 				while (current_valid())
-					end_request(0);
+					end_request(CURRENT, 0);
 				return;
 			}
 
@@ -2236,7 +2236,7 @@ static void azt_poll(void)
 						break;
 					}
 					if (current_valid())
-						end_request(0);
+						end_request(CURRENT, 0);
 					AztTries = 5;
 				}
 				azt_state = AZT_S_START;

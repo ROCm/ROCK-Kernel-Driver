@@ -51,29 +51,4 @@ static inline void ipv6_change_dsfield(struct ipv6hdr *ipv6h,__u8 mask,
 }
 
 
-#if 0 /* put this later into asm-i386 or such ... */
-
-static inline void ip_change_dsfield(struct iphdr *iph,__u16 dsfield)
-{
-	__u16 check;
-
-	__asm__ __volatile__("
-		movw	10(%1),%0
-		xchg	%b0,%h0
-		addb	1(%1),%b0
-		adcb	$0,%h0
-		adcw	$1,%0
-		cmc
-		sbbw	%2,%0
-		sbbw	$0,%0
-		movb	%b2,1(%1)
-		xchg	%b0,%h0
-		movw	%0,10(%1)"
-	    : "=&r" (check)
-	    : "r" (iph), "r" (dsfield)
-	    : "cc");
-}
-
-#endif
-
 #endif

@@ -36,20 +36,22 @@
 #define DISABLE_KBD_DURING_INTERRUPTS	0
 #define INIT_KBD
 
+extern int mac_hid_kbd_translate(unsigned char scancode, unsigned char *keycode,
+				 char raw_mode);
+extern char mac_hid_kbd_unexpected_up(unsigned char keycode);
+extern int pckbd_translate(unsigned char scancode, unsigned char *keycode,
+			   char raw_mode);
+extern char pckbd_unexpected_up(unsigned char keycode);
+extern unsigned char pckbd_sysrq_xlate[128];
+
 static inline int kbd_setkeycode(unsigned int scancode, unsigned int keycode)
 {
-	if ( ppc_md.kbd_setkeycode )
-		return ppc_md.kbd_setkeycode(scancode, keycode);
-	else
-		return 0;
+	return 0;
 }
   
 static inline int kbd_getkeycode(unsigned int scancode)
 {
-	if ( ppc_md.kbd_getkeycode )
-		return ppc_md.kbd_getkeycode(scancode);
-	else
-		return 0;
+	return 0;
 }
   
 static inline int kbd_translate(unsigned char keycode, unsigned char *keycodep,
@@ -58,7 +60,7 @@ static inline int kbd_translate(unsigned char keycode, unsigned char *keycodep,
 	if ( ppc_md.kbd_translate )
 		return ppc_md.kbd_translate(keycode, keycodep, raw_mode);
 	else
-		return 0;
+		return pckbd_translate(keycode, keycodep, raw_mode);
 }
   
 static inline int kbd_unexpected_up(unsigned char keycode)
@@ -66,22 +68,18 @@ static inline int kbd_unexpected_up(unsigned char keycode)
 	if ( ppc_md.kbd_unexpected_up )
 		return ppc_md.kbd_unexpected_up(keycode);
 	else
-		return 0;
+		return pckbd_unexpected_up(keycode);
 }
   
 static inline void kbd_leds(unsigned char leds)
 {
-	if ( ppc_md.kbd_leds )
-		ppc_md.kbd_leds(leds);
 }
 
 static inline void kbd_init_hw(void)
 {
-	if ( ppc_md.kbd_init_hw )
-		ppc_md.kbd_init_hw();
 }
 
-#define kbd_sysrq_xlate	(ppc_md.ppc_kbd_sysrq_xlate)
+#define kbd_sysrq_xlate	pckbd_sysrq_xlate
 
 extern unsigned long SYSRQ_KEY;
 

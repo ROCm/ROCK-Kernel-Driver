@@ -207,14 +207,13 @@ int videobuf_dma_free(struct videobuf_dmabuf *dma)
 
 /* --------------------------------------------------------------------- */
 
-void* videobuf_alloc(int size, int type)
+void* videobuf_alloc(int size)
 {
 	struct videobuf_buffer *vb;
 
 	vb = kmalloc(size,GFP_KERNEL);
 	if (NULL != vb) {
 		memset(vb,0,size);
-		vb->type = type;
 		init_waitqueue_head(&vb->done);
 	}
 	return vb;
@@ -273,12 +272,63 @@ videobuf_iolock(struct pci_dev *pci, struct videobuf_buffer *vb)
 	return 0;
 }
 
+/* --------------------------------------------------------------------- */
+
+void
+videobuf_queue_init(struct videobuf_queue *q,
+		    struct videobuf_queue_ops *ops,
+		    struct pci_dev *pci,
+		    spinlock_t *irqlock,
+		    int type,
+		    int msize)
+{
+	memset(q,0,sizeof(*q));
+
+	q->irqlock = irqlock;
+	q->pci     = pci;
+	q->type    = type;
+	q->msize   = msize;
+	q->ops     = ops;
+
+	init_MUTEX(&q->lock);
+	INIT_LIST_HEAD(&q->stream);
+}
+
+void
+videobuf_queue_cancel(struct file *file, struct videobuf_queue *q)
+{
+	unsigned long flags;
+	int i;
+
+	/* remove queued buffers from list */
+	spin_lock_irqsave(q->irqlock,flags);
+	for (i = 0; i < VIDEO_MAX_FRAME; i++) {
+		if (NULL == q->bufs[i])
+			continue;
+		if (q->bufs[i]->state == STATE_QUEUED) {
+			list_del(&q->bufs[i]->queue);
+			q->bufs[i]->state = STATE_ERROR;
+		}
+	}
+	spin_unlock_irqrestore(q->irqlock,flags);
+
+	/* free all buffers + clear queue */
+	for (i = 0; i < VIDEO_MAX_FRAME; i++) {
+		if (NULL == q->bufs[i])
+			continue;
+		q->ops->buf_release(file,q->bufs[i]);
+	}
+	INIT_LIST_HEAD(&q->stream);
+}
+
+/* --------------------------------------------------------------------- */
+
 #ifdef HAVE_V4L2
-extern void
-videobuf_status(struct v4l2_buffer *b, struct videobuf_buffer *vb)
+void
+videobuf_status(struct v4l2_buffer *b, struct videobuf_buffer *vb, int type)
 {
 	b->index  = vb->i;
-	b->type   = vb->type;
+	b->type   = type;
 	b->offset = vb->boff;
 	b->length = vb->bsize;
 	b->flags  = 0;
@@ -309,7 +359,439 @@ videobuf_status(struct v4l2_buffer *b, struct videobuf_buffer *vb)
 	b->bytesused = vb->size;
 	b->sequence  = vb->field_count >> 1;
 }
+
+int
+videobuf_reqbufs(struct file *file, struct videobuf_queue *q,
+		 struct v4l2_requestbuffers *req)
+{
+	int size,count,retval;
+
+	if ((req->type & V4L2_BUF_TYPE_field) != q->type)
+		return -EINVAL;
+	if (req->count < 1)
+		return -EINVAL;
+
+	down(&q->lock);
+	count = req->count;
+	if (count > VIDEO_MAX_FRAME)
+		count = VIDEO_MAX_FRAME;
+	size = 0;
+	q->ops->buf_setup(file,&count,&size);
+	size = PAGE_ALIGN(size);
+
+	retval = videobuf_mmap_setup(file,q,count,size);
+	if (retval < 0)
+		goto done;
+	req->type  = q->type;
+	req->count = count;
+
+ done:
+	up(&q->lock);
+	return retval;
+}
+
+int
+videobuf_querybuf(struct videobuf_queue *q, struct v4l2_buffer *b)
+{
+	if ((b->type & V4L2_BUF_TYPE_field) != q->type)
+		return -EINVAL;
+	if (b->index < 0 || b->index >= VIDEO_MAX_FRAME)
+		return -EINVAL;
+	if (NULL == q->bufs[b->index])
+		return -EINVAL;
+	videobuf_status(b,q->bufs[b->index],q->type);
+	return 0;
+}
+
+int
+videobuf_qbuf(struct file *file, struct videobuf_queue *q,
+	      struct v4l2_buffer *b)
+{
+	struct videobuf_buffer *buf;
+	unsigned long flags;
+	int field = 0;
+	int retval;
+
+	down(&q->lock);
+	retval = -EBUSY;
+	if (q->reading)
+		goto done;
+	retval = -EINVAL;
+	if ((b->type & V4L2_BUF_TYPE_field) != q->type)
+		goto done;
+	if (b->index < 0 || b->index >= VIDEO_MAX_FRAME)
+		goto done;
+	buf = q->bufs[b->index];
+	if (NULL == buf)
+		goto done;
+	if (0 == buf->baddr)
+		goto done;
+	if (buf->state == STATE_QUEUED ||
+	    buf->state == STATE_ACTIVE)
+		goto done;
+
+	if (b->flags & V4L2_BUF_FLAG_TOPFIELD)
+		field |= VBUF_FIELD_ODD;
+	if (b->flags & V4L2_BUF_FLAG_BOTFIELD)
+		field |= VBUF_FIELD_EVEN;
+	retval = q->ops->buf_prepare(file,buf,field);
+	if (0 != retval)
+		goto done;
+	
+	list_add_tail(&buf->stream,&q->stream);
+	if (q->streaming) {
+		spin_lock_irqsave(q->irqlock,flags);
+		q->ops->buf_queue(file,buf);
+		spin_unlock_irqrestore(q->irqlock,flags);
+	}
+	retval = 0;
+	
+ done:
+	up(&q->lock);
+	return retval;
+}
+
+int
+videobuf_dqbuf(struct file *file, struct videobuf_queue *q,
+	       struct v4l2_buffer *b)
+{
+	struct videobuf_buffer *buf;
+	int retval;
+	
+	down(&q->lock);
+	retval = -EBUSY;
+	if (q->reading)
+		goto done;
+	retval = -EINVAL;
+	if ((b->type & V4L2_BUF_TYPE_field) != q->type)
+		goto done;
+	if (list_empty(&q->stream))
+		goto done;
+	buf = list_entry(q->stream.next, struct videobuf_buffer, stream);
+	retval = videobuf_waiton(buf,1,1);
+	if (retval < 0)
+		goto done;
+	switch (buf->state) {
+	case STATE_ERROR:
+		retval = -EIO;
+		/* fall through */
+	case STATE_DONE:
+		videobuf_dma_pci_sync(q->pci,&buf->dma);
+		buf->state = STATE_IDLE;
+		break;
+	default:
+		retval = -EINVAL;
+		goto done;
+	}
+	list_del(&buf->stream);
+	memset(b,0,sizeof(*b));
+	videobuf_status(b,buf,q->type);
+
+ done:
+	up(&q->lock);
+	return retval;
+}
 #endif /* HAVE_V4L2 */
+
+int videobuf_streamon(struct file *file, struct videobuf_queue *q)
+{
+	struct videobuf_buffer *buf;
+	struct list_head *list;
+	unsigned long flags;
+	int retval;
+	
+	down(&q->lock);
+	retval = -EBUSY;
+	if (q->reading)
+		goto done;
+	retval = 0;
+	if (q->streaming)
+		goto done;
+	q->streaming = 1;
+	spin_lock_irqsave(q->irqlock,flags);
+	list_for_each(list,&q->stream) {
+		buf = list_entry(list, struct videobuf_buffer, stream);
+		if (buf->state == STATE_PREPARED)
+			q->ops->buf_queue(file,buf);
+	}
+	spin_unlock_irqrestore(q->irqlock,flags);
+
+ done:
+	up(&q->lock);
+	return retval;
+}
+
+int videobuf_streamoff(struct file *file, struct videobuf_queue *q)
+{
+	int retval = -EINVAL;
+
+	down(&q->lock);
+	if (!q->streaming)
+		goto done;
+	videobuf_queue_cancel(file,q);
+	q->streaming = 0;
+	retval = 0;
+
+ done:
+	up(&q->lock);
+	return retval;
+}
+
+static ssize_t
+videobuf_read_zerocopy(struct file *file, struct videobuf_queue *q,
+		       char *data, size_t count, loff_t *ppos)
+{
+        int retval;
+
+        /* setup stuff */
+	retval = -ENOMEM;
+	q->read_buf = videobuf_alloc(q->msize);
+	if (NULL == q->read_buf)
+		goto done;
+
+	q->read_buf->baddr = (unsigned long)data;
+        q->read_buf->bsize = count;
+	retval = q->ops->buf_prepare(file,q->read_buf,0);
+	if (0 != retval)
+		goto done;
+	
+        /* start capture & wait */
+	q->ops->buf_queue(file,q->read_buf);
+        retval = videobuf_waiton(q->read_buf,0,0);
+        if (0 == retval) {
+		videobuf_dma_pci_sync(q->pci,&q->read_buf->dma);
+                retval = q->read_buf->size;
+	}
+
+ done:
+	/* cleanup */
+	q->ops->buf_release(file,q->read_buf);
+	kfree(q->read_buf);
+	q->read_buf = NULL;
+	return retval;
+}
+
+ssize_t videobuf_read_one(struct file *file, struct videobuf_queue *q,
+			  char *data, size_t count, loff_t *ppos)
+{
+	int retval, bytes, size, nbufs;
+
+	down(&q->lock);
+
+	nbufs = 1; size = 0;
+	q->ops->buf_setup(file,&nbufs,&size);
+	if (NULL == q->read_buf  &&
+	    count >= size        &&
+	    !(file->f_flags & O_NONBLOCK)) {
+		retval = videobuf_read_zerocopy(file,q,data,count,ppos);
+		if (retval >= 0)
+			/* ok, all done */
+			goto done;
+		/* fallback to kernel bounce buffer on failures */
+	}
+
+	if (NULL == q->read_buf) {
+		/* need to capture a new frame */
+		retval = -ENOMEM;
+		q->read_buf = videobuf_alloc(q->msize);
+		if (NULL == q->read_buf)
+			goto done;
+		retval = q->ops->buf_prepare(file,q->read_buf,0);
+		if (0 != retval)
+			goto done;
+		q->ops->buf_queue(file,q->read_buf);
+		q->read_off = 0;
+	}
+
+	/* wait until capture is done */
+        retval = videobuf_waiton(q->read_buf, file->f_flags & O_NONBLOCK, 1);
+	if (0 != retval)
+		goto done;
+	videobuf_dma_pci_sync(q->pci,&q->read_buf->dma);
+
+	/* copy to userspace */
+	bytes = count;
+	if (bytes > q->read_buf->size - q->read_off)
+		bytes = q->read_buf->size - q->read_off;
+	retval = -EFAULT;
+	if (copy_to_user(data, q->read_buf->dma.vmalloc+q->read_off, bytes))
+		goto done;
+
+	retval = bytes;
+	q->read_off += bytes;
+	if (q->read_off == q->read_buf->size) {
+		/* all data copied, cleanup */
+		q->ops->buf_release(file,q->read_buf);
+		kfree(q->read_buf);
+		q->read_buf = NULL;
+	}
+
+ done:
+	up(&q->lock);
+	return retval;
+}
+
+int videobuf_read_start(struct file *file, struct videobuf_queue *q)
+{
+	unsigned long flags;
+	int count = 0, size = 0;
+	int err, i;
+
+	q->ops->buf_setup(file,&count,&size);
+	if (count < 2)
+		count = 2;
+	if (count > VIDEO_MAX_FRAME)
+		count = VIDEO_MAX_FRAME;
+	size = PAGE_ALIGN(size);
+
+	err = videobuf_mmap_setup(file, q, count, size);
+	if (err)
+		return err;
+	for (i = 0; i < count; i++) {
+		err = q->ops->buf_prepare(file,q->bufs[i],0);
+		if (err)
+			return err;
+		list_add_tail(&q->bufs[i]->stream, &q->stream);
+	}
+	spin_lock_irqsave(q->irqlock,flags);
+	for (i = 0; i < count; i++)
+		q->ops->buf_queue(file,q->bufs[i]);
+	spin_unlock_irqrestore(q->irqlock,flags);
+	q->reading = 1;
+	return 0;
+}
+
+void videobuf_read_stop(struct file *file, struct videobuf_queue *q)
+{
+	int i;
+	
+	videobuf_queue_cancel(file,q);
+	INIT_LIST_HEAD(&q->stream);
+	for (i = 0; i < VIDEO_MAX_FRAME; i++) {
+		if (NULL == q->bufs[i])
+			continue;
+		kfree(q->bufs[i]);
+		q->bufs[i] = NULL;
+	}
+	q->read_buf = NULL;
+	q->reading  = 0;
+}
+
+ssize_t videobuf_read_stream(struct file *file, struct videobuf_queue *q,
+			     char *data, size_t count, loff_t *ppos,
+			     int vbihack)
+{
+	unsigned int *fc;
+	int err, bytes, retval;
+	unsigned long flags;
+	
+	down(&q->lock);
+	retval = -EBUSY;
+	if (q->streaming)
+		goto done;
+	if (!q->reading) {
+		retval = videobuf_read_start(file,q);
+		if (retval < 0)
+			goto done;
+	}
+
+	retval = 0;
+	while (count > 0) {
+		/* get / wait for data */
+		if (NULL == q->read_buf) {
+			q->read_buf = list_entry(q->stream.next,
+						 struct videobuf_buffer,
+						 stream);
+			list_del(&q->read_buf->stream);
+			q->read_off = 0;
+		}
+		err = videobuf_waiton(q->read_buf,
+				      file->f_flags & O_NONBLOCK,1);
+		if (err < 0) {
+			if (0 == retval)
+				retval = err;
+			break;
+		}
+
+		if (vbihack) {
+			/* dirty, undocumented hack -- pass the frame counter
+			 * within the last four bytes of each vbi data block.
+			 * We need that one to maintain backward compatibility
+			 * to all vbi decoding software out there ... */
+			fc  = (unsigned int*)q->read_buf->dma.vmalloc;
+			fc += (q->read_buf->size>>2) -1;
+			*fc = q->read_buf->field_count >> 1;
+		}
+
+		/* copy stuff */
+		bytes = count;
+		if (bytes > q->read_buf->size - q->read_off)
+			bytes = q->read_buf->size - q->read_off;
+		if (copy_to_user(data + retval,
+				 q->read_buf->dma.vmalloc + q->read_off,
+				 bytes)) {
+			if (0 == retval)
+				retval = -EFAULT;
+			break;
+		}
+		count       -= bytes;
+		retval      += bytes;
+		q->read_off += bytes;
+
+		/* requeue buffer when done with copying */
+		if (q->read_off == q->read_buf->size) {
+			list_add_tail(&q->read_buf->stream,
+				      &q->stream);
+			spin_lock_irqsave(q->irqlock,flags);
+			q->ops->buf_queue(file,q->read_buf);
+			spin_unlock_irqrestore(q->irqlock,flags);
+			q->read_buf = NULL;
+		}
+	}
+
+ done:
+	up(&q->lock);
+	return retval;
+}
+
+unsigned int videobuf_poll_stream(struct file *file,
+				  struct videobuf_queue *q,
+				  poll_table *wait)
+{
+	struct videobuf_buffer *buf = NULL;
+	unsigned int rc = 0;
+
+	down(&q->lock);
+	if (q->streaming) {
+		if (!list_empty(&q->stream))
+			buf = list_entry(q->stream.next,
+					 struct videobuf_buffer, stream);
+	} else {
+		if (!q->reading)
+			videobuf_read_start(file,q);
+		if (!q->reading) {
+			rc = POLLERR;
+		} else if (NULL == q->read_buf) {
+			q->read_buf = list_entry(q->stream.next,
+						 struct videobuf_buffer,
+						 stream);
+			list_del(&q->read_buf->stream);
+			q->read_off = 0;
+		}
+		buf = q->read_buf;
+	}
+	if (!buf)
+		rc = POLLERR;
+
+	if (0 == rc) {
+		poll_wait(file, &buf->done, wait);
+		if (buf->state == STATE_DONE ||
+		    buf->state == STATE_ERROR)
+			rc = POLLIN|POLLRDNORM;
+	}
+	up(&q->lock);
+	return rc;
+}
 
 /* --------------------------------------------------------------------- */
 
@@ -331,14 +813,15 @@ videobuf_vm_close(struct vm_area_struct *vma)
 	if (0 == map->count) {
 		dprintk(1,"munmap %p\n",map);
 		for (i = 0; i < VIDEO_MAX_FRAME; i++) {
-			if (NULL == map->buflist[i])
+			if (NULL == map->q->bufs[i])
 				continue;
-			if (map->buflist[i]->map != map)
+			if (map->q->bufs[i])
+				;
+			if (map->q->bufs[i]->map != map)
 				continue;
-			map->buflist[i]->map   = NULL;
-			map->buflist[i]->baddr = 0;
-			if (map->buflist[i]->free)
-				map->buflist[i]->free(vma->vm_file,map->buflist[i]);
+			map->q->bufs[i]->map   = NULL;
+			map->q->bufs[i]->baddr = 0;
+			map->q->ops->buf_release(vma->vm_file,map->q->bufs[i]);
 		}
 		kfree(map);
 	}
@@ -376,108 +859,114 @@ static struct vm_operations_struct videobuf_vm_ops =
 	nopage:   videobuf_vm_nopage,
 };
 
-int videobuf_mmap_setup(struct file *file, struct videobuf_buffer **buflist,
-			int msize, int bcount, int bsize, int type,
-			videobuf_buffer_free free)
+int videobuf_mmap_setup(struct file *file, struct videobuf_queue *q,
+			int bcount, int bsize)
 {
 	int i,err;
 
-	err = videobuf_mmap_free(file,buflist);
+	err = videobuf_mmap_free(file,q);
 	if (0 != err)
 		return err;
 	
 	for (i = 0; i < bcount; i++) {
-		buflist[i] = videobuf_alloc(msize,type);
-		buflist[i]->i     = i;
-		buflist[i]->boff  = bsize * i;
-		buflist[i]->bsize = bsize;
-		buflist[i]->free  = free;
+		q->bufs[i] = videobuf_alloc(q->msize);
+		q->bufs[i]->i     = i;
+		q->bufs[i]->boff  = bsize * i;
+		q->bufs[i]->bsize = bsize;
 	}
 	dprintk(1,"mmap setup: %d buffers, %d bytes each\n",
 		bcount,bsize);
 	return 0;
 }
 
-int videobuf_mmap_free(struct file *file, struct videobuf_buffer **buflist)
+int videobuf_mmap_free(struct file *file, struct videobuf_queue *q)
 {
 	int i;
 
 	for (i = 0; i < VIDEO_MAX_FRAME; i++)
-		if (buflist[i] && buflist[i]->map)
+		if (q->bufs[i] && q->bufs[i]->map)
 			return -EBUSY;
 	for (i = 0; i < VIDEO_MAX_FRAME; i++) {
-		if (NULL == buflist[i])
+		if (NULL == q->bufs[i])
 			continue;
-		if (buflist[i]->free)
-			buflist[i]->free(file,buflist[i]);
-		kfree(buflist[i]);
-		buflist[i] = NULL;
+		q->ops->buf_release(file,q->bufs[i]);
+		kfree(q->bufs[i]);
+		q->bufs[i] = NULL;
 	}
 	return 0;
 }
 
 int videobuf_mmap_mapper(struct vm_area_struct *vma,
-			struct videobuf_buffer **buflist)
+			 struct videobuf_queue *q)
 {
 	struct videobuf_mapping *map;
-	int first,last,size,i;
+	int first,last,size,i,retval;
 
+	down(&q->lock);
+	retval = -EINVAL;
 	if (!(vma->vm_flags & VM_WRITE)) {
 		dprintk(1,"mmap app bug: PROT_WRITE please\n");
-		return -EINVAL;
+		goto done;
 	}
 	if (!(vma->vm_flags & VM_SHARED)) {
 		dprintk(1,"mmap app bug: MAP_SHARED please\n");
-		return -EINVAL;
+		goto done;
 	}
 
 	/* look for first buffer to map */
 	for (first = 0; first < VIDEO_MAX_FRAME; first++) {
-		if (NULL == buflist[first])
+		if (NULL == q->bufs[first])
 			continue;
-		if (buflist[first]->boff  == (vma->vm_pgoff << PAGE_SHIFT))
+		if (q->bufs[first]->boff  == (vma->vm_pgoff << PAGE_SHIFT))
 			break;
 	}
 	if (VIDEO_MAX_FRAME == first) {
 		dprintk(1,"mmap app bug: offset invalid [offset=0x%lx]\n",
 			(vma->vm_pgoff << PAGE_SHIFT));
-		return -EINVAL;
+		goto done;
 	}
 
 	/* look for last buffer to map */
 	for (size = 0, last = first; last < VIDEO_MAX_FRAME; last++) {
-		if (NULL == buflist[last])
+		if (NULL == q->bufs[last])
 			continue;
-		if (buflist[last]->map)
-			return -EBUSY;
-		size += buflist[last]->bsize;
+		if (q->bufs[last]->map) {
+			retval = -EBUSY;
+			goto done;
+		}
+		size += q->bufs[last]->bsize;
 		if (size == (vma->vm_end - vma->vm_start))
 			break;
 	}
 	if (VIDEO_MAX_FRAME == last) {
 		dprintk(1,"mmap app bug: size invalid [size=0x%lx]\n",
 			(vma->vm_end - vma->vm_start));
-		return -EINVAL;
+		goto done;
 	}
 
 	/* create mapping + update buffer list */
+	retval = -ENOMEM;
 	map = kmalloc(sizeof(struct videobuf_mapping),GFP_KERNEL);
 	if (NULL == map)
-		return -ENOMEM;
-	for (size = 0, i = first; i <= last; size += buflist[i++]->bsize) {
-		buflist[i]->map   = map;
-		buflist[i]->baddr = vma->vm_start + size;
+		goto done;
+	for (size = 0, i = first; i <= last; size += q->bufs[i++]->bsize) {
+		q->bufs[i]->map   = map;
+		q->bufs[i]->baddr = vma->vm_start + size;
 	}
 	map->count   = 1;
 	map->start   = vma->vm_start;
 	map->end     = vma->vm_end;
-	map->buflist = buflist;
+	map->q       = q;
 	vma->vm_ops  = &videobuf_vm_ops;
 	vma->vm_flags |= VM_DONTEXPAND;
 	vma->vm_private_data = map;
 	dprintk(1,"mmap %p: %08lx-%08lx pgoff %08lx bufs %d-%d\n",
 		map,vma->vm_start,vma->vm_end,vma->vm_pgoff,first,last);
-	return 0;
+	retval = 0;
+
+ done:
+	up(&q->lock);
+	return retval;
 }
 
 /* --------------------------------------------------------------------- */
@@ -495,9 +984,25 @@ EXPORT_SYMBOL_GPL(videobuf_dma_free);
 EXPORT_SYMBOL_GPL(videobuf_alloc);
 EXPORT_SYMBOL_GPL(videobuf_waiton);
 EXPORT_SYMBOL_GPL(videobuf_iolock);
+
+EXPORT_SYMBOL_GPL(videobuf_queue_init);
+EXPORT_SYMBOL_GPL(videobuf_queue_cancel);
+
 #ifdef HAVE_V4L2
 EXPORT_SYMBOL_GPL(videobuf_status);
+EXPORT_SYMBOL_GPL(videobuf_reqbufs);
+EXPORT_SYMBOL_GPL(videobuf_querybuf);
+EXPORT_SYMBOL_GPL(videobuf_qbuf);
+EXPORT_SYMBOL_GPL(videobuf_dqbuf);
 #endif
+EXPORT_SYMBOL_GPL(videobuf_streamon);
+EXPORT_SYMBOL_GPL(videobuf_streamoff);
+
+EXPORT_SYMBOL_GPL(videobuf_read_start);
+EXPORT_SYMBOL_GPL(videobuf_read_stop);
+EXPORT_SYMBOL_GPL(videobuf_read_stream);
+EXPORT_SYMBOL_GPL(videobuf_read_one);
+EXPORT_SYMBOL_GPL(videobuf_poll_stream);
 
 EXPORT_SYMBOL_GPL(videobuf_mmap_setup);
 EXPORT_SYMBOL_GPL(videobuf_mmap_free);

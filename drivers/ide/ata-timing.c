@@ -86,9 +86,11 @@ short ata_timing_mode(struct ata_device *drive, int map)
 		if ((map & XFER_UDMA_100) == XFER_UDMA_100)
 			if ((best = (id->dma_ultra & 0x0020) ? XFER_UDMA_5 : 0)) return best;
 
-		if ((map & XFER_UDMA_66) == XFER_UDMA_66)
-			if ((best = (id->dma_ultra & 0x0010) ? XFER_UDMA_4 :
-				    (id->dma_ultra & 0x0008) ? XFER_UDMA_3 : 0)) return best;
+		if ((map & XFER_UDMA_66_4) == XFER_UDMA_66_4)
+			if ((best = (id->dma_ultra & 0x0010) ? XFER_UDMA_4 : 0)) return best;
+
+		if ((map & XFER_UDMA_66_3) == XFER_UDMA_66_3)
+			if ((best = (id->dma_ultra & 0x0008) ? XFER_UDMA_3 : 0)) return best;
 
                 if ((best = (id->dma_ultra & 0x0004) ? XFER_UDMA_2 :
 			    (id->dma_ultra & 0x0002) ? XFER_UDMA_1 :

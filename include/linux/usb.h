@@ -466,7 +466,7 @@ const struct usb_device_id *usb_match_id(struct usb_device *dev,
  * than changeable ("unstable") ones like bus numbers or device addresses.
  *
  * With a partial exception for devices connected to USB 2.0 root hubs, these
- * identifiers are also predictable:  so long as the device tree isn't changed,
+ * identifiers are also predictable.  So long as the device tree isn't changed,
  * plugging any USB device into a given hub port always gives it the same path.
  * Because of the use of "companion" controllers, devices connected to ports on
  * USB 2.0 root hubs (EHCI host controllers) will get one path ID if they are
@@ -722,16 +722,14 @@ extern void usb_deregister_dev(int num_minors, int start_minor);
 /*
  * urb->transfer_flags:
  *
- * FIXME should be URB_* flags
+ * FIXME should _all_ be URB_* flags
  */
-#define USB_DISABLE_SPD		0x0001
-#define USB_ISO_ASAP		0x0002
-#define USB_ASYNC_UNLINK	0x0008
-#define USB_QUEUE_BULK		0x0010
-#define USB_NO_FSBR		0x0020
+#define URB_SHORT_NOT_OK	0x0001	/* report short reads as errors */
+#define USB_ISO_ASAP		0x0002	/* iso-only, urb->start_frame ignored */
+#define USB_ASYNC_UNLINK	0x0008	/* usb_unlink_urb() returns asap */
+#define USB_NO_FSBR		0x0020	/* UHCI-specific */
 #define USB_ZERO_PACKET		0x0040	/* Finish bulk OUTs with short packet */
 #define URB_NO_INTERRUPT	0x0080	/* HINT: no non-error interrupt needed */
-					/* ... less overhead for QUEUE_BULK */
 #define USB_TIMEOUT_KILLED	0x1000	/* only set by HCD! */
 
 struct usb_iso_packet_descriptor {
@@ -777,9 +775,9 @@ typedef void (*usb_complete_t)(struct urb *);
  * @actual_length: This is read in non-iso completion functions, and
  *	it tells how many bytes (out of transfer_buffer_length) were
  *	transferred.  It will normally be the same as requested, unless
- *	either an error was reported or a short read was performed and
- *	the USB_DISABLE_SPD transfer flag was used to say that such
- *	short reads are not errors. 
+ *	either an error was reported or a short read was performed.
+ *	The URB_SHORT_NOT_OK transfer flag may be used to make such
+ *	short reads be reported as errors. 
  * @setup_packet: Only used for control transfers, this points to eight bytes
  *	of setup data.  Control transfers always start by sending this data
  *	to the device.  Then transfer_buffer is read or written, if needed.
@@ -814,14 +812,10 @@ typedef void (*usb_complete_t)(struct urb *);
  *
  * All non-isochronous URBs must also initialize 
  * transfer_buffer and transfer_buffer_length.  They may provide the
- * USB_DISABLE_SPD transfer flag, indicating that short reads are
- * not to be treated as errors.
+ * URB_SHORT_NOT_OK transfer flag, indicating that short reads are
+ * to be treated as errors.
  *
- * Bulk URBs may pass the USB_QUEUE_BULK transfer flag, telling the host
- * controller driver never to report an error if several bulk requests get
- * queued to the same endpoint.  Such queueing supports more efficient use
- * of bus bandwidth, minimizing delays due to interrupts and scheduling,
- * if the host controller hardware is smart enough.  Bulk URBs can also
+ * Bulk URBs may
  * use the USB_ZERO_PACKET transfer flag, indicating that bulk OUT transfers
  * should always terminate with a short packet, even if it means adding an
  * extra zero length packet.
@@ -853,7 +847,7 @@ typedef void (*usb_complete_t)(struct urb *);
  * the quality of service is only "best effort".  Callers provide specially
  * allocated URBs, with number_of_packets worth of iso_frame_desc structures
  * at the end.  Each such packet is an individual ISO transfer.  Isochronous
- * URBs are normally queued (no flag like USB_BULK_QUEUE is needed) so that
+ * URBs are normally queued, submitted by drivers to arrange that
  * transfers are at least double buffered, and then explicitly resubmitted
  * in completion handlers, so
  * that data (such as audio or video) streams at as constant a rate as the
@@ -892,7 +886,7 @@ struct urb
 	struct usb_device *dev; 	/* (in) pointer to associated device */
 	unsigned int pipe;		/* (in) pipe information */
 	int status;			/* (return) non-ISO status */
-	unsigned int transfer_flags;	/* (in) USB_DISABLE_SPD | ...*/
+	unsigned int transfer_flags;	/* (in) URB_SHORT_NOT_OK | ...*/
 	void *transfer_buffer;		/* (in) associated data buffer */
 	int transfer_buffer_length;	/* (in) data buffer length */
 	int actual_length;		/* (return) actual transfer length */

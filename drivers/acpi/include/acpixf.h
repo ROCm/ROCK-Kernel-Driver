@@ -44,6 +44,10 @@ acpi_enable_subsystem (
 	u32                     flags);
 
 acpi_status
+acpi_initialize_objects (
+	u32                     flags);
+
+acpi_status
 acpi_terminate (
 	void);
 

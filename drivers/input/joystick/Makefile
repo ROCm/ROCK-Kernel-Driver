@@ -2,24 +2,6 @@
 # Makefile for the input core drivers.
 #
 
-# I-Force may need both USB and RS-232
-
-CONFIG_JOYSTICK_IFORCE := n
-
-ifeq ($(CONFIG_JOYSTICK_IFORCE_232),y)
-	ifeq ($(CONFIG_JOYSTICK_IFORCE_USB),y)
-		CONFIG_JOYSTICK_IFORCE := y
-	endif
-endif
-
-ifeq ($(CONFIG_JOYSTICK_IFORCE_232),m)
-	CONFIG_JOYSTICK_IFORCE := m
-endif
-
-ifeq ($(CONFIG_JOYSTICK_IFORCE_USB),m)
-	CONFIG_JOYSTICK_IFORCE := m
-endif
-
 # Each configuration option enables a list of files.
 
 obj-$(CONFIG_JOYSTICK_A3D)		+= a3d.o

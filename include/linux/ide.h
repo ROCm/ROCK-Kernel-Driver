@@ -372,16 +372,17 @@ struct ata_device {
  * Status returned by various functions.
  */
 typedef enum {
-	ide_stopped,	/* no drive operation was started */
-	ide_started,	/* a drive operation was started, and a handler was set */
-	ide_released	/* started and released bus */
+	ATA_OP_FINISHED,	/* no drive operation was started */
+	ATA_OP_CONTINUES,	/* a drive operation was started, and a handler was set */
+	ATA_OP_RELEASED,	/* started and released bus */
+	ATA_OP_READY,		/* indicate status poll finished fine */
 } ide_startstop_t;
 
 /*
  *  Interrupt and timeout handler type.
  */
 typedef ide_startstop_t (ata_handler_t)(struct ata_device *, struct request *);
-typedef int (ata_expiry_t)(struct ata_device *, struct request *);
+typedef ide_startstop_t (ata_expiry_t)(struct ata_device *, struct request *, unsigned long *);
 
 enum {
 	ATA_PRIMARY	= 0,
@@ -406,7 +407,7 @@ struct ata_channel {
 
 	ide_startstop_t (*handler)(struct ata_device *, struct request *);	/* irq handler, if active */
 	struct timer_list timer;				/* failsafe timer */
-	int (*expiry)(struct ata_device *, struct request *);	/* irq handler, if active */
+	ide_startstop_t (*expiry)(struct ata_device *, struct request *, unsigned long *);	/* irq handler, if active */
 	unsigned long poll_timeout;				/* timeout value during polled operations */
 	struct ata_device *drive;				/* last serviced drive */
 
@@ -456,7 +457,7 @@ struct ata_channel {
 	void (*atapi_read)(struct ata_device *, void *, unsigned int);
 	void (*atapi_write)(struct ata_device *, void *, unsigned int);
 
-	int (*udma_setup)(struct ata_device *);
+	int (*udma_setup)(struct ata_device *, int);
 
 	void (*udma_enable)(struct ata_device *, int, int);
 	void (*udma_start) (struct ata_device *, struct request *);
@@ -496,7 +497,9 @@ struct ata_channel {
 	unsigned unmask		: 1;	/* flag: okay to unmask other irqs */
 	unsigned slow		: 1;	/* flag: slow data port */
 	unsigned io_32bit	: 1;	/* 0=16-bit, 1=32-bit */
+	unsigned no_atapi_autodma : 1;	/* flag: use auto DMA only for disks */
 	unsigned char bus_state;	/* power state of the IDE bus */
+	int modes_map;			/* map of supported transfer modes */
 };
 
 /*
@@ -602,9 +605,7 @@ extern int noautodma;
 #define DEVICE_NR(device)	(minor(device) >> PARTN_BITS)
 #include <linux/blk.h>
 
-/* Not locking and locking variant: */
 extern int __ata_end_request(struct ata_device *, struct request *, int, unsigned int);
-extern int ata_end_request(struct ata_device *drive, struct request *, int);
 
 extern void ata_set_handler(struct ata_device *drive, ata_handler_t handler,
 		unsigned long timeout, ata_expiry_t expiry);
@@ -624,12 +625,6 @@ int ide_xlate_1024(kdev_t, int, int, const char *);
  * Convert kdev_t structure into struct ata_device * one.
  */
 struct ata_device *get_info_ptr(kdev_t i_rdev);
-
-/*
- * Re-Start an operation for an IDE interface.
- * The caller should return immediately after invoking this.
- */
-ide_startstop_t restart_request(struct ata_device *);
 
 /*
  * "action" parameter type for ide_do_drive_cmd() below.
@@ -658,31 +653,7 @@ struct ata_taskfile {
 extern void ata_read(struct ata_device *, void *, unsigned int);
 extern void ata_write(struct ata_device *, void *, unsigned int);
 
-/*
- * Special Flagged Register Validation Caller
- */
-
-/*
- * for now, taskfile requests are special :/
- */
-static inline char *ide_map_rq(struct request *rq, unsigned long *flags)
-{
-	if (rq->bio)
-		return bio_kmap_irq(rq->bio, flags) + ide_rq_offset(rq);
-	else
-		return rq->buffer + ((rq)->nr_sectors - (rq)->current_nr_sectors) * SECTOR_SIZE;
-}
-
-static inline void ide_unmap_rq(struct request *rq, char *to,
-				unsigned long *flags)
-{
-	if (rq->bio)
-		bio_kunmap_irq(to, flags);
-}
-
-extern ide_startstop_t ata_special_intr(struct ata_device *, struct request *);
-extern int ide_raw_taskfile(struct ata_device *, struct ata_taskfile *);
-
+extern int ide_raw_taskfile(struct ata_device *, struct ata_taskfile *, char *);
 extern void ide_fix_driveid(struct hd_driveid *id);
 extern int ide_config_drive_speed(struct ata_device *, byte);
 extern byte eighty_ninty_three(struct ata_device *);
@@ -756,9 +727,12 @@ static inline void udma_start(struct ata_device *drive, struct request *rq)
 
 static inline int udma_stop(struct ata_device *drive)
 {
+	int ret;
+
+	ret = drive->channel->udma_stop(drive);
 	clear_bit(IDE_DMA, drive->channel->active);
 
-	return drive->channel->udma_stop(drive);
+	return ret;
 }
 
 /*
@@ -766,9 +740,12 @@ static inline int udma_stop(struct ata_device *drive)
  */
 static inline ide_startstop_t udma_init(struct ata_device *drive, struct request *rq)
 {
-	int ret = drive->channel->udma_init(drive, rq);
-	if (ret == ide_started)
-		set_bit(IDE_DMA, drive->channel->active);
+	int ret;
+
+	set_bit(IDE_DMA, drive->channel->active);
+	ret = drive->channel->udma_init(drive, rq);
+	if (ret != ATA_OP_CONTINUES)
+		clear_bit(IDE_DMA, drive->channel->active);
 
 	return ret;
 }
@@ -797,7 +774,9 @@ extern int udma_pci_init(struct ata_device *drive, struct request *rq);
 extern int udma_pci_irq_status(struct ata_device *drive);
 extern void udma_pci_timeout(struct ata_device *drive);
 extern void udma_pci_irq_lost(struct ata_device *);
-extern int udma_pci_setup(struct ata_device *);
+extern int udma_pci_setup(struct ata_device *, int);
+
+extern int udma_generic_setup(struct ata_device *, int);
 
 extern int udma_new_table(struct ata_device *, struct request *);
 extern void udma_destroy_table(struct ata_channel *);
@@ -830,10 +809,9 @@ extern int drive_is_ready(struct ata_device *drive);
 
 extern void ata_select(struct ata_device *, unsigned long);
 extern void ata_mask(struct ata_device *);
-extern int ata_busy_poll(struct ata_device *, unsigned long);
 extern int ata_status(struct ata_device *, u8, u8);
 extern int ata_status_poll( struct ata_device *, u8, u8,
-		unsigned long, struct request *rq, ide_startstop_t *);
+		unsigned long, struct request *rq);
 
 extern int ata_irq_enable(struct ata_device *, int);
 extern void ata_reset(struct ata_channel *);

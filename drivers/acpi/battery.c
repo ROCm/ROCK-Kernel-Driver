@@ -1,5 +1,5 @@
 /*
- *  acpi_battery.c - ACPI Battery Driver ($Revision: 35 $)
+ *  acpi_battery.c - ACPI Battery Driver ($Revision: 36 $)
  *
  *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
  *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
@@ -251,7 +251,7 @@ acpi_battery_set_alarm (
 
 	arg0.integer.value = alarm;
 
-	status = acpi_evaluate(battery->handle, "_BTP", &arg_list, NULL);
+	status = acpi_evaluate_object(battery->handle, "_BTP", &arg_list, NULL);
 	if (ACPI_FAILURE(status))
 		return_VALUE(-ENODEV);
 

@@ -49,6 +49,9 @@
  */
 #define __CCREG(x)	__REGP(SA1111_VBASE + (x))
 
+#define sa1111_writel(val,addr)	({ *(volatile unsigned int *)(addr) = (val); })
+#define sa1111_readl(addr)	(*(volatile unsigned int *)(addr))
+
 /*
  * System Bus Interface (SBI)
  *
@@ -696,5 +699,11 @@ struct sa1111_device {
 };
 
 extern struct sa1111_device *sa1111;
+
+/*
+ * These frob the SKPCR register.
+ */
+void sa1111_enable_device(unsigned int mask);
+void sa1111_disable_device(unsigned int mask);
 
 #endif  /* _ASM_ARCH_SA1111 */

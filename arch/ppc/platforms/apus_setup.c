@@ -854,13 +854,6 @@ void platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 
 	/* These should not be used for the APUS yet, since it uses
 	   the M68K keyboard now. */
-	ppc_md.kbd_setkeycode    = apus_kbd_setkeycode;
-	ppc_md.kbd_getkeycode    = apus_kbd_getkeycode;
 	ppc_md.kbd_translate     = amiga_kbd_translate;
 	ppc_md.kbd_unexpected_up = apus_kbd_unexpected_up;
-	ppc_md.kbd_init_hw       = apus_kbd_init_hw;
-#ifdef CONFIG_SYSRQ
-	ppc_md.ppc_kbd_sysrq_xlate = amiga_sysrq_xlate;
-	SYSRQ_KEY                = 0xff;
-#endif
 }

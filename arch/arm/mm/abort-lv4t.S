@@ -7,7 +7,7 @@
  *         : r3 = saved SPSR
  *
  * Returns : r0 = address of abort
- *	   : r1 = FSR, bit 8 = writing
+ *	   : r1 = FSR, bit 11 = write
  *	   : r2-r8 = corrupted
  *	   : r9 = preserved
  *	   : sp = pointer to registers
@@ -21,10 +21,11 @@ ENTRY(v4t_late_abort)
 	tst	r3, #PSR_T_BIT			@ check for thumb mode
 	mrc	p15, 0, r1, c5, c0, 0		@ get FSR
 	mrc	p15, 0, r0, c6, c0, 0		@ get FAR
+	bic	r1, r1, #1 << 11 | 1 << 10	@ clear bits 11 and 10 of FSR
 	ldreq	r8, [r2]			@ read arm instruction
 	bne	.data_thumb_abort
 	tst	r8, #1 << 20			@ L = 1 -> write?
-	orreq	r1, r1, #1 << 8			@ yes.
+	orreq	r1, r1, #1 << 11		@ yes.
 	and	r7, r8, #15 << 24
 	add	pc, pc, r7, lsr #22		@ Now branch to the relevant processing routine
 	nop

@@ -92,14 +92,11 @@ struct _ntfs_inode {
 	run_list attr_list_rl;	/* Run list for the attribute list value. */
 	union {
 		struct { /* It is a directory or $MFT. */
+			struct inode *bmp_ino;	/* Attribute inode for the
+						   directory index $BITMAP. */
 			u32 index_block_size;	/* Size of an index block. */
 			u32 index_vcn_size;	/* Size of a vcn in this
 						   directory index. */
-			s64 bmp_size;		/* Size of the $I30 bitmap. */
-			s64 bmp_initialized_size; /* Copy from $I30 bitmap. */
-			s64 bmp_allocated_size;	/* Copy from $I30 bitmap. */
-			run_list bmp_rl;	/* Run list for the $I30 bitmap
-						   if it is non-resident. */
 			u8 index_block_size_bits; /* Log2 of the above. */
 			u8 index_vcn_size_bits;	/* Log2 of the above. */
 		} SN(idm);
@@ -165,7 +162,6 @@ typedef enum {
 	NI_Sparse,		/* 1: Unnamed data attr is sparse (f).
 				   1: Create sparse files by default (d).
 				   1: Attribute is sparse (a). */
-	NI_BmpNonResident,	/* 1: $I30 bitmap attr is non resident (d). */
 } ntfs_inode_state_bits;
 
 /*
@@ -203,7 +199,6 @@ NINO_FNS(IndexAllocPresent)
 NINO_FNS(Compressed)
 NINO_FNS(Encrypted)
 NINO_FNS(Sparse)
-NINO_FNS(BmpNonResident)
 
 /*
  * The full structure containing a ntfs_inode and a vfs struct inode. Used for
@@ -232,6 +227,8 @@ static inline struct inode *VFS_I(ntfs_inode *ni)
 }
 
 extern struct inode *ntfs_iget(struct super_block *sb, unsigned long mft_no);
+extern struct inode *ntfs_attr_iget(struct inode *base_vi, ATTR_TYPES type,
+		uchar_t *name, u32 name_len);
 
 extern struct inode *ntfs_alloc_big_inode(struct super_block *sb);
 extern void ntfs_destroy_big_inode(struct inode *inode);
@@ -244,6 +241,8 @@ extern void ntfs_clear_extent_inode(ntfs_inode *ni);
 extern void ntfs_read_inode_mount(struct inode *vi);
 
 extern void ntfs_dirty_inode(struct inode *vi);
+
+extern void ntfs_put_inode(struct inode *vi);
 
 extern int ntfs_show_options(struct seq_file *sf, struct vfsmount *mnt);
 

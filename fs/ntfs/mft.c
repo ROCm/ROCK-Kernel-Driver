@@ -95,8 +95,10 @@ int format_mft_record(ntfs_inode *ni, MFT_RECORD *mft_rec)
 	return 0;
 }
 
-/* From fs/ntfs/aops.c */
-extern int ntfs_mst_readpage(struct file *, struct page *);
+/**
+ * From fs/ntfs/aops.c
+ */
+extern int ntfs_readpage(struct file *, struct page *);
 
 /**
  * ntfs_mft_aops - address space operations for access to $MFT
@@ -106,7 +108,7 @@ extern int ntfs_mst_readpage(struct file *, struct page *);
  */
 struct address_space_operations ntfs_mft_aops = {
 	writepage:	NULL,			/* Write dirty page to disk. */
-	readpage:	ntfs_mst_readpage,	/* Fill page with data. */
+	readpage:	ntfs_readpage,		/* Fill page with data. */
 	sync_page:	block_sync_page,	/* Currently, just unplugs the
 						   disk request queue. */
 	prepare_write:	NULL,			/* . */
@@ -214,11 +216,11 @@ static inline void unmap_mft_record_page(ntfs_inode *ni)
  * necessary, increments the use count on the page so that it cannot disappear
  * under us and returns a reference to the page cache page).
  *
- * If read_cache_page() invokes ntfs_mst_readpage() to load the page from disk,
- * it sets PG_locked and clears PG_uptodate on the page. Once I/O has
- * completed and the post-read mst fixups on each mft record in the page have
- * been performed, the page gets PG_uptodate set and PG_locked cleared (this is
- * done in our asynchronous I/O completion handler end_buffer_read_mft_async()).
+ * If read_cache_page() invokes ntfs_readpage() to load the page from disk, it
+ * sets PG_locked and clears PG_uptodate on the page. Once I/O has completed
+ * and the post-read mst fixups on each mft record in the page have been
+ * performed, the page gets PG_uptodate set and PG_locked cleared (this is done
+ * in our asynchronous I/O completion handler end_buffer_read_mft_async()).
  * ntfs_map_page() waits for PG_locked to become clear and checks if
  * PG_uptodate is set and returns an error code if not. This provides
  * sufficient protection against races when reading/using the page.

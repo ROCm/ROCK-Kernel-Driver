@@ -807,32 +807,15 @@ static int  get_empty_nodes(
 	    "PAP-8135: reiserfs_new_blocknrs failed when got new blocks");
 
     p_s_new_bh = sb_getblk(p_s_sb, *p_n_blocknr);
-    if (atomic_read (&(p_s_new_bh->b_count)) > 1) {
-/*&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&*/
-/*
-      reiserfs_warning ("waiting for buffer %b, iput inode pid = %d, this pid %d, mode %c, %h\n",
-			p_s_new_bh, put_inode_pid, current->pid, p_s_tb->tb_vn->vn_mode, p_s_tb->tb_vn->vn_ins_ih);
-      print_tb (0, 0, 0, p_s_tb, "tb");
-*/
-/*&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&*/
-      if (atomic_read(&(p_s_new_bh->b_count)) > 2 || 
-          !(buffer_journaled(p_s_new_bh) || buffer_journal_dirty(p_s_new_bh))) {
-	n_retval = REPEAT_SEARCH ;
-	free_buffers_in_tb (p_s_tb);
-	wait_buffer_until_released (p_s_new_bh);
-      }
-    }
-    RFALSE( (atomic_read (&(p_s_new_bh->b_count)) != 1 || 
-	     buffer_dirty (p_s_new_bh)) && 
-	    (atomic_read(&(p_s_new_bh->b_count)) > 2 || 
-	     !(buffer_journaled(p_s_new_bh) || 
-	       buffer_journal_dirty(p_s_new_bh))),
-	    "PAP-8140: not free or dirty buffer %b for the new block", 
+    RFALSE (buffer_dirty (p_s_new_bh) ||
+	    buffer_journaled (p_s_new_bh) ||
+	    buffer_journal_dirty (p_s_new_bh),
+	    "PAP-8140: journlaled or dirty buffer %b for the new block", 
 	    p_s_new_bh);
     
     /* Put empty buffers into the array. */
-    if (p_s_tb->FEB[p_s_tb->cur_blknum])
-      BUG();
+    RFALSE (p_s_tb->FEB[p_s_tb->cur_blknum],
+	    "PAP-8141: busy slot for new buffer");
 
     mark_buffer_journal_new(p_s_new_bh) ;
     p_s_tb->FEB[p_s_tb->cur_blknum++] = p_s_new_bh;
@@ -1926,7 +1909,7 @@ static int  get_neighbors(
 
 	n_child_position = ( p_s_bh == p_s_tb->FL[n_h] ) ? p_s_tb->lkey[n_h] : B_NR_ITEMS (p_s_tb->FL[n_h]);
 	n_son_number = B_N_CHILD_NUM(p_s_tb->FL[n_h], n_child_position);
-	p_s_bh = reiserfs_bread(p_s_sb, n_son_number);
+	p_s_bh = sb_bread(p_s_sb, n_son_number);
 	if (!p_s_bh)
 	    return IO_ERROR;
 	if ( FILESYSTEM_CHANGED_TB (p_s_tb) ) {
@@ -1959,7 +1942,7 @@ static int  get_neighbors(
 
 	n_child_position = ( p_s_bh == p_s_tb->FR[n_h] ) ? p_s_tb->rkey[n_h] + 1 : 0;
 	n_son_number = B_N_CHILD_NUM(p_s_tb->FR[n_h], n_child_position);
-	p_s_bh = reiserfs_bread(p_s_sb, n_son_number);
+	p_s_bh = sb_bread(p_s_sb, n_son_number);
 	if (!p_s_bh)
 	    return IO_ERROR;
 	if ( FILESYSTEM_CHANGED_TB (p_s_tb) ) {

@@ -390,7 +390,6 @@ static int visor_write (struct usb_serial_port *port, int from_user, const unsig
 					    port->bulk_out_endpointAddress),
 			   buffer, count, 
 			   visor_write_bulk_callback, port);
-	urb->transfer_flags |= USB_QUEUE_BULK;
 
 	/* send it down the pipe */
 	status = usb_submit_urb(urb, GFP_ATOMIC);

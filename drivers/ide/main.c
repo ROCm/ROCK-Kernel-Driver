@@ -1074,7 +1074,8 @@ int ide_register_subdriver(struct ata_device *drive, struct ata_operations *driv
 	spin_unlock_irqrestore(&ide_lock, flags);
 	/* Default autotune or requested autotune */
 	if (drive->autotune != 2) {
-		if (drive->channel->udma_setup) {
+		struct ata_channel *ch = drive->channel;
+		if (ch->udma_setup) {
 
 			/*
 			 * Force DMAing for the beginning of the check.  Some
@@ -1085,7 +1086,7 @@ int ide_register_subdriver(struct ata_device *drive, struct ata_operations *driv
 			 */
 
 			udma_enable(drive, 0, 0);
-			drive->channel->udma_setup(drive);
+			ch->udma_setup(drive, ch->modes_map);
 #ifdef CONFIG_BLK_DEV_IDE_TCQ_DEFAULT
 			udma_tcq_enable(drive, 1);
 #endif

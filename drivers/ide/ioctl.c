@@ -47,7 +47,6 @@ static int do_cmd_ioctl(struct ata_device *drive, unsigned long arg)
 	u8 *argbuf = vals;
 	int argsize = 4;
 	struct ata_taskfile args;
-	struct request req;
 
 	/* Second phase.
 	 */
@@ -80,15 +79,7 @@ static int do_cmd_ioctl(struct ata_device *drive, unsigned long arg)
 
 	/* Issue ATA command and wait for completion.
 	 */
-	args.command_type = IDE_DRIVE_TASK_NO_DATA;
-	args.XXX_handler = ata_special_intr;
-
-	memset(&req, 0, sizeof(req));
-	req.flags = REQ_SPECIAL;
-	req.special = &args;
-
-	req.buffer = argbuf + 4;
-	err = ide_do_drive_cmd(drive, &req, ide_wait);
+	err = ide_raw_taskfile(drive, &args, argbuf + 4);
 
 	argbuf[0] = drive->status;
 	argbuf[1] = args.taskfile.feature;
@@ -130,9 +121,6 @@ int ata_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned
 	switch (cmd) {
 		case HDIO_GET_32BIT: {
 			unsigned long val = drive->channel->io_32bit;
-
-			if (!capable(CAP_SYS_ADMIN))
-				return -EACCES;
 
 			if (put_user(val, (unsigned long *) arg))
 				return -EFAULT;
@@ -181,9 +169,6 @@ int ata_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned
 		case HDIO_GET_UNMASKINTR: {
 			unsigned long val = drive->channel->unmask;
 
-			if (!capable(CAP_SYS_ADMIN))
-				return -EACCES;
-
 			if (put_user(val, (unsigned long *) arg))
 				return -EFAULT;
 
@@ -210,9 +195,6 @@ int ata_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned
 
 		case HDIO_GET_DMA: {
 			unsigned long val = drive->using_dma;
-
-			if (!capable(CAP_SYS_ADMIN))
-				return -EACCES;
 
 			if (put_user(val, (unsigned long *) arg))
 				return -EFAULT;
@@ -245,9 +227,6 @@ int ata_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned
 			struct hd_geometry *loc = (struct hd_geometry *) arg;
 			unsigned short bios_cyl = drive->bios_cyl; /* truncate */
 
-			if (!capable(CAP_SYS_ADMIN))
-				return -EACCES;
-
 			if (!loc || (drive->type != ATA_DISK && drive->type != ATA_FLOPPY))
 				return -EINVAL;
 
@@ -270,9 +249,6 @@ int ata_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned
 		case HDIO_GETGEO_BIG_RAW: {
 			struct hd_big_geometry *loc = (struct hd_big_geometry *) arg;
 
-			if (!capable(CAP_SYS_ADMIN))
-				return -EACCES;
-
 			if (!loc || (drive->type != ATA_DISK && drive->type != ATA_FLOPPY))
 				return -EINVAL;
 
@@ -293,8 +269,6 @@ int ata_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned
 		}
 
 		case HDIO_GET_IDENTITY:
-			if (!capable(CAP_SYS_ADMIN))
-				return -EACCES;
 
 			if (minor(inode->i_rdev) & PARTN_MASK)
 				return -EINVAL;
@@ -308,8 +282,6 @@ int ata_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned
 			return 0;
 
 		case HDIO_GET_NICE:
-			if (!capable(CAP_SYS_ADMIN))
-				return -EACCES;
 
 			return put_user(drive->dsc_overlap << IDE_NICE_DSC_OVERLAP |
 					drive->atapi_overlap << IDE_NICE_ATAPI_OVERLAP,
@@ -332,8 +304,6 @@ int ata_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned
 			return 0;
 
 		case HDIO_GET_BUSSTATE:
-			if (!capable(CAP_SYS_ADMIN))
-				return -EACCES;
 
 			if (put_user(drive->channel->bus_state, (long *)arg))
 				return -EFAULT;

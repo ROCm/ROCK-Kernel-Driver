@@ -14,9 +14,7 @@ dep_tristate '  Guillemot joysticks and gamepads' CONFIG_JOYSTICK_GUILLEMOT $CON
 dep_tristate '  InterAct digital joysticks and gamepads' CONFIG_JOYSTICK_INTERACT $CONFIG_INPUT $CONFIG_INPUT_JOYSTICK $CONFIG_GAMEPORT
 dep_tristate '  Microsoft SideWinder digital joysticks and gamepads' CONFIG_JOYSTICK_SIDEWINDER $CONFIG_INPUT $CONFIG_INPUT_JOYSTICK $CONFIG_GAMEPORT
 dep_tristate '  ThrustMaster DirectConnect joysticks and gamepads' CONFIG_JOYSTICK_TMDC $CONFIG_INPUT $CONFIG_INPUT_JOYSTICK $CONFIG_GAMEPORT
-
-dep_tristate '  I-Force USB joysticks and wheels' CONFIG_JOYSTICK_IFORCE_USB $CONFIG_INPUT $CONFIG_INPUT_JOYSTICK $CONFIG_USB
-dep_tristate '  I-Force Serial joysticks and wheels' CONFIG_JOYSTICK_IFORCE_232 $CONFIG_INPUT $CONFIG_INPUT_JOYSTICK $CONFIG_SERIO
+source drivers/input/joystick/iforce/Config.in
 dep_tristate '  Logitech WingMan Warrior joystick' CONFIG_JOYSTICK_WARRIOR $CONFIG_INPUT $CONFIG_INPUT_JOYSTICK $CONFIG_SERIO
 dep_tristate '  LogiCad3d Magellan/SpaceMouse 6dof controllers' CONFIG_JOYSTICK_MAGELLAN $CONFIG_INPUT $CONFIG_INPUT_JOYSTICK $CONFIG_SERIO
 dep_tristate '  SpaceTec SpaceOrb/Avenger 6dof controllers' CONFIG_JOYSTICK_SPACEORB $CONFIG_INPUT $CONFIG_INPUT_JOYSTICK $CONFIG_SERIO
