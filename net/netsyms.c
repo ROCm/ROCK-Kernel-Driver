@@ -70,11 +70,6 @@ EXPORT_SYMBOL(dst_alloc);
 EXPORT_SYMBOL(__dst_free);
 EXPORT_SYMBOL(dst_destroy);
 
-/*	misc. support routines */
-EXPORT_SYMBOL(net_ratelimit);
-EXPORT_SYMBOL(net_random);
-EXPORT_SYMBOL(net_srandom);
-
 /* Needed by unix.o */
 EXPORT_SYMBOL(files_stat);
 
