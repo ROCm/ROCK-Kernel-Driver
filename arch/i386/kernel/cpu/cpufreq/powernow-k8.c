@@ -494,7 +494,7 @@ check_supported_cpu(void)
 	struct cpuinfo_x86 *c = cpu_data;
 	u32 eax, ebx, ecx, edx;
 
-	if (num_online_cpus != 1) {
+	if (num_online_cpus() != 1) {
 		printk(KERN_INFO PFX "multiprocessor systems not supported\n");
 		return 0;
 	}
