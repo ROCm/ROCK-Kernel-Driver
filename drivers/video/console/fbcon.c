@@ -326,10 +326,6 @@ void set_con2fb_map(int unit, int newidx)
 		fb_display[unit].userfont = userfont;
 		fb_display[unit].fb_info = newfb;
 		gen_set_disp(unit, newfb);
-		if (vc)
-			vc->vc_display_fg = &newfb->display_fg;
-		if (!newfb->display_fg)
-			newfb->display_fg = vc;
 		/* tell console var has changed */
 		fbcon_changevar(unit);
 	}
@@ -346,8 +342,11 @@ struct display_switch fbcon_dummy;
 static const char *fbcon_startup(void)
 {
 	const char *display_desc = "frame buffer device";
-	int irqres = 1;
+	struct fbcon_font_desc *font = NULL;
+	struct fb_info *info;
+	struct vc_data *vc;
 	static int done = 0;
+	int irqres = 1;
 
 	/*
 	 *  If num_registered_fb is zero, this is a call for the dummy part.
@@ -357,6 +356,59 @@ static const char *fbcon_startup(void)
 		return display_desc;
 	done = 1;
 
+	info = registered_fb[num_registered_fb-1];	
+	if (!info)	return NULL;
+
+	if (info->fix.type != FB_TYPE_TEXT) {
+		if (fbcon_softback_size) {
+			if (!softback_buf) {
+				softback_buf =
+				    (unsigned long)
+				    kmalloc(fbcon_softback_size,
+					    GFP_KERNEL);
+				if (!softback_buf) {
+					fbcon_softback_size = 0;
+					softback_top = 0;
+				}
+			}
+		} else {
+			if (softback_buf) {
+				kfree((void *) softback_buf);
+				softback_buf = 0;
+				softback_top = 0;
+			}
+		}
+		if (softback_buf)
+			softback_in = softback_top = softback_curr =
+			    softback_buf;
+		softback_lines = 0;
+	}
+
+	font = fbcon_get_default_font(info->var.xres, info->var.yres);	
+
+	vc = (struct vc_data *) kmalloc(sizeof(struct vc_data), GFP_ATOMIC); 
+
+	/* Setup default font */
+	vc->vc_font.data = font->data;
+	vc->vc_font.width = font->width;
+	vc->vc_font.height = font->height;
+	vc->vc_font.charcount = 256; /* FIXME  Need to support more fonts */
+
+	vc->vc_cols = info->var.xres/vc->vc_font.width;
+	vc->vc_rows = info->var.yres/vc->vc_font.height;
+	
+	/* We trust the mode the driver supplies. */
+	if (info->fbops->fb_set_par)
+		info->fbops->fb_set_par(info);
+
+	DPRINTK("mode:   %s\n", info->fix.id);
+	DPRINTK("visual: %d\n", info->fix.visual);
+	DPRINTK("res:    %dx%d-%d\n", info->var.xres,
+		info->var.yres,
+		info->var.bits_per_pixel);
+
+	info->display_fg = vc;
+	
 #ifdef CONFIG_AMIGA
 	if (MACH_IS_AMIGA) {
 		cursor_blink_rate = AMIGA_CURSOR_BLINK_RATE;
@@ -441,24 +493,11 @@ static void fbcon_init(struct vc_data *vc, int init)
 	/* on which frame buffer will we open this console? */
 	info = registered_fb[(int) con2fb_map[unit]];
 
-	/* We trust the mode the driver supplies. */
-	if (info->fbops->fb_set_par)
-		info->fbops->fb_set_par(info);
-
 	gen_set_disp(unit, info);
-	DPRINTK("mode:   %s\n", info->modename);
-	DPRINTK("visual: %d\n", info->fix.visual);
-	DPRINTK("res:    %dx%d-%d\n", fb_display[unit].var.xres,
-		fb_display[unit].var.yres,
-		fb_display[unit].var.bits_per_pixel);
 	fb_display[unit].conp = vc;
 	fb_display[unit].fb_info = info;
 	/* clear out the cmap so we don't have dangling pointers */
 	fbcon_set_display(unit, init, !init);
-	/* Must be done after fbcon_set_display to prevent excess updates */
-	vc->vc_display_fg = &info->display_fg;
-	if (!info->display_fg)
-		info->display_fg = vc;
 }
 
 
@@ -488,31 +527,6 @@ static int fbcon_changevar(int con)
 		struct fbcon_font_desc *font;
 
 		info->var.xoffset = info->var.yoffset = p->yscroll = 0;	/* reset wrap/pan */
-
-		if (con == fg_console && info->fix.type != FB_TYPE_TEXT) {
-			if (fbcon_softback_size) {
-				if (!softback_buf) {
-					softback_buf =
-				    		(unsigned long)
-				    			kmalloc(fbcon_softback_size,
-					    		GFP_KERNEL);
-					if (!softback_buf) {
-						fbcon_softback_size = 0;
-						softback_top = 0;
-					}
-				}
-			} else {
-				if (softback_buf) {
-					kfree((void *) softback_buf);
-					softback_buf = 0;
-					softback_top = 0;
-				}
-			}
-			if (softback_buf)
-				softback_in = softback_top = softback_curr =
-			    			softback_buf;
-				softback_lines = 0;
-		}
 
 		for (i = 0; i < MAX_NR_CONSOLES; i++)
 			if (i != con && fb_display[i].fb_info == info &&
@@ -655,6 +669,7 @@ static void fbcon_set_display(int con, int init, int logo)
 {
 	struct display *p = &fb_display[con];
 	struct fb_info *info = p->fb_info;
+	struct vc_data *default_mode = info->display_fg;
 	struct vc_data *vc = p->conp;
 	int nr_rows, nr_cols;
 	int old_rows, old_cols;
@@ -667,31 +682,6 @@ static void fbcon_set_display(int con, int init, int logo)
 		logo = 0;
 
 	info->var.xoffset = info->var.yoffset = p->yscroll = 0;	/* reset wrap/pan */
-
-	if (con == fg_console && info->fix.type != FB_TYPE_TEXT) {
-		if (fbcon_softback_size) {
-			if (!softback_buf) {
-				softback_buf =
-				    (unsigned long)
-				    kmalloc(fbcon_softback_size,
-					    GFP_KERNEL);
-				if (!softback_buf) {
-					fbcon_softback_size = 0;
-					softback_top = 0;
-				}
-			}
-		} else {
-			if (softback_buf) {
-				kfree((void *) softback_buf);
-				softback_buf = 0;
-				softback_top = 0;
-			}
-		}
-		if (softback_buf)
-			softback_in = softback_top = softback_curr =
-			    softback_buf;
-		softback_lines = 0;
-	}
 
 	for (i = 0; i < MAX_NR_CONSOLES; i++)
 		if (i != con && fb_display[i].fb_info == info &&
