@@ -52,7 +52,7 @@ int do_IRQ(struct pt_regs *regs)
 	if ( is_soft_enabled() )
 		BUG();
 	
-        hardirq_enter( cpu );
+	irq_enter();
 
 	paca = (struct Paca *)mfspr(SPRG1);
 
@@ -71,7 +71,7 @@ int do_IRQ(struct pt_regs *regs)
 		__restore_flags( flags );
 	}
 
-        hardirq_exit( cpu );
+	irq_exit();
 
 	if ( paca->xLpPacaPtr->xDecrInt ) {
 		paca->xLpPacaPtr->xDecrInt = 0;
