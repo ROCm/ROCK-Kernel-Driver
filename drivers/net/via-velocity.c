@@ -359,6 +359,8 @@ static void __devexit velocity_remove1(struct pci_dev *pdev)
 	pci_disable_device(pdev);
 	pci_set_drvdata(pdev, NULL);
 	free_netdev(dev);
+
+	velocity_nics--;
 }
 
 /**
@@ -462,7 +464,7 @@ static void velocity_init_cam_filter(struct velocity_info *vptr)
 {
 	struct mac_regs * regs = vptr->mac_regs;
 
-	/* T urn on MCFG_PQEN, turn off MCFG_RTGOPT */
+	/* Turn on MCFG_PQEN, turn off MCFG_RTGOPT */
 	WORD_REG_BITS_SET(MCFG_PQEN, MCFG_RTGOPT, &regs->MCFG);
 	WORD_REG_BITS_ON(MCFG_VIDFR, &regs->MCFG);
 
@@ -490,12 +492,6 @@ static void velocity_init_cam_filter(struct velocity_info *vptr)
 	}
 }
 
-static inline void velocity_give_rx_desc(struct rx_desc *rd)
-{
-	*(u32 *)&rd->rdesc0 = 0;
-	rd->rdesc0.owner = cpu_to_le32(OWNED_BY_NIC);
-}
-
 /**
  *	velocity_rx_reset	-	handle a receive reset
  *	@vptr: velocity we are resetting
@@ -516,7 +512,7 @@ static void velocity_rx_reset(struct velocity_info *vptr)
 	 *	Init state, all RD entries belong to the NIC
 	 */
 	for (i = 0; i < vptr->options.numrx; ++i)
-		velocity_give_rx_desc(vptr->rd_ring + i);
+		vptr->rd_ring[i].rdesc0.owner = OWNED_BY_NIC;
 
 	writew(vptr->options.numrx, &regs->RBRDU);
 	writel(vptr->rd_pool_dma, &regs->RDBaseLo);
@@ -591,9 +587,14 @@ static void velocity_init_registers(struct velocity_info *vptr,
 
 		writeb(WOLCFG_SAM | WOLCFG_SAB, &regs->WOLCFGSet);
 		/*
-		 *	Bback off algorithm use original IEEE standard
+		 *	Back off algorithm use original IEEE standard
 		 */
 		BYTE_REG_BITS_SET(CFGB_OFSET, (CFGB_CRANDOM | CFGB_CAP | CFGB_MBA | CFGB_BAKOPT), &regs->CFGB);
+
+		/*
+		 *	Init CAM filter
+		 */
+		velocity_init_cam_filter(vptr);
 
 		/*
 		 *	Set packet filter: Receive directed and broadcast address
@@ -619,8 +620,6 @@ static void velocity_init_registers(struct velocity_info *vptr,
 			mac_tx_queue_run(regs, i);
 		}
 
-		velocity_init_cam_filter(vptr);
-
 		init_flow_control_register(vptr);
 
 		writel(CR0_STOP, &regs->CR0Clr);
@@ -628,7 +627,6 @@ static void velocity_init_registers(struct velocity_info *vptr,
 
 		mii_status = velocity_get_opt_media_mode(vptr);
 		netif_stop_queue(vptr->dev);
-		mac_clear_isr(regs);
 
 		mii_init(vptr, mii_status);
 
@@ -695,7 +693,7 @@ static int __devinit velocity_found1(struct pci_dev *pdev, const struct pci_devi
 	struct mac_regs * regs;
 	int ret = -ENOMEM;
 
-	if (velocity_nics++ >= MAX_UNITS) {
+	if (velocity_nics >= MAX_UNITS) {
 		printk(KERN_NOTICE VELOCITY_NAME ": already found %d NICs.\n", 
 				velocity_nics);
 		return -ENODEV;
@@ -727,7 +725,6 @@ static int __devinit velocity_found1(struct pci_dev *pdev, const struct pci_devi
 
 	vptr->dev = dev;
 
-	dev->priv = vptr;
 	dev->irq = pdev->irq;
 
 	ret = pci_enable_device(pdev);
@@ -762,7 +759,7 @@ static int __devinit velocity_found1(struct pci_dev *pdev, const struct pci_devi
 		dev->dev_addr[i] = readb(&regs->PAR[i]);
 
 
-	velocity_get_options(&vptr->options, velocity_nics - 1, dev->name);
+	velocity_get_options(&vptr->options, velocity_nics, dev->name);
 
 	/* 
 	 *	Mask out the options cannot be set to the chip
@@ -817,6 +814,7 @@ static int __devinit velocity_found1(struct pci_dev *pdev, const struct pci_devi
 		spin_unlock_irqrestore(&velocity_dev_list_lock, flags);
 	}
 #endif
+	velocity_nics++;
 out:
 	return ret;
 
@@ -869,10 +867,7 @@ static void __devinit velocity_init_info(struct pci_dev *pdev, struct velocity_i
 	vptr->io_size = info->io_size;
 	vptr->num_txq = info->txqueue;
 	vptr->multicast_limit = MCAM_SIZE;
-
 	spin_lock_init(&vptr->lock);
-	spin_lock_init(&vptr->xmit_lock);
-
 	INIT_LIST_HEAD(&vptr->list);
 }
 
@@ -1024,11 +1019,11 @@ static inline void velocity_give_many_rx_descs(struct velocity_info *vptr)
 
 	wmb();
 
-	unusable = vptr->rd_filled | 0x0003;
-	dirty = vptr->rd_dirty - unusable + 1;
+	unusable = vptr->rd_filled & 0x0003;
+	dirty = vptr->rd_dirty - unusable;
 	for (avail = vptr->rd_filled & 0xfffc; avail; avail--) {
 		dirty = (dirty > 0) ? dirty - 1 : vptr->options.numrx - 1;
-		velocity_give_rx_desc(vptr->rd_ring + dirty);
+		vptr->rd_ring[dirty].rdesc0.owner = OWNED_BY_NIC;
 	}
 
 	writew(vptr->rd_filled & 0xfffc, &regs->RBRDU);
@@ -1043,7 +1038,7 @@ static int velocity_rx_refill(struct velocity_info *vptr)
 		struct rx_desc *rd = vptr->rd_ring + dirty;
 
 		/* Fine for an all zero Rx desc at init time as well */
-		if (rd->rdesc0.owner == cpu_to_le32(OWNED_BY_NIC))
+		if (rd->rdesc0.owner == OWNED_BY_NIC)
 			break;
 
 		if (!vptr->rd_info[dirty].skb) {
@@ -1096,7 +1091,7 @@ out:
 }
 
 /**
- *	velocity_free_rd_ring	-	set up receive ring
+ *	velocity_free_rd_ring	-	free receive ring
  *	@vptr: velocity to clean up
  *
  *	Free the receive buffers for each ring slot and any
@@ -1161,8 +1156,10 @@ static int velocity_init_td_ring(struct velocity_info *vptr)
 		for (i = 0; i < vptr->options.numtx; i++, curr += sizeof(struct tx_desc)) {
 			td = &(vptr->td_rings[j][i]);
 			td_info = &(vptr->td_infos[j][i]);
-			td_info->buf = vptr->tx_bufs + (i + j) * PKT_BUF_SZ;
-			td_info->buf_dma = vptr->tx_bufs_dma + (i + j) * PKT_BUF_SZ;
+			td_info->buf = vptr->tx_bufs +
+				(j * vptr->options.numtx + i) * PKT_BUF_SZ;
+			td_info->buf_dma = vptr->tx_bufs_dma +
+				(j * vptr->options.numtx + i) * PKT_BUF_SZ;
 		}
 		vptr->td_tail[j] = vptr->td_curr[j] = vptr->td_used[j] = 0;
 	}
@@ -1238,14 +1235,16 @@ static int velocity_rx_srv(struct velocity_info *vptr, int status)
 	int rd_curr = vptr->rd_curr;
 	int works = 0;
 
-	while (1) {
+	do {
 		struct rx_desc *rd = vptr->rd_ring + rd_curr;
 
-		if (!vptr->rd_info[rd_curr].skb || (works++ > 15))
+		if (!vptr->rd_info[rd_curr].skb)
 			break;
 
 		if (rd->rdesc0.owner == OWNED_BY_NIC)
 			break;
+
+		rmb();
 
 		/*
 		 *	Don't drop CE or RL error frame although RXOK is off
@@ -1269,14 +1268,15 @@ static int velocity_rx_srv(struct velocity_info *vptr, int status)
 		rd_curr++;
 		if (rd_curr >= vptr->options.numrx)
 			rd_curr = 0;
-	}
+	} while (++works <= 15);
 
-	if (velocity_rx_refill(vptr) < 0) {
+	vptr->rd_curr = rd_curr;
+
+	if (works > 0 && velocity_rx_refill(vptr) < 0) {
 		VELOCITY_PRT(MSG_LEVEL_ERR, KERN_ERR
 			"%s: rx buf allocation failure\n", vptr->dev->name);
 	}
 
-	vptr->rd_curr = rd_curr;
 	VAR_USED(stats);
 	return works;
 }
