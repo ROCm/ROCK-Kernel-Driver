@@ -20,7 +20,9 @@ typedef enum {
       truncate or unlink. Safe link is used to avoid leakage of disk
       space on crash with some files open, but unlinked. */
     i_link_saved_unlink_mask   =  0x0010,
-    i_link_saved_truncate_mask =  0x0020
+    i_link_saved_truncate_mask =  0x0020,
+    i_priv_object              =  0x0080,
+    i_has_xattr_dir            =  0x0100,
 } reiserfs_inode_flags;
 
 
@@ -49,6 +51,10 @@ struct reiserfs_inode_info {
     ** flushed */
     unsigned long i_trans_id ;
     unsigned long i_trans_index ;
+
+    struct posix_acl *i_acl_access;
+    struct posix_acl *i_acl_default;
+    struct rw_semaphore xattr_sem;
     struct inode vfs_inode;
 };
 

@@ -6,6 +6,7 @@
 
 #ifdef __KERNEL__
 #include <linux/workqueue.h>
+#include <linux/rwsem.h>
 #endif
 
 typedef enum {
@@ -157,13 +158,17 @@ struct reiserfs_list_bitmap {
 ** transaction handle which is passed around for all journal calls
 */
 struct reiserfs_transaction_handle {
-				/* ifdef it. -Hans */
-  char *t_caller ;              /* debugging use */
+  struct super_block *t_super ; /* super for this FS when journal_begin was 
+				   called. saves calls to reiserfs_get_super 
+				   also used by nested transactions to make
+				   sure they are nesting on the right FS
+				   _must_ be first in the handle 
+				*/
+  int t_refcount;
   int t_blocks_logged ;         /* number of blocks this writer has logged */
   int t_blocks_allocated ;      /* number of blocks this writer allocated */
   unsigned long t_trans_id ;    /* sanity check, equals the current trans id */
-  struct super_block *t_super ; /* super for this FS when journal_begin was 
-                                   called. saves calls to reiserfs_get_super */
+  void *t_handle_save ;		/* save existing current->journal_info */
   int displace_new_blocks:1;	/* if new block allocation occurres, that block
 				   should be displaced from others */
 
@@ -403,6 +408,10 @@ struct reiserfs_sb_info
     struct proc_dir_entry *procdir;
     int reserved_blocks; /* amount of blocks reserved for further allocations */
     spinlock_t bitmap_lock; /* this lock on now only used to protect reserved_blocks variable */
+    struct dentry *priv_root; /* root of /.reiserfs_priv */
+    struct dentry *xattr_root; /* root of /.reiserfs_priv/.xa */
+    struct rw_semaphore xattr_dir_sem;
+
 };
 
 /* Definitions of reiserfs on-disk properties: */
@@ -443,6 +452,9 @@ struct reiserfs_sb_info
 #define REISERFS_HASHED_RELOCATION 13
 
 #define REISERFS_ATTRS 15
+#define REISERFS_XATTRS 18
+#define REISERFS_XATTRS_USER 19
+#define REISERFS_POSIXACL 20
 
 #define REISERFS_TEST1 11
 #define REISERFS_TEST2 12
@@ -465,6 +477,18 @@ struct reiserfs_sb_info
 #define reiserfs_attrs(s) (REISERFS_SB(s)->s_mount_opt & (1 << REISERFS_ATTRS))
 #define old_format_only(s) (REISERFS_SB(s)->s_properties & (1 << REISERFS_3_5))
 #define convert_reiserfs(s) (REISERFS_SB(s)->s_mount_opt & (1 << REISERFS_CONVERT))
+#define reiserfs_xattrs_user(s) (REISERFS_SB(s)->s_mount_opt & (1 << REISERFS_XATTRS_USER))
+#define reiserfs_posixacl(s) (REISERFS_SB(s)->s_mount_opt & (1 << REISERFS_POSIXACL))
+#define reiserfs_xattrs_optional(s) (reiserfs_xattrs_user(s) || reiserfs_posixacl(s))
+#define reiserfs_xattrs(s) reiserfs_xattrs_trusted(s)
+#ifndef CONFIG_REISERFS_FS_XATTR
+# define reiserfs_xattrs_trusted(s) (0)
+#else
+/* If xattrs are compiled in, trusted xattrs are "always on." */
+# define reiserfs_xattrs_trusted(s) (1)
+#endif
+
+
 
 
 void reiserfs_file_buffer (struct buffer_head * bh, int list);

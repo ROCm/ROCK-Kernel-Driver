@@ -5,6 +5,8 @@
 #include <linux/config.h>
 #include <linux/time.h>
 #include <linux/reiserfs_fs.h>
+#include <linux/reiserfs_acl.h>
+#include <linux/reiserfs_xattr.h>
 #include <linux/smp_lock.h>
 #include <linux/pagemap.h>
 #include <linux/highmem.h>
@@ -13,6 +15,7 @@
 #include <linux/buffer_head.h>
 #include <linux/mpage.h>
 #include <linux/writeback.h>
+#include <linux/quotaops.h>
 
 extern int reiserfs_default_io_size; /* default io size devuned in super.c */
 
@@ -38,6 +41,8 @@ void reiserfs_delete_inode (struct inode * inode)
     /* The = 0 happens when we abort creating a new inode for some reason like lack of space.. */
     if (!(inode->i_state & I_NEW) && INODE_PKEY(inode)->k_objectid != 0) { /* also handles bad_inode case */
 	down (&inode->i_sem); 
+
+	reiserfs_delete_xattrs (inode);
 
 	journal_begin(&th, inode->i_sb, jbegin_count) ;
 	reiserfs_update_inode_transaction(inode) ;
@@ -206,6 +211,10 @@ static int file_capable (struct inode * inode, long block)
   struct super_block *s = th->t_super ;
   int len = th->t_blocks_allocated ;
 
+  /* we cannot restart while nested */
+  if (th->t_refcount > 1) {
+      return  ;
+  }
   pathrelse(path) ;
   reiserfs_update_sd(th, inode) ;
   journal_end(th, s, len) ;
@@ -970,6 +979,9 @@ static void init_inode (struct inode * inode, struct path * path)
     REISERFS_I(inode)->i_prealloc_count = 0;
     REISERFS_I(inode)->i_trans_id = 0;
     REISERFS_I(inode)->i_trans_index = 0;
+    REISERFS_I(inode)->i_acl_access = NULL;
+    REISERFS_I(inode)->i_acl_default = NULL;
+    init_rwsem (&REISERFS_I(inode)->xattr_sem);
 
     if (stat_data_v1 (ih)) {
 	struct stat_data_v1 * sd = (struct stat_data_v1 *)B_I_PITEM (bh, ih);
@@ -1051,7 +1063,7 @@ static void init_inode (struct inode * inode, struct path * path)
 	inode->i_op = &reiserfs_dir_inode_operations;
 	inode->i_fop = &reiserfs_dir_operations;
     } else if (S_ISLNK (inode->i_mode)) {
-	inode->i_op = &page_symlink_inode_operations;
+	inode->i_op = &reiserfs_symlink_inode_operations;
 	inode->i_mapping->a_ops = &reiserfs_address_space_operations;
     } else {
 	inode->i_blocks = 0;
@@ -1630,6 +1642,9 @@ int reiserfs_new_inode (struct reiserfs_transaction_handle *th,
     REISERFS_I(inode)->i_attrs =
 	REISERFS_I(dir)->i_attrs & REISERFS_INHERIT_MASK;
     sd_attrs_to_i_attrs( REISERFS_I(inode) -> i_attrs, inode );
+    REISERFS_I(inode)->i_acl_access = NULL;
+    REISERFS_I(inode)->i_acl_default = NULL;
+    init_rwsem (&REISERFS_I(inode)->xattr_sem);
 
     if (old_format_only (sb))
 	make_le_item_head (&ih, 0, KEY_FORMAT_3_5, SD_OFFSET, TYPE_STAT_DATA, SD_V1_SIZE, MAX_US_INT);
@@ -1712,6 +1727,19 @@ int reiserfs_new_inode (struct reiserfs_transaction_handle *th,
 	reiserfs_check_path(&path_to_key) ;
 	journal_end(th, th->t_super, th->t_blocks_allocated);
 	goto out_inserted_sd;
+    }
+
+    /* XXX CHECK THIS */
+    if (reiserfs_posixacl (inode->i_sb)) {
+        retval = reiserfs_inherit_default_acl (dir, dentry, inode);
+        if (retval) {
+            err = retval;
+            reiserfs_check_path(&path_to_key) ;
+            journal_end(th, th->t_super, th->t_blocks_allocated);
+            goto out_inserted_sd;
+        }
+    } else if (inode->i_sb->s_flags & MS_POSIXACL) {
+        reiserfs_warning ("ACLs aren't enabled in the fs, but vfs thinks they are!\n");
     }
 
     insert_inode_hash (inode);
@@ -2380,6 +2408,69 @@ static int reiserfs_direct_IO(int rw, struct kiocb *iocb, const struct iovec *io
     return blockdev_direct_IO(rw, iocb, inode, inode->i_sb->s_bdev, iov,
 			      offset, nr_segs, reiserfs_get_blocks_direct_io, NULL);
 }
+
+
+int reiserfs_setattr(struct dentry *dentry, struct iattr *attr) {
+    struct inode *inode = dentry->d_inode ;
+    int error ;
+    unsigned int ia_valid = attr->ia_valid;
+    reiserfs_write_lock(inode->i_sb);
+    if (attr->ia_valid & ATTR_SIZE) {
+	/* version 2 items will be caught by the s_maxbytes check
+	** done for us in vmtruncate
+	*/
+	if (get_inode_item_key_version(inode) == KEY_FORMAT_3_5 &&
+	    attr->ia_size > MAX_NON_LFS) {
+	    error = -EFBIG ;
+	    goto out;
+	}
+	/* fill in hole pointers in the expanding truncate case. */
+        if (attr->ia_size > inode->i_size) {
+	    error = generic_cont_expand(inode, attr->ia_size) ;
+	    if (REISERFS_I(inode)->i_prealloc_count > 0) {
+		struct reiserfs_transaction_handle th ;
+		/* we're changing at most 2 bitmaps, inode + super */
+		journal_begin(&th, inode->i_sb, 4) ;
+		reiserfs_discard_prealloc (&th, inode);
+		journal_end(&th, inode->i_sb, 4) ;
+	    }
+	    if (error)
+	        goto out;
+	}
+    }
+
+    if ((((attr->ia_valid & ATTR_UID) && (attr->ia_uid & ~0xffff)) ||
+	 ((attr->ia_valid & ATTR_GID) && (attr->ia_gid & ~0xffff))) &&
+	(get_inode_sd_version (inode) == STAT_DATA_V1)) {
+		/* stat data of format v3.5 has 16 bit uid and gid */
+	    error = -EINVAL;
+	    goto out;	
+	}
+
+    error = inode_change_ok(inode, attr) ;
+    if (!error) {
+	if ((ia_valid & ATTR_UID && attr->ia_uid != inode->i_uid) ||
+	    (ia_valid & ATTR_GID && attr->ia_gid != inode->i_gid)) {
+                error = reiserfs_chown_xattrs (inode, attr);
+
+                if (!error)
+                    error = DQUOT_TRANSFER(inode, attr) ? -EDQUOT : 0;
+        }
+        if (!error)
+            inode_setattr(inode, attr) ;
+    }
+
+ 
+    if (!error && reiserfs_posixacl (inode->i_sb)) {
+        if (attr->ia_valid & ATTR_MODE)
+            error = reiserfs_acl_chmod (inode);
+    }
+
+out:
+    reiserfs_write_unlock(inode->i_sb);
+    return error ;
+}
+
 
 
 struct address_space_operations reiserfs_address_space_operations = {

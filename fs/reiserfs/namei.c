@@ -15,6 +15,8 @@
 #include <linux/time.h>
 #include <linux/bitops.h>
 #include <linux/reiserfs_fs.h>
+#include <linux/reiserfs_acl.h>
+#include <linux/reiserfs_xattr.h>
 #include <linux/smp_lock.h>
 
 #define INC_DIR_INODE_NLINK(i) if (i->i_nlink != 1) { i->i_nlink++; if (i->i_nlink >= REISERFS_LINK_MAX) i->i_nlink=1; }
@@ -331,11 +333,24 @@ static struct dentry * reiserfs_lookup (struct inode * dir, struct dentry * dent
     retval = reiserfs_find_entry (dir, dentry->d_name.name, dentry->d_name.len, &path_to_entry, &de);
     pathrelse (&path_to_entry);
     if (retval == NAME_FOUND) {
+        /* Hide the .reiserfs_priv directory */
+	if (reiserfs_xattrs (dir->i_sb) &&
+	    !old_format_only(dir->i_sb) &&
+            REISERFS_SB(dir->i_sb)->priv_root &&
+            REISERFS_SB(dir->i_sb)->priv_root->d_inode &&
+	    de.de_objectid == le32_to_cpu (INODE_PKEY(REISERFS_SB(dir->i_sb)->priv_root->d_inode)->k_objectid)) {
+	  return ERR_PTR (-EACCES);
+	}
+
 	inode = reiserfs_iget (dir->i_sb, (struct cpu_key *)&(de.de_dir_id));
 	if (!inode || IS_ERR(inode)) {
 	    reiserfs_write_unlock(dir->i_sb);
 	    return ERR_PTR(-EACCES);
         }
+
+	/* Propogate the priv_object flag so we know we're in the priv tree */
+	if (is_reiserfs_priv_object (dir))
+	    REISERFS_I(inode)->i_flags |= i_priv_object;
     }
     reiserfs_write_unlock(dir->i_sb);
     if ( retval == IO_ERROR ) {
@@ -565,6 +580,7 @@ static int reiserfs_create (struct inode * dir, struct dentry *dentry, int mode,
     struct inode * inode;
     int jbegin_count = JOURNAL_PER_BALANCE_CNT * 2 ;
     struct reiserfs_transaction_handle th ;
+    int locked;
 
     if (!(inode = new_inode(dir->i_sb))) {
 	return -ENOMEM ;
@@ -573,14 +589,21 @@ static int reiserfs_create (struct inode * dir, struct dentry *dentry, int mode,
     if (retval)
         return retval;
 
+    locked = reiserfs_cache_default_acl (dir);
+
     reiserfs_write_lock(dir->i_sb);
+
+    if (locked)
+        reiserfs_write_lock_xattrs (dir->i_sb);
     journal_begin(&th, dir->i_sb, jbegin_count) ;
-    th.t_caller = "create" ;
     retval = reiserfs_new_inode (&th, dir, mode, 0, 0/*i_size*/, dentry, inode);
     if (retval) {
         goto out_failed;
     }
 	
+    if (locked)
+        reiserfs_write_unlock_xattrs (dir->i_sb);
+
     inode->i_op = &reiserfs_file_inode_operations;
     inode->i_fop = &reiserfs_file_operations;
     inode->i_mapping->a_ops = &reiserfs_address_space_operations ;
@@ -612,6 +635,7 @@ static int reiserfs_mknod (struct inode * dir, struct dentry *dentry, int mode, 
     struct inode * inode;
     struct reiserfs_transaction_handle th ;
     int jbegin_count = JOURNAL_PER_BALANCE_CNT * 3; 
+    int locked;
 
     if (!new_valid_dev(rdev))
 	return -EINVAL;
@@ -623,10 +647,20 @@ static int reiserfs_mknod (struct inode * dir, struct dentry *dentry, int mode, 
     if (retval)
         return retval;
 
+    locked = reiserfs_cache_default_acl (dir);
+
     reiserfs_write_lock(dir->i_sb);
+
+    if (locked)
+        reiserfs_write_lock_xattrs (dir->i_sb);
+
     journal_begin(&th, dir->i_sb, jbegin_count) ;
 
     retval = reiserfs_new_inode (&th, dir, mode, 0, 0/*i_size*/, dentry, inode);
+
+    if (locked)
+        reiserfs_write_unlock_xattrs (dir->i_sb);
+
     if (retval) {
         goto out_failed;
     }
@@ -664,6 +698,7 @@ static int reiserfs_mkdir (struct inode * dir, struct dentry *dentry, int mode)
     struct inode * inode;
     struct reiserfs_transaction_handle th ;
     int jbegin_count = JOURNAL_PER_BALANCE_CNT * 3; 
+    int locked;
 
 #ifdef DISPLACE_NEW_PACKING_LOCALITIES
     /* set flag that new packing locality created and new blocks for the content     * of that directory are not displaced yet */
@@ -677,7 +712,11 @@ static int reiserfs_mkdir (struct inode * dir, struct dentry *dentry, int mode)
     if (retval)
         return retval;
 
+    locked = reiserfs_cache_default_acl (dir);
+
     reiserfs_write_lock(dir->i_sb);
+    if (locked)
+        reiserfs_write_lock_xattrs (dir->i_sb);
     journal_begin(&th, dir->i_sb, jbegin_count) ;
 
     /* inc the link count now, so another writer doesn't overflow it while
@@ -689,6 +728,9 @@ static int reiserfs_mkdir (struct inode * dir, struct dentry *dentry, int mode)
 				old_format_only (dir->i_sb) ? 
 				EMPTY_DIR_SIZE_V1 : EMPTY_DIR_SIZE,
 				dentry, inode);
+    if (locked)
+        reiserfs_write_unlock_xattrs (dir->i_sb);
+
     if (retval) {
 	dir->i_nlink-- ;
 	goto out_failed;
@@ -939,6 +981,8 @@ static int reiserfs_symlink (struct inode * parent_dir,
     memcpy (name, symname, strlen (symname));
     padd_item (name, item_len, strlen (symname));
 
+    /* We would inherit the default ACL here, but symlinks don't get ACLs */
+
     journal_begin(&th, parent_dir->i_sb, jbegin_count) ;
 
     retval = reiserfs_new_inode (&th, parent_dir, mode, name, strlen (symname), 
@@ -951,7 +995,7 @@ static int reiserfs_symlink (struct inode * parent_dir,
     reiserfs_update_inode_transaction(inode) ;
     reiserfs_update_inode_transaction(parent_dir) ;
 
-    inode->i_op = &page_symlink_inode_operations;
+    inode->i_op = &reiserfs_symlink_inode_operations;
     inode->i_mapping->a_ops = &reiserfs_address_space_operations;
 
     // must be sure this inode is written with this transaction
@@ -1327,5 +1371,28 @@ struct inode_operations reiserfs_dir_inode_operations = {
     .rmdir	= reiserfs_rmdir,
     .mknod	= reiserfs_mknod,
     .rename	= reiserfs_rename,
+    .setattr    = reiserfs_setattr,
+    .setxattr   = reiserfs_setxattr,
+    .getxattr   = reiserfs_getxattr,
+    .listxattr  = reiserfs_listxattr,
+    .removexattr = reiserfs_removexattr,
+    .permission     = reiserfs_permission,
 };
+
+/*
+ * symlink operations.. same as page_symlink_inode_operations, with xattr
+ * stuff added
+ */
+struct inode_operations reiserfs_symlink_inode_operations = {
+    .readlink       = page_readlink,
+    .follow_link    = page_follow_link,
+    .setattr        = reiserfs_setattr,
+    .setxattr       = reiserfs_setxattr,
+    .getxattr       = reiserfs_getxattr,
+    .listxattr      = reiserfs_listxattr,
+    .removexattr    = reiserfs_removexattr,
+    .permission     = reiserfs_permission,
+
+};
+
 
