@@ -690,6 +690,7 @@ include/linux/version.h: FORCE
 	fi;						\
 	if test $$? -ne 0; then				\
 	    echo '  UPD     $@';			\
+	    mkdir -p $(dir $@);				\
 	    $(call filechk_version.h) > $@;		\
 	fi
 
@@ -1062,14 +1063,14 @@ cmd = @$(if $($(quiet)cmd_$(1)),echo '  $($(quiet)cmd_$(1))' &&) $(cmd_$(1))
 define filechk
 	@set -e;				\
 	echo '  CHK     $@';			\
-	mkdir -p $(dir $@);			\
 	tmp=$$(/bin/mktemp /tmp/kbuild.XXXXXX);	\
 	$(filechk_$(1)) < $< > $$tmp;		\
 	if [ -r $@ ] && cmp -s $@ $$tmp; then	\
 		rm -f $$tmp;			\
 	else					\
 		echo '  UPD     $@';		\
-		mv -f $$tmp $@;		\
+		mkdir -p $(dir $@);		\
+		mv -f $$tmp $@;			\
 	fi
 endef
 

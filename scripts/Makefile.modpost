@@ -64,7 +64,7 @@ modver_file := $(wildcard modversions.$(shell echo $(ARCH)-$(CONFIG_CFGNAME)))
 quiet_cmd_modpost = MODPOST
       cmd_modpost = scripts/modpost $^ $(if $(modver_file),-i $(modver_file))
 __modpost: $(modules:.ko=.o)
-	$(call exec_cmd,modpost)
+	$(call cmd,modpost)
 endif
 
 targets += __modpost
