@@ -832,7 +832,12 @@ fast_exception_return:
 
 /* aargh, a nonrecoverable interrupt, panic */
 /* aargh, we don't know which trap this is */
-3:	li	r10,0
+/* but the 601 doesn't implement the RI bit, so assume it's OK */
+3:
+BEGIN_FTR_SECTION
+	b	2b
+END_FTR_SECTION_IFSET(CPU_FTR_601)
+	li	r10,-1
 	stw	r10,TRAP(r11)
 	addi	r3,r1,STACK_FRAME_OVERHEAD
 	li	r10,MSR_KERNEL
@@ -887,9 +892,9 @@ load_up_altivec:
 	add	r4,r4,r6
 	addi	r4,r4,THREAD	/* want THREAD of last_task_used_altivec */
 	SAVE_32VR(0,r10,r4)
-	MFVSCR(vr0)
+	mfvscr	vr0
 	li	r10,THREAD_VSCR
-	STVX(vr0,r10,r4)
+	stvx	vr0,r10,r4
 	lwz	r5,PT_REGS(r4)
 	add	r5,r5,r6
 	lwz	r4,_MSR-STACK_FRAME_OVERHEAD(r5)
@@ -902,8 +907,8 @@ load_up_altivec:
 	oris	r9,r9,MSR_VEC@h
 	mfspr	r5,SPRG3		/* current task's THREAD (phys) */
 	li	r10,THREAD_VSCR
-	LVX(vr0,r10,r5)
-	MTVSCR(vr0)
+	lvx	vr0,r10,r5
+	mtvscr	vr0
 	REST_32VR(0,r10,r5)
 #ifndef CONFIG_SMP
 	subi	r4,r5,THREAD
@@ -951,9 +956,9 @@ giveup_altivec:
 	lwz	r5,PT_REGS(r3)
 	cmpi	0,r5,0
 	SAVE_32VR(0, r4, r3)
-	MFVSCR(vr0)
+	mfvscr	vr0
 	li	r4,THREAD_VSCR
-	STVX(vr0, r4, r3)
+	stvx	vr0,r4,r3
 	beq	1f
 	lwz	r4,_MSR-STACK_FRAME_OVERHEAD(r5)
 	lis	r3,MSR_VEC@h
@@ -1272,7 +1277,11 @@ _GLOBAL(__setup_cpu_generic)
 setup_common_caches:
 	mfspr	r11,HID0
 	andi.	r0,r11,HID0_DCE
+#ifdef CONFIG_DCACHE_DISABLE
+	ori	r11,r11,HID0_ICE
+#else
 	ori	r11,r11,HID0_ICE|HID0_DCE
+#endif
 	ori	r8,r11,HID0_ICFI
 	bne	1f			/* don't invalidate the D-cache */
 	ori	r8,r8,HID0_DCI		/* unless it wasn't enabled */
@@ -1362,7 +1371,7 @@ setup_7450_23_hid0:
 	isync
 	blr
 
-/* 7450
+/* 7455
  * Enable Store Gathering (SGE), Branch Folding (FOLD)
  * Branch History Table (BHTE), Branch Target ICache (BTIC)
  * Dynamic Power Management (DPM), Speculative (SPD)
@@ -1546,7 +1555,7 @@ _GLOBAL(set_context)
 #endif
 	li	r4,0
 BEGIN_FTR_SECTION
-	dssall	0
+	dssall
 	sync
 END_FTR_SECTION_IFSET(CPU_FTR_ALTIVEC)
 3:
