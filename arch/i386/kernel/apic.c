@@ -636,7 +636,7 @@ static int __init lapic_enable(char *str)
 }
 __setup("lapic", lapic_enable);
 
-static int __init apic_enable(char *str)
+int __init apic_enable(char *str)
 {
 #ifdef CONFIG_X86_IO_APIC
 	extern int skip_ioapic_setup;

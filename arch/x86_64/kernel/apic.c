@@ -970,7 +970,7 @@ asmlinkage void smp_error_interrupt(void)
 }
 
 int disable_apic; 
-int enable_apic_up = 1;
+int enable_local_apic = 1;
 
 /*
  * This initializes the IO-APIC and APIC hardware if this is
