@@ -65,7 +65,7 @@
 
 /* PSG Port A Bit Nr 0 .. Side Sel .. 0 -> Side 1  1 -> Side 2 */
 #define DSKSIDE     (0x01)
-        
+
 #define DSKDRVNONE  (0x06)
 #define DSKDRV0     (0x02)
 #define DSKDRV1     (0x04)

@@ -34,7 +34,7 @@ unsigned short dma_map_page(unsigned long phys_addr,int count,int type) {
 	next_free_xlat_entry+=2;
 	if(next_free_xlat_entry>125)
 		next_free_xlat_entry=0;
-	
+
 #if 0
 	printk("next_free_xlat_entry: %d\n",next_free_xlat_entry);
 #endif

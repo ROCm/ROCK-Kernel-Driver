@@ -5,10 +5,10 @@ M68060 Software Package
 Production Release P1.00 -- October 10, 1994
 
 M68060 Software Package Copyright © 1993, 1994 Motorola Inc.  All rights reserved.
- 
+
 THE SOFTWARE is provided on an "AS IS" basis and without warranty.
 To the maximum extent permitted by applicable law,
-MOTOROLA DISCLAIMS ALL WARRANTIES WHETHER EXPRESS OR IMPLIED, 
+MOTOROLA DISCLAIMS ALL WARRANTIES WHETHER EXPRESS OR IMPLIED,
 INCLUDING IMPLIED WARRANTIES OF MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE
 and any warranty against infringement with regard to the SOFTWARE
 (INCLUDING ANY MODIFIED VERSIONS THEREOF) and any accompanying written materials.
@@ -86,7 +86,7 @@ test_fail:
 #############################################
 _060TESTS_:
 	link		%a6,&-384
-	
+
 	movm.l		&0x3f3c,-(%sp)
 	fmovm.x		&0xff,-(%sp)
 
@@ -138,7 +138,7 @@ _060TESTS_:
 
 _060TESTS_unimp:
 	link		%a6,&-384
-	
+
 	movm.l		&0x3f3c,-(%sp)
 	fmovm.x		&0xff,-(%sp)
 
@@ -164,7 +164,7 @@ _060TESTS_unimp:
 
 _060TESTS_enable:
 	link		%a6,&-384
-	
+
 	movm.l		&0x3f3c,-(%sp)
 	fmovm.x		&0xff,-(%sp)
 
@@ -687,7 +687,7 @@ fmovmx_0:
 
 	fmovm.l		%fpcr,%fpsr,%fpiar,IFPCREGS(%a6)
 	fmovm.x		&0xff,IFPREGS(%a6)
-	
+
 	mov.w		&0x0000,%cc
 
 	fmovm.x		%d0,-(%sp)
@@ -753,7 +753,7 @@ fmovmx_1:
 	movm.l		&0xffff,IREGS(%a6)
 
 	fmovm.l		%fpcr,%fpsr,%fpiar,IFPCREGS(%a6)
-	
+
 	mov.w		&0x0000,%cc
 
 	fmovm.x		(%sp)+,%d0
@@ -797,7 +797,7 @@ fmovmx_2:
 
 	fmovm.l		%fpcr,%fpsr,%fpiar,IFPCREGS(%a6)
 	fmovm.x		&0xff,IFPREGS(%a6)
-	
+
 	mov.w		&0x0000,%cc
 
 	fmovm.x		%d0,-(%sp)

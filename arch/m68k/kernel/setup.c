@@ -85,7 +85,7 @@ void (*mach_reset)( void );
 void (*mach_halt)( void );
 void (*mach_power_off)( void );
 long mach_max_dma_address = 0x00ffffff; /* default set to the lower 16MB */
-#if defined(CONFIG_AMIGA_FLOPPY) || defined(CONFIG_ATARI_FLOPPY) 
+#if defined(CONFIG_AMIGA_FLOPPY) || defined(CONFIG_ATARI_FLOPPY)
 void (*mach_floppy_setup) (char *, int *) __initdata = NULL;
 #endif
 #ifdef CONFIG_HEARTBEAT
@@ -143,7 +143,7 @@ static void __init m68k_parse_bootinfo(const struct bi_record *record)
 		/* Already set up by head.S */
 		break;
 
- 	    case BI_MEMCHUNK:
+	    case BI_MEMCHUNK:
 		if (m68k_num_memory < NUM_MEMINFO) {
 		    m68k_memory[m68k_num_memory].addr = data[0];
 		    m68k_memory[m68k_num_memory].size = data[1];
@@ -236,7 +236,7 @@ void __init setup_arch(char **cmdline_p)
 		volatile int zero = 0;
 		asm __volatile__ ("frestore %0" : : "m" (zero));
 	}
-#endif	
+#endif
 
 	init_mm.start_code = PAGE_OFFSET;
 	init_mm.end_code = (unsigned long) &_etext;
@@ -296,28 +296,28 @@ void __init setup_arch(char **cmdline_p)
 #endif
 #ifdef CONFIG_SUN3
 	    case MACH_SUN3:
-	    	config_sun3();
-	    	break;
+		config_sun3();
+		break;
 #endif
 #ifdef CONFIG_APOLLO
 	    case MACH_APOLLO:
-	    	config_apollo();
-	    	break;
+		config_apollo();
+		break;
 #endif
 #ifdef CONFIG_MVME147
 	    case MACH_MVME147:
-	    	config_mvme147();
-	    	break;
+		config_mvme147();
+		break;
 #endif
 #ifdef CONFIG_MVME16x
 	    case MACH_MVME16x:
-	    	config_mvme16x();
-	    	break;
+		config_mvme16x();
+		break;
 #endif
 #ifdef CONFIG_BVME6000
 	    case MACH_BVME6000:
-	    	config_bvme6000();
-	    	break;
+		config_bvme6000();
+		break;
 #endif
 #ifdef CONFIG_HP300
 	    case MACH_HP300:
@@ -384,11 +384,11 @@ void __init setup_arch(char **cmdline_p)
 
 /* set ISA defs early as possible */
 #if defined(CONFIG_ISA) && defined(MULTI_ISA)
-#if defined(CONFIG_Q40) 
+#if defined(CONFIG_Q40)
 	if (MACH_IS_Q40) {
 	    isa_type = Q40_ISA;
 	    isa_sex = 0;
-	} 
+	}
 #elif defined(CONFIG_GG2)
 	if (MACH_IS_AMIGA && AMIGAHW_PRESENT(GG2_ISA)){
 	    isa_type = GG2_ISA;

@@ -4,7 +4,7 @@
  * Atari time and real time clock stuff
  *
  * Assembled of parts of former atari/config.c 97-12-18 by Roman Hodek
- *  
+ *
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file COPYING in the main directory of this archive
  * for more details.
@@ -25,7 +25,7 @@ atari_sched_init(irqreturn_t (*timer_routine)(int, void *, struct pt_regs *))
     /* set Timer C data Register */
     mfp.tim_dt_c = INT_TICKS;
     /* start timer C, div = 1:100 */
-    mfp.tim_ct_cd = (mfp.tim_ct_cd & 15) | 0x60; 
+    mfp.tim_ct_cd = (mfp.tim_ct_cd & 15) | 0x60;
     /* install interrupt service routine for MFP Timer C */
     request_irq(IRQ_MFP_TIMC, timer_routine, IRQ_TYPE_SLOW,
                 "timer", timer_routine);
@@ -34,7 +34,7 @@ atari_sched_init(irqreturn_t (*timer_routine)(int, void *, struct pt_regs *))
 /* ++andreas: gettimeoffset fixed to check for pending interrupt */
 
 #define TICK_SIZE 10000
-  
+
 /* This is always executed with interrupts disabled.  */
 unsigned long atari_gettimeoffset (void)
 {
@@ -59,9 +59,9 @@ static void mste_read(struct MSTE_RTC *val)
 {
 #define COPY(v) val->v=(mste_rtc.v & 0xf)
 	do {
-		COPY(sec_ones) ; COPY(sec_tens) ; COPY(min_ones) ; 
-		COPY(min_tens) ; COPY(hr_ones) ; COPY(hr_tens) ; 
-		COPY(weekday) ; COPY(day_ones) ; COPY(day_tens) ; 
+		COPY(sec_ones) ; COPY(sec_tens) ; COPY(min_ones) ;
+		COPY(min_tens) ; COPY(hr_ones) ; COPY(hr_tens) ;
+		COPY(weekday) ; COPY(day_ones) ; COPY(day_tens) ;
 		COPY(mon_ones) ; COPY(mon_tens) ; COPY(year_ones) ;
 		COPY(year_tens) ;
 	/* prevent from reading the clock while it changed */
@@ -73,9 +73,9 @@ static void mste_write(struct MSTE_RTC *val)
 {
 #define COPY(v) mste_rtc.v=val->v
 	do {
-		COPY(sec_ones) ; COPY(sec_tens) ; COPY(min_ones) ; 
-		COPY(min_tens) ; COPY(hr_ones) ; COPY(hr_tens) ; 
-		COPY(weekday) ; COPY(day_ones) ; COPY(day_tens) ; 
+		COPY(sec_ones) ; COPY(sec_tens) ; COPY(min_ones) ;
+		COPY(min_tens) ; COPY(hr_ones) ; COPY(hr_tens) ;
+		COPY(weekday) ; COPY(day_ones) ; COPY(day_tens) ;
 		COPY(mon_ones) ; COPY(mon_tens) ; COPY(year_ones) ;
 		COPY(year_tens) ;
 	/* prevent from writing the clock while it changed */
@@ -104,14 +104,14 @@ int atari_mste_hwclk( int op, struct rtc_time *t )
     int hour, year;
     int hr24=0;
     struct MSTE_RTC val;
-    
+
     mste_rtc.mode=(mste_rtc.mode | 1);
     hr24=mste_rtc.mon_tens & 1;
     mste_rtc.mode=(mste_rtc.mode & ~1);
 
     if (op) {
         /* write: prepare values */
-        
+
         val.sec_ones = t->tm_sec % 10;
         val.sec_tens = t->tm_sec / 10;
         val.min_ones = t->tm_min % 10;
@@ -160,8 +160,8 @@ int atari_mste_hwclk( int op, struct rtc_time *t )
 
 int atari_tt_hwclk( int op, struct rtc_time *t )
 {
-    int sec=0, min=0, hour=0, day=0, mon=0, year=0, wday=0; 
-    unsigned long 	flags;
+    int sec=0, min=0, hour=0, day=0, mon=0, year=0, wday=0;
+    unsigned long	flags;
     unsigned char	ctrl;
     int pm = 0;
 
@@ -170,7 +170,7 @@ int atari_tt_hwclk( int op, struct rtc_time *t )
 
     if (op) {
         /* write: prepare values */
-        
+
         sec  = t->tm_sec;
         min  = t->tm_min;
         hour = t->tm_hour;
@@ -178,7 +178,7 @@ int atari_tt_hwclk( int op, struct rtc_time *t )
         mon  = t->tm_mon + 1;
         year = t->tm_year - atari_rtc_year_offset;
         wday = t->tm_wday + (t->tm_wday >= 0);
-        
+
         if (!(ctrl & RTC_24H)) {
 	    if (hour > 11) {
 		pm = 0x80;
@@ -188,7 +188,7 @@ int atari_tt_hwclk( int op, struct rtc_time *t )
 	    else if (hour == 0)
 		hour = 12;
         }
-        
+
         if (!(ctrl & RTC_DM_BINARY)) {
             BIN_TO_BCD(sec);
             BIN_TO_BCD(min);
@@ -199,7 +199,7 @@ int atari_tt_hwclk( int op, struct rtc_time *t )
             if (wday >= 0) BIN_TO_BCD(wday);
         }
     }
-    
+
     /* Reading/writing the clock registers is a bit critical due to
      * the regular update cycle of the RTC. While an update is in
      * progress, registers 0..9 shouldn't be touched.
@@ -242,7 +242,7 @@ int atari_tt_hwclk( int op, struct rtc_time *t )
 
     if (!op) {
         /* read: adjust values */
-        
+
         if (hour & 0x80) {
 	    hour &= ~0x80;
 	    pm = 1;
@@ -284,7 +284,7 @@ int atari_mste_set_clock_mmss (unsigned long nowtime)
     struct MSTE_RTC val;
     unsigned char rtc_minutes;
 
-    mste_read(&val);  
+    mste_read(&val);
     rtc_minutes= val.min_ones + val.min_tens * 10;
     if ((rtc_minutes < real_minutes
          ? real_minutes - rtc_minutes

@@ -109,7 +109,7 @@ void __init mem_init(void)
 			continue;
 		}
 	}
-	
+
 #ifndef CONFIG_SUN3
 	/* insert pointer tables allocated so far into the tablelist */
 	init_pointer_table((unsigned long)kernel_pg_dir);

@@ -159,7 +159,7 @@ static unsigned int serports[]={0x3f8,0x2f8,0x3e8,0x2e8,0};
 void q40_disable_irqs(void)
 {
   unsigned i,j;
-  
+
   j=0;
   while((i=serports[j++])) outb(0,i+UART_IER);
   master_outb(0,EXT_ENABLE_REG);
@@ -170,16 +170,16 @@ void __init config_q40(void)
 {
     mach_sched_init      = q40_sched_init;
 
-    mach_init_IRQ        = q40_init_IRQ;   
-    mach_gettimeoffset   = q40_gettimeoffset; 
-    mach_hwclk           = q40_hwclk; 
+    mach_init_IRQ        = q40_init_IRQ;
+    mach_gettimeoffset   = q40_gettimeoffset;
+    mach_hwclk           = q40_hwclk;
     mach_get_ss          = q40_get_ss;
     mach_get_rtc_pll     = q40_get_rtc_pll;
     mach_set_rtc_pll     = q40_set_rtc_pll;
     mach_set_clock_mmss	 = q40_set_clock_mmss;
 
     mach_reset		 = q40_reset;
-    mach_free_irq	 = q40_free_irq; 
+    mach_free_irq	 = q40_free_irq;
     mach_process_int	 = q40_process_int;
     mach_get_irq_list	 = show_q40_interrupts;
     mach_request_irq	 = q40_request_irq;
@@ -204,9 +204,9 @@ void __init config_q40(void)
     q40_disable_irqs();
 
     /* no DMA at all, but ide-scsi requires it.. make sure
-     * all physical RAM fits into the boundary - otherwise 
+     * all physical RAM fits into the boundary - otherwise
      * allocator may play costly and useless tricks */
-    mach_max_dma_address = 1024*1024*1024;   
+    mach_max_dma_address = 1024*1024*1024;
 
     /* useful for early debugging stages - writes kernel messages into SRAM */
     if (!strncmp( m68k_debug_device,"mem",3 ))
@@ -286,7 +286,7 @@ int q40_hwclk(int op, struct rtc_time *t)
 	  t->tm_sec  = bcd2bin (Q40_RTC_SECS);
 
 	  Q40_RTC_CTRL &= ~(Q40_RTC_READ);
-	  
+
 	  if (t->tm_year < 70)
 	    t->tm_year += 100;
 	  t->tm_wday = bcd2bin(Q40_RTC_DOW)-1;
@@ -319,7 +319,7 @@ int q40_set_clock_mmss (unsigned long nowtime)
 	if ((rtc_minutes < real_minutes
 		? real_minutes - rtc_minutes
 			: rtc_minutes - real_minutes) < 30)
-	{	   
+	{
 	        Q40_RTC_CTRL |= Q40_RTC_WRITE;
 		Q40_RTC_MINS = bin2bcd(real_minutes);
 		Q40_RTC_SECS = bin2bcd(real_seconds);

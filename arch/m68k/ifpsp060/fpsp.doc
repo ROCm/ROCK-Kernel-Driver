@@ -5,10 +5,10 @@ M68060 Software Package
 Production Release P1.00 -- October 10, 1994
 
 M68060 Software Package Copyright © 1993, 1994 Motorola Inc.  All rights reserved.
- 
+
 THE SOFTWARE is provided on an "AS IS" basis and without warranty.
 To the maximum extent permitted by applicable law,
-MOTOROLA DISCLAIMS ALL WARRANTIES WHETHER EXPRESS OR IMPLIED, 
+MOTOROLA DISCLAIMS ALL WARRANTIES WHETHER EXPRESS OR IMPLIED,
 INCLUDING IMPLIED WARRANTIES OF MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE
 and any warranty against infringement with regard to the SOFTWARE
 (INCLUDING ANY MODIFIED VERSIONS THEREOF) and any accompanying written materials.
@@ -31,7 +31,7 @@ or trademarks of Motorola, Inc.
 
 The file fpsp.sa contains the 68060 Floating-Point Software
 Package. This package is essentially a set of exception handlers
-that can be integrated into an operating system. 
+that can be integrated into an operating system.
 These exception handlers emulate Unimplemented FP instructions,
 instructions using unimplemented data types, and instructions
 using unimplemented addressing modes. In addition, this package
@@ -62,14 +62,14 @@ Release file structure:
 -----------------------
 
 (top of module)
-	----------------- 
+	-----------------
 	|		| - 128 byte-sized section
    (1)  |   Call-Out	| - 4 bytes per entry (user fills these in)
 	|		| - example routines in fskeleton.s
 	-----------------
 	|		| - 8 bytes per entry
    (2)  | Entry Point	| - user does "bra" or "jmp" to this address
-	|		| 
+	|		|
 	-----------------
 	|		| - code section
    (3)  ~		~
@@ -79,14 +79,14 @@ Release file structure:
 
 The first section of this module is the "Call-out" section. This section
 is NOT INCLUDED in fpsp.sa (an example "Call-out" section is provided at
-the end of the file fskeleton.s). The purpose of this section is to allow 
-the FPSP routines to reference external functions that must be provided 
-by the host operating system. This section MUST be exactly 128 bytes in 
+the end of the file fskeleton.s). The purpose of this section is to allow
+the FPSP routines to reference external functions that must be provided
+by the host operating system. This section MUST be exactly 128 bytes in
 size. There are 32 fields, each 4 bytes in size. Each field corresponds
 to a function required by the FPSP (these functions and their location are
 listed in "68060FPSP call-outs" below). Each field entry should contain
 the address of the corresponding function RELATIVE to the starting address
-of the "call-out" section. The "Call-out" section must sit adjacent to the 
+of the "call-out" section. The "Call-out" section must sit adjacent to the
 fpsp.sa image in memory.
 
 The second section, the "Entry-point" section, is used by external routines
@@ -97,7 +97,7 @@ are listed in section "68060 FPSP entry points" below. A calling routine
 would simply execute a "bra" or "jmp" that jumped to the selected function
 entry-point.
 
-For example, if the 68060 hardware took a "Line-F Emulator" exception 
+For example, if the 68060 hardware took a "Line-F Emulator" exception
 (vector #11), the operating system should execute something similar to:
 
 	bra	_060FPSP_TOP+128+48

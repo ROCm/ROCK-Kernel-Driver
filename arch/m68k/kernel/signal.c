@@ -121,7 +121,7 @@ do_rt_sigsuspend(struct pt_regs *regs)
 	}
 }
 
-asmlinkage int 
+asmlinkage int
 sys_sigaction(int sig, const struct old_sigaction *act,
 	      struct old_sigaction *oact)
 {
@@ -329,7 +329,7 @@ restore_sigcontext(struct pt_regs *regs, struct sigcontext *usc, void *fp,
 	/* get previous context */
 	if (copy_from_user(&context, usc, sizeof(context)))
 		goto badframe;
-	
+
 	/* restore passed registers */
 	regs->d1 = context.sc_d1;
 	regs->a0 = context.sc_a0;
@@ -521,7 +521,7 @@ asmlinkage int do_sigreturn(unsigned long __unused)
 	sigdelsetmask(&set, ~_BLOCKABLE);
 	current->blocked = set;
 	recalc_sigpending();
-	
+
 	if (restore_sigcontext(regs, &frame->sc, frame + 1, &d0))
 		goto badframe;
 	return d0;
@@ -548,7 +548,7 @@ asmlinkage int do_rt_sigreturn(unsigned long __unused)
 	sigdelsetmask(&set, ~_BLOCKABLE);
 	current->blocked = set;
 	recalc_sigpending();
-	
+
 	if (rt_restore_ucontext(regs, sw, &frame->uc, &d0))
 		goto badframe;
 	return d0;
@@ -1091,7 +1091,7 @@ asmlinkage int do_signal(sigset_t *oldset, struct pt_regs *regs)
 				current->state = TASK_STOPPED;
 				current->exit_code = signr;
 				sighand = current->parent->sighand;
-				if (sighand && !(sighand->action[SIGCHLD-1].sa.sa_flags 
+				if (sighand && !(sighand->action[SIGCHLD-1].sa.sa_flags
 					     & SA_NOCLDSTOP))
 					notify_parent(current, SIGCHLD);
 				schedule();

@@ -176,7 +176,7 @@ int __init mac_parse_bootinfo(const struct bi_record *record)
 
 /*
  * Flip into 24bit mode for an instant - flushes the L2 cache card. We
- * have to disable interrupts for this. Our IRQ handlers will crap 
+ * have to disable interrupts for this. Our IRQ handlers will crap
  * themselves if they take an IRQ in 24bit mode!
  */
 
@@ -232,10 +232,10 @@ void __init config_mac(void)
 	/*
 	 * Determine hardware present
 	 */
-     
+
 	mac_identify();
 	mac_report_hardware();
-    
+
 	/* AFAIK only the IIci takes a cache card.  The IIfx has onboard
 	   cache ... someone needs to figure out how to tell if it's on or
 	   not. */
@@ -252,21 +252,21 @@ void __init config_mac(void)
 #ifdef OLD_NUBUS_CODE
 	 nubus_sweep_video();
 #endif
-}	
+}
 
 
 /*
- *	Macintosh Table: hardcoded model configuration data. 
+ *	Macintosh Table: hardcoded model configuration data.
  *
- *	Much of this was defined by Alan, based on who knows what docs. 
- *	I've added a lot more, and some of that was pure guesswork based 
- *	on hardware pages present on the Mac web site. Possibly wildly 
+ *	Much of this was defined by Alan, based on who knows what docs.
+ *	I've added a lot more, and some of that was pure guesswork based
+ *	on hardware pages present on the Mac web site. Possibly wildly
  *	inaccurate, so look here if a new Mac model won't run. Example: if
  *	a Mac crashes immediately after the VIA1 registers have been dumped
- *	to the screen, it probably died attempting to read DirB on a RBV. 
+ *	to the screen, it probably died attempting to read DirB on a RBV.
  *	Meaning it should have MAC_VIA_IIci here :-)
  */
- 
+
 struct mac_model *macintosh_config;
 EXPORT_SYMBOL(macintosh_config);
 
@@ -288,9 +288,9 @@ static struct mac_model mac_data_table[]=
 
 	/*
 	 *	Original MacII hardware
-	 *	
+	 *
 	 */
-	 
+
 	{
 		.ident		= MAC_MODEL_II,
 		.name		= "II",
@@ -324,7 +324,7 @@ static struct mac_model mac_data_table[]=
 		.scc_type	= MAC_SCC_II,
 		.nubus_type	= MAC_NUBUS
 	},
-	
+
 	/*
 	 *	Weirdified MacII hardware - all subtley different. Gee thanks
 	 *	Apple. All these boxes seem to have VIA2 in a different place to
@@ -373,7 +373,7 @@ static struct mac_model mac_data_table[]=
 		.scc_type	= MAC_SCC_II,
 		.nubus_type	= MAC_NUBUS
 	},
-	
+
 	/*
 	 *	Classic models (guessing: similar to SE/30 ?? Nope, similar to LC ...)
 	 */
@@ -398,7 +398,7 @@ static struct mac_model mac_data_table[]=
 	/*
 	 *	Some Mac LC machines. Basically the same as the IIci, ADB like IIsi
 	 */
-	
+
 	{
 		.ident		= MAC_MODEL_LC,
 		.name		= "LC",
@@ -426,15 +426,15 @@ static struct mac_model mac_data_table[]=
 	},
 
 	/*
-	 *	Quadra. Video is at 0xF9000000, via is like a MacII. We label it differently 
-	 *	as some of the stuff connected to VIA2 seems different. Better SCSI chip and 
-	 *	onboard ethernet using a NatSemi SONIC except the 660AV and 840AV which use an 
+	 *	Quadra. Video is at 0xF9000000, via is like a MacII. We label it differently
+	 *	as some of the stuff connected to VIA2 seems different. Better SCSI chip and
+	 *	onboard ethernet using a NatSemi SONIC except the 660AV and 840AV which use an
 	 *	AMD 79C940 (MACE).
 	 *	The 700, 900 and 950 have some I/O chips in the wrong place to
 	 *	confuse us. The 840AV has a SCSI location of its own (same as
 	 *	the 660AV).
-	 */	 
-	 
+	 */
+
 	{
 		.ident		= MAC_MODEL_Q605,
 		.name		= "Quadra 605",
@@ -528,7 +528,7 @@ static struct mac_model mac_data_table[]=
 		.nubus_type	= MAC_NUBUS
 	},
 
-	/* 
+	/*
 	 *	Performa - more LC type machines
 	 */
 
@@ -816,7 +816,7 @@ void mac_identify(void)
 {
 	struct mac_model *m;
 
-	/* Penguin data useful? */	
+	/* Penguin data useful? */
 	int model = mac_bi_data.id;
 	if (!model) {
 		/* no bootinfo model id -> NetBSD booter was used! */
@@ -825,7 +825,7 @@ void mac_identify(void)
 		printk (KERN_WARNING "No bootinfo model ID, using cpuid instead (hey, use Penguin!)\n");
 	}
 
-	macintosh_config = mac_data_table; 
+	macintosh_config = mac_data_table;
 	for (m = macintosh_config ; m->ident != -1 ; m++) {
 		if (m->ident == model) {
 			macintosh_config = m;
@@ -846,19 +846,19 @@ void mac_identify(void)
 	 * Report booter data:
 	 */
 	printk (KERN_DEBUG " Penguin bootinfo data:\n");
-	printk (KERN_DEBUG " Video: addr 0x%lx row 0x%lx depth %lx dimensions %ld x %ld\n", 
-		mac_bi_data.videoaddr, mac_bi_data.videorow, 
-		mac_bi_data.videodepth, mac_bi_data.dimensions & 0xFFFF, 
-		mac_bi_data.dimensions >> 16); 
+	printk (KERN_DEBUG " Video: addr 0x%lx row 0x%lx depth %lx dimensions %ld x %ld\n",
+		mac_bi_data.videoaddr, mac_bi_data.videorow,
+		mac_bi_data.videodepth, mac_bi_data.dimensions & 0xFFFF,
+		mac_bi_data.dimensions >> 16);
 	printk (KERN_DEBUG " Videological 0x%lx phys. 0x%lx, SCC at 0x%lx \n",
-		mac_bi_data.videological, mac_orig_videoaddr, 
-		mac_bi_data.sccbase); 
+		mac_bi_data.videological, mac_orig_videoaddr,
+		mac_bi_data.sccbase);
 	printk (KERN_DEBUG " Boottime: 0x%lx GMTBias: 0x%lx \n",
-		mac_bi_data.boottime, mac_bi_data.gmtbias); 
+		mac_bi_data.boottime, mac_bi_data.gmtbias);
 	printk (KERN_DEBUG " Machine ID: %ld CPUid: 0x%lx memory size: 0x%lx \n",
-		mac_bi_data.id, mac_bi_data.cpuid, mac_bi_data.memsize); 
+		mac_bi_data.id, mac_bi_data.cpuid, mac_bi_data.memsize);
 #if 0
-	printk ("Ramdisk: addr 0x%lx size 0x%lx\n", 
+	printk ("Ramdisk: addr 0x%lx size 0x%lx\n",
 		m68k_ramdisk.addr, m68k_ramdisk.size);
 #endif
 

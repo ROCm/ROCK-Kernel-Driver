@@ -46,7 +46,7 @@
 
 #define ALIGN(val,align)	(((val) + ((align) - 1)) & ~((align) - 1))
 
-#define MAX(val1, val2) 	(((val1) > (val2)) ? val1 : val2)
+#define MAX(val1, val2)		(((val1) > (val2)) ? val1 : val2)
 
 /*
  * Offsets relative to the I/O and memory base addresses from where resources

@@ -20,7 +20,7 @@
 /* baud_bases for the common clocks in the Atari. These are the real
  * frequencies divided by 16.
  */
-   
+
 #define SCC_BAUD_BASE_TIMC	19200	/* 0.3072 MHz from TT-MFP, Timer C */
 #define SCC_BAUD_BASE_BCLK	153600	/* 2.4576 MHz */
 #define SCC_BAUD_BASE_PCLK4	229500	/* 3.6720 MHz */

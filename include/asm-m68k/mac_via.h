@@ -5,7 +5,7 @@
  *	via them as are assorted bits and bobs - eg rtc, adb. The picture
  *	is a bit incomplete as the Mac documentation doesn't cover this well
  */
- 
+
 #ifndef _ASM_MAC_VIA_H_
 #define _ASM_MAC_VIA_H_
 
@@ -21,7 +21,7 @@
 #define VIA1_BASE	(0x50F00000)
 #define VIA2_BASE	(0x50F02000)
 #define  RBV_BASE	(0x50F26000)
- 
+
 /*
  *	Not all of these are true post MacII I think.
  *      CSA: probably the ones CHRP marks as 'unused' change purposes
@@ -34,9 +34,9 @@
  * VIA1A_vSccWrReq not available and that VIA1A_vSync has moved to an IOP.
  * Also, "All of the functionality of VIA2 has been moved to other chips".
  */
- 
+
 #define VIA1A_vSccWrReq	0x80	/* SCC write. (input)
-				 * [CHRP] SCC WREQ: Reflects the state of the 
+				 * [CHRP] SCC WREQ: Reflects the state of the
 				 * Wait/Request pins from the SCC.
 				 * [Macintosh Family Hardware]
 				 * as CHRP on SE/30,II,IIx,IIcx,IIci.
@@ -93,7 +93,7 @@
 #define VIA1A_CPUID1	0x04	/* CPU id bit 0 on RBV, others */
 #define VIA1A_CPUID2	0x10	/* CPU id bit 0 on RBV, others */
 #define VIA1A_CPUID3	0x40	/* CPU id bit 0 on RBV, others */
- 	
+
 /* Info on VIA1B is from Macintosh Family Hardware & MkLinux.
  * CHRP offers no info. */
 #define VIA1B_vSound	0x80	/* Sound enable (for compatibility with
@@ -123,7 +123,7 @@
 #define	EVRB_SFTWRID	0x80	/* Software Interrupt ReQuest */
 
 /*
- *	VIA2 A register is the interrupt lines raised off the nubus 
+ *	VIA2 A register is the interrupt lines raised off the nubus
  *	slots.
  *      The below info is from 'Macintosh Family Hardware.'
  *      MkLinux calls the 'IIci internal video IRQ' below the 'RBV slot 0 irq.'
@@ -131,7 +131,7 @@
  *      defines the 'Video IRQ' as 0x40 for the 'EVR' VIA work-alike.
  *      Perhaps OSS uses vRAM1 and vRAM2 for ADB.
  */
- 
+
 #define VIA2A_vRAM1	0x80	/* RAM size bit 1 (IIci: reserved) */
 #define VIA2A_vRAM0	0x40	/* RAM size bit 0 (IIci: internal video IRQ) */
 #define VIA2A_vIRQE	0x20	/* IRQ from slot $E */
@@ -148,11 +148,11 @@
  *  1    0    4 Mbit
  *  1    1   16 Mbit
  */
- 
+
 /*
  *	Register B has the fun stuff in it
  */
- 
+
 #define VIA2B_vVBL	0x80	/* VBL output to VIA1 (60.15Hz) driven by
 				 * timer T1.
 				 * on IIci, parity test: 0=test mode.
@@ -184,11 +184,11 @@
  * right bit in the VIA chip (6522 Versatile Interface Adapter).
  * [CSA: don't know which one this is, but it's one of 'em!]
  */
- 
+
 /*
  *	6522 registers - see databook.
  * CSA: Assignments for VIA1 confirmed from CHRP spec.
- */ 
+ */
 
 /* partial address decode.  0xYYXX : XX part for RBV, YY part for VIA */
 /* Note: 15 VIA regs, 8 RBV regs */
@@ -217,7 +217,7 @@
  * decode the bottom eight -- so vBufB | rBufB will always get you BufB */
 /* CSA: in fact, only bits 0,1, and 4 seem to be decoded.
  * BUT note the values for rIER and rIFR, where the top 8 bits *do* seem
- * to matter.  In fact *all* of the top 8 bits seem to matter; 
+ * to matter.  In fact *all* of the top 8 bits seem to matter;
  * setting rIER=0x1813 and rIFR=0x1803 doesn't work, either.
  * Perhaps some sort of 'compatibility mode' is built-in? [21-May-1999]
  */

@@ -116,7 +116,7 @@ void __init base_trap_init(void)
 
 		__asm__ volatile ("movec %%vbr, %0" : "=r" ((void*)sun3x_prom_vbr));
 	}
-	
+
 	/* setup the exception vector table */
 	__asm__ volatile ("movec %0,%%vbr" : : "r" ((void*)vectors));
 
@@ -352,7 +352,7 @@ static inline unsigned long probe040(int iswrite, unsigned long addr, int wbs)
 
 	asm volatile (".chip 68040; movec %%mmusr,%0; .chip 68k" : "=r" (mmusr));
 
-	set_fs(old_fs); 
+	set_fs(old_fs);
 
 	return mmusr;
 }
@@ -379,8 +379,8 @@ static inline int do_040writeback1(unsigned short wbs, unsigned long wba,
 	}
 
 	/* set_fs can not be moved, otherwise put_user() may oops */
-	set_fs(old_fs); 
-	
+	set_fs(old_fs);
+
 
 #ifdef DEBUG
 	printk("do_040writeback1, res=%d\n",res);
@@ -390,7 +390,7 @@ static inline int do_040writeback1(unsigned short wbs, unsigned long wba,
 }
 
 /* after an exception in a writeback the stack frame corresponding
- * to that exception is discarded, set a few bits in the old frame 
+ * to that exception is discarded, set a few bits in the old frame
  * to simulate what it should look like
  */
 static inline void fix_xframe040(struct frame *fp, unsigned long wba, unsigned short wbs)
@@ -415,7 +415,7 @@ static inline void do_040writebacks(struct frame *fp)
 				       fp->un.fmt7.wb2d);
 		if (res)
 			fix_xframe040(fp, fp->un.fmt7.wb2a, fp->un.fmt7.wb2s);
-		else 
+		else
 			fp->un.fmt7.wb2s = 0;
 	}
 
@@ -461,9 +461,9 @@ static inline void access_error040(struct frame *fp)
 
 #ifdef DEBUG
 	printk("ssw=%#x, fa=%#lx\n", ssw, fp->un.fmt7.faddr);
-        printk("wb1s=%#x, wb2s=%#x, wb3s=%#x\n", fp->un.fmt7.wb1s,  
+        printk("wb1s=%#x, wb2s=%#x, wb3s=%#x\n", fp->un.fmt7.wb1s,
 		fp->un.fmt7.wb2s, fp->un.fmt7.wb3s);
-	printk ("wb2a=%lx, wb3a=%lx, wb2d=%lx, wb3d=%lx\n", 
+	printk ("wb2a=%lx, wb3a=%lx, wb2d=%lx, wb3d=%lx\n",
 		fp->un.fmt7.wb2a, fp->un.fmt7.wb3a,
 		fp->un.fmt7.wb2d, fp->un.fmt7.wb3d);
 #endif
@@ -491,7 +491,7 @@ static inline void access_error040(struct frame *fp)
 			errorcode = 0;
 		}
 
-		/* despite what documentation seems to say, RMW 
+		/* despite what documentation seems to say, RMW
 		 * accesses have always both the LK and RW bits set */
 		if (!(ssw & RW_040) || (ssw & LK_040))
 			errorcode |= 2;
@@ -547,7 +547,7 @@ static inline void bus_error030 (struct frame *fp)
 			fp->ptregs.format == 0xa ? fp->ptregs.pc + 2 : fp->un.fmtb.baddr - 2
 			:
 			fp->ptregs.format == 0xa ? fp->ptregs.pc + 4 : fp->un.fmtb.baddr);
-	if (ssw & DF) 
+	if (ssw & DF)
 		printk ("Data %s fault at %#010lx in %s (pc=%#lx)\n",
 			ssw & RW ? "read" : "write",
 			fp->un.fmtb.daddr,
@@ -559,7 +559,7 @@ static inline void bus_error030 (struct frame *fp)
 	 * the testing for a bad kernel-space access (demand-mapping applies
 	 * to kernel accesses too).
 	 */
-	
+
 	if ((ssw & DF)
 	    && (buserr_type & (SUN3_BUSERR_PROTERR | SUN3_BUSERR_INVALID))) {
 		if (mmu_emu_handle_fault (fp->un.fmtb.daddr, ssw & RW, 0))
@@ -659,7 +659,7 @@ static inline void bus_error030 (struct frame *fp)
 		printk ("protection fault on insn access (segv).\n");
 #endif
 		force_sig (SIGSEGV, current);
-       }	
+       }
 }
 #else
 #if defined(CPU_M68020_OR_M68030)
@@ -1035,7 +1035,7 @@ void bad_super_trap (struct frame *fp)
 			fp->ptregs.format);
 	else
 		printk ("*** Exception %d ***   FORMAT=%X\n",
-			(fp->ptregs.vector) >> 2, 
+			(fp->ptregs.vector) >> 2,
 			fp->ptregs.format);
 	if (fp->ptregs.vector >> 2 == VEC_ADDRERR && CPU_IS_020_OR_030) {
 		unsigned short ssw = fp->un.fmtb.ssw;
