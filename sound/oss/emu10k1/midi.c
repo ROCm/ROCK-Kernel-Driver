@@ -32,7 +32,6 @@
 #include <linux/module.h>
 #include <linux/poll.h>
 #include <linux/slab.h>
-#include <linux/version.h>
 #include <linux/sched.h>
 #include <linux/smp_lock.h>
 #include <asm/uaccess.h>
@@ -465,12 +464,12 @@ int emu10k1_midi_callback(unsigned long msg, unsigned long refdata, unsigned lon
 
 /* MIDI file operations */
 struct file_operations emu10k1_midi_fops = {
-	owner:		THIS_MODULE,
-	read:		emu10k1_midi_read,
-	write:		emu10k1_midi_write,
-	poll:		emu10k1_midi_poll,
-	open:		emu10k1_midi_open,
-	release:	emu10k1_midi_release,
+	.owner		= THIS_MODULE,
+	.read		= emu10k1_midi_read,
+	.write		= emu10k1_midi_write,
+	.poll		= emu10k1_midi_poll,
+	.open		= emu10k1_midi_open,
+	.release	= emu10k1_midi_release,
 };
 
 

@@ -2405,45 +2405,45 @@ static int PMacStateInfo(char *b, size_t sp)
 /*** Machine definitions *****************************************************/
 
 static SETTINGS def_hard = {
-	format: AFMT_S16_BE,
-	stereo: 1,
-	size: 16,
-	speed: 44100
+	.format	= AFMT_S16_BE,
+	.stereo	= 1,
+	.size	= 16,
+	.speed	= 44100
 } ;
 
 static SETTINGS def_soft = {
-	format: AFMT_S16_BE,
-	stereo: 1,
-	size: 16,
-	speed: 44100
+	.format	= AFMT_S16_BE,
+	.stereo	= 1,
+	.size	= 16,
+	.speed	= 44100
 } ;
 
 static MACHINE machPMac = {
-	name:		awacs_name,
-	name2:		"PowerMac Built-in Sound",
-	open:		PMacOpen,
-	release:	PMacRelease,
-	dma_alloc:	PMacAlloc,
-	dma_free:	PMacFree,
-	irqinit:	PMacIrqInit,
+	.name		= awacs_name,
+	.name2		= "PowerMac Built-in Sound",
+	.open		= PMacOpen,
+	.release	= PMacRelease,
+	.dma_alloc	= PMacAlloc,
+	.dma_free	= PMacFree,
+	.irqinit	= PMacIrqInit,
 #ifdef MODULE
-	irqcleanup:	PMacIrqCleanup,
+	.irqcleanup	= PMacIrqCleanup,
 #endif /* MODULE */
-	init:		PMacInit,
-	silence:	PMacSilence,
-	setFormat:	PMacSetFormat,
-	setVolume:	PMacSetVolume,
-	play:		PMacPlay,
-	record:		NULL,		/* default to no record */
-	mixer_init:	PMacMixerInit,
-	mixer_ioctl:	PMacMixerIoctl,
-	write_sq_setup:	PMacWriteSqSetup,
-	read_sq_setup:	PMacReadSqSetup,
-	state_info:	PMacStateInfo,
-	abort_read:	PMacAbortRead,
-	min_dsp_speed:	7350,
-	max_dsp_speed:	44100,
-	version:	((DMASOUND_AWACS_REVISION<<8) + DMASOUND_AWACS_EDITION)
+	.init		= PMacInit,
+	.silence	= PMacSilence,
+	.setFormat	= PMacSetFormat,
+	.setVolume	= PMacSetVolume,
+	.play		= PMacPlay,
+	.record		= NULL,		/* default to no record */
+	.mixer_init	= PMacMixerInit,
+	.mixer_ioctl	= PMacMixerIoctl,
+	.write_sq_setup	= PMacWriteSqSetup,
+	.read_sq_setup	= PMacReadSqSetup,
+	.state_info	= PMacStateInfo,
+	.abort_read	= PMacAbortRead,
+	.min_dsp_speed	= 7350,
+	.max_dsp_speed	= 44100,
+	.version	= ((DMASOUND_AWACS_REVISION<<8) + DMASOUND_AWACS_EDITION)
 };
 
 
