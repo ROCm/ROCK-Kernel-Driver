@@ -49,7 +49,7 @@ static int limit_adjust = 0;
 static int fan_speed = -1;
 
 MODULE_AUTHOR("Colin Leroy <colin@colino.net>");
-MODULE_DESCRIPTION("Driver for ADT7467 thermostat in iBook G4");
+MODULE_DESCRIPTION("Driver for ADT746x thermostat in iBook G4 and Powerbook G4 Alu");
 MODULE_LICENSE("GPL");
 
 MODULE_PARM(limit_adjust,"i");
@@ -161,7 +161,7 @@ detach_thermostat(struct i2c_adapter *adapter)
 }
 
 static struct i2c_driver thermostat_driver = {  
-	.name		="Apple Thermostat ADT7467",
+	.name		="Apple Thermostat ADT746x",
 	.id		=0xDEAD7467,
 	.flags		=I2C_DF_NOTIFY,
 	.attach_adapter	=&attach_thermostat,
@@ -494,9 +494,6 @@ thermostat_init(void)
 	struct device_node* np;
 	u32 *prop;
 	
-	/* Currently, we only deal with the iBook G4, we will support
-	 * all "2003" powerbooks later on
-	 */
 	np = of_find_node_by_name(NULL, "fan");
 	if (!np)
 		return -ENODEV;

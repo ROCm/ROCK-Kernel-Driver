@@ -175,8 +175,8 @@ config THERM_WINDTUNNEL
 	  This driver provides some thermostat and fan control for the desktop
 	  G4 "Windtunnel"
 
-config THERM_ADT7467
-	tristate "Support for thermal mgmnt on laptops with ADT 7467 chipset"
+config THERM_ADT746X
+	tristate "Support for thermal mgmnt on laptops with ADT 746x chipset"
 	depends on I2C && I2C_KEYWEST && PPC_PMAC && !PPC_PMAC64
 	help
 	  This driver provides some thermostat and fan control for the
