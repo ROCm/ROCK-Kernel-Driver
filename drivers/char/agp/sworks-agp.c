@@ -496,7 +496,7 @@ static void serverworks_agp_enable(u32 mode)
 	 *        command registers.
 	 */
 
-	agp_device_command(command);
+	agp_device_command(command, 0);
 }
 
 static int __init serverworks_setup (struct pci_dev *pdev)

@@ -382,9 +382,6 @@ static void agp_x86_64_agp_enable(u32 mode)
 			 * Ok, here we have a AGP device. Disable impossible 
 			 * settings, and adjust the readqueue to the minimum.
 			 */
-
-			printk (KERN_INFO "AGP: Setting up AGPv3 capable device at %d:%d:%d\n",
-					device->bus->number, PCI_FUNC(device->devfn), PCI_SLOT(device->devfn));
 			pci_read_config_dword(device, cap_ptr + 4, &scratch);
 
 			/* adjust RQ depth */
@@ -402,15 +399,11 @@ static void agp_x86_64_agp_enable(u32 mode)
 			if (!((command & 0x10) && (scratch & 0x10) && (mode & 0x10)))
 				command &= ~0x10;
 
-			if (!((command & 2) && (scratch & 2) && (mode & 2))) {
+			if (!((command & 2) && (scratch & 2) && (mode & 2)))
 				command &= ~2;		/* 8x */
-				printk (KERN_INFO "AGP: Putting device into 8x mode\n");
-			}
 
-			if (!((command & 1) && (scratch & 1) && (mode & 1))) {
+			if (!((command & 1) && (scratch & 1) && (mode & 1)))
 				command &= ~1;		/* 4x */
-				printk (KERN_INFO "AGP: Putting device into 4x mode\n");
-			}
 		}
 	}
 	/*
@@ -433,7 +426,7 @@ static void agp_x86_64_agp_enable(u32 mode)
 	 *        command registers.
 	 */
 
-	agp_device_command(command);
+	agp_device_command(command, 1);
 }
 
 

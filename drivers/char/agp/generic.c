@@ -314,15 +314,22 @@ int agp_unbind_memory(agp_memory * curr)
 
 /* Generic Agp routines - Start */
 
-void agp_device_command(u32 command)
+void agp_device_command(u32 command, int agp_v3)
 {
 	struct pci_dev *device;
+	int mode;
+
+	mode = command & 0x7;
+	if (agp_v3)
+		mode *= 4;
 
 	pci_for_each_dev(device) {
 		u8 agp = pci_find_capability(device, PCI_CAP_ID_AGP);
 		if (!agp)
 			continue;
 
+		printk(KERN_INFO PFX "Putting AGP V%d device at %s into %dx mode\n",
+				agp_v3 ? 3 : 2, device->slot_name, mode);
 		pci_write_config_dword(device, agp + 8, command);
 	}
 }
@@ -409,7 +416,7 @@ void agp_generic_agp_enable(u32 mode)
 	 *        command registers.
 	 */
 
-	agp_device_command(command);
+	agp_device_command(command, 0);
 }
 
 int agp_generic_create_gatt_table(void)
