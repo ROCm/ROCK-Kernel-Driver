@@ -128,7 +128,7 @@ static char *e1000_strings[] = {
 	"IBM Mobile, Desktop & Server Adapters"
 };
 
-/* Local Function Prototypes */
+/* e1000_main.c Function Prototypes */
 
 int e1000_up(struct e1000_adapter *adapter);
 void e1000_down(struct e1000_adapter *adapter);
@@ -192,23 +192,6 @@ static struct pci_driver e1000_driver = {
 MODULE_AUTHOR("Intel Corporation, <linux.nics@intel.com>");
 MODULE_DESCRIPTION("Intel(R) PRO/1000 Network Driver");
 MODULE_LICENSE("Dual BSD/GPL");
-
-#ifdef EXPORT_SYMTAB
-EXPORT_SYMBOL(e1000_init_module);
-EXPORT_SYMBOL(e1000_exit_module);
-EXPORT_SYMBOL(e1000_probe);
-EXPORT_SYMBOL(e1000_remove);
-EXPORT_SYMBOL(e1000_open);
-EXPORT_SYMBOL(e1000_close);
-EXPORT_SYMBOL(e1000_xmit_frame);
-EXPORT_SYMBOL(e1000_intr);
-EXPORT_SYMBOL(e1000_set_multi);
-EXPORT_SYMBOL(e1000_change_mtu);
-EXPORT_SYMBOL(e1000_set_mac);
-EXPORT_SYMBOL(e1000_get_stats);
-EXPORT_SYMBOL(e1000_watchdog);
-EXPORT_SYMBOL(e1000_ioctl);
-#endif
 
 /**
  * e1000_init_module - Driver Registration Routine
