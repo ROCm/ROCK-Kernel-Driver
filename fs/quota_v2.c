@@ -135,7 +135,7 @@ static void mem2diskdqb(struct v2_disk_dqblk *d, struct mem_dqblk *m, qid_t id)
 
 static dqbuf_t getdqbuf(void)
 {
-	dqbuf_t buf = kmalloc(V2_DQBLKSIZE, GFP_KERNEL);
+	dqbuf_t buf = kmalloc(V2_DQBLKSIZE, GFP_NOFS);
 	if (!buf)
 		printk(KERN_WARNING "VFS: Not enough memory for quota buffers.\n");
 	return buf;

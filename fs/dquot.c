@@ -75,6 +75,7 @@
 #include <linux/proc_fs.h>
 #include <linux/security.h>
 #include <linux/kmod.h>
+#include <linux/pagemap.h>
 
 #include <asm/uaccess.h>
 
@@ -547,7 +548,7 @@ static struct dquot *get_empty_dquot(struct super_block *sb, int type)
 {
 	struct dquot *dquot;
 
-	dquot = kmem_cache_alloc(dquot_cachep, SLAB_KERNEL);
+	dquot = kmem_cache_alloc(dquot_cachep, SLAB_NOFS);
 	if(!dquot)
 		return NODQUOT;
 
@@ -1366,9 +1367,12 @@ static int vfs_quota_on_file(struct file *f, int type, int format_id)
 	error = -EINVAL;
 	if (!fmt->qf_ops->check_quota_file(sb, type))
 		goto out_file_init;
-	/* We don't want quota and atime on quota files (deadlocks possible) */
+	/* We don't want quota and atime on quota files (deadlocks possible)
+	 * We also need to set GFP mask differently because we cannot recurse
+	 * into filesystem when allocating page for quota inode */
 	down_write(&dqopt->dqptr_sem);
 	inode->i_flags |= S_NOQUOTA | S_NOATIME;
+	clear_bit(ffs(__GFP_FS), &inode->i_mapping->flags);
 	for (cnt = 0; cnt < MAXQUOTAS; cnt++) {
 		to_drop[cnt] = inode->i_dquot[cnt];
 		inode->i_dquot[cnt] = NODQUOT;
