@@ -172,7 +172,7 @@ xfs_growfs_data_private(
 		if (nb < mp->m_sb.sb_dblocks)
 			return XFS_ERROR(EINVAL);
 	}
-	new = in->newblocks - mp->m_sb.sb_dblocks;
+	new = nb - mp->m_sb.sb_dblocks;
 	oagcount = mp->m_sb.sb_agcount;
 	if (nagcount > oagcount) {
 		down_write(&mp->m_peraglock);
