@@ -211,7 +211,6 @@ static struct sv11_device *sv11_init(int iobase, int irq)
 {
 	struct z8530_dev *dev;
 	struct sv11_device *sv;
-	unsigned long flags;
 	
 	/*
 	 *	Get the needed I/O space
