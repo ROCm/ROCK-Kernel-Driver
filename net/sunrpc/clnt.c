@@ -909,6 +909,8 @@ call_verify(struct rpc_task *task)
 		switch ((n = ntohl(*p++))) {
 		case RPC_AUTH_REJECTEDCRED:
 		case RPC_AUTH_REJECTEDVERF:
+		case RPCSEC_GSS_CREDPROBLEM:
+		case RPCSEC_GSS_CTXPROBLEM:
 			if (!task->tk_cred_retry)
 				break;
 			task->tk_cred_retry--;
