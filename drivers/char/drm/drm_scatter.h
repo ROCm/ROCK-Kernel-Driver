@@ -1,4 +1,11 @@
-/* drm_scatter.h -- IOCTLs to manage scatter/gather memory -*- linux-c -*-
+/**
+ * \file drm_scatter.h 
+ * IOCTLs to manage scatter/gather memory
+ *
+ * \author Gareth Hughes <gareth@valinux.com>
+ */
+
+/*
  * Created: Mon Dec 18 23:20:54 2000 by gareth@valinux.com
  *
  * Copyright 2000 VA Linux Systems, Inc., Sunnyvale, California.
@@ -22,9 +29,6 @@
  * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
- *
- * Authors:
- *   Gareth Hughes <gareth@valinux.com>
  */
 
 #include <linux/config.h>
