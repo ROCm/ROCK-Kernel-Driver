@@ -62,8 +62,6 @@ void journal_commit_transaction(journal_t *journal)
 	 * all outstanding updates to complete.
 	 */
 
-	lock_journal(journal);
-
 #ifdef COMMIT_STATS
 	spin_lock(&journal->j_list_lock);
 	summarise_journal_usage(journal);
@@ -89,9 +87,7 @@ void journal_commit_transaction(journal_t *journal)
 					TASK_UNINTERRUPTIBLE);
 		if (commit_transaction->t_updates) {
 			spin_unlock(&commit_transaction->t_handle_lock);
-			unlock_journal(journal);
 			schedule();
-			lock_journal(journal);
 			spin_lock(&commit_transaction->t_handle_lock);
 		}
 		finish_wait(&journal->j_wait_updates, &wait);
@@ -240,12 +236,10 @@ write_out_data_locked:
 	if (bufs || need_resched()) {
 		jbd_debug(2, "submit %d writes\n", bufs);
 		spin_unlock(&journal->j_list_lock);
-		unlock_journal(journal);
 		if (bufs)
 			ll_rw_block(WRITE, bufs, wbuf);
 		cond_resched();
 		journal_brelse_array(wbuf, bufs);
-		lock_journal(journal);
 		spin_lock(&journal->j_list_lock);
 		if (bufs)
 			goto write_out_data_locked;
@@ -265,13 +259,11 @@ write_out_data_locked:
 		if (buffer_locked(bh)) {
 			get_bh(bh);
 			spin_unlock(&journal->j_list_lock);
-			unlock_journal(journal);
 			wait_on_buffer(bh);
 			if (unlikely(!buffer_uptodate(bh)))
 				err = -EIO;
 			put_bh(bh);
 			/* the journal_head may have been removed now */
-			lock_journal(journal);
 			goto write_out_data;
 		} else if (buffer_dirty(bh)) {
 			goto write_out_data_locked;
@@ -434,8 +426,7 @@ sync_datalist_empty:
 			tag->t_flags |= htonl(JFS_FLAG_LAST_TAG);
 
 start_journal_io:
-			unlock_journal(journal);
-			for (i=0; i<bufs; i++) {
+			for (i = 0; i < bufs; i++) {
 				struct buffer_head *bh = wbuf[i];
 				set_buffer_locked(bh);
 				clear_buffer_dirty(bh);
@@ -444,7 +435,6 @@ start_journal_io:
 				submit_bh(WRITE, bh);
 			}
 			cond_resched();
-			lock_journal(journal);
 
 			/* Force a new descriptor to be generated next
                            time round the loop. */
@@ -477,11 +467,9 @@ wait_for_iobuf:
 		jh = commit_transaction->t_iobuf_list->b_tprev;
 		bh = jh2bh(jh);
 		if (buffer_locked(bh)) {
-			unlock_journal(journal);
 			wait_on_buffer(bh);
 			if (unlikely(!buffer_uptodate(bh)))
 				err = -EIO;
-			lock_journal(journal);
 			goto wait_for_iobuf;
 		}
 
@@ -539,11 +527,9 @@ wait_for_iobuf:
 		jh = commit_transaction->t_log_list->b_tprev;
 		bh = jh2bh(jh);
 		if (buffer_locked(bh)) {
-			unlock_journal(journal);
 			wait_on_buffer(bh);
 			if (unlikely(!buffer_uptodate(bh)))
 				err = -EIO;
-			lock_journal(journal);
 			goto wait_for_ctlbuf;
 		}
 
@@ -558,10 +544,8 @@ wait_for_iobuf:
 
 	jbd_debug(3, "JBD: commit phase 6\n");
 
-	if (is_journal_aborted(journal)) {
-		unlock_journal(journal);
+	if (is_journal_aborted(journal))
 		goto skip_commit;
-	}
 
 	/* Done it all: now write the commit record.  We should have
 	 * cleaned up our previous buffers by now, so if we are in abort
@@ -571,7 +555,6 @@ wait_for_iobuf:
 	descriptor = journal_get_descriptor_buffer(journal);
 	if (!descriptor) {
 		__journal_abort_hard(journal);
-		unlock_journal(journal);
 		goto skip_commit;
 	}
 
@@ -584,7 +567,6 @@ wait_for_iobuf:
 		tmp->h_sequence = htonl(commit_transaction->t_tid);
 	}
 
-	unlock_journal(journal);
 	JBUFFER_TRACE(descriptor, "write commit block");
 	{
 		struct buffer_head *bh = jh2bh(descriptor);
@@ -603,11 +585,8 @@ wait_for_iobuf:
 
 skip_commit: /* The journal should be unlocked by now. */
 
-	if (err) {
-		lock_journal(journal);
+	if (err)
 		__journal_abort_hard(journal);
-		unlock_journal(journal);
-	}
 	
 	/*
 	 * Call any callbacks that had been registered for handles in this
@@ -632,8 +611,6 @@ skip_commit: /* The journal should be unlocked by now. */
 		}
 	}
 	spin_unlock(&commit_transaction->t_jcb_lock);
-
-	lock_journal(journal);
 
 	jbd_debug(3, "JBD: commit phase 7\n");
 
@@ -758,6 +735,5 @@ skip_commit: /* The journal should be unlocked by now. */
 	jbd_debug(1, "JBD: commit %d complete, head %d\n",
 		  journal->j_commit_sequence, journal->j_tail_sequence);
 
-	unlock_journal(journal);
 	wake_up(&journal->j_wait_done_commit);
 }

@@ -83,10 +83,8 @@ void __log_wait_for_space(journal_t *journal, int nblocks)
 	while (__log_space_left(journal) < nblocks) {
 		if (journal->j_flags & JFS_ABORT)
 			return;
-		unlock_journal(journal);
 		spin_unlock(&journal->j_state_lock);
 		down(&journal->j_checkpoint_sem);
-		lock_journal(journal);
 		
 		/*
 		 * Test again, another process may have checkpointed while we
@@ -148,7 +146,6 @@ static int __cleanup_transaction(journal_t *journal, transaction_t *transaction)
 		if (buffer_locked(bh)) {
 			atomic_inc(&bh->b_count);
 			spin_unlock(&journal->j_list_lock);
-			unlock_journal(journal);
 			wait_on_buffer(bh);
 			/* the journal_head may have gone by now */
 			BUFFER_TRACE(bh, "brelse");
@@ -171,7 +168,6 @@ static int __cleanup_transaction(journal_t *journal, transaction_t *transaction)
 			spin_unlock(&journal->j_list_lock);
 			jbd_unlock_bh_state(bh);
 			log_start_commit(journal, transaction);
-			unlock_journal(journal);
 			log_wait_commit(journal, tid);
 			goto out_return_1;
 		}
@@ -201,7 +197,6 @@ static int __cleanup_transaction(journal_t *journal, transaction_t *transaction)
 
 	return ret;
 out_return_1:
-	lock_journal(journal);
 	spin_lock(&journal->j_list_lock);
 	return 1;
 }

@@ -499,7 +499,6 @@ int log_wait_commit(journal_t *journal, tid_t tid)
 	int err = 0;
 
 #ifdef CONFIG_JBD_DEBUG
-	lock_journal(journal);
 	spin_lock(&journal->j_state_lock);
 	if (!tid_geq(journal->j_commit_request, tid)) {
 		printk(KERN_EMERG
@@ -507,7 +506,6 @@ int log_wait_commit(journal_t *journal, tid_t tid)
 		       __FUNCTION__, journal->j_commit_request, tid);
 	}
 	spin_unlock(&journal->j_state_lock);
-	unlock_journal(journal);
 #endif
 	spin_lock(&journal->j_state_lock);
 	while (tid_gt(tid, journal->j_commit_sequence)) {
@@ -632,7 +630,6 @@ static journal_t * journal_init_common (void)
 	init_waitqueue_head(&journal->j_wait_updates);
 	init_MUTEX(&journal->j_barrier);
 	init_MUTEX(&journal->j_checkpoint_sem);
-	init_MUTEX(&journal->j_sem);
 	spin_lock_init(&journal->j_revoke_lock);
 	spin_lock_init(&journal->j_list_lock);
 	spin_lock_init(&journal->j_state_lock);
@@ -787,11 +784,7 @@ static int journal_reset(journal_t *journal)
 
 	/* Add the dynamic fields and write it to disk. */
 	journal_update_superblock(journal, 1);
-
-	lock_journal(journal);
 	journal_start_thread(journal);
-	unlock_journal(journal);
-
 	return 0;
 }
 
@@ -1062,7 +1055,6 @@ void journal_destroy(journal_t *journal)
 		journal_commit_transaction(journal);
 
 	/* Force any old transactions to disk */
-	lock_journal(journal);
 
 	/* Totally anal locking here... */
 	spin_lock(&journal->j_list_lock);
@@ -1089,8 +1081,6 @@ void journal_destroy(journal_t *journal)
 		iput(journal->j_inode);
 	if (journal->j_revoke)
 		journal_destroy_revoke(journal);
-
-	unlock_journal(journal);
 	kfree(journal);
 }
 
@@ -1275,7 +1265,6 @@ int journal_flush(journal_t *journal)
 	}
 
 	/* ...and flush everything in the log out to disk. */
-	lock_journal(journal);
 	spin_lock(&journal->j_list_lock);
 	while (!err && journal->j_checkpoint_transactions != NULL) {
 		spin_unlock(&journal->j_list_lock);
@@ -1304,8 +1293,6 @@ int journal_flush(journal_t *journal)
 	J_ASSERT(journal->j_head == journal->j_tail);
 	J_ASSERT(journal->j_tail_sequence == journal->j_transaction_sequence);
 	spin_unlock(&journal->j_state_lock);
-	unlock_journal(journal);
-	
 	return err;
 }
 
@@ -1460,11 +1447,9 @@ void __journal_abort_soft (journal_t *journal, int errno)
  * 
  */
 
-void journal_abort (journal_t *journal, int errno)
+void journal_abort(journal_t *journal, int errno)
 {
-	lock_journal(journal);
 	__journal_abort_soft(journal, errno);
-	unlock_journal(journal);
 }
 
 /** 
@@ -1482,18 +1467,14 @@ int journal_errno(journal_t *journal)
 {
 	int err;
 
-	lock_journal(journal);
 	spin_lock(&journal->j_state_lock);
 	if (journal->j_flags & JFS_ABORT)
 		err = -EROFS;
 	else
 		err = journal->j_errno;
 	spin_unlock(&journal->j_state_lock);
-	unlock_journal(journal);
 	return err;
 }
-
-
 
 /** 
  * int journal_clear_err () - clears the journal's error state
@@ -1505,17 +1486,14 @@ int journal_clear_err(journal_t *journal)
 {
 	int err = 0;
 
-	lock_journal(journal);
 	spin_lock(&journal->j_state_lock);
 	if (journal->j_flags & JFS_ABORT)
 		err = -EROFS;
 	else
 		journal->j_errno = 0;
 	spin_unlock(&journal->j_state_lock);
-	unlock_journal(journal);
 	return err;
 }
-
 
 /** 
  * void journal_ack_err() - Ack journal err.
@@ -1525,12 +1503,10 @@ int journal_clear_err(journal_t *journal)
  */
 void journal_ack_err(journal_t *journal)
 {
-	lock_journal(journal);
 	spin_lock(&journal->j_state_lock);
 	if (journal->j_errno)
 		journal->j_flags |= JFS_ACK_ERR;
 	spin_unlock(&journal->j_state_lock);
-	unlock_journal(journal);
 }
 
 int journal_blocks_per_page(struct inode *inode)

@@ -593,7 +593,6 @@ struct transaction_s
  * @j_wait_commit: Wait queue to trigger commit
  * @j_wait_updates: Wait queue to wait for updates to complete
  * @j_checkpoint_sem: Semaphore for locking against concurrent checkpoints
- * @j_sem: The main journal lock, used by lock_journal() 
  * @j_head: Journal head - identifies the first unused block in the journal
  * @j_tail: Journal tail - identifies the oldest still-used block in the
  *  journal.
@@ -699,9 +698,6 @@ struct journal_s
 
 	/* Semaphore for locking against concurrent checkpoints */
 	struct semaphore 	j_checkpoint_sem;
-
-	/* The main journal lock, used by lock_journal() */
-	struct semaphore	j_sem;
 
 	/*
 	 * Journal head: identifies the first unused block in the journal.
@@ -867,33 +863,13 @@ extern void		__wait_on_journal (journal_t *);
 /*
  * Journal locking.
  *
- * We need to lock the journal during transaction state changes so that
- * nobody ever tries to take a handle on the running transaction while
- * we are in the middle of moving it to the commit phase.  
+ * We need to lock the journal during transaction state changes so that nobody
+ * ever tries to take a handle on the running transaction while we are in the
+ * middle of moving it to the commit phase.  j_state_lock does this.
  *
  * Note that the locking is completely interrupt unsafe.  We never touch
  * journal structures from interrupts.
- *
- * In 2.2, the BKL was required for lock_journal.  This is no longer
- * the case.
  */
-
-static inline void lock_journal(journal_t *journal)
-{
-	down(&journal->j_sem);
-}
-
-/* This returns zero if we acquired the semaphore */
-static inline int try_lock_journal(journal_t * journal)
-{
-	return down_trylock(&journal->j_sem);
-}
-
-static inline void unlock_journal(journal_t * journal)
-{
-	up(&journal->j_sem);
-}
-
 
 static inline handle_t *journal_current_handle(void)
 {

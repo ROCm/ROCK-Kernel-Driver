@@ -87,28 +87,30 @@ static int start_this_handle(journal_t *journal, handle_t *handle)
 	int needed;
 	int nblocks = handle->h_buffer_credits;
 	transaction_t *new_transaction = NULL;
+	int ret;
 
 	if (nblocks > journal->j_max_transaction_buffers) {
 		printk(KERN_ERR "JBD: %s wants too many credits (%d > %d)\n",
 		       current->comm, nblocks,
 		       journal->j_max_transaction_buffers);
-		return -ENOSPC;
+		ret = -ENOSPC;
+		goto out;
 	}
 
 alloc_transaction:
 	if (!journal->j_running_transaction) {
 		new_transaction = jbd_kmalloc(sizeof(*new_transaction),
 						GFP_NOFS);
-		if (!new_transaction)
-			return -ENOMEM;
+		if (!new_transaction) {
+			ret = -ENOMEM;
+			goto out;
+		}
 		memset(new_transaction, 0, sizeof(*new_transaction));
 	}
 
 	jbd_debug(3, "New handle %p going live.\n", handle);
 
 repeat:
-
-	lock_journal(journal);
 
 	/*
 	 * We need to hold j_state_lock until t_updates has been incremented,
@@ -118,32 +120,27 @@ repeat:
 	if (is_journal_aborted(journal) ||
 	    (journal->j_errno != 0 && !(journal->j_flags & JFS_ACK_ERR))) {
 		spin_unlock(&journal->j_state_lock);
-		unlock_journal(journal);
-		return -EROFS; 
+		ret = -EROFS; 
+		goto out;
 	}
 
 	/* Wait on the journal's transaction barrier if necessary */
 	if (journal->j_barrier_count) {
 		spin_unlock(&journal->j_state_lock);
-		unlock_journal(journal);
 		wait_event(journal->j_wait_transaction_locked,
 				journal->j_barrier_count == 0);
 		goto repeat;
 	}
 	
-repeat_locked:
 	if (!journal->j_running_transaction) {
 		if (!new_transaction) {
 			spin_unlock(&journal->j_state_lock);
-			unlock_journal(journal);
 			goto alloc_transaction;
 		}
 		get_transaction(journal, new_transaction);
+		new_transaction = NULL;
 	}
 
-	/* @@@ Error? */
-	J_ASSERT(journal->j_running_transaction);
-	
 	transaction = journal->j_running_transaction;
 
 	/*
@@ -152,7 +149,6 @@ repeat_locked:
 	 */
 	if (transaction->t_state == T_LOCKED) {
 		spin_unlock(&journal->j_state_lock);
-		unlock_journal(journal);
 		jbd_debug(3, "Handle %p stalling...\n", handle);
 		wait_event(journal->j_wait_transaction_locked,
 				transaction->t_state != T_LOCKED);
@@ -181,12 +177,9 @@ repeat_locked:
 		prepare_to_wait(&journal->j_wait_transaction_locked, &wait,
 				TASK_UNINTERRUPTIBLE);
 		log_start_commit(journal, transaction);
-		unlock_journal(journal);
 		schedule();
 		finish_wait(&journal->j_wait_transaction_locked, &wait);
-		lock_journal(journal);
-		spin_lock(&journal->j_state_lock);
-		goto repeat_locked;
+		goto repeat;
 	}
 
 	/* 
@@ -223,7 +216,8 @@ repeat_locked:
 		jbd_debug(2, "Handle %p waiting for checkpoint...\n", handle);
 		spin_unlock(&transaction->t_handle_lock);
 		__log_wait_for_space(journal, needed);
-		goto repeat_locked;
+		spin_unlock(&journal->j_state_lock);
+		goto repeat;
 	}
 
 	/* OK, account for the buffers that this operation expects to
@@ -238,7 +232,9 @@ repeat_locked:
 		  __log_space_left(journal));
 	spin_unlock(&transaction->t_handle_lock);
 	spin_unlock(&journal->j_state_lock);
-	unlock_journal(journal);
+out:
+	if (new_transaction)
+		kfree(new_transaction);
 	return 0;
 }
 
@@ -326,8 +322,6 @@ int journal_extend(handle_t *handle, int nblocks)
 	int result;
 	int wanted;
 
-	lock_journal(journal);
-
 	result = -EIO;
 	if (is_handle_aborted(handle))
 		goto error_out;
@@ -367,7 +361,6 @@ unlock:
 	spin_unlock(&transaction->t_handle_lock);
 error_out:
 	spin_unlock(&journal->j_state_lock);
-	unlock_journal(journal);
 	return result;
 }
 
@@ -436,8 +429,6 @@ void journal_lock_updates(journal_t *journal)
 {
 	DEFINE_WAIT(wait);
 
-	lock_journal(journal);
-
 	spin_lock(&journal->j_state_lock);
 	++journal->j_barrier_count;
 
@@ -457,14 +448,11 @@ void journal_lock_updates(journal_t *journal)
 				TASK_UNINTERRUPTIBLE);
 		spin_unlock(&transaction->t_handle_lock);
 		spin_unlock(&journal->j_state_lock);
-		unlock_journal(journal);
 		schedule();
 		finish_wait(&journal->j_wait_updates, &wait);
-		lock_journal(journal);
 		spin_lock(&journal->j_state_lock);
 	}
 	spin_unlock(&journal->j_state_lock);
-	unlock_journal(journal);
 
 	/*
 	 * We have now established a barrier against other normal updates, but
@@ -485,8 +473,6 @@ void journal_lock_updates(journal_t *journal)
  */
 void journal_unlock_updates (journal_t *journal)
 {
-	lock_journal(journal);
-
 	J_ASSERT(journal->j_barrier_count != 0);
 
 	up(&journal->j_barrier);
@@ -494,7 +480,6 @@ void journal_unlock_updates (journal_t *journal)
 	--journal->j_barrier_count;
 	spin_unlock(&journal->j_state_lock);
 	wake_up(&journal->j_wait_transaction_locked);
-	unlock_journal(journal);
 }
 
 /*
@@ -645,11 +630,9 @@ repeat:
 			JBUFFER_TRACE(jh, "on shadow: sleep");
 			spin_unlock(&journal->j_list_lock);
 			jbd_unlock_bh_state(bh);
-			unlock_journal(journal);
 			/* commit wakes up all shadow buffers after IO */
 			wqh = bh_waitq_head(jh2bh(jh));
 			wait_event(*wqh, (jh->b_jlist != BJ_Shadow));
-			lock_journal(journal);
 			goto repeat;
 		}
 			
@@ -752,18 +735,14 @@ out_unlocked:
 
 int journal_get_write_access (handle_t *handle, struct buffer_head *bh) 
 {
-	transaction_t *transaction = handle->h_transaction;
-	journal_t *journal = transaction->t_journal;
 	struct journal_head *jh = journal_add_journal_head(bh);
 	int rc;
 
 	/* We do not want to get caught playing with fields which the
 	 * log thread also manipulates.  Make sure that the buffer
 	 * completes any outstanding IO before proceeding. */
-	lock_journal(journal);
 	rc = do_get_write_access(handle, jh, 0);
 	journal_put_journal_head(jh);
-	unlock_journal(journal);
 	return rc;
 }
 
@@ -795,7 +774,6 @@ int journal_get_create_access(handle_t *handle, struct buffer_head *bh)
 	int err;
 	
 	jbd_debug(5, "journal_head %p\n", jh);
-	lock_journal(journal);
 	err = -EROFS;
 	if (is_handle_aborted(handle))
 		goto out;
@@ -844,7 +822,6 @@ int journal_get_create_access(handle_t *handle, struct buffer_head *bh)
 	journal_cancel_revoke(handle, jh);
 	journal_put_journal_head(jh);
 out:
-	unlock_journal(journal);
 	return err;
 }
 
@@ -876,13 +853,11 @@ out:
  */
 int journal_get_undo_access(handle_t *handle, struct buffer_head *bh)
 {
-	journal_t *journal = handle->h_transaction->t_journal;
 	int err;
 	struct journal_head *jh = journal_add_journal_head(bh);
 	char *committed_data = NULL;
 
 	JBUFFER_TRACE(jh, "entry");
-	lock_journal(journal);
 
 	/* Do this first --- it can drop the journal lock, so we want to
 	 * make sure that obtaining the committed_data is done
@@ -919,7 +894,6 @@ repeat:
 	jbd_unlock_bh_state(bh);
 out:
 	journal_put_journal_head(jh);
-	unlock_journal(journal);
 	if (committed_data)
 		kfree(committed_data);
 	return err;
@@ -938,8 +912,7 @@ out:
  * Returns error number or 0 on success.
  *
  * journal_dirty_data() can be called via page_launder->ext3_writepage
- * by kswapd.  So it cannot block.  Happily, there's nothing here
- * which needs lock_journal if `async' is set.
+ * by kswapd.
  */
 int journal_dirty_data(handle_t *handle, struct buffer_head *bh)
 {
@@ -1113,9 +1086,8 @@ int journal_dirty_metadata(handle_t *handle, struct buffer_head *bh)
 
 	jbd_debug(5, "journal_head %p\n", jh);
 	JBUFFER_TRACE(jh, "entry");
-	lock_journal(journal);
 	if (is_handle_aborted(handle))
-		goto out_unlock;
+		goto out;
 	
 	jbd_lock_bh_state(bh);
 	spin_lock(&journal->j_list_lock);
@@ -1151,9 +1123,8 @@ int journal_dirty_metadata(handle_t *handle, struct buffer_head *bh)
 done_locked:
 	spin_unlock(&journal->j_list_lock);
 	jbd_unlock_bh_state(bh);
+out:
 	JBUFFER_TRACE(jh, "exit");
-out_unlock:
-	unlock_journal(journal);
 	return 0;
 }
 
@@ -1171,7 +1142,6 @@ void journal_release_buffer(handle_t *handle, struct buffer_head *bh)
 	journal_t *journal = transaction->t_journal;
 	struct journal_head *jh = bh2jh(bh);
 
-	lock_journal(journal);
 	JBUFFER_TRACE(jh, "entry");
 
 	/* If the buffer is reserved but not modified by this
@@ -1190,7 +1160,6 @@ void journal_release_buffer(handle_t *handle, struct buffer_head *bh)
 	jbd_unlock_bh_state(bh);
 
 	JBUFFER_TRACE(jh, "exit");
-	unlock_journal(journal);
 }
 
 /** 
@@ -1218,7 +1187,6 @@ void journal_forget(handle_t *handle, struct buffer_head *bh)
 
 	BUFFER_TRACE(bh, "entry");
 
-	lock_journal(journal);
 	jbd_lock_bh_state(bh);
 	spin_lock(&journal->j_list_lock);
 
@@ -1261,7 +1229,6 @@ void journal_forget(handle_t *handle, struct buffer_head *bh)
 			if (!buffer_jbd(bh)) {
 				spin_unlock(&journal->j_list_lock);
 				jbd_unlock_bh_state(bh);
-				unlock_journal(journal);
 				__bforget(bh);
 				return;
 			}
@@ -1285,7 +1252,6 @@ void journal_forget(handle_t *handle, struct buffer_head *bh)
 not_jbd:
 	spin_unlock(&journal->j_list_lock);
 	jbd_unlock_bh_state(bh);
-	unlock_journal(journal);
 	__brelse(bh);
 	return;
 }
@@ -1896,7 +1862,6 @@ int journal_invalidatepage(journal_t *journal,
 	/* We will potentially be playing with lists other than just the
 	 * data lists (especially for journaled data mode), so be
 	 * cautious in our locking. */
-	lock_journal(journal);
 
 	head = bh = page_buffers(page);
 	do {
@@ -1914,8 +1879,6 @@ int journal_invalidatepage(journal_t *journal,
 		bh = next;
 
 	} while (bh != head);
-
-	unlock_journal(journal);
 
 	if (!offset) {
 		if (!may_free || !try_to_free_buffers(page))
