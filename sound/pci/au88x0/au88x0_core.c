@@ -72,6 +72,7 @@
             into au88x0_pcm.c .
  06-06-2003 Buffer shifter bugfix. Mixer volume fix.
  07-12-2003 A3D routing finally fixed. Believed to be OK.
+ 25-03-2004 Many thanks to Claudia, for such valuable bug reports.
  
 */
 
@@ -772,7 +773,9 @@ vortex_src_delWTD(vortex_t * vortex, unsigned char src, unsigned char ch)
 	return 1;
 }
 
- /*FIFO*/ static void
+ /*FIFO*/ 
+
+static void
 vortex_fifo_clearadbdata(vortex_t * vortex, int fifo, int x)
 {
 	for (x--; x >= 0; x--)
@@ -1345,31 +1348,29 @@ vortex_wtdma_setbuffers(vortex_t * vortex, int wtdma,
 	dma->nr_periods = count;
 	dma->sgbuf = sgbuf;
 
-	psize--;
-
 	dma->cfg0 = 0;
 	dma->cfg1 = 0;
 	switch (count) {
 		/* Four or more pages */
 	default:
 	case 4:
-		dma->cfg1 |= 0x88000000 | 0x44000000 | 0x30000000 | psize;
-		hwwrite(vortex->mmio, VORTEX_WTDMA_BUFBASE + (wtdma << 4),
+		dma->cfg1 |= 0x88000000 | 0x44000000 | 0x30000000 | (psize-1);
+		hwwrite(vortex->mmio, VORTEX_WTDMA_BUFBASE + (wtdma << 4) + 0xc,
 			snd_sgbuf_get_addr(sgbuf, psize * 3));
 		/* 3 pages */
 	case 3:
 		dma->cfg0 |= 0x12000000;
-		dma->cfg1 |= 0x80000000 | 0x40000000 | (psize << 0xc);
-		hwwrite(vortex->mmio, VORTEX_WTDMA_BUFBASE + (wtdma << 4),
+		dma->cfg1 |= 0x80000000 | 0x40000000 | ((psize-1) << 0xc);
+		hwwrite(vortex->mmio, VORTEX_WTDMA_BUFBASE + (wtdma << 4)  + 0x8,
 			snd_sgbuf_get_addr(sgbuf, psize * 2));
 		/* 2 pages */
 	case 2:
-		dma->cfg0 |= 0x88000000 | 0x44000000 | 0x10000000 | psize;
-		hwwrite(vortex->mmio, VORTEX_WTDMA_BUFBASE + (wtdma << 4),
+		dma->cfg0 |= 0x88000000 | 0x44000000 | 0x10000000 | (psize-1);
+		hwwrite(vortex->mmio, VORTEX_WTDMA_BUFBASE + (wtdma << 4) + 0x4,
 			snd_sgbuf_get_addr(sgbuf, psize));
 		/* 1 page */
 	case 1:
-		dma->cfg0 |= 0x80000000 | 0x40000000 | (psize << 0xc);
+		dma->cfg0 |= 0x80000000 | 0x40000000 | ((psize-1) << 0xc);
 		hwwrite(vortex->mmio, VORTEX_WTDMA_BUFBASE + (wtdma << 4),
 			snd_sgbuf_get_addr(sgbuf, 0));
 		break;
@@ -1575,11 +1576,11 @@ static void vortex_adb_init(vortex_t * vortex)
 	/* it looks like we are writing more than we need to...
 	 * if we write what we are supposed to it breaks things... */
 	hwwrite(vortex->mmio, VORTEX_ADB_SR, 0);
-	for (i = 0; i < VORTEX_ADB_RTBASE_SIZE; i++)
+	for (i = 0; i < VORTEX_ADB_RTBASE_COUNT; i++)
 		hwwrite(vortex->mmio, VORTEX_ADB_RTBASE + (i << 2),
 			hwread(vortex->mmio,
 			       VORTEX_ADB_RTBASE + (i << 2)) | ROUTE_MASK);
-	for (i = 0; i < VORTEX_ADB_CHNBASE_SIZE; i++) {
+	for (i = 0; i < VORTEX_ADB_CHNBASE_COUNT; i++) {
 		hwwrite(vortex->mmio, VORTEX_ADB_CHNBASE + (i << 2),
 			hwread(vortex->mmio,
 			       VORTEX_ADB_CHNBASE + (i << 2)) | ROUTE_MASK);
@@ -1922,6 +1923,9 @@ vortex_connect_codecplay(vortex_t * vortex, int en, unsigned char mixers[])
 	// Connect front channels through EQ.
 	vortex_connection_mix_adb(vortex, en, 0x11, mixers[0], ADB_EQIN(0));
 	vortex_connection_mix_adb(vortex, en, 0x11, mixers[1], ADB_EQIN(1));
+	/* Lower volume, since EQ has some gain. */
+	vortex_mix_setvolumebyte(vortex, mixers[0], 0);
+	vortex_mix_setvolumebyte(vortex, mixers[1], 0);
 	vortex_route(vortex, en, 0x11, ADB_EQOUT(0), ADB_CODECOUT(0));
 	vortex_route(vortex, en, 0x11, ADB_EQOUT(1), ADB_CODECOUT(1));
 
@@ -2007,9 +2011,11 @@ vortex_adb_checkinout(vortex_t * vortex, int resmap[], int out, int restype)
 }
 
 /* Default Connections  */
+static int
+vortex_adb_allocroute(vortex_t * vortex, int dma, int nr_ch, int dir, int type);
+
 static void vortex_connect_default(vortex_t * vortex, int en)
 {
-	// FIXME: check if checkout was succesful.
 	// Connect AC97 codec.
 	vortex->mixplayb[0] = vortex_adb_checkinout(vortex, vortex->fixed_res, en,
 				  VORTEX_RESOURCE_MIXOUT);
@@ -2044,7 +2050,7 @@ static void vortex_connect_default(vortex_t * vortex, int en)
 #ifndef CHIP_AU8810
 	vortex_wt_connect(vortex, en);
 #endif
-	// A3D (crosstalk canceler and A3D slices).
+	// A3D (crosstalk canceler and A3D slices). AU8810 disabled for now.
 #ifndef CHIP_AU8820
 	vortex_Vort3D_connect(vortex, en);
 #endif
@@ -2053,18 +2059,7 @@ static void vortex_connect_default(vortex_t * vortex, int en)
 	// Connect DSP interface for SQ3500 turbo (not here i think...)
 
 	// Connect AC98 modem codec
- 	
- 	/* Fast Play Workaround. Revision 0xFE does not seem to need it. */
- 	printk(KERN_INFO "vortex: revision = 0x%x, device = %d\n", vortex->rev, vortex->device);
- 	if (IS_BAD_CHIP(vortex)) {
- 		printk(KERN_INFO "vortex: Erratum workaround enabled.\n");
- #ifndef CHIP_AU8820
- 		vortex->fixed_res[VORTEX_RESOURCE_DMA] = 0x00000001;
- #endif
- 		// Channel swapping workaround. We are nuking registers somewhere, or
- 		// its a hardware bug.
- 		vortex->fixed_res[VORTEX_RESOURCE_SRC] = 0x00000001;
- 	}
+	
 }
 
 /*
@@ -2081,7 +2076,7 @@ vortex_adb_allocroute(vortex_t * vortex, int dma, int nr_ch, int dir, int type)
 {
 	stream_t *stream;
 	int i, en;
-
+	
 	if ((nr_ch == 3)
 	    || ((dir == SNDRV_PCM_STREAM_CAPTURE) && (nr_ch > 2)))
 		return -EBUSY;
@@ -2105,7 +2100,6 @@ vortex_adb_allocroute(vortex_t * vortex, int dma, int nr_ch, int dir, int type)
 	stream->dir = dir;
 	stream->type = type;
 
-	// FIXME: check for success of checkout or checkin.
 	/* PLAYBACK ROUTES. */
 	if (dir == SNDRV_PCM_STREAM_PLAYBACK) {
 		int src[4], mix[4], ch_top;
@@ -2165,8 +2159,7 @@ vortex_adb_allocroute(vortex_t * vortex, int dma, int nr_ch, int dir, int type)
 		for (i = 0; i < nr_ch; i++) {
 			if (stream->type == VORTEX_PCM_ADB) {
 				vortex_connection_adbdma_src(vortex, en,
-							     src[nr_ch - 1], 
-							     //src[0], 
+							     src[nr_ch - 1],
 							     dma,
 							     src[i]);
 				vortex_connection_src_mixin(vortex, en,
@@ -2188,7 +2181,7 @@ vortex_adb_allocroute(vortex_t * vortex, int dma, int nr_ch, int dir, int type)
 #ifndef CHIP_AU8820
 			if (stream->type == VORTEX_PCM_A3D) {
 				vortex_connection_adbdma_src(vortex, en,
-							     src[0], 
+							     src[nr_ch - 1], 
 								 dma,
 							     src[i]);
 				vortex_route(vortex, en, 0x11, ADB_SRCOUT(src[i]), ADB_A3DIN(a3d));
@@ -2237,7 +2230,7 @@ vortex_adb_allocroute(vortex_t * vortex, int dma, int nr_ch, int dir, int type)
 				     ADB_SPDIFOUT(1));
 		}
 #endif
-		/* CAPTURE ROUTES. */
+	/* CAPTURE ROUTES. */
 	} else {
 		int src[2], mix[2];
 
@@ -2271,7 +2264,7 @@ vortex_adb_allocroute(vortex_t * vortex, int dma, int nr_ch, int dir, int type)
 			vortex_connection_mixin_mix(vortex, en,
 						    MIX_CAPT(1), mix[0], 0);
 			vortex_connection_src_adbdma(vortex, en,
-						     src[nr_ch - 1],
+						     src[0],
 						     src[0], dma);
 		} else {
 			vortex_connection_mixin_mix(vortex, en,
@@ -2279,7 +2272,7 @@ vortex_adb_allocroute(vortex_t * vortex, int dma, int nr_ch, int dir, int type)
 			vortex_connection_mix_src(vortex, en, 0x11, mix[1],
 						  src[1]);
 			vortex_connection_src_src_adbdma(vortex, en,
-							 src[0], src[0],
+							 src[1], src[0],
 							 src[1], dma);
 		}
 	}

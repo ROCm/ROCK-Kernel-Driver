@@ -51,60 +51,70 @@ MODULE_DEVICES("{{Aureal Semiconductor Inc., Aureal Vortex Sound Processor}}");
 
 MODULE_DEVICE_TABLE(pci, snd_vortex_ids);
 
-static void __devinit snd_vortex_workaround(struct pci_dev *vortex, int fix)
+static void vortex_fix_latency(struct pci_dev *vortex)
 {
-	struct pci_dev *via = NULL;
 	int rc;
-
-	/* autodetect if workarounds are required */
-	while ((via = pci_find_device(PCI_VENDOR_ID_VIA,
-				      PCI_DEVICE_ID_VIA_8365_1, via))) {
-		if (fix == 255) {
-			printk(KERN_INFO CARD_NAME
-			       ": detected VIA KT133/KM133. activating workaround...\n");
-			fix = 3;	// do latency and via bridge workaround
-		}
-		break;
-	}
-
-	/* do not do anything if autodetection was enabled and found no VIA */
-	if (fix == 255)
-		return;
-
-	/* fix vortex latency */
-	if (fix & 0x01) {
-		if (!(rc = pci_write_config_byte(vortex, 0x40, 0xff))) {
+	if (!(rc = pci_write_config_byte(vortex, 0x40, 0xff))) {
 			printk(KERN_INFO CARD_NAME
 			       ": vortex latency is 0xff\n");
-		} else {
-			printk(KERN_WARNING CARD_NAME
-			       ": could not set vortex latency: pci error 0x%x\n",
-			       rc);
-		}
+	} else {
+		printk(KERN_WARNING CARD_NAME
+				": could not set vortex latency: pci error 0x%x\n", rc);
 	}
+}
 
-	/* fix via agp bridge */
-	if (via && (fix & 0x02)) {
-		u8 value;
+static void vortex_fix_agp_bridge(struct pci_dev *via)
+{
+	int rc;
+	u8 value;
 
-		/*
-		 * only set the bit (Extend PCI#2 Internal Master for
-		 * Efficient Handling of Dummy Requests) if the can
-		 * read the config and it is not already set
-		 */
+	/*
+	 * only set the bit (Extend PCI#2 Internal Master for
+	 * Efficient Handling of Dummy Requests) if the can
+	 * read the config and it is not already set
+	 */
 
-		if (!(rc = pci_read_config_byte(via, 0x42, &value))
-		    && ((value & 0x10)
-			|| !(rc =
-			     pci_write_config_byte(via, 0x42, value | 0x10)))) {
+	if (!(rc = pci_read_config_byte(via, 0x42, &value))
+			&& ((value & 0x10)
+				|| !(rc = pci_write_config_byte(via, 0x42, value | 0x10)))) {
+		printk(KERN_INFO CARD_NAME
+				": bridge config is 0x%x\n", value | 0x10);
+	} else {
+		printk(KERN_WARNING CARD_NAME
+				": could not set vortex latency: pci error 0x%x\n", rc);
+	}
+}
 
-			printk(KERN_INFO CARD_NAME
-			       ": bridge config is 0x%x\n", value | 0x10);
-		} else {
-			printk(KERN_WARNING CARD_NAME
-			       ": could not set vortex latency: pci error 0x%x\n",
-			       rc);
+static void __devinit snd_vortex_workaround(struct pci_dev *vortex, int fix)
+{
+	struct pci_dev *via;
+
+	/* autodetect if workarounds are required */
+	if (fix == 255) {
+		/* VIA KT133 */
+		via = pci_find_device(PCI_VENDOR_ID_VIA, PCI_DEVICE_ID_VIA_8365_1, NULL);
+		/* VIA Apollo */
+		if (via == NULL) {
+			via = pci_find_device(PCI_VENDOR_ID_VIA, PCI_DEVICE_ID_VIA_82C598_1, NULL);
 		}
+		/* AMD Irongate */
+		if (via == NULL) {
+			via = pci_find_device(PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_FE_GATE_7007, NULL);
+		}
+		if (via) {
+			printk(KERN_INFO CARD_NAME ": Activating latency workaround...\n");
+			vortex_fix_latency(vortex);
+			vortex_fix_agp_bridge(via);
+		}
+	} else {
+		if (fix & 0x1)
+			vortex_fix_latency(vortex);
+		if ((fix & 0x2) && (via = pci_find_device(PCI_VENDOR_ID_VIA, PCI_DEVICE_ID_VIA_8365_1, NULL)))
+			vortex_fix_agp_bridge(via);
+		if ((fix & 0x4) && (via = pci_find_device(PCI_VENDOR_ID_VIA, PCI_DEVICE_ID_VIA_82C598_1, NULL)))
+			vortex_fix_agp_bridge(via);
+		if ((fix & 0x8) && (via = pci_find_device(PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_FE_GATE_7007, NULL)))
+			vortex_fix_agp_bridge(via);
 	}
 }
 
