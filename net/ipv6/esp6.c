@@ -203,18 +203,24 @@ int esp6_input(struct xfrm_state *x, struct xfrm_decap_state *decap, struct sk_b
 
 	int hdr_len = skb->h.raw - skb->nh.raw;
 	int nfrags;
-	u8 ret_nexthdr = 0;
 	unsigned char *tmp_hdr = NULL;
+	int ret = 0;
 
-	if (!pskb_may_pull(skb, sizeof(struct ipv6_esp_hdr)))
-		goto out;
+	if (!pskb_may_pull(skb, sizeof(struct ipv6_esp_hdr))) {
+		ret = -EINVAL;
+		goto out_nofree;
+	}
 
-	if (elen <= 0 || (elen & (blksize-1)))
-		goto out;
+	if (elen <= 0 || (elen & (blksize-1))) {
+		ret = -EINVAL;
+		goto out_nofree;
+	}
 
 	tmp_hdr = kmalloc(hdr_len, GFP_ATOMIC);
-	if (!tmp_hdr)
-		goto out;
+	if (!tmp_hdr) {
+		ret = -ENOMEM;
+		goto out_nofree;
+	}
 	memcpy(tmp_hdr, skb->nh.raw, hdr_len);
 
 	/* If integrity check is required, do this. */
@@ -229,12 +235,15 @@ int esp6_input(struct xfrm_state *x, struct xfrm_decap_state *decap, struct sk_b
 
 		if (unlikely(memcmp(sum, sum1, alen))) {
 			x->stats.integrity_failed++;
+			ret = -EINVAL;
 			goto out;
 		}
 	}
 
-	if ((nfrags = skb_cow_data(skb, 0, &trailer)) < 0)
+	if ((nfrags = skb_cow_data(skb, 0, &trailer)) < 0) {
+		ret = -EINVAL;
 		goto out;
+	}
 
 	skb->ip_summed = CHECKSUM_NONE;
 
@@ -254,8 +263,10 @@ int esp6_input(struct xfrm_state *x, struct xfrm_decap_state *decap, struct sk_b
 
 		if (unlikely(nfrags > MAX_SG_ONSTACK)) {
 			sg = kmalloc(sizeof(struct scatterlist)*nfrags, GFP_ATOMIC);
-			if (!sg)
+			if (!sg) {
+				ret = -ENOMEM;
 				goto out;
+			}
 		}
 		skb_to_sgvec(skb, sg, sizeof(struct ipv6_esp_hdr) + esp->conf.ivlen, elen);
 		crypto_cipher_decrypt(esp->conf.tfm, sg, sg, elen);
@@ -270,6 +281,7 @@ int esp6_input(struct xfrm_state *x, struct xfrm_decap_state *decap, struct sk_b
 			if (net_ratelimit()) {
 				printk(KERN_WARNING "ipsec esp packet is garbage padlen=%d, elen=%d\n", padlen+2, elen);
 			}
+			ret = -EINVAL;
 			goto out;
 		}
 		/* ... check padding bits here. Silly. :-) */ 
@@ -280,13 +292,13 @@ int esp6_input(struct xfrm_state *x, struct xfrm_decap_state *decap, struct sk_b
 		memcpy(skb->nh.raw, tmp_hdr, hdr_len);
 		skb->nh.ipv6h->payload_len = htons(skb->len - sizeof(struct ipv6hdr));
 		ip6_find_1stfragopt(skb, &prevhdr);
-		ret_nexthdr = *prevhdr = nexthdr[1];
+		ret = *prevhdr = nexthdr[1];
 	}
-	kfree(tmp_hdr);
-	return ret_nexthdr;
 
 out:
-	return -EINVAL;
+	kfree(tmp_hdr);
+out_nofree:
+	return ret;
 }
 
 static u32 esp6_get_max_size(struct xfrm_state *x, int mtu)
