@@ -119,6 +119,39 @@
 #include <linux/list.h>
 #include <linux/cdev.h>
 
+struct tty_struct;
+
+struct tty_operations {
+	int  (*open)(struct tty_struct * tty, struct file * filp);
+	void (*close)(struct tty_struct * tty, struct file * filp);
+	int  (*write)(struct tty_struct * tty, int from_user,
+		      const unsigned char *buf, int count);
+	void (*put_char)(struct tty_struct *tty, unsigned char ch);
+	void (*flush_chars)(struct tty_struct *tty);
+	int  (*write_room)(struct tty_struct *tty);
+	int  (*chars_in_buffer)(struct tty_struct *tty);
+	int  (*ioctl)(struct tty_struct *tty, struct file * file,
+		    unsigned int cmd, unsigned long arg);
+	void (*set_termios)(struct tty_struct *tty, struct termios * old);
+	void (*throttle)(struct tty_struct * tty);
+	void (*unthrottle)(struct tty_struct * tty);
+	void (*stop)(struct tty_struct *tty);
+	void (*start)(struct tty_struct *tty);
+	void (*hangup)(struct tty_struct *tty);
+	void (*break_ctl)(struct tty_struct *tty, int state);
+	void (*flush_buffer)(struct tty_struct *tty);
+	void (*set_ldisc)(struct tty_struct *tty);
+	void (*wait_until_sent)(struct tty_struct *tty, int timeout);
+	void (*send_xchar)(struct tty_struct *tty, char ch);
+	int (*read_proc)(char *page, char **start, off_t off,
+			  int count, int *eof, void *data);
+	int (*write_proc)(struct file *file, const char *buffer,
+			  unsigned long count, void *data);
+	int (*tiocmget)(struct tty_struct *tty, struct file *file);
+	int (*tiocmset)(struct tty_struct *tty, struct file *file,
+			unsigned int set, unsigned int clear);
+};
+
 struct tty_driver {
 	int	magic;		/* magic number for this structure */
 	struct cdev cdev;
@@ -148,7 +181,7 @@ struct tty_driver {
 	
 	/*
 	 * Interface routines from the upper tty layer to the tty
-	 * driver.
+	 * driver.	Will be replaced with struct tty_operations.
 	 */
 	int  (*open)(struct tty_struct * tty, struct file * filp);
 	void (*close)(struct tty_struct * tty, struct file * filp);
@@ -178,10 +211,15 @@ struct tty_driver {
 	int (*tiocmget)(struct tty_struct *tty, struct file *file);
 	int (*tiocmset)(struct tty_struct *tty, struct file *file,
 			unsigned int set, unsigned int clear);
+
 	struct list_head tty_drivers;
 };
 
 extern struct list_head tty_drivers;
+
+struct tty_driver *alloc_tty_driver(int lines);
+void put_tty_driver(struct tty_driver *driver);
+void tty_set_operations(struct tty_driver *driver, struct tty_operations *op);
 
 /* tty driver magic number */
 #define TTY_DRIVER_MAGIC		0x5402
