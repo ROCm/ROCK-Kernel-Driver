@@ -185,16 +185,7 @@ enter:
 
 	.align		64
 begin:
-
-	.globl		U3copy_from_user_nop_1_6
-U3copy_from_user_nop_1_6:
-	ldxa		[%g0] ASI_DCU_CONTROL_REG, %g3
-	sethi		%uhi(DCU_PE), %o3
-	sllx		%o3, 32, %o3
-	or		%g3, %o3, %o3
-	stxa		%o3, [%g0] ASI_DCU_CONTROL_REG	! Enable P-cache
-	membar		#Sync
-
+	membar		#StoreLoad | #StoreStore | #LoadStore
 	prefetcha	[%o1 + 0x000] %asi, #one_read
 	prefetcha	[%o1 + 0x040] %asi, #one_read
 	andn		%o2, (0x40 - 1), %o4
@@ -279,12 +270,6 @@ loopfini:
 	stda		%f16, [%o0] ASI_BLK_P
 	add		%o0, 0x40, %o0
 	add		%o1, 0x40, %o1
-
-	.globl		U3copy_from_user_nop_2_3
-U3copy_from_user_nop_2_3:
-	mov		PRIMARY_CONTEXT, %o3
-	stxa		%g0, [%o3] ASI_DMMU		! Flush P-cache
-	stxa		%g3, [%g0] ASI_DCU_CONTROL_REG	! Disable P-cache
 
 	membar		#Sync
 

@@ -90,16 +90,7 @@ enter:
 
 	.align		64
 begin:
-#ifdef __KERNEL__
-	.globl		U3memcpy_nop_1_6
-U3memcpy_nop_1_6:
-	ldxa		[%g0] ASI_DCU_CONTROL_REG, %g3
-	sethi		%uhi(DCU_PE), %o3
-	sllx		%o3, 32, %o3
-	or		%g3, %o3, %o3
-	stxa		%o3, [%g0] ASI_DCU_CONTROL_REG	! Enable P-cache
-	membar		#Sync
-#endif
+	membar		#StoreLoad | #StoreStore | #LoadStore
 	prefetch	[%o1 + 0x000], #one_read
 	prefetch	[%o1 + 0x040], #one_read
 	andn		%o2, (0x40 - 1), %o4
@@ -184,13 +175,6 @@ loopfini:
 	stda		%f16, [%o0] ASI_BLK_P
 	add		%o0, 0x40, %o0
 	add		%o1, 0x40, %o1
-#ifdef __KERNEL__
-	.globl		U3memcpy_nop_2_3
-U3memcpy_nop_2_3:
-	mov		PRIMARY_CONTEXT, %o3
-	stxa		%g0, [%o3] ASI_DMMU		! Flush P-cache
-	stxa		%g3, [%g0] ASI_DCU_CONTROL_REG	! Disable P-cache
-#endif
 	membar		#Sync
 
 	/* Now we copy the (len modulo 64) bytes at the end.
