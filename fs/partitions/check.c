@@ -131,11 +131,11 @@ static void driverfs_create_partitions(struct gendisk *hd)
 	struct device *dev, *parent;
 	int part;
 
-	/* get parent driverfs device structure */
-	if (hd->driverfs_dev_arr)
-		parent = hd->driverfs_dev_arr[0];
-	else /* if driverfs not supported by subsystem, skip partitions */
+	/* if driverfs not supported by subsystem, skip partitions */
+	if (!(hd->flags & GENHD_FL_DRIVERFS))
 		return;
+
+	parent = hd->driverfs_dev;
 
 	if (parent)  {
 		sprintf(name, "%s", parent->name);
