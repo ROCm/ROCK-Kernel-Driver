@@ -1,7 +1,7 @@
 /*
  * JFFS2 -- Journalling Flash File System, Version 2.
  *
- * Copyright (C) 2001 Red Hat, Inc.
+ * Copyright (C) 2001, 2002 Red Hat, Inc.
  *
  * Created by David Woodhouse <dwmw2@cambridge.redhat.com>
  *
@@ -31,16 +31,21 @@
  * provisions above, a recipient may use your version of this file
  * under either the RHEPL or the GPL.
  *
- * $Id: nodelist.h,v 1.46.2.1 2002/02/23 14:04:44 dwmw2 Exp $
- * + zlib_init calls from v1.65
+ * $Id: nodelist.h,v 1.68 2002/03/08 11:27:19 dwmw2 Exp $
  *
  */
+
+#ifndef __JFFS2_NODELIST_H__
+#define __JFFS2_NODELIST_H__
 
 #include <linux/config.h>
 #include <linux/fs.h>
 
+#include <linux/mtd/compatmac.h> /* For min/max in older kernels */
+#include <linux/jffs2.h>
 #include <linux/jffs2_fs_sb.h>
 #include <linux/jffs2_fs_i.h>
+#include "os-linux.h"
 
 #ifndef CONFIG_JFFS2_FS_DEBUG
 #define CONFIG_JFFS2_FS_DEBUG 2
@@ -72,10 +77,10 @@ struct jffs2_raw_node_ref
 		for this inode instead. The inode_cache will have NULL in the first
 		word so you know when you've got there :) */
 	struct jffs2_raw_node_ref *next_phys;
-	//	__u32 ino;
-	__u32 flash_offset;
-	__u32 totlen;
-//	__u16 nodetype;
+	//	uint32_t ino;
+	uint32_t flash_offset;
+	uint32_t totlen;
+//	uint16_t nodetype;
 	
         /* flash_offset & 3 always has to be zero, because nodes are
 	   always aligned at 4 bytes. So we have a couple of extra bits
@@ -108,13 +113,16 @@ struct jffs2_inode_cache {
 		chain. */
 	struct jffs2_inode_cache *next;
 	struct jffs2_raw_node_ref *nodes;
-	__u32 ino;
+	uint32_t ino;
 	int nlink;
 };
 
 struct jffs2_scan_info {
 	struct jffs2_full_dirent *dents;
 	struct jffs2_tmp_dnode_info *tmpnodes;
+	/* Latest i_size info */
+	uint32_t version;
+	uint32_t isize;
 };
 /*
   Larger representation of a raw node, kept in-core only when the 
@@ -124,9 +132,9 @@ struct jffs2_scan_info {
 struct jffs2_full_dnode
 {
 	struct jffs2_raw_node_ref *raw;
-	__u32 ofs; /* Don't really need this, but optimisation */
-	__u32 size;
-	__u32 frags; /* Number of fragments which currently refer
+	uint32_t ofs; /* Don't really need this, but optimisation */
+	uint32_t size;
+	uint32_t frags; /* Number of fragments which currently refer
 			to this node. When this reaches zero, 
 			the node is obsolete.
 		     */
@@ -141,15 +149,15 @@ struct jffs2_tmp_dnode_info
 {
 	struct jffs2_tmp_dnode_info *next;
 	struct jffs2_full_dnode *fn;
-	__u32 version;
+	uint32_t version;
 };       
 
 struct jffs2_full_dirent
 {
 	struct jffs2_raw_node_ref *raw;
 	struct jffs2_full_dirent *next;
-	__u32 version;
-	__u32 ino; /* == zero for unlink */
+	uint32_t version;
+	uint32_t ino; /* == zero for unlink */
 	unsigned int nhash;
 	unsigned char type;
 	unsigned char name[0];
@@ -162,20 +170,20 @@ struct jffs2_node_frag
 {
 	struct jffs2_node_frag *next;
 	struct jffs2_full_dnode *node; /* NULL for holes */
-	__u32 size;
-	__u32 ofs; /* Don't really need this, but optimisation */
-	__u32 node_ofs; /* offset within the physical node */
+	uint32_t size;
+	uint32_t ofs; /* Don't really need this, but optimisation */
+	uint32_t node_ofs; /* offset within the physical node */
 };
 
 struct jffs2_eraseblock
 {
 	struct list_head list;
 	int bad_count;
-	__u32 offset;		/* of this block in the MTD */
+	uint32_t offset;		/* of this block in the MTD */
 
-	__u32 used_size;
-	__u32 dirty_size;
-	__u32 free_size;	/* Note that sector_size - free_size
+	uint32_t used_size;
+	uint32_t dirty_size;
+	uint32_t free_size;	/* Note that sector_size - free_size
 				   is the address of the first free space */
 	struct jffs2_raw_node_ref *first_node;
 	struct jffs2_raw_node_ref *last_node;
@@ -207,7 +215,7 @@ struct jffs2_eraseblock
 } while(0)
 
 #define ACCT_PARANOIA_CHECK(jeb) do { \
-		__u32 my_used_size = 0; \
+		uint32_t my_used_size = 0; \
 		struct jffs2_raw_node_ref *ref2 = jeb->first_node; \
 		while (ref2) { \
 			if (!(ref2->flash_offset & 1)) \
@@ -249,8 +257,8 @@ void jffs2_add_fd_to_list(struct jffs2_sb_info *c, struct jffs2_full_dirent *new
 void jffs2_add_tn_to_list(struct jffs2_tmp_dnode_info *tn, struct jffs2_tmp_dnode_info **list);
 int jffs2_get_inode_nodes(struct jffs2_sb_info *c, ino_t ino, struct jffs2_inode_info *f,
 			  struct jffs2_tmp_dnode_info **tnp, struct jffs2_full_dirent **fdp,
-			  __u32 *highest_version, __u32 *latest_mctime,
-			  __u32 *mctime_ver);
+			  uint32_t *highest_version, uint32_t *latest_mctime,
+			  uint32_t *mctime_ver);
 struct jffs2_inode_cache *jffs2_get_ino_cache(struct jffs2_sb_info *c, int ino);
 void jffs2_add_ino_cache (struct jffs2_sb_info *c, struct jffs2_inode_cache *new);
 void jffs2_del_ino_cache(struct jffs2_sb_info *c, struct jffs2_inode_cache *old);
@@ -258,28 +266,33 @@ void jffs2_free_ino_caches(struct jffs2_sb_info *c);
 void jffs2_free_raw_node_refs(struct jffs2_sb_info *c);
 
 /* nodemgmt.c */
-int jffs2_reserve_space(struct jffs2_sb_info *c, __u32 minsize, __u32 *ofs, __u32 *len, int prio);
-int jffs2_reserve_space_gc(struct jffs2_sb_info *c, __u32 minsize, __u32 *ofs, __u32 *len);
-int jffs2_add_physical_node_ref(struct jffs2_sb_info *c, struct jffs2_raw_node_ref *new, __u32 len, int dirty);
+int jffs2_reserve_space(struct jffs2_sb_info *c, uint32_t minsize, uint32_t *ofs, uint32_t *len, int prio);
+int jffs2_reserve_space_gc(struct jffs2_sb_info *c, uint32_t minsize, uint32_t *ofs, uint32_t *len);
+int jffs2_add_physical_node_ref(struct jffs2_sb_info *c, struct jffs2_raw_node_ref *new, uint32_t len, int dirty);
 void jffs2_complete_reservation(struct jffs2_sb_info *c);
 void jffs2_mark_node_obsolete(struct jffs2_sb_info *c, struct jffs2_raw_node_ref *raw);
 
 /* write.c */
-struct inode *jffs2_new_inode (struct inode *dir_i, int mode, struct jffs2_raw_inode *ri);
-struct jffs2_full_dnode *jffs2_write_dnode(struct inode *inode, struct jffs2_raw_inode *ri, const unsigned char *data, __u32 datalen, __u32 flash_ofs,  __u32 *writelen);
-struct jffs2_full_dirent *jffs2_write_dirent(struct inode *inode, struct jffs2_raw_dirent *rd, const unsigned char *name, __u32 namelen, __u32 flash_ofs,  __u32 *writelen);
+int jffs2_do_new_inode(struct jffs2_sb_info *c, struct jffs2_inode_info *f, uint32_t mode, struct jffs2_raw_inode *ri);
+struct jffs2_full_dnode *jffs2_write_dnode(struct jffs2_sb_info *c, struct jffs2_inode_info *f, struct jffs2_raw_inode *ri, const unsigned char *data, uint32_t datalen, uint32_t flash_ofs,  uint32_t *writelen);
+struct jffs2_full_dirent *jffs2_write_dirent(struct jffs2_sb_info *c, struct jffs2_inode_info *f, struct jffs2_raw_dirent *rd, const unsigned char *name, uint32_t namelen, uint32_t flash_ofs,  uint32_t *writelen);
+int jffs2_write_inode_range(struct jffs2_sb_info *c, struct jffs2_inode_info *f,
+			    struct jffs2_raw_inode *ri, unsigned char *buf, 
+			    uint32_t offset, uint32_t writelen, uint32_t *retlen);
+int jffs2_do_create(struct jffs2_sb_info *c, struct jffs2_inode_info *dir_f, struct jffs2_inode_info *f, struct jffs2_raw_inode *ri, const char *name, int namelen);
+int jffs2_do_unlink(struct jffs2_sb_info *c, struct jffs2_inode_info *dir_f, const char *name, int namelen, struct jffs2_inode_info *dead_f);
+int jffs2_do_link (struct jffs2_sb_info *c, struct jffs2_inode_info *dir_f, uint32_t ino, uint8_t type, const char *name, int namelen);
+
 
 /* readinode.c */
-void jffs2_truncate_fraglist (struct jffs2_sb_info *c, struct jffs2_node_frag **list, __u32 size);
+void jffs2_truncate_fraglist (struct jffs2_sb_info *c, struct jffs2_node_frag **list, uint32_t size);
 int jffs2_add_full_dnode_to_fraglist(struct jffs2_sb_info *c, struct jffs2_node_frag **list, struct jffs2_full_dnode *fn);
 int jffs2_add_full_dnode_to_inode(struct jffs2_sb_info *c, struct jffs2_inode_info *f, struct jffs2_full_dnode *fn);
-void jffs2_read_inode (struct inode *);
-void jffs2_clear_inode (struct inode *);
+int jffs2_do_read_inode(struct jffs2_sb_info *c, struct jffs2_inode_info *f, 
+			uint32_t ino, struct jffs2_raw_inode *latest_node);
+void jffs2_do_clear_inode(struct jffs2_sb_info *c, struct jffs2_inode_info *f);
 
 /* malloc.c */
-void jffs2_free_tmp_dnode_info_list(struct jffs2_tmp_dnode_info *tn);
-void jffs2_free_full_dirent_list(struct jffs2_full_dirent *fd);
-
 int jffs2_create_slab_caches(void);
 void jffs2_destroy_slab_caches(void);
 
@@ -303,47 +316,24 @@ void jffs2_free_inode_cache(struct jffs2_inode_cache *);
 /* gc.c */
 int jffs2_garbage_collect_pass(struct jffs2_sb_info *c);
 
-/* background.c */
-int jffs2_start_garbage_collect_thread(struct jffs2_sb_info *c);
-void jffs2_stop_garbage_collect_thread(struct jffs2_sb_info *c);
-void jffs2_garbage_collect_trigger(struct jffs2_sb_info *c);
-
-/* dir.c */
-extern struct file_operations jffs2_dir_operations;
-extern struct inode_operations jffs2_dir_inode_operations;
-
-/* file.c */
-extern struct file_operations jffs2_file_operations;
-extern struct inode_operations jffs2_file_inode_operations;
-extern struct address_space_operations jffs2_file_address_operations;
-int jffs2_null_fsync(struct file *, struct dentry *, int);
-int jffs2_setattr (struct dentry *dentry, struct iattr *iattr);
-int jffs2_do_readpage_nolock (struct inode *inode, struct page *pg);
-int jffs2_do_readpage_unlock (struct inode *inode, struct page *pg);
-int jffs2_readpage (struct file *, struct page *);
-int jffs2_prepare_write (struct file *, struct page *, unsigned, unsigned);
-int jffs2_commit_write (struct file *, struct page *, unsigned, unsigned);
-
-/* ioctl.c */
-int jffs2_ioctl(struct inode *, struct file *, unsigned int, unsigned long);
-
 /* read.c */
 int jffs2_read_dnode(struct jffs2_sb_info *c, struct jffs2_full_dnode *fd, unsigned char *buf, int ofs, int len);
+int jffs2_read_inode_range(struct jffs2_sb_info *c, struct jffs2_inode_info *f,
+			   unsigned char *buf, uint32_t offset, uint32_t len);
+char *jffs2_getlink(struct jffs2_sb_info *c, struct jffs2_inode_info *f);
+
 
 /* compr.c */
 unsigned char jffs2_compress(unsigned char *data_in, unsigned char *cpage_out, 
-			     __u32 *datalen, __u32 *cdatalen);
+			     uint32_t *datalen, uint32_t *cdatalen);
 int jffs2_decompress(unsigned char comprtype, unsigned char *cdata_in, 
-		     unsigned char *data_out, __u32 cdatalen, __u32 datalen);
+		     unsigned char *data_out, uint32_t cdatalen, uint32_t datalen);
 
 /* scan.c */
 int jffs2_scan_medium(struct jffs2_sb_info *c);
 
 /* build.c */
-int jffs2_build_filesystem(struct jffs2_sb_info *c);
-
-/* symlink.c */
-extern struct inode_operations jffs2_symlink_inode_operations;
+int jffs2_do_mount_fs(struct jffs2_sb_info *c);
 
 /* erase.c */
 void jffs2_erase_block(struct jffs2_sb_info *c, struct jffs2_eraseblock *jeb);
@@ -351,6 +341,16 @@ void jffs2_erase_pending_blocks(struct jffs2_sb_info *c);
 void jffs2_mark_erased_blocks(struct jffs2_sb_info *c);
 void jffs2_erase_pending_trigger(struct jffs2_sb_info *c);
 
+#ifdef CONFIG_JFFS2_FS_NAND
+/* wbuf.c */
+int jffs2_flush_wbuf(struct jffs2_sb_info *c, int pad);
+int jffs2_check_nand_cleanmarker(struct jffs2_sb_info *c, struct jffs2_eraseblock *jeb);
+int jffs2_write_nand_cleanmarker(struct jffs2_sb_info *c, struct jffs2_eraseblock *jeb);
+int jffs2_nand_read_failcnt(struct jffs2_sb_info *c, struct jffs2_eraseblock *jeb);
+#endif
+
 /* compr_zlib.c */
 int jffs2_zlib_init(void);
 void jffs2_zlib_exit(void);
+
+#endif /* __JFFS2_NODELIST_H__ */

@@ -1,7 +1,7 @@
 /*
  * JFFS2 -- Journalling Flash File System, Version 2.
  *
- * Copyright (C) 2001 Red Hat, Inc.
+ * Copyright (C) 2001, 2002 Red Hat, Inc.
  *
  * Created by David Woodhouse <dwmw2@cambridge.redhat.com>
  *
@@ -31,41 +31,44 @@
  * provisions above, a recipient may use your version of this file
  * under either the RHEPL or the GPL.
  *
- * $Id: pushpull.c,v 1.7 2001/09/23 10:04:15 rmk Exp $
+ * $Id: writev.c,v 1.1 2002/03/08 11:27:59 dwmw2 Exp $
  *
  */
 
-#include <linux/string.h>
-#include "pushpull.h"
-#include <linux/errno.h>
+#include <linux/kernel.h>
+#include <linux/mtd/mtd.h>
+#include "nodelist.h"
 
-void init_pushpull(struct pushpull *pp, char *buf, unsigned buflen, unsigned ofs, unsigned reserve)
+/* This ought to be in core MTD code. All registered MTD devices
+   without writev should have this put in place. Bug the MTD
+   maintainer */
+static inline int mtd_fake_writev(struct mtd_info *mtd, const struct iovec *vecs,
+				  unsigned long count, loff_t to, size_t *retlen)
 {
-	pp->buf = buf;
-	pp->buflen = buflen;
-	pp->ofs = ofs;
-	pp->reserve = reserve;
-}
-     
+	unsigned long i;
+	size_t totlen = 0, thislen;
+	int ret = 0;
 
-int pushbit(struct pushpull *pp, int bit, int use_reserved)
-{
-	if (pp->ofs >= pp->buflen - (use_reserved?0:pp->reserve)) {
-		return -ENOSPC;
+	for (i=0; i<count; i++) {
+		if (!vecs[i].iov_len)
+			continue;
+		mtd->write(mtd, to, vecs[i].iov_len, &thislen, vecs[i].iov_base);
+		totlen += thislen;
+		if (ret || thislen != vecs[i].iov_len)
+			break;
+		to += vecs[i].iov_len;
 	}
-
-	if (bit) {
-		pp->buf[pp->ofs >> 3] |= (1<<(7-(pp->ofs &7)));
-	}
-	else {
-		pp->buf[pp->ofs >> 3] &= ~(1<<(7-(pp->ofs &7)));
-	}
-	pp->ofs++;
-
-	return 0;
+	if (retlen)
+		*retlen = totlen;
+	return ret;
 }
 
-int pushedbits(struct pushpull *pp)
+int jffs2_flash_direct_writev(struct jffs2_sb_info *c, const struct iovec *vecs,
+			      unsigned long count, loff_t to, size_t *retlen)
 {
-	return pp->ofs;
+	if (c->mtd->writev)
+		return c->mtd->writev(c->mtd, vecs, count, to, retlen);
+	else
+		return mtd_fake_writev(c->mtd, vecs, count, to, retlen);
 }
+

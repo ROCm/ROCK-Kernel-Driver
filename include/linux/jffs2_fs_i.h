@@ -1,22 +1,11 @@
-/* $Id: jffs2_fs_i.h,v 1.8 2001/04/18 13:05:28 dwmw2 Exp $ */
+/* $Id: jffs2_fs_i.h,v 1.12 2002/03/06 13:59:21 dwmw2 Exp $ */
 
 #ifndef _JFFS2_FS_I
 #define _JFFS2_FS_I
 
-/* Include the pipe_inode_info at the beginning so that we can still
-   use the storage space in the inode when we have a pipe inode.
-   This sucks.
-*/
-
-#undef THISSUCKS /* Only for 2.2 */
-#ifdef THISSUCKS
-#include <linux/pipe_fs_i.h>
-#endif
+#include <linux/version.h>
 
 struct jffs2_inode_info {
-#ifdef THISSUCKS
-        struct pipe_inode_info pipecrap;
-#endif
 	/* We need an internal semaphore similar to inode->i_sem.
 	   Unfortunately, we can't used the existing one, because
 	   either the GC would deadlock, or we'd have to release it
@@ -26,7 +15,7 @@ struct jffs2_inode_info {
 	struct semaphore sem;
 
 	/* The highest (datanode) version number used for this ino */
-	__u32 highest_version;
+	uint32_t highest_version;
 
 	/* List of data fragments which make up the file */
 	struct jffs2_node_frag *fraglist;
@@ -44,23 +33,11 @@ struct jffs2_inode_info {
 	/* Some stuff we just have to keep in-core at all times, for each inode. */
 	struct jffs2_inode_cache *inocache;
 
-	/* Keep a pointer to the last physical node in the list. We don't 
-	   use the doubly-linked lists because we don't want to increase
-	   the memory usage that much. This is simpler */
-	//	struct jffs2_raw_node_ref *lastnode;
-	__u16 flags;
-	__u8 usercompr;
+	uint16_t flags;
+	uint8_t usercompr;
+#if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,2)
 	struct inode vfs_inode;
+#endif
 };
 
-#ifdef JFFS2_OUT_OF_KERNEL
-#define JFFS2_INODE_INFO(i) ((struct jffs2_inode_info *) &(i)->u)
-#else
-static inline struct jffs2_inode_info *JFFS2_INODE_INFO(struct inode *inode)
-{
-	return list_entry(inode, struct jffs2_inode_info, vfs_inode);
-}
-#endif
-
 #endif /* _JFFS2_FS_I */
-

@@ -1,7 +1,7 @@
 /*
  * JFFS2 -- Journalling Flash File System, Version 2.
  *
- * Copyright (C) 2001 Red Hat, Inc.
+ * Copyright (C) 2001, 2002 Red Hat, Inc.
  *
  * Created by Arjan van de Ven <arjanv@redhat.com>
  *
@@ -31,7 +31,7 @@
  * provisions above, a recipient may use your version of this file
  * under either the RHEPL or the GPL.
  *
- * $Id: compr_rtime.c,v 1.5 2001/03/15 15:38:23 dwmw2 Exp $
+ * $Id: compr_rtime.c,v 1.8 2002/01/25 01:49:26 dwmw2 Exp $
  *
  *
  * Very simple lz77-ish encoder.
@@ -51,8 +51,8 @@
 #include <linux/string.h> 
 
 /* _compress returns the compressed size, -1 if bigger */
-int rtime_compress(unsigned char *data_in, unsigned char *cpage_out, 
-		   __u32 *sourcelen, __u32 *dstlen)
+int jffs2_rtime_compress(unsigned char *data_in, unsigned char *cpage_out, 
+		   uint32_t *sourcelen, uint32_t *dstlen)
 {
 	int positions[256];
 	int outpos = 0;
@@ -91,8 +91,8 @@ int rtime_compress(unsigned char *data_in, unsigned char *cpage_out,
 }		   
 
 
-void rtime_decompress(unsigned char *data_in, unsigned char *cpage_out,
-		      __u32 srclen, __u32 destlen)
+void jffs2_rtime_decompress(unsigned char *data_in, unsigned char *cpage_out,
+		      uint32_t srclen, uint32_t destlen)
 {
 	int positions[256];
 	int outpos = 0;

@@ -1,7 +1,7 @@
 /*
  * JFFS2 -- Journalling Flash File System, Version 2.
  *
- * Copyright (C) 2001 Red Hat, Inc.
+ * Copyright (C) 2001, 2002 Red Hat, Inc.
  *
  * Created by David Woodhouse <dwmw2@cambridge.redhat.com>
  *
@@ -31,7 +31,7 @@
  * provisions above, a recipient may use your version of this file
  * under either the RHEPL or the GPL.
  *
- * $Id: malloc.c,v 1.16 2001/03/15 15:38:24 dwmw2 Exp $
+ * $Id: malloc.c,v 1.21 2002/03/12 17:36:55 dwmw2 Exp $
  *
  */
 
@@ -49,7 +49,6 @@
 
 /* These are initialised to NULL in the kernel startup code.
    If you're porting to other operating systems, beware */
-static kmem_cache_t *jffs2_inode_cachep;
 static kmem_cache_t *full_dnode_slab;
 static kmem_cache_t *raw_dirent_slab;
 static kmem_cache_t *raw_inode_slab;
@@ -58,89 +57,47 @@ static kmem_cache_t *raw_node_ref_slab;
 static kmem_cache_t *node_frag_slab;
 static kmem_cache_t *inode_cache_slab;
 
-void jffs2_free_tmp_dnode_info_list(struct jffs2_tmp_dnode_info *tn)
-{
-	struct jffs2_tmp_dnode_info *next;
-
-	while (tn) {
-		next = tn;
-		tn = tn->next;
-		jffs2_free_full_dnode(next->fn);
-		jffs2_free_tmp_dnode_info(next);
-	}
-}
-
-void jffs2_free_full_dirent_list(struct jffs2_full_dirent *fd)
-{
-	struct jffs2_full_dirent *next;
-
-	while (fd) {
-		next = fd->next;
-		jffs2_free_full_dirent(fd);
-		fd = next;
-	}
-}
-
-struct inode *jffs2_alloc_inode(struct super_block *sb)
-{
-	struct jffs2_inode_info *ei;
-	ei = (struct jffs2_inode_info *)kmem_cache_alloc(jffs2_inode_cachep, SLAB_KERNEL);
-	if (!ei)
-		return NULL;
-	return &ei->vfs_inode;
-}
-
-void jffs2_destroy_inode(struct inode *inode)
-{
-	kmem_cache_free(jffs2_inode_cachep, JFFS2_INODE_INFO(inode));
-}
-
-static void init_once(void * foo, kmem_cache_t * cachep, unsigned long flags)
-{
-	struct jffs2_inode_info *ei = (struct jffs2_inode_info *) foo;
-
-	if ((flags & (SLAB_CTOR_VERIFY|SLAB_CTOR_CONSTRUCTOR)) ==
-	    SLAB_CTOR_CONSTRUCTOR) {
-		init_MUTEX(&ei->sem);
-		inode_init_once(&ei->vfs_inode);
-	}
-}
-
 int __init jffs2_create_slab_caches(void)
 {
-	full_dnode_slab = kmem_cache_create("jffs2_full_dnode", sizeof(struct jffs2_full_dnode), 0, JFFS2_SLAB_POISON, NULL, NULL);
+	full_dnode_slab = kmem_cache_create("jffs2_full_dnode", 
+					    sizeof(struct jffs2_full_dnode),
+					    0, JFFS2_SLAB_POISON, NULL, NULL);
 	if (!full_dnode_slab)
 		goto err;
 
-	raw_dirent_slab = kmem_cache_create("jffs2_raw_dirent", sizeof(struct jffs2_raw_dirent), 0, JFFS2_SLAB_POISON, NULL, NULL);
+	raw_dirent_slab = kmem_cache_create("jffs2_raw_dirent",
+					    sizeof(struct jffs2_raw_dirent),
+					    0, JFFS2_SLAB_POISON, NULL, NULL);
 	if (!raw_dirent_slab)
 		goto err;
 
-	raw_inode_slab = kmem_cache_create("jffs2_raw_inode", sizeof(struct jffs2_raw_inode), 0, JFFS2_SLAB_POISON, NULL, NULL);
+	raw_inode_slab = kmem_cache_create("jffs2_raw_inode",
+					   sizeof(struct jffs2_raw_inode),
+					   0, JFFS2_SLAB_POISON, NULL, NULL);
 	if (!raw_inode_slab)
 		goto err;
 
-	tmp_dnode_info_slab = kmem_cache_create("jffs2_tmp_dnode", sizeof(struct jffs2_tmp_dnode_info), 0, JFFS2_SLAB_POISON, NULL, NULL);
+	tmp_dnode_info_slab = kmem_cache_create("jffs2_tmp_dnode",
+						sizeof(struct jffs2_tmp_dnode_info),
+						0, JFFS2_SLAB_POISON, NULL, NULL);
 	if (!tmp_dnode_info_slab)
 		goto err;
 
-	raw_node_ref_slab = kmem_cache_create("jffs2_raw_node_ref", sizeof(struct jffs2_raw_node_ref), 0, JFFS2_SLAB_POISON, NULL, NULL);
+	raw_node_ref_slab = kmem_cache_create("jffs2_raw_node_ref",
+					      sizeof(struct jffs2_raw_node_ref),
+					      0, JFFS2_SLAB_POISON, NULL, NULL);
 	if (!raw_node_ref_slab)
 		goto err;
 
-	node_frag_slab = kmem_cache_create("jffs2_node_frag", sizeof(struct jffs2_node_frag), 0, JFFS2_SLAB_POISON, NULL, NULL);
+	node_frag_slab = kmem_cache_create("jffs2_node_frag",
+					   sizeof(struct jffs2_node_frag),
+					   0, JFFS2_SLAB_POISON, NULL, NULL);
 	if (!node_frag_slab)
 		goto err;
 
-	jffs2_inode_cachep = kmem_cache_create("jffs2_inode_cache",
-					     sizeof(struct jffs2_inode_info),
-					     0, SLAB_HWCACHE_ALIGN,
-					     init_once, NULL);
-	if (!jffs2_inode_cachep)
-		goto err;
-
-	inode_cache_slab = kmem_cache_create("jffs2_inode", sizeof(struct jffs2_inode_cache), 0, JFFS2_SLAB_POISON, NULL, NULL);
-
+	inode_cache_slab = kmem_cache_create("jffs2_inode_cache",
+					     sizeof(struct jffs2_inode_cache),
+					     0, JFFS2_SLAB_POISON, NULL, NULL);
 	if (inode_cache_slab)
 		return 0;
  err:
@@ -164,9 +121,6 @@ void jffs2_destroy_slab_caches(void)
 		kmem_cache_destroy(node_frag_slab);
 	if(inode_cache_slab)
 		kmem_cache_destroy(inode_cache_slab);
-	if(jffs2_inode_cachep)
-		kmem_cache_destroy(jffs2_inode_cachep);
-
 }
 
 struct jffs2_full_dirent *jffs2_alloc_full_dirent(int namesize)
