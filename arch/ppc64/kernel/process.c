@@ -425,8 +425,7 @@ void show_stack(struct task_struct *p, unsigned long *_sp)
 		print_symbol("%s\n", ip);
 	} while (count++ < 32);
 #if !CONFIG_KALLSYMS
-	if (count > 0)
-		printk("\n");
+	printk("\n");
 #endif
 }
 
