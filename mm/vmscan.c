@@ -876,8 +876,6 @@ int try_to_free_pages(struct zone **zones,
 			ret = 1;
 			goto out;
 		}
-		if (!(gfp_mask & __GFP_FS))
-			break;		/* Let the caller handle it */
 		/*
 		 * Try to write back as many pages as we just scanned.  Not
 		 * sure if that makes sense, but it's an attempt to avoid
