@@ -4,16 +4,6 @@
 #include <linux/ioport.h>
 #include <linux/device.h>
 
-#ifdef CONFIG_EISA
-# ifdef CONFIG_EISA_ALWAYS
-#  define EISA_bus 1
-# else
-   extern int EISA_bus;
-# endif
-#else
-# define EISA_bus 0
-#endif
-
 #define EISA_SIG_LEN   8
 #define EISA_MAX_SLOTS 8
 
@@ -107,5 +97,11 @@ struct eisa_root_device {
 };
 
 int eisa_root_register (struct eisa_root_device *root);
+
+#ifdef CONFIG_EISA
+extern int EISA_bus;
+#else
+# define EISA_bus 0
+#endif
 
 #endif
