@@ -67,7 +67,7 @@
 
 void chrp_progress(char *, unsigned short);
 
-extern void openpic_init_IRQ(void);
+extern void pSeries_init_openpic(void);
 
 extern void find_and_init_phbs(void);
 extern void pSeries_final_fixup(void);
@@ -257,7 +257,7 @@ chrp_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_md.setup_residual = NULL;
 	ppc_md.get_cpuinfo    = chrp_get_cpuinfo;
 	if(naca->interrupt_controller == IC_OPEN_PIC) {
-		ppc_md.init_IRQ       = openpic_init_IRQ; 
+		ppc_md.init_IRQ       = pSeries_init_openpic; 
 		ppc_md.get_irq        = openpic_get_irq;
 	} else {
 		ppc_md.init_IRQ       = xics_init_IRQ;
