@@ -559,7 +559,9 @@ static int __init drm_init( void )
 
 	drm_device_t *dev;
 	int i;
+#if __HAVE_CTX_BITMAP
 	int retcode;
+#endif
 	DRM_DEBUG( "\n" );
 
 #ifdef MODULE
