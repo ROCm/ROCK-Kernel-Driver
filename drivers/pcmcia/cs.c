@@ -133,103 +133,6 @@ socket_state_t dead_socket = {
 LIST_HEAD(pcmcia_socket_list);
 DECLARE_RWSEM(pcmcia_socket_list_rwsem);
 
-/*====================================================================*/
-
-/* String tables for error messages */
-
-typedef struct lookup_t {
-    int key;
-    char *msg;
-} lookup_t;
-
-static const lookup_t error_table[] = {
-    { CS_SUCCESS,		"Operation succeeded" },
-    { CS_BAD_ADAPTER,		"Bad adapter" },
-    { CS_BAD_ATTRIBUTE, 	"Bad attribute", },
-    { CS_BAD_BASE,		"Bad base address" },
-    { CS_BAD_EDC,		"Bad EDC" },
-    { CS_BAD_IRQ,		"Bad IRQ" },
-    { CS_BAD_OFFSET,		"Bad offset" },
-    { CS_BAD_PAGE,		"Bad page number" },
-    { CS_READ_FAILURE,		"Read failure" },
-    { CS_BAD_SIZE,		"Bad size" },
-    { CS_BAD_SOCKET,		"Bad socket" },
-    { CS_BAD_TYPE,		"Bad type" },
-    { CS_BAD_VCC,		"Bad Vcc" },
-    { CS_BAD_VPP,		"Bad Vpp" },
-    { CS_BAD_WINDOW,		"Bad window" },
-    { CS_WRITE_FAILURE,		"Write failure" },
-    { CS_NO_CARD,		"No card present" },
-    { CS_UNSUPPORTED_FUNCTION,	"Usupported function" },
-    { CS_UNSUPPORTED_MODE,	"Unsupported mode" },
-    { CS_BAD_SPEED,		"Bad speed" },
-    { CS_BUSY,			"Resource busy" },
-    { CS_GENERAL_FAILURE,	"General failure" },
-    { CS_WRITE_PROTECTED,	"Write protected" },
-    { CS_BAD_ARG_LENGTH,	"Bad argument length" },
-    { CS_BAD_ARGS,		"Bad arguments" },
-    { CS_CONFIGURATION_LOCKED,	"Configuration locked" },
-    { CS_IN_USE,		"Resource in use" },
-    { CS_NO_MORE_ITEMS,		"No more items" },
-    { CS_OUT_OF_RESOURCE,	"Out of resource" },
-    { CS_BAD_HANDLE,		"Bad handle" },
-    { CS_BAD_TUPLE,		"Bad CIS tuple" }
-};
-#define ERROR_COUNT (sizeof(error_table)/sizeof(lookup_t))
-
-static const lookup_t service_table[] = {
-    { AccessConfigurationRegister,	"AccessConfigurationRegister" },
-    { AddSocketServices,		"AddSocketServices" },
-    { AdjustResourceInfo,		"AdjustResourceInfo" },
-    { CheckEraseQueue,			"CheckEraseQueue" },
-    { CloseMemory,			"CloseMemory" },
-    { DeregisterClient,			"DeregisterClient" },
-    { DeregisterEraseQueue,		"DeregisterEraseQueue" },
-    { GetCardServicesInfo,		"GetCardServicesInfo" },
-    { GetClientInfo,			"GetClientInfo" },
-    { GetConfigurationInfo,		"GetConfigurationInfo" },
-    { GetEventMask,			"GetEventMask" },
-    { GetFirstClient,			"GetFirstClient" },
-    { GetFirstRegion,			"GetFirstRegion" },
-    { GetFirstTuple,			"GetFirstTuple" },
-    { GetNextClient,			"GetNextClient" },
-    { GetNextRegion,			"GetNextRegion" },
-    { GetNextTuple,			"GetNextTuple" },
-    { GetStatus,			"GetStatus" },
-    { GetTupleData,			"GetTupleData" },
-    { MapMemPage,			"MapMemPage" },
-    { ModifyConfiguration,		"ModifyConfiguration" },
-    { ModifyWindow,			"ModifyWindow" },
-    { OpenMemory,			"OpenMemory" },
-    { ParseTuple,			"ParseTuple" },
-    { ReadMemory,			"ReadMemory" },
-    { RegisterClient,			"RegisterClient" },
-    { RegisterEraseQueue,		"RegisterEraseQueue" },
-    { RegisterMTD,			"RegisterMTD" },
-    { ReleaseConfiguration,		"ReleaseConfiguration" },
-    { ReleaseIO,			"ReleaseIO" },
-    { ReleaseIRQ,			"ReleaseIRQ" },
-    { ReleaseWindow,			"ReleaseWindow" },
-    { RequestConfiguration,		"RequestConfiguration" },
-    { RequestIO,			"RequestIO" },
-    { RequestIRQ,			"RequestIRQ" },
-    { RequestSocketMask,		"RequestSocketMask" },
-    { RequestWindow,			"RequestWindow" },
-    { ResetCard,			"ResetCard" },
-    { SetEventMask,			"SetEventMask" },
-    { ValidateCIS,			"ValidateCIS" },
-    { WriteMemory,			"WriteMemory" },
-    { BindDevice,			"BindDevice" },
-    { BindMTD,				"BindMTD" },
-    { ReportError,			"ReportError" },
-    { SuspendCard,			"SuspendCard" },
-    { ResumeCard,			"ResumeCard" },
-    { EjectCard,			"EjectCard" },
-    { InsertCard,			"InsertCard" },
-    { ReplaceCIS,			"ReplaceCIS" }
-};
-#define SERVICE_COUNT (sizeof(service_table)/sizeof(lookup_t))
-
 
 /*====================================================================
 
@@ -2196,35 +2099,6 @@ int pcmcia_set_event_mask(client_handle_t handle, eventmask_t *mask)
     return CS_SUCCESS;
 } /* set_event_mask */
 
-/*====================================================================*/
-
-int pcmcia_report_error(client_handle_t handle, error_info_t *err)
-{
-    int i;
-    char *serv;
-
-    if (CHECK_HANDLE(handle))
-	printk(KERN_NOTICE);
-    else
-	printk(KERN_NOTICE "%s: ", handle->dev_info);
-    
-    for (i = 0; i < SERVICE_COUNT; i++)
-	if (service_table[i].key == err->func) break;
-    if (i < SERVICE_COUNT)
-	serv = service_table[i].msg;
-    else
-	serv = "Unknown service number";
-
-    for (i = 0; i < ERROR_COUNT; i++)
-	if (error_table[i].key == err->retcode) break;
-    if (i < ERROR_COUNT)
-	printk("%s: %s\n", serv, error_table[i].msg);
-    else
-	printk("%s: Unknown error code %#x\n", serv, err->retcode);
-
-    return CS_SUCCESS;
-} /* report_error */
-
 /*======================================================================
 
     OS-specific module glue goes here
@@ -2267,7 +2141,6 @@ EXPORT_SYMBOL(pcmcia_release_io);
 EXPORT_SYMBOL(pcmcia_release_irq);
 EXPORT_SYMBOL(pcmcia_release_window);
 EXPORT_SYMBOL(pcmcia_replace_cis);
-EXPORT_SYMBOL(pcmcia_report_error);
 EXPORT_SYMBOL(pcmcia_request_configuration);
 EXPORT_SYMBOL(pcmcia_request_io);
 EXPORT_SYMBOL(pcmcia_request_irq);
