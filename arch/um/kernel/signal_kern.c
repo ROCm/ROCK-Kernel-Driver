@@ -38,16 +38,17 @@ EXPORT_SYMBOL(unblock_signals);
 /*
  * OK, we're invoking a handler
  */	
-static int handle_signal(struct pt_regs *regs, unsigned long signr, 
-			 struct k_sigaction *ka, siginfo_t *info, 
-			 sigset_t *oldset, int error)
+static void handle_signal(struct pt_regs *regs, unsigned long signr,
+			  struct k_sigaction *ka, siginfo_t *info,
+			  sigset_t *oldset)
 {
         __sighandler_t handler;
 	void (*restorer)(void);
 	unsigned long sp;
 	sigset_t save;
-	int err, ret;
+	int error, err, ret;
 
+	error = PT_REGS_SYSCALL_RET(&current->thread.regs);
 	ret = 0;
 	/* Always make any pending restarted system calls return -EINTR */
 	current_thread_info()->restart_block.fn = do_no_restart_syscall;
@@ -109,31 +110,25 @@ static int handle_signal(struct pt_regs *regs, unsigned long signr,
 	else
 		err = setup_signal_stack_sc(sp, signr, (unsigned long) handler,
 					    restorer, regs, &save);
-	if(err) goto segv;
-
-	return(0);
- segv:
-	force_sigsegv(signr, current);
-	return(1);
+	if(err)
+		force_sigsegv(signr, current);
 }
 
-static int kern_do_signal(struct pt_regs *regs, sigset_t *oldset, int error)
+static int kern_do_signal(struct pt_regs *regs, sigset_t *oldset)
 {
 	struct k_sigaction ka_copy;
 	siginfo_t info;
-	int err, sig;
+	int sig;
 
 	if (!oldset)
 		oldset = &current->blocked;
 
 	sig = get_signal_to_deliver(&info, &ka_copy, regs, NULL);
-	if(sig == 0)
-		return(0);
-
-	/* Whee!  Actually deliver the signal.  */
-	err = handle_signal(regs, sig, &ka_copy, &info, oldset, error);
-	if(!err)
+	if(sig > 0){
+		/* Whee!  Actually deliver the signal.  */
+		handle_signal(regs, sig, &ka_copy, &info, oldset);
 		return(1);
+	}
 
 	/* Did we come from a system call? */
 	if(PT_REGS_SYSCALL_NR(regs) >= 0){
@@ -165,7 +160,7 @@ static int kern_do_signal(struct pt_regs *regs, sigset_t *oldset, int error)
 
 int do_signal(int error)
 {
-	return(kern_do_signal(&current->thread.regs, NULL, error));
+	return(kern_do_signal(&current->thread.regs, NULL));
 }
 
 /*
@@ -182,10 +177,11 @@ int sys_sigsuspend(int history0, int history1, old_sigset_t mask)
 	recalc_sigpending();
 	spin_unlock_irq(&current->sighand->siglock);
 
+	PT_REGS_SYSCALL_RET(&current->thread.regs) = -EINTR;
 	while (1) {
 		current->state = TASK_INTERRUPTIBLE;
 		schedule();
-		if(kern_do_signal(&current->thread.regs, &saveset, -EINTR))
+		if(kern_do_signal(&current->thread.regs, &saveset))
 			return(-EINTR);
 	}
 }
@@ -208,10 +204,11 @@ int sys_rt_sigsuspend(sigset_t __user *unewset, size_t sigsetsize)
 	recalc_sigpending();
 	spin_unlock_irq(&current->sighand->siglock);
 
+	PT_REGS_SYSCALL_RET(&current->thread.regs) = -EINTR;
 	while (1) {
 		current->state = TASK_INTERRUPTIBLE;
 		schedule();
-		if (kern_do_signal(&current->thread.regs, &saveset, -EINTR))
+		if (kern_do_signal(&current->thread.regs, &saveset))
 			return(-EINTR);
 	}
 }
