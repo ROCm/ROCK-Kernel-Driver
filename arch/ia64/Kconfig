@@ -416,92 +416,13 @@ source "drivers/pci/hotplug/Kconfig"
 
 source "drivers/pcmcia/Kconfig"
 
-source "drivers/parport/Kconfig"
-
 endif
 
 endmenu
 
-source "drivers/base/Kconfig"
-
-if !IA64_HP_SIM
-
-source "drivers/mtd/Kconfig"
-
-source "drivers/pnp/Kconfig"
-
-source "drivers/block/Kconfig"
-
-source "drivers/ide/Kconfig"
-
-source "drivers/ieee1394/Kconfig"
-
-source "drivers/message/i2o/Kconfig"
-
-source "drivers/md/Kconfig"
-
-source "drivers/message/fusion/Kconfig"
-
-endif
-
-
-source "drivers/scsi/Kconfig"
-
-source "net/Kconfig"
-
-
-if !IA64_HP_SIM
-
-source "drivers/isdn/Kconfig"
-
-source "drivers/cdrom/Kconfig"
-
-#
-# input before char - char/joystick depends on it. As does USB.
-#
-source "drivers/input/Kconfig"
-
-source "drivers/char/Kconfig"
-
-source "drivers/i2c/Kconfig"
-
-#source drivers/misc/Config.in
-source "drivers/media/Kconfig"
-
-endif
-
-
-menu "Block devices"
-	depends on IA64_HP_SIM
-
-config BLK_DEV_LOOP
-	tristate "Loopback device support"
-
-config BLK_DEV_NBD
-	tristate "Network block device support"
-	depends on NET
-
-config BLK_DEV_RAM
-	tristate "RAM disk support"
-
-config BLK_DEV_RAM_SIZE
-	int "Default RAM disk size"
-	depends on BLK_DEV_RAM
-	default "4096"
-
-endmenu
+source "drivers/Kconfig"
 
 source "fs/Kconfig"
-
-if !IA64_HP_SIM
-
-source "drivers/video/Kconfig"
-
-source "sound/Kconfig"
-
-source "drivers/usb/Kconfig"
-
-endif
 
 source "lib/Kconfig"
 
