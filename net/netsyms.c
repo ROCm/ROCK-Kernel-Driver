@@ -136,32 +136,6 @@ EXPORT_SYMBOL(sockfd_lookup);
 EXPORT_SYMBOL(sk_run_filter);
 EXPORT_SYMBOL(sk_chk_filter);
 
-EXPORT_SYMBOL(neigh_table_init);
-EXPORT_SYMBOL(neigh_table_clear);
-EXPORT_SYMBOL(neigh_resolve_output);
-EXPORT_SYMBOL(neigh_connected_output);
-EXPORT_SYMBOL(neigh_update);
-EXPORT_SYMBOL(neigh_create);
-EXPORT_SYMBOL(neigh_lookup);
-EXPORT_SYMBOL(__neigh_event_send);
-EXPORT_SYMBOL(neigh_event_ns);
-EXPORT_SYMBOL(neigh_ifdown);
-#ifdef CONFIG_ARPD
-EXPORT_SYMBOL(neigh_app_ns);
-#endif
-#ifdef CONFIG_SYSCTL
-EXPORT_SYMBOL(neigh_sysctl_register);
-EXPORT_SYMBOL(neigh_sysctl_unregister);
-#endif
-EXPORT_SYMBOL(pneigh_lookup);
-EXPORT_SYMBOL(pneigh_enqueue);
-EXPORT_SYMBOL(neigh_destroy);
-EXPORT_SYMBOL(neigh_parms_alloc);
-EXPORT_SYMBOL(neigh_parms_release);
-EXPORT_SYMBOL(neigh_rand_reach_time);
-EXPORT_SYMBOL(neigh_compat_output); 
-EXPORT_SYMBOL(neigh_changeaddr); 
-
 /*	dst_entry	*/
 EXPORT_SYMBOL(dst_alloc);
 EXPORT_SYMBOL(__dst_free);
@@ -393,9 +367,6 @@ EXPORT_SYMBOL(netlink_post);
 
 EXPORT_SYMBOL(rtattr_parse);
 EXPORT_SYMBOL(__rta_fill);
-EXPORT_SYMBOL(neigh_delete);
-EXPORT_SYMBOL(neigh_add);
-EXPORT_SYMBOL(neigh_dump_info);
 
 
 /* ABI emulation layers need this */
