@@ -549,10 +549,6 @@ static __inline struct ahd_linux_device *
 static __inline void ahd_linux_run_device_queues(struct ahd_softc *ahd);
 static __inline void ahd_linux_unmap_scb(struct ahd_softc*, struct scb*);
 
-static __inline int ahd_linux_map_seg(struct ahd_softc *ahd, struct scb *scb,
-		 		      struct ahd_dma_seg *sg,
-				      dma_addr_t addr, bus_size_t len);
-
 static __inline void
 ahd_schedule_completeq(struct ahd_softc *ahd)
 {
@@ -709,28 +705,6 @@ ahd_linux_unmap_scb(struct ahd_softc *ahd, struct scb *scb)
 				 scb->platform_data->buf_busaddr,
 				 cmd->request_bufflen, direction);
 	}
-}
-
-static __inline int
-ahd_linux_map_seg(struct ahd_softc *ahd, struct scb *scb,
-		  struct ahd_dma_seg *sg, dma_addr_t addr, bus_size_t len)
-{
-	int	 consumed;
-
-	if ((scb->sg_count + 1) > AHD_NSEG)
-		panic("Too few segs for dma mapping.  "
-		      "Increase AHD_NSEG\n");
-
-	consumed = 1;
-	sg->addr = ahd_htole32(addr & 0xFFFFFFFF);
-	scb->platform_data->xfer_len += len;
-
-	if (sizeof(dma_addr_t) > 4
-	 && (ahd->flags & AHD_39BIT_ADDRESSING) != 0)
-		len |= (addr >> 8) & AHD_SG_HIGH_ADDR_MASK;
-
-	sg->len = ahd_htole32(len);
-	return (consumed);
 }
 
 /******************************** Macros **************************************/
