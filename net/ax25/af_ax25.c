@@ -1264,27 +1264,32 @@ static int ax25_connect(struct socket *sock, struct sockaddr *uaddr, int addr_le
 	if (sk->state != TCP_ESTABLISHED && (flags & O_NONBLOCK))
 		return -EINPROGRESS;
 
-	cli();	/* To avoid races on the sleep */
+	if (sk->state == TCP_SYN_SENT) {
+		struct task_struct *tsk = current;
+		DECLARE_WAITQUEUE(wait, tsk);
 
-	/* A DM or timeout will go to closed, a UA will go to ABM */
-	while (sk->state == TCP_SYN_SENT) {
-		interruptible_sleep_on(sk->sleep);
-		if (signal_pending(current)) {
-			sti();
+		add_wait_queue(sk->sleep, &wait);
+		for (;;) {
+			set_current_state(TASK_INTERRUPTIBLE);
+			if (sk->state != TCP_SYN_SENT)
+				break;
+			if (!signal_pending(tsk)) {
+				schedule();
+				continue;
+			}
 			return -ERESTARTSYS;
 		}
+		current->state = TASK_RUNNING;
+		remove_wait_queue(sk->sleep, &wait);
 	}
 
 	if (sk->state != TCP_ESTABLISHED) {
 		/* Not in ABM, not in WAIT_UA -> failed */
-		sti();
 		sock->state = SS_UNCONNECTED;
 		return sock_error(sk);	/* Always set at this point */
 	}
 
 	sock->state = SS_CONNECTED;
-
-	sti();
 
 	return 0;
 }
