@@ -379,6 +379,16 @@ extern void put_device(struct device * dev);
 
 /* drivers/base/sys.c */
 
+struct sys_root {
+	u32		id;
+	struct device 	dev;
+	struct device	sysdev;
+};
+
+extern int sys_register_root(struct sys_root *);
+extern void sys_unregister_root(struct sys_root *);
+
+
 struct sys_device {
 	char		* name;
 	u32		id;
