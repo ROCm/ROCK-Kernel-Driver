@@ -69,6 +69,7 @@
 #define ERRpipeclosing 232
 #define ERRnotconnected 233
 #define ERRmoredata    234
+#define ERReasnotsupported 282
 #define ErrQuota 0x200		/* The operation would cause a quota limit to be exceeded. */
 #define ErrNotALink 0x201	/* A link operation was performed on a pathname that
 				   was not a link. */

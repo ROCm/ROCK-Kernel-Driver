@@ -1,7 +1,7 @@
 /*
  *   fs/cifs/misc.c
  *
- *   Copyright (C) International Business Machines  Corp., 2002,2003
+ *   Copyright (C) International Business Machines  Corp., 2002,2004
  *   Author(s): Steve French (sfrench@us.ibm.com)
  *
  *   This library is free software; you can redistribute it and/or modify
@@ -29,6 +29,9 @@
 #include "smberr.h"
 #include "nterr.h"
 
+#ifdef CONFIG_CIFS_EXPERIMENTAL
+extern mempool_t *cifs_sm_req_poolp;
+#endif /* CIFS_EXPERIMENTAL */
 extern mempool_t *cifs_req_poolp;
 extern struct task_struct * oplockThread;
 
@@ -160,8 +163,10 @@ cifs_buf_get(void)
 	    (struct smb_hdr *) mempool_alloc(cifs_req_poolp, SLAB_KERNEL | SLAB_NOFS);
 
 	/* clear the first few header bytes */
+	/* clear through bcc + 1, making an even 0x40 bytes */
+
 	if (ret_buf) {
-		memset(ret_buf, 0, sizeof (struct smb_hdr));
+		memset(ret_buf, 0, sizeof(struct smb_hdr) + 27);
 		atomic_inc(&bufAllocCount);
 	}
 
@@ -181,6 +186,44 @@ cifs_buf_release(void *buf_to_free)
 	atomic_dec(&bufAllocCount);
 	return;
 }
+
+#ifdef CONFIG_CIFS_EXPERIMENTAL
+struct smb_hdr *
+cifs_small_buf_get(void)
+{
+	struct smb_hdr *ret_buf = NULL;
+
+/* We could use negotiated size instead of max_msgsize - 
+   but it may be more efficient to always alloc same size 
+   albeit slightly larger than necessary and maxbuffersize 
+   defaults to this and can not be bigger */
+	ret_buf =
+	    (struct smb_hdr *) mempool_alloc(cifs_sm_req_poolp, SLAB_KERNEL | SLAB_NOFS);
+
+	/* clear the first few header bytes */
+	/* clear through bcc + 1, making an even 0x40 bytes */
+	if (ret_buf) {
+		memset(ret_buf, 0, sizeof(struct smb_hdr) + 27);
+		atomic_inc(&smBufAllocCount);
+	}
+
+	return ret_buf;
+}
+
+void
+cifs_small_buf_release(void *buf_to_free)
+{
+
+	if (buf_to_free == NULL) {
+		cFYI(1, ("Null buffer passed to cifs_small_buf_release"));
+		return;
+	}
+	mempool_free(buf_to_free,cifs_sm_req_poolp);
+
+	atomic_dec(&smBufAllocCount);
+	return;
+}
+#endif /* CIFS_EXPERIMENTAL */
 
 void
 header_assemble(struct smb_hdr *buffer, char smb_command /* command */ ,

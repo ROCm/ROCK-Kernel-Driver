@@ -69,6 +69,9 @@ struct smb_vol {
 	unsigned intr:1;
 	unsigned setuids:1;
 	unsigned noperm:1;
+	unsigned no_psx_acl:1; /* set if posix acl support should be disabled */
+	unsigned server_ino:1; /* use inode numbers from server ie UniqueId */
+	unsigned direct_io:1;
 	unsigned int rsize;
 	unsigned int wsize;
 	unsigned int sockopt;
@@ -335,7 +338,7 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 				    (checkSMBhdr
 				     (smb_buffer, smb_buffer->Mid))) {
 					cERROR(1,
-					    ("Invalid size or format for SMB found with length %d and pdu_lenght %d",
+					    ("Invalid size or format for SMB found with length %d and pdu_length %d",
 						length, pdu_length));
 					cifs_dump_mem("Received Data is: ",temp,sizeof(struct smb_hdr));
 					/* could we fix this network corruption by finding next 
@@ -505,7 +508,7 @@ cifs_kcalloc(size_t size, int type)
 }
 
 static int
-cifs_parse_mount_options(char *options, const char *devname, struct smb_vol *vol)
+cifs_parse_mount_options(char *options, const char *devname,struct smb_vol *vol)
 {
 	char *value;
 	char *data;
@@ -692,7 +695,12 @@ cifs_parse_mount_options(char *options, const char *devname, struct smb_vol *vol
 				vol->file_mode =
 					simple_strtoul(value, &value, 0);
 			}
-		} else if (strnicmp(data, "dir_mode", 3) == 0) {
+		} else if (strnicmp(data, "dir_mode", 4) == 0) {
+			if (value && *value) {
+				vol->dir_mode =
+					simple_strtoul(value, &value, 0);
+			}
+		} else if (strnicmp(data, "dirmode", 4) == 0) {
 			if (value && *value) {
 				vol->dir_mode =
 					simple_strtoul(value, &value, 0);
@@ -742,6 +750,8 @@ cifs_parse_mount_options(char *options, const char *devname, struct smb_vol *vol
 			/* ignore */
 		} else if (strnicmp(data, "version", 3) == 0) {
 			/* ignore */
+		} else if (strnicmp(data, "guest",5) == 0) {
+			/* ignore */
 		} else if (strnicmp(data, "rw", 2) == 0) {
 			vol->rw = TRUE;
 		} else if ((strnicmp(data, "suid", 4) == 0) ||
@@ -780,6 +790,18 @@ cifs_parse_mount_options(char *options, const char *devname, struct smb_vol *vol
 			vol->intr = 0;
 		} else if (strnicmp(data, "intr", 4) == 0) {
 			vol->intr = 1;
+		} else if (strnicmp(data, "serverino",7) == 0) {
+			vol->server_ino = 1;
+		} else if (strnicmp(data, "noserverino",9) == 0) {
+			vol->server_ino = 0;
+		} else if (strnicmp(data, "acl",3) == 0) {
+			vol->no_psx_acl = 0;
+		} else if (strnicmp(data, "noacl",5) == 0) {
+			vol->no_psx_acl = 1;
+		} else if (strnicmp(data, "direct",6) == 0) {
+			vol->direct_io = 1;
+		} else if (strnicmp(data, "forcedirectio",13) == 0) {
+			vol->direct_io = 1;
 		} else if (strnicmp(data, "noac", 4) == 0) {
 			printk(KERN_WARNING "CIFS: Mount option noac not supported. Instead set /proc/fs/cifs/LookupCacheEnabled to 0\n");
 		} else
@@ -1393,6 +1415,12 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 			cifs_sb->mnt_cifs_flags |= CIFS_MOUNT_NO_PERM;
 		if(volume_info.setuids)
 			cifs_sb->mnt_cifs_flags |= CIFS_MOUNT_SET_UID;
+		if(volume_info.server_ino)
+			cifs_sb->mnt_cifs_flags |= CIFS_MOUNT_SERVER_INUM;
+		if(volume_info.direct_io) {
+			cERROR(1,("mounting share using direct i/o"));
+			cifs_sb->mnt_cifs_flags |= CIFS_MOUNT_DIRECT_IO;
+		}
 
 		tcon =
 		    find_unc(sin_server.sin_addr.s_addr, volume_info.UNC,
@@ -1482,8 +1510,16 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 		/* do not care if following two calls succeed - informational only */
 		CIFSSMBQFSDeviceInfo(xid, tcon, cifs_sb->local_nls);
 		CIFSSMBQFSAttributeInfo(xid, tcon, cifs_sb->local_nls);
-		if (tcon->ses->capabilities & CAP_UNIX)
-			CIFSSMBQFSUnixInfo(xid, tcon, cifs_sb->local_nls);
+		if (tcon->ses->capabilities & CAP_UNIX) {
+			if(!CIFSSMBQFSUnixInfo(xid, tcon, cifs_sb->local_nls)) {
+				if(!volume_info.no_psx_acl) {
+					if(CIFS_UNIX_POSIX_ACL_CAP & 
+					   le64_to_cpu(tcon->fsUnixInfo.Capability))
+						cFYI(1,("server negotiated posix acl support"));
+						sb->s_flags |= MS_POSIXACL;
+				}
+			}
+		}
 	}
 
 	/* volume_info.password is freed above when existing session found
@@ -1552,14 +1588,15 @@ CIFSSessSetup(unsigned int xid, struct cifsSesInfo *ses,
 		capabilities |= CAP_DFS;
 	}
 	pSMB->req_no_secext.Capabilities = cpu_to_le32(capabilities);
-	/* pSMB->req_no_secext.CaseInsensitivePasswordLength =
-	   CIFS_SESSION_KEY_SIZE; */
-	pSMB->req_no_secext.CaseInsensitivePasswordLength = 0;
+
+	pSMB->req_no_secext.CaseInsensitivePasswordLength = 
+		cpu_to_le16(CIFS_SESSION_KEY_SIZE);
+
 	pSMB->req_no_secext.CaseSensitivePasswordLength =
 	    cpu_to_le16(CIFS_SESSION_KEY_SIZE);
 	bcc_ptr = pByteArea(smb_buffer);
-	/* memcpy(bcc_ptr, (char *) lm_session_key, CIFS_SESSION_KEY_SIZE);
-	   bcc_ptr += CIFS_SESSION_KEY_SIZE; */
+	memcpy(bcc_ptr, (char *) session_key, CIFS_SESSION_KEY_SIZE);
+	bcc_ptr += CIFS_SESSION_KEY_SIZE;
 	memcpy(bcc_ptr, (char *) session_key, CIFS_SESSION_KEY_SIZE);
 	bcc_ptr += CIFS_SESSION_KEY_SIZE;
 

@@ -35,6 +35,8 @@
 #include "cifs_debug.h"
 #include "cifs_fs_sb.h"
 
+extern int cifs_readdir2(struct file *file, void *direntry, filldir_t filldir); /* BB removeme BB */
+
 int
 cifs_open(struct inode *inode, struct file *file)
 {
@@ -452,18 +454,44 @@ cifs_closedir(struct inode *inode, struct file *file)
 {
 	int rc = 0;
 	int xid;
-	struct cifsFileInfo *pSMBFileStruct =
+	struct cifsFileInfo *pCFileStruct =
 	    (struct cifsFileInfo *) file->private_data;
+	char * ptmp;
 
 	cFYI(1, ("Closedir inode = 0x%p with ", inode));
 
 	xid = GetXid();
 
-	if (pSMBFileStruct) {
+	if (pCFileStruct) {
+		struct cifsTconInfo *pTcon;
+		struct cifs_sb_info * cifs_sb = CIFS_SB(file->f_dentry->d_sb);
+
+		pTcon = cifs_sb->tcon;
+
 		cFYI(1, ("Freeing private data in close dir"));
+		if(pCFileStruct->srch_inf.endOfSearch == FALSE) {
+			pCFileStruct->invalidHandle = TRUE;
+			rc = CIFSFindClose(xid, pTcon, pCFileStruct->netfid);
+			cFYI(1,("Closing uncompleted readdir with rc %d",rc));
+			/* not much we can do if it fails anywway, ignore rc */
+			rc = 0;
+		}
+		ptmp = pCFileStruct->srch_inf.ntwrk_buf_start;
+		if(ptmp) {
+			cFYI(1,("freeing smb buf in srch struct in closedir")); /* BB removeme BB */
+			pCFileStruct->srch_inf.ntwrk_buf_start = NULL;
+			cifs_buf_release(ptmp);
+		}
+		ptmp = pCFileStruct->search_resume_name;
+		if(ptmp) {
+			cFYI(1,("freeing resume name in closedir")); /* BB removeme BB */
+			pCFileStruct->search_resume_name = NULL;
+			kfree(ptmp);
+		}
 		kfree(file->private_data);
 		file->private_data = NULL;
 	}
+	/* BB can we lock the filestruct while this is going on? */
 	FreeXid(xid);
 	return rc;
 }
@@ -1039,6 +1067,17 @@ int cifs_file_mmap(struct file * file, struct vm_area_struct * vma)
 	struct dentry * dentry = file->f_dentry;
 	int	rc, xid;
 
+#ifdef CIFS_EXPERIMENTAL   /* BB fixme reenable when cifs_read_wrapper fixed */
+	if(dentry->d_sb) {
+		struct cifs_sb_info *cifs_sb;
+		cifs_sb = CIFS_SB(sb);
+		if(cifs_sb != NULL) {
+			if(cifs_sb->mnt_cifs_flags & CIFS_MOUNT_DIRECT_IO)
+				return -ENODEV
+		}
+	}
+#endif /* CIFS_EXPERIMENTAL */
+
 	xid = GetXid();
 	rc = cifs_revalidate(dentry);
 	if (rc) {
@@ -1376,23 +1415,22 @@ fill_in_inode(struct inode *tmp_inode,
 	cFYI(0,
 	     ("CIFS FFIRST: Attributes came in as 0x%x",
 	      attr));
-	if (attr & ATTR_REPARSE) {
-		*pobject_type = DT_LNK;
-		/* BB can this and S_IFREG or S_IFDIR be set as in Windows? */
-		tmp_inode->i_mode |= S_IFLNK;
-	} else if (attr & ATTR_DIRECTORY) {
+	if (attr & ATTR_DIRECTORY) {
 		*pobject_type = DT_DIR;
 		/* override default perms since we do not lock dirs */
 		if(atomic_read(&cifsInfo->inUse) == 0) {
 			tmp_inode->i_mode = cifs_sb->mnt_dir_mode;
 		}
 		tmp_inode->i_mode |= S_IFDIR;
+/* we no longer mark these because we could not follow them */
+/*        } else if (attr & ATTR_REPARSE) {
+                *pobject_type = DT_LNK;
+                tmp_inode->i_mode |= S_IFLNK;*/
 	} else {
 		*pobject_type = DT_REG;
 		tmp_inode->i_mode |= S_IFREG;
 		if(attr & ATTR_READONLY)
 			tmp_inode->i_mode &= ~(S_IWUGO);
-
 	}/* could add code here - to validate if device or weird share type? */
 
 	/* can not fill in nlink here as in qpathinfo version and Unx search */
@@ -1516,13 +1554,16 @@ unix_fill_in_inode(struct inode *tmp_inode,
 	}
 }
 
-static void
+/* Returns one if new inode created (which therefore needs to be hashed) */
+/* Might check in the future if inode number changed so we can rehash inode */
+int
 construct_dentry(struct qstr *qstring, struct file *file,
 		 struct inode **ptmp_inode, struct dentry **pnew_dentry)
 {
 	struct dentry *tmp_dentry;
 	struct cifs_sb_info *cifs_sb;
 	struct cifsTconInfo *pTcon;
+	int rc = 0;
 
 	cFYI(1, ("For %s ", qstring->name));
 	cifs_sb = CIFS_SB(file->f_dentry->d_sb);
@@ -1537,29 +1578,30 @@ construct_dentry(struct qstr *qstring, struct file *file,
 		if(*ptmp_inode == NULL) {
 	                *ptmp_inode = new_inode(file->f_dentry->d_sb);
 			if(*ptmp_inode == NULL)
-				return;
+				return rc;
+			rc = 1;
 			d_instantiate(tmp_dentry, *ptmp_inode);
-			insert_inode_hash(*ptmp_inode);
 		}
 	} else {
 		tmp_dentry = d_alloc(file->f_dentry, qstring);
 		if(tmp_dentry == NULL) {
 			cERROR(1,("Failed allocating dentry"));
 			*ptmp_inode = NULL;
-			return;
+			return rc;
 		}
 			
 		*ptmp_inode = new_inode(file->f_dentry->d_sb);
 		tmp_dentry->d_op = &cifs_dentry_ops;
 		if(*ptmp_inode == NULL)
-			return;
+			return rc;
+		rc = 1;
 		d_instantiate(tmp_dentry, *ptmp_inode);
 		d_rehash(tmp_dentry);
-		insert_inode_hash(*ptmp_inode);
 	}
 
 	tmp_dentry->d_time = jiffies;
 	*pnew_dentry = tmp_dentry;
+	return rc; 
 }
 
 static void reset_resume_key(struct file * dir_file, 
@@ -1609,11 +1651,19 @@ cifs_filldir(struct qstr *pqstring, FILE_DIRECTORY_INFO * pfindData,
 	pqstring->name = pfindData->FileName;
 	/* pqstring->len is already set by caller */
 
-	construct_dentry(pqstring, file, &tmp_inode, &tmp_dentry);
+	rc = construct_dentry(pqstring, file, &tmp_inode, &tmp_dentry);
 	if((tmp_inode == NULL) || (tmp_dentry == NULL)) {
 		return -ENOMEM;
 	}
 	fill_in_inode(tmp_inode, pfindData, &object_type);
+	if(rc) {
+		/* We have no reliable way to get inode numbers
+		from servers w/o Unix extensions yet so we can not set
+		i_ino from pfindData yet */
+
+		/* new inode created, let us hash it */
+		insert_inode_hash(tmp_inode);
+	} /* else if inode number changed do we rehash it? */
 	rc = filldir(direntry, pfindData->FileName, pqstring->len, file->f_pos,
 		tmp_inode->i_ino, object_type);
 	if(rc) {
@@ -1637,11 +1687,19 @@ cifs_filldir_unix(struct qstr *pqstring,
 	pqstring->name = pUnixFindData->FileName;
 	pqstring->len = strnlen(pUnixFindData->FileName, MAX_PATHCONF);
 
-	construct_dentry(pqstring, file, &tmp_inode, &tmp_dentry);
+	rc = construct_dentry(pqstring, file, &tmp_inode, &tmp_dentry);
 	if((tmp_inode == NULL) || (tmp_dentry == NULL)) {
 		return -ENOMEM;
-	}
+	} 
+	if(rc) {
+		struct cifs_sb_info *cifs_sb = CIFS_SB(tmp_inode->i_sb);
 
+		if(cifs_sb->mnt_cifs_flags & CIFS_MOUNT_SERVER_INUM) {
+			tmp_inode->i_ino = 
+				(unsigned long)pUnixFindData->UniqueId;
+		}
+		insert_inode_hash(tmp_inode);
+	} /* else if i_ino has changed should we rehash it? */
 	unix_fill_in_inode(tmp_inode, pUnixFindData, &object_type);
 	rc = filldir(direntry, pUnixFindData->FileName, pqstring->len,
 		file->f_pos, tmp_inode->i_ino, object_type);
@@ -1675,25 +1733,34 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 	FILE_DIRECTORY_INFO *lastFindData;
 	FILE_UNIX_INFO *pfindDataUnix;
 
+
+    /* BB removeme begin */
+	if(!experimEnabled)
+		return cifs_readdir2(file,direntry,filldir);
+    /* BB removeme end */
+
+
 	xid = GetXid();
 
+	if(file->f_dentry == NULL) {
+		rc = -EIO;
+		FreeXid(xid);
+		return rc;
+	}
 	cifs_sb = CIFS_SB(file->f_dentry->d_sb);
 	pTcon = cifs_sb->tcon;
 	bufsize = pTcon->ses->server->maxBuf - MAX_CIFS_HDR_SIZE;
 	if(bufsize > CIFS_MAX_MSGSIZE) {
+		rc = -EIO;
 		FreeXid(xid);
-		return -EIO;
+		return rc;
 	}
 	data = kmalloc(bufsize, GFP_KERNEL);
 	pfindData = (FILE_DIRECTORY_INFO *) data;
 	if(data == NULL) {
+		rc = -ENOMEM;
 		FreeXid(xid);
-		return -ENOMEM;
-	}
-	if(file->f_dentry == NULL) {
-		kfree(data);
-		FreeXid(xid);
-		return -EIO;
+		return rc;
 	}
 	down(&file->f_dentry->d_sb->s_vfs_rename_sem);
 	full_path = build_wildcard_path_from_dentry(file->f_dentry);
@@ -1727,8 +1794,8 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 		if (file->private_data != NULL) {
 			cifsFile =
 				(struct cifsFileInfo *) file->private_data;
-			if (cifsFile->endOfSearch) {
-				if(cifsFile->emptyDir) {
+			if (cifsFile->srch_inf.endOfSearch) {
+				if(cifsFile->srch_inf.emptyDir) {
 					cFYI(1, ("End of search, empty dir"));
 					rc = 0;
 					break;
@@ -1778,7 +1845,7 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 				break;
 			}
 			/* Offset of resume key same for levels 257 and 514 */
-			cifsFile->resume_key = lastFindData->FileIndex;
+			cifsFile->srch_inf.resume_key = lastFindData->FileIndex;
 			if(UnixSearch == FALSE) {
 				cifsFile->resume_name_length = 
 					le32_to_cpu(lastFindData->FileNameLength);
@@ -1915,13 +1982,13 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 				/* if(pfindData > lastFindData) rc = -EIO; break; */
 			}	/* end for loop */
 			if ((findParms.EndofSearch != 0) && cifsFile) {
-				cifsFile->endOfSearch = TRUE;
+				cifsFile->srch_inf.endOfSearch = TRUE;
 				if(findParms.SearchCount == cpu_to_le16(2))
-					cifsFile->emptyDir = TRUE;
+					cifsFile->srch_inf.emptyDir = TRUE;
 			}
 		} else {
 			if (cifsFile)
-				cifsFile->endOfSearch = TRUE;
+				cifsFile->srch_inf.endOfSearch = TRUE;
 			/* unless parent directory gone do not return error */
 			rc = 0;
 		}
@@ -1934,7 +2001,7 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 			      file->f_pos));
 		} else {
 			cifsFile = (struct cifsFileInfo *) file->private_data;
-			if (cifsFile->endOfSearch) {
+			if (cifsFile->srch_inf.endOfSearch) {
 				rc = 0;
 				cFYI(1, ("End of search "));
 				break;
@@ -1944,7 +2011,7 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 				&findNextParms, searchHandle, 
 				cifsFile->search_resume_name,
 				cifsFile->resume_name_length,
-				cifsFile->resume_key,
+				cifsFile->srch_inf.resume_key,
 				&Unicode, &UnixSearch);
 			cFYI(1,("Count: %d  End: %d ",
 			      le16_to_cpu(findNextParms.SearchCount),
@@ -1961,7 +2028,7 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 					break;
 				}
 				/* Offset of resume key same for levels 257 and 514 */
-				cifsFile->resume_key = lastFindData->FileIndex;
+				cifsFile->srch_inf.resume_key = lastFindData->FileIndex;
 
 				if(UnixSearch == FALSE) {
 					cifsFile->resume_name_length = 
@@ -2114,10 +2181,10 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 	/* BB also should check to ensure pointer not beyond end of SMB */
 				} /* end for loop */
 				if (findNextParms.EndofSearch != 0) {
-					cifsFile->endOfSearch = TRUE;
+					cifsFile->srch_inf.endOfSearch = TRUE;
 				}
 			} else {
-				cifsFile->endOfSearch = TRUE;
+				cifsFile->srch_inf.endOfSearch = TRUE;
 				rc = 0;	/* unless parent directory disappeared - do not
 				return error here (eg Access Denied or no more files) */
 			}
