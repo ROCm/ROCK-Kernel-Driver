@@ -152,6 +152,14 @@ static int ____call_usermodehelper(void *data)
 	struct subprocess_info *sub_info = data;
 	int retval;
 
+	/* Unblock all signals. */
+	flush_signals(current);
+	spin_lock_irq(&current->sighand->siglock);
+	flush_signal_handlers(current);
+	sigemptyset(&current->blocked);
+	recalc_sigpending();
+	spin_unlock_irq(&current->sighand->siglock);
+
 	retval = -EPERM;
 	if (current->fs->root)
 		retval = execve(sub_info->path, sub_info->argv,sub_info->envp);
