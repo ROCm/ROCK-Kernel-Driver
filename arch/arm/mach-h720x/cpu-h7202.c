@@ -24,6 +24,7 @@
 #include <asm/mach/time.h>
 #include <linux/device.h>
 #include <linux/serial_8250.h>
+#include "common.h"
 
 static struct resource h7202ps2_resources[] = {
 	[0] = {
@@ -93,9 +94,6 @@ static struct platform_device *devices[] __initdata = {
 	&h7202ps2_device,
 	&serial_device,
 };
-
-extern unsigned long h720x_gettimeoffset(void);
-extern void __init h720x_init_irq (void);
 
 /* Although we have two interrupt lines for the timers, we only have one
  * status register which clears all pending timer interrupts on reading. So
@@ -176,8 +174,6 @@ static struct irqaction h7202_timer_irq = {
  */
 void __init h7202_init_time(void)
 {
-	gettimeoffset = h720x_gettimeoffset;
-
 	CPU_REG (TIMER_VIRT, TM0_PERIOD) = LATCH;
 	CPU_REG (TIMER_VIRT, TM0_CTRL) = TM_RESET;
 	CPU_REG (TIMER_VIRT, TM0_CTRL) = TM_REPEAT | TM_START;
@@ -185,6 +181,11 @@ void __init h7202_init_time(void)
 
 	setup_irq(IRQ_TIMER0, &h7202_timer_irq);
 }
+
+struct sys_timer h7202_timer = {
+	.init		= h7202_init_time,
+	.offset		= h720x_gettimeoffset,
+};
 
 void __init h7202_init_irq (void)
 {
