@@ -817,33 +817,25 @@ typedef struct ide_dma_ops_s {
  * 
  * temporarily mapping a (possible) highmem bio for PIO transfer
  */
-#define ide_rq_offset(rq) \
-	(((rq)->hard_cur_sectors - (rq)->current_nr_sectors) << 9)
 
-/*
- * taskfiles really should use hard_cur_sectors as well!
- */
-#define task_rq_offset(rq) \
-	(((rq)->nr_sectors - (rq)->current_nr_sectors) * SECTOR_SIZE)
-
-static inline void *ide_map_buffer(struct request *rq, unsigned long *flags)
+static inline void *task_map_rq(struct request *rq, unsigned long *flags)
 {
 	/*
 	 * fs request
 	 */
-	if (rq->bio)
-		return bio_kmap_irq(rq->bio, flags) + ide_rq_offset(rq);
+	if (rq->cbio)
+		return rq_map_buffer(rq, flags);
 
 	/*
 	 * task request
 	 */
-	return rq->buffer + task_rq_offset(rq);
+	return rq->buffer + blk_rq_offset(rq);
 }
 
-static inline void ide_unmap_buffer(struct request *rq, char *buffer, unsigned long *flags)
+static inline void task_unmap_rq(struct request *rq, char *buffer, unsigned long *flags)
 {
-	if (rq->bio)
-		bio_kunmap_irq(buffer, flags);
+	if (rq->cbio)
+		rq_unmap_buffer(buffer, flags);
 }
 
 #define IDE_CHIPSET_PCI_MASK	\
@@ -1417,6 +1409,31 @@ extern void atapi_input_bytes(ide_drive_t *, void *, u32);
 extern void atapi_output_bytes(ide_drive_t *, void *, u32);
 extern void taskfile_input_data(ide_drive_t *, void *, u32);
 extern void taskfile_output_data(ide_drive_t *, void *, u32);
+
+#define IDE_PIO_IN	0
+#define IDE_PIO_OUT	1
+
+static inline void task_sectors(ide_drive_t *drive, struct request *rq,
+				unsigned nsect, int rw)
+{
+	unsigned long flags;
+	char *buf;
+
+	buf = task_map_rq(rq, &flags);
+
+	/*
+	 * IRQ can happen instantly after reading/writing
+	 * last sector of the datablock.
+	 */
+	process_that_request_first(rq, nsect);
+
+	if (rw == IDE_PIO_OUT)
+		taskfile_output_data(drive, buf, nsect * SECTOR_WORDS);
+	else
+		taskfile_input_data(drive, buf, nsect * SECTOR_WORDS);
+
+	task_unmap_rq(rq, buf, &flags);
+}
 
 extern int drive_is_ready(ide_drive_t *);
 extern int wait_for_ready(ide_drive_t *, int /* timeout */);
