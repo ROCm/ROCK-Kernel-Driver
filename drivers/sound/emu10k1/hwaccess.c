@@ -355,51 +355,33 @@ static void sblive_wcwait(struct emu10k1_card *card, u32 wait)
 	}
 }
 
-int sblive_readac97(struct emu10k1_card *card, u8 index, u16 * data)
+u16 emu10k1_ac97_read(struct ac97_codec *codec, u8 reg)
 {
+	struct emu10k1_card *card = codec->private_data;
+	u16 data;
 	unsigned long flags;
 
 	spin_lock_irqsave(&card->lock, flags);
 
-	outb(index, card->iobase + AC97ADDRESS);
-	*data = inw(card->iobase + AC97DATA);
+	outb(reg, card->iobase + AC97ADDRESS);
+	data = inw(card->iobase + AC97DATA);
 
 	spin_unlock_irqrestore(&card->lock, flags);
 
-	return 0;
+	return data;
 }
 
-int sblive_writeac97(struct emu10k1_card *card, u8 index, u16 data)
+void emu10k1_ac97_write(struct ac97_codec *codec, u8 reg, u16 value)
 {
+	struct emu10k1_card *card = codec->private_data;
 	unsigned long flags;
 
 	spin_lock_irqsave(&card->lock, flags);
 
-	outb(index, card->iobase + AC97ADDRESS);
-	outw(data, card->iobase + AC97DATA);
+	outb(reg, card->iobase + AC97ADDRESS);
+	outw(value, card->iobase + AC97DATA);
 
 	spin_unlock_irqrestore(&card->lock, flags);
-
-	return 0;
-}
-
-int sblive_rmwac97(struct emu10k1_card *card, u8 index, u16 data, u16 mask)
-{
-	u16 temp;
-	unsigned long flags;
-
-	spin_lock_irqsave(&card->lock, flags);
-
-	outb(index, card->iobase + AC97ADDRESS);
-	temp = inw(card->iobase + AC97DATA);
-	temp &= ~mask;
-	data &= mask;
-	temp |= data;
-	outw(temp, card->iobase + AC97DATA);
-
-	spin_unlock_irqrestore(&card->lock, flags);
-
-	return 0;
 }
 
 /*********************************************************

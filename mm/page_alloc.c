@@ -589,7 +589,7 @@ unsigned int nr_free_buffer_pages (void)
 	zonelist_t *zonelist;
 	zone_t **zonep, *zone;
 
-	zonelist = contig_page_data.node_zonelists + (GFP_KERNEL & GFP_ZONEMASK);
+	zonelist = contig_page_data.node_zonelists + (GFP_NOFS & GFP_ZONEMASK);
 	zonep = zonelist->zones;
 
 	for (zone = *zonep++; zone; zone = *zonep++) {

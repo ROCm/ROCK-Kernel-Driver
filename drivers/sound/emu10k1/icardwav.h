@@ -34,12 +34,15 @@
 
 struct wave_format 
 {
+	int id;
 	int samplingrate;
 	u8 bitsperchannel;
-	u8 channels;		/* 1 = Mono, 2 = Stereo */
+	u8 channels;		/* 1 = Mono, 2 = Stereo, 3, ... = Multichannel */
 	u8 bytesperchannel;
+	u8 bytespervoicesample;
 	u8 bytespersample;
 	int bytespersec;
+	u8 passthrough;
 };
 
 /* emu10k1_wave states */

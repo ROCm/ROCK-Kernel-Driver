@@ -41,10 +41,7 @@
 void emu10k1_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct emu10k1_card *card = (struct emu10k1_card *) dev_id;
-	u32 irqstatus, tmp;
-
-	if (!(irqstatus = emu10k1_readfn0(card, IPR)))
-		return;
+	u32 irqstatus;
 
 	DPD(4, "emu10k1_interrupt called, irq =  %u\n", irq);
 
@@ -60,14 +57,20 @@ void emu10k1_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	 ** - Eric
 	 */
 
-	do {
-		DPD(4, "irq status %x\n", irqstatus);
+	while ((irqstatus = inl(card->iobase + IPR))) {
+		DPD(4, "irq status %#x\n", irqstatus);
 
-		tmp = irqstatus;
+		/* acknowledge interrupt */
+		outl(irqstatus, card->iobase + IPR);
 
 		if (irqstatus & IRQTYPE_TIMER) {
 			emu10k1_timer_irqhandler(card);
 			irqstatus &= ~IRQTYPE_TIMER;
+		}
+
+		if (irqstatus & IRQTYPE_DSP) {
+			emu10k1_dsp_irqhandler(card);
+			irqstatus &= ~IRQTYPE_DSP;
 		}
 
 		if (irqstatus & IRQTYPE_MPUIN) {
@@ -80,13 +83,22 @@ void emu10k1_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 			irqstatus &= ~IRQTYPE_MPUOUT;
 		}
 
+		if (irqstatus & IPR_MUTE) {
+			emu10k1_mute_irqhandler(card);
+			irqstatus &=~IPR_MUTE;
+		}
+
+		if (irqstatus & IPR_VOLINCR) {
+			emu10k1_volincr_irqhandler(card);
+			irqstatus &=~IPR_VOLINCR;
+		}
+
+		if (irqstatus & IPR_VOLDECR) {
+			emu10k1_voldecr_irqhandler(card);
+			irqstatus &=~IPR_VOLDECR;
+		}
+
 		if (irqstatus)
 			emu10k1_irq_disable(card, irqstatus);
-
-		emu10k1_writefn0(card, IPR, tmp);
-
-	} while ((irqstatus = emu10k1_readfn0(card, IPR)));
-
-	return;
+	}
 }
-

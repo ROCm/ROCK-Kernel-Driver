@@ -1,13 +1,13 @@
 /*
  **********************************************************************
- *     irq.h
- *     Copyright 1999, 2000 Creative Labs, Inc.
+ *     passthrough.h -- Emu10k1 digital passthrough header file
+ *     Copyright (C) 2001  Juha Yrjölä <jyrjola@cc.hut.fi>
  *
  **********************************************************************
  *
  *     Date                 Author          Summary of changes
  *     ----                 ------          ------------------
- *     October 20, 1999     Bertrand Lee    base code release
+ *     May 15, 2001	    Juha Yrjölä     base code release
  *
  **********************************************************************
  *
@@ -29,24 +29,42 @@
  **********************************************************************
  */
 
-#ifndef _IRQ_H
-#define _IRQ_H
+#ifndef _PASSTHROUGH_H
+#define _PASSTHROUGH_H
 
-/* EMU Irq Types */
-#define IRQTYPE_PCIBUSERROR         IPR_PCIERROR
-#define IRQTYPE_MIXERBUTTON         (IPR_VOLINCR | IPR_VOLDECR | IPR_MUTE)
-#define IRQTYPE_VOICE               (IPR_CHANNELLOOP | IPR_CHANNELNUMBERMASK)
-#define IRQTYPE_RECORD              (IPR_ADCBUFFULL | IPR_ADCBUFHALFFULL | IPR_MICBUFFULL | IPR_MICBUFHALFFULL | IPR_EFXBUFFULL | IPR_EFXBUFHALFFULL)
-#define IRQTYPE_MPUOUT              IPR_MIDITRANSBUFEMPTY
-#define IRQTYPE_MPUIN               IPR_MIDIRECVBUFEMPTY
-#define IRQTYPE_TIMER               IPR_INTERVALTIMER
-#define IRQTYPE_SPDIF               (IPR_GPSPDIFSTATUSCHANGE | IPR_CDROMSTATUSCHANGE)
-#define IRQTYPE_DSP                 IPR_FXDSP
+#include "audio.h"
 
-void emu10k1_timer_irqhandler(struct emu10k1_card *);
-void emu10k1_dsp_irqhandler(struct emu10k1_card *);
-void emu10k1_mute_irqhandler(struct emu10k1_card *);
-void emu10k1_volincr_irqhandler(struct emu10k1_card *);
-void emu10k1_voldecr_irqhandler(struct emu10k1_card *);
+/* number of 16-bit stereo samples in XTRAM buffer */
+#define PT_SAMPLES 0x8000
+#define PT_BLOCKSAMPLES 0x400
+#define PT_BLOCKSIZE (PT_BLOCKSAMPLES*4)
+#define PT_BLOCKSIZE_LOG2 12
+#define PT_BLOCKCOUNT (PT_SAMPLES/PT_BLOCKSAMPLES)
+#define PT_INITPTR (PT_SAMPLES/2-1)
 
-#endif /* _IRQ_H */
+#define PT_STATE_INACTIVE 0
+#define PT_STATE_ACTIVATED 1
+#define PT_STATE_PLAYING 2
+
+/* passthrough struct */
+struct pt_data
+{
+	u8	selected, state, spcs_to_use;
+	int	intr_gpr, enable_gpr, pos_gpr;
+	u32	blocks_played, blocks_copied, old_spcs[3];
+	u32	playptr, copyptr;
+	u32	prepend_size;
+	u8	*buf;
+	u8	ac3data;
+
+	char	*patch_name, *intr_gpr_name, *enable_gpr_name, *pos_gpr_name;
+
+	wait_queue_head_t wait;
+	spinlock_t lock;
+};
+
+ssize_t emu10k1_pt_write(struct file *file, const char *buf, size_t count);
+void emu10k1_pt_stop(struct emu10k1_card *card);
+void emu10k1_pt_waveout_update(struct emu10k1_wavedevice *wave_dev);
+
+#endif /* _PASSTHROUGH_H */

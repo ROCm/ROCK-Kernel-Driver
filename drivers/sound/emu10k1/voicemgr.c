@@ -65,21 +65,6 @@ int emu10k1_voice_alloc(struct emu10k1_card *card, struct emu_voice *voice)
 	voice->card = card;
 	voice->num = i;
 
-#ifdef PRIVATE_PCM_VOLUME
-
-	for (i = 0; i < MAX_PCM_CHANNELS; i++) {
-		if (sblive_pcm_volume[i].files == current->files) {
-			sblive_pcm_volume[i].channel_l = voice->num;
-			DPD(2, "preset left: %d\n", voice->num);
-			if (voice->flags & VOICE_FLAGS_STEREO) {
-				sblive_pcm_volume[i].channel_r = voice->num + 1;
-				DPD(2, "preset right: %d\n", voice->num + 1);
-			}
-			break;
-		}
-	}
-#endif
-
 	for (i = 0; i < (voice->flags & VOICE_FLAGS_STEREO ? 2 : 1); i++) {
 		DPD(2, " voice allocated -> %d\n", voice->num + i);
 
@@ -104,20 +89,6 @@ void emu10k1_voice_free(struct emu_voice *voice)
 	if (voice->usage == VOICE_USAGE_FREE)
 		return;
 
-#ifdef PRIVATE_PCM_VOLUME
-	for (i = 0; i < MAX_PCM_CHANNELS; i++) {
-		if (sblive_pcm_volume[i].files == current->files) {
-			if (voice->num == sblive_pcm_volume[i].channel_l)
-				sblive_pcm_volume[i].channel_l = NUM_G;
-			if ((voice->flags & VOICE_FLAGS_STEREO)
-			    && (voice->num + 1) == sblive_pcm_volume[i].channel_r) {
-				sblive_pcm_volume[i].channel_r = NUM_G;
-			}
-			break;
-		}
-	}
-#endif
-
 	for (i = 0; i < (voice->flags & VOICE_FLAGS_STEREO ? 2 : 1); i++) {
 		DPD(2, " voice released -> %d\n", voice->num + i);
 
@@ -139,8 +110,6 @@ void emu10k1_voice_free(struct emu_voice *voice)
 		card->voicetable[voice->num + 1] = VOICE_USAGE_FREE;
 
 	spin_unlock_irqrestore(&card->lock, flags);
-
-	return;
 }
 
 void emu10k1_voice_playback_setup(struct emu_voice *voice)
@@ -203,114 +172,110 @@ void emu10k1_voice_playback_setup(struct emu_voice *voice)
 				/* pitch envelope */
 				    PEFE_PITCHAMOUNT, 0, TAGLIST_END);
 
-#ifdef PRIVATE_PCM_VOLUME
-{
-int j;
-        for (j = 0; j < MAX_PCM_CHANNELS; j++) {
-                if (sblive_pcm_volume[j].channel_l == voice->num + i) {
-                        voice->params[i].initial_attn = (sblive_pcm_volume[j].channel_r < NUM_G) ? sblive_pcm_volume[i].attn_l :
-                // test for mono channel (reverse logic is correct here!)
-                                            (sblive_pcm_volume[j].attn_r >
-                                             sblive_pcm_volume[j].attn_l) ? sblive_pcm_volume[j].attn_l : sblive_pcm_volume[j].attn_r;
-                                        DPD(2, "set left volume %d\n", voice->params[i].initial_attn);
-                                        break;
-                                } else if (sblive_pcm_volume[j].channel_r == voice->num + i) {
-                                        voice->params[i].initial_attn = sblive_pcm_volume[j].attn_r;
-                                        DPD(2, "set right volume %d\n", voice->params[i].initial_attn);
-                                        break;
-                                }
-                        }
-                }
-#endif
-
 		voice->params[i].fc_target = 0xffff;
 	}
-
-	return;
 }
 
-void emu10k1_voice_start(struct emu_voice *voice, int set)
+void emu10k1_voices_start(struct emu_voice *first_voice, unsigned int num_voices, int set)
 {
-	struct emu10k1_card *card = voice->card;
-	int i;
+	struct emu10k1_card *card = first_voice->card;
+	struct emu_voice *voice;
+	unsigned int voicenum;
+	int j;
 
-	DPF(2, "emu10k1_voice_start()\n");
+	DPF(2, "emu10k1_voices_start()\n");
 
-	if (!set) {
-		u32 cra, ccis, cs, sample;
-		if (voice->flags & VOICE_FLAGS_STEREO) {
-			cra = 64;
-			ccis = 28;
-			cs = 4;
-		} else {
-			cra = 64;
-			ccis = 30;
-			cs = 2;
+	for (voicenum = 0; voicenum < num_voices; voicenum++)
+	{
+		voice = first_voice + voicenum;
+
+		if (!set) {
+			u32 cra, ccis, cs, sample;
+			if (voice->flags & VOICE_FLAGS_STEREO) {
+				cra = 64;
+				ccis = 28;
+				cs = 4;
+			} else {
+				cra = 64;
+				ccis = 30;
+				cs = 2;
+			}
+
+			if(voice->flags & VOICE_FLAGS_16BIT) {
+				sample = 0x00000000;
+			} else {
+				sample = 0x80808080;		
+				ccis *= 2;
+			}
+
+			for(j = 0; j < cs; j++)
+	        	        sblive_writeptr(card, CD0 + j, voice->num, sample);
+
+			/* Reset cache */
+			sblive_writeptr(card, CCR_CACHEINVALIDSIZE, voice->num, 0);
+			if (voice->flags & VOICE_FLAGS_STEREO)
+				sblive_writeptr(card, CCR_CACHEINVALIDSIZE, voice->num + 1, 0);
+
+			sblive_writeptr(card, CCR_READADDRESS, voice->num, cra);
+
+			if (voice->flags & VOICE_FLAGS_STEREO)
+				sblive_writeptr(card, CCR_READADDRESS, voice->num + 1, cra);
+
+			/* Fill cache */
+			sblive_writeptr(card, CCR_CACHEINVALIDSIZE, voice->num, ccis);
 		}
 
-		if(voice->flags & VOICE_FLAGS_16BIT) {
-			sample = 0x00000000;
-		} else {
-			sample = 0x80808080;		
-			ccis *= 2;
-		}
-
-		for(i = 0; i < cs; i++)
-	                sblive_writeptr(card, CD0 + i, voice->num, sample);
-
-		/* Reset cache */
-		sblive_writeptr(card, CCR_CACHEINVALIDSIZE, voice->num, 0);
-		if (voice->flags & VOICE_FLAGS_STEREO)
-			sblive_writeptr(card, CCR_CACHEINVALIDSIZE, voice->num + 1, 0);
-
-		sblive_writeptr(card, CCR_READADDRESS, voice->num, cra);
-
-		if (voice->flags & VOICE_FLAGS_STEREO)
-			sblive_writeptr(card, CCR_READADDRESS, voice->num + 1, cra);
-
-		/* Fill cache */
-		sblive_writeptr(card, CCR_CACHEINVALIDSIZE, voice->num, ccis);
-	}
-
-	for (i = 0; i < (voice->flags & VOICE_FLAGS_STEREO ? 2 : 1); i++) {
-		sblive_writeptr_tag(card, voice->num + i,
-				    IFATN, (voice->params[i].initial_fc << 8) | voice->params[i].initial_attn,
-				    VTFT, (voice->params[i].volume_target << 16) | voice->params[i].fc_target,
-				    CVCF, (voice->params[i].volume_target << 16) | voice->params[i].fc_target,
-				    DCYSUSV, (voice->params[i].byampl_env_sustain << 8) | voice->params[i].byampl_env_decay,
+		for (j = 0; j < (voice->flags & VOICE_FLAGS_STEREO ? 2 : 1); j++) {
+			sblive_writeptr_tag(card, voice->num + j,
+				    IFATN, (voice->params[j].initial_fc << 8) | voice->params[j].initial_attn,
+				    VTFT, (voice->params[j].volume_target << 16) | voice->params[j].fc_target,
+				    CVCF, (voice->params[j].volume_target << 16) | voice->params[j].fc_target,
+				    DCYSUSV, (voice->params[j].byampl_env_sustain << 8) | voice->params[j].byampl_env_decay,
 				    TAGLIST_END);
-
-		emu10k1_clear_stop_on_loop(card, voice->num + i);
-
-		sblive_writeptr(card, PTRX_PITCHTARGET, voice->num + i, voice->pitch_target);
-
-		if (i == 0)
-			sblive_writeptr(card, CPF_CURRENTPITCH, voice->num, voice->pitch_target);
-
-		sblive_writeptr(card, IP, voice->num + i, voice->initial_pitch);
+	
+			emu10k1_clear_stop_on_loop(card, voice->num + j);
+		}
 	}
 
-	return;
+
+        for (voicenum = 0; voicenum < num_voices; voicenum++)
+	{
+		voice = first_voice + voicenum;
+
+		for (j = 0; j < (voice->flags & VOICE_FLAGS_STEREO ? 2 : 1); j++) {
+			sblive_writeptr(card, PTRX_PITCHTARGET, voice->num + j, voice->pitch_target);
+
+			if (j == 0)
+				sblive_writeptr(card, CPF_CURRENTPITCH, voice->num, voice->pitch_target);
+
+			sblive_writeptr(card, IP, voice->num + j, voice->initial_pitch);
+		}
+	}
 }
 
-void emu10k1_voice_stop(struct emu_voice *voice)
+void emu10k1_voices_stop(struct emu_voice *first_voice, int num_voices)
 {
-	struct emu10k1_card *card = voice->card;
-	int i;
+	struct emu10k1_card *card = first_voice->card;
+	struct emu_voice *voice;
+	unsigned int voice_num;
+	int j;
 
 	DPF(2, "emu10k1_voice_stop()\n");
 
-	for (i = 0; i < (voice->flags & VOICE_FLAGS_STEREO ? 2 : 1); i++) {
-		sblive_writeptr_tag(card, voice->num + i,
-					PTRX_PITCHTARGET, 0,
-					CPF_CURRENTPITCH, 0,
-					IFATN, 0xffff,
-					VTFT, 0x0000ffff,
-					CVCF, 0x0000ffff,
-					IP, 0,
-					TAGLIST_END);
-	}
+        for (voice_num = 0; voice_num < num_voices; voice_num++)
+	{
+		voice = first_voice + voice_num;
 
-	return;
+		for (j = 0; j < (voice->flags & VOICE_FLAGS_STEREO ? 2 : 1); j++) {
+			sblive_writeptr_tag(card, voice->num + j,
+						PTRX_PITCHTARGET, 0,
+						CPF_CURRENTPITCH, 0,
+						IFATN, 0xffff,
+						VTFT, 0x0000ffff,
+						CVCF, 0x0000ffff,
+						IP, 0,
+						TAGLIST_END);
+		}
+	}
 }
 

@@ -29,7 +29,6 @@
 #include "8010.h"
 #include "hwaccess.h"
 #include <linux/init.h>
-#include <linux/sched.h>
 
 /* In A1 Silicon, these bits are in the HC register */
 #define HOOKN_BIT   (1L << 12)
@@ -109,6 +108,6 @@ struct ecard_state {
 	u16 mux2_setting;
 };
 
-int emu10k1_ecard_init(struct emu10k1_card *) __devinit;
+void emu10k1_ecard_init(struct emu10k1_card *) __devinit;
 
 #endif /* _ECARD_H */

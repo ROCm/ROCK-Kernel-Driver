@@ -1098,9 +1098,10 @@ void swapin_readahead(swp_entry_t entry)
  */
 static int do_swap_page(struct mm_struct * mm,
 	struct vm_area_struct * vma, unsigned long address,
-	pte_t * page_table, swp_entry_t entry, int write_access)
+	pte_t * page_table, pte_t orig_pte, int write_access)
 {
 	struct page *page;
+	swp_entry_t entry = pte_to_swp_entry(orig_pte);
 	pte_t pte;
 
 	spin_unlock(&mm->page_table_lock);
@@ -1112,7 +1113,11 @@ static int do_swap_page(struct mm_struct * mm,
 		unlock_kernel();
 		if (!page) {
 			spin_lock(&mm->page_table_lock);
-			return -1;
+			/*
+			 * Back out if somebody else faulted in this pte while
+			 * we released the page table lock.
+			 */
+			return pte_same(*page_table, orig_pte) ? -1 : 1;
 		}
 	}
 
@@ -1128,7 +1133,7 @@ static int do_swap_page(struct mm_struct * mm,
 	 * released the page table lock.
 	 */
 	spin_lock(&mm->page_table_lock);
-	if (pte_present(*page_table)) {
+	if (!pte_same(*page_table, orig_pte)) {
 		UnlockPage(page);
 		page_cache_release(page);
 		return 1;
@@ -1139,8 +1144,14 @@ static int do_swap_page(struct mm_struct * mm,
 	pte = mk_pte(page, vma->vm_page_prot);
 
 	swap_free(entry);
-	if (write_access && exclusive_swap_page(page))
-		pte = pte_mkwrite(pte_mkdirty(pte));
+	if (exclusive_swap_page(page)) {	
+		if (write_access)
+			pte = pte_mkwrite(pte_mkdirty(pte));
+		if (vm_swap_full()) {
+			delete_from_swap_cache_nolock(page);
+			pte = pte_mkdirty(pte);
+		}
+	}
 	UnlockPage(page);
 
 	flush_page_to_ram(page);
@@ -1297,7 +1308,7 @@ static inline int handle_pte_fault(struct mm_struct *mm,
 		 */
 		if (pte_none(entry))
 			return do_no_page(mm, vma, address, write_access, pte);
-		return do_swap_page(mm, vma, address, pte, pte_to_swp_entry(entry), write_access);
+		return do_swap_page(mm, vma, address, pte, entry, write_access);
 	}
 
 	if (write_access) {

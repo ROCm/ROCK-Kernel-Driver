@@ -1,4 +1,3 @@
-
 /*
  **********************************************************************
  *     midi.c - /dev/midi interface for emu10k1 driver
@@ -43,6 +42,10 @@
 #include "cardmi.h"
 #include "midi.h"
 
+#ifdef EMU10K1_SEQUENCER
+#include "sound_config.h"
+#endif
+
 static spinlock_t midi_spinlock __attribute((unused)) = SPIN_LOCK_UNLOCKED;
 
 static void init_midi_hdr(struct midi_hdr *midihdr)
@@ -85,22 +88,29 @@ static int midiin_add_buffer(struct emu10k1_mididevice *midi_dev, struct midi_hd
 static int emu10k1_midi_open(struct inode *inode, struct file *file)
 {
 	int minor = MINOR(inode->i_rdev);
-	struct emu10k1_card *card=NULL;
+	struct emu10k1_card *card = NULL;
 	struct emu10k1_mididevice *midi_dev;
 	struct list_head *entry;
 
 	DPF(2, "emu10k1_midi_open()\n");
 
+	
 	/* Check for correct device to open */
 	list_for_each(entry, &emu10k1_devs) {
 		card = list_entry(entry, struct emu10k1_card, list);
 
-		if (card->midi_num == minor)
-			break;
+		if (card->midi_dev == minor)
+			goto match;
 	}
 
-	if (entry == &emu10k1_devs)
-		return -ENODEV;
+	return -ENODEV;
+
+match:
+#ifdef EMU10K1_SEQUENCER
+	if(card->seq_mididev)	/* card is opened by sequencer */
+			return -EBUSY;
+#endif
+	
 
 	/* Wait for device to become free */
 	down(&card->open_sem);
@@ -234,6 +244,7 @@ static int emu10k1_midi_release(struct inode *inode, struct file *file)
 	wake_up_interruptible(&card->open_wait);
 
 	unlock_kernel();
+	
 
 	return 0;
 }
@@ -245,7 +256,7 @@ static ssize_t emu10k1_midi_read(struct file *file, char *buffer, size_t count, 
 	u16 cnt;
 	unsigned long flags;
 
-	DPD(4, "emu10k1_midi_read(), count %x\n", (u32) count);
+	DPD(4, "emu10k1_midi_read(), count %#x\n", (u32) count);
 
 	if (pos != &file->f_pos)
 		return -ESPIPE;
@@ -320,7 +331,7 @@ static ssize_t emu10k1_midi_write(struct file *file, const char *buffer, size_t 
 	ssize_t ret = 0;
 	unsigned long flags;
 
-	DPD(4, "emu10k1_midi_write(), count=%x\n", (u32) count);
+	DPD(4, "emu10k1_midi_write(), count=%#x\n", (u32) count);
 
 	if (pos != &file->f_pos)
 		return -ESPIPE;
@@ -434,10 +445,161 @@ int emu10k1_midi_callback(unsigned long msg, unsigned long refdata, unsigned lon
 
 /* MIDI file operations */
 struct file_operations emu10k1_midi_fops = {
-        owner:		THIS_MODULE,
+	owner:		THIS_MODULE,
 	read:		emu10k1_midi_read,
 	write:		emu10k1_midi_write,
 	poll:		emu10k1_midi_poll,
 	open:		emu10k1_midi_open,
 	release:	emu10k1_midi_release,
 };
+
+
+#ifdef EMU10K1_SEQUENCER
+
+/* functions used for sequencer access */
+
+int emu10k1_seq_midi_open(int dev, int mode,
+				void (*input) (int dev, unsigned char data),
+				void (*output) (int dev))
+{
+    struct emu10k1_card *card;
+    struct midi_openinfo dsCardMidiOpenInfo;
+	struct emu10k1_mididevice *midi_dev;
+		
+	if(    midi_devs[dev] == NULL
+		|| midi_devs[dev]->devc == NULL)
+			return -EINVAL;
+
+	card = midi_devs[dev]->devc;
+
+	if(card->open_mode)		/* card is opened native */
+			return -EBUSY;
+			
+	DPF(2, "emu10k1_seq_midi_open()\n");
+	
+	if ((midi_dev = (struct emu10k1_mididevice *) kmalloc(sizeof(*midi_dev), GFP_KERNEL)) == NULL) {
+		return -EINVAL;
+	}
+
+	midi_dev->card = card;
+	midi_dev->mistate = MIDIIN_STATE_STOPPED;
+	init_waitqueue_head(&midi_dev->oWait);
+	init_waitqueue_head(&midi_dev->iWait);
+	midi_dev->ird = 0;
+	midi_dev->iwr = 0;
+	midi_dev->icnt = 0;
+	INIT_LIST_HEAD(&midi_dev->mid_hdrs);
+
+	dsCardMidiOpenInfo.refdata = (unsigned long) midi_dev;
+
+    if (emu10k1_mpuout_open(card, &dsCardMidiOpenInfo) < 0) {
+        ERROR();
+        return -ENODEV;
+    }
+
+	card->seq_mididev = midi_dev;
+		
+	return 0;
+}
+
+void emu10k1_seq_midi_close(int dev)
+{
+	struct emu10k1_card *card;
+
+	DPF(2, "emu10k1_seq_midi_close()\n");
+    if(    midi_devs[dev] == NULL
+        || midi_devs[dev]->devc == NULL)
+			return;
+
+	card = midi_devs[dev]->devc;
+	emu10k1_mpuout_close(card);
+
+	if(card->seq_mididev) {
+			kfree(card->seq_mididev);
+			card->seq_mididev = 0;
+	}
+}
+
+int emu10k1_seq_midi_out(int dev, unsigned char midi_byte)
+{
+
+	struct emu10k1_card *card;
+	struct midi_hdr *midihdr;
+	unsigned long flags;
+
+	if(    midi_devs[dev] == NULL
+        || midi_devs[dev]->devc == NULL)
+			return -EINVAL;
+
+	card = midi_devs[dev]->devc;
+
+	if ((midihdr = (struct midi_hdr *) kmalloc(sizeof(struct midi_hdr), GFP_KERNEL)) == NULL)
+		return -EINVAL;
+
+	midihdr->bufferlength = 1;
+	midihdr->bytesrecorded = 0;
+	midihdr->flags = 0;
+
+	if ((midihdr->data = (u8 *) kmalloc(1, GFP_KERNEL)) == NULL) {
+		ERROR();
+		kfree(midihdr);
+		return -EINVAL;
+	}
+
+	*(midihdr->data) = midi_byte;
+	
+	spin_lock_irqsave(&midi_spinlock, flags);
+
+	if (emu10k1_mpuout_add_buffer(card, midihdr) < 0) {
+		ERROR();
+		kfree(midihdr->data);
+		kfree(midihdr);
+		spin_unlock_irqrestore(&midi_spinlock, flags);
+		return -EINVAL;
+	}
+
+	spin_unlock_irqrestore(&midi_spinlock, flags);
+
+	return 1;
+}
+
+int emu10k1_seq_midi_start_read(int dev)
+{
+	return 0;
+}
+
+int emu10k1_seq_midi_end_read(int dev)
+{
+	return 0;
+}
+
+void emu10k1_seq_midi_kick(int dev)
+{
+}
+
+int emu10k1_seq_midi_buffer_status(int dev)
+{
+	int count;
+	struct midi_queue *queue;
+	struct emu10k1_card *card;
+
+	if(    midi_devs[dev] == NULL
+        || midi_devs[dev]->devc == NULL)
+			return -EINVAL;
+
+	count = 0;
+	
+	card = midi_devs[dev]->devc;
+	queue = card->mpuout->firstmidiq;
+
+	while(queue != NULL) {
+			count++;
+			if(queue == card->mpuout->lastmidiq)
+					break;
+			queue = queue->next;
+	}
+	return count;
+}
+
+#endif
+

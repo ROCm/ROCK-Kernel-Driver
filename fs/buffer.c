@@ -113,19 +113,17 @@ atomic_t buffermem_pages = ATOMIC_INIT(0);
  */
 union bdflush_param {
 	struct {
-		int nfract;  /* Percentage of buffer cache dirty to 
-				activate bdflush */
-		int ndirty;  /* Maximum number of dirty blocks to write out per
-				wake-cycle */
-		int nrefill; /* Number of clean buffers to try to obtain
-				each time we call refill */
-		int dummy1;   /* unused */
-		int interval; /* jiffies delay between kupdate flushes */
-		int age_buffer;  /* Time for normal buffer to age before we flush it */
-		int nfract_sync; /* Percentage of buffer cache dirty to 
-				    activate bdflush synchronously */
-		int dummy2;    /* unused */
-		int dummy3;    /* unused */
+		int nfract;	/* Percentage of buffer cache dirty to 
+				   activate bdflush */
+		int dummy1;	/* old "ndirty" */
+		int dummy2;	/* old "nrefill" */
+		int dummy3;	/* unused */
+		int interval;	/* jiffies delay between kupdate flushes */
+		int age_buffer;	/* Time for normal buffer to age before we flush it */
+		int nfract_sync;/* Percentage of buffer cache dirty to 
+				   activate bdflush synchronously */
+		int dummy4;	/* unused */
+		int dummy5;	/* unused */
 	} b_un;
 	unsigned int data[N_PARAM];
 } bdf_prm = {{30, 64, 64, 256, 5*HZ, 30*HZ, 60, 0, 0}};
@@ -1067,7 +1065,6 @@ repeat:
 	out:
 		write_unlock(&hash_table_lock);
 		spin_unlock(&lru_list_lock);
-		touch_buffer(bh);
 		return bh;
 	}
 
@@ -1234,6 +1231,7 @@ struct buffer_head * bread(kdev_t dev, int block, int size)
 	struct buffer_head * bh;
 
 	bh = getblk(dev, block, size);
+	touch_buffer(bh);
 	if (buffer_uptodate(bh))
 		return bh;
 	ll_rw_block(READ, 1, &bh);
@@ -2601,20 +2599,19 @@ static int sync_old_buffers(void)
 	sync_supers(0);
 	unlock_kernel();
 
-	spin_lock(&lru_list_lock);
 	for (;;) {
-		if (write_some_buffers(NODEV)) {
-			struct buffer_head *bh;
+		struct buffer_head *bh;
 
-			spin_lock(&lru_list_lock);
-			bh = lru_list[BUF_DIRTY];
-			if (bh && !time_before(jiffies, bh->b_flushtime))
-				continue;
-			spin_unlock(&lru_list_lock);
-		}
-		run_task_queue(&tq_disk);
+		spin_lock(&lru_list_lock);
+		bh = lru_list[BUF_DIRTY];
+		if (!bh || time_before(jiffies, bh->b_flushtime))
+			break;
+		if (write_some_buffers(NODEV))
+			continue;
 		return 0;
 	}
+	spin_unlock(&lru_list_lock);
+	return 0;
 }
 
 int block_sync_page(struct page *page)

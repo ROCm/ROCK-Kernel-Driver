@@ -83,10 +83,13 @@ static void ecard_write(struct emu10k1_card *card, u32 value)
 {
 	u16 count;
 	u32 data, hcvalue;
+	unsigned long flags;
 
-	hcvalue = emu10k1_readfn0(card, HCFG) & ~(HOOKN_BIT|HANDN_BIT|PULSEN_BIT);
+	spin_lock_irqsave(&card->lock, flags);
 
-	emu10k1_writefn0(card, HCFG, hcvalue);
+	hcvalue = inl(card->iobase + HCFG) & ~(HOOKN_BIT|HANDN_BIT|PULSEN_BIT);
+
+	outl(card->iobase + HCFG, hcvalue);
 
 	for (count = 0 ; count < EC_NUM_CONTROL_BITS; count++) {
 	
@@ -94,19 +97,21 @@ static void ecard_write(struct emu10k1_card *card, u32 value)
 		data = ((value & 0x1) ? PULSEN_BIT : 0);
 		value >>= 1;
 
-		emu10k1_writefn0(card, HCFG, hcvalue | data);
+		outl(card->iobase + HCFG, hcvalue | data);
 
 		/* Clock the shift register */
-		emu10k1_writefn0(card, HCFG, hcvalue | data | HANDN_BIT);
-		emu10k1_writefn0(card, HCFG, hcvalue | data);
+		outl(card->iobase + HCFG, hcvalue | data | HANDN_BIT);
+		outl(card->iobase + HCFG, hcvalue | data);
 	}
 
 	/* Latch the bits */
-	emu10k1_writefn0(card, HCFG, hcvalue | HOOKN_BIT);
-	emu10k1_writefn0(card, HCFG, hcvalue);
+	outl(card->iobase + HCFG, hcvalue | HOOKN_BIT);
+	outl(card->iobase + HCFG, hcvalue);
+
+	spin_unlock_irqrestore(&card->lock, flags);
 }
 
-int __devinit emu10k1_ecard_init(struct emu10k1_card *card)
+void __devinit emu10k1_ecard_init(struct emu10k1_card *card)
 {
 	u32 hcvalue;
 	struct ecard_state ecard;
@@ -125,7 +130,6 @@ int __devinit emu10k1_ecard_init(struct emu10k1_card *card)
 	 * and enable audio output */
 	hcvalue = emu10k1_readfn0(card, HCFG);
 	emu10k1_writefn0(card, HCFG, hcvalue | HCFG_AUDIOENABLE | HCFG_CODECFORMAT_I2S);
-	emu10k1_readfn0(card, HCFG);
 
 	/* Step 1: Turn off the led and deassert TRIM_CS */
 	ecard_write(card, EC_ADCCAL | EC_LEDN | EC_TRIM_CSN);
@@ -148,8 +152,6 @@ int __devinit emu10k1_ecard_init(struct emu10k1_card *card)
 
 	/* Step 5: Set the analog input gain */
 	ecard_setadcgain(card, &ecard, ecard.adc_gain);
-	
-	return 0;
 }
 
 

@@ -130,7 +130,7 @@ void emu10k1_set_record_src(struct emu10k1_card *card, struct wiinst *wiinst)
 		break;
 	}
 
-	DPD(2, "bus addx: %x\n", buffer->dma_handle);
+	DPD(2, "bus addx: %#x\n", buffer->dma_handle);
 
 	sblive_writeptr(card, buffer->addrreg, 0, buffer->dma_handle);
 

@@ -45,35 +45,42 @@
 #define WAVEOUT_DEFAULTBUFLEN	500 /* Time to play the entire buffer in ms */
 
 #define WAVEOUT_MINFRAGSHIFT	6
+#define WAVEOUT_MAXVOICES 6
 
-struct waveout_buffer {
-	u16 ossfragshift;
-        u32 numfrags;
-	u32 fragment_size;	/* in bytes units */
-	u32 size;		/* in bytes units */
-	u32 pages;		/* buffer size in page units*/
+/* waveout_mem is cardwo internal */
+struct waveout_mem {
 	int emupageindex;
 	void *addr[BUFMAXPAGES];
 	dma_addr_t dma_handle[BUFMAXPAGES];
-        u32 silence_pos;	/* software cursor position (including silence) */
+};
+
+struct waveout_buffer {
+	u16 ossfragshift;
+	u32 numfrags;
+	u32 fragment_size;	/* in bytes units */
+	u32 size;		/* in bytes units */
+	u32 pages;		/* buffer size in page units*/
+	struct waveout_mem mem[WAVEOUT_MAXVOICES];
+	u32 silence_pos;	/* software cursor position (including silence bytes) */
 	u32 hw_pos;		/* hardware cursor position */
-	u32 bytestocopy;	/* free space on buffer (including silence) */
+	u32 free_bytes;		/* free bytes available on the buffer (not including silence bytes) */
 	u8 fill_silence;
-	u32 silence_bytes;      /* silence bytes in buffer */
+	u32 silence_bytes;      /* silence bytes on the buffer */
 };
 
 struct woinst 
 {
 	u8 state;
-	struct emu_voice voice;
+	u8 num_voices;
+	struct emu_voice voice[WAVEOUT_MAXVOICES];
 	struct emu_timer timer;
-        struct wave_format format;
+	struct wave_format format;
 	struct waveout_buffer buffer;
-        wait_queue_head_t wait_queue;
-        u8 mmapped;
-        u32 total_copied;	/* total number of bytes written() to the buffer (excluding silence) */
-        u32 total_played;	/* total number of bytes played including silence */
-        u32 blocks;
+	wait_queue_head_t wait_queue;
+	u8 mmapped;
+	u32 total_copied;	/* total number of bytes written() to the buffer (excluding silence) */
+	u32 total_played;	/* total number of bytes played including silence */
+	u32 blocks;
 	u8 device;
 	spinlock_t lock;
 };

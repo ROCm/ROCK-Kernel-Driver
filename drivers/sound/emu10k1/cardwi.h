@@ -43,6 +43,7 @@ struct wavein_buffer {
 	u32 pos;		/* software cursor position */
 	u32 bytestocopy;	/* bytes of recorded data available */
 	u32 size;
+	u32 pages;
 	u32 sizereg;
 	u32 sizeregval;
         u32 addrreg;

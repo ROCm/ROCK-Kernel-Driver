@@ -1,4 +1,3 @@
-
 /*
  **********************************************************************
  *     sblive_mi.c - MIDI UART input HAL for emu10k1 driver
@@ -291,7 +290,7 @@ int emu10k1_mpuin_callback(struct emu10k1_mpuin *card_mpuin, u32 msg, unsigned l
 	if (msg == ICARDMIDI_INDATA || msg == ICARDMIDI_INDATAERROR) {
 		callback_msg[1] = data;
 		callback_msg[2] = bytesvalid;
-		DPD(2, "emu10k1_mpuin_callback: midimsg = %lx\n", data);
+		DPD(2, "emu10k1_mpuin_callback: midimsg = %#lx\n", data);
 	} else {
 		midiq = (struct midi_queue *) data;
 		midihdr = (struct midi_hdr *) midiq->refdata;

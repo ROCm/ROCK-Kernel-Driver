@@ -85,7 +85,7 @@ struct emu_voice
 int emu10k1_voice_alloc(struct emu10k1_card *, struct emu_voice *);
 void emu10k1_voice_free(struct emu_voice *);
 void emu10k1_voice_playback_setup(struct emu_voice *);
-void emu10k1_voice_start(struct emu_voice *, int);
-void emu10k1_voice_stop(struct emu_voice *);
+void emu10k1_voices_start(struct emu_voice *, unsigned int, int);
+void emu10k1_voices_stop(struct emu_voice *, int);
 
 #endif /* _VOICEMGR_H */

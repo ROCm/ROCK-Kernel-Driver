@@ -35,9 +35,12 @@
 #include <linux/fs.h>
 #include <linux/sound.h>
 #include <linux/soundcard.h>
+#include <linux/ac97_codec.h>
 #include <linux/pci.h>
 
-#include "emu_wrapper.h"
+#include "passthrough.h"
+#include "efxmgr.h"
+#include "midi.h"
 
 #define EMUPAGESIZE     4096            /* don't change */
 #define NUM_G           64              /* use all channels */
@@ -93,6 +96,38 @@ struct emu10k1_wavein
         u32 fxwc;
 };
 
+#define CMD_READ 1
+#define CMD_WRITE 2
+
+struct mixer_private_ioctl {
+        u32 cmd;
+        u32 val[90];
+};
+
+/* bogus ioctls numbers to escape from OSS mixer limitations */
+#define CMD_WRITEFN0            _IOW('D', 0, struct mixer_private_ioctl)
+#define CMD_READFN0		_IOR('D', 1, struct mixer_private_ioctl) 
+#define CMD_WRITEPTR		_IOW('D', 2, struct mixer_private_ioctl) 
+#define CMD_READPTR		_IOR('D', 3, struct mixer_private_ioctl) 
+#define CMD_SETRECSRC		_IOW('D', 4, struct mixer_private_ioctl) 
+#define CMD_GETRECSRC		_IOR('D', 5, struct mixer_private_ioctl) 
+#define CMD_GETVOICEPARAM	_IOR('D', 6, struct mixer_private_ioctl) 
+#define CMD_SETVOICEPARAM	_IOW('D', 7, struct mixer_private_ioctl) 
+#define CMD_GETPATCH		_IOR('D', 8, struct mixer_private_ioctl) 
+#define CMD_GETGPR		_IOR('D', 9, struct mixer_private_ioctl) 
+#define CMD_GETCTLGPR           _IOR('D', 10, struct mixer_private_ioctl)
+#define CMD_SETPATCH		_IOW('D', 11, struct mixer_private_ioctl) 
+#define CMD_SETGPR		_IOW('D', 12, struct mixer_private_ioctl) 
+#define CMD_SETCTLGPR		_IOW('D', 13, struct mixer_private_ioctl)
+#define CMD_SETGPOUT		_IOW('D', 14, struct mixer_private_ioctl)
+#define CMD_GETGPR2OSS		_IOR('D', 15, struct mixer_private_ioctl)
+#define CMD_SETGPR2OSS		_IOW('D', 16, struct mixer_private_ioctl)
+#define CMD_SETMCH_FX		_IOW('D', 17, struct mixer_private_ioctl)
+#define CMD_SETPASSTHROUGH	_IOW('D', 18, struct mixer_private_ioctl)
+
+struct oss_scaling {
+	char scale, muting;
+}; 
 
 struct emu10k1_card 
 {
@@ -117,20 +152,25 @@ struct emu10k1_card
 	unsigned short		model;
 	unsigned int irq; 
 
-	int	audio_num;
-	int	audio1_num;
-	int	mixer_num;
-	int	midi_num;
+	int	audio_dev;
+	int	audio_dev1;
+	int	midi_dev;
+#ifdef EMU10K1_SEQUENCER
+	int seq_dev;
+	struct emu10k1_mididevice *seq_mididev;
+#endif
 
+	struct ac97_codec ac97;
+	int ac97_supported_mixers;
+	int ac97_stereo_mixers;
+
+	/* Number of first fx voice for multichannel output */
+	u8 mchannel_fx;
 	struct emu10k1_waveout	waveout;
 	struct emu10k1_wavein	wavein;
 	struct emu10k1_mpuout	*mpuout;
 	struct emu10k1_mpuin	*mpuin;
 
-	u16			arrwVol[SOUND_MIXER_NRDEVICES + 1];
-	/* array is used from the member 1 to save (-1) operation */
-	u32			digmix[9 * 6 * 2];
-	unsigned int		modcnt;
 	struct semaphore	open_sem;
 	mode_t			open_mode;
 	wait_queue_head_t	open_wait;
@@ -141,26 +181,25 @@ struct emu10k1_card
 	u8 chiprev;                    /* Chip revision                */
 
 	int isaps;
+
+	struct patch_manager mgr;
+	struct pt_data pt;
 };
 
 int emu10k1_addxmgr_alloc(u32, struct emu10k1_card *);
 void emu10k1_addxmgr_free(struct emu10k1_card *, int);
 
-#ifdef PRIVATE_PCM_VOLUME
 
-#define MAX_PCM_CHANNELS NUM_G 
-struct sblive_pcm_volume_rec {
-	struct files_struct *files; // identification of the same thread
-	u8 attn_l;		// attenuation for left channel
-	u8 attn_r;		// attenuation for right channel
-	u16 mixer;		// saved mixer value for return
-	u8 channel_l;		// idx of left channel
-	u8 channel_r;		// idx of right channel
-	int opened;		// counter - locks element
-};
-extern struct sblive_pcm_volume_rec sblive_pcm_volume[];
-extern u16 pcm_last_mixer;
-#endif
+
+int emu10k1_find_control_gpr(struct patch_manager *, const char *, const char *);
+void emu10k1_set_control_gpr(struct emu10k1_card *, int , s32, int );
+
+void emu10k1_set_volume_gpr(struct emu10k1_card *, int, s32, int, int);
+
+
+#define VOL_6BIT 0x40,0x40
+#define VOL_5BIT 0x20,0x20
+#define VOL_4BIT 0x10,0x7f
 
 #define TIMEOUT 		    16384
 
@@ -185,10 +224,9 @@ void emu10k1_irq_disable(struct emu10k1_card *, u32);
 void emu10k1_set_stop_on_loop(struct emu10k1_card *, u32);
 void emu10k1_clear_stop_on_loop(struct emu10k1_card *, u32);
 
-/* AC97 Mixer access function */
-int sblive_readac97(struct emu10k1_card *, u8, u16 *);
-int sblive_writeac97(struct emu10k1_card *, u8, u16);
-int sblive_rmwac97(struct emu10k1_card *, u8, u16, u16);
+/* AC97 Codec register access function */
+u16 emu10k1_ac97_read(struct ac97_codec *, u8);
+void emu10k1_ac97_write(struct ac97_codec *, u8, u16);
 
 /* MPU access function*/
 int emu10k1_mpu_write_data(struct emu10k1_card *, u8);

@@ -148,6 +148,7 @@ extern void delete_from_swap_cache_nolock(struct page *page);
 extern void free_page_and_swap_cache(struct page *page);
 
 /* linux/mm/swapfile.c */
+extern int vm_swap_full(void);
 extern unsigned int nr_swapfiles;
 extern struct swap_info_struct swap_info[];
 extern int is_swap_partition(kdev_t);

@@ -36,6 +36,12 @@
 #include "audio.h"
 #include "cardwi.h"
 
+/**
+ * query_format - returns a valid sound format
+ *
+ * This function will return a valid sound format as close
+ * to the requested one as possible. 
+ */
 void query_format(int recsrc, struct wave_format *wave_fmt)
 {
 
@@ -62,8 +68,18 @@ void query_format(int recsrc, struct wave_format *wave_fmt)
 		else
 			wave_fmt->samplingrate = 0x1F40;
 
-		if ((wave_fmt->bitsperchannel != 8) && (wave_fmt->bitsperchannel != 16))
+		switch (wave_fmt->id) {
+		case AFMT_S16_LE:
 			wave_fmt->bitsperchannel = 16;
+			break;
+		case AFMT_U8:
+			wave_fmt->bitsperchannel = 8;
+			break;
+		default:
+			wave_fmt->id = AFMT_S16_LE;
+			wave_fmt->bitsperchannel = 16;
+			break;
+		}
 
 		break;
 
@@ -80,13 +96,13 @@ void query_format(int recsrc, struct wave_format *wave_fmt)
 	wave_fmt->bytesperchannel = wave_fmt->bitsperchannel >> 3;
 	wave_fmt->bytespersample = wave_fmt->channels * wave_fmt->bytesperchannel;
 	wave_fmt->bytespersec = wave_fmt->bytespersample * wave_fmt->samplingrate;
-
-	return;
 }
 
 static int alloc_buffer(struct emu10k1_card *card, struct wavein_buffer *buffer)
 {
-	if ((buffer->addr = pci_alloc_consistent(card->pci_dev, buffer->size * buffer->cov, &buffer->dma_handle)) == NULL)
+	buffer->addr = pci_alloc_consistent(card->pci_dev, buffer->size * buffer->cov,
+					    &buffer->dma_handle);
+	if (buffer->addr == NULL)
 		return -1;
 
 	return 0;
@@ -95,9 +111,8 @@ static int alloc_buffer(struct emu10k1_card *card, struct wavein_buffer *buffer)
 static void free_buffer(struct emu10k1_card *card, struct wavein_buffer *buffer)
 {
 	if (buffer->addr != NULL)
-		pci_free_consistent(card->pci_dev, buffer->size * buffer->cov, buffer->addr, buffer->dma_handle);
-
-	return;
+		pci_free_consistent(card->pci_dev, buffer->size * buffer->cov,
+				    buffer->addr, buffer->dma_handle);
 }
 
 int emu10k1_wavein_open(struct emu10k1_wavedevice *wave_dev)
@@ -195,8 +210,6 @@ void emu10k1_wavein_close(struct emu10k1_wavedevice *wave_dev)
 	spin_unlock_irqrestore(&card->lock, flags);
 
 	wiinst->state = WAVE_STATE_CLOSED;
-
-	return;
 }
 
 void emu10k1_wavein_start(struct emu10k1_wavedevice *wave_dev)
@@ -214,8 +227,6 @@ void emu10k1_wavein_start(struct emu10k1_wavedevice *wave_dev)
 	wiinst->buffer.bytestocopy = 0;
 
 	wiinst->state |= WAVE_STATE_STARTED;
-
-	return;
 }
 
 void emu10k1_wavein_stop(struct emu10k1_wavedevice *wave_dev)
@@ -232,8 +243,6 @@ void emu10k1_wavein_stop(struct emu10k1_wavedevice *wave_dev)
 	emu10k1_stop_record(card, &wiinst->buffer);
 
 	wiinst->state &= ~WAVE_STATE_STARTED;
-
-	return;
 }
 
 int emu10k1_wavein_setformat(struct emu10k1_wavedevice *wave_dev, struct wave_format *format)
@@ -282,20 +291,21 @@ void emu10k1_wavein_getxfersize(struct wiinst *wiinst, u32 * size)
 
 	*size = buffer->bytestocopy;
 
+	if (wiinst->mmapped)
+		return;
+
 	if (*size > buffer->size) {
 		*size = buffer->size;
 		buffer->pos = buffer->hw_pos;
 		buffer->bytestocopy = buffer->size;
 		DPF(1, "buffer overrun\n");
 	}
-
-	return;
 }
 
 static void copy_block(u8 *dst, u8 * src, u32 str, u32 len, u8 cov)
 {
 	if (cov == 1)
-		copy_to_user(dst, src + str, len);
+		__copy_to_user(dst, src + str, len);
 	else {
 		u8 byte;
 		u32 i;
@@ -304,11 +314,9 @@ static void copy_block(u8 *dst, u8 * src, u32 str, u32 len, u8 cov)
 
 		for (i = 0; i < len; i++) {
 			byte = src[2 * i] ^ 0x80;
-			copy_to_user(dst + i, &byte, 1);
+			__copy_to_user(dst + i, &byte, 1);
 		}
 	}
-
-	return;
 }
 
 void emu10k1_wavein_xferdata(struct wiinst *wiinst, u8 * data, u32 * size)
@@ -340,8 +348,6 @@ void emu10k1_wavein_xferdata(struct wiinst *wiinst, u8 * data, u32 * size)
 	} else {
 		copy_block(data, buffer->addr, start, sizetocopy, buffer->cov);
 	}
-
-	return;
 }
 
 void emu10k1_wavein_update(struct emu10k1_card *card, struct wiinst *wiinst)
@@ -362,6 +368,4 @@ void emu10k1_wavein_update(struct emu10k1_card *card, struct wiinst *wiinst)
 	wiinst->buffer.bytestocopy += diff;
 
 	wiinst->buffer.hw_pos = hw_pos;
-
-	return;
 }

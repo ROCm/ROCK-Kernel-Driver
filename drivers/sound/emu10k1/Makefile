@@ -5,8 +5,9 @@
 O_TARGET := emu10k1.o
 
 obj-y :=     audio.o cardmi.o cardmo.o cardwi.o cardwo.o ecard.o \
-             emuadxmg.o hwaccess.o irqmgr.o main.o midi.o mixer.o \
-             recmgr.o timer.o voicemgr.o
+             efxmgr.o emuadxmg.o hwaccess.o irqmgr.o joystick.o \
+             main.o midi.o mixer.o passthrough.o recmgr.o timer.o \
+             voicemgr.o
 obj-m := $(O_TARGET)
 
 ifdef DEBUG

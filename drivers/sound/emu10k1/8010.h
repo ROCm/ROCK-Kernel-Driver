@@ -39,22 +39,6 @@
 
 #include <linux/types.h>
 
-/* ------------------- DEFINES -------------------- */
-
-#define CMD_WRITEFN0		0x0
-#define CMD_READFN0		0x1
-#define CMD_WRITEPTR		0x2
-#define CMD_READPTR		0x3
-#define CMD_SETRECSRC		0x4
-#define CMD_GETRECSRC		0x5
-#define CMD_GETVOICEPARAM	0x6
-#define CMD_SETVOICEPARAM	0x7
-
-struct mixer_private_ioctl {
-	u32 cmd;
-	u32 val[10];
-};
-
 /************************************************************************************************/
 /* PCI function 0 registers, address = <val> + PCIBASE0						*/
 /************************************************************************************************/
@@ -171,7 +155,10 @@ struct mixer_private_ioctl {
 #define HCFG_CODECFORMAT_I2S	0x00010000	/* I2S CODEC format -- Secondary (Rear) Output	*/
 #define HCFG_GPINPUT0		0x00004000	/* External pin112				*/
 #define HCFG_GPINPUT1		0x00002000	/* External pin110				*/
+
 #define HCFG_GPOUTPUT_MASK	0x00001c00	/* External pins which may be controlled	*/
+#define HCFG_GPOUT0		0x00001000	/* set to enable digital out on 5.1 cards	*/
+
 #define HCFG_JOYENABLE      	0x00000200	/* Internal joystick enable    			*/
 #define HCFG_PHASETRACKENABLE	0x00000100	/* Phase tracking enable			*/
 						/* 1 = Force all 3 async digital inputs to use	*/
@@ -223,54 +210,6 @@ struct mixer_private_ioctl {
 #define AC97ADDRESS		0x1e		/* AC97 register set address register (8 bit)	*/
 #define AC97ADDRESS_READY	0x80		/* Read-only bit, reflects CODEC READY signal	*/
 #define AC97ADDRESS_ADDRESS	0x7f		/* Address of indexed AC97 register		*/
-
-/************************************************************************************************/
-/* PCI function 1 registers, address = <val> + PCIBASE1						*/
-/************************************************************************************************/
-
-#define JOYSTICK1		0x00		/* Analog joystick port register		*/
-#define JOYSTICK2		0x01		/* Analog joystick port register		*/
-#define JOYSTICK3		0x02		/* Analog joystick port register		*/
-#define JOYSTICK4		0x03		/* Analog joystick port register		*/
-#define JOYSTICK5		0x04		/* Analog joystick port register		*/
-#define JOYSTICK6		0x05		/* Analog joystick port register		*/
-#define JOYSTICK7		0x06		/* Analog joystick port register		*/
-#define JOYSTICK8		0x07		/* Analog joystick port register		*/
-
-/* When writing, any write causes JOYSTICK_COMPARATOR output enable to be pulsed on write.	*/
-/* When reading, use these bitfields: */
-#define JOYSTICK_BUTTONS	0x0f		/* Joystick button data				*/
-#define JOYSTICK_COMPARATOR	0xf0		/* Joystick comparator data			*/
-
-
-/********************************************************************************************************/
-/* AC97 pointer-offset register set, accessed through the AC97ADDRESS and AC97DATA registers		*/
-/********************************************************************************************************/
-
-#define AC97_RESET		0x00
-#define AC97_MASTERVOLUME	0x02		/* Master volume					*/
-#define AC97_HEADPHONEVOLUME	0x04		/* Headphone volume					*/
-#define AC97_MASTERVOLUMEMONO	0x06		/* Mast volume mono					*/
-#define AC97_MASTERTONE		0x08
-#define AC97_PCBEEPVOLUME	0x0a		/* PC speaker system beep volume			*/
-#define AC97_PHONEVOLUME	0x0c
-#define AC97_MICVOLUME		0x0e
-#define AC97_LINEINVOLUME	0x10
-#define AC97_CDVOLUME		0x12
-#define AC97_VIDEOVOLUME	0x14
-#define AC97_AUXVOLUME		0x16
-#define AC97_PCMOUTVOLUME	0x18
-#define AC97_RECORDSELECT	0x1a
-#define AC97_RECORDGAIN		0x1c
-#define AC97_RECORDGAINMIC	0x1e
-#define AC97_GENERALPURPOSE	0x20
-#define AC97_3DCONTROL		0x22
-#define AC97_MODEMRATE		0x24
-#define AC97_POWERDOWN		0x26
-#define AC97_VENDORID1		0x7c
-#define AC97_VENDORID2		0x7e
-#define AC97_ZVIDEOVOLUME	0xec
-#define AC97_AC3VOLUME		0xed
 
 /********************************************************************************************************/
 /* Emu10k1 pointer-offset register set, accessed through the PTR and DATA registers			*/
@@ -568,6 +507,16 @@ struct mixer_private_ioctl {
 
 #define DBG			0x52		/* DO NOT PROGRAM THIS REGISTER!!! MAY DESTROY CHIP */
 
+/* definitions for debug register - taken from the alsa drivers */
+#define DBG_ZC                  0x80000000      /* zero tram counter */
+#define DBG_SATURATION_OCCURED  0x02000000      /* saturation control */
+#define DBG_SATURATION_ADDR     0x01ff0000      /* saturation address */
+#define DBG_SINGLE_STEP         0x00008000      /* single step mode */
+#define DBG_STEP                0x00004000      /* start single step */
+#define DBG_CONDITION_CODE      0x00003e00      /* condition code */
+#define DBG_SINGLE_STEP_ADDR    0x000001ff      /* single step address */
+
+
 #define REG53			0x53		/* DO NOT PROGRAM THIS REGISTER!!! MAY DESTROY CHIP */
 
 #define SPCS0			0x54		/* SPDIF output Channel Status 0 register	*/
@@ -615,6 +564,10 @@ struct mixer_private_ioctl {
 
 #define SPBYPASS		0x5e		/* SPDIF BYPASS mode register			*/
 #define SPBYPASS_ENABLE		0x00000001	/* Enable SPDIF bypass mode			*/
+
+#define AC97SLOT		0x5f		/* additional AC97 slots enable bits */
+#define AC97SLOT_CNTR		0x10		/* Center enable */
+#define AC97SLOT_LFE		0x20		/* LFE enable */
 
 #define CDSRCS			0x60		/* CD-ROM Sample Rate Converter status register	*/
 

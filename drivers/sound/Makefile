@@ -73,7 +73,7 @@ subdir-$(CONFIG_SOUND_EMU10K1) += emu10k1
 subdir-$(CONFIG_SOUND_CS4281) += cs4281
 
 ifeq ($(CONFIG_SOUND_EMU10K1),y)
-  obj-y += emu10k1/emu10k1.o
+  obj-y += ac97_codec.o emu10k1/emu10k1.o
 endif
 
 ifeq ($(CONFIG_SOUND_CS4281),y)
