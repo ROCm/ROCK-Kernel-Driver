@@ -293,8 +293,6 @@ static int mwave_ioctl(struct inode *inode, struct file *file,
 	
 		case IOCTL_MW_GET_IPC: {
 			unsigned int ipcnum = (unsigned int) ioarg;
-			spinlock_t ipc_lock = SPIN_LOCK_UNLOCKED;
-			unsigned long flags;
 	
 			PRINTK_3(TRACE_MWAVE,
 				"mwavedd::mwave_ioctl IOCTL_MW_GET_IPC"
@@ -310,32 +308,29 @@ static int mwave_ioctl(struct inode *inode, struct file *file,
 			}
 	
 			if (pDrvData->IPCs[ipcnum].bIsEnabled == TRUE) {
+				DECLARE_WAITQUEUE(wait, current);
+
 				PRINTK_2(TRACE_MWAVE,
 					"mwavedd::mwave_ioctl, thread for"
 					" ipc %x going to sleep\n",
 					ipcnum);
-	
-				spin_lock_irqsave(&ipc_lock, flags);
+				add_wait_queue(&pDrvData->IPCs[ipcnum].ipc_wait_queue, &wait);
+				pDrvData->IPCs[ipcnum].bIsHere = TRUE;
+				set_current_state(TASK_INTERRUPTIBLE);
 				/* check whether an event was signalled by */
 				/* the interrupt handler while we were gone */
 				if (pDrvData->IPCs[ipcnum].usIntCount == 1) {	/* first int has occurred (race condition) */
 					pDrvData->IPCs[ipcnum].usIntCount = 2;	/* first int has been handled */
-					spin_unlock_irqrestore(&ipc_lock, flags);
 					PRINTK_2(TRACE_MWAVE,
 						"mwavedd::mwave_ioctl"
 						" IOCTL_MW_GET_IPC ipcnum %x"
 						" handling first int\n",
 						ipcnum);
 				} else {	/* either 1st int has not yet occurred, or we have already handled the first int */
-					pDrvData->IPCs[ipcnum].bIsHere = TRUE;
-#warning "Sleeping on spinlock"
-					interruptible_sleep_on(&pDrvData->IPCs[ipcnum].ipc_wait_queue);
-					pDrvData->IPCs[ipcnum].bIsHere = FALSE;
+					schedule();
 					if (pDrvData->IPCs[ipcnum].usIntCount == 1) {
-						pDrvData->IPCs[ipcnum].
-						usIntCount = 2;
+						pDrvData->IPCs[ipcnum].usIntCount = 2;
 					}
-					spin_unlock_irqrestore(&ipc_lock, flags);
 					PRINTK_2(TRACE_MWAVE,
 						"mwavedd::mwave_ioctl"
 						" IOCTL_MW_GET_IPC ipcnum %x"
@@ -343,6 +338,9 @@ static int mwave_ioctl(struct inode *inode, struct file *file,
 						" application\n",
 						ipcnum);
 				}
+				pDrvData->IPCs[ipcnum].bIsHere = FALSE;
+				remove_wait_queue(&pDrvData->IPCs[ipcnum].ipc_wait_queue, &wait);
+				set_current_state(TASK_RUNNING);
 				PRINTK_2(TRACE_MWAVE,
 					"mwavedd::mwave_ioctl IOCTL_MW_GET_IPC,"
 					" returning thread for ipc %x"
