@@ -352,8 +352,18 @@ int b1pciv4_detect(avmcard *card)
 
 static void b1dma_queue_tx(avmcard *card, struct sk_buff *skb)
 {
+	unsigned long flags;
+
 	skb_queue_tail(&card->dma->send_queue, skb);
-	b1dma_dispatch_tx(card);
+
+	spin_lock_irq_save(&card->lock, flags);
+
+	if (!(card->csr & EN_TX_TC_INT)) {
+		b1dma_dispatch_tx(card);
+		b1dmaoutmeml(card->mbase+AMCC_INTCSR, card->csr);
+	}
+
+	spin_unlock_irq_restore(&card->lock, flags);
 }
 
 /* ------------------------------------------------------------- */
@@ -369,15 +379,7 @@ static void b1dma_dispatch_tx(avmcard *card)
 	int inint;
 	void *p;
 	
-	save_flags(flags);
-	cli();
-
 	inint = card->interrupt;
-
-	if (card->csr & EN_TX_TC_INT) { /* tx busy */
-	        restore_flags(flags);
-		return;
-	}
 
 	skb = skb_dequeue(&dma->send_queue);
 	if (!skb) {
@@ -429,10 +431,6 @@ static void b1dma_dispatch_tx(avmcard *card)
 
 	card->csr |= EN_TX_TC_INT;
 
-	if (!inint)
-		b1dmaoutmeml(card->mbase+AMCC_INTCSR, card->csr);
-
-	restore_flags(flags);
 	dev_kfree_skb_any(skb);
 }
 
@@ -620,10 +618,15 @@ static void b1dma_handle_interrupt(avmcard *card)
 	}
 
 	if ((status & TX_TC_INT) != 0) {
+		spin_lock_irq_save(&card->lock, flags);
+
 		card->csr &= ~EN_TX_TC_INT;
 	        b1dma_dispatch_tx(card);
+
+		spin_unlock_irq_restore(&card->lock, flags);
 	}
 	b1dmaoutmeml(card->mbase+AMCC_INTCSR, card->csr);
+
 }
 
 void b1dma_interrupt(int interrupt, void *devptr, struct pt_regs *regs)
