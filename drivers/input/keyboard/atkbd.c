@@ -188,6 +188,7 @@ struct atkbd {
 	unsigned int resend:1;
 	unsigned int release:1;
 	unsigned int bat_xl:1;
+	unsigned int enabled:1;
 
 	unsigned int last;
 	unsigned long time;
@@ -247,6 +248,9 @@ static irqreturn_t atkbd_interrupt(struct serio *serio, unsigned char data,
 		atkbd->cmdbuf[--atkbd->cmdcnt] = code;
 		goto out;
 	}
+
+	if (!atkbd->enabled)
+		goto out;
 
 	if (atkbd->translated) {
 
@@ -749,6 +753,8 @@ static void atkbd_connect(struct serio *serio, struct serio_dev *dev)
 		atkbd->set = 2;
 		atkbd->id = 0xab00;
 	}
+
+	atkbd->enabled = 1;
 
 	if (atkbd->extra) {
 		atkbd->dev.ledbit[0] |= BIT(LED_COMPOSE) | BIT(LED_SUSPEND) | BIT(LED_SLEEP) | BIT(LED_MUTE) | BIT(LED_MISC);
