@@ -335,8 +335,8 @@ acpi_parse_plat_int_src (acpi_table_entry_header *header)
 						plintsrc->iosapic_vector,
 						plintsrc->eid,
 						plintsrc->id,
-						(plintsrc->flags.polarity == 1) ? 1 : 0,
-						(plintsrc->flags.trigger == 1) ? 1 : 0);
+						(plintsrc->flags.polarity == 1) ? IOSAPIC_POL_HIGH : IOSAPIC_POL_LOW,
+						(plintsrc->flags.trigger == 1) ? IOSAPIC_EDGE : IOSAPIC_LEVEL);
 
 	platform_intr_list[plintsrc->type] = vector;
 	return 0;
@@ -359,8 +359,8 @@ acpi_parse_int_src_ovr (acpi_table_entry_header *header)
 		return 0;
 
 	iosapic_override_isa_irq(p->bus_irq, p->global_irq,
-				 (p->flags.polarity == 1) ? 1 : 0,
-				 (p->flags.trigger == 1) ? 1 : 0);
+				 (p->flags.polarity == 1) ? IOSAPIC_POL_HIGH : IOSAPIC_POL_LOW,
+				 (p->flags.trigger == 1) ? IOSAPIC_EDGE : IOSAPIC_LEVEL);
 	return 0;
 }
 
@@ -618,7 +618,7 @@ acpi_parse_fadt (unsigned long phys_addr, unsigned long size)
 	if (has_8259 && sci_irq < 16)
 		return 0;	/* legacy, no setup required */
 
-	iosapic_register_intr(sci_irq, 0, 0);
+	iosapic_register_intr(sci_irq, IOSAPIC_POL_LOW, IOSAPIC_LEVEL);
 	return 0;
 }
 
@@ -681,7 +681,7 @@ acpi_parse_spcr (unsigned long phys_addr, unsigned long size)
 			 (spcr->global_int[1] << 8)  |
 			 (spcr->global_int[0])  );
 
-		vector = iosapic_register_intr(gsi, 1, 1);
+		vector = iosapic_register_intr(gsi, IOSAPIC_POL_HIGH, IOSAPIC_EDGE);
 	}
 	return 0;
 }
@@ -849,7 +849,8 @@ acpi_register_irq (u32 gsi, u32 polarity, u32 trigger)
 		return 0;
 
 	/* Turn it on */
-	vector = iosapic_register_intr (gsi, polarity, trigger);
+	vector = iosapic_register_intr (gsi, polarity ? IOSAPIC_POL_HIGH : IOSAPIC_POL_LOW,
+			trigger ? IOSAPIC_EDGE : IOSAPIC_LEVEL);
 	return vector;
 }
 

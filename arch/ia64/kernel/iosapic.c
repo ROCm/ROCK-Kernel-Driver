@@ -444,7 +444,7 @@ iosapic_reassign_vector (int vector)
 
 static void
 register_intr (unsigned int gsi, int vector, unsigned char delivery,
-	       unsigned long polarity, unsigned long edge_triggered)
+	       unsigned long polarity, unsigned long trigger)
 {
 	irq_desc_t *idesc;
 	struct hw_interrupt_type *irq_type;
@@ -464,18 +464,16 @@ register_intr (unsigned int gsi, int vector, unsigned char delivery,
 
 	rte_index = gsi - gsi_base;
 	iosapic_intr_info[vector].rte_index = rte_index;
-	iosapic_intr_info[vector].polarity = polarity ? IOSAPIC_POL_HIGH : IOSAPIC_POL_LOW;
+	iosapic_intr_info[vector].polarity = polarity;
 	iosapic_intr_info[vector].dmode    = delivery;
 	iosapic_intr_info[vector].addr     = iosapic_address;
 	iosapic_intr_info[vector].gsi_base = gsi_base;
+	iosapic_intr_info[vector].trigger  = trigger;
 
-	if (edge_triggered) {
-		iosapic_intr_info[vector].trigger = IOSAPIC_EDGE;
+	if (trigger == IOSAPIC_EDGE)
 		irq_type = &irq_type_iosapic_edge;
-	} else {
-		iosapic_intr_info[vector].trigger = IOSAPIC_LEVEL;
+	else
 		irq_type = &irq_type_iosapic_level;
-	}
 
 	idesc = irq_desc(vector);
 	if (idesc->handler != irq_type) {
@@ -493,7 +491,7 @@ register_intr (unsigned int gsi, int vector, unsigned char delivery,
  */
 int
 iosapic_register_intr (unsigned int gsi,
-		       unsigned long polarity, unsigned long edge_triggered)
+		       unsigned long polarity, unsigned long trigger)
 {
 	int vector;
 	unsigned int dest = (ia64_get_lid() >> 16) & 0xffff;
@@ -503,11 +501,11 @@ iosapic_register_intr (unsigned int gsi,
 		vector = ia64_alloc_vector();
 
 	register_intr(gsi, vector, IOSAPIC_LOWEST_PRIORITY,
-		      polarity, edge_triggered);
+		      polarity, trigger);
 
 	printk(KERN_INFO "GSI 0x%x(%s,%s) -> CPU 0x%04x vector %d\n",
-	       gsi, (polarity ? "high" : "low"),
-	       (edge_triggered ? "edge" : "level"), dest, vector);
+	       gsi, (polarity == IOSAPIC_POL_HIGH ? "high" : "low"),
+	       (trigger == IOSAPIC_EDGE ? "edge" : "level"), dest, vector);
 
 	/* program the IOSAPIC routing table */
 	set_rte(vector, dest);
@@ -521,7 +519,7 @@ iosapic_register_intr (unsigned int gsi,
 int
 iosapic_register_platform_intr (u32 int_type, unsigned int gsi,
 				int iosapic_vector, u16 eid, u16 id,
-				unsigned long polarity, unsigned long edge_triggered)
+				unsigned long polarity, unsigned long trigger)
 {
 	unsigned char delivery;
 	int vector;
@@ -551,11 +549,11 @@ iosapic_register_platform_intr (u32 int_type, unsigned int gsi,
 	}
 
 	register_intr(gsi, vector, delivery, polarity,
-		      edge_triggered);
+		      trigger);
 
 	printk(KERN_INFO "PLATFORM int 0x%x: GSI 0x%x(%s,%s) -> CPU 0x%04x vector %d\n",
-	       int_type, gsi, (polarity ? "high" : "low"),
-	       (edge_triggered ? "edge" : "level"), dest, vector);
+	       int_type, gsi, (polarity == IOSAPIC_POL_HIGH ? "high" : "low"),
+	       (trigger == IOSAPIC_EDGE ? "edge" : "level"), dest, vector);
 
 	/* program the IOSAPIC routing table */
 	set_rte(vector, dest);
@@ -570,18 +568,18 @@ iosapic_register_platform_intr (u32 int_type, unsigned int gsi,
 void
 iosapic_override_isa_irq (unsigned int isa_irq, unsigned int gsi,
 			  unsigned long polarity,
-			  unsigned long edge_triggered)
+			  unsigned long trigger)
 {
 	int vector;
 	unsigned int dest = (ia64_get_lid() >> 16) & 0xffff;
 
 	vector = isa_irq_to_vector(isa_irq);
 
-	register_intr(gsi, vector, IOSAPIC_LOWEST_PRIORITY, polarity, edge_triggered);
+	register_intr(gsi, vector, IOSAPIC_LOWEST_PRIORITY, polarity, trigger);
 
 	DBG("ISA: IRQ %u -> GSI 0x%x (%s,%s) -> CPU 0x%04x vector %d\n",
 	    isa_irq, gsi,
-	    polarity ? "high" : "low", edge_triggered ? "edge" : "level",
+	    polarity == IOSAPIC_POL_HIGH ? "high" : "low", trigger == IOSAPIC_EDGE ? "edge" : "level",
 	    dest, vector);
 
 	/* program the IOSAPIC routing table */
@@ -641,8 +639,7 @@ iosapic_init (unsigned long phys_addr, unsigned int gsi_base)
 		 * Override table.
 		 */
 		for (isa_irq = 0; isa_irq < 16; ++isa_irq)
-			/* IOSAPIC_POL_HIGH, IOSAPIC_EDGE */
-			iosapic_override_isa_irq(isa_irq, isa_irq, 1, 1);
+			iosapic_override_isa_irq(isa_irq, isa_irq, IOSAPIC_POL_HIGH, IOSAPIC_EDGE);
 	}
 }
 
@@ -718,7 +715,7 @@ iosapic_parse_prt (void)
 				/* new GSI; allocate a vector for it */
 				vector = ia64_alloc_vector();
 
-			register_intr(gsi, vector, IOSAPIC_LOWEST_PRIORITY, 0, 0);
+			register_intr(gsi, vector, IOSAPIC_LOWEST_PRIORITY, IOSAPIC_POL_LOW, IOSAPIC_LEVEL);
 		}
 		snprintf(pci_id, sizeof(pci_id), "%02x:%02x:%02x[%c]",
 			 entry->id.segment, entry->id.bus, entry->id.device, 'A' + entry->pin);
