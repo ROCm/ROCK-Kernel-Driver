@@ -21,6 +21,14 @@ ToDo/Notes:
 	- Enable the code for setting the NT4 compatibility flag when we start
 	  making NTFS 1.2 specific modifications.
 
+2.1.18-WIP
+
+	- Remove vol->nr_mft_records as it was pretty meaningless and optimize
+	  the calculation of total/free inodes as used by statfs().
+	- Fix scheduling latencies in ntfs_fill_super() by dropping the BKL
+	  because the code itself is using the ntfs_lock semaphore which
+	  provides safe locking.  (Ingo Molnar)
+
 2.1.17 - Fix bugs in mount time error code paths and other updates.
 
 	- Implement bitmap modification code (fs/ntfs/bitmap.[hc]).  This
