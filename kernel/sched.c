@@ -1064,7 +1064,7 @@ skip_queue:
 	 */
 
 #define CAN_MIGRATE_TASK(p,rq,this_cpu)					\
-	((!idle || (jiffies - (p)->last_run > cache_decay_ticks)) &&	\
+	((idle || (jiffies - (p)->last_run > cache_decay_ticks)) &&	\
 		!task_running(rq, p) &&					\
 			cpu_isset(this_cpu, (p)->cpus_allowed))
 
