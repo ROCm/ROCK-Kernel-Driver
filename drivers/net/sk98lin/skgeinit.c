@@ -2,6 +2,8 @@
  *
  * Name:	skgeinit.c
  * Project:	Gigabit Ethernet Adapters, Common Modules
+ * Version:	$Revision: 1.97 $
+ * Date:	$Date: 2003/10/02 16:45:31 $
  * Purpose:	Contains functions to initialize the adapter
  *
  ******************************************************************************/
@@ -19,7 +21,6 @@
  *	The information in this file is provided "AS IS" without warranty.
  *
  ******************************************************************************/
-
 
 #include "h/skdrv1st.h"
 #include "h/skdrv2nd.h"

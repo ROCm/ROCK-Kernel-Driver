@@ -77,6 +77,8 @@ struct rlb_client_info {
 	u8  assigned;		/* checking whether this entry is assigned */
 	u8  ntt;		/* flag - need to transmit client info */
 	struct slave *slave;	/* the slave assigned to this client */
+	u8 tag;			/* flag - need to tag skb */
+	unsigned short vlan_id;	/* VLAN tag associated with IP address */
 };
 
 struct tlb_slave_info {
@@ -122,6 +124,7 @@ struct alb_bond_info {
 						 * rx traffic should be
 						 * rebalanced
 						 */
+	struct vlan_entry	*current_alb_vlan;
 };
 
 int bond_alb_initialize(struct bonding *bond, int rlb_enabled);
@@ -133,6 +136,6 @@ void bond_alb_handle_active_change(struct bonding *bond, struct slave *new_slave
 int bond_alb_xmit(struct sk_buff *skb, struct net_device *bond_dev);
 void bond_alb_monitor(struct bonding *bond);
 int bond_alb_set_mac_address(struct net_device *bond_dev, void *addr);
-
+void bond_alb_clear_vlan(struct bonding *bond, unsigned short vlan_id);
 #endif /* __BOND_ALB_H__ */
 

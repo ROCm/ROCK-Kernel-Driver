@@ -2,6 +2,8 @@
  *
  * Name:	skge.c
  * Project:	GEnesis, PCI Gigabit Ethernet Adapter
+ * Version:	$Revision: 1.45 $
+ * Date:       	$Date: 2004/02/12 14:41:02 $
  * Purpose:	The main driver source module
  *
  ******************************************************************************/
@@ -294,7 +296,6 @@ static int __init skge_probe (void)
 	SK_BOOL BootStringCount = SK_FALSE;
 	int			retval;
 #ifdef CONFIG_PROC_FS
-	int			proc_root_initialized = 0;
 	struct proc_dir_entry	*pProcFile;
 #endif
 
@@ -311,6 +312,12 @@ static int __init skge_probe (void)
 		dev = NULL;
 		pNet = NULL;
 
+		/* Don't handle Yukon2 cards at the moment */
+		/* 12-feb-2004 ---- mlindner@syskonnect.de */
+		if (pdev->vendor == 0x11ab) {
+			if ( (pdev->device == 0x4360) || (pdev->device == 0x4361) )
+				continue;
+		}
 
 		SK_PCI_ISCOMPLIANT(vendor_flag, pdev);
 		if (!vendor_flag)

@@ -2,6 +2,8 @@
  *
  * Name:	skcsum.c
  * Project:	GEnesis, PCI Gigabit Ethernet Adapter
+ * Version:	$Revision: 1.12 $
+ * Date:	$Date: 2003/08/20 13:55:53 $
  * Purpose:	Store/verify Internet checksum in send/receive packets.
  *
  ******************************************************************************/

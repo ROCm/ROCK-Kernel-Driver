@@ -2,6 +2,8 @@
  *
  * Name:	skaddr.c
  * Project:	Gigabit Ethernet Adapters, ADDR-Module
+ * Version:	$Revision: 1.52 $
+ * Date:	$Date: 2003/06/02 13:46:15 $
  * Purpose:	Manage Addresses (Multicast and Unicast) and Promiscuous Mode.
  *
  ******************************************************************************/
