@@ -2423,7 +2423,7 @@ static struct cdev vc0_cdev;
  * Ok, now we can initialize the rest of the tty devices and can count
  * on memory allocations, interrupts etc..
  */
-void __init tty_init(void)
+static int __init tty_init(void)
 {
 	strcpy(tty_cdev.kobj.name, "dev.tty");
 	cdev_init(&tty_cdev, &tty_fops);
@@ -2512,4 +2512,6 @@ void __init tty_init(void)
 #ifdef CONFIG_A2232
 	a2232board_init();
 #endif
+	return 0;
 }
+module_init(tty_init);

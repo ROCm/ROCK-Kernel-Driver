@@ -1493,16 +1493,16 @@ static void init_std_data(struct entropy_store *r)
 	}
 }
 
-void __init rand_initialize(void)
+static int __init rand_initialize(void)
 {
 	int i;
 
 	if (create_entropy_store(DEFAULT_POOL_SIZE, &random_state))
-		return;		/* Error, return */
+		goto err;
 	if (batch_entropy_init(BATCH_ENTROPY_SIZE, random_state))
-		return;		/* Error, return */
+		goto err;
 	if (create_entropy_store(SECONDARY_POOL_SIZE, &sec_random_state))
-		return;		/* Error, return */
+		goto err;
 	clear_entropy_store(random_state);
 	clear_entropy_store(sec_random_state);
 	init_std_data(random_state);
@@ -1515,7 +1515,11 @@ void __init rand_initialize(void)
 	memset(&mouse_timer_state, 0, sizeof(struct timer_rand_state));
 	memset(&extract_timer_state, 0, sizeof(struct timer_rand_state));
 	extract_timer_state.dont_count_entropy = 1;
+	return 0;
+err:
+	return -1;
 }
+module_init(rand_initialize);
 
 void rand_initialize_irq(int irq)
 {

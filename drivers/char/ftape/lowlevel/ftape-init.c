@@ -55,14 +55,24 @@ char ft_rev[] __initdata = "$Revision: 1.8 $";
 char ft_dat[] __initdata = "$Date: 1997/11/06 00:38:08 $";
 
 
+#ifndef CONFIG_FT_NO_TRACE_AT_ALL
+static int ft_tracing = -1;
+#endif
+
+
 /*  Called by modules package when installing the driver
  *  or by kernel during the initialization phase
  */
-int __init ftape_init(void)
+static int __init ftape_init(void)
 {
 	TRACE_FUN(ft_t_flow);
 
 #ifdef MODULE
+#ifndef CONFIG_FT_NO_TRACE_AT_ALL
+	if (ft_tracing != -1) {
+		ftape_tracing = ft_tracing;
+	}
+#endif
 	printk(KERN_INFO FTAPE_VERSION "\n");
         if (TRACE_LEVEL >= ft_t_info) {
 		printk(
@@ -112,13 +122,6 @@ KERN_INFO "Compiled for Linux version %s\n", UTS_RELEASE);
 #endif
 	TRACE_EXIT 0;
 }
-
-#ifdef MODULE
-
-#ifndef CONFIG_FT_NO_TRACE_AT_ALL
-static int ft_tracing = -1;
-#endif
-
 #define FT_MOD_PARM(var,type,desc) \
 	MODULE_PARM(var,type); MODULE_PARM_DESC(var,desc)
 
@@ -141,21 +144,7 @@ MODULE_DESCRIPTION(
 	"QIC-117 driver for QIC-40/80/3010/3020 floppy tape drives.");
 MODULE_LICENSE("GPL");
 
-/*  Called by modules package when installing the driver
- */
-int init_module(void)
-{
-#ifndef CONFIG_FT_NO_TRACE_AT_ALL
-	if (ft_tracing != -1) {
-		ftape_tracing = ft_tracing;
-	}
-#endif
-	return ftape_init();
-}
-
-/*  Called by modules package when removing the driver
- */
-void cleanup_module(void)
+static void __exit ftape_exit(void)
 {
 	TRACE_FUN(ft_t_flow);
 
@@ -166,4 +155,6 @@ void cleanup_module(void)
         printk(KERN_INFO "ftape: unloaded.\n");
 	TRACE_EXIT;
 }
-#endif /* MODULE */
+
+module_init(ftape_init);
+module_exit(ftape_exit);
