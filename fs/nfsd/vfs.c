@@ -44,6 +44,16 @@
 #include <linux/nfsd/nfsfh.h>
 #include <linux/quotaops.h>
 #include <linux/dnotify.h>
+#ifdef CONFIG_NFSD_V4
+#include <linux/posix_acl.h>
+#include <linux/posix_acl_xattr.h>
+#include <linux/xattr_acl.h>
+#include <linux/xattr.h>
+#include <linux/nfs4.h>
+#include <linux/nfs4_acl.h>
+#include <linux/nfsd_idmap.h>
+#include <linux/security.h>
+#endif /* CONFIG_NFSD_V4 */
 
 #include <asm/uaccess.h>
 
@@ -343,6 +353,177 @@ out_nfserr:
 	err = nfserrno(err);
 	goto out;
 }
+
+#if defined(CONFIG_NFSD_V4)
+
+static int
+set_nfsv4_acl_one(struct dentry *dentry, struct posix_acl *pacl, char *key)
+{
+	int len;
+	size_t buflen;
+	char *buf = NULL;
+	int error = 0;
+	struct inode *inode = dentry->d_inode;
+
+	buflen = posix_acl_xattr_size(pacl->a_count);
+	buf = kmalloc(buflen, GFP_KERNEL);
+	error = -ENOMEM;
+	if (buf == NULL)
+		goto out;
+
+	len = posix_acl_to_xattr(pacl, buf, buflen);
+	if (len < 0) {
+		error = len;
+		goto out;
+	}
+
+	error = -EOPNOTSUPP;
+	if (inode->i_op && inode->i_op->setxattr) {
+		down(&inode->i_sem);
+		security_inode_setxattr(dentry, key, buf, len, 0);
+		error = inode->i_op->setxattr(dentry, key, buf, len, 0);
+		if (!error)
+			security_inode_post_setxattr(dentry, key, buf, len, 0);
+		up(&inode->i_sem);
+	}
+out:
+	kfree(buf);
+	return (error);
+}
+
+int
+nfsd4_set_nfs4_acl(struct svc_rqst *rqstp, struct svc_fh *fhp,
+    struct nfs4_acl *acl)
+{
+	int error;
+	struct dentry *dentry;
+	struct inode *inode;
+	struct posix_acl *pacl = NULL, *dpacl = NULL;
+	unsigned int flags = 0;
+
+	/* Get inode */
+	error = fh_verify(rqstp, fhp, 0 /* S_IFREG */, MAY_SATTR);
+	if (error)
+		goto out;
+
+	dentry = fhp->fh_dentry;
+	inode = dentry->d_inode;
+	if (S_ISDIR(inode->i_mode))
+		flags = NFS4_ACL_DIR;
+
+	error = nfs4_acl_nfsv4_to_posix(acl, &pacl, &dpacl, flags);
+	if (error < 0)
+		goto out_nfserr;
+
+	if (pacl) {
+		error = set_nfsv4_acl_one(dentry, pacl, XATTR_NAME_ACL_ACCESS);
+		if (error < 0)
+			goto out_nfserr;
+	}
+
+	if (dpacl) {
+		error = set_nfsv4_acl_one(dentry, dpacl, XATTR_NAME_ACL_DEFAULT);
+		if (error < 0)
+			goto out_nfserr;
+	}
+
+	error = nfs_ok;
+
+out:
+	posix_acl_release(pacl);
+	posix_acl_release(dpacl);
+	return (error);
+out_nfserr:
+	error = nfserrno(error);
+	goto out;
+}
+
+static struct posix_acl *
+_get_posix_acl(struct dentry *dentry, char *key)
+{
+	struct inode *inode = dentry->d_inode;
+	char *buf = NULL;
+	int buflen, error = 0;
+	struct posix_acl *pacl = NULL;
+
+	down(&inode->i_sem);
+
+	buflen = inode->i_op->getxattr(dentry, key, NULL, 0);
+	if (buflen <= 0) {
+		error = buflen < 0 ? buflen : -ENODATA;
+		goto out_sem;
+	}
+
+	buf = kmalloc(buflen, GFP_KERNEL);
+	if (buf == NULL) {
+		error = -ENOMEM;
+		goto out_sem;
+	}
+
+	error = -EOPNOTSUPP;
+	if (inode->i_op && inode->i_op->getxattr) {
+		error = security_inode_getxattr(dentry, key);
+		if (error)
+			goto out_sem;
+		error = inode->i_op->getxattr(dentry, key, buf, buflen);
+	}
+	if (error < 0)
+		goto out_sem;
+
+	error = 0;
+	up(&inode->i_sem);
+
+	pacl = posix_acl_from_xattr(buf, buflen);
+ out:
+	kfree(buf);
+	return pacl;
+ out_sem:
+	up(&inode->i_sem);
+	pacl = ERR_PTR(error);
+	goto out;
+}
+
+int
+nfsd4_get_nfs4_acl(struct svc_rqst *rqstp, struct dentry *dentry, struct nfs4_acl **acl)
+{
+	struct inode *inode = dentry->d_inode;
+	int error = 0;
+	struct posix_acl *pacl = NULL, *dpacl = NULL;
+	unsigned int flags = 0;
+
+	pacl = _get_posix_acl(dentry, XATTR_NAME_ACL_ACCESS);
+	if (IS_ERR(pacl) && PTR_ERR(pacl) == -ENODATA)
+		pacl = posix_acl_from_mode(inode->i_mode, GFP_KERNEL);
+	if (IS_ERR(pacl)) {
+		error = PTR_ERR(pacl);
+		pacl = NULL;
+		goto out;
+	}
+
+	if (S_ISDIR(inode->i_mode)) {
+		dpacl = _get_posix_acl(dentry, XATTR_NAME_ACL_DEFAULT);
+		if (IS_ERR(dpacl) && PTR_ERR(dpacl) == -ENODATA)
+			dpacl = NULL;
+		else if (IS_ERR(dpacl)) {
+			error = PTR_ERR(dpacl);
+			dpacl = NULL;
+			goto out;
+		}
+		flags = NFS4_ACL_DIR;
+	}
+
+	*acl = nfs4_acl_posix_to_nfsv4(pacl, dpacl, flags);
+	if (IS_ERR(*acl)) {
+		error = PTR_ERR(*acl);
+		*acl = NULL;
+	}
+ out:
+	posix_acl_release(pacl);
+	posix_acl_release(dpacl);
+	return error;
+}
+
+#endif /* defined(CONFIG_NFS_V4) */
 
 #ifdef CONFIG_NFSD_V3
 /*

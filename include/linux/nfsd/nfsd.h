@@ -76,6 +76,11 @@ int		nfsd_lookup(struct svc_rqst *, struct svc_fh *,
 				const char *, int, struct svc_fh *);
 int		nfsd_setattr(struct svc_rqst *, struct svc_fh *,
 				struct iattr *, int, time_t);
+#ifdef CONFIG_NFSD_V4
+int             nfsd4_set_nfs4_acl(struct svc_rqst *, struct svc_fh *,
+                    struct nfs4_acl *);
+int             nfsd4_get_nfs4_acl(struct svc_rqst *, struct dentry *, struct nfs4_acl **);
+#endif /* CONFIG_NFSD_V4 */
 int		nfsd_create(struct svc_rqst *, struct svc_fh *,
 				char *name, int len, struct iattr *attrs,
 				int type, dev_t rdev, struct svc_fh *res);
@@ -258,7 +263,6 @@ static inline int is_fsid(struct svc_fh *fh, struct knfsd_fh *reffh)
 
 /*
  * The following attributes are currently not supported by the NFSv4 server:
- *    ACL           (will be supported in a forthcoming patch)
  *    ARCHIVE       (deprecated anyway)
  *    FS_LOCATIONS  (will be supported eventually)
  *    HIDDEN        (unlikely to be supported any time soon)
@@ -278,7 +282,7 @@ static inline int is_fsid(struct svc_fh *fh, struct knfsd_fh *reffh)
  | FATTR4_WORD0_FILEHANDLE      | FATTR4_WORD0_FILEID       | FATTR4_WORD0_FILES_AVAIL      \
  | FATTR4_WORD0_FILES_FREE      | FATTR4_WORD0_FILES_TOTAL  | FATTR4_WORD0_HOMOGENEOUS      \
  | FATTR4_WORD0_MAXFILESIZE     | FATTR4_WORD0_MAXLINK      | FATTR4_WORD0_MAXNAME          \
- | FATTR4_WORD0_MAXREAD         | FATTR4_WORD0_MAXWRITE)
+ | FATTR4_WORD0_MAXREAD         | FATTR4_WORD0_MAXWRITE     | FATTR4_WORD0_ACL)
 
 #define NFSD_SUPPORTED_ATTRS_WORD1                                                          \
 (FATTR4_WORD1_MODE              | FATTR4_WORD1_NO_TRUNC     | FATTR4_WORD1_NUMLINKS         \
@@ -293,7 +297,8 @@ static inline int is_fsid(struct svc_fh *fh, struct knfsd_fh *reffh)
 (FATTR4_WORD1_TIME_ACCESS_SET   | FATTR4_WORD1_TIME_MODIFY_SET)
 
 /* These are the only attrs allowed in CREATE/OPEN/SETATTR. */
-#define NFSD_WRITEABLE_ATTRS_WORD0                            FATTR4_WORD0_SIZE
+#define NFSD_WRITEABLE_ATTRS_WORD0                                                          \
+(FATTR4_WORD0_SIZE              | FATTR4_WORD0_ACL                                         )
 #define NFSD_WRITEABLE_ATTRS_WORD1                                                          \
 (FATTR4_WORD1_MODE              | FATTR4_WORD1_OWNER         | FATTR4_WORD1_OWNER_GROUP     \
  | FATTR4_WORD1_TIME_ACCESS_SET | FATTR4_WORD1_TIME_METADATA | FATTR4_WORD1_TIME_MODIFY_SET)
