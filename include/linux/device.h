@@ -28,7 +28,6 @@
 #include <linux/ioport.h>
 #include <linux/list.h>
 #include <linux/sched.h>
-#include <linux/driverfs_fs.h>
 #include <linux/kobject.h>
 
 #define DEVICE_NAME_SIZE	80
@@ -284,8 +283,6 @@ struct device {
 					 * persists for the right amount of time */
 
 	struct bus_type	* bus;		/* type of bus device is on */
-	struct driver_dir_entry	dir;
-
 	struct device_driver *driver;	/* which driver has allocated this
 					   device */
 	void		*driver_data;	/* data private to the driver */

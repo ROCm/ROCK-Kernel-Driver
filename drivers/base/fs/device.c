@@ -47,8 +47,3 @@ void fill_devpath(struct device * dev, char * path, int length)
 	pr_debug("%s: path = '%s'\n",__FUNCTION__,path);
 }
 
-void device_remove_symlink(struct driver_dir_entry * dir, const char * name)
-{
-	driverfs_remove_file(dir,name);
-}
-
