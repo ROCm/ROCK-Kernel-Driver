@@ -104,15 +104,22 @@ struct gendisk *
 get_gendisk(kdev_t dev)
 {
 	struct gendisk *gp = NULL;
-	int maj = major(dev);
+	int major = major(dev);
+	int minor = minor(dev);
 
 	read_lock(&gendisk_lock);
-	for (gp = gendisk_head; gp; gp = gp->next)
-		if (gp->major == maj)
-			break;
+	for (gp = gendisk_head; gp; gp = gp->next) {
+		if (gp->major != major)
+			continue;
+		if (gp->first_minor > minor)
+			continue;
+		if (gp->first_minor + (1<<gp->minor_shift) <= minor)
+			continue;
+		read_unlock(&gendisk_lock);
+		return gp;
+	}
 	read_unlock(&gendisk_lock);
-
-	return gp;
+	return NULL;
 }
 
 EXPORT_SYMBOL(get_gendisk);
@@ -158,8 +165,9 @@ static int show_partition(struct seq_file *part, void *v)
 		if ((n & minormask) && sgp->part[n].nr_sects == 0)
 			continue;
 		seq_printf(part, "%4d  %4d %10ld %s\n",
-			sgp->major, n, sgp->part[n].nr_sects << 1,
-			disk_name(sgp, n, buf));
+			sgp->major, n + sgp->first_minor,
+			sgp->part[n].nr_sects << 1,
+			disk_name(sgp, n + sgp->first_minor, buf));
 	}
 
 	return 0;

@@ -70,6 +70,7 @@ struct hd_struct {
 
 struct gendisk {
 	int major;			/* major number of driver */
+	int first_minor;
 	const char *major_name;		/* name of major driver */
 	int minor_shift;		/* number of times minor is shifted to
 					   get real minor */

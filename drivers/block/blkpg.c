@@ -86,7 +86,7 @@ int add_partition(struct block_device *bdev, struct blkpg_partition *p)
 	g = get_gendisk(dev);
 	if (!g)
 		return -ENXIO;
-	part = g->part + minor(dev);
+	part = g->part + minor(dev) - g->first_minor;
 
 	/* existing drive? */
 
@@ -135,7 +135,7 @@ int del_partition(struct block_device *bdev, struct blkpg_partition *p)
 	g = get_gendisk(dev);
 	if (!g)
 		return -ENXIO;
-	part = g->part + minor(dev);
+	part = g->part + minor(dev) - g->first_minor;
 
 	if (bdev != bdev->bd_contains)
 		return -EINVAL;

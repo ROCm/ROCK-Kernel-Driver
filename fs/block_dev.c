@@ -599,9 +599,10 @@ static int do_open(struct block_device *bdev, struct inode *inode, struct file *
 
 		bdev->bd_offset = 0;
 		if (g) {
-			bdev->bd_inode->i_size =
-				(loff_t) g->part[minor(dev)].nr_sects << 9;
-			bdev->bd_offset = g->part[minor(dev)].start_sect;
+			struct hd_struct *p;
+			p = g->part + minor(dev) - g->first_minor;
+			bdev->bd_inode->i_size = (loff_t) p->nr_sects << 9;
+			bdev->bd_offset = p->start_sect;
 		} else if (blk_size[major(dev)])
 			bdev->bd_inode->i_size =
 				(loff_t) blk_size[major(dev)][minor(dev)] << 10;
