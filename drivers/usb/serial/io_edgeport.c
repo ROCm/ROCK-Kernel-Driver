@@ -962,9 +962,8 @@ static void edge_bulk_out_cmd_callback (struct urb *urb, struct pt_regs *regs)
 		kfree(urb->transfer_buffer);
 	}
 
-	// Free the command urb
-	usb_unlink_urb (urb);
-	usb_free_urb   (urb);
+	/* Free the command urb */
+	usb_free_urb (urb);
 
 	if (port_paranoia_check (edge_port->port, __FUNCTION__)) {
 		return;

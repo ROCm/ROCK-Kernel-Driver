@@ -54,8 +54,8 @@ struct vlan_hdr {
 
 #define VLAN_VID_MASK	0xfff
 
-/* found in af_inet.c */
-extern int (*vlan_ioctl_hook)(unsigned long arg);
+/* found in socket.c */
+extern void vlan_ioctl_set(int (*hook)(unsigned long));
 
 #define VLAN_NAME "vlan"
 

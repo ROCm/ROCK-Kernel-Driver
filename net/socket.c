@@ -714,6 +714,11 @@ static ssize_t sock_writev(struct file *file, const struct iovec *vector,
 }
 
 
+/*
+ * Atomic setting of ioctl hooks to avoid race
+ * with module unload.
+ */
+
 static DECLARE_MUTEX(br_ioctl_mutex);
 static int (*br_ioctl_hook)(unsigned long arg) = NULL;
 
@@ -724,8 +729,15 @@ void brioctl_set(int (*hook)(unsigned long))
 	up(&br_ioctl_mutex);
 }
 
+static DECLARE_MUTEX(vlan_ioctl_mutex);
+static int (*vlan_ioctl_hook)(unsigned long arg);
 
-int (*vlan_ioctl_hook)(unsigned long arg);
+void vlan_ioctl_set(int (*hook)(unsigned long))
+{
+	down(&vlan_ioctl_mutex);
+	vlan_ioctl_hook = hook;
+	up(&vlan_ioctl_mutex);
+}
 
 #ifdef CONFIG_DLCI
 extern int dlci_ioctl(unsigned int, void *);
@@ -789,8 +801,10 @@ static int sock_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 			if (!vlan_ioctl_hook)
 				request_module("8021q");
 #endif
+			down(&vlan_ioctl_mutex);
 			if (vlan_ioctl_hook)
 				err = vlan_ioctl_hook(arg);
+			up(&vlan_ioctl_mutex);
 			break;
 		case SIOCGIFDIVERT:
 		case SIOCSIFDIVERT:

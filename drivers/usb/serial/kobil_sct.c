@@ -514,7 +514,9 @@ static int  kobil_ioctl(struct usb_serial_port *port, struct file *file,
 			dbg("%s - port %d Error in verify_area", __FUNCTION__, port->number);
 			return(result);
 		}
-		kernel_termios_to_user_termios((struct termios *)arg, &priv->internal_termios);
+		if (kernel_termios_to_user_termios((struct termios *)arg,
+						   &priv->internal_termios))
+			return -EFAULT;
 		return 0;
 
 	case TCSETS:   // 0x5402
@@ -527,7 +529,9 @@ static int  kobil_ioctl(struct usb_serial_port *port, struct file *file,
 			dbg("%s - port %d Error in verify_area", __FUNCTION__, port->number);
 			return result;
 		}
-		user_termios_to_kernel_termios( &priv->internal_termios, (struct termios *)arg);
+		if (user_termios_to_kernel_termios(&priv->internal_termios,
+						   (struct termios *)arg))
+			return -EFAULT;
 		
 		settings = (unsigned char *) kmalloc(50, GFP_KERNEL);  
 		if (! settings) {

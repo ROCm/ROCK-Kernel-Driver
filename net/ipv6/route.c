@@ -449,13 +449,12 @@ struct dst_entry * ip6_route_output(struct sock *sk, struct flowi *fl)
 	int strict;
 	int attempts = 3;
 
-	strict = ipv6_addr_type(fl->nl_u.ip6_u.daddr) & (IPV6_ADDR_MULTICAST|IPV6_ADDR_LINKLOCAL);
+	strict = ipv6_addr_type(fl->fl6_dst) & (IPV6_ADDR_MULTICAST|IPV6_ADDR_LINKLOCAL);
 
 relookup:
 	read_lock_bh(&rt6_lock);
 
-	fn = fib6_lookup(&ip6_routing_table, fl->nl_u.ip6_u.daddr,
-			 fl->nl_u.ip6_u.saddr);
+	fn = fib6_lookup(&ip6_routing_table, fl->fl6_dst, fl->fl6_src);
 
 restart:
 	rt = fn->leaf;
@@ -477,9 +476,8 @@ restart:
 	if (!rt->rt6i_nexthop && !(rt->rt6i_flags & RTF_NONEXTHOP)) {
 		read_unlock_bh(&rt6_lock);
 
-		rt = rt6_cow(rt, fl->nl_u.ip6_u.daddr,
-			     fl->nl_u.ip6_u.saddr);
-			
+		rt = rt6_cow(rt, fl->fl6_dst, fl->fl6_src);
+
 		if (rt->u.dst.error != -EEXIST || --attempts <= 0)
 			goto out2;
 
@@ -1585,15 +1583,11 @@ int inet6_rtm_getroute(struct sk_buff *in_skb, struct nlmsghdr* nlh, void *arg)
 	skb->mac.raw = skb->data;
 	skb_reserve(skb, MAX_HEADER + sizeof(struct ipv6hdr));
 
-	fl.proto = 0;
-	fl.nl_u.ip6_u.daddr = NULL;
-	fl.nl_u.ip6_u.saddr = NULL;
-	fl.uli_u.icmpt.type = 0;
-	fl.uli_u.icmpt.code = 0;
+	memset(&fl, 0, sizeof(fl));
 	if (rta[RTA_SRC-1])
-		fl.nl_u.ip6_u.saddr = (struct in6_addr*)RTA_DATA(rta[RTA_SRC-1]);
+		fl.fl6_src = (struct in6_addr*)RTA_DATA(rta[RTA_SRC-1]);
 	if (rta[RTA_DST-1])
-		fl.nl_u.ip6_u.daddr = (struct in6_addr*)RTA_DATA(rta[RTA_DST-1]);
+		fl.fl6_dst = (struct in6_addr*)RTA_DATA(rta[RTA_DST-1]);
 
 	if (rta[RTA_IIF-1])
 		memcpy(&iif, RTA_DATA(rta[RTA_IIF-1]), sizeof(int));
@@ -1617,8 +1611,7 @@ int inet6_rtm_getroute(struct sk_buff *in_skb, struct nlmsghdr* nlh, void *arg)
 
 	NETLINK_CB(skb).dst_pid = NETLINK_CB(in_skb).pid;
 	err = rt6_fill_node(skb, rt, 
-			    fl.nl_u.ip6_u.daddr,
-			    fl.nl_u.ip6_u.saddr,
+			    fl.fl6_dst, fl.fl6_src,
 			    iif,
 			    RTM_NEWROUTE, NETLINK_CB(in_skb).pid,
 			    nlh->nlmsg_seq, nlh);

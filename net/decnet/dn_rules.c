@@ -26,10 +26,12 @@
 #include <linux/netdevice.h>
 #include <linux/timer.h>
 #include <linux/spinlock.h>
+#include <linux/in_route.h>
 #include <asm/atomic.h>
 #include <asm/uaccess.h>
 #include <net/neighbour.h>
 #include <net/dst.h>
+#include <net/flow.h>
 #include <net/dn.h>
 #include <net/dn_fib.h>
 #include <net/dn_neigh.h>
@@ -48,6 +50,7 @@ struct dn_fib_rule
 	dn_address		r_srcmask;
 	dn_address		r_dst;
 	dn_address		r_dstmask;
+	dn_address		r_srcmap;
 	u8			r_flags;
 #ifdef CONFIG_DECNET_ROUTE_FWMARK
 	u32			r_fwmark;
@@ -60,7 +63,7 @@ struct dn_fib_rule
 static struct dn_fib_rule default_rule = {
 	.r_clntref =		ATOMIC_INIT(2),
 	.r_preference =		0x7fff,
-	.r_table =		DN_DEFAULT_TABLE,
+	.r_table =		RT_TABLE_MAIN,
 	.r_action =		RTN_UNICAST
 };
 
@@ -150,6 +153,8 @@ int dn_fib_rtm_newrule(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg)
 		memcpy(&new_r->r_src, RTA_DATA(rta[RTA_SRC-1]), 2);
 	if (rta[RTA_DST-1])
 		memcpy(&new_r->r_dst, RTA_DATA(rta[RTA_DST-1]), 2);
+	if (rta[RTA_GATEWAY-1])
+		memcpy(&new_r->r_srcmap, RTA_DATA(rta[RTA_GATEWAY-1]), 2);
 	new_r->r_src_len = rtm->rtm_src_len;
 	new_r->r_dst_len = rtm->rtm_dst_len;
 	new_r->r_srcmask = dnet_make_mask(rtm->rtm_src_len);
@@ -198,12 +203,12 @@ int dn_fib_rtm_newrule(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg)
 }
 
 
-int dn_fib_lookup(struct dn_fib_key *key, struct dn_fib_res *res)
+int dn_fib_lookup(const struct flowi *flp, struct dn_fib_res *res)
 {
 	struct dn_fib_rule *r, *policy;
 	struct dn_fib_table *tb;
-	dn_address saddr = key->src;
-	dn_address daddr = key->dst;
+	dn_address saddr = flp->fld_src;
+	dn_address daddr = flp->fld_dst;
 	int err;
 
 	read_lock(&dn_fib_rules_lock);
@@ -211,13 +216,14 @@ int dn_fib_lookup(struct dn_fib_key *key, struct dn_fib_res *res)
 		if (((saddr^r->r_src) & r->r_srcmask) ||
 		    ((daddr^r->r_dst) & r->r_dstmask) ||
 #ifdef CONFIG_DECNET_ROUTE_FWMARK
-		    (r->r_fwmark && r->r_fwmark != key->fwmark) ||
+		    (r->r_fwmark && r->r_fwmark != flp->fld_fwmark) ||
 #endif
-		    (r->r_ifindex && r->r_ifindex != key->iif))
+		    (r->r_ifindex && r->r_ifindex != flp->iif))
 			continue;
 
 		switch(r->r_action) {
 			case RTN_UNICAST:
+			case RTN_NAT:
 				policy = r;
 				break;
 			case RTN_UNREACHABLE:
@@ -234,7 +240,7 @@ int dn_fib_lookup(struct dn_fib_key *key, struct dn_fib_res *res)
 
 		if ((tb = dn_fib_get_table(r->r_table, 0)) == NULL)
 			continue;
-		err = tb->lookup(tb, key, res);
+		err = tb->lookup(tb, flp, res);
 		if (err == 0) {
 			res->r = policy;
 			if (policy)
@@ -250,6 +256,42 @@ int dn_fib_lookup(struct dn_fib_key *key, struct dn_fib_res *res)
 
 	read_unlock(&dn_fib_rules_lock);
 	return -ESRCH;
+}
+
+unsigned dnet_addr_type(__u16 addr)
+{
+	struct flowi fl = { .nl_u = { .dn_u = { .daddr = addr } } };
+	struct dn_fib_res res;
+	unsigned ret = RTN_UNICAST;
+	struct dn_fib_table *tb = dn_fib_tables[RT_TABLE_LOCAL];
+
+	res.r = NULL;
+
+	if (tb) {
+		if (!tb->lookup(tb, &fl, &res)) {
+			ret = res.type;
+			dn_fib_res_put(&res);
+		}
+	}
+	return ret;
+}
+
+__u16 dn_fib_rules_policy(__u16 saddr, struct dn_fib_res *res, unsigned *flags)
+{
+	struct dn_fib_rule *r = res->r;
+
+	if (r->r_action == RTN_NAT) {
+		int addrtype = dnet_addr_type(r->r_srcmap);
+
+		if (addrtype == RTN_NAT) {
+			saddr = (saddr&~r->r_srcmask)|r->r_srcmap;
+			*flags |= RTCF_SNAT;
+		} else if (addrtype == RTN_LOCAL || r->r_srcmap == 0) {
+			saddr = r->r_srcmap;
+			*flags |= RTCF_MASQ;
+		}
+	}
+	return saddr;
 }
 
 static void dn_fib_rules_detach(struct net_device *dev)
@@ -330,6 +372,8 @@ static int dn_fib_fill_rule(struct sk_buff *skb, struct dn_fib_rule *r, struct n
 		RTA_PUT(skb, RTA_IIF, IFNAMSIZ, &r->r_ifname);
 	if (r->r_preference)
 		RTA_PUT(skb, RTA_PRIORITY, 4, &r->r_preference);
+	if (r->r_srcmap)
+		RTA_PUT(skb, RTA_GATEWAY, 2, &r->r_srcmap);
 	nlh->nlmsg_len = skb->tail - b;
 	return skb->len;
 

@@ -355,6 +355,10 @@
  *      is closed and disconnected. Avoids crashes when writing to a 
  *      disconnected device. (Thanks to Greg KH).
  *
+ * 0.4.12  2003-04-11
+ *    - Fixed endpoint detection. The endpoints were numbered from 1 to n but
+ *      that assumption is not correct in all cases.
+ *
  * TODO
  *    - Performance
  *    - Select/poll methods
@@ -957,7 +961,7 @@ probe_scanner(struct usb_interface *intf,
 				info ("probe_scanner: ignoring additional bulk_in_ep:%d", ep_cnt);
 				continue;
 			}
-			have_bulk_in = ep_cnt;
+			have_bulk_in = endpoint->bEndpointAddress & USB_ENDPOINT_NUMBER_MASK;
 			dbg("probe_scanner: bulk_in_ep:%d", have_bulk_in);
 			continue;
 		}
@@ -968,7 +972,7 @@ probe_scanner(struct usb_interface *intf,
 				info ("probe_scanner: ignoring additional bulk_out_ep:%d", ep_cnt);
 				continue;
 			}
-			have_bulk_out = ep_cnt;
+			have_bulk_out = endpoint->bEndpointAddress & USB_ENDPOINT_NUMBER_MASK;
 			dbg("probe_scanner: bulk_out_ep:%d", have_bulk_out);
 			continue;
 		}
@@ -979,7 +983,7 @@ probe_scanner(struct usb_interface *intf,
 				info ("probe_scanner: ignoring additional intr_ep:%d", ep_cnt);
 				continue;
 			}
-			have_intr = ep_cnt;
+			have_intr = endpoint->bEndpointAddress & USB_ENDPOINT_NUMBER_MASK;
 			dbg("probe_scanner: intr_ep:%d", have_intr);
 			continue;
 		}

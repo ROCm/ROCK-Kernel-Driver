@@ -79,7 +79,6 @@ struct net_bridge_port
 
 struct net_bridge
 {
-	struct net_bridge		*next;
 	rwlock_t			lock;
 	struct net_bridge_port		*port_list;
 	struct net_device		dev;
@@ -114,10 +113,6 @@ struct net_bridge
 
 extern struct notifier_block br_device_notifier;
 extern unsigned char bridge_ula[6];
-
-/* br.c */
-extern void br_dec_use_count(void);
-extern void br_inc_use_count(void);
 
 /* br_device.c */
 extern void br_dev_setup(struct net_device *dev);
@@ -156,8 +151,9 @@ extern void br_flood_forward(struct net_bridge *br,
 		      int clone);
 
 /* br_if.c */
-extern int br_add_bridge(char *name);
-extern int br_del_bridge(char *name);
+extern int br_add_bridge(const char *name);
+extern int br_del_bridge(const char *name);
+extern void br_cleanup_bridges(void);
 extern int br_add_if(struct net_bridge *br,
 	      struct net_device *dev);
 extern int br_del_if(struct net_bridge *br,
@@ -172,7 +168,6 @@ extern int br_handle_frame_finish(struct sk_buff *skb);
 extern int br_handle_frame(struct sk_buff *skb);
 
 /* br_ioctl.c */
-extern void br_call_ioctl_atomic(void (*fn)(void));
 extern int br_ioctl(struct net_bridge *br,
 	     unsigned int cmd,
 	     unsigned long arg0,

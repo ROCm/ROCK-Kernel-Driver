@@ -1289,7 +1289,6 @@ static void init_gendisk (ide_hwif_t *hwif)
 
 	for (unit = 0; unit < MAX_DRIVES; ++unit) {
 		ide_drive_t * drive = &hwif->drives[unit];
-		char name[64];
 		ide_add_generic_settings(drive);
 		snprintf(drive->gendev.bus_id,BUS_ID_SIZE,"%u.%u",
 			 hwif->index,unit);
@@ -1298,13 +1297,12 @@ static void init_gendisk (ide_hwif_t *hwif)
 		drive->gendev.parent = &hwif->gendev;
 		drive->gendev.bus = &ide_bus_type;
 		drive->gendev.driver_data = drive;
-		sprintf (name, "ide/host%d/bus%d/target%d/lun%d",
-			(hwif->channel && hwif->mate) ?
-			hwif->mate->index : hwif->index,
-			hwif->channel, unit, drive->lun);
 		if (drive->present) {
 			device_register(&drive->gendev);
-			drive->de = devfs_mk_dir(name);
+			sprintf(drive->devfs_name, "ide/host%d/bus%d/target%d/lun%d",
+				(hwif->channel && hwif->mate) ?
+				hwif->mate->index : hwif->index,
+				hwif->channel, unit, drive->lun);
 		}
 	}
 	blk_register_region(MKDEV(hwif->major, 0), MAX_DRIVES << PARTN_BITS,

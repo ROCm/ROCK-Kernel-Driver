@@ -180,8 +180,8 @@ _decode_session4(struct sk_buff *skb, struct flowi *fl)
 			if (pskb_may_pull(skb, xprth + 4 - skb->data)) {
 				u16 *ports = (u16 *)xprth;
 
-				fl->uli_u.ports.sport = ports[0];
-				fl->uli_u.ports.dport = ports[1];
+				fl->fl_ip_sport = ports[0];
+				fl->fl_ip_dport = ports[1];
 			}
 			break;
 
@@ -189,7 +189,7 @@ _decode_session4(struct sk_buff *skb, struct flowi *fl)
 			if (pskb_may_pull(skb, xprth + 4 - skb->data)) {
 				u32 *ehdr = (u32 *)xprth;
 
-				fl->uli_u.spi = ehdr[0];
+				fl->fl_ipsec_spi = ehdr[0];
 			}
 			break;
 
@@ -197,7 +197,7 @@ _decode_session4(struct sk_buff *skb, struct flowi *fl)
 			if (pskb_may_pull(skb, xprth + 8 - skb->data)) {
 				u32 *ah_hdr = (u32*)xprth;
 
-				fl->uli_u.spi = ah_hdr[1];
+				fl->fl_ipsec_spi = ah_hdr[1];
 			}
 			break;
 
@@ -205,11 +205,11 @@ _decode_session4(struct sk_buff *skb, struct flowi *fl)
 			if (pskb_may_pull(skb, xprth + 4 - skb->data)) {
 				u16 *ipcomp_hdr = (u16 *)xprth;
 
-				fl->uli_u.spi = ntohl(ntohs(ipcomp_hdr[1]));
+				fl->fl_ipsec_spi = ntohl(ntohs(ipcomp_hdr[1]));
 			}
 			break;
 		default:
-			fl->uli_u.spi = 0;
+			fl->fl_ipsec_spi = 0;
 			break;
 		};
 	} else {

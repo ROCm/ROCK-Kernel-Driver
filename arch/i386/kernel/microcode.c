@@ -107,7 +107,6 @@ static unsigned int microcode_num;  /* number of chunks in microcode */
 static char *mc_applied;            /* array of applied microcode blocks */
 static unsigned int mc_fsize;       /* file size of /dev/cpu/microcode */
 
-/* we share file_operations between misc and devfs mechanisms */
 static struct file_operations microcode_fops = {
 	.owner		= THIS_MODULE,
 	.read		= microcode_read,
@@ -122,41 +121,33 @@ static struct miscdevice microcode_dev = {
 	.fops	= &microcode_fops,
 };
 
-static devfs_handle_t devfs_handle;
-
 static int __init microcode_init(void)
 {
 	int error;
 
 	error = misc_register(&microcode_dev);
 	if (error)
-		printk(KERN_WARNING 
-			"microcode: can't misc_register on minor=%d\n",
-			MICROCODE_MINOR);
+		goto fail;
+	error = devfs_mk_symlink("cpu/microcode", "../misc/microcode");
+	if (error)
+		goto fail_deregister;
 
-	devfs_handle = devfs_register(NULL, "cpu/microcode",
-			DEVFS_FL_DEFAULT, 0, 0, S_IFREG | S_IRUSR | S_IWUSR, 
-			&microcode_fops, NULL);
-	if (devfs_handle == NULL && error) {
-		printk(KERN_ERR "microcode: failed to devfs_register()\n");
-		misc_deregister(&microcode_dev);
-		goto out;
-	}
-	error = 0;
 	printk(KERN_INFO 
 		"IA-32 Microcode Update Driver: v%s <tigran@veritas.com>\n", 
 		MICROCODE_VERSION);
+	return 0;
 
-out:
+fail_deregister:
+	misc_deregister(&microcode_dev);
+fail:
 	return error;
 }
 
 static void __exit microcode_exit(void)
 {
 	misc_deregister(&microcode_dev);
-	devfs_unregister(devfs_handle);
-	if (mc_applied)
-		kfree(mc_applied);
+	devfs_remove("cpu/microcode");
+	kfree(mc_applied);
 	printk(KERN_INFO "IA-32 Microcode Update Driver v%s unregistered\n", 
 			MICROCODE_VERSION);
 }

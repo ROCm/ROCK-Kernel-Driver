@@ -74,7 +74,7 @@ static struct gendisk *z2ram_gendisk;
 static void do_z2_request(request_queue_t *q)
 {
 	struct request *req;
-	while ((req = elv_next_request) != NULL) {
+	while ((req = elv_next_request(q)) != NULL) {
 		unsigned long start = req->sector << 9;
 		unsigned long len  = req->current_nr_sectors << 9;
 

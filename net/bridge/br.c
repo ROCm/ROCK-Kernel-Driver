@@ -21,7 +21,6 @@
 #include <linux/etherdevice.h>
 #include <linux/init.h>
 #include <linux/if_bridge.h>
-#include <linux/brlock.h>
 #include <asm/uaccess.h>
 #include "br_private.h"
 
@@ -30,16 +29,6 @@
 #endif
 
 int (*br_should_route_hook) (struct sk_buff **pskb) = NULL;
-
-void br_dec_use_count()
-{
-	module_put(THIS_MODULE);
-}
-
-void br_inc_use_count()
-{
-	try_module_get(THIS_MODULE);
-}
 
 static int __init br_init(void)
 {
@@ -67,15 +56,17 @@ static void __exit br_deinit(void)
 	br_netfilter_fini();
 #endif
 	unregister_netdevice_notifier(&br_device_notifier);
-
 	brioctl_set(NULL);
 	br_handle_frame_hook = NULL;
 
 #if defined(CONFIG_ATM_LANE) || defined(CONFIG_ATM_LANE_MODULE)
-	/* FIX ME. move into hook structure with ref count */
 	br_fdb_get_hook = NULL;
 	br_fdb_put_hook = NULL;
 #endif
+
+	br_cleanup_bridges();
+
+	synchronize_net();
 }
 
 EXPORT_SYMBOL(br_should_route_hook);

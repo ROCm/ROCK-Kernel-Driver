@@ -81,9 +81,9 @@ static unsigned int ipmi_poll(struct file *file, poll_table *wait)
 	unsigned int             mask = 0;
 	unsigned long            flags;
 
-	spin_lock_irqsave(&priv->recv_msg_lock, flags);
-
 	poll_wait(file, &priv->wait, wait);
+
+	spin_lock_irqsave(&priv->recv_msg_lock, flags);
 
 	if (! list_empty(&(priv->recv_msgs)))
 		mask |= (POLLIN | POLLRDNORM);

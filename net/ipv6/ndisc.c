@@ -405,8 +405,8 @@ static inline void ndisc_flow_init(struct flowi *fl, u8 type,
 	fl->fl6_src		= saddr;
 	fl->fl6_dst	 	= daddr;
 	fl->proto	 	= IPPROTO_ICMPV6;
-	fl->uli_u.icmpt.type	= type;
-	fl->uli_u.icmpt.code	= 0;
+	fl->fl_icmp_type	= type;
+	fl->fl_icmp_code	= 0;
 }
 
 static void ndisc_send_na(struct net_device *dev, struct neighbour *neigh,

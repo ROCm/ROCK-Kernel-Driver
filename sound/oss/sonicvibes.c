@@ -2715,10 +2715,10 @@ static struct pci_device_id id_table[] __devinitdata = {
 MODULE_DEVICE_TABLE(pci, id_table);
 
 static struct pci_driver sv_driver = {
-       name: "sonicvibes",
-       id_table: id_table,
-       probe: sv_probe,
-       remove: sv_remove
+       .name		= "sonicvibes",
+       .id_table	= id_table,
+       .probe		= sv_probe,
+       .remove		= sv_remove,
 };
  
 static int __init init_sonicvibes(void)

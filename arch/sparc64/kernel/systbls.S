@@ -180,7 +180,7 @@ sunos_sys_table:
 	.word sys_listen, sunos_nosys, sunos_sigaction
 	.word sunos_sigblock, sunos_sigsetmask, sys_sigpause
 	.word sys32_sigstack, compat_sys_recvmsg, compat_sys_sendmsg
-	.word sunos_nosys, sys32_gettimeofday, sys32_getrusage
+	.word sunos_nosys, sys32_gettimeofday, compat_sys_getrusage
 	.word sunos_getsockopt, sunos_nosys, sunos_readv
 	.word sunos_writev, sys32_settimeofday, sys32_fchown16
 	.word sys_fchmod, sys32_recvfrom, sys32_setreuid16
@@ -189,8 +189,8 @@ sunos_sys_table:
 	.word sys32_sendto, sys_shutdown, sys_socketpair
 	.word sys_mkdir, sys_rmdir, sys32_utimes
 	.word sys32_sigreturn, sunos_nosys, sys_getpeername
-	.word sunos_gethostid, sunos_nosys, sys32_getrlimit
-	.word sys32_setrlimit, sunos_killpg, sunos_nosys
+	.word sunos_gethostid, sunos_nosys, compat_sys_getrlimit
+	.word compat_sys_setrlimit, sunos_killpg, sunos_nosys
 	.word sunos_nosys, sunos_nosys
 /*150*/	.word sys_getsockname, sunos_nosys, sunos_nosys
 	.word sys_poll, sunos_nosys, sunos_nosys

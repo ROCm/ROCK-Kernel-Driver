@@ -39,6 +39,7 @@ typedef unsigned int	__kernel_gid32_t;
 
 typedef unsigned int	__kernel_old_uid_t;
 typedef unsigned int	__kernel_old_gid_t;
+typedef unsigned long	__kernel_old_dev_t;
 
 typedef struct {
 	int	val[2];

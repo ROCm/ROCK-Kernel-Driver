@@ -35,6 +35,7 @@ static char *verstr = "20030413";
 #include <linux/spinlock.h>
 #include <linux/blk.h>
 #include <linux/moduleparam.h>
+#include <linux/devfs_fs_kernel.h>
 #include <asm/uaccess.h>
 #include <asm/dma.h>
 #include <asm/system.h>
@@ -116,6 +117,7 @@ static struct st_dev_parm {
 };
 #endif
 
+static char *st_formats[ST_NBR_MODES] ={"", "l", "m", "a"};
 
 /* The default definitions have been moved to st_options.h */
 
@@ -3863,11 +3865,12 @@ static int st_attach(Scsi_Device * SDp)
 	write_unlock(&st_dev_arr_lock);
 
 	for (mode = 0; mode < ST_NBR_MODES; ++mode) {
-	    char name[8];
-	    static char *formats[ST_NBR_MODES] ={"", "l", "m", "a"};
+	    char name[8], devfs_name[64];
 
 	    /*  Rewind entry  */
-	    sprintf (name, "mt%s", formats[mode]);
+	    sprintf(name, "mt%s", st_formats[mode]);
+	    sprintf(devfs_name, "%s/mt%s", SDp->devfs_name, st_formats[mode]);
+	    
 	    sprintf(tpnt->driverfs_dev_r[mode].bus_id, "%s:%s", 
 		    SDp->sdev_driverfs_dev.bus_id, name);
 	    sprintf(tpnt->driverfs_dev_r[mode].name, "%s%s", 
@@ -3880,13 +3883,14 @@ static int st_attach(Scsi_Device * SDp)
 	    device_create_file(&tpnt->driverfs_dev_r[mode], 
 			       &dev_attr_type);
 	    device_create_file(&tpnt->driverfs_dev_r[mode], &dev_attr_kdev);
-	    tpnt->de_r[mode] =
-		devfs_register (SDp->de, name, DEVFS_FL_DEFAULT,
+	    devfs_register(NULL, devfs_name, 0,
 				SCSI_TAPE_MAJOR, dev_num + (mode << 5),
 				S_IFCHR | S_IRUGO | S_IWUGO,
 				&st_fops, NULL);
 	    /*  No-rewind entry  */
-	    sprintf (name, "mt%sn", formats[mode]);
+	    sprintf (name, "mt%sn", st_formats[mode]);
+	    sprintf(devfs_name, "%s/mt%sn", SDp->devfs_name, st_formats[mode]);
+
 	    sprintf(tpnt->driverfs_dev_n[mode].bus_id, "%s:%s", 
 		    SDp->sdev_driverfs_dev.bus_id, name);
 	    sprintf(tpnt->driverfs_dev_n[mode].name, "%s%s", 
@@ -3900,13 +3904,12 @@ static int st_attach(Scsi_Device * SDp)
 			       &dev_attr_type);
 	    device_create_file(&tpnt->driverfs_dev_n[mode], 
 			       &dev_attr_kdev);
-	    tpnt->de_n[mode] =
-		devfs_register (SDp->de, name, DEVFS_FL_DEFAULT,
+	    devfs_register(NULL, devfs_name, 0,
 				SCSI_TAPE_MAJOR, dev_num + (mode << 5) + 128,
 				S_IFCHR | S_IRUGO | S_IWUGO,
 				&st_fops, NULL);
 	}
-	disk->number = devfs_register_tape(SDp->de);
+	disk->number = devfs_register_tape(SDp->devfs_name);
 
 	printk(KERN_WARNING
 	"Attached scsi tape %s at scsi%d, channel %d, id %d, lun %d\n",
@@ -3939,10 +3942,8 @@ static void st_detach(Scsi_Device * SDp)
 			write_unlock(&st_dev_arr_lock);
 			devfs_unregister_tape(tpnt->disk->number);
 			for (mode = 0; mode < ST_NBR_MODES; ++mode) {
-				devfs_unregister (tpnt->de_r[mode]);
-				tpnt->de_r[mode] = NULL;
-				devfs_unregister (tpnt->de_n[mode]);
-				tpnt->de_n[mode] = NULL;
+				devfs_remove("%s/mt%s", SDp->devfs_name, st_formats[mode]);
+				devfs_remove("%s/mt%sn", SDp->devfs_name, st_formats[mode]);
 				device_remove_file(&tpnt->driverfs_dev_r[mode],
 						   &dev_attr_type);
 				device_remove_file(&tpnt->driverfs_dev_r[mode],

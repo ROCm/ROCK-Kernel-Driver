@@ -136,7 +136,7 @@ static const char invalid_pcb_msg[] =
 #define INVALID_PCB_MSG(len) \
 	printk(invalid_pcb_msg, (len),filename,__FUNCTION__,__LINE__)
 
-static char search_msg[] __initdata = "%s: Looking for 3c505 adapter at address %#x...";
+static char search_msg[] __initdata = KERN_INFO "%s: Looking for 3c505 adapter at address %#x...";
 
 static char stilllooking_msg[] __initdata = "still looking...";
 
@@ -144,7 +144,7 @@ static char found_msg[] __initdata = "found.\n";
 
 static char notfound_msg[] __initdata = "not found (reason = %d)\n";
 
-static char couldnot_msg[] __initdata = "%s: 3c505 not found\n";
+static char couldnot_msg[] __initdata = KERN_INFO "%s: 3c505 not found\n";
 
 /*********************************************************
  *
@@ -194,7 +194,6 @@ static int addr_list[] __initdata = {0x300, 0x280, 0x310, 0};
 static unsigned long dma_mem_alloc(int size)
 {
 	int order = get_order(size);
-
 	return __get_dma_pages(GFP_KERNEL, order);
 }
 
@@ -350,7 +349,7 @@ static inline unsigned int send_pcb_slow(unsigned int base_addr, unsigned char b
 		if (inb_status(base_addr) & HCRE)
 			return FALSE;
 	}
-	printk("3c505: send_pcb_slow timed out\n");
+	printk(KERN_WARNING "3c505: send_pcb_slow timed out\n");
 	return TRUE;
 }
 
@@ -362,7 +361,7 @@ static inline unsigned int send_pcb_fast(unsigned int base_addr, unsigned char b
 		if (inb_status(base_addr) & HCRE)
 			return FALSE;
 	}
-	printk("3c505: send_pcb_fast timed out\n");
+	printk(KERN_WARNING "3c505: send_pcb_fast timed out\n");
 	return TRUE;
 }
 
@@ -415,7 +414,7 @@ static int send_pcb(struct net_device *dev, pcb_struct * pcb)
 	/* Avoid contention */
 	if (test_and_set_bit(1, &adapter->send_pcb_semaphore)) {
 		if (elp_debug >= 3) {
-			printk("%s: send_pcb entered while threaded\n", dev->name);
+			printk(KERN_DEBUG "%s: send_pcb entered while threaded\n", dev->name);
 		}
 		return FALSE;
 	}
@@ -609,9 +608,10 @@ static void receive_packet(struct net_device *dev, int len)
 	skb = dev_alloc_skb(rlen + 2);
 
 	if (!skb) {
-		printk("%s: memory squeeze, dropping packet\n", dev->name);
+		printk(KERN_WARNING "%s: memory squeeze, dropping packet\n", dev->name);
 		target = adapter->dma_buffer;
 		adapter->current_dma.target = NULL;
+		/* FIXME: stats */
 		return;
 	}
 
@@ -653,7 +653,7 @@ static void receive_packet(struct net_device *dev, int len)
 		adapter->rx_active--;
 
 	if (!adapter->busy)
-		printk("%s: receive_packet called, busy not set.\n", dev->name);
+		printk(KERN_WARNING "%s: receive_packet called, busy not set.\n", dev->name);
 }
 
 /******************************************************
@@ -878,7 +878,7 @@ static int elp_open(struct net_device *dev)
 	 * make sure we actually found the device
 	 */
 	if (adapter == NULL) {
-		printk("%s: Opening a non-existent physical device\n", dev->name);
+		printk(KERN_ERR "%s: Opening a non-existent physical device\n", dev->name);
 		return -EAGAIN;
 	}
 	/*
@@ -1415,9 +1415,6 @@ static int __init elp_sense(struct net_device *dev)
 			printk(notfound_msg, 1);
 		goto out;
 	}
-	/* Enable interrupts - we need timers! */
-	save_flags(flags);
-	sti();
 
 	/* Wait for a while; the adapter may still be booting up */
 	if (elp_debug > 0)
@@ -1426,9 +1423,8 @@ static int __init elp_sense(struct net_device *dev)
 	if (orig_HSR & DIR) {
 		/* If HCR.DIR is up, we pull it down. HSR.DIR should follow. */
 		outb(0, dev->base_addr + PORT_CONTROL);
-		timeout = jiffies + 30*HZ/100;
-		while (time_before(jiffies, timeout));
-		restore_flags(flags);
+		set_current_state(TASK_UNINTERRUPTIBLE);
+		schedule_timeout(30*HZ/100);
 		if (inb_status(addr) & DIR) {
 			if (elp_debug > 0)
 				printk(notfound_msg, 2);
@@ -1437,9 +1433,8 @@ static int __init elp_sense(struct net_device *dev)
 	} else {
 		/* If HCR.DIR is down, we pull it up. HSR.DIR should follow. */
 		outb(DIR, dev->base_addr + PORT_CONTROL);
-		timeout = jiffies + 30*HZ/100;
-		while (time_before(jiffies, timeout));
-		restore_flags(flags);
+		set_current_state(TASK_UNINTERRUPTIBLE);
+		schedule_timeout(30*HZ/100);
 		if (!(inb_status(addr) & DIR)) {
 			if (elp_debug > 0)
 				printk(notfound_msg, 3);

@@ -31,6 +31,7 @@ typedef unsigned int	       __kernel_uid32_t;
 typedef unsigned int	       __kernel_gid32_t;
 typedef unsigned short	       __kernel_old_uid_t;
 typedef unsigned short	       __kernel_old_gid_t;
+typedef unsigned short	       __kernel_old_dev_t;
 typedef int                    __kernel_clockid_t;
 typedef int                    __kernel_timer_t;
 

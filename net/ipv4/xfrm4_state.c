@@ -20,9 +20,9 @@ __xfrm4_init_tempsel(struct xfrm_state *x, struct flowi *fl,
 {
 	x->sel.daddr.a4 = fl->fl4_dst;
 	x->sel.saddr.a4 = fl->fl4_src;
-	x->sel.dport = fl->uli_u.ports.dport;
+	x->sel.dport = fl->fl_ip_dport;
 	x->sel.dport_mask = ~0;
-	x->sel.sport = fl->uli_u.ports.sport;
+	x->sel.sport = fl->fl_ip_sport;
 	x->sel.sport_mask = ~0;
 	x->sel.prefixlen_d = 32;
 	x->sel.prefixlen_s = 32;

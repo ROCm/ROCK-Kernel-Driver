@@ -345,7 +345,7 @@ static int intf_next_seq(ipmi_smi_t           intf,
 	unsigned int i;
 
 	for (i=intf->curr_seq;
-	     i!=(intf->curr_seq-1);
+	     (i+1)%IPMI_IPMB_NUM_SEQ != intf->curr_seq;
 	     i=(i+1)%IPMI_IPMB_NUM_SEQ)
 	{
 		if (! intf->seq_table[i].inuse)
@@ -907,8 +907,6 @@ static inline int i_ipmi_request(ipmi_user_t          user,
 				   probably, so abort. */
 				spin_unlock_irqrestore(&(intf->seq_lock),
 						       flags);
-				ipmi_free_recv_msg(recv_msg);
-				ipmi_free_smi_msg(smi_msg);
 				goto out_err;
 			}
 

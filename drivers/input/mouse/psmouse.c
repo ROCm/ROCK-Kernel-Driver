@@ -599,7 +599,7 @@ static void psmouse_disconnect(struct serio *serio)
 }
 
 /*
- * psmouse_connect() is a callback form the serio module when
+ * psmouse_connect() is a callback from the serio module when
  * an unhandled serio port is found.
  */
 

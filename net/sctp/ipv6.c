@@ -165,8 +165,8 @@ static int sctp_v6_xmit(struct sk_buff *skb, struct sctp_transport *transport,
 		fl.oif = transport->saddr.v6.sin6_scope_id;
 	else
 		fl.oif = sk->bound_dev_if;
-	fl.uli_u.ports.sport = inet_sk(sk)->sport;
-	fl.uli_u.ports.dport = transport->ipaddr.v6.sin6_port;
+	fl.fl_ip_sport = inet_sk(sk)->sport;
+	fl.fl_ip_dport = transport->ipaddr.v6.sin6_port;
 
 	if (np->opt && np->opt->srcrt) {
 		struct rt0_hdr *rt0 = (struct rt0_hdr *) np->opt->srcrt;

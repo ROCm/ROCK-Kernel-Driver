@@ -164,7 +164,7 @@ void hpsb_add_host(struct hpsb_host *host)
         spin_unlock_irqrestore(&hosts_lock, flags);
 
         highlevel_add_host(host);
-        host->driver->devctl(host, RESET_BUS, 0);
+        host->driver->devctl(host, RESET_BUS, LONG_RESET);
 }
 
 void hpsb_remove_host(struct hpsb_host *host)

@@ -45,6 +45,8 @@ typedef long long		__kernel_off64_t;
 typedef unsigned long long	__kernel_ino64_t;
 #endif
 
+typedef unsigned int		__kernel_old_dev_t;
+
 typedef struct {
 #if defined(__KERNEL__) || defined(__USE_ALL)
 	int	val[2];

@@ -1534,7 +1534,7 @@ static int keyspan_usa26_send_setup(struct usb_serial *serial,
 	this_urb->transfer_buffer_length = sizeof(msg);
 
 	this_urb->dev = serial->dev;
-	if ((err = usb_submit_urb(this_urb, GFP_KERNEL)) != 0) {
+	if ((err = usb_submit_urb(this_urb, GFP_ATOMIC)) != 0) {
 		dbg("%s - usb_submit_urb(setup) failed (%d)", __FUNCTION__, err);
 	}
 #if 0
@@ -1659,7 +1659,7 @@ static int keyspan_usa28_send_setup(struct usb_serial *serial,
 	this_urb->transfer_buffer_length = sizeof(msg);
 
 	this_urb->dev = serial->dev;
-	if ((err = usb_submit_urb(this_urb, GFP_KERNEL)) != 0) {
+	if ((err = usb_submit_urb(this_urb, GFP_ATOMIC)) != 0) {
 		dbg("%s - usb_submit_urb(setup) failed", __FUNCTION__);
 	}
 #if 0
@@ -1824,7 +1824,7 @@ static int keyspan_usa49_send_setup(struct usb_serial *serial,
 	this_urb->transfer_buffer_length = sizeof(msg);
 
 	this_urb->dev = serial->dev;
-	if ((err = usb_submit_urb(this_urb, GFP_KERNEL)) != 0) {
+	if ((err = usb_submit_urb(this_urb, GFP_ATOMIC)) != 0) {
 		dbg("%s - usb_submit_urb(setup) failed (%d)", __FUNCTION__, err);
 	}
 #if 0

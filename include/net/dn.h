@@ -171,17 +171,17 @@ struct dn_skb_cb {
 	int iif;
 };
 
-static __inline__ dn_address dn_eth2dn(unsigned char *ethaddr)
+static inline dn_address dn_eth2dn(unsigned char *ethaddr)
 {
 	return ethaddr[4] | (ethaddr[5] << 8);
 }
 
-static __inline__ dn_address dn_saddr2dn(struct sockaddr_dn *saddr)
+static inline dn_address dn_saddr2dn(struct sockaddr_dn *saddr)
 {
 	return *(dn_address *)saddr->sdn_nodeaddr;
 }
 
-static __inline__ void dn_dn2eth(unsigned char *ethaddr, dn_address addr)
+static inline void dn_dn2eth(unsigned char *ethaddr, dn_address addr)
 {
 	ethaddr[0] = 0xAA;
 	ethaddr[1] = 0x00;
@@ -190,6 +190,19 @@ static __inline__ void dn_dn2eth(unsigned char *ethaddr, dn_address addr)
 	ethaddr[4] = (unsigned char)(addr & 0xff);
 	ethaddr[5] = (unsigned char)(addr >> 8);
 }
+
+static inline void dn_sk_ports_copy(struct flowi *fl, struct dn_scp *scp)
+{
+	fl->uli_u.dnports.sport = scp->addrloc;
+	fl->uli_u.dnports.dport = scp->addrrem;
+	fl->uli_u.dnports.objnum = scp->addr.sdn_objnum;
+	if (fl->uli_u.dnports.objnum == 0) {
+		fl->uli_u.dnports.objnamel = scp->addr.sdn_objnamel;
+		memcpy(fl->uli_u.dnports.objname, scp->addr.sdn_objname, 16);
+	}
+}
+
+extern unsigned dn_mss_from_pmtu(struct net_device *dev, int mtu);
 
 #define DN_MENUVER_ACC 0x01
 #define DN_MENUVER_USR 0x02

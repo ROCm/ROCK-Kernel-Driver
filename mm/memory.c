@@ -292,13 +292,11 @@ skip_copy_pte_range:
 				 * and not mapped via rmap - duplicate the
 				 * mapping as is.
 				 */
-				if (!pfn_valid(pfn)) {
+				page = pfn_to_page(pfn);
+				if (!pfn_valid(pfn) || PageReserved(page)) {
 					set_pte(dst_pte, pte);
 					goto cont_copy_pte_range_noset;
 				}
-				page = pfn_to_page(pfn);
-				if (PageReserved(page))
-					goto cont_copy_pte_range;
 
 				/*
 				 * If it's a COW mapping, write protect it both
@@ -319,7 +317,6 @@ skip_copy_pte_range:
 				get_page(page);
 				dst->rss++;
 
-cont_copy_pte_range:
 				set_pte(dst_pte, pte);
 				pte_chain = page_add_rmap(page, dst_pte,
 							pte_chain);

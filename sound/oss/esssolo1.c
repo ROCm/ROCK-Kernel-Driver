@@ -2448,12 +2448,12 @@ static struct pci_device_id id_table[] __devinitdata = {
 MODULE_DEVICE_TABLE(pci, id_table);
 
 static struct pci_driver solo1_driver = {
-	name: "ESS Solo1",
-	id_table: id_table,
-	probe: solo1_probe,
-	remove: solo1_remove,
-	suspend: solo1_suspend,
-	resume: solo1_resume
+	.name		= "ESS Solo1",
+	.id_table	= id_table,
+	.probe		= solo1_probe,
+	.remove		= solo1_remove,
+	.suspend	= solo1_suspend,
+	.resume		= solo1_resume,
 };
 
 

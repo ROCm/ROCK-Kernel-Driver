@@ -36,6 +36,8 @@
 
 #include <mach_apic.h>
 
+#include "io_ports.h"
+
 void __init apic_intr_init(void)
 {
 #ifdef CONFIG_SMP
@@ -739,9 +741,9 @@ static unsigned int __init get_8254_timer_count(void)
 
 	spin_lock_irqsave(&i8253_lock, flags);
 
-	outb_p(0x00, 0x43);
-	count = inb_p(0x40);
-	count |= inb_p(0x40) << 8;
+	outb_p(0x00, PIT_MODE);
+	count = inb_p(PIT_CH0);
+	count |= inb_p(PIT_CH0) << 8;
 
 	spin_unlock_irqrestore(&i8253_lock, flags);
 

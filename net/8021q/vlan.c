@@ -49,6 +49,8 @@ static char vlan_copyright[] = "Ben Greear <greearb@candelatech.com>";
 static char vlan_buggyright[] = "David S. Miller <davem@redhat.com>";
 
 static int vlan_device_event(struct notifier_block *, unsigned long, void *);
+static int vlan_ioctl_handler(unsigned long);
+static int unregister_vlan_dev(struct net_device *, unsigned short );
 
 struct notifier_block vlan_notifier_block = {
 	.notifier_call = vlan_device_event,
@@ -100,9 +102,30 @@ static int __init vlan_proto_init(void)
 	/* Register us to receive netdevice events */
 	register_netdevice_notifier(&vlan_notifier_block);
 
-	vlan_ioctl_hook = vlan_ioctl_handler;
+	vlan_ioctl_set(vlan_ioctl_handler);
 
 	return 0;
+}
+
+/* Cleanup all vlan devices 
+ * Note: devices that have been registered that but not
+ * brought up will exist but have no module ref count.
+ */
+static void __exit vlan_cleanup_devices(void)
+{
+	struct net_device *dev, *nxt;
+
+	rtnl_lock();
+	for (dev = dev_base; dev; dev = nxt) {
+		nxt = dev->next;
+		if (dev->priv_flags & IFF_802_1Q_VLAN) {
+			unregister_vlan_dev(VLAN_DEV_INFO(dev)->real_dev,
+					    VLAN_DEV_INFO(dev)->vlan_id);
+
+			unregister_netdevice(dev);
+		}
+	}
+	rtnl_unlock();
 }
 
 /*
@@ -113,6 +136,14 @@ static void __exit vlan_cleanup_module(void)
 {
 	int i;
 
+	vlan_ioctl_set(NULL);
+
+	/* Un-register us from receiving netdevice events */
+	unregister_netdevice_notifier(&vlan_notifier_block);
+
+	dev_remove_pack(&vlan_packet_type);
+	vlan_cleanup_devices();
+
 	/* This table must be empty if there are no module
 	 * references left.
 	 */
@@ -120,13 +151,9 @@ static void __exit vlan_cleanup_module(void)
 		if (vlan_group_hash[i] != NULL)
 			BUG();
 	}
-
-	/* Un-register us from receiving netdevice events */
-	unregister_netdevice_notifier(&vlan_notifier_block);
-
-	dev_remove_pack(&vlan_packet_type);
 	vlan_proc_cleanup();
-	vlan_ioctl_hook = NULL;
+
+	synchronize_net();
 }
 
 module_init(vlan_proto_init);
@@ -262,8 +289,6 @@ static int unregister_vlan_dev(struct net_device *real_dev,
 
 				ret = 1;
 			}
-
-			module_put(THIS_MODULE);
 		}
 	}
 
@@ -504,12 +529,6 @@ static struct net_device *register_vlan_device(const char *eth_IF_name,
 	if (register_netdevice(new_dev))
 		goto out_free_newdev_priv;
 
-	/* NOTE:  We have a reference to the real device,
-	 * so hold on to the reference. May fail if we are being removed
-	 */
-	if (!try_module_get(THIS_MODULE))
-		goto out_free_unregister;
-
 	/* So, got the sucker initialized, now lets place
 	 * it into our local structure.
 	 */
@@ -523,7 +542,7 @@ static struct net_device *register_vlan_device(const char *eth_IF_name,
 	if (!grp) { /* need to add a new group */
 		grp = kmalloc(sizeof(struct vlan_group), GFP_KERNEL);
 		if (!grp)
-			goto out_free_put;
+			goto out_free_unregister;
 					
 		/* printk(KERN_ALERT "VLAN REGISTER:  Allocated new group.\n"); */
 		memset(grp, 0, sizeof(struct vlan_group));
@@ -551,8 +570,6 @@ static struct net_device *register_vlan_device(const char *eth_IF_name,
 	printk(VLAN_DBG "Allocated new device successfully, returning.\n");
 #endif
 	return new_dev;
-out_free_put:
-	module_put(THIS_MODULE);
 
 out_free_unregister:
 	unregister_netdev(new_dev);
@@ -658,7 +675,7 @@ out:
  *	o execute requested action or pass command to the device driver
  *   arg is really a void* to a vlan_ioctl_args structure.
  */
-int vlan_ioctl_handler(unsigned long arg)
+static int vlan_ioctl_handler(unsigned long arg)
 {
 	int err = 0;
 	struct vlan_ioctl_args args;

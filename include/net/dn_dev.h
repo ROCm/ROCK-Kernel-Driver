@@ -8,6 +8,7 @@ struct dn_ifaddr {
 	struct dn_ifaddr *ifa_next;
 	struct dn_dev    *ifa_dev;
 	dn_address       ifa_local;
+	dn_address       ifa_address;
 	unsigned char    ifa_flags;
 	unsigned char    ifa_scope;
 	char             ifa_label[IFNAMSIZ];
@@ -171,7 +172,10 @@ extern int dn_dev_set_default(struct net_device *dev, int force);
 extern struct net_device *dn_dev_get_default(void);
 extern int dn_dev_bind_default(dn_address *addr);
 
-static __inline__ int dn_dev_islocal(struct net_device *dev, dn_address addr)
+extern int register_dnaddr_notifier(struct notifier_block *nb);
+extern int unregister_dnaddr_notifier(struct notifier_block *nb);
+
+static inline int dn_dev_islocal(struct net_device *dev, dn_address addr)
 {
 	struct dn_dev *dn_db = dev->dn_ptr;
 	struct dn_ifaddr *ifa;

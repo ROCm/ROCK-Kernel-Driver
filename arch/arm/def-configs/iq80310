@@ -43,7 +43,7 @@ CONFIG_KMOD=y
 # CONFIG_ARCH_CAMELOT is not set
 # CONFIG_ARCH_FOOTBRIDGE is not set
 # CONFIG_ARCH_INTEGRATOR is not set
-CONFIG_ARCH_IOP310=y
+CONFIG_ARCH_IOP3XX=y
 # CONFIG_ARCH_L7200 is not set
 # CONFIG_ARCH_RPC is not set
 # CONFIG_ARCH_SA1100 is not set
@@ -70,17 +70,18 @@ CONFIG_ARCH_IOP310=y
 #
 
 #
-# IOP310 Implementation Options
+# IOP3xx Implementation Options
 #
 CONFIG_ARCH_IQ80310=y
+CONFIG_ARCH_IOP310=y
 
 #
-# IOP310 Chipset Features
+# IOP3xx Chipset Features
 #
-# CONFIG_IOP310_AAU is not set
-# CONFIG_IOP310_DMA is not set
-# CONFIG_IOP310_MU is not set
-# CONFIG_IOP310_PMON is not set
+# CONFIG_IOP3XX_AAU is not set
+# CONFIG_IOP3XX_DMA is not set
+# CONFIG_IOP3XX_MU is not set
+# CONFIG_IOP3XX_PMON is not set
 
 #
 # Intel PXA250/210 Implementations

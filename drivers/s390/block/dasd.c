@@ -157,9 +157,10 @@ dasd_state_new_to_known(struct dasd_device *device)
 
 #ifdef CONFIG_DEVFS_FS
 	/* Add a proc directory and the dasd device entry to devfs. */
- 	device->gdp->de = devfs_mk_dir("dasd/%04x",
+ 	sprintf(device->gdp->devfs_name, "dasd/%04x",
 		_ccw_device_get_device_number(device->cdev));
 #endif
+
 	if (device->ro_flag)
 		devfs_perm = S_IFBLK | S_IRUSR;
 	else

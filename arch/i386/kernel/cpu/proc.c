@@ -96,7 +96,7 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 #endif
 	
 	/* We use exception 16 if we have hardware math and we've either seen it or the CPU claims it is internal */
-	fpu_exception = c->hard_math && (ignore_irq13 || cpu_has_fpu);
+	fpu_exception = c->hard_math && (ignore_fpu_irq || cpu_has_fpu);
 	seq_printf(m, "fdiv_bug\t: %s\n"
 			"hlt_bug\t\t: %s\n"
 			"f00f_bug\t: %s\n"

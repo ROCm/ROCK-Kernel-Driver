@@ -42,7 +42,7 @@ typedef unsigned int	__kernel_gid32_t;
 
 /* Some bogus code depends on this; we don't care.  */
 typedef __kernel_uid_t __kernel_old_uid_t;
-
+typedef unsigned int	__kernel_old_dev_t;
 
 typedef struct {
 #if defined(__KERNEL__) || defined(__USE_ALL)

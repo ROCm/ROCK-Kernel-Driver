@@ -47,6 +47,7 @@ const char * osst_version = "0.99.0";
 #include <linux/vmalloc.h>
 #include <linux/version.h>
 #include <linux/blk.h>
+#include <linux/devfs_fs_kernel.h>
 #include <asm/uaccess.h>
 #include <asm/dma.h>
 #include <asm/system.h>
@@ -98,6 +99,8 @@ static struct osst_dev_parm {
        { "max_sg_segs",         &max_sg_segs         }
 };
 #endif
+
+static char *osst_formats[ST_NBR_MODES] ={"", "l", "m", "a"};
 
 /* Some default definitions have been moved to osst_options.h */
 #define OSST_BUFFER_SIZE (OSST_BUFFER_BLOCKS * ST_KILOBYTE)
@@ -5524,11 +5527,12 @@ static int osst_attach(Scsi_Device * SDp)
 	write_unlock(&os_scsi_tapes_lock);
 
 	for (mode = 0; mode < ST_NBR_MODES; ++mode) {
-		char name[8];
-		static char *formats[ST_NBR_MODES] ={"", "l", "m", "a"};
-		
+		char name[8], devfs_name[64];
+
 		/*  Rewind entry  */
-		sprintf (name, "ot%s", formats[mode]);
+		sprintf(name, "ot%s", osst_formats[mode]);
+		sprintf(devfs_name, "%s/ot%s", SDp->devfs_name, osst_formats[mode]);
+
 		sprintf(tpnt->driverfs_dev_r[mode].bus_id, "%s:%s", 
 				SDp->sdev_driverfs_dev.bus_id, name);
 		sprintf(tpnt->driverfs_dev_r[mode].name, "%s%s", 
@@ -5541,13 +5545,14 @@ static int osst_attach(Scsi_Device * SDp)
 		device_create_file(&tpnt->driverfs_dev_r[mode], 
 				&dev_attr_type);
 		device_create_file(&tpnt->driverfs_dev_r[mode], &dev_attr_kdev);
-		tpnt->de_r[mode] =
-			devfs_register (SDp->de, name, DEVFS_FL_DEFAULT,
+		devfs_register(NULL, devfs_name, 0,
 					OSST_MAJOR, dev_num + (mode << 5),
 					S_IFCHR | S_IRUGO | S_IWUGO,
 					&osst_fops, NULL);
 		/*  No-rewind entry  */
-		sprintf (name, "ot%sn", formats[mode]);
+		sprintf (name, "ot%sn", osst_formats[mode]);
+		sprintf(devfs_name, "%s/ot%sn", SDp->devfs_name, osst_formats[mode]);
+
 		sprintf(tpnt->driverfs_dev_n[mode].bus_id, "%s:%s", 
 				SDp->sdev_driverfs_dev.bus_id, name);
 		sprintf(tpnt->driverfs_dev_n[mode].name, "%s%s", 
@@ -5561,13 +5566,12 @@ static int osst_attach(Scsi_Device * SDp)
 				&dev_attr_type);
 		device_create_file(&tpnt->driverfs_dev_n[mode], 
 				&dev_attr_kdev);
-		tpnt->de_n[mode] =
-			devfs_register (SDp->de, name, DEVFS_FL_DEFAULT,
+		devfs_register(NULL, devfs_name, 0,
 					OSST_MAJOR, dev_num + (mode << 5) + 128,
 					S_IFCHR | S_IRUGO | S_IWUGO,
 					&osst_fops, NULL);
 	}
-	drive->number = devfs_register_tape (SDp->de);
+	drive->number = devfs_register_tape(SDp->devfs_name);
 
 	printk(KERN_INFO
 		"osst :I: Attached OnStream %.5s tape at scsi%d, channel %d, id %d, lun %d as %s\n",
@@ -5595,10 +5599,8 @@ static void osst_detach(Scsi_Device * SDp)
 	if((tpnt = os_scsi_tapes[i]) && (tpnt->device == SDp)) {
 		tpnt->device = NULL;
 		for (mode = 0; mode < ST_NBR_MODES; ++mode) {
-			devfs_unregister (tpnt->de_r[mode]);
-			tpnt->de_r[mode] = NULL;
-			devfs_unregister (tpnt->de_n[mode]);
-			tpnt->de_n[mode] = NULL;
+			devfs_remove("%s/ot%s", SDp->devfs_name, osst_formats[mode]);
+			devfs_remove("%s/ot%sn", SDp->devfs_name, osst_formats[mode]);
 		}
 		devfs_unregister_tape(tpnt->drive->number);
 		put_disk(tpnt->drive);

@@ -48,6 +48,7 @@
 
 #include "ieee1394.h"
 #include "ieee1394_types.h"
+#include "ieee1394_hotplug.h"
 #include "hosts.h"
 #include "ieee1394_core.h"
 #include "highlevel.h"
@@ -1247,6 +1248,31 @@ static struct file_operations video1394_fops=
 	.release =	video1394_release
 };
 
+/*** HOTPLUG STUFF **********************************************************/
+/*
+ * Export information about protocols/devices supported by this driver.
+ */
+static struct ieee1394_device_id video1394_id_table[] = {
+	{
+		.match_flags	= IEEE1394_MATCH_SPECIFIER_ID | IEEE1394_MATCH_VERSION,
+		.specifier_id	= CAMERA_UNIT_SPEC_ID_ENTRY & 0xffffff,
+		.version	= CAMERA_SW_VERSION_ENTRY & 0xffffff
+	},
+	{ }
+};
+
+MODULE_DEVICE_TABLE(ieee1394, video1394_id_table);
+
+static struct hpsb_protocol_driver video1394_driver = {
+	.name		= "1394 Digital Camera Driver",
+	.id_table	= video1394_id_table,
+	.driver		= {
+		.name	= VIDEO1394_DRIVER_NAME,
+		.bus	= &ieee1394_bus_type,
+	},
+};
+
+
 static int video1394_init(struct ti_ohci *ohci)
 {
 	struct video_card *video;
@@ -1467,6 +1493,8 @@ static void __exit video1394_exit_module (void)
 		PRINT_G(KERN_INFO, "Error unregistering ioctl32 translations");
 #endif
 
+	hpsb_unregister_protocol(&video1394_driver);
+
 	hpsb_unregister_highlevel (hl_handle);
 
 	devfs_unregister(devfs_handle);
@@ -1495,6 +1523,8 @@ static int __init video1394_init_module (void)
 		ieee1394_unregister_chardev(IEEE1394_MINOR_BLOCK_VIDEO1394);
 		return -ENOMEM;
 	}
+
+	hpsb_register_protocol(&video1394_driver);
 
 #ifdef CONFIG_COMPAT
 	/* First the compatible ones */

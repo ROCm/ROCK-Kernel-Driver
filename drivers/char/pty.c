@@ -305,7 +305,6 @@ static void pty_flush_buffer(struct tty_struct *tty)
 	}
 }
 
-extern void tty_register_devfs (struct tty_driver *driver, unsigned int flags, unsigned minor);
 static int pty_open(struct tty_struct *tty, struct file * filp)
 {
 	int	retval;
@@ -333,13 +332,6 @@ static int pty_open(struct tty_struct *tty, struct file * filp)
 	wake_up_interruptible(&pty->open_wait);
 	set_bit(TTY_THROTTLED, &tty->flags);
 	set_bit(TTY_DO_WRITE_WAKEUP, &tty->flags);
-
-	/*  Register a slave for the master  */
-	if (tty->driver.major == PTY_MASTER_MAJOR)
-		tty_register_devfs(&tty->link->driver,
-				   DEVFS_FL_CURRENT_OWNER | DEVFS_FL_WAIT,
-				   tty->link->driver.minor_start +
-				   minor(tty->device)-tty->driver.minor_start);
 	retval = 0;
 out:
 	return retval;

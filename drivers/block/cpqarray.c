@@ -400,7 +400,6 @@ static int __init cpqarray_init(void)
 			sprintf(disk->disk_name, "ida/c%dd%d", i, j);
 			disk->major = COMPAQ_SMART2_MAJOR + i;
 			disk->first_minor = j<<NWD_SHIFT;
-			disk->flags = GENHD_FL_DEVFS;
 			disk->fops = &ida_fops; 
 			if (!drv->nr_blks)
 				continue;
@@ -1678,10 +1677,9 @@ static void getgeometry(int ctlr)
                 			return;
 
 				}
-				if (!disk->de) {
-					disk->de = devfs_mk_dir("ida/c%dd%d",
-							ctlr, log_unit);
-				}
+
+				sprintf(disk->devfs_name, "ida/c%dd%d", ctlr, log_unit);
+
 				info_p->phys_drives =
 				    sense_config_buf->ctlr_phys_drv;
 				info_p->drv_assign_map

@@ -283,6 +283,14 @@ config MTD_IQ80310
 	  IQ80310 evaluation board. If you have one of these boards and would 
 	  like to use the flash chips on it, say 'Y'.
 
+config MTD_IQ80321
+	tristate "CFI Flash device mapped on the XScale IQ80321 board"
+	depends on ARM && MTD_CFI && ARCH_IQ80321
+	help
+	  This enables access routines for the flash chips on the Intel XScale
+	  IQ80321 evaluation board. If you have one of these boards and would
+	  like to use the flash chips on it, say 'Y'.
+
 config MTD_EPXA10DB
 	tristate "CFI Flash device mapped on Epxa10db"
 	depends on ARM && MTD_CFI && MTD_PARTITIONS && ARCH_CAMELOT

@@ -751,7 +751,7 @@ static void ipmi_register_watchdog(int ipmi_intf)
 {
 	int rv = -EBUSY;
 
-	down_read(&register_sem);
+	down_write(&register_sem);
 	if (watchdog_user)
 		goto out;
 
@@ -917,7 +917,7 @@ static int __init ipmi_wdog_init(void)
 	} else if (strcmp(preaction, "pre_int") == 0) {
 		preaction_val = WDOG_PRETIMEOUT_MSG_INT;
 	} else {
-		action_val = WDOG_PRETIMEOUT_NONE;
+		preaction_val = WDOG_PRETIMEOUT_NONE;
 		printk("ipmi_watchdog: Unknown preaction '%s', defaulting to"
 		       " none\n", preaction);
 	}
@@ -929,7 +929,7 @@ static int __init ipmi_wdog_init(void)
 	} else if (strcmp(preop, "preop_give_data") == 0) {
 		preop_val = WDOG_PREOP_GIVE_DATA;
 	} else {
-		action_val = WDOG_PREOP_NONE;
+		preop_val = WDOG_PREOP_NONE;
 		printk("ipmi_watchdog: Unknown preop '%s', defaulting to"
 		       " none\n", preop);
 	}

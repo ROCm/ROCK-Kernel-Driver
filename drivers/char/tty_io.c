@@ -1355,46 +1355,38 @@ retry_open:
 
 	if (IS_PTMX_DEV(device)) {
 #ifdef CONFIG_UNIX98_PTYS
-
 		/* find a free pty. */
 		int major, minor;
 		struct tty_driver *driver;
 
 		/* find a device that is not in use. */
 		retval = -1;
-		for ( major = 0 ; major < UNIX98_NR_MAJORS ; major++ ) {
+		for (major = 0 ; major < UNIX98_NR_MAJORS ; major++) {
 			driver = &ptm_driver[major];
-			for (minor = driver->minor_start ;
-			     minor < driver->minor_start + driver->num ;
+			for (minor = driver->minor_start;
+			     minor < driver->minor_start + driver->num;
 			     minor++) {
 				device = mk_kdev(driver->major, minor);
-				if (!init_dev(device, &tty)) goto ptmx_found; /* ok! */
+				if (!init_dev(device, &tty))
+					goto ptmx_found; /* ok! */
 			}
 		}
 		return -EIO; /* no free ptys */
+
 	ptmx_found:
 		set_bit(TTY_PTY_LOCK, &tty->flags); /* LOCK THE SLAVE */
 		minor -= driver->minor_start;
 		devpts_pty_new(driver->other->name_base + minor, MKDEV(driver->other->major, minor + driver->other->minor_start));
-		tty_register_device(&pts_driver[major],
-				   pts_driver[major].minor_start + minor);
 		noctty = 1;
-		goto init_dev_done;
-
-#else   /* CONFIG_UNIX_98_PTYS */
-
+#else
 		return -ENODEV;
-
 #endif  /* CONFIG_UNIX_98_PTYS */
+	} else {
+		retval = init_dev(device, &tty);
+		if (retval)
+			return retval;
 	}
 
-	retval = init_dev(device, &tty);
-	if (retval)
-		return retval;
-
-#ifdef CONFIG_UNIX98_PTYS
-init_dev_done:
-#endif
 	filp->private_data = tty;
 	file_move(filp, &tty->tty_files);
 	check_tty_count(tty, "tty_open");
@@ -2052,51 +2044,48 @@ static void tty_default_put_char(struct tty_struct *tty, unsigned char ch)
 	tty->driver.write(tty, 0, &ch, 1);
 }
 
-void tty_register_devfs (struct tty_driver *driver, unsigned int flags, unsigned minor)
-{
 #ifdef CONFIG_DEVFS_FS
+static void tty_register_devfs(struct tty_driver *driver, unsigned minor)
+{
 	umode_t mode = S_IFCHR | S_IRUSR | S_IWUSR;
-	kdev_t device = mk_kdev(driver->major, minor);
+	kdev_t dev = mk_kdev(driver->major, minor);
 	int idx = minor - driver->minor_start;
 	char buf[32];
 
-	if (IS_TTY_DEV(device) || IS_PTMX_DEV(device)) 
-		mode |= S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH;
-	else {
-		if (driver->major == PTY_MASTER_MAJOR)
-			mode |= S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH;
-	}
-	if ( (minor <  driver->minor_start) || 
-	     (minor >= driver->minor_start + driver->num) ) {
+	if ((minor < driver->minor_start) || 
+	    (minor >= driver->minor_start + driver->num)) {
 		printk(KERN_ERR "Attempt to register invalid minor number "
 		       "with devfs (%d:%d).\n", (int)driver->major,(int)minor);
 		return;
 	}
-#  ifdef CONFIG_UNIX98_PTYS
-	if ( (driver->major >= UNIX98_PTY_SLAVE_MAJOR) &&
-	     (driver->major < UNIX98_PTY_SLAVE_MAJOR + UNIX98_NR_MAJORS) )
-		flags |= DEVFS_FL_CURRENT_OWNER;
-#  endif
+
+	if (IS_TTY_DEV(dev) || IS_PTMX_DEV(dev)) 
+		mode |= S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH;
+
 	sprintf(buf, driver->name, idx + driver->name_base);
-	devfs_register (NULL, buf, flags | DEVFS_FL_DEFAULT,
-			driver->major, minor, mode, &tty_fops, NULL);
-#endif /* CONFIG_DEVFS_FS */
+	devfs_register(NULL, buf, 0, driver->major, minor, mode,
+		       &tty_fops, NULL);
 }
 
-void tty_unregister_devfs (struct tty_driver *driver, unsigned minor)
+static void tty_unregister_devfs(struct tty_driver *driver, unsigned minor)
 {
-	devfs_remove(driver->name, minor-driver->minor_start+driver->name_base);
+	devfs_remove(driver->name,
+		     minor - driver->minor_start + driver->name_base);
 }
+#else
+# define tty_register_devfs(driver, minor)	do { } while (0)
+# define tty_unregister_devfs(driver, minor)	do { } while (0)
+#endif /* CONFIG_DEVFS_FS */
 
 /*
  * Register a tty device described by <driver>, with minor number <minor>.
  */
-void tty_register_device (struct tty_driver *driver, unsigned minor)
+void tty_register_device(struct tty_driver *driver, unsigned minor)
 {
-	tty_register_devfs(driver, 0, minor);
+	tty_register_devfs(driver, minor);
 }
 
-void tty_unregister_device (struct tty_driver *driver, unsigned minor)
+void tty_unregister_device(struct tty_driver *driver, unsigned minor)
 {
 	tty_unregister_devfs(driver, minor);
 }
