@@ -128,10 +128,7 @@ int i830_irq_emit( struct inode *inode, struct file *filp, unsigned int cmd,
 	drm_i830_irq_emit_t emit;
 	int result;
 
-   	if(!_DRM_LOCK_IS_HELD(dev->lock.hw_lock->lock)) {
-		DRM_ERROR("i830_irq_emit called without lock held\n");
-		return -EINVAL;
-	}
+	LOCK_TEST_WITH_RETURN(dev, filp);
 
 	if ( !dev_priv ) {
 		DRM_ERROR( "%s called with no initialization\n", __FUNCTION__ );

@@ -1029,10 +1029,7 @@ int i810_flush_ioctl(struct inode *inode, struct file *filp,
    	drm_file_t	  *priv	  = filp->private_data;
    	drm_device_t	  *dev	  = priv->dev;
 
-	if (!_DRM_LOCK_IS_HELD(dev->lock.hw_lock->lock)) {
-		DRM_ERROR("i810_flush_ioctl called without lock held\n");
-		return -EINVAL;
-	}
+	LOCK_TEST_WITH_RETURN(dev, filp);
 
    	i810_flush_queue(dev);
    	return 0;
@@ -1054,10 +1051,7 @@ int i810_dma_vertex(struct inode *inode, struct file *filp,
 	if (copy_from_user(&vertex, (drm_i810_vertex_t __user *)arg, sizeof(vertex)))
 		return -EFAULT;
 
-	if (!_DRM_LOCK_IS_HELD(dev->lock.hw_lock->lock)) {
-		DRM_ERROR("i810_dma_vertex called without lock held\n");
-		return -EINVAL;
-	}
+	LOCK_TEST_WITH_RETURN(dev, filp);
 
 	DRM_DEBUG("i810 dma vertex, idx %d used %d discard %d\n",
 		  vertex.idx, vertex.used, vertex.discard);
@@ -1089,10 +1083,7 @@ int i810_clear_bufs(struct inode *inode, struct file *filp,
    	if (copy_from_user(&clear, (drm_i810_clear_t __user *)arg, sizeof(clear)))
 		return -EFAULT;
 
-	if (!_DRM_LOCK_IS_HELD(dev->lock.hw_lock->lock)) {
-		DRM_ERROR("i810_clear_bufs called without lock held\n");
-		return -EINVAL;
-	}
+	LOCK_TEST_WITH_RETURN(dev, filp);
 
  	/* GH: Someone's doing nasty things... */
  	if (!dev->dev_private) {
@@ -1113,10 +1104,7 @@ int i810_swap_bufs(struct inode *inode, struct file *filp,
 
 	DRM_DEBUG("i810_swap_bufs\n");
 
-	if (!_DRM_LOCK_IS_HELD(dev->lock.hw_lock->lock)) {
-		DRM_ERROR("i810_swap_buf called without lock held\n");
-		return -EINVAL;
-	}
+	LOCK_TEST_WITH_RETURN(dev, filp);
 
 	i810_dma_dispatch_swap( dev );
    	return 0;
@@ -1151,10 +1139,7 @@ int i810_getbuf(struct inode *inode, struct file *filp, unsigned int cmd,
    	if (copy_from_user(&d, (drm_i810_dma_t __user *)arg, sizeof(d)))
 		return -EFAULT;
 
-	if (!_DRM_LOCK_IS_HELD(dev->lock.hw_lock->lock)) {
-		DRM_ERROR("i810_dma called without lock held\n");
-		return -EINVAL;
-	}
+	LOCK_TEST_WITH_RETURN(dev, filp);
 
 	d.granted = 0;
 
@@ -1264,11 +1249,7 @@ int i810_dma_mc(struct inode *inode, struct file *filp,
 	if (copy_from_user(&mc, (drm_i810_mc_t __user *)arg, sizeof(mc)))
 		return -EFAULT;
 
-
-	if (!_DRM_LOCK_IS_HELD(dev->lock.hw_lock->lock)) {
-		DRM_ERROR("i810_dma_mc called without lock held\n");
-		return -EINVAL;
-	}
+	LOCK_TEST_WITH_RETURN(dev, filp);
 
 	if (mc.idx >= dma->buf_count || mc.idx < 0)
 		return -EINVAL;
@@ -1316,10 +1297,8 @@ int i810_fstatus(struct inode *inode, struct file *filp,
 	drm_device_t *dev = priv->dev;
 	drm_i810_private_t *dev_priv = (drm_i810_private_t *)dev->dev_private;
 
-	if (!_DRM_LOCK_IS_HELD(dev->lock.hw_lock->lock)) {
-		DRM_ERROR("i810_fstatus called without lock held\n");
-		return -EINVAL;
-	}
+	LOCK_TEST_WITH_RETURN(dev, filp);
+
 	return I810_READ(0x30008);
 }
 
@@ -1330,10 +1309,7 @@ int i810_ov0_flip(struct inode *inode, struct file *filp,
 	drm_device_t *dev = priv->dev;
 	drm_i810_private_t *dev_priv = (drm_i810_private_t *)dev->dev_private;
 
-	if (!_DRM_LOCK_IS_HELD(dev->lock.hw_lock->lock)) {
-		DRM_ERROR("i810_ov0_flip called without lock held\n");
-		return -EINVAL;
-	}
+	LOCK_TEST_WITH_RETURN(dev, filp);
 
 	//Tell the overlay to update
 	I810_WRITE(0x30000,dev_priv->overlay_physical | 0x80000000);
@@ -1375,10 +1351,7 @@ int i810_flip_bufs(struct inode *inode, struct file *filp,
 
 	DRM_DEBUG("%s\n", __FUNCTION__);
 
-	if (!_DRM_LOCK_IS_HELD(dev->lock.hw_lock->lock)) {
-		DRM_ERROR("i810_flip_buf called without lock held\n");
-		return -EINVAL;
-	}
+	LOCK_TEST_WITH_RETURN(dev, filp);
 
 	if (!dev_priv->page_flipping) 
 		i810_do_init_pageflip( dev );

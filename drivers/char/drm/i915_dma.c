@@ -544,10 +544,7 @@ int i915_flush_ioctl(DRM_IOCTL_ARGS)
 {
 	DRM_DEVICE;
 
-	if (!_DRM_LOCK_IS_HELD(dev->lock.hw_lock->lock)) {
-		DRM_ERROR("i915_flush_ioctl called without lock held\n");
-		return DRM_ERR(EINVAL);
-	}
+	LOCK_TEST_WITH_RETURN(dev, filp);
 
 	return i915_quiescent(dev);
 }
@@ -573,10 +570,7 @@ int i915_batchbuffer(DRM_IOCTL_ARGS)
 	DRM_DEBUG("i915 batchbuffer, start %x used %d cliprects %d\n",
 		  batch.start, batch.used, batch.num_cliprects);
 
-	if (!_DRM_LOCK_IS_HELD(dev->lock.hw_lock->lock)) {
-		DRM_ERROR("i915_batchbuffer called without lock held\n");
-		return DRM_ERR(EINVAL);
-	}
+	LOCK_TEST_WITH_RETURN(dev, filp);
 
 	if (batch.num_cliprects && DRM_VERIFYAREA_READ(batch.cliprects,
 						       batch.num_cliprects *
@@ -605,10 +599,7 @@ int i915_cmdbuffer(DRM_IOCTL_ARGS)
 	DRM_DEBUG("i915 cmdbuffer, buf %p sz %d cliprects %d\n",
 		  cmdbuf.buf, cmdbuf.sz, cmdbuf.num_cliprects);
 
-	if (!_DRM_LOCK_IS_HELD(dev->lock.hw_lock->lock)) {
-		DRM_ERROR("i915_cmdbuffer called without lock held\n");
-		return DRM_ERR(EINVAL);
-	}
+	LOCK_TEST_WITH_RETURN(dev, filp);
 
 	if (cmdbuf.num_cliprects &&
 	    DRM_VERIFYAREA_READ(cmdbuf.cliprects,
@@ -644,10 +635,8 @@ int i915_flip_bufs(DRM_IOCTL_ARGS)
 	DRM_DEVICE;
 
 	DRM_DEBUG("%s\n", __FUNCTION__);
-	if (!_DRM_LOCK_IS_HELD(dev->lock.hw_lock->lock)) {
-		DRM_ERROR("i915_flip_buf called without lock held\n");
-		return DRM_ERR(EINVAL);
-	}
+
+	LOCK_TEST_WITH_RETURN(dev, filp);
 
 	return i915_dispatch_flip(dev);
 }
