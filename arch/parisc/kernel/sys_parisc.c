@@ -30,8 +30,6 @@ static unsigned long get_unshared_area(unsigned long addr, unsigned long len)
 {
 	struct vm_area_struct *vma;
 
-	if (!addr)
-		addr = TASK_UNMAPPED_BASE;
 	addr = PAGE_ALIGN(addr);
 
 	for (vma = find_vma(current->mm, addr); ; vma = vma->vm_next) {
@@ -46,17 +44,38 @@ static unsigned long get_unshared_area(unsigned long addr, unsigned long len)
 
 #define DCACHE_ALIGN(addr) (((addr) + (SHMLBA - 1)) &~ (SHMLBA - 1))
 
-static unsigned long get_shared_area(struct inode *inode, unsigned long addr,
-		unsigned long len, unsigned long pgoff)
+/*
+ * We need to know the offset to use.  Old scheme was to look for
+ * existing mapping and use the same offset.  New scheme is to use the
+ * address of the kernel data structure as the seed for the offset.
+ * We'll see how that works...
+ */
+#if 0
+static int get_offset(struct address_space *mapping)
 {
-	struct vm_area_struct *vma, *first_vma;
-	int offset;
+	struct vm_area_struct *vma = list_entry(mapping->i_mmap_shared.next,
+			struct vm_area_struct, shared);
+	return (vma->vm_start + ((pgoff - vma->vm_pgoff) << PAGE_SHIFT)) &
+		(SHMLBA - 1);
+}
+#else
+/* The mapping is cacheline aligned, so there's no information in the bottom
+ * few bits of the address.  We're looking for 10 bits (4MB / 4k), so let's
+ * drop the bottom 8 bits and use bits 8-17.  
+ */
+static int get_offset(struct address_space *mapping)
+{
+	int offset = (int) mapping << (PAGE_SHIFT - 8);
+	return offset & 0x3FF000;
+}
+#endif
 
-	first_vma = list_entry(inode->i_mapping->i_mmap_shared.next, struct vm_area_struct, shared);
-	offset = (first_vma->vm_start + ((pgoff - first_vma->vm_pgoff) << PAGE_SHIFT)) & (SHMLBA - 1);
+static unsigned long get_shared_area(struct address_space *mapping,
+		unsigned long addr, unsigned long len, unsigned long pgoff)
+{
+	struct vm_area_struct *vma;
+	int offset = get_offset(mapping);
 
-	if (!addr)
-		addr = TASK_UNMAPPED_BASE;
 	addr = DCACHE_ALIGN(addr - offset) + offset;
 
 	for (vma = find_vma(current->mm, addr); ; vma = vma->vm_next) {
@@ -74,17 +93,17 @@ static unsigned long get_shared_area(struct inode *inode, unsigned long addr,
 unsigned long arch_get_unmapped_area(struct file *filp, unsigned long addr,
 		unsigned long len, unsigned long pgoff, unsigned long flags)
 {
-	struct inode *inode = NULL;
+	struct inode *inode;
 
 	if (len > TASK_SIZE)
 		return -ENOMEM;
+	if (!addr)
+		addr = TASK_UNMAPPED_BASE;
 
-	if (filp) {
-		inode = filp->f_dentry->d_inode;
-	}
+	inode = filp ? filp->f_dentry->d_inode : NULL;
 
-	if (inode && (flags & MAP_SHARED) && (!list_empty(&inode->i_mapping->i_mmap_shared))) {
-		addr = get_shared_area(inode, addr, len, pgoff);
+	if (inode && (flags & MAP_SHARED)) {
+		addr = get_shared_area(inode->i_mapping, addr, len, pgoff);
 	} else {
 		addr = get_unshared_area(addr, len);
 	}
@@ -185,6 +204,7 @@ extern asmlinkage ssize_t sys_pread64(unsigned int fd, char *buf,
 					size_t count, loff_t pos);
 extern asmlinkage ssize_t sys_pwrite64(unsigned int fd, const char *buf,
 					size_t count, loff_t pos);
+extern asmlinkage ssize_t sys_readahead(int fd, loff_t offset, size_t count);
 
 asmlinkage ssize_t parisc_pread64(unsigned int fd, char *buf, size_t count,
 					unsigned int high, unsigned int low)
@@ -198,6 +218,11 @@ asmlinkage ssize_t parisc_pwrite64(unsigned int fd, const char *buf,
 	return sys_pwrite64(fd, buf, count, (loff_t)high << 32 | low);
 }
 
+asmlinkage ssize_t parisc_readahead(int fd, unsigned int high, unsigned int low,
+		                    size_t count)
+{
+	return sys_readahead(fd, (loff_t)high << 32 | low, count);
+}
 
 /*
  * FIXME, please remove this crap as soon as possible
@@ -271,7 +296,7 @@ static int copyout_broken_shmid64(struct broken_shmid64_ds *buf, struct shmid64_
 	tbuf.shm_cpid = sbuf->shm_cpid;
 	tbuf.shm_lpid = sbuf->shm_lpid;
 	tbuf.shm_nattch = sbuf->shm_nattch;
-	return copy_to_user(buf, &tbuf, sizeof tbuf);
+	return copy_to_user(buf, &tbuf, sizeof tbuf) ? -EFAULT : 0;
 }
 
 int sys_msgctl_broken(int msqid, int cmd, struct msqid_ds *buf)

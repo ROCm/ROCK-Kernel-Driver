@@ -842,6 +842,10 @@ int probe_irq_off(unsigned long val)
 	return irq_found;
 }
 
+unsigned int probe_irq_mask(unsigned long irqs)
+{
+	return 0;
+}
 
 void __init init_IRQ(void)
 {

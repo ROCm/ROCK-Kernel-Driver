@@ -129,6 +129,92 @@ struct ioa_registers {
         volatile uint32_t   io_io_high;             /* Offset 15 */
 };
 
+/*
+** IOA Registers
+** -------------
+**
+** Runway IO_CONTROL Register (+0x38)
+** 
+** The Runway IO_CONTROL register controls the forwarding of transactions.
+**
+** | 0  ...  13  |  14 15 | 16 ... 21 | 22 | 23 24 |  25 ... 31 |
+** |    HV       |   TLB  |  reserved | HV | mode  |  reserved  |
+**
+** o mode field indicates the address translation of transactions
+**   forwarded from Runway to GSC+:
+**       Mode Name     Value        Definition
+**       Off (default)   0          Opaque to matching addresses.
+**       Include         1          Transparent for matching addresses.
+**       Peek            3          Map matching addresses.
+**
+**       + "Off" mode: Runway transactions which match the I/O range
+**         specified by the IO_IO_LOW/IO_IO_HIGH registers will be ignored.
+**       + "Include" mode: all addresses within the I/O range specified
+**         by the IO_IO_LOW and IO_IO_HIGH registers are transparently
+**         forwarded. This is the I/O Adapter's normal operating mode.
+**       + "Peek" mode: used during system configuration to initialize the
+**         GSC+ bus. Runway Write_Shorts in the address range specified by
+**         IO_IO_LOW and IO_IO_HIGH are forwarded through the I/O Adapter
+**         *AND* the GSC+ address is remapped to the Broadcast Physical
+**         Address space by setting the 14 high order address bits of the
+**         32 bit GSC+ address to ones.
+**
+** o TLB field affects transactions which are forwarded from GSC+ to Runway.
+**   "Real" mode is the poweron default.
+** 
+**   TLB Mode  Value  Description
+**   Real        0    No TLB translation. Address is directly mapped and the
+**                    virtual address is composed of selected physical bits.
+**   Error       1    Software fills the TLB manually.
+**   Normal      2    IOA fetches IO TLB misses from IO PDIR (in host memory).
+**
+**
+** IO_IO_LOW_HV	  +0x60 (HV dependent)
+** IO_IO_HIGH_HV  +0x64 (HV dependent)
+** IO_IO_LOW      +0x78	(Architected register)
+** IO_IO_HIGH     +0x7c	(Architected register)
+**
+** IO_IO_LOW and IO_IO_HIGH set the lower and upper bounds of the
+** I/O Adapter address space, respectively.
+**
+** 0  ... 7 | 8 ... 15 |  16   ...   31 |
+** 11111111 | 11111111 |      address   |
+**
+** Each LOW/HIGH pair describes a disjoint address space region.
+** (2 per GSC+ port). Each incoming Runway transaction address is compared
+** with both sets of LOW/HIGH registers. If the address is in the range
+** greater than or equal to IO_IO_LOW and less than IO_IO_HIGH the transaction
+** for forwarded to the respective GSC+ bus.
+** Specify IO_IO_LOW equal to or greater than IO_IO_HIGH to avoid specifying
+** an address space region.
+**
+** In order for a Runway address to reside within GSC+ extended address space:
+**	Runway Address [0:7]    must identically compare to 8'b11111111
+**	Runway Address [8:11]   must be equal to IO_IO_LOW(_HV)[16:19]
+** 	Runway Address [12:23]  must be greater than or equal to
+**	           IO_IO_LOW(_HV)[20:31] and less than IO_IO_HIGH(_HV)[20:31].
+**	Runway Address [24:39]  is not used in the comparison.
+**
+** When the Runway transaction is forwarded to GSC+, the GSC+ address is
+** as follows:
+**	GSC+ Address[0:3]	4'b1111
+**	GSC+ Address[4:29]	Runway Address[12:37]
+**	GSC+ Address[30:31]	2'b00
+**
+** All 4 Low/High registers must be initialized (by PDC) once the lower bus
+** is interrogated and address space is defined. The operating system will
+** modify the architectural IO_IO_LOW and IO_IO_HIGH registers following
+** the PDC initialization.  However, the hardware version dependent IO_IO_LOW
+** and IO_IO_HIGH registers should not be subsequently altered by the OS.
+** 
+** Writes to both sets of registers will take effect immediately, bypassing
+** the queues, which ensures that subsequent Runway transactions are checked
+** against the updated bounds values. However reads are queued, introducing
+** the possibility of a read being bypassed by a subsequent write to the same
+** register. This sequence can be avoided by having software wait for read
+** returns before issuing subsequent writes.
+*/
+
 struct ioc {
 	struct ioa_registers *ioc_hpa;  /* I/O MMU base address */
 	u8  *res_map;	                /* resource map, bit == pdir entry */
@@ -1448,13 +1534,74 @@ static void __init ccio_init_resources(struct ioc *ioc)
 			(unsigned long)&ioc->ioc_hpa->io_io_low_hv);
 }
 
-static void expand_ioc_area(struct ioc *ioc, unsigned long size,
-		unsigned long min, unsigned long max, unsigned long align)
+static int expand_resource(struct resource *res, unsigned long size,
+			   unsigned long align)
 {
-#ifdef NASTY_HACK_FOR_K_CLASS
-	__raw_writel(0xfffff600, (unsigned long)&(ioc->ioc_hpa->io_io_high));
-	ioc->mmio_region[0].end = 0xf5ffffff;
-#endif
+	struct resource *temp_res;
+	unsigned long start = res->start;
+	unsigned long end ;
+
+	/* see if we can expand above */
+	end = (res->end + size + align - 1) & ~(align - 1);;
+	
+	temp_res = __request_region(res->parent, res->end, end - res->end,
+				    "expansion");
+	if(!temp_res) {
+		/* now try below */
+		start = ((res->start - size + align) & ~(align - 1)) - align;
+		end = res->end;
+		temp_res = __request_region(res->parent, start, size,
+					    "expansion");	
+		if(!temp_res) {
+			return -ENOMEM;
+		}
+	} 
+	release_resource(temp_res);
+	temp_res = res->parent;
+	release_resource(res);
+	res->start = start;
+	res->end = end;
+
+	/* This could be caused by some sort of race.  Basically, if
+	 * this tripped something stole the region we just reserved
+	 * and then released to check for expansion */
+	BUG_ON(request_resource(temp_res, res) != 0);
+
+	return 0;
+}
+
+static void expand_ioc_area(struct resource *parent, struct ioc *ioc,
+			    unsigned long size,	unsigned long min,
+			    unsigned long max, unsigned long align)
+{
+	if(ioc == NULL)
+		/* no IOC, so nothing to expand */
+		return;
+
+	if (expand_resource(parent, size, align) != 0) {
+		printk(KERN_ERR "Unable to expand %s window by 0x%lx\n",
+		       parent->name, size);
+		return;
+	}
+
+	/* OK, we have the memory, now expand the window */
+	if (parent == &ioc->mmio_region[0]) {
+		__raw_writel(((parent->start)>>16) | 0xffff0000,
+			     (unsigned long)&(ioc->ioc_hpa->io_io_low));
+		__raw_writel(((parent->end)>>16) | 0xffff0000,
+			     (unsigned long)&(ioc->ioc_hpa->io_io_high));
+	} else if (parent == &ioc->mmio_region[1]) {
+		__raw_writel(((parent->start)>>16) | 0xffff0000,
+			     (unsigned long)&(ioc->ioc_hpa->io_io_low_hv));
+		__raw_writel(((parent->end)>>16) | 0xffff0000,
+			     (unsigned long)&(ioc->ioc_hpa->io_io_high_hv));
+	} else {
+		/* This should be impossible.  It means
+		 * expand_ioc_area got called with a resource that
+		 * didn't belong to the ioc
+		 */
+		BUG();
+	}
 }
 
 static struct resource *ccio_get_resource(struct ioc* ioc,
@@ -1488,7 +1635,7 @@ int ccio_allocate_resource(const struct parisc_device *dev,
 			alignf_data))
 		return 0;
 
-	expand_ioc_area(ioc, size, min, max, align);
+	expand_ioc_area(parent, ioc, size, min, max, align);
 	return allocate_resource(parent, res, size, min, max, align, alignf,
 			alignf_data);
 }
@@ -1522,7 +1669,6 @@ static int ccio_probe(struct parisc_device *dev)
 	memset(ioc, 0, sizeof(struct ioc));
 
 	ioc->name = dev->id.hversion == U2_IOA_RUNWAY ? "U2" : "UTurn";
-	strlcpy(dev->dev.name, ioc->name, sizeof(dev->dev.name));
 
 	printk(KERN_INFO "Found %s at 0x%lx\n", ioc->name, dev->hpa);
 

@@ -21,16 +21,19 @@
  */
 
 #ifdef __LP64__
-#warning Must be changed for PA64
+#warning PA64 support needs more work...did first cut
 #endif
 
 #include <asm/offsets.h>
-
-	.level		1.1
-	.text
-
 #include <asm/assembly.h>
 #include <asm/signal.h>
+
+#ifdef __LP64__
+	.level          2.0w
+#else
+	.level		1.1
+#endif
+	.text
 
 	/* These should probably go in a header file somewhere.
 	 * They are duplicated in kernel/wrappers.S
@@ -41,41 +44,41 @@
 #ifdef __LP64__
 #warning NEEDS WORK for 64-bit
 #endif
-	stw	%r3, PT_GR3(\regs)
-	stw	%r4, PT_GR4(\regs)
-	stw	%r5, PT_GR5(\regs)
-	stw	%r6, PT_GR6(\regs)
-	stw	%r7, PT_GR7(\regs)
-	stw	%r8, PT_GR8(\regs)
-	stw	%r9, PT_GR9(\regs)
-	stw    %r10,PT_GR10(\regs)
-	stw    %r11,PT_GR11(\regs)
-	stw    %r12,PT_GR12(\regs)
-	stw    %r13,PT_GR13(\regs)
-	stw    %r14,PT_GR14(\regs)
-	stw    %r15,PT_GR15(\regs)
-	stw    %r16,PT_GR16(\regs)
-	stw    %r17,PT_GR17(\regs)
-	stw    %r18,PT_GR18(\regs)
+	STREG	%r3, PT_GR3(\regs)
+	STREG	%r4, PT_GR4(\regs)
+	STREG	%r5, PT_GR5(\regs)
+	STREG	%r6, PT_GR6(\regs)
+	STREG	%r7, PT_GR7(\regs)
+	STREG	%r8, PT_GR8(\regs)
+	STREG	%r9, PT_GR9(\regs)
+	STREG	%r10,PT_GR10(\regs)
+	STREG	%r11,PT_GR11(\regs)
+	STREG	%r12,PT_GR12(\regs)
+	STREG	%r13,PT_GR13(\regs)
+	STREG	%r14,PT_GR14(\regs)
+	STREG	%r15,PT_GR15(\regs)
+	STREG	%r16,PT_GR16(\regs)
+	STREG	%r17,PT_GR17(\regs)
+	STREG	%r18,PT_GR18(\regs)
 	.endm
 
 	.macro	reg_restore regs
-	ldw	PT_GR3(\regs), %r3
-	ldw	PT_GR4(\regs), %r4
-	ldw	PT_GR5(\regs), %r5
-	ldw	PT_GR6(\regs), %r6
-	ldw	PT_GR7(\regs), %r7
-	ldw	PT_GR8(\regs), %r8
-	ldw	PT_GR9(\regs), %r9
-	ldw    PT_GR10(\regs),%r10
-	ldw    PT_GR11(\regs),%r11
-	ldw    PT_GR12(\regs),%r12
-	ldw    PT_GR13(\regs),%r13
-	ldw    PT_GR14(\regs),%r14
-	ldw    PT_GR15(\regs),%r15
-	ldw    PT_GR16(\regs),%r16
-	ldw    PT_GR17(\regs),%r17
-	ldw    PT_GR18(\regs),%r18
+	LDREG	PT_GR3(\regs), %r3
+	LDREG	PT_GR4(\regs), %r4
+	LDREG	PT_GR5(\regs), %r5
+	LDREG	PT_GR6(\regs), %r6
+	LDREG	PT_GR7(\regs), %r7
+	LDREG	PT_GR8(\regs), %r8
+	LDREG	PT_GR9(\regs), %r9
+	LDREG	PT_GR10(\regs),%r10
+	LDREG	PT_GR11(\regs),%r11
+	LDREG	PT_GR12(\regs),%r12
+	LDREG	PT_GR13(\regs),%r13
+	LDREG	PT_GR14(\regs),%r14
+	LDREG	PT_GR15(\regs),%r15
+	LDREG	PT_GR16(\regs),%r16
+	LDREG	PT_GR17(\regs),%r17
+	LDREG	PT_GR18(\regs),%r18
 	.endm
 
 
@@ -88,18 +91,18 @@ hpux_fork_wrapper:
 							    ;! pointer in task
 	reg_save %r1
 
-	stw	%r2,-20(%r30)
+	STREG	%r2,-20(%r30)
 	ldo	64(%r30),%r30
-	stw	%r2,PT_GR19(%r1)	;! save for child
-	stw	%r30,PT_GR21(%r1)	;! save for child
+	STREG	%r2,PT_GR19(%r1)	;! save for child
+	STREG	%r30,PT_GR21(%r1)	;! save for child
 
-	ldw     PT_GR30(%r1),%r25
-	mtctl   %r25,%cr29
+	LDREG	PT_GR30(%r1),%r25
+	mtctl	%r25,%cr29
 	copy	%r1,%r24
 	bl	sys_clone,%r2
 	ldi	SIGCHLD,%r26
 
-	ldw -84(%r30),%r2
+	LDREG	-84(%r30),%r2
 fork_return:
 	ldo	-64(%r30),%r30
 	ldo	TASK_REGS-TASK_SZ_ALGN-64(%r30),%r1	    ;! get pt regs
@@ -116,14 +119,14 @@ fork_return:
 	 * know the difference. We can fix this later if necessary.
 	 */
 
-	ldo -1024(%r0),%r1
+	ldo	-1024(%r0),%r1
 	comb,>>=,n %r28,%r1,fork_exit  /* just let the syscall exit handle it */
-	or,= %r28,%r0,%r0
-	or,tr %r0,%r0,%r29	/* r28 <> 0, we are parent, set r29 to 0 */
-	ldo 1(%r0),%r29 	/* r28 == 0, we are child,  set r29 to 1 */
+	or,=	%r28,%r0,%r0
+	or,tr	%r0,%r0,%r29	/* r28 <> 0, we are parent, set r29 to 0 */
+	ldo	1(%r0),%r29 	/* r28 == 0, we are child,  set r29 to 1 */
 
 fork_exit:
-	bv %r0(%r2)
+	bv	%r0(%r2)
 	nop
 
 	/* Set the return value for the child */
@@ -134,7 +137,7 @@ hpux_child_return:
 	nop
 #endif
 
-	ldw TASK_PT_GR19-TASK_SZ_ALGN-128(%r30),%r2
+	LDREG	TASK_PT_GR19-TASK_SZ_ALGN-128(%r30),%r2
 	b fork_return
 	copy %r0,%r28
 
@@ -157,17 +160,17 @@ hpux_execve_wrapper:
 
 	/* Store arg0, arg1 and arg2 so that hpux_execve will find them */
 
-	stw %r26,PT_GR26(%r1)
-	stw %r25,PT_GR25(%r1)
-	stw %r24,PT_GR24(%r1)
+	STREG %r26,PT_GR26(%r1)
+	STREG %r25,PT_GR25(%r1)
+	STREG %r24,PT_GR24(%r1)
 
-	stw %r2,-20(%r30)
+	STREG %r2,-20(%r30)
 	ldo 64(%r30),%r30
 	bl hpux_execve,%r2
 	copy %r1,%arg0
 
 	ldo -64(%r30),%r30
-	ldw -20(%r30),%r2
+	LDREG	-20(%r30),%r2
 
 	/* If exec succeeded we need to load the args */
 
@@ -175,10 +178,10 @@ hpux_execve_wrapper:
 	comb,>>= %r28,%r1,exec_error
 	copy %r2,%r19
 	ldo	-TASK_SZ_ALGN-64(%r30),%r1	   ;! get task ptr
-	ldw TASK_PT_GR26(%r1),%r26
-	ldw TASK_PT_GR25(%r1),%r25
-	ldw TASK_PT_GR24(%r1),%r24
-	ldw TASK_PT_GR23(%r1),%r23
+	LDREG	TASK_PT_GR26(%r1),%r26
+	LDREG	TASK_PT_GR25(%r1),%r25
+	LDREG	TASK_PT_GR24(%r1),%r24
+	LDREG	TASK_PT_GR23(%r1),%r23
 	copy %r0,%r2	/* Flag to syscall_exit not to clear args */
 
 exec_error:
@@ -191,7 +194,7 @@ exec_error:
 	/* HP-UX expects pipefd's returned in r28 & r29 */
 
 hpux_pipe_wrapper:
-	stw %r2,-20(%r30)
+	STREG %r2,-20(%r30)
 	ldo 64(%r30),%r30
 	bl hpux_pipe,%r2
 	ldo -56(%r30),%r26 /* pass local array to hpux_pipe */
@@ -199,12 +202,12 @@ hpux_pipe_wrapper:
 
 	ldo -1024(%r0),%r1
 	comb,>>= %r28,%r1,pipe_exit /* let syscall exit handle it */
-	ldw -84(%r30),%r2
+	LDREG	-84(%r30),%r2
 
 	/* if success, load fd's from stack array */
 
-	ldw -56(%r30),%r28
-	ldw -52(%r30),%r29
+	LDREG	-56(%r30),%r28
+	LDREG	-52(%r30),%r29
 
 pipe_exit:
 	bv %r0(%r2)
@@ -251,4 +254,4 @@ no_error:
 
 hpux_unimplemented_wrapper:
 	b hpux_unimplemented
-	stw %r22,-64(%r30)  /* overwrite arg8 with syscall number */
+	STREG %r22,-64(%r30)  /* overwrite arg8 with syscall number */

@@ -70,7 +70,6 @@ static int hppb_probe(struct parisc_device *dev)
 		card = card->next;
 	}
         printk(KERN_INFO "Found GeckoBoa at 0x%lx\n", dev->hpa);
-	snprintf(dev->dev.name, sizeof(dev->dev.name), "GeckoBoa");
 
 	card->hpa = dev->hpa;
 	card->mmio_region.name = "HP-PB Bus";

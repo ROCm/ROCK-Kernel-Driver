@@ -782,7 +782,7 @@ lba_fixup_bus(struct pci_bus *bus)
 		int i;
 		struct pci_dev *dev = pci_dev_b(ln);
 
-		DBG("lba_fixup_bus() %s\n", dev->name);
+		DBG("lba_fixup_bus() %s\n", pci_name(dev));
 
 		/* Virtualize Device/Bridge Resources. */
 		for (i = 0; i < PCI_NUM_RESOURCES; i++) {
@@ -1358,8 +1358,6 @@ lba_driver_callback(struct parisc_device *dev)
 
 	printk(KERN_INFO "%s version %s (0x%x) found at 0x%lx\n",
 		MODULE_NAME, version, func_class & 0xf, dev->hpa);
-	snprintf(dev->dev.name, sizeof(dev->dev.name), "%s version %s",
-		 MODULE_NAME, version);
 
 	/* Just in case we find some prototypes... */
 	if (func_class < 2) {

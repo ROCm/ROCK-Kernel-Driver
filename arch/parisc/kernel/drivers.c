@@ -447,7 +447,7 @@ int register_parisc_device(struct parisc_device *dev)
 #define MAX_NATIVE_DEVICES 64
 #define NATIVE_DEVICE_OFFSET 0x1000
 
-#define FLEX_MASK 	(unsigned long)0xfffffffffffc0000
+#define FLEX_MASK 	F_EXTEND(0xfffc0000)
 #define IO_IO_LOW	offsetof(struct bc_module, io_io_low)
 #define IO_IO_HIGH	offsetof(struct bc_module, io_io_high)
 #define READ_IO_IO_LOW(dev)  (unsigned long)(signed int)__raw_readl(dev->hpa + IO_IO_LOW)
@@ -514,7 +514,7 @@ static void walk_native_bus(unsigned long io_io_low, unsigned long io_io_high,
 	} while(!devices_found && hpa < io_io_high);
 }
 
-#define CENTRAL_BUS_ADDR (unsigned long) 0xfffffffffff80000
+#define CENTRAL_BUS_ADDR F_EXTEND(0xfff80000)
 
 /**
  * walk_central_bus - Find devices attached to the central bus

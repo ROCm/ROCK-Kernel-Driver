@@ -401,23 +401,7 @@ ilr_again:
 	{
 		int irq;
 
-		/*
-		 * Perform a binary search on set bits.
-		 * `Less than Fatal' and PS2 interrupts aren't supported.
-		 */
-		if (mask & 0xf) {
-			if (mask & 0x3) {
-				irq = (mask & 0x1) ? 0 : 1; /* PCI INT A, B */
-			} else {
-				irq = (mask & 0x4) ? 2 : 3; /* PCI INT C, D */
-			}
-		} else {
-			if (mask & 0x30) {
-				irq = (mask & 0x10) ? 4 : 5; /* PCI INT E, F */
-			} else {
-				irq = (mask & 0x40) ? 6 : 10; /* GSC, RS232 */
-			}
-		}
+		irq = __ffs(mask);
 
 		mask &= ~(1<<irq);
 
@@ -440,7 +424,7 @@ ilr_again:
 	if (mask) {
 		if (--ilr_loop > 0)
 			goto ilr_again;
-		printk("Dino %lx: stuck interrupt %d\n", dino_dev->hba.base_addr, mask);
+		printk(KERN_ERR "Dino %lx: stuck interrupt %d\n", dino_dev->hba.base_addr, mask);
 		return IRQ_NONE;
 	}
 	return IRQ_HANDLED;
@@ -479,15 +463,35 @@ dino_card_setup(struct pci_bus *bus, unsigned long base_addr)
 	int i;
 	struct dino_device *dino_dev = DINO_DEV(parisc_walk_tree(bus->dev));
 	struct resource *res;
+	char name[128];
+	int size;
 
 	res = &dino_dev->hba.lmmio_space;
 	res->flags = IORESOURCE_MEM;
+	size = snprintf(name, sizeof(name), "Dino LMMIO (%s)", bus->dev->bus_id);
+	res->name = kmalloc(size+1, GFP_KERNEL);
+	if(res->name)
+		strcpy((char *)res->name, name);
+	else
+		res->name = dino_dev->hba.lmmio_space.name;
+	
 
 	if (ccio_allocate_resource(dino_dev->hba.dev, res, _8MB,
-				(unsigned long) 0xfffffffff0000000UL | _8MB,
-				0xffffffffffffffffUL &~ _8MB, _8MB,
+				F_EXTEND(0xf0000000UL) | _8MB,
+				F_EXTEND(0xffffffffUL) &~ _8MB, _8MB,
 				NULL, NULL) < 0) {
-		printk(KERN_WARNING "Dino: Failed to allocate memory region\n");
+		struct list_head *ln, *tmp_ln;
+
+		printk(KERN_ERR "Dino: cannot attach bus %s\n",
+		       bus->dev->bus_id);
+		/* kill the bus, we can't do anything with it */
+		list_for_each_safe(ln, tmp_ln, &bus->devices) {
+			struct pci_dev *dev = pci_dev_b(ln);
+
+			list_del(&dev->global_list);
+			list_del(&dev->bus_list);
+		}
+			
 		return;
 	}
 	bus->resource[1] = res;
@@ -495,9 +499,11 @@ dino_card_setup(struct pci_bus *bus, unsigned long base_addr)
 
 	/* Now tell dino what range it has */
 	for (i = 1; i < 31; i++) {
-		if (res->start == (0xfffffffff0000000UL | i * _8MB))
+		if (res->start == F_EXTEND(0xf0000000UL | (i * _8MB)))
 			break;
 	}
+	DBG("DINO GSC WRITE i=%d, start=%lx, dino addr = %lx\n",
+	    i, res->start, base_addr + DINO_IO_ADDR_EN);
 	gsc_writel(1 << i, base_addr + DINO_IO_ADDR_EN);
 
 	pci_bus_assign_resources(bus);
@@ -521,7 +527,7 @@ dino_card_fixup(struct pci_dev *dev)
 	** Set Latency Timer to 0xff (not a shared bus)
 	** Set CACHELINE_SIZE.
 	*/
-	dino_cfg_write(dev->bus, dev->devfn, PCI_CACHE_LINE_SIZE, 16, 0xff00 | L1_CACHE_BYTES/4); 
+	dino_cfg_write(dev->bus, dev->devfn, PCI_CACHE_LINE_SIZE, 2, 0xff00 | L1_CACHE_BYTES/4); 
 
 	/*
 	** Program INT_LINE for card-mode devices.
@@ -532,13 +538,13 @@ dino_card_fixup(struct pci_dev *dev)
 	** "-1" converts INTA-D (1-4) to PCIINTA-D (0-3) range.
 	** The additional "-1" adjusts for skewing the IRQ<->slot.
 	*/
-	dino_cfg_read(dev->bus, dev->devfn, PCI_INTERRUPT_PIN, 8, &irq_pin); 
+	dino_cfg_read(dev->bus, dev->devfn, PCI_INTERRUPT_PIN, 1, &irq_pin); 
 	dev->irq = (irq_pin + PCI_SLOT(dev->devfn) - 1) % 4 ;
 
 	/* Shouldn't really need to do this but it's in case someone tries
 	** to bypass PCI services and look at the card themselves.
 	*/
-	dino_cfg_write(dev->bus, dev->devfn, PCI_INTERRUPT_LINE, 8, dev->irq); 
+	dino_cfg_write(dev->bus, dev->devfn, PCI_INTERRUPT_LINE, 1, dev->irq); 
 }
 
 
@@ -585,8 +591,8 @@ dino_fixup_bus(struct pci_bus *bus)
 #ifdef __LP64__
 			/* Sign Extend MMIO addresses */
 			else if (res->flags & IORESOURCE_MEM) {
-				res->start |= 0xffffffff00000000UL;
-				res->end   |= 0xffffffff00000000UL;
+				res->start |= F_EXTEND(0UL);
+				res->end   |= F_EXTEND(0UL);
 			}
 #endif
 		}
@@ -789,8 +795,8 @@ static int __init dino_common_init(struct parisc_device *dev,
 	return 0;
 }
 
-#define CUJO_RAVEN_ADDR		0xfffffffff1000000UL
-#define CUJO_FIREHAWK_ADDR	0xfffffffff1604000UL
+#define CUJO_RAVEN_ADDR		F_EXTEND(0xf1000000UL)
+#define CUJO_FIREHAWK_ADDR	F_EXTEND(0xf1604000UL)
 #define CUJO_RAVEN_BADPAGE	0x01003000UL
 #define CUJO_FIREHAWK_BADPAGE	0x01607000UL
 
@@ -818,8 +824,15 @@ dino_driver_callback(struct parisc_device *dev)
 {
 	struct dino_device *dino_dev;	// Dino specific control struct
 	const char *version = "unknown";
-	const char *name = "Dino";
+	const int name_len = 32;
+	char *name;
 	int is_cujo = 0;
+
+	name = kmalloc(name_len, GFP_KERNEL);
+	if(name)
+		snprintf(name, name_len, "Dino %s", dev->dev.bus_id);
+	else
+		name = "Dino";
 
 	if (is_card_dino(&dev->id)) {
 		version = "3.x (card mode)";
@@ -838,8 +851,6 @@ dino_driver_callback(struct parisc_device *dev)
 	}
 
 	printk("%s version %s found at 0x%lx\n", name, version, dev->hpa);
-	snprintf(dev->dev.name, sizeof(dev->dev.name), 
-		 "%s version %s", name, version);
 
 	if (!request_mem_region(dev->hpa, PAGE_SIZE, name)) {
 		printk(KERN_ERR "DINO: Hey! Someone took my MMIO space (0x%ld)!\n",

@@ -203,55 +203,102 @@ static __inline__ int test_bit(int nr, const void *address)
 	return !!(*addr & mask);
 }
 
-extern __inline__ unsigned long ffz(unsigned long word)
-{
-	unsigned long result;
-
-	result = 0;
-	while (word & 1) {
-		result++;
-		word >>= 1;
-	}
-
-	return result;
-}
-
 #ifdef __KERNEL__
 
 /**
- * __ffs - find first bit in word.
+ * __ffs - find first bit in word. returns 0 to "BITS_PER_LONG-1".
  * @word: The word to search
  *
- * Undefined if no bit exists, so code should check against 0 first.
+ * __ffs() return is undefined if no bit is set.
+ *
+ * 32-bit fast __ffs by LaMont Jones "lamont At hp com".
+ * 64-bit enhancement by Grant Grundler "grundler At parisc-linux org".
+ * (with help from willy/jejb to get the semantics right)
+ *
+ * This algorithm avoids branches by making use of nullification.
+ * One side effect of "extr" instructions is it sets PSW[N] bit.
+ * How PSW[N] (nullify next insn) gets set is determined by the 
+ * "condition" field (eg "<>" or "TR" below) in the extr* insn.
+ * Only the 1st and one of either the 2cd or 3rd insn will get executed.
+ * Each set of 3 insn will get executed in 2 cycles on PA8x00 vs 16 or so
+ * cycles for each mispredicted branch.
  */
-static __inline__ unsigned long __ffs(unsigned long word)
-{
-	unsigned long result = 0;
 
-	while (!(word & 1UL)) {
-		result++;
-		word >>= 1;
-	}
-	return result;
+static __inline__ unsigned long __ffs(unsigned long x)
+{
+	unsigned long ret;
+
+	__asm__(
+#if BITS_PER_LONG > 32
+		" ldi       63,%1\n"
+		" extrd,u,*<>  %0,63,32,%%r0\n"
+		" extrd,u,*TR  %0,31,32,%0\n"
+		" addi    -32,%1,%1\n"
+#else
+		" ldi       31,%1\n"
+#endif
+		" extru,<>  %0,31,16,%%r0\n"
+		" extru,TR  %0,15,16,%0\n"
+		" addi    -16,%1,%1\n"
+		" extru,<>  %0,31,8,%%r0\n"
+		" extru,TR  %0,23,8,%0\n"
+		" addi    -8,%1,%1\n"
+		" extru,<>  %0,31,4,%%r0\n"
+		" extru,TR  %0,27,4,%0\n"
+		" addi    -4,%1,%1\n"
+		" extru,<>  %0,31,2,%%r0\n"
+		" extru,TR  %0,29,2,%0\n"
+		" addi    -2,%1,%1\n"
+		" extru,=  %0,31,1,%%r0\n"
+		" addi    -1,%1,%1\n"
+			: "+r" (x), "=r" (ret) );
+	return ret;
 }
 
+/* Undefined if no bit is zero. */
+#define ffz(x)	__ffs(~x)
+
 /*
- * ffs: find first bit set. This is defined the same way as
- * the libc and compiler builtin ffs routines, therefore
- * differs in spirit from the above ffz (man ffs).
+ * ffs: find first bit set. returns 1 to BITS_PER_LONG or 0 (if none set)
+ * This is defined the same way as the libc and compiler builtin
+ * ffs routines, therefore differs in spirit from the above ffz (man ffs).
  */
 static __inline__ int ffs(int x)
 {
-	if (!x)
-		return 0;
-	return __ffs((unsigned long)x);
+	return x ? (__ffs((unsigned long)x) + 1) : 0;
 }
 
 /*
- * fls: find last bit set.
+ * fls: find last (most significant) bit set.
+ * fls(0) = 0, fls(1) = 1, fls(0x80000000) = 32.
  */
 
-#define fls(x) generic_fls(x)
+static __inline__ int fls(int x)
+{
+	int ret;
+	if (!x)
+		return 0;
+
+	__asm__(
+	"	ldi		1,%1\n"
+	"	extru,<>	%0,15,16,%%r0\n"
+	"	zdep,TR		%0,15,16,%0\n"		/* xxxx0000 */
+	"	addi		16,%1,%1\n"
+	"	extru,<>	%0,7,8,%%r0\n"
+	"	zdep,TR		%0,23,24,%0\n"		/* xx000000 */
+	"	addi		8,%1,%1\n"
+	"	extru,<>	%0,3,4,%%r0\n"
+	"	zdep,TR		%0,27,28,%0\n"		/* x0000000 */
+	"	addi		4,%1,%1\n"
+	"	extru,<>	%0,1,2,%%r0\n"
+	"	zdep,TR		%0,29,30,%0\n"		/* y0000000 (y&3 = 0 */
+	"	addi		2,%1,%1\n"
+	"	extru,=		%0,0,1,%%r0\n"
+	"	addi		1,%1,%1\n"		/* if y & 8, add 1 */
+		: "+r" (x), "=r" (ret) );
+
+	return ret;
+}
 
 /*
  * hweightN: returns the hamming weight (i.e. the number

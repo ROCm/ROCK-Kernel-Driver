@@ -83,8 +83,6 @@ wax_init_chip(struct parisc_device *dev)
 
 	wax->version = 0;   /* gsc_readb(wax->hpa+WAX_VER); */
 	printk(KERN_INFO "%s at 0x%lx found.\n", wax->name, wax->hpa);
-	snprintf(dev->dev.name, sizeof(dev->dev.name), "%s version %d",
-		 wax->name, wax->version);
 
 	/* Stop wax hissing for a bit */
 	wax_init_irq(wax);

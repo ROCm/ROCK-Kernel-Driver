@@ -76,8 +76,6 @@ asp_init_chip(struct parisc_device *dev)
 
 	printk(KERN_INFO "%s version %d at 0x%lx found.\n", 
 		asp->name, asp->version, dev->hpa);
-	snprintf(dev->dev.name, sizeof(dev->dev.name), "%s version %d",
-		 asp->name, asp->version);
 
 	/* the IRQ ASP should use */
 	ret = -EBUSY;

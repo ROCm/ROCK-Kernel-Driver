@@ -19,7 +19,6 @@
 #include <linux/sched.h>
 #include <linux/stddef.h>
 #include <linux/unistd.h>
-#include <linux/version.h>
 
 #include <asm/io.h>
 #include <asm/offsets.h>

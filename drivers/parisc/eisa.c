@@ -327,14 +327,13 @@ static int __devinit eisa_probe(struct parisc_device *dev)
 
 	printk(KERN_INFO "%s EISA Adapter found at 0x%08lx\n", 
 		name, dev->hpa);
-	snprintf(dev->dev.name, sizeof(dev->dev.name), "%s EISA", name);
 
 	eisa_dev.hba.dev = dev;
 	eisa_dev.hba.iommu = ccio_get_iommu(dev);
 
 	eisa_dev.hba.lmmio_space.name = "EISA";
-	eisa_dev.hba.lmmio_space.start = (unsigned long) 0xfffffffffc000000;
-	eisa_dev.hba.lmmio_space.end = (unsigned long) 0xffffffffffbfffff;
+	eisa_dev.hba.lmmio_space.start = F_EXTEND(0xfc000000);
+	eisa_dev.hba.lmmio_space.end = F_EXTEND(0xffbfffff);
 	eisa_dev.hba.lmmio_space.flags = IORESOURCE_MEM;
 	result = ccio_request_resource(dev, &eisa_dev.hba.lmmio_space);
 	if (result < 0) {

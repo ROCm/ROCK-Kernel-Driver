@@ -483,7 +483,7 @@ sys_call_table:
 	ENTRY_SAME(madvise)
 	ENTRY_SAME(clone_wrapper)	/* 120 */
 	ENTRY_SAME(setdomainname)
-	ENTRY_SAME(sendfile)
+	ENTRY_DIFF(sendfile)
 	/* struct sockaddr... */
 	ENTRY_SAME(recvfrom)
 	/* struct timex contains longs */
@@ -592,7 +592,7 @@ sys_call_table:
 	ENTRY_SAME(ni_syscall)
 	ENTRY_SAME(ni_syscall)		/* 205 */
 	ENTRY_SAME(gettid)             
-	ENTRY_SAME(readahead)          
+	ENTRY_OURS(readahead)          
 	ENTRY_SAME(ni_syscall)		/* tkill */
 
 	ENTRY_SAME(sendfile64)

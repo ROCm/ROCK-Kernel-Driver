@@ -123,7 +123,7 @@ save_control_regs:
 	nop
 
 restore_control_regs:
-	load32	PA(save_cr_space + (N_SAVED_REGS * REG_SZ)), %r26
+	load32	PA(save_cr_space+(N_SAVED_REGS*REG_SZ)), %r26
 	POP_CR(%cr15, %r26)
 	POP_CR(%cr31, %r26)
 	POP_CR(%cr30, %r26)
@@ -275,6 +275,7 @@ r64_ret:
 	nop
 
 #endif
+
 	.export pc_in_user_space
 	.text
 	/* Doesn't belong here but I couldn't find a nicer spot. */
@@ -283,3 +284,17 @@ pc_in_user_space:
 	bv,n	0(%rp)
 	nop
 
+
+	.export __canonicalize_funcptr_for_compare
+	.text
+	/* http://lists.parisc-linux.org/hypermail/parisc-linux/10916.html
+	**	GCC 3.3 and later has a new function in libgcc.a for
+	**	comparing function pointers.
+	*/
+__canonicalize_funcptr_for_compare:
+#ifdef __LP64__
+	bve (%r2)
+#else
+	bv %r0(%r2)
+#endif
+	copy %r26,%r28

@@ -221,6 +221,8 @@ void die_if_kernel(char *str, struct pt_regs *regs, long err)
 		return;
 	}
 
+	oops_in_progress = 1;
+
 	/* Amuse the user in a SPARC fashion */
 	printk(
 "      _______________________________ \n"
@@ -413,6 +415,8 @@ void transfer_pim_to_trap_frame(struct pt_regs *regs)
 void parisc_terminate(char *msg, struct pt_regs *regs, int code, unsigned long offset)
 {
 	static spinlock_t terminate_lock = SPIN_LOCK_UNLOCKED;
+
+	oops_in_progress = 1;
 
 	set_eiem(0);
 	local_irq_disable();

@@ -91,7 +91,7 @@ struct pdc_chassis_lcd_info_ret_block {
 
 
 /* LCD_CMD and LCD_DATA for KittyHawk machines */
-#define KITTYHAWK_LCD_CMD  (0xfffffffff0190000UL) /* 64bit-ready */
+#define KITTYHAWK_LCD_CMD  F_EXTEND(0xf0190000UL) /* 64bit-ready */
 #define KITTYHAWK_LCD_DATA (KITTYHAWK_LCD_CMD+1)
 
 /* lcd_info is pre-initialized to the values needed to program KittyHawk LCD's 
