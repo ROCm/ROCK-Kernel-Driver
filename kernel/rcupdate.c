@@ -182,7 +182,7 @@ static void rcu_offline_cpu(int cpu)
 	 * it here
 	 */
 	spin_lock_irq(&rcu_ctrlblk.mutex);
-	if (!rcu_ctrlblk.rcu_cpu_mask)
+	if (cpus_empty(rcu_ctrlblk.rcu_cpu_mask))
 		goto unlock;
 
 	cpu_clear(cpu, rcu_ctrlblk.rcu_cpu_mask);
