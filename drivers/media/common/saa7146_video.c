@@ -1,9 +1,9 @@
 #include <media/saa7146_vv.h>
 
-static int memory = 32;
+static int max_memory = 32;
 
-MODULE_PARM(memory,"i");
-MODULE_PARM_DESC(memory, "maximum memory usage for capture buffers (default: 32Mb)");
+MODULE_PARM(max_memory,"i");
+MODULE_PARM_DESC(max_memory, "maximum memory usage for capture buffers (default: 32Mb)");
 
 #define IS_CAPTURE_ACTIVE(fh) \
 	(((vv->video_status & STATUS_CAPTURE) != 0) && (vv->video_fh == fh))
@@ -1331,9 +1331,9 @@ static int buffer_setup(struct file *file, unsigned int *count, unsigned int *si
 
 	*size = fh->video_fmt.sizeimage;
 
-	/* check if we exceed the "memory" parameter */
-	if( (*count * *size) > (memory*1048576) ) {
-		*count = (memory*1048576) / *size;
+	/* check if we exceed the "max_memory" parameter */
+	if( (*count * *size) > (max_memory*1048576) ) {
+		*count = (max_memory*1048576) / *size;
 	}
 	
 	DEB_CAP(("%d buffers, %d bytes each.\n",*count,*size));
