@@ -131,7 +131,7 @@ osf_filldir(void *__buf, const char *name, int namlen, loff_t offset,
 	if (copy_to_user(dirent->d_name, name, namlen) ||
 	    put_user(0, dirent->d_name + namlen))
 		return -EFAULT;
-	((char *) dirent) += reclen;
+	dirent = (void *)dirent + reclen;
 	buf->dirent = dirent;
 	buf->count -= reclen;
 	return 0;
