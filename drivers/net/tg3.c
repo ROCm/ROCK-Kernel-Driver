@@ -1941,13 +1941,12 @@ static int tg3_rx(struct tg3 *tp, int budget)
 		}
 
 		if ((tp->tg3_flags & TG3_FLAG_RX_CHECKSUMS) &&
-		    (desc->type_flags & RXD_FLAG_TCPUDP_CSUM)) {
-			skb->csum = htons((desc->ip_tcp_csum & RXD_TCPCSUM_MASK)
-					  >> RXD_TCPCSUM_SHIFT);
-			skb->ip_summed = CHECKSUM_HW;
-		} else {
+		    (desc->type_flags & RXD_FLAG_TCPUDP_CSUM) &&
+		    (((desc->ip_tcp_csum & RXD_TCPCSUM_MASK)
+		      >> RXD_TCPCSUM_SHIFT) == 0xffff)) {
+			skb->ip_summed = CHECKSUM_UNNECESSARY;
+		else
 			skb->ip_summed = CHECKSUM_NONE;
-		}
 
 		skb->protocol = eth_type_trans(skb, tp->dev);
 #if TG3_VLAN_TAG_USED
@@ -6008,18 +6007,14 @@ static int __devinit tg3_get_invariants(struct tg3 *tp)
 	if (tp->pci_chip_rev_id == CHIPREV_ID_5700_B0)
 		tp->tg3_flags |= TG3_FLAG_BROKEN_CHECKSUMS;
 
-	/* Regardless of whether checksums work or not, we configure
-	 * the StrongARM chips to not compute the pseudo header checksums
-	 * in either direction.  Because of the way Linux checksum support
-	 * works we do not need the chips to do this, and taking the load
-	 * off of the TX/RX onboard StrongARM cpus means that they will not be
-	 * the bottleneck.  Whoever wrote Broadcom's driver did not
-	 * understand the situation at all.  He could have bothered
-	 * to read Jes's Acenic driver because the logic (and this part of
-	 * the Tigon2 hardware/firmware) is pretty much identical.
+	/* Pseudo-header checksum is done by hardware logic and not
+	 * the offload processers, so make the chip do the pseudo-
+	 * header checksums on receive.  For transmit it is more
+	 * convenient to do the pseudo-header checksum in software
+	 * as Linux does that on transmit for us in all cases.
 	 */
 	tp->tg3_flags |= TG3_FLAG_NO_TX_PSEUDO_CSUM;
-	tp->tg3_flags |= TG3_FLAG_NO_RX_PSEUDO_CSUM;
+	tp->tg3_flags &= ~TG3_FLAG_NO_RX_PSEUDO_CSUM;
 
 	/* Derive initial jumbo mode from MTU assigned in
 	 * ether_setup() via the alloc_etherdev() call
