@@ -127,6 +127,7 @@ xfs-objs			+= $(addprefix linux/, \
 				   xfs_fs_subr.o \
 				   xfs_globals.o \
 				   xfs_ioctl.o \
+				   xfs_iomap.o \
 				   xfs_iops.o \
 				   xfs_lrw.o \
 				   xfs_super.o \
