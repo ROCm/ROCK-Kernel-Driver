@@ -163,6 +163,12 @@ struct rpc_xprt {
 				tcp_offset;	/* fragment offset */
 	unsigned long		tcp_copied,	/* copied to request */
 				tcp_flags;
+	/*
+	 * Disconnection of idle sockets
+	 */
+	struct work_struct	task_cleanup;
+	struct timer_list	timer;
+	unsigned long		last_used;
 
 	/*
 	 * Send stuff
@@ -202,6 +208,7 @@ int			xprt_clear_backlog(struct rpc_xprt *);
 void			xprt_sock_setbufsize(struct rpc_xprt *);
 
 #define XPRT_CONNECT	0
+#define XPRT_LOCKED	1
 
 #define xprt_connected(xp)		(test_bit(XPRT_CONNECT, &(xp)->sockstate))
 #define xprt_set_connected(xp)		(set_bit(XPRT_CONNECT, &(xp)->sockstate))
