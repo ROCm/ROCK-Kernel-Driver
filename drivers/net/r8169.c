@@ -698,7 +698,7 @@ static inline u32 rtl8169_tx_vlan_tag(struct rtl8169_private *tp,
 				      struct sk_buff *skb)
 {
 	return (tp->vlgrp && vlan_tx_tag_present(skb)) ?
-		TxVlanTag | cpu_to_be16(vlan_tx_tag_get(skb)) : 0x00;
+		TxVlanTag | swab16(vlan_tx_tag_get(skb)) : 0x00;
 }
 
 static void rtl8169_vlan_rx_register(struct net_device *dev,
@@ -733,12 +733,12 @@ static void rtl8169_vlan_rx_kill_vid(struct net_device *dev, unsigned short vid)
 static int rtl8169_rx_vlan_skb(struct rtl8169_private *tp, struct RxDesc *desc,
 			       struct sk_buff *skb)
 {
-	u32 opts2 = desc->opts2;
+	u32 opts2 = le32_to_cpu(desc->opts2);
 	int ret;
 
 	if (tp->vlgrp && (opts2 & RxVlanTag)) {
 		rtl8169_rx_hwaccel_skb(skb, tp->vlgrp,
-				       be16_to_cpu(opts2 & 0xffff));
+				       swab16(opts2 & 0xffff));
 		ret = 0;
 	} else
 		ret = -1;
@@ -2084,7 +2084,7 @@ rtl8169_tx_interrupt(struct net_device *dev, struct rtl8169_private *tp,
 
 static inline void rtl8169_rx_csum(struct sk_buff *skb, struct RxDesc *desc)
 {
-	u32 opts1 = desc->opts1;
+	u32 opts1 = le32_to_cpu(desc->opts1);
 	u32 status = opts1 & RxProtoMask;
 
 	if (((status == RxProtoTCP) && !(opts1 & TCPFail)) ||
