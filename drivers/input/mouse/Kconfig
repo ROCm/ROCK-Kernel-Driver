@@ -130,14 +130,3 @@ config MOUSE_VSXXXAA
 	  described in the source file). This driver should, in theory,
 	  also work with the digitizer DEC produced, but it isn't tested
 	  with that (I don't have the hardware yet).
-
-config MOUSE_PC9800
-	tristate "NEC PC-9800 busmouse"
-	depends on X86_PC9800 && INPUT && INPUT_MOUSE && ISA
-	help
-	  Say Y here if you have NEC PC-9801/PC-9821 computer and want its
-	  native mouse supported.
-
-	  To compile this driver as a module, choose M here: the
-	  module will be called 98busmouse.
-

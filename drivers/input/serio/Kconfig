@@ -97,16 +97,6 @@ config SERIO_SA1111
 	tristate "Intel SA1111 keyboard controller"
 	depends on SA1111 && SERIO
 
-config SERIO_98KBD
-	tristate "NEC PC-9800 keyboard controller"
-	depends on X86_PC9800 && SERIO
-	help
-	  Say Y here if you have the NEC PC-9801/PC-9821 and want to use its
-	  standard keyboard connected to its keyboard controller.
-
-	  To compile this driver as a module, choose M here: the
-	  module will be called 98kbd-io.
-
 config SERIO_GSCPS2
 	tristate "HP GSC PS/2 keyboard and PS/2 mouse controller"
 	depends on GSC && SERIO

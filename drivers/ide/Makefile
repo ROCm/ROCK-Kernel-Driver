@@ -29,7 +29,6 @@ ide-core-$(CONFIG_BLK_DEV_IDEPNP)	+= ide-pnp.o
 ide-core-$(CONFIG_IDE_ARM)		+= arm/ide_arm.o
 
 # built-in only drivers from legacy/
-ide-core-$(CONFIG_BLK_DEV_IDE_PC9800)	+= legacy/pc9800.o
 ide-core-$(CONFIG_BLK_DEV_BUDDHA)	+= legacy/buddha.o
 ide-core-$(CONFIG_BLK_DEV_FALCON_IDE)	+= legacy/falconide.o
 ide-core-$(CONFIG_BLK_DEV_GAYLE)	+= legacy/gayle.o

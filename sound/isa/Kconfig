@@ -51,16 +51,6 @@ config SND_CS4236
 	  Say 'Y' or 'M' to include support for CS4235,CS4236,CS4237B,CS4238B,CS4239
 	  chips from Cirrus Logic - Crystal Semiconductors.
 
-config SND_PC98_CS4232
-	tristate "NEC PC9800 CS4232 driver"
-	depends on SND && X86_PC9800
-	select SND_OPL3_LIB
-	select SND_MPU401_UART
-	select SND_PCM
-	help
-	  Say 'Y' or 'M' to include support for NEC PC-9801/PC-9821 on-board
-	  soundchip based on CS4232.
-
 config SND_ES968
 	tristate "Generic ESS ES968 driver"
 	depends on SND && ISAPNP

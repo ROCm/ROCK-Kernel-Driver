@@ -586,17 +586,6 @@ config HVC_CONSOLE
 	  console. This driver allows each pSeries partition to have a console
 	  which is accessed via the HMC.
 
-config PC9800_OLDLP
-	tristate "NEC PC-9800 old-style printer port support"
-	depends on X86_PC9800 && !PARPORT
-	---help---
-	  If you intend to attach a printer to the parallel port of NEC PC-9801
-	  /PC-9821 with OLD compatibility mode, Say Y.
-
-config PC9800_OLDLP_CONSOLE
-	bool "Support for console on line printer"
-	depends on PC9800_OLDLP
-
 config QIC02_TAPE
 	tristate "QIC-02 tape support"
 	help
@@ -740,7 +729,7 @@ config NVRAM
 
 config RTC
 	tristate "Enhanced Real Time Clock Support"
-	depends on !PPC32 && !PARISC && !IA64 && !X86_PC9800 && !M68K
+	depends on !PPC32 && !PARISC && !IA64 && !M68K
 	---help---
 	  If you say Y here and create a character special file /dev/rtc with
 	  major number 10 and minor number 135 using mknod ("man mknod"), you
@@ -792,15 +781,6 @@ config GEN_RTC_X
 config EFI_RTC
 	bool "EFI Real Time Clock Services"
 	depends on IA64
-
-config RTC98
-	tristate "NEC PC-9800 Real Time Clock Support"
-	depends on X86_PC9800
-	default y
-	---help---
-	  If you say Y here and create a character special file /dev/rtc with
-	  major number 10 and minor number 135 using mknod ("man mknod"), you
-	  will get access to the real time clock (or hardware clock) built
 
 config H8
 	bool "Tadpole ANA H8 Support (OBSOLETE)"
