@@ -846,6 +846,7 @@ static ide_startstop_t cdrom_start_packet_command(ide_drive_t *drive,
 	}
 
 	/* Set up the controller registers. */
+	/* FIXME: for Virtual DMA we must check harder */
 	HWIF(drive)->OUTB(info->dma, IDE_FEATURE_REG);
 	HWIF(drive)->OUTB(0, IDE_IREASON_REG);
 	HWIF(drive)->OUTB(0, IDE_SECTOR_REG);
