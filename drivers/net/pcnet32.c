@@ -1518,7 +1518,7 @@ pcnet32_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 
     rap = lp->a.read_rap(ioaddr);
     while ((csr0 = lp->a.read_csr (ioaddr, 0)) & 0x8600 && --boguscnt >= 0) {
-	if (csr == 0xffff) {
+	if (csr0 == 0xffff) {
 	    break;			/* PCMCIA remove happened */
 	}
 	/* Acknowledge all of the current interrupt sources ASAP. */
