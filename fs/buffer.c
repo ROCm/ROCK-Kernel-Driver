@@ -1640,8 +1640,6 @@ static int __block_write_full_page(struct inode *inode,
 	last_block = (inode->i_size - 1) >> inode->i_blkbits;
 
 	if (!page_has_buffers(page)) {
-		if (S_ISBLK(inode->i_mode))
-			buffer_error();
 		if (!PageUptodate(page))
 			buffer_error();
 		create_empty_buffers(page, 1 << inode->i_blkbits,
