@@ -1091,7 +1091,7 @@ out:
 #define IDLE_REBALANCE_TICK (HZ/1000 ?: 1)
 #define BUSY_REBALANCE_TICK (HZ/5 ?: 1)
 #define IDLE_NODE_REBALANCE_TICK (IDLE_REBALANCE_TICK * 5)
-#define BUSY_NODE_REBALANCE_TICK (BUSY_REBALANCE_TICK * 100)
+#define BUSY_NODE_REBALANCE_TICK (BUSY_REBALANCE_TICK * 2)
 
 #ifdef CONFIG_NUMA
 static void balance_node(runqueue_t *this_rq, int idle, int this_cpu)
