@@ -757,7 +757,7 @@ static inline void calc_load(unsigned long ticks)
 }
 
 /* jiffies at the most recent update of wall time */
-unsigned long wall_jiffies;
+unsigned long wall_jiffies = INITIAL_JIFFIES;
 
 /*
  * This read-write spinlock protects us from races in SMP while
@@ -1104,7 +1104,7 @@ asmlinkage long sys_sysinfo(struct sysinfo *info)
 	do {
 		seq = read_seqbegin(&xtime_lock);
 
-		uptime = jiffies_64;
+		uptime = jiffies_64 - INITIAL_JIFFIES;
 		do_div(uptime, HZ);
 		val.uptime = (unsigned long) uptime;
 
@@ -1180,6 +1180,13 @@ static void __devinit init_timers_cpu(int cpu)
 	}
 	for (j = 0; j < TVR_SIZE; j++)
 		INIT_LIST_HEAD(base->tv1.vec + j);
+
+	base->timer_jiffies = INITIAL_JIFFIES;
+	base->tv1.index = INITIAL_JIFFIES & TVR_MASK;
+	base->tv2.index = (INITIAL_JIFFIES >> TVR_BITS) & TVN_MASK;
+	base->tv3.index = (INITIAL_JIFFIES >> (TVR_BITS+TVN_BITS)) & TVN_MASK;
+	base->tv4.index = (INITIAL_JIFFIES >> (TVR_BITS+2*TVN_BITS)) & TVN_MASK;
+	base->tv5.index = (INITIAL_JIFFIES >> (TVR_BITS+3*TVN_BITS)) & TVN_MASK;
 }
 	
 static int __devinit timer_cpu_notify(struct notifier_block *self, 

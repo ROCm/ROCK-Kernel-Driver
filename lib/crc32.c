@@ -90,19 +90,16 @@ u32 attribute((pure)) crc32_le(u32 crc, unsigned char const *p, size_t len)
 	const u32      *tab = crc32table_le;
 
 # ifdef __LITTLE_ENDIAN
-#  define DO_CRC crc = (crc>>8) ^ tab[ crc & 255 ]
-#  define ENDIAN_SHIFT 0
+#  define DO_CRC(x) crc = tab[ (crc ^ (x)) & 255 ] ^ (crc>>8)
 # else
-#  define DO_CRC crc = (crc<<8) ^ tab[ crc >> 24 ]
-#  define ENDIAN_SHIFT 24
+#  define DO_CRC(x) crc = tab[ ((crc >> 24) ^ (x)) & 255] ^ (crc<<8)
 # endif
 
 	crc = __cpu_to_le32(crc);
 	/* Align it */
 	if(unlikely(((long)b)&3 && len)){
 		do {
-			crc ^= *((u8 *)b)++ << ENDIAN_SHIFT;
-			DO_CRC;
+			DO_CRC(*((u8 *)b)++);
 		} while ((--len) && ((long)b)&3 );
 	}
 	if(likely(len >= 4)){
@@ -112,10 +109,10 @@ u32 attribute((pure)) crc32_le(u32 crc, unsigned char const *p, size_t len)
 		--b; /* use pre increment below(*++b) for speed */
 		do {
 			crc ^= *++b;
-			DO_CRC;
-			DO_CRC;
-			DO_CRC;
-			DO_CRC;
+			DO_CRC(0);
+			DO_CRC(0);
+			DO_CRC(0);
+			DO_CRC(0);
 		} while (--len);
 		b++; /* point to next byte(s) */
 		len = save_len;
@@ -123,8 +120,7 @@ u32 attribute((pure)) crc32_le(u32 crc, unsigned char const *p, size_t len)
 	/* And the last few bytes */
 	if(len){
 		do {
-			crc ^= *((u8 *)b)++ << ENDIAN_SHIFT;
-			DO_CRC;
+			DO_CRC(*((u8 *)b)++);
 		} while (--len);
 	}
 
@@ -195,19 +191,16 @@ u32 attribute((pure)) crc32_be(u32 crc, unsigned char const *p, size_t len)
 	const u32      *tab = crc32table_be;
 
 # ifdef __LITTLE_ENDIAN
-#  define DO_CRC crc = (crc>>8) ^ tab[ crc & 255 ]
-#  define ENDIAN_SHIFT 24
+#  define DO_CRC(x) crc = tab[ (crc ^ (x)) & 255 ] ^ (crc>>8)
 # else
-#  define DO_CRC crc = (crc<<8) ^ tab[ crc >> 24 ]
-#  define ENDIAN_SHIFT 0
+#  define DO_CRC(x) crc = tab[ ((crc >> 24) ^ (x)) & 255] ^ (crc<<8)
 # endif
 
 	crc = __cpu_to_be32(crc);
 	/* Align it */
 	if(unlikely(((long)b)&3 && len)){
 		do {
-			crc ^= *((u8 *)b)++ << ENDIAN_SHIFT;
-			DO_CRC;
+			DO_CRC(*((u8 *)b)++);
 		} while ((--len) && ((long)b)&3 );
 	}
 	if(likely(len >= 4)){
@@ -217,10 +210,10 @@ u32 attribute((pure)) crc32_be(u32 crc, unsigned char const *p, size_t len)
 		--b; /* use pre increment below(*++b) for speed */
 		do {
 			crc ^= *++b;
-			DO_CRC;
-			DO_CRC;
-			DO_CRC;
-			DO_CRC;
+			DO_CRC(0);
+			DO_CRC(0);
+			DO_CRC(0);
+			DO_CRC(0);
 		} while (--len);
 		b++; /* point to next byte(s) */
 		len = save_len;
@@ -228,8 +221,7 @@ u32 attribute((pure)) crc32_be(u32 crc, unsigned char const *p, size_t len)
 	/* And the last few bytes */
 	if(len){
 		do {
-			crc ^= *((u8 *)b)++ << ENDIAN_SHIFT;
-			DO_CRC;
+			DO_CRC(*((u8 *)b)++);
 		} while (--len);
 	}
 	return __be32_to_cpu(crc);

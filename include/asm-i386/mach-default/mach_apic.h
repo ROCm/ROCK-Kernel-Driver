@@ -9,7 +9,7 @@
  #define TARGET_CPUS 0x01
 #endif
 
-#define no_balance_irq (0)
+#define NO_BALANCE_IRQ (0)
 #define esr_disable (0)
 
 #define INT_DELIVERY_MODE dest_LowestPrio

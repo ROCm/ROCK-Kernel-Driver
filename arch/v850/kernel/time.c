@@ -25,7 +25,7 @@
 
 #include "mach.h"
 
-u64 jiffies_64;
+u64 jiffies_64 = INITIAL_JIFFIES;
 
 #define TICK_SIZE	(tick_nsec / 1000)
 

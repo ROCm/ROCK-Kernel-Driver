@@ -870,7 +870,7 @@ asmlinkage long sys_times(struct tms * tbuf)
 		if (copy_to_user(tbuf, &tmp, sizeof(struct tms)))
 			return -EFAULT;
 	}
-	return jiffies_to_clock_t(jiffies);
+	return (long) jiffies_64_to_clock_t(get_jiffies_64());
 }
 
 /*

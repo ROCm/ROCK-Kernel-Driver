@@ -70,7 +70,7 @@
 #endif /* CONFIG_CPU_SUBTYPE_ST40STB1 */
 #endif /* __sh3__ or __SH4__ */
 
-u64 jiffies_64;
+u64 jiffies_64 = INITIAL_JIFFIES;
 
 extern unsigned long wall_jiffies;
 #define TICK_SIZE tick

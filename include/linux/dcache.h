@@ -262,6 +262,8 @@ extern char * d_path(struct dentry *, struct vfsmount *, char *, int);
 static __inline__ struct dentry * dget(struct dentry *dentry)
 {
 	if (dentry) {
+		if (!atomic_read(&dentry->d_count))
+			BUG();
 		atomic_inc(&dentry->d_count);
 		dentry->d_vfs_flags |= DCACHE_REFERENCED;
 	}

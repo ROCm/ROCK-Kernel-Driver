@@ -60,6 +60,7 @@ int blk_do_rq(request_queue_t *q, struct block_device *bdev, struct request *rq)
 
 	rq->flags |= REQ_NOMERGE;
 	rq->waiting = &wait;
+        drive_stat_acct(rq, rq->nr_sectors, 1);
 	elv_add_request(q, rq, 1, 1);
 	generic_unplug_device(q);
 	wait_for_completion(&wait);

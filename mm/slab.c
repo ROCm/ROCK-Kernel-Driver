@@ -1643,7 +1643,7 @@ cache_alloc_debugcheck_after(kmem_cache_t *cachep,
 	if (cachep->ctor && cachep->flags & SLAB_POISON) {
 		unsigned long	ctor_flags = SLAB_CTOR_CONSTRUCTOR;
 
-		if (!flags & __GFP_WAIT)
+		if (!(flags & __GFP_WAIT))
 			ctor_flags |= SLAB_CTOR_ATOMIC;
 
 		cachep->ctor(objp, cachep, ctor_flags);
@@ -2064,7 +2064,7 @@ static void enable_cpucache (kmem_cache_t *cachep)
 	else
 		limit = 248;
 
-#ifndef DEBUG
+#if DEBUG
 	/* With debugging enabled, large batchcount lead to excessively
 	 * long periods with disabled local interrupts. Limit the 
 	 * batchcount
