@@ -109,7 +109,7 @@ static inline int reiserfs_delete_xattrs (struct inode *inode) { return 0; };
 static inline int reiserfs_chown_xattrs (struct inode *inode, struct iattr *attrs) { return 0; };
 static inline int reiserfs_xattr_init (struct super_block *sb, int mount_flags)
 {
-    s->s_flags = (s->s_flags & ~MS_POSIXACL); /* to be sure */
+    sb->s_flags = (sb->s_flags & ~MS_POSIXACL); /* to be sure */
     return 0;
 };
 #endif
