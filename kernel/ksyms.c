@@ -559,7 +559,6 @@ EXPORT_SYMBOL(buffer_insert_list);
 EXPORT_SYMBOL(make_bad_inode);
 EXPORT_SYMBOL(is_bad_inode);
 EXPORT_SYMBOL(event);
-EXPORT_SYMBOL(brw_page);
 
 #ifdef CONFIG_UID16
 EXPORT_SYMBOL(overflowuid);

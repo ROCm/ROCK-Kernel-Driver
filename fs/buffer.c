@@ -492,7 +492,7 @@ static void free_more_memory(void)
 }
 
 /*
- * I/O completion handler for block_read_full_page() and brw_page() - pages
+ * I/O completion handler for block_read_full_page() - pages
  * which come unlocked at the end of I/O.
  */
 static void end_buffer_async_read(struct buffer_head *bh, int uptodate)
@@ -551,9 +551,8 @@ still_busy:
 }
 
 /*
- * Completion handler for block_write_full_page() and for brw_page() - pages
- * which are unlocked during I/O, and which have PageWriteback cleared
- * upon I/O completion.
+ * Completion handler for block_write_full_page() - pages which are unlocked
+ * during I/O, and which have PageWriteback cleared upon I/O completion.
  */
 static void end_buffer_async_write(struct buffer_head *bh, int uptodate)
 {
@@ -1360,11 +1359,11 @@ int block_invalidatepage(struct page *page, unsigned long offset)
 {
 	struct buffer_head *head, *bh, *next;
 	unsigned int curr_off = 0;
+	int ret = 1;
 
-	if (!PageLocked(page))
-		BUG();
+	BUG_ON(!PageLocked(page));
 	if (!page_has_buffers(page))
-		return 1;
+		goto out;
 
 	head = page_buffers(page);
 	bh = head;
@@ -1386,12 +1385,10 @@ int block_invalidatepage(struct page *page, unsigned long offset)
 	 * The get_block cached value has been unconditionally invalidated,
 	 * so real IO is not possible anymore.
 	 */
-	if (offset == 0) {
-		if (!try_to_release_page(page, 0))
-			return 0;
-	}
-
-	return 1;
+	if (offset == 0)
+		ret = try_to_release_page(page, 0);
+out:
+	return ret;
 }
 EXPORT_SYMBOL(block_invalidatepage);
 
@@ -2264,57 +2261,6 @@ int brw_kiovec(int rw, int nr, struct kiobuf *iovec[],
 	}
 
 	return err ? err : transferred;
-}
-
-/*
- * Start I/O on a page.
- * This function expects the page to be locked and may return
- * before I/O is complete. You then have to check page->locked
- * and page->uptodate.
- *
- * FIXME: we need a swapper_inode->get_block function to remove
- *        some of the bmap kludges and interface ugliness here.
- */
-int brw_page(int rw, struct page *page,
-		struct block_device *bdev, sector_t b[], int size)
-{
-	struct buffer_head *head, *bh;
-
-	BUG_ON(!PageLocked(page));
-
-	if (!page_has_buffers(page))
-		create_empty_buffers(page, size, 0);
-	head = bh = page_buffers(page);
-
-	/* Stage 1: lock all the buffers */
-	do {
-		lock_buffer(bh);
-		bh->b_blocknr = *(b++);
-		bh->b_bdev = bdev;
-		set_buffer_mapped(bh);
-		if (rw == WRITE) {
-			set_buffer_uptodate(bh);
-			clear_buffer_dirty(bh);
-			mark_buffer_async_write(bh);
-		} else {
-			mark_buffer_async_read(bh);
-		}
-		bh = bh->b_this_page;
-	} while (bh != head);
-
-	if (rw == WRITE) {
-		BUG_ON(PageWriteback(page));
-		SetPageWriteback(page);
-		unlock_page(page);
-	}
-
-	/* Stage 2: start the IO */
-	do {
-		struct buffer_head *next = bh->b_this_page;
-		submit_bh(rw, bh);
-		bh = next;
-	} while (bh != head);
-	return 0;
 }
 
 /*

@@ -183,7 +183,6 @@ struct buffer_head * __bread(struct block_device *, int, int);
 void wakeup_bdflush(void);
 struct buffer_head *alloc_buffer_head(int async);
 void free_buffer_head(struct buffer_head * bh);
-int brw_page(int, struct page *, struct block_device *, sector_t [], int);
 void FASTCALL(unlock_buffer(struct buffer_head *bh));
 
 /*
