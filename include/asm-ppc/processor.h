@@ -771,7 +771,7 @@ void _nmask_and_or_msr(unsigned long nmask, unsigned long or_val);
 
 #define have_of (_machine == _MACH_chrp || _machine == _MACH_Pmac)
 
-#define cpu_relax()	do { } while (0)
+#define cpu_relax()	barrier()
 
 /*
  * Prefetch macros.

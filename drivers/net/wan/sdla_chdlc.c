@@ -2852,7 +2852,7 @@ static void process_route (sdla_t *card)
 #endif
 		if(err) {
 			printk(KERN_INFO
-				"%s: Remove route %s failed, (err %d)\n",
+				"%s: Remove route %u.%u.%u.%u failed, (err %d)\n",
 					card->devname, NIPQUAD(remote_IP_addr),
 					err);
 		} else {

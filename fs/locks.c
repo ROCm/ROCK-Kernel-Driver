@@ -477,27 +477,21 @@ static void locks_insert_lock(struct file_lock **pos, struct file_lock *fl)
 }
 
 /*
- * Remove lock from the lock lists
+ * Delete a lock and then free it.
+ * Wake up processes that are blocked waiting for this lock,
+ * notify the FS that the lock has been cleared and
+ * finally free the lock.
  */
-static inline void _unhash_lock(struct file_lock **thisfl_p)
+static void locks_delete_lock(struct file_lock **thisfl_p)
 {
 	struct file_lock *fl = *thisfl_p;
 
 	*thisfl_p = fl->fl_next;
 	fl->fl_next = NULL;
-
 	list_del_init(&fl->fl_link);
-}
 
-/*
- * Wake up processes that are blocked waiting for this lock,
- * notify the FS that the lock has been cleared and
- * finally free the lock.
- */
-static inline void _delete_lock(struct file_lock *fl)
-{
 	fasync_helper(0, fl->fl_file, 0, &fl->fl_fasync);
-	if (fl->fl_fasync != NULL){
+	if (fl->fl_fasync != NULL) {
 		printk(KERN_ERR "locks_delete_lock: fasync == %p\n", fl->fl_fasync);
 		fl->fl_fasync = NULL;
 	}
@@ -507,36 +501,6 @@ static inline void _delete_lock(struct file_lock *fl)
 
 	locks_wake_up_blocks(fl);
 	locks_free_lock(fl);
-}
-
-/*
- * Delete a lock and then free it.
- */
-static void locks_delete_lock(struct file_lock **thisfl_p)
-{
-	struct file_lock *fl = *thisfl_p;
-
-	_unhash_lock(thisfl_p);
-	_delete_lock(fl);
-}
-
-/*
- * Call back client filesystem in order to get it to unregister a lock,
- * then delete lock. Essentially useful only in locks_remove_*().
- * Note: this must be called with the semaphore already held!
- */
-static inline void locks_unlock_delete(struct file_lock **thisfl_p)
-{
-	struct file_lock *fl = *thisfl_p;
-	int (*lock)(struct file *, int, struct file_lock *);
-
-	_unhash_lock(thisfl_p);
-	if (fl->fl_file->f_op &&
-	    (lock = fl->fl_file->f_op->lock) != NULL) {
-		fl->fl_type = F_UNLCK;
-		lock(fl->fl_file, F_SETLK, fl);
-	}
-	_delete_lock(fl);
 }
 
 /* Determine if lock sys_fl blocks lock caller_fl. Common functionality
@@ -1638,37 +1602,27 @@ out:
 
 /*
  * This function is called when the file is being removed
- * from the task's fd array.
+ * from the task's fd array.  POSIX locks belonging to this task
+ * are deleted at this time.
  */
 void locks_remove_posix(struct file *filp, fl_owner_t owner)
 {
-	struct inode * inode = filp->f_dentry->d_inode;
-	struct file_lock *fl;
-	struct file_lock **before;
+	struct file_lock lock;
 
-	/*
-	 * For POSIX locks we free all locks on this file for the given task.
-	 */
-	if (!inode->i_flock) {
-		/*
-		 * Notice that something might be grabbing a lock right now.
-		 * Consider it as a race won by us - event is async, so even if
-		 * we miss the lock added we can trivially consider it as added
-		 * after we went through this call.
-		 */
-		return;
+	lock.fl_type = F_UNLCK;
+	lock.fl_flags = FL_POSIX;
+	lock.fl_start = 0;
+	lock.fl_end = OFFSET_MAX;
+	lock.fl_owner = owner;
+	lock.fl_pid = current->pid;
+	lock.fl_file = filp;
+
+	if (filp->f_op && filp->f_op->lock != NULL) {
+		filp->f_op->lock(filp, F_SETLK, &lock);
+		/* Ignore any error -- we must remove the locks anyway */
 	}
-	lock_kernel();
-	before = &inode->i_flock;
-	while ((fl = *before) != NULL) {
-		if (IS_POSIX(fl) && fl->fl_owner == owner) {
-			locks_unlock_delete(before);
-			before = &inode->i_flock;
-			continue;
-		}
-		before = &fl->fl_next;
-	}
-	unlock_kernel();
+
+	posix_lock_file(filp, &lock, 0);
 }
 
 /*

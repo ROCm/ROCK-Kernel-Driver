@@ -5,7 +5,8 @@
 O_TARGET	:= kernel.o
 EXTRA_TARGETS	:= head.o init_task.o
 
-export-objs	:= io.o io_generic.o io_hd64461.o setup_hd64461.o sh_ksyms.o
+export-objs	:= io.o io_generic.o io_hd64465.o setup_hd64465.o sh_ksyms.o \
+		   io_adx.o io_bigsur.o io_cat68701.o hd64465_gpio.o
 
 obj-y	:= process.o signal.o entry.o traps.o irq.o irq_ipr.o \
 	ptrace.o setup.o time.o sys_sh.o semaphore.o \

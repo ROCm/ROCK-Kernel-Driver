@@ -74,7 +74,7 @@ unsigned long get_wchan(struct task_struct *p);
 #define KSTK_ESP(tsk) \
   ((tsk) == current ? rdusp() : (tsk)->thread_info->pcb.usp)
 
-#define cpu_relax()	do { } while (0)
+#define cpu_relax()	barrier()
 
 #define ARCH_HAS_PREFETCH
 #define ARCH_HAS_PREFETCHW

@@ -2,7 +2,7 @@
 # Makefile for the Linux IPX layer.
 #
 
-export-objs = af_ipx.o af_spx.o
+export-objs = af_ipx.o
 
 obj-$(CONFIG_IPX) += ipx.o
 

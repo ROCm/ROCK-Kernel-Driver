@@ -5,7 +5,7 @@
 
 O_TARGET := baget.a
 
-export-objs		:= vacserial.o vacrtc.o
+export-objs		:= vacserial.o
 obj-y			:= baget.o print.o setup.o time.o irq.o bagetIRQ.o \
 			   reset.o wbflush.o
 obj-$(CONFIG_SERIAL)	+= vacserial.o
