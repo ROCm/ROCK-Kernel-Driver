@@ -3208,6 +3208,8 @@ __nfs4_state_shutdown(void)
 {
 	int i;
 	struct nfs4_client *clp = NULL;
+	struct nfs4_delegation *dp = NULL;
+	struct list_head *pos, *next;
 
 	for (i = 0; i < CLIENT_HASH_SIZE; i++) {
 		while (!list_empty(&conf_id_hashtbl[i])) {
@@ -3219,6 +3221,14 @@ __nfs4_state_shutdown(void)
 			expire_client(clp);
 		}
 	}
+	spin_lock(&recall_lock);
+	list_for_each_safe(pos, next, &del_recall_lru) {
+		dp = list_entry (pos, struct nfs4_delegation, dl_recall_lru);
+		atomic_set(&dp->dl_state, NFS4_RECALL_COMPLETE);
+		release_delegation(dp);
+	}
+	spin_unlock(&recall_lock);
+
 	release_all_files();
 	cancel_delayed_work(&laundromat_work);
 	flush_scheduled_work();
