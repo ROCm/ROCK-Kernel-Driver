@@ -5,7 +5,7 @@
  *
  * This code is GPL
  *
- * $Id: mtdpart.c,v 1.49 2004/08/10 13:41:27 dwmw2 Exp $
+ * $Id: mtdpart.c,v 1.50 2004/08/10 16:18:34 dwmw2 Exp $
  *
  * 	02-21-2002	Thomas Gleixner <gleixner@autronix.de>
  *			added support for read_oob, write_oob
@@ -261,6 +261,7 @@ void mtd_erase_callback(struct erase_info *instr)
 	if (instr->callback)
 		instr->callback(instr);
 }
+EXPORT_SYMBOL_GPL(mtd_erase_callback);
 
 static int part_lock (struct mtd_info *mtd, loff_t ofs, size_t len)
 {
