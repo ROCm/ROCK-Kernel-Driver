@@ -31,8 +31,7 @@
 MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>");
 MODULE_DESCRIPTION("EMU10K1");
 MODULE_LICENSE("GPL");
-MODULE_CLASSES("{sound}");
-MODULE_DEVICES("{{Creative Labs,SB Live!/PCI512/E-mu APS},"
+MODULE_SUPPORTED_DEVICE("{{Creative Labs,SB Live!/PCI512/E-mu APS},"
 	       "{Creative Labs,SB Audigy}}");
 
 #if defined(CONFIG_SND_SEQUENCER) || (defined(MODULE) && defined(CONFIG_SND_SEQUENCER_MODULE))
@@ -53,37 +52,25 @@ static int boot_devs;
 
 module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for the EMU10K1 soundcard.");
-MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
 module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for the EMU10K1 soundcard.");
-MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
 module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable the EMU10K1 soundcard.");
-MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
 module_param_array(extin, int, boot_devs, 0444);
 MODULE_PARM_DESC(extin, "Available external inputs for FX8010. Zero=default.");
-MODULE_PARM_SYNTAX(extin, SNDRV_ENABLED "allows:{{0,0x0ffff}},base:16");
 module_param_array(extout, int, boot_devs, 0444);
 MODULE_PARM_DESC(extout, "Available external outputs for FX8010. Zero=default.");
-MODULE_PARM_SYNTAX(extout, SNDRV_ENABLED "allows:{{0,0x0ffff}},base:16");
 module_param_array(seq_ports, int, boot_devs, 0444);
 MODULE_PARM_DESC(seq_ports, "Allocated sequencer ports for internal synthesizer.");
-MODULE_PARM_SYNTAX(seq_ports, SNDRV_ENABLED "allows:{{0,32}}");
 module_param_array(max_synth_voices, int, boot_devs, 0444);
 MODULE_PARM_DESC(max_synth_voices, "Maximum number of voices for WaveTable.");
-MODULE_PARM_SYNTAX(max_synth_voices, SNDRV_ENABLED);
 module_param_array(max_buffer_size, int, boot_devs, 0444);
 MODULE_PARM_DESC(max_buffer_size, "Maximum sample buffer size in MB.");
-MODULE_PARM_SYNTAX(max_buffer_size, SNDRV_ENABLED);
 module_param_array(enable_ir, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable_ir, "Enable IR.");
-MODULE_PARM_SYNTAX(enable_ir, SNDRV_ENABLE_DESC);
 
 static struct pci_device_id snd_emu10k1_ids[] = {
 	{ 0x1102, 0x0002, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },	/* EMU10K1 */
-#if 0 /* FIXME: not working! */
-	{ 0x1102, 0x0006, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },	/* Dell OEM version (EMU10K1) */
-#endif
 	{ 0x1102, 0x0004, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 1 },	/* Audigy */
 	{ 0, }
 };
@@ -131,10 +118,6 @@ static int __devinit snd_card_emu10k1_probe(struct pci_dev *pci,
 		return err;
 	}		
 	if ((err = snd_emu10k1_pcm_efx(emu, 2, NULL)) < 0) {
-		snd_card_free(card);
-		return err;
-	}		
-	if ((err = snd_emu10k1_fx8010_pcm(emu, 3, NULL)) < 0) {
 		snd_card_free(card);
 		return err;
 	}		

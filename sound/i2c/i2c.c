@@ -62,13 +62,13 @@ static int snd_i2c_bus_free(snd_i2c_bus_t *bus)
 	}
 	if (bus->private_free)
 		bus->private_free(bus);
-	snd_magic_kfree(bus);
+	kfree(bus);
 	return 0;
 }
 
 static int snd_i2c_bus_dev_free(snd_device_t *device)
 {
-	snd_i2c_bus_t *bus = snd_magic_cast(snd_i2c_bus_t, device->device_data, return -ENXIO);
+	snd_i2c_bus_t *bus = device->device_data;
 	return snd_i2c_bus_free(bus);
 }
 
@@ -81,7 +81,7 @@ int snd_i2c_bus_create(snd_card_t *card, const char *name, snd_i2c_bus_t *master
 	};
 
 	*ri2c = NULL;
-	bus = (snd_i2c_bus_t *)snd_magic_kcalloc(snd_i2c_bus_t, 0, GFP_KERNEL);
+	bus = kcalloc(1, sizeof(*bus), GFP_KERNEL);
 	if (bus == NULL)
 		return -ENOMEM;
 	init_MUTEX(&bus->lock_mutex);
@@ -108,7 +108,7 @@ int snd_i2c_device_create(snd_i2c_bus_t *bus, const char *name, unsigned char ad
 
 	*rdevice = NULL;
 	snd_assert(bus != NULL, return -EINVAL);
-	device = (snd_i2c_device_t *)snd_magic_kcalloc(snd_i2c_device_t, 0, GFP_KERNEL);
+	device = kcalloc(1, sizeof(*device), GFP_KERNEL);
 	if (device == NULL)
 		return -ENOMEM;
 	device->addr = addr;
@@ -125,7 +125,7 @@ int snd_i2c_device_free(snd_i2c_device_t *device)
 		list_del(&device->list);
 	if (device->private_free)
 		device->private_free(device);
-	snd_magic_kfree(device);
+	kfree(device);
 	return 0;
 }
 

@@ -30,9 +30,8 @@ struct device;
  * buffer device info
  */
 struct snd_dma_device {
-	int type;			/* SNDRV_MEM_TYPE_XXX */
+	int type;			/* SNDRV_DMA_TYPE_XXX */
 	struct device *dev;		/* generic device */
-	unsigned int id;		/* a unique ID */
 };
 
 #ifndef snd_dma_pci_data
@@ -56,6 +55,7 @@ struct snd_dma_device {
  * info for buffer allocation
  */
 struct snd_dma_buffer {
+	struct snd_dma_device dev;	/* device type */
 	unsigned char *area;	/* virtual pointer */
 	dma_addr_t addr;	/* physical address */
 	size_t bytes;		/* buffer size in bytes */
@@ -76,7 +76,7 @@ struct snd_sg_buf {
 	int tblsize;	/* allocated table size */
 	struct snd_sg_page *table;	/* address table */
 	struct page **page_table;	/* page table (for vmap/vunmap) */
-	struct snd_dma_device dev;
+	struct device *dev;
 };
 
 /*
@@ -97,20 +97,21 @@ static inline dma_addr_t snd_sgbuf_get_addr(struct snd_sg_buf *sgbuf, size_t off
 
 
 /* allocate/release a buffer */
-int snd_dma_alloc_pages(const struct snd_dma_device *dev, size_t size,
+int snd_dma_alloc_pages(int type, struct device *dev, size_t size,
 			struct snd_dma_buffer *dmab);
-int snd_dma_alloc_pages_fallback(const struct snd_dma_device *dev, size_t size,
+int snd_dma_alloc_pages_fallback(int type, struct device *dev, size_t size,
                                  struct snd_dma_buffer *dmab);
-void snd_dma_free_pages(const struct snd_dma_device *dev, struct snd_dma_buffer *dmab);
+void snd_dma_free_pages(struct snd_dma_buffer *dmab);
 
 /* buffer-preservation managements */
-size_t snd_dma_get_reserved(const struct snd_dma_device *dev, struct snd_dma_buffer *dmab);
-int snd_dma_free_reserved(const struct snd_dma_device *dev);
-int snd_dma_set_reserved(const struct snd_dma_device *dev, struct snd_dma_buffer *dmab);
+
+#define snd_dma_pci_buf_id(pci)	(((unsigned int)(pci)->vendor << 16) | (pci)->device)
+
+size_t snd_dma_get_reserved_buf(struct snd_dma_buffer *dmab, unsigned int id);
+int snd_dma_reserve_buf(struct snd_dma_buffer *dmab, unsigned int id);
 
 /* basic memory allocation functions */
 void *snd_malloc_pages(size_t size, unsigned int gfp_flags);
-void *snd_malloc_pages_fallback(size_t size, unsigned int gfp_flags, size_t *res_size);
 void snd_free_pages(void *ptr, size_t size);
 
 #endif /* __SOUND_MEMALLOC_H */

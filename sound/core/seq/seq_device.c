@@ -48,8 +48,6 @@
 MODULE_AUTHOR("Takashi Iwai <tiwai@suse.de>");
 MODULE_DESCRIPTION("ALSA sequencer device management");
 MODULE_LICENSE("GPL");
-MODULE_CLASSES("{sound}");
-MODULE_SUPPORTED_DEVICE("sound");
 
 /*
  * driver list
@@ -181,7 +179,7 @@ int snd_seq_device_new(snd_card_t *card, int device, char *id, int argsize,
 	if (ops == NULL)
 		return -ENOMEM;
 
-	dev = snd_magic_kcalloc(snd_seq_device_t, sizeof(*dev) + argsize, GFP_KERNEL);
+	dev = kcalloc(1, sizeof(*dev)*2 + argsize, GFP_KERNEL);
 	if (dev == NULL) {
 		unlock_driver(ops);
 		return -ENOMEM;
@@ -235,7 +233,7 @@ static int snd_seq_device_free(snd_seq_device_t *dev)
 	free_device(dev, ops);
 	if (dev->private_free)
 		dev->private_free(dev);
-	snd_magic_kfree(dev);
+	kfree(dev);
 
 	unlock_driver(ops);
 
@@ -244,7 +242,7 @@ static int snd_seq_device_free(snd_seq_device_t *dev)
 
 static int snd_seq_device_dev_free(snd_device_t *device)
 {
-	snd_seq_device_t *dev = snd_magic_cast(snd_seq_device_t, device->device_data, return -ENXIO);
+	snd_seq_device_t *dev = device->device_data;
 	return snd_seq_device_free(dev);
 }
 
@@ -253,7 +251,7 @@ static int snd_seq_device_dev_free(snd_device_t *device)
  */
 static int snd_seq_device_dev_register(snd_device_t *device)
 {
-	snd_seq_device_t *dev = snd_magic_cast(snd_seq_device_t, device->device_data, return -ENXIO);
+	snd_seq_device_t *dev = device->device_data;
 	ops_list_t *ops;
 
 	ops = find_driver(dev->id, 0);
@@ -275,7 +273,7 @@ static int snd_seq_device_dev_register(snd_device_t *device)
  */
 static int snd_seq_device_dev_disconnect(snd_device_t *device)
 {
-	snd_seq_device_t *dev = snd_magic_cast(snd_seq_device_t, device->device_data, return -ENXIO);
+	snd_seq_device_t *dev = device->device_data;
 	ops_list_t *ops;
 
 	ops = find_driver(dev->id, 0);
@@ -293,7 +291,7 @@ static int snd_seq_device_dev_disconnect(snd_device_t *device)
  */
 static int snd_seq_device_dev_unregister(snd_device_t *device)
 {
-	snd_seq_device_t *dev = snd_magic_cast(snd_seq_device_t, device->device_data, return -ENXIO);
+	snd_seq_device_t *dev = device->device_data;
 	return snd_seq_device_free(dev);
 }
 

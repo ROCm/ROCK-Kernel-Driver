@@ -30,14 +30,11 @@
 #include <sound/opl3.h>
 #include <sound/initval.h>
 
-#define chip_t cs4231_t
-
 MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>");
 MODULE_LICENSE("GPL");
-MODULE_CLASSES("{sound}");
 #ifdef CS4232
 MODULE_DESCRIPTION("Cirrus Logic CS4232");
-MODULE_DEVICES("{{Turtle Beach,TBS-2000},"
+MODULE_SUPPORTED_DEVICE("{{Turtle Beach,TBS-2000},"
 		"{Turtle Beach,Tropez Plus},"
 		"{SIC CrystalWave 32},"
 		"{Hewlett Packard,Omnibook 5500},"
@@ -45,7 +42,7 @@ MODULE_DEVICES("{{Turtle Beach,TBS-2000},"
 		"{Philips,PCA70PS}}");
 #else
 MODULE_DESCRIPTION("Cirrus Logic CS4235-9");
-MODULE_DEVICES("{{Crystal Semiconductors,CS4235},"
+MODULE_SUPPORTED_DEVICE("{{Crystal Semiconductors,CS4235},"
 		"{Crystal Semiconductors,CS4236},"
 		"{Crystal Semiconductors,CS4237},"
 		"{Crystal Semiconductors,CS4238},"
@@ -99,45 +96,32 @@ static int boot_devs;
 
 module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for " IDENT " soundcard.");
-MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
 module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for " IDENT " soundcard.");
-MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
 module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable " IDENT " soundcard.");
-MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
 #ifdef CONFIG_PNP
 module_param_array(isapnp, bool, boot_devs, 0444);
 MODULE_PARM_DESC(isapnp, "ISA PnP detection for specified soundcard.");
-MODULE_PARM_SYNTAX(isapnp, SNDRV_ISAPNP_DESC);
 #endif
 module_param_array(port, long, boot_devs, 0444);
 MODULE_PARM_DESC(port, "Port # for " IDENT " driver.");
-MODULE_PARM_SYNTAX(port, SNDRV_PORT12_DESC);
 module_param_array(cport, long, boot_devs, 0444);
 MODULE_PARM_DESC(cport, "Control port # for " IDENT " driver.");
-MODULE_PARM_SYNTAX(cport, SNDRV_PORT12_DESC);
 module_param_array(mpu_port, long, boot_devs, 0444);
 MODULE_PARM_DESC(mpu_port, "MPU-401 port # for " IDENT " driver.");
-MODULE_PARM_SYNTAX(mpu_port, SNDRV_PORT12_DESC);
 module_param_array(fm_port, long, boot_devs, 0444);
 MODULE_PARM_DESC(fm_port, "FM port # for " IDENT " driver.");
-MODULE_PARM_SYNTAX(fm_port, SNDRV_PORT12_DESC);
 module_param_array(sb_port, long, boot_devs, 0444);
 MODULE_PARM_DESC(sb_port, "SB port # for " IDENT " driver (optional).");
-MODULE_PARM_SYNTAX(sb_port, SNDRV_PORT12_DESC);
 module_param_array(irq, int, boot_devs, 0444);
 MODULE_PARM_DESC(irq, "IRQ # for " IDENT " driver.");
-MODULE_PARM_SYNTAX(irq, SNDRV_IRQ_DESC);
 module_param_array(mpu_irq, int, boot_devs, 0444);
 MODULE_PARM_DESC(mpu_irq, "MPU-401 IRQ # for " IDENT " driver.");
-MODULE_PARM_SYNTAX(mpu_irq, SNDRV_IRQ_DESC);
 module_param_array(dma1, int, boot_devs, 0444);
 MODULE_PARM_DESC(dma1, "DMA1 # for " IDENT " driver.");
-MODULE_PARM_SYNTAX(dma1, SNDRV_DMA_DESC);
 module_param_array(dma2, int, boot_devs, 0444);
 MODULE_PARM_DESC(dma2, "DMA2 # for " IDENT " driver.");
-MODULE_PARM_SYNTAX(dma2, SNDRV_DMA_DESC);
 
 struct snd_card_cs4236 {
 	struct resource *res_sb_port;

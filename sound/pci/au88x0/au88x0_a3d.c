@@ -567,7 +567,7 @@ static int Vort3DRend_Initialize(vortex_t * v, unsigned short mode)
 	v->xt_mode = mode;	/* this_14 */
 
 	vortex_XtalkHw_init(v);
-	vortex_XtalkHw_SetGains(v, asXtalkGainsAllChan);
+	vortex_XtalkHw_SetGainsAllChan(v);
 	switch (v->xt_mode) {
 	case XT_SPEAKER0:
 		vortex_XtalkHw_ProgramXtalkNarrow(v);
@@ -862,9 +862,8 @@ static int vortex_a3d_register_controls(vortex_t * vortex)
 	/* HRTF controls. */
 	for (i = 0; i < NR_A3D; i++) {
 		if ((kcontrol =
-		     snd_ctl_new1(&vortex_a3d_kcontrol, vortex)) == NULL)
+		     snd_ctl_new1(&vortex_a3d_kcontrol, &vortex->a3d[i])) == NULL)
 			return -ENOMEM;
-		kcontrol->private_data = &vortex->a3d[i];
 		kcontrol->id.numid = CTRLID_HRTF;
 		kcontrol->info = snd_vortex_a3d_hrtf_info;
 		kcontrol->put = snd_vortex_a3d_hrtf_put;
@@ -874,9 +873,8 @@ static int vortex_a3d_register_controls(vortex_t * vortex)
 	/* ITD controls. */
 	for (i = 0; i < NR_A3D; i++) {
 		if ((kcontrol =
-		     snd_ctl_new1(&vortex_a3d_kcontrol, vortex)) == NULL)
+		     snd_ctl_new1(&vortex_a3d_kcontrol, &vortex->a3d[i])) == NULL)
 			return -ENOMEM;
-		kcontrol->private_data = &vortex->a3d[i];
 		kcontrol->id.numid = CTRLID_ITD;
 		kcontrol->info = snd_vortex_a3d_itd_info;
 		kcontrol->put = snd_vortex_a3d_itd_put;
@@ -886,9 +884,8 @@ static int vortex_a3d_register_controls(vortex_t * vortex)
 	/* ILD (gains) controls. */
 	for (i = 0; i < NR_A3D; i++) {
 		if ((kcontrol =
-		     snd_ctl_new1(&vortex_a3d_kcontrol, vortex)) == NULL)
+		     snd_ctl_new1(&vortex_a3d_kcontrol, &vortex->a3d[i])) == NULL)
 			return -ENOMEM;
-		kcontrol->private_data = &vortex->a3d[i];
 		kcontrol->id.numid = CTRLID_GAINS;
 		kcontrol->info = snd_vortex_a3d_ild_info;
 		kcontrol->put = snd_vortex_a3d_ild_put;
@@ -898,9 +895,8 @@ static int vortex_a3d_register_controls(vortex_t * vortex)
 	/* Filter controls. */
 	for (i = 0; i < NR_A3D; i++) {
 		if ((kcontrol =
-		     snd_ctl_new1(&vortex_a3d_kcontrol, vortex)) == NULL)
+		     snd_ctl_new1(&vortex_a3d_kcontrol, &vortex->a3d[i])) == NULL)
 			return -ENOMEM;
-		kcontrol->private_data = &vortex->a3d[i];
 		kcontrol->id.numid = CTRLID_FILTER;
 		kcontrol->info = snd_vortex_a3d_filter_info;
 		kcontrol->put = snd_vortex_a3d_filter_put;

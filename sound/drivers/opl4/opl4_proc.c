@@ -26,7 +26,7 @@
 static int snd_opl4_mem_proc_open(snd_info_entry_t *entry,
 				  unsigned short mode, void **file_private_data)
 {
-	opl4_t *opl4 = snd_magic_cast(opl4_t, entry->private_data, return -ENXIO);
+	opl4_t *opl4 = entry->private_data;
 
 	down(&opl4->access_mutex);
 	if (opl4->memory_access) {
@@ -41,7 +41,7 @@ static int snd_opl4_mem_proc_open(snd_info_entry_t *entry,
 static int snd_opl4_mem_proc_release(snd_info_entry_t *entry,
 				     unsigned short mode, void *file_private_data)
 {
-	opl4_t *opl4 = snd_magic_cast(opl4_t, entry->private_data, return -ENXIO);
+	opl4_t *opl4 = entry->private_data;
 
 	down(&opl4->access_mutex);
 	opl4->memory_access--;
@@ -53,7 +53,7 @@ static long snd_opl4_mem_proc_read(snd_info_entry_t *entry, void *file_private_d
 				   struct file *file, char __user *_buf,
 				   unsigned long count, unsigned long pos)
 {
-	opl4_t *opl4 = snd_magic_cast(opl4_t, entry->private_data, return -ENXIO);
+	opl4_t *opl4 = entry->private_data;
 	long size;
 	char* buf;
 
@@ -79,7 +79,7 @@ static long snd_opl4_mem_proc_write(snd_info_entry_t *entry, void *file_private_
 				    struct file *file, const char __user *_buf,
 				    unsigned long count, unsigned long pos)
 {
-	opl4_t *opl4 = snd_magic_cast(opl4_t, entry->private_data, return -ENXIO);
+	opl4_t *opl4 = entry->private_data;
 	long size;
 	char *buf;
 

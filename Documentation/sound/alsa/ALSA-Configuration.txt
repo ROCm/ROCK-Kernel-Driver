@@ -188,6 +188,13 @@ Module parameters
 
     This module supports up to 8 cards and autoprobe.
 
+  Module snd-atiixp-modem
+  -----------------------
+
+    Module for ATI IXP 150/200/250 AC97 modem controllers.
+
+    Module supports up to 8 cards.
+
   Module snd-au8810, snd-au8820, snd-au8830
   -----------------------------------------
 
@@ -516,6 +523,13 @@ Module parameters
 
     Module for ForteMedia FM801 based PCI soundcards.
 
+    tea575x_tuner       - Enable TEA575x tuner
+                          - 1 = MediaForte 256-PCS
+                          - 2 = MediaForte 256-PCPR
+                          - 3 = MediaForte 64-PCR  
+                          - High 16-bits are video (radio) device number + 1
+                          - example: 0x10002 (MediaForte 256-PCPR, device 1)
+
     Module supports up to 8 cards and autoprobe.
     
   Module snd-gusclassic
@@ -613,7 +627,7 @@ Module parameters
     model       - Use the given board model, one of the following:
 		  delta1010, dio2496, delta66, delta44, audiophile, delta410,
 		  delta1010lt, vx442, ewx2496, ews88mt, ews88mt_new, ews88d,
-		  dmx6fire, dsp24, dsp24_71, ez8
+		  dmx6fire, dsp24, dsp24_value, dsp24_71, ez8
     omni	- Omni I/O support for MidiMan M-Audio Delta44/66
     cs8427_timeout - reset timeout for the CS8427 chip (S/PDIF transciever)
                      in msec resolution, default value is 500 (0.5 sec)
@@ -631,7 +645,8 @@ Module parameters
 			* TerraTec Aureon Sky-5.1, Space-7.1
 
     model       - Use the given board model, one of the following:
-		  revo71, amp2000, prodigy71, aureon51, aureon71
+		  revo71, amp2000, prodigy71, aureon51, aureon71,
+		  k8x800
 
     Module supports up to 8 cards and autoprobe.
 
@@ -655,6 +670,8 @@ Module parameters
                      2 = swap headphone and master controls
                      3 = for AD1985, turn on OMS bit and use headphone
                      4 = for ALC65x, turn on the jack sense mode
+    buggy_irq      - Enable workaround for buggy interrupts on some
+                     motherboards (default off)
 
     Module supports autoprobe and multiple bus-master chips (max 8).
 
@@ -1102,6 +1119,16 @@ Module parameters
     pid             - Product ID for the device (optional)
 
     This module supports up to 8 cards, autoprobe and hotplugging.
+
+  Module snd-usb-usx2y
+  --------------------
+
+    Module for Tascam USB US-122, US-224 and US-428 devices.
+
+    This module supports up to 8 cards, autoprobe and hotplugging.
+
+    Note: you need to load the firmware via usx2yloader utility included
+          in alsa-tools and alsa-firmware packages.
 
   Module snd-via82xx
   ------------------

@@ -34,7 +34,6 @@
 
 MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>");
 MODULE_DESCRIPTION("ESS ESx688 lowlevel module");
-MODULE_CLASSES("{sound}");
 MODULE_LICENSE("GPL");
 
 static int snd_es1688_dsp_command(es1688_t *chip, unsigned char val)
@@ -482,7 +481,7 @@ static int snd_es1688_capture_trigger(snd_pcm_substream_t * substream,
 
 irqreturn_t snd_es1688_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	es1688_t *chip = snd_magic_cast(es1688_t, dev_id, return IRQ_NONE);
+	es1688_t *chip = dev_id;
 
 	if (chip->trigger_value == 0x05)	/* ok.. playback is active */
 		snd_pcm_period_elapsed(chip->playback_substream);
@@ -616,13 +615,13 @@ static int snd_es1688_free(es1688_t *chip)
 		disable_dma(chip->dma8);
 		free_dma(chip->dma8);
 	}
-	snd_magic_kfree(chip);
+	kfree(chip);
 	return 0;
 }
 
 static int snd_es1688_dev_free(snd_device_t *device)
 {
-	es1688_t *chip = snd_magic_cast(es1688_t, device->device_data, return -ENXIO);
+	es1688_t *chip = device->device_data;
 	return snd_es1688_free(chip);
 }
 
@@ -650,7 +649,7 @@ int snd_es1688_create(snd_card_t * card,
 	int err;
 
 	*rchip = NULL;
-	chip = snd_magic_kcalloc(es1688_t, 0, GFP_KERNEL);
+	chip = kcalloc(1, sizeof(*chip), GFP_KERNEL);
 	if (chip == NULL)
 		return -ENOMEM;
 	chip->irq = -1;
@@ -728,7 +727,7 @@ static snd_pcm_ops_t snd_es1688_capture_ops = {
 
 static void snd_es1688_pcm_free(snd_pcm_t *pcm)
 {
-	es1688_t *chip = snd_magic_cast(es1688_t, pcm->private_data, return);
+	es1688_t *chip = pcm->private_data;
 	chip->pcm = NULL;
 	snd_pcm_lib_preallocate_free_for_all(pcm);
 }
@@ -978,8 +977,6 @@ static int snd_es1688_put_double(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t
 	return change;
 }
 
-#define ES1688_CONTROLS (sizeof(snd_es1688_controls)/sizeof(snd_kcontrol_new_t))
-
 static snd_kcontrol_new_t snd_es1688_controls[] = {
 ES1688_DOUBLE("Master Playback Volume", 0, ES1688_MASTER_DEV, ES1688_MASTER_DEV, 4, 0, 15, 0),
 ES1688_DOUBLE("PCM Playback Volume", 0, ES1688_PCM_DEV, ES1688_PCM_DEV, 4, 0, 15, 0),
@@ -1028,7 +1025,7 @@ int snd_es1688_mixer(es1688_t *chip)
 
 	strcpy(card->mixername, snd_es1688_chip_id(chip));
 
-	for (idx = 0; idx < ES1688_CONTROLS; idx++) {
+	for (idx = 0; idx < ARRAY_SIZE(snd_es1688_controls); idx++) {
 		if ((err = snd_ctl_add(card, snd_ctl_new1(&snd_es1688_controls[idx], chip))) < 0)
 			return err;
 	}

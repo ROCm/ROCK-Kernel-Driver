@@ -30,31 +30,19 @@
 #define CHIP_NAME "PMac"
 
 MODULE_DESCRIPTION("PowerMac");
-MODULE_CLASSES("{sound}");
-MODULE_DEVICES("{{Apple,PowerMac}}");
+MODULE_SUPPORTED_DEVICE("{{Apple,PowerMac}}");
 MODULE_LICENSE("GPL");
 
 static int index = SNDRV_DEFAULT_IDX1;		/* Index 0-MAX */
 static char *id = SNDRV_DEFAULT_STR1;		/* ID for this card */
-/* static int enable = 1; */
-#ifdef PMAC_SUPPORT_PCM_BEEP
 static int enable_beep = 1;
-#endif
 
 module_param(index, int, 0444);
 MODULE_PARM_DESC(index, "Index value for " CHIP_NAME " soundchip.");
-MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
 module_param(id, charp, 0444);
 MODULE_PARM_DESC(id, "ID string for " CHIP_NAME " soundchip.");
-MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
-/* module_param(enable, bool, 0444);
-   MODULE_PARM_DESC(enable, "Enable this soundchip.");
-   MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC); */
-#ifdef PMAC_SUPPORT_PCM_BEEP
 module_param(enable_beep, bool, 0444);
 MODULE_PARM_DESC(enable_beep, "Enable beep using PCM.");
-MODULE_PARM_SYNTAX(enable_beep, SNDRV_ENABLED "," SNDRV_BOOLEAN_TRUE_DESC);
-#endif
 
 
 /*
@@ -133,10 +121,8 @@ static int __init snd_pmac_probe(void)
 		goto __error;
 
 	chip->initialized = 1;
-#ifdef PMAC_SUPPORT_PCM_BEEP
 	if (enable_beep)
 		snd_pmac_attach_beep(chip);
-#endif
 
 	if ((err = snd_card_register(card)) < 0)
 		goto __error;
@@ -151,18 +137,14 @@ __error:
 
 
 /*
- * MODULE sutff
+ * MODULE stuff
  */
 
 static int __init alsa_card_pmac_init(void)
 {
 	int err;
-	if ((err = snd_pmac_probe()) < 0) {
-#ifdef MODULE
-		printk(KERN_ERR "no PMac soundchip found\n");
-#endif
+	if ((err = snd_pmac_probe()) < 0)
 		return err;
-	}
 	return 0;
 
 }

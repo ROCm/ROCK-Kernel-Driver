@@ -93,8 +93,6 @@ MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>");
 MODULE_DESCRIPTION("Routines for control of CS4235/4236B/4237B/4238B/4239 chips");
 MODULE_LICENSE("GPL");
 
-#define chip_t cs4231_t
-
 /*
  *
  */
@@ -707,8 +705,6 @@ static int snd_cs4235_put_output_accu(snd_kcontrol_t * kcontrol, snd_ctl_elem_va
 	return change;
 }
 
-#define CS4236_CONTROLS (sizeof(snd_cs4236_controls)/sizeof(snd_kcontrol_new_t))
-
 static snd_kcontrol_new_t snd_cs4236_controls[] = {
 
 CS4236_DOUBLE("Master Digital Playback Switch", 0, CS4236_LEFT_MASTER, CS4236_RIGHT_MASTER, 7, 7, 1, 1),
@@ -759,8 +755,6 @@ CS4231_DOUBLE("Analog Loopback Capture Switch", 0, CS4231_LEFT_INPUT, CS4231_RIG
 CS4231_SINGLE("Digital Loopback Playback Switch", 0, CS4231_LOOPBACK, 0, 1, 0),
 CS4236_DOUBLE1("Digital Loopback Playback Volume", 0, CS4231_LOOPBACK, CS4236_RIGHT_LOOPBACK, 2, 0, 63, 1)
 };
-
-#define CS4235_CONTROLS (sizeof(snd_cs4235_controls)/sizeof(snd_kcontrol_new_t))
 
 static snd_kcontrol_new_t snd_cs4235_controls[] = {
 
@@ -871,8 +865,6 @@ static int snd_cs4236_put_iec958_switch(snd_kcontrol_t * kcontrol, snd_ctl_elem_
 	return change;
 }
 
-#define CS4236_IEC958_CONTROLS (sizeof(snd_cs4236_iec958_controls)/sizeof(snd_kcontrol_new_t))
-
 static snd_kcontrol_new_t snd_cs4236_iec958_controls[] = {
 CS4236_IEC958_ENABLE("IEC958 Output Enable", 0),
 CS4236_SINGLEC("IEC958 Output Validity", 0, 4, 4, 1, 0),
@@ -882,14 +874,10 @@ CS4236_SINGLEC("IEC958 Output Channel Status Low", 0, 5, 1, 127, 0),
 CS4236_SINGLEC("IEC958 Output Channel Status High", 0, 6, 0, 255, 0)
 };
 
-#define CS4236_3D_CONTROLS_CS4235 (sizeof(snd_cs4236_3d_controls_cs4235)/sizeof(snd_kcontrol_new_t))
-
 static snd_kcontrol_new_t snd_cs4236_3d_controls_cs4235[] = {
 CS4236_SINGLEC("3D Control - Switch", 0, 3, 4, 1, 0),
 CS4236_SINGLEC("3D Control - Space", 0, 2, 4, 15, 1)
 };
-
-#define CS4236_3D_CONTROLS_CS4237 (sizeof(snd_cs4236_3d_controls_cs4237)/sizeof(snd_kcontrol_new_t))
 
 static snd_kcontrol_new_t snd_cs4236_3d_controls_cs4237[] = {
 CS4236_SINGLEC("3D Control - Switch", 0, 3, 7, 1, 0),
@@ -898,8 +886,6 @@ CS4236_SINGLEC("3D Control - Center", 0, 2, 0, 15, 1),
 CS4236_SINGLEC("3D Control - Mono", 0, 3, 6, 1, 0),
 CS4236_SINGLEC("3D Control - IEC958", 0, 3, 5, 1, 0)
 };
-
-#define CS4236_3D_CONTROLS_CS4238 (sizeof(snd_cs4236_3d_controls_cs4238)/sizeof(snd_kcontrol_new_t))
 
 static snd_kcontrol_new_t snd_cs4236_3d_controls_cs4238[] = {
 CS4236_SINGLEC("3D Control - Switch", 0, 3, 4, 1, 0),
@@ -921,12 +907,12 @@ int snd_cs4236_mixer(cs4231_t *chip)
 
 	if (chip->hardware == CS4231_HW_CS4235 ||
 	    chip->hardware == CS4231_HW_CS4239) {
-		for (idx = 0; idx < CS4235_CONTROLS; idx++) {
+		for (idx = 0; idx < ARRAY_SIZE(snd_cs4235_controls); idx++) {
 			if ((err = snd_ctl_add(card, snd_ctl_new1(&snd_cs4235_controls[idx], chip))) < 0)
 				return err;
 		}
 	} else {
-		for (idx = 0; idx < CS4236_CONTROLS; idx++) {
+		for (idx = 0; idx < ARRAY_SIZE(snd_cs4236_controls); idx++) {
 			if ((err = snd_ctl_add(card, snd_ctl_new1(&snd_cs4236_controls[idx], chip))) < 0)
 				return err;
 		}
@@ -934,15 +920,15 @@ int snd_cs4236_mixer(cs4231_t *chip)
 	switch (chip->hardware) {
 	case CS4231_HW_CS4235:
 	case CS4231_HW_CS4239:
-		count = CS4236_3D_CONTROLS_CS4235;
+		count = ARRAY_SIZE(snd_cs4236_3d_controls_cs4235);
 		kcontrol = snd_cs4236_3d_controls_cs4235;
 		break;
 	case CS4231_HW_CS4237B:
-		count = CS4236_3D_CONTROLS_CS4237;
+		count = ARRAY_SIZE(snd_cs4236_3d_controls_cs4237);
 		kcontrol = snd_cs4236_3d_controls_cs4237;
 		break;
 	case CS4231_HW_CS4238B:
-		count = CS4236_3D_CONTROLS_CS4238;
+		count = ARRAY_SIZE(snd_cs4236_3d_controls_cs4238);
 		kcontrol = snd_cs4236_3d_controls_cs4238;
 		break;
 	default:
@@ -955,7 +941,7 @@ int snd_cs4236_mixer(cs4231_t *chip)
 	}
 	if (chip->hardware == CS4231_HW_CS4237B ||
 	    chip->hardware == CS4231_HW_CS4238B) {
-		for (idx = 0; idx < CS4236_IEC958_CONTROLS; idx++) {
+		for (idx = 0; idx < ARRAY_SIZE(snd_cs4236_iec958_controls); idx++) {
 			if ((err = snd_ctl_add(card, snd_ctl_new1(&snd_cs4236_iec958_controls[idx], chip))) < 0)
 				return err;
 		}
