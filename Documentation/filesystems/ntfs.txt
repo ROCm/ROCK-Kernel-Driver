@@ -247,6 +247,9 @@ ChangeLog
 
 Note, a technical ChangeLog aimed at kernel hackers is in fs/ntfs/ChangeLog.
 
+2.0.24:
+	- Small internal cleanups.
+	- Support for sendfile system call. (Christoph Hellwig)
 2.0.23:
 	- Massive internal locking changes to mft record locking. Fixes
 	  various race conditions and deadlocks.

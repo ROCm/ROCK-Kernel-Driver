@@ -307,6 +307,23 @@ static int ntfs_remount(struct super_block *sb, int *flags, char *opt)
 
 	ntfs_debug("Entering with remount options string: %s", opt);
 
+#ifndef NTFS_RW
+	/* For read-only compiled driver, enforce all read-only flags. */
+	*flags |= MS_RDONLY | MS_NOATIME | MS_NODIRATIME;
+#else
+	/*
+	 * For the read-write compiled driver, if we are remounting read-write,
+	 * make sure there aren't any volume errors.
+	 */
+	if ((sb->s_flags & MS_RDONLY) && !(*flags & MS_RDONLY)) {
+		if (NVolErrors(vol)) {
+			ntfs_error(sb, "Volume has errors and is read-only."
+					"Cannot remount read-write.");
+			return -EROFS;
+		}
+	}
+#endif
+
 	// FIXME/TODO: If left like this we will have problems with rw->ro and
 	// ro->rw, as well as with sync->async and vice versa remounts.
 	// Note: The VFS already checks that there are no pending deletes and
@@ -323,10 +340,6 @@ static int ntfs_remount(struct super_block *sb, int *flags, char *opt)
 
 	if (!parse_options(vol, opt))
 		return -EINVAL;
-
-#ifndef NTFS_RW
-	*flags |= MS_RDONLY | MS_NOATIME | MS_NODIRATIME;
-#endif
 
 	return 0;
 }

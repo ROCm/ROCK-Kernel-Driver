@@ -110,7 +110,8 @@ static inline run_list_element *ntfs_rl_realloc(run_list_element *rl,
 static inline BOOL ntfs_are_rl_mergeable(run_list_element *dst,
 		run_list_element *src)
 {
-	BUG_ON(!dst || !src);
+	BUG_ON(!dst);
+	BUG_ON(!src);
 
 	if ((dst->lcn < 0) || (src->lcn < 0))     /* Are we merging holes? */
 		return FALSE;
@@ -192,7 +193,8 @@ static inline run_list_element *ntfs_rl_append(run_list_element *dst,
 	BOOL right;
 	int magic;
 
-	BUG_ON(!dst || !src);
+	BUG_ON(!dst);
+	BUG_ON(!src);
 
 	/* First, check if the right hand end needs merging. */
 	right = ntfs_are_rl_mergeable(src + ssize - 1, dst + loc + 1);
@@ -258,7 +260,8 @@ static inline run_list_element *ntfs_rl_insert(run_list_element *dst,
 	BOOL hole = FALSE;	/* Following a hole */
 	int magic;
 
-	BUG_ON(!dst || !src);
+	BUG_ON(!dst);
+	BUG_ON(!src);
 
 	/* disc => Discontinuity between the end of @dst and the start of @src.
 	 *         This means we might need to insert a hole.
@@ -362,7 +365,8 @@ static inline run_list_element *ntfs_rl_replace(run_list_element *dst,
 	BOOL right;
 	int magic;
 
-	BUG_ON(!dst || !src);
+	BUG_ON(!dst);
+	BUG_ON(!src);
 
 	/* First, merge the left and right ends, if necessary. */
 	right = ntfs_are_rl_mergeable(src + ssize - 1, dst + loc + 1);
@@ -423,7 +427,8 @@ static inline run_list_element *ntfs_rl_replace(run_list_element *dst,
 static inline run_list_element *ntfs_rl_split(run_list_element *dst, int dsize,
 		run_list_element *src, int ssize, int loc)
 {
-	BUG_ON(!dst || !src);
+	BUG_ON(!dst);
+	BUG_ON(!src);
 
 	/* Space required: @dst size + @src size + one new hole. */
 	dst = ntfs_rl_realloc(dst, dsize, dsize + ssize + 1);

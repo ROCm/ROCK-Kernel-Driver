@@ -467,7 +467,8 @@ int ntfs_read_compressed_block(struct page *page)
 	 * Bad things happen if we get here for anything that is not an
 	 * unnamed $DATA attribute.
 	 */
-	BUG_ON(ni->type != AT_DATA || ni->name_len);
+	BUG_ON(ni->type != AT_DATA);
+	BUG_ON(ni->name_len);
 
 	pages = kmalloc(nr_pages * sizeof(struct page *), GFP_NOFS);
 

@@ -278,7 +278,9 @@ void ntfs_destroy_big_inode(struct inode *inode)
 	ntfs_inode *ni = NTFS_I(inode);
 
 	ntfs_debug("Entering.");
-	BUG_ON(ni->page || !atomic_dec_and_test(&ni->count));
+	BUG_ON(ni->page);
+	if (!atomic_dec_and_test(&ni->count))
+		BUG();
 	kmem_cache_free(ntfs_big_inode_cache, NTFS_I(inode));
 }
 
@@ -299,7 +301,9 @@ static inline ntfs_inode *ntfs_alloc_extent_inode(void)
 void ntfs_destroy_extent_inode(ntfs_inode *ni)
 {
 	ntfs_debug("Entering.");
-	BUG_ON(ni->page || !atomic_dec_and_test(&ni->count));
+	BUG_ON(ni->page);
+	if (!atomic_dec_and_test(&ni->count))
+		BUG();
 	kmem_cache_free(ntfs_inode_cache, ni);
 }
 

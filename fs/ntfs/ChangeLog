@@ -2,6 +2,22 @@ ToDo:
 	- Find and fix bugs.
 	- Enable NFS exporting of NTFS.
 
+2.0.24 - Cleanups.
+
+	- Treat BUG_ON() as ASSERT() not VERIFY(), i.e. do not use side effects
+	  inside BUG_ON(). (Adam J. Richter)
+	- Split logical OR expressions inside BUG_ON() into individual BUG_ON()
+	  calls for improved debugging. (Adam J. Richter)
+	- Add errors flag to the ntfs volume state, accessed via
+	  NVol{,Set,Clear}Errors(vol).
+	- Do not allow read-write remounts of read-only volumes with errors.
+	- Clarify comment for ntfs file operation sendfile which was added by
+	  Christoph Hellwig a while ago (just using generic_file_sendfile())
+	  to say that ntfs ->sendfile is only used for the case where the
+	  source data is on the ntfs partition and the destination is
+	  somewhere else, i.e. nothing we need to concern ourselves with.
+	- Add generic_file_write() as our ntfs file write operation.
+
 2.0.23 - Major bug fixes (races, deadlocks, non-i386 architectures).
 
 	- Massive internal locking changes to mft record locking. Fixes lock
