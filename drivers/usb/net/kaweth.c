@@ -1189,7 +1189,7 @@ static void kaweth_disconnect(struct usb_interface *intf)
 
 		kaweth_dbg("Unregistering net device");
 		unregister_netdev(kaweth->net);
-		kfree(kaweth->net);
+		free_netdev(kaweth->net);
 	}
 
 	usb_free_urb(kaweth->rx_urb);

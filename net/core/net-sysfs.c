@@ -361,8 +361,23 @@ static int netdev_hotplug(struct class_device *cd, char **envp,
 }
 #endif
 
+/*
+ *	netdev_release -- destroy and free a dead device. 
+ *	Called when last reference to class_device kobject is gone.
+ */
+static void netdev_release(struct class_device *cd)
+{
+	struct net_device *dev 
+		= container_of(cd, struct net_device, class_dev);
+
+	BUG_ON(dev->reg_state != NETREG_RELEASED);
+
+	kfree(dev);
+}
+
 static struct class net_class = {
 	.name = "net",
+	.release = netdev_release,
 #ifdef CONFIG_HOTPLUG
 	.hotplug = netdev_hotplug,
 #endif

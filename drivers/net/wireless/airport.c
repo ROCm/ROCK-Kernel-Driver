@@ -284,7 +284,7 @@ airport_detach(struct net_device *dev)
 	current->state = TASK_UNINTERRUPTIBLE;
 	schedule_timeout(HZ);
 
-	kfree(dev);
+	free_netdev(dev);
 }				/* airport_detach */
 
 static char version[] __initdata = "airport.c 0.13e (Benjamin Herrenschmidt <benh@kernel.crashing.org>)";

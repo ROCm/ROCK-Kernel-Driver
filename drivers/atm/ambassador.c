@@ -1556,33 +1556,6 @@ static int amb_send (struct atm_vcc * atm_vcc, struct sk_buff * skb) {
   return 0;
 }
 
-/********** Scatter Gather Send Capability **********/
-
-static int amb_sg_send (struct atm_vcc * atm_vcc,
-			unsigned long start,
-			unsigned long size) {
-  PRINTD (DBG_FLOW|DBG_VCC, "amb_sg_send: never");
-  return 0;
-  if (atm_vcc->qos.aal == ATM_AAL5) {
-    PRINTD (DBG_FLOW|DBG_VCC, "amb_sg_send: yes");
-    return 1;
-  } else {
-    PRINTD (DBG_FLOW|DBG_VCC, "amb_sg_send: no");
-    return 0;
-  }
-  PRINTD (DBG_FLOW|DBG_VCC, "amb_sg_send: always");
-  return 1;
-}
-
-/********** Send OAM **********/
-
-// static int amb_send_oam (struct atm_vcc * atm_vcc, void * cell, int flags);
-
-/********** Feedback to Driver **********/
-
-// void amb_feedback (struct atm_vcc * atm_vcc, struct sk_buff * skb,
-// unsigned long start, unsigned long dest, int len);
-
 /********** Change QoS on a VC **********/
 
 // int amb_change_qos (struct atm_vcc * atm_vcc, struct atm_qos * qos, int flags);
@@ -1693,7 +1666,6 @@ static const struct atmdev_ops amb_ops = {
   .open	= amb_open,
   .close	= amb_close,
   .send	= amb_send,
-  .sg_send	= amb_sg_send,
   .proc_read	= amb_proc_read,
   .owner	= THIS_MODULE,
 };

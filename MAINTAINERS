@@ -78,12 +78,6 @@ L:	linux-tr@linuxtr.net
 W:	http://www.linuxtr.net
 S:	Maintained
 
-3C501 NETWORK DRIVER
-P:	Alan Cox
-M:	alan@the.3c501.cabal.tm
-L:	linux-net@vger.kernel.org
-S:	Maintained for 2.2 only
-
 3C505 NETWORK DRIVER
 P:	Philip Blundell
 M:	Philip.Blundell@pobox.com
@@ -2244,12 +2238,6 @@ P:	Pete Zaitcev
 M:	zaitcev@yahoo.com
 L:	linux-kernel@vger.kernel.org
 S:	Maintained
-
-Z85230 SYNCHRONOUS DRIVER
-P:	Alan Cox
-M:	alan@redhat.com
-W:	http://roadrunner.swansea.linux.org.uk/synchronous.shtml
-S:	Maintained for 2.2 only
 
 Z8530 DRIVER FOR AX.25
 P:	Joerg Reuter

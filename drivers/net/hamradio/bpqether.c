@@ -482,7 +482,7 @@ static void bpq_setup(struct net_device *dev)
 	dev->set_mac_address = bpq_set_mac_address;
 	dev->get_stats	     = bpq_get_stats;
 	dev->do_ioctl	     = bpq_ioctl;
-	dev->destructor	     =  (void (*)(struct net_device *)) kfree;
+	dev->destructor	     = free_netdev;
 
 	memcpy(dev->broadcast, ax25_bcast, AX25_ADDR_LEN);
 	memcpy(dev->dev_addr,  ax25_defaddr, AX25_ADDR_LEN);

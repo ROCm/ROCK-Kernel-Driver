@@ -355,7 +355,7 @@ static void el3_common_remove (struct net_device *dev)
 
 		unregister_netdev (dev);
 		release_region(dev->base_addr, EL3_IO_EXTENT);
-		kfree (dev);
+		free_netdev (dev);
 }
 
 static int __init el3_probe(int card_idx)

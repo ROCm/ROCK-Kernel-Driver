@@ -1268,14 +1268,6 @@ static unsigned char fs_phy_get(struct atm_dev *dev,unsigned long addr)
 }
 
 
-static void fs_feedback(struct atm_vcc *vcc,struct sk_buff *skb,
-			unsigned long start,unsigned long dest,int len)
-{
-	func_enter ();
-	func_exit ();
-}
-
-
 static int fs_change_qos(struct atm_vcc *vcc,struct atm_qos *qos,int flags)
 {
 	func_enter ();
@@ -1293,11 +1285,9 @@ static const struct atmdev_ops ops = {
 #if 0
 	.owner =        THIS_MODULE,
 #endif
-	/*                 fs_sg_send */
 	/* ioctl:          fs_ioctl, */
 	/* getsockopt:     fs_getsockopt, */
 	/* setsockopt:     fs_setsockopt, */
-	/* feedback:       fs_feedback, */
 	/* change_qos:     fs_change_qos, */
 
 	/* For now implement these internally here... */  

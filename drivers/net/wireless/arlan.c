@@ -2061,7 +2061,7 @@ void cleanup_module(void)
 			unregister_netdev(arlan_device[i]);
 			ap = arlan_device[i]->priv;
 			if (ap->init_etherdev_alloc) {
-				kfree(arlan_device[i]);
+				free_netdev(arlan_device[i]);
 				arlan_device[i] = NULL;
 			} else {
 				kfree(ap);

@@ -1055,7 +1055,7 @@ static int fr_add_pvc(hdlc_device *hdlc, unsigned int dlci, int type)
 		return -EIO;
 	}
 
-	dev->destructor = (void (*)(struct net_device *)) kfree;
+	dev->destructor = free_netdev;
 	*get_dev_p(pvc, type) = dev;
 	if (!used) {
 		hdlc->state.fr.dce_changed = 1;

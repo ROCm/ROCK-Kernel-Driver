@@ -42,6 +42,7 @@
 #include <asm/starfire.h>
 #include <asm/smp.h>
 #include <asm/sections.h>
+#include <asm/cpudata.h>
 
 spinlock_t mostek_lock = SPIN_LOCK_UNLOCKED;
 spinlock_t rtc_lock = SPIN_LOCK_UNLOCKED;
@@ -956,7 +957,7 @@ static unsigned long sparc64_init_timers(irqreturn_t (*cfunc)(int, void *, struc
 			clock = prom_getint(node, "stick-frequency");
 		} else {
 			tick_ops = &tick_operations;
-			node = linux_cpus[0].prom_node;
+			cpu_find_by_instance(0, &node, NULL);
 			clock = prom_getint(node, "clock-frequency");
 		}
 	} else {
@@ -1012,11 +1013,7 @@ unsigned long sparc64_get_clock_tick(unsigned int cpu)
 
 	if (ft->clock_tick_ref)
 		return ft->clock_tick_ref;
-#ifdef CONFIG_SMP
-	return cpu_data[cpu].clock_tick;
-#else
-	return up_clock_tick;
-#endif
+	return cpu_data(cpu).clock_tick;
 }
 
 #ifdef CONFIG_CPU_FREQ
@@ -1028,35 +1025,22 @@ static int sparc64_cpufreq_notifier(struct notifier_block *nb, unsigned long val
 	unsigned int cpu = freq->cpu;
 	struct freq_table *ft = &per_cpu(sparc64_freq_table, cpu);
 
-#ifdef CONFIG_SMP
 	if (!ft->ref_freq) {
 		ft->ref_freq = freq->old;
-		ft->udelay_val_ref = cpu_data[cpu].udelay_val;
-		ft->clock_tick_ref = cpu_data[cpu].clock_tick;
+		ft->udelay_val_ref = cpu_data(cpu).udelay_val;
+		ft->clock_tick_ref = cpu_data(cpu).clock_tick;
 	}
 	if ((val == CPUFREQ_PRECHANGE  && freq->old < freq->new) ||
 	    (val == CPUFREQ_POSTCHANGE && freq->old > freq->new)) {
-		cpu_data[cpu].udelay_val =
+		cpu_data(cpu).udelay_val =
 			cpufreq_scale(ft->udelay_val_ref,
 				      ft->ref_freq,
 				      freq->new);
-		cpu_data[cpu].clock_tick =
+		cpu_data(cpu).clock_tick =
 			cpufreq_scale(ft->clock_tick_ref,
 				      ft->ref_freq,
 				      freq->new);
 	}
-#else
-	/* In the non-SMP case, kernel/cpufreq.c takes care of adjusting
-	 * loops_per_jiffy.
-	 */
-	if (!ft->ref_freq) {
-		ft->ref_freq = freq->old;
-		ft->clock_tick_ref = up_clock_tick;
-	}
-	if ((val == CPUFREQ_PRECHANGE  && freq->old < freq->new) ||
-	    (val == CPUFREQ_POSTCHANGE && freq->old > freq->new))
-		up_clock_tick = cpufreq_scale(ft->clock_tick_ref, ft->ref_freq, freq->new);
-#endif
 
 	return 0;
 }

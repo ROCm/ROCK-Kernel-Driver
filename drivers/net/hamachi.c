@@ -1976,7 +1976,7 @@ static void __devexit hamachi_remove_one (struct pci_dev *pdev)
 			hmp->tx_ring_dma);
 		unregister_netdev(dev);
 		iounmap((char *)dev->base_addr);
-		kfree(dev);
+		free_netdev(dev);
 		pci_release_regions(pdev);
 		pci_set_drvdata(pdev, NULL);
 	}

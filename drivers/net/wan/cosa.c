@@ -632,6 +632,7 @@ static void sppp_channel_delete(struct channel_data *chan)
 {
 	sppp_detach(chan->pppdev.dev);
 	unregister_netdev(chan->pppdev.dev);
+	free_netdev(chan->ppp.dev);
 }
 
 static int cosa_sppp_open(struct net_device *d)

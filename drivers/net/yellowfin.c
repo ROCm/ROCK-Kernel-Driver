@@ -1486,7 +1486,7 @@ static void __devexit yellowfin_remove_one (struct pci_dev *pdev)
 	iounmap ((void *) dev->base_addr);
 #endif
 
-	kfree (dev);
+	free_netdev (dev);
 	pci_set_drvdata(pdev, NULL);
 }
 

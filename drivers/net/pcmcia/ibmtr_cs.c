@@ -306,7 +306,7 @@ static void ibmtr_detach(dev_link_t *link)
     /* Unlink device structure, free bits */
     *linkp = link->next;
     unregister_netdev(dev);
-    kfree(dev);
+    free_netdev(dev);
 } /* ibmtr_detach */
 
 /*======================================================================

@@ -5730,7 +5730,7 @@ void cleanup_module(void)
 		if (dev) {
 			unregister_netdev(dev);
 			cleanup_card(dev);
-			kfree(dev);
+			free_netdev(dev);
 		}
         }
 }

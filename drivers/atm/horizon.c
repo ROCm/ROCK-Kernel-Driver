@@ -2663,18 +2663,6 @@ static int hrz_setsockopt (struct atm_vcc * atm_vcc, int level, int optname,
 }
 #endif
 
-static int hrz_sg_send (struct atm_vcc * atm_vcc,
-			unsigned long start,
-			unsigned long size) {
-  if (atm_vcc->qos.aal == ATM_AAL5) {
-    PRINTD (DBG_FLOW|DBG_VCC, "hrz_sg_send: yes");
-    return 1;
-  } else {
-    PRINTD (DBG_FLOW|DBG_VCC, "hrz_sg_send: no");
-    return 0;
-  }
-}
-
 #if 0
 static int hrz_ioctl (struct atm_dev * atm_dev, unsigned int cmd, void *arg) {
   hrz_dev * dev = HRZ_DEV(atm_dev);
@@ -2748,7 +2736,6 @@ static const struct atmdev_ops hrz_ops = {
   .open	= hrz_open,
   .close	= hrz_close,
   .send	= hrz_send,
-  .sg_send	= hrz_sg_send,
   .proc_read	= hrz_proc_read,
   .owner	= THIS_MODULE,
 };

@@ -961,7 +961,7 @@ static void catc_disconnect(struct usb_interface *intf)
 		usb_free_urb(catc->tx_urb);
 		usb_free_urb(catc->rx_urb);
 		usb_free_urb(catc->irq_urb);
-		kfree(catc->netdev);
+		free_netdev(catc->netdev);
 		kfree(catc);
 	}
 }

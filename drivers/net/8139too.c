@@ -723,7 +723,7 @@ static void __rtl8139_cleanup_dev (struct net_device *dev)
 		sizeof (struct rtl8139_private));
 #endif /* RTL8139_NDEBUG */
 
-	kfree (dev);
+	free_netdev(dev);
 
 	pci_set_drvdata (pdev, NULL);
 }

@@ -1507,7 +1507,7 @@ cleanup_module( void )
 			unregister_netdev( dev );
 			release_region( dev->base_addr, SBNI_IO_EXTENT );
 			kfree( dev->priv );
-			kfree( dev );
+			free_netdev( dev );
 		}
 }
 

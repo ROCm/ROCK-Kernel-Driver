@@ -2582,7 +2582,7 @@ static struct net_device *unlink_modules(struct net_device *p)
 	}
 	unregister_netdev(p);
 	printk("%s: unloaded\n", p->name);
-	kfree(p);		/* Free the device structure */
+	free_netdev(p);		/* Free the device structure */
 
 	return next;
 }				// unlink_modules
