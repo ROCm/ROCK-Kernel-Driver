@@ -81,9 +81,9 @@ void pxa_free_dma (int dma_ch)
 	unsigned long flags;
 
 	if (!dma_channels[dma_ch].name) {
-		printk (KERN_CRIT __FUNCTION__
-			": trying to free channel %d which is already freed\n",
-			dma_ch);
+		printk (KERN_CRIT
+			"%s: trying to free channel %d which is already freed\n",
+			__FUNCTION__, dma_ch);
 		return;
 	}
 
