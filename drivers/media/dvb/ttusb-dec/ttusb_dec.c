@@ -204,12 +204,23 @@ static int ttusb_dec_send_command(struct ttusb_dec *dec, const u8 command,
 				  int *result_length, u8 cmd_result[])
 {
 	int result, actual_len, i;
-	u8 b[COMMAND_PACKET_SIZE + 4];
-	u8 c[COMMAND_PACKET_SIZE + 4];
+	u8 *b;
+	u8 *c;
+	
+	b = kmalloc(COMMAND_PACKET_SIZE + 4, GFP_KERNEL);
+	if (!b)
+		return -ENOMEM;
+	c = kmalloc(COMMAND_PACKET_SIZE + 4, GFP_KERNEL);
+	if (!c) {
+		kfree(b);
+		return -ENOMEM;
+	}
 
 	dprintk("%s\n", __FUNCTION__);
 
 	if ((result = down_interruptible(&dec->usb_sem))) {
+		kfree(b);
+		kfree(c);
 		printk("%s: Failed to down usb semaphore.\n", __FUNCTION__);
 		return result;
 	}
@@ -230,22 +241,26 @@ static int ttusb_dec_send_command(struct ttusb_dec *dec, const u8 command,
 	}
 
 	result = usb_bulk_msg(dec->udev, dec->command_pipe, b,
-			      sizeof(b), &actual_len, HZ);
+			      COMMAND_PACKET_SIZE + 4, &actual_len, HZ);
 
 	if (result) {
 		printk("%s: command bulk message failed: error %d\n",
 		       __FUNCTION__, result);
 		up(&dec->usb_sem);
+		kfree(b);
+		kfree(c);
 		return result;
 	}
 
 	result = usb_bulk_msg(dec->udev, dec->result_pipe, c,
-			      sizeof(c), &actual_len, HZ);
+			      COMMAND_PACKET_SIZE + 4, &actual_len, HZ);
 
 	if (result) {
 		printk("%s: result bulk message failed: error %d\n",
 		       __FUNCTION__, result);
 		up(&dec->usb_sem);
+		kfree(b);
+		kfree(c);
 		return result;
 	} else {
 		if (debug) {
@@ -262,6 +277,8 @@ static int ttusb_dec_send_command(struct ttusb_dec *dec, const u8 command,
 
 		up(&dec->usb_sem);
 
+		kfree(b);
+		kfree(c);
 		return 0;
 	}
 }
