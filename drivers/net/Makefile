@@ -221,16 +221,6 @@ subdir-y	+= ../acorn/net
 obj-y		+= ../acorn/net/acorn-net.o
 endif
 
-#
-# HIPPI adapters
-#
-
-ifneq ($(ARCH),s390)
-ifneq ($(ARCH),s390x)
-obj-y += auto_irq.o
-endif
-endif
-
 include $(TOPDIR)/Rules.make
 
 clean:

@@ -447,11 +447,15 @@ static int __init ni65_probe1(struct net_device *dev,int ioaddr)
 
 		if(dev->irq < 2)
 		{
-			ni65_init_lance(p,dev->dev_addr,0,0);
-			autoirq_setup(0);
-			writereg(CSR0_INIT|CSR0_INEA,CSR0); /* trigger interrupt */
+			unsigned long irq_mask, delay;
 
-			if(!(dev->irq = autoirq_report(2)))
+			ni65_init_lance(p,dev->dev_addr,0,0);
+			irq_mask = probe_irq_on();
+			writereg(CSR0_INIT|CSR0_INEA,CSR0); /* trigger interrupt */
+			delay = jiffies + HZ/50;
+			while (time_before(jiffies, delay)) ;
+			dev->irq = probe_irq_off(irq_mask);
+			if(!dev->irq)
 			{
 				printk("Failed to detect IRQ line!\n");
 				ni65_free_buffer(p);

@@ -545,15 +545,19 @@ static int __init lance_probe1(struct net_device *dev, int ioaddr, int irq, int 
 	if (dev->irq >= 2)
 		printk(" assigned IRQ %d", dev->irq);
 	else if (lance_version != 0)  {	/* 7990 boards need DMA detection first. */
+		unsigned long irq_mask, delay;
+
 		/* To auto-IRQ we enable the initialization-done and DMA error
 		   interrupts. For ISA boards we get a DMA error, but VLB and PCI
 		   boards will work. */
-		autoirq_setup(0);
+		irq_mask = probe_irq_on();
 
 		/* Trigger an initialization just for the interrupt. */
 		outw(0x0041, ioaddr+LANCE_DATA);
 
-		dev->irq = autoirq_report(2);
+		delay = jiffies + HZ/50;
+		while (time_before(jiffies, delay)) ;
+		dev->irq = probe_irq_off(irq_mask);
 		if (dev->irq)
 			printk(", probed IRQ %d", dev->irq);
 		else {
@@ -619,10 +623,14 @@ static int __init lance_probe1(struct net_device *dev, int ioaddr, int irq, int 
 	if (lance_version == 0 && dev->irq == 0) {
 		/* We may auto-IRQ now that we have a DMA channel. */
 		/* Trigger an initialization just for the interrupt. */
-		autoirq_setup(0);
+		unsigned long irq_mask, delay;
+
+		irq_mask = probe_irq_on(0);
 		outw(0x0041, ioaddr+LANCE_DATA);
 
-		dev->irq = autoirq_report(4);
+		delay = jiffies + HZ/25;
+		while (time_before(jiffies, delay)) ;
+		dev->irq = probe_irq_off(irq_mask);
 		if (dev->irq == 0) {
 			printk("  Failed to detect the 7990 IRQ line.\n");
 			return -ENODEV;
