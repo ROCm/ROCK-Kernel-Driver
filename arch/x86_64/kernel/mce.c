@@ -71,17 +71,19 @@ static void mce_log(struct mce *mce)
 
 static void print_mce(struct mce *m)
 {
-	printk("CPU %d: Machine Check Exception: %16Lx Bank %d: %016Lx\n",
+	printk(KERN_EMERG 
+	       "CPU %d: Machine Check Exception: %16Lx Bank %d: %016Lx\n",
 	       m->cpu, m->mcgstatus, m->bank, m->status);
 	if (m->rip) {
-		printk("RIP%s %02x:<%016Lx> ",
+		printk(KERN_EMERG 
+		       "RIP%s %02x:<%016Lx> ",
 		       !(m->mcgstatus & MCG_STATUS_EIPV) ? " !INEXACT!" : "",
 		       m->cs, m->rip);
 		if (m->cs == __KERNEL_CS)
 			print_symbol("{%s}", m->rip);
 		printk("\n");
 	}
-	printk("TSC %Lx ", m->tsc); 
+	printk(KERN_EMERG "TSC %Lx ", m->tsc); 
 	if (m->addr)
 		printk("ADDR %Lx ", m->addr);
 	if (m->misc)
@@ -177,9 +179,14 @@ void do_machine_check(struct pt_regs * regs, long error_code)
 		int user_space = (m.rip && (m.cs & 3));
 		
 		/* When the machine was in user space and the CPU didn't get
-		   confused it's normally not necessary to panic, unless you are 
-		   paranoid (tolerant == 0) */ 
-		if (!user_space && (panic_on_oops || tolerant < 2))
+		   confused it's normally not necessary to panic, unless you 
+		   are paranoid (tolerant == 0)
+
+		   RED-PEN could be more tolerant for MCEs in idle,
+		   but most likely they occur at boot anyways, where
+		   it is best to just halt the machine. */
+		if ((!user_space && (panic_on_oops || tolerant < 2)) ||
+		    (unsigned)current->pid <= 1)
 			mce_panic("Uncorrected machine check", &m, mcestart);
 
 		/* do_exit takes an awful lot of locks and has as slight risk 
