@@ -849,7 +849,7 @@ int swsusp_suspend(void)
 	 * become desynchronized with the actual state of the hardware
 	 * at resume time, and evil weirdness ensues.
 	 */
-	if ((error = device_power_down(PM_SUSPEND_DISK))) {
+	if ((error = device_power_down(PMSG_FREEZE))) {
 		local_irq_enable();
 		return error;
 	}
@@ -878,7 +878,7 @@ int swsusp_resume(void)
 {
 	int error;
 	local_irq_disable();
-	device_power_down(PM_SUSPEND_DISK);
+	device_power_down(PMSG_FREEZE);
 	/* We'll ignore saved state, but this gets preempt count (etc) right */
 	save_processor_state();
 	error = swsusp_arch_resume();
