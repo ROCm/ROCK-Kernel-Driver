@@ -598,14 +598,6 @@ extern void show_mem(void);
 extern void si_meminfo(struct sysinfo * val);
 extern void si_meminfo_node(struct sysinfo *val, int nid);
 
-static inline void vma_prio_tree_init(struct vm_area_struct *vma)
-{
-	vma->shared.vm_set.list.next = NULL;
-	vma->shared.vm_set.list.prev = NULL;
-	vma->shared.vm_set.parent = NULL;
-	vma->shared.vm_set.head = NULL;
-}
-
 /* prio_tree.c */
 void vma_prio_tree_add(struct vm_area_struct *, struct vm_area_struct *old);
 void vma_prio_tree_insert(struct vm_area_struct *, struct prio_tree_root *);
@@ -613,6 +605,13 @@ void vma_prio_tree_remove(struct vm_area_struct *, struct prio_tree_root *);
 struct vm_area_struct *vma_prio_tree_next(
 	struct vm_area_struct *, struct prio_tree_root *,
 	struct prio_tree_iter *, pgoff_t begin, pgoff_t end);
+
+static inline void vma_nonlinear_insert(struct vm_area_struct *vma,
+					struct list_head *list)
+{
+	vma->shared.vm_set.parent = NULL;
+	list_add_tail(&vma->shared.vm_set.list, list);
+}
 
 /* mmap.c */
 extern void vma_adjust(struct vm_area_struct *vma, unsigned long start,

@@ -538,6 +538,9 @@ void vma_prio_tree_add(struct vm_area_struct *vma, struct vm_area_struct *old)
 	BUG_ON(RADIX_INDEX(vma) != RADIX_INDEX(old));
 	BUG_ON(HEAP_INDEX(vma) != HEAP_INDEX(old));
 
+	vma->shared.vm_set.head = NULL;
+	vma->shared.vm_set.parent = NULL;
+
 	if (!old->shared.vm_set.parent)
 		list_add(&vma->shared.vm_set.list,
 				&old->shared.vm_set.list);
@@ -556,6 +559,8 @@ void vma_prio_tree_insert(struct vm_area_struct *vma,
 {
 	struct prio_tree_node *ptr;
 	struct vm_area_struct *old;
+
+	vma->shared.vm_set.head = NULL;
 
 	ptr = prio_tree_insert(root, &vma->shared.prio_tree_node);
 	if (ptr != &vma->shared.prio_tree_node) {
