@@ -45,6 +45,7 @@
 #include <linux/sysdev.h>
 #include <linux/bcd.h>
 #include <linux/efi.h>
+#include <linux/mca.h>
 #include <linux/sysctl.h>
 
 #include <asm/io.h>
@@ -79,9 +80,9 @@ unsigned long cpu_khz;	/* Detected as we calibrate the TSC */
 
 extern unsigned long wall_jiffies;
 
-spinlock_t rtc_lock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(rtc_lock);
 
-spinlock_t i8253_lock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(i8253_lock);
 EXPORT_SYMBOL(i8253_lock);
 
 extern struct init_timer_opts timer_tsc_init;
@@ -562,12 +563,13 @@ static int timer_resume(struct sys_device *dev)
 		hpet_reenable();
 #endif
 	sec = get_cmos_time() + clock_cmos_diff;
-	sleep_length = get_cmos_time() - sleep_start;
+	sleep_length = (get_cmos_time() - sleep_start) * HZ;
 	write_seqlock_irqsave(&xtime_lock, flags);
 	xtime.tv_sec = sec;
 	xtime.tv_nsec = 0;
 	write_sequnlock_irqrestore(&xtime_lock, flags);
-	jiffies += sleep_length * HZ;
+	jiffies += sleep_length;
+	wall_jiffies += sleep_length;
 	return 0;
 }
 

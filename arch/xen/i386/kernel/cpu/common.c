@@ -10,6 +10,11 @@
 #include <asm/msr.h>
 #include <asm/io.h>
 #include <asm/mmu_context.h>
+#ifdef CONFIG_X86_LOCAL_APIC
+#include <asm/mpspec.h>
+#include <asm/apic.h>
+#include <mach_apic.h>
+#endif
 #include <asm-xen/hypervisor.h>
 
 #include "cpu.h"
@@ -277,8 +282,10 @@ void __init generic_identify(struct cpuinfo_x86 * c)
 		/* AMD-defined flags: level 0x80000001 */
 		xlvl = cpuid_eax(0x80000000);
 		if ( (xlvl & 0xffff0000) == 0x80000000 ) {
-			if ( xlvl >= 0x80000001 )
+			if ( xlvl >= 0x80000001 ) {
 				c->x86_capability[1] = cpuid_edx(0x80000001);
+				c->x86_capability[6] = cpuid_ecx(0x80000001);
+			}
 			if ( xlvl >= 0x80000004 )
 				get_model_name(c); /* Default name */
 		}
@@ -324,6 +331,7 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 	c->x86_model = c->x86_mask = 0;	/* So far unknown... */
 	c->x86_vendor_id[0] = '\0'; /* Unset */
 	c->x86_model_id[0] = '\0';  /* Unset */
+	c->x86_num_cores = 1;
 	memset(&c->x86_capability, 0, sizeof c->x86_capability);
 
 	if (!have_cpuid_p()) {
@@ -337,21 +345,19 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 
 	generic_identify(c);
 
-	printk(KERN_DEBUG "CPU: After generic identify, caps: %08lx %08lx %08lx %08lx\n",
-		c->x86_capability[0],
-		c->x86_capability[1],
-		c->x86_capability[2],
-		c->x86_capability[3]);
+	printk(KERN_DEBUG "CPU: After generic identify, caps:");
+	for (i = 0; i < NCAPINTS; i++)
+		printk(" %08lx", c->x86_capability[i]);
+	printk("\n");
 
 	if (this_cpu->c_identify) {
 		this_cpu->c_identify(c);
 
-	printk(KERN_DEBUG "CPU: After vendor identify, caps:  %08lx %08lx %08lx %08lx\n",
-		c->x86_capability[0],
-		c->x86_capability[1],
-		c->x86_capability[2],
-		c->x86_capability[3]);
-}
+		printk(KERN_DEBUG "CPU: After vendor identify, caps:");
+		for (i = 0; i < NCAPINTS; i++)
+			printk(" %08lx", c->x86_capability[i]);
+		printk("\n");
+	}
 
 	/*
 	 * Vendor-specific initialization.  In this section we
@@ -403,11 +409,10 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 
 	/* Now the feature flags better reflect actual CPU features! */
 
-	printk(KERN_DEBUG "CPU: After all inits, caps:        %08lx %08lx %08lx %08lx\n",
-	       c->x86_capability[0],
-	       c->x86_capability[1],
-	       c->x86_capability[2],
-	       c->x86_capability[3]);
+	printk(KERN_DEBUG "CPU: After all inits, caps:");
+	for (i = 0; i < NCAPINTS; i++)
+		printk(" %08lx", c->x86_capability[i]);
+	printk("\n");
 
 	/*
 	 * On SMP, boot_cpu_data holds the common feature set between
@@ -437,6 +442,50 @@ void __init dodgy_tsc(void)
 		cpu_devs[X86_VENDOR_CYRIX]->c_init(&boot_cpu_data);
 }
 
+#ifdef CONFIG_X86_HT
+void __init detect_ht(struct cpuinfo_x86 *c)
+{
+	u32 	eax, ebx, ecx, edx;
+	int 	index_lsb, index_msb, tmp;
+	int 	cpu = smp_processor_id();
+
+	if (!cpu_has(c, X86_FEATURE_HT))
+		return;
+
+	cpuid(1, &eax, &ebx, &ecx, &edx);
+	smp_num_siblings = (ebx & 0xff0000) >> 16;
+
+	if (smp_num_siblings == 1) {
+		printk(KERN_INFO  "CPU: Hyper-Threading is disabled\n");
+	} else if (smp_num_siblings > 1 ) {
+		index_lsb = 0;
+		index_msb = 31;
+
+		if (smp_num_siblings > NR_CPUS) {
+			printk(KERN_WARNING "CPU: Unsupported number of the siblings %d", smp_num_siblings);
+			smp_num_siblings = 1;
+			return;
+		}
+		tmp = smp_num_siblings;
+		while ((tmp & 1) == 0) {
+			tmp >>=1 ;
+			index_lsb++;
+		}
+		tmp = smp_num_siblings;
+		while ((tmp & 0x80000000 ) == 0) {
+			tmp <<=1 ;
+			index_msb--;
+		}
+		if (index_lsb != index_msb )
+			index_msb++;
+		phys_proc_id[cpu] = phys_pkg_id((ebx >> 24) & 0xFF, index_msb);
+
+		printk(KERN_INFO  "CPU: Physical Processor ID: %d\n",
+		       phys_proc_id[cpu]);
+	}
+}
+#endif
+
 void __init print_cpu_info(struct cpuinfo_x86 *c)
 {
 	char *vendor = NULL;
@@ -460,7 +509,7 @@ void __init print_cpu_info(struct cpuinfo_x86 *c)
 		printk("\n");
 }
 
-unsigned long cpu_initialized __initdata = 0;
+cpumask_t cpu_initialized __initdata = CPU_MASK_NONE;
 
 /* This is hacky. :)
  * We're emulating future behavior.
@@ -533,7 +582,7 @@ void __init cpu_init (void)
 	struct tss_struct * t = &per_cpu(init_tss, cpu);
 	struct thread_struct *thread = &current->thread;
 
-	if (test_and_set_bit(cpu, &cpu_initialized)) {
+	if (cpu_test_and_set(cpu, cpu_initialized)) {
 		printk(KERN_WARNING "CPU#%d already initialized!\n", cpu);
 		for (;;) local_irq_enable();
 	}

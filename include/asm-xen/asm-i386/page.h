@@ -41,6 +41,9 @@
 
 #else
 
+#define alloc_zeroed_user_highpage(vma, vaddr) alloc_page_vma(GFP_HIGHUSER | __GFP_ZERO, vma, vaddr)
+#define __HAVE_ARCH_ALLOC_ZEROED_USER_HIGHPAGE
+
 /*
  *	On older X86 processors it's not a win to use MMX here it seems.
  *	Maybe the K6-III ?
@@ -81,7 +84,9 @@ typedef struct { unsigned long pte_low, pte_high; } pte_t;
 typedef struct { unsigned long long pmd; } pmd_t;
 typedef struct { unsigned long long pgd; } pgd_t;
 typedef struct { unsigned long long pgprot; } pgprot_t;
+#define pmd_val(x)	((x).pmd)
 #define pte_val(x)	((x).pte_low | ((unsigned long long)(x).pte_high << 32))
+#define __pmd(x) ((pmd_t) { (x) } )
 #define HPAGE_SHIFT	21
 #else
 typedef struct { unsigned long pte_low; } pte_t;
@@ -92,7 +97,6 @@ typedef struct { unsigned long pgprot; } pgprot_t;
 			 (x).pte_low)
 #define pte_val_ma(x)	((x).pte_low)
 #define HPAGE_SHIFT	22
-#include <asm-generic/pgtable-nopmd.h>
 #endif
 #define PTE_MASK	PAGE_MASK
 
@@ -103,19 +107,14 @@ typedef struct { unsigned long pgprot; } pgprot_t;
 #define HAVE_ARCH_HUGETLB_UNMAPPED_AREA
 #endif
 
-#define pgd_val(x)	((x).pgd)
-#define pgprot_val(x)	((x).pgprot)
-#define __pgd(x)	((pgd_t) { (x) } )
-#define __pgprot(x)	((pgprot_t) { (x) } )
 
-/* Yes, this is ugly... */
-#undef pmd_val
-static inline unsigned long pmd_val(pmd_t x)
+static inline unsigned long pgd_val(pgd_t x)
 {
-	unsigned long ret = pud_val(x.pud);
+	unsigned long ret = x.pgd;
 	if (ret) ret = machine_to_phys(ret);
 	return ret;
 }
+#define pgprot_val(x)	((x).pgprot)
 
 static inline pte_t __pte(unsigned long x)
 {
@@ -123,12 +122,12 @@ static inline pte_t __pte(unsigned long x)
 	return ((pte_t) { (x) });
 }
 #define __pte_ma(x)	((pte_t) { (x) } )
-#undef __pmd
-static inline pmd_t __pmd(unsigned long x)
+static inline pgd_t __pgd(unsigned long x)
 {
 	if ((x & 1)) x = phys_to_machine(x);
-	return ((pmd_t) { __pud(x) });
+	return ((pgd_t) { (x) });
 }
+#define __pgprot(x)	((pgprot_t) { (x) } )
 
 #endif /* !__ASSEMBLY__ */
 

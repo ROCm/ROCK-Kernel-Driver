@@ -114,9 +114,7 @@ static inline unsigned long get_segment_eip(struct pt_regs *regs,
 	}
 
 	/* Decode the code segment base from the descriptor */
-	base =   (desc[0] >> 16) |
-		((desc[1] & 0xff) << 16) |
-		 (desc[1] & 0xff000000);
+	base = get_desc_base((unsigned long *)desc);
 
 	if (seg & (1<<2)) { 
 		up(&current->mm->context.sem);
@@ -547,7 +545,7 @@ vmalloc_fault:
 		pud_k = pud_offset(pgd_k, address);
 		if (!pud_present(*pud_k))
 			goto no_context;
-
+		
 		pmd = pmd_offset(pud, address);
 		pmd_k = pmd_offset(pud_k, address);
 		if (!pmd_present(*pmd_k))

@@ -402,6 +402,17 @@ config PREEMPT
 	  Say Y here if you are building a kernel for a desktop, embedded
 	  or real-time system.  Say N if you are unsure.
 
+config PREEMPT_BKL
+	bool "Preempt The Big Kernel Lock"
+	depends on PREEMPT
+	default y
+	help
+	  This option reduces the latency of the kernel by making the
+	  big kernel lock preemptible.
+
+	  Say Y here if you are building a kernel for a desktop system.
+	  Say N if you are unsure.
+
 #config X86_TSC
 #	 bool
 #	depends on (MWINCHIP3D || MWINCHIP2 || MCRUSOE || MEFFICEON || MCYRIXIII || MK7 || MK6 || MPENTIUM4 || MPENTIUMM || MPENTIUMIII || MPENTIUMII || M686 || M586MMX || M586TSC || MK8 || MVIAC3_2) && !X86_NUMAQ
@@ -642,7 +653,7 @@ config REGPARM
 	depends on EXPERIMENTAL
 	default n
 	help
-	Compile the kernel with -mregparm=3. This uses an different ABI
+	Compile the kernel with -mregparm=3. This uses a different ABI
 	and passes the first three arguments of a function call in registers.
 	This will probably break binary only modules.
 
@@ -732,6 +743,8 @@ config PCI_DIRECT
 	bool
  	depends on PCI
 	default y
+
+source "drivers/pci/pcie/Kconfig"
 
 source "drivers/pci/Kconfig"
 

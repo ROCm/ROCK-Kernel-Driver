@@ -206,11 +206,12 @@ void iounmap(volatile void __iomem *addr)
 	if (!p) { 
 		printk("__iounmap: bad address %p\n", addr);
 		return;
-	} 
+	}
 
 	if ((p->flags >> 20) && is_local_lowmem(p->phys_addr)) {
+		/* p->size includes the guard page, but cpa doesn't like that */
 		change_page_attr(virt_to_page(bus_to_virt(p->phys_addr)),
-				 p->size >> PAGE_SHIFT,
+				 (p->size - PAGE_SIZE) >> PAGE_SHIFT,
 				 PAGE_KERNEL); 				 
 		global_flush_tlb();
 	} 
@@ -354,26 +355,31 @@ int __direct_remap_area_pages(struct mm_struct *mm,
 {
 	pgd_t * dir;
 	unsigned long end = address + size;
+	int error;
 
 	dir = pgd_offset(mm, address);
 	if (address >= end)
 		BUG();
 	spin_lock(&mm->page_table_lock);
 	do {
-		pud_t *pud = pud_alloc(mm, dir, address);
+		pud_t *pud;
 		pmd_t *pmd;
+
+		error = -ENOMEM;
+		pud = pud_alloc(mm, dir, address);
 		if (!pud)
-			return -ENOMEM;
+			break;
 		pmd = pmd_alloc(mm, pud, address);
 		if (!pmd)
-			return -ENOMEM;
+			break;
+		error = 0;
 		direct_remap_area_pmd(mm, pmd, address, end - address, &v);
 		address = (address + PGDIR_SIZE) & PGDIR_MASK;
 		dir++;
 
 	} while (address && (address < end));
 	spin_unlock(&mm->page_table_lock);
-	return 0;
+	return error;
 }
 
 

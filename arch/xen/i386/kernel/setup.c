@@ -33,6 +33,7 @@
 #include <linux/bootmem.h>
 #include <linux/seq_file.h>
 #include <linux/console.h>
+#include <linux/mca.h>
 #include <linux/root_dev.h>
 #include <linux/highmem.h>
 #include <linux/module.h>
@@ -86,7 +87,6 @@ int __initdata acpi_force = 0;
 extern acpi_interrupt_flags	acpi_sci_flags;
 #endif
 
-int MCA_bus;
 /* for MCA, but anyone else can use it if they want */
 unsigned int machine_id;
 unsigned int machine_submodel_id;
@@ -95,6 +95,9 @@ unsigned int mca_pentium_flag;
 
 /* For PCI or other memory-mapped resources */
 unsigned long pci_mem_start = 0x10000000;
+
+/* Boot loader ID as an integer, for the benefit of proc_dointvec */
+int bootloader_type;
 
 /* user-defined highmem size */
 static unsigned int highmem_pages = -1;
@@ -694,6 +697,8 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 	saved_command_line[COMMAND_LINE_SIZE-1] = '\0';
 
 	for (;;) {
+		if (c != ' ')
+			goto next_char;
 		/*
 		 * "mem=nopentium" disables the 4MB page tables.
 		 * "mem=XXX[kKmM]" defines a memory region from HIGH_MEM
@@ -704,7 +709,7 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 		 * HPA tells me bootloaders need to parse mem=, so no new
 		 * option should be mem=  [also see Documentation/i386/boot.txt]
 		 */
-		if (c == ' ' && !memcmp(from, "mem=", 4)) {
+		if (!memcmp(from, "mem=", 4)) {
 			if (to != command_line)
 				to--;
 			if (!memcmp(from+4, "nopentium", 9)) {
@@ -731,7 +736,7 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 			}
 		}
 
-		if (c == ' ' && !memcmp(from, "memmap=", 7)) {
+		else if (!memcmp(from, "memmap=", 7)) {
 			if (to != command_line)
 				to--;
 			if (!memcmp(from+7, "exactmap", 8)) {
@@ -763,6 +768,10 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 				}
 			}
 		}
+
+		else if (!memcmp(from, "noexec=", 7))
+			noexec_setup(from + 7);
+
 
 #ifdef  CONFIG_X86_SMP
 		/*
@@ -834,16 +843,12 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 #endif /* CONFIG_X86_LOCAL_APIC */
 #endif /* CONFIG_ACPI_BOOT */
 
-		else if (!memcmp(from, "noexec=", 7))
-			noexec_setup(from + 7);
-
-
 		/*
 		 * highmem=size forces highmem to be exactly 'size' bytes.
 		 * This works even on boxes that have no highmem otherwise.
 		 * This also works to reduce highmem size on bigger boxes.
 		 */
-		if (c == ' ' && !memcmp(from, "highmem=", 8))
+		else if (!memcmp(from, "highmem=", 8))
 			highmem_pages = memparse(from+8, &from) >> PAGE_SHIFT;
 	
 		/*
@@ -851,9 +856,10 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 		 * bytes. This can be used to increase (or decrease) the
 		 * vmalloc area - the default is 128m.
 		 */
-		if (c == ' ' && !memcmp(from, "vmalloc=", 8))
+		else if (!memcmp(from, "vmalloc=", 8))
 			__VMALLOC_RESERVE = memparse(from+8, &from);
 
+	next_char:
 		c = *(from++);
 		if (!c)
 			break;
@@ -1195,9 +1201,10 @@ legacy_init_iomem_resources(struct resource *code_resource, struct resource *dat
 /*
  * Request address space for all standard resources
  */
-static void __init register_memory(unsigned long max_low_pfn)
+static void __init register_memory(void)
 {
-	unsigned long low_mem_size;
+	unsigned long gapstart, gapsize;
+	unsigned long long last;
 	int	      i;
 
 	if (efi_enabled)
@@ -1212,10 +1219,46 @@ static void __init register_memory(unsigned long max_low_pfn)
 	for (i = 0; i < STANDARD_IO_RESOURCES; i++)
 		request_resource(&ioport_resource, &standard_io_resources[i]);
 
-	/* Tell the PCI layer not to allocate too close to the RAM area.. */
-	low_mem_size = ((max_low_pfn << PAGE_SHIFT) + 0xfffff) & ~0xfffff;
-	if (low_mem_size > pci_mem_start)
-		pci_mem_start = low_mem_size;
+	/*
+	 * Search for the bigest gap in the low 32 bits of the e820
+	 * memory space.
+	 */
+	last = 0x100000000ull;
+	gapstart = 0x10000000;
+	gapsize = 0x400000;
+	i = e820.nr_map;
+	while (--i >= 0) {
+		unsigned long long start = e820.map[i].addr;
+		unsigned long long end = start + e820.map[i].size;
+
+		/*
+		 * Since "last" is at most 4GB, we know we'll
+		 * fit in 32 bits if this condition is true
+		 */
+		if (last > end) {
+			unsigned long gap = last - end;
+
+			if (gap > gapsize) {
+				gapsize = gap;
+				gapstart = end;
+			}
+		}
+		if (start < last)
+			last = start;
+	}
+
+	/*
+	 * Start allocating dynamic PCI memory a bit into the gap,
+	 * aligned up to the nearest megabyte.
+	 *
+	 * Question: should we try to pad it up a bit (do something
+	 * like " + (gapsize >> 3)" in there too?). We now have the
+	 * technology.
+	 */
+	pci_mem_start = (gapstart + 0xfffff) & ~0xfffff;
+
+	printk("Allocating PCI resources starting at %08lx (gap: %08lx:%08lx)\n",
+		pci_mem_start, gapstart, gapsize);
 }
 
 /* Use inline assembly to define this because the nops are defined 
@@ -1327,6 +1370,15 @@ __setup("noreplacement", noreplacement_setup);
 
 static char * __init machine_specific_memory_setup(void);
 
+#ifdef CONFIG_MCA
+static void set_mca_bus(int x)
+{
+	MCA_bus = x;
+}
+#else
+static void set_mca_bus(int x) { }
+#endif
+
 /*
  * Determine if we were loaded by an EFI loader.  If so, then we have also been
  * passed the efi memmap, systab, etc., so we should use these data structures
@@ -1374,12 +1426,13 @@ void __init setup_arch(char **cmdline_p)
 	ist_info = IST_INFO;
 	saved_videomode = VIDEO_MODE;
 	if( SYS_DESC_TABLE.length != 0 ) {
-		MCA_bus = SYS_DESC_TABLE.table[3] &0x2;
+		set_mca_bus(SYS_DESC_TABLE.table[3] & 0x2);
 		machine_id = SYS_DESC_TABLE.table[0];
 		machine_submodel_id = SYS_DESC_TABLE.table[1];
 		BIOS_revision = SYS_DESC_TABLE.table[2];
 	}
 	aux_device_present = AUX_DEVICE_INFO;
+	bootloader_type = LOADER_TYPE;
 
 #ifdef CONFIG_XEN_PHYSDEV_ACCESS
 	/* This is drawn from a dump from vgacon:startup in standard Linux. */
@@ -1491,6 +1544,7 @@ void __init setup_arch(char **cmdline_p)
 	/*
 	 * Parse the ACPI tables for possible boot-time SMP configuration.
 	 */
+	acpi_boot_table_init();
 	acpi_boot_init();
 
 #ifdef CONFIG_X86_LOCAL_APIC
@@ -1502,7 +1556,7 @@ void __init setup_arch(char **cmdline_p)
 	 * conflicts. */
 	noirqdebug_setup("");
 
-	register_memory(max_low_pfn);
+	register_memory();
 
 	/* If we are a privileged guest OS then we should request IO privs. */
 	if (xen_start_info.flags & SIF_PRIVILEGED) {

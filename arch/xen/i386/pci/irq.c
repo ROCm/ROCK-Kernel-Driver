@@ -23,6 +23,8 @@
 #include <asm-xen/xen-public/xen.h>
 #include <asm-xen/xen-public/physdev.h>
 
+static int pirq_enable_irq(struct pci_dev *dev);
+
 /*
  * Never use: 0, 1, 2 (timer, keyboard, and cascade)
  * Avoid using: 13, 14 and 15 (FP error and IDE).
@@ -37,7 +39,6 @@ static int pirq_penalty[16] = {
 
 int (*pcibios_enable_irq)(struct pci_dev *dev) = NULL;
 
-static int pirq_enable_irq(struct pci_dev *);
 
 static int __init pcibios_irq_init(void)
 {

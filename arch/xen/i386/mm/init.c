@@ -62,7 +62,7 @@ static pmd_t * __init one_md_table_init(pgd_t *pgd)
 	pmd_table = (pmd_t *) alloc_bootmem_low_pages(PAGE_SIZE);
 	set_pgd(pgd, __pgd(__pa(pmd_table) | _PAGE_PRESENT));
 	pud = pud_offset(pgd, 0);
-	if (pmd_table != pud_offset(pud, 0))
+	if (pmd_table != pmd_offset(pud, 0)) 
 		BUG();
 #else
 	pud = pud_offset(pgd, 0);
@@ -118,7 +118,6 @@ static void __init page_table_range_init (unsigned long start, unsigned long end
 	for ( ; (pgd_idx < PTRS_PER_PGD_NO_HV) && (vaddr != end); pgd++, pgd_idx++) {
 		if (pgd_none(*pgd)) 
 			one_md_table_init(pgd);
-
 		pud = pud_offset(pgd, vaddr);
 		pmd = pmd_offset(pud, vaddr);
 		for (; (pmd_idx < PTRS_PER_PMD) && (vaddr != end); pmd++, pmd_idx++) {
@@ -254,7 +253,7 @@ EXPORT_SYMBOL(kmap_prot);
 EXPORT_SYMBOL(kmap_pte);
 
 #define kmap_get_fixmap_pte(vaddr)					\
-	pte_offset_kernel(pmd_offset(pud_offset(pgd_offset_k(vaddr), (vaddr)), (vaddr)), (vaddr))
+	pte_offset_kernel(pmd_offset(pud_offset(pgd_offset_k(vaddr), vaddr), (vaddr)), (vaddr))
 
 void __init kmap_init(void)
 {

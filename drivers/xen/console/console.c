@@ -66,10 +66,6 @@ static enum { XC_OFF, XC_DEFAULT, XC_TTY, XC_SERIAL } xc_mode = XC_DEFAULT;
 
 static int __init xencons_setup(char *str)
 {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
-    if (str[0] == '=')
-	str++;
-#endif
     if ( !strcmp(str, "tty") )
         xc_mode = XC_TTY;
     else if ( !strcmp(str, "ttyS") )
@@ -78,7 +74,7 @@ static int __init xencons_setup(char *str)
         xc_mode = XC_OFF;
     return 1;
 }
-__setup("xencons", xencons_setup);
+__setup("xencons=", xencons_setup);
 
 /* The kernel and user-land drivers share a common transmit buffer. */
 #define WBUF_SIZE     4096
@@ -238,7 +234,7 @@ void xencons_force_flush(void)
      * We use dangerous control-interface functions that require a quiescent
      * system and no interrupts. Try to ensure this with a global cli().
      */
-    cli();
+    local_irq_disable();	/* XXXsmp */
 
     /* Spin until console data is flushed through to the domain controller. */
     while ( (wc != wp) && !ctrl_if_transmitter_empty() )

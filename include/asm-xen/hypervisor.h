@@ -30,6 +30,7 @@
 #ifndef __HYPERVISOR_H__
 #define __HYPERVISOR_H__
 
+#include <linux/config.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/version.h>
@@ -38,6 +39,9 @@
 #include <asm-xen/xen-public/io/domain_controller.h>
 #include <asm/ptrace.h>
 #include <asm/page.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
+#include <asm-generic/pgtable-nopmd.h>
+#endif
 
 /* arch/xen/i386/kernel/setup.c */
 union xen_start_info_union
@@ -66,7 +70,7 @@ void lgdt_finish(void);
 extern unsigned int mmu_update_queue_idx;
 
 void queue_l1_entry_update(pte_t *ptr, unsigned long val);
-void queue_l2_entry_update(pmd_t *ptr, unsigned long val);
+void queue_l2_entry_update(pmd_t *ptr, pmd_t val);
 void queue_pt_switch(unsigned long ptr);
 void queue_tlb_flush(void);
 void queue_invlpg(unsigned long ptr);
@@ -77,7 +81,7 @@ void queue_pte_unpin(unsigned long ptr);
 void queue_set_ldt(unsigned long ptr, unsigned long bytes);
 void queue_machphys_update(unsigned long mfn, unsigned long pfn);
 void xen_l1_entry_update(pte_t *ptr, unsigned long val);
-void xen_l2_entry_update(pmd_t *ptr, unsigned long val);
+void xen_l2_entry_update(pmd_t *ptr, pmd_t val);
 void xen_pt_switch(unsigned long ptr);
 void xen_tlb_flush(void);
 void xen_invlpg(unsigned long ptr);
@@ -281,6 +285,22 @@ HYPERVISOR_suspend(
 	: "0" (__HYPERVISOR_sched_op),
         "b" (SCHEDOP_shutdown | (SHUTDOWN_suspend << SCHEDOP_reasonshift)), 
         "S" (srec) : "memory");
+
+    return ret;
+}
+
+static inline int
+HYPERVISOR_crash(
+    void)
+{
+    int ret;
+    unsigned long ign1;
+    __asm__ __volatile__ (
+        TRAP_INSTR
+        : "=a" (ret), "=b" (ign1)
+	: "0" (__HYPERVISOR_sched_op),
+	  "1" (SCHEDOP_shutdown | (SHUTDOWN_crash << SCHEDOP_reasonshift))
+        : "memory" );
 
     return ret;
 }

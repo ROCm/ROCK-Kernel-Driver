@@ -11,17 +11,15 @@
 #define pmd_populate_kernel(mm, pmd, pte) \
 		set_pmd(pmd, __pmd(_PAGE_TABLE + __pa(pte)))
 
-static inline void pmd_populate(struct mm_struct *mm, pmd_t *pmd, struct page *pte)
-{
-	set_pmd(pmd, __pmd(_PAGE_TABLE +
-		((unsigned long long)page_to_pfn(pte) <<
-			(unsigned long long) PAGE_SHIFT)));
-	flush_page_update_queue();
-}
+#define pmd_populate(mm, pmd, pte) do {				\
+	set_pmd(pmd, __pmd(_PAGE_TABLE +			\
+		((unsigned long long)page_to_pfn(pte) <<	\
+			(unsigned long long) PAGE_SHIFT)));	\
+	flush_page_update_queue();				\
+} while (0)
 /*
  * Allocate and free page tables.
  */
-
 extern pgd_t *pgd_alloc(struct mm_struct *);
 extern void pgd_free(pgd_t *pgd);
 
@@ -39,7 +37,7 @@ extern void pte_free(struct page *pte);
 
 #define __pte_free_tlb(tlb,pte) tlb_remove_page((tlb),(pte))
 
-#ifdef CONFIG_PAE
+#ifdef CONFIG_X86_PAE
 /*
  * In the PAE case we free the pmds as part of the pgd.
  */

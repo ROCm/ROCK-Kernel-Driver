@@ -198,6 +198,7 @@ ENTRY(resume_userspace)
 #ifdef CONFIG_PREEMPT
 ENTRY(resume_kernel)
 	XEN_GET_VCPU_INFO(%esi)
+	XEN_BLOCK_EVENTS(%esi)
 	cmpl $0,TI_preempt_count(%ebp)	# non-zero preempt_count ?
 	jnz restore_all
 need_resched:
@@ -206,11 +207,7 @@ need_resched:
 	jz restore_all
 	testb $0xFF,EVENT_MASK(%esp)	# interrupts off (exception path) ?
 	jnz restore_all
-	movl $PREEMPT_ACTIVE,TI_preempt_count(%ebp)
-	XEN_UNBLOCK_EVENTS(%esi)
-	call schedule
-	XEN_BLOCK_EVENTS(%esi)
-	movl $0,TI_preempt_count(%ebp)
+	call preempt_schedule_irq
 	jmp need_resched
 #endif
 

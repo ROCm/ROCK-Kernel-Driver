@@ -9,6 +9,11 @@
 #define PTRS_PER_PGD	1024
 #define PTRS_PER_PGD_NO_HV	(HYPERVISOR_VIRT_START >> PGDIR_SHIFT)
 
+/*
+ * the i386 is two-level, so we don't really have any
+ * PMD directory physically.
+ */
+
 #define PTRS_PER_PTE	1024
 
 #endif /* _I386_PGTABLE_2LEVEL_DEFS_H */

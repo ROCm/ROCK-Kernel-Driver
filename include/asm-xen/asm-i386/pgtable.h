@@ -322,7 +322,7 @@ static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 } while (0)
 
 #define pmd_large(pmd) \
-	((pmd_val(pmd) & (_PAGE_PSE|_PAGE_PRESENT)) == (_PAGE_PSE|_PAGE_PRESENT))
+((pmd_val(pmd) & (_PAGE_PSE|_PAGE_PRESENT)) == (_PAGE_PSE|_PAGE_PRESENT))
 
 /*
  * the pgd page can be thought of an array like this: pgd_t[PTRS_PER_PGD]
@@ -386,6 +386,7 @@ extern pte_t *lookup_address(unsigned long address);
 #endif
 
 extern void noexec_setup(const char *str);
+
 #if defined(CONFIG_HIGHPTE)
 #define pte_offset_map(dir, address) \
 	((pte_t *)kmap_atomic_pte(pmd_page(*(dir)),KM_PTE0) + \

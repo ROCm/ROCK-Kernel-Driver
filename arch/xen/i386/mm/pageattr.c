@@ -13,21 +13,21 @@
 #include <asm/processor.h>
 #include <asm/tlbflush.h>
 
-static spinlock_t cpa_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(cpa_lock);
 static struct list_head df_list = LIST_HEAD_INIT(df_list);
 
 
 pte_t *lookup_address(unsigned long address) 
 { 
-	pgd_t *pgd = pgd_offset_k(address); 
+	pgd_t *pgd = pgd_offset_k(address);
 	pud_t *pud;
 	pmd_t *pmd;
 	if (pgd_none(*pgd))
 		return NULL;
-	pud = pud_offset(pgd, address); 	       
+	pud = pud_offset(pgd, address);
 	if (pud_none(*pud))
 		return NULL;
-	pmd = pmd_offset(pud, address); 	       
+	pmd = pmd_offset(pud, address);
 	if (pmd_none(*pmd))
 		return NULL;
 	if (pmd_large(*pmd))
@@ -98,7 +98,7 @@ static void set_pmd_pte(pte_t *kpte, unsigned long address, pte_t pte)
 static inline void revert_page(struct page *kpte_page, unsigned long address)
 {
 	pte_t *linear = (pte_t *) 
-		pmd_offset(pud_offset(pgd_offset(&init_mm, address), address), address);
+		pmd_offset(pud_offset(pgd_offset_k(address), address), address);
 	set_pmd_pte(linear,  address,
 		    pfn_pte((__pa(address) & LARGE_PAGE_MASK) >> PAGE_SHIFT,
 			    PAGE_KERNEL_LARGE));
@@ -127,7 +127,7 @@ __change_page_attr(struct page *page, pgprot_t prot)
 				return -ENOMEM;
 			set_pmd_pte(kpte,address,mk_pte(split, PAGE_KERNEL));
 			kpte_page = split;
-		}
+		}	
 		get_page(kpte_page);
 	} else if ((pte_val(*kpte) & _PAGE_PSE) == 0) { 
 		set_pte_batched(kpte, mk_pte(page, PAGE_KERNEL));

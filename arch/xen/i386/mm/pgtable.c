@@ -194,7 +194,6 @@ pte_t *pte_alloc_one_kernel(struct mm_struct *mm, unsigned long address)
 {
 	pte_t *pte = (pte_t *)__get_free_page(GFP_KERNEL|__GFP_REPEAT|__GFP_ZERO);
 	if (pte) {
-		//clear_page(pte);
 		make_page_readonly(pte);
 		xen_flush_page_update_queue();
 	}
@@ -233,10 +232,8 @@ struct page *pte_alloc_one(struct mm_struct *mm, unsigned long address)
 	pte = alloc_pages(GFP_KERNEL|__GFP_HIGHMEM|__GFP_REPEAT|__GFP_ZERO, 0);
 	if (pte == NULL)
 		return pte;
-	if (PageHighMem(pte)) {
-		//clear_highpage(pte);
+	if (pte >= highmem_start_page)
 		return pte;
-	}
 	/* not a highmem page -- free page and grab one from the cache */
 	__free_page(pte);
 #endif
@@ -250,7 +247,7 @@ void pte_free(struct page *pte)
 {
 	set_page_count(pte, 1);
 #ifdef CONFIG_HIGHPTE
-	if (!PageHighMem(pte))
+	if (pte < highmem_start_page)
 #endif
 		kmem_cache_free(pte_cache,
 				phys_to_virt(page_to_pseudophys(pte)));
@@ -277,7 +274,7 @@ void pmd_ctor(void *pmd, kmem_cache_t *cache, unsigned long flags)
  * recommendations and having no core impact whatsoever.
  * -- wli
  */
-spinlock_t pgd_lock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(pgd_lock);
 struct page *pgd_list;
 
 static inline void pgd_list_add(pgd_t *pgd)
@@ -371,7 +368,7 @@ void pgd_free(pgd_t *pgd)
 	if (PTRS_PER_PMD > 1)
 		for (i = 0; i < USER_PTRS_PER_PGD; ++i)
 			kmem_cache_free(pmd_cache, (void *)__va(pgd_val(pgd[i])-1));
-	/* in the non-PAE case, clear_page_tables() clears user pgd entries */
+	/* in the non-PAE case, clear_page_range() clears user pgd entries */
 	kmem_cache_free(pgd_cache, pgd);
 }
 

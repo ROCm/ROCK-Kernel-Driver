@@ -17,11 +17,7 @@
 	queue_l1_entry_update(pteptr, (pteval).pte_low)
 #define set_pte(pteptr, pteval) (*(pteptr) = pteval)
 #define set_pte_atomic(pteptr, pteval) set_pte(pteptr,pteval)
-/*
- * (pmds are folded into pgds so this doesn't get actually called,
- * but the define is needed for a generic inline function.)
- */
-#define set_pmd(pmdptr, pmdval) xen_l2_entry_update((pmdptr), pud_val((pmdval).pud))
+#define set_pmd(pmdptr, pmdval) xen_l2_entry_update((pmdptr), (pmdval))
 
 /*
  * A note on implementation of this atomic 'get-and-clear' operation.
@@ -80,7 +76,9 @@ static inline pte_t ptep_get_and_clear(pte_t *xp)
 #define pfn_pmd(pfn, prot)	__pmd(((pfn) << PAGE_SHIFT) | pgprot_val(prot))
 
 #define pmd_page(pmd) (pfn_to_page(pmd_val(pmd) >> PAGE_SHIFT))
-#define pmd_page_kernel(pmd) ((unsigned long) __va(pmd_val(pmd) & PAGE_MASK))
+
+#define pmd_page_kernel(pmd) \
+((unsigned long) __va(pmd_val(pmd) & PAGE_MASK))
 
 /*
  * All present user pages are user-executable:
