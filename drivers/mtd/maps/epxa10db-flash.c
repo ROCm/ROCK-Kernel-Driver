@@ -92,17 +92,17 @@ static void epxa_copy_to(struct map_info *map, unsigned long to, const void *fro
 
 
 static struct map_info epxa_map = {
-	name:		"EPXA flash",
-	size:		FLASH_SIZE,
-	buswidth:	2,
-	read8:		epxa_read8,
-	read16:		epxa_read16,
-	read32:		epxa_read32,
-	copy_from:	epxa_copy_from,
-	write8:		epxa_write8,
-	write16:	epxa_write16,
-	write32:	epxa_write32,
-	copy_to:	epxa_copy_to
+	.name		= "EPXA flash",
+	.size		= FLASH_SIZE,
+	.buswidth	= 2,
+	.read8		= epxa_read8,
+	.read16		= epxa_read16,
+	.read32		= epxa_read32,
+	.copy_from	= epxa_copy_from,
+	.write8		= epxa_write8,
+	.write16	= epxa_write16,
+	.write32	= epxa_write32,
+	.copy_to	= epxa_copy_to
 };
 
 

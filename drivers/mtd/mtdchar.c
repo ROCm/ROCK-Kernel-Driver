@@ -19,8 +19,8 @@ static void mtd_notify_add(struct mtd_info* mtd);
 static void mtd_notify_remove(struct mtd_info* mtd);
 
 static struct mtd_notifier notifier = {
-	add:	mtd_notify_add,
-	remove:	mtd_notify_remove,
+	.add	= mtd_notify_add,
+	.remove	= mtd_notify_remove,
 };
 
 #endif
@@ -445,13 +445,13 @@ static int mtd_ioctl(struct inode *inode, struct file *file,
 } /* memory_ioctl */
 
 static struct file_operations mtd_fops = {
-	owner:		THIS_MODULE,
-	llseek:		mtd_lseek,     	/* lseek */
-	read:		mtd_read,	/* read */
-	write: 		mtd_write, 	/* write */
-	ioctl:		mtd_ioctl,	/* ioctl */
-	open:		mtd_open,	/* open */
-	release:	mtd_close,	/* release */
+	.owner		= THIS_MODULE,
+	.llseek		= mtd_lseek,	/* lseek */
+	.read		= mtd_read,	/* read */
+	.write 		= mtd_write, 	/* write */
+	.ioctl		= mtd_ioctl,	/* ioctl */
+	.open		= mtd_open,	/* open */
+	.release	= mtd_close,	/* release */
 };
 
 

@@ -79,17 +79,17 @@ void edb7312nor_copy_to(struct map_info *map, unsigned long to, const void *from
 }
 
 struct map_info edb7312nor_map = {
-	name: "NOR flash on EDB7312",
-	size: WINDOW_SIZE,
-	buswidth: BUSWIDTH,
-	read8: edb7312nor_read8,
-	read16: edb7312nor_read16,
-	read32: edb7312nor_read32,
-	copy_from: edb7312nor_copy_from,
-	write8: edb7312nor_write8,
-	write16: edb7312nor_write16,
-	write32: edb7312nor_write32,
-	copy_to: edb7312nor_copy_to
+	.name		= "NOR flash on EDB7312",
+	.size		= WINDOW_SIZE,
+	.buswidth	= BUSWIDTH,
+	.read8		= edb7312nor_read8,
+	.read16		= edb7312nor_read16,
+	.read32		= edb7312nor_read32,
+	.copy_from	= edb7312nor_copy_from,
+	.write8		= edb7312nor_write8,
+	.write16	= edb7312nor_write16,
+	.write32	= edb7312nor_write32,
+	.copy_to	= edb7312nor_copy_to
 };
 
 #ifdef CONFIG_MTD_PARTITIONS
@@ -97,23 +97,22 @@ struct map_info edb7312nor_map = {
 /*
  * MTD partitioning stuff 
  */
-static struct mtd_partition static_partitions[3] =
-{
-    {
-	name: "ARMboot",
-	  size: 0x40000,
-	  offset: 0
-    },
-    {
-	name: "Kernel",
-	  size: 0x200000,
-	  offset: 0x40000
-    },
-    {
-	name: "RootFS",
-	  size: 0xDC0000,
-	  offset: 0x240000
-    },
+static struct mtd_partition static_partitions[3] = {
+	{
+		.name = "ARMboot",
+		.size = 0x40000,
+		.offset = 0
+	},
+	{
+		.name = "Kernel",
+		.size = 0x200000,
+		.offset = 0x40000
+	},
+	{
+		.name = "RootFS",
+		.size = 0xDC0000,
+		.offset = 0x240000
+	},
 };
 
 #define NB_OF(x) (sizeof (x) / sizeof (x[0]))

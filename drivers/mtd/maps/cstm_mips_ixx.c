@@ -132,20 +132,15 @@ void cstm_mips_ixx_set_vpp(struct map_info *map,int vpp)
 }
 
 const struct map_info basic_cstm_mips_ixx_map = {
-	NULL,
-	0,
-	0,
-	cstm_mips_ixx_read8,
-	cstm_mips_ixx_read16,
-	cstm_mips_ixx_read32,
-	cstm_mips_ixx_copy_from,
-	cstm_mips_ixx_write8,
-	cstm_mips_ixx_write16,
-	cstm_mips_ixx_write32,
-	cstm_mips_ixx_copy_to,
-        cstm_mips_ixx_set_vpp,
-	0,
-	0
+	.read8		= cstm_mips_ixx_read8,
+	.read16		= cstm_mips_ixx_read16,
+	.read32		= cstm_mips_ixx_read32,
+	.copy_from	= cstm_mips_ixx_copy_from,
+	.write8		= cstm_mips_ixx_write8,
+	.write16	= cstm_mips_ixx_write16,
+	.write32	= cstm_mips_ixx_write32,
+	.copy_to	= cstm_mips_ixx_copy_to,
+	.set_vpp	= cstm_mips_ixx_set_vpp,
 };
 
 /* board and partition description */
@@ -175,9 +170,8 @@ const struct cstm_mips_ixx_info cstm_mips_ixx_board_desc[PHYSMAP_NUMBER] =
 static struct mtd_partition cstm_mips_ixx_partitions[PHYSMAP_NUMBER][MAX_PHYSMAP_PARTITIONS] = {
 {   // 28F128J3A in 2x16 configuration
 	{
-		name: "main partition ",
-		size: 0x02000000, // 128 x 2 x 128k byte sectors
-		offset: 0,
+		.name	= "main partition ",
+		.size	= 0x02000000, // 128 x 2 x 128k byte sectors
 	},
 },
 };
@@ -197,9 +191,8 @@ const struct cstm_mips_ixx_info cstm_mips_ixx_board_desc[PHYSMAP_NUMBER] =
 static struct mtd_partition cstm_mips_ixx_partitions[PHYSMAP_NUMBER][MAX_PHYSMAP_PARTITIONS] = {
 { 
 	{
-		name: "main partition",
-		size:  CONFIG_MTD_CSTM_MIPS_IXX_LEN,
-		offset: 0,
+		.name	= "main partition",
+		.size	= CONFIG_MTD_CSTM_MIPS_IXX_LEN,
 	},
 },
 };

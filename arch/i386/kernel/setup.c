@@ -14,6 +14,9 @@
  * Moved CPU detection code to cpu/${cpu}.c
  *    Patrick Mochel <mochel@osdl.org>, March 2002
  *
+ *  Provisions for empty E820 memory regions (reported by certain BIOSes).
+ *  Alex Achenbach <xela@slit.de>, December 2002.
+ *
  */
 
 /*
@@ -279,7 +282,7 @@ static int __init sanitize_e820_map(struct e820entry * biosmap, char * pnr_map)
 	int chgidx, still_changing;
 	int overlap_entries;
 	int new_bios_entry;
-	int old_nr, new_nr;
+	int old_nr, new_nr, chg_nr;
 	int i;
 
 	/*
@@ -333,20 +336,24 @@ static int __init sanitize_e820_map(struct e820entry * biosmap, char * pnr_map)
 	for (i=0; i < 2*old_nr; i++)
 		change_point[i] = &change_point_list[i];
 
-	/* record all known change-points (starting and ending addresses) */
+	/* record all known change-points (starting and ending addresses),
+	   omitting those that are for empty memory regions */
 	chgidx = 0;
 	for (i=0; i < old_nr; i++)	{
-		change_point[chgidx]->addr = biosmap[i].addr;
-		change_point[chgidx++]->pbios = &biosmap[i];
-		change_point[chgidx]->addr = biosmap[i].addr + biosmap[i].size;
-		change_point[chgidx++]->pbios = &biosmap[i];
+		if (biosmap[i].size != 0) {
+			change_point[chgidx]->addr = biosmap[i].addr;
+			change_point[chgidx++]->pbios = &biosmap[i];
+			change_point[chgidx]->addr = biosmap[i].addr + biosmap[i].size;
+			change_point[chgidx++]->pbios = &biosmap[i];
+		}
 	}
+	chg_nr = chgidx;    	/* true number of change-points */
 
 	/* sort change-point list by memory addresses (low -> high) */
 	still_changing = 1;
 	while (still_changing)	{
 		still_changing = 0;
-		for (i=1; i < 2*old_nr; i++)  {
+		for (i=1; i < chg_nr; i++)  {
 			/* if <current_addr> > <last_addr>, swap */
 			/* or, if current=<start_addr> & last=<end_addr>, swap */
 			if ((change_point[i]->addr < change_point[i-1]->addr) ||
@@ -369,7 +376,7 @@ static int __init sanitize_e820_map(struct e820entry * biosmap, char * pnr_map)
 	last_type = 0;		 /* start with undefined memory type */
 	last_addr = 0;		 /* start with 0 as last starting address */
 	/* loop through change-points, determining affect on the new bios map */
-	for (chgidx=0; chgidx < 2*old_nr; chgidx++)
+	for (chgidx=0; chgidx < chg_nr; chgidx++)
 	{
 		/* keep track of all overlapping bios entries */
 		if (change_point[chgidx]->addr == change_point[chgidx]->pbios->addr)

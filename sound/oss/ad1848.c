@@ -2987,7 +2987,7 @@ static struct pnp_dev *activate_dev(char *devname, char *resname, struct pnp_dev
 	if (err < 0)
 		return(NULL);
 
-	if((err = pnp_activate_dev(dev,NULL)) < 0) {
+	if((err = pnp_activate_dev(dev)) < 0) {
 		printk(KERN_ERR "ad1848: %s %s config failed (out of resources?)[%d]\n", devname, resname, err);
 
 		pnp_device_detach(dev);
@@ -3024,7 +3024,7 @@ static struct pnp_dev *ad1848_init_generic(struct pnp_card *bus, struct address_
 
 static int __init ad1848_isapnp_init(struct address_info *hw_config, struct pnp_card *bus, int slot)
 {
-	char *busname = bus->name[0] ? bus->name : ad1848_isapnp_list[slot].name;
+	char *busname = bus->dev.name[0] ? bus->dev.name : ad1848_isapnp_list[slot].name;
 
 	/* Initialize this baby. */
 

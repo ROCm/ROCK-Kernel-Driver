@@ -210,23 +210,23 @@ SOCKCALL_WRAP(name, mmap, (struct file *file, struct socket *sock, struct vm_are
 	      (file, sock, vma)) \
 	      \
 static struct proto_ops name##_ops = {			\
-	family:		fam,				\
+	.family		= fam,				\
 							\
-	release:	__lock_##name##_release,	\
-	bind:		__lock_##name##_bind,		\
-	connect:	__lock_##name##_connect,	\
-	socketpair:	__lock_##name##_socketpair,	\
-	accept:		__lock_##name##_accept,		\
-	getname:	__lock_##name##_getname,	\
-	poll:		__lock_##name##_poll,		\
-	ioctl:		__lock_##name##_ioctl,		\
-	listen:		__lock_##name##_listen,		\
-	shutdown:	__lock_##name##_shutdown,	\
-	setsockopt:	__lock_##name##_setsockopt,	\
-	getsockopt:	__lock_##name##_getsockopt,	\
-	sendmsg:	__lock_##name##_sendmsg,	\
-	recvmsg:	__lock_##name##_recvmsg,	\
-	mmap:		__lock_##name##_mmap,		\
+	.release	= __lock_##name##_release,	\
+	.bind		= __lock_##name##_bind,		\
+	.connect	= __lock_##name##_connect,	\
+	.socketpair	= __lock_##name##_socketpair,	\
+	.accept		= __lock_##name##_accept,	\
+	.getname	= __lock_##name##_getname,	\
+	.poll		= __lock_##name##_poll,		\
+	.ioctl		= __lock_##name##_ioctl,	\
+	.listen		= __lock_##name##_listen,	\
+	.shutdown	= __lock_##name##_shutdown,	\
+	.setsockopt	= __lock_##name##_setsockopt,	\
+	.getsockopt	= __lock_##name##_getsockopt,	\
+	.sendmsg	= __lock_##name##_sendmsg,	\
+	.recvmsg	= __lock_##name##_recvmsg,	\
+	.mmap		= __lock_##name##_mmap,		\
 };
 #endif
 

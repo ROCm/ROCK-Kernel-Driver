@@ -43,10 +43,10 @@ static struct mtd_info *cfi_amdstd_setup (struct map_info *);
 
 
 static struct mtd_chip_driver cfi_amdstd_chipdrv = {
-	probe: NULL, /* Not usable directly */
-	destroy: cfi_amdstd_destroy,
-	name: "cfi_cmdset_0002",
-	module: THIS_MODULE
+	.probe		= NULL, /* Not usable directly */
+	.destroy	= cfi_amdstd_destroy,
+	.name		= "cfi_cmdset_0002",
+	.module		= THIS_MODULE
 };
 
 struct mtd_info *cfi_cmdset_0002(struct map_info *map, int primary)

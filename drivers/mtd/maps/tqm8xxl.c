@@ -92,17 +92,16 @@ void tqm8xxl_copy_to(struct map_info *map, unsigned long to, const void *from, s
 }
 
 struct map_info tqm8xxl_map = {
-	name: "TQM8xxL",
-	//size: WINDOW_SIZE,
-	buswidth: 4,
-	read8: tqm8xxl_read8,
-	read16: tqm8xxl_read16,
-	read32: tqm8xxl_read32,
-	copy_from: tqm8xxl_copy_from,
-	write8: tqm8xxl_write8,
-	write16: tqm8xxl_write16,
-	write32: tqm8xxl_write32,
-	copy_to: tqm8xxl_copy_to
+	.name		= "TQM8xxL",
+	.buswidth	= 4,
+	.read8		= tqm8xxl_read8,
+	.read16		= tqm8xxl_read16,
+	.read32		= tqm8xxl_read32,
+	.copy_from	= tqm8xxl_copy_from,
+	.write8		= tqm8xxl_write8,
+	.write16	= tqm8xxl_write16,
+	.write32	= tqm8xxl_write32,
+	.copy_to	= tqm8xxl_copy_to
 };
 
 /*
@@ -125,40 +124,39 @@ static unsigned long tqm8xxl_max_flash_size = 0x00800000;
  */
 static struct mtd_partition tqm8xxl_partitions[] = {
 	{
-	  name: "ppcboot",
-	  offset: 0x00000000,
-	  size: 0x00020000,           /* 128KB           */
-	  mask_flags: MTD_WRITEABLE,  /* force read-only */
+		.name		= "ppcboot",
+		.offset		= 0x00000000,
+		.size 		= 0x00020000,	/* 128KB */
+		.mask_flags	= MTD_WRITEABLE, /* force read-only */
 	},
 	{
-	  name: "kernel",             /* default kernel image */
-	  offset: 0x00020000,
-	  size: 0x000e0000,
-	  mask_flags: MTD_WRITEABLE,  /* force read-only */
+		.name		= "kernel",	/* default kernel image */
+		.offset		= 0x00020000,
+		.size		= 0x000e0000,
+		.mask_flags	= MTD_WRITEABLE, /* force read-only */
 	},
 	{
-	  name: "user",
-	  offset: 0x00100000,
-	  size: 0x00100000,
+		.name		= "user",
+		.offset		= 0x00100000,
+		.size		= 0x00100000,
 	},
 	{
-	  name: "initrd",
-	  offset: 0x00200000,
-	  size: 0x00200000,
+		.name		= "initrd",
+		.offset		= 0x00200000,
+		.size		= 0x00200000,
 	}
 };
 /* partition definition for second flahs bank */
 static struct mtd_partition tqm8xxl_fs_partitions[] = {
 	{
-	  name: "cramfs",
-	  offset: 0x00000000,
-	  size: 0x00200000,
+		.name	= "cramfs",
+		.offset	= 0x00000000,
+		.size	= 0x00200000,
 	},
 	{
-	  name: "jffs",
-	  offset: 0x00200000,
-	  size: 0x00200000,
-	  //size: MTDPART_SIZ_FULL,
+		.name	= "jffs",
+		.offset	= 0x00200000,
+		.size	= 0x00200000,
 	}
 };
 #endif

@@ -142,14 +142,14 @@ int gs_write(struct tty_struct * tty, int from_user,
  
 		/* Can't copy more? break out! */
 		if (c <= 0) break;
-		if (from_user)
+		if (from_user) {
 			if (copy_from_user (port->xmit_buf + port->xmit_head, 
 					    buf, c)) {
 				up (& port->port_write_sem);
 				return -EFAULT;
 			}
 
-		else
+		} else
 			memcpy (port->xmit_buf + port->xmit_head, buf, c);
 
 		port -> xmit_cnt += c;

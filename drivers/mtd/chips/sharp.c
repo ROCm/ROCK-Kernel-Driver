@@ -98,10 +98,10 @@ struct mtd_info *sharp_probe(struct map_info *map);
 static void sharp_destroy(struct mtd_info *mtd);
 
 static struct mtd_chip_driver sharp_chipdrv = {
-	probe: sharp_probe,
-	destroy: sharp_destroy,
-	name: "sharp",
-	module: THIS_MODULE
+	.probe		= sharp_probe,
+	.destroy	= sharp_destroy,
+	.name		= "sharp",
+	.module		= THIS_MODULE
 };
 
 

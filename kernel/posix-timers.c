@@ -1207,7 +1207,7 @@ do_clock_nanosleep(clockid_t which_clock, int flags, struct timespec *tsave)
 {
 	struct timespec t;
 	struct timer_list new_timer;
-	struct abs_struct abs_struct = { list:{next:0} };
+	struct abs_struct abs_struct = { .list = { .next = 0 } };
 	int abs;
 	int rtn = 0;
 	int active;

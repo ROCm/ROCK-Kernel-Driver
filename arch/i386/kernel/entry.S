@@ -228,7 +228,6 @@ need_resched:
 #define SYSENTER_RETURN 0xffffe010
 
 	# sysenter call handler stub
-	ALIGN
 ENTRY(sysenter_entry)
 	sti
 	pushl $(__USER_DS)
@@ -271,7 +270,6 @@ ENTRY(sysenter_entry)
 
 
 	# system call handler stub
-	ALIGN
 ENTRY(system_call)
 	pushl %eax			# save orig_eax
 	SAVE_ALL
