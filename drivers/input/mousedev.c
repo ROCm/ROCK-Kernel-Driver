@@ -351,6 +351,15 @@ static ssize_t mousedev_write(struct file * file, const char * buffer, size_t co
 				list->ps2[1] = 0x60; list->ps2[2] = 3; list->ps2[3] = 200;
 				list->bufsiz = 4;
 				break;
+
+			case 0xff: /* Reset */
+				list->impsseq = 0;
+				list->imexseq = 0;
+				list->mode = 0;
+				list->ps2[0] = 0xaa;
+				list->ps2[1] = 0x00;
+				list->bufsiz = 2;
+				break;
 		}
 
 		list->buffer = list->bufsiz;
