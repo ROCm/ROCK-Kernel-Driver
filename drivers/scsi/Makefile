@@ -132,7 +132,6 @@ obj-$(CONFIG_BLK_DEV_SD)	+= sd_mod.o
 obj-$(CONFIG_BLK_DEV_SR)	+= sr_mod.o
 obj-$(CONFIG_CHR_DEV_SG)	+= sg.o
 
-list-multi	:= scsi_mod.o sd_mod.o sr_mod.o initio.o a100u2w.o cpqfc.o
 scsi_mod-objs	:= scsi.o hosts.o scsi_ioctl.o constants.o scsicam.o \
 			scsi_proc.o scsi_error.o scsi_queue.o scsi_lib.o \
 			scsi_merge.o scsi_scan.o scsi_syms.o
@@ -144,25 +143,6 @@ cpqfc-objs	:= cpqfcTSinit.o cpqfcTScontrol.o cpqfcTSi2c.o \
 		   cpqfcTSworker.o cpqfcTStrigger.o
 
 include $(TOPDIR)/Rules.make
-
-
-scsi_mod.o: $(scsi_mod-objs)
-	$(LD) -r -o $@ $(scsi_mod-objs)
-
-sd_mod.o: $(sd_mod-objs)
-	$(LD) -r -o $@ $(sd_mod-objs)
-
-sr_mod.o: $(sr_mod-objs)
-	$(LD) -r -o $@ $(sr_mod-objs)
-
-initio.o: $(initio-objs)
-	$(LD) -r -o $@ $(initio-objs)
-
-a100u2w.o: $(a100u2w-objs)
-	$(LD) -r -o $@ $(a100u2w-objs)
-
-cpqfc.o: $(cpqfc-objs)
-	$(LD) -r -o $@ $(cpqfc-objs)
 
 53c8xx_d.h: 53c7,8xx.scr script_asm.pl
 	ln -sf 53c7,8xx.scr fake8.c

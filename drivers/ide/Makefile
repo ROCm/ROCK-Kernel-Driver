@@ -11,7 +11,6 @@
 O_TARGET := idedriver.o
 
 export-objs		:= ide-taskfile.o ide.o ide-features.o ide-probe.o ataraid.o
-list-multi		:= ide-mod.o
 
 obj-y		:=
 obj-m		:=
@@ -78,6 +77,3 @@ ide-obj-$(CONFIG_PROC_FS)		+= ide-proc.o
 ide-mod-objs		:= ide-taskfile.o ide.o ide-probe.o ide-geometry.o ide-features.o ata-timing.o $(ide-obj-y)
 
 include $(TOPDIR)/Rules.make
-
-ide-mod.o: $(ide-mod-objs)
-	$(LD) -r -o $@ $(ide-mod-objs)
