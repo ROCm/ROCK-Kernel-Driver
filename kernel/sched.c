@@ -2302,7 +2302,7 @@ need_resched:
 EXPORT_SYMBOL(preempt_schedule);
 #endif /* CONFIG_PREEMPT */
 
-int default_wake_function(wait_queue_t *curr, unsigned mode, int sync)
+int default_wake_function(wait_queue_t *curr, unsigned mode, int sync, void *key)
 {
 	task_t *p = curr->task;
 	return try_to_wake_up(p, mode, sync);
@@ -2329,7 +2329,7 @@ static void __wake_up_common(wait_queue_head_t *q, unsigned int mode,
 		unsigned flags;
 		curr = list_entry(tmp, wait_queue_t, task_list);
 		flags = curr->flags;
-		if (curr->func(curr, mode, sync) &&
+		if (curr->func(curr, mode, sync, NULL) &&
 		    (flags & WQ_FLAG_EXCLUSIVE) &&
 		    !--nr_exclusive)
 			break;

@@ -309,7 +309,7 @@ static int ep_modify(struct eventpoll *ep, struct epitem *epi,
 static void ep_unregister_pollwait(struct eventpoll *ep, struct epitem *epi);
 static int ep_unlink(struct eventpoll *ep, struct epitem *epi);
 static int ep_remove(struct eventpoll *ep, struct epitem *epi);
-static int ep_poll_callback(wait_queue_t *wait, unsigned mode, int sync);
+static int ep_poll_callback(wait_queue_t *wait, unsigned mode, int sync, void *key);
 static int ep_eventpoll_close(struct inode *inode, struct file *file);
 static unsigned int ep_eventpoll_poll(struct file *file, poll_table *wait);
 static int ep_collect_ready_items(struct eventpoll *ep,
@@ -1296,7 +1296,7 @@ eexit_1:
  * machanism. It is called by the stored file descriptors when they
  * have events to report.
  */
-static int ep_poll_callback(wait_queue_t *wait, unsigned mode, int sync)
+static int ep_poll_callback(wait_queue_t *wait, unsigned mode, int sync, void *key)
 {
 	int pwake = 0;
 	unsigned long flags;

@@ -17,8 +17,8 @@
 #include <asm/system.h>
 
 typedef struct __wait_queue wait_queue_t;
-typedef int (*wait_queue_func_t)(wait_queue_t *wait, unsigned mode, int sync);
-extern int default_wake_function(wait_queue_t *wait, unsigned mode, int sync);
+typedef int (*wait_queue_func_t)(wait_queue_t *wait, unsigned mode, int sync, void *key);
+int default_wake_function(wait_queue_t *wait, unsigned mode, int sync, void *key);
 
 struct __wait_queue {
 	unsigned int flags;
@@ -240,7 +240,7 @@ void FASTCALL(prepare_to_wait(wait_queue_head_t *q,
 void FASTCALL(prepare_to_wait_exclusive(wait_queue_head_t *q,
 				wait_queue_t *wait, int state));
 void FASTCALL(finish_wait(wait_queue_head_t *q, wait_queue_t *wait));
-int autoremove_wake_function(wait_queue_t *wait, unsigned mode, int sync);
+int autoremove_wake_function(wait_queue_t *wait, unsigned mode, int sync, void *key);
 
 #define DEFINE_WAIT(name)						\
 	wait_queue_t name = {						\

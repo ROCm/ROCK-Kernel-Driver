@@ -197,9 +197,9 @@ void fastcall finish_wait(wait_queue_head_t *q, wait_queue_t *wait)
 
 EXPORT_SYMBOL(finish_wait);
 
-int autoremove_wake_function(wait_queue_t *wait, unsigned mode, int sync)
+int autoremove_wake_function(wait_queue_t *wait, unsigned mode, int sync, void *key)
 {
-	int ret = default_wake_function(wait, mode, sync);
+	int ret = default_wake_function(wait, mode, sync, key);
 
 	if (ret)
 		list_del_init(&wait->task_list);
