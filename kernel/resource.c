@@ -131,20 +131,6 @@ int release_resource(struct resource *old)
 	return retval;
 }
 
-int check_resource(struct resource *root, unsigned long start, unsigned long len)
-{
-	struct resource *conflict, tmp;
-
-	tmp.start = start;
-	tmp.end = start + len - 1;
-	write_lock(&resource_lock);
-	conflict = __request_resource(root, &tmp);
-	if (!conflict)
-		__release_resource(&tmp);
-	write_unlock(&resource_lock);
-	return conflict ? -EBUSY : 0;
-}
-
 /*
  * Find empty slot in the resource tree given range and alignment.
  */
