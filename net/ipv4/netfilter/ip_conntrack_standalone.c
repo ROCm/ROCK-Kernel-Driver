@@ -73,7 +73,8 @@ static unsigned int
 seq_print_counters(struct seq_file *s, struct ip_conntrack_counter *counter)
 {
 	return seq_printf(s, "packets=%llu bytes=%llu ",
-			  counter->packets, counter->bytes);
+			  (unsigned long long)counter->packets,
+			  (unsigned long long)counter->bytes);
 }
 #else
 #define seq_print_counters(x, y)	0
