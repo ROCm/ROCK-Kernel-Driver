@@ -42,10 +42,6 @@ MODULE_LICENSE("GPL");
 
 /* ------------------------------------------------------------- */
 
-static struct capi_driver_interface *di;
-
-/* ------------------------------------------------------------- */
-
 static char *b1pci_procinfo(struct capi_ctr *ctrl)
 {
 	avmctrl_info *cinfo = (avmctrl_info *)(ctrl->driverdata);
@@ -113,7 +109,7 @@ static int b1pci_add_card(struct capi_driver *driver,
 		goto err_release_region;
 	}
 	
-	cinfo->capi_ctrl = di->attach_ctr(driver, card->name, cinfo);
+	cinfo->capi_ctrl = attach_capi_ctr(driver, card->name, cinfo);
 	if (!cinfo->capi_ctrl) {
 		printk(KERN_ERR "%s: attach controller failed.\n",
 		       driver->name);
@@ -153,7 +149,7 @@ static void b1pci_remove_ctr(struct capi_ctr *ctrl)
 	b1_reset(port);
 	b1_reset(port);
 
-	di->detach_ctr(ctrl);
+	detach_capi_ctr(ctrl);
 	free_irq(card->irq, card);
 	release_region(card->port, AVMB1_PORTLEN);
 	ctrl->driverdata = 0;
@@ -165,27 +161,24 @@ static void b1pci_remove_ctr(struct capi_ctr *ctrl)
 /* ------------------------------------------------------------- */
 
 static struct capi_driver b1pci_driver = {
-    name: "b1pci",
-    revision: "0.0",
-    load_firmware: b1_load_firmware,
-    reset_ctr: b1_reset_ctr,
-    remove_ctr: b1pci_remove_ctr,
-    register_appl: b1_register_appl,
-    release_appl: b1_release_appl,
-    send_message: b1_send_message,
-
-    procinfo: b1pci_procinfo,
-    ctr_read_proc: b1ctl_read_proc,
-    driver_read_proc: 0,	/* use standard driver_read_proc */
-
-    add_card: 0, /* no add_card function */
+	owner: THIS_MODULE,
+	name: "b1pci",
+	revision: "0.0",
+	load_firmware: b1_load_firmware,
+	reset_ctr: b1_reset_ctr,
+	remove_ctr: b1pci_remove_ctr,
+	register_appl: b1_register_appl,
+	release_appl: b1_release_appl,
+	send_message: b1_send_message,
+	
+	procinfo: b1pci_procinfo,
+	ctr_read_proc: b1ctl_read_proc,
+	driver_read_proc: 0,	/* use standard driver_read_proc */
+	
+	add_card: 0, /* no add_card function */
 };
 
 #ifdef CONFIG_ISDN_DRV_AVMB1_B1PCIV4
-/* ------------------------------------------------------------- */
-
-static struct capi_driver_interface *div4;
-
 /* ------------------------------------------------------------- */
 
 static char *b1pciv4_procinfo(struct capi_ctr *ctrl)
@@ -274,7 +267,7 @@ static int b1pciv4_add_card(struct capi_driver *driver,
 		goto err_unmap;
 	}
 
-	cinfo->capi_ctrl = div4->attach_ctr(driver, card->name, cinfo);
+	cinfo->capi_ctrl = attach_capi_ctr(driver, card->name, cinfo);
 	if (!cinfo->capi_ctrl) {
 		printk(KERN_ERR "%s: attach controller failed.\n", driver->name);
 		retval = -EBUSY;
@@ -312,7 +305,7 @@ static void b1pciv4_remove_ctr(struct capi_ctr *ctrl)
 
  	b1dma_reset(card);
 
-	div4->detach_ctr(ctrl);
+	detach_capi_ctr(ctrl);
 	free_irq(card->irq, card);
 	iounmap(card->mbase);
 	release_region(card->port, AVMB1_PORTLEN);
@@ -327,20 +320,21 @@ static void b1pciv4_remove_ctr(struct capi_ctr *ctrl)
 
 
 static struct capi_driver b1pciv4_driver = {
-    name: "b1pciv4",
-    revision: "0.0",
-    load_firmware: b1dma_load_firmware,
-    reset_ctr: b1dma_reset_ctr,
-    remove_ctr: b1pciv4_remove_ctr,
-    register_appl: b1dma_register_appl,
-    release_appl: b1dma_release_appl,
-    send_message: b1dma_send_message,
-
-    procinfo: b1pciv4_procinfo,
-    ctr_read_proc: b1dmactl_read_proc,
-    driver_read_proc: 0,	/* use standard driver_read_proc */
-
-    add_card: 0, /* no add_card function */
+	owner: THIS_MODULE,
+	name: "b1pciv4",
+	revision: "0.0",
+	load_firmware: b1dma_load_firmware,
+	reset_ctr: b1dma_reset_ctr,
+	remove_ctr: b1pciv4_remove_ctr,
+	register_appl: b1dma_register_appl,
+	release_appl: b1dma_release_appl,
+	send_message: b1dma_send_message,
+	
+	procinfo: b1pciv4_procinfo,
+	ctr_read_proc: b1dmactl_read_proc,
+	driver_read_proc: 0,	/* use standard driver_read_proc */
+	
+	add_card: 0, /* no add_card function */
 };
 
 #endif /* CONFIG_ISDN_DRV_AVMB1_B1PCIV4 */
@@ -432,25 +426,12 @@ static int __init b1pci_init(void)
 
 	printk(KERN_INFO "%s: revision %s\n", driver->name, driver->revision);
 
-        di = attach_capi_driver(driver);
-	if (!di) {
-		printk(KERN_ERR "%s: failed to attach capi_driver\n",
-				driver->name);
-		MOD_DEC_USE_COUNT;
-		return -ENODEV;
-	}
+        attach_capi_driver(driver);
 
 #ifdef CONFIG_ISDN_DRV_AVMB1_B1PCIV4
 	printk(KERN_INFO "%s: revision %s\n", driverv4->name, driverv4->revision);
 
-        div4 = attach_capi_driver(driverv4);
-	if (!div4) {
-    		detach_capi_driver(driver);
-		printk(KERN_ERR "%s: failed to attach capi_driver\n",
-				driverv4->name);
-		MOD_DEC_USE_COUNT;
-		return -ENODEV;
-	}
+        attach_capi_driver(driverv4);
 #endif
 
 	ncards = pci_register_driver(&b1pci_pci_driver);

@@ -98,7 +98,7 @@ hycapi_remove_ctr(struct capi_ctr *ctrl)
 			hycapi_applications[i].listen_req[ctrl->cnr-1] = NULL;
 		}
 	}
-	hy_di->detach_ctr(ctrl);
+	detach_capi_ctr(ctrl);
 	ctrl->driverdata = 0;
 	kfree(card->hyctrlinfo);
 
@@ -252,7 +252,6 @@ hycapi_register_appl(struct capi_ctr *ctrl, __u16 appl,
 	       rp, sizeof(capi_register_params));
 	
 /*        MOD_INC_USE_COUNT; */
-	ctrl->appl_registered(ctrl, appl);
 }
 
 /*********************************************************************
@@ -313,7 +312,6 @@ hycapi_release_appl(struct capi_ctr *ctrl, __u16 appl)
 	{
 		hycapi_release_internal(ctrl, appl);
 	}
-	ctrl->appl_released(ctrl, appl);
 /*        MOD_DEC_USE_COUNT;  */
 }
 
@@ -666,18 +664,21 @@ hycapi_tx_capiget(hysdn_card *card)
 
 
 static struct capi_driver hycapi_driver = {
-	"hysdn",
-	"0.0",
-	hycapi_load_firmware, 
-	hycapi_reset_ctr,
-	hycapi_remove_ctr,
-	hycapi_register_appl,
-	hycapi_release_appl,
-	hycapi_send_message,
-	hycapi_procinfo,
-	hycapi_read_proc,
-	0,	/* use standard driver_read_proc */
-	0, /* no add_card function */
+	owner: THIS_MODULE,
+	name: "hysdn",
+	revision: "0.0",
+	load_firmware: hycapi_load_firmware, 
+	reset_ctr: hycapi_reset_ctr,
+	remove_ctr: hycapi_remove_ctr,
+	register_appl: hycapi_register_appl,
+	release_appl: hycapi_release_appl,
+	send_message: hycapi_send_message,
+
+	procinfo: hycapi_procinfo,
+	ctr_read_proc: hycapi_read_proc,
+	driver_read_proc: 0,	/* use standard driver_read_proc */
+
+	add_card: 0, /* no add_card function */
 };
 
 
@@ -698,11 +699,8 @@ int hycapi_init()
 	}
 	driver = &hycapi_driver;
 	printk(KERN_NOTICE "HYSDN: Attaching capi-driver\n");
-	hy_di = attach_capi_driver(driver);
-	if (!hy_di) {
-		printk(KERN_ERR "HYCAPI: failed to attach capi_driver\n");
-		return(-1);
-	}
+	attach_capi_driver(driver);
+
 	for(i=0;i<CAPI_MAXAPPL;i++) {
 		memset(&(hycapi_applications[i]), 0, sizeof(hycapi_appl));
 	}
@@ -798,8 +796,8 @@ hycapi_capi_create(hysdn_card *card)
 			default: strcpy(cinfo->cardname,"HYSDN ???"); break;
 		}
 
-		cinfo->capi_ctrl = hy_di->attach_ctr(&hycapi_driver, 
-						     cinfo->cardname, cinfo);
+		cinfo->capi_ctrl = attach_capi_ctr(&hycapi_driver, 
+						   cinfo->cardname, cinfo);
 		ctrl = cinfo->capi_ctrl;
 		if (!ctrl) {
 			printk(KERN_ERR "%s: attach controller failed.\n",

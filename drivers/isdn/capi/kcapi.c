@@ -36,7 +36,6 @@ static char *revision = "$Revision: 1.21.6.8 $";
 
 /* ------------------------------------------------------------- */
 
-#define CARD_FREE	0
 #define CARD_DETECTED	1
 #define CARD_LOADING	2
 #define CARD_RUNNING	3
@@ -72,7 +71,6 @@ struct capi_ncci {
 struct capi_appl {
 	u16 applid;
 	capi_register_params rparam;
-	int releasing;
 	void *param;
 	void (*signal) (u16 applid, void *param);
 	struct sk_buff_head recv_queue;
@@ -107,32 +105,58 @@ static char capi_manufakturer[64] = "AVM Berlin";
 
 #define NCCI2CTRL(ncci)    (((ncci) >> 24) & 0x7f)
 
-#define VALID_CARD(c)	   ((c) > 0 && (c) <= CAPI_MAXCONTR)
-#define CARD(c)		   (&cards[(c)-1])
-#define CARDNR(cp)	   (((cp)-cards)+1)
-
 static struct capi_appl applications[CAPI_MAXAPPL];
-static struct capi_ctr cards[CAPI_MAXCONTR];
-static int ncards = 0;
+static struct capi_ctr *cards[CAPI_MAXCONTR];
+static int ncards;
 static struct sk_buff_head recv_queue;
-static struct capi_interface_user *capi_users = 0;
-static spinlock_t capi_users_lock = SPIN_LOCK_UNLOCKED;
-static struct capi_driver *drivers;
+
+static LIST_HEAD(users);
+static spinlock_t users_lock = SPIN_LOCK_UNLOCKED;
+
+static LIST_HEAD(drivers);
 static spinlock_t drivers_lock = SPIN_LOCK_UNLOCKED;
 
 static struct tq_struct tq_state_notify;
 static struct tq_struct tq_recv_notify;
+
+/* -------- ref counting -------------------------------------- */
+
+static inline struct capi_ctr *
+capi_ctr_get(struct capi_ctr *card)
+{
+	if (card->driver->owner) {
+		if (try_inc_mod_count(card->driver->owner))
+			return card;
+		else
+			return NULL;
+	}
+	return card;
+}
+
+static inline void
+capi_ctr_put(struct capi_ctr *card)
+{
+	if (card->driver->owner)
+		__MOD_DEC_USE_COUNT(card->driver->owner);
+}
+
+static inline struct capi_ctr *get_capi_ctr_by_nr(u16 contr)
+{
+	if (contr - 1 >= CAPI_MAXCONTR)
+		return NULL;
+
+	return cards[contr - 1];
+}
 
 /* -------- util functions ------------------------------------ */
 
 static char *cardstate2str(unsigned short cardstate)
 {
 	switch (cardstate) {
-        	default:
-		case CARD_FREE:		return "free";
-		case CARD_DETECTED:	return "detected";
-		case CARD_LOADING:	return "loading";
-		case CARD_RUNNING:	return "running";
+	case CARD_DETECTED:	return "detected";
+	case CARD_LOADING:	return "loading";
+	case CARD_RUNNING:	return "running";
+	default:	        return "???";
 	}
 }
 
@@ -256,11 +280,14 @@ endloop:
 static int proc_driver_read_proc(char *page, char **start, off_t off,
                                        int count, int *eof, void *data)
 {
+	struct list_head *l;
 	struct capi_driver *driver;
 	int len = 0;
 
 	spin_lock(&drivers_lock);
-	for (driver = drivers; driver; driver = driver->next) {
+	list_for_each(l, &drivers) {
+		driver = list_entry(l, struct capi_driver, driver_list);
+
 		len += sprintf(page+len, "%-32s %d %s\n",
 					driver->name,
 					driver->ncontroller,
@@ -290,11 +317,13 @@ endloop:
 static int proc_users_read_proc(char *page, char **start, off_t off,
                                        int count, int *eof, void *data)
 {
+	struct list_head *l;
         struct capi_interface_user *cp;
 	int len = 0;
 
-	spin_lock(&capi_users_lock);
-        for (cp = capi_users; cp ; cp = cp->next) {
+	spin_lock(&users_lock);
+	list_for_each(l, &users) {
+		cp = list_entry(l, struct capi_interface_user, user_list);
 		len += sprintf(page+len, "%s\n", cp->name);
 		if (len <= off) {
 			off -= len;
@@ -305,7 +334,7 @@ static int proc_users_read_proc(char *page, char **start, off_t off,
 		}
 	}
 endloop:
-	spin_unlock(&capi_users_lock);
+	spin_unlock(&users_lock);
 	*start = page+off;
 	if (len < count)
 		*eof = 1;
@@ -326,8 +355,10 @@ static int proc_controller_read_proc(char *page, char **start, off_t off,
 	int len = 0;
 
 	for (i=0; i < CAPI_MAXCONTR; i++) {
-		cp = &cards[i];
-		if (cp->cardstate == CARD_FREE) continue;
+		cp = cards[i];
+		if (!cp)
+			continue;
+
 		len += sprintf(page+len, "%d %-10s %-8s %-16s %s\n",
 			cp->cnr, cp->driver->name, 
 			cardstate2str(cp->cardstate),
@@ -400,8 +431,9 @@ static int proc_contrstats_read_proc(char *page, char **start, off_t off,
 	int len = 0;
 
 	for (i=0; i < CAPI_MAXCONTR; i++) {
-		cp = &cards[i];
-		if (cp->cardstate == CARD_FREE) continue;
+		cp = cards[i];
+		if (!cp)
+			continue;
 		len += sprintf(page+len, "%d %lu %lu %lu %lu\n",
 			cp->cnr, 
 			cp->nrecvctlpkt,
@@ -469,6 +501,39 @@ static void proc_capi_exit(void)
 	}
     }
 }
+
+/* ------------------------------------------------------------ */
+
+static void register_appl(struct capi_ctr *card, u16 applid, capi_register_params *rparam)
+{
+	card = capi_ctr_get(card);
+
+	card->driver->register_appl(card, applid, rparam);
+}
+
+
+static void release_appl(struct capi_ctr *card, u16 applid)
+{
+	struct capi_ncci **pp, **nextpp;
+
+	for (pp = &APPL(applid)->nccilist; *pp; pp = nextpp) {
+		if (NCCI2CTRL((*pp)->ncci) == card->cnr) {
+			struct capi_ncci *np = *pp;
+			*pp = np->next;
+			printk(KERN_INFO "kcapi: appl %d ncci 0x%x down!\n", applid, np->ncci);
+			kfree(np);
+			APPL(applid)->nncci--;
+			nextpp = pp;
+		} else {
+			nextpp = &(*pp)->next;
+		}
+	}
+
+	card->driver->release_appl(card, applid);
+
+	capi_ctr_put(card);
+}
+
 
 /* -------- Notifier handling --------------------------------- */
 
@@ -543,63 +608,75 @@ static int notify_push(unsigned int cmd, u32 controller,
 
 static void notify_up(u32 contr)
 {
+	struct list_head *l;
 	struct capi_interface_user *p;
+	struct capi_ctr *card = get_capi_ctr_by_nr(contr);
 
         printk(KERN_NOTICE "kcapi: notify up contr %d\n", contr);
-	spin_lock(&capi_users_lock);
-	for (p = capi_users; p; p = p->next) {
+	spin_lock(&users_lock);
+	list_for_each(l, &users) {
+		p = list_entry(l, struct capi_interface_user, user_list);
 		if (!p->callback) continue;
-		(*p->callback) (KCI_CONTRUP, contr, &CARD(contr)->profile);
+		(*p->callback) (KCI_CONTRUP, contr, &card->profile);
 	}
-	spin_unlock(&capi_users_lock);
+	spin_unlock(&users_lock);
 }
 
 /* -------- KCI_CONTRDOWN ------------------------------------- */
 
 static void notify_down(u32 contr)
 {
+	struct list_head *l;
 	struct capi_interface_user *p;
+
         printk(KERN_NOTICE "kcapi: notify down contr %d\n", contr);
-	spin_lock(&capi_users_lock);
-	for (p = capi_users; p; p = p->next) {
+	spin_lock(&users_lock);
+	list_for_each(l, &users) {
+		p = list_entry(l, struct capi_interface_user, user_list);
 		if (!p->callback) continue;
 		(*p->callback) (KCI_CONTRDOWN, contr, 0);
 	}
-	spin_unlock(&capi_users_lock);
+	spin_unlock(&users_lock);
 }
 
 /* -------- KCI_NCCIUP ---------------------------------------- */
 
 static void notify_ncciup(u32 contr, u16 applid, u32 ncci)
 {
+	struct list_head *l;
 	struct capi_interface_user *p;
 	struct capi_ncciinfo n;
+
 	n.applid = applid;
 	n.ncci = ncci;
         /*printk(KERN_NOTICE "kcapi: notify up contr %d\n", contr);*/
-	spin_lock(&capi_users_lock);
-	for (p = capi_users; p; p = p->next) {
+	spin_lock(&users_lock);
+	list_for_each(l, &users) {
+		p = list_entry(l, struct capi_interface_user, user_list);
 		if (!p->callback) continue;
 		(*p->callback) (KCI_NCCIUP, contr, &n);
 	}
-	spin_unlock(&capi_users_lock);
+	spin_unlock(&users_lock);
 };
 
 /* -------- KCI_NCCIDOWN -------------------------------------- */
 
 static void notify_nccidown(u32 contr, u16 applid, u32 ncci)
 {
+	struct list_head *l;
 	struct capi_interface_user *p;
 	struct capi_ncciinfo n;
+
 	n.applid = applid;
 	n.ncci = ncci;
         /*printk(KERN_NOTICE "kcapi: notify down contr %d\n", contr);*/
-	spin_lock(&capi_users_lock);
-	for (p = capi_users; p; p = p->next) {
+	spin_lock(&users_lock);
+	list_for_each(l, &users) {
+		p = list_entry(l, struct capi_interface_user, user_list);
 		if (!p->callback) continue;
 		(*p->callback) (KCI_NCCIDOWN, contr, &n);
 	}
-	spin_unlock(&capi_users_lock);
+	spin_unlock(&users_lock);
 };
 
 /* ------------------------------------------------------------ */
@@ -685,32 +762,6 @@ static inline int mq_dequeue(struct capi_ncci * np, u16 msgid)
 	return 0;
 }
 
-static void controllercb_appl_registered(struct capi_ctr * card, u16 appl)
-{
-}
-
-static void controllercb_appl_released(struct capi_ctr * card, u16 appl)
-{
-	struct capi_ncci **pp, **nextpp;
-	for (pp = &APPL(appl)->nccilist; *pp; pp = nextpp) {
-		if (NCCI2CTRL((*pp)->ncci) == card->cnr) {
-			struct capi_ncci *np = *pp;
-			*pp = np->next;
-			printk(KERN_INFO "kcapi: appl %d ncci 0x%x down!\n", appl, np->ncci);
-			kfree(np);
-			APPL(appl)->nncci--;
-			nextpp = pp;
-		} else {
-			nextpp = &(*pp)->next;
-		}
-	}
-	APPL(appl)->releasing--;
-	if (APPL(appl)->releasing <= 0) {
-		APPL(appl)->signal = 0;
-		APPL_MARK_FREE(appl);
-		printk(KERN_INFO "kcapi: appl %d down\n", appl);
-	}
-}
 /*
  * ncci management
  */
@@ -741,7 +792,7 @@ static void controllercb_new_ncci(struct capi_ctr * card,
 	APPL(appl)->nncci++;
 	printk(KERN_INFO "kcapi: appl %d ncci 0x%x up\n", appl, ncci);
 
-	notify_push(KCI_NCCIUP, CARDNR(card), appl, ncci);
+	notify_push(KCI_NCCIUP, card->cnr, appl, ncci);
 }
 
 static void controllercb_free_ncci(struct capi_ctr * card,
@@ -759,7 +810,7 @@ static void controllercb_free_ncci(struct capi_ctr * card,
 			kfree(np);
 			APPL(appl)->nncci--;
 			printk(KERN_INFO "kcapi: appl %d ncci 0x%x down\n", appl, ncci);
-			notify_push(KCI_NCCIDOWN, CARDNR(card), appl, ncci);
+			notify_push(KCI_NCCIDOWN, card->cnr, appl, ncci);
 			return;
 		}
 	}
@@ -868,22 +919,19 @@ static void controllercb_ready(struct capi_ctr * card)
 
 	for (appl = 1; appl <= CAPI_MAXAPPL; appl++) {
 		if (!VALID_APPLID(appl)) continue;
-		if (APPL(appl)->releasing) continue;
-		card->driver->register_appl(card, appl, &APPL(appl)->rparam);
+		register_appl(card, appl, &APPL(appl)->rparam);
 	}
 
         printk(KERN_NOTICE "kcapi: card %d \"%s\" ready.\n",
-		CARDNR(card), card->name);
+	       card->cnr, card->name);
 
-	notify_push(KCI_CONTRUP, CARDNR(card), 0, 0);
+	notify_push(KCI_CONTRUP, card->cnr, 0, 0);
 }
 
 static void controllercb_reseted(struct capi_ctr * card)
 {
 	u16 appl;
 
-        if (card->cardstate == CARD_FREE)
-		return;
         if (card->cardstate == CARD_DETECTED)
 		return;
 
@@ -901,24 +949,25 @@ static void controllercb_reseted(struct capi_ctr * card)
 				struct capi_ncci *np = *pp;
 				*pp = np->next;
 				printk(KERN_INFO "kcapi: appl %d ncci 0x%x forced down!\n", appl, np->ncci);
-				notify_push(KCI_NCCIDOWN, CARDNR(card), appl, np->ncci);
+				notify_push(KCI_NCCIDOWN, card->cnr, appl, np->ncci);
 				kfree(np);
 				nextpp = pp;
 			} else {
 				nextpp = &(*pp)->next;
 			}
 		}
+		capi_ctr_put(card);
 	}
 
-	printk(KERN_NOTICE "kcapi: card %d down.\n", CARDNR(card));
+	printk(KERN_NOTICE "kcapi: card %d down.\n", card->cnr);
 
-	notify_push(KCI_CONTRDOWN, CARDNR(card), 0, 0);
+	notify_push(KCI_CONTRDOWN, card->cnr, 0, 0);
 }
 
 static void controllercb_suspend_output(struct capi_ctr *card)
 {
 	if (!card->blocked) {
-		printk(KERN_DEBUG "kcapi: card %d suspend\n", CARDNR(card));
+		printk(KERN_DEBUG "kcapi: card %d suspend\n", card->cnr);
 		card->blocked = 1;
 	}
 }
@@ -926,7 +975,7 @@ static void controllercb_suspend_output(struct capi_ctr *card)
 static void controllercb_resume_output(struct capi_ctr *card)
 {
 	if (card->blocked) {
-		printk(KERN_DEBUG "kcapi: card %d resume\n", CARDNR(card));
+		printk(KERN_DEBUG "kcapi: card %d resume\n", card->cnr);
 		card->blocked = 0;
 	}
 }
@@ -935,21 +984,27 @@ static void controllercb_resume_output(struct capi_ctr *card)
 
 
 struct capi_ctr *
-drivercb_attach_ctr(struct capi_driver *driver, char *name, void *driverdata)
+attach_capi_ctr(struct capi_driver *driver, char *name, void *driverdata)
 {
-	struct capi_ctr *card, **pp;
+	struct capi_ctr *card;
 	int i;
 
-	for (i=0; i < CAPI_MAXCONTR && cards[i].cardstate != CARD_FREE; i++) ;
-   
+	for (i=0; i < CAPI_MAXCONTR; i++) {
+		if (cards[i] == NULL)
+			break;
+	}
 	if (i == CAPI_MAXCONTR) {
 		printk(KERN_ERR "kcapi: out of controller slots\n");
-	   	return 0;
+	   	return NULL;
 	}
-	card = &cards[i];
+	card = kmalloc(sizeof(*card), GFP_KERNEL);
+	if (!card)
+		return NULL;
+
+	cards[i] = card;
 	memset(card, 0, sizeof(struct capi_ctr));
 	card->driver = driver;
-	card->cnr = CARDNR(card);
+	card->cnr = i + 1;
 	strncpy(card->name, name, sizeof(card->name));
 	card->cardstate = CARD_DETECTED;
 	card->blocked = 0;
@@ -961,14 +1016,10 @@ drivercb_attach_ctr(struct capi_driver *driver, char *name, void *driverdata)
         card->suspend_output = controllercb_suspend_output;
         card->resume_output = controllercb_resume_output;
         card->handle_capimsg = controllercb_handle_capimsg;
-	card->appl_registered = controllercb_appl_registered;
-	card->appl_released = controllercb_appl_released;
         card->new_ncci = controllercb_new_ncci;
         card->free_ncci = controllercb_free_ncci;
 
-	for (pp = &driver->controller; *pp; pp = &(*pp)->next) ;
-	card->next = 0;
-	*pp = card;
+	list_add_tail(&card->driver_list, &driver->contr_head);
 	driver->ncontroller++;
 	sprintf(card->procfn, "capi/controllers/%d", card->cnr);
 	card->procent = create_proc_entry(card->procfn, 0, 0);
@@ -985,32 +1036,32 @@ drivercb_attach_ctr(struct capi_driver *driver, char *name, void *driverdata)
 	return card;
 }
 
-static int drivercb_detach_ctr(struct capi_ctr *card)
+EXPORT_SYMBOL(attach_capi_ctr);
+
+int detach_capi_ctr(struct capi_ctr *card)
 {
 	struct capi_driver *driver = card->driver;
-	struct capi_ctr **pp;
 
-        if (card->cardstate == CARD_FREE)
-		return 0;
         if (card->cardstate != CARD_DETECTED)
 		controllercb_reseted(card);
-	for (pp = &driver->controller; *pp ; pp = &(*pp)->next) {
-        	if (*pp == card) {
-	        	*pp = card->next;
-			driver->ncontroller--;
-			ncards--;
-	        	break;
-		}
-	}
+
+	list_del(&card->driver_list);
+	driver->ncontroller--;
+	ncards--;
+
 	if (card->procent) {
 	   remove_proc_entry(card->procfn, 0);
 	   card->procent = 0;
 	}
-	card->cardstate = CARD_FREE;
+	cards[card->cnr - 1] = NULL;
 	printk(KERN_NOTICE "kcapi: Controller %d: %s unregistered\n",
 			card->cnr, card->name);
+	kfree(card);
+
 	return 0;
 }
+
+EXPORT_SYMBOL(detach_capi_ctr);
 
 /* ------------------------------------------------------------- */
 
@@ -1034,21 +1085,14 @@ static int driver_read_proc(char *page, char **start, off_t off,
 
 /* ------------------------------------------------------------- */
 
-static struct capi_driver_interface di = {
-    drivercb_attach_ctr,
-    drivercb_detach_ctr,
-};
-
-struct capi_driver_interface *attach_capi_driver(struct capi_driver *driver)
+void attach_capi_driver(struct capi_driver *driver)
 {
-	struct capi_driver **pp;
+	INIT_LIST_HEAD(&driver->contr_head);
 
-	MOD_INC_USE_COUNT;
 	spin_lock(&drivers_lock);
-	for (pp = &drivers; *pp; pp = &(*pp)->next) ;
-	driver->next = 0;
-	*pp = driver;
+	list_add_tail(&driver->driver_list, &drivers);
 	spin_unlock(&drivers_lock);
+
 	printk(KERN_NOTICE "kcapi: driver %s attached\n", driver->name);
 	sprintf(driver->procfn, "capi/drivers/%s", driver->name);
 	driver->procent = create_proc_entry(driver->procfn, 0, 0);
@@ -1062,27 +1106,24 @@ struct capi_driver_interface *attach_capi_driver(struct capi_driver *driver)
 	   }
 	   driver->procent->data = driver;
 	}
-	return &di;
 }
+
+EXPORT_SYMBOL(attach_capi_driver);
 
 void detach_capi_driver(struct capi_driver *driver)
 {
-	struct capi_driver **pp;
 	spin_lock(&drivers_lock);
-	for (pp = &drivers; *pp && *pp != driver; pp = &(*pp)->next) ;
-	if (*pp) {
-		*pp = (*pp)->next;
-		printk(KERN_NOTICE "kcapi: driver %s detached\n", driver->name);
-	} else {
-		printk(KERN_ERR "kcapi: driver %s double detach ?\n", driver->name);
-	}
+	list_del(&driver->driver_list);
 	spin_unlock(&drivers_lock);
+
+	printk(KERN_NOTICE "kcapi: driver %s detached\n", driver->name);
 	if (driver->procent) {
 	   remove_proc_entry(driver->procfn, 0);
 	   driver->procent = 0;
 	}
-	MOD_DEC_USE_COUNT;
 }
+
+EXPORT_SYMBOL(detach_capi_driver);
 
 /* ------------------------------------------------------------- */
 /* -------- CAPI2.0 Interface ---------------------------------- */
@@ -1092,7 +1133,7 @@ static u16 capi_isinstalled(void)
 {
 	int i;
 	for (i = 0; i < CAPI_MAXCONTR; i++) {
-		if (cards[i].cardstate == CARD_RUNNING)
+		if (cards[i] && cards[i]->cardstate == CARD_RUNNING)
 			return CAPI_NOERROR;
 	}
 	return CAPI_REGNOTINSTALLED;
@@ -1120,10 +1161,9 @@ static u16 capi_register(capi_register_params * rparam, u16 * applidp)
 	memcpy(&APPL(appl)->rparam, rparam, sizeof(capi_register_params));
 
 	for (i = 0; i < CAPI_MAXCONTR; i++) {
-		if (cards[i].cardstate != CARD_RUNNING)
+		if (!cards[i] || cards[i]->cardstate != CARD_RUNNING)
 			continue;
-		cards[i].driver->register_appl(&cards[i], appl,
-						&APPL(appl)->rparam);
+		register_appl(cards[i], appl, &APPL(appl)->rparam);
 	}
 	*applidp = appl;
 	printk(KERN_INFO "kcapi: appl %d up\n", appl);
@@ -1135,29 +1175,25 @@ static u16 capi_release(u16 applid)
 {
 	int i;
 
-	if (!VALID_APPLID(applid) || APPL(applid)->releasing)
+	if (!VALID_APPLID(applid))
 		return CAPI_ILLAPPNR;
-	APPL(applid)->releasing++;
 	skb_queue_purge(&APPL(applid)->recv_queue);
 	for (i = 0; i < CAPI_MAXCONTR; i++) {
-		if (cards[i].cardstate != CARD_RUNNING)
+		if (!cards[i] || cards[i]->cardstate != CARD_RUNNING)
 			continue;
-		APPL(applid)->releasing++;
-		cards[i].driver->release_appl(&cards[i], applid);
+		release_appl(cards[i], applid);
 	}
-	APPL(applid)->releasing--;
-	if (APPL(applid)->releasing <= 0) {
-	        APPL(applid)->signal = 0;
-		APPL_MARK_FREE(applid);
-		printk(KERN_INFO "kcapi: appl %d down\n", applid);
-	}
+	APPL(applid)->signal = 0;
+	APPL_MARK_FREE(applid);
+	printk(KERN_INFO "kcapi: appl %d down\n", applid);
+
 	return CAPI_NOERROR;
 }
 
 static u16 capi_put_message(u16 applid, struct sk_buff *skb)
 {
+	struct capi_ctr *card;
 	struct capi_ncci *np;
-	u32 contr;
 	int showctl = 0;
 	u8 cmd, subcmd;
 
@@ -1169,13 +1205,13 @@ static u16 capi_put_message(u16 applid, struct sk_buff *skb)
 	    || !capi_cmd_valid(CAPIMSG_COMMAND(skb->data))
 	    || !capi_subcmd_valid(CAPIMSG_SUBCOMMAND(skb->data)))
 		return CAPI_ILLCMDORSUBCMDORMSGTOSMALL;
-	contr = CAPIMSG_CONTROLLER(skb->data);
-	if (!VALID_CARD(contr) || CARD(contr)->cardstate != CARD_RUNNING) {
-		contr = 1;
-	        if (CARD(contr)->cardstate != CARD_RUNNING) 
+	card = get_capi_ctr_by_nr(CAPIMSG_CONTROLLER(skb->data));
+	if (!card || card->cardstate != CARD_RUNNING) {
+		card = get_capi_ctr_by_nr(1); // XXX why?
+	        if (!card || card->cardstate != CARD_RUNNING) 
 			return CAPI_REGNOTINSTALLED;
 	}
-	if (CARD(contr)->blocked)
+	if (card->blocked)
 		return CAPI_SENDQUEUEFULL;
 
 	cmd = CAPIMSG_COMMAND(skb->data);
@@ -1185,30 +1221,30 @@ static u16 capi_put_message(u16 applid, struct sk_buff *skb)
 	    	if ((np = find_ncci(APPL(applid), CAPIMSG_NCCI(skb->data))) != 0
 	            && mq_enqueue(np, CAPIMSG_MSGID(skb->data)) == 0)
 			return CAPI_SENDQUEUEFULL;
-		CARD(contr)->nsentdatapkt++;
+		card->nsentdatapkt++;
 		APPL(applid)->nsentdatapkt++;
-	        if (CARD(contr)->traceflag > 2) showctl |= 2;
+	        if (card->traceflag > 2) showctl |= 2;
 	} else {
-		CARD(contr)->nsentctlpkt++;
+		card->nsentctlpkt++;
 		APPL(applid)->nsentctlpkt++;
-	        if (CARD(contr)->traceflag) showctl |= 2;
+	        if (card->traceflag) showctl |= 2;
 	}
-	showctl |= (CARD(contr)->traceflag & 1);
+	showctl |= (card->traceflag & 1);
 	if (showctl & 2) {
 		if (showctl & 1) {
-			printk(KERN_DEBUG "kcapi: put [0x%lx] id#%d %s len=%u\n",
-			       (unsigned long) contr,
+			printk(KERN_DEBUG "kcapi: put [%#x] id#%d %s len=%u\n",
+			       CAPIMSG_CONTROLLER(skb->data),
 			       CAPIMSG_APPID(skb->data),
 			       capi_cmd2str(cmd, subcmd),
 			       CAPIMSG_LEN(skb->data));
 		} else {
-			printk(KERN_DEBUG "kcapi: put [0x%lx] %s\n",
-					(unsigned long) contr,
-					capi_message2str(skb->data));
+			printk(KERN_DEBUG "kcapi: put [%#x] %s\n",
+			       CAPIMSG_CONTROLLER(skb->data),
+			       capi_message2str(skb->data));
 		}
 
 	}
-	CARD(contr)->driver->send_message(CARD(contr), skb);
+	card->driver->send_message(card, skb);
 	return CAPI_NOERROR;
 }
 
@@ -1237,64 +1273,81 @@ static u16 capi_set_signal(u16 applid,
 
 static u16 capi_get_manufacturer(u32 contr, u8 buf[CAPI_MANUFACTURER_LEN])
 {
+	struct capi_ctr *card;
+
 	if (contr == 0) {
 		strncpy(buf, capi_manufakturer, CAPI_MANUFACTURER_LEN);
 		return CAPI_NOERROR;
 	}
-	if (!VALID_CARD(contr) || CARD(contr)->cardstate != CARD_RUNNING) 
+	card = get_capi_ctr_by_nr(contr);
+	if (!card || card->cardstate != CARD_RUNNING) 
 		return CAPI_REGNOTINSTALLED;
 
-	strncpy(buf, CARD(contr)->manu, CAPI_MANUFACTURER_LEN);
+	strncpy(buf, card->manu, CAPI_MANUFACTURER_LEN);
 	return CAPI_NOERROR;
 }
 
 static u16 capi_get_version(u32 contr, struct capi_version *verp)
 {
+	struct capi_ctr *card;
+
 	if (contr == 0) {
 		*verp = driver_version;
 		return CAPI_NOERROR;
 	}
-	if (!VALID_CARD(contr) || CARD(contr)->cardstate != CARD_RUNNING) 
+	card = get_capi_ctr_by_nr(contr);
+	if (!card || card->cardstate != CARD_RUNNING) 
 		return CAPI_REGNOTINSTALLED;
 
-	memcpy((void *) verp, &CARD(contr)->version, sizeof(capi_version));
+	memcpy((void *) verp, &card->version, sizeof(capi_version));
 	return CAPI_NOERROR;
 }
 
 static u16 capi_get_serial(u32 contr, u8 serial[CAPI_SERIAL_LEN])
 {
+	struct capi_ctr *card;
+
 	if (contr == 0) {
 		strncpy(serial, driver_serial, CAPI_SERIAL_LEN);
 		return CAPI_NOERROR;
 	}
-	if (!VALID_CARD(contr) || CARD(contr)->cardstate != CARD_RUNNING) 
+	card = get_capi_ctr_by_nr(contr);
+	if (!card || card->cardstate != CARD_RUNNING) 
 		return CAPI_REGNOTINSTALLED;
 
-	strncpy((void *) serial, CARD(contr)->serial, CAPI_SERIAL_LEN);
+	strncpy((void *) serial, card->serial, CAPI_SERIAL_LEN);
 	return CAPI_NOERROR;
 }
 
 static u16 capi_get_profile(u32 contr, struct capi_profile *profp)
 {
+	struct capi_ctr *card;
+
 	if (contr == 0) {
 		profp->ncontroller = ncards;
 		return CAPI_NOERROR;
 	}
-	if (!VALID_CARD(contr) || CARD(contr)->cardstate != CARD_RUNNING) 
+	card = get_capi_ctr_by_nr(contr);
+	if (!card || card->cardstate != CARD_RUNNING) 
 		return CAPI_REGNOTINSTALLED;
 
-	memcpy((void *) profp, &CARD(contr)->profile,
+	memcpy((void *) profp, &card->profile,
 			sizeof(struct capi_profile));
 	return CAPI_NOERROR;
 }
 
 static struct capi_driver *find_driver(char *name)
 {
+	struct list_head *l;
 	struct capi_driver *dp;
 	spin_lock(&drivers_lock);
-	for (dp = drivers; dp; dp = dp->next)
+	list_for_each(l, &drivers) {
+		dp = list_entry(l, struct capi_driver, driver_list);
 		if (strcmp(dp->name, name) == 0)
-			break;
+			goto found;
+	}
+	dp = NULL;
+ found:
 	spin_unlock(&drivers_lock);
 	return dp;
 }
@@ -1365,11 +1418,8 @@ static int old_capi_manufacturer(unsigned int cmd, void *data)
 					    	sizeof(avmb1_loadandconfigdef))))
 				return retval;
 		}
-		if (!VALID_CARD(ldef.contr))
-			return -ESRCH;
-
-		card = CARD(ldef.contr);
-		if (card->cardstate == CARD_FREE)
+		card = get_capi_ctr_by_nr(ldef.contr);
+		if (!card)
 			return -ESRCH;
 		if (card->driver->load_firmware == 0) {
 			printk(KERN_DEBUG "kcapi: load: driver \%s\" has no load function\n", card->driver->name);
@@ -1419,12 +1469,10 @@ static int old_capi_manufacturer(unsigned int cmd, void *data)
 		if ((retval = copy_from_user((void *) &rdef, data,
 					 sizeof(avmb1_resetdef))))
 			return retval;
-		if (!VALID_CARD(rdef.contr))
+		card = get_capi_ctr_by_nr(rdef.contr);
+		if (!card)
 			return -ESRCH;
-		card = CARD(rdef.contr);
 
-		if (card->cardstate == CARD_FREE)
-			return -ESRCH;
 		if (card->cardstate == CARD_DETECTED)
 			return 0;
 
@@ -1445,12 +1493,8 @@ static int old_capi_manufacturer(unsigned int cmd, void *data)
 					 sizeof(avmb1_getdef))))
 			return retval;
 
-		if (!VALID_CARD(gdef.contr))
-			return -ESRCH;
-
-		card = CARD(gdef.contr);
-
-		if (card->cardstate == CARD_FREE)
+		card = get_capi_ctr_by_nr(gdef.contr);
+		if (!card)
 			return -ESRCH;
 
 		gdef.cardstate = card->cardstate;
@@ -1469,11 +1513,8 @@ static int old_capi_manufacturer(unsigned int cmd, void *data)
 					 sizeof(avmb1_resetdef))))
 			return retval;
 
-		if (!VALID_CARD(rdef.contr))
-			return -ESRCH;
-		card = CARD(rdef.contr);
-
-		if (card->cardstate == CARD_FREE)
+		card = get_capi_ctr_by_nr(rdef.contr);
+		if (!card)
 			return -ESRCH;
 
 		if (card->cardstate != CARD_DETECTED)
@@ -1481,7 +1522,7 @@ static int old_capi_manufacturer(unsigned int cmd, void *data)
 
 		card->driver->remove_ctr(card);
 
-		while (card->cardstate != CARD_FREE) {
+		while (cards[rdef.contr]) {
 
 			set_current_state(TASK_INTERRUPTIBLE);
 			schedule_timeout(HZ/10);	/* 0.1 sec */
@@ -1519,11 +1560,10 @@ static int capi_manufacturer(unsigned int cmd, void *data)
 					 sizeof(kcapi_flagdef))))
 			return retval;
 
-		if (!VALID_CARD(fdef.contr))
+		card = get_capi_ctr_by_nr(fdef.contr);
+		if (!card)
 			return -ESRCH;
-		card = CARD(fdef.contr);
-		if (card->cardstate == CARD_FREE)
-			return -ESRCH;
+
 		card->traceflag = fdef.flag;
 		printk(KERN_INFO "kcapi: contr %d set trace=%d\n",
 			card->cnr, card->traceflag);
@@ -1591,55 +1631,30 @@ struct capi_interface avmb1_interface =
 
 struct capi_interface *attach_capi_interface(struct capi_interface_user *userp)
 {
-	struct capi_interface_user *p;
 
-	MOD_INC_USE_COUNT;
-	spin_lock(&capi_users_lock);
-	for (p = capi_users; p; p = p->next) {
-		if (p == userp) {
-			spin_unlock(&capi_users_lock);
-			printk(KERN_ERR "kcapi: double attach from %s\n",
-			       userp->name);
-			MOD_DEC_USE_COUNT;
-			return 0;
-		}
-	}
-	userp->next = capi_users;
-	capi_users = userp;
-	spin_unlock(&capi_users_lock);
+	spin_lock(&users_lock);
+	list_add_tail(&userp->user_list, &users);
+	spin_unlock(&users_lock);
 	printk(KERN_NOTICE "kcapi: %s attached\n", userp->name);
 
 	return &avmb1_interface;
 }
 
+EXPORT_SYMBOL(attach_capi_interface);
+
 int detach_capi_interface(struct capi_interface_user *userp)
 {
-	struct capi_interface_user **pp;
-
-	spin_lock(&capi_users_lock);
-	for (pp = &capi_users; *pp; pp = &(*pp)->next) {
-		if (*pp == userp) {
-			*pp = userp->next;
-			spin_unlock(&capi_users_lock);
-			userp->next = 0;
-			printk(KERN_NOTICE "kcapi: %s detached\n", userp->name);
-			MOD_DEC_USE_COUNT;
-			return 0;
-		}
-	}
-	spin_unlock(&capi_users_lock);
-	printk(KERN_ERR "kcapi: double detach from %s\n", userp->name);
-	return -1;
+	spin_lock(&users_lock);
+	list_del(&userp->user_list);
+	printk(KERN_NOTICE "kcapi: %s detached\n", userp->name);
+	return 0;
 }
+
+EXPORT_SYMBOL(detach_capi_interface);
 
 /* ------------------------------------------------------------- */
 /* -------- Init & Cleanup ------------------------------------- */
 /* ------------------------------------------------------------- */
-
-EXPORT_SYMBOL(attach_capi_interface);
-EXPORT_SYMBOL(detach_capi_interface);
-EXPORT_SYMBOL(attach_capi_driver);
-EXPORT_SYMBOL(detach_capi_driver);
 
 /*
  * init / exit functions
