@@ -17,6 +17,7 @@
 #include <linux/device.h>
 #include <linux/slab.h>
 #include <linux/spinlock.h>
+#include <linux/err.h>
 
 #include <asm/io.h>
 #include <asm/irq.h>
@@ -53,6 +54,7 @@ struct maceps2_data {
 
 static struct maceps2_data port_data[2];
 static struct serio *maceps2_port[2];
+static struct platform_device *maceps2_device;
 
 static int maceps2_write(struct serio *dev, unsigned char val)
 {
@@ -123,13 +125,14 @@ static struct serio * __init maceps2_allocate_port(int idx)
 	serio = kmalloc(sizeof(struct serio), GFP_KERNEL);
 	if (serio) {
 		memset(serio, 0, sizeof(struct serio));
-		serio->type	= SERIO_8042;
-		serio->write	= maceps2_write;
-		serio->open	= maceps2_open;
-		serio->close	= maceps2_close;
+		serio->type		= SERIO_8042;
+		serio->write		= maceps2_write;
+		serio->open		= maceps2_open;
+		serio->close		= maceps2_close;
 		snprintf(serio->name, sizeof(serio->name), "MACE PS/2 port%d", idx);
 		snprintf(serio->phys, sizeof(serio->phys), "mace/serio%d", idx);
-		serio->port_data = &port_data[idx];
+		serio->port_data	= &port_data[idx];
+		serio->dev.parent	= &maceps2_device->dev;
 	}
 
 	return serio;
@@ -138,6 +141,10 @@ static struct serio * __init maceps2_allocate_port(int idx)
 
 static int __init maceps2_init(void)
 {
+	maceps2_device = platform_device_register_simple("maceps2", -1, NULL, 0);
+	if (IS_ERR(maceps2_device))
+		return PTR_ERR(maceps2_device);
+
 	port_data[0].port = &mace->perif.ps2.keyb;
 	port_data[0].irq  = MACEISA_KEYB_IRQ;
 	port_data[1].port = &mace->perif.ps2.mouse;
@@ -148,6 +155,7 @@ static int __init maceps2_init(void)
 	if (!maceps2_port[0] || !maceps2_port[1]) {
 		kfree(maceps2_port[0]);
 		kfree(maceps2_port[1]);
+		platform_device_unregister(maceps2_device);
 		return -ENOMEM;
 	}
 
@@ -161,6 +169,7 @@ static void __exit maceps2_exit(void)
 {
 	serio_unregister_port(maceps2_port[0]);
 	serio_unregister_port(maceps2_port[1]);
+	platform_device_unregister(maceps2_device);
 }
 
 module_init(maceps2_init);

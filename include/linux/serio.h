@@ -27,6 +27,8 @@ struct serio {
 	char name[32];
 	char phys[32];
 
+	unsigned int manual_bind;
+
 	unsigned short idbus;
 	unsigned short idvendor;
 	unsigned short idproduct;
@@ -35,7 +37,7 @@ struct serio {
 	unsigned long type;
 	unsigned long event;
 
-	spinlock_t lock;
+	spinlock_t lock;		/* protects critical sections from port's interrupt handler */
 
 	int (*write)(struct serio *, unsigned char);
 	int (*open)(struct serio *);
@@ -43,7 +45,7 @@ struct serio {
 
 	struct serio *parent, *child;
 
-	struct serio_driver *drv; /* Accessed from interrupt, writes must be protected by serio_lock */
+	struct serio_driver *drv;	/* accessed from interrupt, must be protected by serio->lock */
 
 	struct device dev;
 
@@ -55,7 +57,7 @@ struct serio_driver {
 	void *private;
 	char *description;
 
-	int manual_bind;
+	unsigned int manual_bind;
 
 	void (*write_wakeup)(struct serio *);
 	irqreturn_t (*interrupt)(struct serio *, unsigned char,
@@ -81,6 +83,7 @@ void serio_register_port(struct serio *serio);
 void serio_register_port_delayed(struct serio *serio);
 void serio_unregister_port(struct serio *serio);
 void serio_unregister_port_delayed(struct serio *serio);
+
 void serio_register_driver(struct serio_driver *drv);
 void serio_unregister_driver(struct serio_driver *drv);
 
@@ -103,6 +106,22 @@ static __inline__ void serio_cleanup(struct serio *serio)
 	if (serio->drv && serio->drv->cleanup)
 		serio->drv->cleanup(serio);
 }
+
+
+/*
+ * Use the following fucntions to protect critical sections in
+ * driver code from port's interrupt handler
+ */
+static __inline__ void serio_pause_rx(struct serio *serio)
+{
+	spin_lock_irq(&serio->lock);
+}
+
+static __inline__ void serio_continue_rx(struct serio *serio)
+{
+	spin_unlock_irq(&serio->lock);
+}
+
 
 #endif
 

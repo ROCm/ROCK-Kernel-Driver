@@ -233,17 +233,14 @@ static void synaptics_pass_pt_packet(struct serio *ptport, unsigned char *packet
 {
 	struct psmouse *child = ptport->private;
 
-	if (child) {
-		if (child->state == PSMOUSE_ACTIVATED) {
-			serio_interrupt(ptport, packet[1], 0, NULL);
-			serio_interrupt(ptport, packet[4], 0, NULL);
-			serio_interrupt(ptport, packet[5], 0, NULL);
-			if (child->type >= PSMOUSE_GENPS)
-				serio_interrupt(ptport, packet[2], 0, NULL);
-		} else if (child->state != PSMOUSE_IGNORE) {
-			serio_interrupt(ptport, packet[1], 0, NULL);
-		}
-	}
+	if (child && child->state == PSMOUSE_ACTIVATED) {
+		serio_interrupt(ptport, packet[1], 0, NULL);
+		serio_interrupt(ptport, packet[4], 0, NULL);
+		serio_interrupt(ptport, packet[5], 0, NULL);
+		if (child->type >= PSMOUSE_GENPS)
+			serio_interrupt(ptport, packet[2], 0, NULL);
+	} else
+		serio_interrupt(ptport, packet[1], 0, NULL);
 }
 
 static void synaptics_pt_activate(struct psmouse *psmouse)
@@ -472,9 +469,10 @@ static psmouse_ret_t synaptics_process_byte(struct psmouse *psmouse, struct pt_r
 		if (unlikely(priv->pkt_type == SYN_NEWABS))
 			priv->pkt_type = synaptics_detect_pkt_type(psmouse);
 
-		if (psmouse->serio->child && psmouse->serio->child->drv && synaptics_is_pt_packet(psmouse->packet))
-			synaptics_pass_pt_packet(psmouse->serio->child, psmouse->packet);
-		else
+		if (SYN_CAP_PASS_THROUGH(priv->capabilities) && synaptics_is_pt_packet(psmouse->packet)) {
+			if (psmouse->serio->child)
+				synaptics_pass_pt_packet(psmouse->serio->child, psmouse->packet);
+		} else
 			synaptics_process_packet(psmouse);
 
 		return PSMOUSE_FULL_PACKET;
