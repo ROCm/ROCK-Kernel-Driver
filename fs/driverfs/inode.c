@@ -416,36 +416,36 @@ static int driverfs_d_delete_file (struct dentry * dentry)
 }
 
 static struct file_operations driverfs_file_operations = {
-	read:		driverfs_read_file,
-	write:		driverfs_write_file,
-	llseek:		driverfs_file_lseek,
-	open:		driverfs_open_file,
-	release:	driverfs_release,
+	.read		= driverfs_read_file,
+	.write		= driverfs_write_file,
+	.llseek		= driverfs_file_lseek,
+	.open		= driverfs_open_file,
+	.release	= driverfs_release,
 };
 
 static struct inode_operations driverfs_dir_inode_operations = {
-	create:		driverfs_create,
-	lookup:		simple_lookup,
-	unlink:		driverfs_unlink,
-	symlink:	driverfs_symlink,
-	mkdir:		driverfs_mkdir,
-	rmdir:		driverfs_rmdir,
+	.create		= driverfs_create,
+	.lookup		= simple_lookup,
+	.unlink		= driverfs_unlink,
+	.symlink	= driverfs_symlink,
+	.mkdir		= driverfs_mkdir,
+	.rmdir		= driverfs_rmdir,
 };
 
 static struct address_space_operations driverfs_aops = {
-	readpage:	driverfs_readpage,
-	writepage:	fail_writepage,
-	prepare_write:	driverfs_prepare_write,
-	commit_write:	driverfs_commit_write
+	.readpage	= driverfs_readpage,
+	.writepage	= fail_writepage,
+	.prepare_write	= driverfs_prepare_write,
+	.commit_write	= driverfs_commit_write
 };
 
 static struct dentry_operations driverfs_dentry_file_ops = {
-	d_delete:	driverfs_d_delete_file,
+	.d_delete	= driverfs_d_delete_file,
 };
 
 static struct super_operations driverfs_ops = {
-	statfs:		simple_statfs,
-	drop_inode:	generic_delete_inode,
+	.statfs		= simple_statfs,
+	.drop_inode	= generic_delete_inode,
 };
 
 static int driverfs_fill_super(struct super_block *sb, void *data, int silent)
@@ -481,10 +481,10 @@ static struct super_block *driverfs_get_sb(struct file_system_type *fs_type,
 }
 
 static struct file_system_type driverfs_fs_type = {
-	owner:		THIS_MODULE,
-	name:		"driverfs",
-	get_sb:		driverfs_get_sb,
-	kill_sb:	kill_litter_super,
+	.owner		= THIS_MODULE,
+	.name		= "driverfs",
+	.get_sb		= driverfs_get_sb,
+	.kill_sb	= kill_litter_super,
 };
 
 static int get_mount(void)
