@@ -376,23 +376,6 @@ config SCSI_IN2000
 	  To compile this driver as a module, choose M here: the
 	  module will be called in2000.
 
-# does not use pci dma and seems to be onboard only for old machines
-config SCSI_AM53C974
-	tristate "AM53/79C974 PCI SCSI support"
-	depends on X86 && PCI && SCSI && BROKEN
-	---help---
-	  This is support for the AM53/79C974 SCSI host adapters.  Please read
-	  <file:Documentation/scsi/AM53C974.txt> for details.  Also, the
-	  SCSI-HOWTO, available from
-	  <http://www.tldp.org/docs.html#howto>, is for you.
-
-	  Note that there is another driver for AM53C974 based adapters:
-	  "Tekram DC390(T) and Am53/79C974 (PCscsi) SCSI support", above.  You
-	  can pick either one.
-
-	  To compile this driver as a module, choose M here: the
-	  module will be called AM53C974.
-
 config SCSI_MEGARAID
 	tristate "AMI MegaRAID support"
 	depends on PCI && SCSI
