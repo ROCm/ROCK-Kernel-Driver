@@ -72,6 +72,7 @@ struct sys_device {
 	u32		id;
 	struct sysdev_class	* cls;
 	struct kobject		kobj;
+	struct list_head	entry;
 };
 
 extern int sys_device_register(struct sys_device *);
