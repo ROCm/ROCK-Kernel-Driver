@@ -57,6 +57,7 @@ struct diskparm
 #define		CT_VOLUME_OF_MIRRORS	12	/* volume of mirror */
 #define		CT_PSEUDO_RAID		13	/* really raid4 */
 #define		CT_LAST_VOLUME_TYPE	14
+#define 	CT_OK        		218
 
 /*
  *	Types of objects addressable in some fashion by the client.
@@ -1169,6 +1170,52 @@ union aac_contentinfo {
 };
 
 /*
+ *	Query for Container Configuration Status
+ */
+
+#define CT_GET_CONFIG_STATUS 147
+struct aac_get_config_status {
+	u32		command;	/* VM_ContainerConfig */
+	u32		type;		/* CT_GET_CONFIG_STATUS */
+	u32		parm1;
+	u32		parm2;
+	u32		parm3;
+	u32		parm4;
+	u32		parm5;
+	u32		count;	/* sizeof(((struct aac_get_config_status_resp *)NULL)->data) */
+};
+
+#define CFACT_CONTINUE 0
+#define CFACT_PAUSE    1
+#define CFACT_ABORT    2
+struct aac_get_config_status_resp {
+	u32		response; /* ST_OK */
+	u32		dummy0;
+	u32		status;	/* CT_OK */
+	u32		parm1;
+	u32		parm2;
+	u32		parm3;
+	u32		parm4;
+	u32		parm5;
+	struct {
+		u32	action; /* CFACT_CONTINUE, CFACT_PAUSE or CFACT_ABORT */
+		u16	flags;
+		s16	count;
+	}		data;
+};
+
+/*
+ *	Accept the configuration as-is
+ */
+
+#define CT_COMMIT_CONFIG 152
+
+struct aac_commit_config {
+	u32		command;	/* VM_ContainerConfig */
+	u32		type;		/* CT_COMMIT_CONFIG */
+};
+
+/*
  *	Query for "mountable" objects, ie, objects that are typically
  *	associated with a drive letter on the client (host) side.
  */
@@ -1443,6 +1490,7 @@ void aac_consumer_free(struct aac_dev * dev, struct aac_queue * q, u32 qnum);
 int fib_complete(struct fib * context);
 #define fib_data(fibctx) ((void *)(fibctx)->hw_fib->data)
 struct aac_dev *aac_init_adapter(struct aac_dev *dev);
+int aac_get_config_status(struct aac_dev *dev);
 int aac_get_containers(struct aac_dev *dev);
 int aac_scsi_cmd(struct scsi_cmnd *cmd);
 int aac_dev_ioctl(struct aac_dev *dev, int cmd, void __user *arg);

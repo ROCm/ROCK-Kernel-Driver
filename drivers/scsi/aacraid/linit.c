@@ -589,6 +589,7 @@ static int __devinit aac_probe_one(struct pci_dev *pdev,
 	else
 		shost->max_channel = 1;
 
+	aac_get_config_status(aac);
 	aac_get_containers(aac);
 	aac_devices[aac_count-1] = aac;
 

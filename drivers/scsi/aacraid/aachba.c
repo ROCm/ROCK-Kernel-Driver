@@ -193,6 +193,80 @@ MODULE_PARM_DESC(commit, "Control whether a COMMIT_CONFIG is issued to the adapt
 static int nondasd = -1;
 static int dacmode = -1;
 
+static int commit = -1;
+
+/**
+ *	aac_get_config_status	-	check the adapter configuration
+ *	@common: adapter to query
+ *
+ *	Query config status, and commit the configuration if needed.
+ */
+int aac_get_config_status(struct aac_dev *dev)
+{
+	int status = 0;
+	struct fib * fibptr;
+
+	if (!(fibptr = fib_alloc(dev)))
+		return -ENOMEM;
+
+	fib_init(fibptr);
+	{
+		struct aac_get_config_status *dinfo;
+		dinfo = (struct aac_get_config_status *) fib_data(fibptr);
+
+		dinfo->command = cpu_to_le32(VM_ContainerConfig);
+		dinfo->type = cpu_to_le32(CT_GET_CONFIG_STATUS);
+		dinfo->count = cpu_to_le32(sizeof(((struct aac_get_config_status_resp *)NULL)->data));
+	}
+
+	status = fib_send(ContainerCommand,
+			    fibptr,
+			    sizeof (struct aac_get_config_status),
+			    FsaNormal,
+			    1, 1,
+			    NULL, NULL);
+	if (status < 0 ) {
+		printk(KERN_WARNING "aac_get_config_status: SendFIB failed.\n");
+	} else {
+		struct aac_get_config_status_resp *reply
+		  = (struct aac_get_config_status_resp *) fib_data(fibptr);
+		dprintk((KERN_WARNING
+		  "aac_get_config_status: response=%d status=%d action=%d\n",
+		  reply->response, reply->status, reply->data.action));
+		if ((reply->response != ST_OK)
+		 || (reply->status != CT_OK)
+		 || (reply->data.action > CFACT_PAUSE)) {
+			printk(KERN_WARNING "aac_get_config_status: Will not issue the Commit Configuration\n");
+			status = -EINVAL;
+		}
+	}
+	fib_complete(fibptr);
+	/* Send a CT_COMMIT_CONFIG to enable discovery of devices */
+	if (status >= 0) {
+		if (commit == 1) {
+			struct aac_commit_config * dinfo;
+			fib_init(fibptr);
+			dinfo = (struct aac_commit_config *) fib_data(fibptr);
+	
+			dinfo->command = cpu_to_le32(VM_ContainerConfig);
+			dinfo->type = cpu_to_le32(CT_COMMIT_CONFIG);
+	
+			status = fib_send(ContainerCommand,
+				    fibptr,
+				    sizeof (struct aac_commit_config),
+				    FsaNormal,
+				    1, 1,
+				    NULL, NULL);
+			fib_complete(fibptr);
+		} else if (commit == 0) {
+			printk(KERN_WARNING
+			  "aac_get_config_status: Foreign device configurations are being ignored\n");
+		}
+	}
+	fib_free(fibptr);
+	return status;
+}
+
 /**
  *	aac_get_containers	-	list containers
  *	@common: adapter to probe
