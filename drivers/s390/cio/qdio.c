@@ -65,7 +65,7 @@ MODULE_LICENSE("GPL");
 
 /******************** HERE WE GO ***********************************/
 
-static const char *version="QDIO base support version 2 ("
+static const char version[] = "QDIO base support version 2 ("
 	VERSION_QDIO_C "/" VERSION_QDIO_H  "/" VERSION_CIO_QDIO_H ")";
 
 #ifdef QDIO_PERFORMANCE_STATS
