@@ -878,19 +878,12 @@ static ide_startstop_t cdrom_start_packet_command(ide_drive_t *drive,
  * changed 5 parameters to 3 for dvd-ram
  * struct packet_command *pc; now packet_command_t *pc;
  */
+#define ATAPI_MIN_CDB_BYTES 12
 static ide_startstop_t cdrom_transfer_packet_command (ide_drive_t *drive,
 					  struct request *rq,
 					  ide_handler_t *handler)
 {
-	/*
-	 * FIXME! This should be 'rq->cmd_len' when that is reliable.
-	 *
-	 * This breaks for real 16-byte commands. however, lots of drives
-	 * currently break if we just send 16-bytes for 10/12 byte commands.
-	 */
-#define MAX_CDB_BYTES  12
-	int cmd_len = MAX_CDB_BYTES;
-
+	int cmd_len;
 	struct cdrom_info *info = drive->driver_data;
 	ide_startstop_t startstop;
 
@@ -913,6 +906,11 @@ static ide_startstop_t cdrom_transfer_packet_command (ide_drive_t *drive,
 
 	/* Arm the interrupt handler. */
 	ide_set_handler(drive, handler, rq->timeout, cdrom_timer_expiry);
+
+	/* ATAPI commands get padded out to 12 bytes minimum */
+	cmd_len = rq->cmd_len;
+	if (cmd_len < ATAPI_MIN_CDB_BYTES)
+		cmd_len = ATAPI_MIN_CDB_BYTES;
 
 	/* Send the command to the device. */
 	HWIF(drive)->atapi_output_bytes(drive, rq->cmd, cmd_len);
