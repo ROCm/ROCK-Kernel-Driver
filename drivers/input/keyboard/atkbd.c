@@ -722,9 +722,17 @@ static int __init atkbd_setup_reset(char *str)
         if (ints[0] > 0) atkbd_reset = ints[1];
         return 1;
 }
+static int __init atkbd_setup_softrepeat(char *str)
+{
+        int ints[4];
+        str = get_options(str, ARRAY_SIZE(ints), ints);
+        if (ints[0] > 0) atkbd_softrepeat = ints[1];
+        return 1;
+}
 
 __setup("atkbd_set=", atkbd_setup_set);
 __setup("atkbd_reset", atkbd_setup_reset);
+__setup("atkbd_softrepeat=", atkbd_setup_softrepeat);
 #endif
 
 int __init atkbd_init(void)
