@@ -496,17 +496,16 @@ handle_io_bitmap(struct thread_struct *next, struct tss_struct *tss)
 		return;
 	}
 	/*
-	 * The IO bitmap in the TSS needs updating: copy the relevant
-	 * range of the new task's IO bitmap. Normally this is 128 bytes
-	 * or less:
+	 * Lazy TSS's I/O bitmap copy. We set an invalid offset here
+	 * and we let the task to get a GPF in case an I/O instruction
+	 * is performed.  The handler of the GPF will verify that the
+	 * faulting task has a valid I/O bitmap and, it true, does the
+	 * real copy and restart the instruction.  This will save us
+	 * redundant copies when the currently switched task does not
+	 * perform any I/O during its timeslice.
 	 */
-	memcpy(tss->io_bitmap, next->io_bitmap_ptr,
-		max(tss->io_bitmap_max, next->io_bitmap_max));
-	tss->io_bitmap_max = next->io_bitmap_max;
-	tss->io_bitmap_owner = next;
-	tss->io_bitmap_base = IO_BITMAP_OFFSET;
+	tss->io_bitmap_base = INVALID_IO_BITMAP_OFFSET_LAZY;
 }
-
 /*
  * This special macro can be used to load a debugging register
  */

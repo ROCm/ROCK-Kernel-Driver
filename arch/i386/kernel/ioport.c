@@ -105,11 +105,11 @@ asmlinkage long sys_ioperm(unsigned long from, unsigned long num, int turn_on)
 
 	t->io_bitmap_max = bytes;
 
-	/* Update the TSS: */
-	memcpy(tss->io_bitmap, t->io_bitmap_ptr, bytes_updated);
-	tss->io_bitmap_max = bytes;
-	tss->io_bitmap_owner = &current->thread;
-	tss->io_bitmap_base = IO_BITMAP_OFFSET;
+	/*
+	 * Sets the lazy trigger so that the next I/O operation will
+	 * reload the correct bitmap.
+	 */
+	tss->io_bitmap_base = INVALID_IO_BITMAP_OFFSET_LAZY;
 
 	put_cpu();
 
