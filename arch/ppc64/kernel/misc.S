@@ -737,7 +737,7 @@ _GLOBAL(sys_call_table32)
 	.llong .sys_set_tid_address
 	.llong .ppc32_fadvise64
 	.llong .sys_exit_group
-	.llong .ppc32_lookup_dcookie	/* 245 */
+	.llong .ppc32_lookup_dcookie	/* 235 */
 	.llong .sys_epoll_create
 	.llong .sys_epoll_ctl
 	.llong .sys_epoll_wait
