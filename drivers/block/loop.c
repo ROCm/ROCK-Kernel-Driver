@@ -683,7 +683,7 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
 		lo_flags |= LO_FLAGS_READ_ONLY;
 
 	if (S_ISBLK(inode->i_mode)) {
-		lo_device = inode->i_bdev;
+		lo_device = I_BDEV(inode);
 		if (lo_device == bdev) {
 			error = -EBUSY;
 			goto out_putf;

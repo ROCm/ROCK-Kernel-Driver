@@ -1690,7 +1690,7 @@ inline int generic_write_checks(struct file *file, loff_t *pos, size_t *count, i
 			*count = inode->i_sb->s_maxbytes - *pos;
 	} else {
 		loff_t isize;
-		if (bdev_read_only(inode->i_bdev))
+		if (bdev_read_only(I_BDEV(inode)))
 			return -EPERM;
 		isize = i_size_read(inode);
 		if (*pos >= isize) {

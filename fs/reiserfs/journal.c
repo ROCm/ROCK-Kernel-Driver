@@ -1937,18 +1937,13 @@ static int journal_init_dev( struct super_block *super,
 
 	journal -> j_dev_file = filp_open( jdev_name, 0, 0 );
 	if( !IS_ERR( journal -> j_dev_file ) ) {
-		struct inode *jdev_inode;
-
-		jdev_inode = journal -> j_dev_file -> f_dentry -> d_inode;
-		journal -> j_dev_bd = jdev_inode -> i_bdev;
+		struct inode *jdev_inode = journal->j_dev_file->f_mapping->host;
 		if( !S_ISBLK( jdev_inode -> i_mode ) ) {
 			printk( "journal_init_dev: '%s' is not a block device\n", jdev_name );
 			result = -ENOTBLK;
-		} else if( jdev_inode -> i_bdev == NULL ) {
-			printk( "journal_init_dev: bdev uninitialized for '%s'\n", jdev_name );
-			result = -ENOMEM;
 		} else  {
 			/* ok */
+			journal->j_dev_bd = I_BDEV(jdev_inode);
 			set_blocksize(journal->j_dev_bd, super->s_blocksize);
 		}
 	} else {

@@ -480,6 +480,8 @@ static inline unsigned imajor(struct inode *inode)
 	return MAJOR(inode->i_rdev);
 }
 
+extern struct block_device *I_BDEV(struct inode *inode);
+
 struct fown_struct {
 	rwlock_t lock;          /* protects pid, uid, euid fields */
 	int pid;		/* pid or -pgrp where SIGIO should be sent */
@@ -1128,7 +1130,6 @@ extern struct block_device *bdget(dev_t);
 extern void bd_forget(struct inode *inode);
 extern void bdput(struct block_device *);
 extern int blkdev_open(struct inode *, struct file *);
-extern int blkdev_close(struct inode *, struct file *);
 extern struct block_device *open_by_devnum(dev_t, unsigned, int);
 extern struct file_operations def_blk_fops;
 extern struct address_space_operations def_blk_aops;

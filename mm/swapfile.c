@@ -1100,8 +1100,7 @@ asmlinkage long sys_swapoff(const char __user * specialfile)
 	swap_list_unlock();
 	vfree(swap_map);
 	if (S_ISBLK(mapping->host->i_mode)) {
-		struct block_device *bdev;
-		bdev = mapping->host->i_bdev;
+		struct block_device *bdev = I_BDEV(mapping->host);
 		set_blocksize(bdev, p->old_block_size);
 		bd_release(bdev);
 	} else {
@@ -1294,14 +1293,14 @@ asmlinkage long sys_swapon(const char __user * specialfile, int swap_flags)
 
 	error = -EINVAL;
 	if (S_ISBLK(inode->i_mode)) {
-		bdev = inode->i_bdev;
+		bdev = I_BDEV(inode);
 		error = bd_claim(bdev, sys_swapon);
 		if (error < 0) {
 			bdev = NULL;
 			goto bad_swap;
 		}
 		p->old_block_size = block_size(bdev);
-		error = set_blocksize(inode->i_bdev, PAGE_SIZE);
+		error = set_blocksize(bdev, PAGE_SIZE);
 		if (error < 0)
 			goto bad_swap;
 		p->bdev = bdev;

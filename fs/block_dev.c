@@ -25,6 +25,22 @@
 #include <linux/namei.h>
 #include <asm/uaccess.h>
 
+struct bdev_inode {
+	struct block_device bdev;
+	struct inode vfs_inode;
+};
+
+static inline struct bdev_inode *BDEV_I(struct inode *inode)
+{
+	return container_of(inode, struct bdev_inode, vfs_inode);
+}
+
+inline struct block_device *I_BDEV(struct inode *inode)
+{
+	return &BDEV_I(inode)->bdev;
+}
+
+EXPORT_SYMBOL(I_BDEV);
 
 static sector_t max_block(struct block_device *bdev)
 {
@@ -100,10 +116,10 @@ static int
 blkdev_get_block(struct inode *inode, sector_t iblock,
 		struct buffer_head *bh, int create)
 {
-	if (iblock >= max_block(inode->i_bdev))
+	if (iblock >= max_block(I_BDEV(inode)))
 		return -EIO;
 
-	bh->b_bdev = inode->i_bdev;
+	bh->b_bdev = I_BDEV(inode);
 	bh->b_blocknr = iblock;
 	set_buffer_mapped(bh);
 	return 0;
@@ -113,10 +129,10 @@ static int
 blkdev_get_blocks(struct inode *inode, sector_t iblock,
 		unsigned long max_blocks, struct buffer_head *bh, int create)
 {
-	if ((iblock + max_blocks) > max_block(inode->i_bdev))
+	if ((iblock + max_blocks) > max_block(I_BDEV(inode)))
 		return -EIO;
 
-	bh->b_bdev = inode->i_bdev;
+	bh->b_bdev = I_BDEV(inode);
 	bh->b_blocknr = iblock;
 	bh->b_size = max_blocks << inode->i_blkbits;
 	set_buffer_mapped(bh);
@@ -130,7 +146,7 @@ blkdev_direct_IO(int rw, struct kiocb *iocb, const struct iovec *iov,
 	struct file *file = iocb->ki_filp;
 	struct inode *inode = file->f_mapping->host;
 
-	return blockdev_direct_IO(rw, iocb, inode, inode->i_bdev, iov, offset,
+	return blockdev_direct_IO(rw, iocb, inode, I_BDEV(inode), iov, offset,
 				nr_segs, blkdev_get_blocks, NULL);
 }
 
@@ -161,11 +177,10 @@ static int blkdev_commit_write(struct file *file, struct page *page, unsigned fr
  */
 static loff_t block_llseek(struct file *file, loff_t offset, int origin)
 {
-	struct inode *bd_inode;
+	struct inode *bd_inode = file->f_mapping->host;
 	loff_t size;
 	loff_t retval;
 
-	bd_inode = file->f_dentry->d_inode->i_bdev->bd_inode;
 	down(&bd_inode->i_sem);
 	size = i_size_read(bd_inode);
 
@@ -188,15 +203,13 @@ static loff_t block_llseek(struct file *file, loff_t offset, int origin)
 }
 	
 /*
- *	Filp may be NULL when we are called by an msync of a vma
- *	since the vma has no handle.
+ *	Filp is never NULL; the only case when ->fsync() is called with
+ *	NULL first argument is nfsd_sync_dir() and that's not a directory.
  */
  
 static int block_fsync(struct file *filp, struct dentry *dentry, int datasync)
 {
-	struct inode * inode = dentry->d_inode;
-
-	return sync_blockdev(inode->i_bdev);
+	return sync_blockdev(I_BDEV(filp->f_mapping->host));
 }
 
 /*
@@ -205,16 +218,6 @@ static int block_fsync(struct file *filp, struct dentry *dentry, int datasync)
 
 static spinlock_t bdev_lock __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
 static kmem_cache_t * bdev_cachep;
-
-struct bdev_inode {
-	struct block_device bdev;
-	struct inode vfs_inode;
-};
-
-static inline struct bdev_inode *BDEV_I(struct inode *inode)
-{
-	return container_of(inode, struct bdev_inode, vfs_inode);
-}
 
 static struct inode *bdev_alloc_inode(struct super_block *sb)
 {
@@ -735,11 +738,12 @@ int blkdev_put(struct block_device *bdev, int kind)
 
 EXPORT_SYMBOL(blkdev_put);
 
-int blkdev_close(struct inode * inode, struct file * filp)
+static int blkdev_close(struct inode * inode, struct file * filp)
 {
-	if (inode->i_bdev->bd_holder == filp)
-		bd_release(inode->i_bdev);
-	return blkdev_put(inode->i_bdev, BDEV_FILE);
+	struct block_device *bdev = I_BDEV(filp->f_mapping->host);
+	if (bdev->bd_holder == filp)
+		bd_release(bdev);
+	return blkdev_put(bdev, BDEV_FILE);
 }
 
 static ssize_t blkdev_file_write(struct file *file, const char __user *buf,
@@ -758,6 +762,11 @@ static ssize_t blkdev_file_aio_write(struct kiocb *iocb, const char __user *buf,
 	return generic_file_aio_write_nolock(iocb, &local_iov, 1, &iocb->ki_pos);
 }
 
+static int block_ioctl(struct inode *inode, struct file *file, unsigned cmd,
+			unsigned long arg)
+{
+	return blkdev_ioctl(file->f_mapping->host, file, cmd, arg);
+}
 
 struct address_space_operations def_blk_aops = {
 	.readpage	= blkdev_readpage,
@@ -779,7 +788,7 @@ struct file_operations def_blk_fops = {
   	.aio_write	= blkdev_file_aio_write, 
 	.mmap		= generic_file_mmap,
 	.fsync		= block_fsync,
-	.ioctl		= blkdev_ioctl,
+	.ioctl		= block_ioctl,
 	.readv		= generic_file_readv,
 	.writev		= generic_file_writev,
 	.sendfile	= generic_file_sendfile,
