@@ -7,6 +7,7 @@
 
 #include <linux/config.h>
 #include <linux/mm.h>
+#include <linux/mman.h>
 #include <linux/slab.h>
 #include <linux/kernel_stat.h>
 #include <linux/swap.h>
@@ -1028,12 +1029,18 @@ asmlinkage long sys_swapoff(const char __user * specialfile)
 		}
 		prev = type;
 	}
-	err = -EINVAL;
 	if (type < 0) {
+		err = -EINVAL;
 		swap_list_unlock();
 		goto out_dput;
 	}
-
+	if (vm_enough_memory(p->pages))
+		vm_unacct_memory(p->pages);
+	else {
+		err = -ENOMEM;
+		swap_list_unlock();
+		goto out_dput;
+	}
 	if (prev < 0) {
 		swap_list.head = p->next;
 	} else {
