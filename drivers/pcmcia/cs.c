@@ -2122,7 +2122,6 @@ EXPORT_SYMBOL(pcmcia_request_window);
 EXPORT_SYMBOL(pcmcia_reset_card);
 EXPORT_SYMBOL(pcmcia_resume_card);
 EXPORT_SYMBOL(pcmcia_suspend_card);
-EXPORT_SYMBOL(pcmcia_validate_cis);
 
 EXPORT_SYMBOL(dead_socket);
 EXPORT_SYMBOL(pcmcia_parse_events);

@@ -966,7 +966,7 @@ static int ds_ioctl(struct inode * inode, struct file * file,
 	break;
     case DS_VALIDATE_CIS:
 	pcmcia_validate_mem(s->parent);
-	ret = pcmcia_validate_cis(s->handle, &buf.cisinfo);
+	ret = pccard_validate_cis(s->parent, BIND_FN_ALL, &buf.cisinfo);
 	break;
     case DS_SUSPEND_CARD:
 	ret = pcmcia_suspend_card(s->parent);

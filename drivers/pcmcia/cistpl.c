@@ -1437,20 +1437,15 @@ EXPORT_SYMBOL(pccard_read_tuple);
     
 ======================================================================*/
 
-int pcmcia_validate_cis(client_handle_t handle, cisinfo_t *info)
+int pccard_validate_cis(struct pcmcia_socket *s, unsigned int function, cisinfo_t *info)
 {
     tuple_t *tuple;
     cisparse_t *p;
     int ret, reserved, dev_ok = 0, ident_ok = 0;
-    struct pcmcia_socket *s;
-    unsigned int function;
 
-    if (CHECK_HANDLE(handle))
-	return CS_BAD_HANDLE;
-    s = SOCKET(handle);
     if (!s)
 	return CS_BAD_HANDLE;
-    function = handle->Function;
+
     tuple = kmalloc(sizeof(*tuple), GFP_KERNEL);
     if (tuple == NULL)
 	return CS_OUT_OF_RESOURCE;
@@ -1486,7 +1481,7 @@ int pcmcia_validate_cis(client_handle_t handle, cisinfo_t *info)
 	goto done;
 
     for (info->Chains = 1; info->Chains < MAX_TUPLES; info->Chains++) {
-	ret = pccard_get_next_tuple(handle->Socket, handle->Function, tuple);
+	ret = pccard_get_next_tuple(s, function, tuple);
 	if (ret != CS_SUCCESS) break;
 	if (((tuple->TupleCode > 0x23) && (tuple->TupleCode < 0x40)) ||
 	    ((tuple->TupleCode > 0x47) && (tuple->TupleCode < 0x80)) ||
@@ -1502,6 +1497,7 @@ done:
     kfree(p);
     return CS_SUCCESS;
 }
+EXPORT_SYMBOL(pccard_validate_cis);
 
 /*
  * Compatibility layer.
@@ -1542,3 +1538,13 @@ int pcmcia_parse_tuple(client_handle_t handle, tuple_t *tuple, cisparse_t *parse
 	return pccard_parse_tuple(tuple, parse);
 }
 EXPORT_SYMBOL(pcmcia_parse_tuple);
+
+int pcmcia_validate_cis(client_handle_t handle, cisinfo_t *info)
+{
+	struct pcmcia_socket *s;
+	if (CHECK_HANDLE(handle))
+		return CS_BAD_HANDLE;
+	s = SOCKET(handle);
+	return pccard_validate_cis(s, handle->Function, info);
+}
+EXPORT_SYMBOL(pcmcia_validate_cis);
