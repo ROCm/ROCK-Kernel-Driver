@@ -673,6 +673,10 @@
      3.3GJ (4/15/02):
 	 1. hacks for lk 2.5 series (D. Gilbert)
 
+     3.3GJD (10/14/02):
+         1. change select_queue_depths to slave_attach
+	 2. make cmd_per_lun be sane again
+
   I. Known Problems/Fix List (XXX)
 
      1. Need to add memory mapping workaround. Test the memory mapping.
@@ -4208,8 +4212,7 @@ STATIC PortAddr     _asc_def_iop_base[];
  */
 
 STATIC void       advansys_interrupt(int, void *, struct pt_regs *);
-STATIC void       advansys_select_queue_depths(struct Scsi_Host *,
-                                               Scsi_Device *);
+STATIC int	  advansys_slave_attach(Scsi_Device *);
 STATIC void       asc_scsi_done_list(Scsi_Cmnd *, int from_isr);
 STATIC int        asc_execute_scsi_cmnd(Scsi_Cmnd *);
 STATIC int        asc_build_req(asc_board_t *, Scsi_Cmnd *);
@@ -5307,17 +5310,15 @@ advansys_detect(Scsi_Host_Template *tpnt)
              * compiled as a module and 'cmd_per_lun' is zero, the Mid-Level
              * SCSI function 'allocate_device' will panic. To allow the driver
              * to work as a module in these kernels set 'cmd_per_lun' to 1.
-             */
+	     *
+	     * Note: This is wrong.  cmd_per_lun should be set to the depth
+	     * you want on untagged devices always.
 #ifdef MODULE
-            shp->cmd_per_lun = 1;
-#else /* MODULE */
-            shp->cmd_per_lun = 0;
-#endif /* MODULE */
-            /*
-             * Use the host 'select_queue_depths' function to determine
-             * the number of commands to queue per device.
              */
-            shp->select_queue_depths = advansys_select_queue_depths;
+            shp->cmd_per_lun = 1;
+/* #else
+            shp->cmd_per_lun = 0;
+#endif */
 
             /*
              * Set the maximum number of scatter-gather elements the
@@ -6346,34 +6347,33 @@ advansys_interrupt(int irq, void *dev_id, struct pt_regs *regs)
  * Set the number of commands to queue per device for the
  * specified host adapter.
  */
-STATIC void
-advansys_select_queue_depths(struct Scsi_Host *shp, Scsi_Device *devicelist)
+STATIC int
+advansys_slave_attach(Scsi_Device *device)
 {
-    Scsi_Device        *device;
     asc_board_t        *boardp;
 
-    boardp = ASC_BOARDP(shp);
+    boardp = ASC_BOARDP(device->host);
     boardp->flags |= ASC_SELECT_QUEUE_DEPTHS;
-    for (device = devicelist; device != NULL; device = device->next) {
-        if (device->host != shp) {
-            continue;
-        }
-        /*
-         * Save a pointer to the device and set its initial/maximum
-         * queue depth.
-         */
+    /*
+     * Save a pointer to the device and set its initial/maximum
+     * queue depth.  Only save the pointer for a lun0 dev though.
+     */
+    if(device->lun == 0)
         boardp->device[device->id] = device;
+    if(device->tagged_supported) {
         if (ASC_NARROW_BOARD(boardp)) {
-            device->queue_depth =
-                boardp->dvc_var.asc_dvc_var.max_dvc_qng[device->id];
+	    scsi_adjust_queue_depth(device, MSG_ORDERED_TAG,
+                boardp->dvc_var.asc_dvc_var.max_dvc_qng[device->id]);
         } else {
-            device->queue_depth =
-                boardp->dvc_var.adv_dvc_var.max_dvc_qng;
+	    scsi_adjust_queue_depth(device, MSG_ORDERED_TAG,
+                boardp->dvc_var.adv_dvc_var.max_dvc_qng);
         }
-        ASC_DBG3(1,
-            "advansys_select_queue_depths: shp 0x%lx, id %d, depth %d\n",
-            (ulong) shp, device->id, device->queue_depth);
+    } else {
+	scsi_adjust_queue_depth(device, 0, device->host->cmd_per_lun);
     }
+    ASC_DBG3(1, "advansys_slave_attach: shp 0x%lx, id %d, depth %d\n",
+            (ulong) shp, device->id, device->queue_depth);
+    return 0;
 }
 
 /*
