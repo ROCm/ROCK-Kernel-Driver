@@ -18,6 +18,7 @@
  * 	Yuji SEKIYA @USAGI:	Support default route on router node;
  * 				remove ip6_null_entry from the top of
  * 				routing table.
+ *	Ville Nuorvala:		Fixes to source address sub trees
  */
 #include <linux/config.h>
 #include <linux/errno.h>
@@ -80,6 +81,7 @@ rwlock_t fib6_walker_lock = RW_LOCK_UNLOCKED;
 #define SUBTREE(fn) NULL
 #endif
 
+static struct rt6_info * fib6_find_prefix(struct fib6_node *fn);
 static void fib6_prune_clones(struct fib6_node *fn, struct rt6_info *rt);
 static struct fib6_node * fib6_repair_tree(struct fib6_node *fn);
 
@@ -512,9 +514,12 @@ int fib6_add(struct fib6_node *root, struct rt6_info *rt, struct nlmsghdr *nlh, 
 {
 	struct fib6_node *fn;
 	int err = -ENOMEM;
+#ifdef CONFIG_IPV6_SUBTREES
+	struct fib6_node *pn = NULL;
+#endif
 
 	fn = fib6_add_1(root, &rt->rt6i_dst.addr, sizeof(struct in6_addr),
-			rt->rt6i_dst.plen, (u8*) &rt->rt6i_dst - (u8*) rt);
+			rt->rt6i_dst.plen, offsetof(struct rt6_info, rt6i_dst));
 
 	if (fn == NULL)
 		goto out;
@@ -550,7 +555,7 @@ int fib6_add(struct fib6_node *root, struct rt6_info *rt, struct nlmsghdr *nlh, 
 
 			sn = fib6_add_1(sfn, &rt->rt6i_src.addr,
 					sizeof(struct in6_addr), rt->rt6i_src.plen,
-					(u8*) &rt->rt6i_src - (u8*) rt);
+					offsetof(struct rt6_info, rt6i_src));
 
 			if (sn == NULL) {
 				/* If it is failed, discard just allocated
@@ -564,19 +569,22 @@ int fib6_add(struct fib6_node *root, struct rt6_info *rt, struct nlmsghdr *nlh, 
 			/* Now link new subtree to main tree */
 			sfn->parent = fn;
 			fn->subtree = sfn;
-			if (fn->leaf == NULL) {
-				fn->leaf = rt;
-				atomic_inc(&rt->rt6i_ref);
-			}
 		} else {
 			sn = fib6_add_1(fn->subtree, &rt->rt6i_src.addr,
 					sizeof(struct in6_addr), rt->rt6i_src.plen,
-					(u8*) &rt->rt6i_src - (u8*) rt);
+					offsetof(struct rt6_info, rt6i_src)); 
 
 			if (sn == NULL)
 				goto st_failure;
 		}
 
+		/* fib6_add_1 might have cleared the old leaf pointer */
+		if (fn->leaf == NULL) {
+			fn->leaf = rt;
+			atomic_inc(&rt->rt6i_ref);
+		}
+
+		pn = fn;
 		fn = sn;
 	}
 #endif
@@ -590,8 +598,29 @@ int fib6_add(struct fib6_node *root, struct rt6_info *rt, struct nlmsghdr *nlh, 
 	}
 
 out:
-	if (err)
+	if (err) {
+#ifdef CONFIG_IPV6_SUBTREES
+		/* If fib6_add_1 has cleared the old leaf pointer in the 
+		 * super-tree leaf node, we have to find a new one for it. 
+		 *
+		 * This situation will never arise in the sub-tree since 
+		 * the node will at least have the duplicate route that 
+		 * caused fib6_add_rt2node to fail in the first place.
+		 */
+
+		if (pn && !(pn->fn_flags & RTN_RTINFO)) {
+			pn->leaf = fib6_find_prefix(pn);
+#if RT6_DEBUG >= 2
+			if (!pn->leaf) {
+				BUG_TRAP(pn->leaf);
+				pn->leaf = &ip6_null_entry;
+			}
+#endif
+			atomic_inc(&pn->leaf->rt6i_ref);
+		}
+#endif
 		dst_free(&rt->u.dst);
+	}
 	return err;
 
 #ifdef CONFIG_IPV6_SUBTREES
@@ -680,14 +709,13 @@ struct fib6_node * fib6_lookup(struct fib6_node *root, struct in6_addr *daddr,
 			       struct in6_addr *saddr)
 {
 	struct lookup_args args[2];
-	struct rt6_info *rt = NULL;
 	struct fib6_node *fn;
 
-	args[0].offset = (u8*) &rt->rt6i_dst - (u8*) rt;
+	args[0].offset = offsetof(struct rt6_info, rt6i_dst);
 	args[0].addr = daddr;
 
 #ifdef CONFIG_IPV6_SUBTREES
-	args[1].offset = (u8*) &rt->rt6i_src - (u8*) rt;
+	args[1].offset = offsetof(struct rt6_info, rt6i_src);
 	args[1].addr = saddr;
 #endif
 
@@ -739,20 +767,17 @@ struct fib6_node * fib6_locate(struct fib6_node *root,
 			       struct in6_addr *daddr, int dst_len,
 			       struct in6_addr *saddr, int src_len)
 {
-	struct rt6_info *rt = NULL;
 	struct fib6_node *fn;
 
 	fn = fib6_locate_1(root, daddr, dst_len,
-			   (u8*) &rt->rt6i_dst - (u8*) rt);
+			   offsetof(struct rt6_info, rt6i_dst));
 
 #ifdef CONFIG_IPV6_SUBTREES
 	if (src_len) {
 		BUG_TRAP(saddr!=NULL);
-		if (fn == NULL)
-			fn = fn->subtree;
 		if (fn)
-			fn = fib6_locate_1(fn, saddr, src_len,
-					   (u8*) &rt->rt6i_src - (u8*) rt);
+			fn = fib6_locate_1(fn->subtree, saddr, src_len,
+					   offsetof(struct rt6_info, rt6i_src));
 	}
 #endif
 
