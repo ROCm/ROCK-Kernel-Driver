@@ -24,6 +24,8 @@
  * 2000-08-13	Jan-Benedict Glaw <jbglaw@lug-owl.de>
  * 	Fixed time_init to be aware of epoches != 1900. This prevents
  * 	booting up in 2048 for me;) Code is stolen from rtc.c.
+ * 2003-06-03	R. Scott Bailey <scott.bailey@eds.com>
+ *	Tighten sanity in time_init from 1% (10,000 PPM) to 250 PPM
  */
 #include <linux/config.h>
 #include <linux/errno.h>
@@ -306,7 +308,7 @@ void __init
 time_init(void)
 {
 	unsigned int year, mon, day, hour, min, sec, cc1, cc2, epoch;
-	unsigned long cycle_freq, one_percent;
+	unsigned long cycle_freq, tolerance;
 	long diff;
 
 	/* Calibrate CPU clock -- attempt #1.  */
@@ -324,13 +326,13 @@ time_init(void)
 
 	cycle_freq = hwrpb->cycle_freq;
 	if (est_cycle_freq) {
-		/* If the given value is within 1% of what we calculated, 
+		/* If the given value is within 250 PPM of what we calculated,
 		   accept it.  Otherwise, use what we found.  */
-		one_percent = cycle_freq / 100;
+		tolerance = cycle_freq / 4000;
 		diff = cycle_freq - est_cycle_freq;
 		if (diff < 0)
 			diff = -diff;
-		if ((unsigned long)diff > one_percent) {
+		if ((unsigned long)diff > tolerance) {
 			cycle_freq = est_cycle_freq;
 			printk("HWRPB cycle frequency bogus.  "
 			       "Estimated %lu Hz\n", cycle_freq);
