@@ -2756,21 +2756,31 @@ static int end_bio_bh_io_sync(struct bio *bio, unsigned int bytes_done, int err)
 	if (bio->bi_size)
 		return 1;
 
+	if (err == -EOPNOTSUPP)
+		set_bit(BIO_EOPNOTSUPP, &bio->bi_flags);
+
 	bh->b_end_io(bh, test_bit(BIO_UPTODATE, &bio->bi_flags));
 	bio_put(bio);
 	return 0;
 }
 
-void submit_bh(int rw, struct buffer_head * bh)
+int submit_bh(int rw, struct buffer_head * bh)
 {
 	struct bio *bio;
+	int ret = 0;
 
 	BUG_ON(!buffer_locked(bh));
 	BUG_ON(!buffer_mapped(bh));
 	BUG_ON(!bh->b_end_io);
 
-	/* Only clear out a write error when rewriting */
-	if (test_set_buffer_req(bh) && rw == WRITE)
+	if (buffer_ordered(bh) && (rw == WRITE))
+		rw = WRITE_BARRIER;
+
+	/*
+	 * Only clear out a write error when rewriting, should this
+	 * include WRITE_SYNC as well?
+	 */
+	if (test_set_buffer_req(bh) && (rw == WRITE || rw == WRITE_BARRIER))
 		clear_buffer_write_io_error(bh);
 
 	/*
@@ -2792,7 +2802,14 @@ void submit_bh(int rw, struct buffer_head * bh)
 	bio->bi_end_io = end_bio_bh_io_sync;
 	bio->bi_private = bh;
 
+	bio_get(bio);
 	submit_bio(rw, bio);
+
+	if (bio_flagged(bio, BIO_EOPNOTSUPP))
+		ret = -EOPNOTSUPP;
+
+	bio_put(bio);
+	return ret;
 }
 
 /**

@@ -88,6 +88,7 @@ extern int leases_enable, dir_notify_enable, lease_break_time;
 #define SPECIAL 4	/* For non-blockdevice requests in request queue */
 #define READ_SYNC	(READ | (1 << BIO_RW_SYNC))
 #define WRITE_SYNC	(WRITE | (1 << BIO_RW_SYNC))
+#define WRITE_BARRIER	((1 << BIO_RW) | (1 << BIO_RW_BARRIER))
 
 #define SEL_IN		1
 #define SEL_OUT		2
