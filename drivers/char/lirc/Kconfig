@@ -33,11 +33,13 @@ config LIRC_SUPPORT
 #		  KNC ONE IR
 #
 #		  If these dont make sense to you, then dont use the module.
-#
+#			-- obsoleted by ir-kbd-i2c
+
 #	config LIRC_GPIO
 #		tristate "GPIO Driver"
 #		depends on LIRC_SUPPORT && VIDEO_BT848
-#
+#			-- obsoleted by ir-kbd-gpio
+
 	config LIRC_BT829
 		tristate "BT829 Driver"
 		depends on LIRC_SUPPORT
@@ -53,6 +55,60 @@ config LIRC_SUPPORT
 #	config LIRC_MCEUSB
 #		tristate "MCE USB Driver"
 #		depends on LIRC_SUPPORT && USB
+#			- doesn't build
+
+	config LIRC_PARALLEL
+		tristate "Parallel Driver"
+		depends on LIRC_SUPPORT && !SMP && PARPORT
+
+		# simply default to lpt1, can be overritten with insmod
+		# options anyway ...
+		config LIRC_PORT_PARALLEL
+			hex
+			default "0x378"
+			depends on LIRC_PARALLEL
+
+		config LIRC_IRQ_PARALLEL
+			hex
+			default "7"
+			depends on LIRC_PARALLEL
+
+		config LIRC_TIMER
+			int
+			default "65535"
+			depends on LIRC_PARALLEL
+
+	config LIRC_SERIAL
+		tristate "Serial Driver"
+		depends on LIRC_SUPPORT && SERIAL_8250
+
+		config LIRC_HOMEBREW
+			bool
+			default yes
+
+		config LIRC_PORT_SERIAL
+			hex
+			default "0x3f8"
+			depends on LIRC_SERIAL
+
+		config LIRC_IRQ_SERIAL
+			hex
+			default "4"
+			depends on LIRC_SERIAL
+
+	config LIRC_SIR
+		tristate "SIR Driver"
+		depends on LIRC_SUPPORT
+		select LIRC_SIR_IRDA
+
+		config LIRC_PORT_SIR
+			hex
+			default "0x3f8"
+			depends on LIRC_SIR
+
+		config LIRC_IRQ_SIR
+			hex
+			default "4"
+			depends on LIRC_SIR
 
 endmenu
-

@@ -67,6 +67,10 @@ static inline int  lirc_buffer_empty(struct lirc_buffer *buf)
 {
 	return !(buf->fill);
 }
+static inline int  lirc_buffer_available(struct lirc_buffer *buf)
+{
+    return (buf->size - buf->fill);
+}
 extern inline void lirc_buffer_lock(struct lirc_buffer *buf, unsigned long *flags)
 {
 	spin_lock_irqsave(&buf->lock, *flags);
@@ -117,6 +121,31 @@ static inline void lirc_buffer_write_1(struct lirc_buffer *buf,
 	_lirc_buffer_write_1(buf, orig);
 	lirc_buffer_unlock(buf, &flags);
 }
+static inline void _lirc_buffer_write_n(struct lirc_buffer *buf,
+                       unsigned char* orig, int count)
+{
+    memcpy(&buf->data[buf->tail*buf->chunk_size], orig, count*buf->chunk_size);
+    buf->tail = mod(buf->tail+count, buf->size);
+    buf->fill += count;
+}
+static inline void lirc_buffer_write_n(struct lirc_buffer *buf,
+                       unsigned char* orig, int count)
+{
+    unsigned long flags;
+    int space1;
+    lirc_buffer_lock(buf,&flags);
+    if( buf->head > buf->tail ) space1 = buf->head - buf->tail;
+    else space1 = buf->size - buf->tail;
+    
+    if( count > space1 )
+    {
+        _lirc_buffer_write_n(buf, orig, space1);
+        _lirc_buffer_write_n(buf, orig+(space1*buf->chunk_size), count-space1);
+    }
+    else
+        _lirc_buffer_write_n(buf, orig, count);
+    lirc_buffer_unlock(buf, &flags);
+}
 
 struct lirc_plugin
 {
@@ -126,7 +155,7 @@ struct lirc_plugin
      int sample_rate;
      unsigned long features;
      void* data;
-     int (*get_key) (void* data, unsigned char* key, int key_no);
+     int (*add_to_buf) (void* data, struct lirc_buffer* buf);
      wait_queue_head_t* (*get_queue) (void* data);
      struct lirc_buffer *rbuf;
      int (*set_use_inc) (void* data);
@@ -143,7 +172,7 @@ struct lirc_plugin
  * number will be used (if available)
  *
  * code_length:
- * length ofthe  remote control key code expressed in bits
+ * length of the remote control key code expressed in bits
  * if code_length > 8 then many bytes are returned through the device read
  * in such situation get_key should return key code values starting
  * from most significant byte (device read will preseve this order)
@@ -153,7 +182,7 @@ struct lirc_plugin
  * byte)
  *
  * sample_rate:
- * sample_rate equal to 0 means that no pooling will be performed and get_key
+ * sample_rate equal to 0 means that no polling will be performed and add_to_buf
  * will be triggered by external events (through task queue returned by
  * get_queue)
  *
@@ -161,10 +190,12 @@ struct lirc_plugin
  * it may point to any plugin data and this pointer will be passed to all
  * callback functions
  *
- * get_key:
- * get_key will be called after specified period of the time or triggered by the
- * external event, this behavior depends on value of the sample_rate
- * this function will be called in user context
+ * add_to_buf:
+ * add_to_buf will be called after specified period of the time or triggered
+ * by the external event, this behavior depends on value of the sample_rate
+ * this function will be called in user context. this routine should return 0
+ * if data was added to the buffer and -ENODATA if none was available. this should
+ * add some number of bits evenly divisible by code_length to the buffer
  *
  * get_queue:
  * this callback should return a pointer to the task queue which will be used

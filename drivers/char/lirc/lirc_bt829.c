@@ -83,15 +83,19 @@ int do_pci_probe(void)
 }
 
 
-int atir_get_key (void* data, unsigned char* key, int key_no)
+int atir_add_to_buf (void* data, struct lirc_buffer* buf)
 {
+	unsigned char key;
 	int status;
 	status = poll_main();
-	*key = (status >> 8) & 0xFF;
-	//  if ( status & 0xFF ) {
+	key = (status >> 8) & 0xFF;
+	if( status & 0xFF )
+	{
 	//    printk(KERN_INFO "ATIR reading key %02X\n",*key);
-	//  }
-	return (status & 0xFF) ? 0 : -1;
+		lirc_buffer_write_1( buf, &key );
+		return 0;
+	}
+	return -ENODATA;
 }
 
 int atir_set_use_inc(void* data)
@@ -120,7 +124,7 @@ static int __init lirc_bt829_init(void)
 	atir_plugin.code_length = 8;
 	atir_plugin.sample_rate = 10;
 	atir_plugin.data        = 0;
-	atir_plugin.get_key     = atir_get_key;
+	atir_plugin.add_to_buf  = atir_add_to_buf;
 	atir_plugin.set_use_inc = atir_set_use_inc;
 	atir_plugin.set_use_dec = atir_set_use_dec;
 

@@ -35,6 +35,7 @@
 
 
 #include <linux/sched.h>
+#include <linux/init.h>
 #include <linux/errno.h>
 #include <linux/signal.h>
 #include <linux/fs.h>
@@ -50,7 +51,6 @@
 #include <linux/mm.h>
 #include <linux/delay.h>
 #include <linux/poll.h>
-#include <linux/init.h>
 #include <asm/system.h>
 #include <asm/segment.h>
 #include <asm/io.h>
@@ -125,7 +125,7 @@ static void add_read_queue(int flag,
 static int init_chrdev(void);
 static void drop_chrdev(void);
 	/* Hardware */
-static void it87_interrupt(int irq,
+static irqreturn_t it87_interrupt(int irq,
 			   void * dev_id,
 			   struct pt_regs * regs);
 static void send_space(unsigned long len);
@@ -147,10 +147,13 @@ static int lirc_open(struct inode * inode,
 		     struct file * file)
 {
 	spin_lock(&dev_lock);
-	if (module_refcount(THIS_MODULE)) {
+#ifdef CONFIG_MODULE_UNLOAD
+	if (module_refcount(THIS_MODULE))
+	{
 		spin_unlock(&dev_lock);
 		return -EBUSY;
 	}
+#endif
 	try_module_get(THIS_MODULE);
 	spin_unlock(&dev_lock);
 	return 0;
@@ -392,7 +395,7 @@ static struct lirc_plugin plugin = {
        code_length:    1,
        sample_rate:    0,
        data:           NULL,
-       get_key:        NULL,
+       add_to_buf:     NULL,
        get_queue:      NULL,
        set_use_inc:    set_use_inc,
        set_use_dec:    set_use_dec,
@@ -464,7 +467,7 @@ static void it87_timeout(unsigned long data)
 }
 
 
-static void it87_interrupt(int irq,
+static irqreturn_t it87_interrupt(int irq,
 			   void * dev_id,
 			   struct pt_regs * regs)
 {
@@ -572,6 +575,7 @@ static void it87_interrupt(int irq,
 #endif
 		break;
 	}
+	return IRQ_HANDLED; //FIXME true status should be returned (include/linux/interrupt.h)
 }
 
 

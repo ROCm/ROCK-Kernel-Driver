@@ -293,21 +293,13 @@ static int build_key(unsigned long gpio_val, unsigned char codes[MAX_BYTES])
 	return SUCCESS;
 }
 
-static int get_key(void* data, unsigned char *key, int key_no)
+/* add_to_buf - copy a code to the buffer */
+static int add_to_buf(void* data, struct lirc_buffer* buf)
 {
 	static unsigned long next_time = 0;
-	static unsigned char codes[MAX_BYTES];
+	static unsigned char prev_codes[MAX_BYTES];
 	unsigned long code = 0;
 	unsigned char cur_codes[MAX_BYTES];
-
-	if (key_no > 0)	{
-		if (code_bytes < 2 || key_no >= code_bytes) {
-			dprintk(LOGHEAD "something wrong in get_key\n", card);
-			return -EBADRQC;
-		}
-		*key = codes[key_no];
-		return SUCCESS;
-	}
 
 	if (bttv_read_gpio(card, &code)) {
 		dprintk(LOGHEAD "cannot read GPIO\n", card);
@@ -318,17 +310,21 @@ static int get_key(void* data, unsigned char *key, int key_no)
 		return -EFAULT;
 	}
 
+		
+	/* XXX this should be double checked; i think the soft_gap
+	 * here is supposed to track repeats, which is why i save off
+	 * the prev_codes, but i'm not certain this is correct
+	 */
 	if (soft_gap) {
-		if (!memcmp(codes, cur_codes, code_bytes) &&
-		    jiffies < next_time) {
+		if (!memcmp(prev_codes, cur_codes, code_bytes) &&
+			jiffies < next_time) {
 			return -EAGAIN;
 		}
 		next_time = jiffies + soft_gap;
 	}
+	memcpy( prev_codes, cur_codes, code_bytes );
 
-	memcpy(codes, cur_codes, code_bytes);
-
-	*key = codes[0];
+	lirc_buffer_write_1( buf, cur_codes );
 
 	return SUCCESS;
 }
@@ -351,7 +347,7 @@ static wait_queue_head_t* get_queue(void* data)
 
 static struct lirc_plugin plugin = {
 	.name		= "lirc_gpio  ",
-	.get_key	= get_key,
+	.add_to_buf	= add_to_buf,
 	.get_queue	= get_queue,
 	.set_use_inc	= set_use_inc,
 	.set_use_dec	= set_use_dec,

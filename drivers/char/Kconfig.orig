@@ -389,24 +389,6 @@ config SGI_L1_SERIAL_CONSOLE
 	  controller serial port as your console (you want this!),
 	  say Y.  Otherwise, say N.
 
-config FETCHOP
-	bool "SGI Altix small TLB memory mapping support"
-	depends on IA64
-	default y if IA64
-	help
-	  Support small TLB entry memory mapping for special uncached
-	  operations that can operate without interference from
-	  kernel speculation.
-
-config SGI_IOC4_SERIAL
-	tristate "SGI Altix ioc4 serial support"
-	depends on SERIAL_NONSTANDARD && IA64
-	help
-	  If you have an SGI Altix and you would like to use the ioc4
-	  serial ports, say M.  Otherwise, say N.
-
-	  This driver will be built as a module called ioc4_serial.
-
 config AU1000_SERIAL_CONSOLE
 	bool "Enable Au1000 serial console"
 	depends on AU1000_UART
@@ -606,20 +588,6 @@ config HVC_CONSOLE
 	  console. This driver allows each pSeries partition to have a console
 	  which is accessed via the HMC.
 
-config HVCS
-	tristate "IBM Hypervisor Virtual Console Server support"
-	depends on PPC_PSERIES
-	help
-	  Partitionable IBM Power5 ppc64 machines allow hosting of
-	  firmware virtual consoles from one Linux partition by
-	  another Linux partition.  This driver allows console data
-	  from Linux partitions to be accessed through TTY device
-	  interfaces in the device tree on a Linux partition running
-	  this driver.
-
-	  To compile this driver as a module, choose M here: the
-	  module will be called hvcs.ko.
-
 config PC9800_OLDLP
 	tristate "NEC PC-9800 old-style printer port support"
 	depends on X86_PC9800 && !PARPORT
@@ -630,6 +598,30 @@ config PC9800_OLDLP
 config PC9800_OLDLP_CONSOLE
 	bool "Support for console on line printer"
 	depends on PC9800_OLDLP
+
+
+menu "Mice"
+
+config BUSMOUSE
+	tristate "Bus Mouse Support"
+	---help---
+	  Say Y here if your machine has a bus mouse as opposed to a serial
+	  mouse. Most people have a regular serial MouseSystem or
+	  Microsoft mouse (made by Logitech) that plugs into a COM port
+	  (rectangular with 9 or 25 pins). These people say N here. 
+
+	  If you have a laptop, you either have to check the documentation or
+	  experiment a bit to find out whether the trackball is a serial mouse
+	  or not; it's best to say Y here for you.
+
+	  This is the generic bus mouse driver code. If you have a bus mouse,
+	  you will have to say Y here and also to the specific driver for your
+	  mouse below.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called busmouse.
+
+endmenu
 
 config QIC02_TAPE
 	tristate "QIC-02 tape support"
@@ -748,7 +740,6 @@ config HW_RANDOM
 
 config NVRAM
 	tristate "/dev/nvram support"
-	depends on ATARI || X86 || X86_64 || ARM || GENERIC_NVRAM
 	---help---
 	  If you say Y here and create a character special file /dev/nvram
 	  with major number 10 and minor number 144 using mknod ("man mknod"),
@@ -1009,6 +1000,4 @@ config HANGCHECK_TIMER
 	  or merely print a warning.
 
 endmenu
-
-source "drivers/char/lirc/Kconfig"
 

@@ -102,25 +102,34 @@ static inline void init_irctl(struct irctl *ir)
 
 inline static int add_to_buf(struct irctl *ir)
 {
-	unsigned char buf[BUFLEN];
-	unsigned int i;
-
 	if (lirc_buffer_full(ir->buf)) {
 		dprintk(LOGHEAD "buffer overflow\n",
 			ir->p.name, ir->p.minor);
 		return -EOVERFLOW;
 	}
 
-	for (i=0; i < ir->buf->chunk_size; i++) {
-		if (ir->p.get_key(ir->p.data, &buf[i], i)) {
-			return -ENODATA;
-		}
-		dprintk(LOGHEAD "remote code (0x%x) now in buffer\n",
-			ir->p.name, ir->p.minor, buf[i]);
-	}
+    if(ir->p.add_to_buf) {
+        int res = -ENODATA;
+        int got_data = 0;
+        
+        /* Service the device as long as it is returning
+         * data and we have space
+         */
+        while( !lirc_buffer_full(ir->buf) )
+        {
+            res = ir->p.add_to_buf( ir->p.data, ir->buf );
+            if( res == SUCCESS )
+                got_data++;
+            else
+                break;
+        }
 
-	/* here is the only point at which we add key codes to the buffer */
-	lirc_buffer_write_1(ir->buf, buf);
+        if( res == -ENODEV )
+        {
+            ir->shutdown = 1;
+        }
+        return (got_data ? SUCCESS : res);
+    }
 
 	return SUCCESS;
 }
@@ -147,7 +156,7 @@ static int lirc_thread(void *irctl)
 			} else {
 				interruptible_sleep_on(ir->p.get_queue(ir->p.data));
 			}
-			if (ir->shutdown) {
+			if (ir->shutdown || !ir->open) {
 				break;
 			}
 			if (!add_to_buf(ir)) {
@@ -209,11 +218,16 @@ int lirc_register_plugin(struct lirc_plugin *p)
 	printk("lirc_dev: lirc_register_plugin:"
 	       "sample_rate: %d\n",p->sample_rate);
 	if (p->sample_rate) {
-		if (2 > p->sample_rate || 50 < p->sample_rate) {
+		if (2 > p->sample_rate || 100 < p->sample_rate) {
 			printk("lirc_dev: lirc_register_plugin:"
-			       "sample_rate must be beetween 2 and 50!\n");
+			       "sample_rate must be beetween 2 and 100!\n");
 			return -EBADRQC;
 		}
+        if (!p->add_to_buf) {
+            printk("lirc_dev: lirc_register_plugin:"
+                   "add_to_buf cannot be NULL when sample_rate is set\n");
+            return -EBADRQC;
+        }
 	} else if (!(p->fops && p->fops->read)
 			&& !p->get_queue && !p->rbuf) {
 		printk("lirc_dev: lirc_register_plugin:"
@@ -708,6 +722,6 @@ module_exit(lirc_dev_exit);
  * Overrides for Emacs so that we follow Linus's tabbing style.
  * ---------------------------------------------------------------------------
  * Local variables:
- * c-basic-offset: 8
+ * c-basic-offset: 4
  * End:
  */
