@@ -3105,7 +3105,7 @@ static irqreturn_t airo_interrupt ( int irq, void* dev_id, struct pt_regs *regs)
 			u16 *buffer;
 
 			if (test_bit(FLAG_MPI,&apriv->flags)) {
-				if test_bit(FLAG_802_11, &apriv->flags)
+				if (test_bit(FLAG_802_11, &apriv->flags))
 					mpi_receive_802_11(apriv);
 				else
 					mpi_receive_802_3(apriv);
