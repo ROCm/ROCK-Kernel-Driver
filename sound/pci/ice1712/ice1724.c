@@ -43,6 +43,8 @@
 #include "amp.h"
 #include "revo.h"
 #include "aureon.h"
+#include "prodigy.h"
+
 
 MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>");
 MODULE_DESCRIPTION("ICEnsemble ICE1724 (Envy24HT)");
@@ -52,6 +54,7 @@ MODULE_DEVICES("{"
 	       REVO_DEVICE_DESC
 	       AMP_AUDIO2000_DEVICE_DESC
 	       AUREON_DEVICE_DESC
+	       PRODIGY_DEVICE_DESC
 		"{VIA,VT1724},"
 		"{ICEnsemble,Generic ICE1724},"
 		"{ICEnsemble,Generic Envy24HT}}");
@@ -1580,6 +1583,7 @@ static struct snd_ice1712_card_info *card_tables[] __devinitdata = {
 	snd_vt1724_revo_cards,
 	snd_vt1724_amp_cards, 
 	snd_vt1724_aureon_cards,
+	snd_vt1724_prodigy_cards,
 	0,
 };
 
