@@ -363,7 +363,7 @@ config IP_NF_NAT_LOCAL
 
 	  Please note that you will need a recent version (>= 1.2.6a)
 	  of the iptables userspace program in order to use this feature.
-	  See http://www.iptables.org/ for download instructions.
+	  See <http://www.iptables.org/> for download instructions.
 
 	  If unsure, say 'N'.
 
@@ -497,7 +497,7 @@ config IP_NF_TARGET_ULOG
 	  which can only be viewed through syslog.
 
 	  The apropriate userspace logging daemon (ulogd) may be obtained from
-	  http://www.gnumonks.org/projects/ulogd
+	  <http://www.gnumonks.org/projects/ulogd/>
 
 	  To compile it as a module, choose M here.  If unsure, say N.
 
