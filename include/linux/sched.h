@@ -378,7 +378,7 @@ struct task_struct {
 /* signal handlers */
 	struct signal_struct *sig;
 
-	sigset_t blocked, real_blocked, shared_unblocked;
+	sigset_t blocked, real_blocked;
 	struct sigpending pending;
 
 	unsigned long sas_ss_sp;
@@ -530,7 +530,7 @@ extern void proc_caches_init(void);
 extern void flush_signals(struct task_struct *);
 extern void flush_signal_handlers(struct task_struct *);
 extern void sig_exit(int, int, struct siginfo *);
-extern int dequeue_signal(struct sigpending *pending, sigset_t *mask, siginfo_t *info);
+extern int dequeue_signal(sigset_t *mask, siginfo_t *info);
 extern void block_all_signals(int (*notifier)(void *priv), void *priv,
 			      sigset_t *mask);
 extern void unblock_all_signals(void);
