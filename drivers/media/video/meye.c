@@ -1281,34 +1281,40 @@ static int meye_do_ioctl(struct inode *inode, struct file *file,
 
 		down(&meye.lock);
 		switch (c->id) {
-
 		case V4L2_CID_BRIGHTNESS:
 			sonypi_camera_command(
 				SONYPI_COMMAND_SETCAMERABRIGHTNESS, c->value);
+			meye.picture.brightness = c->value << 10;
 			break;
 		case V4L2_CID_HUE:
 			sonypi_camera_command(
 				SONYPI_COMMAND_SETCAMERAHUE, c->value);
+			meye.picture.hue = c->value << 10;
 			break;
 		case V4L2_CID_CONTRAST:
 			sonypi_camera_command(
-				SONYPI_COMMAND_SETCAMERACOLOR, c->value);
+				SONYPI_COMMAND_SETCAMERACONTRAST, c->value);
+			meye.picture.contrast = c->value << 10;
 			break;
 		case V4L2_CID_SATURATION:
 			sonypi_camera_command(
 				SONYPI_COMMAND_SETCAMERACOLOR, c->value);
+			meye.picture.colour = c->value << 10;
 			break;
 		case V4L2_CID_AGC:
 			sonypi_camera_command(
 				SONYPI_COMMAND_SETCAMERAAGC, c->value);
+			meye.params.agc = c->value;
 			break;
 		case V4L2_CID_SHARPNESS:
 			sonypi_camera_command(
 				SONYPI_COMMAND_SETCAMERASHARPNESS, c->value);
+			meye.params.sharpness = c->value;
 			break;
 		case V4L2_CID_PICTURE:
 			sonypi_camera_command(
 				SONYPI_COMMAND_SETCAMERAPICTURE, c->value);
+			meye.params.picture = c->value;
 			break;
 		case V4L2_CID_JPEGQUAL:
 			meye.params.quality = c->value;
@@ -1330,32 +1336,25 @@ static int meye_do_ioctl(struct inode *inode, struct file *file,
 		down(&meye.lock);
 		switch (c->id) {
 		case V4L2_CID_BRIGHTNESS:
-			c->value = sonypi_camera_command(
-				SONYPI_COMMAND_GETCAMERABRIGHTNESS, 0);
+			c->value = meye.picture.brightness >> 10;
 			break;
 		case V4L2_CID_HUE:
-			c->value = sonypi_camera_command(
-				SONYPI_COMMAND_GETCAMERAHUE, 0);
+			c->value = meye.picture.hue >> 10;
 			break;
 		case V4L2_CID_CONTRAST:
-			c->value = sonypi_camera_command(
-				SONYPI_COMMAND_GETCAMERACOLOR, 0);
+			c->value = meye.picture.contrast >> 10;
 			break;
 		case V4L2_CID_SATURATION:
-			c->value = sonypi_camera_command(
-				SONYPI_COMMAND_GETCAMERACOLOR, 0);
+			c->value = meye.picture.colour >> 10;
 			break;
 		case V4L2_CID_AGC:
-			c->value = sonypi_camera_command(
-				SONYPI_COMMAND_GETCAMERAAGC, 0);
+			c->value = meye.params.agc;
 			break;
 		case V4L2_CID_SHARPNESS:
-			c->value = sonypi_camera_command(
-				SONYPI_COMMAND_GETCAMERASHARPNESS, 0);
+			c->value = meye.params.sharpness;
 			break;
 		case V4L2_CID_PICTURE:
-			c->value = sonypi_camera_command(
-				SONYPI_COMMAND_GETCAMERAPICTURE, 0);
+			c->value = meye.params.picture;
 			break;
 		case V4L2_CID_JPEGQUAL:
 			c->value = meye.params.quality;
