@@ -76,8 +76,17 @@
 
 #include <asm/uaccess.h>
 
-/* FIXME: Cleanup so we don't need TEST_FRAME here. */
-#ifndef TEST_FRAME
+/* FIXME: This macro needs to be moved to a common header file. */
+#define NIP6(addr) \
+        ntohs((addr)->s6_addr16[0]), \
+        ntohs((addr)->s6_addr16[1]), \
+        ntohs((addr)->s6_addr16[2]), \
+        ntohs((addr)->s6_addr16[3]), \
+        ntohs((addr)->s6_addr16[4]), \
+        ntohs((addr)->s6_addr16[5]), \
+        ntohs((addr)->s6_addr16[6]), \
+        ntohs((addr)->s6_addr16[7])
+
 /* FIXME: Comments. */
 static inline void sctp_v6_err(struct sk_buff *skb,
 			       struct inet6_skb_parm *opt,
@@ -92,13 +101,38 @@ static inline int sctp_v6_xmit(struct sk_buff *skb)
 	struct sock *sk = skb->sk;
 	struct ipv6_pinfo *np = inet6_sk(sk);
 	struct flowi fl;
-	struct dst_entry *dst;
+	struct dst_entry *dst = skb->dst;
+	struct rt6_info *rt6 = (struct rt6_info *)dst;
 	struct in6_addr saddr;
-	int err = 0;
+	int err;
 
 	fl.proto = sk->protocol;
-	fl.fl6_dst = &np->daddr;
-	fl.fl6_src = NULL;
+	fl.fl6_dst = &rt6->rt6i_dst.addr;
+
+	/* FIXME: Currently, ip6_route_output() doesn't fill in the source
+	 * address in the returned route entry. So we call ipv6_get_saddr()
+	 * to get an appropriate source address. It is possible that this address
+	 * may not be part of the bind address list of the association.
+	 * Once ip6_route_ouput() is fixed so that it returns a route entry
+	 * with an appropriate source address, the following if condition can
+	 * be removed. With ip6_route_output() returning a source address filled
+	 * route entry, sctp_transport_route() can do real source address 
+	 * selection for v6.
+	 */ 
+	if (ipv6_addr_any(&rt6->rt6i_src.addr)) {
+		err = ipv6_get_saddr(dst, fl.fl6_dst, &saddr);
+
+		if (err) {
+			printk(KERN_ERR "%s: No saddr available for "
+			       "DST=%04x:%04x:%04x:%04x:%04x:%04x:%04x:%04x\n",
+			       __FUNCTION__, NIP6(fl.fl6_src));
+			return err;
+		}
+
+		fl.fl6_src = &saddr;
+	} else {
+		fl.fl6_src = &rt6->rt6i_src.addr;
+	}
 
 	fl.fl6_flowlabel = np->flow_label;
 	IP6_ECN_flow_xmit(sk, fl.fl6_flowlabel);
@@ -111,63 +145,8 @@ static inline int sctp_v6_xmit(struct sk_buff *skb)
 		fl.nl_u.ip6_u.daddr = rt0->addr;
 	}
 
-	dst = __sk_dst_check(sk, np->dst_cookie);
-
-	if (dst == NULL) {
-		dst = ip6_route_output(sk, &fl);
-
-		if (dst->error) {
-			sk->err_soft = -dst->error;
-			dst_release(dst);
-			return -sk->err_soft;
-		}
-		ip6_dst_store(sk, dst, NULL);
-	}
-
-	skb->dst = dst_clone(dst);
-
-	/* FIXME: This is all temporary until real source address
-	 * selection is done.
-	 */
-	if (ipv6_addr_any(&np->saddr)) {
-		err = ipv6_get_saddr(dst, fl.fl6_dst, &saddr);
-
-		if (err)
-			printk(KERN_ERR "sctp_v6_xmit: no saddr available\n");
-
-		/* FIXME: This is a workaround until we get
-		 * real source address selection done.  This is here
-		 * to disallow loopback when the scoping rules have
-		 * not bound loopback to the endpoint.
-		 */
-		if (ipv6_addr_type(&saddr) & IPV6_ADDR_LOOPBACK) {
-			if (!(ipv6_addr_type(&np->daddr) &
-			      IPV6_ADDR_LOOPBACK)) {
-				ipv6_addr_copy(&saddr, &np->daddr);
-			}
-		}
-		fl.fl6_src = &saddr;
-	} else {
-		fl.fl6_src = &np->saddr;
-	}
-
-	/* Restore final destination back after routing done */
-	fl.nl_u.ip6_u.daddr = &np->daddr;
-
 	return ip6_xmit(sk, skb, &fl, np->opt);
 }
-#endif /* TEST_FRAME */
-
-/* FIXME: This macro needs to be moved to a common header file. */
-#define NIP6(addr) \
-        ntohs((addr)->s6_addr16[0]), \
-        ntohs((addr)->s6_addr16[1]), \
-        ntohs((addr)->s6_addr16[2]), \
-        ntohs((addr)->s6_addr16[3]), \
-        ntohs((addr)->s6_addr16[4]), \
-        ntohs((addr)->s6_addr16[5]), \
-        ntohs((addr)->s6_addr16[6]), \
-        ntohs((addr)->s6_addr16[7])
 
 /* Returns the dst cache entry for the given source and destination ip
  * addresses.
