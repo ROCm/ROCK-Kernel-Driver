@@ -244,6 +244,17 @@
 #define __NR_epoll_ctl		237
 #define __NR_epoll_wait		238
 #define __NR_remap_file_pages	239
+#define __NR_timer_create	240
+#define __NR_timer_settime	241
+#define __NR_timer_gettime	242
+#define __NR_timer_getoverrun	243
+#define __NR_timer_delete	244
+#define __NR_clock_settime	245
+#define __NR_clock_gettime	246
+#define __NR_clock_getres	247
+#define __NR_clock_nanosleep	248
+
+#define __NR_syscalls		249
 
 #define __NR(n)	#n
 
@@ -418,6 +429,7 @@ type name(type1 arg1, type2 arg2, type3 arg3, type4 arg4, type5 arg5)	\
 #ifdef __KERNEL__
 
 #define __NR__exit __NR_exit
+#define NR_syscalls	__NR_syscalls
 
 /*
  * Forking from kernel space will result in the child getting a new,
