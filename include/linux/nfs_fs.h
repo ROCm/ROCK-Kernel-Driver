@@ -14,6 +14,7 @@
 #include <linux/mm.h>
 #include <linux/pagemap.h>
 #include <linux/wait.h>
+#include <linux/uio.h>
 
 #include <linux/nfs_fs_sb.h>
 
@@ -282,6 +283,12 @@ nfs_file_cred(struct file *file)
 #endif
 	return cred;
 }
+
+/*
+ * linux/fs/nfs/direct.c
+ */
+extern int nfs_direct_IO(int, struct file *, const struct iovec *, loff_t,
+			unsigned long);
 
 /*
  * linux/fs/nfs/dir.c

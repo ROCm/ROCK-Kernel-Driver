@@ -308,7 +308,8 @@ struct address_space_operations {
 	int (*bmap)(struct address_space *, long);
 	int (*invalidatepage) (struct page *, unsigned long);
 	int (*releasepage) (struct page *, int);
-	int (*direct_IO)(int, struct inode *, const struct iovec *iov, loff_t offset, unsigned long nr_segs);
+	int (*direct_IO)(int, struct file *, const struct iovec *iov,
+			loff_t offset, unsigned long nr_segs);
 };
 
 struct backing_dev_info;
@@ -1247,7 +1248,7 @@ ssize_t generic_file_write_nolock(struct file *file, const struct iovec *iov,
 				unsigned long nr_segs, loff_t *ppos);
 extern ssize_t generic_file_sendfile(struct file *, struct file *, loff_t *, size_t);
 extern void do_generic_file_read(struct file *, loff_t *, read_descriptor_t *, read_actor_t);
-extern ssize_t generic_file_direct_IO(int rw, struct inode *inode, 
+extern ssize_t generic_file_direct_IO(int rw, struct file *file,
 	const struct iovec *iov, loff_t offset, unsigned long nr_segs);
 extern int generic_direct_IO(int rw, struct inode *inode, const struct iovec 
 	*iov, loff_t offset, unsigned long nr_segs, get_blocks_t *get_blocks);
