@@ -58,7 +58,6 @@ extern char *linux_banner;
 static int init(void *);
 
 extern void init_IRQ(void);
-extern void init_modules(void);
 extern void sock_init(void);
 extern void fork_init(unsigned long);
 extern void mca_init(void);
