@@ -15,9 +15,9 @@
 #define __V850_TEG_H__
 
 
-/* The TEG uses the NB85E cpu core.  */
-#include <asm/nb85e.h>
-#include <asm/nb85e_cache.h>
+/* The TEG uses the V850E cpu core.  */
+#include <asm/v850e.h>
+#include <asm/v850e_cache.h>
 
 
 #define CPU_MODEL	"v850e/nb85e-teg"
@@ -70,15 +70,15 @@ extern void teg_uart_pre_configure (unsigned chan,
 
 
 /* The TEG RTPU.  */
-#define NB85E_RTPU_BASE_ADDR		0xFFFFF210
+#define V850E_RTPU_BASE_ADDR		0xFFFFF210
 
 
 /* TEG series timer D details.  */
-#define NB85E_TIMER_D_BASE_ADDR		0xFFFFF210
-#define NB85E_TIMER_D_TMCD_BASE_ADDR 	(NB85E_TIMER_D_BASE_ADDR + 0x0)
-#define NB85E_TIMER_D_TMD_BASE_ADDR 	(NB85E_TIMER_D_BASE_ADDR + 0x4)
-#define NB85E_TIMER_D_CMD_BASE_ADDR 	(NB85E_TIMER_D_BASE_ADDR + 0x8)
-#define NB85E_TIMER_D_BASE_FREQ		CPU_CLOCK_FREQ
+#define V850E_TIMER_D_BASE_ADDR		0xFFFFF210
+#define V850E_TIMER_D_TMCD_BASE_ADDR 	(V850E_TIMER_D_BASE_ADDR + 0x0)
+#define V850E_TIMER_D_TMD_BASE_ADDR 	(V850E_TIMER_D_BASE_ADDR + 0x4)
+#define V850E_TIMER_D_CMD_BASE_ADDR 	(V850E_TIMER_D_BASE_ADDR + 0x8)
+#define V850E_TIMER_D_BASE_FREQ		CPU_CLOCK_FREQ
 
 
 /* `Interrupt Source Select' control register.  */

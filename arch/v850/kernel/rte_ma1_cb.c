@@ -20,7 +20,7 @@
 #include <asm/page.h>
 #include <asm/ma1.h>
 #include <asm/rte_ma1_cb.h>
-#include <asm/nb85e_timer_c.h>
+#include <asm/v850e_timer_c.h>
 
 #include "mach.h"
 
@@ -89,14 +89,14 @@ void __init mach_init_irqs (void)
 	rte_cb_init_irqs ();
 
 	/* Use falling-edge-sensitivity for interrupts .  */
-	NB85E_TIMER_C_SESC (0) &= ~0xC;
-	NB85E_TIMER_C_SESC (1) &= ~0xF;
+	V850E_TIMER_C_SESC (0) &= ~0xC;
+	V850E_TIMER_C_SESC (1) &= ~0xF;
 
 	/* INTP000-INTP011 are shared with `Timer C', so we have to set
 	   up Timer C to pass them through as raw interrupts.  */
 	for (tc = 0; tc < 2; tc++)
 		/* Turn on the timer.  */
-		NB85E_TIMER_C_TMCC0 (tc) |= NB85E_TIMER_C_TMCC0_CAE;
+		V850E_TIMER_C_TMCC0 (tc) |= V850E_TIMER_C_TMCC0_CAE;
 
 	/* Make sure the relevant port0/port1 pins are assigned
 	   interrupt duty.  We used INTP001-INTP011 (don't screw with

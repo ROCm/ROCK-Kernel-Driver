@@ -1,8 +1,8 @@
 /*
  * include/asm-v850/ma.h -- V850E/MA series of cpu chips
  *
- *  Copyright (C) 2001,02  NEC Corporation
- *  Copyright (C) 2001,02  Miles Bader <miles@gnu.org>
+ *  Copyright (C) 2001,02,03  NEC Electronics Corporation
+ *  Copyright (C) 2001,02,03  Miles Bader <miles@gnu.org>
  *
  * This file is subject to the terms and conditions of the GNU General
  * Public License.  See the file COPYING in the main directory of this
@@ -14,9 +14,8 @@
 #ifndef __V850_MA_H__
 #define __V850_MA_H__
 
-
-/* The MA series uses the NB85E cpu core.  */
-#include <asm/nb85e.h>
+/* The MA series uses the V850E cpu core.  */
+#include <asm/v850e.h>
 
 
 /* For <asm/entry.h> */
@@ -39,16 +38,16 @@ extern void ma_uart_pre_configure (unsigned chan,
 
 
 /* MA series timer C details.  */
-#define NB85E_TIMER_C_BASE_ADDR		0xFFFFF600
+#define V850E_TIMER_C_BASE_ADDR		0xFFFFF600
 
 
 /* MA series timer D details.  */
-#define NB85E_TIMER_D_BASE_ADDR		0xFFFFF540
-#define NB85E_TIMER_D_TMD_BASE_ADDR 	(NB85E_TIMER_D_BASE_ADDR + 0x0)
-#define NB85E_TIMER_D_CMD_BASE_ADDR 	(NB85E_TIMER_D_BASE_ADDR + 0x2)
-#define NB85E_TIMER_D_TMCD_BASE_ADDR 	(NB85E_TIMER_D_BASE_ADDR + 0x4)
+#define V850E_TIMER_D_BASE_ADDR		0xFFFFF540
+#define V850E_TIMER_D_TMD_BASE_ADDR 	(V850E_TIMER_D_BASE_ADDR + 0x0)
+#define V850E_TIMER_D_CMD_BASE_ADDR 	(V850E_TIMER_D_BASE_ADDR + 0x2)
+#define V850E_TIMER_D_TMCD_BASE_ADDR 	(V850E_TIMER_D_BASE_ADDR + 0x4)
 
-#define NB85E_TIMER_D_BASE_FREQ		CPU_CLOCK_FREQ
+#define V850E_TIMER_D_BASE_FREQ		CPU_CLOCK_FREQ
 
 
 /* Port 0 */

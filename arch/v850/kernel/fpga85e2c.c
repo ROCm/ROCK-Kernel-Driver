@@ -2,8 +2,8 @@
  * arch/v850/kernel/fpga85e2c.h -- Machine-dependent defs for
  *	FPGA implementation of V850E2/NA85E2C
  *
- *  Copyright (C) 2002  NEC Corporation
- *  Copyright (C) 2002  Miles Bader <miles@gnu.org>
+ *  Copyright (C) 2002,03  NEC Electronics Corporation
+ *  Copyright (C) 2002,03  Miles Bader <miles@gnu.org>
  *
  * This file is subject to the terms and conditions of the GNU General
  * Public License.  See the file COPYING in the main directory of this
@@ -134,7 +134,7 @@ void machine_power_off (void)
 
 /* Interrupts */
 
-struct nb85e_intc_irq_init irq_inits[] = {
+struct v850e_intc_irq_init irq_inits[] = {
 	{ "IRQ", 0, 		NUM_MACH_IRQS,	1, 7 },
 	{ "RPU", IRQ_RPU(0),	IRQ_RPU_NUM,	1, 6 },
 	{ 0 }
@@ -146,7 +146,7 @@ struct hw_interrupt_type hw_itypes[NUM_IRQ_INITS];
 /* Initialize interrupts.  */
 void __init mach_init_irqs (void)
 {
-	nb85e_intc_init_irq_types (irq_inits, hw_itypes);
+	v850e_intc_init_irq_types (irq_inits, hw_itypes);
 }
 
 

@@ -1,8 +1,8 @@
 /*
  * arch/v850/kernel/highres_timer.c -- High resolution timing routines
  *
- *  Copyright (C) 2001,02  NEC Corporation
- *  Copyright (C) 2001,02  Miles Bader <miles@gnu.org>
+ *  Copyright (C) 2001,02,03  NEC Electronics Corporation
+ *  Copyright (C) 2001,02,03  Miles Bader <miles@gnu.org>
  *
  * This file is subject to the terms and conditions of the GNU General
  * Public License.  See the file COPYING in the main directory of this
@@ -12,7 +12,7 @@
  */
 
 #include <asm/system.h>
-#include <asm/nb85e_timer_d.h>
+#include <asm/v850e_timer_d.h>
 #include <asm/highres_timer.h>
 
 #define HIGHRES_TIMER_USEC_SHIFT   12
@@ -42,7 +42,7 @@ void highres_timer_slow_tick_irq (void)
 
 void highres_timer_reset (void)
 {
-	NB85E_TIMER_D_TMD (HIGHRES_TIMER_TIMER_D_UNIT) = 0;
+	V850E_TIMER_D_TMD (HIGHRES_TIMER_TIMER_D_UNIT) = 0;
 	HIGHRES_TIMER_SLOW_TICKS = 0;
 }
 
@@ -51,12 +51,12 @@ void highres_timer_start (void)
 	u32 fast_tick_rate;
 
 	/* Start hardware timer.  */
-	nb85e_timer_d_configure (HIGHRES_TIMER_TIMER_D_UNIT,
+	v850e_timer_d_configure (HIGHRES_TIMER_TIMER_D_UNIT,
 				 HIGHRES_TIMER_SLOW_TICK_RATE);
 
 	fast_tick_rate =
-		(NB85E_TIMER_D_BASE_FREQ
-		 >> NB85E_TIMER_D_DIVLOG2 (HIGHRES_TIMER_TIMER_D_UNIT));
+		(V850E_TIMER_D_BASE_FREQ
+		 >> V850E_TIMER_D_DIVLOG2 (HIGHRES_TIMER_TIMER_D_UNIT));
 
 	/* The obvious way of calculating microseconds from fast ticks
 	   is to do:
@@ -77,16 +77,16 @@ void highres_timer_start (void)
 
 	/* Enable the interrupt (which is hardwired to this use), and
 	   give it the highest priority.  */
-	NB85E_INTC_IC (IRQ_INTCMD (HIGHRES_TIMER_TIMER_D_UNIT)) = 0;
+	V850E_INTC_IC (IRQ_INTCMD (HIGHRES_TIMER_TIMER_D_UNIT)) = 0;
 }
 
 void highres_timer_stop (void)
 {
 	/* Stop the timer.  */
-	NB85E_TIMER_D_TMCD (HIGHRES_TIMER_TIMER_D_UNIT) =
-		NB85E_TIMER_D_TMCD_CAE;
+	V850E_TIMER_D_TMCD (HIGHRES_TIMER_TIMER_D_UNIT) =
+		V850E_TIMER_D_TMCD_CAE;
 	/* Disable its interrupt, just in case.  */
-	nb85e_intc_disable_irq (IRQ_INTCMD (HIGHRES_TIMER_TIMER_D_UNIT));
+	v850e_intc_disable_irq (IRQ_INTCMD (HIGHRES_TIMER_TIMER_D_UNIT));
 }
 
 inline void highres_timer_read_ticks (u32 *slow_ticks, u32 *fast_ticks)
@@ -95,9 +95,9 @@ inline void highres_timer_read_ticks (u32 *slow_ticks, u32 *fast_ticks)
 	u32 fast_ticks_1, fast_ticks_2, _slow_ticks;
 
 	local_irq_save (flags);
-	fast_ticks_1 = NB85E_TIMER_D_TMD (HIGHRES_TIMER_TIMER_D_UNIT);
+	fast_ticks_1 = V850E_TIMER_D_TMD (HIGHRES_TIMER_TIMER_D_UNIT);
 	_slow_ticks = HIGHRES_TIMER_SLOW_TICKS;
-	fast_ticks_2 = NB85E_TIMER_D_TMD (HIGHRES_TIMER_TIMER_D_UNIT);
+	fast_ticks_2 = V850E_TIMER_D_TMD (HIGHRES_TIMER_TIMER_D_UNIT);
 	local_irq_restore (flags);
 
 	if (fast_ticks_2 < fast_ticks_1)

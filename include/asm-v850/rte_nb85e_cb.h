@@ -17,6 +17,21 @@
 #include <asm/rte_cb.h>		/* Common defs for Midas RTE-CB boards.  */
 
 
+#define PLATFORM		"rte-v850e/nb85e-cb"
+#define PLATFORM_LONG		"Midas lab RTE-V850E/NB85E-CB"
+
+#define CPU_CLOCK_FREQ		50000000 /* 50MHz */
+
+/* 1MB of onboard SRAM.  Note that the monitor ROM uses parts of this
+   for its own purposes, so care must be taken.  */
+#define SRAM_ADDR		0x03C00000
+#define SRAM_SIZE		0x00100000 /* 1MB */
+
+/* 16MB of onbard SDRAM.  */
+#define SDRAM_ADDR		0x01000000
+#define SDRAM_SIZE		0x01000000 /* 16MB */
+
+
 /* CPU addresses of GBUS memory spaces.  */
 #define GCS0_ADDR		0x00400000 /* GCS0 - Common SRAM (2MB) */
 #define GCS0_SIZE		0x00400000 /*   4MB */
@@ -39,20 +54,8 @@
 #define IRQ_GINT(n)		(10 + (n))
 #define IRQ_GINT_NUM		3
 
-
-#define PLATFORM	"rte-v850e/nb85e-cb"
-#define PLATFORM_LONG	"Midas lab RTE-V850E/NB85E-CB"
-
-#define CPU_CLOCK_FREQ	50000000 /* 50MHz */
-
-/* 1MB of onboard SRAM.  Note that the monitor ROM uses parts of this
-   for its own purposes, so care must be taken.  */
-#define SRAM_ADDR	0x03C00000
-#define SRAM_SIZE	0x00100000 /* 1MB */
-
-/* 16MB of onbard SDRAM.  */
-#define SDRAM_ADDR	0x01000000
-#define SDRAM_SIZE	0x01000000 /* 16MB */
+/* Used by <asm/rte_cb.h> to derive NUM_MACH_IRQS.  */
+#define NUM_RTE_CB_IRQS		NUM_CPU_IRQS
 
 
 #ifdef CONFIG_ROM_KERNEL

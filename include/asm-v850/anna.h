@@ -145,16 +145,16 @@ extern void anna_uart_pre_configure (unsigned chan,
 
 
 /* Timer C details.  */
-#define NB85E_TIMER_C_BASE_ADDR		0xFFFFF600
+#define V850E_TIMER_C_BASE_ADDR		0xFFFFF600
 
 /* Timer D details (the Anna actually has 5 of these; should change later). */
-#define NB85E_TIMER_D_BASE_ADDR		0xFFFFF540
-#define NB85E_TIMER_D_TMD_BASE_ADDR 	(NB85E_TIMER_D_BASE_ADDR + 0x0)
-#define NB85E_TIMER_D_CMD_BASE_ADDR 	(NB85E_TIMER_D_BASE_ADDR + 0x2)
-#define NB85E_TIMER_D_TMCD_BASE_ADDR 	(NB85E_TIMER_D_BASE_ADDR + 0x4)
+#define V850E_TIMER_D_BASE_ADDR		0xFFFFF540
+#define V850E_TIMER_D_TMD_BASE_ADDR 	(V850E_TIMER_D_BASE_ADDR + 0x0)
+#define V850E_TIMER_D_CMD_BASE_ADDR 	(V850E_TIMER_D_BASE_ADDR + 0x2)
+#define V850E_TIMER_D_TMCD_BASE_ADDR 	(V850E_TIMER_D_BASE_ADDR + 0x4)
 
-#define NB85E_TIMER_D_BASE_FREQ		SYS_CLOCK_FREQ
-#define NB85E_TIMER_D_TMCD_CS_MIN	1 /* min 2^1 divider */
+#define V850E_TIMER_D_BASE_FREQ		SYS_CLOCK_FREQ
+#define V850E_TIMER_D_TMCD_CS_MIN	1 /* min 2^1 divider */
 
 
 /* For <asm/param.h> */

@@ -247,7 +247,7 @@ void __init gbus_int_init_irqs (void)
 	/* First initialize the shared gint interrupts.  */
 	for (i = 0; i < NUM_USED_GINTS; i++) {
 		unsigned gint = used_gint[i].gint;
-		struct nb85e_intc_irq_init gint_irq_init[2];
+		struct v850e_intc_irq_init gint_irq_init[2];
 
 		/* We initialize one GINT interrupt at a time.  */
 		gint_irq_init[0].name = "GINT";
@@ -258,7 +258,7 @@ void __init gbus_int_init_irqs (void)
 
 		gint_irq_init[1].name = 0; /* Terminate the vector.  */
 
-		nb85e_intc_init_irq_types (gint_irq_init, gint_hw_itypes);
+		v850e_intc_init_irq_types (gint_irq_init, gint_hw_itypes);
 	}
 
 	/* Then the GBUS interrupts.  */
