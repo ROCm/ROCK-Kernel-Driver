@@ -954,8 +954,7 @@ static void
 SiS190_tx_interrupt(struct net_device *dev, struct sis190_private *tp,
 		    void *ioaddr)
 {
-	unsigned long dirty_tx, tx_left = 0;
-	int entry = tp->cur_tx % NUM_TX_DESC;
+	unsigned long dirty_tx, tx_left;
 
 	assert(dev != NULL);
 	assert(tp != NULL);
@@ -965,6 +964,8 @@ SiS190_tx_interrupt(struct net_device *dev, struct sis190_private *tp,
 	tx_left = tp->cur_tx - dirty_tx;
 
 	while (tx_left > 0) {
+		int entry = dirty_tx % NUM_TX_DESC;
+
 		if ((le32_to_cpu(tp->TxDescArray[entry].status) & OWNbit) == 0) {
 			struct sk_buff *skb;
 
@@ -980,7 +981,6 @@ SiS190_tx_interrupt(struct net_device *dev, struct sis190_private *tp,
 			tp->stats.tx_packets++;
 			dirty_tx++;
 			tx_left--;
-			entry++;
 		}
 	}
 

@@ -2,6 +2,8 @@
  *
  * Name:	skdim.c
  * Project:	GEnesis, PCI Gigabit Ethernet Adapter
+ * Version:	$Revision: 1.5 $
+ * Date:	$Date: 2003/11/28 12:55:40 $
  * Purpose:	All functions to maintain interrupt moderation
  *
  ******************************************************************************/

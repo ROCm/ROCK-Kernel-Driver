@@ -2,6 +2,8 @@
  *
  * Name:	skqueue.c
  * Project:	Gigabit Ethernet Adapters, Event Scheduler Module
+ * Version:	$Revision: 1.20 $
+ * Date:	$Date: 2003/09/16 13:44:00 $
  * Purpose:	Management of an event queue.
  *
  ******************************************************************************/
@@ -19,6 +21,7 @@
  *	The information in this file is provided "AS IS" without warranty.
  *
  ******************************************************************************/
+
 
 /*
  *	Event queue and dispatcher

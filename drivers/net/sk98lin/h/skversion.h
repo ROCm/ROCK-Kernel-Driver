@@ -2,6 +2,8 @@
  *
  * Name:	version.h
  * Project:	GEnesis, PCI Gigabit Ethernet Adapter
+ * Version:	$Revision: 1.5 $
+ * Date:	$Date: 2003/10/07 08:16:51 $
  * Purpose:	SK specific Error log support
  *
  ******************************************************************************/
@@ -23,14 +25,14 @@
 #ifdef	lint
 static const char SysKonnectFileId[] = "@(#) (C) SysKonnect GmbH.";
 static const char SysKonnectBuildNumber[] =
-	"@(#)SK-BUILD: 6.22 PL: 01"; 
+	"@(#)SK-BUILD: 6.23 PL: 01"; 
 #endif	/* !defined(lint) */
 
-#define BOOT_STRING	"sk98lin: Network Device Driver v6.22\n" \
+#define BOOT_STRING	"sk98lin: Network Device Driver v6.23\n" \
 			"(C)Copyright 1999-2004 Marvell(R)."
 
-#define VER_STRING	"6.22"
+#define VER_STRING	"6.23"
 #define DRIVER_FILE_NAME	"sk98lin"
-#define DRIVER_REL_DATE		"Jan-30-2004"
+#define DRIVER_REL_DATE		"Feb-13-2004"
 
 

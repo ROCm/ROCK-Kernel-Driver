@@ -36,8 +36,8 @@
 #include "bond_3ad.h"
 #include "bond_alb.h"
 
-#define DRV_VERSION	"2.5.4"
-#define DRV_RELDATE	"December 30, 2003"
+#define DRV_VERSION	"2.6.0"
+#define DRV_RELDATE	"January 14, 2004"
 #define DRV_NAME	"bonding"
 #define DRV_DESCRIPTION	"Ethernet Channel Bonding Driver"
 
@@ -147,6 +147,11 @@ struct bond_params {
 	u32 arp_targets[BOND_MAX_ARP_TARGETS];
 };
 
+struct vlan_entry {
+	struct list_head vlan_list;
+	unsigned short vlan_id;
+};
+
 struct slave {
 	struct net_device *dev; /* first - usefull for panic debug */
 	struct slave *next;
@@ -196,6 +201,8 @@ struct bonding {
 	struct   ad_bond_info ad_info;
 	struct   alb_bond_info alb_info;
 	struct   bond_params params;
+	struct   list_head vlan_list;
+	struct   vlan_group *vlgrp;
 };
 
 /**
@@ -237,6 +244,9 @@ extern inline void bond_set_slave_active_flags(struct slave *slave)
 	slave->state = BOND_STATE_ACTIVE;
 	slave->dev->flags &= ~IFF_NOARP;
 }
+
+struct vlan_entry *bond_next_vlan(struct bonding *bond, struct vlan_entry *curr);
+int bond_dev_queue_xmit(struct bonding *bond, struct sk_buff *skb, struct net_device *slave_dev);
 
 #endif /* _LINUX_BONDING_H */
 

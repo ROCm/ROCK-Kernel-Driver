@@ -2,6 +2,8 @@
  *
  * Name:	skgedrv.h
  * Project:	Gigabit Ethernet Adapters, Common Modules
+ * Version:	$Revision: 1.10 $
+ * Date:	$Date: 2003/07/04 12:25:01 $
  * Purpose:	Interface with the driver
  *
  ******************************************************************************/

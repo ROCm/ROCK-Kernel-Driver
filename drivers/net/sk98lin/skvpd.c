@@ -2,6 +2,8 @@
  *
  * Name:	skvpd.c
  * Project:	GEnesis, PCI Gigabit Ethernet Adapter
+ * Version:	$Revision: 1.37 $
+ * Date:	$Date: 2003/01/13 10:42:45 $
  * Purpose:	Shared software to read and write VPD data
  *
  ******************************************************************************/
