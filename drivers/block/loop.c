@@ -76,24 +76,34 @@ static struct gendisk **disks;
 /*
  * Transfer functions
  */
-static int transfer_none(struct loop_device *lo, int cmd, char *raw_buf,
-			 char *loop_buf, int size, sector_t real_block)
+static int transfer_none(struct loop_device *lo, int cmd,
+			 struct page *raw_page, unsigned raw_off,
+			 struct page *loop_page, unsigned loop_off,
+			 int size, sector_t real_block)
 {
-	if (raw_buf != loop_buf) {
-		if (cmd == READ)
-			memcpy(loop_buf, raw_buf, size);
-		else
-			memcpy(raw_buf, loop_buf, size);
-	}
+	char *raw_buf = kmap_atomic(raw_page, KM_USER0) + raw_off;
+	char *loop_buf = kmap_atomic(loop_page, KM_USER1) + loop_off;
 
+	if (cmd == READ)
+		memcpy(loop_buf, raw_buf, size);
+	else
+		memcpy(raw_buf, loop_buf, size);
+
+	kunmap_atomic(raw_buf, KM_USER0);
+	kunmap_atomic(loop_buf, KM_USER1);
+	cond_resched();
 	return 0;
 }
 
-static int transfer_xor(struct loop_device *lo, int cmd, char *raw_buf,
-			char *loop_buf, int size, sector_t real_block)
+static int transfer_xor(struct loop_device *lo, int cmd,
+			struct page *raw_page, unsigned raw_off,
+			struct page *loop_page, unsigned loop_off,
+			int size, sector_t real_block)
 {
-	char	*in, *out, *key;
-	int	i, keysize;
+	char *raw_buf = kmap_atomic(raw_page, KM_USER0) + raw_off;
+	char *loop_buf = kmap_atomic(loop_page, KM_USER1) + loop_off;
+	char *in, *out, *key;
+	int i, keysize;
 
 	if (cmd == READ) {
 		in = raw_buf;
@@ -107,6 +117,10 @@ static int transfer_xor(struct loop_device *lo, int cmd, char *raw_buf,
 	keysize = lo->lo_encrypt_key_size;
 	for (i = 0; i < size; i++)
 		*out++ = *in++ ^ key[(i & 511) % keysize];
+
+	kunmap_atomic(raw_buf, KM_USER0);
+	kunmap_atomic(loop_buf, KM_USER1);
+	cond_resched();
 	return 0;
 }
 
@@ -162,13 +176,15 @@ figure_loop_size(struct loop_device *lo)
 }
 
 static inline int
-lo_do_transfer(struct loop_device *lo, int cmd, char *rbuf,
-	       char *lbuf, int size, sector_t rblock)
+lo_do_transfer(struct loop_device *lo, int cmd,
+	       struct page *rpage, unsigned roffs,
+	       struct page *lpage, unsigned loffs,
+	       int size, sector_t rblock)
 {
 	if (!lo->transfer)
 		return 0;
 
-	return lo->transfer(lo, cmd, rbuf, lbuf, size, rblock);
+	return lo->transfer(lo, cmd, rpage, roffs, lpage, loffs, size, rblock);
 }
 
 static int
@@ -178,16 +194,15 @@ do_lo_send(struct loop_device *lo, struct bio_vec *bvec, int bsize, loff_t pos)
 	struct address_space *mapping = file->f_mapping;
 	struct address_space_operations *aops = mapping->a_ops;
 	struct page *page;
-	char *kaddr, *data;
 	pgoff_t index;
-	unsigned size, offset;
+	unsigned size, offset, bv_offs;
 	int len;
 	int ret = 0;
 
 	down(&mapping->host->i_sem);
 	index = pos >> PAGE_CACHE_SHIFT;
 	offset = pos & ((pgoff_t)PAGE_CACHE_SIZE - 1);
-	data = kmap(bvec->bv_page) + bvec->bv_offset;
+	bv_offs = bvec->bv_offset;
 	len = bvec->bv_len;
 	while (len > 0) {
 		sector_t IV;
@@ -204,25 +219,28 @@ do_lo_send(struct loop_device *lo, struct bio_vec *bvec, int bsize, loff_t pos)
 			goto fail;
 		if (aops->prepare_write(file, page, offset, offset+size))
 			goto unlock;
-		kaddr = kmap(page);
-		transfer_result = lo_do_transfer(lo, WRITE, kaddr + offset,
-						 data, size, IV);
+		transfer_result = lo_do_transfer(lo, WRITE, page, offset,
+						 bvec->bv_page, bv_offs,
+						 size, IV);
 		if (transfer_result) {
+			char *kaddr;
+
 			/*
 			 * The transfer failed, but we still write the data to
 			 * keep prepare/commit calls balanced.
 			 */
 			printk(KERN_ERR "loop: transfer error block %llu\n",
 			       (unsigned long long)index);
+			kaddr = kmap_atomic(page, KM_USER0);
 			memset(kaddr + offset, 0, size);
+			kunmap_atomic(kaddr, KM_USER0);
 		}
 		flush_dcache_page(page);
-		kunmap(page);
 		if (aops->commit_write(file, page, offset, offset+size))
 			goto unlock;
 		if (transfer_result)
 			goto unlock;
-		data += size;
+		bv_offs += size;
 		len -= size;
 		offset = 0;
 		index++;
@@ -232,7 +250,6 @@ do_lo_send(struct loop_device *lo, struct bio_vec *bvec, int bsize, loff_t pos)
 	}
 	up(&mapping->host->i_sem);
 out:
-	kunmap(bvec->bv_page);
 	return ret;
 
 unlock:
@@ -263,7 +280,8 @@ lo_send(struct loop_device *lo, struct bio *bio, int bsize, loff_t pos)
 
 struct lo_read_data {
 	struct loop_device *lo;
-	char *data;
+	struct page *page;
+	unsigned offset;
 	int bsize;
 };
 
@@ -271,7 +289,6 @@ static int
 lo_read_actor(read_descriptor_t *desc, struct page *page,
 	      unsigned long offset, unsigned long size)
 {
-	char *kaddr;
 	unsigned long count = desc->count;
 	struct lo_read_data *p = (struct lo_read_data*)desc->buf;
 	struct loop_device *lo = p->lo;
@@ -282,18 +299,16 @@ lo_read_actor(read_descriptor_t *desc, struct page *page,
 	if (size > count)
 		size = count;
 
-	kaddr = kmap(page);
-	if (lo_do_transfer(lo, READ, kaddr + offset, p->data, size, IV)) {
+	if (lo_do_transfer(lo, READ, page, offset, p->page, p->offset, size, IV)) {
 		size = 0;
 		printk(KERN_ERR "loop: transfer error block %ld\n",
 		       page->index);
 		desc->error = -EINVAL;
 	}
-	kunmap(page);
 	
 	desc->count = count - size;
 	desc->written += size;
-	p->data += size;
+	p->offset += size;
 	return size;
 }
 
@@ -306,12 +321,12 @@ do_lo_receive(struct loop_device *lo,
 	int retval;
 
 	cookie.lo = lo;
-	cookie.data = kmap(bvec->bv_page) + bvec->bv_offset;
+	cookie.page = bvec->bv_page;
+	cookie.offset = bvec->bv_offset;
 	cookie.bsize = bsize;
 	file = lo->lo_backing_file;
 	retval = file->f_op->sendfile(file, &pos, bvec->bv_len,
 			lo_read_actor, &cookie);
-	kunmap(bvec->bv_page);
 	return (retval < 0)? retval: 0;
 }
 
