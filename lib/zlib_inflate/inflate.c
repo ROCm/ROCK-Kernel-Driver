@@ -53,8 +53,6 @@ int zlib_inflateInit2_(
       return Z_VERSION_ERROR;
 
   /* initialize state */
-  if (z == NULL)
-    return Z_STREAM_ERROR;
   z->msg = NULL;
   z->state = &WS(z)->internal_state;
   z->state->blocks = NULL;
