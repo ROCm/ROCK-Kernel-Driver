@@ -4108,6 +4108,9 @@ GDTH_INITFUNC(int, gdth_detect(Scsi_Host_Template *shtp))
             break;
         if (gdth_search_eisa(eisa_slot)) {      /* controller found */
             shp = scsi_register(shtp,sizeof(gdth_ext_str));
+	    if(shp == NULL)
+		    continue;
+
             ha = HADATA(shp);
             if (!gdth_init_eisa(eisa_slot,ha)) {
                 scsi_unregister(shp);
