@@ -62,8 +62,8 @@ cifs_open(struct inode *inode, struct file *file)
 		read_lock(&GlobalSMBSeslock);
 		list_for_each(tmp, &pCifsInode->openFileList) {            
 			pCifsFile = list_entry(tmp,struct cifsFileInfo, flist);           
-			if((pCifsFile->pfile == NULL)&& (pCifsFile->pid = current->pid)){		
-			/* set mode ?? */
+			if((pCifsFile->pfile == NULL)&& (pCifsFile->pid = current->pid)){
+			/* mode set in cifs_create */
 				pCifsFile->pfile = file; /* needed for writepage */
 				file->private_data = pCifsFile;
 				break;
@@ -205,17 +205,17 @@ cifs_open(struct inode *inode, struct file *file)
 					rc = cifs_get_inode_info(&file->f_dentry->d_inode,
 						full_path, buf, inode->i_sb);
 
-				if(oplock == OPLOCK_EXCLUSIVE) {
+				if((oplock & 0xF) == OPLOCK_EXCLUSIVE) {
 					pCifsInode->clientCanCacheAll = TRUE;
 					pCifsInode->clientCanCacheRead = TRUE;
 					cFYI(1,("Exclusive Oplock granted on inode %p",file->f_dentry->d_inode));
-				} else if(oplock == OPLOCK_READ)
+				} else if((oplock & 0xF) == OPLOCK_READ)
 					pCifsInode->clientCanCacheRead = TRUE;
 			} else {
 				write_unlock(&GlobalSMBSeslock);
 				write_unlock(&file->f_owner.lock);
 			}
-			if(file->f_flags & O_CREAT) {           
+			if(oplock & CIFS_CREATE_ACTION) {           
 				/* time to set mode which we can not set earlier due
 				 to problems creating new read-only files */
 				if (cifs_sb->tcon->ses->capabilities & CAP_UNIX)                
@@ -336,11 +336,11 @@ static int cifs_reopen_file(struct inode *inode, struct file *file)
 				rc = cifs_get_inode_info(&inode,
 						full_path, buf, inode->i_sb);
 
-			if(oplock == OPLOCK_EXCLUSIVE) {
+			if((oplock & 0xF) == OPLOCK_EXCLUSIVE) {
 				pCifsInode->clientCanCacheAll =  TRUE;
 				pCifsInode->clientCanCacheRead = TRUE;
 				cFYI(1,("Exclusive Oplock granted on inode %p",file->f_dentry->d_inode));
-			} else if(oplock == OPLOCK_READ) {
+			} else if((oplock & 0xF) == OPLOCK_READ) {
 				pCifsInode->clientCanCacheRead = TRUE;
 				pCifsInode->clientCanCacheAll =  FALSE;
 			} else {
@@ -1872,15 +1872,18 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 							file->f_pos++;
 						}
 					}
-					pfindData = (FILE_DIRECTORY_INFO *) ((char *) pfindData + le32_to_cpu(pfindData->NextEntryOffset));	/* works also for Unix find struct since this is the first field of both */
-					/* BB also should check to make sure that pointer is not beyond the end of the SMB */
+					pfindData = (FILE_DIRECTORY_INFO *) ((char *) pfindData + 
+						le32_to_cpu(pfindData->NextEntryOffset));
+	/* works also for Unix find struct since first field of both */
+	/* BB also should check to ensure pointer not beyond end of SMB */
 				} /* end for loop */
 				if (findNextParms.EndofSearch != 0) {
 					cifsFile->endOfSearch = TRUE;
 				}
 			} else {
 				cifsFile->endOfSearch = TRUE;
-				rc = 0;	/* unless parent directory disappeared - do not return error here (eg Access Denied or no more files) */
+				rc = 0;	/* unless parent directory disappeared - do not
+				return error here (eg Access Denied or no more files) */
 			}
 		}
 	} /* end switch */

@@ -1,3 +1,9 @@
+Version 1.13
+------------
+Fix open of files in which O_CREATE can cause the mode to change in
+some cases. Fix case in which retry of write overlaps file close.
+Fix PPC64 build error.
+
 Version 1.12
 ------------
 Fixes for large file copy, signal handling, socket retry, buffer
