@@ -501,7 +501,9 @@ exception_overflow:
 emergency_stop:
 	addi	r3,r1,STACK_FRAME_OVERHEAD
 	li	r6,0
+#ifdef CONFIG_XMON
 	bl	.xmon
+#endif
 	b	.	
 		
 	/* Space for the naca.  Architected to be located at real address
