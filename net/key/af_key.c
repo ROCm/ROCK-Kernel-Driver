@@ -900,6 +900,7 @@ static struct xfrm_state * pfkey_msg2xfrm_state(struct sadb_msg *hdr,
 		return ERR_PTR(-EINVAL);
 	key = (struct sadb_key*) ext_hdrs[SADB_EXT_KEY_AUTH-1];
 	if (key != NULL &&
+	    sa->sadb_sa_auth != SADB_X_AALG_NULL &&
 	    ((key->sadb_key_bits+7) / 8 == 0 ||
 	     (key->sadb_key_bits+7) / 8 > key->sadb_key_len * sizeof(uint64_t)))
 		return ERR_PTR(-EINVAL);
