@@ -298,29 +298,27 @@ static const char *vcc_state(struct atm_vcc *vcc)
 	return map[ATM_VF2VS(vcc->flags)];
 }
 
-
-static void vc_info(struct atm_vcc *vcc,char *buf)
+static void vcc_info(struct seq_file *seq, struct atm_vcc *vcc)
 {
-	char *here;
-
-	here = buf+sprintf(buf,"%p ",vcc);
-	if (!vcc->dev) here += sprintf(here,"Unassigned    ");
-	else here += sprintf(here,"%3d %3d %5d ",vcc->dev->number,vcc->vpi,
-		    vcc->vci);
+	seq_printf(seq, "%p ", vcc);
+	if (!vcc->dev)
+		seq_printf(seq, "Unassigned    ");
+	else 
+		seq_printf(seq, "%3d %3d %5d ", vcc->dev->number, vcc->vpi,
+			vcc->vci);
 	switch (vcc->sk->sk_family) {
 		case AF_ATMPVC:
-			here += sprintf(here,"PVC");
+			seq_printf(seq, "PVC");
 			break;
 		case AF_ATMSVC:
-			here += sprintf(here,"SVC");
+			seq_printf(seq, "SVC");
 			break;
 		default:
-			here += sprintf(here, "%3d", vcc->sk->sk_family);
+			seq_printf(seq, "%3d", vcc->sk->sk_family);
 	}
-	here += sprintf(here," %04lx  %5d %7d/%7d %7d/%7d\n",vcc->flags,
-	    vcc->sk->sk_err,
-	    atomic_read(&vcc->sk->sk_wmem_alloc), vcc->sk->sk_sndbuf,
-	    atomic_read(&vcc->sk->sk_rmem_alloc), vcc->sk->sk_rcvbuf);
+	seq_printf(seq, " %04lx  %5d %7d/%7d %7d/%7d\n", vcc->flags, vcc->sk->sk_err,
+		atomic_read(&vcc->sk->sk_wmem_alloc),vcc->sk->sk_sndbuf,
+		atomic_read(&vcc->sk->sk_rmem_alloc),vcc->sk->sk_rcvbuf);
 }
 
 static void svc_info(struct seq_file *seq, struct atm_vcc *vcc)
@@ -464,31 +462,39 @@ static struct file_operations pvc_seq_fops = {
 	.release	= vcc_seq_release,
 };
 
-static int atm_vc_info(loff_t pos,char *buf)
+static int vcc_seq_show(struct seq_file *seq, void *v)
 {
-	struct atm_vcc *vcc;
-	struct hlist_node *node;
-	struct sock *s;
-	int left;
-
-	if (!pos)
-		return sprintf(buf,sizeof(void *) == 4 ? "%-8s%s" : "%-16s%s",
-		    "Address"," Itf VPI VCI   Fam Flags Reply Send buffer"
-		    "     Recv buffer\n");
-	left = pos-1;
-	read_lock(&vcc_sklist_lock);
-	sk_for_each(s, node, &vcc_sklist) {
-		vcc = atm_sk(s);
-		if (!left--) {
-			vc_info(vcc,buf);
-			read_unlock(&vcc_sklist_lock);
-			return strlen(buf);
-		}
-	}
-	read_unlock(&vcc_sklist_lock);
-
-	return 0;
+ 	if (v == (void *)1) {
+ 		seq_printf(seq, sizeof(void *) == 4 ? "%-8s%s" : "%-16s%s",
+ 			"Address ", "Itf VPI VCI   Fam Flags Reply "
+ 			"Send buffer     Recv buffer\n");
+ 	} else {
+ 		struct vcc_state *state = seq->private;
+ 		struct atm_vcc *vcc = atm_sk(state->sk);
+  
+ 		vcc_info(seq, vcc);
+ 	}
+  	return 0;
 }
+  
+static struct seq_operations vcc_seq_ops = {
+ 	.start	= vcc_seq_start,
+ 	.next	= vcc_seq_next,
+ 	.stop	= vcc_seq_stop,
+ 	.show	= vcc_seq_show,
+};
+ 
+static int vcc_seq_open(struct inode *inode, struct file *file)
+{
+ 	return __vcc_seq_open(inode, file, 0, &vcc_seq_ops);
+}
+ 
+static struct file_operations vcc_seq_fops = {
+	.open		= vcc_seq_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= vcc_seq_release,
+};
 
 static int svc_seq_show(struct seq_file *seq, void *v)
 {
@@ -751,7 +757,7 @@ void atm_proc_dev_deregister(struct atm_dev *dev)
     name->owner = THIS_MODULE
 
 static struct proc_dir_entry *devices = NULL, *pvc = NULL,
-		*svc = NULL, *arp = NULL, *lec = NULL, *vc = NULL;
+		*svc = NULL, *arp = NULL, *lec = NULL, *vcc = NULL;
 
 static void atm_proc_cleanup(void)
 {
@@ -765,8 +771,8 @@ static void atm_proc_cleanup(void)
 		remove_proc_entry("arp",atm_proc_root);
 	if (lec)
 		remove_proc_entry("lec",atm_proc_root);
-	if (vc)
-		remove_proc_entry("vc",atm_proc_root);
+	if (vcc)
+		remove_proc_entry("vcc",atm_proc_root);
 	remove_proc_entry("net/atm",NULL);
 }
 
@@ -778,7 +784,7 @@ int __init atm_proc_init(void)
 	CREATE_SEQ_ENTRY(devices);
 	CREATE_SEQ_ENTRY(pvc);
 	CREATE_SEQ_ENTRY(svc);
-	CREATE_ENTRY(vc);
+	CREATE_SEQ_ENTRY(vcc);
 #if defined(CONFIG_ATM_CLIP) || defined(CONFIG_ATM_CLIP_MODULE)
 	CREATE_ENTRY(arp);
 #endif
