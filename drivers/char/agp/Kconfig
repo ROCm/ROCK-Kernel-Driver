@@ -107,7 +107,11 @@ config AGP_SWORKS
 
 config AGP_AMD_8151
 	bool "AMD 8151 support"
-	depends on AGP && !GART_IOMMU
+	depends on AGP
+	default GART_IOMMU
+	help
+	  Say Y here to support the AMD 8151 AGP bridge and the builtin
+	  GART on the AMD Athlon64/Opteron ("Hammer") CPUs.
 
 config AGP_I460
 	bool "Intel 460GX support"

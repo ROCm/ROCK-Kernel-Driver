@@ -197,6 +197,9 @@ static int agp_return_size(void)
 		break;
 	}
 
+	current_size -= (agp_memory_reserved / (1024*1024));
+	if (current_size <0)
+		current_size = 0;
 	return current_size;
 }
 
