@@ -141,6 +141,7 @@
 #include <net/raw.h>
 #include <net/checksum.h>
 #include <linux/netfilter_ipv4.h>
+#include <net/xfrm.h>
 #include <linux/mroute.h>
 #include <linux/netlink.h>
 
@@ -222,6 +223,15 @@ static inline int ip_local_deliver_finish(struct sk_buff *skb)
 		struct inet_protocol *ipprot;
 
 	resubmit:
+
+		/* Fuck... This IS ugly. */
+		if (protocol != IPPROTO_AH &&
+		    protocol != IPPROTO_ESP &&
+		    !xfrm_policy_check(XFRM_POLICY_IN, skb)) {
+			kfree_skb(skb);
+			return 0;
+		}
+
 		hash = protocol & (MAX_INET_PROTOS - 1);
 		raw_sk = raw_v4_htable[hash];
 

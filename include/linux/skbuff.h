@@ -213,6 +213,7 @@ struct sk_buff {
 	} mac;
 
 	struct  dst_entry	*dst;
+	struct	sec_path	*sp;
 
 	/*
 	 * This is the control buffer. It is free to use for every

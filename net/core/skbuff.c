@@ -58,6 +58,7 @@
 #include <net/dst.h>
 #include <net/sock.h>
 #include <net/checksum.h>
+#include <net/xfrm.h>
 
 #include <asm/uaccess.h>
 #include <asm/system.h>
@@ -235,6 +236,7 @@ static inline void skb_headerinit(void *p, kmem_cache_t *cache,
 	skb->stamp.tv_sec = 0;	/* No idea about time */
 	skb->dev	  = NULL;
 	skb->dst	  = NULL;
+	skb->sp		  = NULL;
 	memset(skb->cb, 0, sizeof(skb->cb));
 	skb->pkt_type	  = PACKET_HOST;	/* Default type */
 	skb->ip_summed	  = 0;
@@ -322,6 +324,7 @@ void __kfree_skb(struct sk_buff *skb)
 	}
 
 	dst_release(skb->dst);
+	secpath_put(skb->sp);
 	if(skb->destructor) {
 		if (in_irq())
 			printk(KERN_WARNING "Warning: kfree_skb on "
@@ -374,6 +377,8 @@ struct sk_buff *skb_clone(struct sk_buff *skb, int gfp_mask)
 	C(mac);
 	C(dst);
 	dst_clone(n->dst);
+	C(sp);
+	secpath_get(n->sp);
 	memcpy(n->cb, skb->cb, sizeof(skb->cb));
 	C(len);
 	C(data_len);
@@ -433,6 +438,7 @@ static void copy_skb_header(struct sk_buff *new, const struct sk_buff *old)
 	new->priority	= old->priority;
 	new->protocol	= old->protocol;
 	new->dst	= dst_clone(old->dst);
+	new->sp		= secpath_get(old->sp);
 	new->h.raw	= old->h.raw + offset;
 	new->nh.raw	= old->nh.raw + offset;
 	new->mac.raw	= old->mac.raw + offset;

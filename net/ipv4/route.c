@@ -2031,11 +2031,7 @@ int ip_route_output_key(struct rtable **rp, struct flowi *flp)
 
 	if ((err = __ip_route_output_key(rp, flp)) != 0)
 		return err;
-#if 0
 	return flp->proto ? xfrm_lookup((struct dst_entry**)rp, flp, NULL, 0) : 0;
-#else
-	return 0;
-#endif
 }
 
 static int rt_fill_info(struct sk_buff *skb, u32 pid, u32 seq, int event,
@@ -2545,4 +2541,5 @@ void __init ip_rt_init(void)
 #ifdef CONFIG_NET_CLS_ROUTE
 	create_proc_read_entry("net/rt_acct", 0, 0, ip_rt_acct_read, NULL);
 #endif
+	xfrm_init();
 }

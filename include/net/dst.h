@@ -59,6 +59,7 @@ struct dst_entry
 
 	struct neighbour	*neighbour;
 	struct hh_cache		*hh;
+	struct xfrm_state	*xfrm;
 
 	int			(*input)(struct sk_buff*);
 	int			(*output)(struct sk_buff*);
@@ -232,6 +233,11 @@ static inline int dst_input(struct sk_buff *skb)
 }
 
 extern void		dst_init(void);
+
+struct flowi;
+extern int xfrm_lookup(struct dst_entry **dst_p, struct flowi *fl,
+		       struct sock *sk, int flags);
+
 
 #endif
 

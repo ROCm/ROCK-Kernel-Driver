@@ -18,4 +18,6 @@ obj-$(CONFIG_SYN_COOKIES) += syncookies.o
 obj-$(CONFIG_IP_PNP) += ipconfig.o
 obj-$(CONFIG_NETFILTER)	+= netfilter/
 
+obj-y += xfrm_policy.o xfrm_state.o xfrm_input.o ah.o
+
 include $(TOPDIR)/Rules.make

@@ -40,9 +40,7 @@
 #include <net/checksum.h>
 #include <linux/route.h>
 #include <net/route.h>
-#if 0
 #include <net/xfrm.h>
-#endif
 
 static inline int ip_forward_finish(struct sk_buff *skb)
 {
@@ -62,10 +60,9 @@ int ip_forward(struct sk_buff *skb)
 	struct rtable *rt;	/* Route we use */
 	struct ip_options * opt	= &(IPCB(skb)->opt);
 
-#if 0
 	if (!xfrm_policy_check(XFRM_POLICY_FWD, skb))
 		goto drop;
-#endif
+
 	if (IPCB(skb)->opt.router_alert && ip_call_ra_chain(skb))
 		return NET_RX_SUCCESS;
 
@@ -85,10 +82,8 @@ int ip_forward(struct sk_buff *skb)
 	if (iph->ttl <= 1)
                 goto too_many_hops;
 
-#if 0
 	if (!xfrm_route_forward(skb))
 		goto drop;
-#endif
 
 	iph = skb->nh.iph;
 	rt = (struct rtable*)skb->dst;
