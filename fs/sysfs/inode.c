@@ -72,6 +72,7 @@ static struct inode *sysfs_get_inode(struct super_block *sb, int mode, int dev)
 			init_special_inode(inode, mode, dev);
 			break;
 		case S_IFREG:
+			inode->i_size = PAGE_SIZE;
 			inode->i_fop = &sysfs_file_operations;
 			break;
 		case S_IFDIR:
