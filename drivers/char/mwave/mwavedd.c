@@ -466,6 +466,7 @@ static struct file_operations mwave_fops = {
 
 static struct miscdevice mwave_misc_dev = { MWAVE_MINOR, "mwave", &mwave_fops };
 
+#if 0 /* totally b0rked */
 /*
  * sysfs support <paulsch@us.ibm.com>
  */
@@ -499,6 +500,7 @@ static struct device_attribute * const mwave_dev_attrs[] = {
 	&dev_attr_uart_irq,
 	&dev_attr_uart_io,
 };
+#endif
 
 /*
 * mwave_init is called on module load
@@ -508,11 +510,11 @@ static struct device_attribute * const mwave_dev_attrs[] = {
 */
 static void mwave_exit(void)
 {
-	int i;
 	pMWAVE_DEVICE_DATA pDrvData = &mwave_s_mdd;
 
 	PRINTK_1(TRACE_MWAVE, "mwavedd::mwave_exit entry\n");
 
+#if 0
 	for (i = 0; i < pDrvData->nr_registered_attrs; i++)
 		device_remove_file(&mwave_device, mwave_dev_attrs[i]);
 	pDrvData->nr_registered_attrs = 0;
@@ -521,6 +523,7 @@ static void mwave_exit(void)
 		device_unregister(&mwave_device);
 		pDrvData->device_registered = FALSE;
 	}
+#endif
 
 	if ( pDrvData->sLine >= 0 ) {
 		unregister_serial(pDrvData->sLine);
@@ -638,6 +641,7 @@ static int __init mwave_init(void)
 	}
 	/* uart is registered */
 
+#if 0
 	/* sysfs */
 	memset(&mwave_device, 0, sizeof (struct device));
 	snprintf(mwave_device.bus_id, BUS_ID_SIZE, "mwave");
@@ -655,6 +659,7 @@ static int __init mwave_init(void)
 		}
 		pDrvData->nr_registered_attrs++;
 	}
+#endif
 
 	/* SUCCESS! */
 	return 0;
