@@ -69,7 +69,7 @@ static int ac97_clock[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0};
 static int ac97_quirk[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = AC97_TUNE_DEFAULT};
 static int buggy_irq[SNDRV_CARDS];
 static int xbox[SNDRV_CARDS];
-#endif
+
 #ifdef SUPPORT_MIDI
 static int mpu_port[SNDRV_CARDS]; /* disabled */
 #endif
@@ -403,16 +403,17 @@ struct _snd_intel8x0 {
 	snd_pcm_t *pcm[6];
 	ichdev_t ichd[6];
 
-	int multi4: 1,
-	    multi6: 1,
-	    dra: 1,
-	    smp20bit: 1;
-	int in_ac97_init: 1,
-	    in_sdin_init: 1;
-	int in_measurement: 1; /* during ac97 clock measurement */
-	int fix_nocache: 1; /* workaround for 440MX */
-	int buggy_irq: 1; /* workaround for buggy mobos */
-	int xbox: 1;	  /* workaround for Xbox AC'97 detection */
+	unsigned multi4: 1,
+		 multi6: 1,
+		 dra: 1,
+		 smp20bit: 1;
+	unsigned in_ac97_init: 1,
+		 in_sdin_init: 1;
+	unsigned in_measurement: 1;	/* during ac97 clock measurement */
+	unsigned fix_nocache: 1; 	/* workaround for 440MX */
+	unsigned buggy_irq: 1;		/* workaround for buggy mobos */
+	unsigned xbox: 1;		/* workaround for Xbox AC'97 detection */
+
 	int spdif_idx;	/* SPDIF BAR index; *_SPBAR or -1 if use PCMOUT */
 
 	ac97_bus_t *ac97_bus;
