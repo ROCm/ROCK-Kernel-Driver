@@ -821,7 +821,7 @@ static void via_chan_free (struct via_info *card, struct via_channel *chan)
 
 	spin_unlock_irq (&card->lock);
 
-	synchronize_irq();
+	synchronize_irq(card->pdev->irq);
 
 	DPRINTK ("EXIT\n");
 }
