@@ -17,7 +17,7 @@
 .start_gate:
 
 
-#if CONFIG_FSYS
+#ifdef CONFIG_FSYS
 
 #include <asm/errno.h>
 

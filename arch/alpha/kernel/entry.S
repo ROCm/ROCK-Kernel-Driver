@@ -849,7 +849,7 @@ sys_getxpid:
 	   about this loop.  */
 	ldq	$3, TASK_REAL_PARENT($2)
 1:	ldl	$1, TASK_TGID($3)
-#if CONFIG_SMP
+#ifdef CONFIG_SMP
 	mov	$3, $4
 	mb
 	ldq	$3, TASK_REAL_PARENT($2)

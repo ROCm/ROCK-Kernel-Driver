@@ -17,7 +17,7 @@ typedef struct {
 } spinlock_t;
 
 #ifdef __KERNEL__
-#if CONFIG_DEBUG_SPINLOCK
+#ifdef CONFIG_DEBUG_SPINLOCK
 #define SPINLOCK_DEBUG_INIT     , 0, 0
 #else
 #define SPINLOCK_DEBUG_INIT     /* */
@@ -86,7 +86,7 @@ typedef struct {
 #endif
 } rwlock_t;
 
-#if CONFIG_DEBUG_SPINLOCK
+#ifdef CONFIG_DEBUG_SPINLOCK
 #define RWLOCK_DEBUG_INIT     , 0
 #else
 #define RWLOCK_DEBUG_INIT     /* */

@@ -448,7 +448,7 @@ err_bindx_add:
 	 * 							--daisy
 	 */
 
-#if CONFIG_IP_SCTP_ADDIP
+#ifdef CONFIG_IP_SCTP_ADDIP
 	/* Add these addresses to all associations on this endpoint.  */
 	if (retval >= 0) {
 		struct list_head *pos;
@@ -568,7 +568,7 @@ err_bindx_rem:
 	 * ADDIP code.
 	 * 							--daisy
 	 */
-#if CONFIG_IP_SCTP_ADDIP
+#ifdef CONFIG_IP_SCTP_ADDIP
 	/* Remove these addresses from all associations on this endpoint.  */
 	if (retval >= 0) {
 		struct list_head *pos;

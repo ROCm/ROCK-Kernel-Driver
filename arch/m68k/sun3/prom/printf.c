@@ -38,7 +38,7 @@ prom_printf(char *fmt, ...)
 
 	bptr = ppbuf;
 
-#if CONFIG_AP1000
+#ifdef CONFIG_AP1000
         ap_write(1,bptr,strlen(bptr));
 #else
 

@@ -1098,7 +1098,7 @@ setup_elsa(struct IsdnCard *card)
 			return 0;
 		return 1;
 	} else if (card->typ == ISDN_CTYPE_ELSA_PCI) {
-#if CONFIG_PCI
+#ifdef CONFIG_PCI
 		if ((dev_qs1000 = pci_find_device(PCI_VENDOR_ID_ELSA,
 			PCI_DEVICE_ID_ELSA_MICROLINK, dev_qs1000))) {
 			if (elsa_qs_pci_probe(card->cs, dev_qs1000,

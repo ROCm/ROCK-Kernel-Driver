@@ -188,7 +188,7 @@ int scsi_block_when_processing_errors(struct scsi_device *sdev)
 	return sdev->online;
 }
 
-#if CONFIG_SCSI_LOGGING
+#ifdef CONFIG_SCSI_LOGGING
 /**
  * scsi_eh_prt_fail_stats - Log info on failures.
  * @shost:	scsi host being recovered.

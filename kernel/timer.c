@@ -905,7 +905,7 @@ asmlinkage long sys_getppid(void)
 	parent = me->group_leader->real_parent;
 	for (;;) {
 		pid = parent->tgid;
-#if CONFIG_SMP
+#ifdef CONFIG_SMP
 {
 		struct task_struct *old = parent;
 

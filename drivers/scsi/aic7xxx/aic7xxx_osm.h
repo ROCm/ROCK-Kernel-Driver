@@ -258,7 +258,7 @@ int	ahc_dmamap_unload(struct ahc_softc *, bus_dma_tag_t, bus_dmamap_t);
 typedef struct timer_list ahc_timer_t;
 
 /********************************** Includes **********************************/
-#if CONFIG_AIC7XXX_REG_PRETTY_PRINT
+#ifdef CONFIG_AIC7XXX_REG_PRETTY_PRINT
 #define AIC_DEBUG_REGISTERS 1
 #else
 #define AIC_DEBUG_REGISTERS 0

@@ -304,7 +304,7 @@ int do_debugger_trap(struct pt_regs *regs,int signal)
 	}
 	else
 	{
-#if CONFIG_REMOTE_DEBUG
+#ifdef CONFIG_REMOTE_DEBUG
 		if(gdb_stub_initialised)
 		{
 			gdb_stub_handle_exception(regs, signal);

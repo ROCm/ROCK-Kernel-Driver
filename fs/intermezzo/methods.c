@@ -145,7 +145,7 @@ void filter_setup_journal_ops(struct filter_fs *ops, char *cache_type)
 {
         if ( strlen(cache_type) == strlen("ext2") &&
              memcmp(cache_type, "ext2", strlen("ext2")) == 0 ) {
-#if CONFIG_EXT2_FS
+#ifdef CONFIG_EXT2_FS
                 ops->o_trops = &presto_ext2_journal_ops;
 #else
                 ops->o_trops = NULL;
