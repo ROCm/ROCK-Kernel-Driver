@@ -482,9 +482,7 @@ int dvb_frontend_thread (void *data)
 	dprintk ("%s\n", __FUNCTION__);
 
 	lock_kernel ();
-	daemonize ();
-	sigfillset (&current->blocked);
-	strncpy (current->comm, "kdvb-fe", sizeof (current->comm));
+	daemonize("kdvb-fe");
 	fe->thread = current;
 	unlock_kernel ();
 

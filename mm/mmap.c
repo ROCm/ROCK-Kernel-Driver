@@ -801,6 +801,13 @@ get_unmapped_area(struct file *file, unsigned long addr, unsigned long len,
 			return -ENOMEM;
 		if (addr & ~PAGE_MASK)
 			return -EINVAL;
+		if (is_file_hugepages(file)) {
+			unsigned long ret;
+
+			ret = is_aligned_hugepage_range(addr, len);
+			if (ret)
+				return ret;
+		}
 		return addr;
 	}
 
@@ -1224,8 +1231,10 @@ int do_munmap(struct mm_struct *mm, unsigned long start, size_t len)
 	/* we have  start < mpnt->vm_end  */
 
 	if (is_vm_hugetlb_page(mpnt)) {
-		if ((start & ~HPAGE_MASK) || (len & ~HPAGE_MASK))
-			return -EINVAL;
+		int ret = is_aligned_hugepage_range(start, len);
+
+		if (ret)
+			return ret;
 	}
 
 	/* if it doesn't overlap, we have nothing.. */

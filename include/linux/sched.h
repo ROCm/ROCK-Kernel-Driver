@@ -509,6 +509,7 @@ extern void __set_special_pids(pid_t session, pid_t pgrp);
 /* per-UID process charging. */
 extern struct user_struct * alloc_uid(uid_t);
 extern void free_uid(struct user_struct *);
+extern void switch_uid(struct user_struct *);
 
 #include <asm/current.h>
 
@@ -615,7 +616,8 @@ extern void __exit_sighand(struct task_struct *);
 extern NORET_TYPE void do_group_exit(int);
 
 extern void reparent_to_init(void);
-extern void daemonize(void);
+extern void daemonize(const char *, ...);
+extern int allow_signal(int);
 extern task_t *child_reaper;
 
 extern int do_execve(char *, char **, char **, struct pt_regs *);

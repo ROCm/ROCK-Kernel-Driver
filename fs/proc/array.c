@@ -211,6 +211,9 @@ static inline char * task_sig(struct task_struct *p, char *buffer)
 	buffer += sprintf(buffer, "SigPnd:\t");
 	buffer = render_sigset_t(&p->pending.signal, buffer);
 	*buffer++ = '\n';
+	buffer += sprintf(buffer, "ShdPnd:\t");
+	buffer = render_sigset_t(&p->signal->shared_pending.signal, buffer);
+	*buffer++ = '\n';
 	buffer += sprintf(buffer, "SigBlk:\t");
 	buffer = render_sigset_t(&p->blocked, buffer);
 	*buffer++ = '\n';

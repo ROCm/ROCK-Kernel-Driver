@@ -16,14 +16,14 @@
  * code unlike the NMI-based code.
  */
  
-extern int nmi_init(struct oprofile_operations ** ops, enum oprofile_cpu * cpu);
-extern void timer_init(struct oprofile_operations ** ops, enum oprofile_cpu * cpu);
+extern int nmi_init(struct oprofile_operations ** ops);
+extern void timer_init(struct oprofile_operations ** ops);
 
-int __init oprofile_arch_init(struct oprofile_operations ** ops, enum oprofile_cpu * cpu)
+int __init oprofile_arch_init(struct oprofile_operations ** ops)
 {
 #ifdef CONFIG_X86_LOCAL_APIC
-	if (!nmi_init(ops, cpu))
+	if (!nmi_init(ops))
 #endif
-		timer_init(ops, cpu);
+		timer_init(ops);
 	return 0;
 }

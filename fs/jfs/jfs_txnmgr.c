@@ -2771,19 +2771,9 @@ int jfs_lazycommit(void *arg)
 	struct tblock *tblk;
 	unsigned long flags;
 
-	lock_kernel();
-
-	daemonize();
-	strcpy(current->comm, "jfsCommit");
-
-	unlock_kernel();
+	daemonize("jfsCommit");
 
 	jfsCommitTask = current;
-
-	spin_lock_irq(&current->sighand->siglock);
-	sigfillset(&current->blocked);
-	recalc_sigpending();
-	spin_unlock_irq(&current->sighand->siglock);
 
 	LAZY_LOCK_INIT();
 	TxAnchor.unlock_queue = TxAnchor.unlock_tail = 0;
@@ -2978,17 +2968,7 @@ int jfs_sync(void *arg)
 	int rc;
 	tid_t tid;
 
-	lock_kernel();
-
-	daemonize();
-	strcpy(current->comm, "jfsSync");
-
-	unlock_kernel();
-
-	spin_lock_irq(&current->sighand->siglock);
-	sigfillset(&current->blocked);
-	recalc_sigpending();
-	spin_unlock_irq(&current->sighand->siglock);
+	daemonize("jfsSync");
 
 	complete(&jfsIOwait);
 

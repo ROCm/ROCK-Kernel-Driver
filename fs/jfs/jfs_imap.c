@@ -2980,8 +2980,7 @@ static void duplicateIXtree(struct super_block *sb, s64 blkno,
 		j_sb->s_flag |= JFS_BAD_SAIT;
 
 		mark_buffer_dirty(bh);
-		ll_rw_block(WRITE, 1, &bh);
-		wait_on_buffer(bh);
+		sync_dirty_buffer(bh);
 		brelse(bh);
 		return;
 	}

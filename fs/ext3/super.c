@@ -1343,9 +1343,7 @@ static int ext3_fill_super (struct super_block *sb, void *data, int silent)
 	 * superblock lock.
 	 */
 	EXT3_SB(sb)->s_mount_state |= EXT3_ORPHAN_FS;
-	unlock_super(sb);	/* akpm: sigh */
 	ext3_orphan_cleanup(sb, es);
-	lock_super(sb);
 	EXT3_SB(sb)->s_mount_state &= ~EXT3_ORPHAN_FS;
 	if (needs_recovery)
 		printk (KERN_INFO "EXT3-fs: recovery complete.\n");
@@ -1627,10 +1625,8 @@ static void ext3_commit_super (struct super_block * sb,
 	es->s_wtime = cpu_to_le32(get_seconds());
 	BUFFER_TRACE(EXT3_SB(sb)->s_sbh, "marking dirty");
 	mark_buffer_dirty(EXT3_SB(sb)->s_sbh);
-	if (sync) {
-		ll_rw_block(WRITE, 1, &EXT3_SB(sb)->s_sbh);
-		wait_on_buffer(EXT3_SB(sb)->s_sbh);
-	}
+	if (sync)
+		sync_dirty_buffer(EXT3_SB(sb)->s_sbh);
 }
 
 

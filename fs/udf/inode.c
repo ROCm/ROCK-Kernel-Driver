@@ -1520,8 +1520,7 @@ udf_update_inode(struct inode *inode, int do_sync)
 	mark_buffer_dirty(bh);
 	if (do_sync)
 	{
-		ll_rw_block(WRITE, 1, &bh);
-		wait_on_buffer(bh);
+		sync_dirty_buffer(bh);
 		if (buffer_req(bh) && !buffer_uptodate(bh))
 		{
 			printk("IO error syncing udf inode [%s:%08lx]\n",

@@ -110,10 +110,10 @@ int exec_usermodehelper(char *program_path, char *argv[], char *envp[])
 	   as the super user right after the execve fails if you time
 	   the signal just right.
 	*/
-	spin_lock_irq(&curtask->sighand->siglock);
-	sigemptyset(&curtask->blocked);
 	flush_signals(curtask);
 	flush_signal_handlers(curtask);
+	spin_lock_irq(&curtask->sighand->siglock);
+	sigemptyset(&curtask->blocked);
 	recalc_sigpending();
 	spin_unlock_irq(&curtask->sighand->siglock);
 
@@ -121,15 +121,7 @@ int exec_usermodehelper(char *program_path, char *argv[], char *envp[])
 		if (curtask->files->fd[i]) close(i);
 	}
 
-	/* Drop the "current user" thing */
-	{
-		struct user_struct *user = curtask->user;
-		curtask->user = INIT_USER;
-		atomic_inc(&INIT_USER->__count);
-		atomic_inc(&INIT_USER->processes);
-		atomic_dec(&user->processes);
-		free_uid(user);
-	}
+	switch_uid(INIT_USER);
 
 	/* Give kmod all effective privileges.. */
 	curtask->euid = curtask->fsuid = 0;

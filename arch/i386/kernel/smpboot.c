@@ -935,10 +935,6 @@ static void smp_tune_scheduling (void)
  * Cycle through the processors sending APIC IPIs to boot each.
  */
 
-extern int prof_multiplier[NR_CPUS];
-extern int prof_old_multiplier[NR_CPUS];
-extern int prof_counter[NR_CPUS];
-
 static int boot_cpu_logical_apicid;
 /* Where the IO area was mapped on multiquad, always 0 otherwise */
 void *xquad_portio;
@@ -948,17 +944,6 @@ int cpu_sibling_map[NR_CPUS] __cacheline_aligned;
 static void __init smp_boot_cpus(unsigned int max_cpus)
 {
 	int apicid, cpu, bit;
-
-	/*
-	 * Initialize the logical to physical CPU number mapping
-	 * and the per-CPU profiling counter/multiplier
-	 */
-
-	for (cpu = 0; cpu < NR_CPUS; cpu++) {
-		prof_counter[cpu] = 1;
-		prof_old_multiplier[cpu] = 1;
-		prof_multiplier[cpu] = 1;
-	}
 
 	/*
 	 * Setup boot CPU information

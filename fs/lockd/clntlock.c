@@ -201,10 +201,8 @@ reclaimer(void *ptr)
 	struct file_lock *fl;
 	struct inode *inode;
 
-	daemonize();
-	snprintf(current->comm, sizeof(current->comm),
-		 "%s-reclaim",
-		 host->h_name);
+	daemonize("%s-reclaim", host->h_name);
+	allow_signal(SIGKILL);
 
 	/* This one ensures that our parent doesn't terminate while the
 	 * reclaim is in progress */

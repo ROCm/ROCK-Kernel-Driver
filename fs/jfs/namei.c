@@ -972,10 +972,8 @@ int jfs_symlink(struct inode *dip, struct dentry *dentry, const char *name)
 #if 0
 				set_buffer_uptodate(bp);
 				mark_buffer_dirty(bp, 1);
-				if (IS_SYNC(dip)) {
-					ll_rw_block(WRITE, 1, &bp);
-					wait_on_buffer(bp);
-				}
+				if (IS_SYNC(dip))
+					sync_dirty_buffer(bp);
 				brelse(bp);
 #endif				/* 0 */
 				ssize -= copy_size;
