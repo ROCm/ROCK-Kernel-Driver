@@ -620,6 +620,8 @@ enum
 	FS_LEASE_TIME=15,	/* int: maximum time to wait for a lease break */
 	FS_DQSTATS=16,	/* disc quota usage statistics */
 	FS_XFS=17,	/* struct: control xfs parameters */
+	FS_AIO_NR=18,	/* current system-wide number of aio requests */
+	FS_AIO_MAX_NR=19,	/* system-wide maximum number of aio requests */
 };
 
 /* /proc/sys/fs/quota/ */

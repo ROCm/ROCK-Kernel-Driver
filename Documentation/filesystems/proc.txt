@@ -900,6 +900,15 @@ super-nr shows the number of currently allocated ones.
 Every mounted file system needs a super block, so if you plan to mount lots of
 file systems, you may want to increase these numbers.
 
+aio-nr and aio-max-nr
+---------------------
+
+aio-nr is the running total of the number of events specified on the
+io_setup system call for all currently active aio contexts.  If aio-nr
+reaches aio-max-nr then io_setup will fail with EAGAIN.  Note that
+raising aio-max-nr does not result in the pre-allocation or re-sizing
+of any kernel data structures.
+
 2.2 /proc/sys/fs/binfmt_misc - Miscellaneous binary formats
 -----------------------------------------------------------
 
