@@ -77,56 +77,6 @@ int cpufreq_frequency_table_verify(struct cpufreq_policy *policy,
 EXPORT_SYMBOL_GPL(cpufreq_frequency_table_verify);
 
 
-int cpufreq_frequency_table_setpolicy(struct cpufreq_policy *policy,
-				      struct cpufreq_frequency_table *table,
-				      unsigned int *index)
-{
-	struct cpufreq_frequency_table optimal = { .index = ~0, };
-	unsigned int i;
-
-	switch (policy->policy) {
-	case CPUFREQ_POLICY_PERFORMANCE:
-		optimal.frequency = 0;
-		break;
-	case CPUFREQ_POLICY_POWERSAVE:
-		optimal.frequency = ~0;
-		break;
-	}
-
-	if (!cpu_online(policy->cpu))
-		return -EINVAL;
-
-	for (i=0; (table[i].frequency != CPUFREQ_TABLE_END); i++) {
-		unsigned int freq = table[i].frequency;
-		if (freq == CPUFREQ_ENTRY_INVALID)
-			continue;
-		if ((freq < policy->min) || (freq > policy->max))
-			continue;
-		switch(policy->policy) {
-		case CPUFREQ_POLICY_PERFORMANCE:
-			if (optimal.frequency <= freq) {
-				optimal.frequency = freq;
-				optimal.index = i;
-			}
-			break;
-		case CPUFREQ_POLICY_POWERSAVE:
-			if (optimal.frequency >= freq) {
-				optimal.frequency = freq;
-				optimal.index = i;
-			}
-			break;
-		}
-	}
-	if (optimal.index > i)
-		return -EINVAL;
-
-	*index = optimal.index;
-	
-	return 0;
-}
-EXPORT_SYMBOL_GPL(cpufreq_frequency_table_setpolicy);
-
-
 int cpufreq_frequency_table_target(struct cpufreq_policy *policy,
 				   struct cpufreq_frequency_table *table,
 				   unsigned int target_freq,

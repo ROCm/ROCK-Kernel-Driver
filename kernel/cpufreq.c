@@ -798,7 +798,7 @@ int cpufreq_register_driver(struct cpufreq_driver *driver_data)
 	if (cpufreq_driver)
 		return -EBUSY;
 	
-	if (!driver_data || !driver_data->verify || 
+	if (!driver_data || !driver_data->verify || !driver_data->init ||
 	    ((!driver_data->setpolicy) && (!driver_data->target)))
 		return -EINVAL;
 
@@ -806,20 +806,12 @@ int cpufreq_register_driver(struct cpufreq_driver *driver_data)
 
 	cpufreq_driver = driver_data;
 
+	cpufreq_driver->policy = kmalloc(NR_CPUS * sizeof(struct cpufreq_policy), GFP_KERNEL);
 	if (!cpufreq_driver->policy) {
-		/* then we need per-CPU init */
-		if (!cpufreq_driver->init) {
-			up(&cpufreq_driver_sem);
-			return -EINVAL;
-		}
-		cpufreq_driver->policy = kmalloc(NR_CPUS * sizeof(struct cpufreq_policy), GFP_KERNEL);
-		if (!cpufreq_driver->policy) {
-			up(&cpufreq_driver_sem);
-			return -ENOMEM;
-		}
-		memset(cpufreq_driver->policy, 0, NR_CPUS * sizeof(struct cpufreq_policy));
+		up(&cpufreq_driver_sem);
+		return -ENOMEM;
 	}
-	
+	memset(cpufreq_driver->policy, 0, NR_CPUS * sizeof(struct cpufreq_policy));
 	up(&cpufreq_driver_sem);
 
 	ret = interface_register(&cpufreq_interface);
@@ -841,8 +833,8 @@ int cpufreq_unregister_driver(struct cpufreq_driver *driver)
 {
 	down(&cpufreq_driver_sem);
 
-	if (!cpufreq_driver || 
-	    ((driver != cpufreq_driver) && (driver != NULL))) { /* compat */
+	if (!cpufreq_driver ||
+	    (driver != cpufreq_driver)) { 
 		up(&cpufreq_driver_sem);
 		return -EINVAL;
 	}

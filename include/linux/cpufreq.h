@@ -172,9 +172,6 @@ struct cpufreq_driver {
 
 int cpufreq_register_driver(struct cpufreq_driver *driver_data);
 int cpufreq_unregister_driver(struct cpufreq_driver *driver_data);
-/* deprecated */
-#define cpufreq_register(x)   cpufreq_register_driver(x)
-#define cpufreq_unregister() cpufreq_unregister_driver(NULL)
 
 
 void cpufreq_notify_transition(struct cpufreq_freqs *freqs, unsigned int state);
@@ -296,10 +293,6 @@ int cpufreq_frequency_table_cpuinfo(struct cpufreq_policy *policy,
 
 int cpufreq_frequency_table_verify(struct cpufreq_policy *policy,
 				   struct cpufreq_frequency_table *table);
-
-int cpufreq_frequency_table_setpolicy(struct cpufreq_policy *policy,
-				      struct cpufreq_frequency_table *table,
-				      unsigned int *index);
 
 int cpufreq_frequency_table_target(struct cpufreq_policy *policy,
 				   struct cpufreq_frequency_table *table,
