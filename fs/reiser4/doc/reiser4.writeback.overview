@@ -1,0 +1,68 @@
+Hello,
+
+reiser4 has some features that make it somewhat difficult to integrate with
+existing VM mechanisms.
+
+Reiser4 maintains all meta data in the single balanced tree. This tree is
+maintained in the memory in the form different from what will be ultimately
+written to the disk. Roughly speaking, before writing tree node to the disk,
+some complex process ("flush") is to be performed. This process has following
+characteristics:
+
+ 1 it is not local, that is it operates on big number of nodes, possibly far
+   away from the starting node, both in tree and disk order.
+
+ 2 it can involve reading of the large number of nodes from the disk (for
+   example, bitmap nodes are read during extent allocation that is deferred
+   until flush).
+
+ 3 it can allocate unbounded amount of memory (during insertion of allocated
+   extents).
+
+ 4 it participates in the locking protocol which reiser4 uses to implement
+   concurrent tree modifications.
+
+ 5 it is CPU consuming and long
+
+As a result, flush reorganizes some part of reiser4 tree and produces large
+queue of nodes ready to be submitted for io (as a matter of fact, flush write
+clustering is so good that it used to hit BIO_MAX_PAGES all the time, until
+checks were added for this).
+
+Items (3) and (4) alone make flush unsuitable for being called directly from
+reiser4 ->vm_writeback() callback, because of OOM and deadlocks against
+threads waiting for memory.
+
+So, it was decided that flush has to be performed from the separate
+thread. Reiser4 has thread used to periodically commit old transactions and
+this thread can be used for the flushing. That is, flushing thread does flush
+and accumulates nodes prepared for the IO on the special
+queue. reiser4_vm_writeback() submits nodes from this queue, if queue is
+empty, it only wakes up flushing thread and immediately returns.
+
+Still there are some problems with integrating this stuff into VM scanning:
+
+ 1 As ->vm_writeback() returns immediately without actually submitting pages
+   for IO, throttling on PG_writeback in shrink_list() will not work. This
+   opens a possibility (on a fast CPU), of try_to_free_pages() completing
+   scanning and calling out_of_memory() before flushing thread managed to add
+   anything to the queue.
+
+ 2 It is possible, however unlikely, that flushing thread will be unable to flush
+   anything, because there is not enough memory. In this case reiser4 resorts
+   to the "emergency flush": some dumb algorithm that writes tree nodes to the
+   disk without taking locks and without optimizing tree layout.
+
+ 3 Nodes prepared for IO can be from the active list, this means that they
+   will not be met/freed by shrink_list() after IO completion. New
+   blk_congestion_wait() should help here though.
+
+It looks like we need following changes to make this stuff working:
+
+ 1 Adding ->priority field into struct writeback_control, so that file system
+   can vary its behavior depending on how desperate memory pressure is.
+
+ 2 Different mechanism for scan throttling.
+
+Actually latter can be implemented completely within reiser4 but with some
+awkwardness.

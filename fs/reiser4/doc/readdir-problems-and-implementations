@@ -1,0 +1,12 @@
+1.
+
+User level API.
+
+Standard
+
+^ Local variables:
+^ mode-name: "Design Document"
+^ indent-tabs-mode: nil
+^ tab-width: 4
+^ eval: (if (fboundp 'flyspell-mode) (flyspell-mode))
+^ End:

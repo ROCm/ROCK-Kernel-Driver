@@ -537,6 +537,97 @@ void fastcall free_cold_page(struct page *page)
 	free_hot_cold_page(page, 1);
 }
 
+static inline struct list_head *get_per_thread_pages(void)
+{
+	return &current->private_pages;
+}
+
+int perthread_pages_reserve(int nrpages, int gfp)
+{
+	int i;
+	struct list_head  accumulator;
+	struct list_head *per_thread;
+
+	per_thread = get_per_thread_pages();
+	INIT_LIST_HEAD(&accumulator);
+	list_splice_init(per_thread, &accumulator);
+	for (i = 0; i < nrpages; ++i) {
+		struct page *page;
+
+		page = alloc_page(gfp);
+		if (page != NULL)
+			list_add(&page->lru, &accumulator);
+		else {
+			for (; i > 0; --i) {
+				page = list_entry(accumulator.next, struct page, lru);
+				list_del(&page->lru);
+				page_cache_release(page);
+			}
+			return -ENOMEM;
+		}
+	}
+	/*
+	 * Q: why @accumulator is used, instead of directly adding pages to
+	 * the get_per_thread_pages()?
+	 *
+	 * A: because after first page is added to the get_per_thread_pages(),
+	 * next call to the alloc_page() (on the next loop iteration), will
+	 * re-use it.
+	 */
+	list_splice(&accumulator, per_thread);
+	current->private_pages_count += nrpages;
+	return 0;
+}
+EXPORT_SYMBOL(perthread_pages_reserve);
+
+void perthread_pages_release(int nrpages)
+{
+	struct list_head *per_thread;
+
+	current->private_pages_count -= nrpages;
+	per_thread = get_per_thread_pages();
+	for (; nrpages != 0; --nrpages) {
+		struct page *page;
+
+		BUG_ON(list_empty(per_thread));
+		page = list_entry(per_thread->next, struct page, lru);
+		list_del(&page->lru);
+		page_cache_release(page);
+	}
+}
+EXPORT_SYMBOL(perthread_pages_release);
+
+int perthread_pages_count(void)
+{
+	return current->private_pages_count;
+}
+EXPORT_SYMBOL(perthread_pages_count);
+
+static inline struct page *
+perthread_pages_alloc(void)
+{
+	struct list_head *perthread_pages;
+
+	/*
+	 * try to allocate pages from the per-thread private_pages pool. No
+	 * locking is needed: this list can only be modified by the thread
+	 * itself, and not by interrupts or other threads.
+	 */
+	perthread_pages = get_per_thread_pages();
+	if (!in_interrupt() && !list_empty(perthread_pages)) {
+		struct page *page;
+
+		page = list_entry(perthread_pages->next, struct page, lru);
+		list_del(&page->lru);
+		current->private_pages_count--;
+		/*
+		 * per-thread page is already initialized, just return it.
+		 */
+		return page;
+	} else
+		return NULL;
+}
+
 /*
  * Really, prep_compound_page() should be called from __rmqueue_bulk().  But
  * we cheat by calling it from here, in the order > 0 path.  Saves a branch
@@ -614,6 +705,12 @@ __alloc_pages(unsigned int gfp_mask, unsigned int order,
 	int do_retry;
 
 	might_sleep_if(wait);
+
+	if (order == 0) {
+		page = perthread_pages_alloc();
+		if (page != NULL)
+			return page;
+	}
 
 	zones = zonelist->zones;  /* the list of zones suitable for gfp_mask */
 	if (zones[0] == NULL)     /* no zones in the zonelist */

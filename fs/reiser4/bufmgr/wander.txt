@@ -1,0 +1,184 @@
+
+Before discussing the format of the commit record occupying the
+journal area, we must revisit the topic of free space bitmap
+management.  At the time an atom is closing and formatting its commit
+record, the question is how to deallocate the blocks deleted by the
+atom.  Those blocks become free once the atom commits, but they cannot
+be re-allocated before that point in time.
+
+Modified bitmaps are always part of the overwrite set, meaning copies
+are written to wandered positions (i.e., part of the log) before later
+being overwritten.
+
+We have defined these terms:
+
+WORKING BITMAPS: the "current" in-memory bitmaps
+
+COMMIT BITMAPS: bitmap copies written to wandered, overwrite positions
+
+DELETE SET: the set of deleted blocks plus the set of former positions
+of relocated blocks.  These block positions are deallocated when the
+atom commits.
+
+WANDERED SET: the set of temporary locations used to store overwrite
+blocks before they are actually overwritten.  These block positions
+are deallocated some time after the atom commits, when it is ensured
+that the atom will no longer replay during crash recovery.
+
+Both the delete set and the wandered set are blocks to be deleted, but
+the details of handling these deletions are necessarily different.
+
+---- Consider first the handling of the DELETE SET.
+
+There are two ways to handle the delete set.  Before reading their
+descriptions, let me offer my opinion.  The first is MORE complicated
+but requires LESS data to be logged in the commit record.  The second
+is LESS complicated but requires MORE data to be logged in the commit
+record.
+
+Strategy #1: MORE COMPLICATED, LESS LOGGED DATA
+
+  At the time an atom closes, it creates a snapshot of all the
+  modified bitmaps.  In other words, it creates commit bitmaps which
+  are copies of the working bitmaps.  The delete set are immediately
+  deallocated in the commit bitmaps, which are written to their
+  wandered positions and later overwritten in their actual positions.
+
+  This way, the commit record does not contain any record of the
+  delete set.
+
+  But there are problems with this approach, too.  First, there is
+  extra memory pressure associated with maintaining extra copies of
+  modified bitmaps.  Second, it is less straight forward than it may
+  appear at first.  Suppose there are two atoms that commit in
+  sequence, such that the first does not complete its commit (i.e.,
+  finish all the required writes) before the second prepares to
+  commit.  Which bitmaps does the second committing atom copy as its
+  commit bitmaps?  It does not just copy the working bitmaps, since
+  those do not yet represent the first atom deallocations.
+
+  Instead, it looks like we would end up maintaining multiple copies
+  of every bitmap.  Each atom's commit bitmaps are the commit bitmaps
+  of the previous atom plus whatever modifications were made by the
+  atom itself.  This means in addition to maintaining the working
+  bitmaps, we end up maintaining separate commit bitmaps.  It is not
+  just as simple as copying the working bitmaps at the time of commit.
+
+  This solution looks far too complicated to me.  I admit that I have
+  not fully tried to understand the complexity, but I do not think the
+  advantages (smaller commit records) will outweigh the additional
+  complexity, not to mention the additional memory pressure.
+
+Strategy #2: LESS COMPLICATED, MORE LOGGED DATA
+
+  In this solution, the commit bitmaps are the same as the working
+  bitmaps--no copies are made.  We commit the working bitmaps without
+  deallocating the delete set and we include the delete set in the
+  commit record instead.
+
+  Before I describe exactly how deallocation works in this case, let
+  me add that there is another reason why this method is preferred.
+  The wandered set has to be deleted after the atom commits, since it
+  does not become available until the atom will no longer be
+  replayed.  With this approach to freeing the delete set, both kinds
+  of deletion can be handled in the same manner, since they both take
+  place after the atom commits.
+
+  In other words, since we have to address deallocating the wandered
+  set after commit anyway, we might as well use the same mechanism for
+  deallocating the delete set.  It means that additional data is
+  logged, but it reduces complexity in my opinion.
+
+  Here's how it works.  The atom stores a record of its delete set in
+  memory.  When a block is deallocated or relocated, the bit is of
+  course not immediately deallocated in the working bitmaps.
+
+  The delete set is included in the commit record, which is written to
+  the journal area.  The delete set is just a set of block numbers, so
+  there are several possible representations.  The implementation
+  could actually dynamically chose the representation to achieve the
+  best compression: (a) list of blocks, (b) bitmap, and (c) extent
+  compression.  The second two options are likely to achieve
+  significant compression of the delete set unless fragmentation
+  becomes a problem.
+
+  The atom maintains its in-memory copy of the delete set until the
+  commit record is flushed to the disk.  At this point, those blocks
+  become available for new atoms to re-allocate.  The atom releases
+  these blocks back into the working bitmaps through the process of
+  "reposession".  The reposession process makes a younger atom
+  responsible for committing a deallocation from a previous atom.
+
+  For each block in the committed atom's delete set, a younger atom is
+  selected (or created) to handle the deallocation of that block.  The
+  working bitmap corresponding to the block being deleted is or was
+  already captured by the younger (reposessing) atom.  The block is
+  simply marked as deallocated in the working bitmap block captured.
+
+  The reposessing atom may immediately use this block or not, but in
+  either case the deallocation is committed once the reposessing atom
+  commits.  For recovery purposes (not discussed here), each atom also
+  includes a list of atoms for which it resposesses.
+
+---- The commit record
+
+The commit record includes three lists:
+
+  DELETE SET: The set of blocks deallocated by this atom, represented
+  as either a list, bitmap, or using extents.
+
+  WANDER SET: A list of block-pairs giving the original location and
+  the temporary wandered location.  During replay the temporary
+  location is copied to the original location.  After replay is no
+  longer needed, the temporary locations are deallocated using
+  reposession as previously described.
+
+  REPOSESSES FOR SET: A list of the previous atoms for which this atom
+  reposesses deallocated blocks.  This is used to know which atoms
+  deallocations must be replayed during crash recovery.
+
+I propose that all of this information is included in the commit
+record, which is written to the journal area.  There may be multiple
+journal areas (a significant complication) or there may not, but the
+key point is that all of this data is written into a reserved,
+cyclical journal area.  Because the journal area is reserved and
+written in a simple cyclical manner, there are no allocation decisions
+needed to find space for these commit records.
+
+---- The example
+
+Consider a roughly 50G file being modified in a 100G file system.
+Realize that due to maintaining the preserve set, it is not possible
+to transactionally write a file larger than 50G on a 100G file system.
+In the absolute worst case, no extent compression is possible and the
+best representation of the delete set requires a bitmap covering the
+entire file system.
+
+A 100G file system with 4K blocks has 3.27MB of bitmaps, and this is
+the same as the worst-case representation of the delete set, assuming
+just about every other block is deleted.  In reality, we expect the
+delete set to be much smaller because extent-compression would achieve
+significant savings.
+
+The wander set could possibly be compressed, but that is a more
+difficult task.  Suppose we attempt to overwrite the entire 50GB file
+instead of relocating it.  A 50G file has 13 million blocks, therefore
+the wander set requires storing 26 million block address pairs.  With
+8-byte block addresses that requires writing 210MB of wander set
+data.  Ouch!
+
+We should hope that the size of the wander set does not grow so large.
+After all, its parent the extent record must be modified in this case,
+so these blocks are all candidates for relocation.  It would take a
+dumb allocate/flush plugin to try to overwrite a 50G file instead of
+relocating it.
+
+---- The conclusion
+
+I maintain that it is much simpler to write all of this data inside
+reserved log areas.  It is possible that we could write this data
+outside the log, but then it will complicate the allocation and
+deallocation proceedure, since space for the log itself must then be
+allocated using ordinary methods.
+
+Comments?

@@ -1,0 +1,1120 @@
+<p> <H1> Reiser4 (Version 4 of ReiserFS)</H1>
+
+<H2> Primary sponsor www.DARPA.mil, regular sponsors applianceware.com and
+bigstorage.com.  DARPA does not endorse this project, it merely
+sponsors it.  </H2>
+<p>Table of Contents:
+
+<p><a href="#new_ext">
+New Extensibility Infrastructure</a>
+<br>&nbsp;&nbsp;
+<a href="#file_plg">
+File Plugins</a>
+<br>&nbsp;&nbsp;&nbsp;&nbsp;
+<a href="#dir_plg">
+Directory Plugins</a>
+<br>&nbsp;&nbsp;
+<a href="#hash_plg">
+Hash Plugins</a>
+<br>&nbsp;&nbsp;
+<a href="#security_plg">
+Security Plugins</a>
+<br>&nbsp;&nbsp;
+<a href="#new_plg">
+Putting Your New Plugin To Work Will Mean Recompiling</a>
+<br>&nbsp;&nbsp;
+<a href="#item_plg">
+Item Plugins</a>
+<br>&nbsp;&nbsp;
+<a href="#key_plg">
+Key Assignment Plugins</a>
+<br>&nbsp;&nbsp;
+<a href="#search_plg">
+Node Search and Item Search Plugins</a>
+<br>&nbsp;&nbsp;
+<a href="#backup">
+Backup</a>
+<br>&nbsp;&nbsp;
+<a href="#without_plg">
+Without Plugins We Will Drown</a>
+<br>&nbsp;&nbsp;
+<a href="#steps_crt">
+Steps For Creating A Security Attribute</a>
+<br>&nbsp;&nbsp;
+<a href="#lazy">
+Plugins: FS Programming For The Lazy</a>
+<p>
+<a href="#new_funct">
+New Functionality</a>
+<br>&nbsp;&nbsp;
+<a href="#why_scrt">
+Why Linux Needs To Be Secure</a>
+<br>&nbsp;&nbsp;
+<a href="#fine_scrt">
+Fine Graining Security</a>
+<br>&nbsp;&nbsp;&nbsp;&nbsp;
+<a href="#good_scrt">
+Good Security Requires Precision In Specification Of Security</a>
+<br>&nbsp;&nbsp;&nbsp;&nbsp;
+<a href="#imprecise_scrt">
+Space Efficiency Concerns Motivate Imprecise Security</a>
+<br>&nbsp;&nbsp;&nbsp;&nbsp;
+<a href="#scrt_def">
+Security Definition Units And Data Access Patterns Sometimes Inherently Don't Align</a>
+<br>&nbsp;&nbsp;&nbsp;&nbsp;
+<a href="#etc_passwd">
+/etc/passwd As Example</a>
+<br>&nbsp;&nbsp;&nbsp;&nbsp;
+<a href="#aggr_files">
+Aggregating Files Can Improve The User Interface To Them</a>
+<br>&nbsp;&nbsp;&nbsp;&nbsp;
+<a href="#aggr_modif">
+How Do We Write Modifications To An Aggregation</a>
+<br>&nbsp;&nbsp;&nbsp;&nbsp;
+<a href="#inheritance">
+Aggregation Is Best Implemented As Inheritance</a>
+<br>&nbsp;&nbsp;&nbsp;&nbsp;
+<a href="#constr">
+Constraints</a>
+<br>&nbsp;&nbsp;&nbsp;&nbsp;
+<a href="#audit">
+Auditing</a>
+<br>&nbsp;&nbsp;&nbsp;&nbsp;
+<a href="#incr_scrt">
+Increasing the Allowed  Granularity of Security</a>
+<br>&nbsp;&nbsp;&nbsp;&nbsp;
+<a href="#files_dirs">
+Files That Are Also Directories</a>
+<br>&nbsp;&nbsp;&nbsp;&nbsp;
+<a href="#hidden_dir">
+Hidden Directory Entries</a>
+<br>&nbsp;&nbsp;
+<a href="#new_scrt">
+New Security Attributes and Set Theoretic Semantic Purity</a>
+<br>&nbsp;&nbsp;&nbsp;&nbsp;
+<a href="#min_num">
+Minimizing Number Of Primitives Is Important In Abstract Constructions</a>
+<br>&nbsp;&nbsp;&nbsp;&nbsp;
+<a href="#compose_streams">
+Can We Get By Using Just Files and Directories (Composing Streams And Attributes From Files And Directories)?</a>
+<br>&nbsp;&nbsp;&nbsp;&nbsp;
+<a href="#list_features">
+List Of Features Needed To Get Attribute And Stream Functionality From Files And Directories</a>
+<br>&nbsp;&nbsp;&nbsp;&nbsp;
+<a href="#mnt_fs">
+Mounting FS Flavors</a>
+<br>&nbsp;&nbsp;
+<a href="#api">
+API Suitable For Accessing Files That Store Security Attributes</a>
+<br>&nbsp;&nbsp;&nbsp;&nbsp;
+<a href="#flaws">
+Flaws In Traditional File API When Applied To Security Attributes</a>
+<br>&nbsp;&nbsp;&nbsp;&nbsp;
+<a href="#resolution">
+The Usual Resolution Of These Flaws Is A One-Off Solution</a>
+<br>&nbsp;&nbsp;&nbsp;&nbsp;
+<a href="#solution">
+One-Off Solutions Are A Lot of Work To Do A Lot Of</a>
+<br>&nbsp;&nbsp;&nbsp;&nbsp;
+<a href="#syscall">
+reiser4() System Call Description</a>
+<br>&nbsp;&nbsp;&nbsp;&nbsp;
+<a href="#tr_tr">
+Transactions and Transcrashes:</a>
+<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+<a href="#tr_necessary">
+Transactions Are Necessary Safeguard Against Certain Race Condition Exploits</a>
+<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+<a href="#transcr">
+Transcrashes</a>
+<br>
+<a href="#performance">
+Performance Enhancements</a>
+<br>&nbsp;&nbsp;
+<a href="#dancing">
+Dancing Trees Are Faster Than Balanced Trees</a>
+<br>&nbsp;&nbsp;&nbsp;&nbsp;
+<a href="#if_ram">
+If It Is In RAM, Dirty, and Contiguous, Then Squeeze It ALL
+Together Just Before Writing</a>
+<br>&nbsp;&nbsp;
+<a href="#repacker">
+Repacker</a>
+<br>&nbsp;&nbsp;
+<a href="#commit">
+Encryption On Commit</a>
+<br>&nbsp;&nbsp;&nbsp;&nbsp;
+<a href="#wand_lgs">
+Wandering Logs</a>
+<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+<a href="#more_detailed">
+(More detailed treatment soon to be available at www.namesys.com/transactions.html by Joshua MacDonald.)</a>
+<br>&nbsp;&nbsp;&nbsp;&nbsp;
+<a href="#conclusion">
+Conclusion</a>
+
+
+<p>
+<a name="new_ext"></a>
+<H1> New Extensibility Infrastructure </H1>
+<p>
+It takes more than a license to make source code open, it takes a design.
+
+<p> Reiser4 will focus on extensibility.  Plugins ala photoshop but
+for files and directories.  This is necessary if we are to enable
+vendors to DARPA (including ourselves) to cost effectively add
+substantial numbers of new security features to Reiser4.
+
+<p>
+Imagine that you were an experimental physicist who had spent his life
+using only the tools that were in his local hardware store.  Then one
+day you joined a major research lab with a machine shop, and a whole
+bunch of other physicists.  All of a sudden you are not using just
+whatever tools the large tool companies who have never heard of you
+have made for you, you are part of a cooperative of physicists all
+making your own tools, swapping tools with each other, suddenly
+empowered to have tools that are exactly what you want them to be, or
+even merely exactly what your colleagues want them to be, rather than
+what some big tool company wants them to be.  That is the transition
+you will make when you go from version 3 to version 4 of ReiserFS.
+The tools your colleagues and sysadmins (your machinists) make are
+going to be much better for what you need.
+<a name="file_plg"></a>
+<h2>File Plugins</H2>
+<p>
+Every object (file or directory) will possess a plugin id.  This
+plugin id will identify a set of methods.  The set of methods will
+embody all of the different possible interactions with the object that
+come from sources external to reiserfs.  It is a layer of indirection
+added between the external interface to reiserfs, and the rest of
+reiserfs.  Each method will have a methodid.  It will be usual to mix
+and match methods from other plugins when composing plugins.
+
+<a name="dir_plg"></a>
+<h3>Directory Plugins</h3> <p>Reiser4 will implement a plugin for
+traditional directories, and it will implement directory style access
+to file attributes as part of the plugin for regular files.  Later we
+will describe why this is useful.  Other directory plugins we will
+leave for later versions.  There is no deep reason for this
+deferra. It is simply the randomness of what features attract sponsors
+and make into a release specification, and there are no sponsors at
+the moment for additional directory plugins.  I have no doubt that
+they will appear later; new directory plugins will be too much fun to
+miss out on.:-)
+
+<p>
+<a name="hash_plg"></a>
+<H2>Hash Plugins</H2>
+
+<p>Hash plugins already exist in version 3, and if you know what they
+are this paragraph says nothing new.  To coexist with NFS we must be
+able to hand out 64 bit "cookies" that can be used to resume a
+readdir.  Cookies are implemented in most filesystems as byte offsets
+within a directory (which means they cannot shrink directories), and
+in reiserfs as hashes of filenames plus a generation counter.  We
+order directory entries in reiserfs by their cookies.  This costs us
+performance compared to ordering lexicographically (but is immensely
+faster than the linear searching employed by most other Unix
+filesystems), and depending on the hash and its match to the
+application usage pattern there may be more or less performance
+lossage.  Hash plugins will probably remain until version 5 or so,
+when directory plugins and ordering function plugins will obsolete
+them, and directory entries will be ordered by filenames like they
+should be (and possibly stem compressed as well).
+
+<a name="security_plg"></a>
+<H2>Security Plugins</H2>
+<p>
+Security plugins handle all security checks.  They are normally
+invoked by file and directory plugins.
+
+<p>
+<ul>Example of reading a file:
+<li>Access the pluginid for the file.
+<li>Invoke the read method for the plugin.
+<li>The read method determines the security plugin for the file.
+<li>That security plugin invokes its read check method for determining whether to permit the read.
+<li>The read check method for the security plugin reads file/attributes containing the permissions on the file
+<li>Since file/attributes are also files, this means invoking the plugin for reading the file/attribute.
+<li>The pluginid for this particular file/attribute for this file happens to be inherited (saving space and centralizing control of it).
+
+<li>The read method for the file/attribute is coded such that it does
+not check permissions when called by a sec plug method.  (Endless
+recursion is thereby avoided.)
+
+<li>The file/attribute plugin employs a decompression algorithm
+specially designed for efficient decompression of our encoding of
+ACLs.
+
+<li>The security plugin determines that the read should be permitted.
+<li>The read method continues and completes.
+</ul>
+
+<a name="new_plg"></a>
+<H2>Putting Your New Plugin To Work Will Mean Recompiling</H2>
+<p>If you want to add a new plugin, we think your having to ask the sysadmin to
+recompile the kernel with your new plugin added to it will be
+acceptable for version 4.0.  We will initially code plugin-id lookup
+as an in-kernel fixed length array lookup, methodids as function
+pointers, and make no provision for post-compilation loading of
+plugins.  Performance, and coding cost, motivates this.
+<a name="item_plg"></a>
+<H2>Item Plugins</H2>
+<p>
+The balancing code will be able to balance an item iff it has an item
+plugin implemented for it.  The item plugin will implement each of
+the methods the balancing code needs (methods such as splitting items,
+estimating how large the split pieces will be, overwriting, appending
+to, cutting from, or inserting into the item, etc.)
+<p>
+In addition to all of the balancing operations, item plugins will also
+implement intra-item search plugins.
+<p>
+Our current code understands the structure of the items it balances.
+This makes adding new types of items storing such new security
+attributes as other researchers develop too expensive in coding time,
+greatly inhibiting the addition of them to ReiserFS.  We anticipate
+that there will be a great proliferation in the types of security
+attributes in ReiserFS if and only if we are able to make it a matter
+requiring not a modification of the balancing code by our most
+experienced programmers, but the writing of an item handler.  This is
+necessary if we are to achieve our goal of making the adding of each
+new security attribute an order of magnitude or more easier to perform
+than it is now.
+
+<a name="key_plg"></a>
+<H2>Key Assignment Plugins</H2>
+<p>
+
+When assigning the key to an item, the key assignment plugin will be
+invoked, and it will have a key assignment method for each item type.
+A single key assignment plugin is defined for the whole FS at FS
+creation time.  We know from experience that there is no "correct" key
+assignment policy, squid has very different needs from average user
+home directories.  Yes, there could be value in varying it more
+flexibly than just at FS creation time, but we have to draw the line
+somewhere when deciding what goes into each release....
+
+<a name="search_plg"></a>
+<H2>Node Search and Item Search Plugins</H2>
+<P>
+Every node layout will have a search method for that layout, and every
+item that is searched through will have a search method for that item.
+(When doing searches, we search through a node to find an item, and
+then search within the item for those items that contain multiple
+things to find.)
+<a name="backup"></a>
+<h2>Backup</h2>
+<p>
+We need to modify tar to record plugin ids.  Some plugins may require special treatment.
+<a name="without_plg"></a>
+<H2>Without Plugins We Will Drown</H2>
+<P>
+People often ask, as ReiserFS grows in features, how will we keep the
+design from being drowned under the weight of the added complexity,
+and from reaching the point where it is difficult to work on the code?
+<p>
+The infrastructure to support security attributes implemented as files
+also enables lots of features not necessarily security related.  The
+plugins we are choosing to implement in v4.0 are all security related
+because of our funding source, but users will add other sorts of
+plugins just as they took DARPA's TCP/IP and used it for non-military
+computers.  Only requiring that all features be implemented in the
+manner that maximizes code reuse keeps ReiserFS coding complexity down
+to where we can manage it over the long term.
+
+<a name="steps_crt"></a>
+<H2>Steps For Creating A Security Attribute</H2>
+<p>
+Once this infrastructure has been created, you will be able to create a new security attribute by:
+<ul>
+<li>defining a pluginid
+<li>composing a set of methods for the plugin from ones you create or reuse from other existing plugins
+<li>defining a set of items that act as the storage containers of the object, or reusing existing items from other plugins (e.g. regular files)
+<li>implementing item handlers for all of the new items you create
+<li>creating a key assignment algorithm for all of the new items
+<li>implementing a search handler for every item you create that requires searching within it (perhaps search methods should be considered part of the item handler, we shall see while implementing it)
+</ul>
+
+<a name="lazy"></a>
+<H2>Plugins: FS Programming For The Lazy</H2>
+<p>
+The important feature here is that in practice most plugins will have
+only a very few of these features unique to them, and the rest of the
+plugin will be reused code.  This is how we will reduce adding new
+security attributes to a task requiring a few weeks work: by first
+creating the right tools for the job, and only then starting work on
+it.  Our ambition is to have two orders of magnitude more security
+features than we otherwise would in 5 years, by first making it an
+order of magnitude less work to add them to reiser4, and then
+attracting an order of magnitude more security attribute developers
+because of that.  What DARPA is paying for here, is primarily not a
+suite of security plugins from Namesys, though it is getting that, but
+an architectural (not just the license) enabling of lots of outside vendors
+to efficiently create lots of innovative security plugins that Namesys
+would never have imagined if working by itself as a supplier.
+
+<a name="new_funct"></a>
+<H1> New Functionality</H1>
+<a name="why_scrt"></a>
+<H2> Why Linux Needs To Be Secure</H2>
+<p>
+The world is sadly changing.  It used to be that there was no spam,
+because it was not socially acceptable.  Now there is spam.  It used
+to be that security attacks on civilian computers were infrequent,
+because only unbalanced teenage boys had nothing better to do.  This
+is changing in much the same way.
+<p>
+The communist government of China has attacking US information
+infrastructure as part of its military doctrine.  Linux computers are
+the bricks the US (and global) civilian information infrastructure is
+being built from.  It is in the US (and global) interest that Linux
+become SECURELY neutral, so that when large US (or elsewhere) banks
+use Linux, and the US (or anyone else) experiences an attack, the
+infrastructure does not go down.  Chinese crackers are known to have
+compromised a computer forming a part of the California power grid....
+<p>
+It used to be that most casualties in wars were to combatants.  Now
+they are mostly to civilians.  In future information infrastructure
+attacks, who will take more damage, civilian or military
+installations?  DARPA is funding us to make all Linux computers more
+resistant to attack.
+<p>
+<a name="fine_scrt"></a>
+<H2>Fine Graining Security</h2>
+<p>
+<a name="good_scrt"></a>
+<H3>Good Security Requires Precision In Specification Of Security</H3>
+<p>
+Suppose you have a large file, and this file has many components.  One
+of the themes of SE Linux is that Unix security is insufficiently fine
+grained.  This is a general principle of security, that good security
+requires precision of permissions.  When security lacks precision, it
+increases the burden of being secure, and the extent to which users
+adhere to security requirements in practice is a function of the
+burden of adhering to it.
+<p>
+<a name="imprecise_scrt"></a>
+<H3>Space Efficiency Concerns Motivate Imprecise Security</H3>
+<p>
+Many filesystems make it space usage ineffective to store small components as
+separate files for various reasons.  Not being separate
+files means that they cannot have separate permissions.  One of the
+reasons for using overly aggregated units of security is space
+efficiency.  ReiserFS currently improves this by an order of magnitude
+over most of the existing alternative art.  Space efficiency is the
+hardest of the reasons to eliminate, and its elimination makes it that
+much more enticing to attempt to eliminate the other reasons.
+
+<a name="scrt_def"></a>
+<h3>Security Definition Units And Data Access Patterns Sometimes Inherently Don't Align</h3>
+<p>
+Applications sometimes want to operate on a collection of components
+as a single aggregated stream.  (Note that commonly two different
+applications want to operate on data with different levels of
+aggregation, and the infrastructure for solving this as a security
+issue will also solve that problem as well.)
+
+<a name="etc_passwd"></a>
+<h3>/etc/passwd As Example</h3>
+<p>
+I am going to use the /etc/passwd file as an example, not because I
+think that other aspects of SE Linux won't solve its problems better,
+but because the implementation of it as a single flat file in the
+early Unixes is a wonderful illustrative example of poorly
+granularized security that the readers may share my personal
+experiences with, and then I hope they will be able to imagine that
+other data files less famous could have similar problems.
+<p>
+Have you ever tried to figure out just exactly what part of the
+/etc/passwd file changed near the time of a break-in?  Have you ever
+wished that you could have a modification time on each field in it?
+Have you ever wished the users could change part of it, such as the
+gecos field, themselves (setuid utilities have been written to allow
+this, but this is a pedagogical not a practical example), but not have
+the power to change it for other users?
+<p>
+There were good reasons why
+/etc/passwd was first implemented as a single file with one single
+permission governing the entire file.  If we can eliminate them one by
+one, the same techniques for making finer grained security effective
+will be of value to other highly secure data files.
+
+<a name="aggr_files"></a>
+<h3>Aggregating Files Can Improve The User Interface To Them</h3>
+<p>
+Consider the use of emacs on a collection of a thousand small 8-32
+byte files like you might have if you deconstructed /etc/passwd into
+small files with separable acls for every field.  It is more
+convenient in screen real estate, buffer management, and other user
+interface considerations, to operate on them as an aggregation all
+placed into a single buffer rather than as a thousand 8-32 byte
+buffers.
+
+<a name="aggr_modif"></a>
+<h3>How Do We Write Modifications To An Aggregation</h3>
+<p>
+Suppose we create a plugin that aggregates all of the files in a
+directory into a single stream.  How does one handle writes to that
+aggregation that change the length of the components of that
+aggregation?
+
+<p>Richard Stallman pointed out to me that if we separate the
+aggregated files with delimiters, then emacs need not be changed at
+all to acquire an effective interface for large numbers of small files
+accessed via an aggregation plugin.  If
+/new_syntax_access_path/big_directory_of_small_files/.glued is a
+plugin that aggregates every file in big_directory_of_small_files with
+a delimiter separating every file within the aggregation, then one can
+simply type emacs
+/new_syntax_access_path/big_directory_of_small_files/.glued, and the
+filesystem has done all the work emacs needs to be effective at this.
+Not a line of emacs needs to be changed.
+<p>
+One needs to be able to choose different delimiting syntax for
+different aggregation plugins so that one can, for say the passwd
+file, aggregate subdirectories into lines, and files within those
+subdirectories into colon separate fields within the line.  XML would
+benefit from yet other delimiter construction rules.  (We have been
+told by one XML company (need link to testimonial here) that ReiserFS is
+higher performance than any other "database" for storing XML.)
+
+<a name="inheritance"></a>
+<h3>Aggregation Is Best Implemented As Inheritance</h3>
+
+In summary, to be able to achieve precision in security we need to
+have inheritance with specifiable delimiters, and we need whole file
+inheritance to support ACLs.
+
+<a name="constr"></a>
+<h3>Constraints</h3>
+
+<p>
+Another way security may be insufficiently fine grained is in values:
+it can be useful to allow persons to change data but only within
+certain constraints.  For this project we will implement plugins, and
+one type of plugin will be write constraints.  Write-constraints are
+invoked upon write to a file, and if they return non-error then the
+write is allowed.  We will implement two trivial sample
+write-constraint plugins, one in the form of a kernel function
+loadable as a kernel module which returns non-error (thus allowing the
+write) if the file consists of the strings "secret" or "sensitive" but
+not "top-secret", and another in the form of a perl program residing
+in a file and is executed in user-space which does exactly the same.
+Use of kernel functions will have performance advantages, particularly
+for small functions, but severe disadvantages in power of scripting,
+flexibility, and ability to be installed by non-secure sources.  Both
+types of plugins will have their place.
+
+<p>Note that ACLs will also embody write constraints.
+
+<p>
+We will implement constraints that are compiled into the kernel, and
+constraints that are implemented as user space processes.
+Specifically, we will implement a plugin that executes an arbitrary
+constraint contained in an arbitary named file as a user space
+process, passes the proposed new file contents to that process as
+standard input, and iff the process exits without error allows the
+write to occur.
+
+<p>
+It can be useful to have read constraints as well as write constraints.
+<p>
+<a name="audit"></a>
+<H3>Auditing </H3>
+<p>
+We will implement a plugin that notifies administrators by email when
+access is made to files, e.g. read access.
+
+<p>With each plugin implemented, creating additional plugins becomes
+easier as the available toolkit is enriched.  Auditing constitutes a
+major additional security feature, yet it will be easy to implement
+once the infrastructure to support it exists (and it would be
+substantial work to implement it without that infrastructure).
+<p>
+The scope of this project is not the creation of plugins themselves,
+but the creation of the infrastructure that plugin authors would find
+useful.  We want to enable future contractors to the DoD (and US
+financial institutions, PGP Security developers working on SE Linux,
+etc.), to implement more secure systems on the Linux platform, not
+implement them ourselves.  By laying a proper foundation and creating
+a toolkit for them, we hope to reduce the cost of coding new security
+attributes by an order of magnitude for those who follow us.
+Employing a proper set of well orthogonalized primitives also changes
+the addition of these attributes from being a complexity burden upon
+the architecture into being an empowering extension of the
+architecture, which greatly increases their acceptability for
+ReiserFS.
+
+<a name="incr_scrt"></a>
+<H3>Increasing the Allowed  Granularity of Security</H3>
+<p>
+Inheritance of security attributes is important to providing
+flexibility in their administration.  We have spoken about making
+security more fine grained, but sometimes it needs to be larger
+grained.  Sometimes a large number of files are logically one unit in
+regards to their security, and it is desirable to have a single point
+of control over their security.  Inheritance of attributes is the
+mechanism for implementing that.  Security administrators should have
+the power to choose whatever units of security they desire, without
+having to distort them to make them correspond to semantic units.
+Inheritance of file bodies using aggregation plugins allows the units
+of security to be smaller than files, inheritance of attributes allows
+them to be larger than files.
+
+<a name="files_dirs"></a>
+<h3>Files That Are Also Directories</h3>
+<p>
+In Reiser4 (but not ReiserFS 3) an object can be both a file and a
+directory at the same time.  If you access it as a file, you obtain
+the named sequence of bytes, and if you use it as a directory you can
+obtain files within it, directory listings, etc.  There was a lengthy
+discussion on the Linux kernel about whether this was technically
+feasible to do which I won't reproduce here except to summarize that
+Linus showed that it was feasible.
+<p>
+Allowing an object to be both a file and a directory is one of the
+features necessary to to compose the functionality present in streams
+and attributes using files and directories.
+<p>
+<a name="hidden_dir"></a>
+<h3>Hidden Directory Entries</h3>
+<p>
+A file can exist, but not be visible when using readdir in the usual
+way.  WAFL does this with the .snapshots directory, and it works well
+for them without disturbing users.  This is useful for adding access
+to a variety of new features without disturbing the user and
+applications with them when they are not relevant.  An interesting
+question is whether we should have all of these hidden files have the
+same name prefix (e.g. '..' at the start of the hidden name), or not.
+I am still soliciting input on this.  Note that this feature should be
+used for special files that one does not want to be backed up.
+<p>
+<a name="new_scrt"></a>
+<H2>New Security Attributes and
+Set Theoretic Semantic Purity</H2>
+<p>
+<a name="min_num"></a>
+<h3>Minimizing Number Of Primitives Is Important In Abstract Constructions</h3>
+<p>
+To a theoretician, it is extremely important to minimize the number of
+primitives with which one achieves the desired functionality in an
+abstract construction.  It is a bit hard to explain why this is so,
+but it is well accepted that breaking an abstract model into more
+basic primitives is very important.  A not very precise explanation of
+why, is to say that if you have complex primitives, and you break them
+into more basic primitives, then by combining those basic primitives
+differently from how they were originally combined in the complex
+primitives, you can usually express new things that the complex
+primitives did not express.  Let's follow this grand tradition of
+theoreticians, and see what happens if we apply it to Linux files and
+directories.
+<a name="compose_streams"></a>
+<h3>Can We Get By Using Just Files and Directories (Composing Streams And Attributes From Files And Directories)?</h3>
+<p>
+In Linux we have files, directories, and attributes.  In NTFS they
+have streams also.  Since Samba is important to Linux, there are
+frequently requests that we add streams to ReiserFS.  There are also
+requests that we add more and more different kinds of attributes using
+more and more different APIs.  Can we do everything that can be done
+with {files, directories, attributes, streams} using just {files,
+directories}?  I say yes, if we make files and directories more powerful and flexible, and I hope that by the end of reading this you
+will agree.
+<p>Let us have two basic objects.  A file is a sequence of bytes that has a name.  A directory is a namespace mapping names to a set of objects "within" the directory.  We connect these directory namespaces such that one can use compound names whose subcomponents are separated by a delimiter '/'.
+What is missing from files and directories now that attributes and streams offer?
+<p>In ReiserFS 3, there exist file attributes.  File attributes are out-of-band data describing the sequence of bytes which is the file.  For example, the permissions defining who can access a file, or the last modification time, are file attributes.
+File attributes have their own API, and creating new file attributes creates new code complexity and compatibility issues galore.  ACLs are one example of new file attributes users want.
+<p>
+Since files can also be directories in Reiser4, then we can implement
+traditional file attributes as simply files.  To access a file
+attribute, one need merely name the file, followed by a '/', followed
+by an attribute name.  That is, a traditional file will be implemented
+to possess some of the features of a directory, it will contains files
+within the directory corresponding to file attributes which you can
+access by their names, and it will contain a file body which is what
+you access when you name the "directory" not the file.
+<p>
+Unix currently has a variety of attributes that are distinct from
+files (ACLS, permissions, timestamps, other mostly security related
+attributes....).  This is because a variety of persons needed this
+feature and that, and there was no infrastructure that would allow
+implementing the features as fully orthogonal features that could be
+applied to any file.  Reiser4 will create that infrastructure.
+<a name="list_features"></a>
+<h3>List Of Features Needed To Get Attribute And Stream Functionality From Files And Directories</h3>
+<ul>
+<li>api efficient for small files
+<li>efficient storage for small files
+<li>plugins, including plugins that can compress a file servings as an attribute into a single bit
+<li>files that also act as directories when accessed as directories
+<li>inheritance (includes file aggregation)
+<li>constraints
+<li>transactions
+<li>hidden directory entries
+</ul>
+<p>
+The reader is asked to note that each of these additional features is a feature that the filesystem would benefit by the addition of anyway.  So we add them in v4.
+<a name="mnt_fs"></a>
+<H3>Mounting FS Flavors</H3>
+<p>
+Making these attributes accessible via filenames implies a slight
+deviation from Unix tradition.  If we create a way for this deviation
+to not be visible to those who don't want it, it paradoxically gives
+us more freedom to deviate without getting paranoid about the effects
+on existing applications.
+
+<p>
+A strict POSIX filesystem API will be implemented as a restricted
+functionality namespace obtained when mounting with --POSIX-only, and
+it will be possible, and even usual, to mount the filesystem both with
+and without --rich-semantics simultaneously each at different mount
+points.  Note that Al Viro has done work in VFS to make this more
+feasible, which is nice.
+<p> "reiser4" will be a distinct filesystem type from "reiserfs" in
+the eyes of the mount command.  Upon the completion of reiser4, we
+will evaluate the relative costs of implementing a conversion script,
+or supporting mounting "reiserfs" format filesystems using "reiser4".
+Under no circumstance will we make it impossible to mount an old
+"reiserfs" formatted filesystem, though users may or may not be able
+to mount them as type "reiser4" --- this is not yet determined or
+funded.
+
+<a name="api"></a>
+<H2>API Suitable For Accessing Files That Store Security Attributes</H2>
+
+<p>A new system call reiser4() will be implemented to support
+applications that don't have to be fooled into thinking that they are
+using POSIX, and through this entry point a richer set of semantics
+will access the same files that are also accessible using POSIX calls.
+reiser4() will not implement more than hierarchical names, a full set
+theoretic naming system as described on our future vision page will
+not be implemented before reiser5() is implemented.  reiser4() will
+implement all features necessary to access ACLs as files/directories
+rather than as something neither file nor directory.  This includes
+opening and closing transactions, performing a sequence of I/Os in one
+system call, and accessing files without use of file descriptors
+(necessary for efficient small I/O).  It will do it with a syntax
+suitable for evolving into reiser5() syntax with its set theoretic
+naming.
+
+<a name="flaws"></a>
+<h3>Flaws In Traditional File API When Applied To Security Attributes</h3>
+Security related attributes tend to be small.  The traditional filesystem API for reading and writing files has these flaws in the context of accessing security attributes:
+<ul>
+<li>Creating a file descriptor is excessive overhead and not useful when accessing an 8 byte attribute.
+<li>A system call for every attribute accessed is too much overhead when accessing lots of little attributes.
+<li>Lacking constraints:  it is important to constrain what is written to the attribute, often in complex ways.
+<li>Lacking transactional semantics: Often one needs to update multiple attributes as one action that is guaranteed to either fully succeed or fully fail.
+</ul>
+<a name="resolution"></a>
+<h3>The Usual Resolution Of These Flaws Is A One-Off Solution</h3>
+<p>
+The usual response to these flaws is that persons adding security
+related and other attributes create a set of methods unique to their
+attributes, plus non-reusable code to implement those methods in which
+their particular attributes are accessed and stored not using the
+methods for files, but using their particular methods for that
+attribute.  Their particular API for that attribute typically does a
+one-off instantiation of a lightweight single system call write
+constrained atomic access with no code being reusable by those who
+want to modify file bodies.  It is very basic and crucial to system
+design to decompose desired functionality into reusable orthogonal
+separated components.  Persons designing security attributes are
+typically doing it without the filesystem that they want to add them
+to offering them a proper foundation and toolkit.  They need more help
+from us the core FS developers.  Linus said that we can have a system
+call to use as our experimental plaything in this, and with what I
+have in mind for the API, one rather flexible system call is all we
+want for creating transactional lightweight batched constrained
+accesses to files, with each of those adjectives to accesses being an
+orthogonal optional feature that may or may not be invoked in a
+particular instance of the new system call.
+
+<a name="solution"></a>
+<h3>One-Off Solutions Are A Lot of Work To Do A Lot Of</h3>
+<P>Looking at the coin from the other side, we want to make it an
+order of magnitude less work to add features to ReiserFS, so that both
+users and Namesys can add at least an order of magnitude more of them.
+To verify that it is truly more extensible you have to do some
+extending, and our DARPA funding motivates us to instantiate most of
+those extensions as new security features.
+
+<p>This system call's syntax enables attributes to be implemented as a
+particular type of file --- it avoids uglifying the semantics with two
+APIs for two supposedly but not needfully different kinds of objects.
+All of its special features that are useful for accessing particular
+attributes are all available for use on files also.  It has symmetry,
+and its features have been fully orthogonalized.  There will be
+nothing particularly interesting about this system call to a languages
+specialist (it's ideas are decades old except to filesystem
+developers) until Reiser6, when we will further evolve it into a set theoretic
+syntax that deconstructs tuple structured names into ordered set, and
+unordered set, name components.  That is described at
+www.namesys.com/future_vision.html
+<a name="syscall"></a>
+<h3>reiser4() System Call Description</h3>
+<p>The reiser4() system call will contain a sequence of commands
+separated by a separator ( comma only for now).
+
+<p>
+Assignment, and transaction, will be the commands supported in
+reiser4(), more commands will appear in reiser5.  => and <= will be
+the assignment operators.
+
+<ul>lhs
+(assignment target) values:
+
+<li> /process/buffer/first_byte/last_byte/bytes_written assigns
+(writes) to the buffer starting at address first_byte in the process
+address space, ending at last_byte, with the number of bytes actually
+written (assignment source may be smaller or larger than assignment
+target) being written to address bytes_written.  Representation of
+first_byte,last_byte, and bytes_written is left to the coder to
+determine, as it is an issue that will be of much dispute and little
+importance.  Notice how / is used to indicate that the order of the
+operands matters, see www.namesys.com/future_vision.html for details
+of why this is appropriate syntax design.  Notice the lack of a file
+descriptor
+
+<li>/filename assigns to the file named filename, wholly obliterating
+its body with what is assigned.
+
+<li>/filename/..range/first_byte/last_byte/bytes_written writes to the
+body, starting at first_byte, ending not past last_byte, recording
+number of bytes written in bytes_written
+
+<li>/filename/..offset/offset_byte writes to the body starting at offset
+
+</ul>/..process/..range/first_byte/last_byte/bytes_written writes to
+the process address space, starting at first_byte, ending not past
+last_byte, recording number of bytes actually written in bytes_written
+
+<ul>rhs (assignment source) values:
+
+<li> /process/buffer/first_byte/last_byte/bytes_read reads from the
+buffer starting at address first_byte in the process address space,
+ending at last_byte, with the number of bytes actually read
+(assignment source may be smaller or larger than assignment target)
+being written to address bytes_read.  Representation of first_byte,
+last_byte, and bytes_read is left to the coder to determine, as it is
+an issue that will be of much dispute and little importance.
+
+<li>/filename reads the entirety of the file named filename.
+
+<li>/filename/..range/first_byte/last_byte/bytes_read reads from the
+body, starting at first_byte, ending not past last_byte, recording
+number of bytes read in bytes_read
+
+<li>/filename/..offset/offset_byte/bytes_read reads from the body
+starting at offset until the end
+
+<li>/filename/..stat/owner reads from the ownership field of the stat
+data (stat data is that which is returned by the stat() system call (owner, permissions,
+etc.)
+and stored on a per file basis by the FS)
+
+<li>/filename/..nonbody returns a delimiter separated aggregation of
+all parts of the file except the body of the file (owner, permissions,
+ACLs, etc.).
+
+</ul>
+
+<a name="tr_tr"></a>
+<H3>Transactions and Transcrashes:</H3>
+<a name="tr_necessary"></a>
+<h4>Transactions Are Necessary Safeguard Against Certain Race Condition Exploits</h4>
+
+(This section to be replaced with link to Josh MacDonald paper when that is complete.)
+<p>
+Recently, a security exploit was discovered in all versions of the MIT Kerberos secure authentication system due to unsafe handling of temporary files [Bugtraq, 3/7/2001].
+http://www.linuxsecurity.net/advisories/other_advisory-1204.html
+<p>
+During the process of generating a new ticket, the attacker creates a symbolic link that redirects the ticket file being written to an arbitrary location.  This kind of vulnerability is quite common, unfortunately, due to inherent weaknesses of the traditional POSIX file system interface.  There is no primitive support for an operation that atomically tests for the existence of a symbolic link prior to opening that location, not without vulnerability to races. The solution posted in the Kerberos incident does not completely eliminate the vulnerability.  Instead, vulnerability is greatly reduced through programmer vigilance (provided a few assumptions).  The existing file system interface leaves open potential vulnerabilities such as this, by default, due to the fact that it is a stateless interface.  In general, lacking transactions the result of a file system read cannot be trusted for security decisions; the instant a value is returned it may be out of date.
+<p>
+When security is a concern and the application is sufficiently important that it can be modified to conform with more secure interfaces, there is an easy solution to these problems --- transactions.  Transactions provide the framework for strict, fine-grained locking that is used to extend the atomicity of individual operations into an atomic sequence of operations.  In the Kerberos example, the ticket-writing application would instead issue a sequence of operations to:
+<ul>
+<li>lookup the file to be written,
+<li>make security checks on that file,
+<li>open the file for writing
+<li>output data.
+</ul>
+<p>The transaction framework provides a context for ensuring that a security check remains consistent throughout the resulting operation.
+<p>
+Transactions also provide critical support for extensibility (i.e.,
+plugins), since the system is able to automatically recover from
+partial component failures, and transactions are necessary to support
+consistent operations on multiple parts of an "aggregate" file.  [For
+example: you wish to perform a complex edit over /etc/passwd that
+requires the addition of one user and the deletion of another (e.g.,
+rename user).  To perform that operation consistently you must have
+transactions to preserve the invariant.]
+<p>
+There is a close relationship between version control and transaction
+isolation, which is why the same programmer on our team (Josh
+McDonald) does both.
+
+<a name="transcr"></a>
+<H4>Transcrashes</H4>
+<p>
+There is a reason why filesystems implemented on top of databases have
+not performed well.  Traditional database transactions do more work
+than the filesystems needs them to do.  It is not that database
+transactions are done wrong (far from it, we will take great pride in
+adding database style transactions to reiser4), it is that in some
+circumstances they are doing more work than is needed by traditional
+filesystem usage requirements, and good performance requires making
+the aspects of consistency independently selectable.  In particular,
+filesystems often need to be able to guarantee that an operation will
+be atomic with respect to surviving a crash, and DON'T need to
+guarantee isolation with respect to other concurrent operations.  This
+has profound performance import, and it affects not just buffering in
+RAM, but also dramatically impacts the size of logs.
+<p>
+[J.n> Gray] models transactions as having 4 degrees of consistency.  I
+find it more appropriate to model not degrees of consistency, which
+implies that the features have ranked levels and one cannot have a
+higher level feature without also getting the lower level features
+with it, but aspects of consistency, each potentially fully orthogonal
+to the other.
+<p>
+There are three aspects of consistency we will support initially, and
+you'll note that they are decoupled and independently specifiable.
+<ul>
+<li>"Transcrashes", which guarantee that either all or none of the
+transcrash will survive a crash.
+<li>Branches, which guarantee isolation but not exclusion.
+<li>Locks, which guarantee exclusion but not isolation.
+</ul>
+<p>
+There is necessarily a performance cost to implementing an isolated
+transaction.  This cost can be reduced for transcrashes which are not
+also branched or locked.  Very frequently the application better knows
+whether it needs to branch or lock, knows that its structure of
+operation is such that it does not need the protection of branching
+and locking, and it can depend on itself to do the right thing without
+the significant unnecessary performance cost of asking the filesystem
+to protect it from itself.
+<p>
+A "limited transcrash" has the property that it can be told to finish up
+and either commit or abort within MAX_LIMITED_TRANSCRASH_DELAY time, and
+it also has the property that the filesystem doesn't have to know how to
+rollback if it chooses to abort but rather the user space process must
+track how to do rollbacks.  Most such transcrashes will be implemented
+to not ever rollback, but more simply to instead take responsibility
+for ensuring that they can commit quickly enough.  If they fail to do
+so, the commit will be imposed upon them before they have completed
+the transcrash.  This approach is particularly useful for high
+performance short running transcrashes.
+<p>
+For instance, suppose you want to do two simple updates to two files
+as an atomic transaction, and these updates will not require longer
+than MAX_TRANSCRASH_DELAY to be done, and you want to be able to do
+many of these in parallel with high performance, and the application
+process running in user space is able to handle worrying about
+enforcing isolation through selective locking.  In that case, a common
+view of the filesystem state involving many other such limited
+transcrashes can be batched together and committed as one commit.
+(This is necessarily higher performance.)  When memory pressure
+triggers commit, all new transcrashes will hang while all outstanding
+transcrashes are signalled to complete their transcrash, and given
+MAX_TRANSCRASH_DELAY time in which they can be a running process if
+they choose to be.  Carefully note that the delay allowed has to be
+measured as time during which the process has priority if it chooses
+to be runnable, not as absolute time.  (Nikita, please phrase this
+more precisely for me, you know the scheduler better than I.)
+<p>
+A particular source of concern is high concurrency of semantically
+unrelated data that has common metadata.  For instance, the super block
+and the internal nodes of the tree.  Where the application can
+track and self-ensure the isolation of itself from concurrent
+processes rather than requiring the OS to give it its own atomically
+merged and committed view, performance is very likely going to be
+higher, and perhaps order of magnitude higher.
+<p>
+Reiser4 will implement limited transcrashes first, and whether it will
+implement branching in v4.0 or 4.1 will depend on how fast
+Josh works.
+<p>
+Why are limited transcrashs the priority for us?  We need to ensure that
+the infrastructure we create is performance efficient for what
+filesystems currently do before we enable new functionality based on
+strong transactions.  In other words, we have gotten addicted to being
+the fastest FS in town, and we don't want to lose that.  Reiser4 needs
+transactional semantics for some of its internal housekeeping
+(implementing rename), and only limited transcrashs are a high enough
+performance architecture for those needs.
+<p>
+When any grouping delimiter ([] is the only one for 4.0) is preceded
+by tw/transcrash_name (e.g. tw/transcrash_33[ /home/reiser/a <=
+/home/reiser/b, /home/reiser/c <= /home/reiser/d]), then it delimits a
+transcrash.  We leave unspecified for now how to have multipart
+specifications of a transcrash (I am getting pretty shameless in
+deferring things for v4.1, yes...? ).  Transactions logically batch
+not nest, extent that the interpreter will error check the nesting to
+make sure that it has not been passed confused garbage.
+<p>
+To anyone who has worked in databases or any other aspect of language
+design, this design surely seems exceedingly simple and modest.  To
+many filesystem and OS folks, this seems like something extraordinary,
+commands that are parsed, oh no!  The complexity will be
+extraordinary, oh no!  Sigh.  Namesys, determined to bring radical new
+1960's technology from other areas of computer science into the file
+systems field no matter how crazy our competitors think we are!  Sigh.
+Reiser4 will be smaller than XFS much less VxFS....
+
+<a name="performance"></a>
+<H1>Performance Enhancements</H1>
+
+<a name="dancing"></a>
+<H2> Dancing Trees Are Faster Than Balanced Trees</H2>
+
+<p> ReiserFS V4 will also add innovations in the fundamental tree
+technology.  We will employ not balanced trees, but "dancing trees".
+Dancing trees merge insufficiently full nodes not with every
+modification to the tree, but instead:
+
+<ul>
+
+<li>in response to memory pressure
+triggering a commit.
+
+<li>when an insertion into an internal node presents a danger of
+needing to split the internal node, and the immediate children are not
+sufficiently space efficient (sufficiently being a configurable
+value), and reducing the number of children could avoid the split.
+</ul>
+<a name="if_ram"></a>
+<h3>If It Is In RAM, Dirty, and Contiguous, Then Squeeze It ALL
+Together Just Before Writing</h3>
+
+<p>Let a slum be defined as a maximal sequence of contiguous in the
+tree order, and dirty in this transaction, nodes.  A dancing tree,
+when presented with memory pressure, responds to it by committing the
+transaction, and the commit in turn triggers a repacking of all slums
+involved in the transaction which it estimates can be squeezed into
+fewer nodes than they currently occupy.
+<p>
+Balanced trees have an
+inherent tradeoff between balancing cost and space efficiency.  If
+they consider more neighboring nodes, for the purpose of merging them
+to save a node, with every change to the tree, then they can pack the
+tree more tightly at the cost of moving more data with every change to
+the tree.
+<p>
+By contrast, with a dancing tree, you simply take a large slum, shove
+everything in it as far to the left as it will go, and then free all
+the nodes in the slum that are left with nothing remaining in them, at
+the time of committing the slum's contents to disk in response to
+memory pressure.  This gives you extreme space efficiency when slums
+are large, at a cost in data movement that is lower than it would be
+with an invariant balancing criterion because it is done less often.
+By compressing at the time one flushes to disk, one compresses less
+often, and that means one can afford to do it more thoroughly.
+
+<a name="repacker"></a>
+<h2>Repacker</h2>
+<p>
+Another way of escaping from the balancing time vs. space efficiency
+tradeoff is to use a repacker.  80% of files on the disk remain
+unchanged for long periods of time.  It is efficient to pack them
+perfectly, by using a repacker that runs much less often than every
+write to disk.  This repacker goes through the entire tree ordering,
+from left to right and then from right to left, alternating each time
+it runs.  When it goes from left to right in the tree ordering, it
+shoves everything as far to the left as it will go, and when it goes
+from right to left it shoves everything as far to the right as it will
+go.  (Left means small in key or in block number:-) ).  In the absence
+of FS activity the effect of this over time is to sort by tree order
+(defragment), and to pack with perfect efficiency.
+<p>
+Reiser4.1 will modify the repacker to insert controlled "airholes", as
+it is well known that insertion efficiency is harmed by overly tight
+packing.
+<p>
+I hypothesize that it is more efficient to periodically run a repacker
+that systematically repacks using large IOs, than to perform lots of 1
+block reads of neighboring nodes of the modification points, so as to
+preserve a balancing invariant in the face of poorly localized
+modifications to the tree.
+<a name="commit"></a>
+<H2>Encryption On Commit</H2>
+<p>
+Currently, encrypted files suffer severely in their write performance
+when implemented using schemes that encrypt at every write() rather
+than at every commit to disk.  We will implement encrypt on flush,
+such that a file with an encryption plugin id is encrypted not at the
+time of write, but at the time of commit to disk.  This is both
+non-trivial to implement, and important to performance.  It requires
+implementing a memory pressure manager for ReiserFS.  That memory
+pressure manager would receive a request to either reduce memory
+consumed, reduce dirty memory (dirty memory needs special treatment
+for deadlock avoidance reasons), or verify that nothing overly old has
+been kept in memory for too long.  It would respond by selecting what
+to commit, and preparing it for writing to disk.  That preparation
+will consist of encrypting it for those files that implement the
+encryption plugin.  (It can also consist of allocating optimal block
+numbers and repacking formatted nodes and compressing data, but that
+is not of such concern here.)  I suspect you will want us to
+coordinate with the PGP developers you are also contracting with.
+
+<p>Encryption is implemented as a special form of repacking, and it
+occurs for any node which has its CONTAINS_ENCRYPTED_DATA state flag
+set on it regardless of space usage.  With the dancing tree
+infrastructure in place, it should be only a moderate amount of work
+to implement encryption as a variant on repacking on commit.
+<p>
+<a name="wand_lgs"></a>
+<h3>Wandering Logs</h3>
+<a name="more_detailed"></a>
+<h4>(More detailed treatment soon to be available at www.namesys.com/transactions.html by Joshua MacDonald.)</h4>
+<p>
+Traditional fixed location logs have a problem in that data gets
+written twice, once to the log, and once to the rest of the
+filesystem.
+<p>
+Instead of moving data out of the log, wandering logs redefine what
+blocks compose the log.  There is no fixed location for where the log
+is, though there are fixed locations for where the definition of what
+blocks compose the log is.
+<p>
+This approach has two principle disadvantages:
+<ul>
+<li>blocks which contain data that must be retained if the transcrash
+fails to complete cannot be written in the place of the block
+containing the old data, and their location may not be as optimal as
+that of the new data (it may also be more optimal though)
+
+<li>it does not support undo/redo for isolated transactions
+</ul>
+<p>
+This means that in addition to wandering block logs, we also need
+wandering logical logs.
+<p>
+Wandering logical logs log for every transaction enough information to
+either redo or undo each isolated transaction.
+<p>
+They have the disadvantage that first they write the data into the log
+(though it can go anywhere convenient to define as part of the log),
+and then they write the data again after the transaction commits.
+<p>
+They have the advantage that for small updates (when not logging a 100
+megabyte file) their log is smaller.  This is potentially useful for
+distributed filesystems which operate by transmitting the log.
+<p>
+The compelling reason for supporting them is that they are needed for
+supporting isolated transactions, and while isolated transactions are
+expected to be only a small fraction of total disk IO, they are quite
+important functionally.  (How many bytes does it take to make your
+system not secure.... )
+
+<a name="conclusion"></a>
+<h1>Conclusion</h1>
+<p>
+Reiser4 will offer a dramatically better infrastructure for creating
+new filesystem features.  Files and directories will have all of the
+features needed to make it not necessary to have file attributes be
+something different from files.  The effectiveness of this new
+infrastructure will be tested using a variety of new security
+features.  Performance will be greatly improved by the use of dancing
+trees, wandering logs, allocate on flush, a repacker, and encryption
+on commit.

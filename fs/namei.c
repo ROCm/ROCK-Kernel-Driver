@@ -1165,7 +1165,7 @@ struct dentry *lock_rename(struct dentry *p1, struct dentry *p2)
 {
 	struct dentry *p;
 
-	if (p1 == p2) {
+	if (p1->d_inode == p2->d_inode) {
 		down(&p1->d_inode->i_sem);
 		return NULL;
 	}
@@ -1196,7 +1196,7 @@ struct dentry *lock_rename(struct dentry *p1, struct dentry *p2)
 void unlock_rename(struct dentry *p1, struct dentry *p2)
 {
 	up(&p1->d_inode->i_sem);
-	if (p1 != p2) {
+	if (p1->d_inode != p2->d_inode) {
 		up(&p2->d_inode->i_sem);
 		up(&p1->d_inode->i_sb->s_vfs_rename_sem);
 	}

@@ -289,7 +289,7 @@ __writeback_single_inode(struct inode *inode,
  * throttled threads: we don't want them all piling up on __wait_on_inode.
  */
 static void
-sync_sb_inodes(struct super_block *sb, struct writeback_control *wbc)
+generic_sync_sb_inodes(struct super_block *sb, struct writeback_control *wbc)
 {
 	const unsigned long start = jiffies;	/* livelock avoidance */
 
@@ -367,6 +367,15 @@ sync_sb_inodes(struct super_block *sb, struct writeback_control *wbc)
 			break;
 	}
 	return;		/* Leave any unwritten inodes on s_io */
+}
+
+static void
+sync_sb_inodes(struct super_block *sb, struct writeback_control *wbc)
+{
+	if (sb->s_op->sync_inodes)
+		sb->s_op->sync_inodes(sb, wbc);
+	else
+		generic_sync_sb_inodes(sb, wbc);
 }
 
 /*

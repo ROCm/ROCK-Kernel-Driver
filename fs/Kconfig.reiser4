@@ -1,0 +1,162 @@
+config REISER4_FS
+	tristate "Reiser4 (EXPERIMENTAL very fast general purpose filesystem)"
+	depends on EXPERIMENTAL && !4KSTACKS
+	default y
+	---help---
+	  Reiser4 is more than twice as fast for both reads and writes as
+	  ReiserFS V3, and is the fastest Linux filesystem, by a lot,
+	  for typical IO intensive workloads.  [It is slow at fsync
+	  intensive workloads as it is not yet optimized for fsync
+	  (sponsors are welcome for that work), and it is instead
+	  optimized for atomicity, see below.]  Benchmarks that define
+	  "a lot" are at http://www.namesys.com/benchmarks.html.
+
+	  It is the storage layer of what will become a general purpose naming
+	  system --- like what Microsoft wants WinFS to be except designed with a
+	  clean new semantic layer rather than being SQL based like WinFS.
+	  For details read http://www.namesys.com/whitepaper.html
+
+	  It performs all filesystem operations as atomic transactions, which
+	  means that it either performs a write, or it does not, and in the
+	  event of a crash it does not partially perform it or corrupt it.
+	  Many applications that currently use fsync don't need to if they use
+	  reiser4, and that means a lot for performance.  An API for performing
+	  multiple file system operations as one high performance atomic write
+	  is almost finished.
+
+	  It stores files in dancing trees, which are like balanced trees but
+	  faster.  It packs small files together so that they share blocks
+	  without wasting space.  This means you can use it to store really
+	  small files.  It also means that it saves you disk space.  It avoids
+	  hassling you with anachronisms like having a maximum number of
+	  inodes, and wasting space if you use less than that number.
+
+	  It can handle really large directories, because its search
+	  algorithms are logarithmic with size not linear.  With Reiser4 you
+	  should use subdirectories because they help YOU, not because they
+	  help your filesystem's performance, or because your filesystem won't
+	  be able to shrink a directory once you have let it grow.  For squid
+	  and similar applications, everything in one directory should perform
+	  better.
+
+	  It has a plugin-based infrastructure, which means that you can easily
+	  invent new kinds of files, and so can other people, so it will evolve
+	  rapidly.
+
+	  We will be adding a variety of security features to it that DARPA has
+	  funded us to write.
+
+	  "reiser4" is a distinct filesystem mount type from "reiserfs" (V3),
+	  which means that "reiserfs" filesystems will be unaffected by any
+	  reiser4 bugs.
+
+	  ReiserFS V3 is the stablest Linux filesystem, and V4 is the fastest.
+
+	  In regards to claims by ext2 that they are the de facto
+	  standard Linux filesystem, the most polite thing to say is that
+          many persons disagree, and it is interesting that those persons
+	  seem to include the distros that are growing in market share.
+	  See http://www.namesys.com/benchmarks.html for why many disagree.
+
+          If you'd like to upgrade from reiserfs to reiser4, use tar to a
+	  temporary disk, maybe using NFS/ssh/SFS to get to that disk, or ask
+	  your favorite distro to sponsor writing a conversion program.
+
+	  Sponsored by the Defensed Advanced Research Projects Agency (DARPA)
+	  of the United States Government.  DARPA does not endorse this
+	  project, it merely sponsors it.
+	  See http://www.darpa.mil/ato/programs/chats.htm
+
+	  If you would like to learn about our plans to add
+	  military grade security to reiser4, please read
+	  http://www.namesys.com/blackbox_security.html.
+
+	  To learn more about reiser4, go to http://www.namesys.com
+
+config REISER4_LARGE_KEY
+	bool "Use larger keys on reiser4 tree"
+	depends on REISER4_FS
+	default y
+	---help---
+      Make keys larger and use additional bits to order bodies of files within
+      a directory in the order of their names, which is what you want
+      normally. If you turn this off, file bodies will be ordered by creation
+      time, which is not optimal for most users.
+
+      Warning: flipping this option makes your file system binary
+      incompatible.
+
+config REISER4_CHECK
+	bool "Enable reiser4 debug options"
+	depends on REISER4_FS
+	---help---
+	  Don't use this unless you are a developer debugging reiser4.  If
+	  using a kernel made by a distro that thinks they are our competitor
+	  (sigh) rather than made by Linus, always check each release to make
+	  sure they have not turned this on to make us look slow as was done
+	  once in the past.  This checks everything imaginable while reiser4
+	  runs.
+
+	  When adding features to reiser4 you should set this, and then
+	  extensively test the code, and then send to us and we will test it
+	  again.  Include a description of what you did to test it.  All
+	  reiser4 code must be tested, reviewed, and signed off on by two
+	  persons before it will be accepted into a stable kernel by Hans.
+
+config REISER4_DEBUG
+	bool "Assertions"
+	depends on REISER4_CHECK && REISER4_FS!=m
+	help
+	  Turns on assertions checks. Eats a lot of CPU.
+
+config REISER4_DEBUG_MODIFY
+	bool "Dirtying"
+	depends on REISER4_CHECK
+	help
+	  Check that node is marked dirty each time it's modified. This is done
+	  through maintaining checksum of node content. CPU hog.
+
+config REISER4_DEBUG_MEMCPY
+	bool "Memory copying"
+	depends on REISER4_CHECK
+	help
+	  Use special non-inlined versions on memcpy, memset, and memmove in
+	  reiser4 to estimate amount of CPU time spent in data copying.
+
+config REISER4_DEBUG_NODE
+	bool "Node consistency"
+	depends on REISER4_CHECK
+	help
+	  Run consistency checks on nodes in balanced tree. CPU hog.
+
+config REISER4_ZERO_NEW_NODE
+	bool "Node zeroing"
+	depends on REISER4_CHECK
+	help
+	  Zero new node before use.
+
+config REISER4_TRACE
+	bool "Tracing"
+	depends on REISER4_CHECK
+	help
+	  Turn on tracing facility. This enables trace_flags mount option.
+
+config REISER4_EVENT_LOG
+	bool "Log events"
+	depends on REISER4_CHECK
+	help
+	  Log events into user supplied file. This enables trace_file mount option.
+
+config REISER4_STATS
+	bool "Statistics"
+	depends on REISER4_CHECK
+	help
+	  Turn on statistics collection. This increases size of in-memory super
+	  block considerably.
+
+config REISER4_DEBUG_OUTPUT
+	bool "Printing"
+	depends on REISER4_CHECK
+	help
+	  Enable compilation of functions that print internal kernel data
+	  structures in human readable form. Useful for debugging.

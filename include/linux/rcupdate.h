@@ -98,6 +98,7 @@ struct rcu_data {
         struct rcu_head *nxtlist;
 	struct rcu_head **nxttail;
         struct rcu_head *curlist;
+	struct rcu_head barrier;
 };
 
 DECLARE_PER_CPU(struct rcu_data, rcu_data);
@@ -144,6 +145,7 @@ extern void rcu_restart_cpu(int cpu);
 extern void FASTCALL(call_rcu(struct rcu_head *head, 
 				void (*func)(struct rcu_head *head)));
 extern void synchronize_kernel(void);
+extern void rcu_barrier(void);
 
 #endif /* __KERNEL__ */
 #endif /* __LINUX_RCUPDATE_H */

@@ -1,0 +1,203 @@
+
+					  DIRECTORY SERVICE IN REISER4
+
+Directory is mapping from file name to file itself. This mapping is
+implemented through reiser4 internal balanced tree. Single global tree
+is used as global index of all directories as opposed to having tree per
+directory. Unfortunately file names cannot be used as keys until keys of
+variable length are implemented, or unreasonable limitations on maximal
+file name length are imposed. To work around this file name is hashed
+and hash is used as key in a tree. No hash function is perfect and there
+always be hash collisions, that is, file names having the same value of
+a hash. Previous versions of reiserfs (3.5 and 3.6) used "generation
+counter" to overcome this problem: keys for file names having the same
+hash value were distinguished by having different generation
+counters. This allowed to amortize hash collisions at the cost of
+reducing number of bits used for hashing. This "generation counter"
+technique is actually some ad hoc form of support for non-unique
+keys. Keeping in mind that some form of this have to be implemented
+anyway, it seems justifiable to implement more regular support for
+non-unique keys in reiser4.
+
+NON-UNIQUE KEYS
+
+1.
+
+Non-unique keys require changes in both tree lookup and tree update
+code. In addition some new API to iterate through items with identical
+keys is required.
+
+Before going into detail let's note that non-unique keys weakens
+traditional search tree invariant. Search tree with unique keys, keys of
+all items in a left sub-tree of given delimiting key are less than, and
+in the right sub-tree greater than or equal to the said key. In a search
+tree with non-unique keys both inequalities are not strict.
+
+2.
+
+Tree lookups: we require that node layout ->lookup() methods always
+return leftmost item with the key looked for. The same for item
+->lookup() method for items supporting units with non-unique
+keys. Standard node40 layout plugin handles this, see
+fs/reiser4/plugin/node/node40.c:node40_lookup().
+
+3.
+
+Tree balancing: it seems that only change here is the handling of
+weakened search tree invariant. This can be gathered from the
+observation that balancing never even compares keys, only tests them for
+equality. More thought/research is required though. Looking at the
+existing implementations (like Berkeley db) would be useful also.
+
+4.
+
+Iteration through items/unit with identical keys. There are two
+interfaces to iterating abstraction known as "external" (also known as
+"enumeration") and "internal" iterators.
+
+External iterator:
+
+external_iterator {
+  start();
+  next();
+  has_more_p();
+};
+
+external_iterator eit;
+
+for( eit.start() ; eit.has_more_p() ; ) {
+    object = eit.next();
+    ... do stuff with object ...
+}
+
+Internal operator:
+
+internal_iterator {
+    iterate( int ( *function )( object *obj ) );
+};
+
+internal_iterator iit;
+
+int do_stuff( object *obj )
+{
+   ... do stuff with obj ...
+}
+
+iit( &do_stuff );
+
+External iterator seems easier to use, but they are known to be hard to
+implement, especially for complex data-structures like trees (this is
+because of the amount of state that should be maintained in "eit"
+between its invocations).
+
+Internal iterators are harder to use in C, because new function has to
+be declared to perform actions on objects in sequence, but are obviously
+easier to implement.
+
+Given that in 4.0 version there will be only one client of this
+iteration API (viz. directory lookup routine), it seems that internal
+style is preferable for now. Later, external iterator interface can be
+added if necessary.
+
+IMPLEMENTATION OF DIRECTORIES:
+
+1.
+
+There will be many various directory services implemented through
+different plugins. Default directory plugin uses hashing techniques
+described above. Let's code-name in hdir.
+
+2.
+
+Directory consists of directory entries, stored in a tree in a form of
+directory items. Question about whether each directory entry should be
+separate item or they can be compressed into items is left open by now.
+First this decision is purely per-plugin decidable, second, compression
+is good for performance, but harder to implement.
+
+Single directory entry is binding between file-system object and
+directory. In hdir plugin it consists of full name of a file bound and
+key (or part thereof) of file's stat-data:
+
+typedef struct hdir_entry {
+    /**
+     * key of object stat-data. It's not necessary to store
+     * whole key here, because it's always key of stat-data, so minor packing
+     * locality and offset can be omitted here. But this relies on
+     * particular key allocation scheme for stat-data, so, for extensibility
+     * sake, whole key can be stored here.
+     *
+     * We store key as array of bytes, because we don't want 8-byte alignment
+     * of dir entries.
+     */
+    d8 sdkey[ sizeof( reiser4_key ) ];
+    /**
+     * file name. Null terminated string.
+     */
+    d8 name[ 0 ];
+} hdir_entry;
+
+4.
+
+On creation/linking/lookup of object "bar" in directory "foo" (foo/bar),
+we compose key of directory entry for this object. Key has the form
+
+/*
+ * XXX this should be discussed
+ */
+dirent_k = (locality=foo_object_id, objectid=???, offset=hash("bar"));
+
+Major packing locality of dirent_k is set to foo_object_id so that all
+objects (files) in this directory and their bodies are close to
+respective directory entries.
+
+It seems that no single key allocation policy for directory entries fits
+everyone's needs, so, this can be implemented as method of directory
+plugin. No then less, choice of default key allocation policy is still
+important decision, although not that important as in plugin-less
+file-system.
+
+4.
+
+Function
+
+int hdir_find_entry( inode *dir, const hdir_entry *entry,
+                     tween_coord *coord, lock_handle *lh );
+
+iterates through all directory entries in @dir that have the same key as
+@entry (scans hash-bucket), looking for exact match for entry->name.
+
+5.
+
+During ->create()/->link() hdir_find_entry() is used to find place to insert new
+item (and to check for -EEXIST).
+
+During ->lookup() hdir_find_entry() is used find entry for the file
+being looked for and to load stat-data afterwards.
+
+During ->unlink() hdir_find_entry() is used to find unit/item to be
+removed.
+
+NOTE ON ->lookup():
+
+VFS implements following protocol when creating new
+file (fs/namei.c:open_namei()):
+
+dentry hash is searched. If search is unsuccessful, file system
+->lookup() is called.
+If lookup didn't find name, call ->create()
+
+While this protocol spares file system from dealing with dcache locking,
+for reiserfs it means that tree traversal is performed twice during file
+creation/deletion. Possible solution is to cache results of ->lookup()
+(e.g, pointer to znode) in dentry and reuse then in ->create(). On the
+other hand, point cache have more or less the same effect and is more
+general.
+
+
+^ Local variables:
+^ mode-name: "Design Document"
+^ indent-tabs-mode: nil
+^ tab-width: 4
+^ eval: (progn (flyspell-mode) (flyspell-buffer))
+^ End:

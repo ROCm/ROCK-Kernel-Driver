@@ -1,0 +1,276 @@
+/* this is dot(1) input file for lock-ordering diagram */
+/* it should be passed through C preprocessor first */
+/* cpp -P -DFITPAGE lock-ordering.dot | tred | dot -Tps | gv -media a4 - */
+
+#define CATTR fontsize=14, fontname=Helvetica
+#define NATTR CATTR
+#define EATTR CATTR
+
+#define SYSATTR color=yellow, style=filled
+#define PSEUDOATTR color=pink, style=filled, peripheries=2
+
+#define LONGATTR shape=ellipse
+#define SPINATTR shape=box
+
+#define CONDATTR color=blue, peripheries=2, LONGATTR
+
+#define MARKLONG(name) name -> schedulable [style=invis, weight=0]
+
+#define SYSLONG(name, l) name [label=l, NATTR, LONGATTR, SYSATTR]; MARKLONG(name)
+#define SYSPSEUDO(name) name [NATTR, LONGATTR, PSEUDOATTR]; MARKLONG(name)
+#define RLONG(name) name [NATTR, LONGATTR]; MARKLONG(name)
+
+#define RCOND(name, l) name [label=l, NATTR, CONDATTR]; MARKLONG(name)
+
+#define MARKSPIN(name) schedulable -> name [style=invis, weight=0]
+
+#define SYSSPIN(name, l) name [label=l, NATTR, SYSATTR, SPINATTR]; MARKSPIN(name)
+#define RSPIN(name) name [NATTR, SPINATTR]; MARKSPIN(name)
+
+#define ARC(from, to, func, ...) from -> to [EATTR, label=func, ## __VA_ARGS__]
+
+digraph locks {
+
+//clusterrank=none
+#if defined(FITPAGE)
+size="7.5, 10.5";
+ratio=compress;
+center=true;
+#endif
+
+subgraph long {
+	/* reiser4 long term locks */
+	RLONG(longterm_lock);
+	RLONG(inode_rw_lock);
+	RLONG(stack_sema);
+	RLONG(flush_sema);
+	RLONG(commit_sema);
+	RLONG(delete_sema);
+    /* txncommit is a synonym for flush_sema and commit_sema */
+	txncommit [LONGATTR, PSEUDOATTR]; MARKLONG(txncommit);
+	txncommit -> flush_sema [style=dotted, dir=both];
+	txncommit -> commit_sema [style=dotted, dir=both];
+
+    /* atom_event is not really a lock: you can wait on it, but cannot "own"
+       it. */
+	RCOND(atom_event,atom_event);
+
+	//RLONG(lnode_kcond);
+	//RLONG(ktxnmgrd_start);
+	//RLONG(ktxnmgrd_wait);
+	//RLONG(bnode_sema);
+
+	/* pseudo locks */
+	SYSPSEUDO(pfault);
+	SYSPSEUDO(kalloc);
+	SYSPSEUDO(schedulable);
+
+	/* system long term locks */
+	SYSLONG(page_write, page_write);
+	SYSLONG(mm_mmap_sem, "mm->mmap_sem");
+	SYSLONG(mapping_i_shared_sem, "mapping->i_shared_sem");
+
+	SYSLONG(i_sem, i_sem);
+	SYSLONG(page_lock, page_lock);
+	SYSLONG(cache_chain_sem, "&cache_chain_sem");
+	SYSLONG(I_LOCK, "I_LOCK");
+
+	SYSLONG(namespace_sem, "namespace->sem");
+	// SYSLONG(bdev_bd_sem, "bdev->bd_sem");
+	SYSLONG(sb_s_lock, "sb->s_lock");
+	SYSLONG(sb_s_umount, "sb->s_umount");
+}
+
+subgraph spin {
+
+	/* reiser4 spin locks */
+
+	RSPIN(tree_lock);
+	RSPIN(dk_lock);
+	RSPIN(jnode_lock);
+	RSPIN(inode_guard);
+	RSPIN(atom_lock);
+	RSPIN(txnh_lock);
+	RSPIN(txnmgr_lock);
+	RSPIN(ktxnmgrd_lock);
+	RSPIN(cbk_guard);
+	RSPIN(epoch_lock);
+	RSPIN(zgen_lock);
+	RSPIN(stack_lock);
+	RSPIN(zlock);
+	RSPIN(fq_lock);
+	RSPIN(jload_lock);
+	RSPIN(super_guard);
+    RSPIN(eflush_guard);
+    RSPIN(d_lock);
+
+	//RSPIN(stack_lock);
+	//RSPIN(lnode_guard);
+	//RSPIN(cksum_guard);
+	//RSPIN(oid_guard);
+	//RSPIN(test_lock);
+	//RSPIN(kcond_lock);
+	//RSPIN(fake_lock);
+	//RSPIN(panic_guard);
+	//RSPIN(contexts_lock);
+	//RSPIN(pset_guard);
+	//RSPIN(phash_guard);
+
+	/* system spin locks */
+	SYSSPIN(bkl, "BKL");
+	SYSSPIN(cachep_spinlock, "cachep->spinlock");
+	SYSSPIN(zone_lock, "zone->lock");
+	SYSSPIN(swaplock, "&swaplock");
+	SYSSPIN(zone_lru_lock, "zone->lru_lock");
+	SYSSPIN(mapping_private_lock, "mapping->private_lock");
+	SYSSPIN(mapping_page_lock, "mapping->page_lock");
+	SYSSPIN(inode_lock, "&inode_lock");
+	SYSSPIN(swap_device_lock, "swap->device_lock");
+	SYSSPIN(mm_page_table_lock, "mm->page_table_lock");
+	SYSSPIN(sb_lock, "&sb_lock");
+	SYSSPIN(page_chain_lock, "page->chain_lock");
+    //removed at 2003.04.04 by akpm@digeo.com
+	//SYSSPIN(dparent_lock, "dparent_lock");
+	SYSSPIN(dcache_lock, "dcache_lock");
+	SYSSPIN(fs_struct_lock, "fs_struct->lock");
+	SYSSPIN(tasklist_lock, "&tasklist_lock");
+	SYSSPIN(sig_siglock, "sig->siglock");
+	SYSSPIN(fown_lock, "fown->lock");
+	SYSSPIN(task_switch_lock, "task->switch_lock");
+	SYSSPIN(task_proc_lock, "task->proc_lock");
+	SYSSPIN(task_alloc_lock, "task->alloc_lock");
+	/* rq->lock is special: it can be unlocked by thread different from locker */
+	SYSSPIN(rq_lock, "rq->lock");
+	SYSSPIN(task_capability_lock, "&task_capability_lock");
+    SYSSPIN(mmlist_lock, "&mmlist_lock");
+	SYSSPIN(files_file_lock, "files->file_lock");
+	SYSSPIN(dn_lock, "&dn_lock");
+	//SYSSPIN(bdev_lock, "&bdev_lock");
+	SYSSPIN(suspend_pagedir_lock, "&suspend_pagedir_lock")
+}
+
+/* dependencies */
+
+ARC(inode_guard, tree_lock, "update_sd_at()");
+ARC(inode_guard, jnode_lock, "update_sd_at()");
+ARC(inode_guard, atom_lock, "update_sd_at()");
+ARC(atom_lock, jnode_lock, "uncapture_block()"); //capture_fuse_jnode_lists()
+ARC(jnode_lock, txnh_lock, "try_capture_block()");
+//alredy covered
+ARC(atom_lock, txnh_lock, "capture_fuse_txnh_lists()");
+ARC(jnode_lock, tree_lock, "jdrop_in_tree()");
+ARC(tree_lock, cbk_guard, "cbk_cache_invalidate()");
+ARC(dk_lock, tree_lock, "sync_dkeys()");
+ARC(txnmgr_lock, atom_lock, "atom_dec_and_unlock()"); //txnmgr_force_commit_all(),\ncommit_some_atoms(),\nflush_one_atom()");
+ARC(txnmgr_lock, jnode_lock, "atom_begin_andlock()");
+ARC(txnmgr_lock, txnh_lock, "atom_begin_andlock()");
+ARC(i_sem, inode_rw_lock, "unix_file_setattr()");//,\nunix_file_write()");
+ARC(page_lock, i_sem, "reiserfs_unpack()");
+ARC(inode_rw_lock, delete_sema, "shorten()");
+//ARC(delete_sema, txncommit, "reiser4_release_reserved()");
+ARC(flush_sema, longterm_lock, "flush_scan_left()");//,\nflush_allocate_znode_update(),\nflush_scan_formatted(),\nflush_pos_to_child_and_alloc()");
+ARC(longterm_lock, page_lock, "cbk_level_lookup()");
+ARC(commit_sema, page_lock, "submit_write()");
+ARC(pfault, mm_mmap_sem, "handle_page_fault()");
+ARC(page_lock, pfault, "extent_write_flow()");
+ARC(mm_mmap_sem, kalloc, "unix_file_readpage()");
+
+//ARC(inode_rw_lock, mm_mmap_sem, "unix_file_filemap_nopage()", style=dotted, dir=back);
+//ARC(mm_mmap_sem, kalloc, "DEAD2", style="dotted");
+ARC(kalloc, jnode_lock, "emergency_flush()");
+ARC(longterm_lock, jnode_lock, "longterm_unlock_znode()");//,\nflush_allocate_znode()");
+
+ARC(kalloc, inode_guard, "eflush_add()");
+ARC(ktxnmgrd_lock, txnmgr_lock, "commit_some_atoms()");
+
+//already covered
+ARC(mapping_i_shared_sem, mapping_private_lock, "__set_page_dirty_buffers()");
+//already covered
+ARC(mapping_i_shared_sem, mapping_page_lock, "");
+ARC(mapping_i_shared_sem, mm_page_table_lock, "vma_link()");
+
+ARC(inode_lock, mapping_page_lock, "__sync_single_inode()");
+ARC(inode_lock, sb_lock, "writeback_inodes()");
+
+ARC(mm_page_table_lock, swap_device_lock, "try_to_unmap_one()");
+ARC(mm_page_table_lock, mapping_private_lock, "try_to_unmap_one()");
+//already covered
+ARC(mm_page_table_lock, mapping_page_lock, "try_to_unmap_one()");
+
+ARC(mm_mmap_sem, mapping_i_shared_sem, "do_mmap_pgoff()");
+
+ARC(swaplock, swap_device_lock, "swap_info_get()");
+ARC(swap_device_lock, mapping_page_lock, "exclusive_swap_page()");
+
+ARC(page_lock, page_chain_lock, "shrink_list()");
+ARC(mm_page_table_lock, page_chain_lock, "page_add_rmap()");//,\npage_remove_rmap()");
+ARC(mapping_page_lock, zone_lru_lock, "add_to_page_cache()");//,\nfilemap_fdatawait()");
+ARC(mm_page_table_lock, zone_lru_lock, "page_add_rmap()");//,\npage_remove_rmap()");
+ARC(zone_lru_lock, page_chain_lock, "rmap.c");
+
+ARC(cache_chain_sem, kalloc, "cpuup_callback()");
+//ARC(cache_chain_sem, pfault, "kmem_cache_create()");
+
+//obsolete ARC(dcache_lock, dparent_lock, "d_move()");
+ARC(fs_struct_lock, dcache_lock, "set_fs_pwd()");//,\nset_fs_root()");
+
+ARC(namespace_sem, i_sem, "sys_pivot_root()");
+
+ARC(sb_s_lock, txncommit, "reiser4_write_super()");
+ARC(sb_s_umount, txncommit, "reiser4_kill_super()");
+
+ARC(task_switch_lock, rq_lock, "finish_arch_switch()");
+ARC(task_proc_lock, tasklist_lock, "unhash_process()"); // de_thread()
+ARC(task_proc_lock, dcache_lock, "proc_pid_unhash()");
+
+ARC(tasklist_lock, sig_siglock, "de_thread()");//,\ndo_notify_parent(),\nsys_tkill(),\ncopy_process()"); //collect_sigign_sigcatch(),\n__exit_sighand(),\nfreeze_processes()
+ARC(dn_lock, fown_lock, "__inode_dir_notify()");
+ARC(fown_lock, tasklist_lock, "send_sigio()");//,\nsend_sigurg()");
+ARC(tasklist_lock, task_alloc_lock, "chroot_fs_refs()");
+ARC(tasklist_lock, rq_lock, "setscheduler()");
+ARC(task_capability_lock, tasklist_lock, "sys_capget()");//,\nsys_capset()");
+ARC(task_alloc_lock, files_file_lock, "match_comm()");//,\nmatch_pid()");
+
+ARC(mmlist_lock, mm_page_table_lock, "unuse_process()");
+
+ARC(tree_lock, zone_lock, "page_clear_jnode()");//,\njrelse_nolock()");
+ARC(tree_lock, zone_lru_lock, "page_clear_jnode()");//,\njrelse_nolock()");
+ARC(tree_lock, mapping_page_lock, "jdrop_in_tree()");
+ARC(tree_lock, epoch_lock, "zget()");
+ARC(tree_lock, zgen_lock, "zget()");
+
+ARC(bkl, inode_lock, "iget()");
+
+ARC(jnode_lock, mapping_page_lock, "jnode_set_dirty()");
+ARC(jnode_lock, zone_lru_lock, "jnode_set_dirty()");
+
+ARC(I_LOCK, longterm_lock, "reiser4_iget()");
+
+//one cannot wait for atom event keeping longterm lock
+ARC(atom_event, longterm_lock, "flush");
+//one cannot wait for atom event keeping page lock
+ARC(atom_event, page_lock, "jnode_extent_write()");
+ARC(zlock, stack_lock, "longterm_lock_znode()");//,\nlongterm_unlock_znode(), wake_up_all_lopri_owners()");
+
+ARC(atom_lock, stack_lock, "check_not_fused_lock_owners()");//atom_send_event()
+ARC(txnh_lock, stack_lock, "check_not_fused_lock_owners()");
+ARC(fq_lock, stack_lock, "wakeup_atom_waitfor_list()");
+ARC(atom_lock, fq_lock, "detach_fq()");
+ARC(jnode_lock, zlock, "check_not_fused_lock_owners()");
+ARC(txnh_lock, zlock, "check_not_fused_lock_owners()");
+
+ARC(suspend_pagedir_lock, zone_lock, "do_magic_suspend_2()");
+ARC(cachep_spinlock, zone_lock, "cache_flusharray()");
+
+ARC(mapping_page_lock, zone_lock, "add_to_page_cache()"); // find_lock_page
+ARC(mapping_page_lock, zone_lru_lock, "add_to_page_cache()"); // find_lock_page
+ARC(mm_page_table_lock, zone_lock, "try_to_unmap_one()"); // get_user_pages, do_wp_page, do_anonymous_page, do_no_page
+ARC(mm_page_table_lock, zone_lru_lock, "try_to_unmap_one()"); // get_user_pages, do_wp_page, do_anonymous_page, do_no_page
+ARC(jnode_lock, zone_lock, "page_clear_jnode()"); // uncapture_page, extent_write_flow
+ARC(jnode_lock, zone_lru_lock, "page_clear_jnode()"); // uncapture_page, extent_write_flow
+ARC(jnode_lock, jload_lock, "reiser4_releasepage()");
+ARC(atom_lock, super_guard, "grabbed2flush_reserved_nolock()");
+
+ARC(jnode_lock, eflush_guard, "eflush_add()");
+ARC(inode_guard, d_lock, "detach_fsdata()");
+}

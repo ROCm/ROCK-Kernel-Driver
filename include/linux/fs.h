@@ -334,7 +334,7 @@ struct backing_dev_info;
 struct address_space {
 	struct inode		*host;		/* owner: inode, block_device */
 	struct radix_tree_root	page_tree;	/* radix tree of all pages */
-	spinlock_t		tree_lock;	/* and spinlock protecting it */
+	rwlock_t		tree_lock;	/* and rwlock protecting it */
 	unsigned long		nrpages;	/* number of total pages */
 	pgoff_t			writeback_index;/* writeback starts here */
 	struct address_space_operations *a_ops;	/* methods */
@@ -379,10 +379,11 @@ struct block_device {
 
 /*
  * Radix-tree tags, for tagging dirty and writeback pages within the pagecache
- * radix trees
+ * radix trees. One tag is for using for specific filesystem needs
  */
 #define PAGECACHE_TAG_DIRTY	0
 #define PAGECACHE_TAG_WRITEBACK	1
+#define PAGECACHE_TAG_FS_SPECIFIC	2
 
 int mapping_tagged(struct address_space *mapping, int tag);
 
@@ -420,6 +421,7 @@ static inline int mapping_writably_mapped(struct address_space *mapping)
 struct inode {
 	struct hlist_node	i_hash;
 	struct list_head	i_list;
+	struct list_head	i_sb_list;
 	struct list_head	i_dentry;
 	unsigned long		i_ino;
 	atomic_t		i_count;
@@ -725,6 +727,28 @@ extern int send_sigurg(struct fown_struct *fown);
 extern struct list_head super_blocks;
 extern spinlock_t sb_lock;
 
+/*
+ * sb_entry is attached to some super block (register_sb_entry()). It
+ * can be detached manually (unregister_sb_entry()), or automatically by
+ * umount (see deactivate_super()). {get,put}_sb_entry() can be used to
+ * guarantee liveness of entry. Typical usage is to have sb_entry along
+ * with kobject or proc_dir_entry; see struct fs_kobject.
+ */
+
+struct sb_entry {
+	/* linkage into &s->entries */
+	struct list_head linkage;
+	/* true is entry is attached to @s */
+	int live;
+	/* file system type for this entry. This is necessary, because
+	 * entry liveness should be checkable in the situation when ->s
+	 * may already be invalid. */
+	struct file_system_type *type;
+	/* superblock this entry is attached to. Can only be inspected
+	 * after successful call to get_sb_entry() */
+	struct super_block *s;
+};
+
 #define sb_entry(list)	list_entry((list), struct super_block, s_list)
 #define S_BIAS (1<<30)
 struct super_block {
@@ -751,6 +775,7 @@ struct super_block {
 	atomic_t		s_active;
 	void                    *s_security;
 
+	struct list_head	s_inodes;	/* all inodes */
 	struct list_head	s_dirty;	/* dirty inodes */
 	struct list_head	s_io;		/* parked for writeback */
 	struct hlist_head	s_anon;		/* anonymous dentries for (nfs) exporting */
@@ -772,7 +797,52 @@ struct super_block {
 	 * even looking at it. You had been warned.
 	 */
 	struct semaphore s_vfs_rename_sem;	/* Kludge */
+	struct list_head s_entries;             /* list of
+						 * sb_entries. Protected
+						 * by ->s_umount. */
 };
+
+/*
+ * file system kobject.
+ *
+ * fs_kobject is used to export per-super-block information in sysfs
+ * while providing synchronization against concurrent umount. To this
+ * end it includes struct sb_entry that is attached to the super block
+ * by fs_kobject_register() and detached by fs_kobject_unregister().
+ *
+ * We need these wrappers (see fs/super.c:fs_kattr_{show,store}()),
+ * because it's impossible to handle module unloading races properly
+ * from within file-system code. Viz get_sb_entry() avoids umount races
+ * by acquiring reference to the super block (through sget()), but this
+ * may very well be the _last_ reference to the file-system, and
+ * put_sb_entry() will trigger module unload, which means that
+ * put_sb_entry() should be called from the generic code rather than
+ * from file-system module.
+ */
+struct fs_kobject {
+	struct sb_entry entry;
+	struct kobject  kobj; /* it should be kobj for compatibility
+			       * with silly kobject.h macros */
+};
+
+/*
+ * file system kattr. See struct fs_kobject.
+ */
+struct fs_kattr {
+	struct attribute kattr;
+	ssize_t (*show)(struct super_block *sb, struct fs_kobject *fs_kobj,
+			struct fs_kattr *fs_kattr, char *buf);
+	ssize_t (*store)(struct super_block *sb, struct fs_kobject *fs_kobj,
+			struct fs_kattr *fs_kattr, const char *buf,
+			size_t size);
+};
+
+/* in fs/super.c */
+
+int fs_kobject_register(struct super_block *s, struct fs_kobject * fskobj);
+void fs_kobject_unregister(struct fs_kobject * fskobj);
+
+extern struct sysfs_ops fs_attr_ops;
 
 /*
  * Snapshotting support.
@@ -960,6 +1030,8 @@ struct super_operations {
 	void (*clear_inode) (struct inode *);
 	void (*umount_begin) (struct super_block *);
 
+	void (*sync_inodes) (struct super_block *sb,
+				struct writeback_control *wbc);
 	int (*show_options)(struct seq_file *, struct vfsmount *);
 };
 
@@ -1361,6 +1433,7 @@ extern struct inode * igrab(struct inode *);
 extern ino_t iunique(struct super_block *, ino_t);
 extern int inode_needs_sync(struct inode *inode);
 extern void generic_delete_inode(struct inode *inode);
+extern void generic_forget_inode(struct inode *inode);
 
 extern struct inode *ilookup5(struct super_block *sb, unsigned long hashval,
 		int (*test)(struct inode *, void *), void *data);

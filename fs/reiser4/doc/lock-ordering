@@ -1,0 +1,601 @@
+---------------------------------INTRODUCTION-----------------------------------
+
+This document tries to provide concise description of various "locking" issues
+in reiser4 code. There are two major areas here:
+
+1. locking as a device for the concurrency control: various synchronization
+objects are used to maintain integrity of shared data structures.
+
+2. (induced by the former) deadlocks, livelocks, missed wake ups, and alikes.
+
+"Locks" above means both standard synchronization primitives like mutexes,
+semaphores, condition variables and so on, and any other kind of object on
+which thread execution may "block". Waiting on io completion is not considered
+here, because hardware errors barred, it will ultimately finish regardless of
+any other threads and locks in the system (This only holds if io completion
+handlers don't acquire locks themselves.).
+
+-------------------------------LOCKS IN REISER4---------------------------------
+
+Reiser4 introduces following locks:
+
+1.  Per-super-block tree spin lock                              (tree_lock*)
+
+2.  Per-super-block delimiting key spin lock                    (dk_lock*)
+
+3.  Per-jnode spin lock                                         (jnode_lock*)
+
+4.  Per-znode lock with deadlock detection                      (longterm_lock)
+
+5.  Per-reiser4-inode spin lock                                 (inode_guard*)
+
+6.  Per-atom spin lock                                          (atom_lock*)
+
+7.  Per-transaction-handle spin lock                            (txnh_lock*)
+
+8.  Per-transaction-manager spin lock                           (txnmgr_lock*)
+
+9.  Per-lock-stack spin-lock                                    (stack_lock*)
+
+10. Per-inode read-write lock                                   (inode_rw_lock)
+
+11. Per-super-block spin lock                                   (super_guard*+)
+
+12. Per-flushing-thread spin lock                               (ktxnmgrd_lock)
+
+13. Global lnode hash table lock                                (lnode_guard+)
+
+14. Per-super-block cbk cache spin lock                         (cbk_guard)
+
+15. Per-jnode spin lock used by debugging code to access and
+    modify check sum                                            (cksum_guard+)
+
+16. Per-super-block oid map spin lock                           (oid_guard+)
+
+17. Per-super-block spin lock used by "test" disk format plugin to serialize
+    block allocation                                            (test_lock+)
+
+18. Per-condition-variable spin lock                            (kcond_lock+)
+
+19. Single spin lock used to serialize fake block allocation    (fake_lock+)
+
+20. Single spin lock used to serialize calls to reiser4_panic   (panic_guard+)
+
+21. Single spin lock used by debugging code to keep track of all active
+    reiser4_context instances                                   (contexts_lock+)
+
+22. Per-lnode condition variable used by wait for completion of "incompatible
+    access mode"                                                (lnode_kcond)
+
+23. Per-flushing-thread condition variable for startup waiting  (ktxnmgrd_start)
+
+24. Per-flushing-thread condition variable                      (ktxnmgrd_wait)
+
+25. Per-lock-stack wakeup semaphore                             (stack_sema)
+
+26. Per-super-block flush serializing semaphore                 (flush_sema)
+
+27. Per-transaction-manager commit semaphore                    (commit_sema)
+
+28. Per-super-block semaphore used to arbitrate use of 5%       (delete_sema)
+    reserved disk space
+
+30. Global spin lock used to serialize calls to panic           (panic_guard+)
+
+31. Global spin lock used to protect plugin set hash table      (pset_guard+)
+
+32. Global spin lock used to protect phash hash table           (phash_guard+)
+
+33. Per-bitmap-block semaphore used to serialize bitmap loading (bnode_sema+)
+
+34. Per-super-block epoch lock, protecting updates to           (epoch_lock*)
+    znode_epoch field, used to implement seals (seal.[ch])
+    efficiently.
+
+35. Per-atom "event". This is not really lock. Rather, this is an event
+    signaled each time atom changes its state.                  (atom_event)
+
+36. Per-znode spin lock used to protect long term locking
+    structures                                                  (zlock*)
+
+37. Per flush queue lock                                        (fq_lock*)
+
+38. Per-super-block zgen lock, protecting znode generation      (zgen*)
+    counter
+
+39. Per-jnode spin lock used to synchronize jload() with        (jload_lock*)
+    ->releasepage().
+
+40. Per-atom imaginary read-write semaphore handle_sema         (handle_sema)
+
+    let's pretend for the sake of simplicity that there is special per-atom
+    read-write semaphore that threads can claim. Call it
+    handle_sema. This semaphore is acquired on read when thread captures first
+    block and is released when thread's reiser4_context is closed. Formally
+    thread holds this semaphore on read exactly when
+    get_current_context()->trans->atom != NULL, i.e., when thread is
+    associated with atom. Logic behind introducing this imaginary semaphore is
+    that while some thread is associated with an atom (that is, keeps
+    transaction handle opened), this atom cannot commit. In particular, other
+    threads waiting on fusion with atom that is in CAPTURE_WAIT stage wait
+    until this atom commits, that is wait (at least) until there are no opened
+    transaction handles for this atom. Effectively such threads wait until
+    handle_semaphore is free, that is, they in some sense are trying to
+    acquire handle_semaphore in write mode.  So, this circumferential
+    description allows one to reduce (at least partially) problem of waiting
+    on atom fusion to the lock ordering.
+
+41. Per-super-block spin lock protecting consistency of emergency flush hash
+    table, ->eflushed, and ->eflushed_anon counters in inode, and ->flushed
+    counter in atom.                                            (eflush_guard)
+
+42. Per-super-block spin lock protecting detached directory cursors for
+    stateless readdir                                           (d_lock)
+
+99. Various locks used by the user level simulator
+
+Locks marked by (*) after label, are accessed through spin lock macros,
+defined in reiser4.h. For them, locking ordering is checked at the runtime (at
+least in the principle) when REISER4_DEBUG is on(e).
+
+Locks marked by (+) after label exist only for serializing concurrent access
+to the shared data and are not supposed to be used in conjunction with any
+other locks. They are omitted from locking ordering below to simplify the
+picture. One can imaging them to be rightmost in the ordering.
+
+All locks, spin locks, and semaphores, except for stack_sema are subject to
+normal protocol: thread that grabbed the lock will release it. stack_sema is
+described in more details below.
+
+Also, following kernel locks are used by our code:
+
+1. Per-page lock                                                (page_lock)
+
+2. Per-page writeback bit                                       (page_write)
+
+3. Per-inode semaphore                                          (i_sem)
+
+4. Per-inode I_LOCK bit-lock                                    (I_LOCK)
+
+Thread also can block on the following "objects" that are not really locks:
+
+1. Page fault                                                   (pfault)
+
+2. Memory allocation                                            (kalloc)
+
+3. Dirtying a page (through balance_dirty_pages())              (page_dirty)
+
+----------------------------------LOCK SCOPE------------------------------------
+
+Section describing what data are protected by what locks. TBD.
+
+----------------------------------INVARIANTS------------------------------------
+
+Invariants are some (formal or informal) properties of data structures. For
+example, for well-formed doubly linked list, following holds:
+
+item->next->prev == item && item->prev->next == item
+
+In most cases, invariants only hold under proper locks.
+
+LABEL AND DESCRIPTION                                 LOCKS
+
+[inode->eflushed]                                     inode_guard
+
+    inode->eflushed > 0, iff there are emergency flushed jnodes belonging to
+    this inode. Also, each emergency flushed jnode is counted as increase in
+    inode->i_count.
+
+[cbk-cache-invariant]                                 cbk_guard
+
+    If cbk cache is traversed in LRU order, first go all used slots (with
+    slot->node != NULL), then, all unused. All used slots have unique
+    slot->node. (Checked by cbk_cache_invariant().)
+
+[znode-fake]                                          jnode_lock, tree_lock
+
+    /* fake znode doesn't have a parent, and */
+    znode_get_level(node) == 0 => znode_parent(node) == NULL, and
+    /* there is another way to express this very check, and */
+    znode_above_root(node)     => znode_parent(node) == NULL, and
+    /* it has special block number, and */
+    znode_get_level(node) == 0 => *znode_get_block(node) == FAKE_TREE_ADDR, and
+    /* it is the only znode with such block number, and */
+    !znode_above_root(node) && znode_is_loaded(node) =>
+                                  *znode_get_block(node) != FAKE_TREE_ADDR
+    /* it is parent of the tree root node */
+    znode_is_true_root(node)   => znode_above_root(znode_parent(node))
+
+    (Checked by znode_invariant_f().)
+
+[znode-level]                                         jnode_lock, tree_lock
+
+    /* level of parent znode is one larger than that of child, except for the
+       fake znode */
+    znode_parent(node) != NULL && !znode_above_root(znode_parent(node)) =>
+                znode_get_level(znode_parent(node)) == znode_get_level(node) + 1
+    /* left neighbor is at the same level, and */
+    znode_is_left_connected(node) && node->left != NULL =>
+                znode_get_level(node) == znode_get_level(node->left))
+    /* right neighbor is at the same level */
+    znode_is_right_connected(node) && node->right != NULL =>
+                znode_get_level(node) == znode_get_level(node->right)
+
+    (Checked by znode_invariant_f().)
+
+[znode-connected]
+
+     /* ->left, ->right pointers form a valid list and are consistent with
+     JNODE_{LEFT,RIGHT}_CONNECTED bits */
+
+     node->left != NULL => znode_is_left_connected(node)
+     node->right != NULL => znode_is_right_connected(node)
+     node->left != NULL =>
+		      znode_is_right_connected(node->left) &&
+		      node->left->right == node
+     node->right != NULL =>
+		      znode_is_left_connected(node->right) &&
+		      node->right->left == node
+
+[znode-c_count]                                       jnode_lock, tree_lock
+
+    /* for any znode, c_count of its parent is greater than 0, and */
+    znode_parent(node) != NULL && !znode_above_root(znode_parent(node)) =>
+                atomic_read(&znode_parent(node)->c_count) > 0), and
+    /* leaves don't have children */
+    znode_get_level(node) == LEAF_LEVEL => atomic_read(&node->c_count) == 0
+
+    (Checked by znode_invariant_f().)
+
+[znode-modify]                                        zlock_lock(read),
+                                                      jnode_lock, tree_lock
+
+    /* if znode is not write-locked, its checksum remains
+     * invariant */
+	!znode_is_wlocked(node) => znode_at_read(node)
+
+    (Checked by znode_invariant_f().)
+
+[znode-refs]                                          jnode_lock, tree_lock
+
+    /* only referenced znode can be long-term locked */
+    znode_is_locked(node) => atomic_read(&ZJNODE(node)->x_count) != 0
+
+    (Checked by znode_invariant_f().)
+
+[jnode-oid]                                           jnode_lock, tree_lock
+
+    /* for unformatted node ->objectid and ->mapping fields are
+     * consistent */
+    jnode_is_unformatted(node) && node->key.j.mapping != NULL =>
+        node->key.j.objectid == get_inode_oid(node->key.j.mapping->host)
+
+    (Checked by znode_invariant_f().)
+
+[jnode-refs]                                          jnode_lock, tree_lock
+
+    /* only referenced jnode can be loaded */
+    atomic_read(&node->x_count) >= node->d_count
+
+    (Checked by jnode_invariant_f().)
+
+[jnode-dirty]                                         jnode_lock, tree_lock
+
+    /* dirty inode is part of atom */
+    jnode_is_dirty(node) => node->atom != NULL
+
+    (Checked by jnode_invariant_f().)
+
+[jnode-queued]                                         jnode_lock, tree_lock
+
+    /* only relocated node can be queued, except that when znode
+     * is being deleted, its JNODE_RELOC bit is cleared */
+    JF_ISSET(node, JNODE_FLUSH_QUEUED) =>
+		      JF_ISSET(node, JNODE_RELOC) || JF_ISSET(node, JNODE_HEARD_BANSHEE)
+
+    (Checked by jnode_invariant_f().)
+
+[jnode-atom-valid]                                     jnode_lock, tree_lock
+
+    /* node atom has valid state */
+    node->atom != NULL => node->atom->stage != ASTAGE_INVALID
+
+    (Checked by jnode_invariant_f().)
+
+[jnode-page-binding]                                    jnode_lock, tree_lock
+
+    /* if node points to page, it points back to node */
+    node->pg != NULL => node->pg->private == node
+
+    (Checked by jnode_invariant_f().)
+
+[sb-block-counts]                                     super_guard
+
+	reiser4_block_count(super) = reiser4_grabbed_blocks(super) +
+                                 reiser4_free_blocks(super) +
+                                 reiser4_data_blocks(super) +
+                                 reiser4_fake_allocated(super) +
+                                 reiser4_fake_allocated_unformatted(super) +
+                                 reiser4_flush_reserved(super)
+
+    (Checked by check_block_counters().)
+
+[sb-grabbed]                                          super_guard
+
+    reiser4_grabbed_blocks(super) equals the sum of ctx->grabbed_blocks for
+    all grabbed contexts
+
+[sb-fake-allocated]                                   txnmgr_lock, atom_lock
+
+    When all atoms and transaction manager are locked,
+    reiser4_flush_reserved(super) equals to sum of atom->flush_reserved for
+    all atoms.
+
+[tap-sane]
+
+    tap->mode is one of {ZNODE_NO_LOCK, ZNODE_READ_LOCK, ZNODE_WRITE_LOCK}, and
+	tap->coord != NULL, and
+	tap->lh != NULL, and
+	tap->loaded > 0 => znode_is_loaded(tap->coord->node), and
+	tap->coord->node == tap->lh->node
+
+    (Checked by tap_invariant().)
+
+--------------------------------LOCK ORDERING-----------------------------------
+
+Lock ordering for kernel locks is taken from mm/filemap.c. Locks can be taken
+from the left to the right. Locks on the same indentation level are unordered
+with respect to each other. Any spin lock is righter than any long term lock,
+obviously.
+
+i_sem
+..inode_rw_lock <-------DEAD1-----+
+....handle_sema                   |
+......I_LOCK                      |
+......delete_sema                 |
+......flush_sema                  |
+........atom_event                |
+........longterm_lock <---DEAD2-+ |
+......commit_sema               | |
+..........page_lock             | |
+............pfault              | |
+..............mm->mmap_sem------+-+                   [do_page_fault]
+..................ktxnmgrd_lock
+................mapping->i_shared_sem
+................kalloc
+....................inode_guard
+......................d_lock
+....................txnmgr_lock
+......................atom_lock
+..........................super_guard
+........................jnode_lock            [->vm_writeback()->jget()]
+................................eflush_guard
+..........................txnh_lock
+............................zlock
+........................fq_lock
+..............................stack_lock
+..................dk_lock
+..............................tree_lock
+................................cbk_guard
+................................epoch_lock
+................................zgen_lock
+..........................jload_lock
+....................mm->page_table_lock
+......................mapping->private_lock
+........................swaplock
+..........................swap_device_lock
+..........................&inode_lock
+............................&sb_lock
+............................mapping->page_lock
+..............................zone->lru_lock
+                  ^
+                  +-- spin locks are starting here. Don't schedule rightward.
+
+NOT FINISHED.
+
+..............&cache_chain_sem
+......................cachep->spinlock
+......................zone->lock
+
+page_dirty
+....&inode_lock
+....&sb_lock
+....mapping->page_lock [mpage_writepages]
+..page_lock
+..longterm_lock        [__set_page_dirty_buffers->__mark_inode_dirty]
+
+Nice and clear picture with all reiser4 locks totally ordered, right?
+
+Unfortunately, it is not always possible to adhere to this ordering. When it
+is necessary to take locks "decreasing" order, standard trylock-and-repeat
+loop is employed. See:
+
+   atom_get_locked_with_txnh_locked(),
+   atom_get_locked_by_jnode(),
+   atom_free(), and
+   jnode_lock_page()
+
+functions for examples of this.
+
+The only exception from the above locking oder is when thread wants to lock
+object it is just created and hasn't yet announced to other threads (by means
+of placing it into some shared data structure like hash table or list). There
+is special spin lock macro spin_lock_foo_no_ord() defined in reiser4.h for
+this purpose.
+
+pfault and kalloc are something special: when page fault occurs at the page
+occupied by mmapped from reiser4 file, reiser4_readpage() is invoked that
+starts taking locks from the very beginning.
+
+DEAD1
+
+   Scenario:
+
+      process has mmapped reiser4 regular file and then does write(2) into
+      this file from buffer that is in mmaped area. copy_from_user() causes
+      page fault:
+
+         sys_write()
+           reiser4_write()
+             unix_file_write() [inode_rw_lock]
+                         .
+                         .
+                         .
+                 __copy_from_user()
+                         .
+                         .
+                         .
+                   handle_page_fault()
+                     handle_mm_fault()
+                       handle_pte_fault()
+                         do_no_page()
+                           unix_file_filemap_nopage() [inode_rw_lock]
+
+   This is safe, because inode_rw_lock is read-taken by both read/write and
+   unix_file_filemap_nopage(). It is only write-taken during tail<->extent
+   conversion and if file is mmaped is was already converted to extents.
+
+DEAD2
+
+   is safe, because copy_from_user is used only for tails and extents:
+
+    . extent: extent_write_flow() releases longterm_lock before calling
+      copy_from_user.
+
+    . tail: during copying into tail, only node containing this tail is long
+      term locked. It is easy to see, that ->readpage serving page fault (that
+      is, readpage for unformatted data) will never attempt to lock said node.
+
+When memory allocation tries to free some memory it
+
+1. asynchronously launches kswapd that will ultimately call
+   reiser4_writepage().
+
+2. calls reiser4_writepage() synchronously.
+
+----------------------------------LOCK PATTERNS---------------------------------
+
+This section describes where in the code what locks sequences are held. This
+places restrictions on modifications to the lock ordering above and enumerates
+pieces of the code that should be revised if modification of the lock ordering
+is necessary.
+
+flush_sema
+
+    jnode_flush()
+
+        to serialize flushing. This behavior can be disabled with mtflush
+        mount option.
+
+atom_lock->jnode_lock
+
+    uncapture_block()
+
+atom_lock->tree_lock && jnode_lock && page_lock
+
+    uncapture_block() calls jput()
+
+delete_sema
+
+    common_unlink(), shorten_file()->unlink_check_and_grab()
+
+        to serialize access to reserved 5% of disk only used by unlinks. (This
+        is necessary so that it is always possible to unlink something and
+        free more space on file-system.)
+
+delete_sema->flush_sema || commit_sema
+
+    reiser4_release_reserved() calls txnmgr_force_commit_current_atom() under
+    delete_sema
+
+inode_rw_lock->delete_sema
+
+    unix_file_truncate()->shorten_file() takes delete_sema from under write
+    mode of inode_rw_lock
+
+kalloc->jnode_lock
+
+    emergency_flush() takes jnode spin lock
+
+jnode_lock->(mapping->page_lock)
+
+    jnode_set_dirty()->__set_page_dirty_nobuffers()
+
+jnode_lock->(zone->lru_lock)
+
+    jnode_set_dirty()->mark_page_accessed()
+
+
+I_LOCK->longterm_lock
+
+    reiser4_iget()
+
+tree_lock->epoch_lock
+
+    zget() calls znode_build_version()
+
+jnode_lock->stack_lock
+
+    longterm_lock_znode(), longterm_unlock_znode(), wake_up_all_lopri_owners()
+
+tree_lock->cbk_guard
+
+    znode_remove() calls cbk_cache_invalidate()
+
+zlock->stack_lock
+
+    wake_up_all_lopri_owners()
+
+atom->stack_lock
+
+    check_not_fused_lock_owners()
+
+txnh->stack_lock
+
+    check_not_fused_lock_owners()
+
+jnode_lock->jload_lock
+
+    reiser4_releasepage(), emergency_flush(). But this can actually be made
+    other way around.
+
+jnode_lock->eflush_guard
+
+    eflush_add(), eflush_del()
+
+atom_lock->super_guard
+
+    grabbed2flush_reserved_nolock()
+
+inode_guard->d_lock
+
+    detach_fsdata()
+
+----------------------------------DEADLOCKS-------------------------------------
+
+Big section describing found/possible/already-worked-around deadlocks.
+
+1. Locking during tree traversal.
+
+2. Locking during balancing.
+
+3. Locking during squalloc.
+
+4. Page locking.
+
+5. Atom fusion.
+
+Please, fill gaps up.
+
+TBD.
+
+2002.09.19. Nikita.
+
+--------------------------------------------------------------------------------
+
+^ Local variables:
+^ mode-name: "Memo"
+^ indent-tabs-mode: nil
+^ tab-width: 4
+^ eval: (progn (flyspell-mode) (flyspell-buffer))
+^ End:

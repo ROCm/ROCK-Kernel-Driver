@@ -1,0 +1,388 @@
+/* Parser for the reiser4() system call */
+
+/* Takes a string and parses it into a set of commands which are
+   executed.  */
+
+/*
+
+If you want to read about where future versions of this syntax will
+go, and what the grand scheme is, please go to
+www.namesys.com/future_vision.html.
+
+Names resolve into sets of keys.  In Reiser4, the sets of keys all
+consist of exactly one key, but this will change in future versions.
+
+Keys are not immutable objectids ala inode numbers.  The use of
+immutable objectids that all objects could be found by was the
+original architecture, and before coding was started this was realized
+to require lower performance due to creating immutable, and therefor
+poor, locality of reference when resolving them.  Keys currently do
+contain unique objectids, but this objectid does not suffice for
+finding the object.
+
+Name compounders construct names from subnames.  / and [] ([] is not
+implemented in reiser4, see www.namesys.com/future_vision.html for
+what it will do in a later version) are name compounders.  Name
+compounders can use any name which can be resolved into a key as a
+subname.  This provides "closure", in which the type of the result of
+every name operation is the same as the type of what the name
+operators operate on.  (Persons who create abstract models tend to
+place a high value on achieving closure in their design.  For more
+about closure, read www.namesys.com/future_vision.html.)
+
+A/B indicates that B is to be passed to A, and A will resolve its
+meaning.  This is consistent with Unix usage of /.  B is considered
+a subname of A in this example.
+
+Reiser4 supports a plugin that implements Unix regular files (regfile),
+and a plugin that implements Unix regular directories (regdir). (NIKITA-FIXME-HANS: use those names in the code)
+
+Plugins may resolve a subname by invoking a plugin of another object,
+or by invoking methods built into themselves.
+
+Special characters are whitespace plus []{}()/\,:;*$@!`' and keywords
+are <- and ->
+
+<-, ->,  are assignment operators.
+
+
+'A<-B' uses B's read method to read B, and uses A'S write method to
+write to A what was read from B.  It is a copy command similar to
+sendfile().
+
+The righthand side of an assignment defines a flow.  We calculate the flow,
+and then invoke the the write method defined by the lefthand side of
+the assignment.
+
+Example:
+
+A<-B
+
+assigns the contents of the object named B to A, overwriting the contents of A if A exists.
+
+` and ' indicate that all special characters between them should be
+ignored and parsed as a single string. That is, A<-`some text' causes A to have
+contents equal to a file named `some text'.  Quotes are allowed to nest.
+
+" indicates that the next word is inlined text.  Sorry, " is the symbol least useful for something else, so it got used.
+
+A<-"(this is a string not a name of a file)  // German style quoting: ,,ksdajfhkasdh``
+
+assigns (sans the single quotes) the string `this is a string not a name of a file' to A.
+
+A<-"`I think that using " in a language for delimiting quoting is bad style because delimiters should be matching pairs not matching identical singletons if nesting is to work at all.'
+
+assigns the string `I think that using " in a language for delimiting quoting is bad style because delimiters should be matching pairs not matching identical singletons if nesting is to work at all.' to A
+
+A<<-B
+
+appends file B to file A
+
+We need to define multiple aspects of the object when creating it.
+Additionally, we need to assign default values to those aspects of the
+definition not defined.  The problem arises when we have a multi-part
+definition.  We should avoid assigning one part, then assigning
+default values for all other parts, then overwriting those default
+values, some of which actually cannot be overwritten (e.g. pluginid).
+
+This means we need to name the object, and then perform multiple
+assignments in its creation.
+
+(x_ and )x_ where x is any sequence (including the null sequence) of
+non-special characters, are `named parenthesis'.  They have the usual meaning of
+parenthesis in most languages, and delimit what should be treated as a
+single unit by operators.  If you use named parenthesis you can avoid
+the "LISP bird nest" effect.  The disadvantage is that if you leave
+off the whitespace following the open parenthesis you will get an
+unintended effect.  Note that there must be no space between ( and x.
+
+Referencing the contents of parenthesis by the name of the parenthesis
+is planned in later versions..
+
+It is an unenforced but encouraged style convention that subnames which contain
+meta-information about the object, and pseudo-files that implement
+methods of the object, begin with `..'.  IT IS NOT A REQUIREMENT
+THAT THEY START WITH `..',  READ THAT AGAIN!  Sorry, got tired of the complaints about
+the non-existent requirement.  It all depends on how you write your plugins that
+use the meta-information whether the meta-data starts with `..'.
+
+Since what is meta-information, what is a method of the object, and
+what is contained information, or methods of sub-objects, are not
+necessarily always inherently susceptible to precise natural
+distinction, and since we desire to allow users maximal stylistic
+freedom to extend reiser4 into emulating other syntaxes, this is only
+an optional plugin design convention for use when appropriate.
+
+One can specify whether a file is listed by readdir in reiser4.  Using
+that feature, subnames of files containing meta-information about
+other files are by convention not listed by readdir, but can be listed
+by using the command reiser4("A_listing<-A/..list"), and then reading
+the file A_listing.
+
+For instance, if A is a regfile or regdir, then A/..owner resolves to
+a file containing the owner of A, and reading the A directory shows no
+file named ..owner.  More generally, all of the fields returned by
+stat() have a corresponding name of the form A/..field_name for all
+regfiles and regdirs.  The use of'..' avoids clashes between method
+names and filenames.  More extreme measures could be taken using
+something more obscure than '..' as a prefix, but I remember that
+Clearcase and WAFL never really had much in the way of problems with
+namespace collisions affecting users seriously, so I don't think one
+should excessively inconvenience a syntax for such reasons.
+
+DEMIDOV-FIXME-HANS: the paragraph below conflicts with the above
+*A (similar to C language dereference) means take the contents of
+that object which A is the name for, and treat those contents as a name.
+
+
+*`A B' is a reference to a file whose name consists of the characters
+A and a space and a B.
+
+
+A;B indicates that B is not to be executed until A completes.  So, `/'
+orders subnames within a compound name, and `;' orders operations.
+
+
+A,B indicates that A and B are independent of each other and
+unordered.
+
+A/B indicates that the plugin for A is to be passed B,
+and asked to handle it in its way, whatever that way is.
+
+/ and \ are considered equivalent, as a kindness to former windows users
+
+C/..invert<-A +"(some text)+ B
+
+indicates that C when read shall return the contents of A followed by
+'some text' as a delimiter followed by the contents of B.
+
+if  A  and   B  are object expressions then
+               A+B  is object expression
+               A\B  is object expression
+               A<-B is possible operation
+
+
+So, let us discuss the following example:
+
+Assume 357 is the user id of Michael Jackson.
+
+The following 3 expressions are equivalent:
+
+ascii_command = "/home/teletubbies/(..new(..name<-glove_location, ..object_t<-audit/regular, ..perm_t<-acl); glove_location/..acl<-( uid<-357, access<-denied ); glove_location/..audit<-mailto<-teletubbies@pbs.org; glove_location<-'we stole it quite some number of years ago, and put it in the very first loot pile (in the hole near the purple flower.')";
+
+ascii_command = "/home/teletubbies/(glove_location<-( ..object_t<-audit/regular, ..perm_t<-acl); glove_location/..acl<-  ( uid<-357, access<-denied ); glove_location/..audit<-mailto<-teletubbies@pbs.org; glove_location<-'we stole it quite some number of years ago, and put it in the very first loot pile (in the hole near the purple flower)')";
+
+
+ascii_command = "/home/teletubbies/(glove_location<-( ..object_t<-audit/regular, ..perm_t<-acl); glove_location / ( ..acl<-(uid<-357, access<-denied) ; ..audit<-mailto<-teletubbies@pbs.org); glove_location<-'we stole it quite some number of years ago, and put it in the very first loot pile (in the hole near the purple flower).')";
+
+DEMIDOV-FIXME-HANS: what is the meaning of the line below, and should it be ..new rather than new
+a/b/(new/(name<-"new_file_name"; type<-"regular file"; perm_t<-"acl"); new_file_name/acl<- ( uid<-"357", access<-"denied" ))
+
+DEMIDOV-FIXME-HANS: what is the meaning of ..anon and backing?
+ascii_command =
+   "/home/teletubbies/glove_location<-
+             ( (..object_t<-audit, ..perm_t<-acl) ;
+                ..acl<-  ( uid<-'357', access<-denied );
+                ..audit/(backing<-..anon<=(..object_t<-regular); // lookup<-/home/teletubbies/some-existing-file),
+                         log<-(mailto<-teletubbies@pbs.org));
+                ..body<-'we stole it quite some number of years ago, and put it in the very first loot pile (in the hole near the purple flower)';)";
+
+(a b)
+result<-/subject/[elves strike]
+(result /subject/[elves strike])
+/subject/[elves strike]->result
+
+
+
+
+DEMIDOV-FIXME-HANS: cleanup the explanation below
+The components of this example have the following meanings:
+/home/teletubbies/       - directory name
+/(..name                 - specifies that its argument is the name of the new file - parameter for ..new plugin
+/glove_location, - name of new file - parameter for name submethod of ..new method
+..object_t     -  name of submethod that assigns object type to new files - parameter for ..new plugin
+/audit         - plugin for file
+/regular,      - plugin for backing store for audit plugin
+..perm_t       - security plugin to be assigned
+)              - end of parameters for ..new plugin
+;              - next system call
+glove_location - file name
+/..acl         - plugin ..acl
+(              - begin parameters for ..new plugin of ..acl plugin
+uid            - plugin of ..acl plugin
+/357           - its value(parameter)
+,              -
+access         - ..
+/denied        -  value to assign
+)              - end of parameter list
+)              - ? unbalanced brakes
+;
+..audit        - plugin - file is unknown!
+/..new
+/mailto
+/"teletubbies@pbs.org"
+;
+glove_location_file - file name
+/
+
+"we stole it quite some number of years ago, and put it in the very first loot pile (in the hole near the purple flower)." - body of file
+
+reiser4(&ascii_command, ascii_command_length, stack_binary_parameters_referenced_in_ascii_command, stack_length);
+
+
+*/
+
+/*
+
+     w=\$v v=\$u u=5 z=\$w+$w
+               echo $z
+          eval echo $z
+     eval eval echo $z
+
+eval eval eval echo $z
+
+result is:
+
+$w+$v
+$v+$u
+$u+5
+5+5
+
+tw/transcrash_33[ /home/reiser/(a <- b, c <- d) ]
+
+        chgrp --      changes group ownership
+        chown --      changes ownership
+        chmod --      changes permissions
+        cp --	      copies
+        dd --	      copies and converts
+        df --	      shows filesystem disk usage.
+        dir --	      gives brief directory listing
+        du --	      shows disk usage
+        ln --	      creates links
+        ls --	      lists directory contents
+        mkdir --      creates directories
+        mkfifo --     creates FIFOs (named pipes)
+        mknod --      creates special files
+        mv --	      renames
+        rm --	      removes (deletes)
+        rmdir --      removes empty directories
+        shred --      deletes a file securely
+        sync --	      synchronizes memory and disk
+*/
+
+
+
+/*
+
+
+Assignment, and transaction, will be the commands supported in Reiser4(); more commands will appear in Reiser5. -> and <- will be the assignment operators.
+
+The amount transferred by an assignment is the minimum of the size of the left hand side and the size of the right hand side.  This amount is usually made one of the return values.
+
+    * lhs (assignment target) values:
+
+    /..process/..range/(first_byte<-(loff_t),last_byte<-(loff_t),bytes_written<-(ssize_t*) )
+              assigns (writes) to the buffer starting at address first_byte in the process address space, ending at last_byte, with the number of bytes actually written
+	      (The assignment source may be smaller or larger than the assignment target.) being written to address bytes_written.
+	      Representation of first_byte,last_byte, and bytes_written is left to the coder to determine.
+	      It is an issue that will be of much dispute and little importance.
+	      Notice / is used to indicate that the order of the operands matters; see www.namesys.com/future_vision.html for details of why this is appropriate syntax design.
+	      Note the lack of a file descriptor.
+
+    /filename
+              assigns to the file named filename, wholly obliterating its body with what is assigned.
+
+    /filename/..range/(first_byte<-(loff_t),last_byte<-(loff_t),bytes_written<-(ssize_t*) )
+              writes to the body, starting at first_byte, ending not past last_byte,
+	      recording number of bytes written in bytes_written
+
+    /filename/..range/(first_byte<-(loff_t),bytes_written<-(ssize_t*) )
+              writes to the body starting at offset, recording number of bytes written in bytes_written
+
+    * rhs (assignment source) values:
+
+    /..process/..range/(first_byte<-(loff_t),last_byte<-(loff_t),bytes_read<-(ssize_t*) )
+              reads from the buffer starting at address first_byte in the process address space, ending at last_byte.
+	      The number of bytes actually read (assignment source may be smaller or larger than assignment target) is written to address bytes_read.
+	      Representation of first_byte, last_byte, and bytes_read is left to the coder to determine, as it is an issue that will be of much dispute and little importance.
+
+    /filename
+              reads the entirety of the file named filename.
+
+    /filename/..range/(first_byte<-(loff_t),last_byte<-(loff_t),bytes_read<-(ssize_t*) )
+              reads from the body, starting at first_byte, ending not past last_byte,
+              recording number of bytes read in bytes_read
+
+    /filename/..range/(first_byte<-(loff_t),bytes_read<-(ssize_t*) )
+              reads from the body starting at offset until the end, recording number of bytes read in bytes_read
+
+    /filename/..stat/owner
+              reads from the ownership field of the stat data (stat data is that which is returned by the
+              stat() system call (owner, permissions, etc.) and stored on a per file basis by the FS.)
+
+
+
+
+
+*/
+
+
+
+
+/*
+
+example:
+
+
+
+       /path0/path1/filename/..range/(offset<-100,bytes_written<-0xff001258,last_byte<-256)<-/path0/path2/filename/..range/(first_byte<-0,bytes_readed<-0xff001250)
+
+       /path0/(path1/filename/..range/(offset<-100,bytes_written<-0xff001258,last_byte<-256)<-path2/filename/..range(first_byte<-0,bytes_readed<-0xff001250) )
+
+       /path0/(path1/filename/..range/(100,256)<-path2/filename/..range(0,256) )
+
+
+                                                                          ?
+       /path0/path1/filename/..range/(offset<-100,bytes_written<-0xff001258),last_byte<-256,/path0/path2/filename/..range(first_byte<-0,p_bytes_readed<-0xff001250)
+
+ssize_t bytes_readed;
+
+sprintf( string_pointer_bytes_read, "%8.8p", &bytes_readed );
+
+ */
+
+
+examples:
+
+
+.....b/(new/(name<-"new_file_name"; type<-regular_file; permition<-acl); new_file_name/acl/( uid<-"357", access<-denied );new_file_name<-/etc/passwd)
+
+where:
+  b is a directory
+we have lnode for it.and make:
+b_lnode->lookup(new)
+it that meen we find lnode for directory plugin "new"
+   and then we find new_lnode->lookup(name). this is lnode for name of new file and we assign to it string constant "new_file_name".
+
+   then we find new_lnode->lookup(type). this is lnode of type of new file
+   then we find new_lnode->lookup(regular_file) this is lnode of constants of types of plugin "new" for regular file
+   then we copy contens regular_file_lnode throuse tube to type_lnode.
+
+   then we find new_lnode->lookup(permition). this is lnode of type of permition of new file
+   then we find new_lnode->lookup(acl). this is lnode of constants of type of permition of "new" plugin, correcponding to acl
+   then we copy contens acl_lnode throuse tube to permition_lnode.
+
+then we find b_lnode->lookup(new_file_name). this is lnode for new file we jast created.
+then we find new_file_name_lnode->lookup(acl) . this is lnode of acl plugin .
+   then we find acl_lnode->lookup(uid)this is lnode for uid field of acl and assign to it string constant "357".
+   then we find acl_lnode->lookup(access).
+   then we find acl_lnode->lookup(denied).
+   then we copy contens denied_lnode throuse tube to access_lnode.
+
+then we find root_lnode->lookup(etc),
+then we find etc_lnode->lookup(passwd)
+then we read contens passwd_lnode throuse tube and write to new_file_name_lnode lnode.
+
+ok. command string is executed.
+
+

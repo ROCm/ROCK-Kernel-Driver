@@ -129,4 +129,8 @@ extern void FASTCALL(free_cold_page(struct page *page));
 
 void page_alloc_init(void);
 
+int  perthread_pages_reserve(int nrpages, int gfp);
+void perthread_pages_release(int nrpages);
+int  perthread_pages_count(void);
+
 #endif /* __LINUX_GFP_H */

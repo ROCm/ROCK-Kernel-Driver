@@ -537,6 +537,8 @@ struct task_struct {
 
 /* TASK_UNMAPPED_BASE */
 	unsigned long map_base;
+	struct list_head private_pages;	/* per-process private pages */
+	int private_pages_count;
 };
 
 static inline pid_t process_group(struct task_struct *tsk)

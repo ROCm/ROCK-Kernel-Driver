@@ -114,8 +114,8 @@ extern struct group_info init_groups;
 	.journal_info	= NULL,						\
  	.map_base	= __TASK_UNMAPPED_BASE,				\
 	.io_wait	= NULL,						\
+	.private_pages	= LIST_HEAD_INIT(tsk.private_pages),		\
+	.private_pages_count = 0,					\
 }
-
-
 
 #endif

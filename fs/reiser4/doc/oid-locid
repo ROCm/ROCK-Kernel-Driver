@@ -1,0 +1,108 @@
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+Message-ID: <15392.39020.573047.826769@laputa.namesys.com>
+Date: Wed, 19 Dec 2001 16:38:52 +0300
+To: Reiserfs developers mail-list <Reiserfs-Dev@Namesys.COM>
+Subject: [RFC]: objectids and localities management
+X-Mailer: VM 6.96 under 21.4 (patch 3) "Academic Rigor" XEmacs Lucid
+FCC: ~/documents/mail/outgoing
+--text follows this line--
+Hello,
+
+there is one thing that seems awkward in current reiser{fs|4} design: in
+a key we have both locality id (locid) and object id (oid). This is
+slightly illogical because oid alone is unique, but we cannot find an
+object given oid. This was, by the way, main reason behind our NFS
+troubles. So, why is this strictly necessary? I'll try to reason from
+the "first principles". Following account doesn't pretend to be of any
+historical accuracy of course.
+
+1. In a data structure we use to store objects (tree) items
+   with close keys are packed into the same disk block. This means that
+   we cannot completely separate key allocation from block
+   allocation. That is,
+
+      - tree forces us to encode disk location preferences in a key. (A1)
+
+2. If we cannot completely separate key and block allocation let's try
+   in stead to blend them together. That is, we rely on block allocator
+   to follow tree ordering and topology: blocks containing items with
+   close keys are allocated close on disk and blocks contiguous in tree
+   order are more or less contiguous on disk. How far bitmap.c fulfill
+   or can fulfill these goals is out of the scope of this discussion,
+
+      - let's suppose that we have ideal block allocator. (A2)
+
+3. Given this, why cannot we encode disk location preferences in oid
+   alone? Because oid has to be unique and we cannot predict how many
+   objects we are going to group together in a future (how many objects
+   there will be in a directory that is). That is, suppose we create two
+   directories "a" and "b" in succession. If oid were the only thing to
+   store location preference, than we should leave after the oid of "a"
+   enough unused oids for all objects within "a", but we don't know how
+   many of them will be there.
+
+4. To solve this (locid, oid) scheme was born. It has following
+   advantages:
+
+      - it is simple to implement
+      - it allows one to encode enough location preference into the key (A3)
+
+But the more people used reiserfs and the more files they started to
+store in a single directory, the less valid (A3) became. oid became
+inadequate location preference, because while it allows to separate
+files from different directories it doesn't allow to order files within
+single directory. For example readdir of big directory is slow, because
+files are not sorted within directory. Various ad-hoc solutions have
+been proposed (oid==hash, add "band" to oid, etc), but there is obvious
+conflict between requirement that oid is unique and desire to encode
+additional information in it. In effect all such solutions amount to
+further splitting of (locid,oid) pair into (locid, someid, oid) for the
+reasons similar to those on the steps 3,4 above.
+
+The scheme proposed below tries to meet following goals:
+
+ G1. only keep unique oid in a key, thus making it possible to find file
+     given its inode number and additionally shrink key, increasing
+     fanout.
+
+ G2. allow configurable amount of fine-grained locality preference
+     information to be associated with each oid, thus allowing files
+     to be ordered in a tree according to some hierarchical "packing
+     localities", for example: first order files by oid of parent
+     directory, then by hash of name within this directory.
+
+
+Proposal:
+
+Maintain separate map (oidlocmap, implementation discussed below) from
+oid to "locpref", where locpref is additional fine-grained location
+preference data, associated with oid. For example locpref may be just
+(locid) to emulate existing behavior, or (locid, hash) or (locid,
+user-supplied-grouping-info), etc.
+
+Key only contains oid, that is, ceteris paribus, key has form
+(item-type, oid, offset). If oid is 60 bits, this is 16 bytes.
+
+Ordering of items within tree (and, given (A2), their ordering on disk)
+is completely determined by keycmp() function that compares two
+keys. Before comparing two keys, keycmp(k1, k2) consults oidlocmap and
+obtains locprefs, associated with oids of k1 and k2. locprefs then are
+"pasted" into k1 and k2, producing "expanded" keys, containing full
+location preferences information. Expanded keys are compared as usual.
+
+In simplest case oidlocmap can be implemented as normal balanced tree,
+where keys are oids (60 bits) and values locprefs. If we limit ourselves
+to fixed format of locpref (at least per file system) than, we get
+standard text-book balanced tree storing values of fixed size which is
+simple to implement.
+
+There is of course overhead of maintaining oidlocmap and, especially, of
+consulting it on each keycmp(), but it looks to me that it will be not
+that significant, because oidlocmap is compact and will be out-weighted
+by increased fanout in the main tree.
+
+Comments?
+
+Nikita.

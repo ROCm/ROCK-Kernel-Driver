@@ -1,0 +1,192 @@
+
+	   MAINTENANCE OF REISER4 BITKEEPER REPOSITORY FOR THE CORE KERNEL.
+
+								   OVERVIEW
+
+Reiser4 receives linux kernel code from http://linux.bkbits.net/linux-2.5.
+
+This repository is pulled into laputa:~god/src/bk-linux-2.5 (BK-LINUX-2.5) by
+nightly cron job (~god/bin/update-src.sh). BK-LINUX-2.5 is only used as a
+local copy of Linus' repository, no changes are made in it.
+
+BK-LINUX-2.5 has child repository laputa:~god/projects/limbo (LIMBO), where it
+is merged with the set of patches to core kernel that are necessary for
+reiser4 to work.
+
+These patches are maintained through Andrew Morton's patch-scripts
+(http://www.zipworld.com.au/~akpm/linux/patches/). Local and slightly modified
+version of patch-scripts is installed at laputa:~god/run/patch-scripts/. See
+laputa:~god/run/patch-scripts/docco.txt for more detailed usage instructions.
+
+patch-scripts are needed, because reiser4 modifications to the core kernel
+should be available as a set of meaningful separately documented patches
+rather than as one single huge patch (that would result from just accumulating
+all changes in the bitkeeper).
+
+Patches themselves are stored in bitkeeper repository
+laputa:~god/projects/core-patches (CORE-PATCHES).
+
+New versions of the core kernel are pulled into LIMBO, merged with
+CORE-PATCHES, conflicts are resolved. This repository is cloned into temporary
+repositories to test resulting kernel. After testing LIMBO is cloned/pulled
+into thebsh:/usr/home/bk/reiser4-linux-2.6 (REISER4-LINUX-2.6). From there
+individual developers clone/pull it to their heart content.
+
+							 UPGRADE INSTRUCTIONS
+
+1. backup LIMBO:
+
+$ cd ~god/projects
+$ mv limbo limbo.orig
+
+2. clone BK-LINUX-2.5 into LIMBO
+
+$ bk clone ~god/src/bk-linux-2.5 limbo
+$ cd limbo
+$ bk -r edit -q
+
+3. roll LIMBO back to the desired kernel version: after a clone LIMBO contains
+some version of Linus' repository, but usually we want a repository
+corresponding to the exact kernel version. Use bk changes -L to find changeset
+number corresponding to the desired kernel version, then do bk undo -a<rev.no>
+to move the repository to that version.
+
+4. graft CORE-PATCHES into LIMBO
+
+$ bk clone ~god/projects/core-patches patches
+$ cd patches
+$ bk -r edit -q
+$ cd ../
+$ . patches/setpc # set patch-script variables
+
+5. check status of core patches:
+
+$ pstatus # patch-scripts utility
+1:a:2.6.6-mm2 Needs changelog
+2:a:all-sources.diff Needs changelog
+    ...
+35:a:disable-vermagic Needs changelog
+36:a:make-4kstack-option Needs changelog
+37:a:radix_tree_lookup_slot Needs changelog
+?:-:2.6.6-rc3-mm2 Needs changelog
+?:-:do_mmap2-fix.diff Needs changelog
+    ...
+
+Patches marked with ":a:" are applied (list of all currently applied patches
+is in patches/applied-patches). Patches marked with ":-:" are not
+applied. Patches with "?" (not numbered) are not included into "series"
+(patches/series file)---these are usually some old or testing patches no
+longer used.
+
+So, above pstatus output shows that there are 37 patches in the current
+series, all applied. This is normal situation. LIMBO and CORE-PATCHES
+repositories should always be left in such state after upgrading.
+
+6. Refresh core-patches.
+
+$ echo > patches/applied-patches # pretend patches are not applied
+
+Now for each patch do
+
+$ pushpatch # this applies next patch in series
+
+If patch could not applied successfully, "force it":
+
+$ pushpatch -f # this forces patch and generates .rej and .orig files
+
+Go through all generated .rej and .orig, resolve all conflicts, update
+sources. Delete .rej and .orig files.
+
+Independently of whether patch was applied successfully or not, finish its
+processing by refreshing it:
+
+$ refpatch # refresh current patch
+
+Repeat above pushpatch/refpatch sequence until patch-scripts report that
+"Series are fully applied".
+
+7. Commit changes. Simplest way to do this is to do bk citool in LIMBO. But
+this is time-consuming. Alternatively do:
+
+$ bk -r delta -a -q -y"local reiser4 patches applied"
+$ bk commit -q -y"local reiser4 patches applied"
+$ cd patches
+$ bk citool # revise and commit modifications to the local patches
+$ bk push # push modifications to the CORE-PATCHES
+$ cd ..
+
+8. Test resulting sources
+
+$ cd ~god/projects/tmp
+$ bk clone ../limbo
+
+and then follow standard build procedure: clone reiser4 repository into
+tmp/limbo/fs, configure, build, etc.
+
+9. Pull changes to thebsh
+
+$ ssh thebsh
+$ cd /usr/home/bk
+$ mv reiser4-linux-2.6 reiser4-linux-2.6.orig
+$ bk clone god@laputa:/home/god/projects/limbo reiser4-linux-2.6
+
+If everything is ok, remove backup repositories limbo.orig and
+reiser4-linux-2.6.orig.
+
+							   ADDING NEW PATCH
+
+There are two versions of adding-new-patch procedure: first for the "in-order"
+patches, second for the "external" patches, like -mm patch.
+
+								 In-order patch
+
+1. Prepare repositories:
+
+$ cd ~god/projects/limbo
+$ bk -r edit -q
+$ cd patches
+$ bk -r edit -q
+$ cd ..
+
+2. As was mentioned above, all patches in the series should be already
+applied. Put new patch into "patches":
+
+$ mv /tmp/new-patch.diff patches/patches/new-patch.patch
+
+.patch suffix is mandatory!
+
+$ pcpatch new-patch # this generates patches/pc/new-patch.pc
+$ vi patches/txt/new-patch.txt # add patch description
+$ echo new-patch.patch >> patches/series # add patch to the series file
+$ pushpatch # apply it.
+
+If patch couldn't be applied, "force" it and resolve conflicts, see above.
+
+$ refpatch # and refresh it.
+
+This again leaves repositories in the consistent state (all patches in the
+series are applied).
+
+3. Commit changes, don't forget to add new files to the CORE-PATCHES. See
+above.
+
+								External patch
+
+External patch (such as combined patch for -mm) sometimes has to be added at
+the beginning of series (rather than at the end as small patches are). Such
+patches are best added during upgrading. Specifically, step 6 becomes:
+
+6. Refresh core-patches.
+
+$ echo > patches/applied-patches # pretend patches are not applied
+$ cp /tmp/external.patch patches/patches
+$ pcpatch external
+$ vi patches/txt/external.txt
+$ vi patches/series # add "external.patch" at the appropriate place
+
+Proceed with pushpatch/refpatch as usual.
+
+To remove patch from series (for example, when upgrading to the new -mm
+kernel), just kill appropriate line in the patches/series.
+
+Nikita. 2004.05.25

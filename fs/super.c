@@ -67,7 +67,9 @@ static struct super_block *alloc_super(void)
 		INIT_LIST_HEAD(&s->s_io);
 		INIT_LIST_HEAD(&s->s_files);
 		INIT_LIST_HEAD(&s->s_instances);
+		INIT_LIST_HEAD(&s->s_entries);
 		INIT_HLIST_HEAD(&s->s_anon);
+		INIT_LIST_HEAD(&s->s_inodes);
 		init_rwsem(&s->s_umount);
 		sema_init(&s->s_lock, 1);
 		down_write(&s->s_umount);
@@ -98,6 +100,205 @@ static inline void destroy_super(struct super_block *s)
 	security_sb_free(s);
 	kfree(s);
 }
+
+/* struct sb_entry obmanipulations. */
+
+/**
+ *	register_sb_entry	-	attach sb_entry to a superblock
+ *	@s: superblock to attach to
+ *	@entry: entry to attach to the @s
+ *
+ *	Attaches @entry to the superblock, marks it as live. Called under
+ *	write-taken @s->s_umount.
+ */
+static void register_sb_entry(struct super_block *s, struct sb_entry *entry)
+{
+	entry->live = 1;
+	list_add(&entry->linkage, &s->s_entries);
+	entry->type = s->s_type;
+	get_filesystem(entry->type);
+	entry->s = s;
+}
+
+/**
+ *	unregister_sb_entry	-	detach sb_entry from superblock
+ *	@entry: entry to detach
+ *
+ *	Detaches @entry from the superblock, and marks it as dead. Called
+ *	under write-taken @entry->s->s_umount.
+ */
+static void unregister_sb_entry(struct sb_entry *entry)
+{
+	entry->live = 0;
+	list_del_init(&entry->linkage);
+	if (entry->type != NULL) {
+		put_filesystem(entry->type);
+		entry->type = NULL;
+	}
+}
+
+/* helper (*test) callback for get_sb_entry. Should probably be just declared
+ * local in get_sb_entry(). */
+static int test_sb(struct super_block *sb, void *data)
+{
+	return data == sb;
+}
+
+/* helper (*set) callback for get_sb_entry. */
+static int set_sb(struct super_block *sb, void *data)
+{
+	return -ENOENT;
+}
+
+/**
+ *	get_sb_entry	-	acquire a reference to sb_entry
+ *	@entry: sb_entry to acquire reference to
+ *
+ *	Acquires a reference to the @entry. This means that after successful
+ *	return from this function @entry (and @entry->s) are guaranteed to
+ *	exist until corresponding call to @put_sb_entry. This function is used
+ *	to avoid races between sysfs/procfs methods and umount. Fails if
+ *	sget() failed or @entry->s is already unmounted.
+ */
+static int get_sb_entry(struct sb_entry *entry)
+{
+	int result;
+	struct super_block *s;
+
+	s = sget(entry->type, test_sb, set_sb, entry->s);
+	if (IS_ERR(s))
+		return PTR_ERR(s);
+	/* at this point @s is pinned, and s->s_umount is write-taken */
+	result = entry->live ? 0 : -ENOENT;
+	up_write(&s->s_umount);
+	if (result != 0)
+		deactivate_super(s);
+	return result;
+}
+
+/**
+ *	put_sb_entry	-	release a reference to sb_entry
+ *	@entry: sb_entry to release reference to
+ *
+ *	Dual to get_sb_entry(), should always be called if former returned
+ *	success.
+ */
+static void put_sb_entry(struct sb_entry *entry)
+{
+	/* release reference acquired by get_sb_entry() */
+	deactivate_super(entry->s);
+}
+
+/* helper to deactivate_super(): detach all sb_entries from @s */
+static void kill_sb_entries(struct super_block *s)
+{
+	while (!list_empty(&s->s_entries))
+		unregister_sb_entry(container_of(s->s_entries.next,
+						 struct sb_entry, linkage));
+}
+
+/**
+ *	fs_kobject_register	-	register file-system kobject
+ *	@s: superblock @fskobj belongs to
+ *	@fskobj: file-system kobject to register
+ *
+ *	Registers kobject and sb_entry parts of
+ *	@fskobj. Cf. include/linux/fs.h:struct fs_kobject
+ */
+int fs_kobject_register(struct super_block *s, struct fs_kobject * fskobj)
+{
+	int result;
+
+	result = kobject_register(&fskobj->kobj);
+	if (result == 0)
+		register_sb_entry(s, &fskobj->entry);
+	return result;
+}
+EXPORT_SYMBOL(fs_kobject_register);
+
+/**
+ *	fs_kobject_register	-	register file-system kobject
+ *	@fskobj: file-system kobject to register
+ *
+ *	Unregisters kobject and sb_entry parts of @fskobj.
+ */
+void fs_kobject_unregister(struct fs_kobject * fskobj)
+{
+	unregister_sb_entry(&fskobj->entry);
+	kobject_unregister(&fskobj->kobj);
+}
+EXPORT_SYMBOL(fs_kobject_unregister);
+
+/**
+ *	fs_attr_show	-	->show method for fs_attr_ops.
+ *	@kobj: kobject embedded into struct fs_kobject
+ *	@kattr: kattr embedded into struct fs_kattr
+ *
+ *	Calls ->show() method of fs_kattr into which @kattr is
+ *	embedded. Avoids races with umount.
+ */
+static ssize_t
+fs_attr_show(struct kobject *kobj, struct attribute *kattr, char *buf)
+{
+	struct fs_kobject  *fskobj;
+	struct fs_kattr    *fskattr;
+	struct sb_entry    *entry;
+	int                 result;
+
+	fskobj  = container_of(kobj, struct fs_kobject, kobj);
+	fskattr = container_of(kattr, struct fs_kattr, kattr);
+	entry   = &fskobj->entry;
+
+	result = get_sb_entry(entry);
+	if (result == 0) {
+		if (fskattr->show != NULL)
+			result = fskattr->show(entry->s, fskobj, fskattr, buf);
+		else
+			result = 0;
+		put_sb_entry(entry);
+	}
+	return result;
+}
+
+/**
+ *	fs_attr_store	-	->store method for fs_attr_ops.
+ *	@kobj: kobject embedded into struct fs_kobject
+ *	@kattr: kattr embedded into struct fs_kattr
+ *
+ *	Calls ->store() method of fs_kattr into which @kattr is
+ *	embedded. Avoids races with umount.
+ */
+static ssize_t
+fs_attr_store(struct kobject *kobj, struct attribute *kattr,
+	      const char *buf, size_t size)
+{
+	struct fs_kobject  *fskobj;
+	struct fs_kattr    *fskattr;
+	struct sb_entry    *entry;
+	int                 result;
+
+	fskobj  = container_of(kobj, struct fs_kobject, kobj);
+	fskattr = container_of(kattr, struct fs_kattr, kattr);
+	entry   = &fskobj->entry;
+
+	result = get_sb_entry(entry);
+	if (result == 0) {
+		if (fskattr->store != NULL)
+			result = fskattr->store(entry->s,
+						fskobj, fskattr, buf, size);
+		else
+			result = 0;
+		put_sb_entry(entry);
+	}
+	return result;
+}
+
+/* sysfs operations for file systems exporting information in /sys/fs */
+struct sysfs_ops fs_attr_ops = {
+	.show  = fs_attr_show,
+	.store = fs_attr_store
+};
+EXPORT_SYMBOL(fs_attr_ops);
 
 /* Superblock refcounting  */
 
@@ -147,6 +348,7 @@ void deactivate_super(struct super_block *s)
 		s->s_count -= S_BIAS-1;
 		spin_unlock(&sb_lock);
 		down_write(&s->s_umount);
+		kill_sb_entries(s);
 		fs->kill_sb(s);
 		put_filesystem(fs);
 		put_super(s);
@@ -234,7 +436,6 @@ void generic_shutdown_super(struct super_block *sb)
 	spin_unlock(&sb_lock);
 	up_write(&sb->s_umount);
 }
-
 EXPORT_SYMBOL(generic_shutdown_super);
 
 /**
@@ -417,9 +618,8 @@ rescan:
 	spin_unlock(&sb_lock);
 	return NULL;
 }
-
 EXPORT_SYMBOL(get_super);
- 
+
 struct super_block * user_get_super(dev_t dev)
 {
 	struct list_head *p;

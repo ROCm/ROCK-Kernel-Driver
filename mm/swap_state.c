@@ -35,7 +35,7 @@ static struct backing_dev_info swap_backing_dev_info = {
 
 struct address_space swapper_space = {
 	.page_tree	= RADIX_TREE_INIT(GFP_ATOMIC),
-	.tree_lock	= SPIN_LOCK_UNLOCKED,
+	.tree_lock	= RW_LOCK_UNLOCKED,
 	.a_ops		= &swap_aops,
 	.i_mmap_nonlinear = LIST_HEAD_INIT(swapper_space.i_mmap_nonlinear),
 	.backing_dev_info = &swap_backing_dev_info,
@@ -74,7 +74,7 @@ static int __add_to_swap_cache(struct page *page,
 	BUG_ON(PagePrivate(page));
 	error = radix_tree_preload(gfp_mask);
 	if (!error) {
-		spin_lock_irq(&swapper_space.tree_lock);
+		write_lock_irq(&swapper_space.tree_lock);
 		error = radix_tree_insert(&swapper_space.page_tree,
 						entry.val, page);
 		if (!error) {
@@ -85,7 +85,7 @@ static int __add_to_swap_cache(struct page *page,
 			total_swapcache_pages++;
 			pagecache_acct(1);
 		}
-		spin_unlock_irq(&swapper_space.tree_lock);
+		write_unlock_irq(&swapper_space.tree_lock);
 		radix_tree_preload_end();
 	}
 	return error;
@@ -212,9 +212,9 @@ void delete_from_swap_cache(struct page *page)
   
 	entry.val = page->private;
 
-	spin_lock_irq(&swapper_space.tree_lock);
+	write_lock_irq(&swapper_space.tree_lock);
 	__delete_from_swap_cache(page);
-	spin_unlock_irq(&swapper_space.tree_lock);
+	write_unlock_irq(&swapper_space.tree_lock);
 
 	swap_free(entry);
 	page_cache_release(page);
@@ -313,13 +313,13 @@ struct page * lookup_swap_cache(swp_entry_t entry)
 {
 	struct page *page;
 
-	spin_lock_irq(&swapper_space.tree_lock);
+	read_lock_irq(&swapper_space.tree_lock);
 	page = radix_tree_lookup(&swapper_space.page_tree, entry.val);
 	if (page) {
 		page_cache_get(page);
 		INC_CACHE_INFO(find_success);
 	}
-	spin_unlock_irq(&swapper_space.tree_lock);
+	read_unlock_irq(&swapper_space.tree_lock);
 	INC_CACHE_INFO(find_total);
 	return page;
 }
@@ -342,12 +342,12 @@ struct page *read_swap_cache_async(swp_entry_t entry,
 		 * called after lookup_swap_cache() failed, re-calling
 		 * that would confuse statistics.
 		 */
-		spin_lock_irq(&swapper_space.tree_lock);
+		read_lock_irq(&swapper_space.tree_lock);
 		found_page = radix_tree_lookup(&swapper_space.page_tree,
 						entry.val);
 		if (found_page)
 			page_cache_get(found_page);
-		spin_unlock_irq(&swapper_space.tree_lock);
+		read_unlock_irq(&swapper_space.tree_lock);
 		if (found_page)
 			break;
 
