@@ -25,8 +25,8 @@
 
 #define local_softirq_pending()		(local_cpu_data->softirq_pending)
 #define local_ksoftirqd_task()		(local_cpu_data->ksoftirqd)
-#define local_irq_count()		(local_cpu_data->irq_stat.f.irq_count)
-#define local_bh_count()		(local_cpu_data->irq_stat.f.bh_count)
+#define really_local_irq_count()	(local_cpu_data->irq_stat.f.irq_count)	/* XXX fix me */
+#define really_local_bh_count()		(local_cpu_data->irq_stat.f.bh_count)	/* XXX fix me */
 #define local_syscall_count()		/* unused on IA-64 */
 #define local_nmi_count()		0
 
@@ -38,11 +38,11 @@
 #define in_irq()			(local_cpu_data->irq_stat.f.irq_count != 0)
 
 #ifndef CONFIG_SMP
-# define local_hardirq_trylock()	(local_irq_count() == 0)
+# define local_hardirq_trylock()	(really_local_irq_count() == 0)
 # define local_hardirq_endlock()	do { } while (0)
 
-# define local_irq_enter(irq)		(local_irq_count()++)
-# define local_irq_exit(irq)		(local_irq_count()--)
+# define local_irq_enter(irq)		(really_local_irq_count()++)
+# define local_irq_exit(irq)		(really_local_irq_count()--)
 
 # define synchronize_irq()		barrier()
 #else
@@ -70,6 +70,7 @@ release_irqlock (int cpu)
 	/* if we didn't own the irq lock, just ignore.. */
 	if (global_irq_holder == cpu) {
 		global_irq_holder = NO_PROC_ID;
+		smp_mb__before_clear_bit();	/* need barrier before releasing lock... */
 		clear_bit(0,&global_irq_lock);
         }
 }
@@ -77,7 +78,7 @@ release_irqlock (int cpu)
 static inline void
 local_irq_enter (int irq)
 {
-	local_irq_count()++;
+	really_local_irq_count()++;
 
 	while (test_bit(0,&global_irq_lock)) {
 		/* nothing */;
@@ -87,13 +88,13 @@ local_irq_enter (int irq)
 static inline void
 local_irq_exit (int irq)
 {
-	local_irq_count()--;
+	really_local_irq_count()--;
 }
 
 static inline int
 local_hardirq_trylock (void)
 {
-	return !local_irq_count() && !test_bit(0,&global_irq_lock);
+	return !really_local_irq_count() && !test_bit(0,&global_irq_lock);
 }
 
 #define local_hardirq_endlock()		do { } while (0)

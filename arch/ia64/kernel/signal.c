@@ -1,7 +1,7 @@
 /*
  * Architecture-specific signal handling support.
  *
- * Copyright (C) 1999-2001 Hewlett-Packard Co
+ * Copyright (C) 1999-2002 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  *
  * Derived from i386 and Alpha versions.
@@ -17,6 +17,8 @@
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
 #include <linux/stddef.h>
+#include <linux/tty.h>
+#include <linux/binfmts.h>
 #include <linux/unistd.h>
 #include <linux/wait.h>
 
@@ -38,8 +40,6 @@
 # define PUT_SIGSET(k,u)	__put_user((k)->sig[0], &(u)->sig[0])
 # define GET_SIGSET(k,u)	__get_user((k)->sig[0], &(u)->sig[0])
 #endif
-
-extern long ia64_do_signal (sigset_t *, struct sigscratch *, long);	/* forward decl */
 
 long
 ia64_rt_sigsuspend (sigset_t *uset, size_t sigsetsize, struct sigscratch *scr)
@@ -160,6 +160,7 @@ copy_siginfo_to_user (siginfo_t *to, siginfo_t *from)
 		err |= __put_user((short)from->si_code, &to->si_code);
 		switch (from->si_code >> 16) {
 		      case __SI_FAULT >> 16:
+			err |= __put_user(from->si_flags, &to->si_flags);
 			err |= __put_user(from->si_isr, &to->si_isr);
 		      case __SI_POLL >> 16:
 			err |= __put_user(from->si_addr, &to->si_addr);
@@ -172,7 +173,12 @@ copy_siginfo_to_user (siginfo_t *to, siginfo_t *from)
 		      case __SI_PROF >> 16:
 			err |= __put_user(from->si_uid, &to->si_uid);
 			err |= __put_user(from->si_pid, &to->si_pid);
-			err |= __put_user(from->si_pfm_ovfl, &to->si_pfm_ovfl);
+			if (from->si_code == PROF_OVFL) {
+				err |= __put_user(from->si_pfm_ovfl[0], &to->si_pfm_ovfl[0]);
+				err |= __put_user(from->si_pfm_ovfl[1], &to->si_pfm_ovfl[1]);
+				err |= __put_user(from->si_pfm_ovfl[2], &to->si_pfm_ovfl[2]);
+				err |= __put_user(from->si_pfm_ovfl[3], &to->si_pfm_ovfl[3]);
+			}
 			break;
 		      default:
 			err |= __put_user(from->si_uid, &to->si_uid);
@@ -239,7 +245,7 @@ ia64_rt_sigreturn (struct sigscratch *scr)
 	 * could be corrupted.
 	 */
 	retval = (long) &ia64_leave_kernel;
-	if (current->ptrace & PT_TRACESYS)
+	if (test_thread_flag(TIF_SYSCALL_TRACE))
 		/*
 		 * strace expects to be notified after sigreturn returns even though the
 		 * context to which we return may not be in the middle of a syscall.

@@ -4,11 +4,10 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000 Silicon Graphics, Inc.
- * Copyright (C) 2000 by Colin Ngam
+ * Copyright (C) 1992 - 1997, 2000-2001 Silicon Graphics, Inc. All rights reserved.
  */
-#ifndef _ASM_SN_SN1_HUBPI_H
-#define _ASM_SN_SN1_HUBPI_H
+#ifndef _ASM_IA64_SN_SN1_HUBPI_H
+#define _ASM_IA64_SN_SN1_HUBPI_H
 
 /************************************************************************
  *                                                                      *
@@ -551,7 +550,7 @@
 
 
 
-#ifdef _LANGUAGE_C
+#ifndef __ASSEMBLY__
 
 /************************************************************************
  *                                                                      *
@@ -4248,7 +4247,7 @@ typedef union pi_perf_cntr1_b_u {
 
 
 
-#endif /* _LANGUAGE_C */
+#endif /* __ASSEMBLY__ */
 
 /************************************************************************
  *                                                                      *
@@ -4261,4 +4260,4 @@ typedef union pi_perf_cntr1_b_u {
 #define PI_GFX_PAGE_ENABLE	0x0000010000000000LL
 
 
-#endif /* _ASM_SN_SN1_HUBPI_H */
+#endif /* _ASM_IA64_SN_SN1_HUBPI_H */

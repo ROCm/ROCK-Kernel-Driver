@@ -1,13 +1,16 @@
 /*
- * This file contains the code to configure and read/write the ia64 performance
- * monitoring stuff.
+ * This file implements the perfmon subsystem which is used
+ * to program the IA-64 Performance Monitoring Unit (PMU).
  *
  * Originaly Written by Ganesh Venkitachalam, IBM Corp.
- * Modifications by David Mosberger-Tang, Hewlett-Packard Co.
- * Modifications by Stephane Eranian, Hewlett-Packard Co.
  * Copyright (C) 1999 Ganesh Venkitachalam <venkitac@us.ibm.com>
- * Copyright (C) 1999 David Mosberger-Tang <davidm@hpl.hp.com>
- * Copyright (C) 2000-2001 Stephane Eranian <eranian@hpl.hp.com>
+ *
+ * Modifications by Stephane Eranian, Hewlett-Packard Co.
+ * Modifications by David Mosberger-Tang, Hewlett-Packard Co.
+ *
+ * Copyright (C) 1999-2002  Hewlett Packard Co
+ *               Stephane Eranian <eranian@hpl.hp.com>
+ *               David Mosberger-Tang <davidm@hpl.hp.com>
  */
 
 #include <linux/config.h>
@@ -22,151 +25,137 @@
 #include <linux/mm.h>
 
 #include <asm/bitops.h>
-#include <asm/efi.h>
 #include <asm/errno.h>
-#include <asm/hw_irq.h>
 #include <asm/page.h>
 #include <asm/pal.h>
 #include <asm/perfmon.h>
-#include <asm/pgtable.h>
 #include <asm/processor.h>
 #include <asm/signal.h>
-#include <asm/system.h>
 #include <asm/system.h>
 #include <asm/uaccess.h>
 #include <asm/delay.h> /* for ia64_get_itc() */
 
 #ifdef CONFIG_PERFMON
 
-#define PFM_VERSION		"0.3"
-#define PFM_SMPL_HDR_VERSION	1
-
-#define PMU_FIRST_COUNTER	4	/* first generic counter */
-
-#define PFM_WRITE_PMCS		0xa0
-#define PFM_WRITE_PMDS		0xa1
-#define PFM_READ_PMDS		0xa2
-#define PFM_STOP		0xa3
-#define PFM_START		0xa4
-#define PFM_ENABLE		0xa5	/* unfreeze only */
-#define PFM_DISABLE		0xa6	/* freeze only */
-#define PFM_RESTART		0xcf
-#define PFM_CREATE_CONTEXT	0xa7
-#define PFM_DESTROY_CONTEXT	0xa8
 /*
- * Those 2 are just meant for debugging. I considered using sysctl() for
- * that but it is a little bit too pervasive. This solution is at least
- * self-contained.
+ * For PMU which rely on the debug registers for some features, you must
+ * you must enable the following flag to activate the support for
+ * accessing the registers via the perfmonctl() interface.
  */
-#define PFM_DEBUG_ON		0xe0
-#define PFM_DEBUG_OFF		0xe1
-
-#define PFM_DEBUG_BASE		PFM_DEBUG_ON
-
-
-/*
- * perfmon API flags
- */
-#define PFM_FL_INHERIT_NONE	 0x00	/* never inherit a context across fork (default) */
-#define PFM_FL_INHERIT_ONCE	 0x01	/* clone pfm_context only once across fork() */
-#define PFM_FL_INHERIT_ALL	 0x02	/* always clone pfm_context across fork() */
-#define PFM_FL_SMPL_OVFL_NOBLOCK 0x04	/* do not block on sampling buffer overflow */
-#define PFM_FL_SYSTEM_WIDE	 0x08	/* create a system wide context */
-#define PFM_FL_EXCL_INTR	 0x10	/* exclude interrupt from system wide monitoring */
-
-/*
- * PMC API flags
- */
-#define PFM_REGFL_OVFL_NOTIFY	1		/* send notification on overflow */
-
-/*
- * Private flags and masks
- */
-#define PFM_FL_INHERIT_MASK	(PFM_FL_INHERIT_NONE|PFM_FL_INHERIT_ONCE|PFM_FL_INHERIT_ALL)
-
-#ifdef CONFIG_SMP
-#define cpu_is_online(i) (cpu_online_map & (1UL << i))
-#else
-#define cpu_is_online(i)	1
+#ifdef CONFIG_ITANIUM
+#define PFM_PMU_USES_DBR	1
 #endif
 
-#define PMC_IS_IMPL(i)		(i < pmu_conf.num_pmcs && pmu_conf.impl_regs[i>>6] & (1<< (i&~(64-1))))
-#define PMD_IS_IMPL(i)		(i < pmu_conf.num_pmds &&  pmu_conf.impl_regs[4+(i>>6)] & (1<< (i&~(64-1))))
-#define PMD_IS_COUNTER(i)	(i>=PMU_FIRST_COUNTER && i < (PMU_FIRST_COUNTER+pmu_conf.max_counters))
-#define PMC_IS_COUNTER(i)	(i>=PMU_FIRST_COUNTER && i < (PMU_FIRST_COUNTER+pmu_conf.max_counters))
+/*
+ * perfmon context states
+ */
+#define PFM_CTX_DISABLED	0
+#define PFM_CTX_ENABLED		1
 
-/* This is the Itanium-specific PMC layout for counter config */
+/*
+ * Reset register flags
+ */
+#define PFM_RELOAD_LONG_RESET	1
+#define PFM_RELOAD_SHORT_RESET	2
+
+/*
+ * Misc macros and definitions
+ */
+#define PMU_FIRST_COUNTER	4
+
+#define PFM_IS_DISABLED() pmu_conf.pfm_is_disabled
+
+#define PMC_OVFL_NOTIFY(ctx, i)	((ctx)->ctx_soft_pmds[i].flags &  PFM_REGFL_OVFL_NOTIFY)
+#define PFM_FL_INHERIT_MASK	(PFM_FL_INHERIT_NONE|PFM_FL_INHERIT_ONCE|PFM_FL_INHERIT_ALL)
+
+#define PMC_IS_IMPL(i)	  (i<pmu_conf.num_pmcs && pmu_conf.impl_regs[i>>6] & (1UL<< (i) %64))
+#define PMD_IS_IMPL(i)	  (i<pmu_conf.num_pmds &&  pmu_conf.impl_regs[4+(i>>6)] & (1UL<<(i) % 64))
+
+#define PMD_IS_COUNTING(i) (i >=0  && i < 256 && pmu_conf.counter_pmds[i>>6] & (1UL <<(i) % 64))
+#define PMC_IS_COUNTING(i) PMD_IS_COUNTING(i)
+
+#define IBR_IS_IMPL(k)	  (k<pmu_conf.num_ibrs)
+#define DBR_IS_IMPL(k)	  (k<pmu_conf.num_dbrs)
+
+#define PMC_IS_BTB(a)	  (((pfm_monitor_t *)(a))->pmc_es == PMU_BTB_EVENT)
+
+#define LSHIFT(x)		(1UL<<(x))
+#define PMM(x)			LSHIFT(x)
+#define PMC_IS_MONITOR(c)	((pmu_conf.monitor_pmcs[0] & PMM((c))) != 0)
+
+#define CTX_IS_ENABLED(c) 	((c)->ctx_flags.state == PFM_CTX_ENABLED)
+#define CTX_OVFL_NOBLOCK(c)	((c)->ctx_fl_block == 0)
+#define CTX_INHERIT_MODE(c)	((c)->ctx_fl_inherit)
+#define CTX_HAS_SMPL(c)		((c)->ctx_psb != NULL)
+#define CTX_USED_PMD(ctx,n) 	(ctx)->ctx_used_pmds[(n)>>6] |= 1UL<< ((n) % 64)
+
+#define CTX_USED_IBR(ctx,n) 	(ctx)->ctx_used_ibrs[(n)>>6] |= 1UL<< ((n) % 64)
+#define CTX_USED_DBR(ctx,n) 	(ctx)->ctx_used_dbrs[(n)>>6] |= 1UL<< ((n) % 64)
+#define CTX_USES_DBREGS(ctx)	(((pfm_context_t *)(ctx))->ctx_fl_using_dbreg==1)
+
+#define LOCK_CTX(ctx)	spin_lock(&(ctx)->ctx_lock)
+#define UNLOCK_CTX(ctx)	spin_unlock(&(ctx)->ctx_lock)
+
+#define SET_PMU_OWNER(t)    do { pmu_owners[smp_processor_id()].owner = (t); } while(0)
+#define PMU_OWNER()	    pmu_owners[smp_processor_id()].owner
+
+#define LOCK_PFS()	    spin_lock(&pfm_sessions.pfs_lock)
+#define UNLOCK_PFS()	    spin_unlock(&pfm_sessions.pfs_lock)
+
+#define PFM_REG_RETFLAG_SET(flags, val)	do { flags &= ~PFM_REG_RETFL_MASK; flags |= (val); } while(0)
+
+/*
+ * debugging
+ */
+#define DBprintk(a) \
+	do { \
+		if (pfm_debug_mode >0) { printk("%s.%d: CPU%d ", __FUNCTION__, __LINE__, smp_processor_id()); printk a; } \
+	} while (0)
+
+
+/* 
+ * These are some helpful architected PMC and IBR/DBR register layouts
+ */
 typedef struct {
 	unsigned long pmc_plm:4;	/* privilege level mask */
 	unsigned long pmc_ev:1;		/* external visibility */
 	unsigned long pmc_oi:1;		/* overflow interrupt */
 	unsigned long pmc_pm:1;		/* privileged monitor */
 	unsigned long pmc_ig1:1;	/* reserved */
-	unsigned long pmc_es:7;		/* event select */
-	unsigned long pmc_ig2:1;	/* reserved */
-	unsigned long pmc_umask:4;	/* unit mask */
-	unsigned long pmc_thres:3;	/* threshold */
-	unsigned long pmc_ig3:1;	/* reserved (missing from table on p6-17) */
-	unsigned long pmc_ism:2;	/* instruction set mask */
-	unsigned long pmc_ig4:38;	/* reserved */
-} pmc_counter_reg_t;
-
-/* test for EAR/BTB configuration */
-#define PMU_DEAR_EVENT	0x67
-#define PMU_IEAR_EVENT	0x23
-#define PMU_BTB_EVENT	0x11
-
-#define PMC_IS_DEAR(a)		(((pmc_counter_reg_t *)(a))->pmc_es == PMU_DEAR_EVENT)
-#define PMC_IS_IEAR(a)		(((pmc_counter_reg_t *)(a))->pmc_es == PMU_IEAR_EVENT)
-#define PMC_IS_BTB(a)		(((pmc_counter_reg_t *)(a))->pmc_es == PMU_BTB_EVENT)
-
-/*
- * This header is at the beginning of the sampling buffer returned to the user.
- * It is exported as Read-Only at this point. It is directly followed with the
- * first record.
- */
-typedef struct {
-	int		hdr_version;		/* could be used to differentiate formats */
-	int		hdr_reserved;
-	unsigned long	hdr_entry_size;		/* size of one entry in bytes */
-	unsigned long	hdr_count;		/* how many valid entries */
-	unsigned long	hdr_pmds;		/* which pmds are recorded */
-} perfmon_smpl_hdr_t;
-
-/*
- * Header entry in the buffer as a header as follows.
- * The header is directly followed with the PMDS to saved in increasing index order:
- * PMD4, PMD5, .... How many PMDs are present is determined by the tool which must
- * keep track of it when generating the final trace file.
- */
-typedef struct {
-	int		pid;		/* identification of process */
-	int		cpu;		/* which cpu was used */
-	unsigned long	rate;		/* initial value of this counter */
-	unsigned long	stamp;		/* timestamp */
-	unsigned long	ip;		/* where did the overflow interrupt happened */
-	unsigned long	regs;		/* which registers overflowed (up to 64)*/
-} perfmon_smpl_entry_t;
+	unsigned long pmc_es:8;		/* event select */
+	unsigned long pmc_ig2:48;	/* reserved */
+} pfm_monitor_t;
 
 /*
  * There is one such data structure per perfmon context. It is used to describe the
- * sampling buffer. It is to be shared among siblings whereas the pfm_context isn't.
+ * sampling buffer. It is to be shared among siblings whereas the pfm_context 
+ * is not.
  * Therefore we maintain a refcnt which is incremented on fork().
- * This buffer is private to the kernel only the actual sampling buffer including its
- * header are exposed to the user. This construct allows us to export the buffer read-write,
- * if needed, without worrying about security problems.
+ * This buffer is private to the kernel only the actual sampling buffer 
+ * including its header are exposed to the user. This construct allows us to 
+ * export the buffer read-write, if needed, without worrying about security 
+ * problems.
  */
-typedef struct {
-	atomic_t		psb_refcnt;	/* how many users for the buffer */
-	int			reserved;
+typedef struct _pfm_smpl_buffer_desc {
+	spinlock_t		psb_lock;	/* protection lock */
+	unsigned long		psb_refcnt;	/* how many users for the buffer */
+	int			psb_flags;	/* bitvector of flags */
+
 	void			*psb_addr;	/* points to location of first entry */
 	unsigned long		psb_entries;	/* maximum number of entries */
 	unsigned long		psb_size;	/* aligned size of buffer */
-	unsigned long		psb_index;	/* next free entry slot */
+	unsigned long		psb_index;	/* next free entry slot XXX: must use the one in buffer */
 	unsigned long		psb_entry_size;	/* size of each entry including entry header */
 	perfmon_smpl_hdr_t	*psb_hdr;	/* points to sampling buffer header */
+
+	struct _pfm_smpl_buffer_desc *psb_next;	/* next psb, used for rvfreeing of psb_hdr */
+
 } pfm_smpl_buffer_desc_t;
 
+#define LOCK_PSB(p)	spin_lock(&(p)->psb_lock)
+#define UNLOCK_PSB(p)	spin_unlock(&(p)->psb_lock)
+
+#define PFM_PSB_VMA	0x1			/* a VMA is describing the buffer */
 
 /*
  * This structure is initialized at boot time and contains
@@ -180,126 +169,187 @@ typedef struct {
 	unsigned long num_pmcs ;	/* highest PMC implemented (may have holes) */
 	unsigned long num_pmds;		/* highest PMD implemented (may have holes) */
 	unsigned long impl_regs[16];	/* buffer used to hold implememted PMC/PMD mask */
+	unsigned long num_ibrs;		/* number of instruction debug registers */
+	unsigned long num_dbrs;		/* number of data debug registers */
+	unsigned long monitor_pmcs[4];	/* which pmc are controlling monitors */
+	unsigned long counter_pmds[4];	/* which pmd are used as counters */
 } pmu_config_t;
 
-#define PERFMON_IS_DISABLED() pmu_conf.pfm_is_disabled
-
-typedef struct {
-	__u64		val;		/* virtual 64bit counter value */
-	__u64		ival;		/* initial value from user */
-	__u64		smpl_rval;	/* reset value on sampling overflow */
-	__u64		ovfl_rval;	/* reset value on overflow */
-	int		flags;		/* notify/do not notify */
-} pfm_counter_t;
-#define PMD_OVFL_NOTIFY(ctx, i)	((ctx)->ctx_pmds[i].flags &  PFM_REGFL_OVFL_NOTIFY)
-
 /*
- * perfmon context. One per process, is cloned on fork() depending on inheritance flags
+ * 64-bit software counter structure
  */
 typedef struct {
-	unsigned int inherit:2;	/* inherit mode */
-	unsigned int noblock:1;	/* block/don't block on overflow with notification */
-	unsigned int system:1;	/* do system wide monitoring */
-	unsigned int frozen:1;	/* pmu must be kept frozen on ctxsw in */
-	unsigned int exclintr:1;/* exlcude interrupts from system wide monitoring */
-	unsigned int reserved:26;
+	u64 val;	/* virtual 64bit counter value */
+	u64 ival;	/* initial value from user */
+	u64 long_reset;	/* reset value on sampling overflow */
+	u64 short_reset;/* reset value on overflow */
+	u64 reset_pmds[4]; /* which other pmds to reset when this counter overflows */
+	int flags;	/* notify/do not notify */
+} pfm_counter_t;
+
+/*
+ * perfmon context. One per process, is cloned on fork() depending on 
+ * inheritance flags
+ */
+typedef struct {
+	unsigned int state:1;		/* 0=disabled, 1=enabled */
+	unsigned int inherit:2;		/* inherit mode */
+	unsigned int block:1;		/* when 1, task will blocked on user notifications */
+	unsigned int system:1;		/* do system wide monitoring */
+	unsigned int frozen:1;		/* pmu must be kept frozen on ctxsw in */
+	unsigned int protected:1;	/* allow access to creator of context only */
+	unsigned int using_dbreg:1;	/* using range restrictions (debug registers) */
+	unsigned int reserved:24;
 } pfm_context_flags_t;
 
+/*
+ * perfmon context: encapsulates all the state of a monitoring session
+ * XXX: probably need to change layout
+ */
 typedef struct pfm_context {
+	pfm_smpl_buffer_desc_t	*ctx_psb;		/* sampling buffer, if any */
+	unsigned long		ctx_smpl_vaddr;		/* user level virtual address of smpl buffer */
 
-	pfm_smpl_buffer_desc_t	*ctx_smpl_buf;		/* sampling buffer descriptor, if any */
-	unsigned long		ctx_dear_counter;	/* which PMD holds D-EAR */
-	unsigned long		ctx_iear_counter;	/* which PMD holds I-EAR */
-	unsigned long		ctx_btb_counter;	/* which PMD holds BTB */
-
-	spinlock_t		ctx_notify_lock;
+	spinlock_t		ctx_lock;
 	pfm_context_flags_t	ctx_flags;		/* block/noblock */
-	int			ctx_notify_sig;		/* XXX: SIGPROF or other */
+
 	struct task_struct	*ctx_notify_task;	/* who to notify on overflow */
-	struct task_struct	*ctx_creator;		/* pid of creator (debug) */
+	struct task_struct	*ctx_owner;		/* pid of creator (debug) */
 
-	unsigned long		ctx_ovfl_regs;		/* which registers just overflowed (notification) */
-	unsigned long		ctx_smpl_regs;		/* which registers to record on overflow */
+	unsigned long		ctx_ovfl_regs[4];	/* which registers overflowed (notification) */
+	unsigned long		ctx_smpl_regs[4];	/* which registers to record on overflow */
 
-	struct semaphore	ctx_restart_sem; 	/* use for blocking notification mode */
+	struct semaphore	ctx_restart_sem;   	/* use for blocking notification mode */
 
-	unsigned long		ctx_used_pmds[4]; 	/* bitmask of used PMD (speedup ctxsw) */
-	unsigned long		ctx_used_pmcs[4]; 	/* bitmask of used PMC (speedup ctxsw) */
+	unsigned long		ctx_used_pmds[4];	/* bitmask of used PMD (speedup ctxsw) */
+	unsigned long		ctx_saved_pmcs[4];	/* bitmask of PMC to save on ctxsw */
+	unsigned long		ctx_reload_pmcs[4];	/* bitmask of PMC to reload on ctxsw (SMP) */
 
-	pfm_counter_t		ctx_pmds[IA64_NUM_PMD_COUNTERS]; /* XXX: size should be dynamic */
+	unsigned long		ctx_used_ibrs[4];	/* bitmask of used IBR (speedup ctxsw) */
+	unsigned long		ctx_used_dbrs[4];	/* bitmask of used DBR (speedup ctxsw) */
 
+	pfm_counter_t		ctx_soft_pmds[IA64_NUM_PMD_REGS]; /* XXX: size should be dynamic */
+
+	u64			ctx_saved_psr;		/* copy of psr used for lazy ctxsw */
+	unsigned long		ctx_saved_cpus_allowed;	/* copy of the task cpus_allowed (system wide) */
+	unsigned long		ctx_cpu;		/* cpu to which perfmon is applied (system wide) */
+
+	atomic_t		ctx_saving_in_progress;	/* flag indicating actual save in progress */
+	atomic_t		ctx_last_cpu;		/* CPU id of current or last CPU used */
 } pfm_context_t;
 
-#define CTX_USED_PMD(ctx,n) (ctx)->ctx_used_pmds[(n)>>6] |= 1<< ((n) % 64)
-#define CTX_USED_PMC(ctx,n) (ctx)->ctx_used_pmcs[(n)>>6] |= 1<< ((n) % 64)
-
-#define ctx_fl_inherit	ctx_flags.inherit
-#define ctx_fl_noblock	ctx_flags.noblock
-#define ctx_fl_system	ctx_flags.system
-#define ctx_fl_frozen	ctx_flags.frozen
-#define ctx_fl_exclintr	ctx_flags.exclintr
-
-#define CTX_OVFL_NOBLOCK(c)	((c)->ctx_fl_noblock == 1)
-#define CTX_INHERIT_MODE(c)	((c)->ctx_fl_inherit)
-#define CTX_HAS_SMPL(c)		((c)->ctx_smpl_buf != NULL)
-
-static pmu_config_t pmu_conf;
-
-/* for debug only */
-static int pfm_debug=0;	/* 0= nodebug, >0= debug output on */
-
-#define DBprintk(a) \
-	do { \
-		if (pfm_debug >0) { printk(__FUNCTION__" %d: ", __LINE__); printk a; } \
-	} while (0);
-
-static void ia64_reset_pmu(void);
+#define ctx_fl_inherit		ctx_flags.inherit
+#define ctx_fl_block		ctx_flags.block
+#define ctx_fl_system		ctx_flags.system
+#define ctx_fl_frozen		ctx_flags.frozen
+#define ctx_fl_protected	ctx_flags.protected
+#define ctx_fl_using_dbreg	ctx_flags.using_dbreg
 
 /*
- * structure used to pass information between the interrupt handler
- * and the tasklet.
+ * global information about all sessions
+ * mostly used to synchronize between system wide and per-process
  */
 typedef struct {
-	pid_t		to_pid;		/* which process to notify */
-	pid_t		from_pid;	/* which process is source of overflow */
-	int		sig;		/* with which signal */
-	unsigned long	bitvect;	/* which counters have overflowed */
-} notification_info_t;
+	spinlock_t		pfs_lock;		/* lock the structure */
 
-
-typedef struct {
-	unsigned long pfs_proc_sessions;
-	unsigned long pfs_sys_session; /* can only be 0/1 */
-	unsigned long pfs_dfl_dcr;	/* XXX: hack */
-	unsigned int  pfs_pp;
+	unsigned long		pfs_task_sessions;	/* number of per task sessions */
+	unsigned long		pfs_sys_sessions;	/* number of per system wide sessions */
+	unsigned long   	pfs_sys_use_dbregs;	  	/* incremented when a system wide session uses debug regs */
+	unsigned long   	pfs_ptrace_use_dbregs;	  /* incremented when a process uses debug regs */
+	struct task_struct	*pfs_sys_session[NR_CPUS];  /* point to task owning a system-wide session */
 } pfm_session_t;
 
-struct {
+/*
+ * structure used to pass argument to/from remote CPU 
+ * using IPI to check and possibly save the PMU context on SMP systems.
+ *
+ * not used in UP kernels
+ */
+typedef struct {
+	struct task_struct *task;	/* which task we are interested in */
+	int retval;			/* return value of the call: 0=you can proceed, 1=need to wait for completion */
+} pfm_smp_ipi_arg_t;
+
+/*
+ * perfmon command descriptions
+ */
+typedef struct {
+	int		(*cmd_func)(struct task_struct *task, pfm_context_t *ctx, void *arg, int count, struct pt_regs *regs);
+	int		cmd_flags;
+	unsigned int	cmd_narg;
+	size_t		cmd_argsize;
+} pfm_cmd_desc_t;
+
+#define PFM_CMD_PID		0x1	/* command requires pid argument */
+#define PFM_CMD_ARG_READ	0x2	/* command must read argument(s) */
+#define PFM_CMD_ARG_WRITE	0x4	/* command must write argument(s) */
+#define PFM_CMD_CTX		0x8	/* command needs a perfmon context */
+#define PFM_CMD_NOCHK		0x10	/* command does not need to check task's state */
+
+#define PFM_CMD_IDX(cmd)	(cmd)
+
+#define PFM_CMD_IS_VALID(cmd)	((PFM_CMD_IDX(cmd) >= 0) && (PFM_CMD_IDX(cmd) < PFM_CMD_COUNT) \
+				  && pfm_cmd_tab[PFM_CMD_IDX(cmd)].cmd_func != NULL)
+
+#define PFM_CMD_USE_PID(cmd)	((pfm_cmd_tab[PFM_CMD_IDX(cmd)].cmd_flags & PFM_CMD_PID) != 0)
+#define PFM_CMD_READ_ARG(cmd)	((pfm_cmd_tab[PFM_CMD_IDX(cmd)].cmd_flags & PFM_CMD_ARG_READ) != 0)
+#define PFM_CMD_WRITE_ARG(cmd)	((pfm_cmd_tab[PFM_CMD_IDX(cmd)].cmd_flags & PFM_CMD_ARG_WRITE) != 0)
+#define PFM_CMD_USE_CTX(cmd)	((pfm_cmd_tab[PFM_CMD_IDX(cmd)].cmd_flags & PFM_CMD_CTX) != 0)
+#define PFM_CMD_CHK(cmd)	((pfm_cmd_tab[PFM_CMD_IDX(cmd)].cmd_flags & PFM_CMD_NOCHK) == 0)
+
+#define PFM_CMD_ARG_MANY	-1 /* cannot be zero */
+#define PFM_CMD_NARG(cmd)	(pfm_cmd_tab[PFM_CMD_IDX(cmd)].cmd_narg)
+#define PFM_CMD_ARG_SIZE(cmd)	(pfm_cmd_tab[PFM_CMD_IDX(cmd)].cmd_argsize)
+
+
+/*
+ * perfmon internal variables
+ */
+static pmu_config_t	pmu_conf; 	/* PMU configuration */
+static int		pfm_debug_mode;	/* 0= nodebug, >0= debug output on */
+static pfm_session_t	pfm_sessions;	/* global sessions information */
+static struct proc_dir_entry *perfmon_dir; /* for debug only */
+static unsigned long pfm_spurious_ovfl_intr_count; /* keep track of spurious ovfl interrupts */
+static unsigned long pfm_ovfl_intr_count; /* keep track of spurious ovfl interrupts */
+static unsigned long pfm_recorded_samples_count;
+
+static void pfm_vm_close(struct vm_area_struct * area);
+static struct vm_operations_struct pfm_vm_ops={
+	close: pfm_vm_close
+};
+
+/*
+ * keep track of task owning the PMU per CPU.
+ */
+static struct {
 	struct task_struct *owner;
 } ____cacheline_aligned pmu_owners[NR_CPUS];
 
 
-/* 
- * helper macros
- */
-#define SET_PMU_OWNER(t)	do { pmu_owners[smp_processor_id()].owner = (t); } while(0);
-#define PMU_OWNER()		pmu_owners[smp_processor_id()].owner
-
-#ifdef CONFIG_SMP
-#define PFM_CAN_DO_LAZY()	(smp_num_cpus==1 && pfs_info.pfs_sys_session==0)
-#else
-#define PFM_CAN_DO_LAZY()	(pfs_info.pfs_sys_session==0)
-#endif
-
-static void pfm_lazy_save_regs (struct task_struct *ta);
-
-/* for debug only */
-static struct proc_dir_entry *perfmon_dir;
 
 /*
- * XXX: hack to indicate that a system wide monitoring session is active
+ * forward declarations
  */
-static pfm_session_t pfs_info;
+static void ia64_reset_pmu(struct task_struct *);
+static void pfm_fetch_regs(int cpu, struct task_struct *task, pfm_context_t *ctx);
+static void pfm_lazy_save_regs (struct task_struct *ta);
+
+static inline unsigned long
+pfm_read_soft_counter(pfm_context_t *ctx, int i)
+{
+	return ctx->ctx_soft_pmds[i].val + (ia64_get_pmd(i) & pmu_conf.perf_ovfl_val);
+}
+
+static inline void
+pfm_write_soft_counter(pfm_context_t *ctx, int i, unsigned long val)
+{
+	ctx->ctx_soft_pmds[i].val = val  & ~pmu_conf.perf_ovfl_val;
+	/*
+	 * writing to unimplemented part is ignore, so we do not need to
+	 * mask off top part
+	 */
+	ia64_set_pmd(i, val);
+}
 
 /*
  * finds the number of PM(C|D) registers given
@@ -324,10 +374,10 @@ find_num_pm_regs(long *buffer)
  * Generates a unique (per CPU) timestamp
  */
 static inline unsigned long
-perfmon_get_stamp(void)
+pfm_get_stamp(void)
 {
 	/*
-	 * XXX: maybe find something more efficient
+	 * XXX: must find something more efficient
 	 */
 	return ia64_get_itc();
 }
@@ -353,80 +403,185 @@ uvirt_to_kva(pgd_t *pgd, unsigned long adr)
 			}
 		}
 	}
-	DBprintk(("uv2kva(%lx-->%lx)\n", adr, ret));
+	DBprintk(("[%d] uv2kva(%lx-->%lx)\n", current->pid, adr, ret));
 	return ret;
 }
-
 
 /* Here we want the physical address of the memory.
  * This is used when initializing the contents of the
  * area and marking the pages as reserved.
  */
 static inline unsigned long
-kvirt_to_pa(unsigned long adr)
+pfm_kvirt_to_pa(unsigned long adr)
 {
 	__u64 pa = ia64_tpa(adr);
-	DBprintk(("kv2pa(%lx-->%lx)\n", adr, pa));
+	//DBprintk(("kv2pa(%lx-->%lx)\n", adr, pa));
 	return pa;
 }
 
+
 static void *
-rvmalloc(unsigned long size)
+pfm_rvmalloc(unsigned long size)
 {
 	void *mem;
 	unsigned long adr, page;
 
-	/* XXX: may have to revisit this part because
-	 * vmalloc() does not necessarily return a page-aligned buffer.
-	 * This maybe a security problem when mapped at user level
-	 */
 	mem=vmalloc(size);
 	if (mem) {
+		//printk("perfmon: CPU%d pfm_rvmalloc(%ld)=%p\n", smp_processor_id(), size, mem);
 		memset(mem, 0, size); /* Clear the ram out, no junk to the user */
 		adr=(unsigned long) mem;
 		while (size > 0) {
-			page = kvirt_to_pa(adr);
+			page = pfm_kvirt_to_pa(adr);
 			mem_map_reserve(virt_to_page(__va(page)));
-			adr+=PAGE_SIZE;
-			size-=PAGE_SIZE;
+			adr  += PAGE_SIZE;
+			size -= PAGE_SIZE;
 		}
 	}
 	return mem;
 }
 
 static void
-rvfree(void *mem, unsigned long size)
+pfm_rvfree(void *mem, unsigned long size)
 {
-	unsigned long adr, page;
+	unsigned long adr, page = 0;
 
 	if (mem) {
 		adr=(unsigned long) mem;
 		while (size > 0) {
-			page = kvirt_to_pa(adr);
+			page = pfm_kvirt_to_pa(adr);
 			mem_map_unreserve(virt_to_page(__va(page)));
 			adr+=PAGE_SIZE;
 			size-=PAGE_SIZE;
 		}
 		vfree(mem);
 	}
+	return;
+}
+
+/*
+ * This function gets called from mm/mmap.c:exit_mmap() only when there is a sampling buffer
+ * attached to the context AND the current task has a mapping for it, i.e., it is the original
+ * creator of the context.
+ *
+ * This function is used to remember the fact that the vma describing the sampling buffer
+ * has now been removed. It can only be called when no other tasks share the same mm context.
+ *
+ */
+static void 
+pfm_vm_close(struct vm_area_struct *vma)
+{
+	pfm_smpl_buffer_desc_t *psb = (pfm_smpl_buffer_desc_t *)vma->vm_private_data;
+
+	if (psb == NULL) {
+		printk("perfmon: psb is null in [%d]\n", current->pid);
+		return;
+	}
+	/*
+	 * Add PSB to list of buffers to free on release_thread() when no more users
+	 *
+	 * This call is safe because, once the count is zero is cannot be modified anymore.
+	 * This is not because there is no more user of the mm context, that the sampling
+	 * buffer is not being used anymore outside of this task. In fact, it can still
+	 * be accessed from within the kernel by another task (such as the monitored task).
+	 *
+	 * Therefore, we only move the psb into the list of buffers to free when we know
+	 * nobody else is using it.
+	 * The linked list if independent of the perfmon context, because in the case of
+	 * multi-threaded processes, the last thread may not have been involved with
+	 * monitoring however it will be the one removing the vma and it should therefore
+	 * also remove the sampling buffer. This buffer cannot be removed until the vma
+	 * is removed.
+	 *
+	 * This function cannot remove the buffer from here, because exit_mmap() must first
+	 * complete. Given that there is no other vma related callback in the generic code,
+	 * we have created on own with the linked list of sampling buffer to free which
+	 * is part of the thread structure. In release_thread() we check if the list is
+	 * empty. If not we call into perfmon to free the buffer and psb. That is the only
+	 * way to ensure a safe deallocation of the sampling buffer which works when
+	 * the buffer is shared between distinct processes or with multi-threaded programs.
+	 *
+	 * We need to lock the psb because the refcnt test and flag manipulation must
+	 * looked like an atomic operation vis a vis pfm_context_exit()
+	 */
+	LOCK_PSB(psb);
+
+	if (psb->psb_refcnt == 0) {
+
+		psb->psb_next = current->thread.pfm_smpl_buf_list;
+		current->thread.pfm_smpl_buf_list = psb;
+
+		DBprintk(("psb for [%d] smpl @%p size %ld inserted into list\n", 
+			current->pid, psb->psb_hdr, psb->psb_size));
+	}
+	DBprintk(("psb vma flag cleared for [%d] smpl @%p size %ld inserted into list\n", 
+			current->pid, psb->psb_hdr, psb->psb_size));
+
+	/*
+	 * indicate to pfm_context_exit() that the vma has been removed. 
+	 */
+	psb->psb_flags &= ~PFM_PSB_VMA;
+
+	UNLOCK_PSB(psb);
+}
+
+/*
+ * This function is called from pfm_destroy_context() and also from pfm_inherit()
+ * to explicitely remove the sampling buffer mapping from the user level address space.
+ */
+static int
+pfm_remove_smpl_mapping(struct task_struct *task)
+{
+	pfm_context_t *ctx = task->thread.pfm_context;
+	pfm_smpl_buffer_desc_t *psb;
+	int r;
+
+	/*
+	 * some sanity checks first
+	 */
+	if (ctx == NULL || task->mm == NULL || ctx->ctx_smpl_vaddr == 0 || ctx->ctx_psb == NULL) {
+		printk("perfmon: invalid context mm=%p\n", task->mm);
+		return -1;
+	}
+	psb = ctx->ctx_psb;	
+
+	down_write(&task->mm->mmap_sem);
+
+	r = do_munmap(task->mm, ctx->ctx_smpl_vaddr, psb->psb_size);
+
+	up_write(&task->mm->mmap_sem);
+	if (r !=0) {
+		printk("perfmon: pid %d unable to unmap sampling buffer @0x%lx size=%ld\n", 
+				task->pid, ctx->ctx_smpl_vaddr, psb->psb_size);
+	}
+	DBprintk(("[%d] do_unmap(0x%lx, %ld)=%d\n", 
+		task->pid, ctx->ctx_smpl_vaddr, psb->psb_size, r));
+
+	/* 
+	 * make sure we suppress all traces of this buffer
+	 * (important for pfm_inherit)
+	 */
+	ctx->ctx_smpl_vaddr = 0;
+
+	return 0;
 }
 
 static pfm_context_t *
 pfm_context_alloc(void)
 {
-	pfm_context_t *pfc;
+	pfm_context_t *ctx;
 
 	/* allocate context descriptor */
-	pfc = vmalloc(sizeof(*pfc));
-	if (pfc) memset(pfc, 0, sizeof(*pfc));
-
-	return pfc;
+	ctx = kmalloc(sizeof(pfm_context_t), GFP_KERNEL);
+	if (ctx) memset(ctx, 0, sizeof(pfm_context_t));
+	
+	return ctx;
 }
 
 static void
-pfm_context_free(pfm_context_t *pfc)
+pfm_context_free(pfm_context_t *ctx)
 {
-	if (pfc) vfree(pfc);
+	if (ctx) kfree(ctx);
 }
 
 static int
@@ -434,11 +589,13 @@ pfm_remap_buffer(struct vm_area_struct *vma, unsigned long buf, unsigned long ad
 {
 	unsigned long page;
 
+	DBprintk(("CPU%d buf=0x%lx addr=0x%lx size=%ld\n", smp_processor_id(), buf, addr, size));
+
 	while (size > 0) {
-		page = kvirt_to_pa(buf);
+		page = pfm_kvirt_to_pa(buf);
 
 		if (remap_page_range(vma, addr, page, PAGE_SIZE, PAGE_SHARED)) return -ENOMEM;
-
+		
 		addr  += PAGE_SIZE;
 		buf   += PAGE_SIZE;
 		size  -= PAGE_SIZE;
@@ -458,7 +615,7 @@ pfm_smpl_entry_size(unsigned long *which, unsigned long size)
 
 	for (i=0; i < size; i++, which++) res += hweight64(*which);
 
-	DBprintk((" res=%ld\n", res));
+	DBprintk(("weight=%ld\n", res));
 
 	return res;
 }
@@ -467,15 +624,16 @@ pfm_smpl_entry_size(unsigned long *which, unsigned long size)
  * Allocates the sampling buffer and remaps it into caller's address space
  */
 static int
-pfm_smpl_buffer_alloc(pfm_context_t *ctx, unsigned long which_pmds, unsigned long entries, void **user_addr)
+pfm_smpl_buffer_alloc(pfm_context_t *ctx, unsigned long *which_pmds, unsigned long entries, 
+		      void **user_vaddr)
 {
 	struct mm_struct *mm = current->mm;
-	struct vm_area_struct *vma;
-	unsigned long addr, size, regcount;
+	struct vm_area_struct *vma = NULL;
+	unsigned long size, regcount;
 	void *smpl_buf;
 	pfm_smpl_buffer_desc_t *psb;
 
-	regcount = pfm_smpl_entry_size(&which_pmds, 1);
+	regcount = pfm_smpl_entry_size(which_pmds, 1);
 
 	/* note that regcount might be 0, in this case only the header for each
 	 * entry will be recorded.
@@ -488,133 +646,206 @@ pfm_smpl_buffer_alloc(pfm_context_t *ctx, unsigned long which_pmds, unsigned lon
 			  + entries * (sizeof(perfmon_smpl_entry_t) + regcount*sizeof(u64)));
 	/*
 	 * check requested size to avoid Denial-of-service attacks
-	 * XXX: may have to refine this test
+	 * XXX: may have to refine this test	
+	 * Check against address space limit.
+	 *
+	 * if ((mm->total_vm << PAGE_SHIFT) + len> current->rlim[RLIMIT_AS].rlim_cur) 
+	 * 	return -ENOMEM;
 	 */
 	if (size > current->rlim[RLIMIT_MEMLOCK].rlim_cur) return -EAGAIN;
 
-	/* find some free area in address space */
-	addr = get_unmapped_area(NULL, 0, size, 0, MAP_PRIVATE);
-	if (!addr) goto no_addr;
+	/*
+	 * We do the easy to undo allocations first.
+ 	 *
+	 * pfm_rvmalloc(), clears the buffer, so there is no leak
+	 */
+	smpl_buf = pfm_rvmalloc(size);
+	if (smpl_buf == NULL) {
+		DBprintk(("Can't allocate sampling buffer\n"));
+		return -ENOMEM;
+	}
 
-	DBprintk((" entries=%ld aligned size=%ld, unmapped @0x%lx\n", entries, size, addr));
+	DBprintk(("smpl_buf @%p\n", smpl_buf));
+
+	/* allocate sampling buffer descriptor now */
+	psb = kmalloc(sizeof(*psb), GFP_KERNEL);
+	if (psb == NULL) {
+		DBprintk(("Can't allocate sampling buffer descriptor\n"));
+		pfm_rvfree(smpl_buf, size);
+		return -ENOMEM;
+	}
 
 	/* allocate vma */
 	vma = kmem_cache_alloc(vm_area_cachep, SLAB_KERNEL);
-	if (!vma) goto no_vma;
+	if (!vma) {
+		DBprintk(("Cannot allocate vma\n"));
+		goto error;
+	}
+	/*
+	 * partially initialize the vma for the sampling buffer
+	 */
+	vma->vm_flags	     = VM_READ| VM_MAYREAD |VM_RESERVED;
+	vma->vm_page_prot    = PAGE_READONLY; /* XXX may need to change */
+	vma->vm_ops	     = &pfm_vm_ops; /* necesarry to get the close() callback */
+	vma->vm_pgoff	     = 0;
+	vma->vm_file	     = NULL;
+	vma->vm_raend	     = 0;
+	vma->vm_private_data = psb;	/* information needed by the pfm_vm_close() function */
 
 	/*
-	 * initialize the vma for the sampling buffer
+	 * Now we have everything we need and we can initialize
+	 * and connect all the data structures
 	 */
-	vma->vm_mm	  = mm;
-	vma->vm_start	  = addr;
-	vma->vm_end	  = addr + size;
-	vma->vm_flags	  = VM_READ|VM_MAYREAD;
-	vma->vm_page_prot = PAGE_READONLY; /* XXX may need to change */
-	vma->vm_ops	  = NULL;
-	vma->vm_pgoff	  = 0;
-	vma->vm_file	  = NULL;
-	vma->vm_raend	  = 0;
-
-	/* XXX: see rvmalloc() for page alignment problem */
-	smpl_buf = rvmalloc(size);
-	if (smpl_buf == NULL) goto no_buffer;
-
-	DBprintk((" smpl_buf @%p\n", smpl_buf));
-
-	if (pfm_remap_buffer(vma, (unsigned long)smpl_buf, addr, size)) goto cant_remap;
-
-	/* allocate sampling buffer descriptor now */
-	psb = vmalloc(sizeof(*psb));
-	if (psb == NULL) goto no_buffer_desc;
-
-	/* start with something clean */
-	memset(smpl_buf, 0x0, size);
 
 	psb->psb_hdr	 = smpl_buf;
-	psb->psb_addr    = (char *)smpl_buf+sizeof(perfmon_smpl_hdr_t); /* first entry */
+	psb->psb_addr    = ((char *)smpl_buf)+sizeof(perfmon_smpl_hdr_t); /* first entry */
 	psb->psb_size    = size; /* aligned size */
 	psb->psb_index   = 0;
 	psb->psb_entries = entries;
+	psb->psb_flags   = PFM_PSB_VMA; /* remember that there is a vma describing the buffer */
+	psb->psb_refcnt  = 1;
 
-	atomic_set(&psb->psb_refcnt, 1);
-
-	psb->psb_entry_size = sizeof(perfmon_smpl_entry_t) + regcount*sizeof(u64);
-
-	DBprintk((" psb @%p entry_size=%ld hdr=%p addr=%p\n", (void *)psb,psb->psb_entry_size, (void *)psb->psb_hdr, (void *)psb->psb_addr));
-
-	/* initialize some of the fields of header */
-	psb->psb_hdr->hdr_version    = PFM_SMPL_HDR_VERSION;
-	psb->psb_hdr->hdr_entry_size = sizeof(perfmon_smpl_entry_t)+regcount*sizeof(u64);
-	psb->psb_hdr->hdr_pmds	     = which_pmds;
-
-	/* store which PMDS to record */
-	ctx->ctx_smpl_regs = which_pmds;
-
-	/* link to perfmon context */
-	ctx->ctx_smpl_buf  = psb;
-
-	vma->vm_private_data = ctx;	/* link to pfm_context(not yet used) */
+	spin_lock_init(&psb->psb_lock);
 
 	/*
-	 * now insert the vma in the vm list for the process
+	 * XXX: will need to do cacheline alignment to avoid false sharing in SMP mode and
+	 * multitask monitoring.
+	 */
+	psb->psb_entry_size = sizeof(perfmon_smpl_entry_t) + regcount*sizeof(u64);
+
+	DBprintk(("psb @%p entry_size=%ld hdr=%p addr=%p\n", 
+		  (void *)psb,psb->psb_entry_size, (void *)psb->psb_hdr, 
+		  (void *)psb->psb_addr));
+
+	/* initialize some of the fields of user visible buffer header */
+	psb->psb_hdr->hdr_version    = PFM_SMPL_VERSION;
+	psb->psb_hdr->hdr_entry_size = psb->psb_entry_size;
+	psb->psb_hdr->hdr_pmds[0]    = which_pmds[0];
+
+	/*
+	 * Let's do the difficult operations next.
+	 *
+	 * now we atomically find some area in the address space and
+	 * remap the buffer in it.
+	 */
+	down_write(&current->mm->mmap_sem);
+
+
+	/* find some free area in address space, must have mmap sem held */
+	vma->vm_start = get_unmapped_area(NULL, 0, size, 0, MAP_PRIVATE|MAP_ANONYMOUS);
+	if (vma->vm_start == 0UL) {
+		DBprintk(("Cannot find unmapped area for size %ld\n", size));
+		up_write(&current->mm->mmap_sem);
+		goto error;
+	}
+	vma->vm_end = vma->vm_start + size;
+
+	DBprintk(("entries=%ld aligned size=%ld, unmapped @0x%lx\n", entries, size, vma->vm_start));
+		
+	/* can only be applied to current, need to have the mm semaphore held when called */
+	if (pfm_remap_buffer(vma, (unsigned long)smpl_buf, vma->vm_start, size)) {
+		DBprintk(("Can't remap buffer\n"));
+		up_write(&current->mm->mmap_sem);
+		goto error;
+	}
+
+	/*
+	 * now insert the vma in the vm list for the process, must be
+	 * done with mmap lock held
 	 */
 	insert_vm_struct(mm, vma);
 
 	mm->total_vm  += size >> PAGE_SHIFT;
 
+	up_write(&current->mm->mmap_sem);
+
+	/* store which PMDS to record */
+	ctx->ctx_smpl_regs[0] = which_pmds[0];
+
+
+	/* link to perfmon context */
+	ctx->ctx_psb        = psb;
+
 	/*
-	 * that's the address returned to the user
+	 * keep track of user level virtual address 
 	 */
-	*user_addr = (void *)addr;
+	ctx->ctx_smpl_vaddr = *(unsigned long *)user_vaddr = vma->vm_start;
 
 	return 0;
 
-	/* outlined error handling */
-no_addr:
-	DBprintk(("Cannot find unmapped area for size %ld\n", size));
-	return -ENOMEM;
-no_vma:
-	DBprintk(("Cannot allocate vma\n"));
-	return -ENOMEM;
-cant_remap:
-	DBprintk(("Can't remap buffer\n"));
-	rvfree(smpl_buf, size);
-no_buffer:
-	DBprintk(("Can't allocate sampling buffer\n"));
-	kmem_cache_free(vm_area_cachep, vma);
-	return -ENOMEM;
-no_buffer_desc:
-	DBprintk(("Can't allocate sampling buffer descriptor\n"));
-	kmem_cache_free(vm_area_cachep, vma);
-	rvfree(smpl_buf, size);
+error:
+	pfm_rvfree(smpl_buf, size);
+	kfree(psb);
 	return -ENOMEM;
 }
 
+/*
+ * XXX: do something better here
+ */
 static int
-pfx_is_sane(pfreq_context_t *pfx)
+pfm_bad_permissions(struct task_struct *task)
+{
+	/* stolen from bad_signal() */
+	return (current->session != task->session)
+	    && (current->euid ^ task->suid) && (current->euid ^ task->uid)
+	    && (current->uid ^ task->suid) && (current->uid ^ task->uid);
+}
+
+
+static int
+pfx_is_sane(struct task_struct *task, pfarg_context_t *pfx)
 {
 	int ctx_flags;
+	int cpu;
 
 	/* valid signal */
-	//if (pfx->notify_sig < 1 || pfx->notify_sig >= _NSIG) return -EINVAL;
-	if (pfx->notify_sig !=0 && pfx->notify_sig != SIGPROF) return -EINVAL;
 
 	/* cannot send to process 1, 0 means do not notify */
-	if (pfx->notify_pid < 0 || pfx->notify_pid == 1) return -EINVAL;
-
-	ctx_flags = pfx->flags;
+	if (pfx->ctx_notify_pid == 1) {
+		DBprintk(("invalid notify_pid %d\n", pfx->ctx_notify_pid));
+		return -EINVAL;
+	}
+	ctx_flags = pfx->ctx_flags;
 
 	if (ctx_flags & PFM_FL_SYSTEM_WIDE) {
-#ifdef CONFIG_SMP
-		if (smp_num_cpus > 1) {
-			printk("perfmon: system wide monitoring on SMP not yet supported\n");
+		DBprintk(("cpu_mask=0x%lx\n", pfx->ctx_cpu_mask));
+		/*
+		 * cannot block in this mode 
+		 */
+		if (ctx_flags & PFM_FL_NOTIFY_BLOCK) {
+			DBprintk(("cannot use blocking mode when in system wide monitoring\n"));
 			return -EINVAL;
 		}
-#endif
-		if ((ctx_flags & PFM_FL_SMPL_OVFL_NOBLOCK) == 0) {
-			printk("perfmon: system wide monitoring cannot use blocking notification mode\n");
+		/*
+		 * must only have one bit set in the CPU mask
+		 */
+		if (hweight64(pfx->ctx_cpu_mask) != 1UL) {
+			DBprintk(("invalid CPU mask specified\n"));
 			return -EINVAL;
 		}
+		/*
+		 * and it must be a valid CPU
+		 */
+		cpu = ffs(pfx->ctx_cpu_mask);
+		if (cpu > smp_num_cpus) {
+			DBprintk(("CPU%d is not online\n", cpu));
+			return -EINVAL;
+		}
+		/*
+		 * check for pre-existing pinning, if conflicting reject
+		 */
+		if (task->cpus_allowed != ~0UL && (task->cpus_allowed & (1UL<<cpu)) == 0) {
+			DBprintk(("[%d] pinned on 0x%lx, mask for CPU%d \n", task->pid, 
+				task->cpus_allowed, cpu));
+			return -EINVAL;
+		}
+
+	} else {
+		/*
+		 * must provide a target for the signal in blocking mode even when
+		 * no counter is configured with PFM_FL_REG_OVFL_NOTIFY
+		 */
+		if ((ctx_flags & PFM_FL_NOTIFY_BLOCK) && pfx->ctx_notify_pid == 0) return -EINVAL;
 	}
 	/* probably more to add here */
 
@@ -622,68 +853,97 @@ pfx_is_sane(pfreq_context_t *pfx)
 }
 
 static int
-pfm_context_create(int flags, perfmon_req_t *req)
+pfm_create_context(struct task_struct *task, pfm_context_t *ctx, void *req, int count, 
+		   struct pt_regs *regs)
 {
-	pfm_context_t *ctx;
-	struct task_struct *task = NULL;
-	perfmon_req_t tmp;
+	pfarg_context_t tmp;
 	void *uaddr = NULL;
-	int ret;
+	int ret, cpu = 0;
 	int ctx_flags;
-	pid_t pid;
+	pid_t notify_pid;
 
-	/* to go away */
-	if (flags) {
-		printk("perfmon: use context flags instead of perfmon() flags. Obsoleted API\n");
-	}
+	/* a context has already been defined */
+	if (ctx) return -EBUSY;
+
+	/*
+	 * not yet supported
+	 */
+	if (task != current) return -EINVAL;
 
 	if (copy_from_user(&tmp, req, sizeof(tmp))) return -EFAULT;
 
-	ret = pfx_is_sane(&tmp.pfr_ctx);
+	ret = pfx_is_sane(task, &tmp);
 	if (ret < 0) return ret;
 
-	ctx_flags = tmp.pfr_ctx.flags;
+	ctx_flags = tmp.ctx_flags;
+
+	ret =  -EBUSY;
+
+	LOCK_PFS();
 
 	if (ctx_flags & PFM_FL_SYSTEM_WIDE) {
+
+		/* at this point, we know there is at least one bit set */
+		cpu = ffs(tmp.ctx_cpu_mask) - 1;
+
+		DBprintk(("requesting CPU%d currently on CPU%d\n",cpu, smp_processor_id()));
+
+		if (pfm_sessions.pfs_task_sessions > 0) {
+			DBprintk(("system wide not possible, task_sessions=%ld\n", pfm_sessions.pfs_task_sessions));
+			goto abort;
+		}
+
+		if (pfm_sessions.pfs_sys_session[cpu]) {
+			DBprintk(("system wide not possible, conflicting session [%d] on CPU%d\n",pfm_sessions.pfs_sys_session[cpu]->pid, cpu));
+			goto abort;
+		}
+		pfm_sessions.pfs_sys_session[cpu] = task;
 		/*
-		 * XXX: This is not AT ALL SMP safe
+		 * count the number of system wide sessions
 		 */
-		if (pfs_info.pfs_proc_sessions > 0) return -EBUSY;
-		if (pfs_info.pfs_sys_session > 0) return -EBUSY;
+		pfm_sessions.pfs_sys_sessions++;
 
-		pfs_info.pfs_sys_session = 1;
-
-	} else if (pfs_info.pfs_sys_session >0) {
+	} else if (pfm_sessions.pfs_sys_sessions == 0) {
+		pfm_sessions.pfs_task_sessions++;
+	} else {
 		/* no per-process monitoring while there is a system wide session */
-		return -EBUSY;
-	} else
-		pfs_info.pfs_proc_sessions++;
+		goto abort;
+	}
+
+	UNLOCK_PFS();
+
+	ret = -ENOMEM;
 
 	ctx = pfm_context_alloc();
 	if (!ctx) goto error;
 
-	/* record the creator (debug only) */
-	ctx->ctx_creator = current;
+	/* record the creator (important for inheritance) */
+	ctx->ctx_owner = current;
 
-	pid = tmp.pfr_ctx.notify_pid;
+	notify_pid = tmp.ctx_notify_pid;
 
-	spin_lock_init(&ctx->ctx_notify_lock);
+	spin_lock_init(&ctx->ctx_lock);
 
-	if (pid == current->pid) {
+	if (notify_pid == current->pid) {
+
 		ctx->ctx_notify_task = task = current;
 		current->thread.pfm_context = ctx;
 
-		atomic_set(&current->thread.pfm_notifiers_check, 1);
+	} else if (notify_pid!=0) {
+		struct task_struct *notify_task;
 
-	} else if (pid!=0) {
 		read_lock(&tasklist_lock);
 
-		task = find_task_by_pid(pid);
-		if (task) {
+		notify_task = find_task_by_pid(notify_pid);
+
+		if (notify_task) {
+
+			ret = -EPERM;
+
 			/*
-		 	 * record who to notify
-		 	 */
-			ctx->ctx_notify_task = task;
+			 * check if we can send this task a signal
+			 */
+			if (pfm_bad_permissions(notify_task)) goto buffer_error;
 
 			/* 
 		 	 * make visible
@@ -702,7 +962,9 @@ pfm_context_create(int flags, perfmon_req_t *req)
 			 * task has been detached from the tasklist otherwise you are
 			 * exposed to race conditions.
 			 */
-			atomic_add(1, &task->thread.pfm_notifiers_check);
+			atomic_add(1, &ctx->ctx_notify_task->thread.pfm_notifiers_check);
+
+			ctx->ctx_notify_task = notify_task;
 		}
 		read_unlock(&tasklist_lock);
 	}
@@ -710,37 +972,48 @@ pfm_context_create(int flags, perfmon_req_t *req)
 	/*
 	 * notification process does not exist
 	 */
-	if (pid != 0 && task == NULL) {
+	if (notify_pid != 0 && ctx->ctx_notify_task == NULL) {
 		ret = -EINVAL;
 		goto buffer_error;
 	}
 
-	ctx->ctx_notify_sig = SIGPROF;	/* siginfo imposes a fixed signal */
+	if (tmp.ctx_smpl_entries) {
+		DBprintk(("sampling entries=%ld\n",tmp.ctx_smpl_entries));
 
-	if (tmp.pfr_ctx.smpl_entries) {
-		DBprintk((" sampling entries=%ld\n",tmp.pfr_ctx.smpl_entries));
-
-		ret = pfm_smpl_buffer_alloc(ctx, tmp.pfr_ctx.smpl_regs, 
-						 tmp.pfr_ctx.smpl_entries, &uaddr);
+		ret = pfm_smpl_buffer_alloc(ctx, tmp.ctx_smpl_regs, 
+						 tmp.ctx_smpl_entries, &uaddr);
 		if (ret<0) goto buffer_error;
 
-		tmp.pfr_ctx.smpl_vaddr = uaddr;
+		tmp.ctx_smpl_vaddr = uaddr;
 	}
 	/* initialization of context's flags */
-	ctx->ctx_fl_inherit  = ctx_flags & PFM_FL_INHERIT_MASK;
-	ctx->ctx_fl_noblock  = (ctx_flags & PFM_FL_SMPL_OVFL_NOBLOCK) ? 1 : 0;
-	ctx->ctx_fl_system   = (ctx_flags & PFM_FL_SYSTEM_WIDE) ? 1: 0;
-	ctx->ctx_fl_exclintr = (ctx_flags & PFM_FL_EXCL_INTR) ? 1: 0;
-	ctx->ctx_fl_frozen   = 0;
+	ctx->ctx_fl_inherit   = ctx_flags & PFM_FL_INHERIT_MASK;
+	ctx->ctx_fl_block     = (ctx_flags & PFM_FL_NOTIFY_BLOCK) ? 1 : 0;
+	ctx->ctx_fl_system    = (ctx_flags & PFM_FL_SYSTEM_WIDE) ? 1: 0;
+	ctx->ctx_fl_frozen    = 0;
+	/*
+	 * setting this flag to 0 here means, that the creator or the task that the
+	 * context is being attached are granted access. Given that a context can only
+	 * be created for the calling process this, in effect only allows the creator
+	 * to access the context. See pfm_protect() for more.
+	 */
+	ctx->ctx_fl_protected = 0;
+
+	/* for system wide mode only (only 1 bit set) */
+	ctx->ctx_cpu         = cpu;
+
+	atomic_set(&ctx->ctx_last_cpu,-1); /* SMP only, means no CPU */
 
 	/* 
 	 * Keep track of the pmds we want to sample
 	 * XXX: may be we don't need to save/restore the DEAR/IEAR pmds
 	 * but we do need the BTB for sure. This is because of a hardware
 	 * buffer of 1 only for non-BTB pmds.
+	 *
+	 * We ignore the unimplemented pmds specified by the user
 	 */
-	ctx->ctx_used_pmds[0] = tmp.pfr_ctx.smpl_regs;
-	ctx->ctx_used_pmcs[0] = 1; /* always save/restore PMC[0] */
+	ctx->ctx_used_pmds[0]  = tmp.ctx_smpl_regs[0] & pmu_conf.impl_regs[4];
+	ctx->ctx_saved_pmcs[0] = 1; /* always save/restore PMC[0] */
 
 	sema_init(&ctx->ctx_restart_sem, 0); /* init this semaphore to locked */
 
@@ -750,31 +1023,27 @@ pfm_context_create(int flags, perfmon_req_t *req)
 		goto buffer_error;
 	}
 
-	DBprintk((" context=%p, pid=%d notify_sig %d notify_task=%p\n",(void *)ctx, current->pid, ctx->ctx_notify_sig, ctx->ctx_notify_task));
-	DBprintk((" context=%p, pid=%d flags=0x%x inherit=%d noblock=%d system=%d\n",(void *)ctx, current->pid, ctx_flags, ctx->ctx_fl_inherit, ctx->ctx_fl_noblock, ctx->ctx_fl_system));
+	DBprintk(("context=%p, pid=%d notify_task=%p\n",
+			(void *)ctx, task->pid, ctx->ctx_notify_task));
+
+	DBprintk(("context=%p, pid=%d flags=0x%x inherit=%d block=%d system=%d\n", 
+			(void *)ctx, task->pid, ctx_flags, ctx->ctx_fl_inherit, 
+			ctx->ctx_fl_block, ctx->ctx_fl_system));
 
 	/*
 	 * when no notification is required, we can make this visible at the last moment
 	 */
-	if (pid == 0) current->thread.pfm_context = ctx;
-
+	if (notify_pid == 0) task->thread.pfm_context = ctx;
 	/*
-	 * by default, we always include interrupts for system wide
-	 * DCR.pp is set by default to zero by kernel  in cpu_init()
+	 * pin task to CPU and force reschedule on exit to ensure
+	 * that when back to user level the task runs on the designated
+	 * CPU.
 	 */
 	if (ctx->ctx_fl_system) {
-		if (ctx->ctx_fl_exclintr == 0) {
-			unsigned long dcr = ia64_get_dcr();
-
-			ia64_set_dcr(dcr|IA64_DCR_PP);
-			/*
-			* keep track of the kernel default value
-			 */
-			pfs_info.pfs_dfl_dcr = dcr;
-
-			DBprintk((" dcr.pp is set\n"));
-		}
-	} 
+		ctx->ctx_saved_cpus_allowed = task->cpus_allowed;
+		set_cpus_allowed(task, 1UL << cpu);
+		DBprintk(("[%d] rescheduled allowed=0x%lx\n", task->pid,task->cpus_allowed));
+	}
 
 	return 0;
 
@@ -784,225 +1053,492 @@ error:
 	/*
 	 * undo session reservation
 	 */
+	LOCK_PFS();
+
 	if (ctx_flags & PFM_FL_SYSTEM_WIDE) {
-		pfs_info.pfs_sys_session = 0;
+		pfm_sessions.pfs_sys_session[cpu] = NULL;
+		pfm_sessions.pfs_sys_sessions--;
 	} else {
-		pfs_info.pfs_proc_sessions--;
+		pfm_sessions.pfs_task_sessions--;
 	}
+abort:
+	UNLOCK_PFS();
+
 	return ret;
 }
 
 static void
-pfm_reset_regs(pfm_context_t *ctx)
+pfm_reset_regs(pfm_context_t *ctx, unsigned long *ovfl_regs, int flag)
 {
-	unsigned long mask = ctx->ctx_ovfl_regs;
-	int i, cnum;
+	unsigned long mask = ovfl_regs[0];
+	unsigned long reset_others = 0UL;
+	unsigned long val;
+	int i;
 
-	DBprintk((" ovfl_regs=0x%lx\n", mask));
+	DBprintk(("masks=0x%lx\n", mask));
+
 	/*
 	 * now restore reset value on sampling overflowed counters
 	 */
-	for(i=0, cnum=PMU_FIRST_COUNTER; i < pmu_conf.max_counters; i++, cnum++, mask >>= 1) {
+	mask >>= PMU_FIRST_COUNTER;
+	for(i = PMU_FIRST_COUNTER; mask; i++, mask >>= 1) {
 		if (mask & 0x1) {
-			DBprintk((" reseting PMD[%d]=%lx\n", cnum, ctx->ctx_pmds[i].smpl_rval & pmu_conf.perf_ovfl_val));
+			val  = flag == PFM_RELOAD_LONG_RESET ? 
+					ctx->ctx_soft_pmds[i].long_reset:
+					ctx->ctx_soft_pmds[i].short_reset;
+
+			reset_others |= ctx->ctx_soft_pmds[i].reset_pmds[0];
+
+			DBprintk(("[%d] %s reset soft_pmd[%d]=%lx\n", 
+			  	current->pid, 
+				flag == PFM_RELOAD_LONG_RESET ? "long" : "short", i, val));
 
 			/* upper part is ignored on rval */
-			ia64_set_pmd(cnum, ctx->ctx_pmds[i].smpl_rval);
-
-			/*
-			 * we must reset BTB index (clears pmd16.full to make
-			 * sure we do not report the same branches twice.
-			 * The non-blocking case in handled in update_counters()
-			 */
-			if (cnum == ctx->ctx_btb_counter) {
-				DBprintk(("reseting PMD16\n"));
-				ia64_set_pmd(16, 0);
-			}
+			pfm_write_soft_counter(ctx, i, val);
 		}
+	}
+
+	/*
+	 * Now take care of resetting the other registers
+	 */
+	for(i = 0; reset_others; i++, reset_others >>= 1) {
+
+		if ((reset_others & 0x1) == 0) continue;
+
+		val  = flag == PFM_RELOAD_LONG_RESET ? 
+					ctx->ctx_soft_pmds[i].long_reset:
+					ctx->ctx_soft_pmds[i].short_reset;
+
+		if (PMD_IS_COUNTING(i)) {
+			pfm_write_soft_counter(ctx, i, val);
+		} else {
+			ia64_set_pmd(i, val);
+		}
+
+		DBprintk(("[%d] %s reset_others pmd[%d]=%lx\n", 
+			  	current->pid, 
+				flag == PFM_RELOAD_LONG_RESET ? "long" : "short", i, val));
 	}
 	/* just in case ! */
-	ctx->ctx_ovfl_regs = 0;
+	ctx->ctx_ovfl_regs[0] = 0UL;
 }
 
 static int
-pfm_write_pmcs(struct task_struct *ta, perfmon_req_t *req, int count)
+pfm_write_pmcs(struct task_struct *ta, pfm_context_t *ctx, void *arg, int count, struct pt_regs *regs)
 {
 	struct thread_struct *th = &ta->thread;
-	pfm_context_t *ctx = th->pfm_context;
-	perfmon_req_t tmp;
-	unsigned long cnum;
+	pfarg_reg_t tmp, *req = (pfarg_reg_t *)arg;
+	unsigned int cnum;
 	int i;
+	int ret = 0, reg_retval = 0;
+
+	/* we don't quite support this right now */
+	if (ta != current) return -EINVAL;
+
+	if (!CTX_IS_ENABLED(ctx)) return -EINVAL;
 
 	/* XXX: ctx locking may be required here */
 
 	for (i = 0; i < count; i++, req++) {
 
+
 		if (copy_from_user(&tmp, req, sizeof(tmp))) return -EFAULT;
 
-		cnum = tmp.pfr_reg.reg_num;
+		cnum = tmp.reg_num;
 
-		/* XXX needs to check validity of the data maybe */
-		if (!PMC_IS_IMPL(cnum)) {
-			DBprintk((" invalid pmc[%ld]\n", cnum));
-			return -EINVAL;
+		/* 
+		 * we reject all non implemented PMC as well
+		 * as attempts to modify PMC[0-3] which are used
+		 * as status registers by the PMU
+		 */
+		if (!PMC_IS_IMPL(cnum) || cnum < 4) {
+			DBprintk(("pmc[%u] is unimplemented or invalid\n", cnum));
+			ret = -EINVAL;
+			goto abort_mission;
+		}
+		/*
+		 * A PMC used to configure monitors must be:
+		 * 	- system-wide session: privileged monitor
+		 * 	- per-task : user monitor
+		 * any other configuration is rejected.
+		 */
+		if (PMC_IS_MONITOR(cnum)) {
+			pfm_monitor_t *p = (pfm_monitor_t *)&tmp.reg_value;
+
+			DBprintk(("pmc[%u].pm = %d\n", cnum, p->pmc_pm));
+
+			if (ctx->ctx_fl_system ^ p->pmc_pm) {
+			//if ((ctx->ctx_fl_system == 1 && p->pmc_pm == 0)
+			 //  ||(ctx->ctx_fl_system == 0 && p->pmc_pm == 1)) {
+				ret = -EINVAL;
+				goto abort_mission;
+			}
+			/*
+			 * enforce generation of overflow interrupt. Necessary on all
+			 * CPUs which do not implement 64-bit hardware counters.
+			 */
+			p->pmc_oi = 1;
 		}
 
-		if (PMC_IS_COUNTER(cnum)) {
+		if (PMC_IS_COUNTING(cnum)) {
+			if (tmp.reg_flags & PFM_REGFL_OVFL_NOTIFY) {
+				/*
+				 * must have a target for the signal
+				 */
+				if (ctx->ctx_notify_task == NULL) {
+					ret = -EINVAL;
+					goto abort_mission;
+				}
+
+				ctx->ctx_soft_pmds[cnum].flags |= PFM_REGFL_OVFL_NOTIFY;
+			}
+			/*
+			 * copy reset vector
+			 */
+			ctx->ctx_soft_pmds[cnum].reset_pmds[0] = tmp.reg_reset_pmds[0];
+			ctx->ctx_soft_pmds[cnum].reset_pmds[1] = tmp.reg_reset_pmds[1];
+			ctx->ctx_soft_pmds[cnum].reset_pmds[2] = tmp.reg_reset_pmds[2];
+			ctx->ctx_soft_pmds[cnum].reset_pmds[3] = tmp.reg_reset_pmds[3];
 
 			/*
-			 * we keep track of EARS/BTB to speed up sampling later
+			 * needed in case the user does not initialize the equivalent
+			 * PMD. Clearing is done in reset_pmu() so there is no possible
+			 * leak here.
 			 */
-			if (PMC_IS_DEAR(&tmp.pfr_reg.reg_value)) {
-				ctx->ctx_dear_counter = cnum;
-			} else if (PMC_IS_IEAR(&tmp.pfr_reg.reg_value)) {
-				ctx->ctx_iear_counter = cnum;
-			} else if (PMC_IS_BTB(&tmp.pfr_reg.reg_value)) {
-				ctx->ctx_btb_counter = cnum;
-			}
-#if 0
-			if (tmp.pfr_reg.reg_flags & PFM_REGFL_OVFL_NOTIFY)
-				ctx->ctx_pmds[cnum - PMU_FIRST_COUNTER].flags |= PFM_REGFL_OVFL_NOTIFY;
-#endif
+			CTX_USED_PMD(ctx, cnum);
 		}
-		/* keep track of what we use */
-		CTX_USED_PMC(ctx, cnum);
-		ia64_set_pmc(cnum, tmp.pfr_reg.reg_value);
+abort_mission:
+		if (ret == -EINVAL) reg_retval = PFM_REG_RETFL_EINVAL;
 
-		DBprintk((" setting PMC[%ld]=0x%lx flags=0x%x used_pmcs=0%lx\n", cnum, tmp.pfr_reg.reg_value, ctx->ctx_pmds[cnum - PMU_FIRST_COUNTER].flags, ctx->ctx_used_pmcs[0]));
+		PFM_REG_RETFLAG_SET(tmp.reg_flags, reg_retval);
+
+		/*
+		 * update register return value, abort all if problem during copy.
+		 */
+		if (copy_to_user(req, &tmp, sizeof(tmp))) return -EFAULT;
+
+		/*
+		 * if there was something wrong on this register, don't touch
+		 * the hardware at all and abort write request for others.
+		 *
+		 * On error, the user mut sequentially scan the table and the first
+		 * entry which has a return flag set is the one that caused the error.
+		 */
+		if (ret != 0) {
+			DBprintk(("[%d] pmc[%u]=0x%lx error %d\n",
+				  ta->pid, cnum, tmp.reg_value, reg_retval));
+			break;
+		}
+
+		/* 
+		 * We can proceed with this register!
+		 */
+		
+		/* 
+		 * keep copy the pmc, used for register reload
+		 */
+		th->pmc[cnum] = tmp.reg_value;
+
+		ia64_set_pmc(cnum, tmp.reg_value);
+
+		DBprintk(("[%d] pmc[%u]=0x%lx flags=0x%x save_pmcs=0%lx reload_pmcs=0x%lx\n", 
+			  ta->pid, cnum, tmp.reg_value, 
+			  ctx->ctx_soft_pmds[cnum].flags, 
+			  ctx->ctx_saved_pmcs[0], ctx->ctx_reload_pmcs[0]));
 
 	}
-	/*
-	 * we have to set this here event hough we haven't necessarily started monitoring
-	 * because we may be context switched out
-	 */
-	if (ctx->ctx_fl_system==0) th->flags |= IA64_THREAD_PM_VALID;
-
-	return 0;
+	return ret;
 }
 
 static int
-pfm_write_pmds(struct task_struct *ta, perfmon_req_t *req, int count)
+pfm_write_pmds(struct task_struct *ta, pfm_context_t *ctx, void *arg, int count, struct pt_regs *regs)
 {
-	struct thread_struct *th = &ta->thread;
-	pfm_context_t *ctx = th->pfm_context;
-	perfmon_req_t tmp;
-	unsigned long cnum;
+	pfarg_reg_t tmp, *req = (pfarg_reg_t *)arg;
+	unsigned int cnum;
 	int i;
+	int ret = 0, reg_retval = 0;
+
+	/* we don't quite support this right now */
+	if (ta != current) return -EINVAL;
+
+	/* 
+	 * Cannot do anything before PMU is enabled 
+	 */
+	if (!CTX_IS_ENABLED(ctx)) return -EINVAL;
+
 
 	/* XXX: ctx locking may be required here */
 
 	for (i = 0; i < count; i++, req++) {
-		int k;
 
 		if (copy_from_user(&tmp, req, sizeof(tmp))) return -EFAULT;
 
-		cnum = tmp.pfr_reg.reg_num;
+		cnum = tmp.reg_num;
 
-		k = cnum - PMU_FIRST_COUNTER;
-
-		if (!PMD_IS_IMPL(cnum)) return -EINVAL;
+		if (!PMD_IS_IMPL(cnum)) {
+			ret = -EINVAL;
+			goto abort_mission;
+		}
 
 		/* update virtualized (64bits) counter */
-		if (PMD_IS_COUNTER(cnum)) {
-			ctx->ctx_pmds[k].ival = tmp.pfr_reg.reg_value;
-			ctx->ctx_pmds[k].val  = tmp.pfr_reg.reg_value & ~pmu_conf.perf_ovfl_val;
-			ctx->ctx_pmds[k].smpl_rval = tmp.pfr_reg.reg_smpl_reset;
-			ctx->ctx_pmds[k].ovfl_rval = tmp.pfr_reg.reg_ovfl_reset;
+		if (PMD_IS_COUNTING(cnum)) {
+			ctx->ctx_soft_pmds[cnum].ival = tmp.reg_value;
+			ctx->ctx_soft_pmds[cnum].val  = tmp.reg_value & ~pmu_conf.perf_ovfl_val;
+			ctx->ctx_soft_pmds[cnum].long_reset = tmp.reg_long_reset;
+			ctx->ctx_soft_pmds[cnum].short_reset = tmp.reg_short_reset;
 
-			if (tmp.pfr_reg.reg_flags & PFM_REGFL_OVFL_NOTIFY)
-				ctx->ctx_pmds[cnum - PMU_FIRST_COUNTER].flags |= PFM_REGFL_OVFL_NOTIFY;
 		}
+abort_mission:
+		if (ret == -EINVAL) reg_retval = PFM_REG_RETFL_EINVAL;
+
+		PFM_REG_RETFLAG_SET(tmp.reg_flags, reg_retval);
+
+		if (copy_to_user(req, &tmp, sizeof(tmp))) return -EFAULT;
+
+		/*
+		 * if there was something wrong on this register, don't touch
+		 * the hardware at all and abort write request for others.
+		 *
+		 * On error, the user mut sequentially scan the table and the first
+		 * entry which has a return flag set is the one that caused the error.
+		 */
+		if (ret != 0) {
+			DBprintk(("[%d] pmc[%u]=0x%lx error %d\n",
+				  ta->pid, cnum, tmp.reg_value, reg_retval));
+			break;
+		}
+
 		/* keep track of what we use */
 		CTX_USED_PMD(ctx, cnum);
 
 		/* writes to unimplemented part is ignored, so this is safe */
-		ia64_set_pmd(cnum, tmp.pfr_reg.reg_value);
+		ia64_set_pmd(cnum, tmp.reg_value);
 
 		/* to go away */
 		ia64_srlz_d();
-		DBprintk((" setting PMD[%ld]:  ovfl_notify=%d pmd.val=0x%lx pmd.ovfl_rval=0x%lx pmd.smpl_rval=0x%lx pmd=%lx used_pmds=0%lx\n",
-					cnum,
-					PMD_OVFL_NOTIFY(ctx, cnum - PMU_FIRST_COUNTER),
-					ctx->ctx_pmds[k].val,
-					ctx->ctx_pmds[k].ovfl_rval,
-					ctx->ctx_pmds[k].smpl_rval,
-					ia64_get_pmd(cnum) & pmu_conf.perf_ovfl_val,
-					ctx->ctx_used_pmds[0]));
+		DBprintk(("[%d] pmd[%u]: soft_pmd=0x%lx  short_reset=0x%lx "
+			  "long_reset=0x%lx hw_pmd=%lx notify=%c used_pmds=0x%lx reset_pmds=0x%lx\n",
+				ta->pid, cnum,
+				ctx->ctx_soft_pmds[cnum].val,
+				ctx->ctx_soft_pmds[cnum].short_reset,
+				ctx->ctx_soft_pmds[cnum].long_reset,
+				ia64_get_pmd(cnum) & pmu_conf.perf_ovfl_val,
+				PMC_OVFL_NOTIFY(ctx, cnum) ? 'Y':'N',
+				ctx->ctx_used_pmds[0],
+				ctx->ctx_soft_pmds[cnum].reset_pmds[0]));
 	}
-	/*
-	 * we have to set this here event hough we haven't necessarily started monitoring
-	 * because we may be context switched out
-	 */
-	if (ctx->ctx_fl_system==0) th->flags |= IA64_THREAD_PM_VALID;
-
-	return 0;
+	return ret;
 }
 
 static int
-pfm_read_pmds(struct task_struct *ta, perfmon_req_t *req, int count)
+pfm_read_pmds(struct task_struct *ta, pfm_context_t *ctx, void *arg, int count, struct pt_regs *regs)
 {
 	struct thread_struct *th = &ta->thread;
-	pfm_context_t *ctx = th->pfm_context;
 	unsigned long val=0;
-	perfmon_req_t tmp;
+	pfarg_reg_t tmp, *req = (pfarg_reg_t *)arg;
 	int i;
+
+	if (!CTX_IS_ENABLED(ctx)) return -EINVAL;
 
 	/*
 	 * XXX: MUST MAKE SURE WE DON"T HAVE ANY PENDING OVERFLOW BEFORE READING
-	 * This is required when the monitoring has been stoppped by user of kernel.
-	 * If ity is still going on, then that's fine because we a re not gauranteed
-	 * to return an accurate value in this case
+	 * This is required when the monitoring has been stoppped by user or kernel.
+	 * If it is still going on, then that's fine because we a re not guaranteed
+	 * to return an accurate value in this case.
 	 */
 
 	/* XXX: ctx locking may be required here */
 
+	DBprintk(("ctx_last_cpu=%d for [%d]\n", atomic_read(&ctx->ctx_last_cpu), ta->pid));
+
 	for (i = 0; i < count; i++, req++) {
-		unsigned long reg_val = ~0, ctx_val = ~0;
+		unsigned long reg_val = ~0UL, ctx_val = ~0UL;
 
 		if (copy_from_user(&tmp, req, sizeof(tmp))) return -EFAULT;
 
-		if (!PMD_IS_IMPL(tmp.pfr_reg.reg_num)) return -EINVAL;
+		if (!PMD_IS_IMPL(tmp.reg_num)) goto abort_mission;
 
-		if (PMD_IS_COUNTER(tmp.pfr_reg.reg_num)) {
-			if (ta == current){
-				val = ia64_get_pmd(tmp.pfr_reg.reg_num);
-			} else {
-				val = reg_val = th->pmd[tmp.pfr_reg.reg_num];
-			}
-			val &= pmu_conf.perf_ovfl_val;
-			/*
-			 * lower part of .val may not be zero, so we must be an addition because of
-			 * residual count (see update_counters).
-			 */
-			val += ctx_val = ctx->ctx_pmds[tmp.pfr_reg.reg_num - PMU_FIRST_COUNTER].val;
-		} else {
-			/* for now */
-			if (ta != current) return -EINVAL;
-
+		/*
+		 * If the task is not the current one, then we check if the
+		 * PMU state is still in the local live register due to lazy ctxsw.
+		 * If true, then we read directly from the registers.
+		 */
+		if (atomic_read(&ctx->ctx_last_cpu) == smp_processor_id()){
 			ia64_srlz_d();
-			val = ia64_get_pmd(tmp.pfr_reg.reg_num);
+			val = reg_val = ia64_get_pmd(tmp.reg_num);
+			DBprintk(("reading pmd[%u]=0x%lx from hw\n", tmp.reg_num, val));
+		} else {
+#ifdef CONFIG_SMP
+			int cpu;
+			/*
+			 * for SMP system, the context may still be live on another
+			 * CPU so we need to fetch it before proceeding with the read
+			 * This call we only be made once for the whole loop because
+			 * of ctx_last_cpu becoming == -1.
+			 *
+			 * We cannot reuse ctx_last_cpu as it may change before we get to the
+			 * actual IPI call. In this case, we will do the call for nothing but
+			 * there is no way around it. The receiving side will simply do nothing.
+			 */
+			cpu = atomic_read(&ctx->ctx_last_cpu);
+			if (cpu != -1) {
+				DBprintk(("must fetch on CPU%d for [%d]\n", cpu, ta->pid));
+				pfm_fetch_regs(cpu, ta, ctx);
+			}
+#endif
+			/* context has been saved */
+			val = reg_val = th->pmd[tmp.reg_num];
 		}
-		tmp.pfr_reg.reg_value = val;
+		if (PMD_IS_COUNTING(tmp.reg_num)) {
+			/*
+			 * XXX: need to check for overflow
+			 */
 
-		DBprintk((" reading PMD[%ld]=0x%lx reg=0x%lx ctx_val=0x%lx pmc=0x%lx\n", 
-					tmp.pfr_reg.reg_num, val, reg_val, ctx_val, ia64_get_pmc(tmp.pfr_reg.reg_num)));
+			val &= pmu_conf.perf_ovfl_val;
+			val += ctx_val = ctx->ctx_soft_pmds[tmp.reg_num].val;
+		} else {
+
+			val = reg_val = ia64_get_pmd(tmp.reg_num);
+		}
+		PFM_REG_RETFLAG_SET(tmp.reg_flags, 0);
+		tmp.reg_value = val;
+
+		DBprintk(("read pmd[%u] soft_pmd=0x%lx reg=0x%lx pmc=0x%lx\n", 
+					tmp.reg_num, ctx_val, reg_val, 
+					ia64_get_pmc(tmp.reg_num)));
 
 		if (copy_to_user(req, &tmp, sizeof(tmp))) return -EFAULT;
 	}
 	return 0;
+abort_mission:
+	PFM_REG_RETFLAG_SET(tmp.reg_flags, PFM_REG_RETFL_EINVAL);
+	/* 
+	 * XXX: if this fails, we stick we the original failure, flag not updated!
+	 */
+	copy_to_user(req, &tmp, sizeof(tmp));
+	return -EINVAL;
+
 }
 
-static int
-pfm_do_restart(struct task_struct *task)
+#ifdef PFM_PMU_USES_DBR
+/*
+ * Only call this function when a process it trying to
+ * write the debug registers (reading is always allowed)
+ */
+int
+pfm_use_debug_registers(struct task_struct *task)
 {
-	struct thread_struct *th = &task->thread;
-	pfm_context_t *ctx = th->pfm_context;
+	pfm_context_t *ctx = task->thread.pfm_context;
+	int ret = 0;
+
+	DBprintk(("called for [%d]\n", task->pid));
+
+	/*
+	 * do it only once
+	 */
+	if (task->thread.flags & IA64_THREAD_DBG_VALID) return 0;
+
+	/*
+	 * Even on SMP, we do not need to use an atomic here because
+	 * the only way in is via ptrace() and this is possible only when the
+	 * process is stopped. Even in the case where the ctxsw out is not totally
+	 * completed by the time we come here, there is no way the 'stopped' process
+	 * could be in the middle of fiddling with the pfm_write_ibr_dbr() routine.
+	 * So this is always safe.
+	 */
+	if (ctx && ctx->ctx_fl_using_dbreg == 1) return -1;
+
+	/*
+	 * XXX: not pretty
+	 */
+	LOCK_PFS();
+
+	/*
+	 * We only allow the use of debug registers when there is no system
+	 * wide monitoring 
+	 * XXX: we could relax this by 
+	 */
+	if (pfm_sessions.pfs_sys_use_dbregs> 0)
+		ret = -1;
+	else
+		pfm_sessions.pfs_ptrace_use_dbregs++;
+
+	DBprintk(("ptrace_use_dbregs=%lu  sys_use_dbregs=%lu by [%d] ret = %d\n", 
+		  pfm_sessions.pfs_ptrace_use_dbregs, 
+		  pfm_sessions.pfs_sys_use_dbregs, 
+		  task->pid, ret));
+
+	UNLOCK_PFS();
+
+	return ret;
+}
+
+/*
+ * This function is called for every task that exits with the
+ * IA64_THREAD_DBG_VALID set. This indicates a task which was
+ * able to use the debug registers for debugging purposes via
+ * ptrace(). Therefore we know it was not using them for
+ * perfmormance monitoring, so we only decrement the number
+ * of "ptraced" debug register users to keep the count up to date
+ */
+int
+pfm_release_debug_registers(struct task_struct *task)
+{
+	int ret;
+
+	LOCK_PFS();
+	if (pfm_sessions.pfs_ptrace_use_dbregs == 0) {
+		printk("perfmon: invalid release for [%d] ptrace_use_dbregs=0\n", task->pid);
+		ret = -1;
+	}  else {
+		pfm_sessions.pfs_ptrace_use_dbregs--;
+		ret = 0;
+	}
+	UNLOCK_PFS();
+
+	return ret;
+}
+#else /* PFM_PMU_USES_DBR is true */
+/*
+ * in case, the PMU does not use the debug registers, these two functions are nops.
+ * The first function is called from arch/ia64/kernel/ptrace.c.
+ * The second function is called from arch/ia64/kernel/process.c.
+ */
+int
+pfm_use_debug_registers(struct task_struct *task)
+{
+	return 0;
+}
+int
+pfm_release_debug_registers(struct task_struct *task)
+{
+	return 0;
+}
+#endif /* PFM_PMU_USES_DBR */
+
+static int
+pfm_restart(struct task_struct *task, pfm_context_t *ctx, void *arg, int count, 
+	 struct pt_regs *regs)
+{
 	void *sem = &ctx->ctx_restart_sem;
 
-	if (task == current) {
-		DBprintk((" restarting self %d frozen=%d \n", current->pid, ctx->ctx_fl_frozen));
+	/* 
+	 * Cannot do anything before PMU is enabled 
+	 */
+	if (!CTX_IS_ENABLED(ctx)) return -EINVAL;
 
-		pfm_reset_regs(ctx);
+
+	if (ctx->ctx_fl_frozen==0) {
+		printk("task %d without pmu_frozen set\n", task->pid);
+		return -EINVAL;
+	}
+
+	if (task == current) {
+		DBprintk(("restarting self %d frozen=%d \n", current->pid, ctx->ctx_fl_frozen));
+
+		pfm_reset_regs(ctx, ctx->ctx_ovfl_regs, PFM_RELOAD_LONG_RESET);
+
+		ctx->ctx_ovfl_regs[0] = 0UL;
 
 		/*
 		 * We ignore block/don't block because we never block
@@ -1011,26 +1547,37 @@ pfm_do_restart(struct task_struct *task)
 		ctx->ctx_fl_frozen = 0;
 
 		if (CTX_HAS_SMPL(ctx)) {
-			ctx->ctx_smpl_buf->psb_hdr->hdr_count = 0;
-			ctx->ctx_smpl_buf->psb_index = 0;
+			ctx->ctx_psb->psb_hdr->hdr_count = 0;
+			ctx->ctx_psb->psb_index = 0;
 		}
-
-		/* pfm_reset_smpl_buffers(ctx,th->pfm_ovfl_regs);*/
 
 		/* simply unfreeze */
 		ia64_set_pmc(0, 0);
 		ia64_srlz_d();
 
 		return 0;
-	}
+	} 
+	/* restart on another task */
 
-	/* check if blocking */
+	/*
+	 * if blocking, then post the semaphore.
+	 * if non-blocking, then we ensure that the task will go into
+	 * pfm_overflow_must_block() before returning to user mode. 
+	 * We cannot explicitely reset another task, it MUST always
+	 * be done by the task itself. This works for system wide because
+	 * the tool that is controlling the session is doing "self-monitoring".
+	 *
+	 * XXX: what if the task never goes back to user?
+	 *
+	 */
 	if (CTX_OVFL_NOBLOCK(ctx) == 0) {
-		DBprintk((" unblocking %d \n", task->pid));
+		DBprintk(("unblocking %d \n", task->pid));
 		up(sem);
-		return 0;
+	} else {
+		task->thread.pfm_ovfl_block_reset = 1;
+		set_tsk_thread_flag(current, TIF_NOTIFY_RESUME);
 	}
-
+#if 0
 	/*
 	 * in case of non blocking mode, then it's just a matter of
 	 * of reseting the sampling buffer (if any) index. The PMU
@@ -1041,314 +1588,686 @@ pfm_do_restart(struct task_struct *task)
 	 * must reset the header count first
 	 */
 	if (CTX_HAS_SMPL(ctx)) {
-		DBprintk((" resetting sampling indexes for %d \n", task->pid));
-		ctx->ctx_smpl_buf->psb_hdr->hdr_count = 0;
-		ctx->ctx_smpl_buf->psb_index = 0;
+		DBprintk(("resetting sampling indexes for %d \n", task->pid));
+		ctx->ctx_psb->psb_hdr->hdr_count = 0;
+		ctx->ctx_psb->psb_index = 0;
 	}
+#endif
+	return 0;
+}
+
+static int
+pfm_destroy_context(struct task_struct *task, pfm_context_t *ctx, void *arg, int count, 
+	 struct pt_regs *regs)
+{
+	/* we don't quite support this right now */
+	if (task != current) return -EINVAL;
+
+		if (ctx->ctx_fl_system) {
+		ia64_psr(regs)->pp = 0;
+		__asm__ __volatile__ ("rsm psr.pp;;"::: "memory");
+	} else {
+		ia64_psr(regs)->up = 0;
+		__asm__ __volatile__ ("rum psr.up;;"::: "memory");
+
+		task->thread.flags &= ~IA64_THREAD_PM_VALID;
+	}
+
+	SET_PMU_OWNER(NULL);
+
+	/* freeze PMU */
+	ia64_set_pmc(0, 1);
+	ia64_srlz_d();
+
+	/* restore security level */
+	ia64_psr(regs)->sp = 1;
+
+	/*
+	 * remove sampling buffer mapping, if any
+	 */
+	if (ctx->ctx_smpl_vaddr) pfm_remove_smpl_mapping(task);
+
+	/* now free context and related state */
+	pfm_context_exit(task);
 
 	return 0;
 }
 
 /*
- * system-wide mode: propagate activation/desactivation throughout the tasklist
- *
- * XXX: does not work for SMP, of course
+ * does nothing at the moment
  */
-static void
-pfm_process_tasklist(int cmd)
+static int
+pfm_unprotect_context(struct task_struct *task, pfm_context_t *ctx, void *arg, int count, 
+	 struct pt_regs *regs)
 {
-	struct task_struct *p;
-	struct pt_regs *regs;
-
-	for_each_task(p) {
-		regs = (struct pt_regs *)((unsigned long)p + IA64_STK_OFFSET);
-		regs--;
-		ia64_psr(regs)->pp = cmd;
-	}
+	return 0;
 }
 
 static int
-do_perfmonctl (struct task_struct *task, int cmd, int flags, perfmon_req_t *req, int count, struct pt_regs *regs)
+pfm_protect_context(struct task_struct *task, pfm_context_t *ctx, void *arg, int count, 
+	 struct pt_regs *regs)
 {
-	perfmon_req_t tmp;
-	struct thread_struct *th = &task->thread;
-	pfm_context_t *ctx = th->pfm_context;
+	DBprintk(("context from [%d] is protected\n", task->pid));
+	/*
+	 * from now on, only the creator of the context has access to it
+	 */
+	ctx->ctx_fl_protected = 1;
+
+	/*
+	 * reinforce secure monitoring: cannot toggle psr.up
+	 */
+	ia64_psr(regs)->sp = 1;
+
+	return 0;
+}
+
+static int
+pfm_debug(struct task_struct *task, pfm_context_t *ctx, void *arg, int count, 
+	 struct pt_regs *regs)
+{
+	unsigned int mode = *(unsigned int *)arg;
+
+	pfm_debug_mode = mode == 0 ? 0 : 1;
+
+	printk("perfmon debugging %s\n", pfm_debug_mode ? "on" : "off");
+
+	return 0;
+}
+
+#ifdef PFM_PMU_USES_DBR
+
+typedef struct {
+	unsigned long ibr_mask:56;
+	unsigned long ibr_plm:4;
+	unsigned long ibr_ig:3;
+	unsigned long ibr_x:1;
+} ibr_mask_reg_t;
+
+typedef struct {
+	unsigned long dbr_mask:56;
+	unsigned long dbr_plm:4;
+	unsigned long dbr_ig:2;
+	unsigned long dbr_w:1;
+	unsigned long dbr_r:1;
+} dbr_mask_reg_t;
+
+typedef union {
+	unsigned long  val;
+	ibr_mask_reg_t ibr;
+	dbr_mask_reg_t dbr;
+} dbreg_t;
+
+
+static int
+pfm_write_ibr_dbr(int mode, struct task_struct *task, void *arg, int count, struct pt_regs *regs)
+{
+	struct thread_struct *thread = &task->thread;
+	pfm_context_t *ctx = task->thread.pfm_context;
+	pfarg_dbreg_t tmp, *req = (pfarg_dbreg_t *)arg;
+	dbreg_t dbreg;
+	unsigned int rnum;
+	int first_time;
+	int i, ret = 0;
+
+	/*
+	 * for range restriction: psr.db must be cleared or the
+	 * the PMU will ignore the debug registers.
+	 *
+	 * XXX: may need more in system wide mode,
+	 * no task can have this bit set?
+	 */
+	if (ia64_psr(regs)->db == 1) return -EINVAL;
+
+
+	first_time = ctx->ctx_fl_using_dbreg == 0;
+
+	/*
+	 * check for debug registers in system wide mode
+	 *
+	 */
+	LOCK_PFS();
+	if (ctx->ctx_fl_system && first_time) {
+		if (pfm_sessions.pfs_ptrace_use_dbregs) 
+			ret = -EBUSY;
+		else
+			pfm_sessions.pfs_sys_use_dbregs++;
+	}
+	UNLOCK_PFS();
+
+	if (ret != 0) return ret;
+
+	if (ctx->ctx_fl_system) {
+		/* we mark ourselves as owner  of the debug registers */
+		ctx->ctx_fl_using_dbreg = 1;
+	} else {
+       		if (ctx->ctx_fl_using_dbreg == 0) {
+			ret= -EBUSY;
+			if ((thread->flags & IA64_THREAD_DBG_VALID) != 0) {
+				DBprintk(("debug registers already in use for [%d]\n", task->pid));
+				goto abort_mission;
+			}
+			/* we mark ourselves as owner  of the debug registers */
+			ctx->ctx_fl_using_dbreg = 1;
+
+			/* 
+			 * Given debug registers cannot be used for both debugging 
+			 * and performance monitoring at the same time, we reuse
+			 * the storage area to save and restore the registers on ctxsw.
+			 */
+			memset(task->thread.dbr, 0, sizeof(task->thread.dbr));
+			memset(task->thread.ibr, 0, sizeof(task->thread.ibr));
+
+			/*
+			 * clear hardware registers to make sure we don't leak
+			 * information and pick up stale state
+			 */
+			for (i=0; i < pmu_conf.num_ibrs; i++) {
+				ia64_set_ibr(i, 0UL);
+			}
+			for (i=0; i < pmu_conf.num_dbrs; i++) {
+				ia64_set_dbr(i, 0UL);
+			}
+		}
+	}
+
+	ret = -EFAULT;
+
+	/*
+	 * Now install the values into the registers
+	 */
+	for (i = 0; i < count; i++, req++) {
+
+		
+		if (copy_from_user(&tmp, req, sizeof(tmp))) goto abort_mission;
+		
+		rnum      = tmp.dbreg_num;
+		dbreg.val = tmp.dbreg_value;
+		
+		ret = -EINVAL;
+
+		if ((mode == 0 && !IBR_IS_IMPL(rnum)) || ((mode == 1) && !DBR_IS_IMPL(rnum))) {
+			DBprintk(("invalid register %u val=0x%lx mode=%d i=%d count=%d\n", 
+				  rnum, dbreg.val, mode, i, count));
+
+			goto abort_mission;
+		}
+
+		/*
+		 * make sure we do not install enabled breakpoint
+		 */
+		if (rnum & 0x1) {
+			if (mode == 0) 
+				dbreg.ibr.ibr_x = 0;
+			else
+				dbreg.dbr.dbr_r = dbreg.dbr.dbr_w = 0;
+		}
+
+		/*
+		 * clear return flags and copy back to user
+		 *
+		 * XXX: fix once EAGAIN is implemented
+		 */
+		ret = -EFAULT;
+
+		PFM_REG_RETFLAG_SET(tmp.dbreg_flags, 0);
+
+		if (copy_to_user(req, &tmp, sizeof(tmp))) goto abort_mission;
+
+		/*
+		 * Debug registers, just like PMC, can only be modified
+		 * by a kernel call. Moreover, perfmon() access to those
+		 * registers are centralized in this routine. The hardware
+		 * does not modify the value of these registers, therefore,
+		 * if we save them as they are written, we can avoid having
+		 * to save them on context switch out. This is made possible
+		 * by the fact that when perfmon uses debug registers, ptrace()
+		 * won't be able to modify them concurrently.
+		 */
+		if (mode == 0) {
+			CTX_USED_IBR(ctx, rnum);
+
+			ia64_set_ibr(rnum, dbreg.val);
+
+			thread->ibr[rnum] = dbreg.val;
+
+			DBprintk(("write ibr%u=0x%lx used_ibrs=0x%lx\n", rnum, dbreg.val, ctx->ctx_used_ibrs[0]));
+		} else {
+			CTX_USED_DBR(ctx, rnum);
+
+			ia64_set_dbr(rnum, dbreg.val);
+
+			thread->dbr[rnum] = dbreg.val;
+
+			DBprintk(("write dbr%u=0x%lx used_dbrs=0x%lx\n", rnum, dbreg.val, ctx->ctx_used_dbrs[0]));
+		}
+	}
+
+	return 0;
+
+abort_mission:
+	/*
+	 * in case it was our first attempt, we undo the global modifications
+	 */
+	if (first_time) {
+		LOCK_PFS();
+		if (ctx->ctx_fl_system) {
+			pfm_sessions.pfs_sys_use_dbregs--;
+		}
+		UNLOCK_PFS();
+		ctx->ctx_fl_using_dbreg = 0;
+	}
+	/*
+	 * install error return flag
+	 */
+	if (ret != -EFAULT) {
+		/*
+		 * XXX: for now we can only come here on EINVAL
+		 */
+		PFM_REG_RETFLAG_SET(tmp.dbreg_flags, PFM_REG_RETFL_EINVAL);
+		copy_to_user(req, &tmp, sizeof(tmp));
+	}
+	return ret;
+}
+
+static int
+pfm_write_ibrs(struct task_struct *task, pfm_context_t *ctx, void *arg, int count, 
+	 struct pt_regs *regs)
+{	
+	/* we don't quite support this right now */
+	if (task != current) return -EINVAL;
+
+	if (!CTX_IS_ENABLED(ctx)) return -EINVAL;
+
+	return pfm_write_ibr_dbr(0, task, arg, count, regs);
+}
+
+static int
+pfm_write_dbrs(struct task_struct *task, pfm_context_t *ctx, void *arg, int count, 
+	 struct pt_regs *regs)
+{	
+	/* we don't quite support this right now */
+	if (task != current) return -EINVAL;
+
+	if (!CTX_IS_ENABLED(ctx)) return -EINVAL;
+
+	return pfm_write_ibr_dbr(1, task, arg, count, regs);
+}
+
+#endif /* PFM_PMU_USES_DBR */
+
+static int
+pfm_get_features(struct task_struct *task, pfm_context_t *ctx, void *arg, int count, struct pt_regs *regs)
+{
+	pfarg_features_t tmp;
 
 	memset(&tmp, 0, sizeof(tmp));
 
-	if (ctx == NULL && cmd != PFM_CREATE_CONTEXT && cmd < PFM_DEBUG_BASE) {
-		DBprintk((" PFM_WRITE_PMCS: no context for task %d\n", task->pid));
+	tmp.ft_version      = PFM_VERSION;
+	tmp.ft_smpl_version = PFM_SMPL_VERSION;
+
+	if (copy_to_user(arg, &tmp, sizeof(tmp))) return -EFAULT;
+
+	return 0;
+}
+
+static int
+pfm_start(struct task_struct *task, pfm_context_t *ctx, void *arg, int count, 
+	  struct pt_regs *regs)
+{
+	/* we don't quite support this right now */
+	if (task != current) return -EINVAL;
+
+	/* 
+	 * Cannot do anything before PMU is enabled 
+	 */
+	if (!CTX_IS_ENABLED(ctx)) return -EINVAL;
+
+	DBprintk(("[%d] fl_system=%d owner=%p current=%p\n",
+				current->pid,
+				ctx->ctx_fl_system, PMU_OWNER(),
+				current));
+
+	if (PMU_OWNER() != task) {
+		printk("perfmon: pfm_start task [%d] not pmu owner\n", task->pid);
 		return -EINVAL;
 	}
 
-	switch (cmd) {
-		case PFM_CREATE_CONTEXT:
-			/* a context has already been defined */
-			if (ctx) return -EBUSY;
+	if (ctx->ctx_fl_system) {
+		
+		/* enable dcr pp */
+		ia64_set_dcr(ia64_get_dcr()|IA64_DCR_PP);
 
-			/*
-			 * cannot directly create a context in another process
-			 */
-			if (task != current) return -EINVAL;
+		local_cpu_data->pfm_dcr_pp  = 1;
+		ia64_psr(regs)->pp = 1;
+		__asm__ __volatile__ ("ssm psr.pp;;"::: "memory");
 
-			if (req == NULL || count != 1) return -EINVAL;
-
-			if (!access_ok(VERIFY_READ, req, sizeof(struct perfmon_req_t)*count)) return -EFAULT;
-
-			return pfm_context_create(flags, req);
-
-		case PFM_WRITE_PMCS:
-			/* we don't quite support this right now */
-			if (task != current) return -EINVAL;
-
-			if (!access_ok(VERIFY_READ, req, sizeof(struct perfmon_req_t)*count)) return -EFAULT;
-
-			return pfm_write_pmcs(task, req, count);
-
-		case PFM_WRITE_PMDS:
-			/* we don't quite support this right now */
-			if (task != current) return -EINVAL;
-
-			if (!access_ok(VERIFY_READ, req, sizeof(struct perfmon_req_t)*count)) return -EFAULT;
-
-			return pfm_write_pmds(task, req, count);
-
-		case PFM_START:
-			/* we don't quite support this right now */
-			if (task != current) return -EINVAL;
-
-			if (PMU_OWNER()  && PMU_OWNER() != current && PFM_CAN_DO_LAZY()) pfm_lazy_save_regs(PMU_OWNER());
-
-			SET_PMU_OWNER(current);
-
-			/* will start monitoring right after rfi */
-			ia64_psr(regs)->up = 1;
-			ia64_psr(regs)->pp = 1;
-
-			if (ctx->ctx_fl_system) {
-				pfm_process_tasklist(1);
-				pfs_info.pfs_pp = 1;
-			}
-
-			/*
-			 * mark the state as valid.
-			 * this will trigger save/restore at context switch
-			 */
-			if (ctx->ctx_fl_system==0) th->flags |= IA64_THREAD_PM_VALID;
-
-			ia64_set_pmc(0, 0);
-			ia64_srlz_d();
-
-			break;
-
-		case PFM_ENABLE:
-			/* we don't quite support this right now */
-			if (task != current) return -EINVAL;
-
-			if (PMU_OWNER()  && PMU_OWNER() != current && PFM_CAN_DO_LAZY()) pfm_lazy_save_regs(PMU_OWNER());
-
-			/* reset all registers to stable quiet state */
-			ia64_reset_pmu();
-
-			/* make sure nothing starts */
-			ia64_psr(regs)->up = 0;
-			ia64_psr(regs)->pp = 0;
-
-			/* do it on the live register as well */
-			__asm__ __volatile__ ("rsm psr.pp|psr.pp;;"::: "memory");
-
-			SET_PMU_OWNER(current);
-
-			/*
-			 * mark the state as valid.
-			 * this will trigger save/restore at context switch
-			 */
-			if (ctx->ctx_fl_system==0) th->flags |= IA64_THREAD_PM_VALID;
-
-			/* simply unfreeze */
-			ia64_set_pmc(0, 0);
-			ia64_srlz_d();
-			break;
-
-		case PFM_DISABLE:
-			/* we don't quite support this right now */
-			if (task != current) return -EINVAL;
-
-			/* simply freeze */
-			ia64_set_pmc(0, 1);
-			ia64_srlz_d();
-			/*
-			 * XXX: cannot really toggle IA64_THREAD_PM_VALID
-			 * but context is still considered valid, so any 
-			 * read request would return something valid. Same
-			 * thing when this task terminates (pfm_flush_regs()).
-			 */
-			break;
-
-		case PFM_READ_PMDS:
-			if (!access_ok(VERIFY_READ, req, sizeof(struct perfmon_req_t)*count)) return -EFAULT;
-			if (!access_ok(VERIFY_WRITE, req, sizeof(struct perfmon_req_t)*count)) return -EFAULT;
-
-			return pfm_read_pmds(task, req, count);
-
-	      case PFM_STOP:
-			/* we don't quite support this right now */
-			if (task != current) return -EINVAL;
-
-			/* simply stop monitors, not PMU */
-			ia64_psr(regs)->up = 0;
-			ia64_psr(regs)->pp = 0;
-
-			if (ctx->ctx_fl_system) {
-				pfm_process_tasklist(0);
-				pfs_info.pfs_pp = 0;
-			}
-
-			break;
-
-	      case PFM_RESTART: /* temporary, will most likely end up as a PFM_ENABLE */
-
-			if ((th->flags & IA64_THREAD_PM_VALID) == 0 && ctx->ctx_fl_system==0) {
-				printk(" PFM_RESTART not monitoring\n");
-				return -EINVAL;
-			}
-			if (CTX_OVFL_NOBLOCK(ctx) == 0 && ctx->ctx_fl_frozen==0) {
-				printk("task %d without pmu_frozen set\n", task->pid);
-				return -EINVAL;
-			}
-
-			return pfm_do_restart(task); /* we only look at first entry */
-
-	      case PFM_DESTROY_CONTEXT:
-			/* we don't quite support this right now */
-			if (task != current) return -EINVAL;
-
-			/* first stop monitors */
-			ia64_psr(regs)->up = 0;
-			ia64_psr(regs)->pp = 0;
-
-			/* then freeze PMU */
-			ia64_set_pmc(0, 1);
-			ia64_srlz_d();
-
-			/* don't save/restore on context switch */
-			if (ctx->ctx_fl_system ==0) task->thread.flags &= ~IA64_THREAD_PM_VALID;
-
-			SET_PMU_OWNER(NULL);
-
-			/* now free context and related state */
-			pfm_context_exit(task);
-			break;
-
-	      case PFM_DEBUG_ON:
-			printk("perfmon debugging on\n");
-			pfm_debug = 1;
-			break;
-
-	      case PFM_DEBUG_OFF:
-			printk("perfmon debugging off\n");
-			pfm_debug = 0;
-			break;
-
-	      default:
-			DBprintk((" UNknown command 0x%x\n", cmd));
+	} else {
+		if ((task->thread.flags & IA64_THREAD_PM_VALID) == 0) {
+			printk("perfmon: pfm_start task flag not set for [%d]\n", task->pid);
 			return -EINVAL;
+		}
+		ia64_psr(regs)->up = 1;
+		__asm__ __volatile__ ("sum psr.up;;"::: "memory");
+	}
+	ia64_srlz_d();
+
+	return 0;
+}
+
+static int
+pfm_enable(struct task_struct *task, pfm_context_t *ctx, void *arg, int count, 
+	   struct pt_regs *regs)
+{
+	/* we don't quite support this right now */
+	if (task != current) return -EINVAL;
+
+	if (ctx->ctx_fl_system == 0 && PMU_OWNER()  && PMU_OWNER() != current) 
+		pfm_lazy_save_regs(PMU_OWNER());
+
+	/* reset all registers to stable quiet state */
+	ia64_reset_pmu(task);
+
+	/* make sure nothing starts */
+	if (ctx->ctx_fl_system) {
+		ia64_psr(regs)->pp = 0;
+		ia64_psr(regs)->up = 0; /* just to make sure! */
+
+		__asm__ __volatile__ ("rsm psr.pp;;"::: "memory");
+
+#ifdef CONFIG_SMP
+		local_cpu_data->pfm_syst_wide = 1;
+		local_cpu_data->pfm_dcr_pp    = 0;
+#endif
+	} else {
+		/*
+		 * needed in case the task was a passive task during
+		 * a system wide session and now wants to have its own
+		 * session
+		 */
+		ia64_psr(regs)->pp = 0; /* just to make sure! */
+		ia64_psr(regs)->up = 0;
+
+		__asm__ __volatile__ ("rum psr.up;;"::: "memory");
+		/*
+		 * allow user control (user monitors only)
+		if (task  == ctx->ctx_owner) {
+		 */
+		{
+			DBprintk(("clearing psr.sp for [%d]\n", current->pid));
+			ia64_psr(regs)->sp = 0;
+		}
+		task->thread.flags |= IA64_THREAD_PM_VALID;
+	}
+
+	SET_PMU_OWNER(task);
+
+
+	ctx->ctx_flags.state = PFM_CTX_ENABLED;
+	atomic_set(&ctx->ctx_last_cpu, smp_processor_id());
+
+	/* simply unfreeze */
+	ia64_set_pmc(0, 0);
+	ia64_srlz_d();
+
+	return 0;
+}
+
+static int
+pfm_disable(struct task_struct *task, pfm_context_t *ctx, void *arg, int count, 
+	   struct pt_regs *regs)
+{	
+	/* we don't quite support this right now */
+	if (task != current) return -EINVAL;
+
+	if (!CTX_IS_ENABLED(ctx)) return -EINVAL;
+
+	/*
+	 * stop monitoring, freeze PMU, and save state in context
+	 */
+	pfm_flush_regs(task);
+	
+	/*
+	 * just to make sure nothing starts again when back in user mode.
+	 * pfm_flush_regs() freezes the PMU anyway.
+	 */ 
+	if (ctx->ctx_fl_system) {
+		ia64_psr(regs)->pp = 0;
+	} else {
+		ia64_psr(regs)->up = 0;
+	}
+
+	/* 
+	 * goes back to default behavior 
+	 * no need to change live psr.sp because useless at the kernel level
+	 */
+	ia64_psr(regs)->sp = 1;
+
+	DBprintk(("enabling psr.sp for [%d]\n", current->pid));
+
+	ctx->ctx_flags.state = PFM_CTX_DISABLED;
+
+	return 0;
+}
+
+static int
+pfm_stop(struct task_struct *task, pfm_context_t *ctx, void *arg, int count, 
+	 struct pt_regs *regs)
+{
+	/* we don't quite support this right now */
+	if (task != current) return -EINVAL;
+
+	/* 
+	 * Cannot do anything before PMU is enabled 
+	 */
+	if (!CTX_IS_ENABLED(ctx)) return -EINVAL;
+
+	DBprintk(("[%d] fl_system=%d owner=%p current=%p\n",
+				current->pid,
+				ctx->ctx_fl_system, PMU_OWNER(),
+				current));
+	/* simply stop monitoring but not the PMU */
+	if (ctx->ctx_fl_system) {
+
+		__asm__ __volatile__ ("rsm psr.pp;;"::: "memory");
+
+		/* disable dcr pp */
+		ia64_set_dcr(ia64_get_dcr() & ~IA64_DCR_PP);
+
+		local_cpu_data->pfm_dcr_pp  = 0;
+
+		ia64_psr(regs)->pp = 0;
+
+		__asm__ __volatile__ ("rsm psr.pp;;"::: "memory");
+
+	} else {
+		ia64_psr(regs)->up = 0;
+		__asm__ __volatile__ ("rum psr.up;;"::: "memory");
 	}
 	return 0;
 }
 
 /*
- * XXX: do something better here
+ * functions MUST be listed in the increasing order of their index (see permfon.h)
  */
+static pfm_cmd_desc_t pfm_cmd_tab[]={
+/* 0  */{ NULL, 0, 0, 0}, /* not used */
+/* 1  */{ pfm_write_pmcs, PFM_CMD_PID|PFM_CMD_CTX|PFM_CMD_ARG_READ|PFM_CMD_ARG_WRITE, PFM_CMD_ARG_MANY, sizeof(pfarg_reg_t)}, 
+/* 2  */{ pfm_write_pmds, PFM_CMD_PID|PFM_CMD_CTX|PFM_CMD_ARG_READ, PFM_CMD_ARG_MANY, sizeof(pfarg_reg_t)},
+/* 3  */{ pfm_read_pmds, PFM_CMD_PID|PFM_CMD_CTX|PFM_CMD_ARG_READ|PFM_CMD_ARG_WRITE, PFM_CMD_ARG_MANY, sizeof(pfarg_reg_t)},
+/* 4  */{ pfm_stop, PFM_CMD_PID|PFM_CMD_CTX, 0, 0},
+/* 5  */{ pfm_start, PFM_CMD_PID|PFM_CMD_CTX, 0, 0},
+/* 6  */{ pfm_enable, PFM_CMD_PID|PFM_CMD_CTX, 0, 0},
+/* 7  */{ pfm_disable, PFM_CMD_PID|PFM_CMD_CTX, 0, 0},
+/* 8  */{ pfm_create_context, PFM_CMD_ARG_READ, 1, sizeof(pfarg_context_t)},
+/* 9  */{ pfm_destroy_context, PFM_CMD_PID|PFM_CMD_CTX, 0, 0},
+/* 10 */{ pfm_restart, PFM_CMD_PID|PFM_CMD_CTX|PFM_CMD_NOCHK, 0, 0},
+/* 11 */{ pfm_protect_context, PFM_CMD_PID|PFM_CMD_CTX, 0, 0},
+/* 12 */{ pfm_get_features, PFM_CMD_ARG_WRITE, 0, 0},
+/* 13 */{ pfm_debug, 0, 1, sizeof(unsigned int)},
+/* 14 */{ pfm_unprotect_context, PFM_CMD_PID|PFM_CMD_CTX, 0, 0},
+/* 15 */{ NULL, 0, 0, 0}, /* not used */
+/* 16 */{ NULL, 0, 0, 0}, /* not used */
+/* 17 */{ NULL, 0, 0, 0}, /* not used */
+/* 18 */{ NULL, 0, 0, 0}, /* not used */
+/* 19 */{ NULL, 0, 0, 0}, /* not used */
+/* 20 */{ NULL, 0, 0, 0}, /* not used */
+/* 21 */{ NULL, 0, 0, 0}, /* not used */
+/* 22 */{ NULL, 0, 0, 0}, /* not used */
+/* 23 */{ NULL, 0, 0, 0}, /* not used */
+/* 24 */{ NULL, 0, 0, 0}, /* not used */
+/* 25 */{ NULL, 0, 0, 0}, /* not used */
+/* 26 */{ NULL, 0, 0, 0}, /* not used */
+/* 27 */{ NULL, 0, 0, 0}, /* not used */
+/* 28 */{ NULL, 0, 0, 0}, /* not used */
+/* 29 */{ NULL, 0, 0, 0}, /* not used */
+/* 30 */{ NULL, 0, 0, 0}, /* not used */
+/* 31 */{ NULL, 0, 0, 0}, /* not used */
+#ifdef PFM_PMU_USES_DBR
+/* 32 */{ pfm_write_ibrs, PFM_CMD_PID|PFM_CMD_CTX|PFM_CMD_ARG_READ|PFM_CMD_ARG_WRITE, PFM_CMD_ARG_MANY, sizeof(pfarg_dbreg_t)},
+/* 33 */{ pfm_write_dbrs, PFM_CMD_PID|PFM_CMD_CTX|PFM_CMD_ARG_READ|PFM_CMD_ARG_WRITE, PFM_CMD_ARG_MANY, sizeof(pfarg_dbreg_t)}
+#endif
+};
+#define PFM_CMD_COUNT	(sizeof(pfm_cmd_tab)/sizeof(pfm_cmd_desc_t))
+
 static int
-perfmon_bad_permissions(struct task_struct *task)
+check_task_state(struct task_struct *task)
 {
-	/* stolen from bad_signal() */
-	return (current->session != task->session)
-	    && (current->euid ^ task->suid) && (current->euid ^ task->uid)
-	    && (current->uid ^ task->suid) && (current->uid ^ task->uid);
+	int ret = 0;
+#ifdef CONFIG_SMP
+	/* We must wait until the state has been completely
+	 * saved. There can be situations where the reader arrives before
+	 * after the task is marked as STOPPED but before pfm_save_regs()
+	 * is completed.
+	 */
+	for (;;) {
+
+		task_lock(task);
+		if (1 /*XXX !task_has_cpu(task)*/) break;
+		task_unlock(task);
+
+		do {
+			if (task->state != TASK_ZOMBIE && task->state != TASK_STOPPED) return -EBUSY;
+			barrier();
+			cpu_relax();
+		} while (0 /*task_has_cpu(task)*/);
+	}
+	task_unlock(task);
+#else
+	if (task->state != TASK_ZOMBIE && task->state != TASK_STOPPED) {
+		DBprintk(("warning [%d] not in stable state %ld\n", task->pid, task->state));
+		ret = -EBUSY;
+	}
+#endif
+	return ret;
 }
 
 asmlinkage int
-sys_perfmonctl (int pid, int cmd, int flags, perfmon_req_t *req, int count, long arg6, long arg7, long arg8, long stack)
+sys_perfmonctl (pid_t pid, int cmd, void *arg, int count, long arg5, long arg6, long arg7, 
+		long arg8, long stack)
 {
-	struct pt_regs *regs = (struct pt_regs *) &stack;
-	struct task_struct *child = current;
-	int ret = -ESRCH;
+	struct pt_regs *regs = (struct pt_regs *)&stack;
+	struct task_struct *task = current;
+	pfm_context_t *ctx = task->thread.pfm_context;
+	size_t sz;
+	int ret = -ESRCH, narg;
 
-	/* sanity check:
-	 *
-	 * ensures that we don't do bad things in case the OS
-	 * does not have enough storage to save/restore PMC/PMD
+	/* 
+	 * reject any call if perfmon was disabled at initialization time
 	 */
-	if (PERFMON_IS_DISABLED()) return -ENOSYS;
+	if (PFM_IS_DISABLED()) return -ENOSYS;
 
-	/* XXX: pid interface is going away in favor of pfm context */
-	if (pid != current->pid) {
-		read_lock(&tasklist_lock);
+	DBprintk(("cmd=%d idx=%d valid=%d narg=0x%x\n", cmd, PFM_CMD_IDX(cmd), 
+		  PFM_CMD_IS_VALID(cmd), PFM_CMD_NARG(cmd)));
 
-		child = find_task_by_pid(pid);
+	if (PFM_CMD_IS_VALID(cmd) == 0) return -EINVAL;
 
-		if (!child) goto abort_call;
+	/* ingore arguments when command has none */
+	narg = PFM_CMD_NARG(cmd);
+	if ((narg == PFM_CMD_ARG_MANY  && count == 0) || (narg > 0 && narg != count)) return -EINVAL;
 
-		ret = -EPERM;
+	sz = PFM_CMD_ARG_SIZE(cmd);
 
-		if (perfmon_bad_permissions(child)) goto abort_call;
+	if (PFM_CMD_READ_ARG(cmd) && !access_ok(VERIFY_READ, arg, sz*count)) return -EFAULT;
 
-		/*
-		 * XXX: need to do more checking here
+	if (PFM_CMD_WRITE_ARG(cmd) && !access_ok(VERIFY_WRITE, arg, sz*count)) return -EFAULT;
+
+	if (PFM_CMD_USE_PID(cmd))  {
+		/* 
+		 * XXX: may need to fine tune this one
 		 */
-		if (child->state != TASK_ZOMBIE && child->state != TASK_STOPPED) {
-			DBprintk((" warning process %d not in stable state %ld\n", pid, child->state));
+		if (pid < 2) return -EPERM;
+
+		if (pid != current->pid) {
+
+			read_lock(&tasklist_lock);
+
+			task = find_task_by_pid(pid);
+
+			if (!task) goto abort_call;
+
+			ret = -EPERM;
+
+			if (pfm_bad_permissions(task)) goto abort_call;
+
+			if (PFM_CMD_CHK(cmd)) {
+				ret = check_task_state(task);
+				if (ret != 0) goto abort_call;
+			}
+			ctx = task->thread.pfm_context;
 		}
+	} 
+
+	if (PFM_CMD_USE_CTX(cmd)) {
+		ret = -EINVAL;
+	       if (ctx == NULL) {
+			DBprintk(("no context for task %d\n", task->pid));
+			goto abort_call;
+	       }
+	       ret = -EPERM;
+	       /*
+		* we only grant access to the context if:
+		* 	- the caller is the creator of the context (ctx_owner)
+		*  OR   - the context is attached to the caller AND The context IS NOT 
+		*  	  in protected mode
+		*/
+	       if (ctx->ctx_owner != current && (ctx->ctx_fl_protected || task != current)) {
+				DBprintk(("context protected, no access for [%d]\n", task->pid));
+				goto abort_call;
+	       }
 	}
-	ret = do_perfmonctl(child, cmd, flags, req, count, regs);
+
+	ret = (*pfm_cmd_tab[PFM_CMD_IDX(cmd)].cmd_func)(task, ctx, arg, count, regs);
 
 abort_call:
-	if (child != current) read_unlock(&tasklist_lock);
+	if (task != current) read_unlock(&tasklist_lock);
 
 	return ret;
 }
 
-#if __GNUC__ >= 3
-void asmlinkage
-pfm_block_on_overflow(void)
-#else
-void asmlinkage
-pfm_block_on_overflow(u64 arg0, u64 arg1, u64 arg2, u64 arg3, u64 arg4, u64 arg5, u64 arg6, u64 arg7)
-#endif
+void
+pfm_ovfl_block_reset (void)
 {
 	struct thread_struct *th = &current->thread;
 	pfm_context_t *ctx = current->thread.pfm_context;
 	int ret;
 
 	/*
-	 * NO matter what notify_pid is,
-	 * we clear overflow, won't notify again
+	 * clear the flag, to make sure we won't get here
+	 * again
 	 */
-	th->pfm_must_block = 0;
+	th->pfm_ovfl_block_reset = 0;
 
 	/*
 	 * do some sanity checks first
 	 */
 	if (!ctx) {
-		printk("perfmon: process %d has no PFM context\n", current->pid);
-		return;
-	}
-	if (ctx->ctx_notify_task == 0) {
-		printk("perfmon: process %d has no task to notify\n", current->pid);
+		printk("perfmon: [%d] has no PFM context\n", current->pid);
 		return;
 	}
 
-	DBprintk((" current=%d task=%d\n", current->pid, ctx->ctx_notify_task->pid));
+	if (CTX_OVFL_NOBLOCK(ctx)) goto non_blocking;
 
-	/* should not happen */
-	if (CTX_OVFL_NOBLOCK(ctx)) {
-		printk("perfmon: process %d non-blocking ctx should not be here\n", current->pid);
-		return;
-	}
-
-	DBprintk((" CPU%d %d before sleep\n", smp_processor_id(), current->pid));
+	DBprintk(("[%d] before sleeping\n", current->pid));
 
 	/*
 	 * may go through without blocking on SMP systems
@@ -1356,12 +2275,14 @@ pfm_block_on_overflow(u64 arg0, u64 arg1, u64 arg2, u64 arg3, u64 arg4, u64 arg5
 	 */
 	ret = down_interruptible(&ctx->ctx_restart_sem);
 
-	DBprintk((" CPU%d %d after sleep ret=%d\n", smp_processor_id(), current->pid, ret));
+	DBprintk(("[%d] after sleeping ret=%d\n", current->pid, ret));
 
 	/*
 	 * in case of interruption of down() we don't restart anything
 	 */
 	if (ret >= 0) {
+
+non_blocking:
 		/* we reactivate on context switch */
 		ctx->ctx_fl_frozen = 0;
 		/*
@@ -1369,18 +2290,18 @@ pfm_block_on_overflow(u64 arg0, u64 arg1, u64 arg2, u64 arg3, u64 arg4, u64 arg5
 		 * use the local reference
 		 */
 
-		pfm_reset_regs(ctx);
+		pfm_reset_regs(ctx, ctx->ctx_ovfl_regs, PFM_RELOAD_LONG_RESET);
+
+		ctx->ctx_ovfl_regs[0] = 0UL;
 
 		/*
 		 * Unlock sampling buffer and reset index atomically
 		 * XXX: not really needed when blocking
 		 */
 		if (CTX_HAS_SMPL(ctx)) {
-			ctx->ctx_smpl_buf->psb_hdr->hdr_count = 0;
-			ctx->ctx_smpl_buf->psb_index = 0;
+			ctx->ctx_psb->psb_hdr->hdr_count = 0;
+			ctx->ctx_psb->psb_index = 0;
 		}
-
-		DBprintk((" CPU%d %d unfreeze PMU\n", smp_processor_id(), current->pid));
 
 		ia64_set_pmc(0, 0);
 		ia64_srlz_d();
@@ -1390,23 +2311,111 @@ pfm_block_on_overflow(u64 arg0, u64 arg1, u64 arg2, u64 arg3, u64 arg4, u64 arg5
 }
 
 /*
+ * This function will record an entry in the sampling if it is not full already.
+ * Return:
+ * 	0 : buffer is not full (did not BECOME full: still space or was already full)
+ * 	1 : buffer is full (recorded the last entry)
+ */
+static int
+pfm_record_sample(struct task_struct *task, pfm_context_t *ctx, unsigned long ovfl_mask, struct pt_regs *regs)
+{
+	pfm_smpl_buffer_desc_t *psb = ctx->ctx_psb;
+	unsigned long *e, m, idx;
+	perfmon_smpl_entry_t *h;
+	int j;
+
+
+pfm_recorded_samples_count++;
+	idx = ia64_fetch_and_add(1, &psb->psb_index);
+	DBprintk(("recording index=%ld entries=%ld\n", idx-1, psb->psb_entries));
+
+	/*
+	* XXX: there is a small chance that we could run out on index before resetting
+	* but index is unsigned long, so it will take some time.....
+	* We use > instead of == because fetch_and_add() is off by one (see below)
+	*
+	* This case can happen in non-blocking mode or with multiple processes.
+	* For non-blocking, we need to reload and continue.
+	 */
+	if (idx > psb->psb_entries) return 0;
+
+	/* first entry is really entry 0, not 1 caused by fetch_and_add */
+	idx--;
+
+	h = (perfmon_smpl_entry_t *)(((char *)psb->psb_addr) + idx*(psb->psb_entry_size));
+
+	/*
+	 * initialize entry header
+	 */
+	h->pid  = task->pid;
+	h->cpu  = smp_processor_id();
+	h->rate = 0; /* XXX: add the sampling rate used here */
+	h->ip   = regs ? regs->cr_iip : 0x0;	/* where did the fault happened */
+	h->regs = ovfl_mask; 			/* which registers overflowed */
+
+	/* guaranteed to monotonically increase on each cpu */
+	h->stamp  = pfm_get_stamp();
+	h->period = 0UL; /* not yet used */
+
+	/* position for first pmd */
+	e = (unsigned long *)(h+1);
+
+	/*
+	 * selectively store PMDs in increasing index number
+	 */
+	m = ctx->ctx_smpl_regs[0];
+	for (j=0; m; m >>=1, j++) {
+
+		if ((m & 0x1) == 0) continue;
+
+		if (PMD_IS_COUNTING(j)) {
+			*e  =  pfm_read_soft_counter(ctx, j);
+			/* check if this pmd overflowed as well */
+			*e +=  ovfl_mask & (1UL<<j) ? 1 + pmu_conf.perf_ovfl_val : 0;
+		} else {
+			*e = ia64_get_pmd(j); /* slow */
+		}
+		DBprintk(("e=%p pmd%d =0x%lx\n", (void *)e, j, *e));
+		e++;
+	}
+	/*
+	 * make the new entry visible to user, needs to be atomic
+	 */
+	ia64_fetch_and_add(1, &psb->psb_hdr->hdr_count);
+
+	DBprintk(("index=%ld entries=%ld hdr_count=%ld\n", 
+				idx, psb->psb_entries, psb->psb_hdr->hdr_count));
+	/* 
+	 * sampling buffer full ? 
+	 */
+	if (idx == (psb->psb_entries-1)) {
+		DBprintk(("sampling buffer full\n"));
+		/*
+		 * XXX: must reset buffer in blocking mode and lost notified
+		 */
+		return 1;
+	}
+	return 0;
+}
+
+/*
  * main overflow processing routine.
  * it can be called from the interrupt path or explicitely during the context switch code
  * Return:
  *	new value of pmc[0]. if 0x0 then unfreeze, else keep frozen
  */
-unsigned long
-update_counters (struct task_struct *task, u64 pmc0, struct pt_regs *regs)
+static unsigned long
+pfm_overflow_handler(struct task_struct *task, u64 pmc0, struct pt_regs *regs)
 {
-	unsigned long mask, i, cnum;
-	struct thread_struct *th;
+	unsigned long mask;
+	struct thread_struct *t;
 	pfm_context_t *ctx;
-	unsigned long bv = 0;
+	unsigned long old_val;
+	unsigned long ovfl_notify = 0UL, ovfl_pmds = 0UL;
+	int i;
 	int my_cpu = smp_processor_id();
-	int ret = 1, buffer_is_full = 0;
-	int ovfl_has_long_recovery, can_notify, need_reset_pmd16=0;
+	int ret = 1;
 	struct siginfo si;
-
 	/*
 	 * It is never safe to access the task for which the overflow interrupt is destinated
 	 * using the current variable as the interrupt may occur in the middle of a context switch
@@ -1421,233 +2430,151 @@ update_counters (struct task_struct *task, u64 pmc0, struct pt_regs *regs)
 	 */
 
 	if (task == NULL) {
-		DBprintk((" owners[%d]=NULL\n", my_cpu));
+		DBprintk(("owners[%d]=NULL\n", my_cpu));
 		return 0x1;
 	}
-	th  = &task->thread;
-	ctx = th->pfm_context;
+	t   = &task->thread;
+	ctx = task->thread.pfm_context;
+
+	if (!ctx) {
+		printk("perfmon: Spurious overflow interrupt: process %d has no PFM context\n", 
+			task->pid);
+		return 0;
+	}
 
 	/*
 	 * XXX: debug test
 	 * Don't think this could happen given upfront tests
 	 */
-	if ((th->flags & IA64_THREAD_PM_VALID) == 0 && ctx->ctx_fl_system == 0) {
-		printk("perfmon: Spurious overflow interrupt: process %d not using perfmon\n", task->pid);
+	if ((t->flags & IA64_THREAD_PM_VALID) == 0 && ctx->ctx_fl_system == 0) {
+		printk("perfmon: Spurious overflow interrupt: process %d not using perfmon\n", 
+			task->pid);
 		return 0x1;
 	}
-	if (!ctx) {
-		printk("perfmon: Spurious overflow interrupt: process %d has no PFM context\n", task->pid);
-		return 0;
-	}
-
 	/*
 	 * sanity test. Should never happen
 	 */
-	if ((pmc0 & 0x1 )== 0) {
-		printk("perfmon: pid %d pmc0=0x%lx assumption error for freeze bit\n", task->pid, pmc0);
+	if ((pmc0 & 0x1) == 0) {
+		printk("perfmon: pid %d pmc0=0x%lx assumption error for freeze bit\n", 
+			task->pid, pmc0);
 		return 0x0;
 	}
 
 	mask = pmc0 >> PMU_FIRST_COUNTER;
 
-	DBprintk(("pmc0=0x%lx pid=%d owner=%d iip=0x%lx, ctx is in %s mode used_pmds=0x%lx used_pmcs=0x%lx\n", 
-				pmc0, task->pid, PMU_OWNER()->pid, regs->cr_iip, 
-				CTX_OVFL_NOBLOCK(ctx) ? "NO-BLOCK" : "BLOCK",
-				ctx->ctx_used_pmds[0],
-				ctx->ctx_used_pmcs[0]));
+	DBprintk(("pmc0=0x%lx pid=%d iip=0x%lx, %s"
+		  " mode used_pmds=0x%lx save_pmcs=0x%lx reload_pmcs=0x%lx\n", 
+			pmc0, task->pid, (regs ? regs->cr_iip : 0), 
+			CTX_OVFL_NOBLOCK(ctx) ? "nonblocking" : "blocking",
+			ctx->ctx_used_pmds[0],
+			ctx->ctx_saved_pmcs[0],
+			ctx->ctx_reload_pmcs[0]));
 
 	/*
-	 * XXX: need to record sample only when an EAR/BTB has overflowed
+	 * First we update the virtual counters
 	 */
-	if (CTX_HAS_SMPL(ctx)) {
-		pfm_smpl_buffer_desc_t *psb = ctx->ctx_smpl_buf;
-		unsigned long *e, m, idx=0;
-		perfmon_smpl_entry_t *h;
-		int j;
+	for (i = PMU_FIRST_COUNTER; mask ; i++, mask >>= 1) {
 
-		idx = ia64_fetch_and_add(1, &psb->psb_index);
-		DBprintk((" recording index=%ld entries=%ld\n", idx, psb->psb_entries));
-
-		/*
-		 * XXX: there is a small chance that we could run out on index before resetting
-		 * but index is unsigned long, so it will take some time.....
-		 * We use > instead of == because fetch_and_add() is off by one (see below)
-		 *
-		 * This case can happen in non-blocking mode or with multiple processes.
-		 * For non-blocking, we need to reload and continue.
-		 */
-		if (idx > psb->psb_entries) {
-			buffer_is_full = 1;
-			goto reload_pmds;
-		}
-
-		/* first entry is really entry 0, not 1 caused by fetch_and_add */
-		idx--;
-
-		h = (perfmon_smpl_entry_t *)(((char *)psb->psb_addr) + idx*(psb->psb_entry_size));
-
-		h->pid  = task->pid;
-		h->cpu  = my_cpu;
-		h->rate = 0;
-		h->ip   = regs ? regs->cr_iip : 0x0; /* where did the fault happened */
-		h->regs = mask; /* which registers overflowed */
-
-		/* guaranteed to monotonically increase on each cpu */
-		h->stamp = perfmon_get_stamp();
-
-		e = (unsigned long *)(h+1);
-
-		/*
-		 * selectively store PMDs in increasing index number
-		 */
-		for (j=0, m = ctx->ctx_smpl_regs; m; m >>=1, j++) {
-			if (m & 0x1) {
-				if (PMD_IS_COUNTER(j))
-					*e =  ctx->ctx_pmds[j-PMU_FIRST_COUNTER].val
-					    + (ia64_get_pmd(j) & pmu_conf.perf_ovfl_val);
-				else {
-					*e = ia64_get_pmd(j); /* slow */
-				}
-				DBprintk((" e=%p pmd%d =0x%lx\n", (void *)e, j, *e));
-				e++;
-			}
-		}
-		/*
-		 * make the new entry visible to user, needs to be atomic
-		 */
-		ia64_fetch_and_add(1, &psb->psb_hdr->hdr_count);
-
-		DBprintk((" index=%ld entries=%ld hdr_count=%ld\n", idx, psb->psb_entries, psb->psb_hdr->hdr_count));
-		/* 
-		 * sampling buffer full ? 
-		 */
-		if (idx == (psb->psb_entries-1)) {
-			/*
-			 * will cause notification, cannot be 0
-			 */
-			bv = mask << PMU_FIRST_COUNTER;
-
-			buffer_is_full = 1;
-
-			DBprintk((" sampling buffer full must notify bv=0x%lx\n", bv));
-
-			/*
-			 * we do not reload here, when context is blocking
-			 */
-			if (!CTX_OVFL_NOBLOCK(ctx)) goto no_reload;
-
-			/*
-			 * here, we have a full buffer but we are in non-blocking mode
-			 * so we need to reload overflowed PMDs with sampling reset values
-			 * and restart right away.
-			 */
-		}
-		/* FALL THROUGH */
-	}
-reload_pmds:
-
-	/*
-	 * in the case of a non-blocking context, we reload
-	 * with the ovfl_rval when no user notification is taking place (short recovery)
-	 * otherwise when the buffer is full which requires user interaction) then we use
-	 * smpl_rval which is the long_recovery path (disturbance introduce by user execution).
-	 *
-	 * XXX: implies that when buffer is full then there is always notification.
-	 */
-	ovfl_has_long_recovery = CTX_OVFL_NOBLOCK(ctx) && buffer_is_full;
-
-	/*
-	 * XXX: CTX_HAS_SMPL() should really be something like CTX_HAS_SMPL() and is activated,i.e.,
-	 * one of the PMC is configured for EAR/BTB.
-	 *
-	 * When sampling, we can only notify when the sampling buffer is full.
-	 */
-	can_notify   = CTX_HAS_SMPL(ctx) == 0 && ctx->ctx_notify_task;
-
-	DBprintk((" ovfl_has_long_recovery=%d can_notify=%d\n", ovfl_has_long_recovery, can_notify));
-
-	for (i = 0, cnum = PMU_FIRST_COUNTER; mask ; cnum++, i++, mask >>= 1) {
-
+		/* skip pmd which did not overflow */
 		if ((mask & 0x1) == 0) continue;
 
-		DBprintk((" PMD[%ld] overflowed pmd=0x%lx pmod.val=0x%lx\n", cnum, ia64_get_pmd(cnum), ctx->ctx_pmds[i].val));
+		DBprintk(("PMD[%d] overflowed hw_pmd=0x%lx soft_pmd=0x%lx\n", 
+			  i, ia64_get_pmd(i), ctx->ctx_soft_pmds[i].val));
 
 		/*
 		 * Because we sometimes (EARS/BTB) reset to a specific value, we cannot simply use
-		 * val to count the number of times we overflowed. Otherwise we would loose the current value
-		 * in the PMD (which can be >0). So to make sure we don't loose
+		 * val to count the number of times we overflowed. Otherwise we would loose the 
+		 * current value in the PMD (which can be >0). So to make sure we don't loose
 		 * the residual counts we set val to contain full 64bits value of the counter.
-		 *
-		 * XXX: is this needed for EARS/BTB ?
 		 */
-		ctx->ctx_pmds[i].val += 1 + pmu_conf.perf_ovfl_val
-				      + (ia64_get_pmd(cnum) & pmu_conf.perf_ovfl_val); /* slow */
+		old_val = ctx->ctx_soft_pmds[i].val;
+		ctx->ctx_soft_pmds[i].val = 1 + pmu_conf.perf_ovfl_val + pfm_read_soft_counter(ctx, i);
 
-		DBprintk((" pmod[%ld].val=0x%lx pmd=0x%lx\n", i, ctx->ctx_pmds[i].val, ia64_get_pmd(cnum)&pmu_conf.perf_ovfl_val));
 
-		if (can_notify && PMD_OVFL_NOTIFY(ctx, i)) {
-			DBprintk((" CPU%d should notify task %p with signal %d\n", my_cpu, ctx->ctx_notify_task, ctx->ctx_notify_sig));
-			bv |= 1 << i;
-		} else {
-			DBprintk((" CPU%d PMD[%ld] overflow, no notification\n", my_cpu, cnum));
-			/*
-			 * In case no notification is requested, we reload the reset value right away
-			 * otherwise we wait until the notify_pid process has been called and has
-			 * has finished processing data. Check out pfm_overflow_notify()
-			 */
+		DBprintk(("soft_pmd[%d].val=0x%lx old_val=0x%lx pmd=0x%lx\n", 
+			  i, ctx->ctx_soft_pmds[i].val, old_val, 
+			  ia64_get_pmd(i) & pmu_conf.perf_ovfl_val));
 
-			/* writes to upper part are ignored, so this is safe */
-			if (ovfl_has_long_recovery) {
-				DBprintk((" CPU%d PMD[%ld] reload with smpl_val=%lx\n", my_cpu, cnum,ctx->ctx_pmds[i].smpl_rval));
-				ia64_set_pmd(cnum, ctx->ctx_pmds[i].smpl_rval);
-			} else {
-				DBprintk((" CPU%d PMD[%ld] reload with ovfl_val=%lx\n", my_cpu, cnum,ctx->ctx_pmds[i].smpl_rval));
-				ia64_set_pmd(cnum, ctx->ctx_pmds[i].ovfl_rval);
+		/*
+		 * now that we have extracted the hardware counter, we can clear it to ensure
+		 * that a subsequent PFM_READ_PMDS will not include it again.
+		 */
+		ia64_set_pmd(i, 0UL);
+
+		/*
+		 * check for overflow condition
+		 */
+		if (old_val > ctx->ctx_soft_pmds[i].val) {
+
+			ovfl_pmds |= 1UL << i;
+
+			DBprintk(("soft_pmd[%d] overflowed flags=0x%x, ovfl=0x%lx\n", i, ctx->ctx_soft_pmds[i].flags, ovfl_pmds));
+
+			if (PMC_OVFL_NOTIFY(ctx, i)) {
+				ovfl_notify |= 1UL << i;
 			}
 		}
-		if (cnum == ctx->ctx_btb_counter) need_reset_pmd16=1;
-	}
-	/*
-	 * In case of BTB overflow we need to reset the BTB index.
-	 */
-	if (need_reset_pmd16) {
-		DBprintk(("reset PMD16\n"));
-		ia64_set_pmd(16, 0);
 	}
 
-no_reload:
+	/*
+	 * check for sampling buffer
+	 *
+	 * if present, record sample. We propagate notification ONLY when buffer
+	 * becomes full.
+	 */
+	if(CTX_HAS_SMPL(ctx)) {
+		ret = pfm_record_sample(task, ctx, ovfl_pmds, regs);
+		if (ret == 1) {
+			/*
+			 * Sampling buffer became full
+			 * If no notication was requested, then we reset buffer index
+			 * and reset registers (done below) and resume.
+			 * If notification requested, then defer reset until pfm_restart()
+			 */
+			if (ovfl_notify == 0UL) {
+				ctx->ctx_psb->psb_hdr->hdr_count = 0UL;
+				ctx->ctx_psb->psb_index		 = 0UL;
+			}
+		} else {
+			/*
+			 * sample recorded in buffer, no need to notify user
+			 */
+			ovfl_notify = 0UL;
+		}
+	}
 
 	/*
-	 * some counters overflowed, but they did not require
-	 * user notification, so after having reloaded them above
-	 * we simply restart
+	 * No overflow requiring a user level notification
 	 */
-	if (!bv) return 0x0;
+	if (ovfl_notify == 0UL) {
+		pfm_reset_regs(ctx, &ovfl_pmds, PFM_RELOAD_SHORT_RESET);
+		return 0x0;
+	}
 
-	ctx->ctx_ovfl_regs  = bv; /* keep track of what to reset when unblocking */
+	/* 
+	 * keep track of what to reset when unblocking 
+	 */
+	ctx->ctx_ovfl_regs[0]  = ovfl_pmds; 
+
 	/*
-	 * Now we know that:
-	 * 	- we have some counters which overflowed (contains in bv)
-	 * 	- someone has asked to be notified on overflow. 
+	 * we have come to this point because there was an overflow and that notification
+	 * was requested. The notify_task may have disappeared, in which case notify_task
+	 * is NULL.
 	 */
-
-	
-	/*
-	 * If the notification task is still present, then notify_task is non
-	 * null. It is clean by that task if it ever exits before we do. 
-	 */
-
 	if (ctx->ctx_notify_task) {
 
 		si.si_errno    = 0;
 		si.si_addr     = NULL;
 		si.si_pid      = task->pid; /* who is sending */
 
-		si.si_signo    = ctx->ctx_notify_sig; /* is SIGPROF */
-		si.si_code     = PROF_OVFL; /* goes to user */
-		si.si_pfm_ovfl = bv;
-
-
+		si.si_signo    = SIGPROF;
+		si.si_code     = PROF_OVFL; /* indicates a perfmon SIGPROF signal */
+		/*
+		 * Shift the bitvector such that the user sees bit 4 for PMD4 and so on.
+		 * We only use smpl_ovfl[0] for now. It should be fine for quite a while
+		 * until we have more than 61 PMD available.
+		 */
+		si.si_pfm_ovfl[0] = ovfl_notify;
 	
 		/*
 		 * when the target of the signal is not ourself, we have to be more
@@ -1659,15 +2586,29 @@ no_reload:
 		if (ctx->ctx_notify_task != current) {
 			/*
 			 * grab the notification lock for this task
+			 * This guarantees that the sequence: test + send_signal
+			 * is atomic with regards to the ctx_notify_task field.
+			 *
+			 * We need a spinlock and not just an atomic variable for this.
+			 *
 			 */
-			spin_lock(&ctx->ctx_notify_lock);
+			spin_lock(&ctx->ctx_lock);
 
 			/*
 			 * now notify_task cannot be modified until we're done
 			 * if NULL, they it got modified while we were in the handler
 			 */
 			if (ctx->ctx_notify_task == NULL) {
-				spin_unlock(&ctx->ctx_notify_lock);
+
+				spin_unlock(&ctx->ctx_lock);
+
+				/*
+				 * If we've lost the notified task, then we will run
+				 * to completion wbut keep the PMU frozen. Results
+				 * will be incorrect anyway. We do not kill task
+				 * to leave it possible to attach perfmon context
+				 * to already running task.
+				 */
 				goto lost_notify;
 			}
 			/*
@@ -1681,20 +2622,23 @@ no_reload:
 	 	 * necessarily go to the signal handler (if any) when it goes back to
 	 	 * user mode.
 	 	 */
-		DBprintk((" %d sending %d notification to %d\n", task->pid, si.si_signo, ctx->ctx_notify_task->pid));
+		DBprintk(("[%d] sending notification to [%d]\n", 
+			  task->pid, ctx->ctx_notify_task->pid));
 
 
 		/* 
 		 * this call is safe in an interrupt handler, so does read_lock() on tasklist_lock
 		 */
-		ret = send_sig_info(ctx->ctx_notify_sig, &si, ctx->ctx_notify_task);
-		if (ret != 0) printk(" send_sig_info(process %d, SIGPROF)=%d\n",  ctx->ctx_notify_task->pid, ret);
+		ret = send_sig_info(SIGPROF, &si, ctx->ctx_notify_task);
+		if (ret != 0) 
+			printk("send_sig_info(process %d, SIGPROF)=%d\n",  
+			       ctx->ctx_notify_task->pid, ret);
 		/*
 		 * now undo the protections in order
 		 */
 		if (ctx->ctx_notify_task != current) {
 			read_unlock(&tasklist_lock);
-			spin_unlock(&ctx->ctx_notify_lock);
+			spin_unlock(&ctx->ctx_lock);
 		}
 
 		/*
@@ -1711,35 +2655,41 @@ no_reload:
 		 * before, changing it to NULL will still maintain this invariant.
 		 * Of course, when it is equal to current it cannot change at this point.
 		 */
-		if (!CTX_OVFL_NOBLOCK(ctx) && ctx->ctx_notify_task != current) {
-				th->pfm_must_block = 1; /* will cause blocking */
+		DBprintk(("block=%d notify [%d] current [%d]\n", 
+			ctx->ctx_fl_block,
+			ctx->ctx_notify_task ? ctx->ctx_notify_task->pid: -1, 
+			current->pid ));
+
+		if (!CTX_OVFL_NOBLOCK(ctx) && ctx->ctx_notify_task != task) {
+			t->pfm_ovfl_block_reset = 1; /* will cause blocking */
 		}
 	} else {
-lost_notify:
-		DBprintk((" notification task has disappeared !\n"));
+lost_notify: /* XXX: more to do here, to convert to non-blocking (reset values) */
+
+		DBprintk(("notification task has disappeared !\n"));
 		/*
-		 * for a non-blocking context, we make sure we do not fall into the pfm_overflow_notify()
-		 * trap. Also in the case of a blocking context with lost notify process, then we do not
-		 * want to block either (even though it is interruptible). In this case, the PMU will be kept
-		 * frozen and the process will run to completion without monitoring enabled.
+		 * for a non-blocking context, we make sure we do not fall into the 
+		 * pfm_overflow_notify() trap. Also in the case of a blocking context with lost 
+		 * notify process, then we do not want to block either (even though it is 
+		 * interruptible). In this case, the PMU will be kept frozen and the process will 
+		 * run to completion without monitoring enabled.
 		 *
 		 * Of course, we cannot loose notify process when self-monitoring.
 		 */
-		th->pfm_must_block = 0; 
+		t->pfm_ovfl_block_reset = 0; 
 
 	}
 	/*
-	 * if we block, we keep the PMU frozen. If non-blocking we restart.
-	 * in the case of non-blocking were the notify process is lost, we also 
-	 * restart. 
+	 * If notification was successful, then we rely on the pfm_restart()
+	 * call to unfreeze and reset (in both blocking or non-blocking mode).
+	 *
+	 * If notification failed, then we will keep the PMU frozen and run
+	 * the task to completion
 	 */
-	if (!CTX_OVFL_NOBLOCK(ctx)) 
-		ctx->ctx_fl_frozen  = 1;
-	else
-		ctx->ctx_fl_frozen = 0;
+	ctx->ctx_fl_frozen = 1;
 
-	DBprintk((" reload pmc0=0x%x must_block=%ld\n",
-				ctx->ctx_fl_frozen ? 0x1 : 0x0, th->pfm_must_block));
+	DBprintk(("reload pmc0=0x%x must_block=%ld\n",
+				ctx->ctx_fl_frozen ? 0x1 : 0x0, t->pfm_ovfl_block_reset));
 
 	return ctx->ctx_fl_frozen ? 0x1 : 0x0;
 }
@@ -1748,29 +2698,40 @@ static void
 perfmon_interrupt (int irq, void *arg, struct pt_regs *regs)
 {
 	u64 pmc0;
-	struct task_struct *ta;
+	struct task_struct *task;
 
-	pmc0 = ia64_get_pmc(0); /* slow */
+	pfm_ovfl_intr_count++;
+
+	/* 
+	 * srlz.d done before arriving here
+	 *
+	 * This is slow
+	 */
+	pmc0 = ia64_get_pmc(0); 
 
 	/*
 	 * if we have some pending bits set
 	 * assumes : if any PM[0].bit[63-1] is set, then PMC[0].fr = 1
 	 */
-	if ((pmc0 & ~0x1) && (ta=PMU_OWNER())) {
+	if ((pmc0 & ~0x1UL)!=0UL && (task=PMU_OWNER())!= NULL) {
 
-		/* assumes, PMC[0].fr = 1 at this point */
-		pmc0 = update_counters(ta, pmc0, regs);
-
-		/*
-		 * if pmu_frozen = 0
-		 *	pmc0 = 0 and we resume monitoring right away
-		 * else
-		 *	pmc0 = 0x1 frozen but all pending bits are cleared
+		/* 
+		 * assumes, PMC[0].fr = 1 at this point 
+		 *
+		 * XXX: change protype to pass &pmc0
 		 */
-		ia64_set_pmc(0, pmc0);
-		ia64_srlz_d();
+		pmc0 = pfm_overflow_handler(task, pmc0, regs);
+
+		/* we never explicitely freeze PMU here */
+		if (pmc0 == 0) {
+			ia64_set_pmc(0, 0);
+			ia64_srlz_d();
+		}
 	} else {
-		printk("perfmon: Spurious PMU overflow interrupt: pmc0=0x%lx owner=%p\n", pmc0, (void *)PMU_OWNER());
+		pfm_spurious_ovfl_intr_count++;
+
+		DBprintk(("perfmon: Spurious PMU overflow interrupt on CPU%d: pmc0=0x%lx owner=%p\n", 
+			smp_processor_id(), pmc0, (void *)PMU_OWNER()));
 	}
 }
 
@@ -1778,14 +2739,37 @@ perfmon_interrupt (int irq, void *arg, struct pt_regs *regs)
 static int
 perfmon_proc_info(char *page)
 {
+#ifdef CONFIG_SMP
+#define cpu_is_online(i) (cpu_online_map & (1UL << i))
+#else
+#define cpu_is_online(i)        1
+#endif
 	char *p = page;
 	u64 pmc0 = ia64_get_pmc(0);
 	int i;
 
-	p += sprintf(p, "CPU%d.pmc[0]=%lx\nPerfmon debug: %s\n", smp_processor_id(), pmc0, pfm_debug ? "On" : "Off");
-	p += sprintf(p, "proc_sessions=%lu sys_sessions=%lu\n", 
-			pfs_info.pfs_proc_sessions, 
-			pfs_info.pfs_sys_session);
+	p += sprintf(p, "perfmon enabled: %s\n", pmu_conf.pfm_is_disabled ? "No": "Yes");
+
+	p += sprintf(p, "monitors_pmcs0]=0x%lx\n", pmu_conf.monitor_pmcs[0]);
+	p += sprintf(p, "counter_pmcds[0]=0x%lx\n", pmu_conf.counter_pmds[0]);
+	p += sprintf(p, "overflow interrupts=%lu\n", pfm_ovfl_intr_count);
+	p += sprintf(p, "spurious overflow interrupts=%lu\n", pfm_spurious_ovfl_intr_count);
+	p += sprintf(p, "recorded samples=%lu\n", pfm_recorded_samples_count);
+
+	p += sprintf(p, "CPU%d.pmc[0]=%lx\nPerfmon debug: %s\n", 
+			smp_processor_id(), pmc0, pfm_debug ? "On" : "Off");
+
+	p += sprintf(p, "CPU%d cpu_data.pfm_syst_wide=%d cpu_data.dcr_pp=%d\n", 
+			smp_processor_id(), local_cpu_data->pfm_syst_wide, local_cpu_data->pfm_dcr_pp);
+
+	LOCK_PFS();
+	p += sprintf(p, "proc_sessions=%lu\nsys_sessions=%lu\nsys_use_dbregs=%lu\nptrace_use_dbregs=%lu\n", 
+			pfm_sessions.pfs_task_sessions, 
+			pfm_sessions.pfs_sys_sessions,
+			pfm_sessions.pfs_sys_use_dbregs,
+			pfm_sessions.pfs_ptrace_use_dbregs);
+
+	UNLOCK_PFS();
 
 	for(i=0; i < NR_CPUS; i++) {
 		if (cpu_is_online(i)) {
@@ -1794,10 +2778,11 @@ perfmon_proc_info(char *page)
 					pmu_owners[i].owner ? pmu_owners[i].owner->pid: -1);
 		}
 	}
+
 	return p - page;
 }
 
-/* for debug only */
+/* /proc interface, for debug only */
 static int
 perfmon_read_entry(char *page, char **start, off_t off, int count, int *eof, void *data)
 {
@@ -1814,85 +2799,27 @@ perfmon_read_entry(char *page, char **start, off_t off, int count, int *eof, voi
 	return len;
 }
 
-static struct irqaction perfmon_irqaction = {
-	handler:	perfmon_interrupt,
-	flags:		SA_INTERRUPT,
-	name:		"perfmon"
-};
-
-void __init
-perfmon_init (void)
+void
+pfm_syst_wide_update_task(struct task_struct *task, int mode)
 {
-	pal_perf_mon_info_u_t pm_info;
-	s64 status;
+	struct pt_regs *regs = (struct pt_regs *)((unsigned long) task + IA64_STK_OFFSET);
 
-	register_percpu_irq(IA64_PERFMON_VECTOR, &perfmon_irqaction);
-
-	ia64_set_pmv(IA64_PERFMON_VECTOR);
-	ia64_srlz_d();
-
-	pmu_conf.pfm_is_disabled = 1;
-
-	printk("perfmon: version %s (sampling format v%d)\n", PFM_VERSION, PFM_SMPL_HDR_VERSION);
-	printk("perfmon: Interrupt vectored to %u\n", IA64_PERFMON_VECTOR);
-
-	if ((status=ia64_pal_perf_mon_info(pmu_conf.impl_regs, &pm_info)) != 0) {
-		printk("perfmon: PAL call failed (%ld)\n", status);
-		return;
-	}
-	pmu_conf.perf_ovfl_val = (1L << pm_info.pal_perf_mon_info_s.width) - 1;
-	pmu_conf.max_counters  = pm_info.pal_perf_mon_info_s.generic;
-	pmu_conf.num_pmcs      = find_num_pm_regs(pmu_conf.impl_regs);
-	pmu_conf.num_pmds      = find_num_pm_regs(&pmu_conf.impl_regs[4]);
-
-	printk("perfmon: %d bits counters (max value 0x%lx)\n", pm_info.pal_perf_mon_info_s.width, pmu_conf.perf_ovfl_val);
-	printk("perfmon: %ld PMC/PMD pairs, %ld PMCs, %ld PMDs\n", pmu_conf.max_counters, pmu_conf.num_pmcs, pmu_conf.num_pmds);
-
-	/* sanity check */
-	if (pmu_conf.num_pmds >= IA64_NUM_PMD_REGS || pmu_conf.num_pmcs >= IA64_NUM_PMC_REGS) {
-		printk(KERN_ERR "perfmon: ERROR not enough PMC/PMD storage in kernel, perfmon is DISABLED\n");
-		return; /* no need to continue anyway */
-	}
-	/* we are all set */
-	pmu_conf.pfm_is_disabled = 0;
+	regs--;
 
 	/*
-	 * Insert the tasklet in the list.
-	 * It is still disabled at this point, so it won't run
-	printk(__FUNCTION__" tasklet is %p state=%d, count=%d\n", &perfmon_tasklet, perfmon_tasklet.state, perfmon_tasklet.count);
+	 * propagate the value of the dcr_pp bit to the psr
 	 */
-
-	/*
-	 * for now here for debug purposes
-	 */
-	perfmon_dir = create_proc_read_entry ("perfmon", 0, 0, perfmon_read_entry, NULL);
+	ia64_psr(regs)->pp = mode ? local_cpu_data->pfm_dcr_pp : 0;
 }
 
 void
-perfmon_init_percpu (void)
+pfm_save_regs (struct task_struct *task)
 {
-	ia64_set_pmv(IA64_PERFMON_VECTOR);
-	ia64_srlz_d();
-}
-
-void
-pfm_save_regs (struct task_struct *ta)
-{
-	struct task_struct *owner;
 	pfm_context_t *ctx;
-	struct thread_struct *t;
-	u64 pmc0, psr;
-	unsigned long mask;
-	int i;
+	u64 psr;
 
-	t   = &ta->thread;
-	ctx = ta->thread.pfm_context;
+	ctx = task->thread.pfm_context;
 
-	/*
-	 * We must make sure that we don't loose any potential overflow
-	 * interrupt while saving PMU context. In this code, external
-	 * interrupts are always enabled.
-	 */
 
 	/*
 	 * save current PSR: needed because we modify it
@@ -1901,66 +2828,58 @@ pfm_save_regs (struct task_struct *ta)
 
 	/*
 	 * stop monitoring:
-	 * This is the only way to stop monitoring without destroying overflow
-	 * information in PMC[0].
-	 * This is the last instruction which can cause overflow when monitoring
-	 * in kernel.
-	 * By now, we could still have an overflow interrupt in-flight.
+	 * This is the last instruction which can generate an overflow
+	 *
+	 * We do not need to set psr.sp because, it is irrelevant in kernel.
+	 * It will be restored from ipsr when going back to user level
 	 */
-	__asm__ __volatile__ ("rsm psr.up|psr.pp;;"::: "memory");
+	__asm__ __volatile__ ("rum psr.up;;"::: "memory");
+
+	ctx->ctx_saved_psr = psr;
+
+	//ctx->ctx_last_cpu  = smp_processor_id();
+
+}
+
+static void
+pfm_lazy_save_regs (struct task_struct *task)
+{
+	pfm_context_t *ctx;
+	struct thread_struct *t;
+	unsigned long mask;
+	int i;
+
+	DBprintk(("on [%d] by [%d]\n", task->pid, current->pid));
+
+	t   = &task->thread;
+	ctx = task->thread.pfm_context;
+
+#ifdef CONFIG_SMP
+	/* 
+	 * announce we are saving this PMU state
+	 * This will cause other CPU, to wait until we're done
+	 * before using the context.h
+	 *
+	 * must be an atomic operation
+	 */
+	atomic_set(&ctx->ctx_saving_in_progress, 1);
+
+	 /*
+	  * if owner is NULL, it means that the other CPU won the race
+	  * and the IPI has caused the context to be saved in pfm_handle_fectch_regs()
+	  * instead of here. We have nothing to do
+	  *
+	  * note that this is safe, because the other CPU NEVER modifies saving_in_progress.
+	  */
+	if (PMU_OWNER() == NULL) goto do_nothing;
+#endif
 
 	/*
-	 * Mark the PMU as not owned
-	 * This will cause the interrupt handler to do nothing in case an overflow
-	 * interrupt was in-flight
-	 * This also guarantees that pmc0 will contain the final state
-	 * It virtually gives us full control over overflow processing from that point
-	 * on.
-	 * It must be an atomic operation.
+	 * do not own the PMU
 	 */
-	owner = PMU_OWNER();
 	SET_PMU_OWNER(NULL);
 
-	/*
-	 * read current overflow status:
-	 *
-	 * we are guaranteed to read the final stable state
-	 */
 	ia64_srlz_d();
-	pmc0 = ia64_get_pmc(0); /* slow */
-
-	/*
-	 * freeze PMU:
-	 *
-	 * This destroys the overflow information. This is required to make sure
-	 * next process does not start with monitoring on if not requested
-	 */
-	ia64_set_pmc(0, 1);
-
-	/*
-	 * Check for overflow bits and proceed manually if needed
-	 *
-	 * It is safe to call the interrupt handler now because it does
-	 * not try to block the task right away. Instead it will set a
-	 * flag and let the task proceed. The blocking will only occur
-	 * next time the task exits from the kernel.
-	 */
-	if (pmc0 & ~0x1) {
-		update_counters(owner, pmc0, NULL);
-		/* we will save the updated version of pmc0 */
-	}
-	/*
-	 * restore PSR for context switch to save
-	 */
-	__asm__ __volatile__ ("mov psr.l=%0;; srlz.i;;"::"r"(psr): "memory");
-
-	/*
-	 * we do not save registers if we can do lazy
-	 */
-	if (PFM_CAN_DO_LAZY()) {
-		SET_PMU_OWNER(owner);
-		return;
-	}
 
 	/*
 	 * XXX needs further optimization.
@@ -1970,30 +2889,73 @@ pfm_save_regs (struct task_struct *ta)
 	for (i=0; mask; i++, mask>>=1) {
 		if (mask & 0x1) t->pmd[i] =ia64_get_pmd(i);
 	}
-
-	/* skip PMC[0], we handle it separately */
-	mask = ctx->ctx_used_pmcs[0]>>1;
-	for (i=1; mask; i++, mask>>=1) {
+	/*
+	 * XXX: simplify to pmc0 only
+	 */
+	mask = ctx->ctx_saved_pmcs[0];
+	for (i=0; mask; i++, mask>>=1) {
 		if (mask & 0x1) t->pmc[i] = ia64_get_pmc(i);
 	}
+
+	/* not owned by this CPU */
+	atomic_set(&ctx->ctx_last_cpu, -1);
+
+do_nothing:
 	/*
-	 * Throughout this code we could have gotten an overflow interrupt. It is transformed
-	 * into a spurious interrupt as soon as we give up pmu ownership.
+	 * declare we are done saving this context
+	 *
+	 * must be an atomic operation
 	 */
+	atomic_set(&ctx->ctx_saving_in_progress,0);
+
 }
 
-static void
-pfm_lazy_save_regs (struct task_struct *ta)
+#ifdef CONFIG_SMP
+/*
+ * Handles request coming from other CPUs
+ */
+static void 
+pfm_handle_fetch_regs(void *info)
 {
-	pfm_context_t *ctx;
+	pfm_smp_ipi_arg_t *arg = info;
 	struct thread_struct *t;
+	pfm_context_t *ctx;
 	unsigned long mask;
 	int i;
 
-	DBprintk(("  on [%d] by [%d]\n", ta->pid, current->pid));
+	ctx = arg->task->thread.pfm_context;
+	t   = &arg->task->thread;
 
-	t   = &ta->thread;
-	ctx = ta->thread.pfm_context;
+	DBprintk(("task=%d owner=%d saving=%d\n", 
+		  arg->task->pid,
+		  PMU_OWNER() ? PMU_OWNER()->pid: -1,
+		  atomic_read(&ctx->ctx_saving_in_progress)));
+
+	/* must wait if saving was interrupted */
+	if (atomic_read(&ctx->ctx_saving_in_progress)) {
+		arg->retval = 1;
+		return;
+	}
+
+	/* can proceed, done with context */
+	if (PMU_OWNER() != arg->task) {
+		arg->retval = 0;
+		return;
+	}
+
+	DBprintk(("saving state for [%d] save_pmcs=0x%lx all_pmcs=0x%lx used_pmds=0x%lx\n", 
+		arg->task->pid,
+		ctx->ctx_saved_pmcs[0],
+		ctx->ctx_reload_pmcs[0],
+		ctx->ctx_used_pmds[0]));
+
+	/*
+	 * XXX: will be replaced with pure assembly call
+	 */
+	SET_PMU_OWNER(NULL);
+
+	ia64_srlz_d();
+
 	/*
 	 * XXX needs further optimization.
 	 * Also must take holes into account
@@ -2003,84 +2965,338 @@ pfm_lazy_save_regs (struct task_struct *ta)
 		if (mask & 0x1) t->pmd[i] =ia64_get_pmd(i);
 	}
 	
-	/* skip PMC[0], we handle it separately */
-	mask = ctx->ctx_used_pmcs[0]>>1;
-	for (i=1; mask; i++, mask>>=1) {
+	mask = ctx->ctx_saved_pmcs[0];
+	for (i=0; mask; i++, mask>>=1) {
 		if (mask & 0x1) t->pmc[i] = ia64_get_pmc(i);
 	}
-	SET_PMU_OWNER(NULL);
+	/* not owned by this CPU */
+	atomic_set(&ctx->ctx_last_cpu, -1);
+
+	/* can proceed */
+	arg->retval = 0;
 }
 
-void
-pfm_load_regs (struct task_struct *ta)
+/*
+ * Function call to fetch PMU state from another CPU identified by 'cpu'.
+ * If the context is being saved on the remote CPU, then we busy wait until
+ * the saving is done and then we return. In this case, non IPI is sent.
+ * Otherwise, we send an IPI to the remote CPU, potentially interrupting 
+ * pfm_lazy_save_regs() over there.
+ *
+ * If the retval==1, then it means that we interrupted remote save and that we must
+ * wait until the saving is over before proceeding.
+ * Otherwise, we did the saving on the remote CPU, and it was done by the time we got there.
+ * in either case, we can proceed.
+ */
+static void
+pfm_fetch_regs(int cpu, struct task_struct *task, pfm_context_t *ctx)
 {
-	struct thread_struct *t = &ta->thread;
-	pfm_context_t *ctx = ta->thread.pfm_context;
-	struct task_struct *owner;
-	unsigned long mask;
-	int i;
+	pfm_smp_ipi_arg_t  arg;
+	int ret;
 
-	owner = PMU_OWNER();
-	if (owner == ta) goto skip_restore;
-	if (owner) pfm_lazy_save_regs(owner);
+	arg.task   = task;
+	arg.retval = -1;
 
-	SET_PMU_OWNER(ta);
+	if (atomic_read(&ctx->ctx_saving_in_progress)) {
+		DBprintk(("no IPI, must wait for [%d] to be saved on [%d]\n", task->pid, cpu));
 
-	mask = ctx->ctx_used_pmds[0];
-	for (i=0; mask; i++, mask>>=1) {
-		if (mask & 0x1) ia64_set_pmd(i, t->pmd[i]);
+		/* busy wait */
+		while (atomic_read(&ctx->ctx_saving_in_progress));
+		return;
+	}
+	DBprintk(("calling CPU %d from CPU %d\n", cpu, smp_processor_id()));
+
+	if (cpu == -1) {
+		printk("refusing to use -1 for [%d]\n", task->pid);
+		return;
 	}
 
-	/* skip PMC[0] to avoid side effects */
-	mask = ctx->ctx_used_pmcs[0]>>1;
+	/* will send IPI to other CPU and wait for completion of remote call */
+	if ((ret=smp_call_function_single(cpu, pfm_handle_fetch_regs, &arg, 0, 1))) {
+		printk("perfmon: remote CPU call from %d to %d error %d\n", smp_processor_id(), cpu, ret);
+		return;
+	}
+	/*
+	 * we must wait until saving is over on the other CPU
+	 * This is the case, where we interrupted the saving which started just at the time we sent the
+	 * IPI.
+	 */
+	if (arg.retval == 1) {
+		DBprintk(("must wait for [%d] to be saved on [%d]\n", task->pid, cpu));
+		while (atomic_read(&ctx->ctx_saving_in_progress));
+		DBprintk(("done saving for [%d] on [%d]\n", task->pid, cpu));
+	}
+}
+#endif /* CONFIG_SMP */
+
+void
+pfm_load_regs (struct task_struct *task)
+{
+	struct thread_struct *t;
+	pfm_context_t *ctx;
+	struct task_struct *owner;
+	unsigned long mask;
+	u64 psr;
+	int i, cpu;
+
+	owner = PMU_OWNER();
+	ctx   = task->thread.pfm_context;
+
+	/*
+	 * if we were the last user, then nothing to do except restore psr
+	 */
+	if (owner == task) {
+		if (atomic_read(&ctx->ctx_last_cpu) != smp_processor_id())
+			DBprintk(("invalid last_cpu=%d for [%d]\n", 
+				atomic_read(&ctx->ctx_last_cpu), task->pid));
+
+		psr = ctx->ctx_saved_psr;
+		__asm__ __volatile__ ("mov psr.l=%0;; srlz.i;;"::"r"(psr): "memory");
+
+		return;
+	}
+	DBprintk(("load_regs: must reload for [%d] owner=%d\n", 
+		task->pid, owner ? owner->pid : -1 ));
+	/*
+	 * someone else is still using the PMU, first push it out and
+	 * then we'll be able to install our stuff !
+	 */
+	if (owner) pfm_lazy_save_regs(owner);
+
+#ifdef CONFIG_SMP
+	/* 
+	 * check if context on another CPU (-1 means saved)
+	 * We MUST use the variable, as last_cpu may change behind our 
+	 * back. If it changes to -1 (not on a CPU anymore), then in cpu
+	 * we have the last CPU the context was on. We may be sending the 
+	 * IPI for nothing, but we have no way of verifying this. 
+	 */
+	cpu = atomic_read(&ctx->ctx_last_cpu);
+	if (cpu != -1) {
+		pfm_fetch_regs(cpu, task, ctx);
+	}
+#endif
+	t   = &task->thread;
+
+	/*
+	 * XXX: will be replaced by assembly routine
+	 * We clear all unused PMDs to avoid leaking information
+	 */
+	mask = ctx->ctx_used_pmds[0];
+	for (i=0; mask; i++, mask>>=1) {
+		if (mask & 0x1) 
+			ia64_set_pmd(i, t->pmd[i]);
+		else
+			ia64_set_pmd(i, 0UL);
+	}
+	/* XXX: will need to clear all unused pmd, for security */
+
+	/* 
+	 * skip pmc[0] to avoid side-effects, 
+	 * all PMCs are systematically reloaded, unsued get default value
+	 * to avoid picking up stale configuration
+	 */	
+	mask = ctx->ctx_reload_pmcs[0]>>1;
 	for (i=1; mask; i++, mask>>=1) {
 		if (mask & 0x1) ia64_set_pmc(i, t->pmc[i]);
 	}
-skip_restore:
+
 	/*
-	 * unfreeze only when possible
+	 * restore debug registers when used for range restrictions.
+	 * We must restore the unused registers to avoid picking up
+	 * stale information.
+	 */
+	mask = ctx->ctx_used_ibrs[0];
+	for (i=0; mask; i++, mask>>=1) {
+		if (mask & 0x1) 
+			ia64_set_ibr(i, t->ibr[i]);
+		else
+			ia64_set_ibr(i, 0UL);
+	}
+
+	mask = ctx->ctx_used_dbrs[0];
+	for (i=0; mask; i++, mask>>=1) {
+		if (mask & 0x1) 
+			ia64_set_dbr(i, t->dbr[i]);
+		else
+			ia64_set_dbr(i, 0UL);
+	}
+
+	if (t->pmc[0] & ~0x1) {
+		ia64_srlz_d();
+		pfm_overflow_handler(task, t->pmc[0], NULL);
+	}
+
+	/*
+	 * fl_frozen==1 when we are in blocking mode waiting for restart
 	 */
 	if (ctx->ctx_fl_frozen == 0) {
 		ia64_set_pmc(0, 0);
 		ia64_srlz_d();
-		/* place where we potentially (kernel level) start monitoring again */
 	}
+	atomic_set(&ctx->ctx_last_cpu, smp_processor_id());
+
+	SET_PMU_OWNER(task);
+
+	/*
+	 * restore the psr we changed in pfm_save_regs()
+	 */
+	psr = ctx->ctx_saved_psr;
+	__asm__ __volatile__ ("mov psr.l=%0;; srlz.i;;"::"r"(psr): "memory");
+
 }
 
+static void
+pfm_model_specific_reset_pmu(struct task_struct *task)
+{
+	int i;
+
+#ifdef CONFIG_ITANIUM
+	/* opcode matcher set to all 1s */
+	ia64_set_pmc(8,~0UL);
+	ia64_set_pmc(9,~0UL);
+
+	/* I-EAR config cleared, plm=0 */
+	ia64_set_pmc(10,0UL);
+
+	/* D-EAR config cleared, PMC[11].pt must be 1 */
+	ia64_set_pmc(11,1UL << 28);
+
+	/* BTB config. plm=0 */
+	ia64_set_pmc(12,0UL);
+
+	/* Instruction address range, PMC[13].ta must be 1 */
+	ia64_set_pmc(13,1UL);
+
+	/* 
+	 * Clear all PMDs 
+	 *
+	 * XXX: may be good enough to rely on the impl_regs to generalize
+	 * this. 
+	 */
+	for(i = 0; i< 18 ; i++) {
+		ia64_set_pmd(i,0UL);
+	}
+#endif
+}
+
+/*
+ * XXX: this routine is not very portable for PMCs
+ * XXX: make this routine able to work with non current context
+ */
+static void
+ia64_reset_pmu(struct task_struct *task)
+{
+	pfm_context_t *ctx = task->thread.pfm_context;
+	struct thread_struct *t = &task->thread;
+	unsigned long mask;
+	int i;
+
+	if (task != current) {
+		printk("perfmon: invalid task in ia64_reset_pmu()\n");
+		return;
+	}
+
+	/* PMU is frozen, no pending overflow bits */
+	ia64_set_pmc(0,1);
+
+	/*
+	 * Let's first do the architected initializations
+	 */
+
+	/* clear counters */
+	ia64_set_pmd(4,0UL);
+	ia64_set_pmd(5,0UL);
+	ia64_set_pmd(6,0UL);
+	ia64_set_pmd(7,0UL);
+
+	/* clear overflow status bits */
+	ia64_set_pmc(1,0UL);
+	ia64_set_pmc(2,0UL);
+	ia64_set_pmc(3,0UL);
+
+	/* clear counting monitor configuration */
+	ia64_set_pmc(4,0UL);
+	ia64_set_pmc(5,0UL);
+	ia64_set_pmc(6,0UL);
+	ia64_set_pmc(7,0UL);
+
+	/*
+	 * Now let's do the CPU model specific initializations
+	 */
+	pfm_model_specific_reset_pmu(task);
+
+	/*
+	 * On context switched restore, we must restore ALL pmc even
+	 * when they are not actively used by the task. In UP, the incoming process 
+	 * may otherwise pick up left over PMC state from the previous process.
+	 * As opposed to PMD, stale PMC can cause harm to the incoming
+	 * process because they may change what is being measured. 
+	 * Therefore, we must systematically reinstall the entire
+	 * PMC state. In SMP, the same thing is possible on the 
+	 * same CPU but also on between 2 CPUs.
+	 *
+	 * There is unfortunately no easy way to avoid this problem
+	 * on either UP or SMP. This definitively slows down the 
+	 * pfm_load_regs(). 
+	 */
+	
+	 /*
+	  * We must include all the PMC in this mask to make sure we don't
+	  * see any side effect of the stale state, such as opcode matching
+	  * or range restrictions, for instance.
+	  */
+	ctx->ctx_reload_pmcs[0] = pmu_conf.impl_regs[0];
+
+	/*
+	 * make sure we pick up whatever values were installed
+	 * for the CPU model specific reset. We also include
+	 * the architected PMC (pmc4-pmc7)
+	 *
+	 * This step is required in order to restore the correct values in PMC when
+	 * the task is switched out and back in just after the PFM_ENABLE.
+	 */
+	mask = pmu_conf.impl_regs[0];
+	for (i=0; mask; i++, mask>>=1) {
+		if (mask & 0x1) t->pmc[i] = ia64_get_pmc(i);
+	}
+
+	/*
+	 * useful in case of re-enable after disable
+	 */
+	ctx->ctx_used_pmds[0] = 0UL;
+	ctx->ctx_used_ibrs[0] = 0UL;
+	ctx->ctx_used_dbrs[0] = 0UL;
+
+	ia64_srlz_d();
+}
 
 /*
  * This function is called when a thread exits (from exit_thread()).
  * This is a simplified pfm_save_regs() that simply flushes the current
  * register state into the save area taking into account any pending
- * overflow. This time no notification is sent because the taks is dying
+ * overflow. This time no notification is sent because the task is dying
  * anyway. The inline processing of overflows avoids loosing some counts.
  * The PMU is frozen on exit from this call and is to never be reenabled
  * again for this task.
+ *
  */
 void
-pfm_flush_regs (struct task_struct *ta)
+pfm_flush_regs (struct task_struct *task)
 {
 	pfm_context_t *ctx;
-	u64 pmc0, psr, mask;
-	int i,j;
+	u64 pmc0;
+	unsigned long mask, mask2, val;
+	int i;
 
-	if (ta == NULL) {
-		panic(__FUNCTION__" task is NULL\n");
-	}
-	ctx = ta->thread.pfm_context;
-	if (ctx == NULL) {
-		panic(__FUNCTION__" no PFM ctx is NULL\n");
-	}
-	/*
-	 * We must make sure that we don't loose any potential overflow
-	 * interrupt while saving PMU context. In this code, external
-	 * interrupts are always enabled.
-	 */
+	ctx = task->thread.pfm_context;
 
-	/*
-	 * save current PSR: needed because we modify it
+	if (ctx == NULL) return;
+
+	/* 
+	 * that's it if context already disabled
 	 */
-	__asm__ __volatile__ ("mov %0=psr;;": "=r"(psr) :: "memory");
+	if (ctx->ctx_flags.state == PFM_CTX_DISABLED) return;
 
 	/*
 	 * stop monitoring:
@@ -2090,7 +3306,23 @@ pfm_flush_regs (struct task_struct *ta)
 	 * in kernel.
 	 * By now, we could still have an overflow interrupt in-flight.
 	 */
-	__asm__ __volatile__ ("rsm psr.up;;"::: "memory");
+	if (ctx->ctx_fl_system) {
+		/* disable dcr pp */
+		ia64_set_dcr(ia64_get_dcr() & ~IA64_DCR_PP);
+
+		local_cpu_data->pfm_syst_wide = 0;
+		local_cpu_data->pfm_dcr_pp    = 0;
+
+
+		__asm__ __volatile__ ("rsm psr.pp;;"::: "memory");
+
+	} else  {
+
+		__asm__ __volatile__ ("rum psr.up;;"::: "memory");
+
+		/* no more save/restore on ctxsw */
+		current->thread.flags &= ~IA64_THREAD_PM_VALID;
+	}
 
 	/*
 	 * Mark the PMU as not owned
@@ -2121,85 +3353,68 @@ pfm_flush_regs (struct task_struct *ta)
 	ia64_srlz_d();
 
 	/*
-	 * restore PSR for context switch to save
+	 * We don't need to restore psr, because we are on our way out anyway
 	 */
-	__asm__ __volatile__ ("mov psr.l=%0;;srlz.i;"::"r"(psr): "memory");
 
 	/*
 	 * This loop flushes the PMD into the PFM context.
-	 * IT also processes overflow inline.
+	 * It also processes overflow inline.
 	 *
 	 * IMPORTANT: No notification is sent at this point as the process is dying.
 	 * The implicit notification will come from a SIGCHILD or a return from a
 	 * waitpid().
 	 *
-	 * XXX: must take holes into account
 	 */
-	mask = pmc0 >> PMU_FIRST_COUNTER;
-	for (i=0,j=PMU_FIRST_COUNTER; i< pmu_conf.max_counters; i++,j++) {
 
-		/* collect latest results */
-		ctx->ctx_pmds[i].val += ia64_get_pmd(j) & pmu_conf.perf_ovfl_val;
+	if (atomic_read(&ctx->ctx_last_cpu) != smp_processor_id()) 
+		printk("perfmon: [%d] last_cpu=%d\n", task->pid, atomic_read(&ctx->ctx_last_cpu));
 
-		/*
-		 * now everything is in ctx_pmds[] and we need
-		 * to clear the saved context from save_regs() such that
-		 * pfm_read_pmds() gets the correct value
-		 */
-		ta->thread.pmd[j] = 0;
+	mask  = pmc0 >> PMU_FIRST_COUNTER;
+	mask2 = ctx->ctx_used_pmds[0] >> PMU_FIRST_COUNTER;
 
-		/* take care of overflow inline */
-		if (mask & 0x1) {
-			ctx->ctx_pmds[i].val += 1 + pmu_conf.perf_ovfl_val;
-			DBprintk((" PMD[%d] overflowed pmd=0x%lx pmds.val=0x%lx\n",
-			j, ia64_get_pmd(j), ctx->ctx_pmds[i].val));
+	for (i = PMU_FIRST_COUNTER; mask2; i++, mask>>=1, mask2>>=1) {
+
+		/* skip non used pmds */
+		if ((mask2 & 0x1) == 0) continue;
+
+		val = ia64_get_pmd(i);
+
+		if (PMD_IS_COUNTING(i)) {
+
+			DBprintk(("[%d] pmd[%d] soft_pmd=0x%lx hw_pmd=0x%lx\n", task->pid, i, ctx->ctx_soft_pmds[i].val, val & pmu_conf.perf_ovfl_val));
+
+			/* collect latest results */
+			ctx->ctx_soft_pmds[i].val += val & pmu_conf.perf_ovfl_val;
+
+			/*
+			 * now everything is in ctx_soft_pmds[] and we need
+			 * to clear the saved context from save_regs() such that
+			 * pfm_read_pmds() gets the correct value
+			 */
+			task->thread.pmd[i] = 0;
+
+			/* take care of overflow inline */
+			if (mask & 0x1) {
+				ctx->ctx_soft_pmds[i].val += 1 + pmu_conf.perf_ovfl_val;
+				DBprintk(("[%d] pmd[%d] overflowed soft_pmd=0x%lx\n",
+					task->pid, i, ctx->ctx_soft_pmds[i].val));
+			}
+		} else {
+			DBprintk(("[%d] pmd[%d] hw_pmd=0x%lx\n", task->pid, i, val));
+			/* not a counter, just save value as is */
+			task->thread.pmd[i] = val;
 		}
-		mask >>=1;
 	}
+	/* 
+	 * indicates that context has been saved
+	 */
+	atomic_set(&ctx->ctx_last_cpu, -1);
+
 }
 
-/*
- * XXX: this routine is not very portable for PMCs
- * XXX: make this routine able to work with non current context
- */
-static void
-ia64_reset_pmu(void)
-{
-	int i;
-
-	/* PMU is frozen, no pending overflow bits */
-	ia64_set_pmc(0,1);
-
-	/* extra overflow bits + counter configs cleared */
-	for(i=1; i< PMU_FIRST_COUNTER + pmu_conf.max_counters ; i++) {
-		ia64_set_pmc(i,0);
-	}
-
-	/* opcode matcher set to all 1s */
-	ia64_set_pmc(8,~0);
-	ia64_set_pmc(9,~0);
-
-	/* I-EAR config cleared, plm=0 */
-	ia64_set_pmc(10,0);
-
-	/* D-EAR config cleared, PMC[11].pt must be 1 */
-	ia64_set_pmc(11,1 << 28);
-
-	/* BTB config. plm=0 */
-	ia64_set_pmc(12,0);
-
-	/* Instruction address range, PMC[13].ta must be 1 */
-	ia64_set_pmc(13,1);
-
-	/* clears all PMD registers */
-	for(i=0;i< pmu_conf.num_pmds; i++) {
-		if (PMD_IS_IMPL(i))  ia64_set_pmd(i,0);
-	}
-	ia64_srlz_d();
-}
 
 /*
- * task is the newly created task
+ * task is the newly created task, pt_regs for new child
  */
 int
 pfm_inherit(struct task_struct *task, struct pt_regs *regs)
@@ -2207,25 +3422,29 @@ pfm_inherit(struct task_struct *task, struct pt_regs *regs)
 	pfm_context_t *ctx = current->thread.pfm_context;
 	pfm_context_t *nctx;
 	struct thread_struct *th = &task->thread;
-	int i, cnum;
+	unsigned long m;
+	int i;
 
 	/*
-	 * bypass completely for system wide
+	 * make sure child cannot mess up the monitoring session
 	 */
-	if (pfs_info.pfs_sys_session) {
-		DBprintk((" enabling psr.pp for %d\n", task->pid));
-		ia64_psr(regs)->pp = pfs_info.pfs_pp;
-		return 0;
-	}
+	 ia64_psr(regs)->sp = 1;
+	 DBprintk(("enabling psr.sp for [%d]\n", task->pid));
+
+	 /*
+	  * remove any sampling buffer mapping from child user 
+	  * address space. Must be done for all cases of inheritance.
+	  */
+	 if (ctx->ctx_smpl_vaddr) pfm_remove_smpl_mapping(task);
 
 	/*
 	 * takes care of easiest case first
 	 */
 	if (CTX_INHERIT_MODE(ctx) == PFM_FL_INHERIT_NONE) {
-		DBprintk((" removing PFM context for %d\n", task->pid));
+		DBprintk(("removing PFM context for [%d]\n", task->pid));
 		task->thread.pfm_context     = NULL;
-		task->thread.pfm_must_block  = 0;
-		atomic_set(&task->thread.pfm_notifiers_check, 0);
+		task->thread.pfm_ovfl_block_reset  = 0;
+
 		/* copy_thread() clears IA64_THREAD_PM_VALID */
 		return 0;
 	}
@@ -2235,45 +3454,81 @@ pfm_inherit(struct task_struct *task, struct pt_regs *regs)
 	/* copy content */
 	*nctx = *ctx;
 
+
 	if (CTX_INHERIT_MODE(ctx) == PFM_FL_INHERIT_ONCE) {
 		nctx->ctx_fl_inherit = PFM_FL_INHERIT_NONE;
-		atomic_set(&task->thread.pfm_notifiers_check, 0);
-		DBprintk((" downgrading to INHERIT_NONE for %d\n", task->pid));
-		pfs_info.pfs_proc_sessions++;
+		atomic_set(&nctx->ctx_last_cpu, -1);
+
+		/*
+		 * task is not yet visible in the tasklist, so we do 
+		 * not need to lock the newly created context.
+		 * However, we must grab the tasklist_lock to ensure
+		 * that the ctx_owner or ctx_notify_task do not disappear
+		 * while we increment their check counters.
+		 */
+		read_lock(&tasklist_lock);
+
+		if (nctx->ctx_notify_task) 
+			atomic_inc(&nctx->ctx_notify_task->thread.pfm_notifiers_check);
+
+		if (nctx->ctx_owner)
+			atomic_inc(&nctx->ctx_owner->thread.pfm_owners_check);
+
+		read_unlock(&tasklist_lock);
+
+		DBprintk(("downgrading to INHERIT_NONE for [%d]\n", task->pid));
+
+		LOCK_PFS();
+		pfm_sessions.pfs_task_sessions++;
+		UNLOCK_PFS();
 	}
 
 	/* initialize counters in new context */
-	for(i=0, cnum= PMU_FIRST_COUNTER; i < pmu_conf.max_counters; cnum++, i++) {
-		nctx->ctx_pmds[i].val = nctx->ctx_pmds[i].ival & ~pmu_conf.perf_ovfl_val;
-		th->pmd[cnum]	      = nctx->ctx_pmds[i].ival & pmu_conf.perf_ovfl_val;
+	m = pmu_conf.counter_pmds[0] >> PMU_FIRST_COUNTER;
+	for(i = PMU_FIRST_COUNTER ; m ; m>>=1, i++) {
+		if (m & 0x1) {
+			nctx->ctx_soft_pmds[i].val = nctx->ctx_soft_pmds[i].ival & ~pmu_conf.perf_ovfl_val;
+			th->pmd[i]	      	   = nctx->ctx_soft_pmds[i].ival & pmu_conf.perf_ovfl_val;
+		}
 
 	}
 	/* clear BTB index register */
 	th->pmd[16] = 0;
 
 	/* if sampling then increment number of users of buffer */
-	if (nctx->ctx_smpl_buf) {
-		atomic_inc(&nctx->ctx_smpl_buf->psb_refcnt);
+	if (nctx->ctx_psb) {
+
+		/*
+		 * XXX: nopt very pretty!
+		 */
+		LOCK_PSB(nctx->ctx_psb);
+		nctx->ctx_psb->psb_refcnt++;
+		UNLOCK_PSB(nctx->ctx_psb);
+		/*
+	 	 * remove any pointer to sampling buffer mapping
+	 	 */
+		nctx->ctx_smpl_vaddr = 0;
 	}
 
 	nctx->ctx_fl_frozen = 0;
-	nctx->ctx_ovfl_regs = 0;
+	nctx->ctx_ovfl_regs[0] = 0UL;
+
 	sema_init(&nctx->ctx_restart_sem, 0); /* reset this semaphore to locked */
 
 	/* clear pending notification */
-	th->pfm_must_block = 0;
+	th->pfm_ovfl_block_reset = 0;
 
 	/* link with new task */
-	th->pfm_context     = nctx;
+	th->pfm_context    = nctx;
 
-	DBprintk((" nctx=%p for process %d\n", (void *)nctx, task->pid));
+	DBprintk(("nctx=%p for process [%d]\n", (void *)nctx, task->pid));
 
 	/*
 	 * the copy_thread routine automatically clears
 	 * IA64_THREAD_PM_VALID, so we need to reenable it, if it was used by the caller
 	 */
 	if (current->thread.flags & IA64_THREAD_PM_VALID) {
-		DBprintk(("  setting PM_VALID for %d\n", task->pid));
+		DBprintk(("setting PM_VALID for [%d]\n", task->pid));
 		th->flags |= IA64_THREAD_PM_VALID;
 	}
 
@@ -2281,100 +3536,191 @@ pfm_inherit(struct task_struct *task, struct pt_regs *regs)
 }
 
 /* 
- * called from release_thread(), at this point this task is not in the 
- * tasklist anymore
+ *
+ * We cannot touch any of the PMU registers at this point as we may
+ * not be running on the same CPU the task was last run on.  Therefore
+ * it is assumed that the PMU has been stopped appropriately in
+ * pfm_flush_regs() called from exit_thread(). 
+ *
+ * The function is called in the context of the parent via a release_thread()
+ * and wait4(). The task is not in the tasklist anymore.
  */
 void
 pfm_context_exit(struct task_struct *task)
 {
 	pfm_context_t *ctx = task->thread.pfm_context;
 
-	if (!ctx) {
-		DBprintk((" invalid context for %d\n", task->pid));
-		return;
-	}
+	/*
+	 * check sampling buffer
+	 */
+	if (ctx->ctx_psb) {
+		pfm_smpl_buffer_desc_t *psb = ctx->ctx_psb;
 
-	/* check is we have a sampling buffer attached */
-	if (ctx->ctx_smpl_buf) {
-		pfm_smpl_buffer_desc_t *psb = ctx->ctx_smpl_buf;
+		LOCK_PSB(psb);
 
-		/* if only user left, then remove */
-		DBprintk((" [%d] [%d] psb->refcnt=%d\n", current->pid, task->pid, psb->psb_refcnt.counter));
+		DBprintk(("sampling buffer from [%d] @%p size %ld vma_flag=0x%x\n",
+			task->pid,
+			psb->psb_hdr, psb->psb_size, psb->psb_flags));
 
-		if (atomic_dec_and_test(&psb->psb_refcnt) ) {
-			rvfree(psb->psb_hdr, psb->psb_size);
-			vfree(psb);
-			DBprintk((" [%d] cleaning [%d] sampling buffer\n", current->pid, task->pid ));
-		}
-	}
-	DBprintk((" [%d] cleaning [%d] pfm_context @%p\n", current->pid, task->pid, (void *)ctx));
+		/*
+		 * in the case where we are the last user, we may be able to free
+		 * the buffer
+		 */
+		psb->psb_refcnt--;
+
+		if (psb->psb_refcnt == 0) {
+
+			/*
+			 * The flag is cleared in pfm_vm_close(). which gets 
+			 * called from do_exit() via exit_mm(). 
+			 * By the time we come here, the task has no more mm context.
+			 *
+			 * We can only free the psb and buffer here after the vm area
+			 * describing the buffer has been removed. This normally happens 
+			 * as part of do_exit() but the entire mm context is ONLY removed
+			 * once its reference counts goes to zero. This is typically
+			 * the case except for multi-threaded (several tasks) processes.
+			 *
+			 * See pfm_vm_close() and pfm_cleanup_smpl_buf() for more details.
+			 */
+			if ((psb->psb_flags & PFM_PSB_VMA) == 0) {
+
+				DBprintk(("cleaning sampling buffer from [%d] @%p size %ld\n",
+					task->pid,
+					psb->psb_hdr, psb->psb_size));
+
+				/* 
+				 * free the buffer and psb 
+				 */
+				pfm_rvfree(psb->psb_hdr, psb->psb_size);
+				kfree(psb);
+				psb = NULL;
+			} 
+		} 
+		/* psb may have been deleted */
+		if (psb) UNLOCK_PSB(psb);
+	} 
+
+	DBprintk(("cleaning [%d] pfm_context @%p notify_task=%p check=%d mm=%p\n", 
+		task->pid, ctx, 
+		ctx->ctx_notify_task, 
+		atomic_read(&task->thread.pfm_notifiers_check), task->mm));
 
 	/*
-	 * To avoid getting the notified task scan the entire process list
-	 * when it exits because it would have pfm_notifiers_check set, we 
-	 * decrease it by 1 to inform the task, that one less task is going
-	 * to send it notification. each new notifer increases this field by
-	 * 1 in pfm_context_create(). Of course, there is race condition between
-	 * decreasing the value and the notified task exiting. The danger comes
-	 * from the fact that we have a direct pointer to its task structure
-	 * thereby bypassing the tasklist. We must make sure that if we have 
-	 * notify_task!= NULL, the target task is still somewhat present. It may
-	 * already be detached from the tasklist but that's okay. Note that it is
-	 * okay if we 'miss the deadline' and the task scans the list for nothing,
-	 * it will affect performance but not correctness. The correctness is ensured
-	 * by using the notify_lock whic prevents the notify_task from changing on us.
-	 * Once holdhing this lock, if we see notify_task!= NULL, then it will stay like
+	 * To avoid getting the notified task or owner task scan the entire process 
+	 * list when they exit, we decrement notifiers_check and owners_check respectively.
+	 *
+	 * Of course, there is race condition between decreasing the value and the 
+	 * task exiting. The danger comes from the fact that, in both cases, we have a 
+	 * direct pointer to a task structure thereby bypassing the tasklist. 
+	 * We must make sure that, if we have task!= NULL, the target task is still 
+	 * present and is identical to the initial task specified 
+	 * during pfm_create_context(). It may already be detached from the tasklist but 
+	 * that's okay. Note that it is okay if we miss the deadline and the task scans 
+	 * the list for nothing, it will affect performance but not correctness. 
+	 * The correctness is ensured by using the ctx_lock which prevents the 
+	 * notify_task from changing the fields in our context.
+	 * Once holdhing this lock, if we see task!= NULL, then it will stay like
 	 * that until we release the lock. If it is NULL already then we came too late.
 	 */
-	spin_lock(&ctx->ctx_notify_lock);
+	LOCK_CTX(ctx);
 
-	if (ctx->ctx_notify_task) {
-		DBprintk((" [%d] [%d] atomic_sub on [%d] notifiers=%u\n", current->pid, task->pid,
-					ctx->ctx_notify_task->pid, 
-					atomic_read(&ctx->ctx_notify_task->thread.pfm_notifiers_check)));
+	if (ctx->ctx_notify_task != NULL) {
+		DBprintk(("[%d], [%d] atomic_sub on [%d] notifiers=%u\n", current->pid,
+			task->pid,
+			ctx->ctx_notify_task->pid, 
+			atomic_read(&ctx->ctx_notify_task->thread.pfm_notifiers_check)));
 
-		atomic_sub(1, &ctx->ctx_notify_task->thread.pfm_notifiers_check);
+		atomic_dec(&ctx->ctx_notify_task->thread.pfm_notifiers_check);
 	}
 
-	spin_unlock(&ctx->ctx_notify_lock);
+	if (ctx->ctx_owner != NULL) {
+		DBprintk(("[%d], [%d] atomic_sub on [%d] owners=%u\n", 
+			 current->pid, 
+			 task->pid,
+			 ctx->ctx_owner->pid, 
+			 atomic_read(&ctx->ctx_owner->thread.pfm_owners_check)));
+
+		atomic_dec(&ctx->ctx_owner->thread.pfm_owners_check);
+	}
+
+	UNLOCK_CTX(ctx);
+
+	LOCK_PFS();
 
 	if (ctx->ctx_fl_system) {
-		/*
-		 * if included interrupts (true by default), then reset
-		 * to get default value
-		 */
-		if (ctx->ctx_fl_exclintr == 0) {
-			/*
-			 * reload kernel default DCR value
-			 */
-			ia64_set_dcr(pfs_info.pfs_dfl_dcr);
-			DBprintk((" restored dcr to 0x%lx\n", pfs_info.pfs_dfl_dcr));
+
+		pfm_sessions.pfs_sys_session[ctx->ctx_cpu] = NULL;
+		pfm_sessions.pfs_sys_sessions--;
+		DBprintk(("freeing syswide session on CPU%ld\n", ctx->ctx_cpu));
+		/* update perfmon debug register counter */
+		if (ctx->ctx_fl_using_dbreg) {
+			if (pfm_sessions.pfs_sys_use_dbregs == 0) {
+				printk("perfmon: invalid release for [%d] sys_use_dbregs=0\n", task->pid);
+			} else
+				pfm_sessions.pfs_sys_use_dbregs--;
 		}
-		/* 
-		 * free system wide session slot
-		 */
-		pfs_info.pfs_sys_session = 0;
+
+		/*
+	 	 * remove any CPU pinning
+	 	 */
+		set_cpus_allowed(task, ctx->ctx_saved_cpus_allowed);
 	} else {
-		pfs_info.pfs_proc_sessions--;
+		pfm_sessions.pfs_task_sessions--;
 	}
+	UNLOCK_PFS();
 
 	pfm_context_free(ctx);
 	/* 
 	 *  clean pfm state in thread structure,
 	 */
-	task->thread.pfm_context    = NULL;
-	task->thread.pfm_must_block = 0;
-	/* pfm_notifiers is cleaned in pfm_cleanup_notifiers() */
+	task->thread.pfm_context          = NULL;
+	task->thread.pfm_ovfl_block_reset = 0;
 
+	/* pfm_notifiers is cleaned in pfm_cleanup_notifiers() */
 }
 
+/*
+ * function invoked from release_thread when pfm_smpl_buf_list is not NULL
+ */
+int
+pfm_cleanup_smpl_buf(struct task_struct *task)
+{
+	pfm_smpl_buffer_desc_t *tmp, *psb = task->thread.pfm_smpl_buf_list;
+
+	if (psb == NULL) {
+		printk("perfmon: psb is null in [%d]\n", current->pid);
+		return -1;
+	}
+	/*
+	 * Walk through the list and free the sampling buffer and psb
+	 */
+	while (psb) {
+		DBprintk(("[%d] freeing smpl @%p size %ld\n", current->pid, psb->psb_hdr, psb->psb_size));
+
+		pfm_rvfree(psb->psb_hdr, psb->psb_size);
+		tmp = psb->psb_next;
+		kfree(psb);
+		psb = tmp;
+	}
+
+	/* just in case */
+	task->thread.pfm_smpl_buf_list = NULL;
+
+	return 0;
+}
+
+/*
+ * function invoked from release_thread to make sure that the ctx_owner field does not
+ * point to an unexisting task.
+ */
 void
-pfm_cleanup_notifiers(struct task_struct *task)
+pfm_cleanup_owners(struct task_struct *task)
 {
 	struct task_struct *p;
 	pfm_context_t *ctx;
 
-	DBprintk((" [%d] called\n", task->pid));
+	DBprintk(("called by [%d] for [%d]\n", current->pid, task->pid));
 
 	read_lock(&tasklist_lock);
 
@@ -2391,10 +3737,10 @@ pfm_cleanup_notifiers(struct task_struct *task)
 		 */
 		ctx = p->thread.pfm_context;
 
-		DBprintk((" [%d] scanning task [%d] ctx=%p\n", task->pid, p->pid, ctx));
+		//DBprintk(("[%d] scanning task [%d] ctx=%p\n", task->pid, p->pid, ctx));
 
-		if (ctx && ctx->ctx_notify_task == task) {
-			DBprintk((" trying for notifier %d in %d\n", task->pid, p->pid));
+		if (ctx && ctx->ctx_owner == task) {
+			DBprintk(("trying for owner [%d] in [%d]\n", task->pid, p->pid));
 			/*
 			 * the spinlock is required to take care of a race condition
 			 * with the send_sig_info() call. We must make sure that 
@@ -2408,23 +3754,180 @@ pfm_cleanup_notifiers(struct task_struct *task)
 			 * to a completely destroyed task or worse to a new task using the same
 			 * task_struct address.
 			 */
-			spin_lock(&ctx->ctx_notify_lock);
+			LOCK_CTX(ctx);
 
-			ctx->ctx_notify_task = NULL;
+			ctx->ctx_owner = NULL;
 
-			spin_unlock(&ctx->ctx_notify_lock);
+			UNLOCK_CTX(ctx);
 
-			DBprintk((" done for notifier %d in %d\n", task->pid, p->pid));
+			DBprintk(("done for notifier [%d] in [%d]\n", task->pid, p->pid));
 		}
 	}
 	read_unlock(&tasklist_lock);
-
 }
+
+
+/*
+ * function called from release_thread to make sure that the ctx_notify_task is not pointing
+ * to an unexisting task
+ */
+void
+pfm_cleanup_notifiers(struct task_struct *task)
+{
+	struct task_struct *p;
+	pfm_context_t *ctx;
+
+	DBprintk(("called by [%d] for [%d]\n", current->pid, task->pid));
+
+	read_lock(&tasklist_lock);
+
+	for_each_task(p) {
+		/*
+		 * It is safe to do the 2-step test here, because thread.ctx
+		 * is cleaned up only in release_thread() and at that point
+		 * the task has been detached from the tasklist which is an
+		 * operation which uses the write_lock() on the tasklist_lock
+		 * so it cannot run concurrently to this loop. So we have the
+		 * guarantee that if we find p and it has a perfmon ctx then
+		 * it is going to stay like this for the entire execution of this
+		 * loop.
+		 */
+		ctx = p->thread.pfm_context;
+
+		//DBprintk(("[%d] scanning task [%d] ctx=%p\n", task->pid, p->pid, ctx));
+
+		if (ctx && ctx->ctx_notify_task == task) {
+			DBprintk(("trying for notifier [%d] in [%d]\n", task->pid, p->pid));
+			/*
+			 * the spinlock is required to take care of a race condition
+			 * with the send_sig_info() call. We must make sure that 
+			 * either the send_sig_info() completes using a valid task,
+			 * or the notify_task is cleared before the send_sig_info()
+			 * can pick up a stale value. Note that by the time this
+			 * function is executed the 'task' is already detached from the
+			 * tasklist. The problem is that the notifiers have a direct
+			 * pointer to it. It is okay to send a signal to a task in this
+			 * stage, it simply will have no effect. But it is better than sending
+			 * to a completely destroyed task or worse to a new task using the same
+			 * task_struct address.
+			 */
+			LOCK_CTX(ctx);
+
+			ctx->ctx_notify_task = NULL;
+
+			UNLOCK_CTX(ctx);
+
+			DBprintk(("done for notifier [%d] in [%d]\n", task->pid, p->pid));
+		}
+	}
+	read_unlock(&tasklist_lock);
+}
+
+static struct irqaction perfmon_irqaction = {
+	handler:	perfmon_interrupt,
+	flags:		SA_INTERRUPT,
+	name:		"perfmon"
+};
+
+
+/*
+ * perfmon initialization routine, called from the initcall() table
+ */
+int __init
+perfmon_init (void)
+{
+	pal_perf_mon_info_u_t pm_info;
+	s64 status;
+
+	register_percpu_irq(IA64_PERFMON_VECTOR, &perfmon_irqaction);
+
+	ia64_set_pmv(IA64_PERFMON_VECTOR);
+	ia64_srlz_d();
+
+	pmu_conf.pfm_is_disabled = 1;
+
+	printk("perfmon: version %u.%u (sampling format v%u.%u) IRQ %u\n", 
+		PFM_VERSION_MAJ, 
+		PFM_VERSION_MIN, 
+		PFM_SMPL_VERSION_MAJ, 
+		PFM_SMPL_VERSION_MIN, 
+		IA64_PERFMON_VECTOR);
+
+	if ((status=ia64_pal_perf_mon_info(pmu_conf.impl_regs, &pm_info)) != 0) {
+		printk("perfmon: PAL call failed (%ld), perfmon disabled\n", status);
+		return -1;
+	}
+
+	pmu_conf.perf_ovfl_val = (1UL << pm_info.pal_perf_mon_info_s.width) - 1;
+	pmu_conf.max_counters  = pm_info.pal_perf_mon_info_s.generic;
+	pmu_conf.num_pmcs      = find_num_pm_regs(pmu_conf.impl_regs);
+	pmu_conf.num_pmds      = find_num_pm_regs(&pmu_conf.impl_regs[4]);
+
+	printk("perfmon: %u bits counters (max value 0x%016lx)\n", 
+	       pm_info.pal_perf_mon_info_s.width, pmu_conf.perf_ovfl_val);
+
+	printk("perfmon: %lu PMC/PMD pairs, %lu PMCs, %lu PMDs\n", 
+	       pmu_conf.max_counters, pmu_conf.num_pmcs, pmu_conf.num_pmds);
+
+	/* sanity check */
+	if (pmu_conf.num_pmds >= IA64_NUM_PMD_REGS || pmu_conf.num_pmcs >= IA64_NUM_PMC_REGS) {
+		printk(KERN_ERR "perfmon: not enough pmc/pmd, perfmon is DISABLED\n");
+		return -1; /* no need to continue anyway */
+	}
+
+	if (ia64_pal_debug_info(&pmu_conf.num_ibrs, &pmu_conf.num_dbrs)) {
+		printk(KERN_WARNING "perfmon: unable to get number of debug registers\n");
+		pmu_conf.num_ibrs = pmu_conf.num_dbrs = 0;
+	}
+	/* PAL reports the number of pairs */
+	pmu_conf.num_ibrs <<=1;
+	pmu_conf.num_dbrs <<=1;
+
+	/* 
+	 * list the pmc registers used to control monitors 
+	 * XXX: unfortunately this information is not provided by PAL
+	 *
+	 * We start with the architected minimum and then refine for each CPU model
+	 */
+	pmu_conf.monitor_pmcs[0] = PMM(4)|PMM(5)|PMM(6)|PMM(7);
+
+	/*
+	 * architected counters
+	 */
+	pmu_conf.counter_pmds[0] |= PMM(4)|PMM(5)|PMM(6)|PMM(7);
+
+#ifdef CONFIG_ITANIUM
+	pmu_conf.monitor_pmcs[0] |= PMM(10)|PMM(11)|PMM(12);
+	/* Itanium does not add more counters */
+#endif
+	/* we are all set */
+	pmu_conf.pfm_is_disabled = 0;
+
+	/*
+	 * for now here for debug purposes
+	 */
+	perfmon_dir = create_proc_read_entry ("perfmon", 0, 0, perfmon_read_entry, NULL);
+
+	spin_lock_init(&pfm_sessions.pfs_lock);
+
+	return 0;
+}
+
+__initcall(perfmon_init);
+
+void
+perfmon_init_percpu (void)
+{
+	ia64_set_pmv(IA64_PERFMON_VECTOR);
+	ia64_srlz_d();
+}
+
 
 #else /* !CONFIG_PERFMON */
 
 asmlinkage int
-sys_perfmonctl (int pid, int cmd, int flags, perfmon_req_t *req, int count, long arg6, long arg7, long arg8, long stack)
+sys_perfmonctl (int pid, int cmd, void *req, int count, long arg5, long arg6, 
+		long arg7, long arg8, long stack)
 {
 	return -ENOSYS;
 }

@@ -4,11 +4,12 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000 Silicon Graphics, Inc.
- * Copyright (C) 2000 by Colin Ngam
+ * Copyright (C) 1992 - 1997, 2000-2002 Silicon Graphics, Inc. All rights reserved.
  */
-#ifndef _ASM_SN_SYSTEMINFO_H
-#define _ASM_SN_SYSTEMINFO_H
+#ifndef _ASM_IA64_SN_SYSTEMINFO_H
+#define _ASM_IA64_SN_SYSTEMINFO_H
+
+#include <linux/types.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -69,4 +70,4 @@ int get_module_info(int, module_info_t *, size_t);
 }
 #endif
 
-#endif /* _ASM_SN_SYSTEMINFO_H */
+#endif /* _ASM_IA64_SN_SYSTEMINFO_H */

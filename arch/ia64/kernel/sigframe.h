@@ -21,3 +21,5 @@ struct sigframe {
 	struct siginfo info;
 	struct sigcontext sc;
 };
+
+extern long ia64_do_signal (sigset_t *, struct sigscratch *, long);

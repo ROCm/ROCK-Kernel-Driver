@@ -4,13 +4,12 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000 Silicon Graphics, Inc.
+ * Copyright (C) 1992 - 1997, 2000-2001 Silicon Graphics, Inc.
  * Copyright (C) 2000 by Colin Ngam
  */
 #ifndef _ASM_SN_XTALK_XTALKADDRS_H
 #define _ASM_SN_XTALK_XTALKADDRS_H
 
-#include <linux/config.h>
 
 /*
  * CrossTalk to SN0 Hub addressing support
@@ -60,19 +59,15 @@
  * This looks very much like a REMOTE_HUB access, except the nodeID
  * is in a different place, and the highest xtalk bit is set.
  */
-
 /* Hub-specific xtalk definitions */
 
 #define HX_MEM_BIT		0L	/* Hub's idea of xtalk memory access */
 #define HX_IO_BIT		1L	/* Hub's idea of xtalk register access */
 #define HX_ACCTYPE_SHIFT	47
 
-#if CONFIG_SGI_IP35 || CONFIG_IA64_SGI_SN1 || CONFIG_IA64_GENERIC
 #define HX_NODE_SHIFT		39
-#endif
 
 #define HX_BIGWIN_SHIFT		28
-
 #define HX_SWIN_SHIFT		23
 
 #define HX_LOCACC		0L	/* local access */

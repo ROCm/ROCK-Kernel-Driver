@@ -8,7 +8,7 @@
  * This hopefully works with any (fixed) IA-64 page-size, as defined
  * in <asm/page.h> (currently 8192).
  *
- * Copyright (C) 1998-2001 Hewlett-Packard Co
+ * Copyright (C) 1998-2002 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  */
 
@@ -108,19 +108,15 @@
 /*
  * All the normal masks have the "page accessed" bits on, as any time
  * they are used, the page is accessed. They are cleared only by the
- * page-out routines.  On the other hand, we do NOT turn on the
- * execute bit on pages that are mapped writable.  For those pages, we
- * turn on the X bit only when the program attempts to actually
- * execute code in such a page (it's a "lazy execute bit", if you
- * will).  This lets reduce the amount of i-cache flushing we have to
- * do for data pages such as stack and heap pages.
+ * page-out routines.
  */
 #define PAGE_NONE	__pgprot(_PAGE_PROTNONE | _PAGE_A)
 #define PAGE_SHARED	__pgprot(__ACCESS_BITS | _PAGE_PL_3 | _PAGE_AR_RW)
 #define PAGE_READONLY	__pgprot(__ACCESS_BITS | _PAGE_PL_3 | _PAGE_AR_R)
-#define PAGE_COPY	__pgprot(__ACCESS_BITS | _PAGE_PL_3 | _PAGE_AR_R)
+#define PAGE_COPY	__pgprot(__ACCESS_BITS | _PAGE_PL_3 | _PAGE_AR_RX)
 #define PAGE_GATE	__pgprot(__ACCESS_BITS | _PAGE_PL_0 | _PAGE_AR_X_RX)
 #define PAGE_KERNEL	__pgprot(__DIRTY_BITS  | _PAGE_PL_0 | _PAGE_AR_RWX)
+#define PAGE_KERNELRX	__pgprot(__ACCESS_BITS | _PAGE_PL_0 | _PAGE_AR_RX)
 
 # ifndef __ASSEMBLY__
 
@@ -152,8 +148,8 @@
 #define __S011	PAGE_SHARED
 #define __S100	__pgprot(__ACCESS_BITS | _PAGE_PL_3 | _PAGE_AR_X_RX)
 #define __S101	__pgprot(__ACCESS_BITS | _PAGE_PL_3 | _PAGE_AR_RX)
-#define __S110	__pgprot(__ACCESS_BITS | _PAGE_PL_3 | _PAGE_AR_RW)
-#define __S111	__pgprot(__ACCESS_BITS | _PAGE_PL_3 | _PAGE_AR_RW)
+#define __S110	__pgprot(__ACCESS_BITS | _PAGE_PL_3 | _PAGE_AR_RWX)
+#define __S111	__pgprot(__ACCESS_BITS | _PAGE_PL_3 | _PAGE_AR_RWX)
 
 #define pgd_ERROR(e)	printk("%s:%d: bad pgd %016lx.\n", __FILE__, __LINE__, pgd_val(e))
 #define pmd_ERROR(e)	printk("%s:%d: bad pmd %016lx.\n", __FILE__, __LINE__, pmd_val(e))
@@ -161,8 +157,7 @@
 
 
 /*
- * Some definitions to translate between mem_map, PTEs, and page
- * addresses:
+ * Some definitions to translate between mem_map, PTEs, and page addresses:
  */
 
 
@@ -173,6 +168,7 @@ ia64_phys_addr_valid (unsigned long addr)
 	return (addr & (local_cpu_data->unimpl_pa_mask)) == 0;
 }
 
+#ifndef CONFIG_DISCONTIGMEM
 /*
  * kern_addr_valid(ADDR) tests if ADDR is pointing to valid kernel
  * memory.  For the return value to be meaningful, ADDR must be >=
@@ -187,6 +183,8 @@ ia64_phys_addr_valid (unsigned long addr)
  * XXX Need to implement this for IA-64.
  */
 #define kern_addr_valid(addr)	(1)
+
+#endif
 
 /*
  * Now come the defines and routines to manage and access the three-level
@@ -211,12 +209,12 @@ ia64_phys_addr_valid (unsigned long addr)
  * Conversion functions: convert a page and protection to a page entry,
  * and a page entry and page directory to the page they refer to.
  */
-#define mk_pte(page,pgprot)							\
-({										\
-	pte_t __pte;								\
-										\
-	pte_val(__pte) = ((page - mem_map) << PAGE_SHIFT) | pgprot_val(pgprot);	\
-	__pte;									\
+#define mk_pte(page,pgprot)						\
+({									\
+	pte_t __pte;							\
+									\
+	pte_val(__pte) = (page_to_phys(page)) | pgprot_val(pgprot);	\
+	__pte;								\
 })
 
 /* This takes a physical page address that is used by the remapping functions */
@@ -232,14 +230,17 @@ ia64_phys_addr_valid (unsigned long addr)
 #define pte_none(pte) 			(!pte_val(pte))
 #define pte_present(pte)		(pte_val(pte) & (_PAGE_P | _PAGE_PROTNONE))
 #define pte_clear(pte)			(pte_val(*(pte)) = 0UL)
+#ifndef CONFIG_DISCONTIGMEM
 /* pte_page() returns the "struct page *" corresponding to the PTE: */
-#define pte_page(pte)			(mem_map + (unsigned long) ((pte_val(pte) & _PFN_MASK) >> PAGE_SHIFT))
+#define pte_page(pte)			virt_to_page(((pte_val(pte) & _PFN_MASK) + PAGE_OFFSET))
+#endif
 
 #define pmd_none(pmd)			(!pmd_val(pmd))
 #define pmd_bad(pmd)			(!ia64_phys_addr_valid(pmd_val(pmd)))
 #define pmd_present(pmd)		(pmd_val(pmd) != 0UL)
 #define pmd_clear(pmdp)			(pmd_val(*(pmdp)) = 0UL)
-#define pmd_page(pmd)			((unsigned long) __va(pmd_val(pmd) & _PFN_MASK))
+#define pmd_page_kernel(pmd)		((unsigned long) __va(pmd_val(pmd) & _PFN_MASK))
+#define pmd_page(pmd)			virt_to_page((pmd_val(pmd) + PAGE_OFFSET))
 
 #define pgd_none(pgd)			(!pgd_val(pgd))
 #define pgd_bad(pgd)			(!ia64_phys_addr_valid(pgd_val(pgd)))
@@ -339,9 +340,16 @@ pgd_offset (struct mm_struct *mm, unsigned long address)
 #define pmd_offset(dir,addr) \
 	((pmd_t *) pgd_page(*(dir)) + (((addr) >> PMD_SHIFT) & (PTRS_PER_PMD - 1)))
 
-/* Find an entry in the third-level page table.. */
-#define pte_offset(dir,addr) \
-	((pte_t *) pmd_page(*(dir)) + (((addr) >> PAGE_SHIFT) & (PTRS_PER_PTE - 1)))
+/*
+ * Find an entry in the third-level page table.  This looks more complicated than it
+ * should be because some platforms place page tables in high memory.
+ */
+#define __pte_offset(addr)	 	(((addr) >> PAGE_SHIFT) & (PTRS_PER_PTE - 1))
+#define pte_offset_kernel(dir,addr)	((pte_t *) pmd_page_kernel(*(dir)) + __pte_offset(addr))
+#define pte_offset_map(dir,addr)	pte_offset_kernel(dir, addr)
+#define pte_offset_map_nested(dir,addr)	pte_offset_map(dir, addr)
+#define pte_unmap(pte)			do { } while (0)
+#define pte_unmap_nested(pte)		do { } while (0)
 
 /* atomic versions of the some PTE manipulations: */
 
@@ -418,22 +426,6 @@ pte_same (pte_t a, pte_t b)
 	return pte_val(a) == pte_val(b);
 }
 
-/*
- * Macros to check the type of access that triggered a page fault.
- */
-
-static inline int
-is_write_access (int access_type)
-{
-	return (access_type & 0x2);
-}
-
-static inline int
-is_exec_access (int access_type)
-{
-	return (access_type & 0x4);
-}
-
 extern pgd_t swapper_pg_dir[PTRS_PER_PGD];
 extern void paging_init (void);
 
@@ -447,6 +439,33 @@ extern void paging_init (void);
 #define PageSkip(page)		(0)
 
 #define io_remap_page_range remap_page_range	/* XXX is this right? */
+
+
+/*
+ * Now for some cache flushing routines.  This is the kind of stuff that can be very
+ * expensive, so try to avoid them whenever possible.
+ */
+
+/* Caches aren't brain-dead on the IA-64. */
+#define flush_cache_all()			do { } while (0)
+#define flush_cache_mm(mm)			do { } while (0)
+#define flush_cache_range(vma, start, end)	do { } while (0)
+#define flush_cache_page(vma, vmaddr)		do { } while (0)
+#define flush_page_to_ram(page)			do { } while (0)
+#define flush_icache_page(vma,page)		do { } while (0)
+
+#define flush_dcache_page(page)			\
+do {						\
+	clear_bit(PG_arch_1, &page->flags);	\
+} while (0)
+
+extern void flush_icache_range (unsigned long start, unsigned long end);
+
+#define flush_icache_user_range(vma, page, user_addr, len)			\
+do {										\
+	unsigned long _addr = page_address(page) + ((user_addr) & ~PAGE_MASK);	\
+	flush_icache_range(_addr, _addr + (len));				\
+} while (0)
 
 /*
  * ZERO_PAGE is a global shared page that is always zero: used

@@ -4,13 +4,15 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000 Silicon Graphics, Inc.
- * Copyright (C) 2000 by Colin Ngam
+ * Copyright (C) 1992 - 1997, 2000-2001 Silicon Graphics, Inc. All rights reserved.
  */
-#ifndef _ASM_SN_HCL_H
-#define _ASM_SN_HCL_H
+#ifndef _ASM_IA64_SN_HCL_H
+#define _ASM_IA64_SN_HCL_H
 
-extern spinlock_t hcl_spinlock;
+#include <asm/sn/sgi.h>
+#include <asm/sn/invent.h>
+#include <linux/devfs_fs_kernel.h>
+
 extern devfs_handle_t hcl_handle; /* HCL driver */
 extern devfs_handle_t hwgraph_root;
 extern devfs_handle_t linux_busnum;
@@ -93,7 +95,6 @@ extern devfs_handle_t hwgraph_block_device_get(devfs_handle_t);
 extern devfs_handle_t hwgraph_char_device_get(devfs_handle_t);
 extern graph_error_t hwgraph_char_device_add(devfs_handle_t, char *, char *, devfs_handle_t *);
 extern int hwgraph_path_add(devfs_handle_t, char *, devfs_handle_t *);
-extern struct file_operations * hwgraph_bdevsw_get(devfs_handle_t);
 extern int hwgraph_info_add_LBL(devfs_handle_t, char *, arbitrary_info_t);
 extern int hwgraph_info_get_LBL(devfs_handle_t, char *, arbitrary_info_t *);
 extern int hwgraph_info_replace_LBL(devfs_handle_t, char *, arbitrary_info_t,
@@ -111,4 +112,4 @@ extern graph_error_t hwgraph_vertex_unref(devfs_handle_t);
 
 
 
-#endif /* _ASM_SN_HCL_H */
+#endif /* _ASM_IA64_SN_HCL_H */

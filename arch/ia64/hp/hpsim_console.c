@@ -1,15 +1,18 @@
 /*
  * Platform dependent support for HP simulator.
  *
- * Copyright (C) 1998, 1999 Hewlett-Packard Co
- * Copyright (C) 1998, 1999 David Mosberger-Tang <davidm@hpl.hp.com>
+ * Copyright (C) 1998, 1999, 2002 Hewlett-Packard Co
+ *	David Mosberger-Tang <davidm@hpl.hp.com>
  * Copyright (C) 1999 Vijay Chander <vijay@engr.sgi.com>
  */
+#include <linux/config.h>
+
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/param.h>
 #include <linux/string.h>
 #include <linux/types.h>
+#include <linux/tty.h>
 #include <linux/kdev_t.h>
 #include <linux/console.h>
 
@@ -57,5 +60,5 @@ simcons_write (struct console *cons, const char *buf, unsigned count)
 static kdev_t
 simcons_console_device (struct console *c)
 {
-	return MKDEV(TTY_MAJOR, 64 + c->index);
+	return mk_kdev(TTY_MAJOR, 64 + c->index);
 }

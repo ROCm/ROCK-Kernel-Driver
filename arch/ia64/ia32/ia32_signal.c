@@ -1,7 +1,7 @@
 /*
  * IA32 Architecture-specific signal handling support.
  *
- * Copyright (C) 1999, 2001 Hewlett-Packard Co
+ * Copyright (C) 1999, 2001-2002 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  * Copyright (C) 1999 Arun Sharma <arun.sharma@intel.com>
  * Copyright (C) 2000 VA Linux Co
@@ -522,6 +522,7 @@ get_sigframe (struct k_sigaction *ka, struct pt_regs * regs, size_t frame_size)
 static int
 setup_frame_ia32 (int sig, struct k_sigaction *ka, sigset_t *set, struct pt_regs * regs)
 {
+	struct exec_domain *ed = current_thread_info()->exec_domain;
 	struct sigframe_ia32 *frame;
 	int err = 0;
 
@@ -530,12 +531,8 @@ setup_frame_ia32 (int sig, struct k_sigaction *ka, sigset_t *set, struct pt_regs
 	if (!access_ok(VERIFY_WRITE, frame, sizeof(*frame)))
 		goto give_sigsegv;
 
-	err |= __put_user((current->exec_domain
-			   && current->exec_domain->signal_invmap
-			   && sig < 32
-			   ? (int)(current->exec_domain->signal_invmap[sig])
-			   : sig),
-			  &frame->sig);
+	err |= __put_user((ed && ed->signal_invmap && sig < 32
+			   ? (int)(ed->signal_invmap[sig]) : sig), &frame->sig);
 
 	err |= setup_sigcontext_ia32(&frame->sc, &frame->fpstate, regs, set->sig[0]);
 
@@ -590,6 +587,7 @@ static int
 setup_rt_frame_ia32 (int sig, struct k_sigaction *ka, siginfo_t *info,
 		     sigset_t *set, struct pt_regs * regs)
 {
+	struct exec_domain *ed = current_thread_info()->exec_domain;
 	struct rt_sigframe_ia32 *frame;
 	int err = 0;
 
@@ -598,12 +596,8 @@ setup_rt_frame_ia32 (int sig, struct k_sigaction *ka, siginfo_t *info,
 	if (!access_ok(VERIFY_WRITE, frame, sizeof(*frame)))
 		goto give_sigsegv;
 
-	err |= __put_user((current->exec_domain
-			   && current->exec_domain->signal_invmap
-			   && sig < 32
-			   ? current->exec_domain->signal_invmap[sig]
-			   : sig),
-			  &frame->sig);
+	err |= __put_user((ed && ed->signal_invmap
+			   && sig < 32 ? ed->signal_invmap[sig] : sig), &frame->sig);
 	err |= __put_user((long)&frame->info, &frame->pinfo);
 	err |= __put_user((long)&frame->uc, &frame->puc);
 	err |= copy_siginfo_to_user32(&frame->info, info);

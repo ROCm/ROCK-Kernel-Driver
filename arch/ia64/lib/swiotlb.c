@@ -27,9 +27,18 @@
 #define ALIGN(val, align) ((unsigned long)	\
 	(((unsigned long) (val) + ((align) - 1)) & ~((align) - 1)))
 
-#define SG_ENT_VIRT_ADDRESS(sg)	((sg)->address ? (sg)->address			\
-				 : page_address((sg)->page) + (sg)->offset)
+#define OFFSET(val,align) ((unsigned long)	\
+	                   ( (val) & ( (align) - 1)))
+
+#define SG_ENT_VIRT_ADDRESS(sg)	(page_address((sg)->page) + (sg)->offset)
 #define SG_ENT_PHYS_ADDRESS(SG)	virt_to_phys(SG_ENT_VIRT_ADDRESS(SG))
+
+/*
+ * Maximum allowable number of contiguous slabs to map,
+ * must be a power of 2.  What is the appropriate value ?
+ * The complexity of {map,unmap}_single is linearly dependent on this value.
+ */
+#define IO_TLB_SEGSIZE	128
 
 /*
  * log of the size of each IO TLB slab.  The number of slabs is command line controllable.
@@ -69,9 +78,14 @@ static int __init
 setup_io_tlb_npages (char *str)
 {
 	io_tlb_nslabs = simple_strtoul(str, NULL, 0) << (PAGE_SHIFT - IO_TLB_SHIFT);
+
+	/* avoid tail segment of size < IO_TLB_SEGSIZE */
+	io_tlb_nslabs = ALIGN(io_tlb_nslabs, IO_TLB_SEGSIZE);
+
 	return 1;
 }
 __setup("swiotlb=", setup_io_tlb_npages);
+
 
 /*
  * Statically reserve bounce buffer space and initialize bounce buffer data structures for
@@ -92,12 +106,12 @@ swiotlb_init (void)
 
 	/*
 	 * Allocate and initialize the free list array.  This array is used
-	 * to find contiguous free memory regions of size 2^IO_TLB_SHIFT between
-	 * io_tlb_start and io_tlb_end.
+	 * to find contiguous free memory regions of size up to IO_TLB_SEGSIZE
+	 * between io_tlb_start and io_tlb_end.
 	 */
 	io_tlb_list = alloc_bootmem(io_tlb_nslabs * sizeof(int));
 	for (i = 0; i < io_tlb_nslabs; i++)
-		io_tlb_list[i] = io_tlb_nslabs - i;
+ 		io_tlb_list[i] = IO_TLB_SEGSIZE - OFFSET(i, IO_TLB_SEGSIZE);
 	io_tlb_index = 0;
 	io_tlb_orig_addr = alloc_bootmem(io_tlb_nslabs * sizeof(char *));
 
@@ -124,7 +138,7 @@ map_single (struct pci_dev *hwdev, char *buffer, size_t size, int direction)
 	if (size > (1 << PAGE_SHIFT))
 		stride = (1 << (PAGE_SHIFT - IO_TLB_SHIFT));
 	else
-		stride = nslots;
+		stride = 1;
 
 	if (!nslots)
 		BUG();
@@ -151,7 +165,8 @@ map_single (struct pci_dev *hwdev, char *buffer, size_t size, int direction)
 
 				for (i = index; i < index + nslots; i++)
 					io_tlb_list[i] = 0;
-				for (i = index - 1; (i >= 0) && io_tlb_list[i]; i--)
+				for (i = index - 1; (OFFSET(i, IO_TLB_SEGSIZE) != IO_TLB_SEGSIZE -1)
+				       && io_tlb_list[i]; i--)
 					io_tlb_list[i] = ++count;
 				dma_addr = io_tlb_start + (index << IO_TLB_SHIFT);
 
@@ -217,7 +232,8 @@ unmap_single (struct pci_dev *hwdev, char *dma_addr, size_t size, int direction)
 	 */
 	spin_lock_irqsave(&io_tlb_lock, flags);
 	{
-		int count = ((index + nslots) < io_tlb_nslabs ? io_tlb_list[index + nslots] : 0);
+		int count = ((index + nslots) < ALIGN(index + 1, IO_TLB_SEGSIZE) ?
+			     io_tlb_list[index + nslots] : 0);
 		/*
 		 * Step 1: return the slots to the free list, merging the slots with
 		 * superceeding slots
@@ -228,7 +244,8 @@ unmap_single (struct pci_dev *hwdev, char *dma_addr, size_t size, int direction)
 		 * Step 2: merge the returned slots with the preceeding slots, if
 		 * available (non zero)
 		 */
-		for (i = index - 1; (i >= 0) && io_tlb_list[i]; i--)
+		for (i = index - 1;  (OFFSET(i, IO_TLB_SEGSIZE) != IO_TLB_SEGSIZE -1) &&
+		       io_tlb_list[i]; i--)
 			io_tlb_list[i] = ++count;
 	}
 	spin_unlock_irqrestore(&io_tlb_lock, flags);
@@ -405,11 +422,9 @@ swiotlb_map_sg (struct pci_dev *hwdev, struct scatterlist *sg, int nelems, int d
 	for (i = 0; i < nelems; i++, sg++) {
 		sg->orig_address = SG_ENT_VIRT_ADDRESS(sg);
 		if ((SG_ENT_PHYS_ADDRESS(sg) & ~hwdev->dma_mask) != 0) {
-			addr = map_single(hwdev, sg->address, sg->length, direction);
-			if (sg->address)
-				sg->address = addr;
-			else
-				sg->page = virt_to_page(addr);
+			addr = map_single(hwdev, sg->orig_address, sg->length, direction);
+			sg->page = virt_to_page(addr);
+			sg->offset = (u64) addr & ~PAGE_MASK;
 		}
 	}
 	return nelems;
@@ -430,12 +445,10 @@ swiotlb_unmap_sg (struct pci_dev *hwdev, struct scatterlist *sg, int nelems, int
 	for (i = 0; i < nelems; i++, sg++)
 		if (sg->orig_address != SG_ENT_VIRT_ADDRESS(sg)) {
 			unmap_single(hwdev, SG_ENT_VIRT_ADDRESS(sg), sg->length, direction);
-			if (sg->address)
-				sg->address = sg->orig_address;
-			else
-				sg->page = virt_to_page(sg->orig_address);
+			sg->page = virt_to_page(sg->orig_address);
+			sg->offset = (u64) sg->orig_address & ~PAGE_MASK;
 		} else if (direction == PCI_DMA_FROMDEVICE)
-			mark_clean(sg->address, sg->length);
+			mark_clean(SG_ENT_VIRT_ADDRESS(sg), sg->length);
 }
 
 /*

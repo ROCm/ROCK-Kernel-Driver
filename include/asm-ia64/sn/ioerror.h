@@ -4,13 +4,15 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000 Silicon Graphics, Inc.
- * Copyright (C) 2000 by Colin Ngam
+ * Copyright (C) 1992 - 1997, 2000-2002 Silicon Graphics, Inc. All rights reserved.
  */
-#ifndef _ASM_SN_IOERROR_H
-#define _ASM_SN_IOERROR_H
+#ifndef _ASM_IA64_SN_IOERROR_H
+#define _ASM_IA64_SN_IOERROR_H
 
-#if defined(_LANGUAGE_C) || defined(_LANGUAGE_C_PLUS_PLUS)
+#ifndef __ASSEMBLY__
+
+#include <linux/types.h>
+#include <asm/sn/types.h>
 
 /*
  * Macros defining the various Errors to be handled as part of
@@ -162,7 +164,6 @@ typedef struct io_error_s {
 #define	IOERROR_FIELDVALID(e,f)	(((e)->ie_v.iev_b.ievb_ ## f) != 0)
 #define	IOERROR_GETVALUE(e,f)	(ASSERT(IOERROR_FIELDVALID(e,f)),((e)->ie_ ## f))
 
-#if	IP27 || IP35
 /* hub code likes to call the SysAD address "hubaddr" ... */
 #define	ie_hubaddr	ie_sysioaddr
 #define	ievb_hubaddr	ievb_sysioaddr
@@ -178,7 +179,6 @@ typedef enum {
     MODE_DEVREENABLE		/* Reenable pass                */
 } ioerror_mode_t;
 
-#endif				/* C || C++ */
 
 typedef int             error_handler_f(void *, int, ioerror_mode_t, ioerror_t *);
 typedef void           *error_handler_arg_t;
@@ -193,4 +193,4 @@ extern void             ioerror_dump(char *, int, int, ioerror_t *);
 #define	IOERR_PRINTF(x)
 #endif				/* ERROR_DEBUG */
 
-#endif				/* _ASM_SN_IOERROR_H */
+#endif /* _ASM_IA64_SN_IOERROR_H */

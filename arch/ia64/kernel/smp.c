@@ -29,6 +29,7 @@
 #include <linux/smp.h>
 #include <linux/kernel_stat.h>
 #include <linux/mm.h>
+#include <linux/cache.h>
 #include <linux/delay.h>
 #include <linux/cache.h>
 
@@ -38,7 +39,6 @@
 #include <asm/delay.h>
 #include <asm/efi.h>
 #include <asm/machvec.h>
-
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/page.h>
@@ -51,14 +51,19 @@
 #include <asm/unistd.h>
 #include <asm/mca.h>
 
-/* The 'big kernel lock' */
-spinlock_t kernel_flag __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
+/*
+ * The Big Kernel Lock.  It's not supposed to be used for performance critical stuff
+ * anymore.  But we still need to align it because certain workloads are still affected by
+ * it.  For example, llseek() and various other filesystem related routines still use the
+ * BKL.
+ */
+spinlock_t kernel_flag __cacheline_aligned = SPIN_LOCK_UNLOCKED;
 
 /*
  * Structure and data for smp_call_function(). This is designed to minimise static memory
  * requirements. It also looks cleaner.
  */
-static spinlock_t call_lock = SPIN_LOCK_UNLOCKED;
+static spinlock_t call_lock __cacheline_aligned = SPIN_LOCK_UNLOCKED;
 
 struct call_data_struct {
 	void (*func) (void *info);
@@ -70,8 +75,12 @@ struct call_data_struct {
 
 static volatile struct call_data_struct *call_data;
 
+static spinlock_t migration_lock = SPIN_LOCK_UNLOCKED;
+static task_t *migrating_task;
+
 #define IPI_CALL_FUNC		0
 #define IPI_CPU_STOP		1
+#define IPI_MIGRATE_TASK	2
 
 static void
 stop_this_cpu (void)
@@ -98,51 +107,60 @@ handle_IPI (int irq, void *dev_id, struct pt_regs *regs)
 
 	mb();	/* Order interrupt and bit testing. */
 	while ((ops = xchg(pending_ipis, 0)) != 0) {
-	  mb();	/* Order bit clearing and data access. */
-	  do {
-		unsigned long which;
+		mb();	/* Order bit clearing and data access. */
+		do {
+			unsigned long which;
 
-		which = ffz(~ops);
-		ops &= ~(1 << which);
+			which = ffz(~ops);
+			ops &= ~(1 << which);
 
-		switch (which) {
-		case IPI_CALL_FUNC:
-			{
-				struct call_data_struct *data;
-				void (*func)(void *info);
-				void *info;
-				int wait;
+			switch (which) {
+			      case IPI_CALL_FUNC:
+			      {
+				      struct call_data_struct *data;
+				      void (*func)(void *info);
+				      void *info;
+				      int wait;
 
-				/* release the 'pointer lock' */
-				data = (struct call_data_struct *) call_data;
-				func = data->func;
-				info = data->info;
-				wait = data->wait;
+				      /* release the 'pointer lock' */
+				      data = (struct call_data_struct *) call_data;
+				      func = data->func;
+				      info = data->info;
+				      wait = data->wait;
 
-				mb();
-				atomic_inc(&data->started);
+				      mb();
+				      atomic_inc(&data->started);
+				      /*
+				       * At this point the structure may be gone unless
+				       * wait is true.
+				       */
+				      (*func)(info);
 
-				/* At this point the structure may be gone unless wait is true.  */
-				(*func)(info);
+				      /* Notify the sending CPU that the task is done.  */
+				      mb();
+				      if (wait)
+					      atomic_inc(&data->finished);
+			      }
+			      break;
 
-				/* Notify the sending CPU that the task is done.  */
-				mb();
-				if (wait)
-					atomic_inc(&data->finished);
+			      case IPI_MIGRATE_TASK:
+			      {
+				      task_t *p = migrating_task;
+				      spin_unlock(&migration_lock);
+				      sched_task_migrated(p);
+			      }
+			      break;
+
+			      case IPI_CPU_STOP:
+				stop_this_cpu();
+				break;
+
+			      default:
+				printk(KERN_CRIT "Unknown IPI on CPU %d: %lu\n", this_cpu, which);
+				break;
 			}
-			break;
-
-		case IPI_CPU_STOP:
-			stop_this_cpu();
-			break;
-
-		default:
-			printk(KERN_CRIT "Unknown IPI on CPU %d: %lu\n", this_cpu, which);
-			break;
-		} /* Switch */
-	  } while (ops);
-
-	  mb();	/* Order data access and bit testing. */
+		} while (ops);
+		mb();	/* Order data access and bit testing. */
 	}
 }
 
@@ -185,10 +203,25 @@ smp_send_reschedule (int cpu)
 	platform_send_ipi(cpu, IA64_IPI_RESCHEDULE, IA64_IPI_DM_INT, 0);
 }
 
+/*
+ * This function sends a reschedule IPI to all (other) CPUs.  This should only be used if
+ * some 'global' task became runnable, such as a RT task, that must be handled now. The
+ * first CPU that manages to grab the task will run it.
+ */
+void
+smp_send_reschedule_all (void)
+{
+	int i;
+
+	for (i = 0; i < smp_num_cpus; i++)
+		if (i != smp_processor_id())
+			smp_send_reschedule(i);
+}
+
 void
 smp_flush_tlb_all (void)
 {
-	smp_call_function ((void (*)(void *))__flush_tlb_all,0,1,1);
+	smp_call_function((void (*)(void *))__flush_tlb_all, 0, 1, 1);
 	__flush_tlb_all();
 }
 
@@ -315,6 +348,15 @@ smp_send_stop (void)
 {
 	send_IPI_allbutself(IPI_CPU_STOP);
 	smp_num_cpus = 1;
+}
+
+void
+smp_migrate_task (int cpu, task_t *p)
+{
+	/* The target CPU will unlock the migration spinlock: */
+	spin_lock(&migration_lock);
+	migrating_task = p;
+	send_IPI_single(cpu, IPI_MIGRATE_TASK);
 }
 
 int __init
