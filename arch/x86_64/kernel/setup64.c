@@ -215,9 +215,6 @@ void __init cpu_init (void)
 
 	asm volatile("pushfq ; popq %%rax ; btr $14,%%rax ; pushq %%rax ; popfq" ::: "eax");
 
-	if (cpu == 0) 
-		early_identify_cpu(&boot_cpu_data);
-
 	syscall_init();
 
 	wrmsrl(MSR_FS_BASE, 0);
