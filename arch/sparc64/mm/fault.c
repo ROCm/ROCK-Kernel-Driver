@@ -149,16 +149,14 @@ static void unhandled_fault(unsigned long address, struct task_struct *tsk,
 	die_if_kernel("Oops", regs);
 }
 
-extern void show_trace_raw(struct thread_info *, unsigned long);
-
 static void bad_kernel_pc(struct pt_regs *regs)
 {
-	unsigned long ksp;
+	unsigned long *ksp;
 
 	printk(KERN_CRIT "OOPS: Bogus kernel PC [%016lx] in fault handler\n",
 	       regs->tpc);
 	__asm__("mov %%sp, %0" : "=r" (ksp));
-	show_trace_raw(current_thread_info(), ksp);
+	show_stack(current, ksp);
 	unhandled_fault(regs->tpc, current, regs);
 }
 

@@ -275,6 +275,7 @@ static int create_workqueue_thread(struct workqueue_struct *wq,
 	INIT_LIST_HEAD(&cwq->worklist);
 	init_waitqueue_head(&cwq->more_work);
 	init_waitqueue_head(&cwq->work_done);
+	init_completion(&cwq->exit);
 
 	init_completion(&startup.done);
 	startup.cwq = cwq;
@@ -320,10 +321,7 @@ static void cleanup_workqueue_thread(struct workqueue_struct *wq, int cpu)
 
 	cwq = wq->cpu_wq + cpu;
 	if (cwq->thread) {
-		printk("Cleaning up workqueue thread for %i\n", cpu);
-		/* Initiate an exit and wait for it: */
-		init_completion(&cwq->exit);
-		wmb(); /* Thread must see !cwq->thread after completion init */
+		/* Tell thread to exit and wait for it. */
 		cwq->thread = NULL;
 		wake_up(&cwq->more_work);
 

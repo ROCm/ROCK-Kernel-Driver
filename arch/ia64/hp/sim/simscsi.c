@@ -350,6 +350,7 @@ simscsi_queuecommand (Scsi_Cmnd *sc, void (*done)(Scsi_Cmnd *))
 			break;
 
 		      case MODE_SENSE:
+		      case MODE_SENSE_10:
 			/* sd.c uses this to determine whether disk does write-caching. */
 			memset(sc->request_buffer, 0, 128);
 			sc->result = GOOD;

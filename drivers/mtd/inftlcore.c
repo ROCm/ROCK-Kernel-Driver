@@ -7,7 +7,7 @@
  * (c) 1999 Machine Vision Holdings, Inc.
  * Author: David Woodhouse <dwmw2@infradead.org>
  *
- * $Id: inftlcore.c,v 1.9 2003/05/23 11:41:47 dwmw2 Exp $
+ * $Id: inftlcore.c,v 1.11 2003/06/23 12:00:08 dwmw2 Exp $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -113,7 +113,7 @@ static void inftl_add_mtd(struct mtd_blktrans_ops *tr, struct mtd_info *mtd)
 			(long)inftl->sectors );
 	}
 
-	if (add_mtd_blktrans_dev) {
+	if (add_mtd_blktrans_dev(&inftl->mbd)) {
 		if (inftl->PUtable)
 			kfree(inftl->PUtable);
 		if (inftl->VUtable)
@@ -835,35 +835,22 @@ foundit:
 	return 0;
 }
 
-
-static int inftl_ioctl(struct mtd_blktrans_dev *dev,
-		     struct inode *inode, struct file *file, 
-		     unsigned int cmd, unsigned long arg)
+static int inftl_getgeo(struct mtd_blktrans_dev *dev, struct hd_geometry *geo)
 {
 	struct NFTLrecord *nftl = (void *)dev;
 
-	switch (cmd) {
-	case HDIO_GETGEO: {
-		struct hd_geometry g;
+	geo->heads = nftl->heads;
+	geo->sectors = nftl->sectors;
+	geo->cylinders = nftl->cylinders;
 
-		g.heads = nftl->heads;
-		g.sectors = nftl->sectors;
-		g.cylinders = nftl->cylinders;
-		g.start = 0;
-		return copy_to_user((void *)arg, &g, sizeof g) ? -EFAULT : 0;
-	}
-
-	default:
-		return -ENOTTY;
-	}
+	return 0;
 }
-
 
 struct mtd_blktrans_ops inftl_tr = {
 	.name		= "inftl",
 	.major		= INFTL_MAJOR,
 	.part_bits	= INFTL_PARTN_BITS,
-	.ioctl		= inftl_ioctl,
+	.getgeo		= inftl_getgeo,
 	.readsect	= inftl_readblock,
 	.writesect	= inftl_writeblock,
 	.add_mtd	= inftl_add_mtd,
@@ -875,7 +862,7 @@ extern char inftlmountrev[];
 
 int __init init_inftl(void)
 {
-	printk(KERN_INFO "INFTL: inftlcore.c $Revision: 1.9 $, "
+	printk(KERN_INFO "INFTL: inftlcore.c $Revision: 1.11 $, "
 		"inftlmount.c %s\n", inftlmountrev);
 
 	return register_mtd_blktrans(&inftl_tr);

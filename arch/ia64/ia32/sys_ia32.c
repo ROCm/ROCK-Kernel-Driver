@@ -420,7 +420,12 @@ ia32_do_mmap (struct file *file, unsigned long addr, unsigned long len, int prot
 		return addr;
 
 	if (len > IA32_PAGE_OFFSET || addr > IA32_PAGE_OFFSET - len)
+	{
+		if (flags & MAP_FIXED)
+			return -ENOMEM;
+		else
 		return -EINVAL;
+	}
 
 	if (OFFSET4K(offset))
 		return -EINVAL;
@@ -519,7 +524,7 @@ sys32_munmap (unsigned int start, unsigned int len)
 #if PAGE_SHIFT <= IA32_PAGE_SHIFT
 	ret = sys_munmap(start, end - start);
 #else
-	if (start > end)
+	if (start >= end)
 		return -EINVAL;
 
 	start = PAGE_ALIGN(start);
@@ -1275,7 +1280,7 @@ semctl32 (int first, int second, int third, void *uptr)
 static int
 do_sys32_msgsnd (int first, int second, int third, void *uptr)
 {
-	struct msgbuf *p = kmalloc(second + sizeof(struct msgbuf) + 4, GFP_USER);
+	struct msgbuf *p = kmalloc(second + sizeof(struct msgbuf), GFP_USER);
 	struct msgbuf32 *up = (struct msgbuf32 *)uptr;
 	mm_segment_t old_fs;
 	int err;
@@ -1317,12 +1322,12 @@ do_sys32_msgrcv (int first, int second, int msgtyp, int third, int version, void
 		msgtyp = ipck.msgtyp;
 	}
 	err = -ENOMEM;
-	p = kmalloc(second + sizeof(struct msgbuf) + 4, GFP_USER);
+	p = kmalloc(second + sizeof(struct msgbuf), GFP_USER);
 	if (!p)
 		goto out;
 	old_fs = get_fs();
 	set_fs(KERNEL_DS);
-	err = sys_msgrcv(first, p, second + 4, msgtyp, third);
+	err = sys_msgrcv(first, p, second, msgtyp, third);
 	set_fs(old_fs);
 	if (err < 0)
 		goto free_then_out;

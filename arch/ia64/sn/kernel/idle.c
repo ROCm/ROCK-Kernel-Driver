@@ -12,7 +12,7 @@
 
 void snidle(int state) {
 	if (state) {
-		if (pda.idle_flag == 0) {
+		if (pda->idle_flag == 0) {
 			/* 
 			 * Turn the activity LED off.
 			 */
@@ -24,13 +24,13 @@ void snidle(int state) {
 			SIMULATOR_SLEEP();
 #endif
 
-		pda.idle_flag = 1;
+		pda->idle_flag = 1;
 	} else {
 		/* 
 		 * Turn the activity LED on.
 		 */
 		set_led_bits(LED_CPU_ACTIVITY, LED_CPU_ACTIVITY);
 
-		pda.idle_flag = 0;
+		pda->idle_flag = 0;
 	}
 }

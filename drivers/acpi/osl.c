@@ -250,7 +250,14 @@ acpi_os_install_interrupt_handler(u32 irq, OSD_HANDLER handler, void *context)
 	irq = acpi_fadt.sci_int;
 
 #ifdef CONFIG_IA64
-	irq = gsi_to_vector(irq);
+	int vector;
+
+	vector = acpi_irq_to_vector(irq);
+	if (vector < 0) {
+		printk(KERN_ERR PREFIX "SCI (IRQ%d) not registerd\n", irq);
+		return AE_OK;
+	}
+	irq = vector;
 #endif
 	acpi_irq_irq = irq;
 	acpi_irq_handler = handler;
@@ -268,7 +275,7 @@ acpi_os_remove_interrupt_handler(u32 irq, OSD_HANDLER handler)
 {
 	if (acpi_irq_handler) {
 #ifdef CONFIG_IA64
-		irq = gsi_to_vector(irq);
+		irq = acpi_irq_to_vector(irq);
 #endif
 		free_irq(irq, acpi_irq);
 		acpi_irq_handler = NULL;
@@ -933,7 +940,7 @@ acpi_os_get_line(char *buffer)
 }
 
 /* Assumes no unreadable holes inbetween */
-u8
+BOOLEAN
 acpi_os_readable(void *ptr, acpi_size len)
 {
 #if defined(__i386__) || defined(__x86_64__) 
@@ -943,7 +950,7 @@ acpi_os_readable(void *ptr, acpi_size len)
 	return 1;
 }
 
-u8
+BOOLEAN
 acpi_os_writable(void *ptr, acpi_size len)
 {
 	/* could do dummy write (racy) or a kernel page table lookup.

@@ -575,59 +575,6 @@ acpi_find_rsdp (void)
 }
 
 
-#ifdef CONFIG_SERIAL_8250_ACPI
-
-#include <linux/acpi_serial.h>
-
-static int __init
-acpi_parse_spcr (unsigned long phys_addr, unsigned long size)
-{
-	acpi_ser_t *spcr;
-	unsigned int gsi;
-
-	if (!phys_addr || !size)
-		return -EINVAL;
-
-	if (!iosapic_register_intr)
-		return -ENODEV;
-
-	/*
-	 * ACPI is able to describe serial ports that live at non-standard
-	 * memory addresses and use non-standard interrupts, either via
-	 * direct SAPIC mappings or via PCI interrupts.  We handle interrupt
-	 * routing for SAPIC-based (non-PCI) devices here.  Interrupt routing
-	 * for PCI devices will be handled when processing the PCI Interrupt
-	 * Routing Table (PRT).
-	 */
-
-	spcr = (acpi_ser_t *) __va(phys_addr);
-
-	setup_serial_acpi(spcr);
-
-	if (spcr->length < sizeof(acpi_ser_t))
-		/* Table not long enough for full info, thus no interrupt */
-		return -ENODEV;
-
-	if ((spcr->base_addr.space_id != ACPI_SERIAL_PCICONF_SPACE) &&
-	    (spcr->int_type == ACPI_SERIAL_INT_SAPIC))
-	{
-		int vector;
-
-		/* We have a UART in memory space with an SAPIC interrupt */
-
-		gsi = (  (spcr->global_int[3] << 24) |
-			 (spcr->global_int[2] << 16) |
-			 (spcr->global_int[1] << 8)  |
-			 (spcr->global_int[0])  );
-
-		vector = iosapic_register_intr(gsi, IOSAPIC_POL_HIGH, IOSAPIC_EDGE);
-	}
-	return 0;
-}
-
-#endif /* CONFIG_SERIAL_8250_ACPI */
-
-
 int __init
 acpi_boot_init (void)
 {
@@ -681,16 +628,6 @@ acpi_boot_init (void)
 	 */
 	if (acpi_table_parse(ACPI_FADT, acpi_parse_fadt) < 1)
 		printk(KERN_ERR PREFIX "Can't find FADT\n");
-
-#ifdef CONFIG_SERIAL_8250_ACPI
-	/*
-	 * TBD: Need phased approach to table parsing (only do those absolutely
-	 *      required during boot-up).  Recommend expanding concept of fix-
-	 *      feature devices (LDM) to include table-based devices such as
-	 *      serial ports, EC, SMBus, etc.
-	 */
-	acpi_table_parse(ACPI_SPCR, acpi_parse_spcr);
-#endif
 
 #ifdef CONFIG_SMP
 	smp_boot_data.cpu_count = available_cpus;

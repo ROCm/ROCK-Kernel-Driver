@@ -2,7 +2,7 @@
  * Handle mapping of the flash memory access routines 
  * on TQM8xxL based devices.
  *
- * $Id: tqm8xxl.c,v 1.8 2003/05/21 12:45:20 dwmw2 Exp $
+ * $Id: tqm8xxl.c,v 1.9 2003/06/23 11:48:18 dwmw2 Exp $
  *
  * based on rpxlite.c
  *
@@ -110,8 +110,6 @@ static struct mtd_partition tqm8xxl_fs_partitions[] = {
 };
 #endif
 
-#define NB_OF(x)  (sizeof(x)/sizeof(x[0]))
-
 int __init init_tqm_mtd(void)
 {
 	int idx = 0, ret = 0;
@@ -198,11 +196,11 @@ int __init init_tqm_mtd(void)
 	 */
 	part_banks[0].mtd_part = tqm8xxl_partitions;
 	part_banks[0].type = "Static image";
-	part_banks[0].nums = NB_OF(tqm8xxl_partitions);
+	part_banks[0].nums = ARRAY_SIZE(tqm8xxl_partitions);
 
 	part_banks[1].mtd_part = tqm8xxl_fs_partitions;
 	part_banks[1].type = "Static file system";
-	part_banks[1].nums = NB_OF(tqm8xxl_fs_partitions);
+	part_banks[1].nums = ARRAY_SIZE(tqm8xxl_fs_partitions);
 
 	for(idx = 0; idx < num_banks ; idx++) {
 		if (part_banks[idx].nums == 0) {

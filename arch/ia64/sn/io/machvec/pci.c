@@ -49,6 +49,8 @@ int sn_read_config(struct pci_bus *bus, unsigned int devfn, int where, int size,
 	vertex_hdl_t device_vertex;
 
 	device_vertex = devfn_to_vertex(bus->number, devfn);
+	if (!device_vertex)
+		return PCIBIOS_DEVICE_NOT_FOUND;
 	res = pciio_config_get(device_vertex, (unsigned) where, size);
 	*val = (unsigned int) res;
 	return PCIBIOS_SUCCESSFUL;
@@ -59,6 +61,8 @@ int sn_write_config(struct pci_bus *bus, unsigned int devfn, int where, int size
 	vertex_hdl_t device_vertex;
 
 	device_vertex = devfn_to_vertex(bus->number, devfn);
+	if (!device_vertex)
+		return PCIBIOS_DEVICE_NOT_FOUND;
 	pciio_config_set( device_vertex, (unsigned)where, size, (uint64_t) val);
 	return PCIBIOS_SUCCESSFUL;
 }

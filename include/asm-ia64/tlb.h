@@ -39,6 +39,7 @@
  */
 #include <linux/config.h>
 #include <linux/mm.h>
+#include <linux/swap.h>
 
 #include <asm/processor.h>
 #include <asm/tlbflush.h>

@@ -119,7 +119,7 @@ typedef struct _efivar_entry_t {
 */
 static spinlock_t efivars_lock = SPIN_LOCK_UNLOCKED;
 static LIST_HEAD(efivar_list);
-static struct proc_dir_entry *efi_vars_dir = NULL;
+static struct proc_dir_entry *efi_vars_dir;
 
 #define efivar_entry(n) list_entry(n, efivar_entry_t, list)
 

@@ -16,7 +16,7 @@
    along with this program; if not, write to the Free Software
    Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA
 
-   $Id: elan-104nc.c,v 1.17 2003/05/21 15:15:07 dwmw2 Exp $
+   $Id: elan-104nc.c,v 1.18 2003/06/23 07:37:02 dwmw2 Exp $
 
 The ELAN-104NC has up to 8 Mibyte of Intel StrataFlash (28F320/28F640) in x16
 mode.  This drivers uses the CFI probe and Intel Extended Command Set drivers.
@@ -223,30 +223,19 @@ static void cleanup_elan_104nc(void)
 	}
 
 	iounmap((void *)iomapadr);
-	release_region(PAGE_IO,PAGE_IO_SIZE);
 }
 
 int __init init_elan_104nc(void)
 {
-	/* Urg! We use I/O port 0x22 without request_region()ing it */
-	/*
-	if (check_region(PAGE_IO,PAGE_IO_SIZE) != 0) {
-		printk( KERN_ERR"%s: IO ports 0x%x-0x%x in use\n",
-			elan_104nc_map.name,
-			PAGE_IO, PAGE_IO+PAGE_IO_SIZE-1 );
-		return -EAGAIN;
-	}
-	*/
+	/* Urg! We use I/O port 0x22 without request_region()ing it,
+	   because it's already allocated to the PIC. */
+
   	iomapadr = (unsigned long)ioremap(WINDOW_START, WINDOW_LENGTH);
 	if (!iomapadr) {
 		printk( KERN_ERR"%s: failed to ioremap memory region\n",
 			elan_104nc_map.name );
 		return -EIO;
 	}
-
-	/*
-	request_region( PAGE_IO, PAGE_IO_SIZE, "ELAN-104NC flash" );
-	*/
 
 	printk( KERN_INFO"%s: IO:0x%x-0x%x MEM:0x%x-0x%x\n",
 		elan_104nc_map.name,

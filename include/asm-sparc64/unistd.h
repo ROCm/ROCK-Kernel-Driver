@@ -252,8 +252,8 @@
 #endif
 /* #define __NR_oldstat         232    Linux Specific                              */
 #define __NR_stime              233 /* Linux Specific                              */
-/* #define __NR_UNUSED          234 */
-/* #define __NR_UNUSED          235 */
+#define __NR_statfs64           234 /* Linux Specific                              */
+#define __NR_fstatfs64          235 /* Linux Specific                              */
 #define __NR__llseek            236 /* Linux Specific                              */
 #define __NR_mlock              237
 #define __NR_munlock            238
@@ -274,6 +274,11 @@
 #define __NR_fdatasync          253
 #define __NR_nfsservctl         254
 #define __NR_aplib              255
+/* WARNING: You MAY NOT add syscall numbers larger than 255, since
+ *          all of the syscall tables in the Sparc64 kernel are
+ *          sized to have 256 entries (starting at zero).  Therefore
+ *          find a free slot in the 0-255 range.
+ */
 
 #define _syscall0(type,name) \
 type name(void) \
