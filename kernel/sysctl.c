@@ -710,10 +710,12 @@ static ctl_table vm_table[] = {
 	 {
 		.ctl_name	= VM_HUGETLB_PAGES,
 		.procname	= "nr_hugepages",
-		.data		= &htlbpage_max,
-		.maxlen		= sizeof(int),
+		.data		= &max_huge_pages,
+		.maxlen		= sizeof(unsigned long),
 		.mode		= 0644,
 		.proc_handler	= &hugetlb_sysctl_handler,
+		.extra1		= (void *)&hugetlb_zero,
+		.extra2		= (void *)&hugetlb_infinity,
 	 },
 #endif
 	{
