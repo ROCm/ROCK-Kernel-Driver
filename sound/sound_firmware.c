@@ -1,10 +1,8 @@
 #include <linux/vmalloc.h>
-#define __KERNEL_SYSCALLS__
 #include <linux/module.h>
 #include <linux/fs.h>
 #include <linux/mm.h>
 #include <linux/slab.h>
-#include <linux/unistd.h>
 #include <asm/uaccess.h>
 
 static int do_mod_firmware_load(const char *fn, char **fp)

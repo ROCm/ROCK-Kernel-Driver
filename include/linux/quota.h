@@ -280,7 +280,8 @@ struct quota_format_type {
 struct quota_info {
 	unsigned int flags;			/* Flags for diskquotas on this device */
 	struct semaphore dqio_sem;		/* lock device while I/O in progress */
-	struct rw_semaphore dqoff_sem;		/* serialize quota_off() and quota_on() on device and ops using quota_info struct, pointers from inode to dquots */
+	struct semaphore dqonoff_sem;		/* Serialize quotaon & quotaoff */
+	struct rw_semaphore dqptr_sem;		/* serialize ops using quota_info struct, pointers from inode to dquots */
 	struct file *files[MAXQUOTAS];		/* fp's to quotafiles */
 	struct mem_dqinfo info[MAXQUOTAS];	/* Information for each quota type */
 	struct quota_format_ops *ops[MAXQUOTAS];	/* Operations for each type */

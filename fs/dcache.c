@@ -1147,21 +1147,24 @@ static char * __d_path( struct dentry *dentry, struct vfsmount *vfsmnt,
 		namelen = dentry->d_name.len;
 		buflen -= namelen + 1;
 		if (buflen < 0)
-			break;
+			return ERR_PTR(-ENAMETOOLONG);
 		end -= namelen;
 		memcpy(end, dentry->d_name.name, namelen);
 		*--end = '/';
 		retval = end;
 		dentry = parent;
 	}
+
 	return retval;
+
 global_root:
 	namelen = dentry->d_name.len;
 	buflen -= namelen;
 	if (buflen >= 0) {
 		retval -= namelen-1;	/* hit the slash */
 		memcpy(retval, dentry->d_name.name, namelen);
-	}
+	} else
+		retval = ERR_PTR(-ENAMETOOLONG);
 	return retval;
 }
 
@@ -1229,6 +1232,10 @@ asmlinkage long sys_getcwd(char *buf, unsigned long size)
 		cwd = __d_path(pwd, pwdmnt, root, rootmnt, page, PAGE_SIZE);
 		spin_unlock(&dcache_lock);
 
+		error = PTR_ERR(cwd);
+		if (IS_ERR(cwd))
+			goto out;
+
 		error = -ERANGE;
 		len = PAGE_SIZE + page - cwd;
 		if (len <= size) {
@@ -1238,6 +1245,8 @@ asmlinkage long sys_getcwd(char *buf, unsigned long size)
 		}
 	} else
 		spin_unlock(&dcache_lock);
+
+out:
 	dput(pwd);
 	mntput(pwdmnt);
 	dput(root);

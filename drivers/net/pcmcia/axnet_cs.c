@@ -203,6 +203,7 @@ static dev_link_t *axnet_attach(void)
     link = &info->link; dev = &info->dev;
     link->priv = info;
     
+    init_timer(&link->release);
     link->release.function = &axnet_release;
     link->release.data = (u_long)link;
     link->irq.Attributes = IRQ_TYPE_EXCLUSIVE;

@@ -873,12 +873,10 @@ int prepare_binprm(struct linux_binprm *bprm)
 
 void compute_creds(struct linux_binprm *bprm) 
 {
-	int do_unlock = 0;
-
+	task_lock(current);
 	if (bprm->e_uid != current->uid || bprm->e_gid != current->gid) {
                 current->mm->dumpable = 0;
 		
-		lock_kernel();
 		if (must_not_trace_exec(current)
 		    || atomic_read(&current->fs->count) > 1
 		    || atomic_read(&current->files->count) > 1
@@ -888,14 +886,12 @@ void compute_creds(struct linux_binprm *bprm)
 				bprm->e_gid = current->gid;
 			}
 		}
-		do_unlock = 1;
 	}
 
         current->suid = current->euid = current->fsuid = bprm->e_uid;
         current->sgid = current->egid = current->fsgid = bprm->e_gid;
 
-	if(do_unlock)
-		unlock_kernel();
+	task_unlock(current);
 
 	security_bprm_compute_creds(bprm);
 }

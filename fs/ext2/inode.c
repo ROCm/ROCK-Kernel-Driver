@@ -1239,6 +1239,12 @@ int ext2_setattr(struct dentry *dentry, struct iattr *iattr)
 	error = inode_change_ok(inode, iattr);
 	if (error)
 		return error;
+	if ((iattr->ia_valid & ATTR_UID && iattr->ia_uid != inode->i_uid) ||
+	    (iattr->ia_valid & ATTR_GID && iattr->ia_gid != inode->i_gid)) {
+		error = DQUOT_TRANSFER(inode, iattr) ? -EDQUOT : 0;
+		if (error)
+			return error;
+	}
 	inode_setattr(inode, iattr);
 	if (iattr->ia_valid & ATTR_MODE)
 		error = ext2_acl_chmod(inode);

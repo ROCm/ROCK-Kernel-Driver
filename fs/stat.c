@@ -316,3 +316,45 @@ asmlinkage long sys_fstat64(unsigned long fd, struct stat64 * statbuf, long flag
 }
 
 #endif /* LFS-64 */
+
+void inode_add_bytes(struct inode *inode, loff_t bytes)
+{
+	spin_lock(&inode->i_lock);
+	inode->i_blocks += bytes >> 9;
+	bytes &= 511;
+	inode->i_bytes += bytes;
+	if (inode->i_bytes >= 512) {
+		inode->i_blocks++;
+		inode->i_bytes -= 512;
+	}
+	spin_unlock(&inode->i_lock);
+}
+
+void inode_sub_bytes(struct inode *inode, loff_t bytes)
+{
+	spin_lock(&inode->i_lock);
+	inode->i_blocks -= bytes >> 9;
+	bytes &= 511;
+	if (inode->i_bytes < bytes) {
+		inode->i_blocks--;
+		inode->i_bytes += 512;
+	}
+	inode->i_bytes -= bytes;
+	spin_unlock(&inode->i_lock);
+}
+
+loff_t inode_get_bytes(struct inode *inode)
+{
+	loff_t ret;
+
+	spin_lock(&inode->i_lock);
+	ret = (((loff_t)inode->i_blocks) << 9) + inode->i_bytes;
+	spin_unlock(&inode->i_lock);
+	return ret;
+}
+
+void inode_set_bytes(struct inode *inode, loff_t bytes)
+{
+	inode->i_blocks = bytes >> 9;
+	inode->i_bytes = bytes & 511;
+}
