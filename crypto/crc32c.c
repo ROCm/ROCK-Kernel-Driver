@@ -56,12 +56,12 @@ static int chksum_setkey(void *ctx, const u8 *key, unsigned int keylen,
 	return 0;
 }
 
-static void chksum_update(void *ctx, const u8 *data, size_t length)
+static void chksum_update(void *ctx, const u8 *data, unsigned int length)
 {
 	struct chksum_ctx *mctx = ctx;
 	u32 mcrc;
 
-	mcrc = crc32c(mctx->crc, data, length);
+	mcrc = crc32c(mctx->crc, data, (size_t)length);
 
 	mctx->crc = mcrc;
 }

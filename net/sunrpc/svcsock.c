@@ -781,13 +781,15 @@ svc_tcp_accept(struct svc_sock *svsk)
 	if (!sock)
 		return;
 
-	if (!(newsock = sock_alloc())) {
-		printk(KERN_WARNING "%s: no more sockets!\n", serv->sv_name);
+	err = sock_create_lite(PF_INET, SOCK_STREAM, IPPROTO_TCP, &newsock);
+	if (err) {
+		if (err == -ENOMEM)
+			printk(KERN_WARNING "%s: no more sockets!\n",
+			       serv->sv_name);
 		return;
 	}
-	dprintk("svc: tcp_accept %p allocated\n", newsock);
 
-	newsock->type = sock->type;
+	dprintk("svc: tcp_accept %p allocated\n", newsock);
 	newsock->ops = ops = sock->ops;
 
 	clear_bit(SK_CONN, &svsk->sk_flags);
@@ -1413,7 +1415,7 @@ svc_create_socket(struct svc_serv *serv, int protocol, struct sockaddr_in *sin)
 	}
 	type = (protocol == IPPROTO_UDP)? SOCK_DGRAM : SOCK_STREAM;
 
-	if ((error = sock_create(PF_INET, type, protocol, &sock)) < 0)
+	if ((error = sock_create_kern(PF_INET, type, protocol, &sock)) < 0)
 		return error;
 
 	if (sin != NULL) {

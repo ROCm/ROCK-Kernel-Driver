@@ -840,6 +840,27 @@ static int sock_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	return err;
 }
 
+int sock_create_lite(int family, int type, int protocol, struct socket **res)
+{
+	int err;
+	struct socket *sock = NULL;
+	
+	err = security_socket_create(family, type, protocol, 1);
+	if (err)
+		goto out;
+
+	sock = sock_alloc();
+	if (!sock) {
+		err = -ENOMEM;
+		goto out;
+	}
+
+	security_socket_post_create(sock, family, type, protocol, 1);
+	sock->type = type;
+out:
+	*res = sock;
+	return err;
+}
 
 /* No kernel lock held - perfect */
 static unsigned int sock_poll(struct file *file, poll_table * wait)
@@ -983,8 +1004,7 @@ int sock_wake_async(struct socket *sock, int how, int band)
 	return 0;
 }
 
-
-int sock_create(int family, int type, int protocol, struct socket **res)
+static int __sock_create(int family, int type, int protocol, struct socket **res, int kern)
 {
 	int i;
 	int err;
@@ -1012,7 +1032,7 @@ int sock_create(int family, int type, int protocol, struct socket **res)
 		family = PF_PACKET;
 	}
 
-	err = security_socket_create(family, type, protocol);
+	err = security_socket_create(family, type, protocol, kern);
 	if (err)
 		return err;
 		
@@ -1075,7 +1095,7 @@ int sock_create(int family, int type, int protocol, struct socket **res)
 	 */
 	module_put(net_families[family]->owner);
 	*res = sock;
-	security_socket_post_create(sock, family, type, protocol);
+	security_socket_post_create(sock, family, type, protocol, kern);
 
 out:
 	net_family_read_unlock();
@@ -1085,6 +1105,16 @@ out_module_put:
 out_release:
 	sock_release(sock);
 	goto out;
+}
+
+int sock_create(int family, int type, int protocol, struct socket **res)
+{
+	return __sock_create(family, type, protocol, res, 0);
+}
+
+int sock_create_kern(int family, int type, int protocol, struct socket **res)
+{
+	return __sock_create(family, type, protocol, res, 1);
 }
 
 asmlinkage long sys_socket(int family, int type, int protocol)
@@ -1991,6 +2021,8 @@ EXPORT_SYMBOL(move_addr_to_user);
 EXPORT_SYMBOL(sock_alloc);
 EXPORT_SYMBOL(sock_alloc_inode);
 EXPORT_SYMBOL(sock_create);
+EXPORT_SYMBOL(sock_create_kern);
+EXPORT_SYMBOL(sock_create_lite);
 EXPORT_SYMBOL(sock_map_fd);
 EXPORT_SYMBOL(sock_recvmsg);
 EXPORT_SYMBOL(sock_register);

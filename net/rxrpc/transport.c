@@ -86,7 +86,7 @@ int rxrpc_create_transport(unsigned short port,
 	trans->port = port;
 
 	/* create a UDP socket to be my actual transport endpoint */
-	ret = sock_create(PF_INET, SOCK_DGRAM, IPPROTO_UDP, &trans->socket);
+	ret = sock_create_kern(PF_INET, SOCK_DGRAM, IPPROTO_UDP, &trans->socket);
 	if (ret < 0)
 		goto error;
 

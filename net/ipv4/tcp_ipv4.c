@@ -2609,7 +2609,7 @@ struct proto tcp_prot = {
 
 void __init tcp_v4_init(struct net_proto_family *ops)
 {
-	int err = sock_create(PF_INET, SOCK_RAW, IPPROTO_TCP, &tcp_socket);
+	int err = sock_create_kern(PF_INET, SOCK_RAW, IPPROTO_TCP, &tcp_socket);
 	if (err < 0)
 		panic("Failed to create the TCP control socket.\n");
 	tcp_socket->sk->sk_allocation   = GFP_ATOMIC;

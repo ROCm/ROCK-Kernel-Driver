@@ -1108,8 +1108,8 @@ void __init icmp_init(struct net_proto_family *ops)
 		if (!cpu_possible(i))
 			continue;
 
-		err = sock_create(PF_INET, SOCK_RAW, IPPROTO_ICMP,
-				  &per_cpu(__icmp_socket, i));
+		err = sock_create_kern(PF_INET, SOCK_RAW, IPPROTO_ICMP,
+				       &per_cpu(__icmp_socket, i));
 
 		if (err < 0)
 			panic("Failed to create the ICMP control socket.\n");

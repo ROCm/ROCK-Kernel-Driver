@@ -158,7 +158,8 @@ static int rfcomm_l2sock_create(struct socket **sock)
 
 	BT_DBG("");
 
-	err = sock_create(PF_BLUETOOTH, SOCK_SEQPACKET, BTPROTO_L2CAP, sock);
+	err = sock_create_kern(PF_BLUETOOTH, SOCK_SEQPACKET,
+			       BTPROTO_L2CAP, sock);
 	if (!err) {
 		struct sock *sk = (*sock)->sk;
 		sk->sk_data_ready   = rfcomm_l2data_ready;
@@ -1641,11 +1642,9 @@ static inline void rfcomm_accept_connection(struct rfcomm_session *s)
 
 	BT_DBG("session %p", s);
 
-	nsock = sock_alloc();
-	if (!nsock)
+	if (sock_create_lite(PF_BLUETOOTH, SOCK_SEQPACKET, BTPROTO_L2CAP, &nsock))
 		return;
-
-	nsock->type = sock->type;
+	
 	nsock->ops  = sock->ops;
 
 	__module_get(nsock->ops->owner);

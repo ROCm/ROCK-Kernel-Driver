@@ -97,6 +97,9 @@ int sysctl_tcp_vegas_cong_avoid;
 int sysctl_tcp_vegas_alpha = 1<<V_PARAM_SHIFT;
 int sysctl_tcp_vegas_beta  = 3<<V_PARAM_SHIFT;
 int sysctl_tcp_vegas_gamma = 1<<V_PARAM_SHIFT;
+int sysctl_tcp_bic;
+int sysctl_tcp_bic_fast_convergence = 1;
+int sysctl_tcp_bic_low_window = 14;
 
 #define FLAG_DATA		0x01 /* Incoming frame contained data.		*/
 #define FLAG_WIN_UPDATE		0x02 /* Incoming ACK was a window update.	*/
@@ -1858,6 +1861,68 @@ tcp_ack_update_rtt(struct tcp_opt *tp, int flag, s32 seq_rtt)
 	else if (seq_rtt >= 0)
 		tcp_ack_no_tstamp(tp, seq_rtt, flag);
 }
+
+/*
+ * Compute congestion window to use.
+ *
+ * This is from the implementation of BICTCP in
+ * Lison-Xu, Kahaled Harfoush, and Injog Rhee.
+ *  "Binary Increase Congestion Control for Fast, Long Distance
+ *  Networks" in InfoComm 2004
+ * Available from:
+ *  http://www.csc.ncsu.edu/faculty/rhee/export/bitcp.pdf
+ *
+ * Unless BIC is enabled and congestion window is large
+ * this behaves the same as the original Reno.
+ */
+static inline __u32 bictcp_cwnd(struct tcp_opt *tp)
+{
+	/* orignal Reno behaviour */
+	if (!sysctl_tcp_bic)
+		return tp->snd_cwnd;
+
+	if (tp->bictcp.last_cwnd == tp->snd_cwnd)
+		return tp->bictcp.cnt; /*  same cwnd, no update */
+      
+	tp->bictcp.last_cwnd = tp->snd_cwnd;
+      
+	/* start off normal */
+	if (tp->snd_cwnd <= sysctl_tcp_bic_low_window)
+		tp->bictcp.cnt = tp->snd_cwnd;
+
+	/* binary increase */
+	else if (tp->snd_cwnd < tp->bictcp.last_max_cwnd) {
+		__u32 	dist = (tp->bictcp.last_max_cwnd - tp->snd_cwnd)
+			/ BICTCP_B;
+
+		if (dist > BICTCP_MAX_INCREMENT)
+			/* linear increase */
+			tp->bictcp.cnt = tp->snd_cwnd / BICTCP_MAX_INCREMENT;
+		else if (dist <= 1U)
+			/* binary search increase */
+			tp->bictcp.cnt = tp->snd_cwnd * BICTCP_FUNC_OF_MIN_INCR
+				/ BICTCP_B;
+		else
+			/* binary search increase */
+			tp->bictcp.cnt = tp->snd_cwnd / dist;
+	} else {
+		/* slow start amd linear increase */
+		if (tp->snd_cwnd < tp->bictcp.last_max_cwnd + BICTCP_B)
+			/* slow start */
+			tp->bictcp.cnt = tp->snd_cwnd * BICTCP_FUNC_OF_MIN_INCR
+				/ BICTCP_B;
+		else if (tp->snd_cwnd < tp->bictcp.last_max_cwnd
+			 		+ BICTCP_MAX_INCREMENT*(BICTCP_B-1))
+			/* slow start */
+			tp->bictcp.cnt = tp->snd_cwnd * (BICTCP_B-1)
+				/ (tp->snd_cwnd-tp->bictcp.last_max_cwnd);
+		else
+			/* linear increase */
+			tp->bictcp.cnt = tp->snd_cwnd / BICTCP_MAX_INCREMENT;
+	}
+	return tp->bictcp.cnt;
+}
+
 /* This is Jacobson's slow start and congestion avoidance. 
  * SIGCOMM '88, p. 328.
  */
@@ -1871,7 +1936,7 @@ static __inline__ void reno_cong_avoid(struct tcp_opt *tp)
                 /* In dangerous area, increase slowly.
 		 * In theory this is tp->snd_cwnd += 1 / tp->snd_cwnd
 		 */
-		if (tp->snd_cwnd_cnt >= tp->snd_cwnd) {
+		if (tp->snd_cwnd_cnt >= bictcp_cwnd(tp)) {
 			if (tp->snd_cwnd < tp->snd_cwnd_clamp)
 				tp->snd_cwnd++;
 			tp->snd_cwnd_cnt=0;

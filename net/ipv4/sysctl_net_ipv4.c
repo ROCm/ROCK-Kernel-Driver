@@ -641,6 +641,30 @@ ctl_table ipv4_table[] = {
 		.mode		= 0644,
 		.proc_handler	= &proc_dointvec,
 	},
+	{
+		.ctl_name	= NET_TCP_BIC,
+		.procname	= "tcp_bic",
+		.data		= &sysctl_tcp_bic,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},
+	{
+		.ctl_name	= NET_TCP_BIC_FAST_CONVERGENCE,
+		.procname	= "tcp_bic_fast_convergence",
+		.data		= &sysctl_tcp_bic_fast_convergence,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},
+	{
+		.ctl_name	= NET_TCP_BIC_LOW_WINDOW,
+		.procname	= "tcp_bic_low_window",
+		.data		= &sysctl_tcp_bic_low_window,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},
 	{ .ctl_name = 0 }
 };
 

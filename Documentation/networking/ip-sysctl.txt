@@ -316,6 +316,30 @@ tcp_vegas_cong_avoid - BOOLEAN
 	not as aggressive as TCP Reno.
 	Default:0
 
+tcp_bic - BOOLEAN
+	Enable BIC TCP congestion control algorithm.
+	BIC-TCP is a sender-side only change that ensures a linear RTT
+	fairness under large windows while offering both scalability and
+	bounded TCP-friendliness. The protocol combines two schemes
+	called additive increase and binary search increase. When the
+	congestion window is large, additive increase with a large
+	increment ensures linear RTT fairness as well as good
+	scalability. Under small congestion windows, binary search
+	increase provides TCP friendliness.
+	Default: 0
+
+tcp_bic_low_window - INTEGER
+	Sets the threshold window (in packets) where BIC TCP starts to
+	adjust the congestion window. Below this threshold BIC TCP behaves
+	the same as the default TCP Reno. 
+	Default: 14
+
+tcp_bic_fast_convergence - BOOLEAN
+	Forces BIC TCP to more quickly respond to changes in congestion
+	window. Allows two flows sharing the same connection to converge
+	more rapidly.
+	Default: 1
+
 ip_local_port_range - 2 INTEGERS
 	Defines the local port range that is used by TCP and UDP to
 	choose the local port. The first number is the first, the 

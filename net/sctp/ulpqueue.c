@@ -79,7 +79,7 @@ fail:
 struct sctp_ulpq *sctp_ulpq_init(struct sctp_ulpq *ulpq,
 				 struct sctp_association *asoc)
 {
-	memset(ulpq, sizeof(struct sctp_ulpq), 0x00);
+	memset(ulpq, 0, sizeof(struct sctp_ulpq));
 
 	ulpq->asoc = asoc;
 	skb_queue_head_init(&ulpq->reasm);

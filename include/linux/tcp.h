@@ -400,6 +400,13 @@ struct tcp_opt {
 		__u32	minRTT;		/* min of RTTs measured within last RTT (in usec) */
 		__u32	baseRTT;	/* the min of all Vegas RTT measurements seen (in usec) */
 	} vegas;
+
+	/* BI TCP Parameters */
+	struct {
+		__u32	cnt;		/* increase cwnd by 1 after this number of ACKs */
+		__u32 	last_max_cwnd;	/* last maximium snd_cwnd */
+		__u32	last_cwnd;	/* the last snd_cwnd */
+	} bictcp;
 };
 
 /* WARNING: don't change the layout of the members in tcp_sock! */

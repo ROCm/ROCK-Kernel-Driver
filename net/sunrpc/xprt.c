@@ -1567,7 +1567,7 @@ static struct socket * xprt_create_socket(struct rpc_xprt *xprt, int proto, int 
 
 	type = (proto == IPPROTO_UDP)? SOCK_DGRAM : SOCK_STREAM;
 
-	if ((err = sock_create(PF_INET, type, proto, &sock)) < 0) {
+	if ((err = sock_create_kern(PF_INET, type, proto, &sock)) < 0) {
 		printk("RPC: can't create socket (%d).\n", -err);
 		return NULL;
 	}

@@ -509,6 +509,25 @@ static __inline__ int tcp_sk_listen_hashfn(struct sock *sk)
 # define TCP_TW_RECYCLE_TICK (12+2-TCP_TW_RECYCLE_SLOTS_LOG)
 #endif
 
+#define BICTCP_1_OVER_BETA	8	/*
+					 * Fast recovery
+					 * multiplicative decrease factor
+					 */
+#define BICTCP_MAX_INCREMENT 32		/*
+					 * Limit on the amount of
+					 * increment allowed during
+					 * binary search.
+					 */
+#define BICTCP_FUNC_OF_MIN_INCR 11	/*
+					 * log(B/Smin)/log(B/(B-1))+1,
+					 * Smin:min increment
+					 * B:log factor
+					 */
+#define BICTCP_B		4	 /*
+					  * In binary search,
+					  * go to point (max+min)/N
+					  */
+
 /*
  *	TCP option
  */
@@ -588,6 +607,9 @@ extern int sysctl_tcp_vegas_alpha;
 extern int sysctl_tcp_vegas_beta;
 extern int sysctl_tcp_vegas_gamma;
 extern int sysctl_tcp_nometrics_save;
+extern int sysctl_tcp_bic;
+extern int sysctl_tcp_bic_fast_convergence;
+extern int sysctl_tcp_bic_low_window;
 
 extern atomic_t tcp_memory_allocated;
 extern atomic_t tcp_sockets_allocated;
@@ -1207,11 +1229,30 @@ static __inline__ unsigned int tcp_packets_in_flight(struct tcp_opt *tp)
 
 /* Recalculate snd_ssthresh, we want to set it to:
  *
+ * Reno:
  * 	one half the current congestion window, but no
  *	less than two segments
+ *
+ * BIC:
+ *	behave like Reno until low_window is reached,
+ *	then increase congestion window slowly
  */
 static inline __u32 tcp_recalc_ssthresh(struct tcp_opt *tp)
 {
+	if (sysctl_tcp_bic) {
+		if (sysctl_tcp_bic_fast_convergence &&
+		    tp->snd_cwnd < tp->bictcp.last_max_cwnd)
+			tp->bictcp.last_max_cwnd
+				= (tp->snd_cwnd * (2*BICTCP_1_OVER_BETA-1))
+				/ (BICTCP_1_OVER_BETA/2);
+		else
+			tp->bictcp.last_max_cwnd = tp->snd_cwnd;
+
+		if (tp->snd_cwnd > sysctl_tcp_bic_low_window)
+			return max(tp->snd_cwnd - (tp->snd_cwnd/BICTCP_1_OVER_BETA),
+				   2U);
+	}
+
 	return max(tp->snd_cwnd >> 1U, 2U);
 }
 

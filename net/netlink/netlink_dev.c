@@ -112,7 +112,7 @@ static int netlink_open(struct inode * inode, struct file * file)
 	if (test_and_set_bit(minor, &open_map))
 		return -EBUSY;
 
-	err = sock_create(PF_NETLINK, SOCK_RAW, minor, &sock);
+	err = sock_create_kern(PF_NETLINK, SOCK_RAW, minor, &sock);
 	if (err < 0)
 		goto out;
 

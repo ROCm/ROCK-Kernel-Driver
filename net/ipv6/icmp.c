@@ -682,8 +682,8 @@ int __init icmpv6_init(struct net_proto_family *ops)
 		if (!cpu_possible(i))
 			continue;
 
-		err = sock_create(PF_INET6, SOCK_RAW, IPPROTO_ICMPV6,
-				  &per_cpu(__icmpv6_socket, i));
+		err = sock_create_kern(PF_INET6, SOCK_RAW, IPPROTO_ICMPV6,
+				       &per_cpu(__icmpv6_socket, i));
 		if (err < 0) {
 			printk(KERN_ERR
 			       "Failed to initialize the ICMP6 control socket "
