@@ -71,11 +71,11 @@ static inline void __remove_shared_vm_struct(struct vm_area_struct *vma,
 {
 	if (vma->vm_flags & VM_DENYWRITE)
 		atomic_inc(&file->f_dentry->d_inode->i_writecount);
+	if (vma->vm_flags & VM_SHARED)
+		mapping->i_mmap_writable--;
 
 	if (unlikely(vma->vm_flags & VM_NONLINEAR))
 		list_del_init(&vma->shared.vm_set.list);
-	else if (vma->vm_flags & VM_SHARED)
-		vma_prio_tree_remove(vma, &mapping->i_mmap_shared);
 	else
 		vma_prio_tree_remove(vma, &mapping->i_mmap);
 }
@@ -263,12 +263,12 @@ static inline void __vma_link_file(struct vm_area_struct *vma)
 
 		if (vma->vm_flags & VM_DENYWRITE)
 			atomic_dec(&file->f_dentry->d_inode->i_writecount);
+		if (vma->vm_flags & VM_SHARED)
+			mapping->i_mmap_writable++;
 
 		if (unlikely(vma->vm_flags & VM_NONLINEAR))
 			list_add_tail(&vma->shared.vm_set.list,
 					&mapping->i_mmap_nonlinear);
-		else if (vma->vm_flags & VM_SHARED)
-			vma_prio_tree_insert(vma, &mapping->i_mmap_shared);
 		else
 			vma_prio_tree_insert(vma, &mapping->i_mmap);
 	}
@@ -308,8 +308,8 @@ static void vma_link(struct mm_struct *mm, struct vm_area_struct *vma,
 }
 
 /*
- * Insert vm structure into process list sorted by address and into the inode's
- * i_mmap ring. The caller should hold mm->page_table_lock and
+ * Insert vm structure into process list sorted by address and into the
+ * inode's i_mmap tree. The caller should hold mm->page_table_lock and
  * ->f_mappping->i_mmap_lock if vm_file is non-NULL.
  */
 static void
@@ -328,8 +328,8 @@ __insert_vm_struct(struct mm_struct * mm, struct vm_area_struct * vma)
 }
 
 /*
- * We cannot adjust vm_start, vm_end, vm_pgoff fields of a vma that is
- * already present in an i_mmap{_shared} tree without adjusting the tree.
+ * We cannot adjust vm_start, vm_end, vm_pgoff fields of a vma that
+ * is already present in an i_mmap tree without adjusting the tree.
  * The following helper function should be used when such adjustments
  * are necessary.  The "next" vma (if any) is to be removed or inserted
  * before we drop the necessary locks.
@@ -344,10 +344,8 @@ void vma_adjust(struct vm_area_struct *vma, unsigned long start,
 
 	if (file) {
 		mapping = file->f_mapping;
-		if (!(vma->vm_flags & VM_SHARED))
+		if (!(vma->vm_flags & VM_NONLINEAR))
 			root = &mapping->i_mmap;
-		else if (!(vma->vm_flags & VM_NONLINEAR))
-			root = &mapping->i_mmap_shared;
 		spin_lock(&mapping->i_mmap_lock);
 	}
 	spin_lock(&mm->page_table_lock);
@@ -1516,7 +1514,7 @@ void exit_mmap(struct mm_struct *mm)
 }
 
 /* Insert vm structure into process list sorted by address
- * and into the inode's i_mmap ring.  If vm_file is non-NULL
+ * and into the inode's i_mmap tree.  If vm_file is non-NULL
  * then i_mmap_lock is taken here.
  */
 void insert_vm_struct(struct mm_struct * mm, struct vm_area_struct * vma)

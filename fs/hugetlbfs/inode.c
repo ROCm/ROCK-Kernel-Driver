@@ -266,7 +266,7 @@ static void hugetlbfs_drop_inode(struct inode *inode)
  * h_pgoff is in HPAGE_SIZE units.
  * vma->vm_pgoff is in PAGE_SIZE units.
  */
-static void
+static inline void
 hugetlb_vmtruncate_list(struct prio_tree_root *root, unsigned long h_pgoff)
 {
 	struct vm_area_struct *vma = NULL;
@@ -312,8 +312,6 @@ static int hugetlb_vmtruncate(struct inode *inode, loff_t offset)
 	spin_lock(&mapping->i_mmap_lock);
 	if (!prio_tree_empty(&mapping->i_mmap))
 		hugetlb_vmtruncate_list(&mapping->i_mmap, pgoff);
-	if (!prio_tree_empty(&mapping->i_mmap_shared))
-		hugetlb_vmtruncate_list(&mapping->i_mmap_shared, pgoff);
 	spin_unlock(&mapping->i_mmap_lock);
 	truncate_hugepages(mapping, offset);
 	return 0;

@@ -331,9 +331,9 @@ struct address_space {
 	pgoff_t			writeback_index;/* writeback starts here */
 	struct address_space_operations *a_ops;	/* methods */
 	struct prio_tree_root	i_mmap;		/* tree of private mappings */
-	struct prio_tree_root	i_mmap_shared;	/* tree of shared mappings */
-	struct list_head	i_mmap_nonlinear;/*list of nonlinear mappings */
-	spinlock_t		i_mmap_lock;	/* protect trees & list above */
+	unsigned int		i_mmap_writable;/* count VM_SHARED mappings */
+	struct list_head	i_mmap_nonlinear;/*list VM_NONLINEAR mappings */
+	spinlock_t		i_mmap_lock;	/* protect tree, count, list */
 	atomic_t		truncate_count;	/* Cover race condition with truncate */
 	unsigned long		flags;		/* error bits/gfp mask */
 	struct backing_dev_info *backing_dev_info; /* device readahead, etc */
@@ -383,20 +383,18 @@ int mapping_tagged(struct address_space *mapping, int tag);
 static inline int mapping_mapped(struct address_space *mapping)
 {
 	return	!prio_tree_empty(&mapping->i_mmap) ||
-		!prio_tree_empty(&mapping->i_mmap_shared) ||
 		!list_empty(&mapping->i_mmap_nonlinear);
 }
 
 /*
  * Might pages of this file have been modified in userspace?
- * Note that i_mmap_shared holds all the VM_SHARED vmas: do_mmap_pgoff
+ * Note that i_mmap_writable counts all VM_SHARED vmas: do_mmap_pgoff
  * marks vma as VM_SHARED if it is shared, and the file was opened for
  * writing i.e. vma may be mprotected writable even if now readonly.
  */
 static inline int mapping_writably_mapped(struct address_space *mapping)
 {
-	return	!prio_tree_empty(&mapping->i_mmap_shared) ||
-		!list_empty(&mapping->i_mmap_nonlinear);
+	return mapping->i_mmap_writable != 0;
 }
 
 /*

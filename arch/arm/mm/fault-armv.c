@@ -94,12 +94,14 @@ void __flush_dcache_page(struct page *page)
 	 * and invalidate any user data.
 	 */
 	pgoff = page->index << (PAGE_CACHE_SHIFT - PAGE_SHIFT);
-	while ((mpnt = vma_prio_tree_next(mpnt, &mapping->i_mmap_shared,
+	while ((mpnt = vma_prio_tree_next(mpnt, &mapping->i_mmap,
 					&iter, pgoff, pgoff)) != NULL) {
 		/*
 		 * If this VMA is not in our MM, we can ignore it.
 		 */
 		if (mpnt->vm_mm != mm)
+			continue;
+		if (!(mpnt->vm_flags & VM_MAYSHARE))
 			continue;
 		offset = (pgoff - mpnt->vm_pgoff) << PAGE_SHIFT;
 		flush_cache_page(mpnt, mpnt->vm_start + offset);
@@ -127,7 +129,7 @@ make_coherent(struct vm_area_struct *vma, unsigned long addr, struct page *page,
 	 * space, then we need to handle them specially to maintain
 	 * cache coherency.
 	 */
-	while ((mpnt = vma_prio_tree_next(mpnt, &mapping->i_mmap_shared,
+	while ((mpnt = vma_prio_tree_next(mpnt, &mapping->i_mmap,
 					&iter, pgoff, pgoff)) != NULL) {
 		/*
 		 * If this VMA is not in our MM, we can ignore it.
@@ -135,6 +137,8 @@ make_coherent(struct vm_area_struct *vma, unsigned long addr, struct page *page,
 		 * that we are fixing up.
 		 */
 		if (mpnt->vm_mm != mm || mpnt == vma)
+			continue;
+		if (!(mpnt->vm_flags & VM_MAYSHARE))
 			continue;
 		offset = (pgoff - mpnt->vm_pgoff) << PAGE_SHIFT;
 		aliases += adjust_pte(mpnt, mpnt->vm_start + offset);

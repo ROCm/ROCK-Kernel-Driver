@@ -203,7 +203,7 @@ asmlinkage long sys_remap_file_pages(unsigned long start, unsigned long size,
 			mapping = vma->vm_file->f_mapping;
 			spin_lock(&mapping->i_mmap_lock);
 			vma->vm_flags |= VM_NONLINEAR;
-			vma_prio_tree_remove(vma, &mapping->i_mmap_shared);
+			vma_prio_tree_remove(vma, &mapping->i_mmap);
 			vma_prio_tree_init(vma);
 			list_add_tail(&vma->shared.vm_set.list,
 					&mapping->i_mmap_nonlinear);

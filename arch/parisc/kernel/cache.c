@@ -244,46 +244,24 @@ void __flush_dcache_page(struct page *page)
 
 	pgoff = page->index << (PAGE_CACHE_SHIFT - PAGE_SHIFT);
 
-	/* We have ensured in arch_get_unmapped_area() that all shared
-	 * mappings are mapped at equivalent addresses, so we only need
-	 * to flush one for them all to become coherent */
-
-	while ((mpnt = vma_prio_tree_next(mpnt, &mapping->i_mmap_shared,
-					&iter, pgoff, pgoff)) != NULL) {
-		offset = (pgoff - mpnt->vm_pgoff) << PAGE_SHIFT;
-		addr = mpnt->vm_start + offset;
-
-		/* flush instructions produce non access tlb misses.
-		 * On PA, we nullify these instructions rather than 
-		 * taking a page fault if the pte doesn't exist, so we
-		 * have to find a congruent address with an existing
-		 * translation */
-
-		if (!translation_exists(mpnt, addr))
-			continue;
-
-		__flush_cache_page(mpnt, addr);
-
-		/* If we find an address to flush, that will also
-		 * bring all the private mappings up to date (see
-		 * comment below) */
-		return;
-	}
-
-	/* we have carefully arranged in arch_get_unmapped_area() that
+	/* We have carefully arranged in arch_get_unmapped_area() that
 	 * *any* mappings of a file are always congruently mapped (whether
 	 * declared as MAP_PRIVATE or MAP_SHARED), so we only need
-	 * to flush one address here too */
+	 * to flush one address here for them all to become coherent */
 
 	while ((mpnt = vma_prio_tree_next(mpnt, &mapping->i_mmap,
 					&iter, pgoff, pgoff)) != NULL) {
 		offset = (pgoff - mpnt->vm_pgoff) << PAGE_SHIFT;
 		addr = mpnt->vm_start + offset;
 
-		/* This is just for speed.  If the page translation isn't
-		 * there there's no point exciting the nadtlb handler into
-		 * a nullification frenzy */
-		if(!translation_exists(mpnt, addr))
+		/* Flush instructions produce non access tlb misses.
+		 * On PA, we nullify these instructions rather than
+		 * taking a page fault if the pte doesn't exist.
+		 * This is just for speed.  If the page translation
+		 * isn't there, there's no point exciting the
+		 * nadtlb handler into a nullification frenzy */
+
+		if (!translation_exists(mpnt, addr))
 			continue;
 
 		__flush_cache_page(mpnt, addr);

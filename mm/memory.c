@@ -1107,8 +1107,8 @@ no_new_page:
 /*
  * Helper function for unmap_mapping_range().
  */
-static void unmap_mapping_range_list(struct prio_tree_root *root,
-				     struct zap_details *details)
+static inline void unmap_mapping_range_list(struct prio_tree_root *root,
+					    struct zap_details *details)
 {
 	struct vm_area_struct *vma = NULL;
 	struct prio_tree_iter iter;
@@ -1176,12 +1176,6 @@ void unmap_mapping_range(struct address_space *mapping,
 
 	if (unlikely(!prio_tree_empty(&mapping->i_mmap)))
 		unmap_mapping_range_list(&mapping->i_mmap, &details);
-
-	/* Don't waste time to check mapping on fully shared vmas */
-	details.check_mapping = NULL;
-
-	if (unlikely(!prio_tree_empty(&mapping->i_mmap_shared)))
-		unmap_mapping_range_list(&mapping->i_mmap_shared, &details);
 
 	/*
 	 * In nonlinear VMAs there is no correspondence between virtual address

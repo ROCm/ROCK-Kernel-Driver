@@ -328,21 +328,6 @@ static inline int page_referenced_file(struct page *page)
 		}
 	}
 
-	while ((vma = vma_prio_tree_next(vma, &mapping->i_mmap_shared,
-					&iter, pgoff, pgoff)) != NULL) {
-		if (vma->vm_flags & (VM_LOCKED|VM_RESERVED)) {
-			referenced++;
-			goto out;
-		}
-		if (vma->vm_mm->rss) {
-			address = vma_address(vma, pgoff);
-			referenced += page_referenced_one(page,
-				vma->vm_mm, address, &mapcount, &failed);
-			if (!mapcount)
-				goto out;
-		}
-	}
-
 	if (list_empty(&mapping->i_mmap_nonlinear))
 		WARN_ON(!failed);
 out:
@@ -735,17 +720,6 @@ static inline int try_to_unmap_file(struct page *page)
 		return ret;
 
 	while ((vma = vma_prio_tree_next(vma, &mapping->i_mmap,
-					&iter, pgoff, pgoff)) != NULL) {
-		if (vma->vm_mm->rss) {
-			address = vma_address(vma, pgoff);
-			ret = try_to_unmap_one(page,
-				vma->vm_mm, address, &mapcount, vma);
-			if (ret == SWAP_FAIL || !mapcount)
-				goto out;
-		}
-	}
-
-	while ((vma = vma_prio_tree_next(vma, &mapping->i_mmap_shared,
 					&iter, pgoff, pgoff)) != NULL) {
 		if (vma->vm_mm->rss) {
 			address = vma_address(vma, pgoff);

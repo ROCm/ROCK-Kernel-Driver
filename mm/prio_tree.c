@@ -1,5 +1,5 @@
 /*
- * mm/prio_tree.c - priority search tree for mapping->i_mmap{,_shared}
+ * mm/prio_tree.c - priority search tree for mapping->i_mmap
  *
  * Copyright (C) 2004, Rajesh Venkatasubramanian <vrajesh@umich.edu>
  *
@@ -41,7 +41,7 @@
  */
 
 /*
- * The following macros are used for implementing prio_tree for i_mmap{_shared}
+ * The following macros are used for implementing prio_tree for i_mmap
  */
 
 #define RADIX_INDEX(vma)  ((vma)->vm_pgoff)
@@ -491,7 +491,7 @@ repeat:
 }
 
 /*
- * Radix priority search tree for address_space->i_mmap_{_shared}
+ * Radix priority search tree for address_space->i_mmap
  *
  * For each vma that map a unique set of file pages i.e., unique [radix_index,
  * heap_index] value, we have a corresponing priority search tree node. If
