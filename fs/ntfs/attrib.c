@@ -1182,8 +1182,9 @@ BOOL find_attr(const ATTR_TYPES type, const uchar_t *name, const u32 name_len,
 		else {
 			register int rc;
 			
-			rc = memcmp(val, (u8*)a +le16_to_cpu(a->_ARA(value_offset)),
-				min(val_len, le32_to_cpu(a->_ARA(value_length))));
+			rc = memcmp(val, (u8*)a + le16_to_cpu(
+					a->_ARA(value_offset)), min(val_len,
+					le32_to_cpu(a->_ARA(value_length))));
 			/*
 			 * If @val collates before the current attribute's
 			 * value, there is no matching attribute.

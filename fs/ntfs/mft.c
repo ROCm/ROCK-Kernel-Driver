@@ -98,7 +98,7 @@ int format_mft_record(ntfs_inode *ni, MFT_RECORD *mft_rec)
 }
 
 /**
- * From fs/ntfs/aops.c
+ * ntfs_readpage - external declaration, function is in fs/ntfs/aops.c
  */
 extern int ntfs_readpage(struct file *, struct page *);
 
@@ -109,12 +109,9 @@ extern int ntfs_readpage(struct file *, struct page *);
  * ntfs_map_page() in map_mft_record_page().
  */
 struct address_space_operations ntfs_mft_aops = {
-	.writepage	= NULL,			/* Write dirty page to disk. */
 	.readpage	= ntfs_readpage,	/* Fill page with data. */
 	.sync_page	= block_sync_page,	/* Currently, just unplugs the
 						   disk request queue. */
-	.prepare_write	= NULL,			/* . */
-	.commit_write	= NULL,			/* . */
 };
 
 /**

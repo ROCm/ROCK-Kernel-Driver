@@ -28,7 +28,6 @@
 
 #include <asm/pgalloc.h>
 #include <asm/rmap.h>
-#include <asm/smplock.h>
 #include <asm/tlb.h>
 #include <asm/tlbflush.h>
 
