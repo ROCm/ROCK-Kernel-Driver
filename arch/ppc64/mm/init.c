@@ -498,13 +498,6 @@ void __init paging_init(void)
 }
 #endif
 
-extern unsigned long prof_shift;
-extern unsigned long prof_len;
-extern unsigned int * prof_buffer;
-extern unsigned long dprof_shift;
-extern unsigned long dprof_len;
-extern unsigned int * dprof_buffer;
-
 void initialize_paca_hardware_interrupt_stack(void);
 
 void __init mem_init(void)
@@ -577,10 +570,6 @@ void __init mem_init(void)
 
 #ifdef CONFIG_PPC_ISERIES
 	create_virtual_bus_tce_table();
-	/* HACK HACK This allows the iSeries profiling to use /proc/profile */
-	prof_shift = dprof_shift;
-	prof_len = dprof_len;
-	prof_buffer = dprof_buffer;
 #endif
 }
 

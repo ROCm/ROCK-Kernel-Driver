@@ -469,11 +469,6 @@ void __init time_init(void)
 	last_rtc_update = xtime.tv_sec;
 	write_unlock_irqrestore(&xtime_lock, flags);
 
-#ifdef CONFIG_PPC_ISERIES
-	/* HACK HACK This allows the iSeries profiling to use /proc/profile */
-	prof_shift = 0;
-#endif
-
 	/* Not exact, but the timer interrupt takes care of this */
 	set_dec(tb_ticks_per_jiffy);
 }
