@@ -1040,6 +1040,7 @@ static void snd_ice1712_set_pro_rate(ice1712_t *ice, unsigned int rate, int forc
 	default:
 		snd_BUG();
 		val = 0;
+		rate = 48000;
 		break;
 	}
 	outb(val, ICEMT(ice, RATE));
@@ -1050,6 +1051,8 @@ static void snd_ice1712_set_pro_rate(ice1712_t *ice, unsigned int rate, int forc
 		if (ice->akm[i].ops.set_rate_val)
 			ice->akm[i].ops.set_rate_val(&ice->akm[i], rate);
 	}
+	if (ice->spdif.ops.setup_rate)
+		ice->spdif.ops.setup_rate(ice, rate);
 }
 
 static int snd_ice1712_playback_pro_prepare(snd_pcm_substream_t * substream)
@@ -1072,8 +1075,6 @@ static int snd_ice1712_playback_pro_hw_params(snd_pcm_substream_t * substream,
 	ice1712_t *ice = snd_pcm_substream_chip(substream);
 
 	snd_ice1712_set_pro_rate(ice, params_rate(hw_params), 0);
-	if (ice->spdif.ops.setup_rate)
-		ice->spdif.ops.setup_rate(ice, params_rate(hw_params));
 	return snd_pcm_lib_malloc_pages(substream, params_buffer_bytes(hw_params));
 }
 
