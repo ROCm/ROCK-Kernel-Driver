@@ -935,9 +935,6 @@ static void init_inode (struct inode * inode, struct path * path)
 	// (directories and symlinks)
 	struct stat_data * sd = (struct stat_data *)B_I_PITEM (bh, ih);
 
-	/* both old and new directories have old keys */
-	//version = (S_ISDIR (sd->sd_mode) ? ITEM_VERSION_1 : ITEM_VERSION_2);
-
 	inode->i_mode   = sd_v2_mode(sd);
 	inode->i_nlink  = sd_v2_nlink(sd);
 	inode->i_uid    = sd_v2_uid(sd);
@@ -958,6 +955,7 @@ static void init_inode (struct inode * inode, struct path * path)
 	else
 	    set_inode_item_key_version (inode, KEY_FORMAT_3_6);
 	REISERFS_I(inode)->i_first_direct_byte = 0;
+	set_inode_sd_version (inode, STAT_DATA_V2);
     }
 
     pathrelse (path);
