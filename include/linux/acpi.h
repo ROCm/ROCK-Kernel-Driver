@@ -336,12 +336,21 @@ typedef int (*acpi_madt_entry_handler) (acpi_table_entry_header *header);
 char * __acpi_map_table (unsigned long phys_addr, unsigned long size);
 unsigned long acpi_find_rsdp (void);
 int acpi_boot_init (char *cmdline);
+int acpi_numa_init (void);
 
 int acpi_table_init (char *cmdline);
-int acpi_table_parse (enum acpi_table_id, acpi_table_handler);
-int acpi_table_parse_madt (enum acpi_table_id, acpi_madt_entry_handler);
-void acpi_table_print (struct acpi_table_header *, unsigned long);
-void acpi_table_print_madt_entry (acpi_table_entry_header *);
+int acpi_table_parse (enum acpi_table_id id, acpi_table_handler handler);
+int acpi_table_parse_madt (enum acpi_madt_entry_id id, acpi_madt_entry_handler handler);
+int acpi_table_parse_srat (enum acpi_srat_entry_id id, acpi_madt_entry_handler handler);
+void acpi_table_print (struct acpi_table_header *header, unsigned long phys_addr);
+void acpi_table_print_madt_entry (acpi_table_entry_header *madt);
+void acpi_table_print_srat_entry (acpi_table_entry_header *srat);
+
+/* the following four functions are architecture-dependent */
+void acpi_numa_slit_init (struct acpi_table_slit *slit);
+void acpi_numa_processor_affinity_init (struct acpi_table_processor_affinity *pa);
+void acpi_numa_memory_affinity_init (struct acpi_table_memory_affinity *ma);
+void acpi_numa_arch_fixup(void);
 
 extern int acpi_mp_config;
 

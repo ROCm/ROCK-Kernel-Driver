@@ -257,7 +257,6 @@ acpi_system_suspend(
 	unsigned long		flags = 0;
 
 	local_irq_save(flags);
-	local_irq_disable();
 	
 	switch (state)
 	{
