@@ -1579,8 +1579,10 @@ S: L-1148 Luxembourg-City
 S: Luxembourg
 
 N: Gerd Knorr
-E: kraxel@goldbach.in-berlin.de
-D: SCSI CD-ROM driver hacking, vesafb, v4l, minor bug fixes
+W: http://bytesex.org
+E: kraxel@bytesex.org
+E: kraxel@suse.de
+D: video4linux, bttv, vesafb, some scsi, misc fixes
 
 N: Harald Koenig
 E: koenig@tat.physik.uni-tuebingen.de

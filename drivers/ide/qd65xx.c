@@ -139,12 +139,12 @@ static byte qd6500_compute_timing (ide_hwif_t *hwif, int active_time, int recove
 {
 	byte active_cycle,recovery_cycle;
 
-	if (ide_system_bus_speed()<=33) {
-		active_cycle =   9  - IDE_IN(active_time   * ide_system_bus_speed() / 1000 + 1, 2, 9);
-		recovery_cycle = 15 - IDE_IN(recovery_time * ide_system_bus_speed() / 1000 + 1, 0, 15);
+	if (system_bus_speed <= 33) {
+		active_cycle =   9  - IDE_IN(active_time   * system_bus_speed / 1000 + 1, 2, 9);
+		recovery_cycle = 15 - IDE_IN(recovery_time * system_bus_speed / 1000 + 1, 0, 15);
 	} else {
-		active_cycle =   8  - IDE_IN(active_time   * ide_system_bus_speed() / 1000 + 1, 1, 8);
-		recovery_cycle = 18 - IDE_IN(recovery_time * ide_system_bus_speed() / 1000 + 1, 3, 18);
+		active_cycle =   8  - IDE_IN(active_time   * system_bus_speed / 1000 + 1, 1, 8);
+		recovery_cycle = 18 - IDE_IN(recovery_time * system_bus_speed / 1000 + 1, 3, 18);
 	}
 
 	return((recovery_cycle<<4) | 0x08 | active_cycle);
@@ -158,8 +158,8 @@ static byte qd6500_compute_timing (ide_hwif_t *hwif, int active_time, int recove
 
 static byte qd6580_compute_timing (int active_time, int recovery_time)
 {
-	byte active_cycle   = 17-IDE_IN(active_time   * ide_system_bus_speed() / 1000 + 1, 2, 17);
-	byte recovery_cycle = 15-IDE_IN(recovery_time * ide_system_bus_speed() / 1000 + 1, 2, 15);
+	byte active_cycle   = 17-IDE_IN(active_time   * system_bus_speed / 1000 + 1, 2, 17);
+	byte recovery_cycle = 15-IDE_IN(recovery_time * system_bus_speed / 1000 + 1, 2, 15);
 
 	return((recovery_cycle<<4) | active_cycle);
 }
@@ -293,7 +293,7 @@ static void qd6580_tune_drive (ide_drive_t *drive, byte pio)
 		printk(KERN_INFO "%s: PIO mode%d\n",drive->name,pio);
 	}
 
-	if (!HWIF(drive)->channel && drive->media != ide_disk) {
+	if (!HWIF(drive)->channel && drive->type != ATA_DISK) {
 		qd_write_reg(0x5f,QD_CONTROL_PORT);
 		printk(KERN_WARNING "%s: ATAPI: disabled read-ahead FIFO and post-write buffer on %s.\n",drive->name,HWIF(drive)->name);
 	}

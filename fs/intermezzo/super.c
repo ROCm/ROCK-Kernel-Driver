@@ -39,7 +39,7 @@ long presto_kmemory = 0;
 #endif
 
 extern struct presto_cache *presto_init_cache(void);
-extern inline void presto_cache_add(struct presto_cache *cache, kdev_t dev);
+extern inline void presto_cache_add(struct presto_cache *cache, struct super_block *sb);
 extern inline void presto_init_cache_hash(void);
 
 int presto_remount(struct super_block *, int *, char *);
@@ -325,7 +325,7 @@ struct super_block * presto_read_super(struct super_block * presto_sb,
         filter_setup_journal_ops(cache->cache_filter, cache->cache_type); 
 
         /* we now know the dev of the cache: hash the cache */
-        presto_cache_add(cache, mysb->s_dev);
+        presto_cache_add(cache, mysb);
 
         /* make sure we have our own super operations: mysb
            still contains the cache operations */
@@ -402,7 +402,7 @@ int presto_remount(struct super_block * sb, int *flags, char *data)
                 }
         }
 
-        cache = presto_find_cache(sb->s_dev);
+        cache = presto_find_cache(sb);
         if (!cache) {
                 printk(__FUNCTION__ ": cannot find cache on remount\n");
                 err = -ENODEV;

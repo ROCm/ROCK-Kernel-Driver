@@ -662,7 +662,7 @@ static int read_bitmaps (struct super_block * s)
 	return 1;
     for (i = 0, bmp = REISERFS_DISK_OFFSET_IN_BYTES / s->s_blocksize + 1;
 	 i < SB_BMAP_NR(s); i++, bmp = s->s_blocksize * 8 * i) {
-	SB_AP_BITMAP (s)[i] = getblk (s->s_dev, bmp, s->s_blocksize);
+	SB_AP_BITMAP (s)[i] = sb_getblk(s, bmp);
 	if (!buffer_uptodate(SB_AP_BITMAP(s)[i]))
 	    ll_rw_block(READ, 1, SB_AP_BITMAP(s) + i);
     }
@@ -770,7 +770,7 @@ static int read_super_block (struct super_block * s, int offset)
        brelse(bh) ;
        printk("dev %s: Unfinished reiserfsck --rebuild-tree run detected. Please run\n"
               "reiserfsck --rebuild-tree and wait for a completion. If that fais\n"
-              "get newer reiserfsprogs package\n", kdevname (s->s_dev));
+              "get newer reiserfsprogs package\n", s->s_id);
        return 1;
     }
 
@@ -881,7 +881,7 @@ __u32 find_hash_out (struct super_block * s)
 	     ( (r5hash == yurahash) && (yurahash == GET_HASH_VALUE( deh_offset(&(de.de_deh[de.de_entry_num])))) ) ) {
 	    reiserfs_warning("reiserfs: Unable to automatically detect hash"
 		"function for device %s\n"
-		"please mount with -o hash={tea,rupasov,r5}\n", kdevname (s->s_dev));
+		"please mount with -o hash={tea,rupasov,r5}\n", s->s_id);
 	    hash = UNSET_HASH;
 	    break;
 	}
@@ -893,7 +893,7 @@ __u32 find_hash_out (struct super_block * s)
 	    hash = R5_HASH;
 	else {
 	    reiserfs_warning("reiserfs: Unrecognised hash function for "
-			     "device %s\n", kdevname (s->s_dev));
+			     "device %s\n", s->s_id);
 	    hash = UNSET_HASH;
 	}
     } while (0);

@@ -192,7 +192,7 @@ static int trm290_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 			outl(hwif->dmatable_dma|reading|writing, hwif->dma_base);
 			drive->waiting_for_dma = 1;
 			outw((count * 2) - 1, hwif->dma_base+2); /* start DMA */
-			if (drive->media != ide_disk)
+			if (drive->type != ATA_DISK)
 				return 0;
 			ide_set_handler(drive, &ide_dma_intr, WAIT_CMD, NULL);
 			OUT_BYTE(reading ? WIN_READDMA : WIN_WRITEDMA, IDE_COMMAND_REG);

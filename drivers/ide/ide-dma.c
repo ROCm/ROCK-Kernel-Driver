@@ -470,7 +470,7 @@ static int config_drive_for_dma (ide_drive_t *drive)
 	ide_hwif_t *hwif = HWIF(drive);
 
 #ifdef CONFIG_IDEDMA_ONLYDISK
-	if (drive->media != ide_disk)
+	if (drive->type != ATA_DISK)
 		config_allows_dma = 0;
 #endif
 
@@ -555,7 +555,7 @@ static void ide_toggle_bounce(ide_drive_t *drive, int on)
 {
 	u64 addr = BLK_BOUNCE_HIGH;
 
-	if (on && drive->media == ide_disk && HWIF(drive)->highmem) {
+	if (on && drive->type == ATA_DISK && HWIF(drive)->highmem) {
 		if (!PCI_DMA_BUS_IS_PHYS)
 			addr = BLK_BOUNCE_ANY;
 		else
@@ -613,7 +613,7 @@ int ide_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 			outb(reading, dma_base);			/* specify r/w */
 			outb(inb(dma_base+2)|6, dma_base+2);		/* clear INTR & ERROR flags */
 			drive->waiting_for_dma = 1;
-			if (drive->media != ide_disk)
+			if (drive->type != ATA_DISK)
 				return 0;
 #ifdef CONFIG_BLK_DEV_IDEDMA_TIMEOUT
 			ide_set_handler(drive, &ide_dma_intr, 2*WAIT_CMD, NULL);	/* issue cmd to drive */

@@ -309,6 +309,7 @@ struct uhci {
 	spinlock_t frame_list_lock;
 	struct uhci_frame_list *fl;		/* P: uhci->frame_list_lock */
 	int fsbr;				/* Full speed bandwidth reclamation */
+	unsigned long fsbrtimeout;		/* FSBR delay */
 	int is_suspended;
 
 	/* Main list of URB's currently controlled by this HC */

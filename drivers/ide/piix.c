@@ -77,7 +77,6 @@
 
 static int piix_get_info(char *, char **, off_t, int);
 extern int (*piix_display_info)(char *, char **, off_t, int); /* ide-proc.c */
-extern char *ide_media_verbose(ide_drive_t *);
 static struct pci_dev *bmide_dev;
 
 static int piix_get_info (char *buffer, char **addr, off_t offset, int count)
@@ -451,7 +450,7 @@ static int piix_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
 }
 #endif /* defined(CONFIG_BLK_DEV_IDEDMA) && (CONFIG_PIIX_TUNING) */
 
-unsigned int __init pci_init_piix (struct pci_dev *dev, const char *name)
+unsigned int __init pci_init_piix(struct pci_dev *dev)
 {
 #if defined(DISPLAY_PIIX_TIMINGS) && defined(CONFIG_PROC_FS)
 	if (!piix_proc) {

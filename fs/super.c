@@ -499,19 +499,9 @@ static inline void write_super(struct super_block *sb)
  * hold up the sync while mounting a device. (The newly
  * mounted device won't need syncing.)
  */
-void sync_supers(kdev_t dev)
+void sync_supers(void)
 {
 	struct super_block * sb;
-
-	if (!kdev_none(dev)) {
-		sb = get_super(dev);
-		if (sb) {
-			if (sb->s_dirt)
-				write_super(sb);
-			drop_super(sb);
-		}
-		return;
-	}
 restart:
 	spin_lock(&sb_lock);
 	sb = sb_entry(super_blocks.next);

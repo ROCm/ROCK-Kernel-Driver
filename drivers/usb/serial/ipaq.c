@@ -1,7 +1,7 @@
 /*
  * USB Compaq iPAQ driver
  *
- *	Copyright (C) 2001
+ *	Copyright (C) 2001 - 2002
  *	    Ganesh Varadarajan <ganesh@veritas.com>
  *
  *	This program is free software; you can redistribute it and/or modify
@@ -9,6 +9,9 @@
  *	the Free Software Foundation; either version 2 of the License, or
  *	(at your option) any later version.
  *
+ * (25/2/2002) ganesh
+ * 	Added support for the HP Jornada 548 and 568. Completely untested.
+ * 	Thanks to info from Heath Robinson and Arieh Davidoff.
  */
 
 #include <linux/config.h>
@@ -39,9 +42,9 @@
 /*
  * Version Information
  */
-#define DRIVER_VERSION "v0.1"
+#define DRIVER_VERSION "v0.2"
 #define DRIVER_AUTHOR "Ganesh Varadarajan <ganesh@veritas.com>"
-#define DRIVER_DESC "USB Compaq iPAQ driver"
+#define DRIVER_DESC "USB Compaq iPAQ, HP Jornada driver"
 
 /* Function prototypes for an ipaq */
 static int  ipaq_open (struct usb_serial_port *port, struct file *filp);
@@ -61,7 +64,9 @@ static void ipaq_destroy_lists(struct usb_serial_port *port);
 
 
 static __devinitdata struct usb_device_id ipaq_id_table [] = {
-	{ USB_DEVICE(IPAQ_VENDOR_ID, IPAQ_PRODUCT_ID) },
+	{ USB_DEVICE(COMPAQ_VENDOR_ID, COMPAQ_IPAQ_ID) },
+	{ USB_DEVICE(HP_VENDOR_ID, HP_JORNADA_548_ID) },
+	{ USB_DEVICE(HP_VENDOR_ID, HP_JORNADA_568_ID) },
 	{ }					/* Terminating entry */
 };
 
@@ -72,7 +77,7 @@ struct usb_serial_device_type ipaq_device = {
 	owner:			THIS_MODULE,
 	name:			"Compaq iPAQ",
 	id_table:		ipaq_id_table,
-	num_interrupt_in:	0,
+	num_interrupt_in:	NUM_DONT_CARE,
 	num_bulk_in:		1,
 	num_bulk_out:		1,
 	num_ports:		1,
@@ -104,8 +109,6 @@ static int ipaq_open(struct usb_serial_port *port, struct file *filp)
 	
 	dbg(__FUNCTION__ " - port %d", port->number);
 
-	down(&port->sem);
-	
 	++port->open_count;
 	
 	if (port->open_count == 1) {
@@ -193,8 +196,6 @@ static int ipaq_open(struct usb_serial_port *port, struct file *filp)
 		}
 	}
 	
-	up(&port->sem);
-	
 	return result;
 
 enomem:
@@ -219,8 +220,6 @@ static void ipaq_close(struct usb_serial_port *port, struct file *filp)
 	serial = get_usb_serial(port, __FUNCTION__);
 	if (!serial)
 		return;
-	
-	down (&port->sem);
 
 	--port->open_count;
 
@@ -238,8 +237,6 @@ static void ipaq_close(struct usb_serial_port *port, struct file *filp)
 		port->open_count = 0;
 
 	}
-	up (&port->sem);
-
 	/* Uncomment the following line if you want to see some statistics in your syslog */
 	/* info ("Bytes In = %d  Bytes Out = %d", bytes_in, bytes_out); */
 }

@@ -94,7 +94,7 @@ int set_blocksize(kdev_t dev, int size)
 
 	/* Ok, we're actually changing the blocksize.. */
 	bdev = bdget(kdev_t_to_nr(dev));
-	sync_buffers(dev, 2);
+	sync_buffers(bdev, 2);
 	blksize_size[major(dev)][minor(dev)] = size;
 	bdev->bd_inode->i_blkbits = blksize_bits(size);
 	kill_bdev(bdev);
@@ -198,7 +198,7 @@ static int __block_fsync(struct inode * inode)
 	int ret, err;
 
 	ret = filemap_fdatasync(inode->i_mapping);
-	err = sync_buffers(inode->i_rdev, 1);
+	err = sync_buffers(inode->i_bdev, 1);
 	if (err && !ret)
 		ret = err;
 	err = filemap_fdatawait(inode->i_mapping);

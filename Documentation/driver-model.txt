@@ -118,7 +118,18 @@ User Interface
 
 By virtue of having a complete hierarchical view of all the devices in the
 system, exporting a complete hierarchical view to userspace becomes relatively
-easy.
+easy. This has been accomplished by implementing a special purpose virtual
+file system named driverfs. It is hence possible for the user to mount the
+whole driverfs on a particular mount point in the unified UNIX file hierarchy.
+
+This can be done permanently by providing the following entry into the
+/dev/fstab (under the provision that the mount point does exist, of course):
+
+none     	/devices	driverfs    defaults		0	0
+
+Or by hand on the command line:
+
+~: mount -t driverfs none /devices
 
 Whenever a device is inserted into the tree, a directory is created for it.
 This directory may be populated at each layer of discovery - the global layer,
@@ -342,6 +353,8 @@ Instead, the walking of the device tree has been moved to userspace. When a
 user requests the system to suspend, it will walk the device tree, as exported
 via driverfs, and tell each device to go to sleep. It will do this multiple
 times based on what the system policy is.
+
+[ FIXME: URL pointer to the corresponding utility is missing here! ]
 
 Device resume should happen in the same manner when the system awakens.
 

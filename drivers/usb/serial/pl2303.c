@@ -367,8 +367,6 @@ static int pl2303_open (struct usb_serial_port *port, struct file *filp)
 		
 	dbg (__FUNCTION__ " -  port %d", port->number);
 
-	down (&port->sem);
-
 	++port->open_count;
 
 	if (port->open_count == 1) {
@@ -407,7 +405,6 @@ static int pl2303_open (struct usb_serial_port *port, struct file *filp)
 		result = usb_submit_urb (port->read_urb, GFP_KERNEL);
 		if (result) {
 			err(__FUNCTION__ " - failed submitting read urb, error %d", result);
-			up (&port->sem);
 			pl2303_close (port, NULL);
 			return -EPROTO;
 		}
@@ -417,12 +414,10 @@ static int pl2303_open (struct usb_serial_port *port, struct file *filp)
 		result = usb_submit_urb (port->interrupt_in_urb, GFP_KERNEL);
 		if (result) {
 			err(__FUNCTION__ " - failed submitting interrupt urb, error %d", result);
-			up (&port->sem);
 			pl2303_close (port, NULL);
 			return -EPROTO;
 		}
 	}
-	up (&port->sem);
 	return 0;
 }
 
@@ -441,8 +436,6 @@ static void pl2303_close (struct usb_serial_port *port, struct file *filp)
 		return;
 	
 	dbg (__FUNCTION__ " - port %d", port->number);
-
-	down (&port->sem);
 
 	--port->open_count;
 	if (port->open_count <= 0) {
@@ -478,8 +471,6 @@ static void pl2303_close (struct usb_serial_port *port, struct file *filp)
 		}
 		port->open_count = 0;
 	}
-
-	up (&port->sem);
 }
 
 static int set_modem_info (struct usb_serial_port *port, unsigned int cmd, unsigned int *value)

@@ -319,8 +319,6 @@ static int  ftdi_sio_open (struct usb_serial_port *port, struct file *filp)
 
 	dbg(__FUNCTION__);
 
-	down (&port->sem);
-	
 	++port->open_count;
 
 	if (port->open_count == 1){
@@ -361,7 +359,6 @@ static int  ftdi_sio_open (struct usb_serial_port *port, struct file *filp)
 			err(__FUNCTION__ " - failed submitting read urb, error %d", result);
 	}
 
-	up (&port->sem);
 	return result;
 } /* ftdi_sio_open */
 
@@ -374,7 +371,6 @@ static void ftdi_sio_close (struct usb_serial_port *port, struct file *filp)
 
 	dbg( __FUNCTION__);
 
-	down (&port->sem);
 	--port->open_count;
 
 	if (port->open_count <= 0) {
@@ -411,9 +407,6 @@ static void ftdi_sio_close (struct usb_serial_port *port, struct file *filp)
 			tty_hangup(port->tty);
 		}
 	}
-
-	up (&port->sem);
-
 } /* ftdi_sio_close */
 
 
@@ -447,8 +440,6 @@ static int ftdi_sio_write (struct usb_serial_port *port, int from_user,
 		return (0);
 	}		
 
-	down(&port->sem);
-
 	count += data_offset;
 	count = (count > port->bulk_out_size) ? port->bulk_out_size : count;
 
@@ -456,7 +447,6 @@ static int ftdi_sio_write (struct usb_serial_port *port, int from_user,
 	if (from_user) {
 		if (copy_from_user(port->write_urb->transfer_buffer + data_offset,
 				   buf, count - data_offset )){
-			up (&port->sem);
 			return -EFAULT;
 		}
 	} else {
@@ -482,14 +472,11 @@ static int ftdi_sio_write (struct usb_serial_port *port, int from_user,
 	result = usb_submit_urb(port->write_urb, GFP_KERNEL);
 	if (result) {
 		err(__FUNCTION__ " - failed submitting write urb, error %d", result);
-		up (&port->sem);
 		return 0;
 	}
-	up (&port->sem);
 
 	dbg(__FUNCTION__ " write returning: %d", count - data_offset);
 	return (count - data_offset);
-
 } /* ftdi_sio_write */
 
 static void ftdi_sio_write_bulk_callback (struct urb *urb)

@@ -95,12 +95,13 @@ HandSpring Visor, Palm USB, and Clié USB driver
   Kroah-Hartman at greg@kroah.com
 
 
-Compaq iPAQ driver
+Compaq iPAQ and HP Jornada driver
 
-  This driver can be used to connect to Compaq iPAQ PDAs running
-  Windows CE 3.0 using a USB autosync cable. It has been tested only on
-  the Compaq H3135. It should work with the H3600 and later models too.
-  It may work with other CE based handhelds as well.
+  This driver can be used to connect to Compaq iPAQ and HP Jornada PDAs
+  running Windows CE 3.0 or PocketPC 2002 using a USB cable/cradle. It
+  has been tested only on the Compaq H3135, but is rumoured to work on
+  with the H3600 and later models as well as the Jornada 548 and 568.
+  With minor modifications, it may work for other CE based handhelds too.
 
   The driver presents a serial interface (usually on /dev/ttyUSB0) over
   which one may run ppp and establish a TCP/IP link to the iPAQ. Once this
@@ -109,11 +110,14 @@ Compaq iPAQ driver
   kbytes/sec for download/upload to the iPAQ.
 
   The driver works intermittently with the usb-uhci driver but quite
-  reliably with the uhci driver. Make sure you have the right driver
-  loaded - usb-uhci is often the default.
+  reliably with the uhci driver. However, performance is much better
+  with usb-uhci. It does not seem to work with ohci at all.
 
   You must setup hotplug to invoke pppd as soon as the iPAQ is connected.
-  A ppp script like the one below may be used:
+  A ppp script like the one below should be kept in the file
+  /etc/hotplug/usb/ipaq Remember to chmod +x. Make sure there are no
+  options in /etc/ppp/options or ~/.ppprc which conflict with the ones
+  given below.
 
 	#!/bin/bash
 
@@ -133,7 +137,7 @@ Compaq iPAQ driver
   On connecting the cable, you should see the usual "Device Connected",
   "User Authenticated" messages flash by on your iPAQ. Once connected,
   you can use Win CE programs like ftpView, Pocket Outlook from the iPAQ
-  and other synce utilities from the Linux side. Remember to enable IP
+  and xcerdisp, synce utilities from the Linux side. Remember to enable IP
   forwarding. 
 
   To use Pocket IE, follow the instructions given at

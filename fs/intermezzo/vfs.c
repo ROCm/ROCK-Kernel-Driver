@@ -602,7 +602,7 @@ int presto_do_link(struct presto_file_set *fset, struct dentry *old_dentry,
                 goto exit_lock;
 
         error = -EXDEV;
-        if (!kdev_same(dir->d_inode->i_dev, inode->i_dev))
+        if (dir->d_inode->i_sb != inode->i_sb)
                 goto exit_lock;
 
         /*
@@ -1609,7 +1609,7 @@ int presto_rename_dir(struct presto_file_set *fset, struct dentry *old_parent,
         if (error)
                 return error;
 
-        if (!kdev_same(new_dir->i_dev, old_dir->i_dev))
+        if (new_dir->i_sb != old_dir->i_sb)
                 return -EXDEV;
 
         if (!new_dentry->d_inode)
@@ -1690,7 +1690,7 @@ int presto_rename_other(struct presto_file_set *fset, struct dentry *old_parent,
         if (error)
                 return error;
 
-        if (!kdev_same(new_dir->i_dev, old_dir->i_dev))
+        if (new_dir->i_sb != old_dir->i_sb)
                 return -EXDEV;
 
         if (!new_dentry->d_inode)

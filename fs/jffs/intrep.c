@@ -428,7 +428,7 @@ jffs_create_file(struct jffs_control *c,
 
 /* Build a control block for the file system.  */
 static struct jffs_control *
-jffs_create_control(kdev_t dev)
+jffs_create_control(struct super_block *sb)
 {
 	struct jffs_control *c;
 	register int s = sizeof(struct jffs_control);
@@ -451,7 +451,7 @@ jffs_create_control(kdev_t dev)
 	DJM(no_hash++);
 	for (i = 0; i < c->hash_len; i++)
 		INIT_LIST_HEAD(&c->hash[i]);
-	if (!(c->fmc = jffs_build_begin(c, dev))) {
+	if (!(c->fmc = jffs_build_begin(c, sb->s_dev))) {
 		goto fail_fminit;
 	}
 	c->next_ino = JFFS_MIN_INO + 1;
@@ -549,7 +549,7 @@ jffs_build_fs(struct super_block *sb)
 
 	D2(printk("jffs_build_fs()\n"));
 
-	if (!(c = jffs_create_control(sb->s_dev))) {
+	if (!(c = jffs_create_control(sb))) {
 		return -ENOMEM;
 	}
 	c->building_fs = 1;
@@ -563,7 +563,7 @@ jffs_build_fs(struct super_block *sb)
 			D1(printk("jffs_build_fs: Cleaning up all control structures,"
 				  " reallocating them and trying mount again.\n"));
 			jffs_cleanup_control(c);
-			if (!(c = jffs_create_control(sb->s_dev))) {
+			if (!(c = jffs_create_control(sb))) {
 				return -ENOMEM;
 			}
 			c->building_fs = 1;
@@ -1932,8 +1932,7 @@ retry:
    the buffer.  */
 static int
 jffs_get_node_data(struct jffs_file *f, struct jffs_node *node, 
-		   unsigned char *buf,__u32 node_offset, __u32 max_size,
-		   kdev_t dev)
+		   unsigned char *buf,__u32 node_offset, __u32 max_size)
 {
 	struct jffs_fmcontrol *fmc = f->c->fmc;
 	__u32 pos = node->fm->offset + node->fm_offset + node_offset;
@@ -2003,8 +2002,7 @@ jffs_read_data(struct jffs_file *f, unsigned char *buf, __u32 read_offset,
 		}
 		else if ((r = jffs_get_node_data(f, node, &buf[read_data],
 						 node_offset,
-						 size - read_data,
-						 f->c->sb->s_dev)) < 0) {
+						 size - read_data)) < 0) {
 			return r;
 		}
 		read_data += r;

@@ -460,6 +460,8 @@ extern void prepare_namespace(void);
 
 static int init(void * unused)
 {
+	static char * argv_sh[] = { "sh", NULL, };
+
 	lock_kernel();
 	do_basic_setup();
 
@@ -491,6 +493,6 @@ static int init(void * unused)
 	execve("/sbin/init",argv_init,envp_init);
 	execve("/etc/init",argv_init,envp_init);
 	execve("/bin/init",argv_init,envp_init);
-	execve("/bin/sh",argv_init,envp_init);
+	execve("/bin/sh",argv_sh,envp_init);
 	panic("No init found.  Try passing init= option to kernel.");
 }

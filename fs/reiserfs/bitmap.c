@@ -103,7 +103,7 @@ static void _reiserfs_free_block (struct reiserfs_transaction_handle *th, unsign
   if (nr >= sb_bmap_nr (rs)) {
 	  reiserfs_warning ("vs-4075: reiserfs_free_block: "
 			    "block %lu is out of range on %s\n", 
-			    block, bdevname(s->s_dev));
+			    block, s->s_id);
 	  return;
   }
 

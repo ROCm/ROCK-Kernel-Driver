@@ -44,8 +44,8 @@
 /*
  * USB directions
  */
-#define USB_DIR_OUT			0
-#define USB_DIR_IN			0x80
+#define USB_DIR_OUT			0		/* to device */
+#define USB_DIR_IN			0x80		/* to host */
 
 /*
  * Endpoints
@@ -146,12 +146,6 @@ struct usb_ctrlrequest {
  */
 struct usb_devmap {
 	unsigned long devicemap[128 / (8*sizeof(unsigned long))];
-};
-
-#define USB_MAXBUS		64
-
-struct usb_busmap {
-	unsigned long busmap[USB_MAXBUS / (8*sizeof(unsigned long))];
 };
 
 struct usb_device;
@@ -516,7 +510,8 @@ struct usb_device_id {
  * work to connect to a device should be done when the device is opened,
  * and undone at the last close.  The disconnect code needs to address
  * concurrency issues with respect to open() and close() methods, as
- * well as cancel any I/O requests that are still pending.
+ * well as forcing all pending I/O requests to complete (by unlinking
+ * them as necessary, and blocking until the unlinks complete).
  */
 struct usb_driver {
 	struct module *owner;
@@ -905,13 +900,7 @@ extern int usb_make_path(struct usb_device *dev, char *buf, size_t size);
 
 /* Host Controller Driver (HCD) support */
 
-struct usb_operations {
-	int (*allocate)(struct usb_device *);
-	int (*deallocate)(struct usb_device *);
-	int (*get_frame_number) (struct usb_device *usb_dev);
-	int (*submit_urb) (struct urb *urb, int mem_flags);
-	int (*unlink_urb) (struct urb *urb);
-};
+struct usb_operations;
 
 #define DEVNUM_ROUND_ROBIN	/***** OPTION *****/
 
@@ -944,39 +933,10 @@ struct usb_bus {
 	atomic_t refcnt;
 };
 
-extern struct usb_bus *usb_alloc_bus(struct usb_operations *);
-extern void usb_free_bus(struct usb_bus *);
-extern void usb_register_bus(struct usb_bus *);
-extern void usb_deregister_bus(struct usb_bus *);
-extern int usb_register_root_hub(struct usb_device *usb_dev, struct device *parent_dev);
-
-extern int usb_check_bandwidth (struct usb_device *dev, struct urb *urb);
-extern void usb_claim_bandwidth (struct usb_device *dev, struct urb *urb,
-		int bustime, int isoc);
-extern void usb_release_bandwidth(struct usb_device *dev, struct urb *urb,
-		int isoc);
+// FIXME:  root_hub_string vanishes when "usb_hcd" conversion is done,
+// along with pre-hcd versions of the OHCI and UHCI drivers.
 extern int usb_root_hub_string(int id, int serial,
 		char *type, __u8 *data, int len);
-
-/*
- * Some USB 1.1 bandwidth allocation constants.
- */
-#define BW_HOST_DELAY	1000L		/* nanoseconds */
-#define BW_HUB_LS_SETUP	333L		/* nanoseconds */
-                        /* 4 full-speed bit times (est.) */
-
-#define FRAME_TIME_BITS         12000L		/* frame = 1 millisecond */
-#define FRAME_TIME_MAX_BITS_ALLOC	(90L * FRAME_TIME_BITS / 100L)
-#define FRAME_TIME_USECS	1000L
-#define FRAME_TIME_MAX_USECS_ALLOC	(90L * FRAME_TIME_USECS / 100L)
-
-#define BitTime(bytecount)  (7 * 8 * bytecount / 6)  /* with integer truncation */
-		/* Trying not to use worst-case bit-stuffing
-                   of (7/6 * 8 * bytecount) = 9.33 * bytecount */
-		/* bytecount = data payload byte count */
-
-#define NS_TO_US(ns)	((ns + 500L) / 1000L)
-			/* convert & round nanoseconds to microseconds */
 
 /*
  * As of USB 2.0, full/low speed devices are segregated into trees.
@@ -1209,13 +1169,11 @@ void usb_show_string(struct usb_device *dev, char *id, int index);
 /* -------------------------------------------------------------------------- */
 
 /*
- * bus and driver list
+ * driver list
  * exported only for usbfs (not visible outside usbcore)
  */
 
 extern struct list_head usb_driver_list;
-extern struct list_head usb_bus_list;
-extern struct semaphore usb_bus_list_lock;
 
 /*
  * USB device fs stuff

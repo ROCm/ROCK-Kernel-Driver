@@ -393,7 +393,7 @@ int via82cxxx_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
  * and initialize its drive independent registers.
  */
 
-unsigned int __init pci_init_via82cxxx(struct pci_dev *dev, const char *name)
+unsigned int __init pci_init_via82cxxx(struct pci_dev *dev)
 {
 	struct pci_dev *isa = NULL;
 	unsigned char t, v;
@@ -484,7 +484,7 @@ unsigned int __init pci_init_via82cxxx(struct pci_dev *dev, const char *name)
  * Determine system bus clock.
  */
 
-	via_clock = system_bus_clock() * 1000;
+	via_clock = system_bus_speed * 1000;
 
 	switch (via_clock) {
 		case 33000: via_clock = 33333; break;

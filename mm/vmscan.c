@@ -578,7 +578,9 @@ static int shrink_caches(zone_t * classzone, int priority, unsigned int gfp_mask
 		return 0;
 
 	shrink_dcache_memory(priority, gfp_mask);
-	shrink_icache_memory(priority, gfp_mask);
+
+	/* After shrinking the dcache, get rid of unused inodes too .. */
+	shrink_icache_memory(1, gfp_mask);
 #ifdef CONFIG_QUOTA
 	shrink_dqcache_memory(DEF_PRIORITY, gfp_mask);
 #endif

@@ -306,8 +306,6 @@ static int whiteheat_open (struct usb_serial_port *port, struct file *filp)
 
 	dbg(__FUNCTION__" - port %d", port->number);
 
-	down (&port->sem);
-
 	++port->open_count;
 	
 	if (port->open_count == 1) {
@@ -354,16 +352,12 @@ static int whiteheat_open (struct usb_serial_port *port, struct file *filp)
 	}
 
 	dbg(__FUNCTION__ " - exit");
-	up (&port->sem);
-	
 	return retval;
 
 error_exit:
 	--port->open_count;
 
 	dbg(__FUNCTION__ " - error_exit");
-	up (&port->sem);
-	
 	return retval;
 }
 
@@ -374,7 +368,6 @@ static void whiteheat_close(struct usb_serial_port *port, struct file * filp)
 	
 	dbg(__FUNCTION__ " - port %d", port->number);
 	
-	down (&port->sem);
 	--port->open_count;
 
 	if (port->open_count <= 0) {
@@ -391,7 +384,6 @@ static void whiteheat_close(struct usb_serial_port *port, struct file * filp)
 		usb_unlink_urb (port->read_urb);
 		port->open_count = 0;
 	}
-	up (&port->sem);
 }
 
 
@@ -409,8 +401,6 @@ static void whiteheat_set_termios (struct usb_serial_port *port, struct termios 
 	struct whiteheat_port_settings port_settings;
 
 	dbg(__FUNCTION__ " -port %d", port->number);
-
-	down (&port->sem);
 
 	if ((!port->tty) || (!port->tty->termios)) {
 		dbg(__FUNCTION__" - no tty structures");
@@ -492,7 +482,6 @@ static void whiteheat_set_termios (struct usb_serial_port *port, struct termios 
 	whiteheat_send_cmd (port->serial, WHITEHEAT_SETUP_PORT, (__u8 *)&port_settings, sizeof(port_settings));
 	
 exit:
-	up (&port->sem);
 	return;
 }
 

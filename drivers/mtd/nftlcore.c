@@ -795,7 +795,7 @@ static int nftl_ioctl(struct inode * inode, struct file * file, unsigned int cmd
 	}
 	case BLKFLSBUF:
 		if (!capable(CAP_SYS_ADMIN)) return -EACCES;
-		fsync_dev(inode->i_rdev);
+		fsync_bdev(inode->i_bdev);
 		invalidate_buffers(inode->i_rdev);
 		if (nftl->mtd->sync)
 			nftl->mtd->sync(nftl->mtd);

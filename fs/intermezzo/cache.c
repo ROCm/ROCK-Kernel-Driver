@@ -44,16 +44,15 @@
 #define CACHES_MASK CACHES_SIZE - 1
 static struct list_head presto_caches[CACHES_SIZE];
 
-static inline int presto_cache_hash(kdev_t dev)
+static inline int presto_cache_hash(struct super_block *sb)
 {
-        return (CACHES_MASK) & ((0x000F & (kdev_val(dev))) + ((0x0F00 & (kdev_val(dev))) >>8));
+        return (CACHES_MASK) & ((unsigned long)sb / L1_CACHE_BYTES);
 }
 
-inline void presto_cache_add(struct presto_cache *cache, kdev_t dev)
+inline void presto_cache_add(struct presto_cache *cache, struct super_block *sb)
 {
         list_add(&cache->cache_chain,
-                 &presto_caches[presto_cache_hash(dev)]);
-        cache->cache_dev = dev;
+                 &presto_caches[presto_cache_hash(sb)]);
 }
 
 inline void presto_init_cache_hash(void)
@@ -65,17 +64,16 @@ inline void presto_init_cache_hash(void)
 }
 
 /* map a device to a cache */
-struct presto_cache *presto_find_cache(kdev_t dev)
+struct presto_cache *presto_find_cache(struct super_block *sb)
 {
         struct presto_cache *cache;
         struct list_head *lh, *tmp;
 
-        lh = tmp = &(presto_caches[presto_cache_hash(dev)]);
+        lh = tmp = &(presto_caches[presto_cache_hash(sb)]);
         while ( (tmp = lh->next) != lh ) {
                 cache = list_entry(tmp, struct presto_cache, cache_chain);
-                if ( kdev_same(cache->cache_dev, dev) ) {
+                if (cache->cache_sb == sb)
                         return cache;
-                }
         }
         return NULL;
 }
@@ -87,10 +85,10 @@ struct presto_cache *presto_get_cache(struct inode *inode)
         struct presto_cache *cache;
 
         /* find the correct presto_cache here, based on the device */
-        cache = presto_find_cache(inode->i_dev);
+        cache = presto_find_cache(inode->i_sb);
         if ( !cache ) {
-                printk("WARNING: no presto cache for dev %x, ino %ld\n",
-                       kdev_val(inode->i_dev), inode->i_ino);
+                printk("WARNING: no presto cache for dev %s, ino %ld\n",
+                       inode->i_sb->s_id, inode->i_ino);
                 EXIT;
                 return NULL;
         }
@@ -174,7 +172,7 @@ int presto_ispresto(struct inode *inode)
         cache = presto_get_cache(inode);
         if ( !cache )
                 return 0;
-        return (kdev_same(inode->i_dev, cache->cache_dev));
+        return (inode->i_sb == cache->cache_sb);
 }
 
 /* setup a cache structure when we need one */

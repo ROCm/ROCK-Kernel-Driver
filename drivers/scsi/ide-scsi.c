@@ -182,7 +182,7 @@ static inline void idescsi_transform_pc1 (ide_drive_t *drive, idescsi_pc_t *pc)
 
 	if (!test_bit(PC_TRANSFORM, &pc->flags))
 		return;
-	if (drive->media == ide_cdrom || drive->media == ide_optical) {
+	if (drive->type == ATA_ROM || drive->type == ATA_MOD) {
 		if (c[0] == READ_6 || c[0] == WRITE_6) {
 			c[8] = c[4];		c[5] = c[3];		c[4] = c[2];
 			c[3] = c[1] & 0x1f;	c[2] = 0;		c[1] &= 0xe0;
@@ -221,7 +221,7 @@ static inline void idescsi_transform_pc2 (ide_drive_t *drive, idescsi_pc_t *pc)
 
 	if (!test_bit(PC_TRANSFORM, &pc->flags))
 		return;
-	if (drive->media == ide_cdrom || drive->media == ide_optical) {
+	if (drive->type == ATA_ROM || drive->type == ATA_MOD) {
 		if (pc->c[0] == MODE_SENSE_10 && sc[0] == MODE_SENSE) {
 			scsi_buf[0] = atapi_buf[1];		/* Mode data length */
 			scsi_buf[1] = atapi_buf[2];		/* Medium type */
@@ -508,7 +508,8 @@ static void idescsi_add_settings(ide_drive_t *drive)
  */
 static void idescsi_setup (ide_drive_t *drive, idescsi_scsi_t *scsi, int id)
 {
-	DRIVER(drive)->busy++;
+	ata_ops(drive)->busy++;
+
 	idescsi_drives[id] = drive;
 	drive->driver_data = scsi;
 	drive->ready_stat = 0;
@@ -535,18 +536,13 @@ static int idescsi_cleanup (ide_drive_t *drive)
 	return 0;
 }
 
-int idescsi_init(void);
-int idescsi_reinit(ide_drive_t *drive);
+static int idescsi_reinit(ide_drive_t *drive);
 
 /*
  *	IDE subdriver functions, registered with ide.c
  */
-static ide_driver_t idescsi_driver = {
-	name:			"ide-scsi",
-	media:			ide_scsi,
-	busy:			0,
-	supports_dma:		1,
-	supports_dsc_overlap:	0,
+static struct ata_operations idescsi_driver = {
+	owner:			THIS_MODULE,
 	cleanup:		idescsi_cleanup,
 	standby:		NULL,
 	flushcache:		NULL,
@@ -561,54 +557,23 @@ static ide_driver_t idescsi_driver = {
 	capacity:		NULL,
 	special:		NULL,
 	proc:			NULL,
-	driver_init:		idescsi_init,
 	driver_reinit:		idescsi_reinit,
 };
 
-int idescsi_reinit (ide_drive_t *drive)
+static int idescsi_reinit (ide_drive_t *drive)
 {
-#if 0
-	idescsi_scsi_t *scsi;
-	byte media[] = {TYPE_DISK, TYPE_TAPE, TYPE_PROCESSOR, TYPE_WORM, TYPE_ROM, TYPE_SCANNER, TYPE_MOD, 255};
-	int i, failed, id;
-
-	if (!idescsi_initialized)
-		return 0;
-	for (i = 0; i < MAX_HWIFS * MAX_DRIVES; i++)
-		idescsi_drives[i] = NULL;
-
-	MOD_INC_USE_COUNT;
-	for (i = 0; media[i] != 255; i++) {
-		failed = 0;
-		while ((drive = ide_scan_devices (media[i], idescsi_driver.name, NULL, failed++)) != NULL) {
-
-			if ((scsi = (idescsi_scsi_t *) kmalloc (sizeof (idescsi_scsi_t), GFP_KERNEL)) == NULL) {
-				printk (KERN_ERR "ide-scsi: %s: Can't allocate a scsi structure\n", drive->name);
-				continue;
-			}
-			if (ide_register_subdriver (drive, &idescsi_driver)) {
-				printk (KERN_ERR "ide-scsi: %s: Failed to register the driver with ide.c\n", drive->name);
-				kfree (scsi);
-				continue;
-			}
-			for (id = 0; id < MAX_HWIFS * MAX_DRIVES && idescsi_drives[id]; id++);
-				idescsi_setup (drive, scsi, id);
-			failed--;
-		}
-	}
-	ide_register_module(&idescsi_module);
-	MOD_DEC_USE_COUNT;
-#endif
 	return 0;
 }
 
 /*
  *	idescsi_init will register the driver for each scsi.
  */
-int idescsi_init (void)
+static int idescsi_init(void)
 {
 	ide_drive_t *drive;
 	idescsi_scsi_t *scsi;
+	/* FIXME: The following is just plain wrong, since those are definitely *not* the
+	 * media types supported by the ATA layer */
 	byte media[] = {TYPE_DISK, TYPE_TAPE, TYPE_PROCESSOR, TYPE_WORM, TYPE_ROM, TYPE_SCANNER, TYPE_MOD, 255};
 	int i, failed, id;
 
@@ -620,7 +585,7 @@ int idescsi_init (void)
 	MOD_INC_USE_COUNT;
 	for (i = 0; media[i] != 255; i++) {
 		failed = 0;
-		while ((drive = ide_scan_devices (media[i], idescsi_driver.name, NULL, failed++)) != NULL) {
+		while ((drive = ide_scan_devices (media[i], "ide-scsi", NULL, failed++)) != NULL) {
 
 			if ((scsi = (idescsi_scsi_t *) kmalloc (sizeof (idescsi_scsi_t), GFP_KERNEL)) == NULL) {
 				printk (KERN_ERR "ide-scsi: %s: Can't allocate a scsi structure\n", drive->name);
@@ -636,7 +601,7 @@ int idescsi_init (void)
 			failed--;
 		}
 	}
-	ide_register_module(&idescsi_driver);
+	revalidate_drives();
 	MOD_DEC_USE_COUNT;
 	return 0;
 }
@@ -668,7 +633,7 @@ int idescsi_release (struct Scsi_Host *host)
 	for (id = 0; id < MAX_HWIFS * MAX_DRIVES; id++) {
 		drive = idescsi_drives[id];
 		if (drive)
-			DRIVER(drive)->busy--;
+			ata_ops(drive)->busy--;
 	}
 	return 0;
 }
@@ -898,15 +863,22 @@ static void __exit exit_idescsi_module(void)
 	int i, failed;
 
 	scsi_unregister_host(&idescsi_template);
+
+	/* FIXME: The media types scanned here have literally nothing to do
+	 * with the media types used by the overall ATA code!
+	 *
+	 * This is basically showing us, that there is something wrong with the
+	 * ide_scan_devices function.
+	 */
+
 	for (i = 0; media[i] != 255; i++) {
 		failed = 0;
-		while ((drive = ide_scan_devices (media[i], idescsi_driver.name, &idescsi_driver, failed)) != NULL)
+		while ((drive = ide_scan_devices (media[i], "ide-scsi", &idescsi_driver, failed)) != NULL)
 			if (idescsi_cleanup (drive)) {
 				printk ("%s: exit_idescsi_module() called while still busy\n", drive->name);
 				failed++;
 			}
 	}
-	ide_unregister_module(&idescsi_driver);
 }
 
 module_init(init_idescsi_module);

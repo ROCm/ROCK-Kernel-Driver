@@ -37,7 +37,6 @@
 
 static int cs5530_get_info(char *, char **, off_t, int);
 extern int (*cs5530_display_info)(char *, char **, off_t, int); /* ide-proc.c */
-extern char *ide_media_verbose(ide_drive_t *);
 static struct pci_dev *bmide_dev;
 
 static int cs5530_get_info (char *buffer, char **addr, off_t offset, int count)
@@ -251,7 +250,7 @@ int cs5530_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 /*
  * Initialize the cs5530 bridge for reliable IDE DMA operation.
  */
-unsigned int __init pci_init_cs5530 (struct pci_dev *dev, const char *name)
+unsigned int __init pci_init_cs5530(struct pci_dev *dev)
 {
 	struct pci_dev *master_0 = NULL, *cs5530_0 = NULL;
 	unsigned short pcicmd = 0;
@@ -278,11 +277,11 @@ unsigned int __init pci_init_cs5530 (struct pci_dev *dev, const char *name)
 		}
 	}
 	if (!master_0) {
-		printk("%s: unable to locate PCI MASTER function\n", name);
+		printk("%s: unable to locate PCI MASTER function\n", dev->name);
 		return 0;
 	}
 	if (!cs5530_0) {
-		printk("%s: unable to locate CS5530 LEGACY function\n", name);
+		printk("%s: unable to locate CS5530 LEGACY function\n", dev->name);
 		return 0;
 	}
 
