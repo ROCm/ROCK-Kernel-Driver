@@ -58,6 +58,9 @@
  * Revision History:
  *	06/18/98 HL, Initial production Version 1.02
  *	12/19/98 bv, Use spinlocks for 2.1.95 and up
+ *	06/25/02 Doug Ledford <dledford@redhat.com>
+ *		 - This and the i60uscsi.h file are almost identical,
+ *		   merged them into a single header used by both .c files.
  ****************************************************************************/
 
 #ifndef	CVT_LINUX_VERSION
@@ -68,13 +71,14 @@
 #include <linux/version.h>
 #endif
 
+#include <linux/config.h>
 #include <linux/types.h>
+#include <linux/pci.h>
 
 #include "sd.h"
 
 extern int inia100_detect(Scsi_Host_Template *);
 extern int inia100_release(struct Scsi_Host *);
-extern int inia100_command(Scsi_Cmnd *);
 extern int inia100_queue(Scsi_Cmnd *, void (*done) (Scsi_Cmnd *));
 extern int inia100_abort(Scsi_Cmnd *);
 extern int inia100_reset(Scsi_Cmnd *, unsigned int);
@@ -86,13 +90,13 @@ extern int inia100_biosparam(Scsi_Disk *, kdev_t, int *);	/*for linux v2.0 */
 #define INIA100	{ \
 	next:		NULL,						\
 	module:		NULL,						\
-	proc_name:	"INIA100", \
+	proc_name:	"inia100", \
 	proc_info:	NULL,				\
 	name:		inia100_REVID, \
 	detect:		inia100_detect, \
 	release:	inia100_release, \
 	info:		NULL,					\
-	command:	inia100_command, \
+	command:	NULL, \
 	queuecommand:	inia100_queue, \
  	eh_strategy_handler: NULL, \
  	eh_abort_handler: NULL, \
@@ -112,7 +116,6 @@ extern int inia100_biosparam(Scsi_Disk *, kdev_t, int *);	/*for linux v2.0 */
 	use_clustering:	ENABLE_CLUSTERING, \
 }
 
-#define VIRT_TO_BUS(i)  (unsigned int) virt_to_bus((void *)(i))
 #define ULONG   unsigned long
 #define PVOID   void *
 #define USHORT  unsigned short
@@ -139,15 +142,16 @@ extern int inia100_biosparam(Scsi_Disk *, kdev_t, int *);	/*for linux v2.0 */
 #endif
 #if 1
 #define ORC_MAXQUEUE		245
+#define ORC_MAXTAGS		64
 #else
 #define ORC_MAXQUEUE		25
+#define ORC_MAXTAGS		8
 #endif
 
 #define TOTAL_SG_ENTRY		32
 #define MAX_TARGETS		16
 #define IMAX_CDB			15
 #define SENSE_SIZE		14
-#define MAX_SUPPORTED_ADAPTERS  4
 #define SUCCESSFUL              0x00
 
 #define I920_DEVICE_ID	0x0002	/* Initio's inic-950 product ID   */
@@ -159,6 +163,12 @@ typedef struct ORC_SG_Struc {
 	U32 SG_Ptr;		/* Data Pointer */
 	U32 SG_Len;		/* Data Length */
 } ORC_SG;
+
+typedef struct inia100_Adpt_Struc {
+        UWORD ADPT_BIOS;        /* 0 */
+        UWORD ADPT_BASE;        /* 1 */
+        struct pci_dev *ADPT_pdev;      /* 2 */
+} INIA100_ADPT_STRUCT;
 
 
 /* SCSI related definition                                              */
@@ -374,9 +384,9 @@ typedef struct ORC_Ha_Ctrl_Struc {
 	USHORT HCS_AFlags;	/* Adapter info. defined flags   */
 	ULONG HCS_Timeout;	/* Adapter timeout value   */
 	PVOID HCS_virScbArray;	/* 28 Virtual Pointer to SCB array     */
-	U32 HCS_physScbArray;	/* Scb Physical address */
+	dma_addr_t HCS_physScbArray;	/* Scb Physical address */
 	PVOID HCS_virEscbArray;	/* Virtual pointer to ESCB Scatter list */
-	U32 HCS_physEscbArray;	/* scatter list Physical address */
+	dma_addr_t HCS_physEscbArray;	/* scatter list Physical address */
 	UBYTE TargetFlag[16];	/* 30  target configuration, TCF_EN_TAG */
 	UBYTE MaximumTags[16];	/* 40  ORC_MAX_SCBS */
 	UBYTE ActiveTags[16][16];	/* 50 */
@@ -386,6 +396,7 @@ typedef struct ORC_Ha_Ctrl_Struc {
 	Scsi_Cmnd *pSRB_head;
 	Scsi_Cmnd *pSRB_tail;
 	spinlock_t pSRB_lock;
+	struct pci_dev *pdev;
 } ORC_HCS;
 
 /* Bit Definition for HCS_Flags */
@@ -438,3 +449,148 @@ typedef struct ORC_Ha_Ctrl_Struc {
 /*----------------------------------------------*/
 #define	MAX_PCI_DEVICES	21
 #define	MAX_PCI_BUSES	8
+
+typedef struct Adpt_Struc {
+        USHORT ADPT_BIOS;       /* 0 */
+        UBYTE ADPT_BASE;        /* 1 */
+        UBYTE ADPT_Bus;         /* 2 */
+        UBYTE ADPT_Device;      /* 3 */
+        UBYTE ADPT_Reserved[3];
+} JACS, *PJACS;
+
+typedef struct _NVRAM {
+/*----------header ---------------*/
+        UCHAR SubVendorID0;     /* 00 - Sub Vendor ID           */
+        UCHAR SubVendorID1;     /* 00 - Sub Vendor ID           */
+        UCHAR SubSysID0;        /* 02 - Sub System ID           */
+        UCHAR SubSysID1;        /* 02 - Sub System ID           */
+        UCHAR SubClass;         /* 04 - Sub Class               */
+        UCHAR VendorID0;        /* 05 - Vendor ID               */
+        UCHAR VendorID1;        /* 05 - Vendor ID               */
+        UCHAR DeviceID0;        /* 07 - Device ID               */
+        UCHAR DeviceID1;        /* 07 - Device ID               */
+        UCHAR Reserved0[2];     /* 09 - Reserved                */
+        UCHAR Revision;         /* 0B - Revision of data structure */
+        /* ----Host Adapter Structure ---- */
+        UCHAR NumOfCh;          /* 0C - Number of SCSI channel  */
+        UCHAR BIOSConfig1;      /* 0D - BIOS configuration 1    */
+        UCHAR BIOSConfig2;      /* 0E - BIOS boot channel&target ID */
+        UCHAR BIOSConfig3;      /* 0F - BIOS configuration 3    */
+        /* ----SCSI channel Structure ---- */
+        /* from "CTRL-I SCSI Host Adapter SetUp menu "  */
+        UCHAR SCSI0Id;          /* 10 - Channel 0 SCSI ID       */
+        UCHAR SCSI0Config;      /* 11 - Channel 0 SCSI configuration */
+        UCHAR SCSI0MaxTags;     /* 12 - Channel 0 Maximum tags  */
+        UCHAR SCSI0ResetTime;   /* 13 - Channel 0 Reset recovering time */
+        UCHAR ReservedforChannel0[2];   /* 14 - Reserved                */
+
+        /* ----SCSI target Structure ----  */
+        /* from "CTRL-I SCSI device SetUp menu "                        */
+        UCHAR Target00Config;   /* 16 - Channel 0 Target 0 config */
+        UCHAR Target01Config;   /* 17 - Channel 0 Target 1 config */
+        UCHAR Target02Config;   /* 18 - Channel 0 Target 2 config */
+        UCHAR Target03Config;   /* 19 - Channel 0 Target 3 config */
+        UCHAR Target04Config;   /* 1A - Channel 0 Target 4 config */
+        UCHAR Target05Config;   /* 1B - Channel 0 Target 5 config */
+        UCHAR Target06Config;   /* 1C - Channel 0 Target 6 config */
+        UCHAR Target07Config;   /* 1D - Channel 0 Target 7 config */
+        UCHAR Target08Config;   /* 1E - Channel 0 Target 8 config */
+        UCHAR Target09Config;   /* 1F - Channel 0 Target 9 config */
+        UCHAR Target0AConfig;   /* 20 - Channel 0 Target A config */
+        UCHAR Target0BConfig;   /* 21 - Channel 0 Target B config */
+        UCHAR Target0CConfig;   /* 22 - Channel 0 Target C config */
+        UCHAR Target0DConfig;   /* 23 - Channel 0 Target D config */
+        UCHAR Target0EConfig;   /* 24 - Channel 0 Target E config */
+        UCHAR Target0FConfig;   /* 25 - Channel 0 Target F config */
+
+        UCHAR SCSI1Id;          /* 26 - Channel 1 SCSI ID       */
+        UCHAR SCSI1Config;      /* 27 - Channel 1 SCSI configuration */
+        UCHAR SCSI1MaxTags;     /* 28 - Channel 1 Maximum tags  */
+        UCHAR SCSI1ResetTime;   /* 29 - Channel 1 Reset recovering time */
+        UCHAR ReservedforChannel1[2];   /* 2A - Reserved                */
+
+        /* ----SCSI target Structure ----  */
+        /* from "CTRL-I SCSI device SetUp menu "                                          */
+        UCHAR Target10Config;   /* 2C - Channel 1 Target 0 config */
+        UCHAR Target11Config;   /* 2D - Channel 1 Target 1 config */
+        UCHAR Target12Config;   /* 2E - Channel 1 Target 2 config */
+        UCHAR Target13Config;   /* 2F - Channel 1 Target 3 config */
+        UCHAR Target14Config;   /* 30 - Channel 1 Target 4 config */
+        UCHAR Target15Config;   /* 31 - Channel 1 Target 5 config */
+        UCHAR Target16Config;   /* 32 - Channel 1 Target 6 config */
+        UCHAR Target17Config;   /* 33 - Channel 1 Target 7 config */
+        UCHAR Target18Config;   /* 34 - Channel 1 Target 8 config */
+        UCHAR Target19Config;   /* 35 - Channel 1 Target 9 config */
+        UCHAR Target1AConfig;   /* 36 - Channel 1 Target A config */
+        UCHAR Target1BConfig;   /* 37 - Channel 1 Target B config */
+        UCHAR Target1CConfig;   /* 38 - Channel 1 Target C config */
+        UCHAR Target1DConfig;   /* 39 - Channel 1 Target D config */
+        UCHAR Target1EConfig;   /* 3A - Channel 1 Target E config */
+        UCHAR Target1FConfig;   /* 3B - Channel 1 Target F config */
+        UCHAR reserved[3];      /* 3C - Reserved                */
+        /* ---------- CheckSum ----------       */
+        UCHAR CheckSum;         /* 3F - Checksum of NVRam       */
+} NVRAM, *PNVRAM;
+
+/* Bios Configuration for nvram->BIOSConfig1                            */
+#define NBC_BIOSENABLE  0x01    /* BIOS enable                    */
+#define NBC_CDROM       0x02    /* Support bootable CDROM */
+#define NBC_REMOVABLE   0x04    /* Support removable drive        */
+
+/* Bios Configuration for nvram->BIOSConfig2                            */
+#define NBB_TARGET_MASK 0x0F    /* Boot SCSI target ID number     */
+#define NBB_CHANL_MASK  0xF0    /* Boot SCSI channel number       */
+
+/* Bit definition for nvram->SCSIConfig                                 */
+#define NCC_BUSRESET    0x01    /* Reset SCSI bus at power up     */
+#define NCC_PARITYCHK   0x02    /* SCSI parity enable             */
+#define NCC_LVDS        0x10    /* Enable LVDS                    */
+#define NCC_ACTTERM1    0x20    /* Enable active terminator 1     */
+#define NCC_ACTTERM2    0x40    /* Enable active terminator 2     */
+#define NCC_AUTOTERM    0x80    /* Enable auto termination        */
+
+/* Bit definition for nvram->TargetxConfig                              */
+#define NTC_PERIOD      0x07    /* Maximum Sync. Speed            */
+#define NTC_1GIGA       0x08    /* 255 head / 63 sectors (64/32) */
+#define NTC_NO_SYNC     0x10    /* NO SYNC. NEGO          */
+#define NTC_NO_WIDESYNC 0x20    /* NO WIDE SYNC. NEGO             */
+#define NTC_DISC_ENABLE 0x40    /* Enable SCSI disconnect */
+#define NTC_SPINUP      0x80    /* Start disk drive               */
+
+/* Default NVRam values                                                 */
+#define NBC_DEFAULT     (NBC_ENABLE)
+#define NCC_DEFAULT     (NCC_BUSRESET | NCC_AUTOTERM | NCC_PARITYCHK)
+#define NCC_MAX_TAGS    0x20    /* Maximum tags per target        */
+#define NCC_RESET_TIME  0x0A    /* SCSI RESET recovering time     */
+#define NTC_DEFAULT     (NTC_1GIGA | NTC_NO_WIDESYNC | NTC_DISC_ENABLE)
+
+typedef union {                 /* Union define for mechanism 1   */
+        struct {
+                unsigned char RegNum;
+                unsigned char FcnNum:3;
+                unsigned char DeviceNum:5;
+                unsigned char BusNum;
+                unsigned char Reserved:7;
+                unsigned char Enable:1;
+        } sConfigAdr;
+        unsigned long lConfigAdr;
+} CONFIG_ADR;
+
+typedef union {                 /* Union define for mechanism 2   */
+        struct {
+                unsigned char RegNum;
+                unsigned char DeviceNum;
+                unsigned short Reserved;
+        } sHostAdr;
+        unsigned long lHostAdr;
+} HOST_ADR;
+
+#define ORC_RD(x,y)             (UCHAR)(inb(  (int)((ULONG)((ULONG)x+(UCHAR)y)) ))
+#define ORC_RDLONG(x,y)         (long)(inl((int)((ULONG)((ULONG)x+(UCHAR)y)) ))
+
+#define ORC_WR(     adr,data)   outb( (UCHAR)(data), (int)(adr))
+#define ORC_WRSHORT(adr,data)   outw( (UWORD)(data), (int)(adr))
+#define ORC_WRLONG( adr,data)   outl( (ULONG)(data), (int)(adr))
+
+
+
