@@ -3428,10 +3428,15 @@ qla2x00_do_dpc(void *data)
 				    fcport->login_retry) {
 
 					fcport->login_retry--;
-					if (fcport->flags & FCF_FABRIC_DEVICE)
+					if (fcport->flags & FCF_FABRIC_DEVICE) {
+						if (fcport->flags &
+						    FCF_TAPE_PRESENT)
+							qla2x00_fabric_logout(
+							    ha,
+							    fcport->loop_id);
 						status = qla2x00_fabric_login(
 						    ha, fcport, &next_loopid);
-					else 	
+					} else
 						status =
 						    qla2x00_local_device_login(
 							ha, fcport->loop_id);

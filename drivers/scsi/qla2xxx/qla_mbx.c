@@ -1431,35 +1431,37 @@ qla2x00_get_port_database(scsi_qla_host_t *ha, fc_port_t *fcport, uint8_t opt)
 	mcp->flags = MBX_DMA_IN;
 	mcp->tov = (ha->login_timeout * 2) + (ha->login_timeout / 2);
 	rval = qla2x00_mailbox_command(ha, mcp);
+	if (rval != QLA_SUCCESS)
+		goto gpd_error_out;
 
-	if (rval == QLA_SUCCESS) {
-		/* Names are little-endian. */
-		memcpy(fcport->node_name, pd->node_name, WWN_SIZE);
-		memcpy(fcport->port_name, pd->port_name, WWN_SIZE);
-
-		/* Get port_id of device. */
-		fcport->d_id.b.al_pa = pd->port_id[2];
-		fcport->d_id.b.area = pd->port_id[3];
-		fcport->d_id.b.domain = pd->port_id[0];
-		fcport->d_id.b.rsvd_1 = 0;
-
-		/* Check for device require authentication. */
-		pd->common_features & BIT_5 ? (fcport->flags |= FCF_AUTH_REQ) :
-		    (fcport->flags &= ~FCF_AUTH_REQ);
-
-		/* If not target must be initiator or unknown type. */
-		if ((pd->prli_svc_param_word_3[0] & BIT_4) == 0) {
-			fcport->port_type = FCT_INITIATOR;
-		} else {
-			fcport->port_type = FCT_TARGET;
-
-			/* Check for logged in. */
-			if (pd->master_state != PD_STATE_PORT_LOGGED_IN &&
-			    pd->slave_state != PD_STATE_PORT_LOGGED_IN)
-				rval = QLA_FUNCTION_FAILED;
-		}
+	/* Check for logged in state. */
+	if (pd->master_state != PD_STATE_PORT_LOGGED_IN &&
+	    pd->slave_state != PD_STATE_PORT_LOGGED_IN) {
+		rval = QLA_FUNCTION_FAILED;
+		goto gpd_error_out;
 	}
 
+	/* Names are little-endian. */
+	memcpy(fcport->node_name, pd->node_name, WWN_SIZE);
+	memcpy(fcport->port_name, pd->port_name, WWN_SIZE);
+
+	/* Get port_id of device. */
+	fcport->d_id.b.al_pa = pd->port_id[2];
+	fcport->d_id.b.area = pd->port_id[3];
+	fcport->d_id.b.domain = pd->port_id[0];
+	fcport->d_id.b.rsvd_1 = 0;
+
+	/* Check for device require authentication. */
+	pd->common_features & BIT_5 ? (fcport->flags |= FCF_AUTH_REQ) :
+	    (fcport->flags &= ~FCF_AUTH_REQ);
+
+	/* If not target must be initiator or unknown type. */
+	if ((pd->prli_svc_param_word_3[0] & BIT_4) == 0)
+		fcport->port_type = FCT_INITIATOR;
+	else
+		fcport->port_type = FCT_TARGET;
+
+gpd_error_out:
 	pci_free_consistent(ha->pdev, PORT_DATABASE_SIZE, pd, pd_dma);
 
 	if (rval != QLA_SUCCESS) {
