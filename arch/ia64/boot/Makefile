@@ -11,7 +11,6 @@
 EXTRA_TARGETS := vmlinux.bin vmlinux.gz
 
 targets-$(CONFIG_IA64_HP_SIM)  += bootloader
-targets-$(CONFIG_IA64_GENERIC) += bootloader
 EXTRA_TARGETS += $(sort $(targets-y))
 
 quiet_cmd_cptotop = LN      $@
