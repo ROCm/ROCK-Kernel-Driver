@@ -965,7 +965,9 @@ extern void tcp_reset_keepalive_timer(struct sock *, unsigned long);
 extern unsigned int tcp_sync_mss(struct sock *sk, u32 pmtu);
 extern unsigned int tcp_current_mss(struct sock *sk, int large);
 
-extern const char timer_bug_msg[];
+#ifdef TCP_DEBUG
+extern const char tcp_timer_bug_msg[];
+#endif
 
 /* tcp_diag.c */
 extern void tcp_get_info(struct sock *, struct tcp_info *);
@@ -998,7 +1000,9 @@ static inline void tcp_clear_xmit_timer(struct sock *sk, int what)
 #endif
 		break;
 	default:
-		printk(timer_bug_msg);
+#ifdef TCP_DEBUG
+		printk(tcp_timer_bug_msg);
+#endif
 		return;
 	};
 
@@ -1033,7 +1037,9 @@ static inline void tcp_reset_xmit_timer(struct sock *sk, int what, unsigned long
 		break;
 
 	default:
-		printk(timer_bug_msg);
+#ifdef TCP_DEBUG
+		printk(tcp_timer_bug_msg);
+#endif
 	};
 }
 
