@@ -567,12 +567,14 @@ unsigned long do_mmap_pgoff(struct file *file,
 	 * that it represents a valid section of the address space
 	 * - this is the hook for quasi-memory character devices
 	 */
-	if (file && file->f_op->get_unmapped_area)
+	if (file && file->f_op->get_unmapped_area) {
 		addr = file->f_op->get_unmapped_area(file, addr, len, pgoff, flags);
-
-	if (IS_ERR((void *) addr)) {
-		ret = addr;
-		goto error;
+		if (IS_ERR((void *) addr)) {
+			ret = addr;
+			if (ret == (unsigned long) -ENOSYS)
+				ret = (unsigned long) -ENODEV;
+			goto error;
+		}
 	}
 
 	/* we're going to need a VMA struct as well */
