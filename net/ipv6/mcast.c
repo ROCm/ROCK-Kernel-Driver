@@ -1017,7 +1017,9 @@ int igmp6_event_query(struct sk_buff *skb)
 	if (!pskb_may_pull(skb, sizeof(struct in6_addr)))
 		return -EINVAL;
 
-	len = ntohs(skb->nh.ipv6h->payload_len);
+	/* compute payload length excluding extension headers */
+	len = ntohs(skb->nh.ipv6h->payload_len) + sizeof(struct ipv6hdr);
+	len -= (char *)skb->h.raw - (char *)skb->nh.ipv6h; 
 
 	/* Drop queries with not link local source */
 	if (!(ipv6_addr_type(&skb->nh.ipv6h->saddr)&IPV6_ADDR_LINKLOCAL))
