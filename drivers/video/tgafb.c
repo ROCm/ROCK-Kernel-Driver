@@ -1430,7 +1430,6 @@ tgafb_pci_register(struct pci_dev *pdev, const struct pci_device_id *ent)
                           FBINFO_HWACCEL_IMAGEBLIT | FBINFO_HWACCEL_FILLRECT;
 	all->info.fbops = &tgafb_ops;
 	all->info.screen_base = (char *) all->par.tga_fb_base;
-	all->info.currcon = -1;
 	all->info.par = &all->par;
 	all->info.pseudo_palette = all->pseudo_palette;
 

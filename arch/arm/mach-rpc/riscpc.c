@@ -16,6 +16,7 @@
 #include <linux/init.h>
 #include <linux/sched.h>
 #include <linux/device.h>
+#include <linux/serial_8250.h>
 
 #include <asm/elf.h>
 #include <asm/io.h>
@@ -130,9 +131,30 @@ static struct platform_device kbd_device = {
 	},
 };
 
+static struct plat_serial8250_port serial_platform_data[] = {
+	{
+		.mapbase	= 0x03010fe0,
+		.irq		= 10,
+		.uartclk	= 1843200,
+		.regshift	= 2,
+		.iotype		= UPIO_MEM,
+		.flags		= UPF_BOOT_AUTOCONF | UPF_IOREMAP | UPF_SKIP_TEST,
+	},
+	{ },
+};
+
+static struct platform_device serial_device = {
+	.name			= "serial8250",
+	.id			= 0,
+	.dev			= {
+		.platform_data	= serial_platform_data,
+	},
+};
+
 static struct platform_device *devs[] __initdata = {
 	&iomd_device,
 	&kbd_device,
+	&serial_device,
 	&acornfb_device,
 };
 

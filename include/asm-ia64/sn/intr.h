@@ -18,6 +18,7 @@
 #define SGI_XBOW_ERROR                  (0x32)
 #define SGI_PCIBR_ERROR                 (0x33)
 #define SGI_ACPI_SCI_INT                (0x34)
+#define SGI_MMTIMER_VECTOR		(0x35)
 #define SGI_TIO_ERROR			(0x36)
 #define SGI_XPC_NOTIFY                  (0xe7)
 

@@ -307,7 +307,6 @@ static void p9100_init_one(struct sbus_dev *sdev)
 		all->info.screen_base = (char *)
 			sbus_ioremap(&sdev->resource[2], 0,
 				     all->par.fbsize, "p9100 ram");
-	all->info.currcon = -1;
 	all->info.par = &all->par;
 
 	p9100_blank(0, &all->info);

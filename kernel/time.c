@@ -487,8 +487,6 @@ int do_settimeofday (struct timespec *tv)
 	return 0;
 }
 
-EXPORT_SYMBOL(do_settimeofday);
-
 void do_gettimeofday (struct timeval *tv)
 {
 	unsigned long seq, nsec, usec, sec, offset;

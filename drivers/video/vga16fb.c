@@ -859,7 +859,6 @@ static int vga16fb_blank(int blank, struct fb_info *info)
 			par->vesa_blanked = 0;
 		}
 		if (par->palette_blanked) {
-			//do_install_cmap(info->currcon, info);
 			par->palette_blanked = 0;
 		}
 		break;

@@ -1740,7 +1740,7 @@ static int of_finish_dynamic_node(struct device_node *node)
 	if (strcmp(node->name, "pci") == 0 &&
 	    get_property(node, "ibm,dma-window", NULL)) {
 		node->bussubno = node->busno;
-		iommu_devnode_init(node);
+		iommu_devnode_init_pSeries(node);
 	} else
 		node->iommu_table = parent->iommu_table;
 #endif /* CONFIG_PPC_PSERIES */
@@ -1802,6 +1802,15 @@ int of_add_node(const char *path, struct property *proplist)
 }
 
 /*
+ * Prepare an OF node for removal from system
+ */
+static void of_cleanup_node(struct device_node *np)
+{
+	if (np->iommu_table && get_property(np, "ibm,dma-window", NULL))
+		iommu_free_table(np);
+}
+
+/*
  * Remove an OF device node from the system.
  * Caller should have already "gotten" np.
  */
@@ -1818,13 +1827,7 @@ int of_remove_node(struct device_node *np)
 		return -EBUSY;
 	}
 
-	/* XXX This is a layering violation, should be moved to the caller
-	 * --BenH.
-	 */
-#ifdef CONFIG_PPC_PSERIES
-	if (np->iommu_table)
-		iommu_free_table(np);
-#endif /* CONFIG_PPC_PSERIES */
+	of_cleanup_node(np);
 
 	write_lock(&devtree_lock);
 	OF_MARK_STALE(np);

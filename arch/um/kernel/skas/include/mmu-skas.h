@@ -1,13 +1,10 @@
-/* 
+/*
  * Copyright (C) 2002 Jeff Dike (jdike@karaya.com)
  * Licensed under the GPL
  */
 
 #ifndef __SKAS_MMU_H
 #define __SKAS_MMU_H
-
-#include "linux/list.h"
-#include "linux/spinlock.h"
 
 struct mmu_context_skas {
 	int mm_fd;

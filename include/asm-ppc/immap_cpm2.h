@@ -133,7 +133,7 @@ typedef struct	sys_int_timers {
 	u8	res5[2];
 	u32	sit_pitc;
 	u32	sit_pitr;
-	u8	res6[92];
+	u8      res6[94];
 	u8	res7[390];
 } sit_cpm2_t;
 

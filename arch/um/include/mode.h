@@ -9,11 +9,11 @@
 #include "uml-config.h"
 
 #ifdef UML_CONFIG_MODE_TT
-#include "../kernel/tt/include/mode.h"
+#include "mode-tt.h"
 #endif
 
 #ifdef UML_CONFIG_MODE_SKAS
-#include "../kernel/skas/include/mode.h"
+#include "mode-skas.h"
 #endif
 
 #endif

@@ -1534,7 +1534,7 @@ neo2200_imageblit(struct fb_info *info, const struct fb_image *image)
 	       &par->neo2200->xyExt);
 
 	for (i = 0; i < data_len; i++)
-		writeb(image->data[i], par->mmio_vbase + 0x100000);
+		writeb(image->data[i], par->mmio_vbase + 0x100000 + i);
 }
 
 static void

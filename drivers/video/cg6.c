@@ -723,7 +723,6 @@ static void cg6_init_one(struct sbus_dev *sdev)
 		all->info.screen_base = (char *)
 			sbus_ioremap(&sdev->resource[0], CG6_RAM_OFFSET,
 				     all->par.fbsize, "cgsix ram");
-	all->info.currcon = -1;
 	all->info.par = &all->par;
 
 	all->info.var.accel_flags = FB_ACCELF_TEXT;

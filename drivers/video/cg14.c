@@ -552,7 +552,6 @@ static void cg14_init_one(struct sbus_dev *sdev, int node, int parent_node)
 
 	all->info.flags = FBINFO_DEFAULT | FBINFO_HWACCEL_YPAN;
 	all->info.fbops = &cg14_ops;
-	all->info.currcon = -1;
 	all->info.par = &all->par;
 
 	__cg14_reset(&all->par);

@@ -1497,6 +1497,10 @@ static int chip_attach(struct i2c_adapter *adap, int addr, int kind)
 
 static int chip_probe(struct i2c_adapter *adap)
 {
+	/* don't attach on saa7146 based cards,
+	   because dedicated drivers are used */
+	if ((adap->id & I2C_ALGO_SAA7146))
+		return 0;
 #ifdef I2C_CLASS_TV_ANALOG
 	if (adap->class & I2C_CLASS_TV_ANALOG)
 		return i2c_probe(adap, &addr_data, chip_attach);

@@ -43,7 +43,7 @@
 
 #ifdef CONFIG_MPC10X_OPENPIC
 #ifdef CONFIG_EPIC_SERIAL_MODE
-#define EPIC_IRQ_BASE 16
+#define EPIC_IRQ_BASE (epic_serial_mode ? 16 : 5)
 #else
 #define EPIC_IRQ_BASE 5
 #endif
@@ -69,20 +69,16 @@ static struct ocp_def mpc10x_i2c_ocp = {
 	.vendor		= OCP_VENDOR_MOTOROLA,
 	.function	= OCP_FUNC_IIC,
 	.index		= 0,
-	.irq		= MPC10X_I2C_IRQ,
 	.additions	= &mpc10x_i2c_data
 };
 
 static struct ocp_def mpc10x_dma_ocp[2] = {
 {	.vendor		= OCP_VENDOR_MOTOROLA,
 	.function	= OCP_FUNC_DMA,
-	.index		= 0,
-	.irq		= MPC10X_DMA0_IRQ
-},
+	.index		= 0 },
 {	.vendor		= OCP_VENDOR_MOTOROLA,
 	.function	= OCP_FUNC_DMA,
-	.index		= 1,
-	.irq		= MPC10X_DMA1_IRQ }
+	.index		= 1 }
 };
 
 /* Set resources to match bridge memory map */
@@ -292,12 +288,15 @@ mpc10x_bridge_init(struct pci_controller *hose,
 				MPC10X_EUMB_EPIC_SIZE);
 #endif
 		mpc10x_i2c_ocp.paddr = phys_eumb_base + MPC10X_EUMB_I2C_OFFSET;
+		mpc10x_i2c_ocp.irq = MPC10X_I2C_IRQ;
 		ocp_add_one_device(&mpc10x_i2c_ocp);
 		mpc10x_dma_ocp[0].paddr = phys_eumb_base +
 					MPC10X_EUMB_DMA_OFFSET + 0x100;
+		mpc10x_dma_ocp[0].irq = MPC10X_DMA0_IRQ;
 		ocp_add_one_device(&mpc10x_dma_ocp[0]);
 		mpc10x_dma_ocp[1].paddr = phys_eumb_base +
 					MPC10X_EUMB_DMA_OFFSET + 0x200;
+		mpc10x_dma_ocp[1].irq = MPC10X_DMA1_IRQ;
 		ocp_add_one_device(&mpc10x_dma_ocp[1]);
 	}
 

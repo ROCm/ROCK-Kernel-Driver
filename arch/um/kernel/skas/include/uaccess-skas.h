@@ -1,4 +1,4 @@
-/* 
+/*
  * Copyright (C) 2002 Jeff Dike (jdike@karaya.com)
  * Licensed under the GPL
  */
@@ -13,7 +13,7 @@
 	 (((unsigned long) (addr) < TASK_SIZE) && \
 	  ((unsigned long) (addr) + (size) <= TASK_SIZE)))
 
-static inline int verify_area_skas(int type, const void * addr, 
+static inline int verify_area_skas(int type, const void * addr,
 				   unsigned long size)
 {
 	return(access_ok_skas(type, addr, size) ? 0 : -EFAULT);
