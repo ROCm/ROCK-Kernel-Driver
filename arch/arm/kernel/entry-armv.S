@@ -429,186 +429,131 @@ ENTRY(__switch_to)
 
 		__INIT
 /*
- * Vector stubs.  NOTE that we only align 'vector_irq' to a cache line boundary,
- * and we rely on each stub being exactly 48 (1.5 cache lines) in size.  This
- * means that we only ever load two cache lines for this code, or one if we're
- * lucky.  We also copy this code to 0x200 so that we can use branches in the
+ * Vector stubs.
+ *
+ * This code is copied to 0x200 or 0xffff0200 so we can use branches in the
  * vectors, rather than ldr's.
+ *
+ * Common stub entry macro:
+ *   Enter in IRQ mode, spsr = SVC/USR CPSR, lr = SVC/USR PC
  */
-		.align	5
+	.macro	vector_stub, name, sym, correction=0
+	.align	5
+
+vector_\name:
+	ldr	r13, .LCs\sym
+	.if \correction
+	sub	lr, lr, #\correction
+	.endif
+	str	lr, [r13]			@ save lr_IRQ
+	mrs	lr, spsr
+	str	lr, [r13, #4]			@ save spsr_IRQ
+	@
+	@ now branch to the relevant MODE handling routine
+	@
+	mrs	r13, cpsr
+	bic	r13, r13, #MODE_MASK
+	orr	r13, r13, #MODE_SVC
+	msr	spsr_cxsf, r13			@ switch to SVC_32 mode
+
+	and	lr, lr, #15
+	ldr	lr, [pc, lr, lsl #2]
+	movs	pc, lr				@ Changes mode and branches
+	.endm
+
 __stubs_start:
 /*
  * Interrupt dispatcher
- * Enter in IRQ mode, spsr = SVC/USR CPSR, lr = SVC/USR PC
  */
-vector_irq:	@
-		@ save mode specific registers
-		@
-		ldr	r13, .LCsirq
-		sub	lr, lr, #4
-		str	lr, [r13]			@ save lr_IRQ
-		mrs	lr, spsr
-		str	lr, [r13, #4]			@ save spsr_IRQ
-		@
-		@ now branch to the relevant MODE handling routine
-		@
-		mrs	r13, cpsr
-		bic	r13, r13, #MODE_MASK
-		orr	r13, r13, #MODE_SVC
-		msr	spsr_cxsf, r13			@ switch to SVC_32 mode
+	vector_stub	irq, irq, 4
 
-		and	lr, lr, #15
-		ldr	lr, [pc, lr, lsl #2]
-		movs	pc, lr				@ Changes mode and branches
-
-.LCtab_irq:	.word	__irq_usr			@  0  (USR_26 / USR_32)
-		.word	__irq_invalid			@  1  (FIQ_26 / FIQ_32)
-		.word	__irq_invalid			@  2  (IRQ_26 / IRQ_32)
-		.word	__irq_svc			@  3  (SVC_26 / SVC_32)
-		.word	__irq_invalid			@  4
-		.word	__irq_invalid			@  5
-		.word	__irq_invalid			@  6
-		.word	__irq_invalid			@  7
-		.word	__irq_invalid			@  8
-		.word	__irq_invalid			@  9
-		.word	__irq_invalid			@  a
-		.word	__irq_invalid			@  b
-		.word	__irq_invalid			@  c
-		.word	__irq_invalid			@  d
-		.word	__irq_invalid			@  e
-		.word	__irq_invalid			@  f
-
-		.align	5
+	.long	__irq_usr			@  0  (USR_26 / USR_32)
+	.long	__irq_invalid			@  1  (FIQ_26 / FIQ_32)
+	.long	__irq_invalid			@  2  (IRQ_26 / IRQ_32)
+	.long	__irq_svc			@  3  (SVC_26 / SVC_32)
+	.long	__irq_invalid			@  4
+	.long	__irq_invalid			@  5
+	.long	__irq_invalid			@  6
+	.long	__irq_invalid			@  7
+	.long	__irq_invalid			@  8
+	.long	__irq_invalid			@  9
+	.long	__irq_invalid			@  a
+	.long	__irq_invalid			@  b
+	.long	__irq_invalid			@  c
+	.long	__irq_invalid			@  d
+	.long	__irq_invalid			@  e
+	.long	__irq_invalid			@  f
 
 /*
- * Data abort dispatcher - dispatches it to the correct handler for the processor mode
+ * Data abort dispatcher
  * Enter in ABT mode, spsr = USR CPSR, lr = USR PC
  */
-vector_dabt:	@
-		@ save mode specific registers
-		@
-		ldr	r13, .LCsabt
-		sub	lr, lr, #8
-		str	lr, [r13]
-		mrs	lr, spsr
-		str	lr, [r13, #4]
-		@
-		@ now branch to the relevant MODE handling routine
-		@
-		mrs	r13, cpsr
-		bic	r13, r13, #MODE_MASK
-		orr	r13, r13, #MODE_SVC
-		msr	spsr_cxsf, r13			@ switch to SVC_32 mode
+	vector_stub	dabt, abt, 8
 
-		and	lr, lr, #15
-		ldr	lr, [pc, lr, lsl #2]
-		movs	pc, lr				@ Changes mode and branches
-
-.LCtab_dabt:	.word	__dabt_usr			@  0  (USR_26 / USR_32)
-		.word	__dabt_invalid			@  1  (FIQ_26 / FIQ_32)
-		.word	__dabt_invalid			@  2  (IRQ_26 / IRQ_32)
-		.word	__dabt_svc			@  3  (SVC_26 / SVC_32)
-		.word	__dabt_invalid			@  4
-		.word	__dabt_invalid			@  5
-		.word	__dabt_invalid			@  6
-		.word	__dabt_invalid			@  7
-		.word	__dabt_invalid			@  8
-		.word	__dabt_invalid			@  9
-		.word	__dabt_invalid			@  a
-		.word	__dabt_invalid			@  b
-		.word	__dabt_invalid			@  c
-		.word	__dabt_invalid			@  d
-		.word	__dabt_invalid			@  e
-		.word	__dabt_invalid			@  f
-
-		.align	5
+	.long	__dabt_usr			@  0  (USR_26 / USR_32)
+	.long	__dabt_invalid			@  1  (FIQ_26 / FIQ_32)
+	.long	__dabt_invalid			@  2  (IRQ_26 / IRQ_32)
+	.long	__dabt_svc			@  3  (SVC_26 / SVC_32)
+	.long	__dabt_invalid			@  4
+	.long	__dabt_invalid			@  5
+	.long	__dabt_invalid			@  6
+	.long	__dabt_invalid			@  7
+	.long	__dabt_invalid			@  8
+	.long	__dabt_invalid			@  9
+	.long	__dabt_invalid			@  a
+	.long	__dabt_invalid			@  b
+	.long	__dabt_invalid			@  c
+	.long	__dabt_invalid			@  d
+	.long	__dabt_invalid			@  e
+	.long	__dabt_invalid			@  f
 
 /*
- * Prefetch abort dispatcher - dispatches it to the correct handler for the processor mode
+ * Prefetch abort dispatcher
  * Enter in ABT mode, spsr = USR CPSR, lr = USR PC
  */
-vector_pabt:
-		@
-		@ save mode specific registers
-		@
-		ldr	r13, .LCsabt
-		sub	lr, lr, #4
-		str	lr, [r13]			@ save lr_ABT
-		mrs	lr, spsr
-		str	lr, [r13, #4]			@ save spsr_ABT
-		@
-		@ now branch to the relevant MODE handling routine
-		@
-		mrs	r13, cpsr
-		bic	r13, r13, #MODE_MASK
-		orr	r13, r13, #MODE_SVC
-		msr	spsr_cxsf, r13			@ switch to SVC_32 mode
+	vector_stub	pabt, abt, 4
 
-		ands	lr, lr, #15
-		ldr	lr, [pc, lr, lsl #2]
-		movs	pc, lr
-
-.LCtab_pabt:	.word	__pabt_usr			@  0 (USR_26 / USR_32)
-		.word	__pabt_invalid			@  1 (FIQ_26 / FIQ_32)
-		.word	__pabt_invalid			@  2 (IRQ_26 / IRQ_32)
-		.word	__pabt_svc			@  3 (SVC_26 / SVC_32)
-		.word	__pabt_invalid			@  4
-		.word	__pabt_invalid			@  5
-		.word	__pabt_invalid			@  6
-		.word	__pabt_invalid			@  7
-		.word	__pabt_invalid			@  8
-		.word	__pabt_invalid			@  9
-		.word	__pabt_invalid			@  a
-		.word	__pabt_invalid			@  b
-		.word	__pabt_invalid			@  c
-		.word	__pabt_invalid			@  d
-		.word	__pabt_invalid			@  e
-		.word	__pabt_invalid			@  f
-
-		.align	5
+	.long	__pabt_usr			@  0 (USR_26 / USR_32)
+	.long	__pabt_invalid			@  1 (FIQ_26 / FIQ_32)
+	.long	__pabt_invalid			@  2 (IRQ_26 / IRQ_32)
+	.long	__pabt_svc			@  3 (SVC_26 / SVC_32)
+	.long	__pabt_invalid			@  4
+	.long	__pabt_invalid			@  5
+	.long	__pabt_invalid			@  6
+	.long	__pabt_invalid			@  7
+	.long	__pabt_invalid			@  8
+	.long	__pabt_invalid			@  9
+	.long	__pabt_invalid			@  a
+	.long	__pabt_invalid			@  b
+	.long	__pabt_invalid			@  c
+	.long	__pabt_invalid			@  d
+	.long	__pabt_invalid			@  e
+	.long	__pabt_invalid			@  f
 
 /*
- * Undef instr entry dispatcher - dispatches it to the correct handler for the processor mode
+ * Undef instr entry dispatcher
  * Enter in UND mode, spsr = SVC/USR CPSR, lr = SVC/USR PC
  */
-vector_und:
-		@
-		@ save mode specific registers
-		@
-		ldr	r13, .LCsund
-		str	lr, [r13]			@ save lr_UND
-		mrs	lr, spsr
-		str	lr, [r13, #4]			@ save spsr_UND
-		@
-		@ now branch to the relevant MODE handling routine
-		@
-		mrs	r13, cpsr
-		bic	r13, r13, #MODE_MASK
-		orr	r13, r13, #MODE_SVC
-		msr	spsr_cxsf, r13			@ switch to SVC_32 mode
+	vector_stub	und, und
 
-		and	lr, lr, #15
-		ldr	lr, [pc, lr, lsl #2]
-		movs	pc, lr				@ Changes mode and branches
+	.long	__und_usr			@  0 (USR_26 / USR_32)
+	.long	__und_invalid			@  1 (FIQ_26 / FIQ_32)
+	.long	__und_invalid			@  2 (IRQ_26 / IRQ_32)
+	.long	__und_svc			@  3 (SVC_26 / SVC_32)
+	.long	__und_invalid			@  4
+	.long	__und_invalid			@  5
+	.long	__und_invalid			@  6
+	.long	__und_invalid			@  7
+	.long	__und_invalid			@  8
+	.long	__und_invalid			@  9
+	.long	__und_invalid			@  a
+	.long	__und_invalid			@  b
+	.long	__und_invalid			@  c
+	.long	__und_invalid			@  d
+	.long	__und_invalid			@  e
+	.long	__und_invalid			@  f
 
-.LCtab_und:	.word	__und_usr			@  0 (USR_26 / USR_32)
-		.word	__und_invalid			@  1 (FIQ_26 / FIQ_32)
-		.word	__und_invalid			@  2 (IRQ_26 / IRQ_32)
-		.word	__und_svc			@  3 (SVC_26 / SVC_32)
-		.word	__und_invalid			@  4
-		.word	__und_invalid			@  5
-		.word	__und_invalid			@  6
-		.word	__und_invalid			@  7
-		.word	__und_invalid			@  8
-		.word	__und_invalid			@  9
-		.word	__und_invalid			@  a
-		.word	__und_invalid			@  b
-		.word	__und_invalid			@  c
-		.word	__und_invalid			@  d
-		.word	__und_invalid			@  e
-		.word	__und_invalid			@  f
-
-		.align	5
+	.align	5
 
 /*=============================================================================
  * Undefined FIQs
