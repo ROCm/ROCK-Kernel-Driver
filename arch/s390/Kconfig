@@ -181,6 +181,15 @@ config QDIO_PERF_STATS
 
 	  If unsure, say N.
 
+config QDIO_DEBUG
+	bool "Extended debugging information"
+	depends on QDIO
+	help
+	  Say Y here to get extended debugging output in /proc/s390dbf/qdio...
+	  Warning: this option reduces the performance of the QDIO module.
+
+	  If unsure, say N.
+
 comment "Misc"
 
 config PREEMPT
