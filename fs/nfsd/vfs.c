@@ -1127,9 +1127,7 @@ nfsd_symlink(struct svc_rqst *rqstp, struct svc_fh *fhp,
 				iap->ia_valid |= ATTR_CTIME;
 				iap->ia_mode = (iap->ia_mode&S_IALLUGO)
 					| S_IFLNK;
-				down(&dentry->d_inode->i_sem);
 				err = notify_change(dnew, iap);
-				up(&dentry->d_inode->i_sem);
 				if (!err && EX_ISSYNC(fhp->fh_export))
 					write_inode_now(dentry->d_inode, 1);
 		       }

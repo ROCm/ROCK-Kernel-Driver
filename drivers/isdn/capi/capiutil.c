@@ -18,7 +18,7 @@
 #include <linux/mm.h>
 #include <linux/init.h>
 #include <linux/config.h>
-#include "capiutil.h"
+#include <linux/isdn/capiutil.h>
 
 MODULE_DESCRIPTION("CAPI4Linux: CAPI message conversion support");
 MODULE_AUTHOR("Carsten Paeth");

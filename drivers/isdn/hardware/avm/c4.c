@@ -24,9 +24,9 @@
 #include <asm/io.h>
 #include <asm/uaccess.h>
 #include <linux/netdevice.h>
-#include "capicmd.h"
-#include "capiutil.h"
-#include "capilli.h"
+#include <linux/isdn/capicmd.h>
+#include <linux/isdn/capiutil.h>
+#include <linux/isdn/capilli.h>
 #include "avmcard.h"
 
 static char *revision = "$Revision: 1.1.4.1.2.1 $";

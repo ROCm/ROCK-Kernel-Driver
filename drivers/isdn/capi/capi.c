@@ -38,8 +38,8 @@
 #include <linux/kernelcapi.h>
 #include <linux/init.h>
 #include <linux/devfs_fs_kernel.h>
-#include "capiutil.h"
-#include "capicmd.h"
+#include <linux/isdn/capiutil.h>
+#include <linux/isdn/capicmd.h>
 #if defined(CONFIG_ISDN_CAPI_CAPIFS) || defined(CONFIG_ISDN_CAPI_CAPIFS_MODULE)
 #include "capifs.h"
 #endif
