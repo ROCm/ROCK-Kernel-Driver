@@ -22,7 +22,6 @@
 #include <asm/rtas.h>
 #include <asm/semaphore.h>
 #include <asm/machdep.h>
-#include <asm/paca.h>
 #include <asm/page.h>
 #include <asm/param.h>
 #include <asm/system.h>
@@ -75,7 +74,6 @@ rtas_token(const char *service)
 	return tokp ? *tokp : RTAS_UNKNOWN_SERVICE;
 }
 
-
 /** Return a copy of the detailed error text associated with the
  *  most recent failed call to rtas.  Because the error text
  *  might go stale if there are any other intervening rtas calls,
@@ -86,28 +84,32 @@ static int
 __fetch_rtas_last_error(void)
 {
 	struct rtas_args err_args, save_args;
+	u32 bufsz;
+
+	bufsz = rtas_token ("rtas-error-log-max");
+	if ((bufsz == RTAS_UNKNOWN_SERVICE) ||
+	    (bufsz > RTAS_ERROR_LOG_MAX)) {
+		printk (KERN_WARNING "RTAS: bad log buffer size %d\n", bufsz);
+		bufsz = RTAS_ERROR_LOG_MAX;
+	}
 
 	err_args.token = rtas_token("rtas-last-error");
 	err_args.nargs = 2;
 	err_args.nret = 1;
-	err_args.rets = (rtas_arg_t *)&(err_args.args[2]);
 
 	err_args.args[0] = (rtas_arg_t)__pa(rtas_err_buf);
-	err_args.args[1] = RTAS_ERROR_LOG_MAX;
+	err_args.args[1] = bufsz;
 	err_args.args[2] = 0;
 
 	save_args = rtas.args;
 	rtas.args = err_args;
 
-	PPCDBG(PPCDBG_RTAS, "\tentering rtas with 0x%lx\n",
-	       __pa(&err_args));
 	enter_rtas(__pa(&rtas.args));
-	PPCDBG(PPCDBG_RTAS, "\treturned from rtas ...\n");
 
 	err_args = rtas.args;
 	rtas.args = save_args;
 
-	return err_args.rets[0];
+	return err_args.args[2];
 }
 
 int rtas_call(int token, int nargs, int nret, int *outputs, ...)
