@@ -110,7 +110,6 @@ static int __init integrator_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 	return irq_tab[intnr];
 }
 
-extern void pci_v3_setup_resources(struct resource **res);
 extern void pci_v3_init(void *);
 
 struct hw_pci integrator_pci __initdata = {
@@ -118,6 +117,7 @@ struct hw_pci integrator_pci __initdata = {
 	swizzle:		integrator_swizzle,
 	map_irq:		integrator_map_irq,
 	setup:			pci_v3_setup,
+	nr_controllers:		1,
 	scan:			pci_v3_scan_bus,
 	preinit:		pci_v3_preinit,
 	postinit:		pci_v3_postinit,

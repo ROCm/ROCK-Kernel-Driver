@@ -70,7 +70,7 @@ static unsigned int ataraiduse;
 static int ataraid_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg)  
 {
 	int minor;
-	minor = MINOR(inode->i_rdev)>>SHIFT;
+	minor = minor(inode->i_rdev)>>SHIFT;
 	
 	if ((ataraid_ops[minor])&&(ataraid_ops[minor]->ioctl))
 		return (ataraid_ops[minor]->ioctl)(inode,file,cmd,arg);
@@ -80,7 +80,7 @@ static int ataraid_ioctl(struct inode *inode, struct file *file, unsigned int cm
 static int ataraid_open(struct inode * inode, struct file * filp)
 {
 	int minor;
-	minor = MINOR(inode->i_rdev)>>SHIFT;
+	minor = minor(inode->i_rdev)>>SHIFT;
 
 	if ((ataraid_ops[minor])&&(ataraid_ops[minor]->open))
 		return (ataraid_ops[minor]->open)(inode,filp);
@@ -91,7 +91,7 @@ static int ataraid_open(struct inode * inode, struct file * filp)
 static int ataraid_release(struct inode * inode, struct file * filp)
 {
 	int minor;
-	minor = MINOR(inode->i_rdev)>>SHIFT;
+	minor = minor(inode->i_rdev)>>SHIFT;
 
 	if ((ataraid_ops[minor])&&(ataraid_ops[minor]->release))
 		return (ataraid_ops[minor]->release)(inode,filp);
@@ -102,7 +102,7 @@ static int ataraid_make_request (request_queue_t *q, int rw, struct buffer_head 
 {
 	int minor;
 	int retval;
-	minor = MINOR(bh->b_rdev)>>SHIFT;
+	minor = minor(bh->b_rdev)>>SHIFT;
 
 	if ((ataraid_ops[minor])&&(ataraid_ops[minor]->make_request)) {
 		
@@ -229,7 +229,7 @@ void ataraid_release_device(int device)
 
 void ataraid_register_disk(int device,long size)
 {
-	register_disk(&ataraid_gendisk, MKDEV(ATAMAJOR,16*device),16,
+	register_disk(&ataraid_gendisk, mk_kdev(ATAMAJOR,16*device),16,
 		&ataraid_fops,size);
 
 }

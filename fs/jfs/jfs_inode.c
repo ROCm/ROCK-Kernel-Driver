@@ -1,0 +1,132 @@
+/*
+ *
+ *   Copyright (c) International Business Machines  Corp., 2000
+ *
+ *   This program is free software;  you can redistribute it and/or modify
+ *   it under the terms of the GNU General Public License as published by
+ *   the Free Software Foundation; either version 2 of the License, or 
+ *   (at your option) any later version.
+ * 
+ *   This program is distributed in the hope that it will be useful,
+ *   but WITHOUT ANY WARRANTY;  without even the implied warranty of
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See
+ *   the GNU General Public License for more details.
+ *
+ *   You should have received a copy of the GNU General Public License
+ *   along with this program;  if not, write to the Free Software 
+ *   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+ */
+
+#include <linux/fs.h>
+#include "jfs_incore.h"
+#include "jfs_filsys.h"
+#include "jfs_imap.h"
+#include "jfs_dinode.h"
+#include "jfs_debug.h"
+
+/*
+ * NAME:	ialloc()
+ *
+ * FUNCTION:	Allocate a new inode
+ *
+ */
+struct inode *ialloc(struct inode *parent, umode_t mode)
+{
+	struct super_block *sb = parent->i_sb;
+	struct inode *inode;
+	struct jfs_inode_info *jfs_inode;
+	int rc;
+
+	inode = new_inode(sb);
+	if (!inode) {
+		jERROR(1, ("ialloc: new_inode returned NULL!\n"));
+		return inode;
+	}
+
+	jfs_inode = JFS_IP(inode);
+
+	rc = diAlloc(parent, S_ISDIR(mode), inode);
+	if (rc) {
+		jERROR(1, ("ialloc: diAlloc returned %d!\n", rc));
+		make_bad_inode(inode);
+		iput(inode);
+		return NULL;
+	}
+
+	inode->i_uid = current->fsuid;
+	if (parent->i_mode & S_ISGID) {
+		inode->i_gid = parent->i_gid;
+		if (S_ISDIR(mode))
+			mode |= S_ISGID;
+	} else
+		inode->i_gid = current->fsgid;
+
+	inode->i_mode = mode;
+	if (S_ISDIR(mode))
+		jfs_inode->mode2 = IDIRECTORY | mode;
+	else
+		jfs_inode->mode2 = INLINEEA | ISPARSE | mode;
+	inode->i_blksize = sb->s_blocksize;
+	inode->i_blocks = 0;
+	inode->i_mtime = inode->i_atime = inode->i_ctime = CURRENT_TIME;
+	jfs_inode->otime = inode->i_ctime;
+	inode->i_version = ++event;
+	inode->i_generation = JFS_SBI(sb)->gengen++;
+
+	jfs_inode->cflag = 0;
+	set_cflag(COMMIT_New, inode);
+
+	/* Zero remaining fields */
+	memset(&jfs_inode->acl, 0, sizeof(dxd_t));
+	memset(&jfs_inode->ea, 0, sizeof(dxd_t));
+	jfs_inode->next_index = 0;
+	jfs_inode->acltype = 0;
+	jfs_inode->btorder = 0;
+	jfs_inode->btindex = 0;
+	jfs_inode->bxflag = 0;
+	jfs_inode->blid = 0;
+	jfs_inode->atlhead = 0;
+	jfs_inode->atltail = 0;
+	jfs_inode->xtlid = 0;
+
+	jFYI(1, ("ialloc returns inode = 0x%p\n", inode));
+
+	return inode;
+}
+
+/*
+ * NAME:	iwritelocklist()
+ *
+ * FUNCTION:	Lock multiple inodes in sorted order to avoid deadlock
+ *
+ */
+void iwritelocklist(int n, ...)
+{
+	va_list ilist;
+	struct inode *sort[4];
+	struct inode *ip;
+	int k, m;
+
+	va_start(ilist, n);
+	for (k = 0; k < n; k++)
+		sort[k] = va_arg(ilist, struct inode *);
+	va_end(ilist);
+
+	/* Bubble sort in descending order */
+	do {
+		m = 0;
+		for (k = 0; k < n; k++)
+			if ((k + 1) < n
+			    && sort[k + 1]->i_ino > sort[k]->i_ino) {
+				ip = sort[k];
+				sort[k] = sort[k + 1];
+				sort[k + 1] = ip;
+				m++;
+			}
+	} while (m);
+
+	/* Lock them */
+	for (k = 0; k < n; k++) {
+		IWRITE_LOCK(sort[k]);
+	}
+}

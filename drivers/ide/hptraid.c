@@ -75,16 +75,16 @@ static int hptraid_ioctl(struct inode *inode, struct file *file, unsigned int cm
 	unsigned char val;
 	unsigned long sectors;
 	
-	if (!inode || !inode->i_rdev) 	
+	if (!inode || kdev_none(inode->i_rdev))
 		return -EINVAL;
 
-	minor = MINOR(inode->i_rdev)>>SHIFT;
+	minor = minor(inode->i_rdev)>>SHIFT;
 	
 	switch (cmd) {
          	case BLKGETSIZE:   /* Return device size */
 			if (!arg)  return -EINVAL;
-			sectors = ataraid_gendisk.part[MINOR(inode->i_rdev)].nr_sects;
-			if (MINOR(inode->i_rdev)&15)
+			sectors = ataraid_gendisk.part[minor(inode->i_rdev)].nr_sects;
+			if (minor(inode->i_rdev)&15)
 				return put_user(sectors, (unsigned long *) arg);
 			return put_user(raid[minor].sectors , (unsigned long *) arg);
 			break;
@@ -102,7 +102,7 @@ static int hptraid_ioctl(struct inode *inode, struct file *file, unsigned int cm
 			if (put_user(val, (byte *) &loc->sectors)) return -EFAULT;
 			bios_cyl = raid[minor].sectors/63/255;
 			if (put_user(bios_cyl, (unsigned short *) &loc->cylinders)) return -EFAULT;
-			if (put_user((unsigned)ataraid_gendisk.part[MINOR(inode->i_rdev)].start_sect,
+			if (put_user((unsigned)ataraid_gendisk.part[minor(inode->i_rdev)].start_sect,
 				(unsigned long *) &loc->start)) return -EFAULT;
 			return 0;
 		}
@@ -118,7 +118,7 @@ static int hptraid_ioctl(struct inode *inode, struct file *file, unsigned int cm
 			if (put_user(val, (byte *) &loc->sectors)) return -EFAULT;
 			bios_cyl = raid[minor].sectors/63/255;
 			if (put_user(bios_cyl, (unsigned int *) &loc->cylinders)) return -EFAULT;
-			if (put_user((unsigned)ataraid_gendisk.part[MINOR(inode->i_rdev)].start_sect,
+			if (put_user((unsigned)ataraid_gendisk.part[minor(inode->i_rdev)].start_sect,
 				(unsigned long *) &loc->start)) return -EFAULT;
 			return 0;
 		}
@@ -167,7 +167,7 @@ static int hptraid_make_request (request_queue_t *q, int rw, struct buffer_head 
 
 	/* Partitions need adding of the start sector of the partition to the requested sector */
 	
-	rsect += ataraid_gendisk.part[MINOR(bh->b_rdev)].start_sect;
+	rsect += ataraid_gendisk.part[minor(bh->b_rdev)].start_sect;
 
 	/* Woops we need to split the request to avoid crossing a stride barrier */
 	if ((rsect/thisraid->stride) != ((rsect+(bh->b_size/512)-1)/thisraid->stride)) {
@@ -248,7 +248,7 @@ static unsigned long maxsectors (int major,int minor)
 	kdev_t dev;
 	ide_drive_t *ideinfo;
 	
-	dev = MKDEV(major,minor);
+	dev = mk_kdev(major,minor);
 	ideinfo = get_info_ptr (dev);
 	if (ideinfo==NULL)
 		return 0;
@@ -268,7 +268,7 @@ static struct highpoint_raid_conf __initdata prom;
 static void __init probedisk(int major, int minor,int device)
 {
 	int i;
-	struct block_device *bdev = bdget(MKDEV(major,minor));
+	struct block_device *bdev = bdget(mk_kdev(major,minor));
 	struct gendisk *gd;
 
 	if (!bdev)
@@ -301,14 +301,14 @@ static void __init probedisk(int major, int minor,int device)
 	/* now blank the /proc/partitions table for the wrong partition table,
 	   so that scripts don't accidentally mount it and crash the kernel */
 	 /* XXX: the 0 is an utter hack  --hch */
-	gd=get_gendisk(MKDEV(major, 0));
+	gd=get_gendisk(mk_kdev(major, 0));
 	if (gd!=NULL) {
 		int j;
 		for (j=1+(minor<<gd->minor_shift);j<((minor+1)<<gd->minor_shift);j++) 
 			gd->part[j].nr_sects=0;					
 	}
 
-	raid[device].disk[i].device = MKDEV(major,minor);
+	raid[device].disk[i].device = mk_kdev(major,minor);
 	raid[device].disk[i].sectors = maxsectors(major,minor);
 	raid[device].stride = (1<<prom.raid0_shift);
 	raid[device].disks = prom.raid_disks;

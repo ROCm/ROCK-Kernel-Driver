@@ -67,44 +67,6 @@ ENTRY(cpu_arm720_flush_ram_page)
 		mov	pc, lr
 
 /*
- * Function: arm720_tlb_invalidate_all (void)
- *
- * Purpose : flush all TLB entries in all caches
- */
-ENTRY(cpu_arm720_tlb_invalidate_all)
-		mov	r0, #0
-		mcr	p15, 0, r0, c8, c7, 0		@ flush TLB (v4)
-		mov	pc, lr
-
-/*
- * Function: arm720_tlb_invalidate_page (unsigned long address, int end, int flags)
- *
- * Params  : address	Area start address
- *	   : end	Area end address
- *	   : flags	b0 = I cache as well
- *
- * Purpose : flush a TLB entry
- */
-ENTRY(cpu_arm720_tlb_invalidate_range)
-1:		mcr	p15, 0, r0, c8, c7, 1		@ flush TLB (v4)
-		add	r0, r0, #4096
-		cmp	r0, r1
-		blt	1b
-		mov	pc, lr
-
-/*
- * Function: arm720_tlb_invalidate_page (unsigned long address, int flags)
- *
- * Params  : address	Address
- *	   : flags	b0 = I-TLB as well
- *
- * Purpose : flush a TLB entry
- */
-ENTRY(cpu_arm720_tlb_invalidate_page)
-		mcr	p15, 0, r0, c8, c7, 1		@ flush TLB (v4)
-		mov	pc, lr
-
-/*
  * Function: arm720_check_bugs (void)
  *	   : arm720_proc_init (void)
  *	   : arm720_proc_fin (void)
@@ -259,11 +221,6 @@ ENTRY(arm720_processor_functions)
 		.word	cpu_arm720_icache_invalidate_range
 		.word	cpu_arm720_icache_invalidate_page
 
-		/* tlb */
-		.word	cpu_arm720_tlb_invalidate_all
-		.word	cpu_arm720_tlb_invalidate_range
-		.word	cpu_arm720_tlb_invalidate_page
-
 		/* pgtable */
 		.word	cpu_arm720_set_pgd
 		.word	cpu_arm720_set_pmd
@@ -307,4 +264,5 @@ __arm720_proc_info:
 		.long	HWCAP_SWP | HWCAP_HALF | HWCAP_THUMB | HWCAP_26BIT	@ elf_hwcap
 		.long	cpu_arm720_info				@ info
 		.long	arm720_processor_functions
+		.long	v4_tlb_fns
 		.size	__arm720_proc_info, . - __arm720_proc_info

@@ -419,23 +419,15 @@ restart:
  *	writes them out, and puts them back on the normal list.
  */
 
-void sync_inodes(kdev_t dev)
+void sync_inodes(void)
 {
 	struct super_block * s;
-
 	/*
 	 * Search the super_blocks array for the device(s) to sync.
 	 */
-	if (!kdev_none(dev)) {
-		if ((s = get_super(dev)) != NULL) {
-			sync_inodes_sb(s);
-			drop_super(s);
-		}
-	} else {
-		while ((s = get_super_to_sync()) != NULL) {
-			sync_inodes_sb(s);
-			drop_super(s);
-		}
+	while ((s = get_super_to_sync()) != NULL) {
+		sync_inodes_sb(s);
+		drop_super(s);
 	}
 }
 

@@ -32,5 +32,5 @@ static void timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 void __init time_init(void)
 {
 	timer_irq.handler = timer_interrupt;
-	setup_arm_irq(IRQ_TIMER, &timer_irq);
+	setup_irq(IRQ_TIMER, &timer_irq);
 }

@@ -12,6 +12,9 @@
 #include <asm/ptrace.h>
 #include <asm/processor.h>
 
+struct file;
+struct elf_phdr; 
+
 #define IA32_EMULATOR 1
 
 #define IA32_PAGE_OFFSET 0xE0000000
@@ -77,7 +80,6 @@ do {							\
 	__asm__("movl %0,%%fs": :"r" (0)); \
 	__asm__("movl %0,%%es; movl %0,%%ds": :"r" (__USER32_DS)); \
 	wrmsrl(MSR_KERNEL_GS_BASE, 0); \
-	set_thread_flag(TIF_IA32); \
 	(regs)->rip = (new_rip); \
 	(regs)->rsp = (new_rsp); \
 	(regs)->eflags = 0x200; \
@@ -86,6 +88,8 @@ do {							\
 	set_fs(USER_DS); \
 } while(0) 
 
+
+#define elf_map elf32_map
 
 MODULE_DESCRIPTION("Binary format loader for compatibility with IA32 ELF binaries."); 
 MODULE_AUTHOR("Eric Youngdale, Andi Kleen");
@@ -102,6 +106,7 @@ static void elf32_init(struct pt_regs *);
 
 static void elf32_init(struct pt_regs *regs)
 {
+	struct task_struct *me = current; 
 	regs->rdi = 0;
 	regs->rsi = 0;
 	regs->rdx = 0;
@@ -109,9 +114,13 @@ static void elf32_init(struct pt_regs *regs)
 	regs->rax = 0;
 	regs->rbx = 0; 
 	regs->rbp = 0; 
-        current->thread.fs = 0; current->thread.gs = 0;
-	current->thread.fsindex = 0; current->thread.gsindex = 0;
-        current->thread.ds = __USER_DS; current->thread.es == __USER_DS;
+    me->thread.fs = 0; 
+	me->thread.gs = 0;
+	me->thread.fsindex = 0; 
+	me->thread.gsindex = 0;
+    me->thread.ds = __USER_DS; 
+	me->thread.es = __USER_DS;
+	set_thread_flag(TIF_IA32); 
 }
 
 extern void put_dirty_page(struct task_struct * tsk, struct page *page, unsigned long address);
@@ -161,5 +170,18 @@ int ia32_setup_arg_pages(struct linux_binprm *bprm)
 	up_write(&current->mm->mmap_sem);
 	
 	return 0;
+}
+static unsigned long
+elf32_map (struct file *filep, unsigned long addr, struct elf_phdr *eppnt, int prot, int type)
+{
+	unsigned long map_addr;
+	struct task_struct *me = current; 
+
+	down_write(&me->mm->mmap_sem);
+	map_addr = do_mmap(filep, ELF_PAGESTART(addr),
+			   eppnt->p_filesz + ELF_PAGEOFFSET(eppnt->p_vaddr), prot, type|MAP_32BIT,
+			   eppnt->p_offset - ELF_PAGEOFFSET(eppnt->p_vaddr));
+	up_write(&me->mm->mmap_sem);
+	return(map_addr);
 }
 

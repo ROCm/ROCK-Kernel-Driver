@@ -1,10 +1,8 @@
 /*
- * $Id: ns558.c,v 1.29 2001/04/24 07:48:56 vojtech Exp $
+ * $Id: ns558.c,v 1.43 2002/01/24 19:23:21 vojtech Exp $
  *
  *  Copyright (c) 1999-2001 Vojtech Pavlik
  *  Copyright (c) 1999 Brian Gerst
- *
- *  Sponsored by SuSE
  */
 
 /*
@@ -28,7 +26,7 @@
  * 
  * Should you need to contact me, the author, you can do so either by
  * e-mail - mail your message to <vojtech@ucw.cz>, or by paper mail:
- * Vojtech Pavlik, Ucitelska 1576, Prague 8, 182 00 Czech Republic
+ * Vojtech Pavlik, Simunkova 1594, Prague 8, 182 00 Czech Republic
  */
 
 #include <asm/io.h>
@@ -42,6 +40,7 @@
 #include <linux/isapnp.h>
 
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
+MODULE_DESCRIPTION("Classic gameport (ISA/PnP) driver");
 MODULE_LICENSE("GPL");
 
 #define NS558_ISA	1
@@ -56,6 +55,8 @@ struct ns558 {
 	struct pci_dev *dev;
 	struct ns558 *next;
 	struct gameport gameport;
+	char phys[32];
+	char name[32];
 };
 	
 static struct ns558 *ns558;
@@ -141,12 +142,18 @@ static struct ns558* ns558_isa_probe(int io, struct ns558 *next)
 	port->type = NS558_ISA;
 	port->size = (1 << i);
 	port->gameport.io = io & (-1 << i);
+	port->gameport.phys = port->phys;
+	port->gameport.name = port->name;
+	port->gameport.idbus = BUS_ISA;
+
+	sprintf(port->phys, "isa%04x/gameport0", io & (-1 << i));
+	sprintf(port->name, "NS558 ISA");
 
 	request_region(port->gameport.io, (1 << i), "ns558-isa");
 
 	gameport_register_port(&port->gameport);
 
-	printk(KERN_INFO "gameport%d: NS558 ISA at %#x", port->gameport.number, port->gameport.io);
+	printk(KERN_INFO "gameport: NS558 ISA at %#x", port->gameport.io);
 	if (port->size > 1) printk(" size %d", port->size);
 	printk(" speed %d kHz\n", port->gameport.speed);
 
@@ -155,17 +162,33 @@ static struct ns558* ns558_isa_probe(int io, struct ns558 *next)
 
 #ifdef __ISAPNP__
 
+#define NS558_DEVICE(a,b,c,d)\
+	card_vendor: ISAPNP_ANY_ID, card_device: ISAPNP_ANY_ID,\
+	vendor: ISAPNP_VENDOR(a,b,c), function: ISAPNP_DEVICE(d)
+
 static struct isapnp_device_id pnp_devids[] = {
-	{ ISAPNP_ANY_ID, ISAPNP_ANY_ID, ISAPNP_VENDOR('@','P','@'), ISAPNP_DEVICE(0x0001), 0 },
-	{ ISAPNP_ANY_ID, ISAPNP_ANY_ID, ISAPNP_VENDOR('@','P','@'), ISAPNP_DEVICE(0x2001), 0 },
-	{ ISAPNP_ANY_ID, ISAPNP_ANY_ID, ISAPNP_VENDOR('C','T','L'), ISAPNP_DEVICE(0x7001), 0 },
-	{ ISAPNP_ANY_ID, ISAPNP_ANY_ID, ISAPNP_VENDOR('C','T','L'), ISAPNP_DEVICE(0x7002), 0 },
-	{ ISAPNP_ANY_ID, ISAPNP_ANY_ID, ISAPNP_VENDOR('C','S','C'), ISAPNP_DEVICE(0x0010), 0 },
-	{ ISAPNP_ANY_ID, ISAPNP_ANY_ID, ISAPNP_VENDOR('C','S','C'), ISAPNP_DEVICE(0x0110), 0 },
-	{ ISAPNP_ANY_ID, ISAPNP_ANY_ID, ISAPNP_VENDOR('C','S','C'), ISAPNP_DEVICE(0x0b35), 0 },
-	{ ISAPNP_ANY_ID, ISAPNP_ANY_ID, ISAPNP_VENDOR('C','S','C'), ISAPNP_DEVICE(0x0010), 0 },
-	{ ISAPNP_ANY_ID, ISAPNP_ANY_ID, ISAPNP_VENDOR('C','S','C'), ISAPNP_DEVICE(0x0110), 0 },
-	{ ISAPNP_ANY_ID, ISAPNP_ANY_ID, ISAPNP_VENDOR('P','N','P'), ISAPNP_DEVICE(0xb02f), 0 },
+	{ NS558_DEVICE('@','P','@',0x0001) }, /* ALS 100 */
+	{ NS558_DEVICE('@','P','@',0x0020) }, /* ALS 200 */
+	{ NS558_DEVICE('@','P','@',0x1001) }, /* ALS 100+ */
+	{ NS558_DEVICE('@','P','@',0x2001) }, /* ALS 120 */
+	{ NS558_DEVICE('A','S','B',0x16fd) }, /* AdLib NSC16 */
+	{ NS558_DEVICE('A','Z','T',0x3001) }, /* AZT1008 */
+	{ NS558_DEVICE('C','D','C',0x0001) }, /* Opl3-SAx */
+	{ NS558_DEVICE('C','S','C',0x0001) }, /* CS4232 */
+	{ NS558_DEVICE('C','S','C',0x000f) }, /* CS4236 */
+	{ NS558_DEVICE('C','S','C',0x0101) }, /* CS4327 */
+	{ NS558_DEVICE('C','T','L',0x7001) }, /* SB16 */
+	{ NS558_DEVICE('C','T','L',0x7002) }, /* AWE64 */
+	{ NS558_DEVICE('C','T','L',0x7005) }, /* Vibra16 */
+	{ NS558_DEVICE('E','N','S',0x2020) }, /* SoundscapeVIVO */
+	{ NS558_DEVICE('E','S','S',0x0001) }, /* ES1869 */
+	{ NS558_DEVICE('E','S','S',0x0005) }, /* ES1878 */
+	{ NS558_DEVICE('E','S','S',0x6880) }, /* ES688 */
+	{ NS558_DEVICE('I','B','M',0x0012) }, /* CS4232 */
+	{ NS558_DEVICE('O','P','T',0x0001) }, /* OPTi Audio16 */
+	{ NS558_DEVICE('Y','M','H',0x0006) }, /* Opl3-SA */
+	{ NS558_DEVICE('Y','M','H',0x0022) }, /* Opl3-SAx */
+	{ NS558_DEVICE('P','N','P',0xb02f) }, /* Generic */
 	{ 0, },
 };
 
@@ -203,13 +226,24 @@ static struct ns558* ns558_pnp_probe(struct pci_dev *dev, struct ns558 *next)
 
 	port->next = next;
 	port->type = NS558_PNP;
-	port->gameport.io = ioport;
 	port->size = iolen;
 	port->dev = dev;
 
+	port->gameport.io = ioport;
+	port->gameport.phys = port->phys;
+	port->gameport.name = port->name;
+	port->gameport.idbus = BUS_ISAPNP;
+	port->gameport.idvendor = dev->vendor;
+	port->gameport.idproduct = dev->device;
+	port->gameport.idversion = 0x100;
+
+	sprintf(port->phys, "isapnp%d.%d/gameport0", PCI_SLOT(dev->devfn), PCI_FUNC(dev->devfn));
+	sprintf(port->name, "%s", dev->name[0] ? dev->name : "NS558 PnP Gameport");
+
 	gameport_register_port(&port->gameport);
 
-	printk(KERN_INFO "gameport%d: NS558 PnP at %#x", port->gameport.number, port->gameport.io);
+	printk(KERN_INFO "gameport: NS558 PnP at isapnp%d.%d io %#x",
+		PCI_SLOT(dev->devfn), PCI_FUNC(dev->devfn), port->gameport.io);
 	if (iolen > 1) printk(" size %d", iolen);
 	printk(" speed %d kHz\n", port->gameport.speed);
 

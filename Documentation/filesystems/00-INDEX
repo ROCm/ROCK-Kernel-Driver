@@ -22,6 +22,8 @@ hpfs.txt
 	- info and mount options for the OS/2 HPFS.
 isofs.txt
 	- info and mount options for the ISO 9660 (CDROM) filesystem.
+jfs.txt
+	- info and mount options for the JFS filesystem.
 ncpfs.txt
 	- info on Novell Netware(tm) filesystem using NCP protocol.
 ntfs.txt

@@ -8,11 +8,6 @@
 #include <linux/spinlock.h>
 #include <linux/compiler.h>
 
-/*
- * get rid of this next...
- */
-extern int ide_init(void);
-
 extern void set_device_ro(kdev_t dev,int flag);
 extern void add_blkdev_randomness(int major);
 

@@ -150,7 +150,7 @@ static int __init alsa_card_pmac_init(void)
 	int err;
 	if ((err = snd_pmac_probe() < 0)) {
 #ifdef MODULE
-		snd_printk("no PMac soundchip found\n");
+		printk(KERN_ERR "no PMac soundchip found\n");
 #endif
 		return err;
 	}

@@ -7,33 +7,6 @@
 #include <asm/pgalloc.h>
 
 /*
- * Every architecture must define this function. It's the fastest
- * way of searching a 168-bit bitmap where the first 128 bits are
- * unlikely to be set. It's guaranteed that at least one of the 168
- * bits is cleared.
- */
-#if MAX_RT_PRIO != 128 || MAX_PRIO != 168
-# error update this function.
-#endif
-
-static inline int __sched_find_first_bit(unsigned long *b)
-{
-	if (b[0])
-		return __ffs(b[0]);
-	if (b[1])
-		return __ffs(b[1]) + 64;
-	if (b[2])
-		return __ffs(b[2]) + 128;
-}
-
-static inline int sched_find_first_bit(unsigned long *b)
-{ 
-	int n = __sched_find_first_bit(b);
-	BUG_ON((unsigned)n > 167);
-	return n; 
-} 
-
-/*
  * possibly do the LDT unload here?
  */
 #define destroy_context(mm)		do { } while(0)

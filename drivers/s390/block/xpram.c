@@ -654,7 +654,7 @@ int xpram_ioctl (struct inode *inode, struct file *filp,
 			   (u64 *) arg);
 
 	case BLKFLSBUF: /* flush, 0x1261 */
-		fsync_dev(inode->i_rdev);
+		fsync_bdev(inode->i_bdev);
 		if ( capable(CAP_SYS_ADMIN) )invalidate_buffers(inode->i_rdev);
 		return 0;
 
@@ -1191,10 +1191,7 @@ void cleanup_module(void)
 {
 	int i;
 
-	/* first of all, flush it all and reset all the data structures */
-
-	for (i=0; i<xpram_devs; i++)
-		fsync_dev(MKDEV(xpram_major, i)); /* flush the devices */
+	/* first of all, reset all the data structures */
 
 #if (XPRAM_VERSION == 22)
 	blk_dev[major].request_fn = NULL;

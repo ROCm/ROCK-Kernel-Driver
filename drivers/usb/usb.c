@@ -40,12 +40,7 @@
 #endif
 #include <linux/usb.h>
 
-static const int usb_bandwidth_option =
-#ifdef CONFIG_USB_BANDWIDTH
-				1;
-#else
-				0;
-#endif
+#include "hcd.h"
 
 extern int  usb_hub_init(void);
 extern void usb_hub_cleanup(void);
@@ -61,12 +56,8 @@ static void usb_check_support(struct usb_device *);
  * We have a per-interface "registered driver" list.
  */
 LIST_HEAD(usb_driver_list);
-LIST_HEAD(usb_bus_list);
-struct semaphore usb_bus_list_lock;
 
 devfs_handle_t usb_devfs_handle;	/* /dev/usb dir. */
-
-static struct usb_busmap busmap;
 
 static struct usb_driver *usb_minors[16];
 
@@ -105,6 +96,7 @@ int usb_register(struct usb_driver *new_driver)
 
 /**
  *	usb_scan_devices - scans all unclaimed USB interfaces
+ *	Context: !in_interrupt ()
  *
  *	Goes through all unclaimed USB interfaces, and offers them to all
  *	registered USB drivers through the 'probe' function.
@@ -173,6 +165,7 @@ static void usb_drivers_purge(struct usb_driver *driver,struct usb_device *dev)
 /**
  *	usb_deregister - unregister a USB driver
  *	@driver: USB operations of the driver to unregister
+ *	Context: !in_interrupt ()
  *
  *	Unlinks the specified driver from the internal USB driver list.
  */
@@ -255,259 +248,6 @@ struct usb_endpoint_descriptor *usb_epnum_to_ep_desc(struct usb_device *dev, uns
 					return &dev->actconfig->interface[i].altsetting[j].endpoint[k];
 
 	return NULL;
-}
-
-/*
- * usb_calc_bus_time:
- *
- * returns (approximate) USB bus time in nanoseconds for a USB transaction.
- */
-static long usb_calc_bus_time (int low_speed, int input_dir, int isoc, int bytecount)
-{
-	unsigned long	tmp;
-
-	if (low_speed)		/* no isoc. here */
-	{
-		if (input_dir)
-		{
-			tmp = (67667L * (31L + 10L * BitTime (bytecount))) / 1000L;
-			return (64060L + (2 * BW_HUB_LS_SETUP) + BW_HOST_DELAY + tmp);
-		}
-		else
-		{
-			tmp = (66700L * (31L + 10L * BitTime (bytecount))) / 1000L;
-			return (64107L + (2 * BW_HUB_LS_SETUP) + BW_HOST_DELAY + tmp);
-		}
-	}
-
-	/* for full-speed: */
-
-	if (!isoc)		/* Input or Output */
-	{
-		tmp = (8354L * (31L + 10L * BitTime (bytecount))) / 1000L;
-		return (9107L + BW_HOST_DELAY + tmp);
-	} /* end not Isoc */
-
-	/* for isoc: */
-
-	tmp = (8354L * (31L + 10L * BitTime (bytecount))) / 1000L;
-	return (((input_dir) ? 7268L : 6265L) + BW_HOST_DELAY + tmp);
-}
-
-/*
- * usb_check_bandwidth():
- *
- * old_alloc is from host_controller->bandwidth_allocated in microseconds;
- * bustime is from calc_bus_time(), but converted to microseconds.
- *
- * returns <bustime in us> if successful,
- * or -ENOSPC if bandwidth request fails.
- *
- * FIXME:
- * This initial implementation does not use Endpoint.bInterval
- * in managing bandwidth allocation.
- * It probably needs to be expanded to use Endpoint.bInterval.
- * This can be done as a later enhancement (correction).
- * This will also probably require some kind of
- * frame allocation tracking...meaning, for example,
- * that if multiple drivers request interrupts every 10 USB frames,
- * they don't all have to be allocated at
- * frame numbers N, N+10, N+20, etc.  Some of them could be at
- * N+11, N+21, N+31, etc., and others at
- * N+12, N+22, N+32, etc.
- * However, this first cut at USB bandwidth allocation does not
- * contain any frame allocation tracking.
- */
-int usb_check_bandwidth (struct usb_device *dev, struct urb *urb)
-{
-	int		new_alloc;
-	int		old_alloc = dev->bus->bandwidth_allocated;
-	unsigned int	pipe = urb->pipe;
-	long		bustime;
-
-	bustime = usb_calc_bus_time (dev->speed == USB_SPEED_LOW,
-			usb_pipein(pipe), usb_pipeisoc(pipe),
-			usb_maxpacket(dev, pipe, usb_pipeout(pipe)));
-	if (usb_pipeisoc(pipe))
-		bustime = NS_TO_US(bustime) / urb->number_of_packets;
-	else
-		bustime = NS_TO_US(bustime);
-
-	new_alloc = old_alloc + (int)bustime;
-		/* what new total allocated bus time would be */
-
-	if (new_alloc > FRAME_TIME_MAX_USECS_ALLOC)
-		dbg("usb-check-bandwidth %sFAILED: was %u, would be %u, bustime = %ld us",
-			usb_bandwidth_option ? "" : "would have ",
-			old_alloc, new_alloc, bustime);
-
-	if (!usb_bandwidth_option)	/* don't enforce it */
-		return (bustime);
-	return (new_alloc <= FRAME_TIME_MAX_USECS_ALLOC) ? bustime : -ENOSPC;
-}
-
-void usb_claim_bandwidth (struct usb_device *dev, struct urb *urb, int bustime, int isoc)
-{
-	dev->bus->bandwidth_allocated += bustime;
-	if (isoc)
-		dev->bus->bandwidth_isoc_reqs++;
-	else
-		dev->bus->bandwidth_int_reqs++;
-	urb->bandwidth = bustime;
-
-#ifdef USB_BANDWIDTH_MESSAGES
-	dbg("bandwidth alloc increased by %d to %d for %d requesters",
-		bustime,
-		dev->bus->bandwidth_allocated,
-		dev->bus->bandwidth_int_reqs + dev->bus->bandwidth_isoc_reqs);
-#endif
-}
-
-/*
- * usb_release_bandwidth():
- *
- * called to release a pipe's bandwidth (in microseconds)
- */
-void usb_release_bandwidth(struct usb_device *dev, struct urb *urb, int isoc)
-{
-	dev->bus->bandwidth_allocated -= urb->bandwidth;
-	if (isoc)
-		dev->bus->bandwidth_isoc_reqs--;
-	else
-		dev->bus->bandwidth_int_reqs--;
-
-#ifdef USB_BANDWIDTH_MESSAGES
-	dbg("bandwidth alloc reduced by %d to %d for %d requesters",
-		urb->bandwidth,
-		dev->bus->bandwidth_allocated,
-		dev->bus->bandwidth_int_reqs + dev->bus->bandwidth_isoc_reqs);
-#endif
-	urb->bandwidth = 0;
-}
-
-static void usb_bus_get(struct usb_bus *bus)
-{
-	atomic_inc(&bus->refcnt);
-}
-
-static void usb_bus_put(struct usb_bus *bus)
-{
-	if (atomic_dec_and_test(&bus->refcnt))
-		kfree(bus);
-}
-
-/**
- *	usb_alloc_bus - creates a new USB host controller structure (usbcore-internal)
- *	@op: pointer to a struct usb_operations that this bus structure should use
- *
- *	Creates a USB host controller bus structure with the specified 
- *	usb_operations and initializes all the necessary internal objects.
- *	(For use only by USB Host Controller Drivers.)
- *
- *	If no memory is available, NULL is returned.
- *
- *	The caller should call usb_free_bus() when it is finished with the structure.
- */
-struct usb_bus *usb_alloc_bus(struct usb_operations *op)
-{
-	struct usb_bus *bus;
-
-	bus = kmalloc(sizeof(*bus), GFP_KERNEL);
-	if (!bus)
-		return NULL;
-
-	memset(&bus->devmap, 0, sizeof(struct usb_devmap));
-
-#ifdef DEVNUM_ROUND_ROBIN
-	bus->devnum_next = 1;
-#endif /* DEVNUM_ROUND_ROBIN */
-
-	bus->op = op;
-	bus->root_hub = NULL;
-	bus->hcpriv = NULL;
-	bus->busnum = -1;
-	bus->bandwidth_allocated = 0;
-	bus->bandwidth_int_reqs  = 0;
-	bus->bandwidth_isoc_reqs = 0;
-
-	INIT_LIST_HEAD(&bus->bus_list);
-
-	atomic_set(&bus->refcnt, 1);
-
-	return bus;
-}
-
-/**
- *	usb_free_bus - frees the memory used by a bus structure (usbcore-internal)
- *	@bus: pointer to the bus to free
- *
- *	(For use only by USB Host Controller Drivers.)
- */
-void usb_free_bus(struct usb_bus *bus)
-{
-	if (!bus)
-		return;
-
-	usb_bus_put(bus);
-}
-
-/**
- *	usb_register_bus - registers the USB host controller with the usb core (usbcore-internal)
- *	@bus: pointer to the bus to register
- *
- *	(For use only by USB Host Controller Drivers.)
- *
- * This call is synchronous, and may not be used in an interrupt context.
- */
-void usb_register_bus(struct usb_bus *bus)
-{
-	int busnum;
-
-	down (&usb_bus_list_lock);
-	busnum = find_next_zero_bit(busmap.busmap, USB_MAXBUS, 1);
-	if (busnum < USB_MAXBUS) {
-		set_bit(busnum, busmap.busmap);
-		bus->busnum = busnum;
-	} else
-		warn("too many buses");
-
-	usb_bus_get(bus);
-
-	/* Add it to the list of buses */
-	list_add(&bus->bus_list, &usb_bus_list);
-	up (&usb_bus_list_lock);
-
-	usbfs_add_bus(bus);
-
-	info("new USB bus registered, assigned bus number %d", bus->busnum);
-}
-
-/**
- *	usb_deregister_bus - deregisters the USB host controller (usbcore-internal)
- *	@bus: pointer to the bus to deregister
- *
- *	(For use only by USB Host Controller Drivers.)
- *
- * This call is synchronous, and may not be used in an interrupt context.
- */
-void usb_deregister_bus(struct usb_bus *bus)
-{
-	info("USB bus %d deregistered", bus->busnum);
-
-	/*
-	 * NOTE: make sure that all the devices are removed by the
-	 * controller code, as well as having it call this when cleaning
-	 * itself up
-	 */
-	down (&usb_bus_list_lock);
-	list_del(&bus->bus_list);
-	up (&usb_bus_list_lock);
-
-	usbfs_remove_bus(bus);
-
-	clear_bit(bus->busnum, busmap.busmap);
-
-	usb_bus_put(bus);
 }
 
 /*
@@ -1016,6 +756,7 @@ static void usb_find_drivers(struct usb_device *dev)
  * usb_alloc_dev - allocate a usb device structure (usbcore-internal)
  * @parent: hub to which device is connected
  * @bus: bus used to access the device
+ * Context: !in_interrupt ()
  *
  * Only hub drivers (including virtual root hub drivers for host
  * controllers) should ever call this.
@@ -1078,14 +819,12 @@ void usb_inc_dev_use(struct usb_device *dev)
 	atomic_inc(&dev->refcnt);
 }
 
-/* ---------------------------------------------------------------------- 
- * New USB Core Functions
- * ----------------------------------------------------------------------*/
 
 /**
  * usb_alloc_urb - creates a new urb for a USB driver to use
  * @iso_packets: number of iso packets for this urb
- * @mem_flags: the type of memory to allocate, see kmalloc() for a list of valid options for this.
+ * @mem_flags: the type of memory to allocate, see kmalloc() for a list of
+ *	valid options for this.
  *
  * Creates an urb for the USB driver to use, initializes a few internal
  * structures, incrementes the usage counter, and returns a pointer to it.
@@ -1158,7 +897,8 @@ struct urb * usb_get_urb(struct urb *urb)
 /**
  * usb_submit_urb - asynchronously issue a transfer request for an endpoint
  * @urb: pointer to the urb describing the request
- * @mem_flags: the type of memory to allocate, see kmalloc() for a list of valid options for this.
+ * @mem_flags: the type of memory to allocate, see kmalloc() for a list
+ *	of valid options for this.
  *
  * This submits a transfer request, and transfers control of the URB
  * describing that request to the USB subsystem.  Request completion will
@@ -1393,7 +1133,9 @@ int usb_internal_control_msg(struct usb_device *usb_dev, unsigned int pipe,
  *	@index: USB message index value
  *	@data: pointer to the data to send
  *	@size: length in bytes of the data to send
- *	@timeout: time to wait for the message to complete before timing out (if 0 the wait is forever)
+ *	@timeout: time in jiffies to wait for the message to complete before
+ *		timing out (if 0 the wait is forever)
+ *	Context: !in_interrupt ()
  *
  *	This function sends a simple control message to a specified endpoint
  *	and waits for the message to complete, or timeout.
@@ -1401,7 +1143,7 @@ int usb_internal_control_msg(struct usb_device *usb_dev, unsigned int pipe,
  *	If successful, it returns 0, otherwise a negative error number.
  *
  *	Don't use this function from within an interrupt context, like a
- *	bottom half handler.  If you need a asyncronous message, or need to send
+ *	bottom half handler.  If you need an asynchronous message, or need to send
  *	a message from within interrupt context, use usb_submit_urb()
  */
 int usb_control_msg(struct usb_device *dev, unsigned int pipe, __u8 request, __u8 requesttype,
@@ -1436,7 +1178,9 @@ int usb_control_msg(struct usb_device *dev, unsigned int pipe, __u8 request, __u
  *	@data: pointer to the data to send
  *	@len: length in bytes of the data to send
  *	@actual_length: pointer to a location to put the actual length transferred in bytes
- *	@timeout: time to wait for the message to complete before timing out (if 0 the wait is forever)
+ *	@timeout: time in jiffies to wait for the message to complete before
+ *		timing out (if 0 the wait is forever)
+ *	Context: !in_interrupt ()
  *
  *	This function sends a simple bulk message to a specified endpoint
  *	and waits for the message to complete, or timeout.
@@ -1446,7 +1190,7 @@ int usb_control_msg(struct usb_device *dev, unsigned int pipe, __u8 request, __u
  *	actual_length paramater.
  *
  *	Don't use this function from within an interrupt context, like a
- *	bottom half handler.  If you need a asyncronous message, or need to
+ *	bottom half handler.  If you need an asynchronous message, or need to
  *	send a message from within interrupt context, use usb_submit_urb()
  */
 int usb_bulk_msg(struct usb_device *usb_dev, unsigned int pipe, 
@@ -1474,6 +1218,11 @@ int usb_bulk_msg(struct usb_device *usb_dev, unsigned int pipe,
  * Returns the current frame number for the USB host controller
  * used with the given USB device.  This can be used when scheduling
  * isochronous requests.
+ *
+ * Note that different kinds of host controller have different
+ * "scheduling horizons".  While one type might support scheduling only
+ * 32 frames into the future, others could support scheduling up to
+ * 1024 frames into the future.
  */
 int usb_get_current_frame_number(struct usb_device *dev)
 {
@@ -1946,6 +1695,7 @@ int __usb_get_extra_descriptor(char *buffer, unsigned size, unsigned char type, 
 /**
  * usb_disconnect - disconnect a device (usbcore-internal)
  * @pdev: pointer to device being disconnected
+ * Context: !in_interrupt ()
  *
  * Something got disconnected. Get rid of it, and all of its children.
  *
@@ -2069,6 +1819,7 @@ int usb_set_address(struct usb_device *dev)
  * @index: the number of the descriptor
  * @buf: where to put the descriptor
  * @size: how big is "buf"?
+ * Context: !in_interrupt ()
  *
  * Gets a USB descriptor.  Convenience functions exist to simplify
  * getting some types of descriptors.  Use
@@ -2110,6 +1861,7 @@ int usb_get_descriptor(struct usb_device *dev, unsigned char type, unsigned char
  * @index: the number of the descriptor
  * @buf: where to put the string
  * @size: how big is "buf"?
+ * Context: !in_interrupt ()
  *
  * Retrieves a string, encoded using UTF-16LE (Unicode, 16 bits per character,
  * in little-endian byte order).
@@ -2135,6 +1887,7 @@ int usb_get_string(struct usb_device *dev, unsigned short langid, unsigned char 
 /**
  * usb_get_device_descriptor - (re)reads the device descriptor
  * @dev: the device whose device descriptor is being updated
+ * Context: !in_interrupt ()
  *
  * Updates the copy of the device descriptor stored in the device structure,
  * which dedicates space for this purpose.  Note that several fields are
@@ -2169,6 +1922,7 @@ int usb_get_device_descriptor(struct usb_device *dev)
  * @type: USB_RECIP_*; for device, interface, or endpoint
  * @target: zero (for device), else interface or endpoint number
  * @data: pointer to two bytes of bitmap data
+ * Context: !in_interrupt ()
  *
  * Returns device, interface, or endpoint status.  Normally only of
  * interest to see if the device is self powered, or has enabled the
@@ -2227,6 +1981,7 @@ void usb_set_maxpacket(struct usb_device *dev)
  * usb_clear_halt - tells device to clear endpoint halt/stall condition
  * @dev: device whose endpoint is halted
  * @pipe: endpoint "pipe" being cleared
+ * Context: !in_interrupt ()
  *
  * This is used to clear halt conditions for bulk and interrupt endpoints,
  * as reported by URB completion status.  Endpoints that are halted are
@@ -2298,6 +2053,7 @@ int usb_clear_halt(struct usb_device *dev, int pipe)
  * @dev: the device whose interface is being updated
  * @interface: the interface being updated
  * @alternate: the setting being chosen.
+ * Context: !in_interrupt ()
  *
  * This is used to enable data transfers on interfaces that may not
  * be enabled by default.  Not all devices support such configurability.
@@ -2378,6 +2134,7 @@ int usb_set_interface(struct usb_device *dev, int interface, int alternate)
  * usb_set_configuration - Makes a particular device setting be current
  * @dev: the device whose configuration is being updated
  * @configuration: the configuration being chosen.
+ * Context: !in_interrupt ()
  *
  * This is used to enable non-default device modes.  Not all devices
  * support this kind of configurability.  By default, configuration
@@ -2540,6 +2297,7 @@ err:
  * @index: the number of the descriptor
  * @buf: where to put the string
  * @size: how big is "buf"?
+ * Context: !in_interrupt ()
  * 
  * This converts the UTF-16LE encoded strings returned by devices, from
  * usb_get_string_descriptor(), to null-terminated ISO-8859-1 encoded ones
@@ -2619,8 +2377,11 @@ int usb_string(struct usb_device *dev, int index, char *buf, size_t size)
  * @dev: the device whose path is being constructed
  * @buf: where to put the string
  * @size: how big is "buf"?
+ * Context: !in_interrupt ()
  *
  * Returns length of the string (>= 0) or out of memory status (< 0).
+ *
+ * NOTE:  prefer to use use dev->devpath directly.
  */
 int usb_make_path(struct usb_device *dev, char *buf, size_t size)
 {
@@ -2768,29 +2529,6 @@ int usb_new_device(struct usb_device *dev)
 	return 0;
 }
 
-/**
- * usb_register_root_hub - called by a usb host controller to register the root hub device in the system
- * @usb_dev: the usb root hub device to be registered.
- * @parent_dev: the parent device of this root hub.
- *
- * The USB host controller calls this function to register the root hub
- * properly with the USB subsystem.  It sets up the device properly in
- * the driverfs tree, and then calls usb_new_device() to register the
- * usb device.
- */
-int usb_register_root_hub (struct usb_device *usb_dev, struct device *parent_dev)
-{
-	int retval;
-
-	usb_dev->dev.parent = parent_dev;
-	strcpy (&usb_dev->dev.name[0], "usb_name");
-	strcpy (&usb_dev->dev.bus_id[0], "usb_bus");
-	retval = usb_new_device (usb_dev);
-	if (retval)
-		put_device (&usb_dev->dev);
-	return retval;
-}
-
 static int usb_open(struct inode * inode, struct file * file)
 {
 	int minor = minor(inode->i_rdev);
@@ -2859,7 +2597,6 @@ struct list_head *usb_bus_get_list(void)
  */
 static int __init usb_init(void)
 {
-	init_MUTEX(&usb_bus_list_lock);
 	usb_major_init();
 	usbfs_init();
 	usb_hub_init();
@@ -2892,11 +2629,7 @@ EXPORT_SYMBOL(usb_epnum_to_ep_desc);
 EXPORT_SYMBOL(usb_register);
 EXPORT_SYMBOL(usb_deregister);
 EXPORT_SYMBOL(usb_scan_devices);
-EXPORT_SYMBOL(usb_alloc_bus);
-EXPORT_SYMBOL(usb_free_bus);
-EXPORT_SYMBOL(usb_register_bus);
-EXPORT_SYMBOL(usb_deregister_bus);
-EXPORT_SYMBOL(usb_register_root_hub);
+
 EXPORT_SYMBOL(usb_alloc_dev);
 EXPORT_SYMBOL(usb_free_dev);
 EXPORT_SYMBOL(usb_inc_dev_use);
@@ -2911,10 +2644,6 @@ EXPORT_SYMBOL(usb_new_device);
 EXPORT_SYMBOL(usb_reset_device);
 EXPORT_SYMBOL(usb_connect);
 EXPORT_SYMBOL(usb_disconnect);
-
-EXPORT_SYMBOL(usb_check_bandwidth);
-EXPORT_SYMBOL(usb_claim_bandwidth);
-EXPORT_SYMBOL(usb_release_bandwidth);
 
 EXPORT_SYMBOL(__usb_get_extra_descriptor);
 

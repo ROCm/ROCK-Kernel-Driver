@@ -103,7 +103,7 @@ static int ns87415_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
 			ns87415_prepare_drive(drive, 0);	/* DMA failed: select PIO xfer */
 			return 1;
 		case ide_dma_check:
-			if (drive->media != ide_disk)
+			if (drive->type != ATA_DISK)
 				return ide_dmaproc(ide_dma_off_quietly, drive);
 			/* Fallthrough... */
 		default:

@@ -113,7 +113,7 @@ void presto_put_super(struct super_block *sb)
         struct list_head *lh;
 
 	ENTRY;
-        cache = presto_find_cache(sb->s_dev);
+        cache = presto_find_cache(sb);
         if (!cache) {
 		EXIT;
                 goto exit;

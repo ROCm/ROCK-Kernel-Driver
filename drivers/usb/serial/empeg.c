@@ -157,8 +157,6 @@ static int empeg_open (struct usb_serial_port *port, struct file *filp)
 
 	dbg(__FUNCTION__ " - port %d", port->number);
 
-	down (&port->sem);
-
 	++port->open_count;
 
 	if (port->open_count == 1) {
@@ -189,8 +187,6 @@ static int empeg_open (struct usb_serial_port *port, struct file *filp)
 
 	}
 
-	up (&port->sem);
-
 	return result;
 }
 
@@ -208,8 +204,6 @@ static void empeg_close (struct usb_serial_port *port, struct file * filp)
 	if (!serial)
 		return;
 
-	down (&port->sem);
-
 	--port->open_count;
 
 	if (port->open_count <= 0) {
@@ -219,8 +213,6 @@ static void empeg_close (struct usb_serial_port *port, struct file * filp)
 		}
 		port->open_count = 0;
 	}
-
-	up (&port->sem);
 
 	/* Uncomment the following line if you want to see some statistics in your syslog */
 	/* info ("Bytes In = %d  Bytes Out = %d", bytes_in, bytes_out); */
@@ -462,15 +454,7 @@ static void empeg_read_bulk_callback (struct urb *urb)
 static void empeg_throttle (struct usb_serial_port *port)
 {
 	dbg(__FUNCTION__ " - port %d", port->number);
-
-	down (&port->sem);
-
 	usb_unlink_urb (port->read_urb);
-
-	up (&port->sem);
-
-	return;
-
 }
 
 
@@ -480,8 +464,6 @@ static void empeg_unthrottle (struct usb_serial_port *port)
 
 	dbg(__FUNCTION__ " - port %d", port->number);
 
-	down (&port->sem);
-
 	port->read_urb->dev = port->serial->dev;
 
 	result = usb_submit_urb(port->read_urb, GFP_KERNEL);
@@ -489,10 +471,7 @@ static void empeg_unthrottle (struct usb_serial_port *port)
 	if (result)
 		err(__FUNCTION__ " - failed submitting read urb, error %d", result);
 
-	up (&port->sem);
-
 	return;
-
 }
 
 

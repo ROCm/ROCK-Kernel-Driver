@@ -33,6 +33,10 @@ ifeq ($(CONFIG_ARCH_INTEGRATOR),y)
 OBJS		+= head-integrator.o
 endif
 
+ifeq ($(CONFIG_ARCH_CAMELOT),y)
+OBJS		+= head-epxa10db.o
+endif
+
 ifeq ($(CONFIG_ARCH_FTVPCI),y)
 OBJS		+= head-ftvpci.o
 endif

@@ -4,7 +4,7 @@
  * We group personalities into execution domains which have their
  * own handlers for kernel entry points, signal mapping, etc...
  *
- * 2001-05-06	Complete rewrite,  Christoph Hellwig (hch@caldera.de)
+ * 2001-05-06	Complete rewrite,  Christoph Hellwig (hch@infradead.org)
  */
 
 #include <linux/config.h>

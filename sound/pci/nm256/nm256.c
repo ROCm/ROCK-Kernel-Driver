@@ -331,7 +331,7 @@ snd_nm256_write_buffer(nm256_t *chip, void *src, int offset, int size)
 	offset -= chip->buffer_start;
 #ifdef SNDRV_CONFIG_DEBUG
 	if (offset < 0 || offset >= chip->buffer_size) {
-		printk("nm256: write_buffer invalid offset = %d size = %d\n", offset, size);
+		snd_printk("write_buffer invalid offset = %d size = %d\n", offset, size);
 		return;
 	}
 #endif
@@ -1436,10 +1436,10 @@ snd_nm256_create(snd_card_t *card, struct pci_dev *pci,
 		pval = snd_nm256_readw(chip, NM_MIXER_PRESENCE);
 		if ((pval & NM_PRESENCE_MASK) != NM_PRESENCE_VALUE) {
 			if (! force_load) {
-				printk(KERN_INFO "nm256: no ac97 is found!\n");
-				printk(KERN_INFO "  force the driver to load by passing in the module parameter\n");
-				printk(KERN_INFO "    snd_force_ac97=1\n");
-				printk(KERN_INFO "  or try sb16 or cs423x drivers instead.\n");
+				printk(KERN_ERR "nm256: no ac97 is found!\n");
+				printk(KERN_ERR "  force the driver to load by passing in the module parameter\n");
+				printk(KERN_ERR "    snd_force_ac97=1\n");
+				printk(KERN_ERR "  or try sb16 or cs423x drivers instead.\n");
 				err = -ENXIO;
 				goto __error;
 			}
@@ -1477,8 +1477,8 @@ snd_nm256_create(snd_card_t *card, struct pci_dev *pci,
 	chip->buffer_start = chip->buffer_end - chip->buffer_size;
 	chip->buffer_addr += chip->buffer_start;
 
-	snd_printd("NM256: Mapping port 1 from 0x%x - 0x%x\n",
-		   chip->buffer_start, chip->buffer_end);
+	printk(KERN_INFO "nm256: Mapping port 1 from 0x%x - 0x%x\n",
+	       chip->buffer_start, chip->buffer_end);
 
 	chip->res_buffer = request_mem_region(chip->buffer_addr,
 					      chip->buffer_size,
@@ -1652,7 +1652,7 @@ static int __init alsa_card_nm256_init(void)
 	int err;
 	if ((err = pci_module_init(&driver)) < 0) {
 #ifdef MODULE
-		snd_printk("NeoMagic 256 audio soundchip not found or device busy\n");
+		printk(KERN_ERR "NeoMagic 256 audio soundchip not found or device busy\n");
 #endif
 		return err;
 	}

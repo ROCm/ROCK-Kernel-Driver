@@ -1,6 +1,5 @@
 # ALSA soundcard-configuration
 
-dep_tristate '  RTC Timer support' CONFIG_SND_RTCTIMER $CONFIG_SND
 dep_tristate '  Sequencer support' CONFIG_SND_SEQUENCER $CONFIG_SND
 if [ "$CONFIG_SND_SEQUENCER" != "n" ]; then
   dep_tristate '  Sequencer dummy client' CONFIG_SND_SEQ_DUMMY $CONFIG_SND_SEQUENCER
@@ -13,9 +12,10 @@ if [ "$CONFIG_SND_OSSEMUL" = "y" ]; then
     dep_tristate '    OSS Sequencer API' CONFIG_SND_SEQUENCER_OSS $CONFIG_SND_SEQUENCER
   fi
 fi
+dep_tristate '  RTC Timer support' CONFIG_SND_RTCTIMER $CONFIG_SND
+bool '  Verbose printk' CONFIG_SND_VERBOSE_PRINTK
 bool '  Debug' CONFIG_SND_DEBUG
 if [ "$CONFIG_SND_DEBUG" = "y" ]; then
   bool '    Debug memory' CONFIG_SND_DEBUG_MEMORY
-  bool '    Debug full' CONFIG_SND_DEBUG_FULL
   bool '    Debug detection' CONFIG_SND_DEBUG_DETECT
 fi

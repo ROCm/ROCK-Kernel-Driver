@@ -1,9 +1,7 @@
 /*
- * $Id: a3d.c,v 1.14 2001/04/26 10:24:46 vojtech Exp $
+ * $Id: a3d.c,v 1.21 2002/01/22 20:11:50 vojtech Exp $
  *
  *  Copyright (c) 1998-2001 Vojtech Pavlik
- *
- *  Sponsored by SuSE
  */
 
 /*
@@ -26,8 +24,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
  *
  * Should you need to contact me, the author, you can do so either by
- * e-mail - mail your message to <vojtech@suse.cz>, or by paper mail:
- * Vojtech Pavlik, Ucitelska 1576, Prague 8, 182 00 Czech Republic
+ * e-mail - mail your message to <vojtech@ucw.cz>, or by paper mail:
+ * Vojtech Pavlik, Simunkova 1594, Prague 8, 182 00 Czech Republic
  */
 
 #include <linux/kernel.h>
@@ -36,6 +34,10 @@
 #include <linux/init.h>
 #include <linux/gameport.h>
 #include <linux/input.h>
+
+MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
+MODULE_DESCRIPTION("FP-Gaming Assasin 3D joystick driver");
+MODULE_LICENSE("GPL");
 
 #define A3D_MAX_START		400	/* 400 us */ 
 #define A3D_MAX_STROBE		60	/* 40 us */ 
@@ -63,6 +65,8 @@ struct a3d {
 	int used;
 	int reads;
 	int bads;
+	char phys[32];
+	char adcphys[32];
 };
 
 /*
@@ -190,7 +194,7 @@ static void a3d_timer(unsigned long private)
 
 int a3d_adc_cooked_read(struct gameport *gameport, int *axes, int *buttons)
 {
-	struct a3d *a3d = gameport->private;
+	struct a3d *a3d = gameport->driver;
 	int i;
 	for (i = 0; i < 4; i++)
 		axes[i] = (a3d->axes[i] < 254) ? a3d->axes[i] : -1;
@@ -205,7 +209,7 @@ int a3d_adc_cooked_read(struct gameport *gameport, int *axes, int *buttons)
 
 int a3d_adc_open(struct gameport *gameport, int mode)
 {
-	struct a3d *a3d = gameport->private;
+	struct a3d *a3d = gameport->driver;
 	if (mode != GAMEPORT_MODE_COOKED)
 		return -1;
 	if (!a3d->used++)
@@ -219,7 +223,7 @@ int a3d_adc_open(struct gameport *gameport, int mode)
 
 static void a3d_adc_close(struct gameport *gameport)
 {
-	struct a3d *a3d = gameport->private;
+	struct a3d *a3d = gameport->driver;
 	if (!--a3d->used)
 		del_timer(&a3d->timer);
 }
@@ -280,10 +284,12 @@ static void a3d_connect(struct gameport *gameport, struct gameport_dev *dev)
 
 	if (!a3d->mode || a3d->mode > 5) {
 		printk(KERN_WARNING "a3d.c: Unknown A3D device detected "
-			"(gameport%d, id=%d), contact <vojtech@suse.cz>\n", gameport->number, a3d->mode);
+			"(%s, id=%d), contact <vojtech@ucw.cz>\n", gameport->phys, a3d->mode);
 		goto fail2;
 	}
 
+	sprintf(a3d->phys, "%s/input0", gameport->phys);
+	sprintf(a3d->adcphys, "%s/gameport0", gameport->phys);
 
 	if (a3d->mode == A3D_MODE_PXL) {
 
@@ -323,17 +329,23 @@ static void a3d_connect(struct gameport *gameport, struct gameport_dev *dev)
 		a3d->dev.relbit[0] |= BIT(REL_X) | BIT(REL_Y);
 		a3d->dev.keybit[LONG(BTN_MOUSE)] |= BIT(BTN_RIGHT) | BIT(BTN_LEFT) | BIT(BTN_MIDDLE);
 
-		a3d->adc.private = a3d;
+		a3d->adc.driver = a3d;
 		a3d->adc.open = a3d_adc_open;
 		a3d->adc.close = a3d_adc_close;
 		a3d->adc.cooked_read = a3d_adc_cooked_read;
 		a3d->adc.fuzz = 1; 
 
+		a3d->adc.name = a3d_names[a3d->mode];
+		a3d->adc.phys = a3d->adcphys;
+		a3d->adc.idbus = BUS_GAMEPORT;
+		a3d->adc.idvendor = GAMEPORT_ID_VENDOR_MADCATZ;
+		a3d->adc.idproduct = a3d->mode;
+		a3d->adc.idversion = 0x0100;
+
 		a3d_read(a3d, data);
 
 		gameport_register_port(&a3d->adc);
-		printk(KERN_INFO "gameport%d: %s on gameport%d.0\n",
-			a3d->adc.number, a3d_names[a3d->mode], gameport->number);
+		printk(KERN_INFO "gameport: %s on %s\n", a3d_names[a3d->mode], gameport->phys);
 	}
 
 	a3d->dev.private = a3d;
@@ -341,14 +353,14 @@ static void a3d_connect(struct gameport *gameport, struct gameport_dev *dev)
 	a3d->dev.close = a3d_close;
 
 	a3d->dev.name = a3d_names[a3d->mode];
+	a3d->dev.phys = a3d->phys;
 	a3d->dev.idbus = BUS_GAMEPORT;
 	a3d->dev.idvendor = GAMEPORT_ID_VENDOR_MADCATZ;
 	a3d->dev.idproduct = a3d->mode;
 	a3d->dev.idversion = 0x0100;
 
 	input_register_device(&a3d->dev);
-	printk(KERN_INFO "input%d: %s on gameport%d.0\n",
-		a3d->dev.number, a3d_names[a3d->mode], gameport->number);
+	printk(KERN_INFO "input: %s on %s\n", a3d_names[a3d->mode], a3d->phys);
 
 	return;
 fail2:	gameport_close(gameport);
@@ -384,5 +396,3 @@ void __exit a3d_exit(void)
 
 module_init(a3d_init);
 module_exit(a3d_exit);
-
-MODULE_LICENSE("GPL");

@@ -107,12 +107,40 @@ static snd_kcontrol_new_t snd_emu10k1_spdif_control =
         put:            snd_emu10k1_spdif_put
 };
 
-/* FIXME: audigy has more routing/effects */
+
+static void update_emu10k1_fxrt(emu10k1_t *emu, int voice, unsigned char *route)
+{
+	if (emu->audigy) {
+		snd_emu10k1_ptr_write(emu, A_FXRT1, voice,
+				      snd_emu10k1_compose_audigy_fxrt1(route));
+		snd_emu10k1_ptr_write(emu, A_FXRT2, voice,
+				      snd_emu10k1_compose_audigy_fxrt2(route));
+	} else {
+		snd_emu10k1_ptr_write(emu, FXRT, voice,
+				      snd_emu10k1_compose_send_routing(route));
+	}
+}
+
+static void update_emu10k1_send_volume(emu10k1_t *emu, int voice, unsigned char *volume)
+{
+	snd_emu10k1_ptr_write(emu, PTRX_FXSENDAMOUNT_A, voice, volume[0]);
+	snd_emu10k1_ptr_write(emu, PTRX_FXSENDAMOUNT_B, voice, volume[1]);
+	snd_emu10k1_ptr_write(emu, PSST_FXSENDAMOUNT_C, voice, volume[2]);
+	snd_emu10k1_ptr_write(emu, DSL_FXSENDAMOUNT_D, voice, volume[3]);
+	if (emu->audigy) {
+		unsigned int val = ((unsigned int)volume[4] << 24) |
+			((unsigned int)volume[5] << 16) |
+			((unsigned int)volume[6] << 8) |
+			(unsigned int)volume[7];
+		snd_emu10k1_ptr_write(emu, A_SENDAMOUNTS, voice, val);
+	}
+}
+
 static int snd_emu10k1_send_routing_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {
 	emu10k1_t *emu = snd_kcontrol_chip(kcontrol);
 	uinfo->type = SNDRV_CTL_ELEM_TYPE_INTEGER;
-	uinfo->count = 3*4;
+	uinfo->count = emu->audigy ? 3*8 : 3*4;
 	uinfo->value.integer.min = 0;
 	uinfo->value.integer.max = emu->audigy ? 0x3f : 0x0f;
 	return 0;
@@ -125,13 +153,14 @@ static int snd_emu10k1_send_routing_get(snd_kcontrol_t * kcontrol,
 	emu10k1_pcm_mixer_t *mix = (emu10k1_pcm_mixer_t *)kcontrol->private_value;
 	emu10k1_t *emu = snd_kcontrol_chip(kcontrol);
 	int voice, idx;
+	int num_efx = emu->audigy ? 8 : 4;
+	int mask = emu->audigy ? 0x3f : 0x0f;
 
 	spin_lock_irqsave(&emu->reg_lock, flags);
 	for (voice = 0; voice < 3; voice++)
-		for (idx = 0; idx < 4; idx++)
-			ucontrol->value.integer.value[(voice * 4) + idx] = emu->audigy ?
-				((mix->send_routing[voice] >> (idx * 8)) & 0x3f) :
-				((mix->send_routing[voice] >> (idx * 4)) & 0x0f);
+		for (idx = 0; idx < num_efx; idx++)
+			ucontrol->value.integer.value[(voice * num_efx) + idx] = 
+				mix->send_routing[voice][idx] & mask;
 	spin_unlock_irqrestore(&emu->reg_lock, flags);
         return 0;
 }
@@ -143,44 +172,27 @@ static int snd_emu10k1_send_routing_put(snd_kcontrol_t * kcontrol,
 	emu10k1_pcm_mixer_t *mix = (emu10k1_pcm_mixer_t *)kcontrol->private_value;
 	emu10k1_t *emu = snd_kcontrol_chip(kcontrol);
 	int change = 0, voice, idx, val;
+	int num_efx = emu->audigy ? 8 : 4;
+	int mask = emu->audigy ? 0x3f : 0x0f;
 
 	spin_lock_irqsave(&emu->reg_lock, flags);
 	for (voice = 0; voice < 3; voice++)
-		for (idx = 0; idx < 4; idx++) {
-			val = ucontrol->value.integer.value[(voice * 4) + idx];
-			if (emu->audigy) {
-				int shift = idx * 8;
-				val &= 0x3f;
-				if (((mix->send_routing[voice] >> shift) & 0x3f) != val) {
-					mix->send_routing[voice] &= ~(0x3f << shift);
-					mix->send_routing[voice] |= val << shift;
-					change = 1;
-				}
-			} else {
-				int shift = idx * 4;
-				val = ucontrol->value.integer.value[(voice * 4) + idx] & 15;
-				if (((mix->send_routing[voice] >> shift) & 15) != val) {
-					mix->send_routing[voice] &= ~(15 << shift);
-					mix->send_routing[voice] |= val << shift;
-					change = 1;
-				}
+		for (idx = 0; idx < num_efx; idx++) {
+			val = ucontrol->value.integer.value[(voice * num_efx) + idx] & mask;
+			if (mix->send_routing[voice][idx] != val) {
+				mix->send_routing[voice][idx] = val;
+				change = 1;
 			}
 		}	
 	if (change && mix->epcm) {
 		if (mix->epcm->voices[0] && mix->epcm->voices[1]) {
-			if (emu->audigy) {
-				snd_emu10k1_ptr_write(emu, A_FXRT1, mix->epcm->voices[0]->number, mix->send_routing[1]);
-				snd_emu10k1_ptr_write(emu, A_FXRT1, mix->epcm->voices[1]->number, mix->send_routing[2]);
-			} else {
-				snd_emu10k1_ptr_write(emu, FXRT, mix->epcm->voices[0]->number, mix->send_routing[1] << 16);
-				snd_emu10k1_ptr_write(emu, FXRT, mix->epcm->voices[1]->number, mix->send_routing[2] << 16);
-			}
+			update_emu10k1_fxrt(emu, mix->epcm->voices[0]->number,
+					    &mix->send_routing[1][0]);
+			update_emu10k1_fxrt(emu, mix->epcm->voices[1]->number,
+					    &mix->send_routing[2][0]);
 		} else if (mix->epcm->voices[0]) {
-			if (emu->audigy) {
-				snd_emu10k1_ptr_write(emu, A_FXRT1, mix->epcm->voices[0]->number, mix->send_routing[0]);
-			} else {
-				snd_emu10k1_ptr_write(emu, FXRT, mix->epcm->voices[0]->number, mix->send_routing[0] << 16);
-			}
+			update_emu10k1_fxrt(emu, mix->epcm->voices[0]->number,
+					    &mix->send_routing[0][0]);
 		}
 	}
 	spin_unlock_irqrestore(&emu->reg_lock, flags);
@@ -199,8 +211,9 @@ static snd_kcontrol_new_t snd_emu10k1_send_routing_control =
 
 static int snd_emu10k1_send_volume_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {
+	emu10k1_t *emu = snd_kcontrol_chip(kcontrol);
 	uinfo->type = SNDRV_CTL_ELEM_TYPE_INTEGER;
-	uinfo->count = 3*4;
+	uinfo->count = emu->audigy ? 3*8 : 3*4;
 	uinfo->value.integer.min = 0;
 	uinfo->value.integer.max = 255;
 	return 0;
@@ -213,10 +226,11 @@ static int snd_emu10k1_send_volume_get(snd_kcontrol_t * kcontrol,
 	emu10k1_pcm_mixer_t *mix = (emu10k1_pcm_mixer_t *)kcontrol->private_value;
 	emu10k1_t *emu = snd_kcontrol_chip(kcontrol);
 	int idx;
+	int num_efx = emu->audigy ? 8 : 4;
 
 	spin_lock_irqsave(&emu->reg_lock, flags);
-	for (idx = 0; idx < 3*4; idx++)
-		ucontrol->value.integer.value[idx] = mix->send_volume[idx/4][idx%4];
+	for (idx = 0; idx < 3*num_efx; idx++)
+		ucontrol->value.integer.value[idx] = mix->send_volume[idx/num_efx][idx%num_efx];
 	spin_unlock_irqrestore(&emu->reg_lock, flags);
         return 0;
 }
@@ -228,34 +242,25 @@ static int snd_emu10k1_send_volume_put(snd_kcontrol_t * kcontrol,
 	emu10k1_pcm_mixer_t *mix = (emu10k1_pcm_mixer_t *)kcontrol->private_value;
 	emu10k1_t *emu = snd_kcontrol_chip(kcontrol);
 	int change = 0, idx, val;
+	int num_efx = emu->audigy ? 8 : 4;
 
 	spin_lock_irqsave(&emu->reg_lock, flags);
-	for (idx = 0; idx < 3*4; idx++) {
+	for (idx = 0; idx < 3*num_efx; idx++) {
 		val = ucontrol->value.integer.value[idx] & 255;
-		if (mix->send_volume[idx/4][idx%4] != val) {
-			mix->send_volume[idx/4][idx%4] = val;
+		if (mix->send_volume[idx/num_efx][idx%num_efx] != val) {
+			mix->send_volume[idx/num_efx][idx%num_efx] = val;
 			change = 1;
 		}
 	}
 	if (change && mix->epcm) {
-		u32 voice;
 		if (mix->epcm->voices[0] && mix->epcm->voices[1]) {
-			voice = mix->epcm->voices[0]->number;
-			snd_emu10k1_ptr_write(emu, PTRX_FXSENDAMOUNT_A, voice, mix->send_volume[1][0]);
-			snd_emu10k1_ptr_write(emu, PTRX_FXSENDAMOUNT_B, voice, mix->send_volume[1][1]);
-			snd_emu10k1_ptr_write(emu, PSST_FXSENDAMOUNT_C, voice, mix->send_volume[1][2]);
-			snd_emu10k1_ptr_write(emu, DSL_FXSENDAMOUNT_D, voice, mix->send_volume[1][3]);
-			voice = mix->epcm->voices[1]->number;
-			snd_emu10k1_ptr_write(emu, PTRX_FXSENDAMOUNT_A, voice, mix->send_volume[2][0]);
-			snd_emu10k1_ptr_write(emu, PTRX_FXSENDAMOUNT_B, voice, mix->send_volume[2][1]);
-			snd_emu10k1_ptr_write(emu, PSST_FXSENDAMOUNT_C, voice, mix->send_volume[2][2]);
-			snd_emu10k1_ptr_write(emu, DSL_FXSENDAMOUNT_D, voice, mix->send_volume[2][3]);
+			update_emu10k1_send_volume(emu, mix->epcm->voices[0]->number,
+						   &mix->send_volume[1][0]);
+			update_emu10k1_send_volume(emu, mix->epcm->voices[1]->number,
+						   &mix->send_volume[2][0]);
 		} else if (mix->epcm->voices[0]) {
-			voice = mix->epcm->voices[0]->number;
-			snd_emu10k1_ptr_write(emu, PTRX_FXSENDAMOUNT_A, voice, mix->send_volume[0][0]);
-			snd_emu10k1_ptr_write(emu, PTRX_FXSENDAMOUNT_B, voice, mix->send_volume[0][1]);
-			snd_emu10k1_ptr_write(emu, PSST_FXSENDAMOUNT_C, voice, mix->send_volume[0][2]);
-			snd_emu10k1_ptr_write(emu, DSL_FXSENDAMOUNT_D, voice, mix->send_volume[0][3]);
+			update_emu10k1_send_volume(emu, mix->epcm->voices[0]->number,
+						   &mix->send_volume[0][0]);
 		}
 	}
 	spin_unlock_irqrestore(&emu->reg_lock, flags);
@@ -380,6 +385,71 @@ static snd_kcontrol_new_t snd_emu10k1_shared_spdif =
 	put:		snd_emu10k1_shared_spdif_put
 };
 
+#if 0 // XXX: not working yet..
+/*
+ * Audigy analog / digital switches
+ */
+static int audigy_output_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
+{
+	uinfo->type = SNDRV_CTL_ELEM_TYPE_BOOLEAN;
+	uinfo->count = 1;
+	uinfo->value.integer.min = 0;
+	uinfo->value.integer.max = 1;
+	return 0;
+}
+
+static int audigy_output_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
+{
+	emu10k1_t *emu = snd_kcontrol_chip(kcontrol);
+	unsigned int mask = (unsigned int)kcontrol->private_value;
+
+	ucontrol->value.integer.value[0] = inl(emu->port + A_IOCFG) & mask ? 0 : 1;
+        return 0;
+}
+
+static int audigy_output_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
+{
+	unsigned long flags;
+	emu10k1_t *emu = snd_kcontrol_chip(kcontrol);
+	unsigned int mask = (unsigned int)kcontrol->private_value;
+	unsigned int reg, oreg;
+	int change;
+
+	spin_lock_irqsave(&emu->reg_lock, flags);
+	reg = oreg = inl(emu->port + A_IOCFG);
+	reg &= ~mask;
+	reg |= ucontrol->value.integer.value[0] & 1 ? 0 : mask;
+	change = (reg != oreg);
+	if (change)
+		outl(reg, emu->port + A_IOCFG);
+	spin_unlock_irqrestore(&emu->reg_lock, flags);
+        return change;
+}
+
+static snd_kcontrol_new_t audigy_output_analog =
+{
+	iface:		SNDRV_CTL_ELEM_IFACE_MIXER,
+	name:		"Audigy Analog Output Switch",
+	info:		audigy_output_info,
+	get:		audigy_output_get,
+	put:		audigy_output_put,
+	private_value:	0x40,
+};
+
+static snd_kcontrol_new_t audigy_output_digital =
+{
+	iface:		SNDRV_CTL_ELEM_IFACE_MIXER,
+	name:		"Audigy Digital Output Switch",
+	info:		audigy_output_info,
+	get:		audigy_output_get,
+	put:		audigy_output_put,
+	private_value:	0x04,
+};
+#endif // XXX
+
+
+/*
+ */
 static void snd_emu10k1_mixer_free_ac97(ac97_t *ac97)
 {
 	emu10k1_t *emu = snd_magic_cast(emu10k1_t, ac97->private_data, return);
@@ -407,6 +477,7 @@ int __devinit snd_emu10k1_mixer(emu10k1_t *emu)
 
 	for (pcm = 0; pcm < 32; pcm++) {
 		emu10k1_pcm_mixer_t *mix;
+		int v;
 		
 		mix = &emu->pcm_mixer[pcm];
 		mix->epcm = NULL;
@@ -417,11 +488,10 @@ int __devinit snd_emu10k1_mixer(emu10k1_t *emu)
 		kctl->id.index = pcm;
 		if ((err = snd_ctl_add(card, kctl)))
 			return err;
-		if (emu->audigy) {
-			mix->send_routing[0] = mix->send_routing[1] = mix->send_routing[2] = 0x3210;
-		} else {
-			mix->send_routing[0] = mix->send_routing[1] = mix->send_routing[2] = 0x03020100;
-		}
+		for (v = 0; v < 4; v++)
+			mix->send_routing[0][v] = 
+				mix->send_routing[1][v] = 
+				mix->send_routing[2][v] = v;
 		
 		if ((kctl = mix->ctl_send_volume = snd_ctl_new1(&snd_emu10k1_send_volume_control, emu)) == NULL)
 			return -ENOMEM;
@@ -457,10 +527,23 @@ int __devinit snd_emu10k1_mixer(emu10k1_t *emu)
 			return err;
 	}
 
-	if ((kctl = snd_ctl_new1(&snd_emu10k1_shared_spdif, emu)) == NULL)
-		return -ENOMEM;
-	if ((err = snd_ctl_add(card, kctl)))
-		return err;
+	if (emu->audigy) {
+#if 0 // XXX
+		if ((kctl = snd_ctl_new1(&audigy_output_analog, emu)) == NULL)
+			return -ENOMEM;
+		if ((err = snd_ctl_add(card, kctl)))
+			return err;
+		if ((kctl = snd_ctl_new1(&audigy_output_digital, emu)) == NULL)
+			return -ENOMEM;
+		if ((err = snd_ctl_add(card, kctl)))
+			return err;
+#endif // XXX
+	} else {
+		if ((kctl = snd_ctl_new1(&snd_emu10k1_shared_spdif, emu)) == NULL)
+			return -ENOMEM;
+		if ((err = snd_ctl_add(card, kctl)))
+			return err;
+	}
 
 	return 0;
 }

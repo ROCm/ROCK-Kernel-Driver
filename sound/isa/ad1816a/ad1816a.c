@@ -36,6 +36,8 @@
 
 #define chip_t ad1816a_t
 
+#define PFX "ad1816a: "
+
 EXPORT_NO_SYMBOLS;
 MODULE_AUTHOR("Massimo Piccioni <dafastidio@libero.it>");
 MODULE_DESCRIPTION("AD1816A, AD1815");
@@ -176,7 +178,7 @@ static int __init snd_card_ad1816a_isapnp(int dev,
 		isapnp_resource_change(&pdev->irq_resource[0], snd_irq[dev], 1);
 
 	if (pdev->activate(pdev) < 0) {
-		snd_printk("AUDIO isapnp configure failure\n");
+		printk(KERN_ERR PFX "AUDIO isapnp configure failure\n");
 		return -EBUSY;
 	}
 
@@ -202,7 +204,7 @@ static int __init snd_card_ad1816a_isapnp(int dev,
 
 	if (pdev->activate(pdev) < 0) {
 		/* not fatal error */
-		snd_printk("MPU-401 isapnp configure failure\n");
+		printk(KERN_ERR PFX "MPU-401 isapnp configure failure\n");
 		snd_mpu_port[dev] = -1;
 		acard->devmpu = NULL;
 	} else {
@@ -257,7 +259,7 @@ static int __init snd_card_ad1816a_probe(int dev)
 		return error;
 	}
 #else
-	snd_printk("you have to enable ISA PnP support.\n");
+	printk(KERN_ERR PFX "you have to enable ISA PnP support.\n");
 	return -ENOSYS;
 #endif	/* __ISAPNP__ */
 
@@ -284,14 +286,14 @@ static int __init snd_card_ad1816a_probe(int dev)
 		if (snd_mpu401_uart_new(card, 0, MPU401_HW_MPU401,
 					snd_mpu_port[dev], 0, snd_mpu_irq[dev], SA_INTERRUPT,
 					NULL) < 0)
-			snd_printk("no MPU-401 device at 0x%lx.\n", snd_mpu_port[dev]);
+			printk(KERN_ERR PFX "no MPU-401 device at 0x%lx.\n", snd_mpu_port[dev]);
 	}
 
 	if (snd_fm_port[dev] > 0) {
 		if (snd_opl3_create(card,
 				    snd_fm_port[dev], snd_fm_port[dev] + 2,
 				    OPL3_HW_AUTO, 0, &opl3) < 0) {
-			snd_printk("no OPL device at 0x%lx-0x%lx.\n", snd_fm_port[dev], snd_fm_port[dev] + 2);
+			printk(KERN_ERR PFX "no OPL device at 0x%lx-0x%lx.\n", snd_fm_port[dev], snd_fm_port[dev] + 2);
 		} else {
 			if ((error = snd_opl3_timer_new(opl3, 1, 2)) < 0) {
 				snd_card_free(card);
@@ -346,11 +348,11 @@ static int __init alsa_card_ad1816a_init(void)
 #ifdef __ISAPNP__
 	cards += isapnp_probe_cards(snd_ad1816a_pnpids, snd_ad1816a_isapnp_detect);
 #else
-	snd_printk("you have to enable ISA PnP support.\n");
+	printk(KERN_ERR PFX "you have to enable ISA PnP support.\n");
 #endif
 #ifdef MODULE
 	if (!cards)
-		snd_printk("no AD1816A based soundcards found.\n");
+		printk(KERN_ERR "no AD1816A based soundcards found.\n");
 #endif	/* MODULE */
 	return cards ? 0 : -ENODEV;
 }

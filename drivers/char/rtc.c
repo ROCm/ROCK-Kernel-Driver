@@ -41,9 +41,11 @@
  *	1.10c	Cesar Barros: SMP locking fixes and cleanup
  *	1.10d	Paul Gortmaker: delete paranoia check in rtc_exit
  *	1.10e	Maciej W. Rozycki: Handle DECstation's year weirdness.
+ *      1.11    Takashi Iwai: Kernel access functions
+ *			      rtc_register/rtc_unregister/rtc_control
  */
 
-#define RTC_VERSION		"1.10e"
+#define RTC_VERSION		"1.11"
 
 #define RTC_IO_EXTENT	0x10	/* Only really two ports, but...	*/
 
@@ -139,6 +141,11 @@ static unsigned long rtc_status = 0;	/* bitmapped status byte.	*/
 static unsigned long rtc_freq = 0;	/* Current periodic IRQ rate	*/
 static unsigned long rtc_irq_data = 0;	/* our output to the world	*/
 
+#if RTC_IRQ
+static spinlock_t rtc_task_lock = SPIN_LOCK_UNLOCKED;
+static rtc_task_t *rtc_callback = NULL;
+#endif
+
 /*
  *	If this driver ever becomes modularised, it will be really nice
  *	to make the epoch retain its value across module reload...
@@ -180,6 +187,10 @@ static void rtc_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	spin_unlock (&rtc_lock);
 
 	/* Now do the rest of the actions */
+	spin_lock(&rtc_task_lock);
+	if (rtc_callback)
+		rtc_callback->func(rtc_callback->private_data);
+	spin_unlock(&rtc_task_lock);
 	wake_up_interruptible(&rtc_wait);	
 
 	kill_fasync (&rtc_async_queue, SIGIO, POLL_IN);
@@ -244,8 +255,7 @@ static ssize_t rtc_read(struct file *file, char *buf,
 #endif
 }
 
-static int rtc_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
-		     unsigned long arg)
+static int rtc_do_ioctl(unsigned int cmd, unsigned long arg, int kernel)
 {
 	struct rtc_time wtime; 
 
@@ -295,7 +305,7 @@ static int rtc_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		 * We don't really want Joe User enabling more
 		 * than 64Hz of interrupts on a multi-user machine.
 		 */
-		if ((rtc_freq > 64) && (!capable(CAP_SYS_RESOURCE)))
+		if (!kernel && (rtc_freq > 64) && (!capable(CAP_SYS_RESOURCE)))
 			return -EACCES;
 
 		if (!(rtc_status & RTC_TIMER_ON)) {
@@ -493,7 +503,7 @@ static int rtc_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		 * We don't really want Joe User generating more
 		 * than 64Hz of interrupts on a multi-user machine.
 		 */
-		if ((arg > 64) && (!capable(CAP_SYS_RESOURCE)))
+		if (!kernel && (arg > 64) && (!capable(CAP_SYS_RESOURCE)))
 			return -EACCES;
 
 		while (arg > (1<<tmp))
@@ -537,6 +547,12 @@ static int rtc_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		return -EINVAL;
 	}
 	return copy_to_user((void *)arg, &wtime, sizeof wtime) ? -EFAULT : 0;
+}
+
+static int rtc_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
+		     unsigned long arg)
+{
+	return rtc_do_ioctl(cmd, arg, 0);
 }
 
 /*
@@ -606,11 +622,8 @@ no_irq:
 
 	spin_lock_irq (&rtc_lock);
 	rtc_irq_data = 0;
-	spin_unlock_irq (&rtc_lock);
-
-	/* No need for locking -- nobody else can do anything until this rmw is
-	 * committed, and no timer is running. */
 	rtc_status &= ~RTC_IS_OPEN;
+	spin_unlock_irq (&rtc_lock);
 	return 0;
 }
 
@@ -634,6 +647,88 @@ static unsigned int rtc_poll(struct file *file, poll_table *wait)
 	return 0;
 }
 #endif
+
+/*
+ * exported stuffs
+ */
+
+EXPORT_SYMBOL(rtc_register);
+EXPORT_SYMBOL(rtc_unregister);
+EXPORT_SYMBOL(rtc_control);
+
+int rtc_register(rtc_task_t *task)
+{
+#if !RTC_IRQ
+	return -EIO;
+#else
+	if (task == NULL || task->func == NULL)
+		return -EINVAL;
+	spin_lock_irq(&rtc_lock);
+	if (rtc_status & RTC_IS_OPEN) {
+		spin_unlock_irq(&rtc_lock);
+		return -EBUSY;
+	}
+	spin_lock(&rtc_task_lock);
+	if (rtc_callback) {
+		spin_unlock(&rtc_task_lock);
+		spin_unlock_irq(&rtc_lock);
+		return -EBUSY;
+	}
+	rtc_status |= RTC_IS_OPEN;
+	rtc_callback = task;
+	spin_unlock(&rtc_task_lock);
+	spin_unlock_irq(&rtc_lock);
+	return 0;
+#endif
+}
+
+int rtc_unregister(rtc_task_t *task)
+{
+#if !RTC_IRQ
+	return -EIO;
+#else
+	unsigned char tmp;
+
+	spin_lock_irq(&rtc_task_lock);
+	if (rtc_callback != task) {
+		spin_unlock_irq(&rtc_task_lock);
+		return -ENXIO;
+	}
+	rtc_callback = NULL;
+	spin_lock(&rtc_lock);
+	/* disable controls */
+	tmp = CMOS_READ(RTC_CONTROL);
+	tmp &= ~RTC_PIE;
+	tmp &= ~RTC_AIE;
+	tmp &= ~RTC_UIE;
+	CMOS_WRITE(tmp, RTC_CONTROL);
+	CMOS_READ(RTC_INTR_FLAGS);
+	if (rtc_status & RTC_TIMER_ON) {
+		rtc_status &= ~RTC_TIMER_ON;
+		del_timer(&rtc_irq_timer);
+	}
+	rtc_status &= ~RTC_IS_OPEN;
+	spin_unlock(&rtc_lock);
+	spin_unlock_irq(&rtc_task_lock);
+	return 0;
+#endif
+}
+
+int rtc_control(rtc_task_t *task, unsigned int cmd, unsigned long arg)
+{
+#if !RTC_IRQ
+	return -EIO;
+#else
+	spin_lock_irq(&rtc_task_lock);
+	if (rtc_callback != task) {
+		spin_unlock_irq(&rtc_task_lock);
+		return -ENXIO;
+	}
+	spin_unlock_irq(&rtc_task_lock);
+	return rtc_do_ioctl(cmd, arg, 1);
+#endif
+}
+
 
 /*
  *	The various file operations we support.
@@ -822,7 +917,6 @@ static void __exit rtc_exit (void)
 
 module_init(rtc_init);
 module_exit(rtc_exit);
-EXPORT_NO_SYMBOLS;
 
 #if RTC_IRQ
 /*

@@ -56,7 +56,6 @@
 
 static int hpt34x_get_info(char *, char **, off_t, int);
 extern int (*hpt34x_display_info)(char *, char **, off_t, int); /* ide-proc.c */
-extern char *ide_media_verbose(ide_drive_t *);
 static struct pci_dev *bmide_dev;
 
 static int hpt34x_get_info (char *buffer, char **addr, off_t offset, int count)
@@ -210,7 +209,7 @@ static int config_chipset_for_dma (ide_drive_t *drive, byte ultra)
 	struct hd_driveid *id	= drive->id;
 	byte speed		= 0x00;
 
-	if (drive->media != ide_disk)
+	if (drive->type != ATA_DISK)
 		return ((int) ide_dma_off_quietly);
 
 	hpt34x_clear_chipset(drive);
@@ -333,7 +332,7 @@ int hpt34x_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 			outb(reading, dma_base);		/* specify r/w */
 			outb(inb(dma_base+2)|6, dma_base+2);	/* clear INTR & ERROR flags */
 			drive->waiting_for_dma = 1;
-			if (drive->media != ide_disk)
+			if (drive->type != ATA_DISK)
 				return 0;
 			ide_set_handler(drive, &ide_dma_intr, WAIT_CMD, NULL);	/* issue cmd to drive */
 			OUT_BYTE((reading == 9) ? WIN_READDMA : WIN_WRITEDMA, IDE_COMMAND_REG);
@@ -357,7 +356,7 @@ int hpt34x_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
  */
 #define	HPT34X_PCI_INIT_REG		0x80
 
-unsigned int __init pci_init_hpt34x (struct pci_dev *dev, const char *name)
+unsigned int __init pci_init_hpt34x(struct pci_dev *dev)
 {
 	int i = 0;
 	unsigned long hpt34xIoBase = pci_resource_start(dev, 4);

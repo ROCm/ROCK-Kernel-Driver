@@ -135,7 +135,7 @@ static int __init snd_card_cs4231_probe(int dev)
 					snd_mpu_port[dev], 0,
 					snd_mpu_irq[dev], SA_INTERRUPT,
 					NULL) < 0)
-			snd_printk("MPU401 not detected\n");
+			printk(KERN_ERR "cs4231: MPU401 not detected\n");
 	}
 	strcpy(card->driver, "CS4231");
 	strcpy(card->shortname, pcm->name);
@@ -161,7 +161,7 @@ static int __init alsa_card_cs4231_init(void)
 	}
 	if (!cards) {
 #ifdef MODULE
-		snd_printk("CS4231 soundcard not found or device busy\n");
+		printk(KERN_ERR "CS4231 soundcard not found or device busy\n");
 #endif
 		return -ENODEV;
 	}

@@ -1219,10 +1219,10 @@ S: 65183 Wiesbaden
 S: Germany
 
 N: Christoph Hellwig
-E: hch@caldera.de
 E: hch@infradead.org
 D: misc driver & makefile hacking
 D: freevxfs driver
+D: sysvfs maintainer
 S: Triftstraﬂe 26
 S: 38644 Goslar
 S: Germany
@@ -1579,8 +1579,10 @@ S: L-1148 Luxembourg-City
 S: Luxembourg
 
 N: Gerd Knorr
-E: kraxel@goldbach.in-berlin.de
-D: SCSI CD-ROM driver hacking, vesafb, v4l, minor bug fixes
+W: http://bytesex.org
+E: kraxel@bytesex.org
+E: kraxel@suse.de
+D: video4linux, bttv, vesafb, some scsi, misc fixes
 
 N: Harald Koenig
 E: koenig@tat.physik.uni-tuebingen.de
@@ -2672,6 +2674,16 @@ D: CD-List, Books-List, Ex-FAQ
 D: Linux-Support, -Mailbox, -Stammtisch
 D: several improvements to system programs
 S: Oldenburg
+S: Germany
+
+N: Robert Schwebel
+E: robert@schwebel.de
+W: http://www.schwebel.de
+D: Embedded hacker and book author,
+D: AMD Elan support for Linux
+S: Pengutronix
+S: Braunschweiger Strasse 79
+S: 31134 Hildesheim
 S: Germany
 
 N: Darren Senn

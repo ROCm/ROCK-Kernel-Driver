@@ -66,4 +66,17 @@ struct rtc_wkalrm {
 #define RTC_WKALM_SET	_IOW('p', 0x0f, struct rtc_wkalrm)/* Set wakeup alarm*/
 #define RTC_WKALM_RD	_IOR('p', 0x10, struct rtc_wkalrm)/* Get wakeup alarm*/
 
+#ifdef __KERNEL__
+
+typedef struct rtc_task {
+	void (*func)(void *private_data);
+	void *private_data;
+} rtc_task_t;
+
+int rtc_register(rtc_task_t *task);
+int rtc_unregister(rtc_task_t *task);
+int rtc_control(rtc_task_t *t, unsigned int cmd, unsigned long arg);
+
+#endif /* __KERNEL__ */
+
 #endif /* _LINUX_RTC_H_ */

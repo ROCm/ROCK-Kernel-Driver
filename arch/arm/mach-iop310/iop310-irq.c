@@ -29,40 +29,46 @@ extern void xs80200_init_irq(void);
 
 extern void do_IRQ(int, struct pt_regs *);
 
-u32 iop310_mask = 0;
+static u32 iop310_mask /* = 0 */;
 
-static void
-iop310_irq_mask (unsigned int irq)
+static void iop310_irq_mask (unsigned int irq)
 {
-	iop310_mask |= (1 << (irq - IOP310_IRQ_OFS));
+	iop310_mask ++;
 
 	/*
 	 * No mask bits on the 80312, so we have to
 	 * mask everything from the outside!
 	 */
-	xs80200_irq_mask(IRQ_XS80200_EXTIRQ);
+	if (iop310_mask == 1) {
+		disable_irq(IRQ_XS80200_EXTIRQ);
+		irq_desc[IRQ_XS80200_EXTIRQ].chip->mask(IRQ_XS80200_EXTIRQ);
+	}
 }
 
-static void
-iop310_irq_unmask (unsigned int irq)
+static void iop310_irq_unmask (unsigned int irq)
 {
-	iop310_mask &= ~(1 << (irq - IOP310_IRQ_OFS));
+	if (iop310_mask)
+		iop310_mask --;
 
 	/*
 	 * Check if all 80312 sources are unmasked now
 	 */
-	if(!iop310_mask)
-	{
-		xs80200_irq_unmask(IRQ_XS80200_EXTIRQ);
-
-	}
+	if (iop310_mask == 0)
+		enable_irq(IRQ_XS80200_EXTIRQ);
 }
 
-void iop310_irq_demux(int irq, void *dev_id,
-                                   struct pt_regs *regs)
+struct irqchip ext_chip = {
+	ack:	iop310_irq_mask,
+	mask:	iop310_irq_mask,
+	unmask:	iop310_irq_unmask,
+};
+
+void
+iop310_irq_demux(unsigned int irq, struct irqdesc *desc, struct pt_regs *regs)
 {
 	u32 fiq1isr = *((volatile u32*)IOP310_FIQ1ISR);
 	u32 fiq2isr = *((volatile u32*)IOP310_FIQ2ISR);
+	struct irqdesc *d;
 	unsigned int irqno = 0;
 
 	if(fiq1isr)
@@ -86,22 +92,22 @@ void iop310_irq_demux(int irq, void *dev_id,
 			irqno = IRQ_IOP310_MU;
 	}
 
-	do_IRQ(irqno, regs);
+	if (irqno) {
+		d = irq_desc + irqno;
+		d->handle(irqno, d, regs);
+	}
 }
 
 void __init iop310_init_irq(void)
 {
-	int i;
+	unsigned int i;
 
 	for(i = IOP310_IRQ_OFS; i < NR_IOP310_IRQS; i++)
 	{
-		irq_desc[i].valid	= 1;
-		irq_desc[i].probe_ok	= 1;
-		irq_desc[i].mask_ack	= iop310_irq_mask;
-		irq_desc[i].mask	= iop310_irq_mask;
-		irq_desc[i].unmask	= iop310_irq_unmask;
+		set_irq_chip(i, &ext_chip);
+		set_irq_handler(i, do_level_IRQ);
+		set_irq_flags(i, IRQF_VALID | IRQF_PROBE);
 	}
 
 	xs80200_init_irq();
 }
-

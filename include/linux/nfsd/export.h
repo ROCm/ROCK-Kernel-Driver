@@ -87,8 +87,7 @@ struct svc_export {
 void			nfsd_export_init(void);
 void			nfsd_export_shutdown(void);
 void			exp_readlock(void);
-int			exp_writelock(void);
-void			exp_unlock(void);
+void			exp_readunlock(void);
 struct svc_client *	exp_getclient(struct sockaddr_in *sin);
 void			exp_putclient(struct svc_client *clp);
 struct svc_export *	exp_get(struct svc_client *clp, kdev_t dev, ino_t ino);

@@ -17,11 +17,14 @@ static int __init shark_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 	if (dev->bus->number == 0)
 		if (dev->devfn == 0) return 255;
 		else return 11;
-	else return 6;
+	else return 255;
 }
 
 struct hw_pci shark_pci __initdata = {
-	init: via82c505_init,
-	swizzle: no_swizzle,
-	map_irq: shark_map_irq
+	setup:		via82c505_setup,
+	swizzle:       	pci_std_swizzle,
+	map_irq:	shark_map_irq,
+	nr_controllers:	1,
+	scan:		via82c505_scan_bus,
+	preinit:	via82c505_preinit
 };

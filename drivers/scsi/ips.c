@@ -81,7 +81,7 @@
 /*            2.3.18 and later                                               */
 /*          - Sync with other changes from the 2.3 kernels                   */
 /* 4.00.06  - Fix timeout with initial FFDC command                          */
-/* 4.00.06a - Port to 2.4 (trivial) -- Christoph Hellwig <hch@caldera.de>    */
+/* 4.00.06a - Port to 2.4 (trivial) -- Christoph Hellwig <hch@infradead.org> */
 /* 4.10.00  - Add support for ServeRAID 4M/4L                                */
 /* 4.10.13  - Fix for dynamic unload and proc file system                    */
 /* 4.20.03  - Rename version to coincide with new release schedules          */

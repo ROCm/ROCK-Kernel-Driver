@@ -250,6 +250,7 @@ int __devinit snd_emu10k1_proc_init(emu10k1_t * emu)
 		}
 	}
 	emu->proc_entry = entry;
+	entry = NULL;
 	if ((entry = snd_info_create_card_entry(emu->card, "fx8010_gpr", emu->card->proc_root)) != NULL) {
 		entry->content = SNDRV_INFO_CONTENT_DATA;
 		entry->private_data = emu;
@@ -262,6 +263,7 @@ int __devinit snd_emu10k1_proc_init(emu10k1_t * emu)
 		}
 	}
 	emu->proc_entry_fx8010_gpr = entry;
+	entry = NULL;
 	if (!emu->audigy && (entry = snd_info_create_card_entry(emu->card, "fx8010_tram_data", emu->card->proc_root)) != NULL) {
 		entry->content = SNDRV_INFO_CONTENT_DATA;
 		entry->private_data = emu;
@@ -274,6 +276,7 @@ int __devinit snd_emu10k1_proc_init(emu10k1_t * emu)
 		}
 	}
 	emu->proc_entry_fx8010_tram_data = entry;
+	entry = NULL;
 	if (!emu->audigy && (entry = snd_info_create_card_entry(emu->card, "fx8010_tram_addr", emu->card->proc_root)) != NULL) {
 		entry->content = SNDRV_INFO_CONTENT_DATA;
 		entry->private_data = emu;
@@ -286,6 +289,7 @@ int __devinit snd_emu10k1_proc_init(emu10k1_t * emu)
 		}
 	}
 	emu->proc_entry_fx8010_tram_addr = entry;
+	entry = NULL;
 	if ((entry = snd_info_create_card_entry(emu->card, "fx8010_code", emu->card->proc_root)) != NULL) {
 		entry->content = SNDRV_INFO_CONTENT_DATA;
 		entry->private_data = emu;
@@ -298,6 +302,7 @@ int __devinit snd_emu10k1_proc_init(emu10k1_t * emu)
 		}
 	}
 	emu->proc_entry_fx8010_code = entry;
+	entry = NULL;
 	if ((entry = snd_info_create_card_entry(emu->card, "fx8010_acode", emu->card->proc_root)) != NULL) {
 		entry->content = SNDRV_INFO_CONTENT_TEXT;
 		entry->private_data = emu;

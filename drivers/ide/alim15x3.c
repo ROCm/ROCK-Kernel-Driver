@@ -247,7 +247,6 @@ static void ali15x3_tune_drive (ide_drive_t *drive, byte pio)
 	int s_time, a_time, c_time;
 	byte s_clc, a_clc, r_clc;
 	unsigned long flags;
-	int bus_speed = system_bus_clock();
 	int port = hwif->index ? 0x5c : 0x58;
 	int portFIFO = hwif->channel ? 0x55 : 0x54;
 	byte cd_dma_fifo = 0;
@@ -255,18 +254,18 @@ static void ali15x3_tune_drive (ide_drive_t *drive, byte pio)
 	pio = ide_get_best_pio_mode(drive, pio, 5, &d);
 	s_time = ide_pio_timings[pio].setup_time;
 	a_time = ide_pio_timings[pio].active_time;
-	if ((s_clc = (s_time * bus_speed + 999) / 1000) >= 8)
+	if ((s_clc = (s_time * system_bus_speed + 999) / 1000) >= 8)
 		s_clc = 0;
-	if ((a_clc = (a_time * bus_speed + 999) / 1000) >= 8)
+	if ((a_clc = (a_time * system_bus_speed + 999) / 1000) >= 8)
 		a_clc = 0;
 	c_time = ide_pio_timings[pio].cycle_time;
 
 #if 0
-	if ((r_clc = ((c_time - s_time - a_time) * bus_speed + 999) / 1000) >= 16)
+	if ((r_clc = ((c_time - s_time - a_time) * system_bus_speed + 999) / 1000) >= 16)
 		r_clc = 0;
 #endif
 
-	if (!(r_clc = (c_time * bus_speed + 999) / 1000 - a_clc - s_clc)) {
+	if (!(r_clc = (c_time * system_bus_speed + 999) / 1000 - a_clc - s_clc)) {
 		r_clc = 1;
 	} else {
 		if (r_clc >= 16)
@@ -279,7 +278,7 @@ static void ali15x3_tune_drive (ide_drive_t *drive, byte pio)
 	 * PIO mode => ATA FIFO on, ATAPI FIFO off
 	 */
 	pci_read_config_byte(dev, portFIFO, &cd_dma_fifo);
-	if (drive->media==ide_disk) {
+	if (drive->type == ATA_DISK) {
 		if (hwif->index) {
 			pci_write_config_byte(dev, portFIFO, (cd_dma_fifo & 0x0F) | 0x50);
 		} else {
@@ -425,9 +424,9 @@ static byte ali15x3_can_ultra (ide_drive_t *drive)
 	} else if ((m5229_revision < 0xC2) &&
 #ifndef CONFIG_WDC_ALI15X3
 		   ((chip_is_1543c_e && strstr(id->model, "WDC ")) ||
-		    (drive->media!=ide_disk))) {
+		    (drive->type != ATA_DISK))) {
 #else /* CONFIG_WDC_ALI15X3 */
-		   (drive->media!=ide_disk)) {
+		   (drive->type != ATA_DISK)) {
 #endif /* CONFIG_WDC_ALI15X3 */
 		return 0;
 	} else {
@@ -442,7 +441,7 @@ static int ali15x3_config_drive_for_dma(ide_drive_t *drive)
 	ide_dma_action_t dma_func	= ide_dma_on;
 	byte can_ultra_dma		= ali15x3_can_ultra(drive);
 
-	if ((m5229_revision<=0x20) && (drive->media!=ide_disk))
+	if ((m5229_revision<=0x20) && (drive->type != ATA_DISK))
 		return hwif->dmaproc(ide_dma_off_quietly, drive);
 
 	if ((id != NULL) && ((id->capability & 1) != 0) && hwif->autodma) {
@@ -495,7 +494,7 @@ static int ali15x3_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 		case ide_dma_check:
 			return ali15x3_config_drive_for_dma(drive);
 		case ide_dma_write:
-			if ((m5229_revision < 0xC2) && (drive->media != ide_disk))
+			if ((m5229_revision < 0xC2) && (drive->type != ATA_DISK))
 				return 1;	/* try PIO instead of DMA */
 			break;
 		default:
@@ -505,7 +504,7 @@ static int ali15x3_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 }
 #endif /* CONFIG_BLK_DEV_IDEDMA */
 
-unsigned int __init pci_init_ali15x3 (struct pci_dev *dev, const char *name)
+unsigned int __init pci_init_ali15x3(struct pci_dev *dev)
 {
 	unsigned long fixdma_base = pci_resource_start(dev, 4);
 
@@ -524,7 +523,7 @@ unsigned int __init pci_init_ali15x3 (struct pci_dev *dev, const char *name)
 		outb(inb(fixdma_base+2) & 0x60, fixdma_base+2);
 
 		if (inb(fixdma_base+2) & 0x80)
-			printk("%s: simplex device: DMA will fail!!\n", name);
+			printk("%s: simplex device: DMA will fail!!\n", dev->name);
 	}
 
 #if defined(DISPLAY_ALI_TIMINGS) && defined(CONFIG_PROC_FS)

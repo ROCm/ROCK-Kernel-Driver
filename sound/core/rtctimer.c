@@ -156,13 +156,13 @@ static int __init rtctimer_init(void)
 	snd_timer_t *timer;
 
 	if (rtctimer_freq < 2 || rtctimer_freq > 8192) {
-		snd_printk("rtctimer: invalid frequency %d\n", rtctimer_freq);
+		snd_printk(KERN_ERR "rtctimer: invalid frequency %d\n", rtctimer_freq);
 		return -EINVAL;
 	}
 	for (order = 1; rtctimer_freq > order; order <<= 1)
 		;
 	if (rtctimer_freq != order) {
-		snd_printk("rtctimer: invalid frequency %d\n", rtctimer_freq);
+		snd_printk(KERN_ERR "rtctimer: invalid frequency %d\n", rtctimer_freq);
 		return -EINVAL;
 	}
 

@@ -20,6 +20,7 @@
 #include <linux/serial_core.h>
 
 #include <asm/hardware.h>
+#include <asm/irq.h>
 #include <asm/setup.h>
 #include <asm/page.h>
 #include <asm/pgtable.h>
@@ -89,7 +90,7 @@ static int __init assabet_init(void)
 	/*
 	 * Set the IRQ edges
 	 */
-	set_GPIO_IRQ_edge(GPIO_GPIO23, GPIO_RISING_EDGE);	/* UCB1300 */
+	set_irq_type(IRQ_GPIO23, IRQT_RISING);	/* UCB1300 */
 
 	sa1100fb_lcd_power = assabet_lcd_power;
 	sa1100fb_backlight_power = assabet_backlight_power;

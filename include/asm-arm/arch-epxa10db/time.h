@@ -48,7 +48,7 @@ void __init time_init(void)
 	/* 
 	 * Make irqs happen for the system timer
 	 */
-	setup_arm_irq(IRQ_TIMER0, &timer_irq);
+	setup_irq(IRQ_TIMER0, &timer_irq);
 
 	/* Start the timer */
 	*TIMER0_LIMIT(IO_ADDRESS(EXC_TIMER00_BASE))=(unsigned int)(EXC_AHB2_CLK_FREQUENCY/200);

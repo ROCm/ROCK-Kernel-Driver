@@ -378,12 +378,14 @@ smb_new_dentry(struct dentry *dentry)
 void
 smb_renew_times(struct dentry * dentry)
 {
+	read_lock(&dparent_lock);
 	for (;;) {
 		dentry->d_time = jiffies;
 		if (IS_ROOT(dentry))
 			break;
 		dentry = dentry->d_parent;
 	}
+	read_unlock(&dparent_lock);
 }
 
 static struct dentry *

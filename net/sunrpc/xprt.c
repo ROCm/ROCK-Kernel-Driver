@@ -542,25 +542,15 @@ xprt_reconn_status(struct rpc_task *task)
 static inline struct rpc_rqst *
 xprt_lookup_rqst(struct rpc_xprt *xprt, u32 xid)
 {
-	struct rpc_task	*head, *task;
 	struct rpc_rqst	*req;
-	int		safe = 0;
+	struct list_head *le;
+	struct rpc_task *task;
 
 	spin_lock_bh(&rpc_queue_lock);
-	if ((head = xprt->pending.task) != NULL) {
-		task = head;
-		do {
-			if ((req = task->tk_rqstp) && req->rq_xid == xid)
-				goto out;
-			task = task->tk_next;
-			if (++safe > 100) {
-				printk("xprt_lookup_rqst: loop in Q!\n");
-				goto out_bad;
-			}
-		} while (task != head);
-	}
+	task_for_each(task, le, &xprt->pending.tasks)
+		if ((req = task->tk_rqstp) && req->rq_xid == xid)
+			goto out;
 	dprintk("RPC:      unknown XID %08x in reply.\n", xid);
- out_bad:
 	req = NULL;
  out:
 	if (req && !__rpc_lock_task(req->rq_task))
@@ -1487,9 +1477,9 @@ xprt_setup(struct socket *sock, int proto,
 	} else
 		xprt_default_timeout(&xprt->timeout, xprt->prot);
 
-	xprt->pending = RPC_INIT_WAITQ("xprt_pending");
-	xprt->sending = RPC_INIT_WAITQ("xprt_sending");
-	xprt->backlog = RPC_INIT_WAITQ("xprt_backlog");
+	INIT_RPC_WAITQ(&xprt->pending, "xprt_pending");
+	INIT_RPC_WAITQ(&xprt->sending, "xprt_sending");
+	INIT_RPC_WAITQ(&xprt->backlog, "xprt_backlog");
 
 	/* initialize free list */
 	for (i = 0, req = xprt->slot; i < RPC_MAXREQS-1; i++, req++)

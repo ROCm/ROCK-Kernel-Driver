@@ -18,28 +18,44 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 #include <linux/init.h>
+#include <linux/ioport.h>
+#include <asm/io.h>
 #include <asm/hardware.h>
 #include <asm/irq.h>
-#include <asm/io.h>
 #include <asm/mach/irq.h>
 #include <asm/arch/platform.h>
 #include <asm/arch/int_ctrl00.h>
 
 
-static void mask_irq(unsigned int irq)
+static void epxa_mask_irq(unsigned int irq)
 {
-        __raw_writel(1 << irq, INT_MC(IO_ADDRESS(EXC_INT_CTRL00_BASE)));
+        writel(1 << irq, INT_MC(IO_ADDRESS(EXC_INT_CTRL00_BASE)));
 }
 
-static void unmask_irq(unsigned int irq)
+static void epxa_unmask_irq(unsigned int irq)
 {
-        __raw_writel(1 << irq, INT_MS(IO_ADDRESS(EXC_INT_CTRL00_BASE)));
+        writel(1 << irq, INT_MS(IO_ADDRESS(EXC_INT_CTRL00_BASE)));
 }
  
+
+static struct irqchip epxa_irq_chip = {
+	ack:		epxa_mask_irq,
+	mask:		epxa_mask_irq,
+	unmask:		epxa_unmask_irq,
+};
+
+static struct resource irq_resource = {
+	name:	"irq_handler",
+	start:	IO_ADDRESS(EXC_INT_CTRL00_BASE),
+	end:	IO_ADDRESS(INT_PRIORITY_FC(EXC_INT_CTRL00_BASE))+4,
+};
+
 void __init epxa10db_init_irq(void)
 {
 	unsigned int i;
 	
+	request_resource(&iomem_resource, &irq_resource);
+
 	/*
 	 * This bit sets up the interrupt controller using 
 	 * the 6 PLD interrupts mode (the default) each 
@@ -49,22 +65,15 @@ void __init epxa10db_init_irq(void)
 	 * on the contents of your PLD
 	 */
 
-	__raw_writel(3,INT_MODE(IO_ADDRESS(EXC_INT_CTRL00_BASE)));
+	writel(3,INT_MODE(IO_ADDRESS(EXC_INT_CTRL00_BASE)));
 	for (i = 0; i < NR_IRQS; i++){
-		__raw_writel(i+1, INT_PRIORITY_P0(IO_ADDRESS(EXC_INT_CTRL00_BASE)) + (4*i));
+		writel(i+1, INT_PRIORITY_P0(IO_ADDRESS(EXC_INT_CTRL00_BASE)) + (4*i));
+		set_irq_chip(i,&epxa_irq_chip);
+		set_irq_handler(i,do_level_IRQ);
+		set_irq_flags(i, IRQF_VALID | IRQF_PROBE);
 	}
 
-
-	for (i = 0; i < NR_IRQS; i++) {
-	       
-		irq_desc[i].valid	= 1;
-		irq_desc[i].probe_ok	= 1;
-		irq_desc[i].mask_ack	= mask_irq;
-		irq_desc[i].mask	= mask_irq;
-		irq_desc[i].unmask	= unmask_irq;
-	}
-
-	/* Disable all interrupt */
-	__raw_writel(-1,INT_MC(IO_ADDRESS(EXC_INT_CTRL00_BASE)));
+	/* Disable all interrupts */
+	writel(-1,INT_MC(IO_ADDRESS(EXC_INT_CTRL00_BASE)));
 
 }

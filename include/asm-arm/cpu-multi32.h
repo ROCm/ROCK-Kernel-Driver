@@ -93,21 +93,6 @@ extern struct processor {
 		void (*invalidate_page)(void *virt_page);
 	} icache;
 
-	struct {	/* TLB */
-		/*
-		 * flush all TLBs
-		 */
-		void (*invalidate_all)(void);
-		/*
-		 * flush a specific TLB
-		 */
-		void (*invalidate_range)(unsigned long address, unsigned long end);
-		/*
-		 * flush a specific TLB
-		 */
-		void (*invalidate_page)(unsigned long address, int flags);
-	} tlb;
-
 	struct {	/* PageTable */
 		/*
 		 * Set the page table
@@ -151,10 +136,6 @@ extern const struct processor sa110_processor_functions;
 
 #define cpu_icache_invalidate_range(s,e)	processor.icache.invalidate_range(s,e)
 #define cpu_icache_invalidate_page(vp)		processor.icache.invalidate_page(vp)
-
-#define cpu_tlb_invalidate_all()		processor.tlb.invalidate_all()
-#define cpu_tlb_invalidate_range(s,e)		processor.tlb.invalidate_range(s,e)
-#define cpu_tlb_invalidate_page(vp,f)		processor.tlb.invalidate_page(vp,f)
 
 #define cpu_set_pgd(pgd)			processor.pgtable.set_pgd(pgd)
 #define cpu_set_pmd(pmdp, pmd)			processor.pgtable.set_pmd(pmdp, pmd)

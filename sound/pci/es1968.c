@@ -2720,7 +2720,7 @@ static int __devinit snd_es1968_probe(struct pci_dev *pci,
 	if ((err = snd_mpu401_uart_new(card, 0, MPU401_HW_MPU401,
 				       chip->io_port + ESM_MPU401_PORT, 1,
 				       chip->irq, 0, &chip->rmidi)) < 0) {
-		printk(KERN_INFO "es1968: skipping MPU-401 MIDI support..\n");
+		printk(KERN_WARNING "es1968: skipping MPU-401 MIDI support..\n");
 	}
 
 	/* card switches */
@@ -2783,7 +2783,7 @@ static int __init alsa_card_es1968_init(void)
 
         if ((err = pci_module_init(&driver)) < 0) {
 #ifdef MODULE
-		snd_printk("ESS Maestro soundcard not found or device busy\n");
+		printk(KERN_ERR "ESS Maestro soundcard not found or device busy\n");
 #endif
 		return err;
 	}
@@ -2792,7 +2792,7 @@ static int __init alsa_card_es1968_init(void)
 	   leave the speaking emitting an annoying noise, so we catch
 	   shutdown events. */ 
 	if (register_reboot_notifier(&snd_es1968_nb)) {
-		snd_printk("reboot notifier registration failed; may make noise at shutdown.\n");
+		printk(KERN_ERR "reboot notifier registration failed; may make noise at shutdown.\n");
 	}
 #endif
 	return 0;

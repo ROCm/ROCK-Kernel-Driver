@@ -861,10 +861,8 @@ static int keyspan_open (struct usb_serial_port *port, struct file *filp)
 	
 	dbg("keyspan_open called for port%d.\n", port->number); 
 
-	down (&port->sem);
 	already_active = port->open_count;
 	++port->open_count;
-	up (&port->sem);
 
 	if (already_active)
 		return 0;
@@ -926,8 +924,6 @@ static void keyspan_close(struct usb_serial_port *port, struct file *filp)
 	p_priv->out_flip = 0;
 	p_priv->in_flip = 0;
 
-	down (&port->sem);
-
 	if (--port->open_count <= 0) {
 		if (serial->dev) {
 			/* Stop reading/writing urbs */
@@ -941,7 +937,6 @@ static void keyspan_close(struct usb_serial_port *port, struct file *filp)
 		port->open_count = 0;
 		port->tty = 0;
 	}
-	up (&port->sem);
 }
 
 

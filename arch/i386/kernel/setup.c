@@ -99,8 +99,8 @@
 #include <linux/highmem.h>
 #include <linux/bootmem.h>
 #include <linux/seq_file.h>
-#include <asm/processor.h>
 #include <linux/console.h>
+#include <asm/processor.h>
 #include <asm/mtrr.h>
 #include <asm/uaccess.h>
 #include <asm/system.h>
@@ -113,6 +113,7 @@
 #include <asm/dma.h>
 #include <asm/mpspec.h>
 #include <asm/mmu_context.h>
+
 /*
  * Machine setup..
  */
@@ -158,6 +159,7 @@ struct e820map e820;
 unsigned char aux_device_present;
 
 extern void mcheck_init(struct cpuinfo_x86 *c);
+extern void dmi_scan_machine(void);
 extern int root_mountflags;
 extern char _text, _etext, _edata, _end;
 extern int blk_nohighio;
@@ -907,7 +909,6 @@ void __init setup_arch(char **cmdline_p)
 	 */
 	if (smp_found_config)
 		get_smp_config();
-	init_apic_mappings();
 #endif
 
 
@@ -959,6 +960,7 @@ void __init setup_arch(char **cmdline_p)
 	conswitchp = &dummy_con;
 #endif
 #endif
+	dmi_scan_machine();
 }
 
 static int cachesize_override __initdata = -1;

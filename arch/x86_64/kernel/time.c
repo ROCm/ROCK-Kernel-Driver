@@ -120,6 +120,62 @@ spinlock_t i8253_lock = SPIN_LOCK_UNLOCKED;
 
 extern spinlock_t i8259A_lock;
 
+
+static inline unsigned long do_fast_gettimeoffset(void)
+{
+	register unsigned long eax, edx;
+
+	/* Read the Time Stamp Counter */
+
+	rdtsc(eax,edx);
+
+	/* .. relative to previous jiffy (32 bits is enough) */
+	eax -= last_tsc_low;	/* tsc_low delta */
+
+	/*
+         * Time offset = (tsc_low delta) * fast_gettimeoffset_quotient
+         *             = (tsc_low delta) * (usecs_per_clock)
+         *             = (tsc_low delta) * (usecs_per_jiffy / clocks_per_jiffy)
+	 *
+	 * Using a mull instead of a divl saves up to 31 clock cycles
+	 * in the critical path.
+         */
+
+	edx = (eax*fast_gettimeoffset_quotient) >> 32;
+
+	/* our adjusted time offset in microseconds */
+	return delay_at_last_interrupt + edx;
+}
+
+/*
+ * This version of gettimeofday has microsecond resolution
+ * and better than microsecond precision on fast x86 machines with TSC.
+ */
+void do_gettimeofday(struct timeval *tv)
+{
+	unsigned long flags;
+	unsigned long usec, sec;
+
+	read_lock_irqsave(&xtime_lock, flags);
+	usec = do_gettimeoffset();
+	{
+		unsigned long lost = jiffies - wall_jiffies;
+		if (lost)
+			usec += lost * (1000000 / HZ);
+	}
+	sec = xtime.tv_sec;
+	usec += xtime.tv_usec;
+	read_unlock_irqrestore(&xtime_lock, flags);
+
+	while (usec >= 1000000) {
+		usec -= 1000000;
+		sec++;
+	}
+
+	tv->tv_sec = sec;
+	tv->tv_usec = usec;
+}
+
 void do_settimeofday(struct timeval *tv)
 {
 	write_lock_irq(&xtime_lock);
@@ -484,7 +540,7 @@ void __init time_init(void)
 			 * clock/second. Our precision is about 100 ppm.
 			 */
 			{			
-			        cpu_khz = ((1000000*(1UL<<32)) / tsc_quotient); /* FIXME: is it right? */
+			        cpu_khz = ((1000*(1UL<<32)) / tsc_quotient); 
 				printk("Detected %ld Hz processor.\n", cpu_khz);
 			}
 		}

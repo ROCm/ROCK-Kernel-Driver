@@ -341,8 +341,6 @@ static int  mct_u232_open (struct usb_serial_port *port, struct file *filp)
 
 	dbg(__FUNCTION__" port %d", port->number);
 
-	down (&port->sem);
-	
 	++port->open_count;
 
 	if (port->open_count == 1) {
@@ -398,8 +396,6 @@ static int  mct_u232_open (struct usb_serial_port *port, struct file *filp)
 	}
 
 exit:
-	up (&port->sem);
-	
 	return 0;
 } /* mct_u232_open */
 
@@ -407,8 +403,6 @@ exit:
 static void mct_u232_close (struct usb_serial_port *port, struct file *filp)
 {
 	dbg(__FUNCTION__" port %d", port->number);
-
-	down (&port->sem);
 
 	--port->open_count;
 
@@ -421,8 +415,6 @@ static void mct_u232_close (struct usb_serial_port *port, struct file *filp)
 		}
 		port->open_count = 0;
 	}
-	
-	up (&port->sem);
 } /* mct_u232_close */
 
 
@@ -454,16 +446,12 @@ static int mct_u232_write (struct usb_serial_port *port, int from_user,
 		
 	bytes_sent = 0;
 	while (count > 0) {
-		
-		down (&port->sem);
-		
 		size = (count > port->bulk_out_size) ? port->bulk_out_size : count;
 		
 		usb_serial_debug_data (__FILE__, __FUNCTION__, size, buf);
 		
 		if (from_user) {
 			if (copy_from_user(port->write_urb->transfer_buffer, buf, size)) {
-				up (&port->sem);
 				return -EFAULT;
 			}
 		}
@@ -486,11 +474,8 @@ static int mct_u232_write (struct usb_serial_port *port, int from_user,
 		if (result) {
 			err(__FUNCTION__
 			    " - failed submitting write urb, error %d", result);
-			up (&port->sem);
 			return result;
 		}
-
-		up (&port->sem);
 
 		bytes_sent += size;
 		if (write_blocking)

@@ -14,6 +14,7 @@
 #include <linux/time.h>
 #include <linux/slab.h>
 #include <linux/string.h>
+#include <linux/spinlock.h>
 
 #include <linux/sunrpc/svc.h>
 #include <linux/nfsd/nfsd.h>
@@ -38,10 +39,16 @@ static struct nfscache_head *	hash_list;
 static struct svc_cacherep *	lru_head;
 static struct svc_cacherep *	lru_tail;
 static struct svc_cacherep *	nfscache;
-static int			cache_initialized;
 static int			cache_disabled = 1;
 
 static int	nfsd_cache_append(struct svc_rqst *rqstp, struct svc_buf *data);
+
+/* 
+ * locking for the reply cache:
+ * A cache entry is "single use" if c_state == RC_INPROG
+ * Otherwise, it when accessing _prev or _next, the lock must be held.
+ */
+static spinlock_t cache_lock = SPIN_LOCK_UNLOCKED;
 
 void
 nfsd_cache_init(void)
@@ -51,8 +58,6 @@ nfsd_cache_init(void)
 	size_t			i;
 	unsigned long		order;
 
-	if (cache_initialized)
-		return;
 
 	i = CACHESIZE * sizeof (struct svc_cacherep);
 	for (order = 0; (PAGE_SIZE << order) < i; order++)
@@ -90,7 +95,6 @@ nfsd_cache_init(void)
 	lru_head->c_lru_prev = NULL;
 	lru_tail->c_lru_next = NULL;
 
-	cache_initialized = 1;
 	cache_disabled = 0;
 }
 
@@ -101,15 +105,11 @@ nfsd_cache_shutdown(void)
 	size_t			i;
 	unsigned long		order;
 
-	if (!cache_initialized)
-		return;
-
 	for (rp = lru_head; rp; rp = rp->c_lru_next) {
 		if (rp->c_state == RC_DONE && rp->c_type == RC_REPLBUFF)
 			kfree(rp->c_replbuf.buf);
 	}
 
-	cache_initialized = 0;
 	cache_disabled = 1;
 
 	i = CACHESIZE * sizeof (struct svc_cacherep);
@@ -179,12 +179,16 @@ nfsd_cache_lookup(struct svc_rqst *rqstp, int type)
 				vers = rqstp->rq_vers,
 				proc = rqstp->rq_proc;
 	unsigned long		age;
+	int rtn;
 
 	rqstp->rq_cacherep = NULL;
 	if (cache_disabled || type == RC_NOCACHE) {
 		nfsdstats.rcnocache++;
 		return RC_DOIT;
 	}
+
+	spin_lock(&cache_lock);
+	rtn = RC_DOIT;
 
 	rp = rh = (struct svc_cacherep *) &hash_list[REQHASH(xid)];
 	while ((rp = rp->c_hash_next) != rh) {
@@ -208,7 +212,7 @@ nfsd_cache_lookup(struct svc_rqst *rqstp, int type)
 		if (safe++ > CACHESIZE) {
 			printk("nfsd: loop in repcache LRU list\n");
 			cache_disabled = 1;
-			return RC_DOIT;
+			goto out;
 		}
 	}
 	}
@@ -222,7 +226,7 @@ nfsd_cache_lookup(struct svc_rqst *rqstp, int type)
 			printk(KERN_WARNING "nfsd: disabling repcache.\n");
 			cache_disabled = 1;
 		}
-		return RC_DOIT;
+		goto out;
 	}
 
 	rqstp->rq_cacherep = rp;
@@ -242,8 +246,9 @@ nfsd_cache_lookup(struct svc_rqst *rqstp, int type)
 		rp->c_replbuf.buf = NULL;
 	}
 	rp->c_type = RC_NOCACHE;
-
-	return RC_DOIT;
+ out:
+	spin_unlock(&cache_lock);
+	return rtn;
 
 found_entry:
 	/* We found a matching entry which is either in progress or done. */
@@ -251,33 +256,36 @@ found_entry:
 	rp->c_timestamp = jiffies;
 	lru_put_front(rp);
 
+	rtn = RC_DROPIT;
 	/* Request being processed or excessive rexmits */
 	if (rp->c_state == RC_INPROG || age < RC_DELAY)
-		return RC_DROPIT;
+		goto out;
 
 	/* From the hall of fame of impractical attacks:
 	 * Is this a user who tries to snoop on the cache? */
+	rtn = RC_DOIT;
 	if (!rqstp->rq_secure && rp->c_secure)
-		return RC_DOIT;
+		goto out;
 
 	/* Compose RPC reply header */
 	switch (rp->c_type) {
 	case RC_NOCACHE:
-		return RC_DOIT;
+		break;
 	case RC_REPLSTAT:
 		svc_putlong(&rqstp->rq_resbuf, rp->c_replstat);
+		rtn = RC_REPLY;
 		break;
 	case RC_REPLBUFF:
 		if (!nfsd_cache_append(rqstp, &rp->c_replbuf))
-			return RC_DOIT;	/* should not happen */
+			goto out;	/* should not happen */
+		rtn = RC_REPLY;
 		break;
 	default:
 		printk(KERN_WARNING "nfsd: bad repcache type %d\n", rp->c_type);
 		rp->c_state = RC_UNUSED;
-		return RC_DOIT;
 	}
 
-	return RC_REPLY;
+	goto out;
 }
 
 /*
@@ -324,20 +332,22 @@ nfsd_cache_update(struct svc_rqst *rqstp, int cachetype, u32 *statp)
 		cachp = &rp->c_replbuf;
 		cachp->buf = (u32 *) kmalloc(len << 2, GFP_KERNEL);
 		if (!cachp->buf) {
+			spin_lock(&cache_lock);
 			rp->c_state = RC_UNUSED;
+			spin_unlock(&cache_lock);
 			return;
 		}
 		cachp->len = len;
 		memcpy(cachp->buf, statp, len << 2);
 		break;
 	}
-
+	spin_lock(&cache_lock);
 	lru_put_front(rp);
 	rp->c_secure = rqstp->rq_secure;
 	rp->c_type = cachetype;
 	rp->c_state = RC_DONE;
 	rp->c_timestamp = jiffies;
-
+	spin_unlock(&cache_lock);
 	return;
 }
 

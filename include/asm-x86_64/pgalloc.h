@@ -8,173 +8,74 @@
 #include <linux/threads.h>
 #include <linux/mm.h>
 
-#define inc_pgcache_size() add_pda(pgtable_cache_sz,1UL)
-#define dec_pgcache_size() sub_pda(pgtable_cache_sz,1UL)
-
-#define pmd_populate(mm, pmd, pte) \
+#define pmd_populate_kernel(mm, pmd, pte) \
 		set_pmd(pmd, __pmd(_PAGE_TABLE | __pa(pte)))
 #define pgd_populate(mm, pgd, pmd) \
 		set_pgd(pgd, __pgd(_PAGE_TABLE | __pa(pmd)))
 
-extern __inline__ pmd_t *get_pmd_slow(void)
+static inline void pmd_populate(struct mm_struct *mm, pmd_t *pmd, struct page *pte)
 {
-	pmd_t *ret = (pmd_t *)__get_free_page(GFP_KERNEL);
-
-	if (ret)
-		memset(ret, 0, PAGE_SIZE);
-	return ret;
+	set_pmd(pmd, __pmd(_PAGE_TABLE | 
+			   ((u64)(pte - mem_map) << PAGE_SHIFT))); 
 }
 
-extern __inline__ pmd_t *get_pmd_fast(void)
+extern __inline__ pmd_t *get_pmd(void)
 {
-	unsigned long *ret;
-
-	preempt_disable(); 
-	ret = read_pda(pmd_quick);
-	if (ret) {
-		write_pda(pmd_quick, (unsigned long *)(*ret));
-		ret[0] = 0;
-		dec_pgcache_size();
-	}
-	preempt_enable(); 
-	if (!ret)
-		ret = (unsigned long *)get_pmd_slow();
-	return (pmd_t *)ret;
+	return (pmd_t *)get_zeroed_page(GFP_KERNEL);
 }
 
 extern __inline__ void pmd_free(pmd_t *pmd)
-{
-	preempt_disable(); 
-	*(unsigned long *)pmd = (unsigned long) read_pda(pmd_quick);
-	write_pda(pmd_quick,(unsigned long *) pmd);
-	inc_pgcache_size();
-	preempt_enable(); 
-}
-
-extern __inline__ void pmd_free_slow(pmd_t *pmd)
 {
 	if ((unsigned long)pmd & (PAGE_SIZE-1)) 
 		BUG(); 
 	free_page((unsigned long)pmd);
 }
 
-static inline pmd_t *pmd_alloc_one_fast (struct mm_struct *mm, unsigned long addr)
-{
-	unsigned long *ret;
-
-	preempt_disable(); 
-	ret = (unsigned long *)read_pda(pmd_quick);
-
-	if (__builtin_expect(ret != NULL, 1)) {
-		write_pda(pmd_quick, (unsigned long *)(*ret));
-		ret[0] = 0;
-		dec_pgcache_size();
-	}
-	preempt_enable(); 
-	return (pmd_t *)ret;
-}
-
 static inline pmd_t *pmd_alloc_one (struct mm_struct *mm, unsigned long addr)
 {
-	pmd_t *pmd = (pmd_t *) __get_free_page(GFP_KERNEL);
-
-	if (__builtin_expect(pmd != NULL, 1))
-		clear_page(pmd);
-	return pmd;
-}
-
-
-static inline pgd_t *pgd_alloc_one_fast (void)
-{
-	unsigned long *ret;
-
-	preempt_disable(); 
-	ret = read_pda(pgd_quick);
-	if (likely(ret != NULL)) {
-		write_pda(pgd_quick,(unsigned long *)(*ret));
-		ret[0] = 0;
-		dec_pgcache_size();
-	}
-	preempt_enable(); 
-	return (pgd_t *) ret;
+	return (pmd_t *) get_zeroed_page(GFP_KERNEL); 
 }
 
 static inline pgd_t *pgd_alloc (struct mm_struct *mm)
 {
-	/* the VM system never calls pgd_alloc_one_fast(), so we do it here. */
-	pgd_t *pgd = pgd_alloc_one_fast();
-
-	if (pgd == NULL) {
-		pgd = (pgd_t *)__get_free_page(GFP_KERNEL);
-		if (__builtin_expect(pgd != NULL, 1))
-			clear_page(pgd);
-	}
-	return pgd;
+	return (pgd_t *)get_zeroed_page(GFP_KERNEL);
 }
 
 static inline void pgd_free (pgd_t *pgd)
-{
-	preempt_disable();
-	*(unsigned long *)pgd = (unsigned long) read_pda(pgd_quick);
-	write_pda(pgd_quick,(unsigned long *) pgd);
-	inc_pgcache_size();
-	preempt_enable();
-}
-
-
-static inline void pgd_free_slow (pgd_t *pgd)
 {
 	if ((unsigned long)pgd & (PAGE_SIZE-1)) 
 		BUG(); 
 	free_page((unsigned long)pgd);
 }
 
-
-static inline pte_t *pte_alloc_one(struct mm_struct *mm, unsigned long address)
+static inline pte_t *pte_alloc_one_kernel(struct mm_struct *mm, unsigned long address)
 {
-	pte_t *pte;
-
-	pte = (pte_t *) __get_free_page(GFP_KERNEL);
-	if (pte)
-		clear_page(pte);
-	return pte;
+	return (pte_t *) get_zeroed_page(GFP_KERNEL);
 }
 
-extern __inline__ pte_t *pte_alloc_one_fast(struct mm_struct *mm, unsigned long address)
+static inline struct page *pte_alloc_one(struct mm_struct *mm, unsigned long address)
 {
-	unsigned long *ret;
-
-	preempt_disable(); 
-	if(__builtin_expect((ret = read_pda(pte_quick)) != NULL, !0)) {  
-		write_pda(pte_quick, (unsigned long *)(*ret));
-		ret[0] = ret[1];
-		dec_pgcache_size();
-	}
-	preempt_enable(); 
-	return (pte_t *)ret;
+	void *p = (void *)get_zeroed_page(GFP_KERNEL); 
+	if (!p)
+		return NULL;
+	return virt_to_page(p);
 }
 
-/* Should really implement gc for free page table pages. This could be done with 
-   a reference count in struct page. */
+/* Should really implement gc for free page table pages. This could be
+   done with a reference count in struct page. */
 
-extern __inline__ void pte_free(pte_t *pte)
-{	
-	preempt_disable();
-	*(unsigned long *)pte = (unsigned long) read_pda(pte_quick);
-	write_pda(pte_quick, (unsigned long *) pte); 
-	inc_pgcache_size();
-	preempt_enable();
-}
-
-extern __inline__ void pte_free_slow(pte_t *pte)
+extern __inline__ void pte_free_kernel(pte_t *pte)
 {
 	if ((unsigned long)pte & (PAGE_SIZE-1))
 		BUG();
 	free_page((unsigned long)pte); 
 }
 
+extern inline void pte_free(struct page *pte)
+{
+	__free_page(pte);
+} 
 
-extern int do_check_pgt_cache(int, int);
 
 /*
  * TLB flushing:

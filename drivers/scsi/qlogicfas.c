@@ -344,6 +344,7 @@ unsigned int	phase;			/* recorded scsi phase */
 unsigned int	reqlen; 		/* total length of transfer */
 struct scatterlist	*sglist;	/* scatter-gather list pointer */
 unsigned int	sgcount;		/* sg counter */
+char *buf;
 
 rtrc(1)
 	j = inb(qbase + 6);
@@ -391,7 +392,8 @@ rtrc(2)
 					REG0;
 					return ((qabort == 1 ? DID_ABORT : DID_RESET) << 16);
 				}
-				if (ql_pdma(phase, sglist->address, sglist->length))
+				buf = page_address(sglist->page) + sglist->offset;
+				if (ql_pdma(phase, buf, sglist->length))
 					break;
 				sglist++;
 			}

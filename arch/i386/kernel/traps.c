@@ -974,6 +974,10 @@ void __init trap_init(void)
 		EISA_bus = 1;
 #endif
 
+#ifdef CONFIG_X86_LOCAL_APIC
+	init_apic_mappings();
+#endif
+
 	set_trap_gate(0,&divide_error);
 	set_trap_gate(1,&debug);
 	set_intr_gate(2,&nmi);

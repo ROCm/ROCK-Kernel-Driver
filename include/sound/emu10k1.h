@@ -588,7 +588,7 @@
 #define REG53			0x53		/* DO NOT PROGRAM THIS REGISTER!!! MAY DESTROY CHIP */
 
 #define A_DBG			 0x53
-#define A_DBG_SINGLE_STEP_ADDR	 0x00020000	/* Set to zero to start dsp */
+#define A_DBG_SINGLE_STEP	 0x00020000	/* Set to zero to start dsp */
 #define A_DBG_ZC		 0x40000000	/* zero tram counter */
 #define A_DBG_STEP_ADDR		 0x000003ff
 #define A_DBG_SATURATION_OCCURED 0x20000000
@@ -657,6 +657,11 @@
 #define SRCS_RATELOCKED		0x01000000	/* Sample rate locked				*/
 #define SRCS_ESTSAMPLERATE	0x0007ffff	/* Do not modify this field.			*/
 
+/* Note that these values can vary +/- by a small amount                                        */
+#define SRCS_SPDIFRATE_44	0x0003acd9
+#define SRCS_SPDIFRATE_48	0x00040000
+#define SRCS_SPDIFRATE_96	0x00080000
+
 #define MICIDX                  0x63            /* Microphone recording buffer index register   */
 #define MICIDX_MASK             0x0000ffff      /* 16-bit value                                 */
 #define MICIDX_IDX		0x10000063
@@ -683,15 +688,15 @@
 #define A_MUSTAT2		A_MUCMD2	
 
 #define A_SPDIF_SAMPLERATE	0x76		/* Set the sample rate of SPDIF output		*/
-#define A_SPDIF_48000		0x00000000
-#define A_SPDIF_44100		0x00000040
-#define A_SPDIF_96000		0x00000080
+#define A_SPDIF_48000		0x00000080
+#define A_SPDIF_44100		0x00000000
+#define A_SPDIF_96000		0x00000040
 
 #define A_FXRT2			0x7c
-#define A_FXRT_CHANNELE		0x0000003f	/* Effects send bus number for channel's effects send A	*/
-#define A_FXRT_CHANNELF		0x00003f00	/* Effects send bus number for channel's effects send B	*/
-#define A_FXRT_CHANNELG		0x003f0000	/* Effects send bus number for channel's effects send C	*/
-#define A_FXRT_CHANNELH		0x3f000000	/* Effects send bus number for channel's effects send D	*/
+#define A_FXRT_CHANNELE		0x0000003f	/* Effects send bus number for channel's effects send E	*/
+#define A_FXRT_CHANNELF		0x00003f00	/* Effects send bus number for channel's effects send F	*/
+#define A_FXRT_CHANNELG		0x003f0000	/* Effects send bus number for channel's effects send G	*/
+#define A_FXRT_CHANNELH		0x3f000000	/* Effects send bus number for channel's effects send H	*/
 
 #define A_SENDAMOUNTS		0x7d
 #define A_FXSENDAMOUNT_E_MASK	0xFF000000
@@ -797,14 +802,23 @@ struct _snd_emu10k1_pcm {
 };
 
 typedef struct {
-	unsigned long send_routing[3];
-	unsigned char send_volume[3][4];
+	unsigned char send_routing[3][8];
+	unsigned char send_volume[3][8];
 	unsigned short attn[3];
 	snd_kcontrol_t *ctl_send_routing;
 	snd_kcontrol_t *ctl_send_volume;
 	snd_kcontrol_t *ctl_attn;
 	emu10k1_pcm_t *epcm;
 } emu10k1_pcm_mixer_t;
+
+#define snd_emu10k1_compose_send_routing(route) \
+((route[0] | (route[1] << 4) | (route[2] << 8) | (route[3] << 12)) << 16)
+
+#define snd_emu10k1_compose_audigy_fxrt1(route) \
+(((unsigned int)route[0] | ((unsigned int)route[1] << 8) | ((unsigned int)route[2] << 16) | ((unsigned int)route[3] << 12)) << 24)
+
+#define snd_emu10k1_compose_audigy_fxrt2(route) \
+(((unsigned int)route[4] | ((unsigned int)route[5] << 8) | ((unsigned int)route[6] << 16) | ((unsigned int)route[7] << 12)) << 24)
 
 typedef struct snd_emu10k1_memblk {
 	snd_util_memblk_t mem;
@@ -1102,11 +1116,11 @@ int snd_emu10k1_proc_done(emu10k1_t * emu);
 #define GPR_NOISE1	0x59		/* noise source */
 #define GPR_IRQ		0x5a		/* IRQ register */
 #define GPR_DBAC	0x5b		/* TRAM Delay Base Address Counter */
-#define GPR(x)		(FXGPREGBASE + (x))	/* free GPRs: x = 0x00 - 0xff */
-#define ITRAM_DATA(x)	(TANKMEMDATAREGBASE + (x))	/* x = 0x00 - 0x7f */
-#define ETRAM_DATA(x)	(TANKMEMDATAREGBASE + 80 + (x))	/* x = 0x00 - 0x1f */
-#define ITRAM_ADDR(x)	(TANKMEMADDRREGBASE + (x))	/* x = 0x00 - 0x7f */
-#define ETRAM_ADDR(x)	(TANKMEMADDRREGBASE + 80 + (x))	/* x = 0x00 - 0x1f */
+#define GPR(x)		(FXGPREGBASE + (x)) /* free GPRs: x = 0x00 - 0xff */
+#define ITRAM_DATA(x)	(TANKMEMDATAREGBASE + 0x00 + (x)) /* x = 0x00 - 0x7f */
+#define ETRAM_DATA(x)	(TANKMEMDATAREGBASE + 0x80 + (x)) /* x = 0x00 - 0x1f */
+#define ITRAM_ADDR(x)	(TANKMEMADDRREGBASE + 0x00 + (x)) /* x = 0x00 - 0x7f */
+#define ETRAM_ADDR(x)	(TANKMEMADDRREGBASE + 0x80 + (x)) /* x = 0x00 - 0x1f */
 
 #define A_FXBUS(x)	(0x00 + (x))	/* x = 0x00 - 0x3f? */
 #define A_EXTIN(x)	(0x40 + (x))	/* x = 0x00 - 0x1f? */
@@ -1171,6 +1185,10 @@ int snd_emu10k1_proc_done(emu10k1_t * emu);
 #define A_EXTIN_AC97_R		0x01	/* AC'97 capture channel - right */
 #define A_EXTIN_SPDIF_CD_L	0x02	/* digital CD left */
 #define A_EXTIN_SPDIF_CD_R	0x03	/* digital CD left */
+#define A_EXTIN_LINE2_L		0x08	/* audigy drive line2/mic2 - left */
+#define A_EXTIN_LINE2_R		0x09	/*                           right */
+#define A_EXTIN_AUX2_L		0x0c	/* audigy drive aux2 - left */
+#define A_EXTIN_AUX2_R		0x0d	/*                   - right */
 
 /* Audigiy Outputs */
 #define A_EXTOUT_FRONT_L	0x00	/* digital front left */
@@ -1189,9 +1207,38 @@ int snd_emu10k1_proc_done(emu10k1_t * emu);
 /* 0x0d ?? */
 #define A_EXTOUT_AREAR_L	0x0e	/* analog rear left */
 #define A_EXTOUT_AREAR_R	0x0f	/*             right */
-/* 0x10-0x15 ?? */
-#define A_EXTOUT_ADC_CAP_L	0x16	/* ADC capture buffer left */
-#define A_EXTOUT_ADC_CAP_R	0x17	/*                    right */
+#define A_EXTOUT_AC97_L		0x10	/* AC97 left (front) */
+#define A_EXTOUT_AC97_R		0x11	/*      right */
+#define A_EXTOUT_ADC_CAP_L	0x12	/* ADC capture buffer left */
+#define A_EXTOUT_ADC_CAP_R	0x13	/*                    right */
+
+/* Audigy constants */
+#define A_C_00000000	0xc0
+#define A_C_00000001	0xc1
+#define A_C_00000002	0xc2
+#define A_C_00000003	0xc3
+#define A_C_00000004	0xc4
+#define A_C_00000008	0xc5
+#define A_C_00000010	0xc6
+#define A_C_00000020	0xc7
+#define A_C_00000100	0xc8
+#define A_C_00010000	0xc9
+#define A_C_00000800	0xca
+#define A_C_10000000	0xcb
+#define A_C_20000000	0xcc
+#define A_C_40000000	0xcd
+#define A_C_80000000	0xce
+#define A_C_7fffffff	0xcf
+#define A_C_ffffffff	0xd0
+#define A_C_fffffffe	0xd1
+#define A_C_c0000000	0xd2
+#define A_C_4f1bbcdc	0xd3
+#define A_C_5a7ef9db	0xd4
+#define A_C_00100000	0xd5
+/* 0xd6 = 0x7fffffff  (?) ACCUM? */
+/* 0xd7 = 0x0000000   CCR */
+/* 0xd8 = noise1 */
+/* 0xd9 = noise2 */
 
 /* definitions for debug register */
 #define EMU10K1_DBG_ZC			0x80000000	/* zero tram counter */

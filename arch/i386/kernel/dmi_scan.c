@@ -9,6 +9,7 @@
 #include <linux/pm.h>
 #include <asm/keyboard.h>
 #include <asm/system.h>
+#include <linux/bootmem.h>
 
 unsigned long dmi_broken;
 int is_sony_vaio_laptop;
@@ -51,7 +52,7 @@ static int __init dmi_table(u32 base, int len, int num, void (*decode)(struct dm
 	u8 *data;
 	int i=1;
 		
-	buf = ioremap(base, len);
+	buf = bt_ioremap(base, len);
 	if(buf==NULL)
 		return -1;
 
@@ -83,7 +84,7 @@ static int __init dmi_table(u32 base, int len, int num, void (*decode)(struct dm
 		data+=2;
 		i++;
 	}
-	iounmap(buf);
+	bt_iounmap(buf, len);
 	return 0;
 }
 
@@ -155,7 +156,7 @@ static void __init dmi_save_ident(struct dmi_header *dm, int slot, int string)
 		return;
 	if (dmi_ident[slot])
 		return;
-	dmi_ident[slot] = kmalloc(strlen(p)+1, GFP_KERNEL);
+	dmi_ident[slot] = alloc_bootmem(strlen(p)+1);
 	if(dmi_ident[slot])
 		strcpy(dmi_ident[slot], p);
 	else
@@ -416,6 +417,43 @@ static __init int broken_ps2_resume(struct dmi_blacklist *d)
 	return 0;
 }
 
+/*
+ * Some machines, usually laptops, can't handle an enabled local APIC.
+ * The symptoms include hangs or reboots when suspending or resuming,
+ * attaching or detaching the power cord, or entering BIOS setup screens
+ * through magic key sequences.
+ */
+static int __init local_apic_kills_bios(struct dmi_blacklist *d)
+{
+#ifdef CONFIG_X86_LOCAL_APIC
+	extern int dont_enable_local_apic;
+	if (!dont_enable_local_apic) {
+		dont_enable_local_apic = 1;
+		printk(KERN_WARNING "%s with broken BIOS detected. "
+		       "Refusing to enable the local APIC.\n",
+		       d->ident);
+	}
+#endif
+	return 0;
+}
+
+/*
+ * The Intel AL440LX mainboard will hang randomly if the local APIC
+ * timer is running and the APM BIOS hasn't been disabled.
+ */
+static int __init apm_kills_local_apic_timer(struct dmi_blacklist *d)
+{
+#ifdef CONFIG_X86_LOCAL_APIC
+	extern int dont_use_local_apic_timer;
+	if (apm_info.bios.version && !dont_use_local_apic_timer) {
+		dont_use_local_apic_timer = 1;
+		printk(KERN_WARNING "%s with broken BIOS detected. "
+		       "The local APIC timer will not be used.\n",
+		       d->ident);
+	}
+#endif
+	return 0;
+}
 
 /*
  *	Simple "print if true" callback
@@ -560,6 +598,25 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 			MATCH(DMI_BIOS_DATE, "09/12/00"), NO_MATCH
 			} },
 
+	/* Machines which have problems handling enabled local APICs */
+
+	{ local_apic_kills_bios, "Dell Inspiron", {
+			MATCH(DMI_SYS_VENDOR, "Dell Computer Corporation"),
+			MATCH(DMI_PRODUCT_NAME, "Inspiron"),
+			NO_MATCH, NO_MATCH
+			} },
+
+	{ local_apic_kills_bios, "Dell Latitude", {
+			MATCH(DMI_SYS_VENDOR, "Dell Computer Corporation"),
+			MATCH(DMI_PRODUCT_NAME, "Latitude"),
+			NO_MATCH, NO_MATCH
+			} },
+
+	{ apm_kills_local_apic_timer, "Intel AL440LX", {
+			MATCH(DMI_BOARD_VENDOR, "Intel Corporation"),
+			MATCH(DMI_BOARD_NAME, "AL440LX"),
+			NO_MATCH, NO_MATCH } },
+
 	/* Problem Intel 440GX bioses */
 
 	{ broken_pirq, "SABR1 Bios", {			/* Bad $PIR */
@@ -588,7 +645,7 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 			NO_MATCH, NO_MATCH
 			} },
                         
-	/* Intel in disgiuse - In this case they can't hide and they don't run
+	/* Intel in disguise - In this case they can't hide and they don't run
 	   too well either... */
 	{ broken_pirq, "Dell PowerEdge 8450", {		/* Bad $PIR */
 			MATCH(DMI_PRODUCT_NAME, "Dell PowerEdge 8450"),
@@ -728,12 +785,9 @@ static void __init dmi_decode(struct dmi_header *dm)
 	}
 }
 
-static int __init dmi_scan_machine(void)
+void __init dmi_scan_machine(void)
 {
 	int err = dmi_iterate(dmi_decode);
 	if(err == 0)
 		dmi_check_blacklist();
-	return err;
 }
-
-module_init(dmi_scan_machine);

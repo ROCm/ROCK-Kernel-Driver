@@ -36,3 +36,18 @@ int snd_task_name(struct task_struct *task, char *name, size_t size)
 	name[idx] = '\0';
 	return 0;
 }
+
+#ifdef CONFIG_SND_VERBOSE_PRINTK
+int snd_verbose_printk(const char *file, int line, const char *format)
+{
+	if (format[0] == '<' && format[1] >= '0' && format[1] <= '9' && format[2] == '>') {
+		char tmp[] = "<0>ALSA %s:%d: ";
+		tmp[1] = format[1];
+		printk("%sALSA %s:%d: ", tmp, file, line);
+		return 1;
+	} else {
+		printk("ALSA %s:%d: ", file, line);
+		return 0;
+	}
+}
+#endif

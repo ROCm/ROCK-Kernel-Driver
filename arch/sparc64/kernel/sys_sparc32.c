@@ -1471,6 +1471,8 @@ static int cp_new_stat32(struct kstat *stat, struct stat32 *statbuf)
 	err |= put_user(high2lowuid(stat->uid), &statbuf->st_uid);
 	err |= put_user(high2lowgid(stat->gid), &statbuf->st_gid);
 	err |= put_user(stat->rdev, &statbuf->st_rdev);
+	if (stat->size > MAX_NON_LFS)
+		return -EOVERFLOW;
 	err |= put_user(stat->size, &statbuf->st_size);
 	err |= put_user(stat->atime, &statbuf->st_atime);
 	err |= put_user(0, &statbuf->__unused1);

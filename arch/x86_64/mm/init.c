@@ -1,8 +1,9 @@
 /*
- *  linux/arch/i386/mm/init.c
+ *  linux/arch/x86_64/mm/init.c
  *
  *  Copyright (C) 1995  Linus Torvalds
  *  Copyright (C) 2000  Pavel Machek <pavel@suse.cz>
+ *  Copyright (C) 2002  Andi Kleen <ak@suse.de>
  */
 
 #include <linux/config.h>
@@ -39,28 +40,6 @@ mmu_gather_t mmu_gathers[NR_CPUS];
 
 static unsigned long totalram_pages;
 
-int do_check_pgt_cache(int low, int high)
-{
-	int freed = 0;
-	if(read_pda(pgtable_cache_sz) > high) {
-		do {
-			if (read_pda(pgd_quick)) {
-				pgd_free_slow(pgd_alloc_one_fast());
-				freed++;
-			}
-			if (read_pda(pmd_quick)) {
-				pmd_free_slow(pmd_alloc_one_fast(NULL, 0));
-				freed++;
-			}
-			if (read_pda(pte_quick)) {
-				pte_free_slow(pte_alloc_one_fast(NULL, 0));
-				freed++;
-			}
-		} while(read_pda(pgtable_cache_sz) > low);
-	}
-	return freed;
-}
-
 /*
  * NOTE: pagetable_init alloc all the fixmap pagetables contiguous on the
  * physical space so we can cache the place of the first one and move
@@ -89,7 +68,6 @@ void show_mem(void)
 	printk("%d reserved pages\n",reserved);
 	printk("%d pages shared\n",shared);
 	printk("%d pages swap cached\n",cached);
-	printk("%ld pages in page table cache\n",read_pda(pgtable_cache_sz));
 	show_buffers();
 }
 
@@ -138,12 +116,12 @@ static void set_pte_phys(unsigned long vaddr,
 	if (pmd_none(*pmd)) {
 		pte = (pte_t *) spp_getpage();
 		set_pmd(pmd, __pmd(__pa(pte) + 0x7));
-		if (pte != pte_offset(pmd, 0)) {
+		if (pte != pte_offset_kernel(pmd, 0)) {
 			printk("PAGETABLE BUG #02!\n");
 			return;
 		}
 	}
-	pte = pte_offset(pmd, vaddr);
+	pte = pte_offset_kernel(pmd, vaddr);
 	if (pte_val(*pte))
 		pte_ERROR(*pte);
 	set_pte(pte, mk_pte_phys(phys, prot));

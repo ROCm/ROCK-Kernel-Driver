@@ -77,7 +77,6 @@
 
 static int piix_get_info(char *, char **, off_t, int);
 extern int (*piix_display_info)(char *, char **, off_t, int); /* ide-proc.c */
-extern char *ide_media_verbose(ide_drive_t *);
 static struct pci_dev *bmide_dev;
 
 static int piix_get_info (char *buffer, char **addr, off_t offset, int count)
@@ -235,8 +234,8 @@ static void piix_tune_drive (ide_drive_t *drive, byte pio)
 			master_data = master_data | 0x0070;
 		pci_read_config_byte(HWIF(drive)->pci_dev, slave_port, &slave_data);
 		slave_data = slave_data & (HWIF(drive)->index ? 0x0f : 0xf0);
-		slave_data = slave_data | ((timings[pio][0] << 2) | (timings[pio][1]
-					   << (HWIF(drive)->index ? 4 : 0)));
+		slave_data = slave_data | (((timings[pio][0] << 2) | timings[pio][1])
+					   << (HWIF(drive)->index ? 4 : 0));
 	} else {
 		master_data = master_data & 0xccf8;
 		if (pio > 1)
@@ -451,7 +450,7 @@ static int piix_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
 }
 #endif /* defined(CONFIG_BLK_DEV_IDEDMA) && (CONFIG_PIIX_TUNING) */
 
-unsigned int __init pci_init_piix (struct pci_dev *dev, const char *name)
+unsigned int __init pci_init_piix(struct pci_dev *dev)
 {
 #if defined(DISPLAY_PIIX_TIMINGS) && defined(CONFIG_PROC_FS)
 	if (!piix_proc) {

@@ -53,10 +53,10 @@
 #include <asm/irq.h>
 #include <asm/system.h>
 
+#include "hcd.h"
 #include "uhci.h"
 
 #include <linux/pm.h>
-
 
 /*
  * Version Information
@@ -64,7 +64,6 @@
 #define DRIVER_VERSION "v1.1"
 #define DRIVER_AUTHOR "Linus 'Frodo Rabbit' Torvalds, Johannes Erdfelt, Randy Dunlap, Georg Acher, Deti Fliegl, Thomas Sailer, Roman Weissgaerber"
 #define DRIVER_DESC "USB Universal Host Controller Interface driver"
-
 
 /*
  * debug = 0, no debugging messages
@@ -100,6 +99,7 @@ static void wakeup_hc(struct uhci *uhci);
 
 /* If a transfer is still active after this much time, turn off FSBR */
 #define IDLE_TIMEOUT	(HZ / 20)	/* 50 ms */
+#define FSBR_DELAY	(HZ / 20)	/* 50 ms */
 
 #define MAX_URB_LOOP	2048		/* Maximum number of linked URB's */
 
@@ -766,7 +766,7 @@ static void uhci_dec_fsbr(struct uhci *uhci, struct urb *urb)
 	if ((!(urb->transfer_flags & USB_NO_FSBR)) && urbp->fsbr) {
 		urbp->fsbr = 0;
 		if (!--uhci->fsbr)
-			uhci->skel_term_qh->link = UHCI_PTR_TERM;
+			uhci->fsbrtimeout = jiffies + FSBR_DELAY;
 	}
 
 	spin_unlock_irqrestore(&uhci->frame_list_lock, flags);
@@ -2029,6 +2029,12 @@ static void rh_int_timer_do(unsigned long ptr)
 
 		u->transfer_flags |= USB_ASYNC_UNLINK | USB_TIMEOUT_KILLED;
 		uhci_unlink_urb(u);
+	}
+
+	/* Really disable FSBR */
+	if (!uhci->fsbr && uhci->fsbrtimeout && time_after_eq(jiffies, uhci->fsbrtimeout)) {
+		uhci->fsbrtimeout = 0;
+		uhci->skel_term_qh->link = UHCI_PTR_TERM;
 	}
 
 	/* enter global suspend if nothing connected */

@@ -1,9 +1,7 @@
 /*
- * $Id: magellan.c,v 1.8 2000/05/31 13:17:12 vojtech Exp $
+ * $Id: magellan.c,v 1.16 2002/01/22 20:28:39 vojtech Exp $
  *
- *  Copyright (c) 1999-2000 Vojtech Pavlik
- *
- *  Sponsored by SuSE
+ *  Copyright (c) 1999-2001 Vojtech Pavlik
  */
 
 /*
@@ -27,7 +25,7 @@
  * 
  *  Should you need to contact me, the author, you can do so either by
  * e-mail - mail your message to <vojtech@ucw.cz>, or by paper mail:
- * Vojtech Pavlik, Ucitelska 1576, Prague 8, 182 00 Czech Republic
+ * Vojtech Pavlik, Simunkova 1594, Prague 8, 182 00 Czech Republic
  */
 
 #include <linux/kernel.h>
@@ -37,15 +35,19 @@
 #include <linux/serio.h>
 #include <linux/init.h>
 
+MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
+MODULE_DESCRIPTION("Magellan and SpaceMouse 6dof controller driver");
+MODULE_LICENSE("GPL");
+
 /*
  * Definitions & global arrays.
  */
 
 #define	MAGELLAN_MAX_LENGTH	32
 
-static int magellan_buttons[] = { BTN_0, BTN_1, BTN_2, BTN_3, BTN_4, BTN_5, BTN_6, BTN_7, BTN_8};
-static int magellan_axes[] = { ABS_X, ABS_Y, ABS_Z, ABS_RX, ABS_RY, ABS_RZ};
-static char *magellan_name = "LogiCad3D Magellan";
+static int magellan_buttons[] = { BTN_0, BTN_1, BTN_2, BTN_3, BTN_4, BTN_5, BTN_6, BTN_7, BTN_8 };
+static int magellan_axes[] = { ABS_X, ABS_Y, ABS_Z, ABS_RX, ABS_RY, ABS_RZ };
+static char *magellan_name = "LogiCad3D Magellan / SpaceMouse";
 
 /*
  * Per-Magellan data.
@@ -55,6 +57,7 @@ struct magellan {
 	struct input_dev dev;
 	int idx;
 	unsigned char data[MAGELLAN_MAX_LENGTH];
+	char phys[32];
 };
 
 /*
@@ -162,8 +165,11 @@ static void magellan_connect(struct serio *serio, struct serio_dev *dev)
 		magellan->dev.absmax[t] =  360;
 	}
 
+	sprintf(magellan->phys, "%s/input0", serio->phys);
+
 	magellan->dev.private = magellan;
 	magellan->dev.name = magellan_name;
+	magellan->dev.phys = magellan->phys;
 	magellan->dev.idbus = BUS_RS232;
 	magellan->dev.idvendor = SERIO_MAGELLAN;
 	magellan->dev.idproduct = 0x0001;
@@ -178,7 +184,7 @@ static void magellan_connect(struct serio *serio, struct serio_dev *dev)
 
 	input_register_device(&magellan->dev);
 
-	printk(KERN_INFO "input%d: %s on serio%d\n", magellan->dev.number, magellan_name, serio->number);
+	printk(KERN_INFO "input: %s on %s\n", magellan_name, serio->phys);
 }
 
 /*
@@ -208,5 +214,3 @@ void __exit magellan_exit(void)
 
 module_init(magellan_init);
 module_exit(magellan_exit);
-
-MODULE_LICENSE("GPL");

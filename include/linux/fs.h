@@ -1212,12 +1212,12 @@ extern void invalidate_inode_buffers(struct inode *);
 #define destroy_buffers(dev)	__invalidate_buffers((dev), 1)
 extern void invalidate_bdev(struct block_device *, int);
 extern void __invalidate_buffers(kdev_t dev, int);
-extern void sync_inodes(kdev_t);
+extern void sync_inodes(void);
 extern void sync_unlocked_inodes(void);
 extern void write_inode_now(struct inode *, int);
-extern int sync_buffers(kdev_t, int);
-extern void sync_dev(kdev_t);
+extern int sync_buffers(struct block_device *, int);
 extern int fsync_dev(kdev_t);
+extern int fsync_bdev(struct block_device *);
 extern int fsync_super(struct super_block *);
 extern int fsync_no_super(struct block_device *);
 extern void sync_inodes_sb(struct super_block *);
@@ -1234,7 +1234,7 @@ static inline int fsync_inode_data_buffers(struct inode *inode)
 extern int inode_has_buffers(struct inode *);
 extern int filemap_fdatasync(struct address_space *);
 extern int filemap_fdatawait(struct address_space *);
-extern void sync_supers(kdev_t);
+extern void sync_supers(void);
 extern int bmap(struct inode *, int);
 extern int notify_change(struct dentry *, struct iattr *);
 extern int permission(struct inode *, int);
@@ -1511,9 +1511,9 @@ extern int inode_setattr(struct inode *, struct iattr *);
 static inline ino_t parent_ino(struct dentry *dentry)
 {
 	ino_t res;
-	spin_lock(&dcache_lock);
+	read_lock(&dparent_lock);
 	res = dentry->d_parent->d_inode->i_ino;
-	spin_unlock(&dcache_lock);
+	read_unlock(&dparent_lock);
 	return res;
 }
 

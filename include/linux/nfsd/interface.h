@@ -12,13 +12,15 @@
 
 #include <linux/config.h>
 
-#ifdef CONFIG_NFSD_MODULE
+#ifndef CONFIG_NFSD
+#ifdef CONFIG_MODULES
 
 extern struct nfsd_linkage {
 	long (*do_nfsservctl)(int cmd, void *argp, void *resp);
 	struct module *owner;
 } * nfsd_linkage;
 
+#endif
 #endif
 
 #endif /* LINUX_NFSD_INTERFACE_H */

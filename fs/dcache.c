@@ -30,6 +30,7 @@
 /* #define DCACHE_DEBUG 1 */
 
 spinlock_t dcache_lock __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
+rwlock_t dparent_lock __cacheline_aligned_in_smp = RW_LOCK_UNLOCKED;
 
 /* Right now the dcache depends on the kernel lock */
 #define check_lock()	if (!kernel_locked()) BUG()
@@ -916,7 +917,9 @@ void d_move(struct dentry * dentry, struct dentry * target)
 
 	/* Switch the parents and the names.. */
 	switch_names(dentry, target);
+	write_lock(&dparent_lock);
 	do_switch(dentry->d_parent, target->d_parent);
+	write_unlock(&dparent_lock);
 	do_switch(dentry->d_name.len, target->d_name.len);
 	do_switch(dentry->d_name.hash, target->d_name.hash);
 

@@ -444,13 +444,15 @@ static void __init quirk_amd_ioapic(struct pci_dev *dev)
 static void __init quirk_amd_ordering(struct pci_dev *dev)
 {
 	u32 pcic;
-	
-	pci_read_config_dword(dev, 0x42, &pcic);
-	if((pcic&2)==0)
+	pci_read_config_dword(dev, 0x4C, &pcic);
+	if((pcic&6)!=6)
 	{
-		pcic |= 2;
-		printk(KERN_WARNING "BIOS disabled PCI ordering compliance, so we enabled it again.\n");
-		pci_write_config_dword(dev, 0x42, pcic);		
+		pcic |= 6;
+		printk(KERN_WARNING "BIOS failed to enable PCI standards compliance, fixing this error.\n");
+		pci_write_config_dword(dev, 0x4C, pcic);
+		pci_read_config_dword(dev, 0x84, &pcic);
+		pcic |= (1<<23);	/* Required in this mode */
+		pci_write_config_dword(dev, 0x84, pcic);
 	}
 }
 

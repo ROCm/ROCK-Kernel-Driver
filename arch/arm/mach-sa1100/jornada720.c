@@ -48,7 +48,7 @@ static int __init jornada720_init(void)
 
 	/* initialize extra IRQs */
 	set_GPIO_IRQ_edge(GPIO_GPIO1, GPIO_RISING_EDGE);
-	sa1111_init_irq(IRQ_GPIO1));	/* chained on GPIO 1 */
+	sa1111_init_irq(IRQ_GPIO1);	/* chained on GPIO 1 */
 
 	return 0;
 }

@@ -35,6 +35,7 @@
 #include <sound/pcm.h>
 #include <sound/ac97_codec.h>
 #include <sound/info.h>
+#include <sound/mpu401.h>
 #define SNDRV_GET_ID
 #include <sound/initval.h>
 
@@ -52,10 +53,24 @@ MODULE_DEVICES("{{Intel,82801AA},"
 		"{SiS,SI7012},"
 		"{NVidia,NForce Audio}}");
 
+#define SUPPORT_JOYSTICK 1
+#define SUPPORT_MIDI 1
+
 static int snd_index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
 static char *snd_id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
 static int snd_enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card */
 static int snd_ac97_clock[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0};
+#ifdef SUPPORT_JOYSTICK
+static int snd_joystick_port[SNDRV_CARDS] =
+#ifdef CONFIG_ISA
+	{0x200};	/* enable as default */
+#else
+	{0};	/* disabled */
+#endif
+#endif
+#ifdef SUPPORT_MIDI
+static int snd_mpu_port[SNDRV_CARDS]; /* disabled */
+#endif
 
 MODULE_PARM(snd_index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(snd_index, "Index value for Intel i8x0 soundcard.");
@@ -69,6 +84,16 @@ MODULE_PARM_SYNTAX(snd_enable, SNDRV_ENABLE_DESC);
 MODULE_PARM(snd_ac97_clock, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(snd_ac97_clock, "AC'97 codec clock (0 = auto-detect).");
 MODULE_PARM_SYNTAX(snd_ac97_clock, SNDRV_ENABLED ",default:0");
+#ifdef SUPPORT_JOYSTICK
+MODULE_PARM(snd_joystick_port, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(snd_joystick_port, "Joystick port address for Intel i8x0 soundcard. (0 = disabled)");
+MODULE_PARM_SYNTAX(snd_joystick_port, SNDRV_ENABLED ",allows:{{0},{0x200}},dialog:list");
+#endif
+#ifdef SUPPORT_MIDI
+MODULE_PARM(snd_mpu_port, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(snd_mpu_port, "MPU401 port # for Intel i8x0 driver.");
+MODULE_PARM_SYNTAX(snd_mpu_port, SNDRV_ENABLED ",allows:{{0},{0x330},{0x300}},dialog:list");
+#endif
 
 /*
  *  Direct registers
@@ -231,6 +256,8 @@ struct _snd_intel8x0 {
 	ac97_t *ac97;
 	ac97_t *ac97sec;
 
+	snd_rawmidi_t *rmidi;
+
 	spinlock_t reg_lock;
 	spinlock_t ac97_lock;
 	snd_info_entry_t *proc_entry;
@@ -256,9 +283,9 @@ static struct pci_device_id snd_intel8x0_ids[] __devinitdata = {
 	{ 0x8086, 0x2445, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_INTEL },	/* 82801BA */
 	{ 0x8086, 0x2485, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_INTEL },	/* ICH3 */
 	{ 0x8086, 0x7195, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_INTEL },	/* 440MX */
-	{ 0x8086, 0x7195, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_INTEL },	/* 440MX */
 	{ 0x1039, 0x7012, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_SIS },	/* SI7012 */
 	{ 0x10de, 0x01b1, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_INTEL },	/* NFORCE */
+	{ 0x764d, 0x1022, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_INTEL },	/* AMD8111 */
 	{ 0, }
 };
 
@@ -1087,6 +1114,7 @@ static void intel8x0_suspend(intel8x0_t *chip)
 {
 	snd_card_t *card = chip->card;
 
+	chip->in_suspend = 1;
 	snd_power_lock(card);
 	if (card->power_state == SNDRV_CTL_POWER_D3hot)
 		goto __skip;
@@ -1364,6 +1392,7 @@ static struct shortname_table {
 	{ PCI_DEVICE_ID_INTEL_ICH3, "Intel ICH3" },
 	{ PCI_DEVICE_ID_SI_7012, "SiS SI7012" },
 	{ PCI_DEVICE_ID_NVIDIA_MCP_AUDIO, "NVidia NForce" },
+	{ 0x1022, "AMD-8111" },
 	{ 0, 0 },
 };
 
@@ -1416,6 +1445,16 @@ static int __devinit snd_intel8x0_probe(struct pci_dev *pci,
 		}
 	}
 	
+	if (snd_mpu_port[dev] == 0x300 || snd_mpu_port[dev] == 0x330) {
+		if ((err = snd_mpu401_uart_new(card, 0, MPU401_HW_CMIPCI,
+					       snd_mpu_port[dev], 0,
+					       -1, 0, &chip->rmidi)) < 0) {
+			printk(KERN_ERR "intel8x0: no UART401 device at 0x%x, skipping.\n", snd_mpu_port[dev]);
+			snd_mpu_port[dev] = 0;
+		}
+	} else
+		snd_mpu_port[dev] = 0;
+
 	sprintf(card->longname, "%s at 0x%lx, irq %i",
 		card->shortname, chip->port, chip->irq);
 
@@ -1450,16 +1489,77 @@ static struct pci_driver driver = {
 #endif
 };
 
+
+#if defined(SUPPORT_JOYSTICK) || defined(SUPPORT_MIDI)
+/*
+ * initialize joystick/midi addresses
+ */
+
+static int __devinit snd_intel8x0_joystick_probe(struct pci_dev *pci,
+						 const struct pci_device_id *id)
+{
+	static int dev = 0;
+	if (dev >= SNDRV_CARDS)
+		return -ENODEV;
+	if (!snd_enable[dev]) {
+		dev++;
+		return -ENOENT;
+	}
+
+	if (snd_joystick_port[dev] > 0 || snd_mpu_port[dev] > 0) {
+		u16 val;
+		pci_read_config_word(pci, 0xe6, &val);
+		if (snd_joystick_port[dev] > 0)
+			val |= 0x100;
+		if (snd_mpu_port[dev] == 0x300 || snd_mpu_port[dev] == 0x330)
+			val |= 0x20;
+		pci_write_config_word(pci, 0xe6, val | 0x100);
+
+		if (snd_mpu_port[dev] == 0x300 || snd_mpu_port[dev] == 0x330) {
+			u8 b;
+			pci_read_config_byte(pci, 0xe2, &b);
+			if (snd_mpu_port[dev] == 0x300)
+				b |= 0x08;
+			else
+				b &= ~0x08;
+			pci_write_config_byte(pci, 0xe2, b);
+		}
+	}
+	return 0;
+}
+
+static struct pci_device_id snd_intel8x0_joystick_ids[] __devinitdata = {
+	{ 0x8086, 0x2410, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },	/* 82801AA */
+	{ 0x8086, 0x2420, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },	/* 82901AB */
+	{ 0x8086, 0x2440, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 }, /* ICH2 */
+	{ 0x8086, 0x244c, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 }, /* ICH2M */
+	{ 0x8086, 0x248c, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },	/* ICH3 */
+	// { 0x8086, 0x7195, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },	/* 440MX */
+	// { 0x1039, 0x7012, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },	/* SI7012 */
+	{ 0x10de, 0x01b2, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },	/* NFORCE */
+	{ 0, }
+};
+
+static struct pci_driver joystick_driver = {
+	name: "Intel ICH Joystick",
+	id_table: snd_intel8x0_joystick_ids,
+	probe: snd_intel8x0_joystick_probe,
+};
+#endif
+
 static int __init alsa_card_intel8x0_init(void)
 {
 	int err;
 
         if ((err = pci_module_init(&driver)) < 0) {
 #ifdef MODULE
-                snd_printk("Intel ICH soundcard not found or device busy\n");
+		printk(KERN_ERR "Intel ICH soundcard not found or device busy\n");
 #endif
                 return err;
         }
+#if defined(SUPPORT_JOYSTICK) || defined(SUPPORT_MIDI)
+	pci_module_init(&joystick_driver);
+#endif
         return 0;
 
 }
@@ -1467,6 +1567,9 @@ static int __init alsa_card_intel8x0_init(void)
 static void __exit alsa_card_intel8x0_exit(void)
 {
 	pci_unregister_driver(&driver);
+#if defined(SUPPORT_JOYSTICK) || defined(SUPPORT_MIDI)
+	pci_unregister_driver(&joystick_driver);
+#endif
 }
 
 module_init(alsa_card_intel8x0_init)

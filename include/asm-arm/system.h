@@ -53,9 +53,9 @@ extern asmlinkage void __backtrace(void);
 struct thread_info;
 extern struct task_struct *__switch_to(struct thread_info *, struct thread_info *);
 
-#define switch_to(prev,next,last)					\
+#define switch_to(prev,next)						\
 	do {			 					\
-		last = __switch_to(prev->thread_info,next->thread_info); \
+		__switch_to(prev->thread_info,next->thread_info);	\
 		mb();							\
 	} while (0)
 

@@ -151,8 +151,6 @@ static int  cyberjack_open (struct usb_serial_port *port, struct file *filp)
 
 	dbg(__FUNCTION__ " - port %d", port->number);
 
-	down (&port->sem);
-
 	++port->open_count;
 
 	if (port->open_count == 1) {
@@ -179,16 +177,12 @@ static int  cyberjack_open (struct usb_serial_port *port, struct file *filp)
 		dbg(__FUNCTION__ " - usb_submit_urb(int urb)");
 	}
 
-	up (&port->sem);
-
 	return result;
 }
 
 static void cyberjack_close (struct usb_serial_port *port, struct file *filp)
 {
 	dbg(__FUNCTION__ " - port %d", port->number);
-
-	down (&port->sem);
 
 	--port->open_count;
 
@@ -201,8 +195,6 @@ static void cyberjack_close (struct usb_serial_port *port, struct file *filp)
 		}
 		port->open_count = 0;
 	}
-
-	up (&port->sem);
 }
 
 static int cyberjack_write (struct usb_serial_port *port, int from_user, const unsigned char *buf, int count)
@@ -225,8 +217,6 @@ static int cyberjack_write (struct usb_serial_port *port, int from_user, const u
 		return (0);
 	}
 
-	down (&port->sem);
-
 	if( (count+priv->wrfilled)>sizeof(priv->wrbuf) ) {
 		/* To much data  for buffer. Reset buffer. */
 		priv->wrfilled=0;
@@ -235,8 +225,9 @@ static int cyberjack_write (struct usb_serial_port *port, int from_user, const u
 
 	/* Copy data */
 	if (from_user) {
-		if (copy_from_user(priv->wrbuf+priv->wrfilled, buf, count))
+		if (copy_from_user(priv->wrbuf+priv->wrfilled, buf, count)) {
 			return -EFAULT;
+		}
 	} else {
 		memcpy (priv->wrbuf+priv->wrfilled, buf, count);
 	}  
@@ -277,7 +268,6 @@ static int cyberjack_write (struct usb_serial_port *port, int from_user, const u
 			/* Throw away data. No better idea what to do with it. */
 			priv->wrfilled=0;
 			priv->wrsent=0;
-			up (&port->sem);
 			return 0;
 		}
 
@@ -292,7 +282,6 @@ static int cyberjack_write (struct usb_serial_port *port, int from_user, const u
 		}
 	}
 
-	up (&port->sem);
 	return (count);
 } 
 
@@ -432,8 +421,6 @@ static void cyberjack_write_bulk_callback (struct urb *urb)
 			return;
 		}
 
-		down (&port->sem);
-
 		dbg(__FUNCTION__ " - transmitting data (frame n)");
 
 		length = ((priv->wrfilled - priv->wrsent) > port->bulk_out_size) ?
@@ -459,7 +446,6 @@ static void cyberjack_write_bulk_callback (struct urb *urb)
 			/* Throw away data. No better idea what to do with it. */
 			priv->wrfilled=0;
 			priv->wrsent=0;
-			up (&port->sem);
 			queue_task(&port->tqueue, &tq_immediate);
 			mark_bh(IMMEDIATE_BH);
 			return;
@@ -477,7 +463,6 @@ static void cyberjack_write_bulk_callback (struct urb *urb)
 			priv->wrsent=0;
 		}
 
-		up (&port->sem);
 		queue_task(&port->tqueue, &tq_immediate);
 		mark_bh(IMMEDIATE_BH);
 		return;

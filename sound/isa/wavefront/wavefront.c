@@ -740,7 +740,7 @@ static int __init alsa_card_wavefront_init(void)
 #endif
 	if (!cards) {
 #ifdef MODULE
-		snd_printk ("No cards found or devices busy\n");
+		printk (KERN_ERR "No WaveFront cards found or devices busy\n");
 #endif
 		return -ENODEV;
 	}

@@ -133,7 +133,7 @@ static int __init snd_audiodrive_probe(int dev)
 	}
 
 	if ((snd_opl3_create(card, chip->port, chip->port + 2, OPL3_HW_OPL3, 0, &opl3)) < 0) {
-		snd_printk("opl3 not detected at 0x%lx\n", chip->port);
+		printk(KERN_ERR "es1688: opl3 not detected at 0x%lx\n", chip->port);
 	} else {
 		if ((err = snd_opl3_hwdep_new(opl3, 0, 1, NULL)) < 0) {
 			snd_card_free(card);
@@ -194,7 +194,7 @@ static int __init alsa_card_es1688_init(void)
 	cards += snd_legacy_auto_probe(possible_ports, snd_audiodrive_legacy_auto_probe);
 	if (!cards) {
 #ifdef MODULE
-		snd_printk("ESS AudioDrive ES1688 soundcard not found or device busy\n");
+		printk(KERN_ERR "ESS AudioDrive ES1688 soundcard not found or device busy\n");
 #endif
 		return -ENODEV;
 	}

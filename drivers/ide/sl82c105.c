@@ -223,7 +223,7 @@ static unsigned int sl82c105_bridge_revision(struct pci_dev *dev)
 /*
  * Enable the PCI device
  */
-unsigned int __init pci_init_sl82c105(struct pci_dev *dev, const char *msg)
+unsigned int __init pci_init_sl82c105(struct pci_dev *dev)
 {
 	unsigned char ctrl_stat;
 

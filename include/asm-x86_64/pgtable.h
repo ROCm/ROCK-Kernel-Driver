@@ -26,7 +26,7 @@ extern pgd_t level3_ident_pgt[512], swapper_pg_dir[512];
 extern pmd_t level2_kernel_pgt[512];
 extern void paging_init(void);
 
-/* Caches aren't brain-dead on the intel. */
+/* Caches aren't brain-dead. */
 #define flush_cache_all()			do { } while (0)
 #define flush_cache_mm(mm)			do { } while (0)
 #define flush_cache_range(vma, start, end)	do { } while (0)
@@ -35,6 +35,7 @@ extern void paging_init(void);
 #define flush_dcache_page(page)			do { } while (0)
 #define flush_icache_range(start, end)		do { } while (0)
 #define flush_icache_page(vma,pg)		do { } while (0)
+#define flush_icache_user_range(vma,pg,adr,len)       do { } while (0)
 
 #define __flush_tlb()							\
 	do {								\
@@ -341,8 +342,10 @@ extern inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 
 #define page_pte(page) page_pte_prot(page, __pgprot(0))
 
-#define pmd_page(pmd) \
+#define pmd_page_kernel(pmd) \
 ((unsigned long) __va(pmd_val(pmd) & PAGE_MASK))
+#define pmd_page(pmd) \
+       (mem_map + (pmd_val(pmd) >> PAGE_SHIFT))
 
 /* to find an entry in a page-table-directory. */
 #define pgd_index(address) ((address >> PGDIR_SHIFT) & (PTRS_PER_PGD-1))
@@ -360,8 +363,14 @@ extern inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 /* Find an entry in the third-level page table.. */
 #define __pte_offset(address) \
 		((address >> PAGE_SHIFT) & (PTRS_PER_PTE - 1))
-#define pte_offset(dir, address) ((pte_t *) pmd_page(*(dir)) + \
+#define pte_offset_kernel(dir, address) ((pte_t *) pmd_page_kernel(*(dir)) + \
 			__pte_offset(address))
+
+#define pte_offset_map(dir,address) pte_offset_kernel(dir,address)
+#define pte_offset_map_nested(dir,address) pte_offset_kernel(dir,address)
+#define pte_unmap(pte) /* NOP */
+#define pte_unmap_nested(pte) /* NOP */ 
+
 
 /* never use these in the common code */
 #define level4_page(level4) ((unsigned long) __va(level4_val(level4) & PAGE_MASK))

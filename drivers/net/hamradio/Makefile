@@ -7,7 +7,7 @@
 #               Joerg Reuter DL1BKE <jreuter@yaina.de>
 #
 # 20000806	Rewritten to use lists instead of if-statements.
-#		Christoph Hellwig <hch@caldera.de>
+#		Christoph Hellwig <hch@infradead.org>
 #
 
 

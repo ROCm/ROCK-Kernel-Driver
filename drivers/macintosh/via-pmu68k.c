@@ -916,7 +916,7 @@ int __openfirmware powerbook_sleep(void)
 	/* Sync the disks. */
 	/* XXX It would be nice to have some way to ensure that
 	 * nobody is dirtying any new buffers while we wait. */
-	fsync_dev(0);
+	sys_sync();
 
 	/* Turn off the display backlight */
 	save_backlight = backlight_enabled;

@@ -657,6 +657,10 @@ CONFIG_SA1100_SHANNON
   platform with a 640x480 LCD, touchscreen, CIR keyboard, PCMCIA slots,
   and a telco interface.
 
+CONFIG_SA1100_STORK
+  Say Y here if you intend to run this kernel on the Stork
+  handheld computer.
+
 CONFIG_SA1100_VICTOR
   Say Y here if you are using a Visu Aide Intel(R) StrongARM(R)
   SA-1100 based Victor Digital Talking Book Reader.  See

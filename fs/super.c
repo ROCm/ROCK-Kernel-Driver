@@ -355,6 +355,7 @@ static int grab_super(struct super_block *s)
 	}
 	up_write(&s->s_umount);
 	put_super(s);
+	yield();
 	return 0;
 }
  
@@ -381,31 +382,84 @@ static void put_anon_dev(kdev_t dev);
  *	remove_super	-	makes superblock unreachable
  *	@s:	superblock in question
  *
- *	Removes superblock from the lists, unlocks it, drop the reference
- *	and releases the hosting device.  @s should have no active
- *	references by that time and after remove_super() it's essentially
- *	in rundown mode - all remaining references are temporary, no new
- *	reference of any sort are going to appear and all holders of
- *	temporary ones will eventually drop them.  At that point superblock
- *	itself will be destroyed; all its contents is already gone.
+ *	Removes superblock from the lists, unlocks it and drop the reference
+ *	@s should have no active references by that time and after
+ *	remove_super() it's essentially	in rundown mode - all remaining
+ *	references are temporary, no new reference of any sort are going
+ *	to appear and all holders of temporary ones will eventually drop them.
+ *	At that point superblock itself will be destroyed; all its contents
+ *	is already gone.
  */
 static void remove_super(struct super_block *s)
 {
-	kdev_t dev = s->s_dev;
-	struct block_device *bdev = s->s_bdev;
-	struct file_system_type *fs = s->s_type;
-
 	spin_lock(&sb_lock);
 	list_del(&s->s_list);
 	list_del(&s->s_instances);
 	spin_unlock(&sb_lock);
 	up_write(&s->s_umount);
 	put_super(s);
-	put_filesystem(fs);
+}
+
+static void generic_shutdown_super(struct super_block *sb)
+{
+	struct dentry *root = sb->s_root;
+	struct super_operations *sop = sb->s_op;
+
+	if (root) {
+		sb->s_root = NULL;
+		shrink_dcache_parent(root);
+		dput(root);
+		fsync_super(sb);
+		lock_super(sb);
+		lock_kernel();
+		sb->s_flags &= ~MS_ACTIVE;
+		/* bad name - it should be evict_inodes() */
+		invalidate_inodes(sb);
+		if (sop) {
+			if (sop->write_super && sb->s_dirt)
+				sop->write_super(sb);
+			if (sop->put_super)
+				sop->put_super(sb);
+		}
+
+		/* Forget any remaining inodes */
+		if (invalidate_inodes(sb)) {
+			printk("VFS: Busy inodes after unmount. "
+			   "Self-destruct in 5 seconds.  Have a nice day...\n");
+		}
+
+		unlock_kernel();
+		unlock_super(sb);
+	}
+	remove_super(sb);
+}
+
+static void shutdown_super(struct super_block *sb)
+{
+	struct file_system_type *fs = sb->s_type;
+	kdev_t dev = sb->s_dev;
+	struct block_device *bdev = sb->s_bdev;
+
+	/* Need to clean after the sucker */
+	if (fs->fs_flags & FS_LITTER && sb->s_root)
+		d_genocide(sb->s_root);
+	generic_shutdown_super(sb);
 	if (bdev)
 		blkdev_put(bdev, BDEV_FS);
 	else
 		put_anon_dev(dev);
+}
+
+void kill_super(struct super_block *sb)
+{
+	struct file_system_type *fs = sb->s_type;
+
+	if (!deactivate_super(sb))
+		return;
+
+	down_write(&sb->s_umount);
+	shutdown_super(sb);
+	put_filesystem(fs);
 }
 
 struct vfsmount *alloc_vfsmnt(char *name);
@@ -445,19 +499,9 @@ static inline void write_super(struct super_block *sb)
  * hold up the sync while mounting a device. (The newly
  * mounted device won't need syncing.)
  */
-void sync_supers(kdev_t dev)
+void sync_supers(void)
 {
 	struct super_block * sb;
-
-	if (!kdev_none(dev)) {
-		sb = get_super(dev);
-		if (sb) {
-			if (sb->s_dirt)
-				write_super(sb);
-			drop_super(sb);
-		}
-		return;
-	}
 restart:
 	spin_lock(&sb_lock);
 	sb = sb_entry(super_blocks.next);
@@ -724,8 +768,8 @@ restart:
 	return s;
 
 failed:
-	deactivate_super(s);
-	remove_super(s);
+	up_write(&s->s_umount);
+	kill_super(s);
 	goto out;
 out1:
 	blkdev_put(bdev, BDEV_FS);
@@ -748,8 +792,8 @@ struct super_block *get_sb_nodev(struct file_system_type *fs_type,
 
 	error = fill_super(s, data, flags & MS_VERBOSE ? 1 : 0);
 	if (error) {
-		deactivate_super(s);
-		remove_super(s);
+		up_write(&s->s_umount);
+		kill_super(s);
 		return ERR_PTR(error);
 	}
 	s->s_flags |= MS_ACTIVE;
@@ -774,8 +818,8 @@ struct super_block *get_sb_single(struct file_system_type *fs_type,
 		s->s_flags = flags;
 		error = fill_super(s, data, flags & MS_VERBOSE ? 1 : 0);
 		if (error) {
-			deactivate_super(s);
-			remove_super(s);
+			up_write(&s->s_umount);
+			kill_super(s);
 			return ERR_PTR(error);
 		}
 		s->s_flags |= MS_ACTIVE;
@@ -814,45 +858,6 @@ out_mnt:
 out:
 	put_filesystem(type);
 	return (struct vfsmount *)sb;
-}
-
-void kill_super(struct super_block *sb)
-{
-	struct dentry *root = sb->s_root;
-	struct file_system_type *fs = sb->s_type;
-	struct super_operations *sop = sb->s_op;
-
-	if (!deactivate_super(sb))
-		return;
-
-	down_write(&sb->s_umount);
-	sb->s_root = NULL;
-	/* Need to clean after the sucker */
-	if (fs->fs_flags & FS_LITTER)
-		d_genocide(root);
-	shrink_dcache_parent(root);
-	dput(root);
-	fsync_super(sb);
-	lock_super(sb);
-	lock_kernel();
-	sb->s_flags &= ~MS_ACTIVE;
-	invalidate_inodes(sb);	/* bad name - it should be evict_inodes() */
-	if (sop) {
-		if (sop->write_super && sb->s_dirt)
-			sop->write_super(sb);
-		if (sop->put_super)
-			sop->put_super(sb);
-	}
-
-	/* Forget any remaining inodes */
-	if (invalidate_inodes(sb)) {
-		printk("VFS: Busy inodes after unmount. "
-			"Self-destruct in 5 seconds.  Have a nice day...\n");
-	}
-
-	unlock_kernel();
-	unlock_super(sb);
-	remove_super(sb);
 }
 
 struct vfsmount *kern_mount(struct file_system_type *type)

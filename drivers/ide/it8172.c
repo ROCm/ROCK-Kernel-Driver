@@ -53,7 +53,6 @@ static int it8172_tune_chipset (ide_drive_t *drive, byte speed);
 static int it8172_config_drive_for_dma (ide_drive_t *drive);
 static int it8172_dmaproc(ide_dma_action_t func, ide_drive_t *drive);
 #endif
-unsigned int __init pci_init_it8172 (struct pci_dev *dev, const char *name);
 void __init ide_init_it8172 (ide_hwif_t *hwif);
 
 
@@ -232,7 +231,7 @@ static int it8172_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
 #endif /* defined(CONFIG_BLK_DEV_IDEDMA) && (CONFIG_IT8172_TUNING) */
 
 
-unsigned int __init pci_init_it8172 (struct pci_dev *dev, const char *name)
+unsigned int __init pci_init_it8172 (struct pci_dev *dev)
 {
     unsigned char progif;
     

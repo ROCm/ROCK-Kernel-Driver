@@ -25,8 +25,6 @@ MODULE_LICENSE("GPL");
 #define CS461X_FULL_MAP
 */
 
-#define COOKED_MODE
-
 
 #ifndef PCI_VENDOR_ID_CIRRUS
 #define PCI_VENDOR_ID_CIRRUS            0x1013
@@ -122,6 +120,9 @@ MODULE_LICENSE("GPL");
 static unsigned long ba0_addr;
 static unsigned int *ba0;
 
+static char phys[32];
+static char name[] = "CS416x Gameport";
+
 #ifdef CS461X_FULL_MAP
 static unsigned long ba1_addr;
 static union ba1_t {
@@ -206,14 +207,11 @@ static int cs461x_gameport_cooked_read(struct gameport *gameport, int *axes, int
 static int cs461x_gameport_open(struct gameport *gameport, int mode)
 {
 	switch (mode) {
-#ifdef COOKED_MODE
-	case GAMEPORT_MODE_COOKED:
-		return 0;
-#endif
-	case GAMEPORT_MODE_RAW:
-		return 0;
-	default:
-		return -1;
+		case GAMEPORT_MODE_COOKED:
+		case GAMEPORT_MODE_RAW:
+			return 0;
+		default:
+			return -1;
 	}
 	return 0;
 }
@@ -274,9 +272,7 @@ static int __devinit cs461x_pci_probe(struct pci_dev *pdev, const struct pci_dev
 		return -ENOMEM;
 	}
 #endif
-	printk(KERN_INFO "CS461x PCI: %lx[%d]\n",
-	    ba0_addr, CS461X_BA0_SIZE);
-        
+
 	if (!(port = kmalloc(sizeof(struct gameport), GFP_KERNEL))) {
 		printk(KERN_ERR "Memory allocation failed.\n");
 		cs461x_free(pdev);
@@ -287,19 +283,25 @@ static int __devinit cs461x_pci_probe(struct pci_dev *pdev, const struct pci_dev
 	pci_set_drvdata(pdev, port);
 	
 	port->open = cs461x_gameport_open;
-	port->read = cs461x_gameport_read;
 	port->trigger = cs461x_gameport_trigger;
-#ifdef COOKED_MODE
+	port->read = cs461x_gameport_read;
 	port->cooked_read = cs461x_gameport_cooked_read;
-#endif
+
+	sprintf(phys, "pci%s/gameport0", pdev->slot_name);
+
+	port->name = name;
+	port->phys = phys;
+	port->idbus = BUS_PCI;
+	port->idvendor = pdev->vendor;
+	port->idproduct = pdev->device;
 
 	cs461x_pokeBA0(BA0_JSIO, 0xFF); // ?
 	cs461x_pokeBA0(BA0_JSCTL, JSCTL_SP_MEDIUM_SLOW);
 
 	gameport_register_port(port);
 
-	printk(KERN_INFO "gameport%d: CS461x Gameport speed %d kHz\n",
-		port->number, port->speed);
+	printk(KERN_INFO "gameport: %s on pci%s speed %d kHz\n",
+		name, pdev->slot_name, port->speed);
 
 	return 0;
 }
@@ -310,22 +312,22 @@ static void __devexit cs461x_pci_remove(struct pci_dev *pdev)
 }
 	
 static struct pci_driver cs461x_pci_driver = {
-        name:           "PCI Gameport",
+        name:           "CS461x Gameport",
         id_table:       cs461x_pci_tbl,
         probe:          cs461x_pci_probe,
         remove:         __devexit_p(cs461x_pci_remove),
 };
 
-int __init js_cs461x_init(void)
+int __init cs461x_init(void)
 {
         return pci_module_init(&cs461x_pci_driver);
 }
 
-void __exit js_cs461x_exit(void)
+void __exit cs461x_exit(void)
 {
         pci_unregister_driver(&cs461x_pci_driver);
 }
 
-module_init(js_cs461x_init);
-module_exit(js_cs461x_exit);
+module_init(cs461x_init);
+module_exit(cs461x_exit);
 

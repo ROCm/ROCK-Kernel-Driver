@@ -189,7 +189,7 @@ static void write_locked_buffers(struct buffer_head **array, unsigned int count)
  * return without it!
  */
 #define NRSYNC (32)
-static int write_some_buffers(kdev_t dev)
+static int write_some_buffers(struct block_device *bdev)
 {
 	struct buffer_head *next;
 	struct buffer_head *array[NRSYNC];
@@ -203,7 +203,7 @@ static int write_some_buffers(kdev_t dev)
 		struct buffer_head * bh = next;
 		next = bh->b_next_free;
 
-		if (!kdev_none(dev) && !kdev_same(bh->b_dev, dev))
+		if (bdev && bh->b_bdev != bdev)
 			continue;
 		if (test_and_set_bit(BH_Lock, &bh->b_state))
 			continue;
@@ -231,11 +231,11 @@ static int write_some_buffers(kdev_t dev)
 /*
  * Write out all buffers on the dirty list.
  */
-static void write_unlocked_buffers(kdev_t dev)
+static void write_unlocked_buffers(struct block_device *bdev)
 {
 	do {
 		spin_lock(&lru_list_lock);
-	} while (write_some_buffers(dev));
+	} while (write_some_buffers(bdev));
 	run_task_queue(&tq_disk);
 }
 
@@ -245,7 +245,7 @@ static void write_unlocked_buffers(kdev_t dev)
  * This must be called with the LRU lock held, and
  * will return with it released.
  */
-static int wait_for_buffers(kdev_t dev, int index, int refile)
+static int wait_for_buffers(struct block_device *bdev, int index, int refile)
 {
 	struct buffer_head * next;
 	int nr;
@@ -261,7 +261,7 @@ static int wait_for_buffers(kdev_t dev, int index, int refile)
 				__refile_buffer(bh);
 			continue;
 		}
-		if (!kdev_none(dev) && !kdev_same(bh->b_dev, dev))
+		if (bdev && bh->b_bdev !=  bdev)
 			continue;
 
 		get_bh(bh);
@@ -274,17 +274,17 @@ static int wait_for_buffers(kdev_t dev, int index, int refile)
 	return 0;
 }
 
-static inline void wait_for_some_buffers(kdev_t dev)
+static inline void wait_for_some_buffers(struct block_device *bdev)
 {
 	spin_lock(&lru_list_lock);
-	wait_for_buffers(dev, BUF_LOCKED, 1);
+	wait_for_buffers(bdev, BUF_LOCKED, 1);
 }
 
-static int wait_for_locked_buffers(kdev_t dev, int index, int refile)
+static int wait_for_locked_buffers(struct block_device *bdev, int index, int refile)
 {
 	do {
 		spin_lock(&lru_list_lock);
-	} while (wait_for_buffers(dev, index, refile));
+	} while (wait_for_buffers(bdev, index, refile));
 	return 0;
 }
 
@@ -298,7 +298,29 @@ static int wait_for_locked_buffers(kdev_t dev, int index, int refile)
  * We will ultimately want to put these in a separate list, but for
  * now we search all of the lists for dirty buffers.
  */
-int sync_buffers(kdev_t dev, int wait)
+int sync_buffers(struct block_device *bdev, int wait)
+{
+	int err = 0;
+
+	if (!bdev)
+		return 0;
+
+	/* One pass for no-wait, three for wait:
+	 * 0) write out all dirty, unlocked buffers;
+	 * 1) wait for all dirty locked buffers;
+	 * 2) write out all dirty, unlocked buffers;
+	 * 2) wait for completion by waiting for all buffers to unlock.
+	 */
+	write_unlocked_buffers(bdev);
+	if (wait) {
+		err = wait_for_locked_buffers(bdev, BUF_DIRTY, 0);
+		write_unlocked_buffers(bdev);
+		err |= wait_for_locked_buffers(bdev, BUF_LOCKED, 1);
+	}
+	return err;
+}
+
+int sync_all_buffers(int wait)
 {
 	int err = 0;
 
@@ -308,19 +330,18 @@ int sync_buffers(kdev_t dev, int wait)
 	 * 2) write out all dirty, unlocked buffers;
 	 * 2) wait for completion by waiting for all buffers to unlock.
 	 */
-	write_unlocked_buffers(dev);
+	write_unlocked_buffers(NULL);
 	if (wait) {
-		err = wait_for_locked_buffers(dev, BUF_DIRTY, 0);
-		write_unlocked_buffers(dev);
-		err |= wait_for_locked_buffers(dev, BUF_LOCKED, 1);
+		err = wait_for_locked_buffers(NULL, BUF_DIRTY, 0);
+		write_unlocked_buffers(NULL);
+		err |= wait_for_locked_buffers(NULL, BUF_LOCKED, 1);
 	}
 	return err;
 }
 
 int fsync_super(struct super_block *sb)
 {
-	kdev_t dev = sb->s_dev;
-	sync_buffers(dev, 0);
+	sync_buffers(sb->s_bdev, 0);
 
 	lock_kernel();
 	sync_inodes_sb(sb);
@@ -331,48 +352,48 @@ int fsync_super(struct super_block *sb)
 	unlock_super(sb);
 	unlock_kernel();
 
-	return sync_buffers(dev, 1);
+	return sync_buffers(sb->s_bdev, 1);
 }
 
 int fsync_no_super(struct block_device *bdev)
 {
-	kdev_t dev = to_kdev_t(bdev->bd_dev);
-	sync_buffers(dev, 0);
-	return sync_buffers(dev, 1);
+	sync_buffers(bdev, 0);
+	return sync_buffers(bdev, 1);
 }
 
 int fsync_dev(kdev_t dev)
 {
-	sync_buffers(dev, 0);
-
-	lock_kernel();
-	sync_inodes(dev);
-	if (!kdev_none(dev)) {
-		struct super_block *sb = get_super(dev);
-		if (sb) {
-			DQUOT_SYNC(sb);
-			drop_super(sb);
-		}
-	} else
-			DQUOT_SYNC(NULL);
-	sync_supers(dev);
-	unlock_kernel();
-
-	return sync_buffers(dev, 1);
+	struct block_device *bdev = bdget(kdev_t_to_nr(dev));
+	if (bdev) {
+		int res = fsync_bdev(bdev);
+		bdput(bdev);
+		return res;
+	}
+	return 0;
 }
 
-/*
- * There's no real reason to pretend we should
- * ever do anything differently
- */
-void sync_dev(kdev_t dev)
+int fsync_bdev(struct block_device *bdev)
 {
-	fsync_dev(dev);
+	struct super_block *sb = get_super(to_kdev_t(bdev->bd_dev));
+	if (sb) {
+		int res = fsync_super(sb);
+		drop_super(sb);
+		return res;
+	}
+	return fsync_no_super(bdev);
 }
 
 asmlinkage long sys_sync(void)
 {
-	fsync_dev(NODEV);
+	sync_all_buffers(0);
+
+	lock_kernel();
+	sync_inodes();
+	DQUOT_SYNC(NULL);
+	sync_supers();
+	unlock_kernel();
+
+	sync_all_buffers(1);
 	return 0;
 }
 
@@ -384,7 +405,6 @@ int file_fsync(struct file *filp, struct dentry *dentry, int datasync)
 {
 	struct inode * inode = dentry->d_inode;
 	struct super_block * sb;
-	kdev_t dev;
 	int ret;
 
 	lock_kernel();
@@ -399,8 +419,7 @@ int file_fsync(struct file *filp, struct dentry *dentry, int datasync)
 	unlock_super(sb);
 
 	/* .. finally sync the buffers to disk */
-	dev = inode->i_dev;
-	ret = sync_buffers(dev, 1);
+	ret = sync_buffers(sb->s_bdev, 1);
 	unlock_kernel();
 	return ret;
 }
@@ -663,7 +682,6 @@ void invalidate_bdev(struct block_device *bdev, int destroy_dirty_buffers)
 {
 	int i, nlist, slept;
 	struct buffer_head * bh, * bh_next;
-	kdev_t dev = to_kdev_t(bdev->bd_dev);	/* will become bdev */
 
  retry:
 	slept = 0;
@@ -676,7 +694,7 @@ void invalidate_bdev(struct block_device *bdev, int destroy_dirty_buffers)
 			bh_next = bh->b_next_free;
 
 			/* Another device? */
-			if (!kdev_same(bh->b_dev, dev))
+			if (bh->b_bdev != bdev)
 				continue;
 			/* Not hashed? */
 			if (!bh->b_pprev)
@@ -998,7 +1016,7 @@ void balance_dirty(void)
 
 	/* If we're getting into imbalance, start write-out */
 	spin_lock(&lru_list_lock);
-	write_some_buffers(NODEV);
+	write_some_buffers(NULL);
 
 	/*
 	 * And if we're _really_ out of balance, wait for
@@ -1007,7 +1025,7 @@ void balance_dirty(void)
 	 * This will throttle heavy writers.
 	 */
 	if (state > 0) {
-		wait_for_some_buffers(NODEV);
+		wait_for_some_buffers(NULL);
 		wakeup_bdflush();
 	}
 }
@@ -2616,7 +2634,7 @@ static int sync_old_buffers(void)
 {
 	lock_kernel();
 	sync_unlocked_inodes();
-	sync_supers(NODEV);
+	sync_supers();
 	unlock_kernel();
 
 	for (;;) {
@@ -2626,7 +2644,7 @@ static int sync_old_buffers(void)
 		bh = lru_list[BUF_DIRTY];
 		if (!bh || time_before(jiffies, bh->b_flushtime))
 			break;
-		if (write_some_buffers(NODEV))
+		if (write_some_buffers(NULL))
 			continue;
 		return 0;
 	}
@@ -2725,8 +2743,8 @@ int bdflush(void *startup)
 		CHECK_EMERGENCY_SYNC
 
 		spin_lock(&lru_list_lock);
-		if (!write_some_buffers(NODEV) || balance_dirty_state() < 0) {
-			wait_for_some_buffers(NODEV);
+		if (!write_some_buffers(NULL) || balance_dirty_state() < 0) {
+			wait_for_some_buffers(NULL);
 			interruptible_sleep_on(&bdflush_wait);
 		}
 	}
@@ -2757,7 +2775,7 @@ int kupdate(void *startup)
 	complete((struct completion *)startup);
 
 	for (;;) {
-		wait_for_some_buffers(NODEV);
+		wait_for_some_buffers(NULL);
 
 		/* update interval */
 		interval = bdf_prm.b_un.interval;

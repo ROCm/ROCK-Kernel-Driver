@@ -558,7 +558,7 @@ repeat:
 		reset_hd();
 		return;
 	}
-	dev = MINOR(CURRENT->rq_dev);
+	dev = minor(CURRENT->rq_dev);
 	block = CURRENT->sector;
 	nsect = CURRENT->nr_sectors;
 	if (dev >= (NR_HD<<6) || (dev & 0x3f) ||
@@ -568,7 +568,7 @@ repeat:
 			       kdevname(CURRENT->rq_dev));
 		else
 			printk("hd%c: bad access: block=%d, count=%d\n",
-				(MINOR(CURRENT->rq_dev)>>6)+'a', block, nsect);
+				(minor(CURRENT->rq_dev)>>6)+'a', block, nsect);
 		end_request(0);
 		goto repeat;
 	}
@@ -626,7 +626,7 @@ static int hd_ioctl(struct inode * inode, struct file * file,
 	struct hd_geometry *loc = (struct hd_geometry *) arg;
 	int dev;
 
-	if ((!inode) || !(inode->i_rdev))
+	if ((!inode) || kdev_none(inode->i_rdev))
 		return -EINVAL;
 	dev = DEVICE_NR(inode->i_rdev);
 	if (dev >= NR_HD)
@@ -822,7 +822,7 @@ static void __init hd_geninit(void)
 	hd_gendisk.nr_real = NR_HD;
 
 	for(drive=0; drive < NR_HD; drive++)
-		register_disk(&hd_gendisk, MKDEV(MAJOR_NR,drive<<6), 1<<6,
+		register_disk(&hd_gendisk, mk_kdev(MAJOR_NR,drive<<6), 1<<6,
 			&hd_fops, hd_info[drive].head * hd_info[drive].sect *
 			hd_info[drive].cyl);
 }

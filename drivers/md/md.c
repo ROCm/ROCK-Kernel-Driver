@@ -890,7 +890,8 @@ static mdk_rdev_t * find_rdev_all(kdev_t dev)
 
 static int write_disk_sb(mdk_rdev_t * rdev)
 {
-	struct address_space *mapping = rdev->bdev->bd_inode->i_mapping;
+	struct block_device *bdev = rdev->bdev;
+	struct address_space *mapping = bdev->bd_inode->i_mapping;
 	struct page *page;
 	unsigned offs;
 	int error;
@@ -929,7 +930,7 @@ static int write_disk_sb(mdk_rdev_t * rdev)
 	}
 
 	printk(KERN_INFO "(write) %s's sb offset: %ld\n", partition_name(dev), sb_offset);
-	fsync_dev(dev);
+	fsync_bdev(bdev);
 	page = grab_cache_page(mapping, sb_offset/(PAGE_CACHE_SIZE/BLOCK_SIZE));
 	offs = sb_offset % (PAGE_CACHE_SIZE/BLOCK_SIZE);
 	if (!page)
@@ -946,7 +947,7 @@ static int write_disk_sb(mdk_rdev_t * rdev)
 	UnlockPage(page);
 	wait_on_page(page);
 	page_cache_release(page);
-	fsync_dev(dev);
+	fsync_bdev(bdev);
 skip:
 	return 0;
 unlock:

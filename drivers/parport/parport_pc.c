@@ -818,8 +818,9 @@ size_t parport_pc_compat_write_block_pio (struct parport *port,
 	long int expire;
 	const struct parport_pc_private *priv = port->physport->private_data;
 
-	/* Special case: a timeout of zero means we cannot call schedule(). */
-	if (!port->physport->cad->timeout)
+	/* Special case: a timeout of zero means we cannot call schedule().
+	 * Also if O_NONBLOCK is set then use the default implementation. */
+	if (port->physport->cad->timeout <= PARPORT_INACTIVITY_O_NONBLOCK)
 		return parport_ieee1284_write_compat (port, buf,
 						      length, flags);
 
@@ -894,8 +895,9 @@ size_t parport_pc_ecp_write_block_pio (struct parport *port,
 	long int expire;
 	const struct parport_pc_private *priv = port->physport->private_data;
 
-	/* Special case: a timeout of zero means we cannot call schedule(). */
-	if (!port->physport->cad->timeout)
+	/* Special case: a timeout of zero means we cannot call schedule().
+	 * Also if O_NONBLOCK is set then use the default implementation. */
+	if (port->physport->cad->timeout <= PARPORT_INACTIVITY_O_NONBLOCK)
 		return parport_ieee1284_ecp_write_data (port, buf,
 							length, flags);
 
@@ -1014,8 +1016,9 @@ size_t parport_pc_ecp_read_block_pio (struct parport *port,
 DPRINTK (KERN_DEBUG "parport_pc: parport_pc_ecp_read_block_pio\n");
 dump_parport_state ("enter fcn", port);
 
-	/* Special case: a timeout of zero means we cannot call schedule(). */
-	if (!port->cad->timeout)
+	/* Special case: a timeout of zero means we cannot call schedule().
+	 * Also if O_NONBLOCK is set then use the default implementation. */
+	if (port->cad->timeout <= PARPORT_INACTIVITY_O_NONBLOCK)
 		return parport_ieee1284_ecp_read_data (port, buf,
 						       length, flags);
 
@@ -2136,8 +2139,6 @@ static int __devinit parport_irq_probe(struct parport *pb)
 {
 	struct parport_pc_private *priv = pb->private_data;
 
-	priv->ctr_writable |= 0x10;
-
 	if (priv->ecr) {
 		pb->irq = programmable_irq_support(pb);
 
@@ -2161,9 +2162,6 @@ static int __devinit parport_irq_probe(struct parport *pb)
 
 	if (pb->irq == PARPORT_IRQ_NONE)
 		pb->irq = get_superio_irq(pb);
-
-	if (pb->irq == PARPORT_IRQ_NONE)
-		priv->ctr_writable &= ~0x10;
 
 	return pb->irq;
 }
@@ -2293,6 +2291,7 @@ struct parport *parport_pc_probe_port (unsigned long int base,
 	}
 	if (p->irq != PARPORT_IRQ_NONE) {
 		printk(", irq %d", p->irq);
+		priv->ctr_writable |= 0x10;
 
 		if (p->dma == PARPORT_DMA_AUTO) {
 			p->dma = PARPORT_DMA_NONE;
@@ -2720,6 +2719,15 @@ static struct parport_pc_pci {
 		int hi; /* -1 if not there, >6 for offset-method (max
                            BAR is 6) */
 	} addr[4];
+
+	/* If set, this is called immediately after pci_enable_device.
+	 * If it returns non-zero, no probing will take place and the
+	 * ports will not be used. */
+	int (*preinit_hook) (struct pci_dev *pdev, int autoirq, int autodma);
+
+	/* If set, this is called after probing for ports.  If 'failed'
+	 * is non-zero we couldn't use any of the ports. */
+	void (*postinit_hook) (struct pci_dev *pdev, int failed);
 } cards[] __devinitdata = {
 	/* siig_1s1p_10x_550 */		{ 1, { { 3, 4 }, } },
 	/* siig_1s1p_10x_650 */		{ 1, { { 3, 4 }, } },
@@ -2896,6 +2904,10 @@ static int __devinit parport_pc_pci_probe (struct pci_dev *dev,
 	if ((err = pci_enable_device (dev)) != 0)
 		return err;
 
+	if (cards[i].preinit_hook &&
+	    cards[i].preinit_hook (dev, PARPORT_IRQ_NONE, PARPORT_DMA_NONE))
+		return -ENODEV;
+
 	for (n = 0; n < cards[i].numports; n++) {
 		int lo = cards[i].addr[n].lo;
 		int hi = cards[i].addr[n].hi;
@@ -2917,6 +2929,9 @@ static int __devinit parport_pc_pci_probe (struct pci_dev *dev,
 					   PARPORT_DMA_NONE, dev))
 			count++;
 	}
+
+	if (cards[i].postinit_hook)
+		cards[i].postinit_hook (dev, count == 0);
 
 	return count == 0 ? -ENODEV : 0;
 }

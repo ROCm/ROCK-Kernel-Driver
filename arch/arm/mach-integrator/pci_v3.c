@@ -38,8 +38,6 @@
 
 #include <asm/hardware/pci_v3.h>
 
-int setup_arm_irq(int irq, struct irqaction * new);
-
 /*
  * The V3 PCI interface chip in Integrator provides several windows from
  * local bus memory into the PCI memory areas.   Unfortunately, there
@@ -414,12 +412,19 @@ static struct resource pre_mem = {
 	flags:	IORESOURCE_MEM | IORESOURCE_PREFETCH,
 };
 
-static void __init pci_v3_setup_resources(struct resource **resource)
+static int __init pci_v3_setup_resources(struct resource **resource)
 {
-	if (request_resource(&iomem_resource, &non_mem))
-		printk("PCI: unable to allocate non-prefetchable memory region\n");
-	if (request_resource(&iomem_resource, &pre_mem))
-		printk("PCI: unable to allocate prefetchable memory region\n");
+	if (request_resource(&iomem_resource, &non_mem)) {
+		printk(KERN_ERR "PCI: unable to allocate non-prefetchable "
+		       "memory region\n");
+		return -EBUSY;
+	}
+	if (request_resource(&iomem_resource, &pre_mem)) {
+		release_resource(&non_mem);
+		printk(KERN_ERR "PCI: unable to allocate prefetchable "
+		       "memory region\n");
+		return -EBUSY;
+	}
 
 	/*
 	 * bus->resource[0] is the IO resource for this bus
@@ -429,6 +434,8 @@ static void __init pci_v3_setup_resources(struct resource **resource)
 	resource[0] = &ioport_resource;
 	resource[1] = &non_mem;
 	resource[2] = &pre_mem;
+
+	return 0;
 }
 
 /*
@@ -444,13 +451,15 @@ static int v3_fault(unsigned long addr, struct pt_regs *regs)
 {
 	unsigned long pc = instruction_pointer(regs);
 	unsigned long instr = *(unsigned long *)pc;
-//	char buf[128];
+#if 0
+	char buf[128];
 
-//	sprintf(buf, "V3 fault: address=0x%08lx, pc=0x%08lx [%08lx] LBFADDR=%08x LBFCODE=%02x ISTAT=%02x\n",
-//		addr, pc, instr, __raw_readl(SC_LBFADDR), __raw_readl(SC_LBFCODE) & 255,
-//		v3_readb(V3_LB_ISTAT));
-//	printk("%s", buf);
-//	printascii(buf);
+	sprintf(buf, "V3 fault: address=0x%08lx, pc=0x%08lx [%08lx] LBFADDR=%08x LBFCODE=%02x ISTAT=%02x\n",
+		addr, pc, instr, __raw_readl(SC_LBFADDR), __raw_readl(SC_LBFCODE) & 255,
+		v3_readb(V3_LB_ISTAT));
+	printk(KERN_DEBUG "%s", buf);
+	printascii(buf);
+#endif
 
 	v3_writeb(V3_LB_ISTAT, 0);
 	__raw_writel(3, SC_PCI);
@@ -514,28 +523,21 @@ static void v3_irq(int irq, void *devid, struct pt_regs *regs)
 #endif
 }
 
-static struct irqaction v3_int = {
-	name: "V3",
-	handler: v3_irq,
-};
-
-static struct irqaction v3_int2 = {
-	name: "V3TM",
-	handler: v3_irq,
-};
-
 extern int (*external_fault)(unsigned long addr, struct pt_regs *regs);
 
-int pci_v3_setup(int nr, struct pci_sys_data *sys)
+int __init pci_v3_setup(int nr, struct pci_sys_data *sys)
 {
-	if (nr)
-		pci_v3_setup_resources(sys->resource);
-	return nr ? 0 : 1;
+	int ret = 0;
+
+	if (nr == 0)
+		ret = pci_v3_setup_resources(sys->resource);
+
+	return ret;
 }
 
 struct pci_bus *pci_v3_scan_bus(int nr, struct pci_sys_data *sys)
 {
-	return 	pci_scan_bus(sys->busnr, &pci_v3_ops, sys);
+	return pci_scan_bus(sys->busnr, &pci_v3_ops, sys);
 }
 
 /*
@@ -546,6 +548,7 @@ void __init pci_v3_preinit(void)
 {
 	unsigned long flags;
 	unsigned int temp;
+	int ret;
 
 	/*
 	 * Hook in our fault handler for PCI errors
@@ -593,7 +596,7 @@ void __init pci_v3_preinit(void)
 	temp |= V3_PCI_CFG_M_IO_REG_DIS | V3_PCI_CFG_M_IO_DIS;
 	v3_writew(V3_PCI_CFG, temp);
 
-	printk("FIFO_CFG: %04x  FIFO_PRIO: %04x\n",
+	printk(KERN_DEBUG "FIFO_CFG: %04x  FIFO_PRIO: %04x\n",
 		v3_readw(V3_FIFO_CFG), v3_readw(V3_FIFO_PRIORITY));
 
 	/*
@@ -620,7 +623,10 @@ void __init pci_v3_preinit(void)
 	/*
 	 * Grab the PCI error interrupt.
 	 */
-	setup_arm_irq(IRQ_V3INT, &v3_int);
+	ret = request_irq(IRQ_V3INT, v3_irq, 0, "V3", NULL);
+	if (ret)
+		printk(KERN_ERR "PCI: unable to grab PCI error "
+		       "interrupt: %d\n", ret);
 
 	spin_unlock_irqrestore(&v3_lock, flags);
 }
@@ -628,6 +634,7 @@ void __init pci_v3_preinit(void)
 void __init pci_v3_postinit(void)
 {
 	unsigned int pci_cmd;
+	int ret;
 
 	pci_cmd = PCI_COMMAND_MEMORY |
 		  PCI_COMMAND_MASTER | PCI_COMMAND_INVALIDATE;
@@ -637,5 +644,10 @@ void __init pci_v3_postinit(void)
 	v3_writeb(V3_LB_ISTAT, ~0x40);
 	v3_writeb(V3_LB_IMASK, 0x68);
 
-//	setup_arm_irq(IRQ_LBUSTIMEOUT, &v3_int2);
+#if 0
+	ret = request_irq(IRQ_LBUSTIMEOUT, lb_timeout, 0, "bus timeout", NULL);
+	if (ret)
+		printk(KERN_ERR "PCI: unable to grab local bus timeout "
+		       "interrupt: %d\n", ret);
+#endif
 }

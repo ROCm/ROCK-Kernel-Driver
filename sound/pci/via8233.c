@@ -877,7 +877,7 @@ static int __init alsa_card_via8233_init(void)
 
 	if ((err = pci_module_init(&driver)) < 0) {
 #ifdef MODULE
-		snd_printk("VIA 8233 soundcard not found or device busy\n");
+		printk(KERN_ERR "VIA 8233 soundcard not found or device busy\n");
 #endif
 		return err;
 	}

@@ -516,6 +516,19 @@ CONFIG_FB_VOODOO1
   Please read the file Documentation/fb/README-sstfb.txt for supported
   options and other important info  support.
 
+CONFIG_FB_TRIDENT
+  This driver is supposed to support graphics boards with the
+  Trident CyberXXXX/Image/CyberBlade chips mostly found in laptops
+  but also on some motherboards. For more information, read
+  <file:Documentation/fb/tridentfb.txt>
+
+  Say Y if you have such a graphics board.
+
+  The driver is also available as a module ( = code which can be
+  inserted and removed from the running kernel whenever you want). The
+  module will be called rivafb.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
 CONFIG_FB_SBUS
   Say Y if you want support for SBUS or UPA based frame buffer device.
 

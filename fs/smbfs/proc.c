@@ -245,15 +245,20 @@ static int smb_build_path(struct smb_sb_info *server, char * buf, int maxlen,
 	 * Build the path string walking the tree backward from end to ROOT
 	 * and store it in reversed order [see reverse_string()]
 	 */
+	read_lock(&dparent_lock);
 	while (!IS_ROOT(entry)) {
-		if (maxlen < 3)
+		if (maxlen < 3) {
+			read_unlock(&dparent_lock);
 			return -ENAMETOOLONG;
+		}
 
 		len = server->convert(path, maxlen-2, 
 				      entry->d_name.name, entry->d_name.len,
 				      server->local_nls, server->remote_nls);
-		if (len < 0)
+		if (len < 0) {
+			read_unlock(&dparent_lock);
 			return len;
+		}
 		reverse_string(path, len);
 		path += len;
 		*path++ = '\\';
@@ -263,6 +268,7 @@ static int smb_build_path(struct smb_sb_info *server, char * buf, int maxlen,
 		if (IS_ROOT(entry))
 			break;
 	}
+	read_unlock(&dparent_lock);
 	reverse_string(buf, path-buf);
 
 	/* maxlen is at least 1 */

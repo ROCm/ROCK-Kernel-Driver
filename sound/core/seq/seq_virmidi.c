@@ -431,7 +431,7 @@ static int snd_virmidi_dev_register(snd_rawmidi_t *rmidi)
 		/* should check presence of port more strictly.. */
 		break;
 	default:
-		snd_printk("seq_mode is not set: %d\n", rdev->seq_mode);
+		snd_printk(KERN_ERR "seq_mode is not set: %d\n", rdev->seq_mode);
 		return -EINVAL;
 	}
 	return 0;

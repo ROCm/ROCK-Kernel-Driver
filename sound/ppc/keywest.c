@@ -179,7 +179,7 @@ int snd_pmac_keywest_find(pmac_t *chip, pmac_keywest_t *i2c, int addr,
 	i2c_device = find_compatible_devices("i2c", "keywest");
 	
 	if (i2c_device == 0) {
-		snd_printk("No Keywest i2c devices found.\n");
+		printk(KERN_ERR "pmac: No Keywest i2c devices found.\n");
 		return -ENODEV;
 	}
 	

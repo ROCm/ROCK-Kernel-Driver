@@ -33,13 +33,13 @@ static inline void inode_dir_notify(struct inode *inode, unsigned long event)
 static inline void dnotify_parent(struct dentry *dentry, unsigned long event)
 {
 	struct dentry *parent;
-	spin_lock(&dcache_lock);
+	read_lock(&dparent_lock);
 	parent = dentry->d_parent;
 	if (parent->d_inode->i_dnotify_mask & event) {
 		dget(parent);
-		spin_unlock(&dcache_lock);
+		read_unlock(&dparent_lock);
 		__inode_dir_notify(parent->d_inode, event);
 		dput(parent);
 	} else
-		spin_unlock(&dcache_lock);
+		read_unlock(&dparent_lock);
 }

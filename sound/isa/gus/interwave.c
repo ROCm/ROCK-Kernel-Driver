@@ -948,7 +948,7 @@ static int __init alsa_card_interwave_init(void)
 			continue;
 		}
 #ifdef MODULE
-		snd_printk("InterWave soundcard #%i not found at 0x%lx or device busy\n", dev, snd_port[dev]);
+		printk(KERN_ERR "InterWave soundcard #%i not found at 0x%lx or device busy\n", dev, snd_port[dev]);
 #endif
 	}
 	/* legacy auto configured cards */
@@ -960,7 +960,7 @@ static int __init alsa_card_interwave_init(void)
 
 	if (!cards) {
 #ifdef MODULE
-		snd_printk("InterWave soundcard not found or device busy\n");
+		printk(KERN_ERR "InterWave soundcard not found or device busy\n");
 #endif
 		return -ENODEV;
 	}

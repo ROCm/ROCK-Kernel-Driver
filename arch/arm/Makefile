@@ -134,6 +134,10 @@ TEXTADDR	 = 0xc0028000
 MACHINE		 = clps711x
 endif
 
+ifeq ($(CONFIG_ARCH_FORTUNET),y)
+TEXTADDR	 = 0xc0008000
+endif
+
 ifeq ($(CONFIG_ARCH_ANAKIN),y)
 MACHINE		 = anakin
 endif
@@ -215,6 +219,7 @@ CLEAN_FILES	+= \
 	arch/arm/vmlinux.lds
 
 MRPROPER_FILES	+= \
+	arch/arm/tools/constants.h* \
 	include/asm-arm/arch \
 	include/asm-arm/proc \
 	include/asm-arm/constants.h* \

@@ -55,5 +55,5 @@ void __init time_init(void)
 	timer_irq.handler = timer_interrupt;
 	timer_irq.flags = SA_SHIRQ;
 
-	setup_arm_irq(IRQ_TIMER, &timer_irq);
+	setup_irq(IRQ_TIMER, &timer_irq);
 }

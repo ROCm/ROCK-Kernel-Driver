@@ -17,7 +17,7 @@
  *	plug into this. The fact they dont all go via OSS doesn't mean 
  *	they don't have to implement the OSS API. There is a lot of logic
  *	to keeping much of the OSS weight out of the code in a compatibility
- *	module, but its up to the driver to rember to load it...
+ *	module, but it's up to the driver to rember to load it...
  *
  *	The code provides a set of functions for registration of devices
  *	by type. This is done rather than providing a single call so that
@@ -171,10 +171,10 @@ static int sound_insert_unit(struct sound_unit **list, struct file_operations *f
 		return r;
 	}
 	
-	if (r == low)
+	if (r < SOUND_STEP)
 		sprintf (name_buf, "%s", name);
 	else
-		sprintf (name_buf, "%s%d", name, (r - low) / SOUND_STEP);
+		sprintf (name_buf, "%s%d", name, r / SOUND_STEP);
 	s->de = devfs_register (devfs_handle, name_buf,
 				DEVFS_FL_NONE, SOUND_MAJOR, s->unit_minor,
 				S_IFCHR | mode, fops, NULL);
@@ -215,7 +215,7 @@ static void sound_remove_unit(struct sound_unit **list, int unit)
  *	15	*16		unused
  */
 
-static struct sound_unit *chains[16];
+static struct sound_unit *chains[SOUND_STEP];
 
 /**
  *	register_sound_special - register a special sound node
@@ -229,17 +229,22 @@ static struct sound_unit *chains[16];
  
 int register_sound_special(struct file_operations *fops, int unit)
 {
-	char *name;
+	const int chain = unit % (SOUND_STEP-1);
+	int max_unit = 128 + chain;
+	const char *name;
+	char _name[16];
 
-	switch (unit) {
+	switch (chain) {
 	    case 0:
 		name = "mixer";
 		break;
 	    case 1:
 		name = "sequencer";
-		break;
+		if (unit >= SOUND_STEP)
+			goto __unknown;
+		max_unit = unit + 1;
 	    case 2:
-		name = "midi00";
+		name = "midi";
 		break;
 	    case 3:
 		name = "dsp";
@@ -247,26 +252,17 @@ int register_sound_special(struct file_operations *fops, int unit)
 	    case 4:
 		name = "audio";
 		break;
-	    case 5:
-		name = "unknown5";
-		break;
-	    case 6:		/* Was once sndstat */
-		name = "unknown6";
-		break;
-	    case 7:
-		name = "unknown7";
-		break;
 	    case 8:
 		name = "sequencer2";
+		if (unit >= SOUND_STEP)
+			goto __unknown;
+		max_unit = unit + 1;
 		break;
 	    case 9:
 		name = "dmmidi";
 		break;
 	    case 10:
 		name = "dmfm";
-		break;
-	    case 11:
-		name = "unknown11";
 		break;
 	    case 12:
 		name = "adsp";
@@ -278,10 +274,16 @@ int register_sound_special(struct file_operations *fops, int unit)
 		name = "admmidi";
 		break;
 	    default:
-		name = "unknown";
+	    	{
+		    __unknown:
+			sprintf(_name, "unknown%d", chain);
+		    	if (unit >= SOUND_STEP)
+		    		strcat(_name, "-");
+		    	name = _name;
+		}
 		break;
 	}
-	return sound_insert_unit(&chains[unit&15], fops, -1, unit, unit+1,
+	return sound_insert_unit(&chains[chain], fops, -1, unit, max_unit,
 				 name, S_IRUSR | S_IWUSR);
 }
  

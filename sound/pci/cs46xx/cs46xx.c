@@ -183,7 +183,7 @@ static int __init alsa_card_cs46xx_init(void)
 
 	if ((err = pci_module_init(&driver)) < 0) {
 #ifdef MODULE
-		snd_printk("Sound Fusion CS46xx soundcard not found or device busy\n");
+		printk(KERN_ERR "Sound Fusion CS46xx soundcard not found or device busy\n");
 #endif
 		return err;
 	}

@@ -207,8 +207,6 @@ static int  belkin_sa_open (struct usb_serial_port *port, struct file *filp)
 
 	dbg(__FUNCTION__" port %d", port->number);
 
-	down (&port->sem);
-	
 	++port->open_count;
 	
 	if (port->open_count == 1) {
@@ -230,8 +228,6 @@ static int  belkin_sa_open (struct usb_serial_port *port, struct file *filp)
 	}
 	
 exit:
-	up (&port->sem);
-
 	return retval;
 } /* belkin_sa_open */
 
@@ -249,8 +245,6 @@ static void belkin_sa_close (struct usb_serial_port *port, struct file *filp)
 
 	dbg(__FUNCTION__" port %d", port->number);
 
-	down (&port->sem);
-
 	--port->open_count;
 
 	if (port->open_count <= 0) {
@@ -262,8 +256,6 @@ static void belkin_sa_close (struct usb_serial_port *port, struct file *filp)
 		}
 		port->open_count = 0;
 	}
-	
-	up (&port->sem);
 } /* belkin_sa_close */
 
 

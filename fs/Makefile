@@ -1,7 +1,7 @@
 #
 # Makefile for the Linux filesystems.
 #
-# 14 Sep 2000, Christoph Hellwig <hch@caldera.de>
+# 14 Sep 2000, Christoph Hellwig <hch@infradead.org>
 # Rewritten to use lists instead of if-statements.
 # 
 
@@ -67,6 +67,7 @@ subdir-$(CONFIG_ADFS_FS)	+= adfs
 subdir-$(CONFIG_REISERFS_FS)	+= reiserfs
 subdir-$(CONFIG_DEVPTS_FS)	+= devpts
 subdir-$(CONFIG_SUN_OPENPROMFS)	+= openpromfs
+subdir-$(CONFIG_JFS_FS)		+= jfs
 
 
 obj-$(CONFIG_BINFMT_AOUT)	+= binfmt_aout.o

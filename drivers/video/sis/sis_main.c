@@ -2766,7 +2766,7 @@ sishw_ext.usExternalChip = 0;
 	sisfb_crtc_to_var (&default_var);
 
 	fb_info.changevar = NULL;
-	fb_info.node = -1;
+	fb_info.node = NODEV;
 	fb_info.fbops = &sisfb_ops;
 	fb_info.disp = &disp;
 	fb_info.switch_con = &sisfb_switch;
