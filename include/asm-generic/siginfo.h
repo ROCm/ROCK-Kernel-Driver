@@ -275,7 +275,7 @@ static inline void copy_siginfo(struct siginfo *to, struct siginfo *from)
 
 #endif
 
-extern int copy_siginfo_to_user(struct siginfo *to, struct siginfo *from);
+extern int copy_siginfo_to_user(struct siginfo __user *to, struct siginfo *from);
 
 #endif /* __KERNEL__ */
 
