@@ -327,7 +327,7 @@ static ide_startstop_t task_mulout_intr(struct ata_device *drive, struct request
 			 * last transfer.
 			 */
 			ata_write(drive, buf, nsect * SECTOR_WORDS);
-			bio_kunmap_irq(buffer, &flags);
+			bio_kunmap_irq(buf, &flags);
 		} while (mcount);
 
 		rq->errors = 0;

@@ -819,34 +819,34 @@ icn_loadboot(u_char * buffer, icn_card * card)
 #endif
 	if (!(codebuf = kmalloc(ICN_CODE_STAGE1, GFP_KERNEL))) {
 		printk(KERN_WARNING "icn: Could not allocate code buffer\n");
-		return -ENOMEM;
+		ret = -ENOMEM;
+		goto out;
 	}
 	if (copy_from_user(codebuf, buffer, ICN_CODE_STAGE1)) {
-		kfree(codebuf);
-		return -EFAULT;
+		ret = -EFAULT;
+		goto out_kfree;
 	}
 	if (!card->rvalid) {
-		if (check_region(card->port, ICN_PORTLEN)) {
+		if (!request_region(card->port, ICN_PORTLEN, card->regname)) {
 			printk(KERN_WARNING
 			       "icn: (%s) ports 0x%03x-0x%03x in use.\n",
 			       CID,
 			       card->port,
 			       card->port + ICN_PORTLEN);
-			kfree(codebuf);
-			return -EBUSY;
+			ret = -EBUSY;
+			goto out_kfree;
 		}
-		request_region(card->port, ICN_PORTLEN, card->regname);
 		card->rvalid = 1;
 		if (card->doubleS0)
 			card->other->rvalid = 1;
 	}
 	if (!dev.mvalid) {
-		if (check_mem_region(dev.memaddr, 0x4000)) {
+		if (!request_mem_region(dev.memaddr, 0x4000, "icn-isdn (all cards)")) {
 			printk(KERN_WARNING
 			       "icn: memory at 0x%08lx in use.\n", dev.memaddr);
-			return -EBUSY;
+			ret = -EBUSY;
+			goto out_kfree;
 		}
-		request_mem_region(dev.memaddr, 0x4000, "icn-isdn (all cards)");
 		dev.shmem = ioremap(dev.memaddr, 0x4000);
 		dev.mvalid = 1;
 	}
@@ -888,13 +888,15 @@ icn_loadboot(u_char * buffer, icn_card * card)
 		printk(KERN_DEBUG "Bootloader transferred\n");
 #endif
 	}
-	kfree(codebuf);
 	SLEEP(1);
 	OUTB_P(0xff, ICN_RUN);  /* Start Boot-Code */
-	if ((ret = icn_check_loader(card->doubleS0 ? 2 : 1)))
-		return ret;
-	if (!card->doubleS0)
-		return 0;
+	if ((ret = icn_check_loader(card->doubleS0 ? 2 : 1))) {
+		goto out_kfree;
+	}
+	if (!card->doubleS0) {
+		ret = 0;
+		goto out_kfree;
+	}
 	/* reached only, if we have a Double-S0-Card */
 #ifdef BOOT_DEBUG
 	printk(KERN_DEBUG "Map Bank 0\n");
@@ -905,7 +907,12 @@ icn_loadboot(u_char * buffer, icn_card * card)
 	icn_lock_channel(card, 0);	/* Lock Bank 0     */
 	restore_flags(flags);
 	SLEEP(1);
-	return (icn_check_loader(1));
+	ret = (icn_check_loader(1));
+
+ out_kfree:
+	kfree(codebuf);
+ out:
+	return ret;
 }
 
 static int
