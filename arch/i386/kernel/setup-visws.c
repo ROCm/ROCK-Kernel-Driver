@@ -3,6 +3,8 @@
  *  Split out from setup.c by davej@suse.de
  */
 
+#include <linux/init.h>
+
 char visws_board_type = -1;
 char visws_board_rev = -1;
 

@@ -333,7 +333,7 @@ int ntfs_ucstonls(const ntfs_volume *vol, const uchar_t *ins,
 		}
 		if (!ns) {
 			ns_len = ins_len * NLS_MAX_CHARSET_SIZE;
-			ns = (unsigned char*)kmalloc(ns_len, GFP_NOFS);
+			ns = (unsigned char*)kmalloc(ns_len + 1, GFP_NOFS);
 			if (!ns)
 				goto mem_err_out;
 		}
@@ -352,7 +352,7 @@ retry:			wc = nls->uni2char(le16_to_cpu(ins[i]), ns + o,
 						~63, GFP_NOFS);
 				if (tc) {
 					memcpy(tc, ns, ns_len);
-					ns_len = (ns_len + 64) & ~63;
+					ns_len = ((ns_len + 64) & ~63) - 1;
 					kfree(ns);
 					ns = tc;
 					goto retry;

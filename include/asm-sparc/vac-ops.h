@@ -107,8 +107,6 @@ struct sun4c_vac_props {
 
 extern struct sun4c_vac_props sun4c_vacinfo;
 
-extern void sun4c_flush_all(void);
-
 /* sun4c_enable_vac() enables the sun4c virtual address cache. */
 extern __inline__ void sun4c_enable_vac(void)
 {

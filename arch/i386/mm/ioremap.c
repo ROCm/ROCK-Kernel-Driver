@@ -9,6 +9,7 @@
  */
 
 #include <linux/vmalloc.h>
+#include <linux/init.h>
 #include <asm/io.h>
 #include <asm/pgalloc.h>
 #include <asm/fixmap.h>

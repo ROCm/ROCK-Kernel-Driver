@@ -27,22 +27,29 @@ struct ed {
 	__u32			hwNextED;	/* next ED in list */
 
 	/* rest are purely for the driver's use */
-	struct ed		*ed_prev;  
-	__u8			int_period;
-	__u8			int_branch;
-	__u8			int_load; 
-	__u8			int_interval;
-	__u8			state;			// ED_{NEW,UNLINK,OPER}
+	dma_addr_t		dma;		/* addr of ED */
+	struct ed		*ed_prev;	/* for non-interrupt EDs */
+
+	u8			type; 		/* PIPE_{BULK,...} */
+	u8			interval;	/* interrupt, isochronous */
+	union {
+		struct intr_info {		/* interrupt */
+			u8	int_period;
+			u8	int_branch;
+			u8	int_load; 
+		};
+		u16		last_iso;	/* isochronous */
+	};
+
+	u8			state;		/* ED_{NEW,UNLINK,OPER} */
 #define ED_NEW 		0x00		/* unused, no dummy td */
 #define ED_UNLINK 	0x01		/* dummy td, maybe linked to hc */
 #define ED_OPER		0x02		/* dummy td, _is_ linked to hc */
 #define ED_URB_DEL  	0x08		/* for unlinking; masked in */
 
-	__u8			type; 
-	__u16			last_iso;
+	/* HC may see EDs on rm_list until next frame (frame_no == tick) */
+	u16			tick;
 	struct ed		*ed_rm_list;
-
-	dma_addr_t		dma;			/* addr of ED */
 } __attribute__ ((aligned(16)));
 
 #define ED_MASK	((u32)~0x0f)		/* strip hw status in low addr bits */
@@ -335,7 +342,7 @@ struct ohci_hcd {
 	struct ohci_hcca	*hcca;
 	dma_addr_t		hcca_dma;
 
-	struct ed		*ed_rm_list [2];	/* to be removed */
+	struct ed		*ed_rm_list;		/* to be removed */
 
 	struct ed		*ed_bulktail;		/* last in bulk list */
 	struct ed		*ed_controltail;	/* last in ctrl list */

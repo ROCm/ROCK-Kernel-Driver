@@ -114,12 +114,12 @@ endif
 
 export	SYSTEM ZTEXTADDR ZBSSADDR ZRELADDR INITRD_PHYS PARAMS_PHYS
 
-Image:	$(CONFIGURE) $(SYSTEM)
+Image:	$(SYSTEM)
 	$(OBJCOPY) -O binary -R .note -R .comment -S $(SYSTEM) $@
 
 bzImage: zImage
 
-zImage:	$(CONFIGURE) compressed/vmlinux
+zImage:	compressed/vmlinux
 	$(OBJCOPY) -O binary -R .note -R .comment -S compressed/vmlinux $@
 
 bootpImage: bootp/bootp
@@ -135,10 +135,10 @@ initrd:
 	@test "$(INITRD_PHYS)" != "" || (echo This architecture does not support INITRD; exit -1)
 	@test "$(INITRD)" != "" || (echo You must specify INITRD; exit -1)
 
-install: $(CONFIGURE) Image
+install: Image
 	sh ./install.sh $(VERSION).$(PATCHLEVEL).$(SUBLEVEL)$(EXTRAVERSION) Image $(TOPDIR)/System.map "$(INSTALL_PATH)"
 
-zinstall: $(CONFIGURE) zImage
+zinstall: zImage
 	sh ./install.sh $(VERSION).$(PATCHLEVEL).$(SUBLEVEL)$(EXTRAVERSION) zImage $(TOPDIR)/System.map "$(INSTALL_PATH)"
 
 clean:

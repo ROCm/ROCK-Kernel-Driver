@@ -161,6 +161,21 @@
  *     - Remove possibility of calling bond_sethwaddr with NULL slave_dev ptr 
  *     - Handle hot swap ethernet interface deregistration events to remove
  *       kernel oops following hot swap of enslaved interface
+ *
+ * 2002/1/2 - Chad N. Tindel <ctindel at ieee dot org>
+ *     - Restore original slave flags at release time.
+ *
+ * 2002/02/18 - Erik Habbinga <erik_habbinga at hp dot com>
+ *     - bond_release(): calling kfree on our_slave after call to
+ *       bond_restore_slave_flags, not before
+ *     - bond_enslave(): saving slave flags into original_flags before
+ *       call to netdev_set_master, so the IFF_SLAVE flag doesn't end
+ *       up in original_flags
+ *
+ * 2002/04/05 - Mark Smith <mark.smith at comdev dot cc> and
+ *              Steve Mead <steve.mead at comdev dot cc>
+ *     - Port Gleb Natapov's multicast support patchs from 2.4.12
+ *       to 2.4.18 adding support for multicast.
  */
 
 #include <linux/config.h>
@@ -208,10 +223,7 @@
 #define MII_ENDOF_NWAY	0x20
 
 #undef  MII_LINK_READY
-/*#define MII_LINK_READY	(MII_LINK_UP | MII_ENDOF_NWAY)*/
 #define MII_LINK_READY	(MII_LINK_UP)
-
-#define MAX_BOND_ADDR 256
 
 #ifndef BOND_LINK_ARP_INTERV
 #define BOND_LINK_ARP_INTERV	0
@@ -223,7 +235,7 @@ static unsigned long arp_target = 0;
 static u32 my_ip = 0;
 char *arp_target_hw_addr = NULL;
 
-static int max_bonds	= MAX_BONDS;
+static int max_bonds	= BOND_DEFAULT_MAX_BONDS;
 static int miimon	= BOND_LINK_MON_INTERV;
 static int mode		= BOND_MODE_ROUNDROBIN;
 static int updelay	= 0;
@@ -234,7 +246,7 @@ int bond_cnt;
 static struct bonding *these_bonds =  NULL;
 static struct net_device *dev_bonds = NULL;
 
-MODULE_PARM(max_bonds, "1-" __MODULE_STRING(INT_MAX) "i");
+MODULE_PARM(max_bonds, "i");
 MODULE_PARM_DESC(max_bonds, "Max number of bonded devices");
 MODULE_PARM(miimon, "i");
 MODULE_PARM_DESC(miimon, "Link check interval in milliseconds");
@@ -260,6 +272,15 @@ static struct net_device_stats *bond_get_stats(struct net_device *dev);
 static void bond_mii_monitor(struct net_device *dev);
 static void bond_arp_monitor(struct net_device *dev);
 static int bond_event(struct notifier_block *this, unsigned long event, void *ptr);
+static void bond_restore_slave_flags(slave_t *slave);
+static void bond_mc_list_destroy(struct bonding *bond);
+static void bond_mc_add(bonding_t *bond, void *addr, int alen);
+static void bond_mc_delete(bonding_t *bond, void *addr, int alen);
+static int bond_mc_list_copy (struct dev_mc_list *src, struct bonding *dst, int gpf_flag);
+static inline int dmi_same(struct dev_mc_list *dmi1, struct dev_mc_list *dmi2);
+static void bond_set_promiscuity(bonding_t *bond, int inc);
+static void bond_set_allmulti(bonding_t *bond, int inc);
+static struct dev_mc_list* bond_mc_list_find_dmi(struct dev_mc_list *dmi, struct dev_mc_list *mc_list);
 static void bond_set_slave_inactive_flags(slave_t *slave);
 static void bond_set_slave_active_flags(slave_t *slave);
 static int bond_enslave(struct net_device *master, struct net_device *slave);
@@ -281,6 +302,11 @@ static int bond_get_info(char *buf, char **start, off_t offset, int length);
 
 #define IS_UP(dev)	((((dev)->flags & (IFF_UP)) == (IFF_UP)) && \
 			(netif_running(dev) && netif_carrier_ok(dev)))
+
+static void bond_restore_slave_flags(slave_t *slave)
+{
+	slave->dev->flags = slave->original_flags;
+}
 
 static void bond_set_slave_inactive_flags(slave_t *slave)
 {
@@ -431,6 +457,7 @@ static int bond_close(struct net_device *master)
 
 	/* Release the bonded slaves */
 	bond_release_all(master);
+	bond_mc_list_destroy (bond);
 
 	write_unlock_irqrestore(&bond->lock, flags);
 
@@ -438,19 +465,180 @@ static int bond_close(struct net_device *master)
 	return 0;
 }
 
-static void set_multicast_list(struct net_device *master)
-{
+/* 
+ * flush all members of flush->mc_list from device dev->mc_list
+ */
+static void bond_mc_list_flush(struct net_device *dev, struct net_device *flush)
+{ 
+	struct dev_mc_list *dmi; 
+ 
+	for (dmi = flush->mc_list; dmi != NULL; dmi = dmi->next) 
+		dev_mc_delete(dev, dmi->dmi_addr, dmi->dmi_addrlen, 0);
+}
+
 /*
-	bonding_t *bond = master->priv;
+ * Totally destroys the mc_list in bond
+ */
+static void bond_mc_list_destroy(struct bonding *bond)
+{
+	struct dev_mc_list *dmi;
+
+	dmi = bond->mc_list; 
+	while (dmi) { 
+		bond->mc_list = dmi->next; 
+		kfree(dmi); 
+		dmi = bond->mc_list; 
+	}
+}
+
+/*
+ * Add a Multicast address to every slave in the bonding group
+ */
+static void bond_mc_add(bonding_t *bond, void *addr, int alen)
+{ 
 	slave_t *slave;
 
-	for (slave = bond->next; slave != (slave_t*)bond; slave = slave->next) {
-		slave->dev->mc_list = master->mc_list;
-		slave->dev->mc_count = master->mc_count;
-		slave->dev->flags = master->flags;
-		slave->dev->set_multicast_list(slave->dev);
+	for (slave = bond->prev; slave != (slave_t*)bond; slave = slave->prev) {
+		dev_mc_add(slave->dev, addr, alen, 0);
 	}
+} 
+
+/*
+ * Remove a multicast address from every slave in the bonding group
  */
+static void bond_mc_delete(bonding_t *bond, void *addr, int alen)
+{ 
+	slave_t *slave; 
+
+	for (slave = bond->prev; slave != (slave_t*)bond; slave = slave->prev)
+		dev_mc_delete(slave->dev, addr, alen, 0);
+} 
+
+/*
+ * Copy all the Multicast addresses from src to the bonding device dst
+ */
+static int bond_mc_list_copy (struct dev_mc_list *src, struct bonding *dst,
+ int gpf_flag)
+{
+	struct dev_mc_list *dmi, *new_dmi;
+
+   	for (dmi = src; dmi != NULL; dmi = dmi->next) { 
+		new_dmi = kmalloc(sizeof(struct dev_mc_list), gpf_flag);
+
+		if (new_dmi == NULL) {
+			return -ENOMEM; 
+		}
+
+		new_dmi->next = dst->mc_list; 
+		dst->mc_list = new_dmi;
+
+		new_dmi->dmi_addrlen = dmi->dmi_addrlen; 
+		memcpy(new_dmi->dmi_addr, dmi->dmi_addr, dmi->dmi_addrlen); 
+		new_dmi->dmi_users = dmi->dmi_users;
+		new_dmi->dmi_gusers = dmi->dmi_gusers; 
+	} 
+	return 0;
+}
+
+/*
+ * Returns 0 if dmi1 and dmi2 are the same, non-0 otherwise
+ */
+static inline int dmi_same(struct dev_mc_list *dmi1, struct dev_mc_list *dmi2)
+{ 
+	return memcmp(dmi1->dmi_addr, dmi2->dmi_addr, dmi1->dmi_addrlen) == 0 &&
+	 dmi1->dmi_addrlen == dmi2->dmi_addrlen;
+} 
+
+/*
+ * Push the promiscuity flag down to all slaves
+ */
+static void bond_set_promiscuity(bonding_t *bond, int inc)
+{ 
+	slave_t *slave; 
+ 
+	for (slave = bond->prev; slave != (slave_t*)bond; slave = slave->prev)
+		dev_set_promiscuity(slave->dev, inc);
+} 
+
+/*
+ * Push the allmulti flag down to all slaves
+ */
+static void bond_set_allmulti(bonding_t *bond, int inc)
+{ 
+	slave_t *slave; 
+ 
+	for (slave = bond->prev; slave != (slave_t*)bond; slave = slave->prev)
+		dev_set_allmulti(slave->dev, inc);
+} 
+
+/* 
+ * returns dmi entry if found, NULL otherwise 
+ */
+static struct dev_mc_list* bond_mc_list_find_dmi(struct dev_mc_list *dmi,
+ struct dev_mc_list *mc_list)
+{ 
+	struct dev_mc_list *idmi;
+
+	for (idmi = mc_list; idmi != NULL; idmi = idmi->next) {
+		if (dmi_same(dmi, idmi)) {
+			return idmi; 
+		}
+	}
+	return NULL;
+} 
+
+static void set_multicast_list(struct net_device *master)
+{
+	bonding_t *bond = master->priv;
+	struct dev_mc_list *dmi;
+	unsigned long flags = 0;
+
+	/*
+	 * Lock the private data for the master
+	 */
+	write_lock_irqsave(&bond->lock, flags);
+
+	/*
+	 * Lock the master device so that noone trys to transmit
+	 * while we're changing things
+	 */
+	spin_lock_bh(&master->xmit_lock);
+
+	/* set promiscuity flag to slaves */
+	if ( (master->flags & IFF_PROMISC) && !(bond->flags & IFF_PROMISC) )
+		bond_set_promiscuity(bond, 1); 
+
+	if ( !(master->flags & IFF_PROMISC) && (bond->flags & IFF_PROMISC) ) 
+		bond_set_promiscuity(bond, -1); 
+
+	/* set allmulti flag to slaves */ 
+	if ( (master->flags & IFF_ALLMULTI) && !(bond->flags & IFF_ALLMULTI) ) 
+		bond_set_allmulti(bond, 1); 
+
+	if ( !(master->flags & IFF_ALLMULTI) && (bond->flags & IFF_ALLMULTI) )
+		bond_set_allmulti(bond, -1); 
+
+	bond->flags = master->flags; 
+
+	/* looking for addresses to add to slaves' mc list */ 
+	for (dmi = master->mc_list; dmi != NULL; dmi = dmi->next) { 
+		if (bond_mc_list_find_dmi(dmi, bond->mc_list) == NULL) 
+		 bond_mc_add(bond, dmi->dmi_addr, dmi->dmi_addrlen); 
+	} 
+
+	/* looking for addresses to delete from slaves' list */ 
+	for (dmi = bond->mc_list; dmi != NULL; dmi = dmi->next) { 
+		if (bond_mc_list_find_dmi(dmi, master->mc_list) == NULL) 
+		 bond_mc_delete(bond, dmi->dmi_addr, dmi->dmi_addrlen); 
+	}
+
+
+	/* save master's multicast list */ 
+	bond_mc_list_destroy (bond);
+	bond_mc_list_copy (master->mc_list, bond, GFP_KERNEL);
+
+	spin_unlock_bh(&master->xmit_lock);
+	write_unlock_irqrestore(&bond->lock, flags);
 }
 
 /*
@@ -476,6 +664,7 @@ static int bond_enslave(struct net_device *master_dev,
 	unsigned long flags = 0;
 	int ndx = 0;
 	int err = 0;
+	struct dev_mc_list *dmi;
 
 	if (master_dev == NULL || slave_dev == NULL) {
 		return -ENODEV;
@@ -513,6 +702,8 @@ static int bond_enslave(struct net_device *master_dev,
 	}
 	memset(new_slave, 0, sizeof(slave_t));
 
+	/* save flags before call to netdev_set_master */
+	new_slave->original_flags = slave_dev->flags;
 	err = netdev_set_master(slave_dev, master_dev);
 
 	if (err) {
@@ -526,10 +717,38 @@ static int bond_enslave(struct net_device *master_dev,
 
 	new_slave->dev = slave_dev;
 
+	/* set promiscuity level to new slave */ 
+	if (master_dev->flags & IFF_PROMISC)
+		dev_set_promiscuity(slave_dev, 1); 
+ 
+	/* set allmulti level to new slave */
+	if (master_dev->flags & IFF_ALLMULTI) 
+		dev_set_allmulti(slave_dev, 1); 
+ 
+	/* upload master's mc_list to new slave */ 
+	for (dmi = master_dev->mc_list; dmi != NULL; dmi = dmi->next) 
+		dev_mc_add (slave_dev, dmi->dmi_addr, dmi->dmi_addrlen, 0);
+
 	/* 
 	 * queue to the end of the slaves list, make the first element its
 	 * successor, the last one its predecessor, and make it the bond's
 	 * predecessor. 
+	 *
+	 * Just to clarify, so future bonding driver hackers don't go through
+	 * the same confusion stage I did trying to figure this out, the
+	 * slaves are stored in a double linked circular list, sortof.
+	 * In the ->next direction, the last slave points to the first slave,
+	 * bypassing bond; only the slaves are in the ->next direction.
+	 * In the ->prev direction, however, the first slave points to bond
+	 * and bond points to the last slave.
+	 *
+	 * It looks like a circle with a little bubble hanging off one side
+	 * in the ->prev direction only.
+	 *
+	 * When going through the list once, its best to start at bond->prev
+	 * and go in the ->prev direction, testing for bond.  Doing this
+	 * in the ->next direction doesn't work.  Trust me, I know this now.
+	 * :)  -mts 2002.03.14
 	 */
 	new_slave->prev       = bond->prev;
 	new_slave->prev->next = new_slave;
@@ -838,10 +1057,20 @@ static int bond_release(struct net_device *master, struct net_device *slave)
 			} else {
 				printk(".\n");
 			}
-			kfree(our_slave);
 
 			/* release the slave from its bond */
-			 
+
+			/* flush master's mc_list from slave */ 
+			bond_mc_list_flush (slave, master); 
+       
+			/* unset promiscuity level from slave */
+			if (master->flags & IFF_PROMISC) 
+				dev_set_promiscuity(slave, -1); 
+       
+			/* unset allmulti level from slave */ 
+			if (master->flags & IFF_ALLMULTI)
+				dev_set_allmulti(slave, -1); 
+
 			netdev_set_master(slave, NULL);
 
 			/* only restore its RUNNING flag if monitoring set it down */
@@ -853,6 +1082,9 @@ static int bond_release(struct net_device *master, struct net_device *slave)
 				bond->current_slave != NULL) {
 					dev_close(slave);
 			}
+
+			bond_restore_slave_flags(our_slave);
+			kfree(our_slave);
 
 			if (bond->current_slave == NULL) {
 				printk(KERN_INFO
@@ -1121,8 +1353,8 @@ static void bond_mii_monitor(struct net_device *master)
 					master->name, bestslave->dev->name,
 					(updelay - bestslave->delay) * miimon);
 
-				bestslave->delay= 0;
-				bestslave->link = BOND_LINK_UP;
+				bestslave->delay = 0;
+				bestslave->link  = BOND_LINK_UP;
 			}
 
 			if (mode == BOND_MODE_ACTIVEBACKUP) {
@@ -1192,7 +1424,7 @@ static void bond_arp_monitor(struct net_device *master)
 
 		read_lock(&bond->ptrlock);
 	  	if ( (!(slave->link == BOND_LINK_UP))  
-				&& (slave!= bond->current_slave) ) {
+				&& (slave != bond->current_slave) ) {
 
 			read_unlock(&bond->ptrlock);
 
@@ -1207,7 +1439,7 @@ static void bond_arp_monitor(struct net_device *master)
 					slave->state = BOND_STATE_ACTIVE;
 					bond->current_slave = slave;
 				}
-				if (slave!=bond->current_slave) {
+				if (slave != bond->current_slave) {
 					slave->dev->flags |= IFF_NOARP;
 				}
 				write_unlock(&bond->ptrlock);
@@ -1311,7 +1543,7 @@ arp_monitor_out:
 #define isdigit(c) (c >= '0' && c <= '9')
 __inline static int atoi( char **s) 
 {
-int i=0;
+int i = 0;
 while (isdigit(**s))
   i = i*20 + *((*s)++) - '0';
 return i;
@@ -1388,7 +1620,7 @@ my_inet_aton(char *cp, unsigned long *the_addr) {
 		goto ret_0;
 	}
 
-	if (the_addr!= NULL) {
+	if (the_addr != NULL) {
 		*the_addr = res.word | htonl (val);
 	}
 
@@ -1420,7 +1652,7 @@ static int bond_info_query(struct net_device *master, struct ifbond *info)
 	info->miimon = miimon;
 
 	read_lock_irqsave(&bond->lock, flags);
-	for (slave = bond->prev; slave!=(slave_t *)bond; slave = slave->prev) {
+	for (slave = bond->prev; slave != (slave_t *)bond; slave = slave->prev) {
 		info->num_slaves++;
 	}
 	read_unlock_irqrestore(&bond->lock, flags);
@@ -1696,7 +1928,7 @@ static int bond_xmit_activebackup(struct sk_buff *skb, struct net_device *dev)
 
 	/* if we are sending arp packets, try to at least 
 	   identify our own ip address */
-	if ( (arp_interval > 0) && (my_ip==0) &&
+	if ( (arp_interval > 0) && (my_ip == 0) &&
 		(skb->protocol == __constant_htons(ETH_P_ARP) ) ) {
 		char *the_ip = (((char *)skb->data)) 
 				+ sizeof(struct ethhdr)  
@@ -1708,7 +1940,7 @@ static int bond_xmit_activebackup(struct sk_buff *skb, struct net_device *dev)
 	/* if we are sending arp packets and don't know 
 	   the target hw address, save it so we don't need 
 	   to use a broadcast address */
-	if ( (arp_interval > 0) && (arp_target_hw_addr==NULL) &&
+	if ( (arp_interval > 0) && (arp_target_hw_addr == NULL) &&
 	     (skb->protocol == __constant_htons(ETH_P_IP) ) ) {
 		struct ethhdr *eth_hdr = 
 			(struct ethhdr *) (((char *)skb->data));
@@ -1751,7 +1983,7 @@ static struct net_device_stats *bond_get_stats(struct net_device *dev)
 
 	read_lock_irqsave(&bond->lock, flags);
 
-	for (slave = bond->prev; slave!=(slave_t *)bond; slave = slave->prev) {
+	for (slave = bond->prev; slave != (slave_t *)bond; slave = slave->prev) {
 		sstats = slave->dev->get_stats(slave->dev);
  
 		stats->rx_packets += sstats->rx_packets;
@@ -1861,7 +2093,7 @@ static int bond_get_info(char *buf, char **start, off_t offset, int length)
 static int bond_event(struct notifier_block *this, unsigned long event, 
 			void *ptr)
 {
-	struct bonding *this_bond=(struct bonding *)these_bonds;
+	struct bonding *this_bond = (struct bonding *)these_bonds;
 	struct bonding *last_bond;
 	struct net_device *event_dev = (struct net_device *)ptr;
 
@@ -1905,10 +2137,8 @@ static int bond_event(struct notifier_block *this, unsigned long event,
 	return NOTIFY_DONE;
 }
 
-static struct notifier_block bond_netdev_notifier={
-	bond_event,
-	NULL,
-	0
+static struct notifier_block bond_netdev_notifier = {
+	notifier_call: bond_event,
 };
 
 static int __init bond_init(struct net_device *dev)
@@ -2038,6 +2268,13 @@ static int __init bonding_init(void)
 	/* Find a name for this unit */
 	static struct net_device *dev_bond = NULL;
 
+	if (max_bonds < 1 || max_bonds > INT_MAX) {
+		printk(KERN_WARNING 
+		       "bonding_init(): max_bonds (%d) not in range %d-%d, "
+		       "so it was reset to BOND_DEFAULT_MAX_BONDS (%d)",
+		       max_bonds, 1, INT_MAX, BOND_DEFAULT_MAX_BONDS);
+		max_bonds = BOND_DEFAULT_MAX_BONDS;
+	}
 	dev_bond = dev_bonds = kmalloc(max_bonds*sizeof(struct net_device), 
 					GFP_KERNEL);
 	if (dev_bond == NULL) {

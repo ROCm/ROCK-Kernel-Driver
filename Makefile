@@ -37,6 +37,56 @@ HOSTCFLAGS	= -Wall -Wstrict-prototypes -O2 -fomit-frame-pointer
 
 CROSS_COMPILE 	=
 
+# 	That's our default target when none is given on the command line
+
+all:	vmlinux
+
+#	Print entire command lines instead of short version
+#	For now, leave the default
+
+ifndef KBUILD_VERBOSE
+  KBUILD_VERBOSE = 1
+endif
+
+# 	Decide whether to build built-in, modular, or both
+
+KBUILD_MODULES := 1
+KBUILD_BUILTIN := 1
+
+export KBUILD_MODULES KBUILD_BUILTIN
+
+# Beautify output
+# ---------------------------------------------------------------------------
+#
+# Normally, we echo the whole command before executing it. By making
+# that echo $($(quiet)$(cmd)), we now have the possibility to set
+# $(quiet) to choose other forms of output instead, e.g.
+#
+#         quiet_cmd_cc_o_c = Compiling $(RELDIR)/$@
+#         cmd_cc_o_c       = $(CC) $(c_flags) -c -o $@ $<
+#
+# If $(quiet) is empty, the whole command will be printed.
+# If it is set to "quiet_", only the short version will be printed. 
+# If it is set to "silent_", nothing wil be printed at all, since
+# the variable $(silent_cmd_cc_o_c) doesn't exist.
+
+#	If the user wants quiet mode, echo short versions of the commands 
+#	only and suppress the 'Entering/Leaving directory' messages
+
+ifneq ($(KBUILD_VERBOSE),1)
+  quiet=quiet_
+  MAKEFLAGS += --no-print-directory
+endif
+
+#	If the user is running make -s (silent mode), suppress echoing of
+#	commands
+
+ifneq ($(findstring s,$(MAKEFLAGS)),)
+  quiet=silent_
+endif
+
+export quiet
+
 #
 # Include the make variables (CC, etc...)
 #
@@ -69,20 +119,31 @@ export CPPFLAGS EXPORT_FLAGS
 export CFLAGS CFLAGS_KERNEL CFLAGS_MODULE 
 export AFLAGS AFLAGS_KERNEL AFLAGS_MODULE
 
-all:	do-it-all
+noconfig_targets := oldconfig xconfig menuconfig config clean mrproper \
+		    distclean
 
-#
-# Make "config" the default target if there is no configuration file or
-# "depend" the target if there is no top-level dependency information.
-#
+ifeq ($(filter $(noconfig_targets),$(MAKECMDGOALS)),)
 
-ifeq (.config,$(wildcard .config))
-include .config
-do-it-all:	vmlinux
-else
-CONFIGURATION = config
-do-it-all:	config
-endif
+# Here goes the main Makefile
+# ===========================================================================
+#
+# If the user gave a *config target, it'll be handled in another
+# section below, since in this case we cannot include .config
+# Same goes for other targets like clean/mrproper etc, which
+# don't need .config, either
+
+#	In this section, we need .config
+
+-include .config
+
+#	If .config doesn't exist - tough luck
+
+.config:
+	@echo '***'
+	@echo '*** You have not yet configured your kernel!'
+	@echo '*** Please run "make xconfig/menuconfig/config/oldconfig"'
+	@echo '***'
+	@exit 1
 
 #
 # INSTALL_PATH specifies where to place the updated kernel and system map
@@ -149,6 +210,7 @@ boot: vmlinux
 
 vmlinux-objs := $(HEAD) $(INIT) $(CORE_FILES) $(LIBS) $(DRIVERS) $(NETWORKS)
 
+quiet_cmd_link_vmlinux = LD     $@
 cmd_link_vmlinux = $(LD) $(LINKFLAGS) $(HEAD) $(INIT) \
 		--start-group \
 		$(CORE_FILES) \
@@ -166,13 +228,13 @@ define rule_link_vmlinux
 	. scripts/mkversion > .tmpversion
 	mv -f .tmpversion .version
 	$(MAKE) -C init
-	echo $(cmd_link_vmlinux)
+	$(call cmd,cmd_link_vmlinux)
 	$(cmd_link_vmlinux)
 	echo 'cmd_$@ := $(cmd_link_vmlinux)' > $(@D)/.$(@F).cmd
 	$(NM) vmlinux | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aUw] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)' | sort > System.map
 endef
 
-vmlinux: $(CONFIGURATION) $(vmlinux-objs) FORCE
+vmlinux: $(vmlinux-objs) FORCE
 	$(call if_changed_rule,link_vmlinux)
 
 #	The actual objects are generated when descending, 
@@ -183,15 +245,14 @@ $(sort $(vmlinux-objs)): $(SUBDIRS) ;
 # 	Handle descending into subdirectories listed in $(SUBDIRS)
 
 .PHONY: $(SUBDIRS)
-$(SUBDIRS): prepare
+$(SUBDIRS): .hdepend prepare include/config/MARKER
 	@$(MAKE) -C $@
 
-#	Things we need done before we even start the actual build.
-#	The dependency on .hdepend will in turn take care of
-#	include/asm, include/linux/version etc.
+#	Things we need done before we descend to build or make
+#	module versions are listed in "prepare"
 
 .PHONY: prepare
-prepare: .hdepend include/config/MARKER
+prepare: include/linux/version.h include/asm
 
 # Single targets
 # ---------------------------------------------------------------------------
@@ -201,6 +262,8 @@ prepare: .hdepend include/config/MARKER
 %.i: %.c FORCE
 	@$(MAKE) -C $(@D) $(@F)
 %.o: %.c FORCE
+	@$(MAKE) -C $(@D) $(@F)
+%.lst: %.c FORCE
 	@$(MAKE) -C $(@D) $(@F)
 %.s: %.S FORCE
 	@$(MAKE) -C $(@D) $(@F)
@@ -214,14 +277,22 @@ prepare: .hdepend include/config/MARKER
 include/asm:
 	@echo 'Making asm->asm-$(ARCH) symlink'
 	@ln -s asm-$(ARCH) $@
-	@echo 'Making directory include/linux/modules'
-	@mkdir include/linux/modules
 
 # 	Split autoconf.h into include/linux/config/*
 
 include/config/MARKER: scripts/split-include include/linux/autoconf.h
 	scripts/split-include include/linux/autoconf.h include/config
 	@ touch include/config/MARKER
+
+# 	if .config is newer than include/linux/autoconf.h, someone tinkered
+# 	with it and forgot to run make oldconfig
+
+include/linux/autoconf.h: .config
+	@echo '***'
+	@echo '*** You changed .config w/o running make *config?'
+	@echo '*** Please run "make oldconfig"'
+	@echo '***'
+	@exit 1
 
 # Generate some files
 # ---------------------------------------------------------------------------
@@ -230,56 +301,53 @@ include/config/MARKER: scripts/split-include include/linux/autoconf.h
 #	this Makefile
 
 include/linux/version.h: Makefile
-	@echo Generating $@
-	@. scripts/mkversion_h $@ $(KERNELRELEASE) $(VERSION) $(PATCHLEVEL) $(SUBLEVEL)
+	@scripts/mkversion_h $@ $(KERNELRELEASE) $(VERSION) $(PATCHLEVEL) $(SUBLEVEL)
 
 # Helpers built in scripts/
 # ---------------------------------------------------------------------------
 
-scripts/mkdep scripts/split-include : FORCE
+scripts/fixdep scripts/split-include : scripts ;
+
+.PHONY: scripts
+scripts:
 	@$(MAKE) -C scripts
 
-# Generate dependencies
+# Generate module versions
 # ---------------------------------------------------------------------------
 
-# 	In the same pass, generate module versions, that's why it's
-#	all mixed up here.
+# 	The targets are still named depend / dep for traditional
+#	reasons, but the only thing we do here is generating
+#	the module version checksums.
+#	FIXME: For now, we are also calling "archdep" from here,
+#	which should be replaced by a more sensible solution.
 
 .PHONY: depend dep $(patsubst %,_sfdep_%,$(SUBDIRS))
 
 depend dep: .hdepend
 
-#	.hdepend is missing prerequisites - in fact dependencies need
-#	to be redone basically each time anything changed - since
-#	that's too expensive, we traditionally rely on the user to
-#	run "make dep" manually whenever necessary. In this case,
-#	we make "FORCE" a prequisite, to force redoing the
-#	dependencies. Yeah, that's ugly, and it'll go away soon.
+#	.hdepend is our (misnomed) marker for whether we've run
+#	generated module versions and made archdep
 
-.hdepend: scripts/mkdep include/linux/version.h include/asm \
-	  $(if $(filter dep depend,$(MAKECMDGOALS)),FORCE)
-	scripts/mkdep -- `find $(FINDHPATH) -name SCCS -prune -o -follow -name \*.h ! -name modversions.h -print` > $@
-	@$(MAKE) $(patsubst %,_sfdep_%,$(SUBDIRS))
+.hdepend: $(if $(filter dep depend,$(MAKECMDGOALS)),FORCE)
+	@$(MAKE) archdep include/linux/modversions.h
+	@touch $@
+
 ifdef CONFIG_MODVERSIONS
-	@$(MAKE) include/linux/modversions.h
-endif
-	@$(MAKE) archdep
-
-$(patsubst %,_sfdep_%,$(SUBDIRS)): FORCE
-	@$(MAKE) -C $(patsubst _sfdep_%, %, $@) fastdep
 
 # 	Update modversions.h, but only if it would change.
 
-include/linux/modversions.h: FORCE
-	@(echo "#ifndef _LINUX_MODVERSIONS_H";\
-	  echo "#define _LINUX_MODVERSIONS_H"; \
-	  echo "#include <linux/modsetver.h>"; \
-	  cd $(TOPDIR)/include/linux/modules; \
-	  for f in *.ver; do \
-	    if [ -f $$f ]; then echo "#include <linux/modules/$${f}>"; fi; \
-	  done; \
-	  echo "#endif"; \
+include/linux/modversions.h: scripts/fixdep prepare FORCE
+	@rm -rf .tmp_export-objs
+	@$(MAKE) $(patsubst %,_sfdep_%,$(SUBDIRS))
+	@( echo "#ifndef _LINUX_MODVERSIONS_H";\
+	   echo "#define _LINUX_MODVERSIONS_H"; \
+	   echo "#include <linux/modsetver.h>"; \
+	   for f in `cd .tmp_export-objs; find modules -name \*.ver -print`; do \
+	     echo "#include <linux/$${f}>"; \
+	   done; \
+	   echo "#endif"; \
 	) > $@.tmp
+	@rm -rf .tmp_export-objs
 	@if [ -r $@ ] && cmp -s $@ $@.tmp; then \
 		echo $@ was not updated; \
 		rm -f $@.tmp; \
@@ -287,6 +355,17 @@ include/linux/modversions.h: FORCE
 		echo $@ was updated; \
 		mv -f $@.tmp $@; \
 	fi
+
+$(patsubst %,_sfdep_%,$(SUBDIRS)): FORCE
+	@$(MAKE) -C $(patsubst _sfdep_%, %, $@) fastdep
+
+else # !CONFIG_MODVERSIONS
+
+.PHONY: include/linux/modversions.h
+
+include/linux/modversions.h:
+
+endif # CONFIG_MODVERSIONS
 
 # ---------------------------------------------------------------------------
 # Modules
@@ -300,11 +379,8 @@ MODFLAGS += -include $(HPATH)/linux/modversions.h
 endif
 
 .PHONY: modules
-modules: $(patsubst %, _mod_%, $(SUBDIRS))
-
-.PHONY: $(patsubst %, _mod_%, $(SUBDIRS))
-$(patsubst %, _mod_%, $(SUBDIRS)) : include/linux/version.h include/config/MARKER
-	@$(MAKE) -C $(patsubst _mod_%, %, $@) modules
+modules:
+	@$(MAKE) KBUILD_BUILTIN= $(SUBDIRS)
 
 #	Install modules
 
@@ -412,13 +488,36 @@ rpm:	clean spec
 	rpm -ta $(TOPDIR)/../$(KERNELPATH).tar.gz ; \
 	rm $(TOPDIR)/../$(KERNELPATH).tar.gz
 
+else # ifeq ($(filter $(noconfig_targets),$(MAKECMDGOALS)),)
+
 # Targets which don't need .config
 # ===========================================================================
+#
+# These targets basically have their own Makefile - not quite, but at
+# least its own exclusive section in the same Makefile. The reason for
+# this is the following:
+# To know the configuration, the main Makefile has to include
+# .config. That's a obviously a problem when .config doesn't exist
+# yet, but that could be kludged around with only including it if it
+# exists.
+# However, the larger problem is: If you run make *config, make will
+# include the old .config, then execute your *config. It will then
+# notice that a piece it included (.config) did change and restart from
+# scratch. Which will cause execution of *config again. You get the
+# picture.
+# If we don't explicitly let the Makefile know that .config is changed
+# by *config (the old way), it won't reread .config after *config,
+# thus working with possibly stale values - we don't that either.
+#
+# So we divide things: This part here is for making *config targets,
+# and other targets which should work when no .config exists yet.
+# The main part above takes care of the rest after a .config exists.
 
 # Kernel configuration
 # ---------------------------------------------------------------------------
 
-.PHONY: oldconfig xconfig menuconfig config
+.PHONY: oldconfig xconfig menuconfig config \
+	make_with_config
 
 oldconfig:
 	$(CONFIG_SHELL) scripts/Configure -d arch/$(ARCH)/config.in
@@ -434,6 +533,22 @@ menuconfig:
 config:
 	$(CONFIG_SHELL) scripts/Configure arch/$(ARCH)/config.in
 
+#	How we generate .config depends on which *config the
+#	user chose when calling make
+
+.config: $(filter oldconfig xconfig menuconfig config,$(MAKECMDGOALS)) ;
+
+#	If the user gave commands from both the need / need not
+#	.config sections, we need to call make again after
+#	.config is generated, now to take care of the remaining
+#	targets we know nothing about in this section
+
+remaining_targets := $(filter-out $(noconfig_targets),$(MAKECMDGOALS))
+
+$(remaining_targets) : make_with_config
+
+make_with_config: .config
+	@$(MAKE) $(remaining_targets)
 
 # Cleaning up
 # ---------------------------------------------------------------------------
@@ -483,34 +598,44 @@ MRPROPER_FILES += \
 	scripts/lxdialog/*.o scripts/lxdialog/lxdialog \
 	.menuconfig.log \
 	include/asm \
-	.hdepend scripts/mkdep scripts/split-include scripts/docproc \
-	$(TOPDIR)/include/linux/modversions.h \
-	kernel.spec
+	.hdepend scripts/split-include scripts/docproc \
+	scripts/fixdep $(TOPDIR)/include/linux/modversions.h \
+	tags TAGS kernel.spec \
 
 # 	directories removed with 'make mrproper'
 MRPROPER_DIRS += \
 	include/config \
 	$(TOPDIR)/include/linux/modules
 
+#	That's our way to know about arch specific cleanup.
+
+include arch/$(ARCH)/Makefile
 
 clean:	archclean
-	find . \( -name '*.[oas]' -o -name core -o -name '.*.cmd' \) -type f -print \
+	@echo 'Cleaning up'
+	@find . \( -name \*.[oas] -o -name core -o -name .\*.cmd -o \
+		   -name .\*.tmp -o -name .\*.d \) -type f -print \
 		| grep -v lxdialog/ | xargs rm -f
-	rm -f $(CLEAN_FILES)
-	rm -rf $(CLEAN_DIRS)
+	@rm -f $(CLEAN_FILES)
+	@rm -rf $(CLEAN_DIRS)
 	@$(MAKE) -C Documentation/DocBook clean
 
 mrproper: clean archmrproper
-	find . \( -size 0 -o -name .depend \) -type f -print | xargs rm -f
-	rm -f $(MRPROPER_FILES)
-	rm -rf $(MRPROPER_DIRS)
+	@echo 'Making mrproper'
+	@find . \( -size 0 -o -name .depend \) -type f -print | xargs rm -f
+	@rm -f $(MRPROPER_FILES)
+	@rm -rf $(MRPROPER_DIRS)
 	@$(MAKE) -C Documentation/DocBook mrproper
 
 distclean: mrproper
-	rm -f core `find . \( -not -type d \) -and \
-		\( -name '*.orig' -o -name '*.rej' -o -name '*~' \
+	@echo 'Making distclean'
+	@find . \( -not -type d \) -and \
+	 	\( -name '*.orig' -o -name '*.rej' -o -name '*~' \
 		-o -name '*.bak' -o -name '#*#' -o -name '.*.orig' \
-		-o -name '.*.rej' -o -name '.SUMS' -o -size 0 \) -type f -print` TAGS tags
+	 	-o -name '.*.rej' -o -name '.SUMS' -o -size 0 \) -type f \
+		-print | xargs rm -f
+
+endif # ifeq ($(filter $(noconfig_targets),$(MAKECMDGOALS)),)
 
 # FIXME Should go into a make.lib or something 
 # ===========================================================================
@@ -530,5 +655,10 @@ if_changed_rule = $(if $(strip $? \
 		               $(filter-out $(cmd_$(1)),$(cmd_$(@F)))\
 			       $(filter-out $(cmd_$(@F)),$(cmd_$(1)))),\
 	               @$(rule_$(1)))
+
+# If quiet is set, only print short version of rule
+
+cmd = @$(if $($(quiet)$(1)),echo '  $($(quiet)$(1))' &&) $($(1))
+
 
 FORCE:

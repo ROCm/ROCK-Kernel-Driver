@@ -47,4 +47,4 @@ piggy.o:	$(SYSTEM)
 	rm -f $$tmppiggy $$tmppiggy.gz $$tmppiggy.lnk
 
 clean:
-	rm -f vmlinux bvmlinux _tmp_*
+	@rm -f vmlinux bvmlinux _tmp_*

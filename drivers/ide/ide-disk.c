@@ -372,9 +372,8 @@ static u8 get_command(struct ata_device *drive, struct ata_taskfile *ar, int cmd
 			}
 		}
 	}
-	ar->handler = task_no_data_intr;
-	ar->command_type = IDE_DRIVE_TASK_NO_DATA;
 
+	/* not reached! */
 	return WIN_NOP;
 }
 
@@ -582,23 +581,21 @@ static int idedisk_open (struct inode *inode, struct file *filp, struct ata_devi
 {
 	MOD_INC_USE_COUNT;
 	if (drive->removable && drive->usage == 1) {
-		struct ata_taskfile args;
-
 		check_disk_change(inode->i_rdev);
-
-		memset(&args, 0, sizeof(args));
-		args.cmd = WIN_DOORLOCK;
-		args.handler = task_no_data_intr;
-		args.command_type = IDE_DRIVE_TASK_NO_DATA;
 
 		/*
 		 * Ignore the return code from door_lock, since the open() has
 		 * already succeeded once, and the door_lock is irrelevant at this
 		 * time.
 		 */
+		if (drive->doorlocking) {
+			struct ata_taskfile args;
 
-		if (drive->doorlocking && ide_raw_taskfile(drive, &args))
-			drive->doorlocking = 0;
+			memset(&args, 0, sizeof(args));
+			args.cmd = WIN_DOORLOCK;
+			if (ide_raw_taskfile(drive, &args))
+				drive->doorlocking = 0;
+		}
 	}
 	return 0;
 }
@@ -613,29 +610,23 @@ static int idedisk_flushcache(struct ata_device *drive)
 		args.cmd = WIN_FLUSH_CACHE_EXT;
 	else
 		args.cmd = WIN_FLUSH_CACHE;
-
-	args.handler = task_no_data_intr;
-	args.command_type = IDE_DRIVE_TASK_NO_DATA;
-
 	return ide_raw_taskfile(drive, &args);
 }
 
 static void idedisk_release(struct inode *inode, struct file *filp, struct ata_device *drive)
 {
 	if (drive->removable && !drive->usage) {
-		struct ata_taskfile args;
-
 		/* XXX I don't think this is up to the lowlevel drivers..  --hch */
 		invalidate_bdev(inode->i_bdev, 0);
 
-		memset(&args, 0, sizeof(args));
-		args.cmd = WIN_DOORUNLOCK;
-		args.handler = task_no_data_intr;
-		args.command_type = IDE_DRIVE_TASK_NO_DATA;
+		if (drive->doorlocking) {
+			struct ata_taskfile args;
 
-		if (drive->doorlocking &&
-		    ide_raw_taskfile(drive, &args))
-			drive->doorlocking = 0;
+			memset(&args, 0, sizeof(args));
+			args.cmd = WIN_DOORUNLOCK;
+			if (ide_raw_taskfile(drive, &args))
+				drive->doorlocking = 0;
+		}
 	}
 	if ((drive->id->cfs_enable_2 & 0x3000) && drive->wcache)
 		if (idedisk_flushcache(drive))
@@ -680,9 +671,6 @@ static int set_multcount(struct ata_device *drive, int arg)
 	memset(&args, 0, sizeof(args));
 	args.taskfile.sector_count = arg;
 	args.cmd = WIN_SETMULT;
-	args.handler = task_no_data_intr;
-	args.command_type = IDE_DRIVE_TASK_NO_DATA;
-
 	if (!ide_raw_taskfile(drive, &args)) {
 		/* all went well track this setting as valid */
 		drive->mult_count = arg;
@@ -712,9 +700,6 @@ static int write_cache(struct ata_device *drive, int arg)
 	memset(&args, 0, sizeof(args));
 	args.taskfile.feature	= (arg) ? SETFEATURES_EN_WCACHE : SETFEATURES_DIS_WCACHE;
 	args.cmd = WIN_SETFEATURES;
-	args.handler = task_no_data_intr;
-	args.command_type = IDE_DRIVE_TASK_NO_DATA;
-
 	ide_raw_taskfile(drive, &args);
 
 	drive->wcache = arg;
@@ -728,9 +713,6 @@ static int idedisk_standby(struct ata_device *drive)
 
 	memset(&args, 0, sizeof(args));
 	args.cmd = WIN_STANDBYNOW1;
-	args.handler = task_no_data_intr;
-	args.command_type = IDE_DRIVE_TASK_NO_DATA;
-
 	return ide_raw_taskfile(drive, &args);
 }
 
@@ -742,9 +724,6 @@ static int set_acoustic(struct ata_device *drive, int arg)
 	args.taskfile.feature = (arg)?SETFEATURES_EN_AAM:SETFEATURES_DIS_AAM;
 	args.taskfile.sector_count = arg;
 	args.cmd = WIN_SETFEATURES;
-	args.handler = task_no_data_intr;
-	args.command_type = IDE_DRIVE_TASK_NO_DATA;
-
 	ide_raw_taskfile(drive, &args);
 
 	drive->acoustic = arg;
@@ -864,9 +843,6 @@ static unsigned long native_max_address(struct ata_device *drive)
 	memset(&args, 0, sizeof(args));
 	args.taskfile.device_head = 0x40;
 	args.cmd = WIN_READ_NATIVE_MAX;
-	args.handler = task_no_data_intr;
-
-	/* submit command request */
 	ide_raw_taskfile(drive, &args);
 
 	/* if OK, compute maximum address value */
@@ -892,9 +868,6 @@ static u64 native_max_address_ext(struct ata_device *drive)
 
 	args.taskfile.device_head = 0x40;
 	args.cmd = WIN_READ_NATIVE_MAX_EXT;
-	args.handler = task_no_data_intr;
-
-        /* submit command request */
         ide_raw_taskfile(drive, &args);
 
 	/* if OK, compute maximum address value */
@@ -933,9 +906,8 @@ static sector_t set_max_address(struct ata_device *drive, sector_t addr_req)
 
 	args.taskfile.device_head = ((addr_req >> 24) & 0x0f) | 0x40;
 	args.cmd = WIN_SET_MAX;
-	args.handler = task_no_data_intr;
-	/* submit command request */
 	ide_raw_taskfile(drive, &args);
+
 	/* if OK, read new maximum address value */
 	if (!(drive->status & ERR_STAT)) {
 		addr_set = ((args.taskfile.device_head & 0x0f) << 24)
@@ -965,12 +937,10 @@ static u64 set_max_address_ext(struct ata_device *drive, u64 addr_req)
 	args.hobfile.sector_number = (addr_req >>= 8);
 	args.hobfile.low_cylinder = (addr_req >>= 8);
 	args.hobfile.high_cylinder = (addr_req >>= 8);
-
 	args.hobfile.device_head = 0x40;
 
-        args.handler = task_no_data_intr;
-	/* submit command request */
 	ide_raw_taskfile(drive, &args);
+
 	/* if OK, compute maximum address value */
 	if (!(drive->status & ERR_STAT)) {
 		u32 high = (args.hobfile.high_cylinder << 16) |
@@ -1099,7 +1069,9 @@ static void idedisk_setup(struct ata_device *drive)
                         }
 #else
 			printk("%s: setmax_ext LBA %llu, native  %llu\n",
-				drive->name, set_max_ext, capacity_2);
+				drive->name,
+			       (long long) set_max_ext,
+			       (long long) capacity_2);
 #endif
 		}
 		drive->bios_cyl	= drive->cyl;

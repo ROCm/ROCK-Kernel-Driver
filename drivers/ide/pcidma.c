@@ -64,7 +64,7 @@ static int build_sglist(struct ata_device *drive, struct request *rq)
 	struct scatterlist *sg = ch->sg_table;
 	int nents = 0;
 
-	if (rq->flags & REQ_DRIVE_ACB) {
+	if (rq->flags & REQ_SPECIAL) {
 		struct ata_taskfile *args = rq->special;
 #if 1
 		unsigned char *virt_addr = rq->buffer;
@@ -525,6 +525,7 @@ int udma_pci_init(struct ata_device *drive, struct request *rq)
 	if (ata_start_dma(drive, rq))
 		return 1;
 
+	/* No DMA transfers on ATAPI devices. */
 	if (drive->type != ATA_DISK)
 		return 0;
 
@@ -533,13 +534,8 @@ int udma_pci_init(struct ata_device *drive, struct request *rq)
 	else
 		cmd = 0x00;
 
-	ide_set_handler(drive, ide_dma_intr, WAIT_CMD, dma_timer_expiry);	/* issue cmd to drive */
-	if ((rq->flags & REQ_DRIVE_ACB) && (drive->addressing == 1)) {
-		/* FIXME: this should never happen */
-		struct ata_taskfile *args = rq->special;
-
-		outb(args->cmd, IDE_COMMAND_REG);
-	} else if (drive->addressing)
+	ide_set_handler(drive, ide_dma_intr, WAIT_CMD, dma_timer_expiry);
+	if (drive->addressing)
 		outb(cmd ? WIN_READDMA_EXT : WIN_WRITEDMA_EXT, IDE_COMMAND_REG);
 	else
 		outb(cmd ? WIN_READDMA : WIN_WRITEDMA, IDE_COMMAND_REG);

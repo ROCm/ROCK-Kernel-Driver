@@ -176,27 +176,6 @@ int drive_is_ready(struct ata_device *drive)
 	return 1;	/* drive ready: *might* be interrupting */
 }
 
-/*
- * Handler for commands without a data phase
- */
-ide_startstop_t task_no_data_intr(struct ata_device *drive, struct request *rq)
-{
-	struct ata_taskfile *ar = rq->special;
-
-	ide__sti();	/* local CPU only */
-
-	if (!ata_status(drive, READY_STAT, BAD_STAT)) {
-		/* Keep quiet for NOP because it is expected to fail. */
-		if (ar && ar->cmd != WIN_NOP)
-			return ata_error(drive, rq, __FUNCTION__);
-	}
-
-	if (ar)
-		ide_end_drive_cmd(drive, rq);
-
-	return ide_stopped;
-}
-
 ide_startstop_t ata_taskfile(struct ata_device *drive,
 		struct ata_taskfile *ar, struct request *rq)
 {
@@ -385,21 +364,72 @@ int ide_do_drive_cmd(struct ata_device *drive, struct request *rq, ide_action_t 
 
 }
 
-int ide_raw_taskfile(struct ata_device *drive, struct ata_taskfile *args)
+
+/*
+ * Invoked on completion of a special REQ_SPECIAL command.
+ */
+ide_startstop_t ata_special_intr(struct ata_device *drive, struct
+		request *rq) {
+
+	struct ata_taskfile *ar = rq->special;
+	ide_startstop_t ret = ide_stopped;
+
+	ide__sti();	/* local CPU only */
+	if (rq->buffer && ar->taskfile.sector_number) {
+		if (!ata_status(drive, 0, DRQ_STAT) && ar->taskfile.sector_number) {
+			int retries = 10;
+
+			ata_read(drive, rq->buffer, ar->taskfile.sector_number * SECTOR_WORDS);
+
+			while (!ata_status(drive, 0, BUSY_STAT) && retries--)
+				udelay(100);
+		}
+	}
+
+	if (!ata_status(drive, READY_STAT, BAD_STAT)) {
+		/* Keep quiet for NOP because it is expected to fail. */
+		if (ar->cmd != WIN_NOP)
+			ret = ata_error(drive, rq, __FUNCTION__);
+		rq->errors = 1;
+	}
+
+	ar->taskfile.feature = IN_BYTE(IDE_ERROR_REG);
+	ata_in_regfile(drive, &ar->taskfile);
+	ar->taskfile.device_head = IN_BYTE(IDE_SELECT_REG);
+	if ((drive->id->command_set_2 & 0x0400) &&
+			(drive->id->cfs_enable_2 & 0x0400) &&
+			(drive->addressing == 1)) {
+		/* The following command goes to the hob file! */
+		OUT_BYTE(0x80, drive->channel->io_ports[IDE_CONTROL_OFFSET]);
+		ar->hobfile.feature = IN_BYTE(IDE_FEATURE_REG);
+		ata_in_regfile(drive, &ar->hobfile);
+	}
+
+	blkdev_dequeue_request(rq);
+	drive->rq = NULL;
+	end_that_request_last(rq);
+
+	return ret;
+}
+
+int ide_raw_taskfile(struct ata_device *drive, struct ata_taskfile *ar)
 {
-	struct request rq;
+	struct request req;
 
-	memset(&rq, 0, sizeof(rq));
-	rq.flags = REQ_DRIVE_ACB;
-	rq.special = args;
+	ar->command_type = IDE_DRIVE_TASK_NO_DATA;
+	ar->handler = ata_special_intr;
 
-	return ide_do_drive_cmd(drive, &rq, ide_wait);
+	memset(&req, 0, sizeof(req));
+	req.flags = REQ_SPECIAL;
+	req.special = ar;
+
+	return ide_do_drive_cmd(drive, &req, ide_wait);
 }
 
 EXPORT_SYMBOL(drive_is_ready);
+EXPORT_SYMBOL(ide_do_drive_cmd);
 EXPORT_SYMBOL(ata_read);
 EXPORT_SYMBOL(ata_write);
 EXPORT_SYMBOL(ata_taskfile);
-EXPORT_SYMBOL(task_no_data_intr);
-EXPORT_SYMBOL(ide_do_drive_cmd);
+EXPORT_SYMBOL(ata_special_intr);
 EXPORT_SYMBOL(ide_raw_taskfile);

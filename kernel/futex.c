@@ -33,14 +33,10 @@
 #include <linux/futex.h>
 #include <linux/highmem.h>
 #include <linux/time.h>
+#include <linux/pagemap.h>
 #include <asm/uaccess.h>
 
-/* These mutexes are a very simple counter: the winner is the one who
-   decrements from 1 to 0.  The counter starts at 1 when the lock is
-   free.  A value other than 0 or 1 means someone may be sleeping.
-   This is simple enough to work on all architectures, but has the
-   problem that if we never "up" the semaphore it could eventually
-   wrap around. */
+/* Simple "sleep if unchanged" interface. */
 
 /* FIXME: This may be way too small. --RR */
 #define FUTEX_HASHBITS 6
@@ -49,7 +45,7 @@
    the relevent ones (hashed queues may be shared) */
 struct futex_q {
 	struct list_head list;
-	struct task_struct *task;
+	wait_queue_head_t waiters;
 	/* Page struct and offset within it. */
 	struct page *page;
 	unsigned int offset;
@@ -69,6 +65,11 @@ static inline struct list_head *hash_futex(struct page *page,
 	return &futex_queues[hash_long(h, FUTEX_HASHBITS)];
 }
 
+static inline void tell_waiter(struct futex_q *q)
+{
+	wake_up_all(&q->waiters);
+}
+
 static int futex_wake(struct list_head *head,
 		      struct page *page,
 		      unsigned int offset,
@@ -83,7 +84,7 @@ static int futex_wake(struct list_head *head,
 
 		if (this->page == page && this->offset == offset) {
 			list_del_init(i);
-			wake_up_process(this->task);
+			tell_waiter(this);
 			num_woken++;
 			if (num_woken >= num) break;
 		}
@@ -94,11 +95,12 @@ static int futex_wake(struct list_head *head,
 
 /* Add at end to avoid starvation */
 static inline void queue_me(struct list_head *head,
+			    wait_queue_t *wait,
 			    struct futex_q *q,
 			    struct page *page,
 			    unsigned int offset)
 {
-	q->task = current;
+	add_wait_queue(&q->waiters, wait);
 	q->page = page;
 	q->offset = offset;
 
@@ -150,18 +152,20 @@ static int futex_wait(struct list_head *head,
 {
 	int curval;
 	struct futex_q q;
+	DECLARE_WAITQUEUE(wait, current);
 	int ret = 0;
 
 	set_current_state(TASK_INTERRUPTIBLE);
-	queue_me(head, &q, page, offset);
+	queue_me(head, &wait, &q, page, offset);
 
-	/* Page is pinned, can't fail */
-	if (get_user(curval, uaddr) != 0)
-		BUG();
+	/* Page is pinned, but may no longer be in this address space. */
+	if (get_user(curval, uaddr) != 0) {
+		ret = -EFAULT;
+		goto out;
+	}
 
 	if (curval != val) {
 		ret = -EWOULDBLOCK;
-		set_current_state(TASK_RUNNING);
 		goto out;
 	}
 	time = schedule_timeout(time);
@@ -174,6 +178,7 @@ static int futex_wait(struct list_head *head,
 		goto out;
 	}
  out:
+	set_current_state(TASK_RUNNING);
 	/* Were we woken up anyway? */
 	if (!unqueue_me(&q))
 		return 0;
@@ -218,7 +223,7 @@ asmlinkage int sys_futex(void *uaddr, int op, int val, struct timespec *utime)
 	default:
 		ret = -EINVAL;
 	}
-	put_page(page);
+	page_cache_release(page);
 
 	return ret;
 }

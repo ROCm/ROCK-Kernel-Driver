@@ -308,8 +308,6 @@ typedef struct {
 #define	IDEFLOPPY_IOCTL_FORMAT_START		0x4602
 #define IDEFLOPPY_IOCTL_FORMAT_GET_PROGRESS	0x4603
 
-#define IDEFLOPPY_RQ			(REQ_SPECIAL)
-
 /*
  *	Error codes which are returned in rq->errors to the higher part
  *	of the driver.
@@ -633,7 +631,7 @@ static int idefloppy_end_request(struct ata_device *drive, struct request *rq, i
 	if (!rq)
 		return 0;
 
-	if (!(rq->flags & IDEFLOPPY_RQ)) {
+	if (!(rq->flags & REQ_SPECIAL)) {
 		ide_end_request(drive, rq, uptodate);
 		return 0;
 	}
@@ -717,7 +715,7 @@ static void idefloppy_queue_pc_head(struct ata_device *drive,
 		struct atapi_packet_command *pc, struct request *rq)
 {
 	memset(rq, 0, sizeof(*rq));
-	rq->flags = IDEFLOPPY_RQ;
+	rq->flags = REQ_SPECIAL;
 	/* FIXME: --mdcki */
 	rq->buffer = (char *) pc;
 	(void) ide_do_drive_cmd (drive, rq, ide_preempt);
@@ -1251,7 +1249,7 @@ static ide_startstop_t idefloppy_do_request(struct ata_device *drive, struct req
 		}
 		pc = idefloppy_next_pc_storage(drive);
 		idefloppy_create_rw_cmd (floppy, pc, rq, block);
-	} else if (rq->flags & IDEFLOPPY_RQ) {
+	} else if (rq->flags & REQ_SPECIAL) {
 		/* FIXME: --mdcki */
 		pc = (struct atapi_packet_command *) rq->buffer;
 	} else {
@@ -1274,7 +1272,7 @@ static int idefloppy_queue_pc_tail(struct ata_device *drive, struct atapi_packet
 	memset(&rq, 0, sizeof(rq));
 	/* FIXME: --mdcki */
 	rq.buffer = (char *) pc;
-	rq.flags = IDEFLOPPY_RQ;
+	rq.flags = REQ_SPECIAL;
 
 	return ide_do_drive_cmd(drive, &rq, ide_wait);
 }
