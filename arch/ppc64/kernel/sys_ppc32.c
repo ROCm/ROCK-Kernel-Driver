@@ -14,6 +14,7 @@
  *      2 of the License, or (at your option) any later version.
  */
 
+#include <linux/config.h>
 #include <asm/ptrace.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
@@ -2845,6 +2846,7 @@ long ppc32_timer_create(clockid_t clock,
 		return -EFAULT;
 
 	savefs = get_fs();
+	set_fs(KERNEL_DS);
 	err = sys_timer_create(clock, &event, &t);
 	set_fs(savefs);
 

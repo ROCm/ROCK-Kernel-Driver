@@ -70,3 +70,8 @@ include/asm-$(ARCH)/offsets.h: arch/$(ARCH)/kernel/asm-offsets.s
 	$(call filechk,gen-asm-offsets)
 
 CLEAN_FILES += include/asm-$(ARCH)/offsets.h
+
+# Don't use tabs in echo arguments
+define archhelp
+  echo  '* image           - Kernel image for IPL ($(boot)/image)'
+endef

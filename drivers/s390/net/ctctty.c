@@ -1,5 +1,5 @@
 /*
- * $Id: ctctty.c,v 1.14 2003/10/06 11:33:33 mschwide Exp $
+ * $Id: ctctty.c,v 1.15 2004/01/26 10:21:01 mschwide Exp $
  *
  * CTC / ESCON network driver, tty interface.
  *
@@ -759,9 +759,7 @@ ctc_tty_ioctl(struct tty_struct *tty, struct file *file,
 			       info->line);
 #endif
 			error = put_user(C_CLOCAL(tty) ? 1 : 0, (ulong *) arg);
-			if (error)
-				return error;
-			return 0;
+			return error;
 		case TIOCSSOFTCAR:
 #ifdef CTC_DEBUG_MODEM_IOCTL
 			printk(KERN_DEBUG "%s%d ioctl TIOCSSOFTCAR\n", CTC_TTY_NAME,

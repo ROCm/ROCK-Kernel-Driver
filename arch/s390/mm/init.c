@@ -79,8 +79,6 @@ extern unsigned long __init_end;
  * paging_init() sets up the page tables
  */
 
-unsigned long last_valid_pfn;
-
 #ifndef CONFIG_ARCH_S390X
 void __init paging_init(void)
 {

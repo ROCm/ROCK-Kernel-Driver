@@ -133,8 +133,14 @@ extern void proc_tty_unregister_driver(struct tty_driver *driver);
  */
 struct device_node;
 extern void proc_device_tree_init(void);
+#ifdef CONFIG_PROC_DEVICETREE
 extern void proc_device_tree_add_node(struct device_node *, struct proc_dir_entry *);
-
+#else /* !CONFIG_PROC_DEVICETREE */
+static inline void proc_device_tree_add_node(struct device_node *np, struct proc_dir_entry *pde)
+{
+	return;
+}
+#endif /* CONFIG_PROC_DEVICETREE */
 /*
  * proc_rtas.c
  */
