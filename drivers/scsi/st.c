@@ -3120,7 +3120,7 @@ static int st_ioctl(struct inode *inode, struct file *file,
 		case SCSI_IOCTL_STOP_UNIT:
 			return scsi_ioctl(STp->device, cmd_in, (void *)arg);
 		default:
-			retval = scsi_cmd_ioctl(STp->disk, cmd_in, arg);
+			retval = scsi_cmd_ioctl(file, STp->disk, cmd_in, arg);
 			if (retval != -ENOTTY && retval != -ENXIO)
 				return retval;
 	}
