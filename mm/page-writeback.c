@@ -373,8 +373,6 @@ int generic_writeback_mapping(struct address_space *mapping, int *nr_to_write)
 				}
 				spin_unlock(&pagemap_lru_lock);
 			}
-			if (current->flags & PF_MEMALLOC)
-				SetPageLaunder(page);
 			err = writepage(page);
 			if (!ret)
 				ret = err;

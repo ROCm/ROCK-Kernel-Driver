@@ -438,7 +438,8 @@ static int shmem_writepage(struct page * page)
 
 	if (!PageLocked(page))
 		BUG();
-	if (!PageLaunder(page))
+
+	if (!(current->flags & PF_MEMALLOC))
 		return fail_writepage(page);
 
 	mapping = page->mapping;

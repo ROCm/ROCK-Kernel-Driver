@@ -432,7 +432,7 @@ void invalidate_inode_pages2(struct address_space * mapping)
 int fail_writepage(struct page *page)
 {
 	/* Only activate on memory-pressure, not fsync.. */
-	if (PageLaunder(page)) {
+	if (current->flags & PF_MEMALLOC) {
 		activate_page(page);
 		SetPageReferenced(page);
 	}
@@ -652,7 +652,6 @@ void unlock_page(struct page *page)
 void end_page_writeback(struct page *page)
 {
 	wait_queue_head_t *waitqueue = page_waitqueue(page);
-	ClearPageLaunder(page);
 	smp_mb__before_clear_bit();
 	if (!TestClearPageWriteback(page))
 		BUG();

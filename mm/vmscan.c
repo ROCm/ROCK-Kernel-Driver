@@ -424,11 +424,10 @@ static int shrink_cache(int nr_pages, zone_t * classzone, unsigned int gfp_mask,
 			goto page_mapped;
 
 		/*
-		 * The page is locked. IO in progress?
-		 * Move it to the back of the list.
+		 * IO in progress? Leave it at the back of the list.
 		 */
 		if (unlikely(PageWriteback(page))) {
-			if (PageLaunder(page) && (gfp_mask & __GFP_FS)) {
+			if (gfp_mask & __GFP_FS) {
 				page_cache_get(page);
 				spin_unlock(&pagemap_lru_lock);
 				wait_on_page_writeback(page);
