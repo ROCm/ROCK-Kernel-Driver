@@ -4,7 +4,7 @@ bug-list.txt
 	- known bugs in kbuild programs
 commands.txt
 	- overview of kbuild commands
-config-language.txt
-	- specification of Config Language, the language in Config.in files
+kconfig-language.txt
+	- specification of Config Language, the language in Kconfig files
 makefiles.txt
 	- developer information for linux kernel makefiles

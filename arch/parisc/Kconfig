@@ -22,6 +22,10 @@ config SWAP
 	bool
 	default y
 
+config STACK_GROWSUP
+	bool
+	default y
+
 config UID16
 	bool
 
@@ -93,10 +97,27 @@ config PA11
 config PARISC64
 	bool "64-bit kernel"
 	depends on PA8X00
+	help
+	  Enable this if you want to support 64bit kernel on PA-RISC platform.
+	  
+	  At the moment, only people willing to use more than 2GB of RAM,
+	  or having a 64bit-only capable PA-RISC machine should say Y here.
+
+	  Since there is no 64bit userland on PA-RISC, there is no point to
+	  enable this option otherwise. The 64bit kernel is significantly bigger
+	  and slower than the 32bit one.
 
 config PDC_NARROW
 	bool "32-bit firmware"
 	depends on PARISC64
+	help
+	  This option will enable owners of C160, C180, C200, C240, C360, J280,
+	  J282, J2240 and some D/K/R class to run a 64bit kernel with their
+	  32bit PDC firmware.
+	
+	  Nobody should try this option unless they know what they are doing.
+	
+	  If unsure, say N.
 
 config SMP
 	bool "Symmetric multi-processing support"
@@ -211,14 +232,11 @@ source "drivers/parport/Kconfig"
 
 source "drivers/block/Kconfig"
 
-menu "ATA/IDE/MFM/RLL support"
-	depends on SUPERIO
 
+menu "ATA/IDE/MFM/RLL support"
 config IDE
 	tristate "ATA/IDE/MFM/RLL support"
-
 source "drivers/ide/Kconfig"
-
 endmenu
 
 menu "SCSI support"
@@ -244,6 +262,7 @@ config SCSI
 	  is located on a SCSI device.
 
 source drivers/scsi/Kconfig
+
 
 endmenu
 
@@ -323,9 +342,21 @@ menu "Console drivers"
 config STI_CONSOLE
 	bool "STI console"
 	help
-	  The STI console is the builtin display/keyboard on HP-PARISC
-	  machines.  Say Y here to build support for it into your kernel.
+	  STI refers to the HP "Standard Text Interface" which is a set of
+	  BIOS routines contained in a ROM chip in HP PA-RISC based machines.
+	  Enabling this option will give you an 8 color text console on
+	  most of the PA-RISC systems.
+	  Really old HP boxes may not have STI, in which case you must use the
+	  PDC console or your primary serial port as a console.
+	
+	  The text console uses a strange memory layout, and changing the 
+	  plane mask to create colored characters requires calls to the STI 
+	  routines. Because of that do not expect it to be actually very fast,
+	  but it is sufficient for basic text console functions, including fonts.
+	
 	  The alternative is to use your primary serial port as a console.
+	
+	  It is safe to enable this option, so you should probably say "Y".
 
 config DUMMY_CONSOLE
 	bool

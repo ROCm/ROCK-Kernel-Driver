@@ -152,10 +152,10 @@ busdev_unmask_irq(void *irq_dev, int irq)
 }
 
 struct irq_region_ops busdev_irq_ops = {
-	disable_irq:	busdev_disable_irq,
-	enable_irq:	busdev_enable_irq,
-	mask_irq:	busdev_mask_irq,
-	unmask_irq:	busdev_unmask_irq
+	.disable_irq =	busdev_disable_irq,
+	.enable_irq =	busdev_enable_irq,
+	.mask_irq =	busdev_mask_irq,
+	.unmask_irq =	busdev_unmask_irq
 };
 
 

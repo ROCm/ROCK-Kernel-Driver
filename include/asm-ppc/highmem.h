@@ -41,11 +41,7 @@ extern void kmap_init(void) __init;
  * easily, subsequent pte tables have to be allocated in one physical
  * chunk of RAM.
  */
-#ifdef CONFIG_HIGHMEM_START_BOOL
 #define PKMAP_BASE CONFIG_HIGHMEM_START
-#else
-#define PKMAP_BASE (0xfe000000UL)
-#endif /* CONFIG_HIGHMEM_START_BOOL */
 #define LAST_PKMAP 1024
 #define LAST_PKMAP_MASK (LAST_PKMAP-1)
 #define PKMAP_NR(virt)  ((virt-PKMAP_BASE) >> PAGE_SHIFT)

@@ -941,10 +941,10 @@ iosapic_unmask_irq(void *dev, int irq)
 
 
 static struct irq_region_ops iosapic_irq_ops = {
-	disable_irq:	iosapic_disable_irq,
-	enable_irq:	iosapic_enable_irq,
-	mask_irq:	iosapic_mask_irq,
-	unmask_irq:	iosapic_unmask_irq
+	.disable_irq =	iosapic_disable_irq,
+	.enable_irq =	iosapic_enable_irq,
+	.mask_irq =	iosapic_mask_irq,
+	.unmask_irq =	iosapic_unmask_irq
 };
 
 

@@ -481,12 +481,12 @@ static int perf_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 }
 
 static struct file_operations perf_fops = {
-	llseek: no_llseek,
-	read: perf_read,
-	write: perf_write,
-	ioctl: perf_ioctl,
-	open: perf_open,
-	release: perf_release
+	.llseek = no_llseek,
+	.read = perf_read,
+	.write = perf_write,
+	.ioctl = perf_ioctl,
+	.open = perf_open,
+	.release = perf_release
 };
 	
 static struct miscdevice perf_dev = {

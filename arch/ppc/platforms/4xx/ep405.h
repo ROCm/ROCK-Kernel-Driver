@@ -13,7 +13,7 @@
 #define __ASM_EP405_H__
 
 /* We have a 405GP core */
-#include <platforms/ibm405gp.h>
+#include <platforms/4xx/ibm405gp.h>
 
 #ifndef __ASSEMBLY__
 typedef struct board_info {

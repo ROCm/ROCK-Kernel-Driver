@@ -113,7 +113,7 @@ static int afs_init(void)
 /*
  * clean up on module removal
  */
-static void afs_exit(void)
+static void __exit afs_exit(void)
 {
 	printk(KERN_INFO "kAFS: Red Hat AFS client v0.1 unregistering.\n");
 

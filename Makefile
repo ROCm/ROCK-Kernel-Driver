@@ -252,7 +252,7 @@ ifdef include_config
 
 #	In this section, we need .config
 
--include ..config.cmd
+-include .config.cmd
 
 ifdef CONFIG_MODULES
 export EXPORT_FLAGS := -DEXPORT_SYMTAB

@@ -30,7 +30,6 @@ static inline void flush_tlb_range(struct vm_area_struct *vma,
 static inline void flush_tlb_kernel_range(unsigned long start,
 				unsigned long end)
 	{ _tlbia(); }
-#define update_mmu_cache(vma, addr, pte)	do { } while (0)
 
 #elif defined(CONFIG_8xx)
 #define __tlbia()	asm volatile ("tlbia; sync" : : : "memory")
@@ -46,7 +45,6 @@ static inline void flush_tlb_range(struct mm_struct *mm,
 static inline void flush_tlb_kernel_range(unsigned long start,
 				unsigned long end)
 	{ __tlbia(); }
-#define update_mmu_cache(vma, addr, pte)	do { } while (0)
 
 #else	/* 6xx, 7xx, 7xxx cpus */
 struct mm_struct;
@@ -56,15 +54,6 @@ extern void flush_tlb_page(struct vm_area_struct *vma, unsigned long vmaddr);
 extern void flush_tlb_range(struct vm_area_struct *vma, unsigned long start,
 			    unsigned long end);
 extern void flush_tlb_kernel_range(unsigned long start, unsigned long end);
-
-/*
- * This gets called at the end of handling a page fault, when
- * the kernel has put a new PTE into the page table for the process.
- * We use it to put a corresponding HPTE into the hash table
- * ahead of time, instead of waiting for the inevitable extra
- * hash-table miss exception.
- */
-extern void update_mmu_cache(struct vm_area_struct *, unsigned long, pte_t);
 #endif
 
 /*
@@ -76,6 +65,17 @@ static inline void flush_tlb_pgtables(struct mm_struct *mm,
 				      unsigned long start, unsigned long end)
 {
 }
+
+/*
+ * This gets called at the end of handling a page fault, when
+ * the kernel has put a new PTE into the page table for the process.
+ * We use it to ensure coherency between the i-cache and d-cache
+ * for the page which has just been mapped in.
+ * On machines which use an MMU hash table, we use this to put a
+ * corresponding HPTE into the hash table ahead of time, instead of
+ * waiting for the inevitable extra hash-table miss exception.
+ */
+extern void update_mmu_cache(struct vm_area_struct *, unsigned long, pte_t);
 
 #endif /* _PPC_TLBFLUSH_H */
 #endif /*__KERNEL__ */

@@ -370,9 +370,9 @@ static struct parisc_device_id processor_tbl[] = {
 };
 
 static struct parisc_driver cpu_driver = {
-	name:		"CPU",
-	id_table:	processor_tbl,
-	probe:		processor_probe
+	.name		= "CPU",
+	.id_table	= processor_tbl,
+	.probe		= processor_probe
 };
 
 /**

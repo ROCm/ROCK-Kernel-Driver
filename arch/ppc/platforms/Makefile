@@ -37,14 +37,14 @@ obj-$(CONFIG_LOPEC)		+= lopec_setup.o lopec_pci.o
 obj-$(CONFIG_MCPN765)		+= mcpn765_setup.o mcpn765_pci.o
 obj-$(CONFIG_MENF1)		+= menf1_setup.o menf1_pci.o
 obj-$(CONFIG_MVME5100)		+= mvme5100_setup.o mvme5100_pci.o
-obj-$(CONFIG_PAL4)		+= pal4_setup.o pal4_pci.o cpc700_pic.o
+obj-$(CONFIG_PAL4)		+= pal4_setup.o pal4_pci.o
 obj-$(CONFIG_PCORE)		+= pcore_setup.o pcore_pci.o
 obj-$(CONFIG_POWERPMC250)	+= powerpmc250.o
 obj-$(CONFIG_PPLUS)		+= pplus_pci.o pplus_setup.o
 obj-$(CONFIG_PRPMC750)		+= prpmc750_setup.o prpmc750_pci.o
 obj-$(CONFIG_PRPMC800)		+= prpmc800_setup.o prpmc800_pci.o
 obj-$(CONFIG_SANDPOINT)		+= sandpoint_setup.o sandpoint_pci.o
-obj-$(CONFIG_SPRUCE)		+= spruce_setup.o spruce_pci.o cpc700_pic.o
+obj-$(CONFIG_SPRUCE)		+= spruce_setup.o spruce_pci.o
 obj-$(CONFIG_ZX4500)		+= zx4500_setup.o zx4500_pci.o
 obj-$(CONFIG_PPC_ISERIES)	+= iSeries_setup.o iSeries_time.o \
 					iSeries_dma.o iSeries_pic.o

@@ -387,9 +387,9 @@ static struct parisc_device_id __devinitdata eisa_tbl[] = {
 MODULE_DEVICE_TABLE(parisc, eisa_tbl);
 
 static struct parisc_driver eisa_driver = {
-	name:		"EISA Bus Adapter",
-	id_table:	eisa_tbl,
-	probe:		eisa_probe,
+	.name =		"EISA Bus Adapter",
+	.id_table =	eisa_tbl,
+	.probe =	eisa_probe,
 };
 
 void __init eisa_init(void)

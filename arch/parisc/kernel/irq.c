@@ -235,7 +235,7 @@ int show_interrupts(struct seq_file *p, void *v)
 #ifdef CONFIG_SMP
 		for (; j < NR_CPUS; j++)
 #endif
-		    seq_printf(p, "%10u ", kstat.irqs[j][regnr][irq_no]);
+		    seq_printf(p, "%10u ", kstat_cpu(j).irqs[regnr][irq_no]);
 
 		seq_printf(p, " %14s",
 			    region->data.name ? region->data.name : "N/A");
@@ -372,7 +372,7 @@ void do_irq(struct irqaction *action, int irq, struct pt_regs * regs)
 	int cpu = smp_processor_id();
 
 	irq_enter();
-	++kstat.irqs[cpu][IRQ_REGION(irq)][IRQ_OFFSET(irq)];
+	++kstat_cpu(cpu).irqs[IRQ_REGION(irq)][IRQ_OFFSET(irq)];
 
 	DBG_IRQ(irq, ("do_irq(%d) %d+%d\n", irq, IRQ_REGION(irq), IRQ_OFFSET(irq)));
 

@@ -443,36 +443,36 @@ static int hugetlbfs_symlink(struct inode * dir, struct dentry *dentry, const ch
 }
 
 static struct address_space_operations hugetlbfs_aops = {
-	readpage:	hugetlbfs_readpage,
-	writepage:	fail_writepage,
-	prepare_write:	hugetlbfs_prepare_write,
-	commit_write:	hugetlbfs_commit_write
+	.readpage	= hugetlbfs_readpage,
+	.writepage	= fail_writepage,
+	.prepare_write	= hugetlbfs_prepare_write,
+	.commit_write	= hugetlbfs_commit_write
 };
 
 struct file_operations hugetlbfs_file_operations = {
-	read:		generic_file_read,
-	write:		generic_file_write,
-	mmap:		hugetlbfs_file_mmap,
-	fsync:		simple_sync_file,
-	sendfile:	generic_file_sendfile,
+	.read		= generic_file_read,
+	.write		= generic_file_write,
+	.mmap		= hugetlbfs_file_mmap,
+	.fsync		= simple_sync_file,
+	.sendfile	= generic_file_sendfile,
 };
 
 static struct inode_operations hugetlbfs_dir_inode_operations = {
-	create:		hugetlbfs_create,
-	lookup:		simple_lookup,
-	link:		simple_link,
-	unlink:		simple_unlink,
-	symlink:	hugetlbfs_symlink,
-	mkdir:		hugetlbfs_mkdir,
-	rmdir:		simple_rmdir,
-	mknod:		hugetlbfs_mknod,
-	rename:		simple_rename,
-	setattr:	hugetlbfs_setattr,
+	.create		= hugetlbfs_create,
+	.lookup		= simple_lookup,
+	.link		= simple_link,
+	.unlink		= simple_unlink,
+	.symlink	= hugetlbfs_symlink,
+	.mkdir		= hugetlbfs_mkdir,
+	.rmdir		= simple_rmdir,
+	.mknod		= hugetlbfs_mknod,
+	.rename		= simple_rename,
+	.setattr	= hugetlbfs_setattr,
 };
 
 static struct super_operations hugetlbfs_ops = {
-	statfs:		simple_statfs,
-	drop_inode:	hugetlbfs_drop_inode,
+	.statfs		= simple_statfs,
+	.drop_inode	= hugetlbfs_drop_inode,
 };
 
 static int hugetlbfs_fill_super(struct super_block * sb, void * data, int silent)
@@ -504,9 +504,9 @@ static struct super_block *hugetlbfs_get_sb(struct file_system_type *fs_type,
 }
 
 static struct file_system_type hugetlbfs_fs_type = {
-	name:		"hugetlbfs",
-	get_sb:		hugetlbfs_get_sb,
-	kill_sb:	kill_litter_super,
+	.name		= "hugetlbfs",
+	.get_sb		= hugetlbfs_get_sb,
+	.kill_sb	= kill_litter_super,
 };
 
 static struct vfsmount *hugetlbfs_vfsmount;

@@ -239,6 +239,11 @@
 #define __NR_alloc_hugepages	232
 #define __NR_free_hugepages	233
 #define __NR_exit_group		234
+#define __NR_lookup_dcookie	235
+#define __NR_sys_epoll_create	236
+#define __NR_sys_epoll_ctl	237
+#define __NR_sys_epoll_wait	238
+#define __NR_remap_file_pages	239
 
 #define __NR(n)	#n
 

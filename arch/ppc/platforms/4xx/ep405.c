@@ -12,7 +12,7 @@
 #include <asm/pci-bridge.h>
 #include <asm/machdep.h>
 #include <asm/todc.h>
-#include <platforms/ibm_ocp.h>
+#include <platforms/4xx/ibm_ocp.h>
 
 #undef DEBUG
 #ifdef DEBUG

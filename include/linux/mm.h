@@ -106,7 +106,11 @@ struct vm_area_struct {
 #define VM_ACCOUNT	0x00100000	/* Is a VM accounted object */
 #define VM_HUGETLB	0x00400000	/* Huge TLB Page VM */
 
-#define VM_STACK_FLAGS	(0x00000100 | VM_DATA_DEFAULT_FLAGS | VM_ACCOUNT)
+#ifdef CONFIG_STACK_GROWSUP
+#define VM_STACK_FLAGS	(VM_GROWSUP | VM_DATA_DEFAULT_FLAGS | VM_ACCOUNT)
+#else
+#define VM_STACK_FLAGS	(VM_GROWSDOWN | VM_DATA_DEFAULT_FLAGS | VM_ACCOUNT)
+#endif
 
 #define VM_READHINTMASK			(VM_SEQ_READ | VM_RAND_READ)
 #define VM_ClearReadHint(v)		(v)->vm_flags &= ~VM_READHINTMASK

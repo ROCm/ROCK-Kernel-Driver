@@ -6,6 +6,7 @@
  * as published by the Free Software Foundation; either version
  * 2 of the License, or (at your option) any later version.
  */
+#include <linux/string.h>
 #include "nonstdio.h"
 #include "of1275.h"
 #include <asm/processor.h>
@@ -30,7 +31,7 @@ char *avail_high;
 #define RAM_END		(16 << 20)
 
 #define PROG_START	0x00010000
-#define PROG_SIZE	0x003f0000
+#define PROG_SIZE	0x007f0000
 
 #define SCRATCH_SIZE	(128 << 10)
 

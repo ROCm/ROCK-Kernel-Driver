@@ -24,6 +24,7 @@
 #include <asm/machdep.h>
 #include <asm/open_pic.h>
 
+extern void (*setup_ibm_pci)(char *irq_lo, char *irq_hi);
 
 /* Which PCI interrupt line does a given device [slot] use? */
 /* Note: This really should be two dimensional based in slot/pin used */
@@ -612,6 +613,7 @@ static unsigned char prep_pci_intpins[4][4] __prepdata =
 #define ELCRM_INT7_LVL          0x80
 #define ELCRM_INT5_LVL          0x20
 
+#if 0
 /*
  * PCI config space access.
  */
@@ -686,6 +688,7 @@ static struct pci_ops prep_pci_ops =
 	prep_read_config,
 	prep_write_config
 };
+#endif
 
 #define MOTOROLA_CPUTYPE_REG	0x800
 #define MOTOROLA_BASETYPE_REG	0x803
@@ -695,7 +698,7 @@ static struct pci_ops prep_pci_ops =
 
 static u_char prep_openpic_initsenses[] __initdata = {
     (IRQ_SENSE_LEVEL | IRQ_POLARITY_POSITIVE), /* MVME2600_INT_SIO */
-    (IRQ_SENSE_EDGE | IRQ_POLARITY_NEGATIVE), /* MVME2600_INT_FALCON_ECC_ERR */
+    (IRQ_SENSE_EDGE  | IRQ_POLARITY_NEGATIVE), /* MVME2600_INT_FALCN_ECC_ERR */
     (IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE), /* MVME2600_INT_PCI_ETHERNET */
     (IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE), /* MVME2600_INT_PCI_SCSI */
     (IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE), /* MVME2600_INT_PCI_GRAPHICS */
@@ -834,32 +837,51 @@ struct mot_info {
 void __init
 ibm_prep_init(void)
 {
-	u32 addr;
 #ifdef CONFIG_PREP_RESIDUAL
+	u32 addr, real_addr, len;
 	PPC_DEVICE *mpic;
-#endif
+	PnP_TAG_PACKET *pkt;
 
-	if (inb(0x0852) == 0xd5) {
-		/* This is for the 43p-140 */
-		early_read_config_dword(0, 0, PCI_DEVFN(13, 0),
-					PCI_BASE_ADDRESS_0, &addr);
-		if (addr != 0xffffffff
-		    && !(addr & PCI_BASE_ADDRESS_SPACE_IO)
-		    && (addr &= PCI_BASE_ADDRESS_MEM_MASK) != 0) {
-			addr += PREP_ISA_MEM_BASE;
-			OpenPIC_Addr = ioremap(addr, 0x40000);
-			ppc_md.get_irq = openpic_get_irq;
-
-			OpenPIC_InitSenses = prep_openpic_initsenses;
-			OpenPIC_NumInitSenses = sizeof(prep_openpic_initsenses);
-		}
-	}
-
-#ifdef CONFIG_PREP_RESIDUAL
+	/* Use the PReP residual data to determine if an OpenPIC is
+	 * present.  If so, get the large vendor packet which will
+	 * tell us the base address and length in memory.
+	 * If we are successful, ioremap the memory area and set
+	 * OpenPIC_Addr (this indicates that the OpenPIC was found).
+	 */
 	mpic = residual_find_device(-1, NULL, SystemPeripheral,
-				    ProgrammableInterruptController, MPIC, 0);
-	if (mpic != NULL)
-		printk("mpic = %p\n", mpic);
+			    ProgrammableInterruptController, MPIC, 0);
+	if (!mpic)
+		return;
+
+	pkt = PnP_find_large_vendor_packet(res->DevicePnPHeap +
+			mpic->AllocatedOffset, 9, 0);
+
+	if (!pkt)
+		return;
+
+#define p pkt->L4_Pack.L4_Data.L4_PPCPack
+	if (!((p.PPCData[0] == 2) && (p.PPCData[1] == 32)))
+		return; /* not a 32-bit memory address */
+
+	real_addr = ld_le32((unsigned int *) (p.PPCData + 4));
+	if (real_addr == 0xffffffff)
+		return;
+
+	/* Adjust address to be as seen by CPU */
+	addr = real_addr + PREP_ISA_MEM_BASE;
+
+	len = ld_le32((unsigned int *) (p.PPCData + 12));
+	if (!len)
+		return;
+#undef p
+	OpenPIC_Addr = ioremap(addr, len);
+	ppc_md.get_irq = openpic_get_irq;
+
+	OpenPIC_InitSenses = prep_openpic_initsenses;
+	OpenPIC_NumInitSenses = sizeof(prep_openpic_initsenses);
+
+	printk(KERN_INFO "MPIC at 0x%08x (0x%08x), length 0x%08x "
+	       "mapped to 0x%p\n", addr, real_addr, len, OpenPIC_Addr);
 #endif
 }
 
@@ -877,6 +899,47 @@ ibm43p_pci_map_non0(struct pci_dev *dev)
 	intpin = (PCI_SLOT(dev->devfn) + intpin - 1) & 3;
 	dev->irq = openpic_to_irq(bridge_intrs[intpin]);
 	pci_write_config_byte(dev, PCI_INTERRUPT_LINE, dev->irq);
+}
+
+void __init
+prep_sandalfoot_setup_pci(char *irq_edge_mask_lo, char *irq_edge_mask_hi)
+{
+	Motherboard_map_name = "IBM 6015/7020 (Sandalfoot/Sandalbow)";
+	Motherboard_map = ibm6015_pci_IRQ_map;
+	Motherboard_routes = ibm6015_pci_IRQ_routes;
+	*irq_edge_mask_lo = 0x00; /* irq's 0-7 all edge-triggered */
+	*irq_edge_mask_hi = 0xA0; /* irq's 13, 15 level-triggered */
+}
+
+void __init
+prep_thinkpad_setup_pci(char *irq_edge_mask_lo, char *irq_edge_mask_hi)
+{
+	Motherboard_map_name = "IBM Thinkpad 850/860";
+	Motherboard_map = Nobis_pci_IRQ_map;
+	Motherboard_routes = Nobis_pci_IRQ_routes;
+	*irq_edge_mask_lo = 0x00; /* irq's 0-7 all edge-triggered */
+	*irq_edge_mask_hi = 0xA0; /* irq's 13, 15 level-triggered */
+}
+
+void __init
+prep_carolina_setup_pci(char *irq_edge_mask_lo, char *irq_edge_mask_hi)
+{
+	Motherboard_map_name = "IBM 7248, PowerSeries 830/850 (Carolina)";
+	Motherboard_map = ibm8xx_pci_IRQ_map;
+	Motherboard_routes = ibm8xx_pci_IRQ_routes;
+	*irq_edge_mask_lo = 0x00; /* irq's 0-7 all edge-triggered */
+	*irq_edge_mask_hi = 0xA4; /* irq's 10, 13, 15 level-triggered */
+}
+
+void __init
+prep_tiger1_setup_pci(char *irq_edge_mask_lo, char *irq_edge_mask_hi)
+{
+	Motherboard_map_name = "IBM 43P-140 (Tiger1)";
+	Motherboard_map = ibm43p_pci_IRQ_map;
+	Motherboard_routes = ibm43p_pci_IRQ_routes;
+	Motherboard_non0 = ibm43p_pci_map_non0;
+	*irq_edge_mask_lo = 0x00; /* irq's 0-7 all edge-triggered */
+	*irq_edge_mask_hi = 0xA0; /* irq's 13, 15 level-triggered */
 }
 
 void __init
@@ -948,52 +1011,12 @@ prep_route_pci_interrupts(void)
 			outb( (irq_mode >> 8) & 0xff, 0x4d1 );
 		}
 	} else if ( _prep_type == _PREP_IBM ) {
-		unsigned char planar_id = inb(0x0852);
 		unsigned char irq_edge_mask_lo, irq_edge_mask_hi;
 
-		printk("IBM ID: %08x\n", planar_id);
-		switch(planar_id) {
-		case 0xff:
-			Motherboard_map_name = "IBM Thinkpad 850/860";
-			Motherboard_map = Nobis_pci_IRQ_map;
-			Motherboard_routes = Nobis_pci_IRQ_routes;
-			irq_edge_mask_lo = 0x00; /* irq's 0-7 all edge-triggered */
-			irq_edge_mask_hi = 0xA0; /* irq's 13, 15 level-triggered */
-			break;
-		case 0xfc:
-			Motherboard_map_name = "IBM 6015/7020 (Sandalfoot/Sandalbow)";
-			Motherboard_map = ibm6015_pci_IRQ_map;
-			Motherboard_routes = ibm6015_pci_IRQ_routes;
-			irq_edge_mask_lo = 0x00; /* irq's 0-7 all edge-triggered */
-			irq_edge_mask_hi = 0xA0; /* irq's 13, 15 level-triggered */
-			break;
-		case 0xd5:
-			Motherboard_map_name = "IBM 43P-140 (Tiger1)";
-			Motherboard_map = ibm43p_pci_IRQ_map;
-			Motherboard_routes = ibm43p_pci_IRQ_routes;
-			Motherboard_non0 = ibm43p_pci_map_non0;
-			irq_edge_mask_lo = 0x00; /* irq's 0-7 all edge-triggered */
-			irq_edge_mask_hi = 0xA0; /* irq's 13, 15 level-triggered */
-			break;
-		default:
-			printk(KERN_ERR "Unknown IBM motherboard! Defaulting to Carolina.\n");
-		case 0xf0: /* PowerSeries 830/850 */
-		case 0xf1: /* PowerSeries 830/850 */
-		case 0xf2: /* PowerSeries 830/850 */
-		case 0xf4: /* 7248-43P */
-		case 0xf5: /* 7248-43P */
-		case 0xf6: /* 7248-43P */
-		case 0xf7: /* 7248-43P (missing from Carolina Tech Spec) */
-			Motherboard_map_name = "IBM PS830/PS850/7248 (Carolina)";
-			Motherboard_map = ibm8xx_pci_IRQ_map;
-			Motherboard_routes = ibm8xx_pci_IRQ_routes;
-			irq_edge_mask_lo = 0x00; /* irq's 0-7 all edge-triggered */
-			irq_edge_mask_hi = 0xA4; /* irq's 10, 13, 15 level-triggered */
-			break;
-		}
+		setup_ibm_pci(&irq_edge_mask_lo, &irq_edge_mask_hi);
 
-		outb(inb(0x04d0)|irq_edge_mask_lo, 0x04d0); /* primary 8259 */
-		outb(inb(0x04d1)|irq_edge_mask_hi, 0x04d1); /* cascaded 8259 */
+		outb(inb(0x04d0)|irq_edge_mask_lo, 0x4d0); /* primary 8259 */
+		outb(inb(0x04d1)|irq_edge_mask_hi, 0x4d1); /* cascaded 8259 */
 	} else {
 		printk("No known machine pci routing!\n");
 		return;
@@ -1151,7 +1174,6 @@ prep_pcibios_fixup(void)
         struct pci_dev *dev;
         extern unsigned char *Motherboard_map;
         extern unsigned char *Motherboard_routes;
-        unsigned char i;
 
 	prep_route_pci_interrupts();
 
@@ -1182,38 +1204,6 @@ prep_pcibios_fixup(void)
 		 */
 		unsigned char d = PCI_SLOT(dev->devfn);
 		dev->irq = Motherboard_routes[Motherboard_map[d]];
-
-		for ( i = 0 ; i <= 5 ; i++ ) {
-			/*
-			 * Relocate PCI I/O resources if necessary so the
-			 * standard 256MB BAT covers them.
-			 */
-			if ( (pci_resource_flags(dev, i) & IORESOURCE_IO) &&
-				      (dev->resource[i].start > 0x10000000))  {
-				printk("Relocating PCI address %lx -> %lx\n",
-						dev->resource[i].start,
-						(dev->resource[i].start & 
-						 0x00FFFFFF)| 0x01000000);
-				dev->resource[i].start =
-					(dev->resource[i].start & 0x00FFFFFF)
-					| 0x01000000;
-		                pci_write_config_dword(dev,
-						PCI_BASE_ADDRESS_0 + (i*0x4),
-						dev->resource[i].start);
-				dev->resource[i].end = 
-					(dev->resource[i].end & 0x00FFFFFF)
-					| 0x01000000;
-		        }
-		}
-#if 0
-		/*
-		 * If we have residual data and if it knows about this
-		 * device ask it what the irq is.
-		 *  -- Cort
-		 */
-		ppcd = residual_find_device_id( ~0L, dev->device,
-		                                -1,-1,-1, 0);
-#endif
 	}
 }
 
@@ -1270,9 +1260,8 @@ prep_find_bridges(void)
 	prep_init_resource(&hose->io_resource, 0, 0x007fffff, IORESOURCE_IO);
 	prep_init_resource(&hose->mem_resources[0], 0xc0000000, 0xfeffffff,
 			   IORESOURCE_MEM);
-	/* XXX why can't we use the indirect config space access method? */
-	hose->cfg_data = ioremap(PREP_ISA_IO_BASE + 0x800000, 0x800000);
-	hose->ops = &prep_pci_ops;
+	setup_indirect_pci(hose, PREP_ISA_IO_BASE + 0xcf8,
+			   PREP_ISA_IO_BASE + 0xcfc);
 
 	printk("PReP architecture\n");
 #ifdef CONFIG_PREP_RESIDUAL	  
