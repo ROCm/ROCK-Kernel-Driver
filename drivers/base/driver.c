@@ -16,26 +16,23 @@ int driver_for_each_dev(struct device_driver * drv, void * data,
 			int (*callback)(struct device *, void * ))
 {
 	struct list_head * node;
-	struct device * prev = NULL;
 	int error = 0;
 
-	get_driver(drv);
-	spin_lock(&device_lock);
-	list_for_each(node,&drv->devices) {
-		struct device * dev = get_device_locked(to_dev(node));
-		if (dev) {
-			spin_unlock(&device_lock);
-			error = callback(dev,data);
-			if (prev)
-				put_device(prev);
-			prev = dev;
-			spin_lock(&device_lock);
-			if (error)
-				break;
+	drv = get_driver(drv);
+	if (drv) {
+		down_read(&drv->bus->rwsem);
+		list_for_each(node,&drv->devices) {
+			struct device * dev = get_device(to_dev(node));
+			if (dev) {
+				error = callback(dev,data);
+				put_device(dev);
+				if (error)
+					break;
+			}
 		}
+		up_read(&drv->bus->rwsem);
+		put_driver(drv);
 	}
-	spin_unlock(&device_lock);
-	put_driver(drv);
 	return error;
 }
 
