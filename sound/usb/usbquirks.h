@@ -113,7 +113,7 @@ YAMAHA_DEVICE(0x5008, "01V96"),
 		.product_name = "UA-100",
 		.ifnum = QUIRK_ANY_INTERFACE,
 		.type = QUIRK_COMPOSITE,
-		.data = & (const snd_usb_audio_quirk_t[]) {
+		.data = (const snd_usb_audio_quirk_t[]) {
 			{
 				.ifnum = 0,
 				.type = QUIRK_AUDIO_FIXED_ENDPOINT,
@@ -274,7 +274,7 @@ YAMAHA_DEVICE(0x5008, "01V96"),
 		.product_name = "SC-D70",
 		.ifnum = QUIRK_ANY_INTERFACE,
 		.type = QUIRK_COMPOSITE,
-		.data = & (const snd_usb_audio_quirk_t[]) {
+		.data = (const snd_usb_audio_quirk_t[]) {
 			{
 				.ifnum = 0,
 				.type = QUIRK_AUDIO_FIXED_ENDPOINT,
@@ -338,7 +338,7 @@ YAMAHA_DEVICE(0x5008, "01V96"),
 		.product_name = "UA-5",
 		.ifnum = QUIRK_ANY_INTERFACE,
 		.type = QUIRK_COMPOSITE,
-		.data = & (const snd_usb_audio_quirk_t[]) {
+		.data = (const snd_usb_audio_quirk_t[]) {
 			{
 				.ifnum = 1,
 				.type = QUIRK_AUDIO_STANDARD_INTERFACE
@@ -443,7 +443,7 @@ YAMAHA_DEVICE(0x5008, "01V96"),
 		.product_name = "UA-20",
 		.ifnum = QUIRK_ANY_INTERFACE,
 		.type = QUIRK_COMPOSITE,
-		.data = & (const snd_usb_audio_quirk_t[]) {
+		.data = (const snd_usb_audio_quirk_t[]) {
 			{
 				.ifnum = 1,
 				.type = QUIRK_AUDIO_STANDARD_INTERFACE
@@ -488,16 +488,34 @@ YAMAHA_DEVICE(0x5008, "01V96"),
 		}
 	}
 },
-{
+{	/*
+	 * This quirk is for the "Advanced" modes of the Edirol UA-700.
+	 * If the sample format switch is not in an advanced setting, the
+	 * UA-700 has ID 0x0582/0x002c and is standard compliant (no quirks),
+	 * but offers only 16-bit PCM and no MIDI.
+	 */
 	USB_DEVICE_VENDOR_SPEC(0x0582, 0x002b),
 	.driver_info = (unsigned long) & (const snd_usb_audio_quirk_t) {
 		.vendor_name = "EDIROL",
 		.product_name = "UA-700",
-		.ifnum = 3,
-		.type = QUIRK_MIDI_FIXED_ENDPOINT,
-		.data = & (const snd_usb_midi_endpoint_info_t) {
-			.out_cables = 0x0003,
-			.in_cables  = 0x0003
+		.ifnum = QUIRK_ANY_INTERFACE,
+		.type = QUIRK_COMPOSITE,
+		.data = (const snd_usb_audio_quirk_t[]) {
+			{
+				.ifnum = 1,
+				.type = QUIRK_AUDIO_EDIROL_UA700
+			},
+			{
+				.ifnum = 2,
+				.type = QUIRK_AUDIO_EDIROL_UA700
+			},
+			{
+				.ifnum = 3,
+				.type = QUIRK_AUDIO_EDIROL_UA700
+			},
+			{
+				.ifnum = -1
+			}
 		}
 	}
 },
@@ -580,6 +598,62 @@ YAMAHA_DEVICE(0x5008, "01V96"),
 	}
 },
 {
+	USB_DEVICE(0x0582, 0x0044),
+	.driver_info = (unsigned long) & (const snd_usb_audio_quirk_t) {
+		.vendor_name = "Roland",
+		.product_name = "UA-1000",
+		.ifnum = QUIRK_ANY_INTERFACE,
+		.type = QUIRK_COMPOSITE,
+		.data = (const snd_usb_audio_quirk_t[]) {
+			{
+				.ifnum = 1,
+				.type = QUIRK_AUDIO_FIXED_ENDPOINT,
+				.data = & (const struct audioformat) {
+					.format = SNDRV_PCM_FORMAT_S24,
+					.channels = 12,
+					.iface = 1,
+					.altsetting = 1,
+					.altset_idx = 1,
+					.attributes = 0,
+					.endpoint = 0x81,
+					.ep_attr = 0x01,
+					.rates = SNDRV_PCM_RATE_CONTINUOUS,
+					.rate_min = 48000,
+					.rate_max = 48000,
+				}
+			},
+			{
+				.ifnum = 2,
+				.type = QUIRK_AUDIO_FIXED_ENDPOINT,
+				.data = & (const struct audioformat) {
+					.format = SNDRV_PCM_FORMAT_S24,
+					.channels = 10,
+					.iface = 2,
+					.altsetting = 1,
+					.altset_idx = 1,
+					.attributes = 0,
+					.endpoint = 0x02,
+					.ep_attr = 0x01,
+					.rates = SNDRV_PCM_RATE_CONTINUOUS,
+					.rate_min = 48000,
+					.rate_max = 48000,
+				}
+			},
+			{
+				.ifnum = 3,
+				.type = QUIRK_MIDI_FIXED_ENDPOINT,
+				.data = & (const snd_usb_midi_endpoint_info_t) {
+					.out_cables = 0x0003,
+					.in_cables  = 0x0003
+				}
+			},
+			{
+				.ifnum = -1
+			}
+		}
+	}
+},
+{
 	USB_DEVICE(0x0582, 0x0048),
 	.driver_info = (unsigned long) & (const snd_usb_audio_quirk_t) {
 		.vendor_name = "EDIROL",
@@ -629,7 +703,7 @@ YAMAHA_DEVICE(0x5008, "01V96"),
 		.product_name = "UA-3FX",
 		.ifnum = QUIRK_ANY_INTERFACE,
 		.type = QUIRK_COMPOSITE,
-		.data = & (const snd_usb_audio_quirk_t[]) {
+		.data = (const snd_usb_audio_quirk_t[]) {
 			{
 				.ifnum = 1,
 				.type = QUIRK_AUDIO_STANDARD_INTERFACE

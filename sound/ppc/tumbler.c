@@ -684,6 +684,8 @@ static int tumbler_put_mute_switch(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_
 
 static int snapper_set_capture_source(pmac_tumbler_t *mix)
 {
+	if (! mix->i2c.client)
+		return -ENODEV;
 	return snd_pmac_keywest_write_byte(&mix->i2c, TAS_REG_ACS,
 					   mix->capture_source ? 2 : 0);
 }
@@ -870,7 +872,7 @@ static void tumbler_update_automute(pmac_t *chip, int do_notify)
 /* interrupt - headphone plug changed */
 static irqreturn_t headphone_intr(int irq, void *devid, struct pt_regs *regs)
 {
-	pmac_t *chip = snd_magic_cast(pmac_t, devid, return);
+	pmac_t *chip = snd_magic_cast(pmac_t, devid, return IRQ_NONE);
 	if (chip->update_automute && chip->initialized) {
 		chip->update_automute(chip, 1);
 		return IRQ_HANDLED;

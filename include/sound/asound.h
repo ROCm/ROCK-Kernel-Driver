@@ -153,7 +153,7 @@ enum {
  *                                                                           *
  *****************************************************************************/
 
-#define SNDRV_PCM_VERSION		SNDRV_PROTOCOL_VERSION(2, 0, 6)
+#define SNDRV_PCM_VERSION		SNDRV_PROTOCOL_VERSION(2, 0, 7)
 
 typedef unsigned long sndrv_pcm_uframes_t;
 typedef long sndrv_pcm_sframes_t;
@@ -428,6 +428,22 @@ struct sndrv_pcm_mmap_control {
 	sndrv_pcm_uframes_t avail_min;	/* RW: min available frames for wakeup */
 };
 
+#define SNDRV_PCM_SYNC_PTR_HWSYNC	(1<<0)	/* execute hwsync */
+#define SNDRV_PCM_SYNC_PTR_APPL		(1<<1)	/* get appl_ptr from driver (r/w op) */
+#define SNDRV_PCM_SYNC_PTR_AVAIL_MIN	(1<<2)	/* get avail_min from driver */
+
+struct sndrv_pcm_sync_ptr {
+	unsigned int flags;
+	union {
+		struct sndrv_pcm_mmap_status status;
+		unsigned char reserved[64];
+	} s;
+	union {
+		struct sndrv_pcm_mmap_control control;
+		unsigned char reserved[64];
+	} c;
+};
+
 struct sndrv_xferi {
 	sndrv_pcm_sframes_t result;
 	void *buf;
@@ -451,6 +467,7 @@ enum {
 	SNDRV_PCM_IOCTL_STATUS = _IOR('A', 0x20, struct sndrv_pcm_status),
 	SNDRV_PCM_IOCTL_DELAY = _IOR('A', 0x21, sndrv_pcm_sframes_t),
 	SNDRV_PCM_IOCTL_HWSYNC = _IO('A', 0x22),
+	SNDRV_PCM_IOCTL_SYNC_PTR = _IOWR('A', 0x23, struct sndrv_pcm_sync_ptr),
 	SNDRV_PCM_IOCTL_CHANNEL_INFO = _IOR('A', 0x32, struct sndrv_pcm_channel_info),
 	SNDRV_PCM_IOCTL_PREPARE = _IO('A', 0x40),
 	SNDRV_PCM_IOCTL_RESET = _IO('A', 0x41),
@@ -538,7 +555,7 @@ enum {
  *  Timer section - /dev/snd/timer
  */
 
-#define SNDRV_TIMER_VERSION		SNDRV_PROTOCOL_VERSION(2, 0, 1)
+#define SNDRV_TIMER_VERSION		SNDRV_PROTOCOL_VERSION(2, 0, 2)
 
 enum sndrv_timer_class {
 	SNDRV_TIMER_CLASS_NONE = -1,
@@ -619,6 +636,7 @@ struct sndrv_timer_info {
 
 #define SNDRV_TIMER_PSFLG_AUTO		(1<<0)	/* auto start, otherwise one-shot */
 #define SNDRV_TIMER_PSFLG_EXCLUSIVE	(1<<1)	/* exclusive use, precise start/stop/pause/continue */
+#define SNDRV_TIMER_PSFLG_EARLY_EVENT	(1<<2)	/* write early event to the poll queue */
 
 struct sndrv_timer_params {
 	unsigned int flags;		/* flags - SNDRV_MIXER_PSFLG_* */
@@ -667,6 +685,7 @@ enum sndrv_timer_event {
 	SNDRV_TIMER_EVENT_STOP,			/* val = 0 */
 	SNDRV_TIMER_EVENT_CONTINUE,		/* val = resolution in ns */
 	SNDRV_TIMER_EVENT_PAUSE,		/* val = 0 */
+	SNDRV_TIMER_EVENT_EARLY,		/* val = 0, early event */
 	/* master timer events for slave timer instances */
 	SNDRV_TIMER_EVENT_MSTART = SNDRV_TIMER_EVENT_START + 10,
 	SNDRV_TIMER_EVENT_MSTOP = SNDRV_TIMER_EVENT_STOP + 10,

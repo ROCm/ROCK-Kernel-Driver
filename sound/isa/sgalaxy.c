@@ -27,13 +27,13 @@
 #include <linux/delay.h>
 #include <linux/time.h>
 #include <linux/irq.h>
+#include <linux/moduleparam.h>
 #include <sound/core.h>
 #include <sound/sb.h>
 #include <sound/ad1848.h>
 #include <sound/control.h>
 #define SNDRV_LEGACY_FIND_FREE_IRQ
 #define SNDRV_LEGACY_FIND_FREE_DMA
-#define SNDRV_GET_ID
 #include <sound/initval.h>
 
 MODULE_AUTHOR("Christopher Butler <chrisb@sandy.force9.co.uk>");
@@ -49,23 +49,24 @@ static long sbport[SNDRV_CARDS] = SNDRV_DEFAULT_PORT;	/* 0x220,0x240 */
 static long wssport[SNDRV_CARDS] = SNDRV_DEFAULT_PORT;	/* 0x530,0xe80,0xf40,0x604 */
 static int irq[SNDRV_CARDS] = SNDRV_DEFAULT_IRQ;	/* 7,9,10,11 */
 static int dma1[SNDRV_CARDS] = SNDRV_DEFAULT_DMA;	/* 0,1,3 */
+static int boot_devs;
 
-MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for Sound Galaxy soundcard.");
 MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
-MODULE_PARM(id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
+module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for Sound Galaxy soundcard.");
 MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
-MODULE_PARM(sbport, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
+module_param_array(sbport, long, boot_devs, 0444);
 MODULE_PARM_DESC(sbport, "Port # for Sound Galaxy SB driver.");
 MODULE_PARM_SYNTAX(sbport, SNDRV_ENABLED ",allows:{{0x220},{0x240}},dialog:list");
-MODULE_PARM(wssport, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
+module_param_array(wssport, long, boot_devs, 0444);
 MODULE_PARM_DESC(wssport, "Port # for Sound Galaxy WSS driver.");
 MODULE_PARM_SYNTAX(wssport, SNDRV_ENABLED ",allows:{{0x530},{0xe80},{0xf40},{0x604}},dialog:list");
-MODULE_PARM(irq, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(irq, int, boot_devs, 0444);
 MODULE_PARM_DESC(irq, "IRQ # for Sound Galaxy driver.");
 MODULE_PARM_SYNTAX(irq, SNDRV_ENABLED ",allows:{{7},{9},{10},{11}},dialog:list");
-MODULE_PARM(dma1, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(dma1, int, boot_devs, 0444);
 MODULE_PARM_DESC(dma1, "DMA1 # for Sound Galaxy driver.");
 MODULE_PARM_SYNTAX(dma1, SNDRV_DMA8_DESC);
 
@@ -327,30 +328,3 @@ static void __exit alsa_card_sgalaxy_exit(void)
 
 module_init(alsa_card_sgalaxy_init)
 module_exit(alsa_card_sgalaxy_exit)
-
-#ifndef MODULE
-
-/* format is: snd-sgalaxy=enable,index,id,
-			  sbport,wssport,
-			  irq,dma1 */
-
-static int __init alsa_card_sgalaxy_setup(char *str)
-{
-	static unsigned __initdata nr_dev = 0;
-
-	if (nr_dev >= SNDRV_CARDS)
-		return 0;
-	(void)(get_option(&str,&enable[nr_dev]) == 2 &&
-	       get_option(&str,&index[nr_dev]) == 2 &&
-	       get_id(&str,&id[nr_dev]) == 2 &&
-	       get_option_long(&str,&sbport[nr_dev]) == 2 &&
-	       get_option_long(&str,&wssport[nr_dev]) == 2 &&
-	       get_option(&str,&irq[nr_dev]) == 2 &&
-	       get_option(&str,&dma1[nr_dev]) == 2);
-	nr_dev++;
-	return 1;
-}
-
-__setup("snd-sgalaxy=", alsa_card_sgalaxy_setup);
-
-#endif /* ifndef MODULE */

@@ -21,11 +21,11 @@
 
 #include "emu8000_local.h"
 #include <asm/uaccess.h>
+#include <linux/moduleparam.h>
 
-MODULE_PARM(emu8000_reset_addr, "i");
+static int emu8000_reset_addr = 0;
+module_param(emu8000_reset_addr, int, 0444);
 MODULE_PARM_DESC(emu8000_reset_addr, "reset write address at each time (makes slowdown)");
-
-int emu8000_reset_addr = 0;
 
 
 /*

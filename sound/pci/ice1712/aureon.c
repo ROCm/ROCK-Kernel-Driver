@@ -38,6 +38,25 @@
  *   the analog mixing but not easily controllable (it's not connected
  *   directly from envy24ht chip).  so let's leave it as it is.
  *
+ *
+ *   Lowlevel functions for AudioTrak Prodigy 7.1 (and possibly 192) cards
+ *      Copyright (c) 2003 Dimitromanolakis Apostolos <apostol@cs.utoronto.ca>
+ *
+ *   version 0.82: Stable / not all features work yet (no communication with AC97 secondary)
+ *       added 64x/128x oversampling switch (should be 64x only for 96khz)
+ *       fixed some recording labels (still need to check the rest)
+ *       recording is working probably thanks to correct wm8770 initialization
+ *
+ *   version 0.5: Initial release:
+ *           working: analog output, mixer, headphone amplifier switch
+ *       not working: prety much everything else, at least i could verify that
+ *                    we have no digital output, no capture, pretty bad clicks and poops
+ *                    on mixer switch and other coll stuff.
+ *
+ * - Prodigy boards are equipped with AC97 STAC9744 chip , too.  it's used to do
+ *   the analog mixing but not easily controllable (it's not connected
+ *   directly from envy24ht chip).  so let's leave it as it is.
+ *
  */      
 
 #include <sound/driver.h>
@@ -77,12 +96,18 @@
 static void aureon_spi_write(ice1712_t *ice, unsigned int cs, unsigned int data, int bits)
 {
 	unsigned int tmp;
+	unsigned int cscs;
 	int i;
 
 	tmp = snd_ice1712_gpio_read(ice);
 
+	if (ice->eeprom.subvendor == VT1724_SUBDEVICE_PRODIGY71)
+		cscs = PRODIGY_CS8415_CS;
+	else
+		cscs = AUREON_CS8415_CS;
+
 	snd_ice1712_gpio_set_mask(ice, ~(AUREON_WM_RW|AUREON_WM_DATA|AUREON_WM_CLK|
-					 AUREON_WM_CS|AUREON_CS8415_CS));
+					 AUREON_WM_CS|cscs));
 	tmp |= AUREON_WM_RW;
 	tmp &= ~cs;
 	snd_ice1712_gpio_write(ice, tmp);
@@ -132,6 +157,47 @@ static void wm_put(ice1712_t *ice, int reg, unsigned short val)
 	reg <<= 1;
 	ice->akm[0].images[reg] = val >> 8;
 	ice->akm[0].images[reg + 1] = val;
+}
+
+/*
+ * DAC mute control
+ */
+static int wm_dac_mute_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
+{
+	uinfo->type = SNDRV_CTL_ELEM_TYPE_BOOLEAN;
+	uinfo->count = 1;
+	uinfo->value.integer.min = 0;
+	uinfo->value.integer.max = 1;
+	return 0;
+}
+
+static int wm_dac_mute_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
+{
+	ice1712_t *ice = snd_kcontrol_chip(kcontrol);
+	unsigned short val;
+
+	down(&ice->gpio_mutex);
+	val = wm_get(ice, snd_ctl_get_ioffidx(kcontrol, &ucontrol->id)+WM_MUTE);
+	ucontrol->value.integer.value[0] = ~val>>4 & 0x1;
+	up(&ice->gpio_mutex);
+	return 0;
+}
+
+static int wm_dac_mute_put(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
+{
+	ice1712_t *ice = snd_kcontrol_chip(kcontrol);
+	unsigned short new, old;
+	int change;
+
+	snd_ice1712_save_gpio_status(ice);
+	old = wm_get(ice, snd_ctl_get_ioffidx(kcontrol, &ucontrol->id)+WM_MUTE);
+	new = (~ucontrol->value.integer.value[0]<<4&0x10) | (old&~0x10);
+	change = (new != old);
+	if (change)
+		wm_put(ice, snd_ctl_get_ioffidx(kcontrol, &ucontrol->id)+WM_MUTE, new);
+	snd_ice1712_restore_gpio_status(ice);
+
+	return change;
 }
 
 /*
@@ -192,6 +258,47 @@ static int wm_dac_vol_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontr
 }
 
 /*
+ * ADC mute control
+ */
+static int wm_adc_mute_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
+{
+	uinfo->type = SNDRV_CTL_ELEM_TYPE_BOOLEAN;
+	uinfo->count = 1;
+	uinfo->value.integer.min = 0;
+	uinfo->value.integer.max = 1;
+	return 0;
+}
+
+static int wm_adc_mute_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
+{
+	ice1712_t *ice = snd_kcontrol_chip(kcontrol);
+	unsigned short val;
+
+	down(&ice->gpio_mutex);
+	val = wm_get(ice, snd_ctl_get_ioffidx(kcontrol, &ucontrol->id)+WM_ADC_GAIN);
+	ucontrol->value.integer.value[0] = ~val>>5 & 0x1;
+	up(&ice->gpio_mutex);
+	return 0;
+}
+
+static int wm_adc_mute_put(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
+{
+	ice1712_t *ice = snd_kcontrol_chip(kcontrol);
+	unsigned short new, old;
+	int change;
+
+	snd_ice1712_save_gpio_status(ice);
+	old = wm_get(ice, snd_ctl_get_ioffidx(kcontrol, &ucontrol->id)+WM_ADC_GAIN);
+	new = (~ucontrol->value.integer.value[0]<<5&0x20) | (old&~0x20);
+	change = (new != old);
+	if (change)
+		wm_put(ice, snd_ctl_get_ioffidx(kcontrol, &ucontrol->id)+WM_ADC_GAIN, new);
+	snd_ice1712_restore_gpio_status(ice);
+
+	return change;
+}
+
+/*
  * ADC gain mixer control
  */
 static int wm_adc_vol_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t *uinfo)
@@ -227,10 +334,10 @@ static int wm_adc_vol_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontr
 	snd_ice1712_save_gpio_status(ice);
 	idx  = snd_ctl_get_ioffidx(kcontrol, &ucontrol->id) + WM_ADC_GAIN;
 	nvol = ucontrol->value.integer.value[0];
-	ovol = wm_get(ice, idx) & 0x1f;
-	change = (ovol != nvol);
+	ovol = wm_get(ice, idx);
+	change = ((ovol & 0x1f)  != nvol);
 	if (change)
-		wm_put(ice, idx, nvol);
+		wm_put(ice, idx, nvol | (ovol & ~0x1f));
 	snd_ice1712_restore_gpio_status(ice);
 	return change;
 }
@@ -241,18 +348,15 @@ static int wm_adc_vol_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontr
 static int wm_adc_mux_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t *uinfo)
 {
 	static char *texts[] = {
-		"CD Left",
-		"CD Right",
-		"Aux Left",
-		"Aux Right",
-		"Line Left",
-		"Line Right",
-		"Mic Left",
-		"Mic Right",
+		"CD",		//AIN1
+		"Aux",		//AIN2
+		"Line",		//AIN3
+		"Mic",		//AIN4
+		"AC97"		//AIN5
 	};
 	uinfo->type = SNDRV_CTL_ELEM_TYPE_ENUMERATED;
-	uinfo->count = 2;
-	uinfo->value.enumerated.items = 8;
+	uinfo->count = 1;
+	uinfo->value.enumerated.items = 5;
 	if (uinfo->value.enumerated.item >= uinfo->value.enumerated.items)
 		uinfo->value.enumerated.item = uinfo->value.enumerated.items - 1;
 	strcpy(uinfo->value.enumerated.name, texts[uinfo->value.enumerated.item]);
@@ -291,6 +395,127 @@ static int wm_adc_mux_put(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t *ucont
 }
 
 /*
+ * Headphone Amplifier
+ */
+static int aureon_set_headphone_amp(ice1712_t *ice, int enable)
+{
+	unsigned int tmp, tmp2;
+
+	tmp2 = tmp = snd_ice1712_gpio_read(ice);
+	if (enable)
+		tmp |= AUREON_HP_SEL;
+	else
+		tmp &= ~ AUREON_HP_SEL;
+	if (tmp != tmp2) {
+		snd_ice1712_gpio_write(ice, tmp);
+		return 1;
+	}
+	return 0;
+}
+
+static int aureon_get_headphone_amp(ice1712_t *ice)
+{
+	unsigned int tmp = snd_ice1712_gpio_read(ice);
+
+	return ( tmp & AUREON_HP_SEL )!= 0;
+}
+
+static int aureon_bool_info(snd_kcontrol_t *k, snd_ctl_elem_info_t *uinfo)
+{
+	uinfo->type = SNDRV_CTL_ELEM_TYPE_BOOLEAN;
+	uinfo->count = 1;
+	uinfo->value.integer.min = 0;
+	uinfo->value.integer.max = 1;
+	return 0;
+}
+
+static int aureon_hpamp_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
+{
+	ice1712_t *ice = snd_kcontrol_chip(kcontrol);
+
+	ucontrol->value.integer.value[0] = aureon_get_headphone_amp(ice);
+	return 0;
+}
+
+
+static int aureon_hpamp_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
+{
+	ice1712_t *ice = snd_kcontrol_chip(kcontrol);
+
+	return aureon_set_headphone_amp(ice,ucontrol->value.integer.value[0]);
+}
+
+/*
+ * Deemphasis
+ */
+static int aureon_deemp_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
+{
+	ice1712_t *ice = snd_kcontrol_chip(kcontrol);
+	ucontrol->value.integer.value[0] = (wm_get(ice, WM_DAC_CTRL2) & 0xf) == 0xf;
+	return 0;
+}
+
+static int aureon_deemp_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
+{
+	ice1712_t *ice = snd_kcontrol_chip(kcontrol);
+	int temp, temp2;
+	temp2 = temp = wm_get(ice, WM_DAC_CTRL2);
+	if (ucontrol->value.integer.value[0])
+		temp |= 0xf;
+	else
+		temp &= ~0xf;
+	if (temp != temp2) {
+		wm_put(ice, WM_DAC_CTRL2, temp);
+		return 1;
+	}
+	return 0;
+}
+
+/*
+ * ADC Oversampling
+ */
+static int aureon_oversampling_info(snd_kcontrol_t *k, snd_ctl_elem_info_t *uinfo)
+{
+	static char *texts[2] = { "128x", "64x"	};
+
+	uinfo->type = SNDRV_CTL_ELEM_TYPE_ENUMERATED;
+	uinfo->count = 1;
+	uinfo->value.enumerated.items = 2;
+
+	if (uinfo->value.enumerated.item >= uinfo->value.enumerated.items)
+		uinfo->value.enumerated.item = uinfo->value.enumerated.items - 1;
+	strcpy(uinfo->value.enumerated.name, texts[uinfo->value.enumerated.item]);
+
+        return 0;
+}
+
+static int aureon_oversampling_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
+{
+	ice1712_t *ice = snd_kcontrol_chip(kcontrol);
+	ucontrol->value.enumerated.item[0] = (wm_get(ice, WM_MASTER) & 0x8) == 0x8;
+	return 0;
+}
+
+static int aureon_oversampling_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
+{
+	int temp, temp2;
+	ice1712_t *ice = snd_kcontrol_chip(kcontrol);
+
+	temp2 = temp = wm_get(ice, WM_MASTER);
+
+	if (ucontrol->value.enumerated.item[0])
+		temp |= 0x8;
+	else
+		temp &= ~0x8;
+
+	if (temp != temp2) {
+		wm_put(ice, WM_MASTER, temp);
+		return 1;
+	}
+	return 0;
+}
+
+/*
  * mixers
  */
 
@@ -315,11 +540,27 @@ static snd_kcontrol_new_t aureon71_dac_control __devinitdata = {
 static snd_kcontrol_new_t wm_controls[] __devinitdata = {
 	{
 		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+		.name = "Master Playback Switch",
+		.info = wm_dac_mute_info,
+		.get = wm_dac_mute_get,
+		.put = wm_dac_mute_put,
+	},
+	{
+		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
 		.name = "Master Playback Volume",
 		.info = wm_dac_vol_info,
 		.get = wm_dac_vol_get,
 		.put = wm_dac_vol_put,
 		.private_value = 1,
+	},
+	{
+		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+		.name = "ADC Switch",
+		.count = 2,
+		.info = wm_adc_mute_info,
+		.get = wm_adc_mute_get,
+		.put = wm_adc_mute_put,
+
 	},
 	{
 		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
@@ -335,6 +576,27 @@ static snd_kcontrol_new_t wm_controls[] __devinitdata = {
 		.info = wm_adc_mux_info,
 		.get = wm_adc_mux_get,
 		.put = wm_adc_mux_put,
+	},
+	{
+		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+		.name = "Headphone Amplifier Switch",
+		.info = aureon_bool_info,
+		.get = aureon_hpamp_get,
+		.put = aureon_hpamp_put
+	},
+	{
+		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+		.name = "DAC Deemphasis Switch",
+		.info = aureon_bool_info,
+		.get = aureon_deemp_get,
+		.put = aureon_deemp_put
+	},
+	{
+		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+		.name = "ADC Oversampling",
+		.info = aureon_oversampling_info,
+		.get = aureon_oversampling_get,
+		.put = aureon_oversampling_put
 	},
 };
 
@@ -365,7 +627,7 @@ static int __devinit aureon_add_controls(ice1712_t *ice)
  */
 static int __devinit aureon_init(ice1712_t *ice)
 {
-	static unsigned short wm_inits[] = {
+	static unsigned short wm_inits_aureon[] = {
 		/* These come first to reduce init pop noise */
 		0x1b, 0x000,		/* ADC Mux */
 		0x1c, 0x009,		/* Out Mux1 */
@@ -399,20 +661,66 @@ static int __devinit aureon_init(ice1712_t *ice)
 		0x15, 0x000,		/* no deemphasis, no ZFLG */
 		0x19, 0x000,		/* -12dB ADC/L */
 		0x1a, 0x000,		/* -12dB ADC/R */
+		(unsigned short)-1
+	};
+	static unsigned short wm_inits_prodigy[] = {
+
+		/* These come first to reduce init pop noise */
+		0x1b, 0x000,		/* ADC Mux */
+		0x1c, 0x009,		/* Out Mux1 */
+		0x1d, 0x009,		/* Out Mux2 */
+
+		0x18, 0x000,		/* All power-up */
+
+		0x16, 0x022,		/* I2S, normal polarity, 24bit, high-pass on */
+		0x17, 0x006,		/* 128fs, slave mode */
+
+		0x00, 0,		/* DAC1 analog mute */
+		0x01, 0,		/* DAC2 analog mute */
+		0x02, 0,		/* DAC3 analog mute */
+		0x03, 0,		/* DAC4 analog mute */
+		0x04, 0,		/* DAC5 analog mute */
+		0x05, 0,		/* DAC6 analog mute */
+		0x06, 0,		/* DAC7 analog mute */
+		0x07, 0,		/* DAC8 analog mute */
+		0x08, 0x100,		/* master analog mute */
+
+		0x09, 0x7f,		/* DAC1 digital full */
+		0x0a, 0x7f,		/* DAC2 digital full */
+		0x0b, 0x7f,		/* DAC3 digital full */
+		0x0c, 0x7f,		/* DAC4 digital full */
+		0x0d, 0x7f,		/* DAC5 digital full */
+		0x0e, 0x7f,		/* DAC6 digital full */
+		0x0f, 0x7f,		/* DAC7 digital full */
+		0x10, 0x7f,		/* DAC8 digital full */
+		0x11, 0x1FF,		/* master digital full */
+
+		0x12, 0x000,		/* phase normal */
+		0x13, 0x090,		/* unmute DAC L/R */
+		0x14, 0x000,		/* all unmute */
+		0x15, 0x000,		/* no deemphasis, no ZFLG */
+
+		0x19, 0x000,		/* -12dB ADC/L */
+		0x1a, 0x000,		/* -12dB ADC/R */
+		(unsigned short)-1
+
 	};
 	static unsigned short cs_inits[] = {
 		0x0441, /* RUN */
 		0x0100, /* no mute */
 		0x0200, /* */
 		0x0600, /* slave, 24bit */
+		(unsigned short)-1
 	};
 	unsigned int tmp;
-	unsigned int i;
+	unsigned short *p;
+	unsigned int cscs;
 
 	if (ice->eeprom.subvendor == VT1724_SUBDEVICE_AUREON51_SKY) {
 		ice->num_total_dacs = 6;
 		ice->num_total_adcs = 6;
 	} else {
+		/* aureon 7.1 and prodigy 7.1 */
 		ice->num_total_dacs = 8;
 		ice->num_total_adcs = 8;
 	}
@@ -423,16 +731,22 @@ static int __devinit aureon_init(ice1712_t *ice)
 		return -ENOMEM;
 	ice->akm_codecs = 1;
 
+	if (ice->eeprom.subvendor == VT1724_SUBDEVICE_PRODIGY71)
+		cscs = PRODIGY_CS8415_CS;
+	else
+		cscs = AUREON_CS8415_CS;
+
 	snd_ice1712_gpio_set_dir(ice, 0xbfffff); /* fix this for the time being */
 
 	/* reset the wm codec as the SPI mode */
 	snd_ice1712_save_gpio_status(ice);
-	snd_ice1712_gpio_set_mask(ice, ~(AUREON_WM_RESET|AUREON_WM_CS|AUREON_CS8415_CS));
+	snd_ice1712_gpio_set_mask(ice, ~(AUREON_WM_RESET|AUREON_WM_CS|
+					 cscs|AUREON_HP_SEL));
 	tmp = snd_ice1712_gpio_read(ice);
 	tmp &= ~AUREON_WM_RESET;
 	snd_ice1712_gpio_write(ice, tmp);
 	udelay(1);
-	tmp |= AUREON_WM_CS | AUREON_CS8415_CS;
+	tmp |= AUREON_WM_CS | cscs;
 	snd_ice1712_gpio_write(ice, tmp);
 	udelay(1);
 	tmp |= AUREON_WM_RESET;
@@ -440,13 +754,19 @@ static int __devinit aureon_init(ice1712_t *ice)
 	udelay(1);
 
 	/* initialize WM8770 codec */
-	for (i = 0; i < ARRAY_SIZE(wm_inits); i += 2)
-		wm_put(ice, wm_inits[i], wm_inits[i+1]);
+	if (ice->eeprom.subvendor == VT1724_SUBDEVICE_PRODIGY71)
+		p = wm_inits_prodigy;
+	else
+		p = wm_inits_aureon;
+	for (; *p != (unsigned short)-1; p += 2)
+		wm_put(ice, p[0], p[1]);
 
 	/* initialize CS8415A codec */
-	for (i = 0; i < ARRAY_SIZE(cs_inits); i++)
-		aureon_spi_write(ice, AUREON_CS8415_CS,
-				 cs_inits[i] | 0x200000, 24);
+	for (p = cs_inits; *p != (unsigned short)-1; p++)
+		aureon_spi_write(ice, cscs,
+				 *p | 0x200000, 24);
+
+	aureon_set_headphone_amp(ice, 1);
 
 	snd_ice1712_restore_gpio_status(ice);
 
@@ -460,7 +780,7 @@ static int __devinit aureon_init(ice1712_t *ice)
  */
 
 static unsigned char aureon51_eeprom[] __devinitdata = {
-	0x12,	/* SYSCONF: clock 512, mpu401, spdif-in/ADC, 3DACs */
+	0x2a,	/* SYSCONF: clock 512, mpu401, spdif-in/ADC, 3DACs */
 	0x80,	/* ACLINK: I2S */
 	0xf8,	/* I2S: vol, 96k, 24bit, 192k */
 	0xc3,	/* SPDIF: out-en, out-int, spdif-in */
@@ -476,7 +796,23 @@ static unsigned char aureon51_eeprom[] __devinitdata = {
 };
 
 static unsigned char aureon71_eeprom[] __devinitdata = {
-	0x13,	/* SYSCONF: clock 512, mpu401, spdif-in/ADC, 4DACs */
+	0x2b,	/* SYSCONF: clock 512, mpu401, spdif-in/ADC, 4DACs */
+	0x80,	/* ACLINK: I2S */
+	0xf8,	/* I2S: vol, 96k, 24bit, 192k */
+	0xc3,	/* SPDIF: out-en, out-int, spdif-in */
+	0xff,	/* GPIO_DIR */
+	0xff,	/* GPIO_DIR1 */
+	0xbf,	/* GPIO_DIR2 */
+	0x00,	/* GPIO_MASK */
+	0x00,	/* GPIO_MASK1 */
+	0x00,	/* GPIO_MASK2 */
+	0x00,	/* GPIO_STATE */
+	0x00,	/* GPIO_STATE1 */
+	0x00,	/* GPIO_STATE2 */
+};
+
+static unsigned char prodigy71_eeprom[] __devinitdata = {
+	0x2b,	/* SYSCONF: clock 512, mpu401, spdif-in/ADC, 4DACs */
 	0x80,	/* ACLINK: I2S */
 	0xf8,	/* I2S: vol, 96k, 24bit, 192k */
 	0xc3,	/* SPDIF: out-en, out-int, spdif-in */
@@ -496,6 +832,7 @@ struct snd_ice1712_card_info snd_vt1724_aureon_cards[] __devinitdata = {
 	{
 		.subvendor = VT1724_SUBDEVICE_AUREON51_SKY,
 		.name = "Terratec Aureon 5.1-Sky",
+		.model = "aureon51",
 		.chip_init = aureon_init,
 		.build_controls = aureon_add_controls,
 		.eeprom_size = sizeof(aureon51_eeprom),
@@ -504,10 +841,29 @@ struct snd_ice1712_card_info snd_vt1724_aureon_cards[] __devinitdata = {
 	{
 		.subvendor = VT1724_SUBDEVICE_AUREON71_SPACE,
 		.name = "Terratec Aureon 7.1-Space",
+		.model = "aureon71",
 		.chip_init = aureon_init,
 		.build_controls = aureon_add_controls,
 		.eeprom_size = sizeof(aureon71_eeprom),
 		.eeprom_data = aureon71_eeprom,
+	},
+ 	{
+ 		.subvendor = VT1724_SUBDEVICE_AUREON71_UNIVERSE,
+ 		.name = "Terratec Aureon 7.1-Universe",
+		/* model not needed - identical with 7.1-Space */
+ 		.chip_init = aureon_init,
+ 		.build_controls = aureon_add_controls,
+ 		.eeprom_size = sizeof(aureon71_eeprom),
+ 		.eeprom_data = aureon71_eeprom,
+	},
+	{
+		.subvendor = VT1724_SUBDEVICE_PRODIGY71,
+		.name = "Audiotrak Prodigy 7.1",
+		.model = "prodigy71",
+		.chip_init = aureon_init,
+		.build_controls = aureon_add_controls,
+		.eeprom_size = sizeof(prodigy71_eeprom),
+		.eeprom_data = prodigy71_eeprom,
 	},
 	{ } /* terminator */
 };

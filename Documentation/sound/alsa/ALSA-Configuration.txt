@@ -416,7 +416,8 @@ Module parameters
 	* Creative Card w/Digital out + Digital I/O 2	[0x0fc3/0x1f0f]
 	* Creative Card w/Digital CD in + Digital I/O 2	[0x0fcf/0x1f0f]
         * Creative Card 5.1/w Digital out + LiveDrive	[0x3fc3/0x1fff]
-        * Creative Card all ins and outs		[0x3fff/0x1fff]
+	* Creative Card 5.1 (c) 2003			[0x3fc3/0x7cff]
+        * Creative Card all ins and outs		[0x3fff/0x7fff]
     
   Module snd-ens1370
   ------------------
@@ -609,6 +610,10 @@ Module parameters
                         * Hoontech SoundTrack DSP 24 Media 7.1
                         * Digigram VX442
 
+    model       - Use the given board model, one of the following:
+		  delta1010, dio2496, delta66, delta44, audiophile, delta410,
+		  delta1010lt, vx442, ewx2496, ews88mt, ews88mt_new, ews88d,
+		  dmx6fire, dsp24, dsp24_71, ez8
     omni	- Omni I/O support for MidiMan M-Audio Delta44/66
     cs8427_timeout - reset timeout for the CS8427 chip (S/PDIF transciever)
                      in msec resolution, default value is 500 (0.5 sec)
@@ -624,6 +629,9 @@ Module parameters
 			* MidiMan M Audio Revolution 7.1
 			* AMP Ltd AUDIO2000
 			* TerraTec Aureon Sky-5.1, Space-7.1
+
+    model       - Use the given board model, one of the following:
+		  revo71, amp2000, prodigy71, aureon51, aureon71
 
     Module supports up to 8 cards and autoprobe.
 
@@ -787,6 +795,8 @@ Module parameters
 
     Module supports autoprobe and multiple chips (max 8).
 
+    The power-management is supported.
+
     Note: on some notebooks the buffer address cannot be detected
     automatically, or causes hang-up during initialization.
     In such a case, specify the buffer top address explicity via
@@ -796,9 +806,24 @@ Module parameters
       Sony F270: buffer_top=0x272800
     The driver supports only ac97 codec.  It's possible to force
     to initialize/use ac97 although it's not detected.  In such a
-    case, use force_ac97=1 option.
+    case, use force_ac97=1 option - but *NO* guarantee whether it
+    works!
 
-    The power-management is supported.
+    Note: The NM256 chip can be linked internally with non-AC97
+    codecs.  This driver supports only the AC97 codec, and won't work
+    with machines with other (most likely CS423x or OPL3SAx) chips,
+    even though the device is detected in lspci.  In such a case, try
+    other drivers, e.g. snd-cs4232 or snd-opl3sa2.  Some has ISA-PnP
+    but some doesn't have ISA PnP.  You'll need to speicfy isapnp=0
+    and proper hardware parameters in the case without ISA PnP.
+
+    Note: This driver is really crappy.  It's a porting from the
+    OSS driver, which is a result of black-magic reverse engineering.
+    The detection of codec will fail if the driver is loaded *after*
+    X-server as described above.  You might be able to force to load
+    the module, but it may result in hang-up.   Hence, make sure that
+    you load this module *before* X if you encounter this kind of
+    problem.
 
   Module snd-opl3sa2
   ------------------

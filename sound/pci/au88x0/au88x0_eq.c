@@ -710,11 +710,13 @@ static void vortex_Eqlzr_ShutDownA3d(vortex_t * vortex)
 static void vortex_Eqlzr_SetBypass(vortex_t * vortex, long bp)
 {
 	eqlzr_t *eq = &(vortex->eq);
-
+	
 	if ((eq->this28) && (bp == 0)) {
+		/* EQ enabled */
 		vortex_Eqlzr_SetAllBandsFromActiveCoeffSet(vortex);
 		vortex_EqHw_SetBypassGain(vortex, eq->this08, eq->this08);
 	} else {
+		/* EQ disabled. */
 		vortex_EqHw_SetLeftGainsTarget(vortex, (u16 *) (eq->this14));
 		vortex_EqHw_SetRightGainsTarget(vortex, (u16 *) (eq->this14));
 		vortex_EqHw_SetBypassGain(vortex, eq->this0c, eq->this0c);

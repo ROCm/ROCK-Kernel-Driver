@@ -72,6 +72,7 @@
 #include <linux/slab.h>
 #include <linux/pnp.h>
 #include <linux/isapnp.h>
+#include <linux/moduleparam.h>
 #include <sound/core.h>
 #include <sound/control.h>
 #include <sound/pcm.h>
@@ -81,7 +82,6 @@
 #define SNDRV_LEGACY_AUTO_PROBE
 #define SNDRV_LEGACY_FIND_FREE_IRQ
 #define SNDRV_LEGACY_FIND_FREE_DMA
-#define SNDRV_GET_ID
 #include <sound/initval.h>
 
 #define PFX "es18xx: "
@@ -124,7 +124,6 @@ struct _snd_es18xx {
 	spinlock_t mixer_lock;
 	spinlock_t ctrl_lock;
 #ifdef CONFIG_PM
-	struct pm_dev *pm_dev;
 	unsigned char pm_reg;
 #endif
 };
@@ -1610,12 +1609,9 @@ int __devinit snd_es18xx_pcm(es18xx_t *chip, int device, snd_pcm_t ** rpcm)
 
 /* Power Management support functions */
 #ifdef CONFIG_PM
-static void snd_es18xx_suspend(es18xx_t *chip)
+static int snd_es18xx_suspend(snd_card_t *card, unsigned int state)
 {
-	snd_card_t *card = chip->card;
-
-	if (card->power_state == SNDRV_CTL_POWER_D3hot)
-		return;
+	es18xx_t *chip = snd_magic_cast(es18xx_t, card->pm_private_data, return -EINVAL);
 
 	snd_pcm_suspend_all(chip->pcm);
 
@@ -1626,63 +1622,23 @@ static void snd_es18xx_suspend(es18xx_t *chip)
 	snd_es18xx_write(chip, ES18XX_PM, chip->pm_reg ^= ES18XX_PM_SUS);
 
 	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
+	return 0;
 }
 
-static void snd_es18xx_resume(es18xx_t *chip)
+static int snd_es18xx_resume(snd_card_t *card, unsigned int state)
 {
-	snd_card_t *card = chip->card;
-
-	if (card->power_state == SNDRV_CTL_POWER_D0)
-		return;
+	es18xx_t *chip = snd_magic_cast(es18xx_t, card->pm_private_data, return -EINVAL);
 
 	/* restore PM register, we won't wake till (not 0x07) i/o activity though */
 	snd_es18xx_write(chip, ES18XX_PM, chip->pm_reg ^= ES18XX_PM_FM);
 
 	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
-}
-
-/* callback for control API */
-static int snd_es18xx_set_power_state(snd_card_t *card, unsigned int power_state)
-{
-	es18xx_t *chip = (es18xx_t *) card->power_state_private_data;
-	switch (power_state) {
-	case SNDRV_CTL_POWER_D0:
-	case SNDRV_CTL_POWER_D1:
-	case SNDRV_CTL_POWER_D2:
-		snd_es18xx_resume(chip);
-		break;
-	case SNDRV_CTL_POWER_D3hot:
-	case SNDRV_CTL_POWER_D3cold:
-		snd_es18xx_suspend(chip);
-		break;
-	default:
-		return -EINVAL;
-	}
-	return 0;
-}
-
-static int snd_es18xx_pm_callback(struct pm_dev *dev, pm_request_t rqst, void *data)
-{
-	es18xx_t *chip = snd_magic_cast(es18xx_t, dev->data, return 0);
-
-	switch (rqst) {
-	case PM_SUSPEND:
-		snd_es18xx_suspend(chip);
-		break;
-	case PM_RESUME:
-		snd_es18xx_resume(chip);
-		break;
-	}
 	return 0;
 }
 #endif /* CONFIG_PM */
 
 static int snd_es18xx_free(es18xx_t *chip)
 {
-#ifdef CONFIG_PM
-	if (chip->pm_dev)
-		pm_unregister(chip->pm_dev);
-#endif
 	if (chip->res_port) {
 		release_resource(chip->res_port);
 		kfree_nocheck(chip->res_port);
@@ -1900,37 +1856,38 @@ static long fm_port[SNDRV_CARDS] = SNDRV_DEFAULT_PORT;
 static int irq[SNDRV_CARDS] = SNDRV_DEFAULT_IRQ;	/* 5,7,9,10 */
 static int dma1[SNDRV_CARDS] = SNDRV_DEFAULT_DMA;	/* 0,1,3 */
 static int dma2[SNDRV_CARDS] = SNDRV_DEFAULT_DMA;	/* 0,1,3 */
+static int boot_devs;
 
-MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for ES18xx soundcard.");
 MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
-MODULE_PARM(id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
+module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for ES18xx soundcard.");
 MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
-MODULE_PARM(enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable ES18xx soundcard.");
 MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
 #ifdef CONFIG_PNP
-MODULE_PARM(isapnp, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(isapnp, bool, boot_devs, 0444);
 MODULE_PARM_DESC(isapnp, "PnP detection for specified soundcard.");
 MODULE_PARM_SYNTAX(isapnp, SNDRV_ISAPNP_DESC);
 #endif
-MODULE_PARM(port, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
+module_param_array(port, long, boot_devs, 0444);
 MODULE_PARM_DESC(port, "Port # for ES18xx driver.");
 MODULE_PARM_SYNTAX(port, SNDRV_ENABLED ",allows:{{0x220,0x280,0x20}},prefers:{0x220},base:16,dialog:list");
-MODULE_PARM(mpu_port, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
+module_param_array(mpu_port, long, boot_devs, 0444);
 MODULE_PARM_DESC(mpu_port, "MPU-401 port # for ES18xx driver.");
 MODULE_PARM_SYNTAX(mpu_port, SNDRV_ENABLED ",allows:{{0x300,0x330,0x30},{0x800,0xffe,0x2}},prefers:{0x330,0x300},base:16,dialog:combo");
-MODULE_PARM(fm_port, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
+module_param_array(fm_port, long, boot_devs, 0444);
 MODULE_PARM_DESC(fm_port, "FM port # for ES18xx driver.");
 MODULE_PARM_SYNTAX(fm_port, SNDRV_ENABLED ",allows:{{0x388},{0x800,0xffc,0x4}},prefers:{0x388},base:16,dialog:combo");
-MODULE_PARM(irq, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(irq, int, boot_devs, 0444);
 MODULE_PARM_DESC(irq, "IRQ # for ES18xx driver.");
 MODULE_PARM_SYNTAX(irq, SNDRV_IRQ_DESC ",prefers:{5}");
-MODULE_PARM(dma1, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(dma1, int, boot_devs, 0444);
 MODULE_PARM_DESC(dma1, "DMA 1 # for ES18xx driver.");
 MODULE_PARM_SYNTAX(dma1, SNDRV_DMA8_DESC ",prefers:{1}");
-MODULE_PARM(dma2, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(dma2, int, boot_devs, 0444);
 MODULE_PARM_DESC(dma2, "DMA 2 # for ES18xx driver.");
 MODULE_PARM_SYNTAX(dma2, SNDRV_ENABLED ",allows:{{0},{1},{3},{5}},dialog:list,prefers:{0}");
 
@@ -2149,16 +2106,9 @@ static int __devinit snd_audiodrive_probe(int dev, struct pnp_card_link *pcard,
 		chip->rmidi = rmidi;
 	}
 
-#ifdef CONFIG_PM
 	/* Power Management */
-	chip->pm_dev = pm_register(PM_ISA_DEV, 0, snd_es18xx_pm_callback);
-	if (chip->pm_dev) {
-		chip->pm_dev->data = chip;
-		/* set control api callback */
-		card->set_power_state = snd_es18xx_set_power_state;
-		card->power_state_private_data = chip;
-	}
-#endif
+	snd_card_set_isa_pm_callback(card, snd_es18xx_suspend, snd_es18xx_resume, chip);
+
 	if ((err = snd_card_register(card)) < 0) {
 		snd_card_free(card);
 		return err;
@@ -2283,39 +2233,3 @@ static void __exit alsa_card_es18xx_exit(void)
 
 module_init(alsa_card_es18xx_init)
 module_exit(alsa_card_es18xx_exit)
-
-
-#ifndef MODULE
-
-/* format is: snd-es18xx=enable,index,id,isapnp,
-			 port,mpu_port,fm_port,irq,
-			 dma1,dma2 */
-
-static int __init alsa_card_es18xx_setup(char *str)
-{
-	static unsigned __initdata nr_dev = 0;
-	int __attribute__ ((__unused__)) pnp = INT_MAX;
-
-	if (nr_dev >= SNDRV_CARDS)
-		return 0;
-	(void)(get_option(&str,&enable[nr_dev]) == 2 &&
-	       get_option(&str,&index[nr_dev]) == 2 &&
-	       get_id(&str,&id[nr_dev]) == 2 &&
-	       get_option(&str,&pnp) == 2 &&
-	       get_option_long(&str,&port[nr_dev]) == 2 &&
-	       get_option_long(&str,&mpu_port[nr_dev]) == 2 &&
-	       get_option_long(&str,&fm_port[nr_dev]) == 2 &&
-	       get_option(&str,&irq[nr_dev]) == 2 &&
-	       get_option(&str,&dma1[nr_dev]) == 2 &&
-	       get_option(&str,&dma2[nr_dev]) == 2);
-#ifdef CONFIG_PNP
-	if (pnp != INT_MAX)
-		isapnp[nr_dev] = pnp;
-#endif
-	nr_dev++;
-	return 1;
-}
-
-__setup("snd-es18xx=", alsa_card_es18xx_setup);
-
-#endif /* ifndef MODULE */

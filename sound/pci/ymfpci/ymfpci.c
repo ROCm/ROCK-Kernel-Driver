@@ -23,11 +23,11 @@
 #include <linux/init.h>
 #include <linux/pci.h>
 #include <linux/time.h>
+#include <linux/moduleparam.h>
 #include <sound/core.h>
 #include <sound/ymfpci.h>
 #include <sound/mpu401.h>
 #include <sound/opl3.h>
-#define SNDRV_GET_ID
 #include <sound/initval.h>
 
 MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>");
@@ -50,28 +50,29 @@ static long mpu_port[SNDRV_CARDS];
 static long joystick_port[SNDRV_CARDS];
 #endif
 static int rear_switch[SNDRV_CARDS];
+static int boot_devs;
 
-MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for the Yamaha DS-XG PCI soundcard.");
 MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
-MODULE_PARM(id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
+module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for the Yamaha DS-XG PCI soundcard.");
 MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
-MODULE_PARM(enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable Yamaha DS-XG soundcard.");
 MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
-MODULE_PARM(mpu_port, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
+module_param_array(mpu_port, long, boot_devs, 0444);
 MODULE_PARM_DESC(mpu_port, "MPU-401 Port.");
 MODULE_PARM_SYNTAX(mpu_port, SNDRV_ENABLED);
-MODULE_PARM(fm_port, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
+module_param_array(fm_port, long, boot_devs, 0444);
 MODULE_PARM_DESC(fm_port, "FM OPL-3 Port.");
 MODULE_PARM_SYNTAX(fm_port, SNDRV_ENABLED);
 #ifdef SUPPORT_JOYSTICK
-MODULE_PARM(joystick_port, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
+module_param_array(joystick_port, long, boot_devs, 0444);
 MODULE_PARM_DESC(joystick_port, "Joystick port address");
 MODULE_PARM_SYNTAX(joystick_port, SNDRV_ENABLED);
 #endif
-MODULE_PARM(rear_switch, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(rear_switch, bool, boot_devs, 0444);
 MODULE_PARM_DESC(rear_switch, "Enable shared rear/line-in switch");
 MODULE_PARM_SYNTAX(rear_switch, SNDRV_ENABLED "," SNDRV_BOOLEAN_FALSE_DESC);
 
@@ -311,31 +312,14 @@ static int __devinit snd_card_ymfpci_probe(struct pci_dev *pci,
 		snd_card_free(card);
 		return err;
 	}
-	pci_set_drvdata(pci, chip);
+	pci_set_drvdata(pci, card);
 	dev++;
 	return 0;
 }
 
-#ifdef CONFIG_PM
-static int snd_card_ymfpci_suspend(struct pci_dev *pci, u32 state)
-{
-	ymfpci_t *chip = snd_magic_cast(ymfpci_t, pci_get_drvdata(pci), return -ENXIO);
-	snd_ymfpci_suspend(chip);
-	return 0;
-}
-static int snd_card_ymfpci_resume(struct pci_dev *pci)
-{
-	ymfpci_t *chip = snd_magic_cast(ymfpci_t, pci_get_drvdata(pci), return -ENXIO);
-	snd_ymfpci_resume(chip);
-	return 0;
-}
-#endif
-
 static void __devexit snd_card_ymfpci_remove(struct pci_dev *pci)
 {
-	ymfpci_t *chip = snd_magic_cast(ymfpci_t, pci_get_drvdata(pci), return);
-	if (chip)
-		snd_card_free(chip->card);
+	snd_card_free(pci_get_drvdata(pci));
 	pci_set_drvdata(pci, NULL);
 }
 
@@ -344,23 +328,12 @@ static struct pci_driver driver = {
 	.id_table = snd_ymfpci_ids,
 	.probe = snd_card_ymfpci_probe,
 	.remove = __devexit_p(snd_card_ymfpci_remove),
-#ifdef CONFIG_PM
-	.suspend = snd_card_ymfpci_suspend,
-	.resume = snd_card_ymfpci_resume,
-#endif	
+	SND_PCI_PM_CALLBACKS
 };
 
 static int __init alsa_card_ymfpci_init(void)
 {
-	int err;
-
-	if ((err = pci_module_init(&driver)) < 0) {
-#ifdef MODULE
-		printk(KERN_ERR "Yamaha DS-XG PCI soundcard not found or device busy\n");
-#endif
-		return err;
-	}
-	return 0;
+	return pci_module_init(&driver);
 }
 
 static void __exit alsa_card_ymfpci_exit(void)
@@ -370,27 +343,3 @@ static void __exit alsa_card_ymfpci_exit(void)
 
 module_init(alsa_card_ymfpci_init)
 module_exit(alsa_card_ymfpci_exit)
-
-#ifndef MODULE
-
-/* format is: snd-ymfpci=enable,index,id,
-			 fm_port,mpu_port */
-
-static int __init alsa_card_ymfpci_setup(char *str)
-{
-	static unsigned __initdata nr_dev = 0;
-
-	if (nr_dev >= SNDRV_CARDS)
-		return 0;
-	(void)(get_option(&str,&enable[nr_dev]) == 2 &&
-	       get_option(&str,&index[nr_dev]) == 2 &&
-	       get_id(&str,&id[nr_dev]) == 2 &&
-	       get_option_long(&str,&fm_port[nr_dev]) == 2 &&
-	       get_option_long(&str,&mpu_port[nr_dev]) == 2);
-	nr_dev++;
-	return 1;
-}
-
-__setup("snd-ymfpci=", alsa_card_ymfpci_setup);
-
-#endif /* ifndef MODULE */

@@ -133,44 +133,4 @@ static int snd_legacy_find_free_dma(int *dma_table)
 }
 #endif
 
-#if defined(SNDRV_GET_ID) && !defined(MODULE)
-#include <linux/ctype.h>
-#include <linux/init.h>
-#include <linux/bootmem.h>
-static int __init get_id(char **str, char **dst)
-{
-	char *s;
-
-	if (!(*str) || !(**str))
-		return 0;
-	for (s = *str; isalpha(*s) || isdigit(*s) || *s == '_'; s++);
-	if (s != *str) {
-		int len = s - *str;
-		char *d = (char *)alloc_bootmem(len + 1);
-		if (d != NULL) {
-			memcpy(*dst = d, *str, len);
-			d[len] = '\0';
-		}
-	}
-	if (*s == ',') {
-		*str = s + 1;
-		return 2;
-	}
-	*str = s;
-	return 1;
-}
-#endif
-
-/* simple wrapper for long variable.
- * the value more than 32bit won't work!
- */
-inline static int get_option_long(char **str, long *valp)
-{
-	int val, ret;
-	ret = get_option(str, &val);
-	if (ret)
-		*valp = val;
-	return ret;
-}
-
 #endif /* __SOUND_INITVAL_H */

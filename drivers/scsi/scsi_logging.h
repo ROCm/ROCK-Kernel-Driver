@@ -46,7 +46,7 @@ extern unsigned int scsi_logging_level;
 
 #define SCSI_CHECK_LOGGING(SHIFT, BITS, LEVEL, CMD)		\
 {								\
-        if ((SCSI_LOG_LEVEL(SHIFT, BITS)) > (LEVEL))		\
+        if (unlikely((SCSI_LOG_LEVEL(SHIFT, BITS)) > (LEVEL)))	\
 		(CMD);						\
 }
 #else

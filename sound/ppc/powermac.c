@@ -20,8 +20,8 @@
 
 #include <sound/driver.h>
 #include <linux/init.h>
+#include <linux/moduleparam.h>
 #include <sound/core.h>
-#define SNDRV_GET_ID
 #include <sound/initval.h>
 #include "pmac.h"
 #include "awacs.h"
@@ -41,17 +41,17 @@ static char *id = SNDRV_DEFAULT_STR1;		/* ID for this card */
 static int enable_beep = 1;
 #endif
 
-MODULE_PARM(index, "i");
+module_param(index, int, 0444);
 MODULE_PARM_DESC(index, "Index value for " CHIP_NAME " soundchip.");
 MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
-MODULE_PARM(id, "s");
+module_param(id, charp, 0444);
 MODULE_PARM_DESC(id, "ID string for " CHIP_NAME " soundchip.");
 MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
-/* MODULE_PARM(enable, "i");
+/* module_param(enable, bool, 0444);
    MODULE_PARM_DESC(enable, "Enable this soundchip.");
    MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC); */
 #ifdef PMAC_SUPPORT_PCM_BEEP
-MODULE_PARM(enable_beep, "i");
+module_param(enable_beep, bool, 0444);
 MODULE_PARM_DESC(enable_beep, "Enable beep using PCM.");
 MODULE_PARM_SYNTAX(enable_beep, SNDRV_ENABLED "," SNDRV_BOOLEAN_TRUE_DESC);
 #endif
@@ -104,7 +104,7 @@ static int __init snd_pmac_probe(void)
 		sprintf(card->shortname, "PowerMac %s", name_ext);
 		sprintf(card->longname, "%s (Dev %d) Sub-frame %d",
 			card->shortname, chip->device_id, chip->subframe);
-		if ((err = snd_pmac_tumbler_init(chip)) < 0)
+		if ( snd_pmac_tumbler_init(chip) < 0 || snd_pmac_tumbler_post_init() < 0)
 			goto __error;
 		break;
 	case PMAC_AWACS:
@@ -175,26 +175,3 @@ static void __exit alsa_card_pmac_exit(void)
 
 module_init(alsa_card_pmac_init)
 module_exit(alsa_card_pmac_exit)
-
-#ifndef MODULE
-
-/* format is: snd-pmac=enable,index,id,enable_beep
- */
-
-static int __init alsa_card_pmac_setup(char *str)
-{
-	int __attribute__ ((__unused__)) enable = 1;
-
-	(void)(get_option(&str,&enable) == 2 &&
-	       get_option(&str,&index) == 2 &&
-	       get_id(&str,&id) == 2
-#ifdef PMAC_SUPPORT_PCM_BEEP
-	       && get_option(&str,&enable_beep) == 2
-#endif
-	       );
-	return 1;
-}
-
-__setup("snd-pmac=", alsa_card_pmac_setup);
-
-#endif /* ifndef MODULE */

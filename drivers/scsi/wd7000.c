@@ -165,6 +165,7 @@
  * Removed now obsolete wd7000.h
  */
 
+#include <linux/delay.h>
 #include <linux/module.h>
 #include <linux/interrupt.h>
 #include <linux/kernel.h>
@@ -846,7 +847,7 @@ static inline int command_out(Adapter * host, unchar * cmd, int len)
 static inline Scb *alloc_scbs(struct Scsi_Host *host, int needed)
 {
 	register Scb *scb, *p = NULL;
-	register unsigned long flags;
+	unsigned long flags;
 	register unsigned long timeout = jiffies + WAITnexttimeout;
 	register unsigned long now;
 	int i;
@@ -898,7 +899,7 @@ static inline Scb *alloc_scbs(struct Scsi_Host *host, int needed)
 
 static inline void free_scb(Scb * scb)
 {
-	register unsigned long flags;
+	unsigned long flags;
 
 	spin_lock_irqsave(&scbpool_lock, flags);
 
@@ -936,7 +937,7 @@ static int mail_out(Adapter * host, Scb * scbptr)
  */
 {
 	register int i, ogmb;
-	register unsigned long flags;
+	unsigned long flags;
 	unchar start_ogmb;
 	Mailbox *ogmbs = host->mb.ogmb;
 	int *next_ogmb = &(host->next_ogmb);
