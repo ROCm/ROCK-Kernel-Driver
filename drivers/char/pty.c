@@ -95,7 +95,6 @@ static void pty_close(struct tty_struct * tty, struct file * filp)
 			}
 		}
 #endif
-		tty_unregister_device (&tty->link->driver, minor(tty->device));
 		tty_vhangup(tty->link);
 	}
 }
@@ -448,17 +447,14 @@ int __init pty_init(void)
 			init_waitqueue_head(&ptm_state[i][j].open_wait);
 		
 		pts_driver[i] = pty_slave_driver;
-#ifdef CONFIG_DEVFS_FS
-		pts_driver[i].name = "pts/%d";
-#else
 		pts_driver[i].name = "pts";
-#endif
 		pts_driver[i].proc_entry = 0;
 		pts_driver[i].major = UNIX98_PTY_SLAVE_MAJOR+i;
 		pts_driver[i].minor_start = 0;
 		pts_driver[i].name_base = i*NR_PTYS;
 		pts_driver[i].num = ptm_driver[i].num;
 		pts_driver[i].other = &ptm_driver[i];
+		pts_driver[i].flags |= TTY_DRIVER_NO_DEVFS;
 		pts_driver[i].table = pts_table[i];
 		pts_driver[i].termios = pts_termios[i];
 		pts_driver[i].termios_locked = pts_termios_locked[i];

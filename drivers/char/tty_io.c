@@ -2215,7 +2215,8 @@ int tty_unregister_driver(struct tty_driver *driver)
 			driver->termios_locked[i] = NULL;
 			kfree(tp);
 		}
-		tty_unregister_device(driver, driver->minor_start + i);
+		if (!(driver->flags & TTY_DRIVER_NO_DEVFS))
+			tty_unregister_device(driver, driver->minor_start + i);
 	}
 	proc_tty_unregister_driver(driver);
 	return 0;
