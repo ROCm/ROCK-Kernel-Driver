@@ -794,8 +794,12 @@ config SERIAL_M32R_PLDSIO
 
 config SERIAL_TXX9
 	bool "TMPTX39XX/49XX SIO support"
-	depends on MIPS || PCI
+	depends HAS_TXX9_SERIAL
 	select SERIAL_CORE
+	default y
+
+config HAS_TXX9_SERIAL
+	bool
 
 config SERIAL_TXX9_CONSOLE
 	bool "TMPTX39XX/49XX SIO Console support"
