@@ -42,11 +42,11 @@
 #include <linux/wait.h>
 #include <linux/delay.h>
 #include <linux/timer.h>
-#include <linux/tqueue.h>
 #include <linux/interrupt.h>
 #include <linux/sched.h>
 #include <asm/semaphore.h>
 #include <linux/completion.h>
+#include <linux/workqueue.h>
 
 #include <asm/io.h>
 #include <linux/reboot.h>
