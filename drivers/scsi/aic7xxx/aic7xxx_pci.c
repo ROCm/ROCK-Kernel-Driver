@@ -39,7 +39,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/aic7xxx/aic7xxx_pci.c#63 $
+ * $Id: //depot/aic7xxx/aic7xxx/aic7xxx_pci.c#65 $
  *
  * $FreeBSD$
  */
@@ -834,10 +834,10 @@ ahc_pci_config(struct ahc_softc *ahc, struct ahc_pci_identity *entry)
 	ahc_pci_write_config(ahc->dev_softc, DEVCONFIG, devconfig, /*bytes*/4);
 
 	/* Ensure busmastering is enabled */
-	command = ahc_pci_read_config(ahc->dev_softc, PCIR_COMMAND, /*bytes*/1);
+	command = ahc_pci_read_config(ahc->dev_softc, PCIR_COMMAND, /*bytes*/2);
 	command |= PCIM_CMD_BUSMASTEREN;
 
-	ahc_pci_write_config(ahc->dev_softc, PCIR_COMMAND, command, /*bytes*/1);
+	ahc_pci_write_config(ahc->dev_softc, PCIR_COMMAND, command, /*bytes*/2);
 
 	/* On all PCI adapters, we allow SCB paging */
 	ahc->flags |= AHC_PAGESCBS;
