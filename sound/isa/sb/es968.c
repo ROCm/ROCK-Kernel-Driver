@@ -203,8 +203,8 @@ static int __devinit snd_es968_pnp_detect(struct pnp_card_link *card,
 			return res;
 		dev++;
 		return 0;
-        }
-        return -ENODEV;
+	}
+	return -ENODEV;
 }
 
 static void __devexit snd_es968_pnp_remove(struct pnp_card_link * pcard)

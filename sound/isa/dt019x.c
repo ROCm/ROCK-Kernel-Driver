@@ -296,8 +296,8 @@ static int __devinit snd_dt019x_pnp_probe(struct pnp_card_link *card,
 			return res;
 		dev++;
 		return 0;
-        }
-        return -ENODEV;
+	}
+	return -ENODEV;
 }
 
 static void __devexit snd_dt019x_pnp_remove(struct pnp_card_link * pcard)
