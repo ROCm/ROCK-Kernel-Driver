@@ -647,6 +647,7 @@ static inline unsigned long get_high_cpu_load(int cpu, int update)
 #if defined(CONFIG_SMP) && defined(ARCH_HAS_SCHED_WAKE_BALANCE)
 static int sched_balance_wake(int cpu, task_t *p)
 {
+	cpumask_t tmp;
 	struct sched_domain *domain;
 	int i;
 
@@ -657,10 +658,8 @@ static int sched_balance_wake(int cpu, task_t *p)
 	if (!(domain->flags & SD_FLAG_WAKE))
 		return cpu;
 
-	for_each_cpu_mask(i, domain->span) {
-		if (!cpu_online(i))
-			continue;
-
+	cpus_and(tmp, domain->span, cpu_online_map);
+	for_each_cpu_mask(i, tmp) {
 		if (!cpu_isset(i, p->cpus_allowed))
 			continue;
 
@@ -1149,16 +1148,15 @@ out:
  */
 static int sched_best_cpu(struct task_struct *p, struct sched_domain *domain)
 {
+	cpumask_t tmp;
 	int i, min_load, this_cpu, best_cpu;
 
 	best_cpu = this_cpu = task_cpu(p);
 	min_load = INT_MAX;
 
-	for_each_online_cpu(i) {
+	cpus_and(tmp, domain->span, cpu_online_map);
+	for_each_cpu_mask(i, tmp) {
 		unsigned long load;
-		if (!cpu_isset(i, domain->span))
-			continue;
-
 		if (i == this_cpu)
 			load = get_low_cpu_load(i, 0);
 		else
@@ -1373,6 +1371,7 @@ find_busiest_group(struct sched_domain *domain, int this_cpu,
 		modify = 1;
 
 	do {
+		cpumask_t tmp;
 		unsigned long load;
 		int local_group;
 		int i, nr_cpus = 0;
@@ -1381,10 +1380,8 @@ find_busiest_group(struct sched_domain *domain, int this_cpu,
 
 		/* Tally up the load of all CPUs in the group */
 		avg_load = 0;
-		for_each_cpu_mask(i, group->cpumask) {
-			if (!cpu_online(i))
-				continue;
-
+		cpus_and(tmp, group->cpumask, cpu_online_map);
+		for_each_cpu_mask(i, tmp) {
 			/* Bias balancing toward cpus of our domain */
 			if (local_group) {
 				load = get_high_cpu_load(i, modify);
@@ -1496,15 +1493,14 @@ out_balanced:
  */
 static runqueue_t *find_busiest_queue(struct sched_group *group)
 {
+	cpumask_t tmp;
 	int i;
 	unsigned long max_load = 0;
 	runqueue_t *busiest = NULL;
 
-	for_each_cpu_mask(i, group->cpumask) {
+	cpus_and(tmp, group->cpumask, cpu_online_map);
+	for_each_cpu_mask(i, tmp) {
 		unsigned long load;
-
-		if (!cpu_online(i))
-			continue;
 
 		load = get_low_cpu_load(i, 0);
 
@@ -1694,16 +1690,15 @@ static void active_load_balance(runqueue_t *busiest, int busiest_cpu)
 
  	group = sd->groups;
  	do {
+		cpumask_t tmp;
 		runqueue_t *rq;
  		int push_cpu = 0, nr = 0;
 
  		if (group == busy_group)
  			goto next_group;
 
- 		for_each_cpu_mask(i, group->cpumask) {
-			if (!cpu_online(i))
-				continue;
-
+		cpus_and(tmp, group->cpumask, cpu_online_map);
+ 		for_each_cpu_mask(i, tmp) {
 			if (!idle_cpu(i))
 				goto next_group;
  			push_cpu = i;
@@ -3298,17 +3293,17 @@ static void __init arch_init_sched_domains(void)
 	struct sched_group *first_node = NULL, *last_node = NULL;
 
 	/* Set up domains */
-	for_each_cpu_mask(i, cpu_online_map) {
+	for_each_cpu(i) {
 		int node = cpu_to_node(i);
 		cpumask_t nodemask = node_to_cpumask(node);
 		struct sched_domain *node_domain = &per_cpu(node_domains, i);
 		struct sched_domain *cpu_domain = cpu_sched_domain(i);
 
 		*node_domain = SD_NODE_INIT;
-		node_domain->span = cpu_online_map;
+		node_domain->span = cpu_possible_map;
 
 		*cpu_domain = SD_CPU_INIT;
-		cpus_and(cpu_domain->span, nodemask, cpu_online_map);
+		cpus_and(cpu_domain->span, nodemask, cpu_possible_map);
 		cpu_domain->parent = node_domain;
 	}
 
@@ -3320,7 +3315,7 @@ static void __init arch_init_sched_domains(void)
 		struct sched_group *node = &sched_group_nodes[i];
 		cpumask_t tmp = node_to_cpumask(i);
 
-		cpus_and(nodemask, tmp, cpu_online_map);
+		cpus_and(nodemask, tmp, cpu_possible_map);
 
 		if (cpus_empty(nodemask))
 			continue;
@@ -3352,7 +3347,7 @@ static void __init arch_init_sched_domains(void)
 	last_node->next = first_node;
 
 	mb();
-	for_each_cpu_mask(i, cpu_online_map) {
+	for_each_cpu(i) {
 		struct sched_domain *node_domain = &per_cpu(node_domains, i);
 		struct sched_domain *cpu_domain = cpu_sched_domain(i);
 		node_domain->groups = &sched_group_nodes[cpu_to_node(i)];
@@ -3367,15 +3362,15 @@ static void __init arch_init_sched_domains(void)
 	struct sched_group *first_cpu = NULL, *last_cpu = NULL;
 
 	/* Set up domains */
-	for_each_cpu_mask(i, cpu_online_map) {
+	for_each_cpu(i) {
 		struct sched_domain *cpu_domain = cpu_sched_domain(i);
 
 		*cpu_domain = SD_CPU_INIT;
-		cpu_domain->span = cpu_online_map;
+		cpu_domain->span = cpu_possible_map;
 	}
 
 	/* Set up CPU groups */
-	for_each_cpu_mask(i, cpu_online_map) {
+	for_each_cpu_mask(i, cpu_possible_map) {
 		struct sched_group *cpu = &sched_group_cpus[i];
 
 		cpus_clear(cpu->cpumask);
@@ -3391,7 +3386,7 @@ static void __init arch_init_sched_domains(void)
 	last_cpu->next = first_cpu;
 
 	mb();
-	for_each_cpu_mask(i, cpu_online_map) {
+	for_each_cpu(i) {
 		struct sched_domain *cpu_domain = cpu_sched_domain(i);
 		cpu_domain->groups = &sched_group_cpus[i];
 	}

@@ -1138,7 +1138,7 @@ __init void arch_init_sched_domains(void)
 	struct sched_group *first_cpu = NULL, *last_cpu = NULL;
 
 	/* Set up domains */
-	for_each_cpu_mask(i, cpu_online_map) {
+	for_each_cpu(i) {
 		struct sched_domain *cpu_domain = cpu_sched_domain(i);
 		struct sched_domain *phys_domain = &per_cpu(phys_domains, i);
 		struct sched_domain *node_domain = &per_cpu(node_domains, i);
@@ -1152,11 +1152,11 @@ __init void arch_init_sched_domains(void)
 		phys_domain->span = nodemask;
 
 		*node_domain = SD_NODE_INIT;
-		node_domain->span = cpu_online_map;
+		node_domain->span = cpu_possible_map;
 	}
 
 	/* Set up CPU (sibling) groups */
-	for_each_cpu_mask(i, cpu_online_map) {
+	for_each_cpu(i) {
 		struct sched_domain *cpu_domain = cpu_sched_domain(i);
 		int j;
 		first_cpu = last_cpu = NULL;
@@ -1184,7 +1184,7 @@ __init void arch_init_sched_domains(void)
 		int j;
 		cpumask_t nodemask;
 		struct sched_group *node = &sched_group_nodes[i];
-		cpus_and(nodemask, node_to_cpumask(i), cpu_online_map);
+		cpus_and(nodemask, node_to_cpumask(i), cpu_possible_map);
 
 		if (cpus_empty(nodemask))
 			continue;
@@ -1220,7 +1220,7 @@ __init void arch_init_sched_domains(void)
 	for (i = 0; i < MAX_NUMNODES; i++) {
 		struct sched_group *cpu = &sched_group_nodes[i];
 		cpumask_t nodemask;
-		cpus_and(nodemask, node_to_cpumask(i), cpu_online_map);
+		cpus_and(nodemask, node_to_cpumask(i), cpu_possible_map);
 
 		if (cpus_empty(nodemask))
 			continue;
@@ -1237,7 +1237,7 @@ __init void arch_init_sched_domains(void)
 	last_cpu->next = first_cpu;
 
 	mb();
-	for_each_cpu_mask(i, cpu_online_map) {
+	for_each_cpu(i) {
 		int node = cpu_to_node(i);
 		struct sched_domain *cpu_domain = cpu_sched_domain(i);
 		struct sched_domain *phys_domain = &per_cpu(phys_domains, i);
@@ -1264,7 +1264,7 @@ __init void arch_init_sched_domains(void)
 	struct sched_group *first_cpu = NULL, *last_cpu = NULL;
 
 	/* Set up domains */
-	for_each_cpu_mask(i, cpu_online_map) {
+	for_each_cpu(i) {
 		struct sched_domain *cpu_domain = cpu_sched_domain(i);
 		struct sched_domain *phys_domain = &per_cpu(phys_domains, i);
 
@@ -1272,11 +1272,11 @@ __init void arch_init_sched_domains(void)
 		cpu_domain->span = cpu_sibling_map[i];
 
 		*phys_domain = SD_CPU_INIT;
-		phys_domain->span = cpu_online_map;
+		phys_domain->span = cpu_possible_map;
 	}
 
 	/* Set up CPU (sibling) groups */
-	for_each_cpu_mask(i, cpu_online_map) {
+	for_each_cpu(i) {
 		struct sched_domain *cpu_domain = cpu_sched_domain(i);
 		int j;
 		first_cpu = last_cpu = NULL;
@@ -1302,7 +1302,7 @@ __init void arch_init_sched_domains(void)
 
 	first_cpu = last_cpu = NULL;
 	/* Set up physical groups */
-	for_each_cpu_mask(i, cpu_online_map) {
+	for_each_cpu(i) {
 		struct sched_domain *cpu_domain = cpu_sched_domain(i);
 		struct sched_group *cpu = &sched_group_phys[i];
 
@@ -1322,7 +1322,7 @@ __init void arch_init_sched_domains(void)
 	last_cpu->next = first_cpu;
 
 	mb();
-	for_each_cpu_mask(i, cpu_online_map) {
+	for_each_cpu(i) {
 		struct sched_domain *cpu_domain = cpu_sched_domain(i);
 		struct sched_domain *phys_domain = &per_cpu(phys_domains, i);
 		struct sched_group *cpu_group = &sched_group_cpus[i];
