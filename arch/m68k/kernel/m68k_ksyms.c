@@ -45,7 +45,6 @@ EXPORT_SYMBOL(mm_end_of_chunk);
 #else
 EXPORT_SYMBOL(m68k_memoffset);
 #endif /* !CONFIG_SINGLE_MEMORY_CHUNK */
-EXPORT_SYMBOL(mm_vtop_fallback);
 EXPORT_SYMBOL(__ioremap);
 EXPORT_SYMBOL(iounmap);
 EXPORT_SYMBOL(kernel_set_cachemode);
