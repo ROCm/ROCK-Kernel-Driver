@@ -1143,6 +1143,7 @@ static int matroxfb_ioctl(struct inode *inode, struct file *file,
 					return -EFAULT;
 				return err;
 			}
+		case VIDIOC_S_CTRL_OLD:
 		case VIDIOC_S_CTRL:
 			{
 				struct v4l2_control ctrl;
