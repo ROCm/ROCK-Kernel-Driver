@@ -135,11 +135,11 @@ struct ixgb_adapter {
 	struct timer_list watchdog_timer;
 	struct vlan_group *vlgrp;
 	char *id_string;
-	uint32_t bd_number;
-	uint32_t rx_buffer_len;
-	uint32_t part_num;
-	uint16_t link_speed;
-	uint16_t link_duplex;
+	u32 bd_number;
+	u32 rx_buffer_len;
+	u32 part_num;
+	u16 link_speed;
+	u16 link_duplex;
 	atomic_t irq_sem;
 	struct work_struct tx_timeout_task;
 
@@ -154,19 +154,19 @@ struct ixgb_adapter {
 	/* TX */
 	struct ixgb_desc_ring tx_ring;
 	unsigned long timeo_start;
-	uint32_t tx_cmd_type;
+	u32 tx_cmd_type;
 	int max_data_per_txd;
 	uint64_t hw_csum_tx_good;
 	uint64_t hw_csum_tx_error;
 	boolean_t tx_csum;
-	uint32_t tx_int_delay;
+	u32 tx_int_delay;
 	boolean_t tx_int_delay_enable;
 
 	/* RX */
 	struct ixgb_desc_ring rx_ring;
 	uint64_t hw_csum_rx_error;
 	uint64_t hw_csum_rx_good;
-	uint32_t rx_int_delay;
+	u32 rx_int_delay;
 	boolean_t raidc;
 	boolean_t rx_csum;
 
@@ -178,7 +178,7 @@ struct ixgb_adapter {
 	/* structs defined in ixgb_hw.h */
 	struct ixgb_hw hw;
 	struct ixgb_hw_stats stats;
-	uint32_t pci_state[16];
+	u32 pci_state[16];
 	char ifname[IFNAMSIZ];
 };
 

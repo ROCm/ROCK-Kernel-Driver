@@ -91,7 +91,7 @@ static int
 ixgb_ethtool_promiscuous(struct ixgb_adapter *adapter,
 			 struct ethtool_pmode *pmode)
 {
-	uint32_t rctl = IXGB_READ_REG(&adapter->hw, RCTL);
+	u32 rctl = IXGB_READ_REG(&adapter->hw, RCTL);
 
 	pmode->rctl_old = rctl;
 	if (pmode->upe)
@@ -112,7 +112,7 @@ ixgb_ethtool_promiscuous(struct ixgb_adapter *adapter,
 }
 #endif
 
-#define IXGB_REG_DUMP_LEN  136*sizeof(uint32_t)
+#define IXGB_REG_DUMP_LEN  136*sizeof(u32)
 static void
 ixgb_ethtool_gdrvinfo(struct ixgb_adapter *adapter,
 		      struct ethtool_drvinfo *drvinfo)
@@ -131,12 +131,12 @@ ixgb_ethtool_gdrvinfo(struct ixgb_adapter *adapter,
 #define IXGB_GET_STAT(_A_, _R_) _A_->stats._R_
 static void
 ixgb_ethtool_gregs(struct ixgb_adapter *adapter,
-		   struct ethtool_regs *regs, uint8_t * regs_buff)
+		   struct ethtool_regs *regs, u8 * regs_buff)
 {
 	struct ixgb_hw *hw = &adapter->hw;
-	uint32_t *reg = (uint32_t *) regs_buff;
-	uint32_t *reg_start = reg;
-	uint8_t i;
+	u32 *reg = (u32 *) regs_buff;
+	u32 *reg_start = reg;
+	u8 i;
 
 	regs->version =
 	    (adapter->hw.device_id << 16) | adapter->hw.subsystem_id;
@@ -273,13 +273,13 @@ ixgb_ethtool_gregs(struct ixgb_adapter *adapter,
 
 #if 0
 #endif
-	regs->len = (reg - reg_start) * sizeof (uint32_t);
+	regs->len = (reg - reg_start) * sizeof (u32);
 }
 #endif				/* ETHTOOL_GREGS */
 
 static int
 ixgb_ethtool_geeprom(struct ixgb_adapter *adapter,
-		     struct ethtool_eeprom *eeprom, uint16_t * eeprom_buff)
+		     struct ethtool_eeprom *eeprom, u16 * eeprom_buff)
 {
 	struct ixgb_hw *hw = &adapter->hw;
 	int i, max_len, first_word, last_word;
@@ -315,7 +315,7 @@ ixgb_ethtool_seeprom(struct ixgb_adapter *adapter,
 		     struct ethtool_eeprom *eeprom, void *user_data)
 {
 	struct ixgb_hw *hw = &adapter->hw;
-	uint16_t eeprom_buff[256];
+	u16 eeprom_buff[256];
 	int i, max_len, first_word, last_word;
 	void *ptr;
 
@@ -413,9 +413,9 @@ ixgb_ethtool_ioctl(struct net_device *netdev, struct ifreq *ifr)
 {
 	struct ixgb_adapter *adapter = netdev->priv;
 	void *addr = ifr->ifr_data;
-	uint32_t cmd;
+	u32 cmd;
 
-	if (get_user(cmd, (uint32_t *) addr))
+	if (get_user(cmd, (u32 *) addr))
 		return -EFAULT;
 
 	switch (cmd) {
@@ -467,7 +467,7 @@ ixgb_ethtool_ioctl(struct net_device *netdev, struct ifreq *ifr)
 #if defined(ETHTOOL_GREGS) && defined(ETHTOOL_GEEPROM)
 	case ETHTOOL_GREGS:{
 			struct ethtool_regs regs = { ETHTOOL_GREGS };
-			uint8_t regs_buff[IXGB_REG_DUMP_LEN];
+			u8 regs_buff[IXGB_REG_DUMP_LEN];
 
 			ixgb_ethtool_gregs(adapter, &regs, regs_buff);
 
@@ -513,7 +513,7 @@ ixgb_ethtool_ioctl(struct net_device *netdev, struct ifreq *ifr)
 
 	case ETHTOOL_GEEPROM:{
 			struct ethtool_eeprom eeprom = { ETHTOOL_GEEPROM };
-			uint16_t eeprom_buff[IXGB_EEPROM_SIZE];
+			u16 eeprom_buff[IXGB_EEPROM_SIZE];
 			void *ptr;
 			int err;
 

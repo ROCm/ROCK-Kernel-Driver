@@ -73,32 +73,32 @@
 
 /* EEPROM structure */
 struct ixgb_ee_map_type {
-	uint8_t mac_addr[IXGB_ETH_LENGTH_OF_ADDRESS];
-	uint16_t compatibility;
-	uint16_t reserved1[4];
-	uint32_t pba_number;
-	uint16_t init_ctrl_reg_1;
-	uint16_t subsystem_id;
-	uint16_t subvendor_id;
-	uint16_t device_id;
-	uint16_t vendor_id;
-	uint16_t init_ctrl_reg_2;
-	uint16_t oem_reserved[16];
-	uint16_t swdpins_reg;
-	uint16_t circuit_ctrl_reg;
-	uint8_t d3_power;
-	uint8_t d0_power;
-	uint16_t reserved2[28];
-	uint16_t checksum;
+	u8 mac_addr[IXGB_ETH_LENGTH_OF_ADDRESS];
+	u16 compatibility;
+	u16 reserved1[4];
+	u32 pba_number;
+	u16 init_ctrl_reg_1;
+	u16 subsystem_id;
+	u16 subvendor_id;
+	u16 device_id;
+	u16 vendor_id;
+	u16 init_ctrl_reg_2;
+	u16 oem_reserved[16];
+	u16 swdpins_reg;
+	u16 circuit_ctrl_reg;
+	u8 d3_power;
+	u8 d0_power;
+	u16 reserved2[28];
+	u16 checksum;
 };
 
 /* EEPROM Functions */
-uint16_t ixgb_read_eeprom(struct ixgb_hw *hw, uint16_t reg);
+u16 ixgb_read_eeprom(struct ixgb_hw *hw, u16 reg);
 
 boolean_t ixgb_validate_eeprom_checksum(struct ixgb_hw *hw);
 
 void ixgb_update_eeprom_checksum(struct ixgb_hw *hw);
 
-void ixgb_write_eeprom(struct ixgb_hw *hw, uint16_t reg, uint16_t data);
+void ixgb_write_eeprom(struct ixgb_hw *hw, u16 reg, u16 data);
 
 #endif				/* IXGB_EE_H */
