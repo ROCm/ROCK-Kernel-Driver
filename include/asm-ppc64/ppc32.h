@@ -141,20 +141,6 @@ struct ucontext32 {
 	struct mcontext32	uc_mcontext;
 };
 
-typedef struct compat_sigevent {
-	compat_sigval_t sigev_value;
-	int sigev_signo;
-	int sigev_notify;
-	union {
-		int _pad[SIGEV_PAD_SIZE];
-		int _tid;
-		struct {
-			compat_uptr_t _function;
-			compat_uptr_t _attribute;
-		} _sigev_thread;
-	} _sigev_un;
-} compat_sigevent_t;
-
 struct ipc_kludge_32 {
 	unsigned int msgp;
 	int msgtyp;

@@ -266,6 +266,11 @@ cond_syscall(sys_mq_timedsend)
 cond_syscall(sys_mq_timedreceive)
 cond_syscall(sys_mq_notify)
 cond_syscall(sys_mq_getsetattr)
+cond_syscall(compat_sys_mq_open)
+cond_syscall(compat_sys_mq_timedsend)
+cond_syscall(compat_sys_mq_timedreceive)
+cond_syscall(compat_sys_mq_notify)
+cond_syscall(compat_sys_mq_getsetattr)
 
 /* arch-specific weak syscall entries */
 cond_syscall(sys_pciconfig_read)

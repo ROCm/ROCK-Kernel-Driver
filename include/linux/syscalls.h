@@ -48,7 +48,6 @@ struct timex;
 struct timezone;
 struct tms;
 struct utimbuf;
-typedef int mqd_t;
 struct mq_attr;
 
 #include <linux/config.h>

@@ -18,9 +18,9 @@
 #ifndef _LINUX_MQUEUE_H
 #define _LINUX_MQUEUE_H
 
-#define MQ_PRIO_MAX 	32768
+#include <linux/types.h>
 
-typedef int mqd_t;
+#define MQ_PRIO_MAX 	32768
 
 struct mq_attr {
 	long	mq_flags;	/* message queue flags			*/
