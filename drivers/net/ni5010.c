@@ -96,6 +96,7 @@ struct ni5010_local {
 	struct net_device_stats stats;
 	int o_pkt_size;
 	int i_pkt_size;
+	spinlock_t lock;
 };
 
 /* Index to functions, as function prototypes. */
@@ -280,11 +281,16 @@ static int __init ni5010_probe1(struct net_device *dev, int ioaddr)
 	/* DMA is not supported (yet?), so no use detecting it */
 
 	if (dev->priv == NULL) {
+		struct ni5010_local* lp;
+
 		dev->priv = kmalloc(sizeof(struct ni5010_local), GFP_KERNEL|GFP_DMA);
 		if (dev->priv == NULL) {
 			printk(KERN_WARNING "%s: Failed to allocate private memory\n", dev->name);
 			return -ENOMEM;
 		}
+
+		lp = (struct ni5010_local*)dev->priv;
+		spin_lock_init(&lp->lock);
 	}
 
 	PRINTK2((KERN_DEBUG "%s: I/O #10 passed!\n", dev->name));
@@ -463,6 +469,7 @@ static irqreturn_t ni5010_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	ioaddr = dev->base_addr;
 	lp = (struct ni5010_local *)dev->priv;
 	
+	spin_lock(&lp->lock);
 	status = inb(IE_ISTAT); 
 	PRINTK3((KERN_DEBUG "%s: IE_ISTAT = %#02x\n", dev->name, status));
 		
@@ -479,6 +486,7 @@ static irqreturn_t ni5010_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 	if (!xmit_was_error) 
 		reset_receiver(dev); 
+	spin_unlock(&lp->lock);
 	return IRQ_HANDLED;
 }
 
@@ -693,8 +701,7 @@ static void hardware_send_packet(struct net_device *dev, char *buf, int length, 
         buf_offs = NI5010_BUFSIZE - length - pad;
         lp->o_pkt_size = length + pad;
 
-	save_flags(flags);	
-	cli();
+	spin_lock_irqsave(&lp->lock, flags);
 
 	outb(0, EDLC_RMASK);	/* Mask all receive interrupts */
 	outb(0, IE_MMODE);	/* Put Xmit buffer on system bus */
@@ -712,7 +719,7 @@ static void hardware_send_packet(struct net_device *dev, char *buf, int length, 
 	outb(MM_EN_XMT | MM_MUX, IE_MMODE); /* Begin transmission */
 	outb(XM_ALL, EDLC_XMASK); /* Cause interrupt after completion or fail */
 
-	restore_flags(flags);
+	spin_unlock_irqrestore(&lp->lock, flags);
 
 	netif_wake_queue(dev);
 	
