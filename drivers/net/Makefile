@@ -2,8 +2,6 @@
 # Makefile for the Linux network (ethercard) device drivers.
 #
 
-rcpci-objs	:=	rcpci45.o rclanmtl.o
-
 ifeq ($(CONFIG_ISDN_PPP),y)
   obj-$(CONFIG_ISDN) += slhc.o
 endif
@@ -32,7 +30,6 @@ obj-$(CONFIG_BMAC) += bmac.o
 obj-$(CONFIG_OAKNET) += oaknet.o 8390.o
 
 obj-$(CONFIG_DGRS) += dgrs.o
-obj-$(CONFIG_RCPCI) += rcpci.o
 obj-$(CONFIG_VORTEX) += 3c59x.o
 obj-$(CONFIG_TYPHOON) += typhoon.o
 obj-$(CONFIG_NE2K_PCI) += ne2k-pci.o 8390.o
