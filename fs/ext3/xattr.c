@@ -875,7 +875,7 @@ ext3_xattr_set(struct inode *inode, int name_index, const char *name,
 	handle_t *handle;
 	int error, error2;
 
-	handle = ext3_journal_start(inode, EXT3_XATTR_TRANS_BLOCKS);
+	handle = ext3_journal_start(inode, EXT3_DATA_TRANS_BLOCKS);
 	if (IS_ERR(handle))
 		error = PTR_ERR(handle);
 	else
