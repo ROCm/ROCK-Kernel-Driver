@@ -48,7 +48,8 @@
 
 /* A structure to carry information to the ULP (e.g. Sockets API) */
 struct sctp_ulpq {
-	int malloced;
+	char malloced;
+	char pd_mode;
 	sctp_association_t *asoc;
 	struct sk_buff_head reasm;
 	struct sk_buff_head lobby;
@@ -60,13 +61,19 @@ struct sctp_ulpq *sctp_ulpq_init(struct sctp_ulpq *, sctp_association_t *);
 void sctp_ulpq_free(struct sctp_ulpq *);
 
 /* Add a new DATA chunk for processing. */
-int sctp_ulpq_tail_data(struct sctp_ulpq *, sctp_chunk_t *chunk, int priority);
+int sctp_ulpq_tail_data(struct sctp_ulpq *, struct sctp_chunk *, int);
 
 /* Add a new event for propogation to the ULP. */
 int sctp_ulpq_tail_event(struct sctp_ulpq *, struct sctp_ulpevent *ev);
 
-/* Is the ulpqueue empty. */
-int sctp_ulpqueue_is_empty(struct sctp_ulpq *);
+/* Perform partial delivery. */
+void sctp_ulpq_partial_delivery(struct sctp_ulpq *, struct sctp_chunk *, int);
+
+/* Abort the partial delivery. */
+void sctp_ulpq_abort_pd(struct sctp_ulpq *, int);
+
+/* Clear the partial data delivery condition on this socket. */
+int sctp_clear_pd(struct sock *sk);
 
 #endif /* __sctp_ulpqueue_h__ */
 

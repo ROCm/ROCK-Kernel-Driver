@@ -193,11 +193,17 @@ int sctp_outq_tail(struct sctp_outq *q, sctp_chunk_t *chunk)
 			  : "Illegal Chunk");
 
 			skb_queue_tail(&q->out, (struct sk_buff *) chunk);
+			if (chunk->chunk_hdr->flags & SCTP_DATA_UNORDERED)
+				SCTP_INC_STATS(SctpOutUnorderChunks);
+			else
+				SCTP_INC_STATS(SctpOutOrderChunks);
 			q->empty = 0;
 			break;
 		};
-	} else
+	} else {
 		skb_queue_tail(&q->control, (struct sk_buff *) chunk);
+		SCTP_INC_STATS(SctpOutCtrlChunks);
+	}
 
 	if (error < 0)
 		return error;
