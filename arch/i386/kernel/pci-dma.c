@@ -122,6 +122,7 @@ void dma_release_declared_memory(struct device *dev)
 	if(!mem)
 		return;
 	dev->dma_mem = NULL;
+	iounmap(mem->virt_base);
 	kfree(mem->bitmap);
 	kfree(mem);
 }

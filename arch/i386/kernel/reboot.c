@@ -20,7 +20,7 @@
 void (*pm_power_off)(void);
 
 static int reboot_mode;
-int reboot_thru_bios;
+static int reboot_thru_bios;
 
 #ifdef CONFIG_SMP
 int reboot_smp = 0;
