@@ -2056,8 +2056,6 @@ generic_file_write(struct file *file, const char *buf,
 				mark_inode_dirty(inode);
 			}
 			*ppos = end;
-			if (mapping->nrpages)
-				invalidate_inode_pages2(mapping);
 		}
 		/*
 		 * Sync the fs metadata but not the minor inode changes and

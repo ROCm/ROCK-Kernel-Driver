@@ -625,6 +625,8 @@ generic_file_direct_IO(int rw, struct inode *inode, char *buf,
 			goto out;
 	}
 	retval = mapping->a_ops->direct_IO(rw, inode, buf, offset, count);
+	if (inode->i_mapping->nrpages)
+		invalidate_inode_pages2(inode->i_mapping);
 out:
 	return retval;
 }
