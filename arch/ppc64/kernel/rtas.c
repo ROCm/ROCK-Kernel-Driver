@@ -51,7 +51,7 @@ struct flash_block_list_header rtas_firmware_flash_list = {0, 0};
  */
 
 struct rtas_t rtas = { 
-	lock: SPIN_LOCK_UNLOCKED
+	.lock = SPIN_LOCK_UNLOCKED
 };
 
 extern unsigned long reloc_offset(void);

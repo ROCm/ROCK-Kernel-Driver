@@ -114,10 +114,10 @@ static unsigned int rtas_log_poll(struct file *file, poll_table * wait)
 }
 
 struct file_operations proc_rtas_log_operations = {
-	read:		rtas_log_read,
-	poll:		rtas_log_poll,
-	open:		rtas_log_open,
-	release:	rtas_log_release,
+	.read =		rtas_log_read,
+	.poll =		rtas_log_poll,
+	.open =		rtas_log_open,
+	.release =	rtas_log_release,
 };
 
 static void log_rtas(char *buf)

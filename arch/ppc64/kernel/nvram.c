@@ -99,11 +99,11 @@ static int nvram_ioctl(struct inode *inode, struct file *file,
 }
 
 struct file_operations nvram_fops = {
-	owner:		THIS_MODULE,
-	llseek:		nvram_llseek,
-	read:		read_nvram,
-	write:		write_nvram,
-	ioctl:		nvram_ioctl,
+	.owner =	THIS_MODULE,
+	.llseek =	nvram_llseek,
+	.read =		read_nvram,
+	.write =	write_nvram,
+	.ioctl =	nvram_ioctl,
 };
 
 static struct miscdevice nvram_dev = {
