@@ -5,8 +5,9 @@
  */
 
 	.text
-	.align	32
-	.globl	memmove
+	.align		32
+	.globl		memmove
+	.type		memmove,#function
 memmove:
 	mov		%o0, %g1
 	cmp		%o0, %o1
@@ -29,3 +30,4 @@ memmove:
 
 	retl
 	 mov		%g1, %o0
+	.size		memmove, .-memmove

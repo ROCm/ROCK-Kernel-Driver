@@ -7,8 +7,9 @@
 #include <asm/asi.h>
 
 	.text
-	.align 4
-	.global strncmp
+	.align	32
+	.globl	strncmp
+	.type	strncmp,#function
 strncmp:
 	brlez,pn %o2, 3f
 	 lduba	[%o0] (ASI_PNF), %o3
@@ -28,3 +29,4 @@ strncmp:
 3:
 	retl
 	 clr	%o0
+	.size	strncmp, .-strncmp
