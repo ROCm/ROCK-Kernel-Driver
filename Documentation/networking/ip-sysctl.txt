@@ -355,6 +355,17 @@ mc_forwarding - BOOLEAN
 	Do multicast routing. The kernel needs to be compiled with CONFIG_MROUTE
 	and a multicast routing daemon is required.
 
+medium_id - INTEGER
+	Integer value used to differentiate the devices by the medium they
+	are attached to. Two devices can have different id values when
+	the broadcast packets are received only on one of them.
+	The default value 0 means that the device is the only interface
+	to its medium, value of -1 means that medium is not known.
+	
+	Currently, it is used to change the proxy_arp behavior:
+	the proxy_arp feature is enabled for packets forwarded between
+	two devices attached to different media.
+
 proxy_arp - BOOLEAN
 	Do proxy arp.
 
