@@ -34,7 +34,7 @@
 #include <linux/blk.h>
 #include <linux/blkpg.h>
 #include <linux/hdreg.h>  /* HDIO_GETGEO */
-#include <linux/device.h>
+#include <linux/sysdev.h>
 #include <linux/bio.h>
 #include <linux/devfs_fs_kernel.h>
 #include <asm/uaccess.h>
