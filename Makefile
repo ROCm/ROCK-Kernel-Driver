@@ -295,12 +295,15 @@ include/linux/autoconf.h: .config
 #	this Makefile
 
 include/linux/version.h: Makefile
-	@. scripts/mkversion_h $@ $(KERNELRELEASE) $(VERSION) $(PATCHLEVEL) $(SUBLEVEL)
+	@scripts/mkversion_h $@ $(KERNELRELEASE) $(VERSION) $(PATCHLEVEL) $(SUBLEVEL)
 
 # Helpers built in scripts/
 # ---------------------------------------------------------------------------
 
-scripts/mkdep scripts/split-include : FORCE
+scripts/mkdep scripts/split-include : scripts ;
+
+.PHONY: scripts
+scripts:
 	@$(MAKE) -C scripts
 
 # Generate dependencies
