@@ -495,12 +495,10 @@ static int wl3501_mgmt_scan(struct wl3501_card *this, u16 chan_time)
 	dprintk(3, "entry");
 	signal.next_blk = 0;
 	signal.sig_id = WL3501_SIG_SCAN_REQ;
-	signal.ssid[0] = 0;
-	signal.ssid[1] = 0;
+	signal.ssid[0] = signal.ssid[1] = 0;
 	signal.scan_type = WL3501_SCAN_TYPE_ACTIVE;
 	signal.probe_delay = 0x10;
-	signal.min_chan_time = chan_time;
-	signal.max_chan_time = chan_time;
+	signal.min_chan_time = signal.max_chan_time = chan_time;
 
 	if (this->net_type == IW_MODE_INFRA)
 		signal.bss_type = WL3501_NET_TYPE_INFRA;
@@ -1434,7 +1432,7 @@ struct iw_statistics *wl3501_get_wireless_stats(struct net_device *dev)
 {
 	struct wl3501_card *this = (struct wl3501_card *)dev->priv;
 	struct iw_statistics *wstats = &this->wstats;
-	u16 value;
+	u32 value; /* size checked: it is u32 */
 
 	memset(wstats, 0, sizeof(*wstats));
 	wstats->status = netif_running(dev);
@@ -1776,7 +1774,7 @@ static int wl3501_get_rts_threshold(struct net_device *dev,
 				    struct iw_request_info *info,
 				    union iwreq_data *wrqu, char *extra)
 {
-	u16 threshold;
+	u16 threshold; /* size checked: it is u16 */
 	struct wl3501_card *this = (struct wl3501_card *)dev->priv;
 	int rc = wl3501_get_mib_value(this, WL3501_MIB_ATTR_RTS_THRESHOLD,
 				      &threshold, sizeof(threshold));
@@ -1792,7 +1790,7 @@ static int wl3501_get_frag_threshold(struct net_device *dev,
 				     struct iw_request_info *info,
 				     union iwreq_data *wrqu, char *extra)
 {
-	u16 threshold;
+	u16 threshold; /* size checked: it is u16 */
 	struct wl3501_card *this = (struct wl3501_card *)dev->priv;
 	int rc = wl3501_get_mib_value(this, WL3501_MIB_ATTR_FRAG_THRESHOLD,
 				      &threshold, sizeof(threshold));
@@ -1830,7 +1828,7 @@ static int wl3501_get_retry(struct net_device *dev,
 			    struct iw_request_info *info,
 			    union iwreq_data *wrqu, char *extra)
 {
-	u16 retry;
+	u16 retry; /* size checked: it is u16 */
 	struct wl3501_card *this = (struct wl3501_card *)dev->priv;
 	int rc = wl3501_get_mib_value(this,
 				      WL3501_MIB_ATTR_LONG_RETRY_LIMIT,
