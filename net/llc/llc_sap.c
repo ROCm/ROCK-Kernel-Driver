@@ -23,6 +23,22 @@
 #include <net/llc_pdu.h>
 #include <linux/if_tr.h>
 
+void llc_save_primitive(struct sk_buff* skb, u8 prim)
+{
+	struct sockaddr_llc *addr = llc_ui_skb_cb(skb);
+
+       /* save primitive for use by the user. */
+	addr->sllc_family = skb->sk->sk_family;
+	addr->sllc_arphrd = skb->dev->type;
+	addr->sllc_test   = prim == LLC_TEST_PRIM;
+	addr->sllc_xid    = prim == LLC_XID_PRIM;
+	addr->sllc_ua     = prim == LLC_DATAUNIT_PRIM;
+	llc_pdu_decode_sa(skb, addr->sllc_smac);
+	llc_pdu_decode_da(skb, addr->sllc_dmac);
+	llc_pdu_decode_dsap(skb, &addr->sllc_dsap);
+	llc_pdu_decode_ssap(skb, &addr->sllc_ssap);
+}
+
 /**
  *	llc_sap_assign_sock - adds a connection to a SAP
  *	@sap: pointer to SAP.
@@ -238,6 +254,36 @@ static void llc_sap_rcv(struct llc_sap *sap, struct sk_buff *skb)
 	ev->type   = LLC_SAP_EV_TYPE_PDU;
 	ev->reason = 0;
 	llc_sap_state_process(sap, skb);
+}
+
+/**
+ *	llc_lookup_dgram - Finds dgram socket for the local sap/mac
+ *	@sap: SAP
+ *	@laddr: address of local LLC (MAC + SAP)
+ *
+ *	Search socket list of the SAP and finds connection using the local
+ *	mac, and local sap. Returns pointer for socket found, %NULL otherwise.
+ */
+struct sock *llc_lookup_dgram(struct llc_sap *sap, struct llc_addr *laddr)
+{
+	struct sock *rc;
+	struct hlist_node *node;
+
+	read_lock_bh(&sap->sk_list.lock);
+	sk_for_each(rc, node, &sap->sk_list.list) {
+		struct llc_opt *llc = llc_sk(rc);
+
+		if (rc->sk_type == SOCK_DGRAM &&
+		    llc->laddr.lsap == laddr->lsap &&
+		    llc_mac_match(llc->laddr.mac, laddr->mac)) {
+			sock_hold(rc);
+			goto found;
+		}
+	}
+	rc = NULL;
+found:
+	read_unlock_bh(&sap->sk_list.lock);
+	return rc;
 }
 
 void llc_sap_handler(struct llc_sap *sap, struct sk_buff *skb)
