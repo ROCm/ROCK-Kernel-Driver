@@ -921,7 +921,7 @@ asmlinkage int solaris_putmsg(unsigned int fd, u32 arg1, u32 arg2, u32 arg3)
 	ino = filp->f_dentry->d_inode;
 	if (!ino) goto out;
 
-	if (!IS_SOCK(ino->i_mode) &&
+	if (!S_ISSOCK(ino->i_mode) &&
 		(imajor(ino) != 30 || iminor(ino) != 1))
 		goto out;
 
