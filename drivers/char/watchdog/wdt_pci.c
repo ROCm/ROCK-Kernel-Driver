@@ -367,7 +367,7 @@ static int wdtpci_open(struct inode *inode, struct file *file)
 				return -EBUSY;
 
 			if (nowayout) {
-				MOD_INC_USE_COUNT;
+				__module_get(THIS_MODULE);
 			}
 			/*
 			 *	Activate 
