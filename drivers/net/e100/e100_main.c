@@ -1140,6 +1140,8 @@ e100_set_mac(struct net_device *dev, void *addr)
 	int rc = -1;
 	struct sockaddr *p_sockaddr = (struct sockaddr *) addr;
 
+	if (!is_valid_ether_addr(p_sockaddr->sa_data))
+		return -EADDRNOTAVAIL;
 	bdp = dev->priv;
 
 	if (e100_setup_iaaddr(bdp, (u8 *) (p_sockaddr->sa_data))) {
@@ -1274,6 +1276,10 @@ e100_init(struct e100_private *bdp)
 
 	/* read the MAC address from the eprom */
 	e100_rd_eaddr(bdp);
+	if (!is_valid_ether_addr(bdp->device->dev_addr)) {
+		printk(KERN_ERR "e100: Invalid Ethernet address\n");
+		return false;
+	}
 	/* read NIC's part number */
 	e100_rd_pwa_no(bdp);
 
