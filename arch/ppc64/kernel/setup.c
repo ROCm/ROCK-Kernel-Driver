@@ -51,7 +51,6 @@
 extern unsigned long klimit;
 /* extern void *stab; */
 extern HTAB htab_data;
-extern unsigned long loops_per_jiffy;
 
 int have_of = 1;
 
@@ -68,11 +67,11 @@ extern void  pmac_init(unsigned long r3,
 		       unsigned long r7);
 
 extern void fw_feature_init(void);
-extern void iSeries_init_early( void );
-extern void pSeries_init_early( void );
+extern void iSeries_init_early(void);
+extern void pSeries_init_early(void);
 extern void pSeriesLP_init_early(void);
 extern void pmac_init_early(void);
-extern void mm_init_ppc64( void ); 
+extern void mm_init_ppc64(void);
 extern void pseries_secondary_smp_init(unsigned long); 
 extern int  idle_setup(void);
 extern void vpa_init(int cpu);
@@ -263,10 +262,10 @@ void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
 
 #ifdef CONFIG_PPC_ISERIES
 	/* pSeries systems are identified in prom.c via OF. */
-	if ( itLpNaca.xLparInstalled == 1 )
+	if (itLpNaca.xLparInstalled == 1)
 		systemcfg->platform = PLATFORM_ISERIES_LPAR;
 #endif
-	
+
 	switch (systemcfg->platform) {
 #ifdef CONFIG_PPC_ISERIES
 	case PLATFORM_ISERIES_LPAR:
@@ -627,17 +626,6 @@ int __init ppc_init(void)
 
 arch_initcall(ppc_init);
 
-void __init ppc64_calibrate_delay(void)
-{
-	loops_per_jiffy = tb_ticks_per_jiffy;
-
-	printk("Calibrating delay loop... %lu.%02lu BogoMips\n",
-			       loops_per_jiffy/(500000/HZ),
-			       loops_per_jiffy/(5000/HZ) % 100);
-}	
-
-extern void (*calibrate_delay)(void);
-
 #ifdef CONFIG_IRQSTACKS
 static void __init irqstack_early_init(void)
 {
@@ -693,7 +681,6 @@ void __init setup_arch(char **cmdline_p)
 	extern int panic_timeout;
 	extern void do_init_bootmem(void);
 
-	calibrate_delay = ppc64_calibrate_delay;
 
 	ppc64_boot_msg(0x12, "Setup Arch");
 
