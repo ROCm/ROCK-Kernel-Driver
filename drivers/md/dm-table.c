@@ -663,14 +663,14 @@ int dm_table_add_target(struct dm_table *t, const char *type,
 
 	if (!len) {
 		tgt->error = "zero-length target";
-		DMERR(": %s\n", tgt->error);
+		DMERR("%s", tgt->error);
 		return -EINVAL;
 	}
 
 	tgt->type = dm_get_target_type(type);
 	if (!tgt->type) {
 		tgt->error = "unknown target type";
-		DMERR(": %s\n", tgt->error);
+		DMERR("%s", tgt->error);
 		return -EINVAL;
 	}
 
@@ -707,7 +707,7 @@ int dm_table_add_target(struct dm_table *t, const char *type,
 	return 0;
 
  bad:
-	DMERR(": %s\n", tgt->error);
+	DMERR("%s", tgt->error);
 	dm_put_target_type(tgt->type);
 	return r;
 }
