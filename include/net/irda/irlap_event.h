@@ -12,7 +12,7 @@
  * 
  *     Copyright (c) 1998-1999 Dag Brattli <dagb@cs.uit.no>, 
  *     All Rights Reserved.
- *     Copyright (c) 2000-2001 Jean Tourrilhes <jt@hpl.hp.com>
+ *     Copyright (c) 2000-2002 Jean Tourrilhes <jt@hpl.hp.com>
  *     
  *     This program is free software; you can redistribute it and/or 
  *     modify it under the terms of the GNU General Public License as 
@@ -35,9 +35,10 @@
 #define IRLAP_EVENT_H
 
 #include <net/irda/irda.h>
-#include <net/irda/discovery.h>
 
+/* A few forward declarations (to make compiler happy) */
 struct irlap_cb;
+struct irlap_info;
 
 /* IrLAP States */
 typedef enum {
@@ -108,27 +109,16 @@ typedef enum {
 } IRLAP_EVENT;
 
 /*
- *  Various things used by the IrLAP state machine
+ * Disconnect reason code
  */
-struct irlap_info {
-	__u8 caddr;   /* Connection address */
-	__u8 control; /* Frame type */
-        __u8 cmd;
-
-	__u32 saddr;
-	__u32 daddr;
-	
-	int pf;        /* Poll/final bit set */
-
-	__u8  nr;      /* Sequence number of next frame expected */
-	__u8  ns;      /* Sequence number of frame sent */
-
-	int  S;        /* Number of slots */
-	int  slot;     /* Random chosen slot */
-	int  s;        /* Current slot */
-
-	discovery_t *discovery; /* Discovery information */
-};
+typedef enum { /* FIXME check the two first reason codes */
+	LAP_DISC_INDICATION=1, /* Received a disconnect request from peer */
+	LAP_NO_RESPONSE,       /* To many retransmits without response */
+	LAP_RESET_INDICATION,  /* To many retransmits, or invalid nr/ns */
+	LAP_FOUND_NONE,        /* No devices were discovered */
+	LAP_MEDIA_BUSY,
+	LAP_PRIMARY_CONFLICT,
+} LAP_REASON;
 
 extern const char *irlap_state[];
 

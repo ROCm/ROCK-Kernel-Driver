@@ -200,10 +200,6 @@ struct seq_operations partitions_op = {
 
 
 extern int blk_dev_init(void);
-#ifdef CONFIG_FUSION
-extern int fusion_init(void);
-#endif
-extern int net_dev_init(void);
 extern int soc_probe(void);
 extern int atmdev_init(void);
 extern int i2o_init(void);
@@ -217,18 +213,12 @@ int __init device_init(void)
 #ifdef CONFIG_I2O
 	i2o_init();
 #endif
-#ifdef CONFIG_FUSION
-	fusion_init();
-#endif
 #ifdef CONFIG_FC4_SOC
 	/* This has to be done before scsi_dev_init */
 	soc_probe();
 #endif
 #ifdef CONFIG_BLK_CPQ_DA
 	cpqarray_init();
-#endif
-#ifdef CONFIG_NET
-	net_dev_init();
 #endif
 #ifdef CONFIG_ATM
 	(void) atmdev_init();

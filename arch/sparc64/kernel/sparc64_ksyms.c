@@ -59,7 +59,6 @@ struct poll {
 	short revents;
 };
 
-extern unsigned prom_cpu_nodes[64];
 extern void die_if_kernel(char *str, struct pt_regs *regs);
 extern pid_t kernel_thread(int (*fn)(void *), void * arg, unsigned long flags);
 void _sigpause_common (unsigned int set, struct pt_regs *);
@@ -103,7 +102,6 @@ extern int dump_fpu (struct pt_regs * regs, elf_fpregset_t * fpregs);
 
 #ifdef CONFIG_SMP
 extern spinlock_t kernel_flag;
-extern int smp_num_cpus;
 #ifdef CONFIG_DEBUG_SPINLOCK
 extern void _do_spin_lock (spinlock_t *lock, char *str);
 extern void _do_spin_unlock (spinlock_t *lock);
@@ -149,12 +147,9 @@ EXPORT_SYMBOL_NOVERS(mcount);
 /* Per-CPU information table */
 EXPORT_SYMBOL(cpu_data);
 
-/* Misc SMP information */
-#ifdef CONFIG_SMP
-EXPORT_SYMBOL(smp_num_cpus);
-#endif
-EXPORT_SYMBOL(__cpu_number_map);
-EXPORT_SYMBOL(__cpu_logical_map);
+/* CPU online map and active count.  */
+EXPORT_SYMBOL(cpu_online_map);
+EXPORT_SYMBOL(sparc64_num_cpus_online);
 
 /* Spinlock debugging library, optional. */
 #ifdef CONFIG_DEBUG_SPINLOCK

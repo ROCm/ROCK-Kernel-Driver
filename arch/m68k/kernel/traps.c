@@ -815,7 +815,7 @@ asmlinkage void buserr_c(struct frame *fp)
 }
 
 
-int kstack_depth_to_print = 48;
+static int kstack_depth_to_print = 48;
 extern struct module kernel_module;
 
 static inline int kernel_text_address(unsigned long addr)

@@ -109,6 +109,8 @@ unsigned int snd_emu8000_peek_dw(emu8000_t *emu, unsigned int port, unsigned int
 /*exported*/ void
 snd_emu8000_dma_chan(emu8000_t *emu, int ch, int mode)
 {
+	unsigned right_bit = (mode & EMU8000_RAM_RIGHT) ? 0x01000000 : 0;
+	mode &= EMU8000_RAM_MODE_MASK;
 	if (mode == EMU8000_RAM_CLOSE) {
 		EMU8000_CCCA_WRITE(emu, ch, 0);
 		EMU8000_DCYSUSV_WRITE(emu, ch, 0x807F);
@@ -122,9 +124,9 @@ snd_emu8000_dma_chan(emu8000_t *emu, int ch, int mode)
 	EMU8000_PSST_WRITE(emu, ch, 0);
 	EMU8000_CSL_WRITE(emu, ch, 0);
 	if (mode == EMU8000_RAM_WRITE) /* DMA write */
-		EMU8000_CCCA_WRITE(emu, ch, 0x06000000);
+		EMU8000_CCCA_WRITE(emu, ch, 0x06000000 | right_bit);
 	else	   /* DMA read */
-		EMU8000_CCCA_WRITE(emu, ch, 0x04000000);
+		EMU8000_CCCA_WRITE(emu, ch, 0x04000000 | right_bit);
 }
 
 /*

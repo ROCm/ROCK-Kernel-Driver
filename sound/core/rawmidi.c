@@ -143,7 +143,7 @@ int snd_rawmidi_drain_output(snd_rawmidi_substream_t * substream)
 			break;
 		}
 		if (runtime->avail < runtime->buffer_size && !timeout) {
-			snd_printk(KERN_WARNING "rawmidi drain error (avail = %i, buffer_size = %i)\n", runtime->avail, runtime->buffer_size);
+			snd_printk(KERN_WARNING "rawmidi drain error (avail = %li, buffer_size = %li)\n", (long)runtime->avail, (long)runtime->buffer_size);
 			err = -EIO;
 			break;
 		}

@@ -57,7 +57,7 @@ typedef struct sndrv_pcm_mmap_control snd_pcm_mmap_control_t;
 typedef struct _snd_pcm_file snd_pcm_file_t;
 typedef struct _snd_pcm_runtime snd_pcm_runtime_t;
 
-#ifdef CONFIG_SND_OSSEMUL
+#if defined(CONFIG_SND_PCM_OSS) || defined(CONFIG_SND_PCM_OSS_MODULE)
 #include "pcm_oss.h"
 #endif
 
@@ -339,7 +339,7 @@ struct _snd_pcm_runtime {
 	dma_addr_t dma_addr;		/* physical bus address (not accessible from main CPU) */
 	unsigned long dma_bytes;	/* size of DMA area */
 
-#ifdef CONFIG_SND_OSSEMUL
+#if defined(CONFIG_SND_PCM_OSS) || defined(CONFIG_SND_PCM_OSS_MODULE)
 	/* -- OSS things -- */
 	snd_pcm_oss_runtime_t oss;
 #endif
@@ -373,7 +373,7 @@ struct _snd_pcm_substream {
 	snd_pcm_substream_t *link_prev;
 	snd_pcm_file_t *file;
 	struct file *ffile;
-#ifdef CONFIG_SND_OSSEMUL
+#if defined(CONFIG_SND_PCM_OSS) || defined(CONFIG_SND_PCM_OSS_MODULE)
 	/* -- OSS things -- */
 	snd_pcm_oss_substream_t oss;
 #endif
@@ -385,7 +385,7 @@ struct _snd_pcm_substream {
 	snd_info_entry_t *proc_prealloc_entry;
 };
 
-#ifdef CONFIG_SND_OSSEMUL
+#if defined(CONFIG_SND_PCM_OSS) || defined(CONFIG_SND_PCM_OSS_MODULE)
 #define SUBSTREAM_BUSY(substream) ((substream)->file != NULL || ((substream)->oss.file != NULL))
 #else
 #define SUBSTREAM_BUSY(substream) ((substream)->file != NULL)
@@ -399,7 +399,7 @@ struct _snd_pcm_str {
 	unsigned int substream_count;
 	unsigned int substream_opened;
 	snd_pcm_substream_t *substream;
-#ifdef CONFIG_SND_OSSEMUL
+#if defined(CONFIG_SND_PCM_OSS) || defined(CONFIG_SND_PCM_OSS_MODULE)
 	/* -- OSS things -- */
 	snd_pcm_oss_stream_t oss;
 #endif
@@ -422,7 +422,7 @@ struct _snd_pcm {
 	wait_queue_head_t open_wait;
 	void *private_data;
 	void (*private_free) (snd_pcm_t *pcm);
-#ifdef CONFIG_SND_OSSEMUL
+#if defined(CONFIG_SND_PCM_OSS) || defined(CONFIG_SND_PCM_OSS_MODULE)
 	snd_pcm_oss_t oss;
 #endif
 };
@@ -776,7 +776,9 @@ u_int64_t snd_pcm_format_silence_64(snd_pcm_format_t format);
 int snd_pcm_format_set_silence(snd_pcm_format_t format, void *buf, unsigned int frames);
 snd_pcm_format_t snd_pcm_build_linear_format(int width, int unsignd, int big_endian);
 ssize_t snd_pcm_format_size(snd_pcm_format_t format, size_t samples);
- 
+const char *snd_pcm_format_name(snd_pcm_format_t format);
+const char *snd_pcm_subformat_name(snd_pcm_subformat_t subformat);
+
 void snd_pcm_set_ops(snd_pcm_t * pcm, int direction, snd_pcm_ops_t *ops);
 void snd_pcm_set_sync(snd_pcm_substream_t * substream);
 int snd_pcm_lib_interleave_len(snd_pcm_substream_t *substream);

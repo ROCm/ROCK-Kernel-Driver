@@ -64,6 +64,7 @@ static int snd_gus_synth_use(void *private_data, snd_seq_port_subscribe_t *info)
 		voice = snd_gf1_alloc_voice(gus, SNDRV_GF1_VOICE_TYPE_SYNTH, info->sender.client, info->sender.port);
 		if (voice == NULL) {
 			snd_gus_synth_free_voices(gus, info->sender.client, info->sender.port);
+			snd_gus_use_dec(gus);
 			up(&gus->register_mutex);
 			return -EBUSY;
 		}
@@ -80,6 +81,7 @@ static int snd_gus_synth_unuse(void *private_data, snd_seq_port_subscribe_t *inf
 
 	down(&gus->register_mutex);
 	snd_gus_synth_free_voices(gus, info->sender.client, info->sender.port);
+	snd_gus_use_dec(gus);
 	up(&gus->register_mutex);
 	return 0;
 }

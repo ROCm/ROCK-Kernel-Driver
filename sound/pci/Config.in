@@ -14,6 +14,7 @@ dep_tristate 'NeoMagic NM256AV/ZX' CONFIG_SND_NM256 $CONFIG_SND
 dep_tristate 'RME Digi32, 32/8, 32 PRO' CONFIG_SND_RME32 $CONFIG_SND
 dep_tristate 'RME Digi96, 96/8, 96/8 PRO' CONFIG_SND_RME96 $CONFIG_SND
 dep_tristate 'RME Digi9652 (Hammerfall)' CONFIG_SND_RME9652 $CONFIG_SND
+dep_tristate 'RME Hammerfall DSP Audio' CONFIG_SND_HDSP $CONFIG_SND
 dep_tristate 'Trident 4D-Wave DX/NX; SiS 7018' CONFIG_SND_TRIDENT $CONFIG_SND
 dep_tristate 'Yamaha YMF724/740/744/754' CONFIG_SND_YMFPCI $CONFIG_SND
 dep_tristate 'Avance Logic ALS4000' CONFIG_SND_ALS4000 $CONFIG_SND

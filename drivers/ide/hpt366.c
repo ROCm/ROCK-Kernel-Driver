@@ -890,7 +890,6 @@ static int hpt370_udma_stop(struct ata_device *drive)
 		do_udma_start(drive);
 	}
 
-	drive->waiting_for_dma = 0;
 	outb(inb(dma_base)&~1, dma_base);	/* stop DMA */
 	dma_stat = inb(dma_base+2);		/* get DMA status */
 	outb(dma_stat|6, dma_base+2);		/* clear the INTR & ERROR bits */
@@ -913,7 +912,6 @@ static int hpt374_udma_stop(struct ata_device *drive)
 	if ((bwsr_stat & bwsr_mask) == bwsr_mask)
 	        pci_write_config_byte(dev, mscreg, msc_stat|0x30);
 
-	drive->waiting_for_dma = 0;
 	outb(inb(dma_base)&~1, dma_base);	/* stop DMA */
 	dma_stat = inb(dma_base+2);		/* get DMA status */
 	outb(dma_stat|6, dma_base+2);		/* clear the INTR & ERROR bits */

@@ -118,6 +118,15 @@
 #define AC97_AD_SERIAL_CFG	0x74	/* Serial Configuration */
 #define AC97_AD_MISC		0x76	/* Misc Control Bits */
 
+/* specific - Cirrus Logic */
+#define AC97_CSR_ACMODE		0x5e	/* AC Mode Register */
+#define AC97_CSR_MISC_CRYSTAL	0x60	/* Misc Crystal Control */
+#define AC97_CSR_SPDIF		0x68	/* S/PDIF Register */
+#define AC97_CSR_SERIAL		0x6a	/* Serial Port Control */
+#define AC97_CSR_SPECF_ADDR	0x6c	/* Special Feature Address */
+#define AC97_CSR_SPECF_DATA	0x6e	/* Special Feature Data */
+#define AC97_CSR_BDI_STATUS	0x7a	/* BDI Status */
+
 /* ac97->scaps */
 #define AC97_SCAP_SURROUND_DAC	(1<<0)	/* surround L&R DACs are present */
 #define AC97_SCAP_CENTER_LFE_DAC (1<<1)	/* center and LFE DACs are present */
@@ -160,7 +169,7 @@ struct _snd_ac97 {
 	unsigned int rates_mic_adc;
 	unsigned int spdif_status;
 	unsigned short regs[0x80]; /* register cache */
-	bitmap_member(reg_accessed, 0x80); /* bit flags */
+	bitmap_member(reg_accessed,0x80); /* bit flags */
 	union {			/* vendor specific code */
 		struct {
 			unsigned short unchained[3];	// 0 = C34, 1 = C79, 2 = C69

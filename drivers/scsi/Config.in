@@ -10,7 +10,7 @@ dep_tristate '  SCSI tape support' CONFIG_CHR_DEV_ST $CONFIG_SCSI
 
 dep_tristate '  SCSI OnStream SC-x0 tape support' CONFIG_CHR_DEV_OSST $CONFIG_SCSI
 
-dep_tristate '  SCSI CD-ROM support' CONFIG_BLK_DEV_SR $CONFIG_SCSI
+dep_tristate '  SCSI CDROM support' CONFIG_BLK_DEV_SR $CONFIG_SCSI
 
 if [ "$CONFIG_BLK_DEV_SR" != "n" ]; then
    bool '    Enable vendor-specific extensions (for SCSI CDROM)' CONFIG_BLK_DEV_SR_VENDOR

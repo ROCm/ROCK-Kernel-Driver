@@ -231,7 +231,7 @@ const char *snd_pcm_state_name(snd_pcm_state_t state)
 	return snd_pcm_state_names[state];
 }
 
-#ifdef CONFIG_SND_OSSEMUL
+#if defined(CONFIG_SND_PCM_OSS) || defined(CONFIG_SND_PCM_OSS_MODULE)
 #include <linux/soundcard.h>
 const char *snd_pcm_oss_format_name(int format)
 {
@@ -318,7 +318,7 @@ static void snd_pcm_substream_proc_hw_params_read(snd_info_entry_t *entry, snd_i
 	snd_iprintf(buffer, "period_size: %lu\n", runtime->period_size);	
 	snd_iprintf(buffer, "buffer_size: %lu\n", runtime->buffer_size);	
 	snd_iprintf(buffer, "tick_time: %u\n", runtime->tick_time);
-#ifdef CONFIG_SND_OSSEMUL
+#if defined(CONFIG_SND_PCM_OSS) || defined(CONFIG_SND_PCM_OSS_MODULE)
 	if (substream->oss.oss) {
 		snd_iprintf(buffer, "OSS format: %s\n", snd_pcm_oss_format_name(runtime->oss.format));
 		snd_iprintf(buffer, "OSS channels: %u\n", runtime->oss.channels);	
@@ -537,7 +537,7 @@ static int snd_pcm_new_stream(snd_pcm_t *pcm,
 	int idx, err;
 	snd_pcm_substream_t *substream, *prev;
 
-#ifdef CONFIG_SND_OSSEMUL
+#if defined(CONFIG_SND_PCM_OSS) || defined(CONFIG_SND_PCM_OSS_MODULE)
 	init_MUTEX(&pstr->oss.setup_mutex);
 #endif
 	pstr->stream = stream;
@@ -623,7 +623,7 @@ int snd_pcm_new(snd_card_t * card, char *id, int device,
 static void snd_pcm_free_stream(snd_pcm_str_t * pstr)
 {
 	snd_pcm_substream_t *substream, *substream_next;
-#ifdef CONFIG_SND_OSSEMUL
+#if defined(CONFIG_SND_PCM_OSS) || defined(CONFIG_SND_PCM_OSS_MODULE)
 	snd_pcm_oss_setup_t *setup, *setupn;
 #endif
 	substream = pstr->substream;
@@ -634,7 +634,7 @@ static void snd_pcm_free_stream(snd_pcm_str_t * pstr)
 		substream = substream_next;
 	}
 	snd_pcm_stream_proc_done(pstr);
-#ifdef CONFIG_SND_OSSEMUL
+#if defined(CONFIG_SND_PCM_OSS) || defined(CONFIG_SND_PCM_OSS_MODULE)
 	for (setup = pstr->oss.setup_list; setup; setup = setupn) {
 		setupn = setup->next;
 		kfree(setup->task_name);
@@ -968,6 +968,8 @@ EXPORT_SYMBOL(snd_pcm_new);
 EXPORT_SYMBOL(snd_pcm_notify);
 EXPORT_SYMBOL(snd_pcm_open_substream);
 EXPORT_SYMBOL(snd_pcm_release_substream);
+EXPORT_SYMBOL(snd_pcm_format_name);
+EXPORT_SYMBOL(snd_pcm_subformat_name);
   /* pcm_native.c */
 EXPORT_SYMBOL(snd_pcm_start);
 #ifdef CONFIG_PM

@@ -55,19 +55,6 @@
 #include <net/irda/timer.h>
 #include <net/irda/wrapper.h>
 
-extern int irtty_init(void);
-extern int nsc_ircc_init(void);
-extern int ircc_init(void);
-extern int toshoboe_init(void);
-extern int litelink_init(void);
-extern int w83977af_init(void);
-extern int esi_init(void);
-extern int tekram_init(void);
-extern int actisys_init(void);
-extern int girbil_init(void);
-extern int sa1100_irda_init(void);
-extern int ep7211_ir_init(void);
-
 static void __irda_task_delete(struct irda_task *task);
 
 static hashbin_t *dongles = NULL;
@@ -116,53 +103,13 @@ int __init irda_device_init( void)
 		return -ENOMEM;
 	}
 
-	/*
-	 * Call the init function of the device drivers that has not been
-	 * compiled as a module
-	 */
-#ifdef CONFIG_IRTTY_SIR
-	irtty_init();
-#endif
-#ifdef CONFIG_WINBOND_FIR
-	w83977af_init();
-#endif
-#ifdef CONFIG_SA1100_FIR
-	sa1100_irda_init();
-#endif
-#ifdef CONFIG_NSC_FIR
-	nsc_ircc_init();
-#endif
-#ifdef CONFIG_TOSHIBA_FIR
-	toshoboe_init();
-#endif
-#ifdef CONFIG_SMC_IRCC_FIR
-	ircc_init();
-#endif
-#ifdef CONFIG_ESI_DONGLE
-	esi_init();
-#endif
-#ifdef CONFIG_TEKRAM_DONGLE
-	tekram_init();
-#endif
-#ifdef CONFIG_ACTISYS_DONGLE
-	actisys_init();
-#endif
-#ifdef CONFIG_GIRBIL_DONGLE
-	girbil_init();
-#endif
-#ifdef CONFIG_LITELINK_DONGLE
-	litelink_init();
-#endif
-#ifdef CONFIG_OLD_BELKIN
-	old_belkin_init();
-#endif
-#ifdef CONFIG_EP7211_IR
-	ep7211_ir_init();
-#endif
+	/* We no longer initialise the driver ourselves here, we let
+	 * the system do it for us... - Jean II */
+
 	return 0;
 }
 
-void irda_device_cleanup(void)
+void __exit irda_device_cleanup(void)
 {
 	IRDA_DEBUG(4, __FUNCTION__ "()\n");
 

@@ -6,7 +6,7 @@
  *          Title:  MPI Message independent structures and definitions
  *  Creation Date:  July 27, 2000
  *
- *    MPI Version:  01.01.07
+ *    MPI Version:  01.02.03
  *
  *  Version History
  *  ---------------
@@ -39,6 +39,11 @@
  *                      Added function codes for RAID.
  *  04-09-01  01.01.07  Added alternate define for MPI_DOORBELL_ACTIVE,
  *                      MPI_DOORBELL_USED, to better match the spec.
+ *  08-08-01  01.02.01  Original release for v1.2 work.
+ *                      Changed MPI_VERSION_MINOR from 0x01 to 0x02.
+ *                      Added define MPI_FUNCTION_TOOLBOX.
+ *  09-28-01  01.02.02  New function code MPI_SCSI_ENCLOSURE_PROCESSOR.
+ *  11-01-01  01.02.03  Changed name to MPI_FUNCTION_SCSI_ENCLOSURE_PROCESSOR.
  *  --------------------------------------------------------------------------
  */
 
@@ -53,7 +58,7 @@
 *****************************************************************************/
 
 #define MPI_VERSION_MAJOR                   (0x01)
-#define MPI_VERSION_MINOR                   (0x01)
+#define MPI_VERSION_MINOR                   (0x02)
 #define MPI_VERSION            ((MPI_VERSION_MAJOR << 8) | MPI_VERSION_MINOR)
 
 /* Note: The major versions of 0xe0 through 0xff are reserved */
@@ -216,8 +221,12 @@
 #define MPI_FUNCTION_FC_COMMON_TRANSPORT_SEND       (0x13)
 #define MPI_FUNCTION_FC_PRIMITIVE_SEND              (0x14)
 
-#define MPI_FUNCTION_RAID_VOLUME                    (0x15)
+#define MPI_FUNCTION_RAID_ACTION                    (0x15)
 #define MPI_FUNCTION_RAID_SCSI_IO_PASSTHROUGH       (0x16)
+
+#define MPI_FUNCTION_TOOLBOX                        (0x17)
+
+#define MPI_FUNCTION_SCSI_ENCLOSURE_PROCESSOR       (0x18)
 
 #define MPI_FUNCTION_LAN_SEND                       (0x20)
 #define MPI_FUNCTION_LAN_RECEIVE                    (0x21)

@@ -4,5 +4,6 @@
 /* Second argument to futex syscall */
 #define FUTEX_WAIT (0)
 #define FUTEX_WAKE (1)
+#define FUTEX_FD (2)
 
 #endif

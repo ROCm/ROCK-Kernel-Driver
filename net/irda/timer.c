@@ -11,7 +11,7 @@
  * 
  *     Copyright (c) 1997, 1999 Dag Brattli <dagb@cs.uit.no>, 
  *     All Rights Reserved.
- *     Copyright (c) 2000-2001 Jean Tourrilhes <jt@hpl.hp.com>
+ *     Copyright (c) 2000-2002 Jean Tourrilhes <jt@hpl.hp.com>
  *     
  *     This program is free software; you can redistribute it and/or 
  *     modify it under the terms of the GNU General Public License as 
@@ -32,7 +32,7 @@
 #include <net/irda/irda.h>
 #include <net/irda/irtty.h>
 #include <net/irda/irlap.h>
-#include <net/irda/irlmp_event.h>
+#include <net/irda/irlmp.h>
 
 static void irlap_slot_timer_expired(void* data);
 static void irlap_query_timer_expired(void* data);

@@ -16,6 +16,7 @@
 
 #include <linux/isdnif.h>
 #include <linux/init.h>
+#include <linux/tqueue.h>
 
 /* Maximum number of channels for this board */
 #define TPAM_NBCHANNEL		30

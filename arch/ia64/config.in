@@ -64,12 +64,12 @@ if [ "$CONFIG_MCKINLEY" = "y" ]; then
 	fi
 fi
 
-if [ "$CONFIG_IA64_GENERIC" = "y" ] || [ "$CONFIG_IA64_DIG" = "y" ] || [ "$CONFIG_IA64_HP_ZX1" = "y" ]; then
+if [ "$CONFIG_IA64_GENERIC" = "y" -o  "$CONFIG_IA64_DIG" = "y" -o "$CONFIG_IA64_HP_ZX1" = "y" ]; then
 	bool '  Enable IA-64 Machine Check Abort' CONFIG_IA64_MCA
 	define_bool CONFIG_PM y
 fi
 
-if [ "$CONFIG_IA64_SGI_SN1" = "y" ] || [ "$CONFIG_IA64_SGI_SN2" = "y" ]; then
+if [ "$CONFIG_IA64_SGI_SN1" = "y" -o  "$CONFIG_IA64_SGI_SN2" = "y" ]; then
 	define_bool CONFIG_IA64_SGI_SN y
 	bool '  Enable extra debugging code' CONFIG_IA64_SGI_SN_DEBUG n
 	bool '  Enable SGI Medusa Simulator Support' CONFIG_IA64_SGI_SN_SIM
@@ -187,7 +187,7 @@ source drivers/isdn/Config.in
 mainmenu_option next_comment
 comment 'CD-ROM drivers (not for SCSI or IDE/ATAPI drives)'
 
-bool 'Support non-SCSI/IDE/ATAPI drives' CONFIG_CD_NO_IDESCSI
+bool 'Support non-SCSI/IDE/ATAPI CDROM drives' CONFIG_CD_NO_IDESCSI
 if [ "$CONFIG_CD_NO_IDESCSI" != "n" ]; then
   source drivers/cdrom/Config.in
 fi

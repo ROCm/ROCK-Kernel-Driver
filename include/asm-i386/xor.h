@@ -550,7 +550,7 @@ static struct xor_block_template xor_block_p5_mmx = {
 		"movups %%xmm1,0x10(%1)	;\n\t"	\
 		"movups %%xmm2,0x20(%1)	;\n\t"	\
 		"movups %%xmm3,0x30(%1)	;\n\t"	\
-		: "=r" (cr0)			\
+		: "=&r" (cr0)			\
 		: "r" (xmm_save) 		\
 		: "memory")
 

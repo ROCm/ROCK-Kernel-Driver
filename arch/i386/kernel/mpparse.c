@@ -64,7 +64,7 @@ unsigned long mp_lapic_addr;
 unsigned int boot_cpu_physical_apicid = -1U;
 unsigned int boot_cpu_logical_apicid = -1U;
 /* Internal processor count */
-static unsigned int num_processors;
+static unsigned int __initdata num_processors;
 
 /* Bitmask of physically existing CPUs */
 unsigned long phys_cpu_present_map;

@@ -459,6 +459,7 @@ EXPORT_SYMBOL(iomem_resource);
 
 /* process management */
 EXPORT_SYMBOL(complete_and_exit);
+EXPORT_SYMBOL(default_wake_function);
 EXPORT_SYMBOL(__wake_up);
 #if CONFIG_SMP
 EXPORT_SYMBOL_GPL(__wake_up_sync); /* internal use only */

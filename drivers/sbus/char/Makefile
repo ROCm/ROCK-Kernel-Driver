@@ -31,5 +31,3 @@ obj-$(CONFIG_SUN_JSFLASH)		+= jsflash.o
 obj-$(CONFIG_BBC_I2C)			+= bbc.o
 
 include $(TOPDIR)/Rules.make
-
-sunkbdmap.o: sunkeymap.c

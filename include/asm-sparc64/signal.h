@@ -254,6 +254,7 @@ typedef struct sigaltstack32 {
 } stack_t32;
 
 #define HAVE_ARCH_GET_SIGNAL_TO_DELIVER
+#define HAVE_ARCH_SYS_PAUSE
 
 #endif
 

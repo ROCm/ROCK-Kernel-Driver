@@ -124,7 +124,7 @@ if [ "$CONFIG_NET_ETHERNET" = "y" ]; then
       tristate '    EtherExpress 16 support' CONFIG_EEXPRESS
       tristate '    EtherExpressPro support/EtherExpress 10 (i82595) support' CONFIG_EEXPRESS_PRO
       if [ "$CONFIG_OBSOLETE" = "y" ]; then
-         tristate '    FMV-181/182/183/184 support' CONFIG_FMV18X
+         tristate '    FMV-181/182/183/184 support (OBSOLETE)' CONFIG_FMV18X
       fi
       tristate '    HP PCLAN+ (27247B and 27252A) support' CONFIG_HPLAN_PLUS
       tristate '    HP PCLAN (27245 and other 27xxx series) support' CONFIG_HPLAN
@@ -135,7 +135,7 @@ if [ "$CONFIG_NET_ETHERNET" = "y" ]; then
 	 dep_tristate '    SEEQ8005 support (EXPERIMENTAL)' CONFIG_SEEQ8005 $CONFIG_EXPERIMENTAL
       fi
       if [ "$CONFIG_OBSOLETE" = "y" ]; then
-         tristate '    SK_G16 support' CONFIG_SK_G16
+         tristate '    SK_G16 support (OBSOLETE)' CONFIG_SK_G16
       fi
    fi
    if [ "$CONFIG_MCA" = "y" ]; then
@@ -186,7 +186,7 @@ if [ "$CONFIG_NET_ETHERNET" = "y" ]; then
       dep_tristate '    VIA Rhine support' CONFIG_VIA_RHINE $CONFIG_PCI
       dep_mbool '      Use MMIO instead of PIO (EXPERIMENTAL)' CONFIG_VIA_RHINE_MMIO $CONFIG_VIA_RHINE $CONFIG_EXPERIMENTAL
       if [ "$CONFIG_OBSOLETE" = "y" ]; then
-	 dep_bool '    Zenith Z-Note support (EXPERIMENTAL)' CONFIG_ZNET $CONFIG_ISA
+	 dep_bool '    Zenith Z-Note support (OBSOLETE)' CONFIG_ZNET $CONFIG_ISA
       fi
       if [ "$CONFIG_EXPERIMENTAL" = "y" -a "$CONFIG_MIPS" = "y" ]; then
 	 bool '    Philips SAA9730 Ethernet support (EXPERIMENTAL)' CONFIG_LAN_SAA9730
@@ -251,9 +251,9 @@ if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
    if [ "$CONFIG_INET" = "y" ]; then
       bool 'HIPPI driver support (EXPERIMENTAL)' CONFIG_HIPPI
       if [ "$CONFIG_HIPPI" = "y" -a "$CONFIG_PCI" = "y" ]; then
-         dep_tristate '  Essential RoadRunner HIPPI PCI adapter support' CONFIG_ROADRUNNER $CONFIG_PCI
+         dep_tristate '  Essential RoadRunner HIPPI PCI adapter support (EXPERIMENTAL)' CONFIG_ROADRUNNER $CONFIG_PCI
          if [ "$CONFIG_ROADRUNNER" != "n" ]; then
-   	    bool '    Use large TX/RX rings' CONFIG_ROADRUNNER_LARGE_RINGS
+   	    bool '    Use large TX/RX rings (EXPERIMENTAL)' CONFIG_ROADRUNNER_LARGE_RINGS
          fi
       fi
    fi

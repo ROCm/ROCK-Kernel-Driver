@@ -144,7 +144,7 @@ void snd_ctl_notify(snd_card_t *card, unsigned int mask, snd_ctl_elem_id_t *id)
 	
 	snd_runtime_check(card != NULL && id != NULL, return);
 	read_lock_irqsave(&card->control_rwlock, flags);
-#ifdef CONFIG_SND_OSSEMUL
+#if defined(CONFIG_SND_MIXER_OSS) || defined(CONFIG_SND_MIXER_OSS_MODULE)
 	card->mixer_oss_change_count++;
 #endif
 	list_for_each(flist, &card->ctl_files) {

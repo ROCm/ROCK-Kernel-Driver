@@ -1378,7 +1378,6 @@ static int pmac_udma_stop(struct ata_device *drive)
 	ata4 = (pmac_ide[ix].kind == controller_kl_ata4 ||
 		pmac_ide[ix].kind == controller_kl_ata4_80);
 
-	drive->waiting_for_dma = 0;
 	dstat = in_le32(&dma->status);
 	out_le32(&dma->control, ((RUN|WAKE|DEAD) << 16));
 	pmac_ide_destroy_dmatable(drive->channel, ix);
@@ -1418,7 +1417,7 @@ static int pmac_udma_init(struct ata_device *drive, struct request *rq)
 			((reading) ? 0x00800000UL : 0));
 		(void)in_le32((unsigned *)(IDE_DATA_REG + IDE_TIMING_CONFIG + _IO_BASE));
 	}
-	drive->waiting_for_dma = 1;
+
 	if (drive->type != ATA_DISK)
 		return ide_started;
 
@@ -1466,6 +1465,8 @@ static int pmac_udma_irq_status(struct ata_device *drive)
 	 * - The dbdma fifo hasn't yet finished flushing to to system memory
 	 * when the disk interrupt occurs.
 	 *
+	 * FIXME: The following *trick* is broken:
+	 *
 	 * The trick here is to increment drive->waiting_for_dma, and return as
 	 * if no interrupt occured. If the counter reach a certain timeout
 	 * value, we then return 1. If we really got the interrupt, it will
@@ -1480,15 +1481,16 @@ static int pmac_udma_irq_status(struct ata_device *drive)
 	 */
 	if (!(in_le32(&dma->status) & ACTIVE))
 		return 1;
-	if (!drive->waiting_for_dma)
+
+	if (!test_bit(IDE_DMA, drive->channel->active))
 		printk(KERN_WARNING "ide%d, ide_dma_test_irq \
 				called while not waiting\n", ix);
 
 	/* If dbdma didn't execute the STOP command yet, the
 	 * active bit is still set */
-	drive->waiting_for_dma++;
-	if (drive->waiting_for_dma >= DMA_WAIT_TIMEOUT) {
-		printk(KERN_WARNING "ide%d, timeout waiting \
+	set_bit(IDE_DMA, drive->channel->active);
+//	if (drive->waiting_for_dma >= DMA_WAIT_TIMEOUT) {
+//		printk(KERN_WARNING "ide%d, timeout waiting \
 				for dbdma command stop\n", ix);
 		return 1;
 	}

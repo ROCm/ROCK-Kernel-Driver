@@ -6,7 +6,7 @@
  *          Title:  MPI Basic type definitions
  *  Creation Date:  June 6, 2000
  *
- *    MPI Version:  01.01.02
+ *    MPI Version:  01.02.01
  *
  *  Version History
  *  ---------------
@@ -17,6 +17,7 @@
  *  06-06-00  01.00.01  Update version number for 1.0 release.
  *  11-02-00  01.01.01  Original release for post 1.0 work
  *  02-20-01  01.01.02  Added define and ifdef for MPI_POINTER.
+ *  08-08-01  01.02.01  Original release for v1.2 work.
  *  --------------------------------------------------------------------------
  */
 

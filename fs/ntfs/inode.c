@@ -357,8 +357,7 @@ void ntfs_read_inode(struct inode *vi)
 	if (lookup_attr(AT_ATTRIBUTE_LIST, NULL, 0, 0, 0, NULL, 0, ctx)) {
 		if (vi->i_ino == FILE_MFT)
 			goto skip_attr_list_load;
-		ntfs_debug("Attribute list found in inode %li (0x%lx).",
-				vi->i_ino, vi->i_ino);
+		ntfs_debug("Attribute list found in inode 0x%lx.", vi->i_ino);
 		ni->state |= 1 << NI_AttrList;
 		if (ctx->attr->flags & ATTR_IS_ENCRYPTED ||
 				ctx->attr->flags & ATTR_COMPRESSION_MASK) {
@@ -805,8 +804,8 @@ unm_err_out:
 ec_unm_err_out:
 	unmap_mft_record(READ, ni);
 err_out:
-	ntfs_error(vi->i_sb, "Failed with error code %i. Marking inode "
-			"%li (0x%lx) as bad.", -err, vi->i_ino, vi->i_ino);
+	ntfs_error(vi->i_sb, "Failed with error code %i. Marking inode 0x%lx "
+			"as bad.", -err, vi->i_ino);
 	make_bad_inode(vi);
 	return;
 }
@@ -857,7 +856,7 @@ void ntfs_read_inode_mount(struct inode *vi)
 	ntfs_init_big_inode(vi);
 	ni = NTFS_I(vi);
 	if (vi->i_ino != FILE_MFT) {
-		ntfs_error(sb, "Called for inode %ld but only inode %d "
+		ntfs_error(sb, "Called for inode 0x%lx but only inode %d "
 				"allowed.", vi->i_ino, FILE_MFT);
 		goto err_out;
 	}
@@ -1034,7 +1033,7 @@ void ntfs_read_inode_mount(struct inode *vi)
 			if (al_entry->lowest_vcn)
 				goto em_put_err_out;
 			/* First entry has to be in the base mft record. */
-			if (MREF_LE(al_entry->mft_reference) != ni->mft_no) {
+			if (MREF_LE(al_entry->mft_reference) != vi->i_ino) {
 				/* MFT references do not match, logic fails. */
 				ntfs_error(sb, "BUG: The first $DATA extent "
 						"of $MFT is not in the base "
@@ -1096,6 +1095,8 @@ void ntfs_read_inode_mount(struct inode *vi)
 
 		/* Are we in the first extent? */
 		if (!next_vcn) {
+			u64 ll;
+
 			if (attr->_ANR(lowest_vcn)) {
 				ntfs_error(sb, "First extent of $DATA "
 						"attribute has non zero "
@@ -1113,8 +1114,16 @@ void ntfs_read_inode_mount(struct inode *vi)
 			ni->allocated_size = sle64_to_cpu(
 					attr->_ANR(allocated_size));
 			/* Set the number of mft records. */
-			vol->_VMM(nr_mft_records) = vi->i_size >>
-					vol->mft_record_size_bits;
+			ll = vi->i_size >> vol->mft_record_size_bits;
+			/*
+			 * Verify the number of mft records does not exceed
+			 * 2^32 - 1.
+			 */
+			if (ll >= (1ULL << 32)) {
+				ntfs_error(sb, "$MFT is too big! Aborting.");
+				goto put_err_out;
+			}
+			vol->_VMM(nr_mft_records) = ll;
 			/*
 			 * We have got the first extent of the run_list for
 			 * $MFT which means it is now relatively safe to call
@@ -1255,8 +1264,7 @@ void ntfs_dirty_inode(struct inode *vi)
  */
 int ntfs_commit_inode(ntfs_inode *ni)
 {
-	ntfs_debug("Entering for inode 0x%Lx.",
-			(unsigned long long)ni->mft_no);
+	ntfs_debug("Entering for inode 0x%lx.", ni->mft_no);
 	NInoClearDirty(ni);
 	return 0;
 }
@@ -1265,8 +1273,7 @@ void __ntfs_clear_inode(ntfs_inode *ni)
 {
 	int err;
 
-	ntfs_debug("Entering for inode 0x%Lx.",
-			(unsigned long long)ni->mft_no);
+	ntfs_debug("Entering for inode 0x%lx.", ni->mft_no);
 	if (NInoDirty(ni)) {
 		err = ntfs_commit_inode(ni);
 		if (err) {

@@ -31,6 +31,8 @@
 
 static void ext2_sync_super(struct super_block *sb,
 			    struct ext2_super_block *es);
+static int ext2_remount (struct super_block * sb, int * flags, char * data);
+static int ext2_statfs (struct super_block * sb, struct statfs * buf);
 
 static char error_buf[1024];
 
@@ -123,7 +125,7 @@ void ext2_update_dynamic_rev(struct super_block *sb)
 	 */
 }
 
-void ext2_put_super (struct super_block * sb)
+static void ext2_put_super (struct super_block * sb)
 {
 	int db_count;
 	int i;
@@ -772,7 +774,7 @@ void ext2_write_super (struct super_block * sb)
 	unlock_kernel();
 }
 
-int ext2_remount (struct super_block * sb, int * flags, char * data)
+static int ext2_remount (struct super_block * sb, int * flags, char * data)
 {
 	struct ext2_sb_info * sbi = EXT2_SB(sb);
 	struct ext2_super_block * es;
@@ -827,7 +829,7 @@ int ext2_remount (struct super_block * sb, int * flags, char * data)
 	return 0;
 }
 
-int ext2_statfs (struct super_block * sb, struct statfs * buf)
+static int ext2_statfs (struct super_block * sb, struct statfs * buf)
 {
 	struct ext2_sb_info *sbi = EXT2_SB(sb);
 	unsigned long overhead;

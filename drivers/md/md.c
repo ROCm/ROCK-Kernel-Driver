@@ -144,17 +144,17 @@ static spinlock_t all_mddevs_lock = SPIN_LOCK_UNLOCKED;
  */
 #define ITERATE_MDDEV(mddev,tmp)					\
 									\
-	for (spin_lock(&all_mddevs_lock), 				\
-		     (tmp = all_mddevs.next),				\
-		     (mddev = NULL);					\
-	     (void)(tmp != &all_mddevs &&				\
-			mddev_get(list_entry(tmp, mddev_t, all_mddevs))),\
-		     spin_unlock(&all_mddevs_lock),			\
-		     (mddev ? mddev_put(mddev):(void)NULL),		\
-		     (mddev = list_entry(tmp, mddev_t, all_mddevs)),	\
-		     (tmp != &all_mddevs);				\
-	     spin_lock(&all_mddevs_lock),				\
-		     (tmp = tmp->next)					\
+	for (({ spin_lock(&all_mddevs_lock); 				\
+		tmp = all_mddevs.next;					\
+		mddev = NULL;});					\
+	     ({ if (tmp != &all_mddevs)					\
+			mddev_get(list_entry(tmp, mddev_t, all_mddevs));\
+		spin_unlock(&all_mddevs_lock);				\
+		if (mddev) mddev_put(mddev);				\
+		mddev = list_entry(tmp, mddev_t, all_mddevs);		\
+		tmp != &all_mddevs;});					\
+	     ({ spin_lock(&all_mddevs_lock);				\
+		tmp = tmp->next;})					\
 		)
 
 static mddev_t *mddev_map[MAX_MD_DEVS];
@@ -2546,6 +2546,20 @@ static int md_ioctl(struct inode *inode, struct file *file,
 		goto abort;
 	}
 
+
+	if (cmd == START_ARRAY) {
+		/* START_ARRAY doesn't need to lock the array as autostart_array
+		 * does the locking, and it could even be a different array
+		 */
+		err = autostart_array(val_to_kdev(arg));
+		if (err) {
+			printk(KERN_WARNING "md: autostart %s failed!\n",
+			       partition_name(val_to_kdev(arg)));
+			goto abort;
+		}
+		goto done;
+	}
+
 	err = mddev_lock(mddev);
 	if (err) {
 		printk(KERN_INFO "md: ioctl lock interrupted, reason %d, cmd %d\n",
@@ -2580,18 +2594,6 @@ static int md_ioctl(struct inode *inode, struct file *file,
 					printk(KERN_WARNING "md: couldnt set array info. %d\n", err);
 					goto abort_unlock;
 				}
-			}
-			goto done_unlock;
-
-		case START_ARRAY:
-			/*
-			 * possibly make it lock the array ...
-			 */
-			err = autostart_array(val_to_kdev(arg));
-			if (err) {
-				printk(KERN_WARNING "md: autostart %s failed!\n",
-					partition_name(val_to_kdev(arg)));
-				goto abort_unlock;
 			}
 			goto done_unlock;
 
@@ -3228,7 +3230,7 @@ static void md_do_sync(void *data)
 					flush_curr_signals();
 					err = -EINTR;
 					mddev_put(mddev2);
-					goto out;
+					goto skip;
 				}
 			}
 		}
@@ -3329,11 +3331,11 @@ static void md_do_sync(void *data)
 	/*
 	 * this also signals 'finished resyncing' to md_stop
 	 */
-out:
+ out:
 	wait_event(mddev->recovery_wait, !atomic_read(&mddev->recovery_active));
 	/* tell personality that we are finished */
 	mddev->pers->sync_request(mddev, max_sectors, 1);
-
+ skip:
 	mddev->curr_resync = 0;
 	if (err)
 		mddev->recovery_running = err;
@@ -3873,8 +3875,8 @@ int init_module(void)
 static void free_device_names(void)
 {
 	while (!list_empty(&device_names)) {
-		struct dname *tmp = list_entry(device_names.next,
-					       dev_name_t, list);
+		dev_name_t *tmp = list_entry(device_names.next,
+					     dev_name_t, list);
 		list_del(&tmp->list);
 		kfree(tmp);
 	}

@@ -26,9 +26,6 @@ struct cpu_fp_info {
   char* fp_name;
 };
 
-/* In order to get the fpu type correct, you need to take the IDPROM's
- * machine type value into consideration too.  I will fix this.
- */
 struct cpu_fp_info linux_sparc_fpu[] = {
   { 0x17, 0x10, 0, "UltraSparc I integrated FPU"},
   { 0x22, 0x10, 0, "UltraSparc II integrated FPU"},
@@ -51,13 +48,8 @@ struct cpu_iu_info linux_sparc_chips[] = {
 
 #define NSPARCCHIPS  (sizeof(linux_sparc_chips)/sizeof(struct cpu_iu_info))
 
-#ifdef CONFIG_SMP
-char *sparc_cpu_type[64] = { "cpu-oops", "cpu-oops1", "cpu-oops2", "cpu-oops3" };
-char *sparc_fpu_type[64] = { "fpu-oops", "fpu-oops1", "fpu-oops2", "fpu-oops3" };
-#else
-char *sparc_cpu_type[64] = { "cpu-oops", };
-char *sparc_fpu_type[64] = { "fpu-oops", };
-#endif
+char *sparc_cpu_type[NR_CPUS] = { "cpu-oops", };
+char *sparc_fpu_type[NR_CPUS] = { "fpu-oops", };
 
 unsigned int fsr_storage;
 
@@ -72,39 +64,47 @@ void __init cpu_probe(void)
 
 	fprs = fprs_read ();
 	fprs_write (FPRS_FEF);
-	__asm__ __volatile__ ("rdpr %%ver, %0; stx %%fsr, [%1]" : "=&r" (ver) : "r" (&fpu_vers));
+	__asm__ __volatile__ ("rdpr %%ver, %0; stx %%fsr, [%1]"
+			      : "=&r" (ver)
+			      : "r" (&fpu_vers));
 	fprs_write (fprs);
 	
-	manuf = ((ver >> 48)&0xffff);
-	impl = ((ver >> 32)&0xffff);
+	manuf = ((ver >> 48) & 0xffff);
+	impl = ((ver >> 32) & 0xffff);
 
-	fpu_vers = ((fpu_vers>>17)&0x7);
+	fpu_vers = ((fpu_vers >> 17) & 0x7);
 
-	for(i = 0; i<NSPARCCHIPS; i++) {
-		if(linux_sparc_chips[i].manuf == manuf)
-			if(linux_sparc_chips[i].impl == impl) {
-				sparc_cpu_type[cpuid] = linux_sparc_chips[i].cpu_name;
+	for (i = 0; i < NSPARCCHIPS; i++) {
+		if (linux_sparc_chips[i].manuf == manuf) {
+			if (linux_sparc_chips[i].impl == impl) {
+				sparc_cpu_type[cpuid] =
+					linux_sparc_chips[i].cpu_name;
 				break;
 			}
+		}
 	}
 
-	if(i==NSPARCCHIPS) {
-		printk("DEBUG: manuf = 0x%x   impl = 0x%x\n", manuf, 
-			    impl);
+	if (i == NSPARCCHIPS) {
+		printk("DEBUG: manuf = 0x%x   impl = 0x%x\n",
+		       manuf, impl);
 		sparc_cpu_type[cpuid] = "Unknown CPU";
 	}
 
-	for(i = 0; i<NSPARCFPU; i++) {
-		if(linux_sparc_fpu[i].manuf == manuf && linux_sparc_fpu[i].impl == impl)
-			if(linux_sparc_fpu[i].fpu_vers == fpu_vers) {
-				sparc_fpu_type[cpuid] = linux_sparc_fpu[i].fp_name;
+	for (i = 0; i < NSPARCFPU; i++) {
+		if (linux_sparc_fpu[i].manuf == manuf &&
+		    linux_sparc_fpu[i].impl == impl) {
+			if (linux_sparc_fpu[i].fpu_vers == fpu_vers) {
+				sparc_fpu_type[cpuid] =
+					linux_sparc_fpu[i].fp_name;
 				break;
 			}
+		}
 	}
 
-	if(i == NSPARCFPU) {
-		printk("DEBUG: manuf = 0x%x  impl = 0x%x fsr.vers = 0x%x\n", manuf, impl,
-			    (unsigned)fpu_vers);
+	if (i == NSPARCFPU) {
+		printk("DEBUG: manuf = 0x%x  impl = 0x%x fsr.vers = 0x%x\n",
+		       manuf, impl,
+		       (unsigned int) fpu_vers);
 		sparc_fpu_type[cpuid] = "Unknown FPU";
 	}
 }

@@ -36,6 +36,8 @@
 #define EMU8000_RAM_READ   0
 #define EMU8000_RAM_WRITE  1
 #define EMU8000_RAM_CLOSE  2
+#define EMU8000_RAM_MODE_MASK	0x03
+#define EMU8000_RAM_RIGHT	0x10	/* use 'right' DMA channel */
 
 enum {
 	EMU8000_CONTROL_BASS = 0,
@@ -86,6 +88,8 @@ typedef struct snd_emu8000 {
 
 	spinlock_t control_lock;
 	snd_kcontrol_t *controls[EMU8000_NUM_CONTROLS];
+
+	snd_pcm_t *pcm; /* pcm on emu8000 wavetable */
 
 } emu8000_t;
 

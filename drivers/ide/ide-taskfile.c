@@ -148,7 +148,7 @@ void ata_write(struct ata_device *drive, void *buffer, unsigned int wcount)
  */
 int drive_is_ready(struct ata_device *drive)
 {
-	if (drive->waiting_for_dma)
+	if (test_bit(IDE_DMA, drive->channel->active))
 		return udma_irq_status(drive);
 
 	/*
@@ -242,9 +242,8 @@ int ide_do_drive_cmd(struct ata_device *drive, struct request *rq, ide_action_t 
 /*
  * Invoked on completion of a special REQ_SPECIAL command.
  */
-static ide_startstop_t special_intr(struct ata_device *drive,
-		struct request *rq)
-{
+ide_startstop_t ata_special_intr(struct ata_device *drive, struct
+		request *rq) {
 
 	struct ata_taskfile *ar = rq->special;
 	ide_startstop_t ret = ide_stopped;
@@ -293,18 +292,16 @@ static ide_startstop_t special_intr(struct ata_device *drive,
 	return ret;
 }
 
-int ide_raw_taskfile(struct ata_device *drive, struct ata_taskfile *ar,
-		char *buffer)
+int ide_raw_taskfile(struct ata_device *drive, struct ata_taskfile *ar)
 {
 	struct request req;
 
 	ar->command_type = IDE_DRIVE_TASK_NO_DATA;
-	ar->XXX_handler = special_intr;
+	ar->XXX_handler = ata_special_intr;
 
 	memset(&req, 0, sizeof(req));
 	req.flags = REQ_SPECIAL;
 	req.special = ar;
-	req.buffer = buffer;
 
 	return ide_do_drive_cmd(drive, &req, ide_wait);
 }
@@ -313,4 +310,5 @@ EXPORT_SYMBOL(drive_is_ready);
 EXPORT_SYMBOL(ide_do_drive_cmd);
 EXPORT_SYMBOL(ata_read);
 EXPORT_SYMBOL(ata_write);
+EXPORT_SYMBOL(ata_special_intr);
 EXPORT_SYMBOL(ide_raw_taskfile);

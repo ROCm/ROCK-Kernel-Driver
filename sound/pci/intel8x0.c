@@ -44,11 +44,11 @@ MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>");
 MODULE_DESCRIPTION("Intel 82801AA,82901AB,i810,i820,i830,i840,MX440; SiS 7012");
 MODULE_LICENSE("GPL");
 MODULE_CLASSES("{sound}");
-MODULE_DEVICES("{{Intel,82801AA},"
-		"{Intel,82901AB},"
-		"{Intel,82801BA},"
-		"{Intel,ICH3},"
-		"{Intel,ICH4},"
+MODULE_DEVICES("{{Intel,82801AA-ICH},"
+		"{Intel,82901AB-ICH0},"
+		"{Intel,82801BA-ICH2},"
+		"{Intel,82801CA-ICH3},"
+		"{Intel,82801DB-ICH4},"
 		"{Intel,MX440},"
 		"{SiS,SI7012},"
 		"{NVidia,NForce Audio},"
@@ -1403,11 +1403,12 @@ static struct shortname_table {
 	unsigned int id;
 	const char *s;
 } shortnames[] __devinitdata = {
-	{ PCI_DEVICE_ID_INTEL_82801, "Intel ICH 82801AA" },
-	{ PCI_DEVICE_ID_INTEL_82901, "Intel ICH 82901AB" },
+	{ PCI_DEVICE_ID_INTEL_82801, "Intel 82801AA-ICH" },
+	{ PCI_DEVICE_ID_INTEL_82901, "Intel 82901AB-ICH0" },
+	{ PCI_DEVICE_ID_INTEL_82801BA, "Intel 82801BA-ICH2" },
 	{ PCI_DEVICE_ID_INTEL_440MX, "Intel 440MX" },
-	{ PCI_DEVICE_ID_INTEL_ICH3, "Intel ICH3" },
-	{ PCI_DEVICE_ID_INTEL_ICH4, "Intel ICH4" },
+	{ PCI_DEVICE_ID_INTEL_ICH3, "Intel 82801CA-ICH3" },
+	{ PCI_DEVICE_ID_INTEL_ICH4, "Intel 82801DB-ICH4" },
 	{ PCI_DEVICE_ID_SI_7012, "SiS SI7012" },
 	{ PCI_DEVICE_ID_NVIDIA_MCP_AUDIO, "NVidia NForce" },
 	{ 0x764d, "AMD AMD8111" },

@@ -15,11 +15,9 @@
 #include <linux/config.h>
 #include <linux/mm.h>
 #include <linux/swap.h>
-#include <linux/swapctl.h>
 #include <linux/interrupt.h>
 #include <linux/pagemap.h>
 #include <linux/bootmem.h>
-#include <linux/slab.h>
 #include <linux/compiler.h>
 #include <linux/module.h>
 #include <linux/suspend.h>
@@ -44,14 +42,18 @@ static int zone_balance_min[MAX_NR_ZONES] __initdata = { 20 , 20, 20, };
 static int zone_balance_max[MAX_NR_ZONES] __initdata = { 255 , 255, 255, };
 
 /*
- * Temporary debugging check.
+ * Temporary debugging check for pages not lying within a given zone.
  */
-#define BAD_RANGE(zone, page)						\
-(									\
-	(((page) - mem_map) >= ((zone)->zone_start_mapnr+(zone)->size))	\
-	|| (((page) - mem_map) < (zone)->zone_start_mapnr)		\
-	|| ((zone) != page_zone(page))					\
-)
+static inline int bad_range(zone_t *zone, struct page *page)
+{
+	if (page - mem_map >= zone->zone_start_mapnr + zone->size)
+		return 1;
+	if (page - mem_map < zone->zone_start_mapnr)
+		return 1;
+	if (zone != page_zone(page))
+		return 1;
+	return 0;
+}
 
 /*
  * Freeing function for a buddy system allocator.
@@ -65,10 +67,13 @@ static int zone_balance_max[MAX_NR_ZONES] __initdata = { 255 , 255, 255, };
  * at the bottom level available, and propagating the changes upward
  * as necessary, plus some accounting needed to play nicely with other
  * parts of the VM system.
- *
- * TODO: give references to descriptions of buddy system allocators,
- * describe precisely the silly trick buddy allocators use to avoid
- * storing an extra bit, utilizing entry point information.
+ * At each level, we keep one bit for each pair of blocks, which
+ * is set to 1 iff only one of the pair is allocated.  So when we
+ * are allocating or freeing one, we can derive the state of the
+ * other.  That is, if we allocate a small block, and both were   
+ * free, the remainder of the region must be split into blocks.   
+ * If a block is freed, and its buddy is also free, then this
+ * triggers coalescing into a block of larger size.            
  *
  * -- wli
  */
@@ -132,9 +137,9 @@ static void __free_pages_ok (struct page *page, unsigned int order)
 		 */
 		buddy1 = base + (page_idx ^ -mask);
 		buddy2 = base + page_idx;
-		if (BAD_RANGE(zone,buddy1))
+		if (bad_range(zone, buddy1))
 			BUG();
-		if (BAD_RANGE(zone,buddy2))
+		if (bad_range(zone, buddy2))
 			BUG();
 
 		list_del(&buddy1->list);
@@ -168,17 +173,17 @@ static inline struct page * expand (zone_t *zone, struct page *page,
 	unsigned long size = 1 << high;
 
 	while (high > low) {
-		if (BAD_RANGE(zone,page))
+		if (bad_range(zone, page))
 			BUG();
 		area--;
 		high--;
 		size >>= 1;
-		list_add(&(page)->list, &(area)->free_list);
+		list_add(&page->list, &area->free_list);
 		MARK_USED(index, high, area);
 		index += size;
 		page += size;
 	}
-	if (BAD_RANGE(zone,page))
+	if (bad_range(zone, page))
 		BUG();
 	return page;
 }
@@ -201,7 +206,7 @@ static struct page * rmqueue(zone_t *zone, unsigned int order)
 			unsigned int index;
 
 			page = list_entry(curr, struct page, list);
-			if (BAD_RANGE(zone,page))
+			if (bad_range(zone, page))
 				BUG();
 			list_del(curr);
 			index = page - zone->zone_mem_map;
@@ -213,7 +218,7 @@ static struct page * rmqueue(zone_t *zone, unsigned int order)
 			spin_unlock_irqrestore(&zone->lock, flags);
 
 			set_page_count(page, 1);
-			if (BAD_RANGE(zone,page))
+			if (bad_range(zone, page))
 				BUG();
 			if (PageLRU(page))
 				BUG();
@@ -495,16 +500,13 @@ void free_pages(unsigned long addr, unsigned int order)
  */
 unsigned int nr_free_pages(void)
 {
-	unsigned int sum;
-	zone_t *zone;
-	pg_data_t *pgdat = pgdat_list;
+	unsigned int i, sum = 0;
+	pg_data_t *pgdat;
 
-	sum = 0;
-	while (pgdat) {
-		for (zone = pgdat->node_zones; zone < pgdat->node_zones + MAX_NR_ZONES; zone++)
-			sum += zone->free_pages;
-		pgdat = pgdat->node_next;
-	}
+	for (pgdat = pgdat_list; pgdat; pgdat = pgdat->node_next)
+		for (i = 0; i < MAX_NR_ZONES; ++i)
+			sum += pgdat->node_zones[i].free_pages;
+
 	return sum;
 }
 

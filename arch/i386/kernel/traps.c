@@ -84,7 +84,7 @@ asmlinkage void alignment_check(void);
 asmlinkage void spurious_interrupt_bug(void);
 asmlinkage void machine_check(void);
 
-int kstack_depth_to_print = 24;
+static int kstack_depth_to_print = 24;
 
 
 /*

@@ -30,6 +30,10 @@ CONFIG_SND_RME9652
   Say 'Y' or 'M' to include support for RME Hammerfall (RME Digi9652 /
   Digi9636) soundcards.
 
+CONFIG_SND_HDSP
+  Say 'Y' or 'M' to include support for RME Hammerfall DSP Audio
+  soundcards.
+
 CONFIG_SND_TRIDENT
 
 CONFIG_SND_YMFPCI

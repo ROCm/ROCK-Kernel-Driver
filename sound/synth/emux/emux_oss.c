@@ -25,7 +25,7 @@
 #define __NO_VERSION__
 #include <sound/driver.h>
 
-#ifdef CONFIG_SND_OSSEMUL
+#ifdef CONFIG_SND_SEQUENCER_OSS
 
 #include <asm/uaccess.h>
 #include <sound/core.h>
@@ -493,4 +493,4 @@ fake_event(snd_emux_t *emu, snd_emux_port_t *port, int ch, int param, int val, i
 	snd_emux_event_input(&ev, 0, port, atomic, hop);
 }
 
-#endif /* CONFIG_SND_OSSEMUL */
+#endif /* CONFIG_SND_SEQUENCER_OSS */

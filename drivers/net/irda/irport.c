@@ -55,7 +55,6 @@
 #include <asm/io.h>
 
 #include <net/irda/irda.h>
-#include <net/irda/irmod.h>
 #include <net/irda/wrapper.h>
 #include <net/irda/irport.h>
 
@@ -121,8 +120,7 @@ int __init irport_init(void)
  *    Close all configured ports
  *
  */
-#ifdef MODULE
-static void irport_cleanup(void)
+static void __exit irport_cleanup(void)
 {
  	int i;
 
@@ -133,7 +131,6 @@ static void irport_cleanup(void)
  			irport_close(dev_self[i]);
  	}
 }
-#endif /* MODULE */
 
 struct irport_cb *
 irport_open(int i, unsigned int iobase, unsigned int irq)
@@ -1026,7 +1023,6 @@ static struct net_device_stats *irport_net_get_stats(struct net_device *dev)
 	return &self->stats;
 }
 
-#ifdef MODULE
 MODULE_PARM(io, "1-4i");
 MODULE_PARM_DESC(io, "Base I/O addresses");
 MODULE_PARM(irq, "1-4i");
@@ -1036,15 +1032,6 @@ MODULE_AUTHOR("Dag Brattli <dagb@cs.uit.no>");
 MODULE_DESCRIPTION("Half duplex serial driver for IrDA SIR mode");
 MODULE_LICENSE("GPL");
 
-
-void cleanup_module(void)
-{
-	irport_cleanup();
-}
-
-int init_module(void)
-{
-	return irport_init();
-}
-#endif /* MODULE */
+module_init(irport_init);
+module_exit(irport_cleanup);
 

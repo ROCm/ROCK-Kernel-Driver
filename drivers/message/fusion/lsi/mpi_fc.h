@@ -6,7 +6,7 @@
  *          Title:  MPI Fibre Channel messages and structures
  *  Creation Date:  June 12, 2000
  *
- *    MPI Version:  01.01.07
+ *    MPI Version:  01.02.02
  *
  *  Version History
  *  ---------------
@@ -32,6 +32,9 @@
  *                      Added MPI_FC_PRIM_SEND_FLAGS_RESET_LINK define.
  *                      Added structure offset comments.
  *  04-09-01  01.01.07  Added RspLength field to MSG_LINK_SERVICE_RSP_REQUEST.
+ *  08-08-01  01.02.01  Original release for v1.2 work.
+ *  09-28-01  01.02.02  Change name of reserved field in
+ *                      MSG_LINK_SERVICE_RSP_REPLY.
  *  --------------------------------------------------------------------------
  */
 
@@ -172,7 +175,7 @@ typedef struct _MSG_LINK_SERVICE_RSP_REPLY
     U8                      MsgLength;          /* 02h */
     U8                      Function;           /* 03h */
     U16                     Reserved1;          /* 04h */
-    U8                      Reserved2;          /* 06h */
+    U8                      Reserved_0100_InitiatorIndex; /* 06h */ /* obsolete InitiatorIndex */
     U8                      MsgFlags;           /* 07h */
     U32                     MsgContext;         /* 08h */
     U16                     Reserved3;          /* 0Ch */

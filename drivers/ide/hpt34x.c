@@ -157,7 +157,6 @@ static int hpt34x_udma_stop(struct ata_device *drive)
 	unsigned long dma_base = ch->dma_base;
 	u8 dma_stat;
 
-	drive->waiting_for_dma = 0;
 	outb(inb(dma_base)&~1, dma_base);	/* stop DMA */
 	dma_stat = inb(dma_base+2);		/* get DMA status */
 	outb(dma_stat|6, dma_base+2);		/* clear the INTR & ERROR bits */
@@ -184,7 +183,6 @@ static int hpt34x_udma_init(struct ata_device *drive, struct request *rq)
 	outl(ch->dmatable_dma, dma_base + 4);	/* PRD table */
 	outb(cmd, dma_base);			/* specify r/w */
 	outb(inb(dma_base+2)|6, dma_base+2);	/* clear INTR & ERROR flags */
-	drive->waiting_for_dma = 1;
 
 	if (drive->type == ATA_DISK) {
 		ata_set_handler(drive, ide_dma_intr, WAIT_CMD, NULL);	/* issue cmd to drive */

@@ -23,14 +23,14 @@ include $(TOPDIR)/Rules.make
 
 # Dependencies on generates files need to be listed explicitly
 
-sm_afsk1200.o:   sm_tbl_afsk1200.h
-sm_afsk2400_7.o: sm_tbl_afsk2400_7.h
-sm_afsk2400_8.o: sm_tbl_afsk2400_8.h
-sm_afsk2666.o:   sm_tbl_afsk2666.h
-sm_psk4800.o:    sm_tbl_psk4800.h
-sm_hapn4800.o:   sm_tbl_hapn4800.h
-sm_fsk9600.o:    sm_tbl_fsk9600.h
+$(obj)/sm_afsk1200.o:   $(obj)/sm_tbl_afsk1200.h
+$(obj)/sm_afsk2400_7.o: $(obj)/sm_tbl_afsk2400_7.h
+$(obj)/sm_afsk2400_8.o: $(obj)/sm_tbl_afsk2400_8.h
+$(obj)/sm_afsk2666.o:   $(obj)/sm_tbl_afsk2666.h
+$(obj)/sm_psk4800.o:    $(obj)/sm_tbl_psk4800.h
+$(obj)/sm_hapn4800.o:   $(obj)/sm_tbl_hapn4800.h
+$(obj)/sm_fsk9600.o:    $(obj)/sm_tbl_fsk9600.h
 
-sm_tbl_%: gentbl
-	./gentbl
+$(obj)/sm_tbl_%: $(obj)/gentbl
+	$<
 

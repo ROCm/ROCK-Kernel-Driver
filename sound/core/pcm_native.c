@@ -305,7 +305,7 @@ static int snd_pcm_hw_params(snd_pcm_substream_t *substream,
 	default:
 		return -EBADFD;
 	}
-#ifdef CONFIG_SND_OSSEMUL
+#if defined(CONFIG_SND_PCM_OSS) || defined(CONFIG_SND_PCM_OSS_MODULE)
 	if (!substream->oss.oss)
 #endif
 		if (atomic_read(&runtime->mmap_count))
@@ -495,10 +495,14 @@ int snd_pcm_status(snd_pcm_substream_t *substream,
 		if (runtime->status->state == SNDRV_PCM_STATE_RUNNING ||
 		    runtime->status->state == SNDRV_PCM_STATE_DRAINING)
 			status->delay = runtime->buffer_size - status->avail;
+		else
+			status->delay = 0;
 	} else {
 		status->avail = snd_pcm_capture_avail(runtime);
 		if (runtime->status->state == SNDRV_PCM_STATE_RUNNING)
 			status->delay = status->avail;
+		else
+			status->delay = 0;
 	}
 	status->avail_max = runtime->avail_max;
 	status->overrange = runtime->overrange;
@@ -652,7 +656,8 @@ int snd_pcm_start(snd_pcm_substream_t *substream)
 static inline int snd_pcm_pre_stop(snd_pcm_substream_t *substream, int state)
 {
 	snd_pcm_runtime_t *runtime = substream->runtime;
-	if (!snd_pcm_running(substream))
+	if (substream->runtime->status->state != SNDRV_PCM_STATE_RUNNING &&
+	    substream->runtime->status->state != SNDRV_PCM_STATE_DRAINING)
 		return -EBADFD;
 	runtime->trigger_master = substream;
 	return 0;
@@ -2573,10 +2578,8 @@ static int snd_pcm_mmap_control(snd_pcm_substream_t *substream, struct file *fil
 
 static void snd_pcm_mmap_data_open(struct vm_area_struct *area)
 {
-#if 0
 	snd_pcm_substream_t *substream = (snd_pcm_substream_t *)area->vm_private_data;
 	atomic_inc(&substream->runtime->mmap_count);
-#endif
 }
 
 static void snd_pcm_mmap_data_close(struct vm_area_struct *area)

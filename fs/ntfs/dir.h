@@ -40,8 +40,8 @@ typedef struct {
 /* The little endian Unicode string $I30 as a global constant. */
 extern const uchar_t I30[5];
 
-extern u64 ntfs_lookup_inode_by_name(ntfs_inode *dir_ni, const uchar_t *uname,
-		const int uname_len, ntfs_name **res);
+extern MFT_REF ntfs_lookup_inode_by_name(ntfs_inode *dir_ni,
+		const uchar_t *uname, const int uname_len, ntfs_name **res);
 
 #endif /* _LINUX_NTFS_FS_DIR_H */
 

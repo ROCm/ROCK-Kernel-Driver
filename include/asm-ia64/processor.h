@@ -16,6 +16,7 @@
 #include <linux/config.h>
 
 #include <linux/percpu.h>
+#include <linux/compiler.h>
 
 #include <asm/ptrace.h>
 #include <asm/kregs.h>
@@ -283,7 +284,7 @@ struct thread_struct {
 	regs->loadrs = 0;									\
 	regs->r8 = current->mm->dumpable;	/* set "don't zap registers" flag */		\
 	regs->r12 = new_sp - 16;	/* allocate 16 byte scratch area */			\
-	if (!__builtin_expect (current->mm->dumpable, 1)) {					\
+	if (!likely (current->mm->dumpable)) {					\
 		/*										\
 		 * Zap scratch regs to avoid leaking bits between processes with different	\
 		 * uid/privileges.								\

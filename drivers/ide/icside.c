@@ -440,7 +440,6 @@ static int icside_dma_stop(struct ata_device *drive)
 {
 	struct ata_channel *ch = drive->channel;
 
-	drive->waiting_for_dma = 0;
 	disable_dma(ch->hw.dma);
 	icside_destroy_dmatable(drive);
 
@@ -507,8 +506,6 @@ icside_dma_common(struct ata_device *drive, struct request *rq,
 	 */
 	set_dma_sg(ch->hw.dma, ch->sg_table, count);
 	set_dma_mode(ch->hw.dma, dma_mode);
-
-	drive->waiting_for_dma = 1;
 
 	return 0;
 }

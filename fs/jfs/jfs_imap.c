@@ -2819,8 +2819,7 @@ diUpdatePMap(struct inode *ipimap,
 			mp->lsn = lsn;
 			/* move mp after tblock in logsync list */
 			LOGSYNC_LOCK(log);
-			list_del(&mp->synclist);
-			list_add(&mp->synclist, &tblk->synclist);
+			list_move(&mp->synclist, &tblk->synclist);
 			LOGSYNC_UNLOCK(log);
 		}
 		/* inherit younger/larger clsn */
@@ -3052,7 +3051,6 @@ static int copy_from_dinode(dinode_t * dip, struct inode *ip)
 	ip->i_ctime = le32_to_cpu(dip->di_ctime.tv_sec);
 	ip->i_blksize = ip->i_sb->s_blocksize;
 	ip->i_blocks = LBLK2PBLK(ip->i_sb, le64_to_cpu(dip->di_nblocks));
-	ip->i_version = ++event;
 	ip->i_generation = le32_to_cpu(dip->di_gen);
 
 	jfs_ip->ixpxd = dip->di_ixpxd;	/* in-memory pxd's are little-endian */

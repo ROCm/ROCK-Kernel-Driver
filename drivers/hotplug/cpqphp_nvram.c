@@ -33,6 +33,7 @@
 #include <linux/proc_fs.h>
 #include <linux/miscdevice.h>
 #include <linux/slab.h>
+#include <linux/tqueue.h>
 #include <linux/pci.h>
 #include <linux/init.h>
 #include <asm/uaccess.h>

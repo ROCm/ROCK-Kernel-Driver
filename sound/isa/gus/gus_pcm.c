@@ -622,7 +622,7 @@ static snd_pcm_hardware_t snd_gf1_pcm_playback =
 	info:			SNDRV_PCM_INFO_NONINTERLEAVED,
 	formats:		(SNDRV_PCM_FMTBIT_S8 | SNDRV_PCM_FMTBIT_U8 |
 				 SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_U16_LE),
-	rates:			SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_44100,
+	rates:			SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
 	rate_min:		5510,
 	rate_max:		48000,
 	channels_min:		1,

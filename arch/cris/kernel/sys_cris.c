@@ -167,12 +167,3 @@ asmlinkage int sys_ipc (uint call, int first, int second,
 		return -EINVAL;
 	}
 }
-
-/* apparently this is legacy - if we don't need this in Linux/CRIS we can remove it. */
-
-asmlinkage int sys_pause(void)
-{
-        current->state = TASK_INTERRUPTIBLE;
-        schedule();
-        return -ERESTARTNOHAND;
-}

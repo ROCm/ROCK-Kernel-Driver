@@ -66,7 +66,7 @@ if [ "$CONFIG_SA1100_CERF" = "y" ]; then
    choice 'Cerf Flash available'  \
         "8MB    CONFIG_SA1100_CERF_FLASH_8MB \
          16MB   CONFIG_SA1100_CERF_FLASH_16MB \
-         32MB   CONFIG_SA1100_CERF_FLASH_32MB" CerfFlash
+         32MB   CONFIG_SA1100_CERF_FLASH_32MB" 8MB
    bool 'Cerf w/CPLD support (CerfPDA)' CONFIG_SA1100_CERF_CPLD
 fi
 dep_bool '  Compaq iPAQ H3100' CONFIG_SA1100_H3100 $CONFIG_ARCH_SA1100
@@ -341,7 +341,7 @@ comment 'Processor Features'
 if [ "$CONFIG_CPU_ARM720T" = "y" -o "$CONFIG_CPU_ARM920T" = "y" -o \
      "$CONFIG_CPU_ARM922T" = "y" -o "$CONFIG_CPU_ARM926T" = "y" -o \
      "$CONFIG_CPU_ARM1020" = "y" -o "$CONFIG_CPU_XSCALE" = "y" ]; then
-   dep_bool 'Support Thumb instructions (experimental)' CONFIG_ARM_THUMB $CONFIG_EXPERIMENTAL
+   dep_bool 'Support Thumb instructions (EXPERIMENTAL)' CONFIG_ARM_THUMB $CONFIG_EXPERIMENTAL
 fi
 if [ "$CONFIG_CPU_ARM920T" = "y" -o "$CONFIG_CPU_ARM922T" = "y" -o \
      "$CONFIG_CPU_ARM926T" = "y" -o "$CONFIG_CPU_ARM1020" = "y" ]; then
@@ -440,7 +440,7 @@ if [ "$CONFIG_ARCH_SA1100" = "y" -o \
 fi
 
 source drivers/pci/Config.in
-bool 'Support hot-pluggable devices' CONFIG_HOTPLUG
+bool 'Support for hot-pluggable devices' CONFIG_HOTPLUG
 if [ "$CONFIG_HOTPLUG" = "y" ]; then
    source drivers/pcmcia/Config.in
 else
@@ -449,7 +449,7 @@ fi
 comment 'At least one math emulation must be selected'
 tristate 'NWFPE math emulation' CONFIG_FPE_NWFPE
 if [ "$CONFIG_CPU_26" = "n" -a "$CONFIG_CPU_32v3" = "n" ]; then
-   dep_tristate 'FastFPE math emulation (experimental)' CONFIG_FPE_FASTFPE $CONFIG_EXPERIMENTAL
+   dep_tristate 'FastFPE math emulation (EXPERIMENTAL)' CONFIG_FPE_FASTFPE $CONFIG_EXPERIMENTAL
 fi
 choice 'Kernel core (/proc/kcore) format' \
 	"ELF		CONFIG_KCORE_ELF	\
@@ -458,7 +458,7 @@ tristate 'Kernel support for a.out binaries' CONFIG_BINFMT_AOUT
 tristate 'Kernel support for ELF binaries' CONFIG_BINFMT_ELF
 tristate 'Kernel support for MISC binaries' CONFIG_BINFMT_MISC
 bool 'Power Management support' CONFIG_PM
-dep_bool 'Preemptible Kernel (experimental)' CONFIG_PREEMPT $CONFIG_CPU_32 $CONFIG_EXPERIMENTAL
+dep_bool 'Preemptible Kernel (EXPERIMENTAL)' CONFIG_PREEMPT $CONFIG_CPU_32 $CONFIG_EXPERIMENTAL
 dep_tristate 'Advanced Power Management Emulation' CONFIG_APM $CONFIG_PM
 dep_tristate 'RISC OS personality' CONFIG_ARTHUR $CONFIG_CPU_32
 string 'Default kernel command string' CONFIG_CMDLINE ""
@@ -520,7 +520,7 @@ if [ "$CONFIG_NET" = "y" ]; then
    mainmenu_option next_comment
    comment 'Network device support'
 
-   bool 'Network device support?' CONFIG_NETDEVICES
+   bool 'Network device support' CONFIG_NETDEVICES
    if [ "$CONFIG_NETDEVICES" = "y" ]; then
       source drivers/net/Config.in
    fi
@@ -546,7 +546,7 @@ endmenu
 mainmenu_option next_comment
 comment 'SCSI support'
 
-tristate 'SCSI support?' CONFIG_SCSI
+tristate 'SCSI support' CONFIG_SCSI
 
 if [ "$CONFIG_SCSI" != "n" ]; then
    source drivers/scsi/Config.in
@@ -626,7 +626,7 @@ if [ "$CONFIG_ARCH_ACORN" = "y" -o \
    mainmenu_option next_comment
    comment 'Sound'
 
-   tristate 'Sound support' CONFIG_SOUND
+   tristate 'Sound card support' CONFIG_SOUND
    if [ "$CONFIG_SOUND" != "n" ]; then
       source sound/Config.in
    fi

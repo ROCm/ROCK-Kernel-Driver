@@ -3,7 +3,7 @@
 	8139too.c: A RealTek RTL-8139 Fast Ethernet driver for Linux.
 
 	Maintained by Jeff Garzik <jgarzik@mandrakesoft.com>
-	Copyright 2000,2001 Jeff Garzik
+	Copyright 2000-2002 Jeff Garzik
 
 	Much code comes from Donald Becker's rtl8139.c driver,
 	versions 1.13 and older.  This driver was originally based
@@ -92,7 +92,7 @@
 */
 
 #define DRV_NAME	"8139too"
-#define DRV_VERSION	"0.9.24"
+#define DRV_VERSION	"0.9.25"
 
 
 #include <linux/config.h>
@@ -201,6 +201,8 @@ enum {
 	HAS_LNK_CHNG = 0x040000,
 };
 
+#define RTL_NUM_STATS 4		/* number of ETHTOOL_GSTATS u64's */
+#define RTL_REGS_VER 1		/* version of reg. data in ETHTOOL_GREGS */
 #define RTL_MIN_IO_SIZE 0x80
 #define RTL8139B_IO_SIZE 256
 
@@ -269,6 +271,14 @@ static struct pci_device_id rtl8139_pci_tbl[] __devinitdata = {
 };
 MODULE_DEVICE_TABLE (pci, rtl8139_pci_tbl);
 
+static struct {
+	const char str[ETH_GSTRING_LEN];
+} ethtool_stats_keys[] = {
+	{ "early_rx" },
+	{ "tx_buf_mapped" },
+	{ "tx_timeouts" },
+	{ "rx_lost_in_ring" },
+};
 
 /* The rest of these values should never change. */
 
@@ -566,6 +576,7 @@ struct rtl8139_private {
 	struct rtl_extra_stats xstats;
 	int time_to_die;
 	struct mii_if_info mii;
+	unsigned int regs_len;
 };
 
 MODULE_AUTHOR ("Jeff Garzik <jgarzik@mandrakesoft.com>");
@@ -807,6 +818,7 @@ static int __devinit rtl8139_init_board (struct pci_dev *pdev,
 	ioaddr = (void *) pio_start;
 	dev->base_addr = pio_start;
 	tp->mmio_addr = ioaddr;
+	tp->regs_len = pio_len;
 #else
 	/* ioremap MMIO region */
 	ioaddr = ioremap (mmio_start, mmio_len);
@@ -817,6 +829,7 @@ static int __devinit rtl8139_init_board (struct pci_dev *pdev,
 	}
 	dev->base_addr = (long) ioaddr;
 	tp->mmio_addr = ioaddr;
+	tp->regs_len = mmio_len;
 #endif /* USE_IO_OPS */
 
 	/* Bring old chips out of low-power mode. */
@@ -1008,6 +1021,7 @@ static int __devinit rtl8139_init_one (struct pci_dev *pdev,
 	} else
 #endif
 		tp->phys[0] = 32;
+	tp->mii.phy_id = tp->phys[0];
 
 	/* The lower four bits are the media type. */
 	option = (board_idx >= MAX_UNITS) ? 0 : media[board_idx];
@@ -2230,6 +2244,7 @@ static int netdev_ethtool_ioctl (struct net_device *dev, void *useraddr)
 		strcpy (info.driver, DRV_NAME);
 		strcpy (info.version, DRV_VERSION);
 		strcpy (info.bus_info, np->pci_dev->slot_name);
+		info.regdump_len = np->regs_len;
 		if (copy_to_user (useraddr, &info, sizeof (info)))
 			return -EFAULT;
 		return 0;
@@ -2309,6 +2324,104 @@ static int netdev_ethtool_ioctl (struct net_device *dev, void *useraddr)
 			return rc;
 		}
 
+/* TODO: we are too slack to do reg dumping for pio, for now */
+#ifndef CONFIG_8139TOO_PIO
+	/* NIC register dump */
+	case ETHTOOL_GREGS: {
+                struct ethtool_regs regs;
+		unsigned int regs_len = np->regs_len;
+                u8 *regbuf = kmalloc(regs_len, GFP_KERNEL);
+                int rc;
+
+		if (!regbuf)
+			return -ENOMEM;
+		memset(regbuf, 0, regs_len);
+
+                rc = copy_from_user(&regs, useraddr, sizeof(regs));
+		if (rc) {
+			rc = -EFAULT;
+			goto err_out_gregs;
+		}
+                
+                if (regs.len > regs_len)
+                        regs.len = regs_len;
+                if (regs.len < regs_len) {
+			rc = -EINVAL;
+			goto err_out_gregs;
+		}
+
+                regs.version = RTL_REGS_VER;
+                rc = copy_to_user(useraddr, &regs, sizeof(regs));
+		if (rc) {
+			rc = -EFAULT;
+			goto err_out_gregs;
+		}
+
+                useraddr += offsetof(struct ethtool_regs, data);
+
+                spin_lock_irq(&np->lock);
+                memcpy_fromio(regbuf, np->mmio_addr, regs_len);
+                spin_unlock_irq(&np->lock);
+
+                if (copy_to_user(useraddr, regbuf, regs_len))
+                        rc = -EFAULT;
+
+err_out_gregs:
+		kfree(regbuf);
+		return rc;
+	}
+#endif /* CONFIG_8139TOO_PIO */
+
+	/* get string list(s) */
+	case ETHTOOL_GSTRINGS: {
+		struct ethtool_gstrings estr = { ETHTOOL_GSTRINGS };
+
+		if (copy_from_user(&estr, useraddr, sizeof(estr)))
+			return -EFAULT;
+		if (estr.string_set != ETH_SS_STATS)
+			return -EINVAL;
+
+		estr.len = RTL_NUM_STATS;
+		if (copy_to_user(useraddr, &estr, sizeof(estr)))
+			return -EFAULT;
+		if (copy_to_user(useraddr + sizeof(estr),
+				 &ethtool_stats_keys,
+				 sizeof(ethtool_stats_keys)))
+			return -EFAULT;
+		return 0;
+	}
+
+	/* get NIC-specific statistics */
+	case ETHTOOL_GSTATS: {
+		struct ethtool_stats estats = { ETHTOOL_GSTATS };
+		u64 *tmp_stats;
+		const unsigned int sz = sizeof(u64) * RTL_NUM_STATS;
+		int i;
+
+		estats.n_stats = RTL_NUM_STATS;
+		if (copy_to_user(useraddr, &estats, sizeof(estats)))
+			return -EFAULT;
+
+		tmp_stats = kmalloc(sz, GFP_KERNEL);
+		if (!tmp_stats)
+			return -ENOMEM;
+		memset(tmp_stats, 0, sz);
+
+		i = 0;
+		tmp_stats[i++] = np->xstats.early_rx;
+		tmp_stats[i++] = np->xstats.tx_buf_mapped;
+		tmp_stats[i++] = np->xstats.tx_timeouts;
+		tmp_stats[i++] = np->xstats.rx_lost_in_ring;
+		if (i != RTL_NUM_STATS)
+			BUG();
+
+		i = copy_to_user(useraddr + sizeof(estats), tmp_stats, sz);
+		kfree(tmp_stats);
+
+		if (i)
+			return -EFAULT;
+		return 0;
+	}
 	default:
 		break;
 	}
@@ -2427,7 +2540,7 @@ static void __set_rx_mode (struct net_device *dev)
 		     i++, mclist = mclist->next) {
 			int bit_nr = ether_crc(ETH_ALEN, mclist->dmi_addr) >> 26;
 
-			mc_filter[bit_nr >> 5] |= cpu_to_le32(1 << (bit_nr & 31));
+			mc_filter[bit_nr >> 5] |= 1 << (bit_nr & 31);
 			rx_mode |= AcceptMulticast;
 		}
 	}

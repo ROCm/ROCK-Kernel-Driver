@@ -77,7 +77,7 @@ struct tlvtype_proc
 
 /* An unknown option is detected, decide what to do */
 
-int ip6_tlvopt_unknown(struct sk_buff *skb, int optoff)
+static int ip6_tlvopt_unknown(struct sk_buff *skb, int optoff)
 {
 	switch ((skb->nh.raw[optoff] & 0xC0) >> 6) {
 	case 0: /* ignore */
@@ -159,7 +159,7 @@ bad:
   Destination options header.
  *****************************/
 
-struct tlvtype_proc tlvprocdestopt_lst[] = {
+static struct tlvtype_proc tlvprocdestopt_lst[] = {
 	/* No destination options are defined now */
 	{-1,			NULL}
 };
@@ -425,7 +425,7 @@ fail:
    generate error.
  */
 
-struct hdrtype_proc hdrproc_lst[] = {
+static struct hdrtype_proc hdrproc_lst[] = {
 	{NEXTHDR_FRAGMENT,	ipv6_reassembly},
 	{NEXTHDR_ROUTING,	ipv6_routing_header},
 	{NEXTHDR_DEST,		ipv6_dest_opt},
@@ -512,7 +512,7 @@ drop:
 	return 0;
 }
 
-struct tlvtype_proc tlvprochopopt_lst[] = {
+static struct tlvtype_proc tlvprochopopt_lst[] = {
 	{IPV6_TLV_ROUTERALERT,	ipv6_hop_ra},
 	{IPV6_TLV_JUMBO,	ipv6_hop_jumbo},
 	{-1,			NULL}
@@ -536,7 +536,7 @@ int ipv6_parse_hopopts(struct sk_buff *skb, int nhoff)
  *	for headers.
  */
 
-u8 *ipv6_build_rthdr(struct sk_buff *skb, u8 *prev_hdr,
+static u8 *ipv6_build_rthdr(struct sk_buff *skb, u8 *prev_hdr,
 		     struct ipv6_rt_hdr *opt, struct in6_addr *addr)
 {
 	struct rt0_hdr *phdr, *ihdr;

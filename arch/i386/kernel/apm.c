@@ -922,12 +922,13 @@ static void apm_power_off(void)
  * callback we use.
  */
 
-void handle_poweroff (int key, struct pt_regs *pt_regs,
-		struct kbd_struct *kbd, struct tty_struct *tty) {
+static void handle_poweroff (int key, struct pt_regs *pt_regs,
+		struct kbd_struct *kbd, struct tty_struct *tty)
+{
         apm_power_off();
 }
 
-struct sysrq_key_op	sysrq_poweroff_op = {
+static struct sysrq_key_op	sysrq_poweroff_op = {
 	handler:        handle_poweroff,
 	help_msg:       "Off",
 	action_msg:     "Power Off\n"

@@ -1944,7 +1944,7 @@ snd_pcm_sframes_t snd_pcm_lib_write(snd_pcm_substream_t *substream, const void *
 
 	snd_assert(substream->ffile != NULL, return -ENXIO);
 	nonblock = !!(substream->ffile->f_flags & O_NONBLOCK);
-#ifdef CONFIG_SND_OSSEMUL
+#if defined(CONFIG_SND_PCM_OSS) || defined(CONFIG_SND_PCM_OSS_MODULE)
 	if (substream->oss.oss) {
 		snd_pcm_oss_setup_t *setup = substream->oss.setup;
 		if (setup != NULL) {
@@ -1956,7 +1956,8 @@ snd_pcm_sframes_t snd_pcm_lib_write(snd_pcm_substream_t *substream, const void *
 	}
 #endif
 
-	if (runtime->access != SNDRV_PCM_ACCESS_RW_INTERLEAVED)
+	if (runtime->access != SNDRV_PCM_ACCESS_RW_INTERLEAVED &&
+	    runtime->channels > 1)
 		return -EINVAL;
 	return snd_pcm_lib_write1(substream, buf, size, nonblock,
 				  snd_pcm_lib_write_transfer);
@@ -2017,7 +2018,7 @@ snd_pcm_sframes_t snd_pcm_lib_writev(snd_pcm_substream_t *substream, void **bufs
 
 	snd_assert(substream->ffile != NULL, return -ENXIO);
 	nonblock = !!(substream->ffile->f_flags & O_NONBLOCK);
-#ifdef CONFIG_SND_OSSEMUL
+#if defined(CONFIG_SND_PCM_OSS) || defined(CONFIG_SND_PCM_OSS_MODULE)
 	if (substream->oss.oss) {
 		snd_pcm_oss_setup_t *setup = substream->oss.setup;
 		if (setup != NULL) {
@@ -2231,7 +2232,7 @@ snd_pcm_sframes_t snd_pcm_lib_read(snd_pcm_substream_t *substream, void *buf, sn
 
 	snd_assert(substream->ffile != NULL, return -ENXIO);
 	nonblock = !!(substream->ffile->f_flags & O_NONBLOCK);
-#ifdef CONFIG_SND_OSSEMUL
+#if defined(CONFIG_SND_PCM_OSS) || defined(CONFIG_SND_PCM_OSS_MODULE)
 	if (substream->oss.oss) {
 		snd_pcm_oss_setup_t *setup = substream->oss.setup;
 		if (setup != NULL) {
@@ -2298,7 +2299,7 @@ snd_pcm_sframes_t snd_pcm_lib_readv(snd_pcm_substream_t *substream, void **bufs,
 
 	snd_assert(substream->ffile != NULL, return -ENXIO);
 	nonblock = !!(substream->ffile->f_flags & O_NONBLOCK);
-#ifdef CONFIG_SND_OSSEMUL
+#if defined(CONFIG_SND_PCM_OSS) || defined(CONFIG_SND_PCM_OSS_MODULE)
 	if (substream->oss.oss) {
 		snd_pcm_oss_setup_t *setup = substream->oss.setup;
 		if (setup != NULL) {
