@@ -362,6 +362,13 @@ struct scsi_lun {
 #define SCSI_2          3
 #define SCSI_3          4
 
+/*
+ * INQ PERIPHERAL QUALIFIERS
+ */
+#define SCSI_INQ_PQ_CON         0x00
+#define SCSI_INQ_PQ_NOT_CON     0x01
+#define SCSI_INQ_PQ_NOT_CAP     0x03
+
 
 /*
  * Here are some scsi specific ioctl commands which are sometimes useful.
