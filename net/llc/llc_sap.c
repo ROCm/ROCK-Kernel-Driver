@@ -89,15 +89,10 @@ struct llc_sap_state_ev *llc_sap_alloc_ev(struct llc_sap *sap)
  */
 void llc_sap_send_ev(struct llc_sap *sap, struct llc_sap_state_ev *ev)
 {
-	struct llc_prim_if_block *prim;
-	u8 flag;
-
 	llc_sap_next_state(sap, ev);
-	flag = ev->ind_cfm_flag;
-	prim = ev->prim;
-	if (flag == LLC_IND) {
+	if (ev->ind_cfm_flag == LLC_IND) {
 		skb_get(ev->data.pdu.skb);
-		sap->ind(prim);
+		sap->ind(ev->prim);
 	}
 	llc_sap_free_ev(sap, ev);
 }
@@ -112,8 +107,8 @@ void llc_sap_rtn_pdu(struct llc_sap *sap, struct sk_buff *skb,
 		     struct llc_sap_state_ev *ev)
 {
 	struct llc_pdu_un *pdu;
-	struct llc_prim_if_block *prim = &llc_ind_prim;
-	union llc_u_prim_data *prim_data = llc_ind_prim.data;
+	struct llc_prim_if_block *prim = &sap->llc_ind_prim;
+	union llc_u_prim_data *prim_data = prim->data;
 	u8 lfb;
 
 	llc_pdu_decode_sa(skb, prim_data->udata.saddr.mac);
@@ -122,7 +117,7 @@ void llc_sap_rtn_pdu(struct llc_sap *sap, struct sk_buff *skb,
 	llc_pdu_decode_ssap(skb, &prim_data->udata.saddr.lsap);
 	prim_data->udata.pri = 0;
 	prim_data->udata.skb = skb;
-	pdu = (struct llc_pdu_un *)skb->nh.raw;
+	pdu = llc_pdu_un_hdr(skb);
 	switch (LLC_U_PDU_RSP(pdu)) {
 		case LLC_1_PDU_CMD_TEST:
 			prim->prim = LLC_TEST_PRIM;
