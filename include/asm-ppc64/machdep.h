@@ -100,6 +100,11 @@ struct machdep_calls {
 	ssize_t		(*nvram_size)(void);		
 	int		(*nvram_sync)(void);
 
+	/* Motherboard/chipset features. This is a kind of general purpose
+	 * hook used to control some machine specific features (like reset
+	 * lines, chip power control, etc...).
+	 */
+	long	 	(*feature_call)(unsigned int feature, ...);
 
 #ifdef CONFIG_SMP
 	/* functions for dealing with other cpus */
