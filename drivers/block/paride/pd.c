@@ -272,7 +272,6 @@ static int pd_check_media(kdev_t dev);
 static void pd_eject( int unit);
 
 static struct hd_struct pd_hd[PD_DEVS];
-static int pd_sizes[PD_DEVS];
 
 #define PD_NAMELEN	8
 
@@ -332,7 +331,6 @@ static struct gendisk pd_gendisk = {
 	major_name:	PD_NAME,
 	minor_shift:	PD_BITS,
 	part:		pd_hd,
-	sizes:		pd_sizes,
 	fops:		&pd_fops,
 };
 

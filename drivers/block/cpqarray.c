@@ -104,7 +104,6 @@ static struct board_type products[] = {
 };
 
 static struct hd_struct * ida;
-static int * ida_sizes;
 static struct gendisk ida_gendisk[MAX_CTLR];
 
 static struct proc_dir_entry *proc_array;
@@ -176,9 +175,7 @@ static void ida_geninit(int ctlr)
 		drv = &hba[ctlr]->drv[i];
 		if (!drv->nr_blks)
 			continue;
-		ida[(ctlr<<CTLR_SHIFT) + (i<<NWD_SHIFT)].nr_sects =
-		ida_sizes[(ctlr<<CTLR_SHIFT) + (i<<NWD_SHIFT)] =
-				drv->nr_blks;
+		ida[(ctlr<<CTLR_SHIFT) + (i<<NWD_SHIFT)].nr_sects = drv->nr_blks;
 
 		(BLK_DEFAULT_QUEUE(MAJOR_NR + ctlr))->hardsect_size = drv->blk_size;
 		ida_gendisk[ctlr].nr_real++;
@@ -339,7 +336,6 @@ void cleanup_module(void)
 	devfs_find_and_unregister(NULL, "ida", 0, 0, 0, 0);
 	remove_proc_entry("cpqarray", proc_root_driver);
 	kfree(ida);
-	kfree(ida_sizes);
 }
 #endif /* MODULE */
 
@@ -372,16 +368,7 @@ int __init cpqarray_init(void)
 		return(num_cntlrs_reg);
 	}
 	
-	ida_sizes = kmalloc(sizeof(int)*nr_ctlr*NWD*16, GFP_KERNEL);
-	if(ida_sizes==NULL)
-	{
-		kfree(ida); 
-		printk( KERN_ERR "cpqarray: out of memory");
-		return(num_cntlrs_reg);
-	}
-
 	memset(ida, 0, sizeof(struct hd_struct)*nr_ctlr*NWD*16);
-	memset(ida_sizes, 0, sizeof(int)*nr_ctlr*NWD*16);
 	memset(ida_gendisk, 0, sizeof(struct gendisk)*MAX_CTLR);
 
 		/* 
@@ -437,7 +424,6 @@ int __init cpqarray_init(void)
 			if (num_cntlrs_reg == 0) 
 			{
 				kfree(ida);
-				kfree(ida_sizes);
 			}
                 	return(num_cntlrs_reg);
 	
@@ -469,7 +455,6 @@ int __init cpqarray_init(void)
 		ida_gendisk[i].major_name = "ida";
 		ida_gendisk[i].minor_shift = NWD_SHIFT;
 		ida_gendisk[i].part = ida + (i*256);
-		ida_gendisk[i].sizes = ida_sizes + (i*256);
 		ida_gendisk[i].nr_real = 0; 
 		ida_gendisk[i].de_arr = de_arr[i]; 
 		ida_gendisk[i].fops = &ida_fops; 
@@ -770,8 +755,7 @@ static int ida_open(struct inode *inode, struct file *filep)
 	if (ctlr > MAX_CTLR || hba[ctlr] == NULL)
 		return -ENXIO;
 
-	if (!capable(CAP_SYS_RAWIO) && ida_sizes[(ctlr << CTLR_SHIFT) +
-						minor(inode->i_rdev)] == 0)
+	if (!capable(CAP_SYS_RAWIO) && inode->i_bdev->bd_inode->i_size == 0)
 		return -ENXIO;
 
 	/*
@@ -781,7 +765,7 @@ static int ida_open(struct inode *inode, struct file *filep)
 	 * for "raw controller".
 	 */
 	if (capable(CAP_SYS_ADMIN)
-		&& ida_sizes[(ctlr << CTLR_SHIFT) + minor(inode->i_rdev)] == 0 
+		&& inode->i_bdev->bd_inode->i_size == 0
 		&& minor(inode->i_rdev) != 0)
 		return -ENXIO;
 
@@ -1498,7 +1482,6 @@ static int revalidate_allvol(kdev_t dev)
 	 * on this controller to zero.  We will reread all of this data
 	 */
 	memset(ida+(ctlr*256),            0, sizeof(struct hd_struct)*NWD*16);
-	memset(ida_sizes+(ctlr*256),      0, sizeof(int)*NWD*16);
 	memset(hba[ctlr]->drv,            0, sizeof(drv_info_t)*NWD);
 	ida_gendisk[ctlr].nr_real = 0;
 
@@ -1514,7 +1497,7 @@ static int revalidate_allvol(kdev_t dev)
 	ida_geninit(ctlr);
 	for(i=0; i<NWD; i++) {
 		kdev_t kdev = mk_kdev(major(dev), i << NWD_SHIFT);
-		if (ida_sizes[(ctlr<<CTLR_SHIFT) + (i<<NWD_SHIFT)])
+		if (ida[(ctlr<<CTLR_SHIFT) + (i<<NWD_SHIFT)].nr_sects)
 			revalidate_logvol(kdev, 2);
 	}
 

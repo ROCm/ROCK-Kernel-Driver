@@ -122,7 +122,6 @@ static unsigned int xd_bases[] __initdata =
 };
 
 static struct hd_struct xd_struct[XD_MAXDRIVES << 6];
-static int xd_sizes[XD_MAXDRIVES << 6];
 
 static spinlock_t xd_lock = SPIN_LOCK_UNLOCKED;
 
@@ -133,7 +132,6 @@ static struct gendisk xd_gendisk = {
 	major_name:	"xd",
 	minor_shift:	6,
 	part:		xd_struct,
-	sizes:		xd_sizes,
 	fops:		&xd_fops,
 };
 

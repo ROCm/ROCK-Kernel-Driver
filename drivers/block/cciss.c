@@ -348,8 +348,7 @@ static void cciss_geninit( int ctlr)
 		drv = &(hba[ctlr]->drv[i]);
 		if( !(drv->nr_blocks))
 			continue;
-		hba[ctlr]->hd[i << NWD_SHIFT].nr_sects = 
-		hba[ctlr]->sizes[i << NWD_SHIFT] = drv->nr_blocks;
+		hba[ctlr]->hd[i << NWD_SHIFT].nr_sects = drv->nr_blocks;
 		//hba[ctlr]->gendisk.nr_real++;
 		(BLK_DEFAULT_QUEUE(MAJOR_NR + ctlr))->hardsect_size = drv->block_size;
 	}
@@ -375,7 +374,7 @@ static int cciss_open(struct inode *inode, struct file *filep)
 	 * but I'm already using way to many device nodes to claim another one
 	 * for "raw controller".
 	 */
-	if (hba[ctlr]->sizes[minor(inode->i_rdev)] == 0) {
+	if (inode->i_bdev->bd_inode->i_size == 0) {
 		if (minor(inode->i_rdev) != 0)
 			return -ENXIO;
 		if (!capable(CAP_SYS_ADMIN))
@@ -806,7 +805,6 @@ static int revalidate_allvol(kdev_t dev)
          * on this controller to zero.  We will reread all of this data
          */
 	memset(hba[ctlr]->hd,         0, sizeof(struct hd_struct) * 256);
-        memset(hba[ctlr]->sizes,      0, sizeof(int) * 256);
         memset(hba[ctlr]->drv,        0, sizeof(drive_info_struct)
 						* CISS_MAX_LUN);
         hba[ctlr]->gendisk.nr_real = 0;
@@ -823,7 +821,7 @@ static int revalidate_allvol(kdev_t dev)
         cciss_geninit(ctlr);
         for(i=0; i<NWD; i++) {
 		kdev_t kdev = mk_kdev(major(dev), i << NWD_SHIFT);
-                if (hba[ctlr]->sizes[ i<<NWD_SHIFT ])
+                if (hba[ctlr]->gendisk.part[ i<<NWD_SHIFT ].nr_sects)
                         revalidate_logvol(kdev, 2);
 	}
 
@@ -836,7 +834,7 @@ static int deregister_disk(int ctlr, int logvol)
 	unsigned long flags;
 	struct gendisk *gdev = &(hba[ctlr]->gendisk);
 	ctlr_info_t  *h = hba[ctlr];
-	int start, max_p, i;	
+	int start, max_p;
 
 
 	if (!capable(CAP_SYS_RAWIO))
@@ -856,8 +854,6 @@ static int deregister_disk(int ctlr, int logvol)
 	max_p = 1 << gdev->minor_shift;
 	start = logvol << gdev->minor_shift;
 	wipe_partitions(mk_kdev(MAJOR_NR+ctlr, start));
-	for (i=max_p-1; i>=0; i--)
-		h->sizes[start + i] = 0;
 	/* check to see if it was the last disk */
 	if (logvol == h->highest_lun)
 	{
@@ -866,7 +862,7 @@ static int deregister_disk(int ctlr, int logvol)
 		for(i=0; i<h->highest_lun; i++)
 		{
 			/* if the disk has size > 0, it is available */
-			if (h->sizes[i << gdev->minor_shift] != 0)
+			if (h->gendisk.part[i << gdev->minor_shift].nr_sects)
 				newhighest = i;
 		}
 		h->highest_lun = newhighest;
@@ -2498,7 +2494,6 @@ static int __init cciss_init_one(struct pci_dev *pdev,
 	hba[i]->gendisk.major_name = "cciss";
 	hba[i]->gendisk.minor_shift = NWD_SHIFT;
 	hba[i]->gendisk.part = hba[i]->hd;
-	hba[i]->gendisk.sizes = hba[i]->sizes;
 	hba[i]->gendisk.nr_real = hba[i]->highest_lun+1;  
 
 	/* Get on the disk list */ 

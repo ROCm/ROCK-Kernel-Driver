@@ -157,8 +157,8 @@ static int show_partition(struct seq_file *part, void *v)
 		int minormask = (1<<sgp->minor_shift) - 1;
 		if ((n & minormask) && sgp->part[n].nr_sects == 0)
 			continue;
-		seq_printf(part, "%4d  %4d %10d %s\n",
-			sgp->major, n, sgp->sizes[n],
+		seq_printf(part, "%4d  %4d %10ld %s\n",
+			sgp->major, n, sgp->part[n].nr_sects << 1,
 			disk_name(sgp, n, buf));
 	}
 

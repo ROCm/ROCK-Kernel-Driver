@@ -24,6 +24,7 @@
 #include <linux/sched.h>
 #include <linux/init.h>
 #include <linux/blkpg.h>
+#include <linux/buffer_head.h>
 
 #ifdef CONFIG_KMOD
 #include <linux/kmod.h>
@@ -52,17 +53,16 @@
  *  encountered, except ...
  */
 
-static int nftl_sizes[256];
-
 /* .. for the Linux partition table handling. */
+/* So why didn't you fucking go and clean it up? -- AV */
 struct hd_struct part_table[256];
 
+static struct block_device_operations nftl_fops;
 static struct gendisk nftl_gendisk = {
 	major:		MAJOR_NR,
 	major_name:	"nftl",
 	minor_shift:	NFTL_PARTN_BITS,	/* # of partition bits */
 	part:		part_table,		/* hd struct */
-	sizes:		nftl_sizes,		/* block sizes */
 };
 
 struct NFTLrecord *NFTLs[MAX_NFTLS];
@@ -143,7 +143,6 @@ static void NFTL_setup(struct mtd_info *mtd)
 	}
 	NFTLs[firstfree] = nftl;
 	/* Finally, set up the block device sizes */
-	nftl_sizes[firstfree * 16] = nftl->nr_sects;
 	part_table[firstfree * 16].nr_sects = nftl->nr_sects;
 
 	nftl_gendisk.nr_real++;

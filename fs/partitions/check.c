@@ -404,13 +404,8 @@ static void check_partition(struct gendisk *hd, kdev_t dev)
 setup_devfs:
 	blkdev_put(bdev, BDEV_RAW);
 out:
-	/* Setup driverfs tree */
-	if (hd->sizes)
-		driverfs_create_partitions(hd, minor(dev));
-	else
-		driverfs_remove_partitions(hd, minor(dev));
-
-	devfs_register_partitions (hd, minor(dev), hd->sizes ? 0 : 1);
+	driverfs_create_partitions(hd, minor(dev));
+	devfs_register_partitions (hd, minor(dev), 0);
 }
 
 #ifdef CONFIG_DEVFS_FS
@@ -536,36 +531,17 @@ void grok_partitions(kdev_t dev, long size)
 	}
 	end_minor = first_minor + minors;
  
-	if (!g->sizes)
-		blk_size[g->major] = NULL;
-
 	g->part[first_minor].nr_sects = size;
 
 	/* No minors to use for partitions */
 	if (minors == 1)
 		return;
 
-	if (g->sizes) {
-		g->sizes[first_minor] = size >> (BLOCK_SIZE_BITS - 9);
-		for (i = first_minor + 1; i < end_minor; i++)
-			g->sizes[i] = 0;
-	}
-	blk_size[g->major] = g->sizes;
-
 	/* No such device (e.g., media were just removed) */
 	if (!size)
 		return;
 
 	check_partition(g, mk_kdev(g->major, first_minor));
-
- 	/*
- 	 * We need to set the sizes array before we will be able to access
- 	 * any of the partitions on this device.
- 	 */
-	if (g->sizes != NULL) {	/* optional safeguard in ll_rw_blk.c */
-		for (i = first_minor; i < end_minor; i++)
-			g->sizes[i] = g->part[i].nr_sects >> (BLOCK_SIZE_BITS - 9);
-	}
 }
 
 unsigned char *read_dev_sector(struct block_device *bdev, unsigned long n, Sector *p)

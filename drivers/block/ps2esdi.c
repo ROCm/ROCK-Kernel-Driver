@@ -110,7 +110,6 @@ static u_int dma_arb_level;		/* DMA arbitration level */
 static DECLARE_WAIT_QUEUE_HEAD(ps2esdi_int);
 
 static int no_int_yet;
-static int ps2esdi_sizes[MAX_HD << 6];
 static int ps2esdi_drives;
 static struct hd_struct ps2esdi[MAX_HD << 6];
 static u_short io_base;
@@ -155,7 +154,6 @@ static struct gendisk ps2esdi_gendisk =
 	major_name:	"ed",
 	minor_shift:	6,
 	part:		ps2esdi,
-	sizes:		ps2esdi_sizes,
 	fops:		&ps2esdi_fops,
 };
 

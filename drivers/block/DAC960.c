@@ -1961,7 +1961,6 @@ static boolean DAC960_RegisterBlockDevice(DAC960_Controller_T *Controller)
     Controller->MaxSectorsPerRequest[MinorNumber] =
       Controller->MaxBlocksPerCommand;
   Controller->GenericDiskInfo.part = Controller->DiskPartitions;
-  Controller->GenericDiskInfo.sizes = Controller->PartitionSizes;
   /*
     Complete initialization of the Generic Disk Information structure.
   */
@@ -2003,7 +2002,6 @@ static void DAC960_UnregisterBlockDevice(DAC960_Controller_T *Controller)
     array, Max Sectors per Request array, and Max Segments per Request array.
   */
   Controller->GenericDiskInfo.part = NULL;
-  Controller->GenericDiskInfo.sizes = NULL;
   blk_clear(MajorNumber);
   /*
     Remove the Generic Disk Information structure from the list.
@@ -5295,7 +5293,7 @@ static int DAC960_Open(Inode_T *Inode, File_T *File)
       DAC960_ComputeGenericDiskInfo(Controller);
       DAC960_RegisterDisk(Controller, LogicalDriveNumber);
     }
-  if (Controller->GenericDiskInfo.sizes[minor(Inode->i_rdev)] == 0)
+  if (Controller->GenericDiskInfo.part[minor(Inode->i_rdev)].nr_sects == 0)
     return -ENXIO;
   /*
     Increment Controller and Logical Drive Usage Counts.

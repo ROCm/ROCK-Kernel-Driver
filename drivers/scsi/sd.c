@@ -90,7 +90,6 @@ struct hd_struct *sd;
 static Scsi_Disk ** sd_dsk_arr;
 static rwlock_t sd_dsk_arr_lock = RW_LOCK_UNLOCKED;
 
-static int *sd_sizes;
 static int *sd_max_sectors;
 
 static int check_scsidisk_media_change(kdev_t);
@@ -536,7 +535,7 @@ static int sd_open(struct inode *inode, struct file *filp)
 	 * See if we are requesting a non-existent partition.  Do this
 	 * after checking for disk change.
 	 */
-	if (sd_sizes[SD_PARTITION(inode->i_rdev)] == 0) {
+	if (sd[SD_PARTITION(inode->i_rdev)].nr_sects == 0) {
 		goto error_out;
 	}
 
@@ -1225,15 +1224,13 @@ static int sd_init()
 			sd_dsk_arr[k] = sdkp;
 		}
 	}
-	init_mem_lth(sd_sizes, maxparts);
 	init_mem_lth(sd, maxparts);
 	init_mem_lth(sd_gendisks, N_USED_SD_MAJORS);
 	init_mem_lth(sd_max_sectors, sd_template.dev_max << 4);
 
-	if (!sd_dsk_arr || !sd_sizes || !sd || !sd_gendisks)
+	if (!sd_dsk_arr || !sd || !sd_gendisks)
 		goto cleanup_mem;
 
-	zero_mem_lth(sd_sizes, maxparts);
 	zero_mem_lth(sd, maxparts);
 
 	for (k = 0; k < maxparts; k++) {
@@ -1266,7 +1263,6 @@ static int sd_init()
 		sd_gendisks[k].major_name = "sd";
 		sd_gendisks[k].minor_shift = 4;
 		sd_gendisks[k].part = sd + k * (N << 4);
-		sd_gendisks[k].sizes = sd_sizes + k * (N << 4);
 		sd_gendisks[k].nr_real = 0;
 	}
 	return 0;
@@ -1286,8 +1282,6 @@ cleanup_mem:
 	sd_gendisks = NULL;
 	vfree(sd);
 	sd = NULL;
-	vfree(sd_sizes);
-	sd_sizes = NULL;
 	if (sd_dsk_arr) {
                 for (k = 0; k < sd_template.dev_max; ++k)
 			vfree(sd_dsk_arr[k]);
@@ -1326,7 +1320,6 @@ static void sd_finish()
 		if (sdkp && (0 == sdkp->capacity) && sdkp->device) {
 			sd_init_onedisk(sdkp, k);
 			if (!sdkp->has_been_registered) {
-				sd_sizes[k << 4] = sdkp->capacity;
 				register_disk(&SD_GENDISK(k), MKDEV_SD(k),
 						1<<4, &sd_fops,
 						sdkp->capacity);
@@ -1486,7 +1479,7 @@ static void sd_detach(Scsi_Device * sdp)
 {
 	Scsi_Disk *sdkp = NULL;
 	kdev_t dev;
-	int dsk_nr, j;
+	int dsk_nr;
 	int max_p;
 	int start;
 	unsigned long iflags;
@@ -1515,9 +1508,6 @@ static void sd_detach(Scsi_Device * sdp)
 	driverfs_remove_partitions(&SD_GENDISK (dsk_nr), 
 					SD_MINOR_NUMBER (start));
 	wipe_partitions(dev);
-	for (j = max_p - 1; j >= 0; j--)
-		sd_sizes[start + j] = 0;
-
 	devfs_register_partitions (&SD_GENDISK (dsk_nr),
 				   SD_MINOR_NUMBER (start), 1);
 	/* unregister_disk() */
@@ -1567,7 +1557,6 @@ static void __exit exit_sd(void)
 			vfree(sd_dsk_arr[k]);
 		vfree(sd_dsk_arr);
 	}
-	vfree(sd_sizes);
 	vfree((char *) sd);
 	for (k = 0; k < N_USED_SD_MAJORS; k++) {
 		blk_dev[SD_MAJOR(k)].queue = NULL;

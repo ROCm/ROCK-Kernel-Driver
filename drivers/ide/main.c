@@ -491,7 +491,6 @@ void ide_unregister(struct ata_channel *ch)
 	gd = ch->gd;
 	if (gd) {
 		del_gendisk(gd);
-		kfree(gd->sizes);
 		kfree(gd->part);
 		if (gd->de_arr)
 			kfree (gd->de_arr);

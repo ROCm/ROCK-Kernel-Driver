@@ -245,7 +245,6 @@ char 			*acsi_buffer;
 unsigned long 	phys_acsi_buffer;
 
 static int				NDevices = 0;
-static int				acsi_sizes[MAX_DEV<<4] = { 0, };
 static struct hd_struct	acsi_part[MAX_DEV<<4] = { {0,0}, };
 static int 				access_count[MAX_DEV] = { 0, };
 
@@ -1359,7 +1358,6 @@ static struct gendisk acsi_gendisk = {
 	major_name:	"ad",
 	minor_shift:	4,
 	part:		acsi_part,
-	sizes:		acsi_sizes,
 	fops:		&acsi_fops,
 };
 	

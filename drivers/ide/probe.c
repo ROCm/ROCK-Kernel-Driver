@@ -1108,10 +1108,6 @@ static void channel_init(struct ata_channel *ch)
 		goto err_kmalloc_gd;
 
 	memset(gd, 0, sizeof(struct gendisk));
-	gd->sizes = kmalloc(ATA_MINORS * sizeof(int), GFP_KERNEL);
-	if (!gd->sizes)
-		goto err_kmalloc_gd_sizes;
-	memset(gd->sizes, 0, ATA_MINORS*sizeof(gd->sizes[0]));
 
 	gd->part = kmalloc(ATA_MINORS * sizeof(struct hd_struct), GFP_KERNEL);
 	if (!gd->part)
@@ -1164,8 +1160,6 @@ err_kmalloc_gd_flags:
 err_kmalloc_gd_de_arr:
 	kfree(gd->part);
 err_kmalloc_gd_part:
-	kfree(gd->sizes);
-err_kmalloc_gd_sizes:
 	kfree(gd);
 err_kmalloc_gd:
 	printk(KERN_CRIT "(%s) Out of memory\n", __FUNCTION__);

@@ -148,7 +148,6 @@ static int NR_HD;
 #endif
 
 static struct hd_struct hd[MAX_HD<<6];
-static int hd_sizes[MAX_HD<<6];
 
 static struct timer_list device_timer;
 
@@ -714,7 +713,6 @@ static struct gendisk hd_gendisk = {
 	.major_name =	"hd",
 	.minor_shift =	6,
 	.part =		hd,
-	.sizes =	hd_sizes,
 	.fops =		&hd_fops,
 };
 	

@@ -194,7 +194,6 @@ struct mfm_info {
 #define MFM_DRV_INFO mfm_info[raw_cmd.dev]
 
 static struct hd_struct mfm[MFM_MAXDRIVES << 6];
-static int mfm_sizes[MFM_MAXDRIVES << 6];
 
 /* Stuff from the assembly routines */
 extern unsigned int hdc63463_baseaddress;	/* Controller base address */
@@ -1259,7 +1258,6 @@ static struct gendisk mfm_gendisk = {
 	major_name:	"mfm",
 	minor_shift:	6,
 	part:		mfm,
-	sizes:		mfm_sizes,
 };
 
 static struct block_device_operations mfm_fops =

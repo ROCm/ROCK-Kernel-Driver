@@ -109,8 +109,6 @@ int add_partition(struct block_device *bdev, struct blkpg_partition *p)
 	/* all seems OK */
 	part[p->pno].start_sect = pstart;
 	part[p->pno].nr_sects = plength;
-	if (g->sizes)
-		g->sizes[minor(dev)+p->pno] = (plength >> (BLOCK_SIZE_BITS-9));
 	devfs_register_partitions (g, minor(dev), 0);
 	return 0;
 }
@@ -163,8 +161,6 @@ int del_partition(struct block_device *bdev, struct blkpg_partition *p)
 
 	part[p->pno].start_sect = 0;
 	part[p->pno].nr_sects = 0;
-	if (g->sizes)
-		g->sizes[minor(dev) + p->pno] = 0;
 	devfs_register_partitions (g, minor(dev), 0);
 	bd_release(bdevp);
 	bdput(bdevp);

@@ -122,7 +122,6 @@ static struct gendisk md_gendisk=
 	.major_name	= "md",
 	.minor_shift	= 0,
 	.part		= md_hd_struct,
-	.sizes		= md_size,
 	.nr_real	= MAX_MD_DEVS,
 	.next		= NULL,
 	.fops		= &md_fops,
@@ -3177,7 +3176,6 @@ static void md_geninit(void)
 	for(i = 0; i < MAX_MD_DEVS; i++) {
 		md_size[i] = 0;
 	}
-	blk_size[MAJOR_NR] = md_size;
 
 	dprintk("md: sizeof(mdp_super_t) = %d\n", (int)sizeof(mdp_super_t));
 

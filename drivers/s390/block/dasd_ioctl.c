@@ -448,40 +448,6 @@ static int dasd_ioctl_set_ro(void *inp, int no, long args)
 }
 
 /*
- * Return device size in number of sectors.
- */
-static int dasd_ioctl_blkgetsize(void *inp, int no, long args)
-{
-	struct gendisk *gdp;
-	kdev_t kdev;
-	long blocks;
-
-	kdev = ((struct inode *) inp)->i_rdev;
-	gdp = dasd_gendisk_from_major(major(kdev));
-	if (gdp == NULL)
-		return -EINVAL;
-	blocks = gdp->sizes[minor(kdev)] << 1;
-	return put_user(blocks, (long *) args);
-}
-
-/*
- * Return device size in number of sectors, 64bit version.
- */
-static int dasd_ioctl_blkgetsize64(void *inp, int no, long args)
-{
-	struct gendisk *gdp;
-	kdev_t kdev;
-	u64 blocks;
-
-	kdev = ((struct inode *) inp)->i_rdev;
-	gdp = dasd_gendisk_from_major(major(kdev));
-	if (gdp == NULL)
-		return -EINVAL;
-	blocks = gdp->sizes[minor(kdev)] << 1;
-	return put_user(blocks << 10, (u64 *) args);
-}
-
-/*
  * Reread partition table.
  */
 static int dasd_ioctl_rr_partition(void *inp, int no, long args)
@@ -549,8 +515,6 @@ static struct { int no; dasd_ioctl_fn_t fn; } dasd_ioctls[] =
 	{ BIODASDINFO2, dasd_ioctl_information },
 	{ BIODASDPRRD, dasd_ioctl_read_profile },
 	{ BIODASDPRRST, dasd_ioctl_reset_profile },
-	{ BLKGETSIZE, dasd_ioctl_blkgetsize },
-	{ BLKGETSIZE64, dasd_ioctl_blkgetsize64 },
 	{ BLKROSET, dasd_ioctl_set_ro },
 	{ BLKRRPART, dasd_ioctl_rr_partition },
 	{ DASDAPIVER, dasd_ioctl_api_version },

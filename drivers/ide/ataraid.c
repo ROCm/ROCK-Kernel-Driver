@@ -45,7 +45,6 @@ static void ataraid_split_request(request_queue_t * q, int rw,
 
 
 struct gendisk ataraid_gendisk;
-static int ataraid_gendisk_sizes[256];
 static int ataraid_readahead[256];
 
 static struct block_device_operations ataraid_fops = {
@@ -257,7 +256,6 @@ static __init int ataraid_init(void)
 	ataraid_gendisk.major = ATAMAJOR;
 	ataraid_gendisk.major_name = "ataraid";
 	ataraid_gendisk.minor_shift = 4;
-	ataraid_gendisk.sizes = &ataraid_gendisk_sizes[0];
 	ataraid_gendisk.nr_real = 16;
 	ataraid_gendisk.fops = &ataraid_fops;
 
@@ -282,7 +280,6 @@ static __init int ataraid_init(void)
 static void __exit ataraid_exit(void)
 {
 	unregister_blkdev(ATAMAJOR, "ataraid");
-	blk_size[ATAMAJOR] = NULL;
 
 	del_gendisk(&ataraid_gendisk);
 
