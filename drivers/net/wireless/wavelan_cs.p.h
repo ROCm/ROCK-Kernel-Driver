@@ -795,17 +795,10 @@ static dev_link_t *dev_list = NULL;	/* Linked list of devices */
  * The exact syntax is 'insmod wavelan_cs.o <var>=<value>'
  */
 
-/* Bit map of interrupts to choose from */
-/* This means pick from 15, 14, 12, 11, 10, 9, 7, 5, 4 and 3 */
-static int	irq_mask = 0xdeb8;
-static int 	irq_list[4] = { -1 };
-
 /* Shared memory speed, in ns */
 static int	mem_speed = 0;
 
 /* New module interface */
-module_param(irq_mask, int, 0);
-module_param_array(irq_list, int, NULL, 0);
 module_param(mem_speed, int, 0);
 
 #ifdef WAVELAN_ROAMING		/* Conditional compile, see above in options */

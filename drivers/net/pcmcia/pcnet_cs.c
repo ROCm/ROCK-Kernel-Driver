@@ -89,11 +89,6 @@ MODULE_LICENSE("GPL");
 
 #define INT_MODULE_PARM(n, v) static int n = v; module_param(n, int, 0)
 
-/* Bit map of interrupts to choose from */
-INT_MODULE_PARM(irq_mask,	0xdeb8);
-static int irq_list[4] = { -1 };
-module_param_array(irq_list, int, NULL, 0);
-
 INT_MODULE_PARM(if_port,	1);	/* Transceiver type */
 INT_MODULE_PARM(use_big_buf,	1);	/* use 64K packet buffer? */
 INT_MODULE_PARM(mem_speed,	0);	/* shared mem speed, in ns */
@@ -256,7 +251,7 @@ static dev_link_t *pcnet_attach(void)
     dev_link_t *link;
     struct net_device *dev;
     client_reg_t client_reg;
-    int i, ret;
+    int ret;
 
     DEBUG(0, "pcnet_attach()\n");
 
@@ -268,12 +263,7 @@ static dev_link_t *pcnet_attach(void)
     link->priv = dev;
 
     link->irq.Attributes = IRQ_TYPE_EXCLUSIVE;
-    link->irq.IRQInfo1 = IRQ_INFO2_VALID|IRQ_LEVEL_ID;
-    if (irq_list[0] == -1)
-	link->irq.IRQInfo2 = irq_mask;
-    else
-	for (i = 0; i < 4; i++)
-	    link->irq.IRQInfo2 |= 1 << irq_list[i];
+    link->irq.IRQInfo1 = IRQ_LEVEL_ID;
     link->conf.Attributes = CONF_ENABLE_IRQ;
     link->conf.IntType = INT_MEMORY_AND_IO;
 

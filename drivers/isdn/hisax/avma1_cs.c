@@ -53,11 +53,8 @@ static char *version =
 
 /* Parameters that can be set with 'insmod' */
 
-static int default_irq_list[11] = { 15, 13, 12, 11, 10, 9, 7, 5, 4, 3, -1 };
-static int irq_list[11] = { -1 };
 static int isdnprot = 2;
 
-module_param_array(irq_list, int, NULL, 0);
 module_param(isdnprot, int, 0);
 
 /*====================================================================*/
@@ -143,7 +140,7 @@ static dev_link_t *avma1cs_attach(void)
     client_reg_t client_reg;
     dev_link_t *link;
     local_info_t *local;
-    int ret, i;
+    int ret;
     
     DEBUG(0, "avma1cs_attach()\n");
 
@@ -173,15 +170,8 @@ static dev_link_t *avma1cs_attach(void)
     link->irq.Attributes = IRQ_TYPE_EXCLUSIVE;
     link->irq.Attributes = IRQ_TYPE_DYNAMIC_SHARING|IRQ_FIRST_SHARED;
 
-    link->irq.IRQInfo1 = IRQ_INFO2_VALID|IRQ_LEVEL_ID;
-    if (irq_list[0] != -1) {
-	    for (i = 0; i < 10 && irq_list[i] > 0; i++)
-	       link->irq.IRQInfo2 |= 1 << irq_list[i];
-    } else {
-	    for (i = 0; i < 10 && default_irq_list[i] > 0; i++)
-	       link->irq.IRQInfo2 |= 1 << default_irq_list[i];
-    }
-    
+    link->irq.IRQInfo1 = IRQ_LEVEL_ID;
+
     /* General socket configuration */
     link->conf.Attributes = CONF_ENABLE_IRQ;
     link->conf.Vcc = 50;

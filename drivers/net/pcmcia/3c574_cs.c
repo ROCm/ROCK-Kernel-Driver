@@ -109,11 +109,6 @@ MODULE_LICENSE("GPL");
 
 #define INT_MODULE_PARM(n, v) static int n = v; module_param(n, int, 0)
 
-/* Now-standard PC card module parameters. */
-INT_MODULE_PARM(irq_mask, 0xdeb8);
-static int irq_list[4] = { -1 };
-module_param_array(irq_list, int, NULL, 0);
-
 /* Maximum events (Rx packets, etc.) to handle at each interrupt. */
 INT_MODULE_PARM(max_interrupt_work, 32);
 
@@ -275,7 +270,7 @@ static dev_link_t *tc574_attach(void)
 	client_reg_t client_reg;
 	dev_link_t *link;
 	struct net_device *dev;
-	int i, ret;
+	int ret;
 
 	DEBUG(0, "3c574_attach()\n");
 
@@ -291,12 +286,7 @@ static dev_link_t *tc574_attach(void)
 	link->io.NumPorts1 = 32;
 	link->io.Attributes1 = IO_DATA_PATH_WIDTH_16;
 	link->irq.Attributes = IRQ_TYPE_EXCLUSIVE | IRQ_HANDLE_PRESENT;
-	link->irq.IRQInfo1 = IRQ_INFO2_VALID|IRQ_LEVEL_ID;
-	if (irq_list[0] == -1)
-		link->irq.IRQInfo2 = irq_mask;
-	else
-		for (i = 0; i < 4; i++)
-			link->irq.IRQInfo2 |= 1 << irq_list[i];
+	link->irq.IRQInfo1 = IRQ_LEVEL_ID;
 	link->irq.Handler = &el3_interrupt;
 	link->irq.Instance = dev;
 	link->conf.Attributes = CONF_ENABLE_IRQ;

@@ -70,10 +70,6 @@ static char *version =
 
 /* Parameters that can be set with 'insmod' */
 
-/* Bit map of interrupts to choose from */
-static u_int irq_mask = 0xdeb8;
-static int irq_list[4] = { -1 };
-
 /* SCSI bus setup options */
 static int host_id = 7;
 static int reconnect = 1;
@@ -82,8 +78,6 @@ static int synchronous = 1;
 static int reset_delay = 100;
 static int ext_trans = 0;
 
-module_param(irq_mask, int, 0);
-module_param_array(irq_list, int, NULL, 0);
 module_param(host_id, int, 0);
 module_param(reconnect, int, 0);
 module_param(parity, int, 0);
@@ -116,7 +110,7 @@ static dev_link_t *aha152x_attach(void)
     scsi_info_t *info;
     client_reg_t client_reg;
     dev_link_t *link;
-    int i, ret;
+    int ret;
     
     DEBUG(0, "aha152x_attach()\n");
 
@@ -130,12 +124,7 @@ static dev_link_t *aha152x_attach(void)
     link->io.Attributes1 = IO_DATA_PATH_WIDTH_AUTO;
     link->io.IOAddrLines = 10;
     link->irq.Attributes = IRQ_TYPE_EXCLUSIVE;
-    link->irq.IRQInfo1 = IRQ_INFO2_VALID|IRQ_LEVEL_ID;
-    if (irq_list[0] == -1)
-	link->irq.IRQInfo2 = irq_mask;
-    else
-	for (i = 0; i < 4; i++)
-	    link->irq.IRQInfo2 |= 1 << irq_list[i];
+    link->irq.IRQInfo1 = IRQ_LEVEL_ID;
     link->conf.Attributes = CONF_ENABLE_IRQ;
     link->conf.Vcc = 50;
     link->conf.IntType = INT_MEMORY_AND_IO;

@@ -4601,7 +4601,7 @@ wavelan_attach(void)
   dev_link_t *	link;		/* Info for cardmgr */
   struct net_device *	dev;		/* Interface generic data */
   net_local *	lp;		/* Interface specific data */
-  int		i, ret;
+  int		ret;
 
 #ifdef DEBUG_CALLBACK_TRACE
   printk(KERN_DEBUG "-> wavelan_attach()\n");
@@ -4619,12 +4619,7 @@ wavelan_attach(void)
 
   /* Interrupt setup */
   link->irq.Attributes = IRQ_TYPE_EXCLUSIVE | IRQ_HANDLE_PRESENT;
-  link->irq.IRQInfo1 = IRQ_INFO2_VALID | IRQ_LEVEL_ID;
-  if (irq_list[0] == -1)
-    link->irq.IRQInfo2 = irq_mask;
-  else
-    for (i = 0; i < 4; i++)
-      link->irq.IRQInfo2 |= 1 << irq_list[i];
+  link->irq.IRQInfo1 = IRQ_LEVEL_ID;
   link->irq.Handler = wavelan_interrupt;
 
   /* General socket configuration */

@@ -257,9 +257,6 @@ MODULE_LICENSE("Dual MPL/GPL");
 
 #define INT_MODULE_PARM(n, v) static int n = v; module_param(n, int, 0)
 
-static int irq_list[4] = { -1 };
-module_param_array(irq_list, int, NULL, 0);
-INT_MODULE_PARM(irq_mask,	0xdeb8);
 INT_MODULE_PARM(if_port,	0);
 INT_MODULE_PARM(full_duplex,	0);
 INT_MODULE_PARM(do_sound, 	1);
@@ -921,13 +918,7 @@ xirc2ps_config(dev_link_t * link)
     link->io.IOAddrLines =10;
     link->io.Attributes1 = IO_DATA_PATH_WIDTH_16;
     link->irq.Attributes = IRQ_HANDLE_PRESENT;
-    link->irq.IRQInfo1 = IRQ_INFO2_VALID | IRQ_LEVEL_ID;
-    if (irq_list[0] == -1)
-	link->irq.IRQInfo2 = irq_mask;
-    else {
-	for (i = 0; i < 4; i++)
-	    link->irq.IRQInfo2 |= 1 << irq_list[i];
-    }
+    link->irq.IRQInfo1 = IRQ_LEVEL_ID;
     if (local->modem) {
 	int pass;
 
@@ -2025,23 +2016,17 @@ module_exit(exit_xirc2ps_cs);
 #ifndef MODULE
 static int __init setup_xirc2ps_cs(char *str)
 {
-	/* irq, irq_mask, if_port, full_duplex, do_sound, lockup_hack
-	 * [,irq2 [,irq3 [,irq4]]]
+	/* if_port, full_duplex, do_sound, lockup_hack
 	 */
 	int ints[10] = { -1 };
 
 	str = get_options(str, 9, ints);
 
 #define MAYBE_SET(X,Y) if (ints[0] >= Y && ints[Y] != -1) { X = ints[Y]; }
-	MAYBE_SET(irq_list[0], 1);
-	MAYBE_SET(irq_mask, 2);
 	MAYBE_SET(if_port, 3);
 	MAYBE_SET(full_duplex, 4);
 	MAYBE_SET(do_sound, 5);
 	MAYBE_SET(lockup_hack, 6);
-	MAYBE_SET(irq_list[1], 7);
-	MAYBE_SET(irq_list[2], 8);
-	MAYBE_SET(irq_list[3], 9);
 #undef  MAYBE_SET
 
 	return 0;

@@ -190,16 +190,9 @@ static u_int  scramble_key = 0x0;
  */
 static int mem_speed;
 
-/* Bit map of interrupts to choose from */
-/* This means pick from 15, 14, 12, 11, 10, 9, 7, 5, 4, and 3 */
-static u_int irq_mask = 0xdeb8;
-static int irq_list[4] = { -1 };
-
 module_param(domain, int, 0);
 module_param(scramble_key, int, 0);
 module_param(mem_speed, int, 0);
-module_param(irq_mask, int, 0);
-module_param_array(irq_list, int, NULL, 0);
 
 /*====================================================================*/
 
@@ -438,7 +431,7 @@ static dev_link_t *netwave_attach(void)
     dev_link_t *link;
     struct net_device *dev;
     netwave_private *priv;
-    int i, ret;
+    int ret;
     
     DEBUG(0, "netwave_attach()\n");
     
@@ -459,12 +452,7 @@ static dev_link_t *netwave_attach(void)
     
     /* Interrupt setup */
     link->irq.Attributes = IRQ_TYPE_EXCLUSIVE | IRQ_HANDLE_PRESENT;
-    link->irq.IRQInfo1 = IRQ_INFO2_VALID|IRQ_LEVEL_ID;
-    if (irq_list[0] == -1)
-	link->irq.IRQInfo2 = irq_mask;
-    else
-	for (i = 0; i < 4; i++)
-	    link->irq.IRQInfo2 |= 1 << irq_list[i];
+    link->irq.IRQInfo1 = IRQ_LEVEL_ID;
     link->irq.Handler = &netwave_interrupt;
     
     /* General socket configuration */

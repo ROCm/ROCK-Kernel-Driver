@@ -464,16 +464,6 @@ static int debug_level = 0;
 static int maxframe[MAX_DEVICE_COUNT] = {0,};
 static int dosyncppp[MAX_DEVICE_COUNT] = {1,1,1,1};
 
-/* The old way: bit map of interrupts to choose from */
-/* This means pick from 15, 14, 12, 11, 10, 9, 7, 5, 4, and 3 */
-static u_int irq_mask = 0xdeb8;
-
-/* Newer, simpler way of listing specific interrupts */
-static int irq_list[4] = { -1 };
-
-module_param(irq_mask, int, 0);
-module_param_array(irq_list, int, NULL, 0);
-
 module_param(break_on_load, bool, 0);
 module_param(ttymajor, int, 0);
 module_param(debug_level, int, 0);
@@ -555,7 +545,7 @@ static dev_link_t *mgslpc_attach(void)
     MGSLPC_INFO *info;
     dev_link_t *link;
     client_reg_t client_reg;
-    int ret, i;
+    int ret;
     
     if (debug_level >= DEBUG_LEVEL_INFO)
 	    printk("mgslpc_attach\n");
@@ -592,11 +582,6 @@ static dev_link_t *mgslpc_attach(void)
     /* Interrupt setup */
     link->irq.Attributes = IRQ_TYPE_EXCLUSIVE;
     link->irq.IRQInfo1   = IRQ_INFO2_VALID | IRQ_LEVEL_ID;
-    if (irq_list[0] == -1)
-	    link->irq.IRQInfo2 = irq_mask;
-    else
-	    for (i = 0; i < 4; i++)
-		    link->irq.IRQInfo2 |= 1 << irq_list[i];
     link->irq.Handler = NULL;
     
     link->conf.Attributes = 0;

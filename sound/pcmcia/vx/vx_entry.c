@@ -157,12 +157,7 @@ dev_link_t *snd_vxpocket_attach(struct snd_vxp_entry *hw)
 	link->irq.Attributes = IRQ_TYPE_EXCLUSIVE | IRQ_HANDLE_PRESENT;
 	// link->irq.Attributes = IRQ_TYPE_DYNAMIC_SHARING|IRQ_FIRST_SHARED;
 
-	link->irq.IRQInfo1 = IRQ_INFO2_VALID | IRQ_LEVEL_ID;
-	if (hw->irq_list[0] == -1)
-		link->irq.IRQInfo2 = *hw->irq_mask_p;
-	else
-		for (i = 0; i < 4; i++)
-			link->irq.IRQInfo2 |= 1 << hw->irq_list[i];
+	link->irq.IRQInfo1 = IRQ_LEVEL_ID;
 	link->irq.Handler = &snd_vx_irq_handler;
 	link->irq.Instance = chip;
 
