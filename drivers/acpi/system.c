@@ -37,19 +37,6 @@ ACPI_MODULE_NAME		("acpi_system")
 
 extern FADT_DESCRIPTOR		acpi_fadt;
 
-static int acpi_system_add (struct acpi_device *device);
-static int acpi_system_remove (struct acpi_device *device, int type);
-
-static struct acpi_driver acpi_system_driver = {
-	.name =		ACPI_SYSTEM_DRIVER_NAME,
-	.class =	ACPI_SYSTEM_CLASS,
-	.ids =		ACPI_SYSTEM_HID,
-	.ops =		{
-				.add =		acpi_system_add,
-				.remove =	acpi_system_remove
-			},
-};
-
 /* Global vars for handling event proc entry */
 static spinlock_t		acpi_system_event_lock = SPIN_LOCK_UNLOCKED;
 int				event_is_open = 0;
@@ -352,182 +339,85 @@ acpi_system_write_debug (
 
 #endif /* ACPI_DEBUG */
 
-
-static int
-acpi_system_add_fs (
-	struct acpi_device	*device)
+static int __init acpi_system_init (void)
 {
-	struct proc_dir_entry	*entry = NULL;
+	struct proc_dir_entry	*entry;
+	int error = 0;
+	char * name;
 
-	ACPI_FUNCTION_TRACE("acpi_system_add_fs");
-
-	if (!device)
-		return_VALUE(-EINVAL);
+	ACPI_FUNCTION_TRACE("acpi_system_init");
 
 	/* 'info' [R] */
-	entry = create_proc_entry(ACPI_SYSTEM_FILE_INFO,
-		S_IRUGO, acpi_device_dir(device));
+	name = ACPI_SYSTEM_FILE_INFO;
+	entry = create_proc_read_entry(name,
+		S_IRUGO, acpi_root_dir, acpi_system_read_info,NULL);
 	if (!entry)
-		ACPI_DEBUG_PRINT((ACPI_DB_ERROR,
-			"Unable to create '%s' fs entry\n",
-			ACPI_SYSTEM_FILE_INFO));
-	else {
-		entry->read_proc = acpi_system_read_info;
-		entry->data = acpi_driver_data(device);
-	}
+		goto Error;
 
 	/* 'dsdt' [R] */
-	entry = create_proc_entry(ACPI_SYSTEM_FILE_DSDT,
-		S_IRUSR, acpi_device_dir(device));
-	if (!entry)
-		ACPI_DEBUG_PRINT((ACPI_DB_ERROR,
-			"Unable to create '%s' fs entry\n",
-			ACPI_SYSTEM_FILE_DSDT));
-	else
+	name = ACPI_SYSTEM_FILE_DSDT;
+	entry = create_proc_entry(name, S_IRUSR, acpi_root_dir);
+	if (entry)
 		entry->proc_fops = &acpi_system_dsdt_ops;
+	else 
+		goto Error;
 
 	/* 'fadt' [R] */
-	entry = create_proc_entry(ACPI_SYSTEM_FILE_FADT,
-		S_IRUSR, acpi_device_dir(device));
-	if (!entry)
-		ACPI_DEBUG_PRINT((ACPI_DB_ERROR,
-			"Unable to create '%s' fs entry\n",
-			ACPI_SYSTEM_FILE_FADT));
-	else
+	name = ACPI_SYSTEM_FILE_FADT;
+	entry = create_proc_entry(name, S_IRUSR, acpi_root_dir);
+	if (entry)
 		entry->proc_fops = &acpi_system_fadt_ops;
+	else
+		goto Error;
 
 	/* 'event' [R] */
-	entry = create_proc_entry(ACPI_SYSTEM_FILE_EVENT,
-		S_IRUSR, acpi_device_dir(device));
-	if (!entry)
-		ACPI_DEBUG_PRINT((ACPI_DB_ERROR,
-			"Unable to create '%s' fs entry\n",
-			ACPI_SYSTEM_FILE_EVENT));
-	else
+	name = ACPI_SYSTEM_FILE_EVENT;
+	entry = create_proc_entry(name, S_IRUSR, acpi_root_dir);
+	if (entry)
 		entry->proc_fops = &acpi_system_event_ops;
+	else
+		goto Error;
 
 #ifdef ACPI_DEBUG
 
 	/* 'debug_layer' [R/W] */
-	entry = create_proc_entry(ACPI_SYSTEM_FILE_DEBUG_LAYER,
-		S_IFREG|S_IRUGO|S_IWUSR, acpi_device_dir(device));
-	if (!entry)
-		ACPI_DEBUG_PRINT((ACPI_DB_ERROR,
-			"Unable to create '%s' fs entry\n",
-			ACPI_SYSTEM_FILE_DEBUG_LAYER));
-	else {
-		entry->read_proc  = acpi_system_read_debug;
+	name = ACPI_SYSTEM_FILE_DEBUG_LAYER;
+	entry = create_proc_read_entry(name, S_IFREG|S_IRUGO|S_IWUSR, acpi_root_dir,
+				       acpi_system_read_debug,(void *)0);
+	if (entry)
 		entry->write_proc = acpi_system_write_debug;
-		entry->data = (void *) 0;
-	}
+	else
+		goto Error;
 
 	/* 'debug_level' [R/W] */
-	entry = create_proc_entry(ACPI_SYSTEM_FILE_DEBUG_LEVEL,
-		S_IFREG|S_IRUGO|S_IWUSR, acpi_device_dir(device));
-	if (!entry)
-		ACPI_DEBUG_PRINT((ACPI_DB_ERROR,
-			"Unable to create '%s' fs entry\n",
-			ACPI_SYSTEM_FILE_DEBUG_LEVEL));
-	else {
-		entry->read_proc  = acpi_system_read_debug;
+	name = ACPI_SYSTEM_FILE_DEBUG_LEVEL;
+	entry = create_proc_read_entry(name, S_IFREG|S_IRUGO|S_IWUSR, acpi_root_dir,
+				       acpi_system_read_debug, (void *)1);
+	if (entry) 
 		entry->write_proc = acpi_system_write_debug;
-		entry->data = (void *) 1;
-	}
+	else
+		goto Error;
 
 #endif /*ACPI_DEBUG*/
 
-	return_VALUE(0);
-}
+ Done:
+	return_VALUE(error);
 
-
-static int
-acpi_system_remove_fs (
-	struct acpi_device	*device)
-{
-	ACPI_FUNCTION_TRACE("acpi_system_remove_fs");
-
-	if (!device)
-		return_VALUE(-EINVAL);
-
-	remove_proc_entry(ACPI_SYSTEM_FILE_INFO, acpi_device_dir(device));
-	remove_proc_entry(ACPI_SYSTEM_FILE_DSDT, acpi_device_dir(device));
-	remove_proc_entry(ACPI_SYSTEM_FILE_EVENT, acpi_device_dir(device));
+ Error:
+	ACPI_DEBUG_PRINT((ACPI_DB_ERROR, 
+			 "Unable to create '%s' proc fs entry\n", name));
 #ifdef ACPI_DEBUG
-	remove_proc_entry(ACPI_SYSTEM_FILE_DEBUG_LAYER,
-		acpi_device_dir(device));
-	remove_proc_entry(ACPI_SYSTEM_FILE_DEBUG_LEVEL,
-		acpi_device_dir(device));
+	remove_proc_entry(ACPI_SYSTEM_FILE_DEBUG_LEVEL, acpi_root_dir);
+	remove_proc_entry(ACPI_SYSTEM_FILE_DEBUG_LAYER, acpi_root_dir);
 #endif
+	remove_proc_entry(ACPI_SYSTEM_FILE_EVENT, acpi_root_dir);
+	remove_proc_entry(ACPI_SYSTEM_FILE_FADT, acpi_root_dir);
+	remove_proc_entry(ACPI_SYSTEM_FILE_DSDT, acpi_root_dir);
+	remove_proc_entry(ACPI_SYSTEM_FILE_INFO, acpi_root_dir);
 
-	return_VALUE(0);
+	error = -EINVAL;
+	goto Done;
 }
 
 
-/* --------------------------------------------------------------------------
-                                 Driver Interface
-   -------------------------------------------------------------------------- */
-
-static int
-acpi_system_add (
-	struct acpi_device	*device)
-{
-	int			result = 0;
-
-	ACPI_FUNCTION_TRACE("acpi_system_add");
-
-	if (!device)
-		return_VALUE(-EINVAL);
-
-	sprintf(acpi_device_name(device), "%s", ACPI_SYSTEM_DEVICE_NAME);
-	sprintf(acpi_device_class(device), "%s", ACPI_SYSTEM_CLASS);
-
-	result = acpi_system_add_fs(device);
-
-	return_VALUE(result);
-}
-
-
-static int
-acpi_system_remove (
-	struct acpi_device	*device,
-	int			type)
-{
-	struct acpi_system	*system = NULL;
-
-	ACPI_FUNCTION_TRACE("acpi_system_remove");
-
-	if (!device || !acpi_driver_data(device))
-		return_VALUE(-EINVAL);
-
-	system = (struct acpi_system *) acpi_driver_data(device);
-
-	acpi_system_remove_fs(device);
-
-	kfree(system);
-
-	return 0;
-}
-
-
-int __init
-acpi_system_init (void)
-{
-	int			result = 0;
-
-	ACPI_FUNCTION_TRACE("acpi_system_init");
-
-	result = acpi_bus_register_driver(&acpi_system_driver);
-	if (result < 0)
-		return_VALUE(-ENODEV);
-
-	return_VALUE(0);
-}
-
-
-void __exit
-acpi_system_exit (void)
-{
-	ACPI_FUNCTION_TRACE("acpi_system_exit");
-	acpi_bus_unregister_driver(&acpi_system_driver);
-	return_VOID;
-}
+subsys_initcall(acpi_system_init);

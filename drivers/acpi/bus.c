@@ -1953,7 +1953,6 @@ acpi_bus_init (void)
 	 * Install drivers required for proper enumeration of the
 	 * ACPI namespace.
 	 */
-	acpi_system_init();	/* ACPI System */
 	acpi_power_init();	/* ACPI Bus Power Management */
 #ifdef CONFIG_ACPI_EC
 	acpi_ec_init();		/* ACPI Embedded Controller */
@@ -2010,7 +2009,6 @@ acpi_bus_exit (void)
 	acpi_ec_exit();
 #endif
 	acpi_power_exit();
-	acpi_system_exit();
 
 	acpi_bus_remove(acpi_root, ACPI_BUS_REMOVAL_NORMAL);
 
