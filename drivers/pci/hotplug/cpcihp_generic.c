@@ -63,7 +63,7 @@
 
 /* local variables */
 static int debug;
-static char* bridge;
+static char bridge[256];
 static u8 bridge_busnr;
 static u8 bridge_slot;
 static struct pci_bus *bus;
@@ -209,7 +209,7 @@ module_exit(cpcihp_generic_exit);
 MODULE_AUTHOR(DRIVER_AUTHOR);
 MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_LICENSE("GPL");
-module_param(debug, bool, 0644);
+module_param(debug, bool, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(debug, "Debugging mode enabled or not");
 module_param(bridge, charp, 0);
 MODULE_PARM_DESC(bridge, "Hotswap bus bridge device, <bus>:<slot> (bus and slot are in hexadecimal)");

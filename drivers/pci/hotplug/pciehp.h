@@ -127,8 +127,7 @@ struct controller {
 	enum pci_bus_speed speed;
 	u32 first_slot;		/* First physical slot number */  /* PCIE only has 1 slot */
 	u8 slot_bus;		/* Bus where the slots handled by this controller sit */
-	u8 push_flag;
-	u16 ctlrcap;
+	u8 ctrlcap;
 	u16 vendor_id;
 };
 
@@ -179,6 +178,21 @@ struct resource_lists {
 #define REMOVE_NOT_SUPPORTED		0x00000003
 
 #define DISABLE_CARD			1
+
+/* Field definitions in Slot Capabilities Register */
+#define ATTN_BUTTN_PRSN	0x00000001
+#define	PWR_CTRL_PRSN	0x00000002
+#define MRL_SENS_PRSN	0x00000004
+#define ATTN_LED_PRSN	0x00000008
+#define PWR_LED_PRSN	0x00000010
+#define HP_SUPR_RM_SUP	0x00000020
+
+#define ATTN_BUTTN(cap)		(cap & ATTN_BUTTN_PRSN)
+#define POWER_CTRL(cap)		(cap & PWR_CTRL_PRSN)
+#define MRL_SENS(cap)		(cap & MRL_SENS_PRSN)
+#define ATTN_LED(cap)		(cap & ATTN_LED_PRSN)
+#define PWR_LED(cap)		(cap & PWR_LED_PRSN) 
+#define HP_SUPR_RM(cap)		(cap & HP_SUPR_RM_SUP)
 
 /*
  * error Messages
@@ -312,8 +326,7 @@ int pcie_get_ctlr_slot_config(struct controller *ctrl,
 		int *num_ctlr_slots,
 		int *first_device_num,
 		int *physical_slot_num,
-		int *updown,
-		int *flags);
+		u8 *ctrlcap);
 
 struct hpc_ops {
 	int	(*power_on_slot)	(struct slot *slot);

@@ -3,7 +3,8 @@
 #
 
 obj-y		+= access.o bus.o probe.o remove.o pci.o quirks.o \
-			names.o pci-driver.o search.o pci-sysfs.o
+			names.o pci-driver.o search.o pci-sysfs.o \
+			rom.o
 obj-$(CONFIG_PROC_FS) += proc.o
 
 ifndef CONFIG_SPARC64
@@ -27,6 +28,11 @@ obj-$(CONFIG_PPC64) += setup-bus.o
 obj-$(CONFIG_MIPS) += setup-bus.o setup-irq.o
 obj-$(CONFIG_X86_VISWS) += setup-irq.o
 obj-$(CONFIG_PCI_MSI) += msi.o
+
+#
+# ACPI Related PCI FW Functions
+#
+obj-$(CONFIG_ACPI)    += pci-acpi.o
 
 # Cardbus & CompactPCI use setup-bus
 obj-$(CONFIG_HOTPLUG) += setup-bus.o
