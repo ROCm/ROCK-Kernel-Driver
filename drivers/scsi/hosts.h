@@ -598,4 +598,6 @@ static inline Scsi_Device *scsi_find_device(struct Scsi_Host *shost,
         return NULL;
 }
 
+extern void scsi_sysfs_release_attributes(struct SHT *hostt);
+
 #endif

@@ -407,7 +407,8 @@ int scsi_sysfs_modify_shost_attribute(struct class_device_attribute ***class_att
 			modify = num_attrs;
 
 	if(*class_attrs == scsi_sysfs_shost_attrs || !modify) {
-		struct class_device_attribute **tmp_attrs = kmalloc(sizeof(struct class_device_attribute)*(num_attrs + (modify ? 0 : 1)), GFP_KERNEL);
+		/* note: need space for null at the end as well */
+		struct class_device_attribute **tmp_attrs = kmalloc(sizeof(struct class_device_attribute)*(num_attrs + (modify ? 1 : 2)), GFP_KERNEL);
 		if(tmp_attrs == NULL)
 			return -ENOMEM;
 		memcpy(tmp_attrs, *class_attrs, sizeof(struct class_device_attribute)*num_attrs);
@@ -430,7 +431,8 @@ int scsi_sysfs_modify_shost_attribute(struct class_device_attribute ***class_att
 			attr->store = old_attr->store;
 		(*class_attrs)[modify] = attr;
 	} else {
-		(*class_attrs)[num_attrs] = attr;
+		(*class_attrs)[num_attrs++] = attr;
+		(*class_attrs)[num_attrs] = NULL;
 	}
 
 	return 0;
@@ -458,7 +460,8 @@ int scsi_sysfs_modify_sdev_attribute(struct device_attribute ***dev_attrs,
 			modify = num_attrs;
 
 	if(*dev_attrs == scsi_sysfs_sdev_attrs || !modify) {
-		struct device_attribute **tmp_attrs = kmalloc(sizeof(struct device_attribute)*(num_attrs + (modify ? 0 : 1)), GFP_KERNEL);
+		/* note: need space for null at the end as well */
+		struct device_attribute **tmp_attrs = kmalloc(sizeof(struct device_attribute)*(num_attrs + (modify ? 1 : 2)), GFP_KERNEL);
 		if(tmp_attrs == NULL)
 			return -ENOMEM;
 		memcpy(tmp_attrs, *dev_attrs, sizeof(struct device_attribute)*num_attrs);
@@ -481,9 +484,20 @@ int scsi_sysfs_modify_sdev_attribute(struct device_attribute ***dev_attrs,
 			attr->store = old_attr->store;
 		(*dev_attrs)[modify] = attr;
 	} else {
-		(*dev_attrs)[num_attrs] = attr;
+		(*dev_attrs)[num_attrs++] = attr;
+		(*dev_attrs)[num_attrs] = NULL;
 	}
 
 	return 0;
 }
 EXPORT_SYMBOL(scsi_sysfs_modify_sdev_attribute);
+
+void scsi_sysfs_release_attributes(struct SHT *hostt)
+{
+	if(hostt->sdev_attrs != scsi_sysfs_sdev_attrs)
+		kfree(hostt->sdev_attrs);
+
+	if(hostt->shost_attrs != scsi_sysfs_shost_attrs)
+		kfree(hostt->shost_attrs);
+}
+EXPORT_SYMBOL(scsi_sysfs_release_attributes);
