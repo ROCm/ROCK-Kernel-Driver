@@ -1421,7 +1421,7 @@ void blk_insert_request(request_queue_t *q, struct request *rq,
 	if (blk_rq_tagged(rq))
 		blk_queue_end_tag(q, rq);
 
-	_elv_add_request(q, rq, !at_head, 0);
+	__elv_add_request(q, rq, !at_head, 0);
 	q->request_fn(q);
 	spin_unlock_irqrestore(q->queue_lock, flags);
 }
