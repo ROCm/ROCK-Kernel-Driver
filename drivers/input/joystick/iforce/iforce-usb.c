@@ -116,8 +116,7 @@ static void iforce_usb_out(struct urb *urb, struct pt_regs *regs)
 
 	iforce_usb_xmit(iforce);
 
-	if (waitqueue_active(&iforce->wait))
-		wake_up(&iforce->wait);
+	wake_up(&iforce->wait);
 }
 
 static void iforce_usb_ctrl(struct urb *urb, struct pt_regs *regs)
@@ -125,8 +124,7 @@ static void iforce_usb_ctrl(struct urb *urb, struct pt_regs *regs)
 	struct iforce *iforce = urb->context;
 	if (urb->status) return;
 	iforce->ecmd = 0xff00 | urb->actual_length;
-	if (waitqueue_active(&iforce->wait))
-		wake_up(&iforce->wait);
+	wake_up(&iforce->wait);
 }
 
 static int iforce_usb_probe(struct usb_interface *intf,

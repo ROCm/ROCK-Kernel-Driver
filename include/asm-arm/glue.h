@@ -90,7 +90,7 @@
 # endif
 #endif
 
-#ifdef CONFIG_CPU_ABORT_EV5T
+#ifdef CONFIG_CPU_ABRT_EV5T
 # ifdef CPU_ABORT_HANDLER
 #  define MULTI_ABORT 1
 # else

@@ -79,7 +79,7 @@ static __init int local_init(void)
 	int r;
 
 	/* allocate a slab for the dm_ios */
-	_io_cache = kmem_cache_create("dm io",
+	_io_cache = kmem_cache_create("dm_io",
 				      sizeof(struct dm_io), 0, 0, NULL, NULL);
 	if (!_io_cache)
 		return -ENOMEM;

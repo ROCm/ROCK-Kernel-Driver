@@ -593,7 +593,7 @@ asmlinkage int do_signal(sigset_t *oldset, struct pt_regs *regs)
 				continue;
 
 			case SIGTSTP: case SIGTTIN: case SIGTTOU:
-				if (is_orphaned_pgrp(current->pgrp))
+				if (is_orphaned_pgrp(process_group(current)))
 					continue;
 				/* FALLTHRU */
 

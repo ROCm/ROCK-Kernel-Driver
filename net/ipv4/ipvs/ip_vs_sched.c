@@ -106,18 +106,13 @@ int ip_vs_unbind_scheduler(struct ip_vs_service *svc)
 static struct ip_vs_scheduler *ip_vs_sched_getbyname(const char *sched_name)
 {
 	struct ip_vs_scheduler *sched;
-	struct list_head *l, *e;
 
 	IP_VS_DBG(2, "ip_vs_sched_getbyname(): sched_name \"%s\"\n",
 		  sched_name);
 
-	l = &ip_vs_schedulers;
-
 	read_lock_bh(&__ip_vs_sched_lock);
 
-	for (e=l->next; e!=l; e=e->next) {
-		sched = list_entry(e, struct ip_vs_scheduler, n_list);
-
+	list_for_each_entry(sched, &ip_vs_schedulers, n_list) {
 		/*
 		 * Test and get the modules atomically
 		 */

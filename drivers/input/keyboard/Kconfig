@@ -14,7 +14,8 @@ config INPUT_KEYBOARD
 config KEYBOARD_ATKBD
 	tristate "AT keyboard support" if EMBEDDED || !X86 
 	default y
-	depends on INPUT && INPUT_KEYBOARD && SERIO
+	depends on INPUT && INPUT_KEYBOARD
+	select SERIO_I8042
 	help
 	  Say Y here if you want to use a standard AT or PS/2 keyboard. Usually
 	  you'll need this, unless you have a different type keyboard (USB, ADB
@@ -30,7 +31,8 @@ config KEYBOARD_ATKBD
 
 config KEYBOARD_SUNKBD
 	tristate "Sun Type 4 and Type 5 keyboard support"
-	depends on INPUT && INPUT_KEYBOARD && SERIO
+	depends on INPUT && INPUT_KEYBOARD
+	select SERIO
 	help
 	  Say Y here if you want to use a Sun Type 4 or Type 5 keyboard,
 	  connected either to the Sun keyboard connector or to an serial
@@ -43,7 +45,8 @@ config KEYBOARD_SUNKBD
 
 config KEYBOARD_XTKBD
 	tristate "XT Keyboard support"
-	depends on INPUT && INPUT_KEYBOARD && SERIO
+	depends on INPUT && INPUT_KEYBOARD
+	select SERIO
 	help
 	  Say Y here if you want to use the old IBM PC/XT keyboard (or
 	  compatible) on your system. This is only possible with a
@@ -57,7 +60,8 @@ config KEYBOARD_XTKBD
 
 config KEYBOARD_NEWTON
 	tristate "Newton keyboard"
-	depends on INPUT && INPUT_KEYBOARD && SERIO
+	depends on INPUT && INPUT_KEYBOARD
+	select SERIO
 	help
 	  Say Y here if you have a Newton keyboard on a serial port.
 
@@ -92,7 +96,8 @@ config KEYBOARD_AMIGA
 
 config KEYBOARD_98KBD
 	tristate "NEC PC-9800 Keyboard support"
-	depends on X86_PC9800 && INPUT && INPUT_KEYBOARD && SERIO
+	depends on X86_PC9800 && INPUT && INPUT_KEYBOARD
+	select SERIO
 	help
 	  Say Y here if you want to use the NEC PC-9801/PC-9821 keyboard (or
 	  compatible) on your system. 

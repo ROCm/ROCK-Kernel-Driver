@@ -15,10 +15,6 @@
 #include <asm/byteorder.h>
 #include <asm/bug.h>
 
-/* Optimization barrier */
-/* The "volatile" is due to gcc bugs */
-#define barrier() __asm__ __volatile__("": : :"memory")
-
 #define INT_MAX		((int)(~0U>>1))
 #define INT_MIN		(-INT_MAX - 1)
 #define UINT_MAX	(~0U)

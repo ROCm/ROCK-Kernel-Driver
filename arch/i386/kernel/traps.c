@@ -28,6 +28,7 @@
 
 #ifdef CONFIG_EISA
 #include <linux/ioport.h>
+#include <linux/eisa.h>
 #endif
 
 #ifdef CONFIG_MCA
@@ -831,10 +832,6 @@ static void __init set_task_gate(unsigned int n, unsigned int gdt_entry)
 	_set_gate(idt_table+n,5,0,0,(gdt_entry<<3));
 }
 
-
-#ifdef CONFIG_EISA
-int EISA_bus;
-#endif
 
 void __init trap_init(void)
 {

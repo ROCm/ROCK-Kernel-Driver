@@ -43,10 +43,6 @@ extern long __strnlen_user_asm(const char *s);
 
 EXPORT_SYMBOL(mips_machtype);
 
-#ifdef CONFIG_EISA
-EXPORT_SYMBOL(EISA_bus);
-#endif
-
 /*
  * String functions
  */

@@ -45,7 +45,6 @@
 
 static char *main_revision = "$Revision: 1.40 $";
 
-int errno = 0;
 static int major;
 
 static int dbgmask;

@@ -343,11 +343,11 @@ void smp4d_cross_call(smpfunc_t func, unsigned long arg1, unsigned long arg2,
 			unsigned long a3 asm("i3") = arg3;
 			unsigned long a4 asm("i4") = arg4;
 			unsigned long a5 asm("i5") = arg5;
-					
-			__asm__ __volatile__("
-				std %0, [%6]
-				std %2, [%6 + 8]
-				std %4, [%6 + 16]" : : 
+
+			__asm__ __volatile__(
+				"std %0, [%6]\n\t"
+				"std %2, [%6 + 8]\n\t"
+				"std %4, [%6 + 16]\n\t" : :
 				"r"(f), "r"(a1), "r"(a2), "r"(a3), "r"(a4), "r"(a5),
 				"r" (&ccall_info.func));
 		}

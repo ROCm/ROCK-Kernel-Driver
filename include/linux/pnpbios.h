@@ -26,7 +26,7 @@
 #ifdef __KERNEL__
 
 #include <linux/types.h>
-#include <linux/pci.h>
+#include <linux/pnp.h>
 
 /*
  * Return codes
@@ -131,13 +131,7 @@ struct pnp_bios_node {
 #ifdef CONFIG_PNPBIOS
 
 /* non-exported */
-extern int  pnpbios_dont_use_current_config;
 extern struct pnp_dev_node_info node_info;
-extern void *pnpbios_kmalloc(size_t size, int f);
-extern int pnpbios_init (void);
-extern int pnpbios_interface_attach_device(struct pnp_bios_node * node);
-extern int pnpbios_proc_init (void);
-extern void pnpbios_proc_exit (void);
 
 extern int pnp_bios_dev_node_info (struct pnp_dev_node_info *data);
 extern int pnp_bios_get_dev_node (u8 *nodenum, char config, struct pnp_bios_node *data);

@@ -47,6 +47,13 @@
 #define CHIP1370
 #endif
 
+#ifdef CHIP1370
+#define DRIVER_NAME "ENS1370"
+#else
+#define DRIVER_NAME "ENS1371"
+#endif
+
+
 MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>, Thomas Sailer <sailer@ife.ee.ethz.ch>");
 MODULE_LICENSE("GPL");
 MODULE_CLASSES("{sound}");
@@ -2324,12 +2331,8 @@ static int __devinit snd_audiopci_probe(struct pci_dev *pci,
 		snd_card_free(card);
 		return err;
 	}
-#ifdef CHIP1370
-	strcpy(card->driver, "ENS1370");
-#endif
-#ifdef CHIP1371
-	strcpy(card->driver, "ENS1371");
-#endif
+	strcpy(card->driver, DRIVER_NAME);
+
 	strcpy(card->shortname, "Ensoniq AudioPCI");
 	sprintf(card->longname, "%s %s at 0x%lx, irq %i",
 		card->shortname,
@@ -2354,7 +2357,7 @@ static void __devexit snd_audiopci_remove(struct pci_dev *pci)
 }
 
 static struct pci_driver driver = {
-	.name = "Ensoniq AudioPCI",
+	.name = DRIVER_NAME,
 	.id_table = snd_audiopci_ids,
 	.probe = snd_audiopci_probe,
 	.remove = __devexit_p(snd_audiopci_remove),

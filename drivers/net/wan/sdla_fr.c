@@ -139,7 +139,6 @@
 *****************************************************************************/
 
 #include <linux/module.h>
-#include <linux/version.h>
 #include <linux/kernel.h>	/* printk(), and other useful stuff */
 #include <linux/stddef.h>	/* offsetof(), etc. */
 #include <linux/errno.h>	/* return codes */
@@ -147,6 +146,7 @@
 #include <linux/slab.h>	/* kmalloc(), kfree() */
 #include <linux/wanrouter.h>	/* WAN router definitions */
 #include <linux/wanpipe.h>	/* WANPIPE common user API definitions */
+#include <linux/workqueue.h>
 #include <linux/if_arp.h>	/* ARPHRD_* defines */
 #include <asm/byteorder.h>	/* htons(), etc. */
 #include <asm/io.h>		/* for inb(), outb(), etc. */
@@ -247,7 +247,7 @@ typedef struct fr_channel
 	/* Polling task queue. Each interface
          * has its own task queue, which is used
          * to defer events from the interrupt */
-	struct tq_struct fr_poll_task;
+	struct work_struct fr_poll_work;
 	struct timer_list fr_arp_timer;
 
 	u32 ip_local;
@@ -987,9 +987,7 @@ static int new_if(struct wan_device* wandev, struct net_device* dev,
          * We need a poll routine for each network
          * interface. 
          */
-	chan->fr_poll_task.sync = 0;
-	chan->fr_poll_task.routine = (void *)(void *)fr_poll;
-	chan->fr_poll_task.data = dev;
+	INIT_WORK(&chan->fr_poll_work, (void *)fr_poll, dev);
 
 	init_timer(&chan->fr_arp_timer);
 	chan->fr_arp_timer.data=(unsigned long)dev;
@@ -1212,9 +1210,7 @@ static int if_open(struct net_device* dev)
 	/* Initialize the task queue */
 	chan->tq_working=0;
 
-	chan->common.wanpipe_task.sync = 0;
-	chan->common.wanpipe_task.routine = (void *)(void *)fr_bh;
-	chan->common.wanpipe_task.data = dev;
+	INIT_WORK(&chan->common.wanpipe_work, (void *)fr_bh, dev);
 
 	/* Allocate and initialize BH circular buffer */
 	chan->bh_head = kmalloc((sizeof(bh_data_t)*MAX_BH_BUFF),GFP_ATOMIC);
@@ -2178,7 +2174,7 @@ static void rx_intr (sdla_t* card)
 		} 
 		
 
-		/* Send a packed up the IP stack */
+		/* Send a packet up the IP stack */
 		skb->dev->last_rx = jiffies;
 		netif_rx(skb);
 		++chan->drvstats_rx_intr.rx_intr_bfr_passed_to_stack;
@@ -2216,8 +2212,8 @@ rx_done:
  *         dlci number.
  *      2. Check that network interface is up and
  *         properly setup.
- * 	3. Check for a buffered packed.
- *      4. Transmit the packed.
+ * 	3. Check for a buffered packet.
+ *      4. Transmit the packet.
  *	5. If we are in WANPIPE mode, mark the 
  *         NET_BH handler. 
  *      6. If we are in API mode, kick
@@ -4359,8 +4355,8 @@ void s508_s514_unlock(sdla_t *card, unsigned long *smp_flags)
  * bh_enqueue
  *
  * Description:
- *	Insert a received packed into a circular
- *      rx queue.  This packed will be picked up 
+ *	Insert a received packet into a circular
+ *      rx queue.  This packet will be picked up 
  *      by fr_bh() and sent up the stack to the
  *      user.
  *       	
@@ -4411,8 +4407,7 @@ static int bh_enqueue(struct net_device *dev, struct sk_buff *skb)
 static void trigger_fr_bh (fr_channel_t *chan)
 {
 	if (!test_and_set_bit(0,&chan->tq_working)){
-		wanpipe_queue_tq(&chan->common.wanpipe_task);
-		wanpipe_mark_bh();
+		wanpipe_queue_work(&chan->common.wanpipe_work);
 	}
 }
 
@@ -4435,10 +4430,10 @@ static void trigger_fr_bh (fr_channel_t *chan)
  *      card into an skb buffer, the skb buffer
  *  	is appended to a circular BH buffer.
  *  	Then the interrupt kicks fr_bh() to finish the
- *      job at a later time (no within the interrupt).
+ *      job at a later time (not within the interrupt).
  *       
  * Usage:
- * 	Interrupts use this to defer a taks to 
+ * 	Interrupts use this to defer a task to 
  *      a polling routine.
  *
  */	
@@ -4527,7 +4522,7 @@ static int fr_bh_cleanup(struct net_device *dev)
 static void trigger_fr_poll(struct net_device *dev)
 {
 	fr_channel_t* chan = dev->priv;
-	schedule_task(&chan->fr_poll_task);
+	schedule_work(&chan->fr_poll_work);
 	return;
 }
 

@@ -15,11 +15,9 @@
  * should ever peek into this file.
  */
 
-#include <linux/config.h>
 #include <linux/pci.h>
 #include <asm/sn/pci/pcibr.h>
 #include <asm/sn/pci/pciio_private.h>
-#include <asm/sn/ksys/l1.h>
 
 /*
  * convenience typedefs

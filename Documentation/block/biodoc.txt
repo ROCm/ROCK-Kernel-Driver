@@ -6,6 +6,8 @@ Notes Written on Jan 15, 2002:
 	Suparna Bhattacharya <suparna@in.ibm.com>
 
 Last Updated May 2, 2002
+September 2003: Updated I/O Scheduler portions
+	Nick Piggin <piggin@cyberone.com.au>
 
 Introduction:
 
@@ -220,42 +222,8 @@ i/o scheduling algorithm aspects and details outside of the generic loop.
 It also makes it possible to completely hide the implementation details of
 the i/o scheduler from block drivers.
 
-New routines to be used instead of accessing the queue directly:
-
-elv_add_request: Should be called to queue a request
-elv_next_request: Should be called to pull of the next request to be serviced
-  of the queue. It takes care of several things like skipping active requests,
-  invoking the command pre-builder etc.
-
-Some new plugins:
-e->elevator_next_req_fn
-	Plugin called to extract the next request to service from the
-	queue
-e->elevator_add_req_fn
-	Plugin called to add a new request to the queue
-e->elevator_init_fn
-	Plugin called when initializing the queue
-e->elevator_exit_fn
-	Plugin called when destrying the queue
-
-Elevator Linus and Elevator noop are the existing combinations that can be
-directly used, but a driver can provide relevant callbacks, in case
-it needs to do something different.
-
-Elevator noop only attempts to merge requests, but doesn't reorder (sort)
-them. Even merging requires a linear scan today (except for the last merged
-hint case discussed later) though, which takes take up some CPU cycles.
-
-[Note: Merging usually helps in general, because there's usually non-trivial
-command overhead associated with setting up and starting a command. Sorting,
-on the other hand, may not be relevant for intelligent devices that reorder
-requests anyway]
-
-Elevator Linus attempts merging as well as sorting of requests on the queue.
-The sorting happens via an insert scan whenever a request comes in.
-Often some sorting still makes sense as the depth which most hardware can
-handle may be less than the queue lengths during i/o loads.
-
+I/O scheduler wrappers are to be used instead of accessing the queue directly.
+See section 4. The I/O scheduler for details.
 
 1.2 Tuning Based on High level code capabilities
 
@@ -316,32 +284,6 @@ Arjan's proposed request priority scheme allows higher levels some broad
   tunability. Time based aging avoids starvation of lower priority
   requests. Some bits in the bi_rw flags field in the bio structure are
   intended to be used for this priority information.
-
-  Jens has an implementation of a simple deadline i/o scheduler that
-  makes a best effort attempt to start requests within a given expiry
-  time limit, along with trying to optimize disk seeks as in the current
-  elevator. It does this by sorting a request on two lists, one by
-  the deadline and one by the sector order. It employs a policy that
-  follows sector ordering as long as a deadline is not violated, and
-  tries to keep up with deadlines in so far as it can batch up to at
-  least a certain minimum number of sector ordered requests to reduce
-  arbitrary disk seeks. This implementation is constructed in a way
-  that makes it possible to support advanced compound i/o schedulers
-  as a combination of several low level schedulers with an overall
-  class-independent scheduler layered above.
-
-The current elevator scheme provides a latency bound over how many future
-requests can "pass" (get placed before) a given request, and this bound
-is determined by the request type (read, write). However, it doesn't
-prioritize a new request over existing requests in the queue based on its
-latency requirement. A new request could of course get serviced before
-earlier requests based on the position on disk which it accesses. This is
-due to the sort/merge in the  basic elevator scan logic, but irrespective
-of the request's own priority/latency value. Interestingly the elevator
-sequence or the latency bound setting of the new request is unaffected by the
-number of existing requests it has passed, i.e. doesn't depend on where
-it is positioned in the queue, but only on the number of requests that pass
-it in the future.
 
 
 1.3 Direct Access to Low level Device/Driver Capabilities (Bypass mode)
@@ -964,7 +906,74 @@ Aside:
 
 
 4. The I/O scheduler
+I/O schedulers are now per queue. They should be runtime switchable and modular
+but aren't yet. Jens has most bits to do this, but the sysfs implementation is
+missing.
 
+A block layer call to the i/o scheduler follows the convention elv_xxx(). This
+calls elevator_xxx_fn in the elevator switch (drivers/block/elevator.c). Oh,
+xxx and xxx might not match exactly, but use your imagination. If an elevator
+doesn't implement a function, the switch does nothing or some minimal house
+keeping work.
+
+4.1. I/O scheduler API
+
+The functions an elevator may implement are: (* are mandatory)
+elevator_merge_fn		called to query requests for merge with a bio
+
+elevator_merge_req_fn		" " "  with another request
+
+elevator_merged_fn		called when a request in the scheduler has been
+				involved in a merge. It is used in the deadline
+				scheduler for example, to reposition the request
+				if its sorting order has changed.
+
+*elevator_next_req_fn		returns the next scheduled request, or NULL
+				if there are none (or none are ready).
+
+*elevator_add_req_fn		called to add a new request into the scheduler
+
+elevator_queue_empty_fn		returns true if the merge queue is empty.
+				Drivers shouldn't use this, but rather check
+				if elv_next_request is NULL (without losing the
+				request if one exists!)
+
+elevator_remove_req_fn		This is called when a driver claims ownership of
+				the target request - it now belongs to the
+				driver. It must not be modified or merged.
+				Drivers must not lose the request! A subsequent
+				call of elevator_next_req_fn must  return the
+				_next_ request.
+
+elevator_requeue_req_fn		called to add a request to the scheduler. This
+				is used when the request has alrnadebeen
+				returned by elv_next_request, but hasn't
+				completed. If this is not implemented then
+				elevator_add_req_fn is called instead.
+
+elevator_former_req_fn
+elevator_latter_req_fn		These return the request before or after the
+				one specified in disk sort order. Used by the
+				block layer to find merge possibilities.
+
+elevator_completed_req_fn	called when a request is completed. This might
+				come about due to being merged with another or
+				when the device completes the request.
+
+elevator_may_queue_fn		returns true if the scheduler wants to allow the
+				current context to queue a new request even if
+				it is over the queue limit. This must be used
+				very carefully!!
+
+elevator_set_req_fn
+elevator_put_req_fn		Must be used to allocate and free any elevator
+				specific storate for a request.
+
+elevator_init_fn
+elevator_exit_fn		Allocate and free any elevator specific storage
+				for a queue.
+
+4.2 I/O scheduler implementation
 The generic i/o scheduler algorithm attempts to sort/merge/batch requests for
 optimal disk scan and request servicing performance (based on generic
 principles and device capabilities), optimized for:
@@ -974,49 +983,58 @@ iii. better utilization of h/w & CPU time
 
 Characteristics:
 
-i. Linked list for O(n) insert/merge (linear scan) right now
+i. Binary tree
+AS and deadline i/o schedulers use red black binary trees for disk position
+sorting and searching, and a fifo linked list for time-based searching. This
+gives good scalability and good availablility of information. Requests are
+almost always dispatched in disk sort order, so a cache is kept of the next
+request in sort order to prevent binary tree lookups.
 
-This is just the same as it was in 2.4.
+This arrangement is not a generic block layer characteristic however, so
+elevators may implement queues as they please.
 
-There is however an added level of abstraction in the operations for adding
-and extracting a request to/from the queue, which makes it possible to
-try out alternative queue structures without changes to the users of the queue.
-Some things like head-active are thus now handled within elv_next_request
-making it possible to mark more than one request to be left alone.
+ii. Last merge hint
+The last merge hint is part of the generic queue layer. I/O schedulers must do
+some management on it. For the most part, the most important thing is to make
+sure q->last_merge is cleared (set to NULL) when the request on it is no longer
+a candidate for merging (for example if it has been sent to the driver).
 
-Aside:
-1. The use of a merge hash was explored to reduce merge times and to make
-   elevator_noop close to noop by avoiding the scan for merge. However the
-   complexity and locking issues introduced wasn't desirable especially as
-   with multi-page bios the incidence of merges is expected to be lower.
-2. The use of binomial/fibonacci heaps was explored to reduce the scan time;
-   however the idea was given up due to the complexity and added weight of
-   data structures, complications for handling barriers, as well as the
-   advantage of O(1) extraction and deletion (performance critical path) with
-   the existing list implementation vs heap based implementations.
+The last merge performed is cached as a hint for the subsequent request. If
+sequential data is being submitted, the hint is used to perform merges without
+any scanning. This is not sufficient when there are multiple processes doing
+I/O though, so a "merge hash" is used by some schedulers.
 
-ii. Utilizes max_phys/hw_segments, and max_request_size  parameters, to merge
-    within the limits that the device can handle (See 3.2.2)
+iii. Merge hash
+AS and deadline use a hash table indexed by the last sector of a request. This
+enables merging code to quickly look up "back merge" candidates, even when
+multiple I/O streams are being performed at once on one disk.
 
-iii. Last merge hint
-
-In 2.5, information about the last merge is saved as a hint for the subsequent
-request. This way, if sequential data is coming down the pipe, the hint can
-be used to speed up merges without going through a scan.
+"Front merges", a new request being merged at the front of an existing request,
+are far less common than "back merges" due to the nature of most I/O patterns.
+Front merges are handled by the binary trees in AS and deadline schedulers.
 
 iv. Handling barrier cases
+A request with flags REQ_HARDBARRIER or REQ_SOFTBARRIER must not be ordered
+around. That is, they must be processed after all older requests, and before
+any newer ones. This includes merges!
 
-As mentioned earlier, barrier support is new to 2.5, and the i/o scheduler
-has been modified accordingly.
+In AS and deadline schedulers, barriers have the effect of flushing the reorder
+queue. The performance cost of this will vary from nothing to a lot depending
+on i/o patterns and device characteristics. Obviously they won't improve
+performance, so their use should be kept to a minimum.
 
-When a barrier comes in, then since insert happens in the form of a
-linear scan, starting from the end, it just needs to be ensured that this
-and future scans stops barrier point. This is achieved by  skipping the
-entire merge/scan logic for a barrier request, so it gets placed at the
-end of the queue, and specifying a zero latency for the request containing
-the bio so that no future requests can pass it.
+v. Handling insertion position directives
+A request may be inserted with a position directive. The directives are one of
+ELEVATOR_INSERT_BACK, ELEVATOR_INSERT_FRONT, ELEVATOR_INSERT_SORT.
 
-v. Plugging the queue to batch requests in anticipation of opportunities for
+ELEVATOR_INSERT_SORT is a general directive for non-barrier requests.
+ELEVATOR_INSERT_BACK is used to insert a barrier to the back of the queue.
+ELEVATOR_INSERT_FRONT is used to insert a barrier to the front of the queue, and
+overrides the ordering requested by any previous barriers. In practice this is
+harmless and required, because it is used for SCSI requeueing. This does not
+require flushing the reorder queue, so does not impose a performance penalty.
+
+vi. Plugging the queue to batch requests in anticipation of opportunities for
   merge/sort optimizations
 
 This is just the same as in 2.4 so far, though per-device unplugging
@@ -1050,6 +1068,12 @@ Aside:
   concerns with just a single tq_disk flush approach. Something like
   blk_kick_queue() to unplug a specific queue (right away ?)
   or optionally, all queues, is in the plan.
+
+4.3 I/O contexts
+I/O contexts provide a dynamically allocated per process data area. They may
+be used in I/O schedulers, and in the block layer (could be used for IO statis,
+priorities for example). See *io_context in drivers/block/ll_rw_blk.c, and
+as-iosched.c for an example of usage in an i/o scheduler.
 
 
 5. Scalability related changes

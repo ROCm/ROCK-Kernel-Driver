@@ -213,7 +213,7 @@ extern struct sock *tcp_v6_lookup(struct in6_addr *saddr, u16 sport,
 				  int dif);
 #endif
 
-static int tcpdiag_get_exact(struct sk_buff *in_skb, struct nlmsghdr *nlh)
+static int tcpdiag_get_exact(struct sk_buff *in_skb, const struct nlmsghdr *nlh)
 {
 	int err;
 	struct sock *sk;
@@ -272,7 +272,7 @@ out:
 	return err;
 }
 
-int bitstring_match(u32 *a1, u32 *a2, int bits)
+static int bitstring_match(const u32 *a1, const u32 *a2, int bits)
 {
 	int words = bits >> 5;
 
@@ -299,12 +299,12 @@ int bitstring_match(u32 *a1, u32 *a2, int bits)
 }
 
 
-int tcpdiag_bc_run(char *bc, int len, struct sock *sk)
+static int tcpdiag_bc_run(const void *bc, int len, struct sock *sk)
 {
 	while (len > 0) {
 		int yes = 1;
 		struct inet_opt *inet = inet_sk(sk);
-		struct tcpdiag_bc_op *op = (struct tcpdiag_bc_op*)bc;
+		const struct tcpdiag_bc_op *op = bc;
 
 		switch (op->code) {
 		case TCPDIAG_BC_NOP:
@@ -385,10 +385,10 @@ int tcpdiag_bc_run(char *bc, int len, struct sock *sk)
 	return (len == 0);
 }
 
-int valid_cc(char *bc, int len, int cc)
+static int valid_cc(const void *bc, int len, int cc)
 {
 	while (len >= 0) {
-		struct tcpdiag_bc_op *op = (struct tcpdiag_bc_op*)bc;
+		const struct tcpdiag_bc_op *op = bc;
 
 		if (cc > len)
 			return 0;
@@ -402,9 +402,9 @@ int valid_cc(char *bc, int len, int cc)
 	return 0;
 }
 
-int tcpdiag_bc_audit(char *bytecode, int bytecode_len)
+static int tcpdiag_bc_audit(const void *bytecode, int bytecode_len)
 {
-	char *bc = bytecode;
+	const unsigned char *bc = bytecode;
 	int  len = bytecode_len;
 
 	while (len > 0) {
@@ -442,7 +442,7 @@ int tcpdiag_bc_audit(char *bytecode, int bytecode_len)
 }
 
 
-int tcpdiag_dump(struct sk_buff *skb, struct netlink_callback *cb)
+static int tcpdiag_dump(struct sk_buff *skb, struct netlink_callback *cb)
 {
 	int i, num;
 	int s_i, s_num;

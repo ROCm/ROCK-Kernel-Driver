@@ -305,7 +305,7 @@ out:
 	return retval;
 fail_nomem:
 	retval = -ENOMEM;
-  fail:
+fail:
 	vm_unacct_memory(charge);
 	goto out;
 }
@@ -499,7 +499,7 @@ static int copy_mm(unsigned long clone_flags, struct task_struct * tsk)
 		goto fail_nomem;
 
 	if (init_new_context(tsk,mm))
-		goto free_pt;
+		goto fail_nocontext;
 
 	retval = dup_mmap(mm, oldmm);
 	if (retval)
@@ -513,6 +513,15 @@ good_mm:
 free_pt:
 	mmput(mm);
 fail_nomem:
+	return retval;
+
+fail_nocontext:
+	/*
+	 * If init_new_context() failed, we cannot use mmput() to free the mm
+	 * because it calls destroy_context()
+	 */
+	mm_free_pgd(mm);
+	free_mm(mm);
 	return retval;
 }
 
@@ -925,7 +934,7 @@ struct task_struct *copy_process(unsigned long clone_flags,
 	 */
 	p->first_time_slice = 1;
 	current->time_slice >>= 1;
-	p->last_run = jiffies;
+	p->timestamp = sched_clock();
 	if (!current->time_slice) {
 		/*
 	 	 * This case is rare, it happens when the parent has only
@@ -1004,7 +1013,7 @@ struct task_struct *copy_process(unsigned long clone_flags,
 	attach_pid(p, PIDTYPE_PID, p->pid);
 	if (thread_group_leader(p)) {
 		attach_pid(p, PIDTYPE_TGID, p->tgid);
-		attach_pid(p, PIDTYPE_PGID, p->pgrp);
+		attach_pid(p, PIDTYPE_PGID, process_group(p));
 		attach_pid(p, PIDTYPE_SID, p->session);
 		if (p->pid)
 			__get_cpu_var(process_counts)++;

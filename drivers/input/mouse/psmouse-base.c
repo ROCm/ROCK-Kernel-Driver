@@ -17,6 +17,7 @@
 #include <linux/input.h>
 #include <linux/serio.h>
 #include <linux/init.h>
+#include <linux/pm.h>
 #include "psmouse.h"
 #include "synaptics.h"
 #include "logips2pp.h"
@@ -29,6 +30,8 @@ MODULE_PARM(psmouse_resolution, "i");
 MODULE_PARM_DESC(psmouse_resolution, "Resolution, in dpi.");
 MODULE_PARM(psmouse_smartscroll, "i");
 MODULE_PARM_DESC(psmouse_smartscroll, "Logitech Smartscroll autorepeat, 1 = enabled (default), 0 = disabled.");
+MODULE_PARM(psmouse_resetafter, "i");
+MODULE_PARM_DESC(psmouse_resetafter, "Reset Synaptics Touchpad after so many bad packets (0 = never).");
 MODULE_LICENSE("GPL");
 
 #define PSMOUSE_LOGITECH_SMARTSCROLL	1
@@ -36,11 +39,12 @@ MODULE_LICENSE("GPL");
 static int psmouse_noext;
 int psmouse_resolution;
 int psmouse_smartscroll = PSMOUSE_LOGITECH_SMARTSCROLL;
+unsigned int psmouse_resetafter;
 
-static char *psmouse_protocols[] = { "None", "PS/2", "PS2++", "PS2T++", "GenPS/2", "ImPS/2", "ImExPS/2", "Synaptics"};
+static char *psmouse_protocols[] = { "None", "PS/2", "PS2++", "PS2T++", "GenPS/2", "ImPS/2", "ImExPS/2", "SynPS/2"};
 
 /*
- * psmouse_process_packet() anlyzes the PS/2 mouse packet contents and
+ * psmouse_process_packet() analyzes the PS/2 mouse packet contents and
  * reports relevant events to the input module.
  */
 
@@ -108,6 +112,9 @@ static irqreturn_t psmouse_interrupt(struct serio *serio,
 {
 	struct psmouse *psmouse = serio->private;
 
+	if (psmouse->state == PSMOUSE_IGNORE)
+		goto out;
+
 	if (psmouse->acking) {
 		switch (data) {
 			case PSMOUSE_RET_ACK:
@@ -132,20 +139,35 @@ static irqreturn_t psmouse_interrupt(struct serio *serio,
 	}
 
 	if (psmouse->pktcnt && time_after(jiffies, psmouse->last + HZ/2)) {
-		printk(KERN_WARNING "psmouse.c: Lost synchronization, throwing %d bytes away.\n", psmouse->pktcnt);
+		printk(KERN_WARNING "psmouse.c: %s at %s lost synchronization, throwing %d bytes away.\n",
+		       psmouse->name, psmouse->phys, psmouse->pktcnt);
 		psmouse->pktcnt = 0;
 	}
 	
 	psmouse->last = jiffies;
 	psmouse->packet[psmouse->pktcnt++] = data;
 
-	if (psmouse->pktcnt == 3 + (psmouse->type >= PSMOUSE_GENPS)) {
-		psmouse_process_packet(psmouse, regs);
-		psmouse->pktcnt = 0;
-		goto out;
+	if (psmouse->packet[0] == PSMOUSE_RET_BAT) {
+		if (psmouse->pktcnt == 1)
+			goto out;
+		
+		if (psmouse->pktcnt == 2) {
+			if (psmouse->packet[1] == PSMOUSE_RET_ID) {
+				psmouse->state = PSMOUSE_IGNORE;
+				serio_rescan(serio);
+				goto out;
+			}
+			if (psmouse->type == PSMOUSE_SYNAPTICS) {
+				/* neither 0xAA nor 0x00 are valid first bytes
+				 * for a packet in absolute mode
+				 */
+				psmouse->pktcnt = 0;
+				goto out;
+			}
+		}
 	}
 
-	if (psmouse->pktcnt == 1 && psmouse->type == PSMOUSE_SYNAPTICS) {
+	if (psmouse->type == PSMOUSE_SYNAPTICS) {
 		/*
 		 * The synaptics driver has its own resync logic,
 		 * so it needs to receive all bytes one at a time.
@@ -155,8 +177,9 @@ static irqreturn_t psmouse_interrupt(struct serio *serio,
 		goto out;
 	}
 
-	if (psmouse->pktcnt == 1 && psmouse->packet[0] == PSMOUSE_RET_BAT) {
-		serio_rescan(serio);
+	if (psmouse->pktcnt == 3 + (psmouse->type >= PSMOUSE_GENPS)) {
+		psmouse_process_packet(psmouse, regs);
+		psmouse->pktcnt = 0;
 		goto out;
 	}
 out:
@@ -200,7 +223,7 @@ int psmouse_command(struct psmouse *psmouse, unsigned char *param, int command)
 	psmouse->cmdcnt = receive;
 
 	if (command == PSMOUSE_CMD_RESET_BAT)
-                timeout = 2000000; /* 2 sec */
+                timeout = 4000000; /* 4 sec */
 
 	if (command & 0xff)
 		if (psmouse_sendbyte(psmouse, command & 0xff))
@@ -227,7 +250,7 @@ int psmouse_command(struct psmouse *psmouse, unsigned char *param, int command)
 	for (i = 0; i < receive; i++)
 		param[i] = psmouse->cmdbuf[(receive - 1) - i];
 
-	if (psmouse->cmdcnt) 
+	if (psmouse->cmdcnt)
 		return (psmouse->cmdcnt = 0) - 1;
 
 	return 0;
@@ -450,14 +473,18 @@ static void psmouse_initialize(struct psmouse *psmouse)
  */
 
 	psmouse_command(psmouse, param, PSMOUSE_CMD_SETSTREAM);
+}
 
 /*
- * Last, we enable the mouse so that we get reports from it.
+ * psmouse_activate() enables the mouse so that we get motion reports from it.
  */
 
+static void psmouse_activate(struct psmouse *psmouse)
+{
 	if (psmouse_command(psmouse, NULL, PSMOUSE_CMD_ENABLE))
 		printk(KERN_WARNING "psmouse.c: Failed to enable mouse on %s\n", psmouse->serio->phys);
 
+	psmouse->state = PSMOUSE_ACTIVATED;
 }
 
 /*
@@ -478,10 +505,36 @@ static void psmouse_cleanup(struct serio *serio)
 static void psmouse_disconnect(struct serio *serio)
 {
 	struct psmouse *psmouse = serio->private;
+
+	psmouse->state = PSMOUSE_IGNORE;
+	synaptics_disconnect(psmouse);
 	input_unregister_device(&psmouse->dev);
 	serio_close(serio);
-	synaptics_disconnect(psmouse);
 	kfree(psmouse);
+}
+
+/*
+ * Reinitialize mouse hardware after software suspend.
+ */
+
+static int psmouse_pm_callback(struct pm_dev *dev, pm_request_t request, void *data)
+{
+	struct psmouse *psmouse = dev->data;
+	struct serio_dev *ser_dev = psmouse->serio->dev;
+
+	synaptics_disconnect(psmouse);
+
+	/* We need to reopen the serio port to reinitialize the i8042 controller */
+	serio_close(psmouse->serio);
+	serio_open(psmouse->serio, ser_dev);
+
+	/* Probe and re-initialize the mouse */
+	psmouse_probe(psmouse);
+	psmouse_initialize(psmouse);
+	synaptics_pt_init(psmouse);
+	psmouse_activate(psmouse);
+
+	return 0;
 }
 
 /*
@@ -492,8 +545,10 @@ static void psmouse_disconnect(struct serio *serio)
 static void psmouse_connect(struct serio *serio, struct serio_dev *dev)
 {
 	struct psmouse *psmouse;
+	struct pm_dev *pmdev;
 	
-	if ((serio->type & SERIO_TYPE) != SERIO_8042)
+	if ((serio->type & SERIO_TYPE) != SERIO_8042 &&
+	    (serio->type & SERIO_TYPE) != SERIO_PS_PSTHRU)
 		return;
 
 	if (!(psmouse = kmalloc(sizeof(struct psmouse), GFP_KERNEL)))
@@ -506,6 +561,7 @@ static void psmouse_connect(struct serio *serio, struct serio_dev *dev)
 	psmouse->dev.keybit[LONG(BTN_MOUSE)] = BIT(BTN_LEFT) | BIT(BTN_MIDDLE) | BIT(BTN_RIGHT);
 	psmouse->dev.relbit[0] = BIT(REL_X) | BIT(REL_Y);
 
+	psmouse->state = PSMOUSE_NEW_DEVICE;
 	psmouse->serio = serio;
 	psmouse->dev.private = psmouse;
 
@@ -522,6 +578,12 @@ static void psmouse_connect(struct serio *serio, struct serio_dev *dev)
 		return;
 	}
 	
+	pmdev = pm_register(PM_SYS_DEV, PM_SYS_UNKNOWN, psmouse_pm_callback);
+	if (pmdev) {
+		psmouse->dev.pm_dev = pmdev;
+		pmdev->data = psmouse;
+	}
+
 	sprintf(psmouse->devname, "%s %s %s",
 		psmouse_protocols[psmouse->type], psmouse->vendor, psmouse->name);
 	sprintf(psmouse->phys, "%s/input0",
@@ -539,6 +601,10 @@ static void psmouse_connect(struct serio *serio, struct serio_dev *dev)
 	printk(KERN_INFO "input: %s on %s\n", psmouse->devname, serio->phys);
 
 	psmouse_initialize(psmouse);
+
+	synaptics_pt_init(psmouse);
+
+	psmouse_activate(psmouse);
 }
 
 static struct serio_dev psmouse_dev = {
@@ -567,9 +633,16 @@ static int __init psmouse_smartscroll_setup(char *str)
 	return 1;
 }
 
+static int __init psmouse_resetafter_setup(char *str)
+{
+	get_option(&str, &psmouse_resetafter);
+	return 1;
+}
+
 __setup("psmouse_noext", psmouse_noext_setup);
 __setup("psmouse_resolution=", psmouse_resolution_setup);
 __setup("psmouse_smartscroll=", psmouse_smartscroll_setup);
+__setup("psmouse_resetafter=", psmouse_resetafter_setup);
 
 #endif
 

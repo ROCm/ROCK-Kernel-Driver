@@ -502,7 +502,11 @@ extern struct net_device    *dev_getbyhwaddr(unsigned short type, char *hwaddr);
 extern void		dev_add_pack(struct packet_type *pt);
 extern void		dev_remove_pack(struct packet_type *pt);
 extern void		__dev_remove_pack(struct packet_type *pt);
-extern int		dev_get(const char *name);
+extern int		__dev_get(const char *name);
+static inline int __deprecated dev_get(const char *name)
+{
+	return __dev_get(name);
+}
 extern struct net_device	*dev_get_by_flags(unsigned short flags,
 						  unsigned short mask);
 extern struct net_device	*__dev_get_by_flags(unsigned short flags,

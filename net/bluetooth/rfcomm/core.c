@@ -1957,7 +1957,7 @@ int  __init rfcomm_init(void)
 {
 	l2cap_load();
 
-	kernel_thread(rfcomm_run, NULL, CLONE_FS | CLONE_FILES | CLONE_SIGHAND);
+	kernel_thread(rfcomm_run, NULL, CLONE_KERNEL);
 
 	BT_INFO("RFCOMM ver %s", VERSION);
 

@@ -68,7 +68,7 @@ choice
 
 config USB_ZERO
 	tristate "Gadget Zero (DEVELOPMENT)"
-	depends on USB_GADGET && (USB_DUMMY_HCD || USB_NET2280 || USB_PXA250 || USB_SA1100)
+	depends on USB_GADGET && (USB_DUMMY_HCD || USB_NET2280 || USB_PXA2XX || USB_SA1100)
 	help
 	  Gadget Zero is a two-configuration device.  It either sinks and
 	  sources bulk data; or it loops back a configurable number of
@@ -97,9 +97,9 @@ config USB_ZERO_NET2280
 	depends on USB_ZERO && (USB_NET2280 || USB_DUMMY_HCD)
 	default y
 
-config USB_ZERO_PXA250
+config USB_ZERO_PXA2XX
 	bool
-	depends on USB_ZERO && USB_PXA250
+	depends on USB_ZERO && USB_PXA2XX
 	default y
 
 config USB_ZERO_SA1100
@@ -110,22 +110,28 @@ config USB_ZERO_SA1100
 
 config USB_ETH
 	tristate "Ethernet Gadget"
-	depends on USB_GADGET && (USB_DUMMY_HCD || USB_NET2280 || USB_PXA250 || USB_SA1100)
+	depends on USB_GADGET && (USB_DUMMY_HCD || USB_NET2280 || USB_PXA2XX || USB_SA1100)
 	help
-	  This driver implements the "Communication Device Class" (CDC)
-	  Ethernet Control Model.  That protocol is often avoided with pure
-	  Ethernet adapters, in favor of simpler vendor-specific hardware,
-	  but is widely supported by firmware for smart network devices.
+	  This driver implements Ethernet style communication, in either
+	  of two ways:
+	  
+	   - The "Communication Device Class" (CDC) Ethernet Control Model.
+	     That protocol is often avoided with pure Ethernet adapters, in
+	     favor of simpler vendor-specific hardware, but is widely
+	     supported by firmware for smart network devices.
+
+	   - On hardware can't implement that protocol, a simpler approach
+	     is used, placing fewer demands on USB.
 
 	  Within the USB device, this gadget driver exposes a network device
 	  "usbX", where X depends on what other networking devices you have.
 	  Treat it like a two-node Ethernet link:  host, and gadget.
 
 	  The Linux-USB host-side "usbnet" driver interoperates with this
-	  driver, so that deep I/O queues can be supported.  (On 2.4 kernels,
-	  use "CDCEther" instead.)  Deep queues are especially important with
-	  high speed devices.  It should also interoperate with standard CDC
-	  Ethernet class drivers on other host operating systems.
+	  driver, so that deep I/O queues can be supported.  On 2.4 kernels,
+	  use "CDCEther" instead, if you're using the CDC option. That CDC
+	  mode should also interoperate with standard CDC Ethernet class
+	  drivers on other host operating systems.
 
 	  Say "y" to link the driver statically, or "m" to build a
 	  dynamically linked module called "g_ether".
@@ -137,9 +143,9 @@ config USB_ETH_NET2280
 	depends on USB_ETH && (USB_NET2280 || USB_DUMMY_HCD)
 	default y
 
-config USB_ETH_PXA250
+config USB_ETH_PXA2XX
 	bool
-	depends on USB_ETH && USB_PXA250
+	depends on USB_ETH && USB_PXA2XX
 	default y
 
 config USB_ETH_SA1100

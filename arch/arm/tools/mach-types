@@ -6,7 +6,7 @@
 # To add an entry into this database, please see Documentation/arm/README,
 # or contact rmk@arm.linux.org.uk
 #
-# Last update: Sat Sep 13 00:22:34 2003
+# Last update: Thu Sep 18 17:15:55 2003
 #
 # machine_is_xxx	CONFIG_xxxx		MACH_TYPE_xxx		number
 #
@@ -384,3 +384,4 @@ prayoglite		ARCH_PRAYOGLITE		PRAYOGLITE		372
 gumstik			ARCH_GUMSTIK		GUMSTIK			373
 rcube			ARCH_RCUBE		RCUBE			374
 rea_olv			ARCH_REA_OLV		REA_OLV			375
+pxa_iphone		ARCH_PXA_IPHONE		PXA_IPHONE		376

@@ -12,7 +12,8 @@ config INPUT_TOUCHSCREEN
 
 config TOUCHSCREEN_BITSY
 	tristate "Compaq iPAQ H3600 (Bitsy) touchscreen input driver"
-	depends on SA1100_BITSY && INPUT && INPUT_TOUCHSCREEN && SERIO
+	depends on SA1100_BITSY && INPUT && INPUT_TOUCHSCREEN
+	select SERIO
 	help
 	  Say Y here if you have the h3600 (Bitsy) touchscreen.
 
@@ -25,7 +26,8 @@ config TOUCHSCREEN_BITSY
 
 config TOUCHSCREEN_GUNZE
 	tristate "Gunze AHL-51S touchscreen"
-	depends on INPUT && INPUT_TOUCHSCREEN && SERIO
+	depends on INPUT && INPUT_TOUCHSCREEN
+	select SERIO
 	help
 	  Say Y here if you have the Gunze AHL-51 touchscreen connected to
 	  your system.

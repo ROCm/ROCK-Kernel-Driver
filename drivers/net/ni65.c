@@ -72,7 +72,6 @@
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
-#include <linux/version.h>
 #include <linux/module.h>
 
 #include <asm/bitops.h>

@@ -10,8 +10,6 @@
  *  Changelog:
  *   09-Apr-2001 W/TTC	Created
  */
-
-#include <linux/config.h>
 #include <linux/tty.h>
 #include <linux/init.h>
 

@@ -6,13 +6,13 @@
  * Copyright (C) 2000-2003 Silicon Graphics, Inc. All rights reserved.
  */
 
-#include <linux/pci.h>
 #include <linux/module.h>
 #include <asm/io.h>
 #include <asm/delay.h>
 #include <asm/sn/simulator.h>
 #include <asm/sn/pda.h>
 #include <asm/sn/sn_cpuid.h>
+#include <asm/sn/sn2/shub_mmr.h>
 
 /**
  * sn_io_addr - convert an in/out port to an i/o address

@@ -42,9 +42,6 @@ EXPORT_SYMBOL(probe_irq_mask);
 #include <asm/processor.h>
 EXPORT_SYMBOL(kernel_thread);
 EXPORT_SYMBOL(boot_cpu_data);
-#ifdef CONFIG_EISA
-EXPORT_SYMBOL(EISA_bus);
-#endif
 
 #include <linux/pm.h>
 EXPORT_SYMBOL(pm_power_off);

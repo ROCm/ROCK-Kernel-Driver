@@ -680,17 +680,8 @@ static int __init chr_dev_init(void)
 				S_IFCHR | devlist[i].mode, devlist[i].name);
 	}
 	
-	rand_initialize();
 #if defined (CONFIG_FB)
 	fbmem_init();
-#endif
-	tty_init();
-#ifdef CONFIG_M68K_PRINTER
-	lp_m68k_init();
-#endif
-	misc_init();
-#ifdef CONFIG_FTAPE
-	ftape_init();
 #endif
 	return 0;
 }

@@ -239,6 +239,11 @@ static int __init acpi20_parse_srat(struct acpi_table_srat *sratp)
 		}
 	}
 
+	if (num_memory_chunks == 0) {
+		printk("could not finy any ACPI SRAT memory areas.\n");
+		goto out_fail;
+	}
+
 	/* Calculate total number of nodes in system from PXM bitmap and create
 	 * a set of sequential node IDs starting at zero.  (ACPI doesn't seem
 	 * to specify the range of _PXM values.)
@@ -295,10 +300,12 @@ static int __init acpi20_parse_srat(struct acpi_table_srat *sratp)
 			}
 		}
 	}
+	return 1;
+out_fail:
 	return 0;
 }
 
-void __init get_memcfg_from_srat(void)
+int __init get_memcfg_from_srat(void)
 {
 	struct acpi_table_header *header = NULL;
 	struct acpi_table_rsdp *rsdp = NULL;
@@ -316,11 +323,11 @@ void __init get_memcfg_from_srat(void)
 				(u32)rsdp_address->pointer.physical;
 	} else {
 		printk("%s: rsdp_address is not a physical pointer\n", __FUNCTION__);
-		return;
+		goto out_err;
 	}
 	if (!rsdp) {
 		printk("%s: Didn't find ACPI root!\n", __FUNCTION__);
-		return;
+		goto out_err;
 	}
 
 	printk(KERN_INFO "%.8s v%d [%.6s]\n", rsdp->signature, rsdp->revision,
@@ -328,7 +335,7 @@ void __init get_memcfg_from_srat(void)
 
 	if (strncmp(rsdp->signature, RSDP_SIG,strlen(RSDP_SIG))) {
 		printk(KERN_WARNING "%s: RSDP table signature incorrect\n", __FUNCTION__);
-		return;
+		goto out_err;
 	}
 
 	rsdt = (struct acpi_table_rsdt *)
@@ -338,14 +345,14 @@ void __init get_memcfg_from_srat(void)
 		printk(KERN_WARNING
 		       "%s: ACPI: Invalid root system description tables (RSDT)\n",
 		       __FUNCTION__);
-		return;
+		goto out_err;
 	}
 
 	header = & rsdt->header;
 
 	if (strncmp(header->signature, RSDT_SIG, strlen(RSDT_SIG))) {
 		printk(KERN_WARNING "ACPI: RSDT signature incorrect\n");
-		return;
+		goto out_err;
 	}
 
 	/* 
@@ -356,15 +363,18 @@ void __init get_memcfg_from_srat(void)
 	 */
 	tables = (header->length - sizeof(struct acpi_table_header)) / 4;
 
+	if (!tables)
+		goto out_err;
+
 	memcpy(&saved_rsdt, rsdt, sizeof(saved_rsdt));
 
 	if (saved_rsdt.header.length > sizeof(saved_rsdt)) {
 		printk(KERN_WARNING "ACPI: Too big length in RSDT: %d\n",
 		       saved_rsdt.header.length);
-		return;
+		goto out_err;
 	}
 
-printk("Begin table scan....\n");
+	printk("Begin SRAT table scan....\n");
 
 	for (i = 0; i < tables; i++) {
 		/* Map in header, then map in full table length. */
@@ -379,10 +389,13 @@ printk("Begin table scan....\n");
 
 		if (strncmp((char *) &header->signature, "SRAT", 4))
 			continue;
-		acpi20_parse_srat((struct acpi_table_srat *)header);
+
 		/* we've found the srat table. don't need to look at any more tables */
-		break;
+		return acpi20_parse_srat((struct acpi_table_srat *)header);
 	}
+out_err:
+	printk("failed to get NUMA memory information from SRAT table\n");
+	return 0;
 }
 
 /* For each node run the memory list to determine whether there are

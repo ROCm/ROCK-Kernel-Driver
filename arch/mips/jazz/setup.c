@@ -9,6 +9,7 @@
  * Copyright (C) 2001 MIPS Technologies, Inc.
  */
 #include <linux/config.h>
+#include <linux/eisa.h>
 #include <linux/hdreg.h>
 #include <linux/init.h>
 #include <linux/ioport.h>

@@ -42,7 +42,7 @@
 
 /* These should not be considered constants from userland.  */
 #define SIGRTMIN	37
-#define SIGRTMAX	(_NSIG-1) /* it's 44 under HP/UX */
+#define SIGRTMAX	_NSIG /* it's 44 under HP/UX */
 
 /*
  * SA_FLAGS values:
