@@ -524,15 +524,15 @@ static int __devinit cpuup_callback(struct notifier_block *nfb,
 				  unsigned long action,
 				  void *hcpu)
 {
-	int cpu = (int)hcpu;
-	if (action == CPU_ONLINE) {
-		struct list_head *p;
-		struct array_cache *nc;
+	long cpu = (long)hcpu;
+	struct list_head *p;
 
+	switch (action) {
+	case CPU_UP_PREPARE:
 		down(&cache_chain_sem);
-
 		list_for_each(p, &cache_chain) {
 			int memsize;
+			struct array_cache *nc;
 
 			kmem_cache_t* cachep = list_entry(p, kmem_cache_t, next);
 			memsize = sizeof(void*)*cachep->limit+sizeof(struct array_cache);
@@ -551,12 +551,26 @@ static int __devinit cpuup_callback(struct notifier_block *nfb,
 			spin_unlock_irq(&cachep->spinlock);
 
 		}
-
+		up(&cache_chain_sem);
+		break;
+	case CPU_ONLINE:
 		if (g_cpucache_up == FULL)
 			start_cpu_timer(cpu);
-		up(&cache_chain_sem);
-	}
+		break;
+	case CPU_UP_CANCELED:
+		down(&cache_chain_sem);
 
+		list_for_each(p, &cache_chain) {
+			struct array_cache *nc;
+			kmem_cache_t* cachep = list_entry(p, kmem_cache_t, next);
+
+			nc = cachep->array[cpu];
+			cachep->array[cpu] = NULL;
+			kfree(nc);
+		}
+		up(&cache_chain_sem);
+		break;
+	}
 	return NOTIFY_OK;
 bad:
 	up(&cache_chain_sem);
