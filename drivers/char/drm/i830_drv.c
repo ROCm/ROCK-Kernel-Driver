@@ -121,7 +121,7 @@ static struct drm_driver driver = {
 		.open = drm_open,
 		.release = drm_release,
 		.ioctl = drm_ioctl,
-		.mmap = i830_mmap_buffers,
+		.mmap = drm_mmap,
 		.poll = drm_poll,
 		.fasync = drm_fasync,
 	},
