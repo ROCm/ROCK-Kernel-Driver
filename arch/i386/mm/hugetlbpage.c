@@ -485,23 +485,26 @@ static int try_to_free_low(int count)
 {
 	struct list_head *p;
 	struct page *page, *map;
+	int i;
 
-    page = NULL;
+	page = NULL;
 	map = NULL;
 	spin_lock(&htlbpage_lock);
-	/* all lowmem is on node 0 */
-	list_for_each(p, &hugepage_freelists[0]) {
-		if (map) {
-			list_del(&map->lru);
-			update_and_free_page(map);
- 			htlbpagemem[page_zone(map)->zone_pgdat->node_id]--;
-			map = NULL;
-			if (++count == 0)
-				break;
+	
+	for (i = 0; i < MAX_NUMNODES; i++) { 
+		list_for_each(p, &hugepage_freelists[i]) {
+			if (map) {
+				list_del(&map->lru);
+				update_and_free_page(map);
+				htlbpagemem[page_zone(map)->zone_pgdat->node_id]--;
+				map = NULL;
+				if (++count == 0)
+					break;
+			}
+			page = list_entry(p, struct page, lru);
+			if (!PageHighMem(page))
+				map = page;
 		}
-		page = list_entry(p, struct page, lru);
-		if (!PageHighMem(page))
-			map = page;
 	}
 	if (map) {
 		list_del(&map->lru);
