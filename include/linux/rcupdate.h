@@ -105,7 +105,9 @@ struct rcu_data {
 };
 
 DECLARE_PER_CPU(struct rcu_data, rcu_data);
+DECLARE_PER_CPU(struct rcu_data, rcu_bh_data);
 extern struct rcu_ctrlblk rcu_ctrlblk;
+extern struct rcu_ctrlblk rcu_bh_ctrlblk;
 
 /*
  * Increment the quiscent state counter.
@@ -113,6 +115,11 @@ extern struct rcu_ctrlblk rcu_ctrlblk;
 static inline void rcu_qsctr_inc(int cpu)
 {
 	struct rcu_data *rdp = &per_cpu(rcu_data, cpu);
+	rdp->qsctr++;
+}
+static inline void rcu_bh_qsctr_inc(int cpu)
+{
+	struct rcu_data *rdp = &per_cpu(rcu_bh_data, cpu);
 	rdp->qsctr++;
 }
 
@@ -143,11 +150,14 @@ static inline int __rcu_pending(struct rcu_ctrlblk *rcp,
 
 static inline int rcu_pending(int cpu)
 {
-	return __rcu_pending(&rcu_ctrlblk, &per_cpu(rcu_data, cpu));
+	return __rcu_pending(&rcu_ctrlblk, &per_cpu(rcu_data, cpu)) ||
+		__rcu_pending(&rcu_bh_ctrlblk, &per_cpu(rcu_bh_data, cpu));
 }
 
 #define rcu_read_lock()		preempt_disable()
 #define rcu_read_unlock()	preempt_enable()
+#define rcu_read_lock_bh()	local_bh_disable()
+#define rcu_read_unlock_bh()	local_bh_enable()
 
 extern void rcu_init(void);
 extern void rcu_check_callbacks(int cpu, int user);
@@ -155,6 +165,8 @@ extern void rcu_restart_cpu(int cpu);
 
 /* Exported interfaces */
 extern void FASTCALL(call_rcu(struct rcu_head *head, 
+				void (*func)(struct rcu_head *head)));
+extern void FASTCALL(call_rcu_bh(struct rcu_head *head,
 				void (*func)(struct rcu_head *head)));
 extern void synchronize_kernel(void);
 

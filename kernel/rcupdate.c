@@ -50,6 +50,8 @@
 /* Definition for rcupdate control block. */
 struct rcu_ctrlblk rcu_ctrlblk = 
 	{ .cur = -300, .completed = -300 , .lock = SEQCNT_ZERO };
+struct rcu_ctrlblk rcu_bh_ctrlblk =
+	{ .cur = -300, .completed = -300 , .lock = SEQCNT_ZERO };
 
 /* Bookkeeping of the progress of the grace period */
 struct rcu_state {
@@ -60,9 +62,11 @@ struct rcu_state {
 
 struct rcu_state rcu_state ____cacheline_maxaligned_in_smp =
 	  {.lock = SPIN_LOCK_UNLOCKED, .cpumask = CPU_MASK_NONE };
-
+struct rcu_state rcu_bh_state ____cacheline_maxaligned_in_smp =
+	  {.lock = SPIN_LOCK_UNLOCKED, .cpumask = CPU_MASK_NONE };
 
 DEFINE_PER_CPU(struct rcu_data, rcu_data) = { 0L };
+DEFINE_PER_CPU(struct rcu_data, rcu_bh_data) = { 0L };
 
 /* Fake initialization required by compiler */
 static DEFINE_PER_CPU(struct tasklet_struct, rcu_tasklet) = {NULL};
@@ -88,6 +92,34 @@ void fastcall call_rcu(struct rcu_head *head,
 	head->next = NULL;
 	local_irq_save(flags);
 	rdp = &__get_cpu_var(rcu_data);
+	*rdp->nxttail = head;
+	rdp->nxttail = &head->next;
+	local_irq_restore(flags);
+}
+
+/**
+ * call_rcu_bh - Queue an RCU update request for which softirq handler
+ * completion is a quiescent state.
+ * @head: structure to be used for queueing the RCU updates.
+ * @func: actual update function to be invoked after the grace period
+ *
+ * The update function will be invoked as soon as all CPUs have performed
+ * a context switch or been seen in the idle loop or in a user process
+ * or has exited a softirq handler that it may have been executing.
+ * The read-side of critical section that use call_rcu_bh() for updation must
+ * be protected by rcu_read_lock_bh()/rcu_read_unlock_bh() if it is
+ * in process context.
+ */
+void fastcall call_rcu_bh(struct rcu_head *head,
+				void (*func)(struct rcu_head *rcu))
+{
+	unsigned long flags;
+	struct rcu_data *rdp;
+
+	head->func = func;
+	head->next = NULL;
+	local_irq_save(flags);
+	rdp = &__get_cpu_var(rcu_bh_data);
 	*rdp->nxttail = head;
 	rdp->nxttail = &head->next;
 	local_irq_restore(flags);
@@ -249,10 +281,14 @@ static void __rcu_offline_cpu(struct rcu_data *this_rdp,
 static void rcu_offline_cpu(int cpu)
 {
 	struct rcu_data *this_rdp = &get_cpu_var(rcu_data);
+	struct rcu_data *this_bh_rdp = &get_cpu_var(rcu_bh_data);
 
 	__rcu_offline_cpu(this_rdp, &rcu_ctrlblk, &rcu_state,
 					&per_cpu(rcu_data, cpu));
+	__rcu_offline_cpu(this_bh_rdp, &rcu_bh_ctrlblk, &rcu_bh_state,
+					&per_cpu(rcu_bh_data, cpu));
 	put_cpu_var(rcu_data);
+	put_cpu_var(rcu_bh_data);
 	tasklet_kill_immediate(&per_cpu(rcu_tasklet, cpu), cpu);
 }
 
@@ -315,16 +351,20 @@ static void rcu_process_callbacks(unsigned long unused)
 {
 	__rcu_process_callbacks(&rcu_ctrlblk, &rcu_state,
 				&__get_cpu_var(rcu_data));
+	__rcu_process_callbacks(&rcu_bh_ctrlblk, &rcu_bh_state,
+				&__get_cpu_var(rcu_bh_data));
 }
 
 void rcu_check_callbacks(int cpu, int user)
 {
-	struct rcu_data *rdp = &__get_cpu_var(rcu_data);
 	if (user || 
 	    (idle_cpu(cpu) && !in_softirq() && 
-				hardirq_count() <= (1 << HARDIRQ_SHIFT)))
-		rdp->qsctr++;
-	tasklet_schedule(&per_cpu(rcu_tasklet, rdp->cpu));
+				hardirq_count() <= (1 << HARDIRQ_SHIFT))) {
+		rcu_qsctr_inc(cpu);
+		rcu_bh_qsctr_inc(cpu);
+	} else if (!in_softirq())
+		rcu_bh_qsctr_inc(cpu);
+	tasklet_schedule(&per_cpu(rcu_tasklet, cpu));
 }
 
 static void rcu_init_percpu_data(int cpu, struct rcu_ctrlblk *rcp,
@@ -342,8 +382,10 @@ static void rcu_init_percpu_data(int cpu, struct rcu_ctrlblk *rcp,
 static void __devinit rcu_online_cpu(int cpu)
 {
 	struct rcu_data *rdp = &per_cpu(rcu_data, cpu);
+	struct rcu_data *bh_rdp = &per_cpu(rcu_bh_data, cpu);
 
 	rcu_init_percpu_data(cpu, &rcu_ctrlblk, rdp);
+	rcu_init_percpu_data(cpu, &rcu_bh_ctrlblk, bh_rdp);
 	tasklet_init(&per_cpu(rcu_tasklet, cpu), rcu_process_callbacks, 0UL);
 }
 
@@ -414,4 +456,5 @@ void synchronize_kernel(void)
 
 module_param(maxbatch, int, 0);
 EXPORT_SYMBOL(call_rcu);
+EXPORT_SYMBOL(call_rcu_bh);
 EXPORT_SYMBOL(synchronize_kernel);
