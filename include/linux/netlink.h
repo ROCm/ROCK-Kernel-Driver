@@ -2,6 +2,7 @@
 #define __LINUX_NETLINK_H
 
 #include <linux/socket.h> /* for sa_family_t */
+#include <linux/types.h>
 
 #define NETLINK_ROUTE		0	/* Routing/device hook				*/
 #define NETLINK_SKIP		1	/* Reserved for ENskip  			*/
