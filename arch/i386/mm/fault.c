@@ -223,7 +223,7 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long error_code)
 	__asm__("movl %%cr2,%0":"=r" (address));
 
 	/* It's safe to allow irq's after cr2 has been saved */
-	if (regs->eflags & X86_EFLAGS_IF)
+	if (regs->eflags & (X86_EFLAGS_IF|VM_MASK))
 		local_irq_enable();
 
 	tsk = current;
