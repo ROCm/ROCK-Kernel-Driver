@@ -35,23 +35,22 @@ extern void smp_send_xmon_break(int cpu);
 struct pt_regs;
 extern void smp_message_recv(int, struct pt_regs *);
 
-#define NO_PROC_ID		0xFF            /* No processor magic marker */
-
 #define cpu_online(cpu)	test_bit((cpu), &cpu_online_map)
 
 #define cpu_possible(cpu)	paca[cpu].active
 
-static inline int num_online_cpus(void)
+static inline unsigned int num_online_cpus(void)
 {
-	int i, nr = 0;
-
-	for (i = 0; i < NR_CPUS; i++)
-		nr += test_bit(i, &cpu_online_map);
-
-	return nr;
+	return hweight64(cpu_online_map);
 }
 
-extern volatile unsigned int cpu_callin_map[NR_CPUS];
+static inline int any_online_cpu(unsigned int mask)
+{
+	if (mask & cpu_online_map)
+		return __ffs(mask & cpu_online_map);
+
+	return -1;
+}
 
 #define smp_processor_id() (get_paca()->xPacaIndex)
 
