@@ -30,6 +30,8 @@
 #include <asm/ia32.h>
 
 #include <../drivers/char/drm/drm.h>
+#include <../drivers/char/drm/mga_drm.h>
+#include <../drivers/char/drm/i810_drm.h>
 
 
 #define IOCTL_NR(a)	((a) & ~(_IOC_SIZEMASK << _IOC_SIZESHIFT))

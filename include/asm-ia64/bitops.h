@@ -326,7 +326,7 @@ ia64_fls (unsigned long x)
 	return exp - 0xffff;
 }
 
-static int
+static inline int
 fls (int x)
 {
 	return ia64_fls((unsigned int) x);

@@ -59,14 +59,18 @@ void de_put(struct proc_dir_entry *de)
  */
 static void proc_delete_inode(struct inode *inode)
 {
-	struct proc_dir_entry *de = PDE(inode);
+	struct proc_dir_entry *de;
+	struct task_struct *tsk;
 
 	inode->i_state = I_CLEAR;
 
-	if (PROC_INODE_PROPER(inode)) {
-		proc_pid_delete_inode(inode);
-		return;
-	}
+	/* Let go of any associated process */
+	tsk = PROC_I(inode)->task;
+	if (tsk)
+		put_task_struct(tsk);
+
+	/* Let go of any associated proc directory entry */
+	de = PROC_I(inode)->pde;
 	if (de) {
 		if (de->owner)
 			__MOD_DEC_USE_COUNT(de->owner);
@@ -86,10 +90,18 @@ static kmem_cache_t * proc_inode_cachep;
 static struct inode *proc_alloc_inode(struct super_block *sb)
 {
 	struct proc_inode *ei;
+	struct inode *inode;
+
 	ei = (struct proc_inode *)kmem_cache_alloc(proc_inode_cachep, SLAB_KERNEL);
 	if (!ei)
 		return NULL;
-	return &ei->vfs_inode;
+	ei->task = NULL;
+	ei->type = 0;
+	ei->op.proc_get_link = NULL;
+	ei->pde = NULL;
+	inode = &ei->vfs_inode;
+	inode->i_mtime = inode->i_atime = inode->i_ctime = CURRENT_TIME;
+	return inode;
 }
 
 static void proc_destroy_inode(struct inode *inode)

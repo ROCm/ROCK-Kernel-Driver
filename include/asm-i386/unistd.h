@@ -248,6 +248,7 @@
 #define __NR_sched_setaffinity	241
 #define __NR_sched_getaffinity	242
 #define __NR_set_thread_area	243
+#define __NR_get_thread_area	244
 
 /* user-visible error numbers are in the range -1 - -124: see <asm-i386/errno.h> */
 

@@ -412,7 +412,7 @@ static struct notifier_block cpu_nfb = { &cpu_callback, NULL, 0 };
 
 __init int spawn_ksoftirqd(void)
 {
-	cpu_callback(&cpu_nfb, CPU_ONLINE, (void *)smp_processor_id());
+	cpu_callback(&cpu_nfb, CPU_ONLINE, (void *)(long)smp_processor_id());
 	register_cpu_notifier(&cpu_nfb);
 	return 0;
 }

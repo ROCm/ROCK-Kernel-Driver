@@ -7,21 +7,25 @@
 #ifndef __SPARC_SOFTIRQ_H
 #define __SPARC_SOFTIRQ_H
 
-#include <linux/threads.h>	/* For NR_CPUS */
+// #include <linux/threads.h>	/* For NR_CPUS */
 
-#include <asm/atomic.h>
+// #include <asm/atomic.h>
 #include <asm/smp.h>
 #include <asm/hardirq.h>
 
-#define local_bh_disable()	(local_bh_count(smp_processor_id())++)
-#define __local_bh_enable()	(local_bh_count(smp_processor_id())--)
+#define local_bh_disable() \
+		do { preempt_count() += SOFTIRQ_OFFSET; barrier(); } while (0)
+#define __local_bh_enable() \
+		do { barrier(); preempt_count() -= SOFTIRQ_OFFSET; } while (0)
+
 #define local_bh_enable()			  \
-do { if (!--local_bh_count(smp_processor_id()) && \
+do {						\
+	__local_bh_enable();			\
+	if (!in_interrupt() &&			\
 	 softirq_pending(smp_processor_id())) {   \
 		do_softirq();			  \
-		local_irq_enable();			  \
      }						  \
+	preempt_check_resched();		  \
 } while (0)
-#define in_softirq() (local_bh_count(smp_processor_id()) != 0)
 
 #endif	/* __SPARC_SOFTIRQ_H */

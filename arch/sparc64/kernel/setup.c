@@ -73,7 +73,7 @@ asmlinkage void sys_sync(void);	/* it's really int */
 static void
 prom_console_write(struct console *con, const char *s, unsigned n)
 {
-	prom_printf("%s", s);
+	prom_write(s, n);
 }
 
 static struct console prom_console = {

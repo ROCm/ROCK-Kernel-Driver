@@ -62,7 +62,9 @@ struct disk_stat {
 
 extern long ia64_ssc (long arg0, long arg1, long arg2, long arg3, int nr);
 
-static int desc[8] = { -1, -1, -1, -1, -1, -1, -1, -1 };
+static int desc[16] = {
+	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1
+};
 
 static struct queue_entry {
 	Scsi_Cmnd *sc;
@@ -148,9 +150,9 @@ simscsi_biosparam (Disk *disk, struct block_device *n, int ip[])
 {
 	int size = disk->capacity;
 
-	ip[0] = 64;
-	ip[1] = 32;
-	ip[2] = size >> 11;
+	ip[0] = 64;		/* heads */
+	ip[1] = 32;		/* sectors */
+	ip[2] = size >> 11;	/* cylinders */
 	return 0;
 }
 
@@ -229,6 +231,29 @@ simscsi_readwrite6 (Scsi_Cmnd *sc, int mode)
 		simscsi_readwrite(sc, mode, offset, sc->cmnd[4]*512);
 }
 
+static size_t
+simscsi_get_disk_size (int fd)
+{
+	struct disk_stat stat;
+	size_t bit, sectors = 0;
+	struct disk_req req;
+	char buf[512];
+
+	/*
+	 * This is a bit kludgey: the simulator doesn't provide a direct way of determining
+	 * the disk size, so we do a binary search, assuming a maximum disk size of 4GB.
+	 */
+	for (bit = (4UL << 30)/512; bit != 0; bit >>= 1) {
+		req.addr = __pa(&buf);
+		req.len = sizeof(buf);
+		ia64_ssc(fd, 1, __pa(&req), ((sectors | bit) - 1)*512, SSC_READ);
+		stat.fd = fd;
+		ia64_ssc(__pa(&stat), 0, 0, 0, SSC_WAIT_COMPLETION);
+		if (stat.count == sizeof(buf))
+			sectors |= bit;
+	}
+	return sectors - 1;	/* return last valid sector number */
+}
 
 static void
 simscsi_readwrite10 (Scsi_Cmnd *sc, int mode)
@@ -247,6 +272,7 @@ int
 simscsi_queuecommand (Scsi_Cmnd *sc, void (*done)(Scsi_Cmnd *))
 {
 	char fname[MAX_ROOT_LEN+16];
+	size_t disk_size;
 	char *buf;
 #if DEBUG_SIMSCSI
 	register long sp asm ("sp");
@@ -258,15 +284,15 @@ simscsi_queuecommand (Scsi_Cmnd *sc, void (*done)(Scsi_Cmnd *))
 
 	sc->result = DID_BAD_TARGET << 16;
 	sc->scsi_done = done;
-	if (sc->target <= 7 && sc->lun == 0) {
+	if (sc->target <= 15 && sc->lun == 0) {
 		switch (sc->cmnd[0]) {
 		      case INQUIRY:
 			if (sc->request_bufflen < 35) {
 				break;
 			}
 			sprintf (fname, "%s%c", simscsi_root, 'a' + sc->target);
-			desc[sc->target] = ia64_ssc (__pa(fname), SSC_READ_ACCESS|SSC_WRITE_ACCESS,
-						     0, 0, SSC_OPEN);
+			desc[sc->target] = ia64_ssc(__pa(fname), SSC_READ_ACCESS|SSC_WRITE_ACCESS,
+						    0, 0, SSC_OPEN);
 			if (desc[sc->target] < 0) {
 				/* disk doesn't exist... */
 				break;
@@ -319,11 +345,13 @@ simscsi_queuecommand (Scsi_Cmnd *sc, void (*done)(Scsi_Cmnd *))
 			}
 			buf = sc->request_buffer;
 
+			disk_size = simscsi_get_disk_size(desc[sc->target]);
+
 			/* pretend to be a 1GB disk (partition table contains real stuff): */
-			buf[0] = 0x00;
-			buf[1] = 0x1f;
-			buf[2] = 0xff;
-			buf[3] = 0xff;
+			buf[0] = (disk_size >> 24) & 0xff;
+			buf[1] = (disk_size >> 16) & 0xff;
+			buf[2] = (disk_size >>  8) & 0xff;
+			buf[3] = (disk_size >>  0) & 0xff;
 			/* set block size of 512 bytes: */
 			buf[4] = 0;
 			buf[5] = 0;

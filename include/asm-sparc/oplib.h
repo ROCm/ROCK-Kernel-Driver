@@ -153,8 +153,9 @@ extern char prom_getchar(void);
 /* Blocking put character to console. */
 extern void prom_putchar(char character);
 
-/* Prom's internal printf routine, don't use in kernel/boot code. */
-void prom_printf(char *fmt, ...);
+/* Prom's internal routines, don't use in kernel/boot code. */
+extern void prom_printf(char *fmt, ...);
+extern void prom_write(const char *buf, unsigned int len);
 
 /* Query for input device type */
 

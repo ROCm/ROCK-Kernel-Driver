@@ -3530,7 +3530,7 @@ static ssize_t st_device_kdev_read(struct device *driverfs_dev,
 				   char *page, size_t count, loff_t off)
 {
 	kdev_t kdev; 
-	kdev.value=(int)driverfs_dev->driver_data;
+	kdev.value=(int)(long)driverfs_dev->driver_data;
 	return off ? 0 : sprintf(page, "%x\n",kdev.value);
 }
 static DEVICE_ATTR(kdev,"kdev",S_IRUGO,st_device_kdev_read,NULL);
@@ -3653,7 +3653,7 @@ static int st_attach(Scsi_Device * SDp)
 	    tpnt->driverfs_dev_r[mode].parent = &SDp->sdev_driverfs_dev;
 	    tpnt->driverfs_dev_r[mode].bus = &scsi_driverfs_bus_type;
 	    tpnt->driverfs_dev_r[mode].driver_data =
-			(void *)__mkdev(MAJOR_NR, i + (mode << 5));
+			(void *)(long)__mkdev(MAJOR_NR, i + (mode << 5));
 	    device_register(&tpnt->driverfs_dev_r[mode]);
 	    device_create_file(&tpnt->driverfs_dev_r[mode], 
 			       &dev_attr_type);
@@ -3672,7 +3672,7 @@ static int st_attach(Scsi_Device * SDp)
 	    tpnt->driverfs_dev_n[mode].parent= &SDp->sdev_driverfs_dev;
 	    tpnt->driverfs_dev_n[mode].bus = &scsi_driverfs_bus_type;
 	    tpnt->driverfs_dev_n[mode].driver_data =
-			(void *)__mkdev(MAJOR_NR, i + (mode << 5) + 128);
+			(void *)(long)__mkdev(MAJOR_NR, i + (mode << 5) + 128);
 	    device_register(&tpnt->driverfs_dev_n[mode]);
 	    device_create_file(&tpnt->driverfs_dev_n[mode], 
 			       &dev_attr_type);

@@ -328,7 +328,7 @@ int try_to_unmap(struct page * page)
 				case SWAP_SUCCESS:
 					/* Free the pte_chain struct. */
 					pte_chain_free(pc, prev_pc, page);
-					break;
+					continue;
 				case SWAP_AGAIN:
 					/* Skip this pte, remembering status. */
 					prev_pc = pc;
@@ -336,12 +336,13 @@ int try_to_unmap(struct page * page)
 					continue;
 				case SWAP_FAIL:
 					ret = SWAP_FAIL;
-					break;
+					goto give_up;
 				case SWAP_ERROR:
 					ret = SWAP_ERROR;
-					break;
+					goto give_up;
 			}
 		}
+give_up:
 		/* Check whether we can convert to direct pte pointer */
 		pc = page->pte.chain;
 		if (pc && !pc->next) {

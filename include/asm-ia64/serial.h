@@ -1,6 +1,6 @@
 /*
  * include/asm-ia64/serial.h
- * 
+ *
  * Derived from the i386 version.
  */
 
@@ -35,7 +35,7 @@
 #else
 #define RS_TABLE_SIZE
 #endif
-	
+
 /*
  * The following define the access methods for the HUB6 card. All
  * access is through two ports for all 24 possible chips. The card is
@@ -115,21 +115,8 @@
 #define HUB6_SERIAL_PORT_DFNS
 #endif
 
-#ifdef CONFIG_MCA
-#define MCA_SERIAL_PORT_DFNS			\
-	{ 0, BASE_BAUD, 0x3220, 3, STD_COM_FLAGS },	\
-	{ 0, BASE_BAUD, 0x3228, 3, STD_COM_FLAGS },	\
-	{ 0, BASE_BAUD, 0x4220, 3, STD_COM_FLAGS },	\
-	{ 0, BASE_BAUD, 0x4228, 3, STD_COM_FLAGS },	\
-	{ 0, BASE_BAUD, 0x5220, 3, STD_COM_FLAGS },	\
-	{ 0, BASE_BAUD, 0x5228, 3, STD_COM_FLAGS },
-#else
-#define MCA_SERIAL_PORT_DFNS
-#endif
-
 #define SERIAL_PORT_DFNS		\
 	STD_SERIAL_PORT_DEFNS		\
 	EXTRA_SERIAL_PORT_DEFNS		\
-	HUB6_SERIAL_PORT_DFNS		\
-	MCA_SERIAL_PORT_DFNS
+	HUB6_SERIAL_PORT_DFNS
 

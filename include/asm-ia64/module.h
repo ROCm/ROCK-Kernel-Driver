@@ -75,7 +75,7 @@ ia64_module_init (struct module *mod)
 		return 1;
 	}
 	if (!mod_bound(archdata->segment_base, 0, mod)) {
-		printk(KERN_ERR "module_arch_init: archdata->unw_table out of bounds.\n");
+		printk(KERN_ERR "module_arch_init: archdata->segment_base out of bounds.\n");
 		return 1;
 	}
 

@@ -41,21 +41,22 @@ do_profile (unsigned long ip)
 	extern unsigned long prof_cpu_mask;
 	extern char _stext;
 
+	if (!prof_buffer)
+		return;
+
 	if (!((1UL << smp_processor_id()) & prof_cpu_mask))
 		return;
 
-	if (prof_buffer && current->pid) {
-		ip -= (unsigned long) &_stext;
-		ip >>= prof_shift;
-		/*
-		 * Don't ignore out-of-bounds IP values silently, put them into the last
-		 * histogram slot, so if present, they will show up as a sharp peak.
-		 */
-		if (ip > prof_len - 1)
-			ip = prof_len - 1;
+	ip -= (unsigned long) &_stext;
+	ip >>= prof_shift;
+	/*
+	 * Don't ignore out-of-bounds IP values silently, put them into the last
+	 * histogram slot, so if present, they will show up as a sharp peak.
+	 */
+	if (ip > prof_len - 1)
+		ip = prof_len - 1;
 
-		atomic_inc((atomic_t *) &prof_buffer[ip]);
-	}
+	atomic_inc((atomic_t *) &prof_buffer[ip]);
 }
 
 /*
@@ -285,9 +286,9 @@ ia64_init_itm (void)
 }
 
 static struct irqaction timer_irqaction = {
-	handler:	timer_interrupt,
-	flags:		SA_INTERRUPT,
-	name:		"timer"
+	.handler =	timer_interrupt,
+	.flags =	SA_INTERRUPT,
+	.name =		"timer"
 };
 
 void __init

@@ -200,277 +200,12 @@ int show_interrupts(struct seq_file *p, void *v)
 	return 0;
 }
 
-
-/*
- * Global interrupt locks for SMP. Allow interrupts to come in on any
- * CPU, yet make cli/sti act globally to protect critical regions..
- */
-
-#ifdef CONFIG_SMP
-unsigned int global_irq_holder = NO_PROC_ID;
-unsigned volatile long global_irq_lock; /* pedantic: long for set_bit --RR */
-
-extern void show_stack(unsigned long* esp);
-
-static void show(char * str)
+#if CONFIG_SMP
+inline void synchronize_irq(unsigned int irq)
 {
-	int i;
-	int cpu = smp_processor_id();
-
-	printk("\n%s, CPU %d:\n", str, cpu);
-	printk("irq:  %d [",irqs_running());
-	for(i=0;i < NR_CPUS;i++)
-		printk(" %d",irq_count(i));
-	printk(" ]\nbh:   %d [",spin_is_locked(&global_bh_lock) ? 1 : 0);
-	for(i=0;i < NR_CPUS;i++)
-		printk(" %d",bh_count(i));
-
-	printk(" ]\nStack dumps:");
-#if defined(CONFIG_IA64)
-	/*
-	 * We can't unwind the stack of another CPU without access to
-	 * the registers of that CPU.  And sending an IPI when we're
-	 * in a potentially wedged state doesn't sound like a smart
-	 * idea.
-	 */
-#elif defined(CONFIG_X86)
-	for(i=0;i< NR_CPUS;i++) {
-		unsigned long esp;
-		if(i==cpu)
-			continue;
-		printk("\nCPU %d:",i);
-		esp = init_tss[i].esp0;
-		if(esp==NULL) {
-			/* tss->esp0 is set to NULL in cpu_init(),
-			 * it's initialized when the cpu returns to user
-			 * space. -- manfreds
-			 */
-			printk(" <unknown> ");
-			continue;
-		}
-		esp &= ~(THREAD_SIZE-1);
-		esp += sizeof(struct task_struct);
-		show_stack((void*)esp);
-	}
-#else
-	You lose...
-#endif
-	printk("\nCPU %d:",cpu);
-	show_stack(NULL);
-	printk("\n");
+	while (irq_desc(irq)->status & IRQ_INPROGRESS)
+		cpu_relax();
 }
-
-#define MAXCOUNT 100000000
-
-/*
- * I had a lockup scenario where a tight loop doing
- * spin_unlock()/spin_lock() on CPU#1 was racing with
- * spin_lock() on CPU#0. CPU#0 should have noticed spin_unlock(), but
- * apparently the spin_unlock() information did not make it
- * through to CPU#0 ... nasty, is this by design, do we have to limit
- * 'memory update oscillation frequency' artificially like here?
- *
- * Such 'high frequency update' races can be avoided by careful design, but
- * some of our major constructs like spinlocks use similar techniques,
- * it would be nice to clarify this issue. Set this define to 0 if you
- * want to check whether your system freezes.  I suspect the delay done
- * by SYNC_OTHER_CORES() is in correlation with 'snooping latency', but
- * i thought that such things are guaranteed by design, since we use
- * the 'LOCK' prefix.
- */
-#define SUSPECTED_CPU_OR_CHIPSET_BUG_WORKAROUND 0
-
-#if SUSPECTED_CPU_OR_CHIPSET_BUG_WORKAROUND
-# define SYNC_OTHER_CORES(x) udelay(x+1)
-#else
-/*
- * We have to allow irqs to arrive between local_irq_enable and local_irq_disable
- */
-# ifdef CONFIG_IA64
-#  define SYNC_OTHER_CORES(x) __asm__ __volatile__ ("nop 0")
-# else
-#  define SYNC_OTHER_CORES(x) __asm__ __volatile__ ("nop")
-# endif
-#endif
-
-static inline void wait_on_irq(void)
-{
-	int count = MAXCOUNT;
-
-	for (;;) {
-
-		/*
-		 * Wait until all interrupts are gone. Wait
-		 * for bottom half handlers unless we're
-		 * already executing in one..
-		 */
-		if (!irqs_running())
-			if (really_local_bh_count() || !spin_is_locked(&global_bh_lock))
-				break;
-
-		/* Duh, we have to loop. Release the lock to avoid deadlocks */
-		smp_mb__before_clear_bit();	/* need barrier before releasing lock... */
-		clear_bit(0,&global_irq_lock);
-
-		for (;;) {
-			if (!--count) {
-				show("wait_on_irq");
-				count = ~0;
-			}
-			local_irq_enable();
-			SYNC_OTHER_CORES(smp_processor_id());
-			local_irq_disable();
-			if (irqs_running())
-				continue;
-			if (global_irq_lock)
-				continue;
-			if (!really_local_bh_count() && spin_is_locked(&global_bh_lock))
-				continue;
-			if (!test_and_set_bit(0,&global_irq_lock))
-				break;
-		}
-	}
-}
-
-/*
- * This is called when we want to synchronize with
- * interrupts. We may for example tell a device to
- * stop sending interrupts: but to make sure there
- * are no interrupts that are executing on another
- * CPU we need to call this function.
- */
-void synchronize_irq(void)
-{
-	if (irqs_running()) {
-		/* Stupid approach */
-		cli();
-		sti();
-	}
-}
-
-static inline void get_irqlock(void)
-{
-	if (test_and_set_bit(0,&global_irq_lock)) {
-		/* do we already hold the lock? */
-		if (smp_processor_id() == global_irq_holder)
-			return;
-		/* Uhhuh.. Somebody else got it. Wait.. */
-		do {
-			do {
-#ifdef CONFIG_X86
-				rep_nop();
-#endif
-			} while (test_bit(0,&global_irq_lock));
-		} while (test_and_set_bit(0,&global_irq_lock));
-	}
-	/*
-	 * We also to make sure that nobody else is running
-	 * in an interrupt context.
-	 */
-	wait_on_irq();
-
-	/*
-	 * Ok, finally..
-	 */
-	global_irq_holder = smp_processor_id();
-}
-
-#define EFLAGS_IF_SHIFT 9
-
-/*
- * A global "cli()" while in an interrupt context
- * turns into just a local cli(). Interrupts
- * should use spinlocks for the (very unlikely)
- * case that they ever want to protect against
- * each other.
- *
- * If we already have local interrupts disabled,
- * this will not turn a local disable into a
- * global one (problems with spinlocks: this makes
- * save_flags+cli+sti usable inside a spinlock).
- */
-void __global_cli(void)
-{
-	unsigned int flags;
-
-#ifdef CONFIG_IA64
-	local_save_flags(flags);
-	if (flags & IA64_PSR_I) {
-		local_irq_disable();
-		if (!really_local_irq_count())
-			get_irqlock();
-	}
-#else
-	local_save_flags(flags);
-	if (flags & (1 << EFLAGS_IF_SHIFT)) {
-		local_irq_disable();
-		if (!really_local_irq_count())
-			get_irqlock();
-	}
-#endif
-}
-
-void __global_sti(void)
-{
-	if (!really_local_irq_count())
-		release_irqlock(smp_processor_id());
-	local_irq_enable();
-}
-
-/*
- * SMP flags value to restore to:
- * 0 - global cli
- * 1 - global sti
- * 2 - local cli
- * 3 - local sti
- */
-unsigned long __global_save_flags(void)
-{
-	int retval;
-	int local_enabled;
-	unsigned long flags;
-	int cpu = smp_processor_id();
-
-	local_save_flags(flags);
-#ifdef CONFIG_IA64
-	local_enabled = (flags & IA64_PSR_I) != 0;
-#else
-	local_enabled = (flags >> EFLAGS_IF_SHIFT) & 1;
-#endif
-	/* default to local */
-	retval = 2 + local_enabled;
-
-	/* check for global flags if we're not in an interrupt */
-	if (!really_local_irq_count()) {
-		if (local_enabled)
-			retval = 1;
-		if (global_irq_holder == cpu)
-			retval = 0;
-	}
-	return retval;
-}
-
-void __global_restore_flags(unsigned long flags)
-{
-	switch (flags) {
-	case 0:
-		__global_cli();
-		break;
-	case 1:
-		__global_sti();
-		break;
-	case 2:
-		local_irq_disable();
-		break;
-	case 3:
-		local_irq_enable();
-		break;
-	default:
-		printk("global_restore_flags: %08lx (%08lx)\n",
-			flags, (&flags)[-1]);
-	}
-}
-
 #endif
 
 /*
@@ -482,11 +217,7 @@ void __global_restore_flags(unsigned long flags)
  */
 int handle_IRQ_event(unsigned int irq, struct pt_regs * regs, struct irqaction * action)
 {
-	int status;
-
-	local_irq_enter(irq);
-
-	status = 1;	/* Force the "do bottom halves" bit */
+	int status = 1;	/* Force the "do bottom halves" bit */
 
 	if (!(action->flags & SA_INTERRUPT))
 		local_irq_enable();
@@ -500,10 +231,15 @@ int handle_IRQ_event(unsigned int irq, struct pt_regs * regs, struct irqaction *
 		add_interrupt_randomness(irq);
 	local_irq_disable();
 
-	local_irq_exit(irq);
-
 	return status;
 }
+
+/*
+ * Generic enable/disable code: this just calls
+ * down into the PIC-specific version for the actual
+ * hardware disable after having gotten the irq
+ * controller lock.
+ */
 
 /**
  *	disable_irq_nosync - disable an irq without waiting
@@ -546,14 +282,7 @@ inline void disable_irq_nosync(unsigned int irq)
 void disable_irq(unsigned int irq)
 {
 	disable_irq_nosync(irq);
-
-#ifdef CONFIG_SMP
-	if (!really_local_irq_count()) {
-		do {
-			barrier();
-		} while (irq_desc(irq)->status & IRQ_INPROGRESS);
-	}
-#endif
+	synchronize_irq(irq);
 }
 
 /**
@@ -616,6 +345,7 @@ unsigned int do_IRQ(unsigned long irq, struct pt_regs *regs)
 	struct irqaction * action;
 	unsigned int status;
 
+	irq_enter();
 	kstat.irqs[cpu][irq]++;
 
 	if (desc->status & IRQ_PER_CPU) {
@@ -638,7 +368,7 @@ unsigned int do_IRQ(unsigned long irq, struct pt_regs *regs)
 		 * use the action we have.
 		 */
 		action = NULL;
-		if (!(status & (IRQ_DISABLED | IRQ_INPROGRESS))) {
+		if (likely(!(status & (IRQ_DISABLED | IRQ_INPROGRESS)))) {
 			action = desc->action;
 			status &= ~IRQ_PENDING; /* we commit to handling */
 			status |= IRQ_INPROGRESS; /* we are handling it */
@@ -651,7 +381,7 @@ unsigned int do_IRQ(unsigned long irq, struct pt_regs *regs)
 		 * a different instance of this same irq, the other processor
 		 * will take care of it.
 		 */
-		if (!action)
+		if (unlikely(!action))
 			goto out;
 
 		/*
@@ -673,8 +403,8 @@ unsigned int do_IRQ(unsigned long irq, struct pt_regs *regs)
 				break;
 			desc->status &= ~IRQ_PENDING;
 		}
-		desc->status &= ~IRQ_INPROGRESS;
 	  out:
+		desc->status &= ~IRQ_INPROGRESS;
 		/*
 		 * The ->end() handler has to deal with interrupts which got
 		 * disabled while the handler was running.
@@ -682,6 +412,7 @@ unsigned int do_IRQ(unsigned long irq, struct pt_regs *regs)
 		desc->handler->end(irq);
 		spin_unlock(&desc->lock);
 	}
+	irq_exit();
 	return 1;
 }
 
@@ -811,7 +542,7 @@ void free_irq(unsigned int irq, void *dev_id)
 #ifdef CONFIG_SMP
 			/* Wait to make sure it's not being used on another CPU */
 			while (desc->status & IRQ_INPROGRESS)
-				barrier();
+				synchronize_irq(irq);
 #endif
 			kfree(action);
 			return;
@@ -864,7 +595,7 @@ unsigned long probe_irq_on(void)
 
 	/* Wait for longstanding interrupts to trigger. */
 	for (delay = jiffies + HZ/50; time_after(delay, jiffies); )
-		/* about 20ms delay */ synchronize_irq();
+		/* about 20ms delay */ barrier();
 
 	/*
 	 * enable any unassigned irqs
@@ -887,7 +618,7 @@ unsigned long probe_irq_on(void)
 	 * Wait for spurious interrupts to trigger
 	 */
 	for (delay = jiffies + HZ/10; time_after(delay, jiffies); )
-		/* about 100ms delay */ synchronize_irq();
+		/* about 100ms delay */ barrier();
 
 	/*
 	 * Now filter out any obviously spurious interrupts

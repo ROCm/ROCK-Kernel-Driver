@@ -24,11 +24,12 @@
  *	addresses, we just need to give it the buffer length.
  */
  
-static void p8023_datalink_header(struct datalink_proto *dl, 
+static int p8023_request(struct datalink_proto *dl, 
 		struct sk_buff *skb, unsigned char *dest_node)
 {
 	struct net_device	*dev = skb->dev;
 	dev->hard_header(skb, dev, ETH_P_802_3, dest_node, NULL, skb->len);
+	return dev_queue_xmit(skb);
 }
 
 /*
@@ -42,10 +43,8 @@ struct datalink_proto *make_8023_client(void)
 	proto = (struct datalink_proto *) kmalloc(sizeof(*proto), GFP_ATOMIC);
 	if (proto != NULL) 
 	{
-		proto->type_len = 0;
 		proto->header_length = 0;
-		proto->datalink_header = p8023_datalink_header;
-		proto->string_name = "802.3";
+		proto->request = p8023_request;
 	}
 	return proto;
 }

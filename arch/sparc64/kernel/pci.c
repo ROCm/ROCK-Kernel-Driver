@@ -114,6 +114,53 @@ static void pci_controller_init(char *model_name, int namelen, int node)
 	printk("PCI: Ignoring controller...\n");
 }
 
+static int pci_is_controller(char *model_name, int namelen, int node)
+{
+	int i;
+
+	for (i = 0; i < PCI_NUM_CONTROLLER_TYPES; i++) {
+		if (!strncmp(model_name,
+			     pci_controller_table[i].model_name,
+			     namelen)) {
+			return 1;
+		}
+	}
+	return 0;
+}
+
+/* Is there some PCI controller in the system?  */
+int pcic_present(void)
+{
+	char namebuf[16];
+	int node;
+
+	node = prom_getchild(prom_root_node);
+	while ((node = prom_searchsiblings(node, "pci")) != 0) {
+		int len, ret;
+
+		len = prom_getproperty(node, "model",
+				       namebuf, sizeof(namebuf));
+
+		ret = 0;
+		if (len > 0) {
+			ret = pci_is_controller(namebuf, len, node);
+		} else {
+			len = prom_getproperty(node, "compatible",
+					       namebuf, sizeof(namebuf));
+			if (len > 0)
+				ret = pci_is_controller(namebuf, len, node);
+		}
+		if (ret)
+			return ret;
+
+		node = prom_getsibling(node);
+		if (!node)
+			break;
+	}
+
+	return 0;
+}
+
 /* Find each controller in the system, attach and initialize
  * software state structure for each and link into the
  * pci_controller_root.  Setup the controller enough such

@@ -467,7 +467,6 @@ static inline Scsi_Cmnd *remove_SC(Scsi_Cmnd **SC, int target, int lun)
 /* Resetting various pieces of the ESP scsi driver chipset/buses. */
 static void esp_reset_dma(struct esp *esp)
 {
-	unsigned long flags;
 	int can_do_burst16, can_do_burst32, can_do_burst64;
 	int can_do_sbus64;
 	u32 tmp;
