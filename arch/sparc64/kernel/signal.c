@@ -411,6 +411,7 @@ void do_rt_sigreturn(struct pt_regs *regs)
 	struct rt_signal_frame *sf;
 	unsigned long tpc, tnpc, tstate;
 	__siginfo_fpu_t *fpu_save;
+	mm_segment_t old_fs;
 	sigset_t set;
 	stack_t st;
 	int err;
@@ -455,7 +456,10 @@ void do_rt_sigreturn(struct pt_regs *regs)
 	
 	/* It is more difficult to avoid calling this function than to
 	   call it and ignore errors.  */
+	old_fs = get_fs();
+	set_fs(KERNEL_DS);
 	do_sigaltstack(&st, NULL, (unsigned long)sf);
+	set_fs(old_fs);
 
 	sigdelsetmask(&set, ~_BLOCKABLE);
 	spin_lock_irq(&current->sigmask_lock);
