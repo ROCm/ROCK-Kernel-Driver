@@ -565,7 +565,7 @@ static int patch_cmi9880(struct hda_codec *codec)
 	spec->board_config = snd_hda_check_board_config(codec, cmi9880_cfg_tbl);
 	if (spec->board_config < 0) {
 		snd_printd(KERN_INFO "hda_codec: Unknown model for CMI9880\n");
-		spec->board_config = CMI_MINIMAL;
+		spec->board_config = CMI_FULL_DIG; /* try everything */
 	}
 
 	switch (spec->board_config) {

@@ -1038,7 +1038,13 @@ static struct action_ops snd_pcm_action_suspend = {
  */
 int snd_pcm_suspend(snd_pcm_substream_t *substream)
 {
-	return snd_pcm_action(&snd_pcm_action_suspend, substream, 0);
+	int err;
+	unsigned long flags;
+
+	snd_pcm_stream_lock_irqsave(substream, flags);
+	err = snd_pcm_action(&snd_pcm_action_suspend, substream, 0);
+	snd_pcm_stream_unlock_irqrestore(substream, flags);
+	return err;
 }
 
 /**
@@ -1057,11 +1063,8 @@ int snd_pcm_suspend_all(snd_pcm_t *pcm)
 			/* FIXME: the open/close code should lock this as well */
 			if (substream->runtime == NULL)
 				continue;
-			snd_pcm_stream_lock(substream);
-			if (substream->runtime->status->state != SNDRV_PCM_STATE_SUSPENDED)
-				err = snd_pcm_suspend(substream);
-			snd_pcm_stream_unlock(substream);
-			if (err < 0)
+			err = snd_pcm_suspend(substream);
+			if (err < 0 && err != -EBUSY)
 				return err;
 		}
 	}

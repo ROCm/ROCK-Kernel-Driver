@@ -250,6 +250,7 @@ struct snd_atiixp_dma {
 	int running;
 	int pcm_open_flag;
 	int ac97_pcm_type;	/* index # of ac97_pcm to access, -1 = not used */
+	unsigned int saved_curptr;
 };
 
 /*
@@ -1404,8 +1405,12 @@ static int snd_atiixp_suspend(snd_card_t *card, pm_message_t state)
 	int i;
 
 	for (i = 0; i < NUM_ATI_PCMDEVS; i++)
-		if (chip->pcmdevs[i])
+		if (chip->pcmdevs[i]) {
+			atiixp_dma_t *dma = &chip->dmas[i];
+			if (dma->substream && dma->running)
+				dma->saved_curptr = readl(chip->remap_addr + dma->ops->dt_cur);
 			snd_pcm_suspend_all(chip->pcmdevs[i]);
+		}
 	for (i = 0; i < NUM_ATI_CODECS; i++)
 		if (chip->ac97[i])
 			snd_ac97_suspend(chip->ac97[i]);
@@ -1432,6 +1437,17 @@ static int snd_atiixp_resume(snd_card_t *card)
 	for (i = 0; i < NUM_ATI_CODECS; i++)
 		if (chip->ac97[i])
 			snd_ac97_resume(chip->ac97[i]);
+
+	for (i = 0; i < NUM_ATI_PCMDEVS; i++)
+		if (chip->pcmdevs[i]) {
+			atiixp_dma_t *dma = &chip->dmas[i];
+			if (dma->substream && dma->running) {
+				dma->ops->enable_dma(chip, 1);
+				writel((u32)dma->desc_buf.addr | ATI_REG_LINKPTR_EN,
+				       chip->remap_addr + dma->ops->llp_offset);
+				writel(dma->saved_curptr, chip->remap_addr + dma->ops->dt_cur);
+			}
+		}
 
 	return 0;
 }

@@ -586,6 +586,7 @@ struct snd_es1968 {
 	spinlock_t reg_lock;
 	spinlock_t ac97_lock;
 	struct tasklet_struct hwvol_tq;
+	unsigned int in_suspend;
 
 	/* Maestro Stuff */
 	u16 maestro_map[32];
@@ -1937,6 +1938,9 @@ static void es1968_update_hw_volume(unsigned long private_data)
 	outb(0x88, chip->io_port + 0x1e);
 	outb(0x88, chip->io_port + 0x1f);
 
+	if (chip->in_suspend)
+		return;
+
 	if (! chip->master_switch || ! chip->master_volume)
 		return;
 
@@ -2410,6 +2414,7 @@ static int es1968_suspend(snd_card_t *card, pm_message_t state)
 	if (! chip->do_pm)
 		return 0;
 
+	chip->in_suspend = 1;
 	snd_pcm_suspend_all(chip->pcm);
 	snd_ac97_suspend(chip->ac97);
 	snd_es1968_bob_stop(chip);
@@ -2421,6 +2426,7 @@ static int es1968_suspend(snd_card_t *card, pm_message_t state)
 static int es1968_resume(snd_card_t *card)
 {
 	es1968_t *chip = card->pm_private_data;
+	struct list_head *p;
 
 	if (! chip->do_pm)
 		return 0;
@@ -2441,10 +2447,23 @@ static int es1968_resume(snd_card_t *card)
 	/* restore ac97 state */
 	snd_ac97_resume(chip->ac97);
 
+	list_for_each(p, &chip->substream_list) {
+		esschan_t *es = list_entry(p, esschan_t, list);
+		switch (es->mode) {
+		case ESM_MODE_PLAY:
+			snd_es1968_playback_setup(chip, es, es->substream->runtime);
+			break;
+		case ESM_MODE_CAPTURE:
+			snd_es1968_capture_setup(chip, es, es->substream->runtime);
+			break;
+		}
+	}
+
 	/* start timer again */
 	if (chip->bobclient)
 		snd_es1968_bob_start(chip);
 
+	chip->in_suspend = 0;
 	return 0;
 }
 #endif /* CONFIG_PM */
