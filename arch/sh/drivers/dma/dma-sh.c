@@ -55,9 +55,9 @@ struct sh_dmac_channel {
 } __attribute__ ((aligned(16)));
 
 struct sh_dmac_info {
-        struct sh_dmac_channel channel[MAX_DMAC_CHANNELS];
+        struct sh_dmac_channel channel[4];
         unsigned long dmaor;
-} __attribute__ ((packed));
+};
 
 static volatile struct sh_dmac_info *sh_dmac = (volatile struct sh_dmac_info *)SH_DMAC_BASE;
 
@@ -74,23 +74,10 @@ static inline unsigned int get_dmte_irq(unsigned int chan)
 	if (chan < 4) {
 		irq = DMTE0_IRQ + chan;
 	} else {
-		irq = DMTE4_IRQ + chan;
+		irq = DMTE4_IRQ + chan - 4;
 	}
 
 	return irq;
-}
-
-static inline int get_dmte_chan(unsigned int irq)
-{
-	int chan;
-
-	if ((irq - DMTE4_IRQ) < 0) {
-		chan = irq - DMTE0_IRQ;
-	} else {
-		chan = irq - DMTE4_IRQ + 4;
-	}
-
-	return chan;
 }
 
 /*
@@ -106,54 +93,42 @@ static inline unsigned int calc_xmit_shift(struct dma_info *info)
 	return ts_shift[(sh_dmac->channel[info->chan].chcr >> 4) & 0x0007];
 }
 
+/*
+ * The transfer end interrupt must read the chcr register to end the
+ * hardware interrupt active condition.
+ * Besides that it needs to waken any waiting process, which should handle
+ * setting up the next transfer.
+ */
 static irqreturn_t dma_tei(int irq, void *dev_id, struct pt_regs *regs)
 {
-	
-	int chan = get_dmte_chan(irq);
-	struct dma_info *info = get_dma_info(chan);
+	struct dma_info * info = (struct dma_info *)dev_id;
+	u32 chcr = sh_dmac->channel[info->chan].chcr;
 
-	if (info->sar)
-		sh_dmac->channel[info->chan].sar = info->sar;
-	if (info->dar)
-		sh_dmac->channel[info->chan].sar = info->dar;
+	if (!(chcr & CHCR_TE))
+		return IRQ_NONE;
 
-	sh_dmac->channel[info->chan].dmatcr = info->count >> calc_xmit_shift(info);
-	sh_dmac->channel[info->chan].chcr &= ~CHCR_TE;
+	sh_dmac->channel[info->chan].chcr = chcr & ~(CHCR_IE | CHCR_DE);
 
-	disable_irq(irq);
+	wake_up(&info->wait_queue);
 
 	return IRQ_HANDLED;
 }
 
-static struct irqaction irq_tei = {
-	.name		= "DMAC Transfer End",
-	.handler	= dma_tei,
-	.flags		= SA_INTERRUPT,
-};
-
 static int sh_dmac_request_dma(struct dma_info *info)
 {
-	int irq = get_dmte_irq(info->chan);
-	char *p = (char *)((&irq_tei)->name);
-
-	sprintf(p, "%s (Channel %d)", p, info->chan);
-
-	make_ipr_irq(irq, DMA_IPR_ADDR, DMA_IPR_POS, DMA_PRIORITY);
-
-	return setup_irq(irq, &irq_tei);
+	return request_irq(get_dmte_irq(info->chan), dma_tei,
+			   SA_INTERRUPT, "DMAC Transfer End", info);
 }
 
 static void sh_dmac_free_dma(struct dma_info *info)
 {
-	free_irq(get_dmte_irq(info->chan), 0);
+	free_irq(get_dmte_irq(info->chan), info);
 }
 
 static void sh_dmac_configure_channel(struct dma_info *info, unsigned long chcr)
 {
-	if (!chcr) {
-		chcr = sh_dmac->channel[info->chan].chcr;
-		chcr |= /* CHCR_IE | */ RS_DUAL;
-	}
+	if (!chcr)
+		chcr = RS_DUAL;
 
 	sh_dmac->channel[info->chan].chcr = chcr;
 
@@ -162,12 +137,18 @@ static void sh_dmac_configure_channel(struct dma_info *info, unsigned long chcr)
 
 static void sh_dmac_enable_dma(struct dma_info *info)
 {
-	sh_dmac->channel[info->chan].chcr |= CHCR_DE;
+	int irq = get_dmte_irq(info->chan);
+
+	sh_dmac->channel[info->chan].chcr |= (CHCR_DE | CHCR_IE);
+	enable_irq(irq);
 }
 
 static void sh_dmac_disable_dma(struct dma_info *info)
 {
-	sh_dmac->channel[info->chan].chcr &= ~(CHCR_DE | CHCR_TE);
+	int irq = get_dmte_irq(info->chan);
+
+	disable_irq(irq);
+	sh_dmac->channel[info->chan].chcr &= ~(CHCR_DE | CHCR_TE | CHCR_IE);
 }
 
 static int sh_dmac_xfer_dma(struct dma_info *info)
@@ -191,10 +172,14 @@ static int sh_dmac_xfer_dma(struct dma_info *info)
 	 * In this case, only one address can be defined, anything else will
 	 * result in a DMA address error interrupt (at least on the SH-4),
 	 * which will subsequently halt the transfer.
+	 *
+	 * Channel 2 on the Dreamcast is a special case, as this is used for
+	 * cascading to the PVR2 DMAC. In this case, we still need to write
+	 * SAR and DAR, regardless of value, in order for cascading to work.
 	 */
-	if (info->sar)
+	if (info->sar || (mach_is_dreamcast() && info->chan == 2))
 		sh_dmac->channel[info->chan].sar = info->sar;
-	if (info->dar)
+	if (info->dar || (mach_is_dreamcast() && info->chan == 2))
 		sh_dmac->channel[info->chan].dar = info->dar;
 	
 	sh_dmac->channel[info->chan].dmatcr = info->count >> calc_xmit_shift(info);
@@ -206,6 +191,9 @@ static int sh_dmac_xfer_dma(struct dma_info *info)
 
 static int sh_dmac_get_dma_residue(struct dma_info *info)
 {
+	if (!(sh_dmac->channel[info->chan].chcr & CHCR_DE))
+		return 0;
+
 	return sh_dmac->channel[info->chan].dmatcr << calc_xmit_shift(info);
 }
 
@@ -221,12 +209,6 @@ static irqreturn_t dma_err(int irq, void *dev_id, struct pt_regs *regs)
 
 	return IRQ_HANDLED;
 }
-
-static struct irqaction irq_err = {
-	.name		= "DMAC Address Error",
-	.handler	= dma_err,
-	.flags		= SA_INTERRUPT,
-};
 #endif
 
 static struct dma_ops sh_dmac_ops = {
@@ -244,15 +226,21 @@ static int __init sh_dmac_init(void)
 
 #ifdef CONFIG_CPU_SH4
 	make_ipr_irq(DMAE_IRQ, DMA_IPR_ADDR, DMA_IPR_POS, DMA_PRIORITY);
-	setup_irq(DMAE_IRQ, &irq_err);
+	i = request_irq(DMAE_IRQ, dma_err, SA_INTERRUPT, "DMAC Address Error", 0);
+	if (i < 0)
+		return i;
 #endif
 
-	/* Kick the DMAOR */
-	sh_dmac->dmaor |= DMAOR_DME /* | 0x200 */ | 0x8000;	/* DDT = 1, PR1 = 1, DME = 1 */
-	sh_dmac->dmaor &= ~(DMAOR_NMIF | DMAOR_AE);
+	for (i = 0; i < MAX_DMAC_CHANNELS; i++) {
+		int irq = get_dmte_irq(i);
 
-	for (i = 0; i < MAX_DMAC_CHANNELS; i++)
-		dma_info[i].ops  = &sh_dmac_ops;
+		make_ipr_irq(irq, DMA_IPR_ADDR, DMA_IPR_POS, DMA_PRIORITY);
+
+		dma_info[i].ops = &sh_dmac_ops;
+		dma_info[i].tei_capable = 1;
+	}
+
+	sh_dmac->dmaor |= 0x8000 | DMAOR_DME;
 
 	return register_dmac(&sh_dmac_ops);
 }
