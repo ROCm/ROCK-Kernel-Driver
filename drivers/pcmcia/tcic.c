@@ -382,15 +382,6 @@ static int __init init_tcic(void)
 {
     int i, sock, ret = 0;
     u_int mask, scan;
-    servinfo_t serv;
-
-    DEBUG(0, "%s\n", version);
-    pcmcia_get_card_services_info(&serv);
-    if (serv.Revision != CS_RELEASE_CODE) {
-	printk(KERN_NOTICE "tcic: Card Services release "
-	       "does not match!\n");
-	return -1;
-    }
 
     if (driver_register(&tcic_driver))
 	return -1;
