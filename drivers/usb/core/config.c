@@ -37,23 +37,15 @@ static int usb_parse_endpoint(struct usb_host_endpoint *endpoint, unsigned char 
 	buffer += header->bLength;
 	size -= header->bLength;
 
-	/* Skip over the rest of the Class Specific or Vendor Specific */
-	/*  descriptors */
+	/* Skip over any Class Specific or Vendor Specific descriptors */
 	begin = buffer;
 	numskipped = 0;
 	while (size >= sizeof(struct usb_descriptor_header)) {
 		header = (struct usb_descriptor_header *)buffer;
 
-		if (header->bLength < 2) {
-			err("invalid descriptor length of %d", header->bLength);
-			return -EINVAL;
-		}
-
 		/* If we find another "proper" descriptor then we're done  */
 		if ((header->bDescriptorType == USB_DT_ENDPOINT) ||
-		    (header->bDescriptorType == USB_DT_INTERFACE) ||
-		    (header->bDescriptorType == USB_DT_CONFIG) ||
-		    (header->bDescriptorType == USB_DT_DEVICE))
+		    (header->bDescriptorType == USB_DT_INTERFACE))
 			break;
 
 		dbg("skipping descriptor 0x%X", header->bDescriptorType);
@@ -155,27 +147,18 @@ static int usb_parse_interface(struct usb_interface *interface, unsigned char *b
 
 		memcpy(&ifp->desc, buffer, USB_DT_INTERFACE_SIZE);
 
-		/* Skip over the interface */
 		buffer += ifp->desc.bLength;
 		size -= ifp->desc.bLength;
 
+		/* Skip over any Class Specific or Vendor Specific descriptors */
 		begin = buffer;
 		numskipped = 0;
-
-		/* Skip over any interface, class or vendor descriptors */
 		while (size >= sizeof(struct usb_descriptor_header)) {
 			header = (struct usb_descriptor_header *)buffer;
 
-			if (header->bLength < 2) {
-				err("invalid descriptor length of %d", header->bLength);
-				return -EINVAL;
-			}
-
 			/* If we find another "proper" descriptor then we're done  */
 			if ((header->bDescriptorType == USB_DT_INTERFACE) ||
-			    (header->bDescriptorType == USB_DT_ENDPOINT) ||
-			    (header->bDescriptorType == USB_DT_CONFIG) ||
-			    (header->bDescriptorType == USB_DT_DEVICE))
+			    (header->bDescriptorType == USB_DT_ENDPOINT))
 				break;
 
 			dbg("skipping descriptor 0x%X", header->bDescriptorType);
@@ -184,7 +167,6 @@ static int usb_parse_interface(struct usb_interface *interface, unsigned char *b
 			buffer += header->bLength;
 			size -= header->bLength;
 		}
-
 		if (numskipped) {
 			dbg("skipped %d class/vendor specific interface descriptors", numskipped);
 
@@ -200,13 +182,6 @@ static int usb_parse_interface(struct usb_interface *interface, unsigned char *b
 			memcpy(ifp->extra, begin, len);
 			ifp->extralen = len;
 		}
-
-		/* Did we hit an unexpected descriptor? */
-		header = (struct usb_descriptor_header *)buffer;
-		if ((size >= sizeof(struct usb_descriptor_header)) &&
-		    ((header->bDescriptorType == USB_DT_CONFIG) ||
-		     (header->bDescriptorType == USB_DT_DEVICE)))
-			break;
 
 		if (ifp->desc.bNumEndpoints > USB_MAXENDPOINTS) {
 			warn("too many endpoints");
@@ -249,11 +224,13 @@ static int usb_parse_interface(struct usb_interface *interface, unsigned char *b
 int usb_parse_configuration(struct usb_host_config *config, char *buffer)
 {
 	int nintf;
-	int i, size;
+	int i, j, size;
 	struct usb_interface *interface;
+	char *buffer2;
+	int size2;
+	struct usb_descriptor_header *header;
 	int numskipped, len;
 	char *begin;
-	struct usb_descriptor_header *header;
 	int retval;
 
 	memcpy(&config->desc, buffer, USB_DT_CONFIG_SIZE);
@@ -283,6 +260,34 @@ int usb_parse_configuration(struct usb_host_config *config, char *buffer)
 		get_device(&interface->dev);
 	}
 
+	/* Go through the descriptors, checking their length */
+	buffer2 = buffer;
+	size2 = size;
+	j = 0;
+	while (size2 >= sizeof(struct usb_descriptor_header)) {
+		header = (struct usb_descriptor_header *) buffer2;
+		if ((header->bLength > size2) || (header->bLength < 2)) {
+			err("invalid descriptor of length %d", header->bLength);
+			return -EINVAL;
+		}
+
+		if (header->bDescriptorType == USB_DT_INTERFACE) {
+			if (header->bLength < USB_DT_INTERFACE_SIZE) {
+				warn("invalid interface descriptor");
+				return -EINVAL;
+			}
+
+		} else if ((header->bDescriptorType == USB_DT_DEVICE ||
+		    header->bDescriptorType == USB_DT_CONFIG) && j) {
+			warn("unexpected descriptor type 0x%X", header->bDescriptorType);
+			return -EINVAL;
+		}
+
+		j = 1;
+		buffer2 += header->bLength;
+		size2 -= header->bLength;
+	}
+
 	buffer += config->desc.bLength;
 	size -= config->desc.bLength;
 
@@ -292,16 +297,9 @@ int usb_parse_configuration(struct usb_host_config *config, char *buffer)
 	while (size >= sizeof(struct usb_descriptor_header)) {
 		header = (struct usb_descriptor_header *)buffer;
 
-		if ((header->bLength > size) || (header->bLength < 2)) {
-			err("invalid descriptor length of %d", header->bLength);
-			return -EINVAL;
-		}
-
 		/* If we find another "proper" descriptor then we're done  */
 		if ((header->bDescriptorType == USB_DT_ENDPOINT) ||
-		    (header->bDescriptorType == USB_DT_INTERFACE) ||
-		    (header->bDescriptorType == USB_DT_CONFIG) ||
-		    (header->bDescriptorType == USB_DT_DEVICE))
+		    (header->bDescriptorType == USB_DT_INTERFACE))
 			break;
 
 		dbg("skipping descriptor 0x%X", header->bDescriptorType);
