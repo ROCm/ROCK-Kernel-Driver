@@ -1802,6 +1802,7 @@ void *dev_seq_start(struct seq_file *seq, loff_t *pos)
 
 void *dev_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 {
+	++*pos;
 	return v == (void *)1 ? dev_base : ((struct net_device *)v)->next;
 }
 
@@ -1843,11 +1844,11 @@ static void dev_seq_printf_stats(struct seq_file *seq, struct net_device *dev)
 static int dev_seq_show(struct seq_file *seq, void *v)
 {
 	if (v == (void *)1)
-		seq_printf(seq, "Inter-|   Receive                            "
-				"                    |  Transmit\n"
-				" face |bytes    packets errs drop fifo frame "
-				"compressed multicast|bytes    packets errs "
-				"drop fifo colls carrier compressed\n");
+		seq_puts(seq, "Inter-|   Receive                            "
+			      "                    |  Transmit\n"
+			      " face |bytes    packets errs drop fifo frame "
+			      "compressed multicast|bytes    packets errs "
+			      "drop fifo colls carrier compressed\n");
 	else
 		dev_seq_printf_stats(seq, v);
 	return 0;
