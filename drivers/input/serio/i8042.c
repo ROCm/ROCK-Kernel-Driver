@@ -52,9 +52,10 @@ static unsigned int i8042_dumbkbd;
 module_param_named(dumbkbd, i8042_dumbkbd, bool, 0);
 MODULE_PARM_DESC(dumbkbd, "Pretend that controller can only read data from keyboard");
 
+#ifdef __i386__
 extern unsigned int i8042_dmi_noloop;
+#endif
 static unsigned int i8042_noloop;
-extern unsigned int i8042_dmi_noloop;
 
 __obsolete_setup("i8042_noaux");
 __obsolete_setup("i8042_nomux");
