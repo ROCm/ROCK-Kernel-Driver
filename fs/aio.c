@@ -372,6 +372,7 @@ void fastcall __put_ioctx(struct kioctx *ctx)
 	if (unlikely(ctx->reqs_active))
 		BUG();
 
+	flush_workqueue(aio_wq);
 	aio_free_ring(ctx);
 	mmdrop(ctx->mm);
 	ctx->mm = NULL;
@@ -1199,11 +1200,6 @@ static void io_destroy(struct kioctx *ioctx)
 
 	aio_cancel_all(ioctx);
 	wait_for_all_aios(ioctx);
-	/*
-	 * this is an overkill, but ensures we don't leave
-	 * the ctx on the aio_wq
-	 */
-	flush_workqueue(aio_wq);
 	put_ioctx(ioctx);	/* once for the lookup */
 }
 

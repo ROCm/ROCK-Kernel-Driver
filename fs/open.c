@@ -192,7 +192,9 @@ int do_truncate(struct dentry *dentry, loff_t length)
 	newattrs.ia_size = length;
 	newattrs.ia_valid = ATTR_SIZE | ATTR_CTIME;
 	down(&dentry->d_inode->i_sem);
+	down_write(&dentry->d_inode->i_alloc_sem);
 	err = notify_change(dentry, &newattrs);
+	up_write(&dentry->d_inode->i_alloc_sem);
 	up(&dentry->d_inode->i_sem);
 	return err;
 }

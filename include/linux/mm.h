@@ -474,6 +474,7 @@ extern long do_mprotect(struct mm_struct *mm, unsigned long start,
 int __set_page_dirty_buffers(struct page *page);
 int __set_page_dirty_nobuffers(struct page *page);
 int set_page_dirty_lock(struct page *page);
+int clear_page_dirty_for_io(struct page *page);
 
 /*
  * Prototype to add a shrinker callback for ageable caches.
