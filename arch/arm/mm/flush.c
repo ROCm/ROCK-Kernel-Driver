@@ -13,13 +13,11 @@
 
 #include <asm/cacheflush.h>
 
-static void __flush_dcache_page(struct page *page)
+static void __flush_dcache_page(struct address_space *mapping, struct page *page)
 {
-	struct address_space *mapping = page_mapping(page);
 	struct mm_struct *mm = current->active_mm;
 	struct vm_area_struct *mpnt;
 	struct prio_tree_iter iter;
-	unsigned long offset;
 	pgoff_t pgoff;
 
 	__cpuc_flush_dcache_page(page_address(page));
@@ -35,6 +33,8 @@ static void __flush_dcache_page(struct page *page)
 
 	flush_dcache_mmap_lock(mapping);
 	vma_prio_tree_foreach(mpnt, &iter, &mapping->i_mmap, pgoff, pgoff) {
+		unsigned long offset;
+
 		/*
 		 * If this VMA is not in our MM, we can ignore it.
 		 */
@@ -55,6 +55,6 @@ void flush_dcache_page(struct page *page)
 	if (mapping && !mapping_mapped(mapping))
 		set_bit(PG_dcache_dirty, &page->flags);
 	else
-		__flush_dcache_page(page);
+		__flush_dcache_page(mapping, page);
 }
 EXPORT_SYMBOL(flush_dcache_page);
