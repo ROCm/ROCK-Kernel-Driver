@@ -1509,9 +1509,8 @@ inline int generic_write_checks(struct inode *inode,
 				send_sig(SIGXFSZ, current, 0);
 				return -EFBIG;
 			}
-			if (*pos > 0xFFFFFFFFULL || *count > limit-(u32)*pos) {
-				/* send_sig(SIGXFSZ, current, 0); */
-				*count = limit - (u32)*pos;
+			if (*count > limit - (typeof(limit))*pos) {
+				*count = limit - (typeof(limit))*pos;
 			}
 		}
 	}
@@ -1525,9 +1524,8 @@ inline int generic_write_checks(struct inode *inode,
 			send_sig(SIGXFSZ, current, 0);
 			return -EFBIG;
 		}
-		if (*count > MAX_NON_LFS - (u32)*pos) {
-			/* send_sig(SIGXFSZ, current, 0); */
-			*count = MAX_NON_LFS - (u32)*pos;
+		if (*count > MAX_NON_LFS - (unsigned long)*pos) {
+			*count = MAX_NON_LFS - (unsigned long)*pos;
 		}
 	}
 
