@@ -1368,7 +1368,6 @@ nfsd_rename(struct svc_rqst *rqstp, struct svc_fh *ffhp, char *fname, int flen,
 		nfsd_sync_dir(tdentry);
 		nfsd_sync_dir(fdentry);
 	}
-	dput(ndentry);
 
  out_dput_new:
 	dput(ndentry);
