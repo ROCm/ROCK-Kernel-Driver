@@ -64,11 +64,12 @@ dep_tristate '802.1d Ethernet Bridging' CONFIG_BRIDGE $CONFIG_INET
 if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
    tristate 'CCITT X.25 Packet Layer (EXPERIMENTAL)' CONFIG_X25
    tristate 'LAPB Data Link Driver (EXPERIMENTAL)' CONFIG_LAPB
-   bool '802.2 LLC (EXPERIMENTAL)' CONFIG_LLC
+   tristate 'ANSI/IEEE 802.2 Data link layer protocol' CONFIG_LLC
+   if [ "$CONFIG_LLC" != "n" ]; then
+	# When NETBEUI is added the following line will be a tristate
+	define_bool CONFIG_LLC_UI y
+   fi
    bool 'Frame Diverter (EXPERIMENTAL)' CONFIG_NET_DIVERT
-#   if [ "$CONFIG_LLC" = "y" ]; then
-#      bool '  Netbeui (EXPERIMENTAL)' CONFIG_NETBEUI
-#   fi
    if [ "$CONFIG_INET" = "y" ]; then
       tristate 'Acorn Econet/AUN protocols (EXPERIMENTAL)' CONFIG_ECONET
       if [ "$CONFIG_ECONET" != "n" ]; then
