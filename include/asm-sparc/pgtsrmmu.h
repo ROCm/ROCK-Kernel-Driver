@@ -106,7 +106,7 @@
  * enforce all the protection levels that vma's can have.
  * XXX But for now...
  */
-#define SRMMU_PAGE_NONE    __pgprot(SRMMU_VALID | SRMMU_CACHE | \
+#define SRMMU_PAGE_NONE    __pgprot(SRMMU_CACHE | \
 				    SRMMU_PRIV | SRMMU_REF)
 #define SRMMU_PAGE_SHARED  __pgprot(SRMMU_VALID | SRMMU_CACHE | \
 				    SRMMU_EXEC | SRMMU_WRITE | SRMMU_REF)
