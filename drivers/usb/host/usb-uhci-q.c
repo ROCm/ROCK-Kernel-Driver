@@ -13,7 +13,7 @@
     HW-initalization based on material of
     Randy Dunlap + Johannes Erdfelt + Gregory P. Smith + Linus Torvalds 
 
-    $Id: usb-uhci-q.c,v 1.1 2002/05/14 20:36:57 acher Exp $
+    $Id: usb-uhci-q.c,v 1.3 2002/05/25 16:42:41 acher Exp $
 */
 
 /*-------------------------------------------------------------------*/
@@ -59,7 +59,7 @@ static int uhci_submit_control_urb (struct uhci_hcd *uhci, struct urb *urb)
 	urb_priv_t *urb_priv = urb->hcpriv;
 	unsigned long destination, status;
 	int maxsze = usb_maxpacket (urb->dev, urb->pipe, usb_pipeout (urb->pipe));
-	int depth_first=USE_CTRL_DEPTH_FIRST;  // UHCI descriptor chasing method
+	int depth_first = ctrl_depth;  // UHCI descriptor chasing method
 	unsigned long len;
 	char *data;
 
@@ -175,7 +175,7 @@ static int uhci_submit_bulk_urb (struct uhci_hcd *uhci, struct urb *urb, struct 
 	unsigned int pipe = urb->pipe;
 	int maxsze = usb_maxpacket (urb->dev, pipe, usb_pipeout (pipe));
 	int info, len, last;
-	int depth_first=USE_BULK_DEPTH_FIRST;  // UHCI descriptor chasing method
+	int depth_first = bulk_depth;  // UHCI descriptor chasing method
 
 	if (usb_endpoint_halted (urb->dev, usb_pipeendpoint (pipe), usb_pipeout (pipe)))
 		return -EPIPE;
@@ -305,7 +305,7 @@ fail_unmap_enomem:
 static int uhci_submit_int_urb (struct uhci_hcd *uhci, struct urb *urb)
 {
 	urb_priv_t *urb_priv = urb->hcpriv;
-	int nint, n;
+	int nint;
 	uhci_desc_t *td;
 	int status, destination;
 	int info;
@@ -313,16 +313,14 @@ static int uhci_submit_int_urb (struct uhci_hcd *uhci, struct urb *urb)
 	
 	if (urb->interval == 0)
 		nint = 0;
-	else {  // round interval down to 2^n
-		for (nint = 0, n = 1; nint <= 8; nint++, n += n)	
-			if (urb->interval < n) {
-				urb->interval = n / 2;
-				break;
-			}
-		nint--;
+	else {  
+		// log2-function (urb->interval already 2^n)
+		nint = ffs(urb->interval);
+		if (nint>7)
+			nint=7;
 	}
 
-	dbg("Rounded interval to %i, chain  %i", urb->interval, nint);
+	dbg("INT-interval %i, chain  %i", urb->interval, nint);
 	// remember start frame, just in case...
 	urb->start_frame = UHCI_GET_CURRENT_FRAME (uhci) & 1023;	
 
@@ -381,7 +379,7 @@ static int find_iso_limits (struct uhci_hcd *uhci, struct urb *urb, unsigned int
 	}
 	
 	if (last_urb) {
-		*end = (last_urb->start_frame + last_urb->number_of_packets) & 1023;
+		*end = (last_urb->start_frame + last_urb->number_of_packets*last_urb->interval) & 1023;
 		ret=0;
 	}
 	
@@ -395,12 +393,14 @@ static int find_iso_limits (struct uhci_hcd *uhci, struct urb *urb, unsigned int
 static int iso_find_start (struct uhci_hcd *uhci, struct urb *urb)
 {
 	unsigned int now;
-	unsigned int start_limit = 0, stop_limit = 0, queued_size;
+	unsigned int start_limit = 0, stop_limit = 0, queued_size, number_of_frames;
 	int limits;
 
 	now = UHCI_GET_CURRENT_FRAME (uhci) & 1023;
 
-	if ((unsigned) urb->number_of_packets > 900)
+	number_of_frames = (unsigned) (urb->number_of_packets*urb->interval);
+
+	if ( number_of_frames > 900)
 		return -EFBIG;
 	
 	limits = find_iso_limits (uhci, urb, &start_limit, &stop_limit);
@@ -415,17 +415,17 @@ static int iso_find_start (struct uhci_hcd *uhci, struct urb *urb)
 		else {
 			urb->start_frame = stop_limit;		// seamless linkage
 
-			if (((now - urb->start_frame) & 1023) <= (unsigned) urb->number_of_packets) {
+			if (((now - urb->start_frame) & 1023) <= (unsigned) number_of_frames) {
 				info("iso_find_start: gap in seamless isochronous scheduling");
-				dbg("iso_find_start: now %u start_frame %u number_of_packets %u pipe 0x%08x",
-					now, urb->start_frame, urb->number_of_packets, urb->pipe);
+				dbg("iso_find_start: now %u start_frame %u number_of_packets %u interval %u pipe 0x%08x",
+					now, urb->start_frame, urb->number_of_packets, urb->interval, urb->pipe);
 				urb->start_frame = (now + 5) & 1023;	// 5ms setup should be enough
 			}
 		}
 	}
 	else {
 		urb->start_frame &= 1023;
-		if (((now - urb->start_frame) & 1023) < (unsigned) urb->number_of_packets) {
+		if (((now - urb->start_frame) & 1023) < number_of_frames) {
 			dbg("iso_find_start: now between start_frame and end");
 			return -EAGAIN;
 		}
@@ -436,7 +436,7 @@ static int iso_find_start (struct uhci_hcd *uhci, struct urb *urb)
 		return 0;
 
 	if (((urb->start_frame - start_limit) & 1023) < queued_size ||
-	    ((urb->start_frame + urb->number_of_packets - 1 - start_limit) & 1023) < queued_size) {
+	    ((urb->start_frame + number_of_frames - 1 - start_limit) & 1023) < queued_size) {
 		dbg("iso_find_start: start_frame %u number_of_packets %u start_limit %u stop_limit %u",
 			urb->start_frame, urb->number_of_packets, start_limit, stop_limit);
 		return -EAGAIN;
@@ -507,7 +507,7 @@ static int uhci_submit_iso_urb (struct uhci_hcd *uhci, struct urb *urb, int mem_
 			 urb_priv->transfer_buffer_dma + urb->iso_frame_desc[n].offset);
 		list_add_tail (&td->desc_list, &urb_priv->desc_list);
 	
-		insert_td_horizontal (uhci, uhci->iso_td[(urb->start_frame + n) & 1023], td);	// store in iso-tds
+		insert_td_horizontal (uhci, uhci->iso_td[(urb->start_frame + n*urb->interval) & 1023], td);	// store in iso-tds
 	}
 
 	kfree (tdm);
@@ -742,6 +742,7 @@ static int uhci_unlink_urb_async (struct uhci_hcd *uhci, struct urb *urb, int mo
 
 	switch (usb_pipetype (urb->pipe)) {
 	case PIPE_INTERRUPT:
+		urb_priv->flags = 0; // mark as deleted (if called from completion)
 		uhci_do_toggle (urb);
 
 	case PIPE_ISOCHRONOUS:
@@ -853,12 +854,9 @@ static void uhci_check_timeouts(struct uhci_hcd *uhci)
 			async_dbg("uhci_check_timeout: timeout for %p",urb);
 			uhci_unlink_urb_async(uhci, urb, UNLINK_ASYNC_STORE_URB);
 		}
-#ifdef CONFIG_USB_UHCI_HIGH_BANDWIDTH
-		else if (((type == PIPE_BULK) || (type == PIPE_CONTROL)) &&  
+		else if (high_bw && ((type == PIPE_BULK) || (type == PIPE_CONTROL)) &&  
 			 (hcpriv->use_loop) && time_after(jiffies, hcpriv->started + IDLE_TIMEOUT))
 			disable_desc_loop(uhci, urb);
-#endif
-
 	}
 	uhci->timeout_check=jiffies;
 }
@@ -1040,9 +1038,8 @@ static int process_transfer (struct uhci_hcd *uhci, struct urb *urb, int mode)
 	uhci_clean_transfer(uhci, urb, qh, mode);
 	urb->status = status;
 
-#ifdef CONFIG_USB_UHCI_HIGH_BANDWIDTH	
-	disable_desc_loop(uhci,urb);
-#endif	
+	if (high_bw)
+		disable_desc_loop(uhci,urb);
 
 	dbg("process_transfer: (end) urb %p, wanted len %d, len %d status %x err %d",
 		urb,urb->transfer_buffer_length,urb->actual_length, urb->status, urb->error_count);
@@ -1088,21 +1085,19 @@ static int process_interrupt (struct uhci_hcd *uhci, struct urb *urb, int mode)
 			urb->actual_length = actual_length;
 
 	recycle:
+		((urb_priv_t*)urb->hcpriv)->flags=1; // set to detect unlink during completion
+
 		uhci_urb_dma_sync(uhci, urb, urb->hcpriv);
 		if (urb->complete) {
 			//dbg("process_interrupt: calling completion, status %i",status);
 			urb->status = status;
-			((urb_priv_t*)urb->hcpriv)->flags=1; // if unlink_urb is called during completion
-
 			spin_unlock(&uhci->urb_list_lock);
 			urb->complete ((struct urb *) urb);
 			spin_lock(&uhci->urb_list_lock);
-
-			((urb_priv_t*)urb->hcpriv)->flags=0; // FIXME: unlink in completion not handled...
 		}
 		
 		if ((urb->status != -ECONNABORTED) && (urb->status != ECONNRESET) &&
-			    (urb->status != -ENOENT)) {
+			    (urb->status != -ENOENT) && ((urb_priv_t*)urb->hcpriv)->flags) {
 
 			urb->status = -EINPROGRESS;
 
@@ -1125,7 +1120,7 @@ static int process_interrupt (struct uhci_hcd *uhci, struct urb *urb, int mode)
 				mb();
 			}
 			else {
-				uhci_unlink_urb_async(uhci, urb, UNLINK_ASYNC_STORE_URB);				
+				uhci_unlink_urb_async(uhci, urb, UNLINK_ASYNC_STORE_URB);
 				uhci_do_toggle (urb); // correct toggle after unlink
 				clr_td_ioc(desc);    // inactivate TD
 			}
@@ -1199,7 +1194,6 @@ static int process_iso (struct uhci_hcd *uhci, struct urb *urb, int mode)
 		p_tmp = p;
 		p = p->next;
 		list_del (p_tmp);
-//		delete_desc (uhci, desc);
 
 		// add to cool down pool
 		INIT_LIST_HEAD(&desc->horizontal);
@@ -1243,19 +1237,18 @@ static int process_urb (struct uhci_hcd *uhci, struct list_head *p)
 		break;
 	}
 
-	if (urb->status != -EINPROGRESS) {
+	if (urb->status != -EINPROGRESS && type != PIPE_INTERRUPT) {
 
 		dequeue_urb (uhci, urb);
+ 		uhci_free_priv(uhci, urb, urb->hcpriv);
 
-		uhci_free_priv(uhci, urb, urb->hcpriv);
+		spin_unlock(&uhci->urb_list_lock);
+		dbg("giveback urb %p, status %i, length %i\n", 
+		    urb, urb->status, urb->transfer_buffer_length);
+		
+		usb_hcd_giveback_urb(&uhci->hcd, urb);
+		spin_lock(&uhci->urb_list_lock);
 
-		if (type != PIPE_INTERRUPT) {  // process_interrupt does completion on its own		
-			spin_unlock(&uhci->urb_list_lock);
-			dbg("giveback urb %p, status %i, length %i\n", 
-			    urb, urb->status, urb->transfer_buffer_length);
-			usb_hcd_giveback_urb(&uhci->hcd, urb);
-			spin_lock(&uhci->urb_list_lock);
-		}
 	}
 	return ret;
 }
