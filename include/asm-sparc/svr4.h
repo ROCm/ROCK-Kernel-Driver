@@ -49,7 +49,7 @@ typedef struct {
 
 typedef struct {
 	int            count;
-	int            *winptr [SVR4_MAXWIN]; /* pointer to the windows */
+	int            __user *winptr [SVR4_MAXWIN]; /* pointer to the windows */
 	svr4_rwindow_t win[SVR4_MAXWIN];      /* the windows */
 } svr4_gwindows_t;
 
@@ -72,7 +72,7 @@ typedef struct {
 /* Machine dependent context */
 typedef struct {
 	svr4_gregset_t   greg;	/* registers 0..19 (see top) */
-	svr4_gwindows_t  *gwin;	/* may point to register windows */
+	svr4_gwindows_t  __user *gwin;	/* may point to register windows */
 	svr4_fregset_t   freg;	/* floating point registers */
 	svr4_xrs_t       xrs;	/* mhm? */
 	long             pad[19];
@@ -86,7 +86,7 @@ enum svr4_stack_flags {
 
 /* signal stack exection place, unsupported */
 typedef struct svr4_stack_t {
-        char *sp;
+        char __user *sp;
         int  size;
         int  flags;
 } svr4_stack_t;

@@ -202,6 +202,10 @@ EXPORT_SYMBOL(sbus_ioremap);
 #endif
 #ifdef CONFIG_PCI
 EXPORT_SYMBOL(ebus_chain);
+EXPORT_SYMBOL(insb);
+EXPORT_SYMBOL(outsb);
+EXPORT_SYMBOL(insw);
+EXPORT_SYMBOL(outsw);
 EXPORT_SYMBOL(insl);
 EXPORT_SYMBOL(outsl);
 EXPORT_SYMBOL(pci_alloc_consistent);

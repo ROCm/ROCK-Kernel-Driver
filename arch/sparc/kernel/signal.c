@@ -535,7 +535,7 @@ setup_frame(struct sigaction *sa, struct pt_regs *regs, int signr, sigset_t *old
 			sig_address = NULL;
 		}
 	}
-	err |= __put_user((long)sig_address, &sframep->sig_address);
+	err |= __put_user((unsigned long)sig_address, &sframep->sig_address);
 	err |= __put_user(sig_code, &sframep->sig_code);
 	err |= __put_user(sc, &sframep->sig_scptr);
 	if (err)
@@ -832,7 +832,7 @@ setup_svr4_frame(struct sigaction *sa, unsigned long pc, unsigned long npc,
 	 *    to flush the user windows.
 	 */
 	for (window = 0; window < tp->w_saved; window++) {
-		err |= __put_user((int *) &(gw->win[window]), &gw->winptr[window]);
+		err |= __put_user((int __user *) &(gw->win[window]), &gw->winptr[window]);
 		err |= __copy_to_user(&gw->win[window],
 				      &tp->reg_window[window],
 				      sizeof(svr4_rwindow_t));

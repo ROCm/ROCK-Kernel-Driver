@@ -50,7 +50,7 @@ static inline void pt_succ_return(struct pt_regs *regs, unsigned long value)
 }
 
 static inline void
-pt_succ_return_linux(struct pt_regs *regs, unsigned long value, long *addr)
+pt_succ_return_linux(struct pt_regs *regs, unsigned long value, void __user *addr)
 {
 	if (test_thread_flag(TIF_32BIT)) {
 		if (put_user(value, (unsigned int __user *) addr)) {
@@ -70,7 +70,7 @@ pt_succ_return_linux(struct pt_regs *regs, unsigned long value, long *addr)
 }
 
 static void
-pt_os_succ_return (struct pt_regs *regs, unsigned long val, long *addr)
+pt_os_succ_return (struct pt_regs *regs, unsigned long val, void __user *addr)
 {
 	if (current->personality == PER_SUNOS)
 		pt_succ_return (regs, val);
@@ -226,7 +226,7 @@ asmlinkage void do_ptrace(struct pt_regs *regs)
 		if (res < 0)
 			pt_error_return(regs, -res);
 		else
-			pt_os_succ_return(regs, tmp64, (long *) data);
+			pt_os_succ_return(regs, tmp64, (void __user *) data);
 		goto flush_and_out;
 	}
 

@@ -200,7 +200,7 @@ static inline unsigned long getipl(void)
 #define smp_wmb()	__asm__ __volatile__("":::"memory")
 #define smp_read_barrier_depends()	do { } while(0)
 
-#define nop() __asm__ __volatile__ ("nop");
+#define nop() __asm__ __volatile__ ("nop")
 
 /* This has special calling conventions */
 #ifndef CONFIG_SMP
