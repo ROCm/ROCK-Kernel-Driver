@@ -751,3 +751,4 @@ void dm_table_add_wait_queue(struct dm_table *t, wait_queue_t *wq)
 EXPORT_SYMBOL(dm_get_device);
 EXPORT_SYMBOL(dm_put_device);
 EXPORT_SYMBOL(dm_table_event);
+EXPORT_SYMBOL(dm_table_get_mode);
