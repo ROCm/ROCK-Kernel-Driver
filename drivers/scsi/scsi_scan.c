@@ -205,6 +205,7 @@ static struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *shost,
 	sdev->lun = lun;
 	sdev->channel = channel;
 	sdev->online = TRUE;
+	sdev->sdev_state = SDEV_CREATED;
 	INIT_LIST_HEAD(&sdev->siblings);
 	INIT_LIST_HEAD(&sdev->same_target_siblings);
 	INIT_LIST_HEAD(&sdev->cmd_list);

@@ -346,8 +346,10 @@ int scsi_sysfs_add_sdev(struct scsi_device *sdev)
 {
 	int error = -EINVAL, i;
 
-	if (test_and_set_bit(SDEV_ADD, &sdev->sdev_state))
+	if (sdev->sdev_state != SDEV_CREATED)
 		return error;
+
+	sdev->sdev_state = SDEV_RUNNING;
 
 	error = device_add(&sdev->sdev_gendev);
 	if (error) {
@@ -386,8 +388,11 @@ int scsi_sysfs_add_sdev(struct scsi_device *sdev)
 	return error;
 
 clean_device:
+	sdev->sdev_state = SDEV_CANCEL;
+
 	device_del(&sdev->sdev_gendev);
 	put_device(&sdev->sdev_gendev);
+
 	return error;
 
 }
@@ -398,8 +403,8 @@ clean_device:
  **/
 void scsi_remove_device(struct scsi_device *sdev)
 {
-	if (test_and_clear_bit(SDEV_ADD, &sdev->sdev_state)) {
-		set_bit(SDEV_DEL, &sdev->sdev_state);
+	if (sdev->sdev_state == SDEV_RUNNING || sdev->sdev_state == SDEV_CANCEL) {
+		sdev->sdev_state = SDEV_DEL;
 		class_device_unregister(&sdev->sdev_classdev);
 		device_del(&sdev->sdev_gendev);
 		if (sdev->host->hostt->slave_destroy)
