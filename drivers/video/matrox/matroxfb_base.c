@@ -874,6 +874,7 @@ static int matroxfb_ioctl(struct inode *inode, struct file *file,
 			  unsigned int cmd, unsigned long arg,
 			  struct fb_info *info)
 {
+	void __user *argp = (void __user *)arg;
 	MINFO_FROM_INFO(info);
 	
 	DBG(__FUNCTION__)
@@ -891,7 +892,7 @@ static int matroxfb_ioctl(struct inode *inode, struct file *file,
 				err = matroxfb_get_vblank(PMINFO &vblank);
 				if (err)
 					return err;
-				if (copy_to_user((struct fb_vblank*)arg, &vblank, sizeof(vblank)))
+				if (copy_to_user(argp, &vblank, sizeof(vblank)))
 					return -EFAULT;
 				return 0;
 			}
@@ -899,7 +900,7 @@ static int matroxfb_ioctl(struct inode *inode, struct file *file,
 			{
 				u_int32_t crt;
 
-				if (get_user(crt, (u_int32_t *)arg))
+				if (get_user(crt, (u_int32_t __user *)arg))
 					return -EFAULT;
 
 				return matroxfb_wait_for_sync(PMINFO crt);
@@ -910,7 +911,7 @@ static int matroxfb_ioctl(struct inode *inode, struct file *file,
 				struct matrox_altout *oproc;
 				int val;
 
-				if (copy_from_user(&mom, (struct matroxioc_output_mode*)arg, sizeof(mom)))
+				if (copy_from_user(&mom, argp, sizeof(mom)))
 					return -EFAULT;
 				if (mom.output >= MATROXFB_MAX_OUTPUTS)
 					return -ENXIO;
@@ -960,7 +961,7 @@ static int matroxfb_ioctl(struct inode *inode, struct file *file,
 				struct matrox_altout *oproc;
 				int val;
 
-				if (copy_from_user(&mom, (struct matroxioc_output_mode*)arg, sizeof(mom)))
+				if (copy_from_user(&mom, argp, sizeof(mom)))
 					return -EFAULT;
 				if (mom.output >= MATROXFB_MAX_OUTPUTS)
 					return -ENXIO;
@@ -975,7 +976,7 @@ static int matroxfb_ioctl(struct inode *inode, struct file *file,
 				up_read(&ACCESS_FBINFO(altout.lock));
 				if (val)
 					return val;
-				if (copy_to_user((struct matroxioc_output_mode*)arg, &mom, sizeof(mom)))
+				if (copy_to_user(argp, &mom, sizeof(mom)))
 					return -EFAULT;
 				return 0;
 			}
@@ -985,7 +986,7 @@ static int matroxfb_ioctl(struct inode *inode, struct file *file,
 				int i;
 				int changes;
 
-				if (copy_from_user(&tmp, (u_int32_t*)arg, sizeof(tmp)))
+				if (copy_from_user(&tmp, argp, sizeof(tmp)))
 					return -EFAULT;
 				for (i = 0; i < 32; i++) {
 					if (tmp & (1 << i)) {
@@ -1040,7 +1041,7 @@ static int matroxfb_ioctl(struct inode *inode, struct file *file,
 						conn |= 1 << i;
 					}
 				}
-				if (put_user(conn, (u_int32_t*)arg))
+				if (put_user(conn, (u_int32_t __user *)arg))
 					return -EFAULT;
 				return 0;
 			}
@@ -1065,7 +1066,7 @@ static int matroxfb_ioctl(struct inode *inode, struct file *file,
 					if (conn & MATROXFB_OUTPUT_CONN_SECONDARY)
 						conn &= ~MATROXFB_OUTPUT_CONN_DFP;
 				}
-				if (put_user(conn, (u_int32_t*)arg))
+				if (put_user(conn, (u_int32_t __user *)arg))
 					return -EFAULT;
 				return 0;
 			}
@@ -1079,7 +1080,7 @@ static int matroxfb_ioctl(struct inode *inode, struct file *file,
 						conn |= 1 << i;
 					}
 				}
-				if (put_user(conn, (u_int32_t*)arg))
+				if (put_user(conn, (u_int32_t __user *)arg))
 					return -EFAULT;
 				return 0;
 			}
@@ -1093,7 +1094,7 @@ static int matroxfb_ioctl(struct inode *inode, struct file *file,
 				sprintf(r.bus_info, "PCI:%s", pci_name(ACCESS_FBINFO(pcidev)));
 				r.version = KERNEL_VERSION(1,0,0);
 				r.capabilities = V4L2_CAP_VIDEO_OUTPUT;
-				if (copy_to_user((void*)arg, &r, sizeof(r)))
+				if (copy_to_user(argp, &r, sizeof(r)))
 					return -EFAULT;
 				return 0;
 				
@@ -1103,7 +1104,7 @@ static int matroxfb_ioctl(struct inode *inode, struct file *file,
 				struct v4l2_queryctrl qctrl;
 				int err;
 
-				if (copy_from_user(&qctrl, (struct v4l2_queryctrl*)arg, sizeof(qctrl)))
+				if (copy_from_user(&qctrl, argp, sizeof(qctrl)))
 					return -EFAULT;
 
 				down_read(&ACCESS_FBINFO(altout).lock);
@@ -1116,7 +1117,7 @@ static int matroxfb_ioctl(struct inode *inode, struct file *file,
 				}
 				up_read(&ACCESS_FBINFO(altout).lock);
 				if (err >= 0 &&
-				    copy_to_user((struct v4l2_queryctrl*)arg, &qctrl, sizeof(qctrl)))
+				    copy_to_user(argp, &qctrl, sizeof(qctrl)))
 					return -EFAULT;
 				return err;
 			}
@@ -1125,7 +1126,7 @@ static int matroxfb_ioctl(struct inode *inode, struct file *file,
 				struct v4l2_control ctrl;
 				int err;
 
-				if (copy_from_user(&ctrl, (struct v4l2_control*)arg, sizeof(ctrl)))
+				if (copy_from_user(&ctrl, argp, sizeof(ctrl)))
 					return -EFAULT;
 
 				down_read(&ACCESS_FBINFO(altout).lock);
@@ -1138,7 +1139,7 @@ static int matroxfb_ioctl(struct inode *inode, struct file *file,
 				}
 				up_read(&ACCESS_FBINFO(altout).lock);
 				if (err >= 0 &&
-				    copy_to_user((struct v4l2_control*)arg, &ctrl, sizeof(ctrl)))
+				    copy_to_user(argp, &ctrl, sizeof(ctrl)))
 					return -EFAULT;
 				return err;
 			}
@@ -1147,7 +1148,7 @@ static int matroxfb_ioctl(struct inode *inode, struct file *file,
 				struct v4l2_control ctrl;
 				int err;
 
-				if (copy_from_user(&ctrl, (struct v4l2_control*)arg, sizeof(ctrl)))
+				if (copy_from_user(&ctrl, argp, sizeof(ctrl)))
 					return -EFAULT;
 
 				down_read(&ACCESS_FBINFO(altout).lock);
