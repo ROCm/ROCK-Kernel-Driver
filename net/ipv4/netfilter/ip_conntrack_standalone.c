@@ -7,6 +7,7 @@
 /* (c) 1999 Paul `Rusty' Russell.  Licenced under the GNU General
    Public Licence. */
 
+#include <linux/config.h>
 #include <linux/types.h>
 #include <linux/ip.h>
 #include <linux/netfilter.h>
@@ -14,6 +15,9 @@
 #include <linux/module.h>
 #include <linux/skbuff.h>
 #include <linux/proc_fs.h>
+#ifdef CONFIG_SYSCTL
+#include <linux/sysctl.h>
+#endif
 #include <net/checksum.h>
 
 #define ASSERT_READ_LOCK(x) MUST_BE_READ_LOCKED(&ip_conntrack_lock)
@@ -256,6 +260,98 @@ static struct nf_hook_ops ip_conntrack_local_in_ops = {
 	.priority	= NF_IP_PRI_LAST-1,
 };
 
+/* Sysctl support */
+
+#ifdef CONFIG_SYSCTL
+
+/* From ip_conntrack_core.c */
+extern int ip_conntrack_max;
+
+/* From ip_conntrack_proto_tcp.c */
+extern unsigned long ip_ct_tcp_timeout_syn_sent;
+extern unsigned long ip_ct_tcp_timeout_syn_recv;
+extern unsigned long ip_ct_tcp_timeout_established;
+extern unsigned long ip_ct_tcp_timeout_fin_wait;
+extern unsigned long ip_ct_tcp_timeout_close_wait;
+extern unsigned long ip_ct_tcp_timeout_last_ack;
+extern unsigned long ip_ct_tcp_timeout_time_wait;
+extern unsigned long ip_ct_tcp_timeout_close;
+
+/* From ip_conntrack_proto_udp.c */
+extern unsigned long ip_ct_udp_timeout;
+extern unsigned long ip_ct_udp_timeout_stream;
+
+/* From ip_conntrack_proto_icmp.c */
+extern unsigned long ip_ct_icmp_timeout;
+
+/* From ip_conntrack_proto_icmp.c */
+extern unsigned long ip_ct_generic_timeout;
+
+static struct ctl_table_header *ip_ct_sysctl_header;
+
+static ctl_table ip_ct_sysctl_table[] = {
+	{NET_IPV4_NF_CONNTRACK_MAX, "ip_conntrack_max",
+	 &ip_conntrack_max, sizeof(int), 0644, NULL,
+	 &proc_dointvec},
+	{NET_IPV4_NF_CONNTRACK_TCP_TIMEOUT_SYN_SENT, "ip_conntrack_tcp_timeout_syn_sent",
+	 &ip_ct_tcp_timeout_syn_sent, sizeof(unsigned int), 0644, NULL,
+	 &proc_dointvec_jiffies},
+	{NET_IPV4_NF_CONNTRACK_TCP_TIMEOUT_SYN_RECV, "ip_conntrack_tcp_timeout_syn_recv",
+	 &ip_ct_tcp_timeout_syn_recv, sizeof(unsigned int), 0644, NULL,
+	 &proc_dointvec_jiffies},
+	{NET_IPV4_NF_CONNTRACK_TCP_TIMEOUT_ESTABLISHED, "ip_conntrack_tcp_timeout_established",
+	 &ip_ct_tcp_timeout_established, sizeof(unsigned int), 0644, NULL,
+	 &proc_dointvec_jiffies},
+	{NET_IPV4_NF_CONNTRACK_TCP_TIMEOUT_FIN_WAIT, "ip_conntrack_tcp_timeout_fin_wait",
+	 &ip_ct_tcp_timeout_fin_wait, sizeof(unsigned int), 0644, NULL,
+	 &proc_dointvec_jiffies},
+	{NET_IPV4_NF_CONNTRACK_TCP_TIMEOUT_CLOSE_WAIT, "ip_conntrack_tcp_timeout_close_wait",
+	 &ip_ct_tcp_timeout_close_wait, sizeof(unsigned int), 0644, NULL,
+	 &proc_dointvec_jiffies},
+	{NET_IPV4_NF_CONNTRACK_TCP_TIMEOUT_LAST_ACK, "ip_conntrack_tcp_timeout_last_ack",
+	 &ip_ct_tcp_timeout_last_ack, sizeof(unsigned int), 0644, NULL,
+	 &proc_dointvec_jiffies},
+	{NET_IPV4_NF_CONNTRACK_TCP_TIMEOUT_TIME_WAIT, "ip_conntrack_tcp_timeout_time_wait",
+	 &ip_ct_tcp_timeout_time_wait, sizeof(unsigned int), 0644, NULL,
+	 &proc_dointvec_jiffies},
+	{NET_IPV4_NF_CONNTRACK_TCP_TIMEOUT_CLOSE, "ip_conntrack_tcp_timeout_close",
+	 &ip_ct_tcp_timeout_close, sizeof(unsigned int), 0644, NULL,
+	 &proc_dointvec_jiffies},
+	{NET_IPV4_NF_CONNTRACK_UDP_TIMEOUT, "ip_conntrack_udp_timeout",
+	 &ip_ct_udp_timeout, sizeof(unsigned int), 0644, NULL,
+	 &proc_dointvec_jiffies},
+	{NET_IPV4_NF_CONNTRACK_UDP_TIMEOUT_STREAM, "ip_conntrack_udp_timeout_stream",
+	 &ip_ct_udp_timeout_stream, sizeof(unsigned int), 0644, NULL,
+	 &proc_dointvec_jiffies},
+	{NET_IPV4_NF_CONNTRACK_ICMP_TIMEOUT, "ip_conntrack_icmp_timeout",
+	 &ip_ct_icmp_timeout, sizeof(unsigned int), 0644, NULL,
+	 &proc_dointvec_jiffies},
+	{NET_IPV4_NF_CONNTRACK_GENERIC_TIMEOUT, "ip_conntrack_generic_timeout",
+	 &ip_ct_generic_timeout, sizeof(unsigned int), 0644, NULL,
+	 &proc_dointvec_jiffies},
+	{0}
+};
+
+#define NET_IP_CONNTRACK_MAX 2089
+
+static ctl_table ip_ct_netfilter_table[] = {
+	{NET_IPV4_NETFILTER, "netfilter", NULL, 0, 0555, ip_ct_sysctl_table, 0, 0, 0, 0, 0},
+	{NET_IP_CONNTRACK_MAX, "ip_conntrack_max",
+	 &ip_conntrack_max, sizeof(int), 0644, NULL,
+	 &proc_dointvec},
+	{0}
+};
+
+static ctl_table ip_ct_ipv4_table[] = {
+	{NET_IPV4, "ipv4", NULL, 0, 0555, ip_ct_netfilter_table, 0, 0, 0, 0, 0},
+	{0}
+};
+
+static ctl_table ip_ct_net_table[] = {
+	{CTL_NET, "net", NULL, 0, 0555, ip_ct_ipv4_table, 0, 0, 0, 0, 0},
+	{0}
+};
+#endif
 static int init_or_cleanup(int init)
 {
 	struct proc_dir_entry *proc;
@@ -291,10 +387,20 @@ static int init_or_cleanup(int init)
 		printk("ip_conntrack: can't register local in hook.\n");
 		goto cleanup_inoutandlocalops;
 	}
+#ifdef CONFIG_SYSCTL
+	ip_ct_sysctl_header = register_sysctl_table(ip_ct_net_table, 0);
+	if (ip_ct_sysctl_header == NULL) {
+		printk("ip_conntrack: can't register to sysctl.\n");
+		goto cleanup;
+	}
+#endif
 
 	return ret;
 
  cleanup:
+#ifdef CONFIG_SYSCTL
+ 	unregister_sysctl_table(ip_ct_sysctl_header);
+#endif
 	nf_unregister_hook(&ip_conntrack_local_in_ops);
  cleanup_inoutandlocalops:
 	nf_unregister_hook(&ip_conntrack_out_ops);
