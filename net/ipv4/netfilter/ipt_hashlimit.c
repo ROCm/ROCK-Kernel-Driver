@@ -570,7 +570,7 @@ static void *dl_seq_start(struct seq_file *s, loff_t *pos)
 	if (*pos >= htable->cfg.size)
 		return NULL;
 
-	bucket = kmalloc(sizeof(unsigned int), GFP_KERNEL);
+	bucket = kmalloc(sizeof(unsigned int), GFP_ATOMIC);
 	if (!bucket)
 		return ERR_PTR(-ENOMEM);
 
