@@ -721,6 +721,20 @@ static void usb_hub_port_connect_change(struct usb_hub *hubstate, int port,
 		info("new USB device on bus %d path %s, assigned address %d",
 			dev->bus->busnum, dev->devpath, dev->devnum);
 
+		/* put the device in the global device tree */
+		dev->dev.parent = &dev->parent->dev;
+		sprintf (&dev->dev.name[0], "USB device %04x:%04x",
+			 dev->descriptor.idVendor,
+			 dev->descriptor.idProduct);
+		/* find the number of the port this device is connected to */
+		sprintf (&dev->dev.bus_id[0], "unknown_port_%03d", dev->devnum);
+		for (i = 0; i < USB_MAXCHILDREN; ++i) {
+			if (dev->parent->children[i] == dev) {
+				sprintf (&dev->dev.bus_id[0], "%02d", i);
+				break;
+			}
+		}
+
 		/* Run it through the hoops (find a driver, etc) */
 		if (!usb_new_device(dev))
 			goto done;

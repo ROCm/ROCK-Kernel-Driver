@@ -277,7 +277,7 @@ done2:
 	 */
 	usb_connect (udev);
 	udev->speed = USB_SPEED_HIGH;
-	if (usb_new_device (udev) != 0) {
+	if (usb_register_root_hub (udev, &ehci->hcd.pdev->dev) != 0) {
 		if (hcd->state == USB_STATE_RUNNING)
 			ehci_ready (ehci);
 		while (readl (&ehci->regs->status) & (STS_ASS | STS_PSS))

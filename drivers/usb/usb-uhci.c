@@ -2907,7 +2907,7 @@ _static int __init uhci_start_usb (uhci_t *s)
 	s->bus->root_hub = usb_dev;
 	usb_connect (usb_dev);
 
-	if (usb_new_device (usb_dev) != 0) {
+	if (usb_register_root_hub (usb_dev, &s->uhci_pci->dev) != 0) {
 		usb_free_dev (usb_dev);
 		return -1;
 	}
