@@ -103,14 +103,14 @@ static struct net_device_stats *via_ircc_net_get_stats(struct net_device
 static void via_ircc_change_dongle_speed(int iobase, int speed,
 					 int dongle_id);
 static int RxTimerHandler(struct via_ircc_cb *self, int iobase);
-void hwreset(struct via_ircc_cb *self);
+static void hwreset(struct via_ircc_cb *self);
 static int via_ircc_dma_xmit(struct via_ircc_cb *self, u16 iobase);
 static int upload_rxdata(struct via_ircc_cb *self, int iobase);
 static int __devinit via_init_one (struct pci_dev *pcidev, const struct pci_device_id *id);
 static void __exit via_remove_one (struct pci_dev *pdev);
 
 /* Should use udelay() instead, even if we are x86 only - Jean II */
-void iodelay(int udelay)
+static void iodelay(int udelay)
 {
 	u8 data;
 	int i;
@@ -1397,7 +1397,7 @@ static irqreturn_t via_ircc_interrupt(int irq, void *dev_id,
 	return IRQ_RETVAL(iHostIntType);
 }
 
-void hwreset(struct via_ircc_cb *self)
+static void hwreset(struct via_ircc_cb *self)
 {
 	int iobase;
 	iobase = self->io.fir_base;
