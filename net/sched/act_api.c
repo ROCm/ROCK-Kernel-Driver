@@ -48,11 +48,12 @@ int tcf_register_action(struct tc_action_ops *act)
 
 	write_lock(&act_mod_lock);
 	for (ap = &act_base; (a=*ap)!=NULL; ap = &a->next) {
-		if (strcmp(act->kind, a->kind) == 0) {
+		if (act->type == a->type || (strcmp(act->kind, a->kind) == 0)) {
 			write_unlock(&act_mod_lock);
 			return -EEXIST;
 		}
 	}
+
         act->next = NULL;
 	*ap = act;
 
@@ -89,8 +90,13 @@ struct tc_action_ops *tc_lookup_action_n(char *kind)
 	if (kind) {
 		read_lock(&act_mod_lock);
 		for (a = act_base; a; a = a->next) {
-			if (strcmp(kind,a->kind) == 0) 
+			if (strcmp(kind,a->kind) == 0) {
+				if (!try_module_get(a->owner)) {
+					read_unlock(&act_mod_lock);
+					return NULL;
+				} 
 				break;
+			}
 		}
 		read_unlock(&act_mod_lock);
 	}
@@ -108,8 +114,13 @@ struct tc_action_ops *tc_lookup_action(struct rtattr *kind)
 		read_lock(&act_mod_lock);
 		for (a = act_base; a; a = a->next) {
 
-			if (strcmp((char*)RTA_DATA(kind),a->kind) == 0) 
+			if (strcmp((char*)RTA_DATA(kind),a->kind) == 0){
+				if (!try_module_get(a->owner)) {
+					read_unlock(&act_mod_lock);
+					return NULL;
+				} 
 				break;
+			}
 		}
 		read_unlock(&act_mod_lock);
 	}
@@ -125,8 +136,13 @@ struct tc_action_ops *tc_lookup_action_id(u32 type)
 	if (type) {
 		read_lock(&act_mod_lock);
 		for (a = act_base; a; a = a->next) {
-			if (a->type == type) 
+			if (a->type == type) {
+				if (!try_module_get(a->owner)) {
+					read_unlock(&act_mod_lock);
+					return NULL;
+				} 
 				break;
+			}
 		}
 		read_unlock(&act_mod_lock);
 	}
@@ -177,7 +193,10 @@ void tcf_action_destroy(struct tc_action *act, int bind)
 		if (a && a->ops && a->ops->cleanup) {
 			DPRINTK("tcf_action_destroy destroying %p next %p\n", a,a->next?a->next:NULL);
 			act = act->next;
-			a->ops->cleanup(a, bind);
+			if (ACT_P_DELETED == a->ops->cleanup(a, bind)) {
+				module_put(a->ops->owner);
+			}
+			
 			a->ops = NULL;  
 			kfree(a);
 		} else { /*FIXME: Remove later - catch insertion bugs*/
@@ -270,7 +289,6 @@ int tcf_action_init_1(struct rtattr *rta, struct rtattr *est, struct tc_action *
 
 	int err = -EINVAL;
 
-
 	if (NULL == name) {
 		if (rtattr_parse(tb, TCA_ACT_MAX, RTA_DATA(rta), RTA_PAYLOAD(rta))<0)
 			goto err_out;
@@ -306,27 +324,37 @@ int tcf_action_init_1(struct rtattr *rta, struct rtattr *est, struct tc_action *
 	}
 
 	if (NULL == a) {
-		goto err_out;
+		goto err_mod;
 	}
 
 	/* backward compatibility for policer */
 	if (NULL == name) {
 		err = a_o->init(tb[TCA_ACT_OPTIONS-1], est, a, ovr, bind);
 		if (0 > err ) {
-			return -EINVAL;
+			err = -EINVAL;
+			goto err_mod;
 		}
 	} else {
 		err = a_o->init(rta, est, a, ovr, bind);
 		if (0 > err ) {
-			return -EINVAL;
+			err = -EINVAL;
+			goto err_mod;
 		}
 	}
 
-	DPRINTK("tcf_action_init_1: sucess  %s\n",act_name);
-
+	/* module count goes up only when brand new policy is created
+	   if it exists and is only bound to in a_o->init() then
+           ACT_P_CREATED is not returned (a zero is).
+        */
+	if (ACT_P_CREATED != err) {
+		module_put(a_o->owner);
+	} 
 	a->ops = a_o;
+	DPRINTK("tcf_action_init_1: successfull %s \n",act_name);
 
 	return 0;
+err_mod:
+	module_put(a_o->owner);
 err_out:
 	return err;
 }
@@ -350,7 +378,7 @@ int tcf_action_init(struct rtattr *rta, struct rtattr *est, struct tc_action *a,
 					err = -ENOMEM;
 					goto bad_ret;
 				}
-				 memset(act, 0,sizeof(*act));
+				memset(act, 0,sizeof(*act));
 			}
 			act->next = NULL;
 			if (0 > tcf_action_init_1(tb[i],est,act,name,ovr,bind)) {
@@ -489,15 +517,21 @@ int tcf_action_get_1(struct rtattr *rta, struct tc_action *a, struct nlmsghdr *n
 	}
 
 	if (NULL == a) {
-		goto err_out;
+		goto err_mod;
 	}
 
 	a->ops = a_o;
 
-	if (NULL == a_o->lookup || 0 == a_o->lookup(a, index))
-		return -EINVAL;
+	if (NULL == a_o->lookup || 0 == a_o->lookup(a, index)) {
+		a->ops = NULL;
+		err = -EINVAL;
+		goto err_mod;
+	}
 
+	module_put(a_o->owner);
 	return 0;
+err_mod:
+	module_put(a_o->owner);
 err_out:
 	return err;
 }
@@ -621,6 +655,7 @@ int tca_action_flush(struct rtattr *rta, struct nlmsghdr *n, u32 pid)
 
 	nlh->nlmsg_len = skb->tail - b;
 	nlh->nlmsg_flags |= NLM_F_ROOT;
+	module_put(a->ops->owner);
 	kfree(a);
 	err = rtnetlink_send(skb, pid, RTMGRP_TC, n->nlmsg_flags&NLM_F_ECHO);
 	if (err > 0)
@@ -630,6 +665,7 @@ int tca_action_flush(struct rtattr *rta, struct nlmsghdr *n, u32 pid)
 
 
 rtattr_failure:
+	module_put(a->ops->owner);
 nlmsg_failure:
 err_out:
 	kfree_skb(skb);
@@ -852,7 +888,7 @@ static int tc_ctl_action(struct sk_buff *skb, struct nlmsghdr *n, void *arg)
 char *
 find_dump_kind(struct nlmsghdr *n)
 {
-	struct rtattr *tb1, *tb2[TCA_ACT_MAX_PRIO+1];
+	struct rtattr *tb1, *tb2[TCA_ACT_MAX+1];
 	struct rtattr *tb[TCA_ACT_MAX_PRIO + 1];
 	struct rtattr *rta[TCAA_MAX + 1];
 	struct rtattr *kind = NULL;
@@ -941,10 +977,12 @@ tc_dump_action(struct sk_buff *skb, struct netlink_callback *cb)
 	nlh->nlmsg_len = skb->tail - b;
 	if (NETLINK_CB(cb->skb).pid && ret) 
 		nlh->nlmsg_flags |= NLM_F_MULTI;
+	module_put(a_o->owner);
 	return skb->len;
 
 rtattr_failure:
 nlmsg_failure:
+	module_put(a_o->owner);
 	skb_trim(skb, b - skb->data);
 	return skb->len;
 }

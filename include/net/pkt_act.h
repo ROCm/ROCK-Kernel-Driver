@@ -69,20 +69,21 @@ tcf_hash_destroy(struct tcf_st *p)
 	BUG_TRAP(0);
 }
 
-static inline void
+static inline int
 tcf_hash_release(struct tcf_st *p, int bind )
 {
+	int ret = 0;
 	if (p) {
 		if (bind) {
 			p->bindcnt--;
 		}
 		p->refcnt--;
-		if (p->refcnt > 0)
-			MOD_DEC_USE_COUNT;
 	       	if(p->bindcnt <=0 && p->refcnt <= 0) {
 			tcf_hash_destroy(p);
+			ret = 1;
 		}
 	}
+	return ret;
 }
 
 static __inline__ int
@@ -117,7 +118,6 @@ tcf_dump_walker(struct sk_buff *skb, struct netlink_callback *cb,
 			r->rta_len = skb->tail - (u8*)r;
 			n_i++;
 			if (n_i >= TCA_ACT_MAX_PRIO) {
-				printk("Jamal Dump Exceeded batch limit\n");
 				goto done;
 			}
 		}
@@ -148,8 +148,9 @@ tcf_del_walker(struct sk_buff *skb, struct tc_action *a)
 
 		while (p != NULL) {
 			s_p = p->next;
-			printk("tcf_del_walker deleting ..\n");
-			tcf_hash_release(p, 0);
+			if (ACT_P_DELETED == tcf_hash_release(p, 0)) {
+				 module_put(a->ops->owner);
+			}
 			n_i++;
 			p = s_p;
 		}
@@ -250,7 +251,6 @@ tcf_hash_create(struct tc_st *parm, struct rtattr *est, struct tc_action *a, int
 		p->bindcnt = 1;
 	}
 
-	MOD_INC_USE_COUNT;
 	spin_lock_init(&p->lock);
 	p->stats.lock = &p->lock;
 	p->index = parm->index ? : tcf_hash_new_index();

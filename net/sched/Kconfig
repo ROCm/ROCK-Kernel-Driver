@@ -280,6 +280,7 @@ config CLS_U32_PERF
 	help
 	  gathers stats that could be used to tune u32 classifier perfomance.
 	  Requires a new iproute2
+	  You MUST NOT turn this on if you dont have an update iproute2.
 
 config NET_CLS_IND
 	bool "classify input device (slows things u32/fw) "
@@ -289,6 +290,7 @@ config NET_CLS_IND
           metadata action appears because it slows things a little
           Available only for u32 and fw classifiers.
 	  Requires a new iproute2
+	  You MUST NOT turn this on if you dont have an update iproute2.
 
 config NET_CLS_RSVP
 	tristate "Special RSVP classifier"
@@ -321,22 +323,24 @@ config NET_CLS_RSVP6
 
 config NET_CLS_ACT
 	bool '  Packet ACTION ' 
-	depends on NET_CLS && NET_QOS
+	depends on EXPERIMENTAL && NET_CLS && NET_QOS
 	---help---
 	This option requires you have a new iproute2. It enables
 	tc extensions which can be used with tc classifiers.
 	Only the u32 and fw classifiers are supported at the moment.
+	  You MUST NOT turn this on if you dont have an update iproute2.
 
 config NET_ACT_POLICE
 	tristate '      Policing Actions' 
-        depends on NET_CLS_ACT
+        depends on NET_CLS_ACT 
         ---help---
         If you are using a newer iproute2 select this one, otherwise use one
-	NET_CLS_POLICE below
+	below to select a policer.
+	  You MUST NOT turn this on if you dont have an update iproute2.
 
 config NET_CLS_POLICE
 	bool "Traffic policing (needed for in/egress)"
-	depends on NET_CLS && NET_QOS && !NET_ACT_POLICE
+	depends on NET_CLS && NET_QOS && NET_ACT_POLICE!=y && NET_ACT_POLICE!=m
 	help
 	  Say Y to support traffic policing (bandwidth limits).  Needed for
 	  ingress and egress rate limiting.

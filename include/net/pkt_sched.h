@@ -414,6 +414,8 @@ struct tcf_police
 
 #ifdef CONFIG_NET_CLS_ACT
 
+#define ACT_P_CREATED 1
+#define ACT_P_DELETED 1
 #define tca_gen(name) \
 struct tcf_##name *next; \
 	u32 index; \
@@ -442,10 +444,11 @@ struct tc_action_ops
 	char    kind[IFNAMSIZ];
 	__u32   type; /* TBD to match kind */
 	__u32 	capab;  /* capabilities includes 4 bit version */
+	struct module		*owner;
 	int     (*act)(struct sk_buff **, struct tc_action *);
 	int     (*get_stats)(struct sk_buff *, struct tc_action *);
 	int     (*dump)(struct sk_buff *, struct tc_action *,int , int);
-	void     (*cleanup)(struct tc_action *, int bind);
+	int     (*cleanup)(struct tc_action *, int bind);
 	int     (*lookup)(struct tc_action *, u32 );
 	int     (*init)(struct rtattr *,struct rtattr *,struct tc_action *, int , int );
 	int     (*walk)(struct sk_buff *, struct netlink_callback *, int , struct tc_action *);
@@ -472,24 +475,26 @@ extern void tcf_police_destroy(struct tcf_police *p);
 extern struct tcf_police * tcf_police_locate(struct rtattr *rta, struct rtattr *est);
 extern int tcf_police_dump(struct sk_buff *skb, struct tcf_police *p);
 
-static inline void tcf_police_release(struct tcf_police *p, int bind)
+static inline int tcf_police_release(struct tcf_police *p, int bind)
 {
+	int ret = 0;
 #ifdef CONFIG_NET_CLS_ACT
 	if (p) {
 		if (bind) {
 			 p->bindcnt--;
 		}
 		p->refcnt--;
-		if (p->refcnt > 0)
-			MOD_DEC_USE_COUNT;
-		if (p->refcnt <= 0 && !p->bindcnt)
+		if (p->refcnt <= 0 && !p->bindcnt) {
 			tcf_police_destroy(p);
+			ret = 1;
+		}
 	}
 #else
 	if (p && --p->refcnt == 0)
 		tcf_police_destroy(p);
 
 #endif
+	return ret;
 }
 
 extern struct Qdisc noop_qdisc;

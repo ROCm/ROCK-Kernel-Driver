@@ -166,6 +166,7 @@ void tcf_police_destroy(struct tcf_police *p)
 int tcf_act_police_locate(struct rtattr *rta, struct rtattr *est,struct tc_action *a, int ovr, int bind)
 {
 	unsigned h;
+	int ret = 0;
 	struct rtattr *tb[TCA_POLICE_MAX];
 	struct tc_police *parm;
 	struct tcf_police *p;
@@ -195,7 +196,7 @@ int tcf_act_police_locate(struct rtattr *rta, struct rtattr *est,struct tc_actio
 			goto override;
 		}
 		spin_unlock(&p->lock);
-		return 1; 
+		return ret; 
 	}
 
 	p = kmalloc(sizeof(*p), GFP_KERNEL);
@@ -203,7 +204,7 @@ int tcf_act_police_locate(struct rtattr *rta, struct rtattr *est,struct tc_actio
 		return -1;
 
 	memset(p, 0, sizeof(*p));
-	MOD_INC_USE_COUNT;
+	ret = 1;
 	p->refcnt = 1;
 	spin_lock_init(&p->lock);
 	p->stats.lock = &p->lock;
@@ -211,11 +212,13 @@ int tcf_act_police_locate(struct rtattr *rta, struct rtattr *est,struct tc_actio
 		p->bindcnt = 1;
 override:
 	if (parm->rate.rate) {
-		if ((p->R_tab = qdisc_get_rtab(&parm->rate, tb[TCA_POLICE_RATE-1])) == NULL)
+		if ((p->R_tab = qdisc_get_rtab(&parm->rate, tb[TCA_POLICE_RATE-1])) == NULL) {
 			goto failure;
+		}
 		if (parm->peakrate.rate &&
-		    (p->P_tab = qdisc_get_rtab(&parm->peakrate, tb[TCA_POLICE_PEAKRATE-1])) == NULL)
+		    (p->P_tab = qdisc_get_rtab(&parm->peakrate, tb[TCA_POLICE_PEAKRATE-1])) == NULL) {
 			goto failure;
+		}
 	}
 	if (tb[TCA_POLICE_RESULT-1])
 		p->result = *(int*)RTA_DATA(tb[TCA_POLICE_RESULT-1]);
@@ -236,7 +239,7 @@ override:
 
 	if (ovr) {
 		spin_unlock(&p->lock);
-		return 1;
+		return ret;
 	}
 	PSCHED_GET_TIME(p->t_c);
 	p->index = parm->index ? : tcf_police_new_index();
@@ -250,9 +253,8 @@ override:
 	tcf_police_ht[h] = p;
 	write_unlock_bh(&police_lock);
 
-	MOD_INC_USE_COUNT;
 	a->priv = (void *)p;
-	return 1;  
+	return ret;  
 
 failure:
 	if (p->R_tab)
@@ -263,12 +265,14 @@ failure:
 	return -1;
 }
 
-void tcf_act_police_cleanup(struct tc_action *a, int bind)
+int tcf_act_police_cleanup(struct tc_action *a, int bind)
 {
 	struct tcf_police *p;
 	p = PRIV(a);
 	if (NULL != p) 
-		tcf_police_release(p, bind);
+		return tcf_police_release(p, bind);
+
+	return 0;
 }
 
 int tcf_act_police_stats(struct sk_buff *skb, struct tc_action *a)
@@ -392,8 +396,9 @@ MODULE_LICENSE("GPL");
 struct tc_action_ops act_police_ops = {
 	NULL,
 	"police",
-	TCA_ACT_POLICE, 
+	TCA_ID_POLICE, 
 	TCA_CAP_NONE, 
+	THIS_MODULE,
 	tcf_act_police,
 	tcf_act_police_stats,
 	tcf_act_police_dump,
@@ -437,7 +442,6 @@ struct tcf_police * tcf_police_locate(struct rtattr *rta, struct rtattr *est)
 
 	if (parm->index && (p = tcf_police_lookup(parm->index)) != NULL) {
 		p->refcnt++;
-		MOD_INC_USE_COUNT;
 		return p;
 	}
 
@@ -483,7 +487,6 @@ struct tcf_police * tcf_police_locate(struct rtattr *rta, struct rtattr *est)
 	p->next = tcf_police_ht[h];
 	tcf_police_ht[h] = p;
 	write_unlock_bh(&police_lock);
-	MOD_INC_USE_COUNT;
 	return p;
 
 failure:

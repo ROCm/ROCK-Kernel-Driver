@@ -101,12 +101,14 @@ static struct tc_u_common *u32_list;
 
 static __inline__ unsigned u32_hash_fold(u32 key, struct tc_u32_sel *sel)
 {
+#ifdef fix_u32_bug
 	unsigned h = (key & sel->hmask)>>sel->fshift;
+#else
+	unsigned h = (key & sel->hmask);
 
-	/*
 	h ^= h>>16;
 	h ^= h>>8;
-	*/
+#endif
 	return h;
 }
 
@@ -684,6 +686,14 @@ static int u32_change(struct tcf_proto *tp, unsigned long base, u32 handle,
 		return -EINVAL;
 
 	s = RTA_DATA(tb[TCA_U32_SEL-1]);
+
+#ifdef CONFIG_CLS_U32_PERF
+	if (RTA_PAYLOAD(tb[TCA_U32_SEL-1]) < 
+		(s->nkeys*sizeof(struct tc_u32_key)) + sizeof(struct tc_u32_sel)) {
+			printk("Please upgrade your iproute2 tools or compile proper options in!\n");
+			return -EINVAL;
+}
+#endif
 	n = kmalloc(sizeof(*n) + s->nkeys*sizeof(struct tc_u32_key), GFP_KERNEL);
 	if (n == NULL)
 		return -ENOBUFS;
@@ -775,18 +785,7 @@ static int u32_dump(struct tcf_proto *tp, unsigned long fh,
 		if (n->ht_down)
 			RTA_PUT(skb, TCA_U32_LINK, 4, &n->ht_down->handle);
 #ifdef CONFIG_CLS_U32_PERF2
-		printk("fh %x cnt %lu hit %lu\n",n->handle,n->sel.rcnt,n->sel.rhit);
 		n->sel.rcnt = n->sel.rhit = 0;
-		/* dump key cnt */
-		{
-			int i = 0;
-			struct tc_u32_key *key = n->sel.keys;
-			for (i = n->sel.nkeys; i>0; i--, key++) {
-				printk("\t key%d success %lu\n",i,key->kcnt);
-				key->cnt = 0;
-			}
-		}
-
 #endif
 #ifdef CONFIG_NET_CLS_ACT
 		/* again for backward compatible mode - we want

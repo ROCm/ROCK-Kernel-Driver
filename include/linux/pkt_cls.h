@@ -71,16 +71,14 @@ bits 9,10,11: redirect counter -  redirect TTL. Loop avoidance
 #define V_TC_AT(x)       _TC_MAKEVALUE(x,S_TC_AT)
 #define SET_TC_AT(v,n)   ((V_TC_AT(n)) | (v & ~M_TC_AT))
 
-/* Action types */
+/* Action attributes */
 enum
 {
-	TCA_ACT_UNSPEC=0,
-	TCA_ACT_KIND=1,
-	TCA_ACT_OPTIONS=2,
-	TCA_ACT_INDEX=3,
-	TCA_ACT_POLICE=4,
-	/* other actions go here */
-	__TCA_ACT_MAX=255
+	TCA_ACT_UNSPEC,
+	TCA_ACT_KIND,
+	TCA_ACT_OPTIONS,
+	TCA_ACT_INDEX,
+	__TCA_ACT_MAX
 };
 
 #define TCA_ACT_MAX __TCA_ACT_MAX
@@ -104,6 +102,17 @@ enum
 #define TC_ACT_QUEUED		5
 #define TC_ACT_REPEAT		6
 #define TC_ACT_JUMP		0x10000000
+
+/* Action type identifiers*/
+enum
+{
+	TCA_ID_UNSPEC=0,
+	TCA_ID_POLICE=1,
+	/* other actions go here */
+	__TCA_ID_MAX=255
+};
+
+#define TCA_ID_MAX __TCA_ID_MAX
 
 struct tc_police
 {
@@ -213,7 +222,9 @@ struct tc_u32_sel
 	unsigned char		flags;
 	unsigned char		offshift;
 	unsigned char		nkeys;
+#ifdef fix_u32_bug
 	unsigned char		fshift;  /* fold shift */
+#endif
 
 	__u16			offmask;
 	__u16			off;

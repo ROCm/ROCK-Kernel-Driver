@@ -129,11 +129,12 @@ dropped:
 static int
 prio_requeue(struct sk_buff *skb, struct Qdisc* sch)
 {
-	//struct prio_sched_data *q = (struct prio_sched_data *)sch->data;
 	struct Qdisc *qdisc;
 	int ret = NET_XMIT_DROP;
 
+#ifdef CONFIG_NET_CLS_ACT
 	sch->stats.reqs++;
+#endif
 	qdisc = prio_classify(skb, sch, &ret);
 	if (qdisc == NULL)
 		goto dropped;
