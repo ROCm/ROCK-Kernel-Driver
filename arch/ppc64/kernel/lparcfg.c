@@ -33,7 +33,7 @@
 #include <asm/cputable.h>
 #include "vpurr.h"
 
-#define MODULE_VERS "1.2"
+#define MODULE_VERS "1.3"
 #define MODULE_NAME "lparcfg"
 
 /* #define LPARCFG_DEBUG */
@@ -361,19 +361,19 @@ static int lparcfg_data(struct seq_file *m, void *v)
 			      (h_aggregation >> 2*8) & 0xffff);
 
 		seq_printf(m, "system_active_processors=%ld\n", 
-			      (h_resource >> 2*8) & 0xffff);
+			      (h_resource >> 0*8) & 0xffff);
 
 		seq_printf(m, "pool_capacity=%ld\n",
-			      (h_resource >> 3*8) & 0xffff);
+			      (h_resource >> 2*8) & 0xffff);
+
+		seq_printf(m, "unallocated_capacity_weight=%ld\n",
+			      (h_resource >> 4*8) & 0xFF);
 
 		seq_printf(m, "capacity_weight=%ld\n",
-			      (h_resource>>5*8) & 0xFF);
+			      (h_resource >> 5*8) & 0xFF);
 
 		seq_printf(m, "capped=%ld\n",
-			      (h_resource >> 6*8) & 0x40);
-
-		seq_printf(m, "unallocated_variable_weight=%ld\n",
-			      (h_resource>>7*8) & 0xFF);
+			      (h_resource >> 6*8) & 0x01);
 
 		seq_printf(m, "unallocated_capacity=%ld\n",
 			      h_unallocated);
