@@ -4,7 +4,7 @@
 /*
  * IA-64 Linux syscall numbers and inline-functions.
  *
- * Copyright (C) 1998-2003 Hewlett-Packard Co
+ * Copyright (C) 1998-2004 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  */
 
@@ -257,6 +257,7 @@
 #define __NR_mq_timedreceive		1265
 #define __NR_mq_notify			1266
 #define __NR_mq_getsetattr		1267
+#define __NR_kexec_load			1268
 
 #ifdef __KERNEL__
 
