@@ -1013,7 +1013,7 @@ xfs_trans_buf_item_match(
 			}
 
 			bp = blip->bli_buf;
-			if ((XFS_BUF_TARGET_DEV(bp) == target->pbr_dev) &&
+			if ((XFS_BUF_TARGET(bp) == target) &&
 			    (XFS_BUF_ADDR(bp) == blkno) &&
 			    (XFS_BUF_COUNT(bp) == len)) {
 				/*
@@ -1070,7 +1070,7 @@ xfs_trans_buf_item_match_all(
 			}
 
 			bp = blip->bli_buf;
-			if ((XFS_BUF_TARGET_DEV(bp) == target->pbr_dev) &&
+			if ((XFS_BUF_TARGET(bp) == target) &&
 			    (XFS_BUF_ADDR(bp) == blkno) &&
 			    (XFS_BUF_COUNT(bp) == len)) {
 				/*

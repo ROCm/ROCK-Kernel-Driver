@@ -399,12 +399,14 @@ xfs_alloc_read_agfl(
 	xfs_buf_t	**bpp)		/* buffer for the ag free block array */
 {
 	xfs_buf_t	*bp;		/* return value */
-	xfs_daddr_t	d;		/* disk block address */
 	int		error;
 
 	ASSERT(agno != NULLAGNUMBER);
-	d = XFS_AG_DADDR(mp, agno, XFS_AGFL_DADDR);
-	if ((error = xfs_trans_read_buf(mp, tp, mp->m_ddev_targp, d, 1, 0, &bp)))
+	error = xfs_trans_read_buf(
+			mp, tp, mp->m_ddev_targp,
+			XFS_AG_DADDR(mp, agno, XFS_AGFL_DADDR(mp)),
+			XFS_FSS_TO_BB(mp, 1), 0, &bp);
+	if (error)
 		return error;
 	ASSERT(bp);
 	ASSERT(!XFS_BUF_GETERROR(bp));
@@ -1821,9 +1823,8 @@ xfs_alloc_compute_maxlevels(
 /*
  * Decide whether to use this allocation group for this allocation.
  * If so, fix up the btree freelist's size.
- * This is external so mkfs can call it, too.
  */
-int				/* error */
+STATIC int			/* error */
 xfs_alloc_fix_freelist(
 	xfs_alloc_arg_t *args,	/* allocation argument structure */
 	int		flags)	/* XFS_ALLOC_FLAG_... */
@@ -2020,7 +2021,7 @@ xfs_alloc_get_freelist(
 	bno = INT_GET(agfl->agfl_bno[INT_GET(agf->agf_flfirst, ARCH_CONVERT)], ARCH_CONVERT);
 	INT_MOD(agf->agf_flfirst, ARCH_CONVERT, 1);
 	xfs_trans_brelse(tp, agflbp);
-	if (INT_GET(agf->agf_flfirst, ARCH_CONVERT) == XFS_AGFL_SIZE)
+	if (INT_GET(agf->agf_flfirst, ARCH_CONVERT) == XFS_AGFL_SIZE(mp))
 		INT_ZERO(agf->agf_flfirst, ARCH_CONVERT);
 	pag = &mp->m_perag[INT_GET(agf->agf_seqno, ARCH_CONVERT)];
 	INT_MOD(agf->agf_flcount, ARCH_CONVERT, -1);
@@ -2120,13 +2121,13 @@ xfs_alloc_put_freelist(
 		return error;
 	agfl = XFS_BUF_TO_AGFL(agflbp);
 	INT_MOD(agf->agf_fllast, ARCH_CONVERT, 1);
-	if (INT_GET(agf->agf_fllast, ARCH_CONVERT) == XFS_AGFL_SIZE)
+	if (INT_GET(agf->agf_fllast, ARCH_CONVERT) == XFS_AGFL_SIZE(mp))
 		INT_ZERO(agf->agf_fllast, ARCH_CONVERT);
 	pag = &mp->m_perag[INT_GET(agf->agf_seqno, ARCH_CONVERT)];
 	INT_MOD(agf->agf_flcount, ARCH_CONVERT, 1);
 	xfs_trans_agflist_delta(tp, 1);
 	pag->pagf_flcount++;
-	ASSERT(INT_GET(agf->agf_flcount, ARCH_CONVERT) <= XFS_AGFL_SIZE);
+	ASSERT(INT_GET(agf->agf_flcount, ARCH_CONVERT) <= XFS_AGFL_SIZE(mp));
 	blockp = &agfl->agfl_bno[INT_GET(agf->agf_fllast, ARCH_CONVERT)];
 	INT_SET(*blockp, ARCH_CONVERT, bno);
 	TRACE_MODAGF(NULL, agf, XFS_AGF_FLLAST | XFS_AGF_FLCOUNT);
@@ -2152,15 +2153,17 @@ xfs_alloc_read_agf(
 	xfs_agf_t	*agf;		/* ag freelist header */
 	int		agf_ok;		/* set if agf is consistent */
 	xfs_buf_t	*bp;		/* return value */
-	xfs_daddr_t	d;		/* disk block address */
-	int		error;
 	xfs_perag_t	*pag;		/* per allocation group data */
+	int		error;
 
 	ASSERT(agno != NULLAGNUMBER);
-	d = XFS_AG_DADDR(mp, agno, XFS_AGF_DADDR);
-	if ((error = xfs_trans_read_buf(mp, tp, mp->m_ddev_targp, d, 1,
+	error = xfs_trans_read_buf(
+			mp, tp, mp->m_ddev_targp,
+			XFS_AG_DADDR(mp, agno, XFS_AGF_DADDR(mp)),
+			XFS_FSS_TO_BB(mp, 1),
 			(flags & XFS_ALLOC_FLAG_TRYLOCK) ? XFS_BUF_TRYLOCK : 0U,
-			&bp)))
+			&bp);
+	if (error)
 		return error;
 	ASSERT(!bp || !XFS_BUF_GETERROR(bp));
 	if (!bp) {
@@ -2173,12 +2176,13 @@ xfs_alloc_read_agf(
 	agf = XFS_BUF_TO_AGF(bp);
 	agf_ok =
 		INT_GET(agf->agf_magicnum, ARCH_CONVERT) == XFS_AGF_MAGIC &&
-		XFS_AGF_GOOD_VERSION(INT_GET(agf->agf_versionnum, ARCH_CONVERT)) &&
+		XFS_AGF_GOOD_VERSION(
+			INT_GET(agf->agf_versionnum, ARCH_CONVERT)) &&
 		INT_GET(agf->agf_freeblks, ARCH_CONVERT) <=
 				INT_GET(agf->agf_length, ARCH_CONVERT) &&
-		INT_GET(agf->agf_flfirst, ARCH_CONVERT) < XFS_AGFL_SIZE &&
-		INT_GET(agf->agf_fllast,  ARCH_CONVERT) < XFS_AGFL_SIZE &&
-		INT_GET(agf->agf_flcount, ARCH_CONVERT) <= XFS_AGFL_SIZE;
+		INT_GET(agf->agf_flfirst, ARCH_CONVERT) < XFS_AGFL_SIZE(mp) &&
+		INT_GET(agf->agf_fllast,  ARCH_CONVERT) < XFS_AGFL_SIZE(mp) &&
+		INT_GET(agf->agf_flcount, ARCH_CONVERT) <= XFS_AGFL_SIZE(mp);
 	if (XFS_TEST_ERROR(!agf_ok, mp, XFS_ERRTAG_ALLOC_READ_AGF,
 			XFS_RANDOM_ALLOC_READ_AGF)) {
 		xfs_trans_brelse(tp, bp);
@@ -2197,13 +2201,13 @@ xfs_alloc_read_agf(
 			cmn_err(CE_NOTE, "Bad freeblks %d %d",
 				INT_GET(agf->agf_freeblks, ARCH_CONVERT),
 				INT_GET(agf->agf_length, ARCH_CONVERT));
-		if (!(INT_GET(agf->agf_flfirst, ARCH_CONVERT) < XFS_AGFL_SIZE))
+		if (!(INT_GET(agf->agf_flfirst, ARCH_CONVERT) < XFS_AGFL_SIZE(mp)))
 			cmn_err(CE_NOTE, "Bad flfirst %d",
 				INT_GET(agf->agf_flfirst, ARCH_CONVERT));
-		if (!(INT_GET(agf->agf_fllast, ARCH_CONVERT) < XFS_AGFL_SIZE))
+		if (!(INT_GET(agf->agf_fllast, ARCH_CONVERT) < XFS_AGFL_SIZE(mp)))
 			cmn_err(CE_NOTE, "Bad fllast %d",
 				INT_GET(agf->agf_fllast, ARCH_CONVERT));
-		if (!(INT_GET(agf->agf_flcount, ARCH_CONVERT) <= XFS_AGFL_SIZE))
+		if (!(INT_GET(agf->agf_flcount, ARCH_CONVERT) <= XFS_AGFL_SIZE(mp)))
 			cmn_err(CE_NOTE, "Bad flcount %d",
 				INT_GET(agf->agf_flcount, ARCH_CONVERT));
 #endif

@@ -232,7 +232,7 @@ void set_fpu_mxcsr( struct task_struct *tsk, unsigned short mxcsr )
  * FXSR floating point environment conversions.
  */
 
-static inline int convert_fxsr_to_user( struct _fpstate *buf,
+static int convert_fxsr_to_user( struct _fpstate *buf,
 					struct i387_fxsave_struct *fxsave )
 {
 	unsigned long env[7];
@@ -254,13 +254,18 @@ static inline int convert_fxsr_to_user( struct _fpstate *buf,
 	to = &buf->_st[0];
 	from = (struct _fpxreg *) &fxsave->st_space[0];
 	for ( i = 0 ; i < 8 ; i++, to++, from++ ) {
-		if ( __copy_to_user( to, from, sizeof(*to) ) )
+		unsigned long *t = (unsigned long *)to;
+		unsigned long *f = (unsigned long *)from;
+
+		if (__put_user(*f, t) ||
+				__put_user(*(f + 1), t + 1) ||
+				__put_user(from->exponent, &to->exponent))
 			return 1;
 	}
 	return 0;
 }
 
-static inline int convert_fxsr_from_user( struct i387_fxsave_struct *fxsave,
+static int convert_fxsr_from_user( struct i387_fxsave_struct *fxsave,
 					  struct _fpstate *buf )
 {
 	unsigned long env[7];
@@ -283,7 +288,12 @@ static inline int convert_fxsr_from_user( struct i387_fxsave_struct *fxsave,
 	to = (struct _fpxreg *) &fxsave->st_space[0];
 	from = &buf->_st[0];
 	for ( i = 0 ; i < 8 ; i++, to++, from++ ) {
-		if ( __copy_from_user( to, from, sizeof(*from) ) )
+		unsigned long *t = (unsigned long *)to;
+		unsigned long *f = (unsigned long *)from;
+
+		if (__get_user(*f, t) ||
+				__get_user(*(f + 1), t + 1) ||
+				__get_user(from->exponent, &to->exponent))
 			return 1;
 	}
 	return 0;
@@ -305,7 +315,7 @@ static inline int save_i387_fsave( struct _fpstate *buf )
 	return 1;
 }
 
-static inline int save_i387_fxsave( struct _fpstate *buf )
+static int save_i387_fxsave( struct _fpstate *buf )
 {
 	struct task_struct *tsk = current;
 	int err = 0;
@@ -355,7 +365,7 @@ static inline int restore_i387_fsave( struct _fpstate *buf )
 				 sizeof(struct i387_fsave_struct) );
 }
 
-static inline int restore_i387_fxsave( struct _fpstate *buf )
+static int restore_i387_fxsave( struct _fpstate *buf )
 {
 	int err;
 	struct task_struct *tsk = current;
@@ -373,7 +383,7 @@ int restore_i387( struct _fpstate *buf )
 
 	if ( HAVE_HWFP ) {
 		if ( cpu_has_fxsr ) {
-			err =  restore_i387_fxsave( buf );
+			err = restore_i387_fxsave( buf );
 		} else {
 			err = restore_i387_fsave( buf );
 		}

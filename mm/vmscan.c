@@ -238,17 +238,8 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask,
 		may_enter_fs = (gfp_mask & __GFP_FS) ||
 				(PageSwapCache(page) && (gfp_mask & __GFP_IO));
 
-		/*
-		 * If the page is mapped into pagetables then wait on it, to
-		 * throttle this allocator to the rate at which we can clear
-		 * MAP_SHARED data.  This will also throttle against swapcache
-		 * writes.
-		 */
-		if (PageWriteback(page)) {
-			if (may_enter_fs && page_mapped(page))
-				wait_on_page_writeback(page);
+		if (PageWriteback(page))
 			goto keep_locked;
-		}
 
 		pte_chain_lock(page);
 		if (page_referenced(page) && page_mapping_inuse(page)) {
@@ -318,6 +309,8 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask,
 				goto keep_locked;
 			if (!mapping)
 				goto keep_locked;
+			if (mapping->a_ops->writepage == fail_writepage)
+				goto activate_locked;
 			if (!may_enter_fs)
 				goto keep_locked;
 			bdi = mapping->backing_dev_info;
@@ -325,12 +318,25 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask,
 					bdi_write_congested(bdi))
 				goto keep_locked;
 			if (test_clear_page_dirty(page)) {
+				int res;
+
 				write_lock(&mapping->page_lock);
 				list_move(&page->list, &mapping->locked_pages);
 				write_unlock(&mapping->page_lock);
 
-				if (mapping->a_ops->writepage(page) == -EAGAIN)
+				SetPageReclaim(page);
+				res = mapping->a_ops->writepage(page);
+
+				if (res == -EAGAIN) {
+					ClearPageReclaim(page);
 					__set_page_dirty_nobuffers(page);
+				} else if (!PageWriteback(page)) {
+					/*
+					 * synchronous writeout or broken
+					 * a_ops?
+					 */
+					ClearPageReclaim(page);
+				}
 				goto keep;
 			}
 		}
@@ -358,7 +364,7 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask,
 		 */
 		if (PagePrivate(page)) {
 			if (!try_to_release_page(page, gfp_mask))
-				goto keep_locked;
+				goto activate_locked;
 			if (!mapping && page_count(page) == 1)
 				goto free_it;
 		}

@@ -131,16 +131,6 @@ xfs_alloc_compute_maxlevels(
 	struct xfs_mount	*mp);	/* file system mount structure */
 
 /*
- * Decide whether to use this allocation group for this allocation.
- * If so, fix up the btree freelist's size.
- * This is external so mkfs can call it, too.
- */
-int				/* error */
-xfs_alloc_fix_freelist(
-	xfs_alloc_arg_t *args,	/* allocation argument structure */
-	int		flags); /* XFS_ALLOC_FLAG_... */
-
-/*
  * Get a block from the freelist.
  * Returns with the buffer for the block gotten.
  */

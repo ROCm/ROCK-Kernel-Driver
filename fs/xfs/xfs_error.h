@@ -138,13 +138,18 @@ int		xfs_errortag_clearall_umount(int64_t fsid, char *fsname,
 
 /*
  * XFS panic tags -- allow a call to xfs_cmn_err() be turned into
- *			a panic by setting xfs_panic_mask in the
- *			stune file.
+ *			a panic by setting xfs_panic_mask in a
+ *			sysctl.  update xfs_max[XFS_PARAM] if
+ *			more are added.
  */
 #define		XFS_NO_PTAG			0LL
 #define		XFS_PTAG_IFLUSH			0x0000000000000001LL
 #define		XFS_PTAG_LOGRES			0x0000000000000002LL
 #define		XFS_PTAG_AILDELETE		0x0000000000000004LL
+#define		XFS_PTAG_AVAILABLE		0x0000000000000008LL
+#define		XFS_PTAG_SHUTDOWN_CORRUPT	0x0000000000000010LL
+#define		XFS_PTAG_SHUTDOWN_IOERROR	0x0000000000000020LL
+#define		XFS_PTAG_SHUTDOWN_LOGERROR	0x0000000000000040LL
 
 struct xfs_mount;
 /* PRINTFLIKE4 */

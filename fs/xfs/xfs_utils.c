@@ -32,10 +32,6 @@
 
 #include <xfs.h>
 
-#ifdef CONFIG_PROC_FS
-struct xfsstats xfsstats;
-#endif
-
 /*
  * xfs_get_dir_entry is used to get a reference to an inode given
  * its parent directory inode and the name of the file.	 It does

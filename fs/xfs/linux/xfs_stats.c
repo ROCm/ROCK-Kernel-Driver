@@ -33,11 +33,18 @@
 #include <xfs.h>
 #include <linux/proc_fs.h>
 
-static int
-xfs_read_xfsstats(char *buffer, char **start, off_t offset,
-			int count, int *eof, void *data)
+struct xfsstats xfsstats;
+
+STATIC int
+xfs_read_xfsstats(
+	char		*buffer,
+	char		**start,
+	off_t		offset,
+	int		count,
+	int		*eof,
+	void		*data)
 {
-	int	i, j, len;
+	int		i, j, len;
 	static struct xstats_entry {
 		char	*desc;
 		int	endpoint;
@@ -88,11 +95,16 @@ xfs_read_xfsstats(char *buffer, char **start, off_t offset,
 	return len;
 }
 
-static int
-xfs_read_xfsquota(char *buffer, char **start, off_t offset,
-			int count, int *eof, void *data)
+STATIC int
+xfs_read_xfsquota(
+	char		*buffer,
+	char		**start,
+	off_t		offset,
+	int		count,
+	int		*eof,
+	void		*data)
 {
-	int	len;
+	int		len;
 
 	/* maximum; incore; ratio free to inuse; freelist */
 	len = sprintf(buffer, "%d\t%d\t%d\t%u\n",

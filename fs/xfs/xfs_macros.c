@@ -2179,6 +2179,14 @@ xfs_sb_version_haslogv2(xfs_sb_t *sbp)
 }
 #endif
 
+#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_SB_VERSION_HASSECTOR)
+int
+xfs_sb_version_hassector(xfs_sb_t *sbp)
+{
+	return XFS_SB_VERSION_HASSECTOR(sbp);
+}
+#endif
+
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_SB_VERSION_TONEW)
 unsigned
 xfs_sb_version_tonew(unsigned v)

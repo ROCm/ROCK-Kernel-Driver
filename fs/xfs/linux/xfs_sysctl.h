@@ -47,6 +47,7 @@ typedef struct xfs_param {
 	ulong	sgid_inherit;	/* Inherit ISGID bit if process' GID is  */
 				/*  not a member of the parent dir GID.  */
 	ulong	symlink_mode;	/* Symlink creat mode affected by umask. */
+	ulong	panic_mask;	/* bitmask to specify panics on errors.  */
 } xfs_param_t;
 
 enum {
@@ -54,6 +55,7 @@ enum {
 	XFS_RESTRICT_CHOWN = 2,
 	XFS_SGID_INHERIT = 3,
 	XFS_SYMLINK_MODE = 4,
+	XFS_PANIC_MASK = 5,
 };
 
 extern xfs_param_t	xfs_params;

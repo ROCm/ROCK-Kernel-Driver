@@ -213,10 +213,10 @@ xfs_inobt_delrec(
 			 */
 			agfbno = XFS_AG_DADDR(cur->bc_mp,
 					      cur->bc_private.i.agno,
-					      XFS_AGF_DADDR);
+					      XFS_AGF_DADDR(mp));
 			if (error = xfs_trans_read_buf(cur->bc_mp, cur->bc_tp,
-					cur->bc_mp->m_ddev_targp, agfbno, 1, 0,
-					&agfbp))
+					cur->bc_mp->m_ddev_targp, agfbno,
+					XFS_FSS_TO_BB(mp, 1), 0, &agfbp))
 				return error;
 			ASSERT(!XFS_BUF_GETERROR(agfbp));
 			xfs_trans_bhold_until_committed(cur->bc_tp, agfbp);
@@ -506,9 +506,10 @@ xfs_inobt_delrec(
 	 * transaction record makes it to the on-disk log.
 	 */
 	agfbno = XFS_AG_DADDR(cur->bc_mp, cur->bc_private.i.agno,
-			      XFS_AGF_DADDR);
+			      XFS_AGF_DADDR(mp));
 	if (error = xfs_trans_read_buf(cur->bc_mp, cur->bc_tp,
-			cur->bc_mp->m_ddev_targp, agfbno, 1, 0, &agfbp))
+			cur->bc_mp->m_ddev_targp, agfbno,
+			XFS_FSS_TO_BB(mp, 1), 0, &agfbp))
 		return error;
 	ASSERT(!XFS_BUF_GETERROR(agfbp));
 	xfs_trans_bhold_until_committed(cur->bc_tp, agfbp);

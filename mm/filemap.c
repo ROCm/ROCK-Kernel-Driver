@@ -323,10 +323,13 @@ void unlock_page(struct page *page)
 void end_page_writeback(struct page *page)
 {
 	wait_queue_head_t *waitqueue = page_waitqueue(page);
-	smp_mb__before_clear_bit();
-	if (!TestClearPageWriteback(page))
-		BUG();
-	smp_mb__after_clear_bit(); 
+
+	if (!TestClearPageReclaim(page) || rotate_reclaimable_page(page)) {
+		smp_mb__before_clear_bit();
+		if (!TestClearPageWriteback(page))
+			BUG();
+		smp_mb__after_clear_bit();
+	}
 	if (waitqueue_active(waitqueue))
 		wake_up_all(waitqueue);
 }

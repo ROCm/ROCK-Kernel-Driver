@@ -39,6 +39,8 @@
 #ifndef __XFS_VERSION_H__
 #define __XFS_VERSION_H__
 
-#define XFS_VERSION_STRING "CVS-09/15/02:17"
+#include <linux/version.h>
+
+#define XFS_VERSION_STRING "for Linux " UTS_RELEASE
 
 #endif /* __XFS_VERSION_H__ */

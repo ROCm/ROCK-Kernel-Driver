@@ -98,6 +98,10 @@ int ipc_findkey(struct ipc_ids* ids, key_t key)
 	struct kern_ipc_perm* p;
 	int max_id = ids->max_id;
 
+	/*
+	 * read_barrier_depends is not needed here
+	 * since ipc_ids.sem is held
+	 */
 	for (id = 0; id <= max_id; id++) {
 		p = ids->entries[id].p;
 		if(p==NULL)
@@ -134,12 +138,12 @@ static int grow_ary(struct ipc_ids* ids, int newsize)
 
 	/*
 	 * before setting the ids->entries to the new array, there must be a
-	 * wmb() to make sure that the memcpyed contents of the new array are
+	 * smp_wmb() to make sure the memcpyed contents of the new array are
 	 * visible before the new array becomes visible.
 	 */
-	wmb();
+	smp_wmb();	/* prevent seeing new array uninitialized. */
 	ids->entries = new;
-	wmb();
+	smp_wmb();	/* prevent indexing into old array based on new size. */
 	ids->size = newsize;
 
 	ipc_rcu_free(old, sizeof(struct ipc_id)*i);
@@ -156,6 +160,8 @@ static int grow_ary(struct ipc_ids* ids, int newsize)
  *	initialised and the first free entry is set up and the id assigned
  *	is returned. The list is returned in a locked state on success.
  *	On failure the list is not locked and -1 is returned.
+ *
+ *	Called with ipc_ids.sem held.
  */
  
 int ipc_addid(struct ipc_ids* ids, struct kern_ipc_perm* new, int size)
@@ -163,6 +169,11 @@ int ipc_addid(struct ipc_ids* ids, struct kern_ipc_perm* new, int size)
 	int id;
 
 	size = grow_ary(ids,size);
+
+	/*
+	 * read_barrier_depends() is not needed here since
+	 * ipc_ids.sem is held
+	 */
 	for (id = 0; id < size; id++) {
 		if(ids->entries[id].p == NULL)
 			goto found;
@@ -207,7 +218,11 @@ struct kern_ipc_perm* ipc_rmid(struct ipc_ids* ids, int id)
 	int lid = id % SEQ_MULTIPLIER;
 	if(lid >= ids->size)
 		BUG();
-	
+
+	/* 
+	 * do not need a read_barrier_depends() here to force ordering
+	 * on Alpha, since the ipc_ids.sem is held.
+	 */	
 	p = ids->entries[lid].p;
 	ids->entries[lid].p = NULL;
 	if(p==NULL)
@@ -414,15 +429,15 @@ void ipc64_perm_to_ipc_perm (struct ipc64_perm *in, struct ipc_perm *out)
 }
 
 /*
- * ipc_get() requires ipc_ids.sem down, otherwise we need a rmb() here
- * to sync with grow_ary();
+ * So far only shm_get_stat() calls ipc_get() via shm_get(), so ipc_get()
+ * is called with shm_ids.sem locked.  Since grow_ary() is also called with
+ * shm_ids.sem down(for Shared Memory), there is no need to add read 
+ * barriers here to gurantee the writes in grow_ary() are seen in order 
+ * here (for Alpha).
  *
- * So far only shm_get_stat() uses ipc_get() via shm_get().  So ipc_get()
- * is called with shm_ids.sem locked.  Thus a rmb() is not needed here,
- * as grow_ary() also requires shm_ids.sem down(for shm).
- *
- * But if ipc_get() is used in the future without ipc_ids.sem down,
- * we need to add a rmb() before accessing the entries array
+ * However ipc_get() itself does not necessary require ipc_ids.sem down. So
+ * if in the future ipc_get() is used by other places without ipc_ids.sem
+ * down, then ipc_get() needs read memery barriers as ipc_lock() does.
  */
 struct kern_ipc_perm* ipc_get(struct ipc_ids* ids, int id)
 {
@@ -430,7 +445,6 @@ struct kern_ipc_perm* ipc_get(struct ipc_ids* ids, int id)
 	int lid = id % SEQ_MULTIPLIER;
 	if(lid >= ids->size)
 		return NULL;
-	rmb();
 	out = ids->entries[lid].p;
 	return out;
 }
@@ -439,6 +453,7 @@ struct kern_ipc_perm* ipc_lock(struct ipc_ids* ids, int id)
 {
 	struct kern_ipc_perm* out;
 	int lid = id % SEQ_MULTIPLIER;
+	struct ipc_id* entries;
 
 	rcu_read_lock();
 	if(lid >= ids->size) {
@@ -446,9 +461,18 @@ struct kern_ipc_perm* ipc_lock(struct ipc_ids* ids, int id)
 		return NULL;
 	}
 
-	/* we need a barrier here to sync with grow_ary() */
-	rmb();
-	out = ids->entries[lid].p;
+	/* 
+	 * Note: The following two read barriers are corresponding
+	 * to the two write barriers in grow_ary(). They guarantee 
+	 * the writes are seen in the same order on the read side. 
+	 * smp_rmb() has effect on all CPUs.  read_barrier_depends() 
+	 * is used if there are data dependency between two reads, and 
+	 * has effect only on Alpha.
+	 */
+	smp_rmb(); /* prevent indexing old array with new size */
+	entries = ids->entries;
+	read_barrier_depends(); /*prevent seeing new array unitialized */
+	out = entries[lid].p;
 	if(out == NULL) {
 		rcu_read_unlock();
 		return NULL;
