@@ -403,7 +403,9 @@ struct inode {
 	struct file_lock	*i_flock;
 	struct address_space	*i_mapping;
 	struct address_space	i_data;
+#ifdef CONFIG_QUOTA
 	struct dquot		*i_dquot[MAXQUOTAS];
+#endif
 	/* These three should probably be a union */
 	struct list_head	i_devices;
 	struct pipe_inode_info	*i_pipe;
