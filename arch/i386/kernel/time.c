@@ -588,17 +588,20 @@ bad_ctc:
 }
 #endif /* CONFIG_X86_TSC */
 
-static struct device device_i8253 = {
-	.name	       	= "i8253",
-	.bus_id		= "0040",
+static struct sys_device device_i8253 = {
+	.name		= "rtc",
+	.id		= 0,
+	.dev	= {
+		.name	= "i8253 Real Time Clock",
+	},
 };
 
-static int time_init_driverfs(void)
+static int time_init_device(void)
 {
-	return register_sys_device(&device_i8253);
+	return sys_device_register(&device_i8253);
 }
 
-__initcall(time_init_driverfs);
+device_initcall(time_init_device);
 
 void __init time_init(void)
 {
