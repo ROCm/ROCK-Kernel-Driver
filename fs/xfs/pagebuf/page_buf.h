@@ -195,6 +195,10 @@ typedef int (*page_buf_bdstrat_t)(struct page_buf_s *);
 #define PB_PAGES	4
 
 typedef struct page_buf_s {
+	struct semaphore	pb_sema;	/* semaphore for lockables  */
+	unsigned long		pb_flushtime;	/* time to flush pagebuf    */
+	atomic_t		pb_pin_count;	/* pin count		    */
+	wait_queue_head_t	pb_waiters;	/* unpin waiters	    */
 	struct list_head	pb_list;
 	page_buf_flags_t	pb_flags;	/* status flags */
 	struct list_head	pb_hash_list;
@@ -221,6 +225,9 @@ typedef struct page_buf_s {
 	unsigned char		pb_hash_index;	/* hash table index	*/
 	struct page		**pb_pages;	/* array of page pointers */
 	struct page		*pb_page_array[PB_PAGES]; /* inline pages */
+#ifdef PAGEBUF_LOCK_TRACKING
+	int			pb_last_holder;
+#endif
 } page_buf_t;
 
 

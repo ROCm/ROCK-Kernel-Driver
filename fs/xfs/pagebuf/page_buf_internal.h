@@ -48,24 +48,10 @@
 #define page_has_buffers(page)	((page)->buffers)
 #endif
 
-typedef struct page_buf_private_s {
-	page_buf_t		pb_common;	/* public part of structure */
-	struct semaphore	pb_sema;	/* semaphore for lockables  */
-	unsigned long		pb_flushtime;	/* time to flush pagebuf    */
-	atomic_t		pb_pin_count;	/* pin count		    */
-	wait_queue_head_t	pb_waiters;	/* unpin waiters	    */
 #ifdef PAGEBUF_LOCK_TRACKING
-	int			pb_last_holder;
-#endif
-} page_buf_private_t;
-
-#define PBC(pb) (&((pb)->pb_common))
-#define PBP(pb) ((page_buf_private_t *) (pb))
-
-#ifdef PAGEBUF_LOCK_TRACKING
-#define PB_SET_OWNER(pb)	(PBP(pb)->pb_last_holder = current->pid)
-#define PB_CLEAR_OWNER(pb)	(PBP(pb)->pb_last_holder = -1)
-#define PB_GET_OWNER(pb)	(PBP(pb)->pb_last_holder)
+#define PB_SET_OWNER(pb)	(pb->pb_last_holder = current->pid)
+#define PB_CLEAR_OWNER(pb)	(pb->pb_last_holder = -1)
+#define PB_GET_OWNER(pb)	(pb->pb_last_holder)
 #else
 #define PB_SET_OWNER(pb)
 #define PB_CLEAR_OWNER(pb)

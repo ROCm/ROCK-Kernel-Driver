@@ -104,7 +104,7 @@ pb_trace_func(
 	pb_trace.buf[j].event = event;
 	pb_trace.buf[j].flags = pb->pb_flags;
 	pb_trace.buf[j].hold = pb->pb_hold.counter;
-	pb_trace.buf[j].lock_value = PBP(pb)->pb_sema.count.counter;
+	pb_trace.buf[j].lock_value = pb->pb_sema.count.counter;
 	pb_trace.buf[j].task = (void *)current;
 	pb_trace.buf[j].misc = misc;
 	pb_trace.buf[j].ra = ra;
@@ -271,12 +271,12 @@ _pagebuf_initialize(
 	 */
 	flags &= ~(PBF_LOCK|PBF_MAPPED|PBF_DONT_BLOCK|PBF_READ_AHEAD);
 
-	memset(pb, 0, sizeof(page_buf_private_t));
+	memset(pb, 0, sizeof(page_buf_t));
 	atomic_set(&pb->pb_hold, 1);
 	init_MUTEX_LOCKED(&pb->pb_iodonesema);
 	INIT_LIST_HEAD(&pb->pb_list);
 	INIT_LIST_HEAD(&pb->pb_hash_list);
-	init_MUTEX_LOCKED(&PBP(pb)->pb_sema); /* held, no waiters */
+	init_MUTEX_LOCKED(&pb->pb_sema); /* held, no waiters */
 	PB_SET_OWNER(pb);
 	pb->pb_target = target;
 	pb->pb_file_offset = range_base;
@@ -288,8 +288,8 @@ _pagebuf_initialize(
 	pb->pb_buffer_length = pb->pb_count_desired = range_length;
 	pb->pb_flags = flags | PBF_NONE;
 	pb->pb_bn = PAGE_BUF_DADDR_NULL;
-	atomic_set(&PBP(pb)->pb_pin_count, 0);
-	init_waitqueue_head(&PBP(pb)->pb_waiters);
+	atomic_set(&pb->pb_pin_count, 0);
+	init_waitqueue_head(&pb->pb_waiters);
 
 	PB_STATS_INC(pbstats.pb_create);
 	PB_TRACE(pb, PB_TRACE_REC(get), target);
@@ -656,7 +656,7 @@ found:
 	 * if this does not work then we need to drop the
 	 * spinlock and do a hard attempt on the semaphore.
 	 */
-	not_locked = down_trylock(&PBP(pb)->pb_sema);
+	not_locked = down_trylock(&pb->pb_sema);
 	if (not_locked) {
 		if (!(flags & PBF_TRYLOCK)) {
 			/* wait for buffer ownership */
@@ -951,7 +951,7 @@ pagebuf_get_no_daddr(
 	/* otherwise pagebuf_free just ignores it */
 	pb->pb_flags |= _PBF_MEM_ALLOCATED;
 	PB_CLEAR_OWNER(pb);
-	up(&PBP(pb)->pb_sema);	/* Return unlocked pagebuf */
+	up(&pb->pb_sema);	/* Return unlocked pagebuf */
 
 	PB_TRACE(pb, PB_TRACE_REC(no_daddr), rmem);
 
@@ -1069,8 +1069,8 @@ void
 pagebuf_pin(
 	page_buf_t		*pb)
 {
-	atomic_inc(&PBP(pb)->pb_pin_count);
-	PB_TRACE(pb, PB_TRACE_REC(pin), PBP(pb)->pb_pin_count.counter);
+	atomic_inc(&pb->pb_pin_count);
+	PB_TRACE(pb, PB_TRACE_REC(pin), pb->pb_pin_count.counter);
 }
 
 /*
@@ -1084,17 +1084,17 @@ void
 pagebuf_unpin(
 	page_buf_t		*pb)
 {
-	if (atomic_dec_and_test(&PBP(pb)->pb_pin_count)) {
-		wake_up_all(&PBP(pb)->pb_waiters);
+	if (atomic_dec_and_test(&pb->pb_pin_count)) {
+		wake_up_all(&pb->pb_waiters);
 	}
-	PB_TRACE(pb, PB_TRACE_REC(unpin), PBP(pb)->pb_pin_count.counter);
+	PB_TRACE(pb, PB_TRACE_REC(unpin), pb->pb_pin_count.counter);
 }
 
 int
 pagebuf_ispin(
 	page_buf_t		*pb)
 {
-	return atomic_read(&PBP(pb)->pb_pin_count);
+	return atomic_read(&pb->pb_pin_count);
 }
 
 /*
@@ -1110,19 +1110,19 @@ _pagebuf_wait_unpin(
 {
 	DECLARE_WAITQUEUE	(wait, current);
 
-	if (atomic_read(&PBP(pb)->pb_pin_count) == 0)
+	if (atomic_read(&pb->pb_pin_count) == 0)
 		return;
 
-	add_wait_queue(&PBP(pb)->pb_waiters, &wait);
+	add_wait_queue(&pb->pb_waiters, &wait);
 	for (;;) {
 		current->state = TASK_UNINTERRUPTIBLE;
-		if (atomic_read(&PBP(pb)->pb_pin_count) == 0) {
+		if (atomic_read(&pb->pb_pin_count) == 0) {
 			break;
 		}
 		pagebuf_run_queues(pb);
 		schedule();
 	}
-	remove_wait_queue(&PBP(pb)->pb_waiters, &wait);
+	remove_wait_queue(&pb->pb_waiters, &wait);
 	current->state = TASK_RUNNING;
 }
 
@@ -1566,7 +1566,7 @@ pagebuf_delwri_queue(
 	}
 
 	list_add_tail(&pb->pb_list, &pbd_delwrite_queue);
-	PBP(pb)->pb_flushtime = jiffies + pb_params.p_un.age_buffer;
+	pb->pb_flushtime = jiffies + pb_params.p_un.age_buffer;
 	spin_unlock(&pbd_delwrite_lock);
 
 	if (unlock && (pb->pb_flags & _PBF_LOCKABLE)) {
@@ -1649,8 +1649,8 @@ pagebuf_daemon(
 			    (((pb->pb_flags & _PBF_LOCKABLE) == 0) ||
 			     !pagebuf_cond_lock(pb))) {
 
-				if (!force_flush && time_before(jiffies,
-						PBP(pb)->pb_flushtime)) {
+				if (!force_flush &&
+				    time_before(jiffies, pb->pb_flushtime)) {
 					pagebuf_unlock(pb);
 					break;
 				}
@@ -1913,8 +1913,7 @@ pagebuf_init(void)
 			"fs/pagebuf/stat", 0, 0, pagebuf_readstats, NULL);
 #endif
 
-	pagebuf_cache = kmem_cache_create("page_buf_t",
-			sizeof(page_buf_private_t), 0,
+	pagebuf_cache = kmem_cache_create("page_buf_t", sizeof(page_buf_t), 0,
 			SLAB_HWCACHE_ALIGN, NULL, NULL);
 	if (pagebuf_cache == NULL) {
 		printk("pagebuf: couldn't init pagebuf cache\n");
