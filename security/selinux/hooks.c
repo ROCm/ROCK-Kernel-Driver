@@ -2057,9 +2057,11 @@ static int selinux_file_fcntl(struct file *file, unsigned int cmd,
 		case F_GETLK:
 		case F_SETLK:
 	        case F_SETLKW:
+#if BITS_PER_LONG == 32
 	        case F_GETLK64:
 		case F_SETLK64:
 	        case F_SETLKW64:
+#endif
 			if (!file->f_dentry || !file->f_dentry->d_inode) {
 				err = -EINVAL;
 				break;
