@@ -398,10 +398,7 @@ struct jfs_log {
 
 	/* commit */
 	uint cflag;		/* 4: */
-	struct {		/* 8: FIFO commit queue header */
-		struct tblock *head;
-		struct tblock *tail;
-	} cqueue;
+	struct list_head	cqueue; /* FIFO commit queue */
 	struct tblock *flush_tblk; /* tblk we're waiting on for flush */
 	int gcrtc;		/* 4: GC_READY transaction count */
 	struct tblock *gclrt;	/* 4: latest GC_READY transaction */
