@@ -2044,7 +2044,7 @@ config R8169
 
 config SIS190
 	tristate "SiS190 gigabit ethernet support (EXPERIMENTAL)"
-	depends on PCI && EXPERIMENTAL && BROKEN
+	depends on PCI && EXPERIMENTAL
 	---help---
 	  Say Y here if you have a SiS 190 PCI Gigabit Ethernet adapter.
 

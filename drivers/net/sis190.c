@@ -828,19 +828,19 @@ SiS190_init_ring(struct net_device *dev)
 		tp->Tx_skbuff[i] = NULL;
 	}
 	for (i = 0; i < NUM_RX_DESC; i++) {
+		struct RxDesc *desc = tp->RxDescArray + i;
 
-		tp->RxDescArray[i].PSize = 0x0;
+		desc->PSize = 0x0;
 
 		if (i == (NUM_RX_DESC - 1))
-			tp->RxDescArray[i].buf_Len = BIT_31 + RX_BUF_SIZE;	//bit 31 is End bit
+			desc->buf_Len = BIT_31 + RX_BUF_SIZE;	//bit 31 is End bit
 		else
-			tp->RxDescArray[i].buf_Len = RX_BUF_SIZE;
+			desc->buf_Len = RX_BUF_SIZE;
 
-#warning Replace virt_to_bus with DMA mapping
-		tp->RxBufferRing[i] = &(tp->RxBufferRings[i * RX_BUF_SIZE]);
-		tp->RxDescArray[i].buf_addr = virt_to_bus(tp->RxBufferRing[i]);
-		tp->RxDescArray[i].status = OWNbit | INTbit;
-
+		tp->RxBufferRing[i] = tp->RxBufferRings + i * RX_BUF_SIZE;
+		desc->buf_addr = pci_map_single(tp->pci_dev,
+			tp->RxBufferRing[i], RX_BUF_SIZE, PCI_DMA_FROMDEVICE);
+		desc->status = OWNbit | INTbit;
 	}
 
 }
@@ -998,29 +998,30 @@ static void
 SiS190_rx_interrupt(struct net_device *dev, struct sis190_private *tp,
 		    void *ioaddr)
 {
-	int cur_rx;
-	struct sk_buff *skb;
-	int pkt_size = 0;
+	int cur_rx = tp->cur_rx;
+	struct RxDesc *desc = tp->RxDescArray + cur_rx;
 
 	assert(dev != NULL);
 	assert(tp != NULL);
 	assert(ioaddr != NULL);
 
-	cur_rx = tp->cur_rx;
-	while ((tp->RxDescArray[cur_rx].status & OWNbit) == 0) {
+	while ((desc->status & OWNbit) == 0) {
 
-		if (tp->RxDescArray[cur_rx].PSize & 0x0080000) {
+		if (desc->PSize & 0x0080000) {
 			printk(KERN_INFO "%s: Rx ERROR!!!\n", dev->name);
 			tp->stats.rx_errors++;
 			tp->stats.rx_length_errors++;
-		} else if (!(tp->RxDescArray[cur_rx].PSize & 0x0010000)) {
+		} else if (!(desc->PSize & 0x0010000)) {
 			printk(KERN_INFO "%s: Rx ERROR!!!\n", dev->name);
 			tp->stats.rx_errors++;
 			tp->stats.rx_crc_errors++;
 		} else {
-			pkt_size =
-			    (int) (tp->RxDescArray[cur_rx].
-				   PSize & 0x0000FFFF) - 4;
+			struct sk_buff *skb;
+			int pkt_size;
+
+			pkt_size = (int) (desc->PSize & 0x0000FFFF) - 4;
+			pci_dma_sync_single(tp->pci_dev, desc->buf_addr,
+				RX_BUF_SIZE, PCI_DMA_FROMDEVICE);
 			skb = dev_alloc_skb(pkt_size + 2);
 			if (skb != NULL) {
 				skb->dev = dev;
@@ -1031,24 +1032,18 @@ SiS190_rx_interrupt(struct net_device *dev, struct sis190_private *tp,
 				skb->protocol = eth_type_trans(skb, dev);
 				netif_rx(skb);
 
-				tp->RxDescArray[cur_rx].PSize = 0x0;
+				desc->PSize = 0x0;
 
 				if (cur_rx == (NUM_RX_DESC - 1))
-					tp->RxDescArray[cur_rx].buf_Len =
-					    ENDbit + RX_BUF_SIZE;
+					desc->buf_Len = ENDbit + RX_BUF_SIZE;
 				else
-					tp->RxDescArray[cur_rx].buf_Len =
-					    RX_BUF_SIZE;
+					desc->buf_Len = RX_BUF_SIZE;
 
-#warning Replace virt_to_bus with DMA mapping
-				tp->RxDescArray[cur_rx].buf_addr =
-				    virt_to_bus(tp->RxBufferRing[cur_rx]);
 				dev->last_rx = jiffies;
 				tp->stats.rx_bytes += pkt_size;
 				tp->stats.rx_packets++;
 
-				tp->RxDescArray[cur_rx].status =
-				    OWNbit | INTbit;
+				desc->status = OWNbit | INTbit;
 			} else {
 				printk(KERN_WARNING
 				       "%s: Memory squeeze, deferring packet.\n",
@@ -1060,7 +1055,7 @@ SiS190_rx_interrupt(struct net_device *dev, struct sis190_private *tp,
 		}
 
 		cur_rx = (cur_rx + 1) % NUM_RX_DESC;
-
+		desc = tp->RxDescArray + cur_rx;
 	}
 
 	tp->cur_rx = cur_rx;
@@ -1144,11 +1139,13 @@ SiS190_close(struct net_device *dev)
 	pci_free_consistent(tp->pci_dev, RX_DESC_TOTAL_SIZE, tp->RxDescArray,
 		tp->rx_dma);
 	tp->TxDescArray = NULL;
-	tp->RxDescArray = NULL;
-	kfree(tp->RxBufferRings);
 	for (i = 0; i < NUM_RX_DESC; i++) {
+		pci_unmap_single(tp->pci_dev, tp->RxDescArray[i].buf_addr,
+			RX_BUF_SIZE, PCI_DMA_FROMDEVICE);
 		tp->RxBufferRing[i] = NULL;
 	}
+	tp->RxDescArray = NULL;
+	kfree(tp->RxBufferRings);
 
 	return 0;
 }
