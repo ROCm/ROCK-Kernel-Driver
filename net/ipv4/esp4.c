@@ -31,6 +31,7 @@ int esp_output(struct sk_buff *skb)
 	struct esp_data *esp;
 	struct sk_buff *trailer;
 	struct udphdr *uh = NULL;
+	u32 *udpdata32;
 	struct xfrm_encap_tmpl *encap = NULL;
 	int blksize;
 	int clen;
@@ -97,6 +98,14 @@ int esp_output(struct sk_buff *skb)
 				esph = (struct ip_esp_hdr*)(uh+1);
 				top_iph->protocol = IPPROTO_UDP;
 				break;
+			case UDP_ENCAP_ESPINUDP_NON_IKE:
+				uh = (struct udphdr*) esph;
+				udpdata32 = (u32*)(uh+1);
+				udpdata32[0] = udpdata32[1] = 0;
+				esph = (struct ip_esp_hdr*)(udpdata32+2);
+				alen += 2;
+				top_iph->protocol = IPPROTO_UDP;
+				break;
 			default:
 				printk(KERN_INFO
 				       "esp_output(): Unhandled encap: %u\n",
@@ -130,6 +139,14 @@ int esp_output(struct sk_buff *skb)
 			case UDP_ENCAP_ESPINUDP:
 				uh = (struct udphdr*) esph;
 				esph = (struct ip_esp_hdr*)(uh+1);
+				top_iph->protocol = IPPROTO_UDP;
+				break;
+			case UDP_ENCAP_ESPINUDP_NON_IKE:
+				uh = (struct udphdr*) esph;
+				udpdata32 = (u32*)(uh+1);
+				udpdata32[0] = udpdata32[1] = 0;
+				esph = (struct ip_esp_hdr*)(udpdata32+2);
+				alen += 2;
 				top_iph->protocol = IPPROTO_UDP;
 				break;
 			default:
@@ -294,6 +311,7 @@ int esp_input(struct xfrm_state *x, struct xfrm_decap_state *decap, struct sk_bu
 
 			switch (decap->decap_type) {
 			case UDP_ENCAP_ESPINUDP:
+			case UDP_ENCAP_ESPINUDP_NON_IKE:
 
 				if ((void*)uh == (void*)esph) {
 					printk(KERN_DEBUG
@@ -354,6 +372,7 @@ int esp_post_input(struct xfrm_state *x, struct xfrm_decap_state *decap, struct 
 
 		switch (encap->encap_type) {
 		case UDP_ENCAP_ESPINUDP:
+		case UDP_ENCAP_ESPINUDP_NON_IKE:
 			/*
 			 * 1) if the NAT-T peer's IP or port changed then
 			 *    advertize the change to the keying daemon.
@@ -533,6 +552,9 @@ int esp_init_state(struct xfrm_state *x, void *args)
 			switch (encap->encap_type) {
 			case UDP_ENCAP_ESPINUDP:
 				x->props.header_len += sizeof(struct udphdr);
+				break;
+			case UDP_ENCAP_ESPINUDP_NON_IKE:
+				x->props.header_len += sizeof(struct udphdr) + 2 * sizeof(u32);
 				break;
 			default:
 				printk (KERN_INFO
