@@ -2358,8 +2358,8 @@ int ntfs_truncate(struct inode *vi)
 done:
 	ntfs_attr_put_search_ctx(ctx);
 	unmap_mft_record(ni);
-	ntfs_debug("Done.");
 	NInoClearTruncateFailed(ni);
+	ntfs_debug("Done.");
 	return 0;
 err_out:
 	if (err != -ENOMEM) {
@@ -2608,6 +2608,7 @@ err_out:
 		ntfs_error(vi->i_sb, "Failed (error code %i):  Marking inode "
 				"as bad.  You should run chkdsk.", -err);
 		make_bad_inode(vi);
+		NVolSetErrors(ni->vol);
 	}
 	return err;
 }

@@ -84,6 +84,15 @@ ToDo/Notes:
 	- Fix error handling in fs/ntfs/quota.c::ntfs_mark_quotas_out_of_date()
 	  where we failed to release i_sem on the $Quota/$Q attribute inode.
 	- Fix bug in handling of bad inodes in fs/ntfs/namei.c::ntfs_lookup().
+	- Add mapping of unmapped buffers to all remaining code paths, i.e.
+	  fs/ntfs/aops.c::ntfs_write_mst_block(), mft.c::ntfs_sync_mft_mirror(),
+	  and write_mft_record_nolock().  From now on we require that the
+	  complete runlist for the mft mirror is always mapped into memory.
+	- Add creation of buffers to fs/ntfs/mft.c::ntfs_sync_mft_mirror().
+	- Do not check for the page being uptodate in mark_ntfs_record_dirty()
+	  as we now call this after marking the page not uptodate during mft
+	  mirror synchronisation (fs/ntfs/mft.c::ntfs_sync_mft_mirror()).
+	- Improve error handling in fs/ntfs/aops.c::ntfs_{read,write}_block().
 
 2.1.21 - Fix some races and bugs, rewrite mft write code, add mft allocator.
 

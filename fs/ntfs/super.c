@@ -983,6 +983,10 @@ static BOOL load_and_init_mft_mirror(ntfs_volume *vol)
  * @vol:	ntfs super block describing device whose mft mirror to check
  *
  * Return TRUE on success or FALSE on error.
+ *
+ * Note, this function also results in the mft mirror runlist being completely
+ * mapped into memory.  The mft mirror write code requires this and will BUG()
+ * should it find an unmapped runlist element.
  */
 static BOOL check_mft_mirror(ntfs_volume *vol)
 {

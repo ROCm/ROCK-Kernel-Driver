@@ -175,6 +175,9 @@ static int ntfs_read_block(struct page *page)
 	ni = NTFS_I(page->mapping->host);
 	vol = ni->vol;
 
+	/* $MFT/$DATA must have its complete runlist in memory at all times. */
+	BUG_ON(!ni->runlist.rl && !ni->mft_no && !NInoAttr(ni));
+
 	blocksize_bits = VFS_I(ni)->i_blkbits;
 	blocksize = 1 << blocksize_bits;
 
@@ -189,12 +192,6 @@ static int ntfs_read_block(struct page *page)
 	iblock = (s64)page->index << (PAGE_CACHE_SHIFT - blocksize_bits);
 	lblock = (ni->allocated_size + blocksize - 1) >> blocksize_bits;
 	zblock = (ni->initialized_size + blocksize - 1) >> blocksize_bits;
-
-#ifdef DEBUG
-	if (unlikely(!ni->runlist.rl && !ni->mft_no && !NInoAttr(ni)))
-		panic("NTFS: $MFT/$DATA runlist has been unmapped! This is a "
-				"very serious bug! Cannot continue...");
-#endif
 
 	/* Loop through all the buffers in the page. */
 	rl = NULL;
@@ -249,24 +246,30 @@ lock_retry_remap:
 				goto handle_hole;
 			/* If first try and runlist unmapped, map and retry. */
 			if (!is_retry && lcn == LCN_RL_NOT_MAPPED) {
+				int err;
 				is_retry = TRUE;
 				/*
 				 * Attempt to map runlist, dropping lock for
 				 * the duration.
 				 */
 				up_read(&ni->runlist.lock);
-				if (!ntfs_map_runlist(ni, vcn))
+				err = ntfs_map_runlist(ni, vcn);
+				if (likely(!err))
 					goto lock_retry_remap;
 				rl = NULL;
+				lcn = err;
 			}
 			/* Hard error, zero out region. */
+			bh->b_blocknr = -1;
 			SetPageError(page);
-			ntfs_error(vol->sb, "ntfs_rl_vcn_to_lcn(vcn = 0x%llx) "
-					"failed with error code 0x%llx%s.",
-					(unsigned long long)vcn,
-					(unsigned long long)-lcn,
-					is_retry ? " even after retrying" : "");
-			// FIXME: Depending on vol->on_errors, do something.
+			ntfs_error(vol->sb, "Failed to read from inode 0x%lx, "
+					"attribute type 0x%x, vcn 0x%llx, "
+					"offset 0x%x because its location on "
+					"disk could not be determined%s "
+					"(error code %lli).", ni->mft_no,
+					ni->type, (unsigned long long)vcn,
+					vcn_ofs, is_retry ? " even after "
+					"retrying" : "", (long long)lcn);
 		}
 		/*
 		 * Either iblock was outside lblock limits or
@@ -437,8 +440,8 @@ err_out:
 
 /**
  * ntfs_write_block - write a @page to the backing store
- * @wbc:	writeback control structure
  * @page:	page cache page to write out
+ * @wbc:	writeback control structure
  *
  * This function is for writing pages belonging to non-resident, non-mst
  * protected attributes to their backing store.
@@ -457,7 +460,7 @@ err_out:
  *
  * Based on ntfs_read_block() and __block_write_full_page().
  */
-static int ntfs_write_block(struct writeback_control *wbc, struct page *page)
+static int ntfs_write_block(struct page *page, struct writeback_control *wbc)
 {
 	VCN vcn;
 	LCN lcn;
@@ -477,7 +480,7 @@ static int ntfs_write_block(struct writeback_control *wbc, struct page *page)
 	vol = ni->vol;
 
 	ntfs_debug("Entering for inode 0x%lx, attribute type 0x%x, page index "
-			"0x%lx.", vi->i_ino, ni->type, page->index);
+			"0x%lx.", ni->mft_no, ni->type, page->index);
 
 	BUG_ON(!NInoNonResident(ni));
 	BUG_ON(NInoMstProtected(ni));
@@ -618,9 +621,9 @@ static int ntfs_write_block(struct writeback_control *wbc, struct page *page)
 		bh->b_bdev = vol->sb->s_bdev;
 
 		/* Convert block into corresponding vcn and offset. */
-		vcn = (VCN)block << blocksize_bits >> vol->cluster_size_bits;
-		vcn_ofs = ((VCN)block << blocksize_bits) &
-				vol->cluster_size_mask;
+		vcn = (VCN)block << blocksize_bits;
+		vcn_ofs = vcn & vol->cluster_size_mask;
+		vcn >>= vol->cluster_size_bits;
 		if (!rl) {
 lock_retry_remap:
 			down_read(&ni->runlist.lock);
@@ -663,15 +666,17 @@ lock_retry_remap:
 			if (likely(!err))
 				goto lock_retry_remap;
 			rl = NULL;
+			lcn = err;
 		}
 		/* Failed to map the buffer, even after retrying. */
-		bh->b_blocknr = -1UL;
-		ntfs_error(vol->sb, "ntfs_rl_vcn_to_lcn(vcn = 0x%llx) failed "
-				"with error code 0x%llx%s.",
-				(unsigned long long)vcn,
-				(unsigned long long)-lcn,
-				is_retry ? " even after retrying" : "");
-		// FIXME: Depending on vol->on_errors, do something.
+		bh->b_blocknr = -1;
+		ntfs_error(vol->sb, "Failed to write to inode 0x%lx, "
+				"attribute type 0x%x, vcn 0x%llx, offset 0x%x "
+				"because its location on disk could not be "
+				"determined%s (error code %lli).", ni->mft_no,
+				ni->type, (unsigned long long)vcn,
+				vcn_ofs, is_retry ? " even after "
+				"retrying" : "", (long long)lcn);
 		if (!err)
 			err = -EIO;
 		break;
@@ -767,8 +772,8 @@ lock_retry_remap:
 
 /**
  * ntfs_write_mst_block - write a @page to the backing store
- * @wbc:	writeback control structure
  * @page:	page cache page to write out
+ * @wbc:	writeback control structure
  *
  * This function is for writing pages belonging to non-resident, mst protected
  * attributes to their backing store.  The only supported attributes are index
@@ -789,22 +794,24 @@ lock_retry_remap:
  * Based on ntfs_write_block(), ntfs_mft_writepage(), and
  * write_mft_record_nolock().
  */
-static int ntfs_write_mst_block(struct writeback_control *wbc,
-		struct page *page)
+static int ntfs_write_mst_block(struct page *page,
+		struct writeback_control *wbc)
 {
 	sector_t block, dblock, rec_block;
 	struct inode *vi = page->mapping->host;
 	ntfs_inode *ni = NTFS_I(vi);
 	ntfs_volume *vol = ni->vol;
 	u8 *kaddr;
-	unsigned int bh_size = 1 << vi->i_blkbits;
+	unsigned char bh_size_bits = vi->i_blkbits;
+	unsigned int bh_size = 1 << bh_size_bits;
 	unsigned int rec_size = ni->itype.index.block_size;
 	ntfs_inode *locked_nis[PAGE_CACHE_SIZE / rec_size];
-	struct buffer_head *bh, *head, *tbh;
+	struct buffer_head *bh, *head, *tbh, *rec_start_bh;
 	int max_bhs = PAGE_CACHE_SIZE / bh_size;
 	struct buffer_head *bhs[max_bhs];
-	int i, nr_locked_nis, nr_recs, nr_bhs, bhs_per_rec, err;
-	unsigned char bh_size_bits, rec_size_bits;
+	runlist_element *rl;
+	int i, nr_locked_nis, nr_recs, nr_bhs, bhs_per_rec, err, err2;
+	unsigned rec_size_bits;
 	BOOL sync, is_mft, page_is_dirty, rec_is_dirty;
 
 	ntfs_debug("Entering for inode 0x%lx, attribute type 0x%x, page index "
@@ -824,7 +831,6 @@ static int ntfs_write_mst_block(struct writeback_control *wbc,
 	bh = head = page_buffers(page);
 	BUG_ON(!bh);
 
-	bh_size_bits = vi->i_blkbits;
 	rec_size_bits = ni->itype.index.block_size_bits;
 	BUG_ON(!(PAGE_CACHE_SIZE >> rec_size_bits));
 	bhs_per_rec = rec_size >> bh_size_bits;
@@ -837,25 +843,18 @@ static int ntfs_write_mst_block(struct writeback_control *wbc,
 	/* The first out of bounds block for the data size. */
 	dblock = (vi->i_size + bh_size - 1) >> bh_size_bits;
 
-	err = nr_bhs = nr_recs = nr_locked_nis = 0;
+	rl = NULL;
+	err = err2 = nr_bhs = nr_recs = nr_locked_nis = 0;
 	page_is_dirty = rec_is_dirty = FALSE;
+	rec_start_bh = NULL;
 	do {
-		if (unlikely(block >= dblock)) {
-			/*
-			 * Mapped buffers outside i_size will occur, because
-			 * this page can be outside i_size when there is a
-			 * truncate in progress.  The contents of such buffers
-			 * were zeroed by ntfs_writepage().
-			 *
-			 * FIXME: What about the small race window where
-			 * ntfs_writepage() has not done any clearing because
-			 * the page was within i_size but before we get here,
-			 * vmtruncate() modifies i_size?
-			 */
-			clear_buffer_dirty(bh);
-			continue;
-		}
+		BOOL is_retry = FALSE;
+
 		if (likely(block < rec_block)) {
+			if (unlikely(block >= dblock)) {
+				clear_buffer_dirty(bh);
+				continue;
+			}
 			/*
 			 * This block is not the first one in the record.  We
 			 * ignore the buffer's dirty state because we could
@@ -863,22 +862,121 @@ static int ntfs_write_mst_block(struct writeback_control *wbc,
 			 */
 			if (!rec_is_dirty)
 				continue;
+			if (unlikely(err2)) {
+				if (err2 != -ENOMEM)
+					clear_buffer_dirty(bh);
+				continue;
+			}
 		} else /* if (block == rec_block) */ {
 			BUG_ON(block > rec_block);
 			/* This block is the first one in the record. */
 			rec_block += bhs_per_rec;
+			err2 = 0;
+			if (unlikely(block >= dblock)) {
+				clear_buffer_dirty(bh);
+				continue;
+			}
 			if (!buffer_dirty(bh)) {
 				/* Clean records are not written out. */
 				rec_is_dirty = FALSE;
 				continue;
 			}
 			rec_is_dirty = TRUE;
+			rec_start_bh = bh;
 		}
-		BUG_ON(!buffer_mapped(bh));
+		/* Need to map the buffer if it is not mapped already. */
+		if (unlikely(!buffer_mapped(bh))) {
+			VCN vcn;
+			LCN lcn;
+			unsigned int vcn_ofs;
+
+			/* Obtain the vcn and offset of the current block. */
+			vcn = (VCN)block << bh_size_bits;
+			vcn_ofs = vcn & vol->cluster_size_mask;
+			vcn >>= vol->cluster_size_bits;
+			if (!rl) {
+lock_retry_remap:
+				down_read(&ni->runlist.lock);
+				rl = ni->runlist.rl;
+			}
+			if (likely(rl != NULL)) {
+				/* Seek to element containing target vcn. */
+				while (rl->length && rl[1].vcn <= vcn)
+					rl++;
+				lcn = ntfs_rl_vcn_to_lcn(rl, vcn);
+			} else
+				lcn = LCN_RL_NOT_MAPPED;
+			/* Successful remap. */
+			if (likely(lcn >= 0)) {
+				/* Setup buffer head to correct block. */
+				bh->b_blocknr = ((lcn <<
+						vol->cluster_size_bits) +
+						vcn_ofs) >> bh_size_bits;
+				set_buffer_mapped(bh);
+			} else {
+				/*
+				 * Remap failed.  Retry to map the runlist once
+				 * unless we are working on $MFT which always
+				 * has the whole of its runlist in memory.
+				 */
+				if (!is_mft && !is_retry &&
+						lcn == LCN_RL_NOT_MAPPED) {
+					is_retry = TRUE;
+					/*
+					 * Attempt to map runlist, dropping
+					 * lock for the duration.
+					 */
+					up_read(&ni->runlist.lock);
+					err2 = ntfs_map_runlist(ni, vcn);
+					if (likely(!err2))
+						goto lock_retry_remap;
+					if (err2 == -ENOMEM)
+						page_is_dirty = TRUE;
+					lcn = err2;
+				} else
+					err2 = -EIO;
+				/* Hard error.  Abort writing this record. */
+				if (!err || err == -ENOMEM)
+					err = err2;
+				bh->b_blocknr = -1;
+				ntfs_error(vol->sb, "Cannot write ntfs record "
+						"0x%llx (inode 0x%lx, "
+						"attribute type 0x%x) because "
+						"its location on disk could "
+						"not be determined (error "
+						"code %lli).", (s64)block <<
+						bh_size_bits >>
+						vol->mft_record_size_bits,
+						ni->mft_no, ni->type,
+						(long long)lcn);
+				/*
+				 * If this is not the first buffer, remove the
+				 * buffers in this record from the list of
+				 * buffers to write and clear their dirty bit
+				 * if not error -ENOMEM.
+				 */
+				if (rec_start_bh != bh) {
+					while (bhs[--nr_bhs] != rec_start_bh)
+						;
+					if (err2 != -ENOMEM) {
+						do {
+							clear_buffer_dirty(
+								rec_start_bh);
+						} while ((rec_start_bh =
+								rec_start_bh->
+								b_this_page) !=
+								bh);
+					}
+				}
+				continue;
+			}
+		}
 		BUG_ON(!buffer_uptodate(bh));
+		BUG_ON(nr_bhs >= max_bhs);
 		bhs[nr_bhs++] = bh;
-		BUG_ON(nr_bhs > max_bhs);
 	} while (block++, (bh = bh->b_this_page) != head);
+	if (unlikely(rl))
+		up_read(&ni->runlist.lock);
 	/* If there were no dirty buffers, we are done. */
 	if (!nr_bhs)
 		goto done;
@@ -930,9 +1028,11 @@ static int ntfs_write_mst_block(struct writeback_control *wbc,
 				locked_nis[nr_locked_nis++] = tni;
 		}
 		/* Apply the mst protection fixups. */
-		err = pre_write_mst_fixup((NTFS_RECORD*)(kaddr + ofs),
+		err2 = pre_write_mst_fixup((NTFS_RECORD*)(kaddr + ofs),
 				rec_size);
-		if (unlikely(err)) {
+		if (unlikely(err2)) {
+			if (!err || err == -ENOMEM)
+				err = -EIO;
 			ntfs_error(vol->sb, "Failed to apply mst fixups "
 					"(inode 0x%lx, attribute type 0x%x, "
 					"page index 0x%lx, page offset 0x%x)!"
@@ -986,7 +1086,8 @@ do_wait:
 					"0x%lx, page offset 0x%lx)!  Unmount "
 					"and run chkdsk.", vi->i_ino, ni->type,
 					page->index, bh_offset(tbh));
-			err = -EIO;
+			if (!err || err == -ENOMEM)
+				err = -EIO;
 			/*
 			 * Set the buffer uptodate so the page and buffer
 			 * states do not become out of sync.
@@ -1056,13 +1157,18 @@ unm_done:
 		atomic_dec(&tni->count);
 		iput(VFS_I(base_tni));
 	}
-	if (unlikely(err)) {
-		SetPageError(page);
-		NVolSetErrors(vol);
-	}
 	SetPageUptodate(page);
 	kunmap(page);
 done:
+	if (unlikely(err && err != -ENOMEM)) {
+		/*
+		 * Set page error if there is only one ntfs record in the page.
+		 * Otherwise we would loose per-record granularity.
+		 */
+		if (ni->itype.index.block_size == PAGE_CACHE_SIZE)
+			SetPageError(page);
+		NVolSetErrors(vol);
+	}
 	if (page_is_dirty) {
 		ntfs_debug("Page still contains one or more dirty ntfs "
 				"records.  Redirtying the page starting at "
@@ -1182,9 +1288,9 @@ static int ntfs_writepage(struct page *page, struct writeback_control *wbc)
 		}
 		/* Handle mst protected attributes. */
 		if (NInoMstProtected(ni))
-			return ntfs_write_mst_block(wbc, page);
+			return ntfs_write_mst_block(page, wbc);
 		/* Normal data stream. */
-		return ntfs_write_block(wbc, page);
+		return ntfs_write_block(page, wbc);
 	}
 	/*
 	 * Attribute is resident, implying it is not compressed, encrypted,
@@ -1343,7 +1449,7 @@ static int ntfs_prepare_nonresident_write(struct page *page,
 	vol = ni->vol;
 
 	ntfs_debug("Entering for inode 0x%lx, attribute type 0x%x, page index "
-			"0x%lx, from = %u, to = %u.", vi->i_ino, ni->type,
+			"0x%lx, from = %u, to = %u.", ni->mft_no, ni->type,
 			page->index, from, to);
 
 	BUG_ON(!NInoNonResident(ni));
@@ -1537,21 +1643,24 @@ lock_retry_remap:
 					if (likely(!err))
 						goto lock_retry_remap;
 					rl = NULL;
+					lcn = err;
 				}
 				/*
 				 * Failed to map the buffer, even after
 				 * retrying.
 				 */
-				bh->b_blocknr = -1UL;
-				ntfs_error(vol->sb, "ntfs_rl_vcn_to_lcn(vcn = "
-						"0x%llx) failed with error "
-						"code 0x%llx%s.",
+				bh->b_blocknr = -1;
+				ntfs_error(vol->sb, "Failed to write to inode "
+						"0x%lx, attribute type 0x%x, "
+						"vcn 0x%llx, offset 0x%x "
+						"because its location on disk "
+						"could not be determined%s "
+						"(error code %lli).",
+						ni->mft_no, ni->type,
 						(unsigned long long)vcn,
-						(unsigned long long)-lcn,
-						is_retry ? " even after "
-						"retrying" : "");
-				// FIXME: Depending on vol->on_errors, do
-				// something.
+						vcn_ofs, is_retry ? " even "
+						"after retrying" : "",
+						(long long)lcn);
 				if (!err)
 					err = -EIO;
 				goto err_out;
@@ -2173,7 +2282,6 @@ void mark_ntfs_record_dirty(struct page *page, const unsigned int ofs) {
 	struct buffer_head *bh, *head, *buffers_to_free = NULL;
 	unsigned int end, bh_size, bh_ofs;
 
-	BUG_ON(!PageUptodate(page));
 	end = ofs + ni->itype.index.block_size;
 	bh_size = 1 << VFS_I(ni)->i_blkbits;
 	spin_lock(&mapping->private_lock);
