@@ -65,7 +65,7 @@ static long snd_opl4_mem_proc_read(snd_info_entry_t *entry, void *file_private_d
 			return -ENOMEM;
 		snd_opl4_read_memory(opl4, buf, file->f_pos, size);
 		if (copy_to_user(_buf, buf, size)) {
-			kfree(buf);
+			vfree(buf);
 			return -EFAULT;
 		}
 		vfree(buf);
@@ -90,7 +90,7 @@ static long snd_opl4_mem_proc_write(snd_info_entry_t *entry, void *file_private_
 		if (!buf)
 			return -ENOMEM;
 		if (copy_from_user(buf, _buf, size)) {
-			kfree(buf);
+			vfree(buf);
 			return -EFAULT;
 		}
 		snd_opl4_write_memory(opl4, buf, file->f_pos, size);
