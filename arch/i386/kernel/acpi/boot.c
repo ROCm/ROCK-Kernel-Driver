@@ -668,7 +668,7 @@ acpi_boot_init (void)
 	 */
 	error = acpi_table_init();
 	if (error) {
-		acpi_disabled = 1;
+		disable_acpi();
 		return error;
 	}
 
@@ -680,7 +680,7 @@ acpi_boot_init (void)
 	error = acpi_blacklisted();
 	if (error) {
 		printk(KERN_WARNING PREFIX "BIOS listed in blacklist, disabling ACPI support\n");
-		acpi_disabled = 1;
+		disable_acpi();
 		return error;
 	}
 
