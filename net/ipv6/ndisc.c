@@ -810,7 +810,8 @@ static void ndisc_recv_ns(struct sk_buff *skb)
 	 *	update / create cache entry
 	 *	for the source address
 	 */
-	neigh = __neigh_lookup(&nd_tbl, saddr, dev, lladdr || !dev->addr_len);
+	neigh = __neigh_lookup(&nd_tbl, saddr, dev,
+			       !inc || lladdr || !dev->addr_len);
 	if (neigh)
 		neigh_update(neigh, lladdr, NUD_STALE, 
 			     NEIGH_UPDATE_F_WEAK_OVERRIDE|
