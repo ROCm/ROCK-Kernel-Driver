@@ -144,6 +144,7 @@ static struct usb_serial_device_type belkin_device = {
 
 
 struct belkin_sa_private {
+	spinlock_t		lock;
 	unsigned long		control_state;
 	unsigned char		last_lsr;
 	unsigned char		last_msr;
@@ -175,6 +176,7 @@ static int belkin_sa_startup (struct usb_serial *serial)
 	if (!priv)
 		return (-1); /* error */
 	/* set initial values for control structures */
+	spin_lock_init(&priv->lock);
 	priv->control_state = 0;
 	priv->last_lsr = 0;
 	priv->last_msr = 0;
@@ -262,6 +264,7 @@ static void belkin_sa_read_int_callback (struct urb *urb, struct pt_regs *regs)
 	struct usb_serial *serial;
 	unsigned char *data = urb->transfer_buffer;
 	int retval;
+	unsigned long flags;
 
 	switch (urb->status) {
 	case 0:
@@ -289,6 +292,7 @@ static void belkin_sa_read_int_callback (struct urb *urb, struct pt_regs *regs)
 	/* ignore data[0] and data[1] */
 
 	priv = usb_get_serial_port_data(port);
+	spin_lock_irqsave(&priv->lock, flags);
 	priv->last_msr = data[BELKIN_SA_MSR_INDEX];
 	
 	/* Record Control Line states */
@@ -336,6 +340,7 @@ static void belkin_sa_read_int_callback (struct urb *urb, struct pt_regs *regs)
 		}
 	}
 #endif
+	spin_unlock_irqrestore(&priv->lock, flags);
 exit:
 	retval = usb_submit_urb (urb, GFP_ATOMIC);
 	if (retval)
@@ -352,6 +357,9 @@ static void belkin_sa_set_termios (struct usb_serial_port *port, struct termios 
 	unsigned int old_iflag = 0;
 	unsigned int old_cflag = 0;
 	__u16 urb_value = 0; /* Will hold the new flags */
+	unsigned long flags;
+	unsigned long control_state;
+	int bad_flow_control;
 	
 	if ((!port->tty) || (!port->tty->termios)) {
 		dbg ("%s - no tty or termios structure", __FUNCTION__);
@@ -361,6 +369,12 @@ static void belkin_sa_set_termios (struct usb_serial_port *port, struct termios 
 	iflag = port->tty->termios->c_iflag;
 	cflag = port->tty->termios->c_cflag;
 
+	/* get a local copy of the current port settings */
+	spin_lock_irqsave(&priv->lock, flags);
+	control_state = priv->control_state;
+	bad_flow_control = priv->bad_flow_control;
+	spin_unlock_irqrestore(&priv->lock, flags);
+	
 	/* check that they really want us to change something */
 	if (old_termios) {
 		if ((cflag == old_termios->c_cflag) &&
@@ -376,7 +390,7 @@ static void belkin_sa_set_termios (struct usb_serial_port *port, struct termios 
 	if( (cflag&CBAUD) != (old_cflag&CBAUD) ) {
 		/* reassert DTR and (maybe) RTS on transition from B0 */
 		if( (old_cflag&CBAUD) == B0 ) {
-			priv->control_state |= (TIOCM_DTR|TIOCM_RTS);
+			control_state |= (TIOCM_DTR|TIOCM_RTS);
 			if (BSA_USB_CMD(BELKIN_SA_SET_DTR_REQUEST, 1) < 0)
 				err("Set DTR error");
 			/* don't set RTS if using hardware flow control */
@@ -410,7 +424,7 @@ static void belkin_sa_set_termios (struct usb_serial_port *port, struct termios 
 				err("Disable flowcontrol error");
 
 			/* Drop RTS and DTR */
-			priv->control_state &= ~(TIOCM_DTR | TIOCM_RTS);
+			control_state &= ~(TIOCM_DTR | TIOCM_RTS);
 			if (BSA_USB_CMD(BELKIN_SA_SET_DTR_REQUEST, 0) < 0)
 				err("DTR LOW error");
 			if (BSA_USB_CMD(BELKIN_SA_SET_RTS_REQUEST, 0) < 0)
@@ -465,12 +479,17 @@ static void belkin_sa_set_termios (struct usb_serial_port *port, struct termios 
 		else
 			urb_value &= ~(BELKIN_SA_FLOW_OCTS | BELKIN_SA_FLOW_IRTS);
 
-		if (priv->bad_flow_control)
+		if (bad_flow_control)
 			urb_value &= ~(BELKIN_SA_FLOW_IRTS);
 
 		if (BSA_USB_CMD(BELKIN_SA_SET_FLOW_CTRL_REQUEST, urb_value) < 0)
 			err("Set flow control error");
 	}
+
+	/* save off the modified port settings */
+	spin_lock_irqsave(&priv->lock, flags);
+	priv->control_state = control_state;
+	spin_unlock_irqrestore(&priv->lock, flags);
 } /* belkin_sa_set_termios */
 
 
@@ -488,12 +507,19 @@ static int belkin_sa_ioctl (struct usb_serial_port *port, struct file * file, un
 	struct usb_serial *serial = port->serial;
 	__u16 urb_value; /* Will hold the new flags */
 	struct belkin_sa_private *priv = usb_get_serial_port_data(port);
-	int  ret, mask;
+	int ret = 0;
+	int mask;
+	unsigned long control_state;
+	unsigned long flags;
 	
+	spin_lock_irqsave(&priv->lock, flags);
+	control_state = priv->control_state;
+	spin_unlock_irqrestore(&priv->lock, flags);
+
 	/* Based on code from acm.c and others */
 	switch (cmd) {
 	case TIOCMGET:
-		return put_user(priv->control_state, (unsigned long *) arg);
+		return put_user(control_state, (unsigned long *) arg);
 		break;
 
 	case TIOCMSET: /* Turns on and off the lines as specified by the mask */
@@ -506,13 +532,13 @@ static int belkin_sa_ioctl (struct usb_serial_port *port, struct file * file, un
 			/* RTS needs set */
 			urb_value = ((cmd == TIOCMSET) && (mask & TIOCM_RTS)) || (cmd == TIOCMBIS) ? 1 : 0;
 			if (urb_value)
-				priv->control_state |= TIOCM_RTS;
+				control_state |= TIOCM_RTS;
 			else
-				priv->control_state &= ~TIOCM_RTS;
+				control_state &= ~TIOCM_RTS;
 
 			if ((ret = BSA_USB_CMD(BELKIN_SA_SET_RTS_REQUEST, urb_value)) < 0) {
 				err("Set RTS error %d", ret);
-				return(ret);
+				goto cmerror;
 			}
 		}
 
@@ -520,14 +546,19 @@ static int belkin_sa_ioctl (struct usb_serial_port *port, struct file * file, un
 			/* DTR needs set */
 			urb_value = ((cmd == TIOCMSET) && (mask & TIOCM_DTR)) || (cmd == TIOCMBIS) ? 1 : 0;
 			if (urb_value)
-				priv->control_state |= TIOCM_DTR;
+				control_state |= TIOCM_DTR;
 			else
-				priv->control_state &= ~TIOCM_DTR;
+				control_state &= ~TIOCM_DTR;
 			if ((ret = BSA_USB_CMD(BELKIN_SA_SET_DTR_REQUEST, urb_value)) < 0) {
 				err("Set DTR error %d", ret);
-				return(ret);
+				goto cmerror;
 			}
 		}
+cmerror:
+		spin_lock_irqsave(&priv->lock, flags);
+		priv->control_state = control_state;
+		spin_unlock_irqrestore(&priv->lock, flags);
+		return ret;
 		break;
 					
 	case TIOCMIWAIT:

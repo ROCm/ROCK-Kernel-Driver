@@ -260,6 +260,7 @@ static void ehci_watchdog (unsigned long param)
 
 		if (status & STS_IAA) {
 			ehci_vdbg (ehci, "lost IAA\n");
+			COUNT (ehci->stats.lost_iaa);
 			writel (STS_IAA, &ehci->regs->status);
 			ehci->reclaim_ready = 1;
 		}
@@ -547,8 +548,9 @@ static void ehci_stop (struct usb_hcd *hcd)
 	ehci_mem_cleanup (ehci);
 
 #ifdef	EHCI_STATS
-	ehci_dbg (ehci, "irq normal %ld err %ld reclaim %ld\n",
-		ehci->stats.normal, ehci->stats.error, ehci->stats.reclaim);
+	ehci_dbg (ehci, "irq normal %ld err %ld reclaim %ld (lost %ld)\n",
+		ehci->stats.normal, ehci->stats.error, ehci->stats.reclaim,
+		ehci->stats.lost_iaa);
 	ehci_dbg (ehci, "complete %ld unlink %ld\n",
 		ehci->stats.complete, ehci->stats.unlink);
 #endif

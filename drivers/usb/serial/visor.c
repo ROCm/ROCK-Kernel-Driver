@@ -2,7 +2,7 @@
  * USB HandSpring Visor, Palm m50x, and Sony Clie driver
  * (supports all of the Palm OS USB devices)
  *
- *	Copyright (C) 1999 - 2002
+ *	Copyright (C) 1999 - 2003
  *	    Greg Kroah-Hartman (greg@kroah.com)
  *
  *	This program is free software; you can redistribute it and/or modify
@@ -183,34 +183,34 @@ static int palm_os_4_probe (struct usb_serial *serial, const struct usb_device_i
 
 static struct usb_device_id id_table [] = {
 	{ USB_DEVICE(HANDSPRING_VENDOR_ID, HANDSPRING_VISOR_ID),
-		.driver_info = (unsigned int)&palm_os_3_probe },
+		.driver_info = (kernel_ulong_t)&palm_os_3_probe },
 	{ USB_DEVICE(HANDSPRING_VENDOR_ID, HANDSPRING_TREO_ID),
-		.driver_info = (unsigned int)&palm_os_4_probe },
+		.driver_info = (kernel_ulong_t)&palm_os_4_probe },
 	{ USB_DEVICE(PALM_VENDOR_ID, PALM_M500_ID),
-		.driver_info = (unsigned int)&palm_os_4_probe },
+		.driver_info = (kernel_ulong_t)&palm_os_4_probe },
 	{ USB_DEVICE(PALM_VENDOR_ID, PALM_M505_ID),
-		.driver_info = (unsigned int)&palm_os_4_probe },
+		.driver_info = (kernel_ulong_t)&palm_os_4_probe },
 	{ USB_DEVICE(PALM_VENDOR_ID, PALM_M515_ID),
-		.driver_info = (unsigned int)&palm_os_4_probe },
+		.driver_info = (kernel_ulong_t)&palm_os_4_probe },
 	{ USB_DEVICE(PALM_VENDOR_ID, PALM_I705_ID),
-		.driver_info = (unsigned int)&palm_os_4_probe },
+		.driver_info = (kernel_ulong_t)&palm_os_4_probe },
 	{ USB_DEVICE(PALM_VENDOR_ID, PALM_M125_ID),
-		.driver_info = (unsigned int)&palm_os_4_probe },
+		.driver_info = (kernel_ulong_t)&palm_os_4_probe },
 	{ USB_DEVICE(PALM_VENDOR_ID, PALM_M130_ID),
-		.driver_info = (unsigned int)&palm_os_4_probe },
+		.driver_info = (kernel_ulong_t)&palm_os_4_probe },
 	{ USB_DEVICE(PALM_VENDOR_ID, PALM_TUNGSTEN_T_ID),
-		.driver_info = (unsigned int)&palm_os_4_probe },
+		.driver_info = (kernel_ulong_t)&palm_os_4_probe },
 	{ USB_DEVICE(PALM_VENDOR_ID, PALM_TUNGSTEN_Z_ID),
-		.driver_info = (unsigned int)&palm_os_4_probe },
+		.driver_info = (kernel_ulong_t)&palm_os_4_probe },
 	{ USB_DEVICE(PALM_VENDOR_ID, PALM_ZIRE_ID),
-		.driver_info = (unsigned int)&palm_os_4_probe },
+		.driver_info = (kernel_ulong_t)&palm_os_4_probe },
 	{ USB_DEVICE(SONY_VENDOR_ID, SONY_CLIE_4_0_ID),
-		.driver_info = (unsigned int)&palm_os_4_probe },
+		.driver_info = (kernel_ulong_t)&palm_os_4_probe },
 	{ USB_DEVICE(SONY_VENDOR_ID, SONY_CLIE_S360_ID),
-		.driver_info = (unsigned int)&palm_os_4_probe },
+		.driver_info = (kernel_ulong_t)&palm_os_4_probe },
 	{ USB_DEVICE(SONY_VENDOR_ID, SONY_CLIE_4_1_ID) },
 	{ USB_DEVICE(SONY_VENDOR_ID, SONY_CLIE_NX60_ID),
-		.driver_info = (unsigned int)&palm_os_4_probe },
+		.driver_info = (kernel_ulong_t)&palm_os_4_probe },
 	{ }					/* Terminating entry */
 };
 
@@ -374,27 +374,22 @@ static void visor_close (struct usb_serial_port *port, struct file * filp)
 	if (!serial)
 		return;
 	
-	if (serial->dev) {
-		/* only send a shutdown message if the 
-		 * device is still here */
-		transfer_buffer =  kmalloc (0x12, GFP_KERNEL);
-		if (!transfer_buffer) {
-			dev_err(&port->dev, "%s - kmalloc(%d) failed.\n", __FUNCTION__, 0x12);
-		} else {
-			/* send a shutdown message to the device */
-			usb_control_msg (serial->dev,
-					 usb_rcvctrlpipe(serial->dev, 0),
-					 VISOR_CLOSE_NOTIFICATION, 0xc2,
-					 0x0000, 0x0000, 
-					 transfer_buffer, 0x12, 300);
-			kfree (transfer_buffer);
-		}
-		/* shutdown our bulk read */
-		usb_unlink_urb (port->read_urb);
+	/* shutdown our urbs */
+	usb_unlink_urb (port->read_urb);
+	if (port->interrupt_in_urb)
+		usb_unlink_urb (port->interrupt_in_urb);
 
-		if (port->interrupt_in_urb)
-			usb_unlink_urb (port->interrupt_in_urb);
+	/* Try to send shutdown message, if the device is gone, this will just fail. */
+	transfer_buffer =  kmalloc (0x12, GFP_KERNEL);
+	if (transfer_buffer) {
+		usb_control_msg (serial->dev,
+				 usb_rcvctrlpipe(serial->dev, 0),
+				 VISOR_CLOSE_NOTIFICATION, 0xc2,
+				 0x0000, 0x0000, 
+				 transfer_buffer, 0x12, 300);
+		kfree (transfer_buffer);
 	}
+
 	/* Uncomment the following line if you want to see some statistics in your syslog */
 	/* dev_info (&port->dev, "Bytes In = %d  Bytes Out = %d\n", bytes_in, bytes_out); */
 }

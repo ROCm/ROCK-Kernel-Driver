@@ -1148,7 +1148,7 @@ void usb_hub_cleanup(void)
 	int ret;
 
 	/* Kill the thread */
-	ret = kill_proc(khubd_pid, SIGTERM, 1);
+	ret = kill_proc(khubd_pid, SIGKILL, 1);
 
 	wait_for_completion(&khubd_exited);
 

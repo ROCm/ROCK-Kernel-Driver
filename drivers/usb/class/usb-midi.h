@@ -41,6 +41,7 @@
 #define USBMIDI_ROLAND_UA100G		0x0000
 #define USBMIDI_ROLAND_MPU64		0x0002
 #define USBMIDI_ROLAND_SC8850		0x0003
+#define USBMIDI_ROLAND_SC8820		0x0007
 #define USBMIDI_ROLAND_UM2		0x0005
 #define USBMIDI_ROLAND_UM1		0x0009
 #define USBMIDI_ROLAND_PC300		0x0008
@@ -102,6 +103,13 @@ static struct usb_midi_device usb_midi_devices[] = {
     USB_VENDOR_ID_ROLAND, USBMIDI_ROLAND_SC8850, 2, -1,
     { { 0x81, 15 }, {-1, -1} }, /** cables 0,1,2, and 3 **/
     { { 0x01, 15 }, {-1, -1} },
+  },
+
+  { /* Roland SC8820 */
+    "Roland SC8820",
+    USB_VENDOR_ID_ROLAND, USBMIDI_ROLAND_SC8820, 2, -1,
+    { { 0x81, 17 }, {-1, -1} },
+    { { 0x01, 17 }, {-1, -1} },
   },
 
   { /* YAMAHA MU1000 */

@@ -33,6 +33,9 @@
 #define DELL_VENDOR_ID		0x413c
 #define DELL_AXIM_ID		0x4001
 
+#define FSC_VENDOR_ID		0x0bf8
+#define FSC_LOOX_ID		0x1001
+
 #define HP_VENDOR_ID		0x03f0
 #define HP_JORNADA_548_ID	0x1016
 #define HP_JORNADA_568_ID	0x1116
