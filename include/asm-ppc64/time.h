@@ -73,17 +73,19 @@ static __inline__ unsigned int get_dec(void)
 
 static __inline__ void set_dec(int val)
 {
+#ifdef CONFIG_PPC_ISERIES
 	struct paca_struct *lpaca = get_paca();
 	int cur_dec;
 
-	if ( lpaca->xLpPaca.xSharedProc ) {
+	if (lpaca->xLpPaca.xSharedProc) {
 		lpaca->xLpPaca.xVirtualDecr = val;
 		cur_dec = get_dec();
-		if ( cur_dec > val )
+		if (cur_dec > val)
 			HvCall_setVirtualDecr();
-	} else {
+	} else
+#else
 		mtspr(SPRN_DEC, val);
-	}
+#endif
 }
 
 extern __inline__ unsigned long tb_ticks_since(unsigned long tstamp) {
