@@ -114,7 +114,7 @@ mpc52xx_ic_ack(unsigned int irq)
 	/*
 	 * Only some irqs are reset here, others in interrupting hardware.
 	 */
-			
+
 	switch (irq) {
 	case MPC52xx_IRQ0:
 		val = in_be32(&intr->ctrl);
@@ -186,7 +186,7 @@ mpc52xx_init_irq(void)
 		ioremap(MPC52xx_INTR, sizeof(struct mpc52xx_intr));
 	sdma = (struct mpc52xx_sdma *)
 		ioremap(MPC52xx_SDMA, sizeof(struct mpc52xx_sdma));
-	
+
 	if ((intr==NULL) || (sdma==NULL))
 		panic("Can't ioremap PIC/SDMA register for init_irq !");
 
