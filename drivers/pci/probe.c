@@ -663,7 +663,8 @@ struct pci_bus * __devinit pci_scan_bus_parented(struct device *parent, int bus,
 	if (b) {
 		b->sysdata = sysdata;
 		b->ops = ops;
-		b->subordinate = pci_do_scan_bus(b);
+		b->subordinate = pci_scan_child_bus(b);
+		pci_bus_add_devices(b);
 	}
 	return b;
 }
