@@ -1227,6 +1227,9 @@ config UFS_FS
 	  experimental "UFS file system write support", below. Please read the
 	  file <file:Documentation/filesystems/ufs.txt> for more information.
 
+          The recently released UFS2 variant (used in FreeBSD 5.x) is
+          READ-ONLY supported.
+
 	  If you only intend to mount files from some other Unix over the
 	  network using NFS, you don't need the UFS file system support (but
 	  you need NFS file system support obviously).
