@@ -1297,7 +1297,8 @@ prep_find_bridges(void)
 		hostbridge = residual_find_device(PROCESSORDEVICE, NULL,
 			BridgeController, PCIBridge, -1, 0);
 		if (hostbridge &&
-			hostbridge->DeviceId.Interface == PCIBridgeIndirect) {
+			((hostbridge->DeviceId.Interface == PCIBridgeIndirect) ||
+			 (hostbridge->DeviceId.Interface == PCIBridgeRS6K))) {
 			PnP_TAG_PACKET * pkt;
 			pkt = PnP_find_large_vendor_packet(
 				res->DevicePnPHeap+hostbridge->AllocatedOffset,
