@@ -1050,6 +1050,8 @@ typedef struct net_local {
         __u16 QueueSkb;
 
 	struct tr_statistics MacStat;   /* MAC statistics structure */
+	
+	spinlock_t	lock;
 } NET_LOCAL;
 
 /************************************
