@@ -103,53 +103,7 @@
 #include <asm/uaccess.h>
 #include <asm/hardirq.h>
 
-#define DRIVER_VERSION "1.00"
-
-#ifndef PCI_DEVICE_ID_INTEL_82801
-#define PCI_DEVICE_ID_INTEL_82801	0x2415
-#endif
-#ifndef PCI_DEVICE_ID_INTEL_82901
-#define PCI_DEVICE_ID_INTEL_82901	0x2425
-#endif
-#ifndef PCI_DEVICE_ID_INTEL_ICH2
-#define PCI_DEVICE_ID_INTEL_ICH2	0x2445
-#endif
-#ifndef PCI_DEVICE_ID_INTEL_ICH3
-#define PCI_DEVICE_ID_INTEL_ICH3	0x2485
-#endif
-#ifndef PCI_DEVICE_ID_INTEL_ICH4
-#define PCI_DEVICE_ID_INTEL_ICH4	0x24c5
-#endif
-#ifndef PCI_DEVICE_ID_INTEL_ICH5
-#define PCI_DEVICE_ID_INTEL_ICH5	0x24d5
-#endif
-#ifndef PCI_DEVICE_ID_INTEL_ICH6_18
-#define PCI_DEVICE_ID_INTEL_ICH6_18	0x266e
-#endif
-#ifndef PCI_DEVICE_ID_INTEL_440MX
-#define PCI_DEVICE_ID_INTEL_440MX	0x7195
-#endif
-#ifndef PCI_DEVICE_ID_INTEL_ESB_5
-#define PCI_DEVICE_ID_INTEL_ESB_5	0x25a6
-#endif
-#ifndef PCI_DEVICE_ID_SI_7012
-#define PCI_DEVICE_ID_SI_7012		0x7012
-#endif
-#ifndef PCI_DEVICE_ID_NVIDIA_MCP1_AUDIO
-#define PCI_DEVICE_ID_NVIDIA_MCP1_AUDIO	0x01b1
-#endif
-#ifndef PCI_DEVICE_ID_NVIDIA_MCP2_AUDIO
-#define PCI_DEVICE_ID_NVIDIA_MCP2_AUDIO	0x006a
-#endif
-#ifndef PCI_DEVICE_ID_NVIDIA_MCP3_AUDIO
-#define PCI_DEVICE_ID_NVIDIA_MCP3_AUDIO	0x00da
-#endif
-#ifndef PCI_DEVICE_ID_AMD_768_AUDIO
-#define PCI_DEVICE_ID_AMD_768_AUDIO	0x7445
-#endif
-#ifndef PCI_DEVICE_ID_AMD_8111_AC97
-#define PCI_DEVICE_ID_AMD_8111_AC97	0x746d
-#endif
+#define DRIVER_VERSION "1.01"
 
 #define MODULOP2(a, b) ((a) & ((b) - 1))
 #define MASKP2(a, b) ((a) & ~((b) - 1))
@@ -328,19 +282,19 @@ static struct {
 };
 
 static struct pci_device_id i810_pci_tbl [] = {
-	{PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801,
+	{PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801AA_5,
 	 PCI_ANY_ID, PCI_ANY_ID, 0, 0, ICH82801AA},
-	{PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82901,
+	{PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801AB_5,
 	 PCI_ANY_ID, PCI_ANY_ID, 0, 0, ICH82901AB},
 	{PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_440MX,
 	 PCI_ANY_ID, PCI_ANY_ID, 0, 0, INTEL440MX},
-	{PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_ICH2,
+	{PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801BA_4,
 	 PCI_ANY_ID, PCI_ANY_ID, 0, 0, INTELICH2},
-	{PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_ICH3,
+	{PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801CA_5,
 	 PCI_ANY_ID, PCI_ANY_ID, 0, 0, INTELICH3},
-	{PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_ICH4,
+	{PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801DB_5,
 	 PCI_ANY_ID, PCI_ANY_ID, 0, 0, INTELICH4},
-	{PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_ICH5,
+	{PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801EB_5,
 	 PCI_ANY_ID, PCI_ANY_ID, 0, 0, INTELICH5},
 	{PCI_VENDOR_ID_SI, PCI_DEVICE_ID_SI_7012,
 	 PCI_ANY_ID, PCI_ANY_ID, 0, 0, SI7012},
@@ -350,9 +304,9 @@ static struct pci_device_id i810_pci_tbl [] = {
 	 PCI_ANY_ID, PCI_ANY_ID, 0, 0, NVIDIA_NFORCE},
 	{PCI_VENDOR_ID_NVIDIA, PCI_DEVICE_ID_NVIDIA_MCP3_AUDIO,
 	 PCI_ANY_ID, PCI_ANY_ID, 0, 0, NVIDIA_NFORCE},
-	{PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_768_AUDIO,
+	{PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_OPUS_7445,
 	 PCI_ANY_ID, PCI_ANY_ID, 0, 0, AMD768},
-	{PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_8111_AC97,
+	{PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_8111_AUDIO,
 	 PCI_ANY_ID, PCI_ANY_ID, 0, 0, AMD8111},
 	{PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_ESB_5,
 	 PCI_ANY_ID, PCI_ANY_ID, 0, 0, INTELICH4},
@@ -1956,8 +1910,8 @@ static int i810_ioctl(struct inode *inode, struct file *file, unsigned int cmd, 
 		}
 
 		/* ICH and ICH0 only support 2 channels */
-		if ( state->card->pci_id == PCI_DEVICE_ID_INTEL_82801 
-		     || state->card->pci_id == PCI_DEVICE_ID_INTEL_82901) 
+		if ( state->card->pci_id == PCI_DEVICE_ID_INTEL_82801AA_5
+		     || state->card->pci_id == PCI_DEVICE_ID_INTEL_82801AB_5) 
 			return put_user(2, (int *)arg);
 	
 		/* Multi-channel support was added with ICH2. Bits in */
@@ -2772,6 +2726,26 @@ static int i810_ac97_probe_and_powerup(struct i810_card *card,struct ac97_codec 
 	return i;
 }
 
+static int is_new_ich(u16 pci_id)
+{
+	switch (pci_id) {
+	case PCI_DEVICE_ID_INTEL_82801DB_5:
+	case PCI_DEVICE_ID_INTEL_82801EB_5:
+	case PCI_DEVICE_ID_INTEL_ESB_5:
+	case PCI_DEVICE_ID_INTEL_ICH6_18:
+		return 1;
+	default:
+		break;
+	}
+
+	return 0;
+}
+
+static inline int ich_use_mmio(struct i810_card *card)
+{
+	return is_new_ich(card->pci_id) && card->use_mmio;
+}
+
 /**
  *	i810_ac97_power_up_bus	-	bring up AC97 link
  *	@card : ICH audio device to power up
@@ -2821,9 +2795,7 @@ static int i810_ac97_power_up_bus(struct i810_card *card)
 	 */	
 	/* see i810_ac97_init for the next 7 lines (jsaw) */
 	inw(card->ac97base);
-	if ((card->pci_id == PCI_DEVICE_ID_INTEL_ICH4 || card->pci_id == PCI_DEVICE_ID_INTEL_ICH5 ||
-	     card->pci_id == PCI_DEVICE_ID_INTEL_ESB_5 || card->pci_id == PCI_DEVICE_ID_INTEL_ICH6_18)
-	    && (card->use_mmio)) {
+	if (ich_use_mmio(card)) {
 		primary_codec_id = (int) readl(card->iobase_mmio + SDM) & 0x3;
 		printk(KERN_INFO "i810_audio: Primary codec has ID %d\n",
 		       primary_codec_id);
@@ -2892,9 +2864,7 @@ static int __devinit i810_ac97_init(struct i810_card *card)
 		   possible IO channels. Bit 0:1 of SDM then holds the 
 		   last codec ID spoken to. 
 		*/
-		if ((card->pci_id == PCI_DEVICE_ID_INTEL_ICH4 || card->pci_id == PCI_DEVICE_ID_INTEL_ICH5 ||
-		     card->pci_id == PCI_DEVICE_ID_INTEL_ESB_5 || card->pci_id == PCI_DEVICE_ID_INTEL_ICH6_18)
-		    && (card->use_mmio)) {
+		if (ich_use_mmio(card)) {
 			ac97_id = (int) readl(card->iobase_mmio + SDM) & 0x3;
 			printk(KERN_INFO "i810_audio: Connection %d with codec id %d\n",
 			       num_ac97, ac97_id);
