@@ -394,7 +394,11 @@ enum register_offsets {
 	SDCFG			= 0xF8
 };
 /* the values for the 'magic' registers above (PGSEL=1) */
+#ifdef CONFIG_NATSEMI_CABLE_MAGIC
+#define PMDCSR_VAL	0x1898
+#else
 #define PMDCSR_VAL	0x189C
+#endif
 #define TSTDAT_VAL	0x0
 #define DSPCFG_VAL	0x5040
 #define SDCFG_VAL	0x008c
