@@ -126,20 +126,20 @@ static int cpufreq_proc_read (
 
 		p += sprintf(p, "CPU%3d    %9d kHz (%3d %%)  -  %9d kHz (%3d %%)  -  ",
 			     i , policy.min, min_pctg, policy.max, max_pctg);
-		switch (policy.policy) {
-		case CPUFREQ_POLICY_POWERSAVE:
-			p += sprintf(p, "powersave\n");
-			break;
-		case CPUFREQ_POLICY_PERFORMANCE:
-			p += sprintf(p, "performance\n");
-			break;
-		case CPUFREQ_POLICY_GOVERNOR:
+		if (policy.policy) {
+			switch (policy.policy) {
+				case CPUFREQ_POLICY_POWERSAVE:
+				p += sprintf(p, "powersave\n");
+				break;	
+			case CPUFREQ_POLICY_PERFORMANCE:
+				p += sprintf(p, "performance\n");
+				break;
+			default:
+				p += sprintf(p, "INVALID\n");
+				break;
+			} 
+		} else
 			p += snprintf(p, CPUFREQ_NAME_LEN, "%s\n", policy.governor->name);
-			break;
-		default:
-			p += sprintf(p, "INVALID\n");
-			break;
-		}
 	}
 end:
 	len = (p - page);
