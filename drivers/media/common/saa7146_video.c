@@ -220,7 +220,7 @@ static int try_fmt(struct saa7146_fh *fh, struct v4l2_format *f)
 	}
 }
 
-static int start_preview(struct saa7146_fh *fh)
+int saa7146_start_preview(struct saa7146_fh *fh)
 {
 	struct saa7146_dev *dev = fh->dev;
 	struct saa7146_vv *vv = dev->vv_data;
@@ -266,12 +266,12 @@ static int start_preview(struct saa7146_fh *fh)
 	return 0;
 }
 
-static int stop_preview(struct saa7146_fh *fh)
+int saa7146_stop_preview(struct saa7146_fh *fh)
 {
 	struct saa7146_dev *dev = fh->dev;
 	struct saa7146_vv *vv = dev->vv_data;
 
-	DEB_EE(("saa7146.o: stop_preview()\n"));
+	DEB_EE(("saa7146.o: saa7146_stop_preview()\n"));
 
 	/* check if overlay is running */
 	if( 0 == vv->ov_data ) {
@@ -333,8 +333,8 @@ static int s_fmt(struct saa7146_fh *fh, struct v4l2_format *f)
 		if( vv->ov_data != NULL ) {
 			if( fh == vv->ov_data->fh) {
 				spin_lock_irqsave(&dev->slock,flags);
-				stop_preview(fh);
-				start_preview(fh);
+				saa7146_stop_preview(fh);
+				saa7146_start_preview(fh);
 				spin_unlock_irqrestore(&dev->slock,flags);
 			}
 		}
@@ -522,8 +522,8 @@ static int set_control(struct saa7146_fh *fh, struct v4l2_control *c)
 		if( 0 != vv->ov_data ) {
 			if( fh == vv->ov_data->fh ) {
 				spin_lock_irqsave(&dev->slock,flags);
-				stop_preview(fh);
-				start_preview(fh);
+				saa7146_stop_preview(fh);
+				saa7146_start_preview(fh);
 				spin_unlock_irqrestore(&dev->slock,flags);
 			}
 		}
@@ -747,12 +747,12 @@ int saa7146_video_do_ioctl(struct inode *inode, struct file *file, unsigned int 
 	
 	if( 0 != (dev->ext->ext_vv_data->ioctls[ee].flags & SAA7146_EXCLUSIVE) ) {
 		DEB_D(("extension handles ioctl exclusive.\n"));
-		result = dev->ext->ext_vv_data->ioctl(dev, cmd, arg);
+		result = dev->ext->ext_vv_data->ioctl(fh, cmd, arg);
 		return result;
 	}
 	if( 0 != (dev->ext->ext_vv_data->ioctls[ee].flags & SAA7146_BEFORE) ) {
 		DEB_D(("extension handles ioctl before.\n"));
-		result = dev->ext->ext_vv_data->ioctl(dev, cmd, arg);
+		result = dev->ext->ext_vv_data->ioctl(fh, cmd, arg);
 		if( -EAGAIN != result ) {
 			return result;
 		}
@@ -968,7 +968,7 @@ int saa7146_video_do_ioctl(struct inode *inode, struct file *file, unsigned int 
 
 		if( vv->ov_data != NULL ) {
 			ov_fh = vv->ov_data->fh;
-			stop_preview(ov_fh);
+			saa7146_stop_preview(ov_fh);
 			restart_overlay = 1;
 		}
 
@@ -983,7 +983,7 @@ int saa7146_video_do_ioctl(struct inode *inode, struct file *file, unsigned int 
 		}
 
 		if( 0 != restart_overlay ) {
-			start_preview(ov_fh);
+			saa7146_start_preview(ov_fh);
 		}
 		up(&dev->lock);
 
@@ -1013,7 +1013,7 @@ int saa7146_video_do_ioctl(struct inode *inode, struct file *file, unsigned int 
 				}
 			}
 			spin_lock_irqsave(&dev->slock,flags);
-			err = start_preview(fh);
+			err = saa7146_start_preview(fh);
 			spin_unlock_irqrestore(&dev->slock,flags);
 		} else {
 			if( vv->ov_data != NULL ) {
@@ -1022,7 +1022,7 @@ int saa7146_video_do_ioctl(struct inode *inode, struct file *file, unsigned int 
 				}
 			}
 			spin_lock_irqsave(&dev->slock,flags);
-			err = stop_preview(fh);
+			err = saa7146_stop_preview(fh);
 			spin_unlock_irqrestore(&dev->slock,flags);
 		}
 		return err;
@@ -1287,7 +1287,7 @@ static void video_close(struct saa7146_dev *dev, struct saa7146_fh *fh, struct f
 	if( 0 != vv->ov_data ) {
 		if( fh == vv->ov_data->fh ) {
 			spin_lock_irqsave(&dev->slock,flags);
-			stop_preview(fh);
+			saa7146_stop_preview(fh);
 			spin_unlock_irqrestore(&dev->slock,flags);
 		}
 	}
@@ -1331,7 +1331,7 @@ static ssize_t video_read(struct file *file, char *data, size_t count, loff_t *p
 
 	if( vv->ov_data != NULL ) {
 		ov_fh = vv->ov_data->fh;
-		stop_preview(ov_fh);
+		saa7146_stop_preview(ov_fh);
 		restart_overlay = 1;
 	}
 
@@ -1343,7 +1343,7 @@ static ssize_t video_read(struct file *file, char *data, size_t count, loff_t *p
 
 	/* restart overlay if it was active before */
 	if( 0 != restart_overlay ) {
-		start_preview(ov_fh);
+		saa7146_start_preview(ov_fh);
 	}
 	
 	return ret;
@@ -1360,3 +1360,6 @@ struct saa7146_use_ops saa7146_video_uops = {
 };
 
 EXPORT_SYMBOL_GPL(saa7146_video_uops);
+
+EXPORT_SYMBOL_GPL(saa7146_start_preview);
+EXPORT_SYMBOL_GPL(saa7146_stop_preview);

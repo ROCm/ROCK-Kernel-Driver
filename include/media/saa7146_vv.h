@@ -10,12 +10,10 @@
 #define BUFFER_TIMEOUT     (HZ/2)  /* 0.5 seconds */
 
 #define WRITE_RPS0(x) do { \
-	static int count = 0;	\
 	dev->d_rps0.cpu_addr[ count++ ] = cpu_to_le32(x); \
 	} while (0);
 
 #define WRITE_RPS1(x) do { \
-	static int count = 0;	\
 	dev->d_rps1.cpu_addr[ count++ ] = cpu_to_le32(x); \
 	} while (0);
 
@@ -166,7 +164,7 @@ struct saa7146_ext_vv
 	int (*std_callback)(struct saa7146_dev*, struct saa7146_standard *);
 		
 	struct saa7146_extension_ioctls *ioctls;
-	int (*ioctl)(struct saa7146_dev*, unsigned int cmd, void *arg);
+	int (*ioctl)(struct saa7146_fh*, unsigned int cmd, void *arg);
 };
 
 struct saa7146_use_ops  {
@@ -201,6 +199,8 @@ void saa7146_set_gpio(struct saa7146_dev *saa, u8 pin, u8 data);
 
 /* from saa7146_video.c */
 extern struct saa7146_use_ops saa7146_video_uops;
+int saa7146_start_preview(struct saa7146_fh *fh);
+int saa7146_stop_preview(struct saa7146_fh *fh);
 
 /* from saa7146_vbi.c */
 extern struct saa7146_use_ops saa7146_vbi_uops;

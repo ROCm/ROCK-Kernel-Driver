@@ -9,6 +9,7 @@ static int vbi_workaround(struct saa7146_dev *dev)
         u32          *cpu;
         dma_addr_t   dma_addr;
 	
+	int count = 0;
 	int i;
 
 	DECLARE_WAITQUEUE(wait, current);

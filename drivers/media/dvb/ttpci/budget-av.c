@@ -256,8 +256,9 @@ static struct saa7146_extension_ioctls ioctls[] = {
 };
 
 
-static int av_ioctl(struct saa7146_dev *dev, unsigned int cmd, void *arg) 
+static int av_ioctl(struct saa7146_fh *fh, unsigned int cmd, void *arg) 
 {
+	struct saa7146_dev *dev = fh->dev;
 	struct budget_av *budget_av = (struct budget_av*) dev->ext_priv;
 /*
 	struct saa7146_vv *vv = dev->vv_data; 

@@ -246,8 +246,9 @@ int dpc_vbi_bypass(struct saa7146_dev* dev)
 }
 #endif
 
-static int dpc_ioctl(struct saa7146_dev *dev, unsigned int cmd, void *arg) 
+static int dpc_ioctl(struct saa7146_fh *fh, unsigned int cmd, void *arg) 
 {
+	struct saa7146_dev *dev = fh->dev;
 	struct dpc* dpc = (struct dpc*)dev->ext_priv;
 /*
 	struct saa7146_vv *vv = dev->vv_data; 

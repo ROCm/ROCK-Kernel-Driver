@@ -566,8 +566,9 @@ static int saa7111_set_gpio(struct saa7146_dev *dev, int bl)
 	return 0;
 }
 
-static int mxb_ioctl(struct saa7146_dev *dev, unsigned int cmd, void *arg) 
+static int mxb_ioctl(struct saa7146_fh *fh, unsigned int cmd, void *arg) 
 {
+	struct saa7146_dev *dev = fh->dev;
 	struct mxb* mxb = (struct mxb*)dev->ext_priv;
 	struct saa7146_vv *vv = dev->vv_data; 
 	

@@ -181,9 +181,10 @@ static int saa7146_i2c_reset(struct saa7146_dev *dev)
 /* this functions writes out the data-byte 'dword' to the i2c-device.
    it returns 0 if ok, -1 if the transfer failed, -2 if the transfer
    failed badly (e.g. address error) */
-static int saa7146_i2c_writeout(struct saa7146_dev *dev, u32* dword)
+static int saa7146_i2c_writeout(struct saa7146_dev *dev, u32* dword, int short_delay)
 {
 	u32 status = 0, mc2 = 0;
+	int trial = 0;
 	int timeout;
 
 	/* write out i2c-command */
@@ -224,10 +225,13 @@ static int saa7146_i2c_writeout(struct saa7146_dev *dev, u32* dword)
 		/* wait until we get a transfer done or error */
 		timeout = jiffies + HZ/100 + 1; /* 10ms */
 		while(1) {
+			/**
+			 *  first read usually delivers bogus results...
+			 */
+			saa7146_i2c_status(dev);
 			status = saa7146_i2c_status(dev);
-			if( (0x3 == (status & 0x3)) || (0 == (status & 0x1)) ) {
+			if ((status & 0x3) != 1)
 				break;
-			}
 			if (jiffies > timeout) {
 				/* this is normal when probing the bus
 				 * (no answer from nonexisistant device...)
@@ -235,6 +239,9 @@ static int saa7146_i2c_writeout(struct saa7146_dev *dev, u32* dword)
 				DEB_I2C(("saa7146_i2c_writeout: timed out waiting for end of xfer\n"));
 				return -EIO;
 			}
+			if ((++trial < 20) && short_delay)
+				udelay(10);
+			else
 			my_wait(dev,1);
 		}
 	}
@@ -277,6 +284,7 @@ int saa7146_i2c_transfer(struct saa7146_dev *dev, const struct i2c_msg msgs[], i
 	u32* buffer = dev->d_i2c.cpu_addr;
 	int err = 0;
         int address_err = 0;
+        int short_delay = 0;
 	
 	if (down_interruptible (&dev->i2c_lock))
 		return -ERESTARTSYS;
@@ -292,6 +300,8 @@ int saa7146_i2c_transfer(struct saa7146_dev *dev, const struct i2c_msg msgs[], i
 		goto out;
 	}
 
+        if (count > 3) short_delay = 1;
+  
 	do {
 		/* reset the i2c-device if necessary */
 		err = saa7146_i2c_reset(dev);
@@ -302,7 +312,7 @@ int saa7146_i2c_transfer(struct saa7146_dev *dev, const struct i2c_msg msgs[], i
 
 		/* write out the u32s one after another */
 		for(i = 0; i < count; i++) {
-			err = saa7146_i2c_writeout(dev, &buffer[i] );
+			err = saa7146_i2c_writeout(dev, &buffer[i], short_delay);
 			if ( 0 != err) {
 				/* this one is unsatisfying: some i2c slaves on some
 				   dvb cards don't acknowledge correctly, so the saa7146
@@ -357,7 +367,7 @@ out:
 	if( 0 == dev->revision ) {
 		u32 zero = 0;
 		saa7146_i2c_reset(dev);
-		if( 0 != saa7146_i2c_writeout(dev, &zero)) {
+		if( 0 != saa7146_i2c_writeout(dev, &zero, short_delay)) {
 			INFO(("revision 0 error. this should never happen.\n"));
 		}
 	}
