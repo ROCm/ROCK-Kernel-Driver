@@ -1641,11 +1641,6 @@ static dev_link_t *nsp_cs_attach(void)
 
 	nsp_dbg(NSP_DEBUG_INIT, "info=0x%p", info);
 
-	/* Initialize the dev_link_t structure */
-	init_timer(&link->release);
-	link->release.function	 = (void (*)(unsigned long))(&nsp_cs_release);
-	link->release.data	 = (unsigned long)link;
-
 	/* The io structure describes IO port mapping */
 	link->io.NumPorts1	 = 0x10;
 	link->io.Attributes1	 = IO_DATA_PATH_WIDTH_AUTO;
@@ -1721,14 +1716,8 @@ static void nsp_cs_detach(dev_link_t *link)
 		return;
 	}
 
-	del_timer(&link->release);
-	if (link->state & DEV_CONFIG) {
+	if (link->state & DEV_CONFIG)
 		nsp_cs_release(link);
-		if (link->state & DEV_STALE_CONFIG) {
-			link->state |= DEV_STALE_LINK;
-			return;
-		}
-	}
 
 	/* Break the link with Card Services */
 	if (link->handle) {
@@ -2039,17 +2028,6 @@ static void nsp_cs_release(dev_link_t *link)
 
 	nsp_dbg(NSP_DEBUG_INIT, "link=0x%p", link);
 
-	/*
-	 * If the device is currently in use, we won't release until it
-	 * is actually closed.
-	 */
-	if (link->open) {
-		nsp_dbg(NSP_DEBUG_INIT, "release postponed, '%s' still open",
-			link->dev->dev_name);
-		link->state |= DEV_STALE_CONFIG;
-		return;
-	}
-
 	/* Unlink the device chain */
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,2))
 	if (info->host != NULL) {
@@ -2079,11 +2057,6 @@ static void nsp_cs_release(dev_link_t *link)
 		scsi_host_put(info->host);
 	}
 #endif
-
-	if (link->state & DEV_STALE_LINK) {
-		nsp_dbg(NSP_DEBUG_INIT, "stale link");
-		nsp_cs_detach(link);
-	}
 } /* nsp_cs_release */
 
 /*======================================================================
@@ -2115,7 +2088,7 @@ static int nsp_cs_event(event_t		       event,
 		link->state &= ~DEV_PRESENT;
 		if (link->state & DEV_CONFIG) {
 			((scsi_info_t *)link->priv)->stop = 1;
-			mod_timer(&link->release, jiffies + HZ/20);
+			nsp_cs_release(link);
 		}
 		break;
 
@@ -2228,7 +2201,6 @@ static void __exit nsp_cs_exit(void)
 
 	/* XXX: this really needs to move into generic code.. */
 	while (dev_list != NULL) {
-		del_timer(&dev_list->release);
 		if (dev_list->state & DEV_CONFIG) {
 			nsp_cs_release(dev_list);
 		}
