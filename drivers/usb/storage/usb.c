@@ -99,13 +99,6 @@ MODULE_LICENSE("GPL");
 
 static int my_host_number;
 
-/*
- * kernel thread actions
- */
-
-#define US_ACT_COMMAND		1
-#define US_ACT_EXIT		5
-
 /* The list of structures and the protective lock for them */
 struct us_data *us_list;
 struct semaphore us_list_semaphore;
@@ -426,7 +419,7 @@ static int usb_stor_control_thread(void * __us)
 		down(&(us->dev_semaphore));
 
 		/* our device has gone - pretend not ready */
-		if (atomic_read(&us->device_state) == US_STATE_DETACHED) {
+		if (!test_bit(DEV_ATTACHED, &us->bitflags)) {
 			US_DEBUGP("Request is for removed device\n");
 			/* For REQUEST_SENSE, it's the data.  But
 			 * for anything else, it should look like
@@ -450,7 +443,7 @@ static int usb_stor_control_thread(void * __us)
 				       sizeof(usb_stor_sense_notready));
 				us->srb->result = CHECK_CONDITION << 1;
 			}
-		} else { /* atomic_read(&us->device_state) == STATE_DETACHED */
+		} else { /* test_bit(DEV_ATTACHED, &us->bitflags) */
 
 			/* Handle those devices which need us to fake 
 			 * their inquiry data */
@@ -557,9 +550,8 @@ static void * storage_probe(struct usb_device *dev, unsigned int ifnum,
 	unsigned int flags;
 	struct us_unusual_dev *unusual_dev;
 	struct us_data *ss = NULL;
-#ifdef CONFIG_USB_STORAGE_SDDR09
 	int result;
-#endif
+	int new_device = 0;
 
 	/* these are temporary copies -- we test on these, then put them
 	 * in the us-data structure 
@@ -570,13 +562,13 @@ static void * storage_probe(struct usb_device *dev, unsigned int ifnum,
 	u8 subclass = 0;
 	u8 protocol = 0;
 
-	/* the altsettting on the interface we're probing that matched our
+	/* the altsetting on the interface we're probing that matched our
 	 * usb_match_id table
 	 */
 	struct usb_interface *intf = dev->actconfig->interface;
 	struct usb_interface_descriptor *altsetting =
 		intf[ifnum].altsetting + intf[ifnum].act_altsetting;
-	US_DEBUGP("act_altsettting is %d\n", intf[ifnum].act_altsetting);
+	US_DEBUGP("act_altsetting is %d\n", intf[ifnum].act_altsetting);
 
 	/* clear the temporary strings */
 	memset(mf, 0, sizeof(mf));
@@ -663,7 +655,7 @@ static void * storage_probe(struct usb_device *dev, unsigned int ifnum,
 		return NULL;
 	}
 
-	/* At this point, we're committed to using the device */
+	/* At this point, we've decided to try to use the device */
 	usb_get_dev(dev);
 
 	/* clear the GUID and fetch the strings */
@@ -696,7 +688,8 @@ static void * storage_probe(struct usb_device *dev, unsigned int ifnum,
 	 */
 	ss = us_list;
 	while ((ss != NULL) && 
-	       ((ss->pusb_dev) || !GUID_EQUAL(guid, ss->guid)))
+	           (test_bit(DEV_ATTACHED, &ss->bitflags) ||
+		    !GUID_EQUAL(guid, ss->guid)))
 		ss = ss->next;
 
 	if (ss != NULL) {
@@ -710,29 +703,23 @@ static void * storage_probe(struct usb_device *dev, unsigned int ifnum,
 		/* establish the connection to the new device upon reconnect */
 		ss->ifnum = ifnum;
 		ss->pusb_dev = dev;
-		atomic_set(&ss->device_state, US_STATE_ATTACHED);
+		set_bit(DEV_ATTACHED, &ss->bitflags);
 
 		/* copy over the endpoint data */
-		if (ep_in)
-			ss->ep_in = ep_in->bEndpointAddress & 
-				USB_ENDPOINT_NUMBER_MASK;
-		if (ep_out)
-			ss->ep_out = ep_out->bEndpointAddress & 
-				USB_ENDPOINT_NUMBER_MASK;
+		ss->ep_in = ep_in->bEndpointAddress & 
+			USB_ENDPOINT_NUMBER_MASK;
+		ss->ep_out = ep_out->bEndpointAddress & 
+			USB_ENDPOINT_NUMBER_MASK;
 		ss->ep_int = ep_int;
 
 		/* allocate an IRQ callback if one is needed */
-		if ((ss->protocol == US_PR_CBI) && usb_stor_allocate_irq(ss)) {
-			usb_put_dev(dev);
-			return NULL;
-		}
+		if ((ss->protocol == US_PR_CBI) && usb_stor_allocate_irq(ss))
+			goto BadDevice;
 
 		/* allocate the URB we're going to use */
 		ss->current_urb = usb_alloc_urb(0, GFP_KERNEL);
-		if (!ss->current_urb) {
-			usb_put_dev(dev);
-			return NULL;
-		}
+		if (!ss->current_urb)
+			goto BadDevice;
 
                 /* Re-Initialize the device if it needs it */
 		if (unusual_dev && unusual_dev->initFunction)
@@ -752,14 +739,12 @@ static void * storage_probe(struct usb_device *dev, unsigned int ifnum,
 			return NULL;
 		}
 		memset(ss, 0, sizeof(struct us_data));
+		new_device = 1;
 
 		/* allocate the URB we're going to use */
 		ss->current_urb = usb_alloc_urb(0, GFP_KERNEL);
-		if (!ss->current_urb) {
-			kfree(ss);
-			usb_put_dev(dev);
-			return NULL;
-		}
+		if (!ss->current_urb)
+			goto BadDevice;
 
 		/* Initialize the mutexes only when the struct is new */
 		init_completion(&(ss->notify));
@@ -776,12 +761,10 @@ static void * storage_probe(struct usb_device *dev, unsigned int ifnum,
 		ss->unusual_dev = unusual_dev;
 
 		/* copy over the endpoint data */
-		if (ep_in)
-			ss->ep_in = ep_in->bEndpointAddress & 
-				USB_ENDPOINT_NUMBER_MASK;
-		if (ep_out)
-			ss->ep_out = ep_out->bEndpointAddress & 
-				USB_ENDPOINT_NUMBER_MASK;
+		ss->ep_in = ep_in->bEndpointAddress & 
+			USB_ENDPOINT_NUMBER_MASK;
+		ss->ep_out = ep_out->bEndpointAddress & 
+			USB_ENDPOINT_NUMBER_MASK;
 		ss->ep_int = ep_int;
 
 		/* establish the connection to the new device */
@@ -904,12 +887,8 @@ static void * storage_probe(struct usb_device *dev, unsigned int ifnum,
 #endif
 
 		default:
-			ss->transport_name = "Unknown";
-			kfree(ss->current_urb);
-			kfree(ss);
-			usb_put_dev(dev);
-			return NULL;
-			break;
+			/* ss->transport_name = "Unknown"; */
+			goto BadDevice;
 		}
 		US_DEBUGP("Transport: %s\n", ss->transport_name);
 
@@ -959,22 +938,14 @@ static void * storage_probe(struct usb_device *dev, unsigned int ifnum,
 #endif
 
 		default:
-			ss->protocol_name = "Unknown";
-			kfree(ss->current_urb);
-			kfree(ss);
-			usb_put_dev(dev);
-			return NULL;
-			break;
+			/* ss->protocol_name = "Unknown"; */
+			goto BadDevice;
 		}
 		US_DEBUGP("Protocol: %s\n", ss->protocol_name);
 
 		/* allocate an IRQ callback if one is needed */
-		if ((ss->protocol == US_PR_CBI) && usb_stor_allocate_irq(ss)) {
-			kfree(ss->current_urb);
-			kfree(ss);
-			usb_put_dev(dev);
-			return NULL;
-		}
+		if ((ss->protocol == US_PR_CBI) && usb_stor_allocate_irq(ss))
+			goto BadDevice;
 
 		/*
 		 * Since this is a new device, we need to generate a scsi 
@@ -1001,16 +972,13 @@ static void * storage_probe(struct usb_device *dev, unsigned int ifnum,
 
 		/* start up our control thread */
 		atomic_set(&ss->sm_state, US_STATE_IDLE);
-		atomic_set(&ss->device_state, US_STATE_ATTACHED);
+		set_bit(DEV_ATTACHED, &ss->bitflags);
 		ss->pid = kernel_thread(usb_stor_control_thread, ss,
 					CLONE_VM);
 		if (ss->pid < 0) {
 			printk(KERN_WARNING USB_STORAGE 
 			       "Unable to start control thread\n");
-			kfree(ss->current_urb);
-			kfree(ss);
-			usb_put_dev(dev);
-			return NULL;
+			goto BadDevice;
 		}
 
 		/* wait for the thread to start */
@@ -1018,7 +986,17 @@ static void * storage_probe(struct usb_device *dev, unsigned int ifnum,
 
 		/* now register	 - our detect function will be called */
 		ss->htmplt.module = THIS_MODULE;
-		scsi_register_host(&(ss->htmplt));
+		result = scsi_register_host(&(ss->htmplt));
+		if (result) {
+			printk(KERN_WARNING USB_STORAGE
+				"Unable to register the scsi host\n");
+
+			/* tell the control thread to exit */
+			ss->action = US_ACT_EXIT;
+			up(&ss->sema);
+			wait_for_completion(&ss->notify);
+			goto BadDevice;
+		}
 
 		/* lock access to the data structures */
 		down(&us_list_semaphore);
@@ -1038,6 +1016,31 @@ static void * storage_probe(struct usb_device *dev, unsigned int ifnum,
 
 	/* return a pointer for the disconnect function */
 	return ss;
+
+	/* we come here if there are any problems */
+	BadDevice:
+	US_DEBUGP("storage_probe() failed\n");
+	down(&ss->irq_urb_sem);
+	if (ss->irq_urb) {
+		usb_unlink_urb(ss->irq_urb);
+		usb_free_urb(ss->irq_urb);
+		ss->irq_urb = NULL;
+	}
+	up(&ss->irq_urb_sem);
+	if (ss->current_urb) {
+		usb_unlink_urb(ss->current_urb);
+		usb_free_urb(ss->current_urb);
+		ss->current_urb = NULL;
+	}
+
+	clear_bit(DEV_ATTACHED, &ss->bitflags);
+	ss->pusb_dev = NULL;
+	if (new_device)
+		kfree(ss);
+	else
+		up(&ss->dev_semaphore);
+	usb_put_dev(dev);
+	return NULL;
 }
 
 /* Handle a disconnect event from the USB core */
@@ -1078,7 +1081,7 @@ static void storage_disconnect(struct usb_device *dev, void *ptr)
 	/* mark the device as gone */
 	usb_put_dev(ss->pusb_dev);
 	ss->pusb_dev = NULL;
-	atomic_set(&ss->sm_state, US_STATE_DETACHED);
+	clear_bit(DEV_ATTACHED, &ss->bitflags);
 
 	/* unlock access to the device data structure */
 	up(&(ss->dev_semaphore));

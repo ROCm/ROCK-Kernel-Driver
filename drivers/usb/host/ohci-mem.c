@@ -221,6 +221,7 @@ ed_alloc (struct ohci_hcd *hc, int mem_flags)
 	ed = pci_pool_alloc (hc->ed_cache, mem_flags, &dma);
 	if (ed) {
 		memset (ed, 0, sizeof (*ed));
+		INIT_LIST_HEAD (&ed->td_list);
 		ed->dma = dma;
 		/* hash it for later reverse mapping */
 		if (!hash_add_ed (hc, ed, mem_flags)) {
