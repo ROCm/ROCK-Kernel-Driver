@@ -1233,7 +1233,7 @@ static int find_i810(u16 device, const char *name)
 				name);
 		return 0;
 	}
-	
+
 	intel_i810_private.i810_dev = i810_dev;
 	return 1;
 }
@@ -1384,6 +1384,7 @@ static int __devinit agp_intel_probe(struct pci_dev *pdev,
 	default:
 		printk(KERN_ERR PFX "Unsupported Intel chipset (device id: %04x)\n",
 			    pdev->device);
+		agp_put_bridge(bridge);
 		return -ENODEV;
 	};
 
@@ -1406,7 +1407,8 @@ static int __devinit agp_intel_probe(struct pci_dev *pdev,
 	if (!r->start && r->end) {
 		if(pci_assign_resource(pdev, 0)) {
 			printk(KERN_ERR PFX "could not assign resource 0\n");
-			return (-ENODEV);
+			agp_put_bridge(bridge);
+			return -ENODEV;
 		}
 	}
 
@@ -1417,7 +1419,8 @@ static int __devinit agp_intel_probe(struct pci_dev *pdev,
 	*/
 	if (pci_enable_device(pdev)) {
 		printk(KERN_ERR PFX "Unable to Enable PCI device\n");
-		return (-ENODEV);
+		agp_put_bridge(bridge);
+		return -ENODEV;
 	}
 
 	/* Fill in the mode register */
