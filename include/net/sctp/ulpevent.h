@@ -77,8 +77,6 @@ static inline struct sctp_ulpevent *sctp_skb2event(struct sk_buff *skb)
 	return (struct sctp_ulpevent *)skb->cb;
 }
 
-struct sctp_ulpevent *sctp_ulpevent_new(int size, int flags, int gfp);
-void sctp_ulpevent_init(struct sctp_ulpevent *, int flags);
 void sctp_ulpevent_free(struct sctp_ulpevent *);
 int sctp_ulpevent_is_notification(const struct sctp_ulpevent *);
 void sctp_queue_purge_ulpevents(struct sk_buff_head *list);

@@ -65,8 +65,16 @@ static void sctp_stub_rfree(struct sk_buff *skb)
  */
 }
 
+/* Initialize an ULP event from an given skb.  */
+SCTP_STATIC void sctp_ulpevent_init(struct sctp_ulpevent *event, int msg_flags)
+{
+	memset(event, 0, sizeof(struct sctp_ulpevent));
+	event->msg_flags = msg_flags;
+}
+
 /* Create a new sctp_ulpevent.  */
-struct sctp_ulpevent *sctp_ulpevent_new(int size, int msg_flags, int gfp)
+SCTP_STATIC struct sctp_ulpevent *sctp_ulpevent_new(int size, int msg_flags,
+						    int gfp)
 {
 	struct sctp_ulpevent *event;
 	struct sk_buff *skb;
@@ -82,13 +90,6 @@ struct sctp_ulpevent *sctp_ulpevent_new(int size, int msg_flags, int gfp)
 
 fail:
 	return NULL;
-}
-
-/* Initialize an ULP event from an given skb.  */
-void sctp_ulpevent_init(struct sctp_ulpevent *event, int msg_flags)
-{
-	memset(event, 0, sizeof(struct sctp_ulpevent));
-	event->msg_flags = msg_flags;
 }
 
 /* Is this a MSG_NOTIFICATION?  */

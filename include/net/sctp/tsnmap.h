@@ -120,12 +120,6 @@ struct sctp_tsnmap_iter {
 	__u32 start;
 };
 
-/* Create a new tsnmap.  */
-struct sctp_tsnmap *sctp_tsnmap_new(__u16 len, __u32 init_tsn, int gfp);
-
-/* Dispose of a tsnmap.  */
-void sctp_tsnmap_free(struct sctp_tsnmap *);
-
 /* This macro assists in creation of external storage for variable length
  * internal buffers.  We double allocate so the overflow map works.
  */
@@ -209,15 +203,5 @@ void sctp_tsnmap_renege(struct sctp_tsnmap *, __u32 tsn);
 
 /* Is there a gap in the TSN map? */
 int sctp_tsnmap_has_gap(const struct sctp_tsnmap *);
-
-/* Initialize a gap ack block interator from user-provided memory.  */
-void sctp_tsnmap_iter_init(const struct sctp_tsnmap *,
-			   struct sctp_tsnmap_iter *);
-
-/* Get the next gap ack blocks.  We return 0 if there are no more
- * gap ack blocks.
- */
-int sctp_tsnmap_next_gap_ack(const struct sctp_tsnmap *,
-	struct sctp_tsnmap_iter *,__u16 *start, __u16 *end);
 
 #endif /* __sctp_tsnmap_h__ */
