@@ -2016,8 +2016,6 @@ static void __devexit aty128_remove(struct pci_dev *pdev)
 
 	release_mem_region(pci_resource_start(pdev, 0),
 			   pci_resource_len(pdev, 0));
-	release_mem_region(pci_resource_start(pdev, 1),
-			   pci_resource_len(pdev, 1));
 	release_mem_region(pci_resource_start(pdev, 2),
 			   pci_resource_len(pdev, 2));
 	framebuffer_release(info);

@@ -47,7 +47,7 @@ config DVB_DIBUSB_MISDESIGNED_DEVICES
 	    0x04b4:0x8613 (Artec T1 USB2.0, cold)
 	    0x0574:0x1002 (Artec T1 USB2.0, warm)
 
-	  Say Y if your device one of the mentioned IDs.
+	  Say Y if your device has one of the mentioned IDs.
 
 config DVB_DIBCOM_DEBUG
 	bool "Enable extended debug support for DiBcom USB device"

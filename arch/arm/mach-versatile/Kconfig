@@ -7,7 +7,7 @@ config ARCH_VERSATILE_PB
 	help
 	  Include support for the ARM(R) Versatile/PB platform.
 
-config ARCH_VERSATILE_AB
+config MACH_VERSATILE_AB
 	bool "Support Versatile/AB platform"
 	default n
 	help

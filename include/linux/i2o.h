@@ -976,7 +976,7 @@ extern void i2o_debug_state(struct i2o_controller *c);
 #define I2O_TIMEOUT_MESSAGE_GET		5
 #define I2O_TIMEOUT_RESET		30
 #define I2O_TIMEOUT_STATUS_GET		5
-#define I2O_TIMEOUT_LCT_GET		20
+#define I2O_TIMEOUT_LCT_GET		360
 #define I2O_TIMEOUT_SCSI_SCB_ABORT	240
 
 /* retries */

@@ -2,7 +2,12 @@ Version 1.28
 ------------
 Add module init parm for large SMB buffer size (to allow it to be changed
 from its default of 16K) which is especially useful for large file copy
-when mounting with the directio mount option.
+when mounting with the directio mount option. Fix oops after 
+returning from mount when experimental ExtendedSecurity enabled and
+SpnegoNegotiated returning invalid error. Fix case to retry better when 
+peek returns from 1 to 3 bytes on socket which should have more data.
+Fixed path based calls (such as cifs lookup) to handle path names
+longer than 530 (now can handle PATH_MAX).
 
 Version 1.27
 ------------

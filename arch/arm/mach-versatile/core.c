@@ -189,7 +189,7 @@ static struct map_desc versatile_io_desc[] __initdata = {
  { IO_ADDRESS(VERSATILE_SIC_BASE),   VERSATILE_SIC_BASE,   SZ_4K,      MT_DEVICE },
  { IO_ADDRESS(VERSATILE_VIC_BASE),   VERSATILE_VIC_BASE,   SZ_4K,      MT_DEVICE },
  { IO_ADDRESS(VERSATILE_SCTL_BASE),  VERSATILE_SCTL_BASE,  SZ_4K * 9,  MT_DEVICE },
-#ifdef CONFIG_ARCH_VERSATILE_AB
+#ifdef CONFIG_MACH_VERSATILE_AB
  { IO_ADDRESS(VERSATILE_GPIO0_BASE), VERSATILE_GPIO0_BASE, SZ_4K,      MT_DEVICE },
  { IO_ADDRESS(VERSATILE_IB2_BASE),   VERSATILE_IB2_BASE,   SZ_64M,     MT_DEVICE },
 #endif
@@ -341,7 +341,7 @@ static void versatile_oscvco_set(struct clk *clk, struct icst307_vco vco)
 	unsigned long sys_lock = IO_ADDRESS(VERSATILE_SYS_BASE) + VERSATILE_SYS_LOCK_OFFSET;
 #if defined(CONFIG_ARCH_VERSATILE_PB)
 	unsigned long sys_osc = IO_ADDRESS(VERSATILE_SYS_BASE) + VERSATILE_SYS_OSC4_OFFSET;
-#elif defined(CONFIG_ARCH_VERSATILE_AB)
+#elif defined(CONFIG_MACH_VERSATILE_AB)
 	unsigned long sys_osc = IO_ADDRESS(VERSATILE_SYS_BASE) + VERSATILE_SYS_OSC1_OFFSET;
 #endif
 	u32 val;
@@ -512,7 +512,7 @@ static void versatile_clcd_disable(struct clcd_fb *fb)
 	val &= ~SYS_CLCD_NLCDIOON | SYS_CLCD_PWR3V5SWITCH;
 	writel(val, sys_clcd);
 
-#ifdef CONFIG_ARCH_VERSATILE_AB
+#ifdef CONFIG_MACH_VERSATILE_AB
 	/*
 	 * If the LCD is Sanyo 2x5 in on the IB2 board, turn the back-light off
 	 */
@@ -561,7 +561,7 @@ static void versatile_clcd_enable(struct clcd_fb *fb)
 	val |= SYS_CLCD_NLCDIOON | SYS_CLCD_PWR3V5SWITCH;
 	writel(val, sys_clcd);
 
-#ifdef CONFIG_ARCH_VERSATILE_AB
+#ifdef CONFIG_MACH_VERSATILE_AB
 	/*
 	 * If the LCD is Sanyo 2x5 in on the IB2 board, turn the back-light on
 	 */
