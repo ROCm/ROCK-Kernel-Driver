@@ -79,6 +79,7 @@ spinlock_t die_lock = SPIN_LOCK_UNLOCKED;
 void die(const char * str, struct pt_regs * fp, long err)
 {
 	static int die_counter;
+	int nl = 0;
 	console_verbose();
 	spin_lock_irq(&die_lock);
 #ifdef CONFIG_PMAC_BACKLIGHT
@@ -86,6 +87,16 @@ void die(const char * str, struct pt_regs * fp, long err)
 	set_backlight_level(BACKLIGHT_MAX);
 #endif
 	printk("Oops: %s, sig: %ld [#%d]\n", str, err, ++die_counter);
+#ifdef CONFIG_PREEMPT
+	printk("PREEMPT ");
+	nl = 1;
+#endif
+#ifdef CONFIG_SMP
+	printk("SMP NR_CPUS=%d ", NR_CPUS);
+	nl = 1;
+#endif
+	if (nl)
+		printk("\n");
 	show_regs(fp);
 	spin_unlock_irq(&die_lock);
 	/* do_exit() should take care of panic'ing from an interrupt
