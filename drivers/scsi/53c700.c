@@ -1709,7 +1709,6 @@ NCR_700_proc_directory_info(struct Scsi_Host *host, char *proc_buf, char **start
 {
 	static char buf[4096];	/* 1 page should be sufficient */
 	int len = 0;
-	struct Scsi_Host *host;
 	struct NCR_700_Host_Parameters *hostdata;
 	Scsi_Device *SDp;
 
