@@ -35,6 +35,9 @@
 
 #include "include/acpi.h"
 
+#define PREFIX			"ACPI: "
+
+extern int			acpi_disabled;
 
 /* TBD: Make dynamic */
 #define ACPI_MAX_HANDLES	10
@@ -48,7 +51,6 @@ struct acpi_handle_list {
 acpi_status acpi_extract_package (acpi_object *, acpi_buffer *, acpi_buffer *);
 acpi_status acpi_evaluate_integer (acpi_handle, acpi_string, acpi_object_list *, unsigned long *);
 acpi_status acpi_evaluate_reference (acpi_handle, acpi_string, acpi_object_list *, struct acpi_handle_list *);
-
 
 #ifdef CONFIG_ACPI_BUS
 
@@ -115,26 +117,6 @@ struct acpi_driver {
 	char			*ids;		/* Supported Hardware IDs */
 	struct acpi_device_ops	ops;
 };
-
-enum acpi_blacklist_predicates
-{
-	all_versions,
-	less_than_or_equal,
-	equal,
-	greater_than_or_equal,
-};
-
-struct acpi_blacklist_item
-{
-	char		oem_id[7];
-	char		oem_table_id[9];
-	u32		oem_revision;
-	acpi_table_type table;
-	enum acpi_blacklist_predicates oem_revision_predicate;
-	char		*reason;
-	u32		is_critical_error;
-};
-
 
 /*
  * ACPI Device
@@ -310,10 +292,6 @@ int acpi_bus_generate_event (struct acpi_device *device, u8 type, int data);
 int acpi_bus_receive_event (struct acpi_bus_event *event);
 int acpi_bus_register_driver (struct acpi_driver *driver);
 int acpi_bus_unregister_driver (struct acpi_driver *driver);
-int acpi_bus_scan (struct acpi_device *device);
-int acpi_init (void);
-void acpi_exit (void);
-
 
 #endif /*CONFIG_ACPI_BUS*/
 

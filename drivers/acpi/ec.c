@@ -38,9 +38,6 @@
 #define _COMPONENT		ACPI_EC_COMPONENT
 ACPI_MODULE_NAME		("acpi_ec")
 
-#define PREFIX			"ACPI: "
-
-
 #define ACPI_EC_FLAG_OBF	0x01	/* Output buffer full */
 #define ACPI_EC_FLAG_IBF	0x02	/* Input buffer full */
 #define ACPI_EC_FLAG_SCI	0x20	/* EC-SCI occurred */
@@ -784,12 +781,14 @@ error:
 }
 
 
-int __init
-acpi_ec_init (void)
+static int __init acpi_ec_init (void)
 {
 	int			result = 0;
 
 	ACPI_FUNCTION_TRACE("acpi_ec_init");
+
+	if (acpi_disabled)
+		return_VALUE(0);
 
 	result = acpi_bus_register_driver(&acpi_ec_driver);
 	if (result < 0) {
@@ -799,6 +798,8 @@ acpi_ec_init (void)
 
 	return_VALUE(0);
 }
+
+subsys_initcall(acpi_ec_init);
 
 void __exit
 acpi_ec_ecdt_exit (void)

@@ -123,11 +123,7 @@
 #define ACPI_EC_FILE_INFO		"info"
 
 #ifdef CONFIG_ACPI_EC
-
 int acpi_ec_ecdt_probe (void);
-int acpi_ec_init (void);
-void acpi_ec_exit (void);
-
 #endif
 
 
@@ -159,8 +155,6 @@ void acpi_ec_exit (void);
 #define ACPI_PCI_ROOT_DRIVER_NAME	"ACPI PCI Root Bridge Driver"
 #define ACPI_PCI_ROOT_DEVICE_NAME	"PCI Root Bridge"
 
-int acpi_pci_root_init (void);
-void acpi_pci_root_exit (void);
 void acpi_pci_get_translations (acpi_pci_id* id, u64* mem_tra, u64* io_tra);
 
 /* ACPI PCI Interrupt Link (pci_link.c) */
@@ -174,8 +168,6 @@ void acpi_pci_get_translations (acpi_pci_id* id, u64* mem_tra, u64* io_tra);
 
 int acpi_pci_link_check (void);
 int acpi_pci_link_get_irq (acpi_handle handle, int index);
-int acpi_pci_link_init (void);
-void acpi_pci_link_exit (void);
 
 /* ACPI PCI Interrupt Routing (pci_irq.c) */
 
@@ -210,9 +202,6 @@ int acpi_pci_bind_root (struct acpi_device *device, acpi_pci_id *id, struct pci_
 
 int acpi_power_get_inferred_state (struct acpi_device *device);
 int acpi_power_transition (struct acpi_device *device, int state);
-int acpi_power_init (void);
-void acpi_power_exit (void);
-
 #endif
 
 
@@ -256,14 +245,6 @@ int acpi_processor_set_thermal_limit(acpi_handle handle, int type);
 #define ACPI_SYSTEM_FILE_SLEEP		"sleep"
 #define ACPI_SYSTEM_FILE_DEBUG_LAYER	"debug_layer"
 #define ACPI_SYSTEM_FILE_DEBUG_LEVEL	"debug_level"
-
-#ifdef CONFIG_ACPI_SYSTEM
-
-int acpi_system_init (void);
-void acpi_system_exit (void);
-
-#endif
-
 
 /* --------------------------------------------------------------------------
                                  Thermal Zone

@@ -41,8 +41,6 @@ ACPI_MODULE_NAME		("pci_root")
 
 extern struct pci_ops *pci_root_ops;
 
-#define PREFIX			"ACPI: "
-
 static int acpi_pci_root_add (struct acpi_device *device);
 static int acpi_pci_root_remove (struct acpi_device *device, int type);
 
@@ -318,10 +316,12 @@ acpi_pci_root_remove (
 }
 
 
-int __init
-acpi_pci_root_init (void)
+static int __init acpi_pci_root_init (void)
 {
 	ACPI_FUNCTION_TRACE("acpi_pci_root_init");
+
+	if (acpi_disabled)
+		return_VALUE(0);
 
 	/* DEBUG:
 	acpi_dbg_layer = ACPI_PCI_COMPONENT;
@@ -336,13 +336,5 @@ acpi_pci_root_init (void)
 	return_VALUE(0);
 }
 
+subsys_initcall(acpi_pci_root_init);
 
-void __exit
-acpi_pci_root_exit (void)
-{
-	ACPI_FUNCTION_TRACE("acpi_pci_root_exit");
-
-	acpi_bus_unregister_driver(&acpi_pci_root_driver);
-
-	return_VOID;
-}

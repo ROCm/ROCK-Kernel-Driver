@@ -22,6 +22,7 @@
 #include <linux/pm.h>
 #include <linux/device.h>
 #include <linux/suspend.h>
+#include <linux/acpi.h>
 #include <asm/uaccess.h>
 #include <asm/acpi.h>
 #include <asm/tlbflush.h>
