@@ -206,8 +206,6 @@ long sys_sigaction(int sig, const struct old_sigaction *act,
  *
  * Each of these things must be a multiple of 16 bytes in size.
  *
- * XXX ultimately we will have to stack up a siginfo and ucontext
- * for each rt signal.
  */
 struct sigregs {
 	elf_gregset_t	gp_regs;
@@ -261,6 +259,8 @@ int sys_rt_sigreturn(unsigned long r3, unsigned long r4, unsigned long r5,
 	current->blocked = set;
 	recalc_sigpending();
 	spin_unlock_irq(&current->sigmask_lock);
+	if (regs->msr & MSR_FP)
+		giveup_fpu(current);
 
 	/* restore registers -
 	 * sigctx is initialized to point to the 
@@ -268,10 +268,7 @@ int sys_rt_sigreturn(unsigned long r3, unsigned long r4, unsigned long r5,
 	 * see handle_signal()
 	 */
 	sr = (struct sigregs *) sigctx.regs;
-	if (regs->msr & MSR_FP )
-		giveup_fpu(current);
-	if (copy_from_user(saved_regs, &sr->gp_regs,
-			   sizeof(sr->gp_regs)))
+	if (copy_from_user(saved_regs, &sr->gp_regs, sizeof(sr->gp_regs)))
 		goto badframe;
 	saved_regs[PT_MSR] = (regs->msr & ~MSR_USERCHANGE)
 		| (saved_regs[PT_MSR] & MSR_USERCHANGE);
@@ -381,13 +378,12 @@ long sys_sigreturn(unsigned long r3, unsigned long r4, unsigned long r5,
 	current->blocked = set;
 	recalc_sigpending();
 	spin_unlock_irq(&current->sigmask_lock);
+	if (regs->msr & MSR_FP )
+		giveup_fpu(current);
 
 	/* restore registers */
 	sr = (struct sigregs *) sigctx.regs;
-	if (regs->msr & MSR_FP )
-		giveup_fpu(current);
-	if (copy_from_user(saved_regs, &sr->gp_regs,
-			   sizeof(sr->gp_regs)))
+	if (copy_from_user(saved_regs, &sr->gp_regs, sizeof(sr->gp_regs)))
 		goto badframe;
 	saved_regs[PT_MSR] = (regs->msr & ~MSR_USERCHANGE)
 		| (saved_regs[PT_MSR] & MSR_USERCHANGE);

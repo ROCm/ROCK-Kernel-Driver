@@ -512,7 +512,6 @@ long sys32_rt_sigreturn(unsigned long r3, unsigned long r4, unsigned long r5,
 	elf_gregset_t32 saved_regs;   /* an array of 32 bit register values */
 	sigset_t signal_set; 
 	stack_t stack;
-	unsigned int previous_stack;
 
 	ret = 0;
 	/* Adjust the inputted reg1 to point to the first rt signal frame */
