@@ -5,6 +5,11 @@
  * pte chain.
  */
 
+#include <linux/slab.h>
+
+struct pte_chain;
+extern kmem_cache_t *pte_chain_cache;
+
 static inline void pte_chain_lock(struct page *page)
 {
 	/*
@@ -30,4 +35,13 @@ static inline void pte_chain_unlock(struct page *page)
 	clear_bit(PG_chainlock, &page->flags);
 #endif
 	preempt_enable();
+}
+
+struct pte_chain *pte_chain_alloc(int gfp_flags);
+void __pte_chain_free(struct pte_chain *pte_chain);
+
+static inline void pte_chain_free(struct pte_chain *pte_chain)
+{
+	if (pte_chain)
+		__pte_chain_free(pte_chain);
 }
