@@ -90,6 +90,7 @@
 #include	<linux/kallsyms.h>
 #include	<linux/cpu.h>
 #include	<linux/sysctl.h>
+#include	<linux/module.h>
 
 #include	<asm/uaccess.h>
 #include	<asm/cacheflush.h>
@@ -462,6 +463,7 @@ struct list_head cache_chain;
  * SLAB_RECLAIM_ACCOUNT turns this on per-slab
  */
 atomic_t slab_reclaim_pages;
+EXPORT_SYMBOL(slab_reclaim_pages);
 
 /*
  * chicken and egg problem: delay the per-cpu array allocation

@@ -116,6 +116,8 @@ extern kmem_cache_t	*bio_cachep;
 
 void ptrinfo(unsigned long addr);
 
+extern atomic_t slab_reclaim_pages;
+
 #endif	/* __KERNEL__ */
 
 #endif	/* _LINUX_SLAB_H */

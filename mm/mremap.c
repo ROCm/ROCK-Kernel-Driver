@@ -16,6 +16,7 @@
 #include <linux/fs.h>
 #include <linux/highmem.h>
 #include <linux/rmap-locking.h>
+#include <linux/security.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgalloc.h>
@@ -385,7 +386,7 @@ unsigned long do_mremap(unsigned long addr,
 
 	if (vma->vm_flags & VM_ACCOUNT) {
 		charged = (new_len - old_len) >> PAGE_SHIFT;
-		if (!vm_enough_memory(charged))
+		if (security_vm_enough_memory(charged))
 			goto out_nc;
 	}
 

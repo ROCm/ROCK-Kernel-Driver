@@ -43,6 +43,9 @@ int nr_swap_pages;
 int numnodes = 1;
 int sysctl_lower_zone_protection = 0;
 
+EXPORT_SYMBOL(totalram_pages);
+EXPORT_SYMBOL(nr_swap_pages);
+
 /*
  * Used by page_zone() to look up the address of the struct zone whose
  * id is encoded in the upper bits of page->flags
@@ -733,6 +736,7 @@ unsigned int nr_free_pages(void)
 
 	return sum;
 }
+EXPORT_SYMBOL(nr_free_pages);
 
 unsigned int nr_used_zone_pages(void)
 {
@@ -825,6 +829,7 @@ DEFINE_PER_CPU(struct page_state, page_states) = {0};
 EXPORT_PER_CPU_SYMBOL(page_states);
 
 atomic_t nr_pagecache = ATOMIC_INIT(0);
+EXPORT_SYMBOL(nr_pagecache);
 #ifdef CONFIG_SMP
 DEFINE_PER_CPU(long, nr_pagecache_local) = 0;
 #endif
