@@ -2,7 +2,7 @@
 #define __LINUX__AIO_H
 
 #include <linux/list.h>
-#include <linux/tqueue.h>
+#include <linux/workqueue.h>
 #include <linux/aio_abi.h>
 
 #include <asm/atomic.h>
@@ -134,7 +134,7 @@ struct kioctx {
 
 	struct aio_ring_info	ring_info;
 
-	struct tq_struct	tq;
+	struct work_struct	wq;
 };
 
 /* prototypes */

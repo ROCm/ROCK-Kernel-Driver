@@ -234,7 +234,7 @@ static struct kioctx *ioctx_alloc(unsigned nr_events)
 	init_waitqueue_head(&ctx->wait);
 
 	INIT_LIST_HEAD(&ctx->active_reqs);
-	INIT_TQUEUE(&ctx->tq, aio_kick_handler, ctx);
+	INIT_WORK(&ctx->wq, aio_kick_handler, ctx);
 
 	if (aio_setup_ring(ctx) < 0)
 		goto out_freectx;
@@ -612,7 +612,7 @@ void kick_iocb(struct kiocb *iocb)
 		spin_lock_irqsave(&ctx->ctx_lock, flags);
 		list_add_tail(&iocb->ki_run_list, &ctx->run_list);
 		spin_unlock_irqrestore(&ctx->ctx_lock, flags);
-		schedule_task(&ctx->tq);
+		schedule_work(&ctx->wq);
 	}
 }
 
