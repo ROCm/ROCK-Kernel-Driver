@@ -195,7 +195,7 @@ static struct aper_size_info_32 ali_generic_sizes[7] =
 	{4, 1024, 0, 3}
 };
 
-int __init ali_generic_setup (struct pci_dev *pdev)
+static int __init ali_generic_setup (struct pci_dev *pdev)
 {
 	agp_bridge.masks = ali_generic_masks;
 	agp_bridge.num_of_masks = 1;
@@ -338,9 +338,7 @@ static int __init agp_lookup_host_bridge (struct pci_dev *pdev)
 }
 
 
-
-
-static int agp_ali_probe (struct pci_dev *dev, const struct pci_device_id *ent)
+static int __init agp_ali_probe (struct pci_dev *dev, const struct pci_device_id *ent)
 {
 	u8 cap_ptr = 0;
 
@@ -374,7 +372,7 @@ static struct pci_device_id agp_ali_pci_table[] __initdata = {
 
 MODULE_DEVICE_TABLE(pci, agp_ali_pci_table);
 
-static struct pci_driver agp_ali_pci_driver = {
+static struct __initdata pci_driver agp_ali_pci_driver = {
 	.name		= "agpgart-ali",
 	.id_table	= agp_ali_pci_table,
 	.probe		= agp_ali_probe,

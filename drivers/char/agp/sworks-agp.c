@@ -512,7 +512,7 @@ static void serverworks_agp_enable(u32 mode)
 	}
 }
 
-int __init serverworks_setup (struct pci_dev *pdev)
+static int __init serverworks_setup (struct pci_dev *pdev)
 {
 	u32 temp;
 	u32 temp2;
@@ -617,7 +617,7 @@ static int __init agp_find_supported_device(struct pci_dev *dev)
 }
 
 
-static int agp_serverworks_probe (struct pci_dev *dev, const struct pci_device_id *ent)
+static int __init agp_serverworks_probe (struct pci_dev *dev, const struct pci_device_id *ent)
 {
 	if (agp_find_supported_device(dev) == 0) {
 		agp_bridge.dev = dev;
@@ -641,7 +641,7 @@ static struct pci_device_id agp_serverworks_pci_table[] __initdata = {
 
 MODULE_DEVICE_TABLE(pci, agp_serverworks_pci_table);
 
-static struct pci_driver agp_serverworks_pci_driver = {
+static struct __initdata pci_driver agp_serverworks_pci_driver = {
 	.name		= "agpgart-serverworks",
 	.id_table	= agp_serverworks_pci_table,
 	.probe		= agp_serverworks_probe,

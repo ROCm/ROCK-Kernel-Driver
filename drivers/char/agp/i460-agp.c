@@ -523,7 +523,7 @@ static unsigned long i460_mask_memory (unsigned long addr, int type)
 		| (((addr & ~((1 << I460_IO_PAGE_SHIFT) - 1)) & 0xffffff000) >> 12));
 }
 
-int __init intel_i460_setup (struct pci_dev *pdev __attribute__((unused)))
+static int __init intel_i460_setup (struct pci_dev *pdev __attribute__((unused)))
 {
 	agp_bridge.num_of_masks = 1;
 	agp_bridge.masks = i460_masks;
@@ -560,7 +560,7 @@ int __init intel_i460_setup (struct pci_dev *pdev __attribute__((unused)))
 	return 0;
 }
 
-static int agp_intel_i460_probe (struct pci_dev *dev, const struct pci_device_id *ent)
+static int __init agp_intel_i460_probe (struct pci_dev *dev, const struct pci_device_id *ent)
 {
 	u8 cap_ptr = 0;
 
@@ -589,7 +589,7 @@ static struct pci_device_id agp_i460_pci_table[] __initdata = {
 
 MODULE_DEVICE_TABLE(pci, agp_i460_pci_table);
 
-static struct pci_driver agp_i460_pci_driver = {
+static struct __initdata pci_driver agp_i460_pci_driver = {
 	.name		= "agpgart-intel-i460",
 	.id_table	= agp_i460_pci_table,
 	.probe		= agp_i460_probe,

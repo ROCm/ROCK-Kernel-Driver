@@ -166,7 +166,7 @@ static int __init agp_lookup_host_bridge (struct pci_dev *pdev)
 }
 
 
-static int agp_i7x05_probe (struct pci_dev *dev, const struct pci_device_id *ent)
+static int __init agp_i7x05_probe (struct pci_dev *dev, const struct pci_device_id *ent)
 {
 	u8 cap_ptr = 0;
 
@@ -200,7 +200,7 @@ static struct pci_device_id agp_i7x05_pci_table[] __initdata = {
 
 MODULE_DEVICE_TABLE(pci, agp_i7x05_pci_table);
 
-static struct pci_driver agp_i7x05_pci_driver = {
+static struct __initdata pci_driver agp_i7x05_pci_driver = {
 	.name		= "agpgart-i7x05",
 	.id_table	= agp_i7x05_pci_table,
 	.probe		= agp_i7x05_probe,

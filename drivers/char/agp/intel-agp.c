@@ -246,7 +246,7 @@ static unsigned long intel_i810_mask_memory(unsigned long addr, int type)
 	return addr | agp_bridge.masks[type].mask;
 }
 
-int __init intel_i810_setup(struct pci_dev *i810_dev)
+static int __init intel_i810_setup(struct pci_dev *i810_dev)
 {
 	intel_i810_private.i810_dev = i810_dev;
 
@@ -525,7 +525,7 @@ static agp_memory *intel_i830_alloc_by_type(size_t pg_count,int type)
 	return(NULL);
 }
 
-int __init intel_i830_setup(struct pci_dev *i830_dev)
+static int __init intel_i830_setup(struct pci_dev *i830_dev)
 {
 	intel_i830_private.i830_dev = i830_dev;
 
@@ -1438,7 +1438,7 @@ static int __init agp_find_supported_device(struct pci_dev *dev)
 }
 
 
-static int agp_intel_probe (struct pci_dev *dev, const struct pci_device_id *ent)
+static int __init agp_intel_probe (struct pci_dev *dev, const struct pci_device_id *ent)
 {
 	if (agp_find_supported_device(dev) == 0) {
 		agp_register_driver(dev);
@@ -1461,7 +1461,7 @@ static struct pci_device_id agp_intel_pci_table[] __initdata = {
 
 MODULE_DEVICE_TABLE(pci, agp_intel_pci_table);
 
-static struct pci_driver agp_intel_pci_driver = {
+static struct __initdata pci_driver agp_intel_pci_driver = {
 	.name		= "agpgart-intel",
 	.id_table	= agp_intel_pci_table,
 	.probe		= agp_intel_probe,

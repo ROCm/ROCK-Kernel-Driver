@@ -112,7 +112,7 @@ static struct agp_version agp_current_version =
 	.minor = AGPGART_VERSION_MINOR,
 };
 
-static int __init agp_backend_initialize(struct pci_dev *dev)
+static int agp_backend_initialize(struct pci_dev *dev)
 {
 	int size_value, rc, got_gatt=0, got_keylist=0;
 
@@ -262,13 +262,6 @@ int agp_unregister_driver(void)
 	return 0;
 }
 
-int __exit agp_exit(void)
-{
-	if (agp_count==0)
-		return -EBUSY;
-
-	return 0;
-}
 
 int __init agp_init(void)
 {
@@ -289,7 +282,6 @@ int __init agp_init(void)
 
 #ifndef CONFIG_GART_IOMMU
 module_init(agp_init);
-module_exit(agp_exit);
 #endif
 
 EXPORT_SYMBOL(agp_backend_acquire);

@@ -329,7 +329,7 @@ static unsigned long hp_zx1_mask_memory(unsigned long addr, int type)
 	return HP_ZX1_PDIR_VALID_BIT | addr;
 }
 
-int __init hp_zx1_setup (struct pci_dev *pdev __attribute__((unused)))
+static int __init hp_zx1_setup (struct pci_dev *pdev __attribute__((unused)))
 {
 	agp_bridge.masks = hp_zx1_masks;
 	agp_bridge.num_of_masks = 1;
@@ -369,7 +369,7 @@ static int __init agp_find_supported_device(struct pci_dev *dev)
 	}
 	return -ENODEV;
 
-static int agp_hp_probe (struct pci_dev *dev, const struct pci_device_id *ent)
+static int __init agp_hp_probe (struct pci_dev *dev, const struct pci_device_id *ent)
 {
 	if (agp_find_supported_device(dev) == 0) {
 		agp_register_driver(dev);
@@ -392,7 +392,7 @@ static struct pci_device_id agp_hp_pci_table[] __initdata = {
 
 MODULE_DEVICE_TABLE(pci, agp_pci_table);
 
-static struct pci_driver agp_hp_pci_driver = {
+static struct __initdata pci_driver agp_hp_pci_driver = {
 	.name		= "agpgart-hp",
 	.id_table	= agp_hp_pci_table,
 	.probe		= agp_hp_probe,

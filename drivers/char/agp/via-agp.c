@@ -131,7 +131,7 @@ static int __init via_generic_setup (struct pci_dev *pdev)
  * 2.0 compatability mode, we run the normal 3.0 code, and fall back
  * if something nasty happens.
  */
-static void via_kt400_enable(u32 mode)
+static void __init via_kt400_enable(u32 mode)
 {
 	if ((agp_generic_agp_3_0_enable(mode))==FALSE)
 		/* Something weird happened, fall back to 2.0 */
@@ -278,7 +278,7 @@ static int __init agp_lookup_host_bridge (struct pci_dev *pdev)
 }
 
 
-static int agp_via_probe (struct pci_dev *dev, const struct pci_device_id *ent)
+static int __init agp_via_probe (struct pci_dev *dev, const struct pci_device_id *ent)
 {
 	u8 cap_ptr = 0;
 
@@ -312,7 +312,7 @@ static struct pci_device_id agp_via_pci_table[] __initdata = {
 
 MODULE_DEVICE_TABLE(pci, agp_via_pci_table);
 
-static struct pci_driver agp_via_pci_driver = {
+static struct __initdata pci_driver agp_via_pci_driver = {
 	.name		= "agpgart-via",
 	.id_table	= agp_via_pci_table,
 	.probe		= agp_via_probe,

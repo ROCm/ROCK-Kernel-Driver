@@ -86,7 +86,7 @@ static struct gatt_mask sis_generic_masks[] =
 	{.mask = 0x00000000, .type = 0}
 };
 
-int __init sis_generic_setup (struct pci_dev *pdev)
+static int __init sis_generic_setup (struct pci_dev *pdev)
 {
 	agp_bridge.masks = sis_generic_masks;
 	agp_bridge.num_of_masks = 1;
@@ -223,7 +223,7 @@ static int __init agp_lookup_host_bridge (struct pci_dev *pdev)
 }
 
 
-static int agp_sis_probe (struct pci_dev *dev, const struct pci_device_id *ent)
+static int __init agp_sis_probe (struct pci_dev *dev, const struct pci_device_id *ent)
 {
 	u8 cap_ptr = 0;
 
@@ -257,13 +257,13 @@ static struct pci_device_id agp_sis_pci_table[] __initdata = {
 
 MODULE_DEVICE_TABLE(pci, agp_sis_pci_table);
 
-static struct pci_driver agp_sis_pci_driver = {
+static struct __initdata pci_driver agp_sis_pci_driver = {
 	.name		= "agpgart-sis",
 	.id_table	= agp_sis_pci_table,
 	.probe		= agp_sis_probe,
 };
 
-int __init agp_sis_init(void)
+static int __init agp_sis_init(void)
 {
 	int ret_val;
 

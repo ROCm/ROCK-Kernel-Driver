@@ -351,7 +351,7 @@ static struct gatt_mask amd_irongate_masks[] =
 	{.mask = 0x00000001, .type = 0}
 };
 
-int __init amd_irongate_setup (struct pci_dev *pdev)
+static int __init amd_irongate_setup (struct pci_dev *pdev)
 {
 	agp_bridge.masks = amd_irongate_masks;
 	agp_bridge.num_of_masks = 1;
@@ -439,7 +439,7 @@ static int __init agp_lookup_host_bridge (struct pci_dev *pdev)
 
 /* Supported Device Scanning routine */
 
-static int agp_amdk7_probe (struct pci_dev *dev, const struct pci_device_id *ent)
+static int __init agp_amdk7_probe (struct pci_dev *dev, const struct pci_device_id *ent)
 {
 	u8 cap_ptr = 0;
 
@@ -472,7 +472,7 @@ static struct pci_device_id agp_amdk7_pci_table[] __initdata = {
 
 MODULE_DEVICE_TABLE(pci, agp_amdk7_pci_table);
 
-static struct pci_driver agp_amdk7_pci_driver = {
+static struct __initdata pci_driver agp_amdk7_pci_driver = {
 	.name		= "agpgart-amdk7",
 	.id_table	= agp_amdk7_pci_table,
 	.probe		= agp_amdk7_probe,
