@@ -201,6 +201,19 @@ typedef struct _drm_i830_sarea {
 	int vertex_prim;
 } drm_i830_sarea_t;
 
+/* I830 specific ioctls
+ * The device specific ioctl range is 0x40 to 0x79.
+ */
+#define DRM_IOCTL_I830_INIT		DRM_IOW( 0x40, drm_i830_init_t)
+#define DRM_IOCTL_I830_VERTEX		DRM_IOW( 0x41, drm_i830_vertex_t)
+#define DRM_IOCTL_I830_CLEAR		DRM_IOW( 0x42, drm_i830_clear_t)
+#define DRM_IOCTL_I830_FLUSH		DRM_IO ( 0x43)
+#define DRM_IOCTL_I830_GETAGE		DRM_IO ( 0x44)
+#define DRM_IOCTL_I830_GETBUF		DRM_IOWR(0x45, drm_i830_dma_t)
+#define DRM_IOCTL_I830_SWAP		DRM_IO ( 0x46)
+#define DRM_IOCTL_I830_COPY		DRM_IOW( 0x47, drm_i830_copy_t)
+#define DRM_IOCTL_I830_DOCOPY		DRM_IO ( 0x48)
+
 typedef struct _drm_i830_clear {
 	int clear_color;
 	int clear_depth;
