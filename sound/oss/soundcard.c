@@ -127,7 +127,7 @@ static int get_mixer_levels(void __user * arg)
 {
 	int n;
 
-	if (__get_user(n, (int __user *)(&(((mixer_vol_table *__user )arg)->num))))
+	if (__get_user(n, (int __user *)(&(((mixer_vol_table __user *)arg)->num))))
 		return -EFAULT;
 	if (n < 0 || n >= num_mixer_volumes)
 		return -EINVAL;

@@ -109,11 +109,6 @@ static inline int x86_apicid_to_cpu(u8 apicid)
       	if (x86_cpu_to_apicid[0] == BAD_APICID)
 		return 0;
 
-		  /* No entries in x86_cpu_to_apicid?  Either no MPS|ACPI,
-          * or called too early.  Either way, we must be CPU 0. */
-      	if (x86_cpu_to_apicid[0] == BAD_APICID)
-			return 0;
-
 	return -1;
 }
 

@@ -68,7 +68,7 @@ static unsigned long hga_vram_len;		/* Size of video memory */
 
 static inline u8 __iomem * rowaddr(struct fb_info *info, u_int row)
 {
-	return (u8 __iomem *) (fb_readl(info->screen_base + HGA_ROWADDR(row)));
+	return info->screen_base + HGA_ROWADDR(row);
 }
 
 static int hga_mode = -1;			/* 0 = txt, 1 = gfx mode */

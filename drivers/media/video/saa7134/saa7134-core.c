@@ -906,7 +906,7 @@ static int __devinit saa7134_initdev(struct pci_dev *pci_dev,
 		goto fail1;
 	}
 	dev->lmmio = ioremap(pci_resource_start(pci_dev,0), 0x1000);
-	dev->bmmio = (__u8*)dev->lmmio;
+	dev->bmmio = (__u8 __iomem *)dev->lmmio;
 	if (NULL == dev->lmmio) {
 		err = -EIO;
 		printk(KERN_ERR "%s: can't ioremap() MMIO memory\n",

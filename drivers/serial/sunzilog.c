@@ -1690,6 +1690,7 @@ static int __init sunzilog_ports_init(void)
 
 	ret = uart_register_driver(&sunzilog_reg);
 	if (ret == 0) {
+		sunzilog_console_init();
 		for (i = 0; i < NUM_CHANNELS; i++) {
 			struct uart_sunzilog_port *up = &sunzilog_port_table[i];
 
@@ -1738,7 +1739,6 @@ static int __init sunzilog_init(void)
 	sunzilog_alloc_tables();
 
 	sunzilog_ports_init();
-	sunzilog_console_init();
 
 	return 0;
 }

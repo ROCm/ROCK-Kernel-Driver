@@ -1436,7 +1436,7 @@ static struct i2c_driver driver = {
         .attach_adapter = msp_probe,
         .detach_client  = msp_detach,
         .command        = msp_command,
-	.driver {
+	.driver = {
 		.suspend = msp_suspend,
 		.resume  = msp_resume,
 	},

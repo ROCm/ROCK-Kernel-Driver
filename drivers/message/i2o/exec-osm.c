@@ -48,7 +48,7 @@ struct i2o_exec_wait {
 	u32 tcntxt;		/* transaction context from reply */
 	int complete;		/* 1 if reply received otherwise 0 */
 	u32 m;			/* message id */
-	struct i2o_message *msg;	/* pointer to the reply message */
+	struct i2o_message __iomem *msg;	/* pointer to the reply message */
 	struct list_head list;	/* node in global wait list */
 };
 
@@ -114,7 +114,7 @@ int i2o_msg_post_wait_mem(struct i2o_controller *c, u32 m, unsigned long
 	DECLARE_WAIT_QUEUE_HEAD(wq);
 	struct i2o_exec_wait *wait;
 	static u32 tcntxt = 0x80000000;
-	struct i2o_message *msg = c->in_queue.virt + m;
+	struct i2o_message __iomem *msg = c->in_queue.virt + m;
 	int rc = 0;
 
 	wait = i2o_exec_wait_alloc();
@@ -199,7 +199,7 @@ int i2o_msg_post_wait_mem(struct i2o_controller *c, u32 m, unsigned long
  *	message must also be given back to the controller.
  */
 static int i2o_msg_post_wait_complete(struct i2o_controller *c, u32 m,
-				      struct i2o_message *msg)
+				      struct i2o_message __iomem *msg)
 {
 	struct i2o_exec_wait *wait, *tmp;
 	static spinlock_t lock;
@@ -323,7 +323,7 @@ static int i2o_exec_reply(struct i2o_controller *c, u32 m,
 			  struct i2o_message *msg)
 {
 	if (le32_to_cpu(msg->u.head[0]) & MSG_FAIL) {	// Fail bit is set
-		struct i2o_message *pmsg;	/* preserved message */
+		struct i2o_message __iomem *pmsg;	/* preserved message */
 		u32 pm;
 
 		pm = le32_to_cpu(msg->body[3]);
@@ -395,7 +395,7 @@ static void i2o_exec_event(struct i2o_event *evt)
  */
 int i2o_exec_lct_get(struct i2o_controller *c)
 {
-	struct i2o_message *msg;
+	struct i2o_message __iomem *msg;
 	u32 m;
 	int i = 0;
 	int rc = -EAGAIN;
@@ -439,7 +439,7 @@ static int i2o_exec_lct_notify(struct i2o_controller *c, u32 change_ind)
 {
 	i2o_status_block *sb = c->status_block.virt;
 	struct device *dev;
-	struct i2o_message *msg;
+	struct i2o_message __iomem *msg;
 	u32 m;
 
 	dev = &c->pdev->dev;
