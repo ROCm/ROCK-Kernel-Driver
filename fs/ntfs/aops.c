@@ -942,7 +942,7 @@ static int ntfs_writepage(struct page *page, struct writeback_control *wbc)
 	 * the below memcpy() already takes care of the mmap-at-end-of-file
 	 * requirements. If the file is converted to a non-resident one, then
 	 * the code path use is switched to the non-resident one where the
-	 * zeroing happens on each ntfs_writepage() invokation.
+	 * zeroing happens on each ntfs_writepage() invocation.
 	 *
 	 * The above also applies nicely when i_size is decreased.
 	 *

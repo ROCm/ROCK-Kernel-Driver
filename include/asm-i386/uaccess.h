@@ -258,7 +258,7 @@ unsigned long __copy_to_user_ll(void *to, const void *from, unsigned long n);
 unsigned long __copy_from_user_ll(void *to, const void *from, unsigned long n);
 
 /*
- * Here we special-case 1, 2 and 4-byte copy_*_user invokations.  On a fault
+ * Here we special-case 1, 2 and 4-byte copy_*_user invocations.  On a fault
  * we return the initial request size (1, 2 or 4), as copy_*_user should do.
  * If a store crosses a page boundary and gets a fault, the x86 will not write
  * anything, so this is accurate.
