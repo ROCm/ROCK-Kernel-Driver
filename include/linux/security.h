@@ -48,6 +48,7 @@ extern void cap_bprm_compute_creds (struct linux_binprm *bprm);
 extern int cap_task_post_setuid (uid_t old_ruid, uid_t old_euid, uid_t old_suid, int flags);
 extern void cap_task_kmod_set_label (void);
 extern void cap_task_reparent_to_init (struct task_struct *p);
+extern int cap_syslog (int type);
 
 static inline int cap_netlink_send (struct sk_buff *skb)
 {
