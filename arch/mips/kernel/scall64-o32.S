@@ -535,6 +535,7 @@ out:	jr	ra
 	sys	compat_sys_mq_timedreceive 5
 	sys	compat_sys_mq_notify	2	/* 4275 */
 	sys	compat_sys_mq_getsetattr 3
+	sys	sys_ni_syscall		0	/* sys_vserver */
 
 	.endm
 

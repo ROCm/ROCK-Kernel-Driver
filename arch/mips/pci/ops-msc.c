@@ -48,8 +48,12 @@ static int msc_pcibios_config_access(unsigned char access_type,
 	unsigned char type;
 	u32 intr;
 
-	if ((busnum == 0) && (PCI_SLOT(devfn) == 0))
+#ifdef CONFIG_MIPS_BOARDS_GEN
+	if ((busnum == 0) && (PCI_SLOT(devfn) == 17)) {
+		/* MIPS Core boards have SOCit connected as device 17 */
 		return -1;
+	}
+#endif
 
 	/* Clear status register bits. */
 	MSC_WRITE(MSC01_PCI_INTSTAT,

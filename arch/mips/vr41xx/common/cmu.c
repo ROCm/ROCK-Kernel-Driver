@@ -200,7 +200,7 @@ void vr41xx_mask_clock(vr41xx_clock_t clock)
 	spin_unlock_irq(&cmu_lock);
 }
 
-void __init vr41xx_cmu_init(void)
+static int __init vr41xx_cmu_init(void)
 {
 	switch (current_cpu_data.cputype) {
         case CPU_VR4111:
@@ -223,4 +223,8 @@ void __init vr41xx_cmu_init(void)
 	cmuclkmsk = read_cmuclkmsk();
 
 	spin_lock_init(&cmu_lock);
+
+	return 0;
 }
+
+early_initcall(vr41xx_cmu_init);

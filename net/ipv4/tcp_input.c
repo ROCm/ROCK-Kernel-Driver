@@ -259,7 +259,7 @@ tcp_grow_window(struct sock *sk, struct tcp_opt *tp, struct sk_buff *skb)
 	/* Check #1 */
 	if (tp->rcv_ssthresh < tp->window_clamp &&
 	    (int)tp->rcv_ssthresh < tcp_space(sk) &&
-	    !tcp_memory_pressure) {
+	    !tcp_prot.memory_pressure) {
 		int incr;
 
 		/* Check #2. Increase window, if skb with such overhead
@@ -349,7 +349,7 @@ static void tcp_clamp_window(struct sock *sk, struct tcp_opt *tp)
 	if (ofo_win) {
 		if (sk->sk_rcvbuf < sysctl_tcp_rmem[2] &&
 		    !(sk->sk_userlocks & SOCK_RCVBUF_LOCK) &&
-		    !tcp_memory_pressure &&
+		    !tcp_prot.memory_pressure &&
 		    atomic_read(&tcp_memory_allocated) < sysctl_tcp_mem[0])
 			sk->sk_rcvbuf = min(atomic_read(&sk->sk_rmem_alloc),
 					    sysctl_tcp_rmem[2]);
@@ -535,7 +535,7 @@ static void tcp_event_data_recv(struct sock *sk, struct tcp_opt *tp, struct sk_b
 			 * restart window, so that we send ACKs quickly.
 			 */
 			tcp_incr_quickack(tp);
-			tcp_mem_reclaim(sk);
+			sk_stream_mem_reclaim(sk);
 		}
 	}
 	tp->ack.lrcvtime = now;
@@ -3166,7 +3166,7 @@ static void tcp_fin(struct sk_buff *skb, struct sock *sk, struct tcphdr *th)
 	__skb_queue_purge(&tp->out_of_order_queue);
 	if (tp->sack_ok)
 		tcp_sack_reset(tp);
-	tcp_mem_reclaim(sk);
+	sk_stream_mem_reclaim(sk);
 
 	if (!sock_flag(sk, SOCK_DEAD)) {
 		sk->sk_state_change(sk);
@@ -3398,12 +3398,6 @@ static void tcp_ofo_queue(struct sock *sk)
 	}
 }
 
-static inline int tcp_rmem_schedule(struct sock *sk, struct sk_buff *skb)
-{
-	return (int)skb->truesize <= sk->sk_forward_alloc ||
-		tcp_mem_schedule(sk, skb->truesize, 1);
-}
-
 static int tcp_prune_queue(struct sock *sk);
 
 static void tcp_data_queue(struct sock *sk, struct sk_buff *skb)
@@ -3457,8 +3451,9 @@ static void tcp_data_queue(struct sock *sk, struct sk_buff *skb)
 queue_and_out:
 			if (eaten < 0 &&
 			    (atomic_read(&sk->sk_rmem_alloc) > sk->sk_rcvbuf ||
-			     !tcp_rmem_schedule(sk, skb))) {
-				if (tcp_prune_queue(sk) < 0 || !tcp_rmem_schedule(sk, skb))
+			     !sk_stream_rmem_schedule(sk, skb))) {
+				if (tcp_prune_queue(sk) < 0 ||
+				    !sk_stream_rmem_schedule(sk, skb))
 					goto drop;
 			}
 			sk_stream_set_owner_r(skb, sk);
@@ -3530,8 +3525,9 @@ drop:
 	TCP_ECN_check_ce(tp, skb);
 
 	if (atomic_read(&sk->sk_rmem_alloc) > sk->sk_rcvbuf ||
-	    !tcp_rmem_schedule(sk, skb)) {
-		if (tcp_prune_queue(sk) < 0 || !tcp_rmem_schedule(sk, skb))
+	    !sk_stream_rmem_schedule(sk, skb)) {
+		if (tcp_prune_queue(sk) < 0 ||
+		    !sk_stream_rmem_schedule(sk, skb))
 			goto drop;
 	}
 
@@ -3768,14 +3764,14 @@ static int tcp_prune_queue(struct sock *sk)
 
 	if (atomic_read(&sk->sk_rmem_alloc) >= sk->sk_rcvbuf)
 		tcp_clamp_window(sk, tp);
-	else if (tcp_memory_pressure)
+	else if (tcp_prot.memory_pressure)
 		tp->rcv_ssthresh = min(tp->rcv_ssthresh, 4U * tp->advmss);
 
 	tcp_collapse_ofo_queue(sk);
 	tcp_collapse(sk, sk->sk_receive_queue.next,
 		     (struct sk_buff*)&sk->sk_receive_queue,
 		     tp->copied_seq, tp->rcv_nxt);
-	tcp_mem_reclaim(sk);
+	sk_stream_mem_reclaim(sk);
 
 	if (atomic_read(&sk->sk_rmem_alloc) <= sk->sk_rcvbuf)
 		return 0;
@@ -3796,7 +3792,7 @@ static int tcp_prune_queue(struct sock *sk)
 		 */
 		if (tp->sack_ok)
 			tcp_sack_reset(tp);
-		tcp_mem_reclaim(sk);
+		sk_stream_mem_reclaim(sk);
 	}
 
 	if (atomic_read(&sk->sk_rmem_alloc) <= sk->sk_rcvbuf)
@@ -3848,7 +3844,7 @@ static void tcp_new_space(struct sock *sk)
 
 	if (tp->packets_out < tp->snd_cwnd &&
 	    !(sk->sk_userlocks & SOCK_SNDBUF_LOCK) &&
-	    !tcp_memory_pressure &&
+	    !tcp_prot.memory_pressure &&
 	    atomic_read(&tcp_memory_allocated) < sysctl_tcp_mem[0]) {
  		int sndmem = max_t(u32, tp->mss_clamp, tp->mss_cache) +
 			MAX_TCP_HEADER + 16 + sizeof(struct sk_buff),

@@ -3,13 +3,14 @@
  *
  * Generic ISA DMA wrapper for SH DMA API
  *
- * Copyright (C) 2003  Paul Mundt
+ * Copyright (C) 2003, 2004  Paul Mundt
  *
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
- */ 
+ */
 #include <linux/kernel.h>
+#include <linux/module.h>
 #include <asm/dma.h>
 
 /*
@@ -39,55 +40,67 @@ unsigned long __deprecated claim_dma_lock(void)
 
 	return flags;
 }
+EXPORT_SYMBOL(claim_dma_lock);
 
 void __deprecated release_dma_lock(unsigned long flags)
 {
 	spin_unlock_irqrestore(&dma_spin_lock, flags);
 }
+EXPORT_SYMBOL(release_dma_lock);
 
 void __deprecated disable_dma(unsigned int chan)
 {
 	/* Nothing */
 }
+EXPORT_SYMBOL(disable_dma);
 
 void __deprecated enable_dma(unsigned int chan)
 {
 	struct dma_info *info = get_dma_info(chan);
+	struct dma_channel *channel = &info->channels[chan];
 
-	info->ops->xfer(info);
+	info->ops->xfer(channel);
 }
+EXPORT_SYMBOL(enable_dma);
 
 void clear_dma_ff(unsigned int chan)
 {
 	/* Nothing */
 }
+EXPORT_SYMBOL(clear_dma_ff);
 
 void set_dma_mode(unsigned int chan, char mode)
 {
 	struct dma_info *info = get_dma_info(chan);
+	struct dma_channel *channel = &info->channels[chan];
 
-	info->mode = mode;
+	channel->mode = mode;
 }
+EXPORT_SYMBOL(set_dma_mode);
 
 void set_dma_addr(unsigned int chan, unsigned int addr)
 {
 	struct dma_info *info = get_dma_info(chan);
+	struct dma_channel *channel = &info->channels[chan];
 
 	/*
 	 * Single address mode is the only thing supported through
 	 * this interface.
 	 */
-	if ((info->mode & DMA_MODE_MASK) == DMA_MODE_READ) {
-		info->sar = addr;
+	if ((channel->mode & DMA_MODE_MASK) == DMA_MODE_READ) {
+		channel->sar = addr;
 	} else {
-		info->dar = addr;
+		channel->dar = addr;
 	}
 }
+EXPORT_SYMBOL(set_dma_addr);
 
 void set_dma_count(unsigned int chan, unsigned int count)
 {
 	struct dma_info *info = get_dma_info(chan);
+	struct dma_channel *channel = &info->channels[chan];
 
-	info->count = count;
+	channel->count = count;
 }
+EXPORT_SYMBOL(set_dma_count);
 

@@ -53,7 +53,6 @@ tsunami_update_irq_hw(unsigned long mask)
 	register int bcpu = boot_cpuid;
 
 #ifdef CONFIG_SMP
-	register unsigned long cpm = cpu_present_mask;
 	volatile unsigned long *dim0, *dim1, *dim2, *dim3;
 	unsigned long mask0, mask1, mask2, mask3, dummy;
 
@@ -72,10 +71,10 @@ tsunami_update_irq_hw(unsigned long mask)
 	dim1 = &cchip->dim1.csr;
 	dim2 = &cchip->dim2.csr;
 	dim3 = &cchip->dim3.csr;
-	if ((cpm & 1) == 0) dim0 = &dummy;
-	if ((cpm & 2) == 0) dim1 = &dummy;
-	if ((cpm & 4) == 0) dim2 = &dummy;
-	if ((cpm & 8) == 0) dim3 = &dummy;
+	if (cpu_possible(0)) dim0 = &dummy;
+	if (cpu_possible(1)) dim1 = &dummy;
+	if (cpu_possible(2)) dim2 = &dummy;
+	if (cpu_possible(3)) dim3 = &dummy;
 
 	*dim0 = mask0;
 	*dim1 = mask1;
@@ -164,13 +163,13 @@ clipper_end_irq(unsigned int irq)
 }
 
 static void
-cpu_set_irq_affinity(unsigned int irq, unsigned long affinity)
+cpu_set_irq_affinity(unsigned int irq, cpumask_t affinity)
 {
 	int cpu;
 
 	for (cpu = 0; cpu < 4; cpu++) {
 		unsigned long aff = cpu_irq_affinity[cpu];
-		if (affinity & (1UL << cpu))
+		if (cpu_isset(cpu, affinity))
 			aff |= 1UL << irq;
 		else
 			aff &= ~(1UL << irq);
@@ -179,7 +178,7 @@ cpu_set_irq_affinity(unsigned int irq, unsigned long affinity)
 }
 
 static void
-dp264_set_affinity(unsigned int irq, unsigned long affinity)
+dp264_set_affinity(unsigned int irq, cpumask_t affinity)
 { 
 	spin_lock(&dp264_irq_lock);
 	cpu_set_irq_affinity(irq, affinity);
@@ -188,7 +187,7 @@ dp264_set_affinity(unsigned int irq, unsigned long affinity)
 }
 
 static void
-clipper_set_affinity(unsigned int irq, unsigned long affinity)
+clipper_set_affinity(unsigned int irq, cpumask_t affinity)
 { 
 	spin_lock(&dp264_irq_lock);
 	cpu_set_irq_affinity(irq - 16, affinity);

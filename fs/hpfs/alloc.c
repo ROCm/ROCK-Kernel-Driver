@@ -88,7 +88,7 @@ static secno alloc_in_bmp(struct super_block *s, secno near, unsigned n, unsigne
 		goto rt;
 	}*/
 	q = nr + n; b = 0;
-	while ((a = tstbits(bmp, q, n + forward))) {
+	while ((a = tstbits(bmp, q, n + forward)) != 0) {
 		q += a;
 		if (n != 1) q = ((q-1)&~(n-1))+n;
 		if (!b) {
@@ -116,7 +116,7 @@ static secno alloc_in_bmp(struct super_block *s, secno near, unsigned n, unsigne
 			}
 		}
 		if (n != 1) q = ((q-1)&~(n-1))+n;
-		while ((a = tstbits(bmp, q, n + forward))) {
+		while ((a = tstbits(bmp, q, n + forward)) != 0) {
 			q += a;
 			if (n != 1) q = ((q-1)&~(n-1))+n;
 			if (q>>5 > i) break;

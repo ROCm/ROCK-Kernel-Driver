@@ -53,12 +53,6 @@
 
 #define DEBUG_TASKFILE	0	/* unset when fixed */
 
-#if DEBUG_TASKFILE
-#define DTF(x...) printk(x)
-#else
-#define DTF(x...)
-#endif
-
 static void ata_bswap_data (void *buffer, int wcount)
 {
 	u16 *p = buffer;
@@ -165,7 +159,7 @@ ide_startstop_t do_rw_taskfile (ide_drive_t *drive, ide_task_t *task)
 	hwif->OUTB(taskfile->high_cylinder, IDE_HCYL_REG);
 
 	hwif->OUTB((taskfile->device_head & HIHI) | drive->select.all, IDE_SELECT_REG);
-#ifdef CONFIG_IDE_TASKFILE_IO
+
 	if (task->handler != NULL) {
 		if (task->prehandler != NULL) {
 			hwif->OUTBSYNC(drive, taskfile->command, IDE_COMMAND_REG);
@@ -175,14 +169,6 @@ ide_startstop_t do_rw_taskfile (ide_drive_t *drive, ide_task_t *task)
 		ide_execute_command(drive, taskfile->command, task->handler, WAIT_WORSTCASE, NULL);
 		return ide_started;
 	}
-#else
-	if (task->handler != NULL) {
-		ide_execute_command(drive, taskfile->command, task->handler, WAIT_WORSTCASE, NULL);
-		if (task->prehandler != NULL)
-			return task->prehandler(drive, task->rq);
-		return ide_started;
-	}
-#endif
 
 	if (!drive->using_dma)
 		return ide_stopped;
@@ -283,8 +269,6 @@ ide_startstop_t task_no_data_intr (ide_drive_t *drive)
 
 	local_irq_enable();
 	if (!OK_STAT(stat = hwif->INB(IDE_STATUS_REG),READY_STAT,BAD_STAT)) {
-		DTF("%s: command opcode 0x%02x\n", drive->name,
-			args->tfRegister[IDE_COMMAND_OFFSET]);
 		return DRIVER(drive)->error(drive, "task_no_data_intr", stat);
 		/* calls ide_end_drive_cmd */
 	}
@@ -295,6 +279,29 @@ ide_startstop_t task_no_data_intr (ide_drive_t *drive)
 }
 
 EXPORT_SYMBOL(task_no_data_intr);
+
+static void task_buffer_sectors(ide_drive_t *drive, struct request *rq,
+				unsigned nsect, unsigned rw)
+{
+	char *buf = rq->buffer + blk_rq_offset(rq);
+
+	rq->sector += nsect;
+	rq->current_nr_sectors -= nsect;
+	rq->nr_sectors -= nsect;
+	__task_sectors(drive, buf, nsect, rw);
+}
+
+static inline void task_buffer_multi_sectors(ide_drive_t *drive,
+					     struct request *rq, unsigned rw)
+{
+	unsigned int msect = drive->mult_count, nsect;
+
+	nsect = rq->current_nr_sectors;
+	if (nsect > msect)
+		nsect = msect;
+
+	task_buffer_sectors(drive, rq, nsect, rw);
+}
 
 /*
  * old taskfile PIO handlers, to be killed as soon as possible.
@@ -308,7 +315,6 @@ ide_startstop_t task_in_intr (ide_drive_t *drive)
 {
 	struct request *rq	= HWGROUP(drive)->rq;
 	ide_hwif_t *hwif	= HWIF(drive);
-	char *pBuf		= NULL;
 	u8 stat;
 
 	if (!OK_STAT(stat = hwif->INB(IDE_STATUS_REG),DATA_READY,BAD_R_STAT)) {
@@ -316,28 +322,18 @@ ide_startstop_t task_in_intr (ide_drive_t *drive)
 			return DRIVER(drive)->error(drive, "task_in_intr", stat);
 		}
 		if (!(stat & BUSY_STAT)) {
-			DTF("task_in_intr to Soon wait for next interrupt\n");
-			if (HWGROUP(drive)->handler == NULL)
-				ide_set_handler(drive, &task_in_intr, WAIT_WORSTCASE, NULL);
+			ide_set_handler(drive, &task_in_intr, WAIT_WORSTCASE, NULL);
 			return ide_started;  
 		}
 	}
 
-	pBuf = rq->buffer + task_rq_offset(rq);
-	DTF("Read: %p, rq->current_nr_sectors: %d, stat: %02x\n",
-		pBuf, (int) rq->current_nr_sectors, stat);
-	taskfile_input_data(drive, pBuf, SECTOR_WORDS);
+	task_buffer_sectors(drive, rq, 1, IDE_PIO_IN);
 
 	/* FIXME: check drive status */
-	if (--rq->current_nr_sectors <= 0)
+	if (!rq->current_nr_sectors)
 		if (!DRIVER(drive)->end_request(drive, 1, 0))
 			return ide_stopped;
-	/*
-	 * ERM, it is techincally legal to leave/exit here but it makes
-	 * a mess of the code ...
-	 */
-	if (HWGROUP(drive)->handler == NULL)
-		ide_set_handler(drive, &task_in_intr, WAIT_WORSTCASE, NULL);
+	ide_set_handler(drive, &task_in_intr, WAIT_WORSTCASE, NULL);
 	return ide_started;
 }
 
@@ -350,9 +346,6 @@ ide_startstop_t task_mulin_intr (ide_drive_t *drive)
 {
 	ide_hwif_t *hwif	= HWIF(drive);
 	struct request *rq	= HWGROUP(drive)->rq;
-	char *pBuf		= NULL;
-	unsigned int msect	= drive->mult_count;
-	unsigned int nsect;
 	u8 stat;
 
 	if (!OK_STAT(stat = hwif->INB(IDE_STATUS_REG),DATA_READY,BAD_R_STAT)) {
@@ -360,32 +353,19 @@ ide_startstop_t task_mulin_intr (ide_drive_t *drive)
 			return DRIVER(drive)->error(drive, "task_mulin_intr", stat);
 		}
 		/* no data yet, so wait for another interrupt */
-		if (HWGROUP(drive)->handler == NULL)
-			ide_set_handler(drive, &task_mulin_intr, WAIT_WORSTCASE, NULL);
+		ide_set_handler(drive, &task_mulin_intr, WAIT_WORSTCASE, NULL);
 		return ide_started;
 	}
 
-	do {
-		nsect = rq->current_nr_sectors;
-		if (nsect > msect)
-			nsect = msect;
-		pBuf = rq->buffer + task_rq_offset(rq);
-		DTF("Multiread: %p, nsect: %d, msect: %d, " \
-			" rq->current_nr_sectors: %d\n",
-			pBuf, nsect, msect, rq->current_nr_sectors);
-		taskfile_input_data(drive, pBuf, nsect * SECTOR_WORDS);
-		rq->errors = 0;
-		rq->current_nr_sectors -= nsect;
-		msect -= nsect;
+	task_buffer_multi_sectors(drive, rq, IDE_PIO_IN);
 
-		/* FIXME: check drive status */
-		if (!rq->current_nr_sectors) {
-			if (!DRIVER(drive)->end_request(drive, 1, 0))
-				return ide_stopped;
-		}
-	} while (msect);
-	if (HWGROUP(drive)->handler == NULL)
-		ide_set_handler(drive, &task_mulin_intr, WAIT_WORSTCASE, NULL);
+	/* FIXME: check drive status */
+	if (!rq->current_nr_sectors) {
+		DRIVER(drive)->end_request(drive, 1, 0);
+		return ide_stopped;
+	}
+
+	ide_set_handler(drive, &task_mulin_intr, WAIT_WORSTCASE, NULL);
 	return ide_started;
 }
 
@@ -407,8 +387,9 @@ ide_startstop_t pre_task_out_intr (ide_drive_t *drive, struct request *rq)
 		return startstop;
 	}
 	/* For Write_sectors we need to stuff the first sector */
-	taskfile_output_data(drive, rq->buffer + task_rq_offset(rq), SECTOR_WORDS);
-	rq->current_nr_sectors--;
+	ide_set_handler(drive, &task_out_intr, WAIT_WORSTCASE, NULL);
+	task_buffer_sectors(drive, rq, 1, IDE_PIO_OUT);
+
 	return ide_started;
 }
 
@@ -423,7 +404,6 @@ ide_startstop_t task_out_intr (ide_drive_t *drive)
 {
 	ide_hwif_t *hwif	= HWIF(drive);
 	struct request *rq	= HWGROUP(drive)->rq;
-	char *pBuf		= NULL;
 	u8 stat;
 
 	if (!OK_STAT(stat = hwif->INB(IDE_STATUS_REG), DRIVE_READY, drive->bad_wstat)) {
@@ -437,16 +417,9 @@ ide_startstop_t task_out_intr (ide_drive_t *drive)
 		if (!DRIVER(drive)->end_request(drive, 1, 0))
 			return ide_stopped;
 	if ((rq->current_nr_sectors==1) ^ (stat & DRQ_STAT)) {
-		rq = HWGROUP(drive)->rq;
-		pBuf = rq->buffer + task_rq_offset(rq);
-		DTF("write: %p, rq->current_nr_sectors: %d\n",
-			pBuf, (int) rq->current_nr_sectors);
-		taskfile_output_data(drive, pBuf, SECTOR_WORDS);
-		rq->errors = 0;
-		rq->current_nr_sectors--;
+		task_buffer_sectors(drive, rq, 1, IDE_PIO_OUT);
 	}
-	if (HWGROUP(drive)->handler == NULL)
-		ide_set_handler(drive, &task_out_intr, WAIT_WORSTCASE, NULL);
+	ide_set_handler(drive, &task_out_intr, WAIT_WORSTCASE, NULL);
 	return ide_started;
 }
 
@@ -454,7 +427,6 @@ EXPORT_SYMBOL(task_out_intr);
 
 ide_startstop_t pre_task_mulout_intr (ide_drive_t *drive, struct request *rq)
 {
-	ide_task_t *args = rq->special;
 	ide_startstop_t startstop;
 
 	if (ide_wait_stat(&startstop, drive, DATA_READY,
@@ -472,28 +444,22 @@ ide_startstop_t pre_task_mulout_intr (ide_drive_t *drive, struct request *rq)
 		}
 	}
 
-	/*
-	 * WARNING :: if the drive as not acked good status we may not
-	 * move the DATA-TRANSFER T-Bar as BSY != 0. <andre@linux-ide.org>
-	 */
-	return args->handler(drive);
+	ide_set_handler(drive, &task_mulout_intr, WAIT_WORSTCASE, NULL);
+	task_buffer_multi_sectors(drive, rq, IDE_PIO_OUT);
+
+	return ide_started;
 }
 
 EXPORT_SYMBOL(pre_task_mulout_intr);
 
 /*
  * Handler for command write multiple
- * Called directly from execute_drive_cmd for the first bunch of sectors,
- * afterwards only by the ISR
  */
 ide_startstop_t task_mulout_intr (ide_drive_t *drive)
 {
 	ide_hwif_t *hwif		= HWIF(drive);
 	u8 stat				= hwif->INB(IDE_STATUS_REG);
 	struct request *rq		= HWGROUP(drive)->rq;
-	char *pBuf			= NULL;
-	unsigned int msect		= drive->mult_count;
-	unsigned int nsect;
 
 	if (!OK_STAT(stat, DATA_READY, BAD_R_STAT) || !rq->current_nr_sectors) {
 		if (stat & (ERR_STAT|DRQ_STAT)) {
@@ -505,47 +471,58 @@ ide_startstop_t task_mulout_intr (ide_drive_t *drive)
 			return ide_stopped;
 		}
 		/* no data yet, so wait for another interrupt */
-		if (HWGROUP(drive)->handler == NULL)
-			ide_set_handler(drive, &task_mulout_intr, WAIT_WORSTCASE, NULL);
+		ide_set_handler(drive, &task_mulout_intr, WAIT_WORSTCASE, NULL);
 		return ide_started;
 	}
 
-	if (HWGROUP(drive)->handler != NULL) {
-		unsigned long lflags;
-		spin_lock_irqsave(&ide_lock, lflags);
-		HWGROUP(drive)->handler = NULL;
-		del_timer(&HWGROUP(drive)->timer);
-		spin_unlock_irqrestore(&ide_lock, lflags);
-	}
+	task_buffer_multi_sectors(drive, rq, IDE_PIO_OUT);
+	ide_set_handler(drive, &task_mulout_intr, WAIT_WORSTCASE, NULL);
 
-	do {
-		nsect = rq->current_nr_sectors;
-		if (nsect > msect)
-			nsect = msect;
-		pBuf = rq->buffer + task_rq_offset(rq);
-		DTF("Multiwrite: %p, nsect: %d, msect: %d, " \
-			"rq->current_nr_sectors: %ld\n",
-			pBuf, nsect, msect, rq->current_nr_sectors);
-		msect -= nsect;
-		taskfile_output_data(drive, pBuf, nsect * SECTOR_WORDS);
-		rq->current_nr_sectors -= nsect;
-
-		/* FIXME: check drive status */
-		if (!rq->current_nr_sectors) {
-			if (!DRIVER(drive)->end_request(drive, 1, 0))
-				if (!rq->bio)
-					return ide_stopped;
-		}
-	} while (msect);
-	rq->errors = 0;
-	if (HWGROUP(drive)->handler == NULL)
-		ide_set_handler(drive, &task_mulout_intr, WAIT_WORSTCASE, NULL);
 	return ide_started;
 }
 
 EXPORT_SYMBOL(task_mulout_intr);
 
 #else /* !CONFIG_IDE_TASKFILE_IO */
+
+static void task_sectors(ide_drive_t *drive, struct request *rq,
+			 unsigned nsect, unsigned rw)
+{
+	if (rq->cbio) {	/* fs request */
+		rq->errors = 0;
+		task_bio_sectors(drive, rq, nsect, rw);
+	} else		/* task request */
+		task_buffer_sectors(drive, rq, nsect, rw);
+}
+
+static inline void task_bio_multi_sectors(ide_drive_t *drive,
+					  struct request *rq, unsigned rw)
+{
+	unsigned int nsect, msect = drive->mult_count;
+
+	do {
+		nsect = rq->current_nr_sectors;
+		if (nsect > msect)
+			nsect = msect;
+
+		task_bio_sectors(drive, rq, nsect, rw);
+
+		if (!rq->nr_sectors)
+			msect = 0;
+		else
+			msect -= nsect;
+	} while (msect);
+}
+
+static void task_multi_sectors(ide_drive_t *drive,
+			       struct request *rq, unsigned rw)
+{
+	if (rq->cbio) {	/* fs request */
+		rq->errors = 0;
+		task_bio_multi_sectors(drive, rq, rw);
+	} else		/* task request */
+		task_buffer_multi_sectors(drive, rq, rw);
+}
 
 static u8 wait_drive_not_busy(ide_drive_t *drive)
 {
@@ -573,19 +550,16 @@ static u8 wait_drive_not_busy(ide_drive_t *drive)
 ide_startstop_t task_in_intr (ide_drive_t *drive)
 {
 	struct request *rq = HWGROUP(drive)->rq;
-	u8 stat, good_stat;
+	u8 stat = HWIF(drive)->INB(IDE_STATUS_REG);
 
-	good_stat = DATA_READY;
-	stat = HWIF(drive)->INB(IDE_STATUS_REG);
-check_status:
-	if (!OK_STAT(stat, good_stat, BAD_R_STAT)) {
+	if (!OK_STAT(stat, DATA_READY, BAD_R_STAT)) {
 		if (stat & (ERR_STAT | DRQ_STAT))
 			return DRIVER(drive)->error(drive, __FUNCTION__, stat);
 		/* BUSY_STAT: No data yet, so wait for another IRQ. */
 		ide_set_handler(drive, &task_in_intr, WAIT_WORSTCASE, NULL);
 		return ide_started;
 	}
-
+finish_rq:
 	/*
 	 * Complete previously submitted bios (if any).
 	 * Status was already verifyied.
@@ -595,18 +569,18 @@ check_status:
 			return ide_stopped;
 	/* Complete rq->buffer based request (ioctls). */
 	if (!rq->bio && !rq->nr_sectors) {
-		ide_end_drive_cmd(drive, stat, HWIF(drive)->INB(IDE_ERROR_REG));
+		DRIVER(drive)->end_request(drive, 1, 0);
 		return ide_stopped;
 	}
 
-	rq->errors = 0;
 	task_sectors(drive, rq, 1, IDE_PIO_IN);
 
 	/* If it was the last datablock check status and finish transfer. */
 	if (!rq->nr_sectors) {
-		good_stat = 0;
 		stat = wait_drive_not_busy(drive);
-		goto check_status;
+		if (!OK_STAT(stat, 0, BAD_R_STAT))
+			return DRIVER(drive)->error(drive, __FUNCTION__, stat);
+		goto finish_rq;
 	}
 
 	/* Still data left to transfer. */
@@ -622,21 +596,16 @@ EXPORT_SYMBOL(task_in_intr);
 ide_startstop_t task_mulin_intr (ide_drive_t *drive)
 {
 	struct request *rq = HWGROUP(drive)->rq;
-	unsigned int msect = drive->mult_count;
-	unsigned int nsect;
-	u8 stat, good_stat;
+	u8 stat = HWIF(drive)->INB(IDE_STATUS_REG);
 
-	good_stat = DATA_READY;
-	stat = HWIF(drive)->INB(IDE_STATUS_REG);
-check_status:
-	if (!OK_STAT(stat, good_stat, BAD_R_STAT)) {
+	if (!OK_STAT(stat, DATA_READY, BAD_R_STAT)) {
 		if (stat & (ERR_STAT | DRQ_STAT))
 			return DRIVER(drive)->error(drive, __FUNCTION__, stat);
 		/* BUSY_STAT: No data yet, so wait for another IRQ. */
 		ide_set_handler(drive, &task_mulin_intr, WAIT_WORSTCASE, NULL);
 		return ide_started;
 	}
-
+finish_rq:
 	/*
 	 * Complete previously submitted bios (if any).
 	 * Status was already verifyied.
@@ -646,29 +615,18 @@ check_status:
 			return ide_stopped;
 	/* Complete rq->buffer based request (ioctls). */
 	if (!rq->bio && !rq->nr_sectors) {
-		ide_end_drive_cmd(drive, stat, HWIF(drive)->INB(IDE_ERROR_REG));
+		DRIVER(drive)->end_request(drive, 1, 0);
 		return ide_stopped;
 	}
 
-	rq->errors = 0;
-	do {
-		nsect = rq->current_nr_sectors;
-		if (nsect > msect)
-			nsect = msect;
-
-		task_sectors(drive, rq, nsect, IDE_PIO_IN);
-
-		if (!rq->nr_sectors)
-			msect = 0;
-		else
-			msect -= nsect;
-	} while (msect);
+	task_multi_sectors(drive, rq, IDE_PIO_IN);
 
 	/* If it was the last datablock check status and finish transfer. */
 	if (!rq->nr_sectors) {
-		good_stat = 0;
 		stat = wait_drive_not_busy(drive);
-		goto check_status;
+		if (!OK_STAT(stat, 0, BAD_R_STAT))
+			return DRIVER(drive)->error(drive, __FUNCTION__, stat);
+		goto finish_rq;
 	}
 
 	/* Still data left to transfer. */
@@ -712,14 +670,12 @@ ide_startstop_t task_out_intr (ide_drive_t *drive)
 			return ide_stopped;
 	/* Complete rq->buffer based request (ioctls). */
 	if (!rq->bio && !rq->nr_sectors) {
-		ide_end_drive_cmd(drive, stat, HWIF(drive)->INB(IDE_ERROR_REG));
+		DRIVER(drive)->end_request(drive, 1, 0);
 		return ide_stopped;
 	}
 
 	/* Still data left to transfer. */
 	ide_set_handler(drive, &task_out_intr, WAIT_WORSTCASE, NULL);
-
-	rq->errors = 0;
 	task_sectors(drive, rq, 1, IDE_PIO_OUT);
 
 	return ide_started;
@@ -751,8 +707,6 @@ EXPORT_SYMBOL(pre_task_out_intr);
 ide_startstop_t task_mulout_intr (ide_drive_t *drive)
 {
 	struct request *rq = HWGROUP(drive)->rq;
-	unsigned int msect = drive->mult_count;
-	unsigned int nsect;
 	u8 stat;
 
 	stat = HWIF(drive)->INB(IDE_STATUS_REG);
@@ -781,26 +735,13 @@ ide_startstop_t task_mulout_intr (ide_drive_t *drive)
 			return ide_stopped;
 	/* Complete rq->buffer based request (ioctls). */
 	if (!rq->bio && !rq->nr_sectors) {
-		ide_end_drive_cmd(drive, stat, HWIF(drive)->INB(IDE_ERROR_REG));
+		DRIVER(drive)->end_request(drive, 1, 0);
 		return ide_stopped;
 	}
 
 	/* Still data left to transfer. */
 	ide_set_handler(drive, &task_mulout_intr, WAIT_WORSTCASE, NULL);
-
-	rq->errors = 0;
-	do {
-		nsect = rq->current_nr_sectors;
-		if (nsect > msect)
-			nsect = msect;
-
-		task_sectors(drive, rq, nsect, IDE_PIO_OUT);
-
-		if (!rq->nr_sectors)
-			msect = 0;
-		else
-			msect -= nsect;
-	} while (msect);
+	task_multi_sectors(drive, rq, IDE_PIO_OUT);
 
 	return ide_started;
 }
@@ -1201,6 +1142,14 @@ ide_startstop_t flagged_taskfile (ide_drive_t *drive, ide_task_t *task)
 	void debug_taskfile(drive, task);
 #endif /* CONFIG_IDE_TASK_IOCTL_DEBUG */
 
+	if (task->data_phase == TASKFILE_MULTI_IN ||
+	    task->data_phase == TASKFILE_MULTI_OUT) {
+		if (!drive->mult_count) {
+			printk(KERN_ERR "%s: multimode not set!\n", drive->name);
+			return ide_stopped;
+		}
+	}
+
 	/*
 	 * (ks) Check taskfile in/out flags.
 	 * If set, then execute as it is defined.
@@ -1333,7 +1282,6 @@ ide_startstop_t flagged_task_in_intr (ide_drive_t *drive)
 	ide_hwif_t *hwif	= HWIF(drive);
 	u8 stat			= hwif->INB(IDE_STATUS_REG);
 	struct request *rq	= HWGROUP(drive)->rq;
-	char *pBuf		= NULL;
 	int retries             = 5;
 
 	if (!OK_STAT(stat, DATA_READY, BAD_R_STAT)) {
@@ -1349,12 +1297,9 @@ ide_startstop_t flagged_task_in_intr (ide_drive_t *drive)
 		return DRIVER(drive)->error(drive, "flagged_task_in_intr (unexpected data phase)", stat); 
 	}
 
-	pBuf = rq->buffer + ((rq->nr_sectors - rq->current_nr_sectors) * SECTOR_SIZE);
-	DTF("Read - rq->current_nr_sectors: %d, status: %02x\n", (int) rq->current_nr_sectors, stat);
+	task_buffer_sectors(drive, rq, 1, IDE_PIO_IN);
 
-	taskfile_input_data(drive, pBuf, SECTOR_WORDS);
-
-	if (--rq->current_nr_sectors != 0) {
+	if (rq->current_nr_sectors) {
 		/*
                  * (ks) We don't know which command was executed. 
 		 * So, we wait the 'WORSTCASE' value.
@@ -1378,13 +1323,7 @@ ide_startstop_t flagged_task_mulin_intr (ide_drive_t *drive)
 	ide_hwif_t *hwif	= HWIF(drive);
 	u8 stat			= hwif->INB(IDE_STATUS_REG);
 	struct request *rq	= HWGROUP(drive)->rq;
-	char *pBuf		= NULL;
 	int retries             = 5;
-	unsigned int msect, nsect;
-
-	msect = drive->mult_count;
-	if (msect == 0) 
-		return DRIVER(drive)->error(drive, "flagged_task_mulin_intr (multimode not set)", stat); 
 
 	if (!OK_STAT(stat, DATA_READY, BAD_R_STAT)) {
 		if (stat & ERR_STAT) {
@@ -1399,15 +1338,8 @@ ide_startstop_t flagged_task_mulin_intr (ide_drive_t *drive)
 		return DRIVER(drive)->error(drive, "flagged_task_mulin_intr (unexpected data phase)", stat); 
 	}
 
-	nsect = (rq->current_nr_sectors > msect) ? msect : rq->current_nr_sectors;
-	pBuf = rq->buffer + ((rq->nr_sectors - rq->current_nr_sectors) * SECTOR_SIZE);
+	task_buffer_multi_sectors(drive, rq, IDE_PIO_IN);
 
-	DTF("Multiread: %p, nsect: %d , rq->current_nr_sectors: %ld\n",
-	    pBuf, nsect, rq->current_nr_sectors);
-
-	taskfile_input_data(drive, pBuf, nsect * SECTOR_WORDS);
-
-	rq->current_nr_sectors -= nsect;
 	if (rq->current_nr_sectors != 0) {
 		/*
                  * (ks) We don't know which command was executed. 
@@ -1441,8 +1373,7 @@ ide_startstop_t flagged_pre_task_out_intr (ide_drive_t *drive, struct request *r
 		return startstop;
 	}
 
-	taskfile_output_data(drive, rq->buffer, SECTOR_WORDS);
-	--rq->current_nr_sectors;
+	task_buffer_sectors(drive, rq, 1, IDE_PIO_OUT);
 
 	return ide_started;
 }
@@ -1452,7 +1383,6 @@ ide_startstop_t flagged_task_out_intr (ide_drive_t *drive)
 	ide_hwif_t *hwif	= HWIF(drive);
 	u8 stat			= hwif->INB(IDE_STATUS_REG);
 	struct request *rq	= HWGROUP(drive)->rq;
-	char *pBuf		= NULL;
 
 	if (!OK_STAT(stat, DRIVE_READY, BAD_W_STAT)) 
 		return DRIVER(drive)->error(drive, "flagged_task_out_intr", stat);
@@ -1472,12 +1402,7 @@ ide_startstop_t flagged_task_out_intr (ide_drive_t *drive)
 		return DRIVER(drive)->error(drive, "flagged_task_out_intr (unexpected data phase)", stat); 
 	}
 
-	pBuf = rq->buffer + ((rq->nr_sectors - rq->current_nr_sectors) * SECTOR_SIZE);
-	DTF("Write - rq->current_nr_sectors: %d, status: %02x\n",
-		(int) rq->current_nr_sectors, stat);
-
-	taskfile_output_data(drive, pBuf, SECTOR_WORDS);
-	--rq->current_nr_sectors;
+	task_buffer_sectors(drive, rq, 1, IDE_PIO_OUT);
 
 	/*
 	 * (ks) We don't know which command was executed. 
@@ -1490,15 +1415,7 @@ ide_startstop_t flagged_task_out_intr (ide_drive_t *drive)
 
 ide_startstop_t flagged_pre_task_mulout_intr (ide_drive_t *drive, struct request *rq)
 {
-	ide_hwif_t *hwif	= HWIF(drive);
-	u8 stat			= hwif->INB(IDE_STATUS_REG);
-	char *pBuf		= NULL;
 	ide_startstop_t startstop;
-	unsigned int msect, nsect;
-
-	msect = drive->mult_count;
-	if (msect == 0)
-		return DRIVER(drive)->error(drive, "flagged_pre_task_mulout_intr (multimode not set)", stat);
 
 	if (ide_wait_stat(&startstop, drive, DATA_READY,
 			BAD_W_STAT, WAIT_DRQ)) {
@@ -1506,14 +1423,7 @@ ide_startstop_t flagged_pre_task_mulout_intr (ide_drive_t *drive, struct request
 		return startstop;
 	}
 
-	nsect = (rq->current_nr_sectors > msect) ? msect : rq->current_nr_sectors;
-	pBuf = rq->buffer + ((rq->nr_sectors - rq->current_nr_sectors) * SECTOR_SIZE);
-	DTF("Multiwrite: %p, nsect: %d , rq->current_nr_sectors: %ld\n",
-	    pBuf, nsect, rq->current_nr_sectors);
-
-	taskfile_output_data(drive, pBuf, nsect * SECTOR_WORDS);
-
-	rq->current_nr_sectors -= nsect;
+	task_buffer_multi_sectors(drive, rq, IDE_PIO_OUT);
 
 	return ide_started;
 }
@@ -1523,12 +1433,6 @@ ide_startstop_t flagged_task_mulout_intr (ide_drive_t *drive)
 	ide_hwif_t *hwif	= HWIF(drive);
 	u8 stat			= hwif->INB(IDE_STATUS_REG);
 	struct request *rq	= HWGROUP(drive)->rq;
-	char *pBuf		= NULL;
-	unsigned int msect, nsect;
-
-	msect = drive->mult_count;
-	if (msect == 0)
-		return DRIVER(drive)->error(drive, "flagged_task_mulout_intr (multimode not set)", stat);
 
 	if (!OK_STAT(stat, DRIVE_READY, BAD_W_STAT)) 
 		return DRIVER(drive)->error(drive, "flagged_task_mulout_intr", stat);
@@ -1548,13 +1452,7 @@ ide_startstop_t flagged_task_mulout_intr (ide_drive_t *drive)
 		return DRIVER(drive)->error(drive, "flagged_task_mulout_intr (unexpected data phase)", stat); 
 	}
 
-	nsect = (rq->current_nr_sectors > msect) ? msect : rq->current_nr_sectors;
-	pBuf = rq->buffer + ((rq->nr_sectors - rq->current_nr_sectors) * SECTOR_SIZE);
-	DTF("Multiwrite: %p, nsect: %d , rq->current_nr_sectors: %ld\n",
-	    pBuf, nsect, rq->current_nr_sectors);
-
-	taskfile_output_data(drive, pBuf, nsect * SECTOR_WORDS);
-	rq->current_nr_sectors -= nsect;
+	task_buffer_multi_sectors(drive, rq, IDE_PIO_OUT);
 
 	/*
 	 * (ks) We don't know which command was executed. 

@@ -172,7 +172,7 @@ static int afs_super_parse_options(struct afs_mount_params *params,
 	options[PAGE_SIZE - 1] = 0;
 
 	ret = 0;
-	while ((key = strsep(&options, ",")))
+	while ((key = strsep(&options, ",")) != 0)
 	{
 		value = strchr(key, '=');
 		if (value)

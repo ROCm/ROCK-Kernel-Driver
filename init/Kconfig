@@ -77,6 +77,7 @@ config SWAP
 
 config SYSVIPC
 	bool "System V IPC"
+	depends on MMU
 	---help---
 	  Inter Process Communication is a suite of library functions and
 	  system calls which let processes (running programs) synchronize and
@@ -209,26 +210,20 @@ config IKCONFIG
 	bool "Kernel .config support"
 	---help---
 	  This option enables the complete Linux kernel ".config" file
-	  contents, information on compiler used to build the kernel,
-	  kernel running when this kernel was built and kernel version
-	  from Makefile to be saved in the kernel. It provides documentation
+	  contents to be saved in the kernel. It provides documentation
 	  of which kernel options are used in a running kernel or in an
 	  on-disk kernel.  This information can be extracted from the kernel
 	  image file with the script scripts/extract-ikconfig and used as
 	  input to rebuild the current kernel or to build another kernel.
 	  It can also be extracted from a running kernel by reading
-	  /proc/config.gz and /proc/config_built_with, if enabled (below).
-	  /proc/config.gz will list the configuration that was used
-	  to build the kernel and /proc/config_built_with will list
-	  information on the compiler and host machine that was used to
-	  build the kernel.
+	  /proc/config.gz if enabled (below).
 
 config IKCONFIG_PROC
 	bool "Enable access to .config through /proc/config.gz"
 	depends on IKCONFIG && PROC_FS
 	---help---
-	  This option enables access to kernel configuration file and build
-	  information through /proc/config.gz.
+	  This option enables access to the kernel configuration file
+	  through /proc/config.gz.
 
 
 menuconfig EMBEDDED

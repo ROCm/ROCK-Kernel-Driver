@@ -292,7 +292,7 @@ static unsigned int pci_bus_clock_list (u8 speed, struct chipset_bus_clock_list_
 	return chipset_table->chipset_settings;
 }
 
-static void hpt366_tune_chipset (ide_drive_t *drive, u8 xferspeed)
+static int hpt36x_tune_chipset(ide_drive_t *drive, u8 xferspeed)
 {
 	struct pci_dev *dev	= HWIF(drive)->pci_dev;
 	u8 speed		= hpt3xx_ratefilter(drive, xferspeed);
@@ -329,14 +329,11 @@ static void hpt366_tune_chipset (ide_drive_t *drive, u8 xferspeed)
 	reg2 &= ~0x80000000;
 
 	pci_write_config_dword(dev, regtime, reg2);
+
+	return ide_config_drive_speed(drive, speed);
 }
 
-static void hpt368_tune_chipset (ide_drive_t *drive, u8 speed)
-{
-	hpt366_tune_chipset(drive, speed);
-}
-
-static void hpt370_tune_chipset (ide_drive_t *drive, u8 xferspeed)
+static int hpt370_tune_chipset(ide_drive_t *drive, u8 xferspeed)
 {
 	struct pci_dev *dev = HWIF(drive)->pci_dev;
 	u8 speed	= hpt3xx_ratefilter(drive, xferspeed);
@@ -378,9 +375,11 @@ static void hpt370_tune_chipset (ide_drive_t *drive, u8 xferspeed)
 	}
 
 	pci_write_config_dword(dev, drive_pci, list_conf);
+
+	return ide_config_drive_speed(drive, speed);
 }
 
-static void hpt372_tune_chipset (ide_drive_t *drive, u8 xferspeed)
+static int hpt372_tune_chipset(ide_drive_t *drive, u8 xferspeed)
 {
 	struct pci_dev *dev	= HWIF(drive)->pci_dev;
 	u8 speed	= hpt3xx_ratefilter(drive, xferspeed);
@@ -406,11 +405,8 @@ static void hpt372_tune_chipset (ide_drive_t *drive, u8 xferspeed)
 	if (speed < XFER_MW_DMA_0)
 		list_conf &= ~0x80000000; /* Disable on-chip PIO FIFO/buffer */
 	pci_write_config_dword(dev, drive_pci, list_conf);
-}
 
-static void hpt374_tune_chipset (ide_drive_t *drive, u8 speed)
-{
-	hpt372_tune_chipset(drive, speed);
+	return ide_config_drive_speed(drive, speed);
 }
 
 static int hpt3xx_tune_chipset (ide_drive_t *drive, u8 speed)
@@ -418,7 +414,7 @@ static int hpt3xx_tune_chipset (ide_drive_t *drive, u8 speed)
 	struct pci_dev *dev	= HWIF(drive)->pci_dev;
 
 	if (hpt_minimum_revision(dev, 8))
-		hpt374_tune_chipset(drive, speed);
+		return hpt372_tune_chipset(drive, speed); /* not a typo */
 #if 0
 	else if (hpt_minimum_revision(dev, 7))
 		hpt371_tune_chipset(drive, speed);
@@ -426,15 +422,11 @@ static int hpt3xx_tune_chipset (ide_drive_t *drive, u8 speed)
 		hpt302_tune_chipset(drive, speed);
 #endif
 	else if (hpt_minimum_revision(dev, 5))
-		hpt372_tune_chipset(drive, speed);
+		return hpt372_tune_chipset(drive, speed);
 	else if (hpt_minimum_revision(dev, 3))
-		hpt370_tune_chipset(drive, speed);
-	else if (hpt_minimum_revision(dev, 2))
-		hpt368_tune_chipset(drive, speed);
-	else
-                hpt366_tune_chipset(drive, speed);
-
-	return ((int) ide_config_drive_speed(drive, speed));
+		return hpt370_tune_chipset(drive, speed);
+	else	/* hpt368: hpt_minimum_revision(dev, 2) */
+		return hpt36x_tune_chipset(drive, speed);
 }
 
 static void hpt3xx_tune_drive (ide_drive_t *drive, u8 pio)

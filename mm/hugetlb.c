@@ -130,27 +130,25 @@ static void update_and_free_page(struct page *page)
 }
 
 #ifdef CONFIG_HIGHMEM
-static int try_to_free_low(unsigned long count)
+static void try_to_free_low(unsigned long count)
 {
 	int i;
 	for (i = 0; i < MAX_NUMNODES; ++i) {
-		struct page *page;
-		list_for_each_entry(page, &hugepage_freelists[i], lru) {
+		struct page *page, *next;
+		list_for_each_entry_safe(page, next, &hugepage_freelists[i], lru) {
 			if (PageHighMem(page))
 				continue;
 			list_del(&page->lru);
 			update_and_free_page(page);
 			--free_huge_pages;
-			if (!--count)
-				return 0;
+			if (count >= nr_huge_pages)
+				return;
 		}
 	}
-	return count;
 }
 #else
-static inline int try_to_free_low(unsigned long count)
+static inline void try_to_free_low(unsigned long count)
 {
-	return count;
 }
 #endif
 
@@ -170,7 +168,8 @@ static unsigned long set_max_huge_pages(unsigned long count)
 		return nr_huge_pages;
 
 	spin_lock(&hugetlb_lock);
-	for (count = try_to_free_low(count); count < nr_huge_pages; --free_huge_pages) {
+	try_to_free_low(count);
+	for (; count < nr_huge_pages; --free_huge_pages) {
 		struct page *page = dequeue_huge_page();
 		if (!page)
 			break;

@@ -355,7 +355,7 @@ read_next:
 #endif /* DEBUG_READ */
 
 #ifdef CONFIG_IDE_TASKFILE_IO
-	task_sectors(drive, rq, nsect, IDE_PIO_IN);
+	task_bio_sectors(drive, rq, nsect, IDE_PIO_IN);
 
 	/* FIXME: can we check status after transfer on pdc4030? */
 	/* Complete previously submitted bios. */
@@ -478,7 +478,7 @@ static void promise_multwrite (ide_drive_t *drive, unsigned int msect)
 		if (nsect > msect)
 			nsect = msect;
 
-		task_sectors(drive, rq, nsect, IDE_PIO_OUT);
+		task_bio_sectors(drive, rq, nsect, IDE_PIO_OUT);
 
 		if (!rq->nr_sectors)
 			msect = 0;

@@ -42,7 +42,6 @@ typedef struct {
 
 #define spin_is_locked(x)	(*(volatile signed char *)(&(x)->lock) <= 0)
 #define spin_unlock_wait(x)	do { barrier(); } while(spin_is_locked(x))
-#define _raw_spin_lock_flags(lock, flags) _raw_spin_lock(lock)
 
 #define spin_lock_string \
 	"\n1:\t" \
@@ -53,6 +52,23 @@ typedef struct {
 	"rep;nop\n\t" \
 	"cmpb $0,%0\n\t" \
 	"jle 2b\n\t" \
+	"jmp 1b\n" \
+	LOCK_SECTION_END
+
+#define spin_lock_string_flags \
+	"\n1:\t" \
+	"lock ; decb %0\n\t" \
+	"js 2f\n\t" \
+	LOCK_SECTION_START("") \
+	"2:\t" \
+	"testl $0x200, %1\n\t" \
+	"jz 3f\n\t" \
+	"sti\n\t" \
+	"3:\t" \
+	"rep;nop\n\t" \
+	"cmpb $0, %0\n\t" \
+	"jle 3b\n\t" \
+	"cli\n\t" \
 	"jmp 1b\n" \
 	LOCK_SECTION_END
 
@@ -126,6 +142,20 @@ here:
 		:"=m" (lock->lock) : : "memory");
 }
 
+static inline void _raw_spin_lock_flags (spinlock_t *lock, unsigned long flags)
+{
+#ifdef CONFIG_DEBUG_SPINLOCK
+	__label__ here;
+here:
+	if (unlikely(lock->magic != SPINLOCK_MAGIC)) {
+		printk("eip: %p\n", &&here);
+		BUG();
+	}
+#endif
+	__asm__ __volatile__(
+		spin_lock_string_flags
+		:"=m" (lock->lock) : "r" (flags) : "memory");
+}
 
 /*
  * Read-write spinlocks, allowing multiple readers

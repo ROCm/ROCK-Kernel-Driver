@@ -12,7 +12,33 @@
 #include <asm/bitops.h>
 #include <asm/uaccess.h>
 
-int bitmap_empty(const unsigned long *bitmap, int bits)
+/*
+ * bitmaps provide an array of bits, implemented using an an
+ * array of unsigned longs.  The number of valid bits in a
+ * given bitmap does _not_ need to be an exact multiple of
+ * BITS_PER_LONG.
+ *
+ * The possible unused bits in the last, partially used word
+ * of a bitmap are 'don't care'.  The implementation makes
+ * no particular effort to keep them zero.  It ensures that
+ * their value will not affect the results of any operation.
+ * The bitmap operations that return Boolean (bitmap_empty,
+ * for example) or scalar (bitmap_weight, for example) results
+ * carefully filter out these unused bits from impacting their
+ * results.
+ *
+ * These operations actually hold to a slightly stronger rule:
+ * if you don't input any bitmaps to these ops that have some
+ * unused bits set, then they won't output any set unused bits
+ * in output bitmaps.
+ *
+ * The byte ordering of bitmaps is more natural on little
+ * endian architectures.  See the big-endian headers
+ * include/asm-ppc64/bitops.h and include/asm-s390/bitops.h
+ * for the best explanations of this ordering.
+ */
+
+int __bitmap_empty(const unsigned long *bitmap, int bits)
 {
 	int k, lim = bits/BITS_PER_LONG;
 	for (k = 0; k < lim; ++k)
@@ -20,14 +46,14 @@ int bitmap_empty(const unsigned long *bitmap, int bits)
 			return 0;
 
 	if (bits % BITS_PER_LONG)
-		if (bitmap[k] & ((1UL << (bits % BITS_PER_LONG)) - 1))
+		if (bitmap[k] & BITMAP_LAST_WORD_MASK(bits))
 			return 0;
 
 	return 1;
 }
-EXPORT_SYMBOL(bitmap_empty);
+EXPORT_SYMBOL(__bitmap_empty);
 
-int bitmap_full(const unsigned long *bitmap, int bits)
+int __bitmap_full(const unsigned long *bitmap, int bits)
 {
 	int k, lim = bits/BITS_PER_LONG;
 	for (k = 0; k < lim; ++k)
@@ -35,15 +61,15 @@ int bitmap_full(const unsigned long *bitmap, int bits)
 			return 0;
 
 	if (bits % BITS_PER_LONG)
-		if (~bitmap[k] & ((1UL << (bits % BITS_PER_LONG)) - 1))
+		if (~bitmap[k] & BITMAP_LAST_WORD_MASK(bits))
 			return 0;
 
 	return 1;
 }
-EXPORT_SYMBOL(bitmap_full);
+EXPORT_SYMBOL(__bitmap_full);
 
-int bitmap_equal(const unsigned long *bitmap1,
-		unsigned long *bitmap2, int bits)
+int __bitmap_equal(const unsigned long *bitmap1,
+		const unsigned long *bitmap2, int bits)
 {
 	int k, lim = bits/BITS_PER_LONG;
 	for (k = 0; k < lim; ++k)
@@ -51,26 +77,26 @@ int bitmap_equal(const unsigned long *bitmap1,
 			return 0;
 
 	if (bits % BITS_PER_LONG)
-		if ((bitmap1[k] ^ bitmap2[k]) &
-				((1UL << (bits % BITS_PER_LONG)) - 1))
+		if ((bitmap1[k] ^ bitmap2[k]) & BITMAP_LAST_WORD_MASK(bits))
 			return 0;
 
 	return 1;
 }
-EXPORT_SYMBOL(bitmap_equal);
+EXPORT_SYMBOL(__bitmap_equal);
 
-void bitmap_complement(unsigned long *bitmap, int bits)
+void __bitmap_complement(unsigned long *dst, const unsigned long *src, int bits)
 {
-	int k;
-	int nr = BITS_TO_LONGS(bits);
+	int k, lim = bits/BITS_PER_LONG;
+	for (k = 0; k < lim; ++k)
+		dst[k] = ~src[k];
 
-	for (k = 0; k < nr; ++k)
-		bitmap[k] = ~bitmap[k];
+	if (bits % BITS_PER_LONG)
+		dst[k] = ~src[k] & BITMAP_LAST_WORD_MASK(bits);
 }
-EXPORT_SYMBOL(bitmap_complement);
+EXPORT_SYMBOL(__bitmap_complement);
 
 /*
- * bitmap_shift_right - logical right shift of the bits in a bitmap
+ * __bitmap_shift_right - logical right shift of the bits in a bitmap
  *   @dst - destination bitmap
  *   @src - source bitmap
  *   @nbits - shift by this many bits
@@ -80,7 +106,7 @@ EXPORT_SYMBOL(bitmap_complement);
  * direction.  Zeros are fed into the vacated MS positions and the
  * LS bits shifted off the bottom are lost.
  */
-void bitmap_shift_right(unsigned long *dst,
+void __bitmap_shift_right(unsigned long *dst,
 			const unsigned long *src, int shift, int bits)
 {
 	int k, lim = BITS_TO_LONGS(bits), left = bits % BITS_PER_LONG;
@@ -110,10 +136,11 @@ void bitmap_shift_right(unsigned long *dst,
 	if (off)
 		memset(&dst[lim - off], 0, off*sizeof(unsigned long));
 }
-EXPORT_SYMBOL(bitmap_shift_right);
+EXPORT_SYMBOL(__bitmap_shift_right);
+
 
 /*
- * bitmap_shift_left - logical left shift of the bits in a bitmap
+ * __bitmap_shift_left - logical left shift of the bits in a bitmap
  *   @dst - destination bitmap
  *   @src - source bitmap
  *   @nbits - shift by this many bits
@@ -123,7 +150,8 @@ EXPORT_SYMBOL(bitmap_shift_right);
  * direction.  Zeros are fed into the vacated LS bit positions
  * and those MS bits shifted off the top are lost.
  */
-void bitmap_shift_left(unsigned long *dst,
+
+void __bitmap_shift_left(unsigned long *dst,
 			const unsigned long *src, int shift, int bits)
 {
 	int k, lim = BITS_TO_LONGS(bits), left = bits % BITS_PER_LONG;
@@ -149,9 +177,9 @@ void bitmap_shift_left(unsigned long *dst,
 	if (off)
 		memset(dst, 0, off*sizeof(unsigned long));
 }
-EXPORT_SYMBOL(bitmap_shift_left);
+EXPORT_SYMBOL(__bitmap_shift_left);
 
-void bitmap_and(unsigned long *dst, const unsigned long *bitmap1,
+void __bitmap_and(unsigned long *dst, const unsigned long *bitmap1,
 				const unsigned long *bitmap2, int bits)
 {
 	int k;
@@ -160,9 +188,9 @@ void bitmap_and(unsigned long *dst, const unsigned long *bitmap1,
 	for (k = 0; k < nr; k++)
 		dst[k] = bitmap1[k] & bitmap2[k];
 }
-EXPORT_SYMBOL(bitmap_and);
+EXPORT_SYMBOL(__bitmap_and);
 
-void bitmap_or(unsigned long *dst, const unsigned long *bitmap1,
+void __bitmap_or(unsigned long *dst, const unsigned long *bitmap1,
 				const unsigned long *bitmap2, int bits)
 {
 	int k;
@@ -171,10 +199,62 @@ void bitmap_or(unsigned long *dst, const unsigned long *bitmap1,
 	for (k = 0; k < nr; k++)
 		dst[k] = bitmap1[k] | bitmap2[k];
 }
-EXPORT_SYMBOL(bitmap_or);
+EXPORT_SYMBOL(__bitmap_or);
+
+void __bitmap_xor(unsigned long *dst, const unsigned long *bitmap1,
+				const unsigned long *bitmap2, int bits)
+{
+	int k;
+	int nr = BITS_TO_LONGS(bits);
+
+	for (k = 0; k < nr; k++)
+		dst[k] = bitmap1[k] ^ bitmap2[k];
+}
+EXPORT_SYMBOL(__bitmap_xor);
+
+void __bitmap_andnot(unsigned long *dst, const unsigned long *bitmap1,
+				const unsigned long *bitmap2, int bits)
+{
+	int k;
+	int nr = BITS_TO_LONGS(bits);
+
+	for (k = 0; k < nr; k++)
+		dst[k] = bitmap1[k] & ~bitmap2[k];
+}
+EXPORT_SYMBOL(__bitmap_andnot);
+
+int __bitmap_intersects(const unsigned long *bitmap1,
+				const unsigned long *bitmap2, int bits)
+{
+	int k, lim = bits/BITS_PER_LONG;
+	for (k = 0; k < lim; ++k)
+		if (bitmap1[k] & bitmap2[k])
+			return 1;
+
+	if (bits % BITS_PER_LONG)
+		if ((bitmap1[k] & bitmap2[k]) & BITMAP_LAST_WORD_MASK(bits))
+			return 1;
+	return 0;
+}
+EXPORT_SYMBOL(__bitmap_intersects);
+
+int __bitmap_subset(const unsigned long *bitmap1,
+				const unsigned long *bitmap2, int bits)
+{
+	int k, lim = bits/BITS_PER_LONG;
+	for (k = 0; k < lim; ++k)
+		if (bitmap1[k] & ~bitmap2[k])
+			return 0;
+
+	if (bits % BITS_PER_LONG)
+		if ((bitmap1[k] & ~bitmap2[k]) & BITMAP_LAST_WORD_MASK(bits))
+			return 0;
+	return 1;
+}
+EXPORT_SYMBOL(__bitmap_subset);
 
 #if BITS_PER_LONG == 32
-int bitmap_weight(const unsigned long *bitmap, int bits)
+int __bitmap_weight(const unsigned long *bitmap, int bits)
 {
 	int k, w = 0, lim = bits/BITS_PER_LONG;
 
@@ -182,13 +262,12 @@ int bitmap_weight(const unsigned long *bitmap, int bits)
 		w += hweight32(bitmap[k]);
 
 	if (bits % BITS_PER_LONG)
-		w += hweight32(bitmap[k] &
-				((1UL << (bits % BITS_PER_LONG)) - 1));
+		w += hweight32(bitmap[k] & BITMAP_LAST_WORD_MASK(bits));
 
 	return w;
 }
 #else
-int bitmap_weight(const unsigned long *bitmap, int bits)
+int __bitmap_weight(const unsigned long *bitmap, int bits)
 {
 	int k, w = 0, lim = bits/BITS_PER_LONG;
 
@@ -196,13 +275,12 @@ int bitmap_weight(const unsigned long *bitmap, int bits)
 		w += hweight64(bitmap[k]);
 
 	if (bits % BITS_PER_LONG)
-		w += hweight64(bitmap[k] &
-				((1UL << (bits % BITS_PER_LONG)) - 1));
+		w += hweight64(bitmap[k] & BITMAP_LAST_WORD_MASK(bits));
 
 	return w;
 }
 #endif
-EXPORT_SYMBOL(bitmap_weight);
+EXPORT_SYMBOL(__bitmap_weight);
 
 /*
  * Bitmap printing & parsing functions: first version by Bill Irwin,
@@ -319,7 +397,7 @@ int bitmap_parse(const char __user *ubuf, unsigned int ubuflen,
 		if (nchunks == 0 && chunk == 0)
 			continue;
 
-		bitmap_shift_left(maskp, maskp, CHUNKSZ, nmaskbits);
+		__bitmap_shift_left(maskp, maskp, CHUNKSZ, nmaskbits);
 		*maskp |= chunk;
 		nchunks++;
 		nbits += (nchunks == 1) ? nbits_to_hold_value(chunk) : CHUNKSZ;

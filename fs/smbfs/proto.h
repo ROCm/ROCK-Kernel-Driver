@@ -87,7 +87,5 @@ extern int smb_request_send_req(struct smb_request *req);
 extern int smb_request_send_server(struct smb_sb_info *server);
 extern int smb_request_recv(struct smb_sb_info *server);
 /* symlink.c */
-extern int smb_read_link(struct dentry *dentry, char *buffer, int len);
 extern int smb_symlink(struct inode *inode, struct dentry *dentry, const char *oldname);
-extern int smb_follow_link(struct dentry *dentry, struct nameidata *nd);
 extern struct inode_operations smb_link_inode_operations;

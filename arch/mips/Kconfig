@@ -96,11 +96,13 @@ config NEC_EAGLE
 	select DMA_NONCOHERENT
 	select IRQ_CPU
 	depends on MACH_VR41XX
+	select HW_HAS_PCI
 
 config TANBAC_TB0226
 	bool "Support for TANBAC TB0226 (Mbase)"
 	depends on MACH_VR41XX
 	select DMA_NONCOHERENT
+	select HW_HAS_PCI
 	select IRQ_CPU
 	help
 	  The TANBAC TB0226 (Mbase) is a MIPS-based platform manufactured by TANBAC.
@@ -110,6 +112,7 @@ config TANBAC_TB0229
 	bool "Support for TANBAC TB0229 (VR4131DIMM)"
 	depends on MACH_VR41XX
 	select DMA_NONCOHERENT
+	select HW_HAS_PCI
 	select IRQ_CPU
 	help
 	  The TANBAC TB0229 (VR4131DIMM) is a MIPS-based platform manufactured by TANBAC.
@@ -118,6 +121,7 @@ config TANBAC_TB0229
 config VICTOR_MPC30X
 	bool "Support for Victor MP-C303/304"
 	select DMA_NONCOHERENT
+	select HW_HAS_PCI
 	select IRQ_CPU
 	depends on MACH_VR41XX
 
@@ -125,17 +129,22 @@ config ZAO_CAPCELLA
 	bool "Support for ZAO Networks Capcella"
 	depends on MACH_VR41XX
 	select DMA_NONCOHERENT
+	select HW_HAS_PCI
 	select IRQ_CPU
 
+config PCI_VR41XX
+	bool "Add PCI control unit support of NEC VR4100 series"
+	depends on MACH_VR41XX && PCI
+
 config VRC4171
-	tristate "add NEC VRC4171 companion chip support"
+	tristate "Add NEC VRC4171 companion chip support"
 	depends on MACH_VR41XX && ISA
 	---help---
 	  The NEC VRC4171/4171A is a companion chip for NEC VR4111/VR4121.
 
 config VRC4173
-	tristate "add NEC VRC4173 companion chip support"
-	depends on MACH_VR41XX && PCI
+	tristate "Add NEC VRC4173 companion chip support"
+	depends on MACH_VR41XX && PCI_VR41XX
 	---help---
 	  The NEC VRC4173 is a companion chip for NEC VR4122/VR4131.
 
@@ -143,11 +152,13 @@ config TOSHIBA_JMR3927
 	bool "Support for Toshiba JMR-TX3927 board"
 	depends on MIPS32
 	select DMA_NONCOHERENT
+	select HW_HAS_PCI
 
 config MIPS_COBALT
 	bool "Support for Cobalt Server (EXPERIMENTAL)"
 	depends on EXPERIMENTAL
 	select DMA_NONCOHERENT
+	select HW_HAS_PCI
 	select IRQ_CPU
 
 config MACH_DECSTATION
@@ -174,6 +185,7 @@ config MIPS_EV64120
 	bool "Support for Galileo EV64120 Evaluation board (EXPERIMENTAL)"
 	depends on EXPERIMENTAL
 	select DMA_NONCOHERENT
+	select HW_HAS_PCI
 	help
 	  This is an evaluation board based on the Galileo GT-64120
 	  single-chip system controller that contains a MIPS R5000 compatible
@@ -189,6 +201,7 @@ config MIPS_EV96100
 	bool "Support for Galileo EV96100 Evaluation board (EXPERIMENTAL)"
 	depends on EXPERIMENTAL
 	select DMA_NONCOHERENT
+	select HW_HAS_PCI
 	select IRQ_CPU
 	select MIPS_GT96100
 	select RM7000_CPU_SCACHE
@@ -201,6 +214,7 @@ config MIPS_EV96100
 config MIPS_IVR
 	bool "Support for Globespan IVR board"
 	select DMA_NONCOHERENT
+	select HW_HAS_PCI
 	help
 	  This is an evaluation board built by Globespan to showcase thir
 	  iVR (Internet Video Recorder) design. It utilizes a QED RM5231
@@ -211,6 +225,7 @@ config MIPS_IVR
 config LASAT
 	bool "Support for LASAT Networks platforms"
 	select DMA_NONCOHERENT
+	select HW_HAS_PCI
 	select R5000_CPU_SCACHE
 
 config PICVUE
@@ -233,11 +248,13 @@ config HP_LASERJET
 	bool "Support for Hewlett Packard LaserJet board"
 	depends on BROKEN
 	select DMA_NONCOHERENT
+	select HW_HAS_PCI
 	select IRQ_CPU
 
 config MIPS_ITE8172
 	bool "Support for ITE 8172G board"
 	select DMA_NONCOHERENT
+	select HW_HAS_PCI
 	help
 	  Ths is an evaluation board made by ITE <http://www.ite.com.tw/>
 	  with ATX form factor that utilizes a MIPS R5000 to work with its
@@ -257,6 +274,7 @@ config IT8172_REVC
 config MIPS_ATLAS
 	bool "Support for MIPS Atlas board"
 	select DMA_NONCOHERENT
+	select HW_HAS_PCI
 	help
 	  This enables support for the QED R5231-based MIPS Atlas evaluation
 	  board.
@@ -265,6 +283,7 @@ config MIPS_MALTA
 	bool "Support for MIPS Malta board"
 	select HAVE_STD_PC_SERIAL_PORT
 	select DMA_NONCOHERENT
+	select HW_HAS_PCI
 	help
 	  This enables support for the VR5000-based MIPS Malta evaluation
 	  board.
@@ -278,6 +297,7 @@ config MIPS_SEAD
 config MOMENCO_OCELOT
 	bool "Support for Momentum Ocelot board"
 	select DMA_NONCOHERENT
+	select HW_HAS_PCI
 	select IRQ_CPU
 	select IRQ_CPU_RM7K
 	select RM7000_CPU_SCACHE
@@ -288,6 +308,7 @@ config MOMENCO_OCELOT
 config MOMENCO_OCELOT_G
 	bool "Support for Momentum Ocelot-G board"
 	select DMA_NONCOHERENT
+	select HW_HAS_PCI
 	select IRQ_CPU
 	select IRQ_CPU_RM7K
 	select RM7000_CPU_SCACHE
@@ -298,6 +319,7 @@ config MOMENCO_OCELOT_G
 config MOMENCO_OCELOT_C
 	bool "Support for Momentum Ocelot-C board"
 	select DMA_NONCOHERENT
+	select HW_HAS_PCI
 	select IRQ_CPU
 	select RM7000_CPU_SCACHE
 	help
@@ -307,6 +329,7 @@ config MOMENCO_OCELOT_C
 config MOMENCO_JAGUAR_ATX
 	bool "Support for Momentum Jaguar board"
 	select DMA_NONCOHERENT
+	select HW_HAS_PCI
 	select IRQ_CPU
 	select IRQ_CPU_RM7K
 	select LIMITED_DMA
@@ -324,7 +347,10 @@ config JAGUAR_DMALOW
 
 config PMC_YOSEMITE
 	bool "Support for PMC-Sierra Yosemite eval board"
-	select DMA_NONCOHERENT
+	select DMA_COHERENT
+	select HW_HAS_PCI
+	select IRQ_CPU
+	select IRQ_CPU_RM7K
 	help
 	  Yosemite is an evaluation board for the RM9000x2 processor
 	  manufactured by PMC-Sierra
@@ -338,6 +364,7 @@ config DDB5074
 	depends on EXPERIMENTAL
 	select DMA_NONCOHERENT
 	select HAVE_STD_PC_SERIAL_PORT
+	select HW_HAS_PCI
 	select IRQ_CPU
 	select ISA
 	help
@@ -348,6 +375,7 @@ config DDB5476
 	bool "Support for NEC DDB Vrc-5476"
 	select DMA_NONCOHERENT
 	select HAVE_STD_PC_SERIAL_PORT
+	select HW_HAS_PCI
 	select IRQ_CPU
 	select ISA
 	help
@@ -361,6 +389,7 @@ config DDB5476
 config DDB5477
 	bool "Support for NEC DDB Vrc-5477"
 	select DMA_NONCOHERENT
+	select HW_HAS_PCI
 	select IRQ_CPU
 	help
 	  This enables support for the R5432-based NEC DDB Vrc-5477,
@@ -393,6 +422,7 @@ config SGI_IP27
 	bool "Support for SGI IP27 (Origin200/2000)"
 	depends on MIPS64
 	select DMA_IP27
+	select HW_HAS_PCI
 	help
 	  This are the SGI Origin 200, Origin 2000 and Onyx 2 Graphics
 	  workstations.  To compile a Linux kernel that runs on these, say Y
@@ -457,6 +487,7 @@ config SGI_IP32
 	bool "Support for SGI IP32 (O2) (EXPERIMENTAL)"
 	depends on EXPERIMENTAL
 	select DMA_NONCOHERENT
+	select HW_HAS_PCI
 	select R5000_CPU_SCACHE
 	select RM7000_CPU_SCACHE
 	help
@@ -499,26 +530,31 @@ config MIPS_PB1000
 	bool "PB1000 board"
 	depends on SOC_AU1000
 	select DMA_NONCOHERENT
+	select HW_HAS_PCI
 
 config MIPS_PB1100
 	bool "PB1100 board"
 	depends on SOC_AU1100
 	select DMA_NONCOHERENT
+	select HW_HAS_PCI
 
 config MIPS_PB1500
 	bool "PB1500 board"
 	depends on SOC_AU1500
 	select DMA_NONCOHERENT
+	select HW_HAS_PCI
 
 config MIPS_PB1550
 	bool "PB1550 board"
 	depends on SOC_AU1550
 	select DMA_NONCOHERENT
+	select HW_HAS_PCI
 
 config MIPS_DB1000
 	bool "DB1000 board"
 	depends on SOC_AU1000
 	select DMA_NONCOHERENT
+	select HW_HAS_PCI
 
 config MIPS_DB1100
 	bool "DB1100 board"
@@ -529,10 +565,12 @@ config MIPS_DB1500
 	bool "DB1500 board"
 	depends on SOC_AU1500
 	select DMA_NONCOHERENT
+	select HW_HAS_PCI
 
 config MIPS_DB1550
 	bool "DB1550 board"
 	depends on SOC_AU1550
+	select HW_HAS_PCI
 
 config MIPS_BOSPORUS
 	bool "Bosporus board"
@@ -642,6 +680,7 @@ endchoice
 
 config SIBYTE_SB1250
 	bool
+	select HW_HAS_PCI
 
 config SIBYTE_BCM1120
 	bool
@@ -649,10 +688,12 @@ config SIBYTE_BCM1120
 
 config SIBYTE_BCM1125
 	bool
+	select HW_HAS_PCI
 	select SIBYTE_BCM112X
 
 config SIBYTE_BCM1125H
 	bool
+	select HW_HAS_PCI
 	select SIBYTE_BCM112X
 
 config SIBYTE_BCM112X
@@ -698,11 +739,6 @@ endchoice
 
 config CPU_SB1_PASS_2
 	bool
-
-config SIBYTE_HAS_PCI
-	bool
-	depends on SIBYTE_SB1250 || SIBYTE_BCM1125 || SIBYTE_BCM1125H
-	default y
 
 config SIBYTE_HAS_LDT
 	bool
@@ -770,6 +806,7 @@ config SNI_RM200_PCI
 	bool "Support for SNI RM200 PCI"
 	select DMA_NONCOHERENT
 	select HAVE_STD_PC_SERIAL_PORT
+	select HW_HAS_PCI
 	select ISA
 	help
 	  The SNI RM200 PCI was a MIPS-based platform manufactured by Siemens
@@ -781,6 +818,7 @@ config TOSHIBA_RBTX4927
 	bool "Support for Toshiba TBTX49[23]7 board"
 	depends on MIPS32
 	select DMA_NONCOHERENT
+	select HW_HAS_PCI
 	select ISA
 
 config RWSEM_GENERIC_SPINLOCK
@@ -859,11 +897,6 @@ config IRQ_CPU
 
 config IRQ_CPU_RM7K
 	bool
-
-config DUMMY_KEYB
-	bool
-	depends on ZAO_CAPCELLA || VICTOR_MPC30X || SIBYTE_SB1xxx_SOC || NEC_EAGLE || NEC_OSPREY || DDB5477 || CASIO_E55 || TANBAC_TB0226 || TANBAC_TB0229
-	default y
 
 config DDB5XXX_COMMON
 	bool
@@ -1164,6 +1197,16 @@ config PAGE_SIZE_4KB
 	 4kB page size will minimize memory consumption and is therefore
 	 recommended for low memory systems. 
 
+config PAGE_SIZE_8KB
+	bool "8kB"
+	depends on EXPERIMENTAL && CPU_R8000
+	help
+	  Using 8kB page size will result in higher performance kernel at
+	  the price of higher memory consumption.  This option is available
+	  only on the R8000 processor.  Not that at the time of this writing
+	  this option is still high experimental; there are also issues with
+	  compatibility of user applications.
+
 config PAGE_SIZE_16KB
 	bool "16kB"
 	depends on EXPERIMENTAL && !CPU_R3000 && !CPU_TX39XX
@@ -1377,9 +1420,12 @@ endmenu
 
 menu "Bus options (PCI, PCMCIA, EISA, ISA, TC)"
 
+config HW_HAS_PCI
+	bool
+
 config PCI
 	bool "Support for PCI controller"
-	depends on MIPS_DB1000 || DDB5074 || DDB5476 || DDB5477 || HP_LASERJET || LASAT || MIPS_IVR || MIPS_ATLAS || MIPS_COBALT || MIPS_EV64120 || MIPS_EV96100 || MIPS_ITE8172 || MIPS_MALTA || MOMENCO_OCELOT || MOMENCO_OCELOT_C || MOMENCO_OCELOT_G || MOMENCO_JAGUAR_ATX || MIPS_PB1000 || MIPS_PB1100 || SOC_AU1500 || SOC_AU1550 || NEC_EAGLE || SGI_IP27 || SGI_IP32 || SIBYTE_HAS_PCI || SNI_RM200_PCI || TANBAC_TB0226 || TANBAC_TB0229 || TOSHIBA_JMR3927 || TOSHIBA_RBTX4927 || VICTOR_MPC30X || ZAO_CAPCELLA
+	depends on HW_HAS_PCI
 	help
 	  Find out whether you have a PCI motherboard. PCI is the name of a
 	  bus system, i.e. the way the CPU talks to the other stuff inside
@@ -1559,7 +1605,7 @@ config DEBUG_STACK_USAGE
 
 config DEBUG_SLAB
 	bool "Debug memory allocations"
-	depends on DEBUG_KERNEL && !CPU_HAS_LLDSCD
+	depends on DEBUG_KERNEL
 	help
 	  Say Y here to have the kernel do limited verification on memory
 	  allocation as well as poisoning memory on free to catch use of freed

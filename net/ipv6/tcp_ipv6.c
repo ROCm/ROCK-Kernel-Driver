@@ -1893,12 +1893,11 @@ static int tcp_v6_init_sock(struct sock *sk)
 static int tcp_v6_destroy_sock(struct sock *sk)
 {
 	struct tcp_opt *tp = tcp_sk(sk);
-	struct inet_opt *inet = inet_sk(sk);
 
 	tcp_clear_xmit_timers(sk);
 
 	/* Cleanup up the write buffer. */
-  	tcp_writequeue_purge(sk);
+  	sk_stream_writequeue_purge(sk);
 
 	/* Cleans up our, hopefully empty, out_of_order_queue. */
   	__skb_queue_purge(&tp->out_of_order_queue);
@@ -1909,10 +1908,6 @@ static int tcp_v6_destroy_sock(struct sock *sk)
 	/* Clean up a referenced TCP bind bucket. */
 	if (tcp_sk(sk)->bind_hash)
 		tcp_put_port(sk);
-
-	/* If sendmsg cached page exists, toss it. */
-	if (inet->sndmsg_page != NULL)
-		__free_page(inet->sndmsg_page);
 
 	atomic_dec(&tcp_sockets_allocated);
 
@@ -2083,23 +2078,31 @@ void tcp6_proc_exit(void)
 #endif
 
 struct proto tcpv6_prot = {
-	.name		=	"TCPv6",
-	.close		=	tcp_close,
-	.connect	=	tcp_v6_connect,
-	.disconnect	=	tcp_disconnect,
-	.accept		=	tcp_accept,
-	.ioctl		=	tcp_ioctl,
-	.init		=	tcp_v6_init_sock,
-	.destroy	=	tcp_v6_destroy_sock,
-	.shutdown	=	tcp_shutdown,
-	.setsockopt	=	tcp_setsockopt,
-	.getsockopt	=	tcp_getsockopt,
-	.sendmsg	=	tcp_sendmsg,
-	.recvmsg	=	tcp_recvmsg,
-	.backlog_rcv	=	tcp_v6_do_rcv,
-	.hash		=	tcp_v6_hash,
-	.unhash		=	tcp_unhash,
-	.get_port	=	tcp_v6_get_port,
+	.name			= "TCPv6",
+	.close			= tcp_close,
+	.connect		= tcp_v6_connect,
+	.disconnect		= tcp_disconnect,
+	.accept			= tcp_accept,
+	.ioctl			= tcp_ioctl,
+	.init			= tcp_v6_init_sock,
+	.destroy		= tcp_v6_destroy_sock,
+	.shutdown		= tcp_shutdown,
+	.setsockopt		= tcp_setsockopt,
+	.getsockopt		= tcp_getsockopt,
+	.sendmsg		= tcp_sendmsg,
+	.recvmsg		= tcp_recvmsg,
+	.backlog_rcv		= tcp_v6_do_rcv,
+	.hash			= tcp_v6_hash,
+	.unhash			= tcp_unhash,
+	.get_port		= tcp_v6_get_port,
+	.enter_memory_pressure	= tcp_enter_memory_pressure,
+	.sockets_allocated	= &tcp_sockets_allocated,
+	.memory_allocated	= &tcp_memory_allocated,
+	.memory_pressure	= &tcp_memory_pressure,
+	.sysctl_mem		= sysctl_tcp_mem,
+	.sysctl_wmem		= sysctl_tcp_wmem,
+	.sysctl_rmem		= sysctl_tcp_rmem,
+	.max_header		= MAX_TCP_HEADER,
 };
 
 static struct inet6_protocol tcpv6_protocol = {

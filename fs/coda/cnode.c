@@ -17,8 +17,9 @@ inline int coda_fideq(struct CodaFid *fid1, struct CodaFid *fid2)
 }
 
 static struct inode_operations coda_symlink_inode_operations = {
-	.readlink	= page_readlink,
-	.follow_link	= page_follow_link,
+	.readlink	= generic_readlink,
+	.follow_link	= page_follow_link_light,
+	.put_link	= page_put_link,
 	.setattr	= coda_setattr,
 };
 

@@ -315,24 +315,6 @@
 #define MOMENCO_OCELOT_C_SERIAL_PORT_DEFNS
 #endif
 
-#ifdef CONFIG_TITAN_SERIAL
-/* 16552 20 MHz crystal */
-#define TITAN_SERIAL_BASE_BAUD	( 20000000 / 16 )
-#define	TITAN_SERIAL_IRQ	XXX
-#define	TITAN_SERIAL_BASE	0xffffffff
-
-#define	_TITAN_SERIAL_INIT(int, base)					\
-	{ baud_base: TITAN_SERIAL_BASE_BAUD, irq: int,			\
-	  flags: STD_COM_FLAGS,	iomem_base: (u8 *) base,		\
-	  iomem_reg_shift: 2, io_type: SERIAL_IO_MEM			\
-	}
-
-#define TITAN_SERIAL_PORT_DEFNS						\
-	_TITAN_SERIAL_INIT(TITAN_SERIAL_IRQ, TITAN_SERIAL_BASE)
-#else
-#define TITAN_SERIAL_PORT_DEFNS
-#endif
-
 #ifdef CONFIG_DDB5477
 #include <asm/ddb5xxx/ddb5477.h>
 #define DDB5477_SERIAL_PORT_DEFNS                                       \
@@ -371,7 +353,6 @@
 	MOMENCO_OCELOT_G_SERIAL_PORT_DEFNS		\
 	MOMENCO_OCELOT_C_SERIAL_PORT_DEFNS		\
 	MOMENCO_OCELOT_SERIAL_PORT_DEFNS		\
-	TITAN_SERIAL_PORT_DEFNS				\
 	TXX927_SERIAL_PORT_DEFNS                        \
 	AU1000_SERIAL_PORT_DEFNS
 

@@ -34,8 +34,7 @@
 
 
 /* This is used to register protocols. */
-struct inet_protocol 
-{
+struct net_protocol {
 	int			(*handler)(struct sk_buff *skb);
 	void			(*err_handler)(struct sk_buff *skb, u32 info);
 	int			no_policy;
@@ -78,15 +77,15 @@ struct inet_protosw {
 #define INET_PROTOSW_REUSE 0x01	     /* Are ports automatically reusable? */
 #define INET_PROTOSW_PERMANENT 0x02  /* Permanent protocols are unremovable. */
 
-extern struct inet_protocol *inet_protocol_base;
-extern struct inet_protocol *inet_protos[MAX_INET_PROTOS];
+extern struct net_protocol *inet_protocol_base;
+extern struct net_protocol *inet_protos[MAX_INET_PROTOS];
 
 #if defined(CONFIG_IPV6) || defined (CONFIG_IPV6_MODULE)
 extern struct inet6_protocol *inet6_protos[MAX_INET_PROTOS];
 #endif
 
-extern int	inet_add_protocol(struct inet_protocol *prot, unsigned char num);
-extern int	inet_del_protocol(struct inet_protocol *prot, unsigned char num);
+extern int	inet_add_protocol(struct net_protocol *prot, unsigned char num);
+extern int	inet_del_protocol(struct net_protocol *prot, unsigned char num);
 extern void	inet_register_protosw(struct inet_protosw *p);
 extern void	inet_unregister_protosw(struct inet_protosw *p);
 

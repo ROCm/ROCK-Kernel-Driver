@@ -1,48 +1,32 @@
 /*
- * FILE NAME
- *	arch/mips/vr41xx/common/pciu.c
+ *  pci-vr41xx.c, PCI Control Unit routines for the NEC VR4100 series.
  *
- * BRIEF MODULE DESCRIPTION
- *	PCI Control Unit routines for the NEC VR4100 series.
+ *  Copyright (C) 2001-2003 MontaVista Software Inc.
+ *    Author: Yoichi Yuasa <yyuasa@mvista.com or source@mvista.com>
+ *  Copyright (C) 2004  Yoichi Yuasa <yuasa@hh.iij4u.or.jp>
  *
- * Author: Yoichi Yuasa
- *         yyuasa@mvista.com or source@mvista.com
+ *  This program is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation; either version 2 of the License, or
+ *  (at your option) any later version.
  *
- * Copyright 2001-2003 MontaVista Software Inc.
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
  *
- *  This program is free software; you can redistribute it and/or modify it
- *  under the terms of the GNU General Public License as published by the
- *  Free Software Foundation; either version 2 of the License, or (at your
- *  option) any later version.
- *
- *  THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESS OR IMPLIED
- *  WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
- *  MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
- *  IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
- *  INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- *  BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
- *  OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- *  ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR
- *  TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
- *  USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- *  You should have received a copy of the GNU General Public License along
- *  with this program; if not, write to the Free Software Foundation, Inc.,
- *  675 Mass Ave, Cambridge, MA 02139, USA.
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program; if not, write to the Free Software
+ *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 /*
  * Changes:
- *  Paul Mundt <lethal@chaoticdreams.org>
- *  - Fix deadlock-causing PCIU access race for VR4131.
- *
  *  MontaVista Software Inc. <yyuasa@mvista.com> or <source@mvista.com>
  *  - New creation, NEC VR4122 and VR4131 are supported.
  */
-#include <linux/config.h>
 #include <linux/init.h>
 #include <linux/pci.h>
 #include <linux/types.h>
-#include <linux/delay.h>
 
 #include <asm/cpu.h>
 #include <asm/io.h>
@@ -51,183 +35,257 @@
 
 #include "pci-vr41xx.h"
 
-static inline int vr41xx_pci_config_access(unsigned char bus,
-					   unsigned int devfn, int where)
-{
-	if (bus == 0) {
-		/*
-		 * Type 0 configuration
-		 */
-		if (PCI_SLOT(devfn) < 11 || where > 255)
-			return -1;
+extern struct pci_ops vr41xx_pci_ops;
 
-		writel((1UL << PCI_SLOT(devfn)) |
-		       (PCI_FUNC(devfn) << 8) |
-		       (where & 0xfc), PCICONFAREG);
-	} else {
-		/*
-		 * Type 1 configuration
-		 */
-		if (where > 255)
-			return -1;
-
-		writel((bus << 16) |
-		       (devfn << 8) | (where & 0xfc) | 1UL, PCICONFAREG);
-	}
-
-	return 0;
-}
-
-static int vr41xx_pci_config_read(struct pci_bus *bus, unsigned int devfn,
-				  int where, int size, u32 * val)
-{
-	u32 data;
-
-	*val = 0xffffffffUL;
-	if (vr41xx_pci_config_access(bus->number, devfn, where) < 0)
-		return PCIBIOS_DEVICE_NOT_FOUND;
-
-	data = readl(PCICONFDREG);
-
-	switch (size) {
-	case 1:
-		*val = (data >> ((where & 3) << 3)) & 0xffUL;
-		break;
-	case 2:
-		*val = (data >> ((where & 2) << 3)) & 0xffffUL;
-		break;
-	case 4:
-		*val = data;
-		break;
-	default:
-		return PCIBIOS_FUNC_NOT_SUPPORTED;
-	}
-
-	return PCIBIOS_SUCCESSFUL;
-}
-
-static int vr41xx_pci_config_write(struct pci_bus *bus, unsigned int devfn,
-				   int where, int size, u32 val)
-{
-	u32 data;
-	int shift;
-
-	if (vr41xx_pci_config_access(bus->number, devfn, where) < 0)
-		return PCIBIOS_DEVICE_NOT_FOUND;
-
-	data = readl(PCICONFDREG);
-
-	switch (size) {
-	case 1:
-		shift = (where & 3) << 3;
-		data &= ~(0xff << shift);
-		data |= ((val & 0xff) << shift);
-		break;
-	case 2:
-		shift = (where & 2) << 3;
-		data &= ~(0xffff << shift);
-		data |= ((val & 0xffff) << shift);
-		break;
-	case 4:
-		data = val;
-		break;
-	default:
-		return PCIBIOS_FUNC_NOT_SUPPORTED;
-	}
-
-	writel(data, PCICONFDREG);
-
-	return PCIBIOS_SUCCESSFUL;
-}
-
-struct pci_ops vr41xx_pci_ops = {
-	.read = vr41xx_pci_config_read,
-	.write = vr41xx_pci_config_write,
+static struct pci_master_address_conversion pci_master_memory1 = {
+	.bus_base_address	= PCI_MASTER_MEM1_BUS_BASE_ADDRESS,
+	.address_mask		= PCI_MASTER_MEM1_ADDRESS_MASK,
+	.pci_base_address	= PCI_MASTER_MEM1_PCI_BASE_ADDRESS,
 };
 
-void __init vr41xx_pciu_init(struct vr41xx_pci_address_map *map)
-{
-	struct vr41xx_pci_address_space *s;
-	unsigned long vtclock;
-	u32 config;
-	int n;
+static struct pci_target_address_conversion pci_target_memory1 = {
+	.address_mask		= PCI_TARGET_MEM1_ADDRESS_MASK,
+	.bus_base_address	= PCI_TARGET_MEM1_BUS_BASE_ADDRESS,
+};
 
-	if (!map)
-		return;
+static struct pci_master_address_conversion pci_master_io = {
+	.bus_base_address	= PCI_MASTER_IO_BUS_BASE_ADDRESS,
+	.address_mask		= PCI_MASTER_IO_ADDRESS_MASK,
+	.pci_base_address	= PCI_MASTER_IO_PCI_BASE_ADDRESS,
+};
+
+static struct pci_mailbox_address pci_mailbox = {
+	.base_address		= PCI_MAILBOX_BASE_ADDRESS,
+};
+
+static struct pci_target_address_window pci_target_window1 = {
+	.base_address		= PCI_TARGET_WINDOW1_BASE_ADDRESS,
+};
+
+static struct resource pci_mem_resource = {
+	.name   = "PCI Memory resources",
+	.start  = PCI_MEM_RESOURCE_START,
+	.end    = PCI_MEM_RESOURCE_END,
+	.flags  = IORESOURCE_MEM,
+};
+
+static struct resource pci_io_resource = {
+	.name   = "PCI I/O resources",
+	.start  = PCI_IO_RESOURCE_START,
+	.end    = PCI_IO_RESOURCE_END,
+	.flags  = IORESOURCE_IO,
+};
+
+static struct pci_controller_unit_setup vr41xx_pci_controller_unit_setup = {
+	.master_memory1				= &pci_master_memory1,
+	.target_memory1				= &pci_target_memory1,
+	.master_io				= &pci_master_io,
+	.exclusive_access			= CANNOT_LOCK_FROM_DEVICE,
+	.wait_time_limit_from_irdy_to_trdy	= 0,
+	.mailbox				= &pci_mailbox,
+	.target_window1				= &pci_target_window1,
+	.master_latency_timer			= 0x80,
+	.retry_limit				= 0,
+	.arbiter_priority_control		= PCI_ARBITRATION_MODE_FAIR,
+	.take_away_gnt_mode			= PCI_TAKE_AWAY_GNT_DISABLE,
+};
+
+static struct pci_controller vr41xx_pci_controller = {
+	.pci_ops        = &vr41xx_pci_ops,
+	.mem_resource	= &pci_mem_resource,
+	.io_resource	= &pci_io_resource,
+};
+
+void __init vr41xx_pciu_setup(struct pci_controller_unit_setup *setup)
+{
+	vr41xx_pci_controller_unit_setup = *setup;
+}
+
+static int __init vr41xx_pciu_init(void)
+{
+	struct pci_controller_unit_setup *setup;
+	struct pci_master_address_conversion *master;
+	struct pci_target_address_conversion *target;
+	struct pci_mailbox_address *mailbox;
+	struct pci_target_address_window *window;
+	unsigned long vtclock, pci_clock_max;
+	uint32_t val;
+
+	setup = &vr41xx_pci_controller_unit_setup;
 
 	/* Disable PCI interrupt */
-	writew(0, MPCIINTREG);
+	vr41xx_disable_pciint();
 
 	/* Supply VTClock to PCIU */
 	vr41xx_supply_clock(PCIU_CLOCK);
 
-	/*
-	 * Sleep for 1us after setting MSKPPCIU bit in CMUCLKMSK
-	 * before doing any PCIU access to avoid deadlock on VR4131.
-	 */
-	udelay(1);
+	/* Dummy write, waiting for supply of VTClock. */
+	vr41xx_disable_pciint();
 
 	/* Select PCI clock */
-	vtclock = vr41xx_get_vtclock_frequency();
-	if (vtclock < MAX_PCI_CLOCK)
-		writel(EQUAL_VTCLOCK, PCICLKSELREG);
-	else if ((vtclock / 2) < MAX_PCI_CLOCK)
-		writel(HALF_VTCLOCK, PCICLKSELREG);
-	else if ((vtclock / 4) < MAX_PCI_CLOCK)
-		writel(QUARTER_VTCLOCK, PCICLKSELREG);
+	if (setup->pci_clock_max != 0)
+		pci_clock_max = setup->pci_clock_max;
 	else
-		printk(KERN_INFO "Warning: PCI Clock is over 33MHz.\n");
+		pci_clock_max = PCI_CLOCK_MAX;
+	vtclock = vr41xx_get_vtclock_frequency();
+	if (vtclock < pci_clock_max)
+		writel(EQUAL_VTCLOCK, PCICLKSELREG);
+	else if ((vtclock / 2) < pci_clock_max)
+		writel(HALF_VTCLOCK, PCICLKSELREG);
+	else if (current_cpu_data.processor_id >= PRID_VR4131_REV2_1 &&
+	         (vtclock / 3) < pci_clock_max)
+		writel(ONE_THIRD_VTCLOCK, PCICLKSELREG);
+	else if ((vtclock / 4) < pci_clock_max)
+		writel(QUARTER_VTCLOCK, PCICLKSELREG);
+	else {
+		printk(KERN_ERR "PCI Clock is over 33MHz.\n");
+		return -EINVAL;
+	}
 
 	/* Supply PCI clock by PCI bus */
 	vr41xx_supply_clock(PCI_CLOCK);
 
-	/*
-	 * Set PCI memory & I/O space address conversion registers
-	 * for master transaction.
-	 */
-	if (map->mem1 != NULL) {
-		s = map->mem1;
-		config = (s->internal_base & 0xff000000) |
-		    ((s->address_mask & 0x7f000000) >> 11) | (1UL << 12) |
-		    ((s->pci_base & 0xff000000) >> 24);
-		writel(config, PCIMMAW1REG);
-	}
-	if (map->mem2 != NULL) {
-		s = map->mem2;
-		config = (s->internal_base & 0xff000000) |
-		    ((s->address_mask & 0x7f000000) >> 11) | (1UL << 12) |
-		    ((s->pci_base & 0xff000000) >> 24);
-		writel(config, PCIMMAW2REG);
-	}
-	if (map->io != NULL) {
-		s = map->io;
-		config = (s->internal_base & 0xff000000) |
-		    ((s->address_mask & 0x7f000000) >> 11) | (1UL << 12) |
-		    ((s->pci_base & 0xff000000) >> 24);
-		writel(config, PCIMIOAWREG);
+	if (setup->master_memory1 != NULL) {
+		master = setup->master_memory1;
+		val = IBA(master->bus_base_address) |
+		      MASTER_MSK(master->address_mask) |
+		      WINEN |
+		      PCIA(master->pci_base_address);
+		writel(val, PCIMMAW1REG);
+	} else {
+		val = readl(PCIMMAW1REG);
+		val &= ~WINEN;
+		writel(val, PCIMMAW1REG);
 	}
 
-	/* Set target memory windows */
-	writel(0x00081000, PCITAW1REG);
-	writel(0UL, PCITAW2REG);
-	pciu_write_config_dword(PCI_BASE_ADDRESS_0, 0UL);
-	pciu_write_config_dword(PCI_BASE_ADDRESS_1, 0UL);
+	if (setup->master_memory2 != NULL) {
+		master = setup->master_memory2;
+		val = IBA(master->bus_base_address) |
+		      MASTER_MSK(master->address_mask) |
+		      WINEN |
+		      PCIA(master->pci_base_address);
+		writel(val, PCIMMAW2REG);
+	} else {
+		val = readl(PCIMMAW2REG);
+		val &= ~WINEN;
+		writel(val, PCIMMAW2REG);
+	}
+
+	if (setup->target_memory1 != NULL) {
+		target = setup->target_memory1;
+		val = TARGET_MSK(target->address_mask) |
+		      WINEN |
+		      ITA(target->bus_base_address);
+		writel(val, PCITAW1REG);
+	} else {
+		val = readl(PCITAW1REG);
+		val &= ~WINEN;
+		writel(val, PCITAW1REG);
+	}
+
+	if (setup->target_memory2 != NULL) {
+		target = setup->target_memory2;
+		val = TARGET_MSK(target->address_mask) |
+		      WINEN |
+		      ITA(target->bus_base_address);
+		writel(val, PCITAW2REG);
+	} else {
+		val = readl(PCITAW2REG);
+		val &= ~WINEN;
+		writel(val, PCITAW2REG);
+	}
+
+	if (setup->master_io != NULL) {
+		master = setup->master_io;
+		val = IBA(master->bus_base_address) |
+		      MASTER_MSK(master->address_mask) |
+		      WINEN |
+		      PCIIA(master->pci_base_address);
+		writel(val, PCIMIOAWREG);
+	} else {
+		val = readl(PCIMIOAWREG);
+		val &= ~WINEN;
+		writel(val, PCIMIOAWREG);
+	}
+
+	if (setup->exclusive_access == CANNOT_LOCK_FROM_DEVICE)
+		writel(UNLOCK, PCIEXACCREG);
+	else
+		writel(0, PCIEXACCREG);
+
+	if (current_cpu_data.cputype == CPU_VR4122)
+		writel(TRDYV(setup->wait_time_limit_from_irdy_to_trdy), PCITRDYVREG);
+
+	writel(MLTIM(setup->master_latency_timer), LATTIMEREG);
+
+	if (setup->mailbox != NULL) {
+		mailbox = setup->mailbox;
+		val = MBADD(mailbox->base_address) | TYPE_32BITSPACE |
+		      MSI_MEMORY | PREF_APPROVAL;
+		writel(val, MAILBAREG);
+	}
+
+	if (setup->target_window1) {
+		window = setup->target_window1;
+		val = PMBA(window->base_address) | TYPE_32BITSPACE |
+		      MSI_MEMORY | PREF_APPROVAL;
+		writel(val, PCIMBA1REG);
+	}
+
+	if (setup->target_window2) {
+		window = setup->target_window2;
+		val = PMBA(window->base_address) | TYPE_32BITSPACE |
+		      MSI_MEMORY | PREF_APPROVAL;
+		writel(val, PCIMBA2REG);
+	}
+
+	val = readl(RETVALREG);
+	val &= ~RTYVAL_MASK;
+	val |= RTYVAL(setup->retry_limit);
+	writel(val, RETVALREG);
+
+	val = readl(PCIAPCNTREG);
+	val &= ~(TKYGNT | PAPC);
+
+	switch (setup->arbiter_priority_control) {
+	case PCI_ARBITRATION_MODE_ALTERNATE_0:
+		val |= PAPC_ALTERNATE_0;
+		break;
+	case PCI_ARBITRATION_MODE_ALTERNATE_B:
+		val |= PAPC_ALTERNATE_B;
+		break;
+	default:
+		val |= PAPC_FAIR;
+		break;
+	}
+
+	if (setup->take_away_gnt_mode == PCI_TAKE_AWAY_GNT_ENABLE)
+		val |= TKYGNT_ENABLE;
+
+	writel(val, PCIAPCNTREG);
+
+	writel(PCI_COMMAND_IO | PCI_COMMAND_MEMORY | PCI_COMMAND_MASTER |
+	       PCI_COMMAND_PARITY | PCI_COMMAND_SERR, COMMANDREG);
 
 	/* Clear bus error */
-	n = readl(BUSERRADREG);
-
-	if (current_cpu_data.cputype == CPU_VR4122) {
-		writel(0UL, PCITRDYVREG);
-		pciu_write_config_dword(PCI_CACHE_LINE_SIZE, 0x0000f804);
-	} else {
-		writel(100UL, PCITRDYVREG);
-		pciu_write_config_dword(PCI_CACHE_LINE_SIZE, 0x00008004);
-	}
+	readl(BUSERRADREG);
 
 	writel(CONFIG_DONE, PCIENREG);
-	pciu_write_config_dword(PCI_COMMAND,
-				PCI_COMMAND_IO |
-				PCI_COMMAND_MEMORY |
-				PCI_COMMAND_MASTER |
-				PCI_COMMAND_PARITY | PCI_COMMAND_SERR);
+
+	if (setup->mem_resource != NULL)
+		vr41xx_pci_controller.mem_resource = setup->mem_resource;
+
+	if (setup->io_resource != NULL) {
+		vr41xx_pci_controller.io_resource = setup->io_resource;
+	} else {
+		set_io_port_base(IO_PORT_BASE);
+		ioport_resource.start = IO_PORT_RESOURCE_START;
+		ioport_resource.end = IO_PORT_RESOURCE_END;
+	}
+
+	register_pci_controller(&vr41xx_pci_controller);
+
+	return 0;
 }
+
+early_initcall(vr41xx_pciu_init);

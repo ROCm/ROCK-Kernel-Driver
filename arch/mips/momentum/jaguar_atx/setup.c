@@ -46,6 +46,7 @@
 #include <linux/types.h>
 #include <linux/mm.h>
 #include <linux/bootmem.h>
+#include <linux/pci.h>
 #include <linux/swap.h>
 #include <linux/ioport.h>
 #include <linux/sched.h>
@@ -57,7 +58,6 @@
 #include <asm/page.h>
 #include <asm/io.h>
 #include <asm/irq.h>
-#include <asm/pci.h>
 #include <asm/pci_channel.h>
 #include <asm/processor.h>
 #include <asm/ptrace.h>

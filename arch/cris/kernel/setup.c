@@ -29,10 +29,7 @@ unsigned char aux_device_present;
 extern int root_mountflags;
 extern char _etext, _edata, _end;
 
-#define COMMAND_LINE_SIZE 256
-
 static char command_line[COMMAND_LINE_SIZE] = { 0, };
-       char saved_command_line[COMMAND_LINE_SIZE];
 
 extern const unsigned long text_start, edata; /* set by the linker script */
 extern unsigned long dram_start, dram_end;

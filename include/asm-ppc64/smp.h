@@ -51,8 +51,6 @@ extern cpumask_t cpu_possible_map;
 extern cpumask_t cpu_available_map;
 
 #define cpu_present_at_boot(cpu) cpu_isset(cpu, cpu_present_at_boot)
-#define cpu_online(cpu)          cpu_isset(cpu, cpu_online_map) 
-#define cpu_possible(cpu)        cpu_isset(cpu, cpu_possible_map) 
 #define cpu_available(cpu)       cpu_isset(cpu, cpu_available_map) 
 
 /* Since OpenPIC has only 4 IPIs, we use slightly different message numbers.

@@ -279,7 +279,7 @@ static irqreturn_t  sb1250_dummy_handler(int irq, void *dev_id,
 static struct irqaction sb1250_dummy_action = {
 	.handler = sb1250_dummy_handler,
 	.flags   = 0,
-	.mask    = 0,
+	.mask    = CPU_MASK_NONE,
 	.name    = "sb1250-private",
 	.next    = NULL,
 	.dev_id  = 0

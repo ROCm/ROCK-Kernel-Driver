@@ -2580,7 +2580,7 @@ void txFreelock(struct inode *ip)
 	TXN_LOCK();
 	xtlck = (struct tlock *) &jfs_ip->atlhead;
 
-	while ((lid = xtlck->next)) {
+	while ((lid = xtlck->next) != 0) {
 		tlck = lid_to_tlock(lid);
 		if (tlck->flag & tlckFREELOCK) {
 			xtlck->next = tlck->next;

@@ -64,7 +64,6 @@ void q40_set_vectors (void);
 
 extern void q40_mksound(unsigned int /*freq*/, unsigned int /*ticks*/ );
 
-extern char *saved_command_line;
 extern char m68k_debug_device[];
 static void q40_mem_console_write(struct console *co, const char *b,
 				    unsigned int count);

@@ -3,6 +3,10 @@
  *
  *  Copyright (c) 1997-1998  Mark Lord
  *  May be copied or modified under the terms of the GNU General Public License
+ *
+ *  June 22, 2004 - get rid of check_region
+ *                  Jesper Juhl <juhl-lkml@dif.dk>
+ *
  */
 
 /*
@@ -372,16 +376,6 @@ void __devinit init_hwif_trm290(ide_hwif_t *hwif)
 		if (old != compat && old_mask == 0xff) {
 			/* leave lower 10 bits untouched */
 			compat += (next_offset += 0x400);
-#  if 1
-			if (check_region(compat + 2, 1))
-				printk(KERN_ERR "%s: check_region failure at 0x%04x\n",
-					hwif->name, (compat + 2));
-			/*
-			 * The region check is not needed; however.........
-			 * Since this is the checked in ide-probe.c,
-			 * this is only an assignment.
-			 */
-#  endif
 			hwif->io_ports[IDE_CONTROL_OFFSET] = compat + 2;
 			hwif->OUTW(compat|1, hwif->config_data);
 			new = hwif->INW(hwif->config_data);

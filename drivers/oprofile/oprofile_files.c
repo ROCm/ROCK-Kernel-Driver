@@ -90,7 +90,7 @@ static struct file_operations dump_fops = {
 void oprofile_create_files(struct super_block * sb, struct dentry * root)
 {
 	oprofilefs_create_file(sb, root, "enable", &enable_fops);
-	oprofilefs_create_file(sb, root, "dump", &dump_fops);
+	oprofilefs_create_file_perm(sb, root, "dump", &dump_fops, 0666);
 	oprofilefs_create_file(sb, root, "buffer", &event_buffer_fops);
 	oprofilefs_create_ulong(sb, root, "buffer_size", &fs_buffer_size);
 	oprofilefs_create_ulong(sb, root, "buffer_watershed", &fs_buffer_watershed);

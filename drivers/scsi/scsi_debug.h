@@ -7,7 +7,7 @@ static int scsi_debug_slave_configure(struct scsi_device *);
 static void scsi_debug_slave_destroy(struct scsi_device *);
 static int scsi_debug_queuecommand(struct scsi_cmnd *,
 				   void (*done) (struct scsi_cmnd *));
-static int scsi_debug_ioctl(struct scsi_device *, int, void *);
+static int scsi_debug_ioctl(struct scsi_device *, int, void __user *);
 static int scsi_debug_biosparam(struct scsi_device *, struct block_device *,
 		sector_t, int[]);
 static int scsi_debug_abort(struct scsi_cmnd *);

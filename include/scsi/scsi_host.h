@@ -64,7 +64,7 @@ struct scsi_host_template {
 	 *
 	 * Status: OPTIONAL
 	 */
-	int (* ioctl)(struct scsi_device *dev, int cmd, void *arg);
+	int (* ioctl)(struct scsi_device *dev, int cmd, void __user *arg);
 	
 	/*
 	 * The queuecommand function is used to queue up a scsi

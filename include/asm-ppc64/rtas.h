@@ -37,7 +37,7 @@
  * Where n_in is the number of input parameters and
  *       n_out is the number of output parameters
  *
- * If the "string" is invalid on this system, RTAS_UNKOWN_SERVICE
+ * If the "string" is invalid on this system, RTAS_UNKNOWN_SERVICE
  * will be returned as a token.  rtas_call() does look for this
  * token and error out gracefully so rtas_call(rtas_token("str"), ...)
  * may be safely used for one-shot calls to RTAS.
@@ -168,7 +168,7 @@ extern struct rtas_t rtas;
 
 extern void enter_rtas(unsigned long);
 extern int rtas_token(const char *service);
-extern long rtas_call(int token, int, int, unsigned long *, ...);
+extern int rtas_call(int token, int, int, int *, ...);
 extern void call_rtas_display_status(char);
 extern void rtas_restart(char *cmd);
 extern void rtas_power_off(void);

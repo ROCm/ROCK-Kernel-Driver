@@ -122,7 +122,6 @@ static void get_sysnames(unsigned long, unsigned long, unsigned long,
 static void determine_cpu_caches (unsigned int);
 
 static char command_line[COMMAND_LINE_SIZE];
-char saved_command_line[COMMAND_LINE_SIZE];
 
 /*
  * The format of "screen_info" is strange, and due to early
@@ -1246,9 +1245,9 @@ show_cpuinfo(struct seq_file *f, void *slot)
 		       platform_string(), nr_processors);
 
 #ifdef CONFIG_SMP
-	seq_printf(f, "cpus active\t\t: %ld\n"
+	seq_printf(f, "cpus active\t\t: %d\n"
 		      "cpu active mask\t\t: %016lx\n",
-		       num_online_cpus(), cpu_present_mask);
+		       num_online_cpus(), cpus_addr(cpu_possible_map)[0]);
 #endif
 
 	show_cache_size (f, "L1 Icache", alpha_l1i_cacheshape);

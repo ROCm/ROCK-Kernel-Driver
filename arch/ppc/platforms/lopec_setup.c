@@ -33,7 +33,6 @@
 #include <asm/hw_irq.h>
 #include <asm/prep_nvram.h>
 
-extern char saved_command_line[];
 extern void lopec_find_bridges(void);
 
 /*

@@ -135,7 +135,7 @@ int hfsplus_read_wrapper(struct super_block *sb)
 		return -EINVAL;
 	HFSPLUS_SB(sb).alloc_blksz = blocksize;
 	HFSPLUS_SB(sb).alloc_blksz_shift = 0;
-	while (blocksize >>= 1)
+	while ((blocksize >>= 1) != 0)
 		HFSPLUS_SB(sb).alloc_blksz_shift++;
 	blocksize = min(HFSPLUS_SB(sb).alloc_blksz, (u32)PAGE_SIZE);
 

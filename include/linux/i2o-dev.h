@@ -46,24 +46,24 @@
 struct i2o_cmd_passthru
 {
 	unsigned int iop;	/* IOP unit number */
-	void *msg;		/* message */
+	void __user *msg;	/* message */
 };
 
 struct i2o_cmd_hrtlct
 {
 	unsigned int iop;	/* IOP unit number */
-	void *resbuf;		/* Buffer for result */
-	unsigned int *reslen;	/* Buffer length in bytes */
+	void __user *resbuf;	/* Buffer for result */
+	unsigned int __user *reslen;	/* Buffer length in bytes */
 };
 
 struct i2o_cmd_psetget
 {
 	unsigned int iop;	/* IOP unit number */
 	unsigned int tid;	/* Target device TID */
-	void *opbuf;		/* Operation List buffer */
+	void __user *opbuf;	/* Operation List buffer */
 	unsigned int oplen;	/* Operation List buffer length in bytes */
-	void *resbuf;		/* Result List buffer */
-	unsigned int *reslen;	/* Result List buffer length in bytes */
+	void __user *resbuf;	/* Result List buffer */
+	unsigned int __user *reslen;	/* Result List buffer length in bytes */
 };
 
 struct i2o_sw_xfer
@@ -72,10 +72,10 @@ struct i2o_sw_xfer
 	unsigned char flags;	/* Flags field */
 	unsigned char sw_type;	/* Software type */
 	unsigned int sw_id;	/* Software ID */
-	void *buf;		/* Pointer to software buffer */
-	unsigned int *swlen;	/* Length of software data */
-	unsigned int *maxfrag;	/* Maximum fragment count */
-	unsigned int *curfrag;	/* Current fragment count */
+	void __user *buf;	/* Pointer to software buffer */
+	unsigned int __user *swlen;	/* Length of software data */
+	unsigned int __user *maxfrag;	/* Maximum fragment count */
+	unsigned int __user *curfrag;	/* Current fragment count */
 };
 
 struct i2o_html
@@ -83,9 +83,9 @@ struct i2o_html
 	unsigned int iop;	/* IOP unit number */
 	unsigned int tid;	/* Target device ID */
 	unsigned int page;	/* HTML page */
-	void *resbuf;		/* Buffer for reply HTML page */
-	unsigned int *reslen;	/* Length in bytes of reply buffer */
-	void *qbuf;		/* Pointer to HTTP query string */
+	void __user *resbuf;		/* Buffer for reply HTML page */
+	unsigned int __user *reslen;	/* Length in bytes of reply buffer */
+	void __user *qbuf;		/* Pointer to HTTP query string */
 	unsigned int qlen;	/* Length in bytes of query string buffer */
 };
 
