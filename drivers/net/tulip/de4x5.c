@@ -1237,6 +1237,8 @@ de4x5_hw_init(struct net_device *dev, u_long iobase, struct device *gendev)
 	if (lp->useSROM) {
 	    lp->state = INITIALISED;
 	    if (srom_infoleaf_info(dev)) {
+	        dma_free_coherent (gendev, lp->dma_size,
+			       lp->rx_ring, lp->dma_rings);
 		return -ENXIO;
 	    }
 	    srom_init(dev);
