@@ -56,6 +56,7 @@ modkern_cflags := $(CFLAGS_KERNEL)
 
 $(real-objs-m)        : modkern_cflags := $(CFLAGS_MODULE)
 $(real-objs-m:.o=.i)  : modkern_cflags := $(CFLAGS_MODULE)
+$(real-objs-m:.o=.s)  : modkern_cflags := $(CFLAGS_MODULE)
 $(real-objs-m:.o=.lst): modkern_cflags := $(CFLAGS_MODULE)
 
 $(export-objs)        : export_flags   := $(EXPORT_FLAGS)
@@ -63,10 +64,17 @@ $(export-objs:.o=.i)  : export_flags   := $(EXPORT_FLAGS)
 $(export-objs:.o=.s)  : export_flags   := $(EXPORT_FLAGS)
 $(export-objs:.o=.lst): export_flags   := $(EXPORT_FLAGS)
 
-c_flags = -Wp,-MD,$(depfile) $(CFLAGS) $(NOSTDINC_FLAGS) \
-	  $(modkern_cflags) $(EXTRA_CFLAGS) $(CFLAGS_$(*F).o) \
-	  -DKBUILD_BASENAME=$(subst $(comma),_,$(subst -,_,$(*F))) \
-	  $(export_flags) 
+# Default for not multi-part modules
+modname = $(*F)
+
+$(multi-objs-m)         : modname = $(modname-multi)
+$(multi-objs-m:.o=.i)   : modname = $(modname-multi)
+$(multi-objs-m:.o=.s)   : modname = $(modname-multi)
+$(multi-objs-m:.o=.lst) : modname = $(modname-multi)
+$(multi-objs-y)         : modname = $(modname-multi)
+$(multi-objs-y:.o=.i)   : modname = $(modname-multi)
+$(multi-objs-y:.o=.s)   : modname = $(modname-multi)
+$(multi-objs-y:.o=.lst) : modname = $(modname-multi)
 
 quiet_cmd_cc_s_c = CC      $@
 cmd_cc_s_c       = $(CC) $(c_flags) -S -o $@ $< 
