@@ -105,6 +105,7 @@ static int __init pcibios_init(void)
 	pci_scan_bus(pci_bus1, &pci_direct_conf1, NULL);
 	pci_fixup_irqs(visws_swizzle, visws_map_irq);
 	pcibios_resource_survey();
+	return 0;
 }
 
 subsys_initcall(pcibios_init);
