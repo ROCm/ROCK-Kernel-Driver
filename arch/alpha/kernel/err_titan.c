@@ -22,8 +22,10 @@
 static int
 titan_parse_c_misc(u64 c_misc, int print)
 {
+#ifdef CONFIG_VERBOSE_MCHECK
 	char *src;
 	int nxs = 0;
+#endif
 	int status = MCHK_DISPOSITION_REPORT;
 
 #define TITAN__CCHIP_MISC__NXM		(1UL << 28)
@@ -263,11 +265,11 @@ titan_parse_p_perror(int which, int port, u64 perror, int print)
 static int
 titan_parse_p_agperror(int which, u64 agperror, int print)
 {
+	int status = MCHK_DISPOSITION_REPORT;
+#ifdef CONFIG_VERBOSE_MCHECK
 	int cmd, len;
 	unsigned long addr;
-	int status = MCHK_DISPOSITION_REPORT;
 
-#ifdef CONFIG_VERBOSE_MCHECK
 	char *agperror_cmd[] = { "Read (low-priority)",	"Read (high-priority)",
 				 "Write (low-priority)",
 				 "Write (high-priority)",
@@ -575,14 +577,14 @@ titan_register_error_handlers(void)
 static int
 privateer_process_680_frame(struct el_common *mchk_header, int print)
 {
+	int status = MCHK_DISPOSITION_UNKNOWN_ERROR;
+#ifdef CONFIG_VERBOSE_MCHECK
 	struct el_PRIVATEER_envdata_mcheck *emchk =
 		(struct el_PRIVATEER_envdata_mcheck *)
 		((unsigned long)mchk_header + mchk_header->sys_offset);
-	int status = MCHK_DISPOSITION_UNKNOWN_ERROR;
 
 	/* TODO - catagorize errors, for now, no error */
 
-#ifdef CONFIG_VERBOSE_MCHECK
 	if (!print)
 		return status;
 
