@@ -327,6 +327,14 @@ static void dump_packet(const struct ipt_log_info *info,
 		printk("PROTO=%u ", ih->protocol);
 	}
 
+	/* Max length: 15 "UID=4294967295 " */
+ 	if ((info->logflags & IPT_LOG_UID) && !iphoff && skb->sk) {
+		read_lock_bh(&skb->sk->sk_callback_lock);
+		if (skb->sk->sk_socket && skb->sk->sk_socket->file)
+ 			printk("UID=%u ", skb->sk->sk_socket->file->f_uid);
+		read_unlock_bh(&skb->sk->sk_callback_lock);
+	}
+
 	/* Proto    Max log string length */
 	/* IP:      40+46+6+11+127 = 230 */
 	/* TCP:     10+max(25,20+30+13+9+32+11+127) = 252 */
