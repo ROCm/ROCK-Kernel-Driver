@@ -1681,7 +1681,7 @@ static int cfi_amdstd_lock_varsize(struct mtd_info *mtd,
 	int ret;
 
 	DEBUG(MTD_DEBUG_LEVEL3,
-	      "%s: lock status before, ofs=0x%08llx, len=0x%08X\n",
+	      "%s: lock status before, ofs=0x%08llx, len=0x%08zX\n",
 	      __func__, ofs, len);
 	debug_dump_locks(mtd, do_printlockstatus_oneblock, ofs, len, 0);
 
@@ -1705,7 +1705,7 @@ static int cfi_amdstd_unlock_varsize(struct mtd_info *mtd,
 	int ret;
 
 	DEBUG(MTD_DEBUG_LEVEL3,
-	      "%s: lock status before, ofs=0x%08llx, len=0x%08X\n",
+	      "%s: lock status before, ofs=0x%08llx, len=0x%08zX\n",
 	      __func__, ofs, len);
 	debug_dump_locks(mtd, do_printlockstatus_oneblock, ofs, len, 0);
 

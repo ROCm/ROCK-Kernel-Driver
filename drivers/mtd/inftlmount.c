@@ -58,7 +58,7 @@ static int find_boot_record(struct INFTLrecord *inftl)
 	u8 buf[SECTORSIZE];
 	struct INFTLMediaHeader *mh = &inftl->MediaHdr;
 	struct INFTLPartition *ip;
-	int retlen;
+	size_t retlen;
 
 	DEBUG(MTD_DEBUG_LEVEL3, "INFTL: find_boot_record(inftl=0x%x)\n",
 		(int)inftl);
@@ -288,7 +288,7 @@ static int find_boot_record(struct INFTLrecord *inftl)
 		inftl->PUtable = kmalloc(inftl->nb_blocks * sizeof(u16), GFP_KERNEL);
 		if (!inftl->PUtable) {
 			printk(KERN_WARNING "INFTL: allocation of PUtable "
-				"failed (%d bytes)\n",
+				"failed (%zd bytes)\n",
 				inftl->nb_blocks * sizeof(u16));
 			return -ENOMEM;
 		}
@@ -297,7 +297,7 @@ static int find_boot_record(struct INFTLrecord *inftl)
 		if (!inftl->VUtable) {
 			kfree(inftl->PUtable);
 			printk(KERN_WARNING "INFTL: allocation of VUtable "
-				"failed (%d bytes)\n",
+				"failed (%zd bytes)\n",
 				inftl->nb_blocks * sizeof(u16));
 			return -ENOMEM;
 		}
@@ -348,8 +348,9 @@ static int memcmpb(void *a, int c, int n)
 static int check_free_sectors(struct INFTLrecord *inftl, unsigned int address,
 	int len, int check_oob)
 {
-	int i, retlen;
 	u8 buf[SECTORSIZE + inftl->mbd.mtd->oobsize];
+	size_t retlen;
+	int i;
 
 	DEBUG(MTD_DEBUG_LEVEL3, "INFTL: check_free_sectors(inftl=0x%x,"
 		"address=0x%x,len=%d,check_oob=%d)\n", (int)inftl,
@@ -382,7 +383,7 @@ static int check_free_sectors(struct INFTLrecord *inftl, unsigned int address,
  */
 int INFTL_formatblock(struct INFTLrecord *inftl, int block)
 {
-	int retlen;
+	size_t retlen;
 	struct inftl_unittail uci;
 	struct erase_info *instr = &inftl->instr;
 	int physblock;
@@ -551,7 +552,8 @@ int INFTL_mount(struct INFTLrecord *s)
 	int chain_length, do_format_chain;
 	struct inftl_unithead1 h0;
 	struct inftl_unittail h1;
-	int i, retlen;
+	size_t retlen;
+	int i;
 	u8 *ANACtable, ANAC;
 
 	DEBUG(MTD_DEBUG_LEVEL3, "INFTL: INFTL_mount(inftl=0x%x)\n", (int)s);

@@ -246,7 +246,7 @@ static int write_pages(struct blkmtd_dev *dev, const u_char *buf, loff_t to,
 	pagenr = to >> PAGE_SHIFT;
 	offset = to & ~PAGE_MASK;
 
-	DEBUG(2, "blkmtd: write_pages: buf = %p to = %ld len = %d pagenr = %d offset = %d\n",
+	DEBUG(2, "blkmtd: write_pages: buf = %p to = %ld len = %zd pagenr = %d offset = %d\n",
 	      buf, (long)to, len, pagenr, offset);
 
 	/* see if we have to do a partial write at the start */
@@ -270,21 +270,21 @@ static int write_pages(struct blkmtd_dev *dev, const u_char *buf, loff_t to,
 
 	down(&dev->wrbuf_mutex);
 
-	DEBUG(3, "blkmtd: write: start_len = %d len = %d end_len = %d pagecnt = %d\n",
+	DEBUG(3, "blkmtd: write: start_len = %zd len = %zd end_len = %zd pagecnt = %d\n",
 	      start_len, len, end_len, pagecnt);
 
 	if(start_len) {
 		/* do partial start region */
 		struct page *page;
 
-		DEBUG(3, "blkmtd: write: doing partial start, page = %d len = %d offset = %d\n",
+		DEBUG(3, "blkmtd: write: doing partial start, page = %d len = %zd offset = %d\n",
 		      pagenr, start_len, offset);
 
 		BUG_ON(!buf);
 		page = read_cache_page(dev->blkdev->bd_inode->i_mapping, pagenr, (filler_t *)blkmtd_readpage, dev);
 		lock_page(page);
 		if(PageDirty(page)) {
-			err("to = %lld start_len = %d len = %d end_len = %d pagenr = %d\n",
+			err("to = %lld start_len = %zd len = %zd end_len = %zd pagenr = %d\n",
 			    to, start_len, len, end_len, pagenr);
 			BUG();
 		}
@@ -346,13 +346,13 @@ static int write_pages(struct blkmtd_dev *dev, const u_char *buf, loff_t to,
 	if(end_len) {
 		/* do the third region */
 		struct page *page;
-		DEBUG(3, "blkmtd: write: doing partial end, page = %d len = %d\n",
+		DEBUG(3, "blkmtd: write: doing partial end, page = %d len = %zd\n",
 		      pagenr, end_len);
 		BUG_ON(!buf);
 		page = read_cache_page(dev->blkdev->bd_inode->i_mapping, pagenr, (filler_t *)blkmtd_readpage, dev);
 		lock_page(page);
 		if(PageDirty(page)) {
-			err("to = %lld start_len = %d len = %d end_len = %d pagenr = %d\n",
+			err("to = %lld start_len = %zd len = %zd end_len = %zd pagenr = %d\n",
 			    to, start_len, len, end_len, pagenr);
 			BUG();
 		}
@@ -375,7 +375,7 @@ static int write_pages(struct blkmtd_dev *dev, const u_char *buf, loff_t to,
 	if(bio)
 		blkmtd_write_out(bio);
 
-	DEBUG(2, "blkmtd: write: end, retlen = %d, err = %d\n", *retlen, err);
+	DEBUG(2, "blkmtd: write: end, retlen = %zd, err = %d\n", *retlen, err);
 	up(&dev->wrbuf_mutex);
 
 	if(retlen)
@@ -393,14 +393,14 @@ static int blkmtd_erase(struct mtd_info *mtd, struct erase_info *instr)
 	size_t from;
 	u_long len;
 	int err = -EIO;
-	int retlen;
+	size_t retlen;
 
 	instr->state = MTD_ERASING;
 	from = instr->addr;
 	len = instr->len;
 
 	/* check erase region has valid start and length */
-	DEBUG(2, "blkmtd: erase: dev = `%s' from = 0x%x len = 0x%lx\n",
+	DEBUG(2, "blkmtd: erase: dev = `%s' from = 0x%zx len = 0x%lx\n",
 	      mtd->name+9, from, len);
 	while(numregions) {
 		DEBUG(3, "blkmtd: checking erase region = 0x%08X size = 0x%X num = 0x%x\n",
@@ -417,14 +417,14 @@ static int blkmtd_erase(struct mtd_info *mtd, struct erase_info *instr)
 
 	if(!numregions) {
 		/* Not a valid erase block */
-		err("erase: invalid erase request 0x%lX @ 0x%08X", len, from);
+		err("erase: invalid erase request 0x%lX @ 0x%08zX", len, from);
 		instr->state = MTD_ERASE_FAILED;
 		err = -EIO;
 	}
 
 	if(instr->state != MTD_ERASE_FAILED) {
 		/* do the erase */
-		DEBUG(3, "Doing erase from = %d len = %ld\n", from, len);
+		DEBUG(3, "Doing erase from = %zd len = %ld\n", from, len);
 		err = write_pages(dev, NULL, from, len, &retlen);
 		if(err || retlen != len) {
 			err("erase failed err = %d", err);
@@ -453,8 +453,8 @@ static int blkmtd_read(struct mtd_info *mtd, loff_t from, size_t len,
 	int pagenr, pages;
 	size_t thislen = 0;
 
-	DEBUG(2, "blkmtd: read: dev = `%s' from = %ld len = %d buf = %p\n",
-	      mtd->name+9, (long int)from, len, buf);
+	DEBUG(2, "blkmtd: read: dev = `%s' from = %lld len = %zd buf = %p\n",
+	      mtd->name+9, from, len, buf);
 
 	if(from > mtd->size)
 		return -EINVAL;
@@ -496,7 +496,7 @@ static int blkmtd_read(struct mtd_info *mtd, loff_t from, size_t len,
  readerr:
 	if(retlen)
 		*retlen = thislen;
-	DEBUG(2, "blkmtd: end read: retlen = %d, err = %d\n", thislen, err);
+	DEBUG(2, "blkmtd: end read: retlen = %zd, err = %d\n", thislen, err);
 	return err;
 }
 
@@ -511,8 +511,8 @@ static int blkmtd_write(struct mtd_info *mtd, loff_t to, size_t len,
 	if(!len)
 		return 0;
 
-	DEBUG(2, "blkmtd: write: dev = `%s' to = %ld len = %d buf = %p\n",
-	      mtd->name+9, (long int)to, len, buf);
+	DEBUG(2, "blkmtd: write: dev = `%s' to = %lld len = %zd buf = %p\n",
+	      mtd->name+9, to, len, buf);
 
 	if(to >= mtd->size) {
 		return -ENOSPC;
@@ -565,7 +565,7 @@ static struct mtd_erase_region_info *calc_erase_regions(
 {
 	struct mtd_erase_region_info *info = NULL;
 
-	DEBUG(2, "calc_erase_regions, es = %d size = %d regions = %d\n",
+	DEBUG(2, "calc_erase_regions, es = %zd size = %zd regions = %d\n",
 	      erase_size, total_size, *regions);
 	/* Make any user specified erasesize be a power of 2
 	   and at least PAGE_SIZE */
@@ -613,7 +613,7 @@ static struct mtd_erase_region_info *calc_erase_regions(
 				break;
 		}
 	} while(!(*regions));
-	DEBUG(2, "calc_erase_regions done, es = %d size = %d regions = %d\n",
+	DEBUG(2, "calc_erase_regions done, es = %zd size = %zd regions = %d\n",
 	      erase_size, total_size, *regions);
 	return info;
 }

@@ -389,7 +389,7 @@ static ssize_t mwave_read(struct file *file, char __user *buf, size_t count,
                           loff_t * ppos)
 {
 	PRINTK_5(TRACE_MWAVE,
-		"mwavedd::mwave_read entry file %p, buf %p, count %x ppos %p\n",
+		"mwavedd::mwave_read entry file %p, buf %p, count %zx ppos %p\n",
 		file, buf, count, ppos);
 
 	return -EINVAL;
@@ -401,7 +401,7 @@ static ssize_t mwave_write(struct file *file, const char __user *buf,
 {
 	PRINTK_5(TRACE_MWAVE,
 		"mwavedd::mwave_write entry file %p, buf %p,"
-		" count %x ppos %p\n",
+		" count %zx ppos %p\n",
 		file, buf, count, ppos);
 
 	return -EINVAL;

@@ -652,7 +652,8 @@ static int __init find_media_headers(struct mtd_info *mtd, u_char *buf,
 	struct nand_chip *this = mtd->priv;
 	struct doc_priv *doc = (void *)this->priv;
 	int offs, end = (MAX_MEDIAHEADER_SCAN << this->phys_erase_shift);
-	int ret, retlen;
+	int ret;
+	size_t retlen;
 
 	end = min(end, (int)mtd->size); // paranoia
 	for (offs = 0; offs < end; offs += mtd->erasesize) {
