@@ -517,7 +517,7 @@ int __init e1355fb_init(void)
 		do_install_cmap(0, &fb_info.gen);
 	if (register_framebuffer(&fb_info.gen.info) < 0)
 		return -EINVAL;
-	printk(KERN_INFO "fb%d: %s frame buffer device\n", GET_FB_IDX(fb_info.gen.info.node),
+	printk(KERN_INFO "fb%d: %s frame buffer device\n", minor(fb_info.gen.info.node),
 	       fb_info.gen.info.modename);
 
 	return 0;
