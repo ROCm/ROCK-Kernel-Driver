@@ -834,13 +834,14 @@ pagebuf_readahead(
 
 page_buf_t *
 pagebuf_get_empty(
+	size_t			len,
 	pb_target_t		*target)
 {
 	page_buf_t		*pb;
 
 	pb = pagebuf_allocate(_PBF_LOCKABLE);
 	if (pb)
-		_pagebuf_initialize(pb, target, 0, 0, _PBF_LOCKABLE);
+		_pagebuf_initialize(pb, target, 0, len, _PBF_LOCKABLE);
 	return pb;
 }
 

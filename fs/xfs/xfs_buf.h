@@ -316,11 +316,8 @@ static inline int xfs_bdwrite(void *mp, page_buf_t *bp)
 #define xfs_baread(target, rablkno, ralen)  \
 	pagebuf_readahead((target), (rablkno), (ralen), PBF_DONT_BLOCK)
 
-#define XFS_getrbuf(sleep,mp)	\
-	pagebuf_get_empty((mp)->m_ddev_targp)
-#define XFS_ngetrbuf(len,mp)	\
-	pagebuf_get_no_daddr(len,(mp)->m_ddev_targp)
-#define XFS_freerbuf(bp)	pagebuf_free(bp)
-#define XFS_nfreerbuf(bp)	pagebuf_free(bp)
+#define xfs_buf_get_empty(len, target)	pagebuf_get_empty((len), (target))
+#define xfs_buf_get_noaddr(len, target)	pagebuf_get_no_daddr((len), (target))
+#define xfs_buf_free(bp)		pagebuf_free(bp)
 
 #endif

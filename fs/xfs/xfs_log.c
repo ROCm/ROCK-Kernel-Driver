@@ -1219,15 +1219,14 @@ xlog_alloc_log(xfs_mount_t	*mp,
 
 	xlog_get_iclog_buffer_size(mp, log);
 
-	bp = log->l_xbuf   = XFS_getrbuf(0,mp);	/* get my locked buffer */ /* mp needed for pagebuf/linux only */
-
-	XFS_BUF_SET_TARGET(bp, mp->m_logdev_targp);
-	XFS_BUF_SET_SIZE(bp, log->l_iclog_size);
+	bp = xfs_buf_get_empty(log->l_iclog_size, mp->m_logdev_targp);
 	XFS_BUF_SET_IODONE_FUNC(bp, xlog_iodone);
 	XFS_BUF_SET_BDSTRAT_FUNC(bp, xlog_bdstrat_cb);
 	XFS_BUF_SET_FSPRIVATE2(bp, (unsigned long)1);
-	ASSERT(XFS_BUF_ISBUSY(log->l_xbuf));
-	ASSERT(XFS_BUF_VALUSEMA(log->l_xbuf) <= 0);
+	ASSERT(XFS_BUF_ISBUSY(bp));
+	ASSERT(XFS_BUF_VALUSEMA(bp) <= 0);
+	log->l_xbuf = bp;
+
 	spinlock_init(&log->l_icloglock, "iclog");
 	spinlock_init(&log->l_grant_lock, "grhead_iclog");
 	initnsema(&log->l_flushsema, 0, "ic-flush");
@@ -1267,12 +1266,11 @@ xlog_alloc_log(xfs_mount_t	*mp,
 		INT_SET(head->h_fmt, ARCH_CONVERT, XLOG_FMT);
 		memcpy(&head->h_fs_uuid, &mp->m_sb.sb_uuid, sizeof(uuid_t));
 
-		bp = iclog->ic_bp = XFS_getrbuf(0,mp);		/* my locked buffer */ /* mp need for pagebuf/linux only */
-		XFS_BUF_SET_TARGET(bp, mp->m_logdev_targp);
-		XFS_BUF_SET_SIZE(bp, log->l_iclog_size);
+		bp = xfs_buf_get_empty(log->l_iclog_size, mp->m_logdev_targp);
 		XFS_BUF_SET_IODONE_FUNC(bp, xlog_iodone);
 		XFS_BUF_SET_BDSTRAT_FUNC(bp, xlog_bdstrat_cb);
 		XFS_BUF_SET_FSPRIVATE2(bp, (unsigned long)1);
+		iclog->ic_bp = bp;
 
 		iclog->ic_size = XFS_BUF_SIZE(bp) - log->l_iclog_hsize;
 		iclog->ic_state = XLOG_STATE_ACTIVE;
@@ -1572,7 +1570,7 @@ xlog_unalloc_log(xlog_t *log)
 	for (i=0; i<log->l_iclog_bufs; i++) {
 		sv_destroy(&iclog->ic_forcesema);
 		sv_destroy(&iclog->ic_writesema);
-		XFS_freerbuf(iclog->ic_bp);
+		xfs_buf_free(iclog->ic_bp);
 #ifdef DEBUG
 		if (iclog->ic_trace != NULL) {
 			ktrace_free(iclog->ic_trace);
@@ -1603,7 +1601,7 @@ xlog_unalloc_log(xlog_t *log)
 			tic = next_tic;
 		}
 	}
-	XFS_freerbuf(log->l_xbuf);
+	xfs_buf_free(log->l_xbuf);
 #ifdef DEBUG
 	if (log->l_trace != NULL) {
 		ktrace_free(log->l_trace);
@@ -3375,6 +3373,7 @@ xlog_verify_iclog(xlog_t	 *log,
 {
 	xlog_op_header_t	*ophead;
 	xlog_in_core_t		*icptr;
+	xlog_in_core_2_t	*xhdr;
 	xfs_caddr_t		ptr;
 	xfs_caddr_t		base_ptr;
 	__psint_t		field_offset;
@@ -3382,11 +3381,6 @@ xlog_verify_iclog(xlog_t	 *log,
 	int			len, i, j, k, op_len;
 	int			idx;
 	SPLDECL(s);
-
-	union ich {
-		xlog_rec_ext_header_t	hic_xheader;
-		char			hic_sector[XLOG_HEADER_SIZE];
-	}*xhdr;
 
 	/* check validity of iclog pointers */
 	s = LOG_LOCK(log);
@@ -3416,7 +3410,7 @@ xlog_verify_iclog(xlog_t	 *log,
 	ptr = iclog->ic_datap;
 	base_ptr = ptr;
 	ophead = (xlog_op_header_t *)ptr;
-	xhdr = (union ich*)&iclog->ic_header;
+	xhdr = (xlog_in_core_2_t *)&iclog->ic_header;
 	for (i = 0; i < len; i++) {
 		ophead = (xlog_op_header_t *)ptr;
 

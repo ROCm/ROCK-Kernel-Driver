@@ -4282,24 +4282,18 @@ xfs_zero_remaining_bytes(
 	xfs_off_t		startoff,
 	xfs_off_t		endoff)
 {
-	xfs_buf_t		*bp;
-	int			error=0;
 	xfs_bmbt_irec_t		imap;
-	xfs_off_t		lastoffset;
-	xfs_mount_t		*mp;
-	int			nimap;
-	xfs_off_t		offset;
 	xfs_fileoff_t		offset_fsb;
+	xfs_off_t		lastoffset;
+	xfs_off_t		offset;
+	xfs_buf_t		*bp;
+	xfs_mount_t		*mp = ip->i_mount;
+	int			nimap;
+	int			error = 0;
 
-	mp = ip->i_mount;
-	bp = XFS_ngetrbuf(mp->m_sb.sb_blocksize,mp);
-	ASSERT(!XFS_BUF_GETERROR(bp));
-
-	if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME) {
-		XFS_BUF_SET_TARGET(bp, mp->m_rtdev_targp);
-	} else {
-		XFS_BUF_SET_TARGET(bp, mp->m_ddev_targp);
-	}
+	bp = xfs_buf_get_noaddr(mp->m_sb.sb_blocksize,
+				ip->i_d.di_flags & XFS_DIFLAG_REALTIME ?
+				mp->m_rtdev_targp : mp->m_ddev_targp);
 
 	for (offset = startoff; offset <= endoff; offset = lastoffset + 1) {
 		offset_fsb = XFS_B_TO_FSBT(mp, offset);
@@ -4341,7 +4335,7 @@ xfs_zero_remaining_bytes(
 			break;
 		}
 	}
-	XFS_nfreerbuf(bp);
+	xfs_buf_free(bp);
 	return error;
 }
 
