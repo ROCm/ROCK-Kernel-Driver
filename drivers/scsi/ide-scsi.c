@@ -860,8 +860,6 @@ static Scsi_Host_Template idescsi_template = {
 	info:		idescsi_info,
 	ioctl:		idescsi_ioctl,
 	queuecommand:	idescsi_queue,
-	abort:		idescsi_abort,
-	reset:		idescsi_reset,
 	bios_param:	idescsi_bios,
 	can_queue:	10,
 	this_id:	-1,

@@ -63,22 +63,14 @@ int		 ahc_linux_abort(Scsi_Cmnd *);
  * to do with card config are filled in after the card is detected.
  */
 #define AIC7XXX	{						\
-	module: NULL,						\
-	proc_dir: NULL,						\
 	proc_info: ahc_linux_proc_info,				\
-	name: NULL,						\
 	detect: ahc_linux_detect,				\
 	release: ahc_linux_release,				\
 	info: ahc_linux_info,					\
-	command: NULL,						\
 	queuecommand: ahc_linux_queue,				\
-	eh_strategy_handler: NULL,				\
 	eh_abort_handler: ahc_linux_abort,			\
 	eh_device_reset_handler: ahc_linux_dev_reset,		\
 	eh_bus_reset_handler: ahc_linux_bus_reset,		\
-	eh_host_reset_handler: NULL,				\
-	abort: NULL,						\
-	reset: NULL,						\
 	slave_attach: ahc_linux_slave_attach,			\
 	bios_param: AIC7XXX_BIOSPARAM,				\
 	can_queue: 253,		/* max simultaneous cmds      */\

@@ -468,25 +468,14 @@ void tw_unmask_command_interrupt(TW_Device_Extension *tw_dev);
 
 /* Scsi_Host_Template Initializer */
 #define TWXXXX {					\
-	next : NULL,					\
-	module : NULL,					\
 	proc_name : "3w-xxxx",				\
 	proc_info : tw_scsi_proc_info,			\
 	name : "3ware Storage Controller",		\
 	detect : tw_scsi_detect,			\
 	release : tw_scsi_release,			\
-	info : NULL,					\
-	ioctl : NULL,                  			\
-	command : NULL,					\
 	queuecommand : tw_scsi_queue,			\
-	eh_strategy_handler : NULL,			\
 	eh_abort_handler : tw_scsi_eh_abort,		\
-	eh_device_reset_handler : NULL,			\
-	eh_bus_reset_handler : NULL,			\
 	eh_host_reset_handler : tw_scsi_eh_reset,	\
-	abort : NULL,					\
-	reset : NULL,					\
-	slave_attach : NULL,				\
 	bios_param : tw_scsi_biosparam,			\
 	can_queue : TW_Q_LENGTH-1,			\
 	this_id: -1,					\
