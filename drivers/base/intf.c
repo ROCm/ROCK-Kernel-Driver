@@ -10,7 +10,7 @@
 #include "base.h"
 
 
-#define to_intf(node) container_of(node,struct device_interface,subsys.kobj.entry)
+#define to_intf(node) container_of(node,struct device_interface,kset.kobj.entry)
 
 #define to_data(e) container_of(e,struct intf_data,kobj.entry)
 
@@ -25,7 +25,7 @@ static int intf_dev_link(struct intf_data * data)
 {
 	char	name[16];
 	snprintf(name,16,"%d",data->intf_num);
-	return sysfs_create_link(&data->intf->subsys.kset.kobj,&data->dev->kobj,name);
+	return sysfs_create_link(&data->intf->kset.kobj,&data->dev->kobj,name);
 }
 
 /**
@@ -38,7 +38,7 @@ static void intf_dev_unlink(struct intf_data * data)
 {
 	char	name[16];
 	snprintf(name,16,"%d",data->intf_num);
-	sysfs_remove_link(&data->intf->subsys.kset.kobj,name);
+	sysfs_remove_link(&data->intf->kset.kobj,name);
 }
 
 
@@ -62,7 +62,7 @@ int interface_add_data(struct intf_data * data)
 
 	if (intf) {
 		data->intf_num = intf->devnum++;
-		data->kobj.subsys = &intf->subsys;
+		data->kobj.kset = &intf->kset;
 		kobject_register(&data->kobj);
 
 		list_add_tail(&data->dev_entry,&data->dev->intf_list);
@@ -169,9 +169,9 @@ int interface_register(struct device_interface * intf)
 		pr_debug("register interface '%s' with class '%s'\n",
 			 intf->name,cls->name);
 
-		strncpy(intf->subsys.kobj.name,intf->name,KOBJ_NAME_LEN);
-		intf->subsys.kobj.subsys = &cls->subsys;
-		subsystem_register(&intf->subsys);
+		strncpy(intf->kset.kobj.name,intf->name,KOBJ_NAME_LEN);
+		kset_set_kset_s(intf,cls->subsys);
+		kset_register(&intf->kset);
 		add_intf(intf);
 	}
 	return 0;
@@ -192,7 +192,7 @@ static void del_intf(struct device_interface * intf)
 	struct list_head * entry;
 
 	down_write(&intf->devclass->subsys.rwsem);
-	list_for_each(entry,&intf->subsys.kset.list) {
+	list_for_each(entry,&intf->kset.list) {
 		struct intf_data * data = to_data(entry);
 		del(data);
 	}
@@ -215,7 +215,7 @@ void interface_unregister(struct device_interface * intf)
 		pr_debug("unregistering interface '%s' from class '%s'\n",
 			 intf->name,cls->name);
 		del_intf(intf);
-		subsystem_unregister(&intf->subsys);
+		kset_unregister(&intf->kset);
 		put_devclass(cls);
 	}
 }

@@ -212,7 +212,7 @@ struct device_interface {
 	char			* name;
 	struct device_class	* devclass;
 
-	struct subsystem	subsys;
+	struct kset		kset;
 	u32			devnum;
 
 	int (*add_device)	(struct device *);

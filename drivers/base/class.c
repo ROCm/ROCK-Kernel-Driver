@@ -11,7 +11,7 @@
 #include "base.h"
 
 #define to_class_attr(_attr) container_of(_attr,struct devclass_attribute,attr)
-#define to_class(obj) container_of(obj,struct device_class,subsys.kobj)
+#define to_class(obj) container_of(obj,struct device_class,subsys.kset.kobj)
 
 static ssize_t
 devclass_attr_show(struct kobject * kobj, struct attribute * attr,
@@ -48,9 +48,7 @@ static struct kobj_type ktype_devclass = {
 	.sysfs_ops	= &class_sysfs_ops,
 };
 
-static struct subsystem class_subsys = {
-	.kobj	= { .name = "class", },
-};
+static decl_subsys(class,&ktype_devclass);
 
 
 static int devclass_dev_link(struct device_class * cls, struct device * dev)
@@ -228,9 +226,8 @@ void put_devclass(struct device_class * cls)
 int devclass_register(struct device_class * cls)
 {
 	pr_debug("device class '%s': registering\n",cls->name);
-	strncpy(cls->subsys.kobj.name,cls->name,KOBJ_NAME_LEN);
-	cls->subsys.kobj.subsys = &class_subsys;
-	cls->subsys.kobj.ktype = &ktype_devclass;
+	strncpy(cls->subsys.kset.kobj.name,cls->name,KOBJ_NAME_LEN);
+	subsys_set_kset(cls,class_subsys);
 	subsystem_register(&cls->subsys);
 
 	snprintf(cls->devices.kobj.name,KOBJ_NAME_LEN,"devices");

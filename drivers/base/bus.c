@@ -20,7 +20,7 @@
 #define to_drv(node) container_of(node,struct device_driver,kobj.entry)
 
 #define to_bus_attr(_attr) container_of(_attr,struct bus_attribute,attr)
-#define to_bus(obj) container_of(obj,struct bus_type,subsys.kobj)
+#define to_bus(obj) container_of(obj,struct bus_type,subsys.kset.kobj)
 
 /*
  * sysfs bindings for drivers
@@ -114,7 +114,7 @@ int bus_create_file(struct bus_type * bus, struct bus_attribute * attr)
 {
 	int error;
 	if (get_bus(bus)) {
-		error = sysfs_create_file(&bus->subsys.kobj,&attr->attr);
+		error = sysfs_create_file(&bus->subsys.kset.kobj,&attr->attr);
 		put_bus(bus);
 	} else
 		error = -EINVAL;
@@ -124,7 +124,7 @@ int bus_create_file(struct bus_type * bus, struct bus_attribute * attr)
 void bus_remove_file(struct bus_type * bus, struct bus_attribute * attr)
 {
 	if (get_bus(bus)) {
-		sysfs_remove_file(&bus->subsys.kobj,&attr->attr);
+		sysfs_remove_file(&bus->subsys.kset.kobj,&attr->attr);
 		put_bus(bus);
 	}
 }
@@ -134,10 +134,7 @@ static struct kobj_type ktype_bus = {
 
 };
 
-struct subsystem bus_subsys = {
-	.kobj	= { .name = "bus" },
-};
-
+decl_subsys(bus,&ktype_bus);
 
 /**
  *	bus_for_each_dev - device iterator.
@@ -438,8 +435,7 @@ int bus_add_driver(struct device_driver * drv)
 		pr_debug("bus %s: add driver %s\n",bus->name,drv->name);
 
 		strncpy(drv->kobj.name,drv->name,KOBJ_NAME_LEN);
-		drv->kobj.ktype = &ktype_driver;
-		drv->kobj.subsys = &bus->drivers;
+		drv->kobj.kset = &bus->drivers;
 		kobject_register(&drv->kobj);
 
 		down_write(&bus->subsys.rwsem);
@@ -493,9 +489,8 @@ void put_bus(struct bus_type * bus)
  */
 int bus_register(struct bus_type * bus)
 {
-	strncpy(bus->subsys.kobj.name,bus->name,KOBJ_NAME_LEN);
-	bus->subsys.kobj.ktype = &ktype_bus;
-	bus->subsys.kobj.subsys = &bus_subsys;
+	strncpy(bus->subsys.kset.kobj.name,bus->name,KOBJ_NAME_LEN);
+	subsys_set_kset(bus,bus_subsys);
 	subsystem_register(&bus->subsys);
 
 	snprintf(bus->devices.kobj.name,KOBJ_NAME_LEN,"devices");
@@ -504,6 +499,7 @@ int bus_register(struct bus_type * bus)
 
 	snprintf(bus->drivers.kobj.name,KOBJ_NAME_LEN,"drivers");
 	bus->drivers.subsys = &bus->subsys;
+	bus->drivers.ktype = &ktype_driver;
 	kset_register(&bus->drivers);
 
 	pr_debug("bus type '%s' registered\n",bus->name);

@@ -11,6 +11,14 @@
 
 static spinlock_t kobj_lock = SPIN_LOCK_UNLOCKED;
 
+static inline struct kobj_type * get_ktype(struct kobject * k)
+{
+	if (k->kset && k->kset->ktype)
+		return k->kset->ktype;
+	else 
+		return k->ktype;
+}
+
 /**
  *	populate_dir - populate directory with attributes.
  *	@kobj:	object we're working on.
@@ -25,7 +33,7 @@ static spinlock_t kobj_lock = SPIN_LOCK_UNLOCKED;
 
 static int populate_dir(struct kobject * kobj)
 {
-	struct kobj_type * t = kobj->ktype;
+	struct kobj_type * t = get_ktype(kobj);
 	struct attribute * attr;
 	int error = 0;
 	int i;
@@ -83,11 +91,6 @@ int kobject_add(struct kobject * kobj)
 	pr_debug("kobject %s: registering. parent: %s, set: %s\n",
 		 kobj->name, parent ? parent->name : "<NULL>", 
 		 kobj->kset ? kobj->kset->kobj.name : "<NULL>" );
-
-	if (kobj->subsys) {
-		if (!kobj->kset)
-			kobj->kset = &kobj->subsys->kset;
-	}
 
 	if (kobj->kset) {
 		down_write(&kobj->kset->subsys->rwsem);
@@ -177,7 +180,7 @@ struct kobject * kobject_get(struct kobject * kobj)
 
 void kobject_cleanup(struct kobject * kobj)
 {
-	struct kobj_type * t = kobj->ktype;
+	struct kobj_type * t = get_ktype(kobj);
 	struct kset * s = kobj->kset;
 
 	pr_debug("kobject %s: cleaning up\n",kobj->name);
@@ -263,7 +266,6 @@ void kset_unregister(struct kset * k)
 
 void subsystem_init(struct subsystem * s)
 {
-	memcpy(&s->kset.kobj,&s->kobj,sizeof(struct kobject));
 	init_rwsem(&s->rwsem);
 	kset_init(&s->kset);
 }
@@ -308,7 +310,7 @@ int subsys_create_file(struct subsystem * s, struct subsys_attribute * a)
 {
 	int error = 0;
 	if (subsys_get(s)) {
-		error = sysfs_create_file(&s->kobj,&a->attr);
+		error = sysfs_create_file(&s->kset.kobj,&a->attr);
 		subsys_put(s);
 	}
 	return error;
@@ -324,7 +326,7 @@ int subsys_create_file(struct subsystem * s, struct subsys_attribute * a)
 void subsys_remove_file(struct subsystem * s, struct subsys_attribute * a)
 {
 	if (subsys_get(s)) {
-		sysfs_remove_file(&s->kobj,&a->attr);
+		sysfs_remove_file(&s->kset.kobj,&a->attr);
 		subsys_put(s);
 	}
 }

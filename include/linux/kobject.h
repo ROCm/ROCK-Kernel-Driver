@@ -19,7 +19,6 @@ struct kobject {
 	atomic_t		refcount;
 	struct list_head	entry;
 	struct kobject		* parent;
-	struct subsystem	* subsys;
 	struct kset		* kset;
 	struct kobj_type	* ktype;
 	struct dentry		* dentry;
@@ -90,11 +89,62 @@ static inline void kset_put(struct kset * k)
 
 struct subsystem {
 	struct kset		kset;
-	struct kobject		kobj;
 	struct rw_semaphore	rwsem;
 };
 
+#define decl_subsys(_name,_type) \
+struct subsystem _name##_subsys = { \
+	.kset = { \
+		.kobj = { .name = __stringify(_name) }, \
+		.ktype = _type, \
+	} \
+}
 
+
+/**
+ * Helpers for setting the kset of registered objects.
+ * Often, a registered object belongs to a kset embedded in a 
+ * subsystem. These do no magic, just make the resulting code
+ * easier to follow. 
+ */
+
+/**
+ *	kobj_set_kset_s(obj,subsys) - set kset for embedded kobject.
+ *	@obj:		ptr to some object type.
+ *	@subsys:	a subsystem object (not a ptr).
+ *
+ *	Can be used for any object type with an embedded ->kobj.
+ */
+
+#define kobj_set_kset_s(obj,subsys) \
+	(obj)->kobj.kset = &(subsys).kset
+
+/**
+ *	kset_set_kset_s(obj,subsys) - set kset for embedded kset.
+ *	@obj:		ptr to some object type.
+ *	@subsys:	a subsystem object (not a ptr).
+ *
+ *	Can be used for any object type with an embedded ->kset.
+ *	Sets the kset of @obj's  embedded kobject (via its embedded
+ *	kset) to @subsys.kset. This makes @obj a member of that 
+ *	kset.
+ */
+
+#define kset_set_kset_s(obj,subsys) \
+	(obj)->kset.kobj.kset = &(subsys).kset
+
+/**
+ *	subsys_set_kset(obj,subsys) - set kset for subsystem
+ *	@obj:		ptr to some object type.
+ *	@subsys:	a subsystem object (not a ptr).
+ *
+ *	Can be used for any object type with an embedded ->subsys.
+ *	Sets the kset of @obj's kobject to @subsys.kset. This makes
+ *	the object a member of that kset.
+ */
+
+#define subsys_set_kset(obj,_subsys) \
+	(obj)->subsys.kset.kobj.kset = &(_subsys).kset
 
 extern void subsystem_init(struct subsystem *);
 extern int subsystem_register(struct subsystem *);
