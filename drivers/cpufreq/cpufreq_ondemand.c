@@ -125,13 +125,13 @@ static ssize_t store_sampling_down_factor(struct cpufreq_policy *unused,
 	unsigned int input;
 	int ret;
 	ret = sscanf (buf, "%u", &input);
-	down(&dbs_sem);
 	if (ret != 1 )
-		goto out;
+		return -EINVAL;
 
+	down(&dbs_sem);
 	dbs_tuners_ins.sampling_down_factor = input;
-out:
 	up(&dbs_sem);
+
 	return count;
 }
 
@@ -141,13 +141,16 @@ static ssize_t store_sampling_rate(struct cpufreq_policy *unused,
 	unsigned int input;
 	int ret;
 	ret = sscanf (buf, "%u", &input);
+
 	down(&dbs_sem);
-	if (ret != 1 || input > MAX_SAMPLING_RATE || input < MIN_SAMPLING_RATE)
-		goto out;
+	if (ret != 1 || input > MAX_SAMPLING_RATE || input < MIN_SAMPLING_RATE) {
+		up(&dbs_sem);
+		return -EINVAL;
+	}
 
 	dbs_tuners_ins.sampling_rate = input;
-out:
 	up(&dbs_sem);
+
 	return count;
 }
 
@@ -157,15 +160,18 @@ static ssize_t store_up_threshold(struct cpufreq_policy *unused,
 	unsigned int input;
 	int ret;
 	ret = sscanf (buf, "%u", &input);
+
 	down(&dbs_sem);
 	if (ret != 1 || input > MAX_FREQUENCY_UP_THRESHOLD || 
 			input < MIN_FREQUENCY_UP_THRESHOLD ||
-			input <= dbs_tuners_ins.down_threshold)
-		goto out;
+			input <= dbs_tuners_ins.down_threshold) {
+		up(&dbs_sem);
+		return -EINVAL;
+	}
 
 	dbs_tuners_ins.up_threshold = input;
-out:
 	up(&dbs_sem);
+
 	return count;
 }
 
@@ -175,15 +181,18 @@ static ssize_t store_down_threshold(struct cpufreq_policy *unused,
 	unsigned int input;
 	int ret;
 	ret = sscanf (buf, "%u", &input);
+
 	down(&dbs_sem);
 	if (ret != 1 || input > MAX_FREQUENCY_DOWN_THRESHOLD || 
 			input < MIN_FREQUENCY_DOWN_THRESHOLD ||
-			input >= dbs_tuners_ins.up_threshold)
-		goto out;
+			input >= dbs_tuners_ins.up_threshold) {
+		up(&dbs_sem);
+		return -EINVAL;
+	}
 
 	dbs_tuners_ins.down_threshold = input;
-out:
 	up(&dbs_sem);
+
 	return count;
 }
 
