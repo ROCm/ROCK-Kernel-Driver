@@ -1346,6 +1346,9 @@ pagebuf_iorequest(			/* start real I/O		*/
 	 * all the I/O from calling pagebuf_iodone too early.
 	 */
 	atomic_set(&pb->pb_io_remaining, 1);
+	total_nr_pages = pb->pb_page_count;
+	map_i = 0;
+
 
 	/* Special code path for reading a sub page size pagebuf in --
 	 * we populate up the whole page, and hence the other metadata
@@ -1363,11 +1366,11 @@ pagebuf_iorequest(			/* start real I/O		*/
 		bio->bi_private = pb;
 
 		bio_add_page(bio, pb->pb_pages[0], PAGE_CACHE_SIZE, 0);
+		size = 0;
 
 		atomic_inc(&pb->pb_io_remaining);
-		submit_bio(READ, bio);
 
-		goto io_submitted;
+		goto submit_io;
 	}
 
 	if (pb->pb_flags & PBF_WRITE) {
@@ -1393,9 +1396,6 @@ pagebuf_iorequest(			/* start real I/O		*/
 		pb->pb_locked = 1;
 	}
 
-	total_nr_pages = pb->pb_page_count;
-	map_i = 0;
-
 next_chunk:
 	atomic_inc(&pb->pb_io_remaining);
 	nr_pages = BIO_MAX_SECTORS >> (PAGE_SHIFT - BBSHIFT);
@@ -1416,7 +1416,8 @@ next_chunk:
 		if (nbytes > size)
 			nbytes = size;
 
-		if (bio_add_page(bio, pb->pb_pages[map_i], nbytes, offset) < nbytes)
+		if (bio_add_page(bio, pb->pb_pages[map_i],
+					nbytes, offset) < nbytes)
 			break;
 
 		offset = 0;
@@ -1426,16 +1427,19 @@ next_chunk:
 		total_nr_pages--;
 	}
 
-	if (pb->pb_flags & PBF_READ) {
-		submit_bio(READ, bio);
+submit_io:
+	if (likely(bio->bi_size)) {
+		if (pb->pb_flags & PBF_READ) {
+			submit_bio(READ, bio);
+		} else {
+			submit_bio(WRITE, bio);
+		}
+
+		if (size)
+			goto next_chunk;
 	} else {
-		submit_bio(WRITE, bio);
+		pagebuf_ioerror(pb, EIO);
 	}
-
-	if (size)
-		goto next_chunk;
-
-io_submitted:
 
 	if (atomic_dec_and_test(&pb->pb_io_remaining) == 1) {
 		pb->pb_locked = 0;

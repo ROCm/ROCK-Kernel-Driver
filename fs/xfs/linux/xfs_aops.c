@@ -67,7 +67,7 @@ linvfs_unwritten_done(
 	bh->b_end_io = NULL;
 	clear_buffer_unwritten(bh);
 	if (!uptodate)
-		pagebuf_ioerror(pb, -EIO);
+		pagebuf_ioerror(pb, EIO);
 	if (atomic_dec_and_test(&pb->pb_io_remaining) == 1) {
 		pagebuf_iodone(pb, 1, 1);
 	}
