@@ -552,9 +552,11 @@ int ext3_htree_fill_tree(struct file *dir_file, __u32 start_hash,
 	/* Add '.' and '..' from the htree header */
 	if (!start_hash && !start_minor_hash) {
 		de = (struct ext3_dir_entry_2 *) frames[0].bh->b_data;
-		ext3_htree_store_dirent(dir_file, 0, 0, de);
+		if ((err = ext3_htree_store_dirent(dir_file, 0, 0, de)) != 0)
+			goto errout;
 		de = ext3_next_entry(de);
-		ext3_htree_store_dirent(dir_file, 0, 0, de);
+		if ((err = ext3_htree_store_dirent(dir_file, 0, 0, de)) != 0)
+			goto errout;
 		count += 2;
 	}
 
@@ -573,8 +575,9 @@ int ext3_htree_fill_tree(struct file *dir_file, __u32 start_hash,
 			    ((hinfo.hash == start_hash) &&
 			     (hinfo.minor_hash < start_minor_hash)))
 				continue;
-			ext3_htree_store_dirent(dir_file, hinfo.hash,
-						hinfo.minor_hash, de);
+			if ((err = ext3_htree_store_dirent(dir_file,
+				   hinfo.hash, hinfo.minor_hash, de)) != 0)
+				goto errout;
 			count++;
 		}
 		brelse (bh);
