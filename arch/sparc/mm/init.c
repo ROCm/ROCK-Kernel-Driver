@@ -209,8 +209,7 @@ unsigned long __init bootmem_init(unsigned long *pages_avail)
 	if (max_low_pfn > (SRMMU_MAXMEM >> PAGE_SHIFT)) {
 		highstart_pfn = (SRMMU_MAXMEM >> PAGE_SHIFT);
 		max_low_pfn = calc_max_low_pfn();
-		printk(KERN_NOTICE "%ldMB HIGHMEM available.\n",
-		       calc_highpages() >> (20 - PAGE_SHIFT));
+		printk(KERN_NOTICE "%ldMB HIGHMEM available.\n", calc_highpages());
 	}
 
 #ifdef CONFIG_BLK_DEV_INITRD
