@@ -51,10 +51,6 @@ DECLARE_RWSEM(nommu_vma_sem);
 struct vm_operations_struct generic_file_vm_ops = {
 };
 
-void __init prio_tree_init(void)
-{
-}
-
 /*
  * Handle all mappings that got truncated by a "truncate()"
  * system call.
@@ -322,6 +318,15 @@ static void add_nommu_vma(struct vm_area_struct *vma)
 	struct rb_node **p = &nommu_vma_tree.rb_node;
 	struct rb_node *parent = NULL;
 
+	/* add the VMA to the mapping */
+	if (vma->vm_file) {
+		mapping = vma->vm_file->f_mapping;
+
+		flush_dcache_mmap_lock(mapping);
+		vma_prio_tree_insert(vma, &mapping->i_mmap);
+		flush_dcache_mmap_unlock(mapping);
+	}
+
 	/* add the VMA to the master list */
 	while (*p) {
 		parent = *p;
@@ -355,6 +360,15 @@ static void add_nommu_vma(struct vm_area_struct *vma)
 static void delete_nommu_vma(struct vm_area_struct *vma)
 {
 	struct address_space *mapping;
+
+	/* remove the VMA from the mapping */
+	if (vma->vm_file) {
+		mapping = vma->vm_file->f_mapping;
+
+		flush_dcache_mmap_lock(mapping);
+		vma_prio_tree_remove(vma, &mapping->i_mmap);
+		flush_dcache_mmap_unlock(mapping);
+	}
 
 	/* remove from the master list */
 	rb_erase(&vma->vm_rb, &nommu_vma_tree);
