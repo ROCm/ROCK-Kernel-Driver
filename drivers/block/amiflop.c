@@ -386,16 +386,6 @@ static void fd_motor_off(unsigned long drive)
 	fd_select(drive);
 	udelay (1);
 	fd_deselect(drive);
-
-#ifdef MODULE
-/*
-  this is the last interrupt for any drive access, happens after
-  release (from floppy_off). So we have to wait until now to decrease
-  the use count.
-*/
-	if (decusecount)
-		MOD_DEC_USE_COUNT;
-#endif
 }
 
 static void floppy_off (unsigned int nr)
@@ -1590,10 +1580,6 @@ static int floppy_open(struct inode *inode, struct file *filp)
 	local_irq_save(flags);
 	fd_ref[drive]++;
 	fd_device[drive] = system;
-#ifdef MODULE
-	if (unit[drive].motor == 0)
-		MOD_INC_USE_COUNT;
-#endif
 	local_irq_restore(flags);
 
 	unit[drive].dtype=&data_types[system];
@@ -1839,6 +1825,7 @@ int init_module(void)
 	return amiga_floppy_init();
 }
 
+#if 0 /* not safe to unload */
 void cleanup_module(void)
 {
 	int i;
@@ -1859,4 +1846,5 @@ void cleanup_module(void)
 	release_mem_region(CUSTOM_PHYSADDR+0x20, 8);
 	unregister_blkdev(FLOPPY_MAJOR, "fd");
 }
+#endif
 #endif
