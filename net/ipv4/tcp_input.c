@@ -1003,7 +1003,7 @@ void tcp_enter_frto(struct sock *sk)
 	}
 	tcp_sync_left_out(tp);
 
-	tp->ca_state = TCP_CA_Open;
+	tcp_set_ca_state(tp, TCP_CA_Open);
 	tp->frto_highmark = tp->snd_nxt;
 }
 
@@ -1049,7 +1049,7 @@ void tcp_enter_frto_loss(struct sock *sk)
 
 	tp->reordering = min_t(unsigned int, tp->reordering,
 					     sysctl_tcp_reordering);
-	tp->ca_state = TCP_CA_Loss;
+	tcp_set_ca_state(tp, TCP_CA_Loss);
 	tp->high_seq = tp->frto_highmark;
 	TCP_ECN_queue_cwr(tp);
 }
@@ -1112,7 +1112,7 @@ void tcp_enter_loss(struct sock *sk, int how)
 
 	tp->reordering = min_t(unsigned int, tp->reordering,
 					     sysctl_tcp_reordering);
-	tp->ca_state = TCP_CA_Loss;
+	tcp_set_ca_state(tp, TCP_CA_Loss);
 	tp->high_seq = tp->snd_nxt;
 	TCP_ECN_queue_cwr(tp);
 }
@@ -1489,7 +1489,7 @@ static int tcp_try_undo_recovery(struct sock *sk, struct tcp_opt *tp)
 		tcp_moderate_cwnd(tp);
 		return 1;
 	}
-	tp->ca_state = TCP_CA_Open;
+	tcp_set_ca_state(tp, TCP_CA_Open);
 	return 0;
 }
 
@@ -1549,7 +1549,7 @@ static int tcp_try_undo_loss(struct sock *sk, struct tcp_opt *tp)
 		tp->retransmits = 0;
 		tp->undo_marker = 0;
 		if (!IsReno(tp))
-			tp->ca_state = TCP_CA_Open;
+			tcp_set_ca_state(tp, TCP_CA_Open);
 		return 1;
 	}
 	return 0;
@@ -1583,7 +1583,7 @@ static void tcp_try_to_open(struct sock *sk, struct tcp_opt *tp, int flag)
 			state = TCP_CA_Disorder;
 
 		if (tp->ca_state != state) {
-			tp->ca_state = state;
+			tcp_set_ca_state(tp, state);
 			tp->high_seq = tp->snd_nxt;
 		}
 		tcp_moderate_cwnd(tp);
@@ -1658,7 +1658,7 @@ tcp_fastretrans_alert(struct sock *sk, u32 prior_snd_una,
 			 * is ACKed for CWR bit to reach receiver. */
 			if (tp->snd_una != tp->high_seq) {
 				tcp_complete_cwr(tp);
-				tp->ca_state = TCP_CA_Open;
+				tcp_set_ca_state(tp, TCP_CA_Open);
 			}
 			break;
 
@@ -1669,7 +1669,7 @@ tcp_fastretrans_alert(struct sock *sk, u32 prior_snd_una,
 			     * catching for all duplicate ACKs. */
 			    IsReno(tp) || tp->snd_una != tp->high_seq) {
 				tp->undo_marker = 0;
-				tp->ca_state = TCP_CA_Open;
+				tcp_set_ca_state(tp, TCP_CA_Open);
 			}
 			break;
 
@@ -1743,7 +1743,7 @@ tcp_fastretrans_alert(struct sock *sk, u32 prior_snd_una,
 		}
 
 		tp->snd_cwnd_cnt = 0;
-		tp->ca_state = TCP_CA_Recovery;
+		tcp_set_ca_state(tp, TCP_CA_Recovery);
 	}
 
 	if (is_dupack || tcp_head_timedout(sk, tp))

@@ -1212,6 +1212,11 @@ static inline __u32 tcp_recalc_ssthresh(struct tcp_opt *tp)
 	return max(tp->snd_cwnd >> 1U, 2U);
 }
 
+static inline void tcp_set_ca_state(struct tcp_opt *tp, u8 ca_state)
+{
+	tp->ca_state = ca_state;
+}
+
 /* If cwnd > ssthresh, we may raise ssthresh to be half-way to cwnd.
  * The exception is rate halving phase, when cwnd is decreasing towards
  * ssthresh.
@@ -1271,7 +1276,7 @@ static inline void tcp_enter_cwr(struct tcp_opt *tp)
 	tp->prior_ssthresh = 0;
 	if (tp->ca_state < TCP_CA_CWR) {
 		__tcp_enter_cwr(tp);
-		tp->ca_state = TCP_CA_CWR;
+		tcp_set_ca_state(tp, TCP_CA_CWR);
 	}
 }
 

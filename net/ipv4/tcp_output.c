@@ -869,7 +869,7 @@ void tcp_simple_retransmit(struct sock *sk)
 		tp->snd_ssthresh = tcp_current_ssthresh(tp);
 		tp->prior_ssthresh = 0;
 		tp->undo_marker = 0;
-		tp->ca_state = TCP_CA_Loss;
+		tcp_set_ca_state(tp, TCP_CA_Loss);
 	}
 	tcp_xmit_retransmit_queue(sk);
 }
