@@ -797,7 +797,7 @@ static m_addr_t ___dma_getp(m_pool_s *mp)
 		dma_addr_t daddr;
 		vp = (m_addr_t) dma_alloc_coherent(mp->bush,
 						PAGE_SIZE<<MEMO_PAGE_ORDER,
-						&daddr);
+						&daddr, GFP_KERNEL);
 		if (vp) {
 			int hc = VTOB_HASH_CODE(vp);
 			vbp->vaddr = vp;
