@@ -2551,7 +2551,7 @@ need_resched_nonpreemptible:
 	 * The idle thread is not allowed to schedule!
 	 * Remove this check after it has been exercised a bit.
 	 */
-	if (unlikely(current == rq->idle) && current->state != TASK_RUNNING) {
+	if (unlikely(prev == rq->idle) && prev->state != TASK_RUNNING) {
 		printk(KERN_ERR "bad: scheduling from the idle thread!\n");
 		dump_stack();
 	}
@@ -2571,8 +2571,8 @@ need_resched_nonpreemptible:
 
 	spin_lock_irq(&rq->lock);
 
-	if (unlikely(current->flags & PF_DEAD))
-		current->state = EXIT_DEAD;
+	if (unlikely(prev->flags & PF_DEAD))
+		prev->state = EXIT_DEAD;
 	/*
 	 * if entering off of a kernel preemption go straight
 	 * to picking the next task.
