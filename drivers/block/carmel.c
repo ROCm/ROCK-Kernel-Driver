@@ -1538,6 +1538,9 @@ static void carm_free_disks(struct carm_host *host)
 		struct gendisk *disk = host->port[i].disk;
 		if (disk) {
 			request_queue_t *q = disk->queue;
+
+			if (disk->flags & GENHD_FL_UP)
+				del_gendisk(disk);
 			if (q)
 				blk_cleanup_queue(q);
 			put_disk(disk);
