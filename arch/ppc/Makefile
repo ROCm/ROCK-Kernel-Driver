@@ -117,5 +117,4 @@ archclean:
 
 archmrproper:
 
-archdep: scripts/mkdep
-	$(MAKEBOOT) fastdep
+archdep:
