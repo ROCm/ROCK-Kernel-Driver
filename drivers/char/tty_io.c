@@ -442,6 +442,13 @@ void do_tty_hangup(void *data)
 	file_list_lock();
 	for (l = tty->tty_files.next; l != &tty->tty_files; l = l->next) {
 		struct file * filp = list_entry(l, struct file, f_list);
+		/*
+		 * If this file descriptor has been closed, ignore it; it
+		 * will be going away shortly. (We don't test filp->f_count
+		 * for zero since that could open another race.) --rmk
+		 */
+		if (filp->private_data == NULL)
+			continue;
 		if (IS_CONSOLE_DEV(filp->f_dentry->d_inode->i_rdev) ||
 		    IS_SYSCONS_DEV(filp->f_dentry->d_inode->i_rdev)) {
 			cons_filp = filp;
