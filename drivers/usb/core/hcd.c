@@ -310,9 +310,9 @@ static int rh_string (
 	} else
 	    return 0;
 
-	data [0] = 2 + ascii2utf (buf, data + 2, len - 2);
+	data [0] = 2 * (strlen (buf) + 1);
 	data [1] = 3;	/* type == string */
-	return data [0];
+	return 2 + ascii2utf (buf, data + 2, len - 2);
 }
 
 
