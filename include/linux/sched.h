@@ -690,7 +690,11 @@ extern void FASTCALL(add_wait_queue(wait_queue_head_t *q, wait_queue_t * wait));
 extern void FASTCALL(add_wait_queue_exclusive(wait_queue_head_t *q, wait_queue_t * wait));
 extern void FASTCALL(remove_wait_queue(wait_queue_head_t *q, wait_queue_t * wait));
 
+#ifdef CONFIG_SMP
 extern void wait_task_inactive(task_t * p);
+#else
+#define wait_task_inactive(p)	do { } while (0)
+#endif
 extern void kick_if_running(task_t * p);
 
 #define __wait_event(wq, condition) 					\
@@ -955,6 +959,34 @@ static inline void cond_resched(void)
 	if (need_resched())
 		__cond_resched();
 }
+
+#ifdef CONFIG_PREEMPT
+
+/*
+ * cond_resched_lock() - if a reschedule is pending, drop the given lock,
+ * call schedule, and on return reacquire the lock.
+ *
+ * Note: this does not assume the given lock is the _only_ lock held.
+ * The kernel preemption counter gives us "free" checking that we are
+ * atomic -- let's use it.
+ */
+static inline void cond_resched_lock(spinlock_t * lock)
+{
+	if (need_resched() && preempt_count() == 1) {
+		_raw_spin_unlock(lock);
+		preempt_enable_no_resched();
+		__cond_resched();
+		spin_lock(lock);
+	}
+}
+
+#else
+
+static inline void cond_resched_lock(spinlock_t * lock)
+{
+}
+
+#endif
 
 /* Reevaluate whether the task has signals pending delivery.
    This is required every time the blocked sigset_t changes.

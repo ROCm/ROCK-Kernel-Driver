@@ -332,6 +332,29 @@ struct block_device *bdget(dev_t dev)
 	return bdev;
 }
 
+long nr_blockdev_pages(void)
+{
+	long ret = 0;
+	int i;
+
+	spin_lock(&bdev_lock);
+	for (i = 0; i < ARRAY_SIZE(bdev_hashtable); i++) {
+		struct list_head *head = &bdev_hashtable[i];
+		struct list_head *lh;
+
+		if (head == NULL)
+			continue;
+		list_for_each(lh, head) {
+			struct block_device *bdev;
+
+			bdev = list_entry(lh, struct block_device, bd_hash);
+			ret += bdev->bd_inode->i_mapping->nrpages;
+		}
+	}
+	spin_unlock(&bdev_lock);
+	return ret;
+}
+
 static inline void __bd_forget(struct inode *inode)
 {
 	list_del_init(&inode->i_devices);
