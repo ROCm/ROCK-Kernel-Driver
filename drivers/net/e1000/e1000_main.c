@@ -124,6 +124,7 @@ int e1000_setup_tx_resources(struct e1000_adapter *adapter);
 int e1000_setup_rx_resources(struct e1000_adapter *adapter);
 void e1000_free_tx_resources(struct e1000_adapter *adapter);
 void e1000_free_rx_resources(struct e1000_adapter *adapter);
+void e1000_update_stats(struct e1000_adapter *adapter);
 
 /* Local Function Prototypes */
 
@@ -147,7 +148,6 @@ static int e1000_xmit_frame(struct sk_buff *skb, struct net_device *netdev);
 static struct net_device_stats * e1000_get_stats(struct net_device *netdev);
 static int e1000_change_mtu(struct net_device *netdev, int new_mtu);
 static int e1000_set_mac(struct net_device *netdev, void *p);
-static void e1000_update_stats(struct e1000_adapter *adapter);
 static inline void e1000_irq_disable(struct e1000_adapter *adapter);
 static inline void e1000_irq_enable(struct e1000_adapter *adapter);
 static irqreturn_t e1000_intr(int irq, void *data, struct pt_regs *regs);
@@ -1402,6 +1402,17 @@ e1000_watchdog(unsigned long data)
 	}
 
 	e1000_update_stats(adapter);
+
+	adapter->hw.tx_packet_delta = adapter->stats.tpt - adapter->tpt_old;
+	adapter->tpt_old = adapter->stats.tpt;
+	adapter->hw.collision_delta = adapter->stats.colc - adapter->colc_old;
+	adapter->colc_old = adapter->stats.colc;
+	
+	adapter->gorcl = adapter->stats.gorcl - adapter->gorcl_old;
+	adapter->gorcl_old = adapter->stats.gorcl;
+	adapter->gotcl = adapter->stats.gotcl - adapter->gotcl_old;
+	adapter->gotcl_old = adapter->stats.gotcl;
+
 	e1000_update_adaptive(&adapter->hw);
 
 	if(!netif_carrier_ok(netdev)) {
@@ -1855,6 +1866,7 @@ e1000_get_stats(struct net_device *netdev)
 {
 	struct e1000_adapter *adapter = netdev->priv;
 
+	e1000_update_stats(adapter);
 	return &adapter->net_stats;
 }
 
@@ -1913,7 +1925,7 @@ e1000_change_mtu(struct net_device *netdev, int new_mtu)
  * @adapter: board private structure
  **/
 
-static void
+void
 e1000_update_stats(struct e1000_adapter *adapter)
 {
 	struct e1000_hw *hw = &adapter->hw;
@@ -1931,8 +1943,7 @@ e1000_update_stats(struct e1000_adapter *adapter)
 
 	adapter->stats.crcerrs += E1000_READ_REG(hw, CRCERRS);
 	adapter->stats.gprc += E1000_READ_REG(hw, GPRC);
-	adapter->gorcl = E1000_READ_REG(hw, GORCL);
-	adapter->stats.gorcl += adapter->gorcl;
+	adapter->stats.gorcl += E1000_READ_REG(hw, GORCL);
 	adapter->stats.gorch += E1000_READ_REG(hw, GORCH);
 	adapter->stats.bprc += E1000_READ_REG(hw, BPRC);
 	adapter->stats.mprc += E1000_READ_REG(hw, MPRC);
@@ -1943,8 +1954,6 @@ e1000_update_stats(struct e1000_adapter *adapter)
 	adapter->stats.prc511 += E1000_READ_REG(hw, PRC511);
 	adapter->stats.prc1023 += E1000_READ_REG(hw, PRC1023);
 	adapter->stats.prc1522 += E1000_READ_REG(hw, PRC1522);
-
-	spin_unlock_irqrestore(&adapter->stats_lock, flags);
 
 	/* the rest of the counters are only modified here */
 
@@ -1963,8 +1972,7 @@ e1000_update_stats(struct e1000_adapter *adapter)
 	adapter->stats.xofftxc += E1000_READ_REG(hw, XOFFTXC);
 	adapter->stats.fcruc += E1000_READ_REG(hw, FCRUC);
 	adapter->stats.gptc += E1000_READ_REG(hw, GPTC);
-	adapter->gotcl = E1000_READ_REG(hw, GOTCL);
-	adapter->stats.gotcl += adapter->gotcl;
+	adapter->stats.gotcl += E1000_READ_REG(hw, GOTCL);
 	adapter->stats.gotch += E1000_READ_REG(hw, GOTCH);
 	adapter->stats.rnbc += E1000_READ_REG(hw, RNBC);
 	adapter->stats.ruc += E1000_READ_REG(hw, RUC);
@@ -2046,6 +2054,8 @@ e1000_update_stats(struct e1000_adapter *adapter)
 		   !e1000_read_phy_reg(hw, M88E1000_RX_ERR_CNTR, &phy_tmp))
 			adapter->phy_stats.receive_errors += phy_tmp;
 	}
+
+	spin_unlock_irqrestore(&adapter->stats_lock, flags);
 }
 
 /**

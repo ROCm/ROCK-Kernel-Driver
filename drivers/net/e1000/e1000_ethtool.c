@@ -43,6 +43,7 @@ extern int e1000_setup_rx_resources(struct e1000_adapter *adapter);
 extern int e1000_setup_tx_resources(struct e1000_adapter *adapter);
 extern void e1000_free_rx_resources(struct e1000_adapter *adapter);
 extern void e1000_free_tx_resources(struct e1000_adapter *adapter);
+extern void e1000_update_stats(struct e1000_adapter *adapter);
 
 struct e1000_stats {
 	char stat_string[ETH_GSTRING_LEN];
@@ -1604,6 +1605,7 @@ err_geeprom_ioctl:
 		} stats = { {ETHTOOL_GSTATS, E1000_STATS_LEN} };
 		int i;
 
+		e1000_update_stats(adapter);
 		for(i = 0; i < E1000_STATS_LEN; i++)
 			stats.data[i] = (e1000_gstrings_stats[i].sizeof_stat ==
 					sizeof(uint64_t)) ?

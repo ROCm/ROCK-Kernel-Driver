@@ -207,6 +207,9 @@ struct e1000_adapter {
 	uint32_t tx_int_delay;
 	uint32_t tx_abs_int_delay;
 	uint32_t gotcl;
+	uint64_t gotcl_old;
+	uint64_t tpt_old;
+	uint64_t colc_old;
 	uint32_t tx_fifo_head;
 	uint32_t tx_head_addr;
 	uint32_t tx_fifo_size;
@@ -221,6 +224,7 @@ struct e1000_adapter {
 	uint32_t rx_abs_int_delay;
 	boolean_t rx_csum;
 	uint32_t gorcl;
+	uint64_t gorcl_old;
 
 	/* Interrupt Throttle Rate */
 	uint32_t itr;
