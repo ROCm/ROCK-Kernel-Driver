@@ -1475,8 +1475,9 @@ e1000_tso(struct e1000_adapter *adapter, struct sk_buff *skb)
 #ifdef NETIF_F_TSO
 	struct e1000_context_desc *context_desc;
 	unsigned int i;
-	uint8_t ipcss, ipcso, tucss, tucso, hdr_len;
+	uint32_t cmd_length = 0;
 	uint16_t ipcse, tucse, mss;
+	uint8_t ipcss, ipcso, tucss, tucso, hdr_len;
 
 	if(skb_shinfo(skb)->tso_size) {
 		hdr_len = ((skb->h.raw - skb->data) + (skb->h.th->doff << 2));
@@ -1495,6 +1496,10 @@ e1000_tso(struct e1000_adapter *adapter, struct sk_buff *skb)
 		tucso = (void *)&(skb->h.th->check) - (void *)skb->data;
 		tucse = 0;
 
+		cmd_length |= (E1000_TXD_CMD_DEXT | E1000_TXD_CMD_TSE |
+			       E1000_TXD_CMD_IP | E1000_TXD_CMD_TCP |
+			       (skb->len - (hdr_len)));
+
 		i = adapter->tx_ring.next_to_use;
 		context_desc = E1000_CONTEXT_DESC(adapter->tx_ring, i);
 
@@ -1506,10 +1511,7 @@ e1000_tso(struct e1000_adapter *adapter, struct sk_buff *skb)
 		context_desc->upper_setup.tcp_fields.tucse = cpu_to_le16(tucse);
 		context_desc->tcp_seg_setup.fields.mss     = cpu_to_le16(mss);
 		context_desc->tcp_seg_setup.fields.hdr_len = hdr_len;
-		context_desc->cmd_and_length = cpu_to_le32(
-			E1000_TXD_CMD_DEXT | E1000_TXD_CMD_TSE |
-			E1000_TXD_CMD_IP | E1000_TXD_CMD_TCP |
-			(skb->len - (hdr_len)));
+		context_desc->cmd_and_length = cpu_to_le32(cmd_length);
 
 		if(++i == adapter->tx_ring.count) i = 0;
 		adapter->tx_ring.next_to_use = i;
@@ -1526,17 +1528,16 @@ e1000_tx_csum(struct e1000_adapter *adapter, struct sk_buff *skb)
 {
 	struct e1000_context_desc *context_desc;
 	unsigned int i;
-	uint8_t css, cso;
+	uint8_t css;
 
 	if(skb->ip_summed == CHECKSUM_HW) {
 		css = skb->h.raw - skb->data;
-		cso = (skb->h.raw + skb->csum) - skb->data;
 
 		i = adapter->tx_ring.next_to_use;
 		context_desc = E1000_CONTEXT_DESC(adapter->tx_ring, i);
 
 		context_desc->upper_setup.tcp_fields.tucss = css;
-		context_desc->upper_setup.tcp_fields.tucso = cso;
+		context_desc->upper_setup.tcp_fields.tucso = css + skb->csum;
 		context_desc->upper_setup.tcp_fields.tucse = 0;
 		context_desc->tcp_seg_setup.data = 0;
 		context_desc->cmd_and_length = cpu_to_le32(E1000_TXD_CMD_DEXT);
