@@ -63,7 +63,7 @@ MODULE_PARM_DESC(noacpi, "Do not use ACPI to detect controller settings");
 #define DEBUG
 #ifdef DEBUG
 static int i8042_debug;
-module_param_named(debug, i8042_debug, bool, 600);
+module_param_named(debug, i8042_debug, bool, 0600);
 MODULE_PARM_DESC(debug, "Turn i8042 debugging mode on and off");
 #endif
 
