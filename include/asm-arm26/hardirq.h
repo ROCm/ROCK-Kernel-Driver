@@ -29,14 +29,17 @@ typedef struct {
 #define irq_enter()		(preempt_count() += HARDIRQ_OFFSET)
 
 #ifndef CONFIG_SMP
-#define irq_exit()							\
-	do {								\
-		preempt_count() -= HARDIRQ_OFFSET;			\
-		if (!in_interrupt() && softirq_pending(smp_processor_id())) \
-			__asm__("bl%? __do_softirq": : : "lr");/* out of line */\
-		preempt_enable_no_resched();				\
-	} while (0)
 
+extern asmlinkage void __do_softirq(void);
+
+#define irq_exit()                                                      \
+        do {                                                            \
+                preempt_count() -= IRQ_EXIT_OFFSET;                     \
+                if (!in_interrupt() && local_softirq_pending())         \
+                        __do_softirq();                                 \
+                preempt_enable_no_resched();                            \
+        } while (0)
 #endif
+
 
 #endif /* __ASM_HARDIRQ_H */
