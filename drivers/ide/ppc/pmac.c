@@ -788,7 +788,7 @@ static int __pmac
 set_timings_mdma(ide_drive_t *drive, int intf_type, u32 *timings, u32 *timings2,
 			u8 speed, int drive_cycle_time)
 {
-	int cycleTime, accessTime, recTime;
+	int cycleTime, accessTime = 0, recTime = 0;
 	unsigned accessTicks, recTicks;
 	struct mdma_timings_t* tm = NULL;
 	int i;
