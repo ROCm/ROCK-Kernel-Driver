@@ -145,20 +145,6 @@ typedef struct com20020_dev_t {
     dev_node_t          node;
 } com20020_dev_t;
 
-static void com20020_setup(struct net_device *dev)
-{
-	struct arcnet_local *lp = dev->priv;
-
-	lp->timeout = timeout;
-	lp->backplane = backplane;
-	lp->clockp = clockp;
-	lp->clockm = clockm & 3;
-	lp->hw.owner = THIS_MODULE;
-
-	/* fill in our module parameters as defaults */
-	dev->dev_addr[0] = node;
-}
-
 /*======================================================================
 
     com20020_attach() creates an "instance" of the driver, allocating
@@ -188,13 +174,21 @@ static dev_link_t *com20020_attach(void)
 	goto fail_alloc_info;
 
     dev = alloc_netdev(sizeof(struct arcnet_local), "arc%d",
-		       com20020_setup);
+		       arcdev_setup);
     if (!dev)
 	goto fail_alloc_dev;
 
     memset(info, 0, sizeof(struct com20020_dev_t));
     memset(link, 0, sizeof(struct dev_link_t));
     lp = dev->priv;
+    lp->timeout = timeout;
+    lp->backplane = backplane;
+    lp->clockp = clockp;
+    lp->clockm = clockm & 3;
+    lp->hw.owner = THIS_MODULE;
+
+    /* fill in our module parameters as defaults */
+    dev->dev_addr[0] = node;
 
     link->io.Attributes1 = IO_DATA_PATH_WIDTH_8;
     link->io.NumPorts1 = 16;
@@ -293,6 +287,8 @@ static void com20020_detach(dev_link_t *link)
 
 		if (netif_running(dev))
 		    dev->stop(dev);
+
+		unregister_netdev(dev);
 	    
 		/*
 		 * this is necessary because we register our IRQ separately
@@ -300,10 +296,7 @@ static void com20020_detach(dev_link_t *link)
 		 */
 		if (dev->irq)
 		    free_irq(dev->irq, dev);
-		
 		/* ...but I/O ports are done automatically by card services */
-		
-		unregister_netdev(dev);
 	    }
 	    
 	    DEBUG(1,"kfree...\n");

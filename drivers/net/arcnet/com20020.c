@@ -172,11 +172,6 @@ int com20020_found(struct net_device *dev, int shared)
 
 	dev->set_multicast_list = com20020_set_mc_list;
 
-	/* Fill in the fields of the device structure with generic
-	 * values.
-	 */
-	arcdev_setup(dev);
-
 	if (!dev->dev_addr[0])
 		dev->dev_addr[0] = inb(ioaddr + 8);	/* FIXME: do this some other way! */
 
@@ -221,7 +216,7 @@ int com20020_found(struct net_device *dev, int shared)
 	       lp->setup >> 1, 
 	       clockrates[3 - ((lp->setup2 & 0xF0) >> 4) + ((lp->setup & 0x0F) >> 1)]);
 
-	if (!dev->init && register_netdev(dev)) {
+	if (register_netdev(dev)) {
 		free_irq(dev->irq, dev);
 		return -EIO;
 	}
@@ -332,19 +327,10 @@ static void com20020_set_mc_list(struct net_device *dev)
 	}
 }
 
-void com20020_remove(struct net_device *dev)
-{
-	unregister_netdev(dev);
-	free_irq(dev->irq, dev);
-	kfree(dev->priv);
-	free_netdev(dev);
-}
-
 #ifdef MODULE
 
 EXPORT_SYMBOL(com20020_check);
 EXPORT_SYMBOL(com20020_found);
-EXPORT_SYMBOL(com20020_remove);
 
 MODULE_LICENSE("GPL");
 
