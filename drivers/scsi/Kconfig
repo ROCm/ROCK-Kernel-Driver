@@ -1222,7 +1222,7 @@ config SCSI_QLOGIC_FAS
 	  module will be called qlogicfas.
 
 config SCSI_QLOGIC_ISP
-	tristate "Qlogic ISP SCSI support"
+	tristate "Qlogic ISP SCSI support (old driver)"
 	depends on PCI && SCSI
 	---help---
 	  This driver works for all QLogic PCI SCSI host adapters (IQ-PCI,
@@ -1238,6 +1238,9 @@ config SCSI_QLOGIC_ISP
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called qlogicisp.
+
+	  These days the hardware is also supported by the more modern qla1280
+	  driver.  In doubt use that one instead of qlogicisp.
 
 config SCSI_QLOGIC_FC
 	tristate "Qlogic ISP FC SCSI support"
@@ -1257,13 +1260,20 @@ config SCSI_QLOGIC_FC_FIRMWARE
 	  qlogicfc driver. This is required on some platforms.
 
 config SCSI_QLOGIC_1280
-	tristate "Qlogic QLA 1280 SCSI support"
+	tristate "Qlogic QLA 1240/1x80/1x160 SCSI support"
 	depends on PCI && SCSI
 	help
-	  Say Y if you have a QLogic ISP1x80/1x160 SCSI host adapter.
+	  Say Y if you have a QLogic ISP1240/1x80/1x160 SCSI host adapter.
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called qla1280.
+
+config SCSI_QLOGIC_1280_1040
+	bool "Qlogic QLA 1020/1040 SCSI support"
+	help
+	  Say Y here if you have a QLogic ISP1020/1040 SCSI host adapter and
+	  do not want to use the old driver.  This option enables support in
+	  the qla1280 driver for those host adapters.
 
 config SCSI_QLOGICPTI
 	tristate "PTI Qlogic, ISP Driver"

@@ -17,9 +17,12 @@
 * General Public License for more details.
 *
 ******************************************************************************/
-#define QLA1280_VERSION      "3.24.4"
+#define QLA1280_VERSION      "3.25"
 /*****************************************************************************
     Revision History:
+    Rev  3.25, September 28, 2004, Christoph Hellwig
+	- add support for ISP1020/1040
+	- don't include "scsi.h" anymore for 2.6.x
     Rev  3.24.4 June 7, 2004 Christoph Hellwig
 	- restructure firmware loading, cleanup initialization code
 	- prepare support for ISP1020/1040 chips
@@ -356,7 +359,6 @@
 #include <scsi/scsi_device.h>
 #include <scsi/scsi_host.h>
 #include <scsi/scsi_tcq.h>
-#include "scsi.h"
 #else
 #include <linux/blk.h>
 #include "scsi.h"
@@ -390,6 +392,7 @@
 #include "qla1280.h"
 #include "ql12160_fw.h"		/* ISP RISC codes */
 #include "ql1280_fw.h"
+#include "ql1040_fw.h"
 
 
 /*
@@ -632,18 +635,22 @@ struct qla_boards {
 	unsigned char *fwver;	/* Ptr to F/W version array    */
 };
 
-/* NOTE: qla1280_pci_tbl and ql1280_board_tbl must be in the same order */
+/* NOTE: the last argument in each entry is used to index ql1280_board_tbl */
 static struct pci_device_id qla1280_pci_tbl[] = {
 	{PCI_VENDOR_ID_QLOGIC, PCI_DEVICE_ID_QLOGIC_ISP12160,
 		PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
-	{PCI_VENDOR_ID_QLOGIC, PCI_DEVICE_ID_QLOGIC_ISP1080,
+#ifdef CONFIG_SCSI_QLOGIC_1280_1040
+	{PCI_VENDOR_ID_QLOGIC, PCI_DEVICE_ID_QLOGIC_ISP1020,
 		PCI_ANY_ID, PCI_ANY_ID, 0, 0, 1},
-	{PCI_VENDOR_ID_QLOGIC, PCI_DEVICE_ID_QLOGIC_ISP1240,
+#endif
+	{PCI_VENDOR_ID_QLOGIC, PCI_DEVICE_ID_QLOGIC_ISP1080,
 		PCI_ANY_ID, PCI_ANY_ID, 0, 0, 2},
-	{PCI_VENDOR_ID_QLOGIC, PCI_DEVICE_ID_QLOGIC_ISP1280,
+	{PCI_VENDOR_ID_QLOGIC, PCI_DEVICE_ID_QLOGIC_ISP1240,
 		PCI_ANY_ID, PCI_ANY_ID, 0, 0, 3},
-	{PCI_VENDOR_ID_QLOGIC, PCI_DEVICE_ID_QLOGIC_ISP10160,
+	{PCI_VENDOR_ID_QLOGIC, PCI_DEVICE_ID_QLOGIC_ISP1280,
 		PCI_ANY_ID, PCI_ANY_ID, 0, 0, 4},
+	{PCI_VENDOR_ID_QLOGIC, PCI_DEVICE_ID_QLOGIC_ISP10160,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0, 5},
 	{0,}
 };
 MODULE_DEVICE_TABLE(pci, qla1280_pci_tbl);
@@ -652,6 +659,8 @@ static struct qla_boards ql1280_board_tbl[] = {
 	/* Name ,  Number of ports, FW details */
 	{"QLA12160", 2, &fw12160i_code01[0], &fw12160i_length01,
 	 &fw12160i_addr01, &fw12160i_version_str[0]},
+	{"QLA1040", 1, &risc_code01[0], &risc_code_length01,
+	 &risc_code_addr01, &firmware_version[0]},
 	{"QLA1080", 1, &fw1280ei_code01[0], &fw1280ei_length01,
 	 &fw1280ei_addr01, &fw1280ei_version_str[0]},
 	{"QLA1240", 2, &fw1280ei_code01[0], &fw1280ei_length01,
@@ -1779,6 +1788,10 @@ qla1280_initialize_adapter(struct scsi_qla_host *ha)
 	}
 #endif
 
+	/* TODO: implement support for the 1040 nvram format */
+	if (IS_ISP1040(ha))
+		driver_setup.no_nvram = 1;
+
 	dprintk(1, "Configure PCI space for adapter...\n");
 
 	reg = ha->iobase;
@@ -2339,9 +2352,7 @@ qla1280_set_target_defaults(struct scsi_qla_host *ha, int bus, int target)
 #if 1	/* Some SCSI Processors do not seem to like this */
 	nv->bus[bus].target[target].parameter.f.enable_wide = 1;
 #endif
-	if (!IS_ISP1040(ha))
-		nv->bus[bus].target[target].parameter.f.parity_checking = 1;
-
+	nv->bus[bus].target[target].parameter.f.parity_checking = 1;
 	nv->bus[bus].target[target].parameter.f.disconnect_allowed = 1;
 	nv->bus[bus].target[target].execution_throttle =
 		nv->bus[bus].max_queue_depth - 1;
