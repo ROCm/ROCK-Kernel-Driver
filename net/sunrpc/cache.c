@@ -582,9 +582,6 @@ cache_read(struct file *filp, char __user *buf, size_t count, loff_t *ppos)
 	struct cache_detail *cd = PDE(filp->f_dentry->d_inode)->data;
 	int err;
 
-	if (ppos != &filp->f_pos)
-		return -ESPIPE;
-
 	if (count == 0)
 		return 0;
 
@@ -661,9 +658,6 @@ cache_write(struct file *filp, const char __user *buf, size_t count,
 {
 	int err;
 	struct cache_detail *cd = PDE(filp->f_dentry->d_inode)->data;
-
-	if (ppos != &filp->f_pos)
-		return -ESPIPE;
 
 	if (count == 0)
 		return 0;
@@ -751,6 +745,7 @@ cache_open(struct inode *inode, struct file *filp)
 {
 	struct cache_reader *rp = NULL;
 
+	nonseekable_open(inode, filp);
 	if (filp->f_mode & FMODE_READ) {
 		struct cache_detail *cd = PDE(inode)->data;
 
@@ -1212,6 +1207,7 @@ static ssize_t write_flush(struct file * file, const char __user * buf,
 }
 
 static struct file_operations cache_flush_operations = {
+	.open		= nonseekable_open,
 	.read		= read_flush,
 	.write		= write_flush,
 };
