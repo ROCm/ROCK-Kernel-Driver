@@ -43,8 +43,8 @@ static int get_mca_info_helper(struct mca_device *mca_dev, char *page, int len)
 	return len;
 }
 
-int get_mca_info(char *page, char **start, off_t off,
-		 int count, int *eof, void *data)
+static int get_mca_info(char *page, char **start, off_t off,
+			int count, int *eof, void *data)
 {
 	int i, len = 0;
 
