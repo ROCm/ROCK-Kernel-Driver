@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2004 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -85,7 +85,6 @@ kmem_shaker_t	xfs_qm_shaker;
 
 STATIC void	xfs_qm_list_init(xfs_dqlist_t *, char *, int);
 STATIC void	xfs_qm_list_destroy(xfs_dqlist_t *);
-STATIC int	xfs_qm_quotacheck(xfs_mount_t *);
 
 STATIC int	xfs_qm_init_quotainos(xfs_mount_t *);
 STATIC int	xfs_qm_shake(int, unsigned int);
@@ -349,7 +348,8 @@ xfs_qm_unmount_quotadestroy(
  */
 int
 xfs_qm_mount_quotas(
-	xfs_mount_t	*mp)
+	xfs_mount_t	*mp,
+	int		mfsi_flags)
 {
 	unsigned long	s;
 	int		error = 0;
@@ -398,22 +398,16 @@ xfs_qm_mount_quotas(
 	/*
 	 * If any of the quotas are not consistent, do a quotacheck.
 	 */
-	if (XFS_QM_NEED_QUOTACHECK(mp)) {
+	if (XFS_QM_NEED_QUOTACHECK(mp) &&
+		!(mfsi_flags & XFS_MFSI_NO_QUOTACHECK)) {
 #ifdef DEBUG
 		cmn_err(CE_NOTE, "Doing a quotacheck. Please wait.");
 #endif
 		if ((error = xfs_qm_quotacheck(mp))) {
-			cmn_err(CE_WARN, "Quotacheck unsuccessful (Error %d): "
-				"Disabling quotas.",
-				error);
-			/*
-			 * We must turn off quotas.
+			/* Quotacheck has failed and quotas have
+			 * been disabled.
 			 */
-			ASSERT(mp->m_quotainfo != NULL);
-			ASSERT(xfs_Gqm != NULL);
-			xfs_qm_destroy_quotainfo(mp);
-			mp->m_qflags = 0;
-			goto write_changes;
+			return XFS_ERROR(error);
 		}
 #ifdef DEBUG
 		cmn_err(CE_NOTE, "Done quotacheck.");
@@ -1875,9 +1869,9 @@ xfs_qm_dqusage_adjust(
 
 /*
  * Walk thru all the filesystem inodes and construct a consistent view
- * of the disk quota world.
+ * of the disk quota world. If the quotacheck fails, disable quotas.
  */
-STATIC int
+int
 xfs_qm_quotacheck(
 	xfs_mount_t	*mp)
 {
@@ -1973,7 +1967,20 @@ xfs_qm_quotacheck(
 	XQM_LIST_PRINT(&(XFS_QI_MPL_LIST(mp)), MPL_NEXT, "++++ Mp list +++");
 
  error_return:
-	cmn_err(CE_NOTE, "XFS quotacheck %s: Done.", mp->m_fsname);
+	if (error) {
+		cmn_err(CE_WARN, "XFS quotacheck %s: Unsuccessful (Error %d): "
+			"Disabling quotas.",
+			mp->m_fsname, error);
+		/*
+		 * We must turn off quotas.
+		 */
+		ASSERT(mp->m_quotainfo != NULL);
+		ASSERT(xfs_Gqm != NULL);
+		xfs_qm_destroy_quotainfo(mp);
+		xfs_mount_reset_sbqflags(mp);
+	} else {
+		cmn_err(CE_NOTE, "XFS quotacheck %s: Done.", mp->m_fsname);
+	}
 	return (error);
 }
 

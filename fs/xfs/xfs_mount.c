@@ -1036,7 +1036,7 @@ xfs_mountfs(
 	/*
 	 * Complete the quota initialisation, post-log-replay component.
 	 */
-	if ((error = XFS_QM_MOUNT(mp, quotamount, quotaflags)))
+	if ((error = XFS_QM_MOUNT(mp, quotamount, quotaflags, mfsi_flags)))
 		goto error4;
 
 	return 0;

@@ -133,7 +133,7 @@ struct xfs_dqtrxops;
 struct xfs_quotainfo;
 
 typedef int	(*xfs_qminit_t)(struct xfs_mount *, uint *, uint *);
-typedef int	(*xfs_qmmount_t)(struct xfs_mount *, uint, uint);
+typedef int	(*xfs_qmmount_t)(struct xfs_mount *, uint, uint, int);
 typedef int	(*xfs_qmunmount_t)(struct xfs_mount *);
 typedef void	(*xfs_qmdone_t)(struct xfs_mount *);
 typedef void	(*xfs_dqrele_t)(struct xfs_dquot *);
@@ -171,8 +171,8 @@ typedef struct xfs_qmops {
 
 #define XFS_QM_INIT(mp, mnt, fl) \
 	(*(mp)->m_qm_ops.xfs_qminit)(mp, mnt, fl)
-#define XFS_QM_MOUNT(mp, mnt, fl) \
-	(*(mp)->m_qm_ops.xfs_qmmount)(mp, mnt, fl)
+#define XFS_QM_MOUNT(mp, mnt, fl, mfsi_flags) \
+	(*(mp)->m_qm_ops.xfs_qmmount)(mp, mnt, fl, mfsi_flags)
 #define XFS_QM_UNMOUNT(mp) \
 	(*(mp)->m_qm_ops.xfs_qmunmount)(mp)
 #define XFS_QM_DONE(mp) \
@@ -466,6 +466,7 @@ typedef struct xfs_mount {
 #define XFS_MFSI_CLIENT		0x02	/* Is a client -- skip lots of stuff */
 #define XFS_MFSI_NOUNLINK	0x08	/* Skip unlinked inode processing in */
 					/* log recovery */
+#define XFS_MFSI_NO_QUOTACHECK	0x10	/* Skip quotacheck processing */
 
 /*
  * Macros for getting from mount to vfs and back.
