@@ -360,7 +360,13 @@ out_nofds:
 	return ret;
 }
 
-#define POLLFD_PER_PAGE  ((PAGE_SIZE) / sizeof(struct pollfd))
+struct poll_list {
+	struct poll_list *next;
+	int len;
+	struct pollfd entries[0];
+};
+
+#define POLLFD_PER_PAGE  ((PAGE_SIZE-sizeof(struct poll_list)) / sizeof(struct pollfd))
 
 static void do_pollfd(unsigned int num, struct pollfd * fdpage,
 	poll_table ** pwait, int *count)
@@ -394,21 +400,23 @@ static void do_pollfd(unsigned int num, struct pollfd * fdpage,
 	}
 }
 
-static int do_poll(unsigned int nfds, unsigned int nchunks, unsigned int nleft, 
-	struct pollfd *fds[], struct poll_wqueues *wait, long timeout)
+static int do_poll(unsigned int nfds,  struct poll_list *list,
+			struct poll_wqueues *wait, long timeout)
 {
-	int count;
+	int count = 0;
 	poll_table* pt = &wait->pt;
 
+	if (!timeout)
+		pt = NULL;
+ 
 	for (;;) {
-		unsigned int i;
-
+		struct poll_list *walk;
 		set_current_state(TASK_INTERRUPTIBLE);
-		count = 0;
-		for (i=0; i < nchunks; i++)
-			do_pollfd(POLLFD_PER_PAGE, fds[i], &pt, &count);
-		if (nleft)
-			do_pollfd(nleft, fds[nchunks], &pt, &count);
+		walk = list;
+		while(walk != NULL) {
+			do_pollfd( walk->len, walk->entries, &pt, &count);
+			walk = walk->next;
+		}
 		pt = NULL;
 		if (count || !timeout || signal_pending(current))
 			break;
@@ -423,13 +431,14 @@ static int do_poll(unsigned int nfds, unsigned int nchunks, unsigned int nleft,
 
 asmlinkage long sys_poll(struct pollfd * ufds, unsigned int nfds, long timeout)
 {
-	int i, j, fdcount, err;
-	struct pollfd **fds;
-	struct poll_wqueues table, *wait;
-	int nchunks, nleft;
+	struct poll_wqueues table;
+ 	int fdcount, err;
+ 	unsigned int i;
+	struct poll_list *head;
+ 	struct poll_list *walk;
 
 	/* Do a sanity check on nfds ... */
-	if (nfds > NR_OPEN)
+	if (nfds > current->files->max_fdset && nfds > OPEN_MAX)
 		return -EINVAL;
 
 	if (timeout) {
@@ -441,68 +450,59 @@ asmlinkage long sys_poll(struct pollfd * ufds, unsigned int nfds, long timeout)
 	}
 
 	poll_initwait(&table);
-	wait = &table;
-	if (!timeout)
-		wait = NULL;
 
+	head = NULL;
+	walk = NULL;
+	i = nfds;
 	err = -ENOMEM;
-	fds = NULL;
-	if (nfds != 0) {
-		fds = (struct pollfd **)kmalloc(
-			(1 + (nfds - 1) / POLLFD_PER_PAGE) * sizeof(struct pollfd *),
-			GFP_KERNEL);
-		if (fds == NULL)
-			goto out;
-	}
-
-	nchunks = 0;
-	nleft = nfds;
-	while (nleft > POLLFD_PER_PAGE) { /* allocate complete PAGE_SIZE chunks */
-		fds[nchunks] = (struct pollfd *)__get_free_page(GFP_KERNEL);
-		if (fds[nchunks] == NULL)
+	while(i!=0) {
+		struct poll_list *pp;
+		pp = kmalloc(sizeof(struct poll_list)+
+				sizeof(struct pollfd)*
+				(i>POLLFD_PER_PAGE?POLLFD_PER_PAGE:i),
+					GFP_KERNEL);
+		if(pp==NULL)
 			goto out_fds;
-		nchunks++;
-		nleft -= POLLFD_PER_PAGE;
-	}
-	if (nleft) { /* allocate last PAGE_SIZE chunk, only nleft elements used */
-		fds[nchunks] = (struct pollfd *)__get_free_page(GFP_KERNEL);
-		if (fds[nchunks] == NULL)
+		pp->next=NULL;
+		pp->len = (i>POLLFD_PER_PAGE?POLLFD_PER_PAGE:i);
+		if (head == NULL)
+			head = pp;
+		else
+			walk->next = pp;
+
+		walk = pp;
+		if (copy_from_user(pp+1, ufds + nfds-i, 
+				sizeof(struct pollfd)*pp->len)) {
+			err = -EFAULT;
 			goto out_fds;
+		}
+		i -= pp->len;
 	}
-
-	err = -EFAULT;
-	for (i=0; i < nchunks; i++)
-		if (copy_from_user(fds[i], ufds + i*POLLFD_PER_PAGE, PAGE_SIZE))
-			goto out_fds1;
-	if (nleft) {
-		if (copy_from_user(fds[nchunks], ufds + nchunks*POLLFD_PER_PAGE, 
-				nleft * sizeof(struct pollfd)))
-			goto out_fds1;
-	}
-
-	fdcount = do_poll(nfds, nchunks, nleft, fds, wait, timeout);
+	fdcount = do_poll(nfds, head, &table, timeout);
 
 	/* OK, now copy the revents fields back to user space. */
-	for(i=0; i < nchunks; i++)
-		for (j=0; j < POLLFD_PER_PAGE; j++, ufds++)
-			__put_user((fds[i] + j)->revents, &ufds->revents);
-	if (nleft)
-		for (j=0; j < nleft; j++, ufds++)
-			__put_user((fds[nchunks] + j)->revents, &ufds->revents);
+	walk = head;
+	err = -EFAULT;
+	while(walk != NULL) {
+		struct pollfd *fds = walk->entries;
+		int j;
 
+		for (j=0; j < walk->len; j++, ufds++) {
+			if(__put_user(fds[j].revents, &ufds->revents))
+				goto out_fds;
+		}
+		walk = walk->next;
+  	}
 	err = fdcount;
 	if (!fdcount && signal_pending(current))
 		err = -EINTR;
-
-out_fds1:
-	if (nleft)
-		free_page((unsigned long)(fds[nchunks]));
 out_fds:
-	for (i=0; i < nchunks; i++)
-		free_page((unsigned long)(fds[i]));
-	if (nfds != 0)
-		kfree(fds);
-out:
+	walk = head;
+	while(walk!=NULL) {
+		struct poll_list *pp = walk->next;
+		kfree(walk);
+		walk = pp;
+	}
 	poll_freewait(&table);
 	return err;
 }
