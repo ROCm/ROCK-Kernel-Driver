@@ -2272,58 +2272,67 @@ int ntfs_show_options(struct seq_file *sf, struct vfsmount *mnt)
 void ntfs_truncate(struct inode *vi)
 {
 	ntfs_inode *ni = NTFS_I(vi);
+	ntfs_volume *vol = ni->vol;
 	ntfs_attr_search_ctx *ctx;
 	MFT_RECORD *m;
+	const char *te = "  Leaving file length out of sync with i_size.";
 	int err;
 
+	ntfs_debug("Entering for inode 0x%lx.", vi->i_ino);
 	BUG_ON(NInoAttr(ni));
 	BUG_ON(ni->nr_extents < 0);
 	m = map_mft_record(ni);
 	if (IS_ERR(m)) {
+		err = PTR_ERR(m);
 		ntfs_error(vi->i_sb, "Failed to map mft record for inode 0x%lx "
-				"(error code %ld).", vi->i_ino, PTR_ERR(m));
-		if (PTR_ERR(m) != ENOMEM)
-			make_bad_inode(vi);
-		return;
+				"(error code %d).%s", vi->i_ino, err, te);
+		ctx = NULL;
+		m = NULL;
+		goto err_out;
 	}
 	ctx = ntfs_attr_get_search_ctx(ni, m);
 	if (unlikely(!ctx)) {
-		ntfs_error(vi->i_sb, "Failed to allocate a search context: "
-				"Not enough memory");
-		// FIXME: We can't report an error code upstream.  So what do
-		// we do?!?  make_bad_inode() seems a bit harsh...
-		unmap_mft_record(ni);
-		return;
+		ntfs_error(vi->i_sb, "Failed to allocate a search context for "
+				"inode 0x%lx (not enough memory).%s",
+				vi->i_ino, te);
+		err = -ENOMEM;
+		goto err_out;
 	}
 	err = ntfs_attr_lookup(ni->type, ni->name, ni->name_len,
 			CASE_SENSITIVE, 0, NULL, 0, ctx);
 	if (unlikely(err)) {
-		if (err == -ENOENT) {
+		if (err == -ENOENT)
 			ntfs_error(vi->i_sb, "Open attribute is missing from "
 					"mft record.  Inode 0x%lx is corrupt.  "
 					"Run chkdsk.", vi->i_ino);
-			make_bad_inode(vi);
-		} else {
+		else
 			ntfs_error(vi->i_sb, "Failed to lookup attribute in "
 					"inode 0x%lx (error code %d).",
 					vi->i_ino, err);
-			// FIXME: We can't report an error code upstream.  So
-			// what do we do?!?  make_bad_inode() seems a bit
-			// harsh...
-		}
-		goto out;
+		goto err_out;
 	}
 	/* If the size has not changed there is nothing to do. */
 	if (ntfs_attr_size(ctx->attr) == i_size_read(vi))
-		goto out;
+		goto done;
 	// TODO: Implement the truncate...
 	ntfs_error(vi->i_sb, "Inode size has changed but this is not "
 			"implemented yet.  Resetting inode size to old value. "
 			" This is most likely a bug in the ntfs driver!");
 	i_size_write(vi, ntfs_attr_size(ctx->attr)); 
-out:
+done:
 	ntfs_attr_put_search_ctx(ctx);
 	unmap_mft_record(ni);
+	ntfs_debug("Done.");
+	return;
+err_out:
+	if (err != -ENOMEM) {
+		NVolSetErrors(vol);
+		make_bad_inode(vi);
+	}
+	if (ctx)
+		ntfs_attr_put_search_ctx(ctx);
+	if (m)
+		unmap_mft_record(ni);
 	return;
 }
 
