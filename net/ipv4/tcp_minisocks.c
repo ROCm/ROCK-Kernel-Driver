@@ -381,10 +381,8 @@ void tcp_time_wait(struct sock *sk, int state, int timeo)
 		if(tw->family == PF_INET6) {
 			struct ipv6_pinfo *np = inet6_sk(sk);
 
-			memcpy(&tw->v6_daddr, &np->daddr,
-			       sizeof(struct in6_addr));
-			memcpy(&tw->v6_rcv_saddr, &np->rcv_saddr,
-			       sizeof(struct in6_addr));
+			ipv6_addr_copy(&tw->v6_daddr, &np->daddr);
+			ipv6_addr_copy(&tw->v6_rcv_saddr, &np->rcv_saddr);
 		}
 #endif
 		/* Linkage updates. */

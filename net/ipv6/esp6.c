@@ -184,8 +184,10 @@ int esp6_output(struct sk_buff *skb)
 		top_iph->nexthdr = IPPROTO_ESP;
 		top_iph->payload_len = htons(skb->len + alen - sizeof(struct ipv6hdr));
 		top_iph->hop_limit = iph->hop_limit;
-		memcpy(&top_iph->saddr, (struct in6_addr *)&x->props.saddr, sizeof(struct in6_addr));
-		memcpy(&top_iph->daddr, (struct in6_addr *)&x->id.daddr, sizeof(struct in6_addr));
+		ipv6_addr_copy(&top_iph->saddr,
+			       (struct in6_addr *)&x->props.saddr);
+		ipv6_addr_copy(&top_iph->daddr,
+			       (struct in6_addr *)&x->id.daddr);
 	} else { 
 		/* XXX exthdr */
 		esph = (struct ipv6_esp_hdr*)skb_push(skb, x->props.header_len);

@@ -398,8 +398,7 @@ static int rawv6_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg
 	/* Copy the address. */
 	if (sin6) {
 		sin6->sin6_family = AF_INET6;
-		memcpy(&sin6->sin6_addr, &skb->nh.ipv6h->saddr, 
-		       sizeof(struct in6_addr));
+		ipv6_addr_copy(&sin6->sin6_addr, &skb->nh.ipv6h->saddr);
 		sin6->sin6_flowinfo = 0;
 		sin6->sin6_scope_id = 0;
 		if (ipv6_addr_type(&sin6->sin6_addr) & IPV6_ADDR_LINKLOCAL) {

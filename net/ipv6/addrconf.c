@@ -1195,7 +1195,7 @@ addrconf_prefix_route(struct in6_addr *pfx, int plen, struct net_device *dev,
 	struct in6_rtmsg rtmsg;
 
 	memset(&rtmsg, 0, sizeof(rtmsg));
-	memcpy(&rtmsg.rtmsg_dst, pfx, sizeof(struct in6_addr));
+	ipv6_addr_copy(&rtmsg.rtmsg_dst, pfx);
 	rtmsg.rtmsg_dst_len = plen;
 	rtmsg.rtmsg_metric = IP6_RT_PRIO_ADDRCONF;
 	rtmsg.rtmsg_ifindex = dev->ifindex;

@@ -179,7 +179,7 @@ int ipv6_sock_mc_join(struct sock *sk, int ifindex, struct in6_addr *addr)
 		return -ENOMEM;
 
 	mc_lst->next = NULL;
-	memcpy(&mc_lst->addr, addr, sizeof(struct in6_addr));
+	ipv6_addr_copy(&mc_lst->addr, addr);
 
 	if (ifindex == 0) {
 		struct rt6_info *rt;
@@ -825,7 +825,7 @@ int ipv6_dev_mc_inc(struct net_device *dev, struct in6_addr *addr)
 	mc->mca_timer.function = igmp6_timer_handler;
 	mc->mca_timer.data = (unsigned long) mc;
 
-	memcpy(&mc->mca_addr, addr, sizeof(struct in6_addr));
+	ipv6_addr_copy(&mc->mca_addr, addr);
 	mc->idev = idev;
 	mc->mca_users = 1;
 	atomic_set(&mc->mca_refcnt, 2);

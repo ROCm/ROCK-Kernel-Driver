@@ -75,8 +75,8 @@ int ah6_output(struct sk_buff *skb)
 		skb->nh.ipv6h->version = 6;
 		skb->nh.ipv6h->payload_len = htons(skb->len - sizeof(struct ipv6hdr));
 		skb->nh.ipv6h->nexthdr = IPPROTO_AH;
-		memcpy(&skb->nh.ipv6h->saddr, &x->props.saddr, sizeof(struct in6_addr));
-		memcpy(&skb->nh.ipv6h->daddr, &x->id.daddr, sizeof(struct in6_addr));
+		ipv6_addr_copy(&skb->nh.ipv6h->saddr, &x->props.saddr);
+		ipv6_addr_copy(&skb->nh.ipv6h->daddr, &x->id.daddr);
 		ah = (struct ip_auth_hdr*)(skb->nh.ipv6h+1);
 		ah->nexthdr = IPPROTO_IPV6;
 	} else {

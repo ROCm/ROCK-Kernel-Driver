@@ -437,16 +437,14 @@ int inet6_getname(struct socket *sock, struct sockaddr *uaddr,
 		if (((1<<sk->state)&(TCPF_CLOSE|TCPF_SYN_SENT)) && peer == 1)
 			return -ENOTCONN;
 		sin->sin6_port = inet->dport;
-		memcpy(&sin->sin6_addr, &np->daddr, sizeof(struct in6_addr));
+		ipv6_addr_copy(&sin->sin6_addr, &np->daddr);
 		if (np->sndflow)
 			sin->sin6_flowinfo = np->flow_label;
 	} else {
 		if (ipv6_addr_type(&np->rcv_saddr) == IPV6_ADDR_ANY)
-			memcpy(&sin->sin6_addr, &np->saddr,
-			       sizeof(struct in6_addr));
+			ipv6_addr_copy(&sin->sin6_addr, &np->saddr);
 		else
-			memcpy(&sin->sin6_addr, &np->rcv_saddr,
-			       sizeof(struct in6_addr));
+			ipv6_addr_copy(&sin->sin6_addr, &np->rcv_saddr);
 
 		sin->sin6_port = inet->sport;
 	}

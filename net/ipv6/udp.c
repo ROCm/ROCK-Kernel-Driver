@@ -467,8 +467,7 @@ static int udpv6_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg
 			if (inet->cmsg_flags)
 				ip_cmsg_recv(msg, skb);
 		} else {
-			memcpy(&sin6->sin6_addr, &skb->nh.ipv6h->saddr,
-			       sizeof(struct in6_addr));
+			ipv6_addr_copy(&sin6->sin6_addr, &skb->nh.ipv6h->saddr);
 
 			if (np->rxopt.all)
 				datagram_recv_ctl(sk, msg, skb);

@@ -1463,8 +1463,8 @@ int ip6_push_pending_frames(struct sock *sk)
 		hdr->payload_len = 0;
 	hdr->hop_limit = np->hop_limit;
 	hdr->nexthdr = proto;
-	memcpy(&hdr->saddr, fl->fl6_src, sizeof(struct in6_addr));
-	memcpy(&hdr->daddr, final_dst, sizeof(struct in6_addr));
+	ipv6_addr_copy(&hdr->saddr, fl->fl6_src);
+	ipv6_addr_copy(&hdr->daddr, final_dst);
 
 	skb->dst = dst_clone(&rt->u.dst);
 	err = NF_HOOK(PF_INET6, NF_IP6_LOCAL_OUT, skb, NULL, skb->dst->dev, dst_output);
