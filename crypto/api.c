@@ -67,9 +67,10 @@ static int crypto_init_flags(struct crypto_tfm *tfm, u32 flags)
 		return crypto_init_compress_flags(tfm, flags);
 	
 	default:
-		BUG();
+		break;
 	}
 	
+	BUG();
 	return -EINVAL;
 }
 
