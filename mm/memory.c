@@ -358,7 +358,7 @@ static int copy_pmd_range(struct mm_struct *dst_mm,  struct mm_struct *src_mm,
 
 	for (; addr < end; addr = next, src_pmd++, dst_pmd++) {
 		next = (addr + PMD_SIZE) & PMD_MASK;
-		if (next > end)
+		if (next > end || next <= addr)
 			next = end;
 		if (pmd_none(*src_pmd))
 			continue;
@@ -390,7 +390,7 @@ static int copy_pud_range(struct mm_struct *dst_mm,  struct mm_struct *src_mm,
 
 	for (; addr < end; addr = next, src_pud++, dst_pud++) {
 		next = (addr + PUD_SIZE) & PUD_MASK;
-		if (next > end)
+		if (next > end || next <= addr)
 			next = end;
 		if (pud_none(*src_pud))
 			continue;
