@@ -458,7 +458,7 @@ static int lookup_node(struct mm_struct *mm, unsigned long addr)
 
 /* Copy a kernel node mask to user space */
 static int copy_nodes_to_user(unsigned long *user_mask, unsigned long maxnode,
-			      unsigned long *nodes)
+			      DECLARE_BITMAP(nodes, MAX_NUMNODES))
 {
 	unsigned long copy = round_up(maxnode-1, BITS_PER_LONG) / 8;
 	if (copy > sizeof(nodes)) {

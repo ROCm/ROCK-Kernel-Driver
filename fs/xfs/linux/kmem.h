@@ -56,7 +56,8 @@
 
 typedef unsigned long xfs_pflags_t;
 
-#define PFLAGS_TEST_FSTRANS()           (current->flags & PF_FSTRANS)
+#define PFLAGS_NO_RECURSION() \
+	(current->flags & (PF_FSTRANS|PF_MEMALLOC|PF_MEMDIE))
 
 /* these could be nested, so we save state */
 #define PFLAGS_SET_FSTRANS(STATEP) do {	\
@@ -98,7 +99,7 @@ kmem_flags_convert(int flags)
 		lflags = GFP_KERNEL;
 
 		/* avoid recusive callbacks to filesystem during transactions */
-		if (PFLAGS_TEST_FSTRANS() || (flags & KM_NOFS))
+		if (PFLAGS_NO_RECURSION() || (flags & KM_NOFS))
 			lflags &= ~__GFP_FS;
 
 		if (!(flags & KM_MAYFAIL))
@@ -159,7 +160,20 @@ kmem_zone_init(int size, char *zone_name)
 static __inline void *
 kmem_zone_alloc(kmem_zone_t *zone, int flags)
 {
-	return kmem_cache_alloc(zone, kmem_flags_convert(flags));
+	/* __GFP_NOFAIL doesn't work properly when PF_MEMALLOC is already 
+	   set, and this can happen in XFS when it is called in low memory
+	   situations to free up some cached data. Loop on our own.
+
+	   This has some deadlock potential in extreme OOM cases.
+
+	   It would be better to use mempools for the allocations that 
+	   are used from the low memory paths (iput, writepage); like
+	   for the transactions. */
+	void *p;
+	do {
+		p = kmem_cache_alloc(zone, kmem_flags_convert(flags));
+	} while (!p && !(flags & KM_MAYFAIL));
+	return p;
 }
 
 static __inline void *
