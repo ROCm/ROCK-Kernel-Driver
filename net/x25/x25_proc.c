@@ -202,15 +202,6 @@ static struct file_operations x25_seq_route_fops = {
 	.release	= seq_release,
 };
 
-static int x25_proc_perms(struct inode* inode, int op)
-{
-	return 0;
-}
-
-static struct inode_operations x25_seq_inode = {
-	.permission	= x25_proc_perms,
-};
-
 static struct proc_dir_entry *x25_proc_dir;
 
 int __init x25_proc_init(void)
@@ -222,17 +213,15 @@ int __init x25_proc_init(void)
 	if (!x25_proc_dir)
 		goto out;
 
-	p = create_proc_entry("route", 0, x25_proc_dir);
+	p = create_proc_entry("route", S_IRUGO, x25_proc_dir);
 	if (!p)
 		goto out_route;
 	p->proc_fops = &x25_seq_route_fops;
-	p->proc_iops = &x25_seq_inode;
 
-	p = create_proc_entry("socket", 0, x25_proc_dir);
+	p = create_proc_entry("socket", S_IRUGO, x25_proc_dir);
 	if (!p)
 		goto out_socket;
 	p->proc_fops = &x25_seq_socket_fops;
-	p->proc_iops = &x25_seq_inode;
 	rc = 0;
 out:
 	return rc;
