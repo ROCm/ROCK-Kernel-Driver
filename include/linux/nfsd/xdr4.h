@@ -44,16 +44,6 @@
 #define NFSD4_MAX_TAGLEN	128
 #define XDR_LEN(n)                     (((n) + 3) & ~3)
 
-typedef u32 delegation_zero_t;
-typedef u32 delegation_boot_t;
-typedef u64 delegation_id_t;
-
-typedef struct {
-	delegation_zero_t	ds_zero;
-	delegation_boot_t	ds_boot;
-	delegation_id_t		ds_id;
-} delegation_stateid_t;
-
 struct nfsd4_change_info {
 	u32		atomic;
 	u32		before_ctime_sec;
@@ -202,13 +192,13 @@ struct nfsd4_open {
 	u32		op_claim_type;      /* request */
 	struct xdr_netobj op_fname;	    /* request - everything but CLAIM_PREV */
 	u32		op_delegate_type;   /* request - CLAIM_PREV only */
-	delegation_stateid_t	op_delegate_stateid; /* request - CLAIM_DELEGATE_CUR only */
+	stateid_t       op_delegate_stateid; /* request - response */
 	u32		op_create;     	    /* request */
 	u32		op_createmode;      /* request */
 	u32		op_bmval[2];        /* request */
 	union {                             /* request */
-		struct iattr	iattr;		            /* UNCHECKED4,GUARDED4 */
-		nfs4_verifier	verf;		                     /* EXCLUSIVE4 */
+		struct iattr	iattr;                      /* UNCHECKED4,GUARDED4 */
+		nfs4_verifier	verf;                                /* EXCLUSIVE4 */
 	} u;
 	clientid_t	op_clientid;        /* request */
 	struct xdr_netobj op_owner;           /* request */

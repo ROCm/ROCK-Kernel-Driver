@@ -790,8 +790,8 @@ nfsd4_decode_open(struct nfsd4_compoundargs *argp, struct nfsd4_open *open)
 		READ32(open->op_delegate_type);
 		break;
 	case NFS4_OPEN_CLAIM_DELEGATE_CUR:
-		READ_BUF(sizeof(delegation_stateid_t) + 4);
-		COPYMEM(&open->op_delegate_stateid, sizeof(delegation_stateid_t));
+		READ_BUF(sizeof(stateid_t) + 4);
+		COPYMEM(&open->op_delegate_stateid, sizeof(stateid_t));
 		READ32(open->op_fname.len);
 		READ_BUF(open->op_fname.len);
 		SAVEMEM(open->op_fname.data, open->op_fname.len);
@@ -2072,8 +2072,8 @@ nfsd4_encode_open(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_open 
 	case NFS4_OPEN_DELEGATE_NONE:
 		break;
 	case NFS4_OPEN_DELEGATE_READ:
-		RESERVE_SPACE(20 + sizeof(delegation_stateid_t));
-		WRITEMEM(&open->op_delegate_stateid, sizeof(delegation_stateid_t));
+		RESERVE_SPACE(20 + sizeof(stateid_t));
+		WRITEMEM(&open->op_delegate_stateid, sizeof(stateid_t));
 		WRITE32(0);
 
 		/*
@@ -2086,8 +2086,8 @@ nfsd4_encode_open(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_open 
 		ADJUST_ARGS();
 		break;
 	case NFS4_OPEN_DELEGATE_WRITE:
-		RESERVE_SPACE(32 + sizeof(delegation_stateid_t));
-		WRITEMEM(&open->op_delegate_stateid, sizeof(delegation_stateid_t));
+		RESERVE_SPACE(32 + sizeof(stateid_t));
+		WRITEMEM(&open->op_delegate_stateid, sizeof(stateid_t));
 		WRITE32(0);
 
 		/*
