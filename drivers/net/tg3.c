@@ -48,6 +48,13 @@
 #define TG3_VLAN_TAG_USED 0
 #endif
 
+#ifdef NETIF_F_TSO
+/* XXX some bug in tso firmware hangs tx cpu, disabled until fixed */
+#define TG3_DO_TSO	0
+#else
+#define TG3_DO_TSO	0
+#endif
+
 #include "tg3.h"
 
 #define DRV_MODULE_NAME		"tg3"
@@ -2336,7 +2343,7 @@ static int tg3_start_xmit_4gbug(struct sk_buff *skb, struct net_device *dev)
 	base_flags = 0;
 	if (skb->ip_summed == CHECKSUM_HW)
 		base_flags |= TXD_FLAG_TCPUDP_CSUM;
-#ifdef NETIF_F_TSO
+#if TG3_DO_TSO != 0
 	if ((mss = skb_shinfo(skb)->tso_size) != 0)
 		base_flags |= (TXD_FLAG_CPU_PRE_DMA |
 			       TXD_FLAG_CPU_POST_DMA);
@@ -2501,7 +2508,7 @@ static int tg3_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	base_flags = 0;
 	if (skb->ip_summed == CHECKSUM_HW)
 		base_flags |= TXD_FLAG_TCPUDP_CSUM;
-#ifdef NETIF_F_TSO
+#if TG3_DO_TSO != 0
 	if ((mss = skb_shinfo(skb)->tso_size) != 0)
 		base_flags |= (TXD_FLAG_CPU_PRE_DMA |
 			       TXD_FLAG_CPU_POST_DMA);
@@ -3424,7 +3431,7 @@ static int tg3_load_5701_a0_firmware_fix(struct tg3 *tp)
 	return 0;
 }
 
-#ifdef NETIF_F_TSO
+#if TG3_DO_TSO != 0
 
 #define TG3_TSO_FW_RELEASE_MAJOR	0x1
 #define TG3_TSO_FW_RELASE_MINOR		0x8
@@ -3752,7 +3759,7 @@ static int tg3_load_tso_firmware(struct tg3 *tp)
 	return 0;
 }
 
-#endif /* NETIF_F_TSO */
+#endif /* TG3_DO_TSO != 0 */
 
 /* tp->lock is held. */
 static void __tg3_set_mac_addr(struct tg3 *tp)
@@ -4203,7 +4210,7 @@ static int tg3_reset_hw(struct tg3 *tp)
 			return err;
 	}
 
-#ifdef NETIF_F_TSO
+#if TG3_DO_TSO != 0
 	err = tg3_load_tso_firmware(tp);
 	if (err)
 		return err;
@@ -6563,7 +6570,7 @@ static int __devinit tg3_init_one(struct pci_dev *pdev,
 	dev->vlan_rx_register = tg3_vlan_rx_register;
 	dev->vlan_rx_kill_vid = tg3_vlan_rx_kill_vid;
 #endif
-#ifdef NETIF_F_TSO
+#if TG3_DO_TSO != 0
 	dev->features |= NETIF_F_TSO;
 #endif
 
