@@ -15,10 +15,6 @@
 
 KERNELLOAD	:= 0xc000000000000000
 
-ifeq ($(shell uname -m),ppc64)
-CHECKS		= checks
-endif
-
 HAS_BIARCH      := $(shell if $(CC) -m64 -S -o /dev/null -xc /dev/null > /dev/null 2>&1; then echo y; else echo n; fi;)
 ifeq ($(HAS_BIARCH),y)
 AS              := $(AS) -64
@@ -28,12 +24,16 @@ endif
 
 LDFLAGS		:= -m elf64ppc
 LDFLAGS_vmlinux	:= -Bstatic -e $(KERNELLOAD) -Ttext $(KERNELLOAD)
-CFLAGS		+= -msoft-float -pipe -Wno-uninitialized -mminimal-toc
+CFLAGS		+= -msoft-float -pipe -Wno-uninitialized -mminimal-toc \
+		   -mtraceback=none
 
+HAS_POWER4	:= $(shell if $(CC) -mcpu=power4 -S -o /dev/null -xc /dev/null > /dev/null 2>&1; then echo y; else echo n; fi;)
+ifeq ($(HAS_POWER4),y)
 ifeq ($(CONFIG_POWER4_ONLY),y)
 CFLAGS		+= -mcpu=power4
 else
 CFLAGS		+= -mtune=power4
+endif
 endif
 
 have_zero_bss := $(shell if $(CC) -fno-zero-initialized-in-bss -S -o /dev/null -xc /dev/null > /dev/null 2>&1; then echo y; else echo n; fi)
