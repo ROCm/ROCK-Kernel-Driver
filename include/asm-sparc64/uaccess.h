@@ -90,6 +90,10 @@ unsigned long search_extables_range(unsigned long addr, unsigned long *g2);
 
 extern void __ret_efault(void);
 
+extern long not_a_user_address;
+#define check_user_ptr(x) \
+	(void) ({ void __user * __userptr = (__typeof__(*(x)) *)&not_a_user_address; __userptr; })
+
 /* Uh, these should become the main single-value transfer routines..
  * They automatically use the right size if we just have the right
  * pointer type..
@@ -101,10 +105,12 @@ extern void __ret_efault(void);
  */
 #define put_user(x,ptr) ({ \
 unsigned long __pu_addr = (unsigned long)(ptr); \
+check_user_ptr(ptr); \
 __put_user_nocheck((__typeof__(*(ptr)))(x),__pu_addr,sizeof(*(ptr))); })
 
 #define get_user(x,ptr) ({ \
 unsigned long __gu_addr = (unsigned long)(ptr); \
+check_user_ptr(ptr); \
 __get_user_nocheck((x),__gu_addr,sizeof(*(ptr)),__typeof__(*(ptr))); })
 
 #define __put_user(x,ptr) put_user(x,ptr)
@@ -263,12 +269,12 @@ extern unsigned long __copy_in_user(void __user *to, const void __user *from,
 #define copy_to_user __copy_to_user
 #define copy_in_user __copy_in_user
 
-extern unsigned long __bzero_noasi(void *, unsigned long);
+extern unsigned long __bzero_noasi(void __user *, unsigned long);
 
 static inline unsigned long __clear_user(void __user *addr, unsigned long size)
 {
 	
-	return __bzero_noasi((void *) addr, size);
+	return __bzero_noasi(addr, size);
 }
 
 #define clear_user __clear_user
