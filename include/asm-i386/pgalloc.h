@@ -20,11 +20,11 @@ static inline void pmd_populate(struct mm_struct *mm, pmd_t *pmd, struct page *p
  * Allocate and free page tables.
  */
 
-pgd_t *pgd_alloc(struct mm_struct *);
-void pgd_free(pgd_t *pgd);
+extern pgd_t *pgd_alloc(struct mm_struct *);
+extern void pgd_free(pgd_t *pgd);
 
-pte_t *pte_alloc_one_kernel(struct mm_struct *, unsigned long);
-struct page *pte_alloc_one(struct mm_struct *, unsigned long);
+extern pte_t *pte_alloc_one_kernel(struct mm_struct *, unsigned long);
+extern struct page *pte_alloc_one(struct mm_struct *, unsigned long);
 
 static inline void pte_free_kernel(pte_t *pte)
 {

@@ -508,6 +508,8 @@ static void SMP_TIMER_NAME(rt_run_flush)(unsigned long dummy)
 
 	rt_deadline = 0;
 
+	get_random_bytes(&rt_hash_rnd, 4);
+
 	for (i = rt_hash_mask; i >= 0; i--) {
 		spin_lock_bh(&rt_hash_table[i].lock);
 		rth = rt_hash_table[i].chain;
@@ -570,7 +572,6 @@ static void rt_secret_rebuild(unsigned long dummy)
 {
 	unsigned long now = jiffies;
 
-	get_random_bytes(&rt_hash_rnd, 4);
 	rt_cache_flush(0);
 	mod_timer(&rt_secret_timer, now + ip_rt_secret_interval);
 }

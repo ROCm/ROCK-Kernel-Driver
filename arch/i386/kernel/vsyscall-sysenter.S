@@ -74,11 +74,13 @@ SYSENTER_RETURN:
 	.long .Lenter_kernel-.Lpush_edx
 	.byte 0x0e		/* DW_CFA_def_cfa_offset */
 	.byte 0x10		/* RA at offset 16 now */
+	.byte 0x85, 0x04	/* DW_CFA_offset %ebp -16 */
 	/* Finally the epilogue.  */
 	.byte 0x04		/* DW_CFA_advance_loc4 */
 	.long .Lpop_ebp-.Lenter_kernel
 	.byte 0x0e		/* DW_CFA_def_cfa_offset */
 	.byte 0x12		/* RA at offset 12 now */
+	.byte 0xc5		/* DW_CFA_restore %ebp */
 	.byte 0x04		/* DW_CFA_advance_loc4 */
 	.long .Lpop_edx-.Lpop_ebp
 	.byte 0x0e		/* DW_CFA_def_cfa_offset */

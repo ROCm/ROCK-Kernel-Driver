@@ -23,6 +23,7 @@
 #include <asm/ucontext.h>
 #include <asm/uaccess.h>
 #include <asm/i387.h>
+#include "sigframe.h"
 
 #define DEBUG_SIG 0
 
@@ -125,28 +126,6 @@ sys_sigaltstack(const stack_t *uss, stack_t *uoss)
 /*
  * Do a signal return; undo the signal stack.
  */
-
-struct sigframe
-{
-	char *pretcode;
-	int sig;
-	struct sigcontext sc;
-	struct _fpstate fpstate;
-	unsigned long extramask[_NSIG_WORDS-1];
-	char retcode[8];
-};
-
-struct rt_sigframe
-{
-	char *pretcode;
-	int sig;
-	struct siginfo *pinfo;
-	void *puc;
-	struct siginfo info;
-	struct ucontext uc;
-	struct _fpstate fpstate;
-	char retcode[8];
-};
 
 static int
 restore_sigcontext(struct pt_regs *regs, struct sigcontext __user *sc, int *peax)
