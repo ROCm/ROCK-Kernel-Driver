@@ -74,13 +74,7 @@ int handle_page_fault(unsigned long address, unsigned long ip,
 			err = -ENOMEM;
 			goto out_of_memory;
 		default:
-			if (current->pid == 1) {
-				up_read(&mm->mmap_sem);
-				yield();
-				down_read(&mm->mmap_sem);
-				goto survive;
-			}
-			goto out;
+			BUG();
 		}
 		pte = pte_offset_kernel(pmd, page);
 	} while(!pte_present(*pte));
@@ -103,7 +97,6 @@ out_of_memory:
 		down_read(&mm->mmap_sem);
 		goto survive;
 	}
-	err = -ENOMEM;
 	goto out;
 }
 
