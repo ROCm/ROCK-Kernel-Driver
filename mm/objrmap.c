@@ -79,8 +79,8 @@ find_pte(struct vm_area_struct *vma, struct page *page, unsigned long *addr)
 
 	loffset = (page->index << (PAGE_CACHE_SHIFT - PAGE_SHIFT));
 	address = vma->vm_start + ((loffset - vma->vm_pgoff) << PAGE_SHIFT);
-	if (address < vma->vm_start || address >= vma->vm_end)
-		goto out;
+	if (unlikely(address < vma->vm_start || address >= vma->vm_end))
+		goto out_wrong_vma;
 
 	pgd = pgd_offset(mm, address);
 	if (!pgd_present(*pgd))
@@ -106,6 +106,10 @@ out_unmap:
 	pte_unmap(pte);
 out:
 	return NULL;
+
+out_wrong_vma:
+	BUG_ON(!PageAnon(page));
+	goto out;
 }
 
 /**
@@ -129,8 +133,10 @@ page_referenced_one(struct vm_area_struct *vma, struct page *page)
 	 * Tracking the referenced info is too expensive
 	 * for nonlinear mappings.
 	 */
-	if (vma->vm_flags & VM_NONLINEAR)
+	if (unlikely(vma->vm_flags & VM_NONLINEAR)) {
+		BUG();
 		goto out;
+	}
 
 	if (unlikely(!spin_trylock(&mm->page_table_lock)))
 		goto out;
@@ -166,6 +172,8 @@ page_referenced_inode(struct page *page)
 {
 	struct address_space *mapping = page->mapping;
 	struct vm_area_struct *vma;
+	struct prio_tree_iter iter;
+	unsigned long loffset;
 	int referenced = 0;
 
 	BUG_ON(PageSwapCache(page));
@@ -173,11 +181,22 @@ page_referenced_inode(struct page *page)
 	if (unlikely(down_trylock(&mapping->i_shared_sem)))
 		goto out;
 
-	list_for_each_entry(vma, &mapping->i_mmap, shared)
-		referenced += page_referenced_one(vma, page);
+	loffset = (page->index << (PAGE_CACHE_SHIFT - PAGE_SHIFT));
 
-	list_for_each_entry(vma, &mapping->i_mmap_shared, shared)
+	vma = __vma_prio_tree_first(&mapping->i_mmap, &iter, loffset, loffset);
+	while (vma) {
 		referenced += page_referenced_one(vma, page);
+		vma = __vma_prio_tree_next(vma, &mapping->i_mmap, &iter,
+				loffset, loffset);
+	}
+
+	vma = __vma_prio_tree_first(&mapping->i_mmap_shared, &iter, loffset,
+			loffset);
+	while (vma) {
+		referenced += page_referenced_one(vma, page);
+		vma = __vma_prio_tree_next(vma, &mapping->i_mmap_shared, &iter,
+				loffset, loffset);
+	}
 
 	up(&mapping->i_shared_sem);
  out:
@@ -588,6 +607,8 @@ try_to_unmap_inode(struct page *page)
 {
 	struct address_space *mapping = page->mapping;
 	struct vm_area_struct *vma;
+	struct prio_tree_iter iter;
+	unsigned long loffset;
 	int ret = SWAP_AGAIN, young = 0;
 
 	BUG_ON(PageSwapCache(page));
@@ -595,13 +616,28 @@ try_to_unmap_inode(struct page *page)
 	if (unlikely(down_trylock(&mapping->i_shared_sem)))
 		return ret;
 	
-	list_for_each_entry(vma, &mapping->i_mmap, shared) {
+	loffset = (page->index << (PAGE_CACHE_SHIFT - PAGE_SHIFT));
+
+	vma = __vma_prio_tree_first(&mapping->i_mmap, &iter, loffset, loffset);
+	while (vma) {
 		ret = try_to_unmap_one(vma, page, &young);
 		if (ret == SWAP_FAIL || !page->mapcount)
 			goto out;
+		vma = __vma_prio_tree_next(vma, &mapping->i_mmap, &iter,
+				loffset, loffset);
 	}
 
-	list_for_each_entry(vma, &mapping->i_mmap_shared, shared) {
+	vma = __vma_prio_tree_first(&mapping->i_mmap_shared, &iter, loffset,
+			loffset);
+	while (vma) {
+		ret = try_to_unmap_one(vma, page, &young);
+		if (ret == SWAP_FAIL || !page->mapcount)
+			goto out;
+		vma = __vma_prio_tree_next(vma, &mapping->i_mmap_shared, &iter,
+				loffset, loffset);
+	}
+
+	list_for_each_entry(vma, &mapping->i_mmap_nonlinear, shared.vm_set.list) {
 		ret = try_to_unmap_one(vma, page, &young);
 		if (ret == SWAP_FAIL || !page->mapcount)
 			goto out;

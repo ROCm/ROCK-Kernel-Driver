@@ -749,7 +749,8 @@ page_ok:
 		 * virtual addresses, take care about potential aliasing
 		 * before reading the page on the kernel side.
 		 */
-		if (!list_empty(&mapping->i_mmap_shared))
+		if (!prio_tree_empty(&mapping->i_mmap_shared) ||
+			!list_empty(&mapping->i_mmap_nonlinear))
 			flush_dcache_page(page);
 
 		/*

@@ -330,7 +330,7 @@ static inline int dup_mmap(struct mm_struct * mm, struct mm_struct * oldmm)
 		tmp->vm_mm = mm;
 		tmp->vm_next = NULL;
 		file = tmp->vm_file;
-		INIT_LIST_HEAD(&tmp->shared);
+		INIT_VMA_SHARED(tmp);
 		if (file) {
 			struct inode *inode = file->f_dentry->d_inode;
 			get_file(file);
@@ -339,7 +339,7 @@ static inline int dup_mmap(struct mm_struct * mm, struct mm_struct * oldmm)
       
 			/* insert tmp into the share list, just after mpnt */
 			down(&file->f_mapping->i_shared_sem);
-			list_add_tail(&tmp->shared, &mpnt->shared);
+			__vma_prio_tree_add(tmp, mpnt);
 			up(&file->f_mapping->i_shared_sem);
 		}
 
