@@ -122,9 +122,8 @@ int snd_ctl_unregister(snd_card_t *card);
 int snd_ctl_register_ioctl(snd_kctl_ioctl_func_t fcn);
 int snd_ctl_unregister_ioctl(snd_kctl_ioctl_func_t fcn);
 
-/* for ioctl32 */
 int snd_ctl_elem_read(snd_card_t *card, snd_ctl_elem_value_t *control);
-int snd_ctl_elem_write(snd_ctl_file_t *file, snd_ctl_elem_value_t *control);
+int snd_ctl_elem_write(snd_card_t *card, snd_ctl_file_t *file, snd_ctl_elem_value_t *control);
 
 static inline unsigned int snd_ctl_get_ioffnum(snd_kcontrol_t *kctl, snd_ctl_elem_id_t *id)
 {

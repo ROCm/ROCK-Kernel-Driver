@@ -357,7 +357,7 @@ static inline int _snd_ioctl32_ctl_elem_value(unsigned int fd, unsigned int cmd,
 	if (native_ctl == SNDRV_CTL_IOCTL_ELEM_READ)
 		err = snd_ctl_elem_read(ctl->card, data);
 	else
-		err = snd_ctl_elem_write(ctl, data);
+		err = snd_ctl_elem_write(ctl->card, ctl, data);
 	if (err < 0)
 		goto __end;
 	/* restore info to 32bit */

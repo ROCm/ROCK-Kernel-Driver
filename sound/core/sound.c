@@ -473,10 +473,8 @@ EXPORT_SYMBOL(snd_ctl_find_id);
 EXPORT_SYMBOL(snd_ctl_notify);
 EXPORT_SYMBOL(snd_ctl_register_ioctl);
 EXPORT_SYMBOL(snd_ctl_unregister_ioctl);
-#ifdef CONFIG_COMPAT
 EXPORT_SYMBOL(snd_ctl_elem_read);
 EXPORT_SYMBOL(snd_ctl_elem_write);
-#endif
   /* misc.c */
 EXPORT_SYMBOL(snd_task_name);
 #ifdef CONFIG_SND_VERBOSE_PRINTK

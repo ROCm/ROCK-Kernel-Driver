@@ -685,9 +685,8 @@ static int snd_ctl_elem_read_user(snd_card_t *card, snd_ctl_elem_value_t __user 
 	return result;
 }
 
-int snd_ctl_elem_write(snd_ctl_file_t *file, snd_ctl_elem_value_t *control)
+int snd_ctl_elem_write(snd_card_t *card, snd_ctl_file_t *file, snd_ctl_elem_value_t *control)
 {
-	snd_card_t *card = file->card;
 	snd_kcontrol_t *kctl;
 	snd_kcontrol_volatile_t *vd;
 	unsigned int index_offset;
@@ -706,7 +705,7 @@ int snd_ctl_elem_write(snd_ctl_file_t *file, snd_ctl_elem_value_t *control)
 		} else {
 			if (!(vd->access & SNDRV_CTL_ELEM_ACCESS_WRITE) ||
 			    kctl->put == NULL ||
-			    (vd->owner != NULL && vd->owner != file)) {
+			    (file && vd->owner != NULL && vd->owner != file)) {
 				result = -EPERM;
 			} else {
 				snd_ctl_build_ioff(&control->id, kctl, index_offset);
@@ -735,7 +734,7 @@ static int snd_ctl_elem_write_user(snd_ctl_file_t *file, snd_ctl_elem_value_t __
 		kfree(control);
 		return -EFAULT;
 	}
-	result = snd_ctl_elem_write(file, control);
+	result = snd_ctl_elem_write(file->card, file, control);
 	if (result >= 0)
 		if (copy_to_user(_control, control, sizeof(*control)))
 			result = -EFAULT;
