@@ -49,19 +49,19 @@ extern int sysdev_restore(void);
  */
 int device_suspend(u32 state, u32 level)
 {
-	struct list_head * node;
+	struct device * dev;
 	int error = 0;
 
 	printk(KERN_EMERG "Suspending devices\n");
 
 	down_write(&devices_subsys.rwsem);
-	list_for_each(node,&devices_subsys.kset.list) {
-		struct device * dev = to_dev(node);
+	list_for_each_entry_reverse(dev,&devices_subsys.kset.list,kobj.entry) {
 		if (dev->driver && dev->driver->suspend) {
 			pr_debug("suspending device %s\n",dev->name);
 			error = dev->driver->suspend(dev,state,level);
 			if (error)
-				printk(KERN_ERR "%s: suspend returned %d\n",dev->name,error);
+				printk(KERN_ERR "%s: suspend returned %d\n",
+				       dev->name,error);
 		}
 	}
 	up_write(&devices_subsys.rwsem);
@@ -93,7 +93,7 @@ int device_suspend(u32 state, u32 level)
  */
 void device_resume(u32 level)
 {
-	struct list_head * node;
+	struct device * dev;
 
 	switch (level) {
 	case RESUME_POWER_ON:
@@ -107,8 +107,7 @@ void device_resume(u32 level)
 	}
 
 	down_write(&devices_subsys.rwsem);
-	list_for_each_prev(node,&devices_subsys.kset.list) {
-		struct device * dev = to_dev(node);
+	list_for_each_entry(dev,&devices_subsys.kset.list,kobj.entry) {
 		if (dev->driver && dev->driver->resume) {
 			pr_debug("resuming device %s\n",dev->name);
 			dev->driver->resume(dev,level);
@@ -124,13 +123,12 @@ void device_resume(u32 level)
  */
 void device_shutdown(void)
 {
-	struct list_head * entry;
+	struct device * dev;
 	
 	printk(KERN_EMERG "Shutting down devices\n");
 
 	down_write(&devices_subsys.rwsem);
-	list_for_each(entry,&devices_subsys.kset.list) {
-		struct device * dev = to_dev(entry);
+	list_for_each_entry_reverse(dev,&devices_subsys.kset.list,kobj.entry) {
 		pr_debug("shutting down %s: ",dev->name);
 		if (dev->driver && dev->driver->shutdown) {
 			pr_debug("Ok\n");
