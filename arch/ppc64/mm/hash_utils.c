@@ -294,12 +294,6 @@ int hash_page(unsigned long ea, unsigned long access, unsigned long trap)
 		vsid = get_kernel_vsid(ea);
 		break;
 #if 0
-	case EEH_REGION_ID:
-		/*
-		 * Should only be hit if there is an access to MMIO space
-		 * which is protected by EEH.
-		 * Send the problem up to do_page_fault 
-		 */
 	case KERNEL_REGION_ID:
 		/*
 		 * Should never get here - entire 0xC0... region is bolted.
