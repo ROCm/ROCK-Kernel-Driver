@@ -511,10 +511,26 @@ static void __write_metapage(metapage_t * mp)
 	jFYI(1, ("__write_metapage done\n"));
 }
 
+static inline void sync_metapage(metapage_t *mp)
+{
+	struct page *page = mp->page;
+
+	page_cache_get(page);
+	lock_page(page);
+
+	/* we're done with this page - no need to check for errors */
+	if (page->buffers) {
+		writeout_one_page(page);
+		waitfor_one_page(page);
+	}
+
+	UnlockPage(page);
+	page_cache_release(page);
+}
+
 void release_metapage(metapage_t * mp)
 {
 	log_t *log;
-	struct inode *ip;
 
 	jFYI(1,
 	     ("release_metapage: mp = 0x%p, flag = 0x%lx\n", mp,
@@ -527,8 +543,6 @@ void release_metapage(metapage_t * mp)
 		spin_unlock(&meta_lock);
 		return;
 	}
-
-	ip = (struct inode *) mp->mapping->host;
 
 	assert(mp->count);
 	if (--mp->count || atomic_read(&mp->nohomeok)) {
