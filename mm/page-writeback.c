@@ -50,7 +50,7 @@ static int dirty_async_ratio = 50;
  */
 static int dirty_sync_ratio = 60;
 
-static void background_writeout(unsigned long unused);
+static void background_writeout(unsigned long _min_pages);
 
 /*
  * balance_dirty_pages() must be called by processes which are
@@ -491,6 +491,9 @@ int __set_page_dirty_buffers(struct page *page)
 		SetPageDirty(page);
 		goto out;
 	}
+
+	if (!PageUptodate(page))
+		buffer_error();
 
 	spin_lock(&mapping->private_lock);
 

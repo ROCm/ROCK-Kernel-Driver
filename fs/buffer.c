@@ -167,8 +167,9 @@ __clear_page_buffers(struct page *page)
 
 static void buffer_io_error(struct buffer_head *bh)
 {
-	printk(KERN_ERR "Buffer I/O error on device %s, logical block %Ld\n",
-			bdevname(bh->b_bdev), (u64)bh->b_blocknr);
+	printk(KERN_ERR "Buffer I/O error on device %s, logical block %Lu\n",
+			bdevname(bh->b_bdev),
+			(unsigned long long)bh->b_blocknr);
 }
 
 /*
@@ -835,6 +836,7 @@ int write_mapping_buffers(struct address_space *mapping)
 out:
 	return ret;
 }
+EXPORT_SYMBOL(write_mapping_buffers);
 
 void mark_buffer_dirty_inode(struct buffer_head *bh, struct inode *inode)
 {
@@ -1400,7 +1402,6 @@ void create_empty_buffers(struct page *page,
 	head = create_buffers(page, blocksize, 1);
 	bh = head;
 	do {
-		bh->b_end_io = NULL;
 		bh->b_state |= b_state;
 		tail = bh;
 		bh = bh->b_this_page;
@@ -1666,11 +1667,14 @@ static int __block_prepare_write(struct inode *inode, struct page *page,
 	    block++, block_start=block_end, bh = bh->b_this_page) {
 		block_end = block_start + blocksize;
 		if (block_end <= from || block_start >= to) {
-			if (PageUptodate(page))
-				set_buffer_uptodate(bh);
+			if (PageUptodate(page)) {
+				if (!buffer_uptodate(bh))
+					set_buffer_uptodate(bh);
+			}
 			continue;
 		}
-		clear_buffer_new(bh);
+		if (buffer_new(bh))
+			clear_buffer_new(bh);
 		if (!buffer_mapped(bh)) {
 			err = get_block(inode, block, bh, 1);
 			if (err)
@@ -1695,7 +1699,8 @@ static int __block_prepare_write(struct inode *inode, struct page *page,
 			}
 		}
 		if (PageUptodate(page)) {
-			set_buffer_uptodate(bh);
+			if (!buffer_uptodate(bh))
+				set_buffer_uptodate(bh);
 			continue; 
 		}
 		if (!buffer_uptodate(bh) &&
