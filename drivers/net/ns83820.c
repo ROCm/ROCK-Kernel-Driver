@@ -428,7 +428,7 @@ struct rx_info {
 
 struct ns83820 {
 	struct net_device_stats	stats;
-	u8			*base;
+	u8			__iomem *base;
 
 	struct pci_dev		*pci_dev;
 
@@ -1164,7 +1164,7 @@ again:
 
 static void ns83820_update_stats(struct ns83820 *dev)
 {
-	u8 *base = dev->base;
+	u8 __iomem *base = dev->base;
 
 	/* the DP83820 will freeze counters, so we need to read all of them */
 	dev->stats.rx_errors		+= readl(base + 0x60) & 0xffff;
@@ -1512,7 +1512,7 @@ static int ns83820_change_mtu(struct net_device *ndev, int new_mtu)
 static void ns83820_set_multicast(struct net_device *ndev)
 {
 	struct ns83820 *dev = PRIV(ndev);
-	u8 *rfcr = dev->base + RFCR;
+	u8 __iomem *rfcr = dev->base + RFCR;
 	u32 and_mask = 0xffffffff;
 	u32 or_mask = 0;
 	u32 val;
@@ -1816,7 +1816,7 @@ static int __devinit ns83820_init_one(struct pci_dev *pci_dev, const struct pci_
 
 	dev->IMR_cache = 0;
 
-	setup_ee_mem_bitbanger(&dev->ee, (long)dev->base + MEAR, 3, 2, 1, 0,
+	setup_ee_mem_bitbanger(&dev->ee, dev->base + MEAR, 3, 2, 1, 0,
 		0);
 
 	err = request_irq(pci_dev->irq, ns83820_irq, SA_SHIRQ,

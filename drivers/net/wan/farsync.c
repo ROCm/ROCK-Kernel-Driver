@@ -411,7 +411,7 @@ struct buf_window {
 };
 
 /* Calculate offset of a buffer object within the shared memory window */
-#define BUF_OFFSET(X)   ((unsigned int)&(((struct buf_window *)BFM_BASE)->X))
+#define BUF_OFFSET(X)   (BFM_BASE + offsetof(struct buf_window, X))
 
 #pragma pack()
 
@@ -443,8 +443,8 @@ struct fst_port_info {
 /*      Per card information
  */
 struct fst_card_info {
-	char *mem;		/* Card memory mapped to kernel space */
-	char *ctlmem;		/* Control memory for PCI cards */
+	char __iomem *mem;	/* Card memory mapped to kernel space */
+	char __iomem *ctlmem;	/* Control memory for PCI cards */
 	unsigned int phys_mem;	/* Physical memory window address */
 	unsigned int phys_ctlmem;	/* Physical control memory address */
 	unsigned int irq;	/* Interrupt request line number */

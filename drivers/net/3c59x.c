@@ -798,7 +798,7 @@ struct vortex_private {
 
 	/* PCI configuration space information. */
 	struct device *gendev;
-	char *cb_fn_base;					/* CardBus function status addr space. */
+	char __iomem *cb_fn_base;		/* CardBus function status addr space. */
 
 	/* Some values here only for performance evaluation and path-coverage */
 	int rx_nocopy, rx_copy, queued_packet, rx_csumhits;

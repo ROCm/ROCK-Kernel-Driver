@@ -109,7 +109,7 @@ typedef struct s_AC	SK_AC;
 #define SK_MAX_MACS		2
 #define SK_MAX_NETS		2
 
-#define SK_IOC			char*
+#define SK_IOC			char __iomem *
 
 typedef struct s_DrvRlmtMbuf SK_MBUF;
 
