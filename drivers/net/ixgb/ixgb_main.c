@@ -230,9 +230,26 @@ int ixgb_up(struct ixgb_adapter *adapter)
 	ixgb_configure_rx(adapter);
 	ixgb_alloc_rx_buffers(adapter);
 
-	if ((err = request_irq(adapter->pdev->irq, &ixgb_intr,
-			       SA_SHIRQ | SA_SAMPLE_RANDOM,
-			       netdev->name, netdev)))
+#ifdef CONFIG_PCI_MSI
+	{
+	boolean_t pcix = (IXGB_READ_REG(&adapter->hw, STATUS) & 
+						  IXGB_STATUS_PCIX_MODE) ? TRUE : FALSE;
+	adapter->have_msi = TRUE;
+
+	if (!pcix)
+	   adapter->have_msi = FALSE;
+	else if((err = pci_enable_msi(adapter->pdev))) {
+		printk (KERN_ERR
+		 "Unable to allocate MSI interrupt Error: %d\n", err);
+		adapter->have_msi = FALSE;
+		/* proceed to try to request regular interrupt */
+	}
+	}
+
+#endif
+	if((err = request_irq(adapter->pdev->irq, &ixgb_intr,
+				  SA_SHIRQ | SA_SAMPLE_RANDOM,
+				  netdev->name, netdev)))
 		return err;
 
 	/* disable interrupts and get the hardware into a known state */
@@ -269,7 +286,12 @@ void ixgb_down(struct ixgb_adapter *adapter, boolean_t kill_watchdog)
 
 	ixgb_irq_disable(adapter);
 	free_irq(adapter->pdev->irq, netdev);
-	if (kill_watchdog)
+#ifdef CONFIG_PCI_MSI
+	if(adapter->have_msi == TRUE)
+		pci_disable_msi(adapter->pdev);
+
+#endif
+	if(kill_watchdog)
 		del_timer_sync(&adapter->watchdog_timer);
 	adapter->link_speed = 0;
 	adapter->link_duplex = 0;

@@ -188,5 +188,8 @@ struct ixgb_adapter {
 	/* structs defined in ixgb_hw.h */
 	struct ixgb_hw hw;
 	struct ixgb_hw_stats stats;
+#ifdef CONFIG_PCI_MSI
+	boolean_t have_msi;
+#endif
 };
 #endif				/* _IXGB_H_ */
