@@ -373,6 +373,11 @@ extern int acpi_mp_config;
 
 #define acpi_mp_config	0
 
+static inline int acpi_boot_init(void)
+{
+	return 0;
+}
+
 #endif 	/*!CONFIG_ACPI_BOOT*/
 
 
@@ -419,10 +424,17 @@ int ec_write(u8 addr, u8 val);
 
 #endif /*CONFIG_ACPI_EC*/
 
-#ifdef CONFIG_ACPI
+#ifdef CONFIG_ACPI_INTERPRETER
 
 int acpi_blacklisted(void);
 
-#endif /*CONFIG_ACPI*/
+#else /*!CONFIG_ACPI_INTERPRETER*/
+
+static inline int acpi_blacklisted(void)
+{
+	return 0;
+}
+
+#endif /*!CONFIG_ACPI_INTERPRETER*/
 
 #endif /*_LINUX_ACPI_H*/

@@ -27,6 +27,7 @@
 #include <linux/config.h>
 #include <linux/acpi.h>
 #include <asm/pgalloc.h>
+#include <asm/io_apic.h>
 #include <asm/apic.h>
 #include <asm/io.h>
 #include <asm/mpspec.h>
@@ -40,6 +41,9 @@
 
 extern int acpi_disabled;
 extern int acpi_ht;
+
+int acpi_lapic = 0;
+int acpi_ioapic = 0;
 
 /* --------------------------------------------------------------------------
                               Boot-time Configuration
@@ -89,8 +93,6 @@ char *__acpi_map_table(unsigned long phys, unsigned long size)
 
 
 #ifdef CONFIG_X86_LOCAL_APIC
-
-int acpi_lapic;
 
 static u64 acpi_lapic_addr __initdata = APIC_DEFAULT_PHYS_BASE;
 
@@ -158,8 +160,6 @@ acpi_parse_lapic_addr_ovr (
 	return 0;
 }
 
-#ifdef CONFIG_ACPI
-
 static int __init
 acpi_parse_lapic_nmi (
 	acpi_table_entry_header *header)
@@ -178,15 +178,10 @@ acpi_parse_lapic_nmi (
 	return 0;
 }
 
-#endif /*CONFIG_ACPI*/
 
 #endif /*CONFIG_X86_LOCAL_APIC*/
 
-#ifdef CONFIG_X86_IO_APIC
-
-int acpi_ioapic;
-
-#ifdef CONFIG_ACPI
+#if defined(CONFIG_X86_IO_APIC) && defined(CONFIG_ACPI_INTERPRETER)
 
 static int __init
 acpi_parse_ioapic (
@@ -248,7 +243,6 @@ acpi_parse_nmi_src (
 	return 0;
 }
 
-#endif /*CONFIG_ACPI*/ 
 #endif /*CONFIG_X86_IO_APIC*/
 
 
@@ -331,14 +325,12 @@ acpi_boot_init (void)
 	if (result)
 		return result;
 
-#ifdef	CONFIG_ACPI
 	result = acpi_blacklisted();
 	if (result) {
 		printk(KERN_WARNING PREFIX "BIOS listed in blacklist, disabling ACPI support\n");
 		acpi_disabled = 1;
 		return result;
 	}
-#endif
 
 #ifdef CONFIG_X86_LOCAL_APIC
 
@@ -352,7 +344,6 @@ acpi_boot_init (void)
 
 	result = acpi_table_parse(ACPI_APIC, acpi_parse_madt);
 	if (!result) {
-		printk(KERN_WARNING PREFIX "MADT not present\n");
 		return 0;
 	}
 	else if (result < 0) {
@@ -389,21 +380,18 @@ acpi_boot_init (void)
 		return result;
 	}
 
-#ifdef	CONFIG_ACPI
 	result = acpi_table_parse_madt(ACPI_MADT_LAPIC_NMI, acpi_parse_lapic_nmi);
 	if (result < 0) {
 		printk(KERN_ERR PREFIX "Error parsing LAPIC NMI entry\n");
 		/* TBD: Cleanup to allow fallback to MPS */
 		return result;
 	}
-#endif /*CONFIG_ACPI*/
 
 	acpi_lapic = 1;
 
 #endif /*CONFIG_X86_LOCAL_APIC*/
 
-#ifdef CONFIG_X86_IO_APIC
-#ifdef	CONFIG_ACPI
+#if defined(CONFIG_X86_IO_APIC) && defined(CONFIG_ACPI_INTERPRETER)
 
 	/* 
 	 * I/O APIC 
@@ -423,7 +411,7 @@ acpi_boot_init (void)
 	/*
  	 * if "noapic" boot option, don't look for IO-APICs
 	 */
-	if (skip_ioapic_setup) {
+	if (ioapic_setup_disabled()) {
 		printk(KERN_INFO PREFIX "Skipping IOAPIC probe "
 			"due to 'noapic' option.\n");
 		return 1;
@@ -460,15 +448,13 @@ acpi_boot_init (void)
 
 	acpi_ioapic = 1;
 
-#endif /*CONFIG_ACPI*/
-#endif /*CONFIG_X86_IO_APIC*/
-
 #ifdef CONFIG_X86_LOCAL_APIC
 	if (acpi_lapic && acpi_ioapic) {
 		smp_found_config = 1;
 		clustered_apic_check();
 	}
 #endif
+#endif /*CONFIG_X86_IO_APIC && CONFIG_ACPI_INTERPRETER*/
 
 	return 0;
 }

@@ -79,14 +79,3 @@ void md_run_setup(void);
 static inline void md_run_setup(void) {}
 
 #endif
-
-#ifdef CONFIG_MOUNT_ROOT_FAILED_MSG
-
-void mount_root_failed_msg(void);
-
-#else
-
-static inline void mount_root_failed_msg(void) {}
-
-#endif
-
