@@ -852,6 +852,13 @@ L:	jffs-dev@axis.com
 W:	http://sources.redhat.com/jffs2/
 S:	Maintained
 
+JFS FILESYSTEM
+P:	Dave Kleikamp
+M:	shaggy@austin.ibm.com
+L:	jfs-discussion@oss.software.ibm.com
+W:	http://oss.software.ibm.com/jfs/
+S:	Supported
+
 JOYSTICK DRIVER
 P:	Vojtech Pavlik
 M:	vojtech@suse.cz

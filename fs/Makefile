@@ -67,6 +67,7 @@ subdir-$(CONFIG_ADFS_FS)	+= adfs
 subdir-$(CONFIG_REISERFS_FS)	+= reiserfs
 subdir-$(CONFIG_DEVPTS_FS)	+= devpts
 subdir-$(CONFIG_SUN_OPENPROMFS)	+= openpromfs
+subdir-$(CONFIG_JFS_FS)		+= jfs
 
 
 obj-$(CONFIG_BINFMT_AOUT)	+= binfmt_aout.o

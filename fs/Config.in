@@ -54,6 +54,10 @@ tristate 'ISO 9660 CDROM file system support' CONFIG_ISO9660_FS
 dep_mbool '  Microsoft Joliet CDROM extensions' CONFIG_JOLIET $CONFIG_ISO9660_FS
 dep_mbool '  Transparent decompression extension' CONFIG_ZISOFS $CONFIG_ISO9660_FS
 
+tristate 'JFS filesystem support' CONFIG_JFS_FS
+dep_mbool '  JFS debugging' CONFIG_JFS_DEBUG $CONFIG_JFS_FS
+dep_mbool '  JFS statistics' CONFIG_JFS_STATISTICS $CONFIG_JFS_FS
+
 tristate 'Minix fs support' CONFIG_MINIX_FS
 
 tristate 'FreeVxFS file system support (VERITAS VxFS(TM) compatible)' CONFIG_VXFS_FS

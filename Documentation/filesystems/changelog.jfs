@@ -1,0 +1,211 @@
+IBM's Journaled File System (JFS) for Linux version 1.0.15
+Team members
+Steve Best        sbest@us.ibm.com
+Dave Kleikamp     shaggy@austin.ibm.com  
+Barry Arndt       barndt@us.ibm.com
+Christoph Hellwig hch@caldera.de
+
+
+Release February 15, 2002 (version 1.0.15)
+
+This is our fifty-third release of IBM's Enterprise JFS technology port to Linux.
+Beta 1 was release 0.1.0 on 12/8/2000, Beta 2 was release 0.2.0 on 3/7/2001, 
+Beta 3 was release 0.3.0 on 4/30/2001, and release 1.0.0 on 6/28/2001.
+
+Function and Fixes in drop 53 (1.0.15)
+   - Fix trap when appending to very large file
+   - Moving jfs headers into fs/jfs at Linus' request
+   - Move up to linux-2.5.4
+   - Fix file size limit on 32-bit (Andi Kleen)
+   - make changelog more read-able and include only 1.0.0 and above (Christoph Hellwig)
+   - Don't allocate metadata pages from high memory. JFS keeps them kmapped too long causing deadlock.
+   - Fix xtree corruption when creating file with >= 64 GB of physically contiguous dasd
+   - Replace semaphore with struct completion for thread startup/shutdown (Benedikt Spranger)
+   - cleanup Tx alloc/free (Christoph Hellwig)
+   - Move up to linux-2.5.3
+   - thread cleanups (Christoph Hellwig)
+   - First step toward making tblocks and tlocks dynamically allocated. Intro tid_t and lid_t to
+     insulate the majority of the code from future changes. Also hide TxBlock and TxLock arrays
+     by using macros to get from tids and lids to real structures.
+   - minor list-handling cleanup (Christoph Hellwig)
+   - Replace altnext and altprev with struct list_head
+   - Clean up the debugging code and add support for collecting statistics (Christoph Hellwig)
+   
+  
+Function and Fixes in drop 52 (1.0.14)
+   - Fix hang in invalidate_metapages when jfs.o is built as a module
+   - Fix anon_list removal logic in txLock
+
+Function and Fixes in drop 51 (1.0.13)
+   - chmod changes on newly created directories are lost after umount (bug 2535)
+   - Page locking race fixes
+   - Improve metapage locking
+   - Fix timing window. Lock page while metapage is active to avoid page going 
+     away before the metadata is released. (Fixed crash during mount/umount testing)
+   - Make changes for 2.5.2 kernel
+   - Fix race condition truncating large files
+         
+Function and Fixes in drop50 (1.0.12)
+   - Add O_DIRECT support
+   - Add support for 2.4.17 kernel
+   - Make sure COMMIT_STALE gets reset before the inode is unlocked. Fixing
+     this gets rid of XT_GETPAGE errors
+   - Remove invalid __exit keyword from metapage_exit and txExit.
+   - fix assert(log->cqueue.head == NULL by waiting longer
+   
+Function and Fixes in drop49 (1.0.11)
+   - Readdir was not handling multibyte codepages correctly.
+   - Make mount option parsing more robust.
+   - Add iocharset mount option.
+   - Journalling of symlinks incorrect, resulting in logredo failure of -265.
+   - Add jfsutils information to Changes file
+   - Improve recoverability of the file system when metadata corruption is detected.
+   - Fix kernel OOPS when root inode is corrupted 
+   
+Function and Fixes in drop48 (1.0.10)
+   - put inodes later on hash queues
+   - Fix boundary case in xtTruncate
+   - When invalidating metadata, try to flush the dirty buffers rather than sync them.
+   - Add another sanity check to avoid trapping when imap is corrupt
+   - Fix file truncate while removing large file (assert(cmp == 0))
+   - read_cache_page returns ERR_PTR, not NULL on error
+   - Add dtSearchNode and dtRelocate
+   - JFS needs to use generic_file_open & generic_file_llseek
+   - Remove lazyQwait, etc. It created an unnecessary bottleneck in TxBegin.
+
+Function and Fixes in drop47 (1.0.9)
+   - Fix data corruption problem when creating files while deleting others. (jitterbug 183)
+   - Make sure all metadata is written before finalizing the log
+   - Fix serialization problem in shutdown by setting i_size of directory sooner. (bugzilla #334)
+   - JFS should quit whining when special files are marked dirty during read-only mount.
+   - Must always check rc after DT_GETPAGE
+   - Add diExtendFS
+   - Removing defconfig form JFS source - not really needed
+   
+Function and Fixes in drop46 (1.0.8)
+   - Synclist was being built backwards causing logredo to quit too early
+   - jfs_compat.h needs to include module.h
+   - uncomment EXPORTS_NO_SYMBOLS in super.c
+   - Minor code cleanup
+   - xtree of zero-truncated file not being logged
+   - Fix logging on file truncate
+   - remove unused metapage fields
+
+Function and Fixes in drop45 (1.0.7)
+   - cleanup remove IS_KIOBUFIO define.
+   - cleanup remove TRUNC_NO_TOSS define. 
+   - have jFYI's use the name directly from dentry  
+   - Remove nul _ALLOC and _FREE macros and also make spinlocks static. 
+   - cleanup add externs where needed in the header files  
+   - jfs_write_inode is a bad place to call iput.  Also limit warnings.
+   - More truncate cleanup 
+   - Truncate cleanup 
+   - Add missing statics in jfs_metapage.c 
+   - fsync fixes   
+   - Clean up symlink code - use page_symlink_inode_operations 
+   - unicode handling cleanup   
+   - cleanup replace UniChar with wchar_t
+   - Get rid of CDLL_* macros - use list.h instead 
+   - 2.4.11-prex mount problem Call new_inode instead of get_empty_inode 
+   - use kernel min/max macros 
+   - Add MODULE_LICENSE stub for older kernels 
+   - IA64/gcc3 fixes 
+   - Log Manager fixes, introduce __SLEEP_COND macro 
+   - Mark superblock dirty when some errors detected (forcing fsck to be run).
+   - More robust remounting from r/o to r/w. 
+   - Misc. cleanup add static where appropriate 
+   - small cleanup in jfs_umount_rw 
+   - add MODULE_ stuff 
+   - Set *dropped_lock in alloc_metapage 
+   - Get rid of unused log list 
+   - cleanup jfs_imap.c to remove _OLD_STUFF and _NO_MORE_MOUNT_INODE defines 
+   - Log manager cleanup  
+   - Transaction manager cleanup 
+   - correct memory allocations flags 
+   - Better handling of iterative truncation
+   - Change continue to break, otherwise we don't re-acquire LAZY_LOCK
+
+Function and Fixes in drop44 (1.0.6)
+   - Create jfs_incore.h which merges linux/jfs_fs.h, linux/jfs_fs_i.h, and jfs_fs_sb.h
+   - Create a configuration option to handle JFS_DEBUG define
+   - Fixed a few cases where positive error codes were returned to the VFS.
+   - Replace jfs_dir_read by generic_read_dir.
+   - jfs_fsync_inode is only called by jfs_fsync_file, merge the two and rename to jfs_fsync.
+   - Add a bunch of missing externs.
+   - jfs_rwlock_lock is unused, nuke it.
+   - Always use atomic set/test_bit operations to protect jfs_ip->cflag 
+   - Combine jfs_ip->flag with jfs_ip->cflag
+   - Fixed minor format errors reported by fsck 
+   - cflags should be long so bitops always works correctly
+   - Use GFP_NOFS for runtime memory allocations 
+   - Support  VM changes in 2.4.10 of the kernel
+   - Remove ifdefs supporting older 2.4 kernels. JFS now requires at least 2.4.3 or 2.4.2-ac2
+   - Simplify and remove one use of IWRITE_TRYLOCK
+   - jfs_truncate was not passing tid to xtTruncate
+   - removed obsolete extent_page workaround
+   - correct recovery from failed diAlloc call (disk full)
+   - In write_metapage, don't call commit_write if prepare_write failed   
+   
+Function and Fixes in drop43 (1.0.5)
+   - Allow separate allocation of JFS-private superblock/inode data.
+   - Remove checks in namei.c that are already done by the VFS.
+   - Remove redundant mutex defines.
+   - Replace all occurrences of #include <linux/malloc.h> with #include <linux/slab.h>
+   - Work around race condition in remount -fixes OOPS during shutdown
+   - Truncate large files incrementally ( affects directories too)
+
+Function and Fixes in drop42 (1.0.4)
+   - Fixed compiler warnings in the FS when building on 64 bits systems
+   - Fixed deadlock where jfsCommit hung in hold_metapage
+   - Fixed problems with remount
+   - Reserve metapages for jfsCommit thread 
+   - Get rid of buggy invalidate_metapage & use discard_metapage 
+   - Don't hand metapages to jfsIOthread (too many context switches) (jitterbug 125, bugzilla 238)
+   - Fix error message in jfs_strtoUCS
+
+Function and Fixes in drop41 (1.0.3)
+   - Patch to move from previous release to latest release needs to update the version number in super.c 
+   - Jitterbug problems (134,140,152) removing files have been fixed
+   - Set rc=ENOSPC if ialloc fails in jfs_create and jfs_mkdir
+   - Fixed jfs_txnmgr.c 775! assert
+   - Fixed jfs_txnmgr.c 884! assert(mp->nohomeok==0)
+   - Fix hang - prevent tblocks from being exhausted
+   - Fix oops trying to mount reiserfs
+   - Fail more gracefully in jfs_imap.c
+   - Print more information when char2uni fails
+   - Fix timing problem between Block map and metapage cache - jitterbug 139
+   - Code Cleanup (removed many ifdef's, obsolete code, ran code through indent) Mostly 2.4 tree
+   - Split source tree (Now have a separate source tree for 2.2, 2.4, and jfsutils)  
+
+Function and Fixes in drop40 (1.0.2)
+   - Fixed multiple truncate hang
+   - Fixed hang on unlink a file and sync happening at the same time
+   - Improved handling of kmalloc error conditions
+   - Fixed hang in blk_get_queue and SMP deadlock: bh_end_io call generic_make_request
+     (jitterbug 145 and 146)
+   - stbl was not set correctly set in dtDelete  
+   - changed trap to printk in dbAllocAG to avoid system hang
+
+Function and Fixes in drop 39 (1.0.1)
+   - Fixed hang during copying files on 2.2.x series
+   - Fixed TxLock compile problem
+   - Fixed to correctly update the number of blocks for directories (this was causing the FS 
+     to show fsck error after compiling mozilla).
+   - Fixed to prevent old data from being written to disk from the page cache. 
+
+Function and Fixes in drop 38 (1.0.0)
+   - Fixed some general log problems   
+
+Please send bugs, comments, cards and letters to linuxjfs@us.ibm.com.
+
+The JFS mailing list can be subscribed to by using the link labeled "Mail list Subscribe"
+at our web page http://oss.software.ibm.com/jfs/.
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,136 @@
+IBM's Journaled File System (JFS) for Linux version 1.0.15
+Team members
+Steve Best         sbest@us.ibm.com
+Dave Kleikamp      shaggy@austin.ibm.com  
+Barry Arndt        barndt@us.ibm.com
+Christoph Hellwig  hch@caldera.de
+
+
+Release February 15, 2002 (version 1.0.15)
+
+This is our fifty-third release of IBM's Enterprise JFS technology port to Linux.
+Beta 1 was release 0.1.0 on 12/8/2000, Beta 2 was release 0.2.0 on 3/7/2001, 
+Beta 3 was release 0.3.0 on 4/30/2001, and release 1.0.0 on 6/28/2001.
+ 
+The changelog.jfs file contains detailed information of changes done in each source
+code drop.
+
+JFS has a source tree that can be built on 2.4.3 - 2.4.17 and 2.5.4 kernel.org
+source trees.
+ 
+Our current goal on the 2.5.x series of the kernel is to update to the latest 
+2.5.x version and only support the latest version of this kernel.
+This will change when the distros start shipping the 2.5.x series of the kernel.
+
+Our current goal on the 2.4.x series of the kernel is to continue to support
+all of the kernels in this series as we do today.
+
+There is an anonymous cvs access available for the JFS tree. The steps below are
+what is needed to pull the JFS cvs tree from the oss.software.ibm.com server.
+
+id anoncvs
+password anoncvs
+
+To checkout 2.4.x series of the JFS files do the following:
+CVSROOT should be set to :pserver:anoncvs@oss.software.ibm.com:/usr/cvs/jfs
+cvs checkout linux24
+
+To checkout 2.5.2 series of the JFS files do the following:
+CVSROOT should be set to :pserver:anoncvs@oss.software.ibm.com:/usr/cvs/jfs
+cvs checkout linux25
+
+To checkout the JFS utilities do the following:
+CVSROOT should be set to :pserver:anoncvs@oss.software.ibm.com:/usr/cvs/jfs
+cvs checkout jfsutils
+
+The cvs tree contains the latest changes being done to JFS. To receive notification
+of commits to the cvs tree, please send e-mail to linuxjfs@us.ibm.com stating that 
+you would like notifications sent to you. 
+
+The jfs-2.4-1.0.15-patch.tar.gz is the easiest way to get the latest file system
+source code on your system. There are also patch files that can move your jfs source
+code from one release to another. If you have release 1.0.14 and would like to move
+to release 1.0.15 the patch file named jfs-2.4-1_0_14-to-1_0_15-patch.gz will do that.
+
+The jfs-2.4-1.0.15-patch.tar.gz file contains a readme and patch files for different
+levels of the 2.4 kernel. Please see the README in the jfs-2.4-1.0.15-patch.tar.gz
+file for help on applying the two patch files. 
+
+
+The following files in the kernel source tree have been changed so JFS can be built.
+The jfs-2.4-1.0.15.tar.gz source tar ball contains each of the files below with
+the extension of the kernel level it is associated with. As an example, there are now
+four Config.in files named Config.in-2.4.0, Config.in-2.4.5, Config.in-2.4.7 and 
+Config.in-2.4.17.
+
+
+If you use the jfs-2.4-1.0.15.tar.gz to build JFS you must rename each of the 
+kernel files to the file names listed below. The standard kernel from www.kernel.org 
+is the source of the kernel files that are included in the jfs tar file. 
+
+
+In sub dir fs Config.in, Makefile
+In sub dir fs/nls Config.in
+In sub dir Documentation Configure.help, Changes
+In sub dir Documentation/filesystems 00-INDEX
+In sub dir linux MAINTAINERS
+
+Please backup the above files before the JFS tar file is added to the kernel source 
+tree. All JFS files are located in the include/linux/jfs or fs/jfs sub dirs.
+
+Our development team has used the Linux kernel levels  2.4.3 - 2.4.17 kernels
+with gcc version egcs-2.91.66 19990314/Linux (egcs-1.1.2 release) 
+for our port so far. A goal of the JFS team is to have JFS run on all architectures
+that Linux supports, there is no architecture specific code in JFS. JFS has been run
+on the following architectures (x86, PowerPC, Alpha, s/390, ARM) so far. 
+
+To make JFS build, during the "make config" step of building the kernel answer y to
+the Prompt for development and/or incomplete code/drivers in the Code maturity level
+options section. In the Filesystems section use the m for the answer to 
+JFS filesystem support (experimental) (CONFIG_JFS_FS) [Y/m/n?]
+ 
+
+Build in /usr/src/linux with the command:
+
+
+make modules
+make modules_install
+
+If you rebuild jfs.o after having mounted and unmounted a partition, "modprobe -r jfs" 
+will unload the old module.
+
+For the file system debugging messages are being written to /var/log/messages.
+
+Please see the readme in the utilities package for information about building
+the JFS utilities.
+
+JFS TODO list:
+
+Plans for our near term development items
+
+   - get defrag capabilities operational in the FS
+   - get extendfs capabilities operational in the FS
+   - test EXTENDFS utility, for growing JFS partitions
+   - test defrag utility, calls file system to defrag the file system.
+   - add support for block sizes (512,1024,2048)
+   - add support for logfile on dedicated partition
+
+   
+Longer term work items
+
+   - get access control list functionality operational
+   - get extended attributes functionality operational
+   - add quota support
+
+Please send bugs, comments, cards and letters to linuxjfs@us.ibm.com.
+
+The JFS mailing list can be subscribed to by using the link labeled "Mail list Subscribe"
+at our web page http://oss.software.ibm.com/jfs/.
+
+
+
+
+
+
+
+
