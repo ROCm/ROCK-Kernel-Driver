@@ -1406,12 +1406,12 @@ static int es1370_ioctl(struct inode *inode, struct file *file, unsigned int cmd
         case SNDCTL_DSP_RESET:
 		if (file->f_mode & FMODE_WRITE) {
 			stop_dac2(s);
-			synchronize_irq();
+			synchronize_irq(s->irq);
 			s->dma_dac2.swptr = s->dma_dac2.hwptr = s->dma_dac2.count = s->dma_dac2.total_bytes = 0;
 		}
 		if (file->f_mode & FMODE_READ) {
 			stop_adc(s);
-			synchronize_irq();
+			synchronize_irq(s->irq);
 			s->dma_adc.swptr = s->dma_adc.hwptr = s->dma_adc.count = s->dma_adc.total_bytes = 0;
 		}
 		return 0;
@@ -1798,7 +1798,7 @@ static int es1370_release(struct inode *inode, struct file *file)
 	down(&s->open_sem);
 	if (file->f_mode & FMODE_WRITE) {
 		stop_dac2(s);
-		synchronize_irq();
+		synchronize_irq(s->irq);
 		dealloc_dmabuf(s, &s->dma_dac2);
 	}
 	if (file->f_mode & FMODE_READ) {
@@ -1976,7 +1976,7 @@ static int es1370_ioctl_dac(struct inode *inode, struct file *file, unsigned int
 		
         case SNDCTL_DSP_RESET:
 		stop_dac1(s);
-		synchronize_irq();
+		synchronize_irq(s->irq);
 		s->dma_dac1.swptr = s->dma_dac1.hwptr = s->dma_dac1.count = s->dma_dac1.total_bytes = 0;
 		return 0;
 
@@ -2704,7 +2704,7 @@ static void __devinit es1370_remove(struct pci_dev *dev)
 	list_del(&s->devs);
 	outl(CTRL_SERR_DIS | (1 << CTRL_SH_WTSRSEL), s->io+ES1370_REG_CONTROL); /* switch everything off */
 	outl(0, s->io+ES1370_REG_SERIAL_CONTROL); /* clear serial interrupts */
-	synchronize_irq();
+	synchronize_irq(s->irq);
 	free_irq(s->irq, s);
 	if (s->gameport.io) {
 		gameport_unregister_port(&s->gameport);
