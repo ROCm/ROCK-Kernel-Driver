@@ -1293,6 +1293,8 @@ int scsi_decide_disposition(struct scsi_cmnd *scmd)
 		 */
 	case DID_SOFT_ERROR:
 		goto maybe_retry;
+	case DID_IMM_RETRY:
+		return NEEDS_RETRY;
 
 	case DID_ERROR:
 		if (msg_byte(scmd->result) == COMMAND_COMPLETE &&
