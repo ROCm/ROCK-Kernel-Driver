@@ -89,16 +89,16 @@ typedef struct bluecard_info_t {
 } bluecard_info_t;
 
 
-void bluecard_config(dev_link_t * link);
+void bluecard_config(dev_link_t *link);
 void bluecard_release(u_long arg);
-int bluecard_event(event_t event, int priority, event_callback_args_t * args);
+int bluecard_event(event_t event, int priority, event_callback_args_t *args);
 
 static dev_info_t dev_info = "bluecard_cs";
 
 dev_link_t *bluecard_attach(void);
 void bluecard_detach(dev_link_t *);
 
-dev_link_t *dev_list = NULL;
+static dev_link_t *dev_list = NULL;
 
 
 /* Default baud rate: 57600, 115200, 230400 or 460800 */
@@ -171,7 +171,7 @@ dev_link_t *dev_list = NULL;
 
 void bluecard_activity_led_timeout(u_long arg)
 {
-	bluecard_info_t *info = (bluecard_info_t *) arg;
+	bluecard_info_t *info = (bluecard_info_t *)arg;
 	unsigned int iobase = info->link.io.BasePort1;
 
 	if (test_bit(CARD_HAS_ACTIVITY_LED, &(info->hw_state))) {
@@ -184,7 +184,7 @@ void bluecard_activity_led_timeout(u_long arg)
 }
 
 
-static void bluecard_enable_activity_led(bluecard_info_t * info)
+static void bluecard_enable_activity_led(bluecard_info_t *info)
 {
 	unsigned int iobase = info->link.io.BasePort1;
 
@@ -208,8 +208,7 @@ static void bluecard_enable_activity_led(bluecard_info_t * info)
 /* ======================== Interrupt handling ======================== */
 
 
-static int bluecard_write(unsigned int iobase, unsigned int offset,
-			  __u8 * buf, int len)
+static int bluecard_write(unsigned int iobase, unsigned int offset, __u8 *buf, int len)
 {
 	int i, actual;
 
@@ -224,7 +223,7 @@ static int bluecard_write(unsigned int iobase, unsigned int offset,
 }
 
 
-static void bluecard_write_wakeup(bluecard_info_t * info)
+static void bluecard_write_wakeup(bluecard_info_t *info)
 {
 	if (!info) {
 		printk(KERN_WARNING "bluecard_cs: Call of write_wakeup for unknown device.\n");
@@ -253,15 +252,13 @@ static void bluecard_write_wakeup(bluecard_info_t * info)
 			return;
 
 		if (test_bit(XMIT_BUFFER_NUMBER, &(info->tx_state))) {
-			if (!test_bit
-			    (XMIT_BUF_TWO_READY, &(info->tx_state)))
+			if (!test_bit(XMIT_BUF_TWO_READY, &(info->tx_state)))
 				break;
 			offset = 0x10;
 			command = REG_COMMAND_TX_BUF_TWO;
 			ready_bit = XMIT_BUF_TWO_READY;
 		} else {
-			if (!test_bit
-			    (XMIT_BUF_ONE_READY, &(info->tx_state)))
+			if (!test_bit(XMIT_BUF_ONE_READY, &(info->tx_state)))
 				break;
 			offset = 0x00;
 			command = REG_COMMAND_TX_BUF_ONE;
@@ -272,11 +269,9 @@ static void bluecard_write_wakeup(bluecard_info_t * info)
 			break;
 
 		if (skb->pkt_type & 0x80) {
-
 			/* Disable RTS */
 			info->ctrl_reg |= REG_CONTROL_RTS;
 			outb(info->ctrl_reg, iobase + REG_CONTROL);
-
 		}
 
 		/* Activate LED */
@@ -349,8 +344,7 @@ static void bluecard_write_wakeup(bluecard_info_t * info)
 }
 
 
-static int bluecard_read(unsigned int iobase, unsigned int offset,
-			 __u8 * buf, int size)
+static int bluecard_read(unsigned int iobase, unsigned int offset, __u8 *buf, int size)
 {
 	int i, n, len;
 
@@ -378,7 +372,7 @@ static int bluecard_read(unsigned int iobase, unsigned int offset,
 }
 
 
-static void bluecard_receive(bluecard_info_t * info, unsigned int offset)
+static void bluecard_receive(bluecard_info_t *info, unsigned int offset)
 {
 	unsigned int iobase;
 	unsigned char buf[31];
@@ -410,7 +404,7 @@ static void bluecard_receive(bluecard_info_t * info, unsigned int offset)
 
 		if (info->rx_state == RECV_WAIT_PACKET_TYPE) {
 
-			info->rx_skb->dev = (void *) &(info->hdev);
+			info->rx_skb->dev = (void *)&(info->hdev);
 			info->rx_skb->pkt_type = buf[i];
 
 			switch (info->rx_skb->pkt_type) {
@@ -469,20 +463,20 @@ static void bluecard_receive(bluecard_info_t * info, unsigned int offset)
 				switch (info->rx_state) {
 
 				case RECV_WAIT_EVENT_HEADER:
-					eh = (hci_event_hdr *) (info->rx_skb->data);
+					eh = (hci_event_hdr *)(info->rx_skb->data);
 					info->rx_state = RECV_WAIT_DATA;
 					info->rx_count = eh->plen;
 					break;
 
 				case RECV_WAIT_ACL_HEADER:
-					ah = (hci_acl_hdr *) (info->rx_skb->data);
+					ah = (hci_acl_hdr *)(info->rx_skb->data);
 					dlen = __le16_to_cpu(ah->dlen);
 					info->rx_state = RECV_WAIT_DATA;
 					info->rx_count = dlen;
 					break;
 
 				case RECV_WAIT_SCO_HEADER:
-					sh = (hci_sco_hdr *) (info->rx_skb->data);
+					sh = (hci_sco_hdr *)(info->rx_skb->data);
 					info->rx_state = RECV_WAIT_DATA;
 					info->rx_count = sh->dlen;
 					break;
@@ -571,9 +565,8 @@ void bluecard_interrupt(int irq, void *dev_inst, struct pt_regs *regs)
 
 static int bluecard_hci_set_baud_rate(struct hci_dev *hdev, int baud)
 {
-	bluecard_info_t *info = (bluecard_info_t *) (hdev->driver_data);
+	bluecard_info_t *info = (bluecard_info_t *)(hdev->driver_data);
 	struct sk_buff *skb;
-	int i;
 
 	/* Ericsson baud rate command */
 	unsigned char cmd[] = { HCI_COMMAND_PKT, 0x09, 0xfc, 0x01, 0x03 };
@@ -604,8 +597,7 @@ static int bluecard_hci_set_baud_rate(struct hci_dev *hdev, int baud)
 		break;
 	}
 
-	for (i = 0; i < sizeof(cmd); i++)
-		*skb_put(skb, 1) = cmd[i];
+	memcpy(skb_put(skb, sizeof(cmd)), cmd, sizeof(cmd));
 
 	skb_queue_tail(&(info->txq), skb);
 
@@ -621,7 +613,7 @@ static int bluecard_hci_set_baud_rate(struct hci_dev *hdev, int baud)
 
 static int bluecard_hci_flush(struct hci_dev *hdev)
 {
-	bluecard_info_t *info = (bluecard_info_t *) (hdev->driver_data);
+	bluecard_info_t *info = (bluecard_info_t *)(hdev->driver_data);
 
 	/* Drop TX queue */
 	skb_queue_purge(&(info->txq));
@@ -632,7 +624,7 @@ static int bluecard_hci_flush(struct hci_dev *hdev)
 
 static int bluecard_hci_open(struct hci_dev *hdev)
 {
-	bluecard_info_t *info = (bluecard_info_t *) (hdev->driver_data);
+	bluecard_info_t *info = (bluecard_info_t *)(hdev->driver_data);
 	unsigned int iobase = info->link.io.BasePort1;
 
 	bluecard_hci_set_baud_rate(hdev, DEFAULT_BAUD_RATE);
@@ -649,7 +641,7 @@ static int bluecard_hci_open(struct hci_dev *hdev)
 
 static int bluecard_hci_close(struct hci_dev *hdev)
 {
-	bluecard_info_t *info = (bluecard_info_t *) (hdev->driver_data);
+	bluecard_info_t *info = (bluecard_info_t *)(hdev->driver_data);
 	unsigned int iobase = info->link.io.BasePort1;
 
 	if (!test_and_clear_bit(HCI_RUNNING, &(hdev->flags)))
@@ -667,14 +659,14 @@ static int bluecard_hci_close(struct hci_dev *hdev)
 static int bluecard_hci_send_frame(struct sk_buff *skb)
 {
 	bluecard_info_t *info;
-	struct hci_dev *hdev = (struct hci_dev *) (skb->dev);
+	struct hci_dev *hdev = (struct hci_dev *)(skb->dev);
 
 	if (!hdev) {
 		printk(KERN_WARNING "bluecard_cs: Frame for unknown HCI device (hdev=NULL).");
 		return -ENODEV;
 	}
 
-	info = (bluecard_info_t *) (hdev->driver_data);
+	info = (bluecard_info_t *)(hdev->driver_data);
 
 	switch (skb->pkt_type) {
 	case HCI_COMMAND_PKT:
@@ -703,8 +695,7 @@ static void bluecard_hci_destruct(struct hci_dev *hdev)
 }
 
 
-static int bluecard_hci_ioctl(struct hci_dev *hdev, unsigned int cmd,
-			      unsigned long arg)
+static int bluecard_hci_ioctl(struct hci_dev *hdev, unsigned int cmd, unsigned long arg)
 {
 	return -ENOIOCTLCMD;
 }
@@ -714,7 +705,7 @@ static int bluecard_hci_ioctl(struct hci_dev *hdev, unsigned int cmd,
 /* ======================== Card services HCI interaction ======================== */
 
 
-int bluecard_open(bluecard_info_t * info)
+int bluecard_open(bluecard_info_t *info)
 {
 	unsigned int iobase = info->link.io.BasePort1;
 	struct hci_dev *hdev;
@@ -724,7 +715,7 @@ int bluecard_open(bluecard_info_t * info)
 
 	init_timer(&(info->timer));
 	info->timer.function = &bluecard_activity_led_timeout;
-	info->timer.data = (u_long) info;
+	info->timer.data = (u_long)info;
 
 	skb_queue_head_init(&(info->txq));
 
@@ -781,7 +772,8 @@ int bluecard_open(bluecard_info_t * info)
 
 	/* Timeout before it is safe to send the first HCI packet */
 	set_current_state(TASK_INTERRUPTIBLE);
-	schedule_timeout((HZ * 5) / 4);	// or set it to 3/2
+	schedule_timeout((HZ * 5) / 4);		// or set it to 3/2
+
 
 	/* Initialize and register HCI device */
 
@@ -806,7 +798,7 @@ int bluecard_open(bluecard_info_t * info)
 }
 
 
-int bluecard_close(bluecard_info_t * info)
+int bluecard_close(bluecard_info_t *info)
 {
 	unsigned int iobase = info->link.io.BasePort1;
 	struct hci_dev *hdev = &(info->hdev);
@@ -858,7 +850,7 @@ dev_link_t *bluecard_attach(void)
 	link->priv = info;
 
 	link->release.function = &bluecard_release;
-	link->release.data = (u_long) link;
+	link->release.data = (u_long)link;
 	link->io.Attributes1 = IO_DATA_PATH_WIDTH_8;
 	link->io.NumPorts1 = 8;
 	link->irq.Attributes = IRQ_TYPE_EXCLUSIVE | IRQ_HANDLE_PRESENT;
@@ -883,9 +875,9 @@ dev_link_t *bluecard_attach(void)
 	client_reg.dev_info = &dev_info;
 	client_reg.Attributes = INFO_IO_CLIENT | INFO_CARD_SHARE;
 	client_reg.EventMask =
-	    CS_EVENT_CARD_INSERTION | CS_EVENT_CARD_REMOVAL |
-	    CS_EVENT_RESET_PHYSICAL | CS_EVENT_CARD_RESET |
-	    CS_EVENT_PM_SUSPEND | CS_EVENT_PM_RESUME;
+		CS_EVENT_CARD_INSERTION | CS_EVENT_CARD_REMOVAL |
+		CS_EVENT_RESET_PHYSICAL | CS_EVENT_CARD_RESET |
+		CS_EVENT_PM_SUSPEND | CS_EVENT_PM_RESUME;
 	client_reg.event_handler = &bluecard_event;
 	client_reg.Version = 0x0210;
 	client_reg.event_callback_args.client_data = link;
@@ -901,7 +893,7 @@ dev_link_t *bluecard_attach(void)
 }
 
 
-void bluecard_detach(dev_link_t * link)
+void bluecard_detach(dev_link_t *link)
 {
 	bluecard_info_t *info = link->priv;
 	dev_link_t **linkp;
@@ -917,7 +909,7 @@ void bluecard_detach(dev_link_t * link)
 
 	del_timer(&link->release);
 	if (link->state & DEV_CONFIG)
-		bluecard_release((u_long) link);
+		bluecard_release((u_long)link);
 
 	if (link->handle) {
 		ret = CardServices(DeregisterClient, link->handle);
@@ -932,8 +924,7 @@ void bluecard_detach(dev_link_t * link)
 }
 
 
-static int get_tuple(int fn, client_handle_t handle, tuple_t * tuple,
-		     cisparse_t * parse)
+static int get_tuple(int fn, client_handle_t handle, tuple_t *tuple, cisparse_t *parse)
 {
 	int i;
 
@@ -952,7 +943,7 @@ static int get_tuple(int fn, client_handle_t handle, tuple_t * tuple,
 #define first_tuple(a, b, c) get_tuple(GetFirstTuple, a, b, c)
 #define next_tuple(a, b, c) get_tuple(GetNextTuple, a, b, c)
 
-void bluecard_config(dev_link_t * link)
+void bluecard_config(dev_link_t *link)
 {
 	client_handle_t handle = link->handle;
 	bluecard_info_t *info = link->priv;
@@ -962,7 +953,7 @@ void bluecard_config(dev_link_t * link)
 	config_info_t config;
 	int i, n, last_ret, last_fn;
 
-	tuple.TupleData = (cisdata_t *) buf;
+	tuple.TupleData = (cisdata_t *)buf;
 	tuple.TupleOffset = 0;
 	tuple.TupleDataMax = 255;
 	tuple.Attributes = 0;
@@ -1010,12 +1001,12 @@ void bluecard_config(dev_link_t * link)
 		goto failed;
 	}
 
-
 	MOD_INC_USE_COUNT;
 
 	if (bluecard_open(info) != 0)
 		goto failed;
 
+	strcpy(info->node.dev_name, info->hdev.name);
 	link->dev = &info->node;
 	link->state &= ~DEV_CONFIG_PENDING;
 
@@ -1025,13 +1016,13 @@ cs_failed:
 	cs_error(link->handle, last_fn, last_ret);
 
 failed:
-	bluecard_release((u_long) link);
+	bluecard_release((u_long)link);
 }
 
 
 void bluecard_release(u_long arg)
 {
-	dev_link_t *link = (dev_link_t *) arg;
+	dev_link_t *link = (dev_link_t *)arg;
 	bluecard_info_t *info = link->priv;
 
 	if (link->state & DEV_PRESENT)
@@ -1049,8 +1040,7 @@ void bluecard_release(u_long arg)
 }
 
 
-int bluecard_event(event_t event, int priority,
-		   event_callback_args_t * args)
+int bluecard_event(event_t event, int priority, event_callback_args_t *args)
 {
 	dev_link_t *link = args->client_data;
 	bluecard_info_t *info = link->priv;
@@ -1079,8 +1069,7 @@ int bluecard_event(event_t event, int priority,
 		/* Fall through... */
 	case CS_EVENT_CARD_RESET:
 		if (DEV_OK(link))
-			CardServices(RequestConfiguration, link->handle,
-				     &link->conf);
+			CardServices(RequestConfiguration, link->handle, &link->conf);
 		break;
 	}
 

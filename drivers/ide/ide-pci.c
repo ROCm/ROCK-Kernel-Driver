@@ -550,7 +550,8 @@ static void __init hpt374_device_order_fixup (struct pci_dev *dev, struct ata_pc
 	if (!dev2) {
 		return;
 	} else {
-		byte irq = 0, irq2 = 0;
+		u8 irq = 0;
+		u8 irq2 = 0;
 		pci_read_config_byte(dev, PCI_INTERRUPT_LINE, &irq);
 		pci_read_config_byte(dev2, PCI_INTERRUPT_LINE, &irq2);
 		if (irq != irq2) {

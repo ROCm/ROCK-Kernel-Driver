@@ -270,6 +270,12 @@ M:	maxk@qualcomm.com
 W:	http://bluez.sf.net
 S:	Maintained
 
+BLUETOOTH SUBSYSTEM (PC Card Drivers)
+P:	Marcel Holtmann
+M:	marcel@holtmann.org
+W:	http://www.holtmann.org/linux/bluetooth/
+S:	Maintained
+
 BTTV VIDEO4LINUX DRIVER
 P:	Gerd Knorr
 M:	kraxel@bytesex.org

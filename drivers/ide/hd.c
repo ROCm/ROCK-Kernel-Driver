@@ -1,15 +1,11 @@
 /*
- *  linux/drivers/ide/hd.c
- *
  *  Copyright (C) 1991, 1992  Linus Torvalds
- */
-
-/*
+ *
  * This is the low-level hd interrupt support. It traverses the
  * request-list, using interrupts to jump between functions. As
  * all the functions are called within interrupts, we may not
  * sleep. Special care is recommended.
- * 
+ *
  *  modified by Drew Eckhardt to check nr of hd's from the CMOS.
  *
  *  Thanks to Branko Lankester, lankeste@fwi.uva.nl, who found a bug
@@ -26,10 +22,10 @@
  *  Bugfix: max_sectors must be <= 255 or the wheels tend to come
  *  off in a hurry once you queue things up - Paul G. 02/2001
  */
-  
+
 /* Uncomment the following if you want verbose error reports. */
 /* #define VERBOSE_ERRORS */
-  
+
 #include <linux/errno.h>
 #include <linux/signal.h>
 #include <linux/sched.h>
@@ -37,7 +33,6 @@
 #include <linux/fs.h>
 #include <linux/devfs_fs_kernel.h>
 #include <linux/kernel.h>
-#include <linux/hdreg.h>
 #include <linux/genhd.h>
 #include <linux/slab.h>
 #include <linux/string.h>
@@ -45,6 +40,7 @@
 #include <linux/mc146818rtc.h> /* CMOS defines */
 #include <linux/init.h>
 #include <linux/blkpg.h>
+#include <linux/hdreg.h>
 
 #define REALLY_SLOW_IO
 #include <asm/system.h>
@@ -55,6 +51,15 @@
 #define DEVICE_NR(device) (minor(device)>>6)
 #include <linux/blk.h>
 
+/* ATA commands we use.
+ */
+#define WIN_SPECIFY	0x91 /* set drive geometry translation */
+#define WIN_RESTORE	0x10
+#define WIN_READ	0x20 /* 28-Bit */
+#define WIN_WRITE	0x30 /* 28-Bit */
+
+#define HD_IRQ 14	/* the standard disk interrupt */
+
 #ifdef __arm__
 #undef  HD_IRQ
 #endif
@@ -62,6 +67,45 @@
 #ifdef __arm__
 #define HD_IRQ IRQ_HARDDISK
 #endif
+
+/* Hd controller regster ports */
+
+#define HD_DATA		0x1f0		/* _CTL when writing */
+#define HD_ERROR	0x1f1		/* see err-bits */
+#define HD_NSECTOR	0x1f2		/* nr of sectors to read/write */
+#define HD_SECTOR	0x1f3		/* starting sector */
+#define HD_LCYL		0x1f4		/* starting cylinder */
+#define HD_HCYL		0x1f5		/* high byte of starting cyl */
+#define HD_CURRENT	0x1f6		/* 101dhhhh , d=drive, hhhh=head */
+#define HD_STATUS	0x1f7		/* see status-bits */
+#define HD_FEATURE	HD_ERROR	/* same io address, read=error, write=feature */
+#define HD_PRECOMP	HD_FEATURE	/* obsolete use of this port - predates IDE */
+#define HD_COMMAND	HD_STATUS	/* same io address, read=status, write=cmd */
+
+#define HD_CMD		0x3f6		/* used for resets */
+#define HD_ALTSTATUS	0x3f6		/* same as HD_STATUS but doesn't clear irq */
+
+/* Bits of HD_STATUS */
+#define ERR_STAT		0x01
+#define INDEX_STAT		0x02
+#define ECC_STAT		0x04	/* Corrected error */
+#define DRQ_STAT		0x08
+#define SEEK_STAT		0x10
+#define SERVICE_STAT		SEEK_STAT
+#define WRERR_STAT		0x20
+#define READY_STAT		0x40
+#define BUSY_STAT		0x80
+
+/* Bits for HD_ERROR */
+#define MARK_ERR		0x01	/* Bad address mark */
+#define TRK0_ERR		0x02	/* couldn't find track 0 */
+#define ABRT_ERR		0x04	/* Command aborted */
+#define MCR_ERR			0x08	/* media change request */
+#define ID_ERR			0x10	/* ID field not found */
+#define MC_ERR			0x20	/* media changed */
+#define ECC_ERR			0x40	/* Uncorrectable ECC error */
+#define BBD_ERR			0x80	/* pre-EIDE meaning:  block marked bad */
+#define ICRC_ERR		0x80	/* new meaning:  CRC error during transfer */
 
 static spinlock_t hd_lock = SPIN_LOCK_UNLOCKED;
 
@@ -162,12 +206,9 @@ void __init hd_setup(char *str, int *ints)
 
 static void dump_status (const char *msg, unsigned int stat)
 {
-	unsigned long flags;
 	char devc;
 
 	devc = !blk_queue_empty(QUEUE) ? 'a' + DEVICE_NR(CURRENT->rq_dev) : '?';
-	save_flags (flags);
-	sti();
 #ifdef VERBOSE_ERRORS
 	printk("hd%c: %s: status=0x%02x { ", devc, msg, stat & 0xff);
 	if (stat & BUSY_STAT)	printk("Busy ");
@@ -207,8 +248,7 @@ static void dump_status (const char *msg, unsigned int stat)
 		hd_error = inb(HD_ERROR);
 		printk("hd%c: %s: error=0x%02x.\n", devc, msg, hd_error & 0xff);
 	}
-#endif	/* verbose errors */
-	restore_flags (flags);
+#endif
 }
 
 void check_status(void)
@@ -467,7 +507,7 @@ ok_to_write:
 	if (i > 0) {
 		SET_HANDLER(&write_intr);
 		outsw(HD_DATA,CURRENT->buffer,256);
-		sti();
+		local_irq_enable();
 	} else {
 #if (HD_DELAY > 0)
 		last_req = read_timer();
@@ -500,7 +540,7 @@ static void hd_times_out(unsigned long dummy)
 		return;
 
 	disable_irq(HD_IRQ);
-	sti();
+	local_irq_enable();
 	reset = 1;
 	dev = DEVICE_NR(CURRENT->rq_dev);
 	printk("hd%c: timeout\n", dev+'a');
@@ -510,7 +550,7 @@ static void hd_times_out(unsigned long dummy)
 #endif
 		end_request(CURRENT, 0);
 	}
-	cli();
+	local_irq_disable();
 	hd_request();
 	enable_irq(HD_IRQ);
 }
@@ -548,7 +588,7 @@ static void hd_request(void)
 		return;
 repeat:
 	del_timer(&device_timer);
-	sti();
+	local_irq_enable();
 
 	if (blk_queue_empty(QUEUE)) {
 		do_hd = NULL;
@@ -556,7 +596,7 @@ repeat:
 	}
 
 	if (reset) {
-		cli();
+		local_irq_disable();
 		reset_hd();
 		return;
 	}
@@ -688,7 +728,7 @@ static void hd_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	if (!handler)
 		handler = unexpected_hd_interrupt;
 	handler();
-	sti();
+	local_irq_enable();
 }
 
 static struct block_device_operations hd_fops = {
