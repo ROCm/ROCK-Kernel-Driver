@@ -20,7 +20,7 @@ MODULE_LICENSE("GPL");
 
 static int match(const struct sk_buff *skb, const struct net_device *in,
 		 const struct net_device *out, const void *matchinfo,
-		 int offset, const void *hdr, u_int16_t datalen,
+		 int offset, unsigned int protoff,
 		 int *hotdrop)
 {
 	const struct ip6t_hl_info *info = matchinfo;

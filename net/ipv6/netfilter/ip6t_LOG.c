@@ -335,9 +335,9 @@ ip6t_log_packet(unsigned int hooknum,
 
 static unsigned int
 ip6t_log_target(struct sk_buff **pskb,
-		unsigned int hooknum,
 		const struct net_device *in,
 		const struct net_device *out,
+		unsigned int hooknum,
 		const void *targinfo,
 		void *userinfo)
 {

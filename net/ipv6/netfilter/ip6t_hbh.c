@@ -59,8 +59,7 @@ match(const struct sk_buff *skb,
       const struct net_device *out,
       const void *matchinfo,
       int offset,
-      const void *protohdr,
-      u_int16_t datalen,
+      unsigned int protoff,
       int *hotdrop)
 {
        struct ipv6_opt_hdr *optsh = NULL;
