@@ -51,8 +51,8 @@ static struct acpi_driver acpi_pci_root_driver = {
 	.class =	ACPI_PCI_ROOT_CLASS,
 	.ids =		ACPI_PCI_ROOT_HID,
 	.ops =		{
-				.add =		acpi_pci_root_add,
-				.remove =	acpi_pci_root_remove,
+				.add =    acpi_pci_root_add,
+				.remove = acpi_pci_root_remove,
 			},
 };
 

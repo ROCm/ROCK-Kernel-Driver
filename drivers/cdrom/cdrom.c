@@ -266,8 +266,8 @@
 #include <linux/proc_fs.h>
 #include <linux/blkpg.h>
 #include <linux/init.h>
+#include <linux/fcntl.h>
 
-#include <asm/fcntl.h>
 #include <asm/uaccess.h>
 
 /* used to tell the module to turn on full debugging messages */

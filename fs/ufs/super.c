@@ -605,7 +605,7 @@ static int ufs_fill_super(struct super_block *sb, void *data, int silent)
 	}
 	
 again:	
-	if (sb_set_blocksize(sb, block_size)) {
+	if (!sb_set_blocksize(sb, block_size)) {
 		printk(KERN_ERR "UFS: failed to set blocksize\n");
 		goto failed;
 	}

@@ -65,6 +65,7 @@
 #define UHCI_PTR_TERM		cpu_to_le32(0x0001)
 #define UHCI_PTR_QH		cpu_to_le32(0x0002)
 #define UHCI_PTR_DEPTH		cpu_to_le32(0x0004)
+#define UHCI_PTR_BREADTH	cpu_to_le32(0x0000)
 
 #define UHCI_NUMFRAMES		1024	/* in the frame list [array] */
 #define UHCI_MAX_SOF_NUMBER	2047	/* in an SOF packet */
@@ -80,6 +81,19 @@ struct uhci_frame_list {
 
 struct urb_priv;
 
+/* One role of a QH is to hold a queue of TDs for some endpoint.  Each QH is
+ * used with one URB, and qh->element (updated by the HC) is either:
+ *   - the next unprocessed TD for the URB, or
+ *   - UHCI_PTR_TERM (when there's no more traffic for this endpoint), or
+ *   - the QH for the next URB queued to the same endpoint.
+ *
+ * The other role of a QH is to serve as a "skeleton" framelist entry, so we
+ * can easily splice a QH for some endpoint into the schedule at the right
+ * place.  Then qh->element is UHCI_PTR_TERM.
+ *
+ * In the frame list, qh->link maintains a list of QHs seen by the HC:
+ *     skel1 --> ep1-qh --> ep2-qh --> ... --> skel2 --> ...
+ */
 struct uhci_qh {
 	/* Hardware fields */
 	__u32 link;			/* Next queue */
@@ -156,6 +170,9 @@ struct uhci_qh {
  *
  * Alas, not anymore, we have more than 4 words for software, woops.
  * Everything still works tho, surprise! -jerdfelt
+ *
+ * td->link points to either another TD (not necessarily for the same urb or
+ * even the same endpoint), or nothing (PTR_TERM), or a QH (for queued urbs)
  */
 struct uhci_td {
 	/* Hardware fields */
@@ -172,7 +189,7 @@ struct uhci_td {
 
 	struct list_head list;		/* P: urb->lock */
 
-	int frame;
+	int frame;			/* for iso: what frame? */
 	struct list_head fl_list;	/* P: uhci->frame_list_lock */
 } __attribute__((aligned(16)));
 
@@ -217,6 +234,22 @@ struct uhci_td {
  *
  * To keep with Linus' nomenclature, this is called the QH skeleton. These
  * labels (below) are only signficant to the root hub's QH's
+ *
+ *
+ * NOTE:  That ASCII art doesn't match the current (August 2002) code, in
+ * more ways than just not using QHs for ISO.
+ *
+ * NOTE:  Another way to look at the UHCI schedules is to compare them to what
+ * other host controller interfaces use.  EHCI, OHCI, and UHCI all have tables
+ * of transfers that the controller scans, frame by frame, and which hold the
+ * scheduled periodic transfers.  The key differences are that UHCI
+ *
+ *   (a) puts control and bulk transfers into that same table; the others
+ *       have separate data structures for non-periodic transfers.
+ *   (b) lets QHs be linked from TDs, not just other QHs, since they don't
+ *       hold endpoint data.  this driver chooses to use one QH per URB.
+ *   (c) needs more TDs, since it uses one per packet.  the data toggle
+ *       is stored in those TDs, along with all other endpoint state.
  */
 
 #define UHCI_NUM_SKELTD		10
@@ -275,7 +308,7 @@ static inline int __interval_to_skel(int interval)
 	return 7;				/* int128 for 128-255 ms (Max.) */
 }
 
-#define hcd_to_uhci(hcd_ptr) list_entry(hcd_ptr, struct uhci_hcd, hcd)
+#define hcd_to_uhci(hcd_ptr) container_of(hcd_ptr, struct uhci_hcd, hcd)
 
 /*
  * This describes the full uhci information.
@@ -286,18 +319,13 @@ static inline int __interval_to_skel(int interval)
 struct uhci_hcd {
 	struct usb_hcd hcd;
 
-	struct pci_dev *dev;
-
 #ifdef CONFIG_PROC_FS
 	/* procfs */
-	int num;
 	struct proc_dir_entry *proc_entry;
 #endif
 
 	/* Grabbed from PCI */
-	int irq;
 	unsigned int io_addr;
-	unsigned int io_size;
 
 	struct pci_pool *qh_pool;
 	struct pci_pool *td_pool;
@@ -329,7 +357,6 @@ struct uhci_hcd {
 	spinlock_t complete_list_lock;
 	struct list_head complete_list;		/* P: uhci->complete_list_lock */
 
-	struct usb_device *rh_dev;		/* Root hub */
 	int rh_numports;
 
 	struct timer_list stall_timer;

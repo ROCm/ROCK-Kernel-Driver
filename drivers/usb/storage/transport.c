@@ -883,6 +883,9 @@ void usb_stor_abort_transport(struct us_data *us)
 		usb_stor_CBI_irq(us->irq_urb);
 	}
 
+	/* Wait for the aborted command to finish */
+	wait_for_completion(&us->notify);
+
 	/* Reacquire the lock */
 	scsi_lock(us->srb->host);
 }

@@ -32,7 +32,7 @@
 #define UDF_NAME_LEN		255
 #define UDF_PATH_LEN		1023
 
-#define CURRENT_UTIME	(xtime.tv_usec)
+#define CURRENT_UTIME	(xtime.tv_nsec / 1000)
 
 #define udf_file_entry_alloc_offset(inode)\
 	((UDF_I_EXTENDED_FE(inode) ?\

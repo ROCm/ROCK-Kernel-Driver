@@ -7,8 +7,8 @@
 #define TRUE	(!FALSE)
 #endif
 
-static void
-run_sbin_hotplug(struct pci_dev *pdev, int insert)
+#ifdef CONFIG_HOTPLUG
+static void run_sbin_hotplug(struct pci_dev *pdev, int insert)
 {
 	int i;
 	char *argv[3], *envp[8];
@@ -45,13 +45,18 @@ run_sbin_hotplug(struct pci_dev *pdev, int insert)
 
 	call_usermodehelper (argv [0], argv, envp);
 }
+#else
+static void run_sbin_hotplug(struct pci_dev *pdev, int insert) { }
+#endif
 
 /**
- * pci_insert_device - insert a hotplug device
+ * pci_insert_device - insert a pci device
  * @dev: the device to insert
  * @bus: where to insert it
  *
- * Add a new device to the device lists and notify userspace (/sbin/hotplug).
+ * Link the device to both the global PCI device chain and the 
+ * per-bus list of devices, add the /proc entry, and notify
+ * userspace (/sbin/hotplug).
  */
 void
 pci_insert_device(struct pci_dev *dev, struct pci_bus *bus)
@@ -78,11 +83,11 @@ pci_free_resources(struct pci_dev *dev)
 }
 
 /**
- * pci_remove_device - remove a hotplug device
+ * pci_remove_device - remove a pci device
  * @dev: the device to remove
  *
- * Delete the device structure from the device lists and 
- * notify userspace (/sbin/hotplug).
+ * Delete the device structure from the device lists,
+ * remove the /proc entry, and notify userspace (/sbin/hotplug).
  */
 void
 pci_remove_device(struct pci_dev *dev)
@@ -94,10 +99,11 @@ pci_remove_device(struct pci_dev *dev)
 #ifdef CONFIG_PROC_FS
 	pci_proc_detach_device(dev);
 #endif
-
 	/* notify userspace of hotplug device removal */
 	run_sbin_hotplug(dev, FALSE);
 }
 
+#ifdef CONFIG_HOTPLUG
 EXPORT_SYMBOL(pci_insert_device);
 EXPORT_SYMBOL(pci_remove_device);
+#endif

@@ -51,7 +51,7 @@ static struct acpi_driver acpi_ac_driver = {
 	.class =	ACPI_AC_CLASS,
 	.ids =		ACPI_AC_HID,
 	.ops =		{
-				.add =	acpi_ac_add,
+				.add =		acpi_ac_add,
 				.remove =	acpi_ac_remove,
 			},
 };

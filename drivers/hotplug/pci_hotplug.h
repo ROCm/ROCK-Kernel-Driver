@@ -141,20 +141,5 @@ extern int pci_visit_dev	(struct pci_visit *fn,
 				 struct pci_dev_wrapped *wrapped_dev,
 				 struct pci_bus_wrapped *wrapped_parent);
 
-extern int pci_read_config_byte_nodev	(struct pci_ops *ops, u8 bus, u8 device,
-					 u8 function, int where, u8 *val);
-extern int pci_read_config_word_nodev	(struct pci_ops *ops, u8 bus, u8 device,
-					 u8 function, int where, u16 *val);
-extern int pci_read_config_dword_nodev	(struct pci_ops *ops, u8 bus, u8 device,
-					 u8 function, int where, u32 *val);
-
-extern int pci_write_config_byte_nodev	(struct pci_ops *ops, u8 bus, u8 device,
-					 u8 function, int where, u8 val);
-extern int pci_write_config_word_nodev	(struct pci_ops *ops, u8 bus, u8 device,
-					 u8 function, int where, u16 val);
-extern int pci_write_config_dword_nodev	(struct pci_ops *ops, u8 bus, u8 device,
-					 u8 function, int where, u32 val);
-
-
 #endif
 

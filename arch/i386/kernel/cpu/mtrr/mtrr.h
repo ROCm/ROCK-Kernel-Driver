@@ -38,9 +38,10 @@ struct mtrr_ops {
 	u32	vendor;
 	u32	use_intel_if;
 	void	(*init)(void);
-	void	(*init_secondary)(void);
 	void	(*set)(unsigned int reg, unsigned long base,
 		       unsigned long size, mtrr_type type);
+	void	(*set_all)(void);
+
 	void	(*get)(unsigned int reg, unsigned long *base,
 		       unsigned long *size, mtrr_type * type);
 	int	(*get_free_region) (unsigned long base, unsigned long size);

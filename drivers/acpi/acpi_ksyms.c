@@ -114,6 +114,7 @@ EXPORT_SYMBOL(acpi_evaluate_reference);
 #ifdef CONFIG_ACPI_BUS
 
 EXPORT_SYMBOL(acpi_fadt);
+EXPORT_SYMBOL(acpi_walk_namespace);
 EXPORT_SYMBOL(acpi_root_dir);
 EXPORT_SYMBOL(acpi_bus_get_device);
 EXPORT_SYMBOL(acpi_bus_get_status);
@@ -127,4 +128,3 @@ EXPORT_SYMBOL(acpi_bus_scan);
 EXPORT_SYMBOL(acpi_init);
 
 #endif /*CONFIG_ACPI_BUS*/
-

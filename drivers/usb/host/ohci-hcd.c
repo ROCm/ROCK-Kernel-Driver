@@ -17,6 +17,8 @@
  *
  * History:
  * 
+ * 2002/09/03 get rid of ed hashtables, rework periodic scheduling and
+ * 	bandwidth accounting; if debugging, show schedules in driverfs
  * 2002/07/19 fixes to management of ED and schedule state.
  * 2002/06/09 SA-1111 support (Christopher Hoover)
  * 2002/06/01 remember frame when HC won't see EDs any more; use that info
@@ -66,7 +68,6 @@
  * v1.0 1999/04/27 initial release
  *
  * This file is licenced under the GPL.
- * $Id: ohci-hcd.c,v 1.9 2002/03/27 20:41:57 dbrownell Exp $
  */
  
 #include <linux/config.h>
@@ -107,8 +108,8 @@
  *	- lots more testing!!
  */
 
-#define DRIVER_VERSION "2002-Jul-19"
-#define DRIVER_AUTHOR "Roman Weissgaerber <weissg@vienna.at>, David Brownell"
+#define DRIVER_VERSION "2002-Sep-03"
+#define DRIVER_AUTHOR "Roman Weissgaerber, David Brownell"
 #define DRIVER_DESC "USB 1.1 'Open' Host Controller (OHCI) Driver"
 
 /*-------------------------------------------------------------------------*/
@@ -152,7 +153,6 @@ static int ohci_urb_enqueue (
 	unsigned int	pipe = urb->pipe;
 	int		i, size = 0;
 	unsigned long	flags;
-	int		bustime = 0;
 	int		retval = 0;
 	
 #ifdef OHCI_VERBOSE_DEBUG
@@ -230,43 +230,32 @@ static int ohci_urb_enqueue (
 		}
 	}	
 
-// FIXME:  much of this switch should be generic, move to hcd code ...
-// ... and what's not generic can't really be handled this way.
-// need to consider periodicity for both types!
-
-	/* allocate and claim bandwidth if needed; ISO
-	 * needs start frame index if it was't provided.
-	 */
-	switch (usb_pipetype (pipe)) {
-		case PIPE_ISOCHRONOUS:
-			if (urb->transfer_flags & USB_ISO_ASAP) { 
-				urb->start_frame = ((ed->state != ED_IDLE)
-					? (ed->intriso.last_iso + 1)
-					: (le16_to_cpu (ohci->hcca->frame_no)
-						+ 10)) & 0xffff;
-			}
-			/* FALLTHROUGH */
-		case PIPE_INTERRUPT:
-			if (urb->bandwidth == 0) {
-				bustime = usb_check_bandwidth (urb->dev, urb);
-			}
-			if (bustime < 0) {
-				retval = bustime;
-				goto fail;
-			}
-			usb_claim_bandwidth (urb->dev, urb,
-				bustime, usb_pipeisoc (urb->pipe));
-	}
-
-	urb->hcpriv = urb_priv;
-
 	/* schedule the ed if needed */
-	if (ed->state == ED_IDLE)
-		ed_schedule (ohci, ed);
+	if (ed->state == ED_IDLE) {
+		retval = ed_schedule (ohci, ed);
+		if (retval < 0)
+			goto fail;
+		if (ed->type == PIPE_ISOCHRONOUS) {
+			u16	frame = le16_to_cpu (ohci->hcca->frame_no);
+
+			/* delay a few frames before the first TD */
+			frame += max_t (u16, 8, ed->interval);
+			frame &= ~(ed->interval - 1);
+			frame |= ed->branch;
+			urb->start_frame = frame;
+
+			/* yes, only USB_ISO_ASAP is supported, and
+			 * urb->start_frame is never used as input.
+			 */
+		}
+	} else if (ed->type == PIPE_ISOCHRONOUS)
+		urb->start_frame = ed->last_iso + ed->interval;
 
 	/* fill the TDs and link them to the ed; and
 	 * enable that part of the schedule, if needed
+	 * and update count of queued periodic urbs
 	 */
+	urb->hcpriv = urb_priv;
 	td_submit_urb (ohci, urb);
 
 fail:
@@ -530,13 +519,15 @@ static int hc_start (struct ohci_hcd *ohci)
 	usb_connect (udev);
 	udev->speed = USB_SPEED_FULL;
 	if (usb_register_root_hub (udev, ohci->parent_dev) != 0) {
-		usb_free_dev (udev); 
+		usb_free_dev (udev);
+		ohci->hcd.self.root_hub = NULL;
 		disable (ohci);
 		ohci->hc_control &= ~OHCI_CTRL_HCFS;
 		writel (ohci->hc_control, &ohci->regs->control);
 		return -ENODEV;
 	}
 
+	create_debug_files (ohci);
 	return 0;
 }
 
@@ -571,7 +562,8 @@ static void ohci_irq (struct usb_hcd *hcd)
 
 	if (ints & OHCI_INTR_UE) {
 		disable (ohci);
-		err ("OHCI Unrecoverable Error, %s disabled", hcd->self.bus_name);
+		err ("OHCI Unrecoverable Error, %s disabled",
+				hcd->self.bus_name);
 		// e.g. due to PCI Master/Target Abort
 
 #ifdef	DEBUG
@@ -620,10 +612,14 @@ static void ohci_stop (struct usb_hcd *hcd)
 	if (!ohci->disabled)
 		hc_reset (ohci);
 	
+	remove_debug_files (ohci);
 	ohci_mem_cleanup (ohci);
-
-	pci_free_consistent (ohci->hcd.pdev, sizeof *ohci->hcca,
-		ohci->hcca, ohci->hcca_dma);
+	if (ohci->hcca) {
+		pci_free_consistent (ohci->hcd.pdev, sizeof *ohci->hcca,
+					ohci->hcca, ohci->hcca_dma);
+		ohci->hcca = NULL;
+		ohci->hcca_dma = 0;
+	}
 }
 
 /*-------------------------------------------------------------------------*/
@@ -646,14 +642,13 @@ static int hc_restart (struct ohci_hcd *ohci)
 		usb_disconnect (&ohci->hcd.self.root_hub);
 	
 	/* empty the interrupt branches */
-	for (i = 0; i < NUM_INTS; i++) ohci->ohci_int_load [i] = 0;
+	for (i = 0; i < NUM_INTS; i++) ohci->load [i] = 0;
 	for (i = 0; i < NUM_INTS; i++) ohci->hcca->int_table [i] = 0;
 	
 	/* no EDs to remove */
 	ohci->ed_rm_list = NULL;
 
 	/* empty control and bulk lists */	 
-	ohci->ed_isotail     = NULL;
 	ohci->ed_controltail = NULL;
 	ohci->ed_bulktail    = NULL;
 

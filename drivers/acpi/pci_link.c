@@ -54,12 +54,12 @@ static int acpi_pci_link_add (struct acpi_device *device);
 static int acpi_pci_link_remove (struct acpi_device *device, int type);
 
 static struct acpi_driver acpi_pci_link_driver = {
-        .name =		ACPI_PCI_LINK_DRIVER_NAME,
-        .class =	ACPI_PCI_LINK_CLASS,
-        .ids =		ACPI_PCI_LINK_HID,
-        .ops =		{
-				.add =		acpi_pci_link_add,
-				.remove =	acpi_pci_link_remove,
+	.name =		ACPI_PCI_LINK_DRIVER_NAME,
+	.class =	ACPI_PCI_LINK_CLASS,
+	.ids =		ACPI_PCI_LINK_HID,
+	.ops =		{
+				.add =    acpi_pci_link_add,
+				.remove = acpi_pci_link_remove,
 			},
 };
 
