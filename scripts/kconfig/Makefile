@@ -17,23 +17,23 @@ check-meta:
 	    exit 1;							\
 	fi
 
-xconfig: check-meta $(obj)/qconf
+xconfig: $(obj)/qconf check-meta
 	$< arch/$(ARCH)/Kconfig
 
-gconfig: $check-meta (obj)/gconf
+gconfig: (obj)/gconf check-meta
 	./$<  arch/$(ARCH)/Kconfig
 
-menuconfig: check-meta $(obj)/mconf
+menuconfig: $(obj)/mconf check-meta
 	$(Q)$(MAKE) $(build)=scripts/lxdialog
 	$< arch/$(ARCH)/Kconfig
 
-config: check-meta $(obj)/conf
+config: $(obj)/conf check-meta
 	$< arch/$(ARCH)/Kconfig
 
-oldconfig: check-meta $(obj)/conf
+oldconfig: $(obj)/conf check-meta
 	$< -o arch/$(ARCH)/Kconfig
 
-silentoldconfig: check-meta $(obj)/conf
+silentoldconfig: $(obj)/conf check-meta
 	$< -s arch/$(ARCH)/Kconfig
 
 check_CONFIG_IKCONFIG_PROC:
@@ -48,16 +48,16 @@ cloneconfig: check-meta _cloneconfig oldconfig
 
 .PHONY: randconfig allyesconfig allnoconfig allmodconfig defconfig
 
-randconfig: check-meta $(obj)/conf
+randconfig: $(obj)/conf check-meta
 	$< -r arch/$(ARCH)/Kconfig
 
-allyesconfig: check-meta $(obj)/conf
+allyesconfig: $(obj)/conf check-meta
 	$< -y arch/$(ARCH)/Kconfig
 
-allnoconfig: check-meta $(obj)/conf
+allnoconfig: $(obj)/conf check-meta
 	$< -n arch/$(ARCH)/Kconfig
 
-allmodconfig: check-meta $(obj)/conf
+allmodconfig: $(obj)/conf check-meta
 	$< -m arch/$(ARCH)/Kconfig
 
 _defconfig: check_CONFIG_IKCONFIG_PROC
