@@ -285,7 +285,7 @@ struct super_block * presto_get_sb(struct file_system_type *izo_type,
         cache->cache_root = dget(sb->s_root);
 
         /* we now know the dev of the cache: hash the cache */
-        presto_cache_add(cache, to_kdev_t(sb->s_dev));
+        presto_cache_add(cache);
         err = izo_prepare_fileset(sb->s_root, fileset); 
 
         filter_setup_journal_ops(cache->cache_filter, cache->cache_type); 
