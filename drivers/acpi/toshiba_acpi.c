@@ -2,7 +2,7 @@
  *  toshiba_acpi.c - Toshiba Laptop ACPI Extras
  *
  *
- *  Copyright (C) 2002-2003 John Belmonte
+ *  Copyright (C) 2002-2004 John Belmonte
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -33,7 +33,7 @@
  *
  */
 
-#define TOSHIBA_ACPI_VERSION	"0.16"
+#define TOSHIBA_ACPI_VERSION	"0.17"
 #define PROC_INTERFACE_VERSION	1
 
 #include <linux/kernel.h>
@@ -48,9 +48,15 @@ MODULE_AUTHOR("John Belmonte");
 MODULE_DESCRIPTION("Toshiba Laptop ACPI Extras Driver");
 MODULE_LICENSE("GPL");
 
+#define MY_LOGPREFIX "toshiba_acpi: "
+#define MY_ERR KERN_ERR MY_LOGPREFIX
+#define MY_NOTICE KERN_NOTICE MY_LOGPREFIX
+#define MY_INFO KERN_INFO MY_LOGPREFIX
+
 /* Toshiba ACPI method paths */
 #define METHOD_LCD_BRIGHTNESS	"\\_SB_.PCI0.VGA_.LCD_._BCM"
-#define METHOD_HCI		"\\_SB_.VALD.GHCI"
+#define METHOD_HCI_1		"\\_SB_.VALD.GHCI"
+#define METHOD_HCI_2		"\\_SB_.VALZ.GHCI"
 #define METHOD_VIDEO_OUT	"\\_SB_.VALX.DSSX"
 
 /* Toshiba HCI interface definitions
@@ -121,6 +127,16 @@ snscanf(const char* str, int n, const char* format, ...)
  */
 
 static int
+is_valid_acpi_path(const char* methodName)
+{
+	acpi_handle handle;
+	acpi_status status;
+
+	status = acpi_get_handle(0, (char*)methodName, &handle);
+	return !ACPI_FAILURE(status);
+}
+
+static int
 write_acpi_int(const char* methodName, int val)
 {
 	struct acpi_object_list params;
@@ -154,6 +170,8 @@ read_acpi_int(const char* methodName, int* pVal)
 }
 #endif
 
+static const char*		method_hci /*= 0*/;
+
 /* Perform a raw HCI call.  Here we don't care about input or output buffer
  * format.
  */
@@ -177,7 +195,7 @@ hci_raw(const u32 in[HCI_WORDS], u32 out[HCI_WORDS])
 	results.length = sizeof(out_objs);
 	results.pointer = out_objs;
 
-	status = acpi_evaluate_object(0, METHOD_HCI, &params,
+	status = acpi_evaluate_object(0, (char*)method_hci, &params,
 		&results);
 	if ((status == AE_OK) && (out_objs->package.count <= HCI_WORDS)) {
 		for (i = 0; i < out_objs->package.count; ++i) {
@@ -215,7 +233,7 @@ hci_read1(u32 reg, u32* out1, u32* result)
 	return status;
 }
 
-static struct proc_dir_entry*	toshiba_proc_dir;
+static struct proc_dir_entry*	toshiba_proc_dir /*= 0*/;
 static int			force_fan;
 static int			last_key_event;
 static int			key_event_valid;
@@ -270,7 +288,7 @@ read_lcd(char* p)
 		p += sprintf(p, "brightness_levels:       %d\n",
 			HCI_LCD_BRIGHTNESS_LEVELS);
 	} else {
-		p += sprintf(p, "ERROR\n");
+		printk(MY_ERR "Error reading LCD brightness\n");
 	}
 
 	return p;
@@ -310,7 +328,7 @@ read_video(char* p)
 		p += sprintf(p, "crt_out:                 %d\n", is_crt);
 		p += sprintf(p, "tv_out:                  %d\n", is_tv);
 	} else {
-		p += sprintf(p, "ERROR\n");
+		printk(MY_ERR "Error reading video out status\n");
 	}
 
 	return p;
@@ -320,25 +338,31 @@ static unsigned long
 write_video(const char* buffer, unsigned long count)
 {
 	int value;
-	const char* buffer_end = buffer + count;
+	int remain = count;
 	int lcd_out = -1;
 	int crt_out = -1;
 	int tv_out = -1;
 	u32 hci_result;
 	int video_out;
 
-	/* scan expression.  Multiple expressions may be delimited with ; */
-	do {
-		if (snscanf(buffer, count, " lcd_out : %i", &value) == 1)
+	/* scan expression.  Multiple expressions may be delimited with ;
+	 *
+	 *  NOTE: to keep scanning simple, invalid fields are ignored
+	 */
+	while (remain) {
+		if (snscanf(buffer, remain, " lcd_out : %i", &value) == 1)
 			lcd_out = value & 1;
-		else if (snscanf(buffer, count, " crt_out : %i", &value) == 1)
+		else if (snscanf(buffer, remain, " crt_out : %i", &value) == 1)
 			crt_out = value & 1;
-		else if (snscanf(buffer, count, " tv_out : %i", &value) == 1)
+		else if (snscanf(buffer, remain, " tv_out : %i", &value) == 1)
 			tv_out = value & 1;
 		/* advance to one character past the next ; */
-		do ++buffer;
-		while ((buffer < buffer_end) && (*(buffer-1) != ';'));
-	} while (buffer < buffer_end);
+		do {
+			++buffer;
+			--remain;
+		}
+		while (remain && *(buffer-1) != ';');
+	}
 
 	hci_read1(HCI_VIDEO_OUT, &video_out, &hci_result);
 	if (hci_result == HCI_SUCCESS) {
@@ -353,6 +377,8 @@ write_video(const char* buffer, unsigned long count)
 		 * video setting if something changed. */
 		if (new_video_out != video_out)
 			write_acpi_int(METHOD_VIDEO_OUT, new_video_out);
+	} else {
+		return -EFAULT;
 	}
 
 	return count;
@@ -369,7 +395,7 @@ read_fan(char* p)
 		p += sprintf(p, "running:                 %d\n", (value > 0));
 		p += sprintf(p, "force_on:                %d\n", force_fan);
 	} else {
-		p += sprintf(p, "ERROR\n");
+		printk(MY_ERR "Error reading fan status\n");
 	}
 
 	return p;
@@ -413,8 +439,9 @@ read_keys(char* p)
 			 * some machines where system events sporadically
 			 * become disabled. */
 			hci_write1(HCI_SYSTEM_EVENT, 1, &hci_result);
+			printk(MY_NOTICE "Re-enabled hotkeys\n");
 		} else {
-			p += sprintf(p, "ERROR\n");
+			printk(MY_ERR "Error reading hotkey status\n");
 			goto end;
 		}
 	}
@@ -465,7 +492,7 @@ ProcItem proc_items[] =
 	{ 0		, 0		, 0		},
 };
 
-static acpi_status
+static acpi_status __init
 add_device(void)
 {
 	struct proc_dir_entry* proc;
@@ -483,7 +510,7 @@ add_device(void)
 	return(AE_OK);
 }
 
-static acpi_status
+static acpi_status __exit
 remove_device(void)
 {
 	ProcItem* item;
@@ -497,15 +524,19 @@ static int __init
 toshiba_acpi_init(void)
 {
 	acpi_status status = AE_OK;
-	int value;
 	u32 hci_result;
 
-	/* simple device detection: try reading an HCI register */
-	hci_read1(HCI_LCD_BRIGHTNESS, &value, &hci_result);
-	if (hci_result != HCI_SUCCESS)
+	/* simple device detection: look for HCI method */
+	if (is_valid_acpi_path(METHOD_HCI_1))
+		method_hci = METHOD_HCI_1;
+	else if (is_valid_acpi_path(METHOD_HCI_2))
+		method_hci = METHOD_HCI_2;
+	else
 		return -ENODEV;
 
-	printk("Toshiba Laptop ACPI Extras version %s\n", TOSHIBA_ACPI_VERSION);
+	printk(MY_INFO "Toshiba Laptop ACPI Extras version %s\n",
+		TOSHIBA_ACPI_VERSION);
+	printk(MY_INFO "    HCI method: %s\n", method_hci);
 
 	force_fan = 0;
 	key_event_valid = 0;
