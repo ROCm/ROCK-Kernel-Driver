@@ -601,7 +601,6 @@ static int __devinit cpuup_callback(struct notifier_block *nfb,
 {
 	long cpu = (long)hcpu;
 	kmem_cache_t* cachep;
-	struct list_head *p;
 
 	switch (action) {
 	case CPU_UP_PREPARE:
@@ -634,9 +633,8 @@ static int __devinit cpuup_callback(struct notifier_block *nfb,
 	case CPU_UP_CANCELED:
 		down(&cache_chain_sem);
 
-		list_for_each(p, &cache_chain) {
+		list_for_each_entry(cachep, &cache_chain, next) {
 			struct array_cache *nc;
-			kmem_cache_t* cachep = list_entry(p, kmem_cache_t, next);
 
 			nc = cachep->array[cpu];
 			cachep->array[cpu] = NULL;
