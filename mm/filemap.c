@@ -699,13 +699,15 @@ EXPORT_SYMBOL(grab_cache_page_nowait);
  *
  * This is really ugly. But the goto's actually try to clarify some
  * of the logic when it comes to error handling etc.
- * - note the struct file * is only passed for the use of readpage
+ *
+ * Note the struct file* is only passed for the use of readpage.  It may be
+ * NULL.
  */
 void do_generic_mapping_read(struct address_space *mapping,
 			     struct file_ra_state *_ra,
-			     struct file * filp,
+			     struct file *filp,
 			     loff_t *ppos,
-			     read_descriptor_t * desc,
+			     read_descriptor_t *desc,
 			     read_actor_t actor)
 {
 	struct inode *inode = mapping->host;
@@ -869,7 +871,8 @@ out:
 	*ppos = ((loff_t) index << PAGE_CACHE_SHIFT) + offset;
 	if (cached_page)
 		page_cache_release(cached_page);
-	file_accessed(filp);
+	if (filp)
+		file_accessed(filp);
 }
 
 EXPORT_SYMBOL(do_generic_mapping_read);
