@@ -2681,7 +2681,7 @@ int fas216_eh_host_reset(Scsi_Cmnd *SCpnt)
 	 * IRQs after the sleep.
 	 */
 	spin_unlock_irq(info->host->host_lock);
-	scsi_sleep(50 * HZ/100);
+	msleep(50 * 1000/100);
 	spin_lock_irq(info->host->host_lock);
 
 	/*
@@ -2920,7 +2920,7 @@ int fas216_add(struct Scsi_Host *host, struct device *dev)
 	 * scsi standard says wait 250ms
 	 */
 	spin_unlock_irq(info->host->host_lock);
-	scsi_sleep(100*HZ/100);
+	msleep(100*1000/100);
 	spin_lock_irq(info->host->host_lock);
 
 	fas216_writeb(info, REG_CNTL1, info->scsi.cfg[0]);

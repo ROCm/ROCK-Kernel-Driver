@@ -106,9 +106,10 @@ static const char * dmx3191d_info(struct Scsi_Host *host) {
 
 static int dmx3191d_release_resources(struct Scsi_Host *instance)
 {
-	release_region(instance->io_port, DMX3191D_REGION);
 	if(instance->irq!=SCSI_IRQ_NONE)
 		free_irq(instance->irq, instance);
+	NCR5380_exit(instance);
+	release_region(instance->io_port, DMX3191D_REGION);
 
 	return 0;
 }

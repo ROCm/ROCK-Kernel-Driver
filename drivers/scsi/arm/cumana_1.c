@@ -321,6 +321,7 @@ static void __devexit cumanascsi1_remove(struct expansion_card *ec)
 
 	scsi_remove_host(host);
 	free_irq(host->irq, host);
+	NCR5380_exit(host);
 	release_region(host->io_port, host->n_io_port);
 	scsi_host_put(host);
 }

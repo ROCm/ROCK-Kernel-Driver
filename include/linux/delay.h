@@ -40,4 +40,9 @@ extern unsigned long loops_per_jiffy;
 
 void msleep(unsigned int msecs);
 
+static inline void ssleep(unsigned int seconds)
+{
+	msleep(seconds * 1000);
+}
+
 #endif /* defined(_LINUX_DELAY_H) */
