@@ -170,8 +170,6 @@ static void elevator_setup_default(void)
 #else
 #error "You must build at least 1 IO scheduler into the kernel"
 #endif
-	printk(KERN_INFO "elevator: using %s as default io scheduler\n",
-							chosen_elevator);
 }
 
 static int __init elevator_setup(char *str)
@@ -515,7 +513,10 @@ int elv_register(struct elevator_type *e)
 	list_add_tail(&e->list, &elv_list);
 	spin_unlock_irq(&elv_list_lock);
 
-	printk(KERN_INFO "io scheduler %s registered\n", e->elevator_name);
+	printk(KERN_INFO "io scheduler %s registered", e->elevator_name);
+	if (!strcmp(e->elevator_name, chosen_elevator))
+		printk(" (default)");
+	printk("\n");
 	return 0;
 }
 EXPORT_SYMBOL_GPL(elv_register);
