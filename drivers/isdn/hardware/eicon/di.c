@@ -112,16 +112,14 @@ void pr_out(ADAPTER * a)
 #ifdef USE_EXTENDED_DEBUGS
     if ( !this )
     {
-      ISDN_ADAPTER *io = (ISDN_ADAPTER *)a->io ;
       DBG_FTL(("XDI: [%02x] !A%d ==> NULL entity ptr - try to ignore",
-               xdi_xlog_sec++, (int)io->ANum))
+               xdi_xlog_sec++, (int)((ISDN_ADAPTER *)a->io)->ANum))
       e_no = look_req(a) ;
       ReadyCount-- ;
       continue ;
     }
     {
-      ISDN_ADAPTER *io = (ISDN_ADAPTER *)a->io ;
-      DBG_TRC((">A%d Id=0x%x Req=0x%x", io->ANum, this->Id, this->Req))
+      DBG_TRC((">A%d Id=0x%x Req=0x%x", ((ISDN_ADAPTER *)a->io)->ANum, this->Id, this->Req))
     }
 #else
     dbug(dprintf("out:Req=%x,Id=%x,Ch=%x",this->Req,this->Id,this->ReqCh));
@@ -563,8 +561,7 @@ byte isdn_rc(ADAPTER * a,
   int cancel_rc;
 #ifdef USE_EXTENDED_DEBUGS
   {
-    ISDN_ADAPTER *io = (ISDN_ADAPTER *)a->io ;
-    DBG_TRC(("<A%d Id=0x%x Rc=0x%x", io->ANum, Id, Rc))
+    DBG_TRC(("<A%d Id=0x%x Rc=0x%x", ((ISDN_ADAPTER *)a->io)->ANum, Id, Rc))
   }
 #else
   dbug(dprintf("isdn_rc(Rc=%x,Id=%x,Ch=%x)",Rc,Id,Ch));
@@ -767,8 +764,7 @@ byte isdn_ind(ADAPTER * a,
   byte* cma = 0;
 #ifdef USE_EXTENDED_DEBUGS
   {
-    ISDN_ADAPTER *io = (ISDN_ADAPTER *)a->io ;
-    DBG_TRC(("<A%d Id=0x%x Ind=0x%x", io->ANum, Id, Ind))
+    DBG_TRC(("<A%d Id=0x%x Ind=0x%x", ((ISDN_ADAPTER *)a->io)->ANum, Id, Ind))
   }
 #else
   dbug(dprintf("isdn_ind(Ind=%x,Id=%x,Ch=%x)",Ind,Id,Ch));
@@ -956,10 +952,10 @@ static void xdi_xlog_rc_event (byte Adapter,
                                byte Id, byte Ch, byte Rc, byte cb, byte type) {
 #if defined(XDI_USE_XLOG)
   word LogInfo[4];
-  LogInfo[0] = (word)Adapter | (word)(xdi_xlog_sec++ << 8);
-  LogInfo[1] = (word)Id | (word)(Ch << 8);
-  LogInfo[2] = (word)Rc | (word)(type << 8);
-  LogInfo[3] = cb;
+  WRITE_WORD(&LogInfo[0], ((word)Adapter | (word)(xdi_xlog_sec++ << 8)));
+  WRITE_WORD(&LogInfo[1], ((word)Id | (word)(Ch << 8)));
+  WRITE_WORD(&LogInfo[2], ((word)Rc | (word)(type << 8)));
+  WRITE_WORD(&LogInfo[3], cb);
   xdi_xlog ((byte*)&LogInfo[0], 221, sizeof(LogInfo));
 #endif
 }
@@ -980,9 +976,9 @@ static void xdi_xlog_request (byte Adapter, byte Id,
                               byte Ch, byte Req, byte type) {
 #if defined(XDI_USE_XLOG)
   word LogInfo[3];
-  LogInfo[0] = (word)Adapter | (word)(xdi_xlog_sec++ << 8);
-  LogInfo[1] = (word)Id | (word)(Ch << 8);
-  LogInfo[2] = (word)Req | (word)(type << 8);
+  WRITE_WORD(&LogInfo[0], ((word)Adapter | (word)(xdi_xlog_sec++ << 8)));
+  WRITE_WORD(&LogInfo[1], ((word)Id | (word)(Ch << 8)));
+  WRITE_WORD(&LogInfo[2], ((word)Req | (word)(type << 8)));
   xdi_xlog ((byte*)&LogInfo[0], 220, sizeof(LogInfo));
 #endif
 }
@@ -1024,10 +1020,10 @@ static void xdi_xlog_ind (byte Adapter,
                           byte type) {
 #if defined(XDI_USE_XLOG)
   word LogInfo[4];
-  LogInfo[0] = (word)Adapter | (word)(xdi_xlog_sec++ << 8);
-  LogInfo[1] = (word)Id | (word)(Ch << 8);
-  LogInfo[2] = (word)Ind | (word)(type << 8);
-  LogInfo[3] = (word)rnr | (word)(rnr_valid << 8);
+  WRITE_WORD(&LogInfo[0], ((word)Adapter | (word)(xdi_xlog_sec++ << 8)));
+  WRITE_WORD(&LogInfo[1], ((word)Id | (word)(Ch << 8)));
+  WRITE_WORD(&LogInfo[2], ((word)Ind | (word)(type << 8)));
+  WRITE_WORD(&LogInfo[3], ((word)rnr | (word)(rnr_valid << 8)));
   xdi_xlog ((byte*)&LogInfo[0], 222, sizeof(LogInfo));
 #endif
 }
