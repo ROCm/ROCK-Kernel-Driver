@@ -4,7 +4,7 @@
  *  Copyright (c) 2000-2001 Vojtech Pavlik
  *
  *  Based on the work of:
- *	Richard Zidlicky <Richard.Zidlicky@stud.informatik.uni-erlangen.de>	
+ *	Richard Zidlicky <Richard.Zidlicky@stud.informatik.uni-erlangen.de>
  */
 
 /*

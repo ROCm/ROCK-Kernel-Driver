@@ -42,8 +42,8 @@ MODULE_LICENSE("GPL");
  * Register numbers.
  */
 
-#define KBD98_COMMAND_REG	0x43	
-#define KBD98_STATUS_REG	0x43	
+#define KBD98_COMMAND_REG	0x43
+#define KBD98_STATUS_REG	0x43
 #define KBD98_DATA_REG		0x41
 
 spinlock_t kbd98io_lock = SPIN_LOCK_UNLOCKED;
