@@ -541,10 +541,10 @@ static void __exit unload_shpchpd(void)
 	for (loop = 0; loop < 256; loop++) {
 		next = shpchp_slot_list[loop];
 		while (next != NULL) {
-			free_shpchp_res(ctrl->io_head);
-			free_shpchp_res(ctrl->mem_head);
-			free_shpchp_res(ctrl->p_mem_head);
-			free_shpchp_res(ctrl->bus_head);
+			free_shpchp_res(next->io_head);
+			free_shpchp_res(next->mem_head);
+			free_shpchp_res(next->p_mem_head);
+			free_shpchp_res(next->bus_head);
 
 			TempSlot = next;
 			next = next->next;
