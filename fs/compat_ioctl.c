@@ -1619,19 +1619,14 @@ struct consolefontdesc32 {
 
 static int do_fontx_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg, struct file *file)
 {
-	struct consolefontdesc cfdarg;
+	struct consolefontdesc32 __user *user_cfd = compat_ptr(arg);
 	struct console_font_op op;
-	struct consolefontdesc32 *user_cfd = compat_ptr(arg);
+	compat_caddr_t data;
 	int i, perm;
 
 	perm = vt_check(file);
 	if (perm < 0) return perm;
 	
-	if (copy_from_user(&cfdarg, user_cfd, sizeof(struct consolefontdesc32)))
-		return -EFAULT;
-	
-	cfdarg.chardata = compat_ptr(((struct consolefontdesc32 *)&cfdarg)->chardata);
- 	
 	switch (cmd) {
 	case PIO_FONTX:
 		if (!perm)
@@ -1639,26 +1634,30 @@ static int do_fontx_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg, 
 		op.op = KD_FONT_OP_SET;
 		op.flags = 0;
 		op.width = 8;
-		op.height = cfdarg.charheight;
-		op.charcount = cfdarg.charcount;
-		op.data = cfdarg.chardata;
+		if (get_user(op.height, &user_cfd->charheight) ||
+		    get_user(op.charcount, &user_cfd->charcount) ||
+		    get_user(data, &user_cfd->chardata))
+			return -EFAULT;
+		op.data = compat_ptr(data);
 		return con_font_op(fg_console, &op);
 	case GIO_FONTX:
-		if (!cfdarg.chardata)
-			return 0;
 		op.op = KD_FONT_OP_GET;
 		op.flags = 0;
 		op.width = 8;
-		op.height = cfdarg.charheight;
-		op.charcount = cfdarg.charcount;
-		op.data = cfdarg.chardata;
+		if (get_user(op.height, &user_cfd->charheight) ||
+		    get_user(op.charcount, &user_cfd->charcount) ||
+		    get_user(data, &user_cfd->chardata))
+			return -EFAULT;
+		if (!data)
+			return 0;
+		op.data = compat_ptr(data);
 		i = con_font_op(fg_console, &op);
 		if (i)
 			return i;
-		cfdarg.charheight = op.height;
-		cfdarg.charcount = op.charcount;
-		((struct consolefontdesc32 *)&cfdarg)->chardata	= (unsigned long)cfdarg.chardata;
-		if (copy_to_user(user_cfd, &cfdarg, sizeof(struct consolefontdesc32)))
+		if (put_user(op.height, &user_cfd->charheight) ||
+		    put_user(op.charcount, &user_cfd->charcount) ||
+		    put_user((compat_caddr_t)(unsigned long)op.data,
+				&user_cfd->chardata))
 			return -EFAULT;
 		return 0;
 	}
