@@ -2340,8 +2340,6 @@ typedef struct scsi_qla_host {
 
 	uint8_t     node_name[WWN_SIZE];
 	uint8_t     nvram_version; 
-	uint8_t     optrom_major; 
-	uint8_t     optrom_minor; 
 	uint32_t    isp_abort_cnt;
 
 	/* Adapter I/O statistics for failover */

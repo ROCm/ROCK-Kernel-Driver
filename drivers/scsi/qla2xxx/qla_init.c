@@ -133,9 +133,6 @@ qla2x00_initialize_adapter(scsi_qla_host_t *ha)
 	/* Initialize target map database. */
 	qla2x00_init_tgt_map(ha);
 
-	/* Get Flash Version */
-	qla2x00_get_flash_version(ha);
-
 	qla_printk(KERN_INFO, ha, "Configure NVRAM parameters...\n");
 	qla2x00_nvram_config(ha);
 
