@@ -1,5 +1,5 @@
 /*
- *  pci_root.c - ACPI PCI Root Bridge Driver ($Revision: 37 $)
+ *  pci_root.c - ACPI PCI Root Bridge Driver ($Revision: 38 $)
  *
  *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
  *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
@@ -56,11 +56,107 @@ static struct acpi_driver acpi_pci_root_driver = {
                                 },
 };
 
-struct acpi_pci_root {
-	acpi_handle		handle;
-	acpi_pci_id		id;
-	struct pci_bus		*bus;
-};
+ struct acpi_pci_root {
+	struct list_head	node;
+ 	acpi_handle		handle;
+ 	acpi_pci_id		id;
+ 	struct pci_bus		*bus;
+	u64			mem_tra;
+	u64			io_tra;
+ };
+
+struct list_head		acpi_pci_roots;
+
+
+void
+acpi_pci_get_translations (
+	acpi_pci_id		*id,
+	u64			*mem_tra,
+	u64			*io_tra)
+{
+	struct list_head	*node = NULL;
+	struct acpi_pci_root	*entry;
+
+	/* TBD: Locking */
+	list_for_each(node, &acpi_pci_roots) {
+		entry = list_entry(node, struct acpi_pci_root, node);
+		if ((id->segment == entry->id.segment)
+			&& (id->bus == entry->id.bus)) {
+			*mem_tra = entry->mem_tra;
+			*io_tra = entry->io_tra;
+			return;
+		}
+	}
+
+	*mem_tra = 0;
+	*io_tra = 0;
+}
+
+
+static u64
+acpi_pci_root_bus_tra (
+       acpi_resource           *resource,
+       int                     type)
+{
+	acpi_resource_address16 *address16;
+	acpi_resource_address32 *address32;
+	acpi_resource_address64 *address64;
+
+	while (1) {
+		switch (resource->id) {
+		case ACPI_RSTYPE_END_TAG:
+			return 0;
+
+		case ACPI_RSTYPE_ADDRESS16:
+			address16 = (acpi_resource_address16 *) &resource->data;
+			if (type == address16->resource_type) {
+				return address16->address_translation_offset;
+			}
+			break;
+
+		case ACPI_RSTYPE_ADDRESS32:
+			address32 = (acpi_resource_address32 *) &resource->data;
+			if (type == address32->resource_type) {
+				return address32->address_translation_offset;
+			}
+			break;
+
+		case ACPI_RSTYPE_ADDRESS64:
+			address64 = (acpi_resource_address64 *) &resource->data;
+			if (type == address64->resource_type) {
+				return address64->address_translation_offset;
+			}
+			break;
+		}
+		resource = ACPI_PTR_ADD (acpi_resource,
+				resource, resource->length);
+	}
+
+	return 0;
+}
+
+
+static int
+acpi_pci_evaluate_crs (
+	struct acpi_pci_root	*root)
+{
+	acpi_status		status;
+	acpi_buffer		buffer = {ACPI_ALLOCATE_BUFFER, NULL};
+
+	ACPI_FUNCTION_TRACE("acpi_pci_evaluate_crs");
+
+	status = acpi_get_current_resources (root->handle, &buffer);
+	if (ACPI_FAILURE(status))
+		return_VALUE(-ENODEV);
+
+	root->io_tra = acpi_pci_root_bus_tra ((acpi_resource *)
+			buffer.pointer, ACPI_IO_RANGE);
+	root->mem_tra = acpi_pci_root_bus_tra ((acpi_resource *)
+			buffer.pointer, ACPI_MEMORY_RANGE);
+
+	kfree(buffer.pointer);
+	return_VALUE(0);
+}
 
 
 static int
@@ -147,9 +243,13 @@ acpi_pci_root_add (
 	root->id.function = device->pnp.bus_address & 0xFFFF;
 
 	/*
-	 * TBD: Evaluate _CRS to get root bridge resources
+	 * Evaluate _CRS to get root bridge resources
 	 * TBD: Need PCI interface for enumeration/configuration of roots.
 	 */
+ 	acpi_pci_evaluate_crs(root);
+
+ 	/* TBD: Locking */
+ 	list_add_tail(&root->node, &acpi_pci_roots);
 
 	printk(KERN_INFO PREFIX "%s [%s] (%02x:%02x)\n", 
 		acpi_device_name(device), acpi_device_bid(device),
@@ -227,6 +327,8 @@ acpi_pci_root_init (void)
 	acpi_dbg_layer = ACPI_PCI_COMPONENT;
 	acpi_dbg_level = 0xFFFFFFFF;
 	 */
+
+ 	INIT_LIST_HEAD(&acpi_pci_roots);
 
 	if (acpi_bus_register_driver(&acpi_pci_root_driver) < 0)
 		return_VALUE(-ENODEV);
