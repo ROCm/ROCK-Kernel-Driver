@@ -22,8 +22,8 @@
  *************************************************************************/
 
 #define DRV_NAME	"pcnet32"
-#define DRV_VERSION	"1.30g"
-#define DRV_RELDATE	"06.22.2004"
+#define DRV_VERSION	"1.30h"
+#define DRV_RELDATE	"06.24.2004"
 #define PFX		DRV_NAME ": "
 
 static const char *version =
@@ -253,6 +253,7 @@ static int homepna[MAX_UNITS];
  * 	   and Brian Murphy <brian@murphy.dk>.
  * v1.30g  22 Jun 2004 Patrick Simmons <psimmons@flash.net> added option
  *	   homepna for selecting HomePNA mode for PCNet/Home 79C978.
+ * v1.30h  24 Jun 2004 Don Fry correctly select auto, speed, duplex in bcr32.
  */
 
 
@@ -1422,9 +1423,13 @@ pcnet32_open(struct net_device *dev)
 	val |= 0x10;
     lp->a.write_csr (ioaddr, 124, val);
 
+    /* 24 Jun 2004 according AMD, in order to change the PHY,
+     * DANAS (or DISPM for 79C976) must be set; then select the speed,
+     * duplex, and/or enable auto negotiation, and clear DANAS */
     if (lp->mii && !(lp->options & PCNET32_PORT_ASEL)) {
+	lp->a.write_bcr(ioaddr, 32, lp->a.read_bcr(ioaddr, 32) | 0x0080);
 	/* disable Auto Negotiation, set 10Mpbs, HD */
-	val = lp->a.read_bcr (ioaddr, 32) & ~0x38;
+	val = lp->a.read_bcr(ioaddr, 32) & ~0xb8;
 	if (lp->options & PCNET32_PORT_FD)
 	    val |= 0x10;
 	if (lp->options & PCNET32_PORT_100)
@@ -1432,6 +1437,7 @@ pcnet32_open(struct net_device *dev)
 	lp->a.write_bcr (ioaddr, 32, val);
     } else {
 	if (lp->options & PCNET32_PORT_ASEL) {
+	    lp->a.write_bcr(ioaddr, 32, lp->a.read_bcr(ioaddr, 32) | 0x0080);
 	    /* enable auto negotiate, setup, disable fd */
 	    val = lp->a.read_bcr(ioaddr, 32) & ~0x98;
 	    val |= 0x20;
