@@ -9,7 +9,7 @@
 #define _LINUX_RWSEM_SPINLOCK_H
 
 #ifndef _LINUX_RWSEM_H
-#error please dont include linux/rwsem-spinlock.h directly, use linux/rwsem.h instead
+#error "please don't include linux/rwsem-spinlock.h directly, use linux/rwsem.h instead"
 #endif
 
 #include <linux/spinlock.h>

@@ -334,7 +334,7 @@ oom:
  *	@bdev:  I/O target
  *
  *	Return the approximate number of pages we can send to this target.
- *	There's no guarentee that you will be able to fit this number of pages
+ *	There's no guarantee that you will be able to fit this number of pages
  *	into a bio, it does not account for dynamic restrictions that vary
  *	on offset.
  */
@@ -383,7 +383,7 @@ int bio_add_page(struct bio *bio, struct page *page, unsigned int len,
 		return 0;
 
 	/*
-	 * we might loose a segment or two here, but rather that than
+	 * we might lose a segment or two here, but rather that than
 	 * make this too complex.
 	 */
 retry_segments:

@@ -79,7 +79,7 @@ LEAF(lazy_fpu_switch)
 	beqz	a0, 2f				# Save floating point state
 	 nor	t3, zero, t3
 
-	ld	t1, ST_OFF(a0)			# last thread looses fpu
+	ld	t1, ST_OFF(a0)			# last thread loses fpu
 	and	t1, t3
 	sd	t1, ST_OFF(a0)
 	sll	t2, t1, 5

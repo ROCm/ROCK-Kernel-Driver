@@ -7717,7 +7717,7 @@ int __init ixj_probe_isapnp(int *cnt)
 				printk("pnp attach failed %d \n", result);
 				break;
 			}
-			if (pnp_activate_dev(dev, NULL) < 0) {
+			if (pnp_activate_dev(dev) < 0) {
 				printk("pnp activate failed (out of resources?)\n");
 				pnp_device_detach(dev);
 				return -ENOMEM;

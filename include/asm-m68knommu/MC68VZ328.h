@@ -1167,19 +1167,19 @@ typedef struct {
 #define RTCISR		WORD_REF(RTCISR_ADDR)
 
 #define RTCISR_SW	0x0001	/* Stopwatch timed out */
-#define RTCISR_MIN	0x0002	/* 1-minute interrupt has occured */
-#define RTCISR_ALM	0x0004	/* Alarm interrupt has occured */
-#define RTCISR_DAY	0x0008	/* 24-hour rollover interrupt has occured */
-#define RTCISR_1HZ	0x0010	/* 1Hz interrupt has occured */
-#define RTCISR_HR	0x0020	/* 1-hour interrupt has occured */
-#define RTCISR_SAM0	0x0100	/*   4Hz /   4.6875Hz interrupt has occured */ 
-#define RTCISR_SAM1	0x0200	/*   8Hz /   9.3750Hz interrupt has occured */ 
-#define RTCISR_SAM2	0x0400	/*  16Hz /  18.7500Hz interrupt has occured */ 
-#define RTCISR_SAM3	0x0800	/*  32Hz /  37.5000Hz interrupt has occured */ 
-#define RTCISR_SAM4	0x1000	/*  64Hz /  75.0000Hz interrupt has occured */ 
-#define RTCISR_SAM5	0x2000	/* 128Hz / 150.0000Hz interrupt has occured */ 
-#define RTCISR_SAM6	0x4000	/* 256Hz / 300.0000Hz interrupt has occured */ 
-#define RTCISR_SAM7	0x8000	/* 512Hz / 600.0000Hz interrupt has occured */ 
+#define RTCISR_MIN	0x0002	/* 1-minute interrupt has occurred */
+#define RTCISR_ALM	0x0004	/* Alarm interrupt has occurred */
+#define RTCISR_DAY	0x0008	/* 24-hour rollover interrupt has occurred */
+#define RTCISR_1HZ	0x0010	/* 1Hz interrupt has occurred */
+#define RTCISR_HR	0x0020	/* 1-hour interrupt has occurred */
+#define RTCISR_SAM0	0x0100	/*   4Hz /   4.6875Hz interrupt has occurred */ 
+#define RTCISR_SAM1	0x0200	/*   8Hz /   9.3750Hz interrupt has occurred */ 
+#define RTCISR_SAM2	0x0400	/*  16Hz /  18.7500Hz interrupt has occurred */ 
+#define RTCISR_SAM3	0x0800	/*  32Hz /  37.5000Hz interrupt has occurred */ 
+#define RTCISR_SAM4	0x1000	/*  64Hz /  75.0000Hz interrupt has occurred */ 
+#define RTCISR_SAM5	0x2000	/* 128Hz / 150.0000Hz interrupt has occurred */ 
+#define RTCISR_SAM6	0x4000	/* 256Hz / 300.0000Hz interrupt has occurred */ 
+#define RTCISR_SAM7	0x8000	/* 512Hz / 600.0000Hz interrupt has occurred */ 
 
 /*
  * RTC Interrupt Enable Register

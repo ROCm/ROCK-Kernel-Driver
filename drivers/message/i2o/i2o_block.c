@@ -798,7 +798,7 @@ static void i2ob_request(request_queue_t *q)
 
 		/* 
 		 *	Queue depths probably belong with some kind of 
-		 *	generic IOP commit control. Certainly its not right 
+		 *	generic IOP commit control. Certainly it's not right 
 		 *	its global!  
 		 */
 		if(atomic_read(&i2ob_queues[dev->unit]->queue_depth) >= dev->depth)
@@ -1729,7 +1729,7 @@ static void i2o_block_exit(void)
 	 *	We may get further callbacks for ourself. The i2o_core
 	 *	code handles this case reasonably sanely. The problem here
 	 *	is we shouldn't get them .. but a couple of cards feel 
-	 *	obliged to tell us stuff we dont care about.
+	 *	obliged to tell us stuff we don't care about.
 	 *
 	 *	This isnt ideal at all but will do for now.
 	 */

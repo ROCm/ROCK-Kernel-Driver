@@ -702,7 +702,7 @@ init_conntrack(const struct ip_conntrack_tuple *tuple,
 	if (!expected)
 		conntrack->helper = ip_ct_find_helper(&repl_tuple);
 
-	/* If the expectation is dying, then this is a looser. */
+	/* If the expectation is dying, then this is a loser. */
 	if (expected
 	    && expected->expectant->helper->timeout
 	    && ! del_timer(&expected->timeout))

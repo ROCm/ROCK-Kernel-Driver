@@ -1245,7 +1245,7 @@ typedef struct smb_com_transaction2_get_dfs_refer_req {
 	__u8 Reserved3;
 	__u16 SubCommand;	/* one setup word */
 	__u16 ByteCount;
-	__u8 Pad[3];		/* Win2K has sent 0x0F01 (max resp length perhaps?) followed by one byte pad - doesnt seem to matter though */
+	__u8 Pad[3];		/* Win2K has sent 0x0F01 (max resp length perhaps?) followed by one byte pad - doesn't seem to matter though */
 	__u16 MaxReferralLevel;
 	char RequestFileName[1];
 } TRANSACTION2_GET_DFS_REFER_REQ;

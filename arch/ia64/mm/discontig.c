@@ -241,7 +241,7 @@ discontig_mem_init(void)
  *	- build the nodedir for the node. This contains pointers to
  *	  the per-bank mem_map entries.
  *	- fix the page struct "virtual" pointers. These are bank specific
- *	  values that the paging system doesnt understand.
+ *	  values that the paging system doesn't understand.
  *	- replicate the nodedir structure to other nodes	
  */ 
 

@@ -3567,7 +3567,7 @@ static int check_singlebyte_msg(struct esp *esp)
 /* Target negotiates for synchronous transfers before we do, this
  * is legal although very strange.  What is even funnier is that
  * the SCSI2 standard specifically recommends against targets doing
- * this because so many initiators cannot cope with this occuring.
+ * this because so many initiators cannot cope with this occurring.
  */
 static int target_with_ants_in_pants(struct esp *esp,
 				     Scsi_Cmnd *SCptr,

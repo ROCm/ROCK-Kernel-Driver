@@ -461,7 +461,7 @@ long pSeries_lpar_hpte_insert(unsigned long hpte_group,
 		return -1;
 
 	/*
-	 * Since we try and ioremap PHBs we dont own, the pte insert
+	 * Since we try and ioremap PHBs we don't own, the pte insert
 	 * will fail. However we must catch the failure in hash_page
 	 * or we will loop forever, so return -2 in this case.
 	 */
@@ -485,7 +485,7 @@ static long pSeries_lpar_hpte_remove(unsigned long hpte_group)
 
 	for (i = 0; i < HPTES_PER_GROUP; i++) {
 
-		/* dont remove a bolted entry */
+		/* don't remove a bolted entry */
 		lpar_rc = plpar_pte_remove(H_ANDCOND, hpte_group + slot_offset,
 					   (0x1UL << 4), &dummy1, &dummy2);
 

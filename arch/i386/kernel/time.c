@@ -66,7 +66,7 @@ int pit_latch_buggy;              /* extern */
 
 #include "do_timer.h"
 
-u64 jiffies_64;
+u64 jiffies_64 = INITIAL_JIFFIES;
 
 unsigned long cpu_khz;	/* Detected as we calibrate the TSC */
 

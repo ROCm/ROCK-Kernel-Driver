@@ -1304,7 +1304,7 @@ static void MUNICH_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		ch = (struct comx_channel *)dev->priv;
 		hw = (struct slicecom_privdata *)ch->HW_privdata;
 
-		/* We dont trust the "Tx available" info from the TIQ, but check        */
+		/* We don't trust the "Tx available" info from the TIQ, but check        */
 		/* every ring if there is some free room                                        */
 
 		if (ch->init_status && netif_running(dev))

@@ -14,7 +14,7 @@ in order to analyze the reason for the crash.
 If the system still runs but only a subcomponent which uses dbf failes,
 it is possible to look at the debug logs on a live system via the Linux proc
 filesystem.
-The debug feature may also very usefull for kernel and driver development.
+The debug feature may also very useful for kernel and driver development.
 
 Design:
 -------

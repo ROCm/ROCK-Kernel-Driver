@@ -214,7 +214,7 @@ void sys_free_irq(unsigned int irq, void *dev_id)
 /*
  * Do we need these probe functions on the m68k?
  *
- *  ... may be usefull with ISA devices
+ *  ... may be useful with ISA devices
  */
 unsigned long probe_irq_on (void)
 {

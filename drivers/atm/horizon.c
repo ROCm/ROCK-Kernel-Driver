@@ -2874,11 +2874,7 @@ static int __init hrz_probe (void) {
 	// writes to adapter memory (handles IRQ and SMP)
 	spin_lock_init (&dev->mem_lock);
 	
-#if LINUX_VERSION_CODE >= 0x20303
 	init_waitqueue_head (&dev->tx_queue);
-#else
-	dev->tx_queue = 0;
-#endif
 	
 	// vpi in 0..4, vci in 6..10
 	dev->atm_dev->ci_range.vpi_bits = vpi_bits;

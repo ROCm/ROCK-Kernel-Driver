@@ -60,7 +60,7 @@
 /* The detection of the wavelan card is made by reading the MAC address
  * from the card and checking it. If you have a non AT&T product (OEM,
  * like DEC RoamAbout, or Digital Ocean, Epson, ...), you must modify this
- * part to accomodate your hardware...
+ * part to accommodate your hardware...
  */
 const unsigned char	MAC_ADDRESSES[][3] =
 {

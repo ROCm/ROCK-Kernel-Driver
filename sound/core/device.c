@@ -144,7 +144,7 @@ int snd_device_disconnect(snd_card_t *card, void *device_data)
  * Registers the device which was already created via
  * snd_device_new().  Usually this is called from snd_card_register(),
  * but it can be called later if any new devices are created after
- * invokation of snd_card_register().
+ * invocation of snd_card_register().
  *
  * Returns zero if successful, or a negative error code on failure or if the
  * device not found.

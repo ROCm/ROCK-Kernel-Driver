@@ -105,7 +105,7 @@ int rx_pool_sizes[NP] = {128,  128,  128, 64,   64,   64,   32,    32};
    The FS50 CAM (VP/VC match registers) always take the lowest channel
    number that matches. This is not a problem.
 
-   However, they also ignore wether the channel is enabled or
+   However, they also ignore whether the channel is enabled or
    not. This means that if you allocate channel 0 to 1.2 and then
    channel 1 to 0.0, then disabeling channel 0 and writing 0 to the
    match channel for channel 0 will "steal" the traffic from channel

@@ -487,7 +487,7 @@ void tulip_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 				 * to the 21142/3 docs that is).
 				 *   -- rmk
 				 */
-				printk(KERN_ERR "%s: (%lu) System Error occured (%d)\n",
+				printk(KERN_ERR "%s: (%lu) System Error occurred (%d)\n",
 					dev->name, tp->nir, error);
 			}
 			/* Clear all error sources, included undocumented ones! */

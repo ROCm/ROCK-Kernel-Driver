@@ -45,7 +45,7 @@
 
 extern unsigned long wall_jiffies;
 
-u64 jiffies_64;
+u64 jiffies_64 = INITIAL_JIFFIES;
 
 spinlock_t rtc_lock = SPIN_LOCK_UNLOCKED;
 enum sparc_clock_type sp_clock_typ;

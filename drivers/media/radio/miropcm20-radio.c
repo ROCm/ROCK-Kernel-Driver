@@ -15,7 +15,7 @@
  */
 
 /* What ever you think about the ACI, version 0x07 is not very well!
- * I cant get frequency, 'tuner status', 'tuner flags' or mute/mono
+ * I can't get frequency, 'tuner status', 'tuner flags' or mute/mono
  * conditions...                Robert 
  */
 
@@ -93,7 +93,7 @@ static int pcm20_getflags(struct pcm20_device *dev, __u32 *flags, __u16 *signal)
 	} else {
 		/* stereo */
 		*flags=VIDEO_TUNER_STEREO_ON;
-		/* I cant see stereo, when forced to mono */
+		/* I can't see stereo, when forced to mono */
 		dev->stereo=1;
 	}
 

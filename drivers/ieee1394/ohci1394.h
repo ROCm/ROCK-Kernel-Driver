@@ -405,12 +405,12 @@ static inline u32 reg_read(const struct ti_ohci *ohci, int offset)
 					   truncated */
 #define EVT_OVERRUN		0x5	/* A recv FIFO overflowed on reception of ISO
 					   packet */
-#define EVT_DESCRIPTOR_READ	0x6	/* An unrecoverable error occured while host was
+#define EVT_DESCRIPTOR_READ	0x6	/* An unrecoverable error occurred while host was
 					   reading a descriptor block */
-#define EVT_DATA_READ		0x7	/* An error occured while host controller was
+#define EVT_DATA_READ		0x7	/* An error occurred while host controller was
 					   attempting to read from host memory in the data
 					   stage of descriptor processing */
-#define EVT_DATA_WRITE		0x8	/* An error occured while host controller was
+#define EVT_DATA_WRITE		0x8	/* An error occurred while host controller was
 					   attempting to write either during the data stage
 					   of descriptor processing, or when processing a single
 					   16-bit host memory write */

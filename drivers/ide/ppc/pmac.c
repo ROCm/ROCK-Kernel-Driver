@@ -1400,7 +1400,7 @@ pmac_ide_dma_test_irq (ide_drive_t *drive)
 	 * to system memory when the disk interrupt occurs.
 	 * 
 	 * The trick here is to increment drive->waiting_for_dma,
-	 * and return as if no interrupt occured. If the counter
+	 * and return as if no interrupt occurred. If the counter
 	 * reach a certain timeout value, we then return 1. If
 	 * we really got the interrupt, it will happen right away
 	 * again.

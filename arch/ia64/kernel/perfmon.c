@@ -718,7 +718,7 @@ pfm_remap_buffer(struct vm_area_struct *vma, unsigned long buf, unsigned long ad
 
 /*
  * counts the number of PMDS to save per entry.
- * This code is generic enough to accomodate more than 64 PMDS when they become available
+ * This code is generic enough to accommodate more than 64 PMDS when they become available
  */
 static unsigned long
 pfm_smpl_entry_size(unsigned long *which, unsigned long size)

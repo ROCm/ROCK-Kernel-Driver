@@ -1192,7 +1192,7 @@ void    leaf_paste_entries (
   }
 
 
-  /* change item key if neccessary (when we paste before 0-th entry */
+  /* change item key if necessary (when we paste before 0-th entry */
   if (!before)
     {
 	set_le_ih_k_offset (ih, deh_offset(new_dehs));

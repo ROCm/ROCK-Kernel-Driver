@@ -138,7 +138,7 @@ eeprom_reset_semaphore(struct e100_private *adapter)
 //              is then passed to the read/write functions.
 //
 // Returns:
-//      Size of the eeprom, or zero if an error occured
+//      Size of the eeprom, or zero if an error occurred
 //----------------------------------------------------------------------------------------
 u16
 e100_eeprom_size(struct e100_private *adapter)

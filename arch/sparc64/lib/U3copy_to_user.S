@@ -463,7 +463,7 @@ U3copy_to_user_toosmall:
 
 2:	VISEntryHalf					! MS+MS
 
-	/* Compute (len - (len % 8)) into %g2.  This is guarenteed
+	/* Compute (len - (len % 8)) into %g2.  This is guaranteed
 	 * to be nonzero.
 	 */
 	andn		%o2, 0x7, %g2			! A0	Group
@@ -472,7 +472,7 @@ U3copy_to_user_toosmall:
 	 * one 8-byte longword past the end of src.  It actually
 	 * does not, as %g2 is subtracted as loads are done from
 	 * src, so we always stop before running off the end.
-	 * Also, we are guarenteed to have at least 0x10 bytes
+	 * Also, we are guaranteed to have at least 0x10 bytes
 	 * to move here.
 	 */
 	sub		%g2, 0x8, %g2			! A0	Group (reg-dep)

@@ -1078,11 +1078,11 @@ int cpufreq_set_policy(struct cpufreq_policy *policy)
 
 	down(&cpufreq_notifier_sem);
 
-	/* adjust if neccessary - all reasons */
+	/* adjust if necessary - all reasons */
 	notifier_call_chain(&cpufreq_policy_notifier_list, CPUFREQ_ADJUST,
 			    policy);
 
-	/* adjust if neccessary - hardware incompatibility*/
+	/* adjust if necessary - hardware incompatibility*/
 	notifier_call_chain(&cpufreq_policy_notifier_list, CPUFREQ_INCOMPATIBLE,
 			    policy);
 

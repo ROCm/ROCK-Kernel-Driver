@@ -320,7 +320,7 @@ struct s_srf_evc {
 	u_char	evc_rep_required ;		/* report required */
 	u_short	evc_para ;			/* SMT Para Number */
 	u_char	*evc_cond_state ;		/* condition state */
-	u_char	*evc_multiple ;			/* multiple occurence */
+	u_char	*evc_multiple ;			/* multiple occurrence */
 } ;
 
 /*

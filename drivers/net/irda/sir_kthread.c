@@ -151,7 +151,7 @@ static int irda_thread(void *startup)
 
 	while (irda_rq_queue.thread != NULL) {
 
-		set_task_state(current, TASK_UNINTERRUPTIBLE);
+		set_task_state(current, TASK_INTERRUPTIBLE);
 		add_wait_queue(&irda_rq_queue.kick, &wait);
 		if (list_empty(&irda_rq_queue.request_list))
 			schedule();

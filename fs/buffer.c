@@ -2495,7 +2495,7 @@ int block_write_full_page(struct page *page, get_block_t *get_block,
 
 	/*
 	 * The page straddles i_size.  It must be zeroed out on each and every
-	 * writepage invokation because it may be mmapped.  "A file is mapped
+	 * writepage invocation because it may be mmapped.  "A file is mapped
 	 * in multiples of the page size.  For a file that is not a multiple of
 	 * the  page size, the remaining memory is zeroed when mapped, and
 	 * writes to that region are not written out to the file."
@@ -2584,7 +2584,7 @@ int submit_bh(int rw, struct buffer_head * bh)
  * BH_Lock state bit), any buffer that appears to be clean when doing a
  * write request, and any buffer that appears to be up-to-date when doing
  * read request.  Further it marks as clean buffers that are processed for
- * writing (the buffer cache wont assume that they are actually clean until
+ * writing (the buffer cache won't assume that they are actually clean until
  * the buffer gets unlocked).
  *
  * ll_rw_block sets b_end_io to simple completion handler that marks

@@ -153,7 +153,7 @@ SK_EVPARA	Para)	/* Event parameter */
  *		send command to state machine
  *	end
  *	return error reported by individual Event function
- *		0 if no error occured.
+ *		0 if no error occurred.
  */
 int	SkEventDispatcher(
 SK_AC	*pAC,	/* Adapters Context */

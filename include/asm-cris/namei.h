@@ -9,7 +9,7 @@
 
 /* used to find file-system prefixes for doing emulations
  * see for example asm-sparc/namei.h
- * we dont use it...
+ * we don't use it...
  */
 
 #define __emul_prefix() NULL

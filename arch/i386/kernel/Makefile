@@ -28,6 +28,7 @@ obj-$(CONFIG_X86_NUMAQ)		+= numaq.o
 obj-$(CONFIG_EDD)             	+= edd.o
 obj-$(CONFIG_MODULES)		+= module.o
 obj-y				+= sysenter.o
+obj-$(CONFIG_ACPI_SRAT) 	+= srat.o
 
 EXTRA_AFLAGS   := -traditional
 

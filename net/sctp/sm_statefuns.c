@@ -939,7 +939,7 @@ out:
 	return 0;
 }
 
-/* A restart is occuring, check to make sure no new addresses
+/* A restart is occurring, check to make sure no new addresses
  * are being added as we may be under a takeover attack.
  */
 static int sctp_sf_check_restart_addrs(const sctp_association_t *new_asoc,
@@ -1413,7 +1413,7 @@ nomem:
  *      at about the same time but the peer endpoint started its INIT
  *      after responding to the local endpoint's INIT
  */
-/* This case represents an intialization collision.  */
+/* This case represents an initialization collision.  */
 static sctp_disposition_t sctp_sf_do_dupcook_b(const sctp_endpoint_t *ep,
 					       const sctp_association_t *asoc,
 					       sctp_chunk_t *chunk,
@@ -3734,7 +3734,7 @@ sctp_disposition_t sctp_sf_shutdown_ack_sent_prm_abort(
  * o association id - local handle to the SCTP association
  *
  * o destination transport address - the transport address of the
- *   asociation on which a heartbeat should be issued.
+ *   association on which a heartbeat should be issued.
  */
 sctp_disposition_t sctp_sf_do_prm_requestheartbeat(
 					const sctp_endpoint_t *ep,

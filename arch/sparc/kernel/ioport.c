@@ -599,7 +599,7 @@ dma_addr_t pci_map_single(struct pci_dev *hwdev, void *ptr, size_t size,
  * must match what was provided for in a previous pci_map_single call.  All
  * other usages are undefined.
  *
- * After this call, reads by the cpu to the buffer are guarenteed to see
+ * After this call, reads by the cpu to the buffer are guaranteed to see
  * whatever the device wrote there.
  */
 void pci_unmap_single(struct pci_dev *hwdev, dma_addr_t ba, size_t size,

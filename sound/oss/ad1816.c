@@ -1227,7 +1227,7 @@ static void __exit unload_card(ad1816_info *devc)
 			sound_free_dma(devc->dma_capture);
 		}
 
-		/* card wont get added if resources could not be allocated
+		/* card won't get added if resources could not be allocated
 		   thus we need not ckeck if allocation was successful */
 		sound_free_dma (devc->dma_playback);
 		free_irq(devc->irq, devc->osp);

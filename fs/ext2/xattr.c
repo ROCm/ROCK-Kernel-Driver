@@ -199,7 +199,7 @@ ext2_xattr_handler(int name_index)
  */
 ssize_t
 ext2_getxattr(struct dentry *dentry, const char *name,
-	      void *buffer, size_t size, int flags)
+	      void *buffer, size_t size)
 {
 	struct ext2_xattr_handler *handler;
 	struct inode *inode = dentry->d_inode;
@@ -207,7 +207,7 @@ ext2_getxattr(struct dentry *dentry, const char *name,
 	handler = ext2_xattr_resolve_name(&name);
 	if (!handler)
 		return -EOPNOTSUPP;
-	return handler->get(inode, name, buffer, size, flags);
+	return handler->get(inode, name, buffer, size);
 }
 
 /*
@@ -217,9 +217,9 @@ ext2_getxattr(struct dentry *dentry, const char *name,
  * BKL held [before 2.5.x]
  */
 ssize_t
-ext2_listxattr(struct dentry *dentry, char *buffer, size_t size, int flags)
+ext2_listxattr(struct dentry *dentry, char *buffer, size_t size)
 {
-	return ext2_xattr_list(dentry->d_inode, buffer, size, flags);
+	return ext2_xattr_list(dentry->d_inode, buffer, size);
 }
 
 /*
@@ -250,7 +250,7 @@ ext2_setxattr(struct dentry *dentry, const char *name,
  * BKL held [before 2.5.x]
  */
 int
-ext2_removexattr(struct dentry *dentry, const char *name, int flags)
+ext2_removexattr(struct dentry *dentry, const char *name)
 {
 	struct ext2_xattr_handler *handler;
 	struct inode *inode = dentry->d_inode;
@@ -258,7 +258,7 @@ ext2_removexattr(struct dentry *dentry, const char *name, int flags)
 	handler = ext2_xattr_resolve_name(&name);
 	if (!handler)
 		return -EOPNOTSUPP;
-	return handler->set(inode, name, NULL, 0, flags | XATTR_REPLACE);
+	return handler->set(inode, name, NULL, 0, XATTR_REPLACE);
 }
 
 /*
@@ -371,8 +371,7 @@ cleanup:
  * used / required on success.
  */
 int
-ext2_xattr_list(struct inode *inode, char *buffer, size_t buffer_size,
-		int flags)
+ext2_xattr_list(struct inode *inode, char *buffer, size_t buffer_size)
 {
 	struct buffer_head *bh = NULL;
 	struct ext2_xattr_entry *entry;
@@ -412,7 +411,7 @@ bad_block:	ext2_error(inode->i_sb, "ext2_xattr_list",
 		handler = ext2_xattr_handler(entry->e_name_index);
 		if (handler)
 			size += handler->list(NULL, inode, entry->e_name,
-					      entry->e_name_len, flags);
+					      entry->e_name_len);
 	}
 
 	if (ext2_xattr_cache_insert(bh))
@@ -435,7 +434,7 @@ bad_block:	ext2_error(inode->i_sb, "ext2_xattr_list",
 		handler = ext2_xattr_handler(entry->e_name_index);
 		if (handler)
 			buf += handler->list(buf, inode, entry->e_name,
-					     entry->e_name_len, flags);
+					     entry->e_name_len);
 	}
 	error = size;
 

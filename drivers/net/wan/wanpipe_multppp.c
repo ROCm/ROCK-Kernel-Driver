@@ -2283,7 +2283,7 @@ static int intr_test( sdla_t* card)
 
 	Intr_test_counter = 0;
 
-	/* The critical flag is unset because during intialization (if_open) 
+	/* The critical flag is unset because during initialization (if_open) 
 	 * we want the interrupts to be enabled so that when the wpc_isr is
 	 * called it does not exit due to critical flag set.
 	 */ 

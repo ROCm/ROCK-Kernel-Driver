@@ -202,7 +202,7 @@ err_out:
  * records/inodes present in the page before I/O can proceed. In that case we
  * wouldn't need to bother with PG_locked and PG_uptodate as nobody will be
  * accessing anything without owning the mrec_lock semaphore. But we do need
- * to use them because of the read_cache_page() invokation and the code becomes
+ * to use them because of the read_cache_page() invocation and the code becomes
  * so much simpler this way that it is well worth it.
  *
  * The mft record is now ours and we return a pointer to it. You need to check

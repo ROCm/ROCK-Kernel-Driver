@@ -165,7 +165,7 @@ struct r3964_block_header
 {
 	unsigned int length;             /* length in chars without header */
 	unsigned char *data;             /* usually data is located 
-                                        immediatly behind this struct */
+                                        immediately behind this struct */
 	unsigned int locks;              /* only used in rx_buffer */
 	  
     struct r3964_block_header *next;

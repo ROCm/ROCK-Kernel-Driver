@@ -577,7 +577,7 @@ int journal_set_revoke(journal_t *journal,
 	
 	record = find_revoke_record(journal, blocknr);
 	if (record) {
-		/* If we have multiple occurences, only record the
+		/* If we have multiple occurrences, only record the
 		 * latest sequence number in the hashed record */
 		if (tid_gt(sequence, record->sequence))
 			record->sequence = sequence;

@@ -44,6 +44,9 @@ wakeup_code:
 	testl	$1, video_flags - wakeup_code
 	jz	1f
 	lcall   $0xc000,$3
+	movw	%cs, %ax
+	movw	%ax, %ds					# Bios might have played with that
+	movw	%ax, %ss
 1:
 
 	testl	$2, video_flags - wakeup_code

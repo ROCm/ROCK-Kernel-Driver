@@ -207,7 +207,7 @@ static int actisys_change_speed(struct sir_dev *dev, unsigned speed)
  *	o second put the dongle in a know state
  *
  *	The dongle is powered of the RTS and DTR lines. In the dongle, there
- * is a big capacitor to accomodate the current spikes. This capacitor
+ * is a big capacitor to accommodate the current spikes. This capacitor
  * takes a least 50 ms to be charged. In theory, the Bios set those lines
  * up, so by the time we arrive here we should be set. It doesn't hurt
  * to be on the conservative side, so we will wait...

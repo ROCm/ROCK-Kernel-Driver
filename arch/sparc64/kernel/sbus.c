@@ -24,7 +24,7 @@
 #include "iommu_common.h"
 
 /* These should be allocated on an SMP_CACHE_BYTES
- * aligned boundry for optimal performance.
+ * aligned boundary for optimal performance.
  *
  * On SYSIO, using an 8K page size we have 1GB of SBUS
  * DMA space mapped.  We divide this space into equally

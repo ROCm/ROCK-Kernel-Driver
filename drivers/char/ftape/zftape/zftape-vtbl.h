@@ -176,7 +176,7 @@ static inline __s64 zft_check_for_eof(const zft_volinfo *vtbl,
 				      const zft_position *pos);
 
 /* this function decrements the zft_seg_pos counter if we are right
- * at the beginning of a segment. This is to handel fsfm/bsfm -- we
+ * at the beginning of a segment. This is to handle fsfm/bsfm -- we
  * need to position before the eof mark.  NOTE: zft_tape_pos is not
  * changed 
  */

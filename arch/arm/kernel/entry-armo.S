@@ -426,7 +426,7 @@ Ldata_do:	mov	r3, sp
 		mov	r2, #0
 		tst	r4, #1 << 20		@ Check to see if it is a write instruction
 		orreq	r2, r2, #FAULT_CODE_WRITE @ Indicate write instruction
-		mov	r1, r4, lsr #22		@ Now branch to the relevent processing routine
+		mov	r1, r4, lsr #22		@ Now branch to the relevant processing routine
 		and	r1, r1, #15 << 2
 		add	pc, pc, r1
 		movs	pc, lr

@@ -1230,9 +1230,10 @@ flush_tlb_all_function(void* info)
 void
 flush_tlb_all(void)
 {
+	preempt_disable();
 	smp_call_function (flush_tlb_all_function, 0, 1, 1);
-
 	do_flush_tlb_all_local();
+	preempt_enable();
 }
 
 /* used to set up the trampoline for other CPUs when the memory manager
@@ -1453,7 +1454,7 @@ smp_intr_init(void)
 }
 
 /* send a CPI at level cpi to a set of cpus in cpuset (set 1 bit per
- * processor to recieve CPI */
+ * processor to receive CPI */
 static void
 send_CPI(__u32 cpuset, __u8 cpi)
 {

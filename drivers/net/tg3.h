@@ -1821,6 +1821,8 @@ struct tg3 {
 #define TG3_FLAG_GOT_SERDES_FLOWCTL	0x20000000
 #define TG3_FLAG_SPLIT_MODE		0x40000000
 #define TG3_FLAG_INIT_COMPLETE		0x80000000
+	u32				tg3_flags2;
+#define TG3_FLG2_RESTART_TIMER		0x00000001
 
 	u32				split_mode_max_reqs;
 #define SPLIT_MODE_5704_MAX_REQ		3
@@ -1889,6 +1891,7 @@ struct tg3 {
 
 	struct tg3_hw_stats		*hw_stats;
 	dma_addr_t			stats_mapping;
+	struct work_struct		reset_task;
 };
 
 #endif /* !(_T3_H) */

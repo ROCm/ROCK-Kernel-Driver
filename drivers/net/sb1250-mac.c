@@ -512,7 +512,7 @@ static void sbmac_mii_senddata(struct sbmac_softc *s,unsigned int data, int bitc
  *  	   regidx = index of register to read
  *  	   
  *  Return value:
- *  	   value read, or 0 if an error occured.
+ *  	   value read, or 0 if an error occurred.
  ********************************************************************* */
 
 static unsigned int sbmac_mii_read(struct sbmac_softc *s,int phyaddr,int regidx)
@@ -554,7 +554,7 @@ static unsigned int sbmac_mii_read(struct sbmac_softc *s,int phyaddr,int regidx)
 	SBMAC_WRITECSR(s->sbm_mdio,M_MAC_MDIO_DIR_INPUT);
 	
 	/* 
-	 * If an error occured, the PHY will signal '1' back
+	 * If an error occurred, the PHY will signal '1' back
 	 */
 	error = SBMAC_READCSR(s->sbm_mdio) & M_MAC_MDIO_IN;
 	

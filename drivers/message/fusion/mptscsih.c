@@ -116,7 +116,7 @@ typedef struct _BIG_SENSE_BUF {
 #define MPT_ICFLAG_ECHO		0x02	/* ReadBuffer Echo buffer format */
 #define MPT_ICFLAG_PHYS_DISK	0x04	/* Any SCSI IO but do Phys Disk Format */
 #define MPT_ICFLAG_TAGGED_CMD	0x08	/* Do tagged IO */
-#define MPT_ICFLAG_DID_RESET	0x20	/* Bus Reset occured with this command */
+#define MPT_ICFLAG_DID_RESET	0x20	/* Bus Reset occurred with this command */
 #define MPT_ICFLAG_RESERVED	0x40	/* Reserved has been issued */
 
 typedef struct _internal_cmd {
@@ -4207,7 +4207,7 @@ static const char * ascq_set_strings_4max(
 	/*
 	 * Need to check ASC here; if it is "special," then
 	 * the ASCQ is variable, and indicates failed component number.
-	 * We must treat the ASCQ as a "dont care" while searching the
+	 * We must treat the ASCQ as a "don't care" while searching the
 	 * mptscsih_ASCQ_Table[] by masking it off, and then restoring it later
 	 * on when we actually need to identify the failed component.
 	 */

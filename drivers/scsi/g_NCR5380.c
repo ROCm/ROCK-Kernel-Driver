@@ -323,7 +323,7 @@ int __init generic_NCR5380_detect(Scsi_Host_Template * tpnt)
 				printk(KERN_ERR "dtc436e probe: attach failed\n");
 				continue;
 			}
-			if (pnp_activate_dev(dev, NULL) < 0) {
+			if (pnp_activate_dev(dev) < 0) {
 				printk(KERN_ERR "dtc436e probe: activate failed\n");
 				pnp_device_detach(dev);
 				continue;

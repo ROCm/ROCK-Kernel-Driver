@@ -145,7 +145,7 @@ struct RioHostInfo	* info;
 	p->RIOHosts[p->RIONumHosts].PaddrP	= info->location;
 
 	/*
-	** Check that we are able to accomodate another host
+	** Check that we are able to accommodate another host
 	*/
 	if ( p->RIONumHosts >= RIO_HOSTS )
 	{

@@ -150,7 +150,7 @@ is_devfn_node(struct device_node *dn, void *data)
 }
 
 /* This is the "slow" path for looking up a device_node from a
- * pci_dev.  It will hunt for the device under it's parent's
+ * pci_dev.  It will hunt for the device under its parent's
  * phb and then update sysdata for a future fastpath.
  *
  * It may also do fixups on the actual device since this happens

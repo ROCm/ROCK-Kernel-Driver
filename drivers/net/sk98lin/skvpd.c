@@ -563,7 +563,7 @@ SK_IOC		IoC)	/* IO Context */
 
 /*
  *	find the Keyword 'key' in the VPD buffer and fills the
- *	parameter sturct 'p' with it's values
+ *	parameter sturct 'p' with its values
  *
  * returns	*p	success
  *		0:	parameter was not found or VPD encoding error

@@ -440,7 +440,7 @@ static __init int broken_pirq(struct dmi_blacklist *d)
 {
 	printk(KERN_INFO " *** Possibly defective BIOS detected (irqtable)\n");
 	printk(KERN_INFO " *** Many BIOSes matching this signature have incorrect IRQ routing tables.\n");
-	printk(KERN_INFO " *** If you see IRQ problems, in paticular SCSI resets and hangs at boot\n");
+	printk(KERN_INFO " *** If you see IRQ problems, in particular SCSI resets and hangs at boot\n");
 	printk(KERN_INFO " *** contact your hardware vendor and ask about updates.\n");
 	printk(KERN_INFO " *** Building an SMP kernel may evade the bug some of the time.\n");
 #ifdef CONFIG_X86_IO_APIC
@@ -455,7 +455,7 @@ static __init int broken_pirq(struct dmi_blacklist *d)
 
 static __init int broken_toshiba_keyboard(struct dmi_blacklist *d)
 {
-	printk(KERN_WARNING "Toshiba with broken keyboard detected. If your keyboard sometimes generates 3 keypresses instead of one, contact pavel@ucw.cz\n");
+	printk(KERN_WARNING "Toshiba with broken keyboard detected. If your keyboard sometimes generates 3 keypresses instead of one, see http://davyd.ucc.asn.au/projects/toshiba/README\n");
 	return 0;
 }
 
@@ -469,6 +469,23 @@ static __init int init_ints_after_s1(struct dmi_blacklist *d)
 	dmi_broken |= BROKEN_INIT_AFTER_S1;
 	return 0;
 }
+
+#ifdef CONFIG_ACPI_SLEEP
+static __init int reset_videomode_after_s3(struct dmi_blacklist *d)
+{
+	/* See acpi_wakeup.S */
+	extern long acpi_video_flags;
+	acpi_video_flags |= 2;
+	return 0;
+}
+
+static __init int reset_videobios_after_s3(struct dmi_blacklist *d)
+{
+	extern long acpi_video_flags;
+	acpi_video_flags |= 1;
+	return 0;
+}
+#endif
 
 /*
  * Some Bioses enable the PS/2 mouse (touchpad) at resume, even if it was
@@ -743,6 +760,12 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 			MATCH(DMI_PRODUCT_NAME, "S4030CDT/4.3"),
 			NO_MATCH, NO_MATCH, NO_MATCH
 			} },
+#ifdef CONFIG_ACPI_SLEEP
+	{ reset_videomode_after_s3, "Toshiba Satellite 4030cdt", { /* Reset video mode after returning from ACPI S3 sleep */
+			MATCH(DMI_PRODUCT_NAME, "S4030CDT/4.3"),
+			NO_MATCH, NO_MATCH, NO_MATCH
+			} },
+#endif
 
 	{ print_if_true, KERN_WARNING "IBM T23 - BIOS 1.03b+ and controller firmware 1.02+ may be needed for Linux APM.", {
 			MATCH(DMI_SYS_VENDOR, "IBM"),

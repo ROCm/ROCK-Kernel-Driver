@@ -215,7 +215,7 @@ static ssize_t flash_write(struct file *file, const char *buf, size_t size, loff
 	temp = ((int) (p + count) >> 16) - nBlock + 1;
 
 	/*
-	 * write ends at exactly 64k boundry?
+	 * write ends at exactly 64k boundary?
 	 */
 	if (((int) (p + count) & 0xFFFF) == 0)
 		temp -= 1;

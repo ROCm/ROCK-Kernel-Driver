@@ -18,7 +18,8 @@ dev->open:
 dev->stop:
 	Synchronization: rtnl_lock() semaphore.
 	Context: process
-	Notes: netif_running() is guaranteed false when this is called
+	Note1: netif_running() is guaranteed false
+	Note2: dev->poll() is guaranteed to be stopped
 
 dev->do_ioctl:
 	Synchronization: rtnl_lock() semaphore.
@@ -31,10 +32,12 @@ dev->get_stats:
 dev->hard_start_xmit:
 	Synchronization: dev->xmit_lock spinlock.
 	Context: BHs disabled
+	Notes: netif_queue_stopped() is guaranteed false
 
 dev->tx_timeout:
 	Synchronization: dev->xmit_lock spinlock.
 	Context: BHs disabled
+	Notes: netif_queue_stopped() is guaranteed true
 
 dev->set_multicast_list:
 	Synchronization: dev->xmit_lock spinlock.

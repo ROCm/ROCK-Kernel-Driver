@@ -1,7 +1,7 @@
 /*
  * linux/arch/arm/mach-iop310/mm.c
  *
- * Low level memory intialization for IOP310 based systems
+ * Low level memory initialization for IOP310 based systems
  *
  * Author: Nicolas Pitre <npitre@mvista.com>
  *

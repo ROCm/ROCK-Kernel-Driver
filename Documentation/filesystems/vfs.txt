@@ -439,7 +439,7 @@ struct dentry_operations {
 
   d_release: called when a dentry is really deallocated
 
-  d_iput: called when a dentry looses its inode (just prior to its
+  d_iput: called when a dentry loses its inode (just prior to its
 	being deallocated). The default when this is NULL is that the
 	VFS calls iput(). If you define this method, you must call
 	iput() yourself

@@ -164,7 +164,7 @@ setup_arch(char **cmdline_p)
 
 	paging_init();
 
-	/* We dont use a command line yet, so just re-initialize it without
+	/* We don't use a command line yet, so just re-initialize it without
 	   saving anything that might be there.  */
 
 	*cmdline_p = command_line;

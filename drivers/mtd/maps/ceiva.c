@@ -94,7 +94,7 @@ static struct map_info clps_map __initdata = {
  *
  * Please note:
  *  1. The flash size given should be the largest flash size that can
- *     be accomodated.
+ *     be accommodated.
  *
  *  2. The bus width must defined in clps_setup_flash.
  *

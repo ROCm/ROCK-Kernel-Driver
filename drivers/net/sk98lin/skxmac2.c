@@ -596,7 +596,7 @@ int		Port)	/* port to stop (MAC_1 + n) */
  *	none, National: 80ns).
  *
  * ATTENTION:
- * 	It is absolutely neccessary to reset the SW_RST Bit first
+ * 	It is absolutely necessary to reset the SW_RST Bit first
  *	before calling this function.
  *
  * Returns:

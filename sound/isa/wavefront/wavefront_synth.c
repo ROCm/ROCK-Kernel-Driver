@@ -518,7 +518,7 @@ snd_wavefront_cmd (snd_wavefront_t *dev,
 /***********************************************************************
 WaveFront data munging   
 
-Things here are wierd. All data written to the board cannot 
+Things here are weird. All data written to the board cannot 
 have its most significant bit set. Any data item with values 
 potentially > 0x7F (127) must be split across multiple bytes.
 
@@ -527,7 +527,7 @@ the x86 side as 8-32 bit values. Sometimes, we need to munge data
 that is represented on the x86 side as an array of bytes. The most
 efficient approach to handling both cases seems to be to use 2
 different functions for munging and 2 for de-munging. This avoids
-wierd casting and worrying about bit-level offsets.
+weird casting and worrying about bit-level offsets.
 
 **********************************************************************/
 
@@ -906,7 +906,7 @@ wavefront_send_sample (snd_wavefront_t *dev,
 
 	if (header->size) {
 
-		/* XXX its a debatable point whether or not RDONLY semantics
+		/* XXX it's a debatable point whether or not RDONLY semantics
 		   on the ROM samples should cover just the sample data or
 		   the sample header. For now, it only covers the sample data,
 		   so anyone is free at all times to rewrite sample headers.
@@ -1034,7 +1034,7 @@ wavefront_send_sample (snd_wavefront_t *dev,
 	shptr = munge_int32 (*((u32 *) &header->hdr.s.sampleEndOffset),
 			     shptr, 4);
 	
-	/* This one is truly wierd. What kind of wierdo decided that in
+	/* This one is truly weird. What kind of weirdo decided that in
 	   a system dominated by 16 and 32 bit integers, they would use
 	   a just 12 bits ?
 	*/

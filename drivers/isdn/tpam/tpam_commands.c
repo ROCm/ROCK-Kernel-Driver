@@ -880,7 +880,7 @@ void tpam_recv_U3DataInd(tpam_card *card, struct sk_buff *skb) {
 		memcpy(skb_put(result, len), data, len);
 	}
 
-	/* In loop mode, resend the data immediatly */
+	/* In loop mode, resend the data immediately */
 	if (card->loopmode) {
 		struct sk_buff *loopskb;
 

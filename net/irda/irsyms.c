@@ -254,7 +254,7 @@ void irda_notify_init(notify_t *notify)
 /*
  * Function irda_init (void)
  *
- *  Protocol stack intialisation entry point.
+ *  Protocol stack initialisation entry point.
  *  Initialise the various components of the IrDA stack
  */
 int __init irda_init(void)

@@ -340,7 +340,7 @@ static struct SYM_FWA_SCR SYM_FWA_SCR = {
 	/*
 	 *  Now there are 4 possibilities:
 	 *
-	 *  (1) The chip looses arbitration.
+	 *  (1) The chip loses arbitration.
 	 *  This is ok, because it will try again,
 	 *  when the bus becomes idle.
 	 *  (But beware of the timeout function!)
@@ -1361,7 +1361,7 @@ static struct SYM_FWB_SCR SYM_FWB_SCR = {
 	 *  some target to reset or some disconnected 
 	 *  job to abort. Since error recovery is a serious 
 	 *  busyness, we will really reset the SCSI BUS, if 
-	 *  case of a SCSI interrupt occuring in this path.
+	 *  case of a SCSI interrupt occurring in this path.
 	 */
 
 #ifdef SYM_CONF_TARGET_ROLE_SUPPORT

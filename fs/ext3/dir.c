@@ -33,12 +33,17 @@ static unsigned char ext3_filetype_table[] = {
 static int ext3_readdir(struct file *, void *, filldir_t);
 static int ext3_dx_readdir(struct file * filp,
 			   void * dirent, filldir_t filldir);
+static int ext3_release_dir (struct inode * inode,
+				struct file * filp);
 
 struct file_operations ext3_dir_operations = {
 	.read		= generic_read_dir,
 	.readdir	= ext3_readdir,		/* we take BKL. needed?*/
 	.ioctl		= ext3_ioctl,		/* BKL held */
 	.fsync		= ext3_sync_file,		/* BKL held */
+#ifdef CONFIG_EXT3_INDEX
+	.release	= ext3_release_dir,
+#endif
 };
 
 
@@ -275,7 +280,11 @@ static void free_rb_tree_fname(struct rb_root *root)
 		 */
 		parent = n->rb_parent;
 		fname = rb_entry(n, struct fname, rb_hash);
-		kfree(fname);
+		while (fname) {
+			struct fname * old = fname;
+			fname = fname->next;
+			kfree (old);
+		}
 		if (!parent)
 			root->rb_node = 0;
 		else if (parent->rb_left == n)
@@ -481,4 +490,13 @@ finished:
 	UPDATE_ATIME(inode);
 	return 0;
 }
+
+static int ext3_release_dir (struct inode * inode, struct file * filp)
+{
+       if (is_dx(inode) && filp->private_data)
+		ext3_htree_free_dir_info(filp->private_data);
+
+	return 0;
+}
+
 #endif

@@ -160,7 +160,7 @@ getxattr(struct dentry *d, char *name, void *value, size_t size)
 		if (error)
 			goto out;
 		down(&d->d_inode->i_sem);
-		error = d->d_inode->i_op->getxattr(d, kname, kvalue, size, 0);
+		error = d->d_inode->i_op->getxattr(d, kname, kvalue, size);
 		up(&d->d_inode->i_sem);
 	}
 
@@ -233,7 +233,7 @@ listxattr(struct dentry *d, char *list, size_t size)
 		if (error)
 			goto out;
 		down(&d->d_inode->i_sem);
-		error = d->d_inode->i_op->listxattr(d, klist, size, 0);
+		error = d->d_inode->i_op->listxattr(d, klist, size);
 		up(&d->d_inode->i_sem);
 	}
 
@@ -308,7 +308,7 @@ removexattr(struct dentry *d, char *name)
 		if (error)
 			goto out;
 		down(&d->d_inode->i_sem);
-		error = d->d_inode->i_op->removexattr(d, kname, 0);
+		error = d->d_inode->i_op->removexattr(d, kname);
 		up(&d->d_inode->i_sem);
 	}
 out:

@@ -586,7 +586,7 @@ int CpqTsInitializeFrameManager( void *pChip, int opcode)
 
 
 
-// This "look ahead" function examines the IMQ for occurence of
+// This "look ahead" function examines the IMQ for occurrence of
 // "type".  Returns 1 if found, 0 if not.
 static int PeekIMQEntry( PTACHYON fcChip, ULONG type)
 {

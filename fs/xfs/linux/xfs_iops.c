@@ -523,7 +523,7 @@ linvfs_truncate(
  */
 
 #define SYSTEM_NAME	"system."	/* VFS shared names/values */
-#define ROOT_NAME	"xfsroot."	/* XFS ondisk names/values */
+#define ROOT_NAME	"trusted."	/* root's own names/values */
 #define USER_NAME	"user."		/* user's own names/values */
 STATIC xattr_namespace_t xfs_namespace_array[] = {
 	{ .name= SYSTEM_NAME,	.namelen= sizeof(SYSTEM_NAME)-1,.exists= NULL },
@@ -590,7 +590,7 @@ linvfs_setxattr(
 		error = -EINVAL;
 		if (flags & XATTR_CREATE)
 			 return error;
-		error = -ENOATTR;
+		error = -EOPNOTSUPP;
 		p += xfs_namespaces[SYSTEM_NAMES].namelen;
 		if (strcmp(p, POSIXACL_ACCESS) == 0) {
 			error = xfs_acl_vset(vp, (void *) data, size,
@@ -632,7 +632,7 @@ linvfs_setxattr(
 		VOP_ATTR_SET(vp, p, (void *) data, size, xflags, NULL, error);
 		return -error;
 	}
-	return -ENOATTR;
+	return -EOPNOTSUPP;
 }
 
 STATIC ssize_t
@@ -640,8 +640,7 @@ linvfs_getxattr(
 	struct dentry	*dentry,
 	const char	*name,
 	void		*data,
-	size_t		size,
-	int		flags)
+	size_t		size)
 {
 	ssize_t		error;
 	int		xflags = 0;
@@ -651,7 +650,7 @@ linvfs_getxattr(
 
 	if (strncmp(name, xfs_namespaces[SYSTEM_NAMES].name,
 			xfs_namespaces[SYSTEM_NAMES].namelen) == 0) {
-		error = -ENOATTR;
+		error = -EOPNOTSUPP;
 		p += xfs_namespaces[SYSTEM_NAMES].namelen;
 		if (strcmp(p, POSIXACL_ACCESS) == 0) {
 			error = xfs_acl_vget(vp, data, size, _ACL_TYPE_ACCESS);
@@ -690,7 +689,7 @@ linvfs_getxattr(
 			error = -size;
 		return -error;
 	}
-	return -ENOATTR;
+	return -EOPNOTSUPP;
 }
 
 
@@ -698,8 +697,7 @@ STATIC ssize_t
 linvfs_listxattr(
 	struct dentry		*dentry,
 	char			*data,
-	size_t			size,
-	int			flags)
+	size_t			size)
 {
 	ssize_t			error;
 	int			result = 0;
@@ -743,8 +741,7 @@ linvfs_listxattr(
 STATIC int
 linvfs_removexattr(
 	struct dentry	*dentry,
-	const char	*name,
-	int		flags)
+	const char	*name)
 {
 	int		error;
 	int		xflags = 0;
@@ -754,7 +751,7 @@ linvfs_removexattr(
 
 	if (strncmp(name, xfs_namespaces[SYSTEM_NAMES].name,
 			xfs_namespaces[SYSTEM_NAMES].namelen) == 0) {
-		error = -ENOATTR;
+		error = -EOPNOTSUPP;
 		p += xfs_namespaces[SYSTEM_NAMES].namelen;
 		if (strcmp(p, POSIXACL_ACCESS) == 0)
 			error = xfs_acl_vremove(vp, _ACL_TYPE_ACCESS);
@@ -782,7 +779,7 @@ linvfs_removexattr(
 		VOP_ATTR_REMOVE(vp, p, xflags, NULL, error);
 		return -error;
 	}
-	return -ENOATTR;
+	return -EOPNOTSUPP;
 }
 
 

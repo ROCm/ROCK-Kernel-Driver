@@ -52,7 +52,7 @@ static int __init visws_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 
 	pin--;
 
-	/* Nothing usefull at PIIX4 pin 1 */
+	/* Nothing useful at PIIX4 pin 1 */
 	if (bus == pci_bus0 && slot == 4 && pin == 0)
 		return -1;
 

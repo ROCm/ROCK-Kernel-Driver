@@ -108,7 +108,7 @@
  * but are not limited to:
  *
  *  1: Import of the latest FreeBSD sequencer code for this driver
- *  2: Modification of kernel code to accomodate different sequencer semantics
+ *  2: Modification of kernel code to accommodate different sequencer semantics
  *  3: Extensive changes throughout kernel portion of driver to improve
  *     abort/reset processing and error hanndling
  *  4: Other work contributed by various people on the Internet
@@ -875,7 +875,7 @@ ahc_linux_detect(Scsi_Host_Template *template)
 	ahc_list_lockinit();
 
 #ifdef CONFIG_PCI
-	ahc_linux_pci_probe(template);
+	ahc_linux_pci_init();
 #endif
 
 	if (aic7xxx_no_probe == 0)
@@ -1266,9 +1266,9 @@ ahc_linux_bus_reset(Scsi_Cmnd *cmd)
 }
 
 Scsi_Host_Template aic7xxx_driver_template = {
+	.module			= THIS_MODULE,
+	.name			= "aic7xxx",
 	.proc_info		= ahc_linux_proc_info,
-	.detect			= ahc_linux_detect,
-	.release		= ahc_linux_release,
 	.info			= ahc_linux_info,
 	.queuecommand		= ahc_linux_queue,
 	.eh_abort_handler	= ahc_linux_abort,
@@ -1300,18 +1300,16 @@ Scsi_Host_Template aic7xxx_driver_template = {
 #endif
 #endif
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
-	.name			= "aic7xxx",
 	.slave_alloc		= ahc_linux_slave_alloc,
 	.slave_configure	= ahc_linux_slave_configure,
 	.slave_destroy		= ahc_linux_slave_destroy,
 #else
+	.detect			= ahc_linux_detect,
+	.release		= ahc_linux_release,
 	.select_queue_depths	= ahc_linux_select_queue_depth,
 	.use_new_eh_code	= 1,
 #endif
 };
-
-#define driver_template aic7xxx_driver_template
-#include "scsi_module.c"
 
 /**************************** Tasklet Handler *********************************/
 
@@ -1861,9 +1859,8 @@ ahc_linux_register_host(struct ahc_softc *ahc, Scsi_Host_Template *template)
 		ahc_set_name(ahc, new_name);
 	}
 	host->unique_id = ahc->unit;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
-	scsi_set_device(host, &ahc->dev_softc->dev);
-#elif LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,4)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,4) && \
+    LINUX_VERSION_CODE <= KERNEL_VERSION(2,5,0)
 	scsi_set_pci_device(host, ahc->dev_softc);
 #endif
 	ahc_linux_initialize_scsi_bus(ahc);
@@ -1897,6 +1894,10 @@ ahc_linux_register_host(struct ahc_softc *ahc, Scsi_Host_Template *template)
 	ahc_intr_enable(ahc, TRUE);
 	ahc_linux_start_dv(ahc);
 	ahc_unlock(ahc, &s);
+
+#if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,0)
+	scsi_add_host(host, (ahc->dev_softc ? &ahc->dev_softc->dev : NULL));
+#endif
 	return (0);
 }
 
@@ -2075,8 +2076,12 @@ ahc_platform_free(struct ahc_softc *ahc)
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
 		tasklet_kill(&ahc->platform_data->runq_tasklet);
 #endif
-		if (ahc->platform_data->host != NULL)
+		if (ahc->platform_data->host != NULL) {
+#if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,0)
+			scsi_remove_host(ahc->platform_data->host);
+#endif
 			scsi_unregister(ahc->platform_data->host);
+		}
 
 		/* destroy all of the device and target objects */
 		for (i = 0; i < AHC_NUM_TARGETS; i++) {
@@ -2112,19 +2117,16 @@ ahc_platform_free(struct ahc_softc *ahc)
 #endif
 		}
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
-		/* XXX Need an instance detach in the PCI code */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
+		/*
+		 * In 2.4 we detach from the scsi midlayer before the PCI
+		 * layer invokes our remove callback.
+		 */
 		if (ahc->dev_softc != NULL)
 			ahc->dev_softc->driver = NULL;
 #endif
+#endif
 		free(ahc->platform_data, M_DEVBUF);
-	}
-	if (TAILQ_EMPTY(&ahc_tailq)) {
-		unregister_reboot_notifier(&ahc_linux_notifier);
-#ifdef CONFIG_PCI
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
-		pci_unregister_driver(&aic7xxx_pci_driver);
-#endif
-#endif
 	}
 }
 
@@ -5182,3 +5184,51 @@ ahc_platform_dump_card_state(struct ahc_softc *ahc)
 		}
 	}
 }
+
+static int __init ahc_linux_init(void)
+{
+#if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,0)
+	return (ahc_linux_detect(&aic7xxx_driver_template) ? 0 : -ENODEV);
+#else
+	scsi_register_module(MODULE_SCSI_HA, &aic7xxx_driver_template);
+	if (!driver_template.present) {
+		scsi_unregister_module(MODULE_SCSI_HA,
+				       &aic7xxx_driver_template);
+		return (-ENODEV);
+	}
+
+	return (0);
+#endif
+}
+
+static void __exit ahc_linux_exit(void)
+{
+#if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,0)
+	struct	ahc_softc *ahc;
+
+	ahc_linux_pci_exit();
+
+	/*
+	 * Get rid of the non-pci devices.  
+	 *
+	 * XXX(hch): switch over eisa support to new LDM-based API
+	 */
+	TAILQ_FOREACH(ahc, &ahc_tailq, links)
+		ahc_linux_release(ahc->platform_data->host);
+#else
+	scsi_unregister_module(MODULE_SCSI_HA, &aic7xxx_driver_template);
+
+	/*
+	 * In 2.4 we have to unregister from the PCI core _after_
+	 * unregistering from the scsi midlayer to avoid danling references.
+	 *
+	 * The 2.4 scsi midlayer is so f***ed..
+	 */
+	ahc_linux_pci_exit();
+#endif
+
+	unregister_reboot_notifier(&ahc_linux_notifier);
+}
+
+module_init(ahc_linux_init);
+module_exit(ahc_linux_exit);

@@ -1356,7 +1356,7 @@ static int reiserfs_statfs (struct super_block * s, struct statfs * buf)
   buf->f_bavail  = buf->f_bfree;
   buf->f_blocks  = sb_block_count(rs) - sb_bmap_nr(rs) - 1;
   buf->f_bsize   = s->s_blocksize;
-  /* changed to accomodate gcc folks.*/
+  /* changed to accommodate gcc folks.*/
   buf->f_type    =  REISERFS_SUPER_MAGIC;
   return 0;
 }

@@ -287,7 +287,7 @@ anakin_set_termios(struct uart_port *port, struct termios *termios,
 		   struct termios *old)
 {
 	unsigned long flags;
-	unsigned int quot;
+	unsigned int baud, quot;
 
 	/*
 	 * We don't support parity, stop bits, or anything other
@@ -304,11 +304,12 @@ anakin_set_termios(struct uart_port *port, struct termios *termios,
 	/*
 	 * Ask the core to calculate the divisor for us.
 	 */
-	quot = uart_get_divisor(port, termios, old);
+	baud = uart_get_baud_rate(port, termios, old, 0, port->uartclk/16); 
+	quot = uart_get_divisor(port, baud);
 
 	spin_lock_irqsave(&port->lock, flags);
 
-	uart_update_timeout(port, termios->c_cflag, quot);
+	uart_update_timeout(port, termios->c_cflag, baud);
 
 	while (!(anakin_in(port, 0x10) & TXEMPTY))
 		barrier();

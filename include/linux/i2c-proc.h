@@ -69,8 +69,7 @@ extern int i2c_proc_real(ctl_table * ctl, int write, struct file *filp,
    these functions must be updated! */
 extern int i2c_register_entry(struct i2c_client *client,
 				  const char *prefix,
-				  ctl_table * ctl_template,
-				  struct module *controlling_mod);
+				  ctl_table * ctl_template);
 
 extern void i2c_deregister_entry(int id);
 

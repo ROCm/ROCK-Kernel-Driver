@@ -9,8 +9,7 @@
 #ifndef _LINUX_XATTR_H
 #define _LINUX_XATTR_H
 
-#define XATTR_CREATE		0x1	/* fail if attr already exists */
-#define XATTR_REPLACE		0x2	/* fail if attr does not exist */
-#define XATTR_KERNEL_CONTEXT	0x4	/* called from kernel context */
+#define XATTR_CREATE	0x1	/* set value, fail if attr already exists */
+#define XATTR_REPLACE	0x2	/* set value, fail if attr does not exist */
 
 #endif	/* _LINUX_XATTR_H */

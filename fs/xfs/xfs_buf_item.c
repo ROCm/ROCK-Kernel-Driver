@@ -924,7 +924,7 @@ xfs_buf_item_relse(
 
 
 /*
- * Add the given log item with it's callback to the list of callbacks
+ * Add the given log item with its callback to the list of callbacks
  * to be called when the buffer's I/O completes.  If it is not set
  * already, set the buffer's b_iodone() routine to be
  * xfs_buf_iodone_callbacks() and link the log item into the list of

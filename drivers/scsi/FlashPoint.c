@@ -3846,7 +3846,7 @@ int SetDevWideMode(PSCCBcard pCurrCard,PUCB p_ucb)
 	}
 	else
 	{
-		if(!currTar_Info->TarEEValue & EE_WIDE_SCSI)
+		if(!(currTar_Info->TarEEValue & EE_WIDE_SCSI))
 		{
 			return(0);
 		}
@@ -7529,7 +7529,7 @@ void sinits(PSCCB p_sccb, UCHAR p_card)
  *
  *   $Workfile:   phase.c  $
  *
- *   Description:  Functions to intially handle the SCSI bus phase when
+ *   Description:  Functions to initially handle the SCSI bus phase when
  *                 the target asserts request (and the automation is not
  *                 enabled to handle the situation).
  *
@@ -10866,7 +10866,7 @@ int DiagBusMaster(ULONG port)
  * Function: DiagEEPROM
  *
  * Description: Verfiy checksum and 'Key' and initialize the EEPROM if
- *              neccessary.
+ *              necessary.
  *
  *---------------------------------------------------------------------*/
 

@@ -13,6 +13,7 @@
 #include <linux/sched.h>
 #include <linux/param.h>
 #include <linux/init.h>
+#include <linux/unistd.h>
 #include <asm/irq.h>
 #include <asm/dma.h>
 #include <asm/traps.h>

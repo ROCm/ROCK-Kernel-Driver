@@ -233,7 +233,7 @@ handle_name:
 	m = NULL;
 	ctx = NULL;
 
-	/* Check if a conversion error occured. */
+	/* Check if a conversion error occurred. */
 	if ((signed)nls_name.len < 0) {
 		err = (signed)nls_name.len;
 		goto err_out;

@@ -370,7 +370,7 @@ acpi_set_register (
 
 		/*
 		 * Status Registers are different from the rest.  Clear by
-		 * writing 1, writing 0 has no effect.  So, the only relevent
+		 * writing 1, writing 0 has no effect.  So, the only relevant
 		 * information is the single bit we're interested in, all others should
 		 * be written as 0 so they will be left unchanged
 		 */

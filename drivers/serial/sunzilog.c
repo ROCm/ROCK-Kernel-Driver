@@ -48,7 +48,7 @@
 #include "sunzilog.h"
 
 /* On 32-bit sparcs we need to delay after register accesses
- * to accomodate sun4 systems, but we do not need to flush writes.
+ * to accommodate sun4 systems, but we do not need to flush writes.
  * On 64-bit sparc we only need to flush single writes to ensure
  * completion.
  */

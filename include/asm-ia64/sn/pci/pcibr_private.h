@@ -578,7 +578,7 @@ struct pcibr_soft_s {
 #ifdef LATER
 	toid_t                  bserr_toutid;	/* Timeout started by errintr */
 #endif	/* LATER */
-	iopaddr_t               bserr_addr;	/* Address where error occured */
+	iopaddr_t               bserr_addr;	/* Address where error occurred */
 	uint64_t		bserr_intstat;	/* interrupts active at error dump */
     } bs_errinfo;
 

@@ -120,7 +120,7 @@ know what the other elements in the tvcards array are good for:
 video_inputs    - # of video inputs the card has
 audio_inputs    - historical cruft, not used any more.
 tuner           - which input is the tuner
-svhs            - which input is svhs (all others are labled composite)
+svhs            - which input is svhs (all others are labeled composite)
 muxsel          - video mux, input->registervalue mapping
 pll             - same as pll= insmod option
 tuner_type      - same as tuner= insmod option

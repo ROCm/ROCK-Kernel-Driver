@@ -163,7 +163,7 @@ unx_marshal(struct rpc_task *task, u32 *p, int ruid)
 	memcpy(p, clnt->cl_nodename, n);
 	p += (n + 3) >> 2;
 
-	/* Note: we don't use real uid if it involves raising priviledge */
+	/* Note: we don't use real uid if it involves raising privilege */
 	if (ruid && cred->uc_puid != 0 && cred->uc_pgid != 0) {
 		*p++ = htonl((u32) cred->uc_puid);
 		*p++ = htonl((u32) cred->uc_pgid);

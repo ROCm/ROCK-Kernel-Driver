@@ -296,7 +296,7 @@ static struct pci_ops iop310_secondary_ops = {
  *  within 3 instructions."
  *
  * This does not appear to be the case.  With 8 NOPs after the load, we
- * see the imprecise abort occuring on the STM of iop310_sec_pci_status()
+ * see the imprecise abort occurring on the STM of iop310_sec_pci_status()
  * which is about 10 instructions away.
  *
  * Always trust reality!

@@ -341,7 +341,7 @@
  * Trying to merge requests breaks this driver horribly (as in it goes
  * boom and apparently has done so since 2.3.41).  As it is a legacy
  * driver for a horribly slow double speed CD on a hideous interface
- * designed for polled operation, I won't loose any sleep in simply
+ * designed for polled operation, I won't lose any sleep in simply
  * disallowing merging.				Paul G.  02/2001
  *
  * Thu May 30 14:14:47 CEST 2002:

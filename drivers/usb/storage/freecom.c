@@ -240,7 +240,7 @@ int freecom_transport(Scsi_Cmnd *srb, struct us_data *us)
 	 * may not work, but that is a condition that should never happen.
 	 */
 	while (fst->Status & FCM_STATUS_BUSY) {
-		US_DEBUGP("20 second USB/ATAPI bridge TIMEOUT occured!\n");
+		US_DEBUGP("20 second USB/ATAPI bridge TIMEOUT occurred!\n");
 		US_DEBUGP("fst->Status is %x\n", fst->Status);
 
 		/* Get the status again */

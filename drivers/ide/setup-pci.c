@@ -470,7 +470,7 @@ fixup_address:
  *	@hwif: Hardware interface we are configuring
  *
  *	Set up the DMA base for the interface. Enable the master bits as
- *	neccessary and attempt to bring the device DMA into a ready to use
+ *	necessary and attempt to bring the device DMA into a ready to use
  *	state
  */
  
@@ -573,7 +573,7 @@ static int ide_setup_pci_controller(struct pci_dev *dev, ide_pci_device_t *d, in
  *	@index: ata index to update
  *
  *	Scan the interfaces attached to this device and do any
- *	neccessary per port setup. Attach the devices and ask the
+ *	necessary per port setup. Attach the devices and ask the
  *	generic DMA layer to do its work for us.
  *
  *	Normally called automaticall from do_ide_pci_setup_device,

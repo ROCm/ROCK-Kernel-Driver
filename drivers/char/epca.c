@@ -897,7 +897,7 @@ static int pc_write(struct tty_struct * tty, int from_user,
 					Remember copy_from_user WILL generate a page fault if the
 					user memory being accessed has been swapped out.  This can
 					cause this routine to temporarily sleep while this page
-					fault is occuring.
+					fault is occurring.
 				
 				----------------------------------------------------------------- */
 
@@ -1865,7 +1865,7 @@ int __init pc_init(void)
 			case PCXI:
 				board_id = inb((int)bd->port);
 				if ((board_id & 0x1) == 0x1) 
-				{ /* Begin its an XI card */ 
+				{ /* Begin it's an XI card */ 
 
 					/* Is it a 64K board */
 					if ((board_id & 0x30) == 0) 
@@ -2743,11 +2743,11 @@ static void epcaparam(struct tty_struct *tty, struct channel *ch)
 
 		/* ---------------------------------------------------------------
 			Command sets channels iflag structure on the board. Such things 
-			as input soft flow control, handeling of parity errors, and
-			break handeling are all set here.
+			as input soft flow control, handling of parity errors, and
+			break handling are all set here.
 		------------------------------------------------------------------- */
 
-		/* break handeling, parity handeling, input stripping, flow control chars */
+		/* break handling, parity handling, input stripping, flow control chars */
 		fepcmd(ch, SETIFLAGS, (unsigned int) ch->fepiflag, 0, 0, 0);
 	}
 
@@ -3516,7 +3516,7 @@ static void pc_start(struct tty_struct *tty)
 /* ------------------------------------------------------------------
 	The below routines pc_throttle and pc_unthrottle are used 
 	to slow (And resume) the receipt of data into the kernels
-	receive buffers.  The exact occurence of this depends on the
+	receive buffers.  The exact occurrence of this depends on the
 	size of the kernels receive buffer and what the 'watermarks'
 	are set to for that buffer.  See the n_ttys.c file for more
 	details. 

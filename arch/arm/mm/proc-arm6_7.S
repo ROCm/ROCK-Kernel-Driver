@@ -97,7 +97,7 @@ ENTRY(cpu_arm7_data_abort)
 		tst	r4, r4, lsr #21			@ C = bit 20
 		sbc	r1, r1, r1			@ r1 = C - 1
 		and	r2, r4, #15 << 24
-		add	pc, pc, r2, lsr #22		@ Now branch to the relevent processing routine
+		add	pc, pc, r2, lsr #22		@ Now branch to the relevant processing routine
 		movs	pc, lr
 
 		b	Ldata_unknown

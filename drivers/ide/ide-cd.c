@@ -19,7 +19,7 @@
  * ftp://fission.dt.wdc.com/pub/standards/SFF_atapi/spec/SFF8020-r2.6/PS/8020r26.ps
  * ftp://ftp.avc-pioneer.com/Mtfuji4/Spec/Fuji4r10.pdf
  *
- * Drives that deviate from these standards will be accomodated as much
+ * Drives that deviate from these standards will be accommodated as much
  * as possible via compile time or command-line options.  Since I only have
  * a few drives, you generally need to send me patches...
  *

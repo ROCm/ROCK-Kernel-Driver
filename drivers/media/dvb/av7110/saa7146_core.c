@@ -222,7 +222,7 @@ int do_master_xfer (struct dvb_i2c_bus *i2c, struct i2c_msg msgs[], int num)
 		 * we do not start the whole rps1-engine...
 		 */
 
-			/* if address-error occured, don't retry */
+			/* if address-error occurred, don't retry */
 		if (i2c_write_out(a, &a->i2c[i], SAA7146_I2C_TIMEOUT) < 0) {
 			hprintk (KERN_ERR "saa7146_core.o: "
 				"i2c error in address phase\n");

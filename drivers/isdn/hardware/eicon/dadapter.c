@@ -327,7 +327,7 @@ static void diva_notify_adapter_change (DESCRIPTOR* d, int removal) {
    Adapter array will be written to memory described by 'buffer'
    If the last adapter seen in the returned adapter array is
    IDI_DADAPTER or if last adapter in array does have type '0', then
-   it was enougth space in buffer to accomodate all available
+   it was enougth space in buffer to accommodate all available
    adapter descriptors
   *NOTE 1 (debug interface):
    The IDI adapter of type 'IDI_DIMAINT' does register as 'request'

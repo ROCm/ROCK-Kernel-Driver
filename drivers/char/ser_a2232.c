@@ -590,7 +590,7 @@ int ch, err, n, p;
 									printk("A2232: 65EC02 software sent SYNC event, don't know what to do. Ignoring.");
 									break;
 								default:
-									printk("A2232: 65EC02 software broken, unknown event type %d occured.\n",ibuf[bufpos-1]);
+									printk("A2232: 65EC02 software broken, unknown event type %d occurred.\n",ibuf[bufpos-1]);
 								} /* event type switch */
 								break;
  							case A2232INCTL_CHAR:
@@ -599,7 +599,7 @@ int ch, err, n, p;
 								bufpos++;
 								break;
  							default:
-								printk("A2232: 65EC02 software broken, unknown data type %d occured.\n",cbuf[bufpos]);
+								printk("A2232: 65EC02 software broken, unknown data type %d occurred.\n",cbuf[bufpos]);
 								bufpos++;
 							} /* switch on input data type */
 						} /* while there's something in the buffer */

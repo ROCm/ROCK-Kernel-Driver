@@ -254,7 +254,7 @@
    device to be existant, but it has no ldn assigned, it gets a ldn out of 7 
    to 14. The numbers are assigned in cyclic order. Therefore it takes 8 
    dynamical reassignments on the SCSI-devices, until a certain device 
-   looses its ldn again. This assures, that dynamical remapping is avoided 
+   loses its ldn again. This assures, that dynamical remapping is avoided 
    during intense I/O between up to 15 SCSI-devices (means pun,lun 
    combinations). A further advantage of this method is, that people who
    build their kernel without probing on all luns will get what they expect,

@@ -1357,7 +1357,7 @@ int acpiphp_check_bridge (struct acpiphp_bridge *bridge)
 			if (sta != ACPI_STA_ALL) {
 				retval = acpiphp_disable_slot(slot);
 				if (retval) {
-					err("Error occured in enabling\n");
+					err("Error occurred in enabling\n");
 					up(&slot->crit_sect);
 					goto err_exit;
 				}
@@ -1368,7 +1368,7 @@ int acpiphp_check_bridge (struct acpiphp_bridge *bridge)
 			if (sta == ACPI_STA_ALL) {
 				retval = acpiphp_enable_slot(slot);
 				if (retval) {
-					err("Error occured in enabling\n");
+					err("Error occurred in enabling\n");
 					up(&slot->crit_sect);
 					goto err_exit;
 				}

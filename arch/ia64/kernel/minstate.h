@@ -26,7 +26,7 @@
  */
 
 /*
- * For ivt.s we want to access the stack virtually so we dont have to disable translation
+ * For ivt.s we want to access the stack virtually so we don't have to disable translation
  * on interrupts.
  */
 #define MINSTATE_START_SAVE_MIN_VIRT								\
@@ -52,7 +52,7 @@
 
 /*
  * For mca_asm.S we want to access the stack physically since the state is saved before we
- * go virtual and dont want to destroy the iip or ipsr.
+ * go virtual and don't want to destroy the iip or ipsr.
  */
 #define MINSTATE_START_SAVE_MIN_PHYS								\
 (pKStk) movl sp=ia64_init_stack+IA64_STK_OFFSET-IA64_PT_REGS_SIZE;				\

@@ -265,7 +265,7 @@ MODULE_PARM(own, "i");
 MODULE_PARM(i2c_debug,"i");
 
 
-/* Called when module is loaded or when kernel is intialized.
+/* Called when module is loaded or when kernel is initialized.
  * If MODULES is defined when this file is compiled, then this function will
  * resolve to init_module (the function called when insmod is invoked for a
  * module).  Otherwise, this function is called early in the boot, when the

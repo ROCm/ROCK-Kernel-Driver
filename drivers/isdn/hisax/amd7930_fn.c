@@ -42,7 +42,7 @@
  *
  * Credits:
  * Programming the driver for Formula-n enter:now ISDN PCI and
- * neccessary this driver for the used Amd 7930 D-channel-controller
+ * necessary this driver for the used Amd 7930 D-channel-controller
  * was spnsored by Formula-n Europe AG.
  * Thanks to Karsten Keil and Petr Novak, who gave me support in
  * Hisax-specific questions.
@@ -317,7 +317,7 @@ Amd7930_empty_Dfifo(struct IsdnCardState *cs, int flag)
 								QuickHex(t, cs->rcvbuf, cs->rcvidx);
 								debugl1(cs, cs->dlog);
 							}
-                                                        /* moves recieved data in sk-buffer */
+                                                        /* moves received data in sk-buffer */
 							memcpy(skb_put(skb, cs->rcvidx), cs->rcvbuf, cs->rcvidx);
 							skb_queue_tail(&cs->rq, skb);
 						}

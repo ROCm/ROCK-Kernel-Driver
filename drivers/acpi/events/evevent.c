@@ -79,7 +79,7 @@ acpi_ev_initialize (
 
 	/*
 	 * Initialize the Fixed and General Purpose acpi_events prior. This is
-	 * done prior to enabling SCIs to prevent interrupts from occuring
+	 * done prior to enabling SCIs to prevent interrupts from occurring
 	 * before handers are installed.
 	 */
 	status = acpi_ev_fixed_event_initialize ();

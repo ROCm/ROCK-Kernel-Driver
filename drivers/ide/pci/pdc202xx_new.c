@@ -327,7 +327,7 @@ static int config_chipset_for_dma (ide_drive_t *drive)
 #endif /* PDC202_DEBUG_CABLE */
 			break;
 		default:
-			/* If its not one we know we should never
+			/* If it's not one we know we should never
 			   arrive here.. */
 			BUG();
 	}

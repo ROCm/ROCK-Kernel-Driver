@@ -46,7 +46,7 @@
 
 #define TICK_SIZE tick
 
-u64 jiffies_64;
+u64 jiffies_64 = INITIAL_JIFFIES;
 
 static ext_int_info_t ext_int_info_timer;
 static uint64_t xtime_cc;

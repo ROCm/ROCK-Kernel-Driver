@@ -250,7 +250,7 @@ static inline void isa_delay(void)
 #define readl(addr)      in_le32(addr)
 #define writel(val,addr) out_le32((addr),(val))
 
-/* those can be defined for both ISA and PCI - it wont work though */
+/* those can be defined for both ISA and PCI - it won't work though */
 #define readb(addr)       in_8(addr)
 #define readw(addr)       in_le16(addr)
 #define writeb(val,addr)  out_8((addr),(val))

@@ -2677,7 +2677,7 @@ static	struct script script0 __initdata = {
 	/*
 	**	Now there are 4 possibilities:
 	**
-	**	(1) The ncr looses arbitration.
+	**	(1) The ncr loses arbitration.
 	**	This is ok, because it will try again,
 	**	when the bus becomes idle.
 	**	(But beware of the timeout function!)
@@ -3653,7 +3653,7 @@ static	struct scripth scripth0 __initdata = {
 	**	some target to reset or some disconnected 
 	**	job to abort. Since error recovery is a serious 
 	**	busyness, we will really reset the SCSI BUS, if 
-	**	case of a SCSI interrupt occuring in this path.
+	**	case of a SCSI interrupt occurring in this path.
 	*/
 
 	/*
@@ -4631,7 +4631,7 @@ ncr_script_copy_and_bind (ncb_p np,ncrcmd *src,ncrcmd *dst,int len)
 		case 0x8:
 			/*
 			**	JUMP / CALL
-			**	dont't relocate if relative :-)
+			**	don't relocate if relative :-)
 			*/
 			if (opcode & 0x00800000)
 				relocs = 0;
@@ -6984,7 +6984,7 @@ static void ncr_soft_reset(ncb_p np)
 			INW (nc_sist);
 		}
 		else if (istat & DIP) {
-			if (INB (nc_dstat) & ABRT);
+			if (INB (nc_dstat) & ABRT)
 				break;
 		}
 		UDELAY(5);
@@ -7953,7 +7953,7 @@ static void ncr_getsync(ncb_p np, u_char sfac, u_char *fakp, u_char *scntl3p)
 	/*
 	**	Why not to try the immediate lower divisor and to choose 
 	**	the one that allows the fastest output speed ?
-	**	We dont want input speed too much greater than output speed.
+	**	We don't want input speed too much greater than output speed.
 	*/
 	if (div >= 1 && fak < 8) {
 		u_long fak2, per2;
@@ -9092,7 +9092,7 @@ void ncr_int_udc (ncb_p np)
 	ccb_p   cp  = ncr_ccb_from_dsa(np, dsa);
 
 	/*
-	 * Fix Up. Some disks respond to a PPR negotation with
+	 * Fix Up. Some disks respond to a PPR negotiation with
 	 * a bus free instead of a message reject. 
 	 * Disable ppr negotiation if this is first time
 	 * tried ppr negotiation.

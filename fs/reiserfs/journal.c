@@ -1629,7 +1629,7 @@ struct buffer_head * reiserfs_breada (struct block_device *dev, int block, int b
 /*
 ** read and replay the log
 ** on a clean unmount, the journal header's next unflushed pointer will be to an invalid
-** transaction.  This tests that before finding all the transactions in the log, whic makes normal mount times fast.
+** transaction.  This tests that before finding all the transactions in the log, which makes normal mount times fast.
 **
 ** After a crash, this starts with the next unflushed transaction, and replays until it finds one too old, or invalid.
 **
@@ -1913,7 +1913,7 @@ static int journal_init_dev( struct super_block *super,
 			result = -ENOMEM;
 		if( result != 0 )
 			printk( "sh-458: journal_init_dev: cannot init journal device\n '%s': %i", 
-				kdevname( to_kdev_t(jdev) ), result );
+				bdevname(journal->j_dev_bd), result );
 
 		else if (jdev != super->s_dev) {
 			set_blocksize(journal->j_dev_bd, super->s_blocksize);
@@ -1931,7 +1931,7 @@ static int journal_init_dev( struct super_block *super,
 			printk( "journal_init_dev: '%s' is not a block device", jdev_name );
 			result = -ENOTBLK;
 		} else if( jdev_inode -> i_bdev == NULL ) {
-			printk( "journal_init_dev: bdev unintialized for '%s'", jdev_name );
+			printk( "journal_init_dev: bdev uninitialized for '%s'", jdev_name );
 			result = -ENOMEM;
 		} else  {
 			/* ok */
@@ -1946,7 +1946,7 @@ static int journal_init_dev( struct super_block *super,
 	if( result != 0 ) {
 		release_journal_dev( super, journal );
 	}
-	printk( "journal_init_dev: journal device: %s", kdevname(to_kdev_t(jdev)) );
+	printk( "journal_init_dev: journal device: %s", bdevname(journal->j_dev_bd));
 	return result;
 }
 
@@ -2523,7 +2523,7 @@ int show_reiserfs_locks(void) {
 ** haven't hit disk yet.  called from bitmap.c
 **
 ** if it starts flushing things, it ors SCHEDULE_OCCURRED into repeat.
-** note, this is just if schedule has a chance of occuring.  I need to 
+** note, this is just if schedule has a chance of occurring.  I need to 
 ** change flush_commit_lists to have a repeat parameter too.
 **
 */

@@ -20,7 +20,7 @@
  * Strategies:
  *
  * . We rely on pci_auto.c file to assign PCI resources (MEM and IO)
- *   TODO: this shold be optional for some machines where they do have
+ *   TODO: this should be optional for some machines where they do have
  *   a real "pcibios" that does resource assignment.
  *
  * . We then use pci_scan_bus() to "discover" all the resources for

@@ -26,7 +26,7 @@ Gotchas
 The C language stack growth does an implicit mremap. If you want absolute
 guarantees and run close to the edge you MUST mmap your stack for the 
 largest size you think you will need. For typical stack usage is does
-not matter much but its a corner case if you really really care
+not matter much but it's a corner case if you really really care
 
 In mode 2 the MAP_NORESERVE flag is ignored. 
 

@@ -2091,7 +2091,7 @@ static void AM53C974_intr_reselect(struct Scsi_Host *instance, unsigned char sta
 		goto EXIT_ABORT;
 	}
 	msg[0] = AM53C974_read_8(FFREG);
-	if (!msg[0] & 0x80) {
+	if (!(msg[0] & 0x80)) {
 		printk("scsi%d: error: expecting IDENTIFY message, got ", instance->host_no);
 		print_msg(msg);
 		hostdata->aborted = 1;

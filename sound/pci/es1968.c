@@ -2329,7 +2329,7 @@ static void snd_es1968_chip_init(es1968_t *chip)
 	outb(0x88, iobase+0x1f);
 
 	/* it appears some maestros (dell 7500) only work if these are set,
-	   regardless of wether we use the assp or not. */
+	   regardless of whether we use the assp or not. */
 
 	outb(0, iobase + ASSP_CONTROL_B);
 	outb(3, iobase + ASSP_CONTROL_A);	/* M: Reserved bits... */

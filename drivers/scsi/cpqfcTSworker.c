@@ -79,7 +79,7 @@
 // synchronously (i.e. each of the 30k I/O had to be started one at a
 // time by sending a starting frame via Tachyon's outbound que).  
 
-// To accomodate kernel "module" build, this driver limits the exchanges
+// To accommodate kernel "module" build, this driver limits the exchanges
 // to 256, because of the contiguous physical memory limitation of 128M.
 
 // Typical FC Exchanges are opened presuming the FC frames start without errors,

@@ -116,7 +116,7 @@ void __init parisc_pdc_chassis_init(void);
 					 PDC_CHASSIS_LED_ATTN_OFF	| \
 					 PDC_CHASSIS_LED_FAULT_ON	| \
 					 PDC_CHASSIS_LED_VALID		)
-/* Unexpected reboot occured - Executing non-OS code */
+/* Unexpected reboot occurred - Executing non-OS code */
 #define PDC_CHASSIS_LSTATE_NONOS_UNEXP	(PDC_CHASSIS_LED_RUN_FLASH	| \
 					 PDC_CHASSIS_LED_ATTN_OFF	| \
 					 PDC_CHASSIS_LED_FAULT_FLASH	| \

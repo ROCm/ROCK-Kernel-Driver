@@ -472,7 +472,7 @@ static int __init NCR53c406a_detect(Scsi_Host_Template * tpnt)
 		return 0;
 	}
 
-	DEB(printk("NCR53c406a BIOS found at %X\n", (unsigned int) bios_base);
+	DEB(printk("NCR53c406a BIOS found at 0x%x\n", (unsigned int) bios_base);
 	    );
 #endif				/* USE_BIOS */
 
@@ -487,14 +487,14 @@ static int __init NCR53c406a_detect(Scsi_Host_Template * tpnt)
 	} else {
 		for (i = 0; i < PORT_COUNT && !port_base; i++) {
 			if (!request_region(ports[i], 0x10, "NCR53c406a")) {
-				DEB(printk("NCR53c406a: port %x in use\n", ports[i]));
+				DEB(printk("NCR53c406a: port 0x%x in use\n", ports[i]));
 			} else {
-				VDEB(printk("NCR53c406a: port %x available\n", ports[i]));
+				VDEB(printk("NCR53c406a: port 0x%x available\n", ports[i]));
 				outb(C5_IMG, ports[i] + 0x0d);	/* reg set 1 */
 				if ((inb(ports[i] + 0x0e) ^ inb(ports[i] + 0x0e)) == 7 && (inb(ports[i] + 0x0e) ^ inb(ports[i] + 0x0e)) == 7 && (inb(ports[i] + 0x0e) & 0xf8) == 0x58) {
 					port_base = ports[i];
 					VDEB(printk("NCR53c406a: Sig register valid\n"));
-					VDEB(printk("port_base=%x\n", port_base));
+					VDEB(printk("port_base=0x%x\n", port_base));
 					break;
 				}
 				release_region(ports[i], 0x10);
@@ -523,7 +523,7 @@ static int __init NCR53c406a_detect(Scsi_Host_Template * tpnt)
 	}
 #endif
 
-	DEB(printk("NCR53c406a: using port_base %x\n", port_base));
+	DEB(printk("NCR53c406a: using port_base 0x%x\n", port_base));
 
 	tpnt->present = 1;
 	tpnt->proc_name = "NCR53c406a";
@@ -611,11 +611,11 @@ static void __init NCR53c406a_setup(char *str, int *ints)
 	for (i = 0; i < PORT_COUNT && !port_base; i++)
 		if (ports[i] == ints[1]) {
 			port_base = ints[1];
-			DEB(printk("NCR53c406a: Specified port_base 0x%X\n", port_base);
+			DEB(printk("NCR53c406a: Specified port_base 0x%x\n", port_base);
 			    )
 		}
 	if (!port_base) {
-		printk("NCR53c406a: Invalid PORTBASE 0x%X specified\n", ints[1]);
+		printk("NCR53c406a: Invalid PORTBASE 0x%x specified\n", ints[1]);
 		return;
 	}
 
@@ -638,7 +638,7 @@ static void __init NCR53c406a_setup(char *str, int *ints)
 	if (ints[0] > 2)
 		fast_pio = ints[3];
 
-	DEB(printk("NCR53c406a: port_base=0x%X, irq=%d, fast_pio=%d\n", port_base, irq_level, fast_pio);)
+	DEB(printk("NCR53c406a: port_base=0x%x, irq=%d, fast_pio=%d\n", port_base, irq_level, fast_pio);)
 }
 
 __setup("ncr53c406a=", NCR53c406a_setup);

@@ -1114,7 +1114,7 @@ sba_fill_pdir(
 
 /*
 ** Two address ranges are DMA contiguous *iff* "end of prev" and
-** "start of next" are both on a page boundry.
+** "start of next" are both on a page boundary.
 **
 ** (shift left is a quick trick to mask off upper bits)
 */
@@ -1219,7 +1219,7 @@ sba_coalesce_chunks( struct ioc *ioc,
 			** can't change. And we need the offset from the first
 			** chunk - not the last one. Ergo Successive chunks
 			** must start on page boundaries and dove tail
-			** with it's predecessor.
+			** with its predecessor.
 			*/
 			sg_dma_len(vcontig_sg) = vcontig_len;
 

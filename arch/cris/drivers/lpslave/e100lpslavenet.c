@@ -129,7 +129,7 @@ static void set_multicast_list(struct net_device *dev);
 static void e100_hardware_send_packet(unsigned long hostcmd, char *buf, int length);
 static void update_rx_stats(struct net_device_stats *);
 static void update_tx_stats(struct net_device_stats *);
-static void e100_reset_tranceiver(void);
+static void e100_reset_transceiver(void);
 
 static void boot_slave(unsigned char *code);
 
@@ -528,7 +528,7 @@ e100_open(struct net_device *dev)
 }
 
 static void 
-e100_reset_tranceiver(void)
+e100_reset_transceiver(void)
 {
   /* To do: Reboot and setup slave Etrax */
 }
@@ -554,9 +554,9 @@ e100_tx_timeout(struct net_device *dev)
 	RESET_DMA(4);
 	WAIT_DMA(4);
 	
-	/* Reset the tranceiver. */
+	/* Reset the transceiver. */
 	
-	e100_reset_tranceiver();
+	e100_reset_transceiver();
 	
 	/* and get rid of the packet that never got an interrupt */
 	

@@ -99,14 +99,14 @@ ieee754dp ieee754dp_bestnan(ieee754dp x, ieee754dp y)
 }
 
 
-/* generate a normal/denormal number with over,under handeling
+/* generate a normal/denormal number with over,under handling
  * sn is sign
  * xe is an unbiased exponent
  * xm is 3bit extended precision value.
  */
 ieee754dp ieee754dp_format(int sn, int xe, unsigned long long xm)
 {
-	assert(xm);		/* we dont gen exact zeros (probably should) */
+	assert(xm);		/* we don't gen exact zeros (probably should) */
 
 	assert((xm >> (DP_MBITS + 1 + 3)) == 0);	/* no execess */
 	assert(xm & (DP_HIDDEN_BIT << 3));

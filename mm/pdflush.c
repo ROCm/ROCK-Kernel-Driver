@@ -103,9 +103,11 @@ static int __pdflush(struct pdflush_work *my_work)
 		my_work->when_i_went_to_sleep = jiffies;
 		spin_unlock_irq(&pdflush_lock);
 
-		if (current->flags & PF_FREEZE)
-			refrigerator(PF_IOTHREAD);
 		schedule();
+		if (current->flags & PF_FREEZE) {
+			refrigerator(PF_IOTHREAD);
+			continue;
+		}
 
 		spin_lock_irq(&pdflush_lock);
 		if (!list_empty(&my_work->list)) {

@@ -389,7 +389,7 @@ MODULE_PARM(xcvr, "1-" __MODULE_STRING(MAX_E21_CARDS) "i");
 MODULE_PARM_DESC(io, "I/O base address(es)");
 MODULE_PARM_DESC(irq, "IRQ number(s)");
 MODULE_PARM_DESC(mem, " memory base address(es)");
-MODULE_PARM_DESC(xcvr, "tranceiver(s) (0=internal, 1=external)");
+MODULE_PARM_DESC(xcvr, "transceiver(s) (0=internal, 1=external)");
 MODULE_DESCRIPTION("Cabletron E2100 ISA ethernet driver");
 MODULE_LICENSE("GPL");
 

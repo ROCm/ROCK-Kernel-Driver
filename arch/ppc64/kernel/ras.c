@@ -94,7 +94,7 @@ void init_ras_IRQ(void) {
 /*
  * Handle power subsystem events (EPOW).
  *
- * Presently we just log the event has occured.  This should be fixed
+ * Presently we just log the event has occurred.  This should be fixed
  * to examine the type of power failure and take appropriate action where
  * the time horizon permits something useful to be done.
  */

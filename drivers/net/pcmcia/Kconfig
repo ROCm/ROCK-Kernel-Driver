@@ -153,19 +153,5 @@ config PCMCIA_IBMTR
 	  The module will be called ibmtr_cs.  If you want to compile it as
 	  a module, say M here and read <file:Documentation/modules.txt>.
 
-config AIRONET4500_CS
-	tristate "Aironet 4500/4800 PCMCIA support"
-	depends on NET_PCMCIA_RADIO && AIRONET4500 && PCMCIA
-	help
-	  Say Y here if you have a PCMCIA Aironet 4500/4800 card which you
-	  want to use with the standard PCMCIA cardservices provided by the
-	  pcmcia-cs package.
-
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called aironet4500_cs. If you want to
-	  compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.
-
 endmenu
 

@@ -755,7 +755,7 @@ xfs_trans_reserve_quota_bydquots(
 
 /*
  * Lock the dquot and change the reservation if we can.
- * This doesnt change the actual usage, just the reservation.
+ * This doesn't change the actual usage, just the reservation.
  * The inode sent in is locked.
  *
  * Returns 0 on success, EDQUOT or other errors otherwise

@@ -149,7 +149,7 @@ e100_config_init_82550(struct e100_private *bdp)
 	 * 32 from the RFD base address, instead of at offset 16. */
 	bdp->config[7] |= CB_CFIG_EXTENDED_RFD;
 
-	/* put the chip into D102 receive mode.  This is neccessary
+	/* put the chip into D102 receive mode.  This is necessary
 	 * for any parsing and offloading features. */
 	bdp->config[22] = CB_CFIG_RECEIVE_GAMLA_MODE;
 

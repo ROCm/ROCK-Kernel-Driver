@@ -776,7 +776,7 @@ static void qpti_get_clock(struct qlogicpti *qpti)
 }
 
 /* The request and response queues must each be aligned
- * on a page boundry.
+ * on a page boundary.
  */
 static int __init qpti_map_queues(struct qlogicpti *qpti)
 {

@@ -1354,7 +1354,7 @@ static int awacs_sleep_notify(struct pmu_sleep_notifier *self, int when)
 			case AWACS_DACA:
 				wait_ms(10); /* Check this !!! */
 				daca_leave_sleep();
-				break ;		/* dont know how yet */
+				break ;		/* don't know how yet */
 			case AWACS_BURGUNDY:
 				break ;
 			case AWACS_SCREAMER:
@@ -2960,7 +2960,7 @@ printk("dmasound_pmac: Awacs/Screamer Codec Mfct: %d Rev %d\n", mfg, rev);
 			request_module("i2c-keywest");
 #endif /* CONFIG_KMOD */
 			daca_init();
-			break ;		/* dont know how yet */
+			break ;		/* don't know how yet */
 		case AWACS_BURGUNDY:
 			awacs_burgundy_init();
 			break ;

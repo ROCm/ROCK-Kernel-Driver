@@ -34,16 +34,9 @@
 #include <linux/sysctl.h>
 #include <linux/proc_fs.h>
 
-/*
- * Tunable XFS parameters
- */
-
-extern struct xfsstats xfsstats;
 
 STATIC ulong xfs_min[XFS_PARAM] = { 0, 0, 0, 0, 0 };
 STATIC ulong xfs_max[XFS_PARAM] = { 1, 1, 1, 1, 127 };
-
-xfs_param_t xfs_params = { 0, 1, 0, 0, 0 };
 
 static struct ctl_table_header *xfs_table_header;
 

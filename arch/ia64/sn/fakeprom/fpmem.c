@@ -218,7 +218,7 @@ build_efi_memmap(void *md, int mdsize)
 				}
 
                                 /*
-                                 * Check for the node 0 hole. Since banks cant
+                                 * Check for the node 0 hole. Since banks can't
                                  * span the hole, we only need to check if the end of
                                  * the range is the end of the hole.
                                  */
@@ -226,7 +226,7 @@ build_efi_memmap(void *md, int mdsize)
                                         numbytes -= NODE0_HOLE_SIZE;
                                 /*
                                  * UGLY hack - we must skip overr the kernel and
-                                 * PROM runtime services but we dont exactly where it is.
+                                 * PROM runtime services but we don't exactly where it is.
                                  * So lets just reserve:
 				 *	node 0
 				 *		0-1MB for PAL

@@ -2647,7 +2647,7 @@ pcibr_slot_addr_space_init(devfs_handle_t pcibr_vhdl,
 	/*
 	 * The Adaptec 1160 FC Controller WAR #767995:
 	 * The part incorrectly ignores the upper 32 bits of a 64 bit
-	 * address when decoding references to it's registers so to
+	 * address when decoding references to its registers so to
 	 * keep it from responding to a bus cycle that it shouldn't
 	 * we only use I/O space to get at it's registers.  Don't
 	 * enable memory space accesses on that PCI device.
@@ -5113,7 +5113,7 @@ ate_freeze(pcibr_dmamap_t pcibr_dmamap,
 
     /* Bridge Hardware Bug WAR #484930:
      * Bridge can't handle updating External ATEs
-     * while DMA is occuring that uses External ATEs,
+     * while DMA is occurring that uses External ATEs,
      * even if the particular ATEs involved are disjoint.
      */
 
@@ -6844,7 +6844,7 @@ pcibr_xintr_preset(void *which_widget,
  *
  * This is the pcibr interrupt "wrapper" function that is called,
  * in interrupt context, to initiate the interrupt handler(s) registered
- * (via pcibr_intr_alloc/connect) for the occuring interrupt. Non-threaded 
+ * (via pcibr_intr_alloc/connect) for the occurring interrupt. Non-threaded 
  * handlers will be called directly, and threaded handlers will have their 
  * thread woken up.
  */

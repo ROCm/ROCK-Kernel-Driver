@@ -1131,7 +1131,7 @@ int aha152x_detect(Scsi_Host_Template * tpnt)
 	while ( setup_count<ARRAY_SIZE(setup) && (dev=pnp_find_dev(NULL, ISAPNP_VENDOR('A','D','P'), ISAPNP_FUNCTION(0x1505), dev)) ) {
 		if (pnp_device_attach(dev) < 0)
 			continue;
-		if (pnp_activate_dev(dev, NULL) < 0) {
+		if (pnp_activate_dev(dev) < 0) {
 			pnp_device_detach(dev);
 			continue;
 		}
@@ -2663,7 +2663,7 @@ static void datai_run(struct Scsi_Host *shpnt)
 		 * STCNT to trigger ENSWRAP interrupt, instead of
 		 * polling for DFIFOFULL
 		 */
-		the_time=jiffies + 10*HZ;
+		the_time=jiffies + 100*HZ;
 		while(TESTLO(DMASTAT, DFIFOFULL|INTSTAT) && time_before(jiffies,the_time))
 			barrier();
 
@@ -2676,7 +2676,7 @@ static void datai_run(struct Scsi_Host *shpnt)
 		if(TESTHI(DMASTAT, DFIFOFULL)) {
 			fifodata = 128;
 		} else {
-			the_time=jiffies + 10*HZ;
+			the_time=jiffies + 100*HZ;
 			while(TESTLO(SSTAT2, SEMPTY) && time_before(jiffies,the_time))
 				barrier();
 
@@ -2832,7 +2832,7 @@ static void datao_run(struct Scsi_Host *shpnt)
 			CURRENT_SC->SCp.this_residual = CURRENT_SC->SCp.buffer->length;
 		}
 
-		the_time=jiffies + 10*HZ;
+		the_time=jiffies + 100*HZ;
 		while(TESTLO(DMASTAT, DFIFOEMP|INTSTAT) && time_before(jiffies,the_time))
 			barrier();
 

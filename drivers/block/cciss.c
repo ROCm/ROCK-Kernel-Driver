@@ -351,7 +351,7 @@ static int cciss_open(struct inode *inode, struct file *filep)
 	if (ctlr >= MAX_CTLR || hba[ctlr] == NULL)
 		return -ENXIO;
 	/*
-	 * Root is allowed to open raw volume zero even if its not configured
+	 * Root is allowed to open raw volume zero even if it's not configured
 	 * so array config can still work.  I don't think I really like this,
 	 * but I'm already using way to many device nodes to claim another one
 	 * for "raw controller".

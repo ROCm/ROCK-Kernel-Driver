@@ -604,12 +604,12 @@ static void restore_console(void)
 
 static int prepare_suspend_processes(void)
 {
+	sys_sync();	/* Syncing needs pdflushd, so do it before stopping processes */
 	if (freeze_processes()) {
 		printk( KERN_ERR "Suspend failed: Not all processes stopped!\n" );
 		thaw_processes();
 		return 1;
 	}
-	sys_sync();
 	return 0;
 }
 
@@ -961,7 +961,7 @@ static int relocate_pagedir(void)
 	printk("Relocating pagedir");
 
 	if(!does_collide_order(old_pagedir, (unsigned long)old_pagedir, pagedir_order)) {
-		printk("not neccessary\n");
+		printk("not necessary\n");
 		return 0;
 	}
 

@@ -49,7 +49,7 @@ void __init do_cyrix_devid(unsigned char *dir0, unsigned char *dir1)
  * Cx86_dir0_msb is a HACK needed by check_cx686_cpuid/slop in bugs.h in
  * order to identify the Cyrix CPU model after we're out of setup.c
  *
- * Actually since bugs.h doesnt even reference this perhaps someone should
+ * Actually since bugs.h doesn't even reference this perhaps someone should
  * fix the documentation ???
  */
 static unsigned char Cx86_dir0_msb __initdata = 0;
@@ -77,7 +77,7 @@ static char cyrix_model_mult2[] __initdata = "12233445";
  * BIOSes for compatibility with DOS games.  This makes the udelay loop
  * work correctly, and improves performance.
  *
- * FIXME: our newer udelay uses the tsc. We dont need to frob with SLOP
+ * FIXME: our newer udelay uses the tsc. We don't need to frob with SLOP
  */
 
 extern void calibrate_delay(void) __init;

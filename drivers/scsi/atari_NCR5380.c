@@ -2543,7 +2543,7 @@ static void NCR5380_reselect (struct Scsi_Host *instance)
     phase = PHASE_MSGIN;
     NCR5380_transfer_pio(instance, &phase, &len, &data);
 
-    if (!msg[0] & 0x80) {
+    if (!(msg[0] & 0x80)) {
 	printk(KERN_DEBUG "scsi%d: expecting IDENTIFY message, got ", HOSTNO);
 	print_msg(msg);
 	do_abort(instance);
@@ -2953,7 +2953,7 @@ static int NCR5380_reset( Scsi_Cmnd *cmd, unsigned int reset_flags)
      * on any queue, so they won't be retried ...
      *
      * Conclusion: either scsi.c disables timeout for all resetted commands
-     * immediately, or we loose!  As of linux-2.0.20 it doesn't.
+     * immediately, or we lose!  As of linux-2.0.20 it doesn't.
      */
 
     /* After the reset, there are no more connected or disconnected commands

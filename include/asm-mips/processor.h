@@ -228,7 +228,7 @@ extern inline unsigned long thread_saved_pc(struct thread_struct *t)
  * Do necessary setup to start up a newly executed thread.
  */
 #define start_thread(regs, new_pc, new_sp) do {				\
-	/* New thread looses kernel privileges. */			\
+	/* New thread loses kernel privileges. */			\
 	regs->cp0_status = (regs->cp0_status & ~(ST0_CU0|ST0_KSU)) | KU_USER;\
 	regs->cp0_epc = new_pc;						\
 	regs->regs[29] = new_sp;					\

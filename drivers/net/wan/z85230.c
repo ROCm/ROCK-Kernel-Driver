@@ -1634,7 +1634,7 @@ static void z8530_rx_done(struct z8530_channel *c)
 			write_zsreg(c, R0, RES_Rx_CRC);
 		}
 		else
-			/* Can't occur as we dont reenable the DMA irq until
+			/* Can't occur as we don't reenable the DMA irq until
 			   after the flip is done */
 			printk(KERN_WARNING "%s: DMA flip overrun!\n", c->netdevice->name);
 			
