@@ -22,7 +22,7 @@ config ARCH_PERSONAL_SERVER
 	  There are no product plans beyond the current research
 	  prototypes at this time.  Information is available at:
 
-	  <http://crl.research.compaq.com/projects/personalserver/>
+	  <http://www.crl.hpl.hp.com/projects/personalserver/>
 
 	  If you have any questions or comments about the  Compaq Personal
 	  Server, send e-mail to skiff@crl.dec.com.
