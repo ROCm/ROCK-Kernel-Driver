@@ -51,145 +51,106 @@ static void nile4_post_pci_access0(void)
 	nile4_set_pmr(NILE4_PCIINIT1, NILE4_PCICMD_MEM, 0x08000000);
 }
 
-
-static int nile4_pci_read_config_dword(struct pci_dev *dev,
-				       int where, u32 * val)
+static int nile4_pci_read(struct pci_bus *bus, unsigned int devfn, int where,
+			 int size, u32 * val)
 {
-	int slot_num, func_num;
-	u32 base;
-	u32 addr;
+	int status, slot_num, func_num;
+	u32 result, base, addr;
 
-	/*
-	 *  Do we need to generate type 1 configure transaction?
-	 */
-	if (dev->bus->number) {
-		/* FIXME - not working yet */
-		return PCIBIOS_FUNC_NOT_SUPPORTED;
-
-		/*
-		 * the largest type 1 configuration addr is 16M, < 256M
-		 * config space
-		 */
-		slot_num = 0;
-		addr =
-		    (dev->bus->number << 16) | (dev->devfn <
-						8) | where | 1;
-	} else {
-		slot_num = PCI_SLOT(dev->devfn);
-		func_num = PCI_FUNC(dev->devfn);
-		addr = (func_num << 8) + where;
+	if(size == 4) {
+		/* Do we need to generate type 1 configure transaction? */
+		if (bus->number) {
+			/* FIXME - not working yet */
+			return PCIBIOS_FUNC_NOT_SUPPORTED;
+			/*
+			 * the largest type 1 configuration addr is 16M, 
+			 * < 256M config space 
+			 */
+			slot_num = 0;
+			addr = (bus->number << 16) | (devfn < 8) | where | 1;
+		} else {
+			slot_num = PCI_SLOT(devfn);
+			func_num = PCI_FUNC(devfn);
+			addr = (func_num << 8) + where;
+		}
+		base = nile4_pre_pci_access0(slot_num);
+		*val = *(volatile u32 *) (base + addr);
+		nile4_post_pci_access0();
+		return PCIBIOS_SUCCESSFUL;
 	}
 
-	base = nile4_pre_pci_access0(slot_num);
-	*val = *(volatile u32 *) (base + addr);
-	nile4_post_pci_access0();
-	return PCIBIOS_SUCCESSFUL;
-}
-
-static int nile4_pci_write_config_dword(struct pci_dev *dev, int where,
-					u32 val)
-{
-	int slot_num, func_num;
-	u32 base;
-	u32 addr;
-
-	/*
-	 *  Do we need to generate type 1 configure transaction?
-	 */
-	if (dev->bus->number) {
-		/* FIXME - not working yet */
-		return PCIBIOS_FUNC_NOT_SUPPORTED;
-
-		/* the largest type 1 configuration addr is 16M, < 256M config space */
-		slot_num = 0;
-		addr =
-		    (dev->bus->number << 16) | (dev->devfn <
-						8) | where | 1;
-	} else {
-		slot_num = PCI_SLOT(dev->devfn);
-		func_num = PCI_FUNC(dev->devfn);
-		addr = (func_num << 8) + where;
+	status = nile4_pci_read(bus, devfn, where & ~3, 4, &result);
+	if (status != PCIBIOS_SUCCESSFUL)
+		return status;
+	switch (size) {
+		case 1:
+			if (where & 1)
+				result >>= 8;
+			if (where & 2)
+				result >>= 16;
+			*val = (u8)(result & 0xff);
+			break;
+		case 2:
+			if (where & 2)
+				result >>= 16;
+			*val = (u16)(result & 0xffff);
+			break;
 	}
-
-	base = nile4_pre_pci_access0(slot_num);
-	*(volatile u32 *) (base + addr) = val;
-	nile4_post_pci_access0();
 	return PCIBIOS_SUCCESSFUL;
 }
 
-static int nile4_pci_read_config_word(struct pci_dev *dev, int where,
-				      u16 * val)
+static int nile4_pci_write(struct pci_bus *bus, unsigned int devfn, int where,
+			  int size, u32 val)
 {
-	int status;
-	u32 result;
+	int status, slot_num, func_num, shift = 0;
+	u32 result, base, addr;
 
-	status = nile4_pci_read_config_dword(dev, where & ~3, &result);
+	status = nile4_pci_read(bus, devfn, where & ~3, 4, &result);
 	if (status != PCIBIOS_SUCCESSFUL)
 		return status;
-	if (where & 2)
-		result >>= 16;
-	*val = result & 0xffff;
-	return PCIBIOS_SUCCESSFUL;
-}
+	switch (size) {
+		case 1:
+			if (where & 2)
+				shift += 16;
+			if (where & 1)
+				shift += 8;
+			result &= ~(0xff << shift);
+			result |= val << shift;
+			break;
+		case 2:
+			if (where & 2)
+				shift += 16;
+			result &= ~(0xffff << shift);
+			result |= val << shift;
+			break;
+		case 4:
+			/* Do we need to generate type 1 configure transaction? */
+			if (bus->number) {
+				/* FIXME - not working yet */
+				return PCIBIOS_FUNC_NOT_SUPPORTED;
 
-static int nile4_pci_read_config_byte(struct pci_dev *dev, int where,
-				      u8 * val)
-{
-	int status;
-	u32 result;
+				/* the largest type 1 configuration addr is 16M, 
+				 * < 256M config space */
+				slot_num = 0;
+				addr = (bus->number << 16) | (devfn < 8) | 
+					where | 1;
+			} else {
+				slot_num = PCI_SLOT(devfn);
+				func_num = PCI_FUNC(devfn);
+				addr = (func_num << 8) + where;
+			}
 
-	status = nile4_pci_read_config_dword(dev, where & ~3, &result);
-	if (status != PCIBIOS_SUCCESSFUL)
-		return status;
-	if (where & 1)
-		result >>= 8;
-	if (where & 2)
-		result >>= 16;
-	*val = result & 0xff;
-	return PCIBIOS_SUCCESSFUL;
-}
-
-static int nile4_pci_write_config_word(struct pci_dev *dev, int where,
-				       u16 val)
-{
-	int status, shift = 0;
-	u32 result;
-
-	status = nile4_pci_read_config_dword(dev, where & ~3, &result);
-	if (status != PCIBIOS_SUCCESSFUL)
-		return status;
-	if (where & 2)
-		shift += 16;
-	result &= ~(0xffff << shift);
-	result |= val << shift;
-	return nile4_pci_write_config_dword(dev, where & ~3, result);
-}
-
-static int nile4_pci_write_config_byte(struct pci_dev *dev, int where,
-				       u8 val)
-{
-	int status, shift = 0;
-	u32 result;
-
-	status = nile4_pci_read_config_dword(dev, where & ~3, &result);
-	if (status != PCIBIOS_SUCCESSFUL)
-		return status;
-	if (where & 2)
-		shift += 16;
-	if (where & 1)
-		shift += 8;
-	result &= ~(0xff << shift);
-	result |= val << shift;
-	return nile4_pci_write_config_dword(dev, where & ~3, result);
+			base = nile4_pre_pci_access0(slot_num);
+			*(volatile u32 *) (base + addr) = val;
+			nile4_post_pci_access0();
+			return PCIBIOS_SUCCESSFUL;
+	}
+	return nile4_pci_write(bus, devfn, where & ~3, 4, result);
 }
 
 struct pci_ops nile4_pci_ops = {
-	nile4_pci_read_config_byte,
-	nile4_pci_read_config_word,
-	nile4_pci_read_config_dword,
-	nile4_pci_write_config_byte,
-	nile4_pci_write_config_word,
-	nile4_pci_write_config_dword
+	.read = 	nile4_pci_read,
+	.write = 	nile4_pci_write,
 };
 
 struct {
@@ -274,13 +235,13 @@ static void __init ddb5476_pci_fixup(void)
 
 			pci_pmu = dev;	/* for LEDs D2 and D3 */
 			/* Program the lines for LEDs D2 and D3 to output */
-			nile4_pci_read_config_byte(dev, 0x7d, &t8);
+			nile4_pci_read(dev->bus, dev->devfn, 0x7d, 1, &t8);
 			t8 |= 0xc0;
-			nile4_pci_write_config_byte(dev, 0x7d, t8);
+			nile4_pci_write(dev->bus, dev->devfn, 0x7d, 1, t8);
 			/* Turn LEDs D2 and D3 off */
-			nile4_pci_read_config_byte(dev, 0x7e, &t8);
+			nile4_pci_read(dev->bus, dev->devfn, 0x7e, 1, &t8);
 			t8 |= 0xc0;
-			nile4_pci_write_config_byte(dev, 0x7e, t8);
+			nile4_pci_write(dev->bus, dev->devfn, 0x7e, 1, t8);
 		} else if (dev->vendor == PCI_VENDOR_ID_AL &&
 			   dev->device == 0x5229) {
 			int i;

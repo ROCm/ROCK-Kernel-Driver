@@ -43,137 +43,118 @@ static void nile4_post_pci_access0(void)
 }
 
 
-static int nile4_pci_read_config_dword(struct pci_dev *dev,
-				       int where, u32 * val)
+static int nile4_pci_read(struct pci_bus *bus, unsigned int devfn, int where, 
+			  int size, u32 * val)
 {
-	int slot_num, func_num;
-	u32 base;
+	int status, slot_num, func_num;
+	u32 result, base;
 
-	/*
-	 *  For starters let's do configuration cycle 0 only (one bus only)
-	 */
-	if (dev->bus->number)
-		return PCIBIOS_FUNC_NOT_SUPPORTED;
+	switch (size) {
+		case 4:
+			/*
+	 		 *  For starters let's do configuration cycle 0 only 
+			 *  (one bus only)
+	 		*/
+			if (bus->number)
+				return PCIBIOS_FUNC_NOT_SUPPORTED;
 
-	slot_num = PCI_SLOT(dev->devfn);
-	func_num = PCI_FUNC(dev->devfn);
-	if (slot_num == 5) {
-		/*
-		 * This is Nile 4 and it will crash if we access it like other
-		 * devices
-		 */
-		*val = nile4_in32(NILE4_PCI_BASE + where);
-		return PCIBIOS_SUCCESSFUL;
+			slot_num = PCI_SLOT(devfn);
+			func_num = PCI_FUNC(devfn);
+			if (slot_num == 5) {
+				/*
+		 	 	* This is Nile 4 and it will crash if we access it 
+			 	* like other devices
+		 	 	*/
+				*val = nile4_in32(NILE4_PCI_BASE + where);
+				return PCIBIOS_SUCCESSFUL;
+			}
+			base = nile4_pre_pci_access0(slot_num);
+			*val = *((volatile u32 *) (base + (func_num << 8) + 
+					   (where & 0xfc)));
+			nile4_post_pci_access0();
+			return PCIBIOS_SUCCESSFUL;
+
+		case 2:
+			status = nile4_pci_read(bus, devfn, where, 4, &result);
+			if (status != PCIBIOS_SUCCESSFUL)
+				return status;
+			if (where & 2)
+				result >>= 16;
+			*val = (u16)(result & 0xffff);
+			break;
+		case 1:
+			status = nile4_pci_read(bus, devfn, where, 4, &result);
+			if (status != PCIBIOS_SUCCESSFUL)
+				return status;
+			if (where & 1)
+				result >>= 8;
+			if (where & 2)
+				result >>= 16;
+			*val = (u8)(result & 0xff);
+			break;
 	}
-	base = nile4_pre_pci_access0(slot_num);
-	*val =
-	    *((volatile u32 *) (base + (func_num << 8) + (where & 0xfc)));
-	nile4_post_pci_access0();
 	return PCIBIOS_SUCCESSFUL;
 }
 
-static int nile4_pci_write_config_dword(struct pci_dev *dev, int where,
-					u32 val)
+
+static int nile4_pci_write(struct pci_bus *bus, unsigned int devfn, int where, 
+			   int size, u32 val)
 {
-	int slot_num, func_num;
-	u32 base;
+	int status, slot_num, func_num, shift = 0;
+	u32 result, base;
 
-	/*
-	 * For starters let's do configuration cycle 0 only (one bus only)
-	 */
-	if (dev->bus->number)
-		return PCIBIOS_FUNC_NOT_SUPPORTED;
+	switch (size) {
+		case 4:
+			/*
+	 		 * For starters let's do configuration cycle 0 only 
+			 * (one bus only)
+	 		 */
+			if (bus->number)
+				return PCIBIOS_FUNC_NOT_SUPPORTED;
 
-	slot_num = PCI_SLOT(dev->devfn);
-	func_num = PCI_FUNC(dev->devfn);
-	if (slot_num == 5) {
-		/*
-		 * This is Nile 4 and it will crash if we access it like other
-		 * devices
-		 */
-		nile4_out32(NILE4_PCI_BASE + where, val);
-		return PCIBIOS_SUCCESSFUL;
+			slot_num = PCI_SLOT(devfn);
+			func_num = PCI_FUNC(devfn);
+			if (slot_num == 5) {
+				/*
+		 	 	 * This is Nile 4 and it will crash if we access 
+				 * it like other devices
+		 	 	*/
+				nile4_out32(NILE4_PCI_BASE + where, val);
+				return PCIBIOS_SUCCESSFUL;
+			}
+			base = nile4_pre_pci_access0(slot_num);
+			*((volatile u32 *) (base + (func_num << 8) + 
+					    (where & 0xfc))) = val;
+			nile4_post_pci_access0();
+			return PCIBIOS_SUCCESSFUL;
+
+		case 2:
+			status = nile4_pci_read(bus, devfn, where, 4, &result);
+			if (status != PCIBIOS_SUCCESSFUL)
+				return status;
+			if (where & 2)
+				shift += 16;
+			result &= ~(0xffff << shift);
+			result |= (u16)(val << shift);
+			break;
+		case 1:
+			status = nile4_pci_read(bus, devfn, where, 4, &result);
+			if (status != PCIBIOS_SUCCESSFUL)
+				return status;
+			if (where & 2)
+				shift += 16;
+			if (where & 1)
+				shift += 8;
+			result &= ~(0xff << shift);
+			result |= (u8)(val << shift);
+			break;
 	}
-	base = nile4_pre_pci_access0(slot_num);
-	*((volatile u32 *) (base + (func_num << 8) + (where & 0xfc))) =
-	    val;
-	nile4_post_pci_access0();
-	return PCIBIOS_SUCCESSFUL;
-}
-
-static int nile4_pci_read_config_word(struct pci_dev *dev, int where,
-				      u16 * val)
-{
-	int status;
-	u32 result;
-
-	status = nile4_pci_read_config_dword(dev, where, &result);
-	if (status != PCIBIOS_SUCCESSFUL)
-		return status;
-	if (where & 2)
-		result >>= 16;
-	*val = result & 0xffff;
-	return PCIBIOS_SUCCESSFUL;
-}
-
-static int nile4_pci_read_config_byte(struct pci_dev *dev, int where,
-				      u8 * val)
-{
-	int status;
-	u32 result;
-
-	status = nile4_pci_read_config_dword(dev, where, &result);
-	if (status != PCIBIOS_SUCCESSFUL)
-		return status;
-	if (where & 1)
-		result >>= 8;
-	if (where & 2)
-		result >>= 16;
-	*val = result & 0xff;
-	return PCIBIOS_SUCCESSFUL;
-}
-
-static int nile4_pci_write_config_word(struct pci_dev *dev, int where,
-				       u16 val)
-{
-	int status, shift = 0;
-	u32 result;
-
-	status = nile4_pci_read_config_dword(dev, where, &result);
-	if (status != PCIBIOS_SUCCESSFUL)
-		return status;
-	if (where & 2)
-		shift += 16;
-	result &= ~(0xffff << shift);
-	result |= val << shift;
-	return nile4_pci_write_config_dword(dev, where, result);
-}
-
-static int nile4_pci_write_config_byte(struct pci_dev *dev, int where,
-				       u8 val)
-{
-	int status, shift = 0;
-	u32 result;
-
-	status = nile4_pci_read_config_dword(dev, where, &result);
-	if (status != PCIBIOS_SUCCESSFUL)
-		return status;
-	if (where & 2)
-		shift += 16;
-	if (where & 1)
-		shift += 8;
-	result &= ~(0xff << shift);
-	result |= val << shift;
-	return nile4_pci_write_config_dword(dev, where, result);
+	return nile4_pci_write(bus, devfn, where, 4, result);
 }
 
 struct pci_ops nile4_pci_ops = {
-	nile4_pci_read_config_byte,
-	nile4_pci_read_config_word,
-	nile4_pci_read_config_dword,
-	nile4_pci_write_config_byte,
-	nile4_pci_write_config_word,
-	nile4_pci_write_config_dword
+	.read = 	nile4_pci_read,
+	.write = 	nile4_pci_write,
 };
 
 struct {
