@@ -81,7 +81,7 @@ static long mpu_port[SNDRV_CARDS];
 static int joystick[SNDRV_CARDS];
 #endif
 static int ac97_clock[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 48000};
-static int ac97_quirk[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = AC97_TUNE_DEFAULT};
+static char *ac97_quirk[SNDRV_CARDS];
 static int dxs_support[SNDRV_CARDS];
 
 module_param_array(index, int, NULL, 0444);
@@ -98,7 +98,7 @@ MODULE_PARM_DESC(joystick, "Enable joystick. (VT82C686x only)");
 #endif
 module_param_array(ac97_clock, int, NULL, 0444);
 MODULE_PARM_DESC(ac97_clock, "AC'97 codec clock (default 48000Hz).");
-module_param_array(ac97_quirk, int, NULL, 0444);
+module_param_array(ac97_quirk, charp, NULL, 0444);
 MODULE_PARM_DESC(ac97_quirk, "AC'97 workaround for strange hardware.");
 module_param_array(dxs_support, int, NULL, 0444);
 MODULE_PARM_DESC(dxs_support, "Support for DXS channels (0 = auto, 1 = enable, 2 = disable, 3 = 48k only, 4 = no VRA)");
@@ -1602,7 +1602,7 @@ static struct ac97_quirk ac97_quirks[] = {
 	{ } /* terminator */
 };
 
-static int __devinit snd_via82xx_mixer_new(via82xx_t *chip, int ac97_quirk)
+static int __devinit snd_via82xx_mixer_new(via82xx_t *chip, const char *quirk_override)
 {
 	ac97_template_t ac97;
 	int err;
@@ -1625,7 +1625,7 @@ static int __devinit snd_via82xx_mixer_new(via82xx_t *chip, int ac97_quirk)
 	if ((err = snd_ac97_mixer(chip->ac97_bus, &ac97, &chip->ac97)) < 0)
 		return err;
 
-	snd_ac97_tune_hardware(chip->ac97, ac97_quirks, ac97_quirk);
+	snd_ac97_tune_hardware(chip->ac97, ac97_quirks, quirk_override);
 
 	if (chip->chip_type != TYPE_VIA686) {
 		/* use slot 10/11 */

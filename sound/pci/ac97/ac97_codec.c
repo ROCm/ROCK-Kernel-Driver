@@ -2299,6 +2299,7 @@ __reset_ready:
 
 
 /*
+ * Hardware tuning
  */
 static void set_ctl_name(char *dst, const char *src, const char *suffix)
 {
@@ -2308,6 +2309,7 @@ static void set_ctl_name(char *dst, const char *src, const char *suffix)
 		strcpy(dst, src);
 }	
 
+/* remove the control with the given name and optional suffix */
 int snd_ac97_remove_ctl(ac97_t *ac97, const char *name, const char *suffix)
 {
 	snd_ctl_elem_id_t id;
@@ -2326,6 +2328,7 @@ static snd_kcontrol_t *ctl_find(ac97_t *ac97, const char *name, const char *suff
 	return snd_ctl_find_id(ac97->bus->card, &sid);
 }
 
+/* rename the control with the given name and optional suffix */
 int snd_ac97_rename_ctl(ac97_t *ac97, const char *src, const char *dst, const char *suffix)
 {
 	snd_kcontrol_t *kctl = ctl_find(ac97, src, suffix);
@@ -2343,6 +2346,7 @@ void snd_ac97_rename_vol_ctl(ac97_t *ac97, const char *src, const char *dst)
 	snd_ac97_rename_ctl(ac97, src, dst, "Volume");
 }
 
+/* swap controls */
 int snd_ac97_swap_ctl(ac97_t *ac97, const char *s1, const char *s2, const char *suffix)
 {
 	snd_kcontrol_t *kctl1, *kctl2;
@@ -2356,20 +2360,29 @@ int snd_ac97_swap_ctl(ac97_t *ac97, const char *s1, const char *s2, const char *
 	return -ENOENT;
 }
 
-static int swap_headphone(ac97_t *ac97, int remove_master)
+/* ac97 tune: use Headphone control as master */
+static int tune_hp_only(ac97_t *ac97)
 {
 	if (ctl_find(ac97, "Headphone Playback Switch", NULL) == NULL)
 		return -ENOENT;
-	if (remove_master) {
-		snd_ac97_remove_ctl(ac97, "Master Playback", "Switch");
-		snd_ac97_remove_ctl(ac97, "Master Playback", "Volume");
-	} else
-		snd_ac97_rename_vol_ctl(ac97, "Master Playback", "Line-Out Playback");
+	snd_ac97_remove_ctl(ac97, "Master Playback", "Switch");
+	snd_ac97_remove_ctl(ac97, "Master Playback", "Volume");
 	snd_ac97_rename_vol_ctl(ac97, "Headphone Playback", "Master Playback");
 	return 0;
 }
 
-static int swap_surround(ac97_t *ac97)
+/* ac97 tune: swap Headphone and Master controls */
+static int tune_swap_hp(ac97_t *ac97)
+{
+	if (ctl_find(ac97, "Headphone Playback Switch", NULL) == NULL)
+		return -ENOENT;
+	snd_ac97_rename_vol_ctl(ac97, "Master Playback", "Line-Out Playback");
+	snd_ac97_rename_vol_ctl(ac97, "Headphone Playback", "Master Playback");
+	return 0;
+}
+
+/* ac97 tune: swap Surround and Master controls */
+static int tune_swap_surround(ac97_t *ac97)
 {
 	if (snd_ac97_swap_ctl(ac97, "Master Playback", "Surround Playback", "Switch") ||
 	    snd_ac97_swap_ctl(ac97, "Master Playback", "Surround Playback", "Volume"))
@@ -2377,6 +2390,7 @@ static int swap_surround(ac97_t *ac97)
 	return 0;
 }
 
+/* ac97 tune: set up mic sharing for AD codecs */
 static int tune_ad_sharing(ac97_t *ac97)
 {
 	unsigned short scfg;
@@ -2393,6 +2407,7 @@ static int tune_ad_sharing(ac97_t *ac97)
 static const snd_kcontrol_new_t snd_ac97_alc_jack_detect = 
 AC97_SINGLE("Jack Detect", AC97_ALC650_CLOCK, 5, 1, 0);
 
+/* ac97 tune: set up ALC jack-select */
 static int tune_alc_jack(ac97_t *ac97)
 {
 	if ((ac97->id & 0xffffff00) != 0x414c4700) {
@@ -2404,6 +2419,7 @@ static int tune_alc_jack(ac97_t *ac97)
 	return snd_ctl_add(ac97->bus->card, snd_ac97_cnew(&snd_ac97_alc_jack_detect, ac97));
 }
 
+/* ac97 tune: inversed EAPD bit */
 static int tune_inv_eapd(ac97_t *ac97)
 {
 	snd_kcontrol_t *kctl = ctl_find(ac97, "External Amplifier", NULL);
@@ -2432,6 +2448,7 @@ static int master_mute_sw_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *uc
 	return err;
 }
 
+/* ac97 tune: EAPD controls mute LED bound with the master mute */
 static int tune_mute_led(ac97_t *ac97)
 {
 	snd_kcontrol_t *msw = ctl_find(ac97, "Master Playback Switch", NULL);
@@ -2443,26 +2460,48 @@ static int tune_mute_led(ac97_t *ac97)
 	return 0;
 }
 
-static int apply_quirk(ac97_t *ac97, int quirk)
+struct quirk_table {
+	const char *name;
+	int (*func)(ac97_t *);
+};
+
+static struct quirk_table applicable_quirks[] = {
+	{ "none", NULL },
+	{ "hp_only", tune_hp_only },
+	{ "swap_hp", tune_swap_hp },
+	{ "swap_surround", tune_swap_surround },
+	{ "ad_sharing", tune_ad_sharing },
+	{ "alc_jack", tune_alc_jack },
+	{ "inv_eapd", tune_inv_eapd },
+	{ "mute_led", tune_mute_led },
+};
+
+/* apply the quirk with the given type */
+static int apply_quirk(ac97_t *ac97, int type)
 {
-	switch (quirk) {
-	case AC97_TUNE_NONE:
+	if (type <= 0)
 		return 0;
-	case AC97_TUNE_HP_ONLY:
-		return swap_headphone(ac97, 1);
-	case AC97_TUNE_SWAP_HP:
-		return swap_headphone(ac97, 0);
-	case AC97_TUNE_SWAP_SURROUND:
-		return swap_surround(ac97);
-	case AC97_TUNE_AD_SHARING:
-		return tune_ad_sharing(ac97);
-	case AC97_TUNE_ALC_JACK:
-		return tune_alc_jack(ac97);
-	case AC97_TUNE_INV_EAPD:
-		return tune_inv_eapd(ac97);
-	case AC97_TUNE_MUTE_LED:
-		return tune_mute_led(ac97);
+	else if (type >= ARRAY_SIZE(applicable_quirks))
+		return -EINVAL;
+	if (applicable_quirks[type].func)
+		return applicable_quirks[type].func(ac97);
+	return 0;
+}
+
+/* apply the quirk with the given name */
+static int apply_quirk_str(ac97_t *ac97, const char *typestr)
+{
+	int i;
+	struct quirk_table *q;
+
+	for (i = 0; i < ARRAY_SIZE(applicable_quirks); i++) {
+		q = &applicable_quirks[i];
+		if (q->name && ! strcmp(typestr, q->name))
+			return apply_quirk(ac97, i);
 	}
+	/* for compatibility, accept the numbers, too */
+	if (*typestr >= '0' && *typestr <= '9')
+		return apply_quirk(ac97, (int)simple_strtol(typestr, NULL, 10));
 	return -EINVAL;
 }
 
@@ -2470,7 +2509,7 @@ static int apply_quirk(ac97_t *ac97, int quirk)
  * snd_ac97_tune_hardware - tune up the hardware
  * @ac97: the ac97 instance
  * @quirk: quirk list
- * @override: explicit quirk value (overrides the list if not AC97_TUNE_DEFAULT)
+ * @override: explicit quirk value (overrides the list if non-NULL)
  *
  * Do some workaround for each pci device, such as renaming of the
  * headphone (true line-out) control as "Master".
@@ -2479,16 +2518,17 @@ static int apply_quirk(ac97_t *ac97, int quirk)
  * Returns zero if successful, or a negative error code on failure.
  */
 
-int snd_ac97_tune_hardware(ac97_t *ac97, struct ac97_quirk *quirk, int override)
+int snd_ac97_tune_hardware(ac97_t *ac97, struct ac97_quirk *quirk, const char *override)
 {
 	int result;
 
 	snd_assert(quirk, return -EINVAL);
 
-	if (override != AC97_TUNE_DEFAULT) {
-		result = apply_quirk(ac97, override);
+	/* quirk overriden? */
+	if (override && strcmp(override, "-1") && strcmp(override, "default")) {
+		result = apply_quirk_str(ac97, override);
 		if (result < 0)
-			snd_printk(KERN_ERR "applying quirk type %d failed (%d)\n", override, result);
+			snd_printk(KERN_ERR "applying quirk type %s failed (%d)\n", override, result);
 		return result;
 	}
 

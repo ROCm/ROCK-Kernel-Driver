@@ -66,7 +66,7 @@ static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
 static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
 static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card */
 static int ac97_clock[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0};
-static int ac97_quirk[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = AC97_TUNE_DEFAULT};
+static char *ac97_quirk[SNDRV_CARDS];
 static int buggy_irq[SNDRV_CARDS];
 static int xbox[SNDRV_CARDS];
 
@@ -82,7 +82,7 @@ module_param_array(enable, bool, NULL, 0444);
 MODULE_PARM_DESC(enable, "Enable Intel i8x0 soundcard.");
 module_param_array(ac97_clock, int, NULL, 0444);
 MODULE_PARM_DESC(ac97_clock, "AC'97 codec clock (0 = auto-detect).");
-module_param_array(ac97_quirk, int, NULL, 0444);
+module_param_array(ac97_quirk, charp, NULL, 0444);
 MODULE_PARM_DESC(ac97_quirk, "AC'97 workaround for strange hardware.");
 module_param_array(buggy_irq, bool, NULL, 0444);
 MODULE_PARM_DESC(buggy_irq, "Enable workaround for buggy interrupts on some motherboards.");
@@ -1902,7 +1902,7 @@ static struct ac97_quirk ac97_quirks[] __devinitdata = {
 	{ } /* terminator */
 };
 
-static int __devinit snd_intel8x0_mixer(intel8x0_t *chip, int ac97_clock, int ac97_quirk)
+static int __devinit snd_intel8x0_mixer(intel8x0_t *chip, int ac97_clock, const char *quirk_override)
 {
 	ac97_bus_t *pbus;
 	ac97_template_t ac97;
@@ -1998,7 +1998,7 @@ static int __devinit snd_intel8x0_mixer(intel8x0_t *chip, int ac97_clock, int ac
 		}
 	}
 	/* tune up the primary codec */
-	snd_ac97_tune_hardware(chip->ac97[0], ac97_quirks, ac97_quirk);
+	snd_ac97_tune_hardware(chip->ac97[0], ac97_quirks, quirk_override);
 	/* enable separate SDINs for ICH4 */
 	if (chip->device_type == DEVICE_INTEL_ICH4)
 		pbus->isdin = 1;
