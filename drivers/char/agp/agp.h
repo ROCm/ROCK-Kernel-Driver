@@ -118,8 +118,8 @@ struct agp_bridge_data {
 	int (*remove_memory) (agp_memory *, off_t, int);
 	agp_memory *(*alloc_by_type) (size_t, int);
 	void (*free_by_type) (agp_memory *);
-	unsigned long (*agp_alloc_page) (void);
-	void (*agp_destroy_page) (unsigned long);
+	void *(*agp_alloc_page) (void);
+	void (*agp_destroy_page) (void *);
 	int (*suspend)(void);
 	void (*resume)(void);
 	
