@@ -42,6 +42,9 @@
 #include <linux/errno.h>
 #include <linux/types.h>
 
+#define __DQUOT_VERSION__	"dquot_6.5.1"
+#define __DQUOT_NUM_VERSION__	6*10000+5*100+1
+
 typedef __kernel_uid32_t qid_t; /* Type in which we store ids in memory */
 
 /*

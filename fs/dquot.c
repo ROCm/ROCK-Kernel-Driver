@@ -62,10 +62,9 @@
 #include <linux/sysctl.h>
 #include <linux/smp_lock.h>
 #include <linux/init.h>
+#include <linux/proc_fs.h>
 
 #include <asm/uaccess.h>
-
-#define __DQUOT_VERSION__	"dquot_6.4.0"
 
 int nr_dquots, nr_free_dquots;
 
@@ -879,21 +878,6 @@ static int check_bdq(struct dquot *dquot, ulong blocks, char prealloc, char *war
 	return QUOTA_OK;
 }
 
-static int get_stats(caddr_t addr)
-{
-	int error = -EFAULT;
-	struct dqstats stats;
-
-	dqstats.allocated_dquots = nr_dquots;
-	dqstats.free_dquots = nr_free_dquots;
-
-	/* make a copy, in case we page-fault in user space */
-	memcpy(&stats, &dqstats, sizeof(struct dqstats));
-	if (!copy_to_user(addr, &stats, sizeof(struct dqstats)))
-		error = 0;
-	return error;
-}
-
 /*
  * Externally referenced functions through dquot_operations in inode.
  *
@@ -1172,30 +1156,6 @@ warn_put_all:
 	return ret;
 }
 
-static ctl_table fs_table[] = {
-	{FS_NRDQUOT, "dquot-nr", &nr_dquots, 2*sizeof(int),
-	 0444, NULL, &proc_dointvec},
-	{},
-};
-
-static ctl_table dquot_table[] = {
-	{CTL_FS, "fs", NULL, 0, 0555, fs_table},
-	{},
-};
-
-static int __init dquot_init(void)
-{
-	int i;
-
-	register_sysctl_table(dquot_table, 0);
-
-	for (i = 0; i < NR_DQHASH; i++)
-		INIT_LIST_HEAD(dquot_hash + i);
-	printk(KERN_NOTICE "VFS: Diskquotas version %s initialized\n", __DQUOT_VERSION__);
-	return 0;
-}
-__initcall(dquot_init);
-
 /*
  * Definitions of diskquota operations.
  */
@@ -1439,3 +1399,64 @@ out:
 	unlock_kernel();
 	return ret;
 }
+
+#ifdef CONFIG_PROC_FS
+static int read_stats(char *buffer, char **start, off_t offset, int count, int *eof, void *data)
+{
+	int len;
+	struct quota_format_type *actqf;
+
+	dqstats.allocated_dquots = nr_dquots;
+	dqstats.free_dquots = nr_free_dquots;
+
+	len = sprintf(buffer, "Version %u\n", __DQUOT_NUM_VERSION__);
+	len += sprintf(buffer + len, "Formats");
+	lock_kernel();
+	for (actqf = quota_formats; actqf; actqf = actqf->qf_next)
+		len += sprintf(buffer + len, " %u", actqf->qf_id);
+	unlock_kernel();
+	len += sprintf(buffer + len, "\n%u %u %u %u %u %u %u %u\n",
+			dqstats.lookups, dqstats.drops,
+			dqstats.reads, dqstats.writes,
+			dqstats.cache_hits, dqstats.allocated_dquots,
+			dqstats.free_dquots, dqstats.syncs);
+
+	if (offset >= len) {
+		*start = buffer;
+		*eof = 1;
+		return 0;
+	}
+	*start = buffer + offset;
+	if ((len -= offset) > count)
+		return count;
+	*eof = 1;
+
+	return len;
+}
+#endif
+
+static ctl_table fs_table[] = {
+	{FS_NRDQUOT, "dquot-nr", &nr_dquots, 2*sizeof(int),
+	 0444, NULL, &proc_dointvec},
+	{},
+};
+
+static ctl_table dquot_table[] = {
+	{CTL_FS, "fs", NULL, 0, 0555, fs_table},
+	{},
+};
+
+static int __init dquot_init(void)
+{
+	int i;
+
+	register_sysctl_table(dquot_table, 0);
+	for (i = 0; i < NR_DQHASH; i++)
+		INIT_LIST_HEAD(dquot_hash + i);
+	printk(KERN_NOTICE "VFS: Diskquotas version %s initialized\n", __DQUOT_VERSION__);
+#ifdef CONFIG_PROC_FS
+	create_proc_read_entry("fs/quota", 0, 0, read_stats, NULL);
+#endif
+	return 0;
+}
+__initcall(dquot_init);
