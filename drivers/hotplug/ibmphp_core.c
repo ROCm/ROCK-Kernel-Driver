@@ -384,14 +384,15 @@ static int get_adapter_present (struct hotplug_slot *hotplug_slot, u8 * value)
 	debug ("get_adapter_present - Exit rc[%d] hpcrc[%x] value[%x]\n", rc, hpcrc, *value);
 	return rc;
 }
-/*
-static int get_max_bus_speed (struct hotplug_slot *hotplug_slot, u8 * value)
+
+static int get_max_bus_speed (struct hotplug_slot *hotplug_slot, enum pci_bus_speed *value)
 {
 	int rc = -ENODEV;
 	struct slot *pslot;
 	u8 mode = 0;
 
-	debug ("get_max_bus_speed - Entry hotplug_slot[%lx] pvalue[%lx]\n", (ulong)hotplug_slot, (ulong) value);
+	debug ("%s - Entry hotplug_slot[%p] pvalue[%p]\n", __FUNCTION__,
+		hotplug_slot, value);
 
 	ibmphp_lock_operations ();
 
@@ -413,25 +414,26 @@ static int get_max_bus_speed (struct hotplug_slot *hotplug_slot, u8 * value)
 				*value = pslot->supported_speed + 0x01;
 				break;
 			default:
-*/				/* Note (will need to change): there would be soon 256, 512 also */
-/*				rc = -ENODEV;
+				/* Note (will need to change): there would be soon 256, 512 also */
+				rc = -ENODEV;
 			}
 		}
 	} else
 		rc = -ENODEV;
 
 	ibmphp_unlock_operations ();
-	debug ("get_max_bus_speed - Exit rc[%d] value[%x]\n", rc, *value);
+	debug ("%s - Exit rc[%d] value[%x]\n", __FUNCTION__, rc, *value);
 	return rc;
 }
 
-static int get_cur_bus_speed (struct hotplug_slot *hotplug_slot, u8 * value)
+static int get_cur_bus_speed (struct hotplug_slot *hotplug_slot, enum pci_bus_speed *value)
 {
 	int rc = -ENODEV;
 	struct slot *pslot;
 	u8 mode = 0;
 
-	debug ("get_cur_bus_speed - Entry hotplug_slot[%lx] pvalue[%lx]\n", (ulong)hotplug_slot, (ulong) value);
+	debug ("%s - Entry hotplug_slot[%p] pvalue[%p]\n", __FUNCTION__,
+		hotplug_slot, value);
 
 	ibmphp_lock_operations ();
 
@@ -458,8 +460,8 @@ static int get_cur_bus_speed (struct hotplug_slot *hotplug_slot, u8 * value)
 					*value += 0x01;
 					break;
 				default:
-*/					/* Note of change: there would also be 256, 512 soon */
-/*					rc = -ENODEV;
+					/* Note of change: there would also be 256, 512 soon */
+					rc = -ENODEV;
 				}
 			}
 		}
@@ -467,10 +469,10 @@ static int get_cur_bus_speed (struct hotplug_slot *hotplug_slot, u8 * value)
 		rc = -ENODEV;
 
 	ibmphp_unlock_operations ();
-	debug ("get_cur_bus_speed - Exit rc[%d] value[%x]\n", rc, *value);
+	debug ("%s - Exit rc[%d] value[%x]\n", __FUNCTION__, rc, *value);
 	return rc;
 }
-
+/*
 static int get_max_adapter_speed_1 (struct hotplug_slot *hotplug_slot, u8 * value, u8 flag)
 {
 	int rc = -ENODEV;
@@ -1584,9 +1586,9 @@ struct hotplug_slot_ops ibmphp_hotplug_slot_ops = {
 	.get_attention_status =		get_attention_status,
 	.get_latch_status =		get_latch_status,
 	.get_adapter_status =		get_adapter_present,
-/*	.get_max_bus_speed_status =	get_max_bus_speed,
-	.get_max_adapter_speed_status =	get_max_adapter_speed,
-	.get_cur_bus_speed_status =	get_cur_bus_speed,
+	.get_max_bus_speed =		get_max_bus_speed,
+	.get_cur_bus_speed =		get_cur_bus_speed,
+/*	.get_max_adapter_speed =	get_max_adapter_speed,
 	.get_bus_name_status =		get_bus_name,
 */
 };
