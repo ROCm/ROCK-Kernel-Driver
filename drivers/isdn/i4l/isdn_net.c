@@ -33,102 +33,90 @@
 #include "isdn_concap.h"
 #include "isdn_ciscohdlck.h"
 
-/*
- * Outline of new tbusy handling: 
- *
- * Old method, roughly spoken, consisted of setting tbusy when entering
- * isdn_net_start_xmit() and at several other locations and clearing
- * it from isdn_net_start_xmit() thread when sending was successful.
- *
- * With 2.3.x multithreaded network core, to prevent problems, tbusy should
- * only be set by the isdn_net_start_xmit() thread and only when a tx-busy
- * condition is detected. Other threads (in particular isdn_net_stat_callb())
- * are only allowed to clear tbusy.
- *
- * -HE
- */
+#define ISDN_NET_MAX_QUEUE_LENGTH 2
 
 /*
- * About SOFTNET:
- * Most of the changes were pretty obvious and basically done by HE already.
- *
- * One problem of the isdn net device code is that is uses struct net_device
- * for masters and slaves. However, only master interface are registered to 
- * the network layer, and therefore, it only makes sense to call netif_* 
- * functions on them.
- *
- * --KG
- */
-
-/* 
- * Find out if the netdevice has been ifup-ed yet.
+ * is this particular channel busy?
  */
 static inline int
-isdn_net_device_started(isdn_net_dev *idev)
+isdn_net_dev_busy(isdn_net_dev *idev)
 {
-	return netif_running(&idev->mlp->dev);
+	return idev->frame_cnt >= ISDN_NET_MAX_QUEUE_LENGTH;
 }
 
 /*
- * stop the network -> net_device queue.
+ * find out if the net_device which this mlp is belongs to is busy.
+ * It's busy iff all channels are busy.
+ * must hold mlp->xmit_lock
+ * FIXME: Use a mlp->frame_cnt instead of loop?
  */
-static inline void
-isdn_net_dev_stop_queue(isdn_net_dev *idev)
+static inline int
+isdn_net_local_busy(isdn_net_local *mlp)
 {
-	netif_stop_queue(&idev->mlp->dev);
+	isdn_net_dev *idev;
+
+	list_for_each_entry(idev, &mlp->online, online) {
+		if (!isdn_net_dev_busy(idev))
+			return 0;
+	}
+	return 1;
 }
 
 /*
- * find out if the net_device which this lp belongs to (lp can be
- * master or slave) is busy. It's busy iff all (master and slave) 
- * queues are busy
+ * For the given net device, this will get a non-busy channel out of the
+ * corresponding bundle.
  */
-static inline int
-isdn_net_device_busy(isdn_net_dev *idev)
+static inline isdn_net_dev *
+isdn_net_get_xmit_dev(isdn_net_local *mlp)
 {
-	isdn_net_local *mlp = idev->mlp;
-	unsigned long flags;
-	int retval = 1;
+	isdn_net_dev *idev;
 
-	if (!isdn_net_dev_busy(idev))
-		return 0;
-
-	spin_lock_irqsave(&mlp->online_lock, flags);
 	list_for_each_entry(idev, &mlp->online, online) {
 		if (!isdn_net_dev_busy(idev)) {
-			retval = 0;
-			break;
+			/* point the head to next online channel */
+			list_del(&mlp->online);
+			list_add(&mlp->online, &idev->online);
+			return idev;
 		}
 	}
-	spin_unlock_irqrestore(&mlp->online_lock, flags);
-	return retval;
+	return NULL;
 }
 
-static inline
-void isdn_net_inc_frame_cnt(isdn_net_dev *idev)
+/* mlp->xmit_lock must be held */
+static inline void
+isdn_net_inc_frame_cnt(isdn_net_dev *idev)
 {
-	atomic_inc(&idev->frame_cnt);
-	if (isdn_net_device_busy(idev))
-		isdn_net_dev_stop_queue(idev);
+	isdn_net_local *mlp = idev->mlp;
+
+	if (isdn_net_local_busy(mlp))
+		isdn_BUG();
+		
+	idev->frame_cnt++;
+	if (isdn_net_local_busy(mlp))
+		netif_stop_queue(&mlp->dev);
 }
 
+/* mlp->xmit_lock must be held */
 static inline void
 isdn_net_dec_frame_cnt(isdn_net_dev *idev)
 {
-	atomic_dec(&idev->frame_cnt);
+	isdn_net_local *mlp = idev->mlp;
+	int was_busy;
 
-	if (!isdn_net_device_busy(idev)) {
-		if (!skb_queue_empty(&idev->super_tx_queue))
-			tasklet_schedule(&idev->tlet);
-		else
-			isdn_net_dev_wake_queue(idev);
-       }                                                                      
-}
+	was_busy = isdn_net_local_busy(mlp);
 
-static inline
-void isdn_net_zero_frame_cnt(isdn_net_dev *idev)
-{
-	atomic_set(&idev->frame_cnt, 0);
+	idev->frame_cnt--;
+
+	if (isdn_net_local_busy(mlp))
+		isdn_BUG();
+
+	if (!was_busy)
+		return;
+
+	if (!skb_queue_empty(&idev->super_tx_queue))
+		tasklet_schedule(&idev->tlet);
+	else
+		netif_wake_queue(&mlp->dev);
 }
 
 /* Prototypes */
@@ -143,8 +131,11 @@ int
 isdn_net_bsent(isdn_net_dev *idev, isdn_ctrl *c)
 {
 	isdn_net_local *mlp = idev->mlp;
+	unsigned long flags;
 
+	spin_lock_irqsave(&mlp->xmit_lock, flags);
 	isdn_net_dec_frame_cnt(idev);
+	spin_unlock_irqrestore(&mlp->xmit_lock, flags);
 	mlp->stats.tx_packets++;
 	mlp->stats.tx_bytes += c->parm.length;
 	return 1;
@@ -212,33 +203,24 @@ isdn_net_log_skb(struct sk_buff *skb, isdn_net_dev *idev)
  * this function is used to send supervisory data, i.e. data which was
  * not received from the network layer, but e.g. frames from ipppd, CCP
  * reset frames etc.
+ * must hold mlp->xmit_lock
  */
 void
 isdn_net_write_super(isdn_net_dev *idev, struct sk_buff *skb)
 {
-	if (in_irq()) {
-		// we can't grab the lock from irq context, 
-		// so we just queue the packet
-		skb_queue_tail(&idev->super_tx_queue, skb); 
-
-		tasklet_schedule(&idev->tlet);
-		return;
-	}
-
-	spin_lock_bh(&idev->xmit_lock);
-	if (!isdn_net_dev_busy(idev)) {
+	if (!isdn_net_dev_busy(idev))
 		isdn_net_writebuf_skb(idev, skb);
-	} else {
+	else
 		skb_queue_tail(&idev->super_tx_queue, skb);
-	}
-	spin_unlock_bh(&idev->xmit_lock);
 }
 
 /* 
  * all frames sent from the (net) LL to a HL driver should go via this function
  * it's serialized by the caller holding the idev->xmit_lock spinlock
+ * must hold mlp->xmit_lock
  */
-void isdn_net_writebuf_skb(isdn_net_dev *idev, struct sk_buff *skb)
+void
+isdn_net_writebuf_skb(isdn_net_dev *idev, struct sk_buff *skb)
 {
 	isdn_net_local *mlp = idev->mlp;
 	int ret;
@@ -298,22 +280,27 @@ isdn_net_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 {
 	isdn_net_dev *idev;
 	isdn_net_local *mlp = ndev->priv;
+	unsigned long flags;
+	int retval;
 
 	ndev->trans_start = jiffies;
 
-	if (list_empty(&mlp->online))
-		return isdn_net_autodial(skb, ndev);
+	spin_lock_irqsave(&mlp->xmit_lock, flags);
 
-	idev = isdn_net_get_locked_dev(mlp);
-	if (!idev) {
-		printk(KERN_WARNING "%s: all channels busy - requeuing!\n", ndev->name);
-		netif_stop_queue(ndev);
-		return 1;
+	if (list_empty(&mlp->online)) {
+		retval = isdn_net_autodial(skb, ndev);
+		goto out;
 	}
-	/* we have our idev locked from now on */
+
+	idev = isdn_net_get_xmit_dev(mlp);
+	if (!idev) {
+		printk(KERN_INFO "%s: all channels busy - requeuing!\n", ndev->name);
+		netif_stop_queue(ndev);
+		retval = 1;
+		goto out;
+	}
 
 	isdn_net_writebuf_skb(idev, skb);
-	spin_unlock_bh(&idev->xmit_lock);
 
 	/* the following stuff is here for backwards compatibility.
 	 * in future, start-up and hangup of slaves (based on current load)
@@ -348,7 +335,10 @@ isdn_net_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 		list_add_tail(&mlp->online, &idev->online);
 	}
 
-	return 0;
+	retval = 0;
+ out:
+	spin_unlock_irqrestore(&mlp->xmit_lock, flags);
+	return retval;
 }
 
 int

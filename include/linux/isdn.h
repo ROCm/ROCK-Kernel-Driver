@@ -338,10 +338,18 @@ typedef struct isdn_net_local_s {
 				       /* phone[0] = Incoming Numbers      */
 				       /* phone[1] = Outgoing Numbers      */
 
-  struct list_head       slaves;       /* list of all bundled channels     */
-  struct list_head       online;       /* list of all bundled channels, 
-					  which are currently online       */
-  spinlock_t             online_lock;  /* lock to protect online list      */
+  struct list_head       slaves;       /* list of all bundled channels    
+					  protected by serializing config
+					  ioctls / no change allowed when
+					  interface is running             */
+  struct list_head       online;       /* circular list of all bundled
+					  channels, which are currently
+					  online                           
+					  protected by xmit_lock           */
+
+  spinlock_t             xmit_lock;    /* used to protect the xmit path of 
+					  a net_device, including all
+					  associated channels's frame_cnt  */
   struct list_head       running_devs; /* member of global running_devs    */
   atomic_t               refcnt;       /* references held by ISDN code     */
 
@@ -393,12 +401,9 @@ typedef struct isdn_net_dev_s {
   int                    pppbind;      /* ippp device for bindings         */
   int			 ppp_slot;     /* PPPD device slot number          */
 
-  spinlock_t             xmit_lock;    /* used to protect the xmit path of */
-                                       /* a particular channel (including  */
-                                       /* the frame_cnt                    */
   struct sk_buff_head    super_tx_queue; /* List of supervisory frames to  */
 	                               /* be transmitted asap              */
-  atomic_t               frame_cnt;    /* number of frames currently       */
+  int                    frame_cnt;    /* number of frames currently       */
                         	       /* queued in HL driver              */
   struct tasklet_struct  tlet;
 

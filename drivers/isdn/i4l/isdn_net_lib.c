@@ -348,7 +348,6 @@ isdn_net_addif(char *name, isdn_net_local *mlp)
 	strcpy(idev->name, name);
 
 	tasklet_init(&idev->tlet, isdn_net_tasklet, (unsigned long) idev);
-	spin_lock_init(&idev->xmit_lock);
 	skb_queue_head_init(&idev->super_tx_queue);
 
 	idev->isdn_slot = -1;
@@ -380,6 +379,7 @@ isdn_net_addif(char *name, isdn_net_local *mlp)
 		mlp->magic = ISDN_NET_MAGIC;
 		INIT_LIST_HEAD(&mlp->slaves);
 		INIT_LIST_HEAD(&mlp->online);
+		spin_lock_init(&mlp->xmit_lock);
 
 		mlp->p_encap = -1;
 		isdn_net_set_encap(mlp, ISDN_NET_ENCAP_RAWIP);
@@ -1152,16 +1152,16 @@ static void
 isdn_net_tasklet(unsigned long data)
 {
 	isdn_net_dev *idev = (isdn_net_dev *) data;
+	isdn_net_local *mlp = idev->mlp;
 	struct sk_buff *skb;
+	unsigned long flags;
 
-	spin_lock_bh(&idev->xmit_lock);
-	while (!isdn_net_dev_busy(idev)) {
-		skb = skb_dequeue(&idev->super_tx_queue);
-		if (!skb)
-			break;
+	spin_lock_irqsave(&mlp->xmit_lock, flags);
+	while (!isdn_net_dev_busy(idev) &&
+	       (skb = skb_dequeue(&idev->super_tx_queue))) {
 		isdn_net_writebuf_skb(idev, skb);
 	}
-	spin_unlock_bh(&idev->xmit_lock);
+	spin_unlock_irqrestore(&mlp->xmit_lock, flags);
 }
 
 /* ====================================================================== */
@@ -1629,6 +1629,7 @@ bconn(struct fsm_inst *fi, int pr, void *arg)
 {
 	isdn_net_dev *idev = fi->userdata;
 	isdn_net_local *mlp = idev->mlp;
+	unsigned long flags;
 
 	fsm_change_state(&idev->fi, ST_ACTIVE);
 
@@ -1640,14 +1641,16 @@ bconn(struct fsm_inst *fi, int pr, void *arg)
 		del_timer(&idev->dial_timer);
 	}
 
-	isdn_net_add_to_bundle(mlp, idev);
+	spin_lock_irqsave(&mlp->xmit_lock, flags);
+	list_add(&idev->online, &mlp->online);
+	spin_unlock_irqrestore(&mlp->xmit_lock, flags);
 
 	printk(KERN_INFO "%s connected\n", idev->name);
 	/* If first Chargeinfo comes before B-Channel connect,
 	 * we correct the timestamp here.
 	 */
 	idev->chargetime = jiffies;
-	
+	idev->frame_cnt = 0;
 	idev->transcount = 0;
 	idev->cps = 0;
 	idev->last_jiffies = jiffies;
@@ -1655,7 +1658,7 @@ bconn(struct fsm_inst *fi, int pr, void *arg)
 	if (mlp->ops->connected)
 		mlp->ops->connected(idev);
 	else
-		isdn_net_dev_wake_queue(idev);
+		netif_wake_queue(&idev->mlp->dev);
 
 	return 0;
 }
@@ -1665,15 +1668,18 @@ bhup(struct fsm_inst *fi, int pr, void *arg)
 {
 	isdn_net_dev *idev = fi->userdata;
 	isdn_net_local *mlp = idev->mlp;
+	unsigned long flags;
 
 	del_timer(&idev->dial_timer);
 	if (mlp->ops->disconnected)
 		mlp->ops->disconnected(idev);
 
+	spin_lock_irqsave(&mlp->xmit_lock, flags);
+	list_del(&idev->online);
+	spin_unlock_irqrestore(&mlp->xmit_lock, flags);
+
 	printk(KERN_INFO "%s: disconnected\n", idev->name);
 	fsm_change_state(fi, ST_WAIT_DHUP);
-	isdn_net_rm_from_bundle(idev);
-	return 0;
 }
 
 static int
