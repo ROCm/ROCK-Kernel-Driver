@@ -22,6 +22,12 @@ else
 obj-y += noquot.o
 endif
 
+ifneq ($(CONFIG_NFSD),n)
+ifneq ($(CONFIG_NFSD),)
+obj-y += nfsctl.o
+endif
+endif
+
 subdir-$(CONFIG_PROC_FS)	+= proc
 subdir-y			+= partitions
 subdir-y			+= driverfs
