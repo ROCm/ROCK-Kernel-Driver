@@ -355,6 +355,26 @@ static void __init quirk_ioapic_rmw(struct pci_dev *dev)
 		sis_apic_bug = 1;
 }
 
+#define AMD8131_revA0        0x01
+#define AMD8131_revB0        0x11
+#define AMD8131_MISC         0x40
+#define AMD8131_NIOAMODE_BIT 0
+
+static void __init quirk_amd_8131_ioapic(struct pci_dev *dev) 
+{ 
+        unsigned char revid, tmp;
+        
+        if (nr_ioapics == 0) 
+                return;
+
+        pci_read_config_byte(dev, PCI_REVISION_ID, &revid);
+        if (revid == AMD8131_revA0 || revid == AMD8131_revB0) {
+                printk(KERN_INFO "Fixing up AMD8131 IOAPIC mode\n"); 
+                pci_read_config_byte( dev, AMD8131_MISC, &tmp);
+                tmp &= ~(1 << AMD8131_NIOAMODE_BIT);
+                pci_write_config_byte( dev, AMD8131_MISC, tmp);
+        }
+} 
 
 #endif /* CONFIG_X86_IO_APIC */
 
@@ -563,6 +583,8 @@ static struct pci_fixup pci_fixups[] __devinitdata = {
 	{ PCI_FIXUP_FINAL,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_82C686,	quirk_via_ioapic },
 	{ PCI_FIXUP_FINAL, 	PCI_VENDOR_ID_AMD,	PCI_DEVICE_ID_AMD_VIPER_7410,	quirk_amd_ioapic },
 	{ PCI_FIXUP_FINAL,	PCI_VENDOR_ID_SI,	PCI_ANY_ID,			quirk_ioapic_rmw },
+        { PCI_FIXUP_FINAL,      PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_8131_APIC,
+          quirk_amd_8131_ioapic }, 
 #endif
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_82C586_3,	quirk_via_acpi },
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_82C686_4,	quirk_via_acpi },
