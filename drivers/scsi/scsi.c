@@ -177,6 +177,13 @@ void  scsi_initialize_queue(Scsi_Device * SDpnt, struct Scsi_Host * SHpnt)
 	 */
 	blk_queue_max_phys_segments(q, MAX_PHYS_SEGMENTS);
 
+	if(!SHpnt->max_sectors)
+		/* driver imposes no hard sector transfer limit.
+		 * start at machine infinity initially */
+		SHpnt->max_sectors = SCSI_DEFAULT_MAX_SECTORS;
+
+	/* FIXME: we should also adjust this limit later on
+	 * after we know what the device capabilities are */
 	blk_queue_max_sectors(q, SHpnt->max_sectors);
 
 	if (!SHpnt->use_clustering)
