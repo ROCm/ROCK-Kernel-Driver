@@ -38,7 +38,7 @@
 static unsigned char L_clk_mult[32] = { 0, 27, 32, 36, 40, 45, 0, };
 
 /* Memory Frequency to Run Mode Frequency Multiplier (M) */
-static unsigned char M_clk_mult[4] = { 0, 1, 2, 0 };
+static unsigned char M_clk_mult[4] = { 0, 1, 2, 4 };
 
 /* Run Mode Frequency to Turbo Mode Frequency Multiplier (N) */
 /* Note: we store the value N * 2 here. */
@@ -47,11 +47,12 @@ static unsigned char N2_clk_mult[8] = { 0, 0, 2, 3, 4, 0, 6, 0 };
 /* Crystal clock */
 #define BASE_CLK	3686400
 
-
 /*
- * Display what we were booted with.
+ * Get the clock frequency as reflected by CCCR and the turbo flag.
+ * We assume these values have been applied via a fcs.
+ * If info is not 0 we also display the current settings.
  */
-static int __init pxa_display_clocks(void)
+unsigned int get_clk_frequency_khz(int info)
 {
 	unsigned long cccr, turbo;
 	unsigned int l, L, m, M, n2, N;
@@ -67,20 +68,24 @@ static int __init pxa_display_clocks(void)
 	M = m * L;
 	N = n2 * M / 2;
 
-	L += 5000;
-	printk( KERN_INFO "Memory clock: %d.%02dMHz (*%d)\n",
-		L / 1000000, (L % 1000000) / 10000, l );
-	M += 5000;
-	printk( KERN_INFO "Run Mode clock: %d.%02dMHz (*%d)\n",
-		M / 1000000, (M % 1000000) / 10000, m );
-	N += 5000;
-	printk( KERN_INFO "Turbo Mode clock: %d.%02dMHz (*%d.%d, %sactive)\n",
-		N / 1000000, (N % 1000000) / 10000, n2 / 2, (n2 % 2) * 5,
-		(turbo & 1) ? "" : "in" );
+	if(info)
+	{
+		L += 5000;
+		printk( KERN_INFO "Memory clock: %d.%02dMHz (*%d)\n",
+			L / 1000000, (L % 1000000) / 10000, l );
+		M += 5000;
+		printk( KERN_INFO "Run Mode clock: %d.%02dMHz (*%d)\n",
+			M / 1000000, (M % 1000000) / 10000, m );
+		N += 5000;
+		printk( KERN_INFO "Turbo Mode clock: %d.%02dMHz (*%d.%d, %sactive)\n",
+			N / 1000000, (N % 1000000) / 10000, n2 / 2, (n2 % 2) * 5,
+			(turbo & 1) ? "" : "in" );
+	}
 
-	return 0;
+	return (turbo & 1) ? (N/1000) : (M/1000);
 }
 
+EXPORT_SYMBOL(get_clk_frequency_khz);
 
 /*
  * Return the current lclk requency in units of 10kHz
@@ -132,5 +137,5 @@ static struct map_desc standard_io_desc[] __initdata = {
 void __init pxa_map_io(void)
 {
 	iotable_init(standard_io_desc, ARRAY_SIZE(standard_io_desc));
-	pxa_display_clocks();
+	get_clk_frequency_khz(1);
 }

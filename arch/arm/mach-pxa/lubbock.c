@@ -13,6 +13,7 @@
  */
 #include <linux/kernel.h>
 #include <linux/init.h>
+#include <linux/device.h>
 #include <linux/major.h>
 #include <linux/fs.h>
 #include <linux/interrupt.h>
@@ -31,7 +32,6 @@
 #include <asm/hardware/sa1111.h>
 
 #include "generic.h"
-#include "sa1111.h"
 
 static void lubbock_ack_irq(unsigned int irq)
 {
@@ -106,24 +106,16 @@ static void __init lubbock_init_irq(void)
 
 static int __init lubbock_init(void)
 {
-	int ret;
-
-	ret = sa1111_probe(LUBBOCK_SA1111_BASE);
-	if (ret)
-		return ret;
-	sa1111_wake();
-	sa1111_init_irq(LUBBOCK_SA1111_IRQ);
-	return 0;
+	return sa1111_init(0x10000000, LUBBOCK_SA1111_IRQ);
 }
 
-__initcall(lubbock_init);
+subsys_initcall(lubbock_init);
 
 static struct map_desc lubbock_io_desc[] __initdata = {
  /* virtual     physical    length      type */
   { 0xf0000000, 0x08000000, 0x00100000, MT_DEVICE }, /* CPLD */
   { 0xf1000000, 0x0c000000, 0x00100000, MT_DEVICE }, /* LAN91C96 IO */
   { 0xf1100000, 0x0e000000, 0x00100000, MT_DEVICE }, /* LAN91C96 Attr */
-  { 0xf4000000, 0x10000000, 0x00400000, MT_DEVICE }  /* SA1111 */
 };
 
 static void __init lubbock_map_io(void)

@@ -44,89 +44,90 @@
 			((i) - PXA_IRQ(32) + 2)
 #define IRQ_TO_GPIO(i)	((i) - (((i) > IRQ_GPIO1) ? IRQ_GPIO(2) : IRQ_GPIO(0)))
 
-#define	NR_IRQS		(IRQ_GPIO(80) + 1)
+/*
+ * The next 16 interrupts are for board specific purposes.  Since
+ * the kernel can only run on one machine at a time, we can re-use
+ * these.  If you need more, increase IRQ_BOARD_END, but keep it
+ * within sensible limits.
+ */
+#define IRQ_BOARD_START		(IRQ_GPIO(80) + 1)
+#define IRQ_BOARD_END		(IRQ_BOARD_START + 16)
 
-#if defined(CONFIG_SA1111)
+#define IRQ_SA1111_START	(IRQ_BOARD_END)
+#define IRQ_GPAIN0		(IRQ_BOARD_END + 0)
+#define IRQ_GPAIN1		(IRQ_BOARD_END + 1)
+#define IRQ_GPAIN2		(IRQ_BOARD_END + 2)
+#define IRQ_GPAIN3		(IRQ_BOARD_END + 3)
+#define IRQ_GPBIN0		(IRQ_BOARD_END + 4)
+#define IRQ_GPBIN1		(IRQ_BOARD_END + 5)
+#define IRQ_GPBIN2		(IRQ_BOARD_END + 6)
+#define IRQ_GPBIN3		(IRQ_BOARD_END + 7)
+#define IRQ_GPBIN4		(IRQ_BOARD_END + 8)
+#define IRQ_GPBIN5		(IRQ_BOARD_END + 9)
+#define IRQ_GPCIN0		(IRQ_BOARD_END + 10)
+#define IRQ_GPCIN1		(IRQ_BOARD_END + 11)
+#define IRQ_GPCIN2		(IRQ_BOARD_END + 12)
+#define IRQ_GPCIN3		(IRQ_BOARD_END + 13)
+#define IRQ_GPCIN4		(IRQ_BOARD_END + 14)
+#define IRQ_GPCIN5		(IRQ_BOARD_END + 15)
+#define IRQ_GPCIN6		(IRQ_BOARD_END + 16)
+#define IRQ_GPCIN7		(IRQ_BOARD_END + 17)
+#define IRQ_MSTXINT		(IRQ_BOARD_END + 18)
+#define IRQ_MSRXINT		(IRQ_BOARD_END + 19)
+#define IRQ_MSSTOPERRINT	(IRQ_BOARD_END + 20)
+#define IRQ_TPTXINT		(IRQ_BOARD_END + 21)
+#define IRQ_TPRXINT		(IRQ_BOARD_END + 22)
+#define IRQ_TPSTOPERRINT	(IRQ_BOARD_END + 23)
+#define SSPXMTINT		(IRQ_BOARD_END + 24)
+#define SSPRCVINT		(IRQ_BOARD_END + 25)
+#define SSPROR			(IRQ_BOARD_END + 26)
+#define AUDXMTDMADONEA		(IRQ_BOARD_END + 32)
+#define AUDRCVDMADONEA		(IRQ_BOARD_END + 33)
+#define AUDXMTDMADONEB		(IRQ_BOARD_END + 34)
+#define AUDRCVDMADONEB		(IRQ_BOARD_END + 35)
+#define AUDTFSR			(IRQ_BOARD_END + 36)
+#define AUDRFSR			(IRQ_BOARD_END + 37)
+#define AUDTUR			(IRQ_BOARD_END + 38)
+#define AUDROR			(IRQ_BOARD_END + 39)
+#define AUDDTS			(IRQ_BOARD_END + 40)
+#define AUDRDD			(IRQ_BOARD_END + 41)
+#define AUDSTO			(IRQ_BOARD_END + 42)
+#define IRQ_USBPWR		(IRQ_BOARD_END + 43)
+#define IRQ_HCIM		(IRQ_BOARD_END + 44)
+#define IRQ_HCIBUFFACC		(IRQ_BOARD_END + 45)
+#define IRQ_HCIRMTWKP		(IRQ_BOARD_END + 46)
+#define IRQ_NHCIMFCIR		(IRQ_BOARD_END + 47)
+#define IRQ_USB_PORT_RESUME	(IRQ_BOARD_END + 48)
+#define IRQ_S0_READY_NINT	(IRQ_BOARD_END + 49)
+#define IRQ_S1_READY_NINT	(IRQ_BOARD_END + 50)
+#define IRQ_S0_CD_VALID		(IRQ_BOARD_END + 51)
+#define IRQ_S1_CD_VALID		(IRQ_BOARD_END + 52)
+#define IRQ_S0_BVD1_STSCHG	(IRQ_BOARD_END + 53)
+#define IRQ_S1_BVD1_STSCHG	(IRQ_BOARD_END + 54)
 
-#define IRQ_SA1111_START	(IRQ_GPIO(80) + 1)
-#define SA1111_IRQ(x)		(IRQ_SA1111_START + (x))
-
-#define IRQ_GPAIN0		SA1111_IRQ(0)
-#define IRQ_GPAIN1		SA1111_IRQ(1)
-#define IRQ_GPAIN2		SA1111_IRQ(2)
-#define IRQ_GPAIN3		SA1111_IRQ(3)
-#define IRQ_GPBIN0		SA1111_IRQ(4)
-#define IRQ_GPBIN1		SA1111_IRQ(5)
-#define IRQ_GPBIN2		SA1111_IRQ(6)
-#define IRQ_GPBIN3		SA1111_IRQ(7)
-#define IRQ_GPBIN4		SA1111_IRQ(8)
-#define IRQ_GPBIN5		SA1111_IRQ(9)
-#define IRQ_GPCIN0		SA1111_IRQ(10)
-#define IRQ_GPCIN1		SA1111_IRQ(11)
-#define IRQ_GPCIN2		SA1111_IRQ(12)
-#define IRQ_GPCIN3		SA1111_IRQ(13)
-#define IRQ_GPCIN4		SA1111_IRQ(14)
-#define IRQ_GPCIN5		SA1111_IRQ(15)
-#define IRQ_GPCIN6		SA1111_IRQ(16)
-#define IRQ_GPCIN7		SA1111_IRQ(17)
-#define IRQ_MSTXINT		SA1111_IRQ(18)
-#define IRQ_MSRXINT		SA1111_IRQ(19)
-#define IRQ_MSSTOPERRINT	SA1111_IRQ(20)
-#define IRQ_TPTXINT		SA1111_IRQ(21)
-#define IRQ_TPRXINT		SA1111_IRQ(22)
-#define IRQ_TPSTOPERRINT	SA1111_IRQ(23)
-#define SSPXMTINT	SA1111_IRQ(24)
-#define SSPRCVINT	SA1111_IRQ(25)
-#define SSPROR		SA1111_IRQ(26)
-#define AUDXMTDMADONEA	SA1111_IRQ(32)
-#define AUDRCVDMADONEA	SA1111_IRQ(33)
-#define AUDXMTDMADONEB	SA1111_IRQ(34)
-#define AUDRCVDMADONEB	SA1111_IRQ(35)
-#define AUDTFSR		SA1111_IRQ(36)
-#define AUDRFSR		SA1111_IRQ(37)
-#define AUDTUR		SA1111_IRQ(38)
-#define AUDROR		SA1111_IRQ(39)
-#define AUDDTS		SA1111_IRQ(40)
-#define AUDRDD		SA1111_IRQ(41)
-#define AUDSTO		SA1111_IRQ(42)
-#define USBPWR		SA1111_IRQ(43)
-#define NIRQHCIM	SA1111_IRQ(44)
-#define HCIBUFFACC	SA1111_IRQ(45)
-#define HCIRMTWKP	SA1111_IRQ(46)
-#define NHCIMFCIR	SA1111_IRQ(47)
-#define PORT_RESUME	SA1111_IRQ(48)
-#define S0_READY_NINT	SA1111_IRQ(49)
-#define S1_READY_NINT	SA1111_IRQ(50)
-#define S0_CD_VALID	SA1111_IRQ(51)
-#define S1_CD_VALID	SA1111_IRQ(52)
-#define S0_BVD1_STSCHG	SA1111_IRQ(53)
-#define S1_BVD1_STSCHG	SA1111_IRQ(54)
-
-#define SA1111_IRQ_MAX	SA1111_IRQ(54)
-
-#undef NR_IRQS
-#define NR_IRQS		(SA1111_IRQ_MAX + 1)
-
-#endif	// defined(CONFIG_SA1111)
-
-#if defined(CONFIG_ARCH_LUBBOCK) || defined(CONFIG_ARCH_PXA_IDP)
-#if CONFIG_SA1111
-#define LUBBOCK_IRQ(x)	(SA1111_IRQ_MAX + 1 + (x))
+/*
+ * Figure out the MAX IRQ number.
+ *
+ * If we have an SA1111, the max IRQ is S1_BVD1_STSCHG+1.
+ * Otherwise, we have the standard IRQs only.
+ */
+#ifdef CONFIG_SA1111
+#define NR_IRQS			(IRQ_S1_BVD1_STSCHG + 1)
+#elif defined(CONFIG_ARCH_LUBBOCK)
+#define NR_IRQS			(IRQ_BOARD_END)
 #else
-#define LUBBOCK_IRQ(x)	(IRQ_GPIO(80) + 1 + (x))
+#define NR_IRQS			(IRQ_BOARD_START)
 #endif
 
+/*
+ * Board specific IRQs.  Define them here.
+ * Do not surround them with ifdefs.
+ */
+#define LUBBOCK_IRQ(x)		(IRQ_BOARD_START + (x))
 #define LUBBOCK_SD_IRQ		LUBBOCK_IRQ(0)
 #define LUBBOCK_SA1111_IRQ	LUBBOCK_IRQ(1)
 #define LUBBOCK_USB_IRQ		LUBBOCK_IRQ(2)
 #define LUBBOCK_ETH_IRQ		LUBBOCK_IRQ(3)
 #define LUBBOCK_UCB1400_IRQ	LUBBOCK_IRQ(4)
 #define LUBBOCK_BB_IRQ		LUBBOCK_IRQ(5)
-
-#undef NR_IRQS
-#define NR_IRQS		(LUBBOCK_IRQ(5) + 1)
-
-#endif	// CONFIG_ARCH_LUBBOCK
-
-
 
