@@ -21,6 +21,9 @@
 
 #include <linux/parport.h>
 #include <linux/delay.h>
+#include <linux/sched.h>
+
+#include <asm/current.h>
 #include <asm/uaccess.h>
 
 #define DEBUG /* undef me for production */

@@ -26,6 +26,9 @@
 #include <linux/dcache.h>
 #include <linux/namei.h>
 #include <linux/mount.h>
+#include <linux/sched.h>
+
+#include <asm/current.h>
 #include <asm/uaccess.h>
 
 #ifdef DEBUG

@@ -23,6 +23,8 @@
 #include <linux/proc_fs.h>
 #include <linux/list.h>
 #include <linux/security.h>
+#include <linux/sched.h>
+#include <asm/current.h>
 #include <asm/uaccess.h>
 #include "util.h"
 
