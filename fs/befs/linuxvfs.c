@@ -376,7 +376,7 @@ befs_read_inode(struct inode *inode)
 	befs_ino->i_attribute = fsrun_to_cpu(sb, raw_inode->attributes);
 	befs_ino->i_flags = fs32_to_cpu(sb, raw_inode->flags);
 
-	if (S_ISLNK(inode->i_mode) && !(inode->i_flags & BEFS_LONG_SYMLINK)) {
+	if (S_ISLNK(inode->i_mode) && !(befs_ino->i_flags & BEFS_LONG_SYMLINK)){
 		inode->i_size = 0;
 		inode->i_blocks = befs_sb->block_size / VFS_BLOCK_SIZE;
 		strncpy(befs_ino->i_data.symlink, raw_inode->data.symlink,
