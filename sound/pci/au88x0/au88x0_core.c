@@ -2513,16 +2513,13 @@ vortex_codec_write(ac97_t * codec, unsigned short addr, unsigned short data)
 {
 
 	vortex_t *card = (vortex_t *) codec->private_data;
-	unsigned long flags;
 	unsigned int lifeboat = 0;
-	spin_lock_irqsave(&card->lock, flags);
 
 	/* wait for transactions to clear */
 	while (!(hwread(card->mmio, VORTEX_CODEC_CTRL) & 0x100)) {
 		udelay(100);
 		if (lifeboat++ > POLL_COUNT) {
 			printk(KERN_ERR "vortex: ac97 codec stuck busy\n");
-			spin_unlock_irqrestore(&card->lock, flags);
 			return;
 		}
 	}
@@ -2534,8 +2531,6 @@ vortex_codec_write(ac97_t * codec, unsigned short addr, unsigned short data)
 
 	/* Flush Caches. */
 	hwread(card->mmio, VORTEX_CODEC_IO);
-
-	spin_unlock_irqrestore(&card->lock, flags);
 }
 
 static unsigned short vortex_codec_read(ac97_t * codec, unsigned short addr)
@@ -2543,17 +2538,13 @@ static unsigned short vortex_codec_read(ac97_t * codec, unsigned short addr)
 
 	vortex_t *card = (vortex_t *) codec->private_data;
 	u32 read_addr, data;
-	unsigned long flags;
 	unsigned lifeboat = 0;
-
-	spin_lock_irqsave(&card->lock, flags);
 
 	/* wait for transactions to clear */
 	while (!(hwread(card->mmio, VORTEX_CODEC_CTRL) & 0x100)) {
 		udelay(100);
 		if (lifeboat++ > POLL_COUNT) {
 			printk(KERN_ERR "vortex: ac97 codec stuck busy\n");
-			spin_unlock_irqrestore(&card->lock, flags);
 			return 0xffff;
 		}
 	}
@@ -2562,20 +2553,15 @@ static unsigned short vortex_codec_read(ac97_t * codec, unsigned short addr)
 	hwwrite(card->mmio, VORTEX_CODEC_IO, read_addr);
 
 	/* wait for address */
-	{
+	do {
 		udelay(100);
 		data = hwread(card->mmio, VORTEX_CODEC_IO);
 		if (lifeboat++ > POLL_COUNT) {
 			printk(KERN_ERR "vortex: ac97 address never arrived\n");
-			spin_unlock_irqrestore(&card->lock, flags);
 			return 0xffff;
 		}
-	}
-	while ((data & VORTEX_CODEC_ADDMASK) !=
-	       (addr << VORTEX_CODEC_ADDSHIFT)) ;
-
-	/* Unlock. */
-	spin_unlock_irqrestore(&card->lock, flags);
+	} while ((data & VORTEX_CODEC_ADDMASK) !=
+		 (addr << VORTEX_CODEC_ADDSHIFT));
 
 	/* return data. */
 	return (u16) (data & VORTEX_CODEC_DATMASK);
