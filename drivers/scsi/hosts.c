@@ -91,8 +91,8 @@ int scsi_tp_for_each_host(Scsi_Host_Template *shost_tp, int
  * @shost: 
  * 
  * Description:
- * 	This is the default case for the release function.  It should do
- * 	the right thing for most correctly written host adapters.
+ * 	This is the default case for the release function.  Its completely
+ *	useless for anything but old ISA adapters
  **/
 static void scsi_host_generic_release(struct Scsi_Host *shost)
 {
