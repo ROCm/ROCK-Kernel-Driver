@@ -81,7 +81,7 @@ ocotea_show_cpuinfo(struct seq_file *m)
 {
 	seq_printf(m, "vendor\t\t: IBM\n");
 	seq_printf(m, "machine\t\t: PPC440GX EVB (Ocotea)\n");
-
+	ibm440gx_show_cpuinfo(m);
 	return 0;
 }
 
@@ -299,15 +299,6 @@ ocotea_setup_arch(void)
         mtspr(SPRN_DBCR0, (DBCR0_TDE | DBCR0_IDM));
 #endif
 
-	/*
-	 * Determine various clocks.
-	 * To be completely correct we should get SysClk
-	 * from FPGA, because it can be changed by on-board switches
-	 * --ebs
-	 */
-	ibm440gx_get_clocks(&clocks, 33333333, 6 * 1843200);
-	ocp_sys_info.opb_bus_freq = clocks.opb;
-
 	/* Setup TODC access */
 	TODC_INIT(TODC_TYPE_DS1743,
 			0,
@@ -350,8 +341,17 @@ void __init platform_init(unsigned long r3, unsigned long r4,
 	if (r3)
 		__res = *(bd_t *)(r3 + KERNELBASE);
 
-	/* Disable L2-Cache due to hardware issues */
-	ibm440gx_l2c_disable();
+	/*
+	 * Determine various clocks.
+	 * To be completely correct we should get SysClk
+	 * from FPGA, because it can be changed by on-board switches
+	 * --ebs
+	 */
+	ibm440gx_get_clocks(&clocks, 33333333, 6 * 1843200);
+	ocp_sys_info.opb_bus_freq = clocks.opb;
+
+	/* Disable L2-Cache on broken hardware, enable it otherwise */
+	ibm440gx_l2c_setup(&clocks);
 
 	ibm44x_platform_init();
 
