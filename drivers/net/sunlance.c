@@ -70,7 +70,7 @@
 #undef DEBUG_DRIVER
 
 static char version[] =
-	"sunlance.c:v2.01 08/Nov/01 Miguel de Icaza (miguel@nuclecu.unam.mx)\n";
+	"sunlance.c:v2.02 24/Aug/03 Miguel de Icaza (miguel@nuclecu.unam.mx)\n";
 
 static char lancestr[] = "LANCE";
 
@@ -93,6 +93,7 @@ static char lancestr[] = "LANCE";
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
+#include <linux/ethtool.h>
 
 #include <asm/system.h>
 #include <asm/bitops.h>
@@ -1287,6 +1288,30 @@ static void lance_free_hwresources(struct lance_private *lp)
 	}
 }
 
+/* Ethtool support... */
+static void sparc_lance_get_drvinfo(struct net_device *dev, struct ethtool_drvinfo *info)
+{
+	struct lance_private *lp = dev->priv;
+
+	strcpy(info->driver, "sunlance");
+	strcpy(info->version, "2.02");
+	sprintf(info->bus_info, "SBUS:%d",
+		lp->sdev->slot);
+}
+
+static u32 sparc_lance_get_link(struct net_device *dev)
+{
+	/* We really do not keep track of this, but this
+	 * is better than not reporting anything at all.
+	 */
+	return 1;
+}
+
+static struct ethtool_ops sparc_lance_ethtool_ops = {
+	.get_drvinfo		= sparc_lance_get_drvinfo,
+	.get_link		= sparc_lance_get_link,
+};
+
 static int __init sparc_lance_init(struct net_device *dev,
 				   struct sbus_dev *sdev,
 				   struct sbus_dma *ledma,
@@ -1456,6 +1481,7 @@ no_link_test:
 	dev->watchdog_timeo = 5*HZ;
 	dev->get_stats = &lance_get_stats;
 	dev->set_multicast_list = &lance_set_multicast;
+	dev->ethtool_ops = &sparc_lance_ethtool_ops;
 
 	dev->irq = sdev->irqs[0];
 

@@ -3,7 +3,7 @@
  *           auto carrier detecting ethernet driver.  Also known as the
  *           "Happy Meal Ethernet" found on SunSwift SBUS cards.
  *
- * Copyright (C) 1996, 1998, 1999, 2002 David S. Miller (davem@redhat.com)
+ * Copyright (C) 1996, 1998, 1999, 2002, 2003 David S. Miller (davem@redhat.com)
  *
  * Changes :
  * 2000/11/11 Willy Tarreau <willy AT meta-x.org>
@@ -14,7 +14,7 @@
  */
 
 static char version[] =
-        "sunhme.c:v2.01 26/Mar/2002 David S. Miller (davem@redhat.com)\n";
+        "sunhme.c:v2.02 24/Aug/2003 David S. Miller (davem@redhat.com)\n";
 
 #include <linux/module.h>
 #include <linux/config.h>
@@ -2426,84 +2426,108 @@ static void happy_meal_set_multicast(struct net_device *dev)
 }
 
 /* Ethtool support... */
-static int happy_meal_ioctl(struct net_device *dev,
-			    struct ifreq *rq, int cmd)
+static int hme_get_settings(struct net_device *dev, struct ethtool_cmd *cmd)
 {
 	struct happy_meal *hp = dev->priv;
-	struct ethtool_cmd *ep_user = (struct ethtool_cmd *) rq->ifr_data;
-	struct ethtool_cmd ecmd;
 
-	if (cmd != SIOCETHTOOL)
-		return -EOPNOTSUPP;
-	if (copy_from_user(&ecmd, ep_user, sizeof(ecmd)))
-		return -EFAULT;
+	cmd->supported =
+		(SUPPORTED_10baseT_Half | SUPPORTED_10baseT_Full |
+		 SUPPORTED_100baseT_Half | SUPPORTED_100baseT_Full |
+		 SUPPORTED_Autoneg | SUPPORTED_TP | SUPPORTED_MII);
 
-	if (ecmd.cmd == ETHTOOL_GSET) {
-		ecmd.supported =
-			(SUPPORTED_10baseT_Half | SUPPORTED_10baseT_Full |
-			 SUPPORTED_100baseT_Half | SUPPORTED_100baseT_Full |
-			 SUPPORTED_Autoneg | SUPPORTED_TP | SUPPORTED_MII);
+	/* XXX hardcoded stuff for now */
+	cmd->port = PORT_TP; /* XXX no MII support */
+	cmd->transceiver = XCVR_INTERNAL; /* XXX no external xcvr support */
+	cmd->phy_address = 0; /* XXX fixed PHYAD */
 
-		/* XXX hardcoded stuff for now */
-		ecmd.port = PORT_TP; /* XXX no MII support */
-		ecmd.transceiver = XCVR_INTERNAL; /* XXX no external xcvr support */
-		ecmd.phy_address = 0; /* XXX fixed PHYAD */
+	/* Record PHY settings. */
+	spin_lock_irq(&hp->happy_lock);
+	hp->sw_bmcr = happy_meal_tcvr_read(hp, hp->tcvregs, MII_BMCR);
+	hp->sw_lpa = happy_meal_tcvr_read(hp, hp->tcvregs, MII_LPA);
+	spin_unlock_irq(&hp->happy_lock);
 
-		/* Record PHY settings. */
-		spin_lock_irq(&hp->happy_lock);
-		hp->sw_bmcr = happy_meal_tcvr_read(hp, hp->tcvregs, MII_BMCR);
-		hp->sw_lpa = happy_meal_tcvr_read(hp, hp->tcvregs, MII_LPA);
-		spin_unlock_irq(&hp->happy_lock);
-
-		if (hp->sw_bmcr & BMCR_ANENABLE) {
-			ecmd.autoneg = AUTONEG_ENABLE;
-			ecmd.speed =
-				(hp->sw_lpa & (LPA_100HALF | LPA_100FULL)) ?
-				SPEED_100 : SPEED_10;
-			if (ecmd.speed == SPEED_100)
-				ecmd.duplex =
-					(hp->sw_lpa & (LPA_100FULL)) ?
-					DUPLEX_FULL : DUPLEX_HALF;
-			else
-				ecmd.duplex =
-					(hp->sw_lpa & (LPA_10FULL)) ?
-					DUPLEX_FULL : DUPLEX_HALF;
-		} else {
-			ecmd.autoneg = AUTONEG_DISABLE;
-			ecmd.speed =
-				(hp->sw_bmcr & BMCR_SPEED100) ?
-				SPEED_100 : SPEED_10;
-			ecmd.duplex =
-				(hp->sw_bmcr & BMCR_FULLDPLX) ?
+	if (hp->sw_bmcr & BMCR_ANENABLE) {
+		cmd->autoneg = AUTONEG_ENABLE;
+		cmd->speed =
+			(hp->sw_lpa & (LPA_100HALF | LPA_100FULL)) ?
+			SPEED_100 : SPEED_10;
+		if (cmd->speed == SPEED_100)
+			cmd->duplex =
+				(hp->sw_lpa & (LPA_100FULL)) ?
 				DUPLEX_FULL : DUPLEX_HALF;
-		}
-		if (copy_to_user(ep_user, &ecmd, sizeof(ecmd)))
-			return -EFAULT;
-		return 0;
-	} else if (ecmd.cmd == ETHTOOL_SSET) {
-		/* Verify the settings we care about. */
-		if (ecmd.autoneg != AUTONEG_ENABLE &&
-		    ecmd.autoneg != AUTONEG_DISABLE)
-			return -EINVAL;
-		if (ecmd.autoneg == AUTONEG_DISABLE &&
-		    ((ecmd.speed != SPEED_100 &&
-		      ecmd.speed != SPEED_10) ||
-		     (ecmd.duplex != DUPLEX_HALF &&
-		      ecmd.duplex != DUPLEX_FULL)))
-			return -EINVAL;
-
-		/* Ok, do it to it. */
-		spin_lock_irq(&hp->happy_lock);
-		del_timer(&hp->happy_timer);
-		happy_meal_begin_auto_negotiation(hp,
-						  hp->tcvregs,
-						  &ecmd);
-		spin_unlock_irq(&hp->happy_lock);
-
-		return 0;
-	} else
-		return -EOPNOTSUPP;
+		else
+			cmd->duplex =
+				(hp->sw_lpa & (LPA_10FULL)) ?
+				DUPLEX_FULL : DUPLEX_HALF;
+	} else {
+		cmd->autoneg = AUTONEG_DISABLE;
+		cmd->speed =
+			(hp->sw_bmcr & BMCR_SPEED100) ?
+			SPEED_100 : SPEED_10;
+		cmd->duplex =
+			(hp->sw_bmcr & BMCR_FULLDPLX) ?
+			DUPLEX_FULL : DUPLEX_HALF;
+	}
+	return 0;
 }
+
+static int hme_set_settings(struct net_device *dev, struct ethtool_cmd *cmd)
+{
+	struct happy_meal *hp = dev->priv;
+
+	/* Verify the settings we care about. */
+	if (cmd->autoneg != AUTONEG_ENABLE &&
+	    cmd->autoneg != AUTONEG_DISABLE)
+		return -EINVAL;
+	if (cmd->autoneg == AUTONEG_DISABLE &&
+	    ((cmd->speed != SPEED_100 &&
+	      cmd->speed != SPEED_10) ||
+	     (cmd->duplex != DUPLEX_HALF &&
+	      cmd->duplex != DUPLEX_FULL)))
+		return -EINVAL;
+
+	/* Ok, do it to it. */
+	spin_lock_irq(&hp->happy_lock);
+	del_timer(&hp->happy_timer);
+	happy_meal_begin_auto_negotiation(hp, hp->tcvregs, cmd);
+	spin_unlock_irq(&hp->happy_lock);
+
+	return 0;
+}
+
+static void hme_get_drvinfo(struct net_device *dev, struct ethtool_drvinfo *info)
+{
+	struct happy_meal *hp = dev->priv;
+
+	strcpy(info->driver, "sunhme");
+	strcpy(info->version, "2.02");
+	if (hp->happy_flags & HFLAG_PCI) {
+		struct pci_dev *pdev = hp->happy_dev;
+		strcpy(info->bus_info, pci_name(pdev));
+	} else {
+		struct sbus_dev *sdev = hp->happy_dev;
+		sprintf(info->bus_info, "SBUS:%d",
+			sdev->slot);
+	}
+}
+
+static u32 hme_get_link(struct net_device *dev)
+{
+	struct happy_meal *hp = dev->priv;
+
+	spin_lock_irq(&hp->happy_lock);
+	hp->sw_bmcr = happy_meal_tcvr_read(hp, hp->tcvregs, MII_BMCR);
+	spin_unlock_irq(&hp->happy_lock);
+
+	return (hp->sw_bmsr & BMSR_LSTATUS);
+}
+
+static struct ethtool_ops hme_ethtool_ops = {
+	.get_settings		= hme_get_settings,
+	.set_settings		= hme_set_settings,
+	.get_drvinfo		= hme_get_drvinfo,
+	.get_link		= hme_get_link,
+};
 
 static int hme_version_printed;
 
@@ -2797,7 +2821,7 @@ static int __init happy_meal_sbus_init(struct sbus_dev *sdev, int is_qfe)
 	dev->set_multicast_list = &happy_meal_set_multicast;
 	dev->tx_timeout = &happy_meal_tx_timeout;
 	dev->watchdog_timeo = 5*HZ;
-	dev->do_ioctl = &happy_meal_ioctl;
+	dev->ethtool_ops = &hme_ethtool_ops;
 
 	/* Happy Meal can do it all... except VLAN. */
 	dev->features |= NETIF_F_SG | NETIF_F_HW_CSUM | NETIF_F_VLAN_CHALLENGED;
@@ -3141,7 +3165,7 @@ static int __init happy_meal_pci_init(struct pci_dev *pdev)
 	dev->set_multicast_list = &happy_meal_set_multicast;
 	dev->tx_timeout = &happy_meal_tx_timeout;
 	dev->watchdog_timeo = 5*HZ;
-	dev->do_ioctl = &happy_meal_ioctl;
+	dev->ethtool_ops = &hme_ethtool_ops;
 	dev->irq = pdev->irq;
 	dev->dma = 0;
 
