@@ -199,8 +199,8 @@ struct s3c2410_dma_chan_s {
 
 	/* channel's hardware position and configuration */
 	void __iomem           *regs;        /* channels registers */
+	void __iomem           *addr_reg;    /* data address register */
 	unsigned int           irq;          /* channel irq */
-	unsigned long          addr_reg;     /* data address register */
 	unsigned long          dcon;         /* default value of DCON */
 
 	/* driver handles */
