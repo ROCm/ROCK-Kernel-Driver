@@ -63,12 +63,12 @@ nfs_proc_get_root(struct nfs_server *server, struct nfs_fh *fhandle,
 	dprintk("%s: call getattr\n", __FUNCTION__);
 	fattr->valid = 0;
 	status = rpc_call(server->client_sys, NFSPROC_GETATTR, fhandle, fattr, 0);
-	dprintk("%s: reply getattr %d\n", __FUNCTION__, status);
+	dprintk("%s: reply getattr: %d\n", __FUNCTION__, status);
 	if (status)
 		return status;
 	dprintk("%s: call statfs\n", __FUNCTION__);
 	status = rpc_call(server->client_sys, NFSPROC_STATFS, fhandle, &fsinfo, 0);
-	dprintk("%s: reply statfs %d\n", __FUNCTION__, status);
+	dprintk("%s: reply statfs: %d\n", __FUNCTION__, status);
 	if (status)
 		return status;
 	info->rtmax  = NFS_MAXDATA;
@@ -96,7 +96,7 @@ nfs_proc_getattr(struct nfs_server *server, struct nfs_fh *fhandle,
 	fattr->valid = 0;
 	status = rpc_call(server->client, NFSPROC_GETATTR,
 				fhandle, fattr, 0);
-	dprintk("NFS reply getattr\n");
+	dprintk("NFS reply getattr: %d\n", status);
 	return status;
 }
 
@@ -114,7 +114,7 @@ nfs_proc_setattr(struct dentry *dentry, struct nfs_fattr *fattr,
 	dprintk("NFS call  setattr\n");
 	fattr->valid = 0;
 	status = rpc_call(NFS_CLIENT(inode), NFSPROC_SETATTR, &arg, fattr, 0);
-	dprintk("NFS reply setattr\n");
+	dprintk("NFS reply setattr: %d\n", status);
 	return status;
 }
 
