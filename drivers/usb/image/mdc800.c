@@ -979,7 +979,7 @@ static struct usb_driver mdc800_usb_driver =
 
 static int __init usb_mdc800_init (void)
 {
-	int retval;
+	int retval = -ENODEV;
 	/* Allocate Memory */
 	try (mdc800=kmalloc (sizeof (struct mdc800_data), GFP_KERNEL));
 
