@@ -62,7 +62,7 @@
 
 #define ACPI_THERMAL_MAX_ACTIVE	10
 
-#define KELVIN_TO_CELSIUS(t)	((t-2732+5)/10)
+#define KELVIN_TO_CELSIUS(t)    (long)(((long)t-2732>=0) ? ((long)t-2732+5)/10 : ((long)t-2732-5)/10)
 #define CELSIUS_TO_KELVIN(t)	((t+273)*10)
 
 #define _COMPONENT		ACPI_THERMAL_COMPONENT
@@ -790,7 +790,7 @@ acpi_thermal_read_temperature (
 	if (result)
 		goto end;
 
-	p += sprintf(p, "temperature:             %lu C\n", 
+	p += sprintf(p, "temperature:             %ld C\n", 
 		KELVIN_TO_CELSIUS(tz->temperature));
 	
 end:
@@ -826,15 +826,15 @@ acpi_thermal_read_trip_points (
 		goto end;
 
 	if (tz->trips.critical.flags.valid)
-		p += sprintf(p, "critical (S5):           %lu C\n",
+		p += sprintf(p, "critical (S5):           %ld C\n",
 			KELVIN_TO_CELSIUS(tz->trips.critical.temperature));
 
 	if (tz->trips.hot.flags.valid)
-		p += sprintf(p, "hot (S4):                %lu C\n",
+		p += sprintf(p, "hot (S4):                %ld C\n",
 			KELVIN_TO_CELSIUS(tz->trips.hot.temperature));
 
 	if (tz->trips.passive.flags.valid) {
-		p += sprintf(p, "passive:                 %lu C: tc1=%lu tc2=%lu tsp=%lu devices=",
+		p += sprintf(p, "passive:                 %ld C: tc1=%lu tc2=%lu tsp=%lu devices=",
 			KELVIN_TO_CELSIUS(tz->trips.passive.temperature),
 			tz->trips.passive.tc1,
 			tz->trips.passive.tc2, 
@@ -849,7 +849,7 @@ acpi_thermal_read_trip_points (
 	for (i=0; i<ACPI_THERMAL_MAX_ACTIVE; i++) {
 		if (!(tz->trips.active[i].flags.valid))
 			break;
-		p += sprintf(p, "active[%d]:               %lu C: devices=",
+		p += sprintf(p, "active[%d]:               %ld C: devices=",
 			i, KELVIN_TO_CELSIUS(tz->trips.active[i].temperature));
 		for (j=0; j<tz->trips.active[i].devices.count; j++) 
 			p += sprintf(p, "0x%p ",
@@ -1288,7 +1288,7 @@ acpi_thermal_add (
 
 	init_timer(&tz->timer);
 
-	printk(KERN_INFO PREFIX "%s [%s] (%lu C)\n",
+	printk(KERN_INFO PREFIX "%s [%s] (%ld C)\n",
 		acpi_device_name(device), acpi_device_bid(device),
 		KELVIN_TO_CELSIUS(tz->temperature));
 
