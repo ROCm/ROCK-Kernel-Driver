@@ -27,10 +27,12 @@ typedef struct board_info {
 	unsigned char	bi_enetaddr[6];		/* Ethernet MAC address */
 	unsigned int	bi_intfreq;		/* Processor speed, in Hz */
 	unsigned int	bi_busfreq;		/* Bus speed, in Hz */
-	unsigned int	bi_tbfreq;		/* Software timebase freq */
 } bd_t;
+#define bi_tbfreq bi_intfreq
+
 #endif /* !__ASSEMBLY__ */
 
+#define bi_tbfreq bi_intfreq
 #define OAKNET_IO_PADDR		((uint)0xf2000000)
 #define OAKNET_IO_VADDR		OAKNET_IO_PADDR
 #define OAKNET_IO_BASE		OAKNET_IO_VADDR
@@ -38,6 +40,9 @@ typedef struct board_info {
 /* ftr revisit- io size was 0xffff in old-line, is 0x40 in oak.h */
 #define OAKNET_IO_SIZE		0xffff
 #define OAKNET_INT		26	/* EXTINT1 */
+
+#define IDE_XLINUX_MUX_BASE        0xf2040000
+#define IDE_DMA_ADDR	0xfce00000
 
 #define _IO_BASE	0
 #define _ISA_MEM_BASE	0

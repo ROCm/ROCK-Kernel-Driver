@@ -12,14 +12,18 @@ endif
 CFLAGS_prom_init.o      += -mrelocatable-lib
 CFLAGS_btext.o          += -mrelocatable-lib
 
+export-objs			:=  ppc4xx_dma.o ppc4xx_pm.o
+
 obj-$(CONFIG_PPCBUG_NVRAM)	+= prep_nvram.o
 ifeq ($(CONFIG_4xx),y)
-obj-$(CONFIG_4xx)		+= ppc4xx_setup.o ppc4xx_pic.o ppc4xx_serial.o
-obj-$(CONFIG_PPC_RTC)		+= todc_time.o
+obj-$(CONFIG_4xx)		+= ppc4xx_pic.o
+obj-$(CONFIG_40x)		+= ppc4xx_setup.o
+obj-$(CONFIG_GEN_RTC)		+= todc_time.o
 obj-$(CONFIG_KGDB)		+= ppc4xx_kgdb.o
-obj-$(CONFIG_405_DMA)		+= ppc405_dma.o
-obj-$(CONFIG_PCI)		+= ppc405_pci.o indirect_pci.o pci_auto.o
-obj-$(CONFIG_PM)		+= ppc4xx_pm.o
+ifeq ($(CONFIG_40x),y)
+obj-$(CONFIG_KGDB)		+= ppc4xx_kgdb.o
+obj-$(CONFIG_PCI)		+= indirect_pci.o pci_auto.o ppc405_pci.o
+endif
 endif
 obj-$(CONFIG_8xx)		+= m8xx_setup.o ppc8xx_pic.o
 ifeq ($(CONFIG_8xx),y)
