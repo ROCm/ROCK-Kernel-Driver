@@ -1512,7 +1512,7 @@ w83781d_init_client(struct i2c_client *client)
 		w83781d_write_value(client, W83781D_REG_BEEP_INTS2, 0);
 	}
 
-	data->vrm = 82;
+	data->vrm = i2c_which_vrm();
 
 	if ((type != w83781d) && (type != as99127f)) {
 		tmp = w83781d_read_value(client, W83781D_REG_SCFG1);

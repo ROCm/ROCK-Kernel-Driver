@@ -1281,7 +1281,7 @@ static void w83627hf_init_client(struct i2c_client *client)
 		data->vrm = (data->vrm_ovt & 0x01) ? 90 : 82;
 	} else {
 		/* Convert VID to voltage based on default VRM */
-		data->vrm = DEFAULT_VRM;
+		data->vrm = i2c_which_vrm();
 	}
 
 	tmp = w83627hf_read_value(client, W83781D_REG_SCFG1);

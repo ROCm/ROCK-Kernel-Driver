@@ -308,9 +308,6 @@ static int ZONE_TO_REG( int zone )
  * version of the driver.
  */
 
-/* Typically used with Pentium 4 systems v9.1 VRM spec */
-#define LM85_INIT_VRM  91
-
 /* Chip sampling rates
  *
  * Some sensors are not updated more frequently than once per second
@@ -832,7 +829,7 @@ int lm85_detect(struct i2c_adapter *adapter, int address,
 		goto ERROR1;
 
 	/* Set the VRM version */
-	data->vrm = LM85_INIT_VRM ;
+	data->vrm = i2c_which_vrm();
 
 	/* Initialize the LM85 chip */
 	lm85_init_client(new_client);
