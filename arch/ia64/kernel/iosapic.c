@@ -29,6 +29,9 @@
  * 02/07/29	T. Kochi	Allocate interrupt vectors dynamically
  * 02/08/04	T. Kochi	Cleaned up terminology (irq, global system interrupt, vector, etc.)
  * 02/09/20	D. Mosberger	Simplified by taking advantage of ACPI's pci_irq code.
+ * 03/02/19	B. Helgaas	Make pcat_compat system-wide, not per-IOSAPIC.
+ *				Remove iosapic_address & gsi_base from external interfaces.
+ *				Rationalize __init/__devinit attributes.
  */
 /*
  * Here is what the interrupt logic between a PCI device and the kernel looks like:
@@ -111,17 +114,17 @@ static struct iosapic {
 	char		*addr;		/* base address of IOSAPIC */
 	unsigned int 	gsi_base;	/* first GSI assigned to this IOSAPIC */
 	unsigned short 	num_rte;	/* number of RTE in this IOSAPIC */
-} iosapic_lists[256] __devinitdata;
+} iosapic_lists[256];
 
-static int num_iosapic = 0;
+static int num_iosapic;
 
-static unsigned char pcat_compat;	/* 8259 compatibility flag */
+static unsigned char pcat_compat __initdata;	/* 8259 compatibility flag */
 
 
 /*
  * Find an IOSAPIC associated with a GSI
  */
-static inline int __devinit
+static inline int
 find_iosapic (unsigned int gsi)
 {
 	int i;
@@ -424,7 +427,7 @@ iosapic_version (char *addr)
  * if the given vector is already owned by other,
  *  assign a new vector for the other and make the vector available
  */
-static void
+static void __init
 iosapic_reassign_vector (int vector)
 {
 	int new_vector;
@@ -516,7 +519,7 @@ iosapic_register_intr (unsigned int gsi,
  * ACPI calls this when it finds an entry for a platform interrupt.
  * Note that the irq_base and IOSAPIC address must be set in iosapic_init().
  */
-int
+int __init
 iosapic_register_platform_intr (u32 int_type, unsigned int gsi,
 				int iosapic_vector, u16 eid, u16 id,
 				unsigned long polarity, unsigned long trigger)
@@ -565,7 +568,7 @@ iosapic_register_platform_intr (u32 int_type, unsigned int gsi,
  * ACPI calls this when it finds an entry for a legacy ISA IRQ override.
  * Note that the gsi_base and IOSAPIC address must be set in iosapic_init().
  */
-void
+void __init
 iosapic_override_isa_irq (unsigned int isa_irq, unsigned int gsi,
 			  unsigned long polarity,
 			  unsigned long trigger)
@@ -586,7 +589,7 @@ iosapic_override_isa_irq (unsigned int isa_irq, unsigned int gsi,
 	set_rte(vector, dest);
 }
 
-void __devinit
+void __init
 iosapic_system_init (int system_pcat_compat)
 {
 	int vector;
@@ -606,7 +609,7 @@ iosapic_system_init (int system_pcat_compat)
 	}
 }
 
-void __devinit
+void __init
 iosapic_init (unsigned long phys_addr, unsigned int gsi_base)
 {
 	int num_rte;
@@ -643,7 +646,7 @@ iosapic_init (unsigned long phys_addr, unsigned int gsi_base)
 	}
 }
 
-static void
+static void __init
 fixup_vector (int vector, unsigned int gsi, const char *pci_id)
 {
 	struct hw_interrupt_type *irq_type = &irq_type_iosapic_level;

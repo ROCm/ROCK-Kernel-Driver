@@ -837,7 +837,7 @@ acpi_irq_to_vector (u32 irq)
 	return gsi_to_vector(irq);
 }
 
-int __init
+int
 acpi_register_irq (u32 gsi, u32 polarity, u32 trigger)
 {
 	int vector = 0;
