@@ -1,7 +1,5 @@
 # This file is included by the global makefile so that you can add your own
-# architecture-specific flags and dependencies. Remember to do have actions
-# for "archclean" and "archdep" for cleaning up and making dependencies for
-# this architecture
+# architecture-specific flags and dependencies.
 #
 # This file is subject to the terms and conditions of the GNU General Public
 # License.  See the file "COPYING" in the main directory of this archive
@@ -17,24 +15,20 @@ KERNELLOAD	=$(CONFIG_KERNEL_START)
 
 LDFLAGS_BLOB	:= --format binary --oformat elf32-powerpc
 LDFLAGS_vmlinux	= -Ttext $(KERNELLOAD) -Bstatic
-CPPFLAGS	:= $(CPPFLAGS) -I$(TOPDIR)/arch/$(ARCH)
-AFLAGS		:= $(AFLAGS) -I$(TOPDIR)/arch/$(ARCH)
-CFLAGS		:= $(CFLAGS) -I$(TOPDIR)/arch/$(ARCH) -msoft-float -pipe \
+CPPFLAGS	+= -Iarch/$(ARCH)
+AFLAGS		+= -Iarch/$(ARCH)
+cflags-y	+= -Iarch/$(ARCH) -msoft-float -pipe \
 		-ffixed-r2 -Wno-uninitialized -mmultiple -mstring
 CPP		= $(CC) -E $(CFLAGS)
 
-ifdef CONFIG_4xx
-CFLAGS := $(CFLAGS) -Wa,-m405
-endif
-
-ifdef CONFIG_PPC64BRIDGE
-CFLAGS := $(CFLAGS) -Wa,-mppc64bridge
-endif
-
-ifdef CONFIG_MORE_COMPILE_OPTIONS
+cflags-$(CONFIG_4xx)		+= -Wa,-m405
+cflags-$(CONFIG_PPC64BRIDGE)	+= -Wa,-mppc64bridge
 # Use sed to remove the quotes.
-  CFLAGS += $(shell echo $(CONFIG_COMPILE_OPTIONS) | sed -e 's/"//g')
-endif
+cflags-$(CONFIG_MORE_COMPILE_OPTIONS) += \
+	$(shell echo $(CONFIG_COMPILE_OPTIONS) | sed -e 's/"//g')
+
+CFLAGS += $(cflags-y)
+
 
 head-y				:= arch/ppc/kernel/head.o
 head-$(CONFIG_8xx)		:= arch/ppc/kernel/head_8xx.o
