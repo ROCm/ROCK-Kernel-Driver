@@ -11,12 +11,14 @@ Original driver (sg.h):
 Version 2 and 3 extensions to driver:
 *       Copyright (C) 1998 - 2002 Douglas Gilbert
 
-    Version: 3.5.25 (20020425)
+    Version: 3.5.25 (20020504)
     This version is for 2.5 series kernels.
 
     Changes since 3.5.24 (20020319)
-    	- use Scsi_Request::upper_private_data
-    	- zero buffers for non-root users
+	- off by one fix for last scatter gather element
+	- if possible compact kiobuf_map into scatter gather list
+	- use Scsi_Request::upper_private_data
+	- zero buffers for non-root users
     Changes since 3.5.23 (20011231)
 	- change EACCES to EPERM when O_RDONLY is insufficient
 	- suppress newlines in host string
