@@ -233,7 +233,7 @@ __do_page_cache_readahead(struct address_space *mapping, struct file *filp,
 	/*
 	 * Preallocate as many pages as we will need.
 	 */
-	spin_lock_irq(&mapping->tree_lock);
+	read_lock_irq(&mapping->tree_lock);
 	for (page_idx = 0; page_idx < nr_to_read; page_idx++) {
 		unsigned long page_offset = offset + page_idx;
 		
@@ -244,16 +244,16 @@ __do_page_cache_readahead(struct address_space *mapping, struct file *filp,
 		if (page)
 			continue;
 
-		spin_unlock_irq(&mapping->tree_lock);
+		read_unlock_irq(&mapping->tree_lock);
 		page = page_cache_alloc_cold(mapping);
-		spin_lock_irq(&mapping->tree_lock);
+		read_lock_irq(&mapping->tree_lock);
 		if (!page)
 			break;
 		page->index = page_offset;
 		list_add(&page->lru, &page_pool);
 		ret++;
 	}
-	spin_unlock_irq(&mapping->tree_lock);
+	read_unlock_irq(&mapping->tree_lock);
 
 	/*
 	 * Now start the IO.  We ignore I/O errors - if the page is not
@@ -560,6 +560,7 @@ void handle_ra_miss(struct address_space *mapping,
 			ra->next_size = min;
 	}
 }
+EXPORT_SYMBOL(page_cache_readahead);
 
 /*
  * Given a desired number of PAGE_CACHE_SIZE readahead pages, return a

@@ -160,6 +160,8 @@ config FS_MBCACHE
 	default y if EXT2_FS=y || EXT3_FS=y
 	default m if EXT2_FS=m || EXT3_FS=m
 
+source "fs/Kconfig.reiser4"
+
 config REISERFS_FS
 	tristate "Reiserfs support"
 	help

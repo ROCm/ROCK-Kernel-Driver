@@ -1,0 +1,82 @@
+\documentclass[a4paper, oneside, fleqn]{article}
+
+\usepackage{latexsym}
+\usepackage{url}
+\usepackage[T2A]{fontenc}
+
+\pagestyle{empty}
+\listfiles
+\setcounter{errorcontextlines}{100}
+\makeindex
+\pagestyle{headings}
+\frenchspacing
+\tolerance=1000
+\parindent=0pt
+\raggedbottom
+\setlength\parskip{6pt}
+
+\DeclareMathAlphabet{\mathbsf}{T2A}{cmss}{b}{n}
+\SetMathAlphabet{\mathbsf}{normal}{T2A}{cmss}{b}{n}
+
+\def\qopname@#1{\mathop{\fam 0#1}\nolimits}
+\newcommand{\mathsign}[1]
+	{\index{#1@$\mathbsf{#1}$}\qopname@{\mathbsf{#1}}}
+
+\def\As{\mathsign{Assoc}}
+\newcommand{\svi}[2]
+    {\texttt{[} #1 \ V \texttt{]}}
+
+\begin{document}
+
+\thispagestyle{empty}
+
+%\section{Definitions}
+
+We have a set $X$ of objects, and ``associated-with'' relation. We shall write
+
+$$a\As b, \quad a\in X, \ b\in X$$
+
+to denote that $a$ is associated with $b$.
+
+One can imagine $\As$ relation as graph where elements of $X$ are nodes and
+where there is arc (arrow) from $a$ to $b$ iff $a$ is associated with
+$b$. Note that no further restrictions are placed on $\As$. In particular, it
+is not supposed that $\As$ is reflexive (object is not necessary associated
+with itself), symmetric, or transitive.
+
+$\beta(X)$ is set of all subsets of $X$, that is $$\beta(X) = \{ U \subseteq X
+\}$$
+
+Let's define function $A:X\to^{}\beta(X)$ as follows:
+
+$$A(x)=\{y\in X\ |\ y\As x\}, \quad x\in X.$$
+
+that is $A(x)$ is a set of all objects in $X$ associated with $x$.
+Then, define \mbox{$A^*:\beta(X)\to^{}\beta(X)$} as follows:
+
+$$A^*(U)=\bigcup\limits_{x\in U} A(x), \quad U\subseteq X.$$
+
+that is, $A(U)$ is set of all objects associated with any element of $U$. Now
+we can define $\svi{U}{V}$, where $U, V\subseteq X$---``set vicinity
+intersection'' operation as:
+
+%\begin{displaymath}
+%A^+(U) = \left\{
+%    \begin{array}{rl}
+%    U = \{x\}      & \Rightarrow A(x),\\
+%    \textrm{else}  & \Rightarrow A^*(U)
+%    \end{array} \right.
+%\end{displaymath}
+
+$$\svi{U}{V} = A^*(U) \cap A^*(V).$$
+
+In other words, $\svi{U}{V}$ is a set of all objects associated with some
+element of $U$ \emph{and} some element of $V$.
+
+\end{document}
+
+% Local variables:
+% indent-tabs-mode: nil
+% tab-width: 4
+% eval: (progn (if (fboundp 'flyspell-mode) (flyspell-mode)) (set (make-local-variable 'compile-command) "latex set-theoretic-stuff.tex ; dvips -o set-theoretic-stuff.ps set-theoretic-stuff.dvi"))
+% End:

@@ -47,6 +47,7 @@ obj-$(CONFIG_PROFILING)		+= dcookies.o
  
 # Do not add any filesystems before this line
 obj-$(CONFIG_REISERFS_FS)	+= reiserfs/
+obj-$(CONFIG_REISER4_FS)	+= reiser4/
 obj-$(CONFIG_EXT3_FS)		+= ext3/ # Before ext2 so root fs can be ext3
 obj-$(CONFIG_JBD)		+= jbd/
 obj-$(CONFIG_EXT2_FS)		+= ext2/

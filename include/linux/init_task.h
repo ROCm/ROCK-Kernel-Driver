@@ -113,6 +113,8 @@ extern struct group_info init_groups;
 	.switch_lock	= SPIN_LOCK_UNLOCKED,				\
 	.journal_info	= NULL,						\
  	.map_base	= __TASK_UNMAPPED_BASE,				\
+	.private_pages	= LIST_HEAD_INIT(tsk.private_pages),		\
+	.private_pages_count = 0,					\
 }
 
 

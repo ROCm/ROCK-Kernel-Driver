@@ -1,0 +1,57 @@
+Hello,
+
+In upcoming reiser4 we are planning to use page cache to store all file system
+meta data. In some cases it is straightforward; for example, bitmaps blocks,
+placed on the disk through (almost) equal intervals ask to be bound to special
+fake inode and indexed by their disk offsets.
+
+There is one important (most important actually) case where using fake inode
+is inconvenient: blocks of internal balanced tree used by reiser4, known as
+"formatted nodes". Natural solution of using block number as offset within
+some fake inode doesn't pass, because when block size is smaller than page
+some blocks mapped to the same page may be either occupied by something other
+than formatted nodes, or just be free.
+
+This leads to the following complications:
+
+ 1. we cannot simply use block_{read|write}_full_page(), because this will
+ waste IO bandwidth: block that doesn't contain formatted node will be read
+ into memory. Moreover, this block can be later read again, for example,
+ because this is data block of some file and hashed into different place in
+ the page cache, creating alias. This will definitely confuse buffer cache;
+
+ 2. even is we keep track of what blocks have to be actually read, there still
+ will be "internal memory fragmentation", because some parts of page cache
+ pages will be unused.
+
+In brief, formatted nodes form a tree and because of this don't fit into
+<inode, offset> hashing scheme---there is no linear ordering among them.
+
+Moreover, formatted node is never looked up in the page cache by its block
+number, because for each formatted node in memory there is special data
+structure (znode) and znodes are hashed in the hash table anyway.
+
+So, all functionality that we need from the page cache is memory allocator
+with attached memory pressure hooks (I guess, this is close to what Hans
+called "sub-cache" in lkml discussions on this topic).
+
+It seems that we have two solutions:
+
+ 1. change page cache to use different indexing for formatted nodes;
+
+ 2. implement our own memory allocator sitting directly on the top of
+ alloc_pages() and installing proper ->mapping for pages that it grabs.
+
+(2) will only work if generic VM code (e.g., shrink_cache() or
+page_launder_zone() in rmap VM) don't depend on particulars of page cache
+hashing, that, fortunately, seems to be the case. This approach has following
+advantages:
+
+ . we can try to collocate related blocks on the same page, for example
+ blocks from the same transaction, of block with similar cache "hotness";
+
+ . we can use blocks larger than page size.
+
+Nikita.
+
+

@@ -1,0 +1,60 @@
+PROPOSAL:
+
+Keep formatted nodes in a page cache, binding them to the special fake inode
+and using block number divided by number of blocks in a page as page index.
+
+ADVANTAGES:
+
+Page cache is preferred over buffer cache. Much more optimization and
+scalability efforts are going into it. The fewer separate caches are in the
+system, the simpler and better VM can handle load.
+
+DISADVANTAGES:
+
+As formatted nodes are indexed by block number, each page will contain
+blocks with consequentive block numbers. This poses several problems:
+
+  1. When we need to read particular block from the disk (e.g., to load child
+  node during tree lookup), it is not clear that blocks with neighboring block
+  numbers are worth reading into memory at all.
+
+  2. Some of the blocks that have to go in the same page as block we need can
+  be unformatted ones.
+
+SOLUTIONS:
+
+There are several possible workarounds:
+
+  1. rely on the fact that in vast majority of cases block size is equal to
+  the page size. So, we can index formatted nodes by block number storing
+  exactly one block in the page. This will eliminate both problems at the
+  expense of the memory wasting in the setups where block size is smaller than
+  page size.
+
+  2. only load required block in the page marking other blocks mapped to this
+  page as up-to-date. It is not obvious that this will work at all, and in any
+  case, this will force us to use special API to access such pages, bypassing
+  VM interface.
+
+  3. rely on good repacker and load all blocks in the page hoping that they
+  are close to each other in tree order and will be accessed shortly.
+
+  4. allocate unformatted nodes such that they will never go into the same
+  frame as formatted. For example:
+
+    - always align extent to the page boundary on the disk (page is CPU
+    specific though);
+
+    - use some variation of border algorithm to separate formatted and
+    unformatted nodes;
+
+    - use "enriched" bitmap where formatted and unformatted nodes are
+    distinguishable.
+
+
+# Local variables:
+# mode-name: "proposal"
+# indent-tabs-mode: nil
+# tab-width: 4
+# eval: (if (fboundp 'flyspell-mode) (flyspell-mode))
+# End:

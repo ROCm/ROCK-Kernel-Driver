@@ -1,0 +1,222 @@
+SYS_REISER4 IMPLEMENTATION OVERVIEW
+
+
+A. Basics
+*****************************************************************
+
+sys_reiser4() system call executing a sequence of actions upon the
+file-system(s). Actions are specified by the user in the form of a command
+string. For the purposes of present discussion, said command string can be
+thought of as a program in a special purpose programming language, which will
+be further referred to as reiser4_lang.
+
+Canonical example of reiser4_lang program is
+
+/dir1/dir2/dir3/file1 <- /dir4/dir5/dir6/file2
+
+It semantics is following:
+
+1. resolve "/dir1/dir2/dir3/file1" into file-system object (lookup operation)
+2. resolve "/dir4/dir5/dir6/file2" into file-system object (lookup operation)
+3. assign latter to the former.
+
+This is "assignment" operator. Assignment involves two "file-system objects"
+and semantics of both lookup stage and assignment proper depends upon the type
+of the file-system object.
+
+Following types of file-system objects are recognized:
+
+1. foreign objects: objects of different file-systems. Foreign object cannot
+be target or source of an assignment. Rather, foreign objects can only appear
+during path name lookup, while traversing non-reiser4 part of the file-system
+name-space. Probably one should distinguish between objects belonging to
+different file-system types (etx2, NFS) and objects belonging to different
+reiser4 mounts. After sys_reiser4() is stable, foreign objects will be more
+fully supported.
+
+2. reiser4 objects.
+
+3. pseudo-objects: these are entities injected into reiser4 name-space to
+provide uniform access to various file-system meta-data. Pseudo-objects are
+(usually) attached to some particular "host" object. [In the initial version,]
+host objects are reiser4 objects. [Later it is possible to implement some
+pseudo-objects for foreign objects.] Convention (but not enforced rule) is
+that pseudo-objects are accessible through names starting with some well-known
+prefix (".." is current favorite). Examples: ..owner, ..acl, etc. See comment
+at the top of fs/reiser4/plugin/pseudo/pseudo.c for more details.
+
+B. lnodes
+*****************************************************************
+
+lnodes are handles for file-system objects described above. They serve dual
+purpose:
+
+1. uniform interface to the various types of objects. This allows the
+reiser4_lang implementation to treat various types of objects in the same
+manner. When new type of object has to be added, all changes will be grouped
+in one place, rather than scattered across various files. This uniformity also
+allows code sharing between reiser4_lang and VFS access paths. For example,
+the same ->write method can be used by both. That is, ->read(), and ->write()
+plugin methods used in VFS access paths will take lnode(s) as arguments and
+can share code with sys_reiser4() implementation. For example, assignment is
+particular case of write (or visa versa, depending on point of view).
+
+
+2. synchronization. reiser4_lang doesn't use inodes and this poses a problem of
+synchronization with VFS. Each lnode serves as a lock. See lnode.c for more
+details.
+
+C. lookup
+*****************************************************************
+
+reiser4_lang still supports only two traditional UNIX kinds of ordered names
+(pathnames): absolute and relative to the current working directory. In both
+cases, lookup starts from some file-system object represented by lnode. Then
+lookup proceeds component-by-component as follows:
+
+   lnode *parent;
+   lnode  child;
+
+   ret_code = lnode_get_dir_plugin( parent ) -> lnode_by_name( parent,
+                                                               path_component,
+                                                               &child );
+
+1. Abovementioned locking issues require that parent lnode has to be kept
+until operation on child finishes. In effect we get lock-coupling much like in
+internal tree traversal. Also, possibility to use lock on node with directory
+entry in stead of object lock was discussed. We have to think more on this.
+
+
+2. Mount points crossing. It is possible, because dentries and therefore
+inodes of all mount points are pinned in memory and lookup code can check at
+each step whether mount point is crossed. Details are not very nice, because
+for each inode in a path we have to scan list of all its dentries and check
+whether correct one (corresponding to our path) is mount point.
+
+3. It is also possible to pass ->lnode_by_name the whole of the remaining
+name, and let it decide how much of it it should handle. This will complicate
+locking somewhat. But this is doable, though requires changes to the parser.
+
+
+D. assignment
+*****************************************************************
+
+Assignment A<-B basically means duplicating content of B into A. No
+copy-on-write optimizations will be in version 4.0.
+
+Assignment implementation is based on the notion of flow (flow_t). Flow is a
+source from which data can be obtained. Flow can be "backed up" by one of the
+following:
+
+1. memory area in user space. (char *area, size_t length)
+2. memory area in kernel space. (caddr_t *area, size_t length)
+3. file-system object (lnode *obj, loff_t offset, size_t length)
+
+Main function to manipulate flows is:
+
+int flow_place( flow_t *flow, char *area, size_t length );
+
+it copies @length bytes of @flow into @area and updated @flow correspondingly.
+Behavior of flow_place() depends on the type of entity backing up @flow. If
+@flow is based on the kernel-space area, memmove() is used to copy data. If
+@flow is based on the user-space area, copy_from_user() is used. If @flow is
+based on file-system object, flow_place() loads object's data into page cache
+and copies them into @area.
+
+Thus, assignment code looks like following:
+
+typedef int ( *connect_t )( sink_t *target, flow_t *source );
+
+int reiser4_assign( lnode *dst, lnode *src )
+{
+    flow_t        source;
+    sink_t        target;
+    int           ret_code;
+    file_plugin  *src_fplug;
+    file_plugin  *dst_fplug;
+    connect_t     connection;
+
+    /* get plugins */
+
+    src_fplug = lnode_get_file_plugin( src );
+    dst_fplug = lnode_get_file_plugin( dst );
+
+    /* build source flow */
+    ret_code = src_fplug -> build_flow( src, &source, 0 /* offset */ );
+
+    /* build target sink */
+    ret_code = dst_fplug -> build_sink( dst, &target, 0 /* offset */ );
+
+    /*
+     * select how to transfer data from @src to @dst.
+     *
+     * Default implementation of this is common_transfer() (see below).
+     *
+     * Smart file plugin can choose connection based on type of @dst.
+     *
+     */
+    connection = src_fplug -> select_connection( src, dst );
+
+    /* do transfer */
+    return connection( &target, &source );
+}
+
+
+/* look to chain conversion of (lnode * dst) -> (sink_t target) -> (lnode * dst)
+ I think, functions build_sink(...) and  sink_object(...) - superfluous */
+
+int common_transfer( sink_t *target, flow_t *source )
+{
+    lnode  *dst;
+
+    dst = sink_object( target );
+    while( flow_not_empty( source ) ) {
+        char   *area;
+        size_t  length;
+
+        /*
+         * append some space to @target. Reasonable implementation will
+         * allocate several pagesful here
+         */
+        ret_code = lnode_get_body_plugin( dst ) -> prepare_append( dst,
+                                                                   &area,
+                                                                   &length );
+                                            /* why @length not depended from source? */
+        /*
+         * put data from flow into newly alloted space. This also updates
+         * @flow.
+         */
+        flow_place( source, area, length );
+        /*
+         * perform necessary post-write activity required by @dst plugin, like
+         * encryption, compression, etc. Release pages.
+         */
+        ret_code = lnode_get_body_plugin( dst ) -> commit_append( dst,
+                                                                  area, length );
+    }
+}
+
+
+E. parsing
+*****************************************************************
+
+It is not clear what parts of reiser4_lang processing should go into
+kernel. In any case, providing direct system call as main (or, worse, the
+only) way to access reiser4_lang functionality bounds as to maintain binary
+compatibility in a future. To avoid this, reiser4 should be shipped with
+user-level library, containing
+
+int reiser4( const char *cmd, size_t length );
+
+function. For now, this function will directly despatch @cmd to the
+sys_reiser4() in a future, it may do parsing itself and pass parse tree to the
+kernel interpreter.
+
+*****************************************************************
+
+# Local variables:
+# mode-name: "proposal"
+# indent-tabs-mode: nil
+# tab-width: 4
+# eval: (if (fboundp 'flyspell-mode) (flyspell-mode))
+# End:

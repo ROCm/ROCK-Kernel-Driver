@@ -1,0 +1,119 @@
+
+				 Report about "plugin inheritance discussion"
+
+    1. Basic plugin support, psets, default plugins.
+
+    2. Plugin inheritance.
+
+    3. Meta-data inheritance, light-weight files.
+
+1. Basic plugin support, psets, default plugins.
+
+    Let's call Reiser4 file system object "active" when it is used by the
+    kernel, that is, when initialized inode exists for it. Associated with
+    each active object is its "plugin set" ("pset" for short) that is an array
+    of all plugins necessary for proper interaction with this object. Pointer
+    to pset is stored in inode. Pset is constructed when:
+
+        1. new object is created, or
+
+        2. existing object is looked up.
+
+    New object is always created as a child of some already existing
+    object. During object creation its pset is constructed on the basic of
+    parent's one---this is plugin inheritance. Details of plugin inheritance
+    are delegated to the object plugin of new object for flexibility.
+
+    File system has "default pset". In current implementation it is just pset
+    of the root directory, created by mkfs.reiser4.
+
+    When stat-data is saved to disk, pset is saved as part of stat-data. At
+    least this is what default static stat-data plugin does. More advanced
+    stat-data plugins are free to save psets separately, implement sharing,
+    etc.
+
+    As an optimization, only plugins different from default ones are stored in
+    stat-data. Correspondingly, when object is looked up, plugins found in
+    stat-data are installed into pset, and missing plugins are taken from the
+    default pset.
+
+    Plugins in pset can be divided into two types:
+
+        1. "essential"---ones that cannot be changed without some explicit
+        effort. For example, hash and fibration plugins are essential, because
+        changing them would render directory content invalid.
+
+        2. "non-essential"---plugins that can be changed implicitly. For
+        example, security plugin and formatting-policy plugin are
+        non-essential.
+
+    From previous description it is clear that essential plugins in default
+    pset cannot be modified once file system was created, because this would
+    implicitly change plugins of all objects in whose stat-data appropriate
+    plugin is missing, which is contrary to the definition of essential
+    plugin.
+
+    This poses a problem: what to do when new member is added to pset
+    (consider recent addition of fibration plugin)? And, conversely, what to
+    do when mounting a file system with unknown member in default pset?
+
+    The former is only an issue for essential plugins. When new essential
+    plugin is added to pset, backward-compatible implementation of this plugin
+    should be provided as default. That is, for example, when kernel with
+    support for fibration mounts file system without fibration plugin it the
+    root-directory stat-data, "lexicographic" fibration plugin should be
+    used. This guarantees that old file-systems can be used without corrupting
+    them. Of course, new versions of mkfs.reiser4 can set up whatever
+    fibration plugin is deemed best to be default.
+
+    "Forward-compatibility" that is, mounting a file system with
+    unknown plugin in default pset, can be simply refused.
+
+2. Plugin inheritance.
+
+    In addition to pset each active object also has a "hset"---"heir
+    set". When new child is created, it first tries to inherit plugins from
+    parent's hset, and only if plugin is missing there---from parent's
+    pset. hset is treated exactly like pset in all other respects. NOTE:
+    storing hset on disk is not yet implemented.
+
+    One question still remains to be answered: how object plugin of a child
+    being created is selected? One possible solution is to add two new members
+    PSET_CREAT, and PSET_MKDIR to the pset. They specify object plugins used
+    when child is being created through sys_creat() and sys_mkdir() system
+    calls. (Other system calls, such as sys_symlink() and sys_mknod() are too
+    specialized for such flexibility.) NOTE: this is also not yet implemented.
+
+3. Meta-data inheritance, light-weight files.
+
+    Through meta-data inheritance file system object can somehow indicate that
+    some portion of its meta-data should be taken from some place other than
+    object's stat-data. Three obvious scenarios for meta-data inheritance are:
+
+        1. meta-data are taken from file-system level default place,
+
+        2. meta-data are taken from some specially indicated place (i.e.,
+        stat-data contains a key of item(s) where meta-data have to be taken
+        from), and
+
+        3. meta-data are taken from the parent.
+
+    Note, that the last option is ambiguous, because the notion of _the_
+    parent is not well-defined in general. This can be worked around in two
+    ways:
+
+        1. only use it when there is _the_ parent, for example, disable
+        light-weight files with multiple names, or
+
+        2. don't care, for example, allow uid of light-weight file to depend
+        on path-name through which this file was reached.
+
+    In any case, meta-data inheritance can be implemented by re-using existing
+    static stat-data item plugin with simple additional plumbing in the kernel
+    code (pointer to parent inode should be passed to the stat-data
+    methods). It is not clear what to do when light-weight file is accessed
+    through NFS, and there is no parent. Simplest solution is to just disable
+    NFS access to them. This is trivial, because our ->{en,de}code_fh()
+    methods are delegated to object plugin.
+
+
