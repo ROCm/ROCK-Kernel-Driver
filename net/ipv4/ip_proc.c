@@ -282,28 +282,24 @@ static int fib_seq_show(struct seq_file *seq, void *v)
 
 /* ------------------------------------------------------------------------ */
 
-#define UDP_HASH_POS_BITS (sizeof(loff_t) * 8 - 8)
-#define UDP_HASH_BITS (((loff_t)127) << UDP_HASH_POS_BITS)
-#define UDP_HASH_BUCKET(p) ((p & UDP_HASH_BITS) >> UDP_HASH_POS_BITS)
+struct udp_iter_state {
+	int bucket;
+};
 
 static __inline__ struct sock *udp_get_bucket(struct seq_file *seq, loff_t *pos)
 {
+	int i;
 	struct sock *sk = NULL;
-	loff_t ppos = *pos & ~UDP_HASH_BITS, l = ppos;
-	loff_t bucket = UDP_HASH_BUCKET(*pos);
+	loff_t l = *pos;
+	struct udp_iter_state *state = seq->private;
 
-	for (; bucket < UDP_HTABLE_SIZE; ++bucket)
-		for (sk = udp_hash[bucket]; sk; sk = sk->next) {
+	for (; state->bucket < UDP_HTABLE_SIZE; ++state->bucket)
+		for (i = 0, sk = udp_hash[state->bucket]; sk; ++i, sk = sk->next) {
 			if (sk->family != PF_INET)
 				continue;
 			if (l--)
 				continue;
-			*pos = (bucket << UDP_HASH_POS_BITS) | ppos;
-			/*
-			 * temporary HACK till we have a solution to
-			 * get more state passed to seq_show -acme
-			 */
-			seq->private = (void *)(long)bucket;
+			*pos = i;
 			goto out;
 		}
 out:
@@ -318,8 +314,8 @@ static void *udp_seq_start(struct seq_file *seq, loff_t *pos)
 
 static void *udp_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 {
-	int next_bucket;
 	struct sock *sk;
+	struct udp_iter_state *state;
 
 	if (v == (void *)1) {
 		sk = udp_get_bucket(seq, pos);
@@ -331,11 +327,11 @@ static void *udp_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 	if (sk) 
 		goto out;
 
-	next_bucket = UDP_HASH_BUCKET(*pos) + 1;
-	if (next_bucket >= UDP_HTABLE_SIZE) 
+	state = seq->private;
+	if (++state->bucket >= UDP_HTABLE_SIZE) 
 		goto out;
 
-	*pos = (loff_t)next_bucket << UDP_HASH_POS_BITS;
+	*pos = 0;
 	sk = udp_get_bucket(seq, pos);
 out:
 	++*pos;
@@ -372,8 +368,9 @@ static int udp_seq_show(struct seq_file *seq, void *v)
 			   "inode");
 	else {
 		char tmpbuf[129];
+		struct udp_iter_state *state = seq->private;
 
-		udp_format_sock(v, tmpbuf, (long)seq->private);
+		udp_format_sock(v, tmpbuf, state->bucket);
 		seq_printf(seq, "%-127s\n", tmpbuf);
 	}
 	return 0;
@@ -441,7 +438,35 @@ static int fib_seq_open(struct inode *inode, struct file *file)
 
 static int udp_seq_open(struct inode *inode, struct file *file)
 {
-	return seq_open(file, &udp_seq_ops);
+	struct seq_file *seq;
+	int rc = -ENOMEM;
+	struct udp_iter_state *s = kmalloc(sizeof(*s), GFP_KERNEL);
+       
+	if (!s)
+		goto out;
+
+	rc = seq_open(file, &udp_seq_ops);
+	if (rc)
+		goto out_kfree;
+
+	seq	     = file->private_data;
+	seq->private = s;
+	memset(s, 0, sizeof(*s));
+out:
+	return rc;
+out_kfree:
+	kfree(s);
+	goto out;
+}
+
+static int udp_seq_release(struct inode *inode, struct file *file)
+{
+	struct seq_file *seq = (struct seq_file *)file->private_data;
+
+	kfree(seq->private);
+	seq->private = NULL;
+
+	return seq_release(inode, file);
 }
 
 static struct file_operations arp_seq_fops = {
@@ -462,7 +487,7 @@ static struct file_operations udp_seq_fops = {
 	.open           = udp_seq_open,
 	.read           = seq_read,
 	.llseek         = seq_lseek,
-	.release	= seq_release,
+	.release	= udp_seq_release,
 };
 
 /* ------------------------------------------------------------------------ */
