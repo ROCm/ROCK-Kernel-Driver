@@ -59,8 +59,8 @@
 
 static int nbd_blksizes[MAX_NBD];
 static int nbd_blksize_bits[MAX_NBD];
-static int nbd_sizes[MAX_NBD];
 static u64 nbd_bytesizes[MAX_NBD];
+static char nbd_names[MAX_NBD][7];
 
 static struct nbd_device nbd_dev[MAX_NBD];
 static devfs_handle_t devfs_handle;
@@ -78,11 +78,7 @@ static int requests_out;
 
 static int nbd_open(struct inode *inode, struct file *file)
 {
-	int dev;
-
-	if (!inode)
-		return -EINVAL;
-	dev = minor(inode->i_rdev);
+	int dev = minor(inode->i_rdev);
 	if (dev >= MAX_NBD)
 		return -ENODEV;
 
@@ -387,21 +383,15 @@ static void do_nbd_request(request_queue_t * q)
 static int nbd_ioctl(struct inode *inode, struct file *file,
 		     unsigned int cmd, unsigned long arg)
 {
-	struct nbd_device *lo;
-	int dev, error, temp;
+	int dev = minor(inode->i_rdev);
+	struct nbd_device *lo = &nbd_dev[dev];
+	int error, temp;
 	struct request sreq ;
 
 	/* Anyone capable of this syscall can do *real bad* things */
 
 	if (!capable(CAP_SYS_ADMIN))
 		return -EPERM;
-	if (!inode)
-		return -EINVAL;
-	dev = minor(inode->i_rdev);
-	if (dev >= MAX_NBD)
-		return -ENODEV;
-
-	lo = &nbd_dev[dev];
 	switch (cmd) {
 	case NBD_DISCONNECT:
 	        printk(KERN_INFO "NBD_DISCONNECT\n");
@@ -455,15 +445,15 @@ static int nbd_ioctl(struct inode *inode, struct file *file,
 			temp >>= 1;
 		}
 		nbd_bytesizes[dev] &= ~(nbd_blksizes[dev]-1); 
-		nbd_sizes[dev] = nbd_bytesizes[dev] >> BLOCK_SIZE_BITS;
+		set_capacity(&lo->disk, nbd_bytesizes[dev] >> 9);
 		return 0;
 	case NBD_SET_SIZE:
 		nbd_bytesizes[dev] = arg & ~(nbd_blksizes[dev]-1); 
-		nbd_sizes[dev] = nbd_bytesizes[dev] >> BLOCK_SIZE_BITS;
+		set_capacity(&lo->disk, nbd_bytesizes[dev] >> 9);
 		return 0;
 	case NBD_SET_SIZE_BLOCKS:
 		nbd_bytesizes[dev] = ((u64) arg) << nbd_blksize_bits[dev]; 
-		nbd_sizes[dev] = nbd_bytesizes[dev] >> BLOCK_SIZE_BITS;
+		set_capacity(&lo->disk, nbd_bytesizes[dev] >> 9);
 		return 0;
 	case NBD_DO_IT:
 		if (!lo->file)
@@ -479,25 +469,14 @@ static int nbd_ioctl(struct inode *inode, struct file *file,
 		       dev, lo->queue_head.next, lo->queue_head.prev, requests_in, requests_out);
 		return 0;
 #endif
-	case BLKGETSIZE:
-		return put_user(nbd_bytesizes[dev] >> 9, (unsigned long *) arg);
-	case BLKGETSIZE64:
-		return put_user((u64)nbd_bytesizes[dev], (u64 *) arg);
 	}
 	return -EINVAL;
 }
 
 static int nbd_release(struct inode *inode, struct file *file)
 {
-	struct nbd_device *lo;
-	int dev;
-
-	if (!inode)
-		return -ENODEV;
-	dev = minor(inode->i_rdev);
-	if (dev >= MAX_NBD)
-		return -ENODEV;
-	lo = &nbd_dev[dev];
+	int dev = minor(inode->i_rdev);
+	struct nbd_device *lo = &nbd_dev[dev];
 	if (lo->refcnt <= 0)
 		printk(KERN_ALERT "nbd_release: refcount(%d) <= 0\n", lo->refcnt);
 	lo->refcnt--;
@@ -535,9 +514,9 @@ static int __init nbd_init(void)
 #ifdef MODULE
 	printk("nbd: registered device at major %d\n", MAJOR_NR);
 #endif
-	blk_size[MAJOR_NR] = nbd_sizes;
 	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_nbd_request, &nbd_lock);
 	for (i = 0; i < MAX_NBD; i++) {
+		struct gendisk *disk = &nbd_dev[i].disk;
 		nbd_dev[i].refcnt = 0;
 		nbd_dev[i].file = NULL;
 		nbd_dev[i].magic = LO_MAGIC;
@@ -548,9 +527,14 @@ static int __init nbd_init(void)
 		nbd_blksizes[i] = 1024;
 		nbd_blksize_bits[i] = 10;
 		nbd_bytesizes[i] = 0x7ffffc00; /* 2GB */
-		nbd_sizes[i] = nbd_bytesizes[i] >> BLOCK_SIZE_BITS;
-		register_disk(NULL, mk_kdev(MAJOR_NR,i), 1, &nbd_fops,
-				nbd_bytesizes[i]>>9);
+		disk->major = MAJOR_NR;
+		disk->first_minor = i;
+		disk->minor_shift = 0;
+		disk->fops = &nbd_fops;
+		sprintf(nbd_names[i], "nbd%d", i);
+		disk->major_name = nbd_names[i];
+		set_capacity(disk, 0x3ffffe);
+		add_disk(disk);
 	}
 	devfs_handle = devfs_mk_dir (NULL, "nbd", NULL);
 	devfs_register_series (devfs_handle, "%u", MAX_NBD,
@@ -563,6 +547,9 @@ static int __init nbd_init(void)
 
 static void __exit nbd_cleanup(void)
 {
+	int i;
+	for (i = 0; i < MAX_NBD; i++)
+		del_gendisk(&nbd_dev[i].disk);
 	devfs_unregister (devfs_handle);
 	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
 
