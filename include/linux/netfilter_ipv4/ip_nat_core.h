@@ -30,10 +30,4 @@ extern void place_in_hashes(struct ip_conntrack *conntrack,
 extern struct ip_nat_protocol ip_nat_protocol_tcp;
 extern struct ip_nat_protocol ip_nat_protocol_udp;
 extern struct ip_nat_protocol ip_nat_protocol_icmp;
-
-/* Call this before modifying an existing IP packet: ensures it is
-   modifiable and linear to the point you care about (writable_len).
-   Returns true or false. */
-extern int skb_ip_make_writable(struct sk_buff **pskb,
-				unsigned int writable_len);
 #endif /* _IP_NAT_CORE_H */
