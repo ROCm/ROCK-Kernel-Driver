@@ -487,11 +487,11 @@ static void __init smp_space_timers(unsigned int max_cpus)
 #ifdef CONFIG_PPC_PSERIES
 void vpa_init(int cpu)
 {
-	unsigned long flags;
+	unsigned long flags, pcpu = get_hard_smp_processor_id(cpu);
 
 	/* Register the Virtual Processor Area (VPA) */
 	flags = 1UL << (63 - 18);
-	register_vpa(flags, cpu, __pa((unsigned long)&(paca[cpu].lppaca)));
+	register_vpa(flags, pcpu, __pa((unsigned long)&(paca[cpu].lppaca)));
 }
 
 static inline void smp_xics_do_message(int cpu, int msg)

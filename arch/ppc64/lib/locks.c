@@ -63,7 +63,8 @@ void __spin_yield(spinlock_t *lock)
 	HvCall2(HvCallBaseYieldProcessor, HvCall_YieldToProc,
 		((u64)holder_cpu << 32) | yield_count);
 #else
-	plpar_hcall_norets(H_CONFER, holder_cpu, yield_count);
+	plpar_hcall_norets(H_CONFER, get_hard_smp_processor_id(holder_cpu),
+			   yield_count);
 #endif
 }
 
@@ -179,7 +180,8 @@ void __rw_yield(rwlock_t *rw)
 	HvCall2(HvCallBaseYieldProcessor, HvCall_YieldToProc,
 		((u64)holder_cpu << 32) | yield_count);
 #else
-	plpar_hcall_norets(H_CONFER, holder_cpu, yield_count);
+	plpar_hcall_norets(H_CONFER, get_hard_smp_processor_id(holder_cpu),
+			   yield_count);
 #endif
 }
 
