@@ -134,7 +134,7 @@ unsigned long sleep_phys_sp(void *sp)
 #define CTL_PM_P0 4
 #define CTL_PM_CM 5
 
-static int user_atoi(char *ubuf, int len)
+static int user_atoi(char *ubuf, size_t len)
 {
 	char buf[16];
 	unsigned long ret;
