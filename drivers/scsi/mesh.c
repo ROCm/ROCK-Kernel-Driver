@@ -1231,8 +1231,8 @@ static void handle_msgin(struct mesh_state *ms)
 			} else if (code != cmd->device->lun + IDENTIFY_BASE) {
 				printk(KERN_WARNING "mesh: lun mismatch "
 				       "(%d != %d) on reselection from "
-				       "target %d\n", i, cmd->device->lun,
-				       ms->conn_tgt);
+				       "target %d\n", code - IDENTIFY_BASE,
+				       cmd->device->lun, ms->conn_tgt);
 			}
 			break;
 		}
@@ -1762,7 +1762,7 @@ static int mesh_suspend(struct macio_dev *mdev, u32 state)
 	struct mesh_state *ms = (struct mesh_state *)macio_get_drvdata(mdev);
 	unsigned long flags;
 
-	if (state == mdev->ofdev.dev.power_state || state < 2)
+	if (state == mdev->ofdev.dev.power.power_state || state < 2)
 		return 0;
 
 	scsi_block_requests(ms->host);
@@ -1777,7 +1777,7 @@ static int mesh_suspend(struct macio_dev *mdev, u32 state)
 	disable_irq(ms->meshintr);
 	set_mesh_power(ms, 0);
 
-	mdev->ofdev.dev.power_state = state;
+	mdev->ofdev.dev.power.power_state = state;
 
 	return 0;
 }
@@ -1787,7 +1787,7 @@ static int mesh_resume(struct macio_dev *mdev)
 	struct mesh_state *ms = (struct mesh_state *)macio_get_drvdata(mdev);
 	unsigned long flags;
 
-	if (mdev->ofdev.dev.power_state == 0)
+	if (mdev->ofdev.dev.power.power_state == 0)
 		return 0;
 
 	set_mesh_power(ms, 1);
@@ -1798,7 +1798,7 @@ static int mesh_resume(struct macio_dev *mdev)
 	enable_irq(ms->meshintr);
 	scsi_unblock_requests(ms->host);
 
-	mdev->ofdev.dev.power_state = 0;
+	mdev->ofdev.dev.power.power_state = 0;
 
 	return 0;
 }
