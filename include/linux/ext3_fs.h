@@ -334,6 +334,7 @@ struct ext3_inode {
 #else
 #define EXT2_MOUNT_NOLOAD		EXT3_MOUNT_NOLOAD
 #define EXT2_MOUNT_ABORT		EXT3_MOUNT_ABORT
+#define EXT2_MOUNT_DATA_FLAGS		EXT3_MOUNT_DATA_FLAGS
 #endif
 
 #define ext3_set_bit			ext2_set_bit
