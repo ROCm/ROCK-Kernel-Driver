@@ -1233,9 +1233,47 @@ struct request *__blk_get_request(request_queue_t *q, int rw)
 	return rq;
 }
 
-void blk_put_request(struct request *rq)
+/**
+ * blk_insert_request - insert a special request in to a request queue
+ * @q:		request queue where request should be inserted
+ * @rq:		request to be inserted
+ * @at_head:	insert request at head or tail of queue
+ * @data:	private data
+ *
+ * Description:
+ *    Many block devices need to execute commands asynchronously, so they don't
+ *    block the whole kernel from preemption during request execution.  This is
+ *    accomplished normally by inserting aritficial requests tagged as
+ *    REQ_SPECIAL in to the corresponding request queue, and letting them be
+ *    scheduled for actual execution by the request queue.
+ *
+ *    We have the option of inserting the head or the tail of the queue.
+ *    Typically we use the tail for new ioctls and so forth.  We use the head
+ *    of the queue for things like a QUEUE_FULL message from a device, or a
+ *    host that is unable to accept a particular command.
+ */
+void blk_insert_request(request_queue_t *q, struct request *rq,
+		int at_head, void *data)
 {
-	blkdev_release_request(rq);
+	unsigned long flags;
+
+	/*
+	 * tell I/O scheduler that this isn't a regular read/write (ie it
+	 * must not attempt merges on this) and that it acts as a soft
+	 * barrier
+	 */
+	rq->flags &= REQ_QUEUED;
+	rq->flags |= REQ_SPECIAL | REQ_BARRIER;
+
+	rq->special = data;
+
+	spin_lock_irqsave(q->queue_lock, flags);
+	/* If command is tagged, release the tag */
+	if(blk_rq_tagged(rq))
+		blk_queue_end_tag(q, rq);
+	_elv_add_request(q, rq, !at_head, 0);
+	q->request_fn(q);
+	spin_unlock_irqrestore(q->queue_lock, flags);
 }
 
 /* RO fail safe mechanism */
@@ -1307,7 +1345,7 @@ static inline void add_request(request_queue_t * q, struct request * req,
 /*
  * Must be called with queue lock held and interrupts disabled
  */
-void blkdev_release_request(struct request *req)
+void blk_put_request(struct request *req)
 {
 	struct request_list *rl = req->rl;
 	request_queue_t *q = req->q;
@@ -1370,7 +1408,7 @@ static void attempt_merge(request_queue_t *q, struct request *req,
 
 		req->nr_sectors = req->hard_nr_sectors += next->hard_nr_sectors;
 
-		blkdev_release_request(next);
+		blk_put_request(next);
 	}
 }
 
@@ -1568,7 +1606,7 @@ get_rq:
 	add_request(q, req, insert_here);
 out:
 	if (freereq)
-		blkdev_release_request(freereq);
+		blk_put_request(freereq);
 	spin_unlock_irq(q->queue_lock);
 	return 0;
 
@@ -2003,7 +2041,7 @@ void end_that_request_last(struct request *req)
 	if (req->waiting)
 		complete(req->waiting);
 
-	blkdev_release_request(req);
+	blk_put_request(req);
 }
 
 #define MB(kb)	((kb) << 10)
@@ -2064,7 +2102,6 @@ EXPORT_SYMBOL(blk_cleanup_queue);
 EXPORT_SYMBOL(blk_queue_make_request);
 EXPORT_SYMBOL(blk_queue_bounce_limit);
 EXPORT_SYMBOL(generic_make_request);
-EXPORT_SYMBOL(blkdev_release_request);
 EXPORT_SYMBOL(generic_unplug_device);
 EXPORT_SYMBOL(blk_plug_device);
 EXPORT_SYMBOL(blk_remove_plug);
@@ -2088,6 +2125,7 @@ EXPORT_SYMBOL(blk_hw_contig_segment);
 EXPORT_SYMBOL(blk_get_request);
 EXPORT_SYMBOL(__blk_get_request);
 EXPORT_SYMBOL(blk_put_request);
+EXPORT_SYMBOL(blk_insert_request);
 
 EXPORT_SYMBOL(blk_queue_prep_rq);
 
