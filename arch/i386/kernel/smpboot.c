@@ -170,7 +170,7 @@ valid_k7:
 /*
  * TSC synchronization.
  *
- * We first check wether all CPUs have their TSC's synchronized,
+ * We first check whether all CPUs have their TSC's synchronized,
  * then we print a warning if not, and always resync.
  */
 

@@ -104,7 +104,7 @@ static void __init smp_store_cpu_info(int id)
 /*
  * TSC synchronization.
  *
- * We first check wether all CPUs have their TSC's synchronized,
+ * We first check whether all CPUs have their TSC's synchronized,
  * then we print a warning if not, and always resync.
  */
 

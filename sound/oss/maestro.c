@@ -252,7 +252,7 @@ static int debug=0;
 
 /* we try to setup 2^(dsps_order) /dev/dsp devices */
 static int dsps_order=0;
-/* wether or not we mess around with power management */
+/* whether or not we mess around with power management */
 static int use_pm=2; /* set to 1 for force */
 /* clocking for broken hardware - a few laptops seem to use a 50Khz clock
 	ie insmod with clocking=50000 or so */
@@ -3271,7 +3271,7 @@ maestro_config(struct ess_card *card)
 	outb(0x88, iobase+0x1f);
 
 	/* it appears some maestros (dell 7500) only work if these are set,
-		regardless of wether we use the assp or not. */
+		regardless of whether we use the assp or not. */
 
 	outb(0, iobase+0xA4); 
 	outb(3, iobase+0xA2); 

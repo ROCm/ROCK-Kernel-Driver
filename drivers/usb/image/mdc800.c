@@ -213,7 +213,7 @@ static int mdc800_endpoint_equals (struct usb_endpoint_descriptor *a,struct usb_
 
 
 /*
- * Checks wether the camera responds busy
+ * Checks whether the camera responds busy
  */
 static int mdc800_isBusy (char* ch)
 {
@@ -229,7 +229,7 @@ static int mdc800_isBusy (char* ch)
 
 
 /*
- * Checks wether the Camera is ready
+ * Checks whether the Camera is ready
  */
 static int mdc800_isReady (char *ch)
 {

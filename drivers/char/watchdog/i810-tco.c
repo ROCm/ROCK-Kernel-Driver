@@ -218,7 +218,7 @@ static ssize_t i810tco_write (struct file *file, const char *data,
 
 		tco_expect_close = 0;
 
-		/* scan to see wether or not we got the magic character */
+		/* scan to see whether or not we got the magic character */
 		for (i = 0; i != len; i++) {
 			u8 c;
 			if(get_user(c, data+i))

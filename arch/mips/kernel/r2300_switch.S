@@ -108,7 +108,7 @@ LEAF(restore_fp)
 
 /*
  * Load the FPU with signalling NANS.  This bit pattern we're using has
- * the property that no matter wether considered as single or as double
+ * the property that no matter whether considered as single or as double
  * precission represents signaling NANS.
  *
  * We initialize fcr31 to rounding to nearest, no exceptions.

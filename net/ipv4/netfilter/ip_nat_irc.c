@@ -188,7 +188,7 @@ static unsigned int help(struct ip_conntrack *ct,
 
 	datalen = (*pskb)->len - iph->ihl * 4 - tcph->doff * 4;
 	LOCK_BH(&ip_irc_lock);
-	/* Check wether the whole IP/address pattern is carried in the payload */
+	/* Check whether the whole IP/address pattern is carried in the payload */
 	if (between(exp->seq + ct_irc_info->len,
 		    ntohl(tcph->seq),
 		    ntohl(tcph->seq) + datalen)) {

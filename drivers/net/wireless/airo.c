@@ -970,7 +970,7 @@ struct airo_info {
 	int open;
 	struct net_device             *dev;
 	/* Note, we can have MAX_FIDS outstanding.  FIDs are 16-bits, so we
-	   use the high bit to mark wether it is in use. */
+	   use the high bit to mark whether it is in use. */
 #define MAX_FIDS 6
 	int                           fids[MAX_FIDS];
 	int registered;
