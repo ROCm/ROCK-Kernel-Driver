@@ -54,13 +54,6 @@
 #define TRIDENT_DEVICE_ID_NX		((PCI_VENDOR_ID_TRIDENT<<16)|PCI_DEVICE_ID_TRIDENT_4DWAVE_NX)
 #define TRIDENT_DEVICE_ID_SI7018	((PCI_VENDOR_ID_SI<<16)|PCI_DEVICE_ID_SI_7018)
 
-/* Trident chipsets have 1GB memory limit */
-#ifdef __alpha__
-#define TRIDENT_DMA_TYPE        SNDRV_DMA_TYPE_PCI_16MB
-#else
-#define TRIDENT_DMA_TYPE        SNDRV_DMA_TYPE_PCI
-#endif
-
 #define SNDRV_SEQ_DEV_ID_TRIDENT			"trident-synth"
 
 #define SNDRV_TRIDENT_VOICE_TYPE_PCM		0

@@ -858,7 +858,7 @@ static int snd_card_harmony_pcm_init(snd_card_harmony_t *harmony, int device)
 	harmony->pcm = pcm;
 	
 	/* initialize graveyard buffer */
-	harmony->dma_dev.type = SNDRV_DMA_TYPE_PCI;
+	harmony->dma_dev.type = SNDRV_DMA_TYPE_DEV;
 	harmony->dma_dev.dev = snd_dma_pci_data(harmony->fake_pci_dev); 
 	harmony->graveyard_addr = snd_dma_alloc_pages(&chip->dma_dev,
 			HARMONY_BUF_SIZE*GRAVEYARD_BUFS, &harmony->graveyard_dma);

@@ -1655,7 +1655,7 @@ int snd_cs4231_pcm(cs4231_t *chip, int device, snd_pcm_t **rpcm)
 #else
 #  ifdef EBUS_SUPPORT
         if (chip->ebus_flag) {
-                snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_PCI,
+                snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_DEV,
                 				      chip->dev_u.pdev,
 						      64*1024, 128*1024);
         } else {
