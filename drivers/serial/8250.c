@@ -21,6 +21,10 @@
  */
 #include <linux/config.h>
 
+#ifndef NO_PC_LEGACY_SERIAL_8250_CONSOLE
+#define do_not_try_pc_legacy_8250_console (0)
+#endif
+
 #if defined(CONFIG_SERIAL_8250_CONSOLE) && defined(CONFIG_MAGIC_SYSRQ)
 #define SUPPORT_SYSRQ
 #endif
@@ -2111,6 +2115,10 @@ static struct console serial8250_console = {
 
 static int __init serial8250_console_init(void)
 {
+	if(do_not_try_pc_legacy_8250_console) {
+		printk(KERN_INFO "%s: nothing to do on this board\n",__FUNCTION__);
+		return -ENODEV;
+	}
 	serial8250_isa_init_ports();
 	register_console(&serial8250_console);
 	return 0;
@@ -2441,6 +2449,11 @@ EXPORT_SYMBOL(serial8250_unregister_port);
 static int __init serial8250_init(void)
 {
 	int ret, i;
+
+	if(do_not_try_pc_legacy_8250_console) {
+		printk(KERN_INFO "%s: nothing to do on this board\n",__FUNCTION__);
+		return -ENODEV;
+	}
 
 	printk(KERN_INFO "Serial: 8250/16550 driver $Revision: 1.90 $ "
 		"%d ports, IRQ sharing %sabled\n", (int) UART_NR,
