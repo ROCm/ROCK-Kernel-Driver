@@ -107,7 +107,7 @@ int parse_dcc(char *data, char *data_end, u_int32_t * ip, u_int16_t * port,
 static int help(const struct iphdr *iph, size_t len,
 		struct ip_conntrack *ct, enum ip_conntrack_info ctinfo)
 {
-	/* tcplen not negative guarenteed by ip_conntrack_tcp.c */
+	/* tcplen not negative guaranteed by ip_conntrack_tcp.c */
 	struct tcphdr *tcph = (void *) iph + iph->ihl * 4;
 	const char *data = (const char *) tcph + tcph->doff * 4;
 	const char *_data = data;

@@ -1882,7 +1882,7 @@ again:
 		buf = con_buf;
 	}
 
-	/* At this point 'buf' is guarenteed to be a kernel buffer
+	/* At this point 'buf' is guaranteed to be a kernel buffer
 	 * and therefore no access to userspace (and therefore sleeping)
 	 * will be needed.  The con_buf_sem serializes all tty based
 	 * console rendering and vcs write/read operations.  We hold

@@ -59,7 +59,7 @@ struct pci_iommu {
 	unsigned long	iommu_ctxflush;		/* IOMMU context flush register */
 
 	/* This is a register in the PCI controller, which if
-	 * read will have no side-effects but will guarentee
+	 * read will have no side-effects but will guarantee
 	 * completion of all previous writes into IOMMU/STC.
 	 */
 	unsigned long	write_complete_reg;

@@ -318,7 +318,7 @@ pci_map_page(struct pci_dev *pdev, struct page *page, unsigned long offset,
 /* Unmap a single streaming mode DMA translation.  The DMA_ADDR and
    SIZE must match what was provided for in a previous pci_map_single
    call.  All other usages are undefined.  After this call, reads by
-   the cpu to the buffer are guarenteed to see whatever the device
+   the cpu to the buffer are guaranteed to see whatever the device
    wrote there.  */
 
 void

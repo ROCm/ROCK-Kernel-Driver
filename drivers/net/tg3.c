@@ -2194,7 +2194,7 @@ static int tigon3_4gb_hwbug_workaround(struct tg3 *tp, struct sk_buff *skb,
 	int i;
 
 #if !PCI_DMA_BUS_IS_PHYS
-	/* IOMMU, just map the guilty area again which is guarenteed to
+	/* IOMMU, just map the guilty area again which is guaranteed to
 	 * use different addresses.
 	 */
 
@@ -2229,7 +2229,7 @@ static int tigon3_4gb_hwbug_workaround(struct tg3 *tp, struct sk_buff *skb,
 		return -1;
 	}
 
-	/* New SKB is guarenteed to be linear. */
+	/* New SKB is guaranteed to be linear. */
 	entry = *start;
 	new_addr = pci_map_single(tp->pdev, new_skb->data, new_skb->len,
 				  PCI_DMA_TODEVICE);

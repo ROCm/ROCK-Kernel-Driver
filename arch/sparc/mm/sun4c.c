@@ -1042,7 +1042,7 @@ static struct thread_info *sun4c_alloc_thread_info(void)
 		get_locked_segment(addr);
 
 	/* We are changing the virtual color of the page(s)
-	 * so we must flush the cache to guarentee consistency.
+	 * so we must flush the cache to guarantee consistency.
 	 */
 	sun4c_flush_page(pages);
 #ifndef CONFIG_SUN4	
