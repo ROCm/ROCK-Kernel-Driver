@@ -49,19 +49,7 @@ static void snd_instr_unlock_ops(snd_seq_kinstr_list_t *list)
 	}
 }
 
-snd_seq_kcluster_t *snd_seq_cluster_new(int atomic)
-{
-	return kcalloc(1, sizeof(snd_seq_kcluster_t), atomic ? GFP_ATOMIC : GFP_KERNEL);
-}
-
-void snd_seq_cluster_free(snd_seq_kcluster_t *cluster, int atomic)
-{
-	if (cluster == NULL)
-		return;
-	kfree(cluster);
-}
-
-snd_seq_kinstr_t *snd_seq_instr_new(int add_len, int atomic)
+static snd_seq_kinstr_t *snd_seq_instr_new(int add_len, int atomic)
 {
 	snd_seq_kinstr_t *instr;
 	
@@ -72,7 +60,7 @@ snd_seq_kinstr_t *snd_seq_instr_new(int add_len, int atomic)
 	return instr;
 }
 
-int snd_seq_instr_free(snd_seq_kinstr_t *instr, int atomic)
+static int snd_seq_instr_free(snd_seq_kinstr_t *instr, int atomic)
 {
 	int result = 0;
 
@@ -132,7 +120,7 @@ void snd_seq_instr_list_free(snd_seq_kinstr_list_t **list_ptr)
 		while ((cluster = list->chash[idx]) != NULL) {
 			list->chash[idx] = cluster->next;
 			list->ccount--;
-			snd_seq_cluster_free(cluster, 0);
+			kfree(cluster);
 		}
 	}
 	kfree(list);

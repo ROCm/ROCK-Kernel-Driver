@@ -263,7 +263,7 @@ void snd_opl3_timer_func(unsigned long data)
 /*
  * Start system timer
  */
-void snd_opl3_start_timer(opl3_t *opl3)
+static void snd_opl3_start_timer(opl3_t *opl3)
 {
 	unsigned long flags;
 	spin_lock_irqsave(&opl3->sys_timer_lock, flags);

@@ -2,6 +2,9 @@
  *  The driver for the EMU10K1 (SB Live!) based soundcards
  *  Copyright (c) by Jaroslav Kysela <perex@suse.cz>
  *
+ *  Copyright (c) by James Courtier-Dutton <James@superbug.demon.co.uk>
+ *      Added support for Audigy 2 Value.
+ *
  *
  *   This program is free software; you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -17,6 +20,7 @@
  *   along with this program; if not, write to the Free Software
  *   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
  *
+ * 
  */
 
 #include <sound/driver.h>
@@ -68,11 +72,26 @@ MODULE_PARM_DESC(max_buffer_size, "Maximum sample buffer size in MB.");
 module_param_array(enable_ir, bool, NULL, 0444);
 MODULE_PARM_DESC(enable_ir, "Enable IR.");
 
+/*
+ * Class 0401: 1102:0008 (rev 00) Subsystem: 1102:1001 -> Audigy2 Value  Model:SB0400
+ */
 static struct pci_device_id snd_emu10k1_ids[] = {
 	{ 0x1102, 0x0002, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },	/* EMU10K1 */
 	{ 0x1102, 0x0004, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 1 },	/* Audigy */
+	{ 0x1102, 0x0008, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 1 },	/* Audigy 2 Value SB0400 */
 	{ 0, }
 };
+
+/*
+ * Audigy 2 Value notes:
+ * A_IOCFG Input (GPIO)
+ * 0x400  = Front analog jack plugged in. (Green socket)
+ * 0x1000 = Read analog jack plugged in. (Black socket)
+ * 0x2000 = Center/LFE analog jack plugged in. (Orange socket)
+ * A_IOCFG Output (GPIO)
+ * 0x60 = Sound out of front Left.
+ * Win sets it to 0xXX61
+ */
 
 MODULE_DEVICE_TABLE(pci, snd_emu10k1_ids);
 
@@ -124,6 +143,12 @@ static int __devinit snd_card_emu10k1_probe(struct pci_dev *pci,
 		snd_card_free(card);
 		return err;
 	}
+	
+	if ((err = snd_emu10k1_timer(emu, 0)) < 0) {
+		snd_card_free(card);
+		return err;
+	}
+
 	if (emu->audigy) {
 		if ((err = snd_emu10k1_audigy_midi(emu)) < 0) {
 			snd_card_free(card);
@@ -155,7 +180,10 @@ static int __devinit snd_card_emu10k1_probe(struct pci_dev *pci,
 	}
 #endif
  
-	if (emu->audigy && (emu->revision == 4) ) {
+	if (emu->audigy && (emu->serial == 0x10011102) ) {
+		strcpy(card->driver, "Audigy2");
+		strcpy(card->shortname, "Sound Blaster Audigy2_Value");
+	} else if (emu->audigy && (emu->revision == 4) ) {
 		strcpy(card->driver, "Audigy2");
 		strcpy(card->shortname, "Sound Blaster Audigy2");
 	} else if (emu->audigy) {
@@ -168,7 +196,7 @@ static int __devinit snd_card_emu10k1_probe(struct pci_dev *pci,
 		strcpy(card->driver, "EMU10K1");
 		strcpy(card->shortname, "Sound Blaster Live!");
 	}
-	sprintf(card->longname, "%s (rev.%d) at 0x%lx, irq %i", card->shortname, emu->revision, emu->port, emu->irq);
+	sprintf(card->longname, "%s (rev.%d, serial:0x%x) at 0x%lx, irq %i", card->shortname, emu->revision, emu->serial, emu->port, emu->irq);
 
 	if ((err = snd_card_register(card)) < 0) {
 		snd_card_free(card);

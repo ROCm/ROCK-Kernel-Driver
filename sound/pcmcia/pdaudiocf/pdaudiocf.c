@@ -42,8 +42,6 @@ MODULE_SUPPORTED_DEVICE("{{Sound Core," CARD_NAME "}}");
 static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
 static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
 static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable switches */
-static unsigned int irq_mask = 0xffff;
-static int irq_list[4] = { -1 };
 
 module_param_array(index, int, NULL, 0444);
 MODULE_PARM_DESC(index, "Index value for " CARD_NAME " soundcard.");
@@ -51,11 +49,6 @@ module_param_array(id, charp, NULL, 0444);
 MODULE_PARM_DESC(id, "ID string for " CARD_NAME " soundcard.");
 module_param_array(enable, bool, NULL, 0444);
 MODULE_PARM_DESC(enable, "Enable " CARD_NAME " soundcard.");
-module_param(irq_mask, int, 0444);
-MODULE_PARM_DESC(irq_mask, "IRQ bitmask for " CARD_NAME " soundcard.");
-module_param_array(irq_list, int, NULL, 0444);
-MODULE_PARM_DESC(irq_list, "List of Available interrupts for " CARD_NAME " soundcard.");
- 
 
 /*
  */
@@ -164,12 +157,7 @@ static dev_link_t *snd_pdacf_attach(void)
 	link->irq.Attributes = IRQ_TYPE_EXCLUSIVE | IRQ_HANDLE_PRESENT | IRQ_FORCED_PULSE;
 	// link->irq.Attributes = IRQ_TYPE_DYNAMIC_SHARING|IRQ_FIRST_SHARED;
 
-	link->irq.IRQInfo1 = IRQ_INFO2_VALID /* | IRQ_LEVEL_ID */;
-	if (irq_list[0] == -1)
-		link->irq.IRQInfo2 = irq_mask;
-	else
-		for (i = 0; i < 4; i++)
-			link->irq.IRQInfo2 |= 1 << irq_list[i];
+	link->irq.IRQInfo1 = 0 /* | IRQ_LEVEL_ID */;
 	link->irq.Handler = pdacf_interrupt;
 	link->irq.Instance = pdacf;
 	link->conf.Attributes = CONF_ENABLE_IRQ;
@@ -183,7 +171,6 @@ static dev_link_t *snd_pdacf_attach(void)
 
 	/* Register with Card Services */
 	client_reg.dev_info = &dev_info;
-	client_reg.Attributes = INFO_IO_CLIENT | INFO_CARD_SHARE;
 	client_reg.EventMask = 
 		CS_EVENT_CARD_INSERTION | CS_EVENT_CARD_REMOVAL
 #ifdef CONFIG_PM
@@ -271,15 +258,6 @@ static void snd_pdacf_detach(dev_link_t *link)
 	chip->chip_status |= PDAUDIOCF_STAT_IS_STALE; /* to be sure */
 	snd_card_disconnect(chip->card);
 	snd_card_free_in_thread(chip->card);
-}
-
-/*
- * snd_pdacf_detach_all - detach all instances linked to the hw
- */
-static void snd_pdacf_detach_all(void)
-{
-	while (dev_list != NULL)
-		snd_pdacf_detach(dev_list);
 }
 
 /*
@@ -413,7 +391,7 @@ static int __init init_pdacf(void)
 static void __exit exit_pdacf(void)
 {
 	pcmcia_unregister_driver(&pdacf_cs_driver);
-	snd_pdacf_detach_all();
+	BUG_ON(dev_list != NULL);
 }
 
 module_init(init_pdacf);

@@ -1584,7 +1584,7 @@ RME9652_ADAT_SYNC("ADAT3 Sync Check", 0, 2);
 static snd_kcontrol_new_t snd_rme9652_adat1_input =
 RME9652_ADAT1_IN("ADAT1 Input Source", 0);
 
-int snd_rme9652_create_controls(snd_card_t *card, rme9652_t *rme9652)
+static int snd_rme9652_create_controls(snd_card_t *card, rme9652_t *rme9652)
 {
 	unsigned int idx;
 	int err;

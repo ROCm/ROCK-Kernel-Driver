@@ -1,6 +1,30 @@
 /*
- * usbus428.c - ALSA USB US-428 Driver
+ * usbusy2y.c - ALSA USB US-428 Driver
  *
+2004-12-14 Karsten Wiese
+	Version 0.8.7.1:
+	snd_pcm_open for rawusb pcm-devices now returns -EBUSY if called without rawusb's hwdep device being open.
+
+2004-12-02 Karsten Wiese
+	Version 0.8.7:
+	Use macro usb_maxpacket() for portability.
+
+2004-10-26 Karsten Wiese
+	Version 0.8.6:
+	wake_up() process waiting in usX2Y_urbs_start() on error.
+
+2004-10-21 Karsten Wiese
+	Version 0.8.5:
+	nrpacks is runtime or compiletime configurable now with tested values from 1 to 4.
+
+2004-10-03 Karsten Wiese
+	Version 0.8.2:
+	Avoid any possible racing while in prepare callback.
+
+2004-09-30 Karsten Wiese
+	Version 0.8.0:
+	Simplified things and made ohci work again.
+
 2004-09-20 Karsten Wiese
 	Version 0.7.3:
 	Use usb_kill_urb() instead of deprecated (kernel 2.6.9) usb_unlink_urb().
@@ -84,7 +108,7 @@
 	Version 0.0.2: midi works with snd-usb-midi, audio (only fullduplex now) with i.e. bristol.
 	The firmware has been sniffed from win2k us-428 driver 3.09.
 
- *   Copyright (c) 2002 Karsten Wiese
+ *   Copyright (c) 2002 - 2004 Karsten Wiese
  *
  *   This program is free software; you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -119,7 +143,7 @@
 
 
 MODULE_AUTHOR("Karsten Wiese <annabellesgarden@yahoo.de>");
-MODULE_DESCRIPTION("TASCAM "NAME_ALLCAPS" Version 0.7.3");
+MODULE_DESCRIPTION("TASCAM "NAME_ALLCAPS" Version 0.8.7.1");
 MODULE_LICENSE("GPL");
 MODULE_SUPPORTED_DEVICE("{{TASCAM(0x1604), "NAME_ALLCAPS"(0x8001)(0x8005)(0x8007) }}");
 
@@ -285,8 +309,7 @@ static void usX2Y_unlinkSeq(snd_usX2Y_AsyncSeq_t* S)
 			S->urb[i] = NULL;
 		}
 	}
-	if (S->buffer)
-		kfree(S->buffer);
+	kfree(S->buffer);
 }
 
 
@@ -325,13 +348,15 @@ static snd_card_t* usX2Y_create_card(struct usb_device* device)
 	card->private_free = snd_usX2Y_card_private_free;
 	usX2Y(card)->chip.dev = device;
 	usX2Y(card)->chip.card = card;
-	init_MUTEX (&usX2Y(card)->open_mutex);
+	init_waitqueue_head(&usX2Y(card)->prepare_wait_queue);
+	init_MUTEX (&usX2Y(card)->prepare_mutex);
 	INIT_LIST_HEAD(&usX2Y(card)->chip.midi_list);
 	strcpy(card->driver, "USB "NAME_ALLCAPS"");
 	sprintf(card->shortname, "TASCAM "NAME_ALLCAPS"");
 	sprintf(card->longname, "%s (%x:%x if %d at %03d/%03d)",
 		card->shortname, 
-		device->descriptor.idVendor, device->descriptor.idProduct,
+		le16_to_cpu(device->descriptor.idVendor),
+		le16_to_cpu(device->descriptor.idProduct),
 		0,//us428(card)->usbmidi.ifnum,
 		usX2Y(card)->chip.dev->bus->busnum, usX2Y(card)->chip.dev->devnum
 		);
@@ -344,10 +369,10 @@ static void* usX2Y_usb_probe(struct usb_device* device, struct usb_interface *in
 {
 	int		err;
 	snd_card_t*	card;
-	if (device->descriptor.idVendor != 0x1604 ||
-	    (device->descriptor.idProduct != USB_ID_US122 &&
-	     device->descriptor.idProduct != USB_ID_US224 &&
-	     device->descriptor.idProduct != USB_ID_US428) ||
+	if (le16_to_cpu(device->descriptor.idVendor) != 0x1604 ||
+	    (le16_to_cpu(device->descriptor.idProduct) != USB_ID_US122 &&
+	     le16_to_cpu(device->descriptor.idProduct) != USB_ID_US224 &&
+	     le16_to_cpu(device->descriptor.idProduct) != USB_ID_US428) ||
 	    !(card = usX2Y_create_card(device)))
 		return NULL;
 	if ((err = usX2Y_hwdep_new(card, device)) < 0  ||
@@ -389,8 +414,7 @@ static struct usb_driver snd_usX2Y_usb_driver = {
 
 static void snd_usX2Y_card_private_free(snd_card_t *card)
 {
-	if (usX2Y(card)->In04Buf)
-		kfree(usX2Y(card)->In04Buf);
+	kfree(usX2Y(card)->In04Buf);
 	usb_free_urb(usX2Y(card)->In04urb);
 	if (usX2Y(card)->us428ctls_sharedmem)
 		snd_free_pages(usX2Y(card)->us428ctls_sharedmem, sizeof(*usX2Y(card)->us428ctls_sharedmem));

@@ -53,6 +53,9 @@ static int snd_trident_resume(snd_card_t *card, unsigned int state);
 #endif
 static int snd_trident_sis_reset(trident_t *trident);
 
+static void snd_trident_clear_voices(trident_t * trident, unsigned short v_min, unsigned short v_max);
+static int snd_trident_free(trident_t *trident);
+
 /*
  *  common I/O routines
  */
@@ -632,7 +635,7 @@ static void snd_trident_write_cvol_reg(trident_t * trident, snd_trident_voice_t 
    Returns:     Delta value.
   
   ---------------------------------------------------------------------------*/
-unsigned int snd_trident_convert_rate(unsigned int rate)
+static unsigned int snd_trident_convert_rate(unsigned int rate)
 {
 	unsigned int delta;
 
@@ -692,7 +695,7 @@ static unsigned int snd_trident_convert_adc_rate(unsigned int rate)
    Returns:     Delta value.
   
   ---------------------------------------------------------------------------*/
-unsigned int snd_trident_spurious_threshold(unsigned int rate, unsigned int period_size)
+static unsigned int snd_trident_spurious_threshold(unsigned int rate, unsigned int period_size)
 {
 	unsigned int res = (rate * period_size) / 48000;
 	if (res < 64)
@@ -713,7 +716,7 @@ unsigned int snd_trident_spurious_threshold(unsigned int rate, unsigned int peri
    Returns:     Control value.
   
   ---------------------------------------------------------------------------*/
-unsigned int snd_trident_control_mode(snd_pcm_substream_t *substream)
+static unsigned int snd_trident_control_mode(snd_pcm_substream_t *substream)
 {
 	unsigned int CTRL;
 	snd_pcm_runtime_t *runtime = substream->runtime;
@@ -770,8 +773,8 @@ static int snd_trident_ioctl(snd_pcm_substream_t * substream,
   
   ---------------------------------------------------------------------------*/
 
-int snd_trident_allocate_pcm_mem(snd_pcm_substream_t * substream,
-				 snd_pcm_hw_params_t * hw_params)
+static int snd_trident_allocate_pcm_mem(snd_pcm_substream_t * substream,
+					snd_pcm_hw_params_t * hw_params)
 {
 	trident_t *trident = snd_pcm_substream_chip(substream);
 	snd_pcm_runtime_t *runtime = substream->runtime;
@@ -804,8 +807,8 @@ int snd_trident_allocate_pcm_mem(snd_pcm_substream_t * substream,
   
   ---------------------------------------------------------------------------*/
 
-int snd_trident_allocate_evoice(snd_pcm_substream_t * substream,
-				snd_pcm_hw_params_t * hw_params)
+static int snd_trident_allocate_evoice(snd_pcm_substream_t * substream,
+				       snd_pcm_hw_params_t * hw_params)
 {
 	trident_t *trident = snd_pcm_substream_chip(substream);
 	snd_pcm_runtime_t *runtime = substream->runtime;
@@ -3611,10 +3614,13 @@ int __devinit snd_trident_create(snd_card_t * card,
 		return err;
 	}
 
-	if ((err = snd_trident_mixer(trident, pcm_spdif_device)) < 0) {
+	if ((err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, trident, &ops)) < 0) {
 		snd_trident_free(trident);
 		return err;
 	}
+
+	if ((err = snd_trident_mixer(trident, pcm_spdif_device)) < 0)
+		return err;
 	
 	/* initialise synth voices */
 	for (i = 0; i < 64; i++) {
@@ -3635,12 +3641,7 @@ int __devinit snd_trident_create(snd_card_t * card,
 
 	
 	snd_card_set_pm_callback(card, snd_trident_suspend, snd_trident_resume, trident);
-
 	snd_trident_proc_init(trident);
-	if ((err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, trident, &ops)) < 0) {
-		snd_trident_free(trident);
-		return err;
-	}
 	snd_card_set_dev(card, &pci->dev);
 	*rtrident = trident;
 	return 0;
@@ -3650,7 +3651,7 @@ int __devinit snd_trident_create(snd_card_t * card,
    snd_trident_free
   
    Description: This routine will free the device specific class for
-            q    the 4DWave card. 
+                the 4DWave card. 
                 
    Paramters:   trident  - device specific private data for 4DWave card
 
@@ -3658,7 +3659,7 @@ int __devinit snd_trident_create(snd_card_t * card,
   
   ---------------------------------------------------------------------------*/
 
-int snd_trident_free(trident_t *trident)
+static int snd_trident_free(trident_t *trident)
 {
 #if defined(CONFIG_GAMEPORT) || (defined(MODULE) && defined(CONFIG_GAMEPORT_MODULE))
 	if (trident->gameport) {
@@ -3679,8 +3680,7 @@ int snd_trident_free(trident_t *trident)
 			snd_util_memhdr_free(trident->tlb.memhdr);
 		if (trident->tlb.silent_page.area)
 			snd_dma_free_pages(&trident->tlb.silent_page);
-		if (trident->tlb.shadow_entries)
-			vfree(trident->tlb.shadow_entries);
+		vfree(trident->tlb.shadow_entries);
 		snd_dma_free_pages(&trident->tlb.buffer);
 	}
 	if (trident->irq >= 0)
@@ -3807,9 +3807,9 @@ static irqreturn_t snd_trident_interrupt(int irq, void *dev_id, struct pt_regs *
 }
 
 /*---------------------------------------------------------------------------
-   snd_trident_attach_synthesizer, snd_trident_detach_synthesizer
+   snd_trident_attach_synthesizer
   
-   Description: Attach/detach synthesizer hooks
+   Description: Attach synthesizer hooks
                 
    Paramters:   trident  - device specific private data for 4DWave card
 
@@ -3823,17 +3823,6 @@ int snd_trident_attach_synthesizer(trident_t *trident)
 			       sizeof(trident_t*), &trident->seq_dev) >= 0) {
 		strcpy(trident->seq_dev->name, "4DWave");
 		*(trident_t**)SNDRV_SEQ_DEVICE_ARGPTR(trident->seq_dev) = trident;
-	}
-#endif
-	return 0;
-}
-
-int snd_trident_detach_synthesizer(trident_t *trident)
-{
-#if defined(CONFIG_SND_SEQUENCER) || (defined(MODULE) && defined(CONFIG_SND_SEQUENCER_MODULE))
-	if (trident->seq_dev) {
-		snd_device_free(trident->card, trident->seq_dev);
-		trident->seq_dev = NULL;
 	}
 #endif
 	return 0;
@@ -3911,7 +3900,7 @@ void snd_trident_free_voice(trident_t * trident, snd_trident_voice_t *voice)
 		private_free(voice);
 }
 
-void snd_trident_clear_voices(trident_t * trident, unsigned short v_min, unsigned short v_max)
+static void snd_trident_clear_voices(trident_t * trident, unsigned short v_min, unsigned short v_max)
 {
 	unsigned int i, val, mask[2] = { 0, 0 };
 
@@ -3955,7 +3944,6 @@ static int snd_trident_suspend(snd_card_t *card, unsigned int state)
 		break;
 	}
 	pci_disable_device(trident->pci);
-	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
 	return 0;
 }
 
@@ -3990,7 +3978,6 @@ static int snd_trident_resume(snd_card_t *card, unsigned int state)
 
 	snd_trident_enable_eso(trident);
 
-	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
 	trident->in_suspend = 0;
 	return 0;
 }
@@ -4001,9 +3988,7 @@ EXPORT_SYMBOL(snd_trident_free_voice);
 EXPORT_SYMBOL(snd_trident_start_voice);
 EXPORT_SYMBOL(snd_trident_stop_voice);
 EXPORT_SYMBOL(snd_trident_write_voice_regs);
-EXPORT_SYMBOL(snd_trident_clear_voices);
 /* trident_memory.c symbols */
 EXPORT_SYMBOL(snd_trident_synth_alloc);
 EXPORT_SYMBOL(snd_trident_synth_free);
-EXPORT_SYMBOL(snd_trident_synth_bzero);
 EXPORT_SYMBOL(snd_trident_synth_copy_from_user);

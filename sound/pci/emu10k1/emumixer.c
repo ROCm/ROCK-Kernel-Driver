@@ -54,7 +54,7 @@ static int snd_emu10k1_spdif_get(snd_kcontrol_t * kcontrol,
 	ucontrol->value.iec958.status[2] = (emu->spdif_bits[idx] >> 16) & 0xff;
 	ucontrol->value.iec958.status[3] = (emu->spdif_bits[idx] >> 24) & 0xff;
 	spin_unlock_irqrestore(&emu->reg_lock, flags);
-        return 0;
+	return 0;
 }
 
 static int snd_emu10k1_spdif_get_mask(snd_kcontrol_t * kcontrol,
@@ -64,7 +64,7 @@ static int snd_emu10k1_spdif_get_mask(snd_kcontrol_t * kcontrol,
 	ucontrol->value.iec958.status[1] = 0xff;
 	ucontrol->value.iec958.status[2] = 0xff;
 	ucontrol->value.iec958.status[3] = 0xff;
-        return 0;
+	return 0;
 }
 
 static int snd_emu10k1_spdif_put(snd_kcontrol_t * kcontrol,
@@ -87,27 +87,27 @@ static int snd_emu10k1_spdif_put(snd_kcontrol_t * kcontrol,
 		emu->spdif_bits[idx] = val;
 	}
 	spin_unlock_irqrestore(&emu->reg_lock, flags);
-        return change;
+	return change;
 }
 
 static snd_kcontrol_new_t snd_emu10k1_spdif_mask_control =
 {
 	.access =	SNDRV_CTL_ELEM_ACCESS_READ,
-        .iface =        SNDRV_CTL_ELEM_IFACE_MIXER,
-        .name =         SNDRV_CTL_NAME_IEC958("",PLAYBACK,MASK),
+	.iface =        SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name =         SNDRV_CTL_NAME_IEC958("",PLAYBACK,MASK),
 	.count =	4,
-        .info =         snd_emu10k1_spdif_info,
-        .get =          snd_emu10k1_spdif_get_mask
+	.info =         snd_emu10k1_spdif_info,
+	.get =          snd_emu10k1_spdif_get_mask
 };
 
 static snd_kcontrol_new_t snd_emu10k1_spdif_control =
 {
-        .iface =	SNDRV_CTL_ELEM_IFACE_MIXER,
-        .name =         SNDRV_CTL_NAME_IEC958("",PLAYBACK,DEFAULT),
+	.iface =	SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name =         SNDRV_CTL_NAME_IEC958("",PLAYBACK,DEFAULT),
 	.count =	4,
-        .info =         snd_emu10k1_spdif_info,
-        .get =          snd_emu10k1_spdif_get,
-        .put =          snd_emu10k1_spdif_put
+	.info =         snd_emu10k1_spdif_info,
+	.get =          snd_emu10k1_spdif_get,
+	.put =          snd_emu10k1_spdif_put
 };
 
 
@@ -165,7 +165,7 @@ static int snd_emu10k1_send_routing_get(snd_kcontrol_t * kcontrol,
 			ucontrol->value.integer.value[(voice * num_efx) + idx] = 
 				mix->send_routing[voice][idx] & mask;
 	spin_unlock_irqrestore(&emu->reg_lock, flags);
-        return 0;
+	return 0;
 }
 
 static int snd_emu10k1_send_routing_put(snd_kcontrol_t * kcontrol,
@@ -199,18 +199,18 @@ static int snd_emu10k1_send_routing_put(snd_kcontrol_t * kcontrol,
 		}
 	}
 	spin_unlock_irqrestore(&emu->reg_lock, flags);
-        return change;
+	return change;
 }
 
 static snd_kcontrol_new_t snd_emu10k1_send_routing_control =
 {
 	.access =	SNDRV_CTL_ELEM_ACCESS_READWRITE | SNDRV_CTL_ELEM_ACCESS_INACTIVE,
-        .iface =        SNDRV_CTL_ELEM_IFACE_MIXER,
-        .name =         "EMU10K1 PCM Send Routing",
+	.iface =        SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name =         "EMU10K1 PCM Send Routing",
 	.count =	32,
-        .info =         snd_emu10k1_send_routing_info,
-        .get =          snd_emu10k1_send_routing_get,
-        .put =          snd_emu10k1_send_routing_put
+	.info =         snd_emu10k1_send_routing_info,
+	.get =          snd_emu10k1_send_routing_get,
+	.put =          snd_emu10k1_send_routing_put
 };
 
 static int snd_emu10k1_send_volume_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
@@ -236,7 +236,7 @@ static int snd_emu10k1_send_volume_get(snd_kcontrol_t * kcontrol,
 	for (idx = 0; idx < 3*num_efx; idx++)
 		ucontrol->value.integer.value[idx] = mix->send_volume[idx/num_efx][idx%num_efx];
 	spin_unlock_irqrestore(&emu->reg_lock, flags);
-        return 0;
+	return 0;
 }
 
 static int snd_emu10k1_send_volume_put(snd_kcontrol_t * kcontrol,
@@ -268,18 +268,18 @@ static int snd_emu10k1_send_volume_put(snd_kcontrol_t * kcontrol,
 		}
 	}
 	spin_unlock_irqrestore(&emu->reg_lock, flags);
-        return change;
+	return change;
 }
 
 static snd_kcontrol_new_t snd_emu10k1_send_volume_control =
 {
 	.access =	SNDRV_CTL_ELEM_ACCESS_READWRITE | SNDRV_CTL_ELEM_ACCESS_INACTIVE,
-        .iface =        SNDRV_CTL_ELEM_IFACE_MIXER,
-        .name =         "EMU10K1 PCM Send Volume",
+	.iface =        SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name =         "EMU10K1 PCM Send Volume",
 	.count =	32,
-        .info =         snd_emu10k1_send_volume_info,
-        .get =          snd_emu10k1_send_volume_get,
-        .put =          snd_emu10k1_send_volume_put
+	.info =         snd_emu10k1_send_volume_info,
+	.get =          snd_emu10k1_send_volume_get,
+	.put =          snd_emu10k1_send_volume_put
 };
 
 static int snd_emu10k1_attn_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
@@ -303,7 +303,7 @@ static int snd_emu10k1_attn_get(snd_kcontrol_t * kcontrol,
 	for (idx = 0; idx < 3; idx++)
 		ucontrol->value.integer.value[idx] = mix->attn[idx];
 	spin_unlock_irqrestore(&emu->reg_lock, flags);
-        return 0;
+	return 0;
 }
 
 static int snd_emu10k1_attn_put(snd_kcontrol_t * kcontrol,
@@ -331,18 +331,18 @@ static int snd_emu10k1_attn_put(snd_kcontrol_t * kcontrol,
 		}
 	}
 	spin_unlock_irqrestore(&emu->reg_lock, flags);
-        return change;
+	return change;
 }
 
 static snd_kcontrol_new_t snd_emu10k1_attn_control =
 {
 	.access =	SNDRV_CTL_ELEM_ACCESS_READWRITE | SNDRV_CTL_ELEM_ACCESS_INACTIVE,
-        .iface =        SNDRV_CTL_ELEM_IFACE_MIXER,
-        .name =         "EMU10K1 PCM Volume",
+	.iface =        SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name =         "EMU10K1 PCM Volume",
 	.count =	32,
-        .info =         snd_emu10k1_attn_info,
-        .get =          snd_emu10k1_attn_get,
-        .put =          snd_emu10k1_attn_put
+	.info =         snd_emu10k1_attn_info,
+	.get =          snd_emu10k1_attn_get,
+	.put =          snd_emu10k1_attn_put
 };
 
 static int snd_emu10k1_shared_spdif_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
@@ -363,7 +363,7 @@ static int snd_emu10k1_shared_spdif_get(snd_kcontrol_t * kcontrol,
 		ucontrol->value.integer.value[0] = inl(emu->port + A_IOCFG) & A_IOCFG_GPOUT0 ? 1 : 0;
 	else
 		ucontrol->value.integer.value[0] = inl(emu->port + HCFG) & HCFG_GPOUT0 ? 1 : 0;
-        return 0;
+	return 0;
 }
 
 static int snd_emu10k1_shared_spdif_put(snd_kcontrol_t * kcontrol,
@@ -394,7 +394,7 @@ static int snd_emu10k1_shared_spdif_put(snd_kcontrol_t * kcontrol,
 		outl(reg | val, emu->port + HCFG);
 	}
 	spin_unlock_irqrestore(&emu->reg_lock, flags);
-        return change;
+	return change;
 }
 
 static snd_kcontrol_new_t snd_emu10k1_shared_spdif __devinitdata =
@@ -519,6 +519,7 @@ int __devinit snd_emu10k1_mixer(emu10k1_t *emu)
 
 		if ((err = snd_ac97_bus(emu->card, 0, &ops, NULL, &pbus)) < 0)
 			return err;
+		pbus->no_vra = 1; /* we don't need VRA */
 		
 		memset(&ac97, 0, sizeof(ac97));
 		ac97.private_data = emu;

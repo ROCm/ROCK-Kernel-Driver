@@ -30,6 +30,8 @@
 #include <sound/cs8427.h>
 #include <sound/asoundef.h>
 
+static void snd_cs8427_reset(snd_i2c_device_t *cs8427);
+
 MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>");
 MODULE_DESCRIPTION("IEC958 (S/PDIF) receiver & transmitter by Cirrus Logic");
 MODULE_LICENSE("GPL");
@@ -65,16 +67,6 @@ static unsigned char swapbits(unsigned char val)
 	return res;
 }
 
-int snd_cs8427_detect(snd_i2c_bus_t *bus, unsigned char addr)
-{
-	int res;
-
-	snd_i2c_lock(bus);
-	res = snd_i2c_probeaddr(bus, CS8427_ADDR | (addr & 7));
-	snd_i2c_unlock(bus);
-	return res;
-}
-
 int snd_cs8427_reg_write(snd_i2c_device_t *device, unsigned char reg, unsigned char val)
 {
 	int err;
@@ -89,7 +81,7 @@ int snd_cs8427_reg_write(snd_i2c_device_t *device, unsigned char reg, unsigned c
 	return 0;
 }
 
-int snd_cs8427_reg_read(snd_i2c_device_t *device, unsigned char reg)
+static int snd_cs8427_reg_read(snd_i2c_device_t *device, unsigned char reg)
 {
 	int err;
 	unsigned char buf;
@@ -156,8 +148,7 @@ static int snd_cs8427_send_corudata(snd_i2c_device_t *device,
 
 static void snd_cs8427_free(snd_i2c_device_t *device)
 {
-	if (device->private_data)
-		kfree(device->private_data);
+	kfree(device->private_data);
 }
 
 int snd_cs8427_create(snd_i2c_bus_t *bus,
@@ -288,7 +279,7 @@ int snd_cs8427_create(snd_i2c_bus_t *bus,
  * put back AES3INPUT. This workaround is described in latest
  * CS8427 datasheet, otherwise TXDSERIAL will not work.
  */
-void snd_cs8427_reset(snd_i2c_device_t *cs8427)
+static void snd_cs8427_reset(snd_i2c_device_t *cs8427)
 {
 	cs8427_t *chip;
 	unsigned long end_time;
@@ -573,11 +564,9 @@ static void __exit alsa_cs8427_module_exit(void)
 module_init(alsa_cs8427_module_init)
 module_exit(alsa_cs8427_module_exit)
 
-EXPORT_SYMBOL(snd_cs8427_detect);
 EXPORT_SYMBOL(snd_cs8427_create);
 EXPORT_SYMBOL(snd_cs8427_reset);
 EXPORT_SYMBOL(snd_cs8427_reg_write);
-EXPORT_SYMBOL(snd_cs8427_reg_read);
 EXPORT_SYMBOL(snd_cs8427_iec958_build);
 EXPORT_SYMBOL(snd_cs8427_iec958_active);
 EXPORT_SYMBOL(snd_cs8427_iec958_pcm);

@@ -31,6 +31,8 @@
 #include "usbusx2y.h"
 #include "usX2Yhwdep.h"
 
+int usX2Y_hwdep_pcm_new(snd_card_t* card);
+
 
 static struct page * snd_us428ctls_vm_nopage(struct vm_area_struct *area, unsigned long address, int *type)
 {
@@ -95,20 +97,14 @@ static unsigned int snd_us428ctls_poll(snd_hwdep_t *hw, struct file *file, poll_
 {
 	unsigned int	mask = 0;
 	usX2Ydev_t	*us428 = (usX2Ydev_t*)hw->private_data;
-	static unsigned	LastN;
-
+	us428ctls_sharedmem_t *shm = us428->us428ctls_sharedmem;
 	if (us428->chip_status & USX2Y_STAT_CHIP_HUP)
 		return POLLHUP;
 
 	poll_wait(file, &us428->us428ctls_wait_queue_head, wait);
 
-	down(&us428->open_mutex);
-	if (us428->us428ctls_sharedmem
-	    && us428->us428ctls_sharedmem->CtlSnapShotLast != LastN) {
+	if (shm != NULL && shm->CtlSnapShotLast != shm->CtlSnapShotRed)
 		mask |= POLLIN;
-		LastN = us428->us428ctls_sharedmem->CtlSnapShotLast;
-	}
-	up(&us428->open_mutex);
 
 	return mask;
 }
@@ -133,7 +129,7 @@ static int snd_usX2Y_hwdep_dsp_status(snd_hwdep_t *hw, snd_hwdep_dsp_status_t *i
 	};
 	int id = -1;
 
-	switch (((usX2Ydev_t*)hw->private_data)->chip.dev->descriptor.idProduct) {
+	switch (le16_to_cpu(((usX2Ydev_t*)hw->private_data)->chip.dev->descriptor.idProduct)) {
 	case USB_ID_US122:
 		id = USX2Y_TYPE_122;
 		break;
@@ -185,7 +181,7 @@ static int usX2Y_create_usbmidi(snd_card_t* card )
 	};
 	struct usb_device *dev = usX2Y(card)->chip.dev;
 	struct usb_interface *iface = usb_ifnum_to_if(dev, 0);
-	snd_usb_audio_quirk_t *quirk = dev->descriptor.idProduct == USB_ID_US428 ? &quirk_2 : &quirk_1;
+	snd_usb_audio_quirk_t *quirk = le16_to_cpu(dev->descriptor.idProduct) == USB_ID_US428 ? &quirk_2 : &quirk_1;
 
 	snd_printdd("usX2Y_create_usbmidi \n");
 	return snd_usb_create_midi_interface(&usX2Y(card)->chip, iface, quirk);
@@ -201,6 +197,8 @@ static int usX2Y_create_alsa_devices(snd_card_t* card)
 			break;
 		}
 		if ((err = usX2Y_audio_create(card)) < 0) 
+			break;
+		if ((err = usX2Y_hwdep_pcm_new(card)) < 0)
 			break;
 		if ((err = snd_card_register(card)) < 0)
 			break;

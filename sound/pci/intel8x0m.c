@@ -253,7 +253,6 @@ struct _snd_intel8x0m {
 	ac97_t *ac97;
 
 	spinlock_t reg_lock;
-	spinlock_t ac97_lock;
 	
 	struct snd_dma_buffer bdbars;
 	u32 bdbars_count;
@@ -411,13 +410,11 @@ static void snd_intel8x0_codec_write(ac97_t *ac97,
 {
 	intel8x0_t *chip = ac97->private_data;
 	
-	spin_lock(&chip->ac97_lock);
 	if (snd_intel8x0m_codec_semaphore(chip, ac97->num) < 0) {
 		if (! chip->in_ac97_init)
 			snd_printk("codec_write %d: semaphore is not ready for register 0x%x\n", ac97->num, reg);
 	}
 	iaputword(chip, reg + ac97->num * 0x80, val);
-	spin_unlock(&chip->ac97_lock);
 }
 
 static unsigned short snd_intel8x0_codec_read(ac97_t *ac97,
@@ -427,7 +424,6 @@ static unsigned short snd_intel8x0_codec_read(ac97_t *ac97,
 	unsigned short res;
 	unsigned int tmp;
 
-	spin_lock(&chip->ac97_lock);
 	if (snd_intel8x0m_codec_semaphore(chip, ac97->num) < 0) {
 		if (! chip->in_ac97_init)
 			snd_printk("codec_read %d: semaphore is not ready for register 0x%x\n", ac97->num, reg);
@@ -442,7 +438,6 @@ static unsigned short snd_intel8x0_codec_read(ac97_t *ac97,
 			res = 0xffff;
 		}
 	}
-	spin_unlock(&chip->ac97_lock);
 	return res;
 }
 
@@ -1093,7 +1088,6 @@ static int intel8x0m_suspend(snd_card_t *card, unsigned int state)
 	if (chip->ac97)
 		snd_ac97_suspend(chip->ac97);
 	pci_disable_device(chip->pci);
-	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
 	return 0;
 }
 
@@ -1106,7 +1100,6 @@ static int intel8x0m_resume(snd_card_t *card, unsigned int state)
 	if (chip->ac97)
 		snd_ac97_resume(chip->ac97);
 
-	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
 	return 0;
 }
 #endif /* CONFIG_PM */
@@ -1179,7 +1172,6 @@ static int __devinit snd_intel8x0m_create(snd_card_t * card,
 		return -ENOMEM;
 	}
 	spin_lock_init(&chip->reg_lock);
-	spin_lock_init(&chip->ac97_lock);
 	chip->device_type = device_type;
 	chip->card = card;
 	chip->pci = pci;

@@ -214,17 +214,17 @@ static struct pci_device_id snd_azf3328_ids[] = {
 
 MODULE_DEVICE_TABLE(pci, snd_azf3328_ids);
 
-void snd_azf3328_io2_write(azf3328_t *chip, int reg, unsigned char value)
+static inline void snd_azf3328_io2_write(azf3328_t *chip, int reg, unsigned char value)
 {
 	outb(value, chip->io2_port + reg);
 }
 
-unsigned char snd_azf3328_io2_read(azf3328_t *chip, int reg)
+static inline unsigned char snd_azf3328_io2_read(azf3328_t *chip, int reg)
 {
 	return inb(chip->io2_port + reg);
 }
 
-void snd_azf3328_mixer_write(azf3328_t *chip, int reg, unsigned long value, int type)
+static void snd_azf3328_mixer_write(azf3328_t *chip, int reg, unsigned long value, int type)
 {
 	switch(type) {
 	case WORD_VALUE:
@@ -239,26 +239,7 @@ void snd_azf3328_mixer_write(azf3328_t *chip, int reg, unsigned long value, int 
 	}
 }
 
-unsigned long snd_azf3328_mixer_read(azf3328_t *chip, int reg, int type)
-{
-	unsigned long res = 0;
-
-	switch(type) {
-	case WORD_VALUE:
-		res = (unsigned long)inw(chip->mixer_port + reg);
-		break;
-	case DWORD_VALUE:
-		res = (unsigned long)inl(chip->mixer_port + reg);
-		break;
-	case BYTE_VALUE:
-		res = (unsigned long)inb(chip->mixer_port + reg);
-		break;
-	}
-
-	return res;
-}
-
-void snd_azf3328_mixer_set_mute(azf3328_t *chip, int reg, int do_mute)
+static void snd_azf3328_mixer_set_mute(azf3328_t *chip, int reg, int do_mute)
 {
 	unsigned char oldval;
 
@@ -272,7 +253,7 @@ void snd_azf3328_mixer_set_mute(azf3328_t *chip, int reg, int do_mute)
 	outb(oldval, chip->mixer_port + reg + 1);
 }
 
-void snd_azf3328_mixer_write_volume_gradually(azf3328_t *chip, int reg, unsigned char dst_vol_left, unsigned char dst_vol_right, int chan_sel, int delay)
+static void snd_azf3328_mixer_write_volume_gradually(azf3328_t *chip, int reg, unsigned char dst_vol_left, unsigned char dst_vol_right, int chan_sel, int delay)
 {
 	unsigned char curr_vol_left = 0, curr_vol_right = 0;
 	int left_done = 0, right_done = 0;
@@ -1363,14 +1344,14 @@ static int __devinit snd_azf3328_create(snd_card_t * card,
 	for (tmp=0; tmp <= 0x01; tmp += 1)
 		snd_azf3328_dbgmisc("0x%02x: opl 0x%04x, mpu300 0x%04x, mpu310 0x%04x, mpu320 0x%04x, mpu330 0x%04x\n", tmp, inb(0x388 + tmp), inb(0x300 + tmp), inb(0x310 + tmp), inb(0x320 + tmp), inb(0x330 + tmp));
 
-	/* create mixer interface & switches */
-	if ((err = snd_azf3328_mixer_new(chip)) < 0)
-		return err;
-
 	if ((err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, chip, &ops)) < 0) {
 		snd_azf3328_free(chip);
 		return err;
 	}
+
+	/* create mixer interface & switches */
+	if ((err = snd_azf3328_mixer_new(chip)) < 0)
+		return err;
 
 #if 0
 	/* set very low bitrate to reduce noise and power consumption? */

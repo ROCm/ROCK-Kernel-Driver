@@ -341,7 +341,7 @@ static int snd_opl3sa2_info_single(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t
 	return 0;
 }
 
-int snd_opl3sa2_get_single(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
+static int snd_opl3sa2_get_single(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	opl3sa2_t *chip = snd_kcontrol_chip(kcontrol);
 	unsigned long flags;
@@ -358,7 +358,7 @@ int snd_opl3sa2_get_single(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * uco
 	return 0;
 }
 
-int snd_opl3sa2_put_single(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
+static int snd_opl3sa2_put_single(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	opl3sa2_t *chip = snd_kcontrol_chip(kcontrol);
 	unsigned long flags;
@@ -388,7 +388,7 @@ int snd_opl3sa2_put_single(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * uco
   .get = snd_opl3sa2_get_double, .put = snd_opl3sa2_put_double, \
   .private_value = left_reg | (right_reg << 8) | (shift_left << 16) | (shift_right << 19) | (mask << 24) | (invert << 22) }
 
-int snd_opl3sa2_info_double(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
+static int snd_opl3sa2_info_double(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {
 	int mask = (kcontrol->private_value >> 24) & 0xff;
 
@@ -399,7 +399,7 @@ int snd_opl3sa2_info_double(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinf
 	return 0;
 }
 
-int snd_opl3sa2_get_double(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
+static int snd_opl3sa2_get_double(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	opl3sa2_t *chip = snd_kcontrol_chip(kcontrol);
 	unsigned long flags;
@@ -421,7 +421,7 @@ int snd_opl3sa2_get_double(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * uco
 	return 0;
 }
 
-int snd_opl3sa2_put_double(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
+static int snd_opl3sa2_put_double(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	opl3sa2_t *chip = snd_kcontrol_chip(kcontrol);
 	unsigned long flags;
@@ -539,7 +539,6 @@ static int snd_opl3sa2_suspend(snd_card_t *card, unsigned int state)
 	/* power down */
 	snd_opl3sa2_write(chip, OPL3SA2_PM_CTRL, OPL3SA2_PM_D3);
 
-	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
 	return 0;
 }
 
@@ -563,7 +562,6 @@ static int snd_opl3sa2_resume(snd_card_t *card, unsigned int state)
 	/* restore cs4231 */
 	chip->cs4231_resume(chip->cs4231);
 
-	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
 	return 0;
 }
 #endif /* CONFIG_PM */
@@ -713,7 +711,7 @@ static int __devinit snd_opl3sa2_probe(int dev,
 		chip->single_dma = 1;
 	if ((err = snd_opl3sa2_detect(chip)) < 0)
 		goto __error;
-	if (request_irq(xirq, snd_opl3sa2_interrupt, SA_INTERRUPT, "OPL3-SA2/3", (void *)chip)) {
+	if (request_irq(xirq, snd_opl3sa2_interrupt, SA_INTERRUPT, "OPL3-SA2", (void *)chip)) {
 		snd_printk(KERN_ERR "opl3sa2: can't grab IRQ %d\n", xirq);
 		err = -ENODEV;
 		goto __error;

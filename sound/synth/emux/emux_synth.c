@@ -363,16 +363,6 @@ snd_emux_control(void *p, int type, snd_midi_channel_t *chan)
 
 
 /*
- * for Emu10k1 - release at least 1 voice currently using
- */
-int
-snd_emux_release_voice(snd_emux_t *emu)
-{
-	return 0;
-}
-
-
-/*
  * terminate note - if free flag is true, free the terminated voice
  */
 static void

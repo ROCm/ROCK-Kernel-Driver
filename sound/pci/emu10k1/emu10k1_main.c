@@ -3,6 +3,10 @@
  *                   Creative Labs, Inc.
  *  Routines for control of EMU10K1 chips
  *
+ *  Copyright (c) by James Courtier-Dutton <James@superbug.demon.co.uk>
+ *      Added support for Audigy 2 Value.
+ *
+ *
  *  BUGS:
  *    --
  *
@@ -183,6 +187,26 @@ static int __devinit snd_emu10k1_init(emu10k1_t * emu, int enable_ir)
 		outl(0x6E0000, emu->port + 0x20);
 		outl(0xFF00FF00, emu->port + 0x24);
 	}
+	if (emu->audigy && (emu->serial == 0x10011102) ) { /* audigy2 Value */
+		/* Hacks for Alice3 to work independent of haP16V driver */
+		u32 tmp;
+
+		snd_printk(KERN_ERR "Audigy2 value:Special config.\n");
+		//Setup SRCMulti_I2S SamplingRate
+		tmp = snd_emu10k1_ptr_read(emu, A_SPDIF_SAMPLERATE, 0);
+		tmp &= 0xfffff1ff;
+		tmp |= (0x2<<9);
+		snd_emu10k1_ptr_write(emu, A_SPDIF_SAMPLERATE, 0, tmp);
+
+		/* Setup SRCSel (Enable Spdif,I2S SRCMulti) */
+		outl(0x600000, emu->port + 0x20);
+		outl(0x14, emu->port + 0x24);
+
+		/* Setup SRCMulti Input Audio Enable */
+		outl(0x7b0000, emu->port + 0x20);
+		outl(0xFF000000, emu->port + 0x24);
+	}
+
 
 	/*
 	 *  Clear page with silence & setup all pointers to this page
@@ -267,6 +291,9 @@ static int __devinit snd_emu10k1_init(emu10k1_t * emu, int enable_ir)
 			 * This has to be done after init ALice3 I2SOut beyond 48KHz.
 			 * So, sequence is important. */
 			outl(inl(emu->port + A_IOCFG) | 0x0040, emu->port + A_IOCFG);
+		} else if (emu->serial == 0x10011102) { /* audigy2 value */
+			/* Unmute Analog now. */
+			outl(inl(emu->port + A_IOCFG) | 0x0060, emu->port + A_IOCFG);
 		} else {
 			/* Disable routing from AC97 line out to Front speakers */
 			outl(inl(emu->port + A_IOCFG) | 0x0080, emu->port + A_IOCFG);
@@ -553,10 +580,8 @@ static int snd_emu10k1_free(emu10k1_t *emu)
 		snd_dma_free_pages(&emu->silent_page);
 	if (emu->ptb_pages.area)
 		snd_dma_free_pages(&emu->ptb_pages);
-	if (emu->page_ptr_table)
-		vfree(emu->page_ptr_table);
-	if (emu->page_addr_table)
-		vfree(emu->page_addr_table);
+	vfree(emu->page_ptr_table);
+	vfree(emu->page_addr_table);
 	if (emu->irq >= 0)
 		free_irq(emu->irq, (void *)emu);
 	if (emu->port)
@@ -590,7 +615,7 @@ int __devinit snd_emu10k1_create(snd_card_t * card,
 	*remu = NULL;
 
 	// is_audigy = (int)pci->driver_data;
-	is_audigy = (pci->device == 0x0004);
+	is_audigy = (pci->device == 0x0004) || ( (pci->device == 0x0008) );
 
 	/* enable PCI device */
 	if ((err = pci_enable_device(pci)) < 0)
@@ -689,7 +714,7 @@ int __devinit snd_emu10k1_create(snd_card_t * card,
 		emu->no_ac97 = 1;	
 	}
 	
-	if (emu->revision == 4 && emu->model == 0x2002) {
+	if (emu->revision == 4 && (emu->model == 0x2001 || emu->model == 0x2002)) {
 		/* Audigy 2 ZS */
 		snd_printdd(KERN_INFO "Audigy2 ZS is detected. setting 7.1 mode.\n");
 		emu->spk71 = 1;

@@ -37,7 +37,7 @@ static int maximum_substreams = 4;
 module_param(maximum_substreams, int, 0444);
 MODULE_PARM_DESC(maximum_substreams, "Maximum substreams with preallocated DMA memory.");
 
-const static size_t snd_minimum_buffer = 16384;
+static const size_t snd_minimum_buffer = 16384;
 
 
 /*
@@ -291,7 +291,7 @@ struct page *snd_pcm_sgbuf_ops_page(snd_pcm_substream_t *substream, unsigned lon
  * @substream: the substream to allocate the DMA buffer to
  * @size: the requested buffer size in bytes
  *
- * Allocates the DMA buffer on the BUS type given by
+ * Allocates the DMA buffer on the BUS type given earlier to
  * snd_pcm_lib_preallocate_xxx_pages().
  *
  * Returns 1 if the buffer is changed, 0 if not changed, or a negative

@@ -27,8 +27,10 @@
 #include <linux/fs.h>
 #include <sound/core.h>
 #include <sound/control.h>
+#include <sound/minors.h>
 #include <asm/uaccess.h>
 #include "ioctl32.h"
+
 
 /*
  * register/unregister mappers
@@ -93,43 +95,28 @@ struct sndrv_ctl_elem_list32 {
 	unsigned char reserved[50];
 } /* don't set packed attribute here */;
 
-#define CVT_sndrv_ctl_elem_list()\
-{\
-	COPY(offset);\
-	COPY(space);\
-	COPY(used);\
-	COPY(count);\
-	CPTR(pids);\
-}
-
 static inline int _snd_ioctl32_ctl_elem_list(unsigned int fd, unsigned int cmd, unsigned long arg, struct file *file, unsigned int native_ctl)
 {
-	struct sndrv_ctl_elem_list32 data32;
-	struct sndrv_ctl_elem_list data;
-	mm_segment_t oldseg;
+	struct sndrv_ctl_elem_list32 __user *data32;
+	struct sndrv_ctl_elem_list __user *data;
+	compat_caddr_t ptr;
 	int err;
 
-	if (copy_from_user(&data32, (void __user *)arg, sizeof(data32)))
+	data32 = compat_ptr(arg);
+	data = compat_alloc_user_space(sizeof(*data));
+
+	/* offset, space, used, count */
+	if (copy_in_user(data, data32, 4 * sizeof(u32)))
 		return -EFAULT;
-	memset(&data, 0, sizeof(data));
-	data.offset = data32.offset;
-	data.space = data32.space;
-	data.used = data32.used;
-	data.count = data32.count;
-	data.pids = compat_ptr(data32.pids);
-	oldseg = get_fs();
-	set_fs(KERNEL_DS);
-	err = file->f_op->ioctl(file->f_dentry->d_inode, file, native_ctl, (unsigned long)&data);
-	set_fs(oldseg);
+	/* pids */
+	if (__get_user(ptr, &data32->pids) ||
+	    __put_user(compat_ptr(ptr), &data->pids))
+		return -EFAULT;
+	err = file->f_op->ioctl(file->f_dentry->d_inode, file, native_ctl, (unsigned long)data);
 	if (err < 0)
 		return err;
 	/* copy the result */
-	data32.offset = data.offset;
-	data32.space = data.space;
-	data32.used = data.used;
-	data32.count = data.count;
-	//data.pids = data.pids;
-	if (copy_to_user((void __user *)arg, &data32, sizeof(data32)))
+	if (copy_in_user(data32, data, 4 * sizeof(u32)))
 		return -EFAULT;
 	return 0;
 }
@@ -170,54 +157,59 @@ struct sndrv_ctl_elem_info32 {
 
 static inline int _snd_ioctl32_ctl_elem_info(unsigned int fd, unsigned int cmd, unsigned long arg, struct file *file, unsigned int native_ctl)
 {
-	struct sndrv_ctl_elem_info data;
-	struct sndrv_ctl_elem_info32 data32;
+	struct sndrv_ctl_elem_info __user *data, *src;
+	struct sndrv_ctl_elem_info32 __user *data32, *dst;
+	unsigned int type;
 	int err;
-	mm_segment_t oldseg;
 
-	if (copy_from_user(&data32, (void __user *)arg, sizeof(data32)))
+	data32 = compat_ptr(arg);
+	data = compat_alloc_user_space(sizeof(*data));
+
+	/* copy id */
+	if (copy_in_user(&data->id, &data32->id, sizeof(data->id)))
 		return -EFAULT;
-	memset(&data, 0, sizeof(data));
-	data.id = data32.id;
 	/* we need to copy the item index.
 	 * hope this doesn't break anything..
 	 */
-	data.value.enumerated.item = data32.value.enumerated.item;
-	oldseg = get_fs();
-	set_fs(KERNEL_DS);
-	err = file->f_op->ioctl(file->f_dentry->d_inode, file, native_ctl, (unsigned long)&data);
-	set_fs(oldseg);
+	if (copy_in_user(&data->value.enumerated.item,
+			 &data32->value.enumerated.item,
+			 sizeof(data->value.enumerated.item)))
+		return -EFAULT;
+	err = file->f_op->ioctl(file->f_dentry->d_inode, file, native_ctl, (unsigned long)data);
 	if (err < 0)
 		return err;
 	/* restore info to 32bit */
-	data32.id = data.id;
-	data32.type = data.type;
-	data32.access = data.access;
-	data32.count = data.count;
-	data32.owner = data.owner;
-	switch (data.type) {
+	/* for COPY_CVT macro */
+	src = data;
+	dst = data32;
+	/* id, type, access, count */
+	if (copy_in_user(&data32->id, &data->id, sizeof(data->id)) ||
+	    copy_in_user(&data32->type, &data->type, 3 * sizeof(u32)))
+		return -EFAULT;
+	COPY_CVT(owner);
+	__get_user(type, &data->type);
+	switch (type) {
 	case SNDRV_CTL_ELEM_TYPE_BOOLEAN:
 	case SNDRV_CTL_ELEM_TYPE_INTEGER:
-		data32.value.integer.min = data.value.integer.min;
-		data32.value.integer.max = data.value.integer.max;
-		data32.value.integer.step = data.value.integer.step;
+		COPY_CVT(value.integer.min);
+		COPY_CVT(value.integer.max);
+		COPY_CVT(value.integer.step);
 		break;
 	case SNDRV_CTL_ELEM_TYPE_INTEGER64:
-		data32.value.integer64.min = data.value.integer64.min;
-		data32.value.integer64.max = data.value.integer64.max;
-		data32.value.integer64.step = data.value.integer64.step;
+		if (copy_in_user(&data32->value.integer64,
+				 &data->value.integer64,
+				 sizeof(data->value.integer64)))
+			return -EFAULT;
 		break;
 	case SNDRV_CTL_ELEM_TYPE_ENUMERATED:
-		data32.value.enumerated.items = data.value.enumerated.items;
-		data32.value.enumerated.item = data.value.enumerated.item;
-		memcpy(data32.value.enumerated.name, data.value.enumerated.name,
-		       sizeof(data.value.enumerated.name));
+		if (copy_in_user(&data32->value.enumerated,
+				 &data->value.enumerated,
+				 sizeof(data->value.enumerated)))
+			return -EFAULT;
 		break;
 	default:
 		break;
 	}
-	if (copy_to_user((void __user *)arg, &data32, sizeof(data32)))
-		return -EFAULT;
 	return 0;
 }
 
@@ -227,153 +219,140 @@ struct sndrv_ctl_elem_value32 {
 	struct sndrv_ctl_elem_id id;
 	unsigned int indirect;	/* bit-field causes misalignment */
         union {
-		union {
-			s32 value[128];
-			u32 value_ptr;
-		} integer;
-		union {
-			s64 value[64];
-			u32 value_ptr;
-		} integer64;
-		union {
-			u32 item[128];
-			u32 item_ptr;
-		} enumerated;
-		union {
-			unsigned char data[512];
-			u32 data_ptr;
-		} bytes;
-		struct sndrv_aes_iec958 iec958;
+		s32 integer[128];	/* integer and boolean need conversion */
+#ifndef CONFIG_X86_64
+		s64 integer64[64];	/* for alignment */
+#endif
+		unsigned char data[512];	/* others should be compatible */
         } value;
-        unsigned char reserved[128];
+        unsigned char reserved[128];	/* not used */
 };
 
 
 /* hmm, it's so hard to retrieve the value type from the control id.. */
-static int get_ctl_type(struct file *file, snd_ctl_elem_id_t *id)
+static int get_ctl_type(snd_card_t *card, snd_ctl_elem_id_t *id)
 {
-	snd_ctl_file_t *ctl;
 	snd_kcontrol_t *kctl;
 	snd_ctl_elem_info_t info;
 	int err;
 
-	ctl = file->private_data;
-
-	down_read(&ctl->card->controls_rwsem);
-	kctl = snd_ctl_find_id(ctl->card, id);
+	down_read(&card->controls_rwsem);
+	kctl = snd_ctl_find_id(card, id);
 	if (! kctl) {
-		up_read(&ctl->card->controls_rwsem);
+		up_read(&card->controls_rwsem);
 		return -ENXIO;
 	}
 	info.id = *id;
 	err = kctl->info(kctl, &info);
-	up_read(&ctl->card->controls_rwsem);
+	up_read(&card->controls_rwsem);
 	if (err >= 0)
 		err = info.type;
 	return err;
 }
 
+extern int snd_major;
 
 static inline int _snd_ioctl32_ctl_elem_value(unsigned int fd, unsigned int cmd, unsigned long arg, struct file *file, unsigned int native_ctl)
 {
 	struct sndrv_ctl_elem_value *data;
-	struct sndrv_ctl_elem_value32 *data32;
-	int err, i;
+	struct sndrv_ctl_elem_value32 __user *data32;
+	snd_ctl_file_t *ctl;
+	int err, i, indirect;
 	int type;
-	mm_segment_t oldseg;
 
-	/* FIXME: check the sane ioctl.. */
+	/* sanity check */
+	if (imajor(file->f_dentry->d_inode) != snd_major ||
+	    SNDRV_MINOR_DEVICE(iminor(file->f_dentry->d_inode)) != SNDRV_MINOR_CONTROL)
+		return -ENOTTY;
 
-	data = kmalloc(sizeof(*data), GFP_KERNEL);
-	data32 = kmalloc(sizeof(*data32), GFP_KERNEL);
-	if (data == NULL || data32 == NULL) {
-		err = -ENOMEM;
-		goto __end;
-	}
+	if ((ctl = file->private_data) == NULL)
+		return -ENOTTY;
 
-	if (copy_from_user(data32, (void __user *)arg, sizeof(*data32))) {
+	data32 = compat_ptr(arg);
+	data = kcalloc(1, sizeof(*data), GFP_KERNEL);
+	if (data == NULL)
+		return -ENOMEM;
+
+	if (copy_from_user(&data->id, &data32->id, sizeof(data->id))) {
 		err = -EFAULT;
 		goto __end;
 	}
-	memset(data, 0, sizeof(*data));
-	data->id = data32->id;
-	data->indirect = data32->indirect;
-	if (data->indirect) /* FIXME: this is not correct for long arrays */
-		data->value.integer.value_ptr = compat_ptr(data32->value.integer.value_ptr);
-	type = get_ctl_type(file, &data->id);
+	if (__get_user(indirect, &data32->indirect)) {
+		err = -EFAULT;
+		goto __end;
+	}
+	/* FIXME: indirect access is not supported */
+	if (indirect) {
+		err = -EINVAL;
+		goto __end;
+	}
+	type = get_ctl_type(ctl->card, &data->id);
 	if (type < 0) {
 		err = type;
 		goto __end;
 	}
-	if (! data->indirect) {
-		switch (type) {
-		case SNDRV_CTL_ELEM_TYPE_BOOLEAN:
-		case SNDRV_CTL_ELEM_TYPE_INTEGER:
-			for (i = 0; i < 128; i++)
-				data->value.integer.value[i] = data32->value.integer.value[i];
-			break;
-		case SNDRV_CTL_ELEM_TYPE_INTEGER64:
-			for (i = 0; i < 64; i++)
-				data->value.integer64.value[i] = data32->value.integer64.value[i];
-			break;
-		case SNDRV_CTL_ELEM_TYPE_ENUMERATED:
-			for (i = 0; i < 128; i++)
-				data->value.enumerated.item[i] = data32->value.enumerated.item[i];
-			break;
-		case SNDRV_CTL_ELEM_TYPE_BYTES:
-			memcpy(data->value.bytes.data, data32->value.bytes.data,
-			       sizeof(data->value.bytes.data));
-			break;
-		case SNDRV_CTL_ELEM_TYPE_IEC958:
-			data->value.iec958 = data32->value.iec958;
-			break;
-		default:
-			printk("unknown type %d\n", type);
-			break;
+
+	switch (type) {
+	case SNDRV_CTL_ELEM_TYPE_BOOLEAN:
+	case SNDRV_CTL_ELEM_TYPE_INTEGER:
+		for (i = 0; i < 128; i++) {
+			int val;
+			if (__get_user(val, &data32->value.integer[i])) {
+				err = -EFAULT;
+				goto __end;
+			}
+			data->value.integer.value[i] = val;
 		}
+		break;
+	case SNDRV_CTL_ELEM_TYPE_INTEGER64:
+	case SNDRV_CTL_ELEM_TYPE_ENUMERATED:
+	case SNDRV_CTL_ELEM_TYPE_BYTES:
+	case SNDRV_CTL_ELEM_TYPE_IEC958:
+		if (__copy_from_user(data->value.bytes.data,
+				     data32->value.data,
+				     sizeof(data32->value.data))) {
+			err = -EFAULT;
+			goto __end;
+		}
+		break;
+	default:
+		printk(KERN_ERR "snd_ioctl32_ctl_elem_value: unknown type %d\n", type);
+		err = -EINVAL;
+		goto __end;
 	}
 
-	oldseg = get_fs();
-	set_fs(KERNEL_DS);
-	err = file->f_op->ioctl(file->f_dentry->d_inode, file, native_ctl, (unsigned long)data);
-	set_fs(oldseg);
+	if (native_ctl == SNDRV_CTL_IOCTL_ELEM_READ)
+		err = snd_ctl_elem_read(ctl->card, data);
+	else
+		err = snd_ctl_elem_write(ctl->card, ctl, data);
 	if (err < 0)
 		goto __end;
 	/* restore info to 32bit */
-	if (! data->indirect) {
-		switch (type) {
-		case SNDRV_CTL_ELEM_TYPE_BOOLEAN:
-		case SNDRV_CTL_ELEM_TYPE_INTEGER:
-			for (i = 0; i < 128; i++)
-				data32->value.integer.value[i] = data->value.integer.value[i];
-			break;
-		case SNDRV_CTL_ELEM_TYPE_INTEGER64:
-			for (i = 0; i < 64; i++)
-				data32->value.integer64.value[i] = data->value.integer64.value[i];
-			break;
-		case SNDRV_CTL_ELEM_TYPE_ENUMERATED:
-			for (i = 0; i < 128; i++)
-				data32->value.enumerated.item[i] = data->value.enumerated.item[i];
-			break;
-		case SNDRV_CTL_ELEM_TYPE_BYTES:
-			memcpy(data32->value.bytes.data, data->value.bytes.data,
-			       sizeof(data->value.bytes.data));
-			break;
-		case SNDRV_CTL_ELEM_TYPE_IEC958:
-			data32->value.iec958 = data->value.iec958;
-			break;
-		default:
-			break;
+	switch (type) {
+	case SNDRV_CTL_ELEM_TYPE_BOOLEAN:
+	case SNDRV_CTL_ELEM_TYPE_INTEGER:
+		for (i = 0; i < 128; i++) {
+			int val;
+			val = data->value.integer.value[i];
+			if (__put_user(val, &data32->value.integer[i])) {
+				err = -EFAULT;
+				goto __end;
+			}
 		}
+		break;
+	default:
+		if (__copy_to_user(data32->value.data,
+				   data->value.bytes.data,
+				   sizeof(data32->value.data))) {
+			err = -EFAULT;
+			goto __end;
+		}
+		break;
+		break;
 	}
 	err = 0;
-	if (copy_to_user((void __user *)arg, data32, sizeof(*data32)))
-		err = -EFAULT;
       __end:
-      	if (data32)
-      		kfree(data32);
-	if (data)
-		kfree(data);
+	kfree(data);
 	return err;
 }
 

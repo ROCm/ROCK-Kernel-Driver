@@ -1933,7 +1933,6 @@ static int ali_suspend(snd_card_t *card, unsigned int state)
 
 	spin_unlock_irq(&chip->reg_lock);
 	pci_disable_device(chip->pci);
-	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
 	return 0;
 }
 
@@ -1971,7 +1970,6 @@ static int ali_resume(snd_card_t *card, unsigned int state)
 	spin_unlock_irq(&chip->reg_lock);
 
 	snd_ac97_resume(chip->ac97);
-	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
 	
 	return 0;
 }
@@ -1989,8 +1987,7 @@ static int snd_ali_free(ali_t * codec)
 		pci_release_regions(codec->pci);
 	pci_disable_device(codec->pci);
 #ifdef CONFIG_PM
-	if (codec->image)
-		kfree(codec->image);
+	kfree(codec->image);
 #endif
 	kfree(codec);
 	return 0;

@@ -491,6 +491,26 @@ snd_seq_oss_reset(seq_oss_devinfo_t *dp)
 	snd_seq_oss_timer_stop(dp->timer);
 }
 
+
+/*
+ * misc. functions for proc interface
+ */
+char *
+enabled_str(int bool)
+{
+	return bool ? "enabled" : "disabled";
+}
+
+static char *
+filemode_str(int val)
+{
+	static char *str[] = {
+		"none", "read", "write", "read/write",
+	};
+	return str[val & SNDRV_SEQ_OSS_FILE_ACMODE];
+}
+
+
 /*
  * proc interface
  */
@@ -522,23 +542,4 @@ snd_seq_oss_system_info_read(snd_info_buffer_t *buf)
 			snd_seq_oss_readq_info_read(dp->readq, buf);
 	}
 }
-
-/*
- * misc. functions for proc interface
- */
-char *
-enabled_str(int bool)
-{
-	return bool ? "enabled" : "disabled";
-}
-
-char *
-filemode_str(int val)
-{
-	static char *str[] = {
-		"none", "read", "write", "read/write",
-	};
-	return str[val & SNDRV_SEQ_OSS_FILE_ACMODE];
-}
-
 

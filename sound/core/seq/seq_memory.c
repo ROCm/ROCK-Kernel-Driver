@@ -215,7 +215,7 @@ void snd_seq_cell_free(snd_seq_event_cell_t * cell)
 /*
  * allocate an event cell.
  */
-int snd_seq_cell_alloc(pool_t *pool, snd_seq_event_cell_t **cellp, int nonblock, struct file *file)
+static int snd_seq_cell_alloc(pool_t *pool, snd_seq_event_cell_t **cellp, int nonblock, struct file *file)
 {
 	snd_seq_event_cell_t *cell;
 	unsigned long flags;
@@ -436,8 +436,7 @@ int snd_seq_pool_done(pool_t *pool)
 	pool->total_elements = 0;
 	spin_unlock_irqrestore(&pool->lock, flags);
 
-	if (ptr)
-		vfree(ptr);
+	vfree(ptr);
 
 	spin_lock_irqsave(&pool->lock, flags);
 	pool->closing = 0;

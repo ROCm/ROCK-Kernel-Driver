@@ -86,8 +86,7 @@ static int snd_pcm_plugin_alloc(snd_pcm_plugin_t *plugin, snd_pcm_uframes_t fram
 	snd_assert((size % 8) == 0, return -ENXIO);
 	size /= 8;
 	if (plugin->buf_frames < frames) {
-		if (plugin->buf)
-			vfree(plugin->buf);
+		vfree(plugin->buf);
 		plugin->buf = vmalloc(size);
 		plugin->buf_frames = frames;
 	}
@@ -217,14 +216,10 @@ int snd_pcm_plugin_free(snd_pcm_plugin_t *plugin)
 		return 0;
 	if (plugin->private_free)
 		plugin->private_free(plugin);
-	if (plugin->buf_channels)
-		kfree(plugin->buf_channels);
-	if (plugin->buf)
-		vfree(plugin->buf);
-	if (plugin->src_vmask)
-		kfree(plugin->src_vmask);
-	if (plugin->dst_vmask)
-		kfree(plugin->dst_vmask);
+	kfree(plugin->buf_channels);
+	vfree(plugin->buf);
+	kfree(plugin->src_vmask);
+	kfree(plugin->dst_vmask);
 	kfree(plugin);
 	return 0;
 }
@@ -390,7 +385,7 @@ int snd_pcm_plug_format_plugins(snd_pcm_plug_t *plug,
 	snd_pcm_plugin_format_t srcformat;
 	int src_access, dst_access;
 	snd_pcm_plugin_t *plugin = NULL;
-	int err, first;
+	int err;
 	int stream = snd_pcm_plug_stream(plug);
 	int slave_interleaved = (params_channels(slave_params) == 1 ||
 				 params_access(slave_params) == SNDRV_PCM_ACCESS_RW_INTERLEAVED);
@@ -442,7 +437,6 @@ int snd_pcm_plug_format_plugins(snd_pcm_plug_t *plug,
 			tmpformat.format = dstformat.format;
 		else
 			tmpformat.format = SNDRV_PCM_FORMAT_S16;
-		first = plugin == NULL;
 		switch (srcformat.format) {
 		case SNDRV_PCM_FORMAT_MU_LAW:
 			err = snd_pcm_plugin_build_mulaw(plug,
@@ -656,8 +650,8 @@ snd_pcm_sframes_t snd_pcm_plug_client_channels_buf(snd_pcm_plug_t *plug,
 	return count;
 }
 
-int snd_pcm_plug_playback_channels_mask(snd_pcm_plug_t *plug,
-					bitset_t *client_vmask)
+static int snd_pcm_plug_playback_channels_mask(snd_pcm_plug_t *plug,
+					       bitset_t *client_vmask)
 {
 	snd_pcm_plugin_t *plugin = snd_pcm_plug_last(plug);
 	if (plugin == NULL) {
@@ -683,33 +677,6 @@ int snd_pcm_plug_playback_channels_mask(snd_pcm_plug_t *plug,
 			plugin = plugin->prev;
 		}
 		bitset_and(client_vmask, dstmask, plugin->src_format.channels);
-		return 0;
-	}
-}
-
-int snd_pcm_plug_capture_channels_mask(snd_pcm_plug_t *plug,
-				       bitset_t *client_vmask)
-{
-	snd_pcm_plugin_t *plugin = snd_pcm_plug_first(plug);
-	if (plugin == NULL) {
-		return 0;
-	} else {
-		int schannels = plugin->src_format.channels;
-		bitset_t bs[bitset_size(schannels)];
-		bitset_t *srcmask = bs;
-		bitset_t *dstmask;
-		int err;
-		bitset_one(srcmask, schannels);
-		while (1) {
-			err = plugin->dst_channels_mask(plugin, srcmask, &dstmask);
-			if (err < 0)
-				return err;
-			srcmask = dstmask;
-			if (plugin->next == NULL)
-				break;
-			plugin = plugin->next;
-		}
-		bitset_and(client_vmask, srcmask, plugin->dst_format.channels);
 		return 0;
 	}
 }
