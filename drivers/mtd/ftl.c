@@ -1298,7 +1298,6 @@ static void ftl_notify_remove(struct mtd_info *mtd)
 				ftl_freepart(myparts[i]);
 			
 			myparts[i]->state = 0;
-			wipe_partitions(mk_kdev(MAJOR_NR, i<<4));
 			del_gendisk(myparts[i]->disk);
 			kfree(myparts[i]->disk->name);
 			kfree(myparts[i]->disk);

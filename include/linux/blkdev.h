@@ -281,7 +281,6 @@ struct sec_size {
 
 extern struct sec_size * blk_sec[MAX_BLKDEV];
 extern struct blk_dev_struct blk_dev[MAX_BLKDEV];
-extern void grok_partitions(kdev_t dev, long size);
 extern int wipe_partitions(kdev_t dev);
 extern void register_disk(struct gendisk *dev, kdev_t first, unsigned minors, struct block_device_operations *ops, long size);
 extern void check_partition(struct gendisk *disk, struct block_device *bdev);

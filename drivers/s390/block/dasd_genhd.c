@@ -284,14 +284,6 @@ dasd_destroy_partitions(dasd_device_t * device)
 	if (disk == NULL)
 		return;
 
-	wipe_partitions(device->kdev);
-
-	/*
-	 * This is confusing. The funcions is devfs_register_partitions
-	 * but the 1 as third parameter makes it do an unregister...
-	 * FIXME: there must be a better way to get rid of the devfs entries
-	 */
-	devfs_register_partitions(disk, minor(device->kdev), 1);
 	del_gendisk(disk);
 }
 

@@ -1222,10 +1222,8 @@ void __exit mm_cleanup(void)
 
 	del_battery_timer();
 
-	for (i=0; i < num_cards ; i++) {
-		devfs_register_partitions(mm_gendisk + i, i<<MM_SHIFT, 1);
+	for (i=0; i < num_cards ; i++)
 		del_gendisk(mm_gendisk + i);
-	}
 	if (devfs_handle)
 		devfs_unregister(devfs_handle);
 	devfs_handle = NULL;

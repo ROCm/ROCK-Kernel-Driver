@@ -742,7 +742,6 @@ static int revalidate_allvol(kdev_t dev)
 	for(i=0; i< NWD; i++) {
 		struct gendisk *disk = &hba[ctlr]->gendisk[i];
 		if (disk->major_name) {
-			wipe_partitions(mk_kdev(disk->major, disk->first_minor));
 			del_gendisk(disk);
 			disk->major_name = NULL;
 		}
@@ -802,7 +801,6 @@ static int deregister_disk(int ctlr, int logvol)
 
 	/* invalidate the devices and deregister the disk */ 
 	if (disk->major_name) {
-		wipe_partitions(mk_kdev(disk->major, disk->first_minor));
 		del_gendisk(disk);
 		disk->major_name = NULL;
 	}

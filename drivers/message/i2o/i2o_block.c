@@ -737,7 +737,6 @@ static int i2ob_evt(void *dummy)
 			case I2O_EVT_IND_BSA_VOLUME_UNLOAD:
 			{
 				struct gendisk *p = &i2o_disk[unit>>4];
-				wipe_partitions(mk_kdev(MAJOR_NR, unit));
 				del_gendisk(p);
 				for(i = unit; i <= unit+15; i++)
 					blk_queue_max_sectors(i2ob_dev[i].req_queue, 0);
@@ -1616,7 +1615,6 @@ void i2ob_del_device(struct i2o_controller *c, struct i2o_device *d)
 	 * This will force errors when i2ob_get_queue() is called
 	 * by the kenrel.
 	 */
-	wipe_partitions(mk_kdev(MAJOR_NR, unit));
 	del_gendisk(&i2o_disk[unit>>4]);
 	i2ob_dev[unit].req_queue = NULL;
 	for(i = unit; i <= unit+15; i++)

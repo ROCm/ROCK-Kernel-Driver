@@ -1461,7 +1461,6 @@ static int revalidate_allvol(kdev_t dev)
 		struct gendisk *disk = ida_gendisk + ctlr*NWD + i;
 		if (!disk->major_name)
 			continue;
-		wipe_partitions(mk_kdev(disk->major, disk->first_minor));
 		del_gendisk(disk);
 		disk->major_name = NULL;
 	}

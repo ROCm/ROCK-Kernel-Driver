@@ -77,17 +77,19 @@ EXPORT_SYMBOL(add_gendisk);
  * with the kernel.
  */
 void
-del_gendisk(struct gendisk *gp)
+del_gendisk(struct gendisk *disk)
 {
-	struct gendisk **gpp;
+	struct gendisk **p;
 
+	wipe_partitions(mk_kdev(disk->major, disk->first_minor));
 	write_lock(&gendisk_lock);
-	for (gpp = &gendisk_head; *gpp; gpp = &((*gpp)->next))
-		if (*gpp == gp)
+	for (p = &gendisk_head; *p; p = &((*p)->next))
+		if (*p == disk)
 			break;
-	if (*gpp)
-		*gpp = (*gpp)->next;
+	if (*p)
+		*p = (*p)->next;
 	write_unlock(&gendisk_lock);
+	devfs_register_partitions(disk, disk->first_minor, 1);
 }
 
 EXPORT_SYMBOL(del_gendisk);

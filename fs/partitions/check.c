@@ -414,18 +414,10 @@ void devfs_register_partitions (struct gendisk *dev, int minor, int unregister)
  * done
  */
 
-void register_disk(struct gendisk *gdev, kdev_t dev, unsigned minors,
+void register_disk(struct gendisk *g, kdev_t dev, unsigned minors,
 	struct block_device_operations *ops, long size)
 {
-	if (!gdev)
-		return;
-	grok_partitions(dev, size);
-}
-
-void grok_partitions(kdev_t dev, long size)
-{
 	struct block_device *bdev;
-	struct gendisk *g = get_gendisk(dev);
 	struct hd_struct *p;
 
 	if (!g)

@@ -1426,9 +1426,6 @@ static void sd_detach(Scsi_Device * sdp)
 		sdkp->has_been_registered = 0;
 		dev = MKDEV_SD(dsk_nr);
 		driverfs_remove_partitions(sd_disks[dsk_nr], minor(dev));
-		wipe_partitions(dev);
-		devfs_register_partitions (sd_disks[dsk_nr], minor(dev), 1);
-		/* unregister_disk() */
 		del_gendisk(sd_disks[dsk_nr]);
 	}
 	sdp->attached--;
