@@ -7,6 +7,7 @@
 
 #include <asm/ptrace.h>
 #include <asm/user.h>
+#include <asm/processor.h>
 
 #include <linux/utsname.h>
 
@@ -59,6 +60,9 @@ typedef struct user_fxsr_struct elf_fpxregset_t;
 
 /* Wow, the "main" arch needs arch dependent functions too.. :) */
 
+#define savesegment(seg,value) \
+	asm volatile("movl %%" #seg ",%0":"=m" (*(int *)&(value)))
+
 /* regs is struct pt_regs, pr_reg is elf_gregset_t (which is
    now struct_user_regs, they are different) */
 
@@ -72,9 +76,8 @@ typedef struct user_fxsr_struct elf_fpxregset_t;
 	pr_reg[6] = regs->eax;				\
 	pr_reg[7] = regs->xds;				\
 	pr_reg[8] = regs->xes;				\
-	/* fake once used fs and gs selectors? */	\
-	pr_reg[9] = regs->xds;	/* was fs and __fs */	\
-	pr_reg[10] = regs->xds;	/* was gs and __gs */	\
+	savesegment(fs,pr_reg[9]);			\
+	savesegment(gs,pr_reg[10]);			\
 	pr_reg[11] = regs->orig_eax;			\
 	pr_reg[12] = regs->eip;				\
 	pr_reg[13] = regs->xcs;				\
@@ -99,6 +102,20 @@ typedef struct user_fxsr_struct elf_fpxregset_t;
 
 #ifdef __KERNEL__
 #define SET_PERSONALITY(ex, ibcs2) set_personality((ibcs2)?PER_SVR4:PER_LINUX)
+
+extern int dump_task_regs (struct task_struct *, elf_gregset_t *);
+extern int dump_task_fpu (struct task_struct *, elf_fpregset_t *);
+extern int dump_task_extended_fpu (struct task_struct *, struct user_fxsr_struct *);
+
+#define ELF_CORE_COPY_TASK_REGS(tsk, elf_regs) dump_task_regs(tsk, elf_regs)
+#define ELF_CORE_COPY_FPREGS(tsk, elf_fpregs) dump_task_fpu(tsk, elf_fpregs)
+#define ELF_CORE_COPY_XFPREGS(tsk, elf_xfpregs) dump_task_extended_fpu(tsk, elf_xfpregs)
+
+#ifdef CONFIG_SMP
+extern void dump_smp_unlazy_fpu(void);
+#define ELF_CORE_SYNC dump_smp_unlazy_fpu
+#endif
+
 #endif
 
 #endif

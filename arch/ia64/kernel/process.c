@@ -384,6 +384,31 @@ copy_thread (int nr, unsigned long clone_flags,
 void
 do_copy_regs (struct unw_frame_info *info, void *arg)
 {
+	do_copy_task_regs(current, info, arg);
+}
+
+void
+do_dump_fpu (struct unw_frame_info *info, void *arg)
+{
+	do_dump_task_fpu(current, info, arg);
+}
+
+void
+ia64_elf_core_copy_regs (struct pt_regs *pt, elf_gregset_t dst)
+{
+	unw_init_running(do_copy_regs, dst);
+}
+
+int
+dump_fpu (struct pt_regs *pt, elf_fpregset_t dst)
+{
+	unw_init_running(do_dump_fpu, dst);
+	return 1;	/* f0-f31 are always valid so we always return 1 */
+}
+
+static void
+do_copy_task_regs (struct task_struct *task, struct unw_frame_info *info, void *arg)
+{
 	unsigned long mask, sp, nat_bits = 0, ip, ar_rnat, urbs_end, cfm;
 	elf_greg_t *dst = arg;
 	struct pt_regs *pt;
@@ -398,12 +423,12 @@ do_copy_regs (struct unw_frame_info *info, void *arg)
 	unw_get_sp(info, &sp);
 	pt = (struct pt_regs *) (sp + 16);
 
-	urbs_end = ia64_get_user_rbs_end(current, pt, &cfm);
+	urbs_end = ia64_get_user_rbs_end(task, pt, &cfm);
 
-	if (ia64_sync_user_rbs(current, info->sw, pt->ar_bspstore, urbs_end) < 0)
+	if (ia64_sync_user_rbs(task, info->sw, pt->ar_bspstore, urbs_end) < 0)
 		return;
 
-	ia64_peek(current, info->sw, urbs_end, (long) ia64_rse_rnat_addr((long *) urbs_end),
+	ia64_peek(task, info->sw, urbs_end, (long) ia64_rse_rnat_addr((long *) urbs_end),
 		  &ar_rnat);
 
 	/*
@@ -452,7 +477,7 @@ do_copy_regs (struct unw_frame_info *info, void *arg)
 }
 
 void
-do_dump_fpu (struct unw_frame_info *info, void *arg)
+do_dump_task_fpu (struct task_struct *task, struct unw_frame_info *info, void *arg)
 {
 	elf_fpreg_t *dst = arg;
 	int i;
@@ -467,22 +492,41 @@ do_dump_fpu (struct unw_frame_info *info, void *arg)
 	for (i = 2; i < 32; ++i)
 		unw_get_fr(info, i, dst + i);
 
-	ia64_flush_fph(current);
-	if ((current->thread.flags & IA64_THREAD_FPH_VALID) != 0)
-		memcpy(dst + 32, current->thread.fph, 96*16);
+	ia64_flush_fph(task);
+	if ((task->thread.flags & IA64_THREAD_FPH_VALID) != 0)
+		memcpy(dst + 32, task->thread.fph, 96*16);
 }
 
-void
-ia64_elf_core_copy_regs (struct pt_regs *pt, elf_gregset_t dst)
+int dump_task_regs(struct task_struct *task, elf_gregset_t *regs)
 {
-	unw_init_running(do_copy_regs, dst);
+	struct unw_frame_info tcore_info;
+
+	if(current == task) {
+		unw_init_running(do_copy_regs, regs);
+	}
+	else {
+		memset(&tcore_info, 0, sizeof(tcore_info));	
+		unw_init_from_blocked_task(&tcore_info, task);
+		do_copy_task_regs(task, &tcore_info, regs);
+	}
+
+	return 1;
 }
 
-int
-dump_fpu (struct pt_regs *pt, elf_fpregset_t dst)
+int dump_task_fpu (struct task_struct *task, elf_fpregset_t *dst)
 {
-	unw_init_running(do_dump_fpu, dst);
-	return 1;	/* f0-f31 are always valid so we always return 1 */
+	struct unw_frame_info tcore_info;
+
+	if(current == task) {
+		unw_init_running(do_dump_fpu, dst);
+	}
+	else {
+		memset(&tcore_info, 0, sizeof(tcore_info));	
+		unw_init_from_blocked_task(&tcore_info, task);
+		do_dump_task_fpu(task, &tcore_info, dst);
+	}
+
+	return 1; 
 }
 
 asmlinkage long
