@@ -1607,7 +1607,7 @@ static int do_md_run(mddev_t * mddev)
 	spin_lock(&pers_lock);
 	if (!pers[pnum] || !try_module_get(pers[pnum]->owner)) {
 		spin_unlock(&pers_lock);
-		printk(KERN_ERR "md: personality %d is not loaded!\n",
+		printk(KERN_WARNING "md: personality %d is not loaded!\n",
 		       pnum);
 		return -EINVAL;
 	}
