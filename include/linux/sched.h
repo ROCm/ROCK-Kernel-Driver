@@ -346,6 +346,7 @@ struct task_struct {
 
 /* journalling filesystem info */
 	void *journal_info;
+	struct dentry *proc_dentry;
 };
 
 extern void __put_task_struct(struct task_struct *tsk);

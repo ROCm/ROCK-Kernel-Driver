@@ -747,7 +747,7 @@ static int pid_fd_revalidate(struct dentry * dentry, int flags)
  * directory. In this case, however, we can do it - no aliasing problems
  * due to the way we treat inodes.
  */
-static int pid_base_revalidate(struct dentry * dentry, int flags)
+static int pid_revalidate(struct dentry * dentry, int flags)
 {
 	if (proc_task(dentry->d_inode)->pid)
 		return 1;
@@ -755,25 +755,42 @@ static int pid_base_revalidate(struct dentry * dentry, int flags)
 	return 0;
 }
 
-static int pid_delete_dentry(struct dentry * dentry)
+static void pid_base_iput(struct dentry *dentry, struct inode *inode)
+{
+	struct task_struct *task = proc_task(inode);
+	write_lock_irq(&tasklist_lock);
+	if (task->proc_dentry == dentry)
+		task->proc_dentry = NULL;
+	write_unlock_irq(&tasklist_lock);
+	iput(inode);
+}
+
+static int pid_fd_delete_dentry(struct dentry * dentry)
 {
 	return 1;
+}
+
+static int pid_delete_dentry(struct dentry * dentry)
+{
+	return proc_task(dentry->d_inode)->pid == 0;
 }
 
 static struct dentry_operations pid_fd_dentry_operations =
 {
 	d_revalidate:	pid_fd_revalidate,
-	d_delete:	pid_delete_dentry,
+	d_delete:	pid_fd_delete_dentry,
 };
 
 static struct dentry_operations pid_dentry_operations =
 {
+	d_revalidate:	pid_revalidate,
 	d_delete:	pid_delete_dentry,
 };
 
 static struct dentry_operations pid_base_dentry_operations =
 {
-	d_revalidate:	pid_base_revalidate,
+	d_revalidate:	pid_revalidate,
+	d_iput:		pid_base_iput,
 	d_delete:	pid_delete_dentry,
 };
 
@@ -842,6 +859,8 @@ static struct dentry *proc_lookupfd(struct inode * dir, struct dentry * dentry)
 		inode->i_mode |= S_IWUSR | S_IXUSR;
 	dentry->d_op = &pid_fd_dentry_operations;
 	d_add(dentry, inode);
+	if (!proc_task(dentry->d_inode)->pid)
+		d_drop(dentry);
 	return NULL;
 
 out_unlock2:
@@ -959,6 +978,8 @@ static struct dentry *proc_base_lookup(struct inode *dir, struct dentry *dentry)
 	}
 	dentry->d_op = &pid_dentry_operations;
 	d_add(dentry, inode);
+	if (!proc_task(dentry->d_inode)->pid)
+		d_drop(dentry);
 	return NULL;
 
 out:
@@ -1045,6 +1066,11 @@ struct dentry *proc_pid_lookup(struct inode *dir, struct dentry * dentry)
 
 	dentry->d_op = &pid_base_dentry_operations;
 	d_add(dentry, inode);
+	read_lock(&tasklist_lock);
+	proc_task(dentry->d_inode)->proc_dentry = dentry;
+	read_unlock(&tasklist_lock);
+	if (!proc_task(dentry->d_inode)->pid)
+		d_drop(dentry);
 	return NULL;
 out:
 	return ERR_PTR(-ENOENT);

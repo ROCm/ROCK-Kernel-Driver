@@ -29,13 +29,28 @@ int getrusage(struct task_struct *, int, struct rusage *);
 
 static inline void __unhash_process(struct task_struct *p)
 {
+	struct dentry *proc_dentry;
 	write_lock_irq(&tasklist_lock);
 	nr_threads--;
 	unhash_pid(p);
 	REMOVE_LINKS(p);
 	list_del(&p->thread_group);
 	p->pid = 0;
+	proc_dentry = p->proc_dentry;
+	if (unlikely(proc_dentry)) {
+		spin_lock(&dcache_lock);
+		if (!list_empty(&proc_dentry->d_hash)) {
+			dget_locked(proc_dentry);
+			list_del_init(&proc_dentry->d_hash);
+		} else
+			proc_dentry = NULL;
+		spin_unlock(&dcache_lock);
+	}
 	write_unlock_irq(&tasklist_lock);
+	if (unlikely(proc_dentry)) {
+		shrink_dcache_parent(proc_dentry);
+		dput(proc_dentry);
+	}
 }
 
 static void release_task(struct task_struct * p)
