@@ -329,7 +329,7 @@ crypt_alloc_buffer(struct crypt_config *cc, unsigned int size,
                    struct bio *base_bio, unsigned int *bio_vec_idx)
 {
 	struct bio *bio;
-	unsigned int nr_iovecs = dm_div_up(size, PAGE_SIZE);
+	unsigned int nr_iovecs = (size + PAGE_SIZE - 1) >> PAGE_SHIFT;
 	int gfp_mask = GFP_NOIO | __GFP_HIGHMEM;
 	unsigned long flags = current->flags;
 	unsigned int i;

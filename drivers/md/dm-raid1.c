@@ -67,7 +67,7 @@ static inline void wake(void)
 struct mirror_set;
 struct region_hash {
 	struct mirror_set *ms;
-	sector_t region_size;
+	uint32_t region_size;
 	unsigned region_shift;
 
 	/* holds persistent region state */
@@ -135,7 +135,7 @@ static void region_free(void *element, void *pool_data)
 #define MIN_REGIONS 64
 #define MAX_RECOVERY 1
 static int rh_init(struct region_hash *rh, struct mirror_set *ms,
-		   struct dirty_log *log, sector_t region_size,
+		   struct dirty_log *log, uint32_t region_size,
 		   region_t nr_regions)
 {
 	unsigned int nr_buckets, max_buckets;
@@ -871,7 +871,7 @@ static void do_work(void *ignored)
  * Target functions
  *---------------------------------------------------------------*/
 static struct mirror_set *alloc_context(unsigned int nr_mirrors,
-					sector_t region_size,
+					uint32_t region_size,
 					struct dm_target *ti,
 					struct dirty_log *dl)
 {
@@ -894,7 +894,7 @@ static struct mirror_set *alloc_context(unsigned int nr_mirrors,
 
 	ms->ti = ti;
 	ms->nr_mirrors = nr_mirrors;
-	ms->nr_regions = dm_div_up(ti->len, region_size);
+	ms->nr_regions = dm_sector_div_up(ti->len, region_size);
 	ms->in_sync = 0;
 
 	if (rh_init(&ms->rh, ms, dl, region_size, ms->nr_regions)) {
@@ -916,7 +916,7 @@ static void free_context(struct mirror_set *ms, struct dm_target *ti,
 	kfree(ms);
 }
 
-static inline int _check_region_size(struct dm_target *ti, sector_t size)
+static inline int _check_region_size(struct dm_target *ti, uint32_t size)
 {
 	return !(size % (PAGE_SIZE >> 9) || (size & (size - 1)) ||
 		 size > ti->len);
