@@ -29,6 +29,7 @@
 #include <asm/abs_addr.h>
 #include <asm/udbg.h>
 #include <asm/delay.h>
+#include <asm/uaccess.h>
 
 struct flash_block_list_header rtas_firmware_flash_list = {0, 0};
 
@@ -381,6 +382,44 @@ rtas_halt(void)
 	if (rtas_firmware_flash_list.next)
 		rtas_flash_bypass_warning();
         rtas_power_off();
+}
+
+unsigned long rtas_rmo_buf = 0;
+
+asmlinkage int ppc_rtas(struct rtas_args __user *uargs)
+{
+	struct rtas_args args;
+	unsigned long flags;
+
+	if (!capable(CAP_SYS_ADMIN))
+		return -EPERM;
+
+	if (copy_from_user(&args, uargs, 3 * sizeof(u32)) != 0)
+		return -EFAULT;
+
+	if (args.nargs > ARRAY_SIZE(args.args)
+	    || args.nret > ARRAY_SIZE(args.args)
+	    || args.nargs + args.nret > ARRAY_SIZE(args.args))
+		return -EINVAL;
+
+	/* Copy in args. */
+	if (copy_from_user(args.args, uargs->args,
+			   args.nargs * sizeof(rtas_arg_t)) != 0)
+		return -EFAULT;
+
+	spin_lock_irqsave(&rtas.lock, flags);
+	get_paca()->xRtas = args;
+	enter_rtas((void *)__pa((unsigned long)&get_paca()->xRtas));
+	args = get_paca()->xRtas;
+	spin_unlock_irqrestore(&rtas.lock, flags);
+
+	/* Copy out args. */
+	if (copy_to_user(uargs->args + args.nargs,
+			 args.args + args.nargs,
+			 args.nret * sizeof(rtas_arg_t)) != 0)
+		return -EFAULT;
+
+	return 0;
 }
 
 EXPORT_SYMBOL(proc_ppc64);

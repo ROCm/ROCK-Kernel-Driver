@@ -1385,3 +1385,4 @@ _GLOBAL(sys_call_table)
 	.long sys_statfs64
 	.long sys_fstatfs64
 	.long ppc_fadvise64_64
+	.long sys_ni_syscall	/* 255 - rtas (used on ppc64) */

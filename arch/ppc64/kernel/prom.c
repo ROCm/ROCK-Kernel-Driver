@@ -613,6 +613,9 @@ prom_instantiate_rtas(void)
 						      _rtas->base) >= 0) {
 				_rtas->entry = (long)_prom->args.rets[1];
 			}
+			RELOC(rtas_rmo_buf)
+				= lmb_alloc_base(RTAS_RMOBUF_MAX, PAGE_SIZE,
+							rtas_region);
 		}
 
 		if (_rtas->entry <= 0) {
