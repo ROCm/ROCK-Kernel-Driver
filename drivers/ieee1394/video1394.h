@@ -42,7 +42,7 @@ struct video1394_mmap {
 	unsigned int sync_tag;
 	unsigned int nb_buffers;
 	unsigned int buf_size;
-	unsigned int packet_size; /* For VARIABLE_PACKET_SIZE: 
+	unsigned int packet_size; /* For VARIABLE_PACKET_SIZE:
 				     Maximum packet size */
 	unsigned int fps;
 	unsigned int syt_offset;
@@ -53,7 +53,7 @@ struct video1394_mmap {
 struct video1394_queue_variable {
 	unsigned int channel;
 	unsigned int buffer;
-	unsigned int* packet_sizes; /* Buffer of size:  
+	unsigned int* packet_sizes; /* Buffer of size:
 				       buf_size / packet_size  */
 };
 

@@ -23,7 +23,7 @@
  * Contributions:
  *
  * Manfred Weihs <weihs@ict.tuwien.ac.at>
- *        reading bus info block (containing GUID) from serial 
+ *        reading bus info block (containing GUID) from serial
  *            eeprom via i2c and storing it in config ROM
  *        Reworked code for initiating bus resets
  *            (long, short, with or without hold-off)
@@ -139,7 +139,7 @@ static struct i2c_algo_bit_data bit_data = {
 	.udelay			= 5,
 	.mdelay			= 5,
 	.timeout		= 100,
-}; 
+};
 
 static struct i2c_adapter bit_ops = {
 	.id 			= 0xAA, //FIXME: probably we should get an id in i2c-id.h
@@ -195,19 +195,19 @@ static void free_pcl(struct ti_lynx *lynx, pcl_t pclid)
         if (lynx->pcl_bmap[off] & 1<<bit) {
                 lynx->pcl_bmap[off] &= ~(1<<bit);
         } else {
-                PRINT(KERN_ERR, lynx->id, 
+                PRINT(KERN_ERR, lynx->id,
                       "attempted to free unallocated PCL %d", pclid);
         }
         spin_unlock(&lynx->lock);
 }
 
-/* functions useful for debugging */        
+/* functions useful for debugging */
 static void pretty_print_pcl(const struct ti_pcl *pcl)
 {
         int i;
 
         printk("PCL next %08x, userdata %08x, status %08x, remtrans %08x, nextbuf %08x\n",
-               pcl->next, pcl->user_data, pcl->pcl_status, 
+               pcl->next, pcl->user_data, pcl->pcl_status,
                pcl->remaining_transfer_count, pcl->next_data_buffer);
 
         printk("PCL");
@@ -218,7 +218,7 @@ static void pretty_print_pcl(const struct ti_pcl *pcl)
         }
         printk("\n");
 }
-        
+
 static void print_pcl(const struct ti_lynx *lynx, pcl_t pclid)
 {
         struct ti_pcl pcl;
@@ -419,7 +419,7 @@ static void handle_selfid(struct ti_lynx *lynx, struct hpsb_host *host)
                 cpu_to_be32s(&q[i]);
                 i--;
         }
-        
+
         if (!lynx->phyic.reg_1394a) {
                 lsid = generate_own_selfid(lynx, host);
         }
@@ -437,7 +437,7 @@ static void handle_selfid(struct ti_lynx *lynx, struct hpsb_host *host)
         while (size > 0) {
                 struct selfid *sid = (struct selfid *)q;
 
-                if (!lynx->phyic.reg_1394a && !sid->extended 
+                if (!lynx->phyic.reg_1394a && !sid->extended
                     && (sid->phy_id == (phyid + 1))) {
                         hpsb_selfid_received(host, lsid);
                 }
@@ -484,8 +484,7 @@ static void send_next(struct ti_lynx *lynx, int what)
         }
 
         packet = driver_packet(d->queue.next);
-        list_del(&packet->driver_list);
-        list_add_tail(&packet->driver_list, &d->pcl_queue);
+	list_move_tail(&packet->driver_list, &d->pcl_queue);
 
         d->header_dma = pci_map_single(lynx->dev, packet->header,
                                        packet->header_size, PCI_DMA_TODEVICE);
@@ -500,11 +499,9 @@ static void send_next(struct ti_lynx *lynx, int what)
         pcl.next = PCL_NEXT_INVALID;
         pcl.async_error_next = PCL_NEXT_INVALID;
         pcl.pcl_status = 0;
-#ifdef __BIG_ENDIAN
         pcl.buffer[0].control = packet->speed_code << 14 | packet->header_size;
-#else
-        pcl.buffer[0].control = packet->speed_code << 14 | packet->header_size 
-                | PCL_BIGENDIAN;
+#ifdef __BIG_ENDIAN
+        pcl.buffer[0].control |= PCL_BIGENDIAN;
 #endif
         pcl.buffer[0].pointer = d->header_dma;
         pcl.buffer[1].control = PCL_LAST_BUFF | packet->data_size;
@@ -520,7 +517,7 @@ static void send_next(struct ti_lynx *lynx, int what)
         case hpsb_raw:
                 pcl.buffer[0].control |= PCL_CMD_UNFXMT;
                 break;
-        }                
+        }
 
         put_pcl(lynx, d->pcl, &pcl);
         run_pcl(lynx, d->pcl_start, d->channel);
@@ -727,16 +724,16 @@ static int lynx_devctl(struct hpsb_host *host, enum devctl_cmd cmd, int arg)
         case GET_CYCLE_COUNTER:
                 retval = reg_read(lynx, CYCLE_TIMER);
                 break;
-                
+
         case SET_CYCLE_COUNTER:
                 reg_write(lynx, CYCLE_TIMER, arg);
                 break;
 
         case SET_BUS_ID:
-                reg_write(lynx, LINK_ID, 
+                reg_write(lynx, LINK_ID,
                           (arg << 22) | (reg_read(lynx, LINK_ID) & 0x003f0000));
                 break;
-                
+
         case ACT_CYCLE_MASTER:
                 if (arg) {
                         reg_set_bits(lynx, LINK_CONTROL,
@@ -767,7 +764,7 @@ static int lynx_devctl(struct hpsb_host *host, enum devctl_cmd cmd, int arg)
                         get_pcl(lynx, lynx->async.pcl, &pcl);
 
                         packet = driver_packet(lynx->async.pcl_queue.next);
-                        list_del(&packet->driver_list);
+			list_del_init(&packet->driver_list);
 
                         pci_unmap_single(lynx->dev, lynx->async.header_dma,
                                          packet->header_size, PCI_DMA_TODEVICE);
@@ -795,7 +792,7 @@ static int lynx_devctl(struct hpsb_host *host, enum devctl_cmd cmd, int arg)
 
 		while (!list_empty(&packet_list)) {
 			packet = driver_packet(packet_list.next);
-			list_del(&packet->driver_list);
+			list_del_init(&packet->driver_list);
 			hpsb_packet_sent(host, packet, ACKX_ABORTED);
 		}
 
@@ -803,7 +800,7 @@ static int lynx_devctl(struct hpsb_host *host, enum devctl_cmd cmd, int arg)
 
         case ISO_LISTEN_CHANNEL:
                 spin_lock_irqsave(&lynx->iso_rcv.lock, flags);
-                
+
                 if (lynx->iso_rcv.chan_count++ == 0) {
                         reg_write(lynx, DMA_WORD1_CMP_ENABLE(CHANNEL_ISO_RCV),
                                   DMA_WORD1_CMP_ENABLE_MASTER);
@@ -875,7 +872,7 @@ static int mem_open(struct inode *inode, struct file *file)
         int cid = iminor(inode);
         enum { t_rom, t_aux, t_ram } type;
         struct memdata *md;
-        
+
         if (cid < PCILYNX_MINOR_AUX_START) {
                 /* just for completeness */
                 return -ENXIO;
@@ -976,10 +973,10 @@ loff_t mem_llseek(struct file *file, loff_t offs, int orig)
         return newoffs;
 }
 
-/* 
- * do not DMA if count is too small because this will have a serious impact 
+/*
+ * do not DMA if count is too small because this will have a serious impact
  * on performance - the value 2400 was found by experiment and may not work
- * everywhere as good as here - use mem_mindma option for modules to change 
+ * everywhere as good as here - use mem_mindma option for modules to change
  */
 static short mem_mindma = 2400;
 module_param(mem_mindma, short, 0444);
@@ -1123,7 +1120,7 @@ static ssize_t mem_read(struct file *file, char *buffer, size_t count,
 }
 
 
-static ssize_t mem_write(struct file *file, const char *buffer, size_t count, 
+static ssize_t mem_write(struct file *file, const char *buffer, size_t count,
                          loff_t *offset)
 {
         struct memdata *md = (struct memdata *)file->private_data;
@@ -1292,7 +1289,7 @@ static irqreturn_t lynx_irq_handler(int irq, void *dev_id,
                         get_pcl(lynx, lynx->async.pcl, &pcl);
 
                         packet = driver_packet(lynx->async.pcl_queue.next);
-                        list_del(&packet->driver_list);
+                        list_del_init(&packet->driver_list);
 
                         pci_unmap_single(lynx->dev, lynx->async.header_dma,
                                          packet->header_size, PCI_DMA_TODEVICE);
@@ -1338,7 +1335,7 @@ static irqreturn_t lynx_irq_handler(int irq, void *dev_id,
                         get_pcl(lynx, lynx->iso_send.pcl, &pcl);
 
                         packet = driver_packet(lynx->iso_send.pcl_queue.next);
-                        list_del(&packet->driver_list);
+                        list_del_init(&packet->driver_list);
 
                         pci_unmap_single(lynx->dev, lynx->iso_send.header_dma,
                                          packet->header_size, PCI_DMA_TODEVICE);
@@ -1375,7 +1372,7 @@ static irqreturn_t lynx_irq_handler(int irq, void *dev_id,
                 int stat = reg_read(lynx, DMA_CHAN_STAT(CHANNEL_ASYNC_RCV));
 
                 PRINTD(KERN_DEBUG, lynx->id, "received packet size %d",
-                       stat & 0x1fff); 
+                       stat & 0x1fff);
 
                 if (stat & DMA_CHAN_STAT_SELFID) {
                         lynx->selfid_size = stat & 0x1fff;
@@ -1417,7 +1414,7 @@ static void iso_rcv_bh(struct ti_lynx *lynx)
                               lynx->iso_rcv.stat[idx]);
                 }
 
-                if (lynx->iso_rcv.stat[idx] 
+                if (lynx->iso_rcv.stat[idx]
                     & (DMA_CHAN_STAT_PCIERR | DMA_CHAN_STAT_PKTERR)) {
                         PRINT(KERN_INFO, lynx->id,
                               "iso receive error on %d to 0x%p", idx, data);
@@ -1460,7 +1457,7 @@ static void remove_card(struct pci_dev *dev)
                 reg_write(lynx, PCI_INT_ENABLE, 0);
                 free_irq(lynx->dev->irq, lynx);
 
-		/* Disable IRM Contender */
+		/* Disable IRM Contender and LCtrl */
 		if (lynx->phyic.reg_1394a)
 			set_phy_reg(lynx, 4, ~0xc0 & get_phy_reg(lynx, 4));
 
@@ -1558,7 +1555,7 @@ static int __devinit add_card(struct pci_dev *dev,
 
         if (lynx->pcl_mem != NULL) {
                 lynx->state = have_pcl_mem;
-                PRINT(KERN_INFO, lynx->id, 
+                PRINT(KERN_INFO, lynx->id,
                       "allocated PCL memory %d Bytes @ 0x%p", LOCALRAM_SIZE,
                       lynx->pcl_mem);
         } else {
@@ -1668,7 +1665,7 @@ static int __devinit add_card(struct pci_dev *dev,
         lynx->async.channel = CHANNEL_ASYNC_SEND;
         lynx->iso_send.queue_lock = SPIN_LOCK_UNLOCKED;
         lynx->iso_send.channel = CHANNEL_ISO_SEND;
-        
+
         PRINT(KERN_INFO, lynx->id, "remapped memory spaces reg 0x%p, rom 0x%p, "
               "ram 0x%p, aux 0x%p", lynx->registers, lynx->local_rom,
               lynx->local_ram, lynx->aux_port);
@@ -1698,17 +1695,17 @@ static int __devinit add_card(struct pci_dev *dev,
 
         pcl.next = PCL_NEXT_INVALID;
         pcl.async_error_next = PCL_NEXT_INVALID;
-#ifdef __BIG_ENDIAN
+
         pcl.buffer[0].control = PCL_CMD_RCV | 16;
-        pcl.buffer[1].control = PCL_LAST_BUFF | 4080;
-#else
-        pcl.buffer[0].control = PCL_CMD_RCV | PCL_BIGENDIAN | 16;
-        pcl.buffer[1].control = PCL_LAST_BUFF | 4080;
+#ifdef __BIG_ENDIAN
+	pcl.buffer[0].control |= PCL_BIGENDIAN;
 #endif
+	pcl.buffer[1].control = PCL_LAST_BUFF | 4080;
+
         pcl.buffer[0].pointer = lynx->rcv_page_dma;
         pcl.buffer[1].pointer = lynx->rcv_page_dma + 16;
         put_pcl(lynx, lynx->rcv_pcl, &pcl);
-        
+
         pcl.next = pcl_bus(lynx, lynx->async.pcl);
         pcl.async_error_next = pcl_bus(lynx, lynx->async.pcl);
         put_pcl(lynx, lynx->async.pcl_start, &pcl);
@@ -1729,7 +1726,7 @@ static int __devinit add_card(struct pci_dev *dev,
                 int page = i / ISORCV_PER_PAGE;
                 int sec = i % ISORCV_PER_PAGE;
 
-                pcl.buffer[0].pointer = lynx->iso_rcv.page_dma[page] 
+                pcl.buffer[0].pointer = lynx->iso_rcv.page_dma[page]
                         + sec * MAX_ISORCV_SIZE;
                 pcl.buffer[1].pointer = pcl.buffer[0].pointer + 4;
                 put_pcl(lynx, lynx->iso_rcv.pcl[i], &pcl);
@@ -1755,11 +1752,11 @@ static int __devinit add_card(struct pci_dev *dev,
 
         reg_write(lynx, LINK_INT_ENABLE, LINK_INT_PHY_TIMEOUT
                   | LINK_INT_PHY_REG_RCVD  | LINK_INT_PHY_BUSRESET
-                  | LINK_INT_ISO_STUCK     | LINK_INT_ASYNC_STUCK 
+                  | LINK_INT_ISO_STUCK     | LINK_INT_ASYNC_STUCK
                   | LINK_INT_SENT_REJECT   | LINK_INT_TX_INVALID_TC
                   | LINK_INT_GRF_OVERFLOW  | LINK_INT_ITF_UNDERFLOW
                   | LINK_INT_ATF_UNDERFLOW);
-        
+
         reg_write(lynx, DMA_WORD0_CMP_VALUE(CHANNEL_ASYNC_RCV), 0);
         reg_write(lynx, DMA_WORD0_CMP_ENABLE(CHANNEL_ASYNC_RCV), 0xa<<4);
         reg_write(lynx, DMA_WORD1_CMP_VALUE(CHANNEL_ASYNC_RCV), 0);
@@ -1786,14 +1783,14 @@ static int __devinit add_card(struct pci_dev *dev,
                 /* attempt to enable contender bit -FIXME- would this work
                  * elsewhere? */
                 reg_set_bits(lynx, GPIO_CTRL_A, 0x1);
-                reg_write(lynx, GPIO_DATA_BASE + 0x3c, 0x1); 
+                reg_write(lynx, GPIO_DATA_BASE + 0x3c, 0x1);
         } else {
-                /* set the contender bit in the extended PHY register
+                /* set the contender and LCtrl bit in the extended PHY register
                  * set. (Should check that bis 0,1,2 (=0xE0) is set
                  * in register 2?)
                  */
                 i = get_phy_reg(lynx, 4);
-                if (i != -1) set_phy_reg(lynx, 4, i | 0x40);
+                if (i != -1) set_phy_reg(lynx, 4, i | 0xc0);
         }
 
 
@@ -1820,7 +1817,7 @@ static int __devinit add_card(struct pci_dev *dev,
         	{
                         /* do i2c stuff */
                         unsigned char i2c_cmd = 0x10;
-                        struct i2c_msg msg[2] = { { 0x50, 0, 1, &i2c_cmd }, 
+                        struct i2c_msg msg[2] = { { 0x50, 0, 1, &i2c_cmd },
                                                   { 0x50, I2C_M_RD, 20, (unsigned char*) lynx->bus_info_block }
                                                 };
 

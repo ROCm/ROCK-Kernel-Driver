@@ -32,7 +32,7 @@
  * Things implemented, but still in test phase:
  * . Iso Transmit
  * . Async Stream Packets Transmit (Receive done via Iso interface)
- * 
+ *
  * Things not implemented:
  * . DMA error recovery
  *
@@ -41,7 +41,7 @@
  *   added LONG_RESET_ROOT and SHORT_RESET_ROOT for root holdoff --kk
  */
 
-/* 
+/*
  * Acknowledgments:
  *
  * Adam J Richter <adam@yggdrasil.com>
@@ -162,7 +162,7 @@ printk(level "%s: " fmt "\n" , OHCI1394_DRIVER_NAME , ## args)
 printk(level "%s: fw-host%d: " fmt "\n" , OHCI1394_DRIVER_NAME, ohci->host->id , ## args)
 
 static char version[] __devinitdata =
-	"$Rev: 1172 $ Ben Collins <bcollins@debian.org>";
+	"$Rev: 1203 $ Ben Collins <bcollins@debian.org>";
 
 /* Module Parameters */
 static int phys_dma = 1;
@@ -185,7 +185,7 @@ static int alloc_dma_trm_ctx(struct ti_ohci *ohci, struct dma_trm_ctx *d,
 static void ohci1394_pci_remove(struct pci_dev *pdev);
 
 #ifndef __LITTLE_ENDIAN
-static unsigned hdr_sizes[] = 
+static unsigned hdr_sizes[] =
 {
 	3,	/* TCODE_WRITEQ */
 	4,	/* TCODE_WRITEB */
@@ -221,7 +221,7 @@ static inline void packet_swab(quadlet_t *data, int tcode)
  * IEEE-1394 functionality section *
  ***********************************/
 
-static u8 get_phy_reg(struct ti_ohci *ohci, u8 addr) 
+static u8 get_phy_reg(struct ti_ohci *ohci, u8 addr)
 {
 	int i;
 	unsigned long flags;
@@ -243,9 +243,9 @@ static u8 get_phy_reg(struct ti_ohci *ohci, u8 addr)
 	if (i >= OHCI_LOOP_COUNT)
 		PRINT (KERN_ERR, "Get PHY Reg timeout [0x%08x/0x%08x/%d]",
 		       r, r & 0x80000000, i);
-  
+
 	spin_unlock_irqrestore (&ohci->phy_reg_lock, flags);
-     
+
 	return (r & 0x00ff0000) >> 16;
 }
 
@@ -303,7 +303,7 @@ static void handle_selfid(struct ti_ohci *ohci, struct hpsb_host *host,
 	else
 		q0 = q[0];
 
-	if ((self_id_count & 0x80000000) || 
+	if ((self_id_count & 0x80000000) ||
 	    ((self_id_count & 0x00FF0000) != (q0 & 0x00FF0000))) {
 		PRINT(KERN_ERR,
 		      "Error in reception of SelfID packets [0x%08x/0x%08x] (count: %d)",
@@ -335,7 +335,7 @@ static void handle_selfid(struct ti_ohci *ohci, struct hpsb_host *host,
 			q0 = q[0];
 			q1 = q[1];
 		}
-		
+
 		if (q0 == ~q1) {
 			DBGMSG ("SelfID packet 0x%x received", q0);
 			hpsb_selfid_received(host, cpu_to_be32(q0));
@@ -358,7 +358,7 @@ static void ohci_soft_reset(struct ti_ohci *ohci) {
 	int i;
 
 	reg_write(ohci, OHCI1394_HCControlSet, OHCI1394_HCControl_softReset);
-  
+
 	for (i = 0; i < OHCI_LOOP_COUNT; i++) {
 		if (!(reg_read(ohci, OHCI1394_HCControlSet) & OHCI1394_HCControl_softReset))
 			break;
@@ -367,32 +367,6 @@ static void ohci_soft_reset(struct ti_ohci *ohci) {
 	DBGMSG ("Soft reset finished");
 }
 
-static int run_context(struct ti_ohci *ohci, int reg, char *msg)
-{
-	u32 nodeId;
-
-	/* check that the node id is valid */
-	nodeId = reg_read(ohci, OHCI1394_NodeID);
-	if (!(nodeId&0x80000000)) {
-		PRINT(KERN_ERR,
-		      "Running dma failed because Node ID is not valid");
-		return -1;
-	}
-
-	/* check that the node number != 63 */
-	if ((nodeId&0x3f)==63) {
-		PRINT(KERN_ERR,
-		      "Running dma failed because Node ID == 63");
-		return -1;
-	}
-
-	/* Run the dma context */
-	reg_write(ohci, reg, 0x8000);
-
-	if (msg) PRINT(KERN_DEBUG, "%s", msg);
-
-	return 0;
-}
 
 /* Generate the dma receive prgs and start the context */
 static void initialize_dma_rcv_ctx(struct dma_rcv_ctx *d, int generate_irq)
@@ -404,7 +378,7 @@ static void initialize_dma_rcv_ctx(struct dma_rcv_ctx *d, int generate_irq)
 
 	for (i=0; i<d->num_desc; i++) {
 		u32 c;
-		
+
 		c = DMA_CTL_INPUT_MORE | DMA_CTL_UPDATE | DMA_CTL_BRANCH;
 		if (generate_irq)
 			c |= DMA_CTL_IRQ;
@@ -433,7 +407,7 @@ static void initialize_dma_rcv_ctx(struct dma_rcv_ctx *d, int generate_irq)
 
 		/* Set bufferFill, isochHeader, multichannel for IR context */
 		reg_write(ohci, d->ctrlSet, 0xd0000000);
-			
+
 		/* Set the context match register to match on all tags */
 		reg_write(ohci, d->ctxtMatch, 0xf0000000);
 
@@ -505,7 +479,7 @@ static void ohci_initialize(struct ti_ohci *ohci)
 
 	spin_lock_init(&ohci->phy_reg_lock);
 	spin_lock_init(&ohci->event_lock);
-  
+
 	/* Put some defaults to these undefined bus options */
 	buf = reg_read(ohci, OHCI1394_BusOptions);
 	buf |=  0xE0000000; /* Enable IRMC, CMC and ISC */
@@ -521,7 +495,7 @@ static void ohci_initialize(struct ti_ohci *ohci)
 
 	/* Clear link control register */
 	reg_write(ohci, OHCI1394_LinkControlClear, 0xffffffff);
-  
+
 	/* Enable cycle timer and cycle master and set the IRM
 	 * contender bit in our self ID packets. */
 	reg_write(ohci, OHCI1394_LinkControlSet, OHCI1394_LinkControl_CycleTimerEnable |
@@ -539,10 +513,10 @@ static void ohci_initialize(struct ti_ohci *ohci)
 	reg_write(ohci, OHCI1394_ConfigROMmap, ohci->csr_config_rom_bus);
 
 	/* Now get our max packet size */
-	ohci->max_packet_size = 
+	ohci->max_packet_size =
 		1<<(((reg_read(ohci, OHCI1394_BusOptions)>>12)&0xf)+1);
 
-	/* Don't accept phy packets into AR request context */ 
+	/* Don't accept phy packets into AR request context */
 	reg_write(ohci, OHCI1394_LinkControlClear, 0x00000400);
 
 	/* Clear the interrupt mask */
@@ -561,15 +535,15 @@ static void ohci_initialize(struct ti_ohci *ohci)
 	initialize_dma_trm_ctx(&ohci->at_req_context);
 	initialize_dma_trm_ctx(&ohci->at_resp_context);
 
-	/* 
-	 * Accept AT requests from all nodes. This probably 
+	/*
+	 * Accept AT requests from all nodes. This probably
 	 * will have to be controlled from the subsystem
 	 * on a per node basis.
 	 */
 	reg_write(ohci,OHCI1394_AsReqFilterHiSet, 0x80000000);
 
 	/* Specify AT retries */
-	reg_write(ohci, OHCI1394_ATRetries, 
+	reg_write(ohci, OHCI1394_ATRetries,
 		  OHCI1394_MAX_AT_REQ_RETRIES |
 		  (OHCI1394_MAX_AT_RESP_RETRIES<<4) |
 		  (OHCI1394_MAX_PHYS_RESP_RETRIES<<8));
@@ -580,8 +554,8 @@ static void ohci_initialize(struct ti_ohci *ohci)
 	/* Enable interrupts */
 	reg_write(ohci, OHCI1394_IntMaskSet,
 		  OHCI1394_unrecoverableError |
-		  OHCI1394_masterIntEnable | 
-		  OHCI1394_busReset | 
+		  OHCI1394_masterIntEnable |
+		  OHCI1394_busReset |
 		  OHCI1394_selfIDComplete |
 		  OHCI1394_RSPkt |
 		  OHCI1394_RQPkt |
@@ -620,13 +594,46 @@ static void ohci_initialize(struct ti_ohci *ohci)
 		if (status & 0x20)
 			set_phy_reg(ohci, 8, status & ~1);
 	}
+
+        /* Serial EEPROM Sanity check. */
+        if ((ohci->max_packet_size < 512) ||
+	    (ohci->max_packet_size > 4096)) {
+		/* Serial EEPROM contents are suspect, set a sane max packet
+		 * size and print the raw contents for bug reports if verbose
+		 * debug is enabled. */
+#ifdef CONFIG_IEEE1394_VERBOSEDEBUG
+		int i;
+#endif
+
+		PRINT(KERN_DEBUG, "Serial EEPROM has suspicious values, "
+                      "attempting to setting max_packet_size to 512 bytes");
+		reg_write(ohci, OHCI1394_BusOptions,
+			  (reg_read(ohci, OHCI1394_BusOptions) & 0xf007) | 0x8002);
+		ohci->max_packet_size = 512;
+#ifdef CONFIG_IEEE1394_VERBOSEDEBUG
+		PRINT(KERN_DEBUG, "    EEPROM Present: %d",
+		      (reg_read(ohci, OHCI1394_Version) >> 24) & 0x1);
+		reg_write(ohci, OHCI1394_GUID_ROM, 0x80000000);
+
+		for (i = 0;
+		     ((i < 1000) &&
+		      (reg_read(ohci, OHCI1394_GUID_ROM) & 0x80000000)); i++)
+			udelay(10);
+
+		for (i = 0; i < 0x20; i++) {
+			reg_write(ohci, OHCI1394_GUID_ROM, 0x02000000);
+			PRINT(KERN_DEBUG, "    EEPROM %02x: %02x", i,
+			      (reg_read(ohci, OHCI1394_GUID_ROM) >> 16) & 0xff);
+		}
+#endif
+	}
 }
 
-/* 
+/*
  * Insert a packet in the DMA fifo and generate the DMA prg
  * FIXME: rewrite the program in order to accept packets crossing
  *        page boundaries.
- *        check also that a single dma descriptor doesn't cross a 
+ *        check also that a single dma descriptor doesn't cross a
  *        page boundary.
  */
 static void insert_packet(struct ti_ohci *ohci,
@@ -644,13 +651,13 @@ static void insert_packet(struct ti_ohci *ohci,
 	d->prg_cpu[idx]->begin.branchAddress = 0;
 
 	if (d->type == DMA_CTX_ASYNC_RESP) {
-		/* 
+		/*
 		 * For response packets, we need to put a timeout value in
-		 * the 16 lower bits of the status... let's try 1 sec timeout 
-		 */ 
+		 * the 16 lower bits of the status... let's try 1 sec timeout
+		 */
 		cycleTimer = reg_read(ohci, OHCI1394_IsochronousCycleTimer);
 		d->prg_cpu[idx]->begin.status = cpu_to_le32(
-			(((((cycleTimer>>25)&0x7)+1)&0x7)<<13) | 
+			(((((cycleTimer>>25)&0x7)+1)&0x7)<<13) |
 			((cycleTimer&0x01fff000)>>12));
 
 		DBGMSG("cycleTimer: %08x timeStamp: %08x",
@@ -674,7 +681,7 @@ static void insert_packet(struct ti_ohci *ohci,
 			} else {
 				/* Sending a normal async request or response */
 				d->prg_cpu[idx]->data[1] =
-					(packet->header[1] & 0xFFFF) | 
+					(packet->header[1] & 0xFFFF) |
 					(packet->header[0] & 0xFFFF0000);
 				d->prg_cpu[idx]->data[2] = packet->header[2];
 				d->prg_cpu[idx]->data[3] = packet->header[3];
@@ -694,10 +701,10 @@ static void insert_packet(struct ti_ohci *ohci,
 			}
                         d->prg_cpu[idx]->end.control =
                                 cpu_to_le32(DMA_CTL_OUTPUT_LAST |
-					    DMA_CTL_IRQ | 
+					    DMA_CTL_IRQ |
 					    DMA_CTL_BRANCH |
 					    packet->data_size);
-                        /* 
+                        /*
                          * Check that the packet data buffer
                          * does not cross a page boundary.
 			 *
@@ -706,7 +713,7 @@ static void insert_packet(struct ti_ohci *ohci,
 			 * problem.
                          */
 #if 0
-                        if (cross_bound((unsigned long)packet->data, 
+                        if (cross_bound((unsigned long)packet->data,
                                         packet->data_size)>0) {
                                 /* FIXME: do something about it */
                                 PRINT(KERN_ERR,
@@ -723,28 +730,28 @@ static void insert_packet(struct ti_ohci *ohci,
 
                         d->prg_cpu[idx]->end.branchAddress = 0;
                         d->prg_cpu[idx]->end.status = 0;
-                        if (d->branchAddrPtr) 
+                        if (d->branchAddrPtr)
                                 *(d->branchAddrPtr) =
 					cpu_to_le32(d->prg_bus[idx] | 0x3);
                         d->branchAddrPtr =
                                 &(d->prg_cpu[idx]->end.branchAddress);
                 } else { /* quadlet transmit */
                         if (packet->type == hpsb_raw)
-                                d->prg_cpu[idx]->begin.control = 
+                                d->prg_cpu[idx]->begin.control =
 					cpu_to_le32(DMA_CTL_OUTPUT_LAST |
 						    DMA_CTL_IMMEDIATE |
-						    DMA_CTL_IRQ | 
+						    DMA_CTL_IRQ |
 						    DMA_CTL_BRANCH |
 						    (packet->header_size + 4));
                         else
                                 d->prg_cpu[idx]->begin.control =
 					cpu_to_le32(DMA_CTL_OUTPUT_LAST |
 						    DMA_CTL_IMMEDIATE |
-						    DMA_CTL_IRQ | 
+						    DMA_CTL_IRQ |
 						    DMA_CTL_BRANCH |
 						    packet->header_size);
 
-                        if (d->branchAddrPtr) 
+                        if (d->branchAddrPtr)
                                 *(d->branchAddrPtr) =
 					cpu_to_le32(d->prg_bus[idx] | 0x2);
                         d->branchAddrPtr =
@@ -756,11 +763,11 @@ static void insert_packet(struct ti_ohci *ohci,
                         (packet->header[0] & 0xFFFF);
                 d->prg_cpu[idx]->data[1] = packet->header[0] & 0xFFFF0000;
 		packet_swab(d->prg_cpu[idx]->data, packet->tcode);
-  
-                d->prg_cpu[idx]->begin.control = 
-			cpu_to_le32(DMA_CTL_OUTPUT_MORE | 
+
+                d->prg_cpu[idx]->begin.control =
+			cpu_to_le32(DMA_CTL_OUTPUT_MORE |
 				    DMA_CTL_IMMEDIATE | 0x8);
-                d->prg_cpu[idx]->end.control = 
+                d->prg_cpu[idx]->end.control =
 			cpu_to_le32(DMA_CTL_OUTPUT_LAST |
 				    DMA_CTL_UPDATE |
 				    DMA_CTL_IRQ |
@@ -790,7 +797,7 @@ static void insert_packet(struct ti_ohci *ohci,
                        d->prg_cpu[idx]->end.address,
                        d->prg_cpu[idx]->end.branchAddress,
                        d->prg_cpu[idx]->end.status);
-                if (d->branchAddrPtr) 
+                if (d->branchAddrPtr)
   		        *(d->branchAddrPtr) = cpu_to_le32(d->prg_bus[idx] | 0x3);
                 d->branchAddrPtr = &(d->prg_cpu[idx]->end.branchAddress);
         }
@@ -798,7 +805,7 @@ static void insert_packet(struct ti_ohci *ohci,
 
 	/* queue the packet in the appropriate context queue */
 	list_add_tail(&packet->driver_list, &d->fifo_list);
-	d->prg_ind = (d->prg_ind+1)%d->num_desc;
+	d->prg_ind = (d->prg_ind + 1) % d->num_desc;
 }
 
 /*
@@ -806,46 +813,54 @@ static void insert_packet(struct ti_ohci *ohci,
  * and runs or wakes up the DMA prg if necessary.
  *
  * The function MUST be called with the d->lock held.
- */ 
-static int dma_trm_flush(struct ti_ohci *ohci, struct dma_trm_ctx *d)
+ */
+static void dma_trm_flush(struct ti_ohci *ohci, struct dma_trm_ctx *d)
 {
-	struct hpsb_packet *p;
-	int idx,z;
-
-	if (list_empty(&d->pending_list) || d->free_prgs == 0)
-		return 0;
-
-	p = driver_packet(d->pending_list.next);
-	idx = d->prg_ind;
-	z = (p->data_size) ? 3 : 2;
+	struct hpsb_packet *packet, *ptmp;
+	int idx = d->prg_ind;
+	int z = 0;
 
 	/* insert the packets into the dma fifo */
-	while (d->free_prgs > 0 && !list_empty(&d->pending_list)) {
-		struct hpsb_packet *p = driver_packet(d->pending_list.next);
-		list_del(&p->driver_list);
-		insert_packet(ohci, d, p);
+	list_for_each_entry_safe(packet, ptmp, &d->pending_list, driver_list) {
+		if (!d->free_prgs)
+			break;
+
+		/* For the first packet only */
+		if (!z)
+			z = (packet->data_size) ? 3 : 2;
+
+		/* Insert the packet */
+		list_del_init(&packet->driver_list);
+		insert_packet(ohci, d, packet);
 	}
 
-	if (d->free_prgs == 0)
-		DBGMSG("Transmit DMA FIFO ctx=%d is full... waiting", d->ctx);
+	/* Nothing must have been done, either no free_prgs or no packets */
+	if (z == 0)
+		return;
 
-	/* Is the context running ? (should be unless it is 
+	/* Is the context running ? (should be unless it is
 	   the first packet to be sent in this context) */
 	if (!(reg_read(ohci, d->ctrlSet) & 0x8000)) {
+		u32 nodeId = reg_read(ohci, OHCI1394_NodeID);
+
 		DBGMSG("Starting transmit DMA ctx=%d",d->ctx);
-		reg_write(ohci, d->cmdPtr, d->prg_bus[idx]|z);
-		run_context(ohci, d->ctrlSet, NULL);
-	}
-	else {
+		reg_write(ohci, d->cmdPtr, d->prg_bus[idx] | z);
+
+		/* Check that the node id is valid, and not 63 */
+		if (!(nodeId & 0x80000000) || (nodeId & 0x3f) == 63)
+			PRINT(KERN_ERR, "Running dma failed because Node ID is not valid");
+		else
+			reg_write(ohci, d->ctrlSet, 0x8000);
+	} else {
 		/* Wake up the dma context if necessary */
-		if (!(reg_read(ohci, d->ctrlSet) & 0x400)) {
+		if (!(reg_read(ohci, d->ctrlSet) & 0x400))
 			DBGMSG("Waking transmit DMA ctx=%d",d->ctx);
-		}
 
 		/* do this always, to avoid race condition */
 		reg_write(ohci, d->ctrlSet, 0x1000);
 	}
-	return 1;
+
+	return;
 }
 
 /* Transmission of an async or iso packet */
@@ -871,7 +886,7 @@ static int ohci_transmit(struct hpsb_host *host, struct hpsb_packet *packet)
 		 * interrupt context, so we bail out if that is the
 		 * case. I don't see anyone sending ISO packets from
 		 * interrupt context anyway... */
-		
+
 		if (ohci->it_legacy_context.ohci == NULL) {
 			if (in_interrupt()) {
 				PRINT(KERN_ERR,
@@ -889,11 +904,11 @@ static int ohci_transmit(struct hpsb_host *host, struct hpsb_packet *packet)
 
 			initialize_dma_trm_ctx(&ohci->it_legacy_context);
 		}
-		
+
 		d = &ohci->it_legacy_context;
 	} else if ((packet->tcode & 0x02) && (packet->tcode != TCODE_ISO_DATA))
 		d = &ohci->at_resp_context;
-	else 
+	else
 		d = &ohci->at_req_context;
 
 	spin_lock_irqsave(&d->lock,flags);
@@ -986,7 +1001,7 @@ static int ohci_devctl(struct hpsb_host *host, enum devctl_cmd cmd, int arg)
 				 * enable cycleTimer, cycleMaster
 				 */
 				DBGMSG("Cycle master enabled");
-				reg_write(ohci, OHCI1394_LinkControlSet, 
+				reg_write(ohci, OHCI1394_LinkControlSet,
 					  OHCI1394_LinkControl_CycleTimerEnable |
 					  OHCI1394_LinkControl_CycleMaster);
 			}
@@ -1011,7 +1026,7 @@ static int ohci_devctl(struct hpsb_host *host, enum devctl_cmd cmd, int arg)
 
 		if (arg<0 || arg>63) {
 			PRINT(KERN_ERR,
-			      "%s: IS0 listen channel %d is out of range", 
+			      "%s: IS0 listen channel %d is out of range",
 			      __FUNCTION__, arg);
 			return -EFAULT;
 		}
@@ -1038,7 +1053,7 @@ static int ohci_devctl(struct hpsb_host *host, enum devctl_cmd cmd, int arg)
 
 		if (ohci->ISO_channel_usage & mask) {
 			PRINT(KERN_ERR,
-			      "%s: IS0 listen channel %d is already used", 
+			      "%s: IS0 listen channel %d is already used",
 			      __FUNCTION__, arg);
 			spin_unlock_irqrestore(&ohci->IR_channel_lock, flags);
 			return -EFAULT;
@@ -1047,12 +1062,12 @@ static int ohci_devctl(struct hpsb_host *host, enum devctl_cmd cmd, int arg)
 		ohci->ISO_channel_usage |= mask;
 		ohci->ir_legacy_channels |= mask;
 
-		if (arg>31) 
-			reg_write(ohci, OHCI1394_IRMultiChanMaskHiSet, 
-				  1<<(arg-32));			
+		if (arg>31)
+			reg_write(ohci, OHCI1394_IRMultiChanMaskHiSet,
+				  1<<(arg-32));
 		else
-			reg_write(ohci, OHCI1394_IRMultiChanMaskLoSet, 
-				  1<<arg);			
+			reg_write(ohci, OHCI1394_IRMultiChanMaskLoSet,
+				  1<<arg);
 
                 spin_unlock_irqrestore(&ohci->IR_channel_lock, flags);
                 DBGMSG("Listening enabled on channel %d", arg);
@@ -1064,32 +1079,32 @@ static int ohci_devctl(struct hpsb_host *host, enum devctl_cmd cmd, int arg)
 
 		if (arg<0 || arg>63) {
 			PRINT(KERN_ERR,
-			      "%s: IS0 unlisten channel %d is out of range", 
+			      "%s: IS0 unlisten channel %d is out of range",
 			      __FUNCTION__, arg);
 			return -EFAULT;
 		}
 
 		mask = (u64)0x1<<arg;
-		
+
                 spin_lock_irqsave(&ohci->IR_channel_lock, flags);
 
 		if (!(ohci->ISO_channel_usage & mask)) {
 			PRINT(KERN_ERR,
-			      "%s: IS0 unlisten channel %d is not used", 
+			      "%s: IS0 unlisten channel %d is not used",
 			      __FUNCTION__, arg);
 			spin_unlock_irqrestore(&ohci->IR_channel_lock, flags);
 			return -EFAULT;
 		}
-		
+
 		ohci->ISO_channel_usage &= ~mask;
 		ohci->ir_legacy_channels &= ~mask;
 
-		if (arg>31) 
-			reg_write(ohci, OHCI1394_IRMultiChanMaskHiClear, 
-				  1<<(arg-32));			
+		if (arg>31)
+			reg_write(ohci, OHCI1394_IRMultiChanMaskHiClear,
+				  1<<(arg-32));
 		else
-			reg_write(ohci, OHCI1394_IRMultiChanMaskLoClear, 
-				  1<<arg);			
+			reg_write(ohci, OHCI1394_IRMultiChanMaskLoClear,
+				  1<<arg);
 
                 spin_unlock_irqrestore(&ohci->IR_channel_lock, flags);
                 DBGMSG("Listening disabled on channel %d", arg);
@@ -1215,7 +1230,7 @@ static int ohci_iso_recv_init(struct hpsb_iso *iso)
 
 		/* iso->irq_interval is in packets - translate that to blocks */
 		if (iso->irq_interval == 1)
-			recv->block_irq_interval = 1;			
+			recv->block_irq_interval = 1;
 		else
 			recv->block_irq_interval = iso->irq_interval *
 							((recv->nblocks+1)/iso->buf_packets);
@@ -1241,7 +1256,7 @@ static int ohci_iso_recv_init(struct hpsb_iso *iso)
 
 		for (recv->buf_stride = 8; recv->buf_stride < max_packet_size;
 		    recv->buf_stride *= 2);
-	
+
 		if (recv->buf_stride*iso->buf_packets > iso->buf_size ||
 		   recv->buf_stride > PAGE_SIZE) {
 			/* this shouldn't happen, but anyway... */
@@ -1285,7 +1300,7 @@ static int ohci_iso_recv_init(struct hpsb_iso *iso)
 		reg_write(recv->ohci, OHCI1394_IRMultiChanMaskHiClear, 0xFFFFFFFF);
 		reg_write(recv->ohci, OHCI1394_IRMultiChanMaskLoClear, 0xFFFFFFFF);
 	}
-		
+
 	/* write the DMA program */
 	ohci_iso_recv_program(iso);
 
@@ -1293,7 +1308,7 @@ static int ohci_iso_recv_init(struct hpsb_iso *iso)
 	       " (%u bytes), using %u blocks, buf_stride %u, block_irq_interval %d",
 	       recv->dma_mode == BUFFER_FILL_MODE ?
 	       "buffer-fill" : "packet-per-buffer",
-	       iso->buf_size/PAGE_SIZE, iso->buf_size, 
+	       iso->buf_size/PAGE_SIZE, iso->buf_size,
 	       recv->nblocks, recv->buf_stride, recv->block_irq_interval);
 
 	return 0;
@@ -1309,7 +1324,7 @@ static void ohci_iso_recv_stop(struct hpsb_iso *iso)
 
 	/* disable interrupts */
 	reg_write(recv->ohci, OHCI1394_IsoRecvIntMaskClear, 1 << recv->task.context);
-		
+
 	/* halt DMA */
 	ohci1394_stop_context(recv->ohci, recv->ContextControlClear, NULL);
 }
@@ -1457,20 +1472,20 @@ static int ohci_iso_recv_start(struct hpsb_iso *iso, int cycle, int tag_mask, in
 
 	if (cycle != -1) {
 		u32 seconds;
-		
+
 		/* enable cycleMatch */
 		reg_write(recv->ohci, recv->ContextControlSet, (1 << 29));
 
 		/* set starting cycle */
 		cycle &= 0x1FFF;
-		
+
 		/* 'cycle' is only mod 8000, but we also need two 'seconds' bits -
 		   just snarf them from the current time */
 		seconds = reg_read(recv->ohci, OHCI1394_IsochronousCycleTimer) >> 25;
 
 		/* advance one second to give some extra time for DMA to start */
 		seconds += 1;
-		
+
 		cycle |= (seconds & 3) << 13;
 
 		contextMatch |= cycle << 12;
@@ -1535,7 +1550,7 @@ static void ohci_iso_recv_release_block(struct ohci_iso_recv *recv, int block)
 	next->control |= cpu_to_le32(3 << 20);
 	next->status = cpu_to_le32(recv->buf_stride);
 
-	/* link prev to next */	
+	/* link prev to next */
 	prev->branchAddress = cpu_to_le32(dma_prog_region_offset_to_bus(&recv->prog,
 									sizeof(struct dma_cmd) * next_i)
 					  | 1); /* Z=1 */
@@ -1593,15 +1608,15 @@ static void ohci_iso_recv_bufferfill_parse(struct hpsb_iso *iso, struct ohci_iso
 	int wake = 0;
 	int runaway = 0;
 	struct ti_ohci *ohci = recv->ohci;
-		
+
 	while (1) {
 		/* we expect the next parsable packet to begin at recv->dma_offset */
 		/* note: packet layout is as shown in section 10.6.1.1 of the OHCI spec */
-		
+
 		unsigned int offset;
 		unsigned short len, cycle;
 		unsigned char channel, tag, sy;
-		
+
 		unsigned char *p = iso->data_buf.kvirt;
 
 		unsigned int this_block = recv->dma_offset/recv->buf_stride;
@@ -1619,26 +1634,26 @@ static void ohci_iso_recv_bufferfill_parse(struct hpsb_iso *iso, struct ohci_iso
 			break;
 
 		wake = 1;
-		
+
 		/* parse data length, tag, channel, and sy */
-		
+
 		/* note: we keep our own local copies of 'len' and 'offset'
 		   so the user can't mess with them by poking in the mmap area */
-		
+
 		len = p[recv->dma_offset+2] | (p[recv->dma_offset+3] << 8);
 
 		if (len > 4096) {
 			PRINT(KERN_ERR,
 			      "IR DMA error - bogus 'len' value %u\n", len);
 		}
-		
+
 		channel = p[recv->dma_offset+1] & 0x3F;
 		tag = p[recv->dma_offset+1] >> 6;
 		sy = p[recv->dma_offset+0] & 0xF;
 
 		/* advance to data payload */
 		recv->dma_offset += 4;
-		
+
 		/* check for wrap-around */
 		if (recv->dma_offset >= recv->buf_stride*recv->nblocks) {
 			recv->dma_offset -= recv->buf_stride*recv->nblocks;
@@ -1651,7 +1666,7 @@ static void ohci_iso_recv_bufferfill_parse(struct hpsb_iso *iso, struct ohci_iso
 		recv->dma_offset += len;
 
 		/* payload is padded to 4 bytes */
-		if (len % 4) { 
+		if (len % 4) {
 			recv->dma_offset += 4 - (len%4);
 		}
 
@@ -1700,13 +1715,13 @@ static void ohci_iso_recv_bufferfill_task(struct hpsb_iso *iso, struct ohci_iso_
 
 	/* loop over all blocks */
 	for (loop = 0; loop < recv->nblocks; loop++) {
-		
+
 		/* check block_dma to see if it's done */
 		struct dma_cmd *im = &recv->block[recv->block_dma];
-		
+
 		/* check the DMA descriptor for new writes to xferStatus */
 		u16 xferstatus = le32_to_cpu(im->status) >> 16;
-		
+
 		/* rescount is the number of bytes *remaining to be written* in the block */
 		u16 rescount = le32_to_cpu(im->status) & 0xFFFF;
 
@@ -1728,12 +1743,12 @@ static void ohci_iso_recv_bufferfill_task(struct hpsb_iso *iso, struct ohci_iso_
 			   we can't touch it until it's done */
 			break;
 		}
-		
+
 		/* OK, the block is finished... */
-		
+
 		/* sync our view of the block */
 		dma_region_sync_for_cpu(&iso->data_buf, recv->block_dma*recv->buf_stride, recv->buf_stride);
-		
+
 		/* reset the DMA descriptor */
 		im->status = recv->buf_stride;
 
@@ -1756,11 +1771,11 @@ static void ohci_iso_recv_packetperbuf_task(struct hpsb_iso *iso, struct ohci_is
 	int count;
 	int wake = 0;
 	struct ti_ohci *ohci = recv->ohci;
-	
+
 	/* loop over the entire buffer */
 	for (count = 0; count < recv->nblocks; count++) {
 		u32 packet_len = 0;
-		
+
 		/* pointer to the DMA descriptor */
 		struct dma_cmd *il = ((struct dma_cmd*) recv->prog.kvirt) + iso->pkt_dma;
 
@@ -1774,10 +1789,10 @@ static void ohci_iso_recv_packetperbuf_task(struct hpsb_iso *iso, struct ohci_is
 			/* this packet hasn't come in yet; we are done for now */
 			goto out;
 		}
-		
+
 		if (event == 0x11) {
 			/* packet received successfully! */
-			
+
 			/* rescount is the number of bytes *remaining* in the packet buffer,
 			   after the packet was written */
 			packet_len = recv->buf_stride - rescount;
@@ -1790,7 +1805,7 @@ static void ohci_iso_recv_packetperbuf_task(struct hpsb_iso *iso, struct ohci_is
 
 		/* sync our view of the buffer */
 		dma_region_sync_for_cpu(&iso->data_buf, iso->pkt_dma * recv->buf_stride, recv->buf_stride);
-			
+
 		/* record the per-packet info */
 		{
 			/* iso header is 8 bytes ahead of the data payload */
@@ -1806,7 +1821,7 @@ static void ohci_iso_recv_packetperbuf_task(struct hpsb_iso *iso, struct ohci_is
 			/* skip iso header */
 			offset += 8;
 			packet_len -= 8;
-			
+
 			cycle = (hdr[0] | (hdr[1] << 8)) & 0x1FFF;
 			channel = hdr[5] & 0x3F;
 			tag = hdr[5] >> 6;
@@ -1814,7 +1829,7 @@ static void ohci_iso_recv_packetperbuf_task(struct hpsb_iso *iso, struct ohci_is
 
 			hpsb_iso_packet_received(iso, offset, packet_len, cycle, channel, tag, sy);
 		}
-		
+
 		/* reset the DMA descriptor */
 		il->status = recv->buf_stride;
 
@@ -1958,7 +1973,7 @@ static void ohci_iso_xmit_task(unsigned long data)
 
 		/* DMA descriptor */
 		struct iso_xmit_cmd *cmd = dma_region_i(&xmit->prog, struct iso_xmit_cmd, iso->pkt_dma);
-		
+
 		/* check for new writes to xferStatus */
 		u16 xferstatus = le32_to_cpu(cmd->output_last.status) >> 16;
 		u8  event = xferstatus & 0x1F;
@@ -1971,16 +1986,16 @@ static void ohci_iso_xmit_task(unsigned long data)
 		if (event != 0x11)
 			PRINT(KERN_ERR,
 			      "IT DMA error - OHCI error code 0x%02x\n", event);
-		
+
 		/* at least one packet went out, so wake up the writer */
 		wake = 1;
-		
+
 		/* parse cycle */
 		cycle = le32_to_cpu(cmd->output_last.status) & 0x1FFF;
 
 		/* tell the subsystem the packet has gone out */
 		hpsb_iso_packet_sent(iso, cycle, event != 0x11);
-		
+
 		/* reset the DMA descriptor for next time */
 		cmd->output_last.status = 0;
 	}
@@ -2101,14 +2116,14 @@ static int ohci_iso_xmit_start(struct hpsb_iso *iso, int cycle)
 	/* cycle match */
 	if (cycle != -1) {
 		u32 start = cycle & 0x1FFF;
-		
+
 		/* 'cycle' is only mod 8000, but we also need two 'seconds' bits -
 		   just snarf them from the current time */
 		u32 seconds = reg_read(xmit->ohci, OHCI1394_IsochronousCycleTimer) >> 25;
 
 		/* advance one second to give some extra time for DMA to start */
 		seconds += 1;
-		
+
 		start |= (seconds & 3) << 13;
 
 		reg_write(xmit->ohci, xmit->ContextControlSet, 0x80000000 | (start << 16));
@@ -2201,6 +2216,7 @@ static void dma_trm_reset(struct dma_trm_ctx *d)
 	unsigned long flags;
 	LIST_HEAD(packet_list);
 	struct ti_ohci *ohci = d->ohci;
+	struct hpsb_packet *packet, *ptmp;
 
 	ohci1394_stop_context(ohci, d->ctrlClear, NULL);
 
@@ -2221,19 +2237,20 @@ static void dma_trm_reset(struct dma_trm_ctx *d)
 
 	spin_unlock_irqrestore(&d->lock, flags);
 
-	/* Now process subsystem callbacks for the packets from the
-	 * context. */
+	if (list_empty(&packet_list))
+		return;
 
-	while (!list_empty(&packet_list)) {
-		struct hpsb_packet *p = driver_packet(packet_list.next);
-		PRINT(KERN_INFO,
-		      "AT dma reset ctx=%d, aborting transmission", d->ctx);
-		list_del(&p->driver_list);
-		hpsb_packet_sent(ohci->host, p, ACKX_ABORTED);
+	PRINT(KERN_INFO, "AT dma reset ctx=%d, aborting transmission", d->ctx);
+
+	/* Now process subsystem callbacks for the packets from this
+	 * context. */
+	list_for_each_entry_safe(packet, ptmp, &packet_list, driver_list) {
+		list_del_init(&packet->driver_list);
+		hpsb_packet_sent(ohci->host, packet, ACKX_ABORTED);
 	}
 }
 
-static void ohci_schedule_iso_tasklets(struct ti_ohci *ohci, 
+static void ohci_schedule_iso_tasklets(struct ti_ohci *ohci,
 				       quadlet_t rx_event,
 				       quadlet_t tx_event)
 {
@@ -2393,7 +2410,8 @@ static irqreturn_t ohci_irq_handler(int irq, void *dev_id,
 			ohci1394_stop_context(ohci, d->ctrlClear,
 					      "reqTxComplete");
 		else
-			tasklet_schedule(&d->task);
+			dma_trm_tasklet((unsigned long)d);
+			//tasklet_schedule(&d->task);
 		event &= ~OHCI1394_reqTxComplete;
 	}
 	if (event & OHCI1394_respTxComplete) {
@@ -2436,7 +2454,7 @@ static irqreturn_t ohci_irq_handler(int irq, void *dev_id,
 		event &= ~OHCI1394_isochRx;
 	}
 	if (event & OHCI1394_isochTx) {
-		quadlet_t tx_event;		
+		quadlet_t tx_event;
 
 		tx_event = reg_read(ohci, OHCI1394_IsoXmitIntEventSet);
 		reg_write(ohci, OHCI1394_IsoXmitIntEventClear, tx_event);
@@ -2459,7 +2477,7 @@ static irqreturn_t ohci_irq_handler(int irq, void *dev_id,
 			isroot = (node_id & 0x40000000) != 0;
 
 			DBGMSG("SelfID interrupt received "
-			      "(phyid %d, %s)", phyid, 
+			      "(phyid %d, %s)", phyid,
 			      (isroot ? "root" : "not root"));
 
 			handle_selfid(ohci, host, phyid, isroot);
@@ -2535,10 +2553,10 @@ static void insert_dma_buffer(struct dma_rcv_ctx *d, int idx)
 #define cond_le32_to_cpu(data, noswap) \
 	(noswap ? data : le32_to_cpu(data))
 
-static const int TCODE_SIZE[16] = {20, 0, 16, -1, 16, 20, 20, 0, 
+static const int TCODE_SIZE[16] = {20, 0, 16, -1, 16, 20, 20, 0,
 			    -1, 0, -1, 0, -1, -1, 16, -1};
 
-/* 
+/*
  * Determine the length of a packet in the buffer
  * Optimization suggested by Pascal Drolet <pascal.drolet@informission.ca>
  */
@@ -2669,7 +2687,7 @@ static void dma_rcv_tasklet (unsigned long data)
 				offset=0;
 			}
 		}
-		
+
 		/* We get one phy packet to the async descriptor for each
 		 * bus reset. We always ignore it.  */
 		if (tcode != OHCI1394_TCODE_PHY) {
@@ -2687,7 +2705,7 @@ static void dma_rcv_tasklet (unsigned long data)
 			ack = (((cond_le32_to_cpu(d->spb[length/4-1], ohci->no_swap_incoming)>>16)&0x1f)
 				== 0x11) ? 1 : 0;
 
-			hpsb_packet_received(ohci->host, d->spb, 
+			hpsb_packet_received(ohci->host, d->spb,
 					     length-4, ack);
 		}
 #ifdef OHCI1394_DEBUG
@@ -2713,24 +2731,23 @@ static void dma_trm_tasklet (unsigned long data)
 {
 	struct dma_trm_ctx *d = (struct dma_trm_ctx*)data;
 	struct ti_ohci *ohci = (struct ti_ohci*)(d->ohci);
-	struct hpsb_packet *packet;
+	struct hpsb_packet *packet, *ptmp;
 	unsigned long flags;
 	u32 status, ack;
         size_t datasize;
 
 	spin_lock_irqsave(&d->lock, flags);
 
-	while (!list_empty(&d->fifo_list)) {
-		packet = driver_packet(d->fifo_list.next);
+	list_for_each_entry_safe(packet, ptmp, &d->fifo_list, driver_list) {
                 datasize = packet->data_size;
 		if (datasize && packet->type != hpsb_raw)
 			status = le32_to_cpu(
 				d->prg_cpu[d->sent_ind]->end.status) >> 16;
-		else 
+		else
 			status = le32_to_cpu(
 				d->prg_cpu[d->sent_ind]->begin.status) >> 16;
 
-		if (status == 0) 
+		if (status == 0)
 			/* this packet hasn't been sent yet*/
 			break;
 
@@ -2738,34 +2755,34 @@ static void dma_trm_tasklet (unsigned long data)
 		if (datasize)
 			if (((le32_to_cpu(d->prg_cpu[d->sent_ind]->data[0])>>4)&0xf) == 0xa)
 				DBGMSG("Stream packet sent to channel %d tcode=0x%X "
-				       "ack=0x%X spd=%d dataLength=%d ctx=%d", 
+				       "ack=0x%X spd=%d dataLength=%d ctx=%d",
 				       (le32_to_cpu(d->prg_cpu[d->sent_ind]->data[0])>>8)&0x3f,
 				       (le32_to_cpu(d->prg_cpu[d->sent_ind]->data[0])>>4)&0xf,
-				       status&0x1f, (status>>5)&0x3, 
+				       status&0x1f, (status>>5)&0x3,
 				       le32_to_cpu(d->prg_cpu[d->sent_ind]->data[1])>>16,
 				       d->ctx);
 			else
 				DBGMSG("Packet sent to node %d tcode=0x%X tLabel="
-				       "0x%02X ack=0x%X spd=%d dataLength=%d ctx=%d", 
+				       "0x%02X ack=0x%X spd=%d dataLength=%d ctx=%d",
 				       (le32_to_cpu(d->prg_cpu[d->sent_ind]->data[1])>>16)&0x3f,
 				       (le32_to_cpu(d->prg_cpu[d->sent_ind]->data[0])>>4)&0xf,
 				       (le32_to_cpu(d->prg_cpu[d->sent_ind]->data[0])>>10)&0x3f,
 				       status&0x1f, (status>>5)&0x3,
 				       le32_to_cpu(d->prg_cpu[d->sent_ind]->data[3])>>16,
 				       d->ctx);
-		else 
+		else
 			DBGMSG("Packet sent to node %d tcode=0x%X tLabel="
-			       "0x%02X ack=0x%X spd=%d data=0x%08X ctx=%d", 
+			       "0x%02X ack=0x%X spd=%d data=0x%08X ctx=%d",
                                 (le32_to_cpu(d->prg_cpu[d->sent_ind]->data[1])
                                         >>16)&0x3f,
                                 (le32_to_cpu(d->prg_cpu[d->sent_ind]->data[0])
                                         >>4)&0xf,
                                 (le32_to_cpu(d->prg_cpu[d->sent_ind]->data[0])
                                         >>10)&0x3f,
-                                status&0x1f, (status>>5)&0x3, 
+                                status&0x1f, (status>>5)&0x3,
                                 le32_to_cpu(d->prg_cpu[d->sent_ind]->data[3]),
                                 d->ctx);
-#endif		
+#endif
 
 		if (status & 0x10) {
 			ack = status & 0xf;
@@ -2818,11 +2835,11 @@ static void dma_trm_tasklet (unsigned long data)
 			}
 		}
 
-                list_del(&packet->driver_list);
+		list_del_init(&packet->driver_list);
 		hpsb_packet_sent(ohci->host, packet, ack);
 
 		if (datasize) {
-			pci_unmap_single(ohci->dev, 
+			pci_unmap_single(ohci->dev,
 					 cpu_to_le32(d->prg_cpu[d->sent_ind]->end.address),
 					 datasize, PCI_DMA_TODEVICE);
 			OHCI_DMA_FREE("single Xmit data packet");
@@ -2867,7 +2884,7 @@ static void free_dma_rcv_ctx(struct dma_rcv_ctx *d)
 		for (i=0; i<d->num_desc; i++)
 			if (d->buf_cpu[i] && d->buf_bus[i]) {
 				pci_free_consistent(
-					ohci->dev, d->buf_size, 
+					ohci->dev, d->buf_size,
 					d->buf_cpu[i], d->buf_bus[i]);
 				OHCI_DMA_FREE("consistent dma_rcv buf[%d]", i);
 			}
@@ -2875,7 +2892,7 @@ static void free_dma_rcv_ctx(struct dma_rcv_ctx *d)
 		kfree(d->buf_bus);
 	}
 	if (d->prg_cpu) {
-		for (i=0; i<d->num_desc; i++) 
+		for (i=0; i<d->num_desc; i++)
 			if (d->prg_cpu[i] && d->prg_bus[i]) {
 				pci_pool_free(d->prg_pool, d->prg_cpu[i], d->prg_bus[i]);
 				OHCI_DMA_FREE("consistent dma_rcv prg[%d]", i);
@@ -2921,7 +2938,7 @@ alloc_dma_rcv_ctx(struct ti_ohci *ohci, struct dma_rcv_ctx *d,
 	memset(d->buf_cpu, 0, d->num_desc * sizeof(quadlet_t*));
 	memset(d->buf_bus, 0, d->num_desc * sizeof(dma_addr_t));
 
-	d->prg_cpu = kmalloc(d->num_desc * sizeof(struct dma_cmd*), 
+	d->prg_cpu = kmalloc(d->num_desc * sizeof(struct dma_cmd*),
 			     GFP_KERNEL);
 	d->prg_bus = kmalloc(d->num_desc * sizeof(dma_addr_t), GFP_KERNEL);
 
@@ -2946,11 +2963,11 @@ alloc_dma_rcv_ctx(struct ti_ohci *ohci, struct dma_rcv_ctx *d,
 	OHCI_DMA_ALLOC("dma_rcv prg pool");
 
 	for (i=0; i<d->num_desc; i++) {
-		d->buf_cpu[i] = pci_alloc_consistent(ohci->dev, 
+		d->buf_cpu[i] = pci_alloc_consistent(ohci->dev,
 						     d->buf_size,
 						     d->buf_bus+i);
 		OHCI_DMA_ALLOC("consistent dma_rcv buf[%d]", i);
-		
+
 		if (d->buf_cpu[i] != NULL) {
 			memset(d->buf_cpu[i], 0, d->buf_size);
 		} else {
@@ -3015,7 +3032,7 @@ static void free_dma_trm_ctx(struct dma_trm_ctx *d)
 	DBGMSG("Freeing dma_trm_ctx %d", d->ctx);
 
 	if (d->prg_cpu) {
-		for (i=0; i<d->num_desc; i++) 
+		for (i=0; i<d->num_desc; i++)
 			if (d->prg_cpu[i] && d->prg_bus[i]) {
 				pci_pool_free(d->prg_pool, d->prg_cpu[i], d->prg_bus[i]);
 				OHCI_DMA_FREE("pool dma_trm prg[%d]", i);
@@ -3045,7 +3062,7 @@ alloc_dma_trm_ctx(struct ti_ohci *ohci, struct dma_trm_ctx *d,
 	d->ctrlClear = 0;
 	d->cmdPtr = 0;
 
-	d->prg_cpu = kmalloc(d->num_desc * sizeof(struct at_dma_prg*), 
+	d->prg_cpu = kmalloc(d->num_desc * sizeof(struct at_dma_prg*),
 			     GFP_KERNEL);
 	d->prg_bus = kmalloc(d->num_desc * sizeof(dma_addr_t), GFP_KERNEL);
 
@@ -3194,7 +3211,7 @@ static int __devinit ohci1394_pci_probe(struct pci_dev *dev,
 	 * noByteSwapData registers to see if they were not cleared to
 	 * zero. Should this work? Obviously it's not defined what these
 	 * registers will read when they aren't supported. Bleh! */
-	if (dev->vendor == PCI_VENDOR_ID_APPLE && 
+	if (dev->vendor == PCI_VENDOR_ID_APPLE &&
 	    dev->device == PCI_DEVICE_ID_APPLE_UNI_N_FW) {
 		ohci->no_swap_incoming = 1;
 		ohci->selfid_swap = 0;
@@ -3217,7 +3234,7 @@ static int __devinit ohci1394_pci_probe(struct pci_dev *dev,
 
 	/* We hardwire the MMIO length, since some CardBus adaptors
 	 * fail to report the right length.  Anyway, the ohci spec
-	 * clearly says it's 2kb, so this shouldn't be a problem. */ 
+	 * clearly says it's 2kb, so this shouldn't be a problem. */
 	ohci_base = pci_resource_start(dev, 0);
 	if (pci_resource_len(dev, 0) != OHCI1394_REGISTER_SIZE)
 		PRINT(KERN_WARNING, "Unexpected PCI resource length of %lx!",
@@ -3248,7 +3265,7 @@ static int __devinit ohci1394_pci_probe(struct pci_dev *dev,
 	ohci->init_state = OHCI_INIT_HAVE_CONFIG_ROM_BUFFER;
 
 	/* self-id dma buffer allocation */
-	ohci->selfid_buf_cpu = 
+	ohci->selfid_buf_cpu =
 		pci_alloc_consistent(ohci->dev, OHCI1394_SI_DMA_BUF_SIZE,
                       &ohci->selfid_buf_bus);
 	OHCI_DMA_ALLOC("consistent selfid_buf");
@@ -3259,8 +3276,8 @@ static int __devinit ohci1394_pci_probe(struct pci_dev *dev,
 
 	if ((unsigned long)ohci->selfid_buf_cpu & 0x1fff)
 		PRINT(KERN_INFO, "SelfID buffer %p is not aligned on "
-		      "8Kb boundary... may cause problems on some CXD3222 chip", 
-		      ohci->selfid_buf_cpu);  
+		      "8Kb boundary... may cause problems on some CXD3222 chip",
+		      ohci->selfid_buf_cpu);
 
 	/* No self-id errors at startup */
 	ohci->self_id_errors = 0;
@@ -3423,7 +3440,7 @@ static void ohci1394_pci_remove(struct pci_dev *pdev)
 		free_dma_trm_ctx(&ohci->it_legacy_context);
 
 	case OHCI_INIT_HAVE_SELFID_BUFFER:
-		pci_free_consistent(ohci->dev, OHCI1394_SI_DMA_BUF_SIZE, 
+		pci_free_consistent(ohci->dev, OHCI1394_SI_DMA_BUF_SIZE,
 				    ohci->selfid_buf_cpu,
 				    ohci->selfid_buf_bus);
 		OHCI_DMA_FREE("consistent selfid_buf");
@@ -3544,7 +3561,7 @@ int ohci1394_stop_context(struct ti_ohci *ohci, int reg, char *msg)
 
 	/* stop the channel program if it's still running */
 	reg_write(ohci, reg, 0x8000);
-   
+
 	/* Wait until it effectively stops */
 	while (reg_read(ohci, reg) & 0x400) {
 		i++;

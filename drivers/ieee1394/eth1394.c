@@ -1,6 +1,6 @@
 /*
  * eth1394.c -- Ethernet driver for Linux IEEE-1394 Subsystem
- * 
+ *
  * Copyright (C) 2001-2003 Ben Collins <bcollins@debian.org>
  *               2000 Bonin Franck <boninf@free.fr>
  *               2003 Steve Kinneberg <kinnebergsteve@acmsystems.com>
@@ -89,7 +89,7 @@
 #define TRACE() printk(KERN_ERR "%s:%s[%d] ---- TRACE\n", driver_name, __FUNCTION__, __LINE__)
 
 static char version[] __devinitdata =
-	"$Rev: 1175 $ Ben Collins <bcollins@debian.org>";
+	"$Rev: 1198 $ Ben Collins <bcollins@debian.org>";
 
 struct fragment_info {
 	struct list_head list;
@@ -216,7 +216,7 @@ static struct hpsb_highlevel eth1394_highlevel = {
 /* This is called after an "ifup" */
 static int ether1394_open (struct net_device *dev)
 {
-	struct eth1394_priv *priv = (struct eth1394_priv *)dev->priv;
+	struct eth1394_priv *priv = dev->priv;
 	int ret = 0;
 
 	/* Something bad happened, don't even try */
@@ -278,7 +278,7 @@ static void ether1394_tx_timeout (struct net_device *dev)
 
 static int ether1394_change_mtu(struct net_device *dev, int new_mtu)
 {
-	struct eth1394_priv *priv = (struct eth1394_priv *)dev->priv;
+	struct eth1394_priv *priv = dev->priv;
 
 	if ((new_mtu < 68) ||
 	    (new_mtu > min(ETH1394_DATA_LEN,
@@ -479,7 +479,7 @@ static void ether1394_reset_priv (struct net_device *dev, int set_mtu)
 {
 	unsigned long flags;
 	int i;
-	struct eth1394_priv *priv = (struct eth1394_priv *)dev->priv;
+	struct eth1394_priv *priv = dev->priv;
 	struct hpsb_host *host = priv->host;
 	u64 guid = *((u64*)&(host->csr.rom->bus_info_data[3]));
 	u16 maxpayload = 1 << (host->csr.max_rec + 1);
@@ -652,7 +652,7 @@ out:
 static void ether1394_remove_host (struct hpsb_host *host)
 {
 	struct eth1394_host_info *hi;
-	
+
 	hi = hpsb_get_hostinfo(&eth1394_highlevel, host);
 	if (hi != NULL) {
 		struct eth1394_priv *priv = (struct eth1394_priv *)hi->dev->priv;
@@ -660,7 +660,7 @@ static void ether1394_remove_host (struct hpsb_host *host)
 		hpsb_unregister_addrspace(&eth1394_highlevel, host,
 					  priv->local_fifo);
 
-		if (priv->iso != NULL) 
+		if (priv->iso != NULL)
 			hpsb_iso_shutdown(priv->iso);
 
 		if (hi->dev) {
@@ -731,18 +731,16 @@ static int ether1394_header(struct sk_buff *skb, struct net_device *dev,
 
 	eth->h_proto = htons(type);
 
-	if (dev->flags & (IFF_LOOPBACK|IFF_NOARP)) 
-	{
+	if (dev->flags & (IFF_LOOPBACK|IFF_NOARP)) {
 		memset(eth->h_dest, 0, dev->addr_len);
 		return(dev->hard_header_len);
 	}
 
-	if (daddr)
-	{
+	if (daddr) {
 		memcpy(eth->h_dest,daddr,dev->addr_len);
 		return dev->hard_header_len;
 	}
-	
+
 	return -dev->hard_header_len;
 
 }
@@ -760,15 +758,15 @@ static int ether1394_rebuild_header(struct sk_buff *skb)
 	struct eth1394hdr *eth = (struct eth1394hdr *)skb->data;
 	struct net_device *dev = skb->dev;
 
-	switch (eth->h_proto)
-	{
+	switch (eth->h_proto) {
+
 #ifdef CONFIG_INET
 	case __constant_htons(ETH_P_IP):
  		return arp_find((unsigned char*)&eth->h_dest, skb);
-#endif	
+#endif
 	default:
 		ETH1394_PRINT(KERN_DEBUG, dev->name,
-			      "unable to resolve type %04x addresses.\n", 
+			      "unable to resolve type %04x addresses.\n",
 			      eth->h_proto);
 		break;
 	}
@@ -797,7 +795,7 @@ static int ether1394_header_cache(struct neighbour *neigh, struct hh_cache *hh)
 
 	eth->h_proto = type;
 	memcpy(eth->h_dest, neigh->ha, dev->addr_len);
-	
+
 	hh->hh_len = ETH1394_HLEN;
 	return 0;
 }
@@ -867,7 +865,7 @@ static inline u16 ether1394_parse_encap(struct sk_buff *skb,
 					nodeid_t srcid, nodeid_t destid,
 					u16 ether_type)
 {
-	struct eth1394_priv *priv = (struct eth1394_priv *)dev->priv;
+	struct eth1394_priv *priv = dev->priv;
 	u64 dest_hw;
 	unsigned short ret = 0;
 
@@ -1010,7 +1008,7 @@ static inline int new_fragment(struct list_head *frag_info, int offset, int len)
 	}
 
 	new = kmalloc(sizeof(struct fragment_info), GFP_ATOMIC);
-	if (!new) 
+	if (!new)
 		return -ENOMEM;
 
 	new->offset = offset;
@@ -1192,7 +1190,7 @@ static int ether1394_data_handler(struct net_device *dev, int srcid, int destid,
 				purge_partial_datagram(pdgl->prev);
 				pdg->sz--;
 			}
-            
+
 			retval = new_partial_datagram(dev, pdgl, dgl, dg_size,
 						      buf + hdr_len, fg_off,
 						      fg_len);
@@ -1374,7 +1372,7 @@ static void ether1394_iso(struct hpsb_iso *iso)
  * arphdr) is the same format as the ip1394 header, so they overlap.  The rest
  * needs to be munged a bit.  The remainder of the arphdr is formatted based
  * on hwaddr len and ipaddr len.  We know what they'll be, so it's easy to
- * judge.  
+ * judge.
  *
  * Now that the EUI is used for the hardware address all we need to do to make
  * this work for 1394 is to insert 2 quadlets that contain max_rec size,
@@ -1452,7 +1450,7 @@ static inline unsigned int ether1394_encapsulate(struct sk_buff *skb,
 		hdr->common.lf = ETH1394_HDR_LF_IF;
 		hdr->sf.fg_off = 0;
 		break;
-		
+
 	default:
 		hdr->sf.fg_off += adj_max_payload;
 		bufhdr = (union eth1394_hdr *)skb_pull(skb, adj_max_payload);
@@ -1499,7 +1497,7 @@ static inline int ether1394_prep_write_packet(struct hpsb_packet *p,
 		ETH1394_PRINT_G(KERN_ERR, "No more tlabels left while sending "
 				"to node " NODE_BUS_FMT "\n", NODE_BUS_ARGS(host, node));
 		return -1;
-	}		
+	}
 	p->header[0] = (p->node_id << 16) | (p->tlabel << 10)
 		| (1 << 8) | (TCODE_WRITEB << 4);
 
@@ -1538,7 +1536,6 @@ static inline void ether1394_free_packet(struct hpsb_packet *packet)
 {
 	if (packet->tcode != TCODE_STREAM_DATA)
 		hpsb_free_tlabel(packet);
-	packet->data = NULL;
 	hpsb_free_packet(packet);
 }
 
@@ -1583,9 +1580,9 @@ static inline void ether1394_dg_complete(struct packet_task *ptask, int fail)
 {
 	struct sk_buff *skb = ptask->skb;
 	struct net_device *dev = skb->dev;
-	struct eth1394_priv *priv = (struct eth1394_priv *)dev->priv;
+	struct eth1394_priv *priv = dev->priv;
         unsigned long flags;
-		
+
 	/* Statistics */
 	spin_lock_irqsave(&priv->lock, flags);
 	if (fail) {
@@ -1616,8 +1613,7 @@ static void ether1394_complete_cb(void *__ptask)
 	ether1394_free_packet(packet);
 
 	ptask->outstanding_pkts--;
-	if (ptask->outstanding_pkts > 0 && !fail)
-	{
+	if (ptask->outstanding_pkts > 0 && !fail) {
 		int tx_len;
 
 		/* Add the encapsulation header to the fragment */
@@ -1637,7 +1633,7 @@ static int ether1394_tx (struct sk_buff *skb, struct net_device *dev)
 {
 	int kmflags = in_interrupt() ? GFP_ATOMIC : GFP_KERNEL;
 	struct eth1394hdr *eth;
-	struct eth1394_priv *priv = (struct eth1394_priv *)dev->priv;
+	struct eth1394_priv *priv = dev->priv;
 	int proto;
 	unsigned long flags;
 	nodeid_t dest_node;
@@ -1797,7 +1793,7 @@ static int ether1394_ethtool_ioctl(struct net_device *dev, void *useraddr)
 		case ETHTOOL_GDRVINFO: {
 			struct ethtool_drvinfo info = { ETHTOOL_GDRVINFO };
 			strcpy (info.driver, driver_name);
-			strcpy (info.version, "$Rev: 1175 $");
+			strcpy (info.version, "$Rev: 1198 $");
 			/* FIXME XXX provide sane businfo */
 			strcpy (info.bus_info, "ieee1394");
 			if (copy_to_user (useraddr, &info, sizeof (info)))

@@ -271,7 +271,7 @@ struct sbp2_status_block {
 #endif
 
 /*
- * SCSI direction table... 
+ * SCSI direction table...
  * (now used as a back-up in case the direction passed down from above is "unknown")
  *
  * DIN = IN data direction
@@ -285,7 +285,7 @@ struct sbp2_status_block {
 #define DIN				ORB_DIRECTION_READ_FROM_MEDIA
 #define DOU				ORB_DIRECTION_WRITE_TO_MEDIA
 #define DNO				ORB_DIRECTION_NO_DATA_TRANSFER
-#define DUN				DIN 
+#define DUN				DIN
 
 static unchar sbp2scsi_direction_table[0x100] = {
 	DNO,DNO,DIN,DIN,DOU,DIN,DIN,DOU,DIN,DUN,DOU,DOU,DUN,DUN,DUN,DIN,
@@ -316,8 +316,8 @@ enum cmd_dma_types {
 	CMD_DMA_SINGLE
 };
 
-/* 
- * Encapsulates all the info necessary for an outstanding command. 
+/*
+ * Encapsulates all the info necessary for an outstanding command.
  */
 struct sbp2_command_info {
 
@@ -386,12 +386,12 @@ struct scsi_id_instance_data {
 	u32 sbp2_device_type_and_lun;
 	u32 sbp2_firmware_revision;
 
-	/* 
+	/*
 	 * Variable used for logins, reconnects, logouts, query logins
 	 */
 	atomic_t sbp2_login_complete;
 
-	/* 
+	/*
 	 * Pool of command orbs, so we can have more than overlapped command per id
 	 */
 	spinlock_t sbp2_command_orb_lock;
@@ -433,8 +433,8 @@ static int sbp2util_create_command_orb_pool(struct scsi_id_instance_data *scsi_i
 static void sbp2util_remove_command_orb_pool(struct scsi_id_instance_data *scsi_id);
 static struct sbp2_command_info *sbp2util_find_command_for_orb(struct scsi_id_instance_data *scsi_id, dma_addr_t orb);
 static struct sbp2_command_info *sbp2util_find_command_for_SCpnt(struct scsi_id_instance_data *scsi_id, void *SCpnt);
-static struct sbp2_command_info *sbp2util_allocate_command_orb(struct scsi_id_instance_data *scsi_id, 
-							  Scsi_Cmnd *Current_SCpnt, 
+static struct sbp2_command_info *sbp2util_allocate_command_orb(struct scsi_id_instance_data *scsi_id,
+							  Scsi_Cmnd *Current_SCpnt,
 							  void (*Current_done)(Scsi_Cmnd *));
 static void sbp2util_mark_command_completed(struct scsi_id_instance_data *scsi_id,
 		struct sbp2_command_info *command);
@@ -455,8 +455,8 @@ static int sbp2_handle_physdma_read(struct hpsb_host *host, int nodeid, quadlet_
  */
 static int sbp2_query_logins(struct scsi_id_instance_data *scsi_id);
 static int sbp2_login_device(struct scsi_id_instance_data *scsi_id);
-static int sbp2_reconnect_device(struct scsi_id_instance_data *scsi_id); 
-static int sbp2_logout_device(struct scsi_id_instance_data *scsi_id); 
+static int sbp2_reconnect_device(struct scsi_id_instance_data *scsi_id);
+static int sbp2_logout_device(struct scsi_id_instance_data *scsi_id);
 static int sbp2_handle_status_write(struct hpsb_host *host, int nodeid, int destid,
 				    quadlet_t *data, u64 addr, size_t length, u16 flags);
 static int sbp2_agent_reset(struct scsi_id_instance_data *scsi_id, int wait);
@@ -465,7 +465,7 @@ static int sbp2_create_command_orb(struct scsi_id_instance_data *scsi_id,
 				   unchar *scsi_cmd,
 				   unsigned int scsi_use_sg,
 				   unsigned int scsi_request_bufflen,
-				   void *scsi_request_buffer, 
+				   void *scsi_request_buffer,
 				   unsigned char scsi_dir);
 static int sbp2_link_orb_command(struct scsi_id_instance_data *scsi_id,
 				 struct sbp2_command_info *command);

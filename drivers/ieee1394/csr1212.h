@@ -1,6 +1,6 @@
 /*
  * csr1212.h -- IEEE 1212 Control and Status Register support for Linux
- * 
+ *
  * Copyright (C) 2003 Francois Retief <fgretief@sun.ac.za>
  *                    Steve Kinneberg <kinnebergsteve@acmsystems.com>
  *
@@ -37,6 +37,7 @@
 #include <linux/types.h>
 #include <linux/slab.h>
 #include <linux/interrupt.h>
+#include <linux/sched.h>
 
 #define CSR1212_MALLOC(size)		kmalloc((size), in_interrupt() ? GFP_ATOMIC : GFP_KERNEL)
 #define CSR1212_FREE(ptr)		kfree(ptr)
@@ -440,7 +441,7 @@ static inline u_int32_t *CSR1212_ICON_DESCRIPTOR_LEAF_PIXELS(struct csr1212_keyv
 	static const int pd[4] = { 0, 4, 16, 256 };
 	static const int cs[16] = { 4, 2 };
 	int ps = pd[CSR1212_ICON_DESCRIPTOR_LEAF_PALETTE_DEPTH(kv)];
-	
+
 	return &kv->value.leaf.data[5 +
 				    (ps * cs[CSR1212_ICON_DESCRIPTOR_LEAF_COLOR_SPACE(kv)]) /
 			   sizeof(u_int32_t)];
@@ -705,7 +706,7 @@ static inline void csr1212_release_keyval(struct csr1212_keyval *kv)
  * _kv is a struct csr1212_keyval * that'll point to the current keyval (loop index).
  * _dir is a struct csr1212_keyval * that points to the directory to be looped.
  * _pos is a struct csr1212_dentry * that is used internally for indexing.
- * 
+ *
  * kv will be NULL upon exit of the loop.
  */
 #define csr1212_for_each_dir_entry(_csr, _kv, _dir, _pos)			\

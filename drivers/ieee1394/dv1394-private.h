@@ -34,11 +34,11 @@
 /* none of this is exposed to user-space */
 
 
-/* 
+/*
    the 8-byte CIP (Common Isochronous Packet) header that precedes
    each packet of DV data.
 
-   See the IEC 61883 standard. 
+   See the IEC 61883 standard.
 */
 
 struct CIP_header { unsigned char b[8]; };
@@ -71,10 +71,10 @@ static inline void fill_cip_header(struct CIP_header *cip,
 
 
 
-/* 
+/*
    DMA commands used to program the OHCI's DMA engine
 
-   See the Texas Instruments OHCI 1394 chipset documentation. 
+   See the Texas Instruments OHCI 1394 chipset documentation.
 */
 
 struct output_more_immediate { u32 q[8]; };
@@ -95,17 +95,17 @@ static inline void fill_output_more_immediate(struct output_more_immediate *omi,
 	omi->q[1] = 0;
 	omi->q[2] = 0;
 	omi->q[3] = 0;
-	
+
 	/* IT packet header */
 	omi->q[4] = cpu_to_le32(  (0x0 << 16)  /* IEEE1394_SPEED_100 */
 				  | (tag << 14)
 				  | (channel << 8)
-				  | (TCODE_ISO_DATA << 4) 
+				  | (TCODE_ISO_DATA << 4)
 				  | (sync_tag) );
 
 	/* reserved field; mimic behavior of my Sony DSR-40 */
 	omi->q[5] = cpu_to_le32((payload_size << 16) | (0x7F << 8) | 0xA0);
-	
+
 	omi->q[6] = 0;
 	omi->q[7] = 0;
 }
@@ -186,11 +186,11 @@ static inline void fill_input_last(struct input_last *il,
 
 
 
-/* 
+/*
    A "DMA descriptor block" consists of several contiguous DMA commands.
-   struct DMA_descriptor_block encapsulates all of the commands necessary 
-   to send one packet of DV data. 
-   
+   struct DMA_descriptor_block encapsulates all of the commands necessary
+   to send one packet of DV data.
+
    There are three different types of these blocks:
 
         1) command to send an empty packet (CIP header only, no DV data):
@@ -225,44 +225,44 @@ struct DMA_descriptor_block {
 	union {
 		struct {
 			/*  iso header, common to all output block types */
-			struct output_more_immediate omi; 
-			
+			struct output_more_immediate omi;
+
 			union {
 				/* empty packet */
 				struct {
 					struct output_last ol;  /* CIP header */
 				} empty;
-			
+
 				/* full packet */
 				struct {
 					struct output_more om;  /* CIP header */
-					
+
 					union {
 				               /* payload does not cross page boundary */
 						struct {
 							struct output_last ol;  /* data payload */
 						} nocross;
-						
+
 				               /* payload crosses page boundary */
 						struct {
 							struct output_more om;  /* data payload */
 							struct output_last ol;  /* data payload */
 						} cross;
 					} u;
-					
+
 				} full;
 			} u;
 		} out;
 
 		struct {
-			struct input_last il; 
+			struct input_last il;
 		} in;
 
 	} u;
 
-	/* ensure that PAGE_SIZE % sizeof(struct DMA_descriptor_block) == 0 
+	/* ensure that PAGE_SIZE % sizeof(struct DMA_descriptor_block) == 0
 	   by padding out to 128 bytes */
-	u32 __pad__[12]; 
+	u32 __pad__[12];
 };
 
 
@@ -281,7 +281,7 @@ struct frame {
 	/* index of this frame in video_card->frames[] */
 	unsigned int frame_num;
 
-	/* FRAME_CLEAR - DMA program not set up, waiting for data 
+	/* FRAME_CLEAR - DMA program not set up, waiting for data
 	   FRAME_READY - DMA program written, ready to transmit
 
 	   Changes to these should be locked against the interrupt
@@ -290,7 +290,7 @@ struct frame {
 		FRAME_CLEAR = 0,
 		FRAME_READY
 	} state;
-	
+
 	/* whether this frame has been DMA'ed already; used only from
 	   the IRQ handler to determine whether the frame can be reset */
 	int done;
@@ -299,7 +299,7 @@ struct frame {
 	/* kernel virtual pointer to the start of this frame's data in
 	   the user ringbuffer. Use only for CPU access; to get the DMA
 	   bus address you must go through the video->user_dma mapping */
-	unsigned long data; 
+	unsigned long data;
 
 	/* Max # of packets per frame */
 #define MAX_PACKETS 500
@@ -310,7 +310,7 @@ struct frame {
 	struct CIP_header *header_pool;
 	dma_addr_t         header_pool_dma;
 
-	
+
 	/* a physically contiguous memory pool for allocating DMA
 	   descriptor blocks; usually around 64KB in size
 	   !descriptor_pool must be aligned to PAGE_SIZE! */
@@ -338,7 +338,7 @@ struct frame {
 
 	/* pointer to the first packet's CIP header (where the timestamp goes) */
 	struct CIP_header *cip_syt1;
-	
+
 	/* pointer to the second packet's CIP header
 	   (only set if the first packet was empty) */
 	struct CIP_header *cip_syt2;
@@ -384,7 +384,7 @@ static void frame_delete(struct frame *f);
 static void frame_reset(struct frame *f);
 
 /* struct video_card contains all data associated with one instance
-   of the dv1394 driver 
+   of the dv1394 driver
 */
 enum modes {
 	MODE_RECEIVE,
@@ -411,7 +411,7 @@ struct video_card {
 	u32 ohci_IsoXmitContextControlSet;
 	u32 ohci_IsoXmitContextControlClear;
 	u32 ohci_IsoXmitCommandPtr;
-	
+
 	/* OHCI card IR DMA context number, -1 if not in use */
 	struct ohci1394_iso_tasklet ir_tasklet;
 	int ohci_ir_ctx;
@@ -421,10 +421,10 @@ struct video_card {
 	u32 ohci_IsoRcvContextControlClear;
 	u32 ohci_IsoRcvCommandPtr;
 	u32 ohci_IsoRcvContextMatch;
-	
-	
+
+
 	/* CONCURRENCY CONTROL */
-	
+
 	/* there are THREE levels of locking associated with video_card. */
 
 	/*
@@ -435,7 +435,7 @@ struct video_card {
 	 */
 	unsigned long open;
 
-	/* 
+	/*
 	   2) the spinlock - this provides mutual exclusion between the interrupt
 	   handler and process-context operations. Generally you must take the
 	   spinlock under the following conditions:
@@ -458,7 +458,7 @@ struct video_card {
 	/* flag to prevent spurious interrupts (which OHCI seems to
 	   generate a lot :) from accessing the struct */
 	int dma_running;
-	
+
 	/*
 	  3) the sleeping semaphore 'sem' - this is used from process context only,
 	  to serialize various operations on the video_card. Even though only one
@@ -477,24 +477,24 @@ struct video_card {
 
 	/* support asynchronous I/O signals (SIGIO) */
 	struct fasync_struct *fasync;
-	
+
 	/* the large, non-contiguous (rvmalloc()) ringbuffer for DV
            data, exposed to user-space via mmap() */
 	unsigned long      dv_buf_size;
 	struct dma_region  dv_buf;
-	
+
 	/* next byte in the ringbuffer that a write() call will fill */
 	size_t write_off;
 
 	struct frame *frames[DV1394_MAX_FRAMES];
-	
+
 	/* n_frames also serves as an indicator that this struct video_card is
 	   initialized and ready to run DMA buffers */
 
 	int n_frames;
 
 	/* this is the frame that is currently "owned" by the OHCI DMA controller
-	   (set to -1 iff DMA is not running) 
+	   (set to -1 iff DMA is not running)
 
 	   ! must lock against the interrupt handler when accessing it !
 
@@ -511,7 +511,6 @@ struct video_card {
 
 	       The interrupt handler will NEVER advance active_frame to a
 	       frame that is not READY.
-	       
 	*/
 	int active_frame;
 	int first_run;
@@ -521,10 +520,10 @@ struct video_card {
 	/* altered ONLY from process context. Must check first_clear_frame->state;
 	   if it's READY, that means the ringbuffer is full with READY frames;
 	   if it's CLEAR, that means one or more ringbuffer frames are CLEAR */
-	unsigned int first_clear_frame; 
+	unsigned int first_clear_frame;
 
 	/* altered both by process and interrupt */
-	unsigned int n_clear_frames;   
+	unsigned int n_clear_frames;
 
 	/* only altered by the interrupt */
 	unsigned int dropped_frames;
@@ -548,17 +547,17 @@ struct video_card {
 	/* the isochronous channel to use, -1 if video card is inactive */
 	int channel;
 
-	
+
 	/* physically contiguous packet ringbuffer for receive */
 	struct dma_region packet_buf;
 	unsigned long  packet_buf_size;
-	
+
 	unsigned int current_packet;
 	int first_frame; 	/* received first start frame marker? */
 	enum modes mode;
 };
 
-/* 
+/*
    if the video_card is not initialized, then the ONLY fields that are valid are:
    ohci
    open
@@ -575,7 +574,7 @@ static int do_dv1394_init_default(struct video_card *video);
 static void do_dv1394_shutdown(struct video_card *video, int free_user_buf);
 
 
-/* NTSC empty packet rate accurate to within 0.01%, 
+/* NTSC empty packet rate accurate to within 0.01%,
    calibrated against a Sony DSR-40 DVCAM deck */
 
 #define CIP_N_NTSC   68000000

@@ -187,14 +187,14 @@ static int pcr_read(struct hpsb_host *host, int nodeid, quadlet_t *buf,
 	int csraddr = addr - CSR_REGISTER_BASE;
 	int plug;
 	struct cmp_host *ch;
-	
+
 	if (length != 4)
 		return RCODE_TYPE_ERROR;
 
 	ch = hpsb_get_hostinfo(&cmp_highlevel, host);
 	if (csraddr == 0x900) {
 		*buf = cpu_to_be32(ch->u.ompr_quadlet);
-		return RCODE_COMPLETE;   
+		return RCODE_COMPLETE;
 	}
 	else if (csraddr < 0x904 + ch->u.ompr.nplugs * 4) {
 		plug = (csraddr - 0x904) / 4;
@@ -206,7 +206,7 @@ static int pcr_read(struct hpsb_host *host, int nodeid, quadlet_t *buf,
 	}
 	else if (csraddr == 0x980) {
 		*buf = cpu_to_be32(ch->v.impr_quadlet);
-		return RCODE_COMPLETE;   
+		return RCODE_COMPLETE;
 	}
 	else if (csraddr < 0x984 + ch->v.impr.nplugs * 4) {
 		plug = (csraddr - 0x984) / 4;
@@ -225,10 +225,10 @@ static int pcr_lock(struct hpsb_host *host, int nodeid, quadlet_t *store,
 	struct cmp_host *ch;
 
 	ch = hpsb_get_hostinfo(&cmp_highlevel, host);
-	
-	if (extcode != EXTCODE_COMPARE_SWAP) 
+
+	if (extcode != EXTCODE_COMPARE_SWAP)
 		return RCODE_TYPE_ERROR;
-	
+
 	if (csraddr == 0x900) {
 		/* FIXME: Ignore writes to bits 30-31 and 0-7 */
 		*store = cpu_to_be32(ch->u.ompr_quadlet);

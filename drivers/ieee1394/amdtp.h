@@ -24,7 +24,7 @@
  *
  * The dimension field specifies the dimension of the signal, that is,
  * the number of audio channels.  Only AMDTP_FORMAT_RAW supports
- * settings greater than 2.  
+ * settings greater than 2.
  *
  * The mode field specifies which transmission mode to use. The AMDTP
  * specifies two different transmission modes: blocking and
