@@ -4702,21 +4702,22 @@ static int
 pfm_check_task_state(pfm_context_t *ctx, int cmd, unsigned long flags)
 {
 	struct task_struct *task;
-	int state;
+	int state, old_state;
 
+recheck:
 	state = ctx->ctx_state;
+	task  = ctx->ctx_task;
 
-	task = PFM_CTX_TASK(ctx);
 	if (task == NULL) {
 		DPRINT(("context %d no task, state=%d\n", ctx->ctx_fd, state));
 		return 0;
 	}
 
 	DPRINT(("context %d state=%d [%d] task_state=%ld must_stop=%d\n",
-				ctx->ctx_fd,
-				state,
-				task->pid,
-				task->state, PFM_CMD_STOPPED(cmd)));
+		ctx->ctx_fd,
+		state,
+		task->pid,
+		task->state, PFM_CMD_STOPPED(cmd)));
 
 	/*
 	 * self-monitoring always ok.
@@ -4728,31 +4729,61 @@ pfm_check_task_state(pfm_context_t *ctx, int cmd, unsigned long flags)
 	if (task == current || ctx->ctx_fl_system) return 0;
 
 	/*
-	 * context is UNLOADED, MASKED we are safe to go
+	 * no command can operate on a zombie context
+	 */
+	if (state == PFM_CTX_ZOMBIE) {
+		DPRINT(("cmd %d state zombie cannot operate on context\n", cmd));
+		return -EINVAL;
+	}
+
+	/*
+	 * if context is UNLOADED, MASKED we are safe to go
 	 */
 	if (state != PFM_CTX_LOADED) return 0;
 
-	if (state == PFM_CTX_ZOMBIE) return -EINVAL;
-
 	/*
-	 * context is loaded, we must make sure the task is stopped
+	 * context is LOADED, we must make sure the task is stopped
 	 * We could lift this restriction for UP but it would mean that
 	 * the user has no guarantee the task would not run between
 	 * two successive calls to perfmonctl(). That's probably OK.
 	 * If this user wants to ensure the task does not run, then
 	 * the task must be stopped.
 	 */
-	if (PFM_CMD_STOPPED(cmd) && task->state != TASK_STOPPED) {
-		DPRINT(("[%d] task not in stopped state\n", task->pid));
-		return -EBUSY;
+	if (PFM_CMD_STOPPED(cmd)) {
+		if (task->state != TASK_STOPPED) {
+			DPRINT(("[%d] task not in stopped state\n", task->pid));
+			return -EBUSY;
+		}
+		/*
+		 * task is now stopped, wait for ctxsw out
+		 *
+		 * This is an interesting point in the code.
+		 * We need to unprotect the context because
+		 * the pfm_save_regs() routines needs to grab
+		 * the same lock. There are danger in doing
+		 * this because it leaves a window open for
+		 * another task to get access to the context
+		 * and possibly change its state. The one thing
+		 * that is not possible is for the context to disappear
+		 * because we are protected by the VFS layer, i.e.,
+		 * get_fd()/put_fd().
+		 */
+		old_state = state;
+
+		UNPROTECT_CTX(ctx, flags);
+
+		wait_task_inactive(task);
+
+		PROTECT_CTX(ctx, flags);
+
+		/*
+		 * we must recheck to verify if state has changed
+		 */
+		if (ctx->ctx_state != old_state) {
+			DPRINT(("old_state=%d new_state=%d\n", old_state, ctx->ctx_state));
+			goto recheck;
+		}
 	}
-
-	UNPROTECT_CTX(ctx, flags);
-
-	wait_task_inactive(task);
-
-	PROTECT_CTX(ctx, flags);
-
 	return 0;
 }
 
