@@ -1226,7 +1226,7 @@ static int __init init_amd(struct cpuinfo_x86 *c)
 			 * here.
 			 */
 			if (c->x86_model == 6 || c->x86_model == 7) {
-				if (!test_bit(X86_FEATURE_XMM, c->x86_capability)) {
+				if (!cpu_has(c, X86_FEATURE_XMM)) {
 					printk(KERN_INFO "Enabling disabled K7/SSE Support.\n");
 					rdmsr(MSR_K7_HWCR, l, h);
 					l &= ~0x00008000;
@@ -2153,7 +2153,7 @@ static void __init init_intel(struct cpuinfo_x86 *c)
 		strcpy(c->x86_model_id, p);
 	
 #ifdef CONFIG_SMP
-	if (test_bit(X86_FEATURE_HT, c->x86_capability)) {
+	if (cpu_has(c, X86_FEATURE_HT)) {
 		extern	int phys_proc_id[NR_CPUS];
 		
 		u32 	eax, ebx, ecx, edx;
@@ -2322,8 +2322,7 @@ static int __init deep_magic_nexgen_probe(void)
 
 static void __init squash_the_stupid_serial_number(struct cpuinfo_x86 *c)
 {
-	if( test_bit(X86_FEATURE_PN, c->x86_capability) &&
-	    disable_x86_serial_nr ) {
+	if (cpu_has(c, X86_FEATURE_PN) && disable_x86_serial_nr ) {
 		/* Disable processor serial number */
 		unsigned long lo,hi;
 		rdmsr(MSR_IA32_BBL_CR_CTL,lo,hi);
@@ -2760,7 +2759,7 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 	else
 		seq_printf(m, "stepping\t: unknown\n");
 
-	if ( test_bit(X86_FEATURE_TSC, c->x86_capability) ) {
+	if ( cpu_has(c, X86_FEATURE_TSC) ) {
 		seq_printf(m, "cpu MHz\t\t: %lu.%03lu\n",
 			cpu_khz / 1000, (cpu_khz % 1000));
 	}

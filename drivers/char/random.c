@@ -736,7 +736,7 @@ static void add_timer_randomness(struct timer_rand_state *state, unsigned num)
 	int		entropy = 0;
 
 #if defined (__i386__) || defined (__x86_64__)
-	if (cpu_has_tsc)
+	if (cpu_has_tsc) {
 		__u32 high;
 		rdtsc(time, high);
 		num ^= high;
