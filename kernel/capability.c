@@ -63,9 +63,6 @@ asmlinkage long sys_capget(cap_user_header_t header, cap_user_data_t dataptr)
      } else
 	     target = current;
 
-     data.permitted = cap_t(target->cap_permitted);
-     data.inheritable = cap_t(target->cap_inheritable); 
-     data.effective = cap_t(target->cap_effective);
      ret = security_ops->capget(target, &data.effective, &data.inheritable, &data.permitted);
 
 out:
