@@ -21,6 +21,11 @@
 	ldr	\rd, [\rn, #VMA_VM_FLAGS]
 	.endm
 
+	.macro	tsk_mm, rd, rn
+	ldr	\rd, [\rn, #TI_TASK]
+	ldr	\rd, [\rd, #TSK_ACTIVE_MM]
+	.endm
+
 /*
  * act_mm - get current->active_mm
  */

@@ -16,7 +16,6 @@
 #ifndef MULTI_CPU
 EXPORT_SYMBOL(cpu_cache_clean_invalidate_all);
 EXPORT_SYMBOL(cpu_cache_clean_invalidate_range);
-EXPORT_SYMBOL(cpu_flush_ram_page);
 EXPORT_SYMBOL(cpu_dcache_clean_page);
 EXPORT_SYMBOL(cpu_dcache_clean_entry);
 EXPORT_SYMBOL(cpu_dcache_clean_range);
