@@ -606,7 +606,7 @@ static int aha1740_probe (struct device *dev)
 	       dev->name, slotbase, irq_level);
 	printk(KERN_INFO "aha174x: Extended translation %sabled.\n",
 	       translation ? "en" : "dis");
-	shpnt = scsi_register(&aha1740_template,
+	shpnt = scsi_host_alloc(&aha1740_template,
 			      sizeof(struct aha1740_hostdata));
 	if(shpnt == NULL)
 		goto err_release;
@@ -658,7 +658,7 @@ static __devexit int aha1740_remove (struct device *dev)
 			  sizeof (host->ecb), DMA_BIDIRECTIONAL);
 	release_region (shpnt->io_port, SLOTSIZE);
 
-	scsi_unregister (shpnt);
+	scsi_host_put (shpnt);
 	
 	return 0;
 }
