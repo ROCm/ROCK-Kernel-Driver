@@ -3105,6 +3105,7 @@ static int tg3_abort_hw(struct tg3 *tp)
 	err |= tg3_stop_block(tp, SNDDATAI_MODE, SNDDATAI_MODE_ENABLE);
 	err |= tg3_stop_block(tp, RDMAC_MODE, RDMAC_MODE_ENABLE);
 	err |= tg3_stop_block(tp, SNDDATAC_MODE, SNDDATAC_MODE_ENABLE);
+	err |= tg3_stop_block(tp, DMAC_MODE, DMAC_MODE_ENABLE);
 	err |= tg3_stop_block(tp, SNDBDC_MODE, SNDBDC_MODE_ENABLE);
 	if (err)
 		goto out;
