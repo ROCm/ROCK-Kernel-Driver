@@ -875,21 +875,16 @@ static int vlsi_process_tx(struct vlsi_ring *r, struct ring_descr *rd)
 	return (ret) ? -ret : len;
 }
 
-static int vlsi_set_baud(struct net_device *ndev, int dolock)
+static int vlsi_set_baud(vlsi_irda_dev_t *idev, unsigned iobase)
 {
-	vlsi_irda_dev_t *idev = ndev->priv;
-	unsigned long flags;
 	u16 nphyctl;
-	unsigned iobase; 
 	u16 config;
 	unsigned mode;
-	unsigned idle_retry;
 	int	ret;
 	int	baudrate;
-	int	fifocnt = 0;	/* Keep compiler happy */
+	int	fifocnt;
 
 	baudrate = idev->new_baud;
-	iobase = ndev->base_addr;
 	IRDA_DEBUG(2, "%s: %d -> %d\n", __FUNCTION__, idev->baud, idev->new_baud);
 	if (baudrate == 4000000) {
 		mode = IFF_FIR;
@@ -920,37 +915,15 @@ static int vlsi_set_baud(struct net_device *ndev, int dolock)
 				break;
 		}
 	}
-
-	if (dolock)
-		spin_lock_irqsave(&idev->lock, flags);
-	else
-		flags = 0xdead;	/* prevent bogus warning about possible uninitialized use */
-
-	for (idle_retry=0; idle_retry < 100; idle_retry++) {
-		fifocnt = inw(ndev->base_addr+VLSI_PIO_RCVBCNT) & RCVBCNT_MASK;
-		if (fifocnt == 0)
-			break;
-		if (!idle_retry)
-			IRDA_DEBUG(0, "%s: waiting for rx fifo to become empty(%d)\n",
-				__FUNCTION__, fifocnt);
-		if (dolock) {
-			spin_unlock_irqrestore(&idev->lock, flags);
-			udelay(100);
-			spin_lock_irqsave(&idev->lock, flags);
-		}
-		else
-			udelay(100);
-	}
-	if (fifocnt != 0)
-		IRDA_DEBUG(0, "%s: rx fifo not empty(%d)\n", __FUNCTION__, fifocnt);
-
-	outw(0, iobase+VLSI_PIO_IRENABLE);
-	wmb();
-
 	config |= IRCFG_MSTR | IRCFG_ENRX;
 
-	outw(config, iobase+VLSI_PIO_IRCFG);
+	fifocnt = inw(iobase+VLSI_PIO_RCVBCNT) & RCVBCNT_MASK;
+	if (fifocnt != 0) {
+		IRDA_DEBUG(0, "%s: rx fifo not empty(%d)\n", __FUNCTION__, fifocnt);
+	}
 
+	outw(0, iobase+VLSI_PIO_IRENABLE);
+	outw(config, iobase+VLSI_PIO_IRCFG);
 	outw(nphyctl, iobase+VLSI_PIO_NPHYCTL);
 	wmb();
 	outw(IRENABLE_IREN, iobase+VLSI_PIO_IRENABLE);
@@ -987,8 +960,6 @@ static int vlsi_set_baud(struct net_device *ndev, int dolock)
 			ret = 0;
 		}
 	}
-	if (dolock)
-		spin_unlock_irqrestore(&idev->lock, flags);
 
 	if (ret)
 		vlsi_reg_debug(iobase,__FUNCTION__);
@@ -998,12 +969,14 @@ static int vlsi_set_baud(struct net_device *ndev, int dolock)
 
 static inline int vlsi_set_baud_lock(struct net_device *ndev)
 {
-	return vlsi_set_baud(ndev, 1);
-}
+	vlsi_irda_dev_t *idev = ndev->priv;
+	unsigned long flags;
+	int ret;
 
-static inline int vlsi_set_baud_nolock(struct net_device *ndev)
-{
-	return vlsi_set_baud(ndev, 0);
+	spin_lock_irqsave(&idev->lock, flags);
+	ret = vlsi_set_baud(idev, ndev->base_addr);
+	spin_unlock_irqrestore(&idev->lock, flags);
+	return ret;
 }
 
 static int vlsi_hard_start_xmit(struct sk_buff *skb, struct net_device *ndev)
@@ -1047,7 +1020,7 @@ static int vlsi_hard_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 			spin_lock_irqsave(&idev->lock, flags);
 			if (ring_first(idev->tx_ring) == NULL) {
 				/* no race - tx-ring already empty */
-				vlsi_set_baud_nolock(ndev);
+				vlsi_set_baud(idev, iobase);
 				netif_wake_queue(ndev);
 			}
 			else
@@ -1441,7 +1414,7 @@ static int vlsi_init_chip(struct pci_dev *pdev)
 	atomic_set(&idev->tx_ring->head, RINGPTR_GET_TX(ptr));
 	atomic_set(&idev->tx_ring->tail, RINGPTR_GET_TX(ptr));
 
-	vlsi_set_baud_lock(ndev);	/* idev->new_baud used as provided by caller */
+	vlsi_set_baud(idev, iobase);	/* idev->new_baud used as provided by caller */
 
 	outb(IRINTR_INT_MASK, iobase+VLSI_PIO_IRINTR);	/* just in case - w/c pending IRQ's */
 	wmb();
@@ -1498,10 +1471,11 @@ static int vlsi_stop_hw(vlsi_irda_dev_t *idev)
 	spin_lock_irqsave(&idev->lock,flags);
 	outw(0, iobase+VLSI_PIO_IRENABLE);
 	outw(0, iobase+VLSI_PIO_IRCFG);			/* disable everything */
-	wmb();
 
-	outb(IRINTR_INT_MASK, iobase+VLSI_PIO_IRINTR);	/* w/c pending + disable further IRQ */
-	mb();
+	/* disable and w/c irqs */
+	outb(0, iobase+VLSI_PIO_IRINTR);
+	wmb();
+	outb(IRINTR_INT_MASK, iobase+VLSI_PIO_IRINTR);
 	spin_unlock_irqrestore(&idev->lock,flags);
 
 	vlsi_unarm_tx(idev);
@@ -1569,7 +1543,7 @@ static int vlsi_ioctl(struct net_device *ndev, struct ifreq *rq, int cmd)
 			 * if the stack tries to change speed concurrently - which would be
 			 * pretty strange anyway with the userland having full control...
 			 */
-			vlsi_set_baud_nolock(ndev);
+			vlsi_set_baud(idev, ndev->base_addr);
 			spin_unlock_irqrestore(&idev->lock, flags);
 			break;
 		case SIOCSMEDIABUSY:
