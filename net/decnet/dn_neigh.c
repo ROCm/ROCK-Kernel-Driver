@@ -128,7 +128,7 @@ static u32 dn_neigh_hash(const void *pkey, const struct net_device *dev)
 	hash_val ^= (hash_val >> 10);
 	hash_val ^= (hash_val >> 3);
 
-	return hash_val & NEIGH_HASHMASK;
+	return hash_val;
 }
 
 static int dn_neigh_construct(struct neighbour *neigh)

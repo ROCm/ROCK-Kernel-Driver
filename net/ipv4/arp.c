@@ -229,7 +229,7 @@ static u32 arp_hash(const void *pkey, const struct net_device *dev)
 	hash_val ^= (hash_val>>16);
 	hash_val ^= hash_val>>8;
 	hash_val ^= hash_val>>3;
-	hash_val = (hash_val^dev->ifindex)&NEIGH_HASHMASK;
+	hash_val = (hash_val^dev->ifindex);
 
 	return hash_val;
 }

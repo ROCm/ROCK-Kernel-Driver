@@ -291,7 +291,7 @@ struct neighbour *neigh_lookup(struct neigh_table *tbl, const void *pkey,
 {
 	struct neighbour *n;
 	int key_len = tbl->key_len;
-	u32 hash_val = tbl->hash(pkey, dev);
+	u32 hash_val = tbl->hash(pkey, dev) & NEIGH_HASHMASK;
 
 	read_lock_bh(&tbl->lock);
 	for (n = tbl->hash_buckets[hash_val]; n; n = n->next) {
@@ -336,7 +336,7 @@ struct neighbour *neigh_create(struct neigh_table *tbl, const void *pkey,
 
 	n->confirmed = jiffies - (n->parms->base_reachable_time << 1);
 
-	hash_val = tbl->hash(pkey, dev);
+	hash_val = tbl->hash(pkey, dev) & NEIGH_HASHMASK;
 
 	write_lock_bh(&tbl->lock);
 	if (n->parms->dead) {
