@@ -307,7 +307,7 @@ static int readable(struct pcmcia_socket *s, struct resource *res, cisinfo_t *in
 	s->cis_mem.res = res;
 	s->cis_virt = ioremap(res->start, s->map_size);
 	if (s->cis_virt) {
-		ret = pcmcia_validate_cis(s->clients, info);
+		ret = pccard_validate_cis(s, BIND_FN_ALL, info);
 		/* invalidate mapping and CIS cache */
 		iounmap(s->cis_virt);
 		s->cis_virt = NULL;
@@ -973,11 +973,8 @@ static int adjust_irq(adjust_t *adj)
 
 /*====================================================================*/
 
-int pcmcia_adjust_resource_info(client_handle_t handle, adjust_t *adj)
+int pcmcia_adjust_resource_info(adjust_t *adj)
 {
-    if (CHECK_HANDLE(handle))
-	return CS_BAD_HANDLE;
-    
     switch (adj->Resource) {
     case RES_MEMORY_RANGE:
 	return adjust_memory(adj);
@@ -991,6 +988,7 @@ int pcmcia_adjust_resource_info(client_handle_t handle, adjust_t *adj)
     }
     return CS_UNSUPPORTED_FUNCTION;
 }
+EXPORT_SYMBOL(pcmcia_adjust_resource_info);
 
 /*====================================================================*/
 
