@@ -99,12 +99,16 @@ extern int ncp_symlink(struct inode*, struct dentry*, const char*);
 /*
  * Fill in the ncpfs-specific information in the inode.
  */
-void ncp_update_inode(struct inode *inode, struct ncp_entry_info *nwinfo)
+static void ncp_update_dirent(struct inode *inode, struct ncp_entry_info *nwinfo)
 {
 	NCP_FINFO(inode)->DosDirNum = nwinfo->i.DosDirNum;
 	NCP_FINFO(inode)->dirEntNum = nwinfo->i.dirEntNum;
 	NCP_FINFO(inode)->volNumber = nwinfo->volume;
+}
 
+void ncp_update_inode(struct inode *inode, struct ncp_entry_info *nwinfo)
+{
+	ncp_update_dirent(inode, nwinfo);
 	NCP_FINFO(inode)->nwattr = nwinfo->i.attributes;
 	NCP_FINFO(inode)->access = nwinfo->access;
 	memcpy(NCP_FINFO(inode)->file_handle, nwinfo->file_handle,
@@ -114,68 +118,19 @@ void ncp_update_inode(struct inode *inode, struct ncp_entry_info *nwinfo)
 		NCP_FINFO(inode)->dirEntNum);
 }
 
-void ncp_update_inode2(struct inode* inode, struct ncp_entry_info *nwinfo)
+static void ncp_update_dates(struct inode *inode, struct nw_info_struct *nwi)
 {
-	struct nw_info_struct *nwi = &nwinfo->i;
-	struct ncp_server *server = NCP_SERVER(inode);
-
-	if (!atomic_read(&NCP_FINFO(inode)->opened)) {
-#ifdef CONFIG_NCPFS_STRONG
-		NCP_FINFO(inode)->nwattr = nwi->attributes;
-#endif
-		if (nwi->attributes & aDIR) {
-			inode->i_mode = server->m.dir_mode;
-			inode->i_size = NCP_BLOCK_SIZE;
-		} else {
-			inode->i_mode = server->m.file_mode;
-			inode->i_size = le32_to_cpu(nwi->dataStreamSize);
-#ifdef CONFIG_NCPFS_EXTRAS
-			if ((server->m.flags & (NCP_MOUNT_EXTRAS|NCP_MOUNT_SYMLINKS)) && (nwi->attributes & aSHARED)) {
-				switch (nwi->attributes & (aHIDDEN|aSYSTEM)) {
-					case aHIDDEN:
-						if (server->m.flags & NCP_MOUNT_SYMLINKS) {
-							if ( /* (inode->i_size >= NCP_MIN_SYMLINK_SIZE)
-							 && */ (inode->i_size <= NCP_MAX_SYMLINK_SIZE)) {
-								inode->i_mode = (inode->i_mode & ~S_IFMT) | S_IFLNK;
-								break;
-							}
-						}
-						/* FALLTHROUGH */
-					case 0:
-						if (server->m.flags & NCP_MOUNT_EXTRAS)
-							inode->i_mode |= 0444;
-						break;
-					case aSYSTEM:
-						if (server->m.flags & NCP_MOUNT_EXTRAS)
-							inode->i_mode |= (inode->i_mode >> 2) & 0111;
-						break;
-					/* case aSYSTEM|aHIDDEN: */
-					default:
-						/* reserved combination */
-						break;
-				}
-			}
-#endif
-		}
-		if (nwi->attributes & aRONLY) inode->i_mode &= ~0222;
-	}
 	inode->i_blocks = (inode->i_size + NCP_BLOCK_SIZE - 1) >> NCP_BLOCK_SHIFT;
 
 	inode->i_mtime = ncp_date_dos2unix(le16_to_cpu(nwi->modifyTime),
 					   le16_to_cpu(nwi->modifyDate));
 	inode->i_ctime = ncp_date_dos2unix(le16_to_cpu(nwi->creationTime),
 					   le16_to_cpu(nwi->creationDate));
-	inode->i_atime = ncp_date_dos2unix(0, le16_to_cpu(nwi->lastAccessDate));
-
-	NCP_FINFO(inode)->DosDirNum = nwi->DosDirNum;
-	NCP_FINFO(inode)->dirEntNum = nwi->dirEntNum;
-	NCP_FINFO(inode)->volNumber = nwi->volNumber;
+	inode->i_atime = ncp_date_dos2unix(0,
+					   le16_to_cpu(nwi->lastAccessDate));
 }
 
-/*
- * Fill in the inode based on the ncp_entry_info structure.
- */
-static void ncp_set_attr(struct inode *inode, struct ncp_entry_info *nwinfo)
+static void ncp_update_attrs(struct inode *inode, struct ncp_entry_info *nwinfo)
 {
 	struct nw_info_struct *nwi = &nwinfo->i;
 	struct ncp_server *server = NCP_SERVER(inode);
@@ -203,11 +158,11 @@ static void ncp_set_attr(struct inode *inode, struct ncp_entry_info *nwinfo)
 					/* FALLTHROUGH */
 				case 0:
 					if (server->m.flags & NCP_MOUNT_EXTRAS)
-						inode->i_mode |= 0444;
+						inode->i_mode |= S_IRUGO;
 					break;
 				case aSYSTEM:
 					if (server->m.flags & NCP_MOUNT_EXTRAS)
-						inode->i_mode |= (inode->i_mode >> 2) & 0111;
+						inode->i_mode |= (inode->i_mode >> 2) & S_IXUGO;
 					break;
 				/* case aSYSTEM|aHIDDEN: */
 				default:
@@ -217,7 +172,28 @@ static void ncp_set_attr(struct inode *inode, struct ncp_entry_info *nwinfo)
 		}
 #endif
 	}
-	if (nwi->attributes & aRONLY) inode->i_mode &= ~0222;
+	if (nwi->attributes & aRONLY) inode->i_mode &= ~S_IWUGO;
+}
+
+void ncp_update_inode2(struct inode* inode, struct ncp_entry_info *nwinfo)
+{
+	if (!atomic_read(&NCP_FINFO(inode)->opened)) {
+		NCP_FINFO(inode)->nwattr = nwinfo->i.attributes;
+		ncp_update_attrs(inode, nwinfo);
+	}
+
+	ncp_update_dates(inode, &nwinfo->i);
+	ncp_update_dirent(inode, nwinfo);
+}
+
+/*
+ * Fill in the inode based on the ncp_entry_info structure.
+ */
+static void ncp_set_attr(struct inode *inode, struct ncp_entry_info *nwinfo)
+{
+	struct ncp_server *server = NCP_SERVER(inode);
+
+	ncp_update_attrs(inode, nwinfo);
 
 	DDPRINTK("ncp_read_inode: inode->i_mode = %u\n", inode->i_mode);
 
@@ -227,14 +203,7 @@ static void ncp_set_attr(struct inode *inode, struct ncp_entry_info *nwinfo)
 	inode->i_rdev = NODEV;
 	inode->i_blksize = NCP_BLOCK_SIZE;
 
-	inode->i_blocks = (inode->i_size + NCP_BLOCK_SIZE - 1) >> NCP_BLOCK_SHIFT;
-
-	inode->i_mtime = ncp_date_dos2unix(le16_to_cpu(nwi->modifyTime),
-			  		   le16_to_cpu(nwi->modifyDate));
-	inode->i_ctime = ncp_date_dos2unix(le16_to_cpu(nwi->creationTime),
-			    		   le16_to_cpu(nwi->creationDate));
-	inode->i_atime = ncp_date_dos2unix(0,
-					   le16_to_cpu(nwi->lastAccessDate));
+	ncp_update_dates(inode, &nwinfo->i);
 	ncp_update_inode(inode, nwinfo);
 }
 
@@ -659,7 +628,7 @@ int ncp_notify_change(struct dentry *dentry, struct iattr *attr)
 
 	if (((attr->ia_valid & ATTR_MODE) &&
 	     (attr->ia_mode &
-	      ~(S_IFREG | S_IFDIR | S_IRWXU | S_IRWXG | S_IRWXO))))
+	      ~(S_IFREG | S_IFDIR | S_IRWXUGO))))
 		goto out;
 
 	info_mask = 0;
@@ -668,58 +637,60 @@ int ncp_notify_change(struct dentry *dentry, struct iattr *attr)
 #if 1 
         if ((attr->ia_valid & ATTR_MODE) != 0)
         {
+		umode_t newmode = attr->ia_mode;
+
+		info_mask |= DM_ATTRIBUTES;
+
                 if (S_ISDIR(inode->i_mode)) {
-                	umode_t newmode;
-
-                	info_mask |= DM_ATTRIBUTES;
-                	newmode = attr->ia_mode;
-                	newmode &= NCP_SERVER(inode)->m.dir_mode;
-
-                	if (newmode & 0222)
-                		info.attributes &= ~(aRONLY|aRENAMEINHIBIT|aDELETEINHIBIT);
-                	else
-				info.attributes |=  (aRONLY|aRENAMEINHIBIT|aDELETEINHIBIT);
-                } else if (!S_ISREG(inode->i_mode))
-                {
-			result = -EPERM;
-			goto out;
-                }
-                else
-                {
-			umode_t newmode;
+                	newmode &= server->m.dir_mode;
+		} else {
 #ifdef CONFIG_NCPFS_EXTRAS			
-			int extras;
-			
-			extras = server->m.flags & NCP_MOUNT_EXTRAS;
-#endif
-                        info_mask |= DM_ATTRIBUTES;
-                        newmode=attr->ia_mode;
-#ifdef CONFIG_NCPFS_EXTRAS
-			if (!extras)
-#endif
-	                        newmode &= server->m.file_mode;
-
-                        if (newmode & 0222) /* any write bit set */
-                        {
-                                info.attributes &= ~(aRONLY|aRENAMEINHIBIT|aDELETEINHIBIT);
-                        }
-                        else
-                        {
-                                info.attributes |=  (aRONLY|aRENAMEINHIBIT|aDELETEINHIBIT);
-                        }
-#ifdef CONFIG_NCPFS_EXTRAS
-			if (extras) {
-				if (newmode & 0111) /* any execute bit set */
+			if (server->m.flags & NCP_MOUNT_EXTRAS) {
+				/* any non-default execute bit set */
+				if (newmode & ~server->m.file_mode & S_IXUGO)
 					info.attributes |= aSHARED | aSYSTEM;
 				/* read for group/world and not in default file_mode */
-				else if (newmode & ~server->m.file_mode & 0444)
+				else if (newmode & ~server->m.file_mode & S_IRUGO)
 					info.attributes |= aSHARED;
-			}
+			} else
 #endif
+				newmode &= server->m.file_mode;			
                 }
+                if (newmode & S_IWUGO)
+                	info.attributes &= ~(aRONLY|aRENAMEINHIBIT|aDELETEINHIBIT);
+                else
+			info.attributes |=  (aRONLY|aRENAMEINHIBIT|aDELETEINHIBIT);
         }
 #endif
 
+	/* Do SIZE before attributes, otherwise mtime together with size does not work...
+	 */
+	if ((attr->ia_valid & ATTR_SIZE) != 0) {
+		int written;
+
+		DPRINTK("ncpfs: trying to change size to %ld\n",
+			attr->ia_size);
+
+		if ((result = ncp_make_open(inode, O_WRONLY)) < 0) {
+			result = -EACCES;
+			goto out;
+		}
+		ncp_write_kernel(NCP_SERVER(inode), NCP_FINFO(inode)->file_handle,
+			  attr->ia_size, 0, "", &written);
+
+		/* According to ndir, the changes only take effect after
+		   closing the file */
+		ncp_inode_close(inode);
+		result = ncp_make_closed(inode);
+		{
+			struct iattr tmpattr;
+			
+			tmpattr.ia_valid = ATTR_SIZE;
+			tmpattr.ia_size = attr->ia_size;
+			
+			inode_setattr(inode, &tmpattr);
+		}
+	}
 	if ((attr->ia_valid & ATTR_CTIME) != 0) {
 		info_mask |= (DM_CREATE_TIME | DM_CREATE_DATE);
 		ncp_date_unix2dos(attr->ia_ctime,
@@ -754,33 +725,16 @@ int ncp_notify_change(struct dentry *dentry, struct iattr *attr)
 				   a terrible hack, but I do not know
 				   how to do this correctly. */
 				result = 0;
-			}
+			} else
+				goto out;
 		}
 #ifdef CONFIG_NCPFS_STRONG		
 		if ((!result) && (info_mask & DM_ATTRIBUTES))
 			NCP_FINFO(inode)->nwattr = info.attributes;
 #endif
 	}
-	if ((attr->ia_valid & ATTR_SIZE) != 0) {
-		int written;
-
-		DPRINTK("ncpfs: trying to change size to %ld\n",
-			attr->ia_size);
-
-		if ((result = ncp_make_open(inode, O_WRONLY)) < 0) {
-			result = -EACCES;
-			goto out;
-		}
-		ncp_write_kernel(NCP_SERVER(inode), NCP_FINFO(inode)->file_handle,
-			  attr->ia_size, 0, "", &written);
-
-		/* According to ndir, the changes only take effect after
-		   closing the file */
-		ncp_inode_close(inode);
-		result = ncp_make_closed(inode);
-		if (!result)
-			result = vmtruncate(inode, attr->ia_size);
-	}
+	if (!result)
+		inode_setattr(inode, attr);
 out:
 	unlock_kernel();
 	return result;
