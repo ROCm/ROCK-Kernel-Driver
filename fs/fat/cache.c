@@ -45,13 +45,13 @@ int __fat_access(struct super_block *sb, int nr, int new_value)
 	}
 	if (sbi->fat_bits == 32) {
 		p_first = p_last = NULL; /* GCC needs that stuff */
-		next = CF_LE_L(((__u32 *) bh->b_data)[(first &
+		next = CF_LE_L(((__le32 *) bh->b_data)[(first &
 		    (sb->s_blocksize - 1)) >> 2]);
 		/* Fscking Microsoft marketing department. Their "32" is 28. */
 		next &= 0x0fffffff;
 	} else if (sbi->fat_bits == 16) {
 		p_first = p_last = NULL; /* GCC needs that stuff */
-		next = CF_LE_W(((__u16 *) bh->b_data)[(first &
+		next = CF_LE_W(((__le16 *) bh->b_data)[(first &
 		    (sb->s_blocksize - 1)) >> 1]);
 	} else {
 		p_first = &((__u8 *)bh->b_data)[first & (sb->s_blocksize - 1)];
@@ -63,10 +63,10 @@ int __fat_access(struct super_block *sb, int nr, int new_value)
 	}
 	if (new_value != -1) {
 		if (sbi->fat_bits == 32) {
-			((__u32 *)bh->b_data)[(first & (sb->s_blocksize - 1)) >> 2]
+			((__le32 *)bh->b_data)[(first & (sb->s_blocksize - 1)) >> 2]
 				= CT_LE_L(new_value);
 		} else if (sbi->fat_bits == 16) {
-			((__u16 *)bh->b_data)[(first & (sb->s_blocksize - 1)) >> 1]
+			((__le16 *)bh->b_data)[(first & (sb->s_blocksize - 1)) >> 1]
 				= CT_LE_W(new_value);
 		} else {
 			if (nr & 1) {

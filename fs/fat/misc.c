@@ -73,9 +73,9 @@ void fat_clusters_flush(struct super_block *sb)
 		       sbi->fsinfo_sector);
 	} else {
 		if (sbi->free_clusters != -1)
-			fsinfo->free_clusters = CF_LE_L(sbi->free_clusters);
+			fsinfo->free_clusters = cpu_to_le32(sbi->free_clusters);
 		if (sbi->prev_free != -1)
-			fsinfo->next_cluster = CF_LE_L(sbi->prev_free);
+			fsinfo->next_cluster = cpu_to_le32(sbi->prev_free);
 		mark_buffer_dirty(bh);
 	}
 	brelse(bh);
@@ -243,8 +243,7 @@ int date_dos2unix(unsigned short time,unsigned short date)
 
 /* Convert linear UNIX date to a MS-DOS time/date pair. */
 
-void fat_date_unix2dos(int unix_date,unsigned short *time,
-    unsigned short *date)
+void fat_date_unix2dos(int unix_date,__le16 *time, __le16 *date)
 {
 	int day,year,nl_day,month;
 
