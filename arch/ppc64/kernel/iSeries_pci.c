@@ -103,47 +103,6 @@ static void pci_Log_Error(char *Error_Text, int Bus, int SubBus,
 	       Error_Text, Bus, SubBus, AgentId, HvRc);
 }
 
-#if 0
-/*
- * Dump the iSeries Temp Device Node 
- * <4>buswalk [swapper : - DeviceNode: 0xC000000000634300
- * <4>00. Device Node   = 0xC000000000634300
- * <4>    - PciDev      = 0x0000000000000000
- * <4>    - tDevice     = 0x  17:01.00  0x1022 00
- * <4>  4. Device Node = 0xC000000000634480
- * <4>     - PciDev    = 0x0000000000000000
- * <4>     - Device    = 0x  18:38.16 Irq:0xA7 Vendor:0x1014  Flags:0x00
- * <4>     - Devfn     = 0xB0: 22.18
- */
-void dumpDevice_Node(struct iSeries_Device_Node *DevNode)
-{
-	udbg_printf("Device Node      = 0x%p\n", DevNode);
-	udbg_printf("     - PciDev    = 0x%p\n", DevNode->PciDev);
-	udbg_printf("     - Device    = 0x%4X:%02X.%02X (0x%02X)\n",
-			ISERIES_BUS(DevNode), ISERIES_SUBBUS(DevNode),
-			DevNode->AgentId, DevNode->DevFn);
-	udbg_printf("     - LSlot     = 0x%02X\n", DevNode->LogicalSlot);
-	udbg_printf("     - TceTable  = 0x%p\n  ", DevNode->DevTceTable);
-	udbg_printf("     - DSA       = 0x%04X\n", ISERIES_DSA(DevNode) >> 32);
-	udbg_printf("                 = Irq:0x%02X Vendor:0x%04X  Flags:0x%02X\n",
-			DevNode->Irq, DevNode->Vendor, DevNode->Flags);
-	udbg_printf("     - Location  = %s\n", DevNode->CardLocation);
-}
-
-/*
- * Walk down the device node chain 
- */
-static void list_device_nodes(void)
-{
-	struct list_head *Device_Node_Ptr = iSeries_Global_Device_List.next;
-
-	while (Device_Node_Ptr != &iSeries_Global_Device_List) {
-		dumpDevice_Node((struct iSeries_Device_Node*)Device_Node_Ptr);
-		Device_Node_Ptr = Device_Node_Ptr->next;
-	}
-}
-#endif
-
 /*
  * build_device_node(u16 Bus, int SubBus, u8 DevFn)
  */
