@@ -4,6 +4,8 @@
  *  Copyright (C) 1997, Stephen Tweedie
  *
  *  Provide stub functions for unreadable inodes
+ *
+ *  Fabian Frederick : August 2003 - All file operations assigned to EIO
  */
 
 #include <linux/fs.h>
@@ -31,8 +33,10 @@ static int return_EIO(void)
 static struct file_operations bad_file_ops =
 {
 	.llseek		= EIO_ERROR,
+	.aio_read	= EIO_ERROR,
 	.read		= EIO_ERROR,
 	.write		= EIO_ERROR,
+	.aio_write	= EIO_ERROR,
 	.readdir	= EIO_ERROR,
 	.poll		= EIO_ERROR,
 	.ioctl		= EIO_ERROR,
@@ -41,8 +45,14 @@ static struct file_operations bad_file_ops =
 	.flush		= EIO_ERROR,
 	.release	= EIO_ERROR,
 	.fsync		= EIO_ERROR,
+	.aio_fsync	= EIO_ERROR,
 	.fasync		= EIO_ERROR,
 	.lock		= EIO_ERROR,
+	.readv		= EIO_ERROR,
+	.writev		= EIO_ERROR,
+	.sendfile	= EIO_ERROR,
+	.sendpage	= EIO_ERROR,
+	.get_unmapped_area = EIO_ERROR,
 };
 
 struct inode_operations bad_inode_ops =
@@ -61,6 +71,11 @@ struct inode_operations bad_inode_ops =
 	.truncate	= EIO_ERROR,
 	.permission	= EIO_ERROR,
 	.getattr	= EIO_ERROR,
+	.setattr	= EIO_ERROR,
+	.setxattr	= EIO_ERROR,
+	.getxattr	= EIO_ERROR,
+	.listxattr	= EIO_ERROR,
+	.removexattr	= EIO_ERROR,
 };
 
 
