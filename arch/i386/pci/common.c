@@ -120,12 +120,27 @@ struct pci_bus * __devinit pcibios_scan_root(int busnum)
 	return pci_scan_bus(busnum, pci_root_ops, NULL);
 }
 
+extern u8 pci_cache_line_size;
+
 static int __init pcibios_init(void)
 {
+	struct cpuinfo_x86 *c = &boot_cpu_data;
+
 	if (!pci_root_ops) {
 		printk("PCI: System does not support PCI\n");
 		return 0;
 	}
+
+	/*
+	 * Assume PCI cacheline size of 32 bytes for all x86s except K7/K8
+	 * and P4. It's also good for 386/486s (which actually have 16)
+	 * as quite a few PCI devices do not support smaller values.
+	 */
+	pci_cache_line_size = 32 >> 2;
+	if (c->x86 >= 6 && c->x86_vendor == X86_VENDOR_AMD)
+		pci_cache_line_size = 64 >> 2;	/* K7 & K8 */
+	else if (c->x86 > 6)
+		pci_cache_line_size = 128 >> 2;	/* P4 */
 
 	pcibios_resource_survey();
 
