@@ -10,9 +10,7 @@
 #ifndef __ISDN_PPP_VJ_H__
 #define __ISDN_PPP_VJ_H__
 
-#include <linux/kernel.h>
-#include <linux/isdn.h>
-
+#include "isdn_net_lib.h"
 
 #ifdef CONFIG_ISDN_PPP_VJ
 

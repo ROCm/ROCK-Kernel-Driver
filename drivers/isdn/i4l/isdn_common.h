@@ -96,6 +96,6 @@ extern void  isdn_slot_set_usage(int slot, int usage);
 extern char *isdn_slot_num(int slot);
 extern int   isdn_slot_m_idx(int slot);
 extern void  isdn_slot_set_m_idx(int slot, int midx);
-extern void  isdn_slot_set_idev(int sl, isdn_net_dev *);
-extern isdn_net_dev *isdn_slot_idev(int sl);
+extern void  isdn_slot_set_priv(int sl, void *);
+extern void *isdn_slot_priv(int sl);
 extern int   isdn_hard_header_len(void);

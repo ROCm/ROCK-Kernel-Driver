@@ -7,8 +7,7 @@
  * of the GNU General Public License, incorporated herein by reference.
  */
 
-#include <linux/ppp_defs.h>     /* for PPP_PROTOCOL */
-#include <linux/isdn_ppp.h>	/* for isdn_ppp info */
+#include "isdn_net_lib.h"
 
 extern struct file_operations isdn_ppp_fops;
 extern struct isdn_netif_ops isdn_ppp_ops;

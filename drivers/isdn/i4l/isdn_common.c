@@ -44,7 +44,7 @@ struct isdn_slot {
 	unsigned long     obytes;              /* Statistics outgoing bytes  */
 	struct isdn_v110  iv110;               /* For V.110                  */
 	int               m_idx;               /* Index for mdm....          */
-	isdn_net_dev      *idev;               /* pointer to isdn_net_dev    */
+	isdn_net_dev      *priv;               /* pointer to isdn_net_dev    */
 };
 
 static struct isdn_slot slot[ISDN_MAX_CHANNELS]; 
@@ -2023,19 +2023,19 @@ isdn_slot_num(int sl)
 }
 
 void
-isdn_slot_set_idev(int sl, isdn_net_dev *idev)
+isdn_slot_set_priv(int sl, void *priv)
 {
 	BUG_ON(sl < 0);
 
-	slot[sl].idev = idev;
+	slot[sl].priv = priv;
 }
 
-isdn_net_dev *
-isdn_slot_idev(int sl)
+void *
+isdn_slot_priv(int sl)
 {
 	BUG_ON(sl < 0);
 
-	return slot[sl].idev;
+	return slot[sl].priv;
 }
 
 int
