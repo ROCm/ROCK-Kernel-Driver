@@ -79,12 +79,6 @@ struct pdflush_work {
 	unsigned long when_i_went_to_sleep;
 };
 
-/*
- * preemption is disabled in pdflush.  There was a bug in preempt
- * which was causing pdflush to get flipped into state TASK_RUNNING
- * when it performed a spin_unlock.  That bug is probably fixed,
- * but play it safe.  The preempt-off paths are very short.
- */
 static int __pdflush(struct pdflush_work *my_work)
 {
 	daemonize();
@@ -101,7 +95,6 @@ static int __pdflush(struct pdflush_work *my_work)
 	my_work->fn = NULL;
 	my_work->who = current;
 
-	preempt_disable();
 	spin_lock_irq(&pdflush_lock);
 	nr_pdflush_threads++;
 //	printk("pdflush %d [%d] starts\n", nr_pdflush_threads, current->pid);
@@ -120,10 +113,8 @@ static int __pdflush(struct pdflush_work *my_work)
 #endif
 		schedule();
 
-		preempt_enable();
 		if (my_work->fn)
 			(*my_work->fn)(my_work->arg0);
-		preempt_disable();
 
 		/*
 		 * Thread creation: For how long have there been zero
@@ -158,7 +149,6 @@ static int __pdflush(struct pdflush_work *my_work)
 	nr_pdflush_threads--;
 //	printk("pdflush %d [%d] ends\n", nr_pdflush_threads, current->pid);
 	spin_unlock_irq(&pdflush_lock);
-	preempt_enable();
 	return 0;
 }
 
