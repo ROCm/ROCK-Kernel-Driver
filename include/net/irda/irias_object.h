@@ -78,8 +78,6 @@ struct ias_attrib {
 	struct ias_value *value; /* Attribute value */
 };
 
-char *strndup(char *str, int max);
-
 struct ias_object *irias_new_object(char *name, int id);
 void irias_insert_object(struct ias_object *obj);
 int  irias_delete_object(struct ias_object *obj);
@@ -104,6 +102,6 @@ struct ias_value *irias_new_missing_value(void);
 void irias_delete_value(struct ias_value *value);
 
 extern struct ias_value missing;
-extern hashbin_t *objects;
+extern hashbin_t *irias_objects;
 
 #endif

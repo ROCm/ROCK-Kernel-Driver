@@ -12,6 +12,7 @@
 #include <linux/timer.h>
 #include <linux/sunrpc/types.h>
 #include <linux/wait.h>
+#include <linux/sunrpc/xdr.h>
 
 /*
  * This is the actual RPC procedure call info.
@@ -47,6 +48,8 @@ struct rpc_task {
 	__u8			tk_garb_retry,
 				tk_cred_retry,
 				tk_suid_retry;
+	u32			tk_gss_seqno;	/* rpcsec_gss sequence number
+						   used on this request */
 
 	/*
 	 * timeout_fn   to be executed by timer bottom half

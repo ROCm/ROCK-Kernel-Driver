@@ -86,20 +86,6 @@ extern int npmem_ranges;
 /* to align the pointer to the (next) page boundary */
 #define PAGE_ALIGN(addr)	(((addr)+PAGE_SIZE-1)&PAGE_MASK)
 
-/*
- * Tell the user there is some problem. Beep too, so we can
- * see^H^H^Hhear bugs in early bootup as well!
- *
- * We don't beep yet.  prumpf
- */
-#define BUG() do { \
-	printk("kernel BUG at %s:%d!\n", __FILE__, __LINE__); \
-} while (0)
-
-#define PAGE_BUG(page) do { \
-	BUG(); \
-} while (0)
-
 
 #define LINUX_GATEWAY_SPACE     0
 #define __PAGE_OFFSET           (0x10000000)

@@ -111,16 +111,7 @@ static int __devinit rr_init_one(struct pci_dev *pdev,
 		goto out2;
 	}
 
-	if (!dev->priv)
-		dev->priv = kmalloc(sizeof(*rrpriv), GFP_KERNEL);
-
-	if (!dev->priv) {
-		ret = -ENOMEM;
-		goto out2;
-	}
-
 	rrpriv = (struct rr_private *)dev->priv;
-	memset(rrpriv, 0, sizeof(*rrpriv));
 
 	SET_MODULE_OWNER(dev);
 

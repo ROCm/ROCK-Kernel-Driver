@@ -1823,6 +1823,9 @@ acpi_cpufreq_init (
 
 	driver->verify      = &acpi_cpufreq_verify;
 	driver->setpolicy   = &acpi_cpufreq_setpolicy;
+	driver->init        = NULL;
+	driver->exit        = NULL;
+	strncpy(driver->name, "acpi-processor", CPUFREQ_NAME_LEN);
 
 	for (i=0;i<NR_CPUS;i++) {
 		driver->policy[i].cpu    = pr->id;

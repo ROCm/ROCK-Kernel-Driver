@@ -131,9 +131,9 @@ static int cp_hpux_stat(struct kstat *stat, struct hpux_stat64 *statbuf)
 	tmp.st_gid = stat->gid;
 	tmp.st_rdev = stat->rdev;
 	tmp.st_size = stat->size;
-	tmp.st_atime = stat->atime;
-	tmp.st_mtime = stat->mtime;
-	tmp.st_ctime = stat->ctime;
+	tmp.st_atime = stat->atime.tv_sec;
+	tmp.st_mtime = stat->mtime.tv_sec;
+	tmp.st_ctime = stat->ctime.tv_sec;
 	tmp.st_blocks = stat->blocks;
 	tmp.st_blksize = stat->blksize;
 	return copy_to_user(statbuf,&tmp,sizeof(tmp)) ? -EFAULT : 0;

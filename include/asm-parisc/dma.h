@@ -30,7 +30,6 @@
 */
 #define MAX_DMA_ADDRESS (~0UL)
 
-
 /*
 ** We don't have DMA channels... well V-class does but the
 ** Dynamic DMA Mapping interface will support them... right? :^)
@@ -129,6 +128,9 @@ static __inline__ void disable_dma(unsigned int dmanr)
 		dma_outb((dmanr & 3) | 4,  DMA2_MASK_REG);
 #endif
 }
+
+/* reserve a DMA channel */
+#define request_dma(dmanr, device_id)	(0)
 
 /* Clear the 'DMA Pointer Flip Flop'.
  * Write 0 for LSB/MSB, 1 for MSB/LSB access.

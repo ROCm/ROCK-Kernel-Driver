@@ -2185,9 +2185,15 @@ S: Germany
 
 N: Corey Minyard
 E: minyard@wf-rch.cirr.com
+E: minyard@mvista.com
+W: http://home.attbi.com/~minyard
 D: Sony CDU31A CDROM Driver
-S: 1805 Marquette
-S: Richardson, Texas 75081
+D: IPMI driver
+D: Various networking fixes long ago
+D: Original ppc_md work
+D: Shared zlib
+S: 7406 Wheat Field Rd
+S: Garland, Texas 75044
 S: USA
 
 N: Patrick Mochel

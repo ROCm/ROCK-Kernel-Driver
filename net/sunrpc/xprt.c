@@ -83,7 +83,6 @@
  * Local functions
  */
 static void	xprt_request_init(struct rpc_task *, struct rpc_xprt *);
-static void	do_xprt_transmit(struct rpc_task *);
 static inline void	do_xprt_reserve(struct rpc_task *);
 static void	xprt_disconnect(struct rpc_xprt *);
 static void	xprt_conn_status(struct rpc_task *task);
@@ -1091,26 +1090,48 @@ out_unlock:
  * Place the actual RPC call.
  * We have to copy the iovec because sendmsg fiddles with its contents.
  */
-void
-xprt_transmit(struct rpc_task *task)
+int
+xprt_prepare_transmit(struct rpc_task *task)
 {
 	struct rpc_rqst	*req = task->tk_rqstp;
 	struct rpc_xprt	*xprt = req->rq_xprt;
+	int err = 0;
 
-	dprintk("RPC: %4d xprt_transmit(%x)\n", task->tk_pid, 
-				*(u32 *)(req->rq_svec[0].iov_base));
+	dprintk("RPC: %4d xprt_prepare_transmit\n", task->tk_pid);
 
 	if (xprt->shutdown)
-		task->tk_status = -EIO;
+		return -EIO;
 
 	if (!xprt_connected(xprt))
-		task->tk_status = -ENOTCONN;
-
-	if (task->tk_status < 0)
-		return;
+		return -ENOTCONN;
 
 	if (task->tk_rpcwait)
 		rpc_remove_wait_queue(task);
+
+	spin_lock_bh(&xprt->sock_lock);
+	if (!__xprt_lock_write(xprt, task)) {
+		err = -EAGAIN;
+		goto out_unlock;
+	}
+	if (list_empty(&req->rq_list)) {
+		list_add_tail(&req->rq_list, &xprt->recv);
+		req->rq_received = 0;
+	}
+out_unlock:
+	spin_unlock_bh(&xprt->sock_lock);
+	return err;
+}
+
+void
+xprt_transmit(struct rpc_task *task)
+{
+	struct rpc_clnt *clnt = task->tk_client;
+	struct rpc_rqst	*req = task->tk_rqstp;
+	struct rpc_xprt	*xprt = req->rq_xprt;
+	int status, retry = 0;
+
+
+	dprintk("RPC: %4d xprt_transmit(%u)\n", task->tk_pid, req->rq_slen);
 
 	/* set up everything as needed. */
 	/* Write the record marker */
@@ -1119,29 +1140,6 @@ xprt_transmit(struct rpc_task *task)
 
 		*marker = htonl(0x80000000|(req->rq_slen-sizeof(*marker)));
 	}
-
-	spin_lock_bh(&xprt->sock_lock);
-	if (!__xprt_lock_write(xprt, task)) {
-		spin_unlock_bh(&xprt->sock_lock);
-		return;
-	}
-	if (list_empty(&req->rq_list)) {
-		list_add_tail(&req->rq_list, &xprt->recv);
-		req->rq_received = 0;
-	}
-	spin_unlock_bh(&xprt->sock_lock);
-
-	do_xprt_transmit(task);
-}
-
-static void
-do_xprt_transmit(struct rpc_task *task)
-{
-	struct rpc_clnt *clnt = task->tk_client;
-	struct rpc_rqst	*req = task->tk_rqstp;
-	struct rpc_xprt	*xprt = req->rq_xprt;
-	int status, retry = 0;
-
 
 	/* Continue transmitting the packet/record. We must be careful
 	 * to cope with writespace callbacks arriving _after_ we have

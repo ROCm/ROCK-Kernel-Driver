@@ -96,9 +96,10 @@ int __init iriap_init(void)
 		return -ENOMEM;
 
 	/* Object repository - defined in irias_object.c */
-	objects = hashbin_new(HB_LOCK);
-	if (!objects) {
-		WARNING("%s: Can't allocate objects hashbin!\n", __FUNCTION__);
+	irias_objects = hashbin_new(HB_LOCK);
+	if (!irias_objects) {
+		WARNING("%s: Can't allocate irias_objects hashbin!\n",
+			__FUNCTION__);
 		return -ENOMEM;
 	}
 
@@ -147,7 +148,7 @@ void __exit iriap_cleanup(void)
 	irlmp_unregister_service(service_handle);
 
 	hashbin_delete(iriap, (FREE_FUNC) __iriap_close);
-	hashbin_delete(objects, (FREE_FUNC) __irias_delete_object);
+	hashbin_delete(irias_objects, (FREE_FUNC) __irias_delete_object);
 }
 
 /*
@@ -971,16 +972,16 @@ int irias_proc_read(char *buf, char **start, off_t offset, int len)
 	struct ias_attrib *attrib;
 	unsigned long flags;
 
-	ASSERT( objects != NULL, return 0;);
+	ASSERT( irias_objects != NULL, return 0;);
 
 	len = 0;
 
 	len += sprintf(buf+len, "LM-IAS Objects:\n");
 
-	spin_lock_irqsave(&objects->hb_spinlock, flags);
+	spin_lock_irqsave(&irias_objects->hb_spinlock, flags);
 
-	/* List all objects */
-	obj = (struct ias_object *) hashbin_get_first(objects);
+	/* List all irias_objects */
+	obj = (struct ias_object *) hashbin_get_first(irias_objects);
 	while ( obj != NULL) {
 		ASSERT(obj->magic == IAS_OBJECT_MAGIC, return 0;);
 
@@ -1031,9 +1032,9 @@ int irias_proc_read(char *buf, char **start, off_t offset, int len)
 		}
 		spin_unlock(&obj->attribs->hb_spinlock);
 
-	        obj = (struct ias_object *) hashbin_get_next(objects);
+	        obj = (struct ias_object *) hashbin_get_next(irias_objects);
 	}
-	spin_unlock_irqrestore(&objects->hb_spinlock, flags);
+	spin_unlock_irqrestore(&irias_objects->hb_spinlock, flags);
 
 	return len;
 }

@@ -1409,6 +1409,15 @@ static int m_show(struct seq_file *m, void *p)
 	seq_printf(m, "%s %lu",
 		   mod->name, mod->init_size + mod->core_size);
 	print_unload_info(m, mod);
+
+	/* Informative for users. */
+	seq_printf(m, " %s",
+		   mod->state == MODULE_STATE_GOING ? "Unloading":
+		   mod->state == MODULE_STATE_COMING ? "Loading":
+		   "Live");
+	/* Used by oprofile and other similar tools. */
+	seq_printf(m, " 0x%p", mod->module_core);
+
 	seq_printf(m, "\n");
 	return 0;
 }

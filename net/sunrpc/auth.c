@@ -24,6 +24,13 @@ static struct rpc_authops *	auth_flavors[RPC_AUTH_MAXFLAVOR] = {
 	NULL,			/* others can be loadable modules */
 };
 
+u32
+pseudoflavor_to_flavor(u32 flavor) {
+	if (flavor >= RPC_AUTH_MAXFLAVOR)
+		return RPC_AUTH_GSS;
+	return flavor;
+}
+
 int
 rpcauth_register(struct rpc_authops *ops)
 {
@@ -51,13 +58,14 @@ rpcauth_unregister(struct rpc_authops *ops)
 }
 
 struct rpc_auth *
-rpcauth_create(rpc_authflavor_t flavor, struct rpc_clnt *clnt)
+rpcauth_create(rpc_authflavor_t pseudoflavor, struct rpc_clnt *clnt)
 {
 	struct rpc_authops	*ops;
+	u32			flavor = pseudoflavor_to_flavor(pseudoflavor);
 
 	if (flavor >= RPC_AUTH_MAXFLAVOR || !(ops = auth_flavors[flavor]))
 		return NULL;
-	clnt->cl_auth = ops->create(clnt);
+	clnt->cl_auth = ops->create(clnt, pseudoflavor);
 	return clnt->cl_auth;
 }
 
@@ -173,8 +181,9 @@ rpcauth_gc_credcache(struct rpc_auth *auth, struct list_head *free)
 /*
  * Look up a process' credentials in the authentication cache
  */
-static struct rpc_cred *
-rpcauth_lookup_credcache(struct rpc_auth *auth, int taskflags)
+struct rpc_cred *
+rpcauth_lookup_credcache(struct rpc_auth *auth, struct auth_cred * acred,
+		int taskflags)
 {
 	LIST_HEAD(free);
 	struct list_head *pos, *next;
@@ -183,7 +192,7 @@ rpcauth_lookup_credcache(struct rpc_auth *auth, int taskflags)
 	int		nr = 0;
 
 	if (!(taskflags & RPC_TASK_ROOTCREDS))
-		nr = current->uid & RPC_CREDCACHE_MASK;
+		nr = acred->uid & RPC_CREDCACHE_MASK;
 retry:
 	spin_lock(&rpc_credcache_lock);
 	if (time_before(auth->au_nextgc, jiffies))
@@ -195,7 +204,7 @@ retry:
 			continue;
 		if (rpcauth_prune_expired(entry, &free))
 			continue;
-		if (entry->cr_ops->crmatch(entry, taskflags)) {
+		if (entry->cr_ops->crmatch(acred, entry, taskflags)) {
 			list_del(&entry->cr_hash);
 			cred = entry;
 			break;
@@ -217,7 +226,7 @@ retry:
 	rpcauth_destroy_credlist(&free);
 
 	if (!cred) {
-		new = auth->au_ops->crcreate(taskflags);
+		new = auth->au_ops->crcreate(auth, acred, taskflags);
 		if (new) {
 #ifdef RPC_DEBUG
 			new->cr_magic = RPCAUTH_CRED_MAGIC;
@@ -232,19 +241,31 @@ retry:
 struct rpc_cred *
 rpcauth_lookupcred(struct rpc_auth *auth, int taskflags)
 {
+	struct auth_cred acred = {
+		.uid = current->fsuid,
+		.gid = current->fsgid,
+		.ngroups = current->ngroups,
+		.groups = current->groups,
+	};
 	dprintk("RPC:     looking up %s cred\n",
 		auth->au_ops->au_name);
-	return rpcauth_lookup_credcache(auth, taskflags);
+	return rpcauth_lookup_credcache(auth, &acred, taskflags);
 }
 
 struct rpc_cred *
 rpcauth_bindcred(struct rpc_task *task)
 {
 	struct rpc_auth *auth = task->tk_auth;
+	struct auth_cred acred = {
+		.uid = current->fsuid,
+		.gid = current->fsgid,
+		.ngroups = current->ngroups,
+		.groups = current->groups,
+	};
 
 	dprintk("RPC: %4d looking up %s cred\n",
 		task->tk_pid, task->tk_auth->au_ops->au_name);
-	task->tk_msg.rpc_cred = rpcauth_lookup_credcache(auth, task->tk_flags);
+	task->tk_msg.rpc_cred = rpcauth_lookup_credcache(auth, &acred, task->tk_flags);
 	if (task->tk_msg.rpc_cred == 0)
 		task->tk_status = -ENOMEM;
 	return task->tk_msg.rpc_cred;
@@ -339,10 +360,7 @@ rpcauth_invalcred(struct rpc_task *task)
 int
 rpcauth_uptodatecred(struct rpc_task *task)
 {
-	int retval;
-	spin_lock(&rpc_credcache_lock);
-	retval = !(task->tk_msg.rpc_cred) ||
+	return !(task->tk_msg.rpc_cred) ||
 		(task->tk_msg.rpc_cred->cr_flags & RPCAUTH_CRED_UPTODATE);
-	spin_unlock(&rpc_credcache_lock);
-	return retval;
 }
+

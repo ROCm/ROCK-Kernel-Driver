@@ -90,18 +90,6 @@ typedef struct { unsigned long pgprot; } pgprot_t;
 
 #ifndef __ASSEMBLY__
 
-/*
- * Tell the user there is some problem.
- */
-#define BUG() do { \
-	printk("kernel BUG at %s:%d!\n", __FILE__, __LINE__); \
-	asm volatile("nop"); \
-} while (0)
-
-#define PAGE_BUG(page) do { \
-	BUG(); \
-} while (0)
-
 /* Pure 2^n version of get_order */
 static __inline__ int get_order(unsigned long size)
 {

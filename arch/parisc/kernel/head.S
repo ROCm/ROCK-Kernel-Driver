@@ -48,7 +48,6 @@ boot_args:
 	.import	$global$		/* forward declaration */
 	.import fault_vector_11,code	/* IVA parisc 1.1 32 bit */
 	.import fault_vector_20,code	/* IVA parisc 2.0 32 bit */
-	.import start_parisc,code	/* then enable VM and go here */
 
 	.export stext
 	.export _stext,data		/* Kernel want it this way! */
@@ -74,7 +73,7 @@ stext:
 	ldo             R%PA(_end)(%r4),%r4
 $bss_loop:
 	cmpb,<<,n       %r3,%r4,$bss_loop
-	stb,ma          %r0,1(%r3)
+	stw,ma          %r0,4(%r3)
 
 	/* Save away the arguments the boot loader passed in (32 bit args) */
 
@@ -277,8 +276,8 @@ smp_slave_stext:
 	ldo		R%PA(smp_init_current_idle_task)(%sp),%sp
 	ldw		0(%sp),%sp	/* load task address */
 	mtctl           %sp,%cr30       /* store in cr30 */
-	addil		L%TASK_SZ_ALGN,%sp	/* stack is above task */
-	ldo		R%TASK_SZ_ALGN(%r1),%sp
+	addil		L%THREAD_SZ_ALGN,%sp	/* stack is above task */
+	ldo		R%THREAD_SZ_ALGN(%r1),%sp
 
 	/* point CPU to kernel page tables */
 	ldil		L%PA(swapper_pg_dir),%r4

@@ -2439,7 +2439,7 @@ static int __init amb_probe (void) {
 	    " IO %x, IRQ %u, MEM %p", iobase, irq, membase);
     
     // check IO region
-    if (check_region (iobase, AMB_EXTENT)) {
+    if (!request_region (iobase, AMB_EXTENT, DEV_LABEL)) {
       PRINTK (KERN_ERR, "IO range already in use!");
       return;
     }
@@ -2448,6 +2448,7 @@ static int __init amb_probe (void) {
     if (!dev) {
       // perhaps we should be nice: deregister all adapters and abort?
       PRINTK (KERN_ERR, "out of memory!");
+      release_region (iobase, AMB_EXTENT);
       return;
     }
     
@@ -2464,9 +2465,6 @@ static int __init amb_probe (void) {
 	PRINTK (KERN_ERR, "request IRQ failed!");
 	// free_irq is at "endif"
       } else {
-	
-	// reserve IO region
-	request_region (iobase, AMB_EXTENT, DEV_LABEL);
 	
 	dev->atm_dev = atm_dev_register (DEV_LABEL, &amb_ops, -1, NULL);
 	if (!dev->atm_dev) {
@@ -2499,14 +2497,14 @@ static int __init amb_probe (void) {
 	  atm_dev_deregister (dev->atm_dev);
 	} /* atm_dev_register */
 	
-	release_region (iobase, AMB_EXTENT);
 	free_irq (irq, dev);
-      } /* request_region, request_irq */
+      } /* request_irq */
       
       amb_reset (dev, 0);
     } /* amb_init */
     
     kfree (dev);
+    release_region (iobase, AMB_EXTENT);
   } /* kmalloc, end-of-fn */
   
   PRINTD (DBG_FLOW, "amb_probe");

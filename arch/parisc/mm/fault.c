@@ -15,6 +15,7 @@
 #include <linux/ptrace.h>
 #include <linux/sched.h>
 #include <linux/interrupt.h>
+#include <linux/module.h>
 
 #include <asm/uaccess.h>
 #include <asm/traps.h>
@@ -230,7 +231,7 @@ no_context:
 
 	if (!user_mode(regs)) {
 
-		fix = search_exception_table(regs->iaoq[0]);
+		fix = search_exception_tables(regs->iaoq[0]);
 
 		if (fix) {
 

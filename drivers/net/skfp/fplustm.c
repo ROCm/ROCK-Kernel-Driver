@@ -390,7 +390,7 @@ struct s_smc *smc ;
 	outpw(FM_A(FM_TREQ0),(unsigned)t_requ) ;
 }
 
-void set_int(p,l)
+static void set_int(p,l)
 char *p;
 int l;
 {

@@ -324,7 +324,8 @@ static int baud_table[] = {
 #elif defined(CONFIG_CONSOLE_115200)
   #define CONSOLE_BAUDRATE 115200
 #else
-#error "console baud rate undefined"
+  #warn "console baud rate undefined"
+  #define CONSOLE_BAUDRATE 9600
 #endif
 
 /*

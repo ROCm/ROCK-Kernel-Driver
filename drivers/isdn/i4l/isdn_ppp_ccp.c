@@ -241,6 +241,8 @@ ippp_ccp_alloc(void)
 	struct ippp_ccp *ccp;
 
 	ccp = kmalloc(sizeof(*ccp), GFP_ATOMIC); // FIXME
+	if (!cpp)
+		return NULL;
 	memset(ccp, 0, sizeof(*ccp));
 	ccp->mru = 1524;      /* MRU, default 1524 */
 	ccp->reset = kmalloc(sizeof(*ccp->reset), GFP_ATOMIC); // FIXME alloc together?

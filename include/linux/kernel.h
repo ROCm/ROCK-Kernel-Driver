@@ -13,6 +13,7 @@
 #include <linux/types.h>
 #include <linux/compiler.h>
 #include <asm/byteorder.h>
+#include <asm/bug.h>
 
 /* Optimization barrier */
 /* The "volatile" is due to gcc bugs */

@@ -96,15 +96,15 @@ static int irlap_param_additional_bofs(void *instance, irda_param_t *parm,
 static int irlap_param_min_turn_time(void *instance, irda_param_t *param, 
 				     int get);
 
-__u32 min_turn_times[]  = { 10000, 5000, 1000, 500, 100, 50, 10, 0 }; /* us */
-__u32 baud_rates[]      = { 2400, 9600, 19200, 38400, 57600, 115200, 576000, 
-			    1152000, 4000000, 16000000 };           /* bps */
-__u32 data_sizes[]      = { 64, 128, 256, 512, 1024, 2048 };        /* bytes */
-__u32 add_bofs[]        = { 48, 24, 12, 5, 3, 2, 1, 0 };            /* bytes */
-__u32 max_turn_times[]  = { 500, 250, 100, 50 };                    /* ms */
-__u32 link_disc_times[] = { 3, 8, 12, 16, 20, 25, 30, 40 };         /* secs */
+static __u32 min_turn_times[]  = { 10000, 5000, 1000, 500, 100, 50, 10, 0 }; /* us */
+static __u32 baud_rates[]      = { 2400, 9600, 19200, 38400, 57600, 115200, 576000, 
+				   1152000, 4000000, 16000000 };           /* bps */
+static __u32 data_sizes[]      = { 64, 128, 256, 512, 1024, 2048 };        /* bytes */
+static __u32 add_bofs[]        = { 48, 24, 12, 5, 3, 2, 1, 0 };            /* bytes */
+static __u32 max_turn_times[]  = { 500, 250, 100, 50 };                    /* ms */
+static __u32 link_disc_times[] = { 3, 8, 12, 16, 20, 25, 30, 40 };         /* secs */
 
-__u32 max_line_capacities[10][4] = {
+static __u32 max_line_capacities[10][4] = {
        /* 500 ms     250 ms  100 ms  50 ms (max turn time) */
 	{    100,      0,      0,     0 }, /*     2400 bps */
 	{    400,      0,      0,     0 }, /*     9600 bps */
@@ -185,7 +185,7 @@ static inline __u32 index_value(int index, __u32 *array)
  *    Returns index to most significant bit (MSB) in word
  *
  */
-int msb_index (__u16 word) 
+static int msb_index (__u16 word) 
 {
 	__u16 msb = 0x8000;
 	int index = 15;   /* Current MSB */

@@ -54,7 +54,7 @@ _stext:	movew	#0x2700,%sr
 	bne	1b
 
 	/* Copy data segment from ROM to RAM */
-	moveal	#__data_rom_start, %a0
+	moveal	#_etext, %a0
 	moveal	#_sdata, %a1
 	moveal	#_edata, %a2
 

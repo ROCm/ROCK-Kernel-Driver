@@ -23,7 +23,7 @@ and /proc/bus/usb/devices, as well as /proc/bus/usb/BBB/DDD files.
 	  to interact with USB devices.
 
 	  There are a number of mount options supported by usbfs.
-	  Consult the source code (linux/drivers/usb/inode.c) for
+	  Consult the source code (linux/drivers/usb/core/inode.c) for
 	  information about those options.
 
 **NOTE**: The filesystem has been renamed from "usbdevfs" to

@@ -78,7 +78,8 @@ spinlock_t rtc_lock = SPIN_LOCK_UNLOCKED;
 spinlock_t i8253_lock = SPIN_LOCK_UNLOCKED;
 EXPORT_SYMBOL(i8253_lock);
 
-struct timer_opts* timer;
+extern struct timer_opts timer_none;
+struct timer_opts* timer = &timer_none;
 
 /*
  * This version of gettimeofday has microsecond resolution

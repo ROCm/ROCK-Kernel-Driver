@@ -37,7 +37,7 @@ extern inline void * ioremap(unsigned long offset, unsigned long size)
  * it's useful if some control registers are in such an area and write combining
  * or read caching is not desirable:
  */
-extern inline void * ioremap_nocache (unsigned long offset, unsigned long size)
+extern inline void * ioremap_nocache(unsigned long offset, unsigned long size)
 {
         return __ioremap(offset, size, _PAGE_NO_CACHE /* _PAGE_PCD */);
 }
@@ -49,7 +49,8 @@ extern void iounmap(void *addr);
  * too lazy to ioremap first'.  kind of like isa_, except that there's
  * no additional base address to add on.
  */
-extern __inline__ unsigned char __raw_readb(unsigned long addr)
+#define __raw_readb(a) ___raw_readb((unsigned long)(a))
+extern __inline__ unsigned char ___raw_readb(unsigned long addr)
 {
 	long flags;
 	unsigned char ret;
@@ -63,7 +64,8 @@ extern __inline__ unsigned char __raw_readb(unsigned long addr)
 	return ret;
 }
 
-extern __inline__ unsigned short __raw_readw(unsigned long addr)
+#define __raw_readw(a) ___raw_readw((unsigned long)(a))
+extern __inline__ unsigned short ___raw_readw(unsigned long addr)
 {
 	long flags;
 	unsigned short ret;
@@ -77,7 +79,8 @@ extern __inline__ unsigned short __raw_readw(unsigned long addr)
 	return ret;
 }
 
-extern __inline__ unsigned int __raw_readl(unsigned long addr)
+#define __raw_readl(a) ___raw_readl((unsigned long)(a))
+extern __inline__ unsigned int ___raw_readl(unsigned long addr)
 {
 	u32 ret;
 
@@ -88,7 +91,8 @@ extern __inline__ unsigned int __raw_readl(unsigned long addr)
 	return ret;
 }
 
-extern __inline__ unsigned long long __raw_readq(unsigned long addr)
+#define __raw_readq(a) ___raw_readq((unsigned long)(a))
+extern __inline__ unsigned long long ___raw_readq(unsigned long addr)
 {
 	unsigned long long ret;
 #ifdef __LP64__
@@ -103,7 +107,8 @@ extern __inline__ unsigned long long __raw_readq(unsigned long addr)
 	return ret;
 }
 
-extern __inline__ void __raw_writeb(unsigned char val, unsigned long addr)
+#define __raw_writeb(a,b) ___raw_writeb(a, (unsigned long)(b))
+extern __inline__ void ___raw_writeb(unsigned char val, unsigned long addr)
 {
 	long flags;
 	__asm__ __volatile__(
@@ -113,7 +118,8 @@ extern __inline__ void __raw_writeb(unsigned char val, unsigned long addr)
 	: "=&r" (flags) :  "r" (val), "r" (addr) );
 }
 
-extern __inline__ void __raw_writew(unsigned short val, unsigned long addr)
+#define __raw_writew(a,b) ___raw_writew(a, (unsigned long)(b))
+extern __inline__ void ___raw_writew(unsigned short val, unsigned long addr)
 {
 	long flags;
 	__asm__ __volatile__(
@@ -123,14 +129,16 @@ extern __inline__ void __raw_writew(unsigned short val, unsigned long addr)
 	: "=&r" (flags) :  "r" (val), "r" (addr) );
 }
 
-extern __inline__ void __raw_writel(unsigned int val, unsigned long addr)
+#define __raw_writel(a,b) ___raw_writel(a, (unsigned long)(b))
+extern __inline__ void ___raw_writel(unsigned int val, unsigned long addr)
 {
 	__asm__ __volatile__(
 	"	stwas	%0,0(%1)\n"
 	: :  "r" (val), "r" (addr) );
 }
 
-extern __inline__ void __raw_writeq(unsigned long long val, unsigned long addr)
+#define __raw_writeq(a,b) ___raw_writeq(a, (unsigned long)(b))
+extern __inline__ void ___raw_writeq(unsigned long long val, unsigned long addr)
 {
 #ifdef __LP64__
 	__asm__ __volatile__(
@@ -153,19 +161,23 @@ extern __inline__ void __raw_writeq(unsigned long long val, unsigned long addr)
 #define writel(b,addr) (*(volatile unsigned int *) (addr) = (b))
 #define writeq(b,addr) (*(volatile u64 *) (addr) = (b))
 #else /* !USE_HPPA_IOREMAP */
-#define readb(addr) __raw_readb((unsigned long)(addr))
-#define readw(addr) le16_to_cpu(__raw_readw((unsigned long)(addr)))
-#define readl(addr) le32_to_cpu(__raw_readl((unsigned long)(addr)))
-#define readq(addr) le64_to_cpu(__raw_readq((unsigned long)(addr)))
-#define writeb(b,addr) __raw_writeb(b,(unsigned long)(addr))
-#define writew(b,addr) __raw_writew(cpu_to_le16(b),(unsigned long)(addr))
-#define writel(b,addr) __raw_writel(cpu_to_le32(b),(unsigned long)(addr))
-#define writeq(b,addr) __raw_writeq(cpu_to_le64(b),(unsigned long)(addr))
+#define readb(addr) __raw_readb(addr)
+#define readw(addr) le16_to_cpu(__raw_readw(addr))
+#define readl(addr) le32_to_cpu(__raw_readl(addr))
+#define readq(addr) le64_to_cpu(__raw_readq(addr))
+#define writeb(b,addr) __raw_writeb(b,addr)
+#define writew(b,addr) __raw_writew(cpu_to_le16(b),addr)
+#define writel(b,addr) __raw_writel(cpu_to_le32(b),addr)
+#define writeq(b,addr) __raw_writeq(cpu_to_le64(b),addr)
 #endif /* !USE_HPPA_IOREMAP */
 
-extern void memcpy_fromio(void *dest, unsigned long src, int count);
-extern void memcpy_toio(unsigned long dest, const void *src, int count);
-extern void memset_io(unsigned long dest, char fill, int count);
+extern void __memcpy_fromio(unsigned long dest, unsigned long src, int count);
+extern void __memcpy_toio(unsigned long dest, unsigned long src, int count);
+extern void __memset_io(unsigned long dest, char fill, int count);
+
+#define memcpy_fromio(a,b,c) __memcpy_fromio((unsigned long)(a), (unsigned long)(b), (c))
+#define memcpy_toio(a,b,c)   __memcpy_toio((unsigned long)(a), (unsigned long)(b), (c))
+#define memset_io(a,b,c)     __memset_io((unsigned long)(a), (b), (c))
 
 /* Support old drivers which don't ioremap.
  * NB this interface is scheduled to disappear in 2.5
@@ -186,12 +198,12 @@ extern void memset_io(unsigned long dest, char fill, int count);
  * These functions support PA-RISC drivers which don't yet call ioremap().
  * They will disappear once the last of these drivers is gone.
  */
-#define gsc_readb(x) __raw_readb((unsigned long)x)
-#define gsc_readw(x) __raw_readw((unsigned long)x)
-#define gsc_readl(x) __raw_readl((unsigned long)x)
-#define gsc_writeb(x, y) __raw_writeb(x, (unsigned long)y)
-#define gsc_writew(x, y) __raw_writew(x, (unsigned long)y)
-#define gsc_writel(x, y) __raw_writel(x, (unsigned long)y)
+#define gsc_readb(x) __raw_readb(x)
+#define gsc_readw(x) __raw_readw(x)
+#define gsc_readl(x) __raw_readl(x)
+#define gsc_writeb(x, y) __raw_writeb(x, y)
+#define gsc_writew(x, y) __raw_writew(x, y)
+#define gsc_writel(x, y) __raw_writel(x, y)
 
 
 /*
@@ -275,7 +287,7 @@ extern void outsl (unsigned long port, const void *src, unsigned long count);
 #define IO_SPACE_LIMIT 0x00ffffff
 
 
-#define dma_cache_inv(_start,_size)		do { flush_kernel_dcache_range(_start,_size); } while(0)
+#define dma_cache_inv(_start,_size)		do { flush_kernel_dcache_range(_start,_size); } while (0)
 #define dma_cache_wback(_start,_size)		do { flush_kernel_dcache_range(_start,_size); } while (0)
 #define dma_cache_wback_inv(_start,_size)	do { flush_kernel_dcache_range(_start,_size); } while (0)
 

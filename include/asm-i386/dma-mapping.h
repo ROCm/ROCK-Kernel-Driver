@@ -3,11 +3,11 @@
 
 #include <asm/cache.h>
 
-#define dma_alloc_noncoherent(d, s, h) dma_alloc_coherent(d, s, h)
+#define dma_alloc_noncoherent(d, s, h, f) dma_alloc_coherent(d, s, h, f)
 #define dma_free_noncoherent(d, s, v, h) dma_free_coherent(d, s, v, h)
 
 void *dma_alloc_coherent(struct device *dev, size_t size,
-			   dma_addr_t *dma_handle);
+			   dma_addr_t *dma_handle, int flag);
 
 void dma_free_coherent(struct device *dev, size_t size,
 			 void *vaddr, dma_addr_t dma_handle);

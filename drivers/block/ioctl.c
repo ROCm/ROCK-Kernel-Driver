@@ -128,10 +128,6 @@ int blkdev_ioctl(struct inode *inode, struct file *file, unsigned cmd,
 	int ret, n;
 
 	switch (cmd) {
-	case BLKELVGET:
-	case BLKELVSET:
-		/* deprecated, use the /proc/iosched interface instead */
-		return -ENOTTY;
 	case BLKRAGET:
 	case BLKFRAGET:
 		if (!arg)

@@ -771,6 +771,9 @@ static int __init longhaul_init (void)
 
 	driver->verify    = &longhaul_verify;
 	driver->setpolicy = &longhaul_setpolicy;
+	driver->init = NULL;
+	driver->exit = NULL;
+	strncpy(driver->name, "longhaul", CPUFREQ_NAME_LEN);
 
 	driver->policy[0].cpu = 0;
 	driver->policy[0].min = (unsigned int) lowest_speed;

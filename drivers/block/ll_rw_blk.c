@@ -68,7 +68,7 @@ static inline int queue_congestion_on_threshold(void)
 {
 	int ret;
 
-	ret = queue_nr_requests / 4 - 1;
+	ret = queue_nr_requests / 8 - 1;
 	if (ret < 0)
 		ret = 1;
 	return ret;
@@ -81,7 +81,7 @@ static inline int queue_congestion_off_threshold(void)
 {
 	int ret;
 
-	ret = queue_nr_requests / 4 + 1;
+	ret = queue_nr_requests / 8 + 1;
 	if (ret > queue_nr_requests)
 		ret = queue_nr_requests;
 	return ret;
@@ -1159,6 +1159,8 @@ void blk_cleanup_queue(request_queue_t * q)
 {
 	int count = (queue_nr_requests*2);
 
+	elevator_exit(q);
+
 	count -= __blk_cleanup_queue(&q->rq[READ]);
 	count -= __blk_cleanup_queue(&q->rq[WRITE]);
 
@@ -1167,8 +1169,6 @@ void blk_cleanup_queue(request_queue_t * q)
 
 	if (blk_queue_tagged(q))
 		blk_queue_free_tags(q);
-
-	elevator_exit(q);
 
 	memset(q, 0, sizeof(*q));
 }
@@ -1576,22 +1576,22 @@ void blk_congestion_wait(int rw, long timeout)
 /*
  * Has to be called with the request spinlock acquired
  */
-static void attempt_merge(request_queue_t *q, struct request *req,
+static int attempt_merge(request_queue_t *q, struct request *req,
 			  struct request *next)
 {
 	if (!rq_mergeable(req) || !rq_mergeable(next))
-		return;
+		return 0;
 
 	/*
 	 * not contigious
 	 */
 	if (req->sector + req->nr_sectors != next->sector)
-		return;
+		return 0;
 
 	if (rq_data_dir(req) != rq_data_dir(next)
 	    || req->rq_disk != next->rq_disk
 	    || next->waiting || next->special)
-		return;
+		return 0;
 
 	/*
 	 * If we are allowed to merge, then append bio list
@@ -1612,27 +1612,31 @@ static void attempt_merge(request_queue_t *q, struct request *req,
 			req->rq_disk->in_flight--;
 		}
 
-		blkdev_dequeue_request(next);
 		__blk_put_request(q, next);
+		return 1;
 	}
+
+	return 0;
 }
 
-static inline void attempt_back_merge(request_queue_t *q, struct request *rq)
+static inline int attempt_back_merge(request_queue_t *q, struct request *rq)
 {
-	struct list_head *next = rq->queuelist.next;
-	struct list_head *sort_head = elv_get_sort_head(q, rq);
+	struct request *next = elv_latter_request(q, rq);
 
-	if (next != sort_head)
-		attempt_merge(q, rq, list_entry_rq(next));
+	if (next)
+		return attempt_merge(q, rq, next);
+
+	return 0;
 }
 
-static inline void attempt_front_merge(request_queue_t *q, struct request *rq)
+static inline int attempt_front_merge(request_queue_t *q, struct request *rq)
 {
-	struct list_head *prev = rq->queuelist.prev;
-	struct list_head *sort_head = elv_get_sort_head(q, rq);
+	struct request *prev = elv_former_request(q, rq);
 
-	if (prev != sort_head)
-		attempt_merge(q, list_entry_rq(prev), rq);
+	if (prev)
+		return attempt_merge(q, prev, rq);
+
+	return 0;
 }
 
 /**
@@ -1715,8 +1719,8 @@ again:
 			req->biotail = bio;
 			req->nr_sectors = req->hard_nr_sectors += nr_sectors;
 			drive_stat_acct(req, nr_sectors, 0);
-			elv_merged_request(q, req);
-			attempt_back_merge(q, req);
+			if (!attempt_back_merge(q, req))
+				elv_merged_request(q, req);
 			goto out;
 
 		case ELEVATOR_FRONT_MERGE:
@@ -1742,8 +1746,8 @@ again:
 			req->sector = req->hard_sector = sector;
 			req->nr_sectors = req->hard_nr_sectors += nr_sectors;
 			drive_stat_acct(req, nr_sectors, 0);
-			elv_merged_request(q, req);
-			attempt_front_merge(q, req);
+			if (!attempt_front_merge(q, req))
+				elv_merged_request(q, req);
 			goto out;
 
 		/*
@@ -2169,8 +2173,7 @@ int __init blk_dev_init(void)
 	int i;
 
 	request_cachep = kmem_cache_create("blkdev_requests",
-			sizeof(struct request), 0,
-			SLAB_HWCACHE_ALIGN, NULL, NULL);
+			sizeof(struct request), 0, 0, NULL, NULL);
 	if (!request_cachep)
 		panic("Can't create request pool slab cache\n");
 

@@ -19,7 +19,7 @@
  */
 
 
-char *strdup(char *s)
+static char *strdup(char *s)
 {
 	char *rv = kmalloc(strlen(s)+1, GFP_KERNEL);
 	if (rv)

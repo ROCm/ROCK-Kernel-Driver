@@ -260,6 +260,9 @@ static int __init elanfreq_init(void)
 
 	driver->verify        = &elanfreq_verify;
 	driver->setpolicy     = &elanfreq_setpolicy;
+	driver->init = NULL;
+	driver->exit = NULL;
+	strncpy(driver->name, "elanfreq", CPUFREQ_NAME_LEN);
 
 	driver->policy[0].cpu    = 0;
 	ret = cpufreq_frequency_table_cpuinfo(&driver->policy[0], &elanfreq_table[0]);

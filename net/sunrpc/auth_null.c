@@ -20,7 +20,7 @@
 static struct rpc_credops	null_credops;
 
 static struct rpc_auth *
-nul_create(struct rpc_clnt *clnt)
+nul_create(struct rpc_clnt *clnt, rpc_authflavor_t flavor)
 {
 	struct rpc_auth	*auth;
 
@@ -48,7 +48,7 @@ nul_destroy(struct rpc_auth *auth)
  * Create NULL creds for current process
  */
 static struct rpc_cred *
-nul_create_cred(int flags)
+nul_create_cred(struct rpc_auth *auth, struct auth_cred *acred, int flags)
 {
 	struct rpc_cred	*cred;
 
@@ -56,7 +56,7 @@ nul_create_cred(int flags)
 		return NULL;
 	atomic_set(&cred->cr_count, 0);
 	cred->cr_flags = RPCAUTH_CRED_UPTODATE;
-	cred->cr_uid = current->uid;
+	cred->cr_uid = acred->uid;
 	cred->cr_ops = &null_credops;
 
 	return cred;
@@ -75,7 +75,7 @@ nul_destroy_cred(struct rpc_cred *cred)
  * Match cred handle against current process
  */
 static int
-nul_match(struct rpc_cred *cred, int taskflags)
+nul_match(struct auth_cred *acred, struct rpc_cred *cred, int taskflags)
 {
 	return 1;
 }

@@ -46,12 +46,28 @@ extern void smp_do_timer(struct pt_regs *regs);
 #endif
 
 static inline void
-parisc_do_profile(unsigned long pc)
+parisc_do_profile(struct pt_regs *regs)
 {
+	unsigned long pc = regs->iaoq[0];
+	extern unsigned long prof_cpu_mask;
 	extern char _stext;
+
+#ifdef CONFIG_PROFILING
+	extern void parisc_profile_hook(struct pt_regs *);
+
+	parisc_profile_hook(regs);
+#endif
+
+	if (user_mode(regs))
+		return;
 
 	if (!prof_buffer)
 		return;
+
+#if 0
+	if (!((1 << smp_processor_id()) & prof_cpu_mask))
+		return;
+#endif
 
 	pc -= (unsigned long) &_stext;
 	pc >>= prof_shift;
@@ -67,13 +83,15 @@ parisc_do_profile(unsigned long pc)
 
 void timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	long now = mfctl(16);
+	long now;
 	long next_tick;
 	int nticks;
 	int cpu = smp_processor_id();
 
-	/* initialize next_tick to time at last clocktick */
+	parisc_do_profile(regs);
 
+	now = mfctl(16);
+	/* initialize next_tick to time at last clocktick */
 	next_tick = cpu_data[cpu].it_value;
 
 	/* since time passes between the interrupt and the mfctl()
@@ -98,13 +116,6 @@ void timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 #endif
 		if (cpu == 0) {
 			write_lock(&xtime_lock);
-#ifndef CONFIG_SMP
-			extern int pc_in_user_space;
-			if (!user_mode(regs))
-				parisc_do_profile(regs->iaoq[0]);
-			else
-				parisc_do_profile((unsigned long)&pc_in_user_space);
-#endif
 			do_timer(regs);
 			write_unlock(&xtime_lock);
 		}
@@ -240,3 +251,4 @@ void __init time_init(void)
 		xtime.tv_nsec = 0;
 	}
 }
+

@@ -66,6 +66,8 @@
 
 extern struct timezone sys_tz;
 
+extern int panic_timeout;
+
 #ifdef CONFIG_MODVERSIONS
 const struct module_symbol __export_Using_Versions
 __attribute__((section("__ksymtab"))) = {
@@ -502,6 +504,8 @@ EXPORT_SYMBOL(loops_per_jiffy);
 
 /* misc */
 EXPORT_SYMBOL(panic);
+EXPORT_SYMBOL(panic_notifier_list);
+EXPORT_SYMBOL(panic_timeout);
 EXPORT_SYMBOL(sprintf);
 EXPORT_SYMBOL(snprintf);
 EXPORT_SYMBOL(sscanf);

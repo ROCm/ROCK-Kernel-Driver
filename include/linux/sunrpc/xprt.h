@@ -187,6 +187,7 @@ void			xprt_set_timeout(struct rpc_timeout *, unsigned int,
 					unsigned long);
 
 void			xprt_reserve(struct rpc_task *);
+int			xprt_prepare_transmit(struct rpc_task *);
 void			xprt_transmit(struct rpc_task *);
 void			xprt_receive(struct rpc_task *);
 int			xprt_adjust_timeout(struct rpc_timeout *);

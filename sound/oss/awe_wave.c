@@ -267,8 +267,7 @@ static struct voice_alloc_info *voice_alloc;	/* set at initialization */
  * function prototypes
  */
 
-static int awe_check_port(void);
-static void awe_request_region(void);
+static int awe_request_region(void);
 static void awe_release_region(void);
 
 static void awe_reset_samples(void);
@@ -533,8 +532,8 @@ static int __init _attach_awe(void)
 		return 0;
 	}
 
-	/* check AWE32 ports are available */
-	if (awe_check_port()) {
+	/* reserve I/O ports for awedrv */
+	if (! awe_request_region()) {
 		printk(KERN_ERR "AWE32: I/O area already used.\n");
 		return 0;
 	}
@@ -545,6 +544,7 @@ static int __init _attach_awe(void)
 	my_dev = sound_alloc_synthdev();
 	if (my_dev == -1) {
 		printk(KERN_ERR "AWE32 Error: too many synthesizers\n");
+		awe_release_region();
 		return 0;
 	}
 
@@ -558,9 +558,6 @@ static int __init _attach_awe(void)
 #ifdef CONFIG_AWE32_MIDIEMU
 	attach_midiemu();
 #endif
-
-	/* reserve I/O ports for awedrv */
-	awe_request_region();
 
 	/* clear all samples */
 	awe_reset_samples();
@@ -737,26 +734,27 @@ static void awe_wait(unsigned short delay)
 
 
 /*
- * port check / request
+ * port request
  *  0x620-623, 0xA20-A23, 0xE20-E23
  */
 
 static int __init
-awe_check_port(void)
-{
-	if (! port_setuped) return 0;
-	return (check_region(awe_ports[0], 4) ||
-		check_region(awe_ports[1], 4) ||
-		check_region(awe_ports[3], 4));
-}
-
-static void __init
 awe_request_region(void)
 {
-	if (! port_setuped) return;
-	request_region(awe_ports[0], 4, "sound driver (AWE32)");
-	request_region(awe_ports[1], 4, "sound driver (AWE32)");
-	request_region(awe_ports[3], 4, "sound driver (AWE32)");
+	if (! port_setuped) 
+		return 0;
+	if (! request_region(awe_ports[0], 4, "sound driver (AWE32)"))
+		return 0;
+	if (! request_region(awe_ports[1], 4, "sound driver (AWE32)")) 
+		goto err_out;
+	if (! request_region(awe_ports[3], 4, "sound driver (AWE32)"))
+		goto err_out1;
+	return 1;
+err_out1:
+	release_region(awe_ports[1], 4);	  
+err_out:
+	release_region(awe_ports[0], 4);	  
+	return 0;
 }
 
 static void __exit

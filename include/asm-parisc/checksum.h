@@ -32,7 +32,8 @@ extern unsigned int csum_partial_copy_from_user(const char *src, char *dst, int 
 /*
  *	Optimized for IP headers, which always checksum on 4 octet boundaries.
  *
- *	Written by Randolph Chung <tausq@debian.org>
+ *	Written by Randolph Chung <tausq@debian.org>, and then mucked with by
+ *	LaMont Jones <lamont@debian.org>
  */
 static inline unsigned short ip_fast_csum(unsigned char * iph,
 					  unsigned int ihl) {
@@ -41,27 +42,23 @@ static inline unsigned short ip_fast_csum(unsigned char * iph,
 
 	__asm__ __volatile__ (
 "	ldws,ma		4(%1), %0\n"
-"	addi		-4, %2, %2\n"
-"	comib,>=	0, %2, 2f\n"
+"	addib,<=	-4, %2, 2f\n"
 "\n"
-"	ldws,ma		4(%1), %%r19\n"
-"	add		%0, %%r19, %0\n"
-"	ldws,ma		4(%1), %%r19\n"
-"	addc		%0, %%r19, %0\n"
-"	ldws,ma		4(%1), %%r19\n"
+"	ldws		4(%1), %%r20\n"
+"	ldws		8(%1), %%r21\n"
+"	add		%0, %%r20, %0\n"
+"	ldws,ma		12(%1), %%r19\n"
+"	addc		%0, %%r21, %0\n"
 "	addc		%0, %%r19, %0\n"
 "1:	ldws,ma		4(%1), %%r19\n"
-"	addib,<>	-1, %2, 1b\n"
+"	addib,<		0, %2, 1b\n"
 "	addc		%0, %%r19, %0\n"
-"	addc		%0, %%r0, %0\n"
 "\n"
-"	zdepi		-1, 31, 16, %%r19\n"
-"	and		%0, %%r19, %%r20\n"
+"	extru		%0, 31, 16, %%r20\n"
 "	extru		%0, 15, 16, %%r21\n"
-"	add		%%r20, %%r21, %0\n"
-"	and		%0, %%r19, %%r20\n"
+"	addc		%%r20, %%r21, %0\n"
 "	extru		%0, 15, 16, %%r21\n"
-"	add		%%r20, %%r21, %0\n"
+"	add		%0, %%r21, %0\n"
 "	subi		-1, %0, %0\n"
 "2:\n"
 	: "=r" (sum), "=r" (iph), "=r" (ihl)
