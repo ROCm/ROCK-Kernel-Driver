@@ -8,13 +8,11 @@
  * and is not licensed separately. See file COPYING for details.
  *
  * TODO (sorted by decreasing priority)
- *  -- ZIP does "ub: resid 18 len 0 act 0" and whole transport quits (toggles?)
+ *  -- Do resets with usb_device_reset (needs a thread context, use khubd)
  *  -- set readonly flag for CDs, set removable flag for CF readers
  *  -- do inquiry and verify we got a disk and not a tape (for LUN mismatch)
  *  -- support pphaneuf's SDDR-75 with two LUNs (also broken capacity...)
  *  -- special case some senses, e.g. 3a/0 -> no media present, reduce retries
- *  -- do something about spin-down devices, they are extremely dangerous
- *     (ZIP is one. Needs spin-up command as well.)
  *  -- verify the 13 conditions and do bulk resets
  *  -- normal pool of commands instead of cmdv[]?
  *  -- kill last_pipe and simply do two-state clearing on both pipes
@@ -105,13 +103,11 @@ struct ub_dev;
 #define UB_MAX_SECTORS 64
 
 /*
- * A second ought to be enough for a 32K transfer (UB_MAX_SECTORS)
- * even if a webcam hogs the bus (famous last words).
- * Some CDs need a second to spin up though.
- * ZIP drive rejects commands when it's not spinning,
- * so it does not need long timeouts either.
+ * A second is more than enough for a 32K transfer (UB_MAX_SECTORS)
+ * even if a webcam hogs the bus, but some devices need time to spin up.
  */
 #define UB_URB_TIMEOUT	(HZ*2)
+#define UB_DATA_TIMEOUT	(HZ*5)	/* ZIP does spin-ups in the data phase */
 #define UB_CTRL_TIMEOUT	(HZ/2) /* 500ms ought to be enough to clear a stall */
 
 /*
@@ -188,7 +184,7 @@ struct ub_capacity {
  */
 
 #define SCMD_ST_HIST_SZ   8
-#define SCMD_TRACE_SZ    15	/* No more than 256 (trace_index) */
+#define SCMD_TRACE_SZ    63		/* Less than 4KB of 61-byte lines */
 
 struct ub_scsi_cmd_trace {
 	int hcur;
@@ -267,6 +263,7 @@ struct ub_dev {
 	int changed;			/* Media was changed */
 	int removable;
 	int readonly;
+	int first_open;			/* Kludge. See ub_bd_open. */
 	char name[8];
 	struct usb_device *dev;
 	struct usb_interface *intf;
@@ -888,9 +885,6 @@ static void ub_scsi_urb_compl(struct ub_dev *sc, struct ub_scsi_cmd *cmd)
 	int pipe;
 	int rc;
 
-/* P3 */ /** printk("ub: urb status %d pipe 0x%08x len %d act %d\n",
- urb->status, urb->pipe, urb->transfer_buffer_length, urb->actual_length); **/
-
 	if (atomic_read(&sc->poison)) {
 		/* A little too simplistic, I feel... */
 		goto Bad_End;
@@ -959,9 +953,12 @@ static void ub_scsi_urb_compl(struct ub_dev *sc, struct ub_scsi_cmd *cmd)
 			ub_cmdtr_state(sc, cmd);
 			return;
 		}
-		if (urb->status != 0)
+		if (urb->status != 0) {
+			printk("ub: cmd #%d cmd status (%d)\n", cmd->tag, urb->status); /* P3 */
 			goto Bad_End;
+		}
 		if (urb->actual_length != US_BULK_CB_WRAP_LEN) {
+			printk("ub: cmd #%d xferred %d\n", cmd->tag, urb->actual_length); /* P3 */
 			/* XXX Must do reset here to unconfuse the device */
 			goto Bad_End;
 		}
@@ -993,7 +990,7 @@ static void ub_scsi_urb_compl(struct ub_dev *sc, struct ub_scsi_cmd *cmd)
 			return;
 		}
 
-		sc->work_timer.expires = jiffies + UB_URB_TIMEOUT;
+		sc->work_timer.expires = jiffies + UB_DATA_TIMEOUT;
 		add_timer(&sc->work_timer);
 
 		cmd->state = UB_CMDST_DATA;
@@ -1379,12 +1376,7 @@ static void ub_revalidate(struct ub_dev *sc)
 
 	sc->readonly = 0;	/* XXX Query this from the device */
 
-	/*
-	 * XXX sd.c sets capacity to zero in such case. However, it doesn't
-	 * work for us. In case of zero capacity, block layer refuses to
-	 * have the /dev/uba opened (why?) Set capacity to some random value.
-	 */
-	sc->capacity.nsec = 50;
+	sc->capacity.nsec = 0;
 	sc->capacity.bsize = 512;
 	sc->capacity.bshift = 0;
 
@@ -1399,7 +1391,7 @@ static void ub_revalidate(struct ub_dev *sc)
 		 * We keep this because sd.c has retries for capacity.
 		 */
 		if (ub_sync_read_cap(sc, &sc->capacity) != 0) {
-			sc->capacity.nsec = 100;
+			sc->capacity.nsec = 0;
 			sc->capacity.bsize = 512;
 			sc->capacity.bshift = 0;
 		}
@@ -1427,6 +1419,26 @@ static int ub_bd_open(struct inode *inode, struct file *filp)
 	}
 	sc->openc++;
 	spin_unlock_irqrestore(&ub_lock, flags);
+
+	/*
+	 * This is a workaround for a specific problem in our block layer.
+	 * In 2.6.9, register_disk duplicates the code from rescan_partitions.
+	 * However, if we do add_disk with a device which persistently reports
+	 * a changed media, add_disk calls register_disk, which does do_open,
+	 * which will call rescan_paritions for changed media. After that,
+	 * register_disk attempts to do it all again and causes double kobject
+	 * registration and a eventually an oops on module removal.
+	 *
+	 * The bottom line is, Al Viro says that we should not allow
+	 * bdev->bd_invalidated to be set when doing add_disk no matter what.
+	 */
+	if (sc->first_open) {
+		if (sc->changed) {
+			sc->first_open = 0;
+			rc = -ENOMEDIUM;
+			goto err_open;
+		}
+	}
 
 	if (sc->removable || sc->readonly)
 		check_disk_change(inode->i_bdev);
@@ -1467,6 +1479,8 @@ static int ub_bd_release(struct inode *inode, struct file *filp)
 
 	spin_lock_irqsave(&ub_lock, flags);
 	--sc->openc;
+	if (sc->openc == 0)
+		sc->first_open = 0;
 	if (sc->openc == 0 && atomic_read(&sc->poison))
 		ub_cleanup(sc);
 	spin_unlock_irqrestore(&ub_lock, flags);
@@ -1559,13 +1573,9 @@ static int ub_bd_media_changed(struct gendisk *disk)
 	 */
 	if (ub_sync_tur(sc) != 0) {
 		sc->changed = 1;
-		/* P3 */ printk("%s: made changed\n", sc->name);
 		return 1;
 	}
 
-	/* The sd.c clears this before returning (one-shot flag). Why? */
-	/* P3 */ printk("%s: %s changed\n", sc->name,
-	    sc->changed? "is": "was not");
 	return sc->changed;
 }
 
@@ -1919,6 +1929,8 @@ static int ub_probe(struct usb_interface *intf,
 	}
 
 	sc->removable = 1;		/* XXX Query this from the device */
+	sc->changed = 1;		/* ub_revalidate clears only */
+	sc->first_open = 1;
 
 	ub_revalidate(sc);
 	/* This is pretty much a long term P3 */

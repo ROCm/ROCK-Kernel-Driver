@@ -498,12 +498,6 @@ exit:
 /****************************************************************************
  *  sysfs
  ***************************************************************************/
-static inline struct usb_stv *cd_to_stv(struct class_device *cd)
-{
-	struct video_device *vdev = to_video_device(cd);
-	return video_get_drvdata(vdev);
-}
-
 #define stv680_file(name, variable, field)				\
 static ssize_t show_##name(struct class_device *class_dev, char *buf)	\
 {									\

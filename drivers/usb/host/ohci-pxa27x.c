@@ -244,6 +244,7 @@ int usb_hcd_pxa27x_probe (const struct hc_driver *driver,
 
 	usb_bus_init (&hcd->self);
 	hcd->self.op = &usb_hcd_operations;
+	hcd->self.release = &usb_hcd_release;
 	hcd->self.hcpriv = (void *) hcd;
 	hcd->self.bus_name = "pxa27x";
 	hcd->product_desc = "PXA27x OHCI";
@@ -262,9 +263,8 @@ int usb_hcd_pxa27x_probe (const struct hc_driver *driver,
 
  err2:
 	hcd_buffer_destroy (hcd);
-	if (hcd)
-		driver->hcd_free(hcd);
  err1:
+	kfree(hcd);
 	pxa27x_stop_hc(dev);
 	release_mem_region(dev->resource[0].start,
 				dev->resource[0].end
@@ -288,8 +288,6 @@ int usb_hcd_pxa27x_probe (const struct hc_driver *driver,
  */
 void usb_hcd_pxa27x_remove (struct usb_hcd *hcd, struct platform_device *dev)
 {
-	void *base;
-
 	pr_debug ("remove: %s, state %x", hcd->self.bus_name, hcd->state);
 
 	if (in_interrupt ())
@@ -307,9 +305,6 @@ void usb_hcd_pxa27x_remove (struct usb_hcd *hcd, struct platform_device *dev)
 	hcd_buffer_destroy (hcd);
 
 	usb_deregister_bus (&hcd->self);
-
-	base = hcd->regs;
-	hcd->driver->hcd_free (hcd);
 
 	pxa27x_stop_hc(dev);
 	release_mem_region(dev->resource[0].start,
@@ -359,7 +354,6 @@ static const struct hc_driver ohci_pxa27x_hc_driver = {
 	 * memory lifecycle (except per-request)
 	 */
 	.hcd_alloc =		ohci_hcd_alloc,
-	.hcd_free =		ohci_hcd_free,
 
 	/*
 	 * managing i/o requests and associated device resources

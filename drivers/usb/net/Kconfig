@@ -185,6 +185,14 @@ config USB_PL2301
 	  Choose this option if you're using a host-to-host cable
 	  with one of these chips.
 
+config USB_KC2190
+	boolean "KT Technology KC2190 based cables (InstaNet)"
+	default y
+	depends on USB_USBNET && EXPERIMENTAL
+	help
+	  Choose this option if you're using a host-to-host cable
+	  with one of these chips.
+
 comment "Intelligent USB Devices/Gadgets"
 	depends on USB_USBNET
 
