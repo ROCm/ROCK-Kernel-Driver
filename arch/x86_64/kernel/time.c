@@ -296,8 +296,8 @@ EXPORT_SYMBOL(monotonic_clock);
 static irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	static unsigned long rtc_update = 0;
-	unsigned long tsc, lost = 0;
-	int delay, offset = 0;
+	unsigned long tsc;
+	int delay, offset = 0, lost = 0;
 
 /*
  * Here we are in the timer irq handler. We have irqs locally disabled (so we
@@ -353,7 +353,7 @@ static irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 				(((long) offset << 32) / vxtime.tsc_quot) - 1;
 	}
 
-	if (lost) {
+	if (lost > 0) {
 		if (report_lost_ticks) {
 			printk(KERN_WARNING "time.c: Lost %ld timer "
 			       "tick(s)! ", lost);
