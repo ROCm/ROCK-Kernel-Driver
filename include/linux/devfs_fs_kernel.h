@@ -23,21 +23,14 @@
 
 #define DEVFS_FL_NONE           0x000 /* This helps to make code more readable
 				       */
-#define DEVFS_FL_AUTO_OWNER     0x001 /* When a closed inode is opened the
-					 ownerships are set to the opening
-					 process and the protection is set to
-					 that given in <<mode>>. When the inode
-					 is closed, ownership reverts back to
-					 <<uid>> and <<gid>> and the protection
-					 is set to read-write for all        */
-#define DEVFS_FL_HIDE           0x002 /* Do not show entry in directory list */
-#define DEVFS_FL_AUTO_DEVNUM    0x004 /* Automatically generate device number
+#define DEVFS_FL_HIDE           0x001 /* Do not show entry in directory list */
+#define DEVFS_FL_AUTO_DEVNUM    0x002 /* Automatically generate device number
 				       */
-#define DEVFS_FL_AOPEN_NOTIFY   0x008 /* Asynchronously notify devfsd on open
+#define DEVFS_FL_AOPEN_NOTIFY   0x004 /* Asynchronously notify devfsd on open
 				       */
-#define DEVFS_FL_REMOVABLE      0x010 /* This is a removable media device    */
-#define DEVFS_FL_WAIT           0x020 /* Wait for devfsd to finish           */
-#define DEVFS_FL_CURRENT_OWNER  0x040 /* Set initial ownership to current    */
+#define DEVFS_FL_REMOVABLE      0x008 /* This is a removable media device    */
+#define DEVFS_FL_WAIT           0x010 /* Wait for devfsd to finish           */
+#define DEVFS_FL_CURRENT_OWNER  0x020 /* Set initial ownership to current    */
 #define DEVFS_FL_DEFAULT        DEVFS_FL_NONE
 
 
