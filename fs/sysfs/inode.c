@@ -23,6 +23,8 @@
  * Please see Documentation/filesystems/sysfs.txt for more information.
  */
 
+#undef DEBUG 
+
 #include <linux/list.h>
 #include <linux/init.h>
 #include <linux/pagemap.h>
