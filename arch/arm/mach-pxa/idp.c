@@ -54,13 +54,10 @@ unsigned int idp_control_port_shadow = ((0x7 << 21) | 		/* LCD power */
 
 #endif
 
-static int __init idp_init(void)
+static void __init idp_init(void)
 {
 	printk("idp_init()\n");
-	return 0;
 }
-
-__initcall(idp_init);
 
 static void __init idp_init_irq(void)
 {
@@ -119,4 +116,5 @@ MACHINE_START(PXA_IDP, "Accelent Xscale IDP")
 	BOOT_MEM(0xa0000000, 0x40000000, 0xfc000000)
 	MAPIO(idp_map_io)
 	INITIRQ(idp_init_irq)
+	INIT_MACHINE(idp_init)
 MACHINE_END
