@@ -2,7 +2,7 @@
  * tg3.c: Broadcom Tigon3 ethernet driver.
  *
  * Copyright (C) 2001, 2002, 2003 David S. Miller (davem@redhat.com)
- * Copyright (C) 2001, 2002 Jeff Garzik (jgarzik@pobox.com)
+ * Copyright (C) 2001, 2002, 2003 Jeff Garzik (jgarzik@pobox.com)
  */
 
 #include <linux/config.h>
@@ -56,8 +56,8 @@
 
 #define DRV_MODULE_NAME		"tg3"
 #define PFX DRV_MODULE_NAME	": "
-#define DRV_MODULE_VERSION	"1.9"
-#define DRV_MODULE_RELDATE	"August 3, 2003"
+#define DRV_MODULE_VERSION	"2.0"
+#define DRV_MODULE_RELDATE	"August 23, 2003"
 
 #define TG3_DEF_MAC_MODE	0
 #define TG3_DEF_RX_MODE		0
