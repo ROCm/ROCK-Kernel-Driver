@@ -113,7 +113,7 @@ static struct file_operations rds_fops = {
 
 static struct miscdevice rds_miscdev = {
 	.minor		= MISC_DYNAMIC_MINOR,
-	.name		= "radiotext"
+	.name		= "radiotext",
 	.fops		= &rds_fops,
 };
 
@@ -128,7 +128,7 @@ static int __init miropcm20_rds_init(void)
 	error = devfs_mk_symlink(NULL, "v4l/rds/radiotext", 0,
 				 "../misc/radiotext", NULL, NULL);
 	if (error)
-		misc_deregister(&rds_miscdev)
+		misc_deregister(&rds_miscdev);
 
 	return error;
 }
@@ -136,7 +136,7 @@ static int __init miropcm20_rds_init(void)
 static void __exit miropcm20_rds_cleanup(void)
 {
 	devfs_remove("v4l/rds/radiotext");
-	misc_deregister(&rds_miscdev)
+	misc_deregister(&rds_miscdev);
 }
 
 module_init(miropcm20_rds_init);
