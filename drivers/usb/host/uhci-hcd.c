@@ -2517,7 +2517,7 @@ init_failed:
 up_failed:
 
 #ifdef CONFIG_PROC_FS
-	remove_proc_entry("uhci", 0);
+	remove_proc_entry("driver/uhci", 0);
 
 proc_failed:
 #endif
@@ -2537,7 +2537,7 @@ static void __exit uhci_hcd_cleanup(void)
 		printk(KERN_INFO "uhci: not all urb_priv's were freed\n");
 
 #ifdef CONFIG_PROC_FS
-	remove_proc_entry("uhci", 0);
+	remove_proc_entry("driver/uhci", 0);
 #endif
 
 	if (errbuf)
