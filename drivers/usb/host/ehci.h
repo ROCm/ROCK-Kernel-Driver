@@ -84,6 +84,8 @@ struct ehci_hcd {			/* one per controller */
 	struct notifier_block	reboot_notifier;
 	unsigned long		actions;
 	unsigned		stamp;
+	unsigned long		next_statechange;
+	u32			command;
 
 	unsigned		is_arc_rh_tt:1;	/* ARC roothub with TT */
 
@@ -99,8 +101,6 @@ struct ehci_hcd {			/* one per controller */
 /* unwrap an HCD pointer to get an EHCI_HCD pointer */ 
 #define hcd_to_ehci(hcd_ptr) container_of(hcd_ptr, struct ehci_hcd, hcd)
 
-/* NOTE:  urb->transfer_flags expected to not use this bit !!! */
-#define EHCI_STATE_UNLINK	0x8000		/* urb being unlinked */
 
 enum ehci_timer_action {
 	TIMER_IO_WATCHDOG,
@@ -221,7 +221,7 @@ struct ehci_regs {
 	u32		segment; 	/* address bits 63:32 if needed */
 	/* PERIODICLISTBASE: offset 0x14 */
 	u32		frame_list; 	/* points to periodic list */
-	/* ASYNCICLISTADDR: offset 0x18 */
+	/* ASYNCLISTADDR: offset 0x18 */
 	u32		async_next;	/* address of next async queue head */
 
 	u32		reserved [9];
@@ -237,7 +237,10 @@ struct ehci_regs {
 #define PORT_WKDISC_E	(1<<21)		/* wake on disconnect (enable) */
 #define PORT_WKCONN_E	(1<<20)		/* wake on connect (enable) */
 /* 19:16 for port testing */
-/* 15:14 for using port indicator leds (if HCS_INDICATOR allows) */
+#define PORT_LED_OFF	(0<<14)
+#define PORT_LED_AMBER	(1<<14)
+#define PORT_LED_GREEN	(2<<14)
+#define PORT_LED_MASK	(3<<14)
 #define PORT_OWNER	(1<<13)		/* true: companion hc owns this port */
 #define PORT_POWER	(1<<12)		/* true: has power (see PPC) */
 #define PORT_USB11(x) (((x)&(3<<10))==(1<<10))	/* USB 1.1 device */
@@ -592,6 +595,14 @@ ehci_port_speed(struct ehci_hcd *ehci, unsigned int portsc)
 #endif
 
 /*-------------------------------------------------------------------------*/
+
+#define	MSEC_TO_JIFFIES(msec) ((HZ * (msec) + 999) / 1000)
+
+static inline void msec_delay(int msec)
+{
+	set_current_state(TASK_UNINTERRUPTIBLE);
+	schedule_timeout(MSEC_TO_JIFFIES(msec));
+}
 
 #ifndef DEBUG
 #define STUB_DEBUG_FILES

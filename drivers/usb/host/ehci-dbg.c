@@ -170,6 +170,20 @@ dbg_itd (const char *label, struct ehci_hcd *ehci, struct ehci_itd *itd)
 		itd->index[6], itd->index[7]);
 }
 
+static void __attribute__((__unused__))
+dbg_sitd (const char *label, struct ehci_hcd *ehci, struct ehci_sitd *sitd) 
+{
+	ehci_dbg (ehci, "%s [%d] sitd %p, next %08x, urb %p\n",
+		label, sitd->frame, sitd, le32_to_cpu(sitd->hw_next), sitd->urb);
+	ehci_dbg (ehci,
+		"  addr %08x sched %04x result %08x buf %08x %08x\n", 
+		le32_to_cpu(sitd->hw_fullspeed_ep),
+		le32_to_cpu(sitd->hw_uframe),
+		le32_to_cpu(sitd->hw_results),
+		le32_to_cpu(sitd->hw_buf [0]),
+		le32_to_cpu(sitd->hw_buf [1]));
+}
+
 static int __attribute__((__unused__))
 dbg_status_buf (char *buf, unsigned len, char *label, u32 status)
 {
@@ -625,11 +639,20 @@ show_registers (struct class_device *class_dev, char *buf)
 
 	spin_lock_irqsave (&ehci->lock, flags);
 
+	if (bus->controller->power.power_state) {
+		size = scnprintf (next, size,
+			"bus %s, device %s (driver " DRIVER_VERSION ")\n"
+			"SUSPENDED (no register access)\n",
+			hcd->self.controller->bus->name,
+			hcd->self.controller->bus_id);
+		goto done;
+	}
+
 	/* Capability Registers */
 	i = HC_VERSION(readl (&ehci->caps->hc_capbase));
 	temp = scnprintf (next, size,
-		"bus %s device %s\n"
-		"EHCI %x.%02x, hcd state %d (driver " DRIVER_VERSION ")\n",
+		"bus %s, device %s (driver " DRIVER_VERSION ")\n"
+		"EHCI %x.%02x, hcd state %d\n",
 		hcd->self.controller->bus->name,
 		hcd->self.controller->bus_id,
 		i >> 8, i & 0x0ff, ehci->hcd.state);
@@ -672,7 +695,7 @@ show_registers (struct class_device *class_dev, char *buf)
 	next += temp;
 
 	for (i = 0; i < HCS_N_PORTS (ehci->hcs_params); i++) {
-		temp = dbg_port_buf (scratch, sizeof scratch, label, i,
+		temp = dbg_port_buf (scratch, sizeof scratch, label, i + 1,
 				readl (&ehci->regs->port_status [i]));
 		temp = scnprintf (next, size, fmt, temp, scratch);
 		size -= temp;
@@ -701,6 +724,7 @@ show_registers (struct class_device *class_dev, char *buf)
 	next += temp;
 #endif
 
+done:
 	spin_unlock_irqrestore (&ehci->lock, flags);
 
 	return PAGE_SIZE - size;
