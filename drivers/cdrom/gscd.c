@@ -898,20 +898,15 @@ static void update_state(void)
 }
 #endif
 
-static struct gendisk gscd_disk = {
-	.major = MAJOR_NR,
-	.first_minor = 0,
-	.minor_shift = 0,
-	.fops = &gscd_fops,
-	.disk_name = "gscd"
-};
+static struct gendisk *gscd_disk;
 
 static void __exit gscd_exit(void)
 {
 	CLEAR_TIMER;
 
 	devfs_find_and_unregister(NULL, "gscd", 0, 0, DEVFS_SPECIAL_BLK, 0);
-	del_gendisk(&gscd_disk);
+	del_gendisk(gscd_disk);
+	put_disk(gscd_disk);
 	if ((unregister_blkdev(MAJOR_NR, "gscd") == -EINVAL)) {
 		printk("What's that: can't unregister GoldStar-module\n");
 		return;
@@ -977,11 +972,20 @@ static int __init gscd_init(void)
 		i++;
 	}
 
+	gscd_disk = alloc_disk();
+	if (!gscd_disk)
+		goto err_out1;
+	gscd_disk->major = MAJOR_NR;
+	gscd_disk->first_minor = 0;
+	gscd_disk->minor_shift = 0;
+	gscd_disk->fops = &gscd_fops;
+	sprintf(gscd_disk->disk_name, "gscd");
+
 	if (register_blkdev(MAJOR_NR, "gscd", &gscd_fops) != 0) {
 		printk(KERN_WARNING "GSCD: Unable to get major %d for GoldStar "
 		       "CD-ROM\n", MAJOR_NR);
 		ret = -EIO;
-		goto err_out1;
+		goto err_out2;
 	}
 	devfs_register(NULL, "gscd", DEVFS_FL_DEFAULT, MAJOR_NR, 0,
 		       S_IFBLK | S_IRUGO | S_IWUGO, &gscd_fops, NULL);
@@ -991,10 +995,13 @@ static int __init gscd_init(void)
 	disk_state = 0;
 	gscdPresent = 1;
 
-	add_disk(&gscd_disk);
+	add_disk(gscd_disk);
 
 	printk(KERN_INFO "GSCD: GoldStar CD-ROM Drive found.\n");
 	return 0;
+
+err_out2:
+	put_disk(gscd_disk);
 err_out1:
 	release_region(gscd_port, GSCD_IO_EXTENT);
 	return ret;

@@ -312,8 +312,10 @@ keep:
 	list_splice(&ret_pages, page_list);
 	if (pagevec_count(&freed_pvec))
 		__pagevec_release_nonlru(&freed_pvec);
-	KERNEL_STAT_ADD(pgsteal, nr_pages_in - nr_pages);
-	KERNEL_STAT_ADD(pgactivate, pgactivate);
+	mod_page_state(pgsteal, nr_pages_in - nr_pages);
+	if (current->flags & PF_KSWAPD)
+		mod_page_state(kswapd_steal, nr_pages_in - nr_pages);
+	mod_page_state(pgactivate, pgactivate);
 	return nr_pages;
 }
 
@@ -380,7 +382,7 @@ shrink_cache(int nr_pages, struct zone *zone,
 			goto done;
 
 		max_scan -= nr_scan;
-		KERNEL_STAT_ADD(pgscan, nr_scan);
+		mod_page_state(pgscan, nr_scan);
 		nr_pages = shrink_list(&page_list, nr_pages,
 				gfp_mask, &max_scan, nr_mapped);
 
@@ -527,8 +529,8 @@ refill_inactive_zone(struct zone *zone, const int nr_pages_in)
 	spin_unlock_irq(&zone->lru_lock);
 	pagevec_release(&pvec);
 
-	KERNEL_STAT_ADD(pgscan, nr_pages_in - nr_pages);
-	KERNEL_STAT_ADD(pgdeactivate, pgdeactivate);
+	mod_page_state(pgrefill, nr_pages_in - nr_pages);
+	mod_page_state(pgdeactivate, pgdeactivate);
 }
 
 static /* inline */ int
@@ -641,7 +643,7 @@ try_to_free_pages(struct zone *classzone,
 	int priority = DEF_PRIORITY;
 	int nr_pages = SWAP_CLUSTER_MAX;
 
-	KERNEL_STAT_INC(pageoutrun);
+	inc_page_state(pageoutrun);
 
 	for (priority = DEF_PRIORITY; priority; priority--) {
 		int total_scanned = 0;
@@ -757,7 +759,7 @@ int kswapd(void *p)
 	 * us from recursively trying to free more memory as we're
 	 * trying to free the first piece of memory in the first place).
 	 */
-	tsk->flags |= PF_MEMALLOC;
+	tsk->flags |= PF_MEMALLOC|PF_KSWAPD;
 
 	/*
 	 * Kswapd main loop.

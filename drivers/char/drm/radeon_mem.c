@@ -118,7 +118,7 @@ static void free_block( struct mem_block *p )
 		p->size += q->size;
 		p->next = q->next;
 		p->next->prev = p;
-		DRM_FREE(p);
+		DRM_FREE(q);
 	}
 
 	if (p->prev->pid == 0) {

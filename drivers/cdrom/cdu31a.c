@@ -3188,14 +3188,7 @@ static struct cdrom_device_info scd_info = {
 	.name		= "cdu31a"
 };
 
-static struct gendisk scd_gendisk = {
-	.major		= MAJOR_NR,
-	.first_minor	= 0,
-	.minor_shift	= 0,
-	.disk_name	= "cdu31a",
-	.fops		= &scd_bdops,
-	.flags		= GENHD_FL_CD,
-};
+static struct gendisk *scd_gendisk;
 
 /* The different types of disc loading mechanisms supported */
 static char *load_mech[] __initdata =
@@ -3299,7 +3292,8 @@ __setup("cdu31a=", cdu31a_setup);
 int __init cdu31a_init(void)
 {
 	struct s_sony_drive_config drive_config;
-	struct gendisk *disk = &scd_gendisk;
+	struct gendisk *disk;
+	int deficiency = 0;
 	unsigned int res_size;
 	char msg[255];
 	char buf[40];
@@ -3360,115 +3354,119 @@ int __init cdu31a_init(void)
 		}
 	}
 
-	if (drive_found) {
-		int deficiency = 0;
+	if (!drive_found)
+		goto errout3;
 
-		if (!request_region(cdu31a_port, 4, "cdu31a"))
-			goto errout3;
+	if (!request_region(cdu31a_port, 4, "cdu31a"))
+		goto errout3;
 
-		if (register_blkdev(MAJOR_NR, "cdu31a", &scd_bdops)) {
-			printk("Unable to get major %d for CDU-31a\n",
-			       MAJOR_NR);
-			goto errout2;
-		}
-
-		if (SONY_HWC_DOUBLE_SPEED(drive_config)) {
-			is_double_speed = 1;
-		}
-
-		tmp_irq = cdu31a_irq;	/* Need IRQ 0 because we can't sleep here. */
-		cdu31a_irq = 0;
-
-		set_drive_params(sony_speed);
-
-		cdu31a_irq = tmp_irq;
-
-		if (cdu31a_irq > 0) {
-			if (request_irq
-			    (cdu31a_irq, cdu31a_interrupt, SA_INTERRUPT,
-			     "cdu31a", NULL)) {
-				printk
-				    ("Unable to grab IRQ%d for the CDU31A driver\n",
-				     cdu31a_irq);
-				cdu31a_irq = 0;
-			}
-		}
-
-		sprintf(msg, "Sony I/F CDROM : %8.8s %16.16s %8.8s\n",
-			drive_config.vendor_id,
-			drive_config.product_id,
-			drive_config.product_rev_level);
-		sprintf(buf, "  Capabilities: %s",
-			load_mech[SONY_HWC_GET_LOAD_MECH(drive_config)]);
-		strcat(msg, buf);
-		if (SONY_HWC_AUDIO_PLAYBACK(drive_config)) {
-			strcat(msg, ", audio");
-		} else
-			deficiency |= CDC_PLAY_AUDIO;
-		if (SONY_HWC_EJECT(drive_config)) {
-			strcat(msg, ", eject");
-		} else
-			deficiency |= CDC_OPEN_TRAY;
-		if (SONY_HWC_LED_SUPPORT(drive_config)) {
-			strcat(msg, ", LED");
-		}
-		if (SONY_HWC_ELECTRIC_VOLUME(drive_config)) {
-			strcat(msg, ", elec. Vol");
-		}
-		if (SONY_HWC_ELECTRIC_VOLUME_CTL(drive_config)) {
-			strcat(msg, ", sep. Vol");
-		}
-		if (is_double_speed) {
-			strcat(msg, ", double speed");
-		} else
-			deficiency |= CDC_SELECT_SPEED;
-		if (cdu31a_irq > 0) {
-			sprintf(buf, ", irq %d", cdu31a_irq);
-			strcat(msg, buf);
-		}
-		strcat(msg, "\n");
-
-		is_a_cdu31a =
-		    strcmp("CD-ROM CDU31A", drive_config.product_id) == 0;
-
-		blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR),
-			       do_cdu31a_request,
-			       &cdu31a_lock);
-
-		init_timer(&cdu31a_abort_timer);
-		cdu31a_abort_timer.function = handle_abort_timeout;
-
-		scd_info.dev = mk_kdev(MAJOR_NR, 0);
-		scd_info.mask = deficiency;
-		if (register_cdrom(&scd_info))
-			goto errout0;
-		add_disk(disk);
+	if (register_blkdev(MAJOR_NR, "cdu31a", &scd_bdops)) {
+		printk("Unable to get major %d for CDU-31a\n",
+		       MAJOR_NR);
+		goto errout2;
 	}
 
+	disk = alloc_disk();
+	if (!disk)
+		goto errout1;
+	disk->major = MAJOR_NR;
+	disk->first_minor = 0;
+	disk->minor_shift = 0;
+	sprintf(disk->disk_name, "cdu31a");
+	disk->fops = &scd_bdops;
+	disk->flags = GENHD_FL_CD;
+
+	if (SONY_HWC_DOUBLE_SPEED(drive_config))
+		is_double_speed = 1;
+
+	tmp_irq = cdu31a_irq;	/* Need IRQ 0 because we can't sleep here. */
+	cdu31a_irq = 0;
+
+	set_drive_params(sony_speed);
+
+	cdu31a_irq = tmp_irq;
+
+	if (cdu31a_irq > 0) {
+		if (request_irq
+		    (cdu31a_irq, cdu31a_interrupt, SA_INTERRUPT,
+		     "cdu31a", NULL)) {
+			printk
+			    ("Unable to grab IRQ%d for the CDU31A driver\n",
+			     cdu31a_irq);
+			cdu31a_irq = 0;
+		}
+	}
+
+	sprintf(msg, "Sony I/F CDROM : %8.8s %16.16s %8.8s\n",
+		drive_config.vendor_id,
+		drive_config.product_id,
+		drive_config.product_rev_level);
+	sprintf(buf, "  Capabilities: %s",
+		load_mech[SONY_HWC_GET_LOAD_MECH(drive_config)]);
+	strcat(msg, buf);
+	if (SONY_HWC_AUDIO_PLAYBACK(drive_config))
+		strcat(msg, ", audio");
+	else
+		deficiency |= CDC_PLAY_AUDIO;
+	if (SONY_HWC_EJECT(drive_config))
+		strcat(msg, ", eject");
+	else
+		deficiency |= CDC_OPEN_TRAY;
+	if (SONY_HWC_LED_SUPPORT(drive_config))
+		strcat(msg, ", LED");
+	if (SONY_HWC_ELECTRIC_VOLUME(drive_config))
+		strcat(msg, ", elec. Vol");
+	if (SONY_HWC_ELECTRIC_VOLUME_CTL(drive_config))
+		strcat(msg, ", sep. Vol");
+	if (is_double_speed)
+		strcat(msg, ", double speed");
+	else
+		deficiency |= CDC_SELECT_SPEED;
+	if (cdu31a_irq > 0) {
+		sprintf(buf, ", irq %d", cdu31a_irq);
+		strcat(msg, buf);
+	}
+	strcat(msg, "\n");
+
+	is_a_cdu31a =
+	    strcmp("CD-ROM CDU31A", drive_config.product_id) == 0;
+
+	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR),
+		       do_cdu31a_request,
+		       &cdu31a_lock);
+
+	init_timer(&cdu31a_abort_timer);
+	cdu31a_abort_timer.function = handle_abort_timeout;
+
+	scd_info.dev = mk_kdev(MAJOR_NR, 0);
+	scd_info.mask = deficiency;
+	scd_gendisk = disk;
+	if (register_cdrom(&scd_info))
+		goto errout0;
+	add_disk(disk);
 
 	disk_changed = 1;
+	return (0);
 
-	if (drive_found) {
-		return (0);
-	} else {
-		goto errout3;
-	}
-      errout0:
+errout0:
 	printk("Unable to register CDU-31a with Uniform cdrom driver\n");
 	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
+	put_disk(disk);
+errout1:
 	if (unregister_blkdev(MAJOR_NR, "cdu31a")) {
 		printk("Can't unregister block device for cdu31a\n");
 	}
-      errout2:
+errout2:
 	release_region(cdu31a_port, 4);
-      errout3:
+errout3:
 	return -EIO;
 }
 
 
 void __exit cdu31a_exit(void)
 {
-	del_gendisk(&scd_gendisk);
+	del_gendisk(scd_gendisk);
+	put_disk(scd_gendisk);
 	if (unregister_cdrom(&scd_info)) {
 		printk
 		    ("Can't unregister cdu31a from Uniform cdrom driver\n");

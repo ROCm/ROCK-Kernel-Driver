@@ -38,7 +38,7 @@ void activate_page(struct page *page)
 		del_page_from_inactive_list(zone, page);
 		SetPageActive(page);
 		add_page_to_active_list(zone, page);
-		KERNEL_STAT_INC(pgactivate);
+		inc_page_state(pgactivate);
 	}
 	spin_unlock_irq(&zone->lru_lock);
 }
@@ -236,6 +236,29 @@ void pagevec_strip(struct pagevec *pvec)
 			unlock_page(page);
 		}
 	}
+}
+
+/**
+ * pagevec_lookup - gang pagecache lookup
+ * @pvec:	Where the resulting pages are placed
+ * @mapping:	The address_space to search
+ * @start:	The starting page index
+ * @nr_pages:	The maximum number of pages
+ *
+ * pagevec_lookup() will search for and return a group of up to @nr_pages pages
+ * in the mapping.  The pages are placed in @pvec.  pagevec_lookup() takes a
+ * reference against the pages in @pvec.
+ *
+ * The search returns a group of mapping-contiguous pages with ascending
+ * indexes.  There may be holes in the indices due to not-present pages.
+ *
+ * pagevec_lookup() returns the number of pages which were found.
+ */
+unsigned int pagevec_lookup(struct pagevec *pvec, struct address_space *mapping,
+		pgoff_t start, unsigned int nr_pages)
+{
+	pvec->nr = find_get_pages(mapping, start, nr_pages, pvec->pages);
+	return pagevec_count(pvec);
 }
 
 /*

@@ -25,13 +25,13 @@ key: If a user application wants to share hugepages with other
       memory (mapped by hugeTLBs) in their address space.  When a process
       forks, then children share the same physical memory with their parent.
 
-      For the cases when an application wishes to keep the huge pages
-      private, the key value of 0 is defined.  In this case kernel allocates
-      hugetlb pages to the process that are not shareable across different
-      processes.  These segments are marked private for the process.  These
-      segments are not copied to children's address space on forks.
-
-AKPM: So what is present at that address within the child?
+      For the cases when an application wishes to keep the huge
+      pages private, the key value of 0 is defined.  In this case
+      kernel allocates hugetlb pages to the process that are not
+      shareable across different processes.  These segments are marked
+      private for the process.  These segments are not copied to
+      children's address space on forks - the child will have no
+      mapping for these virtual addresses.
 
       The key manangement (and assignment) part is left to user
       applications.

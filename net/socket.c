@@ -79,6 +79,10 @@
 #include <linux/kmod.h>
 #endif
 
+#if defined(CONFIG_NET_RADIO) || defined(CONFIG_NET_PCMCIA_RADIO)
+#include <linux/wireless.h>		/* Note : will define WIRELESS_EXT */
+#endif	/* CONFIG_NET_RADIO || CONFIG_NET_PCMCIA_RADIO */
+
 #include <asm/uaccess.h>
 
 #include <net/sock.h>
@@ -675,19 +679,42 @@ static ssize_t sock_writev(struct file *file, const struct iovec *vector,
 }
 
 /*
- *	With an ioctl arg may well be a user mode pointer, but we don't know what to do
- *	with it - that's up to the protocol still.
+ *	With an ioctl, arg may well be a user mode pointer, but we don't know
+ *	what to do with it - that's up to the protocol still.
  */
 
 int sock_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	   unsigned long arg)
 {
 	struct socket *sock;
-	int err;
+	int pid, err;
 
 	unlock_kernel();
 	sock = SOCKET_I(inode);
-	err = sock->ops->ioctl(sock, cmd, arg);
+	if (cmd >= SIOCDEVPRIVATE && cmd <= (SIOCDEVPRIVATE + 15)) {
+		err = dev_ioctl(cmd, (void *)arg);
+	} else
+#ifdef WIRELESS_EXT
+	if (cmd >= SIOCIWFIRST && cmd <= SIOCIWLAST) {
+		err = dev_ioctl(cmd, (void *)arg);
+	} else
+#endif	/* WIRELESS_EXT */
+	switch (cmd) {
+		case FIOSETOWN:
+		case SIOCSPGRP:
+			err = -EFAULT;
+			if (get_user(pid, (int *)arg))
+				break;
+			err = f_setown(sock->file, pid, 1);
+			break;
+		case FIOGETOWN:
+		case SIOCGPGRP:
+			err = put_user(sock->file->f_owner.pid, (int *)arg);
+			break;
+		default:
+			err = sock->ops->ioctl(sock, cmd, arg);
+			break;
+	}
 	lock_kernel();
 
 	return err;

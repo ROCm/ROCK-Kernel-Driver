@@ -1871,7 +1871,6 @@ static void snd_ali_suspend(struct pci_dev *dev)
 	ali_t *chip = snd_magic_cast(ali_t, pci_get_drvdata(dev), return);
 #endif
 	ali_image_t *im;
-	unsigned long flags;
 	int i, j;
 
 	im = chip->image;
@@ -1882,8 +1881,7 @@ static void snd_ali_suspend(struct pci_dev *dev)
 		return;
 #endif
 
-	save_flags(flags); 
-	cli();
+	spin_lock_irq(&chip->reg_lock);
 	
 	im->regs[ALI_MISCINT >> 2] = inl(ALI_REG(chip, ALI_MISCINT));
 	// im->regs[ALI_START >> 2] = inl(ALI_REG(chip, ALI_START));
@@ -1907,7 +1905,7 @@ static void snd_ali_suspend(struct pci_dev *dev)
 	// stop all HW channel
 	outl(0xffffffff, ALI_REG(chip, ALI_STOP));
 
-	restore_flags(flags);
+	spin_unlock_irq(&chip->reg_lock);
 #ifndef PCI_OLD_SUSPEND
 	return 0;
 #endif
@@ -1925,7 +1923,6 @@ static void snd_ali_resume(struct pci_dev *dev)
 	ali_t *chip = snd_magic_cast(ali_t, pci_get_drvdata(dev), return);
 #endif
 	ali_image_t *im;
-	unsigned long flags;
 	int i, j;
 
 	im = chip->image;
@@ -1938,8 +1935,7 @@ static void snd_ali_resume(struct pci_dev *dev)
 
 	pci_enable_device(chip->pci);
 
-	save_flags(flags); 
-	cli();
+	spin_lock_irq(&chip->reg_lock);
 	
 	for (i = 0; i < ALI_CHANNELS; i++) {
 		outb(i, ALI_REG(chip, ALI_GC_CIR));
@@ -1960,7 +1956,7 @@ static void snd_ali_resume(struct pci_dev *dev)
 	// restore IRQ enable bits
 	outl(im->regs[ALI_MISCINT >> 2], ALI_REG(chip, ALI_MISCINT));
 	
-	restore_flags(flags);
+	spin_unlock_irq(&chip->reg_lock);
 #ifndef PCI_OLD_SUSPEND
 	return 0;
 #endif

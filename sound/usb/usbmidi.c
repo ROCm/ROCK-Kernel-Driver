@@ -479,6 +479,22 @@ static void snd_usbmidi_in_endpoint_delete(snd_usb_midi_in_endpoint_t* ep)
 	snd_magic_kfree(ep);
 }
 
+#ifndef OLD_USB
+/* this code is not exported from USB core anymore */
+struct usb_interface *local_usb_ifnum_to_if(struct usb_device *dev, unsigned ifnum)
+{
+	int i;
+        
+	for (i = 0; i < dev->actconfig->bNumInterfaces; i++)
+		if (dev->actconfig->interface[i].altsetting[0].bInterfaceNumber == ifnum)
+			return &dev->actconfig->interface[i];
+                                                        
+	return NULL;
+}
+#else
+#define local_usb_ifnum_to_if usb_ifnum_to_if
+#endif
+
 /*
  * For Roland devices, use the alternate setting which uses interrupt
  * transfers for input.
@@ -491,7 +507,7 @@ static usb_endpoint_descriptor_t* snd_usbmidi_get_int_epd(snd_usb_midi_t* umidi,
 
 	if (umidi->chip->dev->descriptor.idVendor != 0x0582)
 		return NULL;
-	intf = usb_ifnum_to_if(umidi->chip->dev, umidi->ifnum);
+	intf = local_usb_ifnum_to_if(umidi->chip->dev, umidi->ifnum);
 	if (!intf || intf->num_altsetting != 2)
 		return NULL;
 
@@ -803,7 +819,7 @@ static int snd_usbmidi_get_ms_info(snd_usb_midi_t* umidi,
 
 	memset(endpoints, 0, sizeof(*endpoints) * MIDI_MAX_ENDPOINTS);
 
-	intf = usb_ifnum_to_if(umidi->chip->dev, umidi->ifnum);
+	intf = local_usb_ifnum_to_if(umidi->chip->dev, umidi->ifnum);
 	if (!intf)
 		return -ENXIO;
 	intfd = &intf->altsetting[0];
@@ -862,7 +878,7 @@ static int snd_usbmidi_detect_endpoint(snd_usb_midi_t* umidi,
 	usb_endpoint_descriptor_t* epd;
 
 	if (endpoint->epnum == -1) {
-		intf = usb_ifnum_to_if(umidi->chip->dev, umidi->ifnum);
+		intf = local_usb_ifnum_to_if(umidi->chip->dev, umidi->ifnum);
 		if (!intf || intf->num_altsetting < 1)
 			return -ENOENT;
 		intfd = intf->altsetting;

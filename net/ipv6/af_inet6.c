@@ -455,18 +455,9 @@ int inet6_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 {
 	struct sock *sk = sock->sk;
 	int err = -EINVAL;
-	int pid;
 
 	switch(cmd) 
 	{
-	case FIOSETOWN:
-	case SIOCSPGRP:
-		if (get_user(pid, (int *) arg))
-			return -EFAULT;
-		return f_setown(sock->file, pid, 1);
-	case FIOGETOWN:
-	case SIOCGPGRP:
-		return put_user(sock->file->f_owner.pid, (int *)arg);
 	case SIOCGSTAMP:
 		if(sk->stamp.tv_sec==0)
 			return -ENOENT;
@@ -488,10 +479,6 @@ int inet6_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 	case SIOCSIFDSTADDR:
 		return addrconf_set_dstaddr((void *) arg);
 	default:
-		if ((cmd >= SIOCDEVPRIVATE) &&
-		    (cmd <= (SIOCDEVPRIVATE + 15)))
-			return(dev_ioctl(cmd,(void *) arg));
-		
 		if(sk->prot->ioctl==0 || (err=sk->prot->ioctl(sk, cmd, arg))==-ENOIOCTLCMD)
 			return(dev_ioctl(cmd,(void *) arg));		
 		return err;

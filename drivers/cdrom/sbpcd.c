@@ -722,7 +722,7 @@ static struct sbpcd_drive {
 	u_char mode_xb_8;
 	u_char delay;
 	struct cdrom_device_info *sbpcd_infop;
-	struct gendisk disk;
+	struct gendisk *disk;
 } D_S[NR_SBPCD];
 
 static struct sbpcd_drive *current_drive = D_S;
@@ -5609,6 +5609,7 @@ static int __init config_spea(void)
 
 static devfs_handle_t devfs_handle;
 
+/* FIXME: cleanups after failed allocations are too ugly for words */
 #ifdef MODULE
 int __init __sbpcd_init(void)
 #else
@@ -5830,7 +5831,7 @@ int __init sbpcd_init(void)
 		sbpcd_infop->dev = mk_kdev(MAJOR_NR, j);
 		sbpcd_infop->handle = p;
 		p->sbpcd_infop = sbpcd_infop;
-		disk = &p->disk;
+		disk = alloc_disk();
 		disk->major = MAJOR_NR;
 		disk->first_minor = j;
 		disk->minor_shift = 0;
@@ -5839,6 +5840,7 @@ int __init sbpcd_init(void)
 		disk->flags = GENHD_FL_CD;
 		sprintf(nbuff, "c0t%d", p->drv_id);
 		disk->de = devfs_mk_dir(devfs_handle, nbuff, NULL);
+		p->disk = disk;
 		if (register_cdrom(sbpcd_infop))
 		{
 			printk(" sbpcd: Unable to register with Uniform CD-ROm driver\n");
@@ -5869,7 +5871,8 @@ void sbpcd_exit(void)
 	for (j=0;j<NR_SBPCD;j++)
 	{
 		if (D_S[j].drv_id==-1) continue;
-		del_gendisk(&D_S[j].disk);
+		del_gendisk(D_S[j].disk);
+		put_disk(D_S[j].disk);
 		vfree(D_S[j].sbp_buf);
 		if (D_S[j].sbp_audsiz>0) vfree(D_S[j].aud_buf);
 		devfs_unregister(D_S[j].disk.de);

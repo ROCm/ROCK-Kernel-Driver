@@ -15,7 +15,7 @@ struct work_struct {
 	void (*func)(void *);
 	void *data;
 	void *wq_data;
-	timer_t timer;
+	struct timer_list timer;
 };
 
 #define __WORK_INITIALIZER(n, f, d) {				\

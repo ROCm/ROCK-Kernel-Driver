@@ -43,6 +43,7 @@ struct radix_tree_path {
 };
 
 #define RADIX_TREE_INDEX_BITS  (8 /* CHAR_BIT */ * sizeof(unsigned long))
+#define RADIX_TREE_MAX_PATH (RADIX_TREE_INDEX_BITS/RADIX_TREE_MAP_SHIFT + 2)
 
 /*
  * Radix tree node cache.
@@ -218,9 +219,113 @@ void *radix_tree_lookup(struct radix_tree_root *root, unsigned long index)
 
 	return (void *) *slot;
 }
-
 EXPORT_SYMBOL(radix_tree_lookup);
 
+static /* inline */ unsigned int
+__lookup(struct radix_tree_root *root, void **results, unsigned long index,
+	unsigned int max_items, unsigned long *next_index,
+	unsigned long max_index)
+{
+	unsigned int nr_found = 0;
+	unsigned int shift;
+	unsigned int height = root->height;
+	struct radix_tree_node *slot;
+
+	shift = (height-1) * RADIX_TREE_MAP_SHIFT;
+	slot = root->rnode;
+
+	while (height > 0) {
+		unsigned long i = (index >> shift) & RADIX_TREE_MAP_MASK;
+		for ( ; i < RADIX_TREE_MAP_SIZE; i++) {
+			if (slot->slots[i] != NULL)
+				break;
+			index &= ~((1 << shift) - 1);
+			index += 1 << shift;
+		}
+		if (i == RADIX_TREE_MAP_SIZE)
+			goto out;
+		height--;
+		shift -= RADIX_TREE_MAP_SHIFT;
+		if (height == 0) {
+			/* Bottom level: grab some items */
+			unsigned long j;
+
+			BUG_ON((shift + RADIX_TREE_MAP_SHIFT) != 0);
+			
+			j = index & RADIX_TREE_MAP_MASK;
+			for ( ; j < RADIX_TREE_MAP_SIZE; j++) {
+				index++;
+				if (slot->slots[j]) {
+					results[nr_found++] = slot->slots[j];
+					if (nr_found == max_items)
+						goto out;
+				}
+			}
+		}
+		slot = slot->slots[i];
+	}
+out:
+	*next_index = index;
+	return nr_found;
+	
+}
+/**
+ *	radix_tree_gang_lookup - perform multiple lookup on a radix tree
+ *	@root:		radix tree root
+ *	@results:	where the results of the lookup are placed
+ *	@first_index:	start the lookup from this key
+ *	@max_items:	place up to this many items at *results
+ *
+ *	Performs an index-ascending scan of the tree for present items.  Places
+ *	them at *@results and returns the number of items which were placed at
+ *	*@results.
+ *
+ *	The implementation is naive.
+ */
+unsigned int
+radix_tree_gang_lookup(struct radix_tree_root *root, void **results,
+			unsigned long first_index, unsigned int max_items)
+{
+	const unsigned long max_index = radix_tree_maxindex(root->height);
+	unsigned long cur_index = first_index;
+	unsigned int ret = 0;
+
+	if (root->rnode == NULL)
+		goto out;
+	if (max_index == 0) {			/* Bah.  Special case */
+		if (first_index == 0) {
+			if (max_items > 0) {
+				*results = root->rnode;
+				ret = 1;
+			}
+		}
+		goto out;
+	}
+	while (ret < max_items) {
+		unsigned int nr_found;
+		unsigned long next_index;	/* Index of next search */
+
+		if (cur_index > max_index)
+			break;
+		nr_found = __lookup(root, results + ret, cur_index,
+				max_items - ret, &next_index, max_index);
+		if (nr_found == 0) {
+			 if (!(cur_index & RADIX_TREE_MAP_MASK))
+				break;
+			/*
+			 * It could be that there simply were no items to the
+			 * right of `cur_index' in the leaf node.  So we still
+			 * need to search for additional nodes to the right of
+			 * this one.
+			 */
+		}
+		ret += nr_found;
+		cur_index = next_index;
+	}
+out:
+	return ret;
+}
+EXPORT_SYMBOL(radix_tree_gang_lookup);
 
 /**
  *	radix_tree_delete    -    delete an item from a radix tree
@@ -231,7 +336,7 @@ EXPORT_SYMBOL(radix_tree_lookup);
  */
 int radix_tree_delete(struct radix_tree_root *root, unsigned long index)
 {
-	struct radix_tree_path path[RADIX_TREE_INDEX_BITS/RADIX_TREE_MAP_SHIFT + 2], *pathp = path;
+	struct radix_tree_path path[RADIX_TREE_MAX_PATH], *pathp = path;
 	unsigned int height, shift;
 
 	height = root->height;

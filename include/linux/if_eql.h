@@ -19,8 +19,6 @@
 #ifndef _LINUX_IF_EQL_H
 #define _LINUX_IF_EQL_H
 
-#include <linux/timer.h>
-
 #define EQL_DEFAULT_SLAVE_PRIORITY 28800
 #define EQL_DEFAULT_MAX_SLAVES     4
 #define EQL_DEFAULT_MTU            576
@@ -35,46 +33,51 @@
 #define EQL_GETMASTRCFG (SIOCDEVPRIVATE + 4)
 #define EQL_SETMASTRCFG (SIOCDEVPRIVATE + 5)
 
+#ifdef __KERNEL__
+
+#include <linux/timer.h>
+#include <linux/spinlock.h>
+
 typedef struct slave {
-  struct net_device *dev;
-  long priority;
-  long priority_bps;
-  long priority_Bps;
-  long bytes_queued;
-  struct slave *next;
+	struct list_head	list;
+	struct net_device	*dev;
+	long			priority;
+	long			priority_bps;
+	long			priority_Bps;
+	long			bytes_queued;
 } slave_t;
 
 typedef struct slave_queue {
-  slave_t *head;
-  slave_t *best_slave;
-  int num_slaves;
-  struct net_device *master_dev;
-  char lock;
+	spinlock_t		lock;
+	struct list_head	all_slaves;
+	int			num_slaves;
+	struct net_device	*master_dev;
 } slave_queue_t;
 
 typedef struct equalizer {
-  slave_queue_t *queue;
-  int min_slaves;
-  int max_slaves;
-  struct net_device_stats *stats;
-  struct timer_list timer;
-  char timer_on;
+	slave_queue_t		queue;
+	int			min_slaves;
+	int			max_slaves;
+	struct net_device_stats	stats;
+	struct timer_list	timer;
 } equalizer_t;  
 
+#endif /* __KERNEL__ */
+
 typedef struct master_config {
-  char master_name[16];
-  int max_slaves;
-  int min_slaves;
+	char	master_name[16];
+	int	max_slaves;
+	int	min_slaves;
 } master_config_t;
 
 typedef struct slave_config {
-  char slave_name[16];
-  long priority;
+	char	slave_name[16];
+	long	priority;
 } slave_config_t;
 
 typedef struct slaving_request {
-  char slave_name[16];
-  long priority;
+	char	slave_name[16];
+	long	priority;
 } slaving_request_t;
 
 

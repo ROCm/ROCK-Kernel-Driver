@@ -44,16 +44,47 @@
 #define DRM_MALLOC(x) kmalloc(x, GFP_KERNEL)
 #define DRM_FREE(x) kfree(x)
 
-#define DRM_GETSAREA()								 \
-do { 										 \
-	struct list_head *list;							 \
-	list_for_each( list, &dev->maplist->head ) {				 \
-		drm_map_list_t *entry = (drm_map_list_t *)list;			 \
-		if ( entry->map &&						 \
-		     entry->map->type == _DRM_SHM &&				 \
-		     (entry->map->flags & _DRM_CONTAINS_LOCK) ) {		 \
-			dev_priv->sarea = entry->map;				 \
- 			break;							 \
- 		}								 \
- 	}									 \
+#define DRM_GETSAREA()							 \
+do { 									 \
+	struct list_head *list;						 \
+	list_for_each( list, &dev->maplist->head ) {			 \
+		drm_map_list_t *entry = (drm_map_list_t *)list;		 \
+		if ( entry->map &&					 \
+		     entry->map->type == _DRM_SHM &&			 \
+		     (entry->map->flags & _DRM_CONTAINS_LOCK) ) {	 \
+			dev_priv->sarea = entry->map;			 \
+ 			break;						 \
+ 		}							 \
+ 	}								 \
 } while (0)
+
+#define DRM_HZ HZ
+
+#define DRM_WAIT_ON( ret, queue, timeout, condition )	\
+do {							\
+	DECLARE_WAITQUEUE(entry, current);		\
+	unsigned long end = jiffies + (timeout);	\
+	add_wait_queue(&(queue), &entry);		\
+							\
+	for (;;) {					\
+		current->state = TASK_INTERRUPTIBLE;	\
+		if (condition) 				\
+			break;				\
+		if((signed)(end - jiffies) <= 0) {	\
+			ret = -EBUSY;			\
+			break;				\
+		}					\
+		schedule_timeout(max(HZ/100,1));	\
+		if (signal_pending(current)) {		\
+			ret = -EINTR;			\
+			break;				\
+		}					\
+	}						\
+	current->state = TASK_RUNNING;			\
+	remove_wait_queue(&(queue), &entry);		\
+} while (0)
+
+
+#define DRM_WAKEUP( queue ) wake_up_interruptible( queue )
+#define DRM_INIT_WAITQUEUE( queue ) init_waitqueue_head( queue )
+ 

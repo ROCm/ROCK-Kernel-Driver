@@ -117,9 +117,6 @@
 #ifdef CONFIG_NET_DIVERT
 #include <linux/divert.h>
 #endif /* CONFIG_NET_DIVERT */
-#if defined(CONFIG_NET_RADIO) || defined(CONFIG_NET_PCMCIA_RADIO)
-#include <linux/wireless.h>		/* Note : will define WIRELESS_EXT */
-#endif	/* CONFIG_NET_RADIO || CONFIG_NET_PCMCIA_RADIO */
 
 struct linux_mib net_statistics[NR_CPUS * 2];
 
@@ -850,20 +847,8 @@ int inet_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 {
 	struct sock *sk = sock->sk;
 	int err = 0;
-	int pid;
 
 	switch (cmd) {
-		case FIOSETOWN:
-		case SIOCSPGRP:
-			if (get_user(pid, (int *)arg))
-				err = -EFAULT;
-			else
-				err = f_setown(sock->file, pid, 1);
-			break;
-		case FIOGETOWN:
-		case SIOCGPGRP:
-			err = put_user(sock->file->f_owner.pid, (int *)arg);
-			break;
 		case SIOCGSTAMP:
 			if (!sk->stamp.tv_sec)
 				err = -ENOENT;
@@ -949,15 +934,6 @@ int inet_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 			err = -ENOPKG;
 			break;
 		default:
-			if (cmd >= SIOCDEVPRIVATE &&
-			    cmd <= (SIOCDEVPRIVATE + 15))
-				err = dev_ioctl(cmd, (void *)arg);
-			else
-#ifdef WIRELESS_EXT
-			if (cmd >= SIOCIWFIRST && cmd <= SIOCIWLAST)
-				err = dev_ioctl(cmd, (void *)arg);
-			else
-#endif	/* WIRELESS_EXT */
 			if (!sk->prot->ioctl ||
 			    (err = sk->prot->ioctl(sk, cmd, arg)) ==
 			    					-ENOIOCTLCMD)

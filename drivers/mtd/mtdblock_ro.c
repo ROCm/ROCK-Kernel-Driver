@@ -29,13 +29,13 @@ static int debug = MTDBLOCK_DEBUG;
 MODULE_PARM(debug, "i");
 #endif
 
-static struct gendisk mtd_disks[MAX_MTD_DEVICES];
+static struct gendisk *mtd_disks[MAX_MTD_DEVICES];
 
 static int mtdblock_open(struct inode *inode, struct file *file)
 {
 	struct mtd_info *mtd = NULL;
 	int dev = minor(inode->i_rdev);
-	struct gendisk *disk = mtd_disks + dev;
+	struct gendisk *disk = mtd_disks[dev];
 
 	DEBUG(1,"mtdblock_open\n");
 
@@ -73,7 +73,7 @@ static release_t mtdblock_release(struct inode *inode, struct file *file)
 		release_return(-ENODEV);
 	}
 
-	del_gendisk(mtd_disks + dev);
+	del_gendisk(mtd_disks[dev]);
 	
 	if (mtd->sync)
 		mtd->sync(mtd);
@@ -218,30 +218,42 @@ static struct block_device_operations mtd_fops =
 
 int __init init_mtdblock(void)
 {
+	int err = -ENOMEM;
 	int i;
 
-	if (register_blkdev(MAJOR_NR,DEVICE_NAME,&mtd_fops)) {
-		printk(KERN_NOTICE "Can't allocate major number %d for Memory Technology Devices.\n",
-		       MTD_BLOCK_MAJOR);
-		return -EAGAIN;
-	}
-
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), &mtdblock_request);
-
 	for (i = 0; i < MAX_MTD_DEVICES; i++) {
-		struct gendisk *disk = mtd_disks + i;
+		struct gendisk *disk = alloc_disk();
+		if (!disk)
+			goto out;
 		disk->major = MAJOR_NR;
 		disk->first_minor = i;
 		sprintf(disk->disk_name, "mtdblock%d", i);
 		disk->fops = &mtd_fops;
+		mtd_disks[i] = disk;
 	}
+
+	if (register_blkdev(MAJOR_NR,DEVICE_NAME,&mtd_fops)) {
+		printk(KERN_NOTICE "Can't allocate major number %d for Memory Technology Devices.\n",
+		       MTD_BLOCK_MAJOR);
+		err = -EAGAIN;
+		goto out;
+	}
+
+	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), &mtdblock_request);
 	return 0;
+out:
+	while (i--)
+		put_disk(mtd_disks[i]);
+	return err;
 }
 
 static void __exit cleanup_mtdblock(void)
 {
+	int i;
 	unregister_blkdev(MAJOR_NR,DEVICE_NAME);
 	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
+	for (i = 0; i < MAX_MTD_DEVICES; i++)
+		put_disk(mtd_disks[i]);
 }
 
 module_init(init_mtdblock);

@@ -1487,7 +1487,7 @@ static void llc_process_tmr_ev(struct sock *sk, struct sk_buff *skb)
 	if (llc_sk(sk)->state == LLC_CONN_OUT_OF_SVC) {
 		printk(KERN_WARNING "%s: timer called on closed connection\n",
 		       __FUNCTION__);
-		llc_conn_free_ev(skb);
+		kfree_skb(skb);
 	} else {
 		if (!sk->lock.users)
 			llc_conn_state_process(sk, skb);

@@ -191,6 +191,7 @@ Table 1-3: Kernel info in /proc
 ..............................................................................
  File        Content                                           
  apm         Advanced power management info                    
+ buddyinfo   Kernel memory allocator information (see text)	(2.5)
  bus         Directory containing bus specific information     
  cmdline     Kernel command line                               
  cpuinfo     Info about the CPU                                
@@ -275,7 +276,7 @@ output of a SMP machine):
   ERR:       2155
 
 NMI is incremented in this case because every timer interrupt generates a NMI
-(Non Maskable Interrupt) which is used by the NMI Watchdog to detect lookups.
+(Non Maskable Interrupt) which is used by the NMI Watchdog to detect lockups.
 
 LOC is the local interrupt counter of the internal APIC of every CPU.
 
@@ -325,6 +326,25 @@ The slabinfo  file  gives  information  about  memory usage at the slab level.
 Linux uses  slab  pools for memory management above page level in version 2.2.
 Commonly used  objects  have  their  own  slab  pool (such as network buffers,
 directory cache, and so on).
+
+..............................................................................
+
+> cat /proc/buddyinfo
+
+Node 0, zone      DMA      0      4      5      4      4      3 ...
+Node 0, zone   Normal      1      0      0      1    101      8 ...
+Node 0, zone  HighMem      2      0      0      1      1      0 ...
+
+Memory fragmentation is a problem under some workloads, and buddyinfo is a 
+useful tool for helping diagnose these problems.  Buddyinfo will give you a 
+clue as to how big an area you can safely allocate, or why a previous
+allocation failed.
+
+Each column represents the number of pages of a certain order which are 
+available.  In this case, there are 0 chunks of 2^0*PAGE_SIZE available in 
+ZONE_DMA, 4 chunks of 2^1*PAGE_SIZE in ZONE_DMA, 101 chunks of 2^4*PAGE_SIZE 
+availble in ZONE_NORMAL, etc... 
+
 
 1.3 IDE devices in /proc/ide
 ----------------------------

@@ -54,10 +54,7 @@ void sctp_inqueue_init(sctp_inqueue_t *queue)
 	queue->in_progress = NULL;
 
 	/* Create a task for delivering data.  */
-	INIT_LIST_HEAD(&queue->immediate.list);
-	queue->immediate.sync = 0;
-	queue->immediate.routine = NULL;
-	queue->immediate.data = NULL;
+	INIT_WORK(&queue->immediate, NULL, NULL);
 
 	queue->malloced = 0;
 }
@@ -109,7 +106,7 @@ void sctp_push_inqueue(sctp_inqueue_t *q, sctp_chunk_t *packet)
 	 * on the BH related data structures.
 	 */
 	skb_queue_tail(&(q->in), (struct sk_buff *) packet);
-	q->immediate.routine(q->immediate.data);
+	q->immediate.func(q->immediate.data);
 }
 
 /* Extract a chunk from an SCTP inqueue.
@@ -193,7 +190,6 @@ sctp_chunk_t *sctp_pop_inqueue(sctp_inqueue_t *queue)
 void sctp_inqueue_set_th_handler(sctp_inqueue_t *q,
 				 void (*callback)(void *), void *arg)
 {
-	q->immediate.routine = callback;
-	q->immediate.data = arg;
+	INIT_WORK(&q->immediate, callback, arg);
 }
 

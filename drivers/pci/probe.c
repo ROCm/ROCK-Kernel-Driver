@@ -46,7 +46,7 @@ static u32 pci_size(u32 base, unsigned long mask)
 static void pci_read_bases(struct pci_dev *dev, unsigned int howmany, int rom)
 {
 	unsigned int pos, reg, next;
-	u32 l, sz;
+	u32 l, l0, sz;
 	struct resource *res;
 
 	for(pos=0; pos<howmany; pos = next) {
@@ -55,10 +55,12 @@ static void pci_read_bases(struct pci_dev *dev, unsigned int howmany, int rom)
 		res->name = dev->name;
 		reg = PCI_BASE_ADDRESS_0 + (pos << 2);
 		pci_read_config_dword(dev, reg, &l);
+		pci_write_config_dword(dev, reg, 0);
+		pci_read_config_dword(dev, reg, &l0);
 		pci_write_config_dword(dev, reg, ~0);
 		pci_read_config_dword(dev, reg, &sz);
 		pci_write_config_dword(dev, reg, l);
-		if (!sz || sz == 0xffffffff)
+		if (!sz || sz == 0xffffffff || sz == l0)
 			continue;
 		if (l == 0xffffffff)
 			l = 0;

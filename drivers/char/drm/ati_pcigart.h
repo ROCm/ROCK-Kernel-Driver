@@ -30,14 +30,20 @@
 #define __NO_VERSION__
 #include "drmP.h"
 
-#if PAGE_SIZE == 8192
+#if PAGE_SIZE == 65536
+# define ATI_PCIGART_TABLE_ORDER	0
+# define ATI_PCIGART_TABLE_PAGES	(1 << 0)
+#elif PAGE_SIZE == 16384
+# define ATI_PCIGART_TABLE_ORDER	1
+# define ATI_PCIGART_TABLE_PAGES	(1 << 1)
+#elif PAGE_SIZE == 8192
 # define ATI_PCIGART_TABLE_ORDER 	2
 # define ATI_PCIGART_TABLE_PAGES 	(1 << 2)
 #elif PAGE_SIZE == 4096
 # define ATI_PCIGART_TABLE_ORDER 	3
 # define ATI_PCIGART_TABLE_PAGES 	(1 << 3)
 #else
-# error - PAGE_SIZE not 8K or 4K
+# error - PAGE_SIZE not 64K, 16K, 8K or 4K
 #endif
 
 # define ATI_MAX_PCIGART_PAGES		8192	/* 32 MB aperture, 4K pages */
