@@ -85,6 +85,15 @@ extern struct bus_type * get_bus(struct bus_type * bus);
 extern void put_bus(struct bus_type * bus);
 
 
+/* iterator helpers for buses */
+
+int bus_for_each_dev(struct bus_type * bus, struct device * start, void * data,
+		     int (*fn)(struct device *, void *));
+
+int bus_for_each_drv(struct bus_type * bus, struct device_driver * start, 
+		     void * data, int (*fn)(struct device_driver *, void *));
+
+
 /* driverfs interface for exporting bus attributes */
 
 struct bus_attribute {
