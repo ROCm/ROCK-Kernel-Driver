@@ -281,7 +281,7 @@ static int ide_build_sglist(struct ata_device *drive, struct request *rq)
 	struct scatterlist *sg = ch->sg_table;
 	int nents;
 
-	if (rq->flags & REQ_SPECIAL) {
+	if ((rq->flags & REQ_SPECIAL) && (drive->type == ATA_DISK)) {
 		struct ata_taskfile *args = rq->special;
 
 		if (args->command_type == IDE_DRIVE_TASK_RAW_WRITE)
@@ -521,7 +521,7 @@ icside_dma_common(struct ata_device *drive, struct request *rq,
 static int icside_dma_init(struct ata_device *drive, struct request *rq)
 {
 	struct ata_channel *ch = drive->channel;
-	unsigned int cmd;
+	u8 int cmd;
 
 	if (icside_dma_common(drive, rq, DMA_MODE_WRITE))
 		return 1;
@@ -529,7 +529,7 @@ static int icside_dma_init(struct ata_device *drive, struct request *rq)
 	if (drive->type != ATA_DISK)
 		return 0;
 
-	ide_set_handler(drive, icside_dmaintr, WAIT_CMD, NULL);
+	ata_set_handler(drive, icside_dmaintr, WAIT_CMD, NULL);
 
 	if ((rq->flags & REQ_SPECIAL) && drive->addressing == 1) {
 		struct ata_taskfile *args = rq->special;
@@ -542,6 +542,7 @@ static int icside_dma_init(struct ata_device *drive, struct request *rq)
 	OUT_BYTE(cmd, IDE_COMMAND_REG);
 
 	enable_dma(ch->hw.dma);
+
 	return 0;
 }
 

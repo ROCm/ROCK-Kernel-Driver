@@ -266,11 +266,10 @@ static int hpt34x_udma_init(struct ata_device *drive, struct request *rq)
 	outb(inb(dma_base+2)|6, dma_base+2);	/* clear INTR & ERROR flags */
 	drive->waiting_for_dma = 1;
 
-	if (drive->type != ATA_DISK)
-		return 0;
-
-	ide_set_handler(drive, ide_dma_intr, WAIT_CMD, NULL);	/* issue cmd to drive */
-	OUT_BYTE((cmd == 0x09) ? WIN_READDMA : WIN_WRITEDMA, IDE_COMMAND_REG);
+	if (drive->type == ATA_DISK) {
+		ata_set_handler(drive, ide_dma_intr, WAIT_CMD, NULL);	/* issue cmd to drive */
+		OUT_BYTE((cmd == 0x09) ? WIN_READDMA : WIN_WRITEDMA, IDE_COMMAND_REG);
+	}
 
 	return 0;
 }

@@ -432,8 +432,8 @@ static unsigned int __init svwks_init_chipset(struct pci_dev *dev)
 	return 0;
 }
 
-/* On Dell PowerEdge servers with a CSB5, the top two bits of the subsystem
- * device ID indicate presence of an 80-pin cable.
+/* On Dell PowerEdge servers with a CSB5/CSB6, the top two bits
+ * of the subsystem device ID indicate presence of an 80-pin cable.
  * Bit 15 clear = secondary IDE channel does not have 80-pin cable.
  * Bit 15 set   = secondary IDE channel has 80-pin cable.
  * Bit 14 clear = primary IDE channel does not have 80-pin cable.
@@ -444,7 +444,8 @@ static unsigned int __init ata66_svwks_dell(struct ata_channel *hwif)
 	struct pci_dev *dev = hwif->pci_dev;
 	if (dev->subsystem_vendor == PCI_VENDOR_ID_DELL &&
 	    dev->vendor	== PCI_VENDOR_ID_SERVERWORKS &&
-	    dev->device == PCI_DEVICE_ID_SERVERWORKS_CSB5IDE)
+	    (dev->device == PCI_DEVICE_ID_SERVERWORKS_CSB5IDE ||
+	     dev->device == PCI_DEVICE_ID_SERVERWORKS_CSB6IDE))
 		return ((1 << (hwif->unit + 14)) &
 			dev->subsystem_device) ? 1 : 0;
 	return 0;

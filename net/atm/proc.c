@@ -220,7 +220,7 @@ static void vc_info(struct atm_vcc *vcc,char *buf)
 		default:
 			here += sprintf(here,"%3d",vcc->family);
 	}
-	here += sprintf(here," %04lx  %5d %7d/%7d %7d/%7d\n",vcc->flags.bits,
+	here += sprintf(here," %04lx  %5d %7d/%7d %7d/%7d\n",vcc->flags,
 	    vcc->reply,
 	    atomic_read(&vcc->tx_inuse),vcc->sk->sndbuf,
 	    atomic_read(&vcc->rx_inuse),vcc->sk->rcvbuf);

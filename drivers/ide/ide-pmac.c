@@ -1,6 +1,4 @@
 /*
- * linux/drivers/ide/ide-pmac.c		Version ?.??	Mar. 18, 2000
- *
  * Support for IDE interfaces on PowerMacs.
  * These IDE interfaces are memory-mapped and have a DBDMA channel
  * for doing DMA.
@@ -1436,7 +1434,8 @@ static int pmac_udma_init(struct ata_device *drive, struct request *rq)
 	drive->waiting_for_dma = 1;
 	if (drive->type != ATA_DISK)
 		return 0;
-	ide_set_handler(drive, ide_dma_intr, WAIT_CMD, NULL);
+
+	ata_set_handler(drive, ide_dma_intr, WAIT_CMD, NULL);
 	if ((rq->flags & REQ_SPECIAL) &&
 		(drive->addressing == 1)) {
 		struct ata_taskfile *args = rq->special;
