@@ -2,6 +2,7 @@
 OUTPUT_FORMAT("elf32-sparc", "elf32-sparc", "elf32-sparc")
 OUTPUT_ARCH(sparc)
 ENTRY(_start)
+jiffies = jiffies_64 + 4;
 SECTIONS
 {
   . = 0x10000 + SIZEOF_HEADERS;

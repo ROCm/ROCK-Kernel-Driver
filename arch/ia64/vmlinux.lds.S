@@ -7,6 +7,7 @@
 OUTPUT_FORMAT("elf64-ia64-little")
 OUTPUT_ARCH(ia64)
 ENTRY(phys_start)
+jiffies = jiffies_64; 
 SECTIONS
 {
   /* Sections to be discarded */

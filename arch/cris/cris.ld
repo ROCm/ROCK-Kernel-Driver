@@ -8,6 +8,7 @@
  * the kernel has booted. 
  */	
 
+jiffies = jiffies_64;
 SECTIONS
 {
 	. = @CONFIG_ETRAX_DRAM_VIRTUAL_BASE@;

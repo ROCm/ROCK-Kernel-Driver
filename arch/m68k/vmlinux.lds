@@ -2,6 +2,7 @@
 OUTPUT_FORMAT("elf32-m68k", "elf32-m68k", "elf32-m68k")
 OUTPUT_ARCH(m68k)
 ENTRY(_start)
+jiffies = jiffies_64 + 4;
 SECTIONS
 {
   . = 0x1000;

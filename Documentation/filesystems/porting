@@ -146,3 +146,9 @@ support for this helper, particularly get_parent.
 
 It is planned that this will be required for exporting once the code
 settles down a bit.
+
+[mandatory]
+
+s_export_op is now required for exporting a filesystem.
+isofs, ext2, ext3, resierfs, fat
+can be used as examples of very different filesystems.

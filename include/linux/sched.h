@@ -459,6 +459,11 @@ extern void free_uid(struct user_struct *);
 
 #include <asm/current.h>
 
+/*
+ * The 64-bit value is not volatile - you MUST NOT read it
+ * without holding read_lock_irq(&xtime_lock)
+ */
+extern u64 jiffies_64;
 extern unsigned long volatile jiffies;
 extern unsigned long itimer_ticks;
 extern unsigned long itimer_next;

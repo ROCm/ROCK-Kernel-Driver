@@ -313,15 +313,12 @@ exp_export(struct nfsctl_export *nxp)
 	 *       either a device number (so FS_REQUIRES_DEV needed)
 	 *       or an FSID number (so NFSEXP_FSID needed).
 	 * 2:  We must be able to find an inode from a filehandle.
-	 *       either using fh_to_dentry (prefered)
-	 *       or using read_inode (the hack).
+	 *       This means that s_export_op must be set.
 	 */
 	if (((inode->i_sb->s_type->fs_flags & FS_REQUIRES_DEV)
-	      || (nxp->ex_flags & NFSEXP_FSID))
+	     || (nxp->ex_flags & NFSEXP_FSID))
 	    &&
-	    (inode->i_sb->s_op->read_inode
-	     || inode->i_sb->s_export_op
-	     || inode->i_sb->s_op->fh_to_dentry)) 
+	    inode->i_sb->s_export_op)
 		/* Ok, we can export it */;
 	else {
 		dprintk("exp_export: export of invalid fs type.\n");

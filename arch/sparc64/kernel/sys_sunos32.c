@@ -1198,8 +1198,8 @@ static inline int check_nonblock(int ret, int fd)
 	return ret;
 }
 
-extern asmlinkage int sys_read(unsigned int fd, char *buf, unsigned long count);
-extern asmlinkage int sys_write(unsigned int fd, char *buf, unsigned long count);
+extern asmlinkage ssize_t sys_read(unsigned int fd, char *buf, unsigned long count);
+extern asmlinkage ssize_t sys_write(unsigned int fd, char *buf, unsigned long count);
 extern asmlinkage int sys_recv(int fd, void *ubuf, size_t size, unsigned flags);
 extern asmlinkage int sys_send(int fd, void *buff, size_t len, unsigned flags);
 extern asmlinkage int sys_accept(int fd, struct sockaddr *sa, int *addrlen);
