@@ -993,14 +993,17 @@ static int parse_audio_mixer_unit(mixer_build_t *state, int unitid, unsigned cha
 {
 	int num_ins, num_outs;
 	int i, err;
-	if (desc[0] < 12 || ! (num_ins = desc[4]) || ! (num_outs = desc[5 + num_ins]))
+
+	if (desc[0] < 11 || ! (num_ins = desc[4]) || ! (num_outs = desc[5 + num_ins]))
 		return -EINVAL;
 
 	for (i = 0; i < num_ins; i++) {
 		err = parse_audio_unit(state, desc[5 + i]);
 		if (err < 0)
 			return err;
-		if (check_matrix_bitmap(desc + 9 + num_ins, i, 0, num_outs))
+		/* some devices (e.g. Maya44) omit the bitmap */
+		if (desc[0] > 11 &&
+		    check_matrix_bitmap(desc + 9 + num_ins, i, 0, num_outs))
 			build_mixer_unit_ctl(state, desc, i, unitid);
 	}
 	return 0;
