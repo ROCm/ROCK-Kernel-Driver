@@ -42,6 +42,8 @@
 #define DEV_AWC_INFO 	1
 #define DEV_AWC 	1
 
+spinlock_t driver_lock = SPIN_LOCK_UNLOCKED;
+
 struct awc_proc_private{
 	struct ctl_table_header *	sysctl_header;
   	struct ctl_table	*	proc_table;
@@ -293,10 +295,9 @@ int awc_proc_fun(ctl_table *ctl, int write, struct file * filp,
 	};
 
 	if (!write && rid->selector->may_change) {
-		save_flags(flags);
-		cli();	
+		spin_lock_irqsave(&driver_lock, flags);
 		awc_readrid(dev,rid,rid_dir->buff + rid->offset);
-		restore_flags(flags);
+		spin_unlock_irqrestore(&driver_lock, flags);
 	};
 	
 	if (rid->array > 1 || rid->bits > 32){
@@ -325,9 +326,8 @@ int awc_proc_fun(ctl_table *ctl, int write, struct file * filp,
 		}
         }
 	if (write) {
-		save_flags(flags);
-		cli();	
-
+		spin_lock_irqsave(&driver_lock, flags);
+		
 		if (rid->selector->MAC_Disable_at_write){
 			awc_disable_MAC(dev);
 		};
@@ -335,8 +335,7 @@ int awc_proc_fun(ctl_table *ctl, int write, struct file * filp,
 		if (rid->selector->MAC_Disable_at_write){
 			awc_enable_MAC(dev);
 		};
-		restore_flags(flags);
-
+		spin_lock_irqsave(&driver_lock, flags);
 	};
 
        	DEBUG(0x20000,"awc proc ret  %x \n",retv);
