@@ -1602,6 +1602,38 @@ static void set_multicast_list(struct net_device *dev)
 	}
 }
 
+/* Set a MAC change in hardware.
+ */
+static int 
+fec_set_mac_address(struct net_device *dev, void *p)
+{
+	int i;
+	struct sockaddr *addr = p;
+	volatile fec_t *fecp;
+
+	fecp = fec_hwp;
+
+	if (netif_running(dev))
+		return -EBUSY;
+
+	/* Set the device copy of the Ethernet address
+	*/
+	memcpy(dev->dev_addr, addr->sa_data,dev->addr_len);
+
+	/* Set our copy of the Ethernet address 
+	*/
+	for (i = 0; i < (ETH_ALEN / 2); i++) {
+		my_enet_addr[i] = (dev->dev_addr[i*2] << 8) | dev->dev_addr[i*2 + 1];
+	}
+
+	/* Set station address.
+	*/
+	fecp->fec_addr_low = (my_enet_addr[0] << 16) | my_enet_addr[1];
+	fecp->fec_addr_high = my_enet_addr[2] << 16;
+  
+	return 0;
+}
+
 /* Initialize the FEC Ethernet on 860T (or ColdFire 5272).
  */
 int __init fec_enet_init(struct net_device *dev)
@@ -1734,6 +1766,7 @@ int __init fec_enet_init(struct net_device *dev)
 	dev->stop = fec_enet_close;
 	dev->get_stats = fec_enet_get_stats;
 	dev->set_multicast_list = set_multicast_list;
+	dev->set_mac_address = fec_set_mac_address;
 
 	for (i=0; i<NMII-1; i++)
 		mii_cmds[i].mii_next = &mii_cmds[i+1];
@@ -1767,9 +1800,9 @@ fec_restart(struct net_device *dev, int duplex)
 {
 	struct fec_enet_private *fep;
 	int i;
-	unsigned char	*eap;
-	volatile	cbd_t	*bdp;
-	volatile	fec_t	*fecp;
+	unsigned char *eap;
+	volatile cbd_t *bdp;
+	volatile fec_t *fecp;
 
 	fecp = fec_hwp;
 
