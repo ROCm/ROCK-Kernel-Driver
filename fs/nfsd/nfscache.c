@@ -272,7 +272,7 @@ found_entry:
 	case RC_NOCACHE:
 		break;
 	case RC_REPLSTAT:
-		svc_putlong(&rqstp->rq_resbuf, rp->c_replstat);
+		svc_putu32(&rqstp->rq_resbuf, rp->c_replstat);
 		rtn = RC_REPLY;
 		break;
 	case RC_REPLBUFF:

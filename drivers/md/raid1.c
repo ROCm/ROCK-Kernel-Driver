@@ -236,7 +236,7 @@ static void raid_end_bio_io(r1bio_t *r1_bio, int uptodate)
 {
 	struct bio *bio = r1_bio->master_bio;
 
-	bio_endio(bio, uptodate);
+	bio_endio(bio, bio->bi_size, uptodate ? 0 : -EIO);
 	free_r1bio(r1_bio);
 }
 
@@ -251,12 +251,15 @@ static void inline update_head_pos(int disk, r1bio_t *r1_bio)
 		r1_bio->sector + (r1_bio->master_bio->bi_size >> 9);
 }
 
-static void end_request(struct bio *bio)
+static int end_request(struct bio *bio, unsigned int bytes_done, int error)
 {
 	int uptodate = test_bit(BIO_UPTODATE, &bio->bi_flags);
 	r1bio_t * r1_bio = (r1bio_t *)(bio->bi_private);
 	int mirror;
 	conf_t *conf = mddev_to_conf(r1_bio->mddev);
+
+	if (bio->bi_size)
+		return 1;
 	
 	if (r1_bio->cmd == READ || r1_bio->cmd == READA)
 		mirror = r1_bio->read_disk;
@@ -313,6 +316,7 @@ static void end_request(struct bio *bio)
 			raid_end_bio_io(r1_bio, uptodate);
 	}
 	atomic_dec(&conf->mirrors[mirror].rdev->nr_pending);
+	return 0;
 }
 
 /*
@@ -748,11 +752,14 @@ abort:
 #define REDIRECT_SECTOR KERN_ERR \
 "raid1: %s: redirecting sector %lu to another mirror\n"
 
-static void end_sync_read(struct bio *bio)
+static int end_sync_read(struct bio *bio, unsigned int bytes_done, int error)
 {
 	int uptodate = test_bit(BIO_UPTODATE, &bio->bi_flags);
 	r1bio_t * r1_bio = (r1bio_t *)(bio->bi_private);
 	conf_t *conf = mddev_to_conf(r1_bio->mddev);
+
+	if (bio->bi_size)
+		return 1;
 
 	if (r1_bio->read_bio != bio)
 		BUG();
@@ -769,9 +776,10 @@ static void end_sync_read(struct bio *bio)
 		set_bit(R1BIO_Uptodate, &r1_bio->state);
 	atomic_dec(&conf->mirrors[r1_bio->read_disk].rdev->nr_pending);
 	reschedule_retry(r1_bio);
+	return 0;
 }
 
-static void end_sync_write(struct bio *bio)
+static int end_sync_write(struct bio *bio, unsigned int bytes_done, int error)
 {
 	int uptodate = test_bit(BIO_UPTODATE, &bio->bi_flags);
 	r1bio_t * r1_bio = (r1bio_t *)(bio->bi_private);
@@ -779,6 +787,9 @@ static void end_sync_write(struct bio *bio)
 	conf_t *conf = mddev_to_conf(mddev);
 	int i;
 	int mirror=0;
+
+	if (bio->bi_size)
+		return 1;
 
 	for (i = 0; i < conf->raid_disks; i++)
 		if (r1_bio->write_bios[i] == bio) {
@@ -795,6 +806,7 @@ static void end_sync_write(struct bio *bio)
 		put_buf(r1_bio);
 	}
 	atomic_dec(&conf->mirrors[mirror].rdev->nr_pending);
+	return 0;
 }
 
 static void sync_request_write(mddev_t *mddev, r1bio_t *r1_bio)

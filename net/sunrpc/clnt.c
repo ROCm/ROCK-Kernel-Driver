@@ -7,7 +7,7 @@
  *
  *  -	RPC header generation and argument serialization.
  *  -	Credential refresh.
- *  -	TCP reconnect handling (when finished).
+ *  -	TCP connect handling.
  *  -	Retry of operation when it is suspected the operation failed because
  *	of uid squashing on the server, or when the credentials were stale
  *	and need to be refreshed, or when a packet was damaged in transit.
@@ -55,9 +55,9 @@ static void	call_status(struct rpc_task *task);
 static void	call_refresh(struct rpc_task *task);
 static void	call_refreshresult(struct rpc_task *task);
 static void	call_timeout(struct rpc_task *task);
-static void	call_reconnect(struct rpc_task *task);
-static void	child_reconnect(struct rpc_task *);
-static void	child_reconnect_status(struct rpc_task *);
+static void	call_connect(struct rpc_task *task);
+static void	child_connect(struct rpc_task *task);
+static void	child_connect_status(struct rpc_task *task);
 static u32 *	call_header(struct rpc_task *task);
 static u32 *	call_verify(struct rpc_task *task);
 
@@ -71,7 +71,8 @@ static u32 *	call_verify(struct rpc_task *task);
  */
 struct rpc_clnt *
 rpc_create_client(struct rpc_xprt *xprt, char *servname,
-		  struct rpc_program *program, u32 vers, int flavor)
+		  struct rpc_program *program, u32 vers,
+		  rpc_authflavor_t flavor)
 {
 	struct rpc_version	*version;
 	struct rpc_clnt		*clnt = NULL;
@@ -122,7 +123,7 @@ out_no_clnt:
 	printk(KERN_INFO "RPC: out of memory in rpc_create_client\n");
 	goto out;
 out_no_auth:
-	printk(KERN_INFO "RPC: Couldn't create auth handle (flavor %d)\n",
+	printk(KERN_INFO "RPC: Couldn't create auth handle (flavor %u)\n",
 		flavor);
 	rpc_free(clnt);
 	clnt = NULL;
@@ -561,51 +562,54 @@ call_bind(struct rpc_task *task)
 	dprintk("RPC: %4d call_bind xprt %p %s connected\n", task->tk_pid,
 			xprt, (xprt_connected(xprt) ? "is" : "is not"));
 
-	task->tk_action = (xprt_connected(xprt)) ? call_transmit : call_reconnect;
+	task->tk_action = (xprt_connected(xprt)) ? call_transmit : call_connect;
 
 	if (!clnt->cl_port) {
-		task->tk_action = call_reconnect;
-		task->tk_timeout = clnt->cl_timeout.to_maxval;
+		task->tk_action = call_connect;
+		task->tk_timeout = RPC_CONNECT_TIMEOUT;
 		rpc_getport(task, clnt);
 	}
 }
 
 /*
- * 4a.	Reconnect to the RPC server (TCP case)
+ * 4a.	Connect to the RPC server (TCP case)
  */
 static void
-call_reconnect(struct rpc_task *task)
+call_connect(struct rpc_task *task)
 {
 	struct rpc_clnt *clnt = task->tk_client;
 	struct rpc_task *child;
 
-	dprintk("RPC: %4d call_reconnect status %d\n",
+	dprintk("RPC: %4d call_connect status %d\n",
 				task->tk_pid, task->tk_status);
 
 	task->tk_action = call_transmit;
 	if (task->tk_status < 0 || !clnt->cl_xprt->stream)
 		return;
 
-	/* Run as a child to ensure it runs as an rpciod task */
+	/* Run as a child to ensure it runs as an rpciod task.  Rpciod
+	 * guarantees we have the correct capabilities for socket bind
+	 * to succeed. */
 	child = rpc_new_child(clnt, task);
 	if (child) {
-		child->tk_action = child_reconnect;
+		child->tk_action = child_connect;
 		rpc_run_child(task, child, NULL);
 	}
 }
 
-static void child_reconnect(struct rpc_task *task)
+static void
+child_connect(struct rpc_task *task)
 {
-	task->tk_client->cl_stats->netreconn++;
 	task->tk_status = 0;
-	task->tk_action = child_reconnect_status;
-	xprt_reconnect(task);
+	task->tk_action = child_connect_status;
+	xprt_connect(task);
 }
 
-static void child_reconnect_status(struct rpc_task *task)
+static void
+child_connect_status(struct rpc_task *task)
 {
 	if (task->tk_status == -EAGAIN)
-		task->tk_action = child_reconnect;
+		task->tk_action = child_connect;
 	else
 		task->tk_action = NULL;
 }
@@ -638,7 +642,6 @@ static void
 call_status(struct rpc_task *task)
 {
 	struct rpc_clnt	*clnt = task->tk_client;
-	struct rpc_xprt *xprt = clnt->cl_xprt;
 	struct rpc_rqst	*req = task->tk_rqstp;
 	int		status;
 
@@ -661,30 +664,23 @@ call_status(struct rpc_task *task)
 		break;
 	case -ECONNREFUSED:
 	case -ENOTCONN:
-		req->rq_bytes_sent = 0;
-		if (clnt->cl_autobind || !clnt->cl_port) {
+		if (clnt->cl_autobind)
 			clnt->cl_port = 0;
-			task->tk_action = call_bind;
-			break;
-		}
-		if (xprt->stream) {
-			task->tk_action = call_reconnect;
-			break;
-		}
-		/*
-		 * Sleep and dream of an open connection
-		 */
-		task->tk_timeout = 5 * HZ;
-		rpc_sleep_on(&xprt->sending, task, NULL, NULL);
-	case -ENOMEM:
+		task->tk_action = call_bind;
+		break;
 	case -EAGAIN:
 		task->tk_action = call_transmit;
+		break;
+	case -EIO:
+		/* shutdown or soft timeout */
+		rpc_exit(task, status);
 		break;
 	default:
 		if (clnt->cl_chatty)
 			printk("%s: RPC call returned error %d\n",
 			       clnt->cl_protname, -status);
 		rpc_exit(task, status);
+		break;
 	}
 }
 

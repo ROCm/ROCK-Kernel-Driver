@@ -175,6 +175,8 @@ static int get_pid(unsigned long flags)
 
 	if (last_pid >= next_safe) {
 inside:
+		if (nr_threads > pid_max >> 4)
+			pid_max <<= 1;
 		next_safe = pid_max;
 		read_lock(&tasklist_lock);
 	repeat:

@@ -46,12 +46,10 @@ struct biovec_pool {
  */
 
 #define BV(x) { x, "biovec-" #x }
-static struct biovec_pool bvec_array[BIOVEC_NR_POOLS] = { 
-	BV(1), BV(4), BV(16), BV(64), BV(128), BV(256)
-}; 
+static struct biovec_pool bvec_array[BIOVEC_NR_POOLS] = {
+	BV(1), BV(4), BV(16), BV(64), BV(128), BV(BIO_MAX_PAGES),
+};
 #undef BV
-
-#define BIO_MAX_PAGES	(bvec_array[BIOVEC_NR_POOLS - 1].size)
 
 static void *slab_pool_alloc(int gfp_mask, void *data)
 {
@@ -77,7 +75,7 @@ static inline struct bio_vec *bvec_alloc(int gfp_mask, int nr, int *idx)
 		case   5 ...  16: *idx = 2; break;
 		case  17 ...  64: *idx = 3; break;
 		case  65 ... 128: *idx = 4; break;
-		case 129 ... 256: *idx = 5; break;
+		case 129 ... BIO_MAX_PAGES: *idx = 5; break;
 		default:
 			return NULL;
 	}
@@ -103,7 +101,7 @@ void bio_destructor(struct bio *bio)
 	/*
 	 * cloned bio doesn't own the veclist
 	 */
-	if (!(bio->bi_flags & (1 << BIO_CLONED)))
+	if (!bio_flagged(bio, BIO_CLONED))
 		mempool_free(bio->bi_io_vec, bp->pool);
 
 	mempool_free(bio, bio_pool);
@@ -112,7 +110,7 @@ void bio_destructor(struct bio *bio)
 inline void bio_init(struct bio *bio)
 {
 	bio->bi_next = NULL;
-	bio->bi_flags = 0;
+	bio->bi_flags = 1 << BIO_UPTODATE;
 	bio->bi_rw = 0;
 	bio->bi_vcnt = 0;
 	bio->bi_idx = 0;
@@ -180,7 +178,7 @@ void bio_put(struct bio *bio)
 
 inline int bio_phys_segments(request_queue_t *q, struct bio *bio)
 {
-	if (unlikely(!(bio->bi_flags & (1 << BIO_SEG_VALID))))
+	if (unlikely(!bio_flagged(bio, BIO_SEG_VALID)))
 		blk_recount_segments(q, bio);
 
 	return bio->bi_phys_segments;
@@ -188,7 +186,7 @@ inline int bio_phys_segments(request_queue_t *q, struct bio *bio)
 
 inline int bio_hw_segments(request_queue_t *q, struct bio *bio)
 {
-	if (unlikely(!(bio->bi_flags & (1 << BIO_SEG_VALID))))
+	if (unlikely(!bio_flagged(bio, BIO_SEG_VALID)))
 		blk_recount_segments(q, bio);
 
 	return bio->bi_hw_segments;
@@ -218,7 +216,7 @@ inline void __bio_clone(struct bio *bio, struct bio *bio_src)
 	 */
 	bio->bi_vcnt = bio_src->bi_vcnt;
 	bio->bi_idx = bio_src->bi_idx;
-	if (bio_src->bi_flags & (1 << BIO_SEG_VALID)) {
+	if (bio_flagged(bio, BIO_SEG_VALID)) {
 		bio->bi_phys_segments = bio_src->bi_phys_segments;
 		bio->bi_hw_segments = bio_src->bi_hw_segments;
 		bio->bi_flags |= (1 << BIO_SEG_VALID);
@@ -322,12 +320,97 @@ oom:
 	return NULL;
 }
 
-static void bio_end_io_kio(struct bio *bio)
+/**
+ *	bio_add_page	-	attempt to add page to bio
+ *	@bio: destination bio
+ *	@page: page to add
+ *	@len: vec entry length
+ *	@offset: vec entry offset
+ *
+ *	Attempt to add a page to the bio_vec maplist. This can fail for a
+ *	number of reasons, such as the bio being full or target block
+ *	device limitations.
+ */
+int bio_add_page(struct bio *bio, struct page *page, unsigned int len,
+		 unsigned int offset)
+{
+	request_queue_t *q = bdev_get_queue(bio->bi_bdev);
+	int fail_segments = 0, retried_segments = 0;
+	struct bio_vec *bvec;
+
+	/*
+	 * cloned bio must not modify vec list
+	 */
+	if (unlikely(bio_flagged(bio, BIO_CLONED)))
+		return 1;
+
+	/*
+	 * FIXME: change bi_max?
+	 */
+	BUG_ON(bio->bi_max > BIOVEC_NR_POOLS);
+
+	if (bio->bi_vcnt >= bvec_array[bio->bi_max].nr_vecs)
+		return 1;
+
+	if (((bio->bi_size + len) >> 9) > q->max_sectors)
+		return 1;
+
+	/*
+	 * we might loose a segment or two here, but rather that than
+	 * make this too complex.
+	 */
+retry_segments:
+	if (bio_phys_segments(q, bio) >= q->max_phys_segments
+	    || bio_hw_segments(q, bio) >= q->max_hw_segments)
+		fail_segments = 1;
+
+	if (fail_segments) {
+		if (retried_segments)
+			return 1;
+
+		bio->bi_flags &= ~(1 << BIO_SEG_VALID);
+		retried_segments = 1;
+		goto retry_segments;
+	}
+
+	/*
+	 * setup the new entry, we might clear it again later if we
+	 * cannot add the page
+	 */
+	bvec = &bio->bi_io_vec[bio->bi_vcnt];
+	bvec->bv_page = page;
+	bvec->bv_len = len;
+	bvec->bv_offset = offset;
+
+	/*
+	 * if queue has other restrictions (eg varying max sector size
+	 * depending on offset), it can specify a merge_bvec_fn in the
+	 * queue to get further control
+	 */
+	if (q->merge_bvec_fn && q->merge_bvec_fn(q, bio, bvec)) {
+		bvec->bv_page = NULL;
+		bvec->bv_len = 0;
+		bvec->bv_offset = 0;
+		return 1;
+	}
+
+	bio->bi_vcnt++;
+	bio->bi_phys_segments++;
+	bio->bi_hw_segments++;
+	bio->bi_size += len;
+	return 0;
+}
+
+static int bio_end_io_kio(struct bio *bio, unsigned int bytes_done, int error)
 {
 	struct kiobuf *kio = (struct kiobuf *) bio->bi_private;
 
-	end_kio_request(kio, test_bit(BIO_UPTODATE, &bio->bi_flags));
+	if (bio->bi_size)
+		return 1;
+
+	end_kio_request(kio, error);
 	bio_put(bio);
+	return 0;
 }
 
 /**
@@ -345,7 +428,6 @@ static void bio_end_io_kio(struct bio *bio)
 void ll_rw_kio(int rw, struct kiobuf *kio, struct block_device *bdev, sector_t sector)
 {
 	int i, offset, size, err, map_i, total_nr_pages, nr_pages;
-	struct bio_vec *bvec;
 	struct bio *bio;
 
 	err = 0;
@@ -373,7 +455,7 @@ void ll_rw_kio(int rw, struct kiobuf *kio, struct block_device *bdev, sector_t s
 	map_i = 0;
 
 next_chunk:
-	nr_pages = BIO_MAX_SECTORS >> (PAGE_SHIFT - 9);
+	nr_pages = BIO_MAX_PAGES;
 	if (nr_pages > total_nr_pages)
 		nr_pages = total_nr_pages;
 
@@ -393,8 +475,7 @@ next_chunk:
 	bio->bi_end_io = bio_end_io_kio;
 	bio->bi_private = kio;
 
-	bvec = bio->bi_io_vec;
-	for (i = 0; i < nr_pages; i++, bvec++, map_i++) {
+	for (i = 0; i < nr_pages; i++, map_i++) {
 		int nbytes = PAGE_SIZE - offset;
 
 		if (nbytes > size)
@@ -402,15 +483,12 @@ next_chunk:
 
 		BUG_ON(kio->maplist[map_i] == NULL);
 
-		if (bio->bi_size + nbytes > (BIO_MAX_SECTORS << 9))
-			goto queue_io;
-
-		bio->bi_vcnt++;
-		bio->bi_size += nbytes;
-
-		bvec->bv_page = kio->maplist[map_i];
-		bvec->bv_len = nbytes;
-		bvec->bv_offset = offset;
+		/*
+		 * if we can't add this page to the bio, submit for i/o
+		 * and alloc a new one if needed
+		 */
+		if (bio_add_page(bio, kio->maplist[map_i], nbytes, offset))
+			break;
 
 		/*
 		 * kiobuf only has an offset into the first page
@@ -423,7 +501,6 @@ next_chunk:
 		kio->offset += nbytes;
 	}
 
-queue_io:
 	submit_bio(rw, bio);
 
 	if (total_nr_pages)
@@ -446,15 +523,33 @@ out:
 	end_kio_request(kio, !err);
 }
 
-void bio_endio(struct bio *bio, int uptodate)
+/**
+ * bio_endio - end I/O on a bio
+ * @bio:	bio
+ * @bytes_done:	number of bytes completed
+ * @error:	error, if any
+ *
+ * Description:
+ *   bio_endio() will end I/O @bytes_done number of bytes. This may be just
+ *   a partial part of the bio, or it may be the whole bio. bio_endio() is
+ *   the preferred way to end I/O on a bio, it takes care of decrementing
+ *   bi_size and clearing BIO_UPTODATE on error. @error is 0 on success, and
+ *   and one of the established -Exxxx (-EIO, for instance) error values in
+ *   case something went wrong.
+ **/
+int bio_endio(struct bio *bio, unsigned int bytes_done, int error)
 {
-	if (uptodate)
-		set_bit(BIO_UPTODATE, &bio->bi_flags);
-	else
+	if (error)
 		clear_bit(BIO_UPTODATE, &bio->bi_flags);
 
-	if (bio->bi_end_io)
-		bio->bi_end_io(bio);
+	if (unlikely(bytes_done > bio->bi_size)) {
+		printk("%s: want %u bytes done, only %u left\n", __FUNCTION__,
+						bytes_done, bio->bi_size);
+		bytes_done = bio->bi_size;
+	}
+
+	bio->bi_size -= bytes_done;
+	return bio->bi_end_io(bio, bytes_done, error);
 }
 
 static void __init biovec_init_pools(void)
@@ -538,3 +633,4 @@ EXPORT_SYMBOL(__bio_clone);
 EXPORT_SYMBOL(bio_clone);
 EXPORT_SYMBOL(bio_phys_segments);
 EXPORT_SYMBOL(bio_hw_segments);
+EXPORT_SYMBOL(bio_add_page);

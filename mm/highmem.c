@@ -291,11 +291,15 @@ static inline void copy_to_high_bio_irq(struct bio *to, struct bio *from)
 	}
 }
 
-static inline void bounce_end_io(struct bio *bio, mempool_t *pool)
+static inline int bounce_end_io(struct bio *bio, unsigned int bytes_done,
+				int error, mempool_t *pool)
 {
 	struct bio *bio_orig = bio->bi_private;
 	struct bio_vec *bvec, *org_vec;
 	int i;
+
+	if (bio->bi_size)
+		return 1;
 
 	if (!test_bit(BIO_UPTODATE, &bio->bi_flags))
 		goto out_eio;
@@ -314,38 +318,43 @@ static inline void bounce_end_io(struct bio *bio, mempool_t *pool)
 	}
 
 out_eio:
-	bio_orig->bi_end_io(bio_orig);
+	bio_endio(bio_orig, bytes_done, error);
 	bio_put(bio);
+	return 0;
 }
 
-static void bounce_end_io_write(struct bio *bio)
+static int bounce_end_io_write(struct bio *bio, unsigned int bytes_done,
+			       int error)
 {
-	bounce_end_io(bio, page_pool);
+	return bounce_end_io(bio, bytes_done, error, page_pool);
 }
 
-static void bounce_end_io_write_isa(struct bio *bio)
+static int bounce_end_io_write_isa(struct bio *bio, unsigned int bytes_done,
+				   int error)
 {
-	bounce_end_io(bio, isa_page_pool);
+	return bounce_end_io(bio, bytes_done, error, isa_page_pool);
 }
 
-static inline void __bounce_end_io_read(struct bio *bio, mempool_t *pool)
+static inline int __bounce_end_io_read(struct bio *bio, unsigned int done,
+				       int error, mempool_t *pool)
 {
 	struct bio *bio_orig = bio->bi_private;
 
 	if (test_bit(BIO_UPTODATE, &bio->bi_flags))
 		copy_to_high_bio_irq(bio_orig, bio);
 
-	bounce_end_io(bio, pool);
+	return bounce_end_io(bio, done, error, pool);
 }
 
-static void bounce_end_io_read(struct bio *bio)
+static int bounce_end_io_read(struct bio *bio, unsigned int bytes_done, int err)
 {
-	__bounce_end_io_read(bio, page_pool);
+	return __bounce_end_io_read(bio, bytes_done, err, page_pool);
 }
 
-static void bounce_end_io_read_isa(struct bio *bio)
+static int bounce_end_io_read_isa(struct bio *bio, unsigned int bytes_done,
+				  int err)
 {
-	return __bounce_end_io_read(bio, isa_page_pool);
+	return __bounce_end_io_read(bio, bytes_done, err, isa_page_pool);
 }
 
 void blk_queue_bounce(request_queue_t *q, struct bio **bio_orig)

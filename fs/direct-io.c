@@ -151,10 +151,13 @@ static struct page *dio_get_page(struct dio *dio)
  * During I/O bi_private points at the dio.  After I/O, bi_private is used to
  * implement a singly-linked list of completed BIOs, at dio->bio_list.
  */
-static void dio_bio_end_io(struct bio *bio)
+static int dio_bio_end_io(struct bio *bio, unsigned int bytes_done, int error)
 {
 	struct dio *dio = bio->bi_private;
 	unsigned long flags;
+
+	if (bio->bi_size)
+		return 1;
 
 	spin_lock_irqsave(&dio->bio_list_lock, flags);
 	bio->bi_private = dio->bio_list;
@@ -162,6 +165,7 @@ static void dio_bio_end_io(struct bio *bio)
 	if (dio->waiter)
 		wake_up_process(dio->waiter);
 	spin_unlock_irqrestore(&dio->bio_list_lock, flags);
+	return 0;
 }
 
 static int

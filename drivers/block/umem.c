@@ -544,9 +544,16 @@ static void process_page(unsigned long data)
 
 	while(return_bio) {
 		struct bio *bio = return_bio;
+		int bytes = bio->bi_size;
+
 		return_bio = bio->bi_next;
 		bio->bi_next = NULL;
-		bio->bi_end_io(bio);
+		/* should use bio_endio(), however already cleared
+		 * BIO_UPTODATE. so set bio->bi_size = 0 manually to indicate
+		 * completely done
+		 */
+		bio->bi_size = 0;
+		bio->bi_end_io(bio, bytes, 0);
 	}
 }
 
@@ -560,8 +567,6 @@ static int mm_make_request(request_queue_t *q, struct bio *bio)
 	struct cardinfo *card = q->queuedata;
 	PRINTK("mm_make_request %ld %d\n", bh->b_rsector, bh->b_size);
 
-	/* set uptodate now, and clear it if there are any errors */
-	set_bit(BIO_UPTODATE, &bio->bi_flags);
 	bio->bi_phys_segments = bio->bi_idx; /* count of completed segments*/
 	spin_lock_bh(&card->lock);
 	*card->biotail = bio;

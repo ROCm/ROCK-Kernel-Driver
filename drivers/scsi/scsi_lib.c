@@ -317,13 +317,11 @@ static Scsi_Cmnd *__scsi_end_request(Scsi_Cmnd * SCpnt,
 
 	ASSERT_LOCK(q->queue_lock, 0);
 
-	spin_lock_irqsave(q->queue_lock, flags);
 	/*
 	 * If there are blocks left over at the end, set up the command
 	 * to queue the remainder of them.
 	 */
 	if (end_that_request_first(req, uptodate, sectors)) {
-		spin_unlock_irqrestore(q->queue_lock, flags);
 		if (!requeue)
 			return SCpnt;
 
@@ -337,7 +335,9 @@ static Scsi_Cmnd *__scsi_end_request(Scsi_Cmnd * SCpnt,
 
 	add_blkdev_randomness(major(req->rq_dev));
 
-	if(blk_rq_tagged(req))
+	spin_lock_irqsave(q->queue_lock, flags);
+
+	if (blk_rq_tagged(req))
 		blk_queue_end_tag(q, req);
 
 	end_that_request_last(req);
