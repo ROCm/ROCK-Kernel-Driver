@@ -56,14 +56,20 @@ ALL_SUB_DIRS	:= $(sort $(subdir-y) $(subdir-m) $(subdir-n) $(subdir-))
 
 c_flags = $(CFLAGS) $(EXTRA_CFLAGS) $(CFLAGS_$@) -DKBUILD_BASENAME=$(subst $(comma),_,$(subst -,_,$(*F)))
 
+cmd_cc_s_c = $(CC) $(c_flags) -S $< -o $@
+
 %.s: %.c
-	$(CC) $(c_flags) -S $< -o $@
+	$(cmd_cc_s_c)
+
+cmd_cc_i_c = $(CPP) $(c_flags) $< > $@
 
 %.i: %.c
-	$(CPP) $(c_flags) $< > $@
+	$(cmd_cc_i_c)
+
+cmd_cc_o_c = $(CC) $(c_flags) -c -o $@ $<
 
 %.o: %.c
-	$(CC) $(c_flags) -c -o $@ $<
+	$(cmd_cc_o_c)
 	@ ( \
 	    echo 'ifeq ($(strip $(subst $(comma),:,$(CFLAGS) $(EXTRA_CFLAGS) $(CFLAGS_$@))),$$(strip $$(subst $$(comma),:,$$(CFLAGS) $$(EXTRA_CFLAGS) $$(CFLAGS_$@))))' ; \
 	    echo 'FILES_FLAGS_UP_TO_DATE += $@' ; \
@@ -78,11 +84,15 @@ ifdef USE_STANDARD_AS_RULE
 
 a_flags = $(AFLAGS) $(EXTRA_AFLAGS) $(AFLAGS_$@)
 
+cmd_as_s_S = $(CPP) $(a_flags) $< > $@
+
 %.s: %.S
-	$(CPP) $(a_flags) $< > $@
+	$(cmd_as_s_S)
+
+cmd_as_o_S = $(CC) $(a_flags) -c -o $@ $<
 
 %.o: %.S
-	$(CC) $(a_flags) -c -o $@ $<
+	$(cmd_as_o_S)
 
 endif
 
@@ -91,7 +101,7 @@ endif
 	$(AS) $(AFLAGS) $(EXTRA_CFLAGS) -o $@ $<
 
 %.lst: %.c
-	$(CC) $(CFLAGS) $(EXTRA_CFLAGS) $(CFLAGS_$@) -g -c -o $*.o $<
+	$(CC) $(c_flags) -g -c -o $*.o $<
 	$(TOPDIR)/scripts/makelst $* $(TOPDIR) $(OBJDUMP)
 #
 #
@@ -102,13 +112,13 @@ all_targets: $(O_TARGET) $(L_TARGET)
 # Rule to compile a set of .o files into one .o file
 #
 ifdef O_TARGET
+# If the list of objects to link is empty, just create an empty O_TARGET
+cmd_link_o_target = $(if $(strip $(obj-y)),\
+		      $(LD) $(EXTRA_LDFLAGS) -r -o $@ $(filter $(obj-y), $^),\
+		      rm -f $@; $(AR) rcs $@)
+
 $(O_TARGET): $(obj-y)
-	rm -f $@
-    ifneq "$(strip $(obj-y))" ""
-	$(LD) $(EXTRA_LDFLAGS) -r -o $@ $(filter $(obj-y), $^)
-    else
-	$(AR) rcs $@
-    endif
+	$(cmd_link_o_target)
 	@ ( \
 	    echo 'ifeq ($(strip $(subst $(comma),:,$(EXTRA_LDFLAGS) $(obj-y))),$$(strip $$(subst $$(comma),:,$$(EXTRA_LDFLAGS) $$(obj-y))))' ; \
 	    echo 'FILES_FLAGS_UP_TO_DATE += $@' ; \
@@ -120,9 +130,10 @@ endif # O_TARGET
 # Rule to compile a set of .o files into one .a file
 #
 ifdef L_TARGET
+cmd_link_l_target = rm -f $@; $(AR) $(EXTRA_ARFLAGS) rcs $@ $(obj-y)
+
 $(L_TARGET): $(obj-y)
-	rm -f $@
-	$(AR) $(EXTRA_ARFLAGS) rcs $@ $(obj-y)
+	$(cmd_link_l_target)
 	@ ( \
 	    echo 'ifeq ($(strip $(subst $(comma),:,$(EXTRA_ARFLAGS) $(obj-y))),$$(strip $$(subst $$(comma),:,$$(EXTRA_ARFLAGS) $$(obj-y))))' ; \
 	    echo 'FILES_FLAGS_UP_TO_DATE += $@' ; \
@@ -155,13 +166,14 @@ multi-used-m := $(filter-out $(list-multi),$(__multi-used-m))
 multi-objs-y := $(foreach m, $(multi-used-y), $($(basename $(m))-objs))
 multi-objs-m := $(foreach m, $(multi-used-m), $($(basename $(m))-objs))
 
+cmd_link_multi = $(LD) $(EXTRA_LDFLAGS) -r -o $@ $(filter $($(basename $@)-objs),$^)
+
 # We would rather have a list of rules like
 # 	foo.o: $(foo-objs)
 # but that's not so easy, so we rather make all composite objects depend
 # on the set of all their parts
 $(multi-used-y) : %.o: $(multi-objs-y)
-	rm -f $@
-	$(LD) $(EXTRA_LDFLAGS) -r -o $@ $(filter $($(basename $@)-objs), $^)
+	$(cmd_link_multi)
 	@ ( \
 	    echo 'ifeq ($(strip $(subst $(comma),:,$(LD) $(EXTRA_LDFLAGS) $($(basename $@)-objs)),$$(strip $$(subst $$(comma),:,$$(LD) $$(EXTRA_LDFLAGS) $$($(basename $@)-objs)))))' ; \
 	    echo 'FILES_FLAGS_UP_TO_DATE += $@' ; \
@@ -169,8 +181,7 @@ $(multi-used-y) : %.o: $(multi-objs-y)
 	) > $(dir $@)/.$(notdir $@).flags
 
 $(multi-used-m) : %.o: $(multi-objs-m)
-	rm -f $@
-	$(LD) $(EXTRA_LDFLAGS) -r -o $@ $(filter $($(basename $@)-objs), $^)
+	$(cmd_link_multi)
 	@ ( \
 	    echo 'ifeq ($(strip $(subst $(comma),:,$(LD) $(EXTRA_LDFLAGS) $($(basename $@)-objs)),$$(strip $$(subst $$(comma),:,$$(LD) $$(EXTRA_LDFLAGS) $$($(basename $@)-objs)))))' ; \
 	    echo 'FILES_FLAGS_UP_TO_DATE += $@' ; \
