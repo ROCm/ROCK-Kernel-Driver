@@ -975,60 +975,66 @@ int pcibios_assign_resource(struct pci_dev *pdev, int resource)
  * We do not use horroble macroses here because we want to
  * advance pointer by sizeof(size).
  */
-void outsb(void * __iomem addr, const void *src, unsigned long count) {
+void outsb(unsigned long addr, const void *src, unsigned long count)
+{
 	while (count) {
 		count -= 1;
-		writeb(*(const char *)src, addr);
+		outb(*(const char *)src, addr);
 		src += 1;
-		addr += 1;
+		/* addr += 1; */
 	}
 }
 
-void outsw(void * __iomem addr, const void *src, unsigned long count) {
+void outsw(unsigned long addr, const void *src, unsigned long count)
+{
 	while (count) {
 		count -= 2;
-		writew(*(const short *)src, addr);
+		outw(*(const short *)src, addr);
 		src += 2;
-		addr += 2;
+		/* addr += 2; */
 	}
 }
 
-void outsl(void * __iomem addr, const void *src, unsigned long count) {
+void outsl(unsigned long addr, const void *src, unsigned long count)
+{
 	while (count) {
 		count -= 4;
-		writel(*(const long *)src, addr);
+		outl(*(const long *)src, addr);
 		src += 4;
-		addr += 4;
+		/* addr += 4; */
 	}
 }
 
-void insb(void * __iomem addr, void *dst, unsigned long count) {
+void insb(unsigned long addr, void *dst, unsigned long count)
+{
 	while (count) {
 		count -= 1;
-		*(unsigned char *)dst = readb(addr);
+		*(unsigned char *)dst = inb(addr);
 		dst += 1;
-		addr += 1;
+		/* addr += 1; */
 	}
 }
 
-void insw(void * __iomem addr, void *dst, unsigned long count) {
+void insw(unsigned long addr, void *dst, unsigned long count)
+{
 	while (count) {
 		count -= 2;
-		*(unsigned short *)dst = readw(addr);
+		*(unsigned short *)dst = inw(addr);
 		dst += 2;
-		addr += 2;
+		/* addr += 2; */
 	}
 }
 
-void insl(void * __iomem addr, void *dst, unsigned long count) {
+void insl(unsigned long addr, void *dst, unsigned long count)
+{
 	while (count) {
 		count -= 4;
 		/*
 		 * XXX I am sure we are in for an unaligned trap here.
 		 */
-		*(unsigned long *)dst = readl(addr);
+		*(unsigned long *)dst = inl(addr);
 		dst += 4;
-		addr += 4;
+		/* addr += 4; */
 	}
 }
 
