@@ -179,6 +179,7 @@ nfsd(struct svc_rqst *rqstp)
 	me.task = current;
 	list_add(&me.list, &nfsd_list);
 
+	unlock_kernel();
 	/*
 	 * The main request loop
 	 */
@@ -233,6 +234,8 @@ nfsd(struct svc_rqst *rqstp)
 				break;
 		err = signo;
 	}
+
+	lock_kernel();
 
 	/* Release lockd */
 	lockd_down();

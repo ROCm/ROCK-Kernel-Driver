@@ -187,7 +187,6 @@ asmlinkage handle_sys_nfsservctl(int cmd, void *opaque_argp, void *opaque_resp)
 	int			err;
 	int			argsize, respsize;
 
-	lock_kernel ();
 
 	err = -EPERM;
 	if (!capable(CAP_SYS_ADMIN)) {
@@ -257,7 +256,6 @@ done:
 	if (res)
 		kfree(res);
 
-	unlock_kernel ();
 	return err;
 }
 
