@@ -30,6 +30,7 @@
 #include <linux/slab.h>
 #include <linux/init.h>
 #include <linux/rmap.h>
+#include <linux/rcupdate.h>
 
 #include <asm/tlbflush.h>
 
@@ -159,8 +160,31 @@ static void anon_vma_ctor(void *data, kmem_cache_t *cachep, unsigned long flags)
 
 void __init anon_vma_init(void)
 {
-	anon_vma_cachep = kmem_cache_create("anon_vma",
-		sizeof(struct anon_vma), 0, SLAB_PANIC, anon_vma_ctor, NULL);
+	anon_vma_cachep = kmem_cache_create("anon_vma", sizeof(struct anon_vma),
+			0, SLAB_DESTROY_BY_RCU|SLAB_PANIC, anon_vma_ctor, NULL);
+}
+
+/*
+ * Getting a lock on a stable anon_vma from a page off the LRU is
+ * tricky: page_lock_anon_vma rely on RCU to guard against the races.
+ */
+static struct anon_vma *page_lock_anon_vma(struct page *page)
+{
+	struct anon_vma *anon_vma = NULL;
+	unsigned long anon_mapping;
+
+	rcu_read_lock();
+	anon_mapping = (unsigned long) page->mapping;
+	if (!(anon_mapping & PAGE_MAPPING_ANON))
+		goto out;
+	if (!page_mapped(page))
+		goto out;
+
+	anon_vma = (struct anon_vma *) (anon_mapping - PAGE_MAPPING_ANON);
+	spin_lock(&anon_vma->lock);
+out:
+	rcu_read_unlock();
+	return anon_vma;
 }
 
 /*
@@ -238,19 +262,15 @@ out:
 static int page_referenced_anon(struct page *page)
 {
 	unsigned int mapcount;
-	struct anon_vma *anon_vma = (void *) page->mapping - PAGE_MAPPING_ANON;
+	struct anon_vma *anon_vma;
 	struct vm_area_struct *vma;
 	int referenced = 0;
 
-	/*
-	 * Recheck mapcount: it is not safe to take anon_vma->lock after
-	 * last page_remove_rmap, since struct anon_vma might be reused.
-	 */
-	mapcount = page_mapcount(page);
-	if (!mapcount)
+	anon_vma = page_lock_anon_vma(page);
+	if (!anon_vma)
 		return referenced;
 
-	spin_lock(&anon_vma->lock);
+	mapcount = page_mapcount(page);
 	list_for_each_entry(vma, &anon_vma->head, anon_vma_node) {
 		referenced += page_referenced_one(page, vma, &mapcount);
 		if (!mapcount)
@@ -634,18 +654,14 @@ out_unlock:
 
 static int try_to_unmap_anon(struct page *page)
 {
-	struct anon_vma *anon_vma = (void *) page->mapping - PAGE_MAPPING_ANON;
+	struct anon_vma *anon_vma;
 	struct vm_area_struct *vma;
 	int ret = SWAP_AGAIN;
 
-	/*
-	 * Recheck mapped: it is not safe to take anon_vma->lock after
-	 * last page_remove_rmap, since struct anon_vma might be reused.
-	 */
-	if (!page_mapped(page))
+	anon_vma = page_lock_anon_vma(page);
+	if (!anon_vma)
 		return ret;
 
-	spin_lock(&anon_vma->lock);
 	list_for_each_entry(vma, &anon_vma->head, anon_vma_node) {
 		ret = try_to_unmap_one(page, vma);
 		if (ret == SWAP_FAIL || !page_mapped(page))
