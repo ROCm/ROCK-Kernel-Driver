@@ -145,8 +145,9 @@ acpi_ds_parse_method (
 		return_ACPI_STATUS (AE_NO_MEMORY);
 	}
 
-	status = acpi_ds_init_aml_walk (walk_state, op, node, obj_desc->method.aml_start,
-			  obj_desc->method.aml_length, NULL, NULL, 1);
+	status = acpi_ds_init_aml_walk (walk_state, op, node,
+			  obj_desc->method.aml_start,
+			  obj_desc->method.aml_length, NULL, 1);
 	if (ACPI_FAILURE (status)) {
 		acpi_ds_delete_walk_state (walk_state);
 		return_ACPI_STATUS (status);
@@ -267,8 +268,9 @@ acpi_ds_call_control_method (
 {
 	acpi_status                     status;
 	struct acpi_namespace_node      *method_node;
-	union acpi_operand_object       *obj_desc;
 	struct acpi_walk_state          *next_walk_state;
+	union acpi_operand_object       *obj_desc;
+	struct acpi_parameter_info      info;
 	u32                             i;
 
 
@@ -309,7 +311,6 @@ acpi_ds_call_control_method (
 			return_ACPI_STATUS (AE_NO_MEMORY);
 		}
 
-
 		/* Create and init a Root Node */
 
 		op = acpi_ps_create_scope_op ();
@@ -320,7 +321,7 @@ acpi_ds_call_control_method (
 
 		status = acpi_ds_init_aml_walk (next_walk_state, op, method_node,
 				  obj_desc->method.aml_start, obj_desc->method.aml_length,
-				  NULL, NULL, 1);
+				  NULL, 1);
 		if (ACPI_FAILURE (status)) {
 			acpi_ds_delete_walk_state (next_walk_state);
 			goto cleanup;
@@ -348,9 +349,12 @@ acpi_ds_call_control_method (
 	 */
 	this_walk_state->operands [this_walk_state->num_operands] = NULL;
 
+	info.parameters = &this_walk_state->operands[0];
+	info.parameter_type = ACPI_PARAM_ARGS;
+
 	status = acpi_ds_init_aml_walk (next_walk_state, NULL, method_node,
 			  obj_desc->method.aml_start, obj_desc->method.aml_length,
-			  &this_walk_state->operands[0], NULL, 3);
+			  &info, 3);
 	if (ACPI_FAILURE (status)) {
 		goto cleanup;
 	}

@@ -193,7 +193,7 @@ acpi_ns_root_initialize (void)
 			case ACPI_TYPE_MUTEX:
 
 				obj_desc->mutex.node = new_node;
-				obj_desc->mutex.sync_level = (u16) ACPI_STRTOUL
+				obj_desc->mutex.sync_level = (u8) ACPI_STRTOUL
 						  (val, NULL, 10);
 
 				if (ACPI_STRCMP (init_val->name, "_GL_") == 0) {

@@ -64,7 +64,7 @@
 
 /* Version string */
 
-#define ACPI_CA_VERSION                 0x20040402
+#define ACPI_CA_VERSION                 0x20040427
 
 /* Maximum objects in the various object caches */
 
@@ -187,7 +187,7 @@
 
 /* Number of strings associated with the _OSI reserved method */
 
-#define ACPI_NUM_OSI_STRINGS            4
+#define ACPI_NUM_OSI_STRINGS            9
 
 
 /******************************************************************************

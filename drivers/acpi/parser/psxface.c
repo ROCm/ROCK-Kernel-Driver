@@ -57,7 +57,7 @@
  *
  * FUNCTION:    acpi_psx_execute
  *
- * PARAMETERS:  method_node         - A method object containing both the AML
+ * PARAMETERS:  Info->Node          - A method object containing both the AML
  *                                    address and length.
  *              **Params            - List of parameters to pass to method,
  *                                    terminated by NULL. Params itself may be
@@ -73,9 +73,7 @@
 
 acpi_status
 acpi_psx_execute (
-	struct acpi_namespace_node      *method_node,
-	union acpi_operand_object       **params,
-	union acpi_operand_object       **return_obj_desc)
+	struct acpi_parameter_info      *info)
 {
 	acpi_status                     status;
 	union acpi_operand_object       *obj_desc;
@@ -89,29 +87,31 @@ acpi_psx_execute (
 
 	/* Validate the Node and get the attached object */
 
-	if (!method_node) {
+	if (!info || !info->node) {
 		return_ACPI_STATUS (AE_NULL_ENTRY);
 	}
 
-	obj_desc = acpi_ns_get_attached_object (method_node);
+	obj_desc = acpi_ns_get_attached_object (info->node);
 	if (!obj_desc) {
 		return_ACPI_STATUS (AE_NULL_OBJECT);
 	}
 
 	/* Init for new method, wait on concurrency semaphore */
 
-	status = acpi_ds_begin_method_execution (method_node, obj_desc, NULL);
+	status = acpi_ds_begin_method_execution (info->node, obj_desc, NULL);
 	if (ACPI_FAILURE (status)) {
 		return_ACPI_STATUS (status);
 	}
 
-	if (params) {
+	if (info &&
+	   (info->parameter_type == ACPI_PARAM_ARGS) &&
+	   (info->parameters)) {
 		/*
 		 * The caller "owns" the parameters, so give each one an extra
 		 * reference
 		 */
-		for (i = 0; params[i]; i++) {
-			acpi_ut_add_reference (params[i]);
+		for (i = 0; info->parameters[i]; i++) {
+			acpi_ut_add_reference (info->parameters[i]);
 		}
 	}
 
@@ -121,7 +121,7 @@ acpi_psx_execute (
 	 */
 	ACPI_DEBUG_PRINT ((ACPI_DB_PARSE,
 		"**** Begin Method Parse **** Entry=%p obj=%p\n",
-		method_node, obj_desc));
+		info->node, obj_desc));
 
 	/* Create and init a Root Node */
 
@@ -147,8 +147,9 @@ acpi_psx_execute (
 		goto cleanup2;
 	}
 
-	status = acpi_ds_init_aml_walk (walk_state, op, method_node, obj_desc->method.aml_start,
-			  obj_desc->method.aml_length, NULL, NULL, 1);
+	status = acpi_ds_init_aml_walk (walk_state, op, info->node,
+			  obj_desc->method.aml_start,
+			  obj_desc->method.aml_length, NULL, 1);
 	if (ACPI_FAILURE (status)) {
 		goto cleanup3;
 	}
@@ -159,7 +160,6 @@ acpi_psx_execute (
 	acpi_ps_delete_parse_tree (op);
 	if (ACPI_FAILURE (status)) {
 		goto cleanup1; /* Walk state is already deleted */
-
 	}
 
 	/*
@@ -167,7 +167,7 @@ acpi_psx_execute (
 	 */
 	ACPI_DEBUG_PRINT ((ACPI_DB_PARSE,
 		"**** Begin Method Execution **** Entry=%p obj=%p\n",
-		method_node, obj_desc));
+		info->node, obj_desc));
 
 	/* Create and init a Root Node */
 
@@ -179,8 +179,8 @@ acpi_psx_execute (
 
 	/* Init new op with the method name and pointer back to the NS node */
 
-	acpi_ps_set_name (op, method_node->name.integer);
-	op->common.node = method_node;
+	acpi_ps_set_name (op, info->node->name.integer);
+	op->common.node = info->node;
 
 	/* Create and initialize a new walk state */
 
@@ -190,8 +190,9 @@ acpi_psx_execute (
 		goto cleanup2;
 	}
 
-	status = acpi_ds_init_aml_walk (walk_state, op, method_node, obj_desc->method.aml_start,
-			  obj_desc->method.aml_length, params, return_obj_desc, 3);
+	status = acpi_ds_init_aml_walk (walk_state, op, info->node,
+			  obj_desc->method.aml_start,
+			  obj_desc->method.aml_length, info, 3);
 	if (ACPI_FAILURE (status)) {
 		goto cleanup3;
 	}
@@ -210,13 +211,14 @@ cleanup2:
 	acpi_ps_delete_parse_tree (op);
 
 cleanup1:
-	if (params) {
+	if ((info->parameter_type == ACPI_PARAM_ARGS) &&
+		(info->parameters)) {
 		/* Take away the extra reference that we gave the parameters above */
 
-		for (i = 0; params[i]; i++) {
+		for (i = 0; info->parameters[i]; i++) {
 			/* Ignore errors, just do them all */
 
-			(void) acpi_ut_update_object_reference (params[i], REF_DECREMENT);
+			(void) acpi_ut_update_object_reference (info->parameters[i], REF_DECREMENT);
 		}
 	}
 
@@ -228,10 +230,10 @@ cleanup1:
 	 * If the method has returned an object, signal this to the caller with
 	 * a control exception code
 	 */
-	if (*return_obj_desc) {
+	if (info->return_object) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_PARSE, "Method returned obj_desc=%p\n",
-			*return_obj_desc));
-		ACPI_DUMP_STACK_ENTRY (*return_obj_desc);
+			info->return_object));
+		ACPI_DUMP_STACK_ENTRY (info->return_object);
 
 		status = AE_CTRL_RETURN_VALUE;
 	}

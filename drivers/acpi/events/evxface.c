@@ -479,7 +479,7 @@ unlock_and_exit:
  *              gpe_block       - GPE block (NULL == FADT GPEs)
  *              Type            - Whether this GPE should be treated as an
  *                                edge- or level-triggered interrupt.
- *              Handler         - Address of the handler
+ *              Address         - Address of the handler
  *              Context         - Value passed to the handler on each GPE
  *
  * RETURN:      Status
@@ -493,11 +493,12 @@ acpi_install_gpe_handler (
 	acpi_handle                     gpe_device,
 	u32                             gpe_number,
 	u32                             type,
-	acpi_gpe_handler                handler,
+	acpi_event_handler              address,
 	void                            *context)
 {
-	acpi_status                     status;
 	struct acpi_gpe_event_info      *gpe_event_info;
+	struct acpi_handler_info        *handler;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE ("acpi_install_gpe_handler");
@@ -505,7 +506,7 @@ acpi_install_gpe_handler (
 
 	/* Parameter validation */
 
-	if (!handler) {
+	if ((!address) || (type > ACPI_GPE_XRUPT_TYPE_MASK)) {
 		return_ACPI_STATUS (AE_BAD_PARAMETER);
 	}
 
@@ -524,27 +525,41 @@ acpi_install_gpe_handler (
 
 	/* Make sure that there isn't a handler there already */
 
-	if (gpe_event_info->handler) {
+	if ((gpe_event_info->flags & ACPI_GPE_DISPATCH_MASK) == ACPI_GPE_DISPATCH_HANDLER) {
 		status = AE_ALREADY_EXISTS;
+		goto unlock_and_exit;
+	}
+
+	/* Allocate and init handler object */
+
+	handler = ACPI_MEM_CALLOCATE (sizeof (struct acpi_handler_info));
+	if (!handler) {
+		status = AE_NO_MEMORY;
+		goto unlock_and_exit;
+	}
+
+	handler->address    = address;
+	handler->context    = context;
+	handler->method_node = gpe_event_info->dispatch.method_node;
+
+	/* Disable the GPE before installing the handler */
+
+	status = acpi_ev_disable_gpe (gpe_event_info);
+	if (ACPI_FAILURE (status)) {
 		goto unlock_and_exit;
 	}
 
 	/* Install the handler */
 
 	acpi_os_acquire_lock (acpi_gbl_gpe_lock, ACPI_NOT_ISR);
-	gpe_event_info->handler = handler;
-	gpe_event_info->context = context;
-	gpe_event_info->flags = (u8) type;
+	gpe_event_info->dispatch.handler = handler;
+
+	/* Setup up dispatch flags to indicate handler (vs. method) */
+
+	gpe_event_info->flags &= ~(ACPI_GPE_XRUPT_TYPE_MASK | ACPI_GPE_DISPATCH_MASK); /* Clear bits */
+	gpe_event_info->flags |= (u8) (type | ACPI_GPE_DISPATCH_HANDLER);
+
 	acpi_os_release_lock (acpi_gbl_gpe_lock, ACPI_NOT_ISR);
-
-	/* Clear the GPE (of stale events), the enable it */
-
-	status = acpi_hw_clear_gpe (gpe_event_info);
-	if (ACPI_FAILURE (status)) {
-		goto unlock_and_exit;
-	}
-
-	status = acpi_hw_enable_gpe (gpe_event_info);
 
 
 unlock_and_exit:
@@ -559,7 +574,7 @@ unlock_and_exit:
  *
  * PARAMETERS:  gpe_number      - The event to remove a handler
  *              gpe_block       - GPE block (NULL == FADT GPEs)
- *              Handler         - Address of the handler
+ *              Address         - Address of the handler
  *
  * RETURN:      Status
  *
@@ -571,10 +586,11 @@ acpi_status
 acpi_remove_gpe_handler (
 	acpi_handle                     gpe_device,
 	u32                             gpe_number,
-	acpi_gpe_handler                handler)
+	acpi_event_handler              address)
 {
-	acpi_status                     status;
 	struct acpi_gpe_event_info      *gpe_event_info;
+	struct acpi_handler_info        *handler;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE ("acpi_remove_gpe_handler");
@@ -582,7 +598,7 @@ acpi_remove_gpe_handler (
 
 	/* Parameter validation */
 
-	if (!handler) {
+	if (!address) {
 		return_ACPI_STATUS (AE_BAD_PARAMETER);
 	}
 
@@ -599,27 +615,44 @@ acpi_remove_gpe_handler (
 		goto unlock_and_exit;
 	}
 
-	/* Disable the GPE before removing the handler */
+	/* Make sure that a handler is indeed installed */
 
-	status = acpi_hw_disable_gpe (gpe_event_info);
-	if (ACPI_FAILURE (status)) {
+	if ((gpe_event_info->flags & ACPI_GPE_DISPATCH_MASK) != ACPI_GPE_DISPATCH_HANDLER) {
+		status = AE_NOT_EXIST;
 		goto unlock_and_exit;
 	}
 
 	/* Make sure that the installed handler is the same */
 
-	if (gpe_event_info->handler != handler) {
-		(void) acpi_hw_enable_gpe (gpe_event_info);
+	if (gpe_event_info->dispatch.handler->address != address) {
 		status = AE_BAD_PARAMETER;
+		goto unlock_and_exit;
+	}
+
+	/* Disable the GPE before removing the handler */
+
+	status = acpi_ev_disable_gpe (gpe_event_info);
+	if (ACPI_FAILURE (status)) {
 		goto unlock_and_exit;
 	}
 
 	/* Remove the handler */
 
 	acpi_os_acquire_lock (acpi_gbl_gpe_lock, ACPI_NOT_ISR);
-	gpe_event_info->handler = NULL;
-	gpe_event_info->context = NULL;
+	handler = gpe_event_info->dispatch.handler;
+
+	/* Restore Method node (if any), set dispatch flags */
+
+	gpe_event_info->dispatch.method_node = handler->method_node;
+	gpe_event_info->flags &= ~ACPI_GPE_DISPATCH_MASK; /* Clear bits */
+	if (handler->method_node) {
+		gpe_event_info->flags |= ACPI_GPE_DISPATCH_METHOD;
+	}
 	acpi_os_release_lock (acpi_gbl_gpe_lock, ACPI_NOT_ISR);
+
+	/* Now we can free the handler object */
+
+	ACPI_MEM_FREE (handler);
 
 
 unlock_and_exit:

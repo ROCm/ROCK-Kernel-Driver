@@ -557,6 +557,10 @@ acpi_ev_terminate (void)
 		}
 	}
 
+	/* Deallocate all handler objects installed within GPE info structs */
+
+	status = acpi_ev_walk_gpe_list (acpi_ev_delete_gpe_handlers);
+
 	/* Return to original mode if necessary */
 
 	if (acpi_gbl_original_mode == ACPI_SYS_MODE_LEGACY) {

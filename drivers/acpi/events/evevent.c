@@ -50,7 +50,7 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    acpi_ev_initialize
+ * FUNCTION:    acpi_ev_initialize_events
  *
  * PARAMETERS:  None
  *
@@ -61,13 +61,13 @@
  ******************************************************************************/
 
 acpi_status
-acpi_ev_initialize (
+acpi_ev_initialize_events (
 	void)
 {
 	acpi_status                     status;
 
 
-	ACPI_FUNCTION_TRACE ("ev_initialize");
+	ACPI_FUNCTION_TRACE ("ev_initialize_events");
 
 
 	/* Make sure we have ACPI tables */
@@ -104,7 +104,7 @@ acpi_ev_initialize (
 
 /*******************************************************************************
  *
- * FUNCTION:    acpi_ev_handler_initialize
+ * FUNCTION:    acpi_ev_install_xrupt_handlers
  *
  * PARAMETERS:  None
  *
@@ -115,13 +115,13 @@ acpi_ev_initialize (
  ******************************************************************************/
 
 acpi_status
-acpi_ev_handler_initialize (
+acpi_ev_install_xrupt_handlers (
 	void)
 {
 	acpi_status                     status;
 
 
-	ACPI_FUNCTION_TRACE ("ev_handler_initialize");
+	ACPI_FUNCTION_TRACE ("ev_install_xrupt_handlers");
 
 
 	/* Install the SCI handler */

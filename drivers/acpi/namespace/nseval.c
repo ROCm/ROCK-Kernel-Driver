@@ -77,13 +77,10 @@
 
 acpi_status
 acpi_ns_evaluate_relative (
-	struct acpi_namespace_node      *handle,
 	char                            *pathname,
-	union acpi_operand_object       **params,
-	union acpi_operand_object       **return_object)
+	struct acpi_parameter_info      *info)
 {
 	acpi_status                     status;
-	struct acpi_namespace_node      *prefix_node;
 	struct acpi_namespace_node      *node = NULL;
 	union acpi_generic_state        *scope_info;
 	char                            *internal_path = NULL;
@@ -95,7 +92,7 @@ acpi_ns_evaluate_relative (
 	/*
 	 * Must have a valid object handle
 	 */
-	if (!handle) {
+	if (!info || !info->node) {
 		return_ACPI_STATUS (AE_BAD_PARAMETER);
 	}
 
@@ -118,8 +115,8 @@ acpi_ns_evaluate_relative (
 		goto cleanup;
 	}
 
-	prefix_node = acpi_ns_map_handle_to_node (handle);
-	if (!prefix_node) {
+	info->node = acpi_ns_map_handle_to_node (info->node);
+	if (!info->node) {
 		(void) acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
 		status = AE_BAD_PARAMETER;
 		goto cleanup;
@@ -127,7 +124,7 @@ acpi_ns_evaluate_relative (
 
 	/* Lookup the name in the namespace */
 
-	scope_info->scope.node = prefix_node;
+	scope_info->scope.node = info->node;
 	status = acpi_ns_lookup (scope_info, internal_path, ACPI_TYPE_ANY,
 			 ACPI_IMODE_EXECUTE, ACPI_NS_NO_UPSEARCH, NULL,
 			 &node);
@@ -147,7 +144,8 @@ acpi_ns_evaluate_relative (
 	ACPI_DEBUG_PRINT ((ACPI_DB_NAMES, "%s [%p] Value %p\n",
 		pathname, node, acpi_ns_get_attached_object (node)));
 
-	status = acpi_ns_evaluate_by_handle (node, params, return_object);
+	info->node = node;
+	status = acpi_ns_evaluate_by_handle (info);
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_NAMES, "*** Completed eval of object %s ***\n",
 		pathname));
@@ -166,6 +164,7 @@ cleanup1:
  * FUNCTION:    acpi_ns_evaluate_by_name
  *
  * PARAMETERS:  Pathname            - Fully qualified pathname to the object
+ *              Info                - Contains:
  *              return_object       - Where to put method's return value (if
  *                                    any).  If NULL, no value is returned.
  *              Params              - List of parameters to pass to the method,
@@ -184,11 +183,9 @@ cleanup1:
 acpi_status
 acpi_ns_evaluate_by_name (
 	char                            *pathname,
-	union acpi_operand_object       **params,
-	union acpi_operand_object       **return_object)
+	struct acpi_parameter_info      *info)
 {
 	acpi_status                     status;
-	struct acpi_namespace_node      *node = NULL;
 	char                            *internal_path = NULL;
 
 
@@ -211,7 +208,7 @@ acpi_ns_evaluate_by_name (
 
 	status = acpi_ns_lookup (NULL, internal_path, ACPI_TYPE_ANY,
 			 ACPI_IMODE_EXECUTE, ACPI_NS_NO_UPSEARCH, NULL,
-			 &node);
+			 &info->node);
 
 	(void) acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
 
@@ -226,9 +223,9 @@ acpi_ns_evaluate_by_name (
 	 * to evaluate it.
 	 */
 	ACPI_DEBUG_PRINT ((ACPI_DB_NAMES, "%s [%p] Value %p\n",
-		pathname, node, acpi_ns_get_attached_object (node)));
+		pathname, info->node, acpi_ns_get_attached_object (info->node)));
 
-	status = acpi_ns_evaluate_by_handle (node, params, return_object);
+	status = acpi_ns_evaluate_by_handle (info);
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_NAMES, "*** Completed eval of object %s ***\n",
 		pathname));
@@ -254,6 +251,7 @@ cleanup:
  *              Params              - List of parameters to pass to the method,
  *                                    terminated by NULL.  Params itself may be
  *                                    NULL if no parameters are being passed.
+ *              param_type          - Type of Parameter list
  *              return_object       - Where to put method's return value (if
  *                                    any).  If NULL, no value is returned.
  *
@@ -267,13 +265,9 @@ cleanup:
 
 acpi_status
 acpi_ns_evaluate_by_handle (
-	struct acpi_namespace_node      *handle,
-	union acpi_operand_object       **params,
-	union acpi_operand_object       **return_object)
+	struct acpi_parameter_info      *info)
 {
-	struct acpi_namespace_node      *node;
 	acpi_status                     status;
-	union acpi_operand_object       *local_return_object;
 
 
 	ACPI_FUNCTION_TRACE ("ns_evaluate_by_handle");
@@ -287,15 +281,13 @@ acpi_ns_evaluate_by_handle (
 
 	/* Parameter Validation */
 
-	if (!handle) {
+	if (!info) {
 		return_ACPI_STATUS (AE_BAD_PARAMETER);
 	}
 
-	if (return_object) {
-		/* Initialize the return value to an invalid object */
+	/* Initialize the return value to an invalid object */
 
-		*return_object = NULL;
-	}
+	info->return_object = NULL;
 
 	/* Get the prefix handle and Node */
 
@@ -304,8 +296,8 @@ acpi_ns_evaluate_by_handle (
 		return_ACPI_STATUS (status);
 	}
 
-	node = acpi_ns_map_handle_to_node (handle);
-	if (!node) {
+	info->node = acpi_ns_map_handle_to_node (info->node);
+	if (!info->node) {
 		(void) acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
 		return_ACPI_STATUS (AE_BAD_PARAMETER);
 	}
@@ -315,8 +307,8 @@ acpi_ns_evaluate_by_handle (
 	 * so that proper scoping context will be established
 	 * before execution.
 	 */
-	if (acpi_ns_get_type (node) == ACPI_TYPE_LOCAL_METHOD_ALIAS) {
-		node = ACPI_CAST_PTR (struct acpi_namespace_node, node->object);
+	if (acpi_ns_get_type (info->node) == ACPI_TYPE_LOCAL_METHOD_ALIAS) {
+		info->node = ACPI_CAST_PTR (struct acpi_namespace_node, info->node->object);
 	}
 
 	/*
@@ -328,19 +320,18 @@ acpi_ns_evaluate_by_handle (
 	 * In both cases, the namespace is unlocked by the
 	 *  acpi_ns* procedure
 	 */
-	if (acpi_ns_get_type (node) == ACPI_TYPE_METHOD) {
+	if (acpi_ns_get_type (info->node) == ACPI_TYPE_METHOD) {
 		/*
 		 * Case 1) We have an actual control method to execute
 		 */
-		status = acpi_ns_execute_control_method (node, params,
-				 &local_return_object);
+		status = acpi_ns_execute_control_method (info);
 	}
 	else {
 		/*
 		 * Case 2) Object is NOT a method, just return its
 		 * current value
 		 */
-		status = acpi_ns_get_object_value (node, &local_return_object);
+		status = acpi_ns_get_object_value (info);
 	}
 
 	/*
@@ -348,20 +339,6 @@ acpi_ns_evaluate_by_handle (
 	 * be dealt with
 	 */
 	if (status == AE_CTRL_RETURN_VALUE) {
-		/*
-		 * If the Method returned a value and the caller
-		 * provided a place to store a returned value, Copy
-		 * the returned value to the object descriptor provided
-		 * by the caller.
-		 */
-		if (return_object) {
-			/*
-			 * Valid return object, copy the pointer to
-			 * the returned object
-			 */
-			*return_object = local_return_object;
-		}
-
 		/* Map AE_CTRL_RETURN_VALUE to AE_OK, we are done with it */
 
 		status = AE_OK;
@@ -396,9 +373,7 @@ acpi_ns_evaluate_by_handle (
 
 acpi_status
 acpi_ns_execute_control_method (
-	struct acpi_namespace_node      *method_node,
-	union acpi_operand_object       **params,
-	union acpi_operand_object       **return_obj_desc)
+	struct acpi_parameter_info      *info)
 {
 	acpi_status                     status;
 	union acpi_operand_object       *obj_desc;
@@ -409,7 +384,7 @@ acpi_ns_execute_control_method (
 
 	/* Verify that there is a method associated with this object */
 
-	obj_desc = acpi_ns_get_attached_object (method_node);
+	obj_desc = acpi_ns_get_attached_object (info->node);
 	if (!obj_desc) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "No attached method object\n"));
 
@@ -417,7 +392,7 @@ acpi_ns_execute_control_method (
 		return_ACPI_STATUS (AE_NULL_OBJECT);
 	}
 
-	ACPI_DUMP_PATHNAME (method_node, "Execute Method:",
+	ACPI_DUMP_PATHNAME (info->node, "Execute Method:",
 		ACPI_LV_INFO, _COMPONENT);
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Method at AML address %p Length %X\n",
@@ -444,7 +419,7 @@ acpi_ns_execute_control_method (
 		return_ACPI_STATUS (status);
 	}
 
-	status = acpi_psx_execute (method_node, params, return_obj_desc);
+	status = acpi_psx_execute (info);
 	acpi_ex_exit_interpreter ();
 
 	return_ACPI_STATUS (status);
@@ -468,11 +443,10 @@ acpi_ns_execute_control_method (
 
 acpi_status
 acpi_ns_get_object_value (
-	struct acpi_namespace_node      *node,
-	union acpi_operand_object       **return_obj_desc)
+	struct acpi_parameter_info      *info)
 {
 	acpi_status                     status = AE_OK;
-	struct acpi_namespace_node      *resolved_node = node;
+	struct acpi_namespace_node      *resolved_node = info->node;
 
 
 	ACPI_FUNCTION_TRACE ("ns_get_object_value");
@@ -518,9 +492,9 @@ acpi_ns_get_object_value (
 
 		if (ACPI_SUCCESS (status)) {
 			status = AE_CTRL_RETURN_VALUE;
-			*return_obj_desc = ACPI_CAST_PTR (union acpi_operand_object, resolved_node);
+			info->return_object = ACPI_CAST_PTR (union acpi_operand_object, resolved_node);
 			ACPI_DEBUG_PRINT ((ACPI_DB_NAMES, "Returning object %p [%s]\n",
-				*return_obj_desc, acpi_ut_get_object_type_name (*return_obj_desc)));
+				*info->return_object, acpi_ut_get_object_type_name (info->return_object)));
 		}
 	}
 

@@ -288,19 +288,6 @@ struct smart_battery_table
 };
 
 
-/*
- * High performance timer
- */
-struct hpet_table
-{
-	ACPI_TABLE_HEADER_DEF
-	u32                             hardware_id;
-	u32                             base_address [3];
-	u8                              hpet_number;
-	u16                             clock_tick;
-	u8                              attributes;
-};
-
 #pragma pack()
 
 
@@ -343,5 +330,21 @@ struct acpi_table_support
 #include "actbl1.h"   /* Acpi 1.0 table definitions */
 #include "actbl2.h"   /* Acpi 2.0 table definitions */
 
+
+#pragma pack(1)
+/*
+ * High performance timer
+ */
+struct hpet_table
+{
+	ACPI_TABLE_HEADER_DEF
+	u32                             hardware_id;
+	struct acpi_generic_address     base_address;
+	u8                              hpet_number;
+	u16                             clock_tick;
+	u8                              attributes;
+};
+
+#pragma pack()
 
 #endif /* __ACTBL_H__ */

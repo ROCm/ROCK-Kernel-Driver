@@ -337,25 +337,28 @@ acpi_ns_init_one_device (
 	void                            *context,
 	void                            **return_value)
 {
-	acpi_status                     status;
-	struct acpi_namespace_node     *node;
-	u32                             flags;
 	struct acpi_device_walk_info   *info = (struct acpi_device_walk_info *) context;
+	struct acpi_parameter_info      pinfo;
+	u32                             flags;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE ("ns_init_one_device");
 
 
-	node = acpi_ns_map_handle_to_node (obj_handle);
-	if (!node) {
+	pinfo.parameters = NULL;
+	pinfo.parameter_type = ACPI_PARAM_ARGS;
+
+	pinfo.node = acpi_ns_map_handle_to_node (obj_handle);
+	if (!pinfo.node) {
 		return_ACPI_STATUS (AE_BAD_PARAMETER);
 	}
 
 	/*
 	 * We will run _STA/_INI on Devices and Processors only
 	 */
-	if ((node->type != ACPI_TYPE_DEVICE) &&
-		(node->type != ACPI_TYPE_PROCESSOR)) {
+	if ((pinfo.node->type != ACPI_TYPE_DEVICE) &&
+		(pinfo.node->type != ACPI_TYPE_PROCESSOR)) {
 		return_ACPI_STATUS (AE_OK);
 	}
 
@@ -368,11 +371,11 @@ acpi_ns_init_one_device (
 	/*
 	 * Run _STA to determine if we can run _INI on the device.
 	 */
-	ACPI_DEBUG_EXEC (acpi_ut_display_init_pathname (ACPI_TYPE_METHOD, node, "_STA"));
-	status = acpi_ut_execute_STA (node, &flags);
+	ACPI_DEBUG_EXEC (acpi_ut_display_init_pathname (ACPI_TYPE_METHOD, pinfo.node, "_STA"));
+	status = acpi_ut_execute_STA (pinfo.node, &flags);
 
 	if (ACPI_FAILURE (status)) {
-		if (node->type == ACPI_TYPE_DEVICE) {
+		if (pinfo.node->type == ACPI_TYPE_DEVICE) {
 			/* Ignore error and move on to next device */
 
 			return_ACPI_STATUS (AE_OK);
@@ -393,8 +396,8 @@ acpi_ns_init_one_device (
 	/*
 	 * The device is present. Run _INI.
 	 */
-	ACPI_DEBUG_EXEC (acpi_ut_display_init_pathname (ACPI_TYPE_METHOD, obj_handle, "_INI"));
-	status = acpi_ns_evaluate_relative (obj_handle, "_INI", NULL, NULL);
+	ACPI_DEBUG_EXEC (acpi_ut_display_init_pathname (ACPI_TYPE_METHOD, pinfo.node, "_INI"));
+	status = acpi_ns_evaluate_relative ("_INI", &pinfo);
 	if (ACPI_FAILURE (status)) {
 		/* No _INI (AE_NOT_FOUND) means device requires no initialization */
 
@@ -402,7 +405,7 @@ acpi_ns_init_one_device (
 			/* Ignore error and move on to next device */
 
 	#ifdef ACPI_DEBUG_OUTPUT
-			char                *scope_name = acpi_ns_get_external_pathname (obj_handle);
+			char                *scope_name = acpi_ns_get_external_pathname (pinfo.node);
 
 			ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "%s._INI failed: %s\n",
 					scope_name, acpi_format_exception (status)));
@@ -422,7 +425,7 @@ acpi_ns_init_one_device (
 	if (acpi_gbl_init_handler) {
 		/* External initialization handler is present, call it */
 
-		status = acpi_gbl_init_handler (obj_handle, ACPI_INIT_DEVICE_INI);
+		status = acpi_gbl_init_handler (pinfo.node, ACPI_INIT_DEVICE_INI);
 	}
 
 

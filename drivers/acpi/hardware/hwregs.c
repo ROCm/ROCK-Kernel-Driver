@@ -135,7 +135,7 @@ acpi_get_sleep_type_data (
 	u8                              *sleep_type_b)
 {
 	acpi_status                     status = AE_OK;
-	union acpi_operand_object       *obj_desc;
+	struct acpi_parameter_info      info;
 
 
 	ACPI_FUNCTION_TRACE ("acpi_get_sleep_type_data");
@@ -152,8 +152,9 @@ acpi_get_sleep_type_data (
 	/*
 	 * Evaluate the namespace object containing the values for this state
 	 */
+	info.parameters = NULL;
 	status = acpi_ns_evaluate_by_name ((char *) acpi_gbl_sleep_state_names[sleep_state],
-			  NULL, &obj_desc);
+			  &info);
 	if (ACPI_FAILURE (status)) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "%s while evaluating sleep_state [%s]\n",
 			acpi_format_exception (status), acpi_gbl_sleep_state_names[sleep_state]));
@@ -163,48 +164,50 @@ acpi_get_sleep_type_data (
 
 	/* Must have a return object */
 
-	if (!obj_desc) {
+	if (!info.return_object) {
 		ACPI_REPORT_ERROR (("Missing Sleep State object\n"));
 		status = AE_NOT_EXIST;
 	}
 
 	/* It must be of type Package */
 
-	else if (ACPI_GET_OBJECT_TYPE (obj_desc) != ACPI_TYPE_PACKAGE) {
+	else if (ACPI_GET_OBJECT_TYPE (info.return_object) != ACPI_TYPE_PACKAGE) {
 		ACPI_REPORT_ERROR (("Sleep State object not a Package\n"));
 		status = AE_AML_OPERAND_TYPE;
 	}
 
 	/* The package must have at least two elements */
 
-	else if (obj_desc->package.count < 2) {
+	else if (info.return_object->package.count < 2) {
 		ACPI_REPORT_ERROR (("Sleep State package does not have at least two elements\n"));
 		status = AE_AML_NO_OPERAND;
 	}
 
 	/* The first two elements must both be of type Integer */
 
-	else if ((ACPI_GET_OBJECT_TYPE (obj_desc->package.elements[0]) != ACPI_TYPE_INTEGER) ||
-			 (ACPI_GET_OBJECT_TYPE (obj_desc->package.elements[1]) != ACPI_TYPE_INTEGER)) {
+	else if ((ACPI_GET_OBJECT_TYPE (info.return_object->package.elements[0]) != ACPI_TYPE_INTEGER) ||
+			 (ACPI_GET_OBJECT_TYPE (info.return_object->package.elements[1]) != ACPI_TYPE_INTEGER)) {
 		ACPI_REPORT_ERROR (("Sleep State package elements are not both Integers (%s, %s)\n",
-			acpi_ut_get_object_type_name (obj_desc->package.elements[0]),
-			acpi_ut_get_object_type_name (obj_desc->package.elements[1])));
+			acpi_ut_get_object_type_name (info.return_object->package.elements[0]),
+			acpi_ut_get_object_type_name (info.return_object->package.elements[1])));
 		status = AE_AML_OPERAND_TYPE;
 	}
 	else {
 		/*
 		 * Valid _Sx_ package size, type, and value
 		 */
-		*sleep_type_a = (u8) (obj_desc->package.elements[0])->integer.value;
-		*sleep_type_b = (u8) (obj_desc->package.elements[1])->integer.value;
+		*sleep_type_a = (u8) (info.return_object->package.elements[0])->integer.value;
+		*sleep_type_b = (u8) (info.return_object->package.elements[1])->integer.value;
 	}
 
 	if (ACPI_FAILURE (status)) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "While evaluating sleep_state [%s], bad Sleep object %p type %s\n",
-			acpi_gbl_sleep_state_names[sleep_state], obj_desc, acpi_ut_get_object_type_name (obj_desc)));
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+			"While evaluating sleep_state [%s], bad Sleep object %p type %s\n",
+			acpi_gbl_sleep_state_names[sleep_state], info.return_object,
+			acpi_ut_get_object_type_name (info.return_object)));
 	}
 
-	acpi_ut_remove_reference (obj_desc);
+	acpi_ut_remove_reference (info.return_object);
 	return_ACPI_STATUS (status);
 }
 

@@ -265,19 +265,21 @@ acpi_enter_sleep_state (
 	sleep_type_reg_info = acpi_hw_get_bit_register_info (ACPI_BITREG_SLEEP_TYPE_A);
 	sleep_enable_reg_info = acpi_hw_get_bit_register_info (ACPI_BITREG_SLEEP_ENABLE);
 
+	/* Clear wake status */
+
+	status = acpi_set_register (ACPI_BITREG_WAKE_STATUS, 1, ACPI_MTX_DO_NOT_LOCK);
+	if (ACPI_FAILURE (status)) {
+		return_ACPI_STATUS (status);
+	}
+
+	/* Clear all fixed and general purpose status bits */
+
+	status = acpi_hw_clear_acpi_status (ACPI_MTX_DO_NOT_LOCK);
+	if (ACPI_FAILURE (status)) {
+		return_ACPI_STATUS (status);
+	}
+
 	if (sleep_state != ACPI_STATE_S5) {
-		/* Clear wake status */
-
-		status = acpi_set_register (ACPI_BITREG_WAKE_STATUS, 1, ACPI_MTX_DO_NOT_LOCK);
-		if (ACPI_FAILURE (status)) {
-			return_ACPI_STATUS (status);
-		}
-
-		status = acpi_hw_clear_acpi_status (ACPI_MTX_DO_NOT_LOCK);
-		if (ACPI_FAILURE (status)) {
-			return_ACPI_STATUS (status);
-		}
-
 		/* Disable BM arbitration */
 
 		status = acpi_set_register (ACPI_BITREG_ARB_DISABLE, 1, ACPI_MTX_DO_NOT_LOCK);
@@ -287,10 +289,16 @@ acpi_enter_sleep_state (
 	}
 
 	/*
-	 * 1) Disable all runtime GPEs
+	 * 1) Disable/Clear all GPEs
 	 * 2) Enable all wakeup GPEs
 	 */
-	status = acpi_hw_prepare_gpes_for_sleep ();
+	status = acpi_hw_disable_all_gpes ();
+	if (ACPI_FAILURE (status)) {
+		return_ACPI_STATUS (status);
+	}
+	acpi_gbl_system_awake_and_running = FALSE;
+
+	status = acpi_hw_enable_all_wakeup_gpes ();
 	if (ACPI_FAILURE (status)) {
 		return_ACPI_STATUS (status);
 	}
@@ -420,10 +428,16 @@ acpi_enter_sleep_state_s4bios (
 	}
 
 	/*
-	 * 1) Disable all runtime GPEs
+	 * 1) Disable/Clear all GPEs
 	 * 2) Enable all wakeup GPEs
 	 */
-	status = acpi_hw_prepare_gpes_for_sleep ();
+	status = acpi_hw_disable_all_gpes ();
+	if (ACPI_FAILURE (status)) {
+		return_ACPI_STATUS (status);
+	}
+	acpi_gbl_system_awake_and_running = FALSE;
+
+	status = acpi_hw_enable_all_wakeup_gpes ();
 	if (ACPI_FAILURE (status)) {
 		return_ACPI_STATUS (status);
 	}
@@ -540,10 +554,16 @@ acpi_leave_sleep_state (
 
 	/*
 	 * Restore the GPEs:
-	 * 1) Disable all wakeup GPEs
+	 * 1) Disable/Clear all GPEs
 	 * 2) Enable all runtime GPEs
 	 */
-	status = acpi_hw_restore_gpes_on_wake ();
+	status = acpi_hw_disable_all_gpes ();
+	if (ACPI_FAILURE (status)) {
+		return_ACPI_STATUS (status);
+	}
+	acpi_gbl_system_awake_and_running = TRUE;
+
+	status = acpi_hw_enable_all_runtime_gpes ();
 	if (ACPI_FAILURE (status)) {
 		return_ACPI_STATUS (status);
 	}

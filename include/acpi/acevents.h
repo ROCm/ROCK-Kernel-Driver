@@ -46,11 +46,11 @@
 
 
 acpi_status
-acpi_ev_initialize (
+acpi_ev_initialize_events (
 	void);
 
 acpi_status
-acpi_ev_handler_initialize (
+acpi_ev_install_xrupt_handlers (
 	void);
 
 
@@ -117,6 +117,20 @@ u8
 acpi_ev_valid_gpe_event (
 	struct acpi_gpe_event_info      *gpe_event_info);
 
+acpi_status
+acpi_ev_update_gpe_enable_masks (
+	struct acpi_gpe_event_info      *gpe_event_info,
+	u8                              type);
+
+acpi_status
+acpi_ev_enable_gpe (
+	struct acpi_gpe_event_info      *gpe_event_info,
+	u8                              write_to_hardware);
+
+acpi_status
+acpi_ev_disable_gpe (
+	struct acpi_gpe_event_info      *gpe_event_info);
+
 struct acpi_gpe_event_info *
 acpi_ev_get_gpe_event_info (
 	acpi_handle                     gpe_device,
@@ -139,6 +153,11 @@ acpi_status
 acpi_ev_delete_gpe_block (
 	struct acpi_gpe_block_info      *gpe_block);
 
+acpi_status
+acpi_ev_delete_gpe_handlers (
+	struct acpi_gpe_xrupt_info      *gpe_xrupt_info,
+	struct acpi_gpe_block_info      *gpe_block);
+
 u32
 acpi_ev_gpe_dispatch (
 	struct acpi_gpe_event_info      *gpe_event_info,
@@ -148,12 +167,25 @@ u32
 acpi_ev_gpe_detect (
 	struct acpi_gpe_xrupt_info      *gpe_xrupt_list);
 
+acpi_status
+acpi_ev_set_gpe_type (
+	struct acpi_gpe_event_info      *gpe_event_info,
+	u8                              type);
+
+acpi_status
+acpi_ev_check_for_wake_only_gpe (
+	struct acpi_gpe_event_info      *gpe_event_info);
+
 /*
  * Evregion - Address Space handling
  */
 
 acpi_status
-acpi_ev_init_address_spaces (
+acpi_ev_install_region_handlers (
+	void);
+
+acpi_status
+acpi_ev_initialize_op_regions (
 	void);
 
 acpi_status
@@ -181,6 +213,19 @@ void
 acpi_ev_detach_region (
 	union acpi_operand_object      *region_obj,
 	u8                              acpi_ns_is_locked);
+
+acpi_status
+acpi_ev_install_space_handler (
+	struct acpi_namespace_node      *node,
+	acpi_adr_space_type             space_id,
+	acpi_adr_space_handler          handler,
+	acpi_adr_space_setup            setup,
+	void                            *context);
+
+acpi_status
+acpi_ev_execute_reg_methods (
+	struct acpi_namespace_node      *node,
+	acpi_adr_space_type             space_id);
 
 acpi_status
 acpi_ev_execute_reg_method (

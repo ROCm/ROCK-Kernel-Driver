@@ -278,33 +278,25 @@ acpi_ns_dump_objects (
 
 acpi_status
 acpi_ns_evaluate_by_handle (
-	struct acpi_namespace_node      *prefix_node,
-	union acpi_operand_object       **params,
-	union acpi_operand_object       **return_object);
+	struct acpi_parameter_info      *info);
 
 acpi_status
 acpi_ns_evaluate_by_name (
 	char                            *pathname,
-	union acpi_operand_object       **params,
-	union acpi_operand_object       **return_object);
+	struct acpi_parameter_info      *info);
 
 acpi_status
 acpi_ns_evaluate_relative (
-	struct acpi_namespace_node      *prefix_node,
 	char                            *pathname,
-	union acpi_operand_object       **params,
-	union acpi_operand_object       **return_object);
+	struct acpi_parameter_info      *info);
 
 acpi_status
 acpi_ns_execute_control_method (
-	struct acpi_namespace_node      *method_node,
-	union acpi_operand_object       **params,
-	union acpi_operand_object       **return_obj_desc);
+	struct acpi_parameter_info      *info);
 
 acpi_status
 acpi_ns_get_object_value (
-	struct acpi_namespace_node      *object_node,
-	union acpi_operand_object       **return_obj_desc);
+	struct acpi_parameter_info      *info);
 
 
 /*

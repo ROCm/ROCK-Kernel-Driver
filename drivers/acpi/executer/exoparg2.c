@@ -97,6 +97,7 @@ acpi_ex_opcode_2A_0T_0R (
 {
 	union acpi_operand_object       **operand = &walk_state->operands[0];
 	struct acpi_namespace_node      *node;
+	u32                             value;
 	acpi_status                     status = AE_OK;
 
 
@@ -113,15 +114,45 @@ acpi_ex_opcode_2A_0T_0R (
 
 		node = (struct acpi_namespace_node *) operand[0];
 
+		/* Second value is the notify value */
+
+		value = (u32) operand[1]->integer.value;
+
 		/* Notifies allowed on this object? */
 
 		if (!acpi_ev_is_notify_object (node)) {
-			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Unexpected notify object type [%s]\n",
+			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+					"Unexpected notify object type [%s]\n",
 					acpi_ut_get_type_name (node->type)));
 
 			status = AE_AML_OPERAND_TYPE;
 			break;
 		}
+
+#ifdef ACPI_GPE_NOTIFY_CHECK
+		/*
+		 * GPE method wake/notify check.  Here, we want to ensure that we
+		 * don't receive any "device_wake" Notifies from a GPE _Lxx or _Exx
+		 * GPE method during system runtime.  If we do, the GPE is marked
+		 * as "wake-only" and disabled.
+		 *
+		 * 1) Is the Notify() value == device_wake?
+		 * 2) Is this a GPE deferred method?  (An _Lxx or _Exx method)
+		 * 3) Did the original GPE happen at system runtime?
+		 *    (versus during wake)
+		 *
+		 * If all three cases are true, this is a wake-only GPE that should
+		 * be disabled at runtime.
+		 */
+		if (value == 2)     /* device_wake */ {
+			status = acpi_ev_check_for_wake_only_gpe (walk_state->gpe_event_info);
+			if (ACPI_FAILURE (status)) {
+				/* AE_WAKE_ONLY_GPE only error, means ignore this notify */
+
+				return_ACPI_STATUS (AE_OK)
+			}
+		}
+#endif
 
 		/*
 		 * Dispatch the notify to the appropriate handler
@@ -130,8 +161,7 @@ acpi_ex_opcode_2A_0T_0R (
 		 * from this thread -- because handlers may in turn run other
 		 * control methods.
 		 */
-		status = acpi_ev_queue_notify_request (node,
-				  (u32) operand[1]->integer.value);
+		status = acpi_ev_queue_notify_request (node, value);
 		break;
 
 

@@ -192,6 +192,7 @@ ACPI_EXTERN u8                                  acpi_gbl_step_to_next_call;
 ACPI_EXTERN u8                                  acpi_gbl_acpi_hardware_present;
 ACPI_EXTERN u8                                  acpi_gbl_global_lock_present;
 ACPI_EXTERN u8                                  acpi_gbl_events_initialized;
+ACPI_EXTERN u8                                  acpi_gbl_system_awake_and_running;
 
 extern u8                                       acpi_gbl_shutdown;
 extern u32                                      acpi_gbl_startup_flags;

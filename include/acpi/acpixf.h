@@ -296,7 +296,7 @@ acpi_install_gpe_handler (
 	acpi_handle                     gpe_device,
 	u32                             gpe_number,
 	u32                             type,
-	acpi_gpe_handler                handler,
+	acpi_event_handler              address,
 	void                            *context);
 
 acpi_status
@@ -312,7 +312,7 @@ acpi_status
 acpi_remove_gpe_handler (
 	acpi_handle                     gpe_device,
 	u32                             gpe_number,
-	acpi_gpe_handler                handler);
+	acpi_event_handler              address);
 
 acpi_status
 acpi_enable_event (
@@ -332,6 +332,12 @@ acpi_status
 acpi_get_event_status (
 	u32                             event,
 	acpi_event_status               *event_status);
+
+acpi_status
+acpi_set_gpe_type (
+	acpi_handle                     gpe_device,
+	u32                             gpe_number,
+	u8                              type);
 
 acpi_status
 acpi_enable_gpe (

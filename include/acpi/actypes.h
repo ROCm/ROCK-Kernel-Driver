@@ -557,34 +557,56 @@ typedef u32                                     acpi_event_status;
 #define ACPI_GPE_MAX                    0xFF
 #define ACPI_NUM_GPE                    256
 
+#define ACPI_GPE_ENABLE                 0
+#define ACPI_GPE_DISABLE                1
+
+
 /*
  * GPE info flags - Per GPE
- * +---------+-+-+-+
- * |Bits 8:3 |2|1|0|
- * +---------+-+-+-+
- *          | | | |
- *          | | | +- Edge or Level Triggered
- *          | | +--- Type: Wake or Runtime
- *          | +----- Enabled for wake?
- *          +--------<Reserved>
+ * +-+-+-+---+---+-+
+ * |7|6|5|4:3|2:1|0|
+ * +-+-+-+---+---+-+
+ *  | | |  |   |  |
+ *  | | |  |   |  +--- Interrupt type: Edge or Level Triggered
+ *  | | |  |   +--- Type: Wake-only, Runtime-only, or wake/runtime
+ *  | | |  +--- Type of dispatch -- to method, handler, or none
+ *  | | +--- Enabled for runtime?
+ *  | +--- Enabled for wake?
+ *  +--- System state when GPE ocurred (running/waking)
  */
-#define ACPI_GPE_XRUPT_TYPE_MASK        (u8) 1
-#define ACPI_GPE_LEVEL_TRIGGERED        (u8) 1
-#define ACPI_GPE_EDGE_TRIGGERED         (u8) 0
+#define ACPI_GPE_XRUPT_TYPE_MASK        (u8) 0x01
+#define ACPI_GPE_LEVEL_TRIGGERED        (u8) 0x01
+#define ACPI_GPE_EDGE_TRIGGERED         (u8) 0x00
 
-#define ACPI_GPE_TYPE_MASK              (u8) 2
-#define ACPI_GPE_TYPE_WAKE              (u8) 2
-#define ACPI_GPE_TYPE_RUNTIME           (u8) 0       /* Default */
+#define ACPI_GPE_TYPE_MASK              (u8) 0x06
+#define ACPI_GPE_TYPE_WAKE_RUN          (u8) 0x06
+#define ACPI_GPE_TYPE_WAKE              (u8) 0x02
+#define ACPI_GPE_TYPE_RUNTIME           (u8) 0x04    /* Default */
 
-#define ACPI_GPE_ENABLE_MASK            (u8) 4
-#define ACPI_GPE_ENABLED                (u8) 4
-#define ACPI_GPE_DISABLED               (u8) 0       /* Default */
+#define ACPI_GPE_DISPATCH_MASK          (u8) 0x18
+#define ACPI_GPE_DISPATCH_HANDLER       (u8) 0x08
+#define ACPI_GPE_DISPATCH_METHOD        (u8) 0x10
+#define ACPI_GPE_DISPATCH_NOT_USED      (u8) 0x00    /* Default */
+
+#define ACPI_GPE_RUN_ENABLE_MASK        (u8) 0x20
+#define ACPI_GPE_RUN_ENABLED            (u8) 0x20
+#define ACPI_GPE_RUN_DISABLED           (u8) 0x00    /* Default */
+
+#define ACPI_GPE_WAKE_ENABLE_MASK       (u8) 0x40
+#define ACPI_GPE_WAKE_ENABLED           (u8) 0x40
+#define ACPI_GPE_WAKE_DISABLED          (u8) 0x00    /* Default */
+
+#define ACPI_GPE_ENABLE_MASK            (u8) 0x60    /* Both run/wake */
+
+#define ACPI_GPE_SYSTEM_MASK            (u8) 0x80
+#define ACPI_GPE_SYSTEM_RUNNING         (u8) 0x80
+#define ACPI_GPE_SYSTEM_WAKING          (u8) 0x00
 
 /*
  * Flags for GPE and Lock interfaces
  */
-#define ACPI_EVENT_WAKE_ENABLE          0x2
-#define ACPI_EVENT_WAKE_DISABLE         0x2
+#define ACPI_EVENT_WAKE_ENABLE          0x2             /* acpi_gpe_enable */
+#define ACPI_EVENT_WAKE_DISABLE         0x2             /* acpi_gpe_disable */
 
 #define ACPI_NOT_ISR                    0x1
 #define ACPI_ISR                        0x0
@@ -790,10 +812,6 @@ u32 (*acpi_event_handler) (
 	void                                *context);
 
 typedef
-void (*acpi_gpe_handler) (
-	void                                *context);
-
-typedef
 void (*acpi_notify_handler) (
 	acpi_handle                         device,
 	u32                                 value,
@@ -880,6 +898,7 @@ struct acpi_compatible_id_list
 #define ACPI_VALID_HID                  0x0004
 #define ACPI_VALID_UID                  0x0008
 #define ACPI_VALID_CID                  0x0010
+#define ACPI_VALID_SXDS                 0x0020
 
 
 #define ACPI_COMMON_OBJ_INFO \
@@ -899,12 +918,12 @@ struct acpi_device_info
 {
 	ACPI_COMMON_OBJ_INFO;
 
-	u8                                  highest_dstates[4]; /* _sx_d values 0xFF indicates not valid */
 	u32                                 valid;              /* Indicates which fields below are valid */
 	u32                                 current_status;     /* _STA value */
 	acpi_integer                        address;            /* _ADR value if any */
 	struct acpi_device_id               hardware_id;        /* _HID value if any */
 	struct acpi_device_id               unique_id;          /* _UID value if any */
+	u8                                  highest_dstates[4]; /* _sx_d values: 0xFF indicates not valid */
 	struct acpi_compatible_id_list      compatibility_id;   /* List of _CIDs if any */
 };
 

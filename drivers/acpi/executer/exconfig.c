@@ -48,6 +48,7 @@
 #include <acpi/acnamesp.h>
 #include <acpi/acevents.h>
 #include <acpi/actables.h>
+#include <acpi/acdispat.h>
 
 
 #define _COMPONENT          ACPI_EXECUTER
@@ -285,7 +286,7 @@ acpi_ex_load_op (
 	union acpi_operand_object       *ddb_handle;
 	union acpi_operand_object       *buffer_desc = NULL;
 	struct acpi_table_header        *table_ptr = NULL;
-	u8                              *table_data_ptr;
+	acpi_physical_address           address;
 	struct acpi_table_header        table_header;
 	u32                             i;
 
@@ -300,16 +301,37 @@ acpi_ex_load_op (
 		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Load from Region %p %s\n",
 			obj_desc, acpi_ut_get_object_type_name (obj_desc)));
 
-		/* Get the table header */
+		/*
+		 * If the Region Address and Length have not been previously evaluated,
+		 * evaluate them now and save the results.
+		 */
+		if (!(obj_desc->common.flags & AOPOBJ_DATA_VALID)) {
+			status = acpi_ds_get_region_arguments (obj_desc);
+			if (ACPI_FAILURE (status)) {
+				return_ACPI_STATUS (status);
+			}
+		}
+
+		/* Get the base physical address of the region */
+
+		address = obj_desc->region.address;
+
+		/* Get the table length from the table header */
 
 		table_header.length = 0;
-		for (i = 0; i < sizeof (struct acpi_table_header); i++) {
+		for (i = 0; i < 8; i++) {
 			status = acpi_ev_address_space_dispatch (obj_desc, ACPI_READ,
-					   (acpi_physical_address) i, 8,
+					   (acpi_physical_address) i + address, 8,
 					   ((u8 *) &table_header) + i);
 			if (ACPI_FAILURE (status)) {
 				return_ACPI_STATUS (status);
 			}
+		}
+
+		/* Sanity check the table length */
+
+		if (table_header.length < sizeof (struct acpi_table_header)) {
+			return_ACPI_STATUS (AE_BAD_HEADER);
 		}
 
 		/* Allocate a buffer for the entire table */
@@ -319,17 +341,12 @@ acpi_ex_load_op (
 			return_ACPI_STATUS (AE_NO_MEMORY);
 		}
 
-		/* Copy the header to the buffer */
-
-		ACPI_MEMCPY (table_ptr, &table_header, sizeof (struct acpi_table_header));
-		table_data_ptr = ACPI_PTR_ADD (u8, table_ptr, sizeof (struct acpi_table_header));
-
-		/* Get the table from the op region */
+		/* Get the entire table from the op region */
 
 		for (i = 0; i < table_header.length; i++) {
 			status = acpi_ev_address_space_dispatch (obj_desc, ACPI_READ,
-					   (acpi_physical_address) i, 8,
-					   ((u8 *) table_data_ptr + i));
+					   (acpi_physical_address) i + address, 8,
+					   ((u8 *) table_ptr + i));
 			if (ACPI_FAILURE (status)) {
 				goto cleanup;
 			}
@@ -355,6 +372,12 @@ acpi_ex_load_op (
 		}
 
 		table_ptr = ACPI_CAST_PTR (struct acpi_table_header, buffer_desc->buffer.pointer);
+
+		 /* Sanity check the table length */
+
+		if (table_ptr->length < sizeof (struct acpi_table_header)) {
+			return_ACPI_STATUS (AE_BAD_HEADER);
+		}
 		break;
 
 
