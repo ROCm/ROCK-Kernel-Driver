@@ -57,6 +57,12 @@ static unsigned int i8042_noloop;
 module_param_named(noloop, i8042_noloop, bool, 0);
 MODULE_PARM_DESC(dumbkbd, "Disable the AUX Loopback command while probing for the AUX port");
 
+#ifdef CONFIG_ACPI
+static int i8042_noacpi;
+module_param_named(noacpi, i8042_noacpi, bool, 0);
+MODULE_PARM_DESC(noacpi, "Do not use ACPI to detect controller settings");
+#endif
+
 __obsolete_setup("i8042_noaux");
 __obsolete_setup("i8042_nomux");
 __obsolete_setup("i8042_unlock");

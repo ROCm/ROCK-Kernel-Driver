@@ -469,6 +469,8 @@ running once the system is up.
 	i8042.dumbkbd	[HW] Pretend that controlled can only read data from
 			     keyboard and can not control its state
 			     (Don't attempt to blink the leds)
+	i8042.noacpi	[HW] Don't use ACPI to discover KBD/AUX controller
+			     settings
 	i8042.noaux	[HW] Don't check for auxiliary (== mouse) port
 	i8042.nomux	[HW] Don't check presence of an active multiplexing
 			     controller
