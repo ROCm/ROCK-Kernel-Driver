@@ -645,9 +645,10 @@ static struct console uart00_console = {
 	.index		= 0,
 };
 
-static void __init uart00_console_init(void)
+static int __init uart00_console_init(void)
 {
 	register_console(&uart00_console);
+	return 0;
 }
 console_initcall(uart00_console_init);
 
