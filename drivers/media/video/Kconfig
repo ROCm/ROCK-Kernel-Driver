@@ -306,5 +306,18 @@ config VIDEO_OVCAMCHIP
 	  To compile this driver as a module, choose M here: the
 	  module will be called ovcamchip
 
-endmenu
+config VIDEO_M32R_AR
+	tristate "AR devices"
+	depends on M32R
+	---help---
+	  This is a video4linux driver for the Renesas AR (Artificial Retina)
+	  camera module.
 
+config VIDEO_M32R_AR_M64278
+	tristate "Use Colour AR module M64278(VGA)"
+	depends on VIDEO_M32R_AR
+	---help---
+	  Say Y here to use the Renesas M64278E-800 camera module,
+	  which supports VGA(640x480 pixcels) size of images.
+
+endmenu
