@@ -250,7 +250,6 @@ EXPORT_SYMBOL(fddi_type_trans);
 #if 0
 EXPORT_SYMBOL(eth_copy_and_sum);
 #endif
-EXPORT_SYMBOL(__netdev_watchdog_up);
 EXPORT_SYMBOL(dev_base);
 EXPORT_SYMBOL(dev_base_lock);
 EXPORT_SYMBOL(dev_mc_add);
@@ -269,13 +268,6 @@ EXPORT_SYMBOL(sysctl_ip_default_ttl);
 #endif
 #endif
 
-/* Packet scheduler modules want these. */
-EXPORT_SYMBOL(qdisc_destroy);
-EXPORT_SYMBOL(qdisc_reset);
-EXPORT_SYMBOL(qdisc_restart);
-EXPORT_SYMBOL(qdisc_create_dflt);
-EXPORT_SYMBOL(noop_qdisc);
-EXPORT_SYMBOL(qdisc_tree_lock);
 #ifdef CONFIG_NET_SCHED
 PSCHED_EXPORTLIST;
 EXPORT_SYMBOL(pfifo_qdisc_ops);
