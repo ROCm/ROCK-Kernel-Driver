@@ -51,7 +51,6 @@ extern int hp_probe(struct net_device *dev);
 extern int hp_plus_probe(struct net_device *dev);
 extern struct net_device *express_probe(int unit);
 extern struct net_device *eepro_probe(int unit);
-extern int at1500_probe(struct net_device *);
 extern struct net_device *at1700_probe(int unit);
 extern struct net_device *fmv18x_probe(int unit);
 extern struct net_device *eth16i_probe(int unit);
@@ -234,9 +233,6 @@ static struct devprobe isa_probes[] __initdata = {
 #endif
 #ifdef CONFIG_SEEQ8005 
 	{seeq8005_probe, 0},
-#endif
-#ifdef CONFIG_AT1500
-	{at1500_probe, 0},
 #endif
 	{NULL, 0},
 };
