@@ -96,4 +96,7 @@ extern struct mtrr_ops * mtrr_if;
 
 extern unsigned int num_var_ranges;
 
+void finalize_mtrr_state(void);
+void mtrr_state_warn(void);
+
 extern char * mtrr_if_name[];

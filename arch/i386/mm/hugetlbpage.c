@@ -319,7 +319,7 @@ set_new_inode(unsigned long len, int prot, int flag, int key)
 	}
 	if (i == MAX_ID)
 		return NULL;
-	inode = kmalloc(sizeof (struct inode), GFP_KERNEL);
+	inode = kmalloc(sizeof (struct inode), GFP_ATOMIC);
 	if (inode == NULL)
 		return NULL;
 
@@ -502,7 +502,7 @@ set_hugetlb_mem_size(int count)
 
 	if (lcount > 0) {	/* Increase the mem size. */
 		while (lcount--) {
-			page = alloc_pages(GFP_ATOMIC, HUGETLB_PAGE_ORDER);
+			page = alloc_pages(__GFP_HIGHMEM, HUGETLB_PAGE_ORDER);
 			if (page == NULL)
 				break;
 			map = page;

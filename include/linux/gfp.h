@@ -39,18 +39,25 @@
  * can allocate highmem pages, the *get*page*() variants return
  * virtual kernel addresses to the allocated page(s).
  */
-extern struct page * FASTCALL(_alloc_pages(unsigned int gfp_mask, unsigned int order));
 extern struct page * FASTCALL(__alloc_pages(unsigned int gfp_mask, unsigned int order, struct zonelist *zonelist));
 extern struct page * alloc_pages_node(int nid, unsigned int gfp_mask, unsigned int order);
 
+/*
+ * We get the zone list from the current node and the gfp_mask.
+ * This zone list contains a maximum of MAXNODES*MAX_NR_ZONES zones.
+ *
+ * For the normal case of non-DISCONTIGMEM systems the NODE_DATA() gets
+ * optimized to &contig_page_data at compile-time.
+ */
 static inline struct page * alloc_pages(unsigned int gfp_mask, unsigned int order)
 {
-	/*
-	 * Gets optimized away by the compiler.
-	 */
-	if (order >= MAX_ORDER)
+	pg_data_t *pgdat = NODE_DATA(numa_node_id());
+	unsigned int idx = (gfp_mask & GFP_ZONEMASK);
+
+	if (unlikely(order >= MAX_ORDER))
 		return NULL;
-	return _alloc_pages(gfp_mask, order);
+
+	return __alloc_pages(gfp_mask, order, pgdat->node_zonelists + idx);
 }
 
 #define alloc_page(gfp_mask) alloc_pages(gfp_mask, 0)

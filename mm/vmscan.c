@@ -15,7 +15,6 @@
 #include <linux/slab.h>
 #include <linux/kernel_stat.h>
 #include <linux/swap.h>
-#include <linux/smp_lock.h>
 #include <linux/pagemap.h>
 #include <linux/init.h>
 #include <linux/highmem.h>
@@ -145,6 +144,7 @@ shrink_list(struct list_head *page_list, int nr_pages,
 			if (!add_to_swap(page))
 				goto activate_locked;
 			pte_chain_lock(page);
+			mapping = page->mapping;
 		}
 
 		/*
@@ -174,15 +174,18 @@ shrink_list(struct list_head *page_list, int nr_pages,
 		 */
 		if (PageDirty(page) && is_page_cache_freeable(page) &&
 					mapping && may_enter_fs) {
-			int (*writeback)(struct page *, int *);
+			int (*writeback)(struct page *,
+					struct writeback_control *);
 			const int cluster_size = SWAP_CLUSTER_MAX;
-			int nr_to_write = cluster_size;
+			struct writeback_control wbc = {
+				.nr_to_write = cluster_size,
+			};
 
 			writeback = mapping->a_ops->vm_writeback;
 			if (writeback == NULL)
 				writeback = generic_vm_writeback;
-			(*writeback)(page, &nr_to_write);
-			*max_scan -= (cluster_size - nr_to_write);
+			(*writeback)(page, &wbc);
+			*max_scan -= (cluster_size - wbc.nr_to_write);
 			goto keep;
 		}
 

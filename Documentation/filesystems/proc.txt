@@ -963,13 +963,6 @@ Contains, as a percentage of total system memory, the number of pages at which
 a process which is generating disk writes will itself start writing out dirty
 data.
 
-dirty_sync_ratio
-----------------
-
-Contains, as a percentage of total system memory, the number of pages at which
-a process which is generating disk writes will itself start writing out dirty
-data and waiting upon completion of that writeout.
-
 dirty_writeback_centisecs
 -------------------------
 

@@ -487,9 +487,13 @@ EXPORT_SYMBOL(fail_writepage);
 int filemap_fdatawrite(struct address_space *mapping)
 {
 	int ret;
+	struct writeback_control wbc = {
+		.sync_mode = WB_SYNC_ALL,
+		.nr_to_write = mapping->nrpages * 2,
+	};
 
 	current->flags |= PF_SYNC;
-	ret = do_writepages(mapping, NULL);
+	ret = do_writepages(mapping, &wbc);
 	current->flags &= ~PF_SYNC;
 	return ret;
 }
@@ -1130,10 +1134,26 @@ __generic_file_aio_read(struct kiocb *iocb, const struct iovec *iov,
 	struct file *filp = iocb->ki_filp;
 	ssize_t retval;
 	unsigned long seg;
-	size_t count = iov_length(iov, nr_segs);
+	size_t count;
 
-	if ((ssize_t) count < 0)
-		return -EINVAL;
+	count = 0;
+	for (seg = 0; seg < nr_segs; seg++) {
+		const struct iovec *iv = &iov[seg];
+
+		/*
+		 * If any segment has a negative length, or the cumulative
+		 * length ever wraps negative then return -EINVAL.
+		 */
+		count += iv->iov_len;
+		if (unlikely((ssize_t)(count|iv->iov_len) < 0))
+			return -EINVAL;
+		if (access_ok(VERIFY_WRITE, iv->iov_base, iv->iov_len))
+			continue;
+		if (seg == 0)
+			return -EFAULT;
+		nr_segs = seg;
+		break;
+	}
 
 	/* coalesce the iovecs and go direct-to-BIO for O_DIRECT */
 	if (filp->f_flags & O_DIRECT) {
@@ -1160,11 +1180,6 @@ __generic_file_aio_read(struct kiocb *iocb, const struct iovec *iov,
 		}
 		UPDATE_ATIME(filp->f_dentry->d_inode);
 		goto out;
-	}
-
-	for (seg = 0; seg < nr_segs; seg++) {
-		if (!access_ok(VERIFY_WRITE,iov[seg].iov_base,iov[seg].iov_len))
-			return -EFAULT;
 	}
 
 	retval = 0;
@@ -1626,6 +1641,63 @@ filemap_copy_from_user(struct page *page, unsigned long offset,
 	return left;
 }
 
+static inline int
+__filemap_copy_from_user_iovec(char *vaddr, 
+			const struct iovec *iov, size_t base, unsigned bytes)
+{
+	int left = 0;
+
+	while (bytes) {
+		char *buf = iov->iov_base + base;
+		int copy = min(bytes, iov->iov_len - base);
+		base = 0;
+		if ((left = __copy_from_user(vaddr, buf, copy)))
+			break;
+		bytes -= copy;
+		vaddr += copy;
+		iov++;
+	}
+	return left;
+}
+
+static inline int
+filemap_copy_from_user_iovec(struct page *page, unsigned long offset,
+			const struct iovec *iov, size_t base, unsigned bytes)
+{
+	char *kaddr;
+	int left;
+
+	kaddr = kmap_atomic(page, KM_USER0);
+	left = __filemap_copy_from_user_iovec(kaddr + offset, iov, base, bytes);
+	kunmap_atomic(kaddr, KM_USER0);
+	if (left != 0) {
+		kaddr = kmap(page);
+		left = __filemap_copy_from_user_iovec(kaddr + offset, iov, base, bytes);
+		kunmap(page);
+	}
+	return left;
+}
+
+static inline void
+filemap_set_next_iovec(const struct iovec **iovp, size_t *basep, unsigned bytes)
+{
+	const struct iovec *iov = *iovp;
+	size_t base = *basep;
+
+	while (bytes) {
+		int copy = min(bytes, iov->iov_len - base);
+		bytes -= copy;
+		base += copy;
+		if (iov->iov_len == base) {
+			iov++;
+			base = 0;
+		}
+	}
+	*iovp = iov;
+	*basep = base;
+}
+
+
 /*
  * Write to a file through the page cache. 
  *
@@ -1641,8 +1713,8 @@ generic_file_write_nolock(struct file *file, const struct iovec *iov,
 {
 	struct address_space * mapping = file->f_dentry->d_inode->i_mapping;
 	struct address_space_operations *a_ops = mapping->a_ops;
-	const size_t ocount = iov_length(iov, nr_segs);
-	size_t count =	ocount;
+	size_t ocount;		/* original count */
+	size_t count;		/* after file limit checks */
 	struct inode 	*inode = mapping->host;
 	unsigned long	limit = current->rlim[RLIMIT_FSIZE].rlim_cur;
 	long		status = 0;
@@ -1654,19 +1726,30 @@ generic_file_write_nolock(struct file *file, const struct iovec *iov,
 	unsigned	bytes;
 	time_t		time_now;
 	struct pagevec	lru_pvec;
-	struct iovec	*cur_iov;
-	unsigned	iov_bytes;	/* Cumulative count to the end of the
-					   current iovec */
+	const struct iovec *cur_iov = iov; /* current iovec */
+	unsigned	iov_base = 0;	   /* offset in the current iovec */
 	unsigned long	seg;
 	char		*buf;
 
-	if (unlikely((ssize_t)count < 0))
-		return -EINVAL;
-
+	ocount = 0;
 	for (seg = 0; seg < nr_segs; seg++) {
-		if (!access_ok(VERIFY_READ,iov[seg].iov_base,iov[seg].iov_len))
+		const struct iovec *iv = &iov[seg];
+
+		/*
+		 * If any segment has a negative length, or the cumulative
+		 * length ever wraps negative then return -EINVAL.
+		 */
+		ocount += iv->iov_len;
+		if (unlikely((ssize_t)(ocount|iv->iov_len) < 0))
+			return -EINVAL;
+		if (access_ok(VERIFY_READ, iv->iov_base, iv->iov_len))
+			continue;
+		if (seg == 0)
 			return -EFAULT;
+		nr_segs = seg;
+		break;
 	}
+	count = ocount;
 
 	pos = *ppos;
 	if (unlikely(pos < 0))
@@ -1788,9 +1871,7 @@ generic_file_write_nolock(struct file *file, const struct iovec *iov,
 		goto out_status;
 	}
 
-	cur_iov = (struct iovec *)iov;
-	iov_bytes = cur_iov->iov_len;
-	buf = cur_iov->iov_base;
+	buf = iov->iov_base;
 	do {
 		unsigned long index;
 		unsigned long offset;
@@ -1801,8 +1882,6 @@ generic_file_write_nolock(struct file *file, const struct iovec *iov,
 		bytes = PAGE_CACHE_SIZE - offset;
 		if (bytes > count)
 			bytes = count;
-		if (bytes + written > iov_bytes)
-			bytes = iov_bytes - written;
 
 		/*
 		 * Bring in the user page that we will copy from _first_.
@@ -1830,7 +1909,12 @@ generic_file_write_nolock(struct file *file, const struct iovec *iov,
 				vmtruncate(inode, inode->i_size);
 			break;
 		}
-		page_fault = filemap_copy_from_user(page, offset, buf, bytes);
+		if (likely(nr_segs == 1))
+			page_fault = filemap_copy_from_user(page, offset,
+							buf, bytes);
+		else
+			page_fault = filemap_copy_from_user_iovec(page, offset,
+						cur_iov, iov_base, bytes);
 		flush_dcache_page(page);
 		status = a_ops->commit_write(file, page, offset, offset+bytes);
 		if (unlikely(page_fault)) {
@@ -1844,11 +1928,9 @@ generic_file_write_nolock(struct file *file, const struct iovec *iov,
 				count -= status;
 				pos += status;
 				buf += status;
-				if (written == iov_bytes && count) {
-					cur_iov++;
-					iov_bytes += cur_iov->iov_len;
-					buf = cur_iov->iov_base;
-				}
+				if (unlikely(nr_segs > 1))
+					filemap_set_next_iovec(&cur_iov,
+							&iov_base, status);
 			}
 		}
 		if (!PageReferenced(page))

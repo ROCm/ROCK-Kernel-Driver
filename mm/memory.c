@@ -40,7 +40,6 @@
 #include <linux/mm.h>
 #include <linux/mman.h>
 #include <linux/swap.h>
-#include <linux/smp_lock.h>
 #include <linux/iobuf.h>
 #include <linux/highmem.h>
 #include <linux/pagemap.h>
@@ -53,7 +52,12 @@
 
 #include <linux/swapops.h>
 
+#ifndef CONFIG_DISCONTIGMEM
+/* use the per-pgdat data instead for discontigmem - mbligh */
 unsigned long max_mapnr;
+struct page *mem_map;
+#endif
+
 unsigned long num_physpages;
 void * high_memory;
 struct page *highmem_start_page;
@@ -71,8 +75,6 @@ static inline void copy_cow_page(struct page * from, struct page * to, unsigned 
 	}
 	copy_user_highpage(to, from, address);
 }
-
-struct page *mem_map;
 
 /*
  * Note: this doesn't free the actual pages themselves. That

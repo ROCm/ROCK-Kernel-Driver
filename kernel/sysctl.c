@@ -99,8 +99,8 @@ extern int acct_parm[];
 #endif
 
 #ifdef CONFIG_HUGETLB_PAGE
-extern	int htlbpage_max;
-extern	int	set_hugetlb_mem_size(int);
+extern int htlbpage_max;
+extern int set_hugetlb_mem_size(int);
 #endif
 
 static int parse_table(int *, int, void *, size_t *, void *, size_t,
@@ -263,10 +263,6 @@ static ctl_table kern_table[] = {
 #endif
 	{KERN_PIDMAX, "pid_max", &pid_max, sizeof (int),
 	 0600, NULL, &proc_dointvec},
-#ifdef CONFIG_HUGETLB_PAGE
-	 {KERN_HUGETLB_PAGE_NUM, "numhugepages", &htlbpage_max, sizeof(int), 0644, NULL, 
-	  &proc_dointvec},
-#endif
 	{0}
 };
 
@@ -292,9 +288,6 @@ static ctl_table vm_table[] = {
 	{VM_DIRTY_ASYNC, "dirty_async_ratio", &dirty_async_ratio,
 	 sizeof(dirty_async_ratio), 0644, NULL, &proc_dointvec_minmax,
 	 &sysctl_intvec, NULL, &zero, &one_hundred },
-	{VM_DIRTY_SYNC, "dirty_sync_ratio", &dirty_sync_ratio,
-	 sizeof(dirty_sync_ratio), 0644, NULL, &proc_dointvec_minmax,
-	 &sysctl_intvec, NULL, &zero, &one_hundred },
 	{VM_DIRTY_WB_CS, "dirty_writeback_centisecs",
 	 &dirty_writeback_centisecs, sizeof(dirty_writeback_centisecs), 0644,
 	 NULL, &proc_dointvec_minmax, &sysctl_intvec, NULL,
@@ -317,6 +310,10 @@ static ctl_table vm_table[] = {
 	{ VM_NR_PDFLUSH_THREADS, "nr_pdflush_threads",
 	  &nr_pdflush_threads, sizeof nr_pdflush_threads,
 	  0444 /* read-only*/, NULL, &proc_dointvec},
+#ifdef CONFIG_HUGETLB_PAGE
+	 {VM_HUGETLB_PAGES, "nr_hugepages", &htlbpage_max, sizeof(int), 0644, NULL, 
+	  &proc_dointvec},
+#endif
 	{0}
 };
 

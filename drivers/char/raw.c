@@ -241,7 +241,7 @@ raw_read(struct file *filp, char *buf, size_t size, loff_t *offp)
 static ssize_t
 raw_write(struct file *filp, const char *buf, size_t size, loff_t *offp)
 {
-	struct iovec local_iov = { .iov_base = buf, .iov_len = size};
+	struct iovec local_iov = { .iov_base = (char *)buf, .iov_len = size};
 
 	return rw_raw_dev(WRITE, filp, &local_iov, 1, offp);
 }

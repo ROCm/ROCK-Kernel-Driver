@@ -484,7 +484,7 @@ out:
  * address space and writepage() all of them.
  * 
  * @mapping: address space structure to write
- * @nr_to_write: subtract the number of written pages from *@nr_to_write
+ * @wbc: subtract the number of written pages from *@wbc->nr_to_write
  * @get_block: the filesystem's block mapper function.
  *             If this is NULL then use a_ops->writepage.  Otherwise, go
  *             direct-to-BIO.
@@ -520,7 +520,7 @@ out:
  */
 int
 mpage_writepages(struct address_space *mapping,
-			int *nr_to_write, get_block_t get_block)
+		struct writeback_control *wbc, get_block_t get_block)
 {
 	struct bio *bio = NULL;
 	sector_t last_block_in_bio = 0;
@@ -583,7 +583,7 @@ mpage_writepages(struct address_space *mapping,
 				__set_page_dirty_nobuffers(page);
 				ret = 0;
 			}
-			if (ret || (nr_to_write && --(*nr_to_write) <= 0))
+			if (ret || (--(wbc->nr_to_write) <= 0))
 				done = 1;
 		} else {
 			unlock_page(page);

@@ -91,7 +91,6 @@ EXPORT_SYMBOL(do_brk);
 EXPORT_SYMBOL(exit_mm);
 
 /* internal kernel memory management */
-EXPORT_SYMBOL(_alloc_pages);
 EXPORT_SYMBOL(__alloc_pages);
 EXPORT_SYMBOL(alloc_pages_node);
 EXPORT_SYMBOL(__get_free_pages);
@@ -116,9 +115,12 @@ EXPORT_SYMBOL(vmalloc_32);
 EXPORT_SYMBOL(vmap);
 EXPORT_SYMBOL(vunmap);
 EXPORT_SYMBOL(vmalloc_to_page);
-EXPORT_SYMBOL(mem_map);
 EXPORT_SYMBOL(remap_page_range);
+#ifndef CONFIG_DISCONTIGMEM
+EXPORT_SYMBOL(contig_page_data);
+EXPORT_SYMBOL(mem_map);
 EXPORT_SYMBOL(max_mapnr);
+#endif
 EXPORT_SYMBOL(high_memory);
 EXPORT_SYMBOL(vmtruncate);
 EXPORT_SYMBOL(find_vma);

@@ -1475,13 +1475,13 @@ struct address_space_operations ext3_aops = {
 /* For writeback mode, we can use mpage_writepages() */
 
 static int
-ext3_writepages(struct address_space *mapping, int *nr_to_write)
+ext3_writepages(struct address_space *mapping, struct writeback_control *wbc)
 {
 	int ret;
 	int err;
 
 	ret = write_mapping_buffers(mapping);
-	err = mpage_writepages(mapping, nr_to_write, ext3_get_block);
+	err = mpage_writepages(mapping, wbc, ext3_get_block);
 	if (!ret)
 		ret = err;
 	return ret;

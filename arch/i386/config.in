@@ -154,7 +154,7 @@ if [ "$CONFIG_MWINCHIP3D" = "y" ]; then
    define_bool CONFIG_X86_OOSTORE y
 fi
 
-bool 'IA-32 Huge TLB Page Support (if available on processor)' CONFIG_HUGETLB_PAGE
+bool 'Huge TLB Page Support' CONFIG_HUGETLB_PAGE
 
 bool 'Symmetric multi-processing support' CONFIG_SMP
 bool 'Preemptible Kernel' CONFIG_PREEMPT

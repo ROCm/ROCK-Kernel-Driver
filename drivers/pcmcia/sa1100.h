@@ -160,7 +160,7 @@ struct sa1100_pcmcia_socket {
    */
   socket_state_t        cs_state;
   pccard_io_map         io_map[MAX_IO_WIN];
-  pccard_mem_map        mem_map[MAX_WIN];
+  pccard_mem_map        pc_mem_map[MAX_WIN];
   void                  (*handler)(void *, unsigned int);
   void                  *handler_info;
 

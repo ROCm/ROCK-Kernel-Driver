@@ -15,7 +15,10 @@
 #include <linux/rbtree.h>
 #include <linux/fs.h>
 
+#ifndef CONFIG_DISCONTIGMEM          /* Don't use mapnrs, do it properly */
 extern unsigned long max_mapnr;
+#endif
+
 extern unsigned long num_physpages;
 extern void * high_memory;
 extern int page_cluster;
@@ -345,8 +348,10 @@ static inline int page_mapped(struct page *page)
 #define VM_FAULT_MINOR	1
 #define VM_FAULT_MAJOR	2
 
-/* The array of struct pages */
+#ifndef CONFIG_DISCONTIGMEM
+/* The array of struct pages - for discontigmem use pgdat->lmem_map */
 extern struct page *mem_map;
+#endif 
 
 extern void show_free_areas(void);
 

@@ -82,25 +82,17 @@ static void __init smp_dump_qct(void)
  */
 int physnode_map[MAX_ELEMENTS] = { [0 ... (MAX_ELEMENTS - 1)] = -1};
 
-#define MB_TO_ELEMENT(x) (x >> ELEMENT_REPRESENTS)
-#define PA_TO_MB(pa) (pa >> 20) 	/* assumption: a physical address is in bytes */
-
-int pa_to_nid(u64 pa)
-{
-	int nid;
-	
-	nid = physnode_map[MB_TO_ELEMENT(PA_TO_MB(pa))];
-
-	/* the physical address passed in is not in the map for the system */
-	if (nid == -1)
-		BUG();
-
-	return nid;
-}
+#define PFN_TO_ELEMENT(pfn) (pfn / PAGES_PER_ELEMENT)
+#define PA_TO_ELEMENT(pa) (PFN_TO_ELEMENT(pa >> PAGE_SHIFT))
 
 int pfn_to_nid(unsigned long pfn)
 {
-	return pa_to_nid(((u64)pfn) << PAGE_SHIFT);
+	int nid = physnode_map[PFN_TO_ELEMENT(pfn)];
+
+	if (nid == -1)
+		BUG(); /* address is not present */
+
+	return nid;
 }
 
 /*
@@ -132,7 +124,7 @@ static void __init initialize_physnode_map(void)
 			topofmem = eq->hi_shrd_mem_start + eq->hi_shrd_mem_size;
 			while (cur < topofmem) {
 				physnode_map[cur >> 8] = nid;
-				cur += (ELEMENT_REPRESENTS - 1);
+				cur ++;
 			}
 		}
 	}

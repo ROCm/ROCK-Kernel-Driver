@@ -35,7 +35,11 @@ struct iovec
 #endif
 
 /*
- * Total number of bytes covered by an iovec
+ * Total number of bytes covered by an iovec.
+ *
+ * NOTE that it is not safe to use this function until all the iovec's
+ * segment lengths have been validated.  Because the individual lengths can
+ * overflow a size_t when added together.
  */
 static inline size_t iov_length(const struct iovec *iov, unsigned long nr_segs)
 {

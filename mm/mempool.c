@@ -187,11 +187,12 @@ void * mempool_alloc(mempool_t *pool, int gfp_mask)
 	int curr_nr;
 	DECLARE_WAITQUEUE(wait, current);
 	int gfp_nowait = gfp_mask & ~(__GFP_WAIT | __GFP_IO);
+	int pf_flags = current->flags;
 
 repeat_alloc:
 	current->flags |= PF_NOWARN;
 	element = pool->alloc(gfp_nowait, pool->pool_data);
-	current->flags &= ~PF_NOWARN;
+	current->flags = pf_flags;
 	if (likely(element != NULL))
 		return element;
 

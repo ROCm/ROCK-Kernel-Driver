@@ -256,14 +256,6 @@ int is_head_of_free_region(struct page *page)
 }
 #endif /* CONFIG_SOFTWARE_SUSPEND */
 
-#ifndef CONFIG_DISCONTIGMEM
-struct page *_alloc_pages(unsigned int gfp_mask, unsigned int order)
-{
-	return __alloc_pages(gfp_mask, order,
-		contig_page_data.node_zonelists+(gfp_mask & GFP_ZONEMASK));
-}
-#endif
-
 static /* inline */ struct page *
 balance_classzone(struct zone* classzone, unsigned int gfp_mask,
 			unsigned int order, int * freed)
@@ -680,13 +672,41 @@ void show_free_areas(void)
 /*
  * Builds allocation fallback zone lists.
  */
-static inline void build_zonelists(pg_data_t *pgdat)
+static int __init build_zonelists_node(pg_data_t *pgdat, struct zonelist *zonelist, int j, int k)
 {
-	int i, j, k;
+	switch (k) {
+		struct zone *zone;
+	default:
+		BUG();
+	case ZONE_HIGHMEM:
+		zone = pgdat->node_zones + ZONE_HIGHMEM;
+		if (zone->size) {
+#ifndef CONFIG_HIGHMEM
+			BUG();
+#endif
+			zonelist->zones[j++] = zone;
+		}
+	case ZONE_NORMAL:
+		zone = pgdat->node_zones + ZONE_NORMAL;
+		if (zone->size)
+			zonelist->zones[j++] = zone;
+	case ZONE_DMA:
+		zone = pgdat->node_zones + ZONE_DMA;
+		if (zone->size)
+			zonelist->zones[j++] = zone;
+	}
 
+	return j;
+}
+
+static void __init build_zonelists(pg_data_t *pgdat)
+{
+	int i, j, k, node, local_node;
+
+	local_node = pgdat->node_id;
+	printk("Building zonelist for node : %d\n", local_node);
 	for (i = 0; i <= GFP_ZONEMASK; i++) {
 		struct zonelist *zonelist;
-		struct zone *zone;
 
 		zonelist = pgdat->node_zonelists + i;
 		memset(zonelist, 0, sizeof(*zonelist));
@@ -698,31 +718,47 @@ static inline void build_zonelists(pg_data_t *pgdat)
 		if (i & __GFP_DMA)
 			k = ZONE_DMA;
 
-		switch (k) {
-			default:
-				BUG();
-			/*
-			 * fallthrough:
-			 */
-			case ZONE_HIGHMEM:
-				zone = pgdat->node_zones + ZONE_HIGHMEM;
-				if (zone->size) {
-#ifndef CONFIG_HIGHMEM
-					BUG();
-#endif
-					zonelist->zones[j++] = zone;
-				}
-			case ZONE_NORMAL:
-				zone = pgdat->node_zones + ZONE_NORMAL;
-				if (zone->size)
-					zonelist->zones[j++] = zone;
-			case ZONE_DMA:
-				zone = pgdat->node_zones + ZONE_DMA;
-				if (zone->size)
-					zonelist->zones[j++] = zone;
-		}
+ 		j = build_zonelists_node(pgdat, zonelist, j, k);
+ 		/*
+ 		 * Now we build the zonelist so that it contains the zones
+ 		 * of all the other nodes.
+ 		 * We don't want to pressure a particular node, so when
+ 		 * building the zones for node N, we make sure that the
+ 		 * zones coming right after the local ones are those from
+ 		 * node N+1 (modulo N)
+ 		 */
+ 		for (node = local_node + 1; node < numnodes; node++)
+ 			j = build_zonelists_node(NODE_DATA(node), zonelist, j, k);
+ 		for (node = 0; node < local_node; node++)
+ 			j = build_zonelists_node(NODE_DATA(node), zonelist, j, k);
+ 
 		zonelist->zones[j++] = NULL;
 	} 
+}
+
+void __init build_all_zonelists(void)
+{
+	int i;
+
+	for(i = 0 ; i < numnodes ; i++)
+		build_zonelists(NODE_DATA(i));
+}
+
+void __init calculate_totalpages (pg_data_t *pgdat, unsigned long *zones_size,
+	unsigned long *zholes_size)
+{
+	unsigned long realtotalpages, totalpages = 0;
+	int i;
+
+	for (i = 0; i < MAX_NR_ZONES; i++)
+		totalpages += zones_size[i];
+	pgdat->node_size = totalpages;
+
+	realtotalpages = totalpages;
+	if (zholes_size)
+		for (i = 0; i < MAX_NR_ZONES; i++)
+			realtotalpages -= zholes_size[i];
+	printk("On node %d totalpages: %lu\n", pgdat->node_id, realtotalpages);
 }
 
 /*
@@ -775,46 +811,18 @@ static inline unsigned long wait_table_bits(unsigned long size)
  *   - mark all memory queues empty
  *   - clear the memory bitmaps
  */
-void __init free_area_init_core(int nid, pg_data_t *pgdat, struct page **gmap,
-	unsigned long *zones_size, unsigned long zone_start_pfn, 
-	unsigned long *zholes_size, struct page *lmem_map)
+void __init free_area_init_core(pg_data_t *pgdat,
+		unsigned long *zones_size, unsigned long *zholes_size)
 {
 	unsigned long i, j;
-	unsigned long map_size;
-	unsigned long totalpages, offset, realtotalpages;
+	unsigned long local_offset;
 	const unsigned long zone_required_alignment = 1UL << (MAX_ORDER-1);
+	int nid = pgdat->node_id;
+	struct page *lmem_map = pgdat->node_mem_map;
+	unsigned long zone_start_pfn = pgdat->node_start_pfn;
 
-	totalpages = 0;
-	for (i = 0; i < MAX_NR_ZONES; i++)
-		totalpages += zones_size[i];
-
-	realtotalpages = totalpages;
-	if (zholes_size)
-		for (i = 0; i < MAX_NR_ZONES; i++)
-			realtotalpages -= zholes_size[i];
-			
-	printk("On node %d totalpages: %lu\n", nid, realtotalpages);
-
-	/*
-	 * Some architectures (with lots of mem and discontinous memory
-	 * maps) have to search for a good mem_map area:
-	 * For discontigmem, the conceptual mem map array starts from 
-	 * PAGE_OFFSET, we need to align the actual array onto a mem map 
-	 * boundary, so that MAP_NR works.
-	 */
-	map_size = (totalpages + 1)*sizeof(struct page);
-	if (lmem_map == (struct page *)0) {
-		lmem_map = (struct page *) alloc_bootmem_node(pgdat, map_size);
-		lmem_map = (struct page *)(PAGE_OFFSET + 
-			MAP_ALIGN((unsigned long)lmem_map - PAGE_OFFSET));
-	}
-	*gmap = pgdat->node_mem_map = lmem_map;
-	pgdat->node_size = totalpages;
-	pgdat->node_start_pfn = zone_start_pfn;
-	pgdat->node_start_mapnr = (lmem_map - mem_map);
 	pgdat->nr_zones = 0;
-
-	offset = lmem_map - mem_map;	
+	local_offset = 0;                /* offset within lmem_map */
 	for (j = 0; j < MAX_NR_ZONES; j++) {
 		struct zone *zone = pgdat->node_zones + j;
 		unsigned long mask;
@@ -866,8 +874,7 @@ void __init free_area_init_core(int nid, pg_data_t *pgdat, struct page **gmap,
 		zone->pages_low = mask*2;
 		zone->pages_high = mask*3;
 
-		zone->zone_mem_map = mem_map + offset;
-		zone->zone_start_mapnr = offset;
+		zone->zone_mem_map = lmem_map + local_offset;
 		zone->zone_start_pfn = zone_start_pfn;
 
 		if ((zone_start_pfn) & (zone_required_alignment-1))
@@ -879,7 +886,7 @@ void __init free_area_init_core(int nid, pg_data_t *pgdat, struct page **gmap,
 		 * done. Non-atomic initialization, single-pass.
 		 */
 		for (i = 0; i < size; i++) {
-			struct page *page = mem_map + offset + i;
+			struct page *page = lmem_map + local_offset + i;
 			set_page_zone(page, nid * MAX_NR_ZONES + j);
 			set_page_count(page, 0);
 			SetPageReserved(page);
@@ -893,7 +900,7 @@ void __init free_area_init_core(int nid, pg_data_t *pgdat, struct page **gmap,
 			zone_start_pfn++;
 		}
 
-		offset += size;
+		local_offset += size;
 		for (i = 0; ; i++) {
 			unsigned long bitmap_size;
 
@@ -932,13 +939,15 @@ void __init free_area_init_core(int nid, pg_data_t *pgdat, struct page **gmap,
 			  (unsigned long *) alloc_bootmem_node(pgdat, bitmap_size);
 		}
 	}
-	build_zonelists(pgdat);
 }
 
+#ifndef CONFIG_DISCONTIGMEM
 void __init free_area_init(unsigned long *zones_size)
 {
-	free_area_init_core(0, &contig_page_data, &mem_map, zones_size, 0, 0, 0);
+	free_area_init_node(0, &contig_page_data, NULL, zones_size, 0, NULL);
+	mem_map = contig_page_data.node_mem_map;
 }
+#endif
 
 static int __init setup_mem_frac(char *str)
 {

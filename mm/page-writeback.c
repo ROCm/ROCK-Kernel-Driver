@@ -51,7 +51,7 @@ static long total_pages;
  * It should be somewhat larger than RATELIMIT_PAGES to ensure that reasonably
  * large amounts of I/O are submitted.
  */
-static inline int sync_writeback_pages(void)
+static inline long sync_writeback_pages(void)
 {
 	return ratelimit_pages + ratelimit_pages / 2;
 }
@@ -71,11 +71,6 @@ int dirty_background_ratio = 10;
  * The generator of dirty data starts async writeback at this level
  */
 int dirty_async_ratio = 40;
-
-/*
- * The generator of dirty data performs sync writeout at this level
- */
-int dirty_sync_ratio = 50;
 
 /*
  * The interval between `kupdate'-style writebacks, in centiseconds
@@ -105,15 +100,11 @@ static void background_writeout(unsigned long _min_pages);
  * - Does nothing at all.
  *
  * balance_dirty_pages() can sleep.
- *
- * FIXME: WB_SYNC_LAST doesn't actually work.  It waits on the last dirty
- * inode on the superblock list.  It should wait when nr_to_write is
- * exhausted.  Doesn't seem to matter.
  */
 void balance_dirty_pages(struct address_space *mapping)
 {
 	struct page_state ps;
-	long background_thresh, async_thresh, sync_thresh;
+	long background_thresh, async_thresh;
 	unsigned long dirty_and_writeback;
 	struct backing_dev_info *bdi;
 
@@ -122,18 +113,17 @@ void balance_dirty_pages(struct address_space *mapping)
 
 	background_thresh = (dirty_background_ratio * total_pages) / 100;
 	async_thresh = (dirty_async_ratio * total_pages) / 100;
-	sync_thresh = (dirty_sync_ratio * total_pages) / 100;
 	bdi = mapping->backing_dev_info;
 
-	if (dirty_and_writeback > sync_thresh) {
-		int nr_to_write = sync_writeback_pages();
+	if (dirty_and_writeback > async_thresh) {
+		struct writeback_control wbc = {
+			.bdi		= bdi,
+			.sync_mode	= WB_SYNC_NONE,
+			.older_than_this = NULL,
+			.nr_to_write	= sync_writeback_pages(),
+		};
 
-		writeback_backing_dev(bdi, &nr_to_write, WB_SYNC_LAST, NULL);
-		get_page_state(&ps);
-	} else if (dirty_and_writeback > async_thresh) {
-		int nr_to_write = sync_writeback_pages();
-
-		writeback_backing_dev(bdi, &nr_to_write, WB_SYNC_NONE, NULL);
+		writeback_inodes(&wbc);
 		get_page_state(&ps);
 	}
 
@@ -177,7 +167,12 @@ static void background_writeout(unsigned long _min_pages)
 {
 	long min_pages = _min_pages;
 	long background_thresh;
-	int nr_to_write;
+	struct writeback_control wbc = {
+		.bdi		= NULL,
+		.sync_mode	= WB_SYNC_NONE,
+		.older_than_this = NULL,
+		.nr_to_write	= 0,
+	};
 
 	CHECK_EMERGENCY_SYNC
 
@@ -185,14 +180,13 @@ static void background_writeout(unsigned long _min_pages)
 
 	do {
 		struct page_state ps;
-
 		get_page_state(&ps);
 		if (ps.nr_dirty < background_thresh && min_pages <= 0)
 			break;
-		nr_to_write = MAX_WRITEBACK_PAGES;
-		writeback_unlocked_inodes(&nr_to_write, WB_SYNC_NONE, NULL);
-		min_pages -= MAX_WRITEBACK_PAGES - nr_to_write;
-	} while (nr_to_write <= 0);
+		wbc.nr_to_write = MAX_WRITEBACK_PAGES;
+		writeback_inodes(&wbc);
+		min_pages -= MAX_WRITEBACK_PAGES - wbc.nr_to_write;
+	} while (wbc.nr_to_write <= 0);
 	blk_run_queues();
 }
 
@@ -230,7 +224,12 @@ static void wb_kupdate(unsigned long arg)
 	unsigned long start_jif;
 	unsigned long next_jif;
 	struct page_state ps;
-	int nr_to_write;
+	struct writeback_control wbc = {
+		.bdi		= NULL,
+		.sync_mode	= WB_SYNC_NONE,
+		.older_than_this = &oldest_jif,
+		.nr_to_write	= 0,
+	};
 
 	sync_supers();
 	get_page_state(&ps);
@@ -238,8 +237,8 @@ static void wb_kupdate(unsigned long arg)
 	oldest_jif = jiffies - (dirty_expire_centisecs * HZ) / 100;
 	start_jif = jiffies;
 	next_jif = start_jif + (dirty_writeback_centisecs * HZ) / 100;
-	nr_to_write = ps.nr_dirty;
-	writeback_unlocked_inodes(&nr_to_write, WB_SYNC_NONE, &oldest_jif);
+	wbc.nr_to_write = ps.nr_dirty;
+	writeback_inodes(&wbc);
 	blk_run_queues();
 	yield();
 
@@ -312,8 +311,6 @@ static int __init page_writeback_init(void)
 		dirty_background_ratio /= 100;
 		dirty_async_ratio *= correction;
 		dirty_async_ratio /= 100;
-		dirty_sync_ratio *= correction;
-		dirty_sync_ratio /= 100;
 	}
 
 	init_timer(&wb_timer);
@@ -351,7 +348,7 @@ module_init(page_writeback_init);
  * So.  The proper fix is to leave the page locked-and-dirty and to pass
  * it all the way down.
  */
-int generic_vm_writeback(struct page *page, int *nr_to_write)
+int generic_vm_writeback(struct page *page, struct writeback_control *wbc)
 {
 	struct inode *inode = page->mapping->host;
 
@@ -363,7 +360,7 @@ int generic_vm_writeback(struct page *page, int *nr_to_write)
 	unlock_page(page);
 
 	if (inode) {
-		do_writepages(inode->i_mapping, nr_to_write);
+		do_writepages(inode->i_mapping, wbc);
 
 		/*
 		 * This iput() will internally call ext2_discard_prealloc(),
@@ -392,11 +389,11 @@ int generic_vm_writeback(struct page *page, int *nr_to_write)
 }
 EXPORT_SYMBOL(generic_vm_writeback);
 
-int do_writepages(struct address_space *mapping, int *nr_to_write)
+int do_writepages(struct address_space *mapping, struct writeback_control *wbc)
 {
 	if (mapping->a_ops->writepages)
-		return mapping->a_ops->writepages(mapping, nr_to_write);
-	return generic_writepages(mapping, nr_to_write);
+		return mapping->a_ops->writepages(mapping, wbc);
+	return generic_writepages(mapping, wbc);
 }
 
 /**
