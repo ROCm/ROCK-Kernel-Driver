@@ -178,8 +178,8 @@ struct smb_ops {
 
 	/* --- --- --- end of "static" entries --- --- --- */
 
-	int (*convert)(char *output, int olen,
-		       const char *input, int ilen,
+	int (*convert)(unsigned char *output, int olen,
+		       const unsigned char *input, int ilen,
 		       struct nls_table *nls_from,
 		       struct nls_table *nls_to);
 };

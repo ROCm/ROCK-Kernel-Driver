@@ -37,6 +37,7 @@ struct smb_mount_data {
 #define SMB_MOUNT_OLDATTR	0x0002	/* Use core getattr (Win 95 speedup) */
 #define SMB_MOUNT_DIRATTR	0x0004	/* Use find_first for getattr */
 #define SMB_MOUNT_CASE		0x0008	/* Be case sensitive */
+#define SMB_MOUNT_UNICODE	0x0010	/* Server talks unicode */
 
 
 struct smb_mount_data_kernel {

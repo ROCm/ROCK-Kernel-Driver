@@ -111,8 +111,8 @@ static void reverse_string(char *buf, int len)
 }
 
 /* no conversion, just a wrapper for memcpy. */
-static int convert_memcpy(char *output, int olen,
-			  const char *input, int ilen,
+static int convert_memcpy(unsigned char *output, int olen,
+			  const unsigned char *input, int ilen,
 			  struct nls_table *nls_from,
 			  struct nls_table *nls_to)
 {
@@ -139,8 +139,8 @@ static inline int write_unichar(wchar_t ch, char *output, int olen)
 }
 
 /* convert from one "codepage" to another (possibly being utf8). */
-static int convert_cp(char *output, int olen,
-		      const char *input, int ilen,
+static int convert_cp(unsigned char *output, int olen,
+		      const unsigned char *input, int ilen,
 		      struct nls_table *nls_from,
 		      struct nls_table *nls_to)
 {
@@ -150,7 +150,7 @@ static int convert_cp(char *output, int olen,
 
 	while (ilen > 0) {
 		/* convert by changing to unicode and back to the new cp */
-		n = nls_from->char2uni((unsigned char *)input, ilen, &ch);
+		n = nls_from->char2uni(input, ilen, &ch);
 		if (n == -EINVAL) {
 			ilen--;
 			n = write_char(*input++, output, olen);
@@ -180,6 +180,42 @@ fail:
 	return n;
 }
 
+/* ----------------------------------------------------------- */
+
+/*
+ * nls_unicode
+ *
+ * This encodes/decodes little endian unicode format
+ */
+
+static int uni2char(wchar_t uni, unsigned char *out, int boundlen)
+{
+	if (boundlen < 2)
+		return -EINVAL;
+	*out++ = uni & 0xff;
+	*out++ = uni >> 8;
+	return 2;
+}
+
+static int char2uni(const unsigned char *rawstring, int boundlen, wchar_t *uni)
+{
+	if (boundlen < 2)
+		return -EINVAL;
+	*uni = (rawstring[1] << 8) | rawstring[0];
+	return 2;
+}
+
+static struct nls_table unicode_table = {
+	"unicode",
+	uni2char,
+	char2uni,
+	NULL,		/* not used by smbfs */
+	NULL,
+	NULL,		/* not a module */
+};
+
+/* ----------------------------------------------------------- */
+
 static int setcodepage(struct nls_table **p, char *name)
 {
 	struct nls_table *nls;
@@ -192,7 +228,7 @@ static int setcodepage(struct nls_table **p, char *name)
 	}
 
 	/* if already set, unload the previous one. */
-	if (*p)
+	if (*p && *p != &unicode_table)
 		unload_nls(*p);
 	*p = nls;
 
@@ -210,12 +246,19 @@ int smb_setcodepage(struct smb_sb_info *server, struct smb_nls_codepage *cp)
 	if (!*cp->remote_name)
 		goto out;
 
+	/* local */
 	n = setcodepage(&server->local_nls, cp->local_name);
 	if (n != 0)
 		goto out;
-	n = setcodepage(&server->remote_nls, cp->remote_name);
-	if (n != 0)
-		setcodepage(&server->local_nls, NULL);
+
+	/* remote */
+	if (!strcmp(cp->remote_name, "unicode")) {
+		server->remote_nls = &unicode_table;
+	} else {
+		n = setcodepage(&server->remote_nls, cp->remote_name);
+		if (n != 0)
+			setcodepage(&server->local_nls, NULL);
+	}
 
 out:
 	if (server->local_nls != NULL && server->remote_nls != NULL)
@@ -252,13 +295,15 @@ smb_encode_smb_length(__u8 * p, __u32 len)
  * smb_build_path: build the path to entry and name storing it in buf.
  * The path returned will have the trailing '\0'.
  */
-static int smb_build_path(struct smb_sb_info *server, char * buf, int maxlen,
-			  struct dentry * entry, struct qstr * name)
+static int smb_build_path(struct smb_sb_info *server, unsigned char *buf,
+			  int maxlen,
+			  struct dentry *entry, struct qstr *name)
 {
-	char *path = buf;
+	unsigned char *path = buf;
 	int len;
+	int unicode = (server->mnt->flags & SMB_MOUNT_UNICODE) != 0;
 
-	if (maxlen < 2)
+	if (maxlen < (2<<unicode))
 		return -ENAMETOOLONG;
 
 	if (maxlen > SMB_MAXPATHLEN + 1)
@@ -272,8 +317,10 @@ static int smb_build_path(struct smb_sb_info *server, char * buf, int maxlen,
 	 */
 	if (IS_ROOT(entry) && !name) {
 		*path++ = '\\';
+		if (unicode) *path++ = '\0';
 		*path++ = '\0';
-		return 2;
+		if (unicode) *path++ = '\0';
+		return path-buf;
 	}
 
 	/*
@@ -282,7 +329,7 @@ static int smb_build_path(struct smb_sb_info *server, char * buf, int maxlen,
 	 */
 	read_lock(&dparent_lock);
 	while (!IS_ROOT(entry)) {
-		if (maxlen < 3) {
+		if (maxlen < (3<<unicode)) {
 			read_unlock(&dparent_lock);
 			return -ENAMETOOLONG;
 		}
@@ -296,22 +343,29 @@ static int smb_build_path(struct smb_sb_info *server, char * buf, int maxlen,
 		}
 		reverse_string(path, len);
 		path += len;
+		if (unicode) {
+			/* Note: reverse order */
+			*path++ = '\0';
+			maxlen--;
+		}
 		*path++ = '\\';
 		maxlen -= len+1;
 
 		entry = entry->d_parent;
-		if (IS_ROOT(entry))
-			break;
 	}
 	read_unlock(&dparent_lock);
 	reverse_string(buf, path-buf);
 
-	/* maxlen is at least 1 */
+	/* maxlen has space for at least one char */
 test_name_and_out:
 	if (name) {
-		if (maxlen < 3)
+		if (maxlen < (3<<unicode))
 			return -ENAMETOOLONG;
 		*path++ = '\\';
+		if (unicode) {
+			*path++ = '\0';
+			maxlen--;
+		}
 		len = server->ops->convert(path, maxlen-2, 
 				      name->name, name->len,
 				      server->local_nls, server->remote_nls);
@@ -320,8 +374,9 @@ test_name_and_out:
 		path += len;
 		maxlen -= len+1;
 	}
-	/* maxlen is at least 1 */
+	/* maxlen has space for at least one char */
 	*path++ = '\0';
+	if (unicode) *path++ = '\0';
 	return path-buf;
 }
 
@@ -339,16 +394,31 @@ out:
 	return result;
 }
 
+/* encode_path for non-trans2 request SMBs */
 static int smb_simple_encode_path(struct smb_sb_info *server, char **p,
 			  struct dentry * entry, struct qstr * name)
 {
 	char *s = *p;
 	int res;
 	int maxlen = ((char *)server->packet + server->packet_size) - s;
+	int unicode = (server->mnt->flags & SMB_MOUNT_UNICODE);
 
 	if (!maxlen)
 		return -ENAMETOOLONG;
-	*s++ = 4;
+	*s++ = 4;	/* ASCII data format */
+
+	/*
+	 * SMB Unicode strings must be 16bit aligned relative the start of the
+	 * packet. If they are not they must be padded with 0.
+	 */
+	if (unicode) {
+		int align = s - (char *)server->packet;
+		if (align & 1) {
+			*s++ = '\0';
+			maxlen--;
+		}
+	}
+
 	res = smb_encode_path(server, s, maxlen-1, entry, name);
 	if (res < 0)
 		return res;
@@ -908,11 +978,14 @@ smb_newconn(struct smb_sb_info *server, struct smb_conn_opt *opt)
 		SB_of(server)->s_maxbytes = ~0ULL >> 1;
 		VERBOSE("LFS enabled\n");
 	}
-#if 0
-	/* flags we will test for other patches ... */
 	if (server->opt.capabilities & SMB_CAP_UNICODE) {
+		server->mnt->flags |= SMB_MOUNT_UNICODE;
 		VERBOSE("Unicode enabled\n");
+	} else {
+		server->mnt->flags &= ~SMB_MOUNT_UNICODE;
 	}
+#if 0
+	/* flags we may test for other patches ... */
 	if (server->opt.capabilities & SMB_CAP_LARGE_READX) {
 		VERBOSE("Large reads enabled\n");
 	}
@@ -997,10 +1070,15 @@ smb_setup_header(struct smb_sb_info * server, __u8 command, __u16 wct, __u16 bcc
 	WSET(buf, smb_uid, server->opt.server_uid);
 	WSET(buf, smb_mid, 1);
 
-	if (server->opt.protocol > SMB_PROTOCOL_CORE)
-	{
-		*(buf+smb_flg) = 0x8;
-		WSET(buf, smb_flg2, 0x3);
+	if (server->opt.protocol > SMB_PROTOCOL_CORE) {
+		int flags = SMB_FLAGS_CASELESS_PATHNAMES;
+		int flags2 = SMB_FLAGS2_LONG_PATH_COMPONENTS |
+			SMB_FLAGS2_EXTENDED_ATTRIBUTES;	/* EA? not really ... */
+
+		*(buf+smb_flg) = flags;
+		if (server->mnt->flags & SMB_MOUNT_UNICODE)
+			flags2 |= SMB_FLAGS2_UNICODE_STRINGS;
+		WSET(buf, smb_flg2, flags2);
 	}
 	*p++ = wct;		/* wct */
 	p += 2 * wct;
@@ -1953,6 +2031,7 @@ smb_decode_long_dirent(struct smb_sb_info *server, char *p, int level,
 	unsigned int len = 0;
 	int n;
 	__u16 date, time;
+	int unicode = (server->mnt->flags & SMB_MOUNT_UNICODE);
 
 	/*
 	 * SMB doesn't have a concept of inode numbers ...
@@ -1988,9 +2067,9 @@ smb_decode_long_dirent(struct smb_sb_info *server, char *p, int level,
 		result = p + WVAL(p, 0);
 		len = DVAL(p, 60);
 		if (len > 255) len = 255;
-		/* NT4 null terminates */
+		/* NT4 null terminates, unless we are using unicode ... */
 		qname->name = p + 94;
-		if (len && qname->name[len-1] == '\0')
+		if (!unicode && len && qname->name[len-1] == '\0')
 			len--;
 
 		fattr->f_ctime = smb_ntutc2unixutc(LVAL(p, 8));

@@ -1,5 +1,9 @@
 ChangeLog for smbfs.
 
+2001-08-03 Urban Widmark <urban@teststation.com>
+
+	* *.c: Unicode support
+
 2001-08-23 Jochen Dolze <dolze@epcnet.de>
 
 	* proc.c: Correct rsize/wsize computation for readX/writeX
