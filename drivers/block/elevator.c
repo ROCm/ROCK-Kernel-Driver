@@ -272,13 +272,27 @@ void elv_merge_requests(request_queue_t *q, struct request *rq,
 		e->elevator_merge_req_fn(q, rq, next);
 }
 
-/*
- * add_request and next_request are required to be supported, naturally
- */
-void __elv_add_request(request_queue_t *q, struct request *rq,
-			  struct list_head *insert_here)
+void __elv_add_request(request_queue_t *q, struct request *rq, int at_end,
+		       int plug)
 {
-	q->elevator.elevator_add_req_fn(q, rq, insert_here);
+	struct list_head *insert = &q->queue_head;
+
+	if (at_end)
+		insert = insert->prev;
+	if (plug)
+		blk_plug_device(q);
+
+	q->elevator.elevator_add_req_fn(q, rq, insert);
+}
+
+void elv_add_request(request_queue_t *q, struct request *rq, int at_end,
+		     int plug)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(q->queue_lock, flags);
+	__elv_add_request(q, rq, at_end, plug);
+	spin_unlock_irqrestore(q->queue_lock, flags);
 }
 
 static inline struct request *__elv_next_request(request_queue_t *q)
@@ -357,6 +371,7 @@ module_init(elevator_global_init);
 
 EXPORT_SYMBOL(elevator_noop);
 
+EXPORT_SYMBOL(elv_add_request);
 EXPORT_SYMBOL(__elv_add_request);
 EXPORT_SYMBOL(elv_next_request);
 EXPORT_SYMBOL(elv_remove_request);

@@ -639,7 +639,7 @@ void blk_queue_invalidate_tags(request_queue_t *q)
 			blk_queue_end_tag(q, rq);
 
 		rq->flags &= ~REQ_STARTED;
-		elv_add_request(q, rq, 0);
+		__elv_add_request(q, rq, 0, 0);
 	}
 }
 
@@ -1466,7 +1466,7 @@ static inline void add_request(request_queue_t * q, struct request * req,
 	 * elevator indicated where it wants this request to be
 	 * inserted at elevator_merge time
 	 */
-	__elv_add_request(q, req, insert_here);
+	__elv_add_request_pos(q, req, insert_here);
 }
 
 /*

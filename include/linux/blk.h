@@ -50,22 +50,6 @@ static inline void blkdev_dequeue_request(struct request *req)
 		elv_remove_request(req->q, req);
 }
 
-#define _elv_add_request_core(q, rq, where, plug)			\
-	do {								\
-		if ((plug))						\
-			blk_plug_device((q));				\
-		(q)->elevator.elevator_add_req_fn((q), (rq), (where));	\
-	} while (0)
-
-#define _elv_add_request(q, rq, back, p) do {				      \
-	if ((back))							      \
-		_elv_add_request_core((q), (rq), (q)->queue_head.prev, (p));  \
-	else								      \
-		_elv_add_request_core((q), (rq), &(q)->queue_head, (p));      \
-} while (0)
-
-#define elv_add_request(q, rq, back) _elv_add_request((q), (rq), (back), 1)
-
 #if defined(MAJOR_NR) || defined(IDE_DRIVER)
 #if (MAJOR_NR != SCSI_TAPE_MAJOR) && (MAJOR_NR != OSST_MAJOR)
 #if !defined(IDE_DRIVER)
