@@ -64,6 +64,7 @@
 #include <linux/ipsec.h>
 
 extern int sysctl_ip_dynaddr;
+extern int sysctl_ip_default_ttl;
 int sysctl_tcp_tw_reuse = 0;
 
 /* Check TCP sequence numbers in ICMP packets. */
@@ -1201,6 +1202,7 @@ static void tcp_v4_send_reset(struct sk_buff *skb)
 	arg.n_iov = 1;
 	arg.csumoffset = offsetof(struct tcphdr, check) / 2; 
 
+	tcp_socket->sk->protinfo.af_inet.ttl = sysctl_ip_default_ttl;
 	ip_send_reply(tcp_socket->sk, skb, &arg, sizeof rth);
 
 	TCP_INC_STATS_BH(TcpOutSegs);
