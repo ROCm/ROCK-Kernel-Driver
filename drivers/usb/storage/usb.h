@@ -92,7 +92,14 @@ struct us_unusual_dev {
 
 #define USB_STOR_STRING_LEN 32
 
-#define US_IOBUF_SIZE		32	/* Big enough for bulk-only CBW */
+/*
+ * We provide a DMA-mapped I/O buffer for use with small USB transfers.
+ * It turns out that CB[I] needs a 12-byte buffer and Bulk-only needs a
+ * 31-byte buffer.  But Freecom needs a 64-byte buffer, so that's the
+ * size we'll allocate.
+ */
+
+#define US_IOBUF_SIZE		64	/* Size of the DMA-mapped I/O buffer */
 
 typedef int (*trans_cmnd)(Scsi_Cmnd*, struct us_data*);
 typedef int (*trans_reset)(struct us_data*);
@@ -147,6 +154,8 @@ struct us_data {
 	struct usb_ctrlrequest	*cr;		 /* control requests	 */
 	struct usb_sg_request	current_sg;	 /* scatter-gather req.  */
 	unsigned char		*iobuf;		 /* I/O buffer		 */
+	dma_addr_t		cr_dma;		 /* buffer DMA addresses */
+	dma_addr_t		iobuf_dma;
 
 	/* mutual exclusion structures */
 	struct semaphore	sema;		 /* to sleep thread on   */

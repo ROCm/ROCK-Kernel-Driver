@@ -428,7 +428,7 @@ static int usb_stor_control_thread(void * __us)
  ***********************************************************************/
 
 /* Associate our private data with the USB device */
-static void associate_dev(struct us_data *us, struct usb_interface *intf)
+static int associate_dev(struct us_data *us, struct usb_interface *intf)
 {
 	US_DEBUGP("-- %s\n", __FUNCTION__);
 
@@ -441,6 +441,22 @@ static void associate_dev(struct us_data *us, struct usb_interface *intf)
 	 * device's reference count */
 	usb_set_intfdata(intf, us);
 	usb_get_dev(us->pusb_dev);
+
+	/* Allocate the device-related DMA-mapped buffers */
+	us->cr = usb_buffer_alloc(us->pusb_dev, sizeof(*us->cr),
+			GFP_KERNEL, &us->cr_dma);
+	if (!us->cr) {
+		US_DEBUGP("usb_ctrlrequest allocation failed\n");
+		return -ENOMEM;
+	}
+
+	us->iobuf = usb_buffer_alloc(us->pusb_dev, US_IOBUF_SIZE,
+			GFP_KERNEL, &us->iobuf_dma);
+	if (!us->iobuf) {
+		US_DEBUGP("I/O buffer allocation failed\n");
+		return -ENOMEM;
+	}
+	return 0;
 }
 
 /* Get the unusual_devs entries and the string descriptors */
@@ -742,22 +758,9 @@ static int usb_stor_acquire_resources(struct us_data *us)
 {
 	int p;
 
-	/* Allocate the USB control blocks */
-	us->cr = kmalloc(sizeof(*us->cr), GFP_KERNEL);
-	if (!us->cr) {
-		US_DEBUGP("usb_ctrlrequest allocation failed\n");
-		return -ENOMEM;
-	}
-
 	us->current_urb = usb_alloc_urb(0, GFP_KERNEL);
 	if (!us->current_urb) {
 		US_DEBUGP("URB allocation failed\n");
-		return -ENOMEM;
-	}
-
-	us->iobuf = kmalloc(US_IOBUF_SIZE, GFP_KERNEL);
-	if (!us->iobuf) {
-		US_DEBUGP("I/O buffer allocation failed\n");
 		return -ENOMEM;
 	}
 
@@ -810,8 +813,24 @@ static void dissociate_dev(struct us_data *us)
 {
 	US_DEBUGP("-- %s\n", __FUNCTION__);
 	down(&us->dev_semaphore);
+
+	/* Free the device-related DMA-mapped buffers */
+	if (us->cr) {
+		usb_buffer_free(us->pusb_dev, sizeof(*us->cr), us->cr,
+				us->cr_dma);
+		us->cr = NULL;
+	}
+	if (us->iobuf) {
+		usb_buffer_free(us->pusb_dev, US_IOBUF_SIZE, us->iobuf,
+				us->iobuf_dma);
+		us->iobuf = NULL;
+	}
+
+	/* Remove our private data from the interface and decrement the
+	 * device's reference count */
 	usb_set_intfdata(us->pusb_intf, NULL);
 	usb_put_dev(us->pusb_dev);
+
 	us->pusb_dev = NULL;
 	us->pusb_intf = NULL;
 	up(&us->dev_semaphore);
@@ -850,18 +869,11 @@ void usb_stor_release_resources(struct us_data *us)
 		us->extra_destructor(us->extra);
 	}
 
-	/* Destroy the extra data */
-	if (us->extra) {
+	/* Free the extra data and the URB */
+	if (us->extra)
 		kfree(us->extra);
-	}
-
-	/* Free the USB control blocks */
-	if (us->iobuf)
-		kfree(us->iobuf);
 	if (us->current_urb)
 		usb_free_urb(us->current_urb);
-	if (us->cr)
-		kfree(us->cr);
 
 	/* Free the structure itself */
 	kfree(us);
@@ -892,7 +904,9 @@ static int storage_probe(struct usb_interface *intf,
 	init_completion(&(us->notify));
 
 	/* Associate the us_data structure with the USB device */
-	associate_dev(us, intf);
+	result = associate_dev(us, intf);
+	if (result)
+		goto BadDevice;
 
 	/*
 	 * Get the unusual_devs entries and the descriptors
