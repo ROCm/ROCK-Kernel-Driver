@@ -7,10 +7,6 @@
 # Copyright (C) 1994 David S. Miller (davem@caip.rutgers.edu)
 #
 
-# If the solaris /bin/sh wasn't so broken, I wouldn't need the following
-# line...
-SHELL  =/bin/bash
-
 #
 # Uncomment the first CFLAGS if you are doing kgdb source level
 # debugging of the kernel to get the proper debugging information.
