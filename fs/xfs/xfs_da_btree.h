@@ -253,7 +253,6 @@ typedef struct xfs_da_state {
 	xfs_da_state_path_t	path;		/* search/split paths */
 	xfs_da_state_path_t	altpath;	/* alternate path for join */
 	unsigned char		inleaf;		/* insert into 1->lf, 0->splf */
-	unsigned char		holeok;		/* T/F: can deal with a hole */
 	unsigned char		extravalid;	/* T/F: extrablk is in use */
 	unsigned char		extraafter;	/* T/F: extrablk is after new */
 	xfs_da_state_blk_t	extrablk;	/* for double-splits on leafs */
