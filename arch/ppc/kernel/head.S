@@ -493,13 +493,14 @@ SystemCall:
  * We effectively remap it to 0x3000.
  */
 	. = 0xf00
-
-#ifdef CONFIG_ALTIVEC
 	b	Trap_0f
+
 	. = 0xf20
+#ifdef CONFIG_ALTIVEC
 	b	AltiVecUnavailable
-Trap_0f:
 #endif
+
+Trap_0f:
 	EXCEPTION_PROLOG
 	addi	r3,r1,STACK_FRAME_OVERHEAD
 	EXC_XFER_EE(0xf00, UnknownException)
