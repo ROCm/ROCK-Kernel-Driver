@@ -163,7 +163,7 @@ struct hc_driver {
 	const char	*description;	/* "ehci-hcd" etc */
 
 	/* irq handler */
-	void	(*irq) (struct usb_hcd *hcd, struct pt_regs *regs);
+	irqreturn_t	(*irq) (struct usb_hcd *hcd, struct pt_regs *regs);
 
 	int	flags;
 #define	HCD_MEMORY	0x0001		/* HC regs use memory (else I/O) */

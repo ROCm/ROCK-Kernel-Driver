@@ -1909,7 +1909,7 @@ static void uhci_remove_pending_qhs(struct uhci_hcd *uhci)
 	spin_unlock_irqrestore(&uhci->urb_remove_list_lock, flags);
 }
 
-static void uhci_irq(struct usb_hcd *hcd, struct pt_regs *regs)
+static irqreturn_t uhci_irq(struct usb_hcd *hcd, struct pt_regs *regs)
 {
 	struct uhci_hcd *uhci = hcd_to_uhci(hcd);
 	unsigned int io_addr = uhci->io_addr;
@@ -1922,7 +1922,7 @@ static void uhci_irq(struct usb_hcd *hcd, struct pt_regs *regs)
 	 */
 	status = inw(io_addr + USBSTS);
 	if (!status)	/* shared interrupt, not mine */
-		return;
+		return IRQ_NONE;
 	outw(status, io_addr + USBSTS);		/* Clear it */
 
 	if (status & ~(USBSTS_USBINT | USBSTS_ERROR | USBSTS_RD)) {
@@ -1963,6 +1963,7 @@ static void uhci_irq(struct usb_hcd *hcd, struct pt_regs *regs)
 	spin_unlock(&uhci->urb_list_lock);
 
 	uhci_finish_completion(hcd, regs);
+	return IRQ_HANDLED;
 }
 
 static void reset_hc(struct uhci_hcd *uhci)

@@ -1516,7 +1516,9 @@ irqreturn_t usb_hcd_irq (int irq, void *__hcd, struct pt_regs * r)
 		return IRQ_NONE;
 
 	hcd->saw_irq = 1;
-	hcd->driver->irq (hcd, r);
+	if (hcd->driver->irq (hcd, r) == IRQ_NONE)
+		return IRQ_NONE;
+
 	if (hcd->state != start && hcd->state == USB_STATE_HALT)
 		usb_hc_died (hcd);
 	return IRQ_HANDLED;
