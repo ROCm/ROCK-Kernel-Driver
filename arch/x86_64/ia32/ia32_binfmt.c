@@ -82,9 +82,12 @@ do {									      \
 	int i;								      \
 	Elf32_Off ofs = 0;						      \
 	for (i = 0; i < VSYSCALL32_EHDR->e_phnum; ++i) {		      \
-		struct elf_phdr phdr = vsyscall_phdrs[i];		      \
+		struct elf32_phdr phdr = vsyscall_phdrs[i];		      \
 		if (phdr.p_type == PT_LOAD) {				      \
+			BUG_ON(ofs != 0);				      \
 			ofs = phdr.p_offset = offset;			      \
+			phdr.p_memsz = PAGE_ALIGN(phdr.p_memsz);	      \
+			phdr.p_filesz = phdr.p_memsz;			      \
 			offset += phdr.p_filesz;			      \
 		}							      \
 		else							      \
@@ -99,10 +102,10 @@ do {									      \
 		(const struct elf32_phdr *) (VSYSCALL32_BASE		      \
 					   + VSYSCALL32_EHDR->e_phoff);	      \
 	int i;								      \
-	for (i = 0; i < VSYSCALL32_EHDR->e_phnum; ++i) {		      \
+	for (i = 0; i < VSYSCALL_EHDR->e_phnum; ++i) {			      \
 		if (vsyscall_phdrs[i].p_type == PT_LOAD)		      \
 			DUMP_WRITE((void *) (u64) vsyscall_phdrs[i].p_vaddr,	      \
-				   vsyscall_phdrs[i].p_filesz);		      \
+				   PAGE_ALIGN(vsyscall_phdrs[i].p_memsz));    \
 	}								      \
 } while (0)
 

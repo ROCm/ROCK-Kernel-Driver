@@ -157,7 +157,10 @@ do {									      \
 	for (i = 0; i < VSYSCALL_EHDR->e_phnum; ++i) {			      \
 		struct elf_phdr phdr = vsyscall_phdrs[i];		      \
 		if (phdr.p_type == PT_LOAD) {				      \
+			BUG_ON(ofs != 0);				      \
 			ofs = phdr.p_offset = offset;			      \
+			phdr.p_memsz = PAGE_ALIGN(phdr.p_memsz);	      \
+			phdr.p_filesz = phdr.p_memsz;			      \
 			offset += phdr.p_filesz;			      \
 		}							      \
 		else							      \
@@ -175,7 +178,7 @@ do {									      \
 	for (i = 0; i < VSYSCALL_EHDR->e_phnum; ++i) {			      \
 		if (vsyscall_phdrs[i].p_type == PT_LOAD)		      \
 			DUMP_WRITE((void *) vsyscall_phdrs[i].p_vaddr,	      \
-				   vsyscall_phdrs[i].p_filesz);		      \
+				   PAGE_ALIGN(vsyscall_phdrs[i].p_memsz));    \
 	}								      \
 } while (0)
 

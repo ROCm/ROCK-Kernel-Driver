@@ -1038,9 +1038,9 @@ void usb_show_string(struct usb_device *dev, char *id, int index);
 #define dbg(format, arg...) do {} while (0)
 #endif
 
-#define err(format, arg...) printk(KERN_ERR __FILE__ ": " format "\n" , ## arg)
-#define info(format, arg...) printk(KERN_INFO __FILE__ ": " format "\n" , ## arg)
-#define warn(format, arg...) printk(KERN_WARNING __FILE__ ": " format "\n" , ## arg)
+#define err(format, arg...) printk(KERN_ERR "%s: " format "\n" , __FILE__ , ## arg)
+#define info(format, arg...) printk(KERN_INFO "%s: " format "\n" , __FILE__ , ## arg)
+#define warn(format, arg...) printk(KERN_WARNING "%s: " format "\n" , __FILE__ , ## arg)
 
 
 #endif  /* __KERNEL__ */

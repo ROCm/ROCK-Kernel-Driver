@@ -1,6 +1,6 @@
 /*
  *
- * Version 3.37
+ * Version 3.38
  *
  * VIA IDE driver for Linux. Supported southbridges:
  *
@@ -96,7 +96,6 @@ static struct via_isa_bridge {
 };
 
 static struct via_isa_bridge *via_config;
-static unsigned char via_enabled;
 static unsigned int via_80w;
 static unsigned int via_clock;
 static char *via_dma[] = { "MWDMA16", "UDMA33", "UDMA66", "UDMA100", "UDMA133" };
@@ -146,7 +145,7 @@ static int via_get_info(char *buffer, char **addr, off_t offset, int count)
 	via_print("----------VIA BusMastering IDE Configuration"
 		"----------------");
 
-	via_print("Driver Version:                     3.37");
+	via_print("Driver Version:                     3.38");
 	via_print("South Bridge:                       VIA %s",
 		via_config->name);
 
@@ -370,9 +369,6 @@ static int via_set_drive(ide_drive_t *drive, u8 speed)
 
 static void via82cxxx_tune_drive(ide_drive_t *drive, u8 pio)
 {
-	if (!((via_enabled >> HWIF(drive)->channel) & 1))
-		return;
-
 	if (pio == 255) {
 		via_set_drive(drive,
 			ide_find_best_mode(drive, XFER_PIO | XFER_EPIO));
@@ -506,7 +502,6 @@ static unsigned int __init init_chipset_via82cxxx(struct pci_dev *dev, const cha
 	 */
 
 	pci_read_config_byte(dev, VIA_IDE_ENABLE, &v);
-	via_enabled = ((v & 1) ? 2 : 0) | ((v & 2) ? 1 : 0);
 
 	/*
 	 * Set up FIFO sizes and thresholds.
@@ -523,9 +518,9 @@ static unsigned int __init init_chipset_via82cxxx(struct pci_dev *dev, const cha
 	/* Fix FIFO split between channels */
 	if (via_config->flags & VIA_SET_FIFO) {
 		t &= (t & 0x9f);
-		switch (via_enabled) {
-			case 1: t |= 0x00; break;	/* 16 on primary */
-			case 2: t |= 0x60; break;	/* 16 on secondary */
+		switch (v & 3) {
+			case 2: t |= 0x00; break;	/* 16 on primary */
+			case 1: t |= 0x60; break;	/* 16 on secondary */
 			case 3: t |= 0x20; break;	/* 8 pri 8 sec */
 		}
 	}
@@ -603,27 +598,13 @@ static void __init init_hwif_via82cxxx(ide_hwif_t *hwif)
 	hwif->mwdma_mask = 0x07;
 	hwif->swdma_mask = 0x07;
 
-	if (!(hwif->udma_four))
-		hwif->udma_four = ((via_enabled & via_80w) >> hwif->channel) & 1;
+	if (!hwif->udma_four)
+		hwif->udma_four = (via_80w >> hwif->channel) & 1;
 	hwif->ide_dma_check = &via82cxxx_ide_dma_check;
 	if (!noautodma)
 		hwif->autodma = 1;
 	hwif->drives[0].autodma = hwif->autodma;
 	hwif->drives[1].autodma = hwif->autodma;
-}
-
-/**
- *	init_dma_via82cxxx	-	set up for IDE DMA
- *	@hwif: IDE interface
- *	@dmabase: DMA base address
- *
- *	We allow the BM-DMA driver to only work on enabled interfaces.
- */
-
-static void __init init_dma_via82cxxx(ide_hwif_t *hwif, unsigned long dmabase)
-{
-	if ((via_enabled >> hwif->channel) & 1)
-		ide_setup_dma(hwif, dmabase, 8);
 }
 
 extern void ide_setup_pci_device(struct pci_dev *, ide_pci_device_t *);

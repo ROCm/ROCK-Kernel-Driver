@@ -591,14 +591,14 @@ brlvger_write(struct file *file, const char __user *buffer,
 			int firstpart = 6 - off;
 			
 #ifdef WRITE_DEBUG
-			dbg3("off: %d, rs: %d, count: %d, firstpart: %d",
+			dbg3("off: %lld, rs: %d, count: %d, firstpart: %d",
 			     off, rs, count, firstpart);
 #endif
 
 			firstpart = (firstpart < count) ? firstpart : count;
 
 #ifdef WRITE_DEBUG
-			dbg3("off: %d", off);
+			dbg3("off: %lld", off);
 			dbg3("firstpart: %d", firstpart);
 #endif
 
@@ -618,7 +618,7 @@ brlvger_write(struct file *file, const char __user *buffer,
 			off +=2;
 
 #ifdef WRITE_DEBUG
-			dbg3("off: %d, rs: %d, count: %d, firstpart: %d, "
+			dbg3("off: %lld, rs: %d, count: %d, firstpart: %d, "
 				"written: %d", 	off, rs, count, firstpart, written);
 #endif
 		}
