@@ -441,7 +441,7 @@ void scsi_log_completion(struct scsi_cmnd *cmd, int disposition)
 			case FAILED:
 				printk("FAILED ");
 				break;
-			case TIMEOUT:
+			case TIMEOUT_ERROR:
 				/* 
 				 * If called via scsi_times_out.
 				 */

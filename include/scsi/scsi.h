@@ -302,7 +302,7 @@ struct scsi_lun {
 #define QUEUED          0x2004
 #define SOFT_ERROR      0x2005
 #define ADD_TO_MLQUEUE  0x2006
-#define TIMEOUT         0x2007
+#define TIMEOUT_ERROR   0x2007
 
 /*
  * Midlevel queue return values.
