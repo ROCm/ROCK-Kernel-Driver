@@ -357,7 +357,7 @@ static struct xfrm_algo_desc *xfrm_get_byname(struct xfrm_algo_desc *list,
 		return NULL;
 
 	for (i = 0; i < entries; i++) {
-		if (!strcmp(name, list[i].name))
+		if (strcmp(name, list[i].name))
 			continue;
 
 		if (list[i].available)
