@@ -15,6 +15,11 @@
  *
  * See Documentation/usb/usb-serial.txt for more information on using this driver
  *
+ * (06/05/2002) gkh
+ *	moved location of startup() call in serial_probe() until after all
+ *	of the port information and endpoints are initialized.  This makes
+ *	things easier for some drivers.
+ *
  * (04/10/2002) gkh
  *	added serial_read_proc function which creates a
  *	/proc/tty/driver/usb-serial file.
@@ -341,7 +346,7 @@
 /*
  * Version Information
  */
-#define DRIVER_VERSION "v1.5"
+#define DRIVER_VERSION "v1.6"
 #define DRIVER_AUTHOR "Greg Kroah-Hartman, greg@kroah.com, http://www.kroah.com/linux-usb/"
 #define DRIVER_DESC "USB Serial Driver core"
 
