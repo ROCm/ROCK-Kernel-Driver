@@ -22,7 +22,7 @@
  */
 #include <linux/bitops.h>
 #include <linux/config.h>
-#include <asm/pdc.h>
+#include <linux/eisa.h>
 #include <linux/errno.h>
 #include <linux/init.h>
 #include <linux/signal.h>
@@ -39,6 +39,7 @@
 #include <linux/spinlock.h>
 
 #include <asm/cache.h>
+#include <asm/pdc.h>
 
 #undef DEBUG_IRQ
 #undef PARISC_IRQ_CR16_COUNTS

@@ -29,6 +29,7 @@ static const char *version =
 	"ne3210.c: Driver revision v0.03, 30/09/98\n";
 
 #include <linux/module.h>
+#include <linux/eisa.h>
 #include <linux/kernel.h>
 #include <linux/errno.h>
 #include <linux/string.h>
