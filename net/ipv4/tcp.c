@@ -737,17 +737,6 @@ do_interrupted:
 	goto out;
 }
 
-static inline int can_coalesce(struct sk_buff *skb, int i, struct page *page,
-			       int off)
-{
-	if (i) {
-		skb_frag_t *frag = &skb_shinfo(skb)->frags[i - 1];
-		return page == frag->page &&
-		       off == frag->page_offset + frag->size;
-	}
-	return 0;
-}
-
 static inline void fill_page_desc(struct sk_buff *skb, int i,
 				  struct page *page, int off, int size)
 {
@@ -865,7 +854,7 @@ new_segment:
 			copy = size;
 
 		i = skb_shinfo(skb)->nr_frags;
-		if (can_coalesce(skb, i, page, offset)) {
+		if (skb_can_coalesce(skb, i, page, offset)) {
 			skb_shinfo(skb)->frags[i - 1].size += copy;
 		} else if (i < MAX_SKB_FRAGS) {
 			get_page(page);
@@ -1053,7 +1042,7 @@ new_segment:
 				struct page *page = TCP_PAGE(sk);
 				int off = TCP_OFF(sk);
 
-				if (can_coalesce(skb, i, page, off) &&
+				if (skb_can_coalesce(skb, i, page, off) &&
 				    off != PAGE_SIZE) {
 					/* We can extend the last page
 					 * fragment. */

@@ -993,6 +993,18 @@ static inline int skb_add_data(struct sk_buff *skb,
 	return -EFAULT;
 }
 
+static inline int skb_can_coalesce(struct sk_buff *skb, int i,
+				   struct page *page, int off)
+{
+	if (i) {
+		struct skb_frag_struct *frag = &skb_shinfo(skb)->frags[i - 1];
+
+		return page == frag->page &&
+		       off == frag->page_offset + frag->size;
+	}
+	return 0;
+}
+
 /**
  *	skb_linearize - convert paged skb to linear one
  *	@skb: buffer to linarize
