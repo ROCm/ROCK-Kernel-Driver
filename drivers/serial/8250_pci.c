@@ -1103,14 +1103,6 @@ static struct pci_device_id serial_pci_tbl[] __devinitdata = {
 	{ 0, }
 };
 
-#ifndef __devexit_p
-#if defined(MODULE) || defined(CONFIG_HOTPLUG)
-#define __devexit_p(x) x
-#else
-#define __devexit_p(x) NULL
-#endif
-#endif
-
 static struct pci_driver serial_pci_driver = {
 	.name		= "serial",
 	.probe		= pci_init_one,
