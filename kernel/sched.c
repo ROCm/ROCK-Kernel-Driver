@@ -986,9 +986,7 @@ asmlinkage void schedule(void)
 		}
 	}
 
-#if CONFIG_DEBUG_HIGHMEM
 	check_highmem_ptes();
-#endif
 need_resched:
 	preempt_disable();
 	prev = current;

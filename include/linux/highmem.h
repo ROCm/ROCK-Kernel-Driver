@@ -14,8 +14,6 @@ extern struct page *highmem_start_page;
 /* declarations for linux/mm/highmem.c */
 unsigned int nr_free_highpages(void);
 
-extern void check_highmem_ptes(void);
-
 #else /* CONFIG_HIGHMEM */
 
 static inline unsigned int nr_free_highpages(void) { return 0; }
@@ -29,6 +27,13 @@ static inline void *kmap(struct page *page) { return page_address(page); }
 #define kmap_atomic_to_page(ptr)	virt_to_page(ptr)
 
 #endif /* CONFIG_HIGHMEM */
+
+#if defined(CONFIG_DEBUG_HIGHMEM) && defined(CONFIG_HIGHMEM)
+extern void check_highmem_ptes(void);
+#else
+static inline void check_highmem_ptes(void)
+{}
+#endif
 
 /* when CONFIG_HIGHMEM is not set these will be plain clear/copy_page */
 static inline void clear_user_highpage(struct page *page, unsigned long vaddr)
