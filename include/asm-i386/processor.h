@@ -59,6 +59,7 @@ struct cpuinfo_x86 {
 #define X86_VENDOR_CENTAUR 5
 #define X86_VENDOR_RISE 6
 #define X86_VENDOR_TRANSMETA 7
+#define X86_VENDOR_NSC 8
 #define X86_VENDOR_UNKNOWN 0xff
 
 /*
@@ -216,7 +217,7 @@ static inline void clear_in_cr4 (unsigned long mask)
 }
 
 /*
- *      Cyrix CPU configuration register indexes
+ *      NSC/Cyrix CPU configuration register indexes
  */
 #define CX86_CCR0 0xc0
 #define CX86_CCR1 0xc1
@@ -232,7 +233,7 @@ static inline void clear_in_cr4 (unsigned long mask)
 #define CX86_RCR_BASE 0xdc
 
 /*
- *      Cyrix CPU indexed register access macros
+ *      NSC/Cyrix CPU indexed register access macros
  */
 
 #define getCx86(reg) ({ outb((reg), 0x22); inb(0x23); })
