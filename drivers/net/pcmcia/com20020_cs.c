@@ -263,11 +263,8 @@ static void com20020_detach(dev_link_t *link)
 
     dev = info->dev;
 
-    if (link->state & DEV_CONFIG) {
+    if (link->state & DEV_CONFIG)
         com20020_release(link);
-        if (link->state & DEV_STALE_CONFIG)
-            return;
-    }
 
     if (link->handle)
         CardServices(DeregisterClient, link->handle);
@@ -439,21 +436,11 @@ static void com20020_release(dev_link_t *link)
 
     DEBUG(0, "com20020_release(0x%p)\n", link);
 
-    if (link->open) {
-	DEBUG(1,"postpone...\n");
-	DEBUG(1, "com20020_cs: release postponed, device stll open\n");
-        link->state |= DEV_STALE_CONFIG;
-        return;
-    }
-
     CardServices(ReleaseConfiguration, link->handle);
     CardServices(ReleaseIO, link->handle, &link->io);
     CardServices(ReleaseIRQ, link->handle, &link->irq);
 
     link->state &= ~(DEV_CONFIG | DEV_RELEASE_PENDING);
-
-    if (link->state & DEV_STALE_CONFIG)
-	    com20020_detach(link);
 }
 
 /*======================================================================

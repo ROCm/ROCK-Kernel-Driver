@@ -411,11 +411,8 @@ static void smc91c92_detach(dev_link_t *link)
     if (*linkp == NULL)
 	return;
 
-    if (link->state & DEV_CONFIG) {
+    if (link->state & DEV_CONFIG)
 	smc91c92_release(link);
-	if (link->state & DEV_STALE_CONFIG)
-	    return;
-    }
 
     if (link->handle)
 	CardServices(DeregisterClient, link->handle);
@@ -1060,13 +1057,6 @@ static void smc91c92_release(dev_link_t *link)
 
     DEBUG(0, "smc91c92_release(0x%p)\n", link);
 
-    if (link->open) {
-	DEBUG(1, "smc91c92_cs: release postponed, '%s' still open\n",
-	      link->dev->dev_name);
-	link->state |= DEV_STALE_CONFIG;
-	return;
-    }
-
     CardServices(ReleaseConfiguration, link->handle);
     CardServices(ReleaseIO, link->handle, &link->io);
     CardServices(ReleaseIRQ, link->handle, &link->irq);
@@ -1078,9 +1068,6 @@ static void smc91c92_release(dev_link_t *link)
     }
 
     link->state &= ~DEV_CONFIG;
-
-    if (link->state & DEV_STALE_CONFIG)
-	    smc91c92_detach(link);
 }
 
 /*======================================================================
@@ -1306,8 +1293,6 @@ static int smc_close(struct net_device *dev)
 
     link->open--;
     del_timer_sync(&smc->media);
-    if (link->state & DEV_STALE_CONFIG)
-	    smc91c92_release(link);
 
     return 0;
 } /* smc_close */
