@@ -454,6 +454,7 @@ int __log_start_commit(journal_t *journal, tid_t target)
 	}
 	return 0;
 }
+EXPORT_SYMBOL(__log_start_commit);
 
 int log_start_commit(journal_t *journal, tid_t tid)
 {
