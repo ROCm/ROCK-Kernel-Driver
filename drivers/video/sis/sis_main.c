@@ -579,7 +579,6 @@ static void sisfb_set_disp (int con, struct fb_var_screeninfo *var)
 
 	sisfb_get_fix (&fix, con, 0);
 
-	display->screen_base = ivideo.video_vbase;
 	display->visual = fix.visual;
 	display->type = fix.type;
 	display->type_aux = fix.type_aux;
@@ -2769,6 +2768,7 @@ sishw_ext.usExternalChip = 0;
 	fb_info.changevar = NULL;
 	fb_info.node = NODEV;
 	fb_info.fbops = &sisfb_ops;
+	fb_info.screen_base = ivideo.video_vbase;
 	fb_info.disp = &disp;
 	fb_info.currcon = -1;
 	fb_info.switch_con = &sisfb_switch;

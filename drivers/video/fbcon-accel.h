@@ -1,5 +1,5 @@
 /*
- *  FBcon low-level driver for 32 bpp packed pixel (cfb32)
+ *  FBcon low-level driver that is a wrapper for the accel engine. 
  */
 
 #ifndef _VIDEO_FBCON_ACCEL_H
