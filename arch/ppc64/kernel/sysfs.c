@@ -9,6 +9,90 @@
 #include <asm/processor.h>
 #include <asm/cputable.h>
 #include <asm/hvcall.h>
+#include <asm/prom.h>
+
+
+/* SMT stuff */
+
+#ifndef CONFIG_PPC_ISERIES
+
+/* default to snooze disabled */
+DEFINE_PER_CPU(unsigned long, smt_snooze_delay);
+
+static ssize_t store_smt_snooze_delay(struct sys_device *dev, const char *buf,
+				      size_t count)
+{
+	struct cpu *cpu = container_of(dev, struct cpu, sysdev);
+	ssize_t ret;
+	unsigned long snooze;
+
+	ret = sscanf(buf, "%lu", &snooze);
+	if (ret != 1)
+		return -EINVAL;
+
+	per_cpu(smt_snooze_delay, cpu->sysdev.id) = snooze;
+
+	return count;
+}
+
+static ssize_t show_smt_snooze_delay(struct sys_device *dev, char *buf)
+{
+	struct cpu *cpu = container_of(dev, struct cpu, sysdev);
+
+	return sprintf(buf, "%lu\n", per_cpu(smt_snooze_delay, cpu->sysdev.id));
+}
+
+static SYSDEV_ATTR(smt_snooze_delay, 0644, show_smt_snooze_delay,
+		   store_smt_snooze_delay);
+
+/* Only parse OF options if the matching cmdline option was not specified */
+static int smt_snooze_cmdline;
+
+static int __init smt_setup(void)
+{
+	struct device_node *options;
+	unsigned int *val;
+	unsigned int cpu;
+
+	if (!cur_cpu_spec->cpu_features & CPU_FTR_SMT)
+		return 1;
+
+	options = find_path_device("/options");
+	if (!options)
+		return 1;
+
+	val = (unsigned int *)get_property(options, "ibm,smt-snooze-delay",
+					   NULL);
+	if (!smt_snooze_cmdline && val) {
+		for_each_cpu(cpu)
+			per_cpu(smt_snooze_delay, cpu) = *val;
+	}
+
+	return 1;
+}
+__initcall(smt_setup);
+
+static int __init setup_smt_snooze_delay(char *str)
+{
+	unsigned int cpu;
+	int snooze;
+
+	if (!cur_cpu_spec->cpu_features & CPU_FTR_SMT)
+		return 1;
+
+	smt_snooze_cmdline = 1;
+
+	if (get_option(&str, &snooze)) {
+		for_each_cpu(cpu)
+			per_cpu(smt_snooze_delay, cpu) = snooze;
+	}
+
+	return 1;
+}
+__setup("smt-snooze-delay=", setup_smt_snooze_delay);
+
+#endif
+
 
 /* PMC stuff */
 
@@ -235,6 +319,11 @@ static int __init topology_init(void)
 		register_cpu_pmc(&c->sysdev);
 
 		sysdev_create_file(&c->sysdev, &attr_physical_id);
+
+#ifndef CONFIG_PPC_ISERIES
+		if (cur_cpu_spec->cpu_features & CPU_FTR_SMT)
+			sysdev_create_file(&c->sysdev, &attr_smt_snooze_delay);
+#endif
 	}
 
 	return 0;

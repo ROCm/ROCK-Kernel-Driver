@@ -1254,7 +1254,6 @@ smt_setup(void)
 {
 	char *p, *q;
 	char my_smt_enabled = SMT_DYNAMIC;
-	unsigned long my_smt_snooze_delay; 
 	ihandle prom_options = NULL;
 	char option[9];
 	unsigned long offset = reloc_offset();
@@ -1301,51 +1300,6 @@ smt_setup(void)
 	if (!found )
 		my_smt_enabled = SMT_DYNAMIC; /* default to on */
 
-	found = 0;
-	if (my_smt_enabled) {
-		if (strstr(RELOC(cmd_line), RELOC("smt-snooze-delay="))) {
-			for (q = RELOC(cmd_line); (p = strstr(q, RELOC("smt-snooze-delay="))) != 0; ) {
-				q = p + 17;
-				if (p > RELOC(cmd_line) && p[-1] != ' ')
-					continue;
-				found = 1;
-				/* Don't use simple_strtoul() because _ctype & others aren't RELOC'd */
-				my_smt_snooze_delay = 0;
-				while (*q >= '0' && *q <= '9') {
-					my_smt_snooze_delay = my_smt_snooze_delay * 10 + *q - '0';
-					q++;
-				}
-			}
-		}
-
-		if (!found) {
-			prom_options = (ihandle)call_prom(RELOC("finddevice"), 1, 1, RELOC("/options"));
-			if (prom_options != (ihandle) -1) {
-				call_prom(RELOC("getprop"), 
-					4, 1, prom_options,
-					RELOC("ibm,smt-snooze-delay"), 
-					option, 
-					sizeof(option));
-				if (option[0] != 0) {
-					found = 1;
-					/* Don't use simple_strtoul() because _ctype & others aren't RELOC'd */
-					my_smt_snooze_delay = 0;
-					q = option;
-					while (*q >= '0' && *q <= '9') {
-						my_smt_snooze_delay = my_smt_snooze_delay * 10 + *q - '0';
-						q++;
-					}
-				}
-			}
-		}
-
-		if (!found) {
-			my_smt_snooze_delay = 0; /* default value */
-		}
-	} else {
-		my_smt_snooze_delay = 0; /* default value */
-	}
-	_naca->smt_snooze_delay = my_smt_snooze_delay;
 	_naca->smt_state = my_smt_enabled;
 }
 
