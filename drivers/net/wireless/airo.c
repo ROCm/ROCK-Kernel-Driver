@@ -3310,15 +3310,18 @@ static void proc_config_on_close( struct inode *inode, struct file *file ) {
 			ai->config.rmode &= 0xfe00;
 			ai->flags &= ~FLAG_802_11;
 			ai->config.opmode &= 0xFF00;
+			ai->config.scanMode = SCANMODE_ACTIVE;
 			if ( line[0] == 'a' ) {
 				ai->config.opmode |= 0;
 			} else {
 				ai->config.opmode |= 1;
 				if ( line[0] == 'r' ) {
 					ai->config.rmode |= RXMODE_RFMON | RXMODE_DISABLE_802_3_HEADER;
+					ai->config.scanMode = SCANMODE_PASSIVE;
 					ai->flags |= FLAG_802_11;
 				} else if ( line[0] == 'y' ) {
 					ai->config.rmode |= RXMODE_RFMON_ANYBSS | RXMODE_DISABLE_802_3_HEADER;
+					ai->config.scanMode = SCANMODE_PASSIVE;
 					ai->flags |= FLAG_802_11;
 				} else if ( line[0] == 'l' )
 					ai->config.rmode |= RXMODE_LANMON;
@@ -4593,24 +4596,28 @@ static int airo_set_mode(struct net_device *dev,
 			local->config.opmode &= 0xFF00;
 			local->config.opmode |= MODE_STA_IBSS;
 			local->config.rmode &= 0xfe00;
+			local->config.scanMode = SCANMODE_ACTIVE;
 			local->flags &= ~FLAG_802_11;
 			break;
 		case IW_MODE_INFRA:
 			local->config.opmode &= 0xFF00;
 			local->config.opmode |= MODE_STA_ESS;
 			local->config.rmode &= 0xfe00;
+			local->config.scanMode = SCANMODE_ACTIVE;
 			local->flags &= ~FLAG_802_11;
 			break;
 		case IW_MODE_MASTER:
 			local->config.opmode &= 0xFF00;
 			local->config.opmode |= MODE_AP;
 			local->config.rmode &= 0xfe00;
+			local->config.scanMode = SCANMODE_ACTIVE;
 			local->flags &= ~FLAG_802_11;
 			break;
 		case IW_MODE_REPEAT:
 			local->config.opmode &= 0xFF00;
 			local->config.opmode |= MODE_AP_RPTR;
 			local->config.rmode &= 0xfe00;
+			local->config.scanMode = SCANMODE_ACTIVE;
 			local->flags &= ~FLAG_802_11;
 			break;
 		case IW_MODE_MONITOR:
@@ -4618,6 +4625,7 @@ static int airo_set_mode(struct net_device *dev,
 			local->config.opmode |= MODE_STA_ESS;
 			local->config.rmode &= 0xfe00;
 			local->config.rmode |= RXMODE_RFMON | RXMODE_DISABLE_802_3_HEADER;
+			local->config.scanMode = SCANMODE_PASSIVE;
 			local->flags |= FLAG_802_11;
 			break;
 		default:
