@@ -69,7 +69,7 @@ int dump_generic_sequencer(void)
 			break;
 
 		printk("\n %d dump pages %s of %d each in pass %d\n", 
-		err, save ? "saved" : "skipped", DUMP_PAGE_SIZE, pass);
+		err, save ? "saved" : "skipped", (int)DUMP_PAGE_SIZE, pass);
 
 	}
 

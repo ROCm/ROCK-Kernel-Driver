@@ -7,7 +7,7 @@
 
 #include <linux/config.h>
 #include <linux/module.h>
-
+#include <linux/nmi.h>
 #include <linux/string.h>
 EXPORT_SYMBOL(memset);
 EXPORT_SYMBOL(memchr);
@@ -137,3 +137,24 @@ EXPORT_SYMBOL(ia64_handle_exception);
 EXPORT_SYMBOL(ia64_save_debug_regs);
 EXPORT_SYMBOL(ia64_flush_fph);
 #endif
+
+#include <asm/hw_irq.h>
+
+#ifdef CONFIG_CRASH_DUMP_MODULE
+#ifdef CONFIG_SMP
+extern irq_desc_t _irq_desc[NR_IRQS];
+extern unsigned long irq_affinity[NR_IRQS];
+extern void stop_this_cpu(void *);
+extern int (*dump_ipi_function_ptr)(struct pt_regs *);
+extern void dump_send_ipi(void);
+EXPORT_SYMBOL(_irq_desc);
+EXPORT_SYMBOL(irq_affinity);
+EXPORT_SYMBOL(stop_this_cpu);
+EXPORT_SYMBOL(dump_send_ipi);
+EXPORT_SYMBOL(dump_ipi_function_ptr);
+#endif
+#ifdef ARCH_HAS_NMI_WATCHDOG
+EXPORT_SYMBOL(touch_nmi_watchdog);
+#endif
+#endif
+

@@ -11,10 +11,11 @@ endif
 dump-$(CONFIG_ARM)			+= dump_arm.o
 dump-$(CONFIG_PPC64)                    += dump_ppc64.o
 dump-$(CONFIG_X86_64)			+= dump_x8664.o
+dump-$(CONFIG_IA64)			+= dump_ia64.o
 dump-$(CONFIG_CRASH_DUMP_MEMDEV)	+= dump_memdev.o dump_overlay.o
 dump-objs				+= $(dump-y)
 
-obj-$(CONFIG_CRASH_DUMP)		+= dump.o
+obj-$(CONFIG_CRASH_DUMP)		+= dump.o 
 obj-$(CONFIG_CRASH_DUMP_BLOCKDEV)	+= dump_blockdev.o
 obj-$(CONFIG_CRASH_DUMP_NETDEV)	+= dump_netdev.o
 obj-$(CONFIG_CRASH_DUMP_COMPRESS_RLE)	+= dump_rle.o

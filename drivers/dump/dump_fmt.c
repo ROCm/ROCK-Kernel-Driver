@@ -30,8 +30,8 @@
 #include <linux/sched.h>
 #include <linux/ptrace.h>
 #include <linux/utsname.h>
-#include <asm/dump.h>
 #include <linux/dump.h>
+#include <asm/dump.h>
 #include "dump_methods.h"
 
 /*
@@ -189,20 +189,20 @@ int dump_lcrash_configure_header(const char *panic_str,
 	dump_config.dumper->header_dirty++;
 	return 0;
 }
-
 /* save register and task context */
 void dump_lcrash_save_context(int cpu, const struct pt_regs *regs, 
 	struct task_struct *tsk)
 {
 	dump_header_asm.dha_smp_current_task[cpu] = (unsigned long)tsk;
-
 	__dump_save_regs(&dump_header_asm.dha_smp_regs[cpu], regs);
 
 	/* take a snapshot of the stack */
 	/* doing this enables us to tolerate slight drifts on this cpu */
+
 	if (dump_header_asm.dha_stack[cpu]) {
 		memcpy((void *)dump_header_asm.dha_stack[cpu],
-				tsk->thread_info, THREAD_SIZE);
+				STACK_START_POSITION(tsk),
+				THREAD_SIZE);
 	}
 	dump_header_asm.dha_stack_ptr[cpu] = (unsigned long)(tsk->thread_info);
 }

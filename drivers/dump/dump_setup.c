@@ -119,9 +119,9 @@
 #include <linux/nmi.h>
 #include <linux/init.h>
 #include <linux/ltt.h>
-
 #include <asm/hardirq.h>
 #include <asm/uaccess.h>
+
 
 /*
  * -----------------------------------------------------------------------

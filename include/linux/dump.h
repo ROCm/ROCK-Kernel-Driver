@@ -37,16 +37,26 @@
 #define DUMP_PAGE_SHIFT 	PAGE_SHIFT
 #define DUMP_PAGE_MASK		PAGE_MASK
 #define DUMP_PAGE_ALIGN(addr)	PAGE_ALIGN(addr)
-#define DUMP_HEADER_OFFSET	PAGE_SIZE
+
+/*
+ * Dump offset changed from 4Kb to 64Kb to support multiple PAGE_SIZE 
+ * (kernel page size). Assumption goes that 64K is the highest page size 
+ * supported 
+ */
+
+#define DUMP_HEADER_OFFSET	(1ULL << 16)
 
 #define OLDMINORBITS	8
 #define OLDMINORMASK	((1U << OLDMINORBITS) -1)
 
-/* keep DUMP_PAGE_SIZE constant to 4K = 1<<12
- * it may be different from PAGE_SIZE then.
+/* Making DUMP_PAGE_SIZE = PAGE_SIZE, to support dumping on architectures 
+ * which support page sizes (PAGE_SIZE) greater than 4KB.
+ * Will it affect ia64 discontinuous memory systems ????
  */
-#define DUMP_PAGE_SIZE		4096
+#define DUMP_PAGE_SIZE		PAGE_SIZE
 
+/* thread_info lies at the bottom of stack, (Except IA64). */
+#define STACK_START_POSITION(tsk)               (tsk->thread_info)
 /* 
  * Predefined default memcpy() to use when copying memory to the dump buffer.
  *
@@ -56,6 +66,7 @@
  * macro to __dump_memcpy() and use it's arch specific version.
  */
 #define DUMP_memcpy		memcpy
+#define bzero(a,b)              memset(a, 0, b)
 
 /* necessary header files */
 #include <asm/dump.h>			/* for architecture-specific header */

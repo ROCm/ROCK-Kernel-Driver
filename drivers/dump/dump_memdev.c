@@ -190,9 +190,8 @@ struct page *dump_mem_lookup(struct dump_memdev *dump_mdev, unsigned long loc)
 	unsigned long curr_pfn, curr_map, *curr_map_ptr = NULL;
 
 	map = (unsigned long *)dump_mdev->indirect_map_root;
-	if (!map)
+	if (!map) 
 		return NULL;
-
 	if (loc > dump_mdev->last_offset >> PAGE_SHIFT)
 		return NULL;
 
@@ -201,7 +200,7 @@ struct page *dump_mem_lookup(struct dump_memdev *dump_mdev, unsigned long loc)
 	 * in the chain of indirect maps 
 	 */
 	for (i = 0; i + DUMP_IND_MAP_SZ < index ; i += DUMP_IND_MAP_SZ) {
-		if (!(map = next_indirect_map(map)))
+		if (!(map = next_indirect_map(map))) 
 			return NULL;
 	}
 	/* then the right direct map */

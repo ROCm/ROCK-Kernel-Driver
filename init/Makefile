@@ -10,7 +10,12 @@ mounts-$(CONFIG_BLK_DEV_INITRD)	+= do_mounts_initrd.o
 mounts-$(CONFIG_BLK_DEV_MD)	+= do_mounts_md.o
 
 extra-$(CONFIG_KERNTYPES)	+= kerntypes.o
-CFLAGS_kerntypes.o		:= -gstabs
+#For IA64, compile kerntypes in dwarf-2 format.
+ifeq ($(CONFIG_IA64),y)
+CFLAGS_kerntypes.o             := -gdwarf-2
+else
+CFLAGS_kerntypes.o             := -gstabs
+endif
 
 # files to be removed upon make clean
 clean-files := ../include/linux/compile.h
