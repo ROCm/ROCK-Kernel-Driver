@@ -1317,6 +1317,8 @@ static inline void do_generic_file_read(struct file * filp, loff_t *ppos,
 
 extern struct file_operations generic_ro_fops;
 
+#define special_file(m) (S_ISCHR(m)||S_ISBLK(m)||S_ISFIFO(m)||S_ISSOCK(m))
+
 extern int vfs_readlink(struct dentry *, char __user *, int, const char *);
 extern int vfs_follow_link(struct nameidata *, const char *);
 extern int page_readlink(struct dentry *, char __user *, int);

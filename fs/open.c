@@ -20,8 +20,7 @@
 #include <linux/mount.h>
 #include <linux/vfs.h>
 #include <asm/uaccess.h>
-
-#define special_file(m) (S_ISCHR(m)||S_ISBLK(m)||S_ISFIFO(m)||S_ISSOCK(m))
+#include <linux/fs.h>
 
 int vfs_statfs(struct super_block *sb, struct kstatfs *buf)
 {

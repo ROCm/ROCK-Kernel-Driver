@@ -65,9 +65,6 @@ void jfs_read_inode(struct inode *inode)
 	}
 }
 
-/* This define is from fs/open.c */
-#define special_file(m) (S_ISCHR(m)||S_ISBLK(m)||S_ISFIFO(m)||S_ISSOCK(m))
-
 /*
  * Workhorse of both fsync & write_inode
  */
