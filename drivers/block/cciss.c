@@ -407,8 +407,7 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
                         driver_geo.sectors = 0x3f;
                         driver_geo.cylinders = hba[ctlr]->drv[dsk].nr_blocks / (0xff*0x3f);
                 }
-                driver_geo.start=
-                        hba[ctlr]->hd[minor(inode->i_rdev)].start_sect;
+                driver_geo.start= get_start_sect(inode->i_bdev);
                 if (copy_to_user((void *) arg, &driver_geo,
                                 sizeof( struct hd_geometry)))
                         return  -EFAULT;
@@ -705,7 +704,7 @@ static int cciss_revalidate(kdev_t dev)
         int ctlr = major(dev) - MAJOR_NR;
 	int target = minor(dev) >> NWD_SHIFT;
         struct gendisk *disk = &hba[ctlr]->gendisk[target];
-	disk->part[0].nr_sects = hba[ctlr]->drv[target].nr_blocks;
+	set_capacity(disk, hba[ctlr]->drv[target].nr_blocks);
 	return 0;
 }
 
@@ -742,7 +741,6 @@ static int revalidate_allvol(kdev_t dev)
 	for(i=0; i< NWD; i++) {
 		struct gendisk *disk = &hba[ctlr]->gendisk[i];
 		if (disk->major_name) {
-			wipe_partitions(mk_kdev(disk->major, disk->first_minor));
 			del_gendisk(disk);
 			disk->major_name = NULL;
 		}
@@ -752,7 +750,6 @@ static int revalidate_allvol(kdev_t dev)
          * Set the partition and block size structures for all volumes
          * on this controller to zero.  We will reread all of this data
          */
-	memset(hba[ctlr]->hd,         0, sizeof(struct hd_struct) * 256);
         memset(hba[ctlr]->drv,        0, sizeof(drive_info_struct)
 						* CISS_MAX_LUN);
         /*
@@ -802,7 +799,6 @@ static int deregister_disk(int ctlr, int logvol)
 
 	/* invalidate the devices and deregister the disk */ 
 	if (disk->major_name) {
-		wipe_partitions(mk_kdev(disk->major, disk->first_minor));
 		del_gendisk(disk);
 		disk->major_name = NULL;
 	}
@@ -2448,8 +2444,6 @@ static int __init cciss_init_one(struct pci_dev *pdev,
 		disk->first_minor = j << NWD_SHIFT;
 		disk->major_name = NULL;
 		disk->minor_shift = NWD_SHIFT;
-		disk->part = hba[i]->hd + (j << NWD_SHIFT);
-		disk->nr_real = 1;
 		if( !(drv->nr_blocks))
 			continue;
 		(BLK_DEFAULT_QUEUE(MAJOR_NR + i))->hardsect_size = drv->block_size;

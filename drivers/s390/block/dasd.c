@@ -302,7 +302,7 @@ dasd_state_new_to_known(dasd_device_t *device)
 	/* Add a proc directory and the dasd device entry to devfs. */
 	sprintf(buffer, "%04x", device->devinfo.devno);
 	dir = devfs_mk_dir(dasd_devfs_handle, buffer, device);
-	gdp->de_arr[0] = dir;
+	gdp->de = dir;
 	if (devmap->features & DASD_FEATURE_READONLY)
 		devfs_perm = S_IFBLK | S_IRUSR;
 	else
@@ -328,7 +328,7 @@ dasd_state_known_to_new(dasd_device_t * device)
 		return;
 	/* Remove device entry and devfs directory. */
 	devfs_unregister(device->devfs_entry);
-	devfs_unregister(gdp->de_arr[0]);
+	devfs_unregister(gdp->de);
 
 	/* Forget the discipline information. */
 	device->discipline = NULL;

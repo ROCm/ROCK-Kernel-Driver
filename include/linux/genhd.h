@@ -62,11 +62,12 @@ struct hd_struct {
 	unsigned long start_sect;
 	unsigned long nr_sects;
 	devfs_handle_t de;              /* primary (master) devfs entry  */
-	int number;                     /* stupid old code wastes space  */
 	struct device hd_driverfs_dev;  /* support driverfs hiearchy     */
 };
 
 #define GENHD_FL_REMOVABLE  1
+#define GENHD_FL_DRIVERFS  2
+#define GENHD_FL_DEVFS	4
 
 struct gendisk {
 	int major;			/* major number of driver */
@@ -76,23 +77,34 @@ struct gendisk {
 					   get real minor */
 
 	struct hd_struct *part;		/* [indexed by minor] */
-	int nr_real;			/* number of real devices */
-
 	struct gendisk *next;
 	struct block_device_operations *fops;
+	sector_t capacity;
 
-	devfs_handle_t *de_arr;         /* one per physical disc */
-	struct device **driverfs_dev_arr;/* support driverfs hierarchy */
-	char *flags;                    /* one per physical disc */
+	int flags;
+	int number;			/* devfs crap */
+	devfs_handle_t de;		/* more of the same */
+	devfs_handle_t disk_de;		/* piled higher and deeper */
+	struct device *driverfs_dev;
+	struct device disk_dev;
 };
 
 /* drivers/block/genhd.c */
 extern void add_gendisk(struct gendisk *gp);
 extern void del_gendisk(struct gendisk *gp);
+extern void unlink_gendisk(struct gendisk *gp);
 extern struct gendisk *get_gendisk(kdev_t dev);
 static inline unsigned long get_start_sect(struct block_device *bdev)
 {
 	return bdev->bd_offset;
+}
+static inline sector_t get_capacity(struct gendisk *disk)
+{
+	return disk->capacity;
+}
+static inline void set_capacity(struct gendisk *disk, sector_t size)
+{
+	disk->capacity = size;
 }
 
 #endif  /*  __KERNEL__  */
@@ -242,11 +254,10 @@ struct unixware_disklabel {
 
 #ifdef __KERNEL__
 
-char *disk_name (struct gendisk *hd, int minor, char *buf);
+char *disk_name (struct gendisk *hd, int part, char *buf);
 
-extern void devfs_register_partitions (struct gendisk *dev, int minor,
-				       int unregister);
-extern void driverfs_remove_partitions (struct gendisk *hd, int minor);
+extern int rescan_partitions(struct gendisk *disk, struct block_device *bdev);
+extern void update_partition(struct gendisk *disk, int part);
 
 static inline unsigned int disk_index (kdev_t dev)
 {

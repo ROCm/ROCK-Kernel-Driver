@@ -103,11 +103,6 @@ static ctl_table raid_root_table[] = {
 	{0}
 };
 
-/*
- * these have to be allocated separately because external
- * subsystems want to have a pre-defined structure
- */
-struct hd_struct md_hd_struct[MAX_MD_DEVS];
 static void md_recover_arrays(void);
 static mdk_thread_t *md_recovery_thread;
 
@@ -276,7 +271,7 @@ char * partition_name(kdev_t dev)
 	hd = get_gendisk (dev);
 	dname->name = NULL;
 	if (hd)
-		dname->name = disk_name (hd, minor(dev), dname->namebuf);
+		dname->name = disk_name(hd, minor(dev)-hd->first_minor, dname->namebuf);
 	if (!dname->name) {
 		sprintf (dname->namebuf, "[dev %s]", kdevname(dev));
 		dname->name = dname->namebuf;
@@ -618,7 +613,7 @@ static void free_mddev(mddev_t *mddev)
 
 	export_array(mddev);
 	md_size[mdidx(mddev)] = 0;
-	md_hd_struct[mdidx(mddev)].nr_sects = 0;
+	set_capacity(disks[mdidx(mddev)], 0);
 }
 
 #undef BAD_CSUM
@@ -1458,8 +1453,6 @@ static int do_md_run(mddev_t * mddev)
 	disk->minor_shift = 0;
 	sprintf(major_name, "md%d", mdidx(mddev));
 	disk->major_name = major_name;
-	disk->part = md_hd_struct + mdidx(mddev);
-	disk->nr_real = 1;
 	disk->fops = &md_fops;
 
 	mddev->pers = pers[pnum];
@@ -2344,7 +2337,7 @@ static int md_ioctl(struct inode *inode, struct file *file,
 			err = put_user (4, (char *) &loc->sectors);
 			if (err)
 				goto abort_unlock;
-			err = put_user (md_hd_struct[mdidx(mddev)].nr_sects/8,
+			err = put_user(get_capacity(disks[mdidx(mddev)])/8,
 						(short *) &loc->cylinders);
 			if (err)
 				goto abort_unlock;
@@ -3178,11 +3171,10 @@ int __init md_init(void)
 		return (-1);
 	}
 	devfs_handle = devfs_mk_dir (NULL, "md", NULL);
-	/* we don't use devfs_register_series because we want to fill md_hd_struct */
 	for (minor=0; minor < MAX_MD_DEVS; ++minor) {
 		char devname[128];
 		sprintf (devname, "%u", minor);
-		md_hd_struct[minor].de = devfs_register (devfs_handle,
+		devfs_register (devfs_handle,
 			devname, DEVFS_FL_DEFAULT, MAJOR_NR, minor,
 			S_IFBLK | S_IRUSR | S_IWUSR, &md_fops, NULL);
 	}
