@@ -35,15 +35,17 @@
 #define NFSDBG_FACILITY		NFSDBG_FILE
 
 static int  nfs_file_mmap(struct file *, struct vm_area_struct *);
-static ssize_t nfs_file_read(struct file *, char *, size_t, loff_t *);
-static ssize_t nfs_file_write(struct file *, const char *, size_t, loff_t *);
+static ssize_t nfs_file_read(struct kiocb *, char *, size_t, loff_t);
+static ssize_t nfs_file_write(struct kiocb *, const char *, size_t, loff_t);
 static int  nfs_file_flush(struct file *);
 static int  nfs_fsync(struct file *, struct dentry *dentry, int datasync);
 
 struct file_operations nfs_file_operations = {
 	.llseek		= remote_llseek,
-	.read		= nfs_file_read,
-	.write		= nfs_file_write,
+	.read		= do_sync_read,
+	.write		= do_sync_write,
+	.aio_read		= nfs_file_read,
+	.aio_write		= nfs_file_write,
 	.mmap		= nfs_file_mmap,
 	.open		= nfs_open,
 	.flush		= nfs_file_flush,
@@ -89,19 +91,19 @@ nfs_file_flush(struct file *file)
 }
 
 static ssize_t
-nfs_file_read(struct file * file, char * buf, size_t count, loff_t *ppos)
+nfs_file_read(struct kiocb *iocb, char * buf, size_t count, loff_t pos)
 {
-	struct dentry * dentry = file->f_dentry;
+	struct dentry * dentry = iocb->ki_filp->f_dentry;
 	struct inode * inode = dentry->d_inode;
 	ssize_t result;
 
 	dfprintk(VFS, "nfs: read(%s/%s, %lu@%lu)\n",
 		dentry->d_parent->d_name.name, dentry->d_name.name,
-		(unsigned long) count, (unsigned long) *ppos);
+		(unsigned long) count, (unsigned long) pos);
 
 	result = nfs_revalidate_inode(NFS_SERVER(inode), inode);
 	if (!result)
-		result = generic_file_read(file, buf, count, ppos);
+		result = generic_file_aio_read(iocb, buf, count, pos);
 	return result;
 }
 
@@ -209,15 +211,15 @@ struct address_space_operations nfs_file_aops = {
  * Write to a file (through the page cache).
  */
 static ssize_t
-nfs_file_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
+nfs_file_write(struct kiocb *iocb, const char *buf, size_t count, loff_t pos)
 {
-	struct dentry * dentry = file->f_dentry;
+	struct dentry * dentry = iocb->ki_filp->f_dentry;
 	struct inode * inode = dentry->d_inode;
 	ssize_t result;
 
 	dfprintk(VFS, "nfs: write(%s/%s(%ld), %lu@%lu)\n",
 		dentry->d_parent->d_name.name, dentry->d_name.name,
-		inode->i_ino, (unsigned long) count, (unsigned long) *ppos);
+		inode->i_ino, (unsigned long) count, (unsigned long) pos);
 
 	result = -EBUSY;
 	if (IS_SWAPFILE(inode))
@@ -230,7 +232,7 @@ nfs_file_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
 	if (!count)
 		goto out;
 
-	result = generic_file_write(file, buf, count, ppos);
+	result = generic_file_aio_write(iocb, buf, count, pos);
 out:
 	return result;
 

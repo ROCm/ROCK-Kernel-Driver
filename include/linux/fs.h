@@ -747,7 +747,7 @@ struct file_operations {
 	ssize_t (*read) (struct file *, char *, size_t, loff_t *);
 	ssize_t (*aio_read) (struct kiocb *, char *, size_t, loff_t);
 	ssize_t (*write) (struct file *, const char *, size_t, loff_t *);
-	ssize_t (*aio_write) (struct kiocb *, char *, size_t, loff_t);
+	ssize_t (*aio_write) (struct kiocb *, const char *, size_t, loff_t);
 	int (*readdir) (struct file *, void *, filldir_t);
 	unsigned int (*poll) (struct file *, struct poll_table_struct *);
 	int (*ioctl) (struct inode *, struct file *, unsigned int, unsigned long);
@@ -1239,6 +1239,10 @@ extern int generic_file_mmap(struct file *, struct vm_area_struct *);
 extern int file_read_actor(read_descriptor_t * desc, struct page *page, unsigned long offset, unsigned long size);
 extern ssize_t generic_file_read(struct file *, char *, size_t, loff_t *);
 extern ssize_t generic_file_write(struct file *, const char *, size_t, loff_t *);
+extern ssize_t generic_file_aio_read(struct kiocb *, char *, size_t, loff_t);
+extern ssize_t generic_file_aio_write(struct kiocb *, const char *, size_t, loff_t);
+extern ssize_t do_sync_read(struct file *filp, char *buf, size_t len, loff_t *ppos);
+extern ssize_t do_sync_write(struct file *filp, const char *buf, size_t len, loff_t *ppos);
 ssize_t generic_file_write_nolock(struct file *file, const struct iovec *iov,
 				unsigned long nr_segs, loff_t *ppos);
 extern ssize_t generic_file_sendfile(struct file *, struct file *, loff_t *, size_t);
