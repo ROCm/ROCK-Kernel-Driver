@@ -59,6 +59,7 @@
 #include <asm/eeh.h>
 #include <asm/processor.h>
 #include <asm/mmzone.h>
+#include <asm/cputable.h>
 
 #include <asm/ppcdebug.h>
 
@@ -512,7 +513,7 @@ void __init paging_init(void)
 
 static struct kcore_list kcore_vmem;
 
-static void setup_kcore(void)
+static int __init setup_kcore(void)
 {
 	int i;
 
@@ -536,7 +537,10 @@ static void setup_kcore(void)
 	}
 
 	kclist_add(&kcore_vmem, (void *)VMALLOC_START, VMALLOC_END-VMALLOC_START);
+
+	return 0;
 }
+module_init(setup_kcore);
 
 void initialize_paca_hardware_interrupt_stack(void);
 
@@ -605,8 +609,6 @@ void __init mem_init(void)
 	       PAGE_OFFSET, (unsigned long)__va(lmb_end_of_DRAM()));
 #endif
 	mem_init_done = 1;
-
-	setup_kcore();
 
 	/* set the last page of each hardware interrupt stack to be protected */
 	initialize_paca_hardware_interrupt_stack();
@@ -698,7 +700,7 @@ void update_mmu_cache(struct vm_area_struct *vma, unsigned long ea,
 	int local = 0;
 
 	/* handle i-cache coherency */
-	if (!cpu_has_noexecute()) {
+	if (!(cur_cpu_spec->cpu_features & CPU_FTR_NOEXECUTE)) {
 		unsigned long pfn = pte_pfn(pte);
 		if (pfn_valid(pfn)) {
 			struct page *page = pfn_to_page(pfn);
