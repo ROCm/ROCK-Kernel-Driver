@@ -1470,9 +1470,6 @@ static int tcp_v6_do_rcv(struct sock *sk, struct sk_buff *skb)
 {
 	struct ipv6_pinfo *np = inet6_sk(sk);
 	struct tcp_opt *tp;
-#ifdef CONFIG_FILTER
-	struct sk_filter *filter;
-#endif
 	struct sk_buff *opt_skb = NULL;
 
 	/* Imagine: socket is IPv6. IPv4 packet arrives,
@@ -1486,11 +1483,8 @@ static int tcp_v6_do_rcv(struct sock *sk, struct sk_buff *skb)
 	if (skb->protocol == htons(ETH_P_IP))
 		return tcp_v4_do_rcv(sk, skb);
 
-#ifdef CONFIG_FILTER
-	filter = sk->filter;
-	if (filter && sk_filter(skb, filter))
+	if (sk_filter(sk, skb, 0))
 		goto discard;
-#endif /* CONFIG_FILTER */
 
 	/*
 	 *	socket locking is here for SMP purposes as backlog rcv
@@ -1641,6 +1635,9 @@ process:
 	if(sk->state == TCP_TIME_WAIT)
 		goto do_time_wait;
 
+	if (sk_filter(sk, skb, 0))
+		goto discard_and_relse;
+
 	skb->dev = NULL;
 
 	bh_lock_sock(sk);
@@ -1672,6 +1669,10 @@ discard_it:
 	kfree_skb(skb);
 	return 0;
 
+discard_and_relse:
+	sock_put(sk);
+	goto discard_it;
+                
 do_time_wait:
 	if (skb->len < (th->doff<<2) || tcp_checksum_complete(skb)) {
 		TCP_INC_STATS_BH(TcpInErrs);

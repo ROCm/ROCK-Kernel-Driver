@@ -684,6 +684,12 @@ struct swap_info_struct;
  *	@sock contains the socket structure.
  *	@how contains the flag indicating how future sends and receives are handled.
  *	Return 0 if permission is granted.
+ * @socket_sock_rcv_skb:
+ *	Check permissions on incoming network packets.  This hook is distinct
+ *	from Netfilter's IP input hooks since it is the first time that the
+ *	incoming sk_buff @skb has been associated with a particular socket, @sk.
+ *	@sk contains the sock (not socket) associated with the incoming sk_buff.
+ *	@skb contains the incoming network data.
  *
  * Security hooks affecting all System V IPC operations.
  *
@@ -1073,6 +1079,7 @@ struct security_operations {
 	int (*socket_getsockopt) (struct socket * sock, int level, int optname);
 	int (*socket_setsockopt) (struct socket * sock, int level, int optname);
 	int (*socket_shutdown) (struct socket * sock, int how);
+	int (*socket_sock_rcv_skb) (struct sock * sk, struct sk_buff * skb);
 #endif	/* CONFIG_SECURITY_NETWORK */
 };
 
@@ -2312,6 +2319,12 @@ static inline int security_socket_shutdown(struct socket * sock, int how)
 {
 	return security_ops->socket_shutdown(sock, how);
 }
+
+static inline int security_sock_rcv_skb (struct sock * sk, 
+					 struct sk_buff * skb)
+{
+	return security_ops->socket_sock_rcv_skb (sk, skb);
+}
 #else	/* CONFIG_SECURITY_NETWORK */
 static inline int security_socket_create (int family, int type, int protocol)
 {
@@ -2391,6 +2404,11 @@ static inline int security_socket_setsockopt(struct socket * sock,
 }
 
 static inline int security_socket_shutdown(struct socket * sock, int how)
+{
+	return 0;
+}
+static inline int security_sock_rcv_skb (struct sock * sk, 
+					 struct sk_buff * skb)
 {
 	return 0;
 }

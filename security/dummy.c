@@ -674,6 +674,10 @@ static int dummy_socket_shutdown (struct socket *sock, int how)
 	return 0;
 }
 
+static int dummy_socket_sock_rcv_skb (struct sock *sk, struct sk_buff *skb)
+{
+	return 0;
+}
 #endif	/* CONFIG_SECURITY_NETWORK */
 
 static int dummy_register_security (const char *name, struct security_operations *ops)
@@ -819,6 +823,7 @@ void security_fixup_ops (struct security_operations *ops)
 	set_to_dummy_if_null(ops, socket_setsockopt);
 	set_to_dummy_if_null(ops, socket_getsockopt);
 	set_to_dummy_if_null(ops, socket_shutdown);
+	set_to_dummy_if_null(ops, socket_sock_rcv_skb);
 #endif	/* CONFIG_SECURITY_NETWORK */
 }
 

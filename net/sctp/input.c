@@ -159,6 +159,10 @@ int sctp_rcv(struct sk_buff *skb)
 	if (!xfrm_policy_check(sk, XFRM_POLICY_IN, skb))
 		goto discard_release;
 
+	ret = sk_filter(sk, skb, 1);
+	if (ret)
+                goto discard_release;
+
 	/* Create an SCTP packet structure. */
 	chunk = sctp_chunkify(skb, asoc, sk);
 	if (!chunk) {
