@@ -323,11 +323,12 @@ setsid (void)
 	return sys_setsid();
 }
 
+struct rusage;
+
 static inline pid_t
 waitpid (int pid, int * wait_stat, int flags)
 {
 	extern asmlinkage long sys_wait4 (pid_t, unsigned int *, int, struct rusage *);
-	struct rusage;
 
 	return sys_wait4(pid, wait_stat, flags, NULL);
 }
@@ -374,8 +375,7 @@ clone (unsigned long flags, void *sp)
 	asm volatile ( "break " __stringify(__BREAK_SYSCALL) ";;\n\t"
 		       : "=r" (r8), "=r" (r10), "=r" (r15), "=r" (out0), "=r" (out1)
 		       : "2" (r15), "3" (out0), "4" (out1)
-		       : "memory", "out0", "out1", "out2", "out3", "out4", "out5", "out6", "out7",
-		       "r13",
+		       : "memory", "out2", "out3", "out4", "out5", "out6", "out7", "r13",
 		       /* Non-stacked integer registers, minus r8, r10, r15, r13  */
 		       "r2", "r3", "r9", "r11", "r12", "r14", "r16", "r17", "r18",
 		       "r19", "r20", "r21", "r22", "r23", "r24", "r25", "r26", "r27",
