@@ -1038,9 +1038,10 @@ static int arlan_mac_addr(struct net_device *dev, void *p)
 
 
 
-static void __init arlan_setup_device(struct net_device *dev, int num)
+static int __init arlan_setup_device(struct net_device *dev, int num)
 {
 	struct arlan_private *ap = dev->priv;
+	int err;
 
 	ARLAN_DEBUG_ENTRY("arlan_setup_device");
 
@@ -1058,14 +1059,23 @@ static void __init arlan_setup_device(struct net_device *dev, int num)
 	dev->watchdog_timeo = 3*HZ;
 	
 	ap->irq_test_done = 0;
-	arlan_device[num] = dev;
 	ap->Conf = &arlan_conf[num];
 
 	ap->Conf->pre_Command_Wait = 40;
 	ap->Conf->rx_tweak1 = 30;
 	ap->Conf->rx_tweak2 = 0;
 
+
+	err = register_netdev(dev);
+	if (err) {
+		release_mem_region(virt_to_phys((void *) dev->mem_start), 
+			   ARLAN_SHMEM_SIZE);
+		free_netdev(dev);
+		return err;
+	}
+	arlan_device[num] = dev;
 	ARLAN_DEBUG_EXIT("arlan_setup_device");
+	return 0;
 }
 
 static int __init arlan_probe_here(struct net_device *dev, 
@@ -1772,6 +1782,7 @@ static void arlan_set_multicast(struct net_device *dev)
 struct net_device * __init arlan_probe(int unit)
 {
 	struct net_device *dev;
+	int err;
 	int m;
 
 	ARLAN_DEBUG_ENTRY("arlan_probe");
@@ -1822,10 +1833,11 @@ struct net_device * __init arlan_probe(int unit)
 	return ERR_PTR(-ENODEV);
 
  found:
-	arlan_setup_device(dev, arlans_found++);
-	if (arlans_found == 1) {
+	err = arlan_setup_device(dev, arlans_found);
+	if (err)
+		dev = ERR_PTR(err);
+	else if (!arlans_found++)
 		printk(KERN_INFO "Arlan driver %s\n", arlan_version);
-	}
 
 	return dev;
 }
