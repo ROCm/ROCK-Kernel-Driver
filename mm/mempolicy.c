@@ -1022,7 +1022,7 @@ void __init numa_policy_init(void)
 
 /* Reset policy of current process to default.
  * Assumes fs == KERNEL_DS */
-void __init numa_default_policy(void)
+void numa_default_policy(void)
 {
 	sys_set_mempolicy(MPOL_DEFAULT, NULL, 0);
 }
