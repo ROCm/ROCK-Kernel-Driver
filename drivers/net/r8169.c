@@ -614,7 +614,7 @@ static void rtl8169_phy_timer(unsigned long __opaque)
 		}
 	}
 
-	mod_timer(timer, RTL8169_PHY_TIMEOUT);
+	mod_timer(timer, jiffies + RTL8169_PHY_TIMEOUT);
 }
 
 static inline void rtl8169_delete_timer(struct net_device *dev)
