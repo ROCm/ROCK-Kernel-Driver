@@ -790,13 +790,9 @@ static void scsi_softirq(struct softirq_action *h)
 				if ((status_byte(SCpnt->result) & CHECK_CONDITION) != 0) {
 					SCSI_LOG_MLCOMPLETE(3, print_sense("bh", SCpnt));
 				}
-				if (SCpnt->device->host->eh_wait != NULL) {
-					scsi_eh_eflags_set(SCpnt, SCSI_EH_CMD_FAILED | SCSI_EH_CMD_ERR);
-					SCpnt->owner = SCSI_OWNER_ERROR_HANDLER;
-					SCpnt->state = SCSI_STATE_FAILED;
 
-					scsi_host_failed_inc_and_test(SCpnt->device->host);
-				} else {
+				if (!scsi_eh_scmd_add(SCpnt, 0))
+				{
 					/*
 					 * We only get here if the error
 					 * recovery thread has died.

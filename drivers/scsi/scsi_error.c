@@ -56,6 +56,49 @@
 #define HOST_RESET_SETTLE_TIME  10*HZ
 
 /**
+ * scsi_eh_scmd_add - add scsi cmd to error handling.
+ * @scmd:	scmd to run eh on.
+ * @eh_flag:	optional SCSI_EH flag.
+ *
+ * Return value:
+ *	0 on failure.
+ **/
+int scsi_eh_scmd_add(struct scsi_cmnd *scmd, int eh_flag)
+{
+	struct Scsi_Host *shost = scmd->device->host;
+	unsigned long flags;
+
+	if (shost->eh_wait == NULL)
+		return 0;
+
+	spin_lock_irqsave(shost->host_lock, flags);
+
+	scsi_eh_eflags_set(scmd, eh_flag);
+	/*
+	 * FIXME: Can we stop setting owner and state.
+	 */
+	scmd->owner = SCSI_OWNER_ERROR_HANDLER;
+	scmd->state = SCSI_STATE_FAILED;
+	/*
+	 * Set the serial_number_at_timeout to the current
+	 * serial_number
+	 */
+	scmd->serial_number_at_timeout = scmd->serial_number;
+	list_add_tail(&scmd->eh_list, &shost->eh_cmd_list);
+	shost->in_recovery = 1;
+	shost->host_failed++;
+	if (shost->host_busy == shost->host_failed) {
+		up(shost->eh_wait);
+		SCSI_LOG_ERROR_RECOVERY(5, printk("Waking error handler"
+					  " thread\n"));
+	}
+
+	spin_unlock_irqrestore(shost->host_lock, flags);
+
+	return 1;
+}
+
+/**
  * scsi_add_timer - Start timeout timer for a single scsi command.
  * @scmd:	scsi command that is about to start running.
  * @timeout:	amount of time to allow this command to run.
@@ -131,22 +174,14 @@ int scsi_delete_timer(Scsi_Cmnd *scmd)
  **/
 void scsi_times_out(Scsi_Cmnd *scmd)
 {
-	struct Scsi_Host *shost = scmd->device->host;
-
-	/* Set the serial_number_at_timeout to the current serial_number */
-	scmd->serial_number_at_timeout = scmd->serial_number;
-
-	scsi_eh_eflags_set(scmd, SCSI_EH_CMD_TIMEOUT | SCSI_EH_CMD_ERR);
-
-	if (unlikely(shost->eh_wait == NULL)) {
+	if (unlikely(!scsi_eh_scmd_add(scmd, SCSI_EH_CANCEL_CMD))) {
 		panic("Error handler thread not present at %p %p %s %d",
-		      scmd, shost, __FILE__, __LINE__);
+		      scmd, scmd->device->host, __FILE__, __LINE__);
 	}
 
-	scsi_host_failed_inc_and_test(shost);
-
 	SCSI_LOG_TIMEOUT(3, printk("Command timed out busy=%d failed=%d\n",
-				   shost->host_busy, shost->host_failed));
+				   scmd->device->host->host_busy,
+				   scmd->device->host->host_failed));
 }
 
 /**
