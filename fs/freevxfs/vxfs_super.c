@@ -143,6 +143,7 @@ static int vxfs_fill_super(struct super_block *sbp, void *dp, int silent)
 	struct vxfs_sb		*rsbp;
 	struct buffer_head	*bp = NULL;
 	u_long			bsize;
+	struct inode *root;
 
 	infp = kmalloc(sizeof(*infp), GFP_KERNEL);
 	if (!infp) {
@@ -208,8 +209,10 @@ static int vxfs_fill_super(struct super_block *sbp, void *dp, int silent)
 	}
 
 	sbp->s_op = &vxfs_super_ops;
-	sbp->s_root = d_alloc_root(iget(sbp, VXFS_ROOT_INO));
+	root = iget(sbp, VXFS_ROOT_INO);
+	sbp->s_root = d_alloc_root(root);
 	if (!sbp->s_root) {
+		iput(root);
 		printk(KERN_WARNING "vxfs: unable to get root dentry.\n");
 		goto out_free_ilist;
 	}

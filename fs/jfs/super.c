@@ -321,7 +321,7 @@ cleanup:
 	return 0;
 }
 
-int jfs_remount(struct super_block *sb, int *flags, char *data)
+static int jfs_remount(struct super_block *sb, int *flags, char *data)
 {
 	s64 newLVSize = 0;
 	int rc = 0;
@@ -381,6 +381,7 @@ static int jfs_fill_super(struct super_block *sb, void *data, int silent)
 		return -ENOSPC;
 	memset(sbi, 0, sizeof (struct jfs_sb_info));
 	sb->s_fs_info = sbi;
+	sbi->sb = sb;
 
 	/* initialize the mount flag and determine the default error handler */
 	flag = JFS_ERR_REMOUNT_RO;

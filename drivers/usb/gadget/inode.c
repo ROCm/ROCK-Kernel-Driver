@@ -1812,7 +1812,6 @@ gadgetfs_fill_super (struct super_block *sb, void *opts, int silent)
 		return -ENOMEM;
 	inode->i_op = &simple_dir_inode_operations;
 	if (!(d = d_alloc_root (inode))) {
-enomem:
 		iput (inode);
 		return -ENOMEM;
 	}
@@ -1823,12 +1822,15 @@ enomem:
 	 */
 	dev = dev_new ();
 	if (!dev)
-		goto enomem;
+		return -ENOMEM;
+
 	dev->sb = sb;
 	if (!(inode = gadgetfs_create_file (sb, CHIP,
 				dev, &dev_init_operations,
-				&dev->dentry)))
-		goto enomem;
+				&dev->dentry))) {
+		put_dev(dev);
+		return -ENOMEM;
+	}
 
 	/* other endpoint files are available after hardware setup,
 	 * from binding to a controller.
@@ -1849,8 +1851,10 @@ static void
 gadgetfs_kill_sb (struct super_block *sb)
 {
 	kill_litter_super (sb);
-	put_dev (the_device);
-	the_device = 0;
+	if (the_device) {
+		put_dev (the_device);
+		the_device = 0;
+	}
 }
 
 /*----------------------------------------------------------------------*/

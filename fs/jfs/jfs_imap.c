@@ -2055,7 +2055,7 @@ static int diAllocExt(struct inomap * imap, int agno, struct inode *ip)
 static int diAllocBit(struct inomap * imap, struct iag * iagp, int ino)
 {
 	int extno, bitno, agno, sword, rc;
-	struct metapage *amp, *bmp;
+	struct metapage *amp = NULL, *bmp = NULL;
 	struct iag *aiagp = 0, *biagp = 0;
 	u32 mask;
 
@@ -2065,8 +2065,6 @@ static int diAllocBit(struct inomap * imap, struct iag * iagp, int ino)
 	 * it on the list.
 	 */
 	if (iagp->nfreeinos == cpu_to_le32(1)) {
-		amp = bmp = NULL;
-
 		if ((int) le32_to_cpu(iagp->inofreefwd) >= 0) {
 			if ((rc =
 			     diIAGRead(imap, le32_to_cpu(iagp->inofreefwd),

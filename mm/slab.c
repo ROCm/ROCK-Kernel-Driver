@@ -521,8 +521,18 @@ enum {
 static DEFINE_PER_CPU(struct timer_list, reap_timers);
 
 static void reap_timer_fnc(unsigned long data);
-
+static void free_block(kmem_cache_t* cachep, void** objpp, int len);
 static void enable_cpucache (kmem_cache_t *cachep);
+
+static inline void ** ac_entry(struct array_cache *ac)
+{
+	return (void**)(ac+1);
+}
+
+static inline struct array_cache *ac_data(kmem_cache_t *cachep)
+{
+	return cachep->array[smp_processor_id()];
+}
 
 /* Cal the num objs, wastage, and bytes left over for a given slab size. */
 static void cache_estimate (unsigned long gfporder, size_t size,
@@ -573,6 +583,7 @@ static void start_cpu_timer(int cpu)
 	if (rt->function == NULL) {
 		init_timer(rt);
 		rt->expires = jiffies + HZ + 3*cpu;
+		rt->data = cpu;
 		rt->function = reap_timer_fnc;
 		add_timer_on(rt, cpu);
 	}
@@ -589,16 +600,15 @@ static int __devinit cpuup_callback(struct notifier_block *nfb,
 				  void *hcpu)
 {
 	long cpu = (long)hcpu;
-	struct list_head *p;
+	kmem_cache_t* cachep;
 
 	switch (action) {
 	case CPU_UP_PREPARE:
 		down(&cache_chain_sem);
-		list_for_each(p, &cache_chain) {
+		list_for_each_entry(cachep, &cache_chain, next) {
 			int memsize;
 			struct array_cache *nc;
 
-			kmem_cache_t* cachep = list_entry(p, kmem_cache_t, next);
 			memsize = sizeof(void*)*cachep->limit+sizeof(struct array_cache);
 			nc = kmalloc(memsize, GFP_KERNEL);
 			if (!nc)
@@ -618,15 +628,13 @@ static int __devinit cpuup_callback(struct notifier_block *nfb,
 		up(&cache_chain_sem);
 		break;
 	case CPU_ONLINE:
-		if (g_cpucache_up == FULL)
-			start_cpu_timer(cpu);
+		start_cpu_timer(cpu);
 		break;
 	case CPU_UP_CANCELED:
 		down(&cache_chain_sem);
 
-		list_for_each(p, &cache_chain) {
+		list_for_each_entry(cachep, &cache_chain, next) {
 			struct array_cache *nc;
-			kmem_cache_t* cachep = list_entry(p, kmem_cache_t, next);
 
 			nc = cachep->array[cpu];
 			cachep->array[cpu] = NULL;
@@ -642,16 +650,6 @@ bad:
 }
 
 static struct notifier_block cpucache_notifier = { &cpuup_callback, NULL, 0 };
-
-static inline void ** ac_entry(struct array_cache *ac)
-{
-	return (void**)(ac+1);
-}
-
-static inline struct array_cache *ac_data(kmem_cache_t *cachep)
-{
-	return cachep->array[smp_processor_id()];
-}
 
 /* Initialisation.
  * Called after the gfp() functions have been enabled, and before smp_init().
@@ -1368,7 +1366,6 @@ static void smp_call_function_all_cpus(void (*func) (void *arg), void *arg)
 	preempt_enable();
 }
 
-static void free_block (kmem_cache_t* cachep, void** objpp, int len);
 static void drain_array_locked(kmem_cache_t* cachep,
 				struct array_cache *ac, int force);
 
@@ -2134,7 +2131,7 @@ EXPORT_SYMBOL(kmem_cache_alloc);
  *
  * Currently only used for dentry validation.
  */
-int kmem_ptr_validate(kmem_cache_t *cachep, void *ptr)
+int fastcall kmem_ptr_validate(kmem_cache_t *cachep, void *ptr)
 {
 	unsigned long addr = (unsigned long) ptr;
 	unsigned long min_addr = PAGE_OFFSET;
@@ -2601,17 +2598,19 @@ next:
 }
 
 /*
- * This is a timer handler.  There is on per CPU.  It is called periodially
+ * This is a timer handler.  There is one per CPU.  It is called periodially
  * to shrink this CPU's caches.  Otherwise there could be memory tied up
  * for long periods (or for ever) due to load changes.
  */
-static void reap_timer_fnc(unsigned long data)
+static void reap_timer_fnc(unsigned long cpu)
 {
-	int cpu = smp_processor_id();
 	struct timer_list *rt = &__get_cpu_var(reap_timers);
 
-	cache_reap();
-	mod_timer(rt, jiffies + REAPTIMEOUT_CPUC + cpu);
+	/* CPU hotplug can drag us off cpu: don't run on wrong CPU */
+	if (!cpu_is_offline(cpu)) {
+		cache_reap();
+		mod_timer(rt, jiffies + REAPTIMEOUT_CPUC + cpu);
+	}
 }
 
 #ifdef CONFIG_PROC_FS

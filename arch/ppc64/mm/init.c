@@ -794,7 +794,7 @@ void update_mmu_cache(struct vm_area_struct *vma, unsigned long ea,
 	if (!ptep)
 		return;
 
-	vsid = get_vsid(vma->vm_mm->context, ea);
+	vsid = get_vsid(vma->vm_mm->context.id, ea);
 
 	tmp = cpumask_of_cpu(smp_processor_id());
 	if (cpus_equal(vma->vm_mm->cpu_vm_mask, tmp))

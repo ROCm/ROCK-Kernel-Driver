@@ -18,14 +18,24 @@
 
 #ifndef __ASSEMBLY__
 
-/* Default "unsigned long" context */
-typedef unsigned long mm_context_t;
+/* Time to allow for more things here */
+typedef unsigned long mm_context_id_t;
+typedef struct {
+	mm_context_id_t id;
+#ifdef CONFIG_HUGETLB_PAGE
+	int low_hpages;
+#endif
+} mm_context_t;
 
 #ifdef CONFIG_HUGETLB_PAGE
-#define CONTEXT_LOW_HPAGES	(1UL<<63)
+#define KERNEL_LOW_HPAGES	.low_hpages = 0,
 #else
-#define CONTEXT_LOW_HPAGES	0
+#define KERNEL_LOW_HPAGES
 #endif
+
+#define KERNEL_CONTEXT(ea) ({ \
+		mm_context_t ctx = { .id = REGION_ID(ea), KERNEL_LOW_HPAGES}; \
+		ctx; })
 
 /*
  * Hardware Segment Lookaside Buffer Entry

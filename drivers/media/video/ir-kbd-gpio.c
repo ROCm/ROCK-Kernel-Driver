@@ -279,14 +279,18 @@ static int ir_probe(struct device *dev)
 	switch (sub->core->type) {
 	case BTTV_AVERMEDIA:
 	case BTTV_AVPHONE98:
+	case BTTV_AVERMEDIA98:
 		ir_codes         = ir_codes_avermedia;
 		ir->mask_keycode = 0xf80000;
 		ir->mask_keydown = 0x010000;
 		break;
-	case BTTV_WINFAST2000:
-		ir_codes         = winfast_codes;
-		ir->mask_keycode = 0x8f8;
-		break;
+
+	case BTTV_PXELVWPLTVPAK:
+		ir_codes         = ir_codes_pixelview;
+		ir->mask_keycode = 0x003e00;
+		ir->mask_keyup   = 0x010000;
+		ir->polling      = 50; // ms
+                break;
 	case BTTV_PV_BT878P_9B:
 	case BTTV_PV_BT878P_PLUS:
 		ir_codes         = ir_codes_pixelview;
@@ -294,6 +298,17 @@ static int ir_probe(struct device *dev)
 		ir->mask_keyup   = 0x008000;
 		ir->polling      = 50; // ms
                 break;
+
+	case BTTV_WINFAST2000:
+		ir_codes         = winfast_codes;
+		ir->mask_keycode = 0x8f8;
+		break;
+	case BTTV_MAGICTVIEW061:
+	case BTTV_MAGICTVIEW063:
+		ir_codes         = winfast_codes;
+		ir->mask_keycode = 0x0008e000;
+		ir->mask_keydown = 0x00200000;
+		break;
 	}
 	if (NULL == ir_codes) {
 		kfree(ir);

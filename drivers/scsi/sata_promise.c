@@ -35,7 +35,7 @@
 #include <asm/io.h>
 
 #define DRV_NAME	"sata_promise"
-#define DRV_VERSION	"0.90"
+#define DRV_VERSION	"0.91"
 
 
 enum {
@@ -1013,6 +1013,14 @@ static void pdc_eng_timeout(struct ata_port *ap)
 		       ap->id);
 		goto out;
 	}
+
+	/* hack alert!  We cannot use the supplied completion
+	 * function from inside the ->eh_strategy_handler() thread.
+	 * libata is the only user of ->eh_strategy_handler() in
+	 * any kernel, so the default scsi_done() assumes it is
+	 * not being called from the SCSI EH.
+	 */
+	qc->scsidone = scsi_finish_command;
 
 	switch (qc->tf.protocol) {
 	case ATA_PROT_DMA_READ:

@@ -448,6 +448,7 @@ static int hpfs_fill_super(struct super_block *s, void *options, int silent)
 	struct hpfs_super_block *superblock;
 	struct hpfs_spare_block *spareblock;
 	struct hpfs_sb_info *sbi;
+	struct inode *root;
 
 	uid_t uid;
 	gid_t gid;
@@ -613,10 +614,11 @@ static int hpfs_fill_super(struct super_block *s, void *options, int silent)
 	brelse(bh0);
 
 	hpfs_lock_iget(s, 1);
-	s->s_root = d_alloc_root(iget(s, sbi->sb_root));
+	root = iget(s, sbi->sb_root);
 	hpfs_unlock_iget(s);
-	if (!s->s_root || !s->s_root->d_inode) {
-		printk("HPFS: iget failed. Why???\n");
+	s->s_root = d_alloc_root(root);
+	if (!s->s_root) {
+		iput(root);
 		goto bail0;
 	}
 	hpfs_set_dentry_operations(s->s_root);
@@ -627,22 +629,24 @@ static int hpfs_fill_super(struct super_block *s, void *options, int silent)
 
 	root_dno = hpfs_fnode_dno(s, sbi->sb_root);
 	if (root_dno)
-		de = map_dirent(s->s_root->d_inode, root_dno, "\001\001", 2, NULL, &qbh);
-	if (!root_dno || !de) hpfs_error(s, "unable to find root dir");
+		de = map_dirent(root, root_dno, "\001\001", 2, NULL, &qbh);
+	if (!de)
+		hpfs_error(s, "unable to find root dir");
 	else {
-		s->s_root->d_inode->i_atime.tv_sec = local_to_gmt(s, de->read_date);
-		s->s_root->d_inode->i_atime.tv_nsec = 0;
-		s->s_root->d_inode->i_mtime.tv_sec = local_to_gmt(s, de->write_date);
-		s->s_root->d_inode->i_mtime.tv_nsec = 0;
-		s->s_root->d_inode->i_ctime.tv_sec = local_to_gmt(s, de->creation_date);
-		s->s_root->d_inode->i_ctime.tv_nsec = 0;
-		hpfs_i(s->s_root->d_inode)->i_ea_size = de->ea_size;
-		hpfs_i(s->s_root->d_inode)->i_parent_dir = s->s_root->d_inode->i_ino;
-		if (s->s_root->d_inode->i_size == -1) s->s_root->d_inode->i_size = 2048;
-		if (s->s_root->d_inode->i_blocks == -1) s->s_root->d_inode->i_blocks = 5;
+		root->i_atime.tv_sec = local_to_gmt(s, de->read_date);
+		root->i_atime.tv_nsec = 0;
+		root->i_mtime.tv_sec = local_to_gmt(s, de->write_date);
+		root->i_mtime.tv_nsec = 0;
+		root->i_ctime.tv_sec = local_to_gmt(s, de->creation_date);
+		root->i_ctime.tv_nsec = 0;
+		hpfs_i(root)->i_ea_size = de->ea_size;
+		hpfs_i(root)->i_parent_dir = root->i_ino;
+		if (root->i_size == -1)
+			root->i_size = 2048;
+		if (root->i_blocks == -1)
+			root->i_blocks = 5;
+		hpfs_brelse4(&qbh);
 	}
-	if (de) hpfs_brelse4(&qbh);
-
 	return 0;
 
 bail4:	brelse(bh2);

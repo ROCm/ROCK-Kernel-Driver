@@ -77,6 +77,8 @@ struct hci_dev {
 	__u16		link_policy;
 	__u16		link_mode;
 
+	unsigned long	quirks;
+
 	atomic_t 	cmd_cnt;
 	unsigned int 	acl_cnt;
 	unsigned int 	sco_cnt;
@@ -128,6 +130,7 @@ struct hci_dev {
 	int (*flush)(struct hci_dev *hdev);
 	int (*send)(struct sk_buff *skb);
 	void (*destruct)(struct hci_dev *hdev);
+	void (*notify)(struct hci_dev *hdev, unsigned int evt);
 	int (*ioctl)(struct hci_dev *hdev, unsigned int cmd, unsigned long arg);
 };
 

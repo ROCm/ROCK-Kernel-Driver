@@ -544,6 +544,25 @@ extern int i2o_delete_controller(struct i2o_controller *);
 #define I2O_DSC_DEVICE_BUSY                    0x001B
 #define I2O_DSC_DEVICE_NOT_AVAILABLE           0x001C
 
+/* DetailedStatusCode defines for Block Storage Operation: Table 6-7 Detailed
+   Status Codes.*/
+
+#define I2O_BSA_DSC_SUCCESS               0x0000
+#define I2O_BSA_DSC_MEDIA_ERROR           0x0001
+#define I2O_BSA_DSC_ACCESS_ERROR          0x0002
+#define I2O_BSA_DSC_DEVICE_FAILURE        0x0003
+#define I2O_BSA_DSC_DEVICE_NOT_READY      0x0004
+#define I2O_BSA_DSC_MEDIA_NOT_PRESENT     0x0005
+#define I2O_BSA_DSC_MEDIA_LOCKED          0x0006
+#define I2O_BSA_DSC_MEDIA_FAILURE         0x0007
+#define I2O_BSA_DSC_PROTOCOL_FAILURE      0x0008
+#define I2O_BSA_DSC_BUS_FAILURE           0x0009
+#define I2O_BSA_DSC_ACCESS_VIOLATION      0x000A
+#define I2O_BSA_DSC_WRITE_PROTECTED       0x000B
+#define I2O_BSA_DSC_DEVICE_RESET          0x000C
+#define I2O_BSA_DSC_VOLUME_CHANGED        0x000D
+#define I2O_BSA_DSC_TIMEOUT               0x000E
+
 /* FailureStatusCodes, Table 3-3 Message Failure Codes */
 
 #define I2O_FSC_TRANSPORT_SERVICE_SUSPENDED             0x81

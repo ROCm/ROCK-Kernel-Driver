@@ -152,7 +152,7 @@ static int __init i2c_bitelv_init(void)
 			return -ENODEV;
 		}
 	}
-	pr_debug("i2c-elv: found device at %#x.\n",base);
+	pr_debug("i2c-elv: found device at %#lx.\n",base);
 	return 0;
 }
 

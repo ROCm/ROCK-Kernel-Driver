@@ -76,7 +76,7 @@ int rotate_reclaimable_page(struct page *page)
 /*
  * FIXME: speed this up?
  */
-void activate_page(struct page *page)
+void fastcall activate_page(struct page *page)
 {
 	struct zone *zone = page_zone(page);
 
@@ -97,7 +97,7 @@ void activate_page(struct page *page)
  * inactive,referenced		->	active,unreferenced
  * active,unreferenced		->	active,referenced
  */
-void mark_page_accessed(struct page *page)
+void fastcall mark_page_accessed(struct page *page)
 {
 	if (!PageActive(page) && PageReferenced(page) && PageLRU(page)) {
 		activate_page(page);
@@ -116,7 +116,7 @@ EXPORT_SYMBOL(mark_page_accessed);
 static DEFINE_PER_CPU(struct pagevec, lru_add_pvecs) = { 0, };
 static DEFINE_PER_CPU(struct pagevec, lru_add_active_pvecs) = { 0, };
 
-void lru_cache_add(struct page *page)
+void fastcall lru_cache_add(struct page *page)
 {
 	struct pagevec *pvec = &get_cpu_var(lru_add_pvecs);
 
@@ -126,7 +126,7 @@ void lru_cache_add(struct page *page)
 	put_cpu_var(lru_add_pvecs);
 }
 
-void lru_cache_add_active(struct page *page)
+void fastcall lru_cache_add_active(struct page *page)
 {
 	struct pagevec *pvec = &get_cpu_var(lru_add_active_pvecs);
 
@@ -152,7 +152,7 @@ void lru_add_drain(void)
  * This path almost never happens for VM activity - pages are normally
  * freed via pagevecs.  But it gets used by networking.
  */
-void __page_cache_release(struct page *page)
+void fastcall __page_cache_release(struct page *page)
 {
 	unsigned long flags;
 	struct zone *zone = page_zone(page);

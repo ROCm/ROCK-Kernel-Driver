@@ -369,8 +369,8 @@ do_sys_ptrace(long request, long pid, long addr, long data,
 		/* Mark single stepping.  */
 		child->thread_info->bpt_nsaved = -1;
 		clear_tsk_thread_flag(child, TIF_SYSCALL_TRACE);
-		wake_up_process(child);
 		child->exit_code = data;
+		wake_up_process(child);
 		/* give it a chance to run. */
 		ret = 0;
 		goto out;

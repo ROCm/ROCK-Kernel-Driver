@@ -246,7 +246,15 @@ static void __init winchip2_protect_mcr(void)
 	lo&=~0x1C0;	/* blank bits 8-6 */
 	wrmsr(MSR_IDT_MCR_CTRL, lo, hi);
 }
-#endif
+#endif /* CONFIG_X86_OOSTORE */
+
+#define ACE_PRESENT	(1 << 6)
+#define ACE_ENABLED	(1 << 7)
+#define ACE_FCR		(1 << 28)	/* MSR_VIA_FCR */
+
+#define RNG_PRESENT	(1 << 2)
+#define RNG_ENABLED	(1 << 3)
+#define RNG_ENABLE	(1 << 6)	/* MSR_VIA_RNG */
 
 static void __init init_c3(struct cpuinfo_x86 *c)
 {
@@ -254,6 +262,24 @@ static void __init init_c3(struct cpuinfo_x86 *c)
 
 	/* Test for Centaur Extended Feature Flags presence */
 	if (cpuid_eax(0xC0000000) >= 0xC0000001) {
+		u32 tmp = cpuid_edx(0xC0000001);
+
+		/* enable ACE unit, if present and disabled */
+		if ((tmp & (ACE_PRESENT | ACE_ENABLED)) == ACE_PRESENT) {
+			rdmsr (MSR_VIA_FCR, lo, hi);
+			lo |= ACE_FCR;		/* enable ACE unit */
+			wrmsr (MSR_VIA_FCR, lo, hi);
+			printk(KERN_INFO "CPU: Enabled ACE h/w crypto\n");
+		}
+
+		/* enable RNG unit, if present and disabled */
+		if ((tmp & (RNG_PRESENT | RNG_ENABLED)) == RNG_PRESENT) {
+			rdmsr (MSR_VIA_RNG, lo, hi);
+			lo |= RNG_ENABLE;	/* enable RNG unit */
+			wrmsr (MSR_VIA_RNG, lo, hi);
+			printk(KERN_INFO "CPU: Enabled h/w RNG\n");
+		}
+
 		/* store Centaur Extended Feature Flags as
 		 * word 5 of the CPU capability bit array
 		 */

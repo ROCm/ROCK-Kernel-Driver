@@ -761,8 +761,11 @@ int ip_append_data(struct sock *sk,
 		 */
 		opt = ipc->opt;
 		if (opt) {
-			if (inet->cork.opt == NULL)
+			if (inet->cork.opt == NULL) {
 				inet->cork.opt = kmalloc(sizeof(struct ip_options) + 40, sk->sk_allocation);
+				if (unlikely(inet->cork.opt == NULL))
+					return -ENOBUFS;
+			}
 			memcpy(inet->cork.opt, opt, sizeof(struct ip_options)+opt->optlen);
 			inet->cork.flags |= IPCORK_OPT;
 			inet->cork.addr = ipc->addr;
