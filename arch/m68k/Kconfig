@@ -1766,6 +1766,11 @@ config VT_CONSOLE
 
 	  If unsure, say Y.
 
+config HW_CONSOLE
+	bool
+	depends on VT
+	default y
+
 config NVRAM
 	bool
 	depends on ATARI
