@@ -277,9 +277,9 @@ struct agp_bridge_data {
 
 /* VIA KT400 */
 #define VIA_AGP3_GARTCTRL	0x90
-#define VIA_AGP3_APSIZE	0x94
+#define VIA_AGP3_APSIZE		0x94
 #define VIA_AGP3_ATTBASE	0x98
-#define VIA_AGPSEL	0xfd
+#define VIA_AGPSEL		0xfd
 
 /* SiS registers */
 #define SIS_ATTBASE	0x90
@@ -297,20 +297,20 @@ struct agp_bridge_data {
 #define AMD_TLBFLUSH	0x0c	/* In mmio region (32-bit register) */
 #define AMD_CACHEENTRY	0x10	/* In mmio region (32-bit register) */
 
-#define AMD_8151_APSIZE	0xb4
+#define AMD_8151_APSIZE		0xb4
 #define AMD_8151_GARTBLOCK	0xb8
 
 #define AMD_X86_64_GARTAPERTURECTL	0x90
 #define AMD_X86_64_GARTAPERTUREBASE	0x94
 #define AMD_X86_64_GARTTABLEBASE	0x98
 #define AMD_X86_64_GARTCACHECTL		0x9c
-#define AMD_X86_64_GARTEN	1<<0
+#define AMD_X86_64_GARTEN		1<<0
 
 #define AMD_8151_AGP_CTL		0xb0
-#define AMD_8151_APERTURESIZE	0xb4
+#define AMD_8151_APERTURESIZE		0xb4
 #define AMD_8151_GARTPTR		0xb8
-#define AMD_8151_GTLBEN	1<<7
-#define AMD_8151_APEREN	1<<8
+#define AMD_8151_GTLBEN			1<<7
+#define AMD_8151_APEREN			1<<8
 
 /* ALi registers */
 #define ALI_AGPCTRL			0xb8
@@ -322,17 +322,17 @@ struct agp_bridge_data {
 #define ALI_CACHE_FLUSH_EN		0x100
 
 /* ATI register */
-#define ATI_GART_MMBASE_ADDR        0x14
-#define ATI_RS100_APSIZE            0xac
-#define ATI_RS300_APSIZE            0xf8
-#define ATI_RS100_IG_AGPMODE        0xb0
-#define ATI_RS300_IG_AGPMODE        0xfc
+#define ATI_GART_MMBASE_ADDR	0x14
+#define ATI_RS100_APSIZE	0xac
+#define ATI_RS300_APSIZE	0xf8
+#define ATI_RS100_IG_AGPMODE	0xb0
+#define ATI_RS300_IG_AGPMODE	0xfc
 
-#define ATI_GART_FEATURE_ID         0x00
-#define ATI_GART_BASE               0x04
-#define ATI_GART_CACHE_SZBASE       0x08
-#define ATI_GART_CACHE_CNTRL        0x0c
-#define ATI_GART_CACHE_ENTRY_CNTRL  0x10
+#define ATI_GART_FEATURE_ID		0x00
+#define ATI_GART_BASE			0x04
+#define ATI_GART_CACHE_SZBASE		0x08
+#define ATI_GART_CACHE_CNTRL		0x0c
+#define ATI_GART_CACHE_ENTRY_CNTRL	0x10
 
 /* Serverworks Registers */
 #define SVWRKS_APSIZE		0x10
@@ -363,14 +363,14 @@ struct agp_bridge_data {
 #define HP_ZX1_CACHE_FLUSH	0x428
 
 /* NVIDIA registers */
-#define NVIDIA_0_APSIZE     0x80
-#define NVIDIA_1_WBC        0xf0
-#define NVIDIA_2_GARTCTRL   0xd0
-#define NVIDIA_2_APBASE     0xd8
-#define NVIDIA_2_APLIMIT    0xdc
-#define NVIDIA_2_ATTBASE(i) (0xe0 + (i) * 4)
-#define NVIDIA_3_APBASE     0x50
-#define NVIDIA_3_APLIMIT    0x54
+#define NVIDIA_0_APSIZE		0x80
+#define NVIDIA_1_WBC		0xf0
+#define NVIDIA_2_GARTCTRL	0xd0
+#define NVIDIA_2_APBASE		0xd8
+#define NVIDIA_2_APLIMIT	0xdc
+#define NVIDIA_2_ATTBASE(i)	(0xe0 + (i) * 4)
+#define NVIDIA_3_APBASE		0x50
+#define NVIDIA_3_APLIMIT	0x54
 
 
 struct agp_device_ids {
