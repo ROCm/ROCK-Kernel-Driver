@@ -70,7 +70,7 @@ typedef struct {
 
 /* Description of one CTC-tty */
 typedef struct {
-  struct tty_driver  ctc_tty_device;		   /* tty-device             */
+  struct tty_driver  *ctc_tty_device;		   /* tty-device             */
   ctc_tty_info       info[CTC_TTY_MAX_DEVICES];	   /* Private data           */
 } ctc_tty_driver;
 
@@ -1130,6 +1130,21 @@ ctc_tty_task(unsigned long arg)
 	spin_unlock_irqrestore(&ctc_tty_lock, saveflags);
 }
 
+static struct tty_operations ctc_ops = {
+	.open = ctc_tty_open,
+	.close = ctc_tty_close,
+	.write = ctc_tty_write,
+	.flush_chars = ctc_tty_flush_chars,
+	.write_room = ctc_tty_write_room,
+	.chars_in_buffer = ctc_tty_chars_in_buffer,
+	.flush_buffer = ctc_tty_flush_buffer,
+	.ioctl = ctc_tty_ioctl,
+	.throttle = ctc_tty_throttle,
+	.unthrottle = ctc_tty_unthrottle,
+	.set_termios = ctc_tty_set_termios,
+	.hangup = ctc_tty_hangup,
+};
+
 int
 ctc_tty_init(void)
 {
@@ -1143,41 +1158,31 @@ ctc_tty_init(void)
 		return -ENOMEM;
 	}
 	memset(driver, 0, sizeof(ctc_tty_driver));
-	device = &driver->ctc_tty_device;
+	device = alloc_tty_driver(CTC_TTY_MAX_DEVICES);
+	if (!device) {
+		kfree(driver);
+		printk(KERN_WARNING "Out of memory in ctc_tty_modem_init\n");
+		return -ENOMEM;
+	}
 
-	device->magic = TTY_DRIVER_MAGIC;
 	device->devfs_name = "ctc/" CTC_TTY_NAME;
 	device->name = CTC_TTY_NAME;
 	device->major = CTC_TTY_MAJOR;
 	device->minor_start = 0;
-	device->num = CTC_TTY_MAX_DEVICES;
 	device->type = TTY_DRIVER_TYPE_SERIAL;
 	device->subtype = SERIAL_TYPE_NORMAL;
 	device->init_termios = tty_std_termios;
 	device->init_termios.c_cflag = B9600 | CS8 | CREAD | HUPCL | CLOCAL;
 	device->flags = TTY_DRIVER_REAL_RAW;
-	device->open = ctc_tty_open;
-	device->close = ctc_tty_close;
-	device->write = ctc_tty_write;
-	device->put_char = NULL;
-	device->flush_chars = ctc_tty_flush_chars;
-	device->write_room = ctc_tty_write_room;
-	device->chars_in_buffer = ctc_tty_chars_in_buffer;
-	device->flush_buffer = ctc_tty_flush_buffer;
-	device->ioctl = ctc_tty_ioctl;
-	device->throttle = ctc_tty_throttle;
-	device->unthrottle = ctc_tty_unthrottle;
-	device->set_termios = ctc_tty_set_termios;
-	device->stop = NULL;
-	device->start = NULL;
-	device->hangup = ctc_tty_hangup;
-	device->driver_name = "ctc_tty";
-
+	device->driver_name = "ctc_tty",
+	tty_set_operations(device, &ctc_ops);
 	if (tty_register_driver(device)) {
 		printk(KERN_WARNING "ctc_tty: Couldn't register serial-device\n");
+		put_tty_driver(device);
 		kfree(driver);
 		return -1;
 	}
+	driver->ctc_tty_device = device;
 	for (i = 0; i < CTC_TTY_MAX_DEVICES; i++) {
 		info = &driver->info[i];
 		init_MUTEX(&info->write_sem);
@@ -1258,8 +1263,9 @@ ctc_tty_cleanup(void) {
 	
 	spin_lock_irqsave(&ctc_tty_lock, saveflags);
 	ctc_tty_shuttingdown = 1;
-	tty_unregister_driver(&driver->ctc_tty_device);
+	tty_unregister_driver(driver->ctc_tty_device);
 	kfree(driver);
+	put_tty_driver(driver->ctc_tty_device);
 	driver = NULL;
 	spin_unlock_irqrestore(&ctc_tty_lock, saveflags);
 }
