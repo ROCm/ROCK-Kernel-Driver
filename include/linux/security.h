@@ -27,12 +27,13 @@
 #include <linux/signal.h>
 #include <linux/resource.h>
 #include <linux/sem.h>
-#include <linux/sysctl.h>
 #include <linux/shm.h>
 #include <linux/msg.h>
 #include <linux/sched.h>
 #include <linux/skbuff.h>
 #include <linux/netlink.h>
+
+struct ctl_table;
 
 /*
  * These functions are in security/capability.c and are used
@@ -1029,7 +1030,7 @@ struct security_operations {
 			    kernel_cap_t * inheritable,
 			    kernel_cap_t * permitted);
 	int (*acct) (struct file * file);
-	int (*sysctl) (ctl_table * table, int op);
+	int (*sysctl) (struct ctl_table * table, int op);
 	int (*capable) (struct task_struct * tsk, int cap);
 	int (*quotactl) (int cmds, int type, int id, struct super_block * sb);
 	int (*quota_on) (struct file * f);
@@ -1268,7 +1269,7 @@ static inline int security_acct (struct file *file)
 	return security_ops->acct (file);
 }
 
-static inline int security_sysctl(ctl_table * table, int op)
+static inline int security_sysctl(struct ctl_table *table, int op)
 {
 	return security_ops->sysctl(table, op);
 }
@@ -1940,7 +1941,7 @@ static inline int security_acct (struct file *file)
 	return 0;
 }
 
-static inline int security_sysctl(ctl_table * table, int op)
+static inline int security_sysctl(struct ctl_table *table, int op)
 {
 	return 0;
 }
