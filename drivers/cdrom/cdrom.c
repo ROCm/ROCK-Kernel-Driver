@@ -646,6 +646,80 @@ static int cdrom_mrw_set_lba_space(struct cdrom_device_info *cdi, int space)
 	return 0;
 }
 
+int cdrom_get_random_writable(struct cdrom_device_info *cdi,
+			      struct rwrt_feature_desc *rfd)
+{
+	struct cdrom_generic_command cgc;
+	char buffer[24];
+	struct feature_header *fh;
+	int ret;
+
+	init_cdrom_command(&cgc, buffer, sizeof(buffer), CGC_DATA_READ);
+
+	cgc.cmd[0] = GPCMD_GET_CONFIGURATION;	/* often 0x46 */
+	cgc.cmd[3] = CDF_RWRT;			/* often 0x0020 */
+	cgc.cmd[8] = sizeof(buffer);		/* often 0x18 */
+	cgc.quiet = 1;
+
+	if ((ret = cdi->ops->generic_packet(cdi, &cgc)))
+		return ret;
+
+	fh = (struct feature_header *)&buffer[0];
+	if (be32_to_cpu(fh->data_len) >= (sizeof(struct feature_header)+
+					  sizeof(struct rwrt_feature_desc)))
+		memcpy(rfd, &buffer[sizeof(struct feature_header)],
+		       sizeof (*rfd));
+	else
+		memset(rfd, 0, sizeof(*rfd));
+
+	return 0;
+}
+
+int cdrom_has_defect_mgt(struct cdrom_device_info *cdi)
+{
+	struct cdrom_generic_command cgc;
+	char buffer[16];
+	struct feature_header *fh;
+	__u16 *feature_code;
+	int ret;
+
+	init_cdrom_command(&cgc, buffer, sizeof(buffer), CGC_DATA_READ);
+
+	cgc.cmd[0] = GPCMD_GET_CONFIGURATION;	/* often 0x46 */
+	cgc.cmd[3] = CDF_HWDM;			/* often 0x0024 */
+	cgc.cmd[8] = sizeof(buffer);		/* often 0x10 */
+	cgc.quiet = 1;
+
+	if ((ret = cdi->ops->generic_packet(cdi, &cgc)))
+		return ret;
+
+	fh = (struct feature_header *)&buffer[0];
+	ret = 1;
+	if (be32_to_cpu(fh->data_len) >= (sizeof(struct feature_header)+8)) {
+		feature_code = (__u16 *)&buffer[sizeof(struct feature_header)];
+		if (CDF_HWDM == be16_to_cpu(*feature_code))
+			ret = 0;
+	}
+	return ret;
+}
+
+
+int cdrom_is_random_writable(struct cdrom_device_info *cdi, int *write)
+{
+	struct rwrt_feature_desc rfd;
+	int ret;
+
+	*write = 0;
+
+	if ((ret = cdrom_get_random_writable(cdi, &rfd)))
+		return ret;
+
+	if (CDF_RWRT == be16_to_cpu(rfd.feature_code))
+		*write = 1;
+
+	return 0;
+}
+
 static int cdrom_media_erasable(struct cdrom_device_info *cdi)
 {
 	disc_information di;
@@ -729,6 +803,23 @@ static int mo_open_write(struct cdrom_device_info *cdi)
 	return buffer[3] & 0x80;
 }
 
+static int cdrom_ram_open_write(struct cdrom_device_info *cdi)
+{
+	struct rwrt_feature_desc rfd;
+	int ret;
+
+	if ((ret = cdrom_has_defect_mgt(cdi)))
+		return ret;
+
+	if ((ret = cdrom_get_random_writable(cdi, &rfd)))
+		return ret;
+	else if (CDF_RWRT == be16_to_cpu(rfd.feature_code))
+		ret = !rfd.curr;
+
+	cdinfo(CD_OPEN, "can open for random write\n");
+	return ret;
+}
+
 /*
  * returns 0 for ok to open write, non-0 to disallow
  */
@@ -740,6 +831,9 @@ static int cdrom_open_write(struct cdrom_device_info *cdi)
 		ret = cdrom_mrw_open_write(cdi);
 	else if (CDROM_CAN(CDC_DVD_RAM))
 		ret = cdrom_dvdram_open_write(cdi);
+ 	else if (CDROM_CAN(CDC_RAM) &&
+ 		 !CDROM_CAN(CDC_CD_R|CDC_CD_RW|CDC_DVD|CDC_DVD_R|CDC_MRW))
+ 		ret = cdrom_ram_open_write(cdi);
 	else if (CDROM_CAN(CDC_MO_DRIVE))
 		ret = mo_open_write(cdi);
 
@@ -2785,6 +2879,7 @@ EXPORT_SYMBOL(cdrom_mode_sense);
 EXPORT_SYMBOL(init_cdrom_command);
 EXPORT_SYMBOL(cdrom_get_media_event);
 EXPORT_SYMBOL(cdrom_is_mrw);
+EXPORT_SYMBOL(cdrom_is_random_writable);
 
 #ifdef CONFIG_SYSCTL
 
@@ -2888,6 +2983,10 @@ int cdrom_sysctl_info(ctl_table *ctl, int write, struct file * filp,
 	pos += sprintf(info+pos, "\nCan write MRW:\t");
 	for (cdi=topCdromPtr;cdi!=NULL;cdi=cdi->next)
 	    pos += sprintf(info+pos, "\t%d", CDROM_CAN(CDC_MRW_W) != 0);
+
+	pos += sprintf(info+pos, "\nCan write RAM:\t");
+	for (cdi=topCdromPtr;cdi!=NULL;cdi=cdi->next)
+	    pos += sprintf(info+pos, "\t%d", CDROM_CAN(CDC_RAM) != 0);
 
 	strcpy(info+pos,"\n\n");
 		
