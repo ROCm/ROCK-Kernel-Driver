@@ -708,13 +708,15 @@ static int proc_getdriver(struct dev_state *ps, void __user *arg)
 		return -EFAULT;
 	if ((ret = findintfif(ps->dev, gd.interface)) < 0)
 		return ret;
+	down_read(&usb_bus_type.subsys.rwsem);
 	interface = ps->dev->actconfig->interface[ret];
-	if (!interface->dev.driver)
+	if (!interface || !interface->dev.driver) {
+		up_read(&usb_bus_type.subsys.rwsem);
 		return -ENODATA;
+	}
 	strncpy(gd.driver, interface->dev.driver->name, sizeof(gd.driver));
-	if (copy_to_user(arg, &gd, sizeof(gd)))
-		return -EFAULT;
-	return 0;
+	up_read(&usb_bus_type.subsys.rwsem);
+	return copy_to_user(arg, &gd, sizeof(gd)) ? -EFAULT : 0;
 }
 
 static int proc_connectinfo(struct dev_state *ps, void __user *arg)
