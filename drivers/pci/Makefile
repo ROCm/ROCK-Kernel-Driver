@@ -3,7 +3,7 @@
 #
 
 export-objs	:= access.o hotplug.o pci-driver.o pci.o pool.o \
-			probe.o proc.o search.o compat.o
+			probe.o proc.o search.o compat.o setup-bus.o
 
 obj-y		+= access.o probe.o pci.o pool.o quirks.o \
 			compat.o names.o pci-driver.o search.o hotplug.o

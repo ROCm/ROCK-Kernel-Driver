@@ -19,6 +19,7 @@
 
 #include <linux/init.h>
 #include <linux/kernel.h>
+#include <linux/module.h>
 #include <linux/pci.h>
 #include <linux/errno.h>
 #include <linux/ioport.h>
@@ -357,6 +358,7 @@ pbus_size_bridges(struct pci_bus *bus)
 	}
 	pbus_size_mem(bus, mask, type);
 }
+EXPORT_SYMBOL(pbus_size_bridges);
 
 void __devinit
 pbus_assign_resources(struct pci_bus *bus)
@@ -379,6 +381,7 @@ pbus_assign_resources(struct pci_bus *bus)
 		pci_setup_bridge(b);
 	}
 }
+EXPORT_SYMBOL(pbus_assign_resources);
 
 void __init
 pci_assign_unassigned_resources(void)
