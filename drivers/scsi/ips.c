@@ -6707,6 +6707,7 @@ ips_order_controllers(void){
 					}
 					break;
 				default:
+					break;
 				}
 			}
 		}
@@ -6770,7 +6771,7 @@ ips_register_scsi( int index){
 	kfree(oldha);
 	ips_sh[index] = sh;
 	ips_ha[index] = ha;
-	scsi_set_device(sh, &ha->pcidev->dev);
+	IPS_SCSI_SET_DEVICE(sh, ha);
 
 	/* Store away needed values for later use */
 	sh->io_port = ha->io_addr;
@@ -7032,7 +7033,10 @@ static int ips_init_phase1( struct pci_dev *pci_dev, int *indexPtr )
          !pci_set_dma_mask(ha->pcidev, (u64)0xffffffffffffffff)) {
        (ha)->flags |= IPS_HA_ENH_SG;
     } else {
-       pci_set_dma_mask(ha->pcidev, (u64)0xffffffff);
+       if ( pci_set_dma_mask(ha->pcidev, (u64)0xffffffff) != 0 ) { 
+          printk(KERN_WARNING "Unable to set DMA Mask\n");
+          return ips_abort_init(ha, index);
+       }
     }
 
     ha->enq = kmalloc(sizeof(IPS_ENQ), IPS_INIT_GFP);

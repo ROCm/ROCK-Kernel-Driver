@@ -91,7 +91,7 @@
                                          sizeof(IPS_ENH_SG_LIST) : sizeof(IPS_STD_SG_LIST))
 
    #if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,4)
-      #define pci_set_dma_mask(dev,mask) (1)
+      #define pci_set_dma_mask(dev,mask) ( mask > 0xffffffff ? 1:0 )
       #define scsi_set_pci_device(sh,dev) (0)
    #endif
 
@@ -104,11 +104,13 @@
       #define IPS_UNREGISTER_HOSTS(SHT)    scsi_unregister_module(MODULE_SCSI_HA,SHT)
       #define IPS_ADD_HOST(shost,device)
       #define IPS_REMOVE_HOST(shost)
+      #define IPS_SCSI_SET_DEVICE(sh,ha)   scsi_set_pci_device(sh, (ha)->pcidev)
    #else
       #define IPS_REGISTER_HOSTS(SHT)      (!ips_detect(SHT))
       #define IPS_UNREGISTER_HOSTS(SHT)
       #define IPS_ADD_HOST(shost,device)   scsi_add_host(shost,device)
       #define IPS_REMOVE_HOST(shost)       scsi_remove_host(shost)
+      #define IPS_SCSI_SET_DEVICE(sh,ha)   scsi_set_device(sh, &(ha)->pcidev->dev)
    #endif
 
    #ifndef MDELAY
