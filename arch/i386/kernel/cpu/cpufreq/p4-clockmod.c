@@ -27,7 +27,6 @@
 #include <linux/smp.h>
 #include <linux/cpufreq.h>
 #include <linux/slab.h>
-#include <linux/sched.h>
 
 #include <asm/processor.h> 
 #include <asm/msr.h>
@@ -35,7 +34,7 @@
 
 #include "speedstep-lib.h"
 
-#define PFX	"cpufreq: "
+#define PFX	"p4-clockmod: "
 
 /*
  * Duty Cycle (3bits), note DC_DISABLE is not specified in

@@ -612,33 +612,25 @@ void __init eeh_init(void)
 }
 
 /**
- * eeh_add_device - perform EEH initialization for the indicated pci device
- * @dev: pci device for which to set up EEH
+ * eeh_add_device_early - enable EEH for the indicated device_node
+ * @dn: device node for which to set up EEH
  *
- * This routine can be used to perform EEH initialization for PCI
+ * This routine must be used to perform EEH initialization for PCI
  * devices that were added after system boot (e.g. hotplug, dlpar).
+ * This routine must be called before any i/o is performed to the
+ * adapter (inluding any config-space i/o).
  * Whether this actually enables EEH or not for this device depends
- * on the type of the device, on earlier boot command-line
- * arguments & etc.
+ * on the CEC architecture, type of the device, on earlier boot
+ * command-line arguments & etc.
  */
-void eeh_add_device(struct pci_dev *dev)
+void eeh_add_device_early(struct device_node *dn)
 {
-	struct device_node *dn;
 	struct pci_controller *phb;
 	struct eeh_early_enable_info info;
 
-	if (!dev || !eeh_subsystem_enabled)
+	if (!dn || !eeh_subsystem_enabled)
 		return;
-
-#ifdef DEBUG
-	printk(KERN_DEBUG "EEH: adding device %s %s\n", pci_name(dev),
-	       pci_pretty_name(dev));
-#endif
-	dn = pci_device_to_OF_node(dev);
-	if (NULL == dn)
-		return;
-
-	phb = PCI_GET_PHB_PTR(dev);
+	phb = dn->phb;
 	if (NULL == phb || 0 == phb->buid) {
 		printk(KERN_WARNING "EEH: Expected buid but found none\n");
 		return;
@@ -646,11 +638,30 @@ void eeh_add_device(struct pci_dev *dev)
 
 	info.buid_hi = BUID_HI(phb->buid);
 	info.buid_lo = BUID_LO(phb->buid);
-
 	early_enable_eeh(dn, &info);
+}
+EXPORT_SYMBOL(eeh_add_device_early);
+
+/**
+ * eeh_add_device_late - perform EEH initialization for the indicated pci device
+ * @dev: pci device for which to set up EEH
+ *
+ * This routine must be used to complete EEH initialization for PCI
+ * devices that were added after system boot (e.g. hotplug, dlpar).
+ */
+void eeh_add_device_late(struct pci_dev *dev)
+{
+	if (!dev || !eeh_subsystem_enabled)
+		return;
+
+#ifdef DEBUG
+	printk(KERN_DEBUG "EEH: adding device %s %s\n", pci_name(dev),
+	       pci_pretty_name(dev));
+#endif
+
 	pci_addr_cache_insert_device (dev);
 }
-EXPORT_SYMBOL(eeh_add_device);
+EXPORT_SYMBOL(eeh_add_device_late);
 
 /**
  * eeh_remove_device - undo EEH setup for the indicated pci device

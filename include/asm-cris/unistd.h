@@ -275,8 +275,21 @@
 #define __NR_clock_nanosleep	(__NR_timer_create+8)
 #define __NR_statfs64		268
 #define __NR_fstatfs64		269
+#define __NR_tgkill		270
+#define __NR_utimes		271
+#define __NR_fadvise64_64	272
+#define __NR_vserver		273
+#define __NR_mbind		274
+#define __NR_get_mempolicy	275
+#define __NR_set_mempolicy	276
+#define __NR_mq_open 		277
+#define __NR_mq_unlink		(__NR_mq_open+1)
+#define __NR_mq_timedsend	(__NR_mq_open+2)
+#define __NR_mq_timedreceive	(__NR_mq_open+3)
+#define __NR_mq_notify		(__NR_mq_open+4)
+#define __NR_mq_getsetattr	(__NR_mq_open+5)
  
-#define NR_syscalls 270
+#define NR_syscalls 283
 
 
 #ifdef __KERNEL__
@@ -307,6 +320,7 @@
 
 #include <linux/compiler.h>
 #include <linux/types.h>
+#include <linux/linkage.h>
 
 /*
  * we need this inline - forking from kernel space will result

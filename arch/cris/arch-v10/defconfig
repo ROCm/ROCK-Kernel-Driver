@@ -267,6 +267,7 @@ CONFIG_INET=y
 # CONFIG_BLK_DEV_ISAPNP is not set
 # CONFIG_IDE_CHIPSETS is not set
 # CONFIG_IDEDMA_AUTO is not set
+# CONFIG_BLK_DEV_IDE_MODES is not set
 
 #
 # SCSI support

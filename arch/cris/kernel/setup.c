@@ -1,4 +1,4 @@
-/* $Id: setup.c,v 1.7 2003/07/04 08:27:52 starvik Exp $
+/*
  *
  *  linux/arch/cris/kernel/setup.c
  *
@@ -10,6 +10,7 @@
  * This file handles the architecture-dependent parts of initialization
  */
 
+#include <linux/config.h>
 #include <linux/init.h>
 #include <linux/mm.h>
 #include <linux/bootmem.h>
@@ -37,6 +38,8 @@ extern const unsigned long text_start, edata; /* set by the linker script */
 extern unsigned long dram_start, dram_end;
 
 extern unsigned long romfs_start, romfs_length, romfs_in_flash; /* from head.S */
+
+extern void show_etrax_copyright(void);		/* arch-vX/kernel/setup.c */
 
 /* This mainly sets up the memory area, and can be really confusing.
  *
@@ -153,18 +156,16 @@ setup_arch(char **cmdline_p)
 	*cmdline_p = command_line;
 
 #ifdef CONFIG_ETRAX_CMDLINE
-	strlcpy(command_line, CONFIG_ETRAX_CMDLINE, sizeof(command_line));
-#elif defined(CONFIG_ETRAX_ROOT_DEVICE)
-	strlcpy(command_line, "root=", sizeof(command_line));
-	strlcat(command_line, CONFIG_ETRAX_ROOT_DEVICE,
-		sizeof(command_line));
-#endif
+	strlcpy(command_line, CONFIG_ETRAX_CMDLINE, COMMAND_LINE_SIZE);
 	command_line[COMMAND_LINE_SIZE - 1] = '\0';
 
+	/* Save command line for future references. */
+	memcpy(saved_command_line, command_line, COMMAND_LINE_SIZE);
+	saved_command_line[COMMAND_LINE_SIZE - 1] = '\0';
+#endif
+
 	/* give credit for the CRIS port */
-
-	printk("Linux/CRIS port on ETRAX 100LX (c) 2001 Axis Communications AB\n");
-
+	show_etrax_copyright();
 }
 
 static void *c_start(struct seq_file *m, loff_t *pos)

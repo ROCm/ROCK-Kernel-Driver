@@ -1,4 +1,4 @@
-/* $Id: process.c,v 1.3 2003/07/04 08:27:41 starvik Exp $
+/* $Id: process.c,v 1.6 2004/05/11 12:28:25 starvik Exp $
  * 
  *  linux/arch/cris/kernel/process.c
  *
@@ -16,6 +16,7 @@
 #include <linux/err.h>
 #include <linux/fs.h>
 #include <linux/slab.h>
+#include <asm/arch/svinto.h>
 #include <linux/init.h>
 
 #ifdef CONFIG_ETRAX_GPIO
@@ -249,3 +250,19 @@ unsigned long get_wchan(struct task_struct *p)
 }
 #undef last_sched
 #undef first_sched
+
+void show_regs(struct pt_regs * regs)
+{
+	unsigned long usp = rdusp();
+	printk("IRP: %08lx SRP: %08lx DCCR: %08lx USP: %08lx MOF: %08lx\n",
+	       regs->irp, regs->srp, regs->dccr, usp, regs->mof );
+	printk(" r0: %08lx  r1: %08lx   r2: %08lx  r3: %08lx\n",
+	       regs->r0, regs->r1, regs->r2, regs->r3);
+	printk(" r4: %08lx  r5: %08lx   r6: %08lx  r7: %08lx\n",
+	       regs->r4, regs->r5, regs->r6, regs->r7);
+	printk(" r8: %08lx  r9: %08lx  r10: %08lx r11: %08lx\n",
+	       regs->r8, regs->r9, regs->r10, regs->r11);
+	printk("r12: %08lx r13: %08lx oR10: %08lx\n",
+	       regs->r12, regs->r13, regs->orig_r10);
+}
+

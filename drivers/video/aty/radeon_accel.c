@@ -13,7 +13,10 @@ static void radeonfb_prim_fillrect(struct radeonfb_info *rinfo,
 		rinfo->dp_gui_master_cntl  /* contains, like GMC_DST_32BPP */
                 | GMC_BRUSH_SOLID_COLOR
                 | ROP3_P);
-	OUTREG(DP_BRUSH_FRGD_CLR, region->color);
+	if (radeon_get_dstbpp(rinfo->depth) != DST_8BPP)
+		OUTREG(DP_BRUSH_FRGD_CLR, rinfo->pseudo_palette[region->color]);
+	else
+		OUTREG(DP_BRUSH_FRGD_CLR, region->color);
 	OUTREG(DP_WRITE_MSK, 0xffffffff);
 	OUTREG(DP_CNTL, (DST_X_LEFT_TO_RIGHT | DST_Y_TOP_TO_BOTTOM));
 

@@ -83,12 +83,21 @@ unsigned int get_clk_frequency_khz(int info)
 EXPORT_SYMBOL(get_clk_frequency_khz);
 
 /*
- * Return the current lclk requency in units of 10kHz
+ * Return the current memory clock frequency in units of 10kHz
  */
-unsigned int get_lclk_frequency_10khz(void)
+unsigned int get_memclk_frequency_10khz(void)
 {
 	return L_clk_mult[(CCCR >> 0) & 0x1f] * BASE_CLK / 10000;
 }
 
-EXPORT_SYMBOL(get_lclk_frequency_10khz);
+EXPORT_SYMBOL(get_memclk_frequency_10khz);
 
+/*
+ * Return the current LCD clock frequency in units of 10kHz
+ */
+unsigned int get_lcdclk_frequency_10khz(void)
+{
+	return get_memclk_frequency_10khz();
+}
+
+EXPORT_SYMBOL(get_lcdclk_frequency_10khz);

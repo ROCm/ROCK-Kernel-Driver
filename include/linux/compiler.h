@@ -6,11 +6,13 @@
 # define __kernel	/* default address space */
 # define __safe		__attribute__((safe))
 # define __force	__attribute__((force))
+extern void __chk_user_ptr(void __user *);
 #else
 # define __user
 # define __kernel
 # define __safe
 # define __force
+# define __chk_user_ptr(x) (void)0
 #endif
 
 #ifdef __KERNEL__

@@ -1,4 +1,4 @@
-/* $Id: time.c,v 1.2 2003/07/04 08:27:41 starvik Exp $
+/* $Id: time.c,v 1.3 2004/06/01 05:38:42 starvik Exp $
  *
  *  linux/arch/cris/arch-v10/kernel/time.c
  *
@@ -276,6 +276,12 @@ time_init(void)
 		have_rtc = 1;
 		update_xtime_from_cmos();
 	}
+
+	/*
+	 * Initialize wall_to_monotonic such that adding it to xtime will yield zero, the
+	 * tv_nsec field must be normalized (i.e., 0 <= nsec < NSEC_PER_SEC).
+	 */
+	set_normalized_timespec(&wall_to_monotonic, -xtime.tv_sec, -xtime.tv_nsec);
 
 	/* Setup the etrax timers
 	 * Base frequency is 25000 hz, divider 250 -> 100 HZ

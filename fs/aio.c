@@ -538,19 +538,25 @@ struct kioctx *lookup_ioctx(unsigned long ctx_id)
 
 static void use_mm(struct mm_struct *mm)
 {
-	struct mm_struct *active_mm = current->active_mm;
+	struct mm_struct *active_mm;
+
 	atomic_inc(&mm->mm_count);
+	task_lock(current);
+	active_mm = current->active_mm;
 	current->mm = mm;
 	if (mm != active_mm) {
 		current->active_mm = mm;
 		activate_mm(active_mm, mm);
 	}
+	task_unlock(current);
 	mmdrop(active_mm);
 }
 
 static void unuse_mm(struct mm_struct *mm)
 {
+	task_lock(current);
 	current->mm = NULL;
+	task_unlock(current);
 	/* active_mm is still 'mm' */
 	enter_lazy_tlb(mm, current);
 }
@@ -608,7 +614,7 @@ void fastcall kick_iocb(struct kiocb *iocb)
 		spin_lock_irqsave(&ctx->ctx_lock, flags);
 		list_add_tail(&iocb->ki_run_list, &ctx->run_list);
 		spin_unlock_irqrestore(&ctx->ctx_lock, flags);
-		schedule_work(&ctx->wq);
+		queue_work(aio_wq, &ctx->wq);
 	}
 }
 

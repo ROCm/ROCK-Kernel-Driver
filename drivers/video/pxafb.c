@@ -432,7 +432,7 @@ static inline unsigned int get_pcd(unsigned int pixclock)
          * (DPC) bit? or perhaps set it based on the various clock
          * speeds */
 
-	pcd = (unsigned long long)get_lclk_frequency_10khz() * (unsigned long long)pixclock;
+	pcd = (unsigned long long)get_lcdclk_frequency_10khz() * pixclock;
 	pcd /= 100000000 * 2;
 	/* no need for this, since we should subtract 1 anyway. they cancel */
 	/* pcd += 1; */ /* make up for integer math truncations */

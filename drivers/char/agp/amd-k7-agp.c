@@ -20,6 +20,8 @@
 #define AMD_TLBFLUSH	0x0c	/* In mmio region (32-bit register) */
 #define AMD_CACHEENTRY	0x10	/* In mmio region (32-bit register) */
 
+static struct pci_device_id agp_amdk7_pci_table[];
+
 struct amd_page_map {
 	unsigned long *real;
 	unsigned long *remapped;
@@ -41,7 +43,7 @@ static int amd_create_page_map(struct amd_page_map *page_map)
 
 	SetPageReserved(virt_to_page(page_map->real));
 	global_cache_flush();
-	page_map->remapped = ioremap_nocache(virt_to_phys(page_map->real), 
+	page_map->remapped = ioremap_nocache(virt_to_phys(page_map->real),
 					    PAGE_SIZE);
 	if (page_map->remapped == NULL) {
 		ClearPageReserved(virt_to_page(page_map->real));
@@ -90,7 +92,7 @@ static int amd_create_gatt_pages(int nr_tables)
 	int retval = 0;
 	int i;
 
-	tables = kmalloc((nr_tables + 1) * sizeof(struct amd_page_map *), 
+	tables = kmalloc((nr_tables + 1) * sizeof(struct amd_page_map *),
 			 GFP_KERNEL);
 	if (tables == NULL)
 		return -ENOMEM;
@@ -124,7 +126,7 @@ static int amd_create_gatt_pages(int nr_tables)
 #define GET_PAGE_DIR_OFF(addr) (addr >> 22)
 #define GET_PAGE_DIR_IDX(addr) (GET_PAGE_DIR_OFF(addr) - \
 	GET_PAGE_DIR_OFF(agp_bridge->gart_bus_addr))
-#define GET_GATT_OFF(addr) ((addr & 0x003ff000) >> 12) 
+#define GET_GATT_OFF(addr) ((addr & 0x003ff000) >> 12)
 #define GET_GATT(addr) (amd_irongate_private.gatt_pages[\
 	GET_PAGE_DIR_IDX(addr)]->remapped)
 
@@ -174,7 +176,7 @@ static int amd_create_gatt_table(void)
 static int amd_free_gatt_table(void)
 {
 	struct amd_page_map page_dir;
-   
+
 	page_dir.real = (unsigned long *)agp_bridge->gatt_table_real;
 	page_dir.remapped = (unsigned long *)agp_bridge->gatt_table;
 
@@ -224,9 +226,9 @@ static int amd_irongate_configure(void)
 
 	/* Write the Sync register */
 	pci_write_config_byte(agp_bridge->dev, AMD_MODECNTL, 0x80);
-   
-   	/* Set indexing mode */
-   	pci_write_config_byte(agp_bridge->dev, AMD_MODECNTL2, 0x00);
+
+	/* Set indexing mode */
+	pci_write_config_byte(agp_bridge->dev, AMD_MODECNTL2, 0x00);
 
 	/* Write the enable register */
 	enable_reg = INREG16(amd_irongate_private.registers, AMD_GARTENABLE);
@@ -394,7 +396,6 @@ static struct agp_device_ids amd_agp_device_ids[] __devinitdata =
 static int __devinit agp_amdk7_probe(struct pci_dev *pdev,
 				     const struct pci_device_id *ent)
 {
-	struct agp_device_ids *devs = amd_agp_device_ids;
 	struct agp_bridge_data *bridge;
 	u8 cap_ptr;
 	int j;
@@ -403,19 +404,10 @@ static int __devinit agp_amdk7_probe(struct pci_dev *pdev,
 	if (!cap_ptr)
 		return -ENODEV;
 
-	for (j = 0; devs[j].chipset_name; j++) {
-		if (pdev->device == devs[j].device_id) {
-			printk (KERN_INFO PFX "Detected AMD %s chipset\n",
-					devs[j].chipset_name);
-			goto found;
-		}
-	}
+	j = ent - agp_amdk7_pci_table;
+	printk(KERN_INFO PFX "Detected AMD %s chipset\n",
+	       amd_agp_device_ids[j].chipset_name);
 
-	printk(KERN_ERR PFX "Unsupported AMD chipset (device id: %04x)\n",
-		    pdev->device);
-	return -ENODEV;
-
-found:
 	bridge = agp_alloc_bridge();
 	if (!bridge)
 		return -ENOMEM;
@@ -442,12 +434,29 @@ static void __devexit agp_amdk7_remove(struct pci_dev *pdev)
 	agp_put_bridge(bridge);
 }
 
+/* must be the same order as name table above */
 static struct pci_device_id agp_amdk7_pci_table[] = {
 	{
 	.class		= (PCI_CLASS_BRIDGE_HOST << 8),
 	.class_mask	= ~0,
 	.vendor		= PCI_VENDOR_ID_AMD,
-	.device		= PCI_ANY_ID,
+	.device		= PCI_DEVICE_ID_AMD_FE_GATE_7006,
+	.subvendor	= PCI_ANY_ID,
+	.subdevice	= PCI_ANY_ID,
+	},
+	{
+	.class		= (PCI_CLASS_BRIDGE_HOST << 8),
+	.class_mask	= ~0,
+	.vendor		= PCI_VENDOR_ID_AMD,
+	.device		= PCI_DEVICE_ID_AMD_FE_GATE_700E,
+	.subvendor	= PCI_ANY_ID,
+	.subdevice	= PCI_ANY_ID,
+	},
+	{
+	.class		= (PCI_CLASS_BRIDGE_HOST << 8),
+	.class_mask	= ~0,
+	.vendor		= PCI_VENDOR_ID_AMD,
+	.device		= PCI_DEVICE_ID_AMD_FE_GATE_700C,
 	.subvendor	= PCI_ANY_ID,
 	.subdevice	= PCI_ANY_ID,
 	},

@@ -180,6 +180,9 @@ restore_sigcontext(struct pt_regs *regs, struct sigcontext __user *sc)
 	unsigned int err = 0;
 	unsigned long old_usp;
 
+        /* Always make any pending restarted system calls return -EINTR */
+	current_thread_info()->restart_block.fn = do_no_restart_syscall;
+
 	/* restore the regs from &sc->regs (same as sc, since regs is first)
 	 * (sc is already checked for VERIFY_READ since the sigframe was
 	 *  checked in sys_sigreturn previously)
@@ -492,7 +495,6 @@ handle_signal(int canrestart, unsigned long sig,
 		/* If so, check system call restarting.. */
 		switch (regs->r10) {
 			case -ERESTART_RESTARTBLOCK:
-				current_thread_info()->restart_block.fn = do_no_restart_syscall;
 			case -ERESTARTNOHAND:
 				/* ERESTARTNOHAND means that the syscall should only be
 				   restarted if there was no handler for the signal, and since
