@@ -1691,7 +1691,7 @@ EXPORT_SYMBOL(vmalloc_to_page);
 
 #if !defined(CONFIG_ARCH_GATE_AREA)
 
-#if !defined(AT_SYSINFO_EHDR)
+#if defined(AT_SYSINFO_EHDR)
 struct vm_area_struct gate_vma;
 
 static int __init gate_vma_init(void)
