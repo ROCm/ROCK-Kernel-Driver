@@ -322,7 +322,7 @@ struct parport *parport_enumerate(void)
  *	parport_announce_port().
  *
  *	The @ops structure is allocated by the caller, and must not be
- *	deallocated before calling parport_unregister_port().
+ *	deallocated before calling parport_remove_port().
  *
  *	If there is no memory to allocate a new parport structure,
  *	this function will return %NULL.
@@ -479,7 +479,7 @@ static void unlink_from_list(struct parport *port)
 }
 
 /**
- *	parport_unregister_port - deregister a parallel port
+ *	parport_remove_port - deregister a parallel port
  *	@port: parallel port to deregister
  *
  *	When a parallel port driver is forcibly unloaded, or a
@@ -497,7 +497,7 @@ static void unlink_from_list(struct parport *port)
  *	with @port as the parameter.
  **/
 
-void parport_unregister_port(struct parport *port)
+void parport_remove_port(struct parport *port)
 {
 	int i;
 
@@ -534,7 +534,6 @@ void parport_unregister_port(struct parport *port)
 		if (slave)
 			parport_put_port(slave);
 	}
-	parport_put_port (port);
 }
 
 /**
@@ -1091,7 +1090,7 @@ EXPORT_SYMBOL(parport_claim_or_block);
 EXPORT_SYMBOL(parport_release);
 EXPORT_SYMBOL(parport_register_port);
 EXPORT_SYMBOL(parport_announce_port);
-EXPORT_SYMBOL(parport_unregister_port);
+EXPORT_SYMBOL(parport_remove_port);
 EXPORT_SYMBOL(parport_register_driver);
 EXPORT_SYMBOL(parport_unregister_driver);
 EXPORT_SYMBOL(parport_register_device);

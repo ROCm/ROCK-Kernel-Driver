@@ -327,7 +327,7 @@ static int __init init_one_port(struct sbus_dev *sdev)
 	if ((err = request_irq(p->irq, parport_sunbpp_interrupt,
 			       SA_SHIRQ, p->name, p)) != 0) {
 		dprintk(("ERROR %d\n", err));
-		parport_unregister_port(p);
+		parport_put_port(p);
 		kfree(ops);
 		sbus_iounmap(base, size);
 		return err;
@@ -373,14 +373,15 @@ static void __exit parport_sunbpp_exit(void)
 
 		if (1/*p->modes & PARPORT_MODE_PCSPP*/) { 
 			struct parport_operations *ops = p->ops;
+			parport_remove_port(p);
+			parport_proc_unregister(p);
 
 			if (p->irq != PARPORT_IRQ_NONE) {
 				parport_sunbpp_disable_irq(p);
 				free_irq(p->irq, p);
 			}
 			sbus_iounmap(p->base, p->size);
-			parport_proc_unregister(p);
-			parport_unregister_port(p);
+			parport_put_port(p);
 			kfree (ops);
 		}
 		p = next;

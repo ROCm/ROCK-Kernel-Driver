@@ -210,7 +210,7 @@ static int __init parport_atari_init(void)
 			return -ENODEV;
 		if (request_irq(IRQ_MFP_BUSY, parport_atari_interrupt,
 				IRQ_TYPE_SLOW, p->name, p)) {
-			parport_unregister_port (p);
+			parport_put_port (p);
 			return -ENODEV;
 		}
 
@@ -227,10 +227,11 @@ static int __init parport_atari_init(void)
 
 static void __exit parport_atari_exit(void)
 {
+	parport_remove_port(this_port);
 	if (this_port->irq != PARPORT_IRQ_NONE)
 		free_irq(IRQ_MFP_BUSY, this_port);
 	parport_proc_unregister(this_port);
-	parport_unregister_port(this_port);
+	parport_put_port(this_port);
 }
 
 MODULE_AUTHOR("Andreas Schwab");

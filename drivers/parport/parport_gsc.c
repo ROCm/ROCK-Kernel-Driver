@@ -483,6 +483,7 @@ static void __devexit parport_remove_chip(struct parisc_device *dev)
 	if (p) {
 		struct parport_gsc_private *priv = p->private_data;
 		struct parport_operations *ops = p->ops;
+		parport_remove_port(p);
 		if (p->dma != PARPORT_DMA_NONE)
 			free_dma(p->dma);
 		if (p->irq != PARPORT_IRQ_NONE)
@@ -493,7 +494,7 @@ static void __devexit parport_remove_chip(struct parisc_device *dev)
 					    priv->dma_buf,
 					    priv->dma_handle);
 		kfree (p->private_data);
-		parport_unregister_port(p);
+		parport_put_port(p);
 		kfree (ops); /* hope no-one cached it */
 	}
 }

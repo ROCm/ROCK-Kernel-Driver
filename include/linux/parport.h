@@ -340,7 +340,7 @@ struct parport *parport_register_port(unsigned long base, int irq, int dma,
 void parport_announce_port (struct parport *port);
 
 /* Unregister a port. */
-extern void parport_unregister_port(struct parport *port);
+extern void parport_remove_port(struct parport *port);
 
 /* parport_enumerate returns a pointer to the linked list of all the
    ports in this machine.  DON'T USE THIS.  Use

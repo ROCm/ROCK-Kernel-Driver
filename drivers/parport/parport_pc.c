@@ -2325,6 +2325,8 @@ void parport_pc_unregister_port (struct parport *p)
 	struct parport_pc_private *priv = p->private_data;
 #endif /* CONFIG_PARPORT_PC_FIFO */
 	struct parport_operations *ops = p->ops;
+	parport_remove_port(p);
+	parport_proc_unregister(p);
 	if (p->dma != PARPORT_DMA_NONE)
 		free_dma(p->dma);
 	if (p->irq != PARPORT_IRQ_NONE)
@@ -2334,7 +2336,6 @@ void parport_pc_unregister_port (struct parport *p)
 		release_region(p->base + 3, p->size - 3);
 	if (p->modes & PARPORT_MODE_ECP)
 		release_region(p->base_hi, 3);
-	parport_proc_unregister(p);
 #ifdef CONFIG_PARPORT_PC_FIFO
 	if (priv->dma_buf)
 		pci_free_consistent(priv->dev, PAGE_SIZE,
@@ -2342,7 +2343,7 @@ void parport_pc_unregister_port (struct parport *p)
 				    priv->dma_handle);
 #endif /* CONFIG_PARPORT_PC_FIFO */
 	kfree (p->private_data);
-	parport_unregister_port(p);
+	parport_put_port(p);
 	kfree (ops); /* hope no-one cached it */
 }
 
