@@ -4,8 +4,6 @@
  *     Copyright (c) 2000,2001 Ghozlane Toumi <gtoumi@messel.emse.fr>
  *
  *     Created 28 Aug 2001 by Ghozlane Toumi
- *
- * $Id: sstfb.h,v 1.8 2002/05/10 19:35:11 ghoz Exp $
  */
 
 
@@ -25,7 +23,6 @@
 #  undef SST_DEBUG_REG
 #  undef SST_DEBUG_FUNC
 #  undef SST_DEBUG_VAR
-#  undef SST_DEBUG_IOCTL
 #endif
 
 #if (SST_DEBUG_REG > 0)
@@ -73,8 +70,6 @@
 #define wprintk(X...)	printk(KERN_WARNING "sstfb: " X)
 
 #define BIT(x)		(1ul<<(x))
-#define PS2KHZ(a)	(1000000000UL/(a))	/* picoseconds to KHz */
-#define KHZ2PS(a)	(1000000000UL/(a))
 #define POW2(x)		(1ul<<(x))
 
 #ifndef ABS
@@ -114,7 +109,11 @@
 #  define RD_BUFF_FRONT		  0		/* read buff select (front) */
 #  define RD_BUFF_BACK		  (1 << 6)	/* back */
 #  define EN_PXL_PIPELINE	  BIT(8)	/* pixel pipeline (clip..)*/
+#  define LFB_WORD_SWIZZLE_WR	  BIT(11)	/* enable write-wordswap (big-endian) */
+#  define LFB_BYTE_SWIZZLE_WR	  BIT(12)	/* enable write-byteswap (big-endian) */
 #  define LFB_INVERT_Y		  BIT(13)	/* invert Y origin (LFB) */
+#  define LFB_WORD_SWIZZLE_RD	  BIT(15)	/* enable read-wordswap (big-endian) */
+#  define LFB_BYTE_SWIZZLE_RD	  BIT(16)	/* enable read-byteswap (big-endian) */
 #define CLIP_LEFT_RIGHT		0x0118
 #define CLIP_LOWY_HIGHY		0x011c
 #define NOPCMD			0x0120
@@ -305,9 +304,9 @@ struct sstfb_info;
 
 struct dac_switch {
 	char * name;
-	int (*detect) (struct sstfb_info *sst_info);
-	int (*set_pll) (struct sstfb_info *sst_info, const struct pll_timing *t, const int clock);
-	void (*set_vidmod) (struct sstfb_info *sst_info, const int bpp);
+	int (*detect) (struct fb_info *info);
+	int (*set_pll) (struct fb_info *info, const struct pll_timing *t, const int clock);
+	void (*set_vidmod) (struct fb_info *info, const int bpp);
 };
 
 struct sst_spec {
@@ -317,66 +316,21 @@ struct sst_spec {
 };
 
 struct sstfb_par {
-	unsigned int bpp;
-	unsigned int xDim;	/* xres */
+	unsigned int yDim;
 	unsigned int hSyncOn;	/* hsync_len */
 	unsigned int hSyncOff;	/* left_margin + xres + right_margin */
 	unsigned int hBackPorch;/* left_margin */
-	unsigned int yDim;
 	unsigned int vSyncOn;
 	unsigned int vSyncOff;
 	unsigned int vBackPorch;
-	unsigned int freq;	/* freq in kHz */
 	struct pll_timing pll;
 	unsigned int tiles_in_X;/* num of tiles in X res */
-	unsigned int vmode;     /* doublescan/interlaced */
-	unsigned int sync;      /* H/V sync polarity */
-	unsigned int valid;	/* par is correct (fool proof) */
-};
-
-struct sstfb_info {
-	struct fb_info		info;
-	struct sstfb_par	current_par;
-	struct pci_dev	*	dev;
-
-	struct {
-		unsigned long	base;	/* physical */
-		unsigned long	vbase;	/* virtual (CPU view) */
-		unsigned long	len;
-	} video;			/* fb memory info */
-	struct {
-		unsigned long	base;
-		unsigned long	vbase;
-	} mmio;				/* registers memory info */
-
+	unsigned long mmio_vbase;
 	struct dac_switch 	dac_sw;	/* dac specific functions */
-
+	struct pci_dev		*dev;
 	int	type;
 	u8	revision;
-
-	/* status */
-/*XXX	int	configured;
-	int	indexed_mode;
-	int	vgapass;
-	int	clipping; */
-	int	gfx_clock;
-
-	int	currcon;
-	struct display  	disp; /* current display */
-	struct { u_int red, green, blue, transp; } palette[16];
-
-	union {
-#ifdef FBCON_HAS_CFB16
-		u16 cfb16[16];
-#endif
-#ifdef EN_24_32_BPP
-#if defined (FBCON_HAS_CFB24) || defined(FBCON_HAS_CFB32)
-		u32 cfb32[16];
-#endif
-#endif
-	} fbcon_cmap;
-
+	int	gfx_clock;	/* status */
 };
-
 
 #endif /* _SSTFB_H_ */

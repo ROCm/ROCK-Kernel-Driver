@@ -70,7 +70,7 @@
 
 #ifdef __powerpc__
 #include <asm/prom.h>
-#include <video/macmodes.h>
+#include "../macmodes.h"
 #endif
 #ifdef __sparc__
 #include <asm/pbm.h>
@@ -83,9 +83,6 @@
 #endif
 #ifdef CONFIG_BOOTX_TEXT
 #include <asm/btext.h>
-#endif
-#ifdef CONFIG_NVRAM
-#include <linux/nvram.h>
 #endif
 #ifdef CONFIG_PMAC_BACKLIGHT
 #include <asm/backlight.h>
@@ -226,13 +223,8 @@ static char *mode_option __initdata = NULL;
 #endif
 
 #ifdef CONFIG_PPC
-#ifdef CONFIG_NVRAM_NOT_DEFINED
-static int default_vmode __initdata = VMODE_NVRAM;
-static int default_cmode __initdata = CMODE_NVRAM;
-#else
 static int default_vmode __initdata = VMODE_CHOOSE;
 static int default_cmode __initdata = CMODE_CHOOSE;
-#endif
 #endif
 
 #ifdef CONFIG_ATARI
@@ -984,6 +976,7 @@ static int atyfb_release(struct fb_info *info, int user)
 						var.yres_virtual =
 						    var.yres;
 				}
+				fb_set_var(&var, -1, info);
 			}
 		}
 	} 
@@ -1246,8 +1239,8 @@ static void atyfb_save_palette(struct atyfb_par *par, int enter)
 
 static void atyfb_palette(int enter)
 {
-	struct fb_info *info;
 	struct atyfb_par *par;
+	struct fb_info *info;
 	int i;
 
 	for (i = 0; i < FB_MAX; i++) {
@@ -1409,16 +1402,16 @@ static int aty_power_mgmt(int sleep, struct atyfb_par *par)
 static int aty_sleep_notify(struct pmu_sleep_notifier *self, int when)
 {
 	struct fb_info *info;
-	struct atyfb_par *par = (struct atyfb_par *) info->fb.par;
+	struct atyfb_par *par; 
 	int result;
 
 	result = PBOOK_SLEEP_OK;
 
 	for (info = first_display; info != NULL; info = par->next) {
-		struct fb_fix_screeninfo fix;
 		int nb;
 
-		nb = fb_display[fg_console].var.yres * info->fix.line_length;
+		par = (struct atyfb_par *) info->fb.par;
+		nb = info->var.yres * info->fix.line_length;
 
 		switch (when) {
 		case PBOOK_SLEEP_REQUEST:
@@ -1436,7 +1429,7 @@ static int aty_sleep_notify(struct pmu_sleep_notifier *self, int when)
 			if (par->blitter_may_be_busy)
 				wait_for_idle(par);
 			/* Stop accel engine (stop bus mastering) */
-			if (par->accel_flags & FB_ACCELF_TEXT)
+			if (info->accel_flags & FB_ACCELF_TEXT)
 				aty_reset_engine(par);
 
 			/* Backup fb content */
@@ -1841,14 +1834,6 @@ static int __init aty_init(struct fb_info *info, const char *name)
 			    (&var, info, mode_option, 8))
 				var = default_var;
 		} else {
-#ifdef CONFIG_NVRAM
-			if (default_vmode == VMODE_NVRAM) {
-				default_vmode = nvram_read_byte(NV_VMODE);
-				if (default_vmode <= 0
-				    || default_vmode > VMODE_MAX)
-					default_vmode = VMODE_CHOOSE;
-			}
-#endif
 			if (default_vmode == VMODE_CHOOSE) {
 				if (M64_HAS(G3_PB_1024x768))
 					/* G3 PowerBook with 1024x768 LCD */
@@ -1870,10 +1855,6 @@ static int __init aty_init(struct fb_info *info, const char *name)
 			if (default_vmode <= 0
 			    || default_vmode > VMODE_MAX)
 				default_vmode = VMODE_640_480_60;
-#ifdef CONFIG_NVRAM
-			if (default_cmode == CMODE_NVRAM)
-				default_cmode = nvram_read_byte(NV_CMODE);
-#endif
 			if (default_cmode < CMODE_8
 			    || default_cmode > CMODE_32)
 				default_cmode = CMODE_8;
