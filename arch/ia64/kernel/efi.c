@@ -399,9 +399,7 @@ efi_map_pal_code (void)
 	int pal_code_count = 0;
 	u64 mask, psr;
 	u64 vaddr;
-#ifdef CONFIG_IA64_MCA
 	int cpu;
-#endif
 
 	efi_map_start = __va(ia64_boot_param->efi_memmap);
 	efi_map_end   = efi_map_start + ia64_boot_param->efi_memmap_size;
@@ -463,13 +461,11 @@ efi_map_pal_code (void)
 		ia64_set_psr(psr);		/* restore psr */
 		ia64_srlz_i();
 
-#ifdef CONFIG_IA64_MCA
 		cpu = smp_processor_id();
 
 		/* insert this TR into our list for MCA recovery purposes */
 		ia64_mca_tlb_list[cpu].pal_base = vaddr & mask;
 		ia64_mca_tlb_list[cpu].pal_paddr = pte_val(mk_pte_phys(md->phys_addr, PAGE_KERNEL));
-#endif
 	}
 }
 

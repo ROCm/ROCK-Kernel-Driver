@@ -499,6 +499,8 @@ void show_mem(void)
 	for_each_pgdat(pgdat) {
 		printk("Node ID: %d\n", pgdat->node_id);
 		for(i = 0; i < pgdat->node_spanned_pages; i++) {
+			if (!ia64_pfn_valid(pgdat->node_start_pfn+i))
+				continue;
 			if (PageReserved(pgdat->node_mem_map+i))
 				reserved++;
 			else if (PageSwapCache(pgdat->node_mem_map+i))

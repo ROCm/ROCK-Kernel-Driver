@@ -46,6 +46,8 @@ show_mem (void)
 	printk("Free swap:       %6dkB\n", nr_swap_pages<<(PAGE_SHIFT-10));
 	i = max_mapnr;
 	while (i-- > 0) {
+		if (!pfn_valid(i))
+			continue;
 		total++;
 		if (PageReserved(mem_map+i))
 			reserved++;

@@ -1055,13 +1055,13 @@ sba_alloc_coherent (struct device *dev, size_t size, dma_addr_t *dma_handle, int
 	*dma_handle = virt_to_phys(addr);
 
 #ifdef ALLOW_IOV_BYPASS
-	ASSERT(to_pci_dev(dev)->consistent_dma_mask);
+	ASSERT(dev->coherent_dma_mask);
 	/*
  	** Check if the PCI device can DMA to ptr... if so, just return ptr
  	*/
-	if (likely((*dma_handle & ~to_pci_dev(dev)->consistent_dma_mask) == 0)) {
+	if (likely((*dma_handle & ~dev->coherent_dma_mask) == 0)) {
 		DBG_BYPASS("sba_alloc_coherent() bypass mask/addr: 0x%lx/0x%lx\n",
-		           to_pci_dev(dev)->consistent_dma_mask, *dma_handle);
+		           dev->coherent_dma_mask, *dma_handle);
 
 		return addr;
 	}

@@ -355,10 +355,8 @@ setup_arch (char **cmdline_p)
 # endif
 #endif
 
-#ifdef CONFIG_IA64_MCA
 	/* enable IA-64 Machine Check Abort Handling */
 	ia64_mca_init();
-#endif
 
 	platform_setup(cmdline_p);
 	paging_init();
