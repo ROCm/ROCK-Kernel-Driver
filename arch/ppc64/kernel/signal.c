@@ -108,11 +108,11 @@ long sys_sigsuspend(old_sigset_t mask, int p2, int p3, int p4, int p6, int p7,
 	sigset_t saveset;
 
 	mask &= _BLOCKABLE;
-	spin_lock_irq(&current->sig->siglock);
+	spin_lock_irq(&current->sighand->siglock);
 	saveset = current->blocked;
 	siginitset(&current->blocked, mask);
 	recalc_sigpending();
-	spin_unlock_irq(&current->sig->siglock);
+	spin_unlock_irq(&current->sighand->siglock);
 
 	regs->result = -EINTR;
 	regs->gpr[3] = EINTR;
@@ -349,10 +349,10 @@ long sys_sigreturn(unsigned long r3, unsigned long r4, unsigned long r5,
 	set.sig[1] = sigctx._unused[3];
 #endif
 	sigdelsetmask(&set, ~_BLOCKABLE);
-	spin_lock_irq(&current->sig->siglock);
+	spin_lock_irq(&current->sighand->siglock);
 	current->blocked = set;
 	recalc_sigpending();
-	spin_unlock_irq(&current->sig->siglock);
+	spin_unlock_irq(&current->sighand->siglock);
 	if (regs->msr & MSR_FP)
 		giveup_fpu(current);
 
@@ -446,7 +446,7 @@ static void handle_signal(unsigned long sig, siginfo_t *info, sigset_t *oldset,
 {
 	struct sigcontext *sc;
 	struct rt_sigframe *rt_sf;
-	struct k_sigaction *ka = &current->sig->action[sig-1];
+	struct k_sigaction *ka = &current->sighand->action[sig-1];
 
 	if (regs->trap == 0x0C00 /* System Call! */
 	    && ((int)regs->result == -ERESTARTNOHAND ||
@@ -553,7 +553,7 @@ int do_signal(sigset_t *oldset, struct pt_regs *regs)
 
 	signr = get_signal_to_deliver(&info, regs);
 	if (signr > 0) {
-		ka = &current->sig->action[signr-1];
+		ka = &current->sighand->action[signr-1];
 		if ((ka->sa.sa_flags & SA_ONSTACK)
 		     && (!on_sig_stack(regs->gpr[1])))
 			newsp = (current->sas_ss_sp + current->sas_ss_size);

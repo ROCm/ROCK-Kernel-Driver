@@ -904,7 +904,7 @@ static void handle_signal32(unsigned long sig, siginfo_t *info,
 {
 	struct sigcontext32 *sc;
 	struct rt_sigframe_32 *rt_sf;
-	struct k_sigaction *ka = &current->sig->action[sig-1];
+	struct k_sigaction *ka = &current->sighand->action[sig-1];
 
 	if (regs->trap == 0x0C00 /* System Call! */
 	    && ((int)regs->result == -ERESTARTNOHAND ||
@@ -1065,7 +1065,7 @@ int do_signal32(sigset_t *oldset, struct pt_regs *regs)
 
 	signr = get_signal_to_deliver(&info, regs);
 	if (signr > 0) {
-		ka = &current->sig->action[signr-1];
+		ka = &current->sighand->action[signr-1];
 		if ((ka->sa.sa_flags & SA_ONSTACK)
 		     && (!on_sig_stack(regs->gpr[1])))
 			newsp = (current->sas_ss_sp + current->sas_ss_size);
