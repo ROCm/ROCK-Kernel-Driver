@@ -162,7 +162,7 @@ typedef struct drm_r128_sarea {
 	unsigned int last_dispatch;
 
 	drm_tex_region_t tex_list[R128_NR_TEX_HEAPS][R128_NR_TEX_REGIONS+1];
-	int tex_age[R128_NR_TEX_HEAPS];
+	unsigned int tex_age[R128_NR_TEX_HEAPS];
 	int ctx_owner;
 } drm_r128_sarea_t;
 

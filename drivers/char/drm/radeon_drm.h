@@ -323,12 +323,6 @@ typedef struct {
 
 
 typedef struct {
-	unsigned char next, prev;
-	unsigned char in_use;
-	int age;
-} drm_radeon_tex_region_t;
-
-typedef struct {
 	/* The channel for communication of state information to the
 	 * kernel on firing a vertex buffer with either of the
 	 * obsoleted vertex/index ioctls.
@@ -350,8 +344,8 @@ typedef struct {
 	unsigned int last_dispatch;
 	unsigned int last_clear;
 
-	drm_radeon_tex_region_t tex_list[RADEON_NR_TEX_HEAPS][RADEON_NR_TEX_REGIONS+1];
-	int tex_age[RADEON_NR_TEX_HEAPS];
+	drm_tex_region_t tex_list[RADEON_NR_TEX_HEAPS][RADEON_NR_TEX_REGIONS+1];
+	unsigned int tex_age[RADEON_NR_TEX_HEAPS];
 	int ctx_owner;
         int pfState;                /* number of 3d windows (0,1,2ormore) */
         int pfCurrentPage;	    /* which buffer is being displayed? */
