@@ -824,9 +824,14 @@ config SIBYTE_TBPROF
 
 config SNI_RM200_PCI
 	bool "Support for SNI RM200 PCI"
+	select ARC
+	select ARC32
+	select BOOT_ELF32
 	select DMA_NONCOHERENT
+	select GENERIC_ISA_DMA
 	select HAVE_STD_PC_SERIAL_PORT
 	select HW_HAS_PCI
+	select I8259
 	select ISA
 	help
 	  The SNI RM200 PCI was a MIPS-based platform manufactured by Siemens
