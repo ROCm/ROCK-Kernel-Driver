@@ -16,10 +16,11 @@
 #include <linux/device.h>
 #include <linux/delay.h>
 #include <linux/fs.h>
+#include <linux/device.h>
 #include "power.h"
 
 
-extern u32 pm_disk_mode;
+extern suspend_disk_method_t pm_disk_mode;
 extern struct pm_ops * pm_ops;
 
 extern int swsusp_suspend(void);
@@ -293,7 +294,7 @@ static ssize_t disk_store(struct subsystem * s, const char * buf, size_t n)
 	int i;
 	int len;
 	char *p;
-	u32 mode = 0;
+	suspend_disk_method_t mode = 0;
 
 	p = memchr(buf, '\n', n);
 	len = p ? p - buf : n;

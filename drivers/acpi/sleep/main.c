@@ -42,7 +42,7 @@ static int init_8259A_after_S1;
  *	wakeup code to the waking vector. 
  */
 
-static int acpi_pm_prepare(u32 pm_state)
+static int acpi_pm_prepare(suspend_state_t pm_state)
 {
 	u32 acpi_state = acpi_suspend_states[pm_state];
 
@@ -74,7 +74,7 @@ static int acpi_pm_prepare(u32 pm_state)
  *	It's unfortunate, but it works. Please fix if you're feeling frisky.
  */
 
-static int acpi_pm_enter(u32 pm_state)
+static int acpi_pm_enter(suspend_state_t pm_state)
 {
 	acpi_status status = AE_OK;
 	unsigned long flags = 0;
@@ -136,7 +136,7 @@ static int acpi_pm_enter(u32 pm_state)
  *	failed). 
  */
 
-static int acpi_pm_finish(u32 pm_state)
+static int acpi_pm_finish(suspend_state_t pm_state)
 {
 	u32 acpi_state = acpi_suspend_states[pm_state];
 
