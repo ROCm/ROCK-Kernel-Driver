@@ -956,30 +956,31 @@ out:
 	return status;
 }
 
-static int
-nfs4_proc_lookup(struct inode *dir, struct qstr *name,
-		 struct nfs_fh *fhandle, struct nfs_fattr *fattr)
+static int nfs4_proc_lookup(struct inode *dir, struct qstr *name,
+		struct nfs_fh *fhandle, struct nfs_fattr *fattr)
 {
-	struct nfs4_compound	compound;
-	struct nfs4_op		ops[5];
-	struct nfs_fattr	dir_attr;
-	int			status;
-
-	dir_attr.valid = 0;
+	int		       status;
+	struct nfs4_lookup_arg args = {
+		.bitmask = nfs4_fattr_bitmap,
+		.dir_fh = NFS_FH(dir),
+		.name = name,
+	};
+	struct nfs4_lookup_res res = {
+		.server = NFS_SERVER(dir),
+		.fattr = fattr,
+		.fh = fhandle,
+	};
+	struct rpc_message msg = {
+		.rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_LOOKUP],
+		.rpc_argp = &args,
+		.rpc_resp = &res,
+	};
+	
 	fattr->valid = 0;
 	
 	dprintk("NFS call  lookup %s\n", name->name);
-	nfs4_setup_compound(&compound, ops, NFS_SERVER(dir), "lookup");
-	nfs4_setup_putfh(&compound, NFS_FH(dir));
-	nfs4_setup_getattr(&compound, &dir_attr);
-	nfs4_setup_lookup(&compound, name);
-	nfs4_setup_getattr(&compound, fattr);
-	nfs4_setup_getfh(&compound, fhandle);
-	status = nfs4_call_compound(&compound, NULL, 0);
+	status = rpc_call_sync(NFS_CLIENT(dir), &msg, 0);
 	dprintk("NFS reply lookup: %d\n", status);
-
-	if (status >= 0)
-		status = nfs_refresh_inode(dir, &dir_attr);
 	return nfs4_map_errors(status);
 }
 

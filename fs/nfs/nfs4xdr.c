@@ -81,7 +81,7 @@ static int nfs_stat_to_errno(int);
 #define decode_putrootfh_maxsz	(op_decode_hdr_maxsz)
 #define encode_getfh_maxsz      (op_encode_hdr_maxsz)
 #define decode_getfh_maxsz      (op_decode_hdr_maxsz + 1 + \
-                                (NFS4_FHSIZE >> 2))
+				((3+NFS4_FHSIZE) >> 2))
 #define encode_getattr_maxsz    (op_encode_hdr_maxsz + 3)
 #define nfs4_fattr_bitmap_maxsz (26 + 2 * ((NFS4_MAXNAMLEN +1) >> 2))
 #define decode_getattr_maxsz    (op_decode_hdr_maxsz + 3 + \
@@ -109,7 +109,8 @@ static int nfs_stat_to_errno(int);
 				3 + (NFS4_VERIFIER_SIZE >> 2))
 #define decode_setclientid_confirm_maxsz \
 				(op_decode_hdr_maxsz)
-
+#define encode_lookup_maxsz	(op_encode_hdr_maxsz + \
+				1 + ((3 + NFS4_FHSIZE) >> 2))
 #define NFS4_enc_compound_sz	(1024)  /* XXX: large enough? */
 #define NFS4_dec_compound_sz	(1024)  /* XXX: large enough? */
 #define NFS4_enc_read_sz	(compound_encode_hdr_maxsz + \
@@ -251,6 +252,16 @@ static int nfs_stat_to_errno(int);
 #define NFS4_dec_getattr_sz	(compound_decode_hdr_maxsz + \
 				decode_putfh_maxsz + \
 				decode_getattr_maxsz)
+#define NFS4_enc_lookup_sz	(compound_encode_hdr_maxsz + \
+				encode_putfh_maxsz + \
+				encode_lookup_maxsz + \
+				encode_getattr_maxsz + \
+				encode_getfh_maxsz)
+#define NFS4_dec_lookup_sz	(compound_decode_hdr_maxsz + \
+				decode_putfh_maxsz + \
+				op_decode_hdr_maxsz + \
+				decode_getattr_maxsz + \
+				decode_getfh_maxsz)
 
 
 
@@ -665,16 +676,15 @@ encode_locku(struct xdr_stream *xdr, struct nfs_lockargs *arg)
 	return 0;
 }
 
-static int
-encode_lookup(struct xdr_stream *xdr, struct nfs4_lookup *lookup)
+static int encode_lookup(struct xdr_stream *xdr, const struct qstr *name)
 {
-	int len = lookup->lo_name->len;
+	int len = name->len;
 	uint32_t *p;
 
 	RESERVE_SPACE(8 + len);
 	WRITE32(OP_LOOKUP);
 	WRITE32(len);
-	WRITEMEM(lookup->lo_name->name, len);
+	WRITEMEM(name->name, len);
 
 	return 0;
 }
@@ -1079,7 +1089,7 @@ encode_compound(struct xdr_stream *xdr, struct nfs4_compound *cp, struct rpc_rqs
 			status = encode_link(xdr, &cp->ops[i].u.link);
 			break;
 		case OP_LOOKUP:
-			status = encode_lookup(xdr, &cp->ops[i].u.lookup);
+			status = encode_lookup(xdr, cp->ops[i].u.lookup.lo_name);
 			break;
 		case OP_PUTFH:
 			status = encode_putfh(xdr, cp->ops[i].u.putfh.pf_fhandle);
@@ -1148,6 +1158,30 @@ static int nfs4_xdr_enc_access(struct rpc_rqst *req, uint32_t *p, const struct n
 	encode_compound_hdr(&xdr, &hdr);
 	if ((status = encode_putfh(&xdr, args->fh)) == 0)
 		status = encode_access(&xdr, args->access);
+	return status;
+}
+
+/*
+ * Encode LOOKUP request
+ */
+static int nfs4_xdr_enc_lookup(struct rpc_rqst *req, uint32_t *p, const struct nfs4_lookup_arg *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops = 4,
+	};
+	int status;
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr);
+	if ((status = encode_putfh(&xdr, args->dir_fh)) != 0)
+		goto out;
+	if ((status = encode_lookup(&xdr, args->name)) != 0)
+		goto out;
+	if ((status = encode_getfh(&xdr)) != 0)
+		goto out;
+	status = encode_getfattr(&xdr, args->bitmask);
+out:
 	return status;
 }
 
@@ -2376,10 +2410,8 @@ out_bad_bitmap:
 	return -EIO;
 }
 
-static int
-decode_getfh(struct xdr_stream *xdr, struct nfs4_getfh *getfh)
+static int decode_getfh(struct xdr_stream *xdr, struct nfs_fh *fh)
 {
-	struct nfs_fh *fh = getfh->gf_fhandle;
 	uint32_t *p;
 	uint32_t len;
 	int status;
@@ -2392,7 +2424,7 @@ decode_getfh(struct xdr_stream *xdr, struct nfs4_getfh *getfh)
 
 	READ_BUF(4);
 	READ32(len);
-	if (len > NFS_MAXFHSIZE)
+	if (len > NFS4_FHSIZE)
 		return -EIO;
 	fh->size = len;
 	READ_BUF(len);
@@ -2865,7 +2897,7 @@ decode_compound(struct xdr_stream *xdr, struct nfs4_compound *cp, struct rpc_rqs
 			status = decode_getattr(xdr, &op->u.getattr, cp->server);
 			break;
 		case OP_GETFH:
-			status = decode_getfh(xdr, &op->u.getfh);
+			status = decode_getfh(xdr, op->u.getfh.gf_fhandle);
 			break;
 		case OP_LINK:
 			status = decode_link(xdr, &op->u.link);
@@ -2974,6 +3006,29 @@ out:
 }
 
 /*
+ * Decode LOOKUP response
+ */
+static int nfs4_xdr_dec_lookup(struct rpc_rqst *rqstp, uint32_t *p, struct nfs4_lookup_res *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+	
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	if ((status = decode_compound_hdr(&xdr, &hdr)) != 0)
+		goto out;
+	if ((status = decode_putfh(&xdr)) != 0)
+		goto out;
+	if ((status = decode_lookup(&xdr)) != 0)
+		goto out;
+	if ((status = decode_getfh(&xdr, res->fh)) != 0)
+		goto out;
+	status = decode_getfattr(&xdr, res->fattr, res->server);
+out:
+	return status;
+}
+
+/*
  * Decode GETATTR response
  */
 static int nfs4_xdr_dec_getattr(struct rpc_rqst *rqstp, uint32_t *p, struct nfs4_getattr_res *res)
@@ -3026,9 +3081,6 @@ nfs4_xdr_dec_open(struct rpc_rqst *rqstp, uint32_t *p, struct nfs_openres *res)
 {
         struct xdr_stream xdr;
         struct compound_hdr hdr;
-	struct nfs4_getfh gfh	= {
-		.gf_fhandle = &res->fh,
-	};
         int status;
 
         xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
@@ -3047,7 +3099,7 @@ nfs4_xdr_dec_open(struct rpc_rqst *rqstp, uint32_t *p, struct nfs_openres *res)
         status = decode_getattr(&xdr, res->f_getattr, res->server);
         if (status)
                 goto out;
-        status = decode_getfh(&xdr, &gfh);
+	status = decode_getfh(&xdr, &res->fh);
         if (status)
                 goto out;
         status = decode_restorefh(&xdr);
@@ -3485,6 +3537,7 @@ struct rpc_procinfo	nfs4_procedures[] = {
   PROC(LOCKU,           enc_locku,      dec_locku),
   PROC(ACCESS,		enc_access,	dec_access),
   PROC(GETATTR,		enc_getattr,	dec_getattr),
+  PROC(LOOKUP,		enc_lookup,	dec_lookup),
 };
 
 struct rpc_version		nfs_version4 = {

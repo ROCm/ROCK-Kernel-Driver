@@ -554,6 +554,18 @@ struct nfs4_lookup {
 	struct qstr *			lo_name;          /* request */
 };
 
+struct nfs4_lookup_arg {
+	const struct nfs_fh *		dir_fh;
+	const struct qstr *		name;
+	const u32 *			bitmask;
+};
+
+struct nfs4_lookup_res {
+	const struct nfs_server *	server;
+	struct nfs_fattr *		fattr;
+	struct nfs_fh *			fh;
+};
+
 struct nfs4_open {
 	struct nfs4_client *		op_client_state;  /* request */
 	u32				op_share_access;  /* request */
