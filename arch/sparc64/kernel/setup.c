@@ -107,7 +107,7 @@ int prom_callback(long *args)
 	 * administrator has done a switch-cpu inside obp. In either 
 	 * case, the cpu is marked as in-interrupt. Drop IRQ locks.
 	 */
-	irq_exit(smp_processor_id(), 0);
+	irq_exit();
 	save_and_cli(flags);
 	spin_unlock(&prom_entry_lock);
 	cons = console_drivers;
@@ -305,7 +305,7 @@ int prom_callback(long *args)
 	/*
 	 * Restore in-interrupt status for a resume from obp.
 	 */
-	irq_enter(smp_processor_id(), 0);
+	irq_enter();
 	return 0;
 }
 

@@ -1049,12 +1049,12 @@ void smp_percpu_timer_interrupt(struct pt_regs *regs)
 					   regs->u_regs[UREG_RETPC]);
 		if (!--prof_counter(cpu)) {
 			if (cpu == boot_cpu_id) {
-				irq_enter(cpu, 0);
+				irq_enter();
 
 				kstat.irqs[cpu][0]++;
 				timer_tick_interrupt(regs);
 
-				irq_exit(cpu, 0);
+				irq_exit();
 			}
 
 			update_process_times(user);

@@ -566,151 +566,36 @@ out:
 }
 
 #ifdef CONFIG_SMP
-
-/* Who has the global irq brlock */
-unsigned char global_irq_holder = NO_PROC_ID;
-
-static void show(char * str)
+void synchronize_irq(unsigned int irq)
 {
-	int cpu = smp_processor_id();
-	int i;
-
-	printk("\n%s, CPU %d:\n", str, cpu);
-	printk("irq:  %d [ ", irqs_running());
-	for (i = 0; i < NR_CPUS; i++) {
-		if (!cpu_online(i))
-			continue;
-		printk("%u ", __brlock_array[i][BR_GLOBALIRQ_LOCK]);
-	}
-	printk("]\nbh:   %d [ ",
-	       (spin_is_locked(&global_bh_lock) ? 1 : 0));
-	for (i = 0; i < NR_CPUS; i++) {
-		if (!cpu_online(i))
-			continue;
-		printk("%u ", local_bh_count(i));
-	}
-	printk("]\n");
-}
-
-#define MAXCOUNT 100000000
+	struct ino_bucket *bucket = __bucket(irq);
 
 #if 0
-#define SYNC_OTHER_ULTRAS(x)	udelay(x+1)
-#else
-#define SYNC_OTHER_ULTRAS(x)	membar("#Sync");
-#endif
+	/* The following is how I wish I could implement this.
+	 * Unfortunately the ICLR registers are read-only, you can
+	 * only write ICLR_foo values to them.  To get the current
+	 * IRQ status you would need to get at the IRQ diag registers
+	 * in the PCI/SBUS controller and the layout of those vary
+	 * from one controller to the next, sigh... -DaveM
+	 */
+	unsigned long iclr = bucket->iclr;
 
-void synchronize_irq(void)
-{
-	if (irqs_running()) {
-		cli();
-		sti();
-	}
-}
-
-static inline void get_irqlock(int cpu)
-{
-	int count;
-
-	if ((unsigned char)cpu == global_irq_holder)
-		return;
-
-	count = MAXCOUNT;
-again:
-	br_write_lock(BR_GLOBALIRQ_LOCK);
-	for (;;) {
-		spinlock_t *lock;
-
-		if (!irqs_running() &&
-		    (local_bh_count(smp_processor_id()) || !spin_is_locked(&global_bh_lock)))
-			break;
-
-		br_write_unlock(BR_GLOBALIRQ_LOCK);
-		lock = &__br_write_locks[BR_GLOBALIRQ_LOCK].lock;
-		while (irqs_running() ||
-		       spin_is_locked(lock) ||
-		       (!local_bh_count(smp_processor_id()) && spin_is_locked(&global_bh_lock))) {
-			if (!--count) {
-				show("get_irqlock");
-				count = (~0 >> 1);
-			}
-			local_irq_enable();
-			SYNC_OTHER_ULTRAS(cpu);
-			local_irq_disable();
+	while (1) {
+		u32 tmp = upa_readl(iclr);
+		
+		if (tmp == ICLR_TRANSMIT ||
+		    tmp == ICLR_PENDING) {
+			cpu_relax();
+			continue;
 		}
-		goto again;
-	}
-
-	global_irq_holder = cpu;
-}
-
-void __global_cli(void)
-{
-	unsigned long flags;
-
-	local_save_flags(flags);
-	if(flags == 0) {
-		int cpu;
-		local_irq_disable();
-		cpu = smp_processor_id();
-		if (! local_irq_count(cpu))
-			get_irqlock(cpu);
-	}
-}
-
-void __global_sti(void)
-{
-	int cpu;
-
-	preempt_disable();
-	cpu = smp_processor_id();
-	if (! local_irq_count(cpu))
-		release_irqlock(cpu);
-	local_irq_enable();
-	preempt_enable();
-}
-
-unsigned long __global_save_flags(void)
-{
-	unsigned long flags, local_enabled, retval;
-
-	local_save_flags(flags);
-	local_enabled = ((flags == 0) ? 1 : 0);
-	retval = 2 + local_enabled;
-	if (! local_irq_count(smp_processor_id())) {
-		if (local_enabled)
-			retval = 1;
-		if (global_irq_holder == (unsigned char) smp_processor_id())
-			retval = 0;
-	}
-	return retval;
-}
-
-void __global_restore_flags(unsigned long flags)
-{
-	switch (flags) {
-	case 0:
-		__global_cli();
 		break;
-	case 1:
-		__global_sti();
-		break;
-	case 2:
-		local_irq_disable();
-		break;
-	case 3:
-		local_irq_enable();
-		break;
-	default:
-	{
-		unsigned long pc;
-		__asm__ __volatile__("mov %%i7, %0" : "=r" (pc));
-		printk("global_restore_flags: Bogon flags(%016lx) caller %016lx\n",
-		       flags, pc);
 	}
-	}
+#else
+	/* So we have to do this with a INPROGRESS bit just like x86.  */
+	while (bucket->flags & IBF_INPROGRESS)
+		cpu_relax();
+#endif
 }
-
 #endif /* CONFIG_SMP */
 
 void catch_disabled_ivec(struct pt_regs *regs)
@@ -831,7 +716,7 @@ void handler_irq(int irq, struct pt_regs *regs)
 	clear_softint(1 << irq);
 #endif
 
-	irq_enter(cpu, irq);
+	irq_enter();
 	kstat.irqs[cpu][irq]++;
 
 #ifdef CONFIG_PCI
@@ -853,6 +738,8 @@ void handler_irq(int irq, struct pt_regs *regs)
 
 		nbp = __bucket(bp->irq_chain);
 		bp->irq_chain = 0;
+
+		bp->flags |= IBF_INPROGRESS;
 
 		if ((flags & IBF_ACTIVE) != 0) {
 #ifdef CONFIG_PCI
@@ -891,8 +778,10 @@ void handler_irq(int irq, struct pt_regs *regs)
 			}
 		} else
 			bp->pending = 1;
+
+		bp->flags &= ~IBF_INPROGRESS;
 	}
-	irq_exit(cpu, irq);
+	irq_exit();
 }
 
 #ifdef CONFIG_BLK_DEV_FD
@@ -904,16 +793,20 @@ void sparc_floppy_irq(int irq, void *dev_cookie, struct pt_regs *regs)
 	struct ino_bucket *bucket;
 	int cpu = smp_processor_id();
 
-	irq_enter(cpu, irq);
+	irq_enter();
 	kstat.irqs[cpu][irq]++;
 
 	*(irq_work(cpu, irq)) = 0;
 	bucket = get_ino_in_irqaction(action) + ivector_table;
 
+	bucket->flags |= IBF_INPROGRESS;
+
 	floppy_interrupt(irq, dev_cookie, regs);
 	upa_writel(ICLR_IDLE, bucket->iclr);
 
-	irq_exit(cpu, irq);
+	bucket->flags &= ~IBF_INPROGRESS;
+
+	irq_exit();
 }
 #endif
 

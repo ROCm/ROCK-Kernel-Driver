@@ -66,27 +66,14 @@ enum sparc_cpu {
 #define local_irq_save(flags)		((flags) = read_pil_and_cli())
 #define local_irq_restore(flags)		setipl((flags))
 
+/*
+ * Compatibility macros - they will be removed after some time.
+ */
 #ifndef CONFIG_SMP
 #define cli() local_irq_disable()
 #define sti() local_irq_enable()
 #define save_flags(x) local_save_flags(x)
 #define restore_flags(x) local_irq_restore(x)
-#define save_and_cli(x) local_irq_save(x)
-#else
-
-#ifndef __ASSEMBLY__
-extern void __global_cli(void);
-extern void __global_sti(void);
-extern unsigned long __global_save_flags(void);
-extern void __global_restore_flags(unsigned long flags);
-#endif
-
-#define cli()			__global_cli()
-#define sti()			__global_sti()
-#define save_flags(x)		((x) = __global_save_flags())
-#define restore_flags(flags)	__global_restore_flags(flags)
-#define save_and_cli(flags)	do { save_flags(flags); cli(); } while(0)
-
 #endif
 
 #define nop() 		__asm__ __volatile__ ("nop")

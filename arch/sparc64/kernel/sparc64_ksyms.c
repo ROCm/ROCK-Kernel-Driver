@@ -130,14 +130,9 @@ EXPORT_SYMBOL(__write_unlock);
 EXPORT_SYMBOL(kernel_flag);
 
 /* Hard IRQ locking */
-EXPORT_SYMBOL(global_irq_holder);
 #ifdef CONFIG_SMP
 EXPORT_SYMBOL(synchronize_irq);
 #endif
-EXPORT_SYMBOL(__global_cli);
-EXPORT_SYMBOL(__global_sti);
-EXPORT_SYMBOL(__global_save_flags);
-EXPORT_SYMBOL(__global_restore_flags);
 
 #if defined(CONFIG_MCOUNT)
 extern void mcount(void);
