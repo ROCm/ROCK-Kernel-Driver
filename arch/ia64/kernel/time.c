@@ -160,9 +160,6 @@ do_gettimeofday (struct timeval *tv)
 {
 	unsigned long seq, nsec, usec, sec, old, offset;
 
-	if ((unsigned long)tv->tv_nsec >= NSEC_PER_SEC)
-		return -EINVAL;
-
 	while (1) {
 		seq = read_seqbegin(&xtime_lock);
 		{
