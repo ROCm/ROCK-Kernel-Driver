@@ -57,8 +57,8 @@
 #include <asm/processor.h>
 #include <asm/mmzone.h>
 #include <asm/cputable.h>
-
 #include <asm/ppcdebug.h>
+#include <asm/sections.h>
 
 #ifdef CONFIG_PPC_ISERIES
 #include <asm/iSeries/iSeries_dma.h>
@@ -69,9 +69,6 @@ int mem_init_done;
 unsigned long ioremap_bot = IMALLOC_BASE;
 
 extern pgd_t swapper_pg_dir[];
-extern char __init_begin, __init_end;
-extern char _start[], _end[];
-extern char _stext[], etext[];
 extern struct task_struct *current_set[NR_CPUS];
 
 extern pgd_t ioremap_dir[];
@@ -384,15 +381,15 @@ void free_initmem(void)
 {
 	unsigned long addr;
 
-	addr = (unsigned long)(&__init_begin);
-	for (; addr < (unsigned long)(&__init_end); addr += PAGE_SIZE) {
+	addr = (unsigned long)__init_begin;
+	for (; addr < (unsigned long)__init_end; addr += PAGE_SIZE) {
 		ClearPageReserved(virt_to_page(addr));
 		set_page_count(virt_to_page(addr), 1);
 		free_page(addr);
 		totalram_pages++;
 	}
 	printk ("Freeing unused kernel memory: %luk freed\n",
-		(&__init_end - &__init_begin) >> 10);
+		((unsigned long)__init_end - (unsigned long)__init_begin) >> 10);
 }
 
 #ifdef CONFIG_BLK_DEV_INITRD
@@ -589,11 +586,11 @@ void __init mem_init(void)
 	     addr += PAGE_SIZE) {
 		if (!PageReserved(virt_to_page(addr)))
 			continue;
-		if (addr < (ulong) etext)
+		if (addr < (unsigned long)_etext)
 			codepages++;
 
-		else if (addr >= (unsigned long)&__init_begin
-			 && addr < (unsigned long)&__init_end)
+		else if (addr >= (unsigned long)__init_begin
+			 && addr < (unsigned long)__init_end)
 			initpages++;
 		else if (addr < klimit)
 			datapages++;
