@@ -2,9 +2,14 @@
 #define _ASM_IA64_STATFS_H
 
 /*
- * Copyright (C) 1998, 1999 Hewlett-Packard Co
- * Copyright (C) 1998, 1999 David Mosberger-Tang <davidm@hpl.hp.com>
+ * Copyright (C) 1998, 1999, 2003 Hewlett-Packard Co
+ *	David Mosberger-Tang <davidm@hpl.hp.com>
  */
+
+#ifndef __KERNEL_STRICT_NAMES
+# include <linux/types.h>
+typedef __kernel_fsid_t	fsid_t;
+#endif
 
 /*
  * This is ugly --- we're already 64-bit, so just duplicate the definitions
