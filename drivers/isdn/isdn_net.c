@@ -369,8 +369,7 @@ isdn_net_autohup()
 							       l->name, l->chargetime, l->chargeint);
 							isdn_net_hangup(&p->dev);
 						}
-					} else
-						isdn_net_hangup(&p->dev);
+					}
 				} else if (l->hupflags & ISDN_INHUP)
 					isdn_net_hangup(&p->dev);
 			}
@@ -2872,7 +2871,7 @@ isdn_net_setcfg(isdn_net_ioctl_cfg * cfg)
 		else
 			lp->hupflags &= ~ISDN_INHUP;
 		if (cfg->chargeint > 10) {
-			lp->hupflags |= ISDN_CHARGEHUP | ISDN_HAVECHARGE | ISDN_MANCHARGE;
+			lp->hupflags |= ISDN_HAVECHARGE | ISDN_MANCHARGE;
 			lp->chargeint = cfg->chargeint * HZ;
 		}
 		if (cfg->p_encap != lp->p_encap) {
