@@ -1529,7 +1529,6 @@ static void __init sunzilog_prepare(void)
 static void __init sunzilog_init_kbdms(struct uart_sunzilog_port *up, int channel)
 {
 	int baud, brg;
-	struct serio *serio;
 
 	if (channel == KEYBOARD_LINE) {
 		up->flags |= SUNZILOG_FLAG_CONS_KEYB;
@@ -1546,8 +1545,15 @@ static void __init sunzilog_init_kbdms(struct uart_sunzilog_port *up, int channe
 	up->curregs[R15] = BRKIE;
 	brg = BPS_TO_BRG(baud, ZS_CLOCK / ZS_CLOCK_DIVISOR);
 	sunzilog_convert_to_zs(up, up->cflag, 0, brg);
+	sunzilog_set_mctrl(&up->port, TIOCM_DTR | TIOCM_RTS);
+	__sunzilog_startup(up);
+}
 
 #ifdef CONFIG_SERIO
+static void __init sunzilog_register_serio(struct uart_sunzilog_port *up, int channel)
+{
+	struct serio *serio;
+
 	up->serio = serio = kmalloc(sizeof(struct serio), GFP_KERNEL);
 	if (serio) {
 
@@ -1576,11 +1582,8 @@ static void __init sunzilog_init_kbdms(struct uart_sunzilog_port *up, int channe
 		printk(KERN_WARNING "zs%d: not enough memory for serio port\n",
 			channel);
 	}
-#endif
-
-	sunzilog_set_mctrl(&up->port, TIOCM_DTR | TIOCM_RTS);
-	__sunzilog_startup(up);
 }
+#endif
 
 static void __init sunzilog_init_hw(void)
 {
@@ -1624,6 +1627,11 @@ static void __init sunzilog_init_hw(void)
 		}
 
 		spin_unlock_irqrestore(&up->port.lock, flags);
+
+#ifdef CONFIG_SERIO
+		if (i == KEYBOARD_LINE || i == MOUSE_LINE)
+			sunzilog_register_serio(up, i);
+#endif
 	}
 }
 
