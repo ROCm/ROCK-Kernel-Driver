@@ -41,6 +41,7 @@
 #include <linux/errno.h>
 #include "initializers.h"
 #include "debug.h"
+#include "transport.h"
 
 /* This places the Shuttle/SCM USB<->SCSI bridge devices in multi-target
  * mode */
@@ -59,4 +60,50 @@ int usb_stor_euscsi_init(struct us_data *us)
 	return 0;
 }
 
+/* This function is required to activate all four slots on the UCR-61S2B
+ * flash reader */
 
+int usb_stor_ucr61s2b_init(struct us_data *us)
+{
+	struct bulk_cb_wrap *bcb;
+	struct bulk_cs_wrap *bcs;
+	int res, partial;
+
+	bcb = kmalloc(sizeof *bcb, in_interrupt() ? GFP_ATOMIC : GFP_NOIO);
+	if (!bcb) {
+		return(-1);
+	}
+	bcs = kmalloc(sizeof *bcs, in_interrupt() ? GFP_ATOMIC : GFP_NOIO);
+	if (!bcs) {
+		kfree(bcb);
+		return(-1);
+	}
+
+	US_DEBUGP("Sending UCR-61S2B initialization packet...\n");
+
+	bcb->Signature = cpu_to_le32(US_BULK_CB_SIGN);
+	bcb->Tag = 0;
+	bcb->DataTransferLength = cpu_to_le32(0);
+	bcb->Flags = bcb->Lun = 0;
+	bcb->Length = sizeof(UCR61S2B_INIT);
+	memset(bcb->CDB, 0, sizeof(bcb->CDB));
+	memcpy(bcb->CDB, UCR61S2B_INIT, sizeof(UCR61S2B_INIT));
+
+	res = usb_stor_bulk_transfer_buf(us, us->send_bulk_pipe, bcb,
+			US_BULK_CB_WRAP_LEN, &partial);
+	US_DEBUGP("-- result is %d\n", res);
+	kfree(bcb);
+
+	if(res) {
+		kfree(bcs);
+		return(res);
+	}
+
+	res = usb_stor_bulk_transfer_buf(us, us->recv_bulk_pipe, bcs,
+			US_BULK_CS_WRAP_LEN, &partial);
+	US_DEBUGP("-- result of status read is %d\n", res);
+
+	kfree(bcs);
+
+	return(res ? -1 : 0);
+}
