@@ -145,9 +145,9 @@ extern void __flushw_user(void);
 #define flush_register_windows flushw_all
 #define prepare_to_switch flushw_all
 
-#ifndef CONFIG_DEBUG_SPINLOCk
+#ifndef CONFIG_DEBUG_SPINLOCK
 #define CHECK_LOCKS(PREV)	do { } while(0)
-#else /* CONFIG_DEBUG_SPINLOCk */
+#else /* CONFIG_DEBUG_SPINLOCK */
 #define CHECK_LOCKS(PREV)						\
 if ((PREV)->thread.smp_lock_count) {					\
 	unsigned long rpc;						\
@@ -161,7 +161,7 @@ if ((PREV)->thread.smp_lock_count) {					\
 	printk(KERN_CRIT "(%s)[%d]: Sched caller %016lx\n",		\
 	       (PREV)->comm, (PREV)->pid, rpc);				\
 }
-#endif /* !(CONFIG_DEBUG_SPINLOCk) */
+#endif /* !(CONFIG_DEBUG_SPINLOCK) */
 
 	/* See what happens when you design the chip correctly?
 	 *
