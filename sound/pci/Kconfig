@@ -15,6 +15,30 @@ config SND_ALI5451
 	help
 	  Say 'Y' or 'M' to include support for ALI PCI Audio M5451 sound core.
 
+config SND_AU8810
+        tristate "Aureal Advantage"
+        depends on SND
+	select SND_MPU401_UART
+	select SND_AC97_CODEC
+        help
+          Say 'Y' or 'M' to include support for Aureal Advantage soundcards.
+ 
+config SND_AU8820
+        tristate "Aureal Vortex"
+        depends on SND
+	select SND_MPU401_UART
+	select SND_AC97_CODEC
+        help
+          Say 'Y' or 'M' to include support for Aureal Vortex soundcards.
+ 
+config SND_AU8830
+        tristate "Aureal Vortex 2"
+        depends on SND
+	select SND_MPU401_UART
+	select SND_AC97_CODEC
+        help
+          Say 'Y' or 'M' to include support for Aureal Vortex 2 soundcards.
+ 
 config SND_AZT3328
 	tristate "Aztech AZF3328 / PCI168 (EXPERIMENTAL)"
 	depends on SND && EXPERIMENTAL

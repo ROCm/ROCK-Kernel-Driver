@@ -112,7 +112,8 @@ Module parameters
 		- value is used for /proc/asound filesystem
 		- this value can be used by applications for identification
 		  of card if user does not want identify card with index number
-    enable  	- enable card (only first card is enabled by default)
+    enable  	- enable card.  (all cards enabled for PCI and ISA PnP cards
+		  as default.)
 
   Module snd-ad1816a
   ------------------
@@ -177,6 +178,32 @@ Module parameters
                     0 = disabled (default), 1 = auto-detect
     
     Module supports up to 8 cards, autoprobe and PnP.
+
+  Module snd-au8810, snd-au8820, snd-au8830
+  -----------------------------------------
+
+    Module for Aureal Vortex, Vortex2 and Advantage device.
+
+    pcifix	- Control PCI workarounds
+		  0 = Disable all workarounds
+		  1 = Force the PCI latency of the Aureal card to 0xff
+		  2 = Force the Extend PCI#2 Internal Master for Efficient
+		      Handling of Dummy Requests on the VIA KT133 AGP Bridge
+		  3 = Force both settings
+		  255 = Autodetect what is required (default)
+
+    This module supports all ADB PCM channels, ac97 mixer, SPDIF, hardware
+    EQ, mpu401, gameport. A3D and wavetable support are still in development.
+    Development and reverse engineering work is being coordinated at
+    http://savannah.nongnu.org/projects/openvortex/
+    SPDIF output has a copy of the AC97 codec output, unless you use the
+    "spdif" pcm device, which allows raw data passthru.
+    The hardware EQ hardware and SPDIF is only present in the Vortex2 and 
+    Advantage.
+
+    Note: Some ALSA mixer applicactions don't handle the SPDIF samplerate 
+           control correctly. If you have problems regarding this, try
+           another ALSA compliant mixer (alsamixer works).
 
   Module snd-azt2320
   ------------------
@@ -608,6 +635,7 @@ Module parameters
                      1 = use headphone control as master
                      2 = swap headphone and master controls
                      3 = for AD1985, turn on OMS bit and use headphone
+                     4 = for ALC65x, turn on the jack sense mode
 
     Module supports autoprobe and multiple bus-master chips (max 8).
 

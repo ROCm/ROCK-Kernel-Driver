@@ -41,6 +41,7 @@ obj-$(CONFIG_SND_VIA82XX) += snd-via82xx.o
 obj-$(CONFIG_SND) += \
 	ac97/ \
 	ali5451/ \
+	au88x0/ \
 	cs46xx/ \
 	emu10k1/ \
 	ice1712/ \
