@@ -79,27 +79,6 @@ EXPORT_SYMBOL(irda_param_extract_all);
 EXPORT_SYMBOL(irda_param_pack);
 EXPORT_SYMBOL(irda_param_unpack);
 
-/* IrLMP */
-EXPORT_SYMBOL(irlmp_discovery_request);
-EXPORT_SYMBOL(irlmp_get_discoveries);
-EXPORT_SYMBOL(sysctl_discovery_timeout);
-EXPORT_SYMBOL(irlmp_register_client);
-EXPORT_SYMBOL(irlmp_unregister_client);
-EXPORT_SYMBOL(irlmp_update_client);
-EXPORT_SYMBOL(irlmp_register_service);
-EXPORT_SYMBOL(irlmp_unregister_service);
-EXPORT_SYMBOL(irlmp_service_to_hint);
-EXPORT_SYMBOL(irlmp_data_request);
-EXPORT_SYMBOL(irlmp_open_lsap);
-EXPORT_SYMBOL(irlmp_close_lsap);
-EXPORT_SYMBOL(irlmp_connect_request);
-EXPORT_SYMBOL(irlmp_connect_response);
-EXPORT_SYMBOL(irlmp_disconnect_request);
-EXPORT_SYMBOL(irlmp_get_daddr);
-EXPORT_SYMBOL(irlmp_get_saddr);
-EXPORT_SYMBOL(irlmp_dup);
-EXPORT_SYMBOL(lmp_reasons);
-
 /* IrLAP */
 EXPORT_SYMBOL(irlap_open);
 EXPORT_SYMBOL(irlap_close);

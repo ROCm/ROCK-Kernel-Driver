@@ -62,8 +62,6 @@ static const char *ias_charset_types[] = {
 static hashbin_t *iriap = NULL;
 static void *service_handle;
 
-extern char *lmp_reasons[];
-
 static void __iriap_close(struct iriap_cb *self);
 static int iriap_register_lsap(struct iriap_cb *self, __u8 slsap_sel, int mode);
 static void iriap_disconnect_indication(void *instance, void *sap,
@@ -291,7 +289,7 @@ static void iriap_disconnect_indication(void *instance, void *sap,
 {
 	struct iriap_cb *self;
 
-	IRDA_DEBUG(4, "%s(), reason=%s\n", __FUNCTION__, lmp_reasons[reason]);
+	IRDA_DEBUG(4, "%s(), reason=%s\n", __FUNCTION__, irlmp_reasons[reason]);
 
 	self = (struct iriap_cb *) instance;
 
