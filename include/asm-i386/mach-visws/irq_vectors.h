@@ -47,8 +47,9 @@
 #define TIMER_IRQ 0
 
 /*
- * 
+ * IRQ definitions
  */
+#define NR_VECTORS 256
 #define NR_IRQS 224
 #define NR_IRQ_VECTORS NR_IRQS
 

@@ -60,7 +60,10 @@ struct udp_sock {
 	struct udp_opt	  udp;
 };
 
-#define udp_sk(__sk) (&((struct udp_sock *)__sk)->udp)
+static inline struct udp_opt * udp_sk(const struct sock *__sk)
+{
+	return &((struct udp_sock *)__sk)->udp;
+}
 
 #endif
 

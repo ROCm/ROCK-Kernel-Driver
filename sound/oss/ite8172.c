@@ -2165,7 +2165,7 @@ static int __devinit it8172_probe(struct pci_dev *pcidev,
 	return -1;
 }
 
-static void __devinit it8172_remove(struct pci_dev *dev)
+static void __devexit it8172_remove(struct pci_dev *dev)
 {
 	struct it8172_state *s = pci_get_drvdata(dev);
 
@@ -2200,7 +2200,7 @@ static struct pci_driver it8172_driver = {
 	.name = IT8172_MODULE_NAME,
 	.id_table = id_table,
 	.probe = it8172_probe,
-	.remove = it8172_remove
+	.remove = __devexit_p(it8172_remove)
 };
 
 static int __init init_it8172(void)

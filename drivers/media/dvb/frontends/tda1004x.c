@@ -20,7 +20,7 @@
 
 /*
     This driver needs a copy of the DLL "ttlcdacc.dll" from the Haupauge or Technotrend
-    windows driver saved as '/etc/dvb/tda1004x.mc'.
+    windows driver saved as '/usr/lib/hotplug/firmware/tda1004x.mc'.
     You can also pass the complete file name with the module parameter 'tda1004x_firmware'.
 
     Currently the DLL from v2.15a of the technotrend driver is supported. Other versions can
@@ -45,7 +45,7 @@
 #include "dvb_functions.h"
 
 #ifndef DVB_TDA1004X_FIRMWARE_FILE
-#define DVB_TDA1004X_FIRMWARE_FILE "/etc/dvb/tda1004x.mc"
+#define DVB_TDA1004X_FIRMWARE_FILE "/usr/lib/hotplug/firmware/tda1004x.mc"
 #endif
 
 static int tda1004x_debug = 0;

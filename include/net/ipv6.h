@@ -329,13 +329,6 @@ extern int			ip6_nd_hdr(struct sock *sk,
 					   struct in6_addr *daddr,
 					   int proto, int len);
 
-extern int			ip6_build_xmit(struct sock *sk,
-					       inet_getfrag_t getfrag,
-					       const void *data,
-					       struct flowi *fl,
-					       unsigned length,
-					       struct ipv6_txoptions *opt,
-					       int hlimit, int flags);
 extern int			ip6_find_1stfragopt(struct sk_buff *skb, u8 **nexthdr);
 
 extern int			ip6_append_data(struct sock *sk,

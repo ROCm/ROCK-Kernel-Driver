@@ -213,13 +213,13 @@ static unsigned int cmd640_chip_version;
 
 static void put_cmd640_reg_pci1 (u16 reg, u8 val)
 {
-	outb_p((reg & 0xfc) | cmd640_key, 0xcf8);
+	outl_p((reg & 0xfc) | cmd640_key, 0xcf8);
 	outb_p(val, (reg & 3) | 0xcfc);
 }
 
 static u8 get_cmd640_reg_pci1 (u16 reg)
 {
-	outb_p((reg & 0xfc) | cmd640_key, 0xcf8);
+	outl_p((reg & 0xfc) | cmd640_key, 0xcf8);
 	return inb_p((reg & 3) | 0xcfc);
 }
 

@@ -5603,7 +5603,7 @@ fail2:
 
 // --------------------------------------------------------------------- 
 
-static void __devinit cs46xx_remove(struct pci_dev *pci_dev)
+static void __devexit cs46xx_remove(struct pci_dev *pci_dev)
 {
 	struct cs_card *card = PCI_GET_DRIVER_DATA(pci_dev);
 	int i;
@@ -5730,7 +5730,7 @@ struct pci_driver cs46xx_pci_driver = {
 	.name	  = "cs46xx",
 	.id_table = cs46xx_pci_tbl,
 	.probe	  = cs46xx_probe,
-	.remove	  = cs46xx_remove,
+	.remove	  = __devexit_p(cs46xx_remove),
 	.suspend  = CS46XX_SUSPEND_TBL,
 	.resume	  = CS46XX_RESUME_TBL,
 };

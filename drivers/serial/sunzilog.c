@@ -1631,6 +1631,8 @@ static int __init sunzilog_ports_init(void)
 {
 	struct zs_probe_scan scan;
 	int ret;
+	int uart_count;
+	int i;
 
 	printk(KERN_DEBUG "SunZilog: %d chips.\n", NUM_SUNZILOG);
 
@@ -1650,18 +1652,27 @@ static int __init sunzilog_ports_init(void)
 	sunzilog_init_hw();
 
 	/* We can only init this once we have probed the Zilogs
-	 * in the system.
+	 * in the system. Do not count channels assigned to keyboards
+	 * or mice when we are deciding how many ports to register.
 	 */
-	sunzilog_reg.nr = NUM_CHANNELS;
+	uart_count = 0;
+	for (i = 0; i < NUM_CHANNELS; i++) {
+		struct uart_sunzilog_port *up = &sunzilog_port_table[i];
+
+		if (ZS_IS_KEYB(up) || ZS_IS_MOUSE(up))
+			continue;
+
+		uart_count++;
+	}
+		
+	sunzilog_reg.nr = uart_count;
 	sunzilog_reg.cons = SUNZILOG_CONSOLE;
 
 	sunzilog_reg.minor = sunserial_current_minor;
-	sunserial_current_minor += NUM_CHANNELS;
+	sunserial_current_minor += uart_count;
 
 	ret = uart_register_driver(&sunzilog_reg);
 	if (ret == 0) {
-		int i;
-
 		for (i = 0; i < NUM_CHANNELS; i++) {
 			struct uart_sunzilog_port *up = &sunzilog_port_table[i];
 

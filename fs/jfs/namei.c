@@ -1439,14 +1439,18 @@ static struct dentry *jfs_lookup(struct inode *dip, struct dentry *dentry, struc
 struct dentry *jfs_get_parent(struct dentry *dentry)
 {
 	struct super_block *sb = dentry->d_inode->i_sb;
-	struct dentry *parent = ERR_PTR(-EACCES);
+	struct dentry *parent = ERR_PTR(-ENOENT);
 	struct inode *inode;
+	unsigned long parent_ino;
 
-	inode = iget(sb, JFS_IP(dentry->d_inode)->i_dtroot.header.idotdot);
+	parent_ino =
+		le32_to_cpu(JFS_IP(dentry->d_inode)->i_dtroot.header.idotdot);
+	inode = iget(sb, parent_ino);
 	if (inode) {
-		if (is_bad_inode(inode))
+		if (is_bad_inode(inode)) {
 			iput(inode);
-		else {
+			parent = ERR_PTR(-EACCES);
+		} else {
 			parent = d_alloc_anon(inode);
 			if (!parent) {
 				parent = ERR_PTR(-ENOMEM);

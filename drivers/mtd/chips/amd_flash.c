@@ -23,7 +23,6 @@
 #include <linux/mtd/map.h>
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/flashchip.h>
-#include <linux/init.h>
 
 /* There's no limit. It exists only to avoid realloc. */
 #define MAX_AMD_CHIPS 8

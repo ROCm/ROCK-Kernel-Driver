@@ -347,10 +347,10 @@ static __devinit int cache_nbs (struct pci_dev *pdev, u32 cap_ptr)
 	while ((loop_dev = pci_find_device(PCI_VENDOR_ID_AMD, 0x1103, loop_dev)) 
 			!= NULL) {
 		if (fix_northbridge(loop_dev, pdev, cap_ptr) < 0) { 
-			printk(KERN_INFO PFX "No usable aperture found.\n");
+			printk(KERN_ERR PFX "No usable aperture found.\n");
 #ifdef __x86_64__ 
 			/* should port this to i386 */
-			printk(KERN_INFO PFX "Consider rebooting with iommu=memaper=2 to get a good aperture.\n");
+			printk(KERN_ERR PFX "Consider rebooting with iommu=memaper=2 to get a good aperture.\n");
 #endif 
 			return -1;  
 		}
@@ -358,7 +358,7 @@ static __devinit int cache_nbs (struct pci_dev *pdev, u32 cap_ptr)
 		nr_garts = i;
 #ifdef CONFIG_SMP
 		if (i > MAX_HAMMER_GARTS) { 
-			printk(KERN_INFO PFX "Too many northbridges for AGP\n");
+			printk(KERN_ERR PFX "Too many northbridges for AGP\n");
 			return -1;
 		}
 #else

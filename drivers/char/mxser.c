@@ -56,7 +56,6 @@
 #include <linux/mm.h>
 #include <linux/smp_lock.h>
 #include <linux/pci.h>
-#include <linux/init.h>
 
 #include <asm/system.h>
 #include <asm/io.h>

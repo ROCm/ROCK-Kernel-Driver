@@ -2673,9 +2673,9 @@ static int tuner_set_tv_freq (struct saa7146_dev *dev, u32 freq)
 	buf[1] = div & 0xff;
 	buf[2] = 0x8e;
 
-	if (freq < (u32) 16*168.25 )
+	if (freq < (u32) (16*168.25) )
 		config = 0xa0;
-	else if (freq < (u32) 16*447.25)
+	else if (freq < (u32) (16*447.25) )
 		config = 0x90;
 	else
 		config = 0x30;

@@ -1074,3 +1074,6 @@ static void __exit bpp_cleanup(void)
 
 module_init(bpp_init);
 module_exit(bpp_cleanup);
+
+MODULE_LICENSE("GPL");
+

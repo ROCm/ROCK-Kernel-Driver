@@ -30,7 +30,6 @@
 
  */
 
-#include <linux/init.h>
 #include <sound/driver.h>
 #include <linux/init.h>
 #include <sound/core.h>

@@ -1598,8 +1598,9 @@ xfs_vget(
 #define MNTOPT_NORECOVERY   "norecovery"   /* don't run XFS recovery */
 #define MNTOPT_NOLOGFLUSH   "nologflush"   /* don't hard flush on log writes */
 #define MNTOPT_OSYNCISOSYNC "osyncisosync" /* o_sync is REALLY o_sync */
-#define MNTOPT_64BITINODE   "inode64"  /* inodes can be allocated anywhere */
-#define MNTOPT_IKEEP	"ikeep"		/* free empty inode clusters */
+#define MNTOPT_64BITINODE   "inode64"	/* inodes can be allocated anywhere */
+#define MNTOPT_IKEEP	"ikeep"		/* do not free empty inode clusters */
+#define MNTOPT_NOIKEEP	"noikeep"	/* free empty inode clusters */
 
 
 int
@@ -1614,7 +1615,9 @@ xfs_parseargs(
 	int			dsunit, dswidth, vol_dsunit, vol_dswidth;
 	int			iosize;
 
+#if 0	/* XXX: off by default, until some remaining issues ironed out */
 	args->flags |= XFSMNT_IDELETE; /* default to on */
+#endif
 
 	if (!options)
 		return 0;
@@ -1722,6 +1725,8 @@ xfs_parseargs(
 			args->flags |= XFSMNT_NOLOGFLUSH;
 		} else if (!strcmp(this_char, MNTOPT_IKEEP)) {
 			args->flags &= ~XFSMNT_IDELETE;
+		} else if (!strcmp(this_char, MNTOPT_NOIKEEP)) {
+			args->flags |= XFSMNT_IDELETE;
 		} else if (!strcmp(this_char, "osyncisdsync")) {
 			/* no-op, this is now the default */
 printk("XFS: osyncisdsync is now the default, option is deprecated.\n");
