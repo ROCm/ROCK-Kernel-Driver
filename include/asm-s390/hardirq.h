@@ -98,7 +98,7 @@ extern void account_ticks(struct pt_regs *);
 
 #define invoke_softirq() do_call_softirq()
 
-#ifdef CONFIG_PREEMPT
+#if defined(CONFIG_PREEMPT) || defined(CONFIG_DEBUG_SPINLOCK_SLEEP)
 # define in_atomic()	((preempt_count() & ~PREEMPT_ACTIVE) != kernel_locked())
 # define IRQ_EXIT_OFFSET (HARDIRQ_OFFSET-1)
 #else

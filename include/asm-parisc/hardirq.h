@@ -87,7 +87,7 @@ typedef struct {
 
 #define irq_enter()		(preempt_count() += HARDIRQ_OFFSET)
 
-#ifdef CONFIG_PREEMPT
+#if defined(CONFIG_PREEMPT) || defined(CONFIG_DEBUG_SPINLOCK_SLEEP)
 # error CONFIG_PREEMT currently not supported.
 # define in_atomic()	 BUG()
 # define IRQ_EXIT_OFFSET (HARDIRQ_OFFSET-1)
