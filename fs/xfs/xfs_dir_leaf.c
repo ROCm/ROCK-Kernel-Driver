@@ -2225,7 +2225,7 @@ xfs_dir_put_dirent64_uio(xfs_dir_put_args_t *pa)
 	idbp->d_off = pa->cook.o;
 	idbp->d_name[namelen] = '\0';
 	memcpy(idbp->d_name, pa->name, namelen);
-	retval = uiomove((caddr_t)idbp, reclen, UIO_READ, uio);
+	retval = uio_read((caddr_t)idbp, reclen, uio);
 	pa->done = (retval == 0);
 	return retval;
 }

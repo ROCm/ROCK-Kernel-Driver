@@ -14,5 +14,10 @@ extern int ip_nat_rule_find(struct sk_buff **pskb,
 			    const struct net_device *out,
 			    struct ip_conntrack *ct,
 			    struct ip_nat_info *info);
+
+extern unsigned int
+alloc_null_binding(struct ip_conntrack *conntrack,
+		   struct ip_nat_info *info,
+		   unsigned int hooknum);
 #endif
 #endif /* _IP_NAT_RULE_H */

@@ -141,9 +141,9 @@ struct sctp_association *sctp_association_init(struct sctp_association *asoc,
 	 * socket values.
 	 */
 	asoc->max_retrans = sp->assocparams.sasoc_asocmaxrxt;
-	asoc->rto_initial = sp->rtoinfo.srto_initial * HZ / 1000;
-	asoc->rto_max = sp->rtoinfo.srto_max * HZ / 1000;
-	asoc->rto_min = sp->rtoinfo.srto_min * HZ / 1000;
+	asoc->rto_initial = MSECS_TO_JIFFIES(sp->rtoinfo.srto_initial);
+	asoc->rto_max = MSECS_TO_JIFFIES(sp->rtoinfo.srto_max);
+	asoc->rto_min = MSECS_TO_JIFFIES(sp->rtoinfo.srto_min);
 
 	asoc->overall_error_count = 0;
 
@@ -168,7 +168,8 @@ struct sctp_association *sctp_association_init(struct sctp_association *asoc,
 	asoc->c.sinit_num_ostreams  = sp->initmsg.sinit_num_ostreams;
 	asoc->max_init_attempts	= sp->initmsg.sinit_max_attempts;
 
-	asoc->max_init_timeo    = sp->initmsg.sinit_max_init_timeo * HZ / 1000;
+	asoc->max_init_timeo =
+		 MSECS_TO_JIFFIES(sp->initmsg.sinit_max_init_timeo);
 
 	/* Allocate storage for the ssnmap after the inbound and outbound
 	 * streams have been negotiated during Init.
@@ -245,6 +246,11 @@ struct sctp_association *sctp_association_init(struct sctp_association *asoc,
 	 * already received one packet.]
 	 */
 	asoc->peer.sack_needed = 1;
+
+	/* Assume that the peer recongizes ASCONF until reported otherwise
+	 * via an ERROR chunk.
+	 */
+	asoc->peer.asconf_capable = 1;
 
 	/* Create an input queue.  */
 	sctp_inq_init(&asoc->base.inqueue);
@@ -495,7 +501,7 @@ struct sctp_transport *sctp_assoc_add_peer(struct sctp_association *asoc,
 	/* Initialize the peer's heartbeat interval based on the
 	 * sock configured value.
 	 */
-	peer->hb_interval = sp->paddrparam.spp_hbinterval * HZ;
+	peer->hb_interval = MSECS_TO_JIFFIES(sp->paddrparam.spp_hbinterval);
 
 	/* Set the path max_retrans.  */
 	peer->max_retrans = asoc->max_retrans;

@@ -1007,7 +1007,7 @@ xfs_buf_iodone_callbacks(
 {
 	xfs_log_item_t	*lip;
 	static ulong	lasttime;
-	static dev_t	lastdev;
+	static xfs_buftarg_t *lasttarg;
 	xfs_mount_t	*mp;
 
 	ASSERT(XFS_BUF_FSPRIVATE(bp, void *) != NULL);
@@ -1045,15 +1045,15 @@ xfs_buf_iodone_callbacks(
 			return;
 		}
 
-		if ((XFS_BUF_TARGET_DEV(bp) != lastdev) ||
+		if ((XFS_BUF_TARGET(bp) != lasttarg) ||
 		    (time_after(jiffies, (lasttime + 5*HZ)))) {
 			lasttime = jiffies;
 			prdev("XFS write error in file system meta-data "
 			      "block 0x%Lx in %s",
-			      XFS_BUF_TARGET_DEV(bp),
+			      XFS_BUF_TARGET(bp),
 			      XFS_BUF_ADDR(bp), mp->m_fsname);
 		}
-		lastdev = XFS_BUF_TARGET_DEV(bp);
+		lasttarg = XFS_BUF_TARGET(bp);
 
 		if (XFS_BUF_ISASYNC(bp)) {
 			/*

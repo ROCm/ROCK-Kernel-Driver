@@ -144,14 +144,11 @@ xfs_getattr(
 		xfs_ilock(ip, XFS_ILOCK_SHARED);
 
 	vap->va_size = ip->i_d.di_size;
-	if (vap->va_mask == XFS_AT_SIZE) {
-		if (!(flags & ATTR_LAZY))
-			xfs_iunlock(ip, XFS_ILOCK_SHARED);
-		return 0;
-	}
+	if (vap->va_mask == XFS_AT_SIZE)
+		goto all_done;
+
 	vap->va_nblocks =
 		XFS_FSB_TO_BB(mp, ip->i_d.di_nblocks + ip->i_delayed_blks);
-	vap->va_fsid = mp->m_dev;
 	vap->va_nodeid = ip->i_ino;
 #if XFS_BIG_INUMS
 	vap->va_nodeid += mp->m_inoadd;
@@ -163,11 +160,8 @@ xfs_getattr(
 	 */
 	if ((vap->va_mask &
 	    ~(XFS_AT_SIZE|XFS_AT_FSID|XFS_AT_NODEID|
-	      XFS_AT_NLINK|XFS_AT_BLKSIZE)) == 0) {
-		if (!(flags & ATTR_LAZY))
-			xfs_iunlock(ip, XFS_ILOCK_SHARED);
-		return 0;
-	}
+	      XFS_AT_NLINK|XFS_AT_BLKSIZE)) == 0)
+		goto all_done;
 
 	/*
 	 * Copy from in-core inode.
@@ -194,7 +188,7 @@ xfs_getattr(
 			 * stripe size through is not a good
 			 * idea for now.
 			 */
-			vap->va_blksize = mp->m_swidth ?
+			vap->va_blocksize = mp->m_swidth ?
 				/*
 				 * If the underlying volume is a stripe, then
 				 * return the stripe width in bytes as the
@@ -211,7 +205,7 @@ xfs_getattr(
 					       mp->m_writeio_log));
 
 #else
-			vap->va_blksize =
+			vap->va_blocksize =
 				/*
 				 * Return the largest of the preferred buffer
 				 * sizes since doing small I/Os into larger
@@ -229,13 +223,13 @@ xfs_getattr(
 			 * realtime extent size or the realtime volume's
 			 * extent size.
 			 */
-			vap->va_blksize = ip->i_d.di_extsize ?
+			vap->va_blocksize = ip->i_d.di_extsize ?
 				(ip->i_d.di_extsize << mp->m_sb.sb_blocklog) :
 				(mp->m_sb.sb_rextsize << mp->m_sb.sb_blocklog);
 		}
 	} else {
 		vap->va_rdev = ip->i_df.if_u2.if_rdev;
-		vap->va_blksize = BLKDEV_IOSIZE;
+		vap->va_blocksize = BLKDEV_IOSIZE;
 	}
 
 	vap->va_atime.tv_sec = ip->i_d.di_atime.t_sec;
@@ -251,46 +245,53 @@ xfs_getattr(
 	 */
 	if ((vap->va_mask &
 	     (XFS_AT_XFLAGS|XFS_AT_EXTSIZE|XFS_AT_NEXTENTS|XFS_AT_ANEXTENTS|
-	      XFS_AT_GENCOUNT|XFS_AT_VCODE)) == 0) {
-		if (!(flags & ATTR_LAZY))
-			xfs_iunlock(ip, XFS_ILOCK_SHARED);
-		return 0;
-	}
+	      XFS_AT_GENCOUNT|XFS_AT_VCODE)) == 0)
+		goto all_done;
+
 	/*
 	 * convert di_flags to xflags
 	 */
-	vap->va_xflags =
-		((ip->i_d.di_flags & XFS_DIFLAG_REALTIME) ?
-			XFS_XFLAG_REALTIME : 0) |
-		((ip->i_d.di_flags & XFS_DIFLAG_PREALLOC) ?
-			XFS_XFLAG_PREALLOC : 0) |
-	        ((ip->i_d.di_flags & XFS_DIFLAG_IMMUTABLE) ?
-		        XFS_XFLAG_IMMUTABLE : 0) |
-		((ip->i_d.di_flags & XFS_DIFLAG_APPEND) ?
-		        XFS_XFLAG_APPEND : 0) |
-		((ip->i_d.di_flags & XFS_DIFLAG_SYNC) ?
-		        XFS_XFLAG_SYNC : 0) |
-		((ip->i_d.di_flags & XFS_DIFLAG_NOATIME) ?
-		        XFS_XFLAG_NOATIME : 0) |
-		((ip->i_d.di_flags & XFS_DIFLAG_NODUMP) ?
-		        XFS_XFLAG_NODUMP: 0) |
-		(XFS_IFORK_Q(ip) ?
-			XFS_XFLAG_HASATTR : 0);
+	vap->va_xflags = 0;
+	if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME)
+		vap->va_xflags |= XFS_XFLAG_REALTIME;
+	if (ip->i_d.di_flags & XFS_DIFLAG_PREALLOC)
+		vap->va_xflags |= XFS_XFLAG_PREALLOC;
+	if (ip->i_d.di_flags & XFS_DIFLAG_IMMUTABLE)
+		vap->va_xflags |= XFS_XFLAG_IMMUTABLE;
+	if (ip->i_d.di_flags & XFS_DIFLAG_APPEND)
+		vap->va_xflags |= XFS_XFLAG_APPEND;
+	if (ip->i_d.di_flags & XFS_DIFLAG_SYNC)
+		vap->va_xflags |= XFS_XFLAG_SYNC;
+	if (ip->i_d.di_flags & XFS_DIFLAG_NOATIME)
+		vap->va_xflags |= XFS_XFLAG_NOATIME;
+	if (ip->i_d.di_flags & XFS_DIFLAG_NODUMP)
+		vap->va_xflags |= XFS_XFLAG_NODUMP;
+	if (XFS_IFORK_Q(ip))
+		vap->va_xflags |= XFS_XFLAG_HASATTR;
+	/*
+	 * Exit for inode revalidate.  See if any of the rest of
+	 * the fields to be filled in are needed.
+	 */
+	if ((vap->va_mask &
+	     (XFS_AT_EXTSIZE|XFS_AT_NEXTENTS|XFS_AT_ANEXTENTS|
+	      XFS_AT_GENCOUNT|XFS_AT_VCODE)) == 0)
+		goto all_done;
+
 	vap->va_extsize = ip->i_d.di_extsize << mp->m_sb.sb_blocklog;
 	vap->va_nextents =
 		(ip->i_df.if_flags & XFS_IFEXTENTS) ?
 			ip->i_df.if_bytes / sizeof(xfs_bmbt_rec_t) :
 			ip->i_d.di_nextents;
-	if (ip->i_afp != NULL)
+	if (ip->i_afp)
 		vap->va_anextents =
 			(ip->i_afp->if_flags & XFS_IFEXTENTS) ?
 				ip->i_afp->if_bytes / sizeof(xfs_bmbt_rec_t) :
 				 ip->i_d.di_anextents;
 	else
 		vap->va_anextents = 0;
-	vap->va_gencount = ip->i_d.di_gen;
-	vap->va_vcode = 0L;
+	vap->va_gen = ip->i_d.di_gen;
 
+ all_done:
 	if (!(flags & ATTR_LAZY))
 		xfs_iunlock(ip, XFS_ILOCK_SHARED);
 	return 0;
@@ -415,7 +416,7 @@ xfs_setattr(
 	} else {
 		if (DM_EVENT_ENABLED (vp->v_vfsp, ip, DM_EVENT_TRUNCATE) &&
 		    !(flags & ATTR_DMI)) {
-			code = XFS_SEND_DATA(mp, DM_EVENT_TRUNCATE, bdp,
+			code = XFS_SEND_DATA(mp, DM_EVENT_TRUNCATE, vp,
 				vap->va_size, 0, AT_DELAY_FLAG(flags), NULL);
 			if (code) {
 				lock_flags = 0;
@@ -1042,7 +1043,7 @@ xfs_readlink(
 	pathlen = (int)ip->i_d.di_size;
 
 	if (ip->i_df.if_flags & XFS_IFINLINE) {
-		error = uiomove(ip->i_df.if_u1.if_data, pathlen, UIO_READ, uiop);
+		error = uio_read(ip->i_df.if_u1.if_data, pathlen, uiop);
 	}
 	else {
 		/*
@@ -1073,8 +1074,7 @@ xfs_readlink(
 				byte_cnt = pathlen;
 			pathlen -= byte_cnt;
 
-			error = uiomove(XFS_BUF_PTR(bp), byte_cnt,
-					 UIO_READ, uiop);
+			error = uio_read(XFS_BUF_PTR(bp), byte_cnt, uiop);
 			xfs_buf_relse (bp);
 		}
 
@@ -1729,7 +1729,7 @@ xfs_inactive(
 
 	if (ip->i_d.di_nlink == 0 &&
 	    DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_EVENT_DESTROY)) {
-		(void) XFS_SEND_DESTROY(mp, bdp, DM_RIGHT_NULL);
+		(void) XFS_SEND_DESTROY(mp, vp, DM_RIGHT_NULL);
 	}
 
 	error = 0;
@@ -4163,7 +4163,7 @@ xfs_alloc_file_space(
 		end_dmi_offset = offset+len;
 		if (end_dmi_offset > ip->i_d.di_size)
 			end_dmi_offset = ip->i_d.di_size;
-		error = XFS_SEND_DATA(mp, DM_EVENT_WRITE, XFS_ITOBHV(ip),
+		error = XFS_SEND_DATA(mp, DM_EVENT_WRITE, XFS_ITOV(ip),
 			offset, end_dmi_offset - offset,
 			0, NULL);
 		if (error)
@@ -4410,7 +4410,7 @@ xfs_free_file_space(
 	    DM_EVENT_ENABLED(XFS_MTOVFS(mp), ip, DM_EVENT_WRITE)) {
 		if (end_dmi_offset > ip->i_d.di_size)
 			end_dmi_offset = ip->i_d.di_size;
-		error = XFS_SEND_DATA(mp, DM_EVENT_WRITE, XFS_ITOBHV(ip),
+		error = XFS_SEND_DATA(mp, DM_EVENT_WRITE, XFS_ITOV(ip),
 				offset, end_dmi_offset - offset,
 				AT_DELAY_FLAG(attr_flags), NULL);
 		if (error)

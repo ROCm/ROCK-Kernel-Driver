@@ -233,7 +233,7 @@ static int ipt_dnat_checkentry(const char *tablename,
 	return 1;
 }
 
-static inline unsigned int
+inline unsigned int
 alloc_null_binding(struct ip_conntrack *conntrack,
 		   struct ip_nat_info *info,
 		   unsigned int hooknum)

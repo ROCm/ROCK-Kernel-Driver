@@ -324,6 +324,43 @@ int sctp_bind_addr_match(struct sctp_bind_addr *bp,
 	return 0;
 }
 
+/* Find the first address in the bind address list that is not present in
+ * the addrs packed array.
+ */
+union sctp_addr *sctp_find_unmatch_addr(struct sctp_bind_addr	*bp,
+					const union sctp_addr	*addrs,
+					int			addrcnt,
+					struct sctp_opt		*opt)
+{
+	struct sctp_sockaddr_entry	*laddr;
+	union sctp_addr			*addr;
+	void 				*addr_buf;
+	struct sctp_af			*af;
+	struct list_head		*pos;
+	int				i;
+
+	list_for_each(pos, &bp->address_list) {
+		laddr = list_entry(pos, struct sctp_sockaddr_entry, list);
+		
+		addr_buf = (union sctp_addr *)addrs;
+		for (i = 0; i < addrcnt; i++) {
+			addr = (union sctp_addr *)addr_buf;
+			af = sctp_get_af_specific(addr->v4.sin_family);
+			if (!af) 
+				return NULL;
+
+			if (opt->pf->cmp_addr(&laddr->a, addr, opt))
+				break;
+
+			addr_buf += af->sockaddr_len;
+		}
+		if (i == addrcnt)
+			return &laddr->a;
+	}
+
+	return NULL;
+}
+
 /* Copy out addresses from the global local address list. */
 static int sctp_copy_one_addr(struct sctp_bind_addr *dest, 
 			      union sctp_addr *addr,

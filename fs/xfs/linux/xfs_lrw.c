@@ -218,7 +218,7 @@ xfs_read(
 		int error;
 		vrwlock_t locktype = VRWLOCK_READ;
 
-		error = XFS_SEND_DATA(mp, DM_EVENT_READ, bdp, *offset, size,
+		error = XFS_SEND_DATA(mp, DM_EVENT_READ, BHV_TO_VNODE(bdp), *offset, size,
 				      FILP_DELAY_FLAG(file), &locktype);
 		if (error) {
 			xfs_iunlock(ip, XFS_IOLOCK_SHARED);
@@ -278,7 +278,7 @@ xfs_sendfile(
 		vrwlock_t locktype = VRWLOCK_READ;
 		int error;
 
-		error = XFS_SEND_DATA(mp, DM_EVENT_READ, bdp, *offset, count,
+		error = XFS_SEND_DATA(mp, DM_EVENT_READ, BHV_TO_VNODE(bdp), *offset, count,
 				      FILP_DELAY_FLAG(filp), &locktype);
 		if (error) {
 			xfs_iunlock(ip, XFS_IOLOCK_SHARED);
@@ -612,7 +612,7 @@ start:
 		loff_t		savedsize = *offset;
 
 		xfs_iunlock(xip, XFS_ILOCK_EXCL);
-		error = XFS_SEND_DATA(xip->i_mount, DM_EVENT_WRITE, bdp,
+		error = XFS_SEND_DATA(xip->i_mount, DM_EVENT_WRITE, vp,
 				      *offset, size,
 				      FILP_DELAY_FLAG(file), &locktype);
 		if (error) {

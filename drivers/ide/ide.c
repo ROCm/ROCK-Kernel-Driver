@@ -1800,7 +1800,6 @@ static int __init match_parm (char *s, const char *keywords[], int vals[], int m
 
 #ifdef CONFIG_BLK_DEV_PDC4030
 static int __initdata probe_pdc4030;
-extern void init_pdc4030(void);
 #endif
 #ifdef CONFIG_BLK_DEV_ALI14XX
 static int __initdata probe_ali14xx;
@@ -2238,8 +2237,9 @@ static void __init probe_for_hwifs (void)
 #endif /* CONFIG_BLK_DEV_CMD640 */
 #ifdef CONFIG_BLK_DEV_PDC4030
 	{
-		extern int ide_probe_for_pdc4030(void);
-		(void) ide_probe_for_pdc4030();
+		extern int pdc4030_init(void);
+		if (probe_pdc4030)
+			(void)pdc4030_init();
 	}
 #endif /* CONFIG_BLK_DEV_PDC4030 */
 #ifdef CONFIG_BLK_DEV_IDE_PMAC
@@ -2595,10 +2595,6 @@ int __init ide_init (void)
 
 	init_ide_data();
 
-#ifdef CONFIG_BLK_DEV_PDC4030
-	if (probe_pdc4030)
-		init_pdc4030();
-#endif
 #ifdef CONFIG_BLK_DEV_ALI14XX
 	if (probe_ali14xx)
 		(void)ali14xx_init();
