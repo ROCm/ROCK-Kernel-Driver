@@ -61,16 +61,11 @@ mmci_request_end(struct mmci_host *host, struct mmc_request *mrq)
 
 static void mmci_start_data(struct mmci_host *host, struct mmc_data *data)
 {
-	unsigned int datactrl, timeout;
+	unsigned int datactrl, timeout, irqmask;
 
 	DBG("%s: data: blksz %04x blks %04x flags %08x\n",
 	    host->mmc->host_name, 1 << data->blksz_bits, data->blocks,
 	    data->flags);
-
-	datactrl = MCI_DPSM_ENABLE | data->blksz_bits << 4;
-
-	if (data->flags & MMC_DATA_READ)
-		datactrl |= MCI_DPSM_DIRECTION;
 
 	host->data = data;
 	host->buffer = data->req->buffer;
@@ -83,7 +78,21 @@ static void mmci_start_data(struct mmci_host *host, struct mmc_data *data)
 
 	writel(timeout, host->base + MMCIDATATIMER);
 	writel(host->size, host->base + MMCIDATALENGTH);
+
+	datactrl = MCI_DPSM_ENABLE | data->blksz_bits << 4;
+	if (data->flags & MMC_DATA_READ) {
+		datactrl |= MCI_DPSM_DIRECTION;
+		irqmask = MCI_RXFIFOHALFFULLMASK;
+	} else {
+		/*
+		 * We don't actually need to include "FIFO empty" here
+		 * since its implicit in "FIFO half empty".
+		 */
+		irqmask = MCI_TXFIFOHALFEMPTYMASK;
+	}
+
 	writel(datactrl, host->base + MMCIDATACTRL);
+	writel(irqmask, host->base + MMCIMASK1);
 }
 
 static void
@@ -201,24 +210,32 @@ static irqreturn_t mmci_pio_irq(int irq, void *dev_id, struct pt_regs *regs)
 				readl(host->base + MMCIFIFO);
 			}
 		}
-		if (status & (MCI_TXFIFOEMPTY|MCI_TXFIFOHALFEMPTY)) {
-			int count = host->size;
-			if (count > MCI_FIFOHALFSIZE)
-				count = MCI_FIFOHALFSIZE;
-			if (count && host->buffer) {
-				writesl(host->base + MMCIFIFO, host->buffer, count >> 2);
-				host->buffer += count;
-				host->size -= count;
-				if (host->size == 0)
-					host->buffer = NULL;
-			} else {
-				static int first = 1;
-				if (first) {
-					first = 0;
-					printk(KERN_ERR "MMCI: ran out of source data\n");
-				}
-			}
+
+		/*
+		 * We only need to test the half-empty flag here - if
+		 * the FIFO is completely empty, then by definition
+		 * it is more than half empty.
+		 */
+		if (status & MCI_TXFIFOHALFEMPTY) {
+			unsigned int maxcnt = status & MCI_TXFIFOEMPTY ?
+					      MCI_FIFOSIZE : MCI_FIFOHALFSIZE;
+			unsigned int count = min(host->size, maxcnt);
+
+			writesl(host->base + MMCIFIFO, host->buffer, count >> 2);
+
+			host->buffer += count;
+			host->size -= count;
+
+			/*
+			 * If we run out of data, disable the data IRQs;
+			 * this prevents a race where the FIFO becomes
+			 * empty before the chip itself has disabled the
+			 * data path.
+			 */
+			if (host->size == 0)
+				writel(0, base + MMCIMASK1);
 		}
+
 		ret = 1;
 	} while (status);
 
@@ -413,7 +430,6 @@ static int mmci_probe(struct amba_device *dev, void *id)
 		goto irq0_free;
 
 	writel(MCI_IRQENABLE, host->base + MMCIMASK0);
-	writel(MCI_TXFIFOHALFEMPTYMASK|MCI_RXFIFOHALFFULLMASK, host->base + MMCIMASK1);
 
 	amba_set_drvdata(dev, mmc);
 
