@@ -1,4 +1,4 @@
-#/*
+/*
     Conexant cx22700 DVB OFDM demodulator driver
 
     Copyright (C) 2001-2002 Convergence Integrated Media GmbH
