@@ -1708,7 +1708,7 @@ int radeon_cp_stop( DRM_IOCTL_ARGS )
 void radeon_do_release( drm_device_t *dev )
 {
 	drm_radeon_private_t *dev_priv = dev->dev_private;
-	int ret;
+	int i, ret;
 
 	if (dev_priv) {
 		if (dev_priv->cp_running) {
@@ -1728,6 +1728,14 @@ void radeon_do_release( drm_device_t *dev )
 		/* Disable *all* interrupts */
 		if (dev_priv->mmio)	/* remove this after permanent addmaps */
 			RADEON_WRITE( RADEON_GEN_INT_CNTL, 0 );
+
+		if (dev_priv->mmio) {/* remove all surfaces */
+			for (i = 0; i < RADEON_MAX_SURFACES; i++) {
+				RADEON_WRITE(RADEON_SURFACE0_INFO + 16*i, 0);
+				RADEON_WRITE(RADEON_SURFACE0_LOWER_BOUND + 16*i, 0);
+				RADEON_WRITE(RADEON_SURFACE0_UPPER_BOUND + 16*i, 0);
+			}
+		}
 
 		/* Free memory heap structures */
 		radeon_mem_takedown( &(dev_priv->gart_heap) );

@@ -59,6 +59,8 @@ drm_ioctl_desc_t radeon_ioctls[] = {
 	[DRM_IOCTL_NR(DRM_RADEON_IRQ_EMIT)]   = { radeon_irq_emit,     1, 0 },
 	[DRM_IOCTL_NR(DRM_RADEON_IRQ_WAIT)]   = { radeon_irq_wait,     1, 0 },
 	[DRM_IOCTL_NR(DRM_RADEON_SETPARAM)]   = { radeon_cp_setparam,  1, 0 },
+	[DRM_IOCTL_NR(DRM_RADEON_SURF_ALLOC)] = { radeon_surface_alloc,1, 0 },
+	[DRM_IOCTL_NR(DRM_RADEON_SURF_FREE)]  = { radeon_surface_free, 1, 0 }
 };
 
 int radeon_max_ioctl = DRM_ARRAY_SIZE(radeon_ioctls);
@@ -1731,10 +1733,203 @@ static void radeon_cp_dispatch_stipple( drm_device_t *dev, u32 *stipple )
 	ADVANCE_RING();
 }
 
+static void radeon_apply_surface_regs(int surf_index, drm_radeon_private_t *dev_priv)
+{
+	if (!dev_priv->mmio)
+		return;
+
+	radeon_do_cp_idle(dev_priv);
+
+	RADEON_WRITE(RADEON_SURFACE0_INFO + 16*surf_index,
+		dev_priv->surfaces[surf_index].flags);
+	RADEON_WRITE(RADEON_SURFACE0_LOWER_BOUND + 16*surf_index,
+		dev_priv->surfaces[surf_index].lower);
+	RADEON_WRITE(RADEON_SURFACE0_UPPER_BOUND + 16*surf_index,
+		dev_priv->surfaces[surf_index].upper);
+}
+
+
+/* Allocates a virtual surface
+ * doesn't always allocate a real surface, will stretch an existing 
+ * surface when possible.
+ *
+ * Note that refcount can be at most 2, since during a free refcount=3
+ * might mean we have to allocate a new surface which might not always
+ * be available.
+ * For example : we allocate three contigous surfaces ABC. If B is 
+ * freed, we suddenly need two surfaces to store A and C, which might
+ * not always be available.
+ */
+static int alloc_surface(drm_radeon_surface_alloc_t* new, drm_radeon_private_t *dev_priv, DRMFILE filp)
+{
+	struct radeon_virt_surface *s;
+	int i;
+	int virt_surface_index;
+	uint32_t new_upper, new_lower;
+
+	new_lower = new->address;
+	new_upper = new_lower + new->size - 1;
+
+	/* sanity check */
+	if ((new_lower >= new_upper) || (new->flags == 0) || (new->size == 0) ||
+		((new_upper & RADEON_SURF_ADDRESS_FIXED_MASK) != RADEON_SURF_ADDRESS_FIXED_MASK) ||
+		((new_lower & RADEON_SURF_ADDRESS_FIXED_MASK) != 0))
+		return -1;
+
+	/* make sure there is no overlap with existing surfaces */
+	for (i = 0; i < RADEON_MAX_SURFACES; i++) {
+		if ((dev_priv->surfaces[i].refcount != 0) &&
+		(( (new_lower >= dev_priv->surfaces[i].lower) &&
+			(new_lower < dev_priv->surfaces[i].upper) ) ||
+		 ( (new_lower < dev_priv->surfaces[i].lower) &&
+			(new_upper > dev_priv->surfaces[i].lower) )) ){
+		return -1;}
+	}
+
+	/* find a virtual surface */
+	for (i = 0; i < 2*RADEON_MAX_SURFACES; i++)
+		if (dev_priv->virt_surfaces[i].filp == 0)
+			break;
+	if (i == 2*RADEON_MAX_SURFACES) {
+		return -1;}
+	virt_surface_index = i;
+
+	/* try to reuse an existing surface */
+	for (i = 0; i < RADEON_MAX_SURFACES; i++) {
+		/* extend before */
+		if ((dev_priv->surfaces[i].refcount == 1) &&
+		  (new->flags == dev_priv->surfaces[i].flags) &&
+		  (new_upper + 1 == dev_priv->surfaces[i].lower)) {
+			s = &(dev_priv->virt_surfaces[virt_surface_index]);
+			s->surface_index = i;
+			s->lower = new_lower;
+			s->upper = new_upper;
+			s->flags = new->flags;
+			s->filp = filp;
+			dev_priv->surfaces[i].refcount++;
+			dev_priv->surfaces[i].lower = s->lower;
+			radeon_apply_surface_regs(s->surface_index, dev_priv);
+			return virt_surface_index;
+		}
+
+		/* extend after */
+		if ((dev_priv->surfaces[i].refcount == 1) &&
+		  (new->flags == dev_priv->surfaces[i].flags) &&
+		  (new_lower == dev_priv->surfaces[i].upper + 1)) {
+			s = &(dev_priv->virt_surfaces[virt_surface_index]);
+			s->surface_index = i;
+			s->lower = new_lower;
+			s->upper = new_upper;
+			s->flags = new->flags;
+			s->filp = filp;
+			dev_priv->surfaces[i].refcount++;
+			dev_priv->surfaces[i].upper = s->upper;
+			radeon_apply_surface_regs(s->surface_index, dev_priv);
+			return virt_surface_index;
+		}
+	}
+
+	/* okay, we need a new one */
+	for (i = 0; i < RADEON_MAX_SURFACES; i++) {
+		if (dev_priv->surfaces[i].refcount == 0) {
+			s = &(dev_priv->virt_surfaces[virt_surface_index]);
+			s->surface_index = i;
+			s->lower = new_lower;
+			s->upper = new_upper;
+			s->flags = new->flags;
+			s->filp = filp;
+			dev_priv->surfaces[i].refcount = 1;
+			dev_priv->surfaces[i].lower = s->lower;
+			dev_priv->surfaces[i].upper = s->upper;
+			dev_priv->surfaces[i].flags = s->flags;
+			radeon_apply_surface_regs(s->surface_index, dev_priv);
+			return virt_surface_index;
+		}
+	}
+
+	/* we didn't find anything */
+	return -1;
+}
+
+static int free_surface(DRMFILE filp, drm_radeon_private_t *dev_priv, int lower)
+{
+	struct radeon_virt_surface *s;
+	int i;
+	/* find the virtual surface */
+	for(i = 0; i < 2*RADEON_MAX_SURFACES; i++) {
+		s = &(dev_priv->virt_surfaces[i]);
+		if (s->filp) {
+			if ((lower == s->lower) && (filp == s->filp)) {
+				if (dev_priv->surfaces[s->surface_index].lower == s->lower)
+					dev_priv->surfaces[s->surface_index].lower = s->upper;
+
+				if (dev_priv->surfaces[s->surface_index].upper == s->upper)
+					dev_priv->surfaces[s->surface_index].upper = s->lower;
+
+				dev_priv->surfaces[s->surface_index].refcount--;
+				if (dev_priv->surfaces[s->surface_index].refcount == 0)
+					dev_priv->surfaces[s->surface_index].flags = 0;
+				s->filp = 0;
+				radeon_apply_surface_regs(s->surface_index, dev_priv);
+				return 0;
+			}
+		}
+	}
+	return 1;
+}
+
+static void radeon_surfaces_release(DRMFILE filp, drm_radeon_private_t *dev_priv)
+{
+	int i;
+	for( i = 0; i < 2*RADEON_MAX_SURFACES; i++)
+	{
+		if (dev_priv->virt_surfaces[i].filp == filp)
+			free_surface(filp, dev_priv, dev_priv->virt_surfaces[i].lower);
+	}
+}
 
 /* ================================================================
  * IOCTL functions
  */
+int radeon_surface_alloc(DRM_IOCTL_ARGS)
+{
+	DRM_DEVICE;
+	drm_radeon_private_t *dev_priv = dev->dev_private;
+	drm_radeon_surface_alloc_t alloc;
+
+	if (!dev_priv) {
+		DRM_ERROR( "%s called with no initialization\n", __FUNCTION__ );
+		return DRM_ERR(EINVAL);
+	}
+
+	DRM_COPY_FROM_USER_IOCTL(alloc, (drm_radeon_surface_alloc_t __user *)data,
+				  sizeof(alloc));
+
+	if (alloc_surface(&alloc, dev_priv, filp) == -1)
+		return DRM_ERR(EINVAL);
+	else
+		return 0;
+}
+
+int radeon_surface_free(DRM_IOCTL_ARGS)
+{
+	DRM_DEVICE;
+	drm_radeon_private_t *dev_priv = dev->dev_private;
+	drm_radeon_surface_free_t memfree;
+
+	if (!dev_priv) {
+		DRM_ERROR( "%s called with no initialization\n", __FUNCTION__ );
+		return DRM_ERR(EINVAL);
+	}
+
+	DRM_COPY_FROM_USER_IOCTL(memfree, (drm_radeon_mem_free_t __user *)data,
+				  sizeof(memfree) );
+
+	if (free_surface(filp, dev_priv, memfree.address))
+		return DRM_ERR(EINVAL);
+	else
+		return 0;
+}
 
 int radeon_cp_clear( DRM_IOCTL_ARGS )
 {
@@ -2733,6 +2928,20 @@ int radeon_cp_setparam( DRM_IOCTL_ARGS ) {
 		radeon_priv = filp_priv->driver_priv;
 		radeon_priv->radeon_fb_delta = dev_priv->fb_location - sp.value;
 		break;
+	case RADEON_SETPARAM_SWITCH_TILING:
+		if (sp.value == 0) {
+			DRM_DEBUG( "color tiling disabled\n" );
+			dev_priv->front_pitch_offset &= ~RADEON_DST_TILE_MACRO;
+			dev_priv->back_pitch_offset &= ~RADEON_DST_TILE_MACRO;
+			dev_priv->sarea_priv->tiling_enabled = 0;
+		}
+		else if (sp.value == 1) {
+			DRM_DEBUG( "color tiling enabled\n" );
+			dev_priv->front_pitch_offset |= RADEON_DST_TILE_MACRO;
+			dev_priv->back_pitch_offset |= RADEON_DST_TILE_MACRO;
+			dev_priv->sarea_priv->tiling_enabled = 1;
+		}
+		break;	
 	default:
 		DRM_DEBUG( "Invalid parameter %d\n", sp.param );
 		return DRM_ERR( EINVAL );
@@ -2756,6 +2965,7 @@ void radeon_driver_prerelease(drm_device_t *dev, DRMFILE filp)
 		}						
 		radeon_mem_release( filp, dev_priv->gart_heap ); 
 		radeon_mem_release( filp, dev_priv->fb_heap );	
+		radeon_surfaces_release(filp, dev_priv);
 	}				
 }
 

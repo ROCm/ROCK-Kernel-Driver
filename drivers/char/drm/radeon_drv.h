@@ -38,7 +38,7 @@
 
 #define DRIVER_NAME		"radeon"
 #define DRIVER_DESC		"ATI Radeon"
-#define DRIVER_DATE		"20041207"
+#define DRIVER_DATE		"20050125"
 
 /* Interface history:
  *
@@ -76,9 +76,11 @@
  *       (No 3D support yet - just microcode loading)
  * 1.13- Add packet R200_EMIT_TCL_POINT_SPRITE_CNTL for ARB_point_parameters
  *     - Add hyperz support, add hyperz flags to clear ioctl.
+ * 1.14- Add support for color tiling
+ *     - Add R100/R200 surface allocation/free support
  */
 #define DRIVER_MAJOR		1
-#define DRIVER_MINOR		13
+#define DRIVER_MINOR		14
 #define DRIVER_PATCHLEVEL	0
 
 #define GET_RING_HEAD(dev_priv)		DRM_READ32(  (dev_priv)->ring_rptr, 0 )
@@ -161,6 +163,21 @@ struct mem_block {
 	DRMFILE filp;		/* 0: free, -1: heap, other: real files */
 };
 
+struct radeon_surface {
+	int refcount;
+	u32 lower;
+	u32 upper;
+	u32 flags;
+};
+
+struct radeon_virt_surface {
+	int surface_index;
+	u32 lower;
+	u32 upper;
+	u32 flags;
+	DRMFILE filp;
+};
+
 typedef struct drm_radeon_private {
 	drm_radeon_ring_buffer_t ring;
 	drm_radeon_sarea_t *sarea_priv;
@@ -239,6 +256,9 @@ typedef struct drm_radeon_private {
    	wait_queue_head_t swi_queue;
    	atomic_t swi_emitted;
 
+	struct radeon_surface surfaces[RADEON_MAX_SURFACES];
+	struct radeon_virt_surface virt_surfaces[2*RADEON_MAX_SURFACES];
+
 	/* starting from here on, data is preserved accross an open */
 	uint32_t flags;		/* see radeon_chip_flags */
 } drm_radeon_private_t;
@@ -289,6 +309,8 @@ extern int radeon_mem_free( DRM_IOCTL_ARGS );
 extern int radeon_mem_init_heap( DRM_IOCTL_ARGS );
 extern void radeon_mem_takedown( struct mem_block **heap );
 extern void radeon_mem_release( DRMFILE filp, struct mem_block *heap );
+extern int radeon_surface_alloc(DRM_IOCTL_ARGS);
+extern int radeon_surface_free(DRM_IOCTL_ARGS);
 
 				/* radeon_irq.c */
 extern int radeon_irq_emit( DRM_IOCTL_ARGS );
@@ -565,6 +587,7 @@ extern int radeon_postcleanup( struct drm_device *dev );
 #	define RADEON_SURF_TILE_MODE_16BIT_Z	(3 << 16)
 #define RADEON_SURFACE0_LOWER_BOUND	0x0b04
 #define RADEON_SURFACE0_UPPER_BOUND	0x0b08
+#	define RADEON_SURF_ADDRESS_FIXED_MASK	(0x3ff << 0)
 #define RADEON_SURFACE1_INFO		0x0b1c
 #define RADEON_SURFACE1_LOWER_BOUND	0x0b14
 #define RADEON_SURFACE1_UPPER_BOUND	0x0b18
