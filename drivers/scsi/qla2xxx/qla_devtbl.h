@@ -3,7 +3,7 @@
 /*
  * Adapter model names.
  */
-char	*qla2x00_model_name[QLA_MODEL_NAMES] = {
+static char *qla2x00_model_name[QLA_MODEL_NAMES] = {
 	"QLA2340",	/* 0x100 */
 	"QLA2342",	/* 0x101 */
 	"QLA2344",	/* 0x102 */
@@ -39,7 +39,7 @@ char	*qla2x00_model_name[QLA_MODEL_NAMES] = {
 	"QLA4040C"	/* 0x120 */
 };
 
-char	*qla2x00_model_desc[QLA_MODEL_NAMES] = {
+static char *qla2x00_model_desc[QLA_MODEL_NAMES] = {
 	"133MHz PCI-X to 2Gb FC, Single Channel",	/* 0x100 */
 	"133MHz PCI-X to 2Gb FC, Dual Channel",		/* 0x101 */
 	"133MHz PCI-X to 2Gb FC, Quad Channel",		/* 0x102 */
