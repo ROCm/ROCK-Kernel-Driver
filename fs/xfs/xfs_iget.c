@@ -591,9 +591,7 @@ xfs_ireclaim(xfs_inode_t *ip)
 	 * Release dquots (and their references) if any. An inode may escape
 	 * xfs_inactive and get here via vn_alloc->vn_reclaim path.
 	 */
-	if (ip->i_udquot || ip->i_gdquot) {
-		xfs_qm_dqdettach_inode(ip);
-	}
+	XFS_QM_DQDETACH(ip->i_mount, ip);
 
 	/*
 	 * Pull our behavior descriptor from the vnode chain.

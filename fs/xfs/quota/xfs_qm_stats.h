@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2002 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -29,18 +29,40 @@
  *
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ifndef __XFS_GLOBALS_H__
-#define __XFS_GLOBALS_H__
+#ifndef __XFS_QM_STATS_H__
+#define __XFS_QM_STATS_H__
+
+
+#if defined(CONFIG_PROC_FS) && !defined(XFS_STATS_OFF)
 
 /*
- * This file declares globals needed by XFS that were normally defined
- * somewhere else in IRIX.
+ * XQM global statistics
  */
+struct xqmstats {
+	__uint32_t		xs_qm_dqreclaims;
+	__uint32_t		xs_qm_dqreclaim_misses;
+	__uint32_t		xs_qm_dquot_dups;
+	__uint32_t		xs_qm_dqcachemisses;
+	__uint32_t		xs_qm_dqcachehits;
+	__uint32_t		xs_qm_dqwants;
+	__uint32_t		xs_qm_dqshake_reclaims;
+	__uint32_t		xs_qm_dqinact_reclaims;
+};
 
-extern uint64_t xfs_panic_mask;		/* set to cause more panics */
+extern struct xqmstats xqmstats;
 
-extern unsigned long	xfs_physmem;
+# define XQM_STATS_INC(count)	( (count)++ )
 
-extern struct cred *sys_cred;
+extern void xfs_qm_init_procfs(void);
+extern void xfs_qm_cleanup_procfs(void);
 
-#endif	/* __XFS_GLOBALS_H__ */
+#else
+
+# define XQM_STATS_INC(count)	do { } while (0)
+
+static __inline void xfs_qm_init_procfs(void) { };
+static __inline void xfs_qm_cleanup_procfs(void) { };
+
+#endif
+
+#endif	/* __XFS_QM_STATS_H__ */

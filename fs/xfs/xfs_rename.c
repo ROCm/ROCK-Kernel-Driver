@@ -261,11 +261,12 @@ xfs_rename(
 
 	src_dp = XFS_BHVTOI(src_dir_bdp);
 	target_dp = XFS_BHVTOI(target_dir_bdp);
+	mp = src_dp->i_mount;
 
 	if (DM_EVENT_ENABLED(src_dir_vp->v_vfsp, src_dp, DM_EVENT_RENAME) ||
 	    DM_EVENT_ENABLED(target_dir_vp->v_vfsp,
 				target_dp, DM_EVENT_RENAME)) {
-		error = dm_send_namesp_event(DM_EVENT_RENAME,
+		error = XFS_SEND_NAMESP(mp, DM_EVENT_RENAME,
 					src_dir_bdp, DM_RIGHT_NULL,
 					target_dir_bdp, DM_RIGHT_NULL,
 					src_name, target_name,
@@ -323,7 +324,6 @@ xfs_rename(
 	xfs_rename_unlock4(inodes, XFS_ILOCK_SHARED);
 
 	XFS_BMAP_INIT(&free_list, &first_block);
-	mp = src_dp->i_mount;
 	tp = xfs_trans_alloc(mp, XFS_TRANS_RENAME);
 	cancel_flags = XFS_TRANS_RELEASE_LOG_RES;
 	spaceres = XFS_RENAME_SPACE_RES(mp, target_namelen);
@@ -343,12 +343,10 @@ xfs_rename(
 	/*
 	 * Attach the dquots to the inodes
 	 */
-	if (XFS_IS_QUOTA_ON(mp)) {
-		if ((error = xfs_qm_vop_rename_dqattach(inodes))) {
-			xfs_trans_cancel(tp, cancel_flags);
-			rename_which_error_return = __LINE__;
-			goto rele_return;
-		}
+	if ((error = XFS_QM_DQVOPRENAME(mp, inodes))) {
+		xfs_trans_cancel(tp, cancel_flags);
+		rename_which_error_return = __LINE__;
+		goto rele_return;
 	}
 
 	/*
@@ -625,7 +623,7 @@ std_return:
 	if (DM_EVENT_ENABLED(src_dir_vp->v_vfsp, src_dp, DM_EVENT_POSTRENAME) ||
 	    DM_EVENT_ENABLED(target_dir_vp->v_vfsp,
 				target_dp, DM_EVENT_POSTRENAME)) {
-		(void) dm_send_namesp_event(DM_EVENT_POSTRENAME,
+		(void) XFS_SEND_NAMESP (mp, DM_EVENT_POSTRENAME,
 					src_dir_bdp, DM_RIGHT_NULL,
 					target_dir_bdp, DM_RIGHT_NULL,
 					src_name, target_name,

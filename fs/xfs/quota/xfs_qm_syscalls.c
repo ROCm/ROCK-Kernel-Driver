@@ -31,7 +31,7 @@
  */
 
 #include <xfs.h>
-#include <xfs_quota_priv.h>
+#include "xfs_qm.h"
 
 #ifdef DEBUG
 # define qdprintk(s, args...)	cmn_err(CE_DEBUG, s, ## args)

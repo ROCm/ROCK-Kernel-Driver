@@ -258,11 +258,10 @@ xfs_iomap_write_direct(
 	 * the ilock across a disk read.
 	 */
 
-	if (XFS_IS_QUOTA_ON(mp) && XFS_NOT_DQATTACHED(mp, ip)) {
-		if ((error = xfs_qm_dqattach(ip, XFS_QMOPT_ILOCKED))) {
-			return XFS_ERROR(error);
-		}
-	}
+	error = XFS_QM_DQATTACH(ip->i_mount, ip, XFS_QMOPT_ILOCKED);
+	if (error)
+		return XFS_ERROR(error);
+
 	maps = min(XFS_WRITE_IMAPS, *nmaps);
 	nimaps = maps;
 
@@ -291,7 +290,7 @@ xfs_iomap_write_direct(
 	 * determine if reserving space on
 	 * the data or realtime partition.
 	 */
-	if ((rt = ip->i_d.di_flags & XFS_DIFLAG_REALTIME)) {
+	if ((rt = XFS_IS_REALTIME_INODE(ip))) {
 		int	sbrtextsize, iprtextsize;
 
 		sbrtextsize = mp->m_sb.sb_rextsize;
@@ -333,11 +332,9 @@ xfs_iomap_write_direct(
 		goto error_out; /* Don't return in above if .. trans ..,
 					need lock to return */
 
-	if (XFS_IS_QUOTA_ON(mp)) {
-		if (xfs_trans_reserve_blkquota(tp, ip, resblks)) {
-			error = (EDQUOT);
-			goto error1;
-		}
+	if (XFS_TRANS_RESERVE_BLKQUOTA(mp, tp, ip, resblks)) {
+		error = (EDQUOT);
+		goto error1;
 	}
 	nimaps = 1;
 
@@ -422,11 +419,9 @@ xfs_iomap_write_delay(
 	 * the ilock across a disk read.
 	 */
 
-	if (XFS_IS_QUOTA_ON(mp) && XFS_NOT_DQATTACHED(mp, ip)) {
-		if ((error = xfs_qm_dqattach(ip, XFS_QMOPT_ILOCKED))) {
-			return XFS_ERROR(error);
-		}
-	}
+	error = XFS_QM_DQATTACH(mp, ip, XFS_QMOPT_ILOCKED);
+	if (error)
+		return XFS_ERROR(error);
 
 retry:
 	isize = ip->i_d.di_size;
@@ -538,11 +533,8 @@ xfs_iomap_write_allocate(
 	 * Make sure that the dquots are there.
 	 */
 
-	if (XFS_IS_QUOTA_ON(mp) && XFS_NOT_DQATTACHED(mp, ip)) {
-		if ((error = xfs_qm_dqattach(ip, 0))) {
-			return XFS_ERROR(error);
-		}
-	}
+	if ((error = XFS_QM_DQATTACH(mp, ip, 0)))
+		return XFS_ERROR(error);
 
 	offset_fsb = map->br_startoff;
 	count_fsb = map->br_blockcount;

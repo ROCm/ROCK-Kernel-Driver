@@ -165,9 +165,19 @@ extern int vfs_quotactl(bhv_desc_t *, int, int, caddr_t);
 extern void vfs_init_vnode(bhv_desc_t *, struct vnode *, bhv_desc_t *, int);
 extern void vfs_force_shutdown(bhv_desc_t *, int, char *, int);
 
+typedef struct bhv_vfsops {
+	struct vfsops		bhv_common;
+	void *			bhv_custom;
+} bhv_vfsops_t;
+
+#define vfs_bhv_lookup(v, id)	( bhv_lookup_range(&(v)->vfs_bh, (id), (id)) )
+#define vfs_bhv_custom(b)	( ((bhv_vfsops_t *)BHV_OPS(b))->bhv_custom )
+#define vfs_bhv_set_custom(b,o)	( (b)->bhv_custom = (void *)(o))
+#define vfs_bhv_clr_custom(b)	( (b)->bhv_custom = NULL )
+
 extern vfs_t *vfs_allocate(void);
 extern void vfs_deallocate(vfs_t *);
-extern void vfs_insertops(vfs_t *, vfsops_t *);
+extern void vfs_insertops(vfs_t *, bhv_vfsops_t *);
 extern void vfs_insertbhv(vfs_t *, bhv_desc_t *, vfsops_t *, void *);
 
 extern void bhv_insert_all_vfsops(struct vfs *);

@@ -32,7 +32,6 @@
 
 #include <xfs.h>
 
-STATIC void	xfs_mount_reset_sbqflags(xfs_mount_t *);
 STATIC void	xfs_mount_log_sbunit(xfs_mount_t *, __int64_t);
 STATIC int	xfs_uuid_mount(xfs_mount_t *);
 STATIC void	xfs_uuid_unmount(xfs_mount_t *mp);
@@ -154,13 +153,11 @@ xfs_mount_free(
 	spinlock_destroy(&mp->m_sb_lock);
 	mutex_destroy(&mp->m_ilock);
 	freesema(&mp->m_growlock);
+	if (mp->m_quotainfo)
+		XFS_QM_DONE(mp);
 
-	if (mp->m_fsname != NULL) {
+	if (mp->m_fsname != NULL)
 		kmem_free(mp->m_fsname, mp->m_fsname_len);
-	}
-	if (mp->m_quotainfo != NULL) {
-		xfs_qm_unmount_quotadestroy(mp);
-	}
 
 	if (remove_bhv) {
 		struct vfs	*vfsp = XFS_MTOVFS(mp);
@@ -606,10 +603,8 @@ xfs_mountfs(
 	vmap_t		vmap;
 	xfs_daddr_t	d;
 	__uint64_t	ret64;
-	uint		quotaflags, quotaondisk;
-	uint		uquotaondisk = 0, gquotaondisk = 0;
-	boolean_t	needquotamount;
 	__int64_t	update_flags;
+	uint		quotamount, quotaflags;
 	int		agno, noio;
 	int		uuid_mounted = 0;
 	int		error = 0;
@@ -946,53 +941,21 @@ xfs_mountfs(
 
 	ASSERT(rip != NULL);
 	rvp = XFS_ITOV(rip);
+	VMAP(rvp, vmap);
+
 	if (unlikely((rip->i_d.di_mode & IFMT) != IFDIR)) {
 		cmn_err(CE_WARN, "XFS: corrupted root inode");
-		VMAP(rvp, vmap);
 		prdev("Root inode %llu is not a directory",
 		      mp->m_dev, (unsigned long long)rip->i_ino);
 		xfs_iunlock(rip, XFS_ILOCK_EXCL);
-		VN_RELE(rvp);
-		vn_purge(rvp, &vmap);
 		XFS_ERROR_REPORT("xfs_mountfs_int(2)", XFS_ERRLEVEL_LOW,
 				 mp);
 		error = XFS_ERROR(EFSCORRUPTED);
-		goto error3;
+		goto error4;
 	}
 	mp->m_rootip = rip;	/* save it */
 
 	xfs_iunlock(rip, XFS_ILOCK_EXCL);
-
-	quotaondisk = XFS_SB_VERSION_HASQUOTA(&mp->m_sb) &&
-		mp->m_sb.sb_qflags & (XFS_UQUOTA_ACCT|XFS_GQUOTA_ACCT);
-
-	if (quotaondisk) {
-		uquotaondisk = mp->m_sb.sb_qflags & XFS_UQUOTA_ACCT;
-		gquotaondisk = mp->m_sb.sb_qflags & XFS_GQUOTA_ACCT;
-	}
-
-	/*
-	 * If the device itself is read-only, we can't allow
-	 * the user to change the state of quota on the mount -
-	 * this would generate a transaction on the ro device,
-	 * which would lead to an I/O error and shutdown
-	 */
-
-	if (((uquotaondisk && !XFS_IS_UQUOTA_ON(mp)) ||
-	    (!uquotaondisk &&  XFS_IS_UQUOTA_ON(mp)) ||
-	     (gquotaondisk && !XFS_IS_GQUOTA_ON(mp)) ||
-	    (!gquotaondisk &&  XFS_IS_GQUOTA_ON(mp)))  &&
-	    xfs_dev_is_read_only(mp, "changing quota state")) {
-		cmn_err(CE_WARN,
-			"XFS: please mount with%s%s%s.",
-			(!quotaondisk ? "out quota" : ""),
-			(uquotaondisk ? " usrquota" : ""),
-			(gquotaondisk ? " grpquota" : ""));
-		VN_RELE(rvp);
-		vn_remove(rvp);
-		error = XFS_ERROR(EPERM);
-		goto error3;
-	}
 
 	/*
 	 * Initialize realtime inode pointers in the mount structure
@@ -1002,10 +965,7 @@ xfs_mountfs(
 		 * Free up the root inode.
 		 */
 		cmn_err(CE_WARN, "XFS: failed to read RT inodes");
-		VMAP(rvp, vmap);
-		VN_RELE(rvp);
-		vn_purge(rvp, &vmap);
-		goto error3;
+		goto error4;
 	}
 
 	/*
@@ -1015,41 +975,11 @@ xfs_mountfs(
 	if (update_flags && !(vfsp->vfs_flag & VFS_RDONLY))
 		xfs_mount_log_sbunit(mp, update_flags);
 
-	quotaflags = 0;
-	needquotamount = B_FALSE;
-
 	/*
-	 * Figure out if we'll need to do a quotacheck.
+	 * Initialise the XFS quota management subsystem for this mount
 	 */
-	if (XFS_IS_QUOTA_ON(mp) || quotaondisk) {
-		/*
-		 * Call mount_quotas at this point only if we won't have to do
-		 * a quotacheck.
-		 */
-		if (quotaondisk && !XFS_QM_NEED_QUOTACHECK(mp)) {
-			/*
-			 * If the xfs quota code isn't installed,
-			 * we have to reset the quotachk'd bit.
-			 * If an error occurred, qm_mount_quotas code
-			 * has already disabled quotas. So, just finish
-			 * mounting, and get on with the boring life
-			 * without disk quotas.
-			 */
-			if (xfs_qm_mount_quotas(mp))
-				xfs_mount_reset_sbqflags(mp);
-		} else {
-			/*
-			 * Clear the quota flags, but remember them. This
-			 * is so that the quota code doesn't get invoked
-			 * before we're ready. This can happen when an
-			 * inode goes inactive and wants to free blocks,
-			 * or via xfs_log_mount_finish.
-			 */
-			quotaflags = mp->m_qflags;
-			mp->m_qflags = 0;
-			needquotamount = B_TRUE;
-		}
-	}
+	if ((error = XFS_QM_INIT(mp, &quotamount, &quotaflags)))
+		goto error4;
 
 	/*
 	 * Finish recovering the file system.  This part needed to be
@@ -1059,30 +989,23 @@ xfs_mountfs(
 	error = xfs_log_mount_finish(mp, mfsi_flags);
 	if (error) {
 		cmn_err(CE_WARN, "XFS: log mount finish failed");
-		goto error3;
+		goto error4;
 	}
 
-	if (needquotamount) {
-		ASSERT(mp->m_qflags == 0);
-		mp->m_qflags = quotaflags;
-		if (xfs_qm_mount_quotas(mp))
-			xfs_mount_reset_sbqflags(mp);
-	}
+	/*
+	 * Complete the quota initialisation, post-log-replay component.
+	 */
+	if ((error = XFS_QM_MOUNT(mp, quotamount, quotaflags)))
+		goto error4;
 
-#if defined(DEBUG) && defined(XFS_LOUD_RECOVERY)
-	if (! (XFS_IS_QUOTA_ON(mp)))
-		xfs_fs_cmn_err(CE_NOTE, mp, "Disk quotas not turned on");
-	else
-		xfs_fs_cmn_err(CE_NOTE, mp, "Disk quotas turned on");
-#endif
+	return 0;
 
-#ifdef QUOTADEBUG
-	if (XFS_IS_QUOTA_ON(mp) && xfs_qm_internalqcheck(mp))
-		cmn_err(CE_WARN, "XFS: mount internalqcheck failed");
-#endif
-
-	return (0);
-
+ error4:
+	/*
+	 * Free up the root inode.
+	 */
+	VN_RELE(rvp);
+	vn_purge(rvp, &vmap);
  error3:
 	xfs_log_unmount_dealloc(mp);
  error2:
@@ -1112,25 +1035,14 @@ int
 xfs_unmountfs(xfs_mount_t *mp, struct cred *cr)
 {
 	struct vfs	*vfsp = XFS_MTOVFS(mp);
-	int		ndquots;
 #if defined(DEBUG) || defined(INDUCE_IO_ERROR)
 	int64_t		fsid;
 #endif
 
 	xfs_iflush_all(mp, XFS_FLUSH_ALL);
 
-	/*
-	 * Purge the dquot cache.
-	 * None of the dquots should really be busy at this point.
-	 */
-	if (mp->m_quotainfo) {
-		while ((ndquots = xfs_qm_dqpurge_all(mp,
-						  XFS_QMOPT_UQUOTA|
-						  XFS_QMOPT_GQUOTA|
-						  XFS_QMOPT_UMOUNTING))) {
-			delay(ndquots * 10);
-		}
-	}
+	XFS_QM_DQPURGEALL(mp,
+		XFS_QMOPT_UQUOTA | XFS_QMOPT_GQUOTA | XFS_QMOPT_UMOUNTING);
 
 	/*
 	 * Flush out the log synchronously so that we know for sure
@@ -1643,47 +1555,6 @@ xfs_uuid_unmount(xfs_mount_t *mp)
 	}
 	ASSERT(i < xfs_uuidtab_size);
 	mutex_unlock(&xfs_uuidtabmon);
-}
-
-/*
- * When xfsquotas isn't installed and the superblock had quotas, we need to
- * clear the quotaflags from superblock.
- */
-STATIC void
-xfs_mount_reset_sbqflags(
-	xfs_mount_t	*mp)
-{
-	xfs_trans_t	*tp;
-	unsigned long		s;
-
-	mp->m_qflags = 0;
-	/*
-	 * It is OK to look at sb_qflags here in mount path,
-	 * without SB_LOCK.
-	 */
-	if (mp->m_sb.sb_qflags == 0)
-		return;
-	s = XFS_SB_LOCK(mp);
-	mp->m_sb.sb_qflags = 0;
-	XFS_SB_UNLOCK(mp, s);
-
-	/*
-	 * if the fs is readonly, let the incore superblock run
-	 * with quotas off but don't flush the update out to disk
-	 */
-	if (XFS_MTOVFS(mp)->vfs_flag & VFS_RDONLY)
-		return;
-#ifdef QUOTADEBUG
-	xfs_fs_cmn_err(CE_NOTE, mp, "Writing superblock quota changes");
-#endif
-	tp = xfs_trans_alloc(mp, XFS_TRANS_QM_SBCHANGE);
-	if (xfs_trans_reserve(tp, 0, mp->m_sb.sb_sectsize + 128, 0, 0,
-				      XFS_DEFAULT_LOG_COUNT)) {
-		xfs_trans_cancel(tp, 0);
-		return;
-	}
-	xfs_mod_sb(tp, XFS_SB_QFLAGS);
-	(void)xfs_trans_commit(tp, 0, NULL);
 }
 
 /*

@@ -31,8 +31,8 @@
  */
 
 #include <xfs.h>
-#include <xfs_quota_priv.h>
 #include <xfs_log_recover.h>
+#include "quota/xfs_qm.h"
 #include "pagebuf/page_buf_internal.h"
 
 #include <linux/ctype.h>

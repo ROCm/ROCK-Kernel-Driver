@@ -953,33 +953,27 @@ init_xfs_fs( void )
 	error = init_inodecache();
 	if (error < 0)
 		goto undo_inodecache;
+
 	error = pagebuf_init();
 	if (error < 0)
 		goto undo_pagebuf;
 
 	vn_init();
 	xfs_init();
-
-	error = vfs_initdmapi();
-	if (error < 0)
-		goto undo_dmapi;
-	error = vfs_initquota();
-	if (error < 0)
-		goto undo_quota;
+	vfs_initdmapi();
+	vfs_initquota();
 
 	error = register_filesystem(&xfs_fs_type);
 	if (error)
-		goto undo_fs;
+		goto undo_register;
 	return 0;
 
-undo_fs:
-	vfs_exitquota();
-undo_quota:
-	vfs_exitdmapi();
-undo_dmapi:
+undo_register:
 	pagebuf_terminate();
+
 undo_pagebuf:
 	destroy_inodecache();
+
 undo_inodecache:
 	return error;
 }

@@ -29,8 +29,6 @@
 #
 # http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
 #
-# Makefile for XFS on Linux.
-#
 
 EXTRA_CFLAGS +=	 -Ifs/xfs -funsigned-char
 
@@ -44,18 +42,22 @@ endif
 obj-$(CONFIG_XFS_FS)		+= xfs.o
 
 
-xfs-$(CONFIG_XFS_RT)		+= xfs_rtalloc.o
-
-xfs-$(CONFIG_XFS_QUOTA)		+= xfs_dquot.o \
+xfs-$(CONFIG_XFS_QUOTA)		+= $(addprefix quota/, \
+				   xfs_dquot.o \
 				   xfs_dquot_item.o \
 				   xfs_trans_dquot.o \
 				   xfs_qm_syscalls.o \
-				   xfs_qmops.o \
-				   xfs_qm.o
+				   xfs_qm_bhv.o \
+				   xfs_qm.o)
 
+ifeq ($(CONFIG_XFS_QUOTA),y)
+xfs-$(CONFIG_PROC_FS)		+= quota/xfs_qm_stats.o
+endif
+
+xfs-$(CONFIG_XFS_RT)		+= xfs_rtalloc.o
 xfs-$(CONFIG_XFS_POSIX_ACL)	+= xfs_acl.o
-xfs-$(CONFIG_FS_POSIX_CAP)	+= xfs_cap.o
-xfs-$(CONFIG_FS_POSIX_MAC)	+= xfs_mac.o
+xfs-$(CONFIG_XFS_POSIX_CAP)	+= xfs_cap.o
+xfs-$(CONFIG_XFS_POSIX_MAC)	+= xfs_mac.o
 xfs-$(CONFIG_PROC_FS)		+= linux/xfs_stats.o
 xfs-$(CONFIG_SYSCTL)		+= linux/xfs_sysctl.o
 
@@ -136,6 +138,10 @@ xfs-y				+= $(addprefix support/, \
 				   mrlock.o \
 				   qsort.o \
 				   uuid.o)
+
+# Quota and DMAPI stubs
+xfs-y				+= xfs_dmops.o \
+				   xfs_qmops.o
 
 # If both xfs and kdb modules are built in then xfsidbg is built in.  If xfs is
 # a module and kdb modules are being compiled then xfsidbg must be a module, to

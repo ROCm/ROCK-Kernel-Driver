@@ -58,17 +58,7 @@ spinlock_t Atomic_spin = SPIN_LOCK_UNLOCKED;
  */
 cred_t sys_cred_val, *sys_cred = &sys_cred_val;
 
-/*
- * The global quota manager. There is only one of these for the entire
- * system, _not_ one per file system. XQM keeps track of the overall
- * quota functionality, including maintaining the freelist and hash
- * tables of dquots.
- */
-struct xfs_qm	*xfs_Gqm;
-mutex_t		xfs_Gqm_lock;
-
 /* Export XFS symbols used by xfsidbg */
-EXPORT_SYMBOL(xfs_Gqm);
 EXPORT_SYMBOL(xfs_next_bit);
 EXPORT_SYMBOL(xfs_contig_bits);
 EXPORT_SYMBOL(xfs_bmbt_get_all);

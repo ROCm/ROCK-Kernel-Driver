@@ -32,10 +32,16 @@
 #ifndef __XFS_QM_H__
 #define __XFS_QM_H__
 
-struct	xfs_dqhash;
-struct	xfs_inode;
-struct	xfs_dquot;
+#include "xfs_dquot_item.h"
+#include "xfs_dquot.h"
+#include "xfs_quota_priv.h"
+#include "xfs_qm_stats.h"
 
+struct xfs_qm;
+struct xfs_inode;
+
+extern mutex_t		xfs_Gqm_lock;
+extern struct xfs_qm	*xfs_Gqm;
 extern kmem_zone_t	*qm_dqzone;
 extern kmem_zone_t	*qm_dqtrxzone;
 
@@ -136,24 +142,13 @@ typedef struct xfs_quotainfo {
 } xfs_quotainfo_t;
 
 
-/*
- * The structure kept inside the xfs_trans_t keep track of dquot changes
- * within a transaction and apply them later.
- */
-typedef struct xfs_dqtrx {
-	struct xfs_dquot *qt_dquot;	  /* the dquot this refers to */
-	ulong		qt_blk_res;	  /* blks reserved on a dquot */
-	ulong		qt_blk_res_used;  /* blks used from the reservation */
-	ulong		qt_ino_res;	  /* inode reserved on a dquot */
-	ulong		qt_ino_res_used;  /* inodes used from the reservation */
-	long		qt_bcount_delta;  /* dquot blk count changes */
-	long		qt_delbcnt_delta; /* delayed dquot blk count changes */
-	long		qt_icount_delta;  /* dquot inode count changes */
-	ulong		qt_rtblk_res;	  /* # blks reserved on a dquot */
-	ulong		qt_rtblk_res_used;/* # blks used from reservation */
-	long		qt_rtbcount_delta;/* dquot realtime blk changes */
-	long		qt_delrtb_delta;  /* delayed RT blk count changes */
-} xfs_dqtrx_t;
+extern xfs_dqtrxops_t	xfs_trans_dquot_ops;
+
+extern void	xfs_trans_mod_dquot(xfs_trans_t *, xfs_dquot_t *, uint, long);
+extern int	xfs_trans_reserve_quota_bydquots(xfs_trans_t *, xfs_mount_t *,
+			xfs_dquot_t *, xfs_dquot_t *, long, long, uint);
+extern void	xfs_trans_dqjoin(xfs_trans_t *, xfs_dquot_t *);
+extern void	xfs_trans_log_dquot(xfs_trans_t *, xfs_dquot_t *);
 
 /*
  * We keep the usr and grp dquots separately so that locking will be easier
@@ -184,9 +179,33 @@ typedef struct xfs_dquot_acct {
 
 extern int		xfs_qm_init_quotainfo(xfs_mount_t *);
 extern void		xfs_qm_destroy_quotainfo(xfs_mount_t *);
+extern int		xfs_qm_mount_quotas(xfs_mount_t *);
+extern void		xfs_qm_mount_quotainit(xfs_mount_t *, uint);
+extern void		xfs_qm_unmount_quotadestroy(xfs_mount_t *);
+extern int		xfs_qm_unmount_quotas(xfs_mount_t *);
+extern int		xfs_qm_write_sb_changes(xfs_mount_t *, __int64_t);
+extern int		xfs_qm_sync(xfs_mount_t *, short);
+
+/* dquot stuff */
 extern void		xfs_qm_dqunlink(xfs_dquot_t *);
 extern boolean_t	xfs_qm_dqalloc_incore(xfs_dquot_t **);
-extern int		xfs_qm_write_sb_changes(xfs_mount_t *, __int64_t);
+extern int		xfs_qm_dqattach(xfs_inode_t *, uint);
+extern void		xfs_qm_dqdetach(xfs_inode_t *);
+extern int		xfs_qm_dqpurge_all(xfs_mount_t *, uint);
+extern void		xfs_qm_dqrele_all_inodes(xfs_mount_t *, uint);
+
+/* vop stuff */
+extern int		xfs_qm_vop_dqalloc(xfs_mount_t *, xfs_inode_t *,
+					uid_t, gid_t, uint,
+					xfs_dquot_t **, xfs_dquot_t **);
+extern void		xfs_qm_vop_dqattach_and_dqmod_newinode(
+					xfs_trans_t *, xfs_inode_t *,
+					xfs_dquot_t *, xfs_dquot_t *);
+extern int		xfs_qm_vop_rename_dqattach(xfs_inode_t **);
+extern xfs_dquot_t *	xfs_qm_vop_chown(xfs_trans_t *, xfs_inode_t *,
+					xfs_dquot_t **, xfs_dquot_t *);
+extern int		xfs_qm_vop_chown_reserve(xfs_trans_t *, xfs_inode_t *,
+					xfs_dquot_t *, xfs_dquot_t *, uint);
 
 /* list stuff */
 extern void		xfs_qm_freelist_init(xfs_frlist_t *);
@@ -205,12 +224,6 @@ extern int		xfs_qm_quotactl(bhv_desc_t *, int, int, xfs_caddr_t);
 extern int		xfs_qm_internalqcheck(xfs_mount_t *);
 #else
 #define xfs_qm_internalqcheck(mp)	(0)
-#endif
-
-#ifdef QUOTADEBUG
-extern void		xfs_qm_freelist_print(xfs_frlist_t *, char *);
-#else
-#define xfs_qm_freelist_print(a, b)	do { } while (0)
 #endif
 
 #endif /* __XFS_QM_H__ */

@@ -75,7 +75,6 @@ struct xfs_ihash;
 struct xfs_chash;
 struct xfs_inode;
 struct xfs_perag;
-struct xfs_quotainfo;
 struct xfs_iocore;
 struct xfs_bmbt_irec;
 struct xfs_bmap_free;
@@ -87,13 +86,118 @@ struct xfs_bmap_free;
 #define AIL_LOCK(mp,s)		s=mutex_spinlock(&(mp)->m_ail_lock)
 #define AIL_UNLOCK(mp,s)	mutex_spinunlock(&(mp)->m_ail_lock, s)
 
+
+/*
+ * Prototypes and functions for the Data Migration subsystem.
+ */
+
+typedef int	(*xfs_send_data_t)(int, struct bhv_desc *,
+			xfs_off_t, size_t, int, vrwlock_t *);
+typedef int	(*xfs_send_mmap_t)(struct vm_area_struct *, uint);
+typedef int	(*xfs_send_destroy_t)(struct bhv_desc *, dm_right_t);
+typedef int	(*xfs_send_namesp_t)(dm_eventtype_t, struct bhv_desc *,
+			dm_right_t, struct bhv_desc *, dm_right_t,
+			char *, char *, mode_t, int, int);
+typedef void	(*xfs_send_unmount_t)(struct vfs *, struct vnode *,
+			dm_right_t, mode_t, int, int);
+
+typedef struct xfs_dmops {
+	xfs_send_data_t		xfs_send_data;
+	xfs_send_mmap_t		xfs_send_mmap;
+	xfs_send_destroy_t	xfs_send_destroy;
+	xfs_send_namesp_t	xfs_send_namesp;
+	xfs_send_unmount_t	xfs_send_unmount;
+} xfs_dmops_t;
+
+#define XFS_SEND_DATA(mp, ev,bdp,off,len,fl,lock) \
+	(*(mp)->m_dm_ops.xfs_send_data)(ev,bdp,off,len,fl,lock)
+#define XFS_SEND_MMAP(mp, vma,fl) \
+	(*(mp)->m_dm_ops.xfs_send_mmap)(vma,fl)
+#define XFS_SEND_DESTROY(mp, bdp,right) \
+	(*(mp)->m_dm_ops.xfs_send_destroy)(bdp,right)
+#define XFS_SEND_NAMESP(mp, ev,b1,r1,b2,r2,n1,n2,mode,rval,fl) \
+	(*(mp)->m_dm_ops.xfs_send_namesp)(ev,b1,r1,b2,r2,n1,n2,mode,rval,fl)
+#define XFS_SEND_UNMOUNT(mp, vfsp,vp,right,mode,rval,fl) \
+	(*(mp)->m_dm_ops.xfs_send_unmount)(vfsp,vp,right,mode,rval,fl)
+
+
+/*
+ * Prototypes and functions for the Quota Management subsystem.
+ */
+
+struct xfs_dquot;
+struct xfs_dqtrxops;
+struct xfs_quotainfo;
+
+typedef int	(*xfs_qminit_t)(struct xfs_mount *, uint *, uint *);
+typedef int	(*xfs_qmmount_t)(struct xfs_mount *, uint, uint);
+typedef int	(*xfs_qmunmount_t)(struct xfs_mount *);
+typedef void	(*xfs_qmdone_t)(struct xfs_mount *);
+typedef void	(*xfs_dqrele_t)(struct xfs_dquot *);
+typedef int	(*xfs_dqattach_t)(struct xfs_inode *, uint);
+typedef void	(*xfs_dqdetach_t)(struct xfs_inode *);
+typedef int	(*xfs_dqpurgeall_t)(struct xfs_mount *, uint);
+typedef int	(*xfs_dqvopalloc_t)(struct xfs_mount *,
+			struct xfs_inode *, uid_t, gid_t, uint,
+			struct xfs_dquot **, struct xfs_dquot **);
+typedef void	(*xfs_dqvopcreate_t)(struct xfs_trans *, struct xfs_inode *,
+			struct xfs_dquot *, struct xfs_dquot *);
+typedef int	(*xfs_dqvoprename_t)(struct xfs_inode **);
+typedef struct xfs_dquot * (*xfs_dqvopchown_t)(
+			struct xfs_trans *, struct xfs_inode *,
+			struct xfs_dquot **, struct xfs_dquot *);
+typedef int	(*xfs_dqvopchownresv_t)(struct xfs_trans *, struct xfs_inode *,
+			struct xfs_dquot *, struct xfs_dquot *, uint);
+
+typedef struct xfs_qmops {
+	xfs_qminit_t		xfs_qminit;
+	xfs_qmdone_t		xfs_qmdone;
+	xfs_qmmount_t		xfs_qmmount;
+	xfs_qmunmount_t		xfs_qmunmount;
+	xfs_dqrele_t		xfs_dqrele;
+	xfs_dqattach_t		xfs_dqattach;
+	xfs_dqdetach_t		xfs_dqdetach;
+	xfs_dqpurgeall_t	xfs_dqpurgeall;
+	xfs_dqvopalloc_t	xfs_dqvopalloc;
+	xfs_dqvopcreate_t	xfs_dqvopcreate;
+	xfs_dqvoprename_t	xfs_dqvoprename;
+	xfs_dqvopchown_t	xfs_dqvopchown;
+	xfs_dqvopchownresv_t	xfs_dqvopchownresv;
+	struct xfs_dqtrxops	*xfs_dqtrxops;
+} xfs_qmops_t;
+
+#define XFS_QM_INIT(mp, mnt, fl) \
+	(*(mp)->m_qm_ops.xfs_qminit)(mp, mnt, fl)
+#define XFS_QM_MOUNT(mp, mnt, fl) \
+	(*(mp)->m_qm_ops.xfs_qmmount)(mp, mnt, fl)
+#define XFS_QM_UNMOUNT(mp) \
+	(*(mp)->m_qm_ops.xfs_qmunmount)(mp)
+#define XFS_QM_DONE(mp) \
+	(*(mp)->m_qm_ops.xfs_qmdone)(mp)
+#define XFS_QM_DQRELE(mp, dq) \
+	(*(mp)->m_qm_ops.xfs_dqrele)(dq)
+#define XFS_QM_DQATTACH(mp, ip, fl) \
+	(*(mp)->m_qm_ops.xfs_dqattach)(ip, fl)
+#define XFS_QM_DQDETACH(mp, ip) \
+	(*(mp)->m_qm_ops.xfs_dqdetach)(ip)
+#define XFS_QM_DQPURGEALL(mp, fl) \
+	(*(mp)->m_qm_ops.xfs_dqpurgeall)(mp, fl)
+#define XFS_QM_DQVOPALLOC(mp, ip, uid, gid, fl, dq1, dq2) \
+	(*(mp)->m_qm_ops.xfs_dqvopalloc)(mp, ip, uid, gid, fl, dq1, dq2)
+#define XFS_QM_DQVOPCREATE(mp, tp, ip, dq1, dq2) \
+	(*(mp)->m_qm_ops.xfs_dqvopcreate)(tp, ip, dq1, dq2)
+#define XFS_QM_DQVOPRENAME(mp, ip) \
+	(*(mp)->m_qm_ops.xfs_dqvoprename)(ip)
+#define XFS_QM_DQVOPCHOWN(mp, tp, ip, dqp, dq) \
+	(*(mp)->m_qm_ops.xfs_dqvopchown)(tp, ip, dqp, dq)
+#define XFS_QM_DQVOPCHOWNRESV(mp, tp, ip, dq1, dq2, fl) \
+	(*(mp)->m_qm_ops.xfs_dqvopchownresv)(tp, ip, dq1, dq2, fl)
+
+
 /*
  * Prototypes and functions for I/O core modularization.
  */
  
-struct flid;
-struct buf;
-
 typedef int		(*xfs_ioinit_t)(struct vfs *,
 				struct xfs_mount_args *, int);
 typedef int		(*xfs_bmapi_t)(struct xfs_trans *, void *,
@@ -137,52 +241,38 @@ typedef struct xfs_ioops {
 	xfs_iodone_t			xfs_iodone;
 } xfs_ioops_t;
 
-
 #define XFS_IOINIT(vfsp, args, flags) \
 	(*(mp)->m_io_ops.xfs_ioinit)(vfsp, args, flags)
-
 #define XFS_BMAPI(mp, trans,io,bno,len,f,first,tot,mval,nmap,flist)	\
 	(*(mp)->m_io_ops.xfs_bmapi_func) \
 		(trans,(io)->io_obj,bno,len,f,first,tot,mval,nmap,flist)
-
 #define XFS_BMAP_EOF(mp, io, endoff, whichfork, eof) \
 	(*(mp)->m_io_ops.xfs_bmap_eof_func) \
 		((io)->io_obj, endoff, whichfork, eof)
-
 #define XFS_IOMAP_WRITE_DIRECT(mp, io, offset, count, flags, mval, nmap, found)\
 	(*(mp)->m_io_ops.xfs_iomap_write_direct) \
 		((io)->io_obj, offset, count, flags, mval, nmap, found)
-
 #define XFS_IOMAP_WRITE_DELAY(mp, io, offset, count, flags, mval, nmap) \
 	(*(mp)->m_io_ops.xfs_iomap_write_delay) \
 		((io)->io_obj, offset, count, flags, mval, nmap)
-
 #define XFS_IOMAP_WRITE_ALLOCATE(mp, io, mval, nmap) \
 	(*(mp)->m_io_ops.xfs_iomap_write_allocate) \
 		((io)->io_obj, mval, nmap)
-
 #define XFS_IOMAP_WRITE_UNWRITTEN(mp, io, offset, count) \
 	(*(mp)->m_io_ops.xfs_iomap_write_unwritten) \
 		((io)->io_obj, offset, count)
-
 #define XFS_LCK_MAP_SHARED(mp, io) \
 	(*(mp)->m_io_ops.xfs_lck_map_shared)((io)->io_obj)
-
 #define XFS_ILOCK(mp, io, mode) \
 	(*(mp)->m_io_ops.xfs_ilock)((io)->io_obj, mode)
-
 #define XFS_ILOCK_NOWAIT(mp, io, mode) \
 	(*(mp)->m_io_ops.xfs_ilock_nowait)((io)->io_obj, mode)
-
 #define XFS_IUNLOCK(mp, io, mode) \
 	(*(mp)->m_io_ops.xfs_unlock)((io)->io_obj, mode)
-
 #define XFS_ILOCK_DEMOTE(mp, io, mode) \
 	(*(mp)->m_io_ops.xfs_ilock_demote)((io)->io_obj, mode)
-
 #define XFS_SIZE(mp, io) \
 	(*(mp)->m_io_ops.xfs_size_func)((io)->io_obj)
-
 #define XFS_IODONE(vfsp) \
 	(*(mp)->m_io_ops.xfs_iodone)(vfsp)
 
@@ -284,13 +374,9 @@ typedef struct xfs_mount {
 	int			m_chsize;	/* size of next field */
 	struct xfs_chash	*m_chash;	/* fs private inode per-cluster
 						 * hash table */
+	struct xfs_dmops	m_dm_ops;	/* vector of DMI ops */
+	struct xfs_qmops	m_qm_ops;	/* vector of XQM ops */
 	struct xfs_ioops	m_io_ops;	/* vector of I/O ops */
-	struct xfs_expinfo	*m_expinfo;	/* info to export to other
-						   cells. */
-	uint64_t		m_shadow_pinmask;
-						/* which bits matter in rpc
-						   log item pin masks */
-	uint			m_cxfstype;	/* mounted shared, etc. */
 	lock_t			m_freeze_lock;	/* Lock for m_frozen */
 	uint			m_frozen;	/* FS frozen for shutdown or
 						 * snapshot */
@@ -482,10 +568,9 @@ extern void	xfs_check_frozen(xfs_mount_t *, bhv_desc_t *, int);
 extern struct vfsops xfs_vfsops;
 extern struct vnodeops xfs_vnodeops;
 
+extern struct xfs_dmops xfs_dmcore_xfs;
+extern struct xfs_qmops xfs_qmcore_xfs;
 extern struct xfs_ioops xfs_iocore_xfs;
-
-extern struct vfsops xfs_qmops_xfs;
-extern struct vfsops xfs_dmops_xfs;
 
 extern int 	xfs_init(void);
 extern void	xfs_cleanup(void);

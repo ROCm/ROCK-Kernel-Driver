@@ -68,7 +68,6 @@ xfs_init(void)
 	spinlock_init(&xfs_dabuf_global_lock, "xfsda");
 #endif
 	mutex_init(&xfs_uuidtabmon, MUTEX_DEFAULT, "xfs_uuidtab");
-	mutex_init(&xfs_Gqm_lock, MUTEX_DEFAULT, "xfs_qmlock");
 
 	/*
 	 * Initialize all of the zone allocators we use.
@@ -175,8 +174,6 @@ xfs_cleanup(void)
 	kmem_cache_destroy(xfs_ifork_zone);
 	kmem_cache_destroy(xfs_ili_zone);
 	kmem_cache_destroy(xfs_chashlist_zone);
-	_XQM_ZONE_DESTROY(qm_dqzone);
-	_XQM_ZONE_DESTROY(qm_dqtrxzone);
 	_ACL_ZONE_DESTROY(xfs_acl_zone);
 #if  (defined(DEBUG) || defined(CONFIG_XFS_VNODE_TRACING))
 	ktrace_uninit();
@@ -389,6 +386,7 @@ xfs_mount(
 	cred_t			*credp)
 {
 	struct vfs		*vfsp = bhvtovfs(bhvp);
+	struct bhv_desc		*p;
 	struct xfs_mount	*mp = XFS_BHVTOM(bhvp);
 	struct block_device	*ddev, *logdev, *rtdev;
 	int			ronly = (vfsp->vfs_flag & VFS_RDONLY);
@@ -421,28 +419,43 @@ xfs_mount(
 		}
 	}
 
-	mp->m_io_ops = xfs_iocore_xfs;
+	/*
+	 * Setup xfs_mount function vectors from available behaviors
+	 */
+	p = vfs_bhv_lookup(vfsp, VFS_POSITION_DM);
+	mp->m_dm_ops = p ? *(xfs_dmops_t *) vfs_bhv_custom(p) : xfs_dmcore_xfs;
+	p = vfs_bhv_lookup(vfsp, VFS_POSITION_QM);
+	mp->m_qm_ops = p ? *(xfs_qmops_t *) vfs_bhv_custom(p) : xfs_qmcore_xfs;
+	p = vfs_bhv_lookup(vfsp, VFS_POSITION_IO);
+	mp->m_io_ops = p ? *(xfs_ioops_t *) vfs_bhv_custom(p) : xfs_iocore_xfs;
 
+	/*
+	 * Setup xfs_mount buffer target pointers
+	 */
 	mp->m_ddev_targp = xfs_alloc_buftarg(ddev);
 	if (rtdev)
 		mp->m_rtdev_targp = xfs_alloc_buftarg(rtdev);
 	mp->m_logdev_targp = (logdev && logdev != ddev) ?
 				xfs_alloc_buftarg(logdev) : mp->m_ddev_targp;
 
+	/*
+	 * Setup flags based on mount(2) options and then the superblock
+	 */
 	error = xfs_start_flags(args, mp, ronly);
 	if (error)
 		goto error;
-
 	error = xfs_readsb(mp);
 	if (error)
 		goto error;
-
 	error = xfs_finish_flags(args, mp, ronly);
 	if (error) {
 		xfs_freesb(mp);
 		goto error;
 	}
 
+	/*
+	 * Setup xfs_mount buffer target pointers based on superblock
+	 */
 	xfs_setsize_buftarg(mp->m_ddev_targp, mp->m_sb.sb_blocksize,
 			    mp->m_sb.sb_sectsize);
 	if (logdev && logdev != ddev) {
@@ -531,16 +544,15 @@ xfs_unmount(
 	int		flags,
 	cred_t		*credp)
 {
-	xfs_mount_t	*mp;
-	xfs_inode_t	*rip;
-	vnode_t		*rvp = 0;
 	struct vfs	*vfsp = bhvtovfs(bdp);
+	xfs_mount_t	*mp = XFS_BHVTOM(bdp);
+	xfs_inode_t	*rip;
+	vnode_t		*rvp;
 	int		unmount_event_wanted = 0;
 	int		unmount_event_flags = 0;
 	int		xfs_unmountfs_needed = 0;
 	int		error;
 
-	mp = XFS_BHVTOM(bdp);
 	rip = mp->m_rootip;
 	rvp = XFS_ITOV(rip);
 
@@ -548,7 +560,7 @@ xfs_unmount(
 		bhv_desc_t	*rbdp;
 
 		rbdp = vn_bhv_lookup_unlocked(VN_BHV_HEAD(rvp), &xfs_vnodeops);
-		error = dm_send_namesp_event(DM_EVENT_PREUNMOUNT,
+		error = XFS_SEND_NAMESP(mp, DM_EVENT_PREUNMOUNT,
 				rbdp, DM_RIGHT_NULL, rbdp, DM_RIGHT_NULL,
 				NULL, NULL, 0, 0,
 				(mp->m_dmevmask & (1<<DM_EVENT_PREUNMOUNT))?
@@ -601,9 +613,9 @@ out:
 	 */
 	if (unmount_event_wanted) {
 		/* Note: mp structure must still exist for
-		 * dm_send_unmount_event() call.
+		 * XFS_SEND_UNMOUNT() call.
 		 */
-		dm_send_unmount_event(vfsp, error == 0 ? rvp : NULL,
+		XFS_SEND_UNMOUNT(mp, vfsp, error == 0 ? rvp : NULL,
 			DM_RIGHT_NULL, 0, error, unmount_event_flags);
 	}
 	if (xfs_unmountfs_needed) {
@@ -679,7 +691,7 @@ xfs_unmount_flush(
 	 * Release dquot that rootinode, rbmino and rsumino might be holding,
 	 * flush and purge the quota inodes.
 	 */
-	error = xfs_qm_unmount_quotas(mp);
+	error = XFS_QM_UNMOUNT(mp);
 	if (error == EFSCORRUPTED)
 		goto fscorrupt_out2;
 

@@ -146,6 +146,7 @@ XFS_DQ_IS_LOCKED(xfs_dquot_t *dqp)
 }
 #endif
 
+
 /*
  * The following three routines simply manage the q_flock
  * semaphore embedded in the dquot.  This semaphore synchronizes
@@ -197,7 +198,6 @@ extern void		xfs_qm_dqprint(xfs_dquot_t *);
 #define xfs_qm_dqprint(a)
 #endif
 
-extern xfs_dquot_t	*xfs_qm_dqinit(xfs_mount_t *, xfs_dqid_t, uint);
 extern void		xfs_qm_dqdestroy(xfs_dquot_t *);
 extern int		xfs_qm_dqflush(xfs_dquot_t *, uint);
 extern int		xfs_qm_dqpurge(xfs_dquot_t *, uint);
@@ -206,7 +206,15 @@ extern int		xfs_qm_dqlock_nowait(xfs_dquot_t *);
 extern int		xfs_qm_dqflock_nowait(xfs_dquot_t *);
 extern void		xfs_qm_dqflock_pushbuf_wait(xfs_dquot_t *dqp);
 extern void		xfs_qm_adjust_dqtimers(xfs_mount_t *,
-					       xfs_disk_dquot_t *);
+					xfs_disk_dquot_t *);
 extern int		xfs_qm_dqwarn(xfs_disk_dquot_t *, uint);
+extern int		xfs_qm_dqget(xfs_mount_t *, xfs_inode_t *,
+					xfs_dqid_t, uint, uint, xfs_dquot_t **);
+extern void		xfs_qm_dqput(xfs_dquot_t *);
+extern void		xfs_qm_dqrele(xfs_dquot_t *);
+extern void		xfs_dqlock(xfs_dquot_t *);
+extern void		xfs_dqlock2(xfs_dquot_t *, xfs_dquot_t *);
+extern void		xfs_dqunlock(xfs_dquot_t *);
+extern void		xfs_dqunlock_nonotify(xfs_dquot_t *);
 
 #endif /* __XFS_DQUOT_H__ */

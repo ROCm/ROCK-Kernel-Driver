@@ -29,103 +29,14 @@
  *
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-
 #include <xfs.h>
 
-#define MNTOPT_DMAPI	"dmapi"		/* DMI enabled (DMAPI / XDSM) */
-#define MNTOPT_XDSM	"xdsm"		/* DMI enabled (DMAPI / XDSM) */
-
-STATIC int
-xfs_dm_parseargs(
-	struct bhv_desc		*bhv,
-	char			*options,
-	struct xfs_mount_args	*args,
-	int			update)
-{
-	size_t			length;
-	char			*local_options = options;
-	char			*this_char;
-	int			error;
-
-	while ((this_char = strsep(&local_options, ",")) != NULL) {
-		length = strlen(this_char);
-		if (local_options)
-			length++;
-
-		if (!strcmp(this_char, MNTOPT_DMAPI)) {
-			args->flags |= XFSMNT_DMAPI;
-		} else if (!strcmp(this_char, MNTOPT_XDSM)) {
-			args->flags |= XFSMNT_DMAPI;
-		} else {
-			if (local_options)
-				*(local_options-1) = ',';
-			continue;
-		}
-
-		while (length--)
-			*this_char++ = ',';
-	}
-
-	PVFS_PARSEARGS(BHV_NEXT(bhv), options, args, update, error);
-	if (!error && (args->flags & XFSMNT_DMAPI) && (*args->mtpt == '\0'))
-		error = EINVAL;
-	if (!error && !update && !(args->flags & XFSMNT_DMAPI))
-		bhv_remove_vfsops(bhvtovfs(bhv), VFS_POSITION_DM);
-	return error;
-}
-
-STATIC int
-xfs_dm_showargs(
-	struct bhv_desc		*bhv,
-	struct seq_file		*m)
-{
-	struct vfs		*vfsp = bhvtovfs(bhv);
-	int			error;
-
-	if (vfsp->vfs_flag & VFS_DMI)
-		seq_puts(m, "," MNTOPT_DMAPI);
-
-	PVFS_SHOWARGS(BHV_NEXT(bhv), m, error);
-	return error;
-}
-
-STATIC int
-xfs_dm_mount(
-	struct bhv_desc		*bhv,
-	struct xfs_mount_args	*args,
-	struct cred		*cr)
-{
-	struct bhv_desc		*rootbdp;
-	struct vnode		*rootvp;
-	struct vfs		*vfsp;
-	int			error = 0;
-
-	PVFS_MOUNT(BHV_NEXT(bhv), args, cr, error);
-	if (error)
-		return error;
-
-	if (args->flags & XFSMNT_DMAPI) {
-		vfsp = bhvtovfs(bhv);
-		VFS_ROOT(vfsp, &rootvp, error);
-		if (!error) {
-			vfsp->vfs_flag |= VFS_DMI;
-			rootbdp = vn_bhv_lookup_unlocked(
-					VN_BHV_HEAD(rootvp), &xfs_vnodeops);
-			VN_RELE(rootvp);
-			error = dm_send_mount_event(vfsp, DM_RIGHT_NULL, NULL,
-					DM_RIGHT_NULL, rootbdp, DM_RIGHT_NULL,
-					args->mtpt, args->fsname);
-		}
-	}
-
-	return error;
-}
-
-
-vfsops_t xfs_dmops_xfs = {
-	BHV_IDENTITY_INIT(VFS_BHV_DM, VFS_POSITION_DM),
-	.vfs_mount		= xfs_dm_mount,
-	.vfs_parseargs		= xfs_dm_parseargs,
-	.vfs_showargs		= xfs_dm_showargs,
-	.vfs_dmapiops		= xfs_dm_get_fsys_vector,
+#ifndef CONFIG_XFS_DMAPI
+xfs_dmops_t	xfs_dmcore_xfs = {
+	.xfs_send_data		= (xfs_send_data_t)fs_nosys,
+	.xfs_send_mmap		= (xfs_send_mmap_t)fs_noerr,
+	.xfs_send_destroy	= (xfs_send_destroy_t)fs_nosys,
+	.xfs_send_namesp	= (xfs_send_namesp_t)fs_nosys,
+	.xfs_send_unmount	= (xfs_send_unmount_t)fs_noval,
 };
+#endif /* CONFIG_XFS_DMAPI */

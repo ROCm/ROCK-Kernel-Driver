@@ -32,6 +32,26 @@
 #ifndef __XFS_SUPER_H__
 #define __XFS_SUPER_H__
 
+#ifdef CONFIG_XFS_DMAPI
+# define vfs_insertdmapi(vfs)	vfs_insertops(vfsp, &xfs_dmops)
+# define vfs_initdmapi()	xfs_dm_init()
+# define vfs_exitdmapi()	xfs_dm_exit()
+#else
+# define vfs_insertdmapi(vfs)	do { } while (0)
+# define vfs_initdmapi()	do { } while (0)
+# define vfs_exitdmapi()	do { } while (0)
+#endif
+
+#ifdef CONFIG_XFS_QUOTA
+# define vfs_insertquota(vfs)	vfs_insertops(vfsp, &xfs_qmops)
+# define vfs_initquota()	xfs_qm_init()
+# define vfs_exitquota()	xfs_qm_exit()
+#else
+# define vfs_insertquota(vfs)	do { } while (0)
+# define vfs_initquota()	do { } while (0)
+# define vfs_exitquota()	do { } while (0)
+#endif
+
 #ifdef CONFIG_XFS_POSIX_ACL
 # define XFS_ACL_STRING		"ACLs, "
 # define set_posix_acl_flag(sb)	((sb)->s_flags |= MS_POSIXACL)
@@ -40,34 +60,10 @@
 # define set_posix_acl_flag(sb)	do { } while (0)
 #endif
 
-#ifdef CONFIG_XFS_DMAPI
-# define XFS_DMAPI_STRING	"DMAPI, "
-# define vfs_insertdmapi(vfs)	vfs_insertops(vfsp, &xfs_dmops_xfs)
-# define vfs_initdmapi()	(0)			/* temporarily */
-# define vfs_exitdmapi()	do { } while (0)	/* temporarily */
-#else
-# define XFS_DMAPI_STRING
-# define vfs_insertdmapi(vfs)	do { } while (0)
-# define vfs_initdmapi()	(0)
-# define vfs_exitdmapi()	do { } while (0)
-#endif
-
-#ifdef CONFIG_XFS_QUOTA
-# define XFS_QUOTA_STRING	"quota, "
-# define vfs_insertquota(vfs)	vfs_insertops(vfsp, &xfs_qmops_xfs)
-# define vfs_initquota()	(0)			/* temporarily */
-# define vfs_exitquota()	do { } while (0)	/* temporarily */
-#else
-# define XFS_QUOTA_STRING
-# define vfs_insertquota(vfs)	do { } while (0)
-# define vfs_initquota()	(0)
-# define vfs_exitquota()	do { } while (0)
-#endif
-
 #ifdef CONFIG_XFS_RT
-# define XFS_RT_STRING		"realtime, "
+# define XFS_REALTIME_STRING	"realtime, "
 #else
-# define XFS_RT_STRING
+# define XFS_REALTIME_STRING
 #endif
 
 #ifdef CONFIG_XFS_VNODE_TRACING
@@ -82,9 +78,9 @@
 # define XFS_DBG_STRING		"no debug"
 #endif
 
-#define XFS_BUILD_OPTIONS	XFS_ACL_STRING XFS_DMAPI_STRING \
-				XFS_RT_STRING \
-				XFS_QUOTA_STRING XFS_VNTRACE_STRING \
+#define XFS_BUILD_OPTIONS	XFS_ACL_STRING \
+				XFS_REALTIME_STRING \
+				XFS_VNTRACE_STRING \
 				XFS_DBG_STRING /* DBG must be last */
 
 #define LINVFS_GET_VFS(s) \

@@ -222,7 +222,7 @@ vfs_deallocate(
 void
 vfs_insertops(
 	struct vfs		*vfsp,
-	struct vfsops		*vfsops)
+	struct bhv_vfsops	*vfsops)
 {
 	struct bhv_desc		*bdp;
 
