@@ -183,6 +183,9 @@ struct tcp_info
 	__u32	tcpi_snd_cwnd;
 	__u32	tcpi_advmss;
 	__u32	tcpi_reordering;
+
+	__u32	tcpi_rcv_rtt;
+	__u32	tcpi_rcv_space;
 };
 
 #ifdef __KERNEL__
