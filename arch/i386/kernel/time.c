@@ -342,6 +342,8 @@ void __init hpet_time_init(void)
 	}
 
 	cur_timer = select_timer();
+	printk(KERN_INFO "Using %s for high-res timesource\n",cur_timer->name);
+
 	time_init_hook();
 }
 #endif
@@ -364,5 +366,7 @@ void __init time_init(void)
 	wall_to_monotonic.tv_nsec = -xtime.tv_nsec;
 
 	cur_timer = select_timer();
+	printk(KERN_INFO "Using %s for high-res timesource\n",cur_timer->name);
+
 	time_init_hook();
 }

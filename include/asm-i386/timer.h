@@ -11,6 +11,7 @@
  *	last timer intruupt.
  */
 struct timer_opts{
+	char* name;
 	int (*init)(char *override);
 	void (*mark_offset)(void);
 	unsigned long (*get_offset)(void);
