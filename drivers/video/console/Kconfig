@@ -1,0 +1,268 @@
+#
+# Video configuration
+#
+
+menu "Console display driver support"
+
+config VGA_CONSOLE
+	bool "VGA text console"
+	depends on !ARCH_ACORN && !ARCH_EBSA110 || !4xx && !8xx
+	help
+	  Saying Y here will allow you to use Linux in text mode through a
+	  display that complies with the generic VGA standard. Virtually
+	  everyone wants that.
+
+	  The program SVGATextMode can be used to utilize SVGA video cards to
+	  their full potential in text mode. Download it from
+	  <ftp://ibiblio.org/pub/Linux/utils/console/>.
+
+	  Say Y.
+
+#	if [ "$CONFIG_PCI" = "y" -a "$CONFIG_VGA_CONSOLE" = "y" ]; then
+#	   bool '   Allow VGA on any bus?' CONFIG_VGA_HOSE
+#	   if [ "$CONFIG_VGA_HOSE" = "y" ]; then
+#	      define_bool CONFIG_DUMMY_CONSOLE y
+#	   fi
+#	fi
+
+config VIDEO_SELECT
+	bool "Video mode selection support"
+	---help---
+	  This enables support for text mode selection on kernel startup. If
+	  you want to take advantage of some high-resolution text mode your
+	  card's BIOS offers, but the traditional Linux utilities like
+	  SVGATextMode don't, you can say Y here and set the mode using the
+	  "vga=" option from your boot loader (lilo or loadlin) or set
+	  "vga=ask" which brings up a video mode menu on kernel startup. (Try
+	  "man bootparam" or see the documentation of your boot loader about
+	  how to pass options to the kernel.)
+
+	  Read the file <file:Documentation/svga.txt> for more information
+	  about the Video mode selection support. If unsure, say N.
+
+config MDA_CONSOLE
+	tristate "MDA text console (dual-headed) (EXPERIMENTAL)"
+	---help---
+	  Say Y here if you have an old MDA or monochrome Hercules graphics
+	  adapter in your system acting as a second head ( = video card). You
+	  will then be able to use two monitors with your Linux system. Do not
+	  say Y here if your MDA card is the primary card in your system; the
+	  normal VGA driver will handle it.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted and removed from the running kernel whenever you want).
+	  The module will be called mdacon.o. If you want to compile it as
+	  a module, say M here and read <file:Documentation/modules.txt>.
+
+	  If unsure, say N.
+
+config SGI_NEWPORT_CONSOLE
+        tristate "SGI Newport Console support"
+        depends on SGI_IP22  
+        help
+          Say Y here if you want the console on the Newport aka XL graphics
+          card of your Indy.  Most people say Y here.
+
+#  bool 'IODC console' CONFIG_IODC_CONSOLE
+config STI_CONSOLE
+        bool "STI console"
+        depends on PARISC
+	help
+          The STI console is the builtin display/keyboard on HP-PARISC
+          machines.  Say Y here to build support for it into your kernel.
+          The alternative is to use your primary serial port as a console.
+
+config PROM_CONSOLE
+	bool "PROM console"
+	depends on SPARC32 || SPARC64
+	help
+	  Say Y to build a console driver for Sun machines that uses the
+	  terminal emulation built into their console PROMS.
+
+config DUMMY_CONSOLE
+	bool
+	depends on !PROM_CONSOLE=y || VGA_CONSOLE!=y || SGI_NEWPORT_CONSOLE!=y || !IODC_CONSOLE && GSC_PS2
+	default y
+
+config FRAMEBUFFER_CONSOLE
+	bool "Framebuffer Console support"
+	depends on FB
+
+config PCI_CONSOLE
+	bool
+	depends on FRAMEBUFFER_CONSOLE
+	default y
+
+config FBCON_ADVANCED
+	bool "Advanced low level driver options"
+	depends on FRAMEBUFFER_CONSOLE
+	---help---
+	  The frame buffer console uses character drawing routines that are
+	  tailored to the specific organization of pixels in the memory of
+	  your graphics hardware. These are called the low level frame buffer
+	  console drivers. Note that they are used for text console output
+	  only; they are NOT needed for graphical applications.
+
+	  If you say N here, the needed low level drivers are automatically
+	  enabled, depending on what frame buffer devices you selected above.
+	  This is recommended for most users.
+
+	  If you say Y here, you have more fine-grained control over which low
+	  level drivers are enabled. You can e.g. leave out low level drivers
+	  for color depths you do not intend to use for text consoles.
+
+	  Low level frame buffer console drivers can be modules ( = code which
+	  can be inserted and removed from the running kernel whenever you
+	  want). The modules will be called fbcon-*.o. If you want to compile
+	  (some of) them as modules, read <file:Documentation/modules.txt>.
+
+	  If unsure, say N.
+
+config FBCON_ACCEL
+	tristate "Hardware acceleration support" if FBCON_ADVANCED
+	depends on FRAMEBUFFER_CONSOLE 
+	default m if !FBCON_ADVANCED && FB_NEOMAGIC!=y && !FB_VESA && !FB_FM2 && FB_HIT!=y && !FB_HP300 && !FB_Q40 && !FB_ANAKIN && !FB_G364 && FB_VIRTUAL!=y && !FB_CLPS711X && !FB_PMAG_BA && !FB_PMAGB_B && FB_3DFX!=y && !FB_TX3912 && !FB_MAXINE && !FB_APOLLO && FB_ATY!=y && FB_ATY128!=y && !FB_MAC && FB_RIVA!=y && FB_HGA!=y && !FB_OF && FB_SGIVW!=y && FB_VGA16!=y && (FB_NEOMAGIC=m || FB_HIT=m || FB_VIRTUAL=m || FB_3DFX=m || FB_RIVA=m || FB_SGIVW=m || FB_HGA=m || FB_ATY128=m)
+	default y if !FBCON_ADVANCED && (FB_NEOMAGIC=y || FB_VESA || FB_FM2 || FB_HIT=y || FB_HP300 || FB_Q40 || FB_ANAKIN || FB_G364 || FB_VIRTUAL=y || FB_CLPS711X || FB_PMAG_BA || FB_PMAGB_B || FB_3DFX=y || FB_TX3912 || FB_MAXINE || FB_APOLLO || FB_ATY=y || FB_ATY128=y || FB_MAC || FB_RIVA=y || FB_OF || FB_SGIVW=y || FB_HGA=y || FB_VGA16)
+
+config FBCON_AFB
+	tristate "Amiga bitplanes support" if FBCON_ADVANCED
+	depends on FRAMEBUFFER_CONSOLE 
+	default m if !FBCON_ADVANCED && FB_AMIGA=m
+	default y if !FBCON_ADVANCED && FB_AMIGA=y
+	help
+	  This is the low level frame buffer console driver for 1 to 8
+	  bitplanes (2 to 256 colors) on Amiga.
+
+config FBCON_ILBM
+	tristate "Amiga interleaved bitplanes support" if FBCON_ADVANCED
+	depends on FRAMEBUFFER_CONSOLE 
+	default m if !FBCON_ADVANCED && FB_AMIGA=m
+	default y if !FBCON_ADVANCED && FB_AMIGA=y
+	help
+	  This is the low level frame buffer console driver for 1 to 8
+	  interleaved bitplanes (2 to 256 colors) on Amiga.
+
+config FBCON_IPLAN2P2
+	tristate "Atari interleaved bitplanes (2 planes) support" if FBCON_ADVANCED
+	depends on FRAMEBUFFER_CONSOLE 
+	default y if !FBCON_ADVANCED && FB_ATARI
+	help
+	  This is the low level frame buffer console driver for 2 interleaved
+	  bitplanes (4 colors) on Atari.
+
+config FBCON_IPLAN2P4
+	tristate "Atari interleaved bitplanes (4 planes) support" if FBCON_ADVANCED
+	depends on FRAMEBUFFER_CONSOLE 
+	default y if !FBCON_ADVANCED && FB_ATARI
+	help
+	  This is the low level frame buffer console driver for 4 interleaved
+	  bitplanes (16 colors) on Atari.
+
+config FBCON_IPLAN2P8
+	tristate "Atari interleaved bitplanes (8 planes) support" if FBCON_ADVANCED
+	depends on FRAMEBUFFER_CONSOLE 
+	default y if !FBCON_ADVANCED && FB_ATARI
+	help
+	  This is the low level frame buffer console driver for 8 interleaved
+	  bitplanes (256 colors) on Atari.
+
+# Guess what we need
+config FBCON_STI
+	tristate
+	depends on !FBCON_ADVANCED && FRAMEBUFFER_CONSOLE && FB_STI
+	default y
+
+config FBCON_FONTWIDTH8_ONLY
+	bool "Support only 8 pixels wide fonts"
+	depends on FRAMEBUFFER_CONSOLE
+	help
+	  Answer Y here will make the kernel provide only the 8x8 fonts (these
+	  are the less readable).
+
+	  If unsure, say N.
+
+config FONT_SUN8x16
+	bool "Sparc console 8x16 font"
+	depends on FRAMEBUFFER_CONSOLE && (!SPARC32 && !SPARC64 && FBCON_FONTS || SPARC32 || SPARC64)
+	help
+	  This is the high resolution console font for Sun machines. Say Y.
+
+config FONT_SUN12x22
+	bool "Sparc console 12x22 font (not supported by all drivers)"
+	depends on FRAMEBUFFER_CONSOLE && !FBCON_FONTWIDTH8_ONLY && (!SPARC32 && !SPARC64 && FBCON_FONTS || SPARC32 || SPARC64)
+	help
+	  This is the high resolution console font for Sun machines with very
+	  big letters (like the letters used in the SPARC PROM). If the
+	  standard font is unreadable for you, say Y, otherwise say N.
+
+config FBCON_FONTS
+	bool "Select other fonts" if SPARC32 || SPARC64
+	depends on FRAMEBUFFER_CONSOLE
+	help
+	  Say Y here if you would like to use fonts other than the default
+	  your frame buffer console usually use.
+
+	  Note that the answer to this question won't directly affect the
+	  kernel: saying N will just cause the configurator to skip all
+	  the questions about foreign fonts.
+
+	  If unsure, say N (the default choices are safe).
+
+config FBCON_FONTS
+	prompt "Select compiled-in fonts"
+	depends on FRAMEBUFFER_CONSOLE && !SPARC32 && !SPARC64
+
+config FONT_8x8
+	bool "VGA 8x8 font" if FBCON_FONTS
+	depends on FRAMEBUFFER_CONSOLE
+	default y if !SPARC32 && !SPARC64 && !FBCON_FONTS
+	help
+	  This is the "high resolution" font for the VGA frame buffer (the one
+	  provided by the text console 80x50 (and higher) modes).
+
+	  Note that this is a poor quality font. The VGA 8x16 font is quite a
+	  lot more readable.
+
+	  Given the resolution provided by the frame buffer device, answer N
+	  here is safe.
+
+config FONT_8x16
+	bool "VGA 8x16 font" if FBCON_FONTS
+	depends on FRAMEBUFFER_CONSOLE || SGI_NEWPORT_CONSOLE=y
+	default y if !SPARC32 && !SPARC64 && !FBCON_FONTS
+	help
+	  This is the "high resolution" font for the VGA frame buffer (the one
+	  provided by the VGA text console 80x25 mode.
+
+	  If unsure, say Y.
+
+config FONT_6x11
+	bool "Mac console 6x11 font (not supported by all drivers)" if FBCON_FONTS
+	depends on FRAMEBUFFER_CONSOLE && !FBCON_FONTWIDTH8_ONLY
+	default y if !SPARC32 && !SPARC64 && !FBCON_FONTS && MAC
+	help
+	  Small console font with Macintosh-style high-half glyphs.  Some Mac
+	  framebuffer drivers don't support this one at all.
+
+config FONT_PEARL_8x8
+	bool "Pearl (old m68k) console 8x8 font" if FBCON_FONTS
+	depends on FRAMEBUFFER_CONSOLE
+	default y if !SPARC32 && !SPARC64 && !FBCON_FONTS && AMIGA
+	help
+	  Small console font with PC-style control-character and high-half
+	  glyphs.
+
+config FONT_ACORN_8x8
+	bool "Acorn console 8x8 font" if FBCON_FONTS
+	depends on FRAMEBUFFER_CONSOLE
+	default y if !SPARC32 && !SPARC64 && !FBCON_FONTS && ARM && ARCH_ACORN
+	help
+	  Small console font with PC-style control characters and high-half
+	  glyphs.
+
+config FONT_MINI_4x6
+	bool "Mini 4x6 font"
+	depends on !SPARC32 && !SPARC64 && FBCON_FONTS
+
+endmenu
+
