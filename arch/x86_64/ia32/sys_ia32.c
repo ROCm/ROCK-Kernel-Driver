@@ -1186,21 +1186,6 @@ long sys32_kill(int pid, int sig)
 	return sys_kill(pid, sig);
 }
  
-
-long sys32_io_setup(unsigned nr_reqs, u32 __user *ctx32p)
-{ 
-	long ret; 
-	aio_context_t ctx64;
-	mm_segment_t oldfs = get_fs(); 	
-	set_fs(KERNEL_DS); 
-	ret = sys_io_setup(nr_reqs, &ctx64); 
-	set_fs(oldfs); 
-	/* truncating is ok because it's a user address */
-	if (!ret) 
-		ret = put_user((u32)ctx64, ctx32p);
-	return ret;
-} 
-
 asmlinkage long sys32_io_submit(aio_context_t ctx_id, int nr,
 		   compat_uptr_t __user *iocbpp)
 {
