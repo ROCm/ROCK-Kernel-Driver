@@ -352,7 +352,7 @@ static int proc_pid_cmdline(struct task_struct *task, char * buffer)
 
 	// If the nul at the end of args has been overwritten, then
 	// assume application is using setproctitle(3).
-	if (res > 0 && buffer[res-1] != '\0') {
+	if (res > 0 && buffer[res-1] != '\0' && len < PAGE_SIZE) {
 		len = strnlen(buffer, res);
 		if (len < res) {
 		    res = len;
