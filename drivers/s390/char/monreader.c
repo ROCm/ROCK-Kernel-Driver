@@ -450,7 +450,7 @@ mon_open(struct inode *inode, struct file *filp)
 	}
 	P_INFO("open, established connection to *MONITOR service\n\n");
 	filp->private_data = monpriv;
-	return 0;
+	return nonseekable_open(inode, filp);
 
 out_unregister:
 	iucv_unregister_program(monpriv->iucv_handle);
