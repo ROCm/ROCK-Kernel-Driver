@@ -106,6 +106,8 @@
  *		- Changed the assumption that HZ = 100
  * 10/17/03 mc	- v1.04
  *		- added new DMA API support
+ * 06/01/04 jmd	- v1.04a
+ *		- Re-add reset_bus support
  **************************************************************************/
 
 #define CVT_LINUX_VERSION(V,P,S)        (V * 65536 + P * 256 + S)
@@ -149,6 +151,7 @@ static Scsi_Host_Template driver_template = {
 	.queuecommand	= i91u_queue,
 //	.abort		= i91u_abort,
 //	.reset		= i91u_reset,
+	.eh_bus_reset_handler = i91u_bus_reset,
 	.bios_param	= i91u_biosparam,
 	.can_queue	= 1,
 	.this_id	= 1,
@@ -161,7 +164,7 @@ static Scsi_Host_Template driver_template = {
 char *i91uCopyright = "Copyright (C) 1996-98";
 char *i91uInitioName = "by Initio Corporation";
 char *i91uProductName = "INI-9X00U/UW";
-char *i91uVersion = "v1.04";
+char *i91uVersion = "v1.04a";
 
 #define TULSZ(sz)     (sizeof(sz) / sizeof(sz[0]))
 #define TUL_RDWORD(x,y)         (short)(inl((int)((ULONG)((ULONG)x+(UCHAR)y)) ))
@@ -548,6 +551,15 @@ int i91u_reset(Scsi_Cmnd * SCpnt, unsigned int reset_flags)
 		return tul_reset_scsi_bus(pHCB);
 	else
 		return tul_device_reset(pHCB, (ULONG) SCpnt, SCpnt->device->id, reset_flags);
+}
+
+int i91u_bus_reset(Scsi_Cmnd * SCpnt)
+{
+	HCS *pHCB;
+
+	pHCB = (HCS *) SCpnt->device->host->base;
+	tul_reset_scsi(pHCB, 0);
+	return SUCCESS;
 }
 
 /*
