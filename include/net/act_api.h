@@ -99,7 +99,6 @@ extern int tcf_act_police(struct sk_buff **skb, struct tc_action *a);
 #endif /* CONFIG_NET_CLS_ACT */
 
 extern int tcf_police(struct sk_buff *skb, struct tcf_police *p);
-extern int qdisc_copy_stats(struct sk_buff *skb, struct tc_stats *st, spinlock_t *lock);
 extern void tcf_police_destroy(struct tcf_police *p);
 extern struct tcf_police * tcf_police_locate(struct rtattr *rta, struct rtattr *est);
 extern int tcf_police_dump(struct sk_buff *skb, struct tcf_police *p);

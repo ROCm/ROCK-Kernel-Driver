@@ -88,5 +88,29 @@ config X86_ACPI_CPUFREQ_PROC_INTF
 
 	  If in doubt, say N.
 
+config X86_P4_CLOCKMOD
+	tristate "Intel Pentium 4 clock modulation"
+	depends on CPU_FREQ_TABLE && EMBEDDED
+	help
+	  This adds the clock modulation driver for Intel Pentium 4 / XEON
+	  processors.  When enabled it will lower CPU temperature by skipping
+	  clocks.
+
+	  This driver should be only used in exceptional
+	  circumstances when very low power is needed because it causes severe
+	  slowdowns and noticeable latencies.  Normally Speedstep should be used
+	  instead.
+
+	  For details, take a look at <file:Documentation/cpu-freq/>.
+
+	  Unless you are absolutely sure say N.
+
+
+config X86_SPEEDSTEP_LIB
+        tristate
+        depends on (X86_P4_CLOCKMOD)
+        default (X86_P4_CLOCKMOD)
+
+
 endmenu
 

@@ -8,6 +8,7 @@
 #include <errno.h>
 #include <signal.h>
 #include <linux/unistd.h>
+#include <sys/ptrace.h>
 #include <sys/mman.h>
 #include <sys/wait.h>
 #include "os.h"
@@ -92,6 +93,13 @@ void os_kill_process(int pid, int reap_child)
 	if(reap_child)
 		CATCH_EINTR(waitpid(pid, NULL, 0));
 		
+}
+
+void os_kill_ptraced_process(int pid, int reap_child)
+{
+	ptrace(PTRACE_KILL, pid);
+	if(reap_child)
+		CATCH_EINTR(waitpid(pid, NULL, 0));
 }
 
 void os_usr1_process(int pid)

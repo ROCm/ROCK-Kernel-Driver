@@ -312,8 +312,7 @@ void __init iSeries_pci_final_fixup(void)
 	mf_displaySrc(0xC9000100);
 
 	printk("pcibios_final_fixup\n");
-	while ((pdev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, pdev))
-			!= NULL) {
+	for_each_pci_dev(pdev) {
 		node = find_Device_Node(pdev->bus->number, pdev->devfn);
 		printk("pci dev %p (%x.%x), node %p\n", pdev,
 		       pdev->bus->number, pdev->devfn, node);
@@ -329,7 +328,7 @@ void __init iSeries_pci_final_fixup(void)
 			iSeries_Device_Information(pdev, Buffer,
 					sizeof(Buffer));
 			printk("%d. %s\n", DeviceCount, Buffer);
-			iommu_devnode_init(node);
+			iommu_devnode_init_iSeries(node);
 		} else
 			printk("PCI: Device Tree not found for 0x%016lX\n",
 					(unsigned long)pdev);

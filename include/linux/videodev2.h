@@ -16,6 +16,7 @@
 #ifdef __KERNEL__
 #include <linux/time.h> /* need struct timeval */
 #endif
+#include <linux/compiler.h> /* need __user */
 
 /*
  *	M I S C E L L A N E O U S

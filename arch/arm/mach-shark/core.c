@@ -7,6 +7,7 @@
 #include <linux/init.h>
 #include <linux/interrupt.h>
 #include <linux/sched.h>
+#include <linux/serial_8250.h>
 
 #include <asm/setup.h>
 #include <asm/mach-types.h>
@@ -17,6 +18,46 @@
 #include <asm/mach/map.h>
 #include <asm/mach/arch.h>
 #include <asm/mach/time.h>
+
+static struct plat_serial8250_port serial_platform_data[] = {
+	{
+		.iobase		= 0x3f8,
+		.irq		= 4,
+		.uartclk	= 1843200,
+		.regshift	= 2,
+		.iotype		= UPIO_PORT,
+		.flags		= UPF_BOOT_AUTOCONF | UPF_SKIP_TEST,
+	},
+	{
+		.iobase		= 0x2f8,
+		.irq		= 3,
+		.uartclk	= 1843200,
+		.regshift	= 2,
+		.iotype		= UPIO_PORT,
+		.flags		= UPF_BOOT_AUTOCONF | UPF_SKIP_TEST,
+	},
+	{ },
+};
+
+static struct platform_device serial_device = {
+	.name			= "serial8250",
+	.id			= 0,
+	.dev			= {
+		.platform_data	= serial_platform_data,
+	},
+};
+
+static int __init shark_init(void)
+{
+	int ret;
+
+	if (machine_is_shark())
+		ret = platform_device_register(&serial_device);
+
+	return ret;
+}
+
+arch_initcall(shark_init);
 
 extern void shark_init_irq(void);
 

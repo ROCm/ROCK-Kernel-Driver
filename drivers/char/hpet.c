@@ -712,6 +712,7 @@ static void hpet_register_interpolator(struct hpets *hpetp)
 	ti->addr = &hpetp->hp_hpet->hpet_mc;
 	ti->frequency = hpet_time_div(hpets->hp_period);
 	ti->drift = ti->frequency * HPET_DRIFT / 1000000;
+	ti->mask = -1;
 
 	hpetp->hp_interpolator = ti;
 	register_time_interpolator(ti);

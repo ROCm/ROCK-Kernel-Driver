@@ -24,6 +24,8 @@
 #ifndef __LINUX_ATA_H__
 #define __LINUX_ATA_H__
 
+#include <linux/types.h>
+
 /* defines only for the constants which don't work well as enums */
 #define ATA_DMA_BOUNDARY	0xffffUL
 #define ATA_DMA_MASK		0xffffffffULL
@@ -140,8 +142,6 @@ enum {
 	XFER_PIO_2		= 0x0A,
 	XFER_PIO_1		= 0x09,
 	XFER_PIO_0		= 0x08,
-
-	/* legacy IDE 'stuff' */
 	XFER_SW_DMA_2		= 0x12,
 	XFER_SW_DMA_1		= 0x11,
 	XFER_SW_DMA_0		= 0x10,

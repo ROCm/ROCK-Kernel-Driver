@@ -165,7 +165,7 @@ static inline u16 call_pnp_bios(u16 func, u16 arg1, u16 arg2, u16 arg3,
 	if(pnp_bios_is_utter_crap)
 	{
 		printk(KERN_ERR "PnPBIOS: Warning! Your PnP BIOS caused a fatal error. Attempting to continue\n");
-		printk(KERN_ERR "PnPBIOS: You may need to reboot with the \"nobiospnp\" option to operate stably\n");
+		printk(KERN_ERR "PnPBIOS: You may need to reboot with the \"pnpbios=off\" option to operate stably\n");
 		printk(KERN_ERR "PnPBIOS: Check with your vendor for an updated BIOS\n");
 	}
 

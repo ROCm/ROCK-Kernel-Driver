@@ -361,7 +361,6 @@ static void bw2_init_one(struct sbus_dev *sdev)
 	if (!all->info.screen_base)
 		all->info.screen_base = (char *)
 			sbus_ioremap(resp, 0, all->par.fbsize, "bw2 ram");
-	all->info.currcon = -1;
 	all->info.par = &all->par;
 
 	bw2_blank(0, &all->info);

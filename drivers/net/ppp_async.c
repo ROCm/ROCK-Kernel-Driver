@@ -911,7 +911,9 @@ ppp_async_input(struct asyncppp *ap, const unsigned char *buf,
 			break;
 
 		c = buf[n];
-		if (c == PPP_FLAG) {
+		if (flags != NULL && flags[n] != 0) {
+			ap->state |= SC_TOSS;
+		} else if (c == PPP_FLAG) {
 			process_input_packet(ap);
 		} else if (c == PPP_ESCAPE) {
 			ap->state |= SC_ESCAPE;

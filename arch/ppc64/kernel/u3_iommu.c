@@ -291,7 +291,7 @@ void iommu_setup_u3(void)
 	/* We only have one iommu table on the mac for now, which makes
 	 * things simple. Setup all PCI devices to point to this table
 	 */
-	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
+	for_each_pci_dev(dev) {
 		/* We must use pci_device_to_OF_node() to make sure that
 		 * we get the real "final" pointer to the device in the
 		 * pci_dev sysdata and not the temporary PHB one

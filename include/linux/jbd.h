@@ -352,27 +352,6 @@ static inline void jbd_unlock_bh_journal_head(struct buffer_head *bh)
 	bit_spin_unlock(BH_JournalHead, &bh->b_state);
 }
 
-#define HAVE_JOURNAL_CALLBACK_STATUS
-/**
- *   struct journal_callback - Base structure for callback information.
- *   @jcb_list: list information for other callbacks attached to the same handle.
- *   @jcb_func: Function to call with this callback structure. 
- *
- *   This struct is a 'seed' structure for a using with your own callback
- *   structs. If you are using callbacks you must allocate one of these
- *   or another struct of your own definition which has this struct 
- *   as it's first element and pass it to journal_callback_set().
- *
- *   This is used internally by jbd to maintain callback information.
- *
- *   See journal_callback_set for more information.
- **/
-struct journal_callback {
-	struct list_head jcb_list;		/* t_jcb_lock */
-	void (*jcb_func)(struct journal_callback *jcb, int error);
-	/* user data goes here */
-};
-
 struct jbd_revoke_table_s;
 
 /**
@@ -381,7 +360,6 @@ struct jbd_revoke_table_s;
  * @h_transaction: Which compound transaction is this update a part of?
  * @h_buffer_credits: Number of remaining buffers we are allowed to dirty.
  * @h_ref: Reference count on this handle
- * @h_jcb: List of application registered callbacks for this handle.
  * @h_err: Field for caller's use to track errors through large fs operations
  * @h_sync: flag for sync-on-close
  * @h_jdata: flag to force data journaling
@@ -406,13 +384,6 @@ struct handle_s
 	/* Field for caller's use to track errors through large fs */
 	/* operations */
 	int			h_err;
-
-	/*
-	 * List of application registered callbacks for this handle. The
-	 * function(s) will be called after the transaction that this handle is
-	 * part of has been committed to disk. [t_jcb_lock]
-	 */
-	struct list_head	h_jcb;
 
 	/* Flags [no locking] */
 	unsigned int	h_sync:		1;	/* sync-on-close */
@@ -455,8 +426,6 @@ struct handle_s
  *    j_state_lock
  *    ->j_list_lock			(journal_unmap_buffer)
  *
- *    t_handle_lock
- *    ->t_jcb_lock
  */
 
 struct transaction_s 
@@ -580,15 +549,6 @@ struct transaction_s
 	 */
 	int t_handle_count;
 
-	/*
-	 * Protects the callback list
-	 */
-	spinlock_t		t_jcb_lock;
-	/*
-	 * List of registered callback functions for this transaction.
-	 * Called when the transaction is committed. [t_jcb_lock]
-	 */
-	struct list_head	t_jcb;
 };
 
 /**
@@ -921,10 +881,6 @@ extern int	 journal_invalidatepage(journal_t *,
 extern int	 journal_try_to_free_buffers(journal_t *, struct page *, int);
 extern int	 journal_stop(handle_t *);
 extern int	 journal_flush (journal_t *);
-extern void	 journal_callback_set(handle_t *handle,
-				      void (*fn)(struct journal_callback *,int),
-				      struct journal_callback *jcb);
-
 extern void	 journal_lock_updates (journal_t *);
 extern void	 journal_unlock_updates (journal_t *);
 

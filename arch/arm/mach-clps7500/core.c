@@ -12,6 +12,7 @@
 #include <linux/list.h>
 #include <linux/sched.h>
 #include <linux/init.h>
+#include <linux/serial_8250.h>
 
 #include <asm/mach/arch.h>
 #include <asm/mach/map.h>
@@ -312,6 +313,55 @@ static struct clps7500_timer = {
 	.init		= clps7500_timer_init,
 	.offset		= ioc_timer_gettimeoffset,
 };
+
+static struct plat_serial8250_port serial_platform_data[] = {
+	{
+		.mapbase	= 0x03010fe0,
+		.irq		= 10,
+		.uartclk	= 1843200,
+		.regshift	= 2,
+		.iotype		= UPIO_MEM,
+		.flags		= UPF_BOOT_AUTOCONF | UPF_IOREMAP | UPF_SKIP_TEST,
+	},
+	{
+		.mapbase	= 0x03010be0,
+		.irq		= 0,
+		.uartclk	= 1843200,
+		.regshift	= 2,
+		.iotype		= UPIO_MEM,
+		.flags		= UPF_BOOT_AUTOCONF | UPF_IOREMAP | UPF_SKIP_TEST,
+	},
+	{
+		.iobase		= ISASLOT_IO + 0x2e8,
+		.irq		= 41,
+		.uartclk	= 1843200,
+		.regshift	= 0,
+		.iotype		= UPIO_PORT,
+		.flags		= UPF_BOOT_AUTOCONF | UPF_SKIP_TEST,
+	},
+	{
+		.iobase		= ISASLOT_IO + 0x3e8,
+		.irq		= 40,
+		.uartclk	= 1843200,
+		.regshift	= 0,
+		.iotype		= UPIO_PORT,
+		.flags		= UPF_BOOT_AUTOCONF | UPF_SKIP_TEST,
+	},
+	{ },
+};
+
+static struct platform_device serial_device = {
+	.name			= "serial8250",
+	.id			= 0,
+	.dev			= {
+		.platform_data	= serial_platform_data,
+	},
+};
+
+static int __init clps7500_init(void)
+{
+	return platform_register_device(&serial_device);
+}
 
 MACHINE_START(CLPS7500, "CL-PS7500")
 	MAINTAINER("Philip Blundell")

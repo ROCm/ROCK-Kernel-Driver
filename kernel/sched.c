@@ -4607,3 +4607,35 @@ void __might_sleep(char *file, int line)
 }
 EXPORT_SYMBOL(__might_sleep);
 #endif
+
+#ifdef CONFIG_MAGIC_SYSRQ
+void normalize_rt_tasks(void)
+{
+	struct task_struct *p;
+	prio_array_t *array;
+	unsigned long flags;
+	runqueue_t *rq;
+
+	read_lock_irq(&tasklist_lock);
+	for_each_process (p) {
+		if (!rt_task(p))
+			continue;
+
+		rq = task_rq_lock(p, &flags);
+
+		array = p->array;
+		if (array)
+			deactivate_task(p, task_rq(p));
+		__setscheduler(p, SCHED_NORMAL, 0);
+		if (array) {
+			__activate_task(p, task_rq(p));
+			resched_task(rq->curr);
+		}
+
+		task_rq_unlock(rq, &flags);
+	}
+	read_unlock_irq(&tasklist_lock);
+}
+
+EXPORT_SYMBOL(normalize_rt_tasks);
+#endif /* CONFIG_MAGIC_SYSRQ */

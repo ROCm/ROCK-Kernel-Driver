@@ -2246,7 +2246,6 @@ static int cirrusfb_set_fbinfo(struct cirrusfb_info *cinfo)
 	struct fb_info *info = cinfo->info;
 	struct fb_var_screeninfo *var = &info->var;
 
-	info->currcon = -1;
 	info->par = cinfo;
 	info->pseudo_palette = cinfo->pseudo_palette;
 	info->flags = FBINFO_DEFAULT

@@ -1140,7 +1140,6 @@ int __init gbefb_init(void)
 	for (i = 0; i < (gbe_mem_size >> TILE_SHIFT); i++)
 		gbe_tiles.cpu[i] = (gbe_mem_phys >> TILE_SHIFT) + i;
 
-	fb_info.currcon = -1;
 	fb_info.fbops = &gbefb_ops;
 	fb_info.pseudo_palette = pseudo_palette;
 	fb_info.flags = FBINFO_DEFAULT;

@@ -969,7 +969,6 @@ static void ffb_init_one(int node, int parent)
 			   FBINFO_HWACCEL_IMAGEBLIT);
 	all->info.fbops = &ffb_ops;
 	all->info.screen_base = (char *) all->par.physbase + FFB_DFB24_POFF;
-	all->info.currcon = -1;
 	all->info.par = &all->par;
 	all->info.pseudo_palette = all->pseudo_palette;
 

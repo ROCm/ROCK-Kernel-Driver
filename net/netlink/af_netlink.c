@@ -424,10 +424,9 @@ retry:
 	sk_for_each(osk, node, head) {
 		if (nlk_sk(osk)->pid == pid) {
 			/* Bind collision, search negative pid values. */
-			if (pid > 0)
-				pid = rover;
-			else if (--pid > 0)
-				pid = -4097;
+			pid = rover--;
+			if (rover > -4097)
+				rover = -4097;
 			netlink_table_ungrab();
 			goto retry;
 		}

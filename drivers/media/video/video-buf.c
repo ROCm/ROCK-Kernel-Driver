@@ -1063,7 +1063,7 @@ videobuf_vm_close(struct vm_area_struct *vma)
 				continue;
 			map->q->bufs[i]->map   = NULL;
 			map->q->bufs[i]->baddr = 0;
-			map->q->ops->buf_release(vma->vm_file,map->q->bufs[i]);
+			map->q->ops->buf_release(vma->vm_file->private_data,map->q->bufs[i]);
 		}
 		kfree(map);
 	}
