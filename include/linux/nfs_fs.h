@@ -465,6 +465,7 @@ extern void * nfs_root_data(void);
 enum nfs4_client_state {
 	NFS4CLNT_OK  = 0,
 	NFS4CLNT_NEW,
+	NFS4CLNT_SETUP_STATE,
 };
 
 /*
@@ -475,7 +476,8 @@ struct nfs4_client {
 	struct in_addr		cl_addr;	/* Server identifier */
 	u64			cl_clientid;	/* constant */
 	nfs4_verifier		cl_confirm;
-	enum nfs4_client_state	cl_state;
+	unsigned long		cl_state;
+	long			cl_generation;
 
 	u32			cl_lockowner_id;
 
@@ -499,6 +501,10 @@ struct nfs4_client {
 	unsigned long		cl_lease_time;
 	unsigned long		cl_last_renewal;
 	struct work_struct	cl_renewd;
+	struct work_struct	cl_recoverd;
+
+	wait_queue_head_t	cl_waitq;
+	struct rpc_wait_queue	cl_rpcwaitq;
 
 	/* Our own IP address, as a null-terminated string.
 	 * This is used to generate the clientid, and the callback address.
@@ -523,6 +529,7 @@ struct nfs4_state_owner {
 	u32                  so_seqid;   /* protected by so_sema */
 	unsigned int         so_flags;   /* protected by so_sema */
 	atomic_t	     so_count;
+	long		     so_generation;
 
 	struct rpc_cred	     *so_cred;	 /* Associated cred */
 	struct list_head     so_states;
@@ -556,7 +563,9 @@ extern int nfs4_proc_setclientid(struct nfs4_client *, u32, unsigned short);
 extern int nfs4_proc_setclientid_confirm(struct nfs4_client *);
 extern int nfs4_open_reclaim(struct nfs4_state_owner *, struct nfs4_state *);
 extern int nfs4_proc_async_renew(struct nfs4_client *);
+extern int nfs4_proc_renew(struct nfs4_client *);
 extern int nfs4_do_close(struct inode *, struct nfs4_state *);
+extern int nfs4_wait_clnt_recover(struct rpc_clnt *, struct nfs4_client *);
 
 /* nfs4renewd.c */
 extern void nfs4_schedule_state_renewal(struct nfs4_client *);
@@ -573,7 +582,8 @@ extern void nfs4_put_state_owner(struct nfs4_state_owner *);
 extern struct nfs4_state * nfs4_get_open_state(struct inode *, struct nfs4_state_owner *);
 extern void nfs4_put_open_state(struct nfs4_state *);
 extern void nfs4_increment_seqid(int status, struct nfs4_state_owner *sp);
-extern void nfs4_recover_state(struct nfs4_client *);
+extern int nfs4_handle_error(struct nfs_server *, int);
+extern void nfs4_schedule_state_recovery(struct nfs4_client *);
 
 struct nfs4_mount_data;
 #else

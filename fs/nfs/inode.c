@@ -1448,6 +1448,8 @@ static int nfs4_fill_super(struct super_block *sb, struct nfs4_mount_data *data,
 		clp->cl_cred = rpcauth_lookupcred(clnt->cl_auth, 0);
 		memcpy(clp->cl_ipaddr, server->ip_addr, sizeof(clp->cl_ipaddr));
 	}
+	if (list_empty(&clp->cl_superblocks))
+		clear_bit(NFS4CLNT_OK, &clp->cl_state);
 	list_add_tail(&server->nfs4_siblings, &clp->cl_superblocks);
 	clnt = rpc_clone_client(clp->cl_rpcclient);
 	server->nfs4_state = clp;
