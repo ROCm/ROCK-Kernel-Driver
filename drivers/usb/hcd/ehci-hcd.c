@@ -89,12 +89,6 @@
 // #define EHCI_VERBOSE_DEBUG
 // #define have_split_iso
 
-#ifdef	CONFIG_DEBUG_SLAB
-#	define	EHCI_SLAB_FLAGS		(SLAB_POISON)
-#else
-#	define	EHCI_SLAB_FLAGS		0
-#endif
-
 /* magic numbers that can affect system performance */
 #define	EHCI_TUNE_CERR		3	/* 0-3 qtd retries; 0 == don't stop */
 #define	EHCI_TUNE_RL_HS		0	/* nak throttle; see 4.9 */
@@ -197,7 +191,7 @@ static int ehci_start (struct usb_hcd *hcd)
 	 * periodic_size can shrink by USBCMD update if hcc_params allows.
 	 */
 	ehci->periodic_size = DEFAULT_I_TDPS;
-	if ((retval = ehci_mem_init (ehci, EHCI_SLAB_FLAGS | SLAB_KERNEL)) < 0)
+	if ((retval = ehci_mem_init (ehci, SLAB_KERNEL)) < 0)
 		return retval;
 	hcc_params = readl (&ehci->caps->hcc_params);
 
