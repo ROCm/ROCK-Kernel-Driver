@@ -55,7 +55,7 @@
 #include "scsi_logging.h"
 #include "scsi_debug.h"
 
-static const char * scsi_debug_version_str = "Version: 1.69 (20030329)";
+static const char * scsi_debug_version_str = "Version: 1.70 (20030416)";
 
 /* Additional Sense Code (ASC) used */
 #define NO_ADDED_SENSE 0x0
@@ -145,9 +145,12 @@ struct sdebug_dev_info {
 struct sdebug_host_info {
 	struct list_head host_list;
 	struct Scsi_Host *shost;
-	struct device *dev;
+	struct device dev;
 	struct list_head dev_info_list;
 };
+
+#define to_sdebug_host(d)	\
+	container_of(d, struct sdebug_host_info, dev)
 
 static LIST_HEAD(sdebug_host_list);
 static spinlock_t sdebug_host_list_lock = SPIN_LOCK_UNLOCKED;
@@ -248,22 +251,6 @@ static struct device pseudo_primary;
 static struct bus_type pseudo_lld_bus;
 static int scsi_debug_register_driver(struct device_driver *);
 static int scsi_debug_unregister_driver(struct device_driver *);
-
-static struct sdebug_host_info * 
-		sdebug_shost_to_host_info(struct Scsi_Host *shost)
-{
-	struct sdebug_host_info * sdbg_host, * found = NULL;
-
-	spin_lock(&sdebug_host_list_lock);
-	list_for_each_entry(sdbg_host, &sdebug_host_list, host_list) {
-		if (sdbg_host->shost == shost) {
-			found = sdbg_host;
-			break;
-		}
-	}
-	spin_unlock(&sdebug_host_list_lock);
-	return found;
-}
 
 static unsigned char * scatg2virt(const struct scatterlist * sclp)
 {
@@ -668,6 +655,15 @@ static int resp_ctrl_m_pg(unsigned char * p, int pcontrol, int target)
 	return sizeof(ctrl_m_pg);
 }
 
+static int resp_iec_m_pg(unsigned char * p, int pcontrol, int target)
+{	/* Informational Exceptions control mode page for mode_sense */
+	unsigned char iec_m_pg[] = {0x1c, 0xa, 0x08, 0, 0, 0, 0, 0,
+				    0, 0, 0x0, 0x0};
+	memcpy(p, iec_m_pg, sizeof(iec_m_pg));
+	if (1 == pcontrol)
+		memset(p + 2, 0, sizeof(iec_m_pg) - 2);
+	return sizeof(iec_m_pg);
+}
 
 #define SDEBUG_MAX_MSENSE_SZ 256
 
@@ -734,12 +730,17 @@ static int resp_mode_sense(unsigned char * cmd, int target,
 		len = resp_ctrl_m_pg(ap, pcontrol, target);
 		offset += len;
 		break;
+	case 0x1c:	/* Informational Exceptions Mode page, all devices */
+		len = resp_iec_m_pg(ap, pcontrol, target);
+		offset += len;
+		break;
 	case 0x3f:	/* Read all Mode pages */
 		len = resp_err_recov_pg(ap, pcontrol, target);
 		len += resp_disconnect_pg(ap + len, pcontrol, target);
 		len += resp_format_pg(ap + len, pcontrol, target);
 		len += resp_caching_pg(ap + len, pcontrol, target);
 		len += resp_ctrl_m_pg(ap + len, pcontrol, target);
+		len += resp_iec_m_pg(ap + len, pcontrol, target);
 		offset += len;
 		break;
 	default:
@@ -963,9 +964,9 @@ static struct sdebug_dev_info * devInfoReg(struct scsi_device * sdev)
 
 	if (devip)
 		return devip;
-	sdbg_host = sdebug_shost_to_host_info(sdev->host);
+	sdbg_host = *(struct sdebug_host_info **) sdev->host->hostdata;
         if(! sdbg_host) {
-                printk(KERN_ERR "Unable to locate host info\n");
+                printk(KERN_ERR "Host info NULL\n");
 		return NULL;
         }
 	list_for_each_entry(devip, &sdbg_host->dev_info_list, dev_list) {
@@ -1065,7 +1066,7 @@ static int scsi_debug_bus_reset(struct scsi_cmnd * SCpnt)
 		printk(KERN_INFO "scsi_debug: bus_reset\n");
 	++num_bus_resets;
 	if (SCpnt && ((sdp = SCpnt->device)) && ((hp = sdp->host))) {
-		sdbg_host = sdebug_shost_to_host_info(hp);
+		sdbg_host = *(struct sdebug_host_info **) hp->hostdata;
 		if (sdbg_host) {
 			list_for_each_entry(dev_info,
                                             &sdbg_host->dev_info_list,
@@ -1546,8 +1547,11 @@ static int __init scsi_debug_init(void)
 
 static void __exit scsi_debug_exit(void)
 {
-	/* free up adapters here ?? */
+	int k = scsi_debug_add_host;
+
 	stop_all_queued();
+	for (; k; k--)
+		sdebug_remove_adapter();
 	do_remove_driverfs_files();
 	scsi_debug_unregister_driver(&sdebug_driverfs_driver);
 	bus_unregister(&pseudo_lld_bus);
@@ -1591,69 +1595,29 @@ static int scsi_debug_unregister_driver(struct device_driver *dev_driver)
 
 static void sdebug_release_adapter(struct device * dev)
 {
-        kfree(dev);
+        struct sdebug_host_info *sdbg_host;
+
+	sdbg_host = to_sdebug_host(dev);
+        kfree(sdbg_host);
 }
 
 static int sdebug_add_adapter()
-{
-        struct device * dev;
-        int error;
-
-        dev = kmalloc(sizeof(*dev),GFP_KERNEL);
-        if (NULL == dev) {
-                printk(KERN_ERR "%s: out of memory at line %d\n",
-                       __FUNCTION__, __LINE__);
-                return -ENOMEM;
-        }
-        memset(dev, 0, sizeof(*dev));
-
-        dev->bus = &pseudo_lld_bus;
-        dev->parent = &pseudo_primary;
-        dev->release = &sdebug_release_adapter;
-        sprintf(dev->name, "scsi debug adapter");
-        sprintf(dev->bus_id, "adapter%d", scsi_debug_add_host);
-
-        error = device_register(dev);
-
-        if (error)
-                kfree(dev);
-        else
-                ++scsi_debug_add_host;
-
-        return error;
-}
-
-static void sdebug_remove_adapter()
-{
-        struct sdebug_host_info * sdbg_host = NULL;
-
-        spin_lock(&sdebug_host_list_lock);
-        if (!list_empty(&sdebug_host_list))
-                sdbg_host = list_entry(sdebug_host_list.prev,
-                                       struct sdebug_host_info, host_list);
-        spin_unlock(&sdebug_host_list_lock);
-
-        device_unregister(sdbg_host->dev);
-        --scsi_debug_add_host;
-}
-
-static int sdebug_driver_probe(struct device * dev)
 {
 	int k, devs_per_host;
         int error = 0;
         struct sdebug_host_info *sdbg_host;
         struct sdebug_dev_info *sdbg_devinfo;
         struct list_head *lh, *lh_sf;
-        struct Scsi_Host *hpnt;
 
         sdbg_host = kmalloc(sizeof(*sdbg_host),GFP_KERNEL);
+
         if (NULL == sdbg_host) {
                 printk(KERN_ERR "%s: out of memory at line %d\n",
                        __FUNCTION__, __LINE__);
                 return -ENOMEM;
         }
-        memset(sdbg_host, 0, sizeof(*sdbg_host));
 
+        memset(sdbg_host, 0, sizeof(*sdbg_host));
         INIT_LIST_HEAD(&sdbg_host->dev_info_list);
 
 	devs_per_host = scsi_debug_num_tgts * scsi_debug_max_luns;
@@ -1663,6 +1627,7 @@ static int sdebug_driver_probe(struct device * dev)
                         printk(KERN_ERR "%s: out of memory at line %d\n",
                                __FUNCTION__, __LINE__);
                         error = -ENOMEM;
+			goto clean1;
                 }
                 memset(sdbg_devinfo, 0, sizeof(*sdbg_devinfo));
                 sdbg_devinfo->sdbg_host = sdbg_host;
@@ -1670,9 +1635,65 @@ static int sdebug_driver_probe(struct device * dev)
                               &sdbg_host->dev_info_list);
         }
 
+        spin_lock(&sdebug_host_list_lock);
         list_add_tail(&sdbg_host->host_list, &sdebug_host_list);
+        spin_unlock(&sdebug_host_list_lock);
 
-        hpnt = scsi_register(&sdebug_driver_template, 0);
+        sdbg_host->dev.bus = &pseudo_lld_bus;
+        sdbg_host->dev.parent = &pseudo_primary;
+        sdbg_host->dev.release = &sdebug_release_adapter;
+        sprintf(sdbg_host->dev.name, "scsi debug adapter");
+        sprintf(sdbg_host->dev.bus_id, "adapter%d", scsi_debug_add_host);
+
+        error = device_register(&sdbg_host->dev);
+
+        if (error)
+		goto clean2;
+
+	++scsi_debug_add_host;
+        return error;
+
+clean2:
+	list_for_each_safe(lh, lh_sf, &sdbg_host->dev_info_list) {
+		sdbg_devinfo = list_entry(lh, struct sdebug_dev_info,
+					  dev_list);
+		list_del(&sdbg_devinfo->dev_list);
+		kfree(sdbg_devinfo);
+	}
+
+clean1:
+	kfree(sdbg_host);
+        return error;
+}
+
+static void sdebug_remove_adapter()
+{
+        struct sdebug_host_info * sdbg_host = NULL;
+
+        spin_lock(&sdebug_host_list_lock);
+        if (!list_empty(&sdebug_host_list)) {
+                sdbg_host = list_entry(sdebug_host_list.prev,
+                                       struct sdebug_host_info, host_list);
+		list_del(&sdbg_host->host_list);
+	}
+        spin_unlock(&sdebug_host_list_lock);
+
+	if (!sdbg_host)
+		return;
+
+        device_unregister(&sdbg_host->dev);
+        --scsi_debug_add_host;
+}
+
+static int sdebug_driver_probe(struct device * dev)
+{
+        int error = 0;
+        struct sdebug_host_info *sdbg_host;
+        struct Scsi_Host *hpnt;
+
+	sdbg_host = to_sdebug_host(dev);
+
+        hpnt = scsi_register(&sdebug_driver_template, sizeof(sdbg_host));
         if (NULL == hpnt) {
                 printk(KERN_ERR "%s: scsi_register failed\n", __FUNCTION__);
                 error = -ENODEV;
@@ -1680,14 +1701,14 @@ static int sdebug_driver_probe(struct device * dev)
         }
 
         sdbg_host->shost = hpnt;
-        sdbg_host->dev = dev;
+	*((struct sdebug_host_info **)hpnt->hostdata) = sdbg_host;
 	if ((hpnt->this_id >= 0) && (scsi_debug_num_tgts > hpnt->this_id))
 		hpnt->max_id = scsi_debug_num_tgts + 1;
 	else
 		hpnt->max_id = scsi_debug_num_tgts;
 	hpnt->max_lun = scsi_debug_max_luns;
 
-        error = scsi_add_host(hpnt, sdbg_host->dev);
+        error = scsi_add_host(hpnt, &sdbg_host->dev);
         if (error) {
                 printk(KERN_ERR "%s: scsi_add_host failed\n", __FUNCTION__);
                 error = -ENODEV;
@@ -1700,47 +1721,24 @@ static int sdebug_driver_probe(struct device * dev)
 clean2:
         scsi_unregister(hpnt);
 clean1:
-        list_for_each_safe(lh, lh_sf, &sdbg_host->dev_info_list) {
-                sdbg_devinfo = list_entry(lh, struct sdebug_dev_info,
-                                          dev_list);
-                list_del(&sdbg_devinfo->dev_list);
-                kfree(sdbg_devinfo);
-        }
-
         kfree(sdbg_host);
 
         return error;
 }
 
-static int sdebug_driver_remove(struct device * dev)
+static int scsi_debug_release(struct Scsi_Host * shost)
 {
         struct list_head *lh, *lh_sf;
         struct sdebug_dev_info *sdbg_devinfo;
-        struct sdebug_host_info *sdbg_host, *found = NULL;
+        struct sdebug_host_info *sdbg_host;
 
-        spin_lock(&sdebug_host_list_lock);
-        list_for_each_entry(sdbg_host, &sdebug_host_list, host_list) {
-                if (sdbg_host->dev == dev) {
-                        list_del(&sdbg_host->host_list);
-                        found = sdbg_host;
-                        break;
-                }
-        }
-        spin_unlock(&sdebug_host_list_lock);
+	sdbg_host = *(struct sdebug_host_info **)shost->hostdata;
+        scsi_unregister(shost);
 
-        if (!found) {
-                printk(KERN_ERR "%s: sdebug_host_info not found\n",
-                       __FUNCTION__);
-                return -ENODEV;
-        }
-
-
-        if (scsi_remove_host(sdbg_host->shost)) {
-                printk(KERN_ERR "%s: scsi_remove_host failed\n", __FUNCTION__);
-                return -EBUSY;
-        }
-
-        scsi_unregister(sdbg_host->shost);
+	if (!sdbg_host) {
+		printk(KERN_ERR "Unable to locate host info\n");
+		return 0;
+	}
 
         list_for_each_safe(lh, lh_sf, &sdbg_host->dev_info_list) {
                 sdbg_devinfo = list_entry(lh, struct sdebug_dev_info,
@@ -1749,7 +1747,20 @@ static int sdebug_driver_remove(struct device * dev)
                 kfree(sdbg_devinfo);
         }
 
-        kfree(sdbg_host);
+        return 0;
+
+}
+
+static int sdebug_driver_remove(struct device * dev)
+{
+        struct sdebug_host_info *sdbg_host;
+
+	sdbg_host = to_sdebug_host(dev);
+
+        if (sdbg_host && scsi_remove_host(sdbg_host->shost)) {
+                printk(KERN_ERR "%s: scsi_remove_host failed\n", __FUNCTION__);
+                return -EBUSY;
+        }
 
         return 0;
 }

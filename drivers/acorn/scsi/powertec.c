@@ -475,7 +475,6 @@ static struct ecard_driver powertecscsi_driver = {
 	.remove		= __devexit_p(powertecscsi_remove),
 	.id_table	= powertecscsi_cids,
 	.drv = {
-		.devclass	= &shost_devclass,
 		.name		= "powertecscsi",
 	},
 };
