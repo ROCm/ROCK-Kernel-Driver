@@ -12,11 +12,9 @@
  */
 
 #include <linux/kernel.h>
-#include <linux/ioport.h>
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/stddef.h>
-#include <linux/parport.h>
 #include <linux/i2c.h>
 #include <linux/i2c-algo-8xx.h>
 #include <asm/mpc8xx.h>
