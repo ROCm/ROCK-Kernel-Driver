@@ -496,7 +496,7 @@ sys_call_table:
 	ENTRY_SAME(delete_module)
 	ENTRY_SAME(ni_syscall)		/* 130: get_kernel_syms */
 	/* time_t inside struct dqblk */
-	ENTRY_DIFF(quotactl) /* -- FIXME, doesn't work */
+	ENTRY_SAME(quotactl)
 	ENTRY_SAME(getpgid)
 	ENTRY_SAME(fchdir)
 	ENTRY_SAME(bdflush)

@@ -7,10 +7,11 @@
  * @author John Levon <levon@movementarian.org>
  */
 
+#include <linux/errno.h>
+#include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/oprofile.h>
-#include <linux/init.h>
- 
+
 extern void timer_init(struct oprofile_operations ** ops);
 
 int __init oprofile_arch_init(struct oprofile_operations ** ops)

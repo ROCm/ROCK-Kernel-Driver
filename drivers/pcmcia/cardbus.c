@@ -169,7 +169,7 @@ int read_cb_mem(struct pcmcia_socket * s, int space, u_int addr, u_int len, void
 
 	DEBUG(3, "cs: read_cb_mem(%d, %#x, %u)\n", space, addr, len);
 
-	dev = pci_find_slot(s->cap.cb_dev->subordinate->number, 0);
+	dev = pci_find_slot(s->cb_dev->subordinate->number, 0);
 	if (!dev)
 		goto fail;
 
@@ -239,7 +239,7 @@ static void cardbus_assign_irqs(struct pci_bus *bus, int irq)
 
 int cb_alloc(struct pcmcia_socket * s)
 {
-	struct pci_bus *bus = s->cap.cb_dev->subordinate;
+	struct pci_bus *bus = s->cb_dev->subordinate;
 	struct pci_dev *dev;
 	unsigned int max, pass;
 
@@ -258,17 +258,17 @@ int cb_alloc(struct pcmcia_socket * s)
 	 */
 	pci_bus_size_bridges(bus);
 	pci_bus_assign_resources(bus);
-	cardbus_assign_irqs(bus, s->cap.pci_irq);
+	cardbus_assign_irqs(bus, s->pci_irq);
 	pci_enable_bridges(bus);
 	pci_bus_add_devices(bus);
 
-	s->irq.AssignedIRQ = s->cap.pci_irq;
+	s->irq.AssignedIRQ = s->pci_irq;
 	return CS_SUCCESS;
 }
 
 void cb_free(struct pcmcia_socket * s)
 {
-	struct pci_dev *bridge = s->cap.cb_dev;
+	struct pci_dev *bridge = s->cb_dev;
 
 	cb_release_cis_mem(s);
 

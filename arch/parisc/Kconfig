@@ -103,11 +103,6 @@ config PARISC64
 	  enable this option otherwise. The 64bit kernel is significantly bigger
 	  and slower than the 32bit one.
 
-config COMPAT
-	bool
-	depends on PARISC64
-	default y
-
 config PDC_NARROW
 	bool "32-bit firmware"
 	depends on PARISC64
@@ -145,6 +140,14 @@ config PREEMPT
 #	bool "Preemptible Kernel"
 	default n
 
+config COMPAT
+	bool
+	depends on PARISC64
+	default y
+
+config HPUX
+	bool "Support for HP-UX binaries"
+
 config NR_CPUS
 	int "Maximum number of CPUs (2-32)"
 	depends on SMP
@@ -165,6 +168,7 @@ config KCORE_ELF
 
 config BINFMT_SOM
 	tristate "Kernel support for SOM binaries"
+	depends on HPUX
 	help
 	  SOM is a binary executable format inherited from HP/UX.  Say Y here
 	  to be able to load and execute SOM binaries directly.

@@ -37,7 +37,6 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/config.h>
-#include <linux/proc_fs.h>
 
 #include <pcmcia/version.h>
 #include <pcmcia/cs_types.h>

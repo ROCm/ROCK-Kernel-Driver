@@ -452,7 +452,6 @@ sys32_alarm(unsigned int seconds)
    sorts of things, like timeval and itimerval.  */
 
 extern struct timezone sys_tz;
-extern int do_sys_settimeofday(struct timeval *tv, struct timezone *tz);
 
 asmlinkage long
 sys32_gettimeofday(struct compat_timeval *tv, struct timezone *tz)
@@ -474,18 +473,21 @@ asmlinkage long
 sys32_settimeofday(struct compat_timeval *tv, struct timezone *tz)
 {
 	struct timeval ktv;
+	struct timespec kts;
 	struct timezone ktz;
 
  	if (tv) {
 		if (get_tv32(&ktv, tv))
 			return -EFAULT;
+		kts.tv_sec = ktv.tv_sec;
+		kts.tv_nsec = ktv.tv_usec * NSEC_PER_USEC;
 	}
 	if (tz) {
 		if (copy_from_user(&ktz, tz, sizeof(ktz)))
 			return -EFAULT;
 	}
 
-	return do_sys_settimeofday(tv ? &ktv : NULL, tz ? &ktz : NULL);
+	return do_sys_settimeofday(tv ? &kts : NULL, tz ? &ktz : NULL);
 }
 
 struct linux32_dirent {

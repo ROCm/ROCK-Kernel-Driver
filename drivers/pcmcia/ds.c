@@ -164,6 +164,8 @@ void pcmcia_unregister_driver(struct pcmcia_driver *driver)
 EXPORT_SYMBOL(pcmcia_unregister_driver);
 
 #ifdef CONFIG_PROC_FS
+static struct proc_dir_entry *proc_pccard = NULL;
+
 static int proc_read_drivers_callback(struct device_driver *driver, void *d)
 {
 	char **p = d;
@@ -929,6 +931,7 @@ static int __init init_pcmcia_bus(void)
 		major_dev = i;
 
 #ifdef CONFIG_PROC_FS
+	proc_pccard = proc_mkdir("pccard", proc_bus);
 	if (proc_pccard)
 		create_proc_read_entry("drivers",0,proc_pccard,proc_read_drivers,NULL);
 #endif
@@ -944,8 +947,10 @@ static void __exit exit_pcmcia_bus(void)
 	class_interface_unregister(&pcmcia_bus_interface);
 
 #ifdef CONFIG_PROC_FS
-	if (proc_pccard)
+	if (proc_pccard) {
 		remove_proc_entry("drivers", proc_pccard);
+		remove_proc_entry("pccard", proc_bus);
+	}
 #endif
 	if (major_dev != -1)
 		unregister_chrdev(major_dev, "pcmcia");

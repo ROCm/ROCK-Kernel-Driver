@@ -9,7 +9,6 @@
 #ifndef _ASM_ARCH_PCMCIA
 #define _ASM_ARCH_PCMCIA
 
-#include <linux/proc_fs.h>
 /* include the world */
 #include <pcmcia/version.h>
 #include <pcmcia/cs_types.h>

@@ -30,10 +30,7 @@
 #include <linux/slab.h>
 #include <linux/uio.h>
 #include <linux/nfs_fs.h>
-#include <linux/smb_fs.h>
-#include <linux/smb_mount.h>
 #include <linux/ncp_fs.h>
-#include <linux/quota.h>
 #include <linux/sunrpc/svc.h>
 #include <linux/nfsd/nfsd.h>
 #include <linux/nfsd/cache.h>
@@ -42,11 +39,6 @@
 #include <linux/poll.h>
 #include <linux/personality.h>
 #include <linux/stat.h>
-#include <linux/filter.h>			/* for setsockopt() */
-#include <linux/icmpv6.h>			/* for setsockopt() */
-#include <linux/netfilter_ipv4/ip_queue.h>	/* for setsockopt() */
-#include <linux/netfilter_ipv4/ip_tables.h>	/* for setsockopt() */
-#include <linux/netfilter_ipv6/ip6_tables.h>	/* for setsockopt() */
 #include <linux/highmem.h>
 #include <linux/highuid.h>
 #include <linux/mman.h>
@@ -62,9 +54,6 @@
 
 #include "sys32.h"
 
-#define A(__x) ((unsigned long)(__x))
-
-
 #undef DEBUG
 
 #ifdef DEBUG
@@ -72,34 +61,6 @@
 #else
 #define DBG(x)
 #endif
-
-/* For this source file, we want overflow handling. */
-
-#undef high2lowuid
-#undef high2lowgid
-#undef low2highuid
-#undef low2highgid
-#undef SET_UID16
-#undef SET_GID16
-#undef NEW_TO_OLD_UID
-#undef NEW_TO_OLD_GID
-#undef SET_OLDSTAT_UID
-#undef SET_OLDSTAT_GID
-#undef SET_STAT_UID
-#undef SET_STAT_GID
-
-#define high2lowuid(uid) ((uid) > 65535) ? (u16)overflowuid : (u16)(uid)
-#define high2lowgid(gid) ((gid) > 65535) ? (u16)overflowgid : (u16)(gid)
-#define low2highuid(uid) ((uid) == (u16)-1) ? (uid_t)-1 : (uid_t)(uid)
-#define low2highgid(gid) ((gid) == (u16)-1) ? (gid_t)-1 : (gid_t)(gid)
-#define SET_UID16(var, uid)	var = high2lowuid(uid)
-#define SET_GID16(var, gid)	var = high2lowgid(gid)
-#define NEW_TO_OLD_UID(uid)	high2lowuid(uid)
-#define NEW_TO_OLD_GID(gid)	high2lowgid(gid)
-#define SET_OLDSTAT_UID(stat, uid)	(stat).st_uid = high2lowuid(uid)
-#define SET_OLDSTAT_GID(stat, gid)	(stat).st_gid = high2lowgid(gid)
-#define SET_STAT_UID(stat, uid)		(stat).st_uid = high2lowuid(uid)
-#define SET_STAT_GID(stat, gid)		(stat).st_gid = high2lowgid(gid)
 
 /*
  * count32() counts the number of arguments/envelopes. It is basically
@@ -145,7 +106,7 @@ static int copy_strings32(int argc, u32 *argv, struct linux_binprm *bprm)
 
 		if (get_user(str, argv + argc) ||
 		    !str ||
-		    !(len = strnlen_user((char *)A(str), bprm->p)))
+		    !(len = strnlen_user((char *)compat_ptr(str), bprm->p)))
 			return -EFAULT;
 
 		if (bprm->p < len) 
@@ -181,7 +142,7 @@ static int copy_strings32(int argc, u32 *argv, struct linux_binprm *bprm)
 				if (new)
 					memset(kaddr+offset+len, 0, PAGE_SIZE-offset-len);
 			}
-			err = copy_from_user(kaddr + offset, (char *)A(str), bytes_to_copy);
+			err = copy_from_user(kaddr + offset, (char *)compat_ptr(str), bytes_to_copy);
 			flush_dcache_page(page);
 			kunmap(page);
 
@@ -784,7 +745,7 @@ do_readv_writev32(int type, struct file *file, const struct compat_iovec *vector
 		__get_user(len, &vector->iov_len);
 		__get_user(buf, &vector->iov_base);
 		tot_len += len;
-		ivp->iov_base = (void *)A(buf);
+		ivp->iov_base = compat_ptr(buf);
 		ivp->iov_len = (compat_size_t) len;
 		vector++;
 		ivp++;
@@ -1214,67 +1175,6 @@ asmlinkage int sys32_nfsservctl(int cmd, void *argp, void *resp)
 
 	return ret;
 }
-
-#include <linux/quota.h>
-
-struct dqblk32 {
-    __u32 dqb_bhardlimit;
-    __u32 dqb_bsoftlimit;
-    __u32 dqb_curblocks;
-    __u32 dqb_ihardlimit;
-    __u32 dqb_isoftlimit;
-    __u32 dqb_curinodes;
-    compat_time_t dqb_btime;
-    compat_time_t dqb_itime;
-};
-                                
-
-asmlinkage int sys32_quotactl(int cmd, const char *special, int id, unsigned long addr)
-{
-#if 0
-	extern int sys_quotactl(int cmd, const char *special, int id, caddr_t addr);
-	int cmds = cmd >> SUBCMDSHIFT;
-	int err;
-	struct dqblk d;
-	char *spec;
-	
-	switch (cmds) {
-	case Q_GETQUOTA:
-		break;
-	case Q_SETQUOTA:
-	case Q_SETUSE:
-	case Q_SETQLIM:
-		if (copy_from_user (&d, (struct dqblk32 *)addr,
-				    sizeof (struct dqblk32)))
-			return -EFAULT;
-		d.dqb_itime = ((struct dqblk32 *)&d)->dqb_itime;
-		d.dqb_btime = ((struct dqblk32 *)&d)->dqb_btime;
-		break;
-	default:
-		return sys_quotactl(cmd, special,
-				    id, (caddr_t)addr);
-	}
-	spec = getname (special);
-	err = PTR_ERR(spec);
-	if (IS_ERR(spec)) return err;
-	KERNEL_SYSCALL(err, sys_quotactl, cmd, (const char *)spec, id, (caddr_t)&d);
-	putname (spec);
-	if (cmds == Q_GETQUOTA) {
-		__kernel_time_t b = d.dqb_btime, i = d.dqb_itime;
-		((struct dqblk32 *)&d)->dqb_itime = i;
-		((struct dqblk32 *)&d)->dqb_btime = b;
-		if (copy_to_user ((struct dqblk32 *)addr, &d,
-				  sizeof (struct dqblk32)))
-			return -EFAULT;
-	}
-	return err;
-#endif
-	/* TODO */
-	BUG();
-	return -EINVAL;
-}
-
-
 
 extern asmlinkage ssize_t sys_sendfile64(int out_fd, int in_fd, loff_t *offset, size_t count);
 typedef long __kernel_loff_t32;		/* move this to asm/posix_types.h? */

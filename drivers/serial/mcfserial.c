@@ -21,8 +21,6 @@
 #include <linux/interrupt.h>
 #include <linux/tty.h>
 #include <linux/tty_flip.h>
-#include <linux/config.h>
-#include <linux/major.h>
 #include <linux/string.h>
 #include <linux/fcntl.h>
 #include <linux/mm.h>
@@ -395,7 +393,7 @@ static _INLINE_ void transmit_chars(struct mcf_serial *info)
 /*
  * This is the serial driver's generic interrupt routine
  */
-void mcfrs_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+irqreturn_t mcfrs_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct mcf_serial	*info;
 	unsigned char		isr;
@@ -407,7 +405,7 @@ void mcfrs_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		receive_chars(info, regs, isr);
 	if (isr & MCFUART_UIR_TXREADY)
 		transmit_chars(info);
-	return;
+	return IRQ_HANDLED;
 }
 
 /*
@@ -643,10 +641,17 @@ static void mcfrs_change_speed(struct mcf_serial *info)
 	}
 
 	if (cflag & PARENB) {
-		if (cflag & PARODD)
-			mr1 |= MCFUART_MR1_PARITYODD;
-		else
-			mr1 |= MCFUART_MR1_PARITYEVEN;
+		if (cflag & CMSPAR) {
+			if (cflag & PARODD)
+				mr1 |= MCFUART_MR1_PARITYMARK;
+			else
+				mr1 |= MCFUART_MR1_PARITYSPACE;
+		} else {
+			if (cflag & PARODD)
+				mr1 |= MCFUART_MR1_PARITYODD;
+			else
+				mr1 |= MCFUART_MR1_PARITYEVEN;
+		}
 	} else {
 		mr1 |= MCFUART_MR1_PARITYNONE;
 	}
@@ -735,8 +740,8 @@ static int mcfrs_write(struct tty_struct * tty, int from_user,
 	local_save_flags(flags);
 	while (1) {
 		local_irq_disable();		
-		c = min(count, min(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
-				   SERIAL_XMIT_SIZE - info->xmit_head));
+		c = min(count, (int) min(((int)SERIAL_XMIT_SIZE) - info->xmit_cnt - 1,
+			((int)SERIAL_XMIT_SIZE) - info->xmit_head));
 
 		if (c <= 0) {
 			local_irq_restore(flags);
@@ -748,8 +753,8 @@ static int mcfrs_write(struct tty_struct * tty, int from_user,
 			copy_from_user(mcfrs_tmp_buf, buf, c);
 			local_irq_restore(flags);
 			local_irq_disable();
-			c = min(c, min(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
-				       SERIAL_XMIT_SIZE - info->xmit_head));
+			c = min(c, (int) min(((int)SERIAL_XMIT_SIZE) - info->xmit_cnt - 1,
+				       ((int)SERIAL_XMIT_SIZE) - info->xmit_head));
 			memcpy(info->xmit_buf + info->xmit_head, mcfrs_tmp_buf, c);
 			up(&mcfrs_tmp_buf_sem);
 		} else
@@ -1558,7 +1563,7 @@ static struct tty_operations mcfrs_ops = {
 	.start = mcfrs_start,
 	.hangup = mcfrs_hangup,
 	.read_proc = mcfrs_readproc,
-}
+};
 
 /* mcfrs_init inits the driver */
 static int __init
