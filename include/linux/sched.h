@@ -627,17 +627,6 @@ extern void mmput(struct mm_struct *);
 /* Remove the current tasks stale references to the old mm_struct */
 extern void mm_release(void);
 
-/*
- * Routines for handling the fd arrays
- */
-extern struct file ** alloc_fd_array(int);
-extern int expand_fd_array(struct files_struct *, int nr);
-extern void free_fd_array(struct file **, int);
-
-extern fd_set *alloc_fdset(int);
-extern int expand_fdset(struct files_struct *, int nr);
-extern void free_fdset(fd_set *, int);
-
 extern int  copy_thread(int, unsigned long, unsigned long, unsigned long, struct task_struct *, struct pt_regs *);
 extern void flush_thread(void);
 extern void exit_thread(void);
