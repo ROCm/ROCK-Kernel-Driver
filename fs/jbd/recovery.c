@@ -482,9 +482,9 @@ static int do_one_pass(journal_t *journal,
 					}
 
 					BUFFER_TRACE(nbh, "marking dirty");
+					set_buffer_uptodate(nbh);
 					mark_buffer_dirty(nbh);
 					BUFFER_TRACE(nbh, "marking uptodate");
-					set_buffer_uptodate(nbh);
 					++info->nr_replays;
 					/* ll_rw_block(WRITE, 1, &nbh); */
 					unlock_buffer(nbh);
