@@ -321,12 +321,16 @@ static void shrink_stripes(raid5_conf_t *conf)
 	conf->slab_cache = NULL;
 }
 
-static void raid5_end_read_request (struct bio * bi)
+static int raid5_end_read_request (struct bio * bi, unsigned int bytes_done,
+				   int error)
 {
  	struct stripe_head *sh = bi->bi_private;
 	raid5_conf_t *conf = sh->raid_conf;
 	int disks = conf->raid_disks, i;
 	int uptodate = test_bit(BIO_UPTODATE, &bi->bi_flags);
+
+	if (bi->bi_size)
+		return 1;
 
 	for (i=0 ; i<disks; i++)
 		if (bi == &sh->dev[i].req)
@@ -335,7 +339,7 @@ static void raid5_end_read_request (struct bio * bi)
 	PRINTK("end_read_request %lu/%d, count: %d, uptodate %d.\n", sh->sector, i, atomic_read(&sh->count), uptodate);
 	if (i == disks) {
 		BUG();
-		return;
+		return 0;
 	}
 
 	if (uptodate) {
@@ -384,15 +388,20 @@ static void raid5_end_read_request (struct bio * bi)
 	clear_bit(R5_LOCKED, &sh->dev[i].flags);
 	set_bit(STRIPE_HANDLE, &sh->state);
 	release_stripe(sh);
+	return 0;
 }
 
-static void raid5_end_write_request (struct bio *bi)
+static int raid5_end_write_request (struct bio *bi, unsigned int bytes_done,
+				    int error)
 {
  	struct stripe_head *sh = bi->bi_private;
 	raid5_conf_t *conf = sh->raid_conf;
 	int disks = conf->raid_disks, i;
 	unsigned long flags;
 	int uptodate = test_bit(BIO_UPTODATE, &bi->bi_flags);
+
+	if (bi->bi_size)
+		return 1;
 
 	for (i=0 ; i<disks; i++)
 		if (bi == &sh->dev[i].req)
@@ -401,7 +410,7 @@ static void raid5_end_write_request (struct bio *bi)
 	PRINTK("end_write_request %lu/%d, count %d, uptodate: %d.\n", sh->sector, i, atomic_read(&sh->count), uptodate);
 	if (i == disks) {
 		BUG();
-		return;
+		return 0;
 	}
 
 	spin_lock_irqsave(&conf->device_lock, flags);
@@ -414,6 +423,7 @@ static void raid5_end_write_request (struct bio *bi)
 	set_bit(STRIPE_HANDLE, &sh->state);
 	__release_stripe(conf, sh);
 	spin_unlock_irqrestore(&conf->device_lock, flags);
+	return 0;
 }
 
 
@@ -1135,9 +1145,12 @@ static void handle_stripe(struct stripe_head *sh)
 	spin_unlock(&sh->lock);
 
 	while ((bi=return_bi)) {
+		int bytes = bi->bi_size;
+
 		return_bi = bi->bi_next;
 		bi->bi_next = NULL;
-		bi->bi_end_io(bi);
+		bi->bi_size = 0;
+		bi->bi_end_io(bi, bytes, 0);
 	}
 	for (i=disks; i-- ;) 
 		if (sh->dev[i].flags & ((1<<R5_Wantwrite)|(1<<R5_Wantread))) {
@@ -1236,7 +1249,6 @@ static int make_request (request_queue_t *q, struct bio * bi)
 	last_sector = bi->bi_sector + (bi->bi_size>>9);
 
 	bi->bi_next = NULL;
-	set_bit(BIO_UPTODATE, &bi->bi_flags); /* will be cleared if error detected */
 	bi->bi_phys_segments = 1;	/* over-loaded to count active stripes */
 	for (;logical_sector < last_sector; logical_sector += STRIPE_SECTORS) {
 		
@@ -1257,8 +1269,12 @@ static int make_request (request_queue_t *q, struct bio * bi)
 		}
 	}
 	spin_lock_irq(&conf->device_lock);
-	if (--bi->bi_phys_segments == 0) 
-		bi->bi_end_io(bi);
+	if (--bi->bi_phys_segments == 0) {
+		int bytes = bi->bi_size;
+
+		bi->bi_size = 0;
+		bi->bi_end_io(bi, bytes, 0);
+	}
 	spin_unlock_irq(&conf->device_lock);
 	return 0;
 }
