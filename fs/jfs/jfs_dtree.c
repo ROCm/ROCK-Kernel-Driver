@@ -1927,6 +1927,22 @@ static int dtSplitRoot(tid_t tid,
 			release_metapage(mp);
 	}
 	/*
+	 * Update directory index table for entries now in right page
+	 */
+	if ((rp->header.flag & BT_LEAF) && DO_INDEX(ip)) {
+		metapage_t *mp = 0;
+		ldtentry_t *ldtentry;
+
+		stbl = DT_GETSTBL(rp);
+		for (n = 0; n < rp->header.nextindex; n++) {
+			ldtentry = (ldtentry_t *) & rp->slot[stbl[n]];
+			modify_index(tid, ip, le32_to_cpu(ldtentry->index),
+				     rbn, n, &mp);
+		}
+		if (mp)
+			release_metapage(mp);
+	}
+	/*
 	 * insert the new entry into the new right/child page
 	 * (skip index in the new right page will not change)
 	 */
@@ -2915,6 +2931,12 @@ int jfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 			index = dirtab_slot.slot;
 			DT_GETPAGE(ip, bn, mp, PSIZE, p, rc);
 			if (rc) {
+				filp->f_pos = -1;
+				return 0;
+			}
+			if (p->header.flag & BT_INTERNAL) {
+				jERROR(1,("jfs_readdir: bad index table\n"));
+				DT_PUTPAGE(mp);
 				filp->f_pos = -1;
 				return 0;
 			}
