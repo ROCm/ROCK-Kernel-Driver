@@ -2658,6 +2658,47 @@ int ide_cdrom_probe_capabilities(struct ata_device *drive)
 	return nslots;
 }
 
+
+/*
+ * standard prep_rq_fn that builds 10 byte cmds
+ */
+static int ll_10byte_cmd_build(request_queue_t *q, struct request *rq)
+{
+	int hard_sect = queue_hardsect_size(q);
+	sector_t block = rq->hard_sector / (hard_sect >> 9);
+	unsigned long blocks = rq->hard_nr_sectors / (hard_sect >> 9);
+
+	if (!(rq->flags & REQ_CMD))
+		return 0;
+
+	if (rq->hard_nr_sectors != rq->nr_sectors) {
+		printk(KERN_ERR "ide-cd: hard_nr_sectors differs from nr_sectors! %lu %lu\n",
+				rq->nr_sectors, rq->hard_nr_sectors);
+	}
+	memset(rq->cmd, 0, sizeof(rq->cmd));
+
+	if (rq_data_dir(rq) == READ)
+		rq->cmd[0] = GPCMD_READ_10;
+	else
+		rq->cmd[0] = GPCMD_WRITE_10;
+
+	/*
+	 * fill in lba
+	 */
+	rq->cmd[2] = (block >> 24) & 0xff;
+	rq->cmd[3] = (block >> 16) & 0xff;
+	rq->cmd[4] = (block >>  8) & 0xff;
+	rq->cmd[5] = block & 0xff;
+
+	/*
+	 * and transfer length
+	 */
+	rq->cmd[7] = (blocks >> 8) & 0xff;
+	rq->cmd[8] = blocks & 0xff;
+
+	return 0;
+}
+
 static int ide_cdrom_setup(struct ata_device *drive)
 {
 	struct cdrom_info *info = drive->driver_data;

@@ -279,8 +279,13 @@ static void do_xd_request (request_queue_t * q)
 	sti();
 	if (xdc_busy)
 		return;
-	while (code = 0, !QUEUE_EMPTY) {
-		INIT_REQUEST;	/* do some checking on the request structure */
+	while (1) {
+		code = 0;
+		/* do some checking on the request structure */
+		if (blk_queue_empty(QUEUE)) {
+			CLEAR_INTR;
+			return;
+		}
 
 		if (CURRENT_DEV < xd_drives
 		    && (CURRENT->flags & REQ_CMD)

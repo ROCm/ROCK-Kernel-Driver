@@ -313,22 +313,11 @@ static void (*DEVICE_INTR)(void) = NULL;
 
 #define SET_INTR(x) (DEVICE_INTR = (x))
 
-#ifdef DEVICE_INTR
-#define CLEAR_INTR SET_INTR(NULL)
-#else
-#define CLEAR_INTR
-#endif
-
-#define INIT_REQUEST						\
-	if (QUEUE_EMPTY) {					\
-		CLEAR_INTR;					\
-		return;						\
-	}							\
-	if (major(CURRENT->rq_dev) != MAJOR_NR) 			\
-		panic(DEVICE_NAME ": request list destroyed");	\
-	if (!CURRENT->bio)					\
-		panic(DEVICE_NAME ": no bio");			\
-
+# ifdef DEVICE_INTR
+#  define CLEAR_INTR SET_INTR(NULL)
+# else
+#  define CLEAR_INTR
+# endif
 #endif /* !defined(IDE_DRIVER) */
 
 /*

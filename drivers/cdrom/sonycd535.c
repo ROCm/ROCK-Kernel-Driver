@@ -806,10 +806,11 @@ do_cdu535_request(request_queue_t * q)
 		 * The beginning here is stolen from the hard disk driver.  I hope
 		 * it's right.
 		 */
-		if (QUEUE_EMPTY || CURRENT->rq_status == RQ_INACTIVE) {
+		if (blk_queue_empty(QUEUE)) {
+			CLEAR_INTR;
 			return;
 		}
-		INIT_REQUEST;
+
 		dev = minor(CURRENT->rq_dev);
 		block = CURRENT->sector;
 		nsect = CURRENT->nr_sectors;

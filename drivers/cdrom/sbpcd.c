@@ -4915,12 +4915,15 @@ static void DO_SBPCD_REQUEST(request_queue_t * q)
 	printk(" do_sbpcd_request[%di](%p:%ld+%ld), Pid:%d, Time:%li\n",
 		xnr, CURRENT, CURRENT->sector, CURRENT->nr_sectors, current->pid, jiffies);
 #endif
-	INIT_REQUEST;
+
+	if (blk_queue_empty(QUEUE)) {
+		CLEAR_INTR;
+		return;
+	}
+
 	req=CURRENT;		/* take out our request so no other */
 	blkdev_dequeue_request(req);	/* task can fuck it up         GTL  */
-	
-	if (req->rq_status == RQ_INACTIVE)
-		sbpcd_end_request(req, 0);
+
 	if (req -> sector == -1)
 		sbpcd_end_request(req, 0);
 	spin_unlock_irq(q->queue_lock);

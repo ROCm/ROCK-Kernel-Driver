@@ -1191,11 +1191,14 @@ static void do_ftl_request(request_arg_t)
     partition_t *part;
 
     do {
-      //	    sti();
-	INIT_REQUEST;
+	//	    sti();
+	if (blk_queue_empty(QUEUE)) {
+		CLEAR_INTR;
+		return;
+	}
 
 	minor = minor(CURRENT->rq_dev);
-	
+
 	part = myparts[minor >> 4];
 	if (part) {
 	  ret = 0;
