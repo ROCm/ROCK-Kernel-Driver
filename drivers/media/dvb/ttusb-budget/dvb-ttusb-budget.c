@@ -1008,7 +1008,7 @@ static int ttusb_stop_feed(struct dvb_demux_feed *dvbdmxfeed)
 
 static int ttusb_setup_interfaces(struct ttusb *ttusb)
 {
-	usb_set_configuration(ttusb->dev, 1);
+	usb_reset_configuration(ttusb->dev);
 	usb_set_interface(ttusb->dev, 1, 1);
 
 	ttusb->bulk_out_pipe = usb_sndbulkpipe(ttusb->dev, 1);
@@ -1076,6 +1076,17 @@ static int ttusb_probe(struct usb_interface *intf, const struct usb_device_id *i
 	dprintk("%s: TTUSB DVB connected\n", __FUNCTION__);
 
 	udev = interface_to_usbdev(intf);
+
+	/* Device has already been reset; its configuration was chosen.
+	 * If this fault happens, use a hotplug script to choose the
+	 * right configuration (write bConfigurationValue in sysfs).
+	 */
+	if (udev->actconfig->desc.bConfigurationValue != 1) {
+		dev_err(&intf->dev, "device config is #%d, need #1\n",
+			udev->actconfig->desc.bConfigurationValue);
+		return -ENODEV;
+	}
+
 
 	if (!(ttusb = kmalloc(sizeof(struct ttusb), GFP_KERNEL)))
 		return -ENOMEM;

@@ -99,7 +99,7 @@
 #define DATA_BUFSIZE      63    /* size of URB data buffers */
 #define ATI_INPUTNUM      1     /* Which input device to register as */
 
-unsigned long channel_mask = 0;
+static unsigned long channel_mask = 0;
 module_param(channel_mask, ulong, 444);
 MODULE_PARM_DESC(channel_mask, "Bitmask of remote control channels to ignore");
 
@@ -138,6 +138,8 @@ static char accel[] = { 1, 2, 4, 6, 9, 13, 20 };
  * (HZ >> 4) == 1/16th of a second and works well for me.
  */
 #define FILTER_TIME (HZ >> 4)
+
+static DECLARE_MUTEX(disconnect_sem);
 
 struct ati_remote {
 	struct input_dev idev;		
@@ -286,12 +288,12 @@ static struct usb_driver ati_remote_driver = {
 static void ati_remote_dump(unsigned char *data, unsigned int len)
 {
 	if ((len == 1) && (data[0] != (unsigned char)0xff) && (data[0] != 0x00))
-		warn("Weird byte 0x%02x\n", data[0]);
+		warn("Weird byte 0x%02x", data[0]);
 	else if (len == 4)
-		warn("Weird key %02x %02x %02x %02x\n", 
+		warn("Weird key %02x %02x %02x %02x", 
 		     data[0], data[1], data[2], data[3]);
 	else
-		warn("Weird data, len=%d %02x %02x %02x %02x %02x %02x ...\n",
+		warn("Weird data, len=%d %02x %02x %02x %02x %02x %02x ...",
 		     len, data[0], data[1], data[2], data[3], data[4], data[5]);
 }
 
@@ -301,9 +303,12 @@ static void ati_remote_dump(unsigned char *data, unsigned int len)
 static int ati_remote_open(struct input_dev *inputdev)
 {
 	struct ati_remote *ati_remote = inputdev->private;
+	int retval = 0;
+
+	down(&disconnect_sem);
 
 	if (ati_remote->open++)
-		return 0;
+		goto exit;
 
 	/* On first open, submit the read urb which was set up previously. */
 	ati_remote->irq_urb->dev = ati_remote->udev;
@@ -311,10 +316,12 @@ static int ati_remote_open(struct input_dev *inputdev)
 		dev_err(&ati_remote->interface->dev, 
 			"%s: usb_submit_urb failed!\n", __FUNCTION__);
 		ati_remote->open--;
-		return -EIO;
+		retval = -EIO;
 	}
 
-	return 0;
+exit:
+	up(&disconnect_sem);
+	return retval;
 }
 
 /*
@@ -354,8 +361,7 @@ static void ati_remote_irq_out(struct urb *urb, struct pt_regs *regs)
 	
 	ati_remote->send_flags |= SEND_FLAG_COMPLETE;
 	wmb();
-	if (waitqueue_active(&ati_remote->wait))
-		wake_up(&ati_remote->wait);
+	wake_up(&ati_remote->wait);
 }
 
 /*
@@ -377,17 +383,15 @@ static int ati_remote_sendpacket(struct ati_remote *ati_remote, u16 cmd, unsigne
 	ati_remote->out_urb->dev = ati_remote->udev;
 	ati_remote->send_flags = SEND_FLAG_IN_PROGRESS;
 
-	set_current_state(TASK_INTERRUPTIBLE);
-	add_wait_queue(&ati_remote->wait, &wait);
-
-	retval = usb_submit_urb(ati_remote->out_urb, GFP_KERNEL);
+	retval = usb_submit_urb(ati_remote->out_urb, GFP_ATOMIC);
 	if (retval) {
-		set_current_state(TASK_RUNNING);
-		remove_wait_queue(&ati_remote->wait, &wait);
 		dev_dbg(&ati_remote->interface->dev, 
 			 "sendpacket: usb_submit_urb failed: %d\n", retval);
 		return retval;
 	}
+
+	set_current_state(TASK_INTERRUPTIBLE);
+	add_wait_queue(&ati_remote->wait, &wait);
 
 	while (timeout && (ati_remote->out_urb->status == -EINPROGRESS) 
 	       && !(ati_remote->send_flags & SEND_FLAG_COMPLETE)) {
@@ -594,11 +598,7 @@ static void ati_remote_delete(struct ati_remote *ati_remote)
 	if (ati_remote->out_urb)
 		usb_unlink_urb(ati_remote->out_urb);
 
-	if (ati_remote->irq_urb)
-		usb_free_urb(ati_remote->irq_urb);
-	
-	if (ati_remote->out_urb)
-		usb_free_urb(ati_remote->out_urb);
+	input_unregister_device(&ati_remote->idev);
 
 	if (ati_remote->inbuf)
 		usb_buffer_free(ati_remote->udev, DATA_BUFSIZE, 
@@ -608,6 +608,12 @@ static void ati_remote_delete(struct ati_remote *ati_remote)
 		usb_buffer_free(ati_remote->udev, DATA_BUFSIZE, 
 				ati_remote->inbuf, ati_remote->outbuf_dma);
 	
+	if (ati_remote->irq_urb)
+		usb_free_urb(ati_remote->irq_urb);
+	
+	if (ati_remote->out_urb)
+		usb_free_urb(ati_remote->out_urb);
+
 	kfree(ati_remote);
 }
 
@@ -779,14 +785,14 @@ static int ati_remote_probe(struct usb_interface *interface, const struct usb_de
 
 	usb_set_intfdata(interface, ati_remote);
 	ati_remote->present = 1;	
-	kfree(buf);
-	return 0;
 	
 error:
 	if (buf)
 		kfree(buf);
 
-	ati_remote_delete(ati_remote);
+	if (retval)
+		ati_remote_delete(ati_remote);
+
 	return retval;
 }
 
@@ -796,7 +802,9 @@ error:
 static void ati_remote_disconnect(struct usb_interface *interface)
 {
 	struct ati_remote *ati_remote;
-	
+
+	down(&disconnect_sem);
+
 	ati_remote = usb_get_intfdata(interface);
 	usb_set_intfdata(interface, NULL);
 	if (!ati_remote) {
@@ -804,14 +812,14 @@ static void ati_remote_disconnect(struct usb_interface *interface)
 		return;
 	}
 	
-	input_unregister_device(&ati_remote->idev);
-
 	/* Mark device as unplugged */
 	ati_remote->present = 0;
 
 	/* If device is still open, ati_remote_close will call delete. */
 	if (!ati_remote->open)
 		ati_remote_delete(ati_remote);
+
+	up(&disconnect_sem);
 }
 
 /*

@@ -156,6 +156,7 @@ static void periodic_link (struct ohci_hcd *ohci, struct ed *ed)
 			wmb ();
 			*prev = ed;
 			*prev_p = cpu_to_le32p (&ed->dma);
+			wmb();
 		}
 		ohci->load [i] += ed->load;
 	}
@@ -195,6 +196,7 @@ static int ed_schedule (struct ohci_hcd *ohci, struct ed *ed)
 		}
 		ed->ed_prev = ohci->ed_controltail;
 		if (!ohci->ed_controltail && !ohci->ed_rm_list) {
+			wmb();
 			ohci->hc_control |= OHCI_CTRL_CLE;
 			writel (0, &ohci->regs->ed_controlcurrent);
 			writel (ohci->hc_control, &ohci->regs->control);
@@ -212,6 +214,7 @@ static int ed_schedule (struct ohci_hcd *ohci, struct ed *ed)
 		}
 		ed->ed_prev = ohci->ed_bulktail;
 		if (!ohci->ed_bulktail && !ohci->ed_rm_list) {
+			wmb();
 			ohci->hc_control |= OHCI_CTRL_BLE;
 			writel (0, &ohci->regs->ed_bulkcurrent);
 			writel (ohci->hc_control, &ohci->regs->control);
@@ -868,6 +871,7 @@ static struct td *dl_reverse_done_list (struct ohci_hcd *ohci)
 
 	td_dma = le32_to_cpup (&ohci->hcca->done_head);
 	ohci->hcca->done_head = 0;
+	wmb();
 
 	/* get TD from hc's singly linked list, and
 	 * prepend to ours.  ed->td_list changes later.
@@ -1069,10 +1073,12 @@ dl_done_list (struct ohci_hcd *ohci, struct td *td, struct pt_regs *regs)
   			finish_urb (ohci, urb, regs);
 
 		/* clean schedule:  unlink EDs that are no longer busy */
-		if (list_empty (&ed->td_list) && ed->state == ED_OPER)
-			start_ed_unlink (ohci, ed);
+		if (list_empty (&ed->td_list)) {
+			if (ed->state == ED_OPER)
+				start_ed_unlink (ohci, ed);
+
 		/* ... reenabling halted EDs only after fault cleanup */
-		else if ((ed->hwINFO & (ED_SKIP | ED_DEQUEUE)) == ED_SKIP) {
+		} else if ((ed->hwINFO & (ED_SKIP | ED_DEQUEUE)) == ED_SKIP) {
 			td = list_entry (ed->td_list.next, struct td, td_list);
 			if (!(td->hwINFO & TD_DONE)) {
 				ed->hwINFO &= ~ED_SKIP;

@@ -254,7 +254,7 @@ struct uhci_td {
 #define skel_int2_qh		skelqh[6]
 #define skel_int1_qh		skelqh[7]
 #define skel_ls_control_qh	skelqh[8]
-#define skel_hs_control_qh	skelqh[9]
+#define skel_fs_control_qh	skelqh[9]
 #define skel_bulk_qh		skelqh[10]
 #define skel_term_qh		skelqh[11]
 
@@ -342,8 +342,8 @@ struct uhci_hcd {
 	struct uhci_td *term_td;	/* Terminating TD, see UHCI bug */
 	struct uhci_qh *skelqh[UHCI_NUM_SKELQH];	/* Skeleton QH's */
 
-	spinlock_t frame_list_lock;
-	struct uhci_frame_list *fl;		/* P: uhci->frame_list_lock */
+	spinlock_t schedule_lock;
+	struct uhci_frame_list *fl;		/* P: uhci->schedule_lock */
 	int fsbr;				/* Full-speed bandwidth reclamation */
 	unsigned long fsbrtimeout;		/* FSBR delay */
 
@@ -353,24 +353,19 @@ struct uhci_hcd {
 	unsigned int saved_framenumber;		/* Save during PM suspend */
 
 	/* Main list of URB's currently controlled by this HC */
-	spinlock_t urb_list_lock;
-	struct list_head urb_list;		/* P: uhci->urb_list_lock */
+	struct list_head urb_list;		/* P: uhci->schedule_lock */
 
 	/* List of QH's that are done, but waiting to be unlinked (race) */
-	spinlock_t qh_remove_list_lock;
-	struct list_head qh_remove_list;	/* P: uhci->qh_remove_list_lock */
+	struct list_head qh_remove_list;	/* P: uhci->schedule_lock */
 
 	/* List of TD's that are done, but waiting to be freed (race) */
-	spinlock_t td_remove_list_lock;
-	struct list_head td_remove_list;	/* P: uhci->td_remove_list_lock */
+	struct list_head td_remove_list;	/* P: uhci->schedule_lock */
 
 	/* List of asynchronously unlinked URB's */
-	spinlock_t urb_remove_list_lock;
-	struct list_head urb_remove_list;	/* P: uhci->urb_remove_list_lock */
+	struct list_head urb_remove_list;	/* P: uhci->schedule_lock */
 
 	/* List of URB's awaiting completion callback */
-	spinlock_t complete_list_lock;
-	struct list_head complete_list;		/* P: uhci->complete_list_lock */
+	struct list_head complete_list;		/* P: uhci->schedule_lock */
 
 	int rh_numports;
 
@@ -401,26 +396,15 @@ struct urb_priv {
 /*
  * Locking in uhci.c
  *
- * spinlocks are used extensively to protect the many lists and data
- * structures we have. It's not that pretty, but it's necessary. We
- * need to be done with all of the locks (except complete_list_lock) when
- * we call urb->complete. I've tried to make it simple enough so I don't
- * have to spend hours racking my brain trying to figure out if the
- * locking is safe.
+ * Almost everything relating to the hardware schedule and processing
+ * of URBs is protected by uhci->schedule_lock.  urb->status is protected
+ * by urb->lock; that's the one exception.
  *
- * Here's the safe locking order to prevent deadlocks:
+ * To prevent deadlocks, never lock uhci->schedule_lock while holding
+ * urb->lock.  The safe order of locking is:
  *
- * #1 uhci->urb_list_lock
+ * #1 uhci->schedule_lock
  * #2 urb->lock
- * #3 uhci->urb_remove_list_lock, uhci->frame_list_lock, 
- *   uhci->qh_remove_list_lock
- * #4 uhci->complete_list_lock
- *
- * If you're going to grab 2 or more locks at once, ALWAYS grab the lock
- * at the lowest level FIRST and NEVER grab locks at the same level at the
- * same time.
- * 
- * So, if you need uhci->urb_list_lock, grab it before you grab urb->lock
  */
 
 #endif

@@ -38,6 +38,17 @@ config USB_EHCI_SPLIT_ISO
 	  EHCI or USB 2.0 transaction translator implementations.
 	  It should work for ISO-OUT transfers, like audio.
 
+config USB_EHCI_ROOT_HUB_TT
+	bool "Root Hub Transaction Translators (EXPERIMENTAL)"
+	depends on USB_EHCI_HCD && EXPERIMENTAL
+	---help---
+	  Some EHCI chips have vendor-specific extensions to integrate
+	  transaction translators, so that no OHCI or UHCI companion
+	  controller is needed.  It's safe to say "y" even if your
+	  controller doesn't support this feature.
+
+	  This supports the EHCI implementation from ARC International.
+
 config USB_OHCI_HCD
 	tristate "OHCI HCD support"
 	depends on USB

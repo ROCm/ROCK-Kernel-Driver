@@ -4,8 +4,9 @@
 #
 
 obj-$(CONFIG_USB_AUERSWALD)	+= auerswald.o
-obj-$(CONFIG_USB_EMI62)		+= emi62.o
+obj-$(CONFIG_USB_CYTHERM)	+= cytherm.o
 obj-$(CONFIG_USB_EMI26)		+= emi26.o
+obj-$(CONFIG_USB_EMI62)		+= emi62.o
 obj-$(CONFIG_USB_LCD)		+= usblcd.o
 obj-$(CONFIG_USB_LED)		+= usbled.o
 obj-$(CONFIG_USB_LEGOTOWER)	+= legousbtower.o
