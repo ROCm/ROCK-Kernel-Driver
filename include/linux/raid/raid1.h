@@ -62,18 +62,16 @@ struct r1bio_s {
 	 */
 	struct bio		*master_bio;
 	/*
-	 * if the IO is in READ direction, then this bio is used:
+	 * if the IO is in READ direction, then this is where we read
 	 */
-	struct bio		*read_bio;
 	int			read_disk;
 
-	r1bio_t			*next_r1; /* next for retry or in free list */
 	struct list_head	retry_list;
 	/*
 	 * if the IO is in WRITE direction, then multiple bios are used.
 	 * We choose the number when they are allocated.
 	 */
-	struct bio		*write_bios[0];
+	struct bio		*bios[0];
 };
 
 /* bits for r1bio.state */
