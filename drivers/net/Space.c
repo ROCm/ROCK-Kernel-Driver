@@ -81,7 +81,7 @@ extern int sun3_82586_probe(struct net_device *);
 extern int apne_probe(struct net_device *);
 extern int bionet_probe(struct net_device *);
 extern int pamsnet_probe(struct net_device *);
-extern int cs89x0_probe(struct net_device *dev);
+extern struct net_device *cs89x0_probe(int unit);
 extern int hplance_probe(struct net_device *dev);
 extern int bagetlance_probe(struct net_device *);
 extern int mvme147lance_probe(struct net_device *dev);
@@ -238,13 +238,13 @@ static struct devprobe isa_probes[] __initdata = {
 #ifdef CONFIG_AT1500
 	{at1500_probe, 0},
 #endif
-#ifdef CONFIG_CS89x0
- 	{cs89x0_probe, 0},
-#endif
 	{NULL, 0},
 };
 
 static struct devprobe2 isa_probes2[] __initdata = {
+#ifdef CONFIG_CS89x0
+ 	{cs89x0_probe, 0},
+#endif
 #ifdef CONFIG_AT1700
 	{at1700_probe, 0},
 #endif
