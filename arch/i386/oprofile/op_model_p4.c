@@ -619,14 +619,11 @@ static void p4_setup_ctrs(struct op_msrs const * const msrs)
 }
 
 
-static int p4_check_ctrs(unsigned int const cpu, 
-			  struct op_msrs const * const msrs,
-			  struct pt_regs * const regs)
+static int p4_check_ctrs(struct pt_regs * const regs,
+			 struct op_msrs const * const msrs)
 {
 	unsigned long ctr, low, high, stag, real;
 	int i;
-	unsigned long eip = profile_pc(regs);
-	int is_kernel = !user_mode(regs);
 
 	stag = get_stagger();
 
@@ -657,7 +654,7 @@ static int p4_check_ctrs(unsigned int const cpu,
 		CCCR_READ(low, high, real);
  		CTR_READ(ctr, high, real);
 		if (CCCR_OVF_P(low) || CTR_OVERFLOW_P(ctr)) {
-			oprofile_add_sample(eip, is_kernel, i, cpu);
+			oprofile_add_sample(regs, i);
  			CTR_WRITE(reset_value[i], real);
 			CCCR_CLEAR_OVF(low);
 			CCCR_WRITE(low, high, real);

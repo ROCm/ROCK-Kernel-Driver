@@ -36,9 +36,8 @@ struct op_x86_model_spec {
 	unsigned int const num_controls;
 	void (*fill_in_addresses)(struct op_msrs * const msrs);
 	void (*setup_ctrs)(struct op_msrs const * const msrs);
-	int (*check_ctrs)(unsigned int const cpu, 
-		struct op_msrs const * const msrs,
-		struct pt_regs * const regs);
+	int (*check_ctrs)(struct pt_regs * const regs,
+		struct op_msrs const * const msrs);
 	void (*start)(struct op_msrs const * const msrs);
 	void (*stop)(struct op_msrs const * const msrs);
 };
