@@ -96,8 +96,8 @@ static int rx_copybreak;
    Making the Tx ring too large decreases the effectiveness of channel
    bonding and packet priority.
    There are no ill effects from too-large receive rings. */
-#define TX_RING_SIZE	16
-#define TX_QUEUE_LEN	10		/* Limit ring entries actually used.  */
+#define TX_RING_SIZE	256
+#define TX_QUEUE_LEN	240		/* Limit ring entries actually used.  */
 #define RX_RING_SIZE	256
 #define TX_TOTAL_SIZE	TX_RING_SIZE*sizeof(struct epic_tx_desc)
 #define RX_TOTAL_SIZE	RX_RING_SIZE*sizeof(struct epic_rx_desc)
@@ -294,7 +294,8 @@ enum CommandBits {
 
 #define EpicRemoved	0xffffffff	/* Chip failed or removed (CardBus) */
 
-#define EpicNapiEvent	(RxDone | RxStarted | RxEarlyWarn | RxOverflow | RxFull)
+#define EpicNapiEvent	(TxEmpty | TxDone | \
+			 RxDone | RxStarted | RxEarlyWarn | RxOverflow | RxFull)
 #define EpicNormalEvent	(0x0000ffff & ~EpicNapiEvent)
 
 static u16 media2miictl[16] = {
@@ -503,7 +504,7 @@ static int __devinit epic_init_one (struct pci_dev *pdev,
 	ep->chip_flags = pci_id_tbl[chip_idx].drv_flags;
 	ep->irq_mask = 
 		(ep->chip_flags & TYPE2_INTR ?  PCIBusErr175 : PCIBusErr170)
-		 | CntFull | TxUnderrun | TxDone | TxEmpty | EpicNapiEvent;
+		 | CntFull | TxUnderrun | EpicNapiEvent;
 
 	/* Find the connected MII xcvrs.
 	   Doing this in open() would allow detecting external xcvrs later, but
@@ -804,7 +805,7 @@ static int epic_open(struct net_device *dev)
 
 	/* Enable interrupts by setting the interrupt mask. */
 	outl((ep->chip_flags & TYPE2_INTR ? PCIBusErr175 : PCIBusErr170)
-		 | CntFull | TxUnderrun | TxDone | TxEmpty
+		 | CntFull | TxUnderrun 
 		 | RxError | RxHeader | EpicNapiEvent, ioaddr + INTMASK);
 
 	if (debug > 1)
@@ -892,7 +893,7 @@ static void epic_restart(struct net_device *dev)
 
 	/* Enable interrupts by setting the interrupt mask. */
 	outl((ep->chip_flags & TYPE2_INTR ? PCIBusErr175 : PCIBusErr170)
-		 | CntFull | TxUnderrun | TxDone | TxEmpty
+		 | CntFull | TxUnderrun
 		 | RxError | RxHeader | EpicNapiEvent, ioaddr + INTMASK);
 
 	printk(KERN_DEBUG "%s: epic_restart() done, cmd status %4.4x, ctl %4.4x"
@@ -1111,7 +1112,6 @@ static void epic_tx(struct net_device *dev, struct epic_private *ep)
 	 * Note: if this lock becomes a problem we can narrow the locked
 	 * region at the cost of occasionally grabbing the lock more times.
 	 */
-	spin_lock(&ep->lock);
 	cur_tx = ep->cur_tx;
 	for (dirty_tx = ep->dirty_tx; cur_tx - dirty_tx > 0; dirty_tx++) {
 		struct sk_buff *skb;
@@ -1150,7 +1150,6 @@ static void epic_tx(struct net_device *dev, struct epic_private *ep)
 		ep->tx_full = 0;
 		netif_wake_queue(dev);
 	}
-	spin_unlock(&ep->lock);
 }
 
 
@@ -1186,9 +1185,6 @@ static irqreturn_t epic_interrupt(int irq, void *dev_instance, struct pt_regs *r
 			}
 			spin_unlock(&ep->napi_lock);
 		}
-
-		if (status & (TxEmpty | TxDone))
-			epic_tx(dev, ep);
 
 		/* Check uncommon events all at once. */
 		if (status &
@@ -1361,6 +1357,8 @@ static int epic_poll(struct net_device *dev, int *budget)
 
 rx_action:
 	outl(EpicNapiEvent, ioaddr + INTSTAT);
+
+	epic_tx(dev, ep);
 
 	work_done = epic_rx(dev, *budget);
 
