@@ -20,8 +20,6 @@
 #include <linux/pci.h>
 #include "bkm_ax.h"
 
-#if CONFIG_PCI
-
 #define	ATTEMPT_PCI_REMAPPING	/* Required for PLX rev 1 */
 
 extern const char *CardType[];
@@ -98,23 +96,13 @@ set_ipac_active(struct IsdnCardState *cs, u_int active)
 	ipac_write(cs, IPAC_MASK, active ? 0xc0 : 0xff);
 }
 
-void
-release_io_sct_quadro(struct IsdnCardState *cs)
-{
-	release_region(cs->hw.ax.base & 0xffffffc0, 128);
-	if (cs->subtyp == SCT_1)
-		release_region(cs->hw.ax.plx_adr, 64);
-}
-
 static void
 enable_bkm_int(struct IsdnCardState *cs, unsigned bEnable)
 {
-	if (cs->typ == ISDN_CTYPE_SCT_QUADRO) {
-		if (bEnable)
-			wordout(cs->hw.ax.plx_adr + 0x4C, (wordin(cs->hw.ax.plx_adr + 0x4C) | 0x41));
-		else
-			wordout(cs->hw.ax.plx_adr + 0x4C, (wordin(cs->hw.ax.plx_adr + 0x4C) & ~0x41));
-	}
+	if (bEnable)
+		wordout(cs->hw.ax.plx_adr + 0x4C, (wordin(cs->hw.ax.plx_adr + 0x4C) | 0x41));
+	else
+		wordout(cs->hw.ax.plx_adr + 0x4C, (wordin(cs->hw.ax.plx_adr + 0x4C) & ~0x41));
 }
 
 static void
@@ -129,12 +117,6 @@ reset_bkm(struct IsdnCardState *cs)
 		set_current_state(TASK_UNINTERRUPTIBLE);
 		schedule_timeout((10 * HZ) / 1000);
 	}
-}
-
-static int
-BKM_card_msg(struct IsdnCardState *cs, int mt, void *arg)
-{
-	return (0);
 }
 
 static void
@@ -162,7 +144,7 @@ bkm_a8_release(struct IsdnCardState *cs)
 {
 	set_ipac_active(cs, 0);
 	enable_bkm_int(cs, 0);
-	release_io_sct_quadro(cs);
+	hisax_release_resources(cs);
 }
 
 static struct card_ops bkm_a8_ops = {
@@ -172,29 +154,14 @@ static struct card_ops bkm_a8_ops = {
 	.irq_func = ipac_irq,
 };
 
-int __init
-sct_alloc_io(u_int adr, u_int len)
-{
-	if (!request_region(adr, len, "scitel")) {
-		printk(KERN_WARNING
-			"HiSax: Scitel port %#x-%#x already in use\n",
-			adr, adr + len);
-		return (1);
-	}
-	return(0);
-}
-
 static struct pci_dev *dev_a8 __initdata = NULL;
 static u16  sub_vendor_id __initdata = 0;
 static u16  sub_sys_id __initdata = 0;
 static u8 pci_irq __initdata = 0;
 
-#endif /* CONFIG_PCI */
-
 int __init
 setup_sct_quadro(struct IsdnCard *card)
 {
-#if CONFIG_PCI
 	struct IsdnCardState *cs = card->cs;
 	char tmp[64];
 	u8 pci_rev_id;
@@ -203,11 +170,6 @@ setup_sct_quadro(struct IsdnCard *card)
 
 	strcpy(tmp, sct_quadro_revision);
 	printk(KERN_INFO "HiSax: T-Berkom driver Rev. %s\n", HiSax_getrev(tmp));
-	if (cs->typ == ISDN_CTYPE_SCT_QUADRO) {
-		cs->subtyp = SCT_1;	/* Preset */
-	} else
-		return (0);
-
 	/* Identify subtype by para[0] */
 	if (card->para[0] >= SCT_1 && card->para[0] <= SCT_4)
 		cs->subtyp = card->para[0];
@@ -220,10 +182,6 @@ setup_sct_quadro(struct IsdnCard *card)
 		(sub_vendor_id != PCI_VENDOR_ID_BERKOM)))
 		return (0);
 	if (cs->subtyp == SCT_1) {
-		if (!pci_present()) {
-			printk(KERN_ERR "bkm_a4t: no PCI bus present\n");
-			return (0);
-		}
 		while ((dev_a8 = pci_find_device(PCI_VENDOR_ID_PLX,
 			PCI_DEVICE_ID_PLX_9050, dev_a8))) {
 			
@@ -295,28 +253,28 @@ setup_sct_quadro(struct IsdnCard *card)
 	cs->hw.ax.plx_adr = pci_ioaddr1;
 	/* Enter all ipac_base addresses */
 	switch(cs->subtyp) {
-		case 1:
-			cs->hw.ax.base = pci_ioaddr5 + 0x00;
-			if (sct_alloc_io(pci_ioaddr1, 128))
-				return(0);
-			if (sct_alloc_io(pci_ioaddr5, 64))
-				return(0);
-			break;
-		case 2:
-			cs->hw.ax.base = pci_ioaddr4 + 0x08;
-			if (sct_alloc_io(pci_ioaddr4, 64))
-				return(0);
-			break;
-		case 3:
-			cs->hw.ax.base = pci_ioaddr3 + 0x10;
-			if (sct_alloc_io(pci_ioaddr3, 64))
-				return(0);
-			break;
-		case 4:
-			cs->hw.ax.base = pci_ioaddr2 + 0x20;
-			if (sct_alloc_io(pci_ioaddr2, 64))
-				return(0);
-			break;
+	case 1:
+		cs->hw.ax.base = pci_ioaddr5 + 0x00;
+		if (!request_io(&cs->rs, pci_ioaddr1, 128, "scitel"))
+			goto err;
+		if (!request_io(&cs->rs, pci_ioaddr5, 64, "scitel"))
+			goto err;
+		break;
+	case 2:
+		cs->hw.ax.base = pci_ioaddr4 + 0x08;
+		if (!request_io(&cs->rs, pci_ioaddr4, 64, "scitel"))
+			goto err;
+		break;
+	case 3:
+		cs->hw.ax.base = pci_ioaddr3 + 0x10;
+		if (!request_io(&cs->rs, pci_ioaddr3, 64, "scitel"))
+			goto err;
+		break;
+	case 4:
+		cs->hw.ax.base = pci_ioaddr2 + 0x20;
+		if (!request_io(&cs->rs, pci_ioaddr2, 64, "scitel"))
+			goto err;
+		break;
 	}	
 	cs->hw.ax.data_adr = cs->hw.ax.base + 4;
 	ipac_write(cs, IPAC_MASK, 0xFF);
@@ -329,17 +287,12 @@ setup_sct_quadro(struct IsdnCard *card)
 	       cs->hw.ax.data_adr,
 	       cs->irq);
 
-	cs->dc_hw_ops = &ipac_dc_ops;
-	cs->bc_hw_ops = &ipac_bc_ops;
-	cs->cardmsg = &BKM_card_msg;
 	cs->card_ops = &bkm_a8_ops;
+	if (ipac_setup(cs, &ipac_dc_ops, &ipac_bc_ops))
+		goto err;
 
-	printk(KERN_INFO "HiSax: %s (%s): IPAC Version %d\n",
-		CardType[card->typ],
-		sct_quadro_subtypes[cs->subtyp],
-		ipac_read(cs, IPAC_ID));
-	return (1);
-#else
-	printk(KERN_ERR "HiSax: bkm_a8 only supported on PCI Systems\n");
-#endif /* CONFIG_PCI */
+	return 1;
+ err:
+	hisax_release_resources(cs);
+	return 0;
 }

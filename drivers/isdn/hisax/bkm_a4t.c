@@ -174,66 +174,47 @@ bkm_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	spin_unlock(&cs->lock);
 }
 
-void
-release_io_bkm(struct IsdnCardState *cs)
-{
-	if (cs->hw.ax.base) {
-		iounmap((void *) cs->hw.ax.base);
-		cs->hw.ax.base = 0;
-	}
-}
-
 static void
 enable_bkm_int(struct IsdnCardState *cs, unsigned bEnable)
 {
-	if (cs->typ == ISDN_CTYPE_BKM_A4T) {
-		I20_REGISTER_FILE *pI20_Regs = (I20_REGISTER_FILE *) (cs->hw.ax.base);
-		if (bEnable)
-			pI20_Regs->i20IntCtrl |= (intISDN | intPCI);
-		else
-			/* CAUTION: This disables the video capture driver too */
-			pI20_Regs->i20IntCtrl &= ~(intISDN | intPCI);
-	}
+	I20_REGISTER_FILE *pI20_Regs = (I20_REGISTER_FILE *) (cs->hw.ax.base);
+	if (bEnable)
+		pI20_Regs->i20IntCtrl |= (intISDN | intPCI);
+	else
+		/* CAUTION: This disables the video capture driver too */
+		pI20_Regs->i20IntCtrl &= ~(intISDN | intPCI);
 }
 
 static void
 reset_bkm(struct IsdnCardState *cs)
 {
-	if (cs->typ == ISDN_CTYPE_BKM_A4T) {
-		I20_REGISTER_FILE *pI20_Regs = (I20_REGISTER_FILE *) (cs->hw.ax.base);
-		/* Issue the I20 soft reset     */
-		pI20_Regs->i20SysControl = 0xFF;	/* all in */
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout((10 * HZ) / 1000);
-		/* Remove the soft reset */
-		pI20_Regs->i20SysControl = sysRESET | 0xFF;
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout((10 * HZ) / 1000);
-		/* Set our configuration */
-		pI20_Regs->i20SysControl = sysRESET | sysCFG;
-		/* Issue ISDN reset     */
-		pI20_Regs->i20GuestControl = guestWAIT_CFG |
-		    g_A4T_JADE_RES |
-		    g_A4T_ISAR_RES |
-		    g_A4T_ISAC_RES |
-		    g_A4T_JADE_BOOTR |
-		    g_A4T_ISAR_BOOTR;
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout((10 * HZ) / 1000);
+	I20_REGISTER_FILE *pI20_Regs = (I20_REGISTER_FILE *) (cs->hw.ax.base);
+	/* Issue the I20 soft reset     */
+	pI20_Regs->i20SysControl = 0xFF;	/* all in */
+	set_current_state(TASK_UNINTERRUPTIBLE);
+	schedule_timeout((10 * HZ) / 1000);
+	/* Remove the soft reset */
+	pI20_Regs->i20SysControl = sysRESET | 0xFF;
+	set_current_state(TASK_UNINTERRUPTIBLE);
+	schedule_timeout((10 * HZ) / 1000);
+	/* Set our configuration */
+	pI20_Regs->i20SysControl = sysRESET | sysCFG;
+	/* Issue ISDN reset     */
+	pI20_Regs->i20GuestControl = guestWAIT_CFG |
+		g_A4T_JADE_RES |
+		g_A4T_ISAR_RES |
+		g_A4T_ISAC_RES |
+		g_A4T_JADE_BOOTR |
+		g_A4T_ISAR_BOOTR;
+	set_current_state(TASK_UNINTERRUPTIBLE);
+	schedule_timeout((10 * HZ) / 1000);
 
-		/* Remove RESET state from ISDN */
-		pI20_Regs->i20GuestControl &= ~(g_A4T_ISAC_RES |
-						g_A4T_JADE_RES |
-						g_A4T_ISAR_RES);
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout((10 * HZ) / 1000);
-	}
-}
-
-static int
-BKM_card_msg(struct IsdnCardState *cs, int mt, void *arg)
-{
-	return (0);
+	/* Remove RESET state from ISDN */
+	pI20_Regs->i20GuestControl &= ~(g_A4T_ISAC_RES |
+					g_A4T_JADE_RES |
+					g_A4T_ISAR_RES);
+	set_current_state(TASK_UNINTERRUPTIBLE);
+	schedule_timeout((10 * HZ) / 1000);
 }
 
 static void
@@ -257,9 +238,8 @@ bkm_a4t_reset(struct IsdnCardState *cs)
 static void
 bkm_a4t_release(struct IsdnCardState *cs)
 {
-	enable_bkm_int(cs, 0);
 	reset_bkm(cs);
-	release_io_bkm(cs);
+	hisax_release_resources(cs);
 }
 
 static struct card_ops bkm_a4t_ops = {
@@ -278,21 +258,9 @@ setup_bkm_a4t(struct IsdnCard *card)
 	char tmp[64];
 	u_int pci_memaddr = 0, found = 0;
 	I20_REGISTER_FILE *pI20_Regs;
-#if CONFIG_PCI
-#endif
 
 	strcpy(tmp, bkm_a4t_revision);
 	printk(KERN_INFO "HiSax: T-Berkom driver Rev. %s\n", HiSax_getrev(tmp));
-	if (cs->typ == ISDN_CTYPE_BKM_A4T) {
-		cs->subtyp = BKM_A4T;
-	} else
-		return (0);
-
-#if CONFIG_PCI
-	if (!pci_present()) {
-		printk(KERN_ERR "bkm_a4t: no PCI bus present\n");
-		return (0);
-	}
 	while ((dev_a4t = pci_find_device(PCI_VENDOR_ID_ZORAN,
 		PCI_DEVICE_ID_ZORAN_36120, dev_a4t))) {
 		u16 sub_sys;
@@ -317,40 +285,32 @@ setup_bkm_a4t(struct IsdnCard *card)
 		printk(KERN_WARNING "HiSax: %s: No IRQ\n", CardType[card->typ]);
 		return (0);
 	}
-	if (!pci_memaddr) {
+	cs->hw.ax.base = (unsigned long)request_mmio(&cs->rs,pci_memaddr, 4096, "Telekom A4T");
+	if (!cs->hw.ax.base) {
 		printk(KERN_WARNING "HiSax: %s: No Memory base address\n", CardType[card->typ]);
 		return (0);
 	}
-	cs->hw.ax.base = (long) ioremap(pci_memaddr, 4096);
+	
 	/* Check suspecious address */
 	pI20_Regs = (I20_REGISTER_FILE *) (cs->hw.ax.base);
 	if ((pI20_Regs->i20IntStatus & 0x8EFFFFFF) != 0) {
 		printk(KERN_WARNING "HiSax: %s address %lx-%lx suspecious\n",
 		       CardType[card->typ], cs->hw.ax.base, cs->hw.ax.base + 4096);
-		iounmap((void *) cs->hw.ax.base);
-		cs->hw.ax.base = 0;
+		hisax_release_resources(cs);
 		return (0);
 	}
 	cs->hw.ax.isac_adr = cs->hw.ax.base + PO_OFFSET;
 	cs->hw.ax.jade_adr = cs->hw.ax.base + PO_OFFSET;
 	cs->hw.ax.isac_ale = GCS_1;
 	cs->hw.ax.jade_ale = GCS_3;
-#else
-	printk(KERN_WARNING "HiSax: %s: NO_PCI_BIOS\n", CardType[card->typ]);
-	printk(KERN_WARNING "HiSax: %s: unable to configure\n", CardType[card->typ]);
-	return (0);
-#endif				/* CONFIG_PCI */
+
 	printk(KERN_INFO "HiSax: %s: Card configured at 0x%lX IRQ %d\n",
 	       CardType[card->typ], cs->hw.ax.base, cs->irq);
 
 	reset_bkm(cs);
-	cs->dc_hw_ops = &isac_ops;
-	cs->bc_hw_ops = &jade_ops;
-	cs->cardmsg = &BKM_card_msg;
 	cs->irq_flags |= SA_SHIRQ;
 	cs->card_ops = &bkm_a4t_ops;
-	ISACVersion(cs, "Telekom A4T:");
-	/* Jade version */
-	JadeVersion(cs, "Telekom A4T:");
-	return (1);
+	isac_setup(cs, &isac_ops);
+	jade_setup(cs, &jade_ops);
+	return 1;
 }

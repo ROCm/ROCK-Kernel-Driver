@@ -318,7 +318,7 @@ hfcsx_release(struct IsdnCardState *cs)
 	schedule_timeout((30 * HZ) / 1000);	/* Timeout 30ms */
 	Write_hfc(cs, HFCSX_CIRM, 0);	/* Reset Off */
 	del_timer(&cs->hw.hfcsx.timer);
-	release_region(cs->hw.hfcsx.base, 2); /* release IO-Block */
+	hisax_release_resources(cs);
 	kfree(cs->hw.hfcsx.extra);
 	cs->hw.hfcsx.extra = NULL;
 }
@@ -1139,17 +1139,6 @@ inithfcsx(struct IsdnCardState *cs)
 	mode_hfcsx(cs->bcs + 1, 0, 1);
 }
 
-
-
-/*******************************************/
-/* handle card messages from control layer */
-/*******************************************/
-static int
-hfcsx_card_msg(struct IsdnCardState *cs, int mt, void *arg)
-{
-	return (0);
-}
-
 static void
 hfcsx_init(struct IsdnCardState *cs)
 {
@@ -1243,59 +1232,48 @@ setup_hfcsx(struct IsdnCard *card)
 	cs->hw.hfcsx.int_s1 = 0;
 	cs->dc.hfcsx.ph_state = 0;
 	cs->hw.hfcsx.fifo = 255;
-	if ((cs->typ == ISDN_CTYPE_HFC_SX) || 
-	    (cs->typ == ISDN_CTYPE_HFC_SP_PCMCIA)) {
-	        if ((!cs->hw.hfcsx.base) || 
-		    check_region((cs->hw.hfcsx.base), 2)) {
-		  printk(KERN_WARNING
-			 "HiSax: HFC-SX io-base %#lx already in use\n",
-		          cs->hw.hfcsx.base);
-		  return(0);
-		} else {
-		  request_region(cs->hw.hfcsx.base, 2, "HFCSX isdn");
-		}
-		byteout(cs->hw.hfcsx.base, cs->hw.hfcsx.base & 0xFF);
-		byteout(cs->hw.hfcsx.base + 1,
-			((cs->hw.hfcsx.base >> 8) & 3) | 0x54);
-		udelay(10);
-	        cs->hw.hfcsx.chip = Read_hfc(cs,HFCSX_CHIP_ID);
-                switch (cs->hw.hfcsx.chip >> 4) {
-		  case 1: 
-		    tmp[0] ='+';
-		    break;
-		  case 9: 
-		    tmp[0] ='P';
-		    break;
-		  default:
-		    printk(KERN_WARNING
-			   "HFC-SX: invalid chip id 0x%x\n",
-			   cs->hw.hfcsx.chip >> 4);
-		    release_region(cs->hw.hfcsx.base, 2);
-		    return(0);
-		}  
-		if (!ccd_sp_irqtab[cs->irq & 0xF]) {
-		  printk(KERN_WARNING 
-			 "HFC_SX: invalid irq %d specified\n",cs->irq & 0xF);
-		  release_region(cs->hw.hfcsx.base, 2);
-		  return(0);
-		}  
-		if (!(cs->hw.hfcsx.extra = (void *)
-		      kmalloc(sizeof(struct hfcsx_extra), GFP_ATOMIC))) {
-		  release_region(cs->hw.hfcsx.base, 2);
-		  printk(KERN_WARNING "HFC-SX: unable to allocate memory\n");
-		  return(0);
-		}
 
-		printk(KERN_INFO
-		       "HFC-S%c chip detected at base 0x%x IRQ %d HZ %d\n",
-		       tmp[0], (u_int) cs->hw.hfcsx.base,
-		       cs->irq, HZ);
-		cs->hw.hfcsx.int_m2 = 0;	/* disable alle interrupts */
-		cs->hw.hfcsx.int_m1 = 0;
-		Write_hfc(cs, HFCSX_INT_M1, cs->hw.hfcsx.int_m1);
-		Write_hfc(cs, HFCSX_INT_M2, cs->hw.hfcsx.int_m2);
-	} else
-		return (0);	/* no valid card type */
+	if (!request_io(&cs->rs, cs->hw.hfcsx.base, 2, "HFCSX isdn"))
+		return 0;
+	byteout(cs->hw.hfcsx.base, cs->hw.hfcsx.base & 0xFF);
+	byteout(cs->hw.hfcsx.base + 1,
+		((cs->hw.hfcsx.base >> 8) & 3) | 0x54);
+	udelay(10);
+	cs->hw.hfcsx.chip = Read_hfc(cs,HFCSX_CHIP_ID);
+	switch (cs->hw.hfcsx.chip >> 4) {
+	case 1: 
+		tmp[0] ='+';
+		break;
+	case 9: 
+		tmp[0] ='P';
+		break;
+	default:
+		printk(KERN_WARNING "HFC-SX: invalid chip id 0x%x\n",
+		       cs->hw.hfcsx.chip >> 4);
+		hisax_release_resources(cs);
+		return 0;
+	}  
+	if (!ccd_sp_irqtab[cs->irq & 0xF]) {
+		printk(KERN_WARNING "HFC_SX: invalid irq %d specified\n",
+		       cs->irq & 0xF);
+		hisax_release_resources(cs);
+		return 0;
+	}  
+	cs->hw.hfcsx.extra = kmalloc(sizeof(struct hfcsx_extra), 
+				     GFP_ATOMIC);
+	if (!cs->hw.hfcsx.extra) {
+		hisax_release_resources(cs);
+		printk(KERN_WARNING "HFC-SX: unable to allocate memory\n");
+		return 0;
+	}
+	
+	printk(KERN_INFO "HFC-S%c chip detected at base 0x%x IRQ %d HZ %d\n",
+	       tmp[0], (u_int) cs->hw.hfcsx.base,
+	       cs->irq, HZ);
+	cs->hw.hfcsx.int_m2 = 0;	/* disable alle interrupts */
+	cs->hw.hfcsx.int_m1 = 0;
+	Write_hfc(cs, HFCSX_INT_M1, cs->hw.hfcsx.int_m1);
+	Write_hfc(cs, HFCSX_INT_M2, cs->hw.hfcsx.int_m2);
 
 	cs->hw.hfcsx.timer.function = (void *) hfcsx_Timer;
 	cs->hw.hfcsx.timer.data = (long) cs;
@@ -1304,8 +1282,7 @@ setup_hfcsx(struct IsdnCard *card)
 	init_timer(&cs->hw.hfcsx.timer);
 
 	hfcsx_reset(cs);
-	cs->cardmsg = &hfcsx_card_msg;
 	cs->auxcmd = &hfcsx_auxcmd;
 	cs->card_ops = &hfcsx_ops;
-	return (1);
+	return 1;
 }

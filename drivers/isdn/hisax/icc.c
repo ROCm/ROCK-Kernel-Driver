@@ -51,7 +51,7 @@ icc_write_fifo(struct IsdnCardState *cs, u8 *p, int len)
 static char *ICCVer[] __initdata =
 {"2070 A1/A3", "2070 B1", "2070 B2/B3", "2070 V2.4"};
 
-void
+static void
 ICCVersion(struct IsdnCardState *cs, char *s)
 {
 	int val;
@@ -557,4 +557,12 @@ initicc(struct IsdnCardState *cs)
 	ph_command(cs, ICC_CMD_RES);
 	icc_write_reg(cs, ICC_MASK, 0x0);
 	ph_command(cs, ICC_CMD_DI);
+}
+
+int
+icc_setup(struct IsdnCardState *cs, struct dc_hw_ops *icc_ops)
+{
+	cs->dc_hw_ops = icc_ops;
+	ICCVersion(cs, "HiSax:");
+	return 0;
 }

@@ -67,14 +67,9 @@
 #define DL_FLUSH	0x0224
 #define DL_UNIT_DATA	0x0230
 
-#define MDL_BC_RELEASE  0x0278  // Formula-n enter:now
-#define MDL_BC_ASSIGN   0x027C  // Formula-n enter:now
 #define MDL_ASSIGN	0x0280
 #define MDL_REMOVE	0x0284
 #define MDL_ERROR	0x0288
-#define MDL_INFO_SETUP	0x02E0
-#define MDL_INFO_CONN	0x02E4
-#define MDL_INFO_REL	0x02E8
 
 #define CC_SETUP	0x0300
 #define CC_RESUME	0x0304
@@ -148,6 +143,35 @@
 
 /* #define I4L_IRQ_FLAG SA_INTERRUPT */
 #define I4L_IRQ_FLAG    0
+
+struct res {
+	struct list_head node;
+	const char *name;
+	unsigned long start, end;
+	unsigned long flags;
+	union {
+		void *ioremap_addr;
+	} r_u;
+};
+
+struct resources {
+	struct list_head res_head;
+};
+
+void
+resources_init(struct resources *rs);
+
+void
+resources_release(struct resources *rs);
+
+unsigned long
+request_io(struct resources *rs, unsigned long start, int len,
+	   const char *name);
+
+void *
+request_mmio(struct resources *rs, unsigned long start, int len,
+	     const char *name);
+
 
 /*
  * Statemachine
@@ -563,8 +587,8 @@ struct teles3_hw {
 
 struct teles0_hw {
 	unsigned int cfg_reg;
-	unsigned long membase;
 	unsigned long phymem;
+	void *membase;
 };
 
 struct avm_hw {
@@ -592,7 +616,6 @@ struct diva_hw {
 	unsigned int isac;
 	unsigned long hscx_adr;
 	unsigned int hscx;
-	unsigned int status;
 	struct timer_list tl;
 	u8 ctrl_reg;
 };
@@ -654,6 +677,8 @@ struct njet_hw {
 	unsigned char irqstat0;
 	unsigned char last_is0;
 	struct pci_dev *pdev;
+	void (*bc_activate)(struct IsdnCardState *cs, int bc);
+	void (*bc_deactivate)(struct IsdnCardState *cs, int bc);
 };
 
 struct hfcPCI_hw {
@@ -730,9 +755,8 @@ struct hfcD_hw {
 
 struct isurf_hw {
 	unsigned int reset;
-	unsigned long phymem;
-	unsigned long isac;
-	unsigned long isar;
+	void *isac;
+	void *isar;
 	struct isar_reg isar_r;
 };
 
@@ -857,12 +881,13 @@ struct IsdnCardState;
 /* Methods provided by driver for a specific card */
 
 struct card_ops {
-	void   (*init)      (struct IsdnCardState *);
-	void   (*test)      (struct IsdnCardState *);
-	int    (*reset)     (struct IsdnCardState *);
-	void   (*release)   (struct IsdnCardState *);
-	void   (*aux_ind)   (struct IsdnCardState *, void *);
-	void   (*irq_func)  (int, void *, struct pt_regs *);
+	void   (*init)       (struct IsdnCardState *);
+	void   (*test)       (struct IsdnCardState *);
+	int    (*reset)      (struct IsdnCardState *);
+	void   (*release)    (struct IsdnCardState *);
+	void   (*aux_ind)    (struct IsdnCardState *, void *);
+	void   (*led_handler)(struct IsdnCardState *);
+	void   (*irq_func)   (int, void *, struct pt_regs *);
 };
 
 /* Card specific drivers provide methods to access the
@@ -919,8 +944,10 @@ struct IsdnCardState {
 	spinlock_t lock;
 	struct card_ops *card_ops;
 	int protocol;
+	struct resources rs;
 	unsigned int irq;
 	unsigned long irq_flags;
+	int status;
 	long HW_Flags;
 	int *busy_flag;
         int chanlimit; /* limited number of B-chans to use */
@@ -993,6 +1020,9 @@ struct IsdnCardState {
 	int err_rx;
 #endif
 };
+
+void
+hisax_release_resources(struct IsdnCardState *cs);
 
 #define  MON0_RX	1
 #define  MON1_RX	2
@@ -1436,5 +1466,6 @@ L4L3(struct PStack *st, int pr, void *arg)
 {
 	st->l3.l4l3(st, pr, arg);
 }
+
 
 #endif

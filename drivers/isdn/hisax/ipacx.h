@@ -157,5 +157,8 @@
 
 extern void init_ipacx(struct IsdnCardState *cs, int part);
 extern void interrupt_ipacx(struct IsdnCardState *cs);
+extern int  ipacx_setup(struct IsdnCardState *cs,
+			struct dc_hw_ops *ipacx_dc_ops,
+			struct bc_hw_ops *ipacx_bc_ops);
 
 #endif

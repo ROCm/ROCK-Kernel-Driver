@@ -945,6 +945,7 @@ static int __devinit checkcard(int cardnr, char *id, int *busy_flag)
 	cs->status_end = cs->status_buf + HISAX_STATUS_BUFSIZE - 1;
 	cs->typ = card->typ;
 	spin_lock_init(&cs->lock);
+	resources_init(&cs->rs);
 	SET_MODULE_OWNER(&cs->iif);
 	strcpy(cs->iif.id, id);
 	cs->iif.channels = 2;
@@ -1743,7 +1744,6 @@ static void hisax_d_l1l2(struct hisax_if *ifc, int pr, void *arg);
 static void hisax_b_l1l2(struct hisax_if *ifc, int pr, void *arg);
 static void hisax_d_l2l1(struct PStack *st, int pr, void *arg);
 static void hisax_b_l2l1(struct PStack *st, int pr, void *arg);
-static int hisax_cardmsg(struct IsdnCardState *cs, int mt, void *arg);
 static int hisax_bc_setstack(struct PStack *st, struct BCState *bcs);
 static void hisax_bc_close(struct BCState *bcs);
 static void hisax_bh(void *data);
@@ -1781,7 +1781,6 @@ int hisax_register(struct hisax_d_if *hisax_d_if, struct hisax_b_if *b_if[],
 	cs = cards[i].cs;
 	hisax_d_if->cs = cs;
 	cs->hw.hisax_d_if = hisax_d_if;
-	cs->cardmsg = hisax_cardmsg;
 	cs->iif.owner = hisax_d_if->owner; // FIXME should be done before registering
 	dc_l1_init(cs, &hisax_l1_ops);
 	cs->channel[0].d_st->l1.l2l1 = hisax_d_l2l1;
@@ -1960,11 +1959,6 @@ static void hisax_d_l2l1(struct PStack *st, int pr, void *arg)
 	}
 }
 
-static int hisax_cardmsg(struct IsdnCardState *cs, int mt, void *arg)
-{
-	return 0;
-}
-
 static void hisax_b_l2l1(struct PStack *st, int pr, void *arg)
 {
 	struct BCState *bcs = st->l1.bcs;
@@ -2053,6 +2047,100 @@ static void EChannel_proc_rcv(struct hisax_d_if *d_if)
 		}
 		dev_kfree_skb_any(skb);
 	}
+}
+
+void
+resources_init(struct resources *rs)
+{
+	INIT_LIST_HEAD(&rs->res_head);
+}
+
+void
+resources_release(struct resources *rs)
+{
+	struct res *r;
+
+	list_for_each_entry(r, &rs->res_head, node) {
+		if (r->flags & IORESOURCE_IO) {
+			release_region(r->start, r->end - r->start + 1);
+		}
+		if (r->flags & IORESOURCE_MEM) {
+			iounmap(r->r_u.ioremap_addr);
+			release_mem_region(r->start, r->end - r->start + 1);
+		}
+	}
+}
+
+unsigned long
+request_io(struct resources *rs, unsigned long start, int len,
+	   const char *name)
+{
+	struct res *r;
+
+	r = kmalloc(sizeof(*r), GFP_KERNEL);
+	if (!r) {
+		printk(KERN_WARNING "%s: out of memory\n", __FUNCTION__);
+		goto err;
+	}
+	if (!request_region(start, len, name)) {
+		printk(KERN_WARNING "%s: IO %#lx-%#lx already in use\n",
+		       __FUNCTION__, start, start + len - 1);
+		goto err_free;
+	}
+	r->flags = IORESOURCE_IO;
+	r->start = start;
+	r->end   = start + len - 1;
+	r->name  = name;
+	list_add_tail(&r->node, &rs->res_head);
+
+	return r->start;
+
+ err_free:
+	kfree(r);
+ err:
+	return 0;
+}
+
+void *
+request_mmio(struct resources *rs, unsigned long start, int len,
+	     const char *name)
+{
+	struct res *r;
+
+	r = kmalloc(sizeof(*r), GFP_KERNEL);
+	if (!r) {
+		printk(KERN_WARNING "%s: out of memory\n", __FUNCTION__);
+		goto err;
+	}
+	if (!request_mem_region(start, len, name)) {
+		printk(KERN_WARNING "%s: MMIO %#lx-%#lx already in use\n",
+		       __FUNCTION__, start, start + len - 1);
+		goto err_free;
+	}
+	r->flags            = IORESOURCE_MEM;
+	r->start            = start;
+	r->end              = start + len - 1;
+	r->name             = name;
+	r->r_u.ioremap_addr = ioremap(start, len);
+	if (!r->r_u.ioremap_addr)
+		goto err_release;
+
+	list_add_tail(&r->node, &rs->res_head);
+
+	return r->r_u.ioremap_addr;
+
+ err_release:
+	release_mem_region(r->start, r->end - r->start + 1);
+ err_free:
+	kfree(r);
+ err:
+	return 0;
+}
+
+void
+hisax_resources_release(struct IsdnCardState *cs)
+{
+	resources_release(&cs->rs);
 }
 
 #include <linux/pci.h>

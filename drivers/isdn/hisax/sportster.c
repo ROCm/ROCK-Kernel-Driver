@@ -170,7 +170,7 @@ static struct card_ops sportster_ops = {
 static int __init
 get_io_range(struct IsdnCardState *cs)
 {
-	int i, j, adr;
+	int i, adr;
 	
 	for (i=0;i<64;i++) {
 		adr = cs->hw.spt.cfg_reg + i *1024;
@@ -178,20 +178,18 @@ get_io_range(struct IsdnCardState *cs)
 			printk(KERN_WARNING
 				"HiSax: %s config port %x-%x already in use\n",
 				CardType[cs->typ], adr, adr + 8);
-			break;
+			goto err;
 		}
 	}
-	if (i==64)
-		return(1);
-	else {
-		for (j=0; j<i; j++) {
-			adr = cs->hw.spt.cfg_reg + j *1024;
-			release_region(adr, 8);
-		}
-		return(0);
+	return 1;
+ err:
+	for (i=i-1; i >= 0; i--) {
+		adr = cs->hw.spt.cfg_reg + i *1024;
+		release_region(adr, 8);
 	}
+	return 0;
 }
-
+  
 int __init
 setup_sportster(struct IsdnCard *card)
 {
@@ -200,8 +198,6 @@ setup_sportster(struct IsdnCard *card)
 
 	strcpy(tmp, sportster_revision);
 	printk(KERN_INFO "HiSax: USR Sportster driver Rev. %s\n", HiSax_getrev(tmp));
-	if (cs->typ != ISDN_CTYPE_SPORTSTER)
-		return (0);
 
 	cs->hw.spt.cfg_reg = card->para[1];
 	cs->irq = card->para[0];
@@ -231,21 +227,15 @@ setup_sportster(struct IsdnCard *card)
 			return(0);
 	}
 	sportster_reset(cs);
-	printk(KERN_INFO
-	       "HiSax: %s config irq:%d cfg:0x%X\n",
-	       CardType[cs->typ], cs->irq,
-	       cs->hw.spt.cfg_reg);
+	printk(KERN_INFO "HiSax: %s config irq:%d cfg:0x%X\n",
+	       CardType[cs->typ], cs->irq, cs->hw.spt.cfg_reg);
 
-	cs->dc_hw_ops = &isac_ops;
-	cs->bc_hw_ops = &hscx_ops;
 	cs->cardmsg = &Sportster_card_msg;
 	cs->card_ops = &sportster_ops;
-	ISACVersion(cs, "Sportster:");
-	if (HscxVersion(cs, "Sportster:")) {
-		printk(KERN_WARNING
-		       "Sportster: wrong HSCX versions check IO address\n");
-		sportster_release(cs);
-		return (0);
-	}
-	return (1);
+	if (hscxisac_setup(cs, &isac_ops, &hscx_ops))
+		goto err;
+	return 1;
+ err:
+	hisax_release_resources(cs);
+	return 0;
 }
