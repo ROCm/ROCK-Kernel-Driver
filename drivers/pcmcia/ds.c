@@ -1003,7 +1003,7 @@ static int ds_ioctl(struct inode * inode, struct file * file,
 			   &buf.win_info.map);
 	break;
     case DS_REPLACE_CIS:
-	ret = pcmcia_replace_cis(s->handle, &buf.cisdump);
+	ret = pcmcia_replace_cis(s->parent, &buf.cisdump);
 	break;
     case DS_BIND_REQUEST:
 	if (!capable(CAP_SYS_ADMIN)) return -EPERM;

@@ -376,12 +376,8 @@ int verify_cis_cache(struct pcmcia_socket *s)
     
 ======================================================================*/
 
-int pcmcia_replace_cis(client_handle_t handle, cisdump_t *cis)
+int pcmcia_replace_cis(struct pcmcia_socket *s, cisdump_t *cis)
 {
-    struct pcmcia_socket *s;
-    if (CHECK_HANDLE(handle))
-	return CS_BAD_HANDLE;
-    s = SOCKET(handle);
     if (s->fake_cis != NULL) {
 	kfree(s->fake_cis);
 	s->fake_cis = NULL;

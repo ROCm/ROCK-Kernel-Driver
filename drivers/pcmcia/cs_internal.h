@@ -146,13 +146,6 @@ void write_cis_mem(struct pcmcia_socket *s, int attr,
 void release_cis_mem(struct pcmcia_socket *s);
 void destroy_cis_cache(struct pcmcia_socket *s);
 int verify_cis_cache(struct pcmcia_socket *s);
-void preload_cis_cache(struct pcmcia_socket *s);
-int get_first_tuple(client_handle_t handle, tuple_t *tuple);
-int get_next_tuple(client_handle_t handle, tuple_t *tuple);
-int get_tuple_data(client_handle_t handle, tuple_t *tuple);
-int parse_tuple(client_handle_t handle, tuple_t *tuple, cisparse_t *parse);
-int validate_cis(client_handle_t handle, cisinfo_t *info);
-int replace_cis(client_handle_t handle, cisdump_t *cis);
 int read_tuple(client_handle_t handle, cisdata_t code, void *parse);
 
 /* In bulkmem.c */

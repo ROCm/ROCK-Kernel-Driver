@@ -607,6 +607,6 @@ int pcmcia_get_tuple_data(client_handle_t handle, tuple_t *tuple);
 int pcmcia_parse_tuple(client_handle_t handle, tuple_t *tuple, cisparse_t *parse);
 
 int pcmcia_validate_cis(client_handle_t handle, cisinfo_t *info);
-int pcmcia_replace_cis(client_handle_t handle, cisdump_t *cis);
+int pcmcia_replace_cis(struct pcmcia_socket *s, cisdump_t *cis);
 
 #endif /* LINUX_CISTPL_H */
