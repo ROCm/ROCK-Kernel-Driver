@@ -171,7 +171,7 @@ do_more:
 	 */
 	/* @@@ check errors */
 	BUFFER_TRACE(bitmap_bh, "getting undo access");
-	err = ext3_journal_get_undo_access(handle, bitmap_bh);
+	err = ext3_journal_get_undo_access(handle, bitmap_bh, NULL);
 	if (err)
 		goto error_return;
 	
@@ -406,6 +406,7 @@ ext3_try_to_allocate(struct super_block *sb, handle_t *handle, int group,
 {
 	int i, fatal = 0;
 	int have_access = 0;
+	int credits = 0;
 
 	*errp = 0;
 
@@ -432,7 +433,8 @@ got:
 	 	 * committing transaction.
 		 */
 		BUFFER_TRACE(bitmap_bh, "get undo access for new block");
-		fatal = ext3_journal_get_undo_access(handle, bitmap_bh);
+		fatal = ext3_journal_get_undo_access(handle, bitmap_bh,
+							&credits);
 		if (fatal) {
 			*errp = fatal;
 			goto fail;
@@ -465,7 +467,7 @@ fail:
 	if (have_access) {
 		BUFFER_TRACE(bitmap_bh, "journal_release_buffer");
 		jbd_unlock_bh_state(bitmap_bh);
-		ext3_journal_release_buffer(handle, bitmap_bh);
+		ext3_journal_release_buffer(handle, bitmap_bh, credits);
 	}
 	return -1;
 }

@@ -526,7 +526,8 @@ static void jbd_unexpected_dirty_buffer(struct journal_head *jh)
  */
 
 static int
-do_get_write_access(handle_t *handle, struct journal_head *jh, int force_copy) 
+do_get_write_access(handle_t *handle, struct journal_head *jh,
+			int force_copy, int *credits) 
 {
 	struct buffer_head *bh;
 	transaction_t *transaction = handle->h_transaction;
@@ -604,6 +605,8 @@ repeat:
 
 		J_ASSERT_JH(jh, handle->h_buffer_credits > 0);
 		handle->h_buffer_credits--;
+		if (credits)
+			(*credits)++;
 		goto done_locked;
 	}
 	
@@ -680,6 +683,8 @@ repeat:
 
 	J_ASSERT(handle->h_buffer_credits > 0);
 	handle->h_buffer_credits--;
+	if (credits)
+		(*credits)++;
 
 	/* Finally, if the buffer is not journaled right now, we need to
 	 * make sure it doesn't get written to disk before the caller
@@ -733,7 +738,8 @@ out_unlocked:
  * because we're write()ing a buffer which is also part of a shared mapping.
  */
 
-int journal_get_write_access (handle_t *handle, struct buffer_head *bh) 
+int journal_get_write_access(handle_t *handle,
+			struct buffer_head *bh, int *credits)
 {
 	struct journal_head *jh = journal_add_journal_head(bh);
 	int rc;
@@ -741,7 +747,7 @@ int journal_get_write_access (handle_t *handle, struct buffer_head *bh)
 	/* We do not want to get caught playing with fields which the
 	 * log thread also manipulates.  Make sure that the buffer
 	 * completes any outstanding IO before proceeding. */
-	rc = do_get_write_access(handle, jh, 0);
+	rc = do_get_write_access(handle, jh, 0, NULL);
 	journal_put_journal_head(jh);
 	return rc;
 }
@@ -830,7 +836,8 @@ out:
  *     non-rewindable consequences
  * @handle: transaction
  * @bh: buffer to undo
- * 
+ * @credits: store the number of taken credits here (if not NULL)
+ *
  * Sometimes there is a need to distinguish between metadata which has
  * been committed to disk and that which has not.  The ext3fs code uses
  * this for freeing and allocating space, we have to make sure that we
@@ -849,9 +856,10 @@ out:
  * will be committed to a new transaction in due course, at which point
  * we can discard the old committed data pointer.
  *
- * Returns error number or 0 on success.  
+ * Returns error number or 0 on success.
  */
-int journal_get_undo_access(handle_t *handle, struct buffer_head *bh)
+int journal_get_undo_access(handle_t *handle, struct buffer_head *bh,
+				int *credits)
 {
 	int err;
 	struct journal_head *jh = journal_add_journal_head(bh);
@@ -859,10 +867,12 @@ int journal_get_undo_access(handle_t *handle, struct buffer_head *bh)
 
 	JBUFFER_TRACE(jh, "entry");
 
-	/* Do this first --- it can drop the journal lock, so we want to
+	/*
+	 * Do this first --- it can drop the journal lock, so we want to
 	 * make sure that obtaining the committed_data is done
-	 * atomically wrt. completion of any outstanding commits. */
-	err = do_get_write_access (handle, jh, 1);
+	 * atomically wrt. completion of any outstanding commits.
+	 */
+	err = do_get_write_access(handle, jh, 1, credits);
 	if (err)
 		goto out;
 
@@ -1134,9 +1144,13 @@ out:
  *
  * journal_get_write_access() can block, so it is quite possible for a
  * journaling component to decide after the write access is returned
- * that global state has changed and the update is no longer required.  */
-
-void journal_release_buffer(handle_t *handle, struct buffer_head *bh)
+ * that global state has changed and the update is no longer required.
+ *
+ * The caller passes in the number of credits which should be put back for
+ * this buffer (zero or one).
+ */
+void
+journal_release_buffer(handle_t *handle, struct buffer_head *bh, int credits)
 {
 	transaction_t *transaction = handle->h_transaction;
 	journal_t *journal = transaction->t_journal;
@@ -1153,12 +1167,11 @@ void journal_release_buffer(handle_t *handle, struct buffer_head *bh)
 	if (jh->b_jlist == BJ_Reserved && jh->b_transaction == transaction &&
 	    !buffer_jbddirty(jh2bh(jh))) {
 		JBUFFER_TRACE(jh, "unused: refiling it");
-		handle->h_buffer_credits++;
 		__journal_refile_buffer(jh);
 	}
 	spin_unlock(&journal->j_list_lock);
 	jbd_unlock_bh_state(bh);
-
+	handle->h_buffer_credits += credits;
 	JBUFFER_TRACE(jh, "exit");
 }
 

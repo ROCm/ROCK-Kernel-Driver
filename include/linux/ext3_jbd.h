@@ -97,29 +97,30 @@ void ext3_journal_abort_handle(const char *caller, const char *err_fn,
 		struct buffer_head *bh, handle_t *handle, int err);
 
 static inline int
-__ext3_journal_get_undo_access(const char *where,
-			       handle_t *handle, struct buffer_head *bh)
+__ext3_journal_get_undo_access(const char *where, handle_t *handle,
+				struct buffer_head *bh, int *credits)
 {
-	int err = journal_get_undo_access(handle, bh);
+	int err = journal_get_undo_access(handle, bh, credits);
 	if (err)
 		ext3_journal_abort_handle(where, __FUNCTION__, bh, handle,err);
 	return err;
 }
 
 static inline int
-__ext3_journal_get_write_access(const char *where,
-				handle_t *handle, struct buffer_head *bh)
+__ext3_journal_get_write_access(const char *where, handle_t *handle,
+				struct buffer_head *bh, int *credits)
 {
-	int err = journal_get_write_access(handle, bh);
+	int err = journal_get_write_access(handle, bh, credits);
 	if (err)
 		ext3_journal_abort_handle(where, __FUNCTION__, bh, handle,err);
 	return err;
 }
 
 static inline void
-ext3_journal_release_buffer(handle_t *handle, struct buffer_head *bh)
+ext3_journal_release_buffer(handle_t *handle, struct buffer_head *bh,
+				int credits)
 {
-	journal_release_buffer(handle, bh);
+	journal_release_buffer(handle, bh, credits);
 }
 
 static inline void
@@ -159,10 +160,12 @@ __ext3_journal_dirty_metadata(const char *where,
 }
 
 
-#define ext3_journal_get_undo_access(handle, bh) \
-	__ext3_journal_get_undo_access(__FUNCTION__, (handle), (bh))
+#define ext3_journal_get_undo_access(handle, bh, credits) \
+	__ext3_journal_get_undo_access(__FUNCTION__, (handle), (bh), (credits))
 #define ext3_journal_get_write_access(handle, bh) \
-	__ext3_journal_get_write_access(__FUNCTION__, (handle), (bh))
+	__ext3_journal_get_write_access(__FUNCTION__, (handle), (bh), NULL)
+#define ext3_journal_get_write_access_credits(handle, bh, credits) \
+	__ext3_journal_get_write_access(__FUNCTION__, (handle), (bh), (credits))
 #define ext3_journal_revoke(handle, blocknr, bh) \
 	__ext3_journal_revoke(__FUNCTION__, (handle), (blocknr), (bh))
 #define ext3_journal_get_create_access(handle, bh) \
