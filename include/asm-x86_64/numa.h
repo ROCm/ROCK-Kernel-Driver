@@ -8,7 +8,7 @@ struct node {
 	u64 start,end; 
 };
 
-extern int compute_hash_shift(struct node *nodes);
+extern int compute_hash_shift(struct node *nodes, int numnodes);
 
 #define ZONE_ALIGN (1UL << (MAX_ORDER+PAGE_SHIFT))
 

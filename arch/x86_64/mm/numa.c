@@ -34,9 +34,7 @@ cpumask_t     node_to_cpumask[MAX_NUMNODES];
 
 int numa_off __initdata;
 
-unsigned long nodes_present; 
-
-int __init compute_hash_shift(struct node *nodes)
+int __init compute_hash_shift(struct node *nodes, int numnodes)
 {
 	int i; 
 	int shift = 24;
@@ -45,7 +43,7 @@ int __init compute_hash_shift(struct node *nodes)
 	/* When in doubt use brute force. */
 	while (shift < 48) { 
 		memset(memnodemap,0xff,sizeof(*memnodemap) * NODEMAPSIZE); 
-		for_each_online_node(i) {
+		for (i = 0; i < numnodes; i++) {
 			if (nodes[i].start == nodes[i].end) 
 				continue;
 			for (addr = nodes[i].start; 
@@ -197,7 +195,7 @@ static int numa_emulation(unsigned long start_pfn, unsigned long end_pfn)
  		       (nodes[i].end - nodes[i].start) >> 20);
 		node_set_online(i);
  	}
- 	memnode_shift = compute_hash_shift(nodes);
+ 	memnode_shift = compute_hash_shift(nodes, numa_fake);
  	if (memnode_shift < 0) {
  		memnode_shift = 0;
  		printk(KERN_ERR "No NUMA hash function found. Emulation disabled.\n");
