@@ -2,6 +2,7 @@
 #define __LINUX_SMPLOCK_H
 
 #include <linux/config.h>
+#include <linux/sched.h>
 #include <linux/spinlock.h>
 
 #ifdef CONFIG_LOCK_KERNEL
