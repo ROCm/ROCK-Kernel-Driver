@@ -37,13 +37,21 @@
 #include <linux/agp_backend.h>
 
 #include <linux/types.h>
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
 #include <linux/sisfb.h>
+#else
+#include <video/sisfb.h>
+#endif
 
 #include <asm/io.h>
-#include <asm/mtrr.h>
 
+#ifdef CONFIG_MTRR
+#include <asm/mtrr.h>
+#endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
 #include <video/fbcon.h>
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,5,33)
 #include <video/fbcon-cfb8.h>
 #include <video/fbcon-cfb16.h>
 #include <video/fbcon-cfb24.h>
@@ -54,9 +62,11 @@
 #include "vgatypes.h"
 #include "vstruct.h"
 #include "sis_accel.h"
+#include "sis.h"
 
 extern struct     video_info ivideo;
 extern VGA_ENGINE sisvga_engine;
+extern int sisfb_accel;
 
 static const int sisALUConv[] =
 {
@@ -228,15 +238,38 @@ SiS310SubsequentScreenToScreenCopy(int src_x, int src_y, int dst_x, int dst_y,
                                 int width, int height)
 {
 	long srcbase, dstbase;
+	int mymin, mymax;
 
 	srcbase = dstbase = 0;
-	if (src_y >= 2048) {
-		srcbase = ivideo.video_linelength * src_y;
-		src_y = 0;
-	}
-	if (dst_y >= 2048) {
-		dstbase = ivideo.video_linelength * dst_y;
-		dst_y = 0;
+	mymin = min(src_y, dst_y);
+	mymax = max(src_y, dst_y);
+	
+	/* Although the chip knows the direction to use
+	 * if the source and destination areas overlap, 
+	 * that logic fails if we fiddle with the bitmap
+	 * addresses. Therefore, we check if the source
+	 * and destination blitting areas overlap and 
+	 * adapt the bitmap addresses synchronously 
+	 * if the coordinates exceed the valid range.
+	 * The the areas do not overlap, we do our 
+	 * normal check.
+	 */
+	if((mymax - mymin) < height) { 
+	   if((src_y >= 2048) || (dst_y >= 2048)) {	      
+	      srcbase = ivideo.video_linelength * mymin;
+	      dstbase = ivideo.video_linelength * mymin;
+	      src_y -= mymin;
+	      dst_y -= mymin;
+	   }
+	} else {
+	   if(src_y >= 2048) {
+	      srcbase = ivideo.video_linelength * src_y;
+	      src_y = 0;
+	   }
+	   if(dst_y >= 2048) {
+	      dstbase = ivideo.video_linelength * dst_y;
+	      dst_y = 0;
+	   }
 	}
 
 	SiS310SetupSRCBase(srcbase);
@@ -286,25 +319,62 @@ int sisfb_initaccel(void)
     return(0);
 }
 
+void sisfb_syncaccel(void)
+{
+    if(sisvga_engine == SIS_300_VGA) {
+    	SiS300Sync();
+    } else {
+    	SiS310Sync();
+    }
+}
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,34)  /* --- KERNEL 2.5.34 and later --- */
 
-void fbcon_sis_fillrect(struct fb_info *info, const struct fb_fillrect *rect)
+int sisfb_sync(struct fb_info *info)
 {
+   if(!sisfb_accel) return 0;
+   CRITFLAGS
+   if(sisvga_engine == SIS_300_VGA) {
+      SiS300Sync();
+   } else {
+      SiS310Sync();
+   }
+   CRITEND
+   return 0;
+}
+
+void sisfb_fillrect(struct fb_info *info, const struct fb_fillrect *rect)
+{
+   int col=0;
    CRITFLAGS
 
+   TWDEBUG("Inside sisfb_fillrect");
    if(!rect->width || !rect->height)
    	return;
 
+   if(!sisfb_accel) {
+        cfb_fillrect(info, rect);
+	return;
+   }
+   
+   switch(info->var.bits_per_pixel) {
+		case 8: col = rect->color;
+			break;
+		case 16: col = ((u32 *)(info->pseudo_palette))[rect->color];
+			 break;
+		case 32: col = ((u32 *)(info->pseudo_palette))[rect->color];
+			 break;
+	}	
+
    if(sisvga_engine == SIS_300_VGA) {
 	   CRITBEGIN
-	   SiS300SetupForSolidFill(rect->color, myrops[rect->rop], 0);
+	   SiS300SetupForSolidFill(col, myrops[rect->rop], 0);
 	   SiS300SubsequentSolidFillRect(rect->dx, rect->dy, rect->width, rect->height);
 	   CRITEND
 	   SiS300Sync();
    } else {
 	   CRITBEGIN
-	   SiS310SetupForSolidFill(rect->color, myrops[rect->rop], 0);
+	   SiS310SetupForSolidFill(col, myrops[rect->rop], 0);
 	   SiS310SubsequentSolidFillRect(rect->dx, rect->dy, rect->width, rect->height);
 	   CRITEND
 	   SiS310Sync();
@@ -312,10 +382,16 @@ void fbcon_sis_fillrect(struct fb_info *info, const struct fb_fillrect *rect)
 
 }
 
-void fbcon_sis_copyarea(struct fb_info *info, const struct fb_copyarea *area)
+void sisfb_copyarea(struct fb_info *info, const struct fb_copyarea *area)
 {
    int xdir, ydir;
    CRITFLAGS
+
+   TWDEBUG("Inside sis_copyarea");
+   if(!sisfb_accel) {
+   	cfb_copyarea(info, area);
+	return;
+   }
 
    if(!area->width || !area->height)
    	return;
@@ -350,13 +426,33 @@ void fbcon_sis_bmove(struct display *p, int srcy, int srcx,
         int xdir, ydir;
 	CRITFLAGS
 
+	if(!ivideo.accel) {
+	    switch(ivideo.video_bpp) {
+	    case 8:
+#ifdef FBCON_HAS_CFB8
+	       fbcon_cfb8_bmove(p, srcy, srcx, dsty, dstx, height, width);
+#endif
+	       break;
+	    case 16:
+#ifdef FBCON_HAS_CFB16
+	       fbcon_cfb16_bmove(p, srcy, srcx, dsty, dstx, height, width);
+#endif
+	       break;
+	    case 32:
+#ifdef FBCON_HAS_CFB32
+	       fbcon_cfb32_bmove(p, srcy, srcx, dsty, dstx, height, width);
+#endif
+	       break;
+            }
+	    return;
+	}
+
 	srcx *= fontwidth(p);
 	srcy *= fontheight(p);
 	dstx *= fontwidth(p);
 	dsty *= fontheight(p);
 	width *= fontwidth(p);
 	height *= fontheight(p);
-
 
 	if(srcx < dstx) xdir = 0;
 	else            xdir = 1;
@@ -375,6 +471,10 @@ void fbcon_sis_bmove(struct display *p, int srcy, int srcx,
 	   SiS310SubsequentScreenToScreenCopy(srcx, srcy, dstx, dsty, width, height);
 	   CRITEND
 	   SiS310Sync();
+#if 0	   
+	   printk(KERN_INFO "sis_bmove sx %d sy %d dx %d dy %d w %d h %d\n",
+		srcx, srcy, dstx, dsty, width, height);
+#endif		
 	}
 }
 
@@ -409,6 +509,13 @@ void fbcon_sis_clear8(struct vc_data *conp, struct display *p,
 {
 	u32 bgx;
 
+	if(!ivideo.accel) {
+#ifdef FBCON_HAS_CFB8
+	    fbcon_cfb8_clear(conp, p, srcy, srcx, height, width);
+#endif
+	    return;
+	}
+
 	bgx = attr_bgcol_ec(p, conp);
 	fbcon_sis_clear(conp, p, srcy, srcx, height, width, bgx);
 }
@@ -417,6 +524,12 @@ void fbcon_sis_clear16(struct vc_data *conp, struct display *p,
 			int srcy, int srcx, int height, int width)
 {
 	u32 bgx;
+	if(!ivideo.accel) {
+#ifdef FBCON_HAS_CFB16
+	    fbcon_cfb16_clear(conp, p, srcy, srcx, height, width);
+#endif
+	    return;
+	}
 
 	bgx = ((u_int16_t*)p->dispsw_data)[attr_bgcol_ec(p, conp)];
 	fbcon_sis_clear(conp, p, srcy, srcx, height, width, bgx);
@@ -427,6 +540,13 @@ void fbcon_sis_clear32(struct vc_data *conp, struct display *p,
 {
 	u32 bgx;
 
+	if(!ivideo.accel) {
+#ifdef FBCON_HAS_CFB32
+	    fbcon_cfb32_clear(conp, p, srcy, srcx, height, width);
+#endif
+	    return;
+	}
+
 	bgx = ((u_int32_t*)p->dispsw_data)[attr_bgcol_ec(p, conp)];
 	fbcon_sis_clear(conp, p, srcy, srcx, height, width, bgx);
 }
@@ -434,6 +554,22 @@ void fbcon_sis_clear32(struct vc_data *conp, struct display *p,
 void fbcon_sis_revc(struct display *p, int srcx, int srcy)
 {
 	CRITFLAGS
+
+	if(!ivideo.accel) {
+	    switch(ivideo.video_bpp) {
+	    case 16:
+#ifdef FBCON_HAS_CFB16
+	       fbcon_cfb16_revc(p, srcx, srcy);
+#endif
+	       break;
+	    case 32:
+#ifdef FBCON_HAS_CFB32
+	       fbcon_cfb32_revc(p, srcx, srcy);
+#endif
+	       break;
+            }
+	    return;
+	}
 
 	srcx *= fontwidth(p);
 	srcy *= fontheight(p);

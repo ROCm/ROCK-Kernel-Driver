@@ -98,6 +98,8 @@
 #define FB_ACCEL_3DLABS_PERMEDIA3 37	/* 3Dlabs Permedia 3		*/
 #define FB_ACCEL_ATI_RADEON	38	/* ATI Radeon family		*/
 #define FB_ACCEL_I810           39      /* Intel 810/815                */
+#define FB_ACCEL_SIS_GLAMOUR_2  40	/* SiS 315, 650, 740		*/
+#define FB_ACCEL_SIS_XABRE      41	/* SiS 330 ("Xabre")		*/
 
 #define FB_ACCEL_NEOMAGIC_NM2070 90	/* NeoMagic NM2070              */
 #define FB_ACCEL_NEOMAGIC_NM2090 91	/* NeoMagic NM2090              */
@@ -345,7 +347,6 @@ struct fb_pixmap {
 #ifdef __KERNEL__
 
 #include <linux/fs.h>
-#include <linux/poll.h>
 #include <linux/init.h>
 #include <linux/devfs_fs_kernel.h>
 
@@ -386,8 +387,6 @@ struct fb_ops {
     int (*fb_cursor)(struct fb_info *info, struct fb_cursor *cursor);
     /* Rotates the display */
     void (*fb_rotate)(struct fb_info *info, int angle);
-    /* perform polling on fb device */
-    int (*fb_poll)(struct fb_info *info, poll_table *wait);
     /* wait for blit idle, optional */
     int (*fb_sync)(struct fb_info *info);		
     /* perform fb specific ioctl (optional) */

@@ -34,11 +34,10 @@ typedef enum _SIS_CHIP_TYPE {
 	SIS_730, 
 	SIS_315H,
 	SIS_315,
-	SIS_550,
 	SIS_315PRO,
-	SIS_640,
-	SIS_740,
+	SIS_550,
 	SIS_650,
+	SIS_740,
 	SIS_330,
 	MAX_SIS_CHIP
 } SIS_CHIP_TYPE;
@@ -129,7 +128,16 @@ struct video_info {
 
 	spinlock_t     lockaccel;
 
-	char reserved[256];
+        unsigned int   pcibus;
+	unsigned int   pcislot;
+	unsigned int   pcifunc;
+
+	int 	       accel;
+
+	unsigned short subsysvendor;
+	unsigned short subsysdevice;
+
+	char reserved[236];
 };
 
 
@@ -137,7 +145,9 @@ struct video_info {
 /*     If changing this, vgatypes.h must also be changed (for X driver)    */
 
 /* TW: ioctl for identifying and giving some info (esp. memory heap start) */
-#define SISFB_GET_INFO	  _IOR('n',0xF8,sizeof(__u32))
+#define SISFB_GET_INFO	  	_IOR('n',0xF8,sizeof(__u32))
+
+#define SISFB_GET_VBRSTATUS  	_IOR('n',0xF9,sizeof(__u32))
 
 /* TW: Structure argument for SISFB_GET_INFO ioctl  */
 typedef struct _SISFB_INFO sisfb_info, *psisfb_info;
@@ -156,7 +166,19 @@ struct _SISFB_INFO {
 	unsigned char sisfb_revision;
 	unsigned char sisfb_patchlevel;
 
-	char reserved[253]; 		/* for future use */
+	unsigned char sisfb_caps;	/* Sisfb capabilities */
+
+	int    sisfb_tqlen;		/* turbo queue length (in KB) */
+
+	unsigned int sisfb_pcibus;      /* The card's PCI ID */
+	unsigned int sisfb_pcislot;
+	unsigned int sisfb_pcifunc;
+
+	unsigned char sisfb_lcdpdc;	/* PanelDelayCompensation */
+	
+	unsigned char sisfb_lcda;	/* Detected status of LCDA for low res/text modes */
+
+	char reserved[235]; 		/* for future use */
 };
 
 #ifdef __KERNEL__

@@ -15,8 +15,19 @@
 #define VB_SIS302B        	0x0004
 #define VB_SIS301LV     	0x0008
 #define VB_SIS302LV     	0x0010
+#define VB_SIS30xLV		VB_SIS301LV
+#define VB_SIS30xNEW		VB_SIS302LV
 #define VB_NoLCD        	0x8000
 #define VB_SIS301BLV302BLV      (VB_SIS301B|VB_SIS302B|VB_SIS301LV|VB_SIS302LV)
+#define VB_SIS301B302B          (VB_SIS301B|VB_SIS302B)
+#define VB_SIS301LV302LV        (VB_SIS301LV|VB_SIS302LV)
+
+#define IS_SIS650740            ((HwDeviceExtension->jChipType >= SIS_650) && (HwDeviceExtension->jChipType < SIS_330))
+
+#define IS_SIS650		(HwDeviceExtension->jChipType == SIS_650)
+#define IS_SIS740		(HwDeviceExtension->jChipType == SIS_740)
+#define IS_SIS330		(HwDeviceExtension->jChipType == SIS_330)
+#define IS_SIS550		(HwDeviceExtension->jChipType == SIS_550)
 
 #define CRT1Len                 17
 #define LVDSCRT1Len             15
@@ -35,9 +46,9 @@
 #define ModeInfoFlag            0x07
 #define IsTextMode              0x07
 
-#define DACInfoFlag             0x18
-#define MemoryInfoFlag          0x1E0
-#define MemorySizeShift         0x05
+#define DACInfoFlag             0x0018
+#define MemoryInfoFlag          0x01E0
+#define MemorySizeShift         5
 
 /* modeflag */
 #define Charx8Dot               0x0200
@@ -57,8 +68,9 @@
 #define NoSupportHiVisionTV     0x0060
 #define NoSupportLCD            0x0058
 #define SupportCHTV 		0x0800
-#define SupportTV1024           0x0800  /*301b*/            
+#define SupportTV1024           0x0800            
 #define InterlaceMode           0x0080
+#define SupportHiVisionTV2      0x1000
 #define SyncPP                  0x0000
 #define SyncPN                  0x4000
 #define SyncNP                  0x8000
@@ -72,13 +84,13 @@
 /* VBInfo */
 #define SetSimuScanMode         0x0001   /* CR 30 */
 #define SwitchToCRT2            0x0002
-#define SetCRT2ToTV             0x009C
 #define SetCRT2ToAVIDEO         0x0004
 #define SetCRT2ToSVIDEO         0x0008
 #define SetCRT2ToSCART          0x0010
 #define SetCRT2ToLCD            0x0020
 #define SetCRT2ToRAMDAC         0x0040
 #define SetCRT2ToHiVisionTV     0x0080
+#define SetCRT2ToTV             0x009C   /* alias */
 #define SetNTSCTV               0x0000   /* CR 31 */
 #define SetPALTV                0x0100
 #define SetInSlaveMode          0x0200
@@ -92,6 +104,7 @@
 #define DriverMode              0x4000
 #define HotKeySwitch            0x8000  /* TW: ? */
 #define SetCRT2ToLCDA           0x8000
+
 #define PanelRGB18Bit           0x0100
 #define PanelRGB24Bit           0x0000
 
@@ -126,12 +139,12 @@
 	    010   LVDS
 	    011   LVDS + Chrontel 7019
 	  All other combinations reserved
-   [4]    LVDS: Expanding(0)/Non-expanding(1) LCD display
-          30x:  SiS30x(0)/LCD monitor(1) scaling display
+   [4]    LVDS: 0: Panel Link expands / 1: Panel Link does not expand
+          30x:  0: Bridge scales      / 1: Bridge does not scale = Panel scales (if possible)
    [5]    LCD polarity select
           0: VESA DMT Standard
 	  1: EDID 2.x defined
-   [6]    LCD honrizontal polarity select
+   [6]    LCD horizontal polarity select
           0: High active
 	  1: Low active
    [7]    LCD vertical polarity select
@@ -139,12 +152,37 @@
 	  1: Low active
 */
 
-#define EnableDualEdge 		0x01   /* CR38 (310/325 series) */
-/* #define PAL_NTSC             0x01      (only on 315PRO) */
-#define SetToLCDA		0x02   /* TW: LCD channel A (302 only) */
-#define SetYPbPr                0x10   /* TW: ? */
-#define EnablePALMN             0x40
-#define EnablePALN              0x80
+/* CR37: LCDInfo */
+#define LCDRGB18Bit           0x0001
+#define LCDNonExpanding       0x0010
+#define DontExpandLCD	      LCDNonExpanding
+#define LCDNonExpandingShift       4
+#define DontExpandLCDShift    LCDNonExpandingShift
+#define LCDSync               0x0020
+#define LCDPass11             0x0100 
+#define LCDSyncBit            0x00e0
+#define LCDSyncShift               6
+
+/* CR38 (310/325 series) */
+#define EnableDualEdge 		0x01   
+#define SetToLCDA		0x02   /* LCD channel A (302B/LV and 650+LVDS only) */
+#define EnableSiSHiVision       0x04   /* HiVision (HDTV) on SiS bridge */
+#define EnableLVDSScart         0x04   /* Scart on Ch7019 (unofficial definition - TW) */
+#define EnableLVDSHiVision      0x08   /* YPbPr color format (480i HDTV); only on 650/Ch7019 systems */
+#define SiSHiVision1            0x10   /* See SetHiVision() */
+#define SiSHiVision2            0x20
+#define EnablePALM              0x40   /* 1 = Set PALM */
+#define EnablePALN              0x80   /* 1 = Set PALN */
+
+#define SetSCARTOutput          0x01
+#define BoardTVType             0x02
+
+#define EnablePALMN             0x40   /* Romflag: 1 = Allow PALM/PALN */
+
+/* CR39 (650) */
+#define LCDPass1_1		0x01   /* LVDS only; set by driver to pass 1:1 data to LVDS output  */
+#define Enable302LV_DualLink    0x04   /* 30xNEW (302LV) only; set by mode switching function */
+
 
 /* CR79 (310/325 series only)
    [3-0] Notify driver
@@ -155,15 +193,14 @@
 	 0101 Set Contrast event
 	 0110 Set Mute event
 	 0111 Set Volume Up/Down event
-   [4]   Enable Backlight Control by BIOS/driver (set by driver)
+   [4]   Enable Backlight Control by BIOS/driver 
+         (set by driver; set means that the BIOS should
+	 not touch the backlight registers because eg.
+	 the driver already switched off the backlight)
    [5]   PAL/NTSC (set by BIOS)
-   [6]   Expansion On/Off (set by BIOS)
+   [6]   Expansion On/Off (set by BIOS; copied to CR32[4])
    [7]   TV UnderScan/OverScan (set by BIOS)
 */
-
-
-#define SetSCARTOutput          0x01
-#define BoardTVType             0x02
 
 /* SetFlag */
 #define ProgrammingCRT2         0x01
@@ -173,8 +210,7 @@
 #define EnableLVDSDDA           0x10
 #define SetDispDevSwitchFlag    0x20
 #define CheckWinDos             0x40
-#define SetJDOSMode             0x80
-#define CRT2IsVGA	        0x80  /* TW: Not sure about this name... */
+#define SetDOSMode              0x80
 
 /* LCDResInfo */
 #define Panel300_800x600        0x01	/* CR36 */
@@ -184,7 +220,6 @@
 #define Panel300_640x480        0x05
 #define Panel300_1024x600       0x06
 #define Panel300_1152x768       0x07
-/* #define Panel300_1600x1200      0x06  OLD */
 #define Panel300_320x480        0x08 	/* fstn - TW: This is fake, can be any */
 
 #define Panel310_800x600        0x01
@@ -194,35 +229,40 @@
 #define Panel310_1024x600       0x05
 #define Panel310_1152x864       0x06
 #define Panel310_1280x960       0x07
-#define Panel310_1152x768       0x08
+#define Panel310_1152x768       0x08	/* LVDS only */
 #define Panel310_1400x1050      0x09
-#define Panel310_1280x768       0x0a
+#define Panel310_1280x768       0x0a    /* LVDS only */
 #define Panel310_1600x1200      0x0b
-#define Panel310_320x480        0x0c           /* fstn - TW: This is fake, can be any */
+#define Panel310_320x480        0x0c    /* fstn - TW: This is fake, can be any */
+
+#define Panel_800x600           0x01	/* Unified values */
+#define Panel_1024x768          0x02
+#define Panel_1280x1024         0x03
+#define Panel_640x480           0x04
+#define Panel_1024x600          0x05
+#define Panel_1152x864          0x06
+#define Panel_1280x960          0x07
+#define Panel_1152x768          0x08	/* LVDS only */
+#define Panel_1400x1050         0x09
+#define Panel_1280x768          0x0a    /* LVDS only */
+#define Panel_1600x1200         0x0b
+#define Panel_320x480           0x0c    /* fstn - TW: This is fake, can be any */
 
 #define ExtChipType             0x0e
 #define ExtChip301              0x02
 #define ExtChipLVDS             0x04
 #define ExtChipTrumpion         0x06
 #define ExtChipCH7005           0x08
-#define ExtChipMitacTV          0x0a            /* TW: Incorrect, 0x0a = Chrontel 7005 only */
+#define ExtChipMitacTV          0x0a    /* TW: Incorrect, 0x0a = Chrontel 7005 only */
 
-#define IsM650                  0x80   		/* TW: CR5F */
-
-/* LCDInfo */
-#define LCDRGB18Bit             0x01
-#define LCDNonExpandingShift    0x04
-#define LCDNonExpanding         0x10
-#define LCDSync                 0x20
-/* TW: What is.. */        /*  0x100   */
-#define LCDSyncBit              0xe0
-#define LCDSyncShift            6
+#define IsM650                  0x80   	/* TW: CR5F */
 
 #define LCDDataLen              8
 #define HiTVDataLen             12
 #define TVDataLen               16
 #define SetPALTV                0x0100
 #define HalfDCLK                0x1000  /* modeflag */
+
 #define NTSCHT                  1716
 #define NTSC2HT                 1920
 #define NTSCVT                  525

@@ -24,9 +24,15 @@
 #endif
 
 #ifdef LINUX_KERNEL
+#include <linux/config.h>
+#include <linux/version.h>
 #include <asm/io.h>
 #include <linux/types.h>
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
 #include <linux/sisfb.h>
+#else
+#include <video/sisfb.h>
+#endif
 #endif
 
 #ifdef WIN2000
@@ -41,274 +47,306 @@
 #include "sisv.h"
 #endif
 
-USHORT   SiS_SetFlag;
-USHORT   SiS_RVBHCFACT,SiS_RVBHCMAX,SiS_RVBHRS;
-USHORT   SiS_VGAVT,SiS_VGAHT;
-USHORT   SiS_VT,SiS_HT;
-USHORT   SiS_VGAVDE,SiS_VGAHDE;
-USHORT   SiS_VDE,SiS_HDE;
-USHORT   SiS_NewFlickerMode,SiS_RY1COE,SiS_RY2COE,SiS_RY3COE,SiS_RY4COE;
-USHORT   SiS_LCDHDES,SiS_LCDVDES;
-USHORT   SiS_DDC_Port, SiS_DDC_Index,SiS_DDC_Data, SiS_DDC_Clk;
-USHORT   SiS_DDC_DataShift, SiS_DDC_DeviceAddr, SiS_DDC_Flag;
-USHORT   SiS_DDC_ReadAddr, SiS_DDC_Buffer;
+#if 0
+extern   const USHORT   SiS_MDA_DAC[];
+extern   const USHORT   SiS_CGA_DAC[];
+extern   const USHORT   SiS_EGA_DAC[];
+extern   const USHORT   SiS_VGA_DAC[];
+#endif
 
-USHORT   Panel800x600,   Panel1024x768,  Panel1280x1024, Panel1600x1200;
-USHORT   Panel1280x960,  Panel1400x1050, Panel320x480,   Panel1152x768;
-USHORT   Panel1280x768,  Panel1024x600,  Panel640x480,   Panel1152x864;
-USHORT   PanelMax, PanelMinLVDS, PanelMin301;
+extern   BOOLEAN  SiS_SearchVBModeID(SiS_Private *SiS_Pr, UCHAR *RomAddr, USHORT *);
 
-USHORT   SiS_ChrontelInit;
-
-extern   USHORT   SiS_CRT1Mode;
-extern   USHORT   SiS_P3c4,SiS_P3d4;
-extern   USHORT   SiS_P3ca;
-extern   USHORT   SiS_P3c9;
-extern   USHORT   SiS_P3da;
-extern   USHORT   SiS_Part1Port,SiS_Part2Port;
-extern   USHORT   SiS_Part3Port,SiS_Part4Port,SiS_Part5Port;
-extern   USHORT   SiS_MDA_DAC[];
-extern   USHORT   SiS_CGA_DAC[];
-extern   USHORT   SiS_EGA_DAC[];
-extern   USHORT   SiS_VGA_DAC[];
-extern   USHORT   SiS_ModeType;
-extern   USHORT   SiS_SelectCRT2Rate;
-extern   USHORT   SiS_IF_DEF_LVDS;
-extern   USHORT   SiS_IF_DEF_TRUMPION;
-extern   USHORT   SiS_IF_DEF_CH70xx;
-extern   USHORT   SiS_Backup70xx;
-extern   USHORT   SiS_IF_DEF_HiVision;
-extern   USHORT   SiS_IF_DEF_DSTN;   /*add for dstn*/
-extern   USHORT   SiS_IF_DEF_FSTN;   /*add for fstn*/
-extern   USHORT   SiS_VBInfo;
-extern   USHORT   SiS_VBType;
-extern   USHORT   SiS_VBExtInfo;
-extern   USHORT   SiS_LCDResInfo;
-extern   USHORT   SiS_LCDTypeInfo;
-extern   USHORT   SiS_LCDInfo;
-extern   USHORT   SiS_HiVision;
-
-extern   BOOLEAN  SiS_SearchVBModeID(UCHAR *RomAddr, USHORT *);
-
-BOOLEAN  SiS_Is301B(USHORT BaseAddr);
-BOOLEAN  SiS_IsDisableCRT2(USHORT BaseAddr);
-BOOLEAN  SiS_IsVAMode(PSIS_HW_DEVICE_INFO HwDeviceExtension, USHORT BaseAddr);
-BOOLEAN  SiS_IsDualEdge(PSIS_HW_DEVICE_INFO HwDeviceExtension, USHORT BaseAddr);
-BOOLEAN  SiS_CRT2IsLCD(USHORT BaseAddr);
-
-void     SiS_SetDefCRT2ExtRegs(USHORT BaseAddr);
-USHORT   SiS_GetRatePtrCRT2(UCHAR *ROMAddr, USHORT ModeNo,USHORT ModeIdIndex);
-BOOLEAN  SiS_AdjustCRT2Rate(UCHAR *ROMAddr,USHORT ModeNo,USHORT MODEIdIndex,USHORT RefreshRateTableIndex,USHORT *i);
-void     SiS_SaveCRT2Info(USHORT ModeNo);
-void     SiS_GetCRT2Data(UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex,USHORT RefreshRateTableIndex,
-                         PSIS_HW_DEVICE_INFO HwDeviceExtension);
-void     SiS_GetCRT2DataLVDS(UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex,USHORT RefreshRateTableIndex,
-                             PSIS_HW_DEVICE_INFO HwDeviceExtension);
-void     SiS_GetCRT2PtrA(UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex,USHORT RefreshRateTableIndex,
-                         USHORT *CRT2Index,USHORT *ResIndex);
-void     SiS_GetCRT2Part2Ptr(UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex,
-		             USHORT RefreshRateTableIndex,USHORT *CRT2Index,
-		             USHORT *ResIndex);
-void     SiS_GetCRT2Data301(UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex,USHORT RefreshRateTableIndex,
+BOOLEAN  SiS_Is301B(SiS_Private *SiS_Pr, USHORT BaseAddr);
+BOOLEAN  SiS_IsNotM650or651(SiS_Private *SiS_Pr, PSIS_HW_DEVICE_INFO HwDeviceExtension, USHORT BaseAddr);
+BOOLEAN  SiS_IsDisableCRT2(SiS_Private *SiS_Pr, USHORT BaseAddr);
+BOOLEAN  SiS_IsVAMode(SiS_Private *SiS_Pr, PSIS_HW_DEVICE_INFO HwDeviceExtension, USHORT BaseAddr);
+BOOLEAN  SiS_IsDualEdge(SiS_Private *SiS_Pr, PSIS_HW_DEVICE_INFO HwDeviceExtension, USHORT BaseAddr);
+BOOLEAN  SiS_CRT2IsLCD(SiS_Private *SiS_Pr, USHORT BaseAddr, PSIS_HW_DEVICE_INFO HwDeviceExtension);
+void     SiS_SetDefCRT2ExtRegs(SiS_Private *SiS_Pr, USHORT BaseAddr);
+USHORT   SiS_GetRatePtrCRT2(SiS_Private *SiS_Pr, UCHAR *ROMAddr, USHORT ModeNo,USHORT ModeIdIndex,
                             PSIS_HW_DEVICE_INFO HwDeviceExtension);
-USHORT   SiS_GetResInfo(UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex);
-void     SiS_GetCRT2ResInfo(UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex,PSIS_HW_DEVICE_INFO HwDeviceExtension);
-void     SiS_GetRAMDAC2DATA(UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex,USHORT RefreshRateTableIndex,
+BOOLEAN  SiS_AdjustCRT2Rate(SiS_Private *SiS_Pr, UCHAR *ROMAddr,USHORT ModeNo,USHORT MODEIdIndex,
+                            USHORT RefreshRateTableIndex,USHORT *i,PSIS_HW_DEVICE_INFO HwDeviceExtension);
+void     SiS_SaveCRT2Info(SiS_Private *SiS_Pr, USHORT ModeNo);
+void     SiS_GetCRT2Data(SiS_Private *SiS_Pr, UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex,
+		         USHORT RefreshRateTableIndex,PSIS_HW_DEVICE_INFO HwDeviceExtension);
+void     SiS_GetCRT2DataLVDS(SiS_Private *SiS_Pr, UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex,
+                             USHORT RefreshRateTableIndex,PSIS_HW_DEVICE_INFO HwDeviceExtension);
+void     SiS_GetCRT2PtrA(SiS_Private *SiS_Pr, UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex,
+                         USHORT RefreshRateTableIndex,USHORT *CRT2Index,USHORT *ResIndex);
+void     SiS_GetCRT2Part2Ptr(SiS_Private *SiS_Pr, UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex,
+		             USHORT RefreshRateTableIndex,USHORT *CRT2Index, USHORT *ResIndex);
+void     SiS_GetCRT2Data301(SiS_Private *SiS_Pr, UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex,
+                            USHORT RefreshRateTableIndex,PSIS_HW_DEVICE_INFO HwDeviceExtension);
+USHORT   SiS_GetResInfo(SiS_Private *SiS_Pr, UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex);
+void     SiS_GetCRT2ResInfo(SiS_Private *SiS_Pr, UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex,
                             PSIS_HW_DEVICE_INFO HwDeviceExtension);
-void     SiS_GetCRT2Ptr(UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex,USHORT RefreshRateTableIndex,
-		        USHORT *CRT2Index,USHORT *ResIndex,PSIS_HW_DEVICE_INFO HwDeviceExtension);
-void     SiS_SetCRT2ModeRegs(USHORT BaseAddr,USHORT ModeNo,USHORT ModeIdIndex, PSIS_HW_DEVICE_INFO );
-void     SiS_SetHiVision(USHORT BaseAddr,PSIS_HW_DEVICE_INFO HwDeviceExtension);
-
-void     SiS_GetLVDSDesData(UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex,USHORT RefreshRateTableIndex,
-                            PSIS_HW_DEVICE_INFO HwDeviceExtension);
-void     SiS_SetCRT2Offset(USHORT Part1Port,UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex,
+void     SiS_GetRAMDAC2DATA(SiS_Private *SiS_Pr, UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex,
+                            USHORT RefreshRateTableIndex,PSIS_HW_DEVICE_INFO HwDeviceExtension);
+void     SiS_GetCRT2Ptr(SiS_Private *SiS_Pr, UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex,
+                        USHORT RefreshRateTableIndex,USHORT *CRT2Index,USHORT *ResIndex,
+			PSIS_HW_DEVICE_INFO HwDeviceExtension);
+void     SiS_SetCRT2ModeRegs(SiS_Private *SiS_Pr, USHORT BaseAddr,USHORT ModeNo,USHORT ModeIdIndex,
+                             PSIS_HW_DEVICE_INFO );
+void     SiS_SetHiVision(SiS_Private *SiS_Pr, USHORT BaseAddr,PSIS_HW_DEVICE_INFO HwDeviceExtension);
+void     SiS_GetLVDSDesData(SiS_Private *SiS_Pr, UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex,
+			    USHORT RefreshRateTableIndex,PSIS_HW_DEVICE_INFO HwDeviceExtension);
+void     SiS_SetCRT2Offset(SiS_Private *SiS_Pr, UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex,
                            USHORT RefreshRateTableIndex,PSIS_HW_DEVICE_INFO HwDeviceExtension);
-USHORT   SiS_GetOffset(UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex,USHORT RefreshRateTableIndex,
-                       PSIS_HW_DEVICE_INFO HwDeviceExtension);
-USHORT   SiS_GetColorDepth(UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex);
-USHORT   SiS_GetMCLK(UCHAR *ROMAddr, PSIS_HW_DEVICE_INFO HwDeviceExtension);
-USHORT   SiS_CalcDelayVB(void);
-USHORT   SiS_GetVCLK2Ptr(UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex,
+USHORT   SiS_GetOffset(SiS_Private *SiS_Pr, UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex,
+                       USHORT RefreshRateTableIndex,PSIS_HW_DEVICE_INFO HwDeviceExtension);
+USHORT   SiS_GetColorDepth(SiS_Private *SiS_Pr, UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex);
+USHORT   SiS_GetMCLK(SiS_Private *SiS_Pr, UCHAR *ROMAddr, PSIS_HW_DEVICE_INFO HwDeviceExtension);
+USHORT   SiS_CalcDelayVB(SiS_Private *SiS_Pr);
+USHORT   SiS_GetVCLK2Ptr(SiS_Private *SiS_Pr, UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex,
                          USHORT RefreshRateTableIndex,PSIS_HW_DEVICE_INFO HwDeviceExtension);
-void     SiS_SetCRT2Sync(USHORT BaseAddr,UCHAR *ROMAddr,USHORT ModeNo,USHORT RefreshRateTableIndex,
-                         PSIS_HW_DEVICE_INFO HwDeviceExtension);
+void     SiS_SetCRT2Sync(SiS_Private *SiS_Pr, USHORT BaseAddr,UCHAR *ROMAddr,USHORT ModeNo,
+                         USHORT RefreshRateTableIndex,PSIS_HW_DEVICE_INFO HwDeviceExtension);
 void     SiS_SetRegANDOR(USHORT Port,USHORT Index,USHORT DataAND,USHORT DataOR);
 void     SiS_SetRegOR(USHORT Port,USHORT Index,USHORT DataOR);
 void     SiS_SetRegAND(USHORT Port,USHORT Index,USHORT DataAND);
-USHORT   SiS_GetVGAHT2(void);
-void     SiS_SetGroup2(USHORT BaseAddr,UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex,
+USHORT   SiS_GetVGAHT2(SiS_Private *SiS_Pr);
+void     SiS_Set300Part2Regs(SiS_Private *SiS_Pr, PSIS_HW_DEVICE_INFO HwDeviceExtension,
+    	 		     USHORT ModeIdIndex, USHORT RefreshRateTableIndex,
+			     USHORT BaseAddr, USHORT ModeNo);
+void     SiS_SetGroup2(SiS_Private *SiS_Pr, USHORT BaseAddr,UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex,
                        USHORT RefreshRateTableIndex,PSIS_HW_DEVICE_INFO HwDeviceExtension);
-void     SiS_SetGroup3(USHORT BaseAddr,UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex,
+void     SiS_SetGroup3(SiS_Private *SiS_Pr, USHORT BaseAddr,UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex,
                        PSIS_HW_DEVICE_INFO HwDeviceExtension);
-void     SiS_SetGroup4(USHORT  BaseAddr,UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex,
+void     SiS_SetGroup4(SiS_Private *SiS_Pr, USHORT  BaseAddr,UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex,
                        USHORT RefreshRateTableIndex,PSIS_HW_DEVICE_INFO HwDeviceExtension);
-void     SiS_SetGroup5(USHORT  BaseAddr,UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex);
-void     SiS_SetCRT2VCLK(USHORT BaseAddr,UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex,
-                         USHORT RefreshRateTableIndex,PSIS_HW_DEVICE_INFO HwDeviceExtension);
-void     SiS_EnableCRT2(void);
-void     SiS_LoadDAC2(UCHAR *ROMAddr,USHORT Part5Port,USHORT ModeNo,USHORT ModeIdIndex);
-void     SiS_WriteDAC2(USHORT Pdata,USHORT dl, USHORT ah, USHORT al, USHORT dh);
-void     SiS_GetVBInfo301(USHORT BaseAddr,UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex,
-                          PSIS_HW_DEVICE_INFO HwDeviceExtension);
-BOOLEAN  SiS_GetLCDResInfo(UCHAR *ROMAddr,USHORT P3d4,USHORT ModeNo,USHORT ModeIdIndex);
-BOOLEAN  SiS_BridgeIsOn(USHORT BaseAddr,PSIS_HW_DEVICE_INFO);
-BOOLEAN  SiS_BridgeIsEnable(USHORT BaseAddr,PSIS_HW_DEVICE_INFO);
-BOOLEAN  SiS_BridgeInSlave(void);
-void     SiS_PresetScratchregister(USHORT SiS_P3d4,PSIS_HW_DEVICE_INFO HwDeviceExtension);
-void     SiS_SetTVSystem(VOID);
-void     SiS_LongWait(VOID);
-USHORT   SiS_GetQueueConfig(VOID);
-void     SiS_VBLongWait(VOID);
-USHORT   SiS_GetVCLKLen(UCHAR *ROMAddr);
-void     SiS_WaitVBRetrace(PSIS_HW_DEVICE_INFO HwDeviceExtension);
-void     SiS_WaitRetrace1(PSIS_HW_DEVICE_INFO HwDeviceExtension);
-void     SiS_WaitRetrace2(PSIS_HW_DEVICE_INFO HwDeviceExtension);
-void     SiS_SetCRT2ECLK(UCHAR *ROMAddr, USHORT ModeNo,USHORT ModeIdIndex,USHORT RefreshRateTableIndex,
+void     SiS_SetGroup5(SiS_Private *SiS_Pr, PSIS_HW_DEVICE_INFO, USHORT  BaseAddr,UCHAR *ROMAddr,USHORT ModeNo,
+                       USHORT ModeIdIndex);
+void     SiS_FinalizeLCD(SiS_Private *SiS_Pr, USHORT BaseAddr,UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex,
                          PSIS_HW_DEVICE_INFO HwDeviceExtension);
-void     SiS_GetLVDSDesPtr(UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex,USHORT RefreshRateTableIndex,
-                           USHORT *PanelIndex,USHORT *ResIndex,PSIS_HW_DEVICE_INFO HwDeviceExtension);
-void     SiS_GetLVDSDesPtrA(UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex,USHORT RefreshRateTableIndex,
-                            USHORT *PanelIndex,USHORT *ResIndex);
-void     SiS_SetTPData(VOID);
-void     SiS_ModCRT1CRTC(UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex,USHORT RefreshRateTableIndex,
-			 PSIS_HW_DEVICE_INFO HwDeviceExtension);
-extern BOOLEAN  SiS_GetLVDSCRT1Ptr(UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex,USHORT RefreshRateTableIndex,
-		       USHORT *ResInfo,USHORT *DisplayType);
-void     SiS_SetCHTVReg(UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex,USHORT RefreshRateTableIndex);
-void     SiS_GetCHTVRegPtr(UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex,USHORT RefreshRateTableIndex);
-void     SiS_SetCH700x(USHORT tempax);
-USHORT   SiS_GetCH700x(USHORT tempax);
-void     SiS_SetCH701x(USHORT tempax);
-USHORT   SiS_GetCH701x(USHORT tempax);
-void     SiS_SetCH70xx(USHORT tempax);
-USHORT   SiS_GetCH70xx(USHORT tempax);
-void     SiS_SetCH70xxANDOR(USHORT tempax,USHORT tempbh);
-void     SiS_SetSwitchDDC2(void);
-USHORT   SiS_SetStart(void);
-USHORT   SiS_SetStop(void);
-void     SiS_DDC2Delay(USHORT delaytime);
-USHORT   SiS_SetSCLKLow(void);
-USHORT   SiS_SetSCLKHigh(void);
-USHORT   SiS_ReadDDC2Data(USHORT tempax);
-USHORT   SiS_WriteDDC2Data(USHORT tempax);
-USHORT   SiS_CheckACK(void);
+void     SiS_SetCRT2VCLK(SiS_Private *SiS_Pr, USHORT BaseAddr,UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex,
+                         USHORT RefreshRateTableIndex,PSIS_HW_DEVICE_INFO HwDeviceExtension);
+void     SiS_EnableCRT2(SiS_Private *SiS_Pr);
+void     SiS_GetVBInfo(SiS_Private *SiS_Pr, USHORT BaseAddr,UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex,
+                       PSIS_HW_DEVICE_INFO HwDeviceExtension, int checkcrt2mode);
+BOOLEAN  SiS_BridgeIsOn(SiS_Private *SiS_Pr, USHORT BaseAddr,PSIS_HW_DEVICE_INFO);
+BOOLEAN  SiS_BridgeIsEnable(SiS_Private *SiS_Pr, USHORT BaseAddr,PSIS_HW_DEVICE_INFO);
+BOOLEAN  SiS_BridgeInSlave(SiS_Private *SiS_Pr);
+void     SiS_PresetScratchregister(SiS_Private *SiS_Pr, PSIS_HW_DEVICE_INFO HwDeviceExtension);
+void     SiS_SetTVSystem(SiS_Private *SiS_Pr);
+void     SiS_LongWait(SiS_Private *SiS_Pr);
+USHORT   SiS_GetQueueConfig(SiS_Private *SiS_Pr);
+void     SiS_VBLongWait(SiS_Private *SiS_Pr);
+USHORT   SiS_GetVCLKLen(SiS_Private *SiS_Pr, UCHAR *ROMAddr);
+void     SiS_WaitVBRetrace(SiS_Private *SiS_Pr, PSIS_HW_DEVICE_INFO HwDeviceExtension);
+void     SiS_WaitRetrace1(SiS_Private *SiS_Pr, PSIS_HW_DEVICE_INFO HwDeviceExtension);
+void     SiS_WaitRetrace2(SiS_Private *SiS_Pr, PSIS_HW_DEVICE_INFO HwDeviceExtension);
+void     SiS_WaitRetraceDDC(SiS_Private *SiS_Pr);
+void     SiS_SetCRT2ECLK(SiS_Private *SiS_Pr, UCHAR *ROMAddr, USHORT ModeNo,USHORT ModeIdIndex,
+                         USHORT RefreshRateTableIndex,PSIS_HW_DEVICE_INFO HwDeviceExtension);
+void     SiS_GetLVDSDesPtr(SiS_Private *SiS_Pr, UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex,
+                           USHORT RefreshRateTableIndex,USHORT *PanelIndex,USHORT *ResIndex,
+			   PSIS_HW_DEVICE_INFO HwDeviceExtension);
+void     SiS_GetLVDSDesPtrA(SiS_Private *SiS_Pr, UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex,
+                            USHORT RefreshRateTableIndex,USHORT *PanelIndex,USHORT *ResIndex);
+void     SiS_SetTPData(SiS_Private *SiS_Pr);
+void     SiS_WhatIsThis(SiS_Private *SiS_Pr, USHORT myvbinfo);
+void     SiS_ModCRT1CRTC(SiS_Private *SiS_Pr, UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex,
+                         USHORT RefreshRateTableIndex,PSIS_HW_DEVICE_INFO HwDeviceExtension);
+void     SiS_SetCHTVReg(SiS_Private *SiS_Pr, UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex,
+                        USHORT RefreshRateTableIndex);
+void     SiS_GetCHTVRegPtr(SiS_Private *SiS_Pr, UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex,
+                           USHORT RefreshRateTableIndex);
+void     SiS_SetCH700x(SiS_Private *SiS_Pr, USHORT tempax);
+USHORT   SiS_GetCH700x(SiS_Private *SiS_Pr, USHORT tempax);
+void     SiS_SetCH701x(SiS_Private *SiS_Pr, USHORT tempax);
+USHORT   SiS_GetCH701x(SiS_Private *SiS_Pr, USHORT tempax);
+void     SiS_SetCH70xx(SiS_Private *SiS_Pr, USHORT tempax);
+USHORT   SiS_GetCH70xx(SiS_Private *SiS_Pr, USHORT tempax);
+#ifdef LINUX_XF86
+USHORT   SiS_I2C_GetByte(SiS_Private *SiS_Pr);
+Bool     SiS_I2C_PutByte(SiS_Private *SiS_Pr, USHORT data);
+Bool     SiS_I2C_Address(SiS_Private *SiS_Pr, USHORT addr);
+void     SiS_I2C_Stop(SiS_Private *SiS_Pr);
+#endif
+void     SiS_SetCH70xxANDOR(SiS_Private *SiS_Pr, USHORT tempax,USHORT tempbh);
+void     SiS_SetSwitchDDC2(SiS_Private *SiS_Pr);
+USHORT   SiS_SetStart(SiS_Private *SiS_Pr);
+USHORT   SiS_SetStop(SiS_Private *SiS_Pr);
+void     SiS_DDC2Delay(SiS_Private *SiS_Pr, USHORT delaytime);
+USHORT   SiS_SetSCLKLow(SiS_Private *SiS_Pr);
+USHORT   SiS_SetSCLKHigh(SiS_Private *SiS_Pr);
+USHORT   SiS_ReadDDC2Data(SiS_Private *SiS_Pr, USHORT tempax);
+USHORT   SiS_WriteDDC2Data(SiS_Private *SiS_Pr, USHORT tempax);
+USHORT   SiS_CheckACK(SiS_Private *SiS_Pr);
+USHORT   SiS_ReadLCDDDC(SiS_Private *SiS_Pr, USHORT length, unsigned char *buffer);
+#ifdef LINUX_XF86
+USHORT   SiS_SenseLCDDDC(SiS_Private *SiS_Pr, SISPtr pSiS);
+USHORT   SiS_SenseVGA2DDC(SiS_Private *SiS_Pr, SISPtr pSiS);
+#endif
 #ifdef SIS315H
-void     SiS_OEM310Setting(PSIS_HW_DEVICE_INFO HwDeviceExtension,USHORT BaseAddr,
+void     SiS_OEM310Setting(SiS_Private *SiS_Pr, PSIS_HW_DEVICE_INFO HwDeviceExtension,USHORT BaseAddr,
                            UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex);
-void     SiS_OEMLCD(PSIS_HW_DEVICE_INFO HwDeviceExtension,USHORT BaseAddr,
+void     SiS_OEMLCD(SiS_Private *SiS_Pr, PSIS_HW_DEVICE_INFO HwDeviceExtension,USHORT BaseAddr,
                     UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex);
 #endif
 #ifdef SIS300
-void     SiS_OEM300Setting(PSIS_HW_DEVICE_INFO HwDeviceExtension,USHORT BaseAddr,
+void     SiS_OEM300Setting(SiS_Private *SiS_Pr, PSIS_HW_DEVICE_INFO HwDeviceExtension,USHORT BaseAddr,
                            UCHAR *ROMAddr,USHORT ModeNo);
 #endif
-USHORT   GetRevisionID(PSIS_HW_DEVICE_INFO HwDeviceExtension);
-BOOLEAN  SiS_LowModeStuff(USHORT ModeNo,PSIS_HW_DEVICE_INFO HwDeviceExtension);
+BOOLEAN  SiS_LowModeStuff(SiS_Private *SiS_Pr, USHORT ModeNo,PSIS_HW_DEVICE_INFO HwDeviceExtension);
 
-BOOLEAN  SiS_GetLCDResInfo301(UCHAR *ROMAddr,USHORT SiS_P3d4, USHORT ModeNo, USHORT ModeIdIndex,
-                             PSIS_HW_DEVICE_INFO HwDeviceExtension);
-/* void    SiS_CHACRT1CRTC(UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex,
+BOOLEAN  SiS_GetLCDResInfo(SiS_Private *SiS_Pr, UCHAR *ROMAddr,USHORT ModeNo, USHORT ModeIdIndex,
+                           PSIS_HW_DEVICE_INFO HwDeviceExtension);
+/* void    SiS_CHACRT1CRTC(SiS_Private *SiS_Pr, UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex,
                         USHORT RefreshRateTableIndex); */
-BOOLEAN  SiS_GetLCDACRT1Ptr(UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex,
-		   USHORT RefreshRateTableIndex,USHORT *ResInfo,
-		   USHORT *DisplayType);
-/* 310 series OEM */
-USHORT 	GetLCDPtrIndex (void);
-USHORT  GetTVPtrIndex(void);
-void    SetDelayComp(PSIS_HW_DEVICE_INFO HwDeviceExtension,USHORT BaseAddr,
-             	     UCHAR *ROMAddr,USHORT ModeNo);
-void    SetAntiFlicker(PSIS_HW_DEVICE_INFO HwDeviceExtension,USHORT BaseAddr,
-               	       UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex);
-void    SetEdgeEnhance (PSIS_HW_DEVICE_INFO HwDeviceExtension,USHORT BaseAddr,
-                        UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex);
-void    SetYFilter(PSIS_HW_DEVICE_INFO HwDeviceExtension,USHORT BaseAddr,
-           	   UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex);
-void	SetPhaseIncr(PSIS_HW_DEVICE_INFO HwDeviceExtension,USHORT BaseAddr,
-             	     UCHAR *ROMAddr,USHORT ModeNo);
-/* 300 series OEM */
-USHORT 	GetOEMLCDPtr(PSIS_HW_DEVICE_INFO HwDeviceExtension, int Flag);
-USHORT 	GetOEMTVPtr(void);
-void	SetOEMTVDelay(PSIS_HW_DEVICE_INFO HwDeviceExtension,USHORT BaseAddr,
-              	      UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex);
-void	SetOEMLCDDelay(PSIS_HW_DEVICE_INFO HwDeviceExtension,USHORT BaseAddr,
-               	       UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex);
-void	SetOEMAntiFlicker(PSIS_HW_DEVICE_INFO HwDeviceExtension,
-                          USHORT BaseAddr,UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex);
-void  	SetOEMPhaseIncr(PSIS_HW_DEVICE_INFO HwDeviceExtension,USHORT BaseAddr,
-                        UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex);
-void	SetOEMYFilter(PSIS_HW_DEVICE_INFO HwDeviceExtension,USHORT BaseAddr,
-              	      UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex);
+
+BOOLEAN  SiS_SetCRT2Group301(SiS_Private *SiS_Pr, USHORT BaseAddr,UCHAR *ROMAddr,USHORT ModeNo,
+                             PSIS_HW_DEVICE_INFO HwDeviceExtension);
+void     SiS_SetGroup1(SiS_Private *SiS_Pr, USHORT BaseAddr,UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex,
+                       PSIS_HW_DEVICE_INFO HwDeviceExtension,USHORT RefreshRateTableIndex);
+void     SiS_SetGroup1_LVDS(SiS_Private *SiS_Pr, USHORT BaseAddr,UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex,
+                            PSIS_HW_DEVICE_INFO HwDeviceExtension,USHORT RefreshRateTableIndex);
+void     SiS_SetGroup1_LCDA(SiS_Private *SiS_Pr, USHORT  BaseAddr,UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex,
+                            PSIS_HW_DEVICE_INFO HwDeviceExtension,USHORT RefreshRateTableIndex);
+void     SiS_SetGroup1_301(SiS_Private *SiS_Pr, USHORT BaseAddr,UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex,
+                           PSIS_HW_DEVICE_INFO HwDeviceExtension,USHORT RefreshRateTableIndex);
+#ifdef SIS300
+void     SiS_SetCRT2FIFO_300(SiS_Private *SiS_Pr, UCHAR *ROMAddr,USHORT ModeNo,
+                             PSIS_HW_DEVICE_INFO HwDeviceExtension);
+#endif
+#ifdef SIS315H
+void     SiS_SetCRT2FIFO_310(SiS_Private *SiS_Pr, UCHAR *ROMAddr,USHORT ModeNo,
+                             PSIS_HW_DEVICE_INFO HwDeviceExtension);
+void     SiS_CRT2AutoThreshold(SiS_Private *SiS_Pr, USHORT  BaseAddr);
+#endif
+BOOLEAN  SiS_GetLCDDDCInfo(SiS_Private *SiS_Pr, PSIS_HW_DEVICE_INFO HwDeviceExtension);
+void     SiS_UnLockCRT2(SiS_Private *SiS_Pr, PSIS_HW_DEVICE_INFO,USHORT BaseAddr);
+void     SiS_LockCRT2(SiS_Private *SiS_Pr, PSIS_HW_DEVICE_INFO,USHORT BaseAddr);
+void     SiS_DisableBridge(SiS_Private *SiS_Pr, PSIS_HW_DEVICE_INFO,USHORT  BaseAddr);
+void     SiS_EnableBridge(SiS_Private *SiS_Pr, PSIS_HW_DEVICE_INFO,USHORT BaseAddr);
+void     SiS_SetPanelDelay(SiS_Private *SiS_Pr, UCHAR* ROMAddr,PSIS_HW_DEVICE_INFO,USHORT DelayTime);
+void     SiS_SetPanelDelayLoop(SiS_Private *SiS_Pr, UCHAR *ROMAddr, PSIS_HW_DEVICE_INFO HwDeviceExtension,
+                               USHORT DelayTime, USHORT DelayLoop);
+void     SiS_ShortDelay(SiS_Private *SiS_Pr, USHORT delay);
+void     SiS_LongDelay(SiS_Private *SiS_Pr, USHORT delay);
+void     SiS_GenericDelay(SiS_Private *SiS_Pr, USHORT delay);
+void     SiS_VBWait(SiS_Private *SiS_Pr);
+
+void     SiS_SiS30xBLOn(SiS_Private *SiS_Pr, PSIS_HW_DEVICE_INFO HwDeviceExtension);
+void     SiS_SiS30xBLOff(SiS_Private *SiS_Pr, PSIS_HW_DEVICE_INFO HwDeviceExtension);
+
+/* TW: New functions (with mostly temporary names) */
+void     SiS_Chrontel701xBLOn(SiS_Private *SiS_Pr);
+void     SiS_Chrontel701xOn(SiS_Private *SiS_Pr, PSIS_HW_DEVICE_INFO HwDeviceExtension,
+                            USHORT BaseAddr);
+void     SiS_Chrontel701xBLOff(SiS_Private *SiS_Pr);
+void     SiS_Chrontel701xOff(SiS_Private *SiS_Pr);
+void     SiS_ChrontelResetDB(SiS_Private *SiS_Pr);
+void     SiS_ChrontelDoSomething4(SiS_Private *SiS_Pr, PSIS_HW_DEVICE_INFO HwDeviceExtension, USHORT BaseAddr);
+void     SiS_ChrontelDoSomething3(SiS_Private *SiS_Pr, USHORT ModeNo, PSIS_HW_DEVICE_INFO HwDeviceExtension, USHORT BaseAddr);
+void     SiS_ChrontelDoSomething2(SiS_Private *SiS_Pr, PSIS_HW_DEVICE_INFO HwDeviceExtension, USHORT BaseAddr);
+void     SiS_ChrontelDoSomething1(SiS_Private *SiS_Pr, PSIS_HW_DEVICE_INFO HwDeviceExtension, USHORT BaseAddr);
+BOOLEAN  SiS_WeHaveBacklightCtrl(SiS_Private *SiS_Pr, PSIS_HW_DEVICE_INFO HwDeviceExtension, USHORT BaseAddr);
+#if 0
+BOOLEAN  SiS_IsSomethingCR5F(SiS_Private *SiS_Pr, PSIS_HW_DEVICE_INFO HwDeviceExtension, USHORT BaseAddr);
+#endif
+BOOLEAN  SiS_IsYPbPr(SiS_Private *SiS_Pr, PSIS_HW_DEVICE_INFO HwDeviceExtension, USHORT BaseAddr);
+BOOLEAN  SiS_IsChScart(SiS_Private *SiS_Pr, PSIS_HW_DEVICE_INFO HwDeviceExtension, USHORT BaseAddr);
+BOOLEAN  SiS_IsTVOrYPbPrOrScart(SiS_Private *SiS_Pr, PSIS_HW_DEVICE_INFO HwDeviceExtension, USHORT BaseAddr);
+BOOLEAN  SiS_IsLCDOrLCDA(SiS_Private *SiS_Pr, PSIS_HW_DEVICE_INFO HwDeviceExtension, USHORT BaseAddr);
+void     SiS_SetCH701xForLCD(SiS_Private *SiS_Pr, PSIS_HW_DEVICE_INFO HwDeviceExtension, USHORT BaseAddr);
+void     SiS_ChrontelPowerSequencing(SiS_Private *SiS_Pr);
+BOOLEAN  SiS_CR36BIOSWord23b(SiS_Private *SiS_Pr, PSIS_HW_DEVICE_INFO HwDeviceExtension);
+BOOLEAN  SiS_CR36BIOSWord23d(SiS_Private *SiS_Pr, PSIS_HW_DEVICE_INFO HwDeviceExtension);
+BOOLEAN  SiS_IsSR13_CR30(SiS_Private *SiS_Pr, PSIS_HW_DEVICE_INFO HwDeviceExtension);
+/* TW end */
 
 extern   void     SiS_SetReg1(USHORT, USHORT, USHORT);
 extern   void     SiS_SetReg3(USHORT, USHORT);
 extern   UCHAR    SiS_GetReg1(USHORT, USHORT);
 extern   UCHAR    SiS_GetReg2(USHORT);
-extern   BOOLEAN  SiS_SearchModeID(UCHAR *ROMAddr, USHORT *ModeNo,USHORT *ModeIdIndex);
-extern   BOOLEAN  SiS_GetRatePtr(ULONG, USHORT);
+extern   BOOLEAN  SiS_SearchModeID(SiS_Private *SiS_Pr, UCHAR *ROMAddr, USHORT *ModeNo,USHORT *ModeIdIndex);
+extern   BOOLEAN  SiS_GetRatePtr(SiS_Private *SiS_Pr, ULONG, USHORT);
 extern   void     SiS_SetReg4(USHORT, ULONG);
 extern   ULONG    SiS_GetReg3(USHORT);
-extern   void     SiS_DisplayOff(void);
-extern   void     SiS_DisplayOn(void);
-extern   UCHAR    SiS_GetModePtr(UCHAR *ROMAddr, USHORT ModeNo,USHORT ModeIdIndex);
+extern   void     SiS_SetReg5(USHORT, USHORT);
+extern   USHORT   SiS_GetReg4(USHORT);
+extern   void     SiS_DisplayOff(SiS_Private *SiS_Pr);
+extern   void     SiS_DisplayOn(SiS_Private *SiS_Pr);
+extern   UCHAR    SiS_GetModePtr(SiS_Private *SiS_Pr, UCHAR *ROMAddr, USHORT ModeNo,USHORT ModeIdIndex);
+extern   BOOLEAN  SiS_GetLCDACRT1Ptr(SiS_Private *SiS_Pr, UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex,
+		                     USHORT RefreshRateTableIndex,USHORT *ResInfo,USHORT *DisplayType);
+extern   BOOLEAN  SiS_GetLVDSCRT1Ptr(SiS_Private *SiS_Pr, UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex,
+                                     USHORT RefreshRateTableIndex,USHORT *ResInfo,USHORT *DisplayType);
+extern   void     SiS_LoadDAC(SiS_Private *SiS_Pr, PSIS_HW_DEVICE_INFO, UCHAR *ROMAddr,USHORT ModeNo,
+                              USHORT ModeIdIndex);
 #ifdef SIS315H
-extern   UCHAR    SiS_Get310DRAMType(UCHAR *ROMAddr,PSIS_HW_DEVICE_INFO HwDeviceExtension);
+extern   UCHAR    SiS_Get310DRAMType(SiS_Private *SiS_Pr, UCHAR *ROMAddr,PSIS_HW_DEVICE_INFO HwDeviceExtension);
 #endif
 
-BOOLEAN  SiS_SetCRT2Group301(USHORT BaseAddr,UCHAR *ROMAddr,USHORT ModeNo,
-                             PSIS_HW_DEVICE_INFO HwDeviceExtension);
-void     SiS_SetGroup1(USHORT BaseAddr,UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex,
-                       PSIS_HW_DEVICE_INFO HwDeviceExtension,USHORT RefreshRateTableIndex);
-void     SiS_SetGroup1_LVDS(USHORT BaseAddr,UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex,
-                            PSIS_HW_DEVICE_INFO HwDeviceExtension,USHORT RefreshRateTableIndex);
-void     SiS_SetGroup1_LCDA(USHORT  BaseAddr,UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex,
-                            PSIS_HW_DEVICE_INFO HwDeviceExtension,USHORT RefreshRateTableIndex);/*301b*/
-void     SiS_SetGroup1_301(USHORT BaseAddr,UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex,
-                           PSIS_HW_DEVICE_INFO HwDeviceExtension,USHORT RefreshRateTableIndex);
-#ifdef SIS300
-void     SiS_SetCRT2FIFO_300(UCHAR *ROMAddr,USHORT ModeNo,
-                             PSIS_HW_DEVICE_INFO HwDeviceExtension);
+#ifdef LINUX_XF86
+/* DDC functions */
+USHORT   SiS_InitDDCRegs(SiS_Private *SiS_Pr, SISPtr pSiS, USHORT adaptnum, USHORT DDCdatatype, BOOLEAN checkcr32);
+USHORT   SiS_WriteDABDDC(SiS_Private *SiS_Pr);
+USHORT   SiS_PrepareReadDDC(SiS_Private *SiS_Pr);
+USHORT   SiS_PrepareDDC(SiS_Private *SiS_Pr);
+void     SiS_SendACK(SiS_Private *SiS_Pr, USHORT yesno);
+USHORT   SiS_DoProbeDDC(SiS_Private *SiS_Pr);
+USHORT   SiS_ProbeDDC(SiS_Private *SiS_Pr);
+USHORT   SiS_ReadDDC(SiS_Private *SiS_Pr, SISPtr pSiS, USHORT DDCdatatype, unsigned char *buffer);
+USHORT   SiS_HandleDDC(SiS_Private *SiS_Pr, SISPtr pSiS, USHORT adaptnum,
+                       USHORT DDCdatatype, unsigned char *buffer);
 #endif
-#ifdef SIS315H
-void     SiS_SetCRT2FIFO_310(UCHAR *ROMAddr,USHORT ModeNo,
-                             PSIS_HW_DEVICE_INFO HwDeviceExtension);
-void     SiS_CRT2AutoThreshold(USHORT  BaseAddr);
-#endif
-BOOLEAN  SiS_GetLCDDDCInfo(PSIS_HW_DEVICE_INFO HwDeviceExtension);
-void     SiS_UnLockCRT2(PSIS_HW_DEVICE_INFO,USHORT BaseAddr);
-void     SiS_LockCRT2(PSIS_HW_DEVICE_INFO,USHORT BaseAddr);
-void     SiS_DisableBridge(PSIS_HW_DEVICE_INFO,USHORT  BaseAddr);
-void     SiS_EnableBridge(PSIS_HW_DEVICE_INFO,USHORT BaseAddr);
-void     SiS_SetPanelDelay(UCHAR* ROMAddr,PSIS_HW_DEVICE_INFO,USHORT DelayTime);
-void     SiS_ShortDelay(USHORT delay);
-void     SiS_LongDelay(USHORT delay);
-void     SiS_GenericDelay(USHORT delay);
-void     SiS_VBWait(void);
 
-/* TW: New functions (with temporary names) */
-void     SiS_Chrontel701xOn(void);
-void     SiS_Chrontel701xOn2(PSIS_HW_DEVICE_INFO HwDeviceExtension,
-                           USHORT BaseAddr);
-void     SiS_Chrontel701xOff(void);
-void     SiS_Chrontel701xOff2(void);
-void     SiS_ChrontelFlip0x48(void);
-void     SiS_ChrontelDoSomething4(PSIS_HW_DEVICE_INFO HwDeviceExtension, USHORT BaseAddr);
-void     SiS_ChrontelDoSomething3(USHORT ModeNo, PSIS_HW_DEVICE_INFO HwDeviceExtension, USHORT BaseAddr);
-void     SiS_ChrontelDoSomething2(PSIS_HW_DEVICE_INFO HwDeviceExtension, USHORT BaseAddr);
-void     SiS_ChrontelDoSomething1(PSIS_HW_DEVICE_INFO HwDeviceExtension, USHORT BaseAddr);
-BOOLEAN  SiS_WeHaveBacklightCtrl(PSIS_HW_DEVICE_INFO HwDeviceExtension, USHORT BaseAddr);
-#if 0
-BOOLEAN  SiS_IsSomethingCR5F(PSIS_HW_DEVICE_INFO HwDeviceExtension, USHORT BaseAddr);
-#endif
-BOOLEAN  SiS_IsYPbPr(PSIS_HW_DEVICE_INFO HwDeviceExtension, USHORT BaseAddr);
-BOOLEAN  SiS_IsTVOrSomething(PSIS_HW_DEVICE_INFO HwDeviceExtension, USHORT BaseAddr);
-BOOLEAN  SiS_IsLCDOrLCDA(PSIS_HW_DEVICE_INFO HwDeviceExtension, USHORT BaseAddr);
-void     SiS_SetCHTVForLCD(PSIS_HW_DEVICE_INFO HwDeviceExtension, USHORT BaseAddr);
-void     SiS_Chrontel19f2(void);
-BOOLEAN  SiS_CR36BIOSWord23b(PSIS_HW_DEVICE_INFO HwDeviceExtension);
-BOOLEAN  SiS_CR36BIOSWord23d(PSIS_HW_DEVICE_INFO HwDeviceExtension);
-BOOLEAN  SiS_IsSR13_CR30(PSIS_HW_DEVICE_INFO HwDeviceExtension);
+const UCHAR SiS_HiVisionTable[3][64] = {
+  { 
+    0x17, 0x1d, 0x03, 0x09, 0x05, 0x06, 0x0c, 0x0c,
+    0x94, 0x49, 0x01, 0x0a, 0x06, 0x0d, 0x04, 0x0a,
+    0x06, 0x14, 0x0d, 0x04, 0x0a, 0x00, 0x85, 0x1b,
+    0x0c, 0x50, 0x00, 0x97, 0x00, 0xd4, 0x4a, 0x17,
+    0x7d, 0x05, 0x4b, 0x00, 0x00, 0xe2, 0x00, 0x02,
+    0x03, 0x0a, 0x65, 0x9d, 0x08, 0x92, 0x8f, 0x40,
+    0x60, 0x80, 0x14, 0x90, 0x8c, 0x60, 0x14, 0x53,
+    0x00, 0x40, 0x44, 0x00, 0xdb, 0x02, 0x3b, 0x00
+  },
+  { 
+    0x1d, 0x1d, 0x06, 0x09, 0x0b, 0x0c, 0x0c, 0x0c,
+    0x98, 0x0a, 0x01, 0x0d, 0x06, 0x0d, 0x04, 0x0a,
+    0x06, 0x14, 0x0d, 0x04, 0x0a, 0x00, 0x85, 0x3f,
+    0x0c, 0x50, 0xb2, 0x2e, 0x16, 0xb5, 0xf4, 0x03,
+    0x7d, 0x11, 0x7d, 0xea, 0x30, 0x36, 0x18, 0x96,
+    0x21, 0x0a, 0x58, 0xee, 0x42, 0x92, 0x0f, 0x40,
+    0x60, 0x80, 0x14, 0x90, 0x8c, 0x60, 0x04, 0xf3,
+    0x00, 0x40, 0x11, 0x00, 0xfc, 0xff, 0x32, 0x00
+  },
+  { 
+    0x13, 0x1d, 0xe8, 0x09, 0x09, 0xed, 0x0c, 0x0c, 
+    0x98, 0x0a, 0x01, 0x0c, 0x06, 0x0d, 0x04, 0x0a, 
+    0x06, 0x14, 0x0d, 0x04, 0x0a, 0x00, 0x85, 0x3f, 
+    0xed, 0x50, 0x70, 0x9f, 0x16, 0x59, 0x2b, 0x13, 
+    0x27, 0x0b, 0x27, 0xfc, 0x30, 0x27, 0x1c, 0xb0, 
+    0x4b, 0x4b, 0x6f, 0x2f, 0x63, 0x92, 0x0f, 0x40, 
+    0x60, 0x80, 0x14, 0x90, 0x8c, 0x60, 0x14, 0x2a, 
+    0x00, 0x40, 0x11, 0x00, 0xfc, 0xff, 0x32, 0x00 
+  }
+};
 
-/* TW end */
+const UCHAR SiS_HiTVGroup3_1[] = {
+    0x00, 0x14, 0x15, 0x25, 0x55, 0x15, 0x0b, 0x13,
+    0xb1, 0x41, 0x62, 0x62, 0xff, 0xf4, 0x45, 0xa6,
+    0x25, 0x2f, 0x67, 0xf6, 0xbf, 0xff, 0x8e, 0x20,
+    0xac, 0xda, 0x60, 0xfe, 0x6a, 0x9a, 0x06, 0x10,
+    0xd1, 0x04, 0x18, 0x0a, 0xff, 0x80, 0x00, 0x80,
+    0x3b, 0x77, 0x00, 0xef, 0xe0, 0x10, 0xb0, 0xe0,
+    0x10, 0x4f, 0x0f, 0x0f, 0x05, 0x0f, 0x08, 0x6e,
+    0x1a, 0x1f, 0x25, 0x2a, 0x4c, 0xaa, 0x01
+};
+
+const UCHAR SiS_HiTVGroup3_2[] = {
+    0x00, 0x14, 0x15, 0x25, 0x55, 0x15, 0x0b, 0x7a,
+    0x54, 0x41, 0xe7, 0xe7, 0xff, 0xf4, 0x45, 0xa6,
+    0x25, 0x2f, 0x67, 0xf6, 0xbf, 0xff, 0x8e, 0x20,
+    0xac, 0x6a, 0x60, 0x2b, 0x52, 0xcd, 0x61, 0x10,
+    0x51, 0x04, 0x18, 0x0a, 0x1f, 0x80, 0x00, 0x80,
+    0xff, 0xa4, 0x04, 0x2b, 0x94, 0x21, 0x72, 0x94,
+    0x26, 0x05, 0x01, 0x0f, 0xed, 0x0f, 0x0a, 0x64,
+    0x18, 0x1d, 0x23, 0x28, 0x4c, 0xaa, 0x01
+};
 
 #endif
