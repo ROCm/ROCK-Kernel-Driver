@@ -20,3 +20,9 @@ dep_tristate '  Parallel port keyboard adapter' CONFIG_SERIO_PARKBD $CONFIG_SERI
 if [ "$CONFIG_ARCH_ACORN" = "y" ]; then
    dep_tristate '  Acorn RiscPC keyboard controller' CONFIG_SERIO_ACORN $CONFIG_SERIO
 fi
+if [ "$CONFIG_ARCH_INTEGRATOR" = "y" ]; then
+   dep_tristate '  AMBA KMI keyboard controller' CONFIG_SERIO_AMBAKMI $CONFIG_SERIO
+fi
+if [ "$CONFIG_SA1111" = "y" ]; then
+   dep_tristate '  Intel SA1111 keyboard controller' CONFIG_SERIO_SA1111 $CONFIG_SERIO
+fi
