@@ -82,6 +82,36 @@ void *node_remap_start_vaddr[MAX_NUMNODES];
 void set_pmd_pfn(unsigned long vaddr, unsigned long pfn, pgprot_t flags);
 
 /*
+ * FLAT - support for basic PC memory model with discontig enabled, essentially
+ *        a single node with all available processors in it with a flat
+ *        memory map.
+ */
+void __init get_memcfg_numa_flat(void)
+{
+	int pfn;
+
+	printk("NUMA - single node, flat memory mode\n");
+
+	/* Run the memory configuration and find the top of memory. */
+	find_max_pfn();
+	node_start_pfn[0]  = 0;
+	node_end_pfn[0]	  = max_pfn;
+
+	/* Fill in the physnode_map with our simplistic memory model,
+	* all memory is in node 0.
+	*/
+	for (pfn = node_start_pfn[0]; pfn <= node_end_pfn[0];
+	       pfn += PAGES_PER_ELEMENT)
+	{
+		physnode_map[pfn / PAGES_PER_ELEMENT] = 0;
+	}
+
+         /* Indicate there is one node available. */
+	node_set_online(0);
+	numnodes = 1;
+}
+
+/*
  * Find the highest page frame number we have available for the node
  */
 static void __init find_max_pfn_node(int nid)
