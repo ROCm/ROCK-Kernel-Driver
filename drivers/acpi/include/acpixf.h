@@ -281,7 +281,7 @@ acpi_install_gpe_handler (
 
 acpi_status
 acpi_acquire_global_lock (
-	u32                     timeout,
+	u16                     timeout,
 	u32                     *handle);
 
 acpi_status
