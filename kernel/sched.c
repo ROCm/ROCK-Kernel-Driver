@@ -1707,7 +1707,7 @@ void __wake_up_sync(wait_queue_head_t *q, unsigned int mode, int nr_exclusive)
 	spin_unlock_irqrestore(&q->lock, flags);
 }
 
-EXPORT_SYMBOL(__wake_up_sync);
+EXPORT_SYMBOL_GPL(__wake_up_sync);	/* For internal use only */
 
 void complete(struct completion *x)
 {
