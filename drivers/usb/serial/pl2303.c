@@ -91,6 +91,7 @@ static struct usb_device_id id_table [] = {
 	{ USB_DEVICE(ALCATEL_VENDOR_ID, ALCATEL_PRODUCT_ID) },
 	{ USB_DEVICE(SAMSUNG_VENDOR_ID, SAMSUNG_PRODUCT_ID) },
        { USB_DEVICE(PHAROS_VENDOR_ID, PHAROS_PRODUCT_ID) },
+	{ USB_DEVICE(SIEMENS_VENDOR_ID, SIEMENS_PRODUCT_ID_X65) },
 	{ }					/* Terminating entry */
 };
 

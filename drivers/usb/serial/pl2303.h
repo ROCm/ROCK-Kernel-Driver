@@ -53,3 +53,6 @@
 /* Pharos / Microsoft GPS puck */
 #define PHAROS_VENDOR_ID       0x067b
 #define PHAROS_PRODUCT_ID      0xaaa0
+
+#define SIEMENS_VENDOR_ID	0x11f5
+#define SIEMENS_PRODUCT_ID_X65	0x0003
