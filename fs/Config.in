@@ -17,7 +17,7 @@ tristate 'Reiserfs support' CONFIG_REISERFS_FS
 dep_mbool '  Enable reiserfs debug mode' CONFIG_REISERFS_CHECK $CONFIG_REISERFS_FS
 dep_mbool '  Stats in /proc/fs/reiserfs' CONFIG_REISERFS_PROC_INFO $CONFIG_REISERFS_FS
 
-dep_tristate 'ADFS file system support' CONFIG_ADFS_FS $CONFIG_EXPERIMENTAL
+dep_tristate 'ADFS file system support (EXPERIMENTAL)' CONFIG_ADFS_FS $CONFIG_EXPERIMENTAL
 dep_mbool '  ADFS write support (DANGEROUS)' CONFIG_ADFS_FS_RW $CONFIG_ADFS_FS $CONFIG_EXPERIMENTAL
 
 dep_tristate 'Amiga FFS file system support (EXPERIMENTAL)' CONFIG_AFFS_FS $CONFIG_EXPERIMENTAL
