@@ -33,6 +33,7 @@
 #include <linux/futex.h>
 #include <linux/highmem.h>
 #include <linux/time.h>
+#include <linux/pagemap.h>
 #include <asm/uaccess.h>
 
 /* Simple "sleep if unchanged" interface. */
@@ -215,7 +216,7 @@ asmlinkage int sys_futex(void *uaddr, int op, int val, struct timespec *utime)
 	default:
 		ret = -EINVAL;
 	}
-	put_page(page);
+	page_cache_release(page);
 
 	return ret;
 }
