@@ -328,8 +328,22 @@ asmlinkage unsigned int do_IRQ(struct pt_regs regs)
 	irq_desc_t *desc = irq_desc + irq;
 	struct irqaction * action;
 	unsigned int status;
+	long esp;
 
 	irq_enter();
+
+#ifdef CONFIG_DEBUG_STACKOVERFLOW
+	/* Debugging check for stack overflow: is there less than 1KB free? */
+	__asm__ __volatile__("andl %%esp,%0" : "=r" (esp) : "0" (8191));
+	if (unlikely(esp < (sizeof(struct task_struct) + 1024))) {
+		extern void show_stack(unsigned long *);
+
+		printk("do_IRQ: stack overflow: %ld\n",
+		esp - sizeof(struct task_struct));
+		__asm__ __volatile__("movl %%esp,%0" : "=r" (esp));
+		show_stack((void *)esp);
+	}
+#endif
 	kstat.irqs[cpu][irq]++;
 	spin_lock(&desc->lock);
 	desc->handler->ack(irq);
