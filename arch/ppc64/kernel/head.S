@@ -126,6 +126,10 @@ __secondary_hold_acknowledge:
  * All of it must fit below the first exception vector at 0x100.
  */
 _GLOBAL(__secondary_hold)
+	mfmsr	r24
+	ori	r24,r24,MSR_RI
+	mtmsrd	r24			/* RI on */
+
 	/* Grab our linux cpu number */
 	mr      r24,r3
 
@@ -1666,6 +1670,10 @@ _STATIC(start_here_pSeries)
 	/* get a new offset, now that the kernel has moved. */
 	bl	.reloc_offset
 	mr	r26,r3
+
+	mfmsr	r6
+	ori	r6,r6,MSR_RI
+	mtmsrd	r6			/* RI on */
 
 	/* setup the systemcfg pointer which is needed by *tab_initialize  */
 	LOADADDR(r6,systemcfg)
