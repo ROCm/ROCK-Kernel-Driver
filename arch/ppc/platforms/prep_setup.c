@@ -57,6 +57,7 @@
 #include <asm/mpc10x.h>
 #include <asm/i8259.h>
 #include <asm/open_pic.h>
+#include <asm/pci-bridge.h>
 
 unsigned char ucSystemType;
 unsigned char ucBoardRev;
@@ -991,12 +992,24 @@ static void __init
 prep_init_IRQ(void)
 {
 	int i;
+	unsigned int pci_viddid, pci_did;
 
 	if (OpenPIC_Addr != NULL)
 		openpic_init(NUM_8259_INTERRUPTS);
 	for ( i = 0 ; i < NUM_8259_INTERRUPTS ; i++ )
 		irq_desc[i].handler = &i8259_pic;
-	i8259_init(MPC10X_MAPA_PCI_INTACK_ADDR);
+	/* If we have a Raven PCI bridge or a Hawk PCI bridge / Memory
+	 * controller, we poll (as they have a different int-ack address). */
+	early_read_config_dword(0, 0, 0, PCI_VENDOR_ID, &pci_viddid);
+	pci_did = (pci_viddid & 0xffff0000) >> 16;
+	if (((pci_viddid & 0xffff) == PCI_VENDOR_ID_MOTOROLA)
+			&& ((pci_did == PCI_DEVICE_ID_MOTOROLA_RAVEN)
+				|| (pci_did == PCI_DEVICE_ID_MOTOROLA_HAWK)))
+		i8259_init(0);
+	else
+		/* PCI interrupt ack address given in section 6.1.8 of the
+		 * PReP specification. */
+		i8259_init(MPC10X_MAPA_PCI_INTACK_ADDR);
 }
 
 #if defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE)

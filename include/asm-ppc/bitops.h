@@ -236,8 +236,6 @@ static __inline__ int ffz(unsigned long x)
 	return __ilog2(x & -x);
 }
 
-#ifdef __KERNEL__
-
 static inline int __ffs(unsigned long x)
 {
 	return __ilog2(x & -x);
@@ -273,8 +271,6 @@ static __inline__ int fls(unsigned int x)
 #define hweight32(x) generic_hweight32(x)
 #define hweight16(x) generic_hweight16(x)
 #define hweight8(x) generic_hweight8(x)
-
-#endif /* __KERNEL__ */
 
 /*
  * Find the first bit set in a 140-bit bitmap.
@@ -395,8 +391,6 @@ found_middle:
 }
 
 
-#ifdef __KERNEL__
-
 #define ext2_set_bit(nr, addr)	__test_and_set_bit((nr) ^ 0x18, (unsigned long *)(addr))
 #define ext2_clear_bit(nr, addr) __test_and_clear_bit((nr) ^ 0x18, (unsigned long *)(addr))
 
@@ -459,8 +453,6 @@ found_middle:
 #define minix_test_and_clear_bit(nr,addr) ext2_clear_bit(nr,addr)
 #define minix_test_bit(nr,addr) ext2_test_bit(nr,addr)
 #define minix_find_first_zero_bit(addr,size) ext2_find_first_zero_bit(addr,size)
-
-#endif	/* __KERNEL__ */
 
 #endif /* _PPC_BITOPS_H */
 #endif /* __KERNEL__ */
