@@ -1,7 +1,7 @@
 /*
  * linux/net/sunrpc/sysctl.c
  *
- * Sysctl interface to sunrpc module. This is for debugging only now.
+ * Sysctl interface to sunrpc module.
  *
  * I would prefer to register the sunrpc table below sys/net, but that's
  * impossible at the moment.
@@ -19,6 +19,7 @@
 #include <linux/sunrpc/types.h>
 #include <linux/sunrpc/sched.h>
 #include <linux/sunrpc/stats.h>
+#include <linux/sunrpc/xprt.h>
 
 /*
  * Declare the debug flags here
@@ -117,6 +118,9 @@ done:
 	return 0;
 }
 
+static unsigned int min_slot_table_size = RPC_MIN_SLOT_TABLE;
+static unsigned int max_slot_table_size = RPC_MAX_SLOT_TABLE;
+
 static ctl_table debug_table[] = {
 	{
 		.ctl_name	= CTL_RPCDEBUG,
@@ -150,6 +154,28 @@ static ctl_table debug_table[] = {
 		.mode		= 0644,
 		.proc_handler	= &proc_dodebug
 	}, 
+	{
+		.ctl_name	= CTL_SLOTTABLE_UDP,
+		.procname	= "udp_slot_table_entries",
+		.data		= &xprt_udp_slot_table_entries,
+		.maxlen		= sizeof(unsigned int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec_minmax,
+		.strategy	= &sysctl_intvec,
+		.extra1		= &min_slot_table_size,
+		.extra2		= &max_slot_table_size
+	},
+	{
+		.ctl_name	= CTL_SLOTTABLE_TCP,
+		.procname	= "tcp_slot_table_entries",
+		.data		= &xprt_tcp_slot_table_entries,
+		.maxlen		= sizeof(unsigned int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec_minmax,
+		.strategy	= &sysctl_intvec,
+		.extra1		= &min_slot_table_size,
+		.extra2		= &max_slot_table_size
+	},
 	{ .ctl_name = 0 }
 };
 

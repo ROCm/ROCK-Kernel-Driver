@@ -303,8 +303,6 @@ static int wdt_notify_sys(struct notifier_block *this, unsigned long code, void 
 static struct notifier_block wdt_notifier=
 {
 	.notifier_call = wdt_notify_sys,
-	.next = 0,
-	.priority = 0,
 };
 
 static void __exit alim7101_wdt_unload(void)

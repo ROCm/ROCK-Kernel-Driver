@@ -1,8 +1,9 @@
 /*======================================================================
 
-    drivers/mtd/maps/armflash.c: ARM Flash Layout/Partitioning
+    drivers/mtd/maps/integrator-flash.c: ARM Integrator flash map driver
   
     Copyright (C) 2000 ARM Limited
+    Copyright (C) 2003 Deep Blue Solutions Ltd.
   
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -21,7 +22,7 @@
    This is access code for flashes using ARM's flash partitioning 
    standards.
 
-   $Id: integrator-flash.c,v 1.12 2003/05/20 20:59:30 dwmw2 Exp $
+   $Id: integrator-flash.c,v 1.15 2004/02/27 22:37:39 rmk Exp $
 
 ======================================================================*/
 
@@ -64,7 +65,7 @@ static void armflash_set_vpp(struct map_info *map, int on)
 		info->plat->set_vpp(on);
 }
 
-static const char *probes[] = { "RedBoot", "afs", NULL };
+static const char *probes[] = { "cmdlinepart", "RedBoot", "afs", NULL };
 
 static int armflash_probe(struct device *_dev)
 {

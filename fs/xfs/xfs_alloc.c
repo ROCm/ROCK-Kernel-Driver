@@ -780,14 +780,8 @@ xfs_alloc_ag_vextent_near(
 	/*
 	 * Randomly don't execute the first algorithm.
 	 */
-	static int	seed;		/* randomizing seed value */
 	int		dofirst;	/* set to do first algorithm */
-	timespec_t	now;		/* current time */
 
-	if (!seed) {
-		nanotime(&now);
-		seed = (int)now.tv_sec ^ (int)now.tv_nsec;
-	}
 	dofirst = random() & 1;
 #endif
 	/*

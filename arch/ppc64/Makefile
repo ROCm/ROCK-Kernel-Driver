@@ -53,7 +53,7 @@ $(boottarget-y): vmlinux
 	$(Q)$(MAKE) $(build)=$(boot) $(boot)/$@
 
 bootimage-$(CONFIG_PPC_PSERIES) := zImage
-bootimage-$(CONFIG_PPC_ISERIES) := vmlinux.sm
+bootimage-$(CONFIG_PPC_ISERIES) := vmlinux
 BOOTIMAGE := $(bootimage-y)
 install: vmlinux
 	$(Q)$(MAKE) $(build)=$(boot) BOOTIMAGE=$(BOOTIMAGE) $@

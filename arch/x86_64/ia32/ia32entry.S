@@ -12,6 +12,7 @@
 #include <asm/ia32_unistd.h>	
 #include <asm/thread_info.h>	
 #include <asm/segment.h>
+#include <asm/vsyscall32.h>
 #include <linux/linkage.h>
 
 	.macro IA32_ARG_FIXUP noebp=0
@@ -24,6 +25,99 @@
 	movl	%ebx,%edi
 	movl	%edx,%edx	/* zero extension */
 	.endm 
+
+	/* clobbers %eax */	
+	.macro  CLEAR_RREGS
+	xorl 	%eax,%eax
+	movq	%rax,R11(%rsp)
+	movq	%rax,R10(%rsp)
+	movq	%rax,R9(%rsp)
+	movq	%rax,R8(%rsp)
+	.endm
+
+/*
+ * 32bit SYSENTER instruction entry.
+ *
+ * Arguments:
+ * %eax	System call number.
+ * %ebx Arg1
+ * %ecx Arg2
+ * %edx Arg3
+ * %esi Arg4
+ * %edi Arg5
+ * %ebp user stack
+ * 0(%ebp) Arg6	
+ * 	
+ * Interrupts off.
+ *	
+ * This is purely a fast path. For anything complicated we use the int 0x80
+ * path below.	Set up a complete hardware stack frame to share code
+ * with the int 0x80 path.
+ */ 	
+ENTRY(ia32_sysenter_target)
+	CFI_STARTPROC
+	swapgs
+	movq	%gs:pda_kernelstack, %rsp
+	addq	$(PDA_STACKOFFSET),%rsp	
+	sti	
+ 	movl	%ebp,%ebp		/* zero extension */
+	pushq	$__USER32_DS
+	pushq	%rbp
+	pushfq
+	movl	$VSYSCALL32_SYSEXIT, %r10d
+	pushq	$__USER32_CS
+	movl	%eax, %eax
+	pushq	%r10
+	pushq	%rax
+	cld
+	SAVE_ARGS 0,0,1
+ 	/* no need to do an access_ok check here because rbp has been
+ 	   32bit zero extended */ 
+1:	movl	(%rbp),%r9d
+ 	.section __ex_table,"a"
+ 	.quad 1b,ia32_badarg
+ 	.previous	
+	GET_THREAD_INFO(%r10)
+	bt  $TIF_SYSCALL_TRACE,threadinfo_flags(%r10)
+	jc  sysenter_tracesys
+sysenter_do_call:	
+	cmpl	$(IA32_NR_syscalls),%eax
+	jae	ia32_badsys
+	IA32_ARG_FIXUP 1
+	call	*ia32_sys_call_table(,%rax,8)
+	movq	%rax,RAX-ARGOFFSET(%rsp)
+	GET_THREAD_INFO(%r10)
+	cli
+	testl	$_TIF_ALLWORK_MASK,threadinfo_flags(%r10)
+	jnz	int_ret_from_sys_call
+	/* clear IF, that popfq doesn't enable interrupts early */
+	andl  $~0x200,EFLAGS-R11(%rsp) 
+	RESTORE_ARGS 1,24,1,1,1,1
+	popfq
+	popq	%rcx				/* User %esp */
+	movl	$VSYSCALL32_SYSEXIT,%edx	/* User %eip */
+	swapgs
+	sti		/* sti only takes effect after the next instruction */
+	/* sysexit */
+	.byte	0xf, 0x35
+
+sysenter_tracesys:
+	SAVE_REST
+	CLEAR_RREGS
+	movq	$-ENOSYS,RAX(%rsp)	/* really needed? */
+	movq	%rsp,%rdi        /* &pt_regs -> arg1 */
+	call	syscall_trace
+	LOAD_ARGS ARGOFFSET  /* reload args from stack in case ptrace changed it */
+	RESTORE_REST
+	movl	%ebp, %ebp
+	/* no need to do an access_ok check here because rbp has been
+	   32bit zero extended */ 
+1:	movl	(%rbp),%r9d
+	.section __ex_table,"a"
+	.quad 1b,ia32_badarg
+	.previous
+	jmp	sysenter_do_call
+	CFI_ENDPROC
 
 /*
  * 32bit SYSCALL instruction entry.
@@ -51,7 +145,7 @@ ENTRY(ia32_cstar_target)
 	movl	%esp,%r8d
 	movq	%gs:pda_kernelstack,%rsp
 	sti
-	SAVE_ARGS 8,1
+	SAVE_ARGS 8,1,1
 	movl 	%eax,%eax	/* zero extension */
 	movq	%rax,ORIG_RAX-ARGOFFSET(%rsp)
 	movq	%rcx,RIP-ARGOFFSET(%rsp)
@@ -66,47 +160,48 @@ ENTRY(ia32_cstar_target)
 	/* hardware stack frame is complete now */	
 1:	movl	(%r8),%r9d
 	.section __ex_table,"a"
-	.quad 1b,cstar_badarg
+	.quad 1b,ia32_badarg
 	.previous	
 	GET_THREAD_INFO(%r10)
 	bt  $TIF_SYSCALL_TRACE,threadinfo_flags(%r10)
-	jc  ia32_tracesys
+	jc  cstar_tracesys
 cstar_do_call:	
 	cmpl $IA32_NR_syscalls,%eax
 	jae  ia32_badsys
 	IA32_ARG_FIXUP 1
 	call *ia32_sys_call_table(,%rax,8)
-	.globl cstar_sysret
-	/* label must directly follow call */
-cstar_sysret:	
 	movq %rax,RAX-ARGOFFSET(%rsp)
 	GET_THREAD_INFO(%r10)
 	cli
 	testl $_TIF_ALLWORK_MASK,threadinfo_flags(%r10)
-	jnz 1f
-	RESTORE_ARGS 1,-ARG_SKIP,1,1
+	jnz  int_ret_from_sys_call
+	RESTORE_ARGS 1,-ARG_SKIP,1,1,1
 	movl RIP-ARGOFFSET(%rsp),%ecx
 	movl EFLAGS-ARGOFFSET(%rsp),%r11d	
 	movl RSP-ARGOFFSET(%rsp),%esp
 	swapgs
 	sysretl
 	
-1:
-	btc   $TIF_IRET,threadinfo_flags(%r10) 
-	jmp   int_ret_from_sys_call
-	
 cstar_tracesys:	
 	SAVE_REST
+	CLEAR_RREGS
 	movq $-ENOSYS,RAX(%rsp)	/* really needed? */
 	movq %rsp,%rdi        /* &pt_regs -> arg1 */
 	call syscall_trace
 	LOAD_ARGS ARGOFFSET  /* reload args from stack in case ptrace changed it */
 	RESTORE_REST
+	movl RSP-ARGOFFSET(%rsp), %r8d
+	/* no need to do an access_ok check here because r8 has been
+	   32bit zero extended */ 
+1:	movl	(%r8),%r9d
+	.section __ex_table,"a"
+	.quad 1b,ia32_badarg
+	.previous
 	jmp cstar_do_call
 				
-cstar_badarg:
+ia32_badarg:
 	movq $-EFAULT,%rax
-	jmp cstar_sysret
+	jmp ia32_sysret
 	CFI_ENDPROC
 
 /* 
@@ -139,7 +234,7 @@ ENTRY(ia32_syscall)
 	cld
 	/* note the registers are not zero extended to the sf.
 	   this could be a problem. */
-	SAVE_ARGS
+	SAVE_ARGS 0,0,1
 	GET_THREAD_INFO(%r10)
 	bt $TIF_SYSCALL_TRACE,threadinfo_flags(%r10)
 	jc ia32_tracesys
@@ -148,6 +243,7 @@ ia32_do_syscall:
 	jae  ia32_badsys
 	IA32_ARG_FIXUP
 	call *ia32_sys_call_table(,%rax,8) # xxx: rip relative
+ia32_sysret:
 	movq %rax,RAX-ARGOFFSET(%rsp)
 	jmp int_ret_from_sys_call 
 
@@ -200,8 +296,7 @@ ENTRY(ia32_ptregs_common)
 	call *%rax
 	movq %r15, %r11
 	RESTORE_REST
-	cmpq $cstar_sysret,%r11
-	je   int_ret_from_sys_call /* misbalances the call/ret stack. sorry */
+	leaq ia32_sysret(%rip),%r11
 	pushq %r11
 	ret
 	CFI_ENDPROC

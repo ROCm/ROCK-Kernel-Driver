@@ -61,7 +61,7 @@ _raw_spin_lock (spinlock_t *lock)
 		      "}\n\t"
 		      "cmpxchg4.acq r30 = [%1], r30, ar.ccv;;\n\t"
 		      "cmp4.ne p14, p0 = r30, r0\n"
-		      "(p14) brl.cond.spnt.many ia64_spinlock_contention_pre3_4"
+		      "(p14) brl.cond.spnt.many ia64_spinlock_contention_pre3_4;;"
 		      : "=r"(ptr) : "r"(ptr) : IA64_SPINLOCK_CLOBBERS);
 # endif /* CONFIG_MCKINLEY */
 #else
@@ -81,7 +81,7 @@ _raw_spin_lock (spinlock_t *lock)
 		      "mov ar.ccv = r0;;\n\t"
 		      "cmpxchg4.acq r30 = [%0], r30, ar.ccv;;\n\t"
 		      "cmp4.ne p14, p0 = r30, r0\n\t"
-		      "(p14) brl.call.spnt.many b6=ia64_spinlock_contention"
+		      "(p14) brl.call.spnt.many b6=ia64_spinlock_contention;;"
 		      : "=r"(ptr) : "r"(ptr) : IA64_SPINLOCK_CLOBBERS);
 # endif /* CONFIG_MCKINLEY */
 #endif

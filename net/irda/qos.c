@@ -336,6 +336,7 @@ void irda_init_max_qos_capabilies(struct qos_info *qos)
 	qos->link_disc_time.bits &= 0xff;
 	qos->additional_bofs.bits = 0xff;
 }
+EXPORT_SYMBOL(irda_init_max_qos_capabilies);
 
 /*
  * Function irlap_adjust_qos_settings (qos)
@@ -774,3 +775,4 @@ void irda_qos_bits_to_value(struct qos_info *qos)
 	index = msb_index(qos->additional_bofs.bits);
 	qos->additional_bofs.value = add_bofs[index];
 }
+EXPORT_SYMBOL(irda_qos_bits_to_value);

@@ -1187,6 +1187,9 @@ static void free_a_bridge( struct acpi_bridge	*ab)
 
 static void shpchprm_free_bridges ( struct acpi_bridge	*ab)
 {
+	if (!ab)
+		return;
+
 	if (ab->child)
 		shpchprm_free_bridges (ab->child);
 

@@ -993,7 +993,6 @@ static struct sem_undo *find_undo(int semid)
 	}
 	error = sem_revalidate(semid, sma, nsems, 0);
 	if (error) {
-		sem_unlock(sma);
 		unlock_semundo();
 		kfree(new);
 		un = ERR_PTR(error);

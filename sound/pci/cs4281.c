@@ -1039,7 +1039,8 @@ static int __devinit snd_cs4281_pcm(cs4281_t * chip, int device, snd_pcm_t ** rp
 	strcpy(pcm->name, "CS4281");
 	chip->pcm = pcm;
 
-	snd_pcm_lib_preallocate_pci_pages_for_all(chip->pci, pcm, 64*1024, 512*1024);
+	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_DEV,
+					      snd_dma_pci_data(chip->pci), 64*1024, 512*1024);
 
 	if (rpcm)
 		*rpcm = pcm;

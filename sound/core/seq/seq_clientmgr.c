@@ -547,6 +547,36 @@ static int update_timestamp_of_queue(snd_seq_event_t *event, int queue, int real
 
 
 /*
+ * expand a quoted event.
+ */
+static int expand_quoted_event(snd_seq_event_t *event)
+{
+	snd_seq_event_t *quoted;
+
+	quoted = event->data.quote.event;
+	if (quoted == NULL) {
+		snd_printd("seq: quoted event is NULL\n");
+		return -EINVAL;
+	}
+
+	event->type = quoted->type;
+	event->tag = quoted->tag;
+	event->source = quoted->source;
+	/* don't use quoted destination */
+	event->data = quoted->data;
+	/* use quoted timestamp only if subscription/port didn't update it */
+	if (event->queue == SNDRV_SEQ_QUEUE_DIRECT) {
+		event->flags = quoted->flags;
+		event->queue = quoted->queue;
+		event->time = quoted->time;
+	} else {
+		event->flags = (event->flags & SNDRV_SEQ_TIME_STAMP_MASK)
+			| (quoted->flags & ~SNDRV_SEQ_TIME_STAMP_MASK);
+	}
+	return 0;
+}
+
+/*
  * deliver an event to the specified destination.
  * if filter is non-zero, client filter bitmap is tested.
  *
@@ -581,12 +611,9 @@ static int snd_seq_deliver_single_event(client_t *client,
 		update_timestamp_of_queue(event, dest_port->time_queue,
 					  dest_port->time_real);
 
-	/* expand the quoted event */
 	if (event->type == SNDRV_SEQ_EVENT_KERNEL_QUOTE) {
 		quoted = 1;
-		event = event->data.quote.event;
-		if (event == NULL) {
-			snd_printd("seq: quoted event is NULL\n");
+		if (expand_quoted_event(event) < 0) {
 			result = 0; /* do not send bounce error */
 			goto __skip;
 		}
@@ -694,8 +721,8 @@ static int port_broadcast_event(client_t *client,
 	if (dest_client == NULL)
 		return 0; /* no matching destination */
 
-	read_lock(&client->ports_lock);
-	list_for_each(p, &client->ports_list_head) {
+	read_lock(&dest_client->ports_lock);
+	list_for_each(p, &dest_client->ports_list_head) {
 		client_port_t *port = list_entry(p, client_port_t, list);
 		event->dest.port = port->addr.port;
 		/* pass NULL as source client to avoid error bounce */
@@ -706,7 +733,7 @@ static int port_broadcast_event(client_t *client,
 			break;
 		num_ev++;
 	}
-	read_unlock(&client->ports_lock);
+	read_unlock(&dest_client->ports_lock);
 	snd_seq_client_unlock(dest_client);
 	event->dest.port = SNDRV_SEQ_ADDRESS_BROADCAST; /* restore */
 	return (err < 0) ? err : num_ev;

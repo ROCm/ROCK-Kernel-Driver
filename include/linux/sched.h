@@ -547,6 +547,8 @@ extern void node_nr_running_init(void);
 #define node_nr_running_init() {}
 #endif
 
+/* Move tasks off this (offline) CPU onto another. */
+extern void migrate_all_tasks(void);
 extern void set_user_nice(task_t *p, long nice);
 extern int task_prio(task_t *p);
 extern int task_nice(task_t *p);
@@ -560,13 +562,9 @@ void yield(void);
  */
 extern struct exec_domain	default_exec_domain;
 
-#ifndef INIT_THREAD_SIZE
-# define INIT_THREAD_SIZE	2048*sizeof(long)
-#endif
-
 union thread_union {
 	struct thread_info thread_info;
-	unsigned long stack[INIT_THREAD_SIZE/sizeof(long)];
+	unsigned long stack[THREAD_SIZE/sizeof(long)];
 };
 
 #ifndef __HAVE_ARCH_KSTACK_END
@@ -602,7 +600,7 @@ extern void do_timer(struct pt_regs *);
 extern int FASTCALL(wake_up_state(struct task_struct * tsk, unsigned int state));
 extern int FASTCALL(wake_up_process(struct task_struct * tsk));
 #ifdef CONFIG_SMP
- extern void FASTCALL(kick_process(struct task_struct * tsk));
+ extern void kick_process(struct task_struct *tsk);
 #else
  static inline void kick_process(struct task_struct *tsk) { }
 #endif

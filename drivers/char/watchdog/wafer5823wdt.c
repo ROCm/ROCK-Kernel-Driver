@@ -252,8 +252,6 @@ static struct miscdevice wafwdt_miscdev = {
 
 static struct notifier_block wafwdt_notifier = {
 	.notifier_call = wafwdt_notify_sys,
-	.next = NULL,
-	.priority = 0,
 };
 
 static int __init wafwdt_init(void)

@@ -6,7 +6,6 @@
  *  HPFS bitmap operations
  */
 
-#include <linux/buffer_head.h>
 #include "hpfs_fn.h"
 
 /*

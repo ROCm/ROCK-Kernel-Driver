@@ -8,12 +8,11 @@
  * 
  * This exports a 'system' bus type. 
  * By default, a 'sys' bus gets added to the root of the system. There will
- * always be core system devices. Devices can use sys_device_register() to
+ * always be core system devices. Devices can use sysdev_register() to
  * add themselves as children of the system bus.
  */
 
-#undef DEBUG
-
+#include <linux/config.h>
 #include <linux/sysdev.h>
 #include <linux/err.h>
 #include <linux/module.h>
@@ -164,11 +163,11 @@ EXPORT_SYMBOL(sysdev_driver_unregister);
 
 
 /**
- *	sys_device_register - add a system device to the tree
+ *	sysdev_register - add a system device to the tree
  *	@sysdev:	device in question
  *
  */
-int sys_device_register(struct sys_device * sysdev)
+int sysdev_register(struct sys_device * sysdev)
 {
 	int error;
 	struct sysdev_class * cls = sysdev->cls;
@@ -212,7 +211,7 @@ int sys_device_register(struct sys_device * sysdev)
 	return error;
 }
 
-void sys_device_unregister(struct sys_device * sysdev)
+void sysdev_unregister(struct sys_device * sysdev)
 {
 	struct sysdev_driver * drv;
 
@@ -384,11 +383,11 @@ int sysdev_resume(void)
 }
 
 
-int __init sys_bus_init(void)
+int __init system_bus_init(void)
 {
 	system_subsys.kset.kobj.parent = &devices_subsys.kset.kobj;
 	return subsystem_register(&system_subsys);
 }
 
-EXPORT_SYMBOL(sys_device_register);
-EXPORT_SYMBOL(sys_device_unregister);
+EXPORT_SYMBOL(sysdev_register);
+EXPORT_SYMBOL(sysdev_unregister);

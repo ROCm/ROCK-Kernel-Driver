@@ -63,10 +63,6 @@ EXPORT_SYMBOL(pm_idle);
 EXPORT_SYMBOL(pm_power_off);
 EXPORT_SYMBOL(get_cmos_time);
 
-#ifdef CONFIG_IO_DEBUG
-EXPORT_SYMBOL(__io_virt_debug);
-#endif
-
 EXPORT_SYMBOL_NOVERS(__down_failed);
 EXPORT_SYMBOL_NOVERS(__down_failed_interruptible);
 EXPORT_SYMBOL_NOVERS(__down_failed_trylock);
@@ -196,6 +192,7 @@ EXPORT_SYMBOL(die_chain);
 
 #ifdef CONFIG_SMP
 EXPORT_SYMBOL(cpu_sibling_map);
+EXPORT_SYMBOL(smp_num_siblings);
 #endif
 
 extern void do_softirq_thunk(void);
@@ -224,3 +221,6 @@ EXPORT_SYMBOL_GPL(flush_tlb_all);
 #endif
 
 EXPORT_SYMBOL(sys_ioctl);
+
+EXPORT_SYMBOL(memcpy_toio);
+EXPORT_SYMBOL(memcpy_fromio);

@@ -164,7 +164,6 @@ int emu10k1_wavein_open(struct emu10k1_wavedevice *wave_dev)
 
 	if (alloc_buffer(card, &wiinst->buffer) < 0) {
 		ERROR();
-		emu10k1_wavein_close(wave_dev);
 		return -1;
 	}
 

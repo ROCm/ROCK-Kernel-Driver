@@ -256,7 +256,7 @@ static dev_link_t *fmvj18x_attach(void)
     dev = alloc_etherdev(sizeof(local_info_t));
     if (!dev)
 	return NULL;
-    lp = dev->priv;
+    lp = netdev_priv(dev);
     link = &lp->link;
     link->priv = dev;
 
@@ -394,7 +394,7 @@ static void fmvj18x_config(dev_link_t *link)
 {
     client_handle_t handle = link->handle;
     struct net_device *dev = link->priv;
-    local_info_t *lp = dev->priv;
+    local_info_t *lp = netdev_priv(dev);
     tuple_t tuple;
     cisparse_t parse;
     u_short buf[32];
@@ -803,7 +803,7 @@ module_exit(exit_fmvj18x_cs);
 static irqreturn_t fjn_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
     struct net_device *dev = dev_id;
-    local_info_t *lp = dev->priv;
+    local_info_t *lp = netdev_priv(dev);
     ioaddr_t ioaddr;
     unsigned short tx_stat, rx_stat;
 
@@ -862,7 +862,7 @@ static irqreturn_t fjn_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 static void fjn_tx_timeout(struct net_device *dev)
 {
-    struct local_info_t *lp = (struct local_info_t *)dev->priv;
+    struct local_info_t *lp = netdev_priv(dev);
     ioaddr_t ioaddr = dev->base_addr;
 
     printk(KERN_NOTICE "%s: transmit timed out with status %04x, %s?\n",
@@ -892,7 +892,7 @@ static void fjn_tx_timeout(struct net_device *dev)
 
 static int fjn_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
-    struct local_info_t *lp = (struct local_info_t *)dev->priv;
+    struct local_info_t *lp = netdev_priv(dev);
     ioaddr_t ioaddr = dev->base_addr;
     short length = skb->len;
     
@@ -966,7 +966,7 @@ static int fjn_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 static void fjn_reset(struct net_device *dev)
 {
-    struct local_info_t *lp = (struct local_info_t *)dev->priv;
+    struct local_info_t *lp = netdev_priv(dev);
     ioaddr_t ioaddr = dev->base_addr;
     int i;
 
@@ -1052,7 +1052,7 @@ static void fjn_reset(struct net_device *dev)
 
 static void fjn_rx(struct net_device *dev)
 {
-    struct local_info_t *lp = (struct local_info_t *)dev->priv;
+    struct local_info_t *lp = netdev_priv(dev);
     ioaddr_t ioaddr = dev->base_addr;
     int boguscount = 10;	/* 5 -> 10: by agy 19940922 */
 
@@ -1181,7 +1181,7 @@ static int fjn_config(struct net_device *dev, struct ifmap *map){
 
 static int fjn_open(struct net_device *dev)
 {
-    struct local_info_t *lp = (struct local_info_t *)dev->priv;
+    struct local_info_t *lp = netdev_priv(dev);
     dev_link_t *link = &lp->link;
 
     DEBUG(4, "fjn_open('%s').\n", dev->name);
@@ -1206,7 +1206,7 @@ static int fjn_open(struct net_device *dev)
 
 static int fjn_close(struct net_device *dev)
 {
-    struct local_info_t *lp = (struct local_info_t *)dev->priv;
+    struct local_info_t *lp = netdev_priv(dev);
     dev_link_t *link = &lp->link;
     ioaddr_t ioaddr = dev->base_addr;
 
@@ -1239,7 +1239,7 @@ static int fjn_close(struct net_device *dev)
 
 static struct net_device_stats *fjn_get_stats(struct net_device *dev)
 {
-    local_info_t *lp = (local_info_t *)dev->priv;
+    local_info_t *lp = netdev_priv(dev);
     return &lp->stats;
 } /* fjn_get_stats */
 
@@ -1252,7 +1252,7 @@ static struct net_device_stats *fjn_get_stats(struct net_device *dev)
 static void set_rx_mode(struct net_device *dev)
 {
     ioaddr_t ioaddr = dev->base_addr;
-    struct local_info_t *lp = (struct local_info_t *)dev->priv;
+    struct local_info_t *lp = netdev_priv(dev);
     u_char mc_filter[8];		 /* Multicast hash filter */
     u_long flags;
     int i;

@@ -283,7 +283,7 @@ There are two types of DMA mappings:
              in order to get correct behavior on all platforms.
 
 - Streaming DMA mappings which are usually mapped for one DMA transfer,
-  unmapped right after it (unless you use pci_dma_sync below) and for which
+  unmapped right after it (unless you use pci_dma_sync_* below) and for which
   hardware can optimize for sequential accesses.
 
   This of "streaming" as "asynchronous" or "outside the coherency
@@ -519,7 +519,7 @@ consecutive sglist entries can be merged into one provided the first one
 ends and the second one starts on a page boundary - in fact this is a huge
 advantage for cards which either cannot do scatter-gather or have very
 limited number of scatter-gather entries) and returns the actual number
-of sg entries it mapped them to.
+of sg entries it mapped them to. On failure 0 is returned.
 
 Then you should loop count times (note: this can be less than nents times)
 and use sg_dma_address() and sg_dma_len() macros where you previously
@@ -543,14 +543,30 @@ same bus address space) and you could render the machine unusable by eating
 all bus addresses.
 
 If you need to use the same streaming DMA region multiple times and touch
-the data in between the DMA transfers, just map it with
-pci_map_{single,sg}, and after each DMA transfer call either:
+the data in between the DMA transfers, the buffer needs to be synced
+properly in order for the cpu and device to see the most uptodate and
+correct copy of the DMA buffer.
 
-	pci_dma_sync_single(dev, dma_handle, size, direction);
+So, firstly, just map it with pci_map_{single,sg}, and after each DMA
+transfer call either:
+
+	pci_dma_sync_single_for_cpu(dev, dma_handle, size, direction);
 
 or:
 
-	pci_dma_sync_sg(dev, sglist, nents, direction);
+	pci_dma_sync_sg_for_cpu(dev, sglist, nents, direction);
+
+as appropriate.
+
+Then, if you wish to let the device get at the DMA area again,
+finish accessing the data with the cpu, and then before actually
+giving the buffer to the hardware call either:
+
+	pci_dma_sync_single_for_device(dev, dma_handle, size, direction);
+
+or:
+
+	pci_dma_sync_sg_for_device(dev, sglist, nents, direction);
 
 as appropriate.
 
@@ -590,8 +606,9 @@ to use the pci_dma_sync_*() interfaces.
 			 * the DMA transfer with the CPU first
 			 * so that we see updated contents.
 			 */
-			pci_dma_sync_single(cp->pdev, cp->rx_dma, cp->rx_len,
-					    PCI_DMA_FROMDEVICE);
+			pci_dma_sync_single_for_cpu(cp->pdev, cp->rx_dma,
+						    cp->rx_len,
+						    PCI_DMA_FROMDEVICE);
 
 			/* Now it is safe to examine the buffer. */
 			hp = (struct my_card_header *) cp->rx_buf;
@@ -601,7 +618,13 @@ to use the pci_dma_sync_*() interfaces.
 				pass_to_upper_layers(cp->rx_buf);
 				make_and_setup_new_rx_buf(cp);
 			} else {
-				/* Just give the buffer back to the card. */
+				/* Just sync the buffer and give it back
+				 * to the card.
+				 */
+				pci_dma_sync_single_for_device(cp->pdev,
+							       cp->rx_dma,
+							       cp->rx_len,
+							       PCI_DMA_FROMDEVICE);
 				give_rx_buf_to_card(cp);
 			}
 		}
@@ -709,12 +732,21 @@ interfaces.  To reiterate:
 
 When the DMA transfer is complete, invoke:
 
-	void pci_dac_dma_sync_single(struct pci_dev *pdev,
-				     dma64_addr_t dma_addr,
-				     size_t len, int direction);
+	void pci_dac_dma_sync_single_for_cpu(struct pci_dev *pdev,
+					     dma64_addr_t dma_addr,
+					     size_t len, int direction);
 
 This must be done before the CPU looks at the buffer again.
-This interface behaves identically to pci_dma_sync_{single,sg}().
+This interface behaves identically to pci_dma_sync_{single,sg}_for_cpu().
+
+And likewise, if you wish to let the device get back at the buffer after
+the cpu has read/written it, invoke:
+
+	void pci_dac_dma_sync_single_for_device(struct pci_dev *pdev,
+						dma64_addr_t dma_addr,
+						size_t len, int direction);
+
+before letting the device access the DMA area again.
 
 If you need to get back to the PAGE/OFFSET tuple from a dma64_addr_t
 the following interfaces are provided:
@@ -809,6 +841,27 @@ to "Closing".
    deleted.
 
 2) More to come...
+
+			Handling Errors
+
+DMA address space is limited on some architectures and an allocation
+failure can be determined by:
+
+- checking if pci_alloc_consistent returns NULL or pci_map_sg returns 0
+
+- checking the returned dma_addr_t of pci_map_single and pci_map_page
+  by using pci_dma_error():
+
+	dma_addr_t dma_handle;
+
+	dma_handle = pci_map_single(dev, addr, size, direction);
+	if (pci_dma_error(dma_handle)) {
+		/*
+		 * reduce current DMA mapping usage,
+		 * delay and try again later or
+		 * reset driver.
+		 */
+	}
 
 			   Closing
 

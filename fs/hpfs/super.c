@@ -6,13 +6,11 @@
  *  mounting, unmounting, error handling
  */
 
-#include <linux/buffer_head.h>
-#include <linux/string.h>
 #include "hpfs_fn.h"
 #include <linux/module.h>
 #include <linux/parser.h>
 #include <linux/init.h>
-#include <linux/vfs.h>
+#include <linux/statfs.h>
 
 /* Mark the filesystem dirty, so that chkdsk checks it when os/2 booted */
 
@@ -101,7 +99,7 @@ int hpfs_stop_cycles(struct super_block *s, int key, int *c1, int *c2,
 	return 0;
 }
 
-void hpfs_put_super(struct super_block *s)
+static void hpfs_put_super(struct super_block *s)
 {
 	struct hpfs_sb_info *sbi = hpfs_sb(s);
 	if (sbi->sb_cp_table) kfree(sbi->sb_cp_table);
@@ -137,7 +135,7 @@ static unsigned count_bitmaps(struct super_block *s)
 	return count;
 }
 
-int hpfs_statfs(struct super_block *s, struct kstatfs *buf)
+static int hpfs_statfs(struct super_block *s, struct kstatfs *buf)
 {
 	struct hpfs_sb_info *sbi = hpfs_sb(s);
 	lock_kernel();
@@ -165,7 +163,7 @@ static kmem_cache_t * hpfs_inode_cachep;
 static struct inode *hpfs_alloc_inode(struct super_block *sb)
 {
 	struct hpfs_inode_info *ei;
-	ei = (struct hpfs_inode_info *)kmem_cache_alloc(hpfs_inode_cachep, SLAB_KERNEL);
+	ei = (struct hpfs_inode_info *)kmem_cache_alloc(hpfs_inode_cachep, SLAB_NOFS);
 	if (!ei)
 		return NULL;
 	ei->vfs_inode.i_version = 1;
@@ -184,6 +182,7 @@ static void init_once(void * foo, kmem_cache_t * cachep, unsigned long flags)
 	if ((flags & (SLAB_CTOR_VERIFY|SLAB_CTOR_CONSTRUCTOR)) ==
 	    SLAB_CTOR_CONSTRUCTOR) {
 		init_MUTEX(&ei->i_sem);
+		init_MUTEX(&ei->i_parent);
 		inode_init_once(&ei->vfs_inode);
 	}
 }
@@ -204,19 +203,6 @@ static void destroy_inodecache(void)
 	if (kmem_cache_destroy(hpfs_inode_cachep))
 		printk(KERN_INFO "hpfs_inode_cache: not all structures were freed\n");
 }
-
-/* Super operations */
-
-static struct super_operations hpfs_sops =
-{
-	.alloc_inode	= hpfs_alloc_inode,
-	.destroy_inode	= hpfs_destroy_inode,
-        .read_inode	= hpfs_read_inode,
-	.delete_inode	= hpfs_delete_inode,
-	.put_super	= hpfs_put_super,
-	.statfs		= hpfs_statfs,
-	.remount_fs	= hpfs_remount_fs,
-};
 
 /*
  * A tiny parser for option strings, stolen from dosfs.
@@ -397,7 +383,7 @@ HPFS filesystem options:\n\
 \n");
 }
 
-int hpfs_remount_fs(struct super_block *s, int *flags, char *data)
+static int hpfs_remount_fs(struct super_block *s, int *flags, char *data)
 {
 	uid_t uid;
 	gid_t gid;
@@ -441,6 +427,18 @@ int hpfs_remount_fs(struct super_block *s, int *flags, char *data)
 	return 0;
 }
 
+/* Super operations */
+
+static struct super_operations hpfs_sops =
+{
+	.alloc_inode	= hpfs_alloc_inode,
+	.destroy_inode	= hpfs_destroy_inode,
+	.delete_inode	= hpfs_delete_inode,
+	.put_super	= hpfs_put_super,
+	.statfs		= hpfs_statfs,
+	.remount_fs	= hpfs_remount_fs,
+};
+
 static int hpfs_fill_super(struct super_block *s, void *options, int silent)
 {
 	struct buffer_head *bh0, *bh1, *bh2;
@@ -448,6 +446,7 @@ static int hpfs_fill_super(struct super_block *s, void *options, int silent)
 	struct hpfs_super_block *superblock;
 	struct hpfs_spare_block *spareblock;
 	struct hpfs_sb_info *sbi;
+	struct inode *root;
 
 	uid_t uid;
 	gid_t gid;
@@ -469,9 +468,7 @@ static int hpfs_fill_super(struct super_block *s, void *options, int silent)
 	sbi->sb_bmp_dir = NULL;
 	sbi->sb_cp_table = NULL;
 
-	sbi->sb_rd_inode = 0;
 	init_MUTEX(&sbi->hpfs_creation_de);
-	init_waitqueue_head(&sbi->sb_iget_q);
 
 	uid = current->uid;
 	gid = current->gid;
@@ -612,11 +609,15 @@ static int hpfs_fill_super(struct super_block *s, void *options, int silent)
 	brelse(bh1);
 	brelse(bh0);
 
-	hpfs_lock_iget(s, 1);
-	s->s_root = d_alloc_root(iget(s, sbi->sb_root));
-	hpfs_unlock_iget(s);
-	if (!s->s_root || !s->s_root->d_inode) {
-		printk("HPFS: iget failed. Why???\n");
+	root = iget_locked(s, sbi->sb_root);
+	if (!root)
+		goto bail0;
+	hpfs_init_inode(root);
+	hpfs_read_inode(root);
+	unlock_new_inode(root);
+	s->s_root = d_alloc_root(root);
+	if (!s->s_root) {
+		iput(root);
 		goto bail0;
 	}
 	hpfs_set_dentry_operations(s->s_root);
@@ -627,22 +628,24 @@ static int hpfs_fill_super(struct super_block *s, void *options, int silent)
 
 	root_dno = hpfs_fnode_dno(s, sbi->sb_root);
 	if (root_dno)
-		de = map_dirent(s->s_root->d_inode, root_dno, "\001\001", 2, NULL, &qbh);
-	if (!root_dno || !de) hpfs_error(s, "unable to find root dir");
+		de = map_dirent(root, root_dno, "\001\001", 2, NULL, &qbh);
+	if (!de)
+		hpfs_error(s, "unable to find root dir");
 	else {
-		s->s_root->d_inode->i_atime.tv_sec = local_to_gmt(s, de->read_date);
-		s->s_root->d_inode->i_atime.tv_nsec = 0;
-		s->s_root->d_inode->i_mtime.tv_sec = local_to_gmt(s, de->write_date);
-		s->s_root->d_inode->i_mtime.tv_nsec = 0;
-		s->s_root->d_inode->i_ctime.tv_sec = local_to_gmt(s, de->creation_date);
-		s->s_root->d_inode->i_ctime.tv_nsec = 0;
-		hpfs_i(s->s_root->d_inode)->i_ea_size = de->ea_size;
-		hpfs_i(s->s_root->d_inode)->i_parent_dir = s->s_root->d_inode->i_ino;
-		if (s->s_root->d_inode->i_size == -1) s->s_root->d_inode->i_size = 2048;
-		if (s->s_root->d_inode->i_blocks == -1) s->s_root->d_inode->i_blocks = 5;
+		root->i_atime.tv_sec = local_to_gmt(s, de->read_date);
+		root->i_atime.tv_nsec = 0;
+		root->i_mtime.tv_sec = local_to_gmt(s, de->write_date);
+		root->i_mtime.tv_nsec = 0;
+		root->i_ctime.tv_sec = local_to_gmt(s, de->creation_date);
+		root->i_ctime.tv_nsec = 0;
+		hpfs_i(root)->i_ea_size = de->ea_size;
+		hpfs_i(root)->i_parent_dir = root->i_ino;
+		if (root->i_size == -1)
+			root->i_size = 2048;
+		if (root->i_blocks == -1)
+			root->i_blocks = 5;
+		hpfs_brelse4(&qbh);
 	}
-	if (de) hpfs_brelse4(&qbh);
-
 	return 0;
 
 bail4:	brelse(bh2);

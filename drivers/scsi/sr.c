@@ -566,10 +566,13 @@ static int sr_probe(struct device *dev)
 	snprintf(disk->devfs_name, sizeof(disk->devfs_name),
 			"%s/cd", sdev->devfs_name);
 	disk->driverfs_dev = &sdev->sdev_gendev;
-	register_cdrom(&cd->cdi);
 	set_capacity(disk, cd->capacity);
 	disk->private_data = &cd->driver;
 	disk->queue = sdev->request_queue;
+	cd->cdi.disk = disk;
+
+	if (register_cdrom(&cd->cdi))
+		goto fail_put;
 
 	dev_set_drvdata(dev, cd);
 	add_disk(disk);
@@ -695,7 +698,7 @@ Enomem:
 static void get_capabilities(struct scsi_cd *cd)
 {
 	unsigned char *buffer;
-	int rc, n, mrw_write = 0, mrw = 1;
+	int rc, n, mrw_write = 0, mrw = 1,ram_write=0;
 	struct scsi_mode_data data;
 	struct scsi_request *SRpnt;
 	unsigned char cmd[MAX_COMMAND_SIZE];
@@ -780,6 +783,11 @@ static void get_capabilities(struct scsi_cd *cd)
 	if (!mrw_write)
 		cd->cdi.mask |= CDC_MRW_W;
 
+	if (cdrom_is_random_writable(&cd->cdi, &ram_write))
+		cd->cdi.mask |= CDC_RAM;
+	if (!ram_write)
+		cd->cdi.mask |= CDC_RAM;
+
 	n = data.header_length + data.block_descriptor_length;
 	cd->cdi.speed = ((buffer[n + 8] << 8) + buffer[n + 9]) / 176;
 	cd->readcd_known = 1;
@@ -829,8 +837,8 @@ static void get_capabilities(struct scsi_cd *cd)
 	/*
 	 * if DVD-RAM of MRW-W, we are randomly writeable
 	 */
-	if ((cd->cdi.mask & (CDC_DVD_RAM | CDC_MRW_W)) !=
-			(CDC_DVD_RAM | CDC_MRW_W)) {
+	if ((cd->cdi.mask & (CDC_DVD_RAM | CDC_MRW_W | CDC_RAM)) !=
+			(CDC_DVD_RAM | CDC_MRW_W | CDC_RAM)) {
 		cd->device->writeable = 1;
 		set_disk_ro(cd->disk, 0);
 	}

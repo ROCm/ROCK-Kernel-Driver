@@ -152,6 +152,12 @@ struct pte_chain;
 struct mmu_gather;
 struct inode;
 
+#ifdef ARCH_HAS_ATOMIC_UNSIGNED
+typedef unsigned page_flags_t;
+#else
+typedef unsigned long page_flags_t;
+#endif
+
 /*
  * Each physical page in the system has a struct page associated with
  * it to keep track of whatever it is we are using the page for at the
@@ -168,7 +174,7 @@ struct inode;
  * TODO: make this structure smaller, it could be as small as 32 bytes.
  */
 struct page {
-	unsigned long flags;		/* atomic flags, some possibly
+	page_flags_t flags;		/* atomic flags, some possibly
 					   updated asynchronously */
 	atomic_t count;			/* Usage count, see below. */
 	struct list_head list;		/* ->mapping has some page lists. */
@@ -333,7 +339,7 @@ static inline void put_page(struct page *page)
  * We'll have up to (MAX_NUMNODES * MAX_NR_ZONES) zones total,
  * so we use (MAX_NODES_SHIFT + MAX_ZONES_SHIFT) here to get enough bits.
  */
-#define NODEZONE_SHIFT (BITS_PER_LONG - MAX_NODES_SHIFT - MAX_ZONES_SHIFT)
+#define NODEZONE_SHIFT (sizeof(page_flags_t)*8 - MAX_NODES_SHIFT - MAX_ZONES_SHIFT)
 #define NODEZONE(node, zone)	((node << ZONES_SHIFT) | zone)
 
 static inline unsigned long page_zonenum(struct page *page)
@@ -530,7 +536,8 @@ extern void si_meminfo_node(struct sysinfo *val, int nid);
 
 /* mmap.c */
 extern void insert_vm_struct(struct mm_struct *, struct vm_area_struct *);
-extern void build_mmap_rb(struct mm_struct *);
+extern void __vma_link_rb(struct mm_struct *, struct vm_area_struct *,
+	struct rb_node **, struct rb_node *);
 extern void exit_mmap(struct mm_struct *);
 
 extern unsigned long get_unmapped_area(struct file *, unsigned long, unsigned long, unsigned long, unsigned long);

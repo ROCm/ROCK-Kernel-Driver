@@ -112,17 +112,33 @@ static inline void pci_unmap_sg(struct pci_dev *hwdev, struct scatterlist *sg,
 	pci_dma_ops.pci_unmap_sg(hwdev, sg, nents, direction);
 }
 
-static inline void pci_dma_sync_single(struct pci_dev *hwdev,
-				       dma_addr_t dma_handle,
-				       size_t size, int direction)
+static inline void pci_dma_sync_single_for_cpu(struct pci_dev *hwdev,
+					       dma_addr_t dma_handle,
+					       size_t size, int direction)
 {
 	BUG_ON(direction == PCI_DMA_NONE);
 	/* nothing to do */
 }
 
-static inline void pci_dma_sync_sg(struct pci_dev *hwdev,
-				   struct scatterlist *sg,
-				   int nelems, int direction)
+static inline void pci_dma_sync_single_for_device(struct pci_dev *hwdev,
+						  dma_addr_t dma_handle,
+						  size_t size, int direction)
+{
+	BUG_ON(direction == PCI_DMA_NONE);
+	/* nothing to do */
+}
+
+static inline void pci_dma_sync_sg_for_cpu(struct pci_dev *hwdev,
+					   struct scatterlist *sg,
+					   int nelems, int direction)
+{
+	BUG_ON(direction == PCI_DMA_NONE);
+	/* nothing to do */
+}
+
+static inline void pci_dma_sync_sg_for_device(struct pci_dev *hwdev,
+					      struct scatterlist *sg,
+					      int nelems, int direction)
 {
 	BUG_ON(direction == PCI_DMA_NONE);
 	/* nothing to do */

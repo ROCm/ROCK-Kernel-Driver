@@ -1650,9 +1650,6 @@ static int sis900_rx(struct net_device *net_dev)
 				break;
 			}
 
-			pci_dma_sync_single(sis_priv->pci_dev, 
-				sis_priv->rx_ring[entry].bufptr, RX_BUF_SIZE, 
-				PCI_DMA_FROMDEVICE);
 			pci_unmap_single(sis_priv->pci_dev, 
 				sis_priv->rx_ring[entry].bufptr, RX_BUF_SIZE, 
 				PCI_DMA_FROMDEVICE);

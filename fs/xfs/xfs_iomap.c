@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2004 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -68,6 +68,76 @@
 #include "xfs_trans_space.h"
 #include "xfs_utils.h"
 #include "xfs_iomap.h"
+
+#if defined(XFS_RW_TRACE)
+void
+xfs_iomap_enter_trace(
+	int		tag,
+	xfs_iocore_t	*io,
+	xfs_off_t	offset,
+	ssize_t		count)
+{
+	xfs_inode_t	*ip = XFS_IO_INODE(io);
+
+	if (!ip->i_rwtrace)
+		return;
+
+	ktrace_enter(ip->i_rwtrace,
+		(void *)((unsigned long)tag),
+		(void *)ip,
+		(void *)((unsigned long)((ip->i_d.di_size >> 32) & 0xffffffff)),
+		(void *)((unsigned long)(ip->i_d.di_size & 0xffffffff)),
+		(void *)((unsigned long)((offset >> 32) & 0xffffffff)),
+		(void *)((unsigned long)(offset & 0xffffffff)),
+		(void *)((unsigned long)count),
+		(void *)((unsigned long)((io->io_new_size >> 32) & 0xffffffff)),
+		(void *)((unsigned long)(io->io_new_size & 0xffffffff)),
+		(void *)NULL,
+		(void *)NULL,
+		(void *)NULL,
+		(void *)NULL,
+		(void *)NULL,
+		(void *)NULL,
+		(void *)NULL);
+}
+
+void
+xfs_iomap_map_trace(
+	int		tag,
+	xfs_iocore_t	*io,
+	xfs_off_t	offset,
+	ssize_t		count,
+	xfs_iomap_t	*iomapp,
+	xfs_bmbt_irec_t	*imapp,
+	int		flags)
+{
+	xfs_inode_t	*ip = XFS_IO_INODE(io);
+
+	if (!ip->i_rwtrace)
+		return;
+
+	ktrace_enter(ip->i_rwtrace,
+		(void *)((unsigned long)tag),
+		(void *)ip,
+		(void *)((unsigned long)((ip->i_d.di_size >> 32) & 0xffffffff)),
+		(void *)((unsigned long)(ip->i_d.di_size & 0xffffffff)),
+		(void *)((unsigned long)((offset >> 32) & 0xffffffff)),
+		(void *)((unsigned long)(offset & 0xffffffff)),
+		(void *)((unsigned long)count),
+		(void *)((unsigned long)flags),
+		(void *)((unsigned long)((iomapp->iomap_offset >> 32) & 0xffffffff)),
+		(void *)((unsigned long)(iomapp->iomap_offset & 0xffffffff)),
+		(void *)((unsigned long)(iomapp->iomap_delta)),
+		(void *)((unsigned long)(iomapp->iomap_bsize)),
+		(void *)((unsigned long)(iomapp->iomap_bn)),
+		(void *)(__psint_t)(imapp->br_startoff),
+		(void *)((unsigned long)(imapp->br_blockcount)),
+		(void *)(__psint_t)(imapp->br_startblock));
+}
+#else
+#define xfs_iomap_enter_trace(tag, io, offset, count)
+#define xfs_iomap_map_trace(tag, io, offset, count, iomapp, imapp, flags)
+#endif
 
 #define XFS_WRITEIO_ALIGN(mp,off)	(((off) >> mp->m_writeio_log) \
 						<< mp->m_writeio_log)
@@ -149,17 +219,20 @@ xfs_iomap(
 		(BMAPI_READ | BMAPI_WRITE | BMAPI_ALLOCATE |
 		 BMAPI_UNWRITTEN | BMAPI_DEVICE)) {
 	case BMAPI_READ:
+		xfs_iomap_enter_trace(XFS_IOMAP_READ_ENTER, io, offset, count);
 		lockmode = XFS_LCK_MAP_SHARED(mp, io);
 		bmapi_flags = XFS_BMAPI_ENTIRE;
 		if (flags & BMAPI_IGNSTATE)
 			bmapi_flags |= XFS_BMAPI_IGSTATE;
 		break;
 	case BMAPI_WRITE:
+		xfs_iomap_enter_trace(XFS_IOMAP_WRITE_ENTER, io, offset, count);
 		lockmode = XFS_ILOCK_EXCL|XFS_EXTSIZE_WR;
 		bmapi_flags = 0;
 		XFS_ILOCK(mp, io, lockmode);
 		break;
 	case BMAPI_ALLOCATE:
+		xfs_iomap_enter_trace(XFS_IOMAP_ALLOC_ENTER, io, offset, count);
 		lockmode = XFS_ILOCK_SHARED|XFS_EXTSIZE_RD;
 		bmapi_flags = XFS_BMAPI_ENTIRE;
 		/* Attempt non-blocking lock */
@@ -201,8 +274,11 @@ phase2:
 	switch (flags & (BMAPI_WRITE|BMAPI_ALLOCATE|BMAPI_UNWRITTEN)) {
 	case BMAPI_WRITE:
 		/* If we found an extent, return it */
-		if (nimaps && (imap.br_startblock != HOLESTARTBLOCK))
+		if (nimaps && (imap.br_startblock != HOLESTARTBLOCK)) {
+			xfs_iomap_map_trace(XFS_IOMAP_WRITE_MAP, io,
+					offset, count, iomapp, &imap, flags);
 			break;
+		}
 
 		if (flags & (BMAPI_DIRECT|BMAPI_MMAP)) {
 			error = XFS_IOMAP_WRITE_DIRECT(mp, io, offset,
@@ -211,6 +287,10 @@ phase2:
 			error = XFS_IOMAP_WRITE_DELAY(mp, io, offset, count,
 					flags, &imap, &nimaps);
 		}
+		if (!error) {
+			xfs_iomap_map_trace(XFS_IOMAP_ALLOC_MAP, io,
+					offset, count, iomapp, &imap, flags);
+		}
 		iomap_flags = IOMAP_NEW;
 		break;
 	case BMAPI_ALLOCATE:
@@ -218,8 +298,11 @@ phase2:
 		XFS_IUNLOCK(mp, io, lockmode);
 		lockmode = 0;
 
-		if (nimaps && !ISNULLSTARTBLOCK(imap.br_startblock))
+		if (nimaps && !ISNULLSTARTBLOCK(imap.br_startblock)) {
+			xfs_iomap_map_trace(XFS_IOMAP_WRITE_MAP, io,
+					offset, count, iomapp, &imap, flags);
 			break;
+		}
 
 		error = XFS_IOMAP_WRITE_ALLOCATE(mp, io, &imap, &nimaps);
 		break;
@@ -309,7 +392,6 @@ xfs_iomap_write_direct(
 	 * Make sure that the dquots are there. This doesn't hold
 	 * the ilock across a disk read.
 	 */
-
 	error = XFS_QM_DQATTACH(ip->i_mount, ip, XFS_QMOPT_ILOCKED);
 	if (error)
 		return XFS_ERROR(error);
@@ -540,8 +622,9 @@ retry:
 	 * If bmapi returned us nothing, and if we didn't get back EDQUOT,
 	 * then we must have run out of space.
 	 */
-
 	if (nimaps == 0) {
+		xfs_iomap_enter_trace(XFS_IOMAP_WRITE_NOSPACE,
+					io, offset, count);
 		if (xfs_flush_space(ip, &fsynced, &ioflag))
 			return XFS_ERROR(ENOSPC);
 
@@ -584,7 +667,6 @@ xfs_iomap_write_allocate(
 	/*
 	 * Make sure that the dquots are there.
 	 */
-
 	if ((error = XFS_QM_DQATTACH(mp, ip, 0)))
 		return XFS_ERROR(error);
 
@@ -612,7 +694,6 @@ xfs_iomap_write_allocate(
 					XFS_WRITE_LOG_RES(mp),
 					0, XFS_TRANS_PERM_LOG_RES,
 					XFS_WRITE_LOG_COUNT);
-
 			if (error == ENOSPC) {
 				error = xfs_trans_reserve(tp, 0,
 						XFS_WRITE_LOG_RES(mp),
@@ -653,19 +734,16 @@ xfs_iomap_write_allocate(
 			error = xfs_bmapi(tp, ip, map_start_fsb, count_fsb,
 					XFS_BMAPI_WRITE, &first_block, 1,
 					imap, &nimaps, &free_list);
-
 			if (error)
 				goto trans_cancel;
 
 			error = xfs_bmap_finish(&tp, &free_list,
 					first_block, &committed);
-
 			if (error)
 				goto trans_cancel;
 
 			error = xfs_trans_commit(tp,
 					XFS_TRANS_RELEASE_LOG_RES, NULL);
-
 			if (error)
 				goto error0;
 
@@ -724,6 +802,9 @@ xfs_iomap_write_unwritten(
 	int		nimaps;
 	xfs_fsblock_t	firstfsb;
 	xfs_bmap_free_t	free_list;
+
+	xfs_iomap_enter_trace(XFS_IOMAP_UNWRITTEN,
+				&ip->i_iocore, offset, count);
 
 	offset_fsb = XFS_B_TO_FSBT(mp, offset);
 	count_fsb = XFS_B_TO_FSB(mp, count);

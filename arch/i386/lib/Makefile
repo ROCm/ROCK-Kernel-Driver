@@ -9,4 +9,3 @@ lib-y = checksum.o delay.o \
 
 lib-$(CONFIG_X86_USE_3DNOW) += mmx.o
 lib-$(CONFIG_HAVE_DEC_LOCK) += dec_and_lock.o
-lib-$(CONFIG_DEBUG_IOVIRT)  += iodebug.o

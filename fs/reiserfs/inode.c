@@ -209,7 +209,7 @@ static int file_capable (struct inode * inode, long block)
   pathrelse(path) ;
   reiserfs_update_sd(th, inode) ;
   journal_end(th, s, len) ;
-  journal_begin(th, s, len) ;
+  journal_begin(th, s, JOURNAL_PER_BALANCE_CNT * 6) ;
   reiserfs_update_inode_transaction(inode) ;
 }
 
@@ -444,7 +444,7 @@ static int reiserfs_get_blocks_direct_io(struct inode *inode,
         /* make sure future calls to the direct io funcs for this offset
         ** in the file fail by unmapping the buffer
         */
-        reiserfs_unmap_buffer(bh_result);
+        clear_buffer_mapped(bh_result);
         ret = -EINVAL ;
     }
     /* Possible unpacked tail. Flush the data before pages have

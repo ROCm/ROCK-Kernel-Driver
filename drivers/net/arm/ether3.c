@@ -121,7 +121,7 @@ static inline void ether3_outw(int v, const int r)
 static int
 ether3_setbuffer(struct net_device *dev, buffer_rw_t read, int start)
 {
-	struct dev_priv *priv = (struct dev_priv *)dev->priv;
+	struct dev_priv *priv = netdev_priv(dev);
 	int timeout = 1000;
 
 	ether3_outw(priv->regs.config1 | CFG1_LOCBUFMEM, REG_CONFIG1);
@@ -180,7 +180,7 @@ static void
 ether3_ledoff(unsigned long data)
 {
 	struct net_device *dev = (struct net_device *)data;
-	struct dev_priv *priv = (struct dev_priv *)dev->priv;
+	struct dev_priv *priv = netdev_priv(dev);
 	ether3_outw(priv->regs.config2 |= CFG2_CTRLO, REG_CONFIG2);
 }
 
@@ -280,7 +280,7 @@ ether3_ramtest(struct net_device *dev, unsigned char byte)
 static int __init
 ether3_init_2(struct net_device *dev)
 {
-	struct dev_priv *priv = (struct dev_priv *)dev->priv;
+	struct dev_priv *priv = netdev_priv(dev);
 	int i;
 
 	priv->regs.config1 = CFG1_RECVCOMPSTAT0|CFG1_DMABURST8;
@@ -330,7 +330,7 @@ ether3_init_2(struct net_device *dev)
 static void
 ether3_init_for_open(struct net_device *dev)
 {
-	struct dev_priv *priv = (struct dev_priv *)dev->priv;
+	struct dev_priv *priv = netdev_priv(dev);
 	int i;
 
 	memset(&priv->stats, 0, sizeof(struct net_device_stats));
@@ -434,7 +434,7 @@ ether3_open(struct net_device *dev)
 static int
 ether3_close(struct net_device *dev)
 {
-	struct dev_priv *priv = (struct dev_priv *)dev->priv;
+	struct dev_priv *priv = netdev_priv(dev);
 
 	netif_stop_queue(dev);
 
@@ -457,7 +457,7 @@ ether3_close(struct net_device *dev)
  */
 static struct net_device_stats *ether3_getstats(struct net_device *dev)
 {
-	struct dev_priv *priv = (struct dev_priv *)dev->priv;
+	struct dev_priv *priv = netdev_priv(dev);
 	return &priv->stats;
 }
 
@@ -469,7 +469,7 @@ static struct net_device_stats *ether3_getstats(struct net_device *dev)
  */
 static void ether3_setmulticastlist(struct net_device *dev)
 {
-	struct dev_priv *priv = (struct dev_priv *)dev->priv;
+	struct dev_priv *priv = netdev_priv(dev);
 
 	priv->regs.config1 &= ~CFG1_RECVPROMISC;
 
@@ -487,7 +487,7 @@ static void ether3_setmulticastlist(struct net_device *dev)
 static void
 ether3_timeout(struct net_device *dev)
 {
-	struct dev_priv *priv = (struct dev_priv *)dev->priv;
+	struct dev_priv *priv = netdev_priv(dev);
 	unsigned long flags;
 
 	del_timer(&priv->timer);
@@ -518,7 +518,7 @@ ether3_timeout(struct net_device *dev)
 static int
 ether3_sendpacket(struct sk_buff *skb, struct net_device *dev)
 {
-	struct dev_priv *priv = (struct dev_priv *)dev->priv;
+	struct dev_priv *priv = netdev_priv(dev);
 	unsigned long flags;
 	unsigned int length = ETH_ZLEN < skb->len ? skb->len : ETH_ZLEN;
 	unsigned int ptr, next_ptr;
@@ -594,7 +594,7 @@ ether3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		printk("eth3irq: %d ", irq);
 #endif
 
-	priv = (struct dev_priv *)dev->priv;
+	priv = netdev_priv(dev);
 
 	status = ether3_inw(REG_STATUS);
 
@@ -844,7 +844,7 @@ ether3_probe(struct expansion_card *ec, const struct ecard_id *id)
 		goto free;
 	}
 
-	priv = (struct dev_priv *) dev->priv;
+	priv = netdev_priv(dev);
 	init_timer(&priv->timer);
 
 	/* Reset card...

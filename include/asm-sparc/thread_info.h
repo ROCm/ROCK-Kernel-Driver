@@ -79,9 +79,9 @@ register struct thread_info *current_thread_info_reg asm("g6");
 /*
  * thread information allocation
  */
-#ifdef CONFIG_SUN4
+#if PAGE_SHIFT == 13
 #define THREAD_INFO_ORDER  0
-#else
+#else /* PAGE_SHIFT */
 #define THREAD_INFO_ORDER  1
 #endif
 
@@ -100,9 +100,6 @@ BTFIXUPDEF_CALL(void, free_thread_info, struct thread_info *)
  * Size of kernel stack for each process.
  * Observe the order of get_free_pages() in alloc_thread_info().
  * The sun4 has 8K stack too, because it's short on memory, and 16K is a waste.
- *
- * XXX Watch how INIT_THREAD_SIZE evolves in linux/sched.h and elsewhere.
- *     On 2.5.24 it happens to match 8192 magically.
  */
 #define THREAD_SIZE		8192
 

@@ -351,7 +351,7 @@ config CPU_FREQ_INTEGRATOR
 	help
 	  This enables the CPUfreq driver for ARM Integrator CPUs.
 
-	  For details, take a look at linux/Documentation/cpufreq.
+	  For details, take a look at linux/Documentation/cpu-freq.
 
 	  If in doubt, say Y.
 
@@ -656,6 +656,15 @@ config DEBUG_USER
 	  print a brief message explaining what the problem was. This is
 	  sometimes helpful for debugging but serves no purpose on a
 	  production system. Most people should say N here.
+
+	  In addition, you need to pass user_debug=N on the kernel command
+	  line to enable this feature.  N consists of the sum of:
+
+	      1 - undefined instruction events
+	      2 - system calls
+	      4 - invalid data aborts
+	      8 - SIGSEGV faults
+	     16 - SIGBUS faults
 
 config DEBUG_INFO
 	bool "Include GDB debugging information in kernel binary"

@@ -22,6 +22,8 @@
 #include <linux/completion.h>
 #include <linux/workqueue.h>
 #include <linux/slab.h>
+#include <linux/cpu.h>
+#include <linux/notifier.h>
 #include <linux/kthread.h>
 
 /*
@@ -47,6 +49,7 @@ struct cpu_workqueue_struct {
 	struct workqueue_struct *wq;
 	task_t *thread;
 
+	int run_depth;		/* Detect run_workqueue() recursion depth */
 } ____cacheline_aligned;
 
 /*
@@ -55,7 +58,21 @@ struct cpu_workqueue_struct {
  */
 struct workqueue_struct {
 	struct cpu_workqueue_struct cpu_wq[NR_CPUS];
+	const char *name;
+	struct list_head list;
 };
+
+#ifdef CONFIG_HOTPLUG_CPU
+/* All the workqueues on the system, for hotplug cpu to add/remove
+   threads to each one as cpus come/go.  Protected by cpucontrol
+   sem. */
+static LIST_HEAD(workqueues);
+#define add_workqueue(wq) list_add(&(wq)->list, &workqueues)
+#define del_workqueue(wq) list_del(&(wq)->list)
+#else
+#define add_workqueue(wq)
+#define del_workqueue(wq)
+#endif /* CONFIG_HOTPLUG_CPU */
 
 /* Preempt must be disabled. */
 static void __queue_work(struct cpu_workqueue_struct *cwq,
@@ -78,7 +95,7 @@ static void __queue_work(struct cpu_workqueue_struct *cwq,
  * We queue the work to the CPU it was submitted, but there is no
  * guarantee that it will be processed by that CPU.
  */
-int queue_work(struct workqueue_struct *wq, struct work_struct *work)
+int fastcall queue_work(struct workqueue_struct *wq, struct work_struct *work)
 {
 	int ret = 0, cpu = get_cpu();
 
@@ -99,7 +116,7 @@ static void delayed_work_timer_fn(unsigned long __data)
 	__queue_work(wq->cpu_wq + smp_processor_id(), work);
 }
 
-int queue_delayed_work(struct workqueue_struct *wq,
+int fastcall queue_delayed_work(struct workqueue_struct *wq,
 			struct work_struct *work, unsigned long delay)
 {
 	int ret = 0;
@@ -129,6 +146,13 @@ static inline void run_workqueue(struct cpu_workqueue_struct *cwq)
 	 * done.
 	 */
 	spin_lock_irqsave(&cwq->lock, flags);
+	cwq->run_depth++;
+	if (cwq->run_depth > 3) {
+		/* morton gets to eat his hat */
+		printk("%s: recursion depth exceeded: %d\n",
+			__FUNCTION__, cwq->run_depth);
+		dump_stack();
+	}
 	while (!list_empty(&cwq->worklist)) {
 		struct work_struct *work = list_entry(cwq->worklist.next,
 						struct work_struct, entry);
@@ -146,13 +170,13 @@ static inline void run_workqueue(struct cpu_workqueue_struct *cwq)
 		cwq->remove_sequence++;
 		wake_up(&cwq->work_done);
 	}
+	cwq->run_depth--;
 	spin_unlock_irqrestore(&cwq->lock, flags);
 }
 
 static int worker_thread(void *__cwq)
 {
 	struct cpu_workqueue_struct *cwq = __cwq;
-	int cpu = cwq - cwq->wq->cpu_wq;
 	DECLARE_WAITQUEUE(wait, current);
 	struct k_sigaction sa;
 	sigset_t blocked;
@@ -160,7 +184,6 @@ static int worker_thread(void *__cwq)
 	current->flags |= PF_IOTHREAD;
 
 	set_user_nice(current, -10);
-	BUG_ON(smp_processor_id() != cpu);
 
 	/* Block and flush all signals */
 	sigfillset(&blocked);
@@ -203,13 +226,14 @@ static int worker_thread(void *__cwq)
  * This function used to run the workqueues itself.  Now we just wait for the
  * helper threads to do it.
  */
-void flush_workqueue(struct workqueue_struct *wq)
+void fastcall flush_workqueue(struct workqueue_struct *wq)
 {
 	struct cpu_workqueue_struct *cwq;
 	int cpu;
 
 	might_sleep();
 
+	lock_cpu_hotplug();
 	for (cpu = 0; cpu < NR_CPUS; cpu++) {
 		DEFINE_WAIT(wait);
 		long sequence_needed;
@@ -218,6 +242,14 @@ void flush_workqueue(struct workqueue_struct *wq)
 			continue;
 		cwq = wq->cpu_wq + cpu;
 
+		if (cwq->thread == current) {
+			/*
+			 * Probably keventd trying to flush its own queue.
+			 * So simply run it by hand rather than deadlocking.
+			 */
+			run_workqueue(cwq);
+			continue;
+		}
 		spin_lock_irq(&cwq->lock);
 		sequence_needed = cwq->insert_sequence;
 
@@ -231,11 +263,10 @@ void flush_workqueue(struct workqueue_struct *wq)
 		finish_wait(&cwq->work_done, &wait);
 		spin_unlock_irq(&cwq->lock);
 	}
+	unlock_cpu_hotplug();
 }
 
-static int create_workqueue_thread(struct workqueue_struct *wq,
-				   const char *name,
-				   int cpu)
+static int create_workqueue_thread(struct workqueue_struct *wq, int cpu)
 {
 	struct cpu_workqueue_struct *cwq = wq->cpu_wq + cpu;
 	struct task_struct *p;
@@ -249,7 +280,7 @@ static int create_workqueue_thread(struct workqueue_struct *wq,
 	init_waitqueue_head(&cwq->more_work);
 	init_waitqueue_head(&cwq->work_done);
 
-	p = kthread_create(worker_thread, cwq, "%s/%d", name, cpu);
+	p = kthread_create(worker_thread, cwq, "%s/%d", wq->name, cpu);
 	if (IS_ERR(p))
 		return PTR_ERR(p);
 	cwq->thread = p;
@@ -267,15 +298,21 @@ struct workqueue_struct *create_workqueue(const char *name)
 	wq = kmalloc(sizeof(*wq), GFP_KERNEL);
 	if (!wq)
 		return NULL;
+	memset(wq, 0, sizeof(*wq));
 
+	wq->name = name;
+	/* We don't need the distraction of CPUs appearing and vanishing. */
+	lock_cpu_hotplug();
 	for (cpu = 0; cpu < NR_CPUS; cpu++) {
 		if (!cpu_online(cpu))
 			continue;
-		if (create_workqueue_thread(wq, name, cpu) < 0)
+		if (create_workqueue_thread(wq, cpu) < 0)
 			destroy = 1;
 		else
 			wake_up_process(wq->cpu_wq[cpu].thread);
 	}
+	add_workqueue(wq);
+
 	/*
 	 * Was there any error during startup? If yes then clean up:
 	 */
@@ -283,16 +320,23 @@ struct workqueue_struct *create_workqueue(const char *name)
 		destroy_workqueue(wq);
 		wq = NULL;
 	}
+	unlock_cpu_hotplug();
 	return wq;
 }
 
 static void cleanup_workqueue_thread(struct workqueue_struct *wq, int cpu)
 {
 	struct cpu_workqueue_struct *cwq;
+	unsigned long flags;
+	struct task_struct *p;
 
 	cwq = wq->cpu_wq + cpu;
-	if (cwq->thread)
-		kthread_stop(cwq->thread);
+	spin_lock_irqsave(&cwq->lock, flags);
+	p = cwq->thread;
+	cwq->thread = NULL;
+	spin_unlock_irqrestore(&cwq->lock, flags);
+	if (p)
+		kthread_stop(p);
 }
 
 void destroy_workqueue(struct workqueue_struct *wq)
@@ -301,21 +345,25 @@ void destroy_workqueue(struct workqueue_struct *wq)
 
 	flush_workqueue(wq);
 
+	/* We don't need the distraction of CPUs appearing and vanishing. */
+	lock_cpu_hotplug();
 	for (cpu = 0; cpu < NR_CPUS; cpu++) {
 		if (cpu_online(cpu))
 			cleanup_workqueue_thread(wq, cpu);
 	}
+	del_workqueue(wq);
+	unlock_cpu_hotplug();
 	kfree(wq);
 }
 
 static struct workqueue_struct *keventd_wq;
 
-int schedule_work(struct work_struct *work)
+int fastcall schedule_work(struct work_struct *work)
 {
 	return queue_work(keventd_wq, work);
 }
 
-int schedule_delayed_work(struct work_struct *work, unsigned long delay)
+int fastcall schedule_delayed_work(struct work_struct *work, unsigned long delay)
 {
 	return queue_delayed_work(keventd_wq, work, delay);
 }
@@ -333,20 +381,88 @@ int keventd_up(void)
 int current_is_keventd(void)
 {
 	struct cpu_workqueue_struct *cwq;
-	int cpu;
+	int cpu = smp_processor_id();	/* preempt-safe: keventd is per-cpu */
+	int ret = 0;
 
 	BUG_ON(!keventd_wq);
 
-	for_each_cpu(cpu) {
-		cwq = keventd_wq->cpu_wq + cpu;
-		if (current == cwq->thread)
-			return 1;
-	}
-	return 0;
+	cwq = keventd_wq->cpu_wq + cpu;
+	if (current == cwq->thread)
+		ret = 1;
+
+	return ret;
+
 }
+
+#ifdef CONFIG_HOTPLUG_CPU
+/* Take the work from this (downed) CPU. */
+static void take_over_work(struct workqueue_struct *wq, unsigned int cpu)
+{
+	struct cpu_workqueue_struct *cwq = wq->cpu_wq + cpu;
+	LIST_HEAD(list);
+	struct work_struct *work;
+
+	spin_lock_irq(&cwq->lock);
+	list_splice_init(&cwq->worklist, &list);
+
+	while (!list_empty(&list)) {
+		printk("Taking work for %s\n", wq->name);
+		work = list_entry(list.next,struct work_struct,entry);
+		list_del(&work->entry);
+		__queue_work(wq->cpu_wq + smp_processor_id(), work);
+	}
+	spin_unlock_irq(&cwq->lock);
+}
+
+/* We're holding the cpucontrol mutex here */
+static int __devinit workqueue_cpu_callback(struct notifier_block *nfb,
+				  unsigned long action,
+				  void *hcpu)
+{
+	unsigned int hotcpu = (unsigned long)hcpu;
+	struct workqueue_struct *wq;
+
+	switch (action) {
+	case CPU_UP_PREPARE:
+		/* Create a new workqueue thread for it. */
+		list_for_each_entry(wq, &workqueues, list) {
+			if (create_workqueue_thread(wq, hotcpu) < 0) {
+				printk("workqueue for %i failed\n", hotcpu);
+				return NOTIFY_BAD;
+			}
+		}
+		break;
+
+	case CPU_ONLINE:
+		/* Kick off worker threads. */
+		list_for_each_entry(wq, &workqueues, list)
+			wake_up_process(wq->cpu_wq[hotcpu].thread);
+		break;
+
+	case CPU_UP_CANCELED:
+		list_for_each_entry(wq, &workqueues, list) {
+			/* Unbind so it can run. */
+			kthread_bind(wq->cpu_wq[hotcpu].thread,
+				     smp_processor_id());
+			cleanup_workqueue_thread(wq, hotcpu);
+		}
+		break;
+
+	case CPU_DEAD:
+		list_for_each_entry(wq, &workqueues, list)
+			cleanup_workqueue_thread(wq, hotcpu);
+		list_for_each_entry(wq, &workqueues, list)
+			take_over_work(wq, hotcpu);
+		break;
+	}
+
+	return NOTIFY_OK;
+}
+#endif
 
 void init_workqueues(void)
 {
+	hotcpu_notifier(workqueue_cpu_callback, 0);
 	keventd_wq = create_workqueue("events");
 	BUG_ON(!keventd_wq);
 }

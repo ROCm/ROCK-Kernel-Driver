@@ -16,7 +16,6 @@
  * This file handles the architecture-dependent parts of process handling..
  */
 
-#define __KERNEL_SYSCALLS__
 #include <stdarg.h>
 
 #include <linux/errno.h>
@@ -25,7 +24,6 @@
 #include <linux/mm.h>
 #include <linux/elfcore.h>
 #include <linux/smp.h>
-#include <linux/unistd.h>
 #include <linux/slab.h>
 #include <linux/user.h>
 #include <linux/module.h>
@@ -34,6 +32,7 @@
 #include <linux/delay.h>
 #include <linux/irq.h>
 #include <linux/ptrace.h>
+#include <linux/version.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
@@ -53,7 +52,7 @@ asmlinkage extern void ret_from_fork(void);
 
 unsigned long kernel_thread_flags = CLONE_VM | CLONE_UNTRACED;
 
-int hlt_counter;
+atomic_t hlt_counter = ATOMIC_INIT(0);
 
 /*
  * Powermanagement idle function, if any..
@@ -62,14 +61,14 @@ void (*pm_idle)(void);
 
 void disable_hlt(void)
 {
-	hlt_counter++;
+	atomic_inc(&hlt_counter);
 }
 
 EXPORT_SYMBOL(disable_hlt);
 
 void enable_hlt(void)
 {
-	hlt_counter--;
+	atomic_dec(&hlt_counter);
 }
 
 EXPORT_SYMBOL(enable_hlt);
@@ -80,7 +79,7 @@ EXPORT_SYMBOL(enable_hlt);
  */
 void default_idle(void)
 {
-	if (!hlt_counter) {
+	if (!atomic_read(&hlt_counter)) {
 		local_irq_disable();
 		if (!need_resched())
 			safe_halt();
@@ -207,7 +206,8 @@ void __show_regs(struct pt_regs * regs)
 
 	printk("\n");
 	print_modules();
-	printk("Pid: %d, comm: %.20s %s\n", current->pid, current->comm, print_tainted());
+	printk("Pid: %d, comm: %.20s %s %s\n", 
+	       current->pid, current->comm, print_tainted(), UTS_RELEASE);
 	printk("RIP: %04lx:[<%016lx>] ", regs->cs & 0xffff, regs->rip);
 	printk_address(regs->rip); 
 	printk("\nRSP: %04lx:%016lx  EFLAGS: %08lx\n", regs->ss, regs->rsp, regs->eflags);

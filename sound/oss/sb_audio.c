@@ -882,7 +882,7 @@ sb16_copy_from_user(int dev,
 			c -= locallen; p += locallen;
 		}
 		/* used = ( samples * 16 bits size ) */
-		*used = len << 1;
+		*used =  max_in  > ( max_out << 1) ? (max_out << 1) : max_in;
 		/* returned = ( samples * 8 bits size ) */
 		*returned = len;
 	}

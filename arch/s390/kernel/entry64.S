@@ -471,6 +471,9 @@ pgm_per:
 pgm_per_std:
 	SAVE_ALL __LC_PGM_OLD_PSW,1
 	GET_THREAD_INFO
+	mvc	__THREAD_per+__PER_atmid(2,%r9),__LC_PER_ATMID
+	mvc	__THREAD_per+__PER_address(8,%r9),__LC_PER_ADDRESS
+	mvc	__THREAD_per+__PER_access_id(1,%r9),__LC_PER_ACCESS_ID
 	lghi    %r4,0x7f
 	lgf     %r3,__LC_PGM_ILC	 # load program interruption code
         nr      %r4,%r3			 # clear per-event-bit and ilc
@@ -483,7 +486,7 @@ pgm_per_std:
 pgm_per_only:
         la      %r2,SP_PTREGS(15)	 # address of register-save area
         larl    %r14,sysc_return	 # load adr. of system return
-        jg      handle_per_exception
+        jg      do_debugger_trap
 
 #
 # it was a single stepped SVC that is causing all the trouble
@@ -493,6 +496,9 @@ pgm_svcper:
 	llgh    %r7,__LC_SVC_INT_CODE # get svc number from lowcore
 	stosm   48(%r15),0x03     # reenable interrupts
         GET_THREAD_INFO           # load pointer to task_struct to R9
+	mvc	__THREAD_per+__PER_atmid(2,%r9),__LC_PER_ATMID
+	mvc	__THREAD_per+__PER_address(8,%r9),__LC_PER_ADDRESS
+	mvc	__THREAD_per+__PER_access_id(1,%r9),__LC_PER_ACCESS_ID
 	slag	%r7,%r7,2         # *4 and test for svc 0
 	jnz	pgm_svcstd
 	# svc 0: system call number in %r1
@@ -516,7 +522,7 @@ pgm_svcper_noemu:
 
 pgm_svcret:
 	tm	__TI_flags+7(%r9),_TIF_SIGPENDING
-	jo	pgm_svcper_nosig
+	jno	pgm_svcper_nosig
         la      %r2,SP_PTREGS(%r15) # load pt_regs
         sgr     %r3,%r3             # clear *oldset
 	brasl	%r14,do_signal
@@ -526,7 +532,7 @@ pgm_svcper_nosig:
 	st      %r0,SP_TRAP(%r15)
         la      %r2,SP_PTREGS(15) # address of register-save area
         larl    %r14,sysc_return  # load adr. of system return
-        jg      handle_per_exception
+        jg      do_debugger_trap
 #
 # call trace before and after sys_call
 #

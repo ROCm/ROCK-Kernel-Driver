@@ -22,6 +22,14 @@ subdir-$(CONFIG_PCMCIA)		+= pcmcia
 
 obj-$(CONFIG_SCSI)		+= scsi_mod.o
 
+# --- NOTE ORDERING HERE ---
+# For kernel non-modular link, transport attributes need to
+# be initialised before drivers
+# --------------------------
+obj-$(CONFIG_SCSI_SPI_ATTRS)	+= scsi_transport_spi.o
+obj-$(CONFIG_SCSI_FC_ATTRS) 	+= scsi_transport_fc.o
+
+
 obj-$(CONFIG_SCSI_AMIGA7XX)	+= amiga7xx.o	53c7xx.o
 obj-$(CONFIG_A3000_SCSI)	+= a3000.o	wd33c93.o
 obj-$(CONFIG_A2091_SCSI)	+= a2091.o	wd33c93.o
@@ -41,7 +49,7 @@ obj-$(CONFIG_SCSI_MAC_ESP)	+= mac_esp.o	NCR53C9x.o
 obj-$(CONFIG_SUN3_SCSI)		+= sun3_scsi.o  sun3_scsi_vme.o
 obj-$(CONFIG_MVME16x_SCSI)	+= mvme16x.o	53c7xx.o
 obj-$(CONFIG_BVME6000_SCSI)	+= bvme6000.o	53c7xx.o
-obj-$(CONFIG_SCSI_SIM710)	+= sim710.o	53c700.o
+obj-$(CONFIG_SCSI_SIM710)	+= 53c700.o	sim710.o
 obj-$(CONFIG_SCSI_ADVANSYS)	+= advansys.o
 obj-$(CONFIG_SCSI_PCI2000)	+= pci2000.o
 obj-$(CONFIG_SCSI_PCI2220I)	+= pci2220i.o
@@ -64,7 +72,7 @@ obj-$(CONFIG_SCSI_IN2000)	+= in2000.o
 obj-$(CONFIG_SCSI_GENERIC_NCR5380) += g_NCR5380.o
 obj-$(CONFIG_SCSI_GENERIC_NCR5380_MMIO) += g_NCR5380_mmio.o
 obj-$(CONFIG_SCSI_NCR53C406A)	+= NCR53c406a.o
-obj-$(CONFIG_SCSI_NCR_D700)	+= NCR_D700.o 53c700.o
+obj-$(CONFIG_SCSI_NCR_D700)	+= 53c700.o NCR_D700.o
 obj-$(CONFIG_SCSI_NCR_Q720)	+= NCR_Q720_mod.o
 obj-$(CONFIG_SCSI_SYM53C416)	+= sym53c416.o
 obj-$(CONFIG_SCSI_QLOGIC_FAS)	+= qlogicfas.o
@@ -107,13 +115,14 @@ obj-$(CONFIG_SUN3X_ESP)		+= NCR53C9x.o	sun3x_esp.o
 obj-$(CONFIG_SCSI_DEBUG)	+= scsi_debug.o
 obj-$(CONFIG_SCSI_FCAL)		+= fcal.o
 obj-$(CONFIG_SCSI_CPQFCTS)	+= cpqfc.o
-obj-$(CONFIG_SCSI_LASI700)	+= lasi700.o 53c700.o
+obj-$(CONFIG_SCSI_LASI700)	+= 53c700.o lasi700.o
 obj-$(CONFIG_SCSI_NSP32)	+= nsp32.o
 obj-$(CONFIG_SCSI_SATA_SVW)	+= libata.o sata_svw.o
 obj-$(CONFIG_SCSI_ATA_PIIX)	+= libata.o ata_piix.o
 obj-$(CONFIG_SCSI_SATA_PROMISE)	+= libata.o sata_promise.o
 obj-$(CONFIG_SCSI_SATA_SIL)	+= libata.o sata_sil.o
 obj-$(CONFIG_SCSI_SATA_VIA)	+= libata.o sata_via.o
+obj-$(CONFIG_SCSI_SATA_VITESSE)	+= libata.o sata_vsc.o
 
 obj-$(CONFIG_ARM)		+= arm/
 
@@ -130,7 +139,7 @@ scsi_mod-y			+= scsi.o hosts.o scsi_ioctl.o constants.o \
 scsi_mod-$(CONFIG_SYSCTL)	+= scsi_sysctl.o
 scsi_mod-$(CONFIG_SCSI_PROC_FS)	+= scsi_proc.o
 scsi_mod-$(CONFIG_X86_PC9800)	+= scsi_pc98.o
-			
+
 sd_mod-objs	:= sd.o
 sr_mod-objs	:= sr.o sr_ioctl.o sr_vendor.o
 initio-objs	:= ini9100u.o i91uscsi.o

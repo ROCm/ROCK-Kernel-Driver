@@ -8,7 +8,7 @@
 	This software may be used and distributed according to the terms
 	of the GNU General Public License, incorporated herein by reference.
 
-	Please refer to Documentation/DocBook/tulip.{pdf,ps,html}
+	Please refer to Documentation/DocBook/tulip-user.{pdf,ps,html}
 	for more information on this driver, or visit the project
 	Web page at http://sourceforge.net/projects/tulip/
 
@@ -253,8 +253,9 @@ static void tulip_down(struct net_device *dev);
 static struct net_device_stats *tulip_get_stats(struct net_device *dev);
 static int private_ioctl(struct net_device *dev, struct ifreq *rq, int cmd);
 static void set_rx_mode(struct net_device *dev);
-
-
+#ifdef CONFIG_NET_POLL_CONTROLLER
+static void poll_tulip(struct net_device *dev);
+#endif
 
 static void tulip_set_power_state (struct tulip_private *tp,
 				   int sleep, int snooze)
@@ -276,7 +277,7 @@ static void tulip_set_power_state (struct tulip_private *tp,
 
 static void tulip_up(struct net_device *dev)
 {
-	struct tulip_private *tp = (struct tulip_private *)dev->priv;
+	struct tulip_private *tp = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 	int next_tick = 3*HZ;
 	int i;
@@ -499,7 +500,7 @@ tulip_open(struct net_device *dev)
 
 static void tulip_tx_timeout(struct net_device *dev)
 {
-	struct tulip_private *tp = (struct tulip_private *)dev->priv;
+	struct tulip_private *tp = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 	unsigned long flags;
 
@@ -587,7 +588,7 @@ static void tulip_tx_timeout(struct net_device *dev)
 /* Initialize the Rx and Tx rings, along with various 'dev' bits. */
 static void tulip_init_ring(struct net_device *dev)
 {
-	struct tulip_private *tp = (struct tulip_private *)dev->priv;
+	struct tulip_private *tp = netdev_priv(dev);
 	int i;
 
 	tp->susp_rx = 0;
@@ -638,7 +639,7 @@ static void tulip_init_ring(struct net_device *dev)
 static int
 tulip_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
-	struct tulip_private *tp = (struct tulip_private *)dev->priv;
+	struct tulip_private *tp = netdev_priv(dev);
 	int entry;
 	u32 flag;
 	dma_addr_t mapping;
@@ -724,7 +725,7 @@ static void tulip_clean_tx_ring(struct tulip_private *tp)
 static void tulip_down (struct net_device *dev)
 {
 	long ioaddr = dev->base_addr;
-	struct tulip_private *tp = (struct tulip_private *) dev->priv;
+	struct tulip_private *tp = netdev_priv(dev);
 	unsigned long flags;
 
 	del_timer_sync (&tp->timer);
@@ -764,7 +765,7 @@ static void tulip_down (struct net_device *dev)
 static int tulip_close (struct net_device *dev)
 {
 	long ioaddr = dev->base_addr;
-	struct tulip_private *tp = (struct tulip_private *) dev->priv;
+	struct tulip_private *tp = netdev_priv(dev);
 	int i;
 
 	netif_stop_queue (dev);
@@ -811,7 +812,7 @@ static int tulip_close (struct net_device *dev)
 
 static struct net_device_stats *tulip_get_stats(struct net_device *dev)
 {
-	struct tulip_private *tp = (struct tulip_private *)dev->priv;
+	struct tulip_private *tp = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 
 	if (netif_running(dev)) {
@@ -830,7 +831,7 @@ static struct net_device_stats *tulip_get_stats(struct net_device *dev)
 
 static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
 {
-	struct tulip_private *np = dev->priv;
+	struct tulip_private *np = netdev_priv(dev);
 	u32 ethcmd;
 
 	if (copy_from_user(&ethcmd, useraddr, sizeof(ethcmd)))
@@ -855,7 +856,7 @@ static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
 /* Provide ioctl() calls to examine the MII xcvr state. */
 static int private_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
 {
-	struct tulip_private *tp = dev->priv;
+	struct tulip_private *tp = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 	struct mii_ioctl_data *data = (struct mii_ioctl_data *) & rq->ifr_data;
 	const unsigned int phy_idx = 0;
@@ -964,7 +965,7 @@ static int private_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
 
 static void build_setup_frame_hash(u16 *setup_frm, struct net_device *dev)
 {
-	struct tulip_private *tp = (struct tulip_private *)dev->priv;
+	struct tulip_private *tp = netdev_priv(dev);
 	u16 hash_table[32];
 	struct dev_mc_list *mclist;
 	int i;
@@ -995,7 +996,7 @@ static void build_setup_frame_hash(u16 *setup_frm, struct net_device *dev)
 
 static void build_setup_frame_perfect(u16 *setup_frm, struct net_device *dev)
 {
-	struct tulip_private *tp = (struct tulip_private *)dev->priv;
+	struct tulip_private *tp = netdev_priv(dev);
 	struct dev_mc_list *mclist;
 	int i;
 	u16 *eaddrs;
@@ -1023,7 +1024,7 @@ static void build_setup_frame_perfect(u16 *setup_frm, struct net_device *dev)
 
 static void set_rx_mode(struct net_device *dev)
 {
-	struct tulip_private *tp = (struct tulip_private *)dev->priv;
+	struct tulip_private *tp = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 	int csr6;
 
@@ -1150,7 +1151,7 @@ static void set_rx_mode(struct net_device *dev)
 static void __devinit tulip_mwi_config (struct pci_dev *pdev,
 					struct net_device *dev)
 {
-	struct tulip_private *tp = dev->priv;
+	struct tulip_private *tp = netdev_priv(dev);
 	u8 cache;
 	u16 pci_command;
 	u32 csr0;
@@ -1373,7 +1374,7 @@ static int __devinit tulip_init_one (struct pci_dev *pdev,
 	 * initialize private data structure 'tp'
 	 * it is zeroed and aligned in alloc_etherdev
 	 */
-	tp = dev->priv;
+	tp = netdev_priv(dev);
 
 	tp->rx_ring = pci_alloc_consistent(pdev,
 					   sizeof(struct tulip_rx_desc) * RX_RING_SIZE +
@@ -1618,6 +1619,9 @@ static int __devinit tulip_init_one (struct pci_dev *pdev,
 	dev->get_stats = tulip_get_stats;
 	dev->do_ioctl = private_ioctl;
 	dev->set_multicast_list = set_rx_mode;
+#ifdef CONFIG_NET_POLL_CONTROLLER
+	dev->poll_controller = &poll_tulip;
+#endif
 
 	if (register_netdev(dev))
 		goto err_out_free_ring;
@@ -1756,7 +1760,7 @@ static void __devexit tulip_remove_one (struct pci_dev *pdev)
 	if (!dev)
 		return;
 
-	tp = dev->priv;
+	tp = netdev_priv(dev);
 	pci_free_consistent (pdev,
 			     sizeof (struct tulip_rx_desc) * RX_RING_SIZE +
 			     sizeof (struct tulip_tx_desc) * TX_RING_SIZE,
@@ -1774,6 +1778,22 @@ static void __devexit tulip_remove_one (struct pci_dev *pdev)
 	/* pci_power_off (pdev, -1); */
 }
 
+#ifdef CONFIG_NET_POLL_CONTROLLER
+/*
+ * Polling 'interrupt' - used by things like netconsole to send skbs
+ * without having to re-enable interrupts. It's not called while
+ * the interrupt routine is executing.
+ */
+
+static void poll_tulip (struct net_device *dev)
+{
+	/* disable_irq here is not very nice, but with the lockless
+	   interrupt handler we have no other choice. */
+	disable_irq(dev->irq);
+	tulip_interrupt (dev->irq, dev, NULL);
+	enable_irq(dev->irq);
+}
+#endif
 
 static struct pci_driver tulip_driver = {
 	.name		= DRV_NAME,

@@ -54,7 +54,7 @@ xdr_decode_netobj(u32 *p, struct xdr_netobj *obj)
 }
 
 u32 *
-xdr_encode_array(u32 *p, const char *array, unsigned int len)
+xdr_encode_array(u32 *p, const void *array, unsigned int len)
 {
 	int quadlen = XDR_QUADLEN(len);
 

@@ -18,7 +18,6 @@
 #include <linux/devfs_fs_kernel.h>
 #include <linux/kernel.h>
 #include <linux/syscalls.h>
-#include <linux/unistd.h>
 #include <linux/string.h>
 #include <linux/ctype.h>
 #include <linux/delay.h>
@@ -38,9 +37,11 @@
 #include <linux/profile.h>
 #include <linux/rcupdate.h>
 #include <linux/moduleparam.h>
+#include <linux/kallsyms.h>
 #include <linux/writeback.h>
 #include <linux/cpu.h>
 #include <linux/efi.h>
+#include <linux/unistd.h>
 
 #include <asm/io.h>
 #include <asm/bugs.h>
@@ -155,8 +156,11 @@ static int __init obsolete_checksetup(char *line)
 	p = &__setup_start;
 	do {
 		int n = strlen(p->str);
-		if (!strncmp(line,p->str,n)) {
-			if (p->setup_func(line+n))
+		if (!strncmp(line, p->str, n)) {
+			if (!p->setup_func) {
+				printk(KERN_WARNING "Parameter %s is obsolete, ignored\n", p->str);
+				return 1;
+			} else if (p->setup_func(line + n))
 				return 1;
 		}
 		p++;
@@ -510,8 +514,11 @@ static void __init do_initcalls(void)
 	for (call = &__initcall_start; call < &__initcall_end; call++) {
 		char *msg;
 
-		if (initcall_debug)
-			printk("calling initcall 0x%p\n", *call);
+		if (initcall_debug) {
+			printk(KERN_DEBUG "Calling initcall 0x%p", *call);
+			print_symbol(": %s()", (unsigned long) *call);
+			printk("\n");
+		}
 
 		(*call)();
 
@@ -608,11 +615,11 @@ static int init(void * unused)
 	unlock_kernel();
 	system_running = 1;
 
-	if (open("/dev/console", O_RDWR, 0) < 0)
+	if (sys_open("/dev/console", O_RDWR, 0) < 0)
 		printk("Warning: unable to open an initial console.\n");
 
-	(void) dup(0);
-	(void) dup(0);
+	(void) sys_dup(0);
+	(void) sys_dup(0);
 	
 	/*
 	 * We try each of these until one succeeds.

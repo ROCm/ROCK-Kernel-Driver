@@ -94,6 +94,7 @@ static void macide_mediabay_interrupt(int irq, void *dev_id, struct pt_regs *reg
 void macide_init(void)
 {
 	hw_regs_t hw;
+	ide_hwif_t *hwif;
 	int index = -1;
 
 	switch (macintosh_config->ide_type) {
@@ -102,21 +103,21 @@ void macide_init(void)
 				0, 0, macide_ack_intr,
 //				quadra_ide_iops,
 				IRQ_NUBUS_F);
-		index = ide_register_hw(&hw, NULL);
+		index = ide_register_hw(&hw, &hwif);
 		break;
 	case MAC_IDE_PB:
 		ide_setup_ports(&hw, IDE_BASE, macide_offsets,
 				0, 0, macide_ack_intr,
 //				macide_pb_iops,
 				IRQ_NUBUS_C);
-		index = ide_register_hw(&hw, NULL);
+		index = ide_register_hw(&hw, &hwif);
 		break;
 	case MAC_IDE_BABOON:
 		ide_setup_ports(&hw, BABOON_BASE, macide_offsets,
 				0, 0, NULL,
 //				macide_baboon_iops,
 				IRQ_BABOON_1);
-		index = ide_register_hw(&hw, NULL);
+		index = ide_register_hw(&hw, &hwif);
 		if (index == -1) break;
 		if (macintosh_config->ident == MAC_MODEL_PB190) {
 
@@ -141,6 +142,7 @@ void macide_init(void)
 	}
 
         if (index != -1) {
+		hwif->mmio = 2;
 		if (macintosh_config->ide_type == MAC_IDE_QUADRA)
 			printk(KERN_INFO "ide%d: Macintosh Quadra IDE interface\n", index);
 		else if (macintosh_config->ide_type == MAC_IDE_PB)

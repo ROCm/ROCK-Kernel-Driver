@@ -19,7 +19,6 @@
 #include <linux/init.h>
 
 #include <asm/prom.h>
-#include <asm/proc_fs.h>
 #include <asm/rtas.h>
 #include <asm/semaphore.h>
 #include <asm/machdep.h>
@@ -259,6 +258,33 @@ rtas_get_power_level(int powerdomain, int *level)
 }
 
 int
+rtas_set_power_level(int powerdomain, int level, int *setlevel)
+{
+	int token = rtas_token("set-power-level");
+	unsigned int wait_time;
+	long returned_level;
+	int rc;
+
+	if (token == RTAS_UNKNOWN_SERVICE)
+		return RTAS_UNKNOWN_OP;
+
+	while (1) {
+		rc = (int) rtas_call(token, 2, 2, &returned_level, powerdomain,
+					level);
+		if (rc == RTAS_BUSY)
+			udelay(1);
+		else if (rtas_is_extended_busy(rc)) {
+			wait_time = rtas_extended_busy_delay_time(rc);
+			udelay(wait_time * 1000);
+		}
+		else
+			break;
+	}
+	*setlevel = (int) returned_level;
+	return rc;
+}
+
+int
 rtas_get_sensor(int sensor, int index, int *state)
 {
 	int token = rtas_token("get-sensor-state");
@@ -426,6 +452,7 @@ asmlinkage int ppc_rtas(struct rtas_args __user *uargs)
 {
 	struct rtas_args args;
 	unsigned long flags;
+	int nargs;
 
 	if (!capable(CAP_SYS_ADMIN))
 		return -EPERM;
@@ -433,14 +460,15 @@ asmlinkage int ppc_rtas(struct rtas_args __user *uargs)
 	if (copy_from_user(&args, uargs, 3 * sizeof(u32)) != 0)
 		return -EFAULT;
 
-	if (args.nargs > ARRAY_SIZE(args.args)
+	nargs = args.nargs;
+	if (nargs > ARRAY_SIZE(args.args)
 	    || args.nret > ARRAY_SIZE(args.args)
-	    || args.nargs + args.nret > ARRAY_SIZE(args.args))
+	    || nargs + args.nret > ARRAY_SIZE(args.args))
 		return -EINVAL;
 
 	/* Copy in args. */
 	if (copy_from_user(args.args, uargs->args,
-			   args.nargs * sizeof(rtas_arg_t)) != 0)
+			   nargs * sizeof(rtas_arg_t)) != 0)
 		return -EFAULT;
 
 	spin_lock_irqsave(&rtas.lock, flags);
@@ -449,14 +477,15 @@ asmlinkage int ppc_rtas(struct rtas_args __user *uargs)
 	enter_rtas((void *)__pa((unsigned long)&get_paca()->xRtas));
 	args = get_paca()->xRtas;
 
+	args.rets  = (rtas_arg_t *)&(args.args[nargs]);
 	if (args.rets[0] == -1)
 		log_rtas_error(&args);
 
 	spin_unlock_irqrestore(&rtas.lock, flags);
 
 	/* Copy out args. */
-	if (copy_to_user(uargs->args + args.nargs,
-			 args.args + args.nargs,
+	if (copy_to_user(uargs->args + nargs,
+			 args.args + nargs,
 			 args.nret * sizeof(rtas_arg_t)) != 0)
 		return -EFAULT;
 
@@ -472,4 +501,5 @@ EXPORT_SYMBOL(rtas_data_buf_lock);
 EXPORT_SYMBOL(rtas_extended_busy_delay_time);
 EXPORT_SYMBOL(rtas_get_sensor);
 EXPORT_SYMBOL(rtas_get_power_level);
+EXPORT_SYMBOL(rtas_set_power_level);
 EXPORT_SYMBOL(rtas_set_indicator);

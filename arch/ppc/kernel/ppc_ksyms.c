@@ -32,8 +32,6 @@
 #include <linux/pmu.h>
 #include <asm/prom.h>
 #include <asm/system.h>
-#define __KERNEL_SYSCALLS__
-#include <asm/unistd.h>
 #include <asm/pci-bridge.h>
 #include <asm/irq.h>
 #include <asm/pmac_feature.h>
@@ -189,10 +187,6 @@ EXPORT_SYMBOL(consistent_sync);
 EXPORT_SYMBOL(flush_dcache_all);
 #endif
 
-EXPORT_SYMBOL(open);
-EXPORT_SYMBOL(read);
-EXPORT_SYMBOL(lseek);
-EXPORT_SYMBOL(close);
 EXPORT_SYMBOL(start_thread);
 EXPORT_SYMBOL(kernel_thread);
 

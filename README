@@ -172,24 +172,15 @@ COMPILING the kernel:
 
    Please note that you can still run a.out user programs with this kernel.
 
- - Do a "make bzImage" to create a compressed kernel image.  If you want
-   to make a boot disk (without root filesystem or LILO), insert a floppy
-   in your A: drive, and do a "make bzdisk".  It is also possible to do
-   "make install" if you have lilo installed to suit the kernel makefiles,
-   but you may want to check your particular lilo setup first. 
+ - Do a "make" to create a compressed kernel image. It is also
+   possible to do "make install" if you have lilo installed to suit the
+   kernel makefiles, but you may want to check your particular lilo setup first.
 
    To do the actual install you have to be root, but none of the normal
    build should require that. Don't take the name of root in vain.
 
- - In the unlikely event that your system cannot boot bzImage kernels you
-   can still compile your kernel as zImage. However, since zImage support
-   will be removed at some point in the future in favor of bzImage we
-   encourage people having problems with booting bzImage kernels to report
-   these, with detailed hardware configuration information, to the
-   linux-kernel mailing list and to H. Peter Anvin <hpa+linux@zytor.com>.
-
  - If you configured any of the parts of the kernel as `modules', you
-   will have to do "make modules" followed by "make modules_install".
+   will also have to do "make modules_install".
 
  - Keep a backup kernel handy in case something goes wrong.  This is 
    especially true for the development releases, since each new release
@@ -200,11 +191,11 @@ COMPILING the kernel:
    do a "make modules_install".
 
  - In order to boot your new kernel, you'll need to copy the kernel
-   image (found in .../linux/arch/i386/boot/bzImage after compilation)
+   image (e.g. .../linux/arch/i386/boot/bzImage after compilation)
    to the place where your regular bootable kernel is found. 
 
-   For some, this is on a floppy disk, in which case you can copy the
-   kernel bzImage file to /dev/fd0 to make a bootable floppy.
+ - Booting a kernel directly from a floppy without the assistance of a
+   bootloader such as LILO, is no longer supported.
 
    If you boot Linux from the hard drive, chances are you use LILO which
    uses the kernel image as specified in the file /etc/lilo.conf.  The
@@ -262,8 +253,9 @@ IF SOMETHING GOES WRONG:
    the above example it's due to a bad kernel pointer). More information
    on making sense of the dump is in Documentation/oops-tracing.txt
 
- - You can use the "ksymoops" program to make sense of the dump.  This
-   utility can be downloaded from
+ - If you compiled the kernel with CONFIG_KALLSYMS you can send the dump
+   as is, otherwise you will have to use the "ksymoops" program to make
+   sense of the dump.  This utility can be downloaded from
    ftp://ftp.<country>.kernel.org/pub/linux/utils/kernel/ksymoops.
    Alternately you can do the dump lookup by hand:
 

@@ -48,11 +48,12 @@
 
 #define PREFIX			"ACPI: "
 
-int acpi_noirq __initdata = 0;	/* skip ACPI IRQ initialization */
+int acpi_noirq __initdata;	/* skip ACPI IRQ initialization */
 int acpi_ht __initdata = 1;	/* enable HT */
 
 int acpi_lapic;
 int acpi_ioapic;
+int acpi_strict;
 
 /* --------------------------------------------------------------------------
                               Boot-time Configuration
@@ -76,6 +77,31 @@ __acpi_map_table (
 
 	return NULL; 
 } 	      
+
+#ifdef CONFIG_PCI_MMCONFIG
+static int __init acpi_parse_mcfg(unsigned long phys_addr, unsigned long size)
+{
+	struct acpi_table_mcfg *mcfg;
+
+	if (!phys_addr || !size)
+		return -EINVAL;
+
+	mcfg = (struct acpi_table_mcfg *) __acpi_map_table(phys_addr, size);
+	if (!mcfg) {
+		printk(KERN_WARNING PREFIX "Unable to map MCFG\n");
+		return -ENODEV;
+	}
+
+	if (mcfg->base_reserved) {
+		printk(KERN_ERR PREFIX "MMCONFIG not in low 4GB of memory\n");
+		return -ENODEV;
+	}
+
+	pci_mmcfg_base_addr = mcfg->base_address;
+
+	return 0;
+}
+#endif /* CONFIG_PCI_MMCONFIG */
 
 #ifdef CONFIG_X86_LOCAL_APIC
 
@@ -233,6 +259,24 @@ acpi_parse_nmi_src (
 
 #endif /*CONFIG_X86_IO_APIC*/
 
+static int __init acpi_parse_sbf(unsigned long phys_addr, unsigned long size)
+{
+	struct acpi_table_sbf *sb;
+
+	if (!phys_addr || !size)
+		return -EINVAL;
+
+	sb = (struct acpi_table_sbf *) __acpi_map_table(phys_addr, size);
+	if (!sb) {
+		printk(KERN_WARNING PREFIX "Unable to map SBF\n");
+		return -ENODEV;
+	}
+
+	sbf_port = sb->sbf_cmos; /* Save CMOS port */
+
+	return 0;
+}
+
 #ifdef CONFIG_HPET_TIMER
 static int __init
 acpi_parse_hpet (
@@ -264,7 +308,7 @@ acpi_parse_hpet (
  * programs the PIC-mode SCI to Level Trigger.
  * (NO-OP if the BIOS set Level Trigger already)
  *
- * If a PIC-mode SCI is not recogznied or gives spurious IRQ7's
+ * If a PIC-mode SCI is not recognized or gives spurious IRQ7's
  * it may require Edge Trigger -- use "acpi_pic_sci=edge"
  * (NO-OP if the BIOS set Edge Trigger already)
  *
@@ -321,6 +365,17 @@ acpi_pic_sci_setup(char *str)
 __setup("acpi_pic_sci=", acpi_pic_sci_setup);
 
 #endif /* CONFIG_ACPI_BUS */
+
+int acpi_gsi_to_irq(u32 gsi, unsigned int *irq)
+{
+#ifdef CONFIG_X86_IO_APIC
+	if (use_pci_vector() && !platform_legacy_irq(gsi))
+ 		*irq = IO_APIC_VECTOR(gsi);
+	else
+#endif
+		*irq = gsi;
+	return 0;
+}
 
 static unsigned long __init
 acpi_scan_rsdp (
@@ -402,6 +457,8 @@ acpi_boot_init (void)
 		acpi_disabled = 1;
 		return result;
 	}
+
+	(void) acpi_table_parse(ACPI_BOOT, acpi_parse_sbf);
 
 	result = acpi_blacklisted();
 	if (result) {
@@ -547,6 +604,12 @@ acpi_boot_init (void)
 	result = acpi_table_parse(ACPI_HPET, acpi_parse_hpet);
 	if (result < 0) 
 		printk("ACPI: no HPET table found (%d).\n", result); 
+#endif
+
+#ifdef CONFIG_PCI_MMCONFIG
+	result = acpi_table_parse(ACPI_MCFG, acpi_parse_mcfg);
+	if (result)
+		printk(KERN_ERR PREFIX "Error %d parsing MCFG\n", result);
 #endif
 
 	return 0;

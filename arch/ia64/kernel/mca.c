@@ -103,8 +103,6 @@ extern void			ia64_slave_init_handler (void);
 
 static ia64_mc_info_t		ia64_mc_info;
 
-extern struct hw_interrupt_type	irq_type_iosapic_level;
-
 struct ia64_mca_tlb_info ia64_mca_tlb_list[NR_CPUS];
 
 #define MAX_CPE_POLL_INTERVAL (15*60*HZ) /* 15 minutes */
@@ -1253,7 +1251,6 @@ ia64_mca_init(void)
 				if (irq_to_vector(irq) == cpev) {
 					desc = irq_descp(irq);
 					desc->status |= IRQ_PER_CPU;
-					desc->handler = &irq_type_iosapic_level;
 					setup_irq(irq, &mca_cpe_irqaction);
 				}
 			ia64_mca_register_cpev(cpev);

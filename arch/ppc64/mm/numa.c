@@ -15,6 +15,7 @@
 #include <linux/mmzone.h>
 #include <linux/module.h>
 #include <asm/lmb.h>
+#include <asm/machdep.h>
 
 #if 1
 #define dbg(args...) udbg_printf(args)
@@ -22,9 +23,17 @@
 #define dbg(args...)
 #endif
 
-int numa_cpu_lookup_table[NR_CPUS] = { [ 0 ... (NR_CPUS - 1)] = -1};
+#ifdef DEBUG_NUMA
+#define ARRAY_INITIALISER -1
+#else
+#define ARRAY_INITIALISER 0
+#endif
+
+int numa_cpu_lookup_table[NR_CPUS] = { [ 0 ... (NR_CPUS - 1)] =
+	ARRAY_INITIALISER};
 int numa_memory_lookup_table[MAX_MEMORY >> MEMORY_INCREMENT_SHIFT] =
-	{ [ 0 ... ((MAX_MEMORY >> MEMORY_INCREMENT_SHIFT) - 1)] = -1};
+	{ [ 0 ... ((MAX_MEMORY >> MEMORY_INCREMENT_SHIFT) - 1)] =
+	ARRAY_INITIALISER};
 cpumask_t numa_cpumask_lookup_table[MAX_NUMNODES];
 int nr_cpus_in_node[MAX_NUMNODES] = { [0 ... (MAX_NUMNODES -1)] = 0};
 
@@ -33,7 +42,10 @@ bootmem_data_t plat_node_bdata[MAX_NUMNODES];
 static unsigned long node0_io_hole_size;
 
 EXPORT_SYMBOL(node_data);
+EXPORT_SYMBOL(numa_cpu_lookup_table);
 EXPORT_SYMBOL(numa_memory_lookup_table);
+EXPORT_SYMBOL(numa_cpumask_lookup_table);
+EXPORT_SYMBOL(nr_cpus_in_node);
 
 static inline void map_cpu_to_node(int cpu, int node)
 {
@@ -53,6 +65,11 @@ static int __init parse_numa_properties(void)
 	int *memory_associativity;
 	int depth;
 	int max_domain = 0;
+
+	if (strstr(saved_command_line, "numa=off")) {
+		printk(KERN_WARNING "NUMA disabled by user\n");
+		return -1;
+	}
 
 	cpu = of_find_node_by_type(NULL, "cpu");
 	if (!cpu)

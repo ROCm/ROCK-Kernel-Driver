@@ -1269,8 +1269,10 @@ asmlinkage long sys_swapon(const char __user * specialfile, int swap_flags)
 	swap_list_unlock();
 	name = getname(specialfile);
 	error = PTR_ERR(name);
-	if (IS_ERR(name))
+	if (IS_ERR(name)) {
+		name = NULL;
 		goto bad_swap_2;
+	}
 	swap_file = filp_open(name, O_RDWR, 0);
 	error = PTR_ERR(swap_file);
 	if (IS_ERR(swap_file)) {

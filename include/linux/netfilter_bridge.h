@@ -88,6 +88,20 @@ void nf_bridge_save_header(struct sk_buff *skb)
 	memcpy(skb->nf_bridge->data, skb->data - header_size, header_size);
 }
 
+/* This is called by the IP fragmenting code and it ensures there is
+ * enough room for the encapsulating header (if there is one). */
+static inline
+int nf_bridge_pad(struct sk_buff *skb)
+{
+	if (skb->protocol == __constant_htons(ETH_P_IP))
+		return 0;
+	if (skb->nf_bridge) {
+		if (skb->protocol == __constant_htons(ETH_P_8021Q))
+			return 4;
+	}
+	return 0;
+}
+
 struct bridge_skb_cb {
 	union {
 		__u32 ipv4;

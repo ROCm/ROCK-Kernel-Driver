@@ -10,7 +10,6 @@
  * This file handles the architecture-dependent parts of process handling..
  */
 
-#define __KERNEL_SYSCALLS__
 #include <stdarg.h>
 
 #include <linux/errno.h>
@@ -22,7 +21,6 @@
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
 #include <linux/stddef.h>
-#include <linux/unistd.h>
 #include <linux/ptrace.h>
 #include <linux/slab.h>
 #include <linux/user.h>
@@ -43,6 +41,7 @@
 #include <asm/fpumacro.h>
 #include <asm/head.h>
 #include <asm/cpudata.h>
+#include <asm/unistd.h>
 
 /* #define VERBOSE_SHOWREGS */
 

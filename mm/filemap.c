@@ -161,12 +161,14 @@ EXPORT_SYMBOL(filemap_fdatawrite);
 
 /*
  * This is a mostly non-blocking flush.  Not suitable for data-integrity
- * purposes.
+ * purposes - I/O may not be started against all dirty pages.
  */
 int filemap_flush(struct address_space *mapping)
 {
 	return __filemap_fdatawrite(mapping, WB_SYNC_NONE);
 }
+
+EXPORT_SYMBOL(filemap_flush);
 
 /**
  * filemap_fdatawait - walk the list of locked pages of the given address
@@ -292,7 +294,7 @@ static wait_queue_head_t *page_waitqueue(struct page *page)
 	return &zone->wait_table[hash_ptr(page, zone->wait_table_bits)];
 }
 
-void wait_on_page_bit(struct page *page, int bit_nr)
+void fastcall wait_on_page_bit(struct page *page, int bit_nr)
 {
 	wait_queue_head_t *waitqueue = page_waitqueue(page);
 	DEFINE_WAIT(wait);
@@ -324,7 +326,7 @@ EXPORT_SYMBOL(wait_on_page_bit);
  * the clear_bit and the read of the waitqueue (to avoid SMP races with a
  * parallel wait_on_page_locked()).
  */
-void unlock_page(struct page *page)
+void fastcall unlock_page(struct page *page)
 {
 	wait_queue_head_t *waitqueue = page_waitqueue(page);
 	smp_mb__before_clear_bit();
@@ -365,7 +367,7 @@ EXPORT_SYMBOL(end_page_writeback);
  * chances are that on the second loop, the block layer's plug list is empty,
  * so sync_page() will then return in state TASK_UNINTERRUPTIBLE.
  */
-void __lock_page(struct page *page)
+void fastcall __lock_page(struct page *page)
 {
 	wait_queue_head_t *wqh = page_waitqueue(page);
 	DEFINE_WAIT(wait);
@@ -572,7 +574,7 @@ EXPORT_SYMBOL(grab_cache_page_nowait);
 
 /*
  * This is a generic file read routine, and uses the
- * inode->i_op->readpage() function for the actual low-level
+ * mapping->a_ops->readpage() function for the actual low-level
  * stuff.
  *
  * This is really ugly. But the goto's actually try to clarify some
@@ -723,7 +725,7 @@ no_cached_page:
 	*ppos = ((loff_t) index << PAGE_CACHE_SHIFT) + offset;
 	if (cached_page)
 		page_cache_release(cached_page);
-	update_atime(inode);
+	file_accessed(filp);
 }
 
 EXPORT_SYMBOL(do_generic_mapping_read);
@@ -818,7 +820,7 @@ __generic_file_aio_read(struct kiocb *iocb, const struct iovec *iov,
 			if (retval > 0)
 				*ppos = pos + retval;
 		}
-		update_atime(filp->f_dentry->d_inode);
+		file_accessed(filp);
 		goto out;
 	}
 
@@ -953,7 +955,7 @@ asmlinkage ssize_t sys_readahead(int fd, loff_t offset, size_t count)
  * and schedules an I/O to read in its contents from disk.
  */
 static int FASTCALL(page_cache_read(struct file * file, unsigned long offset));
-static int page_cache_read(struct file * file, unsigned long offset)
+static int fastcall page_cache_read(struct file * file, unsigned long offset)
 {
 	struct address_space *mapping = file->f_mapping;
 	struct page *page; 
@@ -1351,11 +1353,10 @@ static struct vm_operations_struct generic_file_vm_ops = {
 int generic_file_mmap(struct file * file, struct vm_area_struct * vma)
 {
 	struct address_space *mapping = file->f_mapping;
-	struct inode *inode = mapping->host;
 
 	if (!mapping->a_ops->readpage)
 		return -ENOEXEC;
-	update_atime(inode);
+	file_accessed(file);
 	vma->vm_ops = &generic_file_vm_ops;
 	return 0;
 }
@@ -1501,10 +1502,11 @@ repeat:
  *	if suid or (sgid and xgrp)
  *		remove privs
  */
-void remove_suid(struct dentry *dentry)
+int remove_suid(struct dentry *dentry)
 {
 	mode_t mode = dentry->d_inode->i_mode;
 	int kill = 0;
+	int result = 0;
 
 	/* suid always must be killed */
 	if (unlikely(mode & S_ISUID))
@@ -1521,8 +1523,9 @@ void remove_suid(struct dentry *dentry)
 		struct iattr newattrs;
 
 		newattrs.ia_valid = ATTR_FORCE | kill;
-		notify_change(dentry, &newattrs);
+		result = notify_change(dentry, &newattrs);
 	}
+	return result;
 }
 EXPORT_SYMBOL(remove_suid);
 
@@ -1776,11 +1779,13 @@ generic_file_aio_write_nolock(struct kiocb *iocb, const struct iovec *iov,
 	if (err)
 		goto out;
 
-
 	if (count == 0)
 		goto out;
 
-	remove_suid(file->f_dentry);
+	err = remove_suid(file->f_dentry);
+	if (err)
+		goto out;
+
 	inode_update_time(inode, 1);
 
 	/* coalesce the iovecs and go direct-to-BIO for O_DIRECT */

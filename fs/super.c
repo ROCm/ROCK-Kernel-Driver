@@ -745,7 +745,7 @@ do_kern_mount(const char *fstype, int flags, const char *name, void *data)
 			goto out_mnt;
 		}
 
-		error = security_sb_copy_data(fstype, data, secdata);
+		error = security_sb_copy_data(type, data, secdata);
 		if (error) {
 			sb = ERR_PTR(error);
 			goto out_free_secdata;

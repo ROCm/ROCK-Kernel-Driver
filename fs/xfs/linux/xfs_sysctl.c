@@ -117,6 +117,16 @@ STATIC ctl_table xfs_table[] = {
 	sizeof(int), 0644, NULL, &proc_dointvec_minmax,
 	&sysctl_intvec, NULL,
 	&xfs_params.inherit_noatim.min, &xfs_params.inherit_noatim.max},
+	
+	{XFS_FLUSH_INTERVAL, "flush_interval", &xfs_params.flush_interval.val,
+	sizeof(int), 0644, NULL, &proc_dointvec_minmax,
+	&sysctl_intvec, NULL,
+	&xfs_params.flush_interval.min, &xfs_params.flush_interval.max},
+
+	{XFS_AGE_BUFFER, "age_buffer", &xfs_params.age_buffer.val,
+	sizeof(int), 0644, NULL, &proc_dointvec_minmax,
+	&sysctl_intvec, NULL,
+	&xfs_params.age_buffer.min, &xfs_params.age_buffer.max},
 
 	/* please keep this the last entry */
 #ifdef CONFIG_PROC_FS

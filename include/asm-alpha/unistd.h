@@ -360,7 +360,10 @@
 #define __NR_clock_nanosleep		422
 #define __NR_semtimedop			423
 #define __NR_tgkill			424
-#define NR_SYSCALLS			425
+#define __NR_stat64			425
+#define __NR_lstat64			426
+#define __NR_fstat64			427
+#define NR_SYSCALLS			428
 
 #if defined(__GNUC__)
 
@@ -573,9 +576,9 @@ static inline off_t lseek(int fd, off_t off, int whence)
 	return sys_lseek(fd, off, whence);
 }
 
-static inline long _exit(int value)
+static inline void _exit(int value)
 {
-	return sys_exit(value);
+	sys_exit(value);
 }
 
 #define exit(x) _exit(x)

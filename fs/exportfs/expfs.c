@@ -135,7 +135,6 @@ find_exported_dentry(struct super_block *sb, void *obj, void *parent,
 	 * the noprogress counter.  If we go through the loop 10 times (2 is
 	 * probably enough) without getting anywhere, we just give up
 	 */
-	lock_kernel();
 	noprogress= 0;
 	while (target_dir->d_flags & DCACHE_DISCONNECTED && noprogress++ < 10) {
 		struct dentry *pd = target_dir;
@@ -232,7 +231,6 @@ find_exported_dentry(struct super_block *sb, void *obj, void *parent,
 		/* something went wrong - oh-well */
 		if (!err)
 			err = -ESTALE;
-		unlock_kernel();
 		goto err_target;
 	}
 	/* if we weren't after a directory, have one more step to go */
@@ -254,7 +252,6 @@ find_exported_dentry(struct super_block *sb, void *obj, void *parent,
 		}
 	}
 	dput(target_dir);
-	unlock_kernel();
 	/* now result is properly connected, it is our best bet */
 	if (acceptable(context, result))
 		return result;

@@ -144,7 +144,7 @@ static expansioncard_ops_t etherh_ops = {
 static void
 etherh_setif(struct net_device *dev)
 {
-	struct etherh_priv *eh = (struct etherh_priv *)dev->priv;
+	struct etherh_priv *eh = netdev_priv(dev);
 	struct ei_device *ei_local = &eh->eidev;
 	unsigned long addr, flags;
 
@@ -188,7 +188,7 @@ etherh_setif(struct net_device *dev)
 static int
 etherh_getifstat(struct net_device *dev)
 {
-	struct etherh_priv *eh = (struct etherh_priv *)dev->priv;
+	struct etherh_priv *eh = netdev_priv(dev);
 	struct ei_device *ei_local = &eh->eidev;
 	int stat = 0;
 
@@ -256,7 +256,7 @@ static int etherh_set_config(struct net_device *dev, struct ifmap *map)
 static void
 etherh_reset(struct net_device *dev)
 {
-	struct ei_device *ei_local = (struct ei_device *) dev->priv;
+	struct ei_device *ei_local = netdev_priv(dev);
 
 	outb_p(E8390_NODMA+E8390_PAGE0+E8390_STOP, dev->base_addr);
 
@@ -283,7 +283,7 @@ etherh_reset(struct net_device *dev)
 static void
 etherh_block_output (struct net_device *dev, int count, const unsigned char *buf, int start_page)
 {
-	struct ei_device *ei_local = (struct ei_device *) dev->priv;
+	struct ei_device *ei_local = netdev_priv(dev);
 	unsigned int addr, dma_addr;
 	unsigned long dma_start;
 
@@ -349,7 +349,7 @@ etherh_block_output (struct net_device *dev, int count, const unsigned char *buf
 static void
 etherh_block_input (struct net_device *dev, int count, struct sk_buff *skb, int ring_offset)
 {
-	struct ei_device *ei_local = (struct ei_device *) dev->priv;
+	struct ei_device *ei_local = netdev_priv(dev);
 	unsigned int addr, dma_addr;
 	unsigned char *buf;
 
@@ -390,7 +390,7 @@ etherh_block_input (struct net_device *dev, int count, struct sk_buff *skb, int 
 static void
 etherh_get_header (struct net_device *dev, struct e8390_pkt_hdr *hdr, int ring_page)
 {
-	struct ei_device *ei_local = (struct ei_device *) dev->priv;
+	struct ei_device *ei_local = netdev_priv(dev);
 	unsigned int addr, dma_addr;
 
 	if (ei_local->dmaing) {
@@ -432,7 +432,7 @@ etherh_get_header (struct net_device *dev, struct e8390_pkt_hdr *hdr, int ring_p
 static int
 etherh_open(struct net_device *dev)
 {
-	struct ei_device *ei_local = (struct ei_device *) dev->priv;
+	struct ei_device *ei_local = netdev_priv(dev);
 
 	if (!is_valid_ether_addr(dev->dev_addr)) {
 		printk(KERN_WARNING "%s: invalid ethernet MAC address\n",
@@ -557,7 +557,7 @@ etherh_probe(struct expansion_card *ec, const struct ecard_id *id)
 		goto out;
 	}
 
-	eh = dev->priv;
+	eh = netdev_priv(dev);
 
 	spin_lock_init(&eh->eidev.page_lock);
 
@@ -653,7 +653,7 @@ etherh_probe(struct expansion_card *ec, const struct ecard_id *id)
 		break;
 	}
 
-	ei_local = (struct ei_device *) dev->priv;
+	ei_local = netdev_priv(dev);
 	if (ec->cid.product == PROD_ANT_ETHERM) {
 		ei_local->tx_start_page = ETHERM_TX_START_PAGE;
 		ei_local->stop_page     = ETHERM_STOP_PAGE;

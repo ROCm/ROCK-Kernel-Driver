@@ -272,7 +272,7 @@ asmlinkage long sys_readlink(const char __user * path, char __user * buf, int bu
 		if (inode->i_op && inode->i_op->readlink) {
 			error = security_inode_readlink(nd.dentry);
 			if (!error) {
-				update_atime(inode);
+				touch_atime(nd.mnt, nd.dentry);
 				error = inode->i_op->readlink(nd.dentry, buf, bufsiz);
 			}
 		}
@@ -283,7 +283,7 @@ asmlinkage long sys_readlink(const char __user * path, char __user * buf, int bu
 
 
 /* ---------- LFS-64 ----------- */
-#if !defined(__alpha__) && !defined(__ia64__) && !defined(__mips64) && !defined(__x86_64__) && !defined(CONFIG_ARCH_S390X)
+#if !defined(__ia64__) && !defined(__mips64) && !defined(__x86_64__) && !defined(CONFIG_ARCH_S390X)
 
 static long cp_new_stat64(struct kstat *stat, struct stat64 __user *statbuf)
 {

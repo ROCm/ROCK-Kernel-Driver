@@ -9,31 +9,39 @@
 #include <linux/sched.h>
 
 /*
- * Semaphores are implemented using a two-way counter:
- * 
- * The "count" variable is decremented for each process that tries to sleep,
- * while the "waking" variable is incremented when the "up()" code goes to
- * wake up waiting processes.
- *
- * Notably, the inline "up()" and "down()" functions can efficiently test
- * if they need to do any extra work (up needs to do something only if count
- * was negative before the increment operation.
- *
- * waking_non_zero() (from asm/semaphore.h) must execute atomically.
- *
- * When __up() is called, the count was negative before incrementing it,
- * and we need to wake up somebody.
- *
- * This routine adds one to the count of processes that need to wake up and
- * exit.  ALL waiting processes actually wake up but only the one that gets
- * to the "waking" field first will gate through and acquire the semaphore.
- * The others will go back to sleep.
- *
- * Note that these functions are only called when there is contention on the
- * lock, and as such all this is the "non-critical" part of the whole
- * semaphore business. The critical part is the inline stuff in
- * <asm/semaphore.h> where we want to avoid any extra jumps and calls.
+ * This is basically the PPC semaphore scheme ported to use
+ * the Alpha ll/sc sequences, so see the PPC code for
+ * credits.
  */
+
+/*
+ * Atomically update sem->count.
+ * This does the equivalent of the following:
+ *
+ *	old_count = sem->count;
+ *	tmp = MAX(old_count, 0) + incr;
+ *	sem->count = tmp;
+ *	return old_count;
+ */
+static inline int __sem_update_count(struct semaphore *sem, int incr)
+{
+	long old_count, tmp = 0;
+
+	__asm__ __volatile__(
+	"1:	ldl_l	%0,%2\n"
+	"	cmovgt	%0,%0,%1\n"
+	"	addl	%1,%3,%1\n"
+	"	stl_c	%1,%2\n"
+	"	beq	%1,2f\n"
+	"	mb\n"
+	".subsection 2\n"
+	"2:	br	1b\n"
+	".previous"
+	: "=&r" (old_count), "=&r" (tmp), "=m" (sem->count)
+	: "Ir" (incr), "1" (tmp), "m" (sem->count));
+
+	return old_count;
+}
 
 /*
  * Perform the "down" function.  Return zero for semaphore acquired,
@@ -55,134 +63,77 @@
 void
 __down_failed(struct semaphore *sem)
 {
-	DECLARE_WAITQUEUE(wait, current);
+	struct task_struct *tsk = current;
+	DECLARE_WAITQUEUE(wait, tsk);
 
 #ifdef CONFIG_DEBUG_SEMAPHORE
 	printk("%s(%d): down failed(%p)\n",
-	       current->comm, current->pid, sem);
+	       tsk->comm, tsk->pid, sem);
 #endif
 
-	current->state = TASK_UNINTERRUPTIBLE;
+	tsk->state = TASK_UNINTERRUPTIBLE;
 	wmb();
 	add_wait_queue_exclusive(&sem->wait, &wait);
 
-	/* At this point we know that sem->count is negative.  In order
-	   to avoid racing with __up, we must check for wakeup before
-	   going to sleep the first time.  */
-
-	while (1) {
-		long ret, tmp;
-
-		/* An atomic conditional decrement of sem->waking.  */
-		__asm__ __volatile__(
-			"1:	ldl_l	%1,%2\n"
-			"	blt	%1,2f\n"
-			"	subl	%1,1,%0\n"
-			"	stl_c	%0,%2\n"
-			"	beq	%0,3f\n"
-			"2:\n"
-			".subsection 2\n"
-			"3:	br	1b\n"
-			".previous"
-			: "=r"(ret), "=&r"(tmp), "=m"(sem->waking)
-			: "0"(0));
-
-		if (ret)
-			break;
-
+	/*
+	 * Try to get the semaphore.  If the count is > 0, then we've
+	 * got the semaphore; we decrement count and exit the loop.
+	 * If the count is 0 or negative, we set it to -1, indicating
+	 * that we are asleep, and then sleep.
+	 */
+	while (__sem_update_count(sem, -1) <= 0) {
 		schedule();
-		set_task_state(current, TASK_UNINTERRUPTIBLE);
+		set_task_state(tsk, TASK_UNINTERRUPTIBLE);
 	}
-
 	remove_wait_queue(&sem->wait, &wait);
-	current->state = TASK_RUNNING;
+	tsk->state = TASK_RUNNING;
+
+	/*
+	 * If there are any more sleepers, wake one of them up so
+	 * that it can either get the semaphore, or set count to -1
+	 * indicating that there are still processes sleeping.
+	 */
+	wake_up(&sem->wait);
 
 #ifdef CONFIG_DEBUG_SEMAPHORE
 	printk("%s(%d): down acquired(%p)\n",
-	       current->comm, current->pid, sem);
+	       tsk->comm, tsk->pid, sem);
 #endif
 }
 
 int
 __down_failed_interruptible(struct semaphore *sem)
 {
-	DECLARE_WAITQUEUE(wait, current);
-	long ret;
+	struct task_struct *tsk = current;
+	DECLARE_WAITQUEUE(wait, tsk);
+	long ret = 0;
 
 #ifdef CONFIG_DEBUG_SEMAPHORE
 	printk("%s(%d): down failed(%p)\n",
-	       current->comm, current->pid, sem);
+	       tsk->comm, tsk->pid, sem);
 #endif
 
-	current->state = TASK_INTERRUPTIBLE;
+	tsk->state = TASK_INTERRUPTIBLE;
 	wmb();
 	add_wait_queue_exclusive(&sem->wait, &wait);
 
-	while (1) {
-		long tmp, tmp2, tmp3;
-
-		/* We must undo the sem->count down_interruptible decrement
-		   simultaneously and atomically with the sem->waking
-		   adjustment, otherwise we can race with __up.  This is
-		   accomplished by doing a 64-bit ll/sc on two 32-bit words.
-		
-		   "Equivalent" C.  Note that we have to do this all without
-		   (taken) branches in order to be a valid ll/sc sequence.
-
-		   do {
-		       tmp = ldq_l;
-		       ret = 0;
-		       if (tmp >= 0) {			// waking >= 0
-		           tmp += 0xffffffff00000000;	// waking -= 1
-		           ret = 1;
-		       }
-		       else if (pending) {
-			   // count += 1, but since -1 + 1 carries into the
-			   // high word, we have to be more careful here.
-			   tmp = (tmp & 0xffffffff00000000)
-				 | ((tmp + 1) & 0x00000000ffffffff);
-		           ret = -EINTR;
-		       }
-		       tmp = stq_c = tmp;
-		   } while (tmp == 0);
-		*/
-
-		__asm__ __volatile__(
-			"1:	ldq_l	%1,%4\n"
-			"	lda	%0,0\n"
-			"	cmovne	%5,%6,%0\n"
-			"	addq	%1,1,%2\n"
-			"	and	%1,%7,%3\n"
-			"	andnot	%2,%7,%2\n"
-			"	cmovge	%1,1,%0\n"
-			"	or	%3,%2,%2\n"
-			"	addq	%1,%7,%3\n"
-			"	cmovne	%5,%2,%1\n"
-			"	cmovge	%2,%3,%1\n"
-			"	stq_c	%1,%4\n"
-			"	beq	%1,3f\n"
-			"2:\n"
-			".subsection 2\n"
-			"3:	br	1b\n"
-			".previous"
-			: "=&r"(ret), "=&r"(tmp), "=&r"(tmp2),
-			  "=&r"(tmp3), "=m"(*sem)
-			: "r"(signal_pending(current)), "r"(-EINTR),
-			  "r"(0xffffffff00000000));
-
-		/* At this point we have ret
-		  	1	got the lock
-		  	0	go to sleep
-		  	-EINTR	interrupted  */
-		if (ret != 0)
+	while (__sem_update_count(sem, -1) <= 0) {
+		if (signal_pending(current)) {
+			/*
+			 * A signal is pending - give up trying.
+			 * Set sem->count to 0 if it is negative,
+			 * since we are no longer sleeping.
+			 */
+			__sem_update_count(sem, 0);
+			ret = -EINTR;
 			break;
-
+		}
 		schedule();
-		set_task_state(current, TASK_INTERRUPTIBLE);
+		set_task_state(tsk, TASK_INTERRUPTIBLE);
 	}
 
 	remove_wait_queue(&sem->wait, &wait);
-	current->state = TASK_RUNNING;
+	tsk->state = TASK_RUNNING;
 	wake_up(&sem->wait);
 
 #ifdef CONFIG_DEBUG_SEMAPHORE
@@ -190,14 +141,21 @@ __down_failed_interruptible(struct semaphore *sem)
 	       current->comm, current->pid,
 	       (ret < 0 ? "interrupted" : "acquired"), sem);
 #endif
-
-	/* Convert "got the lock" to 0==success.  */
-	return (ret < 0 ? ret : 0);
+	return ret;
 }
 
 void
 __up_wakeup(struct semaphore *sem)
 {
+	/*
+	 * Note that we incremented count in up() before we came here,
+	 * but that was ineffective since the result was <= 0, and
+	 * any negative value of count is equivalent to 0.
+	 * This ends up setting count to 1, unless count is now > 0
+	 * (i.e. because some other cpu has called up() in the meantime),
+	 * in which case we just increment count.
+	 */
+	__sem_update_count(sem, 1);
 	wake_up(&sem->wait);
 }
 

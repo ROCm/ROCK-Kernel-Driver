@@ -492,7 +492,7 @@ static int com20020_event(event_t event, int priority,
             pcmcia_request_configuration(link->handle, &link->conf);
             if (link->open) {
 		int ioaddr = dev->base_addr;
-		struct arcnet_local *lp = (struct arcnet_local *)dev->priv;
+		struct arcnet_local *lp = dev->priv;
 		ARCRESET;
             }
         }

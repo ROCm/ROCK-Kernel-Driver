@@ -54,12 +54,3 @@ config INPUT_UINPUT
 	  To compile this driver as a module, choose M here: the
 	  module will be called uinput.
 
-config INPUT_GSC
-	tristate "PA-RISC GSC PS/2 keyboard/mouse support"
-	depends on GSC && INPUT && INPUT_MISC
-	help
-	  Say Y here if you have a PS/2 keyboard and/or mouse attached
-	  to your PA-RISC box.	HP run the keyboard in AT mode rather than
-	  XT mode like everyone else, so we need our own driver.
-	  Furthermore, the GSC PS/2 controller shares IRQ between mouse and
-	  keyboard.

@@ -565,35 +565,6 @@ _GLOBAL(kernel_thread)
 	ld	r30,-16(r1)
 	blr
 
-	.section	".toc","aw"
-.SYSCALL_ERRNO:
-	.tc errno[TC],errno
-
-	.section	".text"
-	.align 3
-	
-#define SYSCALL(name) \
-_GLOBAL(name) \
-	li	r0,__NR_##name; \
-	sc; \
-	bnslr; \
-	ld	r4,.SYSCALL_ERRNO@toc(2); \
-	std	r3,0(r4); \
-	li	r3,-1; \
-	blr
-
-#define __NR__exit __NR_exit
-
-SYSCALL(setsid)
-SYSCALL(open)
-SYSCALL(read)
-SYSCALL(write)
-SYSCALL(lseek)
-SYSCALL(close)
-SYSCALL(dup)
-SYSCALL(execve)
-SYSCALL(waitpid)
-
 #ifdef CONFIG_PPC_ISERIES	/* hack hack hack */
 #define ppc_rtas	sys_ni_syscall
 #endif
@@ -653,7 +624,7 @@ _GLOBAL(sys_call_table32)
 	.llong .sys_geteuid
 	.llong .sys_getegid		/* 50 */
 	.llong .sys_acct
-	.llong .sys32_umount
+	.llong .sys_umount
 	.llong .sys_ni_syscall		/* old lock syscall */
 	.llong .compat_sys_ioctl
 	.llong .compat_sys_fcntl		/* 55 */

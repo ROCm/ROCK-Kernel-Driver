@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2001 Sistina Software (UK) Limited.
+ * Copyright (C) 2001-2003 Sistina Software (UK) Limited.
  *
  * This file is released under the GPL.
  */
@@ -65,7 +65,8 @@ static void linear_dtr(struct dm_target *ti)
 	kfree(lc);
 }
 
-static int linear_map(struct dm_target *ti, struct bio *bio)
+static int linear_map(struct dm_target *ti, struct bio *bio,
+		      union map_info *map_context)
 {
 	struct linear_c *lc = (struct linear_c *) ti->private;
 
@@ -96,6 +97,7 @@ static int linear_status(struct dm_target *ti, status_type_t type,
 
 static struct target_type linear_target = {
 	.name   = "linear",
+	.version= {1, 0, 1},
 	.module = THIS_MODULE,
 	.ctr    = linear_ctr,
 	.dtr    = linear_dtr,

@@ -171,7 +171,7 @@ static inline void snd_remove_proc_entry(struct proc_dir_entry *parent,
 					 struct proc_dir_entry *de) { ; }
 
 #define snd_card_proc_new(card,name,entryp)  0 /* always success */
-#define snd_info_set_text_ops(entry,private_data,read) /*NOP*/
+#define snd_info_set_text_ops(entry,private_data,read_size,read) /*NOP*/
 
 #endif
 

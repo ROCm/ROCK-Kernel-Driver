@@ -55,10 +55,6 @@
  */
 
 #include <linux/config.h>
-#ifdef CONFIG_I2C_DEBUG_BUS
-#define DEBUG	1
-#endif
-
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/pci.h>
@@ -216,7 +212,7 @@ static int i2c_register_bus(struct pci_dev *dev, struct s_i2c_bus *p, u8 *mmvga,
 /*
  * Cleanup stuff
  */
-static void __devexit prosavage_remove(struct pci_dev *dev)
+static void prosavage_remove(struct pci_dev *dev)
 {
 	struct s_i2c_chip *chip;
 	int i, ret;
@@ -321,7 +317,7 @@ static struct pci_driver prosavage_driver = {
 	.name		=	"prosavage-smbus",
 	.id_table	=	prosavage_pci_tbl,
 	.probe		=	prosavage_probe,
-	.remove		=	__devexit_p(prosavage_remove),
+	.remove		=	prosavage_remove,
 };
 
 static int __init i2c_prosavage_init(void)

@@ -98,6 +98,7 @@ static unsigned short zf_readb(unsigned char port)
 MODULE_AUTHOR("Fernando Fuganti <fuganti@conectiva.com.br>");
 MODULE_DESCRIPTION("MachZ ZF-Logic Watchdog driver");
 MODULE_LICENSE("GPL");
+MODULE_ALIAS_MISCDEV(WATCHDOG_MINOR);
 
 #ifdef CONFIG_WATCHDOG_NOWAYOUT
 static int nowayout = 1;
@@ -446,8 +447,6 @@ static struct miscdevice zf_miscdev = {
  */
 static struct notifier_block zf_notifier = {
 	.notifier_call = zf_notify_sys,
-	.next = NULL,
-	.priority = 0,
 };
 
 static void __init zf_show_action(int act)

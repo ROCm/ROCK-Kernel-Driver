@@ -70,7 +70,9 @@ one or more packets could finish before an error stops further endpoint I/O.
 			(That is, if drivers see this it's a bug.)
 
 -EPROTO (*)		a) bitstuff error
-			b) unknown USB error 
+			b) no response packet received within the
+			   prescribed bus turn-around time
+			c) unknown USB error 
 
 -EILSEQ (*)		CRC mismatch
 

@@ -52,7 +52,7 @@ extern void pci_free_consistent(struct pci_dev *hwdev, size_t size, void *vaddr,
  * The 32-bit bus address to use is returned.
  *
  * Once the device is given the dma address, the device owns this memory
- * until either pci_unmap_single or pci_dma_sync_single is performed.
+ * until either pci_unmap_single or pci_dma_sync_single_for_cpu is performed.
  */
 extern dma_addr_t pci_map_single(struct pci_dev *hwdev, void *ptr, size_t size, int direction);
 
@@ -116,18 +116,21 @@ extern void pci_unmap_sg(struct pci_dev *hwdev, struct scatterlist *sg, int nhwe
  * If you perform a pci_map_single() but wish to interrogate the
  * buffer using the cpu, yet do not wish to teardown the PCI dma
  * mapping, you must call this function before doing so.  At the
- * next point you give the PCI dma address back to the card, the
- * device again owns the buffer.
+ * next point you give the PCI dma address back to the card, you
+ * must first perform a pci_dma_sync_for_device, and then the device
+ * again owns the buffer.
  */
-extern void pci_dma_sync_single(struct pci_dev *hwdev, dma_addr_t dma_handle, size_t size, int direction);
+extern void pci_dma_sync_single_for_cpu(struct pci_dev *hwdev, dma_addr_t dma_handle, size_t size, int direction);
+extern void pci_dma_sync_single_for_device(struct pci_dev *hwdev, dma_addr_t dma_handle, size_t size, int direction);
 
 /* Make physical memory consistent for a set of streaming
  * mode DMA translations after a transfer.
  *
- * The same as pci_dma_sync_single but for a scatter-gather list,
+ * The same as pci_dma_sync_single_* but for a scatter-gather list,
  * same rules and usage.
  */
-extern void pci_dma_sync_sg(struct pci_dev *hwdev, struct scatterlist *sg, int nelems, int direction);
+extern void pci_dma_sync_sg_for_cpu(struct pci_dev *hwdev, struct scatterlist *sg, int nelems, int direction);
+extern void pci_dma_sync_sg_for_device(struct pci_dev *hwdev, struct scatterlist *sg, int nelems, int direction);
 
 /* Return whether the given PCI device DMA address mask can
  * be supported properly.  For example, if your device can

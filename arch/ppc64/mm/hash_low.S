@@ -176,7 +176,6 @@ _GLOBAL(htab_call_hpte_insert1)
 	beq-	htab_pte_insert_failure
 
 	/* Now try secondary slot */
-	ori	r30,r30,_PAGE_SECONDARY
 	
 	/* page number in r5 */
 	rldicl	r5,r31,64-PTE_SHIFT,PTE_SHIFT
@@ -215,8 +214,8 @@ _GLOBAL(htab_call_hpte_remove)
 	b	htab_insert_pte	
 
 htab_pte_insert_ok:
-	/* Insert slot number in PTE */
-	rldimi	r30,r3,12,63-14
+	/* Insert slot number & secondary bit in PTE */
+	rldimi	r30,r3,12,63-15
 		
 	/* Write out the PTE with a normal write
 	 * (maybe add eieio may be good still ?)

@@ -76,7 +76,8 @@ struct zone {
 	spinlock_t		lru_lock;	
 	struct list_head	active_list;
 	struct list_head	inactive_list;
-	atomic_t		refill_counter;
+	atomic_t		nr_scan_active;
+	atomic_t		nr_scan_inactive;
 	unsigned long		nr_active;
 	unsigned long		nr_inactive;
 	int			all_unreclaimable; /* All pages pinned */
@@ -213,6 +214,7 @@ typedef struct pglist_data {
 	int node_id;
 	struct pglist_data *pgdat_next;
 	wait_queue_head_t       kswapd_wait;
+	struct task_struct *kswapd;
 } pg_data_t;
 
 #define node_present_pages(nid)	(NODE_DATA(nid)->node_present_pages)
@@ -288,6 +290,11 @@ static inline int is_highmem(struct zone *zone)
 	return (zone - zone->zone_pgdat->node_zones == ZONE_HIGHMEM);
 }
 
+static inline int is_normal(struct zone *zone)
+{
+	return (zone - zone->zone_pgdat->node_zones == ZONE_NORMAL);
+}
+
 /* These two functions are used to setup the per zone pages min values */
 struct ctl_table;
 struct file;
@@ -310,7 +317,7 @@ extern struct pglist_data contig_page_data;
 
 #include <asm/mmzone.h>
 
-#if BITS_PER_LONG == 32
+#if BITS_PER_LONG == 32 || defined(ARCH_HAS_ATOMIC_UNSIGNED)
 /*
  * with 32 bit page->flags field, we reserve 8 bits for node/zone info.
  * there are 3 zones (2 bits) and this leaves 8-2=6 bits for nodes.

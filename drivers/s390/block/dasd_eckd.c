@@ -7,7 +7,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999,2000
  *
- * $Revision: 1.50 $
+ * $Revision: 1.51 $
  */
 
 #include <linux/config.h>
@@ -85,7 +85,7 @@ dasd_eckd_probe (struct ccw_device *cdev)
 	ret = dasd_generic_probe (cdev, &dasd_eckd_discipline);
 	if (ret)
 		return ret;
-	ccw_device_set_options(cdev, CCWDEV_DO_PATHGROUP);
+	ccw_device_set_options(cdev, CCWDEV_DO_PATHGROUP | CCWDEV_ALLOW_FORCE);
 	return 0;
 }
 

@@ -61,6 +61,14 @@ extern const struct linux_logo logo_linux_clut224;
 #endif
 
 /*
+ * Properties whose value is longer than this get excluded from our
+ * copy of the device tree. This value does need to be big enough to
+ * ensure that we don't lose things like the interrupt-map property
+ * on a PCI-PCI bridge.
+ */
+#define MAX_PROPERTY_LENGTH	(1UL * 1024 * 1024)
+
+/*
  * prom_init() is called very early on, before the kernel text
  * and data have been mapped to KERNELBASE.  At this point the code
  * is running at whatever address it has been loaded at, so
@@ -130,6 +138,7 @@ static interpret_func interpret_macio_props;
 struct prom_t prom;
 
 char *prom_display_paths[FB_MAX] __initdata = { 0, };
+phandle prom_display_nodes[FB_MAX] __initdata;
 unsigned int prom_num_displays = 0;
 char *of_stdout_device = 0;
 
@@ -137,8 +146,8 @@ extern struct rtas_t rtas;
 extern unsigned long klimit;
 extern struct lmb lmb;
 
-#define MAX_PHB 16 * 3  // 16 Towers * 3 PHBs/tower
-struct _of_tce_table of_tce_table[MAX_PHB + 1] = {{0, 0, 0}};
+#define MAX_PHB (32 * 6)  /* 32 drawers * 6 PHBs/drawer */
+struct of_tce_table of_tce_table[MAX_PHB + 1];
 
 char *bootpath = 0;
 char *bootdevice = 0;
@@ -177,7 +186,7 @@ void prom_dump_lmb(void);
 
 extern unsigned long reloc_offset(void);
 
-extern void enter_prom(void *dummy,...);
+extern void enter_prom(struct prom_args *args);
 extern void copy_and_flush(unsigned long dest, unsigned long src,
 			   unsigned long size, unsigned long offset);
 
@@ -516,6 +525,9 @@ prom_initialize_naca(unsigned long mem)
 	return mem;
 }
 
+#ifdef CONFIG_PMAC_DART
+static int dart_force_on;
+#endif
 
 static unsigned long __init
 prom_initialize_lmb(unsigned long mem)
@@ -539,10 +551,12 @@ prom_initialize_lmb(unsigned long mem)
 		prom_print(opt);
 		prom_print(RELOC("\n"));
 		opt += 6;
-		while(*opt && *opt == ' ')
+		while (*opt && *opt == ' ')
 			opt++;
 		if (!strncmp(opt, RELOC("off"), 3))
 			nodart = 1;
+		else if (!strncmp(opt, RELOC("force"), 5))
+			RELOC(dart_force_on) = 1;
 	}
 #else
 	nodart = 1;
@@ -763,8 +777,10 @@ void prom_initialize_dart_table(void)
 	extern unsigned long dart_tablebase;
 	extern unsigned long dart_tablesize;
 
-	/* Only reserve DART space if machine has more than 2Gb of RAM */
-	if (lmb_end_of_DRAM() <= 0x80000000ull)
+	/* Only reserve DART space if machine has more than 2GB of RAM
+	 * or if requested with iommu=on on cmdline.
+	 */
+	if (lmb_end_of_DRAM() <= 0x80000000ull && !RELOC(dart_force_on))
 		return;
 
 	/* 512 pages is max DART tablesize. */
@@ -792,7 +808,7 @@ prom_initialize_tce_table(void)
 	unsigned long i, table = 0;
 	unsigned long base, vbase, align;
 	unsigned int minalign, minsize;
-	struct _of_tce_table *prom_tce_table = RELOC(of_tce_table);
+	struct of_tce_table *prom_tce_table = RELOC(of_tce_table);
 	unsigned long tce_entry, *tce_entryp;
 
 #ifdef DEBUG_PROM
@@ -801,6 +817,12 @@ prom_initialize_tce_table(void)
 
 	/* Search all nodes looking for PHBs. */
 	for (node = 0; prom_next_node(&node); ) {
+		if (table == MAX_PHB) {
+			prom_print(RELOC("WARNING: PCI host bridge ignored, "
+				         "need to increase MAX_PHB\n"));
+			continue;
+		}
+
 		compatible[0] = 0;
 		type[0] = 0;
 		model[0] = 0;
@@ -840,20 +862,21 @@ prom_initialize_tce_table(void)
 			minsize = 4UL << 20;
 		}
 
-		/* Even though we read what OF wants, we just set the table
+		/*
+		 * Even though we read what OF wants, we just set the table
 		 * size to 4 MB.  This is enough to map 2GB of PCI DMA space.
 		 * By doing this, we avoid the pitfalls of trying to DMA to
 		 * MMIO space and the DMA alias hole.
-		 */
-		/* 
+		 *
 		 * On POWER4, firmware sets the TCE region by assuming
 		 * each TCE table is 8MB. Using this memory for anything
 		 * else will impact performance, so we always allocate 8MB.
 		 * Anton
-		 *
-		 * XXX FIXME use a cpu feature here
 		 */
-		minsize = 8UL << 20;
+		if (__is_processor(PV_POWER4) || __is_processor(PV_POWER4p))
+			minsize = 8UL << 20;
+		else
+			minsize = 4UL << 20;
 
 		/* Align to the greater of the align or size */
 		align = max(minalign, minsize);
@@ -900,9 +923,11 @@ prom_initialize_tce_table(void)
 			*tce_entryp = tce_entry;
 		}
 
+		/* It seems OF doesn't null-terminate the path :-( */
+		memset(path, 0, sizeof(path));
 		/* Call OF to setup the TCE hardware */
 		if (call_prom(RELOC("package-to-path"), 3, 1, node,
-                             path, 255) <= 0) {
+                             path, sizeof(path)-1) <= 0) {
                         prom_print(RELOC("package-to-path failed\n"));
                 } else {
                         prom_print(RELOC("opened "));
@@ -1493,13 +1518,12 @@ prom_init(unsigned long r3, unsigned long r4, unsigned long pp,
 	/* Default machine type. */
 	_systemcfg->platform = prom_find_machine_type();
 
-
 	/* On pSeries, copy the CPU hold code */
 	if (_systemcfg->platform == PLATFORM_PSERIES)
 		copy_and_flush(0, KERNELBASE - offset, 0x100, 0);
 
 	/* Start storing things at klimit */
-	mem = RELOC(klimit) - offset; 
+      	mem = RELOC(klimit) - offset; 
 
 	/* Get the full OF pathname of the stdout device */
 	p = (char *) mem;
@@ -1639,10 +1663,10 @@ check_display(unsigned long mem)
 {
 	phandle node;
 	ihandle ih;
-	int i;
+	int i, j;
 	unsigned long offset = reloc_offset();
         struct prom_t *_prom = PTRRELOC(&prom);
-	char type[64], *path;
+	char type[16], *path;
 	static unsigned char default_colors[] = {
 		0x00, 0x00, 0x00,
 		0x00, 0x00, 0xaa,
@@ -1665,6 +1689,12 @@ check_display(unsigned long mem)
 
 	_prom->disp_node = 0;
 
+	prom_print(RELOC("Looking for displays\n"));
+	if (RELOC(of_stdout_device) != 0) {
+		prom_print(RELOC("OF stdout is   : "));
+		prom_print(PTRRELOC(RELOC(of_stdout_device)));
+		prom_print(RELOC("\n"));
+	}
 	for (node = 0; prom_next_node(&node); ) {
 		type[0] = 0;
 		call_prom(RELOC("getprop"), 4, 1, node, RELOC("device_type"),
@@ -1674,20 +1704,54 @@ check_display(unsigned long mem)
 		/* It seems OF doesn't null-terminate the path :-( */
 		path = (char *) mem;
 		memset(path, 0, 256);
+
+		/*
+		 * leave some room at the end of the path for appending extra
+		 * arguments
+		 */
 		if ((long) call_prom(RELOC("package-to-path"), 3, 1,
-				    node, path, 255) < 0)
+				    node, path, 250) < 0)
 			continue;
-		prom_print(RELOC("opening display "));
+		prom_print(RELOC("found display   : "));
+		prom_print(path);
+		prom_print(RELOC("\n"));
+		
+		/*
+		 * If this display is the device that OF is using for stdout,
+		 * move it to the front of the list.
+		 */
+		mem += strlen(path) + 1;
+		i = RELOC(prom_num_displays);
+		RELOC(prom_num_displays) = i + 1;
+		if (RELOC(of_stdout_device) != 0 && i > 0
+		    && strcmp(PTRRELOC(RELOC(of_stdout_device)), path) == 0) {
+			for (; i > 0; --i) {
+				RELOC(prom_display_paths[i])
+					= RELOC(prom_display_paths[i-1]);
+				RELOC(prom_display_nodes[i])
+					= RELOC(prom_display_nodes[i-1]);
+			}
+			_prom->disp_node = (ihandle)(unsigned long)node;
+		}
+		RELOC(prom_display_paths[i]) = PTRUNRELOC(path);
+		RELOC(prom_display_nodes[i]) = node;
+		if (_prom->disp_node == 0)
+			_prom->disp_node = (ihandle)(unsigned long)node;
+		if (RELOC(prom_num_displays) >= FB_MAX)
+			break;
+	}
+	prom_print(RELOC("Opening displays...\n"));
+	for (j = RELOC(prom_num_displays) - 1; j >= 0; j--) {
+		path = PTRRELOC(RELOC(prom_display_paths[j]));
+		prom_print(RELOC("opening display : "));
 		prom_print(path);
 		ih = (ihandle)call_prom(RELOC("open"), 1, 1, path);
 		if (ih == (ihandle)0 || ih == (ihandle)-1) {
 			prom_print(RELOC("... failed\n"));
 			continue;
 		}
-		prom_print(RELOC("... ok\n"));
 
-		if (_prom->disp_node == 0)
-			_prom->disp_node = (ihandle)(unsigned long)node;
+		prom_print(RELOC("... ok\n"));
 
 		/* Setup a useable color table when the appropriate
 		 * method is available. Should update this to set-colors */
@@ -1704,26 +1768,8 @@ check_display(unsigned long mem)
 					   clut[2]) != 0)
 				break;
 #endif /* CONFIG_LOGO_LINUX_CLUT224 */
-
-		/*
-		 * If this display is the device that OF is using for stdout,
-		 * move it to the front of the list.
-		 */
-		mem += strlen(path) + 1;
-		i = RELOC(prom_num_displays)++;
-		if (RELOC(of_stdout_device) != 0 && i > 0
-		    && strcmp(PTRRELOC(RELOC(of_stdout_device)), path) == 0) {
-			for (; i > 0; --i)
-				RELOC(prom_display_paths[i]) = RELOC(prom_display_paths[i-1]);
-		}
-		RELOC(prom_display_paths[i]) = PTRUNRELOC(path);
-		if (RELOC(prom_num_displays) >= FB_MAX)
-			break;
-		/* XXX Temporary workaround: only open the first display so we don't
-		 * lose debug output
-		 */
-		break;
 	}
+	
 	return DOUBLEWORD_ALIGN(mem);
 }
 
@@ -1770,8 +1816,7 @@ copy_device_tree(unsigned long mem_start)
 	return new_start;
 }
 
-__init
-static unsigned long
+static unsigned long __init
 inspect_node(phandle node, struct device_node *dad,
 	     unsigned long mem_start, unsigned long mem_end,
 	     struct device_node ***allnextpp)
@@ -1819,6 +1864,22 @@ inspect_node(phandle node, struct device_node *dad,
 				  valp, mem_end - mem_start);
 		if (pp->length < 0)
 			continue;
+		if (pp->length > MAX_PROPERTY_LENGTH) {
+			char path[128];
+
+			prom_print(RELOC("WARNING: ignoring large property "));
+			/* It seems OF doesn't null-terminate the path :-( */
+			memset(path, 0, sizeof(path));
+			if (call_prom(RELOC("package-to-path"), 3, 1, node,
+                            path, sizeof(path)-1) > 0)
+				prom_print(path);
+			prom_print(namep);
+			prom_print(RELOC(" length 0x"));
+			prom_print_hex(pp->length);
+			prom_print_nl();
+
+			continue;
+		}
 		mem_start = DOUBLEWORD_ALIGN(mem_start + pp->length);
 		*prev_propp = PTRUNRELOC(pp);
 		prev_propp = &pp->next;
@@ -2829,40 +2890,12 @@ int of_remove_node(struct device_node *np)
 	struct device_node *parent, *child;
 
 	parent = of_get_parent(np);
-
 	if (!parent)
 		return -EINVAL;
 
-	/* Make sure we are not recursively removing
-	 * more than one level of nodes.  We need to
-	 * allow this so we can remove a slot containing
-	 * an IOA.
-	 */
-	for (child = of_get_next_child(np, NULL);
-	     child != NULL;
-	     child = of_get_next_child(np, child)) {
-		struct device_node *grandchild;
-
-		if ((grandchild = of_get_next_child(child, NULL))) {
-			/* Too deep */
-			of_node_put(grandchild);
-			of_node_put(child);
-			return -EBUSY;
-		}
-	}
-
-	/* Now that we're reasonably sure that we won't
-	 * overflow our stack, remove any children of np.
-	 */
-	for (child = of_get_next_child(np, NULL);
-	     child != NULL;
-	     child = of_get_next_child(np, child)) {
-		int rc;
-
-		if ((rc = of_remove_node(child))) {
-			of_node_put(child);
-			return rc;
-		}
+	if ((child = of_get_next_child(np, NULL))) {
+		of_node_put(child);
+		return -EBUSY;
 	}
 
 	write_lock(&devtree_lock);
@@ -2940,6 +2973,53 @@ static void remove_node_proc_entries(struct device_node *np)
 #endif /* CONFIG_PROC_DEVICETREE */
 
 /*
+ * Fix up n_intrs and intrs fields in a new device node
+ *
+ */
+static int of_finish_dynamic_node_interrupts(struct device_node *node)
+{
+	int intrcells, intlen, i;
+	unsigned *irq, *ints, virq;
+	struct device_node *ic;
+
+	ints = (unsigned int *)get_property(node, "interrupts", &intlen);
+	intrcells = prom_n_intr_cells(node);
+	intlen /= intrcells * sizeof(unsigned int);
+	node->n_intrs = intlen;
+	node->intrs = kmalloc(sizeof(struct interrupt_info) * intlen,
+			      GFP_KERNEL);
+	if (!node->intrs)
+		return -ENOMEM;
+
+	for (i = 0; i < intlen; ++i) {
+		int n, j;
+		node->intrs[i].line = 0;
+		node->intrs[i].sense = 1;
+		n = map_interrupt(&irq, &ic, node, ints, intrcells);
+		if (n <= 0)
+			continue;
+		virq = virt_irq_create_mapping(irq[0]);
+		if (virq == NO_IRQ) {
+			printk(KERN_CRIT "Could not allocate interrupt "
+			       "number for %s\n", node->full_name);
+			return -ENOMEM;
+		}
+		node->intrs[i].line = openpic_to_irq(virq);
+		if (n > 1)
+			node->intrs[i].sense = irq[1];
+		if (n > 2) {
+			printk(KERN_DEBUG "hmmm, got %d intr cells for %s:", n,
+			       node->full_name);
+			for (j = 0; j < n; ++j)
+				printk(" %d", irq[j]);
+			printk("\n");
+		}
+		ints += intrcells;
+	}
+	return 0;
+}
+
+/*
  * Fix up the uninitialized fields in a new device node:
  * name, type, n_addrs, addrs, n_intrs, intrs, and pci-specific fields
  *
@@ -2954,11 +3034,8 @@ static int of_finish_dynamic_node(struct device_node *node)
 {
 	struct device_node *parent = of_get_parent(node);
 	u32 *regs;
-	unsigned int *ints;
-	int intlen, intrcells;
-	int i, j, n, err = 0;
-	unsigned int *irq, virq;
-	struct device_node *ic;
+	int err = 0;
+	phandle *ibm_phandle;
  
 	node->name = get_property(node, "name", 0);
 	node->type = get_property(node, "device_type", 0);
@@ -2973,6 +3050,10 @@ static int of_finish_dynamic_node(struct device_node *node)
 	 */
 	if (systemcfg->platform == PLATFORM_POWERMAC)
 		return -ENODEV;
+
+	/* fix up new node's linux_phandle field */
+	if ((ibm_phandle = (unsigned int *)get_property(node, "ibm,phandle", NULL)))
+		node->linux_phandle = *ibm_phandle;
 
 	/* do the work of interpret_pci_props */
 	if (parent->type && !strcmp(parent->type, "pci")) {
@@ -3003,45 +3084,9 @@ static int of_finish_dynamic_node(struct device_node *node)
 	}
 
 	/* now do the work of finish_node_interrupts */
-
-	ints = (unsigned int *) get_property(node, "interrupts", &intlen);
-	if (!ints) {
-		err = -ENODEV;
-		goto out;
-	}
-
-	intrcells = prom_n_intr_cells(node);
-	intlen /= intrcells * sizeof(unsigned int);
-	node->n_intrs = intlen;
-	node->intrs = kmalloc(sizeof(struct interrupt_info) * intlen,
-			      GFP_KERNEL);
-	if (!node->intrs) {
-		err = -ENOMEM;
-		goto out;
-	}
-
-	for (i = 0; i < intlen; ++i) {
-		node->intrs[i].line = 0;
-		node->intrs[i].sense = 1;
-		n = map_interrupt(&irq, &ic, node, ints, intrcells);
-		if (n <= 0)
-			continue;
-		virq = virt_irq_create_mapping(irq[0]);
-		if (virq == NO_IRQ) {
-			printk(KERN_CRIT "Could not allocate interrupt "
-			       "number for %s\n", node->full_name);
-		} else
-			node->intrs[i].line = openpic_to_irq(virq);
-		if (n > 1)
-			node->intrs[i].sense = irq[1];
-		if (n > 2) {
-			printk(KERN_DEBUG "hmmm, got %d intr cells for %s:", n,
-			       node->full_name);
-			for (j = 0; j < n; ++j)
-				printk(" %d", irq[j]);
-			printk("\n");
-		}
-		ints += intrcells;
+	if (get_property(node, "interrupts", 0)) {
+		err = of_finish_dynamic_node_interrupts(node);
+		if (err) goto out;
 	}
 
        /* now do the rough equivalent of update_dn_pci_info, this

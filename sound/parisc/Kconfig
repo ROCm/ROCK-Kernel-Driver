@@ -6,6 +6,7 @@ menu "ALSA PA-RISC devices"
 config SND_HARMONY
 	tristate "Harmony/Vivace sound chip"
 	depends on SND
+	select SND_PCM
 	help
 	  Say 'Y' or 'M' to include support for Harmony/Vivace soundchip
 	  on HP712s, 715/new and many other GSC based machines.

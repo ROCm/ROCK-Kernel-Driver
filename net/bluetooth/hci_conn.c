@@ -170,6 +170,9 @@ struct hci_conn *hci_conn_add(struct hci_dev *hdev, int type, bdaddr_t *dst)
 	hci_conn_hash_add(hdev, conn);
 	tasklet_enable(&hdev->tx_task);
 
+	if (hdev->notify)
+		hdev->notify(hdev, HCI_NOTIFY_CONN_ADD);
+
 	return conn;
 }
 
@@ -195,6 +198,9 @@ int hci_conn_del(struct hci_conn *conn)
 		/* Unacked frames */
 		hdev->acl_cnt += conn->sent;
 	}
+
+	if (hdev->notify)
+		hdev->notify(hdev, HCI_NOTIFY_CONN_DEL);
 
 	tasklet_disable(&hdev->tx_task);
 	hci_conn_hash_del(hdev, conn);

@@ -23,6 +23,11 @@ CFLAGS		+= -mbig-endian
 AS		+= -EB
 LD		+= -EB
 AFLAGS		+= -mbig-endian
+else
+CFLAGS		+= -mlittle-endian
+AS		+= -EL
+LD		+= -EL
+AFLAGS		+= -mlittle-endian
 endif
 
 comma = ,

@@ -103,21 +103,47 @@ dma_unmap_sg(struct device *dev, struct scatterlist *sg, int nhwentries,
 }
 
 static inline void
-dma_sync_single(struct device *dev, dma_addr_t dma_handle, size_t size,
-		enum dma_data_direction direction)
+dma_sync_single_for_cpu(struct device *dev, dma_addr_t dma_handle, size_t size,
+			enum dma_data_direction direction)
 {
 	BUG_ON(dev->bus != &pci_bus_type);
 
-	pci_dma_sync_single(to_pci_dev(dev), dma_handle, size, (int)direction);
+	pci_dma_sync_single_for_cpu(to_pci_dev(dev), dma_handle,
+				    size, (int)direction);
 }
 
 static inline void
-dma_sync_sg(struct device *dev, struct scatterlist *sg, int nelems,
-	    enum dma_data_direction direction)
+dma_sync_single_for_device(struct device *dev, dma_addr_t dma_handle, size_t size,
+			   enum dma_data_direction direction)
 {
 	BUG_ON(dev->bus != &pci_bus_type);
 
-	pci_dma_sync_sg(to_pci_dev(dev), sg, nelems, (int)direction);
+	pci_dma_sync_single_for_device(to_pci_dev(dev), dma_handle,
+				       size, (int)direction);
+}
+
+static inline void
+dma_sync_sg_for_cpu(struct device *dev, struct scatterlist *sg, int nelems,
+		    enum dma_data_direction direction)
+{
+	BUG_ON(dev->bus != &pci_bus_type);
+
+	pci_dma_sync_sg_for_cpu(to_pci_dev(dev), sg, nelems, (int)direction);
+}
+
+static inline void
+dma_sync_sg_for_device(struct device *dev, struct scatterlist *sg, int nelems,
+		       enum dma_data_direction direction)
+{
+	BUG_ON(dev->bus != &pci_bus_type);
+
+	pci_dma_sync_sg_for_device(to_pci_dev(dev), sg, nelems, (int)direction);
+}
+
+static inline int
+dma_error(dma_addr_t dma_addr)
+{
+	return pci_dma_error(dma_addr);
 }
 
 /* Now for the API extensions over the pci_ one */
@@ -135,12 +161,21 @@ dma_get_cache_alignment(void)
 }
 
 static inline void
-dma_sync_single_range(struct device *dev, dma_addr_t dma_handle,
-		      unsigned long offset, size_t size,
-		      enum dma_data_direction direction)
+dma_sync_single_range_for_cpu(struct device *dev, dma_addr_t dma_handle,
+			      unsigned long offset, size_t size,
+			      enum dma_data_direction direction)
 {
 	/* just sync everything, that's all the pci API can do */
-	dma_sync_single(dev, dma_handle, offset+size, direction);
+	dma_sync_single_for_cpu(dev, dma_handle, offset+size, direction);
+}
+
+static inline void
+dma_sync_single_range_for_device(struct device *dev, dma_addr_t dma_handle,
+				 unsigned long offset, size_t size,
+				 enum dma_data_direction direction)
+{
+	/* just sync everything, that's all the pci API can do */
+	dma_sync_single_for_device(dev, dma_handle, offset+size, direction);
 }
 
 static inline void

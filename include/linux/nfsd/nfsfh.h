@@ -66,8 +66,9 @@ struct nfs_fhbase_old {
  *     0  - 4 byte device id (ms-2-bytes major, ls-2-bytes minor), 4byte inode number
  *        NOTE: we cannot use the kdev_t device id value, because kdev_t.h
  *              says we mustn't.  We must break it up and reassemble.
- *  Possible future encodings:
  *     1  - 4 byte user specified identifier
+ *     2  - 4 byte major, 4 byte minor, 4 byte inode number - DEPRECATED
+ *     3  - 4 byte device id, encoded for user-space, 4 byte inode number
  *
  * The fileid_type identified how the file within the filesystem is encoded.
  * This is (will be) passed to, and set by, the underlying filesystem if it supports
@@ -114,6 +115,7 @@ struct knfsd_fh {
 #define	fh_auth_type		fh_base.fh_new.fb_auth_type
 #define	fh_fileid_type		fh_base.fh_new.fb_fileid_type
 #define	fh_auth			fh_base.fh_new.fb_auth
+#define	fh_fsid			fh_base.fh_new.fb_auth
 
 #ifdef __KERNEL__
 
@@ -181,6 +183,23 @@ static inline void mk_fsid_v2(u32 *fsidv, dev_t dev, ino_t ino)
 	fsidv[0] = htonl(MAJOR(dev));
 	fsidv[1] = htonl(MINOR(dev));
 	fsidv[2] = ino_t_to_u32(ino);
+}
+
+static inline void mk_fsid_v3(u32 *fsidv, dev_t dev, ino_t ino)
+{
+	fsidv[0] = new_encode_dev(dev);
+	fsidv[1] = ino_t_to_u32(ino);
+}
+
+static inline int key_len(int type)
+{
+	switch(type) {
+	case 0: return 8;
+	case 1: return 4;
+	case 2: return 12;
+	case 3: return 8;
+	default: return 0;
+	}
 }
 
 /*

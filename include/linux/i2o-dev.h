@@ -182,7 +182,7 @@ typedef struct _i2o_hrt_entry
 {
 	u32	adapter_id;
 	u32	parent_tid:12;
-	u32 	tate:4;
+	u32 	state:4;
 	u32	bus_num:8;
 	u32	bus_type:8;
 	union

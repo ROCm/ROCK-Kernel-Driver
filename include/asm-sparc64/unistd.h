@@ -443,11 +443,12 @@ static __inline__ _syscall1(int,close,int,fd)
 static __inline__ _syscall1(int,_exit,int,exitcode)
 static __inline__ _syscall3(pid_t,waitpid,pid_t,pid,int *,wait_stat,int,options)
 
+#include <linux/linkage.h>
+
 asmlinkage unsigned long sys_mmap(
 				unsigned long addr, unsigned long len,
 				unsigned long prot, unsigned long flags,
 				unsigned long fd, unsigned long off);
-asmlinkage long sys_ioperm(unsigned long from, unsigned long num, int on);
 struct sigaction;
 asmlinkage long sys_rt_sigaction(int sig,
 				const struct sigaction __user *act,

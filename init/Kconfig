@@ -66,7 +66,7 @@ endmenu
 menu "General setup"
 
 config SWAP
-	bool "Support for paging of anonymous memory"
+	bool "Support for paging of anonymous memory (swap)"
 	depends on MMU
 	default y
 	help
@@ -304,4 +304,10 @@ config KMOD
 	  runs modprobe with the appropriate arguments, thereby
 	  loading the module if it is available.  If unsure, say Y.
 
+config STOP_MACHINE
+	bool
+	default y
+	depends on (SMP && MODULE_UNLOAD) || HOTPLUG_CPU
+	help
+	  Need stop_machine() primitive.
 endmenu

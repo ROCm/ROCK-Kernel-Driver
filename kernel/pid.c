@@ -57,7 +57,7 @@ static pidmap_t *map_limit = pidmap_array + PIDMAP_ENTRIES;
 
 static spinlock_t pidmap_lock __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
 
-inline void free_pidmap(int pid)
+fastcall void free_pidmap(int pid)
 {
 	pidmap_t *map = pidmap_array + pid / BITS_PER_PAGE;
 	int offset = pid & BITS_PER_PAGE_MASK;
@@ -146,7 +146,7 @@ failure:
 	return -1;
 }
 
-inline struct pid *find_pid(enum pid_type type, int nr)
+fastcall struct pid *find_pid(enum pid_type type, int nr)
 {
 	struct list_head *elem, *bucket = &pid_hash[type][pid_hashfn(nr)];
 	struct pid *pid;
@@ -159,14 +159,14 @@ inline struct pid *find_pid(enum pid_type type, int nr)
 	return NULL;
 }
 
-void link_pid(task_t *task, struct pid_link *link, struct pid *pid)
+void fastcall link_pid(task_t *task, struct pid_link *link, struct pid *pid)
 {
 	atomic_inc(&pid->count);
 	list_add_tail(&link->pid_chain, &pid->task_list);
 	link->pidptr = pid;
 }
 
-int attach_pid(task_t *task, enum pid_type type, int nr)
+int fastcall attach_pid(task_t *task, enum pid_type type, int nr)
 {
 	struct pid *pid = find_pid(type, nr);
 
@@ -209,7 +209,7 @@ static void _detach_pid(task_t *task, enum pid_type type)
 	__detach_pid(task, type);
 }
 
-void detach_pid(task_t *task, enum pid_type type)
+void fastcall detach_pid(task_t *task, enum pid_type type)
 {
 	int nr = __detach_pid(task, type);
 

@@ -1498,8 +1498,10 @@ static int hamachi_rx(struct net_device *dev)
 		
 		if (desc_status & DescOwn)
 			break;
-		pci_dma_sync_single(hmp->pci_dev, desc->addr, hmp->rx_buf_sz, 
-			PCI_DMA_FROMDEVICE);
+		pci_dma_sync_single_for_cpu(hmp->pci_dev,
+					    desc->addr,
+					    hmp->rx_buf_sz,
+					    PCI_DMA_FROMDEVICE);
 		buf_addr = desc_to_virt(desc->addr);
 		frame_status = le32_to_cpu(get_unaligned((s32*)&(buf_addr[data_size - 12])));
 		if (hamachi_debug > 4)
@@ -1563,6 +1565,10 @@ static int hamachi_rx(struct net_device *dev)
 #endif
 				skb->dev = dev;
 				skb_reserve(skb, 2);	/* 16 byte align the IP header */
+				pci_dma_sync_single_for_cpu(hmp->pci_dev,
+							    hmp->rx_ring[entry].addr,
+							    hmp->rx_buf_sz,
+							    PCI_DMA_FROMDEVICE);
 				/* Call copy + cksum if available. */
 #if 1 || USE_IP_COPYSUM
 				eth_copy_and_sum(skb, 
@@ -1572,10 +1578,14 @@ static int hamachi_rx(struct net_device *dev)
 				memcpy(skb_put(skb, pkt_len), hmp->rx_ring_dma
 					+ entry*sizeof(*desc), pkt_len);
 #endif
+				pci_dma_sync_single_for_device(hmp->pci_dev,
+							       hmp->rx_ring[entry].addr,
+							       hmp->rx_buf_sz,
+							       PCI_DMA_FROMDEVICE);
 			} else {
 				pci_unmap_single(hmp->pci_dev, 
-					hmp->rx_ring[entry].addr, 
-					hmp->rx_buf_sz, PCI_DMA_FROMDEVICE);
+						 hmp->rx_ring[entry].addr,
+						 hmp->rx_buf_sz, PCI_DMA_FROMDEVICE);
 				skb_put(skb = hmp->rx_skbuff[entry], pkt_len);
 				hmp->rx_skbuff[entry] = NULL;
 			}

@@ -31,6 +31,9 @@ cutype:	    The control unit type / model.
 
 devtype:    The device type / model, if applicable.
 
+availability: Can be 'good' or 'boxed'; 'no path' or 'no device' for
+	      disconnected devices.
+
 online:     An interface to set the device online and offline.
 	    In the special case of the device being disconnected (see the
 	    notify function under 1.2), piping 0 to online will focibly delete
@@ -247,7 +250,7 @@ xpram shows up under sys/ as 'xpram'.
 -----------
 
 The netiucv driver creates an attribute 'connection' under
-bus/iucv/drivers/NETIUCV. Piping to this attibute creates a new netiucv
+bus/iucv/drivers/netiucv. Piping to this attibute creates a new netiucv
 connection to the specified host.
 
 Netiucv connections show up under devices/iucv/ as "netiucv<ifnum>". The interface

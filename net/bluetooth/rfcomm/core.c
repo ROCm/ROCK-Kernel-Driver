@@ -50,7 +50,7 @@
 #include <net/bluetooth/l2cap.h>
 #include <net/bluetooth/rfcomm.h>
 
-#define VERSION "1.1"
+#define VERSION "1.2"
 
 #ifndef CONFIG_BT_RFCOMM_DEBUG
 #undef  BT_DBG
@@ -409,7 +409,7 @@ int rfcomm_dlc_send(struct rfcomm_dlc *d, struct sk_buff *skb)
 	return len;
 }
 
-void __rfcomm_dlc_throttle(struct rfcomm_dlc *d)
+void fastcall __rfcomm_dlc_throttle(struct rfcomm_dlc *d)
 {
 	BT_DBG("dlc %p state %ld", d, d->state);
 
@@ -420,7 +420,7 @@ void __rfcomm_dlc_throttle(struct rfcomm_dlc *d)
 	rfcomm_schedule(RFCOMM_SCHED_TX);
 }
 
-void __rfcomm_dlc_unthrottle(struct rfcomm_dlc *d)
+void fastcall __rfcomm_dlc_unthrottle(struct rfcomm_dlc *d)
 {
 	BT_DBG("dlc %p state %ld", d, d->state);
 
@@ -1948,7 +1948,7 @@ static void __exit rfcomm_proc_cleanup(void)
 #endif /* CONFIG_PROC_FS */
 
 /* ---- Initialization ---- */
-int  __init rfcomm_init(void)
+static int __init rfcomm_init(void)
 {
 	l2cap_load();
 
@@ -1967,7 +1967,7 @@ int  __init rfcomm_init(void)
 	return 0;
 }
 
-void __exit rfcomm_cleanup(void)
+static void __exit rfcomm_exit(void)
 {
 	/* Terminate working thread.
 	 * ie. Set terminate flag and wake it up */
@@ -1988,9 +1988,10 @@ void __exit rfcomm_cleanup(void)
 }
 
 module_init(rfcomm_init);
-module_exit(rfcomm_cleanup);
+module_exit(rfcomm_exit);
 
 MODULE_AUTHOR("Maxim Krasnyansky <maxk@qualcomm.com>, Marcel Holtmann <marcel@holtmann.org>");
 MODULE_DESCRIPTION("Bluetooth RFCOMM ver " VERSION);
+MODULE_VERSION(VERSION);
 MODULE_LICENSE("GPL");
 MODULE_ALIAS("bt-proto-3");

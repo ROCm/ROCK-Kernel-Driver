@@ -248,12 +248,6 @@ int __init verify_local_APIC(void)
 	 */
 	reg0 = apic_read(APIC_ID);
 	Dprintk("Getting ID: %x\n", reg0);
-	apic_write(APIC_ID, reg0 ^ APIC_ID_MASK);
-	reg1 = apic_read(APIC_ID);
-	Dprintk("Getting ID: %x\n", reg1);
-	apic_write(APIC_ID, reg0);
-	if (reg1 != (reg0 ^ APIC_ID_MASK))
-		return 0;
 
 	/*
 	 * The next two are just to see if we have sane values.
@@ -595,7 +589,7 @@ static int __init init_lapic_sysfs(void)
 
 	error = sysdev_class_register(&lapic_sysclass);
 	if (!error)
-		error = sys_device_register(&device_lapic);
+		error = sysdev_register(&device_lapic);
 	return error;
 }
 device_initcall(init_lapic_sysfs);

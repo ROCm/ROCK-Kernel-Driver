@@ -410,6 +410,8 @@ snd_seq_oss_synth_reset(seq_oss_devinfo_t *dp, int dev)
 		if (midi_synth_dev.opened <= 0)
 			return;
 		snd_seq_oss_midi_reset(dp, info->midi_mapped);
+		/* reopen the device */
+		snd_seq_oss_midi_close(dp, dev);
 		if (snd_seq_oss_midi_open(dp, info->midi_mapped,
 					  dp->file_mode) < 0) {
 			midi_synth_dev.opened--;

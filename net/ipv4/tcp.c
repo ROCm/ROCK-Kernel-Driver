@@ -2621,9 +2621,7 @@ void __init tcp_init(void)
 	else
 		goal = num_physpages >> (23 - PAGE_SHIFT);
 
-	if (!thash_entries)
-		goal = min(10UL, goal);
-	else
+	if (thash_entries)
 		goal = (thash_entries * sizeof(struct tcp_ehash_bucket)) >> PAGE_SHIFT;
 	for (order = 0; (1UL << order) < goal; order++)
 		;

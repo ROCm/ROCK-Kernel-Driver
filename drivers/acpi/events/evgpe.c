@@ -149,6 +149,11 @@ acpi_ev_gpe_detect (
 
 	ACPI_FUNCTION_NAME ("ev_gpe_detect");
 
+	/* Check for the case where there are no GPEs */
+
+	if (!gpe_xrupt_list) {
+		return (int_status);
+	}
 
 	/* Examine all GPE blocks attached to this interrupt level */
 

@@ -174,7 +174,8 @@ get_mem_size(void)
 }
 
 unsigned long
-load_kernel(unsigned long load_addr, int num_words, unsigned long cksum)
+load_kernel(unsigned long load_addr, int num_words, unsigned long cksum,
+		void *ign1, void *ign2)
 {
 	int csr0;
 	int csr_id;

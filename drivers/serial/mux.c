@@ -25,6 +25,7 @@
 #include <linux/console.h>
 #include <linux/slab.h>
 #include <linux/delay.h> /* for udelay */
+#include <linux/device.h>
 #include <asm/io.h>
 #include <asm/parisc-device.h>
 
@@ -535,3 +536,4 @@ module_exit(mux_exit);
 MODULE_AUTHOR("Ryan Bradetich");
 MODULE_DESCRIPTION("Serial MUX driver");
 MODULE_LICENSE("GPL");
+MODULE_ALIAS_CHARDEV_MAJOR(MUX_MAJOR);

@@ -1064,8 +1064,8 @@ dequeue_rx(struct idt77252_dev *card, struct rsq_entry *rsqe)
 
 	vcc = vc->rx_vcc;
 
-	pci_dma_sync_single(card->pcidev, IDT77252_PRV_PADDR(skb),
-			    skb->end - skb->data, PCI_DMA_FROMDEVICE);
+	pci_dma_sync_single_for_cpu(card->pcidev, IDT77252_PRV_PADDR(skb),
+				    skb->end - skb->data, PCI_DMA_FROMDEVICE);
 
 	if ((vcc->qos.aal == ATM_AAL0) ||
 	    (vcc->qos.aal == ATM_AAL34)) {
@@ -1902,6 +1902,9 @@ recycle_rx_skb(struct idt77252_dev *card, struct sk_buff *skb)
 {
 	u32 handle = IDT77252_PRV_POOL(skb);
 	int err;
+
+	pci_dma_sync_single_for_device(card->pcidev, IDT77252_PRV_PADDR(skb),
+				       skb->end - skb->data, PCI_DMA_FROMDEVICE);
 
 	err = push_rx_skb(card, skb, POOL_QUEUE(handle));
 	if (err) {

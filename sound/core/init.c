@@ -79,6 +79,7 @@ snd_card_t *snd_card_new(int idx, const char *xid,
 			goto __error;
 		strlcpy(card->id, xid, sizeof(card->id));
 	}
+	err = 0;
 	write_lock(&snd_card_rwlock);
 	if (idx < 0) {
 		int idx2;
@@ -94,15 +95,14 @@ snd_card_t *snd_card_new(int idx, const char *xid,
 			idx = snd_ecards_limit++;
 	} else if (idx < snd_ecards_limit) {
 		if (snd_cards_lock & (1 << idx))
-			idx = -1;	/* invalid */
+			err = -ENODEV;	/* invalid */
 	} else if (idx < SNDRV_CARDS)
 		snd_ecards_limit = idx + 1; /* increase the limit */
 	else
-		idx = -1;
-	if (idx < 0) {
+		err = -ENODEV;
+	if (idx < 0 || err < 0) {
 		write_unlock(&snd_card_rwlock);
-		if (idx >= snd_ecards_limit)
-			snd_printk(KERN_ERR "card %i is out of range (0-%i)\n", idx, snd_ecards_limit-1);
+		snd_printk(KERN_ERR "cannot find the slot for index %d (range 0-%i)\n", idx, snd_ecards_limit - 1);
 		goto __error;
 	}
 	snd_cards_lock |= 1 << idx;		/* lock it */
@@ -281,7 +281,8 @@ int snd_card_free(snd_card_t * card)
 	}
 	if (card->private_free)
 		card->private_free(card);
-	snd_info_free_entry(card->proc_id);
+	if (card->proc_id)
+		snd_info_unregister(card->proc_id);
 	if (snd_info_card_free(card) < 0) {
 		snd_printk(KERN_WARNING "unable to free card info\n");
 		/* Not fatal error */

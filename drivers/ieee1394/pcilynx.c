@@ -1516,11 +1516,6 @@ static int __devinit add_card(struct pci_dev *dev,
         return error; \
         } while (0)
 
-	struct csr1212_keyval *root;
-	struct csr1212_keyval *vend_id = NULL;
-	struct csr1212_keyval *text = NULL;
-	int ret;
-
 	char irq_buf[16];
 	struct hpsb_host *host;
         struct ti_lynx *lynx; /* shortcut to currently handled device */
@@ -1890,42 +1885,14 @@ static int __devinit add_card(struct pci_dev *dev,
 	else
 		host->csr.lnk_spd = be32_to_cpu(lynx->bus_info_block[2]) & 0x7;
 
-	/* Setup initial root directory entries */
-	root = host->csr.rom->root_kv;
-
-	vend_id = csr1212_new_immediate(CSR1212_KV_ID_VENDOR,
-					be32_to_cpu(lynx->bus_info_block[3]) >> 8);
-	text = csr1212_new_string_descriptor_leaf("Linux 1394 - PCI-Lynx");
-
-	if (!vend_id || !text) {
-		if (vend_id)
-			csr1212_release_keyval(vend_id);
-		if (text)
-			csr1212_release_keyval(text);
+	if (hpsb_add_host(host)) {
 		error = -ENOMEM;
-		FAIL("Failed to allocate memory for mandatory ConfigROM entries!");
+		FAIL("Failed to register host with highlevel");
 	}
 
-	ret = csr1212_associate_keyval(vend_id, text);
-	csr1212_release_keyval(text);		/* no longer needed locally. */
-	if(ret != CSR1212_SUCCESS) {
-		csr1212_release_keyval(vend_id);
-		error = ret;
-		FAIL("Failed to associate text descriptor to vendor id");
-	}
-
-	ret = csr1212_attach_keyval_to_directory(root, vend_id);
-	csr1212_release_keyval(vend_id);	/* no longer needed locally. */
-	if(ret != CSR1212_SUCCESS) {
-		error = ret;
-		FAIL("Failed to attach vendor id to root directory");
-	}
-
-	host->update_config_rom = 1;
-	hpsb_add_host(host);
 	lynx->state = is_host;
 
-	return ret;
+	return 0;
 #undef FAIL
 }
 

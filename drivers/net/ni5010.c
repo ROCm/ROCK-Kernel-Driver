@@ -309,7 +309,7 @@ static int __init ni5010_probe1(struct net_device *dev, int ioaddr)
 	PRINTK2((KERN_DEBUG "%s: I/O #9 passed!\n", dev->name));
 
 	/* DMA is not supported (yet?), so no use detecting it */
-	lp = (struct ni5010_local*)dev->priv;
+	lp = netdev_priv(dev);
 
 	spin_lock_init(&lp->lock);
 
@@ -484,7 +484,7 @@ static irqreturn_t ni5010_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	PRINTK2((KERN_DEBUG "%s: entering ni5010_interrupt\n", dev->name));
 
 	ioaddr = dev->base_addr;
-	lp = (struct ni5010_local *)dev->priv;
+	lp = netdev_priv(dev);
 	
 	spin_lock(&lp->lock);
 	status = inb(IE_ISTAT); 
@@ -527,7 +527,7 @@ static void dump_packet(void *buf, int len)
 /* We have a good packet, get it out of the buffer. */
 static void ni5010_rx(struct net_device *dev)
 {
-	struct ni5010_local *lp = (struct ni5010_local *)dev->priv;
+	struct ni5010_local *lp = netdev_priv(dev);
 	int ioaddr = dev->base_addr;
 	unsigned char rcv_stat;
 	struct sk_buff *skb;
@@ -592,7 +592,7 @@ static void ni5010_rx(struct net_device *dev)
 
 static int process_xmt_interrupt(struct net_device *dev)
 {
-	struct ni5010_local *lp = (struct ni5010_local *)dev->priv;
+	struct ni5010_local *lp = netdev_priv(dev);
 	int ioaddr = dev->base_addr;
 	int xmit_stat;
 
@@ -651,7 +651,7 @@ static int ni5010_close(struct net_device *dev)
    closed. */
 static struct net_device_stats *ni5010_get_stats(struct net_device *dev)
 {
-	struct ni5010_local *lp = (struct ni5010_local *)dev->priv;
+	struct ni5010_local *lp = netdev_priv(dev);
 
 	PRINTK2((KERN_DEBUG "%s: entering ni5010_get_stats\n", dev->name));
 	
@@ -693,7 +693,7 @@ static void ni5010_set_multicast_list(struct net_device *dev)
 
 static void hardware_send_packet(struct net_device *dev, char *buf, int length, int pad)
 {
-	struct ni5010_local *lp = (struct ni5010_local *)dev->priv;
+	struct ni5010_local *lp = netdev_priv(dev);
 	int ioaddr = dev->base_addr;
 	unsigned long flags;
 	unsigned int buf_offs;

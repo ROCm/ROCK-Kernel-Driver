@@ -69,10 +69,14 @@
 #include <linux/termios.h>
 #include <linux/tty.h>
 #include <linux/serial_core.h>
+#include <linux/delay.h>
+#include <linux/ide.h>
 #include <asm/io.h>
 #include <asm/hardware.h>
 #include <asm/irq.h>
 #include <asm/superio.h>
+
+#define SUPERIO_IDE_MAX_RETRIES 25
 
 static struct superio_device sio_dev;
 
@@ -161,7 +165,6 @@ superio_init(struct superio_device *sio)
 	printk (KERN_INFO "SuperIO: Found NS87560 Legacy I/O device at %s (IRQ %i) \n",
 		pci_name(pdev),pdev->irq);
 
-	/* Find our I/O devices */
 	pci_read_config_dword (pdev, SIO_SP1BAR, &sio->sp1_base);
 	sio->sp1_base &= ~1;
 	printk (KERN_INFO "SuperIO: Serial port 1 at 0x%x\n", sio->sp1_base);
@@ -462,16 +465,72 @@ superio_parport_init(void)
 }
 
 
-int
-superio_get_ide_irq(void)
+static u8 superio_ide_inb (unsigned long port);
+static unsigned long superio_ide_status[2];
+static unsigned long superio_ide_select[2];
+static unsigned long superio_ide_dma_status[2];
+
+void superio_fixup_pci(struct pci_dev *pdev)
 {
-	if (sio_dev.irq_region)
-		return sio_dev.irq_region->data.irqbase + IDE_IRQ;
-	else
-		return 0;
+	u8 prog;
+
+	pdev->class |= 0x5;
+	pci_write_config_byte(pdev, PCI_CLASS_PROG, pdev->class);
+
+	pci_read_config_byte(pdev, PCI_CLASS_PROG, &prog);
+	printk("PCI: Enabled native mode for NS87415 (pif=0x%x)\n", prog);
 }
 
-EXPORT_SYMBOL(superio_get_ide_irq);
+/* Because of a defect in Super I/O, all reads of the PCI DMA status 
+ * registers, IDE status register and the IDE select register need to be 
+ * retried
+ */
+static u8 superio_ide_inb (unsigned long port)
+{
+	if (port == superio_ide_status[0] ||
+	    port == superio_ide_status[1] ||
+	    port == superio_ide_select[0] ||
+	    port == superio_ide_select[1] ||
+	    port == superio_ide_dma_status[0] ||
+	    port == superio_ide_dma_status[1]) {
+		u8 tmp;
+		int retries = SUPERIO_IDE_MAX_RETRIES;
+
+		/* printk(" [ reading port 0x%x with retry ] ", port); */
+
+		do {
+			tmp = inb(port);
+			if (tmp == 0)
+				udelay(50);
+		} while (tmp == 0 && retries-- > 0);
+
+		return tmp;
+	}
+
+	return inb(port);
+}
+
+void __init superio_ide_init_iops (struct hwif_s *hwif)
+{
+	u32 base, dmabase;
+	u8 tmp;
+	struct pci_dev *pdev = hwif->pci_dev;
+	u8 port = hwif->channel;
+
+	base = pci_resource_start(pdev, port * 2) & ~3;
+	dmabase = pci_resource_start(pdev, 4) & ~3;
+
+	superio_ide_status[port] = base + IDE_STATUS_OFFSET;
+	superio_ide_select[port] = base + IDE_SELECT_OFFSET;
+	superio_ide_dma_status[port] = dmabase + (!port ? 2 : 0xa);
+	
+	/* Clear error/interrupt, enable dma */
+	tmp = superio_ide_inb(superio_ide_dma_status[port]);
+	outb(tmp | 0x66, superio_ide_dma_status[port]);
+
+	/* We need to override inb to workaround a SuperIO errata */
+	hwif->INB = superio_ide_inb;
+}
 
 static int __devinit superio_probe(struct pci_dev *dev, const struct pci_device_id *id)
 {

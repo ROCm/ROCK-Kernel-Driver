@@ -269,9 +269,6 @@ config MK8
 	  use of some extended instructions, and passes appropriate optimization
 	  flags to GCC.
 
-config MELAN
-	bool "Elan"
-
 config MCRUSOE
 	bool "Crusoe"
 	help
@@ -457,8 +454,8 @@ config SMP
 	  Y to "Enhanced Real Time Clock Support", below. The "Advanced Power
 	  Management" code will be disabled if you say Y here.
 
-	  See also the <file:Documentation/smp.tex>,
-	  <file:Documentation/smp.txt>, <file:Documentation/i386/IO-APIC.txt>,
+	  See also the <file:Documentation/smp.txt>,
+	  <file:Documentation/i386/IO-APIC.txt>,
 	  <file:Documentation/nmi_watchdog.txt> and the SMP-HOWTO available at
 	  <http://www.tldp.org/docs.html#howto>.
 
@@ -552,7 +549,7 @@ config X86_MCE
 	  the 386 and 486, so nearly everyone can say Y here.
 
 config X86_MCE_NONFATAL
-	bool "Check for non-fatal errors on AMD Athlon/Duron / Intel Pentium 4"
+	tristate "Check for non-fatal errors on AMD Athlon/Duron / Intel Pentium 4"
 	depends on X86_MCE
 	help
 	  Enabling this feature starts a timer that triggers every 5 seconds which
@@ -640,16 +637,7 @@ config X86_CPUID
 	  with major 203 and minors 0 to 31 for /dev/cpu/0/cpuid to
 	  /dev/cpu/31/cpuid.
 
-config EDD
-	tristate "BIOS Enhanced Disk Drive calls determine boot disk (EXPERIMENTAL)"
-	depends on EXPERIMENTAL
-	help
-	  Say Y or M here if you want to enable BIOS Enhanced Disk Drive
-	  Services real mode BIOS calls to determine which disk
-	  BIOS tries boot from.  This information is then exported via driverfs.
-
-	  This option is experimental, but believed to be safe,
-	  and most disk controller BIOS vendors do not yet implement this feature.
+source "drivers/firmware/Kconfig"
 
 choice
 	prompt "High Memory Support"
@@ -1058,9 +1046,6 @@ choice
 	prompt "PCI access mode"
 	depends on PCI && !X86_VISWS
 	default PCI_GOANY
-
-config PCI_GOBIOS
-	bool "BIOS"
 	---help---
 	  On PCI systems, the BIOS can be used to detect the PCI devices and
 	  determine their configuration. However, some old PCI motherboards
@@ -1068,12 +1053,19 @@ config PCI_GOBIOS
 	  PCI-based systems don't have any BIOS at all. Linux can also try to
 	  detect the PCI hardware directly without using the BIOS.
 
-	  With this option, you can specify how Linux should detect the PCI
-	  devices. If you choose "BIOS", the BIOS will be used, if you choose
-	  "Direct", the BIOS won't be used, and if you choose "Any", the
-	  kernel will try the direct access method and falls back to the BIOS
-	  if that doesn't work. If unsure, go with the default, which is
-	  "Any".
+	  With this option, you can specify how Linux should detect the
+	  PCI devices. If you choose "BIOS", the BIOS will be used,
+	  if you choose "Direct", the BIOS won't be used, and if you
+	  choose "MMConfig", then PCI Express MMCONFIG will be used.
+	  If you choose "Any", the kernel will try MMCONFIG, then the
+	  direct access method and falls back to the BIOS if that doesn't
+	  work. If unsure, go with the default, which is "Any".
+
+config PCI_GOBIOS
+	bool "BIOS"
+
+config PCI_GOMMCONFIG
+	bool "MMConfig"
 
 config PCI_GODIRECT
 	bool "Direct"
@@ -1091,6 +1083,12 @@ config PCI_BIOS
 config PCI_DIRECT
 	bool
  	depends on PCI && ((PCI_GODIRECT || PCI_GOANY) || X86_VISWS)
+	default y
+
+config PCI_MMCONFIG
+	bool
+	depends on PCI && (PCI_GOMMCONFIG || PCI_GOANY)
+	select ACPI_BOOT
 	default y
 
 config PCI_USE_VECTOR
@@ -1231,17 +1229,6 @@ config DEBUG_SLAB
 	  allocation as well as poisoning memory on free to catch use of freed
 	  memory.
 
-config DEBUG_IOVIRT
-	bool "Memory mapped I/O debugging"
-	depends on DEBUG_KERNEL
-	help
-	  Say Y here to get warned whenever an attempt is made to do I/O on
-	  obviously invalid addresses such as those generated when ioremap()
-	  calls are forgotten.  Memory mapped I/O will go through an extra
-	  check to catch access to unmapped ISA addresses, an access method
-	  that can still be used by old drivers that are being ported from
-	  2.0/2.2.
-
 config MAGIC_SYSRQ
 	bool "Magic SysRq key"
 	depends on DEBUG_KERNEL
@@ -1338,7 +1325,7 @@ config X86_BIOS_REBOOT
 
 config X86_TRAMPOLINE
 	bool
-	depends on SMP || X86_VISWS
+	depends on X86_SMP || (X86_VOYAGER && SMP)
 	default y
 
 config PC

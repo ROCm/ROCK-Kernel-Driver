@@ -44,6 +44,7 @@ struct zr36050 {
 	__u16 bitrate_ctrl;
 
 	__u32 total_code_vol;
+	__u32 real_code_vol;
 	__u16 max_block_vol;
 
 	__u8 h_samp_ratio[8];

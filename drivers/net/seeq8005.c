@@ -357,7 +357,7 @@ out:
    */
 static int seeq8005_open(struct net_device *dev)
 {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 
 	{
 		 int irqval = request_irq(dev->irq, &seeq8005_interrupt, 0, "seeq8005", dev);
@@ -390,7 +390,7 @@ static void seeq8005_timeout(struct net_device *dev)
 
 static int seeq8005_send_packet(struct sk_buff *skb, struct net_device *dev)
 {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 	short length = skb->len;
 	unsigned char *buf;
 
@@ -424,7 +424,7 @@ static irqreturn_t seeq8005_interrupt(int irq, void *dev_id, struct pt_regs * re
 	int handled = 0;
 
 	ioaddr = dev->base_addr;
-	lp = (struct net_local *)dev->priv;
+	lp = netdev_priv(dev);
 
 	status = inw(SEEQ_STATUS);
 	do {
@@ -462,7 +462,7 @@ static irqreturn_t seeq8005_interrupt(int irq, void *dev_id, struct pt_regs * re
 /* We have a good packet(s), get it/them out of the buffers. */
 static void seeq8005_rx(struct net_device *dev)
 {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 	int boguscount = 10;
 	int pkt_hdr;
 	int ioaddr = dev->base_addr;
@@ -561,7 +561,7 @@ static void seeq8005_rx(struct net_device *dev)
 /* The inverse routine to net_open(). */
 static int seeq8005_close(struct net_device *dev)
 {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 	int ioaddr = dev->base_addr;
 
 	lp->open_time = 0;
@@ -583,7 +583,7 @@ static int seeq8005_close(struct net_device *dev)
    closed. */
 static struct net_device_stats *seeq8005_get_stats(struct net_device *dev)
 {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 
 	return &lp->stats;
 }
@@ -618,7 +618,7 @@ static void set_multicast_list(struct net_device *dev)
 
 void seeq8005_init(struct net_device *dev, int startp)
 {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 	int ioaddr = dev->base_addr;
 	int i;
 	

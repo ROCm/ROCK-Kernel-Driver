@@ -700,7 +700,8 @@ typedef unsigned long space_t;
 
 
 void SBA_INLINE
-sba_io_pdir_entry(u64 *pdir_ptr, space_t sid, unsigned long vba)
+sba_io_pdir_entry(u64 *pdir_ptr, space_t sid, unsigned long vba,
+		  unsigned long hint)
 {
 	u64 pa; /* physical address */
 	register unsigned ci; /* coherent index */
@@ -874,7 +875,7 @@ sba_map_single(struct device *dev, void *addr, size_t size,
 
 	while (size > 0) {
 		ASSERT(((u8 *)pdir_start)[7] == 0); /* verify availability */
-		sba_io_pdir_entry(pdir_start, KERNEL_SPACE, (unsigned long) addr);
+		sba_io_pdir_entry(pdir_start, KERNEL_SPACE, (unsigned long) addr, 0);
 
 		DBG_RUN(" pdir 0x%p %02x%02x%02x%02x%02x%02x%02x%02x\n",
 			pdir_start,
@@ -1027,242 +1028,14 @@ sba_free_consistent(struct device *hwdev, size_t size, void *vaddr,
 */
 #define PIDE_FLAG 0x80000000UL
 
+#ifdef SBA_COLLECT_STATS
+#define IOMMU_MAP_STATS
+#endif
+#include "iommu-helpers.h"
+
 #ifdef DEBUG_LARGE_SG_ENTRIES
 int dump_run_sg = 0;
 #endif
-
-
-/**
- * sba_fill_pdir - write allocated SG entries into IO PDIR
- * @ioc: IO MMU structure which owns the pdir we are interested in.
- * @startsg:  list of IOVA/size pairs
- * @nents: number of entries in startsg list
- *
- * Take preprocessed SG list and write corresponding entries
- * in the IO PDIR.
- */
-
-static SBA_INLINE int
-sba_fill_pdir(
-	struct ioc *ioc,
-	struct scatterlist *startsg,
-	int nents)
-{
-	struct scatterlist *dma_sg = startsg;	/* pointer to current DMA */
-	int n_mappings = 0;
-	u64 *pdirp = 0;
-	unsigned long dma_offset = 0;
-
-	dma_sg--;
-	while (nents-- > 0) {
-		int     cnt = sg_dma_len(startsg);
-		sg_dma_len(startsg) = 0;
-
-#ifdef DEBUG_LARGE_SG_ENTRIES
-		if (dump_run_sg)
-			printk(KERN_DEBUG " %2d : %08lx/%05x %p/%05x\n",
-				nents,
-				(unsigned long) sg_dma_address(startsg), cnt,
-				sg_virt_addr(startsg), startsg->length
-		);
-#else
-		DBG_RUN_SG(" %d : %08lx/%05x %p/%05x\n",
-				nents,
-				(unsigned long) sg_dma_address(startsg), cnt,
-				sg_virt_addr(startsg), startsg->length
-		);
-#endif
-		/*
-		** Look for the start of a new DMA stream
-		*/
-		if (sg_dma_address(startsg) & PIDE_FLAG) {
-			u32 pide = sg_dma_address(startsg) & ~PIDE_FLAG;
-			dma_offset = (unsigned long) pide & ~IOVP_MASK;
-			sg_dma_address(startsg) = 0;
-			dma_sg++;
-			sg_dma_address(dma_sg) = pide;
-			pdirp = &(ioc->pdir_base[pide >> IOVP_SHIFT]);
-			n_mappings++;
-		}
-
-		/*
-		** Look for a VCONTIG chunk
-		*/
-		if (cnt) {
-			unsigned long vaddr = (unsigned long) sg_virt_addr(startsg);
-			ASSERT(pdirp);
-
-			/* Since multiple Vcontig blocks could make up
-			** one DMA stream, *add* cnt to dma_len.
-			*/
-			sg_dma_len(dma_sg) += cnt;
-			cnt += dma_offset;
-			dma_offset=0;	/* only want offset on first chunk */
-			cnt = ROUNDUP(cnt, IOVP_SIZE);
-#ifdef SBA_COLLECT_STATS
-			ioc->msg_pages += cnt >> IOVP_SHIFT;
-#endif
-			do {
-				sba_io_pdir_entry(pdirp, KERNEL_SPACE, vaddr);
-				vaddr += IOVP_SIZE;
-				cnt -= IOVP_SIZE;
-				pdirp++;
-			} while (cnt > 0);
-		}
-		startsg++;
-	}
-#ifdef DEBUG_LARGE_SG_ENTRIES
-	dump_run_sg = 0;
-#endif
-	return(n_mappings);
-}
-
-
-/*
-** Two address ranges are DMA contiguous *iff* "end of prev" and
-** "start of next" are both on a page boundary.
-**
-** (shift left is a quick trick to mask off upper bits)
-*/
-#define DMA_CONTIG(__X, __Y) \
-	(((((unsigned long) __X) | ((unsigned long) __Y)) << (BITS_PER_LONG - PAGE_SHIFT)) == 0UL)
-
-
-/**
- * sba_coalesce_chunks - preprocess the SG list
- * @ioc: IO MMU structure which owns the pdir we are interested in.
- * @startsg:  list of IOVA/size pairs
- * @nents: number of entries in startsg list
- *
- * First pass is to walk the SG list and determine where the breaks are
- * in the DMA stream. Allocates PDIR entries but does not fill them.
- * Returns the number of DMA chunks.
- *
- * Doing the fill separate from the coalescing/allocation keeps the
- * code simpler. Future enhancement could make one pass through
- * the sglist do both.
- */
-static SBA_INLINE int
-sba_coalesce_chunks( struct ioc *ioc,
-	struct scatterlist *startsg,
-	int nents)
-{
-	struct scatterlist *vcontig_sg;    /* VCONTIG chunk head */
-	unsigned long vcontig_len;         /* len of VCONTIG chunk */
-	unsigned long vcontig_end;
-	struct scatterlist *dma_sg;        /* next DMA stream head */
-	unsigned long dma_offset, dma_len; /* start/len of DMA stream */
-	int n_mappings = 0;
-
-	while (nents > 0) {
-		unsigned long vaddr = (unsigned long) sg_virt_addr(startsg); 
-
-		/*
-		** Prepare for first/next DMA stream
-		*/
-		dma_sg = vcontig_sg = startsg;
-		dma_len = vcontig_len = vcontig_end = startsg->length;
-		vcontig_end +=  vaddr;
-		dma_offset = vaddr & ~IOVP_MASK;
-
-		/* PARANOID: clear entries */
-		sg_dma_address(startsg) = 0;
-		sg_dma_len(startsg) = 0;
-
-		/*
-		** This loop terminates one iteration "early" since
-		** it's always looking one "ahead".
-		*/
-		while (--nents > 0) {
-			unsigned long vaddr;	/* tmp */
-
-			startsg++;
-
-			/* PARANOID: clear entries */
-			sg_dma_address(startsg) = 0;
-			sg_dma_len(startsg) = 0;
-
-			/* catch brokenness in SCSI layer */
-			ASSERT(startsg->length <= DMA_CHUNK_SIZE);
-
-			/*
-			** First make sure current dma stream won't
-			** exceed DMA_CHUNK_SIZE if we coalesce the
-			** next entry.
-			*/
-			if (((dma_len + dma_offset + startsg->length + ~IOVP_MASK) & IOVP_MASK) > DMA_CHUNK_SIZE)
-				break;
-
-			/*
-			** Then look for virtually contiguous blocks.
-			** PARISC needs to associate a virtual address
-			** with each IO address mapped. The CPU cache is
-			** virtually tagged and the IOMMU uses part
-			** of the virtual address to participate in
-			** CPU cache coherency.
-			**
-			** append the next transaction?
-			*/
-			vaddr = (unsigned long) sg_virt_addr(startsg);
-			if  (vcontig_end == vaddr)
-			{
-				vcontig_len += startsg->length;
-				vcontig_end += startsg->length;
-				dma_len     += startsg->length;
-				continue;
-			}
-
-#ifdef DEBUG_LARGE_SG_ENTRIES
-			dump_run_sg = (vcontig_len > IOVP_SIZE);
-#endif
-
-			/*
-			** Not virtually contigous.
-			** Terminate prev chunk.
-			** Start a new chunk.
-			**
-			** Once we start a new VCONTIG chunk, dma_offset
-			** can't change. And we need the offset from the first
-			** chunk - not the last one. Ergo Successive chunks
-			** must start on page boundaries and dove tail
-			** with its predecessor.
-			*/
-			sg_dma_len(vcontig_sg) = vcontig_len;
-
-			vcontig_sg = startsg;
-			vcontig_len = startsg->length;
-
-			/*
-			** 3) do the entries end/start on page boundaries?
-			**    Don't update vcontig_end until we've checked.
-			*/
-			if (DMA_CONTIG(vcontig_end, vaddr))
-			{
-				vcontig_end = vcontig_len + vaddr;
-				dma_len += vcontig_len;
-				continue;
-			} else {
-				break;
-			}
-		}
-
-		/*
-		** End of DMA Stream
-		** Terminate last VCONTIG block.
-		** Allocate space for DMA stream.
-		*/
-		sg_dma_len(vcontig_sg) = vcontig_len;
-		dma_len = (dma_len + dma_offset + ~IOVP_MASK) & IOVP_MASK;
-		ASSERT(dma_len <= DMA_CHUNK_SIZE);
-		sg_dma_address(dma_sg) =
-			PIDE_FLAG 
-			| (sba_alloc_range(ioc, dma_len) << IOVP_SHIFT)
-			| dma_offset;
-		n_mappings++;
-	}
-
-	return n_mappings;
-}
 
 
 /**
@@ -1318,7 +1091,7 @@ sba_map_sg(struct device *dev, struct scatterlist *sglist, int nents,
 	** w/o this association, we wouldn't have coherent DMA!
 	** Access to the virtual address is what forces a two pass algorithm.
 	*/
-	coalesced = sba_coalesce_chunks(ioc, sglist, nents);
+	coalesced = iommu_coalesce_chunks(ioc, sglist, nents, sba_alloc_range);
 
 	/*
 	** Program the I/O Pdir
@@ -1328,7 +1101,7 @@ sba_map_sg(struct device *dev, struct scatterlist *sglist, int nents,
 	** o dma_len will contain the number of bytes to map 
 	** o address contains the virtual address.
 	*/
-	filled = sba_fill_pdir(ioc, sglist, nents);
+	filled = iommu_fill_pdir(ioc, sglist, nents, 0, sba_io_pdir_entry);
 
 #ifdef ASSERT_PDIR_SANITY
 	if (sba_check_pdir(ioc,"Check after sba_map_sg()"))
@@ -1410,8 +1183,10 @@ static struct hppa_dma_ops sba_ops = {
 	.unmap_single =		sba_unmap_single,
 	.map_sg =		sba_map_sg,
 	.unmap_sg =		sba_unmap_sg,
-	.dma_sync_single =	NULL,
-	.dma_sync_sg =		NULL,
+	.dma_sync_single_for_cpu =	NULL,
+	.dma_sync_single_for_device =	NULL,
+	.dma_sync_sg_for_cpu =		NULL,
+	.dma_sync_sg_for_device =	NULL,
 };
 
 
@@ -2045,6 +1820,9 @@ sba_driver_callback(struct parisc_device *dev)
 	create_proc_info_entry("bitmap", 0, proc_runway_root, sba_resource_map);
 #endif
 #endif
+	parisc_vmerge_boundary = IOVP_SIZE;
+	parisc_vmerge_max_size = IOVP_SIZE * BITS_PER_LONG;
+
 	return 0;
 }
 

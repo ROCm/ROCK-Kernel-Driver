@@ -11,6 +11,7 @@ struct scsi_cmnd;
 struct scsi_device;
 struct Scsi_Host;
 struct scsi_host_cmd_pool;
+struct scsi_transport_template;
 
 
 /*
@@ -395,6 +396,7 @@ struct Scsi_Host {
 	unsigned int            eh_kill:1; /* set when killing the eh thread */
 	wait_queue_head_t       host_wait;
 	struct scsi_host_template *hostt;
+	struct scsi_transport_template *transportt;
 	volatile unsigned short host_busy;   /* commands actually active on low-level */
 	volatile unsigned short host_failed; /* commands that failed. */
     

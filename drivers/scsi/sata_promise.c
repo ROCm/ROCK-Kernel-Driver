@@ -21,7 +21,6 @@
  *
  */
 
-#include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/pci.h>
@@ -35,7 +34,7 @@
 #include <asm/io.h>
 
 #define DRV_NAME	"sata_promise"
-#define DRV_VERSION	"0.90"
+#define DRV_VERSION	"0.91"
 
 
 enum {
@@ -146,10 +145,6 @@ struct pdc_host_priv {
 
 static u32 pdc_sata_scr_read (struct ata_port *ap, unsigned int sc_reg);
 static void pdc_sata_scr_write (struct ata_port *ap, unsigned int sc_reg, u32 val);
-static void pdc_sata_set_piomode (struct ata_port *ap, struct ata_device *adev,
-			      unsigned int pio);
-static void pdc_sata_set_udmamode (struct ata_port *ap, struct ata_device *adev,
-			      unsigned int udma);
 static int pdc_sata_init_one (struct pci_dev *pdev, const struct pci_device_id *ent);
 static void pdc_dma_start(struct ata_queued_cmd *qc);
 static void pdc20621_dma_start(struct ata_queued_cmd *qc);
@@ -200,14 +195,11 @@ static Scsi_Host_Template pdc_sata_sht = {
 
 static struct ata_port_operations pdc_sata_ops = {
 	.port_disable		= ata_port_disable,
-	.set_piomode		= pdc_sata_set_piomode,
-	.set_udmamode		= pdc_sata_set_udmamode,
 	.tf_load		= pdc_tf_load_mmio,
 	.tf_read		= ata_tf_read_mmio,
 	.check_status		= ata_check_status_mmio,
 	.exec_command		= pdc_exec_command_mmio,
 	.phy_reset		= sata_phy_reset,
-	.phy_config		= pata_phy_config,	/* not a typo */
 	.bmdma_start            = pdc_dma_start,
 	.fill_sg		= pdc_fill_sg,
 	.eng_timeout		= pdc_eng_timeout,
@@ -220,14 +212,11 @@ static struct ata_port_operations pdc_sata_ops = {
 
 static struct ata_port_operations pdc_20621_ops = {
 	.port_disable		= ata_port_disable,
-	.set_piomode		= pdc_sata_set_piomode,
-	.set_udmamode		= pdc_sata_set_udmamode,
 	.tf_load		= pdc_tf_load_mmio,
 	.tf_read		= ata_tf_read_mmio,
 	.check_status		= ata_check_status_mmio,
 	.exec_command		= pdc_exec_command_mmio,
 	.phy_reset		= pdc_20621_phy_reset,
-	.phy_config		= pata_phy_config,	/* not a typo */
 	.bmdma_start            = pdc20621_dma_start,
 	.fill_sg		= pdc20621_fill_sg,
 	.eng_timeout		= pdc_eng_timeout,
@@ -376,19 +365,6 @@ static void pdc_sata_scr_write (struct ata_port *ap, unsigned int sc_reg,
 	if (sc_reg > SCR_CONTROL)
 		return;
 	writel(val, (void *) ap->ioaddr.scr_addr + (sc_reg * 4));
-}
-
-static void pdc_sata_set_piomode (struct ata_port *ap, struct ata_device *adev,
-			      unsigned int pio)
-{
-	/* dummy */
-}
-
-
-static void pdc_sata_set_udmamode (struct ata_port *ap, struct ata_device *adev,
-			      unsigned int udma)
-{
-	/* dummy */
 }
 
 enum pdc_packet_bits {
@@ -1014,6 +990,14 @@ static void pdc_eng_timeout(struct ata_port *ap)
 		goto out;
 	}
 
+	/* hack alert!  We cannot use the supplied completion
+	 * function from inside the ->eh_strategy_handler() thread.
+	 * libata is the only user of ->eh_strategy_handler() in
+	 * any kernel, so the default scsi_done() assumes it is
+	 * not being called from the SCSI EH.
+	 */
+	qc->scsidone = scsi_finish_command;
+
 	switch (qc->tf.protocol) {
 	case ATA_PROT_DMA_READ:
 	case ATA_PROT_DMA_WRITE:
@@ -1164,13 +1148,16 @@ static void pdc_sata_setup_port(struct ata_ioports *port, unsigned long base)
 {
 	port->cmd_addr		= base;
 	port->data_addr		= base;
+	port->feature_addr	=
 	port->error_addr	= base + 0x4;
 	port->nsect_addr	= base + 0x8;
 	port->lbal_addr		= base + 0xc;
 	port->lbam_addr		= base + 0x10;
 	port->lbah_addr		= base + 0x14;
 	port->device_addr	= base + 0x18;
-	port->cmdstat_addr	= base + 0x1c;
+	port->command_addr	=
+	port->status_addr	= base + 0x1c;
+	port->altstatus_addr	=
 	port->ctl_addr		= base + 0x38;
 }
 
@@ -1682,6 +1669,9 @@ static int pdc_sata_init_one (struct pci_dev *pdev, const struct pci_device_id *
 	rc = pci_set_dma_mask(pdev, ATA_DMA_MASK);
 	if (rc)
 		goto err_out_regions;
+	rc = pci_set_consistent_dma_mask(pdev, ATA_DMA_MASK);
+	if (rc)
+		goto err_out_regions;
 
 	probe_ent = kmalloc(sizeof(*probe_ent), GFP_KERNEL);
 	if (probe_ent == NULL) {
@@ -1801,13 +1791,7 @@ err_out:
 
 static int __init pdc_sata_init(void)
 {
-	int rc;
-
-	rc = pci_module_init(&pdc_sata_pci_driver);
-	if (rc)
-		return rc;
-
-	return 0;
+	return pci_module_init(&pdc_sata_pci_driver);
 }
 
 

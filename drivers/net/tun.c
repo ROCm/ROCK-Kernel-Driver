@@ -70,7 +70,7 @@ static int tun_net_close(struct net_device *dev)
 /* Net device start xmit */
 static int tun_net_xmit(struct sk_buff *skb, struct net_device *dev)
 {
-	struct tun_struct *tun = (struct tun_struct *)dev->priv;
+	struct tun_struct *tun = netdev_priv(dev);
 
 	DBG(KERN_INFO "%s: tun_net_xmit %d\n", tun->dev->name, skb->len);
 
@@ -113,14 +113,14 @@ static void tun_net_mclist(struct net_device *dev)
 
 static struct net_device_stats *tun_net_stats(struct net_device *dev)
 {
-	struct tun_struct *tun = (struct tun_struct *)dev->priv;
+	struct tun_struct *tun = netdev_priv(dev);
 	return &tun->stats;
 }
 
 /* Initialize net device. */
 static void tun_net_init(struct net_device *dev)
 {
-	struct tun_struct *tun = (struct tun_struct *)dev->priv;
+	struct tun_struct *tun = netdev_priv(dev);
    
 	switch (tun->flags & TUN_TYPE_MASK) {
 	case TUN_TUN_DEV:
@@ -153,7 +153,7 @@ static void tun_net_init(struct net_device *dev)
 /* Poll */
 static unsigned int tun_chr_poll(struct file *file, poll_table * wait)
 {  
-	struct tun_struct *tun = (struct tun_struct *)file->private_data;
+	struct tun_struct *tun = file->private_data;
 	unsigned int mask = POLLOUT | POLLWRNORM;
 
 	if (!tun)
@@ -169,7 +169,7 @@ static unsigned int tun_chr_poll(struct file *file, poll_table * wait)
 	return mask;
 }
 
-/* Get packet from user space buffer(already verified) */
+/* Get packet from user space buffer */
 static __inline__ ssize_t tun_get_user(struct tun_struct *tun, struct iovec *iv, size_t count)
 {
 	struct tun_pi pi = { 0, __constant_htons(ETH_P_IP) };
@@ -180,7 +180,8 @@ static __inline__ ssize_t tun_get_user(struct tun_struct *tun, struct iovec *iv,
 		if ((len -= sizeof(pi)) > len)
 			return -EINVAL;
 
-		memcpy_fromiovec((void *)&pi, iv, sizeof(pi));
+		if(memcpy_fromiovec((void *)&pi, iv, sizeof(pi)))
+			return -EFAULT;
 	}
  
 	if (!(skb = alloc_skb(len + 2, GFP_KERNEL))) {
@@ -189,7 +190,8 @@ static __inline__ ssize_t tun_get_user(struct tun_struct *tun, struct iovec *iv,
 	}
 
 	skb_reserve(skb, 2);
-	memcpy_fromiovec(skb_put(skb, len), iv, len);
+	if (memcpy_fromiovec(skb_put(skb, len), iv, len))
+		return -EFAULT;
 
 	skb->dev = tun->dev;
 	switch (tun->flags & TUN_TYPE_MASK) {
@@ -213,26 +215,29 @@ static __inline__ ssize_t tun_get_user(struct tun_struct *tun, struct iovec *iv,
 	return count;
 } 
 
+static inline size_t iov_total(const struct iovec *iv, unsigned long count)
+{
+	unsigned long i;
+	size_t len;
+
+	for (i = 0, len = 0; i < count; i++) 
+		len += iv[i].iov_len;
+
+	return len;
+}
+
 /* Writev */
 static ssize_t tun_chr_writev(struct file * file, const struct iovec *iv, 
 			      unsigned long count, loff_t *pos)
 {
-	struct tun_struct *tun = (struct tun_struct *)file->private_data;
-	unsigned long i;
-	size_t len;
+	struct tun_struct *tun = file->private_data;
 
 	if (!tun)
 		return -EBADFD;
 
 	DBG(KERN_INFO "%s: tun_chr_write %ld\n", tun->dev->name, count);
 
-	for (i = 0, len = 0; i < count; i++) {
-		if (verify_area(VERIFY_READ, iv[i].iov_base, iv[i].iov_len))
-			return -EFAULT;
-		len += iv[i].iov_len;
-	}
-
-	return tun_get_user(tun, (struct iovec *) iv, len);
+	return tun_get_user(tun, (struct iovec *) iv, iov_total(iv, count));
 }
 
 /* Write */
@@ -243,7 +248,7 @@ static ssize_t tun_chr_write(struct file * file, const char * buf,
 	return tun_chr_writev(file, &iv, 1, pos);
 }
 
-/* Put packet to the user space buffer (already verified) */
+/* Put packet to the user space buffer */
 static __inline__ ssize_t tun_put_user(struct tun_struct *tun,
 				       struct sk_buff *skb,
 				       struct iovec *iv, int len)
@@ -260,7 +265,8 @@ static __inline__ ssize_t tun_put_user(struct tun_struct *tun,
 			pi.flags |= TUN_PKT_STRIP;
 		}
  
-		memcpy_toiovec(iv, (void *) &pi, sizeof(pi));
+		if (memcpy_toiovec(iv, (void *) &pi, sizeof(pi)))
+			return -EFAULT;
 		total += sizeof(pi);
 	}       
 
@@ -279,22 +285,17 @@ static __inline__ ssize_t tun_put_user(struct tun_struct *tun,
 static ssize_t tun_chr_readv(struct file *file, const struct iovec *iv,
 			    unsigned long count, loff_t *pos)
 {
-	struct tun_struct *tun = (struct tun_struct *)file->private_data;
+	struct tun_struct *tun = file->private_data;
 	DECLARE_WAITQUEUE(wait, current);
 	struct sk_buff *skb;
 	ssize_t len, ret = 0;
-	unsigned long i;
 
 	if (!tun)
 		return -EBADFD;
 
 	DBG(KERN_INFO "%s: tun_chr_read\n", tun->dev->name);
 
-	for (i = 0, len = 0; i < count; i++) {
-		if (verify_area(VERIFY_WRITE, iv[i].iov_base, iv[i].iov_len))
-			return -EFAULT;
-		len += iv[i].iov_len;
-	}
+	len = iov_total(iv, count);
 	if (len < 0)
 		return -EINVAL;
 
@@ -341,7 +342,7 @@ static ssize_t tun_chr_read(struct file * file, char * buf,
 
 static void tun_setup(struct net_device *dev)
 {
-	struct tun_struct *tun = dev->priv;
+	struct tun_struct *tun = netdev_priv(dev);
 
 	skb_queue_head_init(&tun->readq);
 	init_waitqueue_head(&tun->read_wait);
@@ -413,7 +414,7 @@ static int tun_set_iff(struct file *file, struct ifreq *ifr)
 		if (!dev)
 			return -ENOMEM;
 
-		tun = dev->priv;
+		tun = netdev_priv(dev);
 		tun->dev = dev;
 		tun->flags = flags;
 
@@ -455,7 +456,7 @@ static int tun_set_iff(struct file *file, struct ifreq *ifr)
 static int tun_chr_ioctl(struct inode *inode, struct file *file, 
 			 unsigned int cmd, unsigned long arg)
 {
-	struct tun_struct *tun = (struct tun_struct *)file->private_data;
+	struct tun_struct *tun = file->private_data;
 
 	if (cmd == TUNSETIFF && !tun) {
 		struct ifreq ifr;
@@ -527,7 +528,7 @@ static int tun_chr_ioctl(struct inode *inode, struct file *file,
 
 static int tun_chr_fasync(int fd, struct file *file, int on)
 {
-	struct tun_struct *tun = (struct tun_struct *)file->private_data;
+	struct tun_struct *tun = file->private_data;
 	int ret;
 
 	if (!tun)
@@ -558,7 +559,7 @@ static int tun_chr_open(struct inode *inode, struct file * file)
 
 static int tun_chr_close(struct inode *inode, struct file *file)
 {
-	struct tun_struct *tun = (struct tun_struct *)file->private_data;
+	struct tun_struct *tun = file->private_data;
 
 	if (!tun)
 		return 0;
@@ -602,21 +603,22 @@ static struct file_operations tun_fops = {
 
 static struct miscdevice tun_miscdev = {
 	.minor = TUN_MINOR,
-	.name = "net/tun",
-	.fops = &tun_fops
+	.name = "tun",
+	.fops = &tun_fops,
+	.devfs_name = "net/tun",
 };
 
 int __init tun_init(void)
 {
+	int ret = 0;
+
 	printk(KERN_INFO "Universal TUN/TAP device driver %s " 
 	       "(C)1999-2002 Maxim Krasnyansky\n", TUN_VER);
 
-	if (misc_register(&tun_miscdev)) {
+	ret = misc_register(&tun_miscdev);
+	if (ret)
 		printk(KERN_ERR "tun: Can't register misc device %d\n", TUN_MINOR);
-		return -EIO;
-	}
-
-	return 0;
+	return ret;
 }
 
 void tun_cleanup(void)

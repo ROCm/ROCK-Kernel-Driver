@@ -326,6 +326,13 @@ acpi_get_object_info (
 			info.valid |= ACPI_VALID_ADR;
 		}
 
+		/* Execute the Device._sx_d methods */
+
+		status = acpi_ut_execute_sxds (node, info.highest_dstates);
+		if (ACPI_SUCCESS (status)) {
+			info.valid |= ACPI_VALID_STA;
+		}
+
 		status = AE_OK;
 	}
 

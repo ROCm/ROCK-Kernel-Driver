@@ -99,7 +99,7 @@ void __mark_inode_dirty(struct inode *inode, int flags)
 		 * reposition it (that would break s_dirty time-ordering).
 		 */
 		if (!was_dirty) {
-			mapping->dirtied_when = jiffies|1; /* 0 is special */
+			mapping->dirtied_when = jiffies;
 			list_move(&inode->i_list, &sb->s_dirty);
 		}
 	}
@@ -176,17 +176,15 @@ __sync_single_inode(struct inode *inode, struct writeback_control *wbc)
 		} else if (!list_empty(&mapping->dirty_pages)) {
 			/* Redirtied */
 			inode->i_state |= I_DIRTY_PAGES;
-			mapping->dirtied_when = jiffies|1;
+			mapping->dirtied_when = jiffies;
 			list_move(&inode->i_list, &sb->s_dirty);
 		} else if (inode->i_state & I_DIRTY) {
 			/* Redirtied */
-			mapping->dirtied_when = jiffies|1;
+			mapping->dirtied_when = jiffies;
 			list_move(&inode->i_list, &sb->s_dirty);
 		} else if (atomic_read(&inode->i_count)) {
-			mapping->dirtied_when = 0;
 			list_move(&inode->i_list, &inode_in_use);
 		} else {
-			mapping->dirtied_when = 0;
 			list_move(&inode->i_list, &inode_unused);
 		}
 	}
@@ -310,7 +308,7 @@ sync_sb_inodes(struct super_block *sb, struct writeback_control *wbc)
 		__iget(inode);
 		__writeback_single_inode(inode, wbc);
 		if (wbc->sync_mode == WB_SYNC_HOLD) {
-			mapping->dirtied_when = jiffies|1;
+			mapping->dirtied_when = jiffies;
 			list_move(&inode->i_list, &sb->s_dirty);
 		}
 		if (current_is_pdflush())

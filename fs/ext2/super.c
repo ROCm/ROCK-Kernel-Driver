@@ -563,6 +563,7 @@ static int ext2_fill_super(struct super_block *sb, void *data, int silent)
 	struct buffer_head * bh;
 	struct ext2_sb_info * sbi;
 	struct ext2_super_block * es;
+	struct inode *root;
 	unsigned long block, sb_block = 1;
 	unsigned long logic_sb_block = get_sb_block(&data);
 	unsigned long offset = 0;
@@ -815,15 +816,17 @@ static int ext2_fill_super(struct super_block *sb, void *data, int silent)
 	 */
 	sb->s_op = &ext2_sops;
 	sb->s_export_op = &ext2_export_ops;
-	sb->s_root = d_alloc_root(iget(sb, EXT2_ROOT_INO));
-	if (!sb->s_root || !S_ISDIR(sb->s_root->d_inode->i_mode) ||
-	    !sb->s_root->d_inode->i_blocks || !sb->s_root->d_inode->i_size) {
-		if (sb->s_root) {
-			dput(sb->s_root);
-			sb->s_root = NULL;
-			printk(KERN_ERR "EXT2-fs: corrupt root inode, run e2fsck\n");
-		} else
-			printk(KERN_ERR "EXT2-fs: get root inode failed\n");
+	root = iget(sb, EXT2_ROOT_INO);
+	sb->s_root = d_alloc_root(root);
+	if (!sb->s_root) {
+		iput(root);
+		printk(KERN_ERR "EXT2-fs: get root inode failed\n");
+		goto failed_mount2;
+	}
+	if (!S_ISDIR(root->i_mode) || !root->i_blocks || !root->i_size) {
+		dput(sb->s_root);
+		sb->s_root = NULL;
+		printk(KERN_ERR "EXT2-fs: corrupt root inode, run e2fsck\n");
 		goto failed_mount2;
 	}
 	if (EXT2_HAS_COMPAT_FEATURE(sb, EXT3_FEATURE_COMPAT_HAS_JOURNAL))

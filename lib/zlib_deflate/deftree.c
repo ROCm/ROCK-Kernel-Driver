@@ -217,10 +217,6 @@ static void send_bits(
 }
 #endif /* DEBUG_ZLIB */
 
-
-#define MAX(a,b) (a >= b ? a : b)
-/* the arguments must not have side effects */
-
 /* ===========================================================================
  * Initialize the various 'constant' tables. In a multi-threaded environment,
  * this function may be called by two threads concurrently, but this is
@@ -598,7 +594,7 @@ static void build_tree(
 
         /* Create a new node father of n and m */
         tree[node].Freq = tree[n].Freq + tree[m].Freq;
-        s->depth[node] = (uch) (MAX(s->depth[n], s->depth[m]) + 1);
+        s->depth[node] = (uch) (max(s->depth[n], s->depth[m]) + 1);
         tree[n].Dad = tree[m].Dad = (ush)node;
 #ifdef DUMP_BL_TREE
         if (tree == s->bl_tree) {

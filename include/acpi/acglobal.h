@@ -57,6 +57,12 @@
 #define ACPI_EXTERN extern
 #endif
 
+/*
+ * Keep local copies of these FADT-based registers.  NOTE: These globals
+ * are first in this file for alignment reasons on 64-bit systems.
+ */
+ACPI_EXTERN struct acpi_generic_address         acpi_gbl_xpm1a_enable;
+ACPI_EXTERN struct acpi_generic_address         acpi_gbl_xpm1b_enable;
 
 /*****************************************************************************
  *
@@ -73,6 +79,14 @@ extern      u32                                 acpi_dbg_layer;
 
 extern      u32                                 acpi_gbl_nesting_level;
 
+/*****************************************************************************
+ *
+ * Runtime configuration
+ *
+ ****************************************************************************/
+
+ACPI_EXTERN u8                                  acpi_gbl_create_osi_method;
+ACPI_EXTERN u8                                  acpi_gbl_all_methods_serialized;
 
 /*****************************************************************************
  *
@@ -97,6 +111,11 @@ ACPI_EXTERN FADT_DESCRIPTOR            *acpi_gbl_FADT;
 ACPI_EXTERN struct acpi_table_header           *acpi_gbl_DSDT;
 ACPI_EXTERN FACS_DESCRIPTOR            *acpi_gbl_FACS;
 ACPI_EXTERN struct acpi_common_facs             acpi_gbl_common_fACS;
+/*
+ * Since there may be multiple SSDTs and PSDTS, a single pointer is not
+ * sufficient; Therefore, there isn't one!
+ */
+
 
 /*
  * Handle both ACPI 1.0 and ACPI 2.0 Integer widths
@@ -106,17 +125,6 @@ ACPI_EXTERN struct acpi_common_facs             acpi_gbl_common_fACS;
 ACPI_EXTERN u8                                  acpi_gbl_integer_bit_width;
 ACPI_EXTERN u8                                  acpi_gbl_integer_byte_width;
 ACPI_EXTERN u8                                  acpi_gbl_integer_nybble_width;
-
-/* Keep local copies of these FADT-based registers */
-
-ACPI_EXTERN struct acpi_generic_address         acpi_gbl_xpm1a_enable;
-ACPI_EXTERN struct acpi_generic_address         acpi_gbl_xpm1b_enable;
-
-/*
- * Since there may be multiple SSDTs and PSDTS, a single pointer is not
- * sufficient; Therefore, there isn't one!
- */
-
 
 /*
  * ACPI Table info arrays
@@ -165,9 +173,11 @@ ACPI_EXTERN u8                                  acpi_gbl_events_initialized;
 extern u8                                       acpi_gbl_shutdown;
 extern u32                                      acpi_gbl_startup_flags;
 extern const u8                                 acpi_gbl_decode_to8bit[8];
-extern const char                              *acpi_gbl_db_sleep_states[ACPI_S_STATE_COUNT];
+extern const char                              *acpi_gbl_sleep_state_names[ACPI_S_STATE_COUNT];
+extern const char                              *acpi_gbl_highest_dstate_names[4];
 extern const struct acpi_opcode_info            acpi_gbl_aml_op_info[AML_NUM_OPCODES];
 extern const char                              *acpi_gbl_region_types[ACPI_NUM_PREDEFINED_REGIONS];
+extern const char                              *acpi_gbl_valid_osi_strings[ACPI_NUM_OSI_STRINGS];
 
 
 /*****************************************************************************
@@ -178,7 +188,7 @@ extern const char                              *acpi_gbl_region_types[ACPI_NUM_P
 
 #define NUM_NS_TYPES                    ACPI_TYPE_INVALID+1
 
-#if defined (ACPI_NO_METHOD_EXECUTION) || defined (ACPI_CONSTANT_EVAL_ONLY)
+#if !defined (ACPI_NO_METHOD_EXECUTION) || defined (ACPI_CONSTANT_EVAL_ONLY)
 #define NUM_PREDEFINED_NAMES            10
 #else
 #define NUM_PREDEFINED_NAMES            9

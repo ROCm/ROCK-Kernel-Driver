@@ -66,6 +66,8 @@ struct hpsb_host {
 	int update_config_rom;
 	struct timer_list delayed_reset;
 
+	unsigned int config_roms;
+
 	struct list_head addr_space;
 };
 
@@ -191,7 +193,7 @@ struct hpsb_host_driver {
 
 struct hpsb_host *hpsb_alloc_host(struct hpsb_host_driver *drv, size_t extra,
 				  struct device *dev);
-void hpsb_add_host(struct hpsb_host *host);
+int hpsb_add_host(struct hpsb_host *host);
 void hpsb_remove_host(struct hpsb_host *h);
 
 /* The following 2 functions are deprecated and will be removed when the

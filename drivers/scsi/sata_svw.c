@@ -103,13 +103,13 @@ static void k2_sata_tf_load(struct ata_port *ap, struct ata_taskfile *tf)
 		ata_wait_idle(ap);
 	}
 	if (is_addr && (tf->flags & ATA_TFLAG_LBA48)) {
-		writew(tf->feature | (((u16)tf->hob_feature) << 8), ioaddr->error_addr);
+		writew(tf->feature | (((u16)tf->hob_feature) << 8), ioaddr->feature_addr);
 		writew(tf->nsect | (((u16)tf->hob_nsect) << 8), ioaddr->nsect_addr);
 		writew(tf->lbal | (((u16)tf->hob_lbal) << 8), ioaddr->lbal_addr);
 		writew(tf->lbam | (((u16)tf->hob_lbam) << 8), ioaddr->lbam_addr);
 		writew(tf->lbah | (((u16)tf->hob_lbah) << 8), ioaddr->lbah_addr);
 	} else if (is_addr) {
-		writew(tf->feature, ioaddr->error_addr);
+		writew(tf->feature, ioaddr->feature_addr);
 		writew(tf->nsect, ioaddr->nsect_addr);
 		writew(tf->lbal, ioaddr->lbal_addr);
 		writew(tf->lbam, ioaddr->lbam_addr);
@@ -146,26 +146,8 @@ static void k2_sata_tf_read(struct ata_port *ap, struct ata_taskfile *tf)
 
 static u8 k2_stat_check_status(struct ata_port *ap)
 {
-       	return readl((void *) ap->ioaddr.cmdstat_addr);
+       	return readl((void *) ap->ioaddr.status_addr);
 }
-
-static void k2_sata_set_piomode (struct ata_port *ap, struct ata_device *adev,
-			      unsigned int pio)
-{
-	/* We need empty implementation, the core doesn't test for NULL
-	 * function pointer
-	 */
-}
-
-
-static void k2_sata_set_udmamode (struct ata_port *ap, struct ata_device *adev,
-			      unsigned int udma)
-{
-	/* We need empty implementation, the core doesn't test for NULL
-	 * function pointer
-	 */
-}
-
 
 #ifdef CONFIG_PPC_OF
 /*
@@ -239,14 +221,11 @@ static Scsi_Host_Template k2_sata_sht = {
 
 static struct ata_port_operations k2_sata_ops = {
 	.port_disable		= ata_port_disable,
-	.set_piomode		= k2_sata_set_piomode,
-	.set_udmamode		= k2_sata_set_udmamode,
 	.tf_load		= k2_sata_tf_load,
 	.tf_read		= k2_sata_tf_read,
 	.check_status		= k2_stat_check_status,
 	.exec_command		= ata_exec_command_mmio,
 	.phy_reset		= sata_phy_reset,
-	.phy_config		= pata_phy_config,	/* not a typo */
 	.bmdma_start            = ata_bmdma_start_mmio,
 	.fill_sg		= ata_fill_sg,
 	.eng_timeout		= ata_eng_timeout,
@@ -261,13 +240,16 @@ static void k2_sata_setup_port(struct ata_ioports *port, unsigned long base)
 {
 	port->cmd_addr		= base + K2_SATA_TF_CMD_OFFSET;
 	port->data_addr		= base + K2_SATA_TF_DATA_OFFSET;
+	port->feature_addr	=
 	port->error_addr	= base + K2_SATA_TF_ERROR_OFFSET;
 	port->nsect_addr	= base + K2_SATA_TF_NSECT_OFFSET;
 	port->lbal_addr		= base + K2_SATA_TF_LBAL_OFFSET;
 	port->lbam_addr		= base + K2_SATA_TF_LBAM_OFFSET;
 	port->lbah_addr		= base + K2_SATA_TF_LBAH_OFFSET;
 	port->device_addr	= base + K2_SATA_TF_DEVICE_OFFSET;
-	port->cmdstat_addr	= base + K2_SATA_TF_CMDSTAT_OFFSET;
+	port->command_addr	=
+	port->status_addr	= base + K2_SATA_TF_CMDSTAT_OFFSET;
+	port->altstatus_addr	=
 	port->ctl_addr		= base + K2_SATA_TF_CTL_OFFSET;
 	port->bmdma_addr	= base + K2_SATA_DMA_CMD_OFFSET;
 	port->scr_addr		= base + K2_SATA_SCR_STATUS_OFFSET;
@@ -305,6 +287,9 @@ static int k2_sata_init_one (struct pci_dev *pdev, const struct pci_device_id *e
 		goto err_out;
 
 	rc = pci_set_dma_mask(pdev, ATA_DMA_MASK);
+	if (rc)
+		goto err_out_regions;
+	rc = pci_set_consistent_dma_mask(pdev, ATA_DMA_MASK);
 	if (rc)
 		goto err_out_regions;
 
@@ -350,7 +335,7 @@ static int k2_sata_init_one (struct pci_dev *pdev, const struct pci_device_id *e
 	 * if we don't fill these
 	 */
 	probe_ent->pio_mask = 0x1f;
-	probe_ent->udma_mask = 0x3f;
+	probe_ent->udma_mask = 0x7f;
 
 	/* We have 4 ports per PCI function */
 	k2_sata_setup_port(&probe_ent->port[0], base + 0 * K2_SATA_PORT_OFFSET);
@@ -392,15 +377,8 @@ static struct pci_driver k2_sata_pci_driver = {
 
 static int __init k2_sata_init(void)
 {
-	int rc;
-
-	rc = pci_module_init(&k2_sata_pci_driver);
-	if (rc)
-		return rc;
-
-	return 0;
+	return pci_module_init(&k2_sata_pci_driver);
 }
-
 
 static void __exit k2_sata_exit(void)
 {

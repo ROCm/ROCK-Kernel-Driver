@@ -54,7 +54,7 @@ SYSCALL(sys_pipe,sys_pipe,sys32_pipe_wrapper)
 SYSCALL(sys_times,sys_times,compat_sys_times_wrapper)
 NI_SYSCALL							/* old prof syscall */
 SYSCALL(sys_brk,sys_brk,sys32_brk_wrapper)			/* 45 */
-SYSCALL(sys_setgid16,sys_ni_syscall,sys32_setgid16)		/* old setgid16 syscall*/
+SYSCALL(sys_setgid16,sys_ni_syscall,sys32_setgid16_wrapper)	/* old setgid16 syscall*/
 SYSCALL(sys_getgid16,sys_ni_syscall,sys32_getgid16)		/* old getgid16 syscall*/
 SYSCALL(sys_signal,sys_signal,sys32_signal_wrapper)
 SYSCALL(sys_geteuid16,sys_ni_syscall,sys32_geteuid16)		/* old geteuid16 syscall */
@@ -109,7 +109,7 @@ SYSCALL(sys_setpriority,sys_setpriority,sys32_setpriority_wrapper)
 NI_SYSCALL							/* old profil syscall */
 SYSCALL(sys_statfs,sys_statfs,compat_sys_statfs_wrapper)
 SYSCALL(sys_fstatfs,sys_fstatfs,compat_sys_fstatfs_wrapper)	/* 100 */
-SYSCALL(sys_ioperm,sys_ni_syscall,sys_ni_syscall)
+NI_SYSCALL							/* ioperm for i386 */
 SYSCALL(sys_socketcall,sys_socketcall,compat_sys_socketcall_wrapper)
 SYSCALL(sys_syslog,sys_syslog,sys32_syslog_wrapper)
 SYSCALL(sys_setitimer,sys_setitimer,compat_sys_setitimer_wrapper)
@@ -273,3 +273,5 @@ SYSCALL(sys_clock_getres,sys_clock_getres,sys32_clock_getres_wrapper)
 SYSCALL(sys_clock_nanosleep,sys_clock_nanosleep,sys32_clock_nanosleep_wrapper)
 NI_SYSCALL							/* reserved for vserver */
 SYSCALL(s390_fadvise64_64,sys_ni_syscall,sys32_fadvise64_64_wrapper)
+SYSCALL(sys_statfs64,sys_statfs64,compat_sys_statfs64_wrapper)
+SYSCALL(sys_fstatfs64,sys_fstatfs64,compat_sys_fstatfs64_wrapper)

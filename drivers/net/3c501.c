@@ -306,7 +306,7 @@ static int __init el1_probe1(struct net_device *dev, int ioaddr)
 		printk(KERN_DEBUG "%s", version);
 
 	memset(dev->priv, 0, sizeof(struct net_local));
-	lp=dev->priv;
+	lp = netdev_priv(dev);
 	spin_lock_init(&lp->lock);
 	
 	/*
@@ -341,7 +341,7 @@ static int el_open(struct net_device *dev)
 {
 	int retval;
 	int ioaddr = dev->base_addr;
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 	unsigned long flags;
 
 	if (el_debug > 2)
@@ -371,7 +371,7 @@ static int el_open(struct net_device *dev)
  
 static void el_timeout(struct net_device *dev)
 {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 	int ioaddr = dev->base_addr;
  
 	if (el_debug)
@@ -411,7 +411,7 @@ static void el_timeout(struct net_device *dev)
 
 static int el_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 	int ioaddr = dev->base_addr;
 	unsigned long flags;
 
@@ -524,7 +524,7 @@ static irqreturn_t el_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	int axsr;			/* Aux. status reg. */
 
 	ioaddr = dev->base_addr;
-	lp = (struct net_local *)dev->priv;
+	lp = netdev_priv(dev);
 
 	spin_lock(&lp->lock);
 	
@@ -698,7 +698,7 @@ out:
 
 static void el_receive(struct net_device *dev)
 {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 	int ioaddr = dev->base_addr;
 	int pkt_len;
 	struct sk_buff *skb;
@@ -764,7 +764,7 @@ static void el_receive(struct net_device *dev)
 
 static void  el_reset(struct net_device *dev)
 {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 	int ioaddr = dev->base_addr;
 
 	if (el_debug> 2)
@@ -828,7 +828,7 @@ static int el1_close(struct net_device *dev)
  
 static struct net_device_stats *el1_get_stats(struct net_device *dev)
 {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 	return &lp->stats;
 }
 

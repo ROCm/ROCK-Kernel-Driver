@@ -862,15 +862,14 @@ static void lp_detach (struct parport *port)
 }
 
 static struct parport_driver lp_driver = {
-	"lp",
-	lp_attach,
-	lp_detach,
-	NULL
+	.name = "lp",
+	.attach = lp_attach,
+	.detach = lp_detach,
 };
 
 int __init lp_init (void)
 {
-	int i;
+	int i, err = 0;
 
 	if (parport_nr[0] == LP_PARPORT_OFF)
 		return 0;
@@ -901,10 +900,15 @@ int __init lp_init (void)
 
 	devfs_mk_dir("printers");
 	lp_class = class_simple_create(THIS_MODULE, "printer");
+	if (IS_ERR(lp_class)) {
+		err = PTR_ERR(lp_class);
+		goto out_devfs;
+	}
 
 	if (parport_register_driver (&lp_driver)) {
 		printk (KERN_ERR "lp: unable to register with parport\n");
-		return -EIO;
+		err = -EIO;
+		goto out_class;
 	}
 
 	if (!lp_count) {
@@ -916,6 +920,13 @@ int __init lp_init (void)
 	}
 
 	return 0;
+
+out_class:
+	class_simple_destroy(lp_class);
+out_devfs:
+	devfs_remove("printers");
+	unregister_chrdev(LP_MAJOR, "lp");
+	return err;
 }
 
 static int __init lp_init_module (void)

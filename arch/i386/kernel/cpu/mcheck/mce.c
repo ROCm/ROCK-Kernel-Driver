@@ -7,6 +7,7 @@
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/smp.h>
 #include <linux/thread_info.h>
 
@@ -17,6 +18,8 @@
 
 int mce_disabled __initdata = 0;
 int nr_mce_banks;
+
+EXPORT_SYMBOL_GPL(nr_mce_banks);	/* non-fatal.o */
 
 /* Handle unconfigured int18 (should never happen) */
 static asmlinkage void unexpected_machine_check(struct pt_regs * regs, long error_code)

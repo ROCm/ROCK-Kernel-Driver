@@ -220,10 +220,14 @@ csum_partial_copy_generic:
 	/* Exception handlers. Very simple, zeroing is done in the wrappers */
 .Lbad_source:
 	movq (%rsp),%rax
+	testq %rax,%rax
+	jz   .Lende
 	movl $-EFAULT,(%rax)
 	jmp  .Lende
 	
 .Lbad_dest:
 	movq 8(%rsp),%rax
+	testq %rax,%rax
+	jz   .Lende	
 	movl $-EFAULT,(%rax)
 	jmp .Lende

@@ -14,8 +14,10 @@
 #define dma_map_sg		platform_dma_map_sg
 #define dma_unmap_single	platform_dma_unmap_single
 #define dma_unmap_sg		platform_dma_unmap_sg
-#define dma_sync_single		platform_dma_sync_single
-#define dma_sync_sg		platform_dma_sync_sg
+#define dma_sync_single_for_cpu	platform_dma_sync_single_for_cpu
+#define dma_sync_sg_for_cpu	platform_dma_sync_sg_for_cpu
+#define dma_sync_single_for_device platform_dma_sync_single_for_device
+#define dma_sync_sg_for_device	platform_dma_sync_sg_for_device
 
 #define dma_map_page(dev, pg, off, size, dir)				\
 	dma_map_single(dev, page_address(pg) + (off), (size), (dir))
@@ -27,8 +29,10 @@
  * See Documentation/DMA-API.txt for details.
  */
 
-#define dma_sync_single_range(dev, dma_handle, offset, size, dir)	\
-	dma_sync_single(dev, dma_handle, size, dir)
+#define dma_sync_single_range_for_cpu(dev, dma_handle, offset, size, dir)	\
+	dma_sync_single_for_cpu(dev, dma_handle, size, dir)
+#define dma_sync_single_range_for_device(dev, dma_handle, offset, size, dir)	\
+	dma_sync_single_for_device(dev, dma_handle, size, dir)
 
 #define dma_supported		platform_dma_supported
 

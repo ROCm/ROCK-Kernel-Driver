@@ -918,7 +918,7 @@ acpi_ns_get_node_by_path (
 
 	status = acpi_ut_acquire_mutex (ACPI_MTX_NAMESPACE);
 	if (ACPI_FAILURE (status)) {
-		return_ACPI_STATUS (status);
+		goto cleanup;
 	}
 
 	/* Setup lookup scope (search starting point) */
@@ -936,10 +936,10 @@ acpi_ns_get_node_by_path (
 				internal_path, acpi_format_exception (status)));
 	}
 
-	/* Cleanup */
-
 	(void) acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
 
+cleanup:
+	/* Cleanup */
 	if (internal_path) {
 		ACPI_MEM_FREE (internal_path);
 	}

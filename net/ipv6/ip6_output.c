@@ -816,9 +816,12 @@ int ip6_append_data(struct sock *sk, int getfrag(void *from, char *to, int offse
 		 * setup for corking
 		 */
 		if (opt) {
-			if (np->cork.opt == NULL)
+			if (np->cork.opt == NULL) {
 				np->cork.opt = kmalloc(opt->tot_len,
 						       sk->sk_allocation);
+				if (unlikely(np->cork.opt == NULL))
+					return -ENOBUFS;
+			}
 			memcpy(np->cork.opt, opt, opt->tot_len);
 			inet->cork.flags |= IPCORK_OPT;
 			/* need source address above miyazawa*/

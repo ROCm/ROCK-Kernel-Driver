@@ -305,7 +305,7 @@ static int vlandev_seq_show(struct seq_file *seq, void *offset)
 	struct net_device *vlandev = (struct net_device *) seq->private;
 	const struct vlan_dev_info *dev_info = VLAN_DEV_INFO(vlandev);
 	struct net_device_stats *stats;
-	static const char *fmt = "%30s %12lu\n";
+	static const char fmt[] = "%30s %12lu\n";
 	int i;
 
 	if ((vlandev == NULL) || (!(vlandev->priv_flags & IFF_802_1Q_VLAN)))

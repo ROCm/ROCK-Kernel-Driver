@@ -162,7 +162,7 @@ define rule_cc_o_c
 	$(if $($(quiet)cmd_cc_o_c),echo '  $($(quiet)cmd_cc_o_c)';)	  \
 	$(cmd_cc_o_c);							  \
 	$(cmd_modversions)						  \
-	scripts/fixdep $(depfile) $@ '$(cmd_cc_o_c)' > $(@D)/.$(@F).tmp;  \
+	scripts/basic/fixdep $(depfile) $@ '$(cmd_cc_o_c)' > $(@D)/.$(@F).tmp;  \
 	rm -f $(depfile);						  \
 	mv -f $(@D)/.$(@F).tmp $(@D)/.$(@F).cmd
 endef

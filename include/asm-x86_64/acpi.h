@@ -60,7 +60,7 @@ __acpi_acquire_global_lock (unsigned int *lock)
 	do {
 		old = *lock;
 		new = (((old & ~0x3) + 2) + ((old >> 1) & 0x1));
-		val = cmpxchg4_locked(lock, new, old);
+		val = cmpxchg(lock, old, new);
 	} while (unlikely (val != old));
 	return (new < 3) ? -1 : 0;
 }
@@ -72,7 +72,7 @@ __acpi_release_global_lock (unsigned int *lock)
 	do {
 		old = *lock;
 		new = old & ~0x3;
-		val = cmpxchg4_locked(lock, new, old);
+		val = cmpxchg(lock, old, new);
 	} while (unlikely (val != old));
 	return old & 0x1;
 }
@@ -104,9 +104,12 @@ __acpi_release_global_lock (unsigned int *lock)
 extern int acpi_lapic;
 extern int acpi_ioapic;
 extern int acpi_noirq;
+extern int acpi_strict;
 
 /* Fixmap pages to reserve for ACPI boot-time tables (see fixmap.h) */
 #define FIX_ACPI_PAGES 4
+
+extern int acpi_gsi_to_irq(u32 gsi, unsigned int *irq);
 
 #else	/* !CONFIG_ACPI_BOOT */
 #define acpi_lapic 0

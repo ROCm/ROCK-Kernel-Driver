@@ -6,7 +6,6 @@
  *  handling HPFS anode tree that contains file allocation info
  */
 
-#include <linux/buffer_head.h>
 #include "hpfs_fn.h"
 
 /* Find a sector in allocation tree */

@@ -148,7 +148,7 @@ static int btuart_write(unsigned int iobase, int fifo_size, __u8 *buf, int len)
 static void btuart_write_wakeup(btuart_info_t *info)
 {
 	if (!info) {
-		printk(KERN_WARNING "btuart_cs: Call of write_wakeup for unknown device.\n");
+		BT_ERR("Unknown device");
 		return;
 	}
 
@@ -195,7 +195,7 @@ static void btuart_receive(btuart_info_t *info)
 	int boguscount = 0;
 
 	if (!info) {
-		printk(KERN_WARNING "btuart_cs: Call of receive for unknown device.\n");
+		BT_ERR("Unknown device");
 		return;
 	}
 
@@ -209,7 +209,7 @@ static void btuart_receive(btuart_info_t *info)
 			info->rx_state = RECV_WAIT_PACKET_TYPE;
 			info->rx_count = 0;
 			if (!(info->rx_skb = bt_skb_alloc(HCI_MAX_FRAME_SIZE, GFP_ATOMIC))) {
-				printk(KERN_WARNING "btuart_cs: Can't allocate mem for new packet.\n");
+				BT_ERR("Can't allocate mem for new packet");
 				return;
 			}
 		}
@@ -238,7 +238,7 @@ static void btuart_receive(btuart_info_t *info)
 
 			default:
 				/* Unknown packet */
-				printk(KERN_WARNING "btuart_cs: Unknown HCI packet with type 0x%02x received.\n", info->rx_skb->pkt_type);
+				BT_ERR("Unknown HCI packet with type 0x%02x received", info->rx_skb->pkt_type);
 				info->hdev->stat.err_rx++;
 				clear_bit(HCI_RUNNING, &(info->hdev->flags));
 
@@ -309,7 +309,7 @@ static irqreturn_t btuart_interrupt(int irq, void *dev_inst, struct pt_regs *reg
 	int iir, lsr;
 
 	if (!info) {
-		printk(KERN_WARNING "btuart_cs: Call of irq %d for unknown device.\n", irq);
+		BT_ERR("Call of irq %d for unknown device", irq);
 		return IRQ_NONE;
 	}
 
@@ -325,7 +325,7 @@ static irqreturn_t btuart_interrupt(int irq, void *dev_inst, struct pt_regs *reg
 
 		switch (iir) {
 		case UART_IIR_RLSI:
-			printk(KERN_NOTICE "btuart_cs: RLSI\n");
+			BT_ERR("RLSI");
 			break;
 		case UART_IIR_RDI:
 			/* Receive interrupt */
@@ -338,7 +338,7 @@ static irqreturn_t btuart_interrupt(int irq, void *dev_inst, struct pt_regs *reg
 			}
 			break;
 		default:
-			printk(KERN_NOTICE "btuart_cs: Unhandled IIR=%#x\n", iir);
+			BT_ERR("Unhandled IIR=%#x", iir);
 			break;
 		}
 
@@ -365,7 +365,7 @@ static void btuart_change_speed(btuart_info_t *info, unsigned int speed)
 	int divisor;
 
 	if (!info) {
-		printk(KERN_WARNING "btuart_cs: Call of change speed for unknown device.\n");
+		BT_ERR("Unknown device");
 		return;
 	}
 
@@ -447,7 +447,7 @@ static int btuart_hci_send_frame(struct sk_buff *skb)
 	struct hci_dev *hdev = (struct hci_dev *)(skb->dev);
 
 	if (!hdev) {
-		printk(KERN_WARNING "btuart_cs: Frame for unknown HCI device (hdev=NULL).");
+		BT_ERR("Frame for unknown HCI device (hdev=NULL)");
 		return -ENODEV;
 	}
 
@@ -531,7 +531,7 @@ int btuart_open(btuart_info_t *info)
 	/* Initialize and register HCI device */
 	hdev = hci_alloc_dev();
 	if (!hdev) {
-		printk(KERN_WARNING "btuart_cs: Can't allocate HCI device.\n");
+		BT_ERR("Can't allocate HCI device");
 		return -ENOMEM;
 	}
 
@@ -550,7 +550,7 @@ int btuart_open(btuart_info_t *info)
 	hdev->owner = THIS_MODULE;
 	
 	if (hci_register_dev(hdev) < 0) {
-		printk(KERN_WARNING "btuart_cs: Can't register HCI device.\n");
+		BT_ERR("Can't register HCI device");
 		hci_free_dev(hdev);
 		return -ENODEV;
 	}
@@ -578,7 +578,7 @@ int btuart_close(btuart_info_t *info)
 	spin_unlock_irqrestore(&(info->lock), flags);
 
 	if (hci_unregister_dev(hdev) < 0)
-		printk(KERN_WARNING "btuart_cs: Can't unregister HCI device %s.\n", hdev->name);
+		BT_ERR("Can't unregister HCI device %s", hdev->name);
 
 	hci_free_dev(hdev);
 
@@ -777,7 +777,7 @@ next_entry:
 
 found_port:
 	if (i != CS_SUCCESS) {
-		printk(KERN_NOTICE "btuart_cs: No usable port range found. Giving up.\n");
+		BT_ERR("No usable port range found");
 		cs_error(link->handle, RequestIO, i);
 		goto failed;
 	}

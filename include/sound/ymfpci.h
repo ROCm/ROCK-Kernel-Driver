@@ -316,9 +316,8 @@ struct _snd_ymfpci {
 	struct gameport gameport;
 #endif
 
-	void *work_ptr;
-	dma_addr_t work_ptr_addr;
-	unsigned long work_ptr_size;
+	struct snd_dma_device dma_dev;
+	struct snd_dma_buffer work_ptr;
 
 	unsigned int bank_size_playback;
 	unsigned int bank_size_capture;
@@ -333,8 +332,7 @@ struct _snd_ymfpci {
 	dma_addr_t bank_base_capture_addr;
 	dma_addr_t bank_base_effect_addr;
 	dma_addr_t work_base_addr;
-	void *ac3_tmp_base;
-	dma_addr_t ac3_tmp_base_addr;
+	struct snd_dma_buffer ac3_tmp_base;
 
 	u32 *ctrl_playback;
 	snd_ymfpci_playback_bank_t *bank_playback[YDSXG_PLAYBACK_VOICES][2];

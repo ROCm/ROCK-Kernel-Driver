@@ -1,5 +1,5 @@
 /*
- *   Copyright (c) International Business Machines Corp., 2000-2002
+ *   Copyright (C) International Business Machines Corp., 2000-2004
  *
  *   This program is free software;  you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -128,7 +128,7 @@ int jfs_umount(struct super_block *sb)
 		 *
 		 * remove file system from log active file system list.
 		 */
-		rc = lmLogClose(sb, log);
+		rc = lmLogClose(sb);
 	}
 	jfs_info("UnMount JFS Complete: rc = %d", rc);
 	return rc;
@@ -167,7 +167,6 @@ int jfs_umount_rw(struct super_block *sb)
 	filemap_fdatawait(bdev_mapping);
 
 	updateSuper(sb, FM_CLEAN);
-	sbi->log = NULL;
 
-	return lmLogClose(sb, log);
+	return lmLogClose(sb);
 }

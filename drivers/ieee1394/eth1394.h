@@ -24,6 +24,8 @@
 #ifndef __ETH1394_H
 #define __ETH1394_H
 
+#include <linux/netdevice.h>
+
 #include "ieee1394.h"
 
 /* Register for incoming packets. This is 4096 bytes, which supports up to

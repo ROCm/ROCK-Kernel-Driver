@@ -203,8 +203,8 @@ static int __devinit snd_es968_pnp_detect(struct pnp_card_link *card,
 			return res;
 		dev++;
 		return 0;
-        }
-        return -ENODEV;
+	}
+	return -ENODEV;
 }
 
 static void __devexit snd_es968_pnp_remove(struct pnp_card_link * pcard)
@@ -225,15 +225,14 @@ static struct pnp_card_driver es968_pnpc_driver = {
 
 static int __init alsa_card_es968_init(void)
 {
-	int res = pnp_register_card_driver(&es968_pnpc_driver);
-	if (res == 0)
-	{
-		pnp_unregister_card_driver(&es968_pnpc_driver);
+	int cards = pnp_register_card_driver(&es968_pnpc_driver);
 #ifdef MODULE
+	if (cards == 0) {
+		pnp_unregister_card_driver(&es968_pnpc_driver);
 		snd_printk(KERN_ERR "no ES968 based soundcards found\n");
-#endif
 	}
-	return res < 0 ? res : 0;
+#endif
+	return cards ? 0 : -ENODEV;
 }
 
 static void __exit alsa_card_es968_exit(void)

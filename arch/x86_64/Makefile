@@ -38,7 +38,7 @@ OBJCOPYFLAGS	:= -O binary -R .note -R .comment -S
 LDFLAGS_vmlinux := -e stext
 
 cflags-$(CONFIG_MK8) += $(call check_gcc,-march=k8,)
-cflags-$(CONFIG_MPSC) += $(call check_gcc,-march=pentium4,)
+cflags-$(CONFIG_MPSC) += $(call check_gcc,-march=prescott,)
 CFLAGS += $(cflags-y)
 
 CFLAGS += -mno-red-zone
@@ -63,7 +63,7 @@ head-y := arch/x86_64/kernel/head.o arch/x86_64/kernel/head64.o arch/x86_64/kern
 libs-y 					+= arch/x86_64/lib/
 core-y					+= arch/x86_64/kernel/ arch/x86_64/mm/
 core-$(CONFIG_IA32_EMULATION)		+= arch/x86_64/ia32/
-drivers-$(CONFIG_PCI)			+= arch/i386/pci/
+drivers-$(CONFIG_PCI)			+= arch/x86_64/pci/
 drivers-$(CONFIG_OPROFILE)		+= arch/x86_64/oprofile/
 
 boot := arch/x86_64/boot

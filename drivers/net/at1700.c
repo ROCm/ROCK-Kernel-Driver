@@ -241,7 +241,7 @@ static int irq;
 static void cleanup_card(struct net_device *dev)
 {
 #ifdef CONFIG_MCA	
-	struct net_local *lp = dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 	if (lp->mca_slot)
 		mca_mark_as_unused(lp->mca_slot);
 #endif	
@@ -319,8 +319,8 @@ static int __init at1700_probe1(struct net_device *dev, int ioaddr)
 	char at1700_irqmap[8] = {3, 4, 5, 9, 10, 11, 14, 15};
 	unsigned int i, irq, is_fmv18x = 0, is_at1700 = 0;
 	int slot, ret = -ENODEV;
-	struct net_local *lp = dev->priv;
-	
+	struct net_local *lp = netdev_priv(dev);
+
 #ifndef CONFIG_X86_PC9800
 	if (!request_region(ioaddr, AT1700_IO_EXTENT, dev->name))
 		return -EBUSY;
@@ -618,7 +618,7 @@ static int __init read_eeprom(long ioaddr, int location)
 
 static int net_open(struct net_device *dev)
 {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 	int ioaddr = dev->base_addr;
 
 	/* Set the configuration register 0 to 32K 100ns. byte-wide memory, 16 bit
@@ -649,7 +649,7 @@ static int net_open(struct net_device *dev)
 
 static void net_tx_timeout (struct net_device *dev)
 {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 	int ioaddr = dev->base_addr;
 
 	printk ("%s: transmit timed out with status %04x, %s?\n", dev->name,
@@ -683,7 +683,7 @@ static void net_tx_timeout (struct net_device *dev)
 
 static int net_send_packet (struct sk_buff *skb, struct net_device *dev)
 {
-	struct net_local *lp = (struct net_local *) dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 	int ioaddr = dev->base_addr;
 	short length = ETH_ZLEN < skb->len ? skb->len : ETH_ZLEN;
 	short len = skb->len;
@@ -748,7 +748,7 @@ net_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	}
 
 	ioaddr = dev->base_addr;
-	lp = (struct net_local *)dev->priv;
+	lp = netdev_priv(dev);
 	
 	spin_lock (&lp->lock);
 	
@@ -808,7 +808,7 @@ net_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 static void
 net_rx(struct net_device *dev)
 {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 	int ioaddr = dev->base_addr;
 	int boguscount = 5;
 
@@ -891,7 +891,7 @@ net_rx(struct net_device *dev)
 /* The inverse routine to net_open(). */
 static int net_close(struct net_device *dev)
 {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 	int ioaddr = dev->base_addr;
 
 	netif_stop_queue(dev);
@@ -919,7 +919,7 @@ static int net_close(struct net_device *dev)
 static struct net_device_stats *
 net_get_stats(struct net_device *dev)
 {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 	return &lp->stats;
 }
 
@@ -931,7 +931,7 @@ static void
 set_rx_mode(struct net_device *dev)
 {
 	int ioaddr = dev->base_addr;
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 	unsigned char mc_filter[8];		 /* Multicast hash filter */
 	unsigned long flags;
 	int i;

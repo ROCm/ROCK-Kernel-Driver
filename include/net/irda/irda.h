@@ -61,7 +61,7 @@ typedef __u32 magic_t;
 
 #ifdef CONFIG_IRDA_DEBUG
 
-extern __u32 irda_debug;
+extern unsigned int irda_debug;
 
 /* use 0 for production, 1 for verification, >2 for debug */
 #define IRDA_DEBUG_LEVEL 0

@@ -407,6 +407,7 @@ int aac_sa_init(struct aac_dev *dev, unsigned long devnum)
 	dev->a_ops.adapter_disable_int = aac_sa_disable_interrupt;
 	dev->a_ops.adapter_notify = aac_sa_notify_adapter;
 	dev->a_ops.adapter_sync_cmd = sa_sync_cmd;
+	dev->a_ops.adapter_check_health = aac_sa_check_health;
 
 	dprintk(("FUNCDONE\n"));
 

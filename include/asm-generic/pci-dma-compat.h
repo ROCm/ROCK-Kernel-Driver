@@ -71,17 +71,37 @@ pci_unmap_sg(struct pci_dev *hwdev, struct scatterlist *sg,
 }
 
 static inline void
-pci_dma_sync_single(struct pci_dev *hwdev, dma_addr_t dma_handle,
+pci_dma_sync_single_for_cpu(struct pci_dev *hwdev, dma_addr_t dma_handle,
 		    size_t size, int direction)
 {
-	dma_sync_single(hwdev == NULL ? NULL : &hwdev->dev, dma_handle, size, (enum dma_data_direction)direction);
+	dma_sync_single_for_cpu(hwdev == NULL ? NULL : &hwdev->dev, dma_handle, size, (enum dma_data_direction)direction);
 }
 
 static inline void
-pci_dma_sync_sg(struct pci_dev *hwdev, struct scatterlist *sg,
+pci_dma_sync_single_for_device(struct pci_dev *hwdev, dma_addr_t dma_handle,
+		    size_t size, int direction)
+{
+	dma_sync_single_for_device(hwdev == NULL ? NULL : &hwdev->dev, dma_handle, size, (enum dma_data_direction)direction);
+}
+
+static inline void
+pci_dma_sync_sg_for_cpu(struct pci_dev *hwdev, struct scatterlist *sg,
 		int nelems, int direction)
 {
-	dma_sync_sg(hwdev == NULL ? NULL : &hwdev->dev, sg, nelems, (enum dma_data_direction)direction);
+	dma_sync_sg_for_cpu(hwdev == NULL ? NULL : &hwdev->dev, sg, nelems, (enum dma_data_direction)direction);
+}
+
+static inline void
+pci_dma_sync_sg_for_device(struct pci_dev *hwdev, struct scatterlist *sg,
+		int nelems, int direction)
+{
+	dma_sync_sg_for_device(hwdev == NULL ? NULL : &hwdev->dev, sg, nelems, (enum dma_data_direction)direction);
+}
+
+static inline int
+pci_dma_error(dma_addr_t dma_addr)
+{
+	return dma_error(dma_addr);
 }
 
 #endif

@@ -444,6 +444,7 @@ extern struct slot *cpqhp_find_slot		(struct controller *ctrl, u8 device);
 
 /* Global variables */
 extern int cpqhp_debug;
+extern int cpqhp_legacy_mode;
 extern struct controller *cpqhp_ctrl_list;
 extern struct pci_func *cpqhp_slot_list[256];
 

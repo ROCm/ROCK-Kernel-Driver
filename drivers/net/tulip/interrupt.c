@@ -8,7 +8,7 @@
 	This software may be used and distributed according to the terms
 	of the GNU General Public License, incorporated herein by reference.
 
-	Please refer to Documentation/DocBook/tulip.{pdf,ps,html}
+	Please refer to Documentation/DocBook/tulip-user.{pdf,ps,html}
 	for more information on this driver, or visit the project
 	Web page at http://sourceforge.net/projects/tulip/
 
@@ -63,7 +63,7 @@ unsigned int mit_table[MIT_SIZE+1] =
 
 int tulip_refill_rx(struct net_device *dev)
 {
-	struct tulip_private *tp = (struct tulip_private *)dev->priv;
+	struct tulip_private *tp = netdev_priv(dev);
 	int entry;
 	int refilled = 0;
 
@@ -109,7 +109,7 @@ void oom_timer(unsigned long data)
 
 int tulip_poll(struct net_device *dev, int *budget)
 {
-	struct tulip_private *tp = (struct tulip_private *)dev->priv;
+	struct tulip_private *tp = netdev_priv(dev);
 	int entry = tp->cur_rx % RX_RING_SIZE;
 	int rx_work_limit = *budget;
 	int received = 0;
@@ -191,9 +191,9 @@ int tulip_poll(struct net_device *dev, int *budget)
                                    && (skb = dev_alloc_skb(pkt_len + 2)) != NULL) {
                                        skb->dev = dev;
                                        skb_reserve(skb, 2);    /* 16 byte align the IP header */
-                                       pci_dma_sync_single(tp->pdev,
-                                                           tp->rx_buffers[entry].mapping,
-                                                           pkt_len, PCI_DMA_FROMDEVICE);
+                                       pci_dma_sync_single_for_cpu(tp->pdev,
+								   tp->rx_buffers[entry].mapping,
+								   pkt_len, PCI_DMA_FROMDEVICE);
 #if ! defined(__alpha__)
                                        eth_copy_and_sum(skb, tp->rx_buffers[entry].skb->tail,
                                                         pkt_len, 0);
@@ -203,6 +203,9 @@ int tulip_poll(struct net_device *dev, int *budget)
                                               tp->rx_buffers[entry].skb->tail,
                                               pkt_len);
 #endif
+                                       pci_dma_sync_single_for_device(tp->pdev,
+								      tp->rx_buffers[entry].mapping,
+								      pkt_len, PCI_DMA_FROMDEVICE);
                                } else {        /* Pass up the skb already on the Rx ring. */
                                        char *temp = skb_put(skb = tp->rx_buffers[entry].skb,
                                                             pkt_len);
@@ -211,7 +214,7 @@ int tulip_poll(struct net_device *dev, int *budget)
                                        if (tp->rx_buffers[entry].mapping !=
                                            le32_to_cpu(tp->rx_ring[entry].buffer1)) {
                                                printk(KERN_ERR "%s: Internal fault: The skbuff addresses "
-                                                      "do not match in tulip_rx: %08x vs. %llx %p / %p.\n",
+                                                      "do not match in tulip_rx: %08x vs. %08llx %p / %p.\n",
                                                       dev->name,
                                                       le32_to_cpu(tp->rx_ring[entry].buffer1),
                                                       (unsigned long long)tp->rx_buffers[entry].mapping,
@@ -354,7 +357,7 @@ done:
 
 static int tulip_rx(struct net_device *dev)
 {
-	struct tulip_private *tp = (struct tulip_private *)dev->priv;
+	struct tulip_private *tp = netdev_priv(dev);
 	int entry = tp->cur_rx % RX_RING_SIZE;
 	int rx_work_limit = tp->dirty_rx + RX_RING_SIZE - tp->cur_rx;
 	int received = 0;
@@ -412,9 +415,9 @@ static int tulip_rx(struct net_device *dev)
 				&& (skb = dev_alloc_skb(pkt_len + 2)) != NULL) {
 				skb->dev = dev;
 				skb_reserve(skb, 2);	/* 16 byte align the IP header */
-				pci_dma_sync_single(tp->pdev,
-						    tp->rx_buffers[entry].mapping,
-						    pkt_len, PCI_DMA_FROMDEVICE);
+				pci_dma_sync_single_for_cpu(tp->pdev,
+							    tp->rx_buffers[entry].mapping,
+							    pkt_len, PCI_DMA_FROMDEVICE);
 #if ! defined(__alpha__)
 				eth_copy_and_sum(skb, tp->rx_buffers[entry].skb->tail,
 						 pkt_len, 0);
@@ -424,6 +427,9 @@ static int tulip_rx(struct net_device *dev)
 				       tp->rx_buffers[entry].skb->tail,
 				       pkt_len);
 #endif
+				pci_dma_sync_single_for_device(tp->pdev,
+							       tp->rx_buffers[entry].mapping,
+							       pkt_len, PCI_DMA_FROMDEVICE);
 			} else { 	/* Pass up the skb already on the Rx ring. */
 				char *temp = skb_put(skb = tp->rx_buffers[entry].skb,
 						     pkt_len);
@@ -465,7 +471,7 @@ static inline unsigned int phy_interrupt (struct net_device *dev)
 {
 #ifdef __hppa__
 	int csr12 = inl(dev->base_addr + CSR12) & 0xff;
-	struct tulip_private *tp = (struct tulip_private *)dev->priv;
+	struct tulip_private *tp = netdev_priv(dev);
 
 	if (csr12 != tp->csr12_shadow) {
 		/* ack interrupt */
@@ -490,7 +496,7 @@ static inline unsigned int phy_interrupt (struct net_device *dev)
 irqreturn_t tulip_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 {
 	struct net_device *dev = (struct net_device *)dev_instance;
-	struct tulip_private *tp = (struct tulip_private *)dev->priv;
+	struct tulip_private *tp = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 	int csr5;
 	int missed;

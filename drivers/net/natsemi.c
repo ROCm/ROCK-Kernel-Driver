@@ -175,6 +175,8 @@
 #define DRV_VERSION	"1.07+LK1.0.17"
 #define DRV_RELDATE	"Sep 27, 2002"
 
+#define RX_OFFSET	2
+
 /* Updated to recommendations in pci-skeleton v2.03. */
 
 /* The user-configurable values.
@@ -1467,13 +1469,14 @@ static void refill_rx(struct net_device *dev)
 		struct sk_buff *skb;
 		int entry = np->dirty_rx % RX_RING_SIZE;
 		if (np->rx_skbuff[entry] == NULL) {
-			skb = dev_alloc_skb(np->rx_buf_sz);
+			unsigned int buflen = np->rx_buf_sz + RX_OFFSET;
+			skb = dev_alloc_skb(buflen);
 			np->rx_skbuff[entry] = skb;
 			if (skb == NULL)
 				break; /* Better luck next round. */
 			skb->dev = dev; /* Mark as being used by this device. */
 			np->rx_dma[entry] = pci_map_single(np->pci_dev,
-				skb->data, skb->len, PCI_DMA_FROMDEVICE);
+				skb->tail, buflen, PCI_DMA_FROMDEVICE);
 			np->rx_ring[entry].addr = cpu_to_le32(np->rx_dma[entry]);
 		}
 		np->rx_ring[entry].cmd_status = cpu_to_le32(np->rx_buf_sz);
@@ -1543,6 +1546,7 @@ static void drain_tx(struct net_device *dev)
 static void drain_ring(struct net_device *dev)
 {
 	struct netdev_private *np = dev->priv;
+	unsigned int buflen = np->rx_buf_sz + RX_OFFSET;
 	int i;
 
 	/* Free all the skbuffs in the Rx queue. */
@@ -1551,7 +1555,7 @@ static void drain_ring(struct net_device *dev)
 		np->rx_ring[i].addr = 0xBADF00D0; /* An invalid address. */
 		if (np->rx_skbuff[i]) {
 			pci_unmap_single(np->pci_dev,
-				np->rx_dma[i], np->rx_skbuff[i]->len,
+				np->rx_dma[i], buflen,
 				PCI_DMA_FROMDEVICE);
 			dev_kfree_skb(np->rx_skbuff[i]);
 		}
@@ -1747,6 +1751,7 @@ static void netdev_rx(struct net_device *dev)
 	int entry = np->cur_rx % RX_RING_SIZE;
 	int boguscnt = np->dirty_rx + RX_RING_SIZE - np->cur_rx;
 	s32 desc_status = le32_to_cpu(np->rx_head_desc->cmd_status);
+	unsigned int buflen = np->rx_buf_sz + RX_OFFSET;
 
 	/* If the driver owns the next entry it's a new packet. Send it up. */
 	while (desc_status < 0) { /* e.g. & DescOwn */
@@ -1785,13 +1790,13 @@ static void netdev_rx(struct net_device *dev)
 			/* Check if the packet is long enough to accept
 			 * without copying to a minimally-sized skbuff. */
 			if (pkt_len < rx_copybreak
-			    && (skb = dev_alloc_skb(pkt_len + 2)) != NULL) {
+			    && (skb = dev_alloc_skb(pkt_len + RX_OFFSET)) != NULL) {
 				skb->dev = dev;
 				/* 16 byte align the IP header */
-				skb_reserve(skb, 2);
-				pci_dma_sync_single(np->pci_dev,
+				skb_reserve(skb, RX_OFFSET);
+				pci_dma_sync_single_for_cpu(np->pci_dev,
 					np->rx_dma[entry],
-					np->rx_skbuff[entry]->len,
+					buflen,
 					PCI_DMA_FROMDEVICE);
 #if HAS_IP_COPYSUM
 				eth_copy_and_sum(skb,
@@ -1801,10 +1806,13 @@ static void netdev_rx(struct net_device *dev)
 				memcpy(skb_put(skb, pkt_len),
 					np->rx_skbuff[entry]->tail, pkt_len);
 #endif
+				pci_dma_sync_single_for_device(np->pci_dev,
+					np->rx_dma[entry],
+					buflen,
+					PCI_DMA_FROMDEVICE);
 			} else {
 				pci_unmap_single(np->pci_dev, np->rx_dma[entry],
-					np->rx_skbuff[entry]->len,
-					PCI_DMA_FROMDEVICE);
+					buflen, PCI_DMA_FROMDEVICE);
 				skb_put(skb = np->rx_skbuff[entry], pkt_len);
 				np->rx_skbuff[entry] = NULL;
 			}

@@ -339,6 +339,30 @@ config SH_WDT
 	  To compile this driver as a module, choose M here: the
 	  module will be called shwdt.
 
+# SPARC64 Architecture
+
+config WATCHDOG_CP1XXX
+	tristate "CP1XXX Hardware Watchdog support"
+	depends on WATCHDOG && SPARC64 && PCI
+	---help---
+	  This is the driver for the hardware watchdog timers present on
+	  Sun Microsystems CompactPCI models CP1400 and CP1500.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called cpwatchdog.
+
+	  If you do not have a CompactPCI model CP1400 or CP1500, or
+	  another UltraSPARC-IIi-cEngine boardset with hardware watchdog,
+	  you should say N to this option.
+
+config WATCHDOG_RIO
+	tristate "RIO Hardware Watchdog support"
+	depends on WATCHDOG && SPARC64 && PCI
+	help
+	  Say Y here to support the hardware watchdog capability on Sun RIO
+	  machines.  The watchdog timeout period is normally one minute but
+	  can be changed with a boot-time parameter.
+
 #
 # ISA-based Watchdog Cards
 #
@@ -454,5 +478,27 @@ config WDT_501_PCI
 	  /dev/temperature yields one byte, the temperature in degrees
 	  Fahrenheit. This works only if you have a WDT501P watchdog board
 	  installed.
+
+#
+# USB-based Watchdog Cards
+#
+
+comment "USB-based Watchdog Cards"
+	depends on WATCHDOG && USB
+
+config USBPCWATCHDOG
+	tristate "Berkshire Products USB-PC Watchdog"
+	depends on WATCHDOG && USB
+	---help---
+	  This is the driver for the Berkshire Products USB-PC Watchdog card.
+	  This card simply watches your kernel to make sure it doesn't freeze,
+	  and if it does, it reboots your computer after a certain amount of
+	  time. The card can also monitor the internal temperature of the PC.
+	  More info is available at <http://www.berkprod.com/usb_pc_watchdog.htm>.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called pcwd_usb.
+
+	  Most people will say N.
 
 endmenu

@@ -246,7 +246,6 @@ nfs_coalesce_requests(struct list_head *head, struct list_head *dst,
  * nfs_scan_list - Scan a list for matching requests
  * @head: One of the NFS inode request lists
  * @dst: Destination list
- * @file: if set, ensure we match requests from this file
  * @idx_start: lower bound of page->index to scan
  * @npages: idx_start + npages sets the upper bound to scan.
  *
@@ -258,7 +257,6 @@ nfs_coalesce_requests(struct list_head *head, struct list_head *dst,
  */
 int
 nfs_scan_list(struct list_head *head, struct list_head *dst,
-	      struct file *file,
 	      unsigned long idx_start, unsigned int npages)
 {
 	struct list_head	*pos, *tmp;
@@ -275,9 +273,6 @@ nfs_scan_list(struct list_head *head, struct list_head *dst,
 	list_for_each_safe(pos, tmp, head) {
 
 		req = nfs_list_entry(pos);
-
-		if (file && req->wb_file != file)
-			continue;
 
 		if (req->wb_index < idx_start)
 			continue;

@@ -694,7 +694,7 @@ static inline void move_irq(int irq) { }
 #endif /* CONFIG_IRQBALANCE */
 
 #ifndef CONFIG_SMP
-void send_IPI_self(int vector)
+void fastcall send_IPI_self(int vector)
 {
 	unsigned int cfg;
 
@@ -2152,10 +2152,6 @@ static inline void check_timer(void)
 {
 	int pin1, pin2;
 	int vector;
-	unsigned int ver;
-
-	ver = apic_read(APIC_LVR);
-	ver = GET_APIC_VERSION(ver);
 
 	/*
 	 * get/set the timer IRQ vector:
@@ -2169,17 +2165,11 @@ static inline void check_timer(void)
 	 * mode for the 8259A whenever interrupts are routed
 	 * through I/O APICs.  Also IRQ0 has to be enabled in
 	 * the 8259A which implies the virtual wire has to be
-	 * disabled in the local APIC.  Finally timer interrupts
-	 * need to be acknowledged manually in the 8259A for
-	 * do_slow_timeoffset() and for the i82489DX when using
-	 * the NMI watchdog.
+	 * disabled in the local APIC.
 	 */
 	apic_write_around(APIC_LVT0, APIC_LVT_MASKED | APIC_DM_EXTINT);
 	init_8259A(1);
-	if (nmi_watchdog == NMI_IO_APIC && !APIC_INTEGRATED(ver))
-		timer_ack = 1;
-	else
-		timer_ack = !cpu_has_tsc;
+	timer_ack = 1;
 	enable_8259A_irq(0);
 
 	pin1 = find_isa_irq_pin(0, mp_INT);
@@ -2197,8 +2187,7 @@ static inline void check_timer(void)
 				disable_8259A_irq(0);
 				setup_nmi();
 				enable_8259A_irq(0);
-				if (check_nmi_watchdog() < 0);
-					timer_ack = !cpu_has_tsc;
+				check_nmi_watchdog();
 			}
 			return;
 		}
@@ -2221,8 +2210,7 @@ static inline void check_timer(void)
 				add_pin_to_irq(0, 0, pin2);
 			if (nmi_watchdog == NMI_IO_APIC) {
 				setup_nmi();
-				if (check_nmi_watchdog() < 0);
-					timer_ack = !cpu_has_tsc;
+				check_nmi_watchdog();
 			}
 			return;
 		}

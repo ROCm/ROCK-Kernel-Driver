@@ -163,7 +163,7 @@ config CPU_FREQ
 	  fly. This is a nice method to save battery power on notebooks,
 	  because the lower the clock speed, the less power the CPU consumes.
 
-	  For more information, take a look at linux/Documentation/cpufreq or
+	  For more information, take a look at linux/Documentation/cpu-freq or
 	  at <http://www.brodo.de/cpufreq/>
 
 	  If in doubt, say N.
@@ -609,7 +609,7 @@ config PPC_OF
 
 config PPC_GEN550
 	bool
-	depends on SANDPOINT || MCPN765 || SPRUCE
+	depends on SANDPOINT || MCPN765 || SPRUCE || PPLUS
 	default y
 
 config FORCE

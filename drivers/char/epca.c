@@ -1644,6 +1644,7 @@ int __init pc_init(void)
 
 	pc_driver->owner = THIS_MODULE;
 	pc_driver->name = "ttyD"; 
+	pc_driver->devfs_name = "tts/D";
 	pc_driver->major = DIGI_MAJOR; 
 	pc_driver->minor_start = 0;
 	pc_driver->type = TTY_DRIVER_TYPE_SERIAL;

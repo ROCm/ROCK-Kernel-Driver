@@ -58,6 +58,7 @@ static char *acpi_table_signatures[ACPI_TABLE_COUNT] = {
 	[ACPI_SSDT]		= "SSDT",
 	[ACPI_SPMI]		= "SPMI",
 	[ACPI_HPET]		= "HPET",
+	[ACPI_MCFG]		= "MCFG",
 };
 
 static char *mps_inti_flags_polarity[] = { "dfl", "high", "res", "low" };
@@ -385,8 +386,13 @@ acpi_table_parse (
 	for (i = 0; i < sdt_count; i++) {
 		if (sdt_entry[i].id != id)
 			continue;
-		handler(sdt_entry[i].pa, sdt_entry[i].size);
 		count++;
+		if (count == 1)
+			handler(sdt_entry[i].pa, sdt_entry[i].size);
+
+		else
+			printk(KERN_WARNING PREFIX "%d duplicate %s table ignored.\n",
+				count, acpi_table_signatures[id]);
 	}
 
 	return count;
@@ -550,6 +556,14 @@ acpi_table_get_sdt (
 	return 0;
 }
 
+/*
+ * acpi_table_init()
+ *
+ * find RSDP, find and checksum SDT/XSDT.
+ * checksum all tables, print SDT/XSDT
+ * 
+ * result: sdt_entry[] is initialized
+ */
 
 int __init
 acpi_table_init (void)

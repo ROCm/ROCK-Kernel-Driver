@@ -24,6 +24,7 @@
 #include <linux/smp_lock.h>
 #include <linux/delay.h>
 #include <linux/spinlock.h>
+#include <linux/mm.h>
 
 #include <asm/openprom.h>
 #include <asm/oplib.h>

@@ -76,8 +76,6 @@ static int qnx4_readdir(struct file *filp, void *dirent, filldir_t filldir)
 		}
 		brelse(bh);
 	}
-	update_atime(inode);
-
 out:
 	unlock_kernel();
 	return 0;

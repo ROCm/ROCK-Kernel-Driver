@@ -160,9 +160,10 @@ config X86_CPUID
 	  with major 203 and minors 0 to 31 for /dev/cpu/0/cpuid to
 	  /dev/cpu/31/cpuid.
 
+# disable it for opteron optimized builds because it pulls in ACPI_BOOT
 config X86_HT
 	bool
-	depends on SMP
+	depends on SMP && !MK8
 	default y
        
 config MATH_EMULATION
@@ -330,6 +331,11 @@ config PCI_DIRECT
 	depends on PCI
 	default y
 
+config PCI_MMCONFIG 
+	bool "Support mmconfig PCI config space access" 
+	depends on PCI
+	select ACPI_BOOT
+
 # the drivers/pci/msi.c code needs to be fixed first before enabling
 config PCI_USE_VECTOR
 	bool "Vector-based interrupt indexing"
@@ -381,6 +387,10 @@ config COMPAT
 	depends on IA32_EMULATION
 	default y
 
+config SYSVIPC_COMPAT
+	bool
+	depends on COMPAT && SYSVIPC
+	default y
 
 config UID16
 	bool

@@ -466,6 +466,17 @@ static int gen_rtc_read_proc(char *page, char **start, off_t off,
 	return len;
 }
 
+static int __init gen_rtc_proc_init(void)
+{
+	struct proc_dir_entry *r;
+
+	r = create_proc_read_entry("driver/rtc", 0, 0, gen_rtc_read_proc, NULL);
+	if (!r)
+		return -ENOMEM;
+	return 0;
+}
+#else
+static inline int gen_rtc_proc_init(void) { return 0; }
 #endif /* CONFIG_PROC_FS */
 
 
@@ -498,15 +509,14 @@ static int __init rtc_generic_init(void)
 	printk(KERN_INFO "Generic RTC Driver v%s\n", RTC_VERSION);
 
 	retval = misc_register(&rtc_gen_dev);
-	if(retval < 0)
+	if (retval < 0)
 		return retval;
 
-#ifdef CONFIG_PROC_FS
-	if((create_proc_read_entry ("driver/rtc", 0, 0, gen_rtc_read_proc, NULL)) == NULL){
+	retval = gen_rtc_proc_init();
+	if (retval) {
 		misc_deregister(&rtc_gen_dev);
-		return -ENOMEM;
+		return retval;
 	}
-#endif
 
 	return 0;
 }

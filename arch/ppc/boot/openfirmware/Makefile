@@ -162,7 +162,7 @@ zImage.initrd:	 $(images)/vmlinux.initrd.coff 		\
 		 $(images)/miboot.initrd.image
 	@echo '  kernel: $@ is ready ($<)'
 
-TFTPIMAGE	:= /tftpboot/zImage.
+TFTPIMAGE	:= /tftpboot/zImage
 
 .PHONY: znetboot znetboot.initrd
 znetboot:	$(images)/vmlinux.coff		\

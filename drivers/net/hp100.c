@@ -201,6 +201,7 @@ static struct eisa_device_id hp100_eisa_tbl[] = {
 	{ "HWP1990" }, /* HP J2577 */
 	{ "CPX0301" }, /* ReadyLink ENET100-VG4 */
 	{ "CPX0401" }, /* FreedomLine 100/VG */
+	{ "" }	       /* Mandatory final entry ! */
 };
 MODULE_DEVICE_TABLE(eisa, hp100_eisa_tbl);
 #endif
@@ -326,16 +327,21 @@ static __init const char *hp100_read_id(int ioaddr)
 	return str;
 }
 
-static __init int hp100_isa_probe1(struct net_device *dev, int addr)
+static __init int hp100_isa_probe1(struct net_device *dev, int ioaddr)
 {
 	const char *sig;
 	int i;
 
-	if (!request_region(addr, HP100_REGION_SIZE, "hp100"))
+	if (!request_region(ioaddr, HP100_REGION_SIZE, "hp100"))
 		goto err;
 
-	sig = hp100_read_id(addr);
-	release_region(addr, HP100_REGION_SIZE);
+	if (hp100_inw(HW_ID) != HP100_HW_ID_CASCADE) {
+		release_region(ioaddr, HP100_REGION_SIZE);
+		goto err;
+	}
+
+	sig = hp100_read_id(ioaddr);
+	release_region(ioaddr, HP100_REGION_SIZE);
 
 	if (sig == NULL)
 		goto err;
@@ -347,7 +353,7 @@ static __init int hp100_isa_probe1(struct net_device *dev, int addr)
 	}
 
 	if (i < ARRAY_SIZE(hp100_isa_tbl))
-		return hp100_probe1(dev, addr, HP100_BUS_ISA, NULL);
+		return hp100_probe1(dev, ioaddr, HP100_BUS_ISA, NULL);
  err:
 	return -ENODEV;
 
@@ -2856,7 +2862,7 @@ static int __init hp100_eisa_probe (struct device *gendev)
 	SET_MODULE_OWNER(dev);
 	SET_NETDEV_DEV(dev, &edev->dev);
 
-	err = hp100_probe1(dev, edev->base_addr, HP100_BUS_EISA, NULL);
+	err = hp100_probe1(dev, edev->base_addr + 0xC38, HP100_BUS_EISA, NULL);
 	if (err)
 		goto out1;
 

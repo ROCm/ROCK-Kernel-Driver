@@ -463,10 +463,9 @@ tipar_detach(struct parport *port)
 }
 
 static struct parport_driver tipar_driver = {
-	"tipar",
-	tipar_attach,
-	tipar_detach,
-	NULL
+	.name = "tipar",
+	.attach = tipar_attach,
+	.detach = tipar_detach,
 };
 
 int __init

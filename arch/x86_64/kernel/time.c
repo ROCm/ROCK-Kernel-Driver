@@ -26,6 +26,7 @@
 #include <linux/device.h>
 #include <linux/sysdev.h>
 #include <linux/bcd.h>
+#include <linux/kallsyms.h>
 #include <asm/pgtable.h>
 #include <asm/vsyscall.h>
 #include <asm/timex.h>
@@ -353,11 +354,11 @@ static irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	}
 
 	if (lost) {
-		if (report_lost_ticks)
+		if (report_lost_ticks) {
 			printk(KERN_WARNING "time.c: Lost %ld timer "
-			       "tick(s)! (rip %016lx)\n",
-			       (offset - vxtime.last) / hpet_tick - 1,
-			       regs->rip);
+			       "tick(s)! ", lost);
+			print_symbol("rip %s)\n", regs->rip);
+		}
 		jiffies += lost;
 	}
 
@@ -399,8 +400,19 @@ static irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	return IRQ_HANDLED;
 }
 
-/* RED-PEN: calculation is done in 32bits with multiply for performance
-   and could overflow, it may be better (but slower)to use an 64bit division. */
+static unsigned int cyc2ns_scale;
+#define CYC2NS_SCALE_FACTOR 10 /* 2^10, carefully chosen */
+
+static inline void set_cyc2ns_scale(unsigned long cpu_mhz)
+{
+	cyc2ns_scale = (1000 << CYC2NS_SCALE_FACTOR)/cpu_mhz;
+}
+
+static inline unsigned long long cycles_2_ns(unsigned long long cyc)
+{
+	return (cyc * cyc2ns_scale) >> CYC2NS_SCALE_FACTOR;
+}
+
 unsigned long long sched_clock(void)
 {
 	unsigned long a = 0;
@@ -420,7 +432,7 @@ unsigned long long sched_clock(void)
 	   purposes. */
 
 	rdtscll(a);
-	return (a * vxtime.tsc_quot) >> 32;
+	return cycles_2_ns(a);
 }
 
 unsigned long get_cmos_time(void)
@@ -527,6 +539,8 @@ static int time_cpufreq_notifier(struct notifier_block *nb, unsigned long val,
 		vxtime.tsc_quot = (1000L << 32) / cpu_khz;
 	}
 	
+	set_cyc2ns_scale(cpu_khz_ref / 1000);
+
 	return 0;
 }
  
@@ -725,6 +739,8 @@ void __init time_init(void)
 	rdtscll_sync(&vxtime.last_tsc);
 	setup_irq(0, &irq0);
 
+	set_cyc2ns_scale(cpu_khz / 1000);
+
 #ifdef CONFIG_CPU_FREQ
 	cpufreq_register_notifier(&time_cpufreq_notifier_block, 
 				  CPUFREQ_TRANSITION_NOTIFIER);
@@ -788,7 +804,7 @@ static int time_init_device(void)
 {
 	int error = sysdev_class_register(&pit_sysclass);
 	if (!error)
-		error = sys_device_register(&device_i8253);
+		error = sysdev_register(&device_i8253);
 	return error;
 }
 

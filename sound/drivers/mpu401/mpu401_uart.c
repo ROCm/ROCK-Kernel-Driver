@@ -528,9 +528,9 @@ int snd_mpu401_uart_new(snd_card_t * card, int device,
 	mpu->irq = irq;
 	mpu->irq_flags = irq_flags;
 	if (card->shortname[0])
-		snprintf(rmidi->name, sizeof(rmidi->name), "%s MPU-401", card->shortname);
+		snprintf(rmidi->name, sizeof(rmidi->name), "%s MIDI", card->shortname);
 	else
-		sprintf(rmidi->name, "MPU-401 (UART) %d-%d", card->number, device);
+		sprintf(rmidi->name, "MPU-401 MIDI %d-%d", card->number, device);
 	snd_rawmidi_set_ops(rmidi, SNDRV_RAWMIDI_STREAM_OUTPUT, &snd_mpu401_uart_output);
 	snd_rawmidi_set_ops(rmidi, SNDRV_RAWMIDI_STREAM_INPUT, &snd_mpu401_uart_input);
 	rmidi->info_flags |= SNDRV_RAWMIDI_INFO_OUTPUT |

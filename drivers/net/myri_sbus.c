@@ -435,9 +435,9 @@ static void myri_rx(struct myri_eth *mp, struct net_device *dev)
 
 		/* Check for errors. */
 		DRX(("rxd[%d]: %p len[%d] csum[%08x] ", entry, rxd, len, csum));
-		sbus_dma_sync_single(mp->myri_sdev,
-				     sbus_readl(&rxd->myri_scatters[0].addr),
-				     RX_ALLOC_SIZE, SBUS_DMA_FROMDEVICE);
+		sbus_dma_sync_single_for_cpu(mp->myri_sdev,
+					     sbus_readl(&rxd->myri_scatters[0].addr),
+					     RX_ALLOC_SIZE, SBUS_DMA_FROMDEVICE);
 		if (len < (ETH_HLEN + MYRI_PAD_LEN) || (skb->data[0] != MYRI_PAD_LEN)) {
 			DRX(("ERROR["));
 			mp->enet_stats.rx_errors++;
@@ -454,6 +454,10 @@ static void myri_rx(struct myri_eth *mp, struct net_device *dev)
 			drops++;
 			DRX(("DROP "));
 			mp->enet_stats.rx_dropped++;
+			sbus_dma_sync_single_for_device(mp->myri_sdev,
+							sbus_readl(&rxd->myri_scatters[0].addr),
+							RX_ALLOC_SIZE,
+							SBUS_DMA_FROMDEVICE);
 			sbus_writel(RX_ALLOC_SIZE, &rxd->myri_scatters[0].len);
 			sbus_writel(index, &rxd->ctx);
 			sbus_writel(1, &rxd->num_sg);
@@ -508,6 +512,10 @@ static void myri_rx(struct myri_eth *mp, struct net_device *dev)
 
 			/* Reuse original ring buffer. */
 			DRX(("reuse "));
+			sbus_dma_sync_single_for_device(mp->myri_sdev,
+							sbus_readl(&rxd->myri_scatters[0].addr),
+							RX_ALLOC_SIZE,
+							SBUS_DMA_FROMDEVICE);
 			sbus_writel(RX_ALLOC_SIZE, &rxd->myri_scatters[0].len);
 			sbus_writel(index, &rxd->ctx);
 			sbus_writel(1, &rxd->num_sg);

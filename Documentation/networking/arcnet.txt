@@ -186,7 +186,6 @@ loadable module. You can also say 'y' to "Generic ARCnet support" and 'm'
 to the chipset support if you wish.
 
 	make config
-	make dep
 	make clean	
 	make zImage
 	make modules

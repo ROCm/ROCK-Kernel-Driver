@@ -677,7 +677,6 @@ static void update_wall_time(unsigned long ticks)
 	if (xtime.tv_nsec >= 1000000000) {
 	    xtime.tv_nsec -= 1000000000;
 	    xtime.tv_sec++;
-	    time_interpolator_update(NSEC_PER_SEC);
 	    second_overflow();
 	}
 }
@@ -868,7 +867,7 @@ asmlinkage unsigned long sys_alarm(unsigned int seconds)
 	oldalarm = it_old.it_value.tv_sec;
 	/* ehhh.. We can't return 0 if we have an alarm pending.. */
 	/* And we'd better return too much than too little anyway */
-	if (it_old.it_value.tv_usec)
+	if ((!oldalarm && it_old.it_value.tv_usec) || it_old.it_value.tv_usec >= 500000)
 		oldalarm++;
 	return oldalarm;
 }
@@ -997,7 +996,7 @@ static void process_timeout(unsigned long __data)
  *
  * In all cases the return value is guaranteed to be non-negative.
  */
-signed long schedule_timeout(signed long timeout)
+fastcall signed long schedule_timeout(signed long timeout)
 {
 	struct timer_list timer;
 	unsigned long expire;
@@ -1223,7 +1222,73 @@ static void __devinit init_timers_cpu(int cpu)
 
 	base->timer_jiffies = jiffies;
 }
-	
+
+#ifdef CONFIG_HOTPLUG_CPU
+static int migrate_timer_list(tvec_base_t *new_base, struct list_head *head)
+{
+	struct timer_list *timer;
+
+	while (!list_empty(head)) {
+		timer = list_entry(head->next, struct timer_list, entry);
+		/* We're locking backwards from __mod_timer order here,
+		   beware deadlock. */
+		if (!spin_trylock(&timer->lock))
+			return 0;
+		list_del(&timer->entry);
+		internal_add_timer(new_base, timer);
+		timer->base = new_base;
+		spin_unlock(&timer->lock);
+	}
+	return 1;
+}
+
+static void __devinit migrate_timers(int cpu)
+{
+	tvec_base_t *old_base;
+	tvec_base_t *new_base;
+	int i;
+
+	BUG_ON(cpu_online(cpu));
+	old_base = &per_cpu(tvec_bases, cpu);
+	new_base = &get_cpu_var(tvec_bases);
+
+	local_irq_disable();
+again:
+	/* Prevent deadlocks via ordering by old_base < new_base. */
+	if (old_base < new_base) {
+		spin_lock(&new_base->lock);
+		spin_lock(&old_base->lock);
+	} else {
+		spin_lock(&old_base->lock);
+		spin_lock(&new_base->lock);
+	}
+
+	if (old_base->running_timer)
+		BUG();
+	for (i = 0; i < TVR_SIZE; i++)
+		if (!migrate_timer_list(new_base, old_base->tv1.vec + i))
+			goto unlock_again;
+	for (i = 0; i < TVN_SIZE; i++)
+		if (!migrate_timer_list(new_base, old_base->tv2.vec + i)
+		    || !migrate_timer_list(new_base, old_base->tv3.vec + i)
+		    || !migrate_timer_list(new_base, old_base->tv4.vec + i)
+		    || !migrate_timer_list(new_base, old_base->tv5.vec + i))
+			goto unlock_again;
+	spin_unlock(&old_base->lock);
+	spin_unlock(&new_base->lock);
+	local_irq_enable();
+	put_cpu_var(tvec_bases);
+	return;
+
+unlock_again:
+	/* Avoid deadlock with __mod_timer, by backing off. */
+	spin_unlock(&old_base->lock);
+	spin_unlock(&new_base->lock);
+	cpu_relax();
+	goto again;
+}
+#endif /* CONFIG_HOTPLUG_CPU */
+
 static int __devinit timer_cpu_notify(struct notifier_block *self, 
 				unsigned long action, void *hcpu)
 {
@@ -1232,6 +1297,11 @@ static int __devinit timer_cpu_notify(struct notifier_block *self,
 	case CPU_UP_PREPARE:
 		init_timers_cpu(cpu);
 		break;
+#ifdef CONFIG_HOTPLUG_CPU
+	case CPU_DEAD:
+		migrate_timers(cpu);
+		break;
+#endif
 	default:
 		break;
 	}

@@ -618,6 +618,7 @@ int ip_setsockopt(struct sock *sk, int level, int optname, char *optval, int opt
 		case IP_MSFILTER:
 		{
 			extern int sysctl_optmem_max;
+			extern int sysctl_igmp_max_msf;
 			struct ip_msfilter *msf;
 
 			if (optlen < IP_MSFILTER_SIZE(0))
@@ -636,9 +637,14 @@ int ip_setsockopt(struct sock *sk, int level, int optname, char *optval, int opt
 				kfree(msf);
 				break;
 			}
-			if (IP_MSFILTER_SIZE(msf->imsf_numsrc) < 
-			    IP_MSFILTER_SIZE(0) ||
-			    IP_MSFILTER_SIZE(msf->imsf_numsrc) > optlen) {
+			/* numsrc >= (1G-4) overflow in 32 bits */
+			if (msf->imsf_numsrc >= 0x3ffffffcU ||
+			    msf->imsf_numsrc > sysctl_igmp_max_msf) {
+				kfree(msf);
+				err = -ENOBUFS;
+				break;
+			}
+			if (IP_MSFILTER_SIZE(msf->imsf_numsrc) > optlen) {
 				kfree(msf);
 				err = -EINVAL;
 				break;
@@ -765,6 +771,8 @@ int ip_setsockopt(struct sock *sk, int level, int optname, char *optval, int opt
 		}
 		case MCAST_MSFILTER:
 		{
+			extern int sysctl_optmem_max;
+			extern int sysctl_igmp_max_msf;
 			struct sockaddr_in *psin;
 			struct ip_msfilter *msf = 0;
 			struct group_filter *gsf = 0;
@@ -772,6 +780,10 @@ int ip_setsockopt(struct sock *sk, int level, int optname, char *optval, int opt
 
 			if (optlen < GROUP_FILTER_SIZE(0))
 				goto e_inval;
+			if (optlen > sysctl_optmem_max) {
+				err = -ENOBUFS;
+				break;
+			}
 			gsf = (struct group_filter *)kmalloc(optlen,GFP_KERNEL);
 			if (gsf == 0) {
 				err = -ENOBUFS;
@@ -781,7 +793,13 @@ int ip_setsockopt(struct sock *sk, int level, int optname, char *optval, int opt
 			if (copy_from_user(gsf, optval, optlen)) {
 				goto mc_msf_out;
 			}
-			if (GROUP_FILTER_SIZE(gsf->gf_numsrc) < optlen) {
+			/* numsrc >= (4G-140)/128 overflow in 32 bits */
+			if (gsf->gf_numsrc >= 0x1ffffff ||
+			    gsf->gf_numsrc > sysctl_igmp_max_msf) {
+				err = -ENOBUFS;
+				goto mc_msf_out;
+			}
+			if (GROUP_FILTER_SIZE(gsf->gf_numsrc) > optlen) {
 				err = EINVAL;
 				goto mc_msf_out;
 			}

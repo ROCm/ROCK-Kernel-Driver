@@ -1043,7 +1043,9 @@ int snd_ad1848_pcm(ad1848_t *chip, int device, snd_pcm_t **rpcm)
 	pcm->info_flags = SNDRV_PCM_INFO_HALF_DUPLEX;
 	strcpy(pcm->name, snd_ad1848_chip_id(chip));
 
-	snd_pcm_lib_preallocate_isa_pages_for_all(pcm, 64*1024, chip->dma > 3 ? 128*1024 : 64*1024);
+	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_DEV,
+					      snd_dma_isa_data(),
+					      64*1024, chip->dma > 3 ? 128*1024 : 64*1024);
 
 	chip->pcm = pcm;
 	if (rpcm)

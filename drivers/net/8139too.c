@@ -113,6 +113,7 @@
 #include <linux/suspend.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>
+#include <asm/irq.h>
 
 #define RTL8139_DRIVER_NAME   DRV_NAME " Fast Ethernet driver " DRV_VERSION
 #define PFX DRV_NAME ": "
@@ -968,12 +969,11 @@ static int __devinit rtl8139_init_one (struct pci_dev *pdev,
 	if (i < 0)
 		return i;
 
-	tp = dev->priv;
-	ioaddr = tp->mmio_addr;
-
-	assert (ioaddr != NULL);
 	assert (dev != NULL);
+	tp = dev->priv;
 	assert (tp != NULL);
+	ioaddr = tp->mmio_addr;
+	assert (ioaddr != NULL);
 
 	addr_len = read_eeprom (ioaddr, 0, 8) == 0x8129 ? 8 : 6;
 	for (i = 0; i < 3; i++)

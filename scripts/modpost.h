@@ -31,7 +31,7 @@
 
 #if KERNEL_ELFDATA != HOST_ELFDATA
 
-static void __endian(const void *src, void *dest, unsigned int size)
+static inline void __endian(const void *src, void *dest, unsigned int size)
 {
 	unsigned int i;
 	for (i = 0; i < size; i++)
@@ -52,6 +52,9 @@ static void __endian(const void *src, void *dest, unsigned int size)
 #define TO_NATIVE(x) (x)
 
 #endif
+
+#define NOFAIL(ptr)   do_nofail((ptr), __FILE__, __LINE__, #ptr)
+void *do_nofail(void *ptr, const char *file, int line, const char *expr);
 
 struct buffer {
 	char *p;
@@ -95,4 +98,5 @@ void maybe_frob_version(const char *modfilename,
 			unsigned long modinfo_offset);
 
 void *grab_file(const char *filename, unsigned long *size);
+char* get_next_line(unsigned long *pos, void *file, unsigned long size);
 void release_file(void *file, unsigned long size);

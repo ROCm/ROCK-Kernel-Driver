@@ -257,8 +257,6 @@ static struct miscdevice wdt_miscdev = {
 
 static struct notifier_block wdt_notifier = {
 	.notifier_call = wdt_notify_sys,
-	.next = NULL,
-	.priority = 0,
 };
 
 static int __init
@@ -321,4 +319,4 @@ module_exit(wdt_exit);
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Pádraig Brady <P@draigBrady.com>");
 MODULE_DESCRIPTION("w38627hf WDT driver");
-
+MODULE_ALIAS_MISCDEV(WATCHDOG_MINOR);

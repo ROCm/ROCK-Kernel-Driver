@@ -82,7 +82,6 @@ extern unsigned long pci_dram_offset;
 #define insl(port, buf, nl)	_insl_ns((u32 *)((port)+_IO_BASE), (buf), (nl))
 #define outsl(port, buf, nl)	_outsl_ns((u32 *)((port)+_IO_BASE), (buf), (nl))
 
-#ifdef CONFIG_PPC_PMAC
 /*
  * On powermacs, we will get a machine check exception if we
  * try to read data from a non-existent I/O port.  Because the
@@ -94,7 +93,7 @@ extern unsigned long pci_dram_offset;
  * all PPC implementations tested so far.  The twi and isync are
  * needed on the 601 (in fact twi; sync works too), the isync and
  * nop are needed on 604[e|r], and any of twi, sync or isync will
- * work on 603[e], 750, 74x0.
+ * work on 603[e], 750, 74xx.
  * The twi creates an explicit data dependency on the returned
  * value which seems to be needed to make the 601 wait for the
  * load to finish.
@@ -140,27 +139,17 @@ extern __inline__ void name(unsigned int val, unsigned int port) \
 }
 
 __do_in_asm(inb, "lbzx")
+__do_out_asm(outb, "stbx")
+#ifdef CONFIG_APUS
+__do_in_asm(inw, "lhz%U1%X1")
+__do_in_asm(inl, "lwz%U1%X1")
+__do_out_asm(outl,"stw%U0%X0")
+__do_out_asm(outw, "sth%U0%X0")
+#else
 __do_in_asm(inw, "lhbrx")
 __do_in_asm(inl, "lwbrx")
-__do_out_asm(outb, "stbx")
 __do_out_asm(outw, "sthbrx")
 __do_out_asm(outl, "stwbrx")
-
-#elif defined(CONFIG_APUS)
-#define inb(port)		in_8((u8 *)((port)+_IO_BASE))
-#define outb(val, port)		out_8((u8 *)((port)+_IO_BASE), (val))
-#define inw(port)		in_be16((u16 *)((port)+_IO_BASE))
-#define outw(val, port)		out_be16((u16 *)((port)+_IO_BASE), (val))
-#define inl(port)		in_be32((u32 *)((port)+_IO_BASE))
-#define outl(val, port)		out_be32((u32 *)((port)+_IO_BASE), (val))
-
-#else /* not APUS or PMAC */
-#define inb(port)		in_8((u8 *)((port)+_IO_BASE))
-#define outb(val, port)		out_8((u8 *)((port)+_IO_BASE), (val))
-#define inw(port)		in_le16((u16 *)((port)+_IO_BASE))
-#define outw(val, port)		out_le16((u16 *)((port)+_IO_BASE), (val))
-#define inl(port)		in_le32((u32 *)((port)+_IO_BASE))
-#define outl(val, port)		out_le32((u32 *)((port)+_IO_BASE), (val))
 #endif
 
 #define inb_p(port)		inb((port))
@@ -291,12 +280,19 @@ extern inline void eieio(void)
 
 /*
  * 8, 16 and 32 bit, big and little endian I/O operations, with barrier.
+ *
+ * Read operations have additional twi & isync to make sure the read
+ * is actually performed (i.e. the data has come back) before we start
+ * executing any following instructions.
  */
 extern inline int in_8(volatile unsigned char *addr)
 {
 	int ret;
 
-	__asm__ __volatile__("lbz%U1%X1 %0,%1; eieio" : "=r" (ret) : "m" (*addr));
+	__asm__ __volatile__(
+		"lbz%U1%X1 %0,%1;\n"
+		"twi 0,%0,0;\n"
+		"isync" : "=r" (ret) : "m" (*addr));
 	return ret;
 }
 
@@ -309,7 +305,9 @@ extern inline int in_le16(volatile unsigned short *addr)
 {
 	int ret;
 
-	__asm__ __volatile__("lhbrx %0,0,%1; eieio" : "=r" (ret) :
+	__asm__ __volatile__("lhbrx %0,0,%1;\n"
+			     "twi 0,%0,0;\n"
+			     "isync" : "=r" (ret) :
 			      "r" (addr), "m" (*addr));
 	return ret;
 }
@@ -318,7 +316,9 @@ extern inline int in_be16(volatile unsigned short *addr)
 {
 	int ret;
 
-	__asm__ __volatile__("lhz%U1%X1 %0,%1; eieio" : "=r" (ret) : "m" (*addr));
+	__asm__ __volatile__("lhz%U1%X1 %0,%1;\n"
+			     "twi 0,%0,0;\n"
+			     "isync" : "=r" (ret) : "m" (*addr));
 	return ret;
 }
 
@@ -337,7 +337,9 @@ extern inline unsigned in_le32(volatile unsigned *addr)
 {
 	unsigned ret;
 
-	__asm__ __volatile__("lwbrx %0,0,%1; eieio" : "=r" (ret) :
+	__asm__ __volatile__("lwbrx %0,0,%1;\n"
+			     "twi 0,%0,0;\n"
+			     "isync" : "=r" (ret) :
 			     "r" (addr), "m" (*addr));
 	return ret;
 }
@@ -346,7 +348,9 @@ extern inline unsigned in_be32(volatile unsigned *addr)
 {
 	unsigned ret;
 
-	__asm__ __volatile__("lwz%U1%X1 %0,%1; eieio" : "=r" (ret) : "m" (*addr));
+	__asm__ __volatile__("lwz%U1%X1 %0,%1;\n"
+			     "twi 0,%0,0;\n"
+			     "isync" : "=r" (ret) : "m" (*addr));
 	return ret;
 }
 
@@ -417,7 +421,7 @@ extern void consistent_sync_page(struct page *page, unsigned long offset,
 #define dma_cache_wback_inv(_start,_size)	do { } while (0)
 
 #define consistent_alloc(gfp, size, handle)	NULL
-#define consistent_free(addr, size)		do { } while (0)
+#define consistent_free(addr)			do { } while (0)
 #define consistent_sync(addr, size, rw)		do { } while (0)
 #define consistent_sync_page(pg, off, sz, rw)	do { } while (0)
 

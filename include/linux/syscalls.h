@@ -386,24 +386,24 @@ asmlinkage long sys_getdents64(unsigned int fd,
 				unsigned int count);
 
 asmlinkage long sys_setsockopt(int fd, int level, int optname,
-				char *optval, int optlen);
+				char __user *optval, int optlen);
 asmlinkage long sys_getsockopt(int fd, int level, int optname,
 				char __user *optval, int __user *optlen);
-asmlinkage long sys_bind(int, struct sockaddr *, int);
-asmlinkage long sys_connect(int, struct sockaddr *, int);
-asmlinkage long sys_accept(int, struct sockaddr *, int *);
-asmlinkage long sys_getsockname(int, struct sockaddr *, int *);
-asmlinkage long sys_getpeername(int, struct sockaddr *, int *);
-asmlinkage long sys_send(int, void *, size_t, unsigned);
-asmlinkage long sys_sendto(int, void *, size_t, unsigned,
-				struct sockaddr *, int);
+asmlinkage long sys_bind(int, struct sockaddr __user *, int);
+asmlinkage long sys_connect(int, struct sockaddr __user *, int);
+asmlinkage long sys_accept(int, struct sockaddr __user *, int __user *);
+asmlinkage long sys_getsockname(int, struct sockaddr __user *, int __user *);
+asmlinkage long sys_getpeername(int, struct sockaddr __user *, int __user *);
+asmlinkage long sys_send(int, void __user *, size_t, unsigned);
+asmlinkage long sys_sendto(int, void __user *, size_t, unsigned,
+				struct sockaddr __user *, int);
 asmlinkage long sys_sendmsg(int fd, struct msghdr __user *msg, unsigned flags);
-asmlinkage long sys_recv(int, void *, size_t, unsigned);
-asmlinkage long sys_recvfrom(int, void *, size_t, unsigned,
-				struct sockaddr *, int *);
+asmlinkage long sys_recv(int, void __user *, size_t, unsigned);
+asmlinkage long sys_recvfrom(int, void __user *, size_t, unsigned,
+				struct sockaddr __user *, int __user *);
 asmlinkage long sys_recvmsg(int fd, struct msghdr __user *msg, unsigned flags);
 asmlinkage long sys_socket(int, int, int);
-asmlinkage long sys_socketpair(int, int, int, int [2]);
+asmlinkage long sys_socketpair(int, int, int, int __user *);
 asmlinkage long sys_socketcall(int call, unsigned long __user *args);
 asmlinkage long sys_listen(int, int);
 asmlinkage long sys_poll(struct pollfd __user *ufds, unsigned int nfds,

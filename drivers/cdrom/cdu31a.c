@@ -3203,12 +3203,15 @@ static struct gendisk *scd_gendisk;
 static char *load_mech[] __initdata =
     { "caddy", "tray", "pop-up", "unknown" };
 
-static void __init
+static int __init
 get_drive_configuration(unsigned short base_io,
 			unsigned char res_reg[], unsigned int *res_size)
 {
 	unsigned long retry_count;
 
+
+	if (!request_region(base_io, 4, "cdu31a"))
+		return 0;
 
 	/* Set the base address */
 	cdu31a_port = base_io;
@@ -3244,7 +3247,7 @@ get_drive_configuration(unsigned short base_io,
 		/* If attention is never seen probably not a CDU31a present */
 		if (!is_attention()) {
 			res_reg[0] = 0x20;
-			return;
+			goto out_err;
 		}
 #endif
 
@@ -3254,11 +3257,17 @@ get_drive_configuration(unsigned short base_io,
 		do_sony_cd_cmd(SONY_REQ_DRIVE_CONFIG_CMD,
 			       NULL,
 			       0, (unsigned char *) res_reg, res_size);
-		return;
+		if (*res_size <= 2 || (res_reg[0] & 0xf0) != 0)
+			goto out_err;
+		return 1;
 	}
 
 	/* Return an error */
 	res_reg[0] = 0x20;
+out_err:
+	release_region(cdu31a_port, 4);
+	cdu31a_port = 0;
+	return 0;
 }
 
 #ifndef MODULE
@@ -3307,9 +3316,7 @@ int __init cdu31a_init(void)
 	char msg[255];
 	char buf[40];
 	int i;
-	int drive_found;
 	int tmp_irq;
-
 
 	/*
 	 * According to Alex Freed (freed@europa.orion.adobe.com), this is
@@ -3323,51 +3330,32 @@ int __init cdu31a_init(void)
 		outb(0xe2, 0x9a01);
 	}
 
-	drive_found = 0;
-
 	/* Setting the base I/O address to 0xffff will disable it. */
-	if (cdu31a_port == 0xffff) {
-	} else if (cdu31a_port != 0) {
-		tmp_irq = cdu31a_irq;	/* Need IRQ 0 because we can't sleep here. */
+	if (cdu31a_port == 0xffff)
+		goto errout3;
+
+	if (cdu31a_port != 0) {
+		/* Need IRQ 0 because we can't sleep here. */
+		tmp_irq = cdu31a_irq;
 		cdu31a_irq = 0;
-
-		get_drive_configuration(cdu31a_port,
-					drive_config.exec_status,
-					&res_size);
-		if ((res_size > 2)
-		    && ((drive_config.exec_status[0] & 0xf0) == 0x00)) {
-			drive_found = 1;
-		}
-
+		if (!get_drive_configuration(cdu31a_port,
+					    drive_config.exec_status,
+					    &res_size))
+			goto errout3;
 		cdu31a_irq = tmp_irq;
 	} else {
 		cdu31a_irq = 0;
-		i = 0;
-		while ((cdu31a_addresses[i].base != 0)
-		       && (!drive_found)) {
-			if (check_region(cdu31a_addresses[i].base, 4)) {
-				i++;
-				continue;
-			}
-			get_drive_configuration(cdu31a_addresses[i].base,
-						drive_config.exec_status,
-						&res_size);
-			if ((res_size > 2)
-			    && ((drive_config.exec_status[0] & 0xf0) ==
-				0x00)) {
-				drive_found = 1;
+		for (i = 0; cdu31a_addresses[i].base; i++) {
+			if (get_drive_configuration(cdu31a_addresses[i].base,
+						     drive_config.exec_status,
+						     &res_size)) {
 				cdu31a_irq = cdu31a_addresses[i].int_num;
-			} else {
-				i++;
+				break;
 			}
 		}
+		if (!cdu31a_port)
+			goto errout3;
 	}
-
-	if (!drive_found)
-		goto errout3;
-
-	if (!request_region(cdu31a_port, 4, "cdu31a"))
-		goto errout3;
 
 	if (register_blkdev(MAJOR_NR, "cdu31a"))
 		goto errout2;

@@ -149,7 +149,7 @@ unx_marshal(struct rpc_task *task, u32 *p, int ruid)
 	struct rpc_clnt	*clnt = task->tk_client;
 	struct unx_cred	*cred = (struct unx_cred *) task->tk_msg.rpc_cred;
 	u32		*base, *hold;
-	int		i, n;
+	int		i;
 
 	*p++ = htonl(RPC_AUTH_UNIX);
 	base = p++;
@@ -158,10 +158,7 @@ unx_marshal(struct rpc_task *task, u32 *p, int ruid)
 	/*
 	 * Copy the UTS nodename captured when the client was created.
 	 */
-	n = clnt->cl_nodelen;
-	*p++ = htonl(n);
-	memcpy(p, clnt->cl_nodename, n);
-	p += (n + 3) >> 2;
+	p = xdr_encode_array(p, clnt->cl_nodename, clnt->cl_nodelen);
 
 	/* Note: we don't use real uid if it involves raising privilege */
 	if (ruid && cred->uc_puid != 0 && cred->uc_pgid != 0) {

@@ -162,7 +162,7 @@ static inline struct rw_semaphore *rwsem_down_failed_common(struct rw_semaphore 
 /*
  * wait for the read lock to be granted
  */
-struct rw_semaphore *rwsem_down_read_failed(struct rw_semaphore *sem)
+struct rw_semaphore fastcall *rwsem_down_read_failed(struct rw_semaphore *sem)
 {
 	struct rwsem_waiter waiter;
 
@@ -178,7 +178,7 @@ struct rw_semaphore *rwsem_down_read_failed(struct rw_semaphore *sem)
 /*
  * wait for the write lock to be granted
  */
-struct rw_semaphore *rwsem_down_write_failed(struct rw_semaphore *sem)
+struct rw_semaphore fastcall *rwsem_down_write_failed(struct rw_semaphore *sem)
 {
 	struct rwsem_waiter waiter;
 
@@ -195,7 +195,7 @@ struct rw_semaphore *rwsem_down_write_failed(struct rw_semaphore *sem)
  * handle waking up a waiter on the semaphore
  * - up_read has decremented the active part of the count if we come here
  */
-struct rw_semaphore *rwsem_wake(struct rw_semaphore *sem)
+struct rw_semaphore fastcall *rwsem_wake(struct rw_semaphore *sem)
 {
 	rwsemtrace(sem,"Entering rwsem_wake");
 
@@ -217,7 +217,7 @@ struct rw_semaphore *rwsem_wake(struct rw_semaphore *sem)
  * - caller incremented waiting part of count, and discovered it to be still negative
  * - just wake up any readers at the front of the queue
  */
-struct rw_semaphore *rwsem_downgrade_wake(struct rw_semaphore *sem)
+struct rw_semaphore fastcall *rwsem_downgrade_wake(struct rw_semaphore *sem)
 {
 	rwsemtrace(sem,"Entering rwsem_downgrade_wake");
 

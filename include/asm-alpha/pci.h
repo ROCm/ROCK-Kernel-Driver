@@ -88,7 +88,7 @@ extern void pci_free_consistent(struct pci_dev *, size_t, void *, dma_addr_t);
 /* Map a single buffer of the indicate size for PCI DMA in streaming
    mode.  The 32-bit PCI bus mastering address to use is returned.
    Once the device is given the dma address, the device owns this memory
-   until either pci_unmap_single or pci_dma_sync_single is performed.  */
+   until either pci_unmap_single or pci_dma_sync_single_for_cpu is performed.  */
 
 extern dma_addr_t pci_map_single(struct pci_dev *, void *, size_t, int);
 
@@ -142,28 +142,44 @@ extern int pci_map_sg(struct pci_dev *, struct scatterlist *, int, int);
 extern void pci_unmap_sg(struct pci_dev *, struct scatterlist *, int, int);
 
 /* Make physical memory consistent for a single streaming mode DMA
-   translation after a transfer.
+   translation after a transfer and device currently has ownership
+   of the buffer.
 
    If you perform a pci_map_single() but wish to interrogate the
    buffer using the cpu, yet do not wish to teardown the PCI dma
    mapping, you must call this function before doing so.  At the next
-   point you give the PCI dma address back to the card, the device
-   again owns the buffer.  */
+   point you give the PCI dma address back to the card, you must first
+   perform a pci_dma_sync_for_device, and then the device again owns
+   the buffer.  */
 
 static inline void
-pci_dma_sync_single(struct pci_dev *dev, dma_addr_t dma_addr, long size,
-		    int direction)
+pci_dma_sync_single_for_cpu(struct pci_dev *dev, dma_addr_t dma_addr, long size,
+			    int direction)
+{
+	/* Nothing to do.  */
+}
+
+static inline void
+pci_dma_sync_single_for_device(struct pci_dev *dev, dma_addr_t dma_addr, long size,
+			       int direction)
 {
 	/* Nothing to do.  */
 }
 
 /* Make physical memory consistent for a set of streaming mode DMA
-   translations after a transfer.  The same as pci_dma_sync_single but
-   for a scatter-gather list, same rules and usage.  */
+   translations after a transfer.  The same as pci_dma_sync_single_*
+   but for a scatter-gather list, same rules and usage.  */
 
 static inline void
-pci_dma_sync_sg(struct pci_dev *dev, struct scatterlist *sg, int nents,
-	        int direction)
+pci_dma_sync_sg_for_cpu(struct pci_dev *dev, struct scatterlist *sg, int nents,
+			int direction)
+{
+	/* Nothing to do.  */
+}
+
+static inline void
+pci_dma_sync_sg_for_device(struct pci_dev *dev, struct scatterlist *sg, int nents,
+			int direction)
 {
 	/* Nothing to do.  */
 }
@@ -184,8 +200,14 @@ extern dma64_addr_t pci_dac_page_to_dma(struct pci_dev *, struct page *, unsigne
 extern struct page *pci_dac_dma_to_page(struct pci_dev *, dma64_addr_t);
 extern unsigned long pci_dac_dma_to_offset(struct pci_dev *, dma64_addr_t);
 
-static __inline__ void
-pci_dac_dma_sync_single(struct pci_dev *pdev, dma64_addr_t dma_addr, size_t len, int direction)
+static inline void
+pci_dac_dma_sync_single_for_cpu(struct pci_dev *pdev, dma64_addr_t dma_addr, size_t len, int direction)
+{
+	/* Nothing to do. */
+}
+
+static inline void
+pci_dac_dma_sync_single_for_device(struct pci_dev *pdev, dma64_addr_t dma_addr, size_t len, int direction)
 {
 	/* Nothing to do. */
 }

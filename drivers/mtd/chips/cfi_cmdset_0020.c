@@ -1460,3 +1460,5 @@ static void __exit cfi_staa_exit(void)
 
 module_init(cfi_staa_init);
 module_exit(cfi_staa_exit);
+
+MODULE_LICENSE("GPL");

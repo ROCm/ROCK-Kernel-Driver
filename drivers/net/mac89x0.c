@@ -225,7 +225,7 @@ struct net_device * __init mac89x0_probe(int unit)
 		goto out;
 
 	/* Initialize the net_device structure. */
-	lp = (struct net_local *)dev->priv;
+	lp = netdev_priv(dev);
 
 	/* Fill in the 'dev' fields. */
 	dev->base_addr = ioaddr;
@@ -328,7 +328,7 @@ void __init reset_chip(struct net_device *dev)
 static int
 net_open(struct net_device *dev)
 {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 	int i;
 
 	/* Disable the interrupt for now */
@@ -392,7 +392,7 @@ net_send_packet(struct sk_buff *skb, struct net_device *dev)
 	if (test_and_set_bit(0, (void*)&dev->tbusy) != 0)
 		printk("%s: Transmitter access conflict.\n", dev->name);
 	else {
-		struct net_local *lp = (struct net_local *)dev->priv;
+		struct net_local *lp = netdev_priv(dev);
 		unsigned long flags;
 
 		if (net_debug > 3)
@@ -446,7 +446,7 @@ static irqreturn_t net_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 	dev->interrupt = 1;
 
 	ioaddr = dev->base_addr;
-	lp = (struct net_local *)dev->priv;
+	lp = netdev_priv(dev);
 
 	/* we MUST read all the events out of the ISQ, otherwise we'll never
            get interrupted again.  As a consequence, we can't have any limit
@@ -505,7 +505,7 @@ static irqreturn_t net_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 static void
 net_rx(struct net_device *dev)
 {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 	struct sk_buff *skb;
 	int status, length;
 
@@ -571,7 +571,7 @@ net_close(struct net_device *dev)
 static struct net_device_stats *
 net_get_stats(struct net_device *dev)
 {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 	unsigned long flags;
 
 	local_irq_save(flags);
@@ -585,7 +585,7 @@ net_get_stats(struct net_device *dev)
 
 static void set_multicast_list(struct net_device *dev)
 {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 
 	if(dev->flags&IFF_PROMISC)
 	{

@@ -292,7 +292,24 @@ END_FTR_SECTION_IFSET(CPU_FTR_ALTIVEC)
 	addi	r6,r4,-THREAD	/* Convert THREAD to 'current' */
 	std	r6,PACACURRENT(r13)	/* Set new 'current' */
 
-	ld	r1,KSP(r4)	/* Load new stack pointer */
+	ld	r8,KSP(r4)	/* new stack pointer */
+BEGIN_FTR_SECTION
+	clrrdi	r6,r8,28	/* get its ESID */
+	clrrdi	r9,r1,28	/* get current sp ESID */
+	clrldi.	r0,r6,2		/* is new ESID c00000000? */
+	cmpd	cr1,r6,r9	/* or is new ESID the same as current ESID? */
+	cror	eq,4*cr1+eq,eq
+	beq	2f		/* if yes, don't slbie it */
+	oris	r6,r6,0x0800	/* set C (class) bit */
+	slbie	r6
+2:
+END_FTR_SECTION_IFSET(CPU_FTR_SLB)
+	clrrdi	r7,r8,THREAD_SHIFT	/* base of new stack */
+	addi	r7,r7,THREAD_SIZE-INT_FRAME_SIZE
+
+	mr	r1,r8		/* start using new stack pointer */
+	std	r7,PACAKSAVE(r13)
+
 	ld	r6,_CCR(r1)
 	mtcrf	0xFF,r6
 
@@ -357,7 +374,6 @@ _GLOBAL(ret_from_except)
 	addi	r0,r1,INT_FRAME_SIZE	/* size of frame */
 	ld	r4,PACACURRENT(r13)
 	std	r0,THREAD+KSP(r4)	/* save kernel stack pointer */
-	std	r1,PACAKSAVE(r13)	/* save exception stack pointer */
 
 	/*
 	 * r13 is our per cpu area, only restore it if we are returning to
@@ -387,6 +403,10 @@ restore:
 
 4:	stb	r5,PACAPROCENABLED(r4)
 #endif
+
+	ld	r3,_MSR(r1)
+	andi.	r3,r3,MSR_RI
+	beq-	unrecov_restore
 
 	ld	r3,_CTR(r1)
 	ld	r0,_LINK(r1)
@@ -438,6 +458,11 @@ do_work:
 	addi	r4,r1,STACK_FRAME_OVERHEAD
 	bl	.do_signal
 	b	.ret_from_except
+
+unrecov_restore:
+	addi	r3,r1,STACK_FRAME_OVERHEAD
+	bl	.unrecoverable_exception
+	b	unrecov_restore
 
 #ifdef CONFIG_PPC_PSERIES
 /*
@@ -570,11 +595,10 @@ _GLOBAL(enter_prom)
 	 * of all registers that it saves.  We therefore save those registers
 	 * PROM might touch to the stack.  (r0, r3-r13 are caller saved)
    	 */
-	SAVE_8GPRS(2, r1)		/* Save the TOC & incoming param(s) */
-	SAVE_GPR(13, r1)		/* Save paca */
-	SAVE_8GPRS(14, r1)		/* Save the non-volatiles */
-	SAVE_10GPRS(22, r1)		/* ditto */
-
+	SAVE_8GPRS(2, r1)
+	SAVE_GPR(13, r1)
+	SAVE_8GPRS(14, r1)
+	SAVE_10GPRS(22, r1)
 	mfcr	r4
 	std	r4,_CCR(r1)
 	mfctr	r5
@@ -592,20 +616,16 @@ _GLOBAL(enter_prom)
 	mfmsr	r11
 	std	r11,_MSR(r1)
 
-	/* Unfortunatly, the stack pointer is also clobbered, so it is saved
-	 * in the SPRG2 which allows us to restore our original state after
-	 * PROM returns.
-         */
-	mtspr	SPRG2,r1
-
-        /* put a relocation offset into r3 */
+	/* Get the PROM entrypoint */
         bl      .reloc_offset
 	LOADADDR(r12,prom)
 	sub	r12,r12,r3
-	ld	r12,PROMENTRY(r12)	/* get the prom->entry value */
+	ld	r12,PROMENTRY(r12)
 	mtlr	r12
 
-        mfmsr   r11			/* grab the current MSR */
+	/* Switch MSR to 32 bits mode
+	 */
+        mfmsr   r11
         li      r12,1
         rldicr  r12,r12,MSR_SF_LG,(63-MSR_SF_LG)
         andc    r11,r11,r12
@@ -615,22 +635,25 @@ _GLOBAL(enter_prom)
         mtmsrd  r11
         isync
 
-	REST_8GPRS(2, r1)		/* Restore the TOC & param(s) */
-	REST_GPR(13, r1)		/* Restore paca */
-	REST_8GPRS(14, r1)		/* Restore the non-volatiles */
-	REST_10GPRS(22, r1)		/* ditto */
-	blrl				/* Entering PROM here... */
+	/* Restore arguments & enter PROM here... */
+	ld	r3,GPR3(r1)
+	blrl
 
-	mfspr	r1,SPRG2		/* Restore the stack pointer */
-	ld	r6,_MSR(r1)		/* Restore the MSR */
-	mtmsrd	r6
+	/* Just make sure that r1 top 32 bits didn't get
+	 * corrupt by OF
+	 */
+	rldicl	r1,r1,0,32
+
+	/* Restore the MSR (back to 64 bits) */
+	ld	r0,_MSR(r1)
+	mtmsrd	r0
         isync
 
-	REST_GPR(2, r1)			/* Restore the TOC */
-	REST_GPR(13, r1)		/* Restore paca */
-	REST_8GPRS(14, r1)		/* Restore the non-volatiles */
-	REST_10GPRS(22, r1)		/* ditto */
-
+	/* Restore other registers */
+	REST_GPR(2, r1)
+	REST_GPR(13, r1)
+	REST_8GPRS(14, r1)
+	REST_10GPRS(22, r1)
 	ld	r4,_CCR(r1)
 	mtcr	r4
 	ld	r5,_CTR(r1)
@@ -645,9 +668,10 @@ _GLOBAL(enter_prom)
 	mtsrr0	r9
 	ld	r10,_SRR1(r1)
 	mtsrr1	r10
+	
         addi	r1,r1,PROM_FRAME_SIZE
-	ld	r0,16(r1)		/* get return address */
-
+	ld	r0,16(r1)
 	mtlr    r0
-        blr				/* return to caller */
+        blr
+	
 #endif	/* defined(CONFIG_PPC_PSERIES) */

@@ -398,8 +398,8 @@ static int find_group_other(struct super_block *sb, struct inode *parent)
 	 * That failed: try linear search for a free inode, even if that group
 	 * has no free blocks.
 	 */
-	group = parent_group + 1;
-	for (i = 2; i < ngroups; i++) {
+	group = parent_group;
+	for (i = 0; i < ngroups; i++) {
 		if (++group >= ngroups)
 			group = 0;
 		desc = ext3_get_group_desc (sb, group, &bh);

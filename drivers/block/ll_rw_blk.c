@@ -28,6 +28,11 @@
 #include <linux/slab.h>
 #include <linux/swap.h>
 
+/*
+ * for max sense size
+ */
+#include <scsi/scsi_cmnd.h>
+
 static void blk_unplug_work(void *data);
 static void blk_unplug_timeout(unsigned long data);
 
@@ -42,7 +47,10 @@ static kmem_cache_t *request_cachep;
 static LIST_HEAD(blk_plug_list);
 static spinlock_t blk_plug_lock __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
 
-static wait_queue_head_t congestion_wqh[2];
+static wait_queue_head_t congestion_wqh[2] = {
+		__WAIT_QUEUE_HEAD_INITIALIZER(congestion_wqh[0]),
+		__WAIT_QUEUE_HEAD_INITIALIZER(congestion_wqh[1])
+	};
 
 /*
  * Controlling structure to kblockd
@@ -104,6 +112,7 @@ static void clear_queue_congested(request_queue_t *q, int rw)
 
 	bit = (rw == WRITE) ? BDI_write_congested : BDI_read_congested;
 	clear_bit(bit, &q->backing_dev_info.state);
+	smp_mb__after_clear_bit();
 	if (waitqueue_active(wqh))
 		wake_up(wqh);
 }
@@ -1136,8 +1145,6 @@ static inline void __generic_unplug_device(request_queue_t *q)
 	if (!blk_remove_plug(q))
 		return;
 
-	del_timer(&q->unplug_timer);
-
 	/*
 	 * was plugged, fire request_fn if queue has stuff to do
 	 */
@@ -1188,13 +1195,23 @@ static void blk_unplug_timeout(unsigned long data)
  * Description:
  *   blk_start_queue() will clear the stop flag on the queue, and call
  *   the request_fn for the queue if it was in a stopped state when
- *   entered. Also see blk_stop_queue(). Must not be called from driver
- *   request function due to recursion issues. Queue lock must be held.
+ *   entered. Also see blk_stop_queue(). Queue lock must be held.
  **/
 void blk_start_queue(request_queue_t *q)
 {
 	clear_bit(QUEUE_FLAG_STOPPED, &q->queue_flags);
-	schedule_work(&q->unplug_work);
+
+	/*
+	 * one level of recursion is ok and is much faster than kicking
+	 * the unplug handling
+	 */
+	if (!test_and_set_bit(QUEUE_FLAG_REENTER, &q->queue_flags)) {
+		q->request_fn(q);
+		clear_bit(QUEUE_FLAG_REENTER, &q->queue_flags);
+	} else {
+		blk_plug_device(q);
+		schedule_work(&q->unplug_work);
+	}
 }
 
 EXPORT_SYMBOL(blk_start_queue);
@@ -1533,7 +1550,6 @@ static void freed_request(request_queue_t *q, int rw)
 	if (rl->count[rw] < queue_congestion_off_threshold(q))
 		clear_queue_congested(q, rw);
 	if (rl->count[rw]+1 <= q->nr_requests) {
-		smp_mb();
 		if (waitqueue_active(&rl->wait[rw]))
 			wake_up(&rl->wait[rw]);
 		if (!waitqueue_active(&rl->wait[rw]))
@@ -1615,6 +1631,7 @@ static struct request *get_request(request_queue_t *q, int rw, int gfp_mask)
 	rq->rl = rl;
 	rq->waiting = NULL;
 	rq->special = NULL;
+	rq->data_len = 0;
 	rq->data = NULL;
 	rq->sense = NULL;
 
@@ -1737,9 +1754,9 @@ void blk_insert_request(request_queue_t *q, struct request *rq,
 	/*
 	 * If command is tagged, release the tag
 	 */
-	if(reinsert) {
+	if (reinsert)
 		blk_requeue_request(q, rq);
-	} else {
+	else {
 		int where = ELEVATOR_INSERT_BACK;
 
 		if (at_head)
@@ -1751,11 +1768,152 @@ void blk_insert_request(request_queue_t *q, struct request *rq,
 		drive_stat_acct(rq, rq->nr_sectors, 1);
 		__elv_add_request(q, rq, where, 0);
 	}
-	q->request_fn(q);
+	if (blk_queue_plugged(q))
+		__generic_unplug_device(q);
+	else
+		q->request_fn(q);
 	spin_unlock_irqrestore(q->queue_lock, flags);
 }
 
 EXPORT_SYMBOL(blk_insert_request);
+
+/**
+ * blk_rq_map_user - map user data to a request, for REQ_BLOCK_PC usage
+ * @q:		request queue where request should be inserted
+ * @rw:		READ or WRITE data
+ * @ubuf:	the user buffer
+ * @len:	length of user data
+ *
+ * Description:
+ *    Data will be mapped directly for zero copy io, if possible. Otherwise
+ *    a kernel bounce buffer is used.
+ *
+ *    A matching blk_rq_unmap_user() must be issued at the end of io, while
+ *    still in process context.
+ */
+struct request *blk_rq_map_user(request_queue_t *q, int rw, void __user *ubuf,
+				unsigned int len)
+{
+	struct request *rq = NULL;
+	char *buf = NULL;
+	struct bio *bio;
+	int ret;
+
+	rq = blk_get_request(q, rw, __GFP_WAIT);
+	if (!rq)
+		return ERR_PTR(-ENOMEM);
+
+	bio = bio_map_user(q, NULL, (unsigned long) ubuf, len, rw == READ);
+	if (!bio) {
+		int bytes = (len + 511) & ~511;
+
+		buf = kmalloc(bytes, q->bounce_gfp | GFP_USER);
+		if (!buf) {
+			ret = -ENOMEM;
+			goto fault;
+		}
+
+		if (rw == WRITE) {
+			if (copy_from_user(buf, ubuf, len)) {
+				ret = -EFAULT;
+				goto fault;
+			}
+		} else
+			memset(buf, 0, len);
+	}
+
+	rq->bio = rq->biotail = bio;
+	if (rq->bio)
+		blk_rq_bio_prep(q, rq, bio);
+
+	rq->buffer = rq->data = buf;
+	rq->data_len = len;
+	return rq;
+fault:
+	if (buf)
+		kfree(buf);
+	if (bio)
+		bio_unmap_user(bio, 1);
+	if (rq)
+		blk_put_request(rq);
+
+	return ERR_PTR(ret);
+}
+
+EXPORT_SYMBOL(blk_rq_map_user);
+
+/**
+ * blk_rq_unmap_user - unmap a request with user data
+ * @rq:		request to be unmapped
+ * @ubuf:	user buffer
+ * @ulen:	length of user buffer
+ *
+ * Description:
+ *    Unmap a request previously mapped by blk_rq_map_user().
+ */
+int blk_rq_unmap_user(struct request *rq, void __user *ubuf, unsigned int ulen)
+{
+	const int read = rq_data_dir(rq) == READ;
+	int ret = 0;
+
+	if (rq->biotail)
+		bio_unmap_user(rq->biotail, read);
+	if (rq->buffer) {
+		if (read && copy_to_user(ubuf, rq->buffer, ulen))
+			ret = -EFAULT;
+		kfree(rq->buffer);
+	}
+
+	blk_put_request(rq);
+	return ret;
+}
+
+EXPORT_SYMBOL(blk_rq_unmap_user);
+
+/**
+ * blk_execute_rq - insert a request into queue for execution
+ * @q:		queue to insert the request in
+ * @bd_disk:	matching gendisk
+ * @rq:		request to insert
+ *
+ * Description:
+ *    Insert a fully prepared request at the back of the io scheduler queue
+ *    for execution.
+ */
+int blk_execute_rq(request_queue_t *q, struct gendisk *bd_disk,
+		   struct request *rq)
+{
+	DECLARE_COMPLETION(wait);
+	char sense[SCSI_SENSE_BUFFERSIZE];
+	int err = 0;
+
+	rq->rq_disk = bd_disk;
+
+	/*
+	 * we need an extra reference to the request, so we can look at
+	 * it after io completion
+	 */
+	rq->ref_count++;
+
+	if (!rq->sense) {
+		memset(sense, 0, sizeof(sense));
+		rq->sense = sense;
+		rq->sense_len = 0;
+	}
+
+	rq->flags |= REQ_NOMERGE;
+	rq->waiting = &wait;
+	elv_add_request(q, rq, ELEVATOR_INSERT_BACK, 1);
+	generic_unplug_device(q);
+	wait_for_completion(&wait);
+
+	if (rq->errors)
+		err = -EIO;
+
+	return err;
+}
+
+EXPORT_SYMBOL(blk_execute_rq);
 
 void drive_stat_acct(struct request *rq, int nr_sectors, int new_io)
 {
@@ -1885,15 +2043,17 @@ EXPORT_SYMBOL(blk_put_request);
  * If no queues are congested then just wait for the next request to be
  * returned.
  */
-void blk_congestion_wait(int rw, long timeout)
+long blk_congestion_wait(int rw, long timeout)
 {
+	long ret;
 	DEFINE_WAIT(wait);
 	wait_queue_head_t *wqh = &congestion_wqh[rw];
 
 	blk_run_queues();
 	prepare_to_wait(wqh, &wait, TASK_UNINTERRUPTIBLE);
-	io_schedule_timeout(timeout);
+	ret = io_schedule_timeout(timeout);
 	finish_wait(wqh, &wait);
+	return ret;
 }
 
 EXPORT_SYMBOL(blk_congestion_wait);
@@ -1926,6 +2086,15 @@ static int attempt_merge(request_queue_t *q, struct request *req,
 	 */
 	if (!q->merge_requests_fn(q, req, next))
 		return 0;
+
+	/*
+	 * At this point we have either done a back merge
+	 * or front merge. We need the smaller start_time of
+	 * the merged requests to be the current request
+	 * for accounting purposes.
+	 */
+	if (time_after(req->start_time, next->start_time))
+		req->start_time = next->start_time;
 
 	req->biotail->bi_next = next->bio;
 	req->biotail = next->biotail;
@@ -2108,23 +2277,20 @@ get_rq:
 		goto again;
 	}
 
+	req->flags |= REQ_CMD;
+
 	/*
-	 * first three bits are identical in rq->flags and bio->bi_rw,
-	 * see bio.h and blkdev.h
+	 * inherit FAILFAST from bio and don't stack up
+	 * retries for read ahead
 	 */
-	req->flags = (bio->bi_rw & 7) | REQ_CMD;
+	if (ra || test_bit(BIO_RW_FAILFAST, &bio->bi_rw))	
+		req->flags |= REQ_FAILFAST;
 
 	/*
 	 * REQ_BARRIER implies no merging, but lets make it explicit
 	 */
 	if (barrier)
 		req->flags |= (REQ_HARDBARRIER | REQ_NOMERGE);
-
-	/*
-	 * don't stack up retries for read ahead
-	 */
-	if (ra)
-		req->flags |= REQ_FAILFAST;
 
 	req->errors = 0;
 	req->hard_sector = req->sector = sector;
@@ -2671,8 +2837,6 @@ void kblockd_flush(void)
 
 int __init blk_dev_init(void)
 {
-	int i;
-
 	kblockd_workqueue = create_workqueue("kblockd");
 	if (!kblockd_workqueue)
 		panic("Failed to create kblockd\n");
@@ -2684,9 +2848,6 @@ int __init blk_dev_init(void)
 
 	blk_max_low_pfn = max_low_pfn;
 	blk_max_pfn = max_pfn;
-
-	for (i = 0; i < ARRAY_SIZE(congestion_wqh); i++)
-		init_waitqueue_head(&congestion_wqh[i]);
 	return 0;
 }
 

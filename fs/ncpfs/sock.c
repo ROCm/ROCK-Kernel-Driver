@@ -188,11 +188,14 @@ static inline void __ncptcp_abort(struct ncp_server *server) {
 
 static int ncpdgram_send(struct socket *sock, struct ncp_request_reply *req) {
 	struct msghdr msg;
+	struct iovec iov[3];
 	
+	/* sock_sendmsg updates iov pointers for us :-( */
+	memcpy(iov, req->tx_ciov, req->tx_iovlen * sizeof(iov[0]));
 	msg.msg_name = NULL;
 	msg.msg_namelen = 0;
 	msg.msg_control = NULL;
-	msg.msg_iov = req->tx_ciov;
+	msg.msg_iov = iov;
 	msg.msg_iovlen = req->tx_iovlen;
 	msg.msg_flags = MSG_DONTWAIT;
 	return sock_sendmsg(sock, &msg, req->tx_totallen);

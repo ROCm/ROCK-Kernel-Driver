@@ -118,10 +118,11 @@ ENTRY(vhpt_miss)
 #ifdef CONFIG_HUGETLB_PAGE
 	extr.u r26=r25,2,6
 	;;
-	cmp.eq p8,p0=HPAGE_SHIFT,r26
+	cmp.ne p8,p0=r18,r26
+	sub r27=r26,r18
 	;;
 (p8)	dep r25=r18,r25,2,6
-(p8)	shr r22=r22,HPAGE_SHIFT-PAGE_SHIFT
+(p8)	shr r22=r22,r27
 #endif
 	;;
 	cmp.eq p6,p7=5,r17			// is IFA pointing into to region 5?

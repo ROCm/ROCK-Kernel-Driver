@@ -186,7 +186,6 @@ static int reiserfs_readdir (struct file * filp, void * dirent, filldir_t filldi
     filp->f_pos = next_pos;
     pathrelse (&path_to_entry);
     reiserfs_check_path(&path_to_entry) ;
-    update_atime(inode) ;
  out:
     reiserfs_write_unlock(inode->i_sb);
     return ret;

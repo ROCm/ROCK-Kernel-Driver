@@ -195,19 +195,6 @@ done:
 }
 
 /*
- * Wait while server is in grace period
- */
-static inline int
-nlmclnt_grace_wait(struct nlm_host *host)
-{
-	if (!host->h_reclaiming)
-		interruptible_sleep_on_timeout(&host->h_gracewait, 10*HZ);
-	else
-		interruptible_sleep_on(&host->h_gracewait);
-	return signalled()? -ERESTARTSYS : 0;
-}
-
-/*
  * Allocate an NLM RPC call struct
  */
 struct nlm_rqst *
@@ -456,7 +443,7 @@ nlmclnt_lock(struct nlm_rqst *req, struct file_lock *fl)
 		}
 		if (status < 0)
 			return status;
-	} while (resp->status == NLM_LCK_BLOCKED);
+	} while (resp->status == NLM_LCK_BLOCKED && req->a_args.block);
 
 	if (resp->status == NLM_LCK_GRANTED) {
 		fl->fl_u.nfs_fl.state = host->h_state;

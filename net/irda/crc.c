@@ -14,6 +14,7 @@
  ********************************************************************/
 
 #include <net/irda/crc.h>
+#include <linux/module.h>
 
 /*
  * This mysterious table is just the CRC of each possible byte.  It can be
@@ -56,10 +57,12 @@ __u16 const irda_crc16_table[256] =
 	0xf78f, 0xe606, 0xd49d, 0xc514, 0xb1ab, 0xa022, 0x92b9, 0x8330,
 	0x7bc7, 0x6a4e, 0x58d5, 0x495c, 0x3de3, 0x2c6a, 0x1ef1, 0x0f78
 };
+EXPORT_SYMBOL(irda_crc16_table);
 
-unsigned short irda_calc_crc16( __u16 fcs, __u8 const *buf, size_t len) 
+__u16 irda_calc_crc16( __u16 fcs, __u8 const *buf, size_t len) 
 {
 	while (len--)
                 fcs = irda_fcs(fcs, *buf++);
 	return fcs;
 }
+EXPORT_SYMBOL(irda_calc_crc16);

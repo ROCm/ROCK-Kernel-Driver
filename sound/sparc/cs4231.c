@@ -1570,13 +1570,15 @@ int snd_cs4231_pcm(cs4231_t *chip)
 
 #ifdef EBUS_SUPPORT
 	if (chip->flags & CS4231_FLAG_EBUS) {
-		snd_pcm_lib_preallocate_pci_pages_for_all(chip->dev_u.pdev, pcm,
-							  64*1024, 128*1024);
+		snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_DEV,
+						      snd_dma_pci_data(chip->dev_u.pdev),
+						      64*1024, 128*1024);
 	} else {
 #endif
 #ifdef SBUS_SUPPORT
-		snd_pcm_lib_preallocate_sbus_pages_for_all(chip->dev_u.sdev, pcm,
-							   64*1024, 128*1024);
+		snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_SBUS,
+						      snd_dma_sbus_data(chip->dev_u.sdev),
+						      64*1024, 128*1024);
 #endif
 #ifdef EBUS_SUPPORT
 	}

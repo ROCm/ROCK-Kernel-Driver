@@ -77,9 +77,9 @@
 /*
  *  General driver includes.
  */
-#include "sym_misc.h"
 #include "sym_conf.h"
 #include "sym_defs.h"
+#include "sym_misc.h"
 
 /*
  * Configuration addendum for Linux.
@@ -111,6 +111,26 @@
  */
 #define sym_udelay(us)	udelay(us)
 #define sym_mdelay(ms)	mdelay(ms)
+
+/*
+ *  A 'read barrier' flushes any data that have been prefetched 
+ *  by the processor due to out of order execution. Such a barrier 
+ *  must notably be inserted prior to looking at data that have 
+ *  been DMAed, assuming that program does memory READs in proper 
+ *  order and that the device ensured proper ordering of WRITEs.
+ *
+ *  A 'write barrier' prevents any previous WRITEs to pass further 
+ *  WRITEs. Such barriers must be inserted each time another agent 
+ *  relies on ordering of WRITEs.
+ *
+ *  Note that, due to posting of PCI memory writes, we also must 
+ *  insert dummy PCI read transactions when some ordering involving 
+ *  both directions over the PCI does matter. PCI transactions are 
+ *  fully ordered in each direction.
+ */
+
+#define MEMORY_READ_BARRIER()	rmb()
+#define MEMORY_WRITE_BARRIER()	wmb()
 
 /*
  *  Let the compiler know about driver data structure names.
@@ -413,6 +433,8 @@ struct sym_slot {
 	char	inst_name[16];
 };
 
+struct sym_nvram;
+
 struct sym_device {
 	struct pci_dev *pdev;
 	struct sym_slot  s;
@@ -420,12 +442,7 @@ struct sym_device {
 	struct sym_nvram *nvram;
 	u_short device_id;
 	u_char host_id;
-#ifdef	SYM_CONF_PQS_PDS_SUPPORT
-	u_char pqs_pds;
-#endif
 };
-
-typedef struct sym_device *sdev_p;
 
 /*
  *  The driver definitions (sym_hipd.h) must know about a 

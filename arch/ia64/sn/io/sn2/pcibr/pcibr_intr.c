@@ -101,7 +101,7 @@ sn_dma_flush(unsigned long addr)
 {
 	nasid_t nasid;
 	int wid_num;
-	volatile struct sn_flush_device_list *p;
+	struct sn_flush_device_list *p;
 	int i,j;
 	int bwin;
 	unsigned long flags;

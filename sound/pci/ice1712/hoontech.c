@@ -153,6 +153,7 @@ static int __devinit snd_ice1712_hoontech_init(ice1712_t *ice)
 	int box, chn;
 
 	ice->num_total_dacs = 8;
+	ice->num_total_adcs = 8;
 
 	ice->hoontech_boxbits[0] = 
 	ice->hoontech_boxbits[1] = 

@@ -23,6 +23,7 @@ CONFIG_SYSVIPC=y
 # CONFIG_BSD_PROCESS_ACCT is not set
 CONFIG_SYSCTL=y
 CONFIG_LOG_BUF_SHIFT=16
+CONFIG_HOTPLUG=y
 CONFIG_IKCONFIG=y
 CONFIG_IKCONFIG_PROC=y
 CONFIG_EMBEDDED=y
@@ -72,7 +73,6 @@ CONFIG_IOMMU_SBA=y
 # CONFIG_SUPERIO is not set
 CONFIG_CHASSIS_LCD_LED=y
 # CONFIG_PDC_CHASSIS is not set
-CONFIG_HOTPLUG=y
 
 #
 # PCMCIA/CardBus support
@@ -102,6 +102,7 @@ CONFIG_BINFMT_ELF=y
 # Generic Driver Options
 #
 # CONFIG_FW_LOADER is not set
+CONFIG_DEBUG_DRIVER=y
 
 #
 # Memory Technology Devices (MTD)
@@ -116,7 +117,6 @@ CONFIG_BINFMT_ELF=y
 #
 # Plug and Play support
 #
-# CONFIG_PNP is not set
 
 #
 # Block devices
@@ -195,9 +195,15 @@ CONFIG_SCSI_SYM53C8XX_IOMAPPED=y
 CONFIG_SCSI_QLOGIC_FC=m
 # CONFIG_SCSI_QLOGIC_FC_FIRMWARE is not set
 CONFIG_SCSI_QLOGIC_1280=m
+CONFIG_SCSI_QLA2XXX=y
+# CONFIG_SCSI_QLA21XX is not set
+# CONFIG_SCSI_QLA22XX is not set
+CONFIG_SCSI_QLA2300=m
+CONFIG_SCSI_QLA2322=m
+CONFIG_SCSI_QLA6312=m
+CONFIG_SCSI_QLA6322=m
 # CONFIG_SCSI_DC395x is not set
 # CONFIG_SCSI_DC390T is not set
-# CONFIG_SCSI_NSP32 is not set
 CONFIG_SCSI_DEBUG=m
 
 #
@@ -215,6 +221,7 @@ CONFIG_MD_LINEAR=y
 CONFIG_MD_RAID0=y
 CONFIG_MD_RAID1=y
 # CONFIG_MD_RAID5 is not set
+# CONFIG_MD_RAID6 is not set
 # CONFIG_MD_MULTIPATH is not set
 # CONFIG_BLK_DEV_DM is not set
 
@@ -227,14 +234,17 @@ CONFIG_FUSION_ISENSE=m
 CONFIG_FUSION_CTL=m
 
 #
-# IEEE 1394 (FireWire) support (EXPERIMENTAL)
+# IEEE 1394 (FireWire) support
 #
 # CONFIG_IEEE1394 is not set
 
 #
 # I2O device support
 #
-# CONFIG_I2O is not set
+
+#
+# Macintosh device drivers
+#
 
 #
 # Networking support
@@ -362,7 +372,7 @@ CONFIG_LLC2=m
 #
 # Network testing
 #
-# CONFIG_NET_PKTGEN is not set
+CONFIG_NET_PKTGEN=m
 CONFIG_NETDEVICES=y
 
 #
@@ -391,9 +401,10 @@ CONFIG_TYPHOON=m
 #
 CONFIG_NET_TULIP=y
 CONFIG_DE2104X=m
-CONFIG_TULIP=y
+CONFIG_TULIP=m
 # CONFIG_TULIP_MWI is not set
 CONFIG_TULIP_MMIO=y
+# CONFIG_TULIP_NAPI is not set
 # CONFIG_DE4X5 is not set
 # CONFIG_WINBOND_840 is not set
 # CONFIG_DM9102 is not set
@@ -405,10 +416,12 @@ CONFIG_PCNET32=m
 # CONFIG_AMD8111_ETH is not set
 # CONFIG_ADAPTEC_STARFIRE is not set
 # CONFIG_B44 is not set
+# CONFIG_FORCEDETH is not set
 # CONFIG_DGRS is not set
 CONFIG_EEPRO100=m
 # CONFIG_EEPRO100_PIO is not set
 CONFIG_E100=m
+CONFIG_E100_NAPI=y
 # CONFIG_FEALNX is not set
 CONFIG_NATSEMI=m
 # CONFIG_NE2K_PCI is not set
@@ -418,6 +431,7 @@ CONFIG_8139TOO=m
 # CONFIG_8139TOO_TUNE_TWISTER is not set
 # CONFIG_8139TOO_8129 is not set
 # CONFIG_8139_OLD_RX_RESET is not set
+CONFIG_8139_RXBUF_IDX=1
 # CONFIG_SIS900 is not set
 CONFIG_EPIC100=m
 # CONFIG_SUNDANCE is not set
@@ -482,13 +496,13 @@ CONFIG_HERMES=m
 CONFIG_PLX_HERMES=m
 CONFIG_TMD_HERMES=m
 CONFIG_PCI_HERMES=m
+# CONFIG_ATMEL is not set
 
 #
 # Wireless 802.11b Pcmcia/Cardbus cards support
 #
 CONFIG_PCMCIA_HERMES=m
 CONFIG_AIRO_CS=m
-# CONFIG_PCMCIA_ATMEL is not set
 # CONFIG_PCMCIA_WL3501 is not set
 CONFIG_NET_WIRELESS=y
 
@@ -535,7 +549,7 @@ CONFIG_PCMCIA_XIRC2PS=m
 #
 # ISDN subsystem
 #
-# CONFIG_ISDN_BOOL is not set
+# CONFIG_ISDN is not set
 
 #
 # Telephony Support
@@ -602,25 +616,7 @@ CONFIG_PDC_CONSOLE=y
 CONFIG_SERIAL_CORE=y
 CONFIG_SERIAL_CORE_CONSOLE=y
 CONFIG_UNIX98_PTYS=y
-CONFIG_UNIX98_PTY_COUNT=256
-
-#
-# I2C support
-#
-# CONFIG_I2C is not set
-
-#
-# I2C Algorithms
-#
-
-#
-# I2C Hardware Bus support
-#
-
-#
-# I2C Hardware Sensors Chip support
-#
-# CONFIG_I2C_SENSOR is not set
+# CONFIG_LEGACY_PTYS is not set
 
 #
 # Mice
@@ -659,6 +655,15 @@ CONFIG_RAW_DRIVER=y
 CONFIG_MAX_RAW_DEVS=256
 
 #
+# I2C support
+#
+# CONFIG_I2C is not set
+
+#
+# Misc devices
+#
+
+#
 # Multimedia devices
 #
 # CONFIG_VIDEO_DEV is not set
@@ -676,7 +681,6 @@ CONFIG_MAX_RAW_DEVS=256
 #
 # Console display driver support
 #
-# CONFIG_VGA_CONSOLE is not set
 # CONFIG_MDA_CONSOLE is not set
 # CONFIG_STI_CONSOLE is not set
 CONFIG_DUMMY_CONSOLE_COLUMNS=160
@@ -692,6 +696,10 @@ CONFIG_DUMMY_CONSOLE=y
 # USB support
 #
 # CONFIG_USB is not set
+
+#
+# USB Gadget Support
+#
 # CONFIG_USB_GADGET is not set
 
 #
@@ -711,6 +719,7 @@ CONFIG_JFS_FS=m
 CONFIG_XFS_FS=m
 # CONFIG_XFS_RT is not set
 # CONFIG_XFS_QUOTA is not set
+# CONFIG_XFS_SECURITY is not set
 # CONFIG_XFS_POSIX_ACL is not set
 # CONFIG_MINIX_FS is not set
 # CONFIG_ROMFS_FS is not set
@@ -740,7 +749,6 @@ CONFIG_VFAT_FS=m
 CONFIG_PROC_FS=y
 CONFIG_PROC_KCORE=y
 # CONFIG_DEVFS_FS is not set
-CONFIG_DEVPTS_FS=y
 # CONFIG_DEVPTS_FS_XATTR is not set
 # CONFIG_TMPFS is not set
 # CONFIG_HUGETLBFS is not set
@@ -753,6 +761,7 @@ CONFIG_RAMFS=y
 # CONFIG_ADFS_FS is not set
 # CONFIG_AFFS_FS is not set
 # CONFIG_HFS_FS is not set
+# CONFIG_HFSPLUS_FS is not set
 # CONFIG_BEFS_FS is not set
 # CONFIG_BFS_FS is not set
 # CONFIG_EFS_FS is not set
@@ -876,6 +885,7 @@ CONFIG_CRYPTO_SERPENT=m
 CONFIG_CRYPTO_AES=m
 CONFIG_CRYPTO_CAST5=m
 CONFIG_CRYPTO_CAST6=m
+# CONFIG_CRYPTO_ARC4 is not set
 CONFIG_CRYPTO_DEFLATE=m
 CONFIG_CRYPTO_TEST=m
 

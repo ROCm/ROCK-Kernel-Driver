@@ -171,6 +171,7 @@ static int coda_fill_super(struct super_block *sb, void *data, int silent)
 	sbi->sbi_vcomm = vc;
 
         sb->s_fs_info = sbi;
+	sb->s_flags |= MS_NODIRATIME; /* probably even noatime */
         sb->s_blocksize = 1024;	/* XXXXX  what do we put here?? */
         sb->s_blocksize_bits = 10;
         sb->s_magic = CODA_SUPER_MAGIC;
@@ -195,6 +196,8 @@ static int coda_fill_super(struct super_block *sb, void *data, int silent)
 	printk("coda_read_super: rootinode is %ld dev %s\n", 
 	       root->i_ino, root->i_sb->s_id);
 	sb->s_root = d_alloc_root(root);
+	if (!sb->s_root)
+		goto error;
         return 0;
 
  error:
@@ -306,5 +309,6 @@ struct file_system_type coda_fs_type = {
 	.name		= "coda",
 	.get_sb		= coda_get_sb,
 	.kill_sb	= kill_anon_super,
+	.fs_flags	= FS_BINARY_MOUNTDATA,
 };
 

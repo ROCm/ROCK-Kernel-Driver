@@ -373,7 +373,7 @@ static munich_board_t pcicom_boards[MAX_BOARDS];
 
 void rework_idle_channels(struct net_device *dev)
 {
-    struct comx_channel *ch = dev->priv;
+    struct comx_channel *ch = netdev_priv(dev);
     struct slicecom_privdata *hw = ch->HW_privdata;
     munich_board_t *board = slicecom_boards + hw->boardnum;
     munich_ccb_t *ccb = board->ccb;
@@ -731,7 +731,7 @@ static void pcicom_modemline(unsigned long b)
 {
     munich_board_t *board = (munich_board_t *) b;
     struct net_device *dev = board->twins[0];
-    struct comx_channel *ch = dev->priv;
+    struct comx_channel *ch = netdev_priv(dev);
     unsigned long regs;
 
     regs = readl((void *)(&board->bar1[GPDATA]));
@@ -765,7 +765,7 @@ static void pcicom_modemline(unsigned long b)
 
 static int MUNICH_txe(struct net_device *dev)
 {
-    struct comx_channel *ch = dev->priv;
+    struct comx_channel *ch = netdev_priv(dev);
     struct slicecom_privdata *hw = ch->HW_privdata;
 
     return (hw->busy < TX_DESC_MAX - 1);
@@ -905,7 +905,7 @@ static int munich_probe(void)
 #if 0
 static int slicecom_reset(struct net_device *dev)
 {
-    struct comx_channel *ch = dev->priv;
+    struct comx_channel *ch = netdev_priv(dev);
 
     printk("slicecom_reset: resetting the hardware\n");
 
@@ -933,7 +933,7 @@ static int slicecom_reset(struct net_device *dev)
 
 static int MUNICH_send_packet(struct net_device *dev, struct sk_buff *skb)
 {
-    struct comx_channel *ch = (struct comx_channel *)dev->priv;
+    struct comx_channel *ch = netdev_priv(dev);
     struct slicecom_privdata *hw = ch->HW_privdata;
 
     /* Send it to the debug facility too if needed: */
@@ -1085,7 +1085,7 @@ static irqreturn_t MUNICH_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		goto go_for_next_interrupt;
 	    }
 
-	    ch = (struct comx_channel *)dev->priv;
+	    ch = netdev_priv(dev);
 	    hw = (struct slicecom_privdata *)ch->HW_privdata;
 
 	    //      printk("Rx STAT=0x%08x int_info=0x%08x rx_desc_ptr=%d rx_desc.status=0x%01x\n",
@@ -1125,7 +1125,7 @@ static irqreturn_t MUNICH_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 	    if (dev != NULL)
 	    {
-		ch = (struct comx_channel *)dev->priv;
+		ch = netdev_priv(dev);
 		hw = (struct slicecom_privdata *)ch->HW_privdata;
 
 		rx_status = hw->rx_desc[hw->rx_desc_ptr].status;
@@ -1261,7 +1261,7 @@ static irqreturn_t MUNICH_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		goto go_for_next_tx_interrupt;
 	    }
 
-	    ch = (struct comx_channel *)dev->priv;
+	    ch = netdev_priv(dev);
 	    hw = (struct slicecom_privdata *)ch->HW_privdata;
 
 	    //      printk("Tx STAT=0x%08x int_info=0x%08x tiq_ptr=%d\n", stat, int_info.all, board->tiq_ptr );
@@ -1295,7 +1295,7 @@ static irqreturn_t MUNICH_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	    {
 		int newbusy;
 
-		ch = (struct comx_channel *)dev->priv;
+		ch = netdev_priv(dev);
 		hw = (struct slicecom_privdata *)ch->HW_privdata;
 
 		/* We don't trust the "Tx available" info from the TIQ, but check        */
@@ -1398,7 +1398,7 @@ static irqreturn_t MUNICH_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 static int MUNICH_open(struct net_device *dev)
 {
-    struct comx_channel *ch = dev->priv;
+    struct comx_channel *ch = netdev_priv(dev);
     struct slicecom_privdata *hw = ch->HW_privdata;
     struct proc_dir_entry *procfile = ch->procdir->subdir;
     munich_board_t *board;
@@ -1891,7 +1891,7 @@ static int MUNICH_open(struct net_device *dev)
 
 static int MUNICH_close(struct net_device *dev)
 {
-    struct comx_channel *ch = dev->priv;
+    struct comx_channel *ch = netdev_priv(dev);
     struct slicecom_privdata *hw = ch->HW_privdata;
     struct proc_dir_entry *procfile = ch->procdir->subdir;
     munich_board_t *board;
@@ -2028,7 +2028,7 @@ static int MUNICH_close(struct net_device *dev)
 
 static int MUNICH_minden(struct net_device *dev, char *page)
 {
-    struct comx_channel *ch = dev->priv;
+    struct comx_channel *ch = netdev_priv(dev);
     struct slicecom_privdata *hw = ch->HW_privdata;
     munich_board_t *board;
     struct net_device *devp;
@@ -2290,7 +2290,7 @@ static int munich_read_proc(char *page, char **start, off_t off, int count,
 {
     struct proc_dir_entry *file = (struct proc_dir_entry *)data;
     struct net_device *dev = file->parent->data;
-    struct comx_channel *ch = dev->priv;
+    struct comx_channel *ch = netdev_priv(dev);
     struct slicecom_privdata *hw = ch->HW_privdata;
     munich_board_t *board;
 
@@ -2388,7 +2388,7 @@ static int munich_write_proc(struct file *file, const char *buffer,
 {
     struct proc_dir_entry *entry = (struct proc_dir_entry *)data;
     struct net_device *dev = (struct net_device *)entry->parent->data;
-    struct comx_channel *ch = dev->priv;
+    struct comx_channel *ch = netdev_priv(dev);
     struct slicecom_privdata *hw = ch->HW_privdata;
     munich_board_t *board;
 
@@ -2656,7 +2656,7 @@ static int init_escape(struct comx_channel *ch)
 
 static int BOARD_init(struct net_device *dev)
 {
-    struct comx_channel *ch = (struct comx_channel *)dev->priv;
+    struct comx_channel *ch = netdev_priv(dev);
     struct slicecom_privdata *hw;
     struct proc_dir_entry *new_file;
 
@@ -2772,7 +2772,7 @@ static int BOARD_init(struct net_device *dev)
  */
 static int BOARD_exit(struct net_device *dev)
 {
-    struct comx_channel *ch = (struct comx_channel *)dev->priv;
+    struct comx_channel *ch = netdev_priv(dev);
 
     /* Free private data area */
 //    board = hw->boardnum + (ch->hardware == &pcicomhw ? pcicom_boards : slicecom_boards);

@@ -331,25 +331,24 @@ static int try_context_mount(struct super_block *sb, void *data)
 
 	name = sb->s_type->name;
 
-	/* Ignore these fileystems with binary mount option data. */
-	if (!strcmp(name, "coda") ||
-	    !strcmp(name, "afs") || !strcmp(name, "smbfs"))
-		goto out;
+	if (sb->s_type->fs_flags & FS_BINARY_MOUNTDATA) {
 
-	/* NFS we understand. */
-	if (!strcmp(name, "nfs")) {
-		struct nfs_mount_data *d = data;
+		/* NFS we understand. */
+		if (!strcmp(name, "nfs")) {
+			struct nfs_mount_data *d = data;
 
-		if (d->version <  NFS_MOUNT_VERSION)
+			if (d->version <  NFS_MOUNT_VERSION)
+				goto out;
+
+			if (d->context[0]) {
+				context = d->context;
+				seen |= Opt_context;
+			}
+		} else
 			goto out;
 
-		if (d->context[0]) {
-			context = d->context;
-			seen |= Opt_context;
-		}
-
-	/* Standard string-based options. */
 	} else {
+		/* Standard string-based options. */
 		char *p, *options = data;
 
 		while ((p = strsep(&options, ",")) != NULL) {
@@ -1492,7 +1491,7 @@ static int selinux_syslog(int type)
  * succeed and -ENOMEM implies there is not.
  *
  * We currently support three overcommit policies, which are set via the
- * vm.overcommit_memory sysctl.  See Documentation/vm/overcommit-acounting
+ * vm.overcommit_memory sysctl.  See Documentation/vm/overcommit-accounting
  *
  * Strict overcommit modes added 2002 Feb 26 by Alan Cox.
  * Additional code 2002 Jul 20 by Robert Love.
@@ -1885,7 +1884,7 @@ static inline void take_option(char **to, char *from, int *first, int len)
 	*to += len;
 }
 
-static int selinux_sb_copy_data(const char *fstype, void *orig, void *copy)
+static int selinux_sb_copy_data(struct file_system_type *type, void *orig, void *copy)
 {
 	int fnosec, fsec, rc = 0;
 	char *in_save, *in_curr, *in_end;
@@ -1895,8 +1894,7 @@ static int selinux_sb_copy_data(const char *fstype, void *orig, void *copy)
 	sec_curr = copy;
 
 	/* Binary mount data: just copy */
-	if (!strcmp(fstype, "nfs") || !strcmp(fstype, "coda") ||
-	    !strcmp(fstype, "smbfs") || !strcmp(fstype, "afs")) {
+	if (type->fs_flags & FS_BINARY_MOUNTDATA) {
 		copy_page(sec_curr, in_curr);
 		goto out;
 	}

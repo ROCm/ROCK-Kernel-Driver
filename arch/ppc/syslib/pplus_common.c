@@ -21,7 +21,7 @@
 #include <asm/pci.h>
 #include <asm/pci-bridge.h>
 #include <asm/open_pic.h>
-#include <asm/pplus.h>
+#include <asm/hawk.h>
 
 /*
  * The Falcon/Raven and HAWK has 4 sets of registers:
@@ -95,10 +95,10 @@ pplus_init(struct pci_controller *hose,
 	/*
 	 * Disable previous PPC->PCI mappings.
 	 */
-	out_be32((uint *)(ppc_reg_base + PPLUS_PPC_XSOFF0_OFF), 0x00000000);
-	out_be32((uint *)(ppc_reg_base + PPLUS_PPC_XSOFF1_OFF), 0x00000000);
-	out_be32((uint *)(ppc_reg_base + PPLUS_PPC_XSOFF2_OFF), 0x00000000);
-	out_be32((uint *)(ppc_reg_base + PPLUS_PPC_XSOFF3_OFF), 0x00000000);
+	out_be32((uint *)(ppc_reg_base + HAWK_PPC_XSOFF0_OFF), 0x00000000);
+	out_be32((uint *)(ppc_reg_base + HAWK_PPC_XSOFF1_OFF), 0x00000000);
+	out_be32((uint *)(ppc_reg_base + HAWK_PPC_XSOFF2_OFF), 0x00000000);
+	out_be32((uint *)(ppc_reg_base + HAWK_PPC_XSOFF3_OFF), 0x00000000);
 
 	/*
 	 * Program the XSADD/XSOFF registers to set up the PCI Mem & I/O
@@ -113,21 +113,23 @@ pplus_init(struct pci_controller *hose,
 	/* Set up PPC->PCI Mem mapping */
 	addr = processor_pci_mem_start | (processor_pci_mem_end >> 16);
 	offset = (hose->mem_space.start - processor_pci_mem_start) | 0xd2;
-	out_be32((uint *)(ppc_reg_base + PPLUS_PPC_XSADD0_OFF), addr);
-	out_be32((uint *)(ppc_reg_base + PPLUS_PPC_XSOFF0_OFF), offset);
+	out_be32((uint *)(ppc_reg_base + HAWK_PPC_XSADD0_OFF), addr);
+	out_be32((uint *)(ppc_reg_base + HAWK_PPC_XSOFF0_OFF), offset);
 
 	/* Set up PPC->MPIC mapping on the bridge */
 	addr = processor_mpic_base |
-	        (((processor_mpic_base + PPLUS_MPIC_SIZE) >> 16) - 1);
-	offset = 0xc2; /* No write posting for this PCI Mem space */
-	out_be32((uint *)(ppc_reg_base + PPLUS_PPC_XSADD1_OFF), addr);
-	out_be32((uint *)(ppc_reg_base + PPLUS_PPC_XSOFF1_OFF), offset);
+	        (((processor_mpic_base + HAWK_MPIC_SIZE) >> 16) - 1);
+	/* No write posting for this PCI Mem space */
+	offset = (hose->mem_space.start - processor_pci_mem_start) | 0xc2;
+
+	out_be32((uint *)(ppc_reg_base + HAWK_PPC_XSADD1_OFF), addr);
+	out_be32((uint *)(ppc_reg_base + HAWK_PPC_XSOFF1_OFF), offset);
 
 	/* Set up PPC->PCI I/O mapping -- Contiguous I/O space */
 	addr = processor_pci_io_start | (processor_pci_io_end >> 16);
 	offset = (hose->io_space.start - processor_pci_io_start) | 0xc0;
-	out_be32((uint *)(ppc_reg_base + PPLUS_PPC_XSADD3_OFF), addr);
-	out_be32((uint *)(ppc_reg_base + PPLUS_PPC_XSOFF3_OFF), offset);
+	out_be32((uint *)(ppc_reg_base + HAWK_PPC_XSADD3_OFF), addr);
+	out_be32((uint *)(ppc_reg_base + HAWK_PPC_XSOFF3_OFF), offset);
 
 	hose->io_base_virt = (void *)ioremap(processor_pci_io_start,
 			(processor_pci_io_end - processor_pci_io_start + 1));
@@ -137,8 +139,8 @@ pplus_init(struct pci_controller *hose,
 	 * The PCI config addr/data pair based on start addr of PCI I/O space.
 	 */
 	setup_indirect_pci(hose,
-			   processor_pci_io_start + PPLUS_PCI_CONFIG_ADDR_OFF,
-			   processor_pci_io_start + PPLUS_PCI_CONFIG_DATA_OFF);
+			   processor_pci_io_start + HAWK_PCI_CONFIG_ADDR_OFF,
+			   processor_pci_io_start + HAWK_PCI_CONFIG_DATA_OFF);
 
 	/*
 	 * Disable previous PCI->PPC mappings.
@@ -161,10 +163,12 @@ pplus_init(struct pci_controller *hose,
 			         0,
 			         PCI_DEVFN(0,0),
 			         PCI_BASE_ADDRESS_1,
-			         processor_mpic_base | 0x0);
+			         (processor_mpic_base -
+				 processor_pci_mem_start + 
+				 hose->mem_space.start) | 0x0);
 
 	/* Map MPIC into vitual memory */
-	OpenPIC_Addr = ioremap(processor_mpic_base, PPLUS_MPIC_SIZE);
+	OpenPIC_Addr = ioremap(processor_mpic_base, HAWK_MPIC_SIZE);
 
 	return 0;
 }
@@ -181,14 +185,14 @@ pplus_init(struct pci_controller *hose,
 #define	MB	(1024*1024)
 
 static uint reg_offset_table[] __initdata = {
-	PPLUS_SMC_RAM_A_SIZE_REG_OFF,
-	PPLUS_SMC_RAM_B_SIZE_REG_OFF,
-	PPLUS_SMC_RAM_C_SIZE_REG_OFF,
-	PPLUS_SMC_RAM_D_SIZE_REG_OFF,
-	PPLUS_SMC_RAM_E_SIZE_REG_OFF,
-	PPLUS_SMC_RAM_F_SIZE_REG_OFF,
-	PPLUS_SMC_RAM_G_SIZE_REG_OFF,
-	PPLUS_SMC_RAM_H_SIZE_REG_OFF
+	HAWK_SMC_RAM_A_SIZE_REG_OFF,
+	HAWK_SMC_RAM_B_SIZE_REG_OFF,
+	HAWK_SMC_RAM_C_SIZE_REG_OFF,
+	HAWK_SMC_RAM_D_SIZE_REG_OFF,
+	HAWK_SMC_RAM_E_SIZE_REG_OFF,
+	HAWK_SMC_RAM_F_SIZE_REG_OFF,
+	HAWK_SMC_RAM_G_SIZE_REG_OFF,
+	HAWK_SMC_RAM_H_SIZE_REG_OFF
 };
 
 static uint falcon_size_table[] __initdata = {
@@ -246,13 +250,13 @@ pplus_get_mem_size(uint smc_base)
 		size_table_entries = sizeof(falcon_size_table) /
 				     sizeof(falcon_size_table[0]);
 
-		reg_limit = PPLUS_FALCON_SMC_REG_COUNT;
+		reg_limit = FALCON_SMC_REG_COUNT;
 	}
 	else if (vend_dev_id == PCI_DEVICE_ID_MOTOROLA_HAWK) {
 		size_table = hawk_size_table;
 		size_table_entries = sizeof(hawk_size_table) /
 				     sizeof(hawk_size_table[0]);
-		reg_limit = PPLUS_HAWK_SMC_REG_COUNT;
+		reg_limit = HAWK_SMC_REG_COUNT;
 	}
 	else {
 		printk("pplus_get_mem_size: %s (0x%x)\n",

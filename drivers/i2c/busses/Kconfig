@@ -58,17 +58,6 @@ config I2C_ELEKTOR
 	  This support is also available as a module.  If so, the module 
 	  will be called i2c-elektor.
 
-config I2C_ELV
-	tristate "ELV adapter"
-	depends on I2C
-	select I2C_ALGOBIT
-	help
-	  This supports parallel-port I2C adapters called ELV.  Say Y if you
-	  own such an adapter.
-
-	  This support is also available as a module.  If so, the module 
-	  will be called i2c-elv.
-
 config I2C_HYDRA
 	tristate "CHRP Apple Hydra Mac I/O I2C interface"
 	depends on I2C && PCI && PPC_CHRP && EXPERIMENTAL
@@ -144,6 +133,17 @@ config I2C_ITE
 	  This support is also available as a module.  If so, the module 
 	  will be called i2c-ite.
 
+config I2C_IXP42X
+	tristate "IXP42x GPIO-Based I2C Interface"
+	depends on I2C && ARCH_IXP425
+	select I2C_ALGOBIT
+	help
+	  Say Y here if you have an Intel IXP42x(420,421,422,425) based 
+	  system and are using GPIO lines for an I2C bus.
+
+	  This support is also available as a module. If so, the module
+	  will be called i2c-ixp42x.
+
 config I2C_KEYWEST
 	tristate "Powermac Keywest I2C interface"
 	depends on I2C && PPC_PMAC
@@ -163,16 +163,6 @@ config I2C_NFORCE2
 
 	  This driver can also be built as a module.  If so, the module
 	  will be called i2c-nforce2.
-
-config I2C_PHILIPSPAR
-	tristate "Philips style parallel port adapter"
-	depends on I2C && PARPORT
-	select I2C_ALGOBIT
-	help
-	  This supports parallel-port I2C adapters made by Philips.
-
-	  This support is also available as a module.  If so, the module 
-	  will be called i2c-philips-par.
 
 config I2C_PARPORT
 	tristate "Parallel port adapter"
@@ -342,17 +332,6 @@ config I2C_SIS96X
 
 	  This driver can also be built as a module.  If so, the module
 	  will be called i2c-sis96x.
-
-config I2C_VELLEMAN
-	tristate "Velleman K8000 adapter"
-	depends on I2C
-	select I2C_ALGOBIT
-	help
-	  This supports the Velleman K8000 parallel-port I2C adapter.  Say Y
-	  if you own such an adapter.
-
-	  This support is also available as a module.  If so, the module 
-	  will be called i2c-velleman.
 
 config I2C_VIA
 	tristate "VIA 82C586B"

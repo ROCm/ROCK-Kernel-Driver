@@ -99,18 +99,8 @@ struct NCR_700_SG_List {
 #define NCR_700_DEV_NEGOTIATED_SYNC	(1<<16)
 #define NCR_700_DEV_BEGIN_SYNC_NEGOTIATION	(1<<17)
 #define NCR_700_DEV_BEGIN_TAG_QUEUEING	(1<<18)
-#define NCR_700_DEV_TAG_STARVATION_WARNED (1<<19)
+#define NCR_700_DEV_PRINT_SYNC_NEGOTIATION (1<<19)
 
-static inline void
-NCR_700_set_SXFER(Scsi_Device *SDp, __u8 sxfer)
-{
-	SDp->hostdata = (void *)(((long)SDp->hostdata & 0xffffff00) |
-				(sxfer & 0xff));
-}
-static inline __u8 NCR_700_get_SXFER(Scsi_Device *SDp)
-{
-	return (((unsigned long)SDp->hostdata) & 0xff);
-}
 static inline void
 NCR_700_set_depth(Scsi_Device *SDp, __u8 depth)
 {
@@ -215,6 +205,7 @@ struct NCR_700_Host_Parameters {
 	__u8	tag_negotiated;
 	__u8	rev;
 	__u8	reselection_id;
+	__u8	min_period;
 
 	/* Free list, singly linked by ITL_forw elements */
 	struct NCR_700_command_slot *free_list;
@@ -438,6 +429,7 @@ struct NCR_700_Host_Parameters {
 		       #symbol, A_##symbol##_used[i], val)); \
 	} \
 }
+
 
 static inline __u8
 NCR_700_mem_readb(struct Scsi_Host *host, __u32 reg)

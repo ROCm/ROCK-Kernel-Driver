@@ -47,6 +47,23 @@ config IEEE1394_OUI_DB
 	  This option is not needed for userspace programs like gscanbus
 	  to show this information.
 
+config IEEE1394_EXTRA_CONFIG_ROMS
+	bool "Build in extra config rom entries for certain functionality"
+	depends on IEEE1394
+	help
+	  Some IEEE1394 functionality depends on extra config rom entries
+	  being available in the host adapters CSR. These options will
+	  allow you to choose which ones.
+
+config IEEE1394_CONFIG_ROM_IP1394
+	bool "IP-1394 Entry"
+	depends on IEEE1394_EXTRA_CONFIG_ROMS && IEEE1394
+	help
+	  Adds an entry for using IP-over-1394. If you want to use your
+	  IEEE1394 bus as a network for IP systems (including interacting
+	  with MacOSX and WinXP IP-over-1394), enable this option and the
+	  eth1394 option below.
+
 comment "Device Drivers"
 	depends on IEEE1394
 
@@ -108,6 +125,8 @@ config IEEE1394_SBP2_PHYS_DMA
 config IEEE1394_ETH1394
 	tristate "Ethernet over 1394"
 	depends on IEEE1394 && EXPERIMENTAL
+	select IEEE1394_CONFIG_ROM_IP1394
+	select IEEE1394_EXTRA_CONFIG_ROMS
 	help
 	  This driver implements a functional majority of RFC 2734: IPv4 over
 	  1394.  It will provide IP connectivity with implementations of RFC

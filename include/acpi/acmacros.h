@@ -681,7 +681,4 @@
 
 #endif /* ACPI_DBG_TRACK_ALLOCATIONS */
 
-
-#define ACPI_GET_STACK_POINTER          _asm {mov eax, ebx}
-
 #endif /* ACMACROS_H */

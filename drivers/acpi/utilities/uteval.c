@@ -53,6 +53,62 @@
 
 /*******************************************************************************
  *
+ * FUNCTION:    acpi_ut_osi_implementation
+ *
+ * PARAMETERS:  walk_state          - Current walk state
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Implementation of _OSI predefined control method
+ *              Supported = _OSI (String)
+ *
+ ******************************************************************************/
+
+acpi_status
+acpi_ut_osi_implementation (
+	struct acpi_walk_state          *walk_state)
+{
+	union acpi_operand_object       *string_desc;
+	union acpi_operand_object       *return_desc;
+	acpi_native_uint                i;
+
+
+	ACPI_FUNCTION_TRACE ("ut_osi_implementation");
+
+
+	/* Validate the string input argument */
+
+	string_desc = walk_state->arguments[0].object;
+	if (!string_desc || (string_desc->common.type != ACPI_TYPE_STRING)) {
+		return_ACPI_STATUS (AE_TYPE);
+	}
+
+	/* Create a return object (Default value = 0) */
+
+	return_desc = acpi_ut_create_internal_object (ACPI_TYPE_INTEGER);
+	if (!return_desc) {
+		return_ACPI_STATUS (AE_NO_MEMORY);
+	}
+
+	/* Compare input string to table of supported strings */
+
+	for (i = 0; i < ACPI_NUM_OSI_STRINGS; i++) {
+		if (!ACPI_STRCMP (string_desc->string.pointer,
+				   (char *) acpi_gbl_valid_osi_strings[i])) {
+			/* This string is supported */
+
+			return_desc->integer.value = 0xFFFFFFFF;
+			break;
+		}
+	}
+
+	walk_state->return_desc = return_desc;
+	return_ACPI_STATUS (AE_CTRL_TERMINATE);
+}
+
+
+/*******************************************************************************
+ *
  * FUNCTION:    acpi_ut_evaluate_object
  *
  * PARAMETERS:  prefix_node         - Starting node
@@ -561,4 +617,64 @@ acpi_ut_execute_STA (
 
 	acpi_ut_remove_reference (obj_desc);
 	return_ACPI_STATUS (status);
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    acpi_ut_execute_Sxds
+ *
+ * PARAMETERS:  device_node         - Node for the device
+ *              *Flags              - Where the status flags are returned
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Executes _STA for selected device and stores results in
+ *              *Flags.
+ *
+ *              NOTE: Internal function, no parameter validation
+ *
+ ******************************************************************************/
+
+acpi_status
+acpi_ut_execute_sxds (
+	struct acpi_namespace_node      *device_node,
+	u8                              *highest)
+{
+	union acpi_operand_object       *obj_desc;
+	acpi_status                     status;
+	u32                             i;
+
+
+	ACPI_FUNCTION_TRACE ("ut_execute_Sxds");
+
+
+	for (i = 0; i < 4; i++) {
+		highest[i] = 0xFF;
+		status = acpi_ut_evaluate_object (device_node,
+				 (char *) acpi_gbl_highest_dstate_names[i],
+				 ACPI_BTYPE_INTEGER, &obj_desc);
+		if (ACPI_FAILURE (status)) {
+			if (status != AE_NOT_FOUND) {
+				ACPI_DEBUG_PRINT ((ACPI_DB_EXEC,
+					"%s on Device %4.4s, %s\n",
+					(char *) acpi_gbl_highest_dstate_names[i],
+					acpi_ut_get_node_name (device_node),
+					acpi_format_exception (status)));
+
+				return_ACPI_STATUS (status);
+			}
+		}
+		else {
+			/* Extract the Dstate value */
+
+			highest[i] = (u8) obj_desc->integer.value;
+
+			/* Delete the return object */
+
+			acpi_ut_remove_reference (obj_desc);
+		}
+	}
+
+	return_ACPI_STATUS (AE_OK);
 }

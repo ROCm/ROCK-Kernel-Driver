@@ -152,11 +152,11 @@ acpi_get_sleep_type_data (
 	/*
 	 * Evaluate the namespace object containing the values for this state
 	 */
-	status = acpi_ns_evaluate_by_name ((char *) acpi_gbl_db_sleep_states[sleep_state],
+	status = acpi_ns_evaluate_by_name ((char *) acpi_gbl_sleep_state_names[sleep_state],
 			  NULL, &obj_desc);
 	if (ACPI_FAILURE (status)) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "%s while evaluating sleep_state [%s]\n",
-			acpi_format_exception (status), acpi_gbl_db_sleep_states[sleep_state]));
+			acpi_format_exception (status), acpi_gbl_sleep_state_names[sleep_state]));
 
 		return_ACPI_STATUS (status);
 	}
@@ -201,7 +201,7 @@ acpi_get_sleep_type_data (
 
 	if (ACPI_FAILURE (status)) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "While evaluating sleep_state [%s], bad Sleep object %p type %s\n",
-			acpi_gbl_db_sleep_states[sleep_state], obj_desc, acpi_ut_get_object_type_name (obj_desc)));
+			acpi_gbl_sleep_state_names[sleep_state], obj_desc, acpi_ut_get_object_type_name (obj_desc)));
 	}
 
 	acpi_ut_remove_reference (obj_desc);

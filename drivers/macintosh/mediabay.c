@@ -10,8 +10,6 @@
  *  as published by the Free Software Foundation; either version
  *  2 of the License, or (at your option) any later version.
  */
-#define __KERNEL_SYSCALLS__
-
 #include <linux/config.h>
 #include <linux/types.h>
 #include <linux/errno.h>
@@ -21,7 +19,6 @@
 #include <linux/timer.h>
 #include <linux/hdreg.h>
 #include <linux/stddef.h>
-#include <linux/unistd.h>
 #include <linux/init.h>
 #include <linux/ide.h>
 #include <asm/prom.h>

@@ -106,6 +106,7 @@ int __init mca_register_device(int bus, struct mca_device *mca_dev)
 	sprintf (mca_dev->dev.bus_id, "%02d:%02X", bus, mca_dev->slot);
 	mca_dev->dma_mask = mca_bus->default_dma_mask;
 	mca_dev->dev.dma_mask = &mca_dev->dma_mask;
+	mca_dev->dev.coherent_dma_mask = mca_dev->dma_mask;
 
 	if (device_register(&mca_dev->dev))
 		return 0;

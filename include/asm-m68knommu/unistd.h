@@ -416,7 +416,6 @@ asmlinkage long sys_mmap2(unsigned long addr, unsigned long len,
 asmlinkage int sys_execve(char *name, char **argv, char **envp);
 asmlinkage int sys_pipe(unsigned long *fildes);
 asmlinkage int sys_ptrace(long request, long pid, long addr, long data);
-asmlinkage long sys_ioperm(unsigned long from, unsigned long num, int on);
 struct pt_regs;
 int sys_request_irq(unsigned int,
 			irqreturn_t (*)(int, void *, struct pt_regs *),

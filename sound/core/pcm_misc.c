@@ -654,3 +654,35 @@ snd_pcm_format_t snd_pcm_build_linear_format(int width, int unsignd, int big_end
 	}
 	return snd_int_to_enum(((int(*)[2][2])linear_formats)[width][!!unsignd][!!big_endian]);
 }
+
+/**
+ * snd_pcm_limit_hw_rates - determine rate_min/rate_max fields
+ * @runtime: the runtime instance
+ *
+ * Determines the rate_min and rate_max fields from the rates bits of
+ * the given runtime->hw.
+ *
+ * Returns zero if successful.
+ */
+int snd_pcm_limit_hw_rates(snd_pcm_runtime_t *runtime)
+{
+	static unsigned rates[] = {
+		/* ATTENTION: these values depend on the definition in pcm.h! */
+		5512, 8000, 11025, 16000, 22050, 32000, 44100, 48000,
+		64000, 88200, 96000, 176400, 192000
+	};
+	int i;
+	for (i = 0; i < (int)ARRAY_SIZE(rates); i++) {
+		if (runtime->hw.rates & (1 << i)) {
+			runtime->hw.rate_min = rates[i];
+			break;
+		}
+	}
+	for (i = (int)ARRAY_SIZE(rates) - 1; i >= 0; i--) {
+		if (runtime->hw.rates & (1 << i)) {
+			runtime->hw.rate_max = rates[i];
+			break;
+		}
+	}
+	return 0;
+}

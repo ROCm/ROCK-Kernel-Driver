@@ -143,7 +143,7 @@ static int __devinit snd_card_dt019x_pnp(int dev, struct snd_card_dt019x *acard,
 	port[dev] = pnp_port_start(pdev, 0);
 	dma8[dev] = pnp_dma(pdev, 0);
 	irq[dev] = pnp_irq(pdev, 0);
-	snd_printdd("dt019x: found audio interface: port=0x%lx, irq=0x%lx, dma=0x%lx\n",
+	snd_printdd("dt019x: found audio interface: port=0x%lx, irq=0x%x, dma=0x%x\n",
 			port[dev],irq[dev],dma8[dev]);
 
 	pdev = acard->devmpu;
@@ -164,7 +164,7 @@ static int __devinit snd_card_dt019x_pnp(int dev, struct snd_card_dt019x *acard,
 		}
 		mpu_port[dev] = pnp_port_start(pdev, 0);
 		mpu_irq[dev] = pnp_irq(pdev, 0);
-		snd_printdd("dt019x: found MPU-401: port=0x%lx, irq=0x%lx\n",
+		snd_printdd("dt019x: found MPU-401: port=0x%lx, irq=0x%x\n",
 			 	mpu_port[dev],mpu_irq[dev]);
 	} else {
 	__mpu_error:
@@ -296,8 +296,8 @@ static int __devinit snd_dt019x_pnp_probe(struct pnp_card_link *card,
 			return res;
 		dev++;
 		return 0;
-        }
-        return -ENODEV;
+	}
+	return -ENODEV;
 }
 
 static void __devexit snd_dt019x_pnp_remove(struct pnp_card_link * pcard)
@@ -322,8 +322,10 @@ static int __init alsa_card_dt019x_init(void)
 	cards += pnp_register_card_driver(&dt019x_pnpc_driver);
 
 #ifdef MODULE
-	if (!cards)
+	if (!cards) {
+		pnp_unregister_card_driver(&dt019x_pnpc_driver);
 		snd_printk(KERN_ERR "no DT-019X / ALS-007 based soundcards found\n");
+	}
 #endif
 	return cards ? 0 : -ENODEV;
 }

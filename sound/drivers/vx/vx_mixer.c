@@ -919,7 +919,7 @@ int snd_vx_mixer_new(vx_core_t *chip)
 	if ((err = snd_ctl_add(card, snd_ctl_new1(&vx_control_iec958, chip))) < 0)
 		return err;
 	/* VU, peak, saturation meters */
-	for (c = 0; c < 1; c++) {
+	for (c = 0; c < 2; c++) {
 		static char *dir[2] = { "Output", "Input" };
 		for (i = 0; i < chip->hw->num_ins; i++) {
 			int val = (i * 2) | (c << 8);

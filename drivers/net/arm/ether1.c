@@ -447,7 +447,7 @@ static rbd_t  init_rbd	= {
 static int
 ether1_init_for_open (struct net_device *dev)
 {
-	struct ether1_priv *priv = (struct ether1_priv *)dev->priv;
+	struct ether1_priv *priv = netdev_priv(dev);
 	int i, status, addr, next, next2;
 	int failures = 0;
 	unsigned long timeout;
@@ -616,7 +616,7 @@ ether1_init_for_open (struct net_device *dev)
 static int
 ether1_txalloc (struct net_device *dev, int size)
 {
-	struct ether1_priv *priv = (struct ether1_priv *)dev->priv;
+	struct ether1_priv *priv = netdev_priv(dev);
 	int start, tail;
 
 	size = (size + 1) & ~1;
@@ -642,7 +642,7 @@ ether1_txalloc (struct net_device *dev, int size)
 static int
 ether1_open (struct net_device *dev)
 {
-	struct ether1_priv *priv = (struct ether1_priv *)dev->priv;
+	struct ether1_priv *priv = netdev_priv(dev);
 
 	if (!is_valid_ether_addr(dev->dev_addr)) {
 		printk(KERN_WARNING "%s: invalid ethernet MAC address\n",
@@ -668,7 +668,7 @@ ether1_open (struct net_device *dev)
 static void
 ether1_timeout(struct net_device *dev)
 {
-	struct ether1_priv *priv = (struct ether1_priv *)dev->priv;
+	struct ether1_priv *priv = netdev_priv(dev);
 
 	printk(KERN_WARNING "%s: transmit timeout, network cable problem?\n",
 		dev->name);
@@ -686,7 +686,7 @@ ether1_timeout(struct net_device *dev)
 static int
 ether1_sendpacket (struct sk_buff *skb, struct net_device *dev)
 {
-	struct ether1_priv *priv = (struct ether1_priv *)dev->priv;
+	struct ether1_priv *priv = netdev_priv(dev);
 	int tmp, tst, nopaddr, txaddr, tbdaddr, dataddr;
 	unsigned long flags;
 	tx_t tx;
@@ -762,7 +762,7 @@ ether1_sendpacket (struct sk_buff *skb, struct net_device *dev)
 static void
 ether1_xmit_done (struct net_device *dev)
 {
-	struct ether1_priv *priv = (struct ether1_priv *)dev->priv;
+	struct ether1_priv *priv = netdev_priv(dev);
 	nop_t nop;
 	int caddr, tst;
 
@@ -863,7 +863,7 @@ again:
 static void
 ether1_recv_done (struct net_device *dev)
 {
-	struct ether1_priv *priv = (struct ether1_priv *)dev->priv;
+	struct ether1_priv *priv = netdev_priv(dev);
 	int status;
 	int nexttail, rbdaddr;
 	rbd_t rbd;
@@ -919,7 +919,7 @@ static irqreturn_t
 ether1_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct net_device *dev = (struct net_device *)dev_id;
-	struct ether1_priv *priv = (struct ether1_priv *)dev->priv;
+	struct ether1_priv *priv = netdev_priv(dev);
 	int status;
 
 	status = ether1_inw (dev, SCB_ADDR, scb_t, scb_status, NORMALIRQS);
@@ -978,7 +978,7 @@ ether1_close (struct net_device *dev)
 static struct net_device_stats *
 ether1_getstats (struct net_device *dev)
 {
-	struct ether1_priv *priv = (struct ether1_priv *)dev->priv;
+	struct ether1_priv *priv = netdev_priv(dev);
 	return &priv->stats;
 }
 
@@ -1030,7 +1030,7 @@ ether1_probe(struct expansion_card *ec, const struct ecard_id *id)
 	request_region(dev->base_addr, 16, dev->name);
 	request_region(dev->base_addr + 0x800, 4096, dev->name);
 
-	priv = (struct ether1_priv *)dev->priv;
+	priv = netdev_priv(dev);
 	if ((priv->bus_type = ether1_reset(dev)) == 0) {
 		ret = -ENODEV;
 		goto release;

@@ -55,7 +55,7 @@ config FB_CIRRUS
 
 config FB_PM2
 	tristate "Permedia2 support"
-	depends on FB && (AMIGA || PCI) && BROKEN
+	depends on FB && (AMIGA || PCI)
 	help
 	  This is the frame buffer device driver for the Permedia2 AGP frame
 	  buffer card from ASK, aka `Graphic Blaster Exxtreme'.  There is a
@@ -66,21 +66,7 @@ config FB_PM2_FIFO_DISCONNECT
 	bool "enable FIFO disconnect feature"
 	depends on FB_PM2 && PCI
 	help
-	  Support the Permedia2 FIFOI disconnect feature (see CONFIG_FB_PM2).
-
-config FB_PM2_PCI
-	bool "generic Permedia2 PCI board support"
-	depends on FB_PM2 && PCI
-	help
-	  Say Y to enable support for Permedia2 AGP frame buffer card from
-	  3Dlabs (aka `Graphic Blaster Exxtreme') on the PCI bus.
-
-config FB_PM2_CVPPC
-	bool "Phase5 CVisionPPC/BVisionPPC support"
-	depends on FB_PM2 && AMIGA
-	help
-	  Say Y to enable support for the Amiga Phase 5 CVisionPPC BVisionPPC
-	  framebuffer cards.  Phase 5 is no longer with us, alas.
+	  Support the Permedia2 FIFO disconnect feature (see CONFIG_FB_PM2).
 
 config FB_ACORN
 	bool "Acorn VIDC support"

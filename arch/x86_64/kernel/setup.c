@@ -218,6 +218,11 @@ static __init void parse_cmdline_early (char ** cmdline_p)
 		if (!memcmp(from, "acpi=ht", 7)) { 
 			acpi_ht = 1; 
 		}
+
+		/* acpi=strict disables out-of-spec workarounds */
+		else if (!memcmp(from, "acpi=strict", 11)) {
+			acpi_strict = 1;
+		}
 #endif
 
 		if (!memcmp(from, "nolapic", 7) ||
@@ -227,7 +232,7 @@ static __init void parse_cmdline_early (char ** cmdline_p)
 		if (!memcmp(from, "noapic", 6)) 
 			skip_ioapic_setup = 1;
 
-		if (!memcmp(from, "apic", 6)) { 
+		if (!memcmp(from, "apic", 4)) { 
 			skip_ioapic_setup = 0;
 			ioapic_force = 1;
 		}
@@ -448,9 +453,7 @@ void __init setup_arch(char **cmdline_p)
 	paging_init();
 
 #ifndef CONFIG_SMP
-	/* Temporary hack: disable the IO-APIC for UP Nvidia and 
-	   This is until we sort out the ACPI problems. */
-	if (!acpi_disabled) 
+	/* Temporary hack: disable the IO-APIC for UP Nvidia and VIA. */
 		check_ioapic();
 #endif
 #ifdef CONFIG_ACPI_BOOT
@@ -591,8 +594,6 @@ static int __init init_amd(struct cpuinfo_x86 *c)
 static void __init detect_ht(void)
 {
 #ifdef CONFIG_SMP
-	extern	int phys_proc_id[NR_CPUS];
-	
 	u32 	eax, ebx, ecx, edx;
 	int 	index_lsb, index_msb, tmp;
 	int	initial_apic_id;
@@ -610,8 +611,7 @@ static void __init detect_ht(void)
 		 * At this point we only support two siblings per
 		 * processor package.
 		 */
-#define NR_SIBLINGS	2
-		if (smp_num_siblings != NR_SIBLINGS) {
+		if (smp_num_siblings > NR_CPUS) {
 			printk(KERN_WARNING "CPU: Unsupported number of the siblings %d", smp_num_siblings);
 			smp_num_siblings = 1;
 			return;
@@ -794,13 +794,12 @@ struct cpu_model_info {
 	char *model_names[16];
 };
 
-/*
- * This does the hard work of actually picking apart the CPU stuff...
- */
-void __init identify_cpu(struct cpuinfo_x86 *c)
+/* Do some early cpuid on the boot CPU to get some parameter that are
+   needed before check_bugs. Everything advanced is in identify_cpu
+   below. */
+void __init early_identify_cpu(struct cpuinfo_x86 *c)
 {
-	int i;
-	u32 xlvl, tfms;
+	u32 tfms;
 
 	c->loops_per_jiffy = loops_per_jiffy;
 	c->x86_cache_size = -1;
@@ -808,6 +807,7 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 	c->x86_model = c->x86_mask = 0;	/* So far unknown... */
 	c->x86_vendor_id[0] = '\0'; /* Unset */
 	c->x86_model_id[0] = '\0';  /* Unset */
+	c->x86_clflush_size = 64;
 	memset(&c->x86_capability, 0, sizeof c->x86_capability);
 
 	/* Get vendor name */
@@ -817,6 +817,7 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 	      (int *)&c->x86_vendor_id[4]);
 		
 	get_cpu_vendor(c);
+
 	/* Initialize the standard set of capabilities */
 	/* Note that the vendor-specific code below might override */
 
@@ -838,6 +839,17 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 		/* Have CPUID level 0 only - unheard of */
 		c->x86 = 4;
 	}
+}
+
+/*
+ * This does the hard work of actually picking apart the CPU stuff...
+ */
+void __init identify_cpu(struct cpuinfo_x86 *c)
+{
+	int i;
+	u32 xlvl;
+
+	early_identify_cpu(c);
 
 	/* AMD-defined flags: level 0x80000001 */
 	xlvl = cpuid_eax(0x80000000);
@@ -854,7 +866,6 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 		if (  xlvl >= 0x80860001 )
 			c->x86_capability[2] = cpuid_edx(0x80860001);
 	}
-
 
 	/*
 	 * Vendor-specific initialization.  In this section we
@@ -996,7 +1007,6 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 	
 #ifdef CONFIG_X86_HT
 	if (cpu_has_ht) {
-		extern int phys_proc_id[NR_CPUS];
 		seq_printf(m, "physical id\t: %d\n", phys_proc_id[c - cpu_data]);
 		seq_printf(m, "siblings\t: %d\n", smp_num_siblings);
 	}

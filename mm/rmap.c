@@ -50,7 +50,8 @@
 
 /*
  * next_and_idx encodes both the address of the next pte_chain and the
- * offset of the highest-index used pte in ptes[].
+ * offset of the lowest-index used pte in ptes[] (which is equal also
+ * to the offset of the highest-index unused pte in ptes[], plus one).
  */
 struct pte_chain {
 	unsigned long next_and_idx;
@@ -112,13 +113,13 @@ pte_chain_encode(struct pte_chain *pte_chain, int idx)
  * If the page has a single-entry pte_chain, collapse that back to a PageDirect
  * representation.  This way, it's only done under memory pressure.
  */
-int page_referenced(struct page * page)
+int fastcall page_referenced(struct page * page)
 {
 	struct pte_chain *pc;
 	int referenced = 0;
 
 	if (page_test_and_clear_young(page))
-		mark_page_accessed(page);
+		referenced++;
 
 	if (TestClearPageReferenced(page))
 		referenced++;
@@ -165,7 +166,7 @@ int page_referenced(struct page * page)
  * Add a new pte reverse mapping to a page.
  * The caller needs to hold the mm->page_table_lock.
  */
-struct pte_chain *
+struct pte_chain * fastcall
 page_add_rmap(struct page *page, pte_t *ptep, struct pte_chain *pte_chain)
 {
 	pte_addr_t pte_paddr = ptep_to_paddr(ptep);
@@ -221,7 +222,7 @@ out:
  * the page.
  * Caller needs to hold the mm->page_table_lock.
  */
-void page_remove_rmap(struct page *page, pte_t *ptep)
+void fastcall page_remove_rmap(struct page *page, pte_t *ptep)
 {
 	pte_addr_t pte_paddr = ptep_to_paddr(ptep);
 	struct pte_chain *pc;
@@ -293,7 +294,7 @@ out_unlock:
  *		    mm->page_table_lock	try_to_unmap_one(), trylock
  */
 static int FASTCALL(try_to_unmap_one(struct page *, pte_addr_t));
-static int try_to_unmap_one(struct page * page, pte_addr_t paddr)
+static int fastcall try_to_unmap_one(struct page * page, pte_addr_t paddr)
 {
 	pte_t *ptep = rmap_ptep_map(paddr);
 	unsigned long address = ptep_to_address(ptep);
@@ -382,7 +383,7 @@ out_unlock:
  * SWAP_AGAIN	- we missed a trylock, try again later
  * SWAP_FAIL	- the page is unswappable
  */
-int try_to_unmap(struct page * page)
+int fastcall try_to_unmap(struct page * page)
 {
 	struct pte_chain *pc, *next_pc, *start;
 	int ret = SWAP_SUCCESS;

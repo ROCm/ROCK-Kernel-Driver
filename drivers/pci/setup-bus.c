@@ -43,13 +43,15 @@
 #define CARDBUS_IO_SIZE		(4096)
 #define CARDBUS_MEM_SIZE	(32*1024*1024)
 
-static int __devinit
+static void __devinit
 pbus_assign_resources_sorted(struct pci_bus *bus)
 {
 	struct pci_dev *dev;
 	struct resource *res;
 	struct resource_list head, *list, *tmp;
-	int idx, found_vga = 0;
+	int idx;
+
+	bus->bridge_ctl &= ~PCI_BRIDGE_CTL_VGA;
 
 	head.next = NULL;
 	list_for_each_entry(dev, &bus->devices, bus_list) {
@@ -57,7 +59,7 @@ pbus_assign_resources_sorted(struct pci_bus *bus)
 
 		if (class == PCI_CLASS_DISPLAY_VGA
 				|| class == PCI_CLASS_NOT_DEFINED_VGA)
-			found_vga = 1;
+			bus->bridge_ctl |= PCI_BRIDGE_CTL_VGA;
 
 		pdev_sort_resources(dev, &head);
 	}
@@ -70,8 +72,6 @@ pbus_assign_resources_sorted(struct pci_bus *bus)
 		list = list->next;
 		kfree(tmp);
 	}
-
-	return found_vga;
 }
 
 static void __devinit
@@ -211,10 +211,7 @@ pci_setup_bridge(struct pci_bus *bus)
 	/* Clear out the upper 32 bits of PREF base. */
 	pci_write_config_dword(bridge, PCI_PREF_BASE_UPPER32, 0);
 
-	/* Check if we have VGA behind the bridge.
-	   Enable ISA in either case (FIXME!). */
-	l = (bus->resource[0]->flags & IORESOURCE_BUS_HAS_VGA) ? 0x0c : 0x04;
-	pci_write_config_word(bridge, PCI_BRIDGE_CONTROL, l);
+	pci_write_config_word(bridge, PCI_BRIDGE_CONTROL, bus->bridge_ctl);
 }
 
 /* Check whether the bridge supports optional I/O and
@@ -498,13 +495,14 @@ void __devinit
 pci_bus_assign_resources(struct pci_bus *bus)
 {
 	struct pci_bus *b;
-	int found_vga = pbus_assign_resources_sorted(bus);
 	struct pci_dev *dev;
 
-	if (found_vga) {
+	pbus_assign_resources_sorted(bus);
+
+	if (bus->bridge_ctl & PCI_BRIDGE_CTL_VGA) {
 		/* Propagate presence of the VGA to upstream bridges */
 		for (b = bus; b->parent; b = b->parent) {
-			b->resource[0]->flags |= IORESOURCE_BUS_HAS_VGA;
+			b->bridge_ctl |= PCI_BRIDGE_CTL_VGA;
 		}
 	}
 	list_for_each_entry(dev, &bus->devices, bus_list) {

@@ -379,7 +379,7 @@ int comx_rx(struct net_device *dev, struct sk_buff *skb)
 
 static struct net_device_stats *comx_stats(struct net_device *dev)
 {
-	struct comx_channel *ch = (struct comx_channel *)dev->priv;
+	struct comx_channel *ch = dev->priv;
 
 	return ch->current_stats;
 }
@@ -535,7 +535,7 @@ static int comx_read_proc(char *page, char **start, off_t off, int count,
 {
 	struct proc_dir_entry *file = (struct proc_dir_entry *)data;
 	struct net_device *dev = file->parent->data;
-	struct comx_channel *ch=(struct comx_channel *)dev->priv;
+	struct comx_channel *ch = dev->priv;
 	int len = 0;
 
 	if (strcmp(file->name, FILENAME_STATUS) == 0) {
@@ -599,7 +599,7 @@ static int comx_write_proc(struct file *file, const char *buffer, u_long count,
 {
 	struct proc_dir_entry *entry = (struct proc_dir_entry *)data;
 	struct net_device *dev = (struct net_device *)entry->parent->data;
-	struct comx_channel *ch=(struct comx_channel *)dev->priv;
+	struct comx_channel *ch = dev->priv;
 	char *page;
 	struct comx_hardware *hw = comx_channels;
 	struct comx_protocol *line = comx_lines;
@@ -821,7 +821,7 @@ static int comx_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 	if (register_netdevice(dev)) {
 		goto cleanup_filename_debug;
 	}
-	ch=dev->priv;
+	ch = dev->priv;
 	if((ch->if_ptr = (void *)kmalloc(sizeof(struct ppp_device), 
 				 GFP_KERNEL)) == NULL) {
 		goto cleanup_register;

@@ -87,7 +87,7 @@ struct xdr_buf {
 /*
  * Miscellaneous XDR helper functions
  */
-u32 *	xdr_encode_array(u32 *p, const char *s, unsigned int len);
+u32 *	xdr_encode_array(u32 *p, const void *s, unsigned int len);
 u32 *	xdr_encode_string(u32 *p, const char *s);
 u32 *	xdr_decode_string(u32 *p, char **sp, int *lenp, int maxlen);
 u32 *	xdr_decode_string_inplace(u32 *p, char **sp, int *lenp, int maxlen);

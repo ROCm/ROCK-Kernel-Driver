@@ -256,12 +256,15 @@
 #define __NR_clock_gettime	(__NR_timer_create+6)
 #define __NR_clock_getres	(__NR_timer_create+7)
 #define __NR_clock_nanosleep	(__NR_timer_create+8)
+
 /*
  * Number 263 is reserved for vserver
  */
 #define __NR_fadvise64_64	264
+#define __NR_statfs64		265
+#define __NR_fstatfs64		266
 
-#define NR_syscalls 265
+#define NR_syscalls 267
 
 /* 
  * There are some system calls that are not present on 64 bit, some
@@ -553,7 +556,6 @@ asmlinkage int sys_vfork(struct pt_regs regs);
 #endif /* CONFIG_ARCH_S390X */
 asmlinkage __SYS_RETTYPE sys_pipe(unsigned long *fildes);
 asmlinkage int sys_ptrace(long request, long pid, long addr, long data);
-asmlinkage long sys_ioperm(unsigned long from, unsigned long num, int on);
 struct sigaction;
 asmlinkage long sys_rt_sigaction(int sig,
 				const struct sigaction __user *act,

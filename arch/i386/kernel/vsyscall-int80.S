@@ -1,5 +1,10 @@
 /*
  * Code for the vsyscall page.  This version uses the old int $0x80 method.
+ *
+ * NOTE:
+ * 1) __kernel_vsyscall _must_ be first in this page.
+ * 2) there are alignment constraints on this stub, see vsyscall-sigreturn.S
+ *    for details.
  */
 
 	.text

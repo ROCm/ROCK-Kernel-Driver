@@ -361,7 +361,8 @@ int show_stat(struct seq_file *p, void *v)
 	int i;
 	extern unsigned long total_forks;
 	unsigned long jif;
-	unsigned int sum = 0, user = 0, nice = 0, system = 0, idle = 0, iowait = 0, irq = 0, softirq = 0;
+	u64	sum = 0, user = 0, nice = 0, system = 0,
+		idle = 0, iowait = 0, irq = 0, softirq = 0;
 
 	jif = - wall_to_monotonic.tv_sec;
 	if (wall_to_monotonic.tv_nsec)
@@ -381,26 +382,35 @@ int show_stat(struct seq_file *p, void *v)
 			sum += kstat_cpu(i).irqs[j];
 	}
 
-	seq_printf(p, "cpu  %u %u %u %u %u %u %u\n",
-		jiffies_to_clock_t(user),
-		jiffies_to_clock_t(nice),
-		jiffies_to_clock_t(system),
-		jiffies_to_clock_t(idle),
-		jiffies_to_clock_t(iowait),
-		jiffies_to_clock_t(irq),
-		jiffies_to_clock_t(softirq));
-	for_each_online_cpu(i) {
-		seq_printf(p, "cpu%d %u %u %u %u %u %u %u\n",
+	seq_printf(p, "cpu  %llu %llu %llu %llu %llu %llu %llu\n",
+		(unsigned long long)jiffies_64_to_clock_t(user),
+		(unsigned long long)jiffies_64_to_clock_t(nice),
+		(unsigned long long)jiffies_64_to_clock_t(system),
+		(unsigned long long)jiffies_64_to_clock_t(idle),
+		(unsigned long long)jiffies_64_to_clock_t(iowait),
+		(unsigned long long)jiffies_64_to_clock_t(irq),
+		(unsigned long long)jiffies_64_to_clock_t(softirq));
+	for_each_cpu(i) {
+		/* two separate calls here to work around gcc-2.95.3 ICE */
+		seq_printf(p, "cpu%d %llu %llu %llu ",
 			i,
-			jiffies_to_clock_t(kstat_cpu(i).cpustat.user),
-			jiffies_to_clock_t(kstat_cpu(i).cpustat.nice),
-			jiffies_to_clock_t(kstat_cpu(i).cpustat.system),
-			jiffies_to_clock_t(kstat_cpu(i).cpustat.idle),
-			jiffies_to_clock_t(kstat_cpu(i).cpustat.iowait),
-			jiffies_to_clock_t(kstat_cpu(i).cpustat.irq),
-			jiffies_to_clock_t(kstat_cpu(i).cpustat.softirq));
+			(unsigned long long)
+			  jiffies_64_to_clock_t(kstat_cpu(i).cpustat.user),
+			(unsigned long long)
+			  jiffies_64_to_clock_t(kstat_cpu(i).cpustat.nice),
+			(unsigned long long)
+			  jiffies_64_to_clock_t(kstat_cpu(i).cpustat.system));
+		seq_printf(p, "%llu %llu %llu %llu\n",
+			(unsigned long long)
+			  jiffies_64_to_clock_t(kstat_cpu(i).cpustat.idle),
+			(unsigned long long)
+			  jiffies_64_to_clock_t(kstat_cpu(i).cpustat.iowait),
+			(unsigned long long)
+			  jiffies_64_to_clock_t(kstat_cpu(i).cpustat.irq),
+			(unsigned long long)
+			  jiffies_64_to_clock_t(kstat_cpu(i).cpustat.softirq));
 	}
-	seq_printf(p, "intr %u", sum);
+	seq_printf(p, "intr %llu", (unsigned long long)sum);
 
 #if !defined(CONFIG_PPC64) && !defined(CONFIG_ALPHA)
 	for (i = 0; i < NR_IRQS; i++)
@@ -408,7 +418,7 @@ int show_stat(struct seq_file *p, void *v)
 #endif
 
 	seq_printf(p,
-		"\nctxt %lu\n"
+		"\nctxt %llu\n"
 		"btime %lu\n"
 		"processes %lu\n"
 		"procs_running %lu\n"
@@ -424,7 +434,7 @@ int show_stat(struct seq_file *p, void *v)
 
 static int stat_open(struct inode *inode, struct file *file)
 {
-	unsigned size = 4096 * (1 + num_online_cpus() / 32);
+	unsigned size = 4096 * (1 + num_possible_cpus() / 32);
 	char *buf;
 	struct seq_file *m;
 	int res;

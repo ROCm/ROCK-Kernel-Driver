@@ -22,12 +22,13 @@
 #include <asm/uaccess.h>
 
 #define MISC_MCELOG_MINOR 227
+#define NR_BANKS 5
 
 static int mce_disabled __initdata;
 /* 0: always panic, 1: panic if deadlock possible, 2: try to avoid panic */ 
 static int tolerant = 2;
 static int banks;
-static unsigned long disabled_banks;
+static unsigned long bank[NR_BANKS] = { [0 ... NR_BANKS-1] = ~0UL };
 
 /*
  * Lockless MCE logging infrastructure.
@@ -73,7 +74,9 @@ static void print_mce(struct mce *m)
 	printk("CPU %d: Machine Check Exception: %16Lx Bank %d: %016Lx\n",
 	       m->cpu, m->mcgstatus, m->bank, m->status);
 	if (m->rip) {
-		printk("RIP %02x:<%016Lx> ", m->cs, m->rip);
+		printk("RIP%s %02x:<%016Lx> ",
+		       !(m->mcgstatus & MCG_STATUS_EIPV) ? " !INEXACT!" : "",
+		       m->cs, m->rip);
 		if (m->cs == __KERNEL_CS)
 			print_symbol("{%s}", m->rip);
 		printk("\n");
@@ -133,7 +136,7 @@ void do_machine_check(struct pt_regs * regs, long error_code)
 		return;
 	if (!(m.mcgstatus & MCG_STATUS_RIPV))
 		kill_it = 1;
-	if (regs && (m.mcgstatus & MCG_STATUS_EIPV)) {
+	if (regs) {
 		m.rip = regs->rip;
 		m.cs = regs->cs;
 	}
@@ -142,7 +145,7 @@ void do_machine_check(struct pt_regs * regs, long error_code)
 	mb();
 
 	for (i = 0; i < banks; i++) {
-		if (test_bit(i, &disabled_banks))
+		if (!bank[i])
 			continue;
 
 		rdmsrl(MSR_IA32_MC0_STATUS + i*4, m.status);
@@ -177,7 +180,7 @@ void do_machine_check(struct pt_regs * regs, long error_code)
 		   confused it's normally not necessary to panic, unless you are 
 		   paranoid (tolerant == 0) */ 
 		if (!user_space && (panic_on_oops || tolerant < 2))
-			mce_panic("Uncorrected machine check in kernel", &m, mcestart);
+			mce_panic("Uncorrected machine check", &m, mcestart);
 
 		/* do_exit takes an awful lot of locks and has as slight risk 
 		   of deadlocking. If you don't want that don't set tolerant >= 2 */
@@ -236,16 +239,30 @@ static void mce_init(void *dummy)
 		wrmsr(MSR_IA32_MCG_CTL, 0xffffffff, 0xffffffff);
 
 	banks = cap & 0xff;
+	if (banks > NR_BANKS) { 
+		printk(KERN_INFO "MCE: warning: using only %d banks\n", banks);
+		banks = NR_BANKS; 
+	}
 
 	mce_clear_all(); 
 	for (i = 0; i < banks; i++) {
-		u64 val = test_bit(i, &disabled_banks) ? 0 : ~0UL;
-		wrmsrl(MSR_IA32_MC0_CTL+4*i, val);
+		wrmsrl(MSR_IA32_MC0_CTL+4*i, bank[i]);
 		wrmsrl(MSR_IA32_MC0_STATUS+4*i, 0);
 	}	
 
 	set_in_cr4(X86_CR4_MCE);
 }
+
+/* Add per CPU specific workarounds here */
+static void __init mce_cpu_quirks(struct cpuinfo_x86 *c) 
+{ 
+	/* This should be disabled by the BIOS, but isn't always */
+	if (c->x86_vendor == X86_VENDOR_AMD && c->x86 == 15) {
+		/* disable GART TBL walk error reporting, which trips off 
+		   incorrectly with the IOMMU & 3ware & Cerberus. */
+		clear_bit(10, &bank[4]);
+	}
+}			
 
 /* 
  * Called for each booted CPU to set up machine checks.
@@ -254,6 +271,8 @@ static void mce_init(void *dummy)
 void __init mcheck_init(struct cpuinfo_x86 *c)
 {
 	static unsigned long mce_cpus __initdata = 0;
+
+	mce_cpu_quirks(c); 
 
 	if (test_and_set_bit(smp_processor_id(), &mce_cpus) || !mce_available(c))
 		return;
@@ -341,23 +360,9 @@ static int mce_ioctl(struct inode *i, struct file *f,unsigned int cmd, unsigned 
 	} 
 }
 
-#if 0 /* for testing */
-static ssize_t mce_write(struct file *f, const char __user *buf, size_t sz, loff_t *off)
-{
-	struct mce m;
-	if (sz != sizeof(struct mce))
-		return -EINVAL;
-	copy_from_user(&m, buf, sizeof(struct mce));
-	m.finished = 0;
-	mce_log(&m);
-	return sizeof(struct mce);
-}
-#endif
-
 static struct file_operations mce_chrdev_ops = {
 	.read = mce_read,
 	.ioctl = mce_ioctl,
-	//.write = mce_write
 };
 
 static struct miscdevice mce_log_device = {
@@ -423,23 +428,27 @@ static struct sys_device device_mce = {
 };
 
 /* Why are there no generic functions for this? */
-#define ACCESSOR(name, start) \
+#define ACCESSOR(name, var, start) \
 	static ssize_t show_ ## name(struct sys_device *s, char *buf) { 	   	   \
-		return sprintf(buf, "%lu\n", (unsigned long)name);		   \
+		return sprintf(buf, "%lu\n", (unsigned long)var);		   \
 	} 									   \
 	static ssize_t set_ ## name(struct sys_device *s,const char *buf,size_t siz) { \
 		char *end; 							   \
 		unsigned long new = simple_strtoul(buf, &end, 0); 		   \
 		if (end == buf) return -EINVAL;					   \
-		name = new;							   \
+		var = new;							   \
 		start; 								   \
 		return end-buf;		     					   \
 	}									   \
 	static SYSDEV_ATTR(name, 0644, show_ ## name, set_ ## name);
 
-ACCESSOR(disabled_banks,mce_restart())
-ACCESSOR(tolerant,)
-ACCESSOR(check_interval,mce_restart())
+ACCESSOR(bank0ctl,bank[0],mce_restart())
+ACCESSOR(bank1ctl,bank[1],mce_restart())
+ACCESSOR(bank2ctl,bank[2],mce_restart())
+ACCESSOR(bank3ctl,bank[3],mce_restart())
+ACCESSOR(bank4ctl,bank[4],mce_restart())
+ACCESSOR(tolerant,tolerant,)
+ACCESSOR(check_interval,check_interval,mce_restart())
 
 static __init int mce_init_device(void)
 {
@@ -448,10 +457,14 @@ static __init int mce_init_device(void)
 		return -EIO;
 	err = sysdev_class_register(&mce_sysclass);
 	if (!err)
-		err = sys_device_register(&device_mce);
+		err = sysdev_register(&device_mce);
 	if (!err) { 
 		/* could create per CPU objects, but is not worth it. */
-		sysdev_create_file(&device_mce, &attr_disabled_banks); 
+		sysdev_create_file(&device_mce, &attr_bank0ctl); 
+		sysdev_create_file(&device_mce, &attr_bank1ctl); 
+		sysdev_create_file(&device_mce, &attr_bank2ctl); 
+		sysdev_create_file(&device_mce, &attr_bank3ctl); 
+		sysdev_create_file(&device_mce, &attr_bank4ctl); 
 		sysdev_create_file(&device_mce, &attr_tolerant); 
 		sysdev_create_file(&device_mce, &attr_check_interval);
 	} 

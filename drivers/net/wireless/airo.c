@@ -1505,7 +1505,7 @@ static int RxSeqValid (struct airo_info *ai,miccntx *context,int mcast,u32 micSe
 	seq = micSeq - (context->window - 33);
 
 	//Too old of a SEQ number to check.
-	if ((u32)seq < 0)
+	if ((s32)seq < 0)
 		return ERROR;
     
 	if ( seq > 64 ) {

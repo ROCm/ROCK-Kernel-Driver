@@ -8,7 +8,7 @@
 	This software may be used and distributed according to the terms
 	of the GNU General Public License, incorporated herein by reference.
 
-	Please refer to Documentation/DocBook/tulip.{pdf,ps,html}
+	Please refer to Documentation/DocBook/tulip-user.{pdf,ps,html}
 	for more information on this driver, or visit the project
 	Web page at http://sourceforge.net/projects/tulip/
 
@@ -20,7 +20,7 @@
 
 void pnic_do_nway(struct net_device *dev)
 {
-	struct tulip_private *tp = (struct tulip_private *)dev->priv;
+	struct tulip_private *tp = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 	u32 phy_reg = inl(ioaddr + 0xB8);
 	u32 new_csr6 = tp->csr6 & ~0x40C40200;
@@ -53,7 +53,7 @@ void pnic_do_nway(struct net_device *dev)
 
 void pnic_lnk_change(struct net_device *dev, int csr5)
 {
-	struct tulip_private *tp = (struct tulip_private *)dev->priv;
+	struct tulip_private *tp = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 	int phy_reg = inl(ioaddr + 0xB8);
 
@@ -89,7 +89,7 @@ void pnic_lnk_change(struct net_device *dev, int csr5)
 void pnic_timer(unsigned long data)
 {
 	struct net_device *dev = (struct net_device *)data;
-	struct tulip_private *tp = (struct tulip_private *)dev->priv;
+	struct tulip_private *tp = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 	int next_tick = 60*HZ;
 

@@ -24,6 +24,8 @@
 #include <linux/radix-tree.h>
 #include <linux/percpu.h>
 #include <linux/slab.h>
+#include <linux/notifier.h>
+#include <linux/cpu.h>
 #include <linux/gfp.h>
 #include <linux/string.h>
 
@@ -420,6 +422,28 @@ static __init void radix_tree_init_maxindex(void)
 		height_to_maxindex[i] = __maxindex(i);
 }
 
+#ifdef CONFIG_HOTPLUG_CPU
+static int radix_tree_callback(struct notifier_block *nfb,
+                            unsigned long action,
+                            void *hcpu)
+{
+       int cpu = (long)hcpu;
+       struct radix_tree_preload *rtp;
+
+       /* Free per-cpu pool of perloaded nodes */
+       if (action == CPU_DEAD) {
+               rtp = &per_cpu(radix_tree_preloads, cpu);
+               while (rtp->nr) {
+                       kmem_cache_free(radix_tree_node_cachep,
+                                       rtp->nodes[rtp->nr-1]);
+                       rtp->nodes[rtp->nr-1] = NULL;
+                       rtp->nr--;
+               }
+       }
+       return NOTIFY_OK;
+}
+#endif /* CONFIG_HOTPLUG_CPU */
+
 void __init radix_tree_init(void)
 {
 	radix_tree_node_cachep = kmem_cache_create("radix_tree_node",
@@ -428,4 +452,5 @@ void __init radix_tree_init(void)
 	if (!radix_tree_node_cachep)
 		panic ("Failed to create radix_tree_node cache\n");
 	radix_tree_init_maxindex();
+	hotcpu_notifier(radix_tree_callback, 0);
 }

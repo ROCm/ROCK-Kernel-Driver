@@ -124,7 +124,7 @@ static int dbAllocAG(struct bmap * bmp, int agno, s64 nblocks, int l2nb,
 		     s64 * results);
 static int dbAllocCtl(struct bmap * bmp, s64 nblocks, int l2nb, s64 blkno,
 		      s64 * results);
-int dbExtend(struct inode *ip, s64 blkno, s64 nblocks, s64 addnblocks);
+static int dbExtend(struct inode *ip, s64 blkno, s64 nblocks, s64 addnblocks);
 static int dbFindBits(u32 word, int l2nb);
 static int dbFindCtl(struct bmap * bmp, int l2nb, int level, s64 * blkno);
 static int dbFindLeaf(dmtree_t * tp, int l2nb, int *leafidx);
@@ -134,10 +134,10 @@ static int dbFreeDmap(struct bmap * bmp, struct dmap * dp, s64 blkno,
 		      int nblocks);
 static int dbMaxBud(u8 * cp);
 s64 dbMapFileSizeToMapSize(struct inode *ipbmap);
-int blkstol2(s64 nb);
+static int blkstol2(s64 nb);
 
-int cntlz(u32 value);
-int cnttz(u32 word);
+static int cntlz(u32 value);
+static int cnttz(u32 word);
 
 static int dbAllocDmapBU(struct bmap * bmp, struct dmap * dp, s64 blkno,
 			 int nblocks);
@@ -155,7 +155,7 @@ static int dbGetL2AGSize(s64 nblocks);
  * into the table, with the table elements yielding the maximum
  * binary buddy of free bits within the character.
  */
-signed char budtab[256] = {
+static s8 budtab[256] = {
 	3, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
 	2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
 	2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
@@ -942,7 +942,7 @@ int dbAlloc(struct inode *ip, s64 hint, s64 nblocks, s64 * results)
 	return (rc);
 }
 
-
+#ifdef _NOTYET
 /*
  * NAME:	dbAllocExact()
  *
@@ -1009,7 +1009,7 @@ int dbAllocExact(struct inode *ip, s64 blkno, int nblocks)
 
 	return (rc);
 }
-
+#endif /* _NOTYET */
 
 /*
  * NAME:	dbReAlloc()
@@ -1092,7 +1092,7 @@ dbReAlloc(struct inode *ip,
  *      -ENOSPC	- insufficient disk resources
  *      -EIO	- i/o error
  */
-int dbExtend(struct inode *ip, s64 blkno, s64 nblocks, s64 addnblocks)
+static int dbExtend(struct inode *ip, s64 blkno, s64 nblocks, s64 addnblocks)
 {
 	struct jfs_sb_info *sbi = JFS_SBI(ip->i_sb);
 	s64 lblkno, lastblkno, extblkno;
@@ -3022,7 +3022,7 @@ static int dbMaxBud(u8 * cp)
  * RETURN VALUES:
  *      count of trailing zeros
  */
-int cnttz(u32 word)
+static int cnttz(u32 word)
 {
 	int n;
 
@@ -3047,7 +3047,7 @@ int cnttz(u32 word)
  * RETURN VALUES:
  *      count of leading zeros
  */
-int cntlz(u32 value)
+static int cntlz(u32 value)
 {
 	int n;
 

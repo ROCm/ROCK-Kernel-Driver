@@ -13,6 +13,7 @@
 #include <asm/ptrace.h>
 #include <asm/vaddrs.h>
 #include <asm/contregs.h>
+#include <asm/thread_info.h>
 
 	.globl sun4m_cpu_startup, __smp4m_processor_id
 	.globl sun4d_cpu_startup, __smp4d_processor_id

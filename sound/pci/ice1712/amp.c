@@ -38,6 +38,7 @@ static int __devinit snd_vt1724_amp_init(ice1712_t *ice)
 	/* only use basic functionality for now */
 
 	ice->num_total_dacs = 2;	/* only PSDOUT0 is connected */
+	ice->num_total_adcs = 2;
 
 	return 0;
 }

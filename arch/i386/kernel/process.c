@@ -28,6 +28,7 @@
 #include <linux/a.out.h>
 #include <linux/interrupt.h>
 #include <linux/config.h>
+#include <linux/version.h>
 #include <linux/delay.h>
 #include <linux/reboot.h>
 #include <linux/init.h>
@@ -222,7 +223,7 @@ void show_regs(struct pt_regs * regs)
 
 	if (regs->xcs & 3)
 		printk(" ESP: %04x:%08lx",0xffff & regs->xss,regs->esp);
-	printk(" EFLAGS: %08lx    %s\n",regs->eflags, print_tainted());
+	printk(" EFLAGS: %08lx    %s  (%s)\n",regs->eflags, print_tainted(),UTS_RELEASE);
 	printk("EAX: %08lx EBX: %08lx ECX: %08lx EDX: %08lx\n",
 		regs->eax,regs->ebx,regs->ecx,regs->edx);
 	printk("ESI: %08lx EDI: %08lx EBP: %08lx",
@@ -493,7 +494,7 @@ int dump_task_regs(struct task_struct *tsk, elf_gregset_t *regs)
  * the task-switch, and shows up in ret_from_fork in entry.S,
  * for example.
  */
-struct task_struct * __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
+struct task_struct fastcall * __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 {
 	struct thread_struct *prev = &prev_p->thread,
 				 *next = &next_p->thread;

@@ -102,7 +102,6 @@ void ccw_device_disband_done(struct ccw_device *, int);
 
 int ccw_device_call_handler(struct ccw_device *);
 
-void ccw_device_add_stlck(void *);
 int ccw_device_stlck(struct ccw_device *);
 
 /* qdio needs this. */

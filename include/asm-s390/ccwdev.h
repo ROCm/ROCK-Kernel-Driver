@@ -118,6 +118,8 @@ extern int ccw_device_set_options(struct ccw_device *, unsigned long);
 #define CCWDEV_REPORT_ALL	 	0x0002
 /* Try to perform path grouping. */
 #define CCWDEV_DO_PATHGROUP             0x0004
+/* Allow forced onlining of boxed devices. */
+#define CCWDEV_ALLOW_FORCE              0x0008
 
 /*
  * ccw_device_start()

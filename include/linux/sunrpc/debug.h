@@ -54,7 +54,7 @@ extern unsigned int		nlm_debug;
 
 #undef ifdebug
 #ifdef RPC_DEBUG			
-# define ifdebug(fac)		if (rpc_debug & RPCDBG_##fac)
+# define ifdebug(fac)		if (unlikely(rpc_debug & RPCDBG_##fac))
 # define dfprintk(fac, args...)	do { ifdebug(fac) printk(args); } while(0)
 # define RPC_IFDEBUG(x)		x
 #else
@@ -92,6 +92,8 @@ enum {
 	CTL_NFSDEBUG,
 	CTL_NFSDDEBUG,
 	CTL_NLMDEBUG,
+	CTL_SLOTTABLE_UDP,
+	CTL_SLOTTABLE_TCP,
 };
 
 #endif /* _LINUX_SUNRPC_DEBUG_H_ */

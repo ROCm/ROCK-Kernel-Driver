@@ -77,7 +77,7 @@ struct locomx_data {
 
 static int LOCOMX_txe(struct net_device *dev)
 {
-	struct comx_channel *ch = dev->priv;
+	struct comx_channel *ch = netdev_priv(dev);
 	struct locomx_data *hw = ch->HW_privdata;
 
 	return (!hw->board.chanA.tx_next_skb);
@@ -86,8 +86,8 @@ static int LOCOMX_txe(struct net_device *dev)
 
 static void locomx_rx(struct z8530_channel *c, struct sk_buff *skb)
 {
-	struct net_device *dev=c->netdevice;
-	struct comx_channel *ch=dev->priv;
+	struct net_device *dev = c->netdevice;
+	struct comx_channel *ch = netdev_priv(dev);
 	
 	if (ch->debug_flags & DEBUG_HW_RX) {
 		comx_debug_skb(dev, skb, "locomx_rx receiving");
@@ -97,7 +97,7 @@ static void locomx_rx(struct z8530_channel *c, struct sk_buff *skb)
 
 static int LOCOMX_send_packet(struct net_device *dev, struct sk_buff *skb) 
 {
-	struct comx_channel *ch = (struct comx_channel *)dev->priv;
+	struct comx_channel *ch = netdev_priv(dev);
 	struct locomx_data *hw = ch->HW_privdata;
 
 	if (ch->debug_flags & DEBUG_HW_TX) {
@@ -126,9 +126,9 @@ static int LOCOMX_send_packet(struct net_device *dev, struct sk_buff *skb)
 
 static void locomx_status_timerfun(unsigned long d)
 {
-	struct net_device *dev=(struct net_device *)d;
-	struct comx_channel *ch=dev->priv;
-	struct locomx_data *hw=ch->HW_privdata;
+	struct net_device *dev = (struct net_device *)d;
+	struct comx_channel *ch = netdev_priv(dev);
+	struct locomx_data *hw = ch->HW_privdata;
 
 	if(!(ch->line_status & LINE_UP) &&
 	    (hw->board.chanA.status & CTS)) {
@@ -144,7 +144,7 @@ static void locomx_status_timerfun(unsigned long d)
 
 static int LOCOMX_open(struct net_device *dev)
 {
-	struct comx_channel *ch = dev->priv;
+	struct comx_channel *ch = netdev_priv(dev);
 	struct locomx_data *hw = ch->HW_privdata;
 	struct proc_dir_entry *procfile = ch->procdir->subdir;
 	unsigned long flags;
@@ -256,7 +256,7 @@ irq_fail:
 
 static int LOCOMX_close(struct net_device *dev)
 {
-	struct comx_channel *ch = dev->priv;
+	struct comx_channel *ch = netdev_priv(dev);
 	struct locomx_data *hw = ch->HW_privdata;
 	struct proc_dir_entry *procfile = ch->procdir->subdir;
 
@@ -376,7 +376,7 @@ static int locomx_write_proc(struct file *file, const char *buffer,
 
 static int LOCOMX_init(struct net_device *dev) 
 {
-	struct comx_channel *ch = (struct comx_channel *)dev->priv;
+	struct comx_channel *ch = netdev_priv(dev);
 	struct locomx_data *hw;
 	struct proc_dir_entry *new_file;
 
@@ -449,7 +449,7 @@ cleanup_HW_privdata:
 
 static int LOCOMX_exit(struct net_device *dev)
 {
-	struct comx_channel *ch = (struct comx_channel *)dev->priv;
+	struct comx_channel *ch = netdev_priv(dev);
 
 	ch->HW_access_board = NULL;
 	ch->HW_release_board = NULL;

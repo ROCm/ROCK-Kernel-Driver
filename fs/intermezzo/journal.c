@@ -309,7 +309,7 @@ journal_log_prefix_with_groups_and_ids(char *buf, int opcode,
                                        __u32 fsuid, __u32 fsgid)
 {
         struct kml_prefix_hdr p;
-        u32 loggroups[NGROUPS_MAX];
+        u32 loggroups[NGROUPS_SMALL];
 
         int i; 
 
@@ -332,15 +332,15 @@ journal_log_prefix_with_groups_and_ids(char *buf, int opcode,
 static inline char *
 journal_log_prefix(char *buf, int opcode, struct rec_info *rec)
 {
-        __u32 groups[NGROUPS_MAX]; 
+        __u32 groups[NGROUPS_SMALL]; 
         int i; 
 
         /* convert 16 bit gid's to 32 bit gid's */
-        for (i=0; i<current->ngroups; i++) 
-                groups[i] = (__u32) current->groups[i];
+        for (i=0; i<current->group_info->ngroups; i++) 
+                groups[i] = GROUP_AT(current->group_info,i);
         
         return journal_log_prefix_with_groups_and_ids(buf, opcode, rec,
-                                                      (__u32)current->ngroups,
+                                                      (__u32)current->group_info->ngroups,
                                                       groups,
                                                       (__u32)current->fsuid,
                                                       (__u32)current->fsgid);
@@ -1319,7 +1319,7 @@ int presto_write_lml_close(struct rec_info *rec,
         pathlen = cpu_to_le32(MYPATHLEN(buffer, path));
         ino = cpu_to_le64(dentry->d_inode->i_ino);
         generation = cpu_to_le32(dentry->d_inode->i_generation);
-        size =  sizeof(__u32) * current->ngroups + 
+        size =  sizeof(__u32) * current->group_info->ngroups + 
                 sizeof(struct kml_prefix_hdr) + sizeof(*new_file_ver) +
                 sizeof(ino) + sizeof(generation) + sizeof(pathlen) +
                 sizeof(remote_ino) + sizeof(remote_generation) + 
@@ -1529,7 +1529,7 @@ int presto_journal_setattr(struct rec_info *rec, struct presto_file_set *fset,
         BUFF_ALLOC(buffer, NULL);
         path = presto_path(dentry, root, buffer, PAGE_SIZE);
         pathlen = cpu_to_le32(MYPATHLEN(buffer, path));
-        size =  sizeof(__u32) * current->ngroups + 
+        size =  sizeof(__u32) * current->group_info->ngroups + 
                 sizeof(struct kml_prefix_hdr) + sizeof(*old_ver) +
                 sizeof(valid) + sizeof(mode) + sizeof(uid) + sizeof(gid) +
                 sizeof(fsize) + sizeof(mtime) + sizeof(ctime) + sizeof(flags) +
@@ -1600,7 +1600,7 @@ int presto_get_fileid(int minor, struct presto_file_set *fset,
         BUFF_ALLOC(buffer, NULL);
         path = presto_path(dentry, root, buffer, PAGE_SIZE);
         pathlen = cpu_to_le32(MYPATHLEN(buffer, path));
-        size =  sizeof(__u32) * current->ngroups + 
+        size =  sizeof(__u32) * current->group_info->ngroups + 
                 sizeof(struct kml_prefix_hdr) + sizeof(pathlen) +
                 size_round(le32_to_cpu(pathlen)) +
                 sizeof(struct kml_suffix);
@@ -1659,7 +1659,7 @@ int presto_journal_create(struct rec_info *rec, struct presto_file_set *fset,
         BUFF_ALLOC(buffer, NULL);
         path = presto_path(dentry, root, buffer, PAGE_SIZE);
         pathlen = cpu_to_le32(MYPATHLEN(buffer, path));
-        size =  sizeof(__u32) * current->ngroups + 
+        size =  sizeof(__u32) * current->group_info->ngroups + 
                 sizeof(struct kml_prefix_hdr) + 3 * sizeof(*tgt_dir_ver) +
                 sizeof(lmode) + sizeof(uid) + sizeof(gid) + sizeof(pathlen) +
                 sizeof(struct kml_suffix);
@@ -1715,7 +1715,7 @@ int presto_journal_symlink(struct rec_info *rec, struct presto_file_set *fset,
         BUFF_ALLOC(buffer, NULL);
         path = presto_path(dentry, root, buffer, PAGE_SIZE);
         pathlen = cpu_to_le32(MYPATHLEN(buffer, path));
-        size =  sizeof(__u32) * current->ngroups + 
+        size =  sizeof(__u32) * current->group_info->ngroups + 
                 sizeof(struct kml_prefix_hdr) + 3 * sizeof(*tgt_dir_ver) +
                 sizeof(uid) + sizeof(gid) + sizeof(pathlen) +
                 sizeof(targetlen) + sizeof(struct kml_suffix);
@@ -1773,7 +1773,7 @@ int presto_journal_mkdir(struct rec_info *rec, struct presto_file_set *fset,
         BUFF_ALLOC(buffer, NULL);
         path = presto_path(dentry, root, buffer, PAGE_SIZE);
         pathlen = cpu_to_le32(MYPATHLEN(buffer, path));
-        size = sizeof(__u32) * current->ngroups + 
+        size = sizeof(__u32) * current->group_info->ngroups + 
                 sizeof(struct kml_prefix_hdr) + 3 * sizeof(*tgt_dir_ver) +
                 sizeof(lmode) + sizeof(uid) + sizeof(gid) + sizeof(pathlen) +
                 sizeof(struct kml_suffix);
@@ -1828,7 +1828,7 @@ presto_journal_rmdir(struct rec_info *rec, struct presto_file_set *fset,
         BUFF_ALLOC(buffer, NULL);
         path = presto_path(dir, root, buffer, PAGE_SIZE);
         pathlen = cpu_to_le32(MYPATHLEN(buffer, path));
-        size =  sizeof(__u32) * current->ngroups + 
+        size =  sizeof(__u32) * current->group_info->ngroups + 
                 sizeof(struct kml_prefix_hdr) + 3 * sizeof(*tgt_dir_ver) +
                 sizeof(pathlen) + sizeof(llen) + sizeof(*rb) +
                 sizeof(struct kml_suffix);
@@ -1891,7 +1891,7 @@ presto_journal_mknod(struct rec_info *rec, struct presto_file_set *fset,
         BUFF_ALLOC(buffer, NULL);
         path = presto_path(dentry, root, buffer, PAGE_SIZE);
         pathlen = cpu_to_le32(MYPATHLEN(buffer, path));
-        size = sizeof(__u32) * current->ngroups + 
+        size = sizeof(__u32) * current->group_info->ngroups + 
                 sizeof(struct kml_prefix_hdr) + 3 * sizeof(*tgt_dir_ver) +
                 sizeof(lmode) + sizeof(uid) + sizeof(gid) + sizeof(lmajor) +
                 sizeof(lminor) + sizeof(pathlen) +
@@ -1951,7 +1951,7 @@ presto_journal_link(struct rec_info *rec, struct presto_file_set *fset,
         BUFF_ALLOC(buffer, srcbuffer);
         path = presto_path(tgt, root, buffer, PAGE_SIZE);
         pathlen = cpu_to_le32(MYPATHLEN(buffer, path));
-        size =  sizeof(__u32) * current->ngroups + 
+        size =  sizeof(__u32) * current->group_info->ngroups + 
                 sizeof(struct kml_prefix_hdr) + 3 * sizeof(*tgt_dir_ver) +
                 sizeof(srcpathlen) + sizeof(pathlen) +
                 sizeof(struct kml_suffix);
@@ -2009,7 +2009,7 @@ int presto_journal_rename(struct rec_info *rec, struct presto_file_set *fset,
         BUFF_ALLOC(buffer, srcbuffer);
         path = presto_path(tgt, root, buffer, PAGE_SIZE);
         pathlen = cpu_to_le32(MYPATHLEN(buffer, path));
-        size =  sizeof(__u32) * current->ngroups + 
+        size =  sizeof(__u32) * current->group_info->ngroups + 
                 sizeof(struct kml_prefix_hdr) + 4 * sizeof(*src_dir_ver) +
                 sizeof(srcpathlen) + sizeof(pathlen) +
                 sizeof(struct kml_suffix);
@@ -2069,7 +2069,7 @@ int presto_journal_unlink(struct rec_info *rec, struct presto_file_set *fset,
         BUFF_ALLOC(buffer, NULL);
         path = presto_path(dir, root, buffer, PAGE_SIZE);
         pathlen = cpu_to_le32(MYPATHLEN(buffer, path));
-        size = sizeof(__u32) * current->ngroups + 
+        size = sizeof(__u32) * current->group_info->ngroups + 
                 sizeof(struct kml_prefix_hdr) + 3 * sizeof(*tgt_dir_ver) +
                 sizeof(pathlen) + sizeof(llen) + sizeof(*rb) +
                 sizeof(old_targetlen) + sizeof(struct kml_suffix);
@@ -2116,7 +2116,7 @@ presto_journal_close(struct rec_info *rec, struct presto_file_set *fset,
         __u32 open_fsuid;
         __u32 open_fsgid;
         __u32 open_ngroups;
-        __u32 open_groups[NGROUPS_MAX];
+        __u32 open_groups[NGROUPS_SMALL];
         __u32 open_mode;
         __u32 open_uid;
         __u32 open_gid;
@@ -2146,9 +2146,9 @@ presto_journal_close(struct rec_info *rec, struct presto_file_set *fset,
                 open_fsuid = fd->fd_fsuid;
                 open_fsgid = fd->fd_fsgid;
         } else {
-                open_ngroups = current->ngroups;
-                for (i=0; i<current->ngroups; i++)
-                        open_groups[i] =  (__u32) current->groups[i]; 
+                open_ngroups = current->group_info->ngroups;
+                for (i=0; i<current->group_info->ngroups; i++)
+                        open_groups[i] =  (__u32) GROUP_AT(current->group_info,i); 
                 open_mode = dentry->d_inode->i_mode;
                 open_uid = dentry->d_inode->i_uid;
                 open_gid = dentry->d_inode->i_gid;
@@ -2246,7 +2246,7 @@ int presto_rewrite_close(struct rec_info *rec, struct presto_file_set *fset,
 /* write closes for the local close records in the LML */ 
 int presto_complete_lml(struct presto_file_set *fset)
 {
-        __u32 groups[NGROUPS_MAX];
+        __u32 groups[NGROUPS_SMALL];
         loff_t lml_offset;
         loff_t read_offset; 
         char *buffer;
@@ -2408,7 +2408,7 @@ int presto_journal_set_ext_attr (struct rec_info *rec,
          */
         mode=cpu_to_le32(dentry->d_inode->i_mode);
 
-        size =  sizeof(__u32) * current->ngroups + 
+        size =  sizeof(__u32) * current->group_info->ngroups + 
                 sizeof(struct kml_prefix_hdr) + 
                 2 * sizeof(struct presto_version) +
                 sizeof(flags) + sizeof(mode) + sizeof(namelen) + 

@@ -23,6 +23,18 @@
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  */
 
+/*
+ * ACPI power-managed devices may be controlled in two ways:
+ * 1. via "Device Specific (D-State) Control"
+ * 2. via "Power Resource Control".
+ * This module is used to manage devices relying on Power Resource Control.
+ * 
+ * An ACPI "power resource object" describes a software controllable power
+ * plane, clock plane, or other resource used by a power managed device.
+ * A device may rely on multiple power resources, and a power resource
+ * may be shared by multiple devices.
+ */
+
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/init.h>

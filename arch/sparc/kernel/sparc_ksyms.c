@@ -157,7 +157,6 @@ EXPORT_SYMBOL(___change_bit);
 
 #ifdef CONFIG_SMP
 /* IRQ implementation. */
-EXPORT_SYMBOL(global_irq_holder);
 EXPORT_SYMBOL(synchronize_irq);
 
 /* Misc SMP information */
@@ -206,8 +205,10 @@ EXPORT_SYMBOL(sbus_map_single);
 EXPORT_SYMBOL(sbus_unmap_single);
 EXPORT_SYMBOL(sbus_map_sg);
 EXPORT_SYMBOL(sbus_unmap_sg);
-EXPORT_SYMBOL(sbus_dma_sync_single);
-EXPORT_SYMBOL(sbus_dma_sync_sg);
+EXPORT_SYMBOL(sbus_dma_sync_single_for_cpu);
+EXPORT_SYMBOL(sbus_dma_sync_single_for_device);
+EXPORT_SYMBOL(sbus_dma_sync_sg_for_cpu);
+EXPORT_SYMBOL(sbus_dma_sync_sg_for_device);
 EXPORT_SYMBOL(sbus_iounmap);
 EXPORT_SYMBOL(sbus_ioremap);
 #endif
@@ -219,7 +220,10 @@ EXPORT_SYMBOL(pci_alloc_consistent);
 EXPORT_SYMBOL(pci_free_consistent);
 EXPORT_SYMBOL(pci_map_single);
 EXPORT_SYMBOL(pci_unmap_single);
-EXPORT_SYMBOL(pci_dma_sync_single);
+EXPORT_SYMBOL(pci_dma_sync_single_for_cpu);
+EXPORT_SYMBOL(pci_dma_sync_single_for_device);
+EXPORT_SYMBOL(pci_dma_sync_sg_for_cpu);
+EXPORT_SYMBOL(pci_dma_sync_sg_for_device);
 /* Actually, ioremap/iounmap are not PCI specific. But it is ok for drivers. */
 EXPORT_SYMBOL(ioremap);
 EXPORT_SYMBOL(iounmap);

@@ -9,7 +9,6 @@
  * This file handles the architecture-dependent parts of process handling..
  */
 
-#define __KERNEL_SYSCALLS__
 #include <stdarg.h>
 
 #include <linux/errno.h>
@@ -19,7 +18,6 @@
 #include <linux/kallsyms.h>
 #include <linux/mm.h>
 #include <linux/stddef.h>
-#include <linux/unistd.h>
 #include <linux/ptrace.h>
 #include <linux/slab.h>
 #include <linux/user.h>
@@ -42,6 +40,7 @@
 #include <asm/processor.h>
 #include <asm/psr.h>
 #include <asm/elf.h>
+#include <asm/unistd.h>
 
 /* 
  * Power management idle function 

@@ -392,7 +392,7 @@ static int __devinit dmfe_init_one (struct pci_dev *pdev,
 	}
 
 	/* Init system & device */
-	db = dev->priv;
+	db = netdev_priv(dev);
 
 	/* Allocate Tx/Rx descriptor memory */
 	db->desc_pool_ptr = pci_alloc_consistent(pdev, sizeof(struct tx_desc) * DESC_ALL_CNT + 0x20, &db->desc_pool_dma_ptr);
@@ -466,7 +466,7 @@ err_out_free:
 static void __devexit dmfe_remove_one (struct pci_dev *pdev)
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
-	struct dmfe_board_info *db = dev->priv;
+	struct dmfe_board_info *db = netdev_priv(dev);
 
 	DMFE_DBUG(0, "dmfe_remove_one()", 0);
 
@@ -494,7 +494,7 @@ static void __devexit dmfe_remove_one (struct pci_dev *pdev)
 static int dmfe_open(struct DEVICE *dev)
 {
 	int ret;
-	struct dmfe_board_info *db = dev->priv;
+	struct dmfe_board_info *db = netdev_priv(dev);
 
 	DMFE_DBUG(0, "dmfe_open", 0);
 
@@ -552,7 +552,7 @@ static int dmfe_open(struct DEVICE *dev)
 
 static void dmfe_init_dm910x(struct DEVICE *dev)
 {
-	struct dmfe_board_info *db = dev->priv;
+	struct dmfe_board_info *db = netdev_priv(dev);
 	unsigned long ioaddr = db->ioaddr;
 
 	DMFE_DBUG(0, "dmfe_init_dm910x()", 0);
@@ -618,7 +618,7 @@ static void dmfe_init_dm910x(struct DEVICE *dev)
 
 static int dmfe_start_xmit(struct sk_buff *skb, struct DEVICE *dev)
 {
-	struct dmfe_board_info *db = dev->priv;
+	struct dmfe_board_info *db = netdev_priv(dev);
 	struct tx_desc *txptr;
 	unsigned long flags;
 
@@ -687,7 +687,7 @@ static int dmfe_start_xmit(struct sk_buff *skb, struct DEVICE *dev)
 
 static int dmfe_stop(struct DEVICE *dev)
 {
-	struct dmfe_board_info *db = dev->priv;
+	struct dmfe_board_info *db = netdev_priv(dev);
 	unsigned long ioaddr = dev->base_addr;
 
 	DMFE_DBUG(0, "dmfe_stop", 0);
@@ -730,7 +730,7 @@ static int dmfe_stop(struct DEVICE *dev)
 static irqreturn_t dmfe_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct DEVICE *dev = dev_id;
-	struct dmfe_board_info *db = (struct dmfe_board_info *) dev->priv;
+	struct dmfe_board_info *db = netdev_priv(dev);
 	unsigned long ioaddr = dev->base_addr;
 	unsigned long flags;
 
@@ -957,7 +957,7 @@ static void dmfe_rx_packet(struct DEVICE *dev, struct dmfe_board_info * db)
 
 static struct net_device_stats * dmfe_get_stats(struct DEVICE *dev)
 {
-	struct dmfe_board_info *db = (struct dmfe_board_info *)dev->priv;
+	struct dmfe_board_info *db = netdev_priv(dev);
 
 	DMFE_DBUG(0, "dmfe_get_stats", 0);
 	return &db->stats;
@@ -970,7 +970,7 @@ static struct net_device_stats * dmfe_get_stats(struct DEVICE *dev)
 
 static void dmfe_set_filter_mode(struct DEVICE * dev)
 {
-	struct dmfe_board_info *db = dev->priv;
+	struct dmfe_board_info *db = netdev_priv(dev);
 	unsigned long flags;
 
 	DMFE_DBUG(0, "dmfe_set_filter_mode()", 0);
@@ -1003,7 +1003,7 @@ static void dmfe_set_filter_mode(struct DEVICE * dev)
 static void netdev_get_drvinfo(struct net_device *dev,
 			       struct ethtool_drvinfo *info)
 {
-	struct dmfe_board_info *np = dev->priv;
+	struct dmfe_board_info *np = netdev_priv(dev);
 
 	strcpy(info->driver, DRV_NAME);
 	strcpy(info->version, DRV_VERSION);
@@ -1028,7 +1028,7 @@ static void dmfe_timer(unsigned long data)
 	u32 tmp_cr8;
 	unsigned char tmp_cr12;
 	struct DEVICE *dev = (struct DEVICE *) data;
-	struct dmfe_board_info *db = (struct dmfe_board_info *) dev->priv;
+	struct dmfe_board_info *db = netdev_priv(dev);
  	unsigned long flags;
 
 	DMFE_DBUG(0, "dmfe_timer()", 0);
@@ -1160,7 +1160,7 @@ static void dmfe_timer(unsigned long data)
 
 static void dmfe_dynamic_reset(struct DEVICE *dev)
 {
-	struct dmfe_board_info *db = dev->priv;
+	struct dmfe_board_info *db = netdev_priv(dev);
 
 	DMFE_DBUG(0, "dmfe_dynamic_reset()", 0);
 
@@ -1358,7 +1358,7 @@ static void dm9132_id_table(struct DEVICE *dev, int mc_cnt)
 
 static void send_filter_frame(struct DEVICE *dev, int mc_cnt)
 {
-	struct dmfe_board_info *db = dev->priv;
+	struct dmfe_board_info *db = netdev_priv(dev);
 	struct dev_mc_list *mcptr;
 	struct tx_desc *txptr;
 	u16 * addrptr;

@@ -365,7 +365,7 @@ int reiserfs_allocate_blocks_for_region(
     // it means there are no existing in-tree representation for file area
     // we are going to overwrite, so there is nothing to scan through for holes.
     for ( curr_block = 0, itempos = path.pos_in_item ; curr_block < blocks_to_allocate && res == POSITION_FOUND ; ) {
-
+retry:
 	if ( itempos >= ih_item_len(ih)/UNFM_P_SIZE ) {
 	    /* We run out of data in this indirect item, let's look for another
 	       one. */
@@ -422,8 +422,8 @@ int reiserfs_allocate_blocks_for_region(
 		    bh=get_last_bh(&path);
 		    ih=get_ih(&path);
 		    item = get_item(&path);
-		    // Itempos is still the same
-		    continue;
+		    itempos = path.pos_in_item;
+		    goto retry;
 		}
 		modifying_this_item = 1;
 	    }
@@ -856,8 +856,12 @@ int reiserfs_prepare_file_region_for_write(
 			/* Try to find next item */
 			res = search_for_position_by_key(inode->i_sb, &key, &path);
 			/* Abort if no more items */
-			if ( res != POSITION_FOUND )
+			if ( res != POSITION_FOUND ) {
+			    /* make sure later loops don't use this item */
+			    itembuf = NULL;
+			    item = NULL;
 			    break;
+			}
 
 			/* Update information about current indirect item */
 			itembuf = get_last_bh( &path );
@@ -1060,7 +1064,10 @@ ssize_t reiserfs_file_write( struct file *file, /* the file we are going to writ
     if ( count == 0 )
 	goto out;
 
-    remove_suid(file->f_dentry);
+    res = remove_suid(file->f_dentry);
+    if (res)
+	goto out;
+
     inode_update_time(inode, 1); /* Both mtime and ctime */
 
     // Ok, we are done with all the checks.
@@ -1191,6 +1198,14 @@ out:
     return res;
 }
 
+static ssize_t reiserfs_aio_write(struct kiocb *iocb, const char __user *buf,
+			       size_t count, loff_t pos)
+{
+    return generic_file_aio_write(iocb, buf, count, pos);
+}
+
+
+
 struct file_operations reiserfs_file_operations = {
     .read	= generic_file_read,
     .write	= reiserfs_file_write,
@@ -1199,6 +1214,8 @@ struct file_operations reiserfs_file_operations = {
     .release	= reiserfs_file_release,
     .fsync	= reiserfs_sync_file,
     .sendfile	= generic_file_sendfile,
+    .aio_read   = generic_file_aio_read,
+    .aio_write  = reiserfs_aio_write,
 };
 
 

@@ -194,10 +194,7 @@ early_sn_setup(void)
 	}
 }
 
-#ifdef CONFIG_IA64_MCA
 extern int platform_intr_list[];
-#endif
-
 extern nasid_t master_nasid;
 static int shub_1_1_found __initdata;
 

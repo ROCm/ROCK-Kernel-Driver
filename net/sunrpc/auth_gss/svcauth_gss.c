@@ -594,12 +594,13 @@ gss_write_verf(struct svc_rqst *rqstp, struct gss_ctx *ctx_id, u32 seq)
 	iov.iov_len = sizeof(xdr_seq);
 	xdr_buf_from_iov(&iov, &verf_data);
 	p = rqstp->rq_res.head->iov_base + rqstp->rq_res.head->iov_len;
+	mic.data = (u8 *)(p + 1);
 	maj_stat = gss_get_mic(ctx_id, 0, &verf_data, &mic);
 	if (maj_stat != GSS_S_COMPLETE)
 		return -1;
-	p = xdr_encode_netobj(rqstp->rq_res.head->iov_base
-				+ rqstp->rq_res.head->iov_len, &mic);
-	kfree(mic.data);
+	*p++ = htonl(mic.len);
+	memset((u8 *)p + mic.len, 0, round_up_to_quad(mic.len) - mic.len);
+	p += XDR_QUADLEN(mic.len);
 	if (!xdr_ressize_check(rqstp, p))
 		return -1;
 	return 0;

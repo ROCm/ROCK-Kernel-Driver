@@ -119,30 +119,55 @@ void dma_unmap_sg(struct device *dev, struct scatterlist *sg, int nhwentries,
 
 EXPORT_SYMBOL(dma_unmap_sg);
 
-void dma_sync_single(struct device *dev, dma_addr_t dma_handle, size_t size,
+void dma_sync_single_for_cpu(struct device *dev, dma_addr_t dma_handle, size_t size,
 		enum dma_data_direction direction)
 {
 	BUG_ON(direction == DMA_NONE);
 }
 
-EXPORT_SYMBOL(dma_sync_single);
+EXPORT_SYMBOL(dma_sync_single_for_cpu);
 
-void dma_sync_single_range(struct device *dev, dma_addr_t dma_handle,
+void dma_sync_single_for_device(struct device *dev, dma_addr_t dma_handle, size_t size,
+		enum dma_data_direction direction)
+{
+	BUG_ON(direction == DMA_NONE);
+}
+
+EXPORT_SYMBOL(dma_sync_single_for_device);
+
+void dma_sync_single_range_for_cpu(struct device *dev, dma_addr_t dma_handle,
 		      unsigned long offset, size_t size,
 		      enum dma_data_direction direction)
 {
 	BUG_ON(direction == DMA_NONE);
 }
 
-EXPORT_SYMBOL(dma_sync_single_range);
+EXPORT_SYMBOL(dma_sync_single_range_for_cpu);
 
-void dma_sync_sg(struct device *dev, struct scatterlist *sg, int nelems,
+void dma_sync_single_range_for_device(struct device *dev, dma_addr_t dma_handle,
+		      unsigned long offset, size_t size,
+		      enum dma_data_direction direction)
+{
+	BUG_ON(direction == DMA_NONE);
+}
+
+EXPORT_SYMBOL(dma_sync_single_range_for_device);
+
+void dma_sync_sg_for_cpu(struct device *dev, struct scatterlist *sg, int nelems,
 		 enum dma_data_direction direction)
 {
 	BUG_ON(direction == DMA_NONE);
 }
 
-EXPORT_SYMBOL(dma_sync_sg);
+EXPORT_SYMBOL(dma_sync_sg_for_cpu);
+
+void dma_sync_sg_for_device(struct device *dev, struct scatterlist *sg, int nelems,
+		 enum dma_data_direction direction)
+{
+	BUG_ON(direction == DMA_NONE);
+}
+
+EXPORT_SYMBOL(dma_sync_sg_for_device);
 
 int dma_supported(struct device *dev, u64 mask)
 {
@@ -204,12 +229,20 @@ unsigned long pci_dac_dma_to_offset(struct pci_dev *pdev,
 
 EXPORT_SYMBOL(pci_dac_dma_to_offset);
 
-void pci_dac_dma_sync_single(struct pci_dev *pdev,
+void pci_dac_dma_sync_single_for_cpu(struct pci_dev *pdev,
 	dma64_addr_t dma_addr, size_t len, int direction)
 {
 	BUG_ON(direction == PCI_DMA_NONE);
 }
 
-EXPORT_SYMBOL(pci_dac_dma_sync_single);
+EXPORT_SYMBOL(pci_dac_dma_sync_single_for_cpu);
+
+void pci_dac_dma_sync_single_for_device(struct pci_dev *pdev,
+	dma64_addr_t dma_addr, size_t len, int direction)
+{
+	BUG_ON(direction == PCI_DMA_NONE);
+}
+
+EXPORT_SYMBOL(pci_dac_dma_sync_single_for_device);
 
 #endif /* CONFIG_PCI */

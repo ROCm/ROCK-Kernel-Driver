@@ -1,7 +1,7 @@
 /*
  * linux/drivers/char/pcmcia/synclink_cs.c
  *
- * $Id: synclink_cs.c,v 4.15 2003/09/05 15:26:02 paulkf Exp $
+ * $Id: synclink_cs.c,v 4.21 2004/03/08 15:29:23 paulkf Exp $
  *
  * Device driver for Microgate SyncLink PC Card
  * multiprotocol serial adapter.
@@ -489,7 +489,7 @@ MODULE_PARM(dosyncppp,"1-" __MODULE_STRING(MAX_DEVICE_COUNT) "i");
 MODULE_LICENSE("GPL");
 
 static char *driver_name = "SyncLink PC Card driver";
-static char *driver_version = "$Revision: 4.15 $";
+static char *driver_version = "$Revision: 4.21 $";
 
 static struct tty_driver *serial_driver;
 
@@ -4233,11 +4233,12 @@ void mgslpc_sppp_init(MGSLPC_INFO *info)
 	info->if_ptr = &info->pppdev;
 	info->netdev = info->pppdev.dev = d;
 
-	sppp_attach(&info->pppdev);
-
 	d->base_addr = info->io_base;
 	d->irq = info->irq_level;
 	d->priv = info;
+
+	sppp_attach(&info->pppdev);
+	mgslpc_setup(d);
 
 	if (register_netdev(d)) {
 		printk(KERN_WARNING "%s: register_netdev failed.\n", d->name);
@@ -4413,7 +4414,7 @@ struct net_device_stats *mgslpc_net_stats(struct net_device *dev)
 
 int mgslpc_sppp_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
-	MGSLPC_INFO *info = (MGSLPC_INFO *)dev->priv;
+	MGSLPC_INFO *info = dev->priv;
 	if (debug_level >= DEBUG_LEVEL_INFO)
 		printk("%s(%d):mgslpc_ioctl %s cmd=%08X\n", __FILE__,__LINE__,
 			info->netname, cmd );

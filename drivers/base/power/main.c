@@ -19,8 +19,7 @@
  * ancestral dependencies that the subsystem list maintains.
  */
 
-#undef DEBUG
-
+#include <linux/config.h>
 #include <linux/device.h>
 #include "power.h"
 

@@ -242,7 +242,7 @@ static int __init i8259A_init_sysfs(void)
 {
 	int error = sysdev_class_register(&i8259_sysdev_class);
 	if (!error)
-		error = sys_device_register(&device_i8259A);
+		error = sysdev_register(&device_i8259A);
 	return error;
 }
 

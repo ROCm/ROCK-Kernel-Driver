@@ -1598,7 +1598,10 @@ int __devinit snd_es18xx_pcm(es18xx_t *chip, int device, snd_pcm_t ** rpcm)
 	sprintf(pcm->name, "ESS AudioDrive ES%x", chip->version);
         chip->pcm = pcm;
 
-	snd_pcm_lib_preallocate_isa_pages_for_all(pcm, 64*1024, chip->dma1 > 3 || chip->dma2 > 3 ? 128*1024 : 64*1024);
+	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_DEV,
+					      snd_dma_isa_data(),
+					      64*1024,
+					      chip->dma1 > 3 || chip->dma2 > 3 ? 128*1024 : 64*1024);
 
         if (rpcm)
         	*rpcm = pcm;
@@ -2229,7 +2232,7 @@ static struct pnp_card_driver es18xx_pnpc_driver = {
 static int __init alsa_card_es18xx_init(void)
 {
 	static unsigned long possible_ports[] = {0x220, 0x240, 0x260, 0x280, -1};
-	int dev, cards = 0;
+	int dev, cards = 0, i;
 
 	/* legacy non-auto cards at first */
 	for (dev = 0; dev < SNDRV_CARDS; dev++) {
@@ -2243,10 +2246,16 @@ static int __init alsa_card_es18xx_init(void)
 			cards++;
 	}
 	/* legacy auto configured cards */
-	cards += snd_legacy_auto_probe(possible_ports, snd_audiodrive_probe_legacy_port);
+	i = snd_legacy_auto_probe(possible_ports, snd_audiodrive_probe_legacy_port);
+	if (i > 0)
+		cards += i;
+
 #ifdef CONFIG_PNP
 	/* ISA PnP cards at last */
-	cards += pnp_register_card_driver(&es18xx_pnpc_driver);
+	i = pnp_register_card_driver(&es18xx_pnpc_driver);
+	if (i > 0)
+		cards += i;
+
 #endif
 	if(!cards) {
 #ifdef CONFIG_PNP

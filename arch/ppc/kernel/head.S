@@ -1492,22 +1492,22 @@ BEGIN_FTR_SECTION
 	 * seems that doesn't affect our ability to actually
 	 * write to these SPRs.
 	 */
-	mtspr	SPRN_DBAT4U,r20
-	mtspr	SPRN_DBAT4L,r20
-	mtspr	SPRN_DBAT5U,r20
-	mtspr	SPRN_DBAT5L,r20
-	mtspr	SPRN_DBAT6U,r20
-	mtspr	SPRN_DBAT6L,r20
-	mtspr	SPRN_DBAT7U,r20
-	mtspr	SPRN_DBAT7L,r20
-	mtspr	SPRN_IBAT4U,r20
-	mtspr	SPRN_IBAT4L,r20
-	mtspr	SPRN_IBAT5U,r20
-	mtspr	SPRN_IBAT5L,r20
-	mtspr	SPRN_IBAT6U,r20
-	mtspr	SPRN_IBAT6L,r20
-	mtspr	SPRN_IBAT7U,r20
-	mtspr	SPRN_IBAT7L,r20
+	mtspr	SPRN_DBAT4U,r10
+	mtspr	SPRN_DBAT4L,r10
+	mtspr	SPRN_DBAT5U,r10
+	mtspr	SPRN_DBAT5L,r10
+	mtspr	SPRN_DBAT6U,r10
+	mtspr	SPRN_DBAT6L,r10
+	mtspr	SPRN_DBAT7U,r10
+	mtspr	SPRN_DBAT7L,r10
+	mtspr	SPRN_IBAT4U,r10
+	mtspr	SPRN_IBAT4L,r10
+	mtspr	SPRN_IBAT5U,r10
+	mtspr	SPRN_IBAT5L,r10
+	mtspr	SPRN_IBAT6U,r10
+	mtspr	SPRN_IBAT6L,r10
+	mtspr	SPRN_IBAT7U,r10
+	mtspr	SPRN_IBAT7L,r10
 END_FTR_SECTION_IFSET(CPU_FTR_HAS_HIGH_BATS)
 	blr
 

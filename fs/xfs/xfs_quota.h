@@ -347,9 +347,6 @@ extern int xfs_qm_dqcheck(xfs_disk_dquot_t *, xfs_dqid_t, uint, uint, char *);
 
 extern struct bhv_vfsops xfs_qmops;
 
-extern void xfs_qm_init(void);
-extern void xfs_qm_exit(void);
-
 #endif	/* __KERNEL__ */
 
 #endif	/* __XFS_QUOTA_H__ */

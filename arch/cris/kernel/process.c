@@ -91,8 +91,6 @@
  * This file handles the architecture-dependent parts of process handling..
  */
 
-#define __KERNEL_SYSCALLS__
-
 #include <asm/atomic.h>
 #include <asm/pgtable.h>
 #include <asm/uaccess.h>

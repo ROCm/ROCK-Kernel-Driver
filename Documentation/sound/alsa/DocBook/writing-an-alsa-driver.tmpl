@@ -18,8 +18,8 @@
       </affiliation>
      </author>
 
-     <date>Mar. 26, 2003</date>
-     <edition>0.3</edition>
+     <date>Mar. 6, 2004</date>
+     <edition>0.3.1</edition>
 
     <abstract>
       <para>
@@ -30,7 +30,7 @@
 
     <legalnotice>
     <para>
-    Copyright (c) 2002, 2003  Takashi Iwai <email>tiwai@suse.de</email>
+    Copyright (c) 2002-2004  Takashi Iwai <email>tiwai@suse.de</email>
     </para>
 
     <para>
@@ -111,18 +111,18 @@
 
       <para>
         One is the the trees provided as a tarball or via cvs from the
-      ALSA's ftp site, and another is the 2.5 (or later) Linux kernel
+      ALSA's ftp site, and another is the 2.6 (or later) Linux kernel
       tree. To synchronize both, the ALSA driver tree is split to
       two different trees: alsa-kernel and alsa-driver. The former
-      contains purely the source codes for the Linux 2.5 (or later)
-      tree. This tree is designed only for compilation on 2.5 or
+      contains purely the source codes for the Linux 2.6 (or later)
+      tree. This tree is designed only for compilation on 2.6 or
       later environment. The latter, alsa-driver, contains many subtle
       files for compiling the ALSA driver on the outside of Linux
       kernel like configure script, the wrapper functions for older,
       2.2 and 2.4 kernels, to adapt the latest kernel API,
       and additional drivers which are still in development or in
       tests.  The drivers in alsa-driver tree will be moved to
-      alsa-kernel (eventually 2.5 kernel tree) once when they are
+      alsa-kernel (eventually 2.6 kernel tree) once when they are
       finished and confirmed to work fine.
       </para>
 
@@ -346,7 +346,7 @@
     <section id="file-tree-oss-directory">
       <title>oss directory</title>
       <para>
-        The OSS/Lite source files are stored here on Linux 2.5 (or
+        The OSS/Lite source files are stored here on Linux 2.6 (or
       later) tree. (In the ALSA driver tarball, it's empty, of course :) 
       </para>
     </section>
@@ -1815,7 +1815,7 @@
 
       <para>
         Oh, one thing was forgotten. If you have no exported symbols,
-        you need to declare it on 2.2 or 2.4 kernels (on 2.5 kernels
+        you need to declare it on 2.2 or 2.4 kernels (on 2.6 kernels
         it's not necessary, though).
 
         <informalexample>
@@ -2075,8 +2075,9 @@
           snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_CAPTURE,
                           &snd_mychip_capture_ops);
           /* pre-allocation of buffers */
-          snd_pcm_lib_preallocate_pci_pages_for_all(chip->pci, pcm,
-                                                    64*1024, 64*1024);
+          snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_DEV,
+                                                snd_dma_pci_data(chip->pci),
+                                                64*1024, 64*1024);
           return 0;
   }
 ]]>
@@ -2202,8 +2203,9 @@
         <informalexample>
           <programlisting>
 <![CDATA[
-  snd_pcm_lib_preallocate_pci_pages_for_all(chip->pci, pcm,
-                                          64*1024, 64*1024);
+  snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_DEV,
+                                        snd_dma_pci_data(chip->pci),
+                                        64*1024, 64*1024);
 ]]>
           </programlisting>
         </informalexample>
@@ -3769,14 +3771,20 @@ struct _snd_pcm_runtime {
             <programlisting>
 <![CDATA[
   static int snd_myctl_info(snd_kcontrol_t *kcontrol,
-  static char *texts[4] = {
-          "First", "Second", "Third", "Fourth"
-  };
-  uinfo->value.enumerated.items = 4;
-  if (uinfo->value.enumerated.item > 3)
-          uinfo->value.enumerated.item = 3;
-  strcpy(uinfo->value.enumerated.name,
-         texts[uinfo->value.enumerated.item]);
+                          snd_ctl_elem_info_t *uinfo)
+  {
+          static char *texts[4] = {
+                  "First", "Second", "Third", "Fourth"
+          };
+          uinfo->type = SNDRV_CTL_ELEM_TYPE_ENUMERATED;
+          uinfo->count = 1;
+          uinfo->value.enumerated.items = 4;
+          if (uinfo->value.enumerated.item > 3)
+                  uinfo->value.enumerated.item = 3;
+          strcpy(uinfo->value.enumerated.name,
+                 texts[uinfo->value.enumerated.item]);
+          return 0;
+  }
 ]]>
             </programlisting>
           </informalexample>
@@ -4718,7 +4726,8 @@ struct _snd_pcm_runtime {
         <informalexample>
           <programlisting>
 <![CDATA[
-  snd_pcm_lib_preallocate_pci_pages_for_all(pci, pcm, size, max);
+  snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_DEV,
+                                        snd_dma_pci_data(pci), size, max);
 ]]>
           </programlisting>
         </informalexample>
@@ -4728,8 +4737,25 @@ struct _snd_pcm_runtime {
       size to be changed via <filename>prealloc</filename> proc file.
       The allocator will try to get as the large area as possible
       within the given size. 
-      There are different versions of pre-allocator for different
-      buses.
+      </para>
+
+      <para>
+      The second argument (type) and the third argument (device pointer)
+      are dependent on the bus.
+      In the case of ISA bus, pass <function>snd_dma_isa_data()</function>
+      as the third argument with <constant>SNDRV_DMA_TYPE_DEV</constant> type.
+      For the continuous buffer unrelated to the bus can be pre-allocated
+      with <constant>SNDRV_DMA_TYPE_CONTINUOUS</constant> type and the
+      <function>snd_dma_continuous_data(GFP_KERNEL)</function> device pointer,
+      whereh <constant>GFP_KERNEL</constant> is the kernel allocation flag to
+      use.  For the SBUS, <constant>SNDRV_DMA_TYPE_SBUS</constant> and
+      <function>snd_dma_sbus_data(sbus_dev)</function> are used instead.
+      For the PCI scatter-gather buffers, use
+      <constant>SNDRV_DMA_TYPE_DEV_SG</constant> with
+      <function>snd_dma_pci_data(pci)</function>
+      (see the section
+          <link linkend="buffer-and-memory-non-contiguous"><citetitle>Non-Contiguous Buffers
+          </citetitle></link>).
       </para>
 
       <para>
@@ -4936,11 +4962,13 @@ struct _snd_pcm_runtime {
 
       <para>
         For creating the SG-buffer handler, call
-        <function>snd_pcm_lib_preallocate_sg_pages()</function> or
-        <function>snd_pcm_lib_preallocate_sg_pages_for_all()</function>
+        <function>snd_pcm_lib_preallocate_pages()</function> or
+        <function>snd_pcm_lib_preallocate_pages_for_all()</function>
+        with <constant>SNDRV_DMA_TYPE_DEV_SG</constant>
 	in the PCM constructor like other PCI pre-allocator.
-        You need to pass the
-        <structname>pci_dev</structname> struct pointer of the chip.
+        You need to pass the <function>snd_dma_pci_data(pci)</function>,
+        where pci is the struct <structname>pci_dev</structname> pointer
+        of the chip as well.
         The <type>snd_sg_buf_t</type> instance is created as
         substream-&gt;dma_private. You can cast
         the pointer like: 
@@ -5274,7 +5302,7 @@ struct _snd_pcm_runtime {
     </para>
 
     <para>
-      For keeping the readability of 2.5 source code, it's recommended to
+      For keeping the readability of 2.6 source code, it's recommended to
       separate the above ifdef condition as the patch file in alsa-driver
       directory.
       See <filename>alsa-driver/pci/ali5451.c</filename> for example.
@@ -5606,7 +5634,7 @@ struct _snd_pcm_runtime {
 	tree.  Then the driver is evaluated, audited and tested
 	by developers and users.  After a certain time, the driver
 	will go to alsa-kernel tree and eventually integrated into
-	Linux 2.5 tree.
+	Linux 2.6 tree.
 	</para>
 
 	<para>
@@ -5642,61 +5670,44 @@ struct _snd_pcm_runtime {
 
 	<listitem>
 	<para>
-	Modify alsa-driver/acore/Makefile
+	Create the Kconfig entry
 	</para>
 
 	<para>
-	Here define the dependent modules.
+	Add the new entry of Kconfig for your xyz driver.
       <informalexample>
         <programlisting>
 <![CDATA[
-  obj-$(CONFIG_SND_XYZ) += snd.o ...
+  config SND_BT87X
+          tristate "Foobar XYX"
+          depends on SND
+          select SND_PCM
+          help
+            Say 'Y' or 'M' to include support for Foobar XYZ soundcard.
 ]]>
         </programlisting>
       </informalexample>
 
-	If the driver supports PCM, snd-pcm.o,
-	snd-timer.o and snd-page-alloc.o
-	will be needed.
-	</para>
-	<para>
-	For rawmidi, snd-rawmidi.o is needed in addition.
-	The MIDI stuff is also related to the sequencer.
-	You'll need to modify alsa-driver/acore/seq/Makefile.
+	the line, select SND_PCM, specifies that the driver xyz supports
+	PCM.  In addition to SND_PCM, the following components are
+	supported for select command:
+	SND_RAWMIDI, SND_TIMER, SND_HWDEP, SND_MPU401_UART,
+	SND_OPL3_LIB, SND_OPL4_LIB, SND_VX_LIB, SND_AC97_CODEC.
+	Add the select command for each supported component.
 	</para>
 
 	<para>
-	For OPL3, snd-hwdep.o is needed, too.
-	It's involved with the sequencer, and as well as rawmidi,
-	you'll need to modify alsa-driver/acore/seq/Makefile
-	and acore/seq/instr/Makefile in addition.
-	Also, a new entry is necessary in
-	alsa-driver/drivers/opl3/Makefile.
-	</para>
-
-	</listitem>
-
-	<listitem>
-	<para>
-	Modify alsa-driver/utils/Modules.dep
+	Note that some selections imply the lowlevel selections.
+	For example, PCM includes TIMER, MPU401_UART includes RAWMIDI,
+	AC97_CODEC includes PCM, and OPL3_LIB includes HWDEP.
+	You don't need to give the lowlevel selections again.
 	</para>
 
 	<para>
-	Add the module definition for configure, here.
-	The beginning of the line must be a vertical bar, following
-	the card module name (snd-xyz) and the list of its all 
-	dependent modules.
-
-      <informalexample>
-        <programlisting>
-<![CDATA[
-  %dir linux/sound/pci
-  |snd-azt3328 snd-pcm snd-mpu401-uart snd-opl3-lib snd-opl3-synth
-  |snd-xyz snd-pcm ...
-]]>
-        </programlisting>
-      </informalexample>
+	For the details of Kconfig script, refer to the kbuild
+	documentation.
 	</para>
+
 	</listitem>
 
 	<listitem>
@@ -5724,7 +5735,7 @@ struct _snd_pcm_runtime {
       <informalexample>
         <programlisting>
 <![CDATA[
-  extra-subdir-y := pdplus vx222 xyz
+  obj-$(CONFIG_SND) += xyz/
 ]]>
         </programlisting>
       </informalexample>
@@ -5739,12 +5750,12 @@ struct _snd_pcm_runtime {
 	<title>Sample Makefile for a driver xyz</title>
         <programlisting>
 <![CDATA[
-  TOPDIR = ../..
+  ifndef SND_TOPDIR
+  SND_TOPDIR=../..
+  endif
 
   include $(TOPDIR)/toplevel.config
   include $(TOPDIR)/Makefile.conf
-
-  TOPDIR = $(MAINSRCDIR)
 
   snd-xyz-objs := xyz.o abc.o def.o
 
@@ -5759,28 +5770,11 @@ struct _snd_pcm_runtime {
 
 	<listitem>
 	<para>
-	Modify alsa-driver/acore/Makefile
+	Create the Kconfig entry
 	</para>
 
 	<para>
 	This procedure is as same as in the last section.
-	</para>
-	</listitem>
-
-	<listitem>
-	<para>
-	Modify alsa-driver/utils/Modules.dep
-	</para>
-
-	<para>
-      <informalexample>
-        <programlisting>
-<![CDATA[
-	%dir linux/sound/pci/xyz
-	|snd-xyz snd-pcm ...
-]]>
-        </programlisting>
-      </informalexample>
 	</para>
 	</listitem>
 

@@ -67,8 +67,11 @@ void snd_pcm_playback_silence(snd_pcm_substream_t *substream, snd_pcm_uframes_t 
 			frames = runtime->silence_size;
 	} else {
 		if (new_hw_ptr == ULONG_MAX) {	/* initialization */
-			runtime->silence_filled = 0;
-			runtime->silence_start = runtime->control->appl_ptr;
+			snd_pcm_sframes_t avail = snd_pcm_playback_hw_avail(runtime);
+			runtime->silence_filled = avail > 0 ? avail : 0;
+			runtime->silence_start = (runtime->status->hw_ptr +
+						  runtime->silence_filled) %
+						 runtime->boundary;
 		} else {
 			ofs = runtime->status->hw_ptr;
 			frames = new_hw_ptr - ofs;
@@ -2659,20 +2662,6 @@ EXPORT_SYMBOL(snd_pcm_lib_preallocate_free);
 EXPORT_SYMBOL(snd_pcm_lib_preallocate_free_for_all);
 EXPORT_SYMBOL(snd_pcm_lib_preallocate_pages);
 EXPORT_SYMBOL(snd_pcm_lib_preallocate_pages_for_all);
+EXPORT_SYMBOL(snd_pcm_sgbuf_ops_page);
 EXPORT_SYMBOL(snd_pcm_lib_malloc_pages);
 EXPORT_SYMBOL(snd_pcm_lib_free_pages);
-#ifdef CONFIG_ISA
-EXPORT_SYMBOL(snd_pcm_lib_preallocate_isa_pages);
-EXPORT_SYMBOL(snd_pcm_lib_preallocate_isa_pages_for_all);
-#endif
-#ifdef CONFIG_PCI
-EXPORT_SYMBOL(snd_pcm_lib_preallocate_pci_pages);
-EXPORT_SYMBOL(snd_pcm_lib_preallocate_pci_pages_for_all);
-EXPORT_SYMBOL(snd_pcm_lib_preallocate_sg_pages);
-EXPORT_SYMBOL(snd_pcm_lib_preallocate_sg_pages_for_all);
-EXPORT_SYMBOL(snd_pcm_sgbuf_ops_page);
-#endif
-#ifdef CONFIG_SBUS
-EXPORT_SYMBOL(snd_pcm_lib_preallocate_sbus_pages);
-EXPORT_SYMBOL(snd_pcm_lib_preallocate_sbus_pages_for_all);
-#endif

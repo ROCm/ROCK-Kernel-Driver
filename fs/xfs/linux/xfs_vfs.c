@@ -117,7 +117,6 @@ vfs_mntupdate(
 	return ((*bhvtovfsops(next)->vfs_mntupdate)(next, fl, args));
 }
 
-
 int
 vfs_root(
 	struct bhv_desc		*bdp,

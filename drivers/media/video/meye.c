@@ -160,13 +160,15 @@ static void rvfree(void * mem, unsigned long size) {
 	}
 }
 
-/* return a page table pointing to N pages of locked memory
+/*
+ * return a page table pointing to N pages of locked memory
  *
  * NOTE: The meye device expects dma_addr_t size to be 32 bits
  * (the toc must be exactly 1024 entries each of them being 4 bytes
  * in size, the whole result being 4096 bytes). We're using here
- * dma_addr_t for corectness but the compilation of this driver is
- * disabled for HIGHMEM64G=y, where sizeof(dma_addr_t) != 4 */
+ * dma_addr_t for correctness but the compilation of this driver is
+ * disabled for HIGHMEM64G=y, where sizeof(dma_addr_t) != 4
+ */
 static int ptable_alloc(void) {
 	dma_addr_t *pt;
 	int i;

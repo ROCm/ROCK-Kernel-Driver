@@ -14,36 +14,13 @@
 #ifdef __KERNEL__
 
 #include <linux/config.h>
-#include <asm/superio.h>
 
 #ifndef MAX_HWIFS
 #define MAX_HWIFS	2
 #endif
 
-static __inline__ int ide_default_irq(ide_ioreg_t base)
-{
-	switch (base) {
-#ifdef CONFIG_SUPERIO
-		case 0x1f0: 
-		case 0x170:
-			return superio_get_ide_irq();
-#endif /* CONFIG_SUPERIO */
-		default:
-			return 0;
-	}
-}
-
-static __inline__ ide_ioreg_t ide_default_io_base(int index)
-{
-	switch (index) {
-#ifdef CONFIG_SUPERIO 
-		case 0:	return (superio_get_ide_irq() ? 0x1f0 : 0);
-		case 1:	return (superio_get_ide_irq() ? 0x170 : 0);
-#endif /* CONFIG_SUPERIO */
-		default:
-			return 0;
-	}
-}
+#define ide_default_irq(base) (0)
+#define ide_default_io_base(index) ((ide_ioreg_t)0)
 
 static __inline__ void ide_init_hwif_ports(hw_regs_t *hw, ide_ioreg_t data_port, ide_ioreg_t ctrl_port, int *irq)
 {
@@ -93,7 +70,7 @@ static __inline__ void ide_init_default_hwifs(void)
 static __inline__ void __ide_mm_insw(unsigned long port, void *addr, u32 count)
 {
 	while (count--) {
-		*(u16 *)addr = readw(port);
+		*(u16 *)addr = __raw_readw(port);
 		addr += 2;
 	}
 }
@@ -101,7 +78,7 @@ static __inline__ void __ide_mm_insw(unsigned long port, void *addr, u32 count)
 static __inline__ void __ide_mm_insl(unsigned long port, void *addr, u32 count)
 {
 	while (count--) {
-		*(u32 *)addr = readl(port);
+		*(u32 *)addr = __raw_readl(port);
 		addr += 4;
 	}
 }
@@ -109,7 +86,7 @@ static __inline__ void __ide_mm_insl(unsigned long port, void *addr, u32 count)
 static __inline__ void __ide_mm_outsw(unsigned long port, void *addr, u32 count)
 {
 	while (count--) {
-		writew(*(u16 *)addr, port);
+		__raw_writew(*(u16 *)addr, port);
 		addr += 2;
 	}
 }
@@ -117,7 +94,7 @@ static __inline__ void __ide_mm_outsw(unsigned long port, void *addr, u32 count)
 static __inline__ void __ide_mm_outsl(unsigned long port, void *addr, u32 count)
 {
 	while (count--) {
-		writel(*(u32 *)addr, port);
+		__raw_writel(*(u32 *)addr, port);
 		addr += 4;
 	}
 }

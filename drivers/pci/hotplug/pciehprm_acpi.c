@@ -1188,6 +1188,9 @@ static void free_a_bridge( struct acpi_bridge	*ab)
 
 static void pciehprm_free_bridges ( struct acpi_bridge	*ab)
 {
+	if (!ab)
+		return;
+
 	if (ab->child)
 		pciehprm_free_bridges (ab->child);
 
@@ -1265,7 +1268,8 @@ static int print_acpi_resources (struct acpi_bridge	*ab)
 int pciehprm_print_pirt(void)
 {
 	dbg("PCIEHPRM ACPI Slots\n");
-	print_acpi_resources (acpi_bridges_head);
+	if (acpi_bridges_head)
+		print_acpi_resources (acpi_bridges_head);
 
 	return 0;
 }

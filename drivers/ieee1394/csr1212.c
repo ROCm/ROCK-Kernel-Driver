@@ -704,10 +704,11 @@ void _csr1212_destroy_keyval(struct csr1212_keyval *kv)
 			if (k->key.type == CSR1212_KV_TYPE_DIRECTORY) {
 				/* If the current entry is a directory, then move all
 				 * the entries to the destruction list. */
-				tail->next = k->value.directory.dentries_head;
-				if (k->value.directory.dentries_head)
+				if (k->value.directory.dentries_head) {
+					tail->next = k->value.directory.dentries_head;
 					k->value.directory.dentries_head->prev = tail;
-				tail = k->value.directory.dentries_tail;
+					tail = k->value.directory.dentries_tail;
+                                }
 			}
 			free_keyval(k);
 			k = a;
@@ -1347,6 +1348,12 @@ int csr1212_parse_keyval(struct csr1212_keyval *kv,
 	case CSR1212_KV_TYPE_DIRECTORY:
 		for (i = 0; i < kvi_len; i++) {
 			csr1212_quad_t ki = kvi->data[i];
+
+			/* Some devices put null entries in their unit
+			 * directories.  If we come across such and entry,
+			 * then skip it. */
+			if (ki == 0x0)
+				continue;
 			ret = csr1212_parse_dir_entry(kv, ki,
 						      (kv->offset +
 						       quads_to_bytes(i + 1)),

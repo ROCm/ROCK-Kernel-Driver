@@ -4,7 +4,6 @@
  * Cipher operations.
  *
  * Copyright (c) 2002 James Morris <jmorris@intercode.com.au>
- * Generic scatterwalk code by Adam J. Richter <adam@yggdrasil.com>.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the Free
@@ -17,30 +16,13 @@
 #include <linux/errno.h>
 #include <linux/mm.h>
 #include <linux/slab.h>
-#include <linux/pagemap.h>
-#include <linux/highmem.h>
 #include <asm/scatterlist.h>
 #include "internal.h"
+#include "scatterwalk.h"
 
 typedef void (cryptfn_t)(void *, u8 *, const u8 *);
 typedef void (procfn_t)(struct crypto_tfm *, u8 *,
-                        u8*, cryptfn_t, int enc, void *);
-
-struct scatter_walk {
-	struct scatterlist	*sg;
-	struct page		*page;
-	void			*data;
-	unsigned int		len_this_page;
-	unsigned int		len_this_segment;
-	unsigned int		offset;
-};
-
-enum km_type crypto_km_types[] = {
-	KM_USER0,
-	KM_USER1,
-	KM_SOFTIRQ0,
-	KM_SOFTIRQ1,
-};
+                        u8*, cryptfn_t, int enc, void *, int);
 
 static inline void xor_64(u8 *a, const u8 *b)
 {
@@ -56,108 +38,6 @@ static inline void xor_128(u8 *a, const u8 *b)
 	((u32 *)a)[3] ^= ((u32 *)b)[3];
 }
 
-
-/* Define sg_next is an inline routine now in case we want to change
-   scatterlist to a linked list later. */
-static inline struct scatterlist *sg_next(struct scatterlist *sg)
-{
-	return sg + 1;
-}
-
-void *which_buf(struct scatter_walk *walk, unsigned int nbytes, void *scratch)
-{
-	if (nbytes <= walk->len_this_page &&
-	    (((unsigned long)walk->data) & (PAGE_CACHE_SIZE - 1)) + nbytes <=
-	    PAGE_CACHE_SIZE)
-		return walk->data;
-	else
-		return scratch;
-}
-
-static void memcpy_dir(void *buf, void *sgdata, size_t nbytes, int out)
-{
-	if (out)
-		memcpy(sgdata, buf, nbytes);
-	else
-		memcpy(buf, sgdata, nbytes);
-}
-
-static void scatterwalk_start(struct scatter_walk *walk, struct scatterlist *sg)
-{
-	unsigned int rest_of_page;
-
-	walk->sg = sg;
-
-	walk->page = sg->page;
-	walk->len_this_segment = sg->length;
-
-	rest_of_page = PAGE_CACHE_SIZE - (sg->offset & (PAGE_CACHE_SIZE - 1));
-	walk->len_this_page = min(sg->length, rest_of_page);
-	walk->offset = sg->offset;
-}
-
-static void scatterwalk_map(struct scatter_walk *walk, int out)
-{
-	walk->data = crypto_kmap(walk->page, out) + walk->offset;
-}
-
-static void scatter_page_done(struct scatter_walk *walk, int out,
-			      unsigned int more)
-{
-	/* walk->data may be pointing the first byte of the next page;
-	   however, we know we transfered at least one byte.  So,
-	   walk->data - 1 will be a virutual address in the mapped page. */
-
-	if (out)
-		flush_dcache_page(walk->page);
-
-	if (more) {
-		walk->len_this_segment -= walk->len_this_page;
-
-		if (walk->len_this_segment) {
-			walk->page++;
-			walk->len_this_page = min(walk->len_this_segment,
-						  (unsigned)PAGE_CACHE_SIZE);
-			walk->offset = 0;
-		}
-		else
-			scatterwalk_start(walk, sg_next(walk->sg));
-	}
-}
-
-static void scatter_done(struct scatter_walk *walk, int out, int more)
-{
-	crypto_kunmap(walk->data, out);
-	if (walk->len_this_page == 0 || !more)
-		scatter_page_done(walk, out, more);
-}
-
-/*
- * Do not call this unless the total length of all of the fragments 
- * has been verified as multiple of the block size.
- */
-static int copy_chunks(void *buf, struct scatter_walk *walk,
-			size_t nbytes, int out)
-{
-	if (buf != walk->data) {
-		while (nbytes > walk->len_this_page) {
-			memcpy_dir(buf, walk->data, walk->len_this_page, out);
-			buf += walk->len_this_page;
-			nbytes -= walk->len_this_page;
-
-			crypto_kunmap(walk->data, out);
-			scatter_page_done(walk, out, 1);
-			scatterwalk_map(walk, out);
-		}
-
-		memcpy_dir(buf, walk->data, nbytes, out);
-	}
-
-	walk->offset += nbytes;
-	walk->len_this_page -= nbytes;
-	walk->len_this_segment -= nbytes;
-	return 0;
-}
 
 /* 
  * Generic encrypt/decrypt wrapper for ciphers, handles operations across
@@ -191,19 +71,21 @@ static int crypt(struct crypto_tfm *tfm,
 
 		scatterwalk_map(&walk_in, 0);
 		scatterwalk_map(&walk_out, 1);
-		src_p = which_buf(&walk_in, bsize, tmp_src);
-		dst_p = which_buf(&walk_out, bsize, tmp_dst);
+		src_p = scatterwalk_whichbuf(&walk_in, bsize, tmp_src);
+		dst_p = scatterwalk_whichbuf(&walk_out, bsize, tmp_dst);
 
 		nbytes -= bsize;
 
-		copy_chunks(src_p, &walk_in, bsize, 0);
+		scatterwalk_copychunks(src_p, &walk_in, bsize, 0);
 
-		prfn(tfm, dst_p, src_p, crfn, enc, info);
+		prfn(tfm, dst_p, src_p, crfn, enc, info,
+		     scatterwalk_samebuf(&walk_in, &walk_out,
+					 src_p, dst_p));
 
-		scatter_done(&walk_in, 0, nbytes);
+		scatterwalk_done(&walk_in, 0, nbytes);
 
-		copy_chunks(dst_p, &walk_out, bsize, 1);
-		scatter_done(&walk_out, 1, nbytes);
+		scatterwalk_copychunks(dst_p, &walk_out, bsize, 1);
+		scatterwalk_done(&walk_out, 1, nbytes);
 
 		if (!nbytes)
 			return 0;
@@ -212,8 +94,8 @@ static int crypt(struct crypto_tfm *tfm,
 	}
 }
 
-static void cbc_process(struct crypto_tfm *tfm,
-                        u8 *dst, u8 *src, cryptfn_t fn, int enc, void *info)
+static void cbc_process(struct crypto_tfm *tfm, u8 *dst, u8 *src,
+			cryptfn_t fn, int enc, void *info, int in_place)
 {
 	u8 *iv = info;
 	
@@ -226,10 +108,9 @@ static void cbc_process(struct crypto_tfm *tfm,
 		fn(crypto_tfm_ctx(tfm), dst, iv);
 		memcpy(iv, dst, crypto_tfm_alg_blocksize(tfm));
 	} else {
-		const int need_stack = (src == dst);
-		u8 stack[need_stack ? crypto_tfm_alg_blocksize(tfm) : 0];
-		u8 *buf = need_stack ? stack : dst;
-		
+		u8 stack[in_place ? crypto_tfm_alg_blocksize(tfm) : 0];
+		u8 *buf = in_place ? stack : dst;
+
 		fn(crypto_tfm_ctx(tfm), buf, src);
 		tfm->crt_u.cipher.cit_xor_block(buf, iv);
 		memcpy(iv, src, crypto_tfm_alg_blocksize(tfm));
@@ -239,7 +120,7 @@ static void cbc_process(struct crypto_tfm *tfm,
 }
 
 static void ecb_process(struct crypto_tfm *tfm, u8 *dst, u8 *src,
-                        cryptfn_t fn, int enc, void *info)
+			cryptfn_t fn, int enc, void *info, int in_place)
 {
 	fn(crypto_tfm_ctx(tfm), dst, src);
 }

@@ -195,6 +195,9 @@ irqreturn_t serio_interrupt(struct serio *serio,
                 ret = serio->dev->interrupt(serio, data, flags, regs);
 	} else {
 		if (!flags) {
+			if ((serio->type == SERIO_8042 ||
+				serio->type == SERIO_8042_XL) && (data != 0xaa))
+					return ret;
 			serio_rescan(serio);
 			ret = IRQ_HANDLED;
 		}

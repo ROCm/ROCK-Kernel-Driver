@@ -67,8 +67,10 @@ EXPORT_SYMBOL(__cmpxchg_u64);
 #include <asm/uaccess.h>
 EXPORT_SYMBOL(lcopy_to_user);
 EXPORT_SYMBOL(lcopy_from_user);
-EXPORT_SYMBOL(lstrnlen_user);
+EXPORT_SYMBOL(lcopy_in_user);
+EXPORT_SYMBOL(lstrncpy_from_user);
 EXPORT_SYMBOL(lclear_user);
+EXPORT_SYMBOL(lstrnlen_user);
 
 #ifndef __LP64__
 /* Needed so insmod can set dp value */

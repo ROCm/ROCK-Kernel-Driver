@@ -69,7 +69,7 @@ int __init register_node(struct node *node, int num, struct node *parent)
 	node->cpumap = node_to_cpumask(num);
 	node->sysdev.id = num;
 	node->sysdev.cls = &node_class;
-	error = sys_device_register(&node->sysdev);
+	error = sysdev_register(&node->sysdev);
 
 	if (!error){
 		sysdev_create_file(&node->sysdev, &attr_cpumap);

@@ -116,9 +116,18 @@ static int
 blkdev_get_block(struct inode *inode, sector_t iblock,
 		struct buffer_head *bh, int create)
 {
-	if (iblock >= max_block(I_BDEV(inode)))
-		return -EIO;
+	if (iblock >= max_block(I_BDEV(inode))) {
+		if (create)
+			return -EIO;
 
+		/*
+		 * for reads, we're just trying to fill a partial page.
+		 * return a hole, they will have to call get_block again
+		 * before they can fill it, and they will get -EIO at that
+		 * time
+		 */
+		return 0;
+	}
 	bh->b_bdev = I_BDEV(inode);
 	bh->b_blocknr = iblock;
 	set_buffer_mapped(bh);
@@ -522,7 +531,7 @@ int check_disk_change(struct block_device *bdev)
 
 EXPORT_SYMBOL(check_disk_change);
 
-static void bd_set_size(struct block_device *bdev, loff_t size)
+void bd_set_size(struct block_device *bdev, loff_t size)
 {
 	unsigned bsize = bdev_hardsect_size(bdev);
 
@@ -535,6 +544,7 @@ static void bd_set_size(struct block_device *bdev, loff_t size)
 	bdev->bd_block_size = bsize;
 	bdev->bd_inode->i_blkbits = blksize_bits(bsize);
 }
+EXPORT_SYMBOL(bd_set_size);
 
 static int do_open(struct block_device *bdev, struct file *file)
 {

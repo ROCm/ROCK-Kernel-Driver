@@ -541,7 +541,6 @@ linvfs_setattr(
 	if (error)
 		return(-error);	/* Positive error up from XFS */
 	if (ia_valid & ATTR_SIZE) {
-		i_size_write(inode, vattr.va_size);
 		error = vmtruncate(inode, attr->ia_size);
 	}
 
@@ -631,8 +630,7 @@ linvfs_listxattr(
 
 	if (!size)
 		xflags |= ATTR_KERNOVAL;
-	if (capable(CAP_SYS_ADMIN))
-		xflags |= ATTR_KERNFULLS;
+	xflags |= capable(CAP_SYS_ADMIN) ? ATTR_KERNFULLS : ATTR_KERNORMALS;
 
 	error = attr_generic_list(vp, data, size, xflags, &result);
 	if (error < 0)

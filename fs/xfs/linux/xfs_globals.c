@@ -61,6 +61,8 @@ xfs_param_t xfs_params = {
 	.inherit_sync	= {	0,	1,	1	},
 	.inherit_nodump	= {	0,	1,	1	},
 	.inherit_noatim = {	0,	1,	1	},
+	.flush_interval	= {	HZ/2,	HZ,	30*HZ	},
+	.age_buffer	= {	1*HZ,	15*HZ,	300*HZ	},
 };
 
 /*

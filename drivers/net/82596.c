@@ -458,7 +458,7 @@ static inline int wait_cfg(struct net_device *dev, struct i596_cmd *cmd, int del
  
 static void i596_display_data(struct net_device *dev)
 {
-	struct i596_private *lp = (struct i596_private *) dev->priv;
+	struct i596_private *lp = dev->priv;
 	struct i596_cmd *cmd;
 	struct i596_rfd *rfd;
 	struct i596_rbd *rbd;
@@ -528,7 +528,7 @@ static irqreturn_t i596_error(int irq, void *dev_id, struct pt_regs *regs)
 
 static inline void init_rx_bufs(struct net_device *dev)
 {
-	struct i596_private *lp = (struct i596_private *)dev->priv;
+	struct i596_private *lp = dev->priv;
 	int i;
 	struct i596_rfd *rfd;
 	struct i596_rbd *rbd;
@@ -579,7 +579,7 @@ static inline void init_rx_bufs(struct net_device *dev)
 
 static inline void remove_rx_bufs(struct net_device *dev)
 {
-	struct i596_private *lp = (struct i596_private *)dev->priv;
+	struct i596_private *lp = dev->priv;
 	struct i596_rbd *rbd;
 	int i;
 
@@ -593,7 +593,7 @@ static inline void remove_rx_bufs(struct net_device *dev)
 
 static void rebuild_rx_bufs(struct net_device *dev)
 {
-	struct i596_private *lp = (struct i596_private *) dev->priv;
+	struct i596_private *lp = dev->priv;
 	int i;
 
 	/* Ensure rx frame/buffer descriptors are tidy */
@@ -612,7 +612,7 @@ static void rebuild_rx_bufs(struct net_device *dev)
 
 static int init_i596_mem(struct net_device *dev)
 {
-	struct i596_private *lp = (struct i596_private *) dev->priv;
+	struct i596_private *lp = dev->priv;
 #if !defined(ENABLE_MVME16x_NET) && !defined(ENABLE_BVME6000_NET)
 	short ioaddr = dev->base_addr;
 #endif
@@ -765,7 +765,7 @@ failed:
 
 static inline int i596_rx(struct net_device *dev)
 {
-	struct i596_private *lp = (struct i596_private *)dev->priv;
+	struct i596_private *lp = dev->priv;
 	struct i596_rfd *rfd;
 	struct i596_rbd *rbd;
 	int frames = 0;
@@ -960,7 +960,7 @@ static inline void i596_reset(struct net_device *dev, struct i596_private *lp, i
 
 static void i596_add_cmd(struct net_device *dev, struct i596_cmd *cmd)
 {
-	struct i596_private *lp = (struct i596_private *) dev->priv;
+	struct i596_private *lp = dev->priv;
 	int ioaddr = dev->base_addr;
 	unsigned long flags;
 
@@ -1030,7 +1030,7 @@ static int i596_open(struct net_device *dev)
 
 static void i596_tx_timeout (struct net_device *dev)
 {
-	struct i596_private *lp = (struct i596_private *) dev->priv;
+	struct i596_private *lp = dev->priv;
 	int ioaddr = dev->base_addr;
 
 	/* Transmitter timeout, serious problems. */
@@ -1059,7 +1059,7 @@ static void i596_tx_timeout (struct net_device *dev)
 
 static int i596_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
-	struct i596_private *lp = (struct i596_private *) dev->priv;
+	struct i596_private *lp = dev->priv;
 	struct tx_cmd *tx_cmd;
 	struct i596_tbd *tbd;
 	short length = skb->len;
@@ -1245,7 +1245,7 @@ struct net_device * __init i82596_probe(int unit)
 
 	dev->priv = (void *)(dev->mem_start);
 
-	lp = (struct i596_private *) dev->priv;
+	lp = dev->priv;
 	DEB(DEB_INIT,printk(KERN_DEBUG "%s: lp at 0x%08lx (%d bytes), lp->scb at 0x%08lx\n",
 			dev->name, (unsigned long)lp,
 			sizeof(struct i596_private), (unsigned long)&lp->scb));
@@ -1305,7 +1305,7 @@ static irqreturn_t i596_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	}
 
 	ioaddr = dev->base_addr;
-	lp = (struct i596_private *) dev->priv;
+	lp = dev->priv;
 
 	spin_lock (&lp->lock);
 
@@ -1448,7 +1448,7 @@ static irqreturn_t i596_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 static int i596_close(struct net_device *dev)
 {
-	struct i596_private *lp = (struct i596_private *) dev->priv;
+	struct i596_private *lp = dev->priv;
 	unsigned long flags;
 
 	netif_stop_queue(dev);
@@ -1495,7 +1495,7 @@ static int i596_close(struct net_device *dev)
 static struct net_device_stats *
  i596_get_stats(struct net_device *dev)
 {
-	struct i596_private *lp = (struct i596_private *) dev->priv;
+	struct i596_private *lp = dev->priv;
 
 	return &lp->stats;
 }
@@ -1506,7 +1506,7 @@ static struct net_device_stats *
 
 static void set_multicast_list(struct net_device *dev)
 {
-	struct i596_private *lp = (struct i596_private *) dev->priv;
+	struct i596_private *lp = dev->priv;
 	int config = 0, cnt;
 
 	DEB(DEB_MULTI,printk(KERN_DEBUG "%s: set multicast list, %d entries, promisc %s, allmulti %s\n",

@@ -85,7 +85,7 @@ static char * critical_overtemp_path = "/sbin/critical_overtemp";
  * I'm not sure which of these Apple's algorithm is supposed
  * to use
  */
-#define RPM_PID_USE_ACTUAL_SPEED		1
+#define RPM_PID_USE_ACTUAL_SPEED		0
 
 /*
  * i2c IDs. Currently, we hard code those and assume that
@@ -220,6 +220,7 @@ struct cpu_pid_state
 	s32			current_a;
 	s32			last_temp;
 	int			first;
+	u8			adc_config;
 };
 
 /*

@@ -41,6 +41,15 @@
  * EDID parser
  */
 
+#undef DEBUG  /* define this for verbose EDID parsing output */
+
+#ifdef DEBUG
+#define DPRINTK(fmt, args...) printk(fmt,## args)
+#else
+#define DPRINTK(fmt, args...)
+#endif
+
+
 const unsigned char edid_v1_header[] = { 0x00, 0xff, 0xff, 0xff,
 	0xff, 0xff, 0xff, 0x00
 };
@@ -84,203 +93,93 @@ static int edid_check_header(unsigned char *edid)
 	return 1;
 }
 
-static void parse_vendor_block(unsigned char *block)
+static void parse_vendor_block(unsigned char *block, struct fb_monspecs *specs)
 {
-	unsigned char c[4];
-
-	c[0] = ((block[0] & 0x7c) >> 2) + '@';
-	c[1] = ((block[0] & 0x03) << 3) + ((block[1] & 0xe0) >> 5) + '@';
-	c[2] = (block[1] & 0x1f) + '@';
-	c[3] = 0;
-	printk("   Manufacturer: %s ", c);
-	printk("Model: %x ", block[2] + (block[3] << 8));
-	printk("Serial#: %u\n", block[4] + (block[5] << 8) + 
-	       (block[6] << 16) + (block[7] << 24));
-	printk("   Year: %u Week %u\n", block[9] + 1990, block[8]);
+	specs->manufacturer[0] = ((block[0] & 0x7c) >> 2) + '@';
+	specs->manufacturer[1] = ((block[0] & 0x03) << 3) +
+		((block[1] & 0xe0) >> 5) + '@';
+	specs->manufacturer[2] = (block[1] & 0x1f) + '@';
+	specs->manufacturer[3] = 0;
+	specs->model = block[2] + (block[3] << 8);
+	specs->serial = block[4] + (block[5] << 8) +
+	       (block[6] << 16) + (block[7] << 24);
+	specs->year = block[9] + 1990;
+	specs->week = block[8];
+	DPRINTK("   Manufacturer: %s\n", specs->manufacturer);
+	DPRINTK("   Model: %x\n", specs->model);
+	DPRINTK("   Serial#: %u\n", specs->serial);
+	DPRINTK("   Year: %u Week %u\n", specs->year, specs->week);
 }
 
-static void parse_dpms_capabilities(unsigned char flags)
+static void get_dpms_capabilities(unsigned char flags,
+				  struct fb_monspecs *specs)
 {
-	printk("      DPMS: Active %s, Suspend %s, Standby %s\n",
+	specs->dpms = 0;
+	if (flags & DPMS_ACTIVE_OFF)
+		specs->dpms |= FB_DPMS_ACTIVE_OFF;
+	if (flags & DPMS_SUSPEND)
+		specs->dpms |= FB_DPMS_SUSPEND;
+	if (flags & DPMS_STANDBY)
+		specs->dpms |= FB_DPMS_STANDBY;
+	DPRINTK("      DPMS: Active %s, Suspend %s, Standby %s\n",
 	       (flags & DPMS_ACTIVE_OFF) ? "yes" : "no",
 	       (flags & DPMS_SUSPEND)    ? "yes" : "no",
 	       (flags & DPMS_STANDBY)    ? "yes" : "no");
 }
 	
-static void print_chroma(unsigned char *block)
+static void get_chroma(unsigned char *block, struct fb_monspecs *specs)
 {
 	int tmp;
 
+	DPRINTK("      Chroma\n");
 	/* Chromaticity data */
-	printk("      Chromaticity: ");
 	tmp = ((block[5] & (3 << 6)) >> 6) | (block[0x7] << 2);
 	tmp *= 1000;
 	tmp += 512;
-	printk("RedX:   0.%03d ", tmp/1024);
+	specs->chroma.redx = tmp/1024;
+	DPRINTK("         RedX:     0.%03d ", specs->chroma.redx);
 
 	tmp = ((block[5] & (3 << 4)) >> 4) | (block[0x8] << 2);
 	tmp *= 1000;
 	tmp += 512;
-	printk("RedY:   0.%03d\n", tmp/1024);
+	specs->chroma.redy = tmp/1024;
+	DPRINTK("RedY:     0.%03d\n", specs->chroma.redy);
 
 	tmp = ((block[5] & (3 << 2)) >> 2) | (block[0x9] << 2);
 	tmp *= 1000;
 	tmp += 512;
-	printk("                    GreenX: 0.%03d ", tmp/1024);
+	specs->chroma.greenx = tmp/1024;
+	DPRINTK("         GreenX:   0.%03d ", specs->chroma.greenx);
 
 	tmp = (block[5] & 3) | (block[0xa] << 2);
 	tmp *= 1000;
 	tmp += 512;
-	printk("GreenY: 0.%03d\n", tmp/1024);
+	specs->chroma.greeny = tmp/1024;
+	DPRINTK("GreenY:   0.%03d\n", specs->chroma.greeny);
 
 	tmp = ((block[6] & (3 << 6)) >> 6) | (block[0xb] << 2);
 	tmp *= 1000;
 	tmp += 512;
-	printk("                    BlueX:  0.%03d ", tmp/1024);
+	specs->chroma.bluex = tmp/1024;
+	DPRINTK("         BlueX:    0.%03d ", specs->chroma.bluex);
 
 	tmp = ((block[6] & (3 << 4)) >> 4) | (block[0xc] << 2);
 	tmp *= 1000;
 	tmp += 512;
-	printk("BlueY:  0.%03d\n", tmp/1024);
+	specs->chroma.bluey = tmp/1024;
+	DPRINTK("BlueY:    0.%03d\n", specs->chroma.bluey);
 	
 	tmp = ((block[6] & (3 << 2)) >> 2) | (block[0xd] << 2);
 	tmp *= 1000;
 	tmp += 512;
-	printk("                    WhiteX: 0.%03d ", tmp/1024);
+	specs->chroma.whitex = tmp/1024;
+	DPRINTK("         WhiteX:   0.%03d ", specs->chroma.whitex);
 
 	tmp = (block[6] & 3) | (block[0xe] << 2);
 	tmp *= 1000;
 	tmp += 512;
-	printk("WhiteY: 0.%03d\n", tmp/1024);
-}
-
-static void parse_display_block(unsigned char *block)
-{
-	unsigned char c;
-
-	c = (block[0] & 0x80) >> 7;
-	if (c) 
-		printk("      Digital Display Input");
-	else {
-		printk("      Analog Display Input: Input Voltage - ");
-		switch ((block[0] & 0x60) >> 5) {
-		case 0:
-			printk("0.700V/0.300V");
-			break;
-		case 1:
-			printk("0.714V/0.286V");
-			break;
-		case 2:
-			printk("1.000V/0.400V");
-			break;
-		case 3:
-			printk("0.700V/0.000V");
-			break;
-		default:
-			printk("unknown");
-		}
-		printk("\n");
-	}
-	c = (block[0] & 0x10) >> 4;
-	if (c)
-		printk("      Configurable signal level\n");
-	printk("      Sync: ");
-	c = block[0] & 0x0f;
-	if (c & 0x10)
-		printk("Blank to Blank ");
-	if (c & 0x08)
-		printk("Separate ");
-	if (c & 0x04)
-		printk("Composite ");
-	if (c & 0x02)
-		printk("Sync on Green ");
-	if (c & 0x01)
-		printk("Serration on ");
-	printk("\n");
-
-	printk("      Max H-size in cm: ");
-	c = block[1];
-	if (c) 
-		printk("%d\n", c);
-	else
-		printk("variable\n");
-	
-	printk("      Max V-size in cm: ");
-	c = block[2];
-	if (c)
-		printk("%d\n", c);
-	else
-		printk("variable\n");
-
-	c = block[3];
-	printk("      Gamma: ");
-	printk("%d.%d\n", (c + 100)/100, (c+100) % 100);
-
-	parse_dpms_capabilities(block[4]);
-
-	switch ((block[4] & 0x18) >> 3) {
-	case 0:
-		printk("      Monochrome/Grayscale\n");
-		break;
-	case 1:
-		printk("      RGB Color Display\n");
-		break;
-	case 2:
-		printk("      Non-RGB Multicolor Display\n");
-		break;
-	default:
-		printk("      Unknown\n");
-		break;
-	}
-
-	print_chroma(block);
-	
-	c = block[4] & 0x7;
-	if (c & 0x04)
-		printk("      Default color format is primary\n");
-	if (c & 0x02)
-		printk("      First DETAILED Timing is preferred\n");
-	if (c & 0x01)
-		printk("      Display is GTF capable\n");
-}
-
-static void parse_std_md_block(unsigned char *block)
-{
-	unsigned char c;
-
-	c = block[0];
-	if (c&0x80) printk("      720x400@70Hz\n");
-	if (c&0x40) printk("      720x400@88Hz\n");
-	if (c&0x20) printk("      640x480@60Hz\n");
-	if (c&0x10) printk("      640x480@67Hz\n");
-	if (c&0x08) printk("      640x480@72Hz\n");
-	if (c&0x04) printk("      640x480@75Hz\n");
-	if (c&0x02) printk("      800x600@56Hz\n");
-	if (c&0x01) printk("      800x600@60Hz\n");
-
-	c = block[1];
-	if (c&0x80) printk("      800x600@72Hz\n");
-	if (c&0x40) printk("      800x600@75Hz\n");
-	if (c&0x20) printk("      832x624@75Hz\n");
-	if (c&0x10) printk("      1024x768@87Hz (interlaced)\n");
-	if (c&0x08) printk("      1024x768@60Hz\n");
-	if (c&0x04) printk("      1024x768@70Hz\n");
-	if (c&0x02) printk("      1024x768@75Hz\n");
-	if (c&0x01) printk("      1280x1024@75Hz\n");
-
-	c = block[2];
-	if (c&0x80) printk("      1152x870@75Hz\n");
-	printk("      Manufacturer's mask: %x\n",c&0x7F);
-}
-		
-		
-static int edid_is_timing_block(unsigned char *block)
-{
-	if ((block[0] != 0x00) || (block[1] != 0x00) || 
-	    (block[2] != 0x00) || (block[4] != 0x00)) 
-		return 1;
-	else
-		return 0;
+	specs->chroma.whitey = tmp/1024;
+	DPRINTK("WhiteY:   0.%03d\n", specs->chroma.whitey);
 }
 
 static int edid_is_serial_block(unsigned char *block)
@@ -323,154 +222,6 @@ static int edid_is_monitor_block(unsigned char *block)
 		return 0;
 }
 
-static int edid_is_color_block(unsigned char *block)
-{
-	if ((block[0] == 0x00) && (block[1] == 0x00) && 
-	    (block[2] == 0x00) && (block[3] == 0xfb) &&
-	    (block[4] == 0x00))
-		return 1;
-	else
-		return 0;
-}
-
-static int edid_is_std_timings_block(unsigned char *block)
-{
-	if ((block[0] == 0x00) && (block[1] == 0x00) && 
-	    (block[2] == 0x00) && (block[3] == 0xfa) &&
-	    (block[4] == 0x00))
-		return 1;
-	else
-		return 0;
-}
-
-static void parse_serial_block(unsigned char *block)
-{
-	unsigned char c[13];
-	
-	copy_string(block, c);
-	printk("      Serial No     : %s\n", c);
-}
-
-static void parse_ascii_block(unsigned char *block)
-{
-	unsigned char c[13];
-	
-	copy_string(block, c);
-	printk("      %s\n", c);
-}
-
-static void parse_limits_block(unsigned char *block)
-{
-	printk("      HorizSync     : %d-%d KHz\n", H_MIN_RATE, H_MAX_RATE);
-	printk("      VertRefresh   : %d-%d Hz\n", V_MIN_RATE, V_MAX_RATE);
-	if (MAX_PIXEL_CLOCK != 10*0xff)
-		printk("      Max Pixelclock: %d MHz\n", (int) MAX_PIXEL_CLOCK);
-}
-
-static void parse_monitor_block(unsigned char *block)
-{
-	unsigned char c[13];
-	
-	copy_string(block, c);
-	printk("      Monitor Name  : %s\n", c);
-}
-
-static void parse_color_block(unsigned char *block)
-{
-	printk("      Color Point    : unimplemented\n");
-}
-
-static void parse_std_timing_block(unsigned char *block)
-{
-	int xres, yres = 0, refresh, ratio, err = 1;
-	
-	xres = (block[0] + 31) * 8;
-	if (xres <= 256)
-		return;
-
-	ratio = (block[1] & 0xc0) >> 6;
-	switch (ratio) {
-	case 0:
-		yres = xres;
-		break;
-	case 1:
-		yres = (xres * 3)/4;
-		break;
-	case 2:
-		yres = (xres * 4)/5;
-		break;
-	case 3:
-		yres = (xres * 9)/16;
-		break;
-	}
-	refresh = (block[1] & 0x3f) + 60;
-	printk("      %dx%d@%dHz\n", xres, yres, refresh);
-	err = 0;
-}
-
-static void parse_dst_timing_block(unsigned char *block)
-{
-	int i;
-
-	block += 5;
-	for (i = 0; i < 5; i++, block += STD_TIMING_DESCRIPTION_SIZE)
-		parse_std_timing_block(block);
-}
-
-static void parse_detailed_timing_block(unsigned char *block)
-{
-	printk("      %d MHz ",  PIXEL_CLOCK/1000000);
-	printk("%d %d %d %d ", H_ACTIVE, H_ACTIVE + H_SYNC_OFFSET, 
-	       H_ACTIVE + H_SYNC_OFFSET + H_SYNC_WIDTH, H_ACTIVE + H_BLANKING);
-	printk("%d %d %d %d ", V_ACTIVE, V_ACTIVE + V_SYNC_OFFSET, 
-	       V_ACTIVE + V_SYNC_OFFSET + V_SYNC_WIDTH, V_ACTIVE + V_BLANKING);
-	printk("%sHSync %sVSync\n\n", (HSYNC_POSITIVE) ? "+" : "-", 
-	       (VSYNC_POSITIVE) ? "+" : "-");
-}
-
-int parse_edid(unsigned char *edid, struct fb_var_screeninfo *var)
-{
-	int i;
-	unsigned char *block;
-
-	if (edid == NULL || var == NULL)
-		return 1;
-
-	if (!(edid_checksum(edid)))
-		return 1;
-
-	if (!(edid_check_header(edid)))
-		return 1;
-
-	block = edid + DETAILED_TIMING_DESCRIPTIONS_START;
-
-	for (i = 0; i < 4; i++, block += DETAILED_TIMING_DESCRIPTION_SIZE) {
-		if (edid_is_timing_block(block)) {
-			var->xres = var->xres_virtual = H_ACTIVE;
-			var->yres = var->yres_virtual = V_ACTIVE;
-			var->height = var->width = -1;
-			var->right_margin = H_SYNC_OFFSET;
-			var->left_margin = (H_ACTIVE + H_BLANKING) -
-				(H_ACTIVE + H_SYNC_OFFSET + H_SYNC_WIDTH);
-			var->upper_margin = V_BLANKING - V_SYNC_OFFSET - 
-				V_SYNC_WIDTH;
-			var->lower_margin = V_SYNC_OFFSET;
-			var->hsync_len = H_SYNC_WIDTH;
-			var->vsync_len = V_SYNC_WIDTH;
-			var->pixclock = PIXEL_CLOCK;
-			var->pixclock /= 1000;
-			var->pixclock = KHZ2PICOS(var->pixclock);
-
-			if (HSYNC_POSITIVE)
-				var->sync |= FB_SYNC_HOR_HIGH_ACT;
-			if (VSYNC_POSITIVE)
-				var->sync |= FB_SYNC_VERT_HIGH_ACT;
-			return 0;
-		}
-	}
-	return 1;
-}
-
 static void calc_mode_timings(int xres, int yres, int refresh, struct fb_videomode *mode)
 {
 	struct fb_var_screeninfo var;
@@ -500,45 +251,82 @@ static int get_est_timing(unsigned char *block, struct fb_videomode *mode)
 	unsigned char c;
 
 	c = block[0];
-	if (c&0x80) 
-		calc_mode_timings(720, 400, 70, &mode[num++]);
-	if (c&0x40) 
-		calc_mode_timings(720, 400, 88, &mode[num++]);
-	if (c&0x20)
+	if (c&0x80) {
+		calc_mode_timings(720, 400, 70, &mode[num]);
+		mode[num++].flag = FB_MODE_IS_CALCULATED;
+		DPRINTK("      720x400@70Hz\n");
+	}
+	if (c&0x40) {
+		calc_mode_timings(720, 400, 88, &mode[num]);
+		mode[num++].flag = FB_MODE_IS_CALCULATED;
+		DPRINTK("      720x400@88Hz\n");
+	}
+	if (c&0x20) {
 		mode[num++] = vesa_modes[3];
-	if (c&0x10)
-		calc_mode_timings(640, 480, 67, &mode[num++]);
-	if (c&0x08)
+		DPRINTK("      640x480@60Hz\n");
+	}
+	if (c&0x10) {
+		calc_mode_timings(640, 480, 67, &mode[num]);
+		mode[num++].flag = FB_MODE_IS_CALCULATED;
+		DPRINTK("      640x480@67Hz\n");
+	}
+	if (c&0x08) {
 		mode[num++] = vesa_modes[4];
-	if (c&0x04)
+		DPRINTK("      640x480@72Hz\n");
+	}
+	if (c&0x04) {
 		mode[num++] = vesa_modes[5];
-	if (c&0x02)
+		DPRINTK("      640x480@75Hz\n");
+	}
+	if (c&0x02) {
 		mode[num++] = vesa_modes[7];
-	if (c&0x01)
+		DPRINTK("      800x600@56Hz\n");
+	}
+	if (c&0x01) {
 		mode[num++] = vesa_modes[8];
+		DPRINTK("      800x600@60Hz\n");
+	}
 
 	c = block[1];
-	if (c&0x80)
+	if (c&0x80) {
  		mode[num++] = vesa_modes[9];
-	if (c&0x40)
+		DPRINTK("      800x600@72Hz\n");
+	}
+	if (c&0x40) {
  		mode[num++] = vesa_modes[10];
-	if (c&0x20)
-		calc_mode_timings(832, 624, 75, &mode[num++]);
-	if (c&0x10)
+		DPRINTK("      800x600@75Hz\n");
+	}
+	if (c&0x20) {
+		calc_mode_timings(832, 624, 75, &mode[num]);
+		mode[num++].flag = FB_MODE_IS_CALCULATED;
+		DPRINTK("      832x624@75Hz\n");
+	}
+	if (c&0x10) {
 		mode[num++] = vesa_modes[12];
-	if (c&0x08)
+		DPRINTK("      1024x768@87Hz Interlaced\n");
+	}
+	if (c&0x08) {
 		mode[num++] = vesa_modes[13];
-	if (c&0x04)
+		DPRINTK("      1024x768@60Hz\n");
+	}
+	if (c&0x04) {
 		mode[num++] = vesa_modes[14];
-	if (c&0x02)
+		DPRINTK("      1024x768@70Hz\n");
+	}
+	if (c&0x02) {
 		mode[num++] = vesa_modes[15];
-	if (c&0x01)
+		DPRINTK("      1024x768@75Hz\n");
+	}
+	if (c&0x01) {
 		mode[num++] = vesa_modes[21];
-
+		DPRINTK("      1280x1024@75Hz\n");
+	}
 	c = block[2];
-	if (c&0x80)
+	if (c&0x80) {
 		mode[num++] = vesa_modes[17];
-
+		DPRINTK("      1152x870@75Hz\n");
+	}
+	DPRINTK("      Manufacturer's mask: %x\n",c&0x7F);
 	return num;
 }
 
@@ -567,17 +355,17 @@ static int get_std_timing(unsigned char *block, struct fb_videomode *mode)
 	}
 	refresh = (block[1] & 0x3f) + 60;
 
+	DPRINTK("      %dx%d@%dHz\n", xres, yres, refresh);
 	for (i = 0; i < VESA_MODEDB_SIZE; i++) {
 		if (vesa_modes[i].xres == xres && 
 		    vesa_modes[i].yres == yres &&
 		    vesa_modes[i].refresh == refresh) {
 			*mode = vesa_modes[i];
-			break;
-		} else {
-			calc_mode_timings(xres, yres, refresh, mode);
-			break;
+			mode->flag |= FB_MODE_IS_STANDARD;
+			return 1;
 		}
 	}
+	calc_mode_timings(xres, yres, refresh, mode);
 	return 1;
 }
 
@@ -615,6 +403,15 @@ static void get_detailed_timing(unsigned char *block,
 	mode->refresh = PIXEL_CLOCK/((H_ACTIVE + H_BLANKING) *
 				     (V_ACTIVE + V_BLANKING));
 	mode->vmode = 0;
+	mode->flag = FB_MODE_IS_DETAILED;
+
+	DPRINTK("      %d MHz ",  PIXEL_CLOCK/1000000);
+	DPRINTK("%d %d %d %d ", H_ACTIVE, H_ACTIVE + H_SYNC_OFFSET,
+	       H_ACTIVE + H_SYNC_OFFSET + H_SYNC_WIDTH, H_ACTIVE + H_BLANKING);
+	DPRINTK("%d %d %d %d ", V_ACTIVE, V_ACTIVE + V_SYNC_OFFSET,
+	       V_ACTIVE + V_SYNC_OFFSET + V_SYNC_WIDTH, V_ACTIVE + V_BLANKING);
+	DPRINTK("%sHSync %sVSync\n\n", (HSYNC_POSITIVE) ? "+" : "-",
+	       (VSYNC_POSITIVE) ? "+" : "-");
 }
 
 /**
@@ -647,21 +444,30 @@ struct fb_videomode *fb_create_modedb(unsigned char *edid, int *dbsize)
 
 	*dbsize = 0;
 
+	DPRINTK("   Supported VESA Modes\n");
 	block = edid + ESTABLISHED_TIMING_1;
 	num += get_est_timing(block, &mode[num]);
 
+	DPRINTK("   Standard Timings\n");
 	block = edid + STD_TIMING_DESCRIPTIONS_START;
 	for (i = 0; i < STD_TIMING; i++, block += STD_TIMING_DESCRIPTION_SIZE) 
 		num += get_std_timing(block, &mode[num]);
 
+	DPRINTK("   Detailed Timings\n");
 	block = edid + DETAILED_TIMING_DESCRIPTIONS_START;
 	for (i = 0; i < 4; i++, block+= DETAILED_TIMING_DESCRIPTION_SIZE) {
+	        int first = 1;
+
 		if (block[0] == 0x00 && block[1] == 0x00) {
 			if (block[3] == 0xfa) {
 				num += get_dst_timing(block + 5, &mode[num]);
 			}
 		} else  {
 			get_detailed_timing(block, &mode[num]);
+			if (first) {
+			        mode[num].flag |= FB_MODE_IS_FIRST;
+				first = 0;
+			}
 			num++;
 		}
 	}
@@ -694,45 +500,24 @@ void fb_destroy_modedb(struct fb_videomode *modedb)
 		kfree(modedb);
 }
 
-/**
- * fb_get_monitor_limits - get monitor operating limits
- * @edid: EDID data
- * @specs: fb_monspecs structure pointer
- *
- * DESCRIPTION:
- * Gets monitor operating limits from EDID data and places them in 
- * @specs
- */
 int fb_get_monitor_limits(unsigned char *edid, struct fb_monspecs *specs)
 {
 	int i, retval = 1;
 	unsigned char *block;
 
-	if (edid == NULL || specs == NULL)
-		return 1;
-
-	if (!(edid_checksum(edid)))
-		return 1;
-
-	if (!(edid_check_header(edid)))
-		return 1;
-
-	memset(specs, 0, sizeof(struct fb_monspecs));
 	block = edid + DETAILED_TIMING_DESCRIPTIONS_START;
 
-	printk("Monitor Operating Limits: ");
+	DPRINTK("      Monitor Operating Limits: ");
 	for (i = 0; i < 4; i++, block += DETAILED_TIMING_DESCRIPTION_SIZE) {
 		if (edid_is_limits_block(block)) {
 			specs->hfmin = H_MIN_RATE * 1000;
 			specs->hfmax = H_MAX_RATE * 1000;
 			specs->vfmin = V_MIN_RATE;
 			specs->vfmax = V_MAX_RATE;
-			specs->dclkmax = (MAX_PIXEL_CLOCK != 10*0xff) ?
-				MAX_PIXEL_CLOCK * 1000000 : 0;
+			specs->dclkmax = MAX_PIXEL_CLOCK * 1000000;
 			specs->gtf = (GTF_SUPPORT) ? 1 : 0;
-			specs->dpms = edid[DPMS_FLAGS];
 			retval = 0;
-			printk("From EDID\n");
+			DPRINTK("From EDID\n");
 			break;
 		}
 	}
@@ -744,7 +529,7 @@ int fb_get_monitor_limits(unsigned char *edid, struct fb_monspecs *specs)
 
 		modes = fb_create_modedb(edid, &num_modes);
 		if (!modes) {
-			printk("None Available\n");
+			DPRINTK("None Available\n");
 			return 1;
 		}
 
@@ -767,15 +552,189 @@ int fb_get_monitor_limits(unsigned char *edid, struct fb_monspecs *specs)
 			if (specs->vfmin == 0 || specs->vfmin > hz)
 				specs->vfmin = hz;
 		}
-		printk("Extrapolated\n");
+		DPRINTK("Extrapolated\n");
 		fb_destroy_modedb(modes);
 	}
-	printk("     H: %d-%dKHz V: %d-%dHz DCLK: %dMHz\n", specs->hfmin/1000, specs->hfmax/1000, 
-	       specs->vfmin, specs->vfmax, specs->dclkmax/1000000);
+	DPRINTK("           H: %d-%dKHz V: %d-%dHz DCLK: %dMHz\n",
+		specs->hfmin/1000, specs->hfmax/1000, specs->vfmin,
+		specs->vfmax, specs->dclkmax/1000000);
 	return retval;
 }
 
-void show_edid(unsigned char *edid)
+static void get_monspecs(unsigned char *edid, struct fb_monspecs *specs)
+{
+	unsigned char c, *block;
+
+	block = edid + EDID_STRUCT_DISPLAY;
+
+	fb_get_monitor_limits(edid, specs);
+
+	c = (block[0] & 0x80) >> 7;
+	specs->input = 0;
+	if (c) {
+		specs->input |= FB_DISP_DDI;
+		DPRINTK("      Digital Display Input");
+	} else {
+		DPRINTK("      Analog Display Input: Input Voltage - ");
+		switch ((block[0] & 0x60) >> 5) {
+		case 0:
+			DPRINTK("0.700V/0.300V");
+			specs->input |= FB_DISP_ANA_700_300;
+			break;
+		case 1:
+			DPRINTK("0.714V/0.286V");
+			specs->input |= FB_DISP_ANA_714_286;
+			break;
+		case 2:
+			DPRINTK("1.000V/0.400V");
+			specs->input |= FB_DISP_ANA_1000_400;
+			break;
+		case 3:
+			DPRINTK("0.700V/0.000V");
+			specs->input |= FB_DISP_ANA_700_000;
+			break;
+		default:
+			DPRINTK("unknown");
+			specs->input |= FB_DISP_UNKNOWN;
+		}
+	}
+	DPRINTK("\n      Sync: ");
+	c = (block[0] & 0x10) >> 4;
+	if (c)
+		DPRINTK("      Configurable signal level\n");
+	c = block[0] & 0x0f;
+	specs->signal = 0;
+	if (c & 0x10) {
+		DPRINTK("Blank to Blank ");
+		specs->signal |= FB_SIGNAL_BLANK_BLANK;
+	}
+	if (c & 0x08) {
+		DPRINTK("Separate ");
+		specs->signal |= FB_SIGNAL_SEPARATE;
+	}
+	if (c & 0x04) {
+		DPRINTK("Composite ");
+		specs->signal |= FB_SIGNAL_COMPOSITE;
+	}
+	if (c & 0x02) {
+		DPRINTK("Sync on Green ");
+		specs->signal |= FB_SIGNAL_SYNC_ON_GREEN;
+	}
+	if (c & 0x01) {
+		DPRINTK("Serration on ");
+		specs->signal |= FB_SIGNAL_SERRATION_ON;
+	}
+	DPRINTK("\n");
+	specs->max_x = block[1];
+	specs->max_y = block[2];
+	DPRINTK("      Max H-size in cm: ");
+	if (specs->max_x)
+		DPRINTK("%d\n", specs->max_x);
+	else
+		DPRINTK("variable\n");
+	DPRINTK("      Max V-size in cm: ");
+	if (specs->max_y)
+		DPRINTK("%d\n", specs->max_y);
+	else
+		DPRINTK("variable\n");
+
+	c = block[3];
+	specs->gamma = c+100;
+	DPRINTK("      Gamma: ");
+	DPRINTK("%d.%d\n", specs->gamma/100, specs->gamma % 100);
+
+	get_dpms_capabilities(block[4], specs);
+
+	switch ((block[4] & 0x18) >> 3) {
+	case 0:
+		DPRINTK("      Monochrome/Grayscale\n");
+		specs->input |= FB_DISP_MONO;
+		break;
+	case 1:
+		DPRINTK("      RGB Color Display\n");
+		specs->input |= FB_DISP_RGB;
+		break;
+	case 2:
+		DPRINTK("      Non-RGB Multicolor Display\n");
+		specs->input |= FB_DISP_MULTI;
+		break;
+	default:
+		DPRINTK("      Unknown\n");
+		specs->input |= FB_DISP_UNKNOWN;
+		break;
+	}
+
+	get_chroma(block, specs);
+
+	specs->misc = 0;
+	c = block[4] & 0x7;
+	if (c & 0x04) {
+		DPRINTK("      Default color format is primary\n");
+		specs->misc |= FB_MISC_PRIM_COLOR;
+	}
+	if (c & 0x02) {
+		DPRINTK("      First DETAILED Timing is preferred\n");
+		specs->misc |= FB_MISC_1ST_DETAIL;
+	}
+	if (c & 0x01) {
+		printk("      Display is GTF capable\n");
+		specs->gtf = 1;
+	}
+}
+
+static int edid_is_timing_block(unsigned char *block)
+{
+	if ((block[0] != 0x00) || (block[1] != 0x00) ||
+	    (block[2] != 0x00) || (block[4] != 0x00))
+		return 1;
+	else
+		return 0;
+}
+
+int fb_parse_edid(unsigned char *edid, struct fb_var_screeninfo *var)
+{
+	int i;
+	unsigned char *block;
+
+	if (edid == NULL || var == NULL)
+		return 1;
+
+	if (!(edid_checksum(edid)))
+		return 1;
+
+	if (!(edid_check_header(edid)))
+		return 1;
+
+	block = edid + DETAILED_TIMING_DESCRIPTIONS_START;
+
+	for (i = 0; i < 4; i++, block += DETAILED_TIMING_DESCRIPTION_SIZE) {
+		if (edid_is_timing_block(block)) {
+			var->xres = var->xres_virtual = H_ACTIVE;
+			var->yres = var->yres_virtual = V_ACTIVE;
+			var->height = var->width = -1;
+			var->right_margin = H_SYNC_OFFSET;
+			var->left_margin = (H_ACTIVE + H_BLANKING) -
+				(H_ACTIVE + H_SYNC_OFFSET + H_SYNC_WIDTH);
+			var->upper_margin = V_BLANKING - V_SYNC_OFFSET -
+				V_SYNC_WIDTH;
+			var->lower_margin = V_SYNC_OFFSET;
+			var->hsync_len = H_SYNC_WIDTH;
+			var->vsync_len = V_SYNC_WIDTH;
+			var->pixclock = PIXEL_CLOCK;
+			var->pixclock /= 1000;
+			var->pixclock = KHZ2PICOS(var->pixclock);
+
+			if (HSYNC_POSITIVE)
+				var->sync |= FB_SYNC_HOR_HIGH_ACT;
+			if (VSYNC_POSITIVE)
+				var->sync |= FB_SYNC_VERT_HIGH_ACT;
+			return 0;
+		}
+	}
+	return 1;
+}
+
+void fb_edid_to_monspecs(unsigned char *edid, struct fb_monspecs *specs)
 {
 	unsigned char *block;
 	int i;
@@ -788,83 +747,52 @@ void show_edid(unsigned char *edid)
 
 	if (!(edid_check_header(edid)))
 		return;
-	printk("========================================\n");
-	printk("Display Information (EDID)\n");
-	printk("========================================\n");
-	printk("   EDID Version %d.%d\n", (int) edid[EDID_STRUCT_VERSION],
-	       (int) edid[EDID_STRUCT_REVISION]);
 
-	parse_vendor_block(edid + ID_MANUFACTURER_NAME);
+	memset(specs, 0, sizeof(struct fb_monspecs));
 
-	printk("   Display Characteristics:\n");
-	parse_display_block(edid + EDID_STRUCT_DISPLAY);
+	specs->version = edid[EDID_STRUCT_VERSION];
+	specs->revision = edid[EDID_STRUCT_REVISION];
 
-	printk("   Standard Timings\n");
-	block = edid + STD_TIMING_DESCRIPTIONS_START;
-	for (i = 0; i < STD_TIMING; i++, block += STD_TIMING_DESCRIPTION_SIZE) 
-		parse_std_timing_block(block);
+	DPRINTK("========================================\n");
+	DPRINTK("Display Information (EDID)\n");
+	DPRINTK("========================================\n");
+	DPRINTK("   EDID Version %d.%d\n", (int) specs->version,
+	       (int) specs->revision);
 
-	printk("   Supported VESA Modes\n");
-	parse_std_md_block(edid + ESTABLISHED_TIMING_1);
+	parse_vendor_block(edid + ID_MANUFACTURER_NAME, specs);
 
-	printk("   Detailed Monitor Information\n");
 	block = edid + DETAILED_TIMING_DESCRIPTIONS_START;
 	for (i = 0; i < 4; i++, block += DETAILED_TIMING_DESCRIPTION_SIZE) {
 		if (edid_is_serial_block(block)) {
-			parse_serial_block(block);
+			copy_string(block, specs->serial_no);
+			DPRINTK("   Serial Number: %s\n", specs->serial_no);
 		} else if (edid_is_ascii_block(block)) {
-			parse_ascii_block(block);
-		} else if (edid_is_limits_block(block)) {
-			parse_limits_block(block);
+			copy_string(block, specs->ascii);
+			DPRINTK("   ASCII Block: %s\n", specs->ascii);
 		} else if (edid_is_monitor_block(block)) {
-			parse_monitor_block(block);
-		} else if (edid_is_color_block(block)) {
-			parse_color_block(block);
-		} else if (edid_is_std_timings_block(block)) {
-			parse_dst_timing_block(block);
-		} else if (edid_is_timing_block(block)) {
-			parse_detailed_timing_block(block);
+			copy_string(block, specs->monitor);
+			DPRINTK("   Monitor Name: %s\n", specs->monitor);
 		}
 	}
-	printk("========================================\n");
+
+	DPRINTK("   Display Characteristics:\n");
+	get_monspecs(edid, specs);
+
+	specs->modedb = fb_create_modedb(edid, &specs->modedb_len);
+	DPRINTK("========================================\n");
 }
 
-#ifdef CONFIG_PPC_OF
-char *get_EDID_from_OF(struct pci_dev *pdev)
+char *get_EDID_from_firmware(struct device *dev)
 {
-	static char *propnames[] =
-	    { "DFP,EDID", "LCD,EDID", "EDID", "EDID1", NULL };
 	unsigned char *pedid = NULL;
-	struct device_node *dp;
-	int i;
 
-	if (pdev == NULL)
-		return NULL;
-	dp = pci_device_to_OF_node(pdev);
-	while (dp != NULL) {
-		for (i = 0; propnames[i] != NULL; ++i) {
-			pedid = (unsigned char *) get_property(dp, propnames[i], NULL);
-			if (pedid != NULL)
-				return pedid;
-		}
-		dp = dp->child;
-	}
-	show_edid(pedid);
-	return pedid;
-}
-#endif
-
-#ifdef CONFIG_X86
-char *get_EDID_from_BIOS(void *dummy)
-{
-	unsigned char *pedid = edid_info.dummy;
-	
+#if defined(CONFIG_EDID_FIRMWARE) && defined(CONFIG_X86)
+	pedid = edid_info.dummy;
 	if (!pedid)
 		return NULL;
-	show_edid(pedid);
-	return pedid;				
-}
 #endif
+	return pedid;
+}
 
 /* 
  * VESA Generalized Timing Formula (GTF) 
@@ -1179,7 +1107,7 @@ int fb_get_mode(int flags, u32 val, struct fb_var_screeninfo *var, struct fb_inf
  * REQUIRES:
  * A valid info->monspecs.
  */
-int fb_validate_mode(struct fb_var_screeninfo *var, struct fb_info *info)
+int fb_validate_mode(const struct fb_var_screeninfo *var, struct fb_info *info)
 {
 	u32 hfreq, vfreq, htotal, vtotal, pixclock;
 	u32 hfmin, hfmax, vfmin, vfmax, dclkmin, dclkmax;
@@ -1228,16 +1156,12 @@ int fb_validate_mode(struct fb_var_screeninfo *var, struct fb_info *info)
 		-EINVAL : 0;
 }
 
-EXPORT_SYMBOL(parse_edid);
-EXPORT_SYMBOL(show_edid);
-#ifdef CONFIG_X86
-EXPORT_SYMBOL(get_EDID_from_BIOS);
-#endif
-#ifdef CONFIG_PPC_OF
-EXPORT_SYMBOL(get_EDID_from_OF);
-#endif
-EXPORT_SYMBOL(fb_get_monitor_limits);
+EXPORT_SYMBOL(fb_parse_edid);
+EXPORT_SYMBOL(fb_edid_to_monspecs);
+EXPORT_SYMBOL(get_EDID_from_firmware);
+
 EXPORT_SYMBOL(fb_get_mode);
 EXPORT_SYMBOL(fb_validate_mode);
 EXPORT_SYMBOL(fb_create_modedb);
 EXPORT_SYMBOL(fb_destroy_modedb);
+EXPORT_SYMBOL(fb_get_monitor_limits);

@@ -166,6 +166,10 @@ int ip6_mc_leave_src(struct sock *sk, struct ipv6_mc_socklist *iml,
 #define MLDV2_QQIC(value) MLDV2_EXP(0x80, 4, 3, value)
 #define MLDV2_MRC(value) MLDV2_EXP(0x8000, 12, 3, value)
 
+#define IPV6_MLD_MAX_MSF	10
+
+int sysctl_mld_max_msf = IPV6_MLD_MAX_MSF;
+
 /*
  *	socket join on multicast group
  */
@@ -404,6 +408,10 @@ int ip6_mc_source(int add, int omode, struct sock *sk,
 	}
 	/* else, add a new source to the filter */
 
+	if (psl && psl->sl_count >= sysctl_mld_max_msf) {
+		err = -ENOBUFS;
+		goto done;
+	}
 	if (!psl || psl->sl_count == psl->sl_max) {
 		struct ip6_sf_socklist *newpsl;
 		int count = IP6_SFBLOCK;

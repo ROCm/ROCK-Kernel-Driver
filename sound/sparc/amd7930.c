@@ -791,7 +791,9 @@ static int __init snd_amd7930_pcm(amd7930_t *amd)
 	strcpy(pcm->name, amd->card->shortname);
 	amd->pcm = pcm;
 
-	snd_pcm_lib_preallocate_pages_for_all(pcm, 64*1024, 64*1024, GFP_KERNEL);
+	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_CONTINUOUS,
+					      snd_dma_continuous_data(GFP_KERNEL),
+					      64*1024, 64*1024);
 
 	return 0;
 }

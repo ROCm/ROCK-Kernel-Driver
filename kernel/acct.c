@@ -52,6 +52,7 @@
 #include <linux/security.h>
 #include <linux/vfs.h>
 #include <linux/jiffies.h>
+#include <linux/times.h>
 #include <asm/uaccess.h>
 #include <asm/div64.h>
 #include <linux/blkdev.h> /* sector_div */
@@ -235,8 +236,11 @@ asmlinkage long sys_acct(const char *name)
 	}
 
 	error = security_acct(file);
-	if (error)
+	if (error) {
+		if (file)
+			filp_close(file, NULL);
 		return error;
+	}
 
 	spin_lock(&acct_globals.lock);
 	acct_file_reopen(file);
@@ -333,13 +337,13 @@ static void do_acct_process(long exitcode, struct file *file)
 
 	strlcpy(ac.ac_comm, current->comm, sizeof(ac.ac_comm));
 
-	elapsed = get_jiffies_64() - current->start_time;
+	elapsed = jiffies_64_to_clock_t(get_jiffies_64() - current->start_time);
 	ac.ac_etime = encode_comp_t(elapsed < (unsigned long) -1l ?
 	                       (unsigned long) elapsed : (unsigned long) -1l);
-	do_div(elapsed, HZ);
+	do_div(elapsed, USER_HZ);
 	ac.ac_btime = xtime.tv_sec - elapsed;
-	ac.ac_utime = encode_comp_t(current->utime);
-	ac.ac_stime = encode_comp_t(current->stime);
+	ac.ac_utime = encode_comp_t(jiffies_to_clock_t(current->utime));
+	ac.ac_stime = encode_comp_t(jiffies_to_clock_t(current->stime));
 	/* we really need to bite the bullet and change layout */
 	ac.ac_uid = current->uid;
 	ac.ac_gid = current->gid;

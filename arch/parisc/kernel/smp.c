@@ -16,7 +16,6 @@
 **      the Free Software Foundation; either version 2 of the License, or
 **      (at your option) any later version.
 */
-#define __KERNEL_SYSCALLS__
 #undef ENTRY_SYS_CPUS	/* syscall support for iCOD-like functionality */
 
 #include <linux/autoconf.h>

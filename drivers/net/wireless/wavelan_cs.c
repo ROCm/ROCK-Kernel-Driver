@@ -4155,18 +4155,6 @@ wv_pcmcia_release(dev_link_t *link)
   printk(KERN_DEBUG "%s: -> wv_pcmcia_release(0x%p)\n", dev->name, link);
 #endif
 
-  /* If the device is currently in use, we won't release until it is
-   * actually closed. */
-  if(link->open)
-    {
-#ifdef DEBUG_CONFIG_INFO
-      printk(KERN_DEBUG "%s: wv_pcmcia_release: release postponed, device still open\n",
-	     dev->name);
-#endif
-      link->state |= DEV_STALE_CONFIG;
-      return;
-    }
-
   /* Don't bother checking to see if these succeed or not */
   iounmap((u_char *)dev->mem_start);
   pcmcia_release_window(link->win);
@@ -4179,9 +4167,6 @@ wv_pcmcia_release(dev_link_t *link)
 #ifdef DEBUG_CONFIG_TRACE
   printk(KERN_DEBUG "%s: <- wv_pcmcia_release()\n", dev->name);
 #endif
-
-  if (link->state & DEV_STALE_CONFIG)
-	  wavelan_detach(link);
 }
 
 /************************ INTERRUPT HANDLING ************************/
@@ -4634,10 +4619,6 @@ wavelan_close(struct net_device *	dev)
       /* Power down the module */
       hacr_write(base, HACR_DEFAULT & (~HACR_PWR_STAT));
     }
-  else
-    /* The card is no more there (flag is activated in wv_pcmcia_release) */
-    if(link->state & DEV_STALE_CONFIG)
-      wv_pcmcia_release(link);
 
 #ifdef DEBUG_CALLBACK_TRACE
   printk(KERN_DEBUG "%s: <-wavelan_close()\n", dev->name);
@@ -4802,14 +4783,6 @@ wavelan_detach(dev_link_t *	link)
     {
       /* Some others haven't done their job : give them another chance */
       wv_pcmcia_release(link);
-      if(link->state & DEV_STALE_CONFIG)
-	{
-#ifdef DEBUG_CONFIG_INFO
-	  printk(KERN_DEBUG "wavelan_detach: detach postponed,"
-		 " '%s' still locked\n", link->dev->dev_name);
-#endif
-	  return;
-	}
     }
 
   /* Break the link with Card Services */

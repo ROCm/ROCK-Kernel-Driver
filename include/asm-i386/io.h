@@ -45,17 +45,6 @@
 
 #include <linux/vmalloc.h>
 
-/*
- * Temporary debugging check to catch old code using
- * unmapped ISA addresses. Will be removed in 2.4.
- */
-#ifdef CONFIG_DEBUG_IOVIRT
-  extern void *__io_virt_debug(unsigned long x, const char *file, int line);
-  #define __io_virt(x) __io_virt_debug((unsigned long)(x), __FILE__, __LINE__)
-#else
-  #define __io_virt(x) ((void *)(x))
-#endif
-
 /**
  *	virt_to_phys	-	map virtual addresses to physical
  *	@address: address to remap
@@ -150,9 +139,9 @@ extern void bt_iounmap(void *addr, unsigned long size);
  * memory location directly.
  */
 
-#define readb(addr) (*(volatile unsigned char *) __io_virt(addr))
-#define readw(addr) (*(volatile unsigned short *) __io_virt(addr))
-#define readl(addr) (*(volatile unsigned int *) __io_virt(addr))
+#define readb(addr) (*(volatile unsigned char *) (addr))
+#define readw(addr) (*(volatile unsigned short *) (addr))
+#define readl(addr) (*(volatile unsigned int *) (addr))
 #define readb_relaxed(addr) readb(addr)
 #define readw_relaxed(addr) readw(addr)
 #define readl_relaxed(addr) readl(addr)
@@ -160,16 +149,16 @@ extern void bt_iounmap(void *addr, unsigned long size);
 #define __raw_readw readw
 #define __raw_readl readl
 
-#define writeb(b,addr) (*(volatile unsigned char *) __io_virt(addr) = (b))
-#define writew(b,addr) (*(volatile unsigned short *) __io_virt(addr) = (b))
-#define writel(b,addr) (*(volatile unsigned int *) __io_virt(addr) = (b))
+#define writeb(b,addr) (*(volatile unsigned char *) (addr) = (b))
+#define writew(b,addr) (*(volatile unsigned short *) (addr) = (b))
+#define writel(b,addr) (*(volatile unsigned int *) (addr) = (b))
 #define __raw_writeb writeb
 #define __raw_writew writew
 #define __raw_writel writel
 
-#define memset_io(a,b,c)	memset(__io_virt(a),(b),(c))
-#define memcpy_fromio(a,b,c)	__memcpy((a),__io_virt(b),(c))
-#define memcpy_toio(a,b,c)	__memcpy(__io_virt(a),(b),(c))
+#define memset_io(a,b,c)	memset((void *)(a),(b),(c))
+#define memcpy_fromio(a,b,c)	__memcpy((a),(void *)(b),(c))
+#define memcpy_toio(a,b,c)	__memcpy((void *)(a),(b),(c))
 
 /*
  * ISA space is 'always mapped' on a typical x86 system, no need to
@@ -196,8 +185,8 @@ extern void bt_iounmap(void *addr, unsigned long size);
  * Again, i386 does not require mem IO specific function.
  */
 
-#define eth_io_copy_and_sum(a,b,c,d)		eth_copy_and_sum((a),__io_virt(b),(c),(d))
-#define isa_eth_io_copy_and_sum(a,b,c,d)	eth_copy_and_sum((a),__io_virt(__ISA_IO_base + (b)),(c),(d))
+#define eth_io_copy_and_sum(a,b,c,d)		eth_copy_and_sum((a),(void *)(b),(c),(d))
+#define isa_eth_io_copy_and_sum(a,b,c,d)	eth_copy_and_sum((a),(void *)(__ISA_IO_base + (b)),(c),(d))
 
 /**
  *	check_signature		-	find BIOS signatures

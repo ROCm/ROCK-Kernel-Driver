@@ -4,7 +4,7 @@
 
 proc-crypto-$(CONFIG_PROC_FS) = proc.o
 
-obj-$(CONFIG_CRYPTO) += api.o cipher.o digest.o compress.o \
+obj-$(CONFIG_CRYPTO) += api.o scatterwalk.o cipher.o digest.o compress.o \
 			$(proc-crypto-y)
 
 obj-$(CONFIG_CRYPTO_HMAC) += hmac.o
@@ -21,6 +21,7 @@ obj-$(CONFIG_CRYPTO_SERPENT) += serpent.o
 obj-$(CONFIG_CRYPTO_AES) += aes.o
 obj-$(CONFIG_CRYPTO_CAST5) += cast5.o
 obj-$(CONFIG_CRYPTO_CAST6) += cast6.o
+obj-$(CONFIG_CRYPTO_ARC4) += arc4.o
 obj-$(CONFIG_CRYPTO_DEFLATE) += deflate.o
 
 obj-$(CONFIG_CRYPTO_TEST) += tcrypt.o

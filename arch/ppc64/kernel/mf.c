@@ -30,18 +30,17 @@
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/mm.h>
+#include <linux/module.h>
 #include <asm/iSeries/HvLpConfig.h>
 #include <linux/slab.h>
 #include <linux/delay.h>
 #include <asm/nvram.h>
 #include <asm/time.h>
 #include <asm/iSeries/ItSpCommArea.h>
-#include <asm/iSeries/iSeries_proc.h>
 #include <asm/uaccess.h>
-#include <linux/pci.h>
+#include <linux/dma-mapping.h>
 #include <linux/bcd.h>
-
-extern struct pci_dev *iSeries_vio_dev;
+#include <asm/iSeries/vio.h>
 
 /*
  * This is the structure layout for the Machine Facilites LPAR event
@@ -561,6 +560,7 @@ void mf_allocateLpEvents(HvLpIndex targetLp, HvLpEvent_Type type,
 	if ((rc != 0) && (hdlr != NULL))
 		(*hdlr)(userToken, rc);
 }
+EXPORT_SYMBOL(mf_allocateLpEvents);
 
 /*
  * Global kernel interface to unseed and deallocate events already in
@@ -591,6 +591,7 @@ void mf_deallocateLpEvents(HvLpIndex targetLp, HvLpEvent_Type type,
 	if ((rc != 0) && (hdlr != NULL))
 		(*hdlr)(userToken, rc);
 }
+EXPORT_SYMBOL(mf_deallocateLpEvents);
 
 /*
  * Global kernel interface to tell the VSP object in the primary
@@ -681,8 +682,6 @@ void mf_init(void)
 
 	/* initialization complete */
 	printk(KERN_NOTICE "mf.c: iSeries Linux LPAR Machine Facilities initialized\n");
-
-	iSeries_proc_callback(&mf_proc_init);
 }
 
 void mf_setSide(char side)
@@ -791,7 +790,8 @@ void mf_setCmdLine(const char *cmdline, int size, u64 side)
 {
 	struct VspCmdData myVspCmd;
 	dma_addr_t dma_addr = 0;
-	char *page = pci_alloc_consistent(iSeries_vio_dev, size, &dma_addr);
+	char *page = dma_alloc_coherent(iSeries_vio_dev, size, &dma_addr,
+			GFP_ATOMIC);
 
 	if (page == NULL) {
 		printk(KERN_ERR "mf.c: couldn't allocate memory to set command line\n");
@@ -809,7 +809,7 @@ void mf_setCmdLine(const char *cmdline, int size, u64 side)
 	mb();
 	(void)signal_vsp_instruction(&myVspCmd);
 
-	pci_free_consistent(iSeries_vio_dev, size, page, dma_addr);
+	dma_free_coherent(iSeries_vio_dev, size, page, dma_addr);
 }
 
 int mf_getCmdLine(char *cmdline, int *size, u64 side)
@@ -819,8 +819,8 @@ int mf_getCmdLine(char *cmdline, int *size, u64 side)
 	int len = *size;
 	dma_addr_t dma_addr;
 
-	dma_addr = pci_map_single(iSeries_vio_dev, cmdline, len,
-			PCI_DMA_FROMDEVICE);
+	dma_addr = dma_map_single(iSeries_vio_dev, cmdline, len,
+			DMA_FROM_DEVICE);
 	memset(cmdline, 0, len);
 	memset(&myVspCmd, 0, sizeof(myVspCmd));
 	myVspCmd.cmd = 33;
@@ -840,7 +840,7 @@ int mf_getCmdLine(char *cmdline, int *size, u64 side)
 #endif
 	}
 
-	pci_unmap_single(iSeries_vio_dev, dma_addr, *size, PCI_DMA_FROMDEVICE);
+	dma_unmap_single(iSeries_vio_dev, dma_addr, *size, DMA_FROM_DEVICE);
 
 	return len;
 }
@@ -851,7 +851,8 @@ int mf_setVmlinuxChunk(const char *buffer, int size, int offset, u64 side)
 	struct VspCmdData myVspCmd;
 	int rc;
 	dma_addr_t dma_addr = 0;
-	char *page = pci_alloc_consistent(iSeries_vio_dev, size, &dma_addr);
+	char *page = dma_alloc_coherent(iSeries_vio_dev, size, &dma_addr,
+			GFP_ATOMIC);
 
 	if (page == NULL) {
 		printk(KERN_ERR "mf.c: couldn't allocate memory to set vmlinux chunk\n");
@@ -876,7 +877,7 @@ int mf_setVmlinuxChunk(const char *buffer, int size, int offset, u64 side)
 			rc = -ENOMEM;
 	}
 
-	pci_free_consistent(iSeries_vio_dev, size, page, dma_addr);
+	dma_free_coherent(iSeries_vio_dev, size, page, dma_addr);
 
 	return rc;
 }
@@ -888,8 +889,8 @@ int mf_getVmlinuxChunk(char *buffer, int *size, int offset, u64 side)
 	int len = *size;
 	dma_addr_t dma_addr;
 
-	dma_addr = pci_map_single(iSeries_vio_dev, buffer, len,
-			PCI_DMA_FROMDEVICE);
+	dma_addr = dma_map_single(iSeries_vio_dev, buffer, len,
+			DMA_FROM_DEVICE);
 	memset(buffer, 0, len);
 	memset(&myVspCmd, 0, sizeof(myVspCmd));
 	myVspCmd.cmd = 32;
@@ -907,7 +908,7 @@ int mf_getVmlinuxChunk(char *buffer, int *size, int offset, u64 side)
 			rc = -ENOMEM;
 	}
 
-	pci_unmap_single(iSeries_vio_dev, dma_addr, len, PCI_DMA_FROMDEVICE);
+	dma_unmap_single(iSeries_vio_dev, dma_addr, len, DMA_FROM_DEVICE);
 
 	return rc;
 }

@@ -475,7 +475,6 @@ CONFIG_SOFT_WATCHDOG=y
 # CONFIG_ADVANTECH_WDT is not set
 # CONFIG_60XX_WDT is not set
 # CONFIG_MIXCOMWD is not set
-# CONFIG_I810_TCO is not set
 # CONFIG_MACHZ_WDT is not set
 # CONFIG_INTEL_RNG is not set
 # CONFIG_NVRAM is not set

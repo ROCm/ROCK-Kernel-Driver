@@ -140,8 +140,9 @@ reload_context (mm_context_t context)
 {
 	unsigned long rid;
 	unsigned long rid_incr = 0;
-	unsigned long rr0, rr1, rr2, rr3, rr4;
+	unsigned long rr0, rr1, rr2, rr3, rr4, old_rr4;
 
+	old_rr4 = ia64_get_rr(0x8000000000000000);
 	rid = context << 3;	/* make space for encoding the region number */
 	rid_incr = 1 << 8;
 
@@ -152,7 +153,7 @@ reload_context (mm_context_t context)
 	rr3 = rr0 + 3*rid_incr;
 	rr4 = rr0 + 4*rid_incr;
 #ifdef  CONFIG_HUGETLB_PAGE
-	rr4 = (rr4 & (~(0xfcUL))) | (HPAGE_SHIFT << 2);
+	rr4 = (rr4 & (~(0xfcUL))) | (old_rr4 & 0xfc);
 #endif
 
 	ia64_set_rr(0x0000000000000000, rr0);

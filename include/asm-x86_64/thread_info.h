@@ -82,7 +82,6 @@ static inline struct thread_info *stack_thread_info(void)
 #else /* !__ASSEMBLY__ */
 
 /* how to get the thread information struct from ASM */
-/* only works on the process stack. otherwise get it via the PDA. */
 #define GET_THREAD_INFO(reg) \
 	movq %gs:pda_kernelstack,reg ; \
 	subq $(THREAD_SIZE-PDA_STACKOFFSET),reg
@@ -118,8 +117,10 @@ static inline struct thread_info *stack_thread_info(void)
 #define _TIF_FORK		(1<<TIF_FORK)
 #define _TIF_ABI_PENDING	(1<<TIF_ABI_PENDING)
 
-#define _TIF_WORK_MASK		0x0000FFFE	/* work to do on interrupt/exception return */
-#define _TIF_ALLWORK_MASK	0x0000FFFF	/* work to do on any return to u-space */
+/* work to do on interrupt/exception return */
+#define _TIF_WORK_MASK    (0x0000FFFF & ~(_TIF_SYSCALL_TRACE|_TIF_SINGLESTEP))
+/* work to do on any return to user space */
+#define _TIF_ALLWORK_MASK 0x0000FFFF	
 
 #define PREEMPT_ACTIVE     0x4000000
 

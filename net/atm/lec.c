@@ -793,7 +793,7 @@ lec_vcc_attach(struct atm_vcc *vcc, void *arg)
 		return -ENOMEM;
 	vpriv->xoff = 0;
 	vpriv->old_pop = vcc->pop;
-	LEC_VCC_PRIV(vcc) = vpriv;
+	vcc->user_back = vpriv;
 	vcc->pop = lec_pop;
         lec_vcc_added(dev_lec[ioc_data.dev_num]->priv, 
                       &ioc_data, vcc, vcc->push);
@@ -1420,7 +1420,7 @@ lec_arp_clear_vccs(struct lec_arp_table *entry)
 		if (vpriv->xoff)
 			netif_wake_queue(dev);
 		kfree(vpriv);
-		LEC_VCC_PRIV(vcc) = NULL;
+		vcc->user_back = NULL;
                 vcc->push = entry->old_push;
 		vcc_release_async(vcc, -EPIPE);
                 vcc = NULL;
@@ -2374,7 +2374,7 @@ lec_mcast_make(struct lec_priv *priv, struct atm_vcc *vcc)
 		return -ENOMEM;
 	vpriv->xoff = 0;
 	vpriv->old_pop = vcc->pop;
-	LEC_VCC_PRIV(vcc) = vpriv;
+	vcc->user_back = vpriv;
         vcc->pop = lec_pop;
         lec_arp_get(priv);
         to_add = make_entry(priv, mac_addr);

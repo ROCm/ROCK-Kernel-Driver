@@ -308,11 +308,9 @@ typedef struct {
 	unsigned int * entries;		/* 16k-aligned TLB table */
 	dma_addr_t entries_dmaaddr;	/* 16k-aligned PCI address to TLB table */
 	unsigned long * shadow_entries;	/* shadow entries with virtual addresses */
-	void * buffer;			/* pointer for table calloc */
-	dma_addr_t buffer_dmaaddr;	/* not accessible PCI BUS physical address */
+	struct snd_dma_buffer buffer;
 	snd_util_memhdr_t * memhdr;	/* page allocation list */
-	void * silent_page;		/* silent page */
-	dma_addr_t silent_page_dmaaddr; /* not accessible PCI BUS physical address */
+	struct snd_dma_buffer silent_page;
 } snd_trident_tlb_t;
 
 struct _snd_trident_voice {
@@ -434,6 +432,8 @@ struct _snd_trident {
 
 	spinlock_t event_lock;
 	spinlock_t voice_alloc;
+
+	struct snd_dma_device dma_dev;
 
 	struct pci_dev *pci;
 	snd_card_t *card;

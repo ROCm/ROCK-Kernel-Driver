@@ -31,7 +31,7 @@
  *
  * $Id: hci_usb.c,v 1.8 2002/07/18 17:23:09 maxk Exp $    
  */
-#define VERSION "2.4"
+#define VERSION "2.5"
 
 #include <linux/config.h>
 #include <linux/module.h>
@@ -55,7 +55,7 @@
 
 #include "hci_usb.h"
 
-#ifndef HCI_USB_DEBUG
+#ifndef CONFIG_BT_HCIUSB_DEBUG
 #undef  BT_DBG
 #define BT_DBG( A... )
 #undef  BT_DMP
@@ -70,12 +70,6 @@
 static struct usb_driver hci_usb_driver; 
 
 static struct usb_device_id bluetooth_ids[] = {
-	/* Broadcom BCM2033 without firmware */
-	{ USB_DEVICE(0x0a5c, 0x2033), .driver_info = HCI_IGNORE },
-
-	/* Digianswer device */
-	{ USB_DEVICE(0x08fd, 0x0001), .driver_info = HCI_DIGIANSWER },
-
 	/* Generic Bluetooth USB device */
 	{ USB_DEVICE_INFO(HCI_DEV_CLASS, HCI_DEV_SUBCLASS, HCI_DEV_PROTOCOL) },
 
@@ -92,6 +86,19 @@ static struct usb_device_id bluetooth_ids[] = {
 };
 
 MODULE_DEVICE_TABLE (usb, bluetooth_ids);
+
+static struct usb_device_id blacklist_ids[] = {
+	/* Broadcom BCM2033 without firmware */
+	{ USB_DEVICE(0x0a5c, 0x2033), .driver_info = HCI_IGNORE },
+
+	/* Broadcom BCM2035 */
+	{ USB_DEVICE(0x0a5c, 0x200a), .driver_info = HCI_RESET },
+
+	/* Digianswer device */
+	{ USB_DEVICE(0x08fd, 0x0001), .driver_info = HCI_DIGIANSWER },
+
+	{ }     /* Terminating entry */
+};
 
 struct _urb *_urb_alloc(int isoc, int gfp)
 {
@@ -644,7 +651,7 @@ static inline int __recv_frame(struct hci_usb *husb, int type, void *data, int c
 #endif
 			}
 			BT_DBG("new packet len %d", len);
-				
+
 			skb = bt_skb_alloc(len, GFP_ATOMIC);
 			if (!skb) {
 				BT_ERR("%s no memory for the packet", husb->hdev->name);
@@ -788,7 +795,14 @@ int hci_usb_probe(struct usb_interface *intf, const struct usb_device_id *id)
 	struct hci_dev *hdev;
 	int i, a, e, size, ifn, isoc_ifnum, isoc_alts;
 
-	BT_DBG("udev %p ifnum %d", udev, ifnum);
+	BT_DBG("udev %p intf %p", udev, intf);
+
+	if (!id->driver_info) {
+		const struct usb_device_id *match;
+		match = usb_match_id(intf, blacklist_ids);
+		if (match)
+			id = match;
+	}
 
 	iface = udev->actconfig->interface[0];
 
@@ -928,6 +942,9 @@ int hci_usb_probe(struct usb_interface *intf, const struct usb_device_id *id)
 
 	hdev->owner = THIS_MODULE;
 
+	if (id->driver_info & HCI_RESET)
+		set_bit(HCI_QUIRK_RESET_ON_INIT, &hdev->quirks);
+
 	if (hci_register_dev(hdev) < 0) {
 		BT_ERR("Can't register HCI device");
 		hci_free_dev(hdev);
@@ -974,7 +991,7 @@ static struct usb_driver hci_usb_driver = {
 	.id_table   =  bluetooth_ids,
 };
 
-int hci_usb_init(void)
+static int __init hci_usb_init(void)
 {
 	int err;
 
@@ -986,14 +1003,15 @@ int hci_usb_init(void)
 	return err;
 }
 
-void hci_usb_cleanup(void)
+static void __exit hci_usb_exit(void)
 {
 	usb_deregister(&hci_usb_driver);
 }
 
 module_init(hci_usb_init);
-module_exit(hci_usb_cleanup);
+module_exit(hci_usb_exit);
 
-MODULE_AUTHOR("Maxim Krasnyansky <maxk@qualcomm.com>");
+MODULE_AUTHOR("Maxim Krasnyansky <maxk@qualcomm.com>, Marcel Holtmann <marcel@holtmann.org>");
 MODULE_DESCRIPTION("Bluetooth HCI USB driver ver " VERSION);
+MODULE_VERSION(VERSION);
 MODULE_LICENSE("GPL");

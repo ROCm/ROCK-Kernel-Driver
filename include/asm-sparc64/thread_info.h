@@ -142,12 +142,29 @@ register struct thread_info *current_thread_info_reg asm("g6");
 
 /* thread information allocation */
 #if PAGE_SHIFT == 13
-#define alloc_thread_info(tsk)((struct thread_info *)__get_free_pages(GFP_KERNEL, 1))
-#define free_thread_info(ti)  free_pages((unsigned long)(ti),1)
+#define __THREAD_INFO_ORDER	1
 #else /* PAGE_SHIFT == 13 */
-#define alloc_thread_info(tsk)((struct thread_info *)__get_free_pages(GFP_KERNEL, 0))
-#define free_thread_info(ti)  free_pages((unsigned long)(ti),0)
+#define __THREAD_INFO_ORDER	0
 #endif /* PAGE_SHIFT == 13 */
+
+#ifdef CONFIG_DEBUG_STACK_USAGE
+#define alloc_thread_info(tsk)					\
+({								\
+	struct thread_info *ret;				\
+								\
+	ret = (struct thread_info *)				\
+	  __get_free_pages(GFP_KERNEL, __THREAD_INFO_ORDER);	\
+	if (ret)						\
+		memset(ret, 0, PAGE_SIZE<<__THREAD_INFO_ORDER);	\
+	ret;							\
+})
+#else
+#define alloc_thread_info(tsk) \
+	((struct thread_info *)__get_free_pages(GFP_KERNEL, __THREAD_INFO_ORDER))
+#endif
+
+#define free_thread_info(ti) \
+	free_pages((unsigned long)(ti),__THREAD_INFO_ORDER)
 
 #define __thread_flag_byte_ptr(ti)	\
 	((unsigned char *)(&((ti)->flags)))

@@ -26,7 +26,6 @@
 #include <asm/macints.h>
 #include <asm/mac_via.h>
 #include <asm/mac_oss.h>
-#include <asm/unistd.h>
 
 int oss_present;
 volatile struct mac_oss *oss;
@@ -68,15 +67,15 @@ void __init oss_init(void)
 
 void __init oss_register_interrupts(void)
 {
-	sys_request_irq(OSS_IRQLEV_SCSI, oss_irq, IRQ_FLG_LOCK,
+	cpu_request_irq(OSS_IRQLEV_SCSI, oss_irq, IRQ_FLG_LOCK,
 			"scsi", (void *) oss);
-	sys_request_irq(OSS_IRQLEV_IOPSCC, mac_scc_dispatch, IRQ_FLG_LOCK,
+	cpu_request_irq(OSS_IRQLEV_IOPSCC, mac_scc_dispatch, IRQ_FLG_LOCK,
 			"scc", mac_scc_dispatch);
-	sys_request_irq(OSS_IRQLEV_NUBUS, oss_nubus_irq, IRQ_FLG_LOCK,
+	cpu_request_irq(OSS_IRQLEV_NUBUS, oss_nubus_irq, IRQ_FLG_LOCK,
 			"nubus", (void *) oss);
-	sys_request_irq(OSS_IRQLEV_SOUND, oss_irq, IRQ_FLG_LOCK,
+	cpu_request_irq(OSS_IRQLEV_SOUND, oss_irq, IRQ_FLG_LOCK,
 			"sound", (void *) oss);
-	sys_request_irq(OSS_IRQLEV_VIA1, via1_irq, IRQ_FLG_LOCK,
+	cpu_request_irq(OSS_IRQLEV_VIA1, via1_irq, IRQ_FLG_LOCK,
 			"via1", (void *) via1);
 }
 

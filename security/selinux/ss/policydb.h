@@ -4,6 +4,17 @@
  *
  * Author : Stephen Smalley, <sds@epoch.ncsc.mil>
  */
+
+/* Updated: Frank Mayer <mayerf@tresys.com> and Karl MacMillan <kmacmillan@tresys.com>
+ *
+ * 	Added conditional policy language extensions
+ *
+ * Copyright (C) 2003 - 2004 Tresys Technology, LLC
+ *	This program is free software; you can redistribute it and/or modify
+ *  	it under the terms of the GNU General Public License as published by
+ *	the Free Software Foundation, version 2.
+ */
+
 #ifndef _SS_POLICYDB_H_
 #define _SS_POLICYDB_H_
 
@@ -100,6 +111,13 @@ struct cat_datum {
 };
 #endif
 
+/* Boolean data type */
+struct cond_bool_datum {
+	__u32 value;		/* internal type value */
+	int state;
+};
+
+struct cond_node;
 
 /*
  * The configuration data includes security contexts for
@@ -145,9 +163,11 @@ struct genfs {
 #ifdef CONFIG_SECURITY_SELINUX_MLS
 #define SYM_LEVELS  5
 #define SYM_CATS    6
-#define SYM_NUM     7
+#define SYM_BOOLS   7
+#define SYM_NUM     8
 #else
-#define SYM_NUM     5
+#define SYM_BOOLS   5
+#define SYM_NUM     6
 #endif
 
 /* object context array indices */
@@ -170,6 +190,7 @@ struct policydb {
 #define p_users symtab[SYM_USERS]
 #define p_levels symtab[SYM_LEVELS]
 #define p_cats symtab[SYM_CATS]
+#define p_bools symtab[SYM_BOOLS]
 
 	/* symbol names indexed by (value - 1) */
 	char **sym_val_to_name[SYM_NUM];
@@ -180,6 +201,7 @@ struct policydb {
 #define p_user_val_to_name sym_val_to_name[SYM_USERS]
 #define p_sens_val_to_name sym_val_to_name[SYM_LEVELS]
 #define p_cat_val_to_name sym_val_to_name[SYM_CATS]
+#define p_bool_val_to_name sym_val_to_name[SYM_BOOLS]
 
 	/* class, role, and user attributes indexed by (value - 1) */
 	struct class_datum **class_val_to_struct;
@@ -191,6 +213,13 @@ struct policydb {
 
 	/* role transitions */
 	struct role_trans *role_tr;
+
+	/* bools indexed by (value - 1) */
+	struct cond_bool_datum **bool_val_to_struct;
+	/* type enforcement conditional access vectors and transitions */
+	struct avtab te_cond_avtab;
+	/* linked list indexing te_cond_avtab by conditional */
+	struct cond_node* cond_list;
 
 	/* role allows */
 	struct role_allow *role_allow;

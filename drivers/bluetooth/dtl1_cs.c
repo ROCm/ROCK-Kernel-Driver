@@ -150,7 +150,7 @@ static int dtl1_write(unsigned int iobase, int fifo_size, __u8 *buf, int len)
 static void dtl1_write_wakeup(dtl1_info_t *info)
 {
 	if (!info) {
-		printk(KERN_WARNING "dtl1_cs: Call of write_wakeup for unknown device.\n");
+		BT_ERR("Unknown device");
 		return;
 	}
 
@@ -201,9 +201,9 @@ static void dtl1_control(dtl1_info_t *info, struct sk_buff *skb)
 	u8 flowmask = *(u8 *)skb->data;
 	int i;
 
-	printk(KERN_INFO "dtl1_cs: Nokia control data = ");
+	printk(KERN_INFO "Bluetooth: Nokia control data =");
 	for (i = 0; i < skb->len; i++) {
-		printk("%02x ", skb->data[i]);
+		printk(" %02x", skb->data[i]);
 	}
 	printk("\n");
 
@@ -226,7 +226,7 @@ static void dtl1_receive(dtl1_info_t *info)
 	int boguscount = 0;
 
 	if (!info) {
-		printk(KERN_WARNING "dtl1_cs: Call of receive for unknown device.\n");
+		BT_ERR("Unknown device");
 		return;
 	}
 
@@ -238,7 +238,7 @@ static void dtl1_receive(dtl1_info_t *info)
 		/* Allocate packet */
 		if (info->rx_skb == NULL)
 			if (!(info->rx_skb = bt_skb_alloc(HCI_MAX_FRAME_SIZE, GFP_ATOMIC))) {
-				printk(KERN_WARNING "dtl1_cs: Can't allocate mem for new packet.\n");
+				BT_ERR("Can't allocate mem for new packet");
 				info->rx_state = RECV_WAIT_NSH;
 				info->rx_count = NSHL;
 				return;
@@ -283,7 +283,7 @@ static void dtl1_receive(dtl1_info_t *info)
 					break;
 				default:
 					/* unknown packet */
-					printk(KERN_WARNING "dtl1_cs: Unknown HCI packet with type 0x%02x received.\n", info->rx_skb->pkt_type);
+					BT_ERR("Unknown HCI packet with type 0x%02x received", info->rx_skb->pkt_type);
 					kfree_skb(info->rx_skb);
 					break;
 				}
@@ -313,7 +313,7 @@ static irqreturn_t dtl1_interrupt(int irq, void *dev_inst, struct pt_regs *regs)
 	int iir, lsr;
 
 	if (!info) {
-		printk(KERN_WARNING "dtl1_cs: Call of irq %d for unknown device.\n", irq);
+		BT_ERR("Call of irq %d for unknown device", irq);
 		return IRQ_NONE;
 	}
 
@@ -329,7 +329,7 @@ static irqreturn_t dtl1_interrupt(int irq, void *dev_inst, struct pt_regs *regs)
 
 		switch (iir) {
 		case UART_IIR_RLSI:
-			printk(KERN_NOTICE "dtl1_cs: RLSI\n");
+			BT_ERR("RLSI");
 			break;
 		case UART_IIR_RDI:
 			/* Receive interrupt */
@@ -342,7 +342,7 @@ static irqreturn_t dtl1_interrupt(int irq, void *dev_inst, struct pt_regs *regs)
 			}
 			break;
 		default:
-			printk(KERN_NOTICE "dtl1_cs: Unhandled IIR=%#x\n", iir);
+			BT_ERR("Unhandled IIR=%#x", iir);
 			break;
 		}
 
@@ -410,7 +410,7 @@ static int dtl1_hci_send_frame(struct sk_buff *skb)
 	nsh_t nsh;
 
 	if (!hdev) {
-		printk(KERN_WARNING "dtl1_cs: Frame for unknown HCI device (hdev=NULL).");
+		BT_ERR("Frame for unknown HCI device (hdev=NULL)");
 		return -ENODEV;
 	}
 
@@ -510,7 +510,7 @@ int dtl1_open(dtl1_info_t *info)
 	/* Initialize and register HCI device */
 	hdev = hci_alloc_dev();
 	if (!hdev) {
-		printk(KERN_WARNING "dtl1_cs: Can't allocate HCI device.\n");
+		BT_ERR("Can't allocate HCI device");
 		return -ENOMEM;
 	}
 
@@ -529,7 +529,7 @@ int dtl1_open(dtl1_info_t *info)
 	hdev->owner = THIS_MODULE;
 
 	if (hci_register_dev(hdev) < 0) {
-		printk(KERN_WARNING "dtl1_cs: Can't register HCI device.\n");
+		BT_ERR("Can't register HCI device");
 		hci_free_dev(hdev);
 		return -ENODEV;
 	}
@@ -557,7 +557,7 @@ int dtl1_close(dtl1_info_t *info)
 	spin_unlock_irqrestore(&(info->lock), flags);
 
 	if (hci_unregister_dev(hdev) < 0)
-		printk(KERN_WARNING "dtl1_cs: Can't unregister HCI device %s.\n", hdev->name);
+		BT_ERR("Can't unregister HCI device %s", hdev->name);
 
 	hci_free_dev(hdev);
 

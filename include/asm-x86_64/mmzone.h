@@ -31,6 +31,8 @@ static inline __attribute__((pure)) int phys_to_nid(unsigned long addr)
 	return nid; 
 } 
 
+#define pfn_to_nid(pfn) phys_to_nid((unsigned long)(pfn) << PAGE_SHIFT)
+
 #define kvaddr_to_nid(kaddr)	phys_to_nid(__pa(kaddr))
 #define NODE_DATA(nid)		(node_data[nid])
 

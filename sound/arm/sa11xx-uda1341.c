@@ -21,7 +21,7 @@
  *                              merged HAL layer (patches from Brian)
  */
 
-/* $Id: sa11xx-uda1341.c,v 1.12 2003/08/13 13:14:31 tiwai Exp $ */
+/* $Id: sa11xx-uda1341.c,v 1.13 2004/03/02 15:32:35 perex Exp $ */
 
 /***************************************************************************************************
 *
@@ -840,7 +840,9 @@ static int __init snd_card_sa11xx_uda1341_pcm(sa11xx_uda1341_t *sa11xx_uda1341, 
 	 * isa works but I'm not sure why (or if) it's the right choice
 	 * this may be too large, trying it for now
 	 */
-	snd_pcm_lib_preallocate_isa_pages_for_all(pcm, 64*1024, 64*1024);
+	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_ISA, 
+					      snd_pcm_dma_flags(0),
+					      64*1024, 64*1024);
 
 	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_PLAYBACK, &snd_card_sa11xx_uda1341_playback_ops);
 	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_CAPTURE, &snd_card_sa11xx_uda1341_capture_ops);

@@ -308,7 +308,7 @@ static inline void *get_check_address(struct pt_regs *regs)
 	return (void *)((regs->psw.addr-S390_lowcore.pgm_ilc) & PSW_ADDR_INSN);
 }
 
-static int do_debugger_trap(struct pt_regs *regs)
+int do_debugger_trap(struct pt_regs *regs)
 {
 	if ((regs->psw.mask & PSW_MASK_PSTATE) &&
 	    (current->ptrace & PT_PTRACED)) {
@@ -616,8 +616,6 @@ void __init trap_init(void)
         pgm_check_table[9] = &divide_exception;
         pgm_check_table[0x10] = &do_segment_exception;
         pgm_check_table[0x11] = &do_page_exception;
-        pgm_check_table[0x10] = &do_segment_exception;
-        pgm_check_table[0x11] = &do_page_exception;
         pgm_check_table[0x12] = &translation_exception;
         pgm_check_table[0x13] = &special_op_exception;
 #ifndef CONFIG_ARCH_S390X
@@ -654,23 +652,3 @@ void __init trap_init(void)
 #endif
 	}
 }
-
-
-void handle_per_exception(struct pt_regs *regs)
-{
-	if (regs->psw.mask & PSW_MASK_PSTATE) {
-		per_struct *per_info=&current->thread.per_info;
-		per_info->lowcore.words.perc_atmid=S390_lowcore.per_perc_atmid;
-		per_info->lowcore.words.address=S390_lowcore.per_address;
-		per_info->lowcore.words.access_id=S390_lowcore.per_access_id;
-	}
-	if (do_debugger_trap(regs)) {
-		/* I've seen this possibly a task structure being reused ? */
-		printk("Spurious per exception detected\n");
-		printk("switching off per tracing for this task.\n");
-		show_regs(regs);
-		/* Hopefully switching off per tracing will help us survive */
-		regs->psw.mask &= ~PSW_MASK_PER;
-	}
-}
-

@@ -406,6 +406,11 @@ int register_cdrom(struct cdrom_device_info *cdi)
 	if (CDROM_CAN(CDC_MRW_W))
 		cdi->exit = cdrom_mrw_exit;
 
+	if (cdi->disk)
+		cdi->cdda_method = CDDA_BPC_FULL;
+	else
+		cdi->cdda_method = CDDA_OLD;
+
 	cdinfo(CD_REG_UNREG, "drive \"/dev/%s\" registered\n", cdi->name);
 	spin_lock(&cdrom_lock);
 	cdi->next = topCdromPtr; 	
@@ -641,6 +646,80 @@ static int cdrom_mrw_set_lba_space(struct cdrom_device_info *cdi, int space)
 	return 0;
 }
 
+int cdrom_get_random_writable(struct cdrom_device_info *cdi,
+			      struct rwrt_feature_desc *rfd)
+{
+	struct cdrom_generic_command cgc;
+	char buffer[24];
+	struct feature_header *fh;
+	int ret;
+
+	init_cdrom_command(&cgc, buffer, sizeof(buffer), CGC_DATA_READ);
+
+	cgc.cmd[0] = GPCMD_GET_CONFIGURATION;	/* often 0x46 */
+	cgc.cmd[3] = CDF_RWRT;			/* often 0x0020 */
+	cgc.cmd[8] = sizeof(buffer);		/* often 0x18 */
+	cgc.quiet = 1;
+
+	if ((ret = cdi->ops->generic_packet(cdi, &cgc)))
+		return ret;
+
+	fh = (struct feature_header *)&buffer[0];
+	if (be32_to_cpu(fh->data_len) >= (sizeof(struct feature_header)+
+					  sizeof(struct rwrt_feature_desc)))
+		memcpy(rfd, &buffer[sizeof(struct feature_header)],
+		       sizeof (*rfd));
+	else
+		memset(rfd, 0, sizeof(*rfd));
+
+	return 0;
+}
+
+int cdrom_has_defect_mgt(struct cdrom_device_info *cdi)
+{
+	struct cdrom_generic_command cgc;
+	char buffer[16];
+	struct feature_header *fh;
+	__u16 *feature_code;
+	int ret;
+
+	init_cdrom_command(&cgc, buffer, sizeof(buffer), CGC_DATA_READ);
+
+	cgc.cmd[0] = GPCMD_GET_CONFIGURATION;	/* often 0x46 */
+	cgc.cmd[3] = CDF_HWDM;			/* often 0x0024 */
+	cgc.cmd[8] = sizeof(buffer);		/* often 0x10 */
+	cgc.quiet = 1;
+
+	if ((ret = cdi->ops->generic_packet(cdi, &cgc)))
+		return ret;
+
+	fh = (struct feature_header *)&buffer[0];
+	ret = 1;
+	if (be32_to_cpu(fh->data_len) >= (sizeof(struct feature_header)+8)) {
+		feature_code = (__u16 *)&buffer[sizeof(struct feature_header)];
+		if (CDF_HWDM == be16_to_cpu(*feature_code))
+			ret = 0;
+	}
+	return ret;
+}
+
+
+int cdrom_is_random_writable(struct cdrom_device_info *cdi, int *write)
+{
+	struct rwrt_feature_desc rfd;
+	int ret;
+
+	*write = 0;
+
+	if ((ret = cdrom_get_random_writable(cdi, &rfd)))
+		return ret;
+
+	if (CDF_RWRT == be16_to_cpu(rfd.feature_code))
+		*write = 1;
+
+	return 0;
+}
+
 static int cdrom_media_erasable(struct cdrom_device_info *cdi)
 {
 	disc_information di;
@@ -724,6 +803,23 @@ static int mo_open_write(struct cdrom_device_info *cdi)
 	return buffer[3] & 0x80;
 }
 
+static int cdrom_ram_open_write(struct cdrom_device_info *cdi)
+{
+	struct rwrt_feature_desc rfd;
+	int ret;
+
+	if ((ret = cdrom_has_defect_mgt(cdi)))
+		return ret;
+
+	if ((ret = cdrom_get_random_writable(cdi, &rfd)))
+		return ret;
+	else if (CDF_RWRT == be16_to_cpu(rfd.feature_code))
+		ret = !rfd.curr;
+
+	cdinfo(CD_OPEN, "can open for random write\n");
+	return ret;
+}
+
 /*
  * returns 0 for ok to open write, non-0 to disallow
  */
@@ -735,6 +831,9 @@ static int cdrom_open_write(struct cdrom_device_info *cdi)
 		ret = cdrom_mrw_open_write(cdi);
 	else if (CDROM_CAN(CDC_DVD_RAM))
 		ret = cdrom_dvdram_open_write(cdi);
+ 	else if (CDROM_CAN(CDC_RAM) &&
+ 		 !CDROM_CAN(CDC_CD_R|CDC_CD_RW|CDC_DVD|CDC_DVD_R|CDC_MRW))
+ 		ret = cdrom_ram_open_write(cdi);
 	else if (CDROM_CAN(CDC_MO_DRIVE))
 		ret = mo_open_write(cdi);
 
@@ -1788,6 +1887,149 @@ static int cdrom_read_block(struct cdrom_device_info *cdi,
 	return cdo->generic_packet(cdi, cgc);
 }
 
+static int cdrom_read_cdda_old(struct cdrom_device_info *cdi, __u8 __user *ubuf,
+			       int lba, int nframes)
+{
+	struct cdrom_generic_command cgc;
+	int nr, ret;
+
+	memset(&cgc, 0, sizeof(cgc));
+
+	/*
+	 * start with will ra.nframes size, back down if alloc fails
+	 */
+	nr = nframes;
+	do {
+		cgc.buffer = kmalloc(CD_FRAMESIZE_RAW * nr, GFP_KERNEL);
+		if (cgc.buffer)
+			break;
+
+		nr >>= 1;
+	} while (nr);
+
+	if (!nr)
+		return -ENOMEM;
+
+	if (!access_ok(VERIFY_WRITE, ubuf, nframes * CD_FRAMESIZE_RAW)) {
+		kfree(cgc.buffer);
+		return -EFAULT;
+	}
+
+	cgc.data_direction = CGC_DATA_READ;
+	while (nframes > 0) {
+		if (nr > nframes)
+			nr = nframes;
+
+		ret = cdrom_read_block(cdi, &cgc, lba, nr, 1, CD_FRAMESIZE_RAW);
+		if (ret)
+			break;
+		__copy_to_user(ubuf, cgc.buffer, CD_FRAMESIZE_RAW * nr);
+		ubuf += CD_FRAMESIZE_RAW * nr;
+		nframes -= nr;
+		lba += nr;
+	}
+	kfree(cgc.buffer);
+	return 0;
+}
+
+static int cdrom_read_cdda_bpc(struct cdrom_device_info *cdi, __u8 __user *ubuf,
+			       int lba, int nframes)
+{
+	request_queue_t *q = cdi->disk->queue;
+	struct request *rq;
+	unsigned int len;
+	int nr, ret = 0;
+
+	if (!q)
+		return -ENXIO;
+
+	while (nframes) {
+		nr = nframes;
+		if (cdi->cdda_method == CDDA_BPC_SINGLE)
+			nr = 1;
+		if (nr * CD_FRAMESIZE_RAW > (q->max_sectors << 9))
+			nr = (q->max_sectors << 9) / CD_FRAMESIZE_RAW;
+
+		len = nr * CD_FRAMESIZE_RAW;
+
+		rq = blk_rq_map_user(q, READ, ubuf, len);
+		if (IS_ERR(rq))
+			return PTR_ERR(rq);
+
+		memset(rq->cmd, 0, sizeof(rq->cmd));
+		rq->cmd[0] = GPCMD_READ_CD;
+		rq->cmd[1] = 1 << 2;
+		rq->cmd[2] = (lba >> 24) & 0xff;
+		rq->cmd[3] = (lba >> 16) & 0xff;
+		rq->cmd[4] = (lba >>  8) & 0xff;
+		rq->cmd[5] = lba & 0xff;
+		rq->cmd[6] = (nr >> 16) & 0xff;
+		rq->cmd[7] = (nr >>  8) & 0xff;
+		rq->cmd[8] = nr & 0xff;
+		rq->cmd[9] = 0xf8;
+
+		rq->cmd_len = 12;
+		rq->flags |= REQ_BLOCK_PC;
+		rq->timeout = 60 * HZ;
+
+		if (blk_execute_rq(q, cdi->disk, rq)) {
+			struct request_sense *s = rq->sense;
+			ret = -EIO;
+			cdi->last_sense = s->sense_key;
+		}
+
+		if (blk_rq_unmap_user(rq, ubuf, len))
+			ret = -EFAULT;
+
+		if (ret)
+			break;
+
+		nframes -= nr;
+		lba += nr;
+	}
+
+	return ret;
+}
+
+static int cdrom_read_cdda(struct cdrom_device_info *cdi, __u8 __user *ubuf,
+			   int lba, int nframes)
+{
+	int ret;
+
+	if (cdi->cdda_method == CDDA_OLD)
+		return cdrom_read_cdda_old(cdi, ubuf, lba, nframes);
+
+retry:
+	/*
+	 * for anything else than success and io error, we need to retry
+	 */
+	ret = cdrom_read_cdda_bpc(cdi, ubuf, lba, nframes);
+	if (!ret || ret != -EIO)
+		return ret;
+
+	/*
+	 * I've seen drives get sense 4/8/3 udma crc errors on multi
+	 * frame dma, so drop to single frame dma if we need to
+	 */
+	if (cdi->cdda_method == CDDA_BPC_FULL && nframes > 1) {
+		printk("cdrom: dropping to single frame dma\n");
+		cdi->cdda_method = CDDA_BPC_SINGLE;
+		goto retry;
+	}
+
+	/*
+	 * so we have an io error of some sort with multi frame dma. if the
+	 * condition wasn't a hardware error
+	 * problems, not for any error
+	 */
+	if (cdi->last_sense != 0x04 && cdi->last_sense != 0x0b)
+		return ret;
+
+	printk("cdrom: dropping to old style cdda (sense=%x)\n", cdi->last_sense);
+	cdi->cdda_method = CDDA_OLD;
+	return cdrom_read_cdda_old(cdi, ubuf, lba, nframes);	
+}
+
 /* Just about every imaginable ioctl is supported in the Uniform layer
  * these days. ATAPI / SCSI specific code now mainly resides in
  * mmc_ioct().
@@ -2280,7 +2522,7 @@ static int mmc_ioctl(struct cdrom_device_info *cdi, unsigned int cmd,
 		}
 	case CDROMREADAUDIO: {
 		struct cdrom_read_audio ra;
-		int lba, nr;
+		int lba;
 
 		IOCTL_IN(arg, struct cdrom_read_audio, ra);
 
@@ -2297,40 +2539,7 @@ static int mmc_ioctl(struct cdrom_device_info *cdi, unsigned int cmd,
 		if (lba < 0 || ra.nframes <= 0 || ra.nframes > CD_FRAMES)
 			return -EINVAL;
 
-		/*
-		 * start with will ra.nframes size, back down if alloc fails
-		 */
-		nr = ra.nframes;
-		do {
-			cgc.buffer = kmalloc(CD_FRAMESIZE_RAW * nr, GFP_KERNEL);
-			if (cgc.buffer)
-				break;
-
-			nr >>= 1;
-		} while (nr);
-
-		if (!nr)
-			return -ENOMEM;
-
-		if (!access_ok(VERIFY_WRITE, ra.buf, ra.nframes*CD_FRAMESIZE_RAW)) {
-			kfree(cgc.buffer);
-			return -EFAULT;
-		}
-		cgc.data_direction = CGC_DATA_READ;
-		while (ra.nframes > 0) {
-			if (nr > ra.nframes)
-				nr = ra.nframes;
-
-			ret = cdrom_read_block(cdi, &cgc, lba, nr, 1, CD_FRAMESIZE_RAW);
-			if (ret)
-				break;
-			__copy_to_user(ra.buf, cgc.buffer, CD_FRAMESIZE_RAW*nr);
-			ra.buf += CD_FRAMESIZE_RAW * nr;
-			ra.nframes -= nr;
-			lba += nr;
-		}
-		kfree(cgc.buffer);
-		return ret;
+		return cdrom_read_cdda(cdi, ra.buf, lba, ra.nframes);
 		}
 	case CDROMSUBCHNL: {
 		struct cdrom_subchnl q;
@@ -2670,6 +2879,7 @@ EXPORT_SYMBOL(cdrom_mode_sense);
 EXPORT_SYMBOL(init_cdrom_command);
 EXPORT_SYMBOL(cdrom_get_media_event);
 EXPORT_SYMBOL(cdrom_is_mrw);
+EXPORT_SYMBOL(cdrom_is_random_writable);
 
 #ifdef CONFIG_SYSCTL
 
@@ -2773,6 +2983,10 @@ int cdrom_sysctl_info(ctl_table *ctl, int write, struct file * filp,
 	pos += sprintf(info+pos, "\nCan write MRW:\t");
 	for (cdi=topCdromPtr;cdi!=NULL;cdi=cdi->next)
 	    pos += sprintf(info+pos, "\t%d", CDROM_CAN(CDC_MRW_W) != 0);
+
+	pos += sprintf(info+pos, "\nCan write RAM:\t");
+	for (cdi=topCdromPtr;cdi!=NULL;cdi=cdi->next)
+	    pos += sprintf(info+pos, "\t%d", CDROM_CAN(CDC_RAM) != 0);
 
 	strcpy(info+pos,"\n\n");
 		

@@ -33,6 +33,7 @@
 #include <linux/suspend.h>
 #include <linux/blkdev.h>
 #include <linux/delay.h>
+#include <linux/smp.h>
 #include <linux/timer.h>
 #include <linux/rcupdate.h>
 #include <linux/cpu.h>
@@ -200,8 +201,9 @@ struct prio_array {
  */
 struct runqueue {
 	spinlock_t lock;
-	unsigned long nr_running, nr_switches, expired_timestamp,
-		      nr_uninterruptible, timestamp_last_tick;
+	unsigned long long nr_switches;
+	unsigned long nr_running, expired_timestamp, nr_uninterruptible,
+		timestamp_last_tick;
 	task_t *curr, *idle;
 	struct mm_struct *prev_mm;
 	prio_array_t *active, *expired, arrays[2];
@@ -592,28 +594,21 @@ void wait_task_inactive(task_t * p)
 {
 	unsigned long flags;
 	runqueue_t *rq;
+	int preempted;
 
 repeat:
-	preempt_disable();
-	rq = task_rq(p);
-	if (unlikely(task_running(rq, p))) {
-		cpu_relax();
-		/*
-		 * enable/disable preemption just to make this
-		 * a preemption point - we are busy-waiting
-		 * anyway.
-		 */
-		preempt_enable();
-		goto repeat;
-	}
 	rq = task_rq_lock(p, &flags);
-	if (unlikely(task_running(rq, p))) {
+	/* Must be off runqueue entirely, not preempted. */
+	if (unlikely(p->array)) {
+		/* If it's preempted, we yield.  It could be a while. */
+		preempted = !task_running(rq, p);
 		task_rq_unlock(rq, &flags);
-		preempt_enable();
+		cpu_relax();
+		if (preempted)
+			yield();
 		goto repeat;
 	}
 	task_rq_unlock(rq, &flags);
-	preempt_enable();
 }
 
 /***
@@ -671,8 +666,8 @@ repeat_lock_task:
 			if (unlikely(sync && !task_running(rq, p) &&
 				(task_cpu(p) != smp_processor_id()) &&
 					cpu_isset(smp_processor_id(),
-							p->cpus_allowed))) {
-
+							p->cpus_allowed) &&
+					!cpu_is_offline(smp_processor_id()))) {
 				set_task_cpu(p, smp_processor_id());
 				task_rq_unlock(rq, &flags);
 				goto repeat_lock_task;
@@ -700,7 +695,7 @@ repeat_lock_task:
 
 	return success;
 }
-int wake_up_process(task_t * p)
+int fastcall wake_up_process(task_t * p)
 {
 	return try_to_wake_up(p, TASK_STOPPED |
 		       		 TASK_INTERRUPTIBLE | TASK_UNINTERRUPTIBLE, 0);
@@ -708,7 +703,7 @@ int wake_up_process(task_t * p)
 
 EXPORT_SYMBOL(wake_up_process);
 
-int wake_up_state(task_t *p, unsigned int state)
+int fastcall wake_up_state(task_t *p, unsigned int state)
 {
 	return try_to_wake_up(p, state, 0);
 }
@@ -717,7 +712,7 @@ int wake_up_state(task_t *p, unsigned int state)
  * Perform scheduler related setup for a newly forked process p.
  * p is forked by current.
  */
-void sched_fork(task_t *p)
+void fastcall sched_fork(task_t *p)
 {
 	/*
 	 * We mark the process as running here, but have not actually
@@ -773,7 +768,7 @@ void sched_fork(task_t *p)
  * This function will do some initial scheduler statistics housekeeping
  * that must be done for every newly created process.
  */
-void wake_up_forked_process(task_t * p)
+void fastcall wake_up_forked_process(task_t * p)
 {
 	unsigned long flags;
 	runqueue_t *rq = task_rq_lock(current, &flags);
@@ -817,7 +812,7 @@ void wake_up_forked_process(task_t * p)
  * artificially, because any timeslice recovered here
  * was given away by the parent in the first place.)
  */
-void sched_exit(task_t * p)
+void fastcall sched_exit(task_t * p)
 {
 	unsigned long flags;
 	runqueue_t *rq;
@@ -949,9 +944,9 @@ unsigned long nr_uninterruptible(void)
 	return sum;
 }
 
-unsigned long nr_context_switches(void)
+unsigned long long nr_context_switches(void)
 {
-	unsigned long i, sum = 0;
+	unsigned long long i, sum = 0;
 
 	for_each_cpu(i)
 		sum += cpu_rq(i)->nr_switches;
@@ -1017,6 +1012,7 @@ static void sched_migrate_task(task_t *p, int dest_cpu)
 	unsigned long flags;
 	cpumask_t old_mask, new_mask = cpumask_of_cpu(dest_cpu);
 
+	lock_cpu_hotplug();
 	rq = task_rq_lock(p, &flags);
 	old_mask = p->cpus_allowed;
 	if (!cpu_isset(dest_cpu, old_mask) || !cpu_online(dest_cpu))
@@ -1040,6 +1036,7 @@ static void sched_migrate_task(task_t *p, int dest_cpu)
 	}
 out:
 	task_rq_unlock(rq, &flags);
+	unlock_cpu_hotplug();
 }
 
 /*
@@ -1303,6 +1300,9 @@ static void load_balance(runqueue_t *this_rq, int idle, cpumask_t cpumask)
 	prio_array_t *array;
 	struct list_head *head, *curr;
 	task_t *tmp;
+
+	if (cpu_is_offline(this_cpu))
+		goto out;
 
 	busiest = find_busiest_queue(this_rq, this_cpu, idle,
 				     &imbalance, cpumask);
@@ -1796,7 +1796,7 @@ static void __wake_up_common(wait_queue_head_t *q, unsigned int mode,
  * @mode: which threads
  * @nr_exclusive: how many wake-one or wake-many threads to wake up
  */
-void __wake_up(wait_queue_head_t *q, unsigned int mode, int nr_exclusive)
+void fastcall __wake_up(wait_queue_head_t *q, unsigned int mode, int nr_exclusive)
 {
 	unsigned long flags;
 
@@ -1810,7 +1810,7 @@ EXPORT_SYMBOL(__wake_up);
 /*
  * Same as __wake_up but called with the spinlock in wait_queue_head_t held.
  */
-void __wake_up_locked(wait_queue_head_t *q, unsigned int mode)
+void fastcall __wake_up_locked(wait_queue_head_t *q, unsigned int mode)
 {
 	__wake_up_common(q, mode, 1, 0);
 }
@@ -1828,7 +1828,7 @@ void __wake_up_locked(wait_queue_head_t *q, unsigned int mode)
  *
  * On UP it can prevent extra preemption.
  */
-void __wake_up_sync(wait_queue_head_t *q, unsigned int mode, int nr_exclusive)
+void fastcall __wake_up_sync(wait_queue_head_t *q, unsigned int mode, int nr_exclusive)
 {
 	unsigned long flags;
 
@@ -1845,7 +1845,7 @@ void __wake_up_sync(wait_queue_head_t *q, unsigned int mode, int nr_exclusive)
 
 EXPORT_SYMBOL_GPL(__wake_up_sync);	/* For internal use only */
 
-void complete(struct completion *x)
+void fastcall complete(struct completion *x)
 {
 	unsigned long flags;
 
@@ -1858,7 +1858,7 @@ void complete(struct completion *x)
 
 EXPORT_SYMBOL(complete);
 
-void complete_all(struct completion *x)
+void fastcall complete_all(struct completion *x)
 {
 	unsigned long flags;
 
@@ -1869,7 +1869,7 @@ void complete_all(struct completion *x)
 	spin_unlock_irqrestore(&x->wait.lock, flags);
 }
 
-void wait_for_completion(struct completion *x)
+void fastcall wait_for_completion(struct completion *x)
 {
 	might_sleep();
 	spin_lock_irq(&x->wait.lock);
@@ -1907,7 +1907,7 @@ EXPORT_SYMBOL(wait_for_completion);
 	__remove_wait_queue(q, &wait);			\
 	spin_unlock_irqrestore(&q->lock, flags);
 
-void interruptible_sleep_on(wait_queue_head_t *q)
+void fastcall interruptible_sleep_on(wait_queue_head_t *q)
 {
 	SLEEP_ON_VAR
 
@@ -1920,7 +1920,7 @@ void interruptible_sleep_on(wait_queue_head_t *q)
 
 EXPORT_SYMBOL(interruptible_sleep_on);
 
-long interruptible_sleep_on_timeout(wait_queue_head_t *q, long timeout)
+long fastcall interruptible_sleep_on_timeout(wait_queue_head_t *q, long timeout)
 {
 	SLEEP_ON_VAR
 
@@ -1935,7 +1935,7 @@ long interruptible_sleep_on_timeout(wait_queue_head_t *q, long timeout)
 
 EXPORT_SYMBOL(interruptible_sleep_on_timeout);
 
-void sleep_on(wait_queue_head_t *q)
+void fastcall sleep_on(wait_queue_head_t *q)
 {
 	SLEEP_ON_VAR
 
@@ -1948,7 +1948,7 @@ void sleep_on(wait_queue_head_t *q)
 
 EXPORT_SYMBOL(sleep_on);
 
-long sleep_on_timeout(wait_queue_head_t *q, long timeout)
+long fastcall sleep_on_timeout(wait_queue_head_t *q, long timeout)
 {
 	SLEEP_ON_VAR
 
@@ -2102,6 +2102,18 @@ static inline task_t *find_process_by_pid(pid_t pid)
 	return pid ? find_task_by_pid(pid) : current;
 }
 
+/* Actually do priority change: must hold rq lock. */
+static void __setscheduler(struct task_struct *p, int policy, int prio)
+{
+	BUG_ON(p->array);
+	p->policy = policy;
+	p->rt_priority = prio;
+	if (policy != SCHED_NORMAL)
+		p->prio = MAX_USER_RT_PRIO-1 - p->rt_priority;
+	else
+		p->prio = p->static_prio;
+}
+
 /*
  * setscheduler - change the scheduling policy and/or RT priority of a thread.
  */
@@ -2174,13 +2186,8 @@ static int setscheduler(pid_t pid, int policy, struct sched_param __user *param)
 	if (array)
 		deactivate_task(p, task_rq(p));
 	retval = 0;
-	p->policy = policy;
-	p->rt_priority = lp.sched_priority;
 	oldprio = p->prio;
-	if (policy != SCHED_NORMAL)
-		p->prio = MAX_USER_RT_PRIO-1 - p->rt_priority;
-	else
-		p->prio = p->static_prio;
+	__setscheduler(p, policy, lp.sched_priority);
 	if (array) {
 		__activate_task(p, task_rq(p));
 		/*
@@ -2311,11 +2318,13 @@ asmlinkage long sys_sched_setaffinity(pid_t pid, unsigned int len,
 	if (copy_from_user(&new_mask, user_mask_ptr, sizeof(new_mask)))
 		return -EFAULT;
 
+	lock_cpu_hotplug();
 	read_lock(&tasklist_lock);
 
 	p = find_process_by_pid(pid);
 	if (!p) {
 		read_unlock(&tasklist_lock);
+		unlock_cpu_hotplug();
 		return -ESRCH;
 	}
 
@@ -2336,6 +2345,7 @@ asmlinkage long sys_sched_setaffinity(pid_t pid, unsigned int len,
 
 out_unlock:
 	put_task_struct(p);
+	unlock_cpu_hotplug();
 	return retval;
 }
 
@@ -2365,7 +2375,7 @@ asmlinkage long sys_sched_getaffinity(pid_t pid, unsigned int len,
 		goto out_unlock;
 
 	retval = 0;
-	cpus_and(mask, p->cpus_allowed, cpu_online_map);
+	cpus_and(mask, p->cpus_allowed, cpu_possible_map);
 
 out_unlock:
 	read_unlock(&tasklist_lock);
@@ -2730,11 +2740,9 @@ EXPORT_SYMBOL_GPL(set_cpus_allowed);
 static void move_task_away(struct task_struct *p, int dest_cpu)
 {
 	runqueue_t *rq_dest;
-	unsigned long flags;
 
 	rq_dest = cpu_rq(dest_cpu);
 
-	local_irq_save(flags);
 	double_rq_lock(this_rq(), rq_dest);
 	if (task_cpu(p) != smp_processor_id())
 		goto out; /* Already moved */
@@ -2750,7 +2758,6 @@ static void move_task_away(struct task_struct *p, int dest_cpu)
 
 out:
 	double_rq_unlock(this_rq(), rq_dest);
-	local_irq_restore(flags);
 }
 
 /*
@@ -2760,16 +2767,10 @@ out:
  */
 static int migration_thread(void * data)
 {
-	/* Marking "param" __user is ok, since we do a set_fs(KERNEL_DS); */
-	struct sched_param __user param = { .sched_priority = MAX_RT_PRIO-1 };
 	runqueue_t *rq;
 	int cpu = (long)data;
-	int ret;
 
-	BUG_ON(smp_processor_id() != cpu);
-	ret = setscheduler(0, SCHED_FIFO, &param);
-
-	rq = this_rq();
+	rq = cpu_rq(cpu);
 	BUG_ON(rq->migration_thread != current);
 
 	while (!kthread_should_stop()) {
@@ -2789,14 +2790,72 @@ static int migration_thread(void * data)
 		}
 		req = list_entry(head->next, migration_req_t, list);
 		list_del_init(head->next);
-		spin_unlock_irq(&rq->lock);
+		spin_unlock(&rq->lock);
 
 		move_task_away(req->task,
 			       any_online_cpu(req->task->cpus_allowed));
+		local_irq_enable();
 		complete(&req->done);
 	}
 	return 0;
 }
+
+#ifdef CONFIG_HOTPLUG_CPU
+/* migrate_all_tasks - function to migrate all the tasks from the
+ * current cpu caller must have already scheduled this to the target
+ * cpu via set_cpus_allowed.  Machine is stopped.  */
+void migrate_all_tasks(void)
+{
+	struct task_struct *tsk, *t;
+	int dest_cpu, src_cpu;
+	unsigned int node;
+
+	/* We're nailed to this CPU. */
+	src_cpu = smp_processor_id();
+
+	/* Not required, but here for neatness. */
+	write_lock(&tasklist_lock);
+
+	/* watch out for per node tasks, let's stay on this node */
+	node = cpu_to_node(src_cpu);
+
+	do_each_thread(t, tsk) {
+		cpumask_t mask;
+		if (tsk == current)
+			continue;
+
+		if (task_cpu(tsk) != src_cpu)
+			continue;
+
+		/* Figure out where this task should go (attempting to
+		 * keep it on-node), and check if it can be migrated
+		 * as-is.  NOTE that kernel threads bound to more than
+		 * one online cpu will be migrated. */
+		mask = node_to_cpumask(node);
+		cpus_and(mask, mask, tsk->cpus_allowed);
+		dest_cpu = any_online_cpu(mask);
+		if (dest_cpu == NR_CPUS)
+			dest_cpu = any_online_cpu(tsk->cpus_allowed);
+		if (dest_cpu == NR_CPUS) {
+			cpus_clear(tsk->cpus_allowed);
+			cpus_complement(tsk->cpus_allowed);
+			dest_cpu = any_online_cpu(tsk->cpus_allowed);
+
+			/* Don't tell them about moving exiting tasks
+			   or kernel threads (both mm NULL), since
+			   they never leave kernel. */
+			if (tsk->mm && printk_ratelimit())
+				printk(KERN_INFO "process %d (%s) no "
+				       "longer affine to cpu%d\n",
+				       tsk->pid, tsk->comm, src_cpu);
+		}
+
+		move_task_away(tsk, dest_cpu);
+	} while_each_thread(t, tsk);
+
+	write_unlock(&tasklist_lock);
+}
+#endif /* CONFIG_HOTPLUG_CPU */
 
 /*
  * migration_call - callback that gets triggered when a CPU is added.
@@ -2807,6 +2866,8 @@ static int migration_call(struct notifier_block *nfb, unsigned long action,
 {
 	int cpu = (long)hcpu;
 	struct task_struct *p;
+	struct runqueue *rq;
+	unsigned long flags;
 
 	switch (action) {
 	case CPU_UP_PREPARE:
@@ -2814,23 +2875,32 @@ static int migration_call(struct notifier_block *nfb, unsigned long action,
 		if (IS_ERR(p))
 			return NOTIFY_BAD;
 		kthread_bind(p, cpu);
+		/* Must be high prio: stop_machine expects to yield to it. */
+		rq = task_rq_lock(p, &flags);
+		__setscheduler(p, SCHED_FIFO, MAX_RT_PRIO-1);
+		task_rq_unlock(rq, &flags);
 		cpu_rq(cpu)->migration_thread = p;
 		break;
 	case CPU_ONLINE:
 		/* Strictly unneccessary, as first user will wake it. */
 		wake_up_process(cpu_rq(cpu)->migration_thread);
 		break;
+#ifdef CONFIG_HOTPLUG_CPU
+	case CPU_UP_CANCELED:
+		/* Unbind it from offline cpu so it can run.  Fall thru. */
+		kthread_bind(cpu_rq(cpu)->migration_thread,smp_processor_id());
+	case CPU_DEAD:
+		kthread_stop(cpu_rq(cpu)->migration_thread);
+		cpu_rq(cpu)->migration_thread = NULL;
+ 		BUG_ON(cpu_rq(cpu)->nr_running != 0);
+ 		break;
+#endif
 	}
 	return NOTIFY_OK;
 }
 
-/*
- * We want this after the other threads, so they can use set_cpus_allowed
- * from their CPU_OFFLINE callback
- */
 static struct notifier_block __devinitdata migration_notifier = {
 	.notifier_call = migration_call,
-	.priority = -10,
 };
 
 int __init migration_init(void)

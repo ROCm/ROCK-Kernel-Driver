@@ -76,6 +76,14 @@ ctl_table ipv6_table[] = {
 		.proc_handler	= &proc_dointvec_jiffies,
 		.strategy	= &sysctl_jiffies
 	},
+	{
+		.ctl_name	= NET_IPV6_MLD_MAX_MSF,
+		.procname	= "mld_max_msf",
+		.data		= &sysctl_mld_max_msf,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec
+	},
 	{ .ctl_name = 0 }
 };
 

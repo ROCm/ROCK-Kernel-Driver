@@ -24,7 +24,7 @@
 #include "jfs_xattr.h"
 #include "jfs_acl.h"
 
-struct posix_acl *jfs_get_acl(struct inode *inode, int type)
+static struct posix_acl *jfs_get_acl(struct inode *inode, int type)
 {
 	struct posix_acl *acl;
 	char *ea_name;
@@ -74,7 +74,7 @@ struct posix_acl *jfs_get_acl(struct inode *inode, int type)
 	return acl;
 }
 
-int jfs_set_acl(struct inode *inode, int type, struct posix_acl *acl)
+static int jfs_set_acl(struct inode *inode, int type, struct posix_acl *acl)
 {
 	char *ea_name;
 	struct jfs_inode_info *ji = JFS_IP(inode);
@@ -247,7 +247,7 @@ cleanup:
 	return rc;
 }
 
-int jfs_acl_chmod(struct inode *inode)
+static int jfs_acl_chmod(struct inode *inode)
 {
 	struct posix_acl *acl, *clone;
 	int rc;

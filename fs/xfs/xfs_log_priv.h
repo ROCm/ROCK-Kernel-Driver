@@ -63,6 +63,9 @@ int xlog_btolrbb(int b);
 #else
 #define XLOG_BTOLRBB(b)		(((b)+XLOG_RECORD_BSIZE-1) >> XLOG_RECORD_BSHIFT)
 #endif
+#define XLOG_BTOLSUNIT(log, b)  (((b)+(log)->l_mp->m_sb.sb_logsunit-1) / \
+                                 (log)->l_mp->m_sb.sb_logsunit)
+#define XLOG_LSUNITTOB(log, su) ((su) * (log)->l_mp->m_sb.sb_logsunit)
 
 #define XLOG_HEADER_SIZE	512
 
@@ -531,7 +534,6 @@ typedef struct log {
 	uint			l_flags;
 	uint			l_quotaoffs_flag; /* XFS_DQ_*, for QUOTAOFFs */
 	struct xfs_buf_cancel	**l_buf_cancel_table;
-	int			l_stripemask;	/* log stripe mask */
 	int			l_iclog_hsize;  /* size of iclog header */
 	int			l_iclog_heads;  /* # of iclog header sectors */
 	uint			l_sectbb_log;   /* log2 of sector size in BBs */

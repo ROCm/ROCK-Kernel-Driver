@@ -151,7 +151,7 @@ void
 gen550_init(int i, struct uart_port *serial_req)
 {
 	rs_table[i].io_type = serial_req->iotype;
-	rs_table[i].port = serial_req->line;
+	rs_table[i].port = serial_req->iobase;
 	rs_table[i].iomem_base = serial_req->membase;
 	rs_table[i].iomem_reg_shift = serial_req->regshift;
 }

@@ -88,10 +88,6 @@ EXPORT_SYMBOL(get_cmos_time);
 EXPORT_SYMBOL(cpu_khz);
 EXPORT_SYMBOL(apm_info);
 
-#ifdef CONFIG_DEBUG_IOVIRT
-EXPORT_SYMBOL(__io_virt_debug);
-#endif
-
 EXPORT_SYMBOL_NOVERS(__down_failed);
 EXPORT_SYMBOL_NOVERS(__down_failed_interruptible);
 EXPORT_SYMBOL_NOVERS(__down_failed_trylock);
@@ -180,10 +176,13 @@ EXPORT_SYMBOL_GPL(unset_nmi_callback);
  
 #undef memcpy
 #undef memset
+#undef memcmp
 extern void * memset(void *,int,__kernel_size_t);
 extern void * memcpy(void *,const void *,__kernel_size_t);
+extern int memcmp(const void *,const void *,__kernel_size_t);
 EXPORT_SYMBOL_NOVERS(memcpy);
 EXPORT_SYMBOL_NOVERS(memset);
+EXPORT_SYMBOL_NOVERS(memcmp);
 
 #ifdef CONFIG_HAVE_DEC_LOCK
 EXPORT_SYMBOL(atomic_dec_and_lock);

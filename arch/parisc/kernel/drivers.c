@@ -618,6 +618,7 @@ static void parisc_generic_device_register_recursive( struct parisc_device *dev 
 		 tmp1);
 	/* make the generic dma mask a pointer to the parisc one */
 	dev->dev.dma_mask = &dev->dma_mask;
+	dev->dev.coherent_dma_mask = dev->dma_mask;
 	pr_debug("device_register(%s)\n", dev->dev.bus_id);
 	device_register(&dev->dev);
 }

@@ -1,10 +1,8 @@
-#define __KERNEL_SYSCALLS__
 #include <linux/init.h>
 #include <linux/fs.h>
 #include <linux/slab.h>
 #include <linux/types.h>
 #include <linux/fcntl.h>
-#include <linux/unistd.h>
 #include <linux/delay.h>
 #include <linux/string.h>
 #include <linux/syscalls.h>
@@ -16,7 +14,7 @@ static void __init error(char *x)
 		message = x;
 }
 
-static void __init *malloc(int size)
+static void __init *malloc(size_t size)
 {
 	return kmalloc(size, GFP_KERNEL);
 }

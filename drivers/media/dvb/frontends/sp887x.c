@@ -12,7 +12,6 @@
    next 0x4000 loaded. This may change in future versions.
  */
 
-#define __KERNEL_SYSCALLS__
 #include <linux/kernel.h>
 #include <linux/vmalloc.h>
 #include <linux/module.h>
@@ -67,8 +66,6 @@ struct dvb_frontend_info sp887x_info = {
 		FE_CAN_FEC_5_6 | FE_CAN_FEC_7_8 | FE_CAN_FEC_AUTO |
 		FE_CAN_QPSK | FE_CAN_QAM_16 | FE_CAN_QAM_64 | FE_CAN_RECOVER
 };
-
-static int errno;
 
 static
 int i2c_writebytes (struct dvb_frontend *fe, u8 addr, u8 *buf, u8 len)
@@ -216,13 +213,13 @@ int sp887x_initial_setup (struct dvb_frontend *fe)
 
 	// Load the firmware
 	set_fs(get_ds());
-	fd = open(sp887x_firmware, 0, 0);
+	fd = sys_open(sp887x_firmware, 0, 0);
 	if (fd < 0) {
 		printk(KERN_WARNING "%s: Unable to open firmware %s\n", __FUNCTION__,
 		       sp887x_firmware);
 		return -EIO;
 	}
-	filesize = lseek(fd, 0L, 2);
+	filesize = sys_lseek(fd, 0L, 2);
 	if (filesize <= 0) {
 		printk(KERN_WARNING "%s: Firmware %s is empty\n", __FUNCTION__,
 		       sp887x_firmware);
@@ -244,8 +241,8 @@ int sp887x_initial_setup (struct dvb_frontend *fe)
 	// read it!
 	// read the first 16384 bytes from the file
 	// ignore the first 10 bytes
-	lseek(fd, 10, 0);
-	if (read(fd, firmware, fw_size) != fw_size) {
+	sys_lseek(fd, 10, 0);
+	if (sys_read(fd, firmware, fw_size) != fw_size) {
 		printk(KERN_WARNING "%s: Failed to read firmware\n", __FUNCTION__);
 		vfree(firmware);
 		sys_close(fd);

@@ -334,10 +334,11 @@ acpi_ns_install_node (
 	node->owner_id = owner_id;
 	node->type = (u8) type;
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_NAMES, "%4.4s (%s) added to %4.4s (%s) %p at %p\n",
-		acpi_ut_get_node_name (node), acpi_ut_get_type_name (node->type),
+	ACPI_DEBUG_PRINT ((ACPI_DB_NAMES,
+		"%4.4s (%s) [Node %p Owner %X] added to %4.4s (%s) [Node %p]\n",
+		acpi_ut_get_node_name (node), acpi_ut_get_type_name (node->type), node, owner_id,
 		acpi_ut_get_node_name (parent_node), acpi_ut_get_type_name (parent_node->type),
-		parent_node, node));
+		parent_node));
 
 	/*
 	 * Increment the reference count(s) of all parents up to

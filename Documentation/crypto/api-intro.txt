@@ -186,6 +186,7 @@ Original developers of the crypto algorithms:
   Dag Arne Osvik (Serpent)
   Brian Gladman (AES)
   Kartikey Mahendra Bhatt (CAST6)
+  Jon Oberheide (ARC4)
 
 SHA1 algorithm contributors:
   Jean-Francois Dive

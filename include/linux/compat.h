@@ -10,6 +10,8 @@
 
 #include <linux/stat.h>
 #include <linux/param.h>	/* for HZ */
+#include <linux/sem.h>
+
 #include <asm/compat.h>
 
 #define compat_jiffies_to_clock_t(x)	\
@@ -45,7 +47,7 @@ typedef struct {
 
 extern int cp_compat_stat(struct kstat *, struct compat_stat *);
 extern int get_compat_timespec(struct timespec *, const struct compat_timespec *);
-extern int put_compat_timespec(struct timespec *, const struct compat_timespec *);
+extern int put_compat_timespec(const struct timespec *, struct compat_timespec *);
 
 struct compat_iovec {
 	compat_uptr_t	iov_base;
@@ -88,5 +90,15 @@ typedef union compat_sigval {
 	compat_uptr_t	sival_ptr;
 } compat_sigval_t;
 
+long compat_sys_semctl(int first, int second, int third, void __user *uptr);
+long compat_sys_msgsnd(int first, int second, int third, void __user *uptr);
+long compat_sys_msgrcv(int first, int second, int msgtyp, int third,
+		int version, void __user *uptr);
+long compat_sys_msgctl(int first, int second, void __user *uptr);
+long compat_sys_shmat(int first, int second, compat_uptr_t third, int version,
+		void __user *uptr);
+long compat_sys_shmctl(int first, int second, void __user *uptr);
+long compat_sys_semtimedop(int semid, struct sembuf __user *tsems,
+		unsigned nsems, const struct compat_timespec __user *timeout);
 #endif /* CONFIG_COMPAT */
 #endif /* _LINUX_COMPAT_H */

@@ -26,6 +26,7 @@
 #include <linux/list.h> 
 #include <linux/string.h>
 #include <linux/init.h>
+#include <linux/module.h>
 #include <linux/ide.h>
 #include <linux/pci.h>
 
@@ -472,6 +473,7 @@ void *iSeries_memset_io(void *dest, char c, size_t Count)
 	}
 	return dest;
 }
+EXPORT_SYMBOL(iSeries_memset_io);
 
 void *iSeries_memcpy_toio(void *dest, void *source, size_t count)
 {
@@ -485,6 +487,7 @@ void *iSeries_memcpy_toio(void *dest, void *source, size_t count)
 	}
 	return dest;
 }
+EXPORT_SYMBOL(iSeries_memcpy_toio);
 
 void *iSeries_memcpy_fromio(void *dest, void *source, size_t count)
 {
@@ -498,6 +501,7 @@ void *iSeries_memcpy_fromio(void *dest, void *source, size_t count)
 	}
 	return dest;
 }
+EXPORT_SYMBOL(iSeries_memcpy_fromio);
 
 /*
  * Look down the chain to find the matching Device Device
@@ -708,6 +712,7 @@ u8 iSeries_Read_Byte(void *IoAddress)
 
 	return (u8)ret.value;
 }
+EXPORT_SYMBOL(iSeries_Read_Byte);
 
 u16 iSeries_Read_Word(void *IoAddress)
 {
@@ -737,6 +742,7 @@ u16 iSeries_Read_Word(void *IoAddress)
 
 	return swab16((u16)ret.value);
 }
+EXPORT_SYMBOL(iSeries_Read_Word);
 
 u32 iSeries_Read_Long(void *IoAddress)
 {
@@ -766,6 +772,7 @@ u32 iSeries_Read_Long(void *IoAddress)
 
 	return swab32((u32)ret.value);
 }
+EXPORT_SYMBOL(iSeries_Read_Long);
 
 /*
  * Write MM I/O Instructions for the iSeries
@@ -799,6 +806,7 @@ void iSeries_Write_Byte(u8 data, void *IoAddress)
 		rc = HvCall4(HvCallPciBarStore8, dsa, BarOffset, data, 0);
 	} while (CheckReturnCode("WWB", DevNode, rc) != 0);
 }
+EXPORT_SYMBOL(iSeries_Write_Byte);
 
 void iSeries_Write_Word(u16 data, void *IoAddress)
 {
@@ -825,6 +833,7 @@ void iSeries_Write_Word(u16 data, void *IoAddress)
 		rc = HvCall4(HvCallPciBarStore16, dsa, BarOffset, swab16(data), 0);
 	} while (CheckReturnCode("WWW", DevNode, rc) != 0);
 }
+EXPORT_SYMBOL(iSeries_Write_Word);
 
 void iSeries_Write_Long(u32 data, void *IoAddress)
 {
@@ -851,6 +860,7 @@ void iSeries_Write_Long(u32 data, void *IoAddress)
 		rc = HvCall4(HvCallPciBarStore32, dsa, BarOffset, swab32(data), 0);
 	} while (CheckReturnCode("WWL", DevNode, rc) != 0);
 }
+EXPORT_SYMBOL(iSeries_Write_Long);
 
 void pcibios_name_device(struct pci_dev *dev)
 {

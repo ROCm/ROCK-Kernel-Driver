@@ -342,7 +342,7 @@ static int __init snd_uart16550_detect(snd_uart16550_t *uart)
 	unsigned char c;
 
 	/* Do some vague tests for the presence of the uart */
-	if (io_base == 0) {
+	if (io_base == 0 || io_base == SNDRV_AUTO_PORT) {
 		return -ENODEV;	/* Not configured */
 	}
 
@@ -804,10 +804,9 @@ static int __init snd_uart16550_create(snd_card_t * card,
 		return err;
 	}
 
-	if (irq >= 0) {
+	if (irq >= 0 && irq != SNDRV_AUTO_IRQ) {
 		if (request_irq(irq, snd_uart16550_interrupt,
 				SA_INTERRUPT, "Serial MIDI", (void *) uart)) {
-			uart->irq = -1;
 			snd_printk("irq %d busy. Using Polling.\n", irq);
 		} else {
 			uart->irq = irq;

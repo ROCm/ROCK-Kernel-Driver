@@ -54,7 +54,7 @@ static int qptis_running = 0;
 
 #define PACKB(a, b)			(((a)<<4)|(b))
 
-const u_char mbox_param[] = {
+static const u_char mbox_param[] = {
 	PACKB(1, 1),	/* MBOX_NO_OP */
 	PACKB(5, 5),	/* MBOX_LOAD_RAM */
 	PACKB(2, 0),	/* MBOX_EXEC_FIRMWARE */

@@ -104,8 +104,8 @@ out_free_pages:
 	for ( ; i > 0 ; i--)
 		__free_page(bio->bi_io_vec[i-1].bv_page);
 out_free_bio:
-	while ( j < conf->raid_disks )
-		bio_put(r1_bio->bios[++j]);
+	while ( ++j < conf->raid_disks )
+		bio_put(r1_bio->bios[j]);
 	r1bio_pool_free(r1_bio, conf->mddev);
 	return NULL;
 }

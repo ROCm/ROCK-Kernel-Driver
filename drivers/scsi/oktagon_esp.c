@@ -12,7 +12,6 @@
 #define USE_BOTTOM_HALF
 #endif
 
-#define __KERNEL_SYSCALLS__
 #include <linux/module.h>
 
 #include <linux/kernel.h>
@@ -42,8 +41,6 @@
 #include <linux/workqueue.h>
 #include <linux/interrupt.h>
 #endif
-
-#include <linux/unistd.h>
 
 /* The controller registers can be found in the Z2 config area at these
  * offsets:

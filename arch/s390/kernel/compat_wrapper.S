@@ -1097,6 +1097,7 @@ compat_sys_futex_wrapper:
 	lgfr	%r3,%r3			# int
 	lgfr	%r4,%r4			# int
 	llgtr	%r5,%r5			# struct compat_timespec *
+	llgtr	%r6,%r6			# u32 *
 	jg	compat_sys_futex	# branch to system call
 
 	.globl	sys32_setxattr_wrapper
@@ -1338,3 +1339,17 @@ sys32_io_cancel_wrapper:
 	llgtr	%r3,%r3			# struct iocb *
 	llgtr	%r4,%r4			# struct io_event *
 	jg	sys_io_cancel
+
+	.globl compat_sys_statfs64_wrapper
+compat_sys_statfs64_wrapper:
+	llgtr	%r2,%r2			# const char *
+	llgfr	%r3,%r3			# compat_size_t
+	llgtr	%r4,%r4			# struct compat_statfs64 *
+	jg	compat_statfs64
+
+	.globl compat_sys_fstatfs64_wrapper
+compat_sys_fstatfs64_wrapper:
+	llgfr	%r2,%r2			# unsigned int fd
+	llgfr	%r3,%r3			# compat_size_t
+	llgtr	%r4,%r4			# struct compat_statfs64 *
+	jg	compat_fstatfs64

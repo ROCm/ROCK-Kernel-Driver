@@ -12,7 +12,7 @@ int fixup_exception(struct pt_regs *regs)
 	const struct exception_table_entry *fixup;
 
 #ifdef CONFIG_PNPBIOS
-	if (unlikely((regs->xcs | 8) == 0x88)) /* 0x80 or 0x88 */
+	if (unlikely((regs->xcs & ~15) == (GDT_ENTRY_PNPBIOS_BASE << 3)))
 	{
 		extern u32 pnp_bios_fault_eip, pnp_bios_fault_esp;
 		extern u32 pnp_bios_is_utter_crap;
@@ -21,7 +21,7 @@ int fixup_exception(struct pt_regs *regs)
 		__asm__ volatile(
 			"movl %0, %%esp\n\t"
 			"jmp *%1\n\t"
-			: "=a" (pnp_bios_fault_esp), "=b" (pnp_bios_fault_eip));
+			: : "g" (pnp_bios_fault_esp), "g" (pnp_bios_fault_eip));
 		panic("do_trap: can't hit this");
 	}
 #endif

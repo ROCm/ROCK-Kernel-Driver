@@ -87,8 +87,7 @@ cmm_alloc_pages(long pages, long *counter, struct cmm_page_array **list)
 			pa->index = 0;
 			*list = pa;
 		}
-		if (page < 0x80000000UL)
-			diag10(page);
+		diag10(page);
 		pa->pages[pa->index++] = page;
 		(*counter)++;
 		pages--;

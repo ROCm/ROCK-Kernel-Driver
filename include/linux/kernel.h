@@ -168,14 +168,14 @@ extern void dump_stack(void);
  * "unnecessary" pointer comparison.
  */
 #define min(x,y) ({ \
-	const typeof(x) _x = (x);	\
-	const typeof(y) _y = (y);	\
+	typeof(x) _x = (x);	\
+	typeof(y) _y = (y);	\
 	(void) (&_x == &_y);		\
 	_x < _y ? _x : _y; })
 
 #define max(x,y) ({ \
-	const typeof(x) _x = (x);	\
-	const typeof(y) _y = (y);	\
+	typeof(x) _x = (x);	\
+	typeof(y) _y = (y);	\
 	(void) (&_x == &_y);		\
 	_x > _y ? _x : _y; })
 

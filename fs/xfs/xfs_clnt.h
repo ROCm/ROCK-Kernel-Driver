@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2004 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -57,10 +57,10 @@ struct xfs_mount_args {
 	int	flags;		/* flags -> see XFSMNT_... macros below */
 	int	logbufs;	/* Number of log buffers, -1 to default */
 	int	logbufsize;	/* Size of log buffers, -1 to default */
-	char	fsname[MAXNAMELEN];	/* data device name */
-	char	rtname[MAXNAMELEN];	/* realtime device filename */
-	char	logname[MAXNAMELEN];	/* journal device filename */
-	char	mtpt[MAXNAMELEN];	/* filesystem mount point */
+	char	fsname[MAXNAMELEN+1];	/* data device name */
+	char	rtname[MAXNAMELEN+1];	/* realtime device filename */
+	char	logname[MAXNAMELEN+1];	/* journal device filename */
+	char	mtpt[MAXNAMELEN+1];	/* filesystem mount point */
 	int	sunit;		/* stripe unit (BBs) */
 	int	swidth;		/* stripe width (BBs), multiple of sunit */
 	uchar_t iosizelog;	/* log2 of the preferred I/O size */

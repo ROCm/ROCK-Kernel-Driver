@@ -39,7 +39,6 @@
 #include <asm/system.h>
 #include <asm/uaccess.h>
 #include <asm/naca.h>
-#include <asm/pmc.h>
 #include <asm/machdep.h>
 #include <asm/lmb.h>
 #include <asm/abs_addr.h>
@@ -265,7 +264,7 @@ int hash_page(unsigned long ea, unsigned long access, unsigned long trap)
 		if (mm == NULL)
 			return 1;
 
-		vsid = get_vsid(mm->context, ea);
+		vsid = get_vsid(mm->context.id, ea);
 		break;
 	case IO_REGION_ID:
 		mm = &ioremap_mm;

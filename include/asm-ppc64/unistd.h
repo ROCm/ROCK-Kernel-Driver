@@ -274,10 +274,6 @@
 
 #ifndef __ASSEMBLY__
 
-#include <linux/types.h>
-#include <linux/compiler.h>
-#include <linux/linkage.h>
-
 /* On powerpc a system call basically clobbers the same registers like a
  * function call, with the exception of LR (which is needed for the
  * "sc; bnslr" sequence) and CR (where only CR0.SO is clobbered to signal
@@ -399,20 +395,19 @@ type name(type1 arg1, type2 arg2, type3 arg3, type4 arg4, type5 arg5, type6 arg6
 /*
  * System call prototypes.
  */
-extern pid_t setsid(void);
-extern int write(int fd, const char *buf, off_t count);
-extern int read(int fd, char *buf, off_t count);
-extern off_t lseek(int fd, off_t offset, int count);
-extern int dup(int fd);
-extern int execve(const char *file, char **argv, char **envp);
-extern int open(const char *file, int flag, int mode);
-extern int close(int fd);
-extern pid_t waitpid(pid_t pid, int *wait_stat, int options);
+static inline _syscall3(int, execve, __const__ char *, file, char **, argv,
+			char **,envp)
+
 #endif /* __KERNEL_SYSCALLS__ */
 
-asmlinkage unsigned long sys_mmap(unsigned long addr, size_t len,
-				unsigned long prot, unsigned long flags,
-				unsigned long fd, off_t offset);
+#ifdef __KERNEL__
+
+#include <linux/types.h>
+#include <linux/compiler.h>
+#include <linux/linkage.h>
+
+unsigned long sys_mmap(unsigned long addr, size_t len, unsigned long prot,
+		       unsigned long flags, unsigned long fd, off_t offset);
 struct pt_regs;
 int sys_execve(unsigned long a0, unsigned long a1, unsigned long a2,
 		unsigned long a3, unsigned long a4, unsigned long a5,
@@ -426,13 +421,11 @@ int sys_fork(unsigned long p1, unsigned long p2, unsigned long p3,
 int sys_vfork(unsigned long p1, unsigned long p2, unsigned long p3,
 		unsigned long p4, unsigned long p5, unsigned long p6,
 		struct pt_regs *regs);
-asmlinkage int sys_pipe(int *fildes);
+int sys_pipe(int *fildes);
 int sys_ptrace(long request, long pid, long addr, long data);
 struct sigaction;
-asmlinkage long sys_rt_sigaction(int sig,
-				const struct sigaction __user *act,
-				struct sigaction __user *oact,
-				size_t sigsetsize);
+long sys_rt_sigaction(int sig, const struct sigaction __user *act,
+		      struct sigaction __user *oact, size_t sigsetsize);
 
 /*
  * "Conditional" syscalls
@@ -441,6 +434,8 @@ asmlinkage long sys_rt_sigaction(int sig,
  * but it doesn't work on all toolchains, so we just do it by hand
  */
 #define cond_syscall(x) asm(".weak\t." #x "\n\t.set\t." #x ",.sys_ni_syscall");
+
+#endif		/* __KERNEL__ */
 
 #endif		/* __ASSEMBLY__ */
 

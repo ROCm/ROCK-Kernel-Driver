@@ -10,6 +10,7 @@
 #include <linux/completion.h>
 #include <linux/err.h>
 #include <linux/unistd.h>
+#include <linux/file.h>
 #include <asm/semaphore.h>
 
 struct kthread_create_info
@@ -41,6 +42,21 @@ int kthread_should_stop(void)
 	return (kthread_stop_info.k == current);
 }
 
+
+static void kthread_exit_files(void)
+{
+	struct fs_struct *fs;
+	struct task_struct *tsk = current;
+
+	exit_fs(tsk);		/* current->fs->count--; */
+	fs = init_task.fs;
+	tsk->fs = fs;
+	atomic_inc(&fs->count);
+ 	exit_files(tsk);
+	current->files = init_task.files;
+	atomic_inc(&tsk->files->count);
+}
+
 static int kthread(void *_create)
 {
 	struct kthread_create_info *create = _create;
@@ -49,6 +65,8 @@ static int kthread(void *_create)
 	sigset_t blocked;
 	int ret = -EINTR;
 	cpumask_t mask = CPU_MASK_ALL;
+
+	kthread_exit_files();
 
 	/* Copy data: it's on keventd's stack */
 	threadfn = create->threadfn;
@@ -91,7 +109,6 @@ static void keventd_create_kthread(void *_create)
 	} else {
 		wait_for_completion(&create->started);
 		create->result = find_task_by_pid(pid);
-		wait_task_inactive(create->result);
 	}
 	complete(&create->done);
 }
@@ -131,7 +148,9 @@ struct task_struct *kthread_create(int (*threadfn)(void *data),
 void kthread_bind(struct task_struct *k, unsigned int cpu)
 {
 	BUG_ON(k->state != TASK_INTERRUPTIBLE);
-	k->thread_info->cpu = cpu;
+	/* Must have done schedule() in kthread() before we set_task_cpu */
+	wait_task_inactive(k);
+	set_task_cpu(k, cpu);
 	k->cpus_allowed = cpumask_of_cpu(cpu);
 }
 

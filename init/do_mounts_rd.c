@@ -69,8 +69,8 @@ identify_ramdisk_image(int fd, int start_block)
 	/*
 	 * Read block 0 to test for gzipped kernel
 	 */
-	lseek(fd, start_block * BLOCK_SIZE, 0);
-	read(fd, buf, size);
+	sys_lseek(fd, start_block * BLOCK_SIZE, 0);
+	sys_read(fd, buf, size);
 
 	/*
 	 * If it matches the gzip magic numbers, return -1
@@ -104,8 +104,8 @@ identify_ramdisk_image(int fd, int start_block)
 	/*
 	 * Read block 1 to test for minix and ext2 superblock
 	 */
-	lseek(fd, (start_block+1) * BLOCK_SIZE, 0);
-	read(fd, buf, size);
+	sys_lseek(fd, (start_block+1) * BLOCK_SIZE, 0);
+	sys_read(fd, buf, size);
 
 	/* Try minix */
 	if (minixsb->s_magic == MINIX_SUPER_MAGIC ||
@@ -131,7 +131,7 @@ identify_ramdisk_image(int fd, int start_block)
 	       start_block);
 	
 done:
-	lseek(fd, start_block * BLOCK_SIZE, 0);
+	sys_lseek(fd, start_block * BLOCK_SIZE, 0);
 	kfree(buf);
 	return nblocks;
 }
@@ -148,11 +148,11 @@ int __init rd_load_image(char *from)
 	char rotator[4] = { '|' , '/' , '-' , '\\' };
 #endif
 
-	out_fd = open("/dev/ram", O_RDWR, 0);
+	out_fd = sys_open("/dev/ram", O_RDWR, 0);
 	if (out_fd < 0)
 		goto out;
 
-	in_fd = open(from, O_RDONLY, 0);
+	in_fd = sys_open(from, O_RDONLY, 0);
 	if (in_fd < 0)
 		goto noclose_input;
 
@@ -217,20 +217,20 @@ int __init rd_load_image(char *from)
 		if (i && (i % devblocks == 0)) {
 			printk("done disk #%d.\n", disk++);
 			rotate = 0;
-			if (close(in_fd)) {
+			if (sys_close(in_fd)) {
 				printk("Error closing the disk.\n");
 				goto noclose_input;
 			}
 			change_floppy("disk #%d", disk);
-			in_fd = open(from, O_RDONLY, 0);
+			in_fd = sys_open(from, O_RDONLY, 0);
 			if (in_fd < 0)  {
 				printk("Error opening disk.\n");
 				goto noclose_input;
 			}
 			printk("Loading disk #%d... ", disk);
 		}
-		read(in_fd, buf, BLOCK_SIZE);
-		write(out_fd, buf, BLOCK_SIZE);
+		sys_read(in_fd, buf, BLOCK_SIZE);
+		sys_write(out_fd, buf, BLOCK_SIZE);
 #if !defined(CONFIG_ARCH_S390) && !defined(CONFIG_PPC_ISERIES)
 		if (!(i % 16)) {
 			printk("%c\b", rotator[rotate & 0x3]);
@@ -243,9 +243,9 @@ int __init rd_load_image(char *from)
 successful_load:
 	res = 1;
 done:
-	close(in_fd);
+	sys_close(in_fd);
 noclose_input:
-	close(out_fd);
+	sys_close(out_fd);
 out:
 	kfree(buf);
 	sys_unlink("/dev/ram");
@@ -342,7 +342,7 @@ static int __init fill_inbuf(void)
 {
 	if (exit_code) return -1;
 	
-	insize = read(crd_infd, inbuf, INBUFSIZ);
+	insize = sys_read(crd_infd, inbuf, INBUFSIZ);
 	if (insize == 0) {
 		error("RAMDISK: ran out of compressed data");
 		return -1;
@@ -363,7 +363,7 @@ static void __init flush_window(void)
     unsigned n, written;
     uch *in, ch;
     
-    written = write(crd_outfd, window, outcnt);
+    written = sys_write(crd_outfd, window, outcnt);
     if (written != outcnt && unzip_error == 0) {
 	printk(KERN_ERR "RAMDISK: incomplete write (%d != %d) %ld\n",
 	       written, outcnt, bytes_out);

@@ -37,6 +37,12 @@
 #include <asm/hvcall.h>
 #include <asm/prom.h>
 
+/* in pSeries_hvCall.S */
+EXPORT_SYMBOL(plpar_hcall);
+EXPORT_SYMBOL(plpar_hcall_4out);
+EXPORT_SYMBOL(plpar_hcall_norets);
+EXPORT_SYMBOL(plpar_hcall_8arg_2ret);
+
 long poll_pending(void)
 {
 	unsigned long dummy;
@@ -379,7 +385,10 @@ long pSeries_lpar_hpte_insert(unsigned long hpte_group,
 	if (lpar_rc != H_Success)
 		return -2;
 
-	return slot;
+	/* Because of iSeries, we have to pass down the secondary
+	 * bucket bit here as well
+	 */
+	return (slot & 7) | (secondary << 3);
 }
 
 static spinlock_t pSeries_lpar_tlbie_lock = SPIN_LOCK_UNLOCKED;

@@ -778,6 +778,7 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 	sb->s_fs_info = sbi;
 	memset(sbi, 0, sizeof(struct msdos_sb_info));
 
+	sb->s_flags |= MS_NODIRATIME;
 	sb->s_magic = MSDOS_SUPER_MAGIC;
 	sb->s_op = &fat_sops;
 	sb->s_export_op = &fat_export_ops;

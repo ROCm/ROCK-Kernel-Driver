@@ -11,7 +11,7 @@
  *			  Frank Pavlic (pavlic@de.ibm.com) and
  *		 	  Martin Schwidefsky <schwidefsky@de.ibm.com>
  *
- *    $Revision: 1.66 $	 $Date: 2004/02/19 13:46:01 $
+ *    $Revision: 1.68 $	 $Date: 2004/03/02 15:34:01 $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -58,7 +58,7 @@
 /**
  * initialization string for output
  */
-#define VERSION_LCS_C  "$Revision: 1.66 $"
+#define VERSION_LCS_C  "$Revision: 1.68 $"
 
 static char version[] __initdata = "LCS driver ("VERSION_LCS_C "/" VERSION_LCS_H ")";
 
@@ -1855,17 +1855,8 @@ lcs_new_device(struct ccwgroup_device *ccwgdev)
 	if (register_netdev(dev) != 0)
 		goto out;
 	/* Create symlinks. */
-	if (sysfs_create_link(&ccwgdev->dev.kobj, &dev->class_dev.kobj,
-			      dev->name)) {
-		unregister_netdev(dev);
-		goto out;
-	}
-	if (sysfs_create_link(&dev->class_dev.kobj, &ccwgdev->dev.kobj,
-			      ccwgdev->dev.bus_id)) {
-		sysfs_remove_link(&ccwgdev->dev.kobj, dev->name);
-		unregister_netdev(dev);
-		goto out;
-	}
+	SET_NETDEV_DEV(dev, &ccwgdev->dev);
+
 	netif_stop_queue(dev);
 	lcs_stopcard(card);
 	return 0;
@@ -1891,8 +1882,6 @@ lcs_shutdown_device(struct ccwgroup_device *ccwgdev)
 	ret = lcs_stop_device(card->dev);
 	if (ret)
 		return ret;
-	sysfs_remove_link(&card->dev->class_dev.kobj, ccwgdev->dev.bus_id);
-	sysfs_remove_link(&ccwgdev->dev.kobj, card->dev->name);
 	unregister_netdev(card->dev);
 	return 0;
 }
@@ -1911,9 +1900,6 @@ lcs_remove_device(struct ccwgroup_device *ccwgdev)
 		return;
 	if (ccwgdev->state == CCWGROUP_ONLINE) {
 		lcs_stop_device(card->dev); /* Ignore rc. */
-		sysfs_remove_link(&card->dev->class_dev.kobj,
-				  ccwgdev->dev.bus_id);
-		sysfs_remove_link(&ccwgdev->dev.kobj, card->dev->name);
 		unregister_netdev(card->dev);
 	}
 	sysfs_remove_group(&ccwgdev->dev.kobj, &lcs_attr_group);
@@ -1926,6 +1912,7 @@ lcs_remove_device(struct ccwgroup_device *ccwgdev)
  * LCS ccwgroup driver registration
  */
 static struct ccwgroup_driver lcs_group_driver = {
+	.owner       = THIS_MODULE,
 	.name        = "lcs",
 	.max_slaves  = 2,
 	.driver_id   = 0xD3C3E2,

@@ -15,7 +15,7 @@ struct scsi_mode_data;
  * sdev state
  */
 enum scsi_device_state {
-	SDEV_CREATED,		/* device created but not added to sysfs
+	SDEV_CREATED = 1,	/* device created but not added to sysfs
 				 * Only internal commands allowed (for inq) */
 	SDEV_RUNNING,		/* device properly configured
 				 * All commands allowed */
@@ -23,6 +23,9 @@ enum scsi_device_state {
 				 * Only error handler commands allowed */
 	SDEV_DEL,		/* device deleted 
 				 * no commands allowed */
+	SDEV_QUIESCE,		/* Device quiescent.  No block commands
+				 * will be accepted, only specials (which
+				 * originate in the mid-layer) */
 };
 
 struct scsi_device {
@@ -94,6 +97,7 @@ struct scsi_device {
 	unsigned skip_ms_page_8:1;	/* do not use MODE SENSE page 0x08 */
 	unsigned skip_ms_page_3f:1;	/* do not use MODE SENSE page 0x3f */
 	unsigned no_start_on_add:1;	/* do not issue start on add */
+	unsigned allow_restart:1; /* issue START_UNIT in error handler */
 
 	unsigned int device_blocked;	/* Device returned QUEUE_FULL. */
 
@@ -103,12 +107,17 @@ struct scsi_device {
 	struct device		sdev_gendev;
 	struct class_device	sdev_classdev;
 
+	struct class_device	transport_classdev;
+
 	enum scsi_device_state sdev_state;
-};
+	unsigned long		transport_data[0];
+} __attribute__((aligned(sizeof(unsigned long))));
 #define	to_scsi_device(d)	\
 	container_of(d, struct scsi_device, sdev_gendev)
 #define	class_to_sdev(d)	\
 	container_of(d, struct scsi_device, sdev_classdev)
+#define transport_class_to_sdev(class_dev) \
+	container_of(class_dev, struct scsi_device, transport_classdev)
 
 extern struct scsi_device *scsi_add_device(struct Scsi_Host *,
 		uint, uint, uint);
@@ -164,4 +173,8 @@ extern int scsi_set_medium_removal(struct scsi_device *, char);
 extern int scsi_mode_sense(struct scsi_device *sdev, int dbd, int modepage,
 			   unsigned char *buffer, int len, int timeout,
 			   int retries, struct scsi_mode_data *data);
+extern int scsi_device_set_state(struct scsi_device *sdev,
+				 enum scsi_device_state state);
+extern int scsi_device_quiesce(struct scsi_device *sdev);
+extern void scsi_device_resume(struct scsi_device *sdev);
 #endif /* _SCSI_SCSI_DEVICE_H */

@@ -507,7 +507,6 @@ static int snd_trident_simple_put_sample(void *private_data, simple_instrument_t
 					 char *data, long len, int atomic)
 {
 	trident_t *trident = snd_magic_cast(trident_t, private_data, return -ENXIO);
-	unsigned char *block = NULL;
 	int size = instr->size;
 	int shift = 0;
 
@@ -530,7 +529,7 @@ static int snd_trident_simple_put_sample(void *private_data, simple_instrument_t
 
 	if (trident->tlb.entries) {
 		snd_util_memblk_t *memblk;
-		memblk = snd_trident_synth_alloc(trident,size); 
+		memblk = snd_trident_synth_alloc(trident, size); 
 		if (memblk == NULL)
 			return -ENOMEM;
 		if (snd_trident_synth_copy_from_user(trident, memblk, 0, data, size) ) {
@@ -540,17 +539,17 @@ static int snd_trident_simple_put_sample(void *private_data, simple_instrument_t
 		instr->address.ptr = (unsigned char*)memblk;
 		instr->address.memory = memblk->offset;
 	} else {
-		dma_addr_t addr;
-		block = (unsigned char *) snd_malloc_pci_pages(trident->pci, size, &addr);
-		if (block == NULL)
+		struct snd_dma_buffer dmab;
+
+		if (snd_dma_alloc_pages(&trident->dma_dev, size, &dmab) < 0)
 			return -ENOMEM;
 
-		if (copy_from_user(block, data, size)) {
-			snd_free_pci_pages(trident->pci, size, block, addr);
+		if (copy_from_user(dmab.area, data, size)) {
+			snd_dma_free_pages(&trident->dma_dev, &dmab);
 			return -EFAULT;
 		}
-		instr->address.ptr = block;
-		instr->address.memory = addr;
+		instr->address.ptr = dmab.area;
+		instr->address.memory = dmab.addr;
 	}
 
 	trident->synth.current_size += size;

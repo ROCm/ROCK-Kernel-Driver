@@ -74,7 +74,7 @@ static int __init init_lubbock(void)
 	lubbock_maps[flashboot].name = "Lubbock Boot ROM";
 
 	for (i = 0; i < 2; i++) {
-		lubbock_maps[i].virt = (unsigned long)__ioremap(lubbock_maps[i].phys, WINDOW_SIZE, 0);
+		lubbock_maps[i].virt = (unsigned long)ioremap(lubbock_maps[i].phys, WINDOW_SIZE);
 		if (!lubbock_maps[i].virt) {
 			printk(KERN_WARNING "Failed to ioremap %s\n", lubbock_maps[i].name);
 			if (!ret)
@@ -97,8 +97,8 @@ static int __init init_lubbock(void)
 		}
 		mymtds[i]->owner = THIS_MODULE;
 
-		int ret = parse_mtd_partitions(mymtds[i], probes,
-					       &parsed_parts[i], 0);
+		ret = parse_mtd_partitions(mymtds[i], probes,
+					   &parsed_parts[i], 0);
 
 		if (ret > 0)
 			nr_parsed_parts[i] = ret;

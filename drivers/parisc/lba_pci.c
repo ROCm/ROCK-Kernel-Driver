@@ -533,10 +533,10 @@ static int lba_cfg_read(struct pci_bus *bus, unsigned int devfn, int pos, int si
 	*/
 	LBA_CFG_TR4_ADDR_SETUP(d, tok | pos);
 	switch(size) {
-	case 1: *(u8 *)  data = READ_REG8(d->hba.base_addr + LBA_PCI_CFG_DATA);
-	   break;
-	case 2: *(u16 *) data = READ_REG16(d->hba.base_addr + LBA_PCI_CFG_DATA);
-	   break;
+	case 1: *(u8 *)  data = READ_REG8(d->hba.base_addr + LBA_PCI_CFG_DATA + (pos & 3));
+		break;
+	case 2: *(u16 *) data = READ_REG16(d->hba.base_addr + LBA_PCI_CFG_DATA + (pos & 2));
+		break;
 	case 4: *(u32 *) data = READ_REG32(d->hba.base_addr + LBA_PCI_CFG_DATA);
 	   break;
 	}
@@ -613,13 +613,14 @@ static int lba_cfg_write(struct pci_bus *bus, unsigned int devfn, int pos, int s
 	/* Basic Algorithm */
 	LBA_CFG_TR4_ADDR_SETUP(d, tok | pos);
 	switch(size) {
-	case 1: WRITE_REG8 (data, d->hba.base_addr + LBA_PCI_CFG_DATA);
+	case 1: WRITE_REG8 (data, d->hba.base_addr + LBA_PCI_CFG_DATA + (pos & 3));
 		   break;
-	case 2: WRITE_REG16(data, d->hba.base_addr + LBA_PCI_CFG_DATA);
+	case 2: WRITE_REG16(data, d->hba.base_addr + LBA_PCI_CFG_DATA + (pos & 2));
 		   break;
 	case 4: WRITE_REG32(data, d->hba.base_addr + LBA_PCI_CFG_DATA);
 		   break;
 	}
+	/* flush posted write */
 	lba_t32 = READ_REG32(d->hba.base_addr + LBA_PCI_CFG_ADDR);
 	return 0;
 }

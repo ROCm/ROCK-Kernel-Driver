@@ -53,11 +53,11 @@ static void kmlreint_pre_secure(struct kml_rec *rec, struct file *dir,
         ctxt.root = ctxt.pwd;
         ctxt.rootmnt = ctxt.pwdmnt;
         if (rec->prefix.hdr->ngroups > 0) {
-                ctxt.ngroups = rec->prefix.hdr->ngroups;
-                for (i = 0; i< ctxt.ngroups; i++) 
-                        ctxt.groups[i] = rec->prefix.groups[i];
+                ctxt.group_info = groups_alloc(rec->prefix.hdr->ngroups);
+                for (i = 0; i< ctxt.group_info->ngroups; i++) 
+                        GROUP_AT(ctxt.group_info,i)= rec->prefix.groups[i];
         } else
-                ctxt.ngroups = 0;
+                ctxt.group_info = groups_alloc(0);
 
         push_ctxt(saved, &ctxt);
 }

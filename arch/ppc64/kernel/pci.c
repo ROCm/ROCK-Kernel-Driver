@@ -119,43 +119,6 @@ static void fixup_windbond_82c105(struct pci_dev* dev)
 	}
 }
 
-/* Given an mmio phys address, find a pci device that implements
- * this address.  This is of course expensive, but only used
- * for device initialization or error paths.
- * For io BARs it is assumed the pci_io_base has already been added
- * into addr.
- *
- * Bridges are ignored although they could be used to optimize the search.
- */
-struct pci_dev *pci_find_dev_by_addr(unsigned long addr)
-{
-	struct pci_dev *dev = NULL;
-	int i;
-	unsigned long ioaddr;
-
-	ioaddr = (addr > isa_io_base) ? addr - isa_io_base : 0;
-
-	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
-		if ((dev->class >> 16) == PCI_BASE_CLASS_BRIDGE)
-			continue;
-		for (i = 0; i < DEVICE_COUNT_RESOURCE; i++) {
-			unsigned long start = pci_resource_start(dev,i);
-			unsigned long end = pci_resource_end(dev,i);
-			unsigned int flags = pci_resource_flags(dev,i);
-			if (start == 0 || ~start == 0 ||
-			    end == 0 || ~end == 0)
-				continue;
-			if ((flags & IORESOURCE_IO) &&
-			    (ioaddr >= start && ioaddr <= end))
-				return dev;
-			else if ((flags & IORESOURCE_MEM) &&
-				 (addr >= start && addr <= end))
-				return dev;
-		}
-	}
-	return NULL;
-}
-
 void 
 pcibios_resource_to_bus(struct pci_dev *dev, struct pci_bus_region *region,
 			struct resource *res)
@@ -358,6 +321,10 @@ static int __init pcibios_init(void)
 
 	printk("PCI: Probing PCI hardware done\n");
 	//ppc64_boot_msg(0x41, "PCI Done");
+
+#ifdef CONFIG_PPC_PSERIES
+	pci_addr_cache_build();
+#endif
 
 	return 0;
 }

@@ -278,6 +278,7 @@ static int hfsplus_fill_super(struct super_block *sb, void *data, int silent)
 	struct hfsplus_sb_info *sbi;
 	hfsplus_cat_entry entry;
 	struct hfs_find_data fd;
+	struct inode *root;
 	struct qstr str;
 	int err = -EINVAL;
 
@@ -364,10 +365,12 @@ static int hfsplus_fill_super(struct super_block *sb, void *data, int silent)
 	}
 
 	/* Load the root directory */
-	sb->s_root = d_alloc_root(iget(sb, HFSPLUS_ROOT_CNID));
+	root = iget(sb, HFSPLUS_ROOT_CNID);
+	sb->s_root = d_alloc_root(root);
 	if (!sb->s_root) {
 		if (!silent)
 			printk("HFS+-fs: failed to load root directory\n");
+		iput(root);
 		goto cleanup;
 	}
 

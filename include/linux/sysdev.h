@@ -70,8 +70,8 @@ struct sys_device {
 	struct kobject		kobj;
 };
 
-extern int sys_device_register(struct sys_device *);
-extern void sys_device_unregister(struct sys_device *);
+extern int sysdev_register(struct sys_device *);
+extern void sysdev_unregister(struct sys_device *);
 
 
 struct sysdev_attribute { 

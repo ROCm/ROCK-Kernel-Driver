@@ -25,6 +25,8 @@ cpqphp-objs		:=	cpqphp_core.o	\
 				cpqphp_ctrl.o	\
 				cpqphp_sysfs.o	\
 				cpqphp_pci.o
+cpqphp-$(CONFIG_HOTPLUG_PCI_COMPAQ_NVRAM) += cpqphp_nvram.o
+cpqphp-objs += $(cpqphp-y)
 
 ibmphp-objs		:=	ibmphp_core.o	\
 				ibmphp_ebda.o	\
@@ -38,7 +40,9 @@ acpiphp-objs		:=	acpiphp_core.o	\
 				acpiphp_res.o
 
 rpaphp-objs		:=	rpaphp_core.o	\
-				rpaphp_pci.o	
+				rpaphp_pci.o	\
+				rpaphp_slot.o	\
+				rpaphp_vio.o
 
 rpadlpar_io-objs	:=	rpadlpar_core.o \
 				rpadlpar_sysfs.o
@@ -48,38 +52,23 @@ pciehp-objs		:=	pciehp_core.o	\
 				pciehp_pci.o	\
 				pciehp_sysfs.o	\
 				pciehp_hpc.o
+ifdef CONFIG_ACPI_BUS
+	pciehp-objs += pciehprm_acpi.o
+else
+	pciehp-objs += pciehprm_nonacpi.o
+endif
 
 shpchp-objs		:=	shpchp_core.o	\
 				shpchp_ctrl.o	\
 				shpchp_pci.o	\
 				shpchp_sysfs.o	\
 				shpchp_hpc.o
-
-ifdef CONFIG_HOTPLUG_PCI_ACPI
-  EXTRA_CFLAGS  += -D_LINUX -I$(TOPDIR)/drivers/acpi
-  ifdef CONFIG_ACPI_DEBUG
-    EXTRA_CFLAGS += -DACPI_DEBUG_OUTPUT
-  endif
-endif
-
-ifeq ($(CONFIG_HOTPLUG_PCI_COMPAQ_NVRAM),y)
-	cpqphp-objs += cpqphp_nvram.o
-endif
-
-ifeq ($(CONFIG_HOTPLUG_PCI_PCIE_PHPRM_NONACPI),y)
-  pciehp-objs += pciehprm_nonacpi.o
+ifdef CONFIG_ACPI_BUS
+	shpchp-objs += shpchprm_acpi.o
 else
-  pciehp-objs += pciehprm_acpi.o
-  EXTRA_CFLAGS  += -D_LINUX -I$(TOPDIR)/drivers/acpi -I$(TOPDIR)/drivers/acpi/include 
-endif
-
-ifeq ($(CONFIG_HOTPLUG_PCI_SHPC_PHPRM_LEGACY),y)
-  shpchp-objs += shpchprm_legacy.o
-else
-   ifeq ($(CONFIG_HOTPLUG_PCI_SHPC_PHPRM_NONACPI),y)
-     shpchp-objs += shpchprm_nonacpi.o
-   else
-      shpchp-objs += shpchprm_acpi.o
-      EXTRA_CFLAGS  += -D_LINUX -I$(TOPDIR)/drivers/acpi 
-   endif
+	ifdef CONFIG_HOTPLUG_PCI_SHPC_PHPRM_LEGACY
+		shpchp-objs += shpchprm_legacy.o
+	else
+		shpchp-objs += shpchprm_nonacpi.o
+	endif
 endif

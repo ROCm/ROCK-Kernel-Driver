@@ -32,7 +32,6 @@
  *    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#define __KERNEL_SYSCALLS__
 #include <stdarg.h>
 
 #include <linux/elf.h>
@@ -251,6 +250,16 @@ sys_clone(unsigned long clone_flags, unsigned long usp,
 	  struct pt_regs *regs)
 {
 	int *user_tid = (int *)regs->gr[26];
+
+	/* usp must be word aligned.  This also prevents users from
+	 * passing in the value 1 (which is the signal for a special
+	 * return for a kernel thread) */
+	usp = ALIGN(usp, 4);
+
+	/* A zero value for usp means use the current stack */
+	if(usp == 0)
+		usp = regs->gr[30];
+
 	return do_fork(clone_flags & ~CLONE_IDLETASK, usp, regs, 0, user_tid, NULL);
 }
 
@@ -291,7 +300,7 @@ copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 	 * We rely on the fact that kernel_thread passes
 	 * in zero for usp.
 	 */
-	if (usp == 0) {
+	if (usp == 1) {
 		/* kernel thread */
 		cregs->ksp = (((unsigned long)(ti)) + THREAD_SZ_ALGN);
 		/* Must exit via ret_from_kernel_thread in order
@@ -316,7 +325,7 @@ copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 
 		/* Use same stack depth as parent */
 		cregs->ksp = ((unsigned long)(ti))
-			+ (pregs->gr[21] & (INIT_THREAD_SIZE - 1));
+			+ (pregs->gr[21] & (THREAD_SIZE - 1));
 		cregs->gr[30] = usp;
 		if (p->personality == PER_HPUX) {
 #ifdef CONFIG_HPUX

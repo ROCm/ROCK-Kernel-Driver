@@ -1227,15 +1227,15 @@ static void amdtp_add_host(struct hpsb_host *host)
 	ah->host = host;
 	ah->ohci = host->hostdata;
 
-	hpsb_set_hostinfo_key(&amdtp_highlevel, host, ah->ohci->id);
+	hpsb_set_hostinfo_key(&amdtp_highlevel, host, ah->host->id);
 
-	minor = IEEE1394_MINOR_BLOCK_AMDTP * 16 + ah->ohci->id;
+	minor = IEEE1394_MINOR_BLOCK_AMDTP * 16 + ah->host->id;
 
 	INIT_LIST_HEAD(&ah->stream_list);
 	spin_lock_init(&ah->stream_list_lock);
 
 	devfs_mk_cdev(MKDEV(IEEE1394_MAJOR, minor),
-			S_IFCHR|S_IRUSR|S_IWUSR, "amdtp/%d", ah->ohci->id);
+			S_IFCHR|S_IRUSR|S_IWUSR, "amdtp/%d", ah->host->id);
 }
 
 static void amdtp_remove_host(struct hpsb_host *host)
@@ -1243,7 +1243,7 @@ static void amdtp_remove_host(struct hpsb_host *host)
 	struct amdtp_host *ah = hpsb_get_hostinfo(&amdtp_highlevel, host);
 
 	if (ah)
-		devfs_remove("amdtp/%d", ah->ohci->id);
+		devfs_remove("amdtp/%d", ah->host->id);
 
 	return;
 }
@@ -1266,7 +1266,6 @@ static int __init amdtp_init_module (void)
 {
 	cdev_init(&amdtp_cdev, &amdtp_fops);
 	amdtp_cdev.owner = THIS_MODULE;
-	kobject_set_name(&amdtp_cdev.kobj, "amdtp");
 	if (cdev_add(&amdtp_cdev, IEEE1394_AMDTP_DEV, 16)) {
 		HPSB_ERR("amdtp: unable to add char device");
  		return -EIO;

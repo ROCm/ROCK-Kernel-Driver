@@ -28,7 +28,8 @@ extern int nr_cpus_in_node[];
 #define MEMORY_INCREMENT_SHIFT 28
 #define MEMORY_INCREMENT (1UL << MEMORY_INCREMENT_SHIFT)
 
-#define DEBUG_NUMA
+/* NUMA debugging, will not work on a DLPAR machine */
+#undef DEBUG_NUMA
 
 static inline int pa_to_nid(unsigned long pa)
 {

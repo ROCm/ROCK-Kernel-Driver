@@ -675,6 +675,7 @@ xfs_mountfs(
 				error = XFS_ERROR(EINVAL);
 				goto error1;
 			}
+			mp->m_dalign = mp->m_swidth = 0;
 		} else {
 			/*
 			 * Convert the stripe unit and width to FSBs.

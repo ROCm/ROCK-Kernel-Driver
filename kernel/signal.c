@@ -213,7 +213,7 @@ static inline int has_pending_signals(sigset_t *signal, sigset_t *blocked)
 
 #define PENDING(p,b) has_pending_signals(&(p)->signal, (b))
 
-inline void recalc_sigpending_tsk(struct task_struct *t)
+fastcall void recalc_sigpending_tsk(struct task_struct *t)
 {
 	if (t->signal->group_stop_count > 0 ||
 	    PENDING(&t->pending, &t->blocked) ||
@@ -1051,17 +1051,23 @@ int __kill_pg_info(int sig, struct siginfo *info, pid_t pgrp)
 	struct task_struct *p;
 	struct list_head *l;
 	struct pid *pid;
-	int err, retval = -ESRCH;
+	int retval;
+	int found;
 
 	if (pgrp <= 0)
 		return -EINVAL;
 
+	found = 0;
+	retval = 0;
 	for_each_task_pid(pgrp, PIDTYPE_PGID, p, l, pid) {
+		int err;
+
+		found = 1;
 		err = group_send_sig_info(sig, info, p);
-		if (retval)
+		if (!retval)
 			retval = err;
 	}
-	return retval;
+	return found ? retval : -ESRCH;
 }
 
 int
@@ -2476,7 +2482,8 @@ out:
 #endif /* __sparc__ */
 #endif
 
-#if !defined(__alpha__) && !defined(__ia64__) && !defined(__arm__)
+#if !defined(__alpha__) && !defined(__ia64__) && \
+    !defined(__arm__) && !defined(__s390__)
 /*
  * For backwards compatibility.  Functionality superseded by sigprocmask.
  */

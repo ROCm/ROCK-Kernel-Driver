@@ -397,37 +397,18 @@ static int config_chipset_for_dma (ide_drive_t *drive)
 	u8 ultra_66		= ((id->dma_ultra & 0x0010) ||
 				   (id->dma_ultra & 0x0008)) ? 1 : 0;
 
-	switch(dev->device) {
-		case PCI_DEVICE_ID_PROMISE_20267:
-		case PCI_DEVICE_ID_PROMISE_20265:
-		case PCI_DEVICE_ID_PROMISE_20263:
-		case PCI_DEVICE_ID_PROMISE_20262:
-			cable = pdc202xx_old_cable_detect(hwif);
-#if PDC202_DEBUG_CABLE
-			printk(KERN_DEBUG "%s: %s-pin cable, %s-pin cable, %d\n",
-				hwif->name, hwif->udma_four ? "80" : "40",
-				cable ? "40" : "80", cable);
-#endif /* PDC202_DEBUG_CABLE */
-			break;
-		case PCI_DEVICE_ID_PROMISE_20246:
-			ultra_66 = 0;
-			break;
-		default:
-			BUG();
-	}
+	if (dev->device != PCI_DEVICE_ID_PROMISE_20246)
+		cable = pdc202xx_old_cable_detect(hwif);
+	else
+		ultra_66 = 0;
 
-	if ((ultra_66) && (cable)) {
-#ifdef DEBUG
-		printk(KERN_DEBUG "ULTRA 66/100/133: %s channel of Ultra 66/100/133 "
-			"requires an 80-pin cable for Ultra66 operation.\n",
-			hwif->channel ? "Secondary" : "Primary");
-		printk(KERN_DEBUG "         Switching to Ultra33 mode.\n");
-#endif /* DEBUG */
+	if (ultra_66 && cable) {
 		printk(KERN_WARNING "Warning: %s channel requires an 80-pin cable for operation.\n", hwif->channel ? "Secondary":"Primary");
 		printk(KERN_WARNING "%s reduced to Ultra33 mode.\n", drive->name);
 	}
 
-	pdc_old_disable_66MHz_clock(drive->hwif);
+	if (dev->device != PCI_DEVICE_ID_PROMISE_20246)
+		pdc_old_disable_66MHz_clock(drive->hwif);
 
 	drive_pci = 0x60 + (drive->dn << 2);
 	pci_read_config_dword(dev, drive_pci, &drive_conf);
@@ -637,7 +618,6 @@ void pdc202xx_reset (ide_drive_t *drive)
 	 */
 	if (hwif->present) {
 		u16 hunit = 0;
-		hwif->initializing = 1;
 		for (hunit = 0; hunit < MAX_DRIVES; ++hunit) {
 			ide_drive_t *hdrive = &hwif->drives[hunit];
 			if (hdrive->present) {
@@ -647,11 +627,9 @@ void pdc202xx_reset (ide_drive_t *drive)
 					hwif->tuneproc(hdrive, 5);
 			}
 		}
-		hwif->initializing = 0;
 	}
 	if (mate->present) {
 		u16 munit = 0;
-		mate->initializing = 1;
 		for (munit = 0; munit < MAX_DRIVES; ++munit) {
 			ide_drive_t *mdrive = &mate->drives[munit];
 			if (mdrive->present) {
@@ -661,7 +639,6 @@ void pdc202xx_reset (ide_drive_t *drive)
 					mate->tuneproc(mdrive, 5);
 			}
 		}
-		mate->initializing = 0;
 	}
 #else
 	hwif->tuneproc(drive, 5);
@@ -921,6 +898,7 @@ static struct pci_device_id pdc202xx_pci_tbl[] = {
 	{ PCI_VENDOR_ID_PROMISE, PCI_DEVICE_ID_PROMISE_20267, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 4},
 	{ 0, },
 };
+MODULE_DEVICE_TABLE(pci, pdc202xx_pci_tbl);
 
 static struct pci_driver driver = {
 	.name		= "Promise Old IDE",

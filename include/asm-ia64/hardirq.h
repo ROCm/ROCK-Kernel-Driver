@@ -2,7 +2,7 @@
 #define _ASM_IA64_HARDIRQ_H
 
 /*
- * Copyright (C) 1998-2002 Hewlett-Packard Co
+ * Modified 1998-2002, 2004 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  */
 
@@ -86,8 +86,6 @@
 #define hardirq_trylock()	(!in_interrupt())
 #define hardirq_endlock()	do { } while (0)
 
-#define irq_enter()		(preempt_count() += HARDIRQ_OFFSET)
-
 #ifdef CONFIG_PREEMPT
 # include <linux/smp_lock.h>
 # define in_atomic()		((preempt_count() & ~PREEMPT_ACTIVE) != kernel_locked())
@@ -96,14 +94,6 @@
 # define in_atomic()		(preempt_count() != 0)
 # define IRQ_EXIT_OFFSET HARDIRQ_OFFSET
 #endif
-
-#define irq_exit()						\
-do {								\
-		preempt_count() -= IRQ_EXIT_OFFSET;		\
-		if (!in_interrupt() && local_softirq_pending())	\
-			do_softirq();				\
-		preempt_enable_no_resched();			\
-} while (0)
 
 #ifdef CONFIG_SMP
   extern void synchronize_irq (unsigned int irq);

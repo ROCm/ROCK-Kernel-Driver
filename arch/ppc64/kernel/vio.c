@@ -29,6 +29,8 @@
 
 #define DBGENTER() pr_debug("%s entered\n", __FUNCTION__)
 
+extern struct subsystem devices_subsys; /* needed for vio_find_name() */
+
 struct iommu_table *vio_build_iommu_table(struct vio_dev *dev);
 
 static int vio_num_address_cells;
@@ -157,8 +159,7 @@ static int __init vio_bus_init(void)
 
 	node_vroot = find_devices("vdevice");
 	if ((node_vroot == NULL) || (node_vroot->child == NULL)) {
-		printk(KERN_INFO "VIO: missing or empty /vdevice node; no virtual IO"
-			" devices present.\n");
+		/* this machine doesn't do virtual IO, and that's ok */
 		return 0;
 	}
 
@@ -260,7 +261,7 @@ struct vio_dev * __devinit vio_register_device(struct device_node *of_node)
 	/* init generic 'struct device' fields: */
 	viodev->dev.parent = &vio_bus_device->dev;
 	viodev->dev.bus = &vio_bus_type;
-	snprintf(viodev->dev.bus_id, BUS_ID_SIZE, "%lx", viodev->unit_address);
+	snprintf(viodev->dev.bus_id, BUS_ID_SIZE, "%x", viodev->unit_address);
 	viodev->dev.release = vio_dev_release;
 
 	/* register with generic device framework */
@@ -298,6 +299,42 @@ const void * vio_get_attribute(struct vio_dev *vdev, void* which, int* length)
 	return get_property((struct device_node *)vdev->archdata, (char*)which, length);
 }
 EXPORT_SYMBOL(vio_get_attribute);
+
+/* vio_find_name() - internal because only vio.c knows how we formatted the
+ * kobject name
+ * XXX once vio_bus_type.devices is actually used as a kset in
+ * drivers/base/bus.c, this function should be removed in favor of
+ * "device_find(kobj_name, &vio_bus_type)"
+ */
+static struct vio_dev *vio_find_name(const char *kobj_name)
+{
+	struct kobject *found;
+
+	found = kset_find_obj(&devices_subsys.kset, kobj_name);
+	if (!found)
+		return NULL;
+
+	return to_vio_dev(container_of(found, struct device, kobj));
+}
+
+/**
+ * vio_find_node - find an already-registered vio_dev
+ * @vnode: device_node of the virtual device we're looking for
+ */
+struct vio_dev *vio_find_node(struct device_node *vnode)
+{
+	uint32_t *unit_address;
+	char kobj_name[BUS_ID_SIZE];
+
+	/* construct the kobject name from the device node */
+	unit_address = (uint32_t *)get_property(vnode, "reg", NULL);
+	if (!unit_address)
+		return NULL;
+	snprintf(kobj_name, BUS_ID_SIZE, "%x", *unit_address);
+
+	return vio_find_name(kobj_name);
+}
+EXPORT_SYMBOL(vio_find_node);
 
 /**
  * vio_build_iommu_table: - gets the dma information from OF and builds the TCE tree.
@@ -395,7 +432,7 @@ dma_addr_t vio_map_single(struct vio_dev *dev, void *vaddr,
 	tbl = dev->iommu_table;
 
 	if (tbl) {
-		dma_handle = iommu_alloc(tbl, vaddr, npages, direction, NULL);
+		dma_handle = iommu_alloc(tbl, vaddr, npages, direction);
 		dma_handle |= (uaddr & ~PAGE_MASK);
 	}
 
@@ -424,7 +461,6 @@ int vio_map_sg(struct vio_dev *vdev, struct scatterlist *sglist, int nelems,
 	       int direction)
 {
 	struct iommu_table *tbl;
-	unsigned long handle;
 
 	BUG_ON(direction == PCI_DMA_NONE);
 
@@ -435,7 +471,7 @@ int vio_map_sg(struct vio_dev *vdev, struct scatterlist *sglist, int nelems,
 	if (!tbl)
 		return 0;
 
-	return iommu_alloc_sg(tbl, sglist, nelems, direction, &handle);
+	return iommu_alloc_sg(tbl, &vdev->dev, sglist, nelems, direction);
 }
 EXPORT_SYMBOL(vio_map_sg);
 
@@ -448,7 +484,7 @@ void vio_unmap_sg(struct vio_dev *vdev, struct scatterlist *sglist, int nelems,
 
 	tbl = vdev->iommu_table;
 	if (tbl)
-		iommu_free_sg(tbl, sglist, nelems, direction);
+		iommu_free_sg(tbl, sglist, nelems);
 }
 EXPORT_SYMBOL(vio_unmap_sg);
 
@@ -480,7 +516,7 @@ void *vio_alloc_consistent(struct vio_dev *dev, size_t size,
 			/* Page allocation succeeded */
 			memset(ret, 0, npages << PAGE_SHIFT);
 			/* Set up tces to cover the allocated range */
-			tce = iommu_alloc(tbl, ret, npages, PCI_DMA_BIDIRECTIONAL, NULL);
+			tce = iommu_alloc(tbl, ret, npages, PCI_DMA_BIDIRECTIONAL);
 			if (tce == NO_TCE) {
 				PPCDBG(PPCDBG_TCE, "vio_alloc_consistent: iommu_alloc failed\n" );
 				free_pages((unsigned long)ret, order);
@@ -544,5 +580,4 @@ struct bus_type vio_bus_type = {
 	.match = vio_bus_match,
 };
 
-EXPORT_SYMBOL(plpar_hcall_norets);
-EXPORT_SYMBOL(plpar_hcall_8arg_2ret);
+EXPORT_SYMBOL(vio_bus_type);

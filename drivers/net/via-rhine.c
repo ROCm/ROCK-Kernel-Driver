@@ -615,6 +615,15 @@ static void __devinit reload_eeprom(long ioaddr)
 			break;
 }
 
+#ifdef CONFIG_NET_POLL_CONTROLLER
+static void via_rhine_poll(struct net_device *dev)
+{
+	disable_irq(dev->irq);
+	via_rhine_interrupt(dev->irq, (void *)dev, NULL);
+	enable_irq(dev->irq);
+}
+#endif
+
 static int __devinit via_rhine_init_one (struct pci_dev *pdev,
 					 const struct pci_device_id *ent)
 {
@@ -784,6 +793,9 @@ static int __devinit via_rhine_init_one (struct pci_dev *pdev,
 	dev->ethtool_ops = &netdev_ethtool_ops;
 	dev->tx_timeout = via_rhine_tx_timeout;
 	dev->watchdog_timeo = TX_TIMEOUT;
+#ifdef CONFIG_NET_POLL_CONTROLLER
+	dev->poll_controller = via_rhine_poll;
+#endif
 	if (np->drv_flags & ReqTxAlign)
 		dev->features |= NETIF_F_SG|NETIF_F_HW_CSUM;
 
@@ -1524,7 +1536,7 @@ static void via_rhine_rx(struct net_device *dev)
 				(skb = dev_alloc_skb(pkt_len + 2)) != NULL) {
 				skb->dev = dev;
 				skb_reserve(skb, 2);	/* 16 byte align the IP header */
-				pci_dma_sync_single(np->pdev, np->rx_skbuff_dma[entry],
+				pci_dma_sync_single_for_cpu(np->pdev, np->rx_skbuff_dma[entry],
 						    np->rx_buf_sz, PCI_DMA_FROMDEVICE);
 
 				/* *_IP_COPYSUM isn't defined anywhere and eth_copy_and_sum
@@ -1537,6 +1549,8 @@ static void via_rhine_rx(struct net_device *dev)
 				memcpy(skb_put(skb, pkt_len), np->rx_skbuff[entry]->tail,
 					   pkt_len);
 #endif
+				pci_dma_sync_single_for_device(np->pdev, np->rx_skbuff_dma[entry],
+						    np->rx_buf_sz, PCI_DMA_FROMDEVICE);
 			} else {
 				skb = np->rx_skbuff[entry];
 				if (skb == NULL) {

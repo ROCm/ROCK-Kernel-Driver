@@ -226,10 +226,14 @@
 #define AC97_GPIO_LINE2_HL1R    0x8000  /* Opt./ Handset to Line2 relay control (out) */
 
 /* specific - SigmaTel */
+#define AC97_SIGMATEL_OUTSEL	0x64	/* Output Select, STAC9758 */
+#define AC97_SIGMATEL_INSEL	0x66	/* Input Select, STAC9758 */
+#define AC97_SIGMATEL_IOMISC	0x68	/* STAC9758 */
 #define AC97_SIGMATEL_ANALOG	0x6c	/* Analog Special */
 #define AC97_SIGMATEL_DAC2INVERT 0x6e
 #define AC97_SIGMATEL_BIAS1	0x70
 #define AC97_SIGMATEL_BIAS2	0x72
+#define AC97_SIGMATEL_VARIOUS	0x72	/* STAC9758 */
 #define AC97_SIGMATEL_MULTICHN	0x74	/* Multi-Channel programming */
 #define AC97_SIGMATEL_CIC1	0x76
 #define AC97_SIGMATEL_CIC2	0x78
@@ -484,7 +488,8 @@ enum {
 	AC97_TUNE_HP_ONLY,	/* headphone (true line-out) control as master only */
 	AC97_TUNE_SWAP_HP,	/* swap headphone and master controls */
 	AC97_TUNE_SWAP_SURROUND, /* swap master and surround controls */
-	AC97_TUNE_AD_SHARING	/* for AD1985, turn on OMS bit and use headphone */
+	AC97_TUNE_AD_SHARING,	/* for AD1985, turn on OMS bit and use headphone */
+	AC97_TUNE_ALC_JACK,	/* for Realtek, enable JACK detection */
 };
 
 struct ac97_quirk {

@@ -67,6 +67,4 @@ extern int mf_getRtcTime(unsigned long *time);
 extern int mf_getRtc( struct rtc_time * tm );
 extern int mf_setRtc( struct rtc_time * tm );
 
-extern void mf_proc_init(struct proc_dir_entry *iSeries_proc);
-
 #endif /* MF_H_INCLUDED */

@@ -215,7 +215,7 @@ int videobuf_dma_pci_sync(struct pci_dev *dev, struct videobuf_dmabuf *dma)
 		BUG();
 
 	if (!dma->bus_addr)
-		pci_dma_sync_sg(dev,dma->sglist,dma->nr_pages,dma->direction);
+		pci_dma_sync_sg_for_cpu(dev,dma->sglist,dma->nr_pages,dma->direction);
 	return 0;
 }
 

@@ -50,6 +50,7 @@ typedef struct _snd_pcm_oss_runtime {
 	unsigned int maxfrags;
 	unsigned int subdivision;		/* requested subdivision */
 	size_t period_bytes;			/* requested period size */
+	size_t period_frames;			/* period frames for poll */
 	size_t period_ptr;			/* actual write pointer to period */
 	unsigned int periods;
 	size_t buffer_bytes;			/* requested buffer size */

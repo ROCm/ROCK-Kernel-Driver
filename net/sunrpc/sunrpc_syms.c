@@ -63,6 +63,8 @@ EXPORT_SYMBOL(rpc_mkpipe);
 EXPORT_SYMBOL(xprt_create_proto);
 EXPORT_SYMBOL(xprt_destroy);
 EXPORT_SYMBOL(xprt_set_timeout);
+EXPORT_SYMBOL(xprt_udp_slot_table_entries);
+EXPORT_SYMBOL(xprt_tcp_slot_table_entries);
 
 /* Client credential cache */
 EXPORT_SYMBOL(rpcauth_register);

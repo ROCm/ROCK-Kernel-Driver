@@ -441,7 +441,7 @@ static int __init el16_probe1(struct net_device *dev, int ioaddr)
 	if (net_debug)
 		printk(version);
 
-	lp = dev->priv;
+	lp = netdev_priv(dev);
  	memset(lp, 0, sizeof(*lp));
 	spin_lock_init(&lp->lock);
 
@@ -471,7 +471,7 @@ static int el16_open(struct net_device *dev)
 
 static void el16_tx_timeout (struct net_device *dev)
 {
-	struct net_local *lp = (struct net_local *) dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 	int ioaddr = dev->base_addr;
 	unsigned long shmem = dev->mem_start;
 
@@ -501,7 +501,7 @@ static void el16_tx_timeout (struct net_device *dev)
 
 static int el16_send_packet (struct sk_buff *skb, struct net_device *dev)
 {
-	struct net_local *lp = (struct net_local *) dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 	int ioaddr = dev->base_addr;
 	unsigned long flags;
 	short length = ETH_ZLEN < skb->len ? skb->len : ETH_ZLEN;
@@ -546,7 +546,7 @@ static irqreturn_t el16_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	}
 
 	ioaddr = dev->base_addr;
-	lp = (struct net_local *)dev->priv;
+	lp = netdev_priv(dev);
 	shmem = dev->mem_start;
 
 	spin_lock(&lp->lock);
@@ -660,7 +660,7 @@ static int el16_close(struct net_device *dev)
    closed. */
 static struct net_device_stats *el16_get_stats(struct net_device *dev)
 {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 
 	/* ToDo: decide if there are any useful statistics from the SCB. */
 
@@ -670,7 +670,7 @@ static struct net_device_stats *el16_get_stats(struct net_device *dev)
 /* Initialize the Rx-block list. */
 static void init_rx_bufs(struct net_device *dev)
 {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 	unsigned long write_ptr;
 	unsigned short SCB_base = SCB_BASE;
 
@@ -713,7 +713,7 @@ static void init_rx_bufs(struct net_device *dev)
 
 static void init_82586_mem(struct net_device *dev)
 {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 	short ioaddr = dev->base_addr;
 	unsigned long shmem = dev->mem_start;
 
@@ -771,7 +771,7 @@ static void init_82586_mem(struct net_device *dev)
 
 static void hardware_send_packet(struct net_device *dev, void *buf, short length, short pad)
 {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 	short ioaddr = dev->base_addr;
 	ushort tx_block = lp->tx_head;
 	unsigned long write_ptr = dev->mem_start + tx_block;
@@ -820,7 +820,7 @@ static void hardware_send_packet(struct net_device *dev, void *buf, short length
 
 static void el16_rx(struct net_device *dev)
 {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 	unsigned long shmem = dev->mem_start;
 	ushort rx_head = lp->rx_head;
 	ushort rx_tail = lp->rx_tail;

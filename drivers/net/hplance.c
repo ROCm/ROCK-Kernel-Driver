@@ -63,7 +63,7 @@ static struct hplance_private *root_hplance_dev;
 
 static void cleanup_card(struct net_device *dev)
 {
-        struct hplance_private *lp = dev->priv;
+        struct hplance_private *lp = netdev_priv(dev);
 	dio_unconfig_board(lp->scode);
 }
 
@@ -97,7 +97,7 @@ struct net_device * __init hplance_probe(int unit)
 		dio_config_board(scode);
                 hplance_init(dev, scode);
 		if (!register_netdev(dev)) {
-			struct hplance_private *lp = dev->priv;
+			struct hplance_private *lp = netdev_priv(dev);
 			lp->next_module = root_hplance_dev;
 			root_hplance_dev = lp;
 			return dev;
@@ -141,7 +141,7 @@ static void __init hplance_init(struct net_device *dev, int scode)
                 printk("%c%2.2x", i == 0 ? ' ' : ':', dev->dev_addr[i]);
         }
         
-        lp = (struct hplance_private *)dev->priv;
+        lp = netdev_priv(dev);
         lp->lance.name = (char*)name;                   /* discards const, shut up gcc */
         lp->lance.ll = (struct lance_regs *)(va + HPLANCE_REGOFF);
         lp->lance.init_block = (struct lance_init_block *)(va + HPLANCE_MEMOFF); /* CPU addr */
@@ -195,7 +195,7 @@ static unsigned short hplance_readrdp(void *priv)
 static int hplance_open(struct net_device *dev)
 {
         int status;
-        struct hplance_private *lp = (struct hplance_private *)dev->priv;
+        struct hplance_private *lp = netdev_priv(dev);
         struct hplance_reg *hpregs = (struct hplance_reg *)lp->base;
         
         status = lance_open(dev);                 /* call generic lance open code */
@@ -209,7 +209,7 @@ static int hplance_open(struct net_device *dev)
 
 static int hplance_close(struct net_device *dev)
 {
-        struct hplance_private *lp = (struct hplance_private *)dev->priv;
+        struct hplance_private *lp = netdev_priv(dev);
         struct hplance_reg *hpregs = (struct hplance_reg *)lp->base;
         out_8(&(hpregs->status), 8);              /* disable interrupts at boardlevel */
         lance_close(dev);

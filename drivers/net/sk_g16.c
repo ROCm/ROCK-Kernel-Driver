@@ -650,7 +650,7 @@ int __init SK_probe(struct net_device *dev, short ioaddr)
     int sk_addr_flag = 0;   /* SK ADDR correct? 1 - no, 0 - yes */
     unsigned int rom_addr;  /* used to store RAM address used for POS_ADDR */
 
-    struct priv *p = dev->priv;         /* SK_G16 private structure */
+    struct priv *p = netdev_priv(dev);	/* SK_G16 private structure */
 
     if (inb(SK_POS0) != SK_IDLOW || inb(SK_POS1) != SK_IDHIGH)
 	return -ENODEV;
@@ -869,7 +869,7 @@ static int SK_open(struct net_device *dev)
 
     int irqtab[] = SK_IRQS; 
 
-    struct priv *p = (struct priv *)dev->priv;
+    struct priv *p = netdev_priv(dev);
 
     PRINTK(("## %s: At beginning of SK_open(). CSR0: %#06x\n", 
            SK_NAME, SK_read_reg(CSR0)));
@@ -1023,7 +1023,7 @@ static int SK_lance_init(struct net_device *dev, unsigned short mode)
 {
     int i;
     unsigned long flags;
-    struct priv *p = (struct priv *) dev->priv; 
+    struct priv *p = netdev_priv(dev);
     struct tmd  *tmdp;
     struct rmd  *rmdp;
 
@@ -1196,7 +1196,7 @@ static void SK_timeout(struct net_device *dev)
 
 static int SK_send_packet(struct sk_buff *skb, struct net_device *dev)
 {
-    struct priv *p = (struct priv *) dev->priv;
+    struct priv *p = netdev_priv(dev);
     struct tmd *tmdp;
     static char pad[64];
 
@@ -1285,7 +1285,7 @@ static irqreturn_t SK_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 {
     int csr0;
     struct net_device *dev = dev_id;
-    struct priv *p = (struct priv *) dev->priv;
+    struct priv *p = netdev_priv(dev);
 
 
     PRINTK2(("## %s: SK_interrupt(). status: %#06x\n", 
@@ -1355,7 +1355,7 @@ static void SK_txintr(struct net_device *dev)
 {
     int tmdstat;
     struct tmd *tmdp;
-    struct priv *p = (struct priv *) dev->priv;
+    struct priv *p = netdev_priv(dev);
 
 
     PRINTK2(("## %s: SK_txintr() status: %#06x\n", 
@@ -1469,7 +1469,7 @@ static void SK_rxintr(struct net_device *dev)
 
     struct rmd *rmdp;
     int rmdstat;
-    struct priv *p = (struct priv *) dev->priv;
+    struct priv *p = netdev_priv(dev);
 
     PRINTK2(("## %s: SK_rxintr(). CSR0: %#06x\n", 
             SK_NAME, SK_read_reg(CSR0)));
@@ -1653,7 +1653,7 @@ static int SK_close(struct net_device *dev)
 static struct net_device_stats *SK_get_stats(struct net_device *dev)
 {
 
-    struct priv *p = (struct priv *) dev->priv;
+    struct priv *p = netdev_priv(dev);
 
     PRINTK(("## %s: SK_get_stats(). CSR0: %#06x\n", 
            SK_NAME, SK_read_reg(CSR0)));
@@ -2030,7 +2030,7 @@ void __init SK_print_ram(struct net_device *dev)
 {
 
     int i;    
-    struct priv *p = (struct priv *) dev->priv;
+    struct priv *p = netdev_priv(dev);
 
     printk("## %s: RAM Details.\n"
            "##   RAM at %#08x tmdhead: %#08x rmdhead: %#08x initblock: %#08x\n",

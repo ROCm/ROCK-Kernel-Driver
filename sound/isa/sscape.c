@@ -168,23 +168,20 @@ static inline struct soundscape *get_hwdep_soundscape(snd_hwdep_t * hw)
 }
 
 
-struct dmabuf {
-	size_t size;
-	unsigned char *data;
-	dma_addr_t addr;
-};
-
 /*
  * Allocates some kernel memory that we can use for DMA.
  * I think this means that the memory has to map to
  * contiguous pages of physical memory.
  */
-static struct dmabuf *get_dmabuf(struct dmabuf *buf, unsigned long s)
+static struct snd_dma_buffer *get_dmabuf(struct snd_dma_buffer *buf, unsigned long size)
 {
 	if (buf) {
-		buf->data = snd_malloc_isa_pages_fallback(s, &buf->addr, &buf->size);
-		if (!buf->data) {
-			snd_printk(KERN_ERR "sscape: Failed to allocate %lu bytes for DMA\n", s);
+		struct snd_dma_device dev;
+		memset(&dev, 0, sizeof(dev));
+		dev.type = SNDRV_DMA_TYPE_DEV;
+		dev.dev = snd_dma_isa_data();
+		if (snd_dma_alloc_pages_fallback(&dev, size, buf) < 0) {
+			snd_printk(KERN_ERR "sscape: Failed to allocate %lu bytes for DMA\n", size);
 			return NULL;
 		}
 	}
@@ -195,10 +192,15 @@ static struct dmabuf *get_dmabuf(struct dmabuf *buf, unsigned long s)
 /*
  * Release the DMA-able kernel memory ...
  */
-static void free_dmabuf(struct dmabuf *buf)
+static void free_dmabuf(struct snd_dma_buffer *buf)
 {
-	if (buf && buf->data)
-		snd_free_isa_pages(buf->size, buf->data, buf->addr);
+	if (buf && buf->area) {
+		struct snd_dma_device dev;
+		memset(&dev, 0, sizeof(dev));
+		dev.type = SNDRV_DMA_TYPE_DEV;
+		dev.dev = snd_dma_isa_data();
+		snd_dma_free_pages(&dev, buf);
+	}
 }
 
 
@@ -456,7 +458,7 @@ static int upload_dma_data(struct soundscape *s,
                            size_t size)
 {
 	unsigned long flags;
-	struct dmabuf dma;
+	struct snd_dma_buffer dma;
 	int ret;
 
 	if (!get_dmabuf(&dma, PAGE_ALIGN(size)))
@@ -500,8 +502,8 @@ static int upload_dma_data(struct soundscape *s,
 		 * comes from USERSPACE. We have already verified
 		 * the userspace pointer ...
 		 */
-		len = min(size, dma.size);
-		__copy_from_user(dma.data, data, len);
+		len = min(size, dma.bytes);
+		__copy_from_user(dma.area, data, len);
 		data += len;
 		size -= len;
 

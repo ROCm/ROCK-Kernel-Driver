@@ -482,11 +482,19 @@ fore200e_pca_dma_unmap(struct fore200e* fore200e, u32 dma_addr, int size, int di
 
 
 static void
-fore200e_pca_dma_sync(struct fore200e* fore200e, u32 dma_addr, int size, int direction)
+fore200e_pca_dma_sync_for_cpu(struct fore200e* fore200e, u32 dma_addr, int size, int direction)
 {
     DPRINTK(3, "PCI DVMA sync: dma_addr = 0x%08x, size = %d, direction = %d\n", dma_addr, size, direction);
 
-    pci_dma_sync_single((struct pci_dev*)fore200e->bus_dev, dma_addr, size, direction);
+    pci_dma_sync_single_for_cpu((struct pci_dev*)fore200e->bus_dev, dma_addr, size, direction);
+}
+
+static void
+fore200e_pca_dma_sync_for_device(struct fore200e* fore200e, u32 dma_addr, int size, int direction)
+{
+    DPRINTK(3, "PCI DVMA sync: dma_addr = 0x%08x, size = %d, direction = %d\n", dma_addr, size, direction);
+
+    pci_dma_sync_single_for_device((struct pci_dev*)fore200e->bus_dev, dma_addr, size, direction);
 }
 
 
@@ -761,11 +769,19 @@ fore200e_sba_dma_unmap(struct fore200e* fore200e, u32 dma_addr, int size, int di
 
 
 static void
-fore200e_sba_dma_sync(struct fore200e* fore200e, u32 dma_addr, int size, int direction)
+fore200e_sba_dma_sync_for_cpu(struct fore200e* fore200e, u32 dma_addr, int size, int direction)
 {
     DPRINTK(3, "SBUS DVMA sync: dma_addr = 0x%08x, size = %d, direction = %d\n", dma_addr, size, direction);
     
-    sbus_dma_sync_single((struct sbus_dev*)fore200e->bus_dev, dma_addr, size, direction);
+    sbus_dma_sync_single_for_cpu((struct sbus_dev*)fore200e->bus_dev, dma_addr, size, direction);
+}
+
+static void
+fore200e_sba_dma_sync_for_device(struct fore200e* fore200e, u32 dma_addr, int size, int direction)
+{
+    DPRINTK(3, "SBUS DVMA sync: dma_addr = 0x%08x, size = %d, direction = %d\n", dma_addr, size, direction);
+
+    sbus_dma_sync_single_for_device((struct sbus_dev*)fore200e->bus_dev, dma_addr, size, direction);
 }
 
 
@@ -1149,10 +1165,13 @@ fore200e_push_rpd(struct fore200e* fore200e, struct rpd* rpd)
 	/* rebuild rx buffer address from rsd handle */
 	buffer = FORE200E_HDL2BUF(rpd->rsd[ i ].handle);
 	
-	/* ensure DMA synchronisation */
-	fore200e->bus->dma_sync(fore200e, buffer->data.dma_addr, rpd->rsd[ i ].length, FORE200E_DMA_FROMDEVICE);
+	/* Make device DMA transfer visible to CPU.  */
+	fore200e->bus->dma_sync_for_cpu(fore200e, buffer->data.dma_addr, rpd->rsd[ i ].length, FORE200E_DMA_FROMDEVICE);
 	
 	memcpy(skb_put(skb, rpd->rsd[ i ].length), buffer->data.align_addr, rpd->rsd[ i ].length);
+
+	/* Now let the device get at it again.  */
+	fore200e->bus->dma_sync_for_device(fore200e, buffer->data.dma_addr, rpd->rsd[ i ].length, FORE200E_DMA_FROMDEVICE);
     }
     
     DPRINTK(3, "rx skb: len = %d, truesize = %d\n", skb->len, skb->truesize);
@@ -1584,8 +1603,9 @@ fore200e_send(struct atm_vcc *vcc, struct sk_buff *skb)
 
     tasklet_enable(&fore200e->tasklet);
 
-    /* ensure DMA synchronisation */
-    fore200e->bus->dma_sync(fore200e, tpd->tsd[ 0 ].buffer, tpd->tsd[ 0 ].length, FORE200E_DMA_TODEVICE);
+    /* The dma_map call above implies a dma_sync so the device can use it,
+     * thus no explicit dma_sync call is necessary here.
+     */
     
     DPRINTK(3, "tx on %d.%d.%d:%d, len = %u (%u)\n", 
 	    vcc->itf, vcc->vpi, vcc->vci, fore200e_atm2fore_aal(vcc->qos.aal),
@@ -2918,7 +2938,8 @@ static const struct fore200e_bus fore200e_bus[] = {
       fore200e_pca_write,
       fore200e_pca_dma_map,
       fore200e_pca_dma_unmap,
-      fore200e_pca_dma_sync,
+      fore200e_pca_dma_sync_for_cpu,
+      fore200e_pca_dma_sync_for_device,
       fore200e_pca_dma_chunk_alloc,
       fore200e_pca_dma_chunk_free,
       fore200e_pca_detect,
@@ -2940,7 +2961,8 @@ static const struct fore200e_bus fore200e_bus[] = {
       fore200e_sba_write,
       fore200e_sba_dma_map,
       fore200e_sba_dma_unmap,
-      fore200e_sba_dma_sync,
+      fore200e_sba_dma_sync_for_cpu,
+      fore200e_sba_dma_sync_for_device,
       fore200e_sba_dma_chunk_alloc,
       fore200e_sba_dma_chunk_free,
       fore200e_sba_detect, 

@@ -320,7 +320,7 @@ static struct parport_operations pp_mfc3_ops = {
 
 /* ----------- Initialisation code --------------------------------- */
 
-int __init parport_mfc3_init(void)
+static int __init parport_mfc3_init(void)
 {
 	struct parport *p;
 	int pias = 0;
@@ -360,7 +360,6 @@ int __init parport_mfc3_init(void)
 		this_port[pias++] = p;
 		printk(KERN_INFO "%s: Multiface III port using irq\n", p->name);
 		/* XXX: set operating mode */
-		parport_proc_register(p);
 
 		p->private_data = (void *)piabase;
 		parport_announce_port (p);
@@ -370,7 +369,7 @@ int __init parport_mfc3_init(void)
 		continue;
 
 	out_irq:
-		parport_unregister_port(p);
+		parport_put_port(p);
 	out_port:
 		release_mem_region(piabase, sizeof(struct pia));
 	}
@@ -378,20 +377,20 @@ int __init parport_mfc3_init(void)
 	return pias ? 0 : -ENODEV;
 }
 
-void __exit parport_mfc3_exit(void)
+static void __exit parport_mfc3_exit(void)
 {
 	int i;
 
 	for (i = 0; i < MAX_MFC; i++) {
 		if (!this_port[i])
 			continue;
+		parport_remove_port(this_port[i]);
 		if (!this_port[i]->irq != PARPORT_IRQ_NONE) {
 			if (--use_cnt == 0) 
 				free_irq(IRQ_AMIGA_PORTS, &pp_mfc3_ops);
 		}
-		parport_proc_unregister(this_port[i]);
-		parport_unregister_port(this_port[i]);
 		release_mem_region(ZTWO_PADDR(this_port[i]->private_data), sizeof(struct pia));
+		parport_put_port(this_port[i]);
 	}
 }
 
@@ -403,4 +402,3 @@ MODULE_LICENSE("GPL");
 
 module_init(parport_mfc3_init)
 module_exit(parport_mfc3_exit)
-

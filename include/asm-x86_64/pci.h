@@ -78,10 +78,18 @@ extern dma_addr_t swiotlb_map_single (struct device *hwdev, void *ptr, size_t si
 				      int dir);
 extern void swiotlb_unmap_single (struct device *hwdev, dma_addr_t dev_addr,
 				  size_t size, int dir);
-extern void swiotlb_sync_single (struct device *hwdev, dma_addr_t dev_addr, 
-				 size_t size, int dir);
-extern void swiotlb_sync_sg (struct device *hwdev, struct scatterlist *sg, int nelems, 
-			     int dir);
+extern void swiotlb_sync_single_for_cpu (struct device *hwdev,
+					 dma_addr_t dev_addr,
+					 size_t size, int dir);
+extern void swiotlb_sync_single_for_device (struct device *hwdev,
+					    dma_addr_t dev_addr,
+					    size_t size, int dir);
+extern void swiotlb_sync_sg_for_cpu (struct device *hwdev,
+				     struct scatterlist *sg, int nelems,
+				     int dir);
+extern void swiotlb_sync_sg_for_device (struct device *hwdev,
+					struct scatterlist *sg, int nelems,
+					int dir);
 extern int swiotlb_map_sg(struct device *hwdev, struct scatterlist *sg,
 		      int nents, int direction);
 extern void swiotlb_unmap_sg(struct device *hwdev, struct scatterlist *sg,
@@ -95,7 +103,7 @@ extern void swiotlb_unmap_sg(struct device *hwdev, struct scatterlist *sg,
  * The 32-bit bus address to use is returned.
  *
  * Once the device is given the dma address, the device owns this memory
- * until either pci_unmap_single or pci_dma_sync_single is performed.
+ * until either pci_unmap_single or pci_dma_sync_single_for_cpu is performed.
  */
 extern dma_addr_t pci_map_single(struct pci_dev *hwdev, void *ptr, size_t size, 
 				 int direction);
@@ -125,29 +133,56 @@ void pci_unmap_single(struct pci_dev *hwdev, dma_addr_t addr,
 #define pci_unmap_len_set(PTR, LEN_NAME, VAL)		\
 	(((PTR)->LEN_NAME) = (VAL))
 
-static inline void pci_dma_sync_single(struct pci_dev *hwdev, 
-				       dma_addr_t dma_handle,
-				       size_t size, int direction)
+static inline void pci_dma_sync_single_for_cpu(struct pci_dev *hwdev,
+					       dma_addr_t dma_handle,
+					       size_t size, int direction)
 {
 	BUG_ON(direction == PCI_DMA_NONE); 
 
 #ifdef CONFIG_SWIOTLB
 	if (swiotlb)
-		return swiotlb_sync_single(&hwdev->dev,dma_handle,size,direction);
+		return swiotlb_sync_single_for_cpu(&hwdev->dev,dma_handle,size,direction);
 #endif
 
 	flush_write_buffers();
 } 
 
-static inline void pci_dma_sync_sg(struct pci_dev *hwdev, 
-				   struct scatterlist *sg,
-				   int nelems, int direction)
+static inline void pci_dma_sync_single_for_device(struct pci_dev *hwdev,
+						  dma_addr_t dma_handle,
+						  size_t size, int direction)
+{
+	BUG_ON(direction == PCI_DMA_NONE);
+
+#ifdef CONFIG_SWIOTLB
+	if (swiotlb)
+		return swiotlb_sync_single_for_device(&hwdev->dev,dma_handle,size,direction);
+#endif
+
+	flush_write_buffers();
+}
+
+static inline void pci_dma_sync_sg_for_cpu(struct pci_dev *hwdev,
+					   struct scatterlist *sg,
+					   int nelems, int direction)
+{
+	BUG_ON(direction == PCI_DMA_NONE);
+
+#ifdef CONFIG_SWIOTLB
+	if (swiotlb)
+		return swiotlb_sync_sg_for_cpu(&hwdev->dev,sg,nelems,direction);
+#endif
+	flush_write_buffers();
+}
+
+static inline void pci_dma_sync_sg_for_device(struct pci_dev *hwdev,
+					      struct scatterlist *sg,
+					      int nelems, int direction)
 { 
 	BUG_ON(direction == PCI_DMA_NONE); 
 
 #ifdef CONFIG_SWIOTLB
 	if (swiotlb)
-		return swiotlb_sync_sg(&hwdev->dev,sg,nelems,direction);
+		return swiotlb_sync_sg_for_device(&hwdev->dev,sg,nelems,direction);
 #endif
 	flush_write_buffers();
 } 
@@ -218,12 +253,21 @@ static inline dma_addr_t pci_map_page(struct pci_dev *hwdev, struct page *page,
  * If you perform a pci_map_single() but wish to interrogate the
  * buffer using the cpu, yet do not wish to teardown the PCI dma
  * mapping, you must call this function before doing so.  At the
- * next point you give the PCI dma address back to the card, the
+ * next point you give the PCI dma address back to the card, you
+ * must first perform a pci_dma_sync_for_device, and then the
  * device again owns the buffer.
  */
-static inline void pci_dma_sync_single(struct pci_dev *hwdev,
-				       dma_addr_t dma_handle,
-				       size_t size, int direction)
+static inline void pci_dma_sync_single_for_cpu(struct pci_dev *hwdev,
+					       dma_addr_t dma_handle,
+					       size_t size, int direction)
+{
+	if (direction == PCI_DMA_NONE)
+		out_of_line_bug();
+}
+
+static inline void pci_dma_sync_single_for_device(struct pci_dev *hwdev,
+						  dma_addr_t dma_handle,
+						  size_t size, int direction)
 {
 	if (direction == PCI_DMA_NONE)
 		out_of_line_bug();
@@ -233,12 +277,20 @@ static inline void pci_dma_sync_single(struct pci_dev *hwdev,
 /* Make physical memory consistent for a set of streaming
  * mode DMA translations after a transfer.
  *
- * The same as pci_dma_sync_single but for a scatter-gather list,
+ * The same as pci_dma_sync_single_* but for a scatter-gather list,
  * same rules and usage.
  */
-static inline void pci_dma_sync_sg(struct pci_dev *hwdev,
-				   struct scatterlist *sg,
-				   int nelems, int direction)
+static inline void pci_dma_sync_sg_for_cpu(struct pci_dev *hwdev,
+					   struct scatterlist *sg,
+					   int nelems, int direction)
+{
+	if (direction == PCI_DMA_NONE)
+		out_of_line_bug();
+}
+
+static inline void pci_dma_sync_sg_for_device(struct pci_dev *hwdev,
+					      struct scatterlist *sg,
+					      int nelems, int direction)
 {
 	if (direction == PCI_DMA_NONE)
 		out_of_line_bug();
@@ -264,27 +316,32 @@ extern void pci_unmap_sg(struct pci_dev *hwdev, struct scatterlist *sg,
  */
 extern int pci_dma_supported(struct pci_dev *hwdev, u64 mask);
 
-static __inline__ dma64_addr_t
+static inline dma64_addr_t
 pci_dac_page_to_dma(struct pci_dev *pdev, struct page *page, unsigned long offset, int direction)
 {
 	return ((dma64_addr_t) page_to_phys(page) +
 		(dma64_addr_t) offset);
 }
 
-static __inline__ struct page *
+static inline struct page *
 pci_dac_dma_to_page(struct pci_dev *pdev, dma64_addr_t dma_addr)
 {
 	return virt_to_page(__va(dma_addr)); 	
 }
 
-static __inline__ unsigned long
+static inline unsigned long
 pci_dac_dma_to_offset(struct pci_dev *pdev, dma64_addr_t dma_addr)
 {
 	return (dma_addr & ~PAGE_MASK);
 }
 
-static __inline__ void
-pci_dac_dma_sync_single(struct pci_dev *pdev, dma64_addr_t dma_addr, size_t len, int direction)
+static inline void
+pci_dac_dma_sync_single_for_cpu(struct pci_dev *pdev, dma64_addr_t dma_addr, size_t len, int direction)
+{
+}
+
+static inline void
+pci_dac_dma_sync_single_for_device(struct pci_dev *pdev, dma64_addr_t dma_addr, size_t len, int direction)
 {
 	flush_write_buffers();
 }

@@ -1699,6 +1699,8 @@ void locks_remove_posix(struct file *filp, fl_owner_t owner)
 	unlock_kernel();
 }
 
+EXPORT_SYMBOL(locks_remove_posix);
+
 /*
  * This function is called on the last close of an open file.
  */

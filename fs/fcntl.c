@@ -19,7 +19,7 @@
 #include <asm/siginfo.h>
 #include <asm/uaccess.h>
 
-void set_close_on_exec(unsigned int fd, int flag)
+void fastcall set_close_on_exec(unsigned int fd, int flag)
 {
 	struct files_struct *files = current->files;
 	spin_lock(&files->file_lock);
@@ -293,11 +293,11 @@ static long do_fcntl(unsigned int fd, unsigned int cmd,
 			err = dupfd(filp, arg);
 			break;
 		case F_GETFD:
-			err = get_close_on_exec(fd);
+			err = get_close_on_exec(fd) ? FD_CLOEXEC : 0;
 			break;
 		case F_SETFD:
 			err = 0;
-			set_close_on_exec(fd, arg&1);
+			set_close_on_exec(fd, arg & FD_CLOEXEC);
 			break;
 		case F_GETFL:
 			err = filp->f_flags;

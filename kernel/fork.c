@@ -91,7 +91,7 @@ void __put_task_struct(struct task_struct *tsk)
 	free_task(tsk);
 }
 
-void add_wait_queue(wait_queue_head_t *q, wait_queue_t * wait)
+void fastcall add_wait_queue(wait_queue_head_t *q, wait_queue_t * wait)
 {
 	unsigned long flags;
 
@@ -103,7 +103,7 @@ void add_wait_queue(wait_queue_head_t *q, wait_queue_t * wait)
 
 EXPORT_SYMBOL(add_wait_queue);
 
-void add_wait_queue_exclusive(wait_queue_head_t *q, wait_queue_t * wait)
+void fastcall add_wait_queue_exclusive(wait_queue_head_t *q, wait_queue_t * wait)
 {
 	unsigned long flags;
 
@@ -115,7 +115,7 @@ void add_wait_queue_exclusive(wait_queue_head_t *q, wait_queue_t * wait)
 
 EXPORT_SYMBOL(add_wait_queue_exclusive);
 
-void remove_wait_queue(wait_queue_head_t *q, wait_queue_t * wait)
+void fastcall remove_wait_queue(wait_queue_head_t *q, wait_queue_t * wait)
 {
 	unsigned long flags;
 
@@ -139,7 +139,7 @@ EXPORT_SYMBOL(remove_wait_queue);
  * stops them from bleeding out - it would still allow subsequent
  * loads to move into the the critical region).
  */
-void prepare_to_wait(wait_queue_head_t *q, wait_queue_t *wait, int state)
+void fastcall prepare_to_wait(wait_queue_head_t *q, wait_queue_t *wait, int state)
 {
 	unsigned long flags;
 
@@ -153,7 +153,7 @@ void prepare_to_wait(wait_queue_head_t *q, wait_queue_t *wait, int state)
 
 EXPORT_SYMBOL(prepare_to_wait);
 
-void
+void fastcall
 prepare_to_wait_exclusive(wait_queue_head_t *q, wait_queue_t *wait, int state)
 {
 	unsigned long flags;
@@ -168,7 +168,7 @@ prepare_to_wait_exclusive(wait_queue_head_t *q, wait_queue_t *wait, int state)
 
 EXPORT_SYMBOL(prepare_to_wait_exclusive);
 
-void finish_wait(wait_queue_head_t *q, wait_queue_t *wait)
+void fastcall finish_wait(wait_queue_head_t *q, wait_queue_t *wait)
 {
 	unsigned long flags;
 
@@ -265,6 +265,7 @@ static struct task_struct *dup_task_struct(struct task_struct *orig)
 static inline int dup_mmap(struct mm_struct * mm, struct mm_struct * oldmm)
 {
 	struct vm_area_struct * mpnt, *tmp, **pprev;
+	struct rb_node **rb_link, *rb_parent;
 	int retval;
 	unsigned long charge = 0;
 
@@ -277,6 +278,9 @@ static inline int dup_mmap(struct mm_struct * mm, struct mm_struct * oldmm)
 	mm->map_count = 0;
 	mm->rss = 0;
 	cpus_clear(mm->cpu_vm_mask);
+	mm->mm_rb = RB_ROOT;
+	rb_link = &mm->mm_rb.rb_node;
+	rb_parent = NULL;
 	pprev = &mm->mmap;
 
 	/*
@@ -324,11 +328,17 @@ static inline int dup_mmap(struct mm_struct * mm, struct mm_struct * oldmm)
 
 		/*
 		 * Link in the new vma and copy the page table entries:
-		 * link in first so that swapoff can see swap entries.
+		 * link in first so that swapoff can see swap entries,
+		 * and try_to_unmap_one's find_vma find the new vma.
 		 */
 		spin_lock(&mm->page_table_lock);
 		*pprev = tmp;
 		pprev = &tmp->vm_next;
+
+		__vma_link_rb(mm, tmp, rb_link, rb_parent);
+		rb_link = &tmp->vm_rb.rb_right;
+		rb_parent = &tmp->vm_rb;
+
 		mm->map_count++;
 		retval = copy_page_range(mm, current->mm, tmp);
 		spin_unlock(&mm->page_table_lock);
@@ -340,7 +350,6 @@ static inline int dup_mmap(struct mm_struct * mm, struct mm_struct * oldmm)
 			goto fail;
 	}
 	retval = 0;
-	build_mmap_rb(mm);
 
 out:
 	flush_tlb_mm(current->mm);
@@ -418,7 +427,7 @@ struct mm_struct * mm_alloc(void)
  * is dropped: either by a lazy thread or by
  * mmput. Free the page directory and the mm.
  */
-void __mmdrop(struct mm_struct *mm)
+void fastcall __mmdrop(struct mm_struct *mm)
 {
 	BUG_ON(mm == &init_mm);
 	mm_free_pgd(mm);

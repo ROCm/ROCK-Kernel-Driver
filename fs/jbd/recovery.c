@@ -137,7 +137,10 @@ static int jread(struct buffer_head **bhp, journal_t *journal,
 
 	*bhp = NULL;
 
-	J_ASSERT (offset < journal->j_maxlen);
+	if (offset >= journal->j_maxlen) {
+		printk(KERN_ERR "JBD: corrupted journal superblock\n");
+		return -EIO;
+	}
 
 	err = journal_bmap(journal, offset, &blocknr);
 

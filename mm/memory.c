@@ -145,7 +145,7 @@ void clear_page_tables(struct mmu_gather *tlb, unsigned long first, int nr)
 	} while (--nr);
 }
 
-pte_t * pte_alloc_map(struct mm_struct *mm, pmd_t *pmd, unsigned long address)
+pte_t fastcall * pte_alloc_map(struct mm_struct *mm, pmd_t *pmd, unsigned long address)
 {
 	if (!pmd_present(*pmd)) {
 		struct page *new;
@@ -171,7 +171,7 @@ out:
 	return pte_offset_map(pmd, address);
 }
 
-pte_t * pte_alloc_kernel(struct mm_struct *mm, pmd_t *pmd, unsigned long address)
+pte_t fastcall * pte_alloc_kernel(struct mm_struct *mm, pmd_t *pmd, unsigned long address)
 {
 	if (!pmd_present(*pmd)) {
 		pte_t *new;
@@ -222,7 +222,7 @@ int copy_page_range(struct mm_struct *dst, struct mm_struct *src,
 	if (is_vm_hugetlb_page(vma))
 		return copy_hugetlb_page_range(dst, src, vma);
 
-	pte_chain = pte_chain_alloc(GFP_ATOMIC);
+	pte_chain = pte_chain_alloc(GFP_ATOMIC | __GFP_NOWARN);
 	if (!pte_chain) {
 		spin_unlock(&dst->page_table_lock);
 		pte_chain = pte_chain_alloc(GFP_KERNEL);
@@ -335,7 +335,7 @@ skip_copy_pte_range:
 							pte_chain);
 				if (pte_chain)
 					goto cont_copy_pte_range_noset;
-				pte_chain = pte_chain_alloc(GFP_ATOMIC);
+				pte_chain = pte_chain_alloc(GFP_ATOMIC | __GFP_NOWARN);
 				if (pte_chain)
 					goto cont_copy_pte_range_noset;
 
@@ -1336,7 +1336,7 @@ do_anonymous_page(struct mm_struct *mm, struct vm_area_struct *vma,
 	struct pte_chain *pte_chain;
 	int ret;
 
-	pte_chain = pte_chain_alloc(GFP_ATOMIC);
+	pte_chain = pte_chain_alloc(GFP_ATOMIC | __GFP_NOWARN);
 	if (!pte_chain) {
 		pte_unmap(page_table);
 		spin_unlock(&mm->page_table_lock);
@@ -1646,7 +1646,7 @@ int handle_mm_fault(struct mm_struct *mm, struct vm_area_struct * vma,
  * On a two-level page table, this ends up actually being entirely
  * optimized away.
  */
-pmd_t *__pmd_alloc(struct mm_struct *mm, pgd_t *pgd, unsigned long address)
+pmd_t fastcall *__pmd_alloc(struct mm_struct *mm, pgd_t *pgd, unsigned long address)
 {
 	pmd_t *new;
 

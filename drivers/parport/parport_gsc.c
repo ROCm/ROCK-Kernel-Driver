@@ -412,7 +412,6 @@ struct parport *__devinit parport_gsc_probe_port (unsigned long base,
 	}
 #undef printmode
 	printk("]\n");
-	parport_proc_register(p);
 
 	if (p->irq != PARPORT_IRQ_NONE) {
 		if (request_irq (p->irq, parport_gsc_interrupt,
@@ -477,25 +476,26 @@ static int __devinit parport_init_chip(struct parisc_device *dev)
 	return 0;
 }
 
-static void __devexit parport_remove_chip(struct parisc_device *dev)
+static int __devexit parport_remove_chip(struct parisc_device *dev)
 {
 	struct parport *p = dev->dev.driver_data;
 	if (p) {
 		struct parport_gsc_private *priv = p->private_data;
 		struct parport_operations *ops = p->ops;
+		parport_remove_port(p);
 		if (p->dma != PARPORT_DMA_NONE)
 			free_dma(p->dma);
 		if (p->irq != PARPORT_IRQ_NONE)
 			free_irq(p->irq, p);
-		parport_proc_unregister(p);
 		if (priv->dma_buf)
 			pci_free_consistent(priv->dev, PAGE_SIZE,
 					    priv->dma_buf,
 					    priv->dma_handle);
 		kfree (p->private_data);
-		parport_unregister_port(p);
+		parport_put_port(p);
 		kfree (ops); /* hope no-one cached it */
 	}
+	return 0;
 }
 
 static struct parisc_device_id parport_tbl[] = {
@@ -509,7 +509,7 @@ static struct parisc_driver parport_driver = {
 	.name		= "Parallel",
 	.id_table	= parport_tbl,
 	.probe		= parport_init_chip,
-	.remove		= parport_remove_chip,
+	.remove		= __devexit_p(parport_remove_chip),
 };
 
 int __devinit parport_gsc_init(void)

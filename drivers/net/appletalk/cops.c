@@ -333,7 +333,7 @@ static int __init cops_probe1(struct net_device *dev, int ioaddr)
 
 	dev->base_addr = ioaddr;
 
-        lp = (struct cops_local *)dev->priv;
+        lp = netdev_priv(dev);
         memset(lp, 0, sizeof(struct cops_local));
         spin_lock_init(&lp->lock);
 
@@ -422,7 +422,7 @@ static int __init cops_irq (int ioaddr, int board)
  */
 static int cops_open(struct net_device *dev)
 {
-    struct cops_local *lp = (struct cops_local *)dev->priv;
+    struct cops_local *lp = netdev_priv(dev);
 
 	if(dev->irq==0)
 	{
@@ -456,7 +456,7 @@ static int cops_open(struct net_device *dev)
  */
 static int cops_jumpstart(struct net_device *dev)
 {
-	struct cops_local *lp = (struct cops_local *)dev->priv;
+	struct cops_local *lp = netdev_priv(dev);
 
 	/*
          *      Once the card has the firmware loaded and has acquired
@@ -490,7 +490,7 @@ static void tangent_wait_reset(int ioaddr)
  */
 static void cops_reset(struct net_device *dev, int sleep)
 {
-        struct cops_local *lp = (struct cops_local *)dev->priv;
+        struct cops_local *lp = netdev_priv(dev);
         int ioaddr=dev->base_addr;
 
         if(lp->board==TANGENT)
@@ -525,7 +525,7 @@ static void cops_load (struct net_device *dev)
 {
         struct ifreq ifr;
         struct ltfirmware *ltf= (struct ltfirmware *)&ifr.ifr_data;
-        struct cops_local *lp=(struct cops_local *)dev->priv;
+        struct cops_local *lp = netdev_priv(dev);
         int ioaddr=dev->base_addr;
 	int length, i = 0;
 
@@ -618,7 +618,7 @@ static void cops_load (struct net_device *dev)
  */
 static int cops_nodeid (struct net_device *dev, int nodeid)
 {
-	struct cops_local *lp = (struct cops_local *) dev->priv;
+	struct cops_local *lp = netdev_priv(dev);
 	int ioaddr = dev->base_addr;
 
 	if(lp->board == DAYNA)
@@ -730,7 +730,7 @@ static irqreturn_t cops_interrupt(int irq, void *dev_id, struct pt_regs * regs)
         int boguscount = 0;
 
         ioaddr = dev->base_addr;
-        lp = (struct cops_local *)dev->priv;
+        lp = netdev_priv(dev);
 
 	if(lp->board==DAYNA)
 	{
@@ -765,7 +765,7 @@ static void cops_rx(struct net_device *dev)
         int pkt_len = 0;
         int rsp_type = 0;
         struct sk_buff *skb = NULL;
-        struct cops_local *lp = dev->priv;
+        struct cops_local *lp = netdev_priv(dev);
         int ioaddr = dev->base_addr;
         int boguscount = 0;
         unsigned long flags;
@@ -869,7 +869,7 @@ static void cops_rx(struct net_device *dev)
 
 static void cops_timeout(struct net_device *dev)
 {
-        struct cops_local *lp = (struct cops_local *)dev->priv;
+        struct cops_local *lp = netdev_priv(dev);
         int ioaddr = dev->base_addr;
 
 	lp->stats.tx_errors++;
@@ -891,7 +891,7 @@ static void cops_timeout(struct net_device *dev)
 
 static int cops_send_packet(struct sk_buff *skb, struct net_device *dev)
 {
-        struct cops_local *lp = (struct cops_local *)dev->priv;
+        struct cops_local *lp = netdev_priv(dev);
         int ioaddr = dev->base_addr;
         unsigned long flags;
 
@@ -966,7 +966,7 @@ static int cops_hard_header(struct sk_buff *skb, struct net_device *dev,
  
 static int cops_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
-        struct cops_local *lp = (struct cops_local *)dev->priv;
+        struct cops_local *lp = netdev_priv(dev);
         struct sockaddr_at *sa = (struct sockaddr_at *)&ifr->ifr_addr;
         struct atalk_addr *aa = (struct atalk_addr *)&lp->node_addr;
 
@@ -1002,7 +1002,7 @@ static int cops_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
  
 static int cops_close(struct net_device *dev)
 {
-	struct cops_local *lp = (struct cops_local *)dev->priv;
+	struct cops_local *lp = netdev_priv(dev);
 
 	/* If we were running polled, yank the timer.
 	 */
@@ -1019,7 +1019,7 @@ static int cops_close(struct net_device *dev)
  */
 static struct net_device_stats *cops_get_stats(struct net_device *dev)
 {
-        struct cops_local *lp = (struct cops_local *)dev->priv;
+        struct cops_local *lp = netdev_priv(dev);
         return &lp->stats;
 }
 

@@ -158,7 +158,7 @@
 
 
 #define DRV_NAME		"e100"
-#define DRV_VERSION		"3.0.15"
+#define DRV_VERSION		"3.0.17"
 #define DRV_DESCRIPTION		"Intel(R) PRO/100 Network Driver"
 #define DRV_COPYRIGHT		"Copyright(c) 1999-2004 Intel Corporation"
 #define PFX			DRV_NAME ": "
@@ -1032,8 +1032,9 @@ static int e100_phy_init(struct nic *nic)
 	nic->phy = (u32)id_hi << 16 | (u32)id_lo;
 	DPRINTK(HW, DEBUG, "phy ID = 0x%08X\n", nic->phy);
 
-	/* Handle National tx phy */
-	if(nic->phy == phy_nsc_tx) {
+	/* Handle National tx phys */
+#define NCS_PHY_MODEL_MASK	0xFFF0FFFF
+	if((nic->phy & NCS_PHY_MODEL_MASK) == phy_nsc_tx) {
 		/* Disable congestion control */
 		cong = mdio_read(netdev, nic->mii.phy_id, MII_NSC_CONG);
 		cong |= NSC_CONG_TXREADY;
@@ -1284,6 +1285,7 @@ static inline int e100_tx_clean(struct nic *nic)
 				le16_to_cpu(cb->u.tcb.tbd.size),
 				PCI_DMA_TODEVICE);
 			dev_kfree_skb_any(cb->skb);
+			cb->skb = NULL;
 			tx_cleaned = 1;
 		}
 		cb->status = 0;
@@ -1346,6 +1348,7 @@ static int e100_alloc_cbs(struct nic *nic)
 		cb->dma_addr = nic->cbs_dma_addr + i * sizeof(struct cb);
 		cb->link = cpu_to_le32(nic->cbs_dma_addr +
 			((i+1) % count) * sizeof(struct cb));
+		cb->skb = NULL;
 	}
 
 	nic->cb_to_use = nic->cb_to_send = nic->cb_to_clean = nic->cbs;
@@ -1386,8 +1389,8 @@ static inline int e100_rx_alloc_skb(struct nic *nic, struct rx *rx)
 			(u32 *)&prev_rfd->link);
 		wmb();
 		prev_rfd->command &= ~cpu_to_le16(cb_el);
-		pci_dma_sync_single(nic->pdev, rx->prev->dma_addr,
-			sizeof(struct rfd), PCI_DMA_TODEVICE);
+		pci_dma_sync_single_for_device(nic->pdev, rx->prev->dma_addr,
+					       sizeof(struct rfd), PCI_DMA_TODEVICE);
 	}
 
 	return 0;
@@ -1404,8 +1407,8 @@ static inline int e100_rx_indicate(struct nic *nic, struct rx *rx,
 		return -EAGAIN;
 
 	/* Need to sync before taking a peek at cb_complete bit */
-	pci_dma_sync_single(nic->pdev, rx->dma_addr,
-		sizeof(struct rfd), PCI_DMA_FROMDEVICE);
+	pci_dma_sync_single_for_cpu(nic->pdev, rx->dma_addr,
+				    sizeof(struct rfd), PCI_DMA_FROMDEVICE);
 	rfd_status = le16_to_cpu(rfd->status);
 
 	DPRINTK(RX_STATUS, DEBUG, "status=0x%04X\n", rfd_status);
@@ -1420,11 +1423,8 @@ static inline int e100_rx_indicate(struct nic *nic, struct rx *rx,
 		actual_size = RFD_BUF_LEN - sizeof(struct rfd);
 
 	/* Get data */
-	pci_dma_sync_single(nic->pdev, rx->dma_addr,
-		sizeof(struct rfd) + actual_size,
-		PCI_DMA_FROMDEVICE);
 	pci_unmap_single(nic->pdev, rx->dma_addr,
-		RFD_BUF_LEN, PCI_DMA_FROMDEVICE);
+			 RFD_BUF_LEN, PCI_DMA_FROMDEVICE);
 
 	/* Pull off the RFD and put the actual data (minus eth hdr) */
 	skb_reserve(skb, sizeof(struct rfd));

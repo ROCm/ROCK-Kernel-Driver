@@ -104,8 +104,7 @@ static struct kobj_type hotplug_slot_ktype = {
 	.release = &hotplug_slot_release,
 };
 
-decl_subsys(pci_hotplug_slots, &hotplug_slot_ktype, NULL);
-
+decl_subsys_name(pci_hotplug_slots, slots, &hotplug_slot_ktype, NULL);
 
 /* these strings match up with the values in pci_bus_speed */
 static char *pci_bus_speed_strings[] = {
@@ -281,7 +280,7 @@ exit:
 }
 
 static struct hotplug_slot_attribute hotplug_slot_attr_latch = {
-	.attr = {.name = "latch", .mode = S_IFREG | S_IRUGO | S_IWUSR},
+	.attr = {.name = "latch", .mode = S_IFREG | S_IRUGO},
 	.show = latch_read_file,
 };
 
@@ -300,7 +299,7 @@ exit:
 }
 
 static struct hotplug_slot_attribute hotplug_slot_attr_presence = {
-	.attr = {.name = "adapter", .mode = S_IFREG | S_IRUGO | S_IWUSR},
+	.attr = {.name = "adapter", .mode = S_IFREG | S_IRUGO},
 	.show = presence_read_file,
 };
 
@@ -350,7 +349,7 @@ exit:
 }
 
 static struct hotplug_slot_attribute hotplug_slot_attr_max_bus_speed = {
-	.attr = {.name = "max_bus_speed", .mode = S_IFREG | S_IRUGO | S_IWUSR},
+	.attr = {.name = "max_bus_speed", .mode = S_IFREG | S_IRUGO},
 	.show = max_bus_speed_read_file,
 };
 
@@ -376,7 +375,7 @@ exit:
 }
 
 static struct hotplug_slot_attribute hotplug_slot_attr_cur_bus_speed = {
-	.attr = {.name = "cur_bus_speed", .mode = S_IFREG | S_IRUGO | S_IWUSR},
+	.attr = {.name = "cur_bus_speed", .mode = S_IFREG | S_IRUGO},
 	.show = cur_bus_speed_read_file,
 };
 

@@ -13,3 +13,4 @@ obj-$(CONFIG_NETFILTER) += netfilter.o
 obj-$(CONFIG_NET_DIVERT) += dv.o
 obj-$(CONFIG_NET_PKTGEN) += pktgen.o
 obj-$(CONFIG_NET_RADIO) += wireless.o
+obj-$(CONFIG_NETPOLL) += netpoll.o

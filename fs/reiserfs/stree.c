@@ -652,8 +652,8 @@ int search_by_key (struct super_block * p_s_sb,
                                        stop at leaf level - set to
                                        DISK_LEAF_NODE_LEVEL */
     ) {
-    int  n_block_number = SB_ROOT_BLOCK (p_s_sb),
-      expected_level = SB_TREE_HEIGHT (p_s_sb);
+    int  n_block_number;
+    int  expected_level;
     struct buffer_head  *       p_s_bh;
     struct path_element *       p_s_last_element;
     int				n_node_level, n_retval;
@@ -677,6 +677,8 @@ int search_by_key (struct super_block * p_s_sb,
     /* With each iteration of this loop we search through the items in the
        current node, and calculate the next current node(next path element)
        for the next iteration of this loop.. */
+    n_block_number = SB_ROOT_BLOCK (p_s_sb);
+    expected_level = -1;
     while ( 1 ) {
 
 #ifdef CONFIG_REISERFS_CHECK
@@ -690,7 +692,6 @@ int search_by_key (struct super_block * p_s_sb,
 	/* prep path to have another element added to it. */
 	p_s_last_element = PATH_OFFSET_PELEMENT(p_s_search_path, ++p_s_search_path->path_length);
 	fs_gen = get_generation (p_s_sb);
-	expected_level --;
 
 #ifdef SEARCH_BY_KEY_READA
 	/* schedule read of right neighbor */
@@ -705,25 +706,26 @@ int search_by_key (struct super_block * p_s_sb,
 	    pathrelse(p_s_search_path);
 	    return IO_ERROR;
 	}
-
- 	if( fs_changed (fs_gen, p_s_sb) ) {
- 		PROC_INFO_INC( p_s_sb, search_by_key_fs_changed );
- 		PROC_INFO_INC( p_s_sb, sbk_fs_changed[ expected_level - 1 ] );
- 	}
+	if (expected_level == -1)
+		expected_level = SB_TREE_HEIGHT (p_s_sb);
+	expected_level --;
 
 	/* It is possible that schedule occurred. We must check whether the key
 	   to search is still in the tree rooted from the current buffer. If
 	   not then repeat search from the root. */
 	if ( fs_changed (fs_gen, p_s_sb) && 
-	     (!B_IS_IN_TREE (p_s_bh) || !key_in_buffer(p_s_search_path, p_s_key, p_s_sb)) ) {
- 	    PROC_INFO_INC( p_s_sb, search_by_key_restarted );
+	    (!B_IS_IN_TREE (p_s_bh) ||
+	     B_LEVEL(p_s_bh) != expected_level ||
+	     !key_in_buffer(p_s_search_path, p_s_key, p_s_sb))) {
+	    PROC_INFO_INC( p_s_sb, search_by_key_fs_changed );
+	    PROC_INFO_INC( p_s_sb, search_by_key_restarted );
 	    PROC_INFO_INC( p_s_sb, sbk_restarted[ expected_level - 1 ] );
 	    decrement_counters_in_path(p_s_search_path);
 	    
 	    /* Get the root block number so that we can repeat the search
-               starting from the root. */
+	       starting from the root. */
 	    n_block_number = SB_ROOT_BLOCK (p_s_sb);
-	    expected_level = SB_TREE_HEIGHT (p_s_sb);
+	    expected_level = -1;
 	    right_neighbor_of_leaf_node = 0;
 	    
 	    /* repeat search from the root */
@@ -1103,6 +1105,7 @@ static char  prepare_for_delete_or_cut(
 	    for (n_counter = *p_n_removed;
 		 n_counter < n_unfm_number; n_counter++, p_n_unfm_pointer-- ) {
 
+		cond_resched();
 		if (item_moved (&s_ih, p_s_path)) {
 		    need_research = 1 ;
 		    break;
@@ -1754,7 +1757,7 @@ void reiserfs_do_truncate (struct reiserfs_transaction_handle *th,
 	  reiserfs_update_sd(th, p_s_inode) ;
 
 	  journal_end(th, p_s_inode->i_sb, orig_len_alloc) ;
-	  journal_begin(th, p_s_inode->i_sb, orig_len_alloc) ;
+	  journal_begin(th, p_s_inode->i_sb, JOURNAL_PER_BALANCE_CNT * 6) ;
 	  reiserfs_update_inode_transaction(p_s_inode) ;
 	}
     } while ( n_file_size > ROUND_UP (n_new_file_size) &&

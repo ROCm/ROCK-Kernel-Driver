@@ -399,6 +399,7 @@ int hfsplus_symlink(struct inode *dir, struct dentry *dentry, const char *symnam
 	res = hfsplus_create_cat(inode->i_ino, dir, &dentry->d_name, inode);
 
 	if (!res) {
+		dentry->d_fsdata = (void *)inode->i_ino;
 		d_instantiate(dentry, inode);
 		mark_inode_dirty(inode);
 	}
@@ -424,6 +425,7 @@ int hfsplus_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t rdev
 		return res;
 	}
 	init_special_inode(inode, mode, rdev);
+	dentry->d_fsdata = (void *)inode->i_ino;
 	d_instantiate(dentry, inode);
 	mark_inode_dirty(inode);
 

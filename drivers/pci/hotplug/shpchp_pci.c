@@ -101,7 +101,7 @@ int shpchp_unconfigure_device(struct pci_func* func)
  */
 int shpchp_set_irq (u8 bus_num, u8 dev_num, u8 int_pin, u8 irq_num)
 {
-#if !defined(CONFIG_X86_IO_APIC) && !defined(CONFIG_X86_64)
+#if defined(CONFIG_X86) && !defined(CONFIG_X86_IO_APIC) && !defined(CONFIG_X86_64)
 	int rc;
 	u16 temp_word;
 	struct pci_dev fakedev;

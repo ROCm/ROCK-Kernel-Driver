@@ -117,7 +117,7 @@ struct usb_ep_ops {
 	void (*free_buffer) (struct usb_ep *ep, void *buf, dma_addr_t dma,
 		unsigned bytes);
 	// NOTE:  on 2.5, drivers may also use dma_map() and
-	// dma_sync_single() to manage dma overhead. 
+	// dma_sync_single_*() to manage dma overhead.
 
 	int (*queue) (struct usb_ep *ep, struct usb_request *req,
 		int gfp_flags);
@@ -465,6 +465,8 @@ struct usb_gadget_ops {
  * 	driver setup() requests
  * @ep_list: List of other endpoints supported by the device.
  * @speed: Speed of current connection to USB host.
+ * @is_dualspeed: True if the controller supports both high and full speed
+ *	operation.  If it does, the gadget driver must also support both.
  * @name: Identifies the controller hardware type.  Used in diagnostics
  * 	and sometimes configuration.
  * @dev: Driver model state for this abstract device.
@@ -488,6 +490,7 @@ struct usb_gadget {
 	struct usb_ep			*ep0;
 	struct list_head		ep_list;	/* of usb_ep */
 	enum usb_device_speed		speed;
+	unsigned			is_dualspeed:1;
 	const char			*name;
 	struct device			dev;
 };
@@ -690,7 +693,7 @@ int usb_gadget_unregister_driver (struct usb_gadget_driver *driver);
 /**
  * struct usb_string - wraps a C string and its USB id
  * @id:the (nonzero) ID for this string
- * @s:the string, in ISO-8859/1 characters
+ * @s:the string, in UTF-8 encoding
  *
  * If you're using usb_gadget_get_string(), use this to wrap a string
  * together with its ID.
@@ -716,6 +719,17 @@ struct usb_gadget_strings {
 /* put descriptor for string with that id into buf (buflen >= 256) */
 int usb_gadget_get_string (struct usb_gadget_strings *table, int id, u8 *buf);
 
+/*-------------------------------------------------------------------------*/
+
+/* utility to simplify managing config descriptors */
+
+/* write vector of descriptors into buffer */
+int usb_descriptor_fillbuf(void *, unsigned,
+		const struct usb_descriptor_header **);
+
+/* build config descriptor from single descriptor vector */
+int usb_gadget_config_buf(const struct usb_config_descriptor *config,
+	void *buf, unsigned buflen, const struct usb_descriptor_header **desc);
 
 #endif  /* __KERNEL__ */
 

@@ -292,6 +292,15 @@ config BLK_DEV_NBD
 
 	  If unsure, say N.
 
+config BLK_DEV_CARMEL
+	tristate "Promise SATA SX8 (carmel) support"
+	depends on PCI
+	---help---
+	  Saying Y or M here will enable support for the 
+	  Promise SATA SX8 ("carmel") controllers.
+
+	  Use devices /dev/carmel/$N and /dev/carmel/$Np$M.
+
 config BLK_DEV_RAM
 	tristate "RAM disk support"
 	---help---
@@ -321,6 +330,7 @@ config BLK_DEV_RAM_SIZE
 
 config BLK_DEV_INITRD
 	bool "Initial RAM disk (initrd) support"
+	depends on BLK_DEV_RAM=y
 	help
 	  The initial RAM disk is a RAM disk that is loaded by the boot loader
 	  (loadlin or lilo) and that is mounted as root before the normal boot

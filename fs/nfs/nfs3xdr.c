@@ -33,51 +33,51 @@ extern int			nfs_stat_to_errno(int);
  * Declare the space requirements for NFS arguments and replies as
  * number of 32bit-words
  */
-#define NFS3_fhandle_sz		1+16
-#define NFS3_fh_sz		NFS3_fhandle_sz	/* shorthand */
-#define NFS3_sattr_sz		15
-#define NFS3_filename_sz	1+(NFS3_MAXNAMLEN>>2)
-#define NFS3_path_sz		1+(NFS3_MAXPATHLEN>>2)
-#define NFS3_fattr_sz		21
-#define NFS3_wcc_attr_sz		6
-#define NFS3_pre_op_attr_sz	1+NFS3_wcc_attr_sz
-#define NFS3_post_op_attr_sz	1+NFS3_fattr_sz
-#define NFS3_wcc_data_sz		NFS3_pre_op_attr_sz+NFS3_post_op_attr_sz
+#define NFS3_fhandle_sz		(1+16)
+#define NFS3_fh_sz		(NFS3_fhandle_sz)	/* shorthand */
+#define NFS3_sattr_sz		(15)
+#define NFS3_filename_sz	(1+(NFS3_MAXNAMLEN>>2))
+#define NFS3_path_sz		(1+(NFS3_MAXPATHLEN>>2))
+#define NFS3_fattr_sz		(21)
+#define NFS3_wcc_attr_sz		(6)
+#define NFS3_pre_op_attr_sz	(1+NFS3_wcc_attr_sz)
+#define NFS3_post_op_attr_sz	(1+NFS3_fattr_sz)
+#define NFS3_wcc_data_sz		(NFS3_pre_op_attr_sz+NFS3_post_op_attr_sz)
 #define NFS3_fsstat_sz		
 #define NFS3_fsinfo_sz		
 #define NFS3_pathconf_sz		
-#define NFS3_entry_sz		NFS3_filename_sz+3
+#define NFS3_entry_sz		(NFS3_filename_sz+3)
 
-#define NFS3_sattrargs_sz	NFS3_fh_sz+NFS3_sattr_sz+3
-#define NFS3_diropargs_sz	NFS3_fh_sz+NFS3_filename_sz
-#define NFS3_accessargs_sz	NFS3_fh_sz+1
-#define NFS3_readlinkargs_sz	NFS3_fh_sz
-#define NFS3_readargs_sz	NFS3_fh_sz+3
-#define NFS3_writeargs_sz	NFS3_fh_sz+5
-#define NFS3_createargs_sz	NFS3_diropargs_sz+NFS3_sattr_sz
-#define NFS3_mkdirargs_sz	NFS3_diropargs_sz+NFS3_sattr_sz
-#define NFS3_symlinkargs_sz	NFS3_diropargs_sz+NFS3_path_sz+NFS3_sattr_sz
-#define NFS3_mknodargs_sz	NFS3_diropargs_sz+2+NFS3_sattr_sz
-#define NFS3_renameargs_sz	NFS3_diropargs_sz+NFS3_diropargs_sz
-#define NFS3_linkargs_sz		NFS3_fh_sz+NFS3_diropargs_sz
-#define NFS3_readdirargs_sz	NFS3_fh_sz+2
-#define NFS3_commitargs_sz	NFS3_fh_sz+3
+#define NFS3_sattrargs_sz	(NFS3_fh_sz+NFS3_sattr_sz+3)
+#define NFS3_diropargs_sz	(NFS3_fh_sz+NFS3_filename_sz)
+#define NFS3_accessargs_sz	(NFS3_fh_sz+1)
+#define NFS3_readlinkargs_sz	(NFS3_fh_sz)
+#define NFS3_readargs_sz	(NFS3_fh_sz+3)
+#define NFS3_writeargs_sz	(NFS3_fh_sz+5)
+#define NFS3_createargs_sz	(NFS3_diropargs_sz+NFS3_sattr_sz)
+#define NFS3_mkdirargs_sz	(NFS3_diropargs_sz+NFS3_sattr_sz)
+#define NFS3_symlinkargs_sz	(NFS3_diropargs_sz+NFS3_path_sz+NFS3_sattr_sz)
+#define NFS3_mknodargs_sz	(NFS3_diropargs_sz+2+NFS3_sattr_sz)
+#define NFS3_renameargs_sz	(NFS3_diropargs_sz+NFS3_diropargs_sz)
+#define NFS3_linkargs_sz		(NFS3_fh_sz+NFS3_diropargs_sz)
+#define NFS3_readdirargs_sz	(NFS3_fh_sz+2)
+#define NFS3_commitargs_sz	(NFS3_fh_sz+3)
 
-#define NFS3_attrstat_sz	1+NFS3_fattr_sz
-#define NFS3_wccstat_sz		1+NFS3_wcc_data_sz
-#define NFS3_lookupres_sz	1+NFS3_fh_sz+(2 * NFS3_post_op_attr_sz)
-#define NFS3_accessres_sz	1+NFS3_post_op_attr_sz+1
-#define NFS3_readlinkres_sz	1+NFS3_post_op_attr_sz
-#define NFS3_readres_sz		1+NFS3_post_op_attr_sz+3
-#define NFS3_writeres_sz	1+NFS3_wcc_data_sz+4
-#define NFS3_createres_sz	1+NFS3_fh_sz+NFS3_post_op_attr_sz+NFS3_wcc_data_sz
-#define NFS3_renameres_sz	1+(2 * NFS3_wcc_data_sz)
-#define NFS3_linkres_sz		1+NFS3_post_op_attr_sz+NFS3_wcc_data_sz
-#define NFS3_readdirres_sz	1+NFS3_post_op_attr_sz+2
-#define NFS3_fsstatres_sz	1+NFS3_post_op_attr_sz+13
-#define NFS3_fsinfores_sz	1+NFS3_post_op_attr_sz+12
-#define NFS3_pathconfres_sz	1+NFS3_post_op_attr_sz+6
-#define NFS3_commitres_sz	1+NFS3_wcc_data_sz+2
+#define NFS3_attrstat_sz	(1+NFS3_fattr_sz)
+#define NFS3_wccstat_sz		(1+NFS3_wcc_data_sz)
+#define NFS3_lookupres_sz	(1+NFS3_fh_sz+(2 * NFS3_post_op_attr_sz))
+#define NFS3_accessres_sz	(1+NFS3_post_op_attr_sz+1)
+#define NFS3_readlinkres_sz	(1+NFS3_post_op_attr_sz)
+#define NFS3_readres_sz		(1+NFS3_post_op_attr_sz+3)
+#define NFS3_writeres_sz	(1+NFS3_wcc_data_sz+4)
+#define NFS3_createres_sz	(1+NFS3_fh_sz+NFS3_post_op_attr_sz+NFS3_wcc_data_sz)
+#define NFS3_renameres_sz	(1+(2 * NFS3_wcc_data_sz))
+#define NFS3_linkres_sz		(1+NFS3_post_op_attr_sz+NFS3_wcc_data_sz)
+#define NFS3_readdirres_sz	(1+NFS3_post_op_attr_sz+2)
+#define NFS3_fsstatres_sz	(1+NFS3_post_op_attr_sz+13)
+#define NFS3_fsinfores_sz	(1+NFS3_post_op_attr_sz+12)
+#define NFS3_pathconfres_sz	(1+NFS3_post_op_attr_sz+6)
+#define NFS3_commitres_sz	(1+NFS3_wcc_data_sz+2)
 
 /*
  * Map file type to S_IFMT bits
@@ -103,9 +103,7 @@ static struct {
 static inline u32 *
 xdr_encode_fhandle(u32 *p, struct nfs_fh *fh)
 {
-	*p++ = htonl(fh->size);
-	memcpy(p, fh->data, fh->size);
-	return p + XDR_QUADLEN(fh->size);
+	return xdr_encode_array(p, fh->data, fh->size);
 }
 
 static inline u32 *

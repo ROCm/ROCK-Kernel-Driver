@@ -10,8 +10,8 @@
 struct pte_chain;
 extern kmem_cache_t *pte_chain_cache;
 
-#define pte_chain_lock(page)	bit_spin_lock(PG_chainlock, &page->flags)
-#define pte_chain_unlock(page)	bit_spin_unlock(PG_chainlock, &page->flags)
+#define pte_chain_lock(page)	bit_spin_lock(PG_chainlock, (unsigned long *)&page->flags)
+#define pte_chain_unlock(page)	bit_spin_unlock(PG_chainlock, (unsigned long *)&page->flags)
 
 struct pte_chain *pte_chain_alloc(int gfp_flags);
 void __pte_chain_free(struct pte_chain *pte_chain);

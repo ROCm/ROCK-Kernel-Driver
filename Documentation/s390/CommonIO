@@ -14,15 +14,6 @@ Command line parameters
   Default is off.
 
 
-* cio_notoper_msg = yes | no
-
-  Determines whether messages of the type "Device 0.0.4711 became 'not
-  operational'" should be shown during startup; after startup, they will always
-  be shown.
-  
-  Default is on.
-
-
 * cio_ignore = {all} |
 	       {<device> | <range of devices>} |
 	       {!<device> | !<range of devices>}

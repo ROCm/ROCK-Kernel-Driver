@@ -28,16 +28,18 @@
  *
  * Upper procedures may check whether a request would block waiting for
  * a free RPC slot by using the RPC_CONGESTED() macro.
- *
- * Note: on machines with low memory we should probably use a smaller
- * MAXREQS value: At 32 outstanding reqs with 8 megs of RAM, fragment
- * reassembly will frequently run out of memory.
  */
-#define RPC_MAXCONG		(16)
-#define RPC_MAXREQS		RPC_MAXCONG
-#define RPC_CWNDSCALE		(256)
-#define RPC_MAXCWND		(RPC_MAXCONG * RPC_CWNDSCALE)
+extern unsigned int xprt_udp_slot_table_entries;
+extern unsigned int xprt_tcp_slot_table_entries;
+
+#define RPC_MIN_SLOT_TABLE	(2U)
+#define RPC_DEF_SLOT_TABLE	(16U)
+#define RPC_MAX_SLOT_TABLE	(128U)
+
+#define RPC_CWNDSHIFT		(8U)
+#define RPC_CWNDSCALE		(1U << RPC_CWNDSHIFT)
 #define RPC_INITCWND		RPC_CWNDSCALE
+#define RPC_MAXCWND(xprt)	((xprt)->max_reqs << RPC_CWNDSHIFT)
 #define RPCXPRT_CONGESTED(xprt) ((xprt)->cong >= (xprt)->cwnd)
 
 /* Default timeout values */
@@ -92,7 +94,6 @@ struct rpc_rqst {
 	 */
 	struct rpc_task *	rq_task;	/* RPC task data */
 	__u32			rq_xid;		/* request XID */
-	struct rpc_rqst *	rq_next;	/* free list */
 	int			rq_cong;	/* has incremented xprt->cong */
 	int			rq_received;	/* receive completed */
 	u32			rq_seqno;	/* gss seq no. used on req. */
@@ -102,7 +103,6 @@ struct rpc_rqst {
 	struct xdr_buf		rq_private_buf;		/* The receive buffer
 							 * used in the softirq.
 							 */
-
 	/*
 	 * For authentication (e.g. auth_des)
 	 */
@@ -146,13 +146,19 @@ struct rpc_xprt {
 	struct rpc_wait_queue	resend;		/* requests waiting to resend */
 	struct rpc_wait_queue	pending;	/* requests in flight */
 	struct rpc_wait_queue	backlog;	/* waiting for slot */
-	struct rpc_rqst *	free;		/* free slots */
-	struct rpc_rqst		slot[RPC_MAXREQS];
+	struct list_head	free;		/* free slots */
+	struct rpc_rqst *	slot;		/* slot table storage */
+	unsigned int		max_reqs;	/* total slots */
 	unsigned long		sockstate;	/* Socket state */
 	unsigned char		shutdown   : 1,	/* being shut down */
 				nocong	   : 1,	/* no congestion control */
 				resvport   : 1, /* use a reserved port */
 				stream     : 1;	/* TCP */
+
+	/*
+	 * XID
+	 */
+	__u32			xid;		/* Next XID value to use */
 
 	/*
 	 * State of TCP reply receive stuff
@@ -163,6 +169,11 @@ struct rpc_xprt {
 				tcp_offset;	/* fragment offset */
 	unsigned long		tcp_copied,	/* copied to request */
 				tcp_flags;
+	/*
+	 * Connection of sockets
+	 */
+	struct work_struct	sock_connect;
+	unsigned short		port;
 	/*
 	 * Disconnection of idle sockets
 	 */

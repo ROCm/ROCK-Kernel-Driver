@@ -1071,9 +1071,14 @@ static irqreturn_t shpc_isr(int IRQ, void *dev_id, struct pt_regs *regs)
 	if (!shpchp_poll_mode) { 
 		ctrl = (struct controller *)dev_id;
 		php_ctlr = ctrl->hpc_ctlr_handle;
-	} else 
+	} else { 
 		php_ctlr = (struct php_ctlr_state_s *) dev_id;
+		ctrl = (struct controller *)php_ctlr->callback_instance_id;
+	}
 
+	if (!ctrl)
+		return IRQ_NONE;
+	
 	if (!php_ctlr || !php_ctlr->creg)
 		return IRQ_NONE;
 
@@ -1085,18 +1090,20 @@ static irqreturn_t shpc_isr(int IRQ, void *dev_id, struct pt_regs *regs)
 	dbg("%s: shpc_isr proceeds\n", __FUNCTION__);
 	dbg("%s: intr_loc = %x\n",__FUNCTION__, intr_loc); 
 
-	/* Mask Global Interrupt Mask - see implementation note on p. 139 */
-	/* of SHPC spec rev 1.0*/
-	temp_dword = readl(php_ctlr->creg + SERR_INTR_ENABLE);
-	dbg("%s: Before masking global interrupt, temp_dword = %x\n",
-		__FUNCTION__, temp_dword); 
-	temp_dword |= 0x00000001;
-	dbg("%s: After masking global interrupt, temp_dword = %x\n",
-		__FUNCTION__, temp_dword); 
-	writel(temp_dword, php_ctlr->creg + SERR_INTR_ENABLE);
+	if(!shpchp_poll_mode) {
+		/* Mask Global Interrupt Mask - see implementation note on p. 139 */
+		/* of SHPC spec rev 1.0*/
+		temp_dword = readl(php_ctlr->creg + SERR_INTR_ENABLE);
+		dbg("%s: Before masking global interrupt, temp_dword = %x\n",
+			__FUNCTION__, temp_dword); 
+		temp_dword |= 0x00000001;
+		dbg("%s: After masking global interrupt, temp_dword = %x\n",
+			__FUNCTION__, temp_dword); 
+		writel(temp_dword, php_ctlr->creg + SERR_INTR_ENABLE);
 
-	intr_loc2 = readl(php_ctlr->creg + INTR_LOC);  
-	dbg("%s: intr_loc2 = %x\n",__FUNCTION__, intr_loc2); 
+		intr_loc2 = readl(php_ctlr->creg + INTR_LOC);  
+		dbg("%s: intr_loc2 = %x\n",__FUNCTION__, intr_loc2); 
+	}
 
 	if (intr_loc & 0x0001) {
 		/* 
@@ -1159,14 +1166,16 @@ static irqreturn_t shpc_isr(int IRQ, void *dev_id, struct pt_regs *regs)
 			dbg("%s: intr_loc2 = %x\n",__FUNCTION__, intr_loc2); 
 		}
 	}
-	/* Unmask Global Interrupt Mask */
-	temp_dword = readl(php_ctlr->creg + SERR_INTR_ENABLE);
-	dbg("%s: 2-Before unmasking global interrupt, temp_dword = %x\n",
-		__FUNCTION__, temp_dword); 
-	temp_dword &= 0xfffffffe;
-	dbg("%s: 2-After unmasking global interrupt, temp_dword = %x\n",
-		__FUNCTION__, temp_dword); 
-	writel(temp_dword, php_ctlr->creg + SERR_INTR_ENABLE);
+	if (!shpchp_poll_mode) {
+		/* Unmask Global Interrupt Mask */
+		temp_dword = readl(php_ctlr->creg + SERR_INTR_ENABLE);
+		dbg("%s: 2-Before unmasking global interrupt, temp_dword = %x\n",
+			__FUNCTION__, temp_dword); 
+		temp_dword &= 0xfffffffe;
+		dbg("%s: 2-After unmasking global interrupt, temp_dword = %x\n",
+			__FUNCTION__, temp_dword); 
+		writel(temp_dword, php_ctlr->creg + SERR_INTR_ENABLE);
+	}
 	
 	return IRQ_HANDLED;
 }

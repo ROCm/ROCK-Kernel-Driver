@@ -1,5 +1,5 @@
 /*
- * linux/drivers/s390/cio/cmf.c ($Revision: 1.11 $)
+ * linux/drivers/s390/cio/cmf.c ($Revision: 1.13 $)
  *
  * Linux on zSeries Channel Measurement Facility support
  *
@@ -138,7 +138,7 @@ static inline u64 time_to_avg_nsec(u32 value, u32 count)
 	if (count == 0)
 		return 0;
 
-	/* value comes in units of 128 5sec */
+	/* value comes in units of 128 µsec */
 	ret = time_to_nsec(value);
 	do_div(ret, count);
 
@@ -390,12 +390,13 @@ alloc_cmb (struct ccw_device *cdev)
 		WARN_ON(!list_empty(&cmb_area.list));
 
 		spin_unlock(&cmb_area.lock);
-		mem = kmalloc(size, GFP_KERNEL | GFP_DMA);
+		mem = (void*)__get_free_pages(GFP_KERNEL | GFP_DMA,
+				 get_order(size));
 		spin_lock(&cmb_area.lock);
 
 		if (cmb_area.mem) {
 			/* ok, another thread was faster */
-			kfree(mem);
+			free_pages((unsigned long)mem, get_order(size));
 		} else if (!mem) {
 			/* no luck */
 			ret = -ENOMEM;
@@ -435,8 +436,10 @@ free_cmb(struct ccw_device *cdev)
 	list_del_init(&priv->cmb_list);
 
 	if (list_empty(&cmb_area.list)) {
+		ssize_t size;
+		size = sizeof(struct cmb) * cmb_area.num_channels;
 		cmf_activate(NULL, 0);
-		kfree(cmb_area.mem);
+		free_pages((unsigned long)cmb_area.mem, get_order(size));
 		cmb_area.mem = NULL;
 	}
 out:
@@ -595,11 +598,22 @@ struct cmbe {
 	u32 reserved[7];
 };
 
+/* kmalloc only guarantees 8 byte alignment, but we need cmbe
+ * pointers to be naturally aligned. Make sure to allocate
+ * enough space for two cmbes */
+static inline struct cmbe* cmbe_align(struct cmbe *c)
+{
+	unsigned long addr;
+	addr = ((unsigned long)c + sizeof (struct cmbe) - sizeof(long)) &
+				 ~(sizeof (struct cmbe) - sizeof(long));
+	return (struct cmbe*)addr;
+}
+
 static int
 alloc_cmbe (struct ccw_device *cdev)
 {
 	struct cmbe *cmbe;
-	cmbe = kmalloc (sizeof (*cmbe), GFP_KERNEL /* | GFP_DMA ? */);
+	cmbe = kmalloc (sizeof (*cmbe) * 2, GFP_KERNEL);
 	if (!cmbe)
 		return -ENOMEM;
 
@@ -647,7 +661,7 @@ set_cmbe(struct ccw_device *cdev, u32 mme)
 
 	if (!cdev->private->cmb)
 		return -EINVAL;
-	mba = mme ? (unsigned long)cdev->private->cmb : 0;
+	mba = mme ? (unsigned long) cmbe_align(cdev->private->cmb) : 0;
 
 	return set_schib_wait(cdev, mme, 1, mba);
 }
@@ -669,7 +683,7 @@ read_cmbe (struct ccw_device *cdev, int index)
 		return 0;
 	}
 
-	cmb = *(struct cmbe*)cdev->private->cmb;
+	cmb = *cmbe_align(cdev->private->cmb);
 	spin_unlock_irqrestore(cdev->ccwlock, flags);
 
 	switch (index) {
@@ -720,7 +734,7 @@ readall_cmbe (struct ccw_device *cdev, struct cmbdata *data)
 		return -ENODEV;
 	}
 
-	cmb = *(struct cmbe*)cdev->private->cmb;
+	cmb = *cmbe_align(cdev->private->cmb);
 	time = get_clock() - cdev->private->cmb_start_time;
 	spin_unlock_irqrestore(cdev->ccwlock, flags);
 
@@ -760,7 +774,7 @@ reset_cmbe(struct ccw_device *cdev)
 {
 	struct cmbe *cmb;
 	spin_lock_irq(cdev->ccwlock);
-	cmb = cdev->private->cmb;
+	cmb = cmbe_align(cdev->private->cmb);
 	if (cmb)
 		memset (cmb, 0, sizeof (*cmb));
 	cdev->private->cmb_start_time = get_clock();

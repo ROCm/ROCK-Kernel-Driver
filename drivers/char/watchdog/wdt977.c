@@ -1,5 +1,5 @@
 /*
- *	Wdt977	0.02:	A Watchdog Device for Netwinder W83977AF chip
+ *	Wdt977	0.03:	A Watchdog Device for Netwinder W83977AF chip
  *
  *	(c) Copyright 1998 Rebel.com (Woody Suwalski <woody@netwinder.org>)
  *
@@ -29,24 +29,27 @@
 #include <linux/miscdevice.h>
 #include <linux/init.h>
 #include <linux/watchdog.h>
+#include <linux/notifier.h>
+#include <linux/reboot.h>
 
 #include <asm/io.h>
 #include <asm/system.h>
 #include <asm/mach-types.h>
 #include <asm/uaccess.h>
 
+#define PFX "Wdt977: "
 #define WATCHDOG_MINOR	130
 
-#define	DEFAULT_TIMEOUT	1	/* default timeout = 1 minute */
+#define	DEFAULT_TIMEOUT	60			/* default timeout in seconds */
 
-static	int timeout = DEFAULT_TIMEOUT*60;	/* TO in seconds from user */
-static	int timeoutM = DEFAULT_TIMEOUT;		/* timeout in minutes */
+static	int timeout = DEFAULT_TIMEOUT;
+static	int timeoutM;				/* timeout in minutes */
 static	unsigned long timer_alive;
 static	int testmode;
 static	char expect_close;
 
 module_param(timeout, int, 0);
-MODULE_PARM_DESC(timeout,"Watchdog timeout in seconds (60..15300), default=60");
+MODULE_PARM_DESC(timeout,"Watchdog timeout in seconds (60..15300), default=" __MODULE_STRING(DEFAULT_TIMEOUT) ")");
 module_param(testmode, int, 0);
 MODULE_PARM_DESC(testmode,"Watchdog testmode (1 = no reboot), default=0");
 
@@ -59,71 +62,12 @@ static int nowayout = 0;
 module_param(nowayout, int, 0);
 MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default=CONFIG_WATCHDOG_NOWAYOUT)");
 
-
-/* This is kicking the watchdog by simply re-writing the timeout to reg. 0xF2 */
-static int kick_wdog(void)
-{
-	/*
-	 *	Refresh the timer.
-	 */
-
-	/* unlock the SuperIO chip */
-	outb(0x87,0x370);
-	outb(0x87,0x370);
-
-	/* select device Aux2 (device=8) and kicks watchdog reg F2 */
-	/* F2 has the timeout in minutes */
-
-	outb(0x07,0x370);
-	outb(0x08,0x371);
-	outb(0xF2,0x370);
-	outb(timeoutM,0x371);
-
-	/* lock the SuperIO chip */
-	outb(0xAA,0x370);
-
-	return 0;
-}
-
-
 /*
- *	Allow only one person to hold it open
+ * Start the watchdog
  */
 
-static int wdt977_open(struct inode *inode, struct file *file)
+static int wdt977_start(void)
 {
-
-	if( test_and_set_bit(0,&timer_alive) )
-		return -EBUSY;
-
-	/* convert seconds to minutes, rounding up */
-	timeoutM = timeout + 59;
-	timeoutM /= 60;
-
-	if (nowayout)
-	{
-		__module_get(THIS_MODULE);
-
-		/* do not permit disabling the watchdog by writing 0 to reg. 0xF2 */
-		if (!timeoutM) timeoutM = DEFAULT_TIMEOUT;
-	}
-
-	if (machine_is_netwinder())
-	{
-		/* we have a hw bug somewhere, so each 977 minute is actually only 30sec
-		 *  this limits the max timeout to half of device max of 255 minutes...
-		 */
-		timeoutM += timeoutM;
-	}
-
-	/* max timeout value = 255 minutes (0xFF). Write 0 to disable WatchDog. */
-	if (timeoutM > 255) timeoutM = 255;
-
-	/* convert seconds to minutes */
-	printk(KERN_INFO "Wdt977 Watchdog activated: timeout = %d sec, nowayout = %i, testmode = %i.\n",
-		machine_is_netwinder() ? (timeoutM>>1)*60 : timeoutM*60,
-		nowayout, testmode);
-
 	/* unlock the SuperIO chip */
 	outb(0x87,0x370);
 	outb(0x87,0x370);
@@ -156,6 +100,146 @@ static int wdt977_open(struct inode *inode, struct file *file)
 	/* lock the SuperIO chip */
 	outb(0xAA,0x370);
 
+	printk(KERN_INFO PFX "activated.\n");
+
+	return 0;
+}
+
+/*
+ * Stop the watchdog
+ */
+
+static int wdt977_stop(void)
+{
+	/* unlock the SuperIO chip */
+	outb(0x87,0x370);
+	outb(0x87,0x370);
+
+	/* select device Aux2 (device=8) and set watchdog regs F2,F3 and F4
+	* F3 is reset to its default state
+	* F4 can clear the TIMEOUT'ed state (bit 0) - back to default
+	* We can not use GP17 as a PowerLed, as we use its usage as a RedLed
+	*/
+	outb(0x07,0x370);
+	outb(0x08,0x371);
+	outb(0xF2,0x370);
+	outb(0xFF,0x371);
+	outb(0xF3,0x370);
+	outb(0x00,0x371);
+	outb(0xF4,0x370);
+	outb(0x00,0x371);
+	outb(0xF2,0x370);
+	outb(0x00,0x371);
+
+	/* at last select device Aux1 (dev=7) and set GP16 as a watchdog output */
+	outb(0x07,0x370);
+	outb(0x07,0x371);
+	outb(0xE6,0x370);
+	outb(0x08,0x371);
+
+	/* lock the SuperIO chip */
+	outb(0xAA,0x370);
+
+	printk(KERN_INFO PFX "shutdown.\n");
+
+	return 0;
+}
+
+/*
+ * Send a keepalive ping to the watchdog
+ * This is done by simply re-writing the timeout to reg. 0xF2
+ */
+
+static int wdt977_keepalive(void)
+{
+	/* unlock the SuperIO chip */
+	outb(0x87,0x370);
+	outb(0x87,0x370);
+
+	/* select device Aux2 (device=8) and kicks watchdog reg F2 */
+	/* F2 has the timeout in minutes */
+	outb(0x07,0x370);
+	outb(0x08,0x371);
+	outb(0xF2,0x370);
+	outb(timeoutM,0x371);
+
+	/* lock the SuperIO chip */
+	outb(0xAA,0x370);
+
+	return 0;
+}
+
+/*
+ * Set the watchdog timeout value
+ */
+
+static int wdt977_set_timeout(int t)
+{
+	int tmrval;
+
+	/* convert seconds to minutes, rounding up */
+	tmrval = (t + 59) / 60;
+
+	if (machine_is_netwinder()) {
+		/* we have a hw bug somewhere, so each 977 minute is actually only 30sec
+		 *  this limits the max timeout to half of device max of 255 minutes...
+		 */
+		tmrval += tmrval;
+	}
+
+	if ((tmrval < 1) || (tmrval > 255))
+		return -EINVAL;
+
+	/* timeout is the timeout in seconds, timeoutM is the timeout in minutes) */
+	timeout = t;
+	timeoutM = tmrval;
+	return 0;
+}
+
+/*
+ * Get the watchdog status
+ */
+
+static int wdt977_get_status(int *status)
+{
+	int new_status;
+
+	*status=0;
+
+	/* unlock the SuperIO chip */
+	outb(0x87,0x370);
+	outb(0x87,0x370);
+
+	/* select device Aux2 (device=8) and read watchdog reg F4 */
+	outb(0x07,0x370);
+	outb(0x08,0x371);
+	outb(0xF4,0x370);
+	new_status = inb(0x371);
+
+	/* lock the SuperIO chip */
+	outb(0xAA,0x370);
+
+	if (new_status & 1)
+		*status |= WDIOF_CARDRESET;
+
+	return 0;
+}
+
+
+/*
+ *	/dev/watchdog handling
+ */
+
+static int wdt977_open(struct inode *inode, struct file *file)
+{
+	/* If the watchdog is alive we don't need to start it again */
+	if( test_and_set_bit(0,&timer_alive) )
+		return -EBUSY;
+
+	if (nowayout)
+		__module_get(THIS_MODULE);
+
+	wdt977_start();
 	return 0;
 }
 
@@ -167,40 +251,11 @@ static int wdt977_release(struct inode *inode, struct file *file)
 	 */
 	if (expect_close == 42)
 	{
-		/* unlock the SuperIO chip */
-		outb(0x87,0x370);
-		outb(0x87,0x370);
-
-		/* select device Aux2 (device=8) and set watchdog regs F2,F3 and F4
-		* F3 is reset to its default state
-		* F4 can clear the TIMEOUT'ed state (bit 0) - back to default
-		* We can not use GP17 as a PowerLed, as we use its usage as a RedLed
-		*/
-		outb(0x07,0x370);
-		outb(0x08,0x371);
-		outb(0xF2,0x370);
-		outb(0xFF,0x371);
-		outb(0xF3,0x370);
-		outb(0x00,0x371);
-		outb(0xF4,0x370);
-		outb(0x00,0x371);
-		outb(0xF2,0x370);
-		outb(0x00,0x371);
-
-		/* at last select device Aux1 (dev=7) and set GP16 as a watchdog output */
-		outb(0x07,0x370);
-		outb(0x07,0x371);
-		outb(0xE6,0x370);
-		outb(0x08,0x371);
-
-		/* lock the SuperIO chip */
-		outb(0xAA,0x370);
-
+		wdt977_stop();
 		clear_bit(0,&timer_alive);
-
-		printk(KERN_INFO "Wdt977 Watchdog: shutdown\n");
 	} else {
-		printk(KERN_CRIT "WDT device closed unexpectedly.  WDT will not stop!\n");
+		printk(KERN_CRIT PFX "Unexpected close, not stopping watchdog!\n");
+		wdt977_keepalive();
 	}
 	expect_close = 0;
 	return 0;
@@ -240,7 +295,7 @@ static ssize_t wdt977_write(struct file *file, const char *buf, size_t count, lo
 			}
 		}
 
-		kick_wdog();
+		wdt977_keepalive();
 	}
 	return count;
 }
@@ -257,14 +312,19 @@ static ssize_t wdt977_write(struct file *file, const char *buf, size_t count, lo
  */
 
 static struct watchdog_info ident = {
-	.options	= WDIOF_SETTIMEOUT,
-	.identity	= "Winbond 83977",
+	.options =		WDIOF_SETTIMEOUT |
+				WDIOF_MAGICCLOSE |
+				WDIOF_KEEPALIVEPING,
+	.firmware_version =	1,
+	.identity =		"Winbond 83977",
 };
 
 static int wdt977_ioctl(struct inode *inode, struct file *file,
 	unsigned int cmd, unsigned long arg)
 {
-	int temp;
+	int status;
+	int new_options, retval = -EINVAL;
+	int new_timeout;
 
 	switch(cmd)
 	{
@@ -272,62 +332,59 @@ static int wdt977_ioctl(struct inode *inode, struct file *file,
 		return -ENOIOCTLCMD;
 
 	case WDIOC_GETSUPPORT:
-	    return copy_to_user((struct watchdog_info *)arg, &ident,
+		return copy_to_user((struct watchdog_info *)arg, &ident,
 			sizeof(ident)) ? -EFAULT : 0;
+
+	case WDIOC_GETSTATUS:
+		wdt977_get_status(&status);
+		return put_user(status, (int *) arg);
 
 	case WDIOC_GETBOOTSTATUS:
 		return put_user(0, (int *) arg);
 
-	case WDIOC_GETSTATUS:
-		/* unlock the SuperIO chip */
-		outb(0x87,0x370);
-		outb(0x87,0x370);
-
-		/* select device Aux2 (device=8) and read watchdog reg F4 */
-		outb(0x07,0x370);
-		outb(0x08,0x371);
-		outb(0xF4,0x370);
-		temp = inb(0x371);
-
-		/* lock the SuperIO chip */
-		outb(0xAA,0x370);
-
-		/* return info if "expired" in test mode */
-		return put_user(temp & 1, (int *) arg);
-
 	case WDIOC_KEEPALIVE:
-		kick_wdog();
+		wdt977_keepalive();
 		return 0;
 
-	case WDIOC_SETTIMEOUT:
-		if (copy_from_user(&temp, (int *) arg, sizeof(int)))
+	case WDIOC_SETOPTIONS:
+		if (get_user (new_options, (int *) arg))
 			return -EFAULT;
 
-		/* convert seconds to minutes, rounding up */
-		temp += 59;
-		temp /= 60;
-
-		/* we have a hw bug somewhere, so each 977 minute is actually only 30sec
-		*  this limits the max timeout to half of device max of 255 minutes...
-		*/
-		if (machine_is_netwinder())
-		{
-		    temp += temp;
+		if (new_options & WDIOS_DISABLECARD) {
+			wdt977_stop();
+			retval = 0;
 		}
 
-		/* Sanity check */
-		if (temp < 0 || temp > 255)
-			return -EINVAL;
+		if (new_options & WDIOS_ENABLECARD) {
+			wdt977_start();
+			retval = 0;
+		}
 
-		if (!temp && nowayout)
-			return -EINVAL;
+		return retval;
 
-		timeoutM = temp;
-		kick_wdog();
-		return 0;
+	case WDIOC_SETTIMEOUT:
+		if (get_user(new_timeout, (int *) arg))
+			return -EFAULT;
+
+		if (wdt977_set_timeout(new_timeout))
+		    return -EINVAL;
+
+		wdt977_keepalive();
+		/* Fall */
+
+	case WDIOC_GETTIMEOUT:
+		return put_user(timeout, (int *)arg);
+
 	}
 }
 
+static int wdt977_notify_sys(struct notifier_block *this, unsigned long code,
+	void *unused)
+{
+	if(code==SYS_DOWN || code==SYS_HALT)
+		wdt977_stop();
+	return NOTIFY_DONE;
+}
 
 static struct file_operations wdt977_fops=
 {
@@ -345,25 +402,54 @@ static struct miscdevice wdt977_miscdev=
 	.fops		= &wdt977_fops,
 };
 
+static struct notifier_block wdt977_notifier = {
+	.notifier_call = wdt977_notify_sys,
+};
+
 static int __init nwwatchdog_init(void)
 {
 	int retval;
 	if (!machine_is_netwinder())
 		return -ENODEV;
 
+	/* Check that the timeout value is within it's range ; if not reset to the default */
+	if (wdt977_set_timeout(timeout)) {
+		wdt977_set_timeout(DEFAULT_TIMEOUT);
+		printk(KERN_INFO PFX "timeout value must be 60<timeout<15300, using %d\n",
+			DEFAULT_TIMEOUT);
+	}
+
+	retval = register_reboot_notifier(&wdt977_notifier);
+	if (retval) {
+		printk(KERN_ERR PFX "cannot register reboot notifier (err=%d)\n",
+			retval);
+		return retval;
+	}
+
 	retval = misc_register(&wdt977_miscdev);
-	if (!retval)
-		printk(KERN_INFO "Wdt977 Watchdog sleeping.\n");
-	return retval;
+	if (retval) {
+		printk(KERN_ERR PFX "cannot register miscdev on minor=%d (err=%d)\n",
+			WATCHDOG_MINOR, retval);
+		unregister_reboot_notifier(&wdt977_notifier);
+		return retval;
+	}
+
+	printk(KERN_INFO PFX "initialized. timeout=%d sec (nowayout=%d, testmode = %i)\n",
+		timeout, nowayout, testmode);
+
+	return 0;
 }
 
 static void __exit nwwatchdog_exit(void)
 {
 	misc_deregister(&wdt977_miscdev);
+	unregister_reboot_notifier(&wdt977_notifier);
 }
 
 module_init(nwwatchdog_init);
 module_exit(nwwatchdog_exit);
 
+MODULE_AUTHOR("Woody Suwalski <woody@netwinder.org>");
 MODULE_DESCRIPTION("W83977AF Watchdog driver");
 MODULE_LICENSE("GPL");
+MODULE_ALIAS_MISCDEV(WATCHDOG_MINOR);

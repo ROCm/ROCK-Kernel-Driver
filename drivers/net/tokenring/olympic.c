@@ -842,10 +842,13 @@ static void olympic_rx(struct net_device *dev)
 							olympic_priv->rx_ring_skb[rx_ring_last_received] = skb ; 
 							netif_rx(skb2) ; 
 						} else { 
-							pci_dma_sync_single(olympic_priv->pdev,
+							pci_dma_sync_single_for_cpu(olympic_priv->pdev,
 								le32_to_cpu(olympic_priv->olympic_rx_ring[rx_ring_last_received].buffer),
 								olympic_priv->pkt_buf_sz,PCI_DMA_FROMDEVICE) ; 
 							memcpy(skb_put(skb,length-4),olympic_priv->rx_ring_skb[rx_ring_last_received]->data,length-4) ; 
+							pci_dma_sync_single_for_device(olympic_priv->pdev,
+								le32_to_cpu(olympic_priv->olympic_rx_ring[rx_ring_last_received].buffer),
+								olympic_priv->pkt_buf_sz,PCI_DMA_FROMDEVICE) ;
 							skb->protocol = tr_type_trans(skb,dev) ; 
 							netif_rx(skb) ; 
 						} 
@@ -854,12 +857,15 @@ static void olympic_rx(struct net_device *dev)
 							olympic_priv->rx_ring_last_received++ ; 
 							olympic_priv->rx_ring_last_received &= (OLYMPIC_RX_RING_SIZE -1);
 							rx_ring_last_received = olympic_priv->rx_ring_last_received ; 
-							pci_dma_sync_single(olympic_priv->pdev,
+							pci_dma_sync_single_for_cpu(olympic_priv->pdev,
 								le32_to_cpu(olympic_priv->olympic_rx_ring[rx_ring_last_received].buffer),
 								olympic_priv->pkt_buf_sz,PCI_DMA_FROMDEVICE) ; 
 							rx_desc = &(olympic_priv->olympic_rx_ring[rx_ring_last_received]);
 							cpy_length = (i == 1 ? frag_len : le32_to_cpu(rx_desc->res_length)); 
 							memcpy(skb_put(skb, cpy_length), olympic_priv->rx_ring_skb[rx_ring_last_received]->data, cpy_length) ;
+							pci_dma_sync_single_for_device(olympic_priv->pdev,
+								le32_to_cpu(olympic_priv->olympic_rx_ring[rx_ring_last_received].buffer),
+								olympic_priv->pkt_buf_sz,PCI_DMA_FROMDEVICE) ;
 						} while (--i) ; 
 						skb_trim(skb,skb->len-4) ; 
 						skb->protocol = tr_type_trans(skb,dev);

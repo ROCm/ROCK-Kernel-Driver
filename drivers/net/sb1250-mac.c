@@ -2080,7 +2080,7 @@ static int sbmac_set_duplex(struct sbmac_softc *s,sbmac_duplex_t duplex,sbmac_fc
 static irqreturn_t sbmac_intr(int irq,void *dev_instance,struct pt_regs *rgs)
 {
 	struct net_device *dev = (struct net_device *) dev_instance;
-	struct sbmac_softc *sc = (struct sbmac_softc *) (dev->priv);
+	struct sbmac_softc *sc = netdev_priv(dev);
 	uint64_t isr;
 	int handled = 0;
 
@@ -2150,7 +2150,7 @@ static irqreturn_t sbmac_intr(int irq,void *dev_instance,struct pt_regs *rgs)
  ********************************************************************* */
 static int sbmac_start_tx(struct sk_buff *skb, struct net_device *dev)
 {
-	struct sbmac_softc *sc = (struct sbmac_softc *)dev->priv;
+	struct sbmac_softc *sc = netdev_priv(dev);
 	
 	/* lock eth irq */
 	spin_lock_irq (&sc->sbm_lock);
@@ -2374,7 +2374,7 @@ static int sbmac_init(struct net_device *dev, int idx)
 	int i;
 	int err;
 	
-	sc = (struct sbmac_softc *)dev->priv;
+	sc = netdev_priv(dev);
 	
 	/* Determine controller base address */
 	
@@ -2454,7 +2454,7 @@ static int sbmac_init(struct net_device *dev, int idx)
 
 static int sbmac_open(struct net_device *dev)
 {
-	struct sbmac_softc *sc = (struct sbmac_softc *)dev->priv;
+	struct sbmac_softc *sc = netdev_priv(dev);
 	
 	if (debug > 1) {
 		printk(KERN_DEBUG "%s: sbmac_open() irq %d.\n", dev->name, dev->irq);
@@ -2609,7 +2609,7 @@ static int sbmac_mii_poll(struct sbmac_softc *s,int noisy)
 static void sbmac_timer(unsigned long data)
 {
 	struct net_device *dev = (struct net_device *)data;
-	struct sbmac_softc *sc = (struct sbmac_softc *)dev->priv;
+	struct sbmac_softc *sc = netdev_priv(dev);
 	int next_tick = HZ;
 	int mii_status;
 
@@ -2655,7 +2655,7 @@ static void sbmac_timer(unsigned long data)
 
 static void sbmac_tx_timeout (struct net_device *dev)
 {
-	struct sbmac_softc *sc = (struct sbmac_softc *) dev->priv;
+	struct sbmac_softc *sc = netdev_priv(dev);
 	
 	spin_lock_irq (&sc->sbm_lock);
 	
@@ -2673,7 +2673,7 @@ static void sbmac_tx_timeout (struct net_device *dev)
 
 static struct net_device_stats *sbmac_get_stats(struct net_device *dev)
 {
-	struct sbmac_softc *sc = (struct sbmac_softc *)dev->priv;
+	struct sbmac_softc *sc = netdev_priv(dev);
 	unsigned long flags;
 	
 	spin_lock_irqsave(&sc->sbm_lock, flags);
@@ -2691,7 +2691,7 @@ static void sbmac_set_rx_mode(struct net_device *dev)
 {
 	unsigned long flags;
 	int msg_flag = 0;
-	struct sbmac_softc *sc = (struct sbmac_softc *)dev->priv;
+	struct sbmac_softc *sc = netdev_priv(dev);
 
 	spin_lock_irqsave(&sc->sbm_lock, flags);
 	if ((dev->flags ^ sc->sbm_devflags) & IFF_PROMISC) {
@@ -2726,7 +2726,7 @@ static void sbmac_set_rx_mode(struct net_device *dev)
 
 static int sbmac_mii_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
-	struct sbmac_softc *sc = (struct sbmac_softc *)dev->priv;
+	struct sbmac_softc *sc = netdev_priv(dev);
 	u16 *data = (u16 *)&rq->ifr_data;
 	unsigned long flags;
 	int retval;
@@ -2762,7 +2762,7 @@ static int sbmac_mii_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 
 static int sbmac_close(struct net_device *dev)
 {
-	struct sbmac_softc *sc = (struct sbmac_softc *)dev->priv;
+	struct sbmac_softc *sc = netdev_priv(dev);
 	unsigned long flags;
 	int irq;
 
@@ -2911,7 +2911,7 @@ sbmac_cleanup_module(void)
 	for (idx = 0; idx < MAX_UNITS; idx++) {
 		dev = dev_sbmac[idx];
 		if (!dev) {
-			struct sbmac_softc *sc = dev->priv;
+			struct sbmac_softc *sc = netdev_priv(dev);
 			unregister_netdev(dev);
 			sbmac_uninitctx(sc);
 			free_netdev(dev);

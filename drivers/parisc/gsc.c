@@ -29,6 +29,11 @@
 
 #include "gsc.h"
 
+/* This sets the vmerge boundary and size, it's here because it has to
+ * be available on all platforms (zero means no-virtual merging) */
+unsigned long parisc_vmerge_boundary = 0;
+unsigned long parisc_vmerge_max_size = 0;
+
 #undef DEBUG
 
 #ifdef DEBUG

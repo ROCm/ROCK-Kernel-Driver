@@ -27,6 +27,15 @@
 
 /*
  * Memory data
+ *
+ * This is accessed as binary data by z/VM. If changes to it can't be avoided,
+ * the structure version (product ID, see appldata_base.c) needs to be changed
+ * as well and all documentation and z/VM applications using it must be
+ * updated.
+ *
+ * The record layout is documented in the Linux for zSeries Device Drivers
+ * book:
+ * http://oss.software.ibm.com/developerworks/opensource/linux390/index.shtml
  */
 struct appldata_mem_data {
 	u64 timestamp;
@@ -105,11 +114,10 @@ static void appldata_get_mem_data(void *data)
 	mem_data->pgpgout    = ps.pgpgout >> 1;
 	mem_data->pswpin     = ps.pswpin;
 	mem_data->pswpout    = ps.pswpout;
-	mem_data->pgalloc    = ps.pgalloc;
+	mem_data->pgalloc    = ps.pgalloc_high + ps.pgalloc_normal +
+			       ps.pgalloc_dma;
 	mem_data->pgfault    = ps.pgfault;
 	mem_data->pgmajfault = ps.pgmajfault;
-
-P_DEBUG("pgalloc = %lu, pgfree = %lu\n", ps.pgalloc, ps.pgfree);
 
 	si_meminfo(&val);
 	mem_data->sharedram = val.sharedram;

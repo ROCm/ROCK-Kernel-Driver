@@ -6,6 +6,7 @@ menu "ALSA ARM devices"
 config SND_SA11XX_UDA1341
 	tristate "SA11xx UDA1341TS driver (H3600)"
 	depends on ARCH_SA1100 && SND && L3
+	select SND_PCM
 	help
 	  Say Y or M if you have a Compaq iPaq H3x00 handheld computer and want
 	  to use its Philips UDA 1341 audio chip.

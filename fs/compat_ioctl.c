@@ -1458,6 +1458,7 @@ static int cdrom_do_generic_command(unsigned int fd, unsigned int cmd, unsigned 
 	struct cdrom_generic_command *cgc;
 	struct cdrom_generic_command32 *cgc32;
 	unsigned char dir;
+	int itmp;
 
 	cgc = compat_alloc_user_space(sizeof(*cgc));
 	cgc32 = compat_ptr(arg);
@@ -1469,12 +1470,16 @@ static int cdrom_do_generic_command(unsigned int fd, unsigned int cmd, unsigned 
 	    __cgc_do_ptr((void **) &cgc->sense, &cgc32->sense))
 		return -EFAULT;
 
-	if (get_user(dir, &cgc->data_direction) ||
-	    put_user(dir, &cgc32->data_direction))
+	if (get_user(dir, &cgc32->data_direction) ||
+	    put_user(dir, &cgc->data_direction))
 		return -EFAULT;
 
-	if (copy_in_user(&cgc->quiet, &cgc32->quiet,
-			 2 * sizeof(int)))
+	if (get_user(itmp, &cgc32->quiet) ||
+	    put_user(itmp, &cgc->quiet))
+		return -EFAULT;
+
+	if (get_user(itmp, &cgc32->timeout) ||
+	    put_user(itmp, &cgc->timeout))
 		return -EFAULT;
 
 	if (__cgc_do_ptr(&cgc->reserved[0], &cgc32->reserved[0]))
@@ -1947,6 +1952,7 @@ static int blkpg_ioctl_trans(unsigned int fd, unsigned int cmd, unsigned long ar
 		set_fs (KERNEL_DS);
 		err = sys_ioctl(fd, cmd, (unsigned long)&a);
 		set_fs (old_fs);
+		break;
 	default:
 		return -EINVAL;
 	}                                        

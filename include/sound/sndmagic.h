@@ -200,6 +200,9 @@ static inline int _snd_magic_bad(void *obj, unsigned long magic)
 #define azf3328_t_magic				0xa15a4200
 #define snd_card_harmony_t_magic		0xa15a4300
 #define bt87x_t_magic				0xa15a4400
+#define pdacf_t_magic				0xa15a4500
+#define vortex_t_magic				0xa15a4601
+#define atiixp_t_magic				0xa15a4701
 
 #else
 

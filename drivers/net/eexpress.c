@@ -452,7 +452,7 @@ static int eexp_open(struct net_device *dev)
 {
 	int ret;
 	unsigned short ioaddr = dev->base_addr;
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 
 #if NET_DEBUG > 6
 	printk(KERN_DEBUG "%s: eexp_open()\n", dev->name);
@@ -515,7 +515,7 @@ static int eexp_open(struct net_device *dev)
 static int eexp_close(struct net_device *dev)
 {
 	unsigned short ioaddr = dev->base_addr;
-	struct net_local *lp = dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 
 	int irq = dev->irq;
 
@@ -541,7 +541,7 @@ static int eexp_close(struct net_device *dev)
 
 static struct net_device_stats *eexp_stats(struct net_device *dev)
 {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 
 	return &lp->stats;
 }
@@ -553,7 +553,7 @@ static struct net_device_stats *eexp_stats(struct net_device *dev)
 
 static void unstick_cu(struct net_device *dev)
 {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 	unsigned short ioaddr = dev->base_addr;
 
 	if (lp->started)
@@ -627,7 +627,7 @@ static void unstick_cu(struct net_device *dev)
 
 static void eexp_timeout(struct net_device *dev)
 {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 #ifdef CONFIG_SMP
 	unsigned long flags;
 #endif
@@ -667,7 +667,7 @@ static void eexp_timeout(struct net_device *dev)
  */
 static int eexp_xmit(struct sk_buff *buf, struct net_device *dev)
 {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 	short length = buf->len;
 #ifdef CONFIG_SMP
 	unsigned long flags;
@@ -728,7 +728,7 @@ static unsigned short eexp_start_irq(struct net_device *dev,
 				     unsigned short status)
 {
 	unsigned short ack_cmd = SCB_ack(status);
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 	unsigned short ioaddr = dev->base_addr;
 	if ((dev->flags & IFF_UP) && !(lp->started & STARTED_CU)) {
 		short diag_status, tdr_status;
@@ -806,7 +806,7 @@ static irqreturn_t eexp_irq(int irq, void *dev_info, struct pt_regs *regs)
 		return IRQ_NONE;
 	}
 
-	lp = (struct net_local *)dev->priv;
+	lp = netdev_priv(dev);
 	ioaddr = dev->base_addr;
 
 	spin_lock(&lp->lock);
@@ -925,7 +925,7 @@ static void eexp_hw_set_interface(struct net_device *dev)
 
 static void eexp_hw_rx_pio(struct net_device *dev)
 {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 	unsigned short rx_block = lp->rx_ptr;
 	unsigned short boguscount = lp->num_rx_bufs;
 	unsigned short ioaddr = dev->base_addr;
@@ -1022,7 +1022,7 @@ static void eexp_hw_rx_pio(struct net_device *dev)
 static void eexp_hw_tx_pio(struct net_device *dev, unsigned short *buf,
 		       unsigned short len)
 {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 	unsigned short ioaddr = dev->base_addr;
 
 	if (LOCKUP16 || lp->width) {
@@ -1090,7 +1090,7 @@ static int __init eexp_hw_probe(struct net_device *dev, unsigned short ioaddr)
 	unsigned int memory_size;
 	int i;
 	unsigned short xsum = 0;
-	struct net_local *lp = dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 
 	printk("%s: EtherExpress 16 at %#x ",dev->name,ioaddr);
 
@@ -1262,7 +1262,7 @@ static unsigned short __init eexp_hw_readeeprom(unsigned short ioaddr,
 
 static unsigned short eexp_hw_lasttxstat(struct net_device *dev)
 {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 	unsigned short tx_block = lp->tx_reap;
 	unsigned short status;
 
@@ -1332,7 +1332,7 @@ static unsigned short eexp_hw_lasttxstat(struct net_device *dev)
 
 static void eexp_hw_txrestart(struct net_device *dev)
 {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 	unsigned short ioaddr = dev->base_addr;
 
 	lp->last_tx_restart = lp->tx_link;
@@ -1377,7 +1377,7 @@ static void eexp_hw_txrestart(struct net_device *dev)
 
 static void eexp_hw_txinit(struct net_device *dev)
 {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 	unsigned short tx_block = TX_BUF_START;
 	unsigned short curtbuf;
 	unsigned short ioaddr = dev->base_addr;
@@ -1419,7 +1419,7 @@ static void eexp_hw_txinit(struct net_device *dev)
 
 static void eexp_hw_rxinit(struct net_device *dev)
 {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 	unsigned short rx_block = lp->rx_buf_start;
 	unsigned short ioaddr = dev->base_addr;
 
@@ -1478,7 +1478,7 @@ static void eexp_hw_rxinit(struct net_device *dev)
 
 static void eexp_hw_init586(struct net_device *dev)
 {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 	unsigned short ioaddr = dev->base_addr;
 	int i;
 
@@ -1639,7 +1639,7 @@ static void
 eexp_set_multicast(struct net_device *dev)
 {
         unsigned short ioaddr = dev->base_addr;
-        struct net_local *lp = (struct net_local *)dev->priv;
+        struct net_local *lp = netdev_priv(dev);
         int kick = 0, i;
         if ((dev->flags & IFF_PROMISC) != lp->was_promisc) {
                 outw(CONF_PROMISC & ~31, ioaddr+SM_PTR);

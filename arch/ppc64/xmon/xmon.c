@@ -56,9 +56,6 @@ static u_int bus_error_jmp[100];
 #define setjmp xmon_setjmp
 #define longjmp xmon_longjmp
 
-/* Max number of stack frames we are willing to produce on a backtrace. */
-#define MAXFRAMECOUNT 50
-
 /* Breakpoint stuff */
 struct bpt {
 	unsigned long address;
@@ -85,7 +82,6 @@ static void dump(void);
 static void prdump(unsigned long, long);
 static int ppc_inst_dump(unsigned long, long);
 void print_address(unsigned long);
-static int getsp(void);
 static void backtrace(struct pt_regs *);
 static void excprint(struct pt_regs *);
 static void prregs(struct pt_regs *);
@@ -177,7 +173,8 @@ Commands:\n\
   S	print special registers\n\
   t	print backtrace\n\
   T	Enable/Disable PPCDBG flags\n\
-  x	exit monitor\n\
+  x	exit monitor and recover\n\
+  X	exit monitor and dont recover\n\
   u	dump segment table or SLB\n\
   ?	help\n"
   "\
@@ -344,7 +341,10 @@ xmon(struct pt_regs *excp)
 #endif /* CONFIG_SMP */
 	set_msrd(msr);		/* restore interrupt enable */
 
-	return 0;
+	if (cmd == 'X')
+		return 0;
+
+	return 1;
 }
 
 int
@@ -563,6 +563,7 @@ cmds(struct pt_regs *excp)
 			break;
 		case 's':
 		case 'x':
+		case 'X':
 		case EOF:
 			return cmd;
 		case '?':
@@ -897,93 +898,75 @@ const char *getvecname(unsigned long vec)
 	return ret;
 }
 
-static void
-backtrace(struct pt_regs *excp)
+/*
+ * Most of our exceptions are in the form:
+ *    bl handler
+ *    b .ret_from_exception
+ * and this currently fails to catch them.
+ */
+static inline int exception_frame(unsigned long ip)
 {
-	unsigned long sp;
-	unsigned long lr;
-	unsigned long stack[3];
-	struct pt_regs regs;
-	int framecount;
-	char *funcname;
-	/* declare these as raw ptrs so we don't get func descriptors */
-	extern void *ret_from_except, *ret_from_syscall_1;
+	extern void *ret_from_syscall_1, *ret_from_syscall_2, *ret_from_except;
 
-	if (excp != NULL) {
-	        lr = excp->link;
-		sp = excp->gpr[1];
-	} else {
-	        /* Use care not to call any function before this point
-		 so the saved lr has a chance of being good. */
-	        asm volatile ("mflr %0" : "=r" (lr) :);
-		sp = getsp();
-	}
-	scanhex(&sp);
-	scannl();
-	for (framecount = 0;
-	     sp != 0 && framecount < MAXFRAMECOUNT;
-	     sp = stack[0], framecount++) {
-		if (mread(sp, stack, sizeof(stack)) != sizeof(stack))
-			break;
-#if 0
-		if (lr != 0) {
-		    stack[2] = lr;	/* fake out the first saved lr.  It may not be saved yet. */
-		    lr = 0;
-		}
-#endif
-		printf("%.16lx  %.16lx", sp, stack[2]);
-		/* TAI -- for now only the ones cast to unsigned long will match.
-		 * Need to test the rest...
-		 */
-		if ((stack[2] == (unsigned long)ret_from_except &&
-		            (funcname = "ret_from_except"))
-		    || (stack[2] == (unsigned long)ret_from_syscall_1 &&
-		            (funcname = "ret_from_syscall_1"))
-#if 0
-		    || stack[2] == (unsigned) &ret_from_syscall_2
-		    || stack[2] == (unsigned) &do_signal_ret
-#endif
-		    ) {
-			printf("  %s\n", funcname);
-			if (mread(sp+112, &regs, sizeof(regs)) != sizeof(regs))
-				break;
-			printf("exception: %lx %s regs %lx\n", regs.trap, getvecname(regs.trap), sp+112);
-			printf("                  %.16lx", regs.nip);
-			if (regs.nip & 0xffffffff00000000UL)
-				xmon_print_symbol("  %s", regs.nip);
-			printf("\n");
-                        if (regs.gpr[1] < sp) {
-                            printf("<Stack drops into userspace %.16lx>\n", regs.gpr[1]);
-                            break;
-			}
+	if ((ip == (unsigned long)ret_from_syscall_1) ||
+	    (ip == (unsigned long)ret_from_syscall_2) ||
+	    (ip == (unsigned long)ret_from_except))
+		return 1;
 
-			sp = regs.gpr[1];
-			if (mread(sp, stack, sizeof(stack)) != sizeof(stack))
-				break;
-		} else {
-			if (stack[2])
-				xmon_print_symbol("  %s", stack[2]);
-			printf("\n");
-		}
-		if (stack[0] && stack[0] <= sp) {
-			if ((stack[0] & 0xffffffff00000000UL) == 0)
-				printf("<Stack drops into 32-bit userspace %.16lx>\n", stack[0]);
-			else
-				printf("<Corrupt stack.  Next backchain is %.16lx>\n", stack[0]);
-			break;
-		}
-	}
-	if (framecount >= MAXFRAMECOUNT)
-		printf("<Punt. Too many stack frames>\n");
+	return 0;
 }
 
-int
-getsp()
-{
-	int x;
+static int xmon_depth_to_print = 64;
 
-	asm("mr %0,1" : "=r" (x) :);
-	return x;
+static void xmon_show_stack(unsigned long sp)
+{
+	unsigned long ip;
+	unsigned long newsp;
+	int count = 0;
+	struct pt_regs regs;
+
+	do {
+		if (sp < PAGE_OFFSET) {
+			printf("SP in userspace\n");
+			break;
+		}
+
+		if (!mread((sp + 16), &ip, sizeof(unsigned long)))
+			break;
+
+		printf("[%016lx] [%016lx] ", sp, ip);
+		xmon_print_symbol("%s\n", ip);
+
+		if (exception_frame(ip)) {
+			if (mread(sp+112, &regs, sizeof(regs)) != sizeof(regs))
+				break;
+
+                        printf("  exception: %lx %s regs %lx\n", regs.trap,
+			       getvecname(regs.trap), sp+112);
+		}
+
+		if (!mread(sp, &newsp, sizeof(unsigned long)))
+			break;
+		if (newsp < sp)
+			break;
+
+		sp = newsp;
+	} while (count++ < xmon_depth_to_print);
+}
+
+static void backtrace(struct pt_regs *excp)
+{
+	unsigned long sp;
+
+	if (excp == NULL)
+		sp = __get_SP();
+	else
+		sp = excp->gpr[1];
+
+	scanhex(&sp);
+	scannl();
+
+	xmon_show_stack(sp);
 }
 
 spinlock_t exception_print_lock = SPIN_LOCK_UNLOCKED;

@@ -1,5 +1,5 @@
 /*
- * $Id: netiucv.c,v 1.38 2004/02/19 13:12:57 mschwide Exp $
+ * $Id: netiucv.c,v 1.45 2004/03/15 08:48:48 braunu Exp $
  *
  * IUCV network driver
  *
@@ -30,7 +30,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
- * RELEASE-TAG: IUCV network driver $Revision: 1.38 $
+ * RELEASE-TAG: IUCV network driver $Revision: 1.45 $
  *
  */
 
@@ -229,6 +229,7 @@ static const char *dev_state_names[] = {
 	"StartWait",
 	"StopWait",
 	"Running",
+	"StartRetry",
 };
 
 /**
@@ -251,6 +252,7 @@ static const char *dev_event_names[] = {
 	"Stop",
 	"Connection up",
 	"Connection down",
+	"Timer",
 };
 
 /**
@@ -343,11 +345,6 @@ enum conn_states {
 	 * Data sent, awaiting CONN_EVENT_TXDONE
 	 */
 	CONN_STATE_TX,
-
-	/**
-	 * Terminating
-	 */
-	CONN_STATE_TERM,
 
 	/**
 	 * Error during registration.
@@ -495,7 +492,7 @@ static void
 netiucv_unpack_skb(struct iucv_connection *conn, struct sk_buff *pskb)
 {
 	struct net_device     *dev = conn->netdev;
-	struct netiucv_priv   *privptr = (struct netiucv_priv *)dev->priv;
+	struct netiucv_priv   *privptr = dev->priv;
 	__u16          offset = 0;
 
 	skb_put(pskb, NETIUCV_HDRLEN);
@@ -1214,7 +1211,7 @@ netiucv_close(struct net_device *dev) {
 static int netiucv_tx(struct sk_buff *skb, struct net_device *dev)
 {
 	int          rc = 0;
-	struct netiucv_priv *privptr = (struct netiucv_priv *)dev->priv;
+	struct netiucv_priv *privptr = dev->priv;
 
 	/**
 	 * Some sanity checks ...
@@ -1290,7 +1287,6 @@ netiucv_change_mtu (struct net_device * dev, int new_mtu)
 /**
  * attributes in sysfs
  *****************************************************************************/
-#define CTRL_BUFSIZE 40
 
 static ssize_t
 user_show (struct device *dev, char *buf)
@@ -1300,7 +1296,57 @@ user_show (struct device *dev, char *buf)
 	return sprintf(buf, "%s\n", netiucv_printname(priv->conn->userid));
 }
 
-static DEVICE_ATTR(user, 0444, user_show, NULL);
+static ssize_t
+user_write (struct device *dev, const char *buf, size_t count)
+{
+	struct netiucv_priv *priv = dev->driver_data;
+	struct net_device *ndev = priv->conn->netdev;
+	char    *p;
+	char    *tmp;
+	char 	username[10];
+	int 	i;
+
+	if (count>9) {
+		printk(KERN_WARNING
+			"netiucv: username too long (%d)!\n", (int)count);
+		return -EINVAL;
+	}
+
+	tmp = strsep((char **) &buf, "\n");
+	for (i=0, p=tmp; i<8 && *p; i++, p++) {
+		if (isalnum(*p) || (*p == '$'))
+			username[i]= *p;
+		else if (*p == '\n') {
+			/* trailing lf, grr */
+			break;
+		} else {
+			printk(KERN_WARNING
+				"netiucv: Invalid character in username!\n");
+			return -EINVAL;
+		}
+	}
+	while (i<9)
+		username[i++] = ' ';
+	username[9] = '\0';
+
+	if (memcmp(username, priv->conn->userid, 8) != 0) {
+		/* username changed */
+		if (ndev->flags & (IFF_UP | IFF_RUNNING)) {
+			printk(KERN_WARNING
+				"netiucv: device %s active, connected to %s\n",
+				dev->bus_id, priv->conn->userid);
+			printk(KERN_WARNING
+				"netiucv: user cannot be updated\n");
+			return -EBUSY;
+		}
+	}
+	memcpy(priv->conn->userid, username, 9);
+
+	return count;
+
+}
+
+static DEVICE_ATTR(user, 0644, user_show, user_write);
 
 static ssize_t
 buffer_show (struct device *dev, char *buf)
@@ -1317,25 +1363,29 @@ buffer_write (struct device *dev, const char *buf, size_t count)
 	struct net_device *ndev = priv->conn->netdev;
 	char         *e;
 	int          bs1;
-	char         tmp[CTRL_BUFSIZE];
 
 	if (count >= 39)
 		return -EINVAL;
 
-	if (copy_from_user(tmp, buf, count))
-		 return -EFAULT;
-	tmp[count+1] = '\0';
-	bs1 = simple_strtoul(tmp, &e, 0);
+	bs1 = simple_strtoul(buf, &e, 0);
 
-	if ((bs1 > NETIUCV_BUFSIZE_MAX) ||
-	    (e && (!isspace(*e))))
+	if (e && (!isspace(*e))) {
+		printk(KERN_WARNING
+			"netiucv: Invalid character in buffer!\n");
 		return -EINVAL;
+	}
+	if (bs1 > NETIUCV_BUFSIZE_MAX) {
+		printk(KERN_WARNING
+			"netiucv: Given buffer size %d too large.\n",
+			bs1);
+
+		return -EINVAL;
+	}
 	if ((ndev->flags & IFF_RUNNING) &&
 	    (bs1 < (ndev->mtu + NETIUCV_HDRLEN + 2)))
 		return -EINVAL;
 	if (bs1 < (576 + NETIUCV_HDRLEN + NETIUCV_HDRLEN))
 		return -EINVAL;
-
 
 	priv->conn->max_buffsize = bs1;
 	if (!(ndev->flags & IFF_RUNNING))
@@ -1606,20 +1656,10 @@ netiucv_register_device(struct net_device *ndev, int ifno)
 	ret = netiucv_add_files(dev);
 	if (ret)
 		goto out_unreg;
-	ret = sysfs_create_link(&dev->kobj, &ndev->class_dev.kobj, ndev->name);
-	if (ret) 
-		goto out_rm_files;
-	ret = sysfs_create_link(&ndev->class_dev.kobj, &dev->kobj, dev->bus_id);
-	if (ret)
-		goto out_rm_link;
 	dev->driver_data = priv;
 	priv->dev = dev;
 	return 0;
 
-out_rm_link:
-	sysfs_remove_link(&dev->kobj, ndev->name);
-out_rm_files:
-	netiucv_remove_files(dev);
 out_unreg:
 	device_unregister(dev);
 	return ret;
@@ -1628,12 +1668,7 @@ out_unreg:
 static void
 netiucv_unregister_device(struct device *dev)
 {
-	struct netiucv_priv *priv = dev->driver_data;
-	struct net_device *ndev = priv->conn->netdev;
-
 	pr_debug("%s() called\n", __FUNCTION__);
-	sysfs_remove_link(&ndev->class_dev.kobj, dev->bus_id);
-	sysfs_remove_link(&dev->kobj, ndev->name);
 	netiucv_remove_files(dev);
 	device_unregister(dev);
 }
@@ -1814,7 +1849,7 @@ conn_write(struct device_driver *drv, const char *buf, size_t count)
 {
 	char *p;
 	char username[10];
-	int i;
+	int i, ret;
 	struct net_device *dev;
 
 	if (count>9) {
@@ -1846,30 +1881,37 @@ conn_write(struct device_driver *drv, const char *buf, size_t count)
 		return -ENODEV;
 	}
 	
-	if (register_netdev(dev)) {
-		printk(KERN_WARNING
-		       "netiucv: Could not register '%s'\n", dev->name);
-		netiucv_free_netdevice(dev);
-		return -ENODEV;
+	if ((ret = netiucv_register_device(dev, ifno)))
+		goto out_free_ndev;
+	/* sysfs magic */
+	SET_NETDEV_DEV(dev, (struct device*)((struct netiucv_priv*)dev->priv)->dev);
+	if ((ret = register_netdev(dev))) {
+		netiucv_unregister_device((struct device*)((struct netiucv_priv*)dev->priv)->dev);
+		goto out_free_ndev;
 	}
 	printk(KERN_INFO "%s: '%s'\n", dev->name, netiucv_printname(username));
-	netiucv_register_device(dev, ifno);
 	ifno++;
 	
 	return count;
+
+out_free_ndev:
+	printk(KERN_WARNING
+		       "netiucv: Could not register '%s'\n", dev->name);
+	netiucv_free_netdevice(dev);
+	return ret;
 }
 
 DRIVER_ATTR(connection, 0200, NULL, conn_write);
 
 static struct device_driver netiucv_driver = {
-	.name = "NETIUCV",
+	.name = "netiucv",
 	.bus  = &iucv_bus,
 };
 
 static void
 netiucv_banner(void)
 {
-	char vbuf[] = "$Revision: 1.38 $";
+	char vbuf[] = "$Revision: 1.45 $";
 	char *version = vbuf;
 
 	if ((version = strchr(version, ':'))) {

@@ -6,8 +6,6 @@
  *  general buffer i/o
  */
 
-#include <linux/buffer_head.h>
-#include <linux/string.h>
 #include "hpfs_fn.h"
 
 void hpfs_lock_creation(struct super_block *s)
@@ -24,136 +22,6 @@ void hpfs_unlock_creation(struct super_block *s)
 	printk("unlock creation\n");
 #endif
 	up(&hpfs_sb(s)->hpfs_creation_de);
-}
-
-void hpfs_lock_iget(struct super_block *s, int mode)
-{
-#ifdef DEBUG_LOCKS
-	printk("lock iget\n");
-#endif
-	while (hpfs_sb(s)->sb_rd_inode) sleep_on(&hpfs_sb(s)->sb_iget_q);
-	hpfs_sb(s)->sb_rd_inode = mode;
-}
-
-void hpfs_unlock_iget(struct super_block *s)
-{
-#ifdef DEBUG_LOCKS
-	printk("unlock iget\n");
-#endif
-	hpfs_sb(s)->sb_rd_inode = 0;
-	wake_up(&hpfs_sb(s)->sb_iget_q);
-}
-
-void hpfs_lock_inode(struct inode *i)
-{
-	if (i) {
-		struct hpfs_inode_info *hpfs_inode = hpfs_i(i);
-		down(&hpfs_inode->i_sem);
-	}
-}
-
-void hpfs_unlock_inode(struct inode *i)
-{
-	if (i) {
-		struct hpfs_inode_info *hpfs_inode = hpfs_i(i);
-		up(&hpfs_inode->i_sem);
-	}
-}
-
-void hpfs_lock_2inodes(struct inode *i1, struct inode *i2)
-{
-	struct hpfs_inode_info *hpfs_i1 = NULL, *hpfs_i2 = NULL;
-
-	if (!i1) {
-		if (i2) {
-			hpfs_i2 = hpfs_i(i2);
-			down(&hpfs_i2->i_sem);
-		}
-		return;
-	}
-	if (!i2) {
-		if (i1) {
-			hpfs_i1 = hpfs_i(i1);
-			down(&hpfs_i1->i_sem);
-		}
-		return;
-	}
-	if (i1->i_ino < i2->i_ino) {
-		down(&hpfs_i1->i_sem);
-		down(&hpfs_i2->i_sem);
-	} else if (i1->i_ino > i2->i_ino) {
-		down(&hpfs_i2->i_sem);
-		down(&hpfs_i1->i_sem);
-	} else down(&hpfs_i1->i_sem);
-}
-
-void hpfs_unlock_2inodes(struct inode *i1, struct inode *i2)
-{
-	struct hpfs_inode_info *hpfs_i1 = NULL, *hpfs_i2 = NULL;
-
-	if (!i1) {
-		if (i2) {
-			hpfs_i2 = hpfs_i(i2);
-			up(&hpfs_i2->i_sem);
-		}
-		return;
-	}
-	if (!i2) {
-		if (i1) {
-			hpfs_i1 = hpfs_i(i1);
-			up(&hpfs_i1->i_sem);
-		}
-		return;
-	}
-	if (i1->i_ino < i2->i_ino) {
-		up(&hpfs_i2->i_sem);
-		up(&hpfs_i1->i_sem);
-	} else if (i1->i_ino > i2->i_ino) {
-		up(&hpfs_i1->i_sem);
-		up(&hpfs_i2->i_sem);
-	} else up(&hpfs_i1->i_sem);
-}
-
-void hpfs_lock_3inodes(struct inode *i1, struct inode *i2, struct inode *i3)
-{
-	if (!i1) { hpfs_lock_2inodes(i2, i3); return; }
-	if (!i2) { hpfs_lock_2inodes(i1, i3); return; }
-	if (!i3) { hpfs_lock_2inodes(i1, i2); return; }
-	if (i1->i_ino < i2->i_ino && i1->i_ino < i3->i_ino) {
-		struct hpfs_inode_info *hpfs_i1 = hpfs_i(i1);
-		down(&hpfs_i1->i_sem);
-		hpfs_lock_2inodes(i2, i3);
-	} else if (i2->i_ino < i1->i_ino && i2->i_ino < i3->i_ino) {
-		struct hpfs_inode_info *hpfs_i2 = hpfs_i(i2);
-		down(&hpfs_i2->i_sem);
-		hpfs_lock_2inodes(i1, i3);
-	} else if (i3->i_ino < i1->i_ino && i3->i_ino < i2->i_ino) {
-		struct hpfs_inode_info *hpfs_i3 = hpfs_i(i3);
-		down(&hpfs_i3->i_sem);
-		hpfs_lock_2inodes(i1, i2);
-	} else if (i1->i_ino != i2->i_ino) hpfs_lock_2inodes(i1, i2);
-	else hpfs_lock_2inodes(i1, i3);
-}
-		
-void hpfs_unlock_3inodes(struct inode *i1, struct inode *i2, struct inode *i3)
-{
-	if (!i1) { hpfs_unlock_2inodes(i2, i3); return; }
-	if (!i2) { hpfs_unlock_2inodes(i1, i3); return; }
-	if (!i3) { hpfs_unlock_2inodes(i1, i2); return; }
-	if (i1->i_ino < i2->i_ino && i1->i_ino < i3->i_ino) {
-		struct hpfs_inode_info *hpfs_i1 = hpfs_i(i1);
-		hpfs_unlock_2inodes(i2, i3);
-		up(&hpfs_i1->i_sem);
-	} else if (i2->i_ino < i1->i_ino && i2->i_ino < i3->i_ino) {
-		struct hpfs_inode_info *hpfs_i2 = hpfs_i(i2);
-		hpfs_unlock_2inodes(i1, i3);
-		up(&hpfs_i2->i_sem);
-	} else if (i3->i_ino < i1->i_ino && i3->i_ino < i2->i_ino) {
-		struct hpfs_inode_info *hpfs_i3 = hpfs_i(i3);
-		hpfs_unlock_2inodes(i1, i2);
-		up(&hpfs_i3->i_sem);
-	} else if (i1->i_ino != i2->i_ino) hpfs_unlock_2inodes(i1, i2);
-	else hpfs_unlock_2inodes(i1, i3);
 }
 
 /* Map a sector into a buffer and return pointers to it and to the buffer. */
@@ -202,7 +70,7 @@ void *hpfs_map_4sectors(struct super_block *s, unsigned secno, struct quad_buffe
 		return 0;
 	}
 
-	qbh->data = data = (char *)kmalloc(2048, GFP_KERNEL);
+	qbh->data = data = (char *)kmalloc(2048, GFP_NOFS);
 	if (!data) {
 		printk("HPFS: hpfs_map_4sectors: out of memory\n");
 		goto bail;
@@ -254,7 +122,7 @@ void *hpfs_get_4sectors(struct super_block *s, unsigned secno,
 	}
 
 	/*return hpfs_map_4sectors(s, secno, qbh, 0);*/
-	if (!(qbh->data = kmalloc(2048, GFP_KERNEL))) {
+	if (!(qbh->data = kmalloc(2048, GFP_NOFS))) {
 		printk("HPFS: hpfs_get_4sectors: out of memory\n");
 		return NULL;
 	}

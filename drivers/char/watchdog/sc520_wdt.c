@@ -354,8 +354,6 @@ static int wdt_notify_sys(struct notifier_block *this, unsigned long code,
 static struct notifier_block wdt_notifier=
 {
 	.notifier_call = wdt_notify_sys,
-	.next = NULL,
-	.priority = 0,
 };
 
 static void __exit sc520_wdt_unload(void)

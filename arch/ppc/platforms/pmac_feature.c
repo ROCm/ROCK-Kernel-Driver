@@ -1360,7 +1360,7 @@ g5_fw_enable(struct device_node* node, long param, long value)
 		mb();
 		k2_skiplist[1] = NULL;
 	} else {
-		k2_skiplist[0] = pdev;
+		k2_skiplist[1] = pdev;
 		mb();
 		MACIO_BIC(KEYLARGO_FCR1, K2_FCR1_FW_CLK_ENABLE);
 	}

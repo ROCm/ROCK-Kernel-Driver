@@ -268,6 +268,7 @@ static int hfs_fill_super(struct super_block *sb, void *data, int silent)
 	}
 
 	sb->s_op = &hfs_super_operations;
+	sb->s_flags |= MS_NODIRATIME;
 	init_MUTEX(&sbi->bitmap_lock);
 
 	res = hfs_mdb_get(sb);
@@ -294,13 +295,15 @@ static int hfs_fill_super(struct super_block *sb, void *data, int silent)
 
 	sb->s_root = d_alloc_root(root_inode);
 	if (!sb->s_root)
-		goto bail_no_root;
+		goto bail_iput;
 
 	sb->s_root->d_op = &hfs_dentry_operations;
 
 	/* everything's okay */
 	return 0;
 
+bail_iput:
+	iput(root_inode);
 bail_no_root:
 	hfs_warn("hfs_fs: get root inode failed.\n");
 	hfs_mdb_put(sb);

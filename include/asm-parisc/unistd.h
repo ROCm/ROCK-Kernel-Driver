@@ -909,7 +909,6 @@ int sys_clone(unsigned long clone_flags, unsigned long usp,
 int sys_vfork(struct pt_regs *regs);
 int sys_pipe(int *fildes);
 long sys_ptrace(long request, pid_t pid, long addr, long data);
-asmlinkage long sys_ioperm(unsigned long from, unsigned long num, int turn_on);
 struct sigaction;
 asmlinkage long sys_rt_sigaction(int sig,
 				const struct sigaction __user *act,

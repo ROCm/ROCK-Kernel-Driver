@@ -1135,7 +1135,7 @@ void print_Scsi_Cmnd(struct scsi_cmnd *cmd) {
 static const char * hostbyte_table[]={
 "DID_OK", "DID_NO_CONNECT", "DID_BUS_BUSY", "DID_TIME_OUT", "DID_BAD_TARGET", 
 "DID_ABORT", "DID_PARITY", "DID_ERROR", "DID_RESET", "DID_BAD_INTR",
-"DID_PASSTHROUGH", "DID_SOFT_ERROR", NULL};
+"DID_PASSTHROUGH", "DID_SOFT_ERROR", "DID_IMM_RETRY", NULL};
 
 void print_hostbyte(int scsiresult)
 {   static int maxcode=0;

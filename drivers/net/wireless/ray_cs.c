@@ -454,11 +454,8 @@ static void ray_detach(dev_link_t *link)
       the release() function is called, that will trigger a proper
       detach().
     */
-    if (link->state & DEV_CONFIG) {
+    if (link->state & DEV_CONFIG)
         ray_release(link);
-        if(link->state & DEV_STALE_CONFIG)
-            return;
-    }
 
     /* Break the link with Card Services */
     if (link->handle)
@@ -872,15 +869,7 @@ static void ray_release(dev_link_t *link)
     int i;
     
     DEBUG(1, "ray_release(0x%p)\n", link);
-    /* If the device is currently in use, we won't release until it
-      is actually closed.
-    */
-    if (link->open) {
-        DEBUG(1, "ray_cs: release postponed, '%s' still open\n",
-              link->dev->dev_name);
-        link->state |= DEV_STALE_CONFIG;
-        return;
-    }
+
     del_timer(&local->timer);
     link->state &= ~DEV_CONFIG;
 
@@ -900,9 +889,6 @@ static void ray_release(dev_link_t *link)
     if ( i != CS_SUCCESS ) DEBUG(0,"ReleaseIRQ ret = %x\n",i);
 
     DEBUG(2,"ray_release ending\n");
-
-    if (link->state & DEV_STALE_CONFIG)
-	    ray_detach(link);
 }
 
 /*=============================================================================
@@ -1724,8 +1710,6 @@ static int ray_dev_close(struct net_device *dev)
 
     link->open--;
     netif_stop_queue(dev);
-    if (link->state & DEV_STALE_CONFIG)
-	    ray_release(link);
 
     /* In here, we should stop the hardware (stop card from beeing active)
      * and set local->card_status to CARD_AWAITING_PARAM, so that while the

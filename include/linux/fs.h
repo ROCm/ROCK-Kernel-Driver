@@ -89,6 +89,7 @@ extern int leases_enable, dir_notify_enable, lease_break_time;
 
 /* public flags for file_system_type */
 #define FS_REQUIRES_DEV 1 
+#define FS_BINARY_MOUNTDATA 2
 #define FS_REVAL_DOT	16384	/* Check the paths ".", ".." for staleness */
 #define FS_ODD_RENAME	32768	/* Temporary stuff; will go away as soon
 				  * as nfs_rename() will be cleaned up
@@ -137,6 +138,7 @@ extern int leases_enable, dir_notify_enable, lease_break_time;
 #define S_DEAD		32	/* removed, but still open directory */
 #define S_NOQUOTA	64	/* Inode is not counted to quota */
 #define S_DIRSYNC	128	/* Directory modifications are synchronous */
+#define S_NOCMTIME	256	/* Do not update file c/mtime */
 
 /*
  * Note that nosuid etc flags are inode-specific: setting some file-system
@@ -170,6 +172,7 @@ extern int leases_enable, dir_notify_enable, lease_break_time;
 #define IS_ONE_SECOND(inode)	__IS_FLG(inode, MS_ONE_SECOND)
 
 #define IS_DEADDIR(inode)	((inode)->i_flags & S_DEAD)
+#define IS_NOCMTIME(inode)	((inode)->i_flags & S_NOCMTIME)
 
 /* the read-only stuff doesn't really belong here, but any other place is
    probably as bad and I don't want to create yet another include file. */
@@ -507,6 +510,8 @@ struct file_ra_state {
 	unsigned long prev_page;	/* Cache last read() position */
 	unsigned long ahead_start;	/* Ahead window */
 	unsigned long ahead_size;
+	unsigned long serial_cnt;	/* measure of sequentiality */
+	unsigned long average;		/* another measure of sequentiality */
 	unsigned long ra_pages;		/* Maximum readahead window */
 	unsigned long mmap_hit;		/* Cache hit stat for mmap accesses */
 	unsigned long mmap_miss;	/* Cache miss stat for mmap accesses */
@@ -909,6 +914,17 @@ static inline void mark_inode_dirty_sync(struct inode *inode)
 	__mark_inode_dirty(inode, I_DIRTY_SYNC);
 }
 
+static inline void touch_atime(struct vfsmount *mnt, struct dentry *dentry)
+{
+	/* per-mountpoint checks will go here */
+	update_atime(dentry->d_inode);
+}
+
+static inline void file_accessed(struct file *file)
+{
+	touch_atime(file->f_vfsmnt, file->f_dentry);
+}
+
 
 /**
  * &export_operations - for nfsd to communicate with file systems
@@ -1133,6 +1149,7 @@ extern void vfs_caches_init(unsigned long);
 extern int register_blkdev(unsigned int, const char *);
 extern int unregister_blkdev(unsigned int, const char *);
 extern struct block_device *bdget(dev_t);
+extern void bd_set_size(struct block_device *, loff_t size);
 extern void bd_forget(struct inode *inode);
 extern void bdput(struct block_device *);
 extern int blkdev_open(struct inode *, struct file *);
@@ -1280,7 +1297,7 @@ extern void __iget(struct inode * inode);
 extern void clear_inode(struct inode *);
 extern void destroy_inode(struct inode *);
 extern struct inode *new_inode(struct super_block *);
-extern void remove_suid(struct dentry *);
+extern int remove_suid(struct dentry *);
 
 extern void __insert_inode_hash(struct inode *, unsigned long hashval);
 extern void remove_inode_hash(struct inode *);
@@ -1315,7 +1332,8 @@ extern ssize_t do_sync_write(struct file *filp, const char __user *buf, size_t l
 ssize_t generic_file_write_nolock(struct file *file, const struct iovec *iov,
 				unsigned long nr_segs, loff_t *ppos);
 extern ssize_t generic_file_sendfile(struct file *, loff_t *, size_t, read_actor_t, void __user *);
-extern void do_generic_mapping_read(struct address_space *, struct file_ra_state *, struct file *,
+extern void do_generic_mapping_read(struct address_space *mapping,
+				    struct file_ra_state *, struct file *,
 				    loff_t *, read_descriptor_t *, read_actor_t);
 extern void
 file_ra_state_init(struct file_ra_state *ra, struct address_space *mapping);

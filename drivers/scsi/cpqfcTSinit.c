@@ -46,10 +46,6 @@
 #include <linux/ioport.h>  // request_region() prototype
 #include <linux/completion.h>
 
-#ifdef __alpha__
-#define __KERNEL_SYSCALLS__
-#endif
-#include <asm/unistd.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>   // ioctl related
 #include <asm/irq.h>

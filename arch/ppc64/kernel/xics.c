@@ -327,6 +327,8 @@ static void xics_mask_and_ack_irq(unsigned int irq)
 	}
 }
 
+extern unsigned int real_irq_to_virt_slowpath(unsigned int real_irq);
+
 int xics_get_irq(struct pt_regs *regs)
 {
 	unsigned int cpu = smp_processor_id();
@@ -349,6 +351,8 @@ int xics_get_irq(struct pt_regs *regs)
 		irq = -1;
 	} else {
 		irq = real_irq_to_virt(vec);
+		if (irq == NO_IRQ)
+			irq = real_irq_to_virt_slowpath(vec);
 		if (irq == NO_IRQ) {
 			printk(KERN_ERR "Interrupt 0x%x (real) is invalid,"
 			       " disabling it.\n", vec);

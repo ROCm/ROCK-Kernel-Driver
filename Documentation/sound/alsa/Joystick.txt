@@ -43,7 +43,8 @@ The following PCI drivers support the joystick natively.
     ens1370	joystick	0 = disable (default), 1 = enable
     ens1371	joystick_port	0 = disable (default), 1 = auto-detect,
                                 manual: 0x200, 0x208, 0x210, 0x218
-    cmipci	joystick	0 = disable (default), 1 = enable
+    cmipci	joystick_port	0 = disable (default), 1 = auto-detect,
+                                manual: any address (e.g. 0x200)
     cs4281	N/A		N/A
     cs46xx	N/A		N/A
     es1938	N/A		N/A

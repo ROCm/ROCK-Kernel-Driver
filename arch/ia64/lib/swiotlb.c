@@ -47,7 +47,7 @@
 #define IO_TLB_SHIFT 11
 
 /*
- * Used to do a quick range check in swiotlb_unmap_single and swiotlb_sync_single, to see
+ * Used to do a quick range check in swiotlb_unmap_single and swiotlb_sync_single_*, to see
  * if the memory was in fact allocated by this API.
  */
 static char *io_tlb_start, *io_tlb_end;
@@ -381,11 +381,24 @@ swiotlb_unmap_single (struct device *hwdev, dma_addr_t dev_addr, size_t size, in
  *
  * If you perform a swiotlb_map_single() but wish to interrogate the buffer using the cpu,
  * yet do not wish to teardown the PCI dma mapping, you must call this function before
- * doing so.  At the next point you give the PCI dma address back to the card, the device
- * again owns the buffer.
+ * doing so.  At the next point you give the PCI dma address back to the card, you must
+ * first perform a swiotlb_dma_sync_for_device, and then the device again owns the buffer
  */
 void
-swiotlb_sync_single (struct device *hwdev, dma_addr_t dev_addr, size_t size, int dir)
+swiotlb_sync_single_for_cpu (struct device *hwdev, dma_addr_t dev_addr, size_t size, int dir)
+{
+	char *dma_addr = phys_to_virt(dev_addr);
+
+	if (dir == DMA_NONE)
+		BUG();
+	if (dma_addr >= io_tlb_start && dma_addr < io_tlb_end)
+		sync_single(hwdev, dma_addr, size, dir);
+	else if (dir == DMA_FROM_DEVICE)
+		mark_clean(dma_addr, size);
+}
+
+void
+swiotlb_sync_single_for_device (struct device *hwdev, dma_addr_t dev_addr, size_t size, int dir)
 {
 	char *dma_addr = phys_to_virt(dev_addr);
 
@@ -456,11 +469,24 @@ swiotlb_unmap_sg (struct device *hwdev, struct scatterlist *sg, int nelems, int 
  * Make physical memory consistent for a set of streaming mode DMA translations after a
  * transfer.
  *
- * The same as swiotlb_dma_sync_single but for a scatter-gather list, same rules and
+ * The same as swiotlb_sync_single_* but for a scatter-gather list, same rules and
  * usage.
  */
 void
-swiotlb_sync_sg (struct device *hwdev, struct scatterlist *sg, int nelems, int dir)
+swiotlb_sync_sg_for_cpu (struct device *hwdev, struct scatterlist *sg, int nelems, int dir)
+{
+	int i;
+
+	if (dir == DMA_NONE)
+		BUG();
+
+	for (i = 0; i < nelems; i++, sg++)
+		if (sg->dma_address != SG_ENT_PHYS_ADDRESS(sg))
+			sync_single(hwdev, (void *) sg->dma_address, sg->dma_length, dir);
+}
+
+void
+swiotlb_sync_sg_for_device (struct device *hwdev, struct scatterlist *sg, int nelems, int dir)
 {
 	int i;
 
@@ -488,8 +514,10 @@ EXPORT_SYMBOL(swiotlb_map_single);
 EXPORT_SYMBOL(swiotlb_unmap_single);
 EXPORT_SYMBOL(swiotlb_map_sg);
 EXPORT_SYMBOL(swiotlb_unmap_sg);
-EXPORT_SYMBOL(swiotlb_sync_single);
-EXPORT_SYMBOL(swiotlb_sync_sg);
+EXPORT_SYMBOL(swiotlb_sync_single_for_cpu);
+EXPORT_SYMBOL(swiotlb_sync_single_for_device);
+EXPORT_SYMBOL(swiotlb_sync_sg_for_cpu);
+EXPORT_SYMBOL(swiotlb_sync_sg_for_device);
 EXPORT_SYMBOL(swiotlb_alloc_coherent);
 EXPORT_SYMBOL(swiotlb_free_coherent);
 EXPORT_SYMBOL(swiotlb_dma_supported);

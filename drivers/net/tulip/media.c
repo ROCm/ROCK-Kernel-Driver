@@ -8,7 +8,7 @@
 	This software may be used and distributed according to the terms
 	of the GNU General Public License, incorporated herein by reference.
 
-	Please refer to Documentation/DocBook/tulip.{pdf,ps,html}
+	Please refer to Documentation/DocBook/tulip-user.{pdf,ps,html}
 	for more information on this driver, or visit the project
 	Web page at http://sourceforge.net/projects/tulip/
 
@@ -48,7 +48,7 @@ static const unsigned char comet_miireg2offset[32] = {
 
 int tulip_mdio_read(struct net_device *dev, int phy_id, int location)
 {
-	struct tulip_private *tp = (struct tulip_private *)dev->priv;
+	struct tulip_private *tp = netdev_priv(dev);
 	int i;
 	int read_cmd = (0xf6 << 10) | ((phy_id & 0x1f) << 5) | location;
 	int retval = 0;
@@ -111,7 +111,7 @@ int tulip_mdio_read(struct net_device *dev, int phy_id, int location)
 
 void tulip_mdio_write(struct net_device *dev, int phy_id, int location, int val)
 {
-	struct tulip_private *tp = (struct tulip_private *)dev->priv;
+	struct tulip_private *tp = netdev_priv(dev);
 	int i;
 	int cmd = (0x5002 << 16) | ((phy_id & 0x1f) << 23) | (location<<18) | (val & 0xffff);
 	long ioaddr = dev->base_addr;
@@ -171,7 +171,7 @@ void tulip_mdio_write(struct net_device *dev, int phy_id, int location, int val)
 void tulip_select_media(struct net_device *dev, int startup)
 {
 	long ioaddr = dev->base_addr;
-	struct tulip_private *tp = (struct tulip_private *)dev->priv;
+	struct tulip_private *tp = netdev_priv(dev);
 	struct mediatable *mtable = tp->mtable;
 	u32 new_csr6;
 	int i;
@@ -374,7 +374,7 @@ void tulip_select_media(struct net_device *dev, int startup)
   */
 int tulip_check_duplex(struct net_device *dev)
 {
-	struct tulip_private *tp = dev->priv;
+	struct tulip_private *tp = netdev_priv(dev);
 	unsigned int bmsr, lpa, negotiated, new_csr6;
 
 	bmsr = tulip_mdio_read(dev, tp->phys[0], MII_BMSR);
@@ -420,7 +420,7 @@ int tulip_check_duplex(struct net_device *dev)
 
 void __devinit tulip_find_mii (struct net_device *dev, int board_idx)
 {
-	struct tulip_private *tp = dev->priv;
+	struct tulip_private *tp = netdev_priv(dev);
 	int phyn, phy_idx = 0;
 	int mii_reg0;
 	int mii_advert;

@@ -33,6 +33,7 @@
 
 #include <linux/config.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/major.h>
@@ -53,6 +54,7 @@
 
 #include <asm/atomic.h>
 
+#define IN_CARD_SERVICES
 #include <pcmcia/version.h>
 #include <pcmcia/cs_types.h>
 #include <pcmcia/cs.h>
@@ -60,6 +62,8 @@
 #include <pcmcia/cistpl.h>
 #include <pcmcia/ds.h>
 #include <pcmcia/ss.h>
+
+#include "cs_internal.h"
 
 /*====================================================================*/
 
@@ -69,13 +73,17 @@ MODULE_AUTHOR("David Hinds <dahinds@users.sourceforge.net>");
 MODULE_DESCRIPTION("PCMCIA Driver Services");
 MODULE_LICENSE("Dual MPL/GPL");
 
-#define INT_MODULE_PARM(n, v) static int n = v; MODULE_PARM(n, "i")
+#ifdef DEBUG
+static int pc_debug;
 
-#ifdef PCMCIA_DEBUG
-INT_MODULE_PARM(pc_debug, PCMCIA_DEBUG);
-#define DEBUG(n, args...) if (pc_debug>(n)) printk(KERN_DEBUG args)
+module_param(pc_debug, int, 0644);
+
+#define ds_dbg(lvl, fmt, arg...) do {				\
+	if (pc_debug > (lvl))					\
+		printk(KERN_DEBUG "ds: " fmt , ## arg);		\
+} while (0)
 #else
-#define DEBUG(n, args...)
+#define ds_dbg(lvl, fmt, arg...) do { } while (0)
 #endif
 
 /*====================================================================*/
@@ -113,10 +121,10 @@ struct pcmcia_bus_socket {
 	struct pcmcia_socket	*parent;
 };
 
-#define SOCKET_PRESENT		0x01
-#define SOCKET_BUSY		0x02
-#define SOCKET_REMOVAL_PENDING	0x10
-#define SOCKET_DEAD		0x80
+#define DS_SOCKET_PRESENT		0x01
+#define DS_SOCKET_BUSY			0x02
+#define DS_SOCKET_REMOVAL_PENDING	0x10
+#define DS_SOCKET_DEAD			0x80
 
 /*====================================================================*/
 
@@ -128,6 +136,214 @@ static int major_dev = -1;
 extern struct proc_dir_entry *proc_pccard;
 
 /*====================================================================*/
+
+/* code which was in cs.c before */
+
+/*======================================================================
+
+    Bind_device() associates a device driver with a particular socket.
+    It is normally called by Driver Services after it has identified
+    a newly inserted card.  An instance of that driver will then be
+    eligible to register as a client of this socket.
+    
+======================================================================*/
+
+static int pcmcia_bind_device(bind_req_t *req)
+{
+	client_t *client;
+	struct pcmcia_socket *s;
+
+	s = req->Socket;
+	if (!s)
+		return CS_BAD_SOCKET;
+
+	client = (client_t *) kmalloc(sizeof(client_t), GFP_KERNEL);
+	if (!client) 
+		return CS_OUT_OF_RESOURCE;
+	memset(client, '\0', sizeof(client_t));
+	client->client_magic = CLIENT_MAGIC;
+	strlcpy(client->dev_info, (char *)req->dev_info, DEV_NAME_LEN);
+	client->Socket = s;
+	client->Function = req->Function;
+	client->state = CLIENT_UNBOUND;
+	client->erase_busy.next = &client->erase_busy;
+	client->erase_busy.prev = &client->erase_busy;
+	init_waitqueue_head(&client->mtd_req);
+	client->next = s->clients;
+	s->clients = client;
+	ds_dbg(1, "%s: bind_device(): client 0x%p, dev %s\n",
+		cs_socket_name(client->Socket), client, client->dev_info);
+	return CS_SUCCESS;
+} /* bind_device */
+
+
+/*======================================================================
+
+    Bind_mtd() associates a device driver with a particular memory
+    region.  It is normally called by Driver Services after it has
+    identified a memory device type.  An instance of the corresponding
+    driver will then be able to register to control this region.
+    
+======================================================================*/
+
+static int pcmcia_bind_mtd(mtd_bind_t *req)
+{
+	struct pcmcia_socket *s;
+	memory_handle_t region;
+
+	s = req->Socket;
+	if (!s)
+		return CS_BAD_SOCKET;
+    
+	if (req->Attributes & REGION_TYPE_AM)
+		region = s->a_region;
+	else
+		region = s->c_region;
+
+	while (region) {
+		if (region->info.CardOffset == req->CardOffset) 
+			break;
+		region = region->info.next;
+	}
+	if (!region || (region->mtd != NULL))
+		return CS_BAD_OFFSET;
+	strlcpy(region->dev_info, (char *)req->dev_info, DEV_NAME_LEN);
+
+	ds_dbg(1, "%s: bind_mtd: attr 0x%x, offset 0x%x, dev %s\n",
+	      cs_socket_name(s), req->Attributes, req->CardOffset,
+	      (char *)req->dev_info);
+	return CS_SUCCESS;
+} /* bind_mtd */
+
+
+/* String tables for error messages */
+
+typedef struct lookup_t {
+    int key;
+    char *msg;
+} lookup_t;
+
+static const lookup_t error_table[] = {
+    { CS_SUCCESS,		"Operation succeeded" },
+    { CS_BAD_ADAPTER,		"Bad adapter" },
+    { CS_BAD_ATTRIBUTE, 	"Bad attribute", },
+    { CS_BAD_BASE,		"Bad base address" },
+    { CS_BAD_EDC,		"Bad EDC" },
+    { CS_BAD_IRQ,		"Bad IRQ" },
+    { CS_BAD_OFFSET,		"Bad offset" },
+    { CS_BAD_PAGE,		"Bad page number" },
+    { CS_READ_FAILURE,		"Read failure" },
+    { CS_BAD_SIZE,		"Bad size" },
+    { CS_BAD_SOCKET,		"Bad socket" },
+    { CS_BAD_TYPE,		"Bad type" },
+    { CS_BAD_VCC,		"Bad Vcc" },
+    { CS_BAD_VPP,		"Bad Vpp" },
+    { CS_BAD_WINDOW,		"Bad window" },
+    { CS_WRITE_FAILURE,		"Write failure" },
+    { CS_NO_CARD,		"No card present" },
+    { CS_UNSUPPORTED_FUNCTION,	"Usupported function" },
+    { CS_UNSUPPORTED_MODE,	"Unsupported mode" },
+    { CS_BAD_SPEED,		"Bad speed" },
+    { CS_BUSY,			"Resource busy" },
+    { CS_GENERAL_FAILURE,	"General failure" },
+    { CS_WRITE_PROTECTED,	"Write protected" },
+    { CS_BAD_ARG_LENGTH,	"Bad argument length" },
+    { CS_BAD_ARGS,		"Bad arguments" },
+    { CS_CONFIGURATION_LOCKED,	"Configuration locked" },
+    { CS_IN_USE,		"Resource in use" },
+    { CS_NO_MORE_ITEMS,		"No more items" },
+    { CS_OUT_OF_RESOURCE,	"Out of resource" },
+    { CS_BAD_HANDLE,		"Bad handle" },
+    { CS_BAD_TUPLE,		"Bad CIS tuple" }
+};
+
+
+static const lookup_t service_table[] = {
+    { AccessConfigurationRegister,	"AccessConfigurationRegister" },
+    { AddSocketServices,		"AddSocketServices" },
+    { AdjustResourceInfo,		"AdjustResourceInfo" },
+    { CheckEraseQueue,			"CheckEraseQueue" },
+    { CloseMemory,			"CloseMemory" },
+    { DeregisterClient,			"DeregisterClient" },
+    { DeregisterEraseQueue,		"DeregisterEraseQueue" },
+    { GetCardServicesInfo,		"GetCardServicesInfo" },
+    { GetClientInfo,			"GetClientInfo" },
+    { GetConfigurationInfo,		"GetConfigurationInfo" },
+    { GetEventMask,			"GetEventMask" },
+    { GetFirstClient,			"GetFirstClient" },
+    { GetFirstRegion,			"GetFirstRegion" },
+    { GetFirstTuple,			"GetFirstTuple" },
+    { GetNextClient,			"GetNextClient" },
+    { GetNextRegion,			"GetNextRegion" },
+    { GetNextTuple,			"GetNextTuple" },
+    { GetStatus,			"GetStatus" },
+    { GetTupleData,			"GetTupleData" },
+    { MapMemPage,			"MapMemPage" },
+    { ModifyConfiguration,		"ModifyConfiguration" },
+    { ModifyWindow,			"ModifyWindow" },
+    { OpenMemory,			"OpenMemory" },
+    { ParseTuple,			"ParseTuple" },
+    { ReadMemory,			"ReadMemory" },
+    { RegisterClient,			"RegisterClient" },
+    { RegisterEraseQueue,		"RegisterEraseQueue" },
+    { RegisterMTD,			"RegisterMTD" },
+    { ReleaseConfiguration,		"ReleaseConfiguration" },
+    { ReleaseIO,			"ReleaseIO" },
+    { ReleaseIRQ,			"ReleaseIRQ" },
+    { ReleaseWindow,			"ReleaseWindow" },
+    { RequestConfiguration,		"RequestConfiguration" },
+    { RequestIO,			"RequestIO" },
+    { RequestIRQ,			"RequestIRQ" },
+    { RequestSocketMask,		"RequestSocketMask" },
+    { RequestWindow,			"RequestWindow" },
+    { ResetCard,			"ResetCard" },
+    { SetEventMask,			"SetEventMask" },
+    { ValidateCIS,			"ValidateCIS" },
+    { WriteMemory,			"WriteMemory" },
+    { BindDevice,			"BindDevice" },
+    { BindMTD,				"BindMTD" },
+    { ReportError,			"ReportError" },
+    { SuspendCard,			"SuspendCard" },
+    { ResumeCard,			"ResumeCard" },
+    { EjectCard,			"EjectCard" },
+    { InsertCard,			"InsertCard" },
+    { ReplaceCIS,			"ReplaceCIS" }
+};
+
+
+int pcmcia_report_error(client_handle_t handle, error_info_t *err)
+{
+	int i;
+	char *serv;
+
+	if (CHECK_HANDLE(handle))
+		printk(KERN_NOTICE);
+	else
+		printk(KERN_NOTICE "%s: ", handle->dev_info);
+
+	for (i = 0; i < ARRAY_SIZE(service_table); i++)
+		if (service_table[i].key == err->func)
+			break;
+	if (i < ARRAY_SIZE(service_table))
+		serv = service_table[i].msg;
+	else
+		serv = "Unknown service number";
+
+	for (i = 0; i < ARRAY_SIZE(error_table); i++)
+		if (error_table[i].key == err->retcode)
+			break;
+	if (i < ARRAY_SIZE(error_table))
+		printk("%s: %s\n", serv, error_table[i].msg);
+	else
+		printk("%s: Unknown error code %#x\n", serv, err->retcode);
+
+	return CS_SUCCESS;
+} /* report_error */
+EXPORT_SYMBOL(pcmcia_report_error);
+
+/* end of code which was in cs.c before */
+
+/*======================================================================*/
 
 void cs_error(client_handle_t handle, int func, int ret)
 {
@@ -249,12 +465,12 @@ static int handle_request(struct pcmcia_bus_socket *s, event_t event)
 {
     if (s->req_pending != 0)
 	return CS_IN_USE;
-    if (s->state & SOCKET_BUSY)
+    if (s->state & DS_SOCKET_BUSY)
 	s->req_pending = 1;
     handle_event(s, event);
     if (wait_event_interruptible(s->request, s->req_pending <= 0))
         return CS_IN_USE;
-    if (s->state & SOCKET_BUSY)
+    if (s->state & DS_SOCKET_BUSY)
         return s->req_result;
     return CS_SUCCESS;
 }
@@ -263,7 +479,7 @@ static void handle_removal(void *data)
 {
     struct pcmcia_bus_socket *s = data;
     handle_event(s, CS_EVENT_CARD_REMOVAL);
-    s->state &= ~SOCKET_REMOVAL_PENDING;
+    s->state &= ~DS_SOCKET_REMOVAL_PENDING;
 }
 
 /*======================================================================
@@ -277,22 +493,22 @@ static int ds_event(event_t event, int priority,
 {
     struct pcmcia_bus_socket *s;
 
-    DEBUG(1, "ds: ds_event(0x%06x, %d, 0x%p)\n",
+    ds_dbg(1, "ds_event(0x%06x, %d, 0x%p)\n",
 	  event, priority, args->client_handle);
     s = args->client_data;
     
     switch (event) {
 	
     case CS_EVENT_CARD_REMOVAL:
-	s->state &= ~SOCKET_PRESENT;
-	if (!(s->state & SOCKET_REMOVAL_PENDING)) {
-		s->state |= SOCKET_REMOVAL_PENDING;
+	s->state &= ~DS_SOCKET_PRESENT;
+	if (!(s->state & DS_SOCKET_REMOVAL_PENDING)) {
+		s->state |= DS_SOCKET_REMOVAL_PENDING;
 		schedule_delayed_work(&s->removal,  HZ/10);
 	}
 	break;
 	
     case CS_EVENT_CARD_INSERTION:
-	s->state |= SOCKET_PRESENT;
+	s->state |= DS_SOCKET_PRESENT;
 	handle_event(s, event);
 	break;
 
@@ -353,7 +569,7 @@ static int bind_request(struct pcmcia_bus_socket *s, bind_info_t *bind_info)
     if (!s)
 	    return -EINVAL;
 
-    DEBUG(2, "bind_request(%d, '%s')\n", s->parent->sock,
+    ds_dbg(2, "bind_request(%d, '%s')\n", s->parent->sock,
 	  (char *)bind_info->dev_info);
     driver = get_pcmcia_driver(&bind_info->dev_info);
     if (!driver)
@@ -484,7 +700,7 @@ static int unbind_request(struct pcmcia_bus_socket *s, bind_info_t *bind_info)
 {
     socket_bind_t **b, *c;
 
-    DEBUG(2, "unbind_request(%d, '%s')\n", s->parent->sock,
+    ds_dbg(2, "unbind_request(%d, '%s')\n", s->parent->sock,
 	  (char *)bind_info->dev_info);
     for (b = &s->bind; *b; b = &(*b)->next)
 	if ((strcmp((char *)(*b)->driver->drv.name,
@@ -518,17 +734,17 @@ static int ds_open(struct inode *inode, struct file *file)
     struct pcmcia_bus_socket *s;
     user_info_t *user;
 
-    DEBUG(0, "ds_open(socket %d)\n", i);
+    ds_dbg(0, "ds_open(socket %d)\n", i);
 
     s = pcmcia_get_bus_socket(i);
     if (!s)
 	    return -ENODEV;
 
     if ((file->f_flags & O_ACCMODE) != O_RDONLY) {
-	if (s->state & SOCKET_BUSY)
+	if (s->state & DS_SOCKET_BUSY)
 	    return -EBUSY;
 	else
-	    s->state |= SOCKET_BUSY;
+	    s->state |= DS_SOCKET_BUSY;
     }
     
     user = kmalloc(sizeof(user_info_t), GFP_KERNEL);
@@ -540,7 +756,7 @@ static int ds_open(struct inode *inode, struct file *file)
     s->user = user;
     file->private_data = user;
     
-    if (s->state & SOCKET_PRESENT)
+    if (s->state & DS_SOCKET_PRESENT)
 	queue_event(user, CS_EVENT_CARD_INSERTION);
     return 0;
 } /* ds_open */
@@ -552,7 +768,7 @@ static int ds_release(struct inode *inode, struct file *file)
     struct pcmcia_bus_socket *s;
     user_info_t *user, **link;
 
-    DEBUG(0, "ds_release(socket %d)\n", iminor(inode));
+    ds_dbg(0, "ds_release(socket %d)\n", iminor(inode));
 
     user = file->private_data;
     if (CHECK_USER(user))
@@ -562,7 +778,7 @@ static int ds_release(struct inode *inode, struct file *file)
 
     /* Unlink user data structure */
     if ((file->f_flags & O_ACCMODE) != O_RDONLY) {
-	s->state &= ~SOCKET_BUSY;
+	s->state &= ~DS_SOCKET_BUSY;
 	s->req_pending = 0;
 	wake_up_interruptible(&s->request);
     }
@@ -588,7 +804,7 @@ static ssize_t ds_read(struct file *file, char *buf,
     user_info_t *user;
     int ret;
 
-    DEBUG(2, "ds_read(socket %d)\n", iminor(inode));
+    ds_dbg(2, "ds_read(socket %d)\n", iminor(file->f_dentry->d_inode));
     
     if (count < 4)
 	return -EINVAL;
@@ -598,7 +814,7 @@ static ssize_t ds_read(struct file *file, char *buf,
 	return -EIO;
     
     s = user->socket;
-    if (s->state & SOCKET_DEAD)
+    if (s->state & DS_SOCKET_DEAD)
         return -EIO;
 
     ret = wait_event_interruptible(s->queue, !queue_empty(user));
@@ -616,7 +832,7 @@ static ssize_t ds_write(struct file *file, const char *buf,
     struct pcmcia_bus_socket *s;
     user_info_t *user;
 
-    DEBUG(2, "ds_write(socket %d)\n", iminor(inode));
+    ds_dbg(2, "ds_write(socket %d)\n", iminor(file->f_dentry->d_inode));
     
     if (count != 4)
 	return -EINVAL;
@@ -628,7 +844,7 @@ static ssize_t ds_write(struct file *file, const char *buf,
 	return -EIO;
 
     s = user->socket;
-    if (s->state & SOCKET_DEAD)
+    if (s->state & DS_SOCKET_DEAD)
         return -EIO;
 
     if (s->req_pending) {
@@ -650,7 +866,7 @@ static u_int ds_poll(struct file *file, poll_table *wait)
     struct pcmcia_bus_socket *s;
     user_info_t *user;
 
-    DEBUG(2, "ds_poll(socket %d)\n", iminor(inode));
+    ds_dbg(2, "ds_poll(socket %d)\n", iminor(file->f_dentry->d_inode));
     
     user = file->private_data;
     if (CHECK_USER(user))
@@ -677,14 +893,14 @@ static int ds_ioctl(struct inode * inode, struct file * file,
     ds_ioctl_arg_t buf;
     user_info_t *user;
 
-    DEBUG(2, "ds_ioctl(socket %d, %#x, %#lx)\n", iminor(inode), cmd, arg);
+    ds_dbg(2, "ds_ioctl(socket %d, %#x, %#lx)\n", iminor(inode), cmd, arg);
     
     user = file->private_data;
     if (CHECK_USER(user))
 	return -EIO;
 
     s = user->socket;
-    if (s->state & SOCKET_DEAD)
+    if (s->state & DS_SOCKET_DEAD)
         return -EIO;
     
     size = (cmd & IOCSIZE_MASK) >> IOCSIZE_SHIFT;
@@ -697,14 +913,14 @@ static int ds_ioctl(struct inode * inode, struct file * file,
     if (cmd & IOC_IN) {
 	err = verify_area(VERIFY_READ, (char *)arg, size);
 	if (err) {
-	    DEBUG(3, "ds_ioctl(): verify_read = %d\n", err);
+	    ds_dbg(3, "ds_ioctl(): verify_read = %d\n", err);
 	    return err;
 	}
     }
     if (cmd & IOC_OUT) {
 	err = verify_area(VERIFY_WRITE, (char *)arg, size);
 	if (err) {
-	    DEBUG(3, "ds_ioctl(): verify_write = %d\n", err);
+	    ds_dbg(3, "ds_ioctl(): verify_write = %d\n", err);
 	    return err;
 	}
     }
@@ -748,16 +964,16 @@ static int ds_ioctl(struct inode * inode, struct file * file,
 	ret = pcmcia_validate_cis(s->handle, &buf.cisinfo);
 	break;
     case DS_SUSPEND_CARD:
-	ret = pcmcia_suspend_card(s->handle, NULL);
+	ret = pcmcia_suspend_card(s->parent);
 	break;
     case DS_RESUME_CARD:
-	ret = pcmcia_resume_card(s->handle, NULL);
+	ret = pcmcia_resume_card(s->parent);
 	break;
     case DS_EJECT_CARD:
-	ret = pcmcia_eject_card(s->handle, NULL);
+	ret = pcmcia_eject_card(s->parent);
 	break;
     case DS_INSERT_CARD:
-	ret = pcmcia_insert_card(s->handle, NULL);
+	ret = pcmcia_insert_card(s->parent);
 	break;
     case DS_ACCESS_CONFIGURATION_REGISTER:
 	if ((buf.conf_reg.Action == CS_WRITE) && !capable(CAP_SYS_ADMIN))
@@ -806,7 +1022,7 @@ static int ds_ioctl(struct inode * inode, struct file * file,
     }
     
     if ((err == 0) && (ret != CS_SUCCESS)) {
-	DEBUG(2, "ds_ioctl: ret = %d\n", ret);
+	ds_dbg(2, "ds_ioctl: ret = %d\n", ret);
 	switch (ret) {
 	case CS_BAD_SOCKET: case CS_NO_CARD:
 	    err = -ENODEV; break;
@@ -916,7 +1132,7 @@ static void pcmcia_bus_remove_socket(struct class_device *class_dev)
 
 	pcmcia_deregister_client(socket->pcmcia->handle);
 
-	socket->pcmcia->state |= SOCKET_DEAD;
+	socket->pcmcia->state |= DS_SOCKET_DEAD;
 	pcmcia_put_bus_socket(socket->pcmcia);
 	socket->pcmcia = NULL;
 

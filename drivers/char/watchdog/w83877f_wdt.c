@@ -341,8 +341,6 @@ static int wdt_notify_sys(struct notifier_block *this, unsigned long code,
 static struct notifier_block wdt_notifier=
 {
 	.notifier_call = wdt_notify_sys,
-	.next = NULL,
-	.priority = 0,
 };
 
 static void __exit w83877f_wdt_unload(void)
@@ -427,3 +425,4 @@ module_exit(w83877f_wdt_unload);
 MODULE_AUTHOR("Scott and Bill Jennings");
 MODULE_DESCRIPTION("Driver for watchdog timer in w83877f chip");
 MODULE_LICENSE("GPL");
+MODULE_ALIAS_MISCDEV(WATCHDOG_MINOR);

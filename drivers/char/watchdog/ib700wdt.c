@@ -284,8 +284,6 @@ static struct miscdevice ibwdt_miscdev = {
 
 static struct notifier_block ibwdt_notifier = {
 	.notifier_call = ibwdt_notify_sys,
-	.next = NULL,
-	.priority = 0,
 };
 
 static int __init ibwdt_init(void)
@@ -350,5 +348,6 @@ module_exit(ibwdt_exit);
 MODULE_AUTHOR("Charles Howes <chowes@vsol.net>");
 MODULE_DESCRIPTION("IB700 SBC watchdog driver");
 MODULE_LICENSE("GPL");
+MODULE_ALIAS_MISCDEV(WATCHDOG_MINOR);
 
 /* end of ib700wdt.c */

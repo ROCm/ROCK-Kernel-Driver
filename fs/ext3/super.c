@@ -1040,6 +1040,7 @@ static int ext3_fill_super (struct super_block *sb, void *data, int silent)
 	unsigned long offset = 0;
 	unsigned long journal_inum = 0;
 	unsigned long def_mount_opts;
+	struct inode *root;
 	int blocksize;
 	int hblock;
 	int db_count;
@@ -1354,16 +1355,17 @@ static int ext3_fill_super (struct super_block *sb, void *data, int silent)
 	 * so we can safely mount the rest of the filesystem now.
 	 */
 
-	sb->s_root = d_alloc_root(iget(sb, EXT3_ROOT_INO));
-	if (!sb->s_root || !S_ISDIR(sb->s_root->d_inode->i_mode) ||
-	    !sb->s_root->d_inode->i_blocks || !sb->s_root->d_inode->i_size) {
-		if (sb->s_root) {
-			dput(sb->s_root);
-			sb->s_root = NULL;
-			printk(KERN_ERR
-			       "EXT3-fs: corrupt root inode, run e2fsck\n");
-		} else
-			printk(KERN_ERR "EXT3-fs: get root inode failed\n");
+	root = iget(sb, EXT3_ROOT_INO);
+	sb->s_root = d_alloc_root(root);
+	if (!sb->s_root) {
+		printk(KERN_ERR "EXT3-fs: get root inode failed\n");
+		iput(root);
+		goto failed_mount3;
+	}
+	if (!S_ISDIR(root->i_mode) || !root->i_blocks || !root->i_size) {
+		dput(sb->s_root);
+		sb->s_root = NULL;
+		printk(KERN_ERR "EXT3-fs: corrupt root inode, run e2fsck\n");
 		goto failed_mount3;
 	}
 

@@ -541,20 +541,15 @@ static void snd_ymfpci_pcm_init_voice(ymfpci_voice_t *voice, int stereo,
 
 static int __devinit snd_ymfpci_ac3_init(ymfpci_t *chip)
 {
-	unsigned char *ptr;
-	dma_addr_t ptr_addr;
-
-	if ((ptr = snd_malloc_pci_pages(chip->pci, 4096, &ptr_addr)) == NULL)
+	if (snd_dma_alloc_pages(&chip->dma_dev, 4096, &chip->ac3_tmp_base) < 0)
 		return -ENOMEM;
 
-	chip->ac3_tmp_base = ptr;
-	chip->ac3_tmp_base_addr = ptr_addr;
 	chip->bank_effect[3][0]->base =
-	chip->bank_effect[3][1]->base = cpu_to_le32(chip->ac3_tmp_base_addr);
+	chip->bank_effect[3][1]->base = cpu_to_le32(chip->ac3_tmp_base.addr);
 	chip->bank_effect[3][0]->loop_end =
 	chip->bank_effect[3][1]->loop_end = cpu_to_le32(1024);
 	chip->bank_effect[4][0]->base =
-	chip->bank_effect[4][1]->base = cpu_to_le32(chip->ac3_tmp_base_addr + 2048);
+	chip->bank_effect[4][1]->base = cpu_to_le32(chip->ac3_tmp_base.addr + 2048);
 	chip->bank_effect[4][0]->loop_end =
 	chip->bank_effect[4][1]->loop_end = cpu_to_le32(1024);
 
@@ -572,9 +567,9 @@ static int snd_ymfpci_ac3_done(ymfpci_t *chip)
 			  snd_ymfpci_readl(chip, YDSXGR_MAPOFEFFECT) & ~(3 << 3));
 	spin_unlock_irq(&chip->reg_lock);
 	// snd_ymfpci_irq_wait(chip);
-	if (chip->ac3_tmp_base) {
-		snd_free_pci_pages(chip->pci, 4096, chip->ac3_tmp_base, chip->ac3_tmp_base_addr);
-		chip->ac3_tmp_base = NULL;
+	if (chip->ac3_tmp_base.area) {
+		snd_dma_free_pages(&chip->dma_dev, &chip->ac3_tmp_base);
+		chip->ac3_tmp_base.area = NULL;
 	}
 	return 0;
 }
@@ -1104,7 +1099,8 @@ int __devinit snd_ymfpci_pcm(ymfpci_t *chip, int device, snd_pcm_t ** rpcm)
 	strcpy(pcm->name, "YMFPCI");
 	chip->pcm = pcm;
 
-	snd_pcm_lib_preallocate_pci_pages_for_all(chip->pci, pcm, 64*1024, 256*1024);
+	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_DEV,
+					      snd_dma_pci_data(chip->pci), 64*1024, 256*1024);
 
 	if (rpcm)
 		*rpcm = pcm;
@@ -1149,7 +1145,8 @@ int __devinit snd_ymfpci_pcm2(ymfpci_t *chip, int device, snd_pcm_t ** rpcm)
 		chip->device_id == PCI_DEVICE_ID_YAMAHA_754 ? "Direct Recording" : "AC'97");
 	chip->pcm2 = pcm;
 
-	snd_pcm_lib_preallocate_pci_pages_for_all(chip->pci, pcm, 64*1024, 256*1024);
+	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_DEV,
+					      snd_dma_pci_data(chip->pci), 64*1024, 256*1024);
 
 	if (rpcm)
 		*rpcm = pcm;
@@ -1193,7 +1190,8 @@ int __devinit snd_ymfpci_pcm_spdif(ymfpci_t *chip, int device, snd_pcm_t ** rpcm
 	strcpy(pcm->name, "YMFPCI - IEC958");
 	chip->pcm_spdif = pcm;
 
-	snd_pcm_lib_preallocate_pci_pages_for_all(chip->pci, pcm, 64*1024, 256*1024);
+	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_DEV,
+					      snd_dma_pci_data(chip->pci), 64*1024, 256*1024);
 
 	if (rpcm)
 		*rpcm = pcm;
@@ -1237,7 +1235,8 @@ int __devinit snd_ymfpci_pcm_4ch(ymfpci_t *chip, int device, snd_pcm_t ** rpcm)
 	strcpy(pcm->name, "YMFPCI - Rear PCM");
 	chip->pcm_4ch = pcm;
 
-	snd_pcm_lib_preallocate_pci_pages_for_all(chip->pci, pcm, 64*1024, 256*1024);
+	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_DEV,
+					      snd_dma_pci_data(chip->pci), 64*1024, 256*1024);
 
 	if (rpcm)
 		*rpcm = pcm;
@@ -1976,12 +1975,11 @@ static int __devinit snd_ymfpci_memalloc(ymfpci_t *chip)
 	       chip->work_size;
 	/* work_ptr must be aligned to 256 bytes, but it's already
 	   covered with the kernel page allocation mechanism */
-	if ((ptr = snd_malloc_pci_pages(chip->pci, size, &ptr_addr)) == NULL)
+	if (snd_dma_alloc_pages(&chip->dma_dev, size, &chip->work_ptr) < 0) 
 		return -ENOMEM;
+	ptr = chip->work_ptr.area;
+	ptr_addr = chip->work_ptr.addr;
 	memset(ptr, 0, size);	/* for sure */
-	chip->work_ptr = ptr;
-	chip->work_ptr_addr = ptr_addr;
-	chip->work_ptr_size = size;
 
 	chip->bank_base_playback = ptr;
 	chip->bank_base_playback_addr = ptr_addr;
@@ -2024,7 +2022,7 @@ static int __devinit snd_ymfpci_memalloc(ymfpci_t *chip)
 	chip->work_base = ptr;
 	chip->work_base_addr = ptr_addr;
 	
-	snd_assert(ptr + chip->work_size == chip->work_ptr + chip->work_ptr_size, );
+	snd_assert(ptr + chip->work_size == chip->work_ptr.area + chip->work_ptr.bytes, );
 
 	snd_ymfpci_writel(chip, YDSXGR_PLAYCTRLBASE, chip->bank_base_playback_addr);
 	snd_ymfpci_writel(chip, YDSXGR_RECCTRLBASE, chip->bank_base_capture_addr);
@@ -2107,8 +2105,8 @@ static int snd_ymfpci_free(ymfpci_t *chip)
 #endif
 	if (chip->reg_area_virt)
 		iounmap((void *)chip->reg_area_virt);
-	if (chip->work_ptr)
-		snd_free_pci_pages(chip->pci, chip->work_ptr_size, chip->work_ptr, chip->work_ptr_addr);
+	if (chip->work_ptr.area)
+		snd_dma_free_pages(&chip->dma_dev, &chip->work_ptr);
 	
 	if (chip->irq >= 0)
 		free_irq(chip->irq, (void *)chip);
@@ -2275,6 +2273,10 @@ int __devinit snd_ymfpci_create(snd_card_t * card,
 		return -EBUSY;
 	}
 	chip->irq = pci->irq;
+
+	memset(&chip->dma_dev, 0, sizeof(chip->dma_dev));
+	chip->dma_dev.type = SNDRV_DMA_TYPE_DEV;
+	chip->dma_dev.dev = snd_dma_pci_data(pci);
 
 	snd_ymfpci_aclink_reset(pci);
 	if (snd_ymfpci_codec_ready(chip, 0) < 0) {

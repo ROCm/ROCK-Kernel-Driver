@@ -76,7 +76,7 @@ static void vgacon_init(struct vc_data *c, int init);
 static void vgacon_deinit(struct vc_data *c);
 static void vgacon_cursor(struct vc_data *c, int mode);
 static int vgacon_switch(struct vc_data *c);
-static int vgacon_blank(struct vc_data *c, int blank);
+static int vgacon_blank(struct vc_data *c, int blank, int mode_switch);
 static int vgacon_font_op(struct vc_data *c, struct console_font_op *op);
 static int vgacon_set_palette(struct vc_data *vc, unsigned char *table);
 static int vgacon_scrolldelta(struct vc_data *c, int lines);
@@ -661,7 +661,7 @@ static void vga_pal_blank(struct vgastate *state)
 	}
 }
 
-static int vgacon_blank(struct vc_data *c, int blank)
+static int vgacon_blank(struct vc_data *c, int blank, int mode_switch)
 {
 	switch (blank) {
 	case 0:		/* Unblank */
@@ -678,7 +678,8 @@ static int vgacon_blank(struct vc_data *c, int blank)
 		/* Tell console.c that it has to restore the screen itself */
 		return 1;
 	case 1:		/* Normal blanking */
-		if (vga_video_type == VIDEO_TYPE_VGAC) {
+	case -1:	/* Obsolete */
+		if (!mode_switch && vga_video_type == VIDEO_TYPE_VGAC) {
 			vga_pal_blank(&state);
 			vga_palette_blanked = 1;
 			return 0;
@@ -686,11 +687,8 @@ static int vgacon_blank(struct vc_data *c, int blank)
 		vgacon_set_origin(c);
 		scr_memsetw((void *) vga_vram_base, BLANK,
 			    c->vc_screenbuf_size);
-		return 1;
-	case -1:		/* Entering graphic mode */
-		scr_memsetw((void *) vga_vram_base, BLANK,
-			    c->vc_screenbuf_size);
-		vga_is_gfx = 1;
+		if (mode_switch)
+			vga_is_gfx = 1;
 		return 1;
 	default:		/* VESA blanking */
 		if (vga_video_type == VIDEO_TYPE_VGAC) {

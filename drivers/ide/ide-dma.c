@@ -883,16 +883,6 @@ int ide_release_dma_engine (ide_hwif_t *hwif)
 	return 1;
 }
 
-int ide_release_mmio_dma (ide_hwif_t *hwif)
-{
-	if ((hwif->dma_extra) && (hwif->channel == 0))
-		release_mem_region((hwif->dma_base + 16), hwif->dma_extra);
-	release_mem_region(hwif->dma_base, 8);
-	if (hwif->dma_base2)
-		release_mem_region(hwif->dma_base, 8);
-	return 1;
-}
-
 int ide_release_iomio_dma (ide_hwif_t *hwif)
 {
 	if ((hwif->dma_extra) && (hwif->channel == 0))
@@ -914,8 +904,6 @@ int ide_release_dma (ide_hwif_t *hwif)
 		return 1;
 
 	ide_release_dma_engine(hwif);
-	if (hwif->mmio == 1)
-		return ide_release_mmio_dma(hwif);
 	return ide_release_iomio_dma(hwif);
 }
 
@@ -936,38 +924,6 @@ int ide_allocate_dma_engine (ide_hwif_t *hwif)
 		hwif->cds->name);
 
 	ide_release_dma_engine(hwif);
-	return 1;
-}
-
-int ide_mmio_dma (ide_hwif_t *hwif, unsigned long base, unsigned int ports)
-{
-	printk(KERN_INFO "    %s: MMIO-DMA at 0x%08lx-0x%08lx",
-		hwif->name, base, base + ports - 1);
-	if (!request_mem_region(base, ports, hwif->name))
-		goto fail;
-	hwif->dma_base = base;
-	if ((hwif->cds->extra) && (hwif->channel == 0)) {
-		if (!request_region(base+16, hwif->cds->extra, hwif->cds->name))
-			goto release_mem;
-		hwif->dma_extra = hwif->cds->extra;
-	}
-	
-	if(hwif->mate)
-		hwif->dma_master = (hwif->channel) ? hwif->mate->dma_base : base;
-	else
-		hwif->dma_master = base;
-	if (hwif->dma_base2) {
-		if (!request_mem_region(hwif->dma_base2, ports, hwif->name))
-			goto release_io;
-	}
-	return 0;
-
-release_mem:
-	release_mem_region(base, ports);
-release_io:
-	release_region(base+16, hwif->cds->extra);
-fail:
-	printk(" -- Error, MMIO ports already in use.\n");
 	return 1;
 }
 
@@ -1022,8 +978,7 @@ int ide_dma_iobase (ide_hwif_t *hwif, unsigned long base, unsigned int ports)
 {
 	if (hwif->mmio == 2)
 		return ide_mapped_mmio_dma(hwif, base,ports);
-	if (hwif->mmio == 1)
-		return ide_mmio_dma(hwif, base, ports);
+	BUG_ON(hwif->mmio == 1);
 	return ide_iomio_dma(hwif, base, ports);
 }
 

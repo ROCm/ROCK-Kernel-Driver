@@ -173,7 +173,7 @@ static inline void clear_in_cr4 (unsigned long mask)
  * space during mmap's.
  */
 #define IA32_PAGE_OFFSET ((current->personality & ADDR_LIMIT_3GB) ? 0xc0000000 : 0xFFFFe000)
-#define TASK_UNMAPPED_32 (PAGE_ALIGN(IA32_PAGE_OFFSET / 3))
+#define TASK_UNMAPPED_32 PAGE_ALIGN(IA32_PAGE_OFFSET/3)
 #define TASK_UNMAPPED_64 PAGE_ALIGN(TASK_SIZE/3) 
 #define TASK_UNMAPPED_BASE	\
 	(test_thread_flag(TIF_IA32) ? TASK_UNMAPPED_32 : TASK_UNMAPPED_64)  
@@ -262,7 +262,9 @@ struct thread_struct {
 #define STACKFAULT_STACK 1
 #define DOUBLEFAULT_STACK 2 
 #define NMI_STACK 3 
-#define N_EXCEPTION_STACKS 3  /* hw limit: 7 */
+#define DEBUG_STACK 4 
+#define MCE_STACK 5
+#define N_EXCEPTION_STACKS 5  /* hw limit: 7 */
 #define EXCEPTION_STKSZ (PAGE_SIZE << EXCEPTION_STACK_ORDER)
 #define EXCEPTION_STACK_ORDER 0 
 
@@ -450,5 +452,7 @@ static inline void __mwait(unsigned long eax, unsigned long ecx)
 	asm("andq %%rsp,%0; ":"=r" (ti) : "0" (CURRENT_MASK));	\
 	ti->task;					\
 })
+
+#define cache_line_size() (boot_cpu_data.x86_clflush_size)
 
 #endif /* __ASM_X86_64_PROCESSOR_H */

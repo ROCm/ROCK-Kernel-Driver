@@ -571,8 +571,8 @@ extern void	xfs_check_frozen(xfs_mount_t *, bhv_desc_t *, int);
 extern struct vfsops xfs_vfsops;
 extern struct vnodeops xfs_vnodeops;
 
-extern struct xfs_dmops xfs_dmcore_xfs;
-extern struct xfs_qmops xfs_qmcore_xfs;
+extern struct xfs_dmops xfs_dmcore_stub;
+extern struct xfs_qmops xfs_qmcore_stub;
 extern struct xfs_ioops xfs_iocore_xfs;
 
 extern int	xfs_init(void);

@@ -499,6 +499,7 @@ int smb_fill_super(struct super_block *sb, void *raw_data, int silent)
 	if (ver != SMB_MOUNT_OLDVERSION && cpu_to_be32(ver) != SMB_MOUNT_ASCII)
 		goto out_wrong_data;
 
+	sb->s_flags |= MS_NODIRATIME;
 	sb->s_blocksize = 1024;	/* Eh...  Is this correct? */
 	sb->s_blocksize_bits = 10;
 	sb->s_magic = SMB_SUPER_MAGIC;
@@ -778,6 +779,7 @@ static struct file_system_type smb_fs_type = {
 	.name		= "smbfs",
 	.get_sb		= smb_get_sb,
 	.kill_sb	= kill_anon_super,
+	.fs_flags	= FS_BINARY_MOUNTDATA,
 };
 
 static int __init init_smb_fs(void)

@@ -275,14 +275,15 @@ _GLOBAL(__secondary_hold)
 	mfspr	r22,SPRG1;		/* Save r21 in exc. frame      */ \
 	std	r22,EX_R21(r21);	                                  \
 	std     r21,PACAEXCSP(r20);     /* update exception stack ptr  */ \
-		                        /*   iff no protection flt     */ \
 	ld	r22,EX_SRR1(r21);	/* Get SRR1 from exc. frame    */ \
 	andi.   r22,r22,MSR_PR;         /* Set CR for later branch     */ \
 	mr      r22,r1;                 /* Save r1                     */ \
 	subi    r1,r1,INT_FRAME_SIZE;   /* alloc frame on kernel stack */ \
 	beq-    1f;                                                       \
 	ld      r1,PACAKSAVE(r20);      /* kernel stack to use         */ \
-1:      std     r22,GPR1(r1);           /* save r1 in stackframe       */ \
+1:      cmpdi	cr1,r1,0;		/* check if r1 is in userspace */ \
+	bge	cr1,bad_stack;		/* abort if it is	       */ \
+	std     r22,GPR1(r1);           /* save r1 in stackframe       */ \
 	std     r22,0(r1);              /* make stack chain pointer    */ \
 	std     r23,_CCR(r1);           /* save CR in stackframe       */ \
 	ld	r22,EX_R20(r21);	/* move r20 to stackframe      */ \
@@ -610,12 +611,68 @@ __end_stab:
 #else
 	STD_EXCEPTION_COMMON(0x1700, AltivecAssist, .UnknownException )
 #endif
+
+/*
+ * Here the exception frame is filled out and we have detected that
+ * the kernel stack pointer is bad.  R23 contains the saved CR, r20
+ * points to the paca, r21 points to the exception frame, and r22
+ * contains the (bad) kernel stack pointer.
+ * We switch to using the paca guard page as an emergency stack,
+ * save the registers on there, and call kernel_bad_stack(),
+ * which panics.
+ */
+bad_stack:
+	addi	r1,r20,8192-64-INT_FRAME_SIZE
+	std	r22,GPR1(r1)
+	std	r23,_CCR(r1)
+	ld	r22,EX_R20(r21)
+	std	r22,GPR20(r1)
+	ld	r23,EX_R21(r21)
+	std	r23,GPR21(r1)
+	ld	r22,EX_R22(r21)
+	std	r22,GPR22(r1)
+	ld	r23,EX_R23(r21)
+	std	r23,GPR23(r1)
+	ld	r23,EX_DAR(r21)
+	std	r23,_DAR(r1)
+	lwz     r22,EX_DSISR(r21)
+	std	r22,_DSISR(r1)
+	lwz	r23,EX_TRAP(r21)
+	std	r23,TRAP(r1)
+	ld	r22,EX_SRR0(r21)
+	ld	r23,EX_SRR1(r21)
+	std	r22,_NIP(r1)
+	std	r23,_MSR(r1)
+	addi	r21,r21,-EXC_FRAME_SIZE
+	std	r21,PACAEXCSP(r20)
+	mflr	r22
+	std	r22,_LINK(r1)
+	mfctr	r23
+	std	r23,_CTR(r1)
+	mfspr	r22,XER
+	std	r22,_XER(r1)
+	SAVE_GPR(0, r1)
+	SAVE_10GPRS(2, r1)
+	SAVE_8GPRS(12, r1)
+	SAVE_8GPRS(24, r1)
+	addi	r21,r1,INT_FRAME_SIZE
+	std	r21,0(r1)
+	li	r22,0
+	std	r22,0(r21)
+	ld	r2,PACATOC(r20)
+	mr	r13,r20
+1:	addi	r3,r1,STACK_FRAME_OVERHEAD
+	bl	.kernel_bad_stack
+	b	1b
+
 /*
  * Return from an exception which is handled without calling
  * save_remaining_regs.  The caller is assumed to have done
  * EXCEPTION_PROLOG_COMMON.
  */
 fast_exception_return:
+	andi.	r3,r23,MSR_RI		/* check if RI is set */
+	beq-	unrecov_fer
 	ld      r3,_CCR(r1)
 	ld      r4,_LINK(r1)
 	ld      r5,_CTR(r1)
@@ -638,6 +695,14 @@ fast_exception_return:
 	REST_4GPRS(20, r1)
 	ld      r1,GPR1(r1)
 	rfid
+
+unrecov_fer:
+	li	r6,0x4000
+	li	r20,0
+	bl	.save_remaining_regs
+1:	addi	r3,r1,STACK_FRAME_OVERHEAD
+	bl	.unrecoverable_exception
+	b	1b
 
 /*
  * Here r20 points to the PACA, r21 to the exception frame,
@@ -904,12 +969,13 @@ _GLOBAL(do_stab_bolted)
 
 	/* (((ea >> 28) & 0x1fff) << 15) | (ea >> 60) */
 	mfspr	r21,DAR
-	rldicl  r20,r21,36,32   /* Permits a full 32b of ESID */
-	rldicr  r20,r20,15,48
-	rldicl  r21,r21,4,60
-	or      r20,r20,r21
+	rldicl	r20,r21,36,51
+	sldi	r20,r20,15
+	srdi	r21,r21,60
+	or	r20,r20,r21
 
-	li      r21,9           /* VSID_RANDOMIZER */
+	/* VSID_RANDOMIZER */
+	li      r21,9
 	sldi    r21,r21,32
 	oris    r21,r21,58231
 	ori     r21,r21,39831
@@ -933,11 +999,11 @@ _GLOBAL(do_stab_bolted)
 	rldicl  r23,r23,57,63
 	cmpwi   r23,0
 	bne     2f
-	ld      r23,8(r21)      /* Get the current vsid part of the ste */
+	li	r23,0
 	rldimi  r23,r20,12,0    /* Insert the new vsid value            */
 	std     r23,8(r21)      /* Put new entry back into the stab     */
 	eieio                  /* Order vsid update                    */
-	ld      r23,0(r21)      /* Get the esid part of the ste         */
+	li	r23,0
 	mfspr	r20,DAR        /* Get the new esid                     */
 	rldicl  r20,r20,36,28  /* Permits a full 36b of ESID           */
 	rldimi  r23,r20,28,0    /* Insert the new esid value            */
@@ -971,13 +1037,13 @@ _GLOBAL(do_stab_bolted)
 	std     r23,0(r21)
 	sync
 
-	ld      r23,8(r21)
+	li	r23,0
 	rldimi  r23,r20,12,0
 	std     r23,8(r21)
 	eieio
 
-	ld      r23,0(r21)      /* Get the esid part of the ste         */
-	mr      r22,r23
+	ld	r22,0(r21)	/* Get the esid part of the ste         */
+	li	r23,0
 	mfspr	r20,DAR         /* Get the new esid                     */
 	rldicl  r20,r20,36,28   /* Permits a full 32b of ESID           */
 	rldimi  r23,r20,28,0    /* Insert the new esid value            */
@@ -995,6 +1061,11 @@ _GLOBAL(do_stab_bolted)
 	ld      r21,PACAEXCSP(r20)      /* Get the exception frame pointer */
 	addi    r21,r21,EXC_FRAME_SIZE
 	lwz	r23,EX_CCR(r21)		/* get saved CR */
+
+	ld	r22,EX_SRR1(r21)
+	andi.	r22,r22,MSR_RI
+	beq-	unrecov_stab
+
 	/* note that this is almost identical to maskable_exception_exit */
 	mtcr    r23                     /* restore CR */
 
@@ -1012,6 +1083,15 @@ _GLOBAL(do_stab_bolted)
 	mfspr	r20,SPRG2
 	mfspr	r21,SPRG1
 	rfid
+
+unrecov_stab:
+	EXCEPTION_PROLOG_COMMON
+	li	r6,0x4100
+	li	r20,0
+	bl	.save_remaining_regs
+1:	addi	r3,r1,STACK_FRAME_OVERHEAD
+	bl	.unrecoverable_exception
+	b	1b
 
 /*
  * r20 points to the PACA, r21 to the exception frame,
@@ -1051,15 +1131,23 @@ SLB_NUM_ENTRIES = 64
 	slbmfee	r21,r22
 	srdi	r21,r21,27
 	/*
-	 * This is incorrect (r1 is not the kernel stack) if we entered
-	 * from userspace but there is no critical window from userspace
-	 * so this should be OK. Also if we cast out the userspace stack
-	 * segment while in userspace we will fault it straight back in.
+	 * Use paca->ksave as the value of the kernel stack pointer,
+	 * because this is valid at all times.
+	 * The >> 27 (rather than >> 28) is so that the LSB is the
+	 * valid bit - this way we check valid and ESID in one compare.
+	 * In order to completely close the tiny race in the context
+	 * switch (between updating r1 and updating paca->ksave),
+	 * we check against both r1 and paca->ksave.
 	 */
 	srdi	r23,r1,27
 	ori	r23,r23,1
 	cmpd	r23,r21
 	beq-	1b
+	ld	r23,PACAKSAVE(r20)
+	srdi	r23,r23,27
+ 	ori	r23,r23,1
+ 	cmpd	r23,r21
+ 	beq-	1b
 
 	/* r20 = paca, r22 = entry */
 
@@ -1115,6 +1203,10 @@ END_FTR_SECTION_IFSET(CPU_FTR_16M_PAGE)
 	addi	r21,r21,EXC_FRAME_SIZE
 	lwz	r23,EX_CCR(r21)		/* get saved CR */
 	/* note that this is almost identical to maskable_exception_exit */
+
+	ld	r22,EX_SRR1(r21)
+	andi.	r22,r22,MSR_RI
+	beq-	unrecov_stab
 
 	/*
 	 * Until everyone updates binutils hardwire the POWER4 optimised
@@ -1189,9 +1281,8 @@ _GLOBAL(save_remaining_regs)
 
 	/*
 	 * Indicate that r1 contains the kernel stack and
-	 * get the Kernel TOC and CURRENT pointers from the paca
+	 * get the Kernel TOC pointer from the paca
 	 */
-	std	r22,PACAKSAVE(r13)	/* r1 is now kernel sp */
 	ld	r2,PACATOC(r13)		/* Get Kernel TOC pointer */
 
 	/*
@@ -1763,7 +1854,6 @@ _GLOBAL(__secondary_start)
 
 	std	r2,PACATOC(r13)
 	li	r6,0
-	std	r6,PACAKSAVE(r13)
 	stb	r6,PACAPROCENABLED(r13)
 
 #ifndef CONFIG_PPC_ISERIES
@@ -1782,6 +1872,7 @@ _GLOBAL(__secondary_start)
 	ldx	r1,r3,r28
 	addi	r1,r1,THREAD_SIZE
 	subi	r1,r1,STACK_FRAME_OVERHEAD
+	std	r1,PACAKSAVE(r13)
 
 	ld	r3,PACASTABREAL(r13)    /* get raddr of segment table       */
 	ori	r4,r3,1			/* turn on valid bit                */
@@ -2054,7 +2145,7 @@ _STATIC(start_here_common)
 
 	std	r2,PACATOC(r13)
 	li	r5,0
-	std	r0,PACAKSAVE(r13)
+	std	r1,PACAKSAVE(r13)
 
 	/* Restore the parms passed in from the bootloader. */
 	mr	r3,r31

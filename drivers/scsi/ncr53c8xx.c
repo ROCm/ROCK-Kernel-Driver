@@ -5140,9 +5140,10 @@ void ncr_complete (ncb_p np, ccb_p cp)
 		*/
 		if (cmd->cmnd[0] == 0x12 && !(cmd->cmnd[1] & 0x3) &&
 		    cmd->cmnd[4] >= 7 && !cmd->use_sg) {
-			sync_scsi_data(np, cmd);	/* SYNC the data */
+			sync_scsi_data_for_cpu(np, cmd);	/* SYNC the data */
 			ncr_setup_lcb (np, cmd->device->id, cmd->device->lun,
 				       (char *) cmd->request_buffer);
+			sync_scsi_data_for_device(np, cmd);	/* SYNC the data */
 		}
 
 		tp->bytes     += cp->data_len;

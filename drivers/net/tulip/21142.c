@@ -8,7 +8,7 @@
 	This software may be used and distributed according to the terms
 	of the GNU General Public License, incorporated herein by reference.
 
-	Please refer to Documentation/DocBook/tulip.{pdf,ps,html}
+	Please refer to Documentation/DocBook/tulip-user.{pdf,ps,html}
 	for more information on this driver, or visit the project
 	Web page at http://sourceforge.net/projects/tulip/
 
@@ -29,7 +29,7 @@ static u16 t21142_csr15[] = { 0x0008, 0x0006, 0x000E, 0x0008, 0x0008, };
 void t21142_timer(unsigned long data)
 {
 	struct net_device *dev = (struct net_device *)data;
-	struct tulip_private *tp = (struct tulip_private *)dev->priv;
+	struct tulip_private *tp = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 	int csr12 = inl(ioaddr + CSR12);
 	int next_tick = 60*HZ;
@@ -103,7 +103,7 @@ void t21142_timer(unsigned long data)
 
 void t21142_start_nway(struct net_device *dev)
 {
-	struct tulip_private *tp = (struct tulip_private *)dev->priv;
+	struct tulip_private *tp = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 	int csr14 = ((tp->sym_advertise & 0x0780) << 9)  |
 		((tp->sym_advertise & 0x0020) << 1) | 0xffbf;
@@ -131,7 +131,7 @@ void t21142_start_nway(struct net_device *dev)
 
 void t21142_lnk_change(struct net_device *dev, int csr5)
 {
-	struct tulip_private *tp = (struct tulip_private *)dev->priv;
+	struct tulip_private *tp = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 	int csr12 = inl(ioaddr + CSR12);
 

@@ -722,7 +722,9 @@ struct request_sense {
 /*
  * feature profile
  */
-#define CDF_MRW		0x28
+#define CDF_RWRT	0x0020	/* "Random Writable" */
+#define CDF_HWDM	0x0024	/* "Hardware Defect Management" */
+#define CDF_MRW 	0x0028
 
 /*
  * media status bits
@@ -769,6 +771,34 @@ struct mrw_feature_desc {
 	__u8 reserved3;
 	__u8 reserved4;
 	__u8 reserved5;
+};
+
+/* cf. mmc4r02g.pdf 5.3.10 Random Writable Feature (0020h) pg 197 of 635 */
+struct rwrt_feature_desc {
+	__u16 feature_code;
+#if defined(__BIG_ENDIAN_BITFIELD)
+	__u8 reserved1		: 2;
+	__u8 feature_version	: 4;
+	__u8 persistent		: 1;
+	__u8 curr		: 1;
+#elif defined(__LITTLE_ENDIAN_BITFIELD)
+	__u8 curr		: 1;
+	__u8 persistent		: 1;
+	__u8 feature_version	: 4;
+	__u8 reserved1		: 2;
+#endif
+	__u8 add_len;
+	__u32 last_lba;
+	__u32 block_size;
+	__u16 blocking;
+#if defined(__BIG_ENDIAN_BITFIELD)
+	__u8 reserved2		: 7;
+	__u8 page_present	: 1;
+#elif defined(__LITTLE_ENDIAN_BITFIELD)
+	__u8 page_present	: 1;
+	__u8 reserved2		: 7;
+#endif
+	__u8 reserved3;
 };
 
 typedef struct {
@@ -877,10 +907,18 @@ struct mode_page_header {
 #include <linux/fs.h>		/* not really needed, later.. */
 #include <linux/device.h>
 
+/*
+ * _OLD will use PIO transfer on atapi devices, _BPC_* will use DMA
+ */
+#define CDDA_OLD		0	/* old style */
+#define CDDA_BPC_SINGLE		1	/* single frame block pc */
+#define CDDA_BPC_FULL		2	/* multi frame block pc */
+
 /* Uniform cdrom data structures for cdrom.c */
 struct cdrom_device_info {
 	struct cdrom_device_ops  *ops;  /* link to device_ops */
 	struct cdrom_device_info *next; /* next device_info for this major */
+	struct gendisk *disk;		/* matching block layer disk */
 	void *handle;		        /* driver-dependent data */
 /* specifications */
 	int mask;                       /* mask of capability: disables them */
@@ -894,6 +932,8 @@ struct cdrom_device_info {
 /* per-device flags */
         __u8 sanyo_slot		: 2;	/* Sanyo 3 CD changer support */
         __u8 reserved		: 6;	/* not used yet */
+	int cdda_method;		/* see flags */
+	__u8 last_sense;
 	int for_data;
 	int (*exit)(struct cdrom_device_info *);
 	int mrw_mode_page;
@@ -1130,6 +1170,7 @@ struct media_event_desc {
 
 extern int cdrom_get_media_event(struct cdrom_device_info *cdi, struct media_event_desc *med);
 extern int cdrom_is_mrw(struct cdrom_device_info *cdi, int *write);
+extern int cdrom_is_random_writable(struct cdrom_device_info *cdi, int *write);
 
 #endif  /* End of kernel only stuff */ 
 

@@ -194,7 +194,7 @@ static inline int sco_chan_add(struct sco_conn *conn, struct sock *sk, struct so
 	return err;
 }
 
-int sco_connect(struct sock *sk)
+static int sco_connect(struct sock *sk)
 {
 	bdaddr_t *src = &bt_sk(sk)->src;
 	bdaddr_t *dst = &bt_sk(sk)->dst;
@@ -533,7 +533,7 @@ done:
 	return err;
 }
 
-int sco_sock_listen(struct socket *sock, int backlog)
+static int sco_sock_listen(struct socket *sock, int backlog)
 {
 	struct sock *sk = sock->sk;
 	int err = 0;
@@ -556,7 +556,7 @@ done:
 	return err;
 }
 
-int sco_sock_accept(struct socket *sock, struct socket *newsock, int flags)
+static int sco_sock_accept(struct socket *sock, struct socket *newsock, int flags)
 {
 	DECLARE_WAITQUEUE(wait, current);
 	struct sock *sk = sock->sk, *ch;
@@ -655,7 +655,7 @@ static int sco_sock_sendmsg(struct kiocb *iocb, struct socket *sock,
 	return err;
 }
 
-int sco_sock_setsockopt(struct socket *sock, int level, int optname, char *optval, int optlen)
+static int sco_sock_setsockopt(struct socket *sock, int level, int optname, char *optval, int optlen)
 {
 	struct sock *sk = sock->sk;
 	int err = 0;
@@ -674,7 +674,7 @@ int sco_sock_setsockopt(struct socket *sock, int level, int optname, char *optva
 	return err;
 }
 
-int sco_sock_getsockopt(struct socket *sock, int level, int optname, char *optval, int *optlen)
+static int sco_sock_getsockopt(struct socket *sock, int level, int optname, char *optval, int *optlen)
 {
 	struct sock *sk = sock->sk;
 	struct sco_options opts;
@@ -835,7 +835,7 @@ done:
 }
 
 /* ----- SCO interface with lower layer (HCI) ----- */
-int sco_connect_ind(struct hci_dev *hdev, bdaddr_t *bdaddr, __u8 type)
+static int sco_connect_ind(struct hci_dev *hdev, bdaddr_t *bdaddr, __u8 type)
 {
 	BT_DBG("hdev %s, bdaddr %s", hdev->name, batostr(bdaddr));
 
@@ -843,7 +843,7 @@ int sco_connect_ind(struct hci_dev *hdev, bdaddr_t *bdaddr, __u8 type)
 	return HCI_LM_ACCEPT;
 }
 
-int sco_connect_cfm(struct hci_conn *hcon, __u8 status)
+static int sco_connect_cfm(struct hci_conn *hcon, __u8 status)
 {
 	BT_DBG("hcon %p bdaddr %s status %d", hcon, batostr(&hcon->dst), status);
 
@@ -862,7 +862,7 @@ int sco_connect_cfm(struct hci_conn *hcon, __u8 status)
 	return 0;
 }
 
-int sco_disconn_ind(struct hci_conn *hcon, __u8 reason)
+static int sco_disconn_ind(struct hci_conn *hcon, __u8 reason)
 {
 	BT_DBG("hcon %p reason %d", hcon, reason);
 
@@ -873,7 +873,7 @@ int sco_disconn_ind(struct hci_conn *hcon, __u8 reason)
 	return 0;
 }
 
-int sco_recv_scodata(struct hci_conn *hcon, struct sk_buff *skb)
+static int sco_recv_scodata(struct hci_conn *hcon, struct sk_buff *skb)
 {
 	struct sco_conn *conn = hcon->sco_data;
 
@@ -1013,7 +1013,7 @@ static struct hci_proto sco_hci_proto = {
 	.recv_scodata =	sco_recv_scodata
 };
 
-int __init sco_init(void)
+static int __init sco_init(void)
 {
 	int err;
 
@@ -1035,7 +1035,7 @@ int __init sco_init(void)
 	return 0;
 }
 
-void __exit sco_cleanup(void)
+static void __exit sco_exit(void)
 {
 	int err;
 
@@ -1050,9 +1050,10 @@ void __exit sco_cleanup(void)
 }
 
 module_init(sco_init);
-module_exit(sco_cleanup);
+module_exit(sco_exit);
 
 MODULE_AUTHOR("Maxim Krasnyansky <maxk@qualcomm.com>");
 MODULE_DESCRIPTION("Bluetooth SCO ver " VERSION);
+MODULE_VERSION(VERSION);
 MODULE_LICENSE("GPL");
 MODULE_ALIAS("bt-proto-2");

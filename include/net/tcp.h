@@ -263,7 +263,10 @@ static __inline__ int tw_del_dead_node(struct tcp_tw_bucket *tw)
 #define tw_for_each(tw, node, head) \
 	hlist_for_each_entry(tw, node, head, tw_node)
 
-#define tw_for_each_inmate(tw, node, safe, jail) \
+#define tw_for_each_inmate(tw, node, jail) \
+	hlist_for_each_entry(tw, node, jail, tw_death_node)
+
+#define tw_for_each_inmate_safe(tw, node, safe, jail) \
 	hlist_for_each_entry_safe(tw, node, safe, jail, tw_death_node)
 
 #define tcptw_sk(__sk)	((struct tcp_tw_bucket *)(__sk))

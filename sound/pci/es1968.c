@@ -1495,13 +1495,15 @@ static void snd_es1968_free_dmabuf(es1968_t *chip)
 static int __devinit
 snd_es1968_init_dmabuf(es1968_t *chip)
 {
+	int err;
 	esm_memory_t *chunk;
 
-	snd_dma_device_pci(&chip->dma_dev, chip->pci, 0);
+	chip->dma_dev.type = SNDRV_DMA_TYPE_DEV;
+	chip->dma_dev.dev = snd_dma_pci_data(chip->pci);
+	chip->dma_dev.id = 0;
 	if (! snd_dma_get_reserved(&chip->dma_dev, &chip->dma)) {
-		chip->dma.area = snd_malloc_pci_pages_fallback(chip->pci, chip->total_bufsize,
-							       &chip->dma.addr, &chip->dma.bytes);
-		if (chip->dma.area == NULL) {
+		err = snd_dma_alloc_pages_fallback(&chip->dma_dev, chip->total_bufsize, &chip->dma);
+		if (err < 0 || ! chip->dma.area) {
 			snd_printk("es1968: can't allocate dma pages for size %d\n",
 				   chip->total_bufsize);
 			return -ENOMEM;

@@ -133,6 +133,7 @@ struct usblp {
 	wait_queue_head_t	wait;			/* Zzzzz ... */
 	int			readcount;		/* Counter for reads */
 	int			ifnum;			/* Interface number */
+	struct usb_interface	*intf;			/* The interface */
 	/* Alternate-setting numbers and endpoints for each protocol
 	 * (7/1/{index=1,2,3}) that the device supports: */
 	struct {
@@ -603,14 +604,16 @@ static ssize_t usblp_write(struct file *file, const char __user *buffer, size_t 
 {
 	DECLARE_WAITQUEUE(wait, current);
 	struct usblp *usblp = file->private_data;
-	int timeout, err = 0, transfer_length;
+	int timeout, err = 0, transfer_length = 0;
 	size_t writecount = 0;
 
 	while (writecount < count) {
 		if (!usblp->wcomplete) {
 			barrier();
-			if (file->f_flags & O_NONBLOCK)
+			if (file->f_flags & O_NONBLOCK) {
+				writecount += transfer_length;
 				return writecount ? writecount : -EAGAIN;
+			}
 
 			timeout = USBLP_WRITE_TIMEOUT;
 			add_wait_queue(&usblp->wait, &wait);
@@ -654,13 +657,24 @@ static ssize_t usblp_write(struct file *file, const char __user *buffer, size_t 
 			continue;
 		}
 
+		/* We must increment writecount here, and not at the
+		 * end of the loop. Otherwise, the final loop iteration may
+		 * be skipped, leading to incomplete printer output.
+		 */
+		writecount += transfer_length;
+		if (writecount == count) {
+			up(&usblp->sem);
+			break;
+		}
+
 		transfer_length=(count - writecount);
 		if (transfer_length > USBLP_BUF_SIZE)
 			transfer_length = USBLP_BUF_SIZE;
 
 		usblp->writeurb->transfer_buffer_length = transfer_length;
 
-		if (copy_from_user(usblp->writeurb->transfer_buffer, buffer + writecount, transfer_length)) {
+		if (copy_from_user(usblp->writeurb->transfer_buffer, 
+				   buffer + writecount, transfer_length)) {
 			up(&usblp->sem);
 			return writecount ? writecount : -EFAULT;
 		}
@@ -677,8 +691,6 @@ static ssize_t usblp_write(struct file *file, const char __user *buffer, size_t 
 			break;
 		}
 		up (&usblp->sem);
-
-		writecount += transfer_length;
 	}
 
 	return count;
@@ -829,7 +841,8 @@ static int usblp_probe(struct usb_interface *intf,
 	usblp->dev = dev;
 	init_MUTEX (&usblp->sem);
 	init_waitqueue_head(&usblp->wait);
-	usblp->ifnum = intf->altsetting->desc.bInterfaceNumber;
+	usblp->ifnum = intf->cur_altsetting->desc.bInterfaceNumber;
+	usblp->intf = intf;
 
 	usblp->writeurb = usb_alloc_urb(0, GFP_KERNEL);
 	if (!usblp->writeurb) {
@@ -965,7 +978,7 @@ static int usblp_select_alts(struct usblp *usblp)
 	struct usb_endpoint_descriptor *epd, *epwrite, *epread;
 	int p, i, e;
 
-	if_alt = usblp->dev->actconfig->interface[usblp->ifnum];
+	if_alt = usblp->intf;
 
 	for (p = 0; p < USBLP_MAX_PROTOCOLS; p++)
 		usblp->protocol[p].alt_setting = -1;
@@ -1014,7 +1027,8 @@ static int usblp_select_alts(struct usblp *usblp)
 			epread = NULL;
 		}
 
-		usblp->protocol[ifd->desc.bInterfaceProtocol].alt_setting = i;
+		usblp->protocol[ifd->desc.bInterfaceProtocol].alt_setting =
+				ifd->desc.bAlternateSetting;
 		usblp->protocol[ifd->desc.bInterfaceProtocol].epwrite = epwrite;
 		usblp->protocol[ifd->desc.bInterfaceProtocol].epread = epread;
 	}

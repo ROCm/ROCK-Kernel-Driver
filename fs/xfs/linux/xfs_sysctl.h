@@ -58,6 +58,10 @@ typedef struct xfs_param {
 	xfs_sysctl_val_t inherit_sync;	/* Inherit the "sync" inode flag. */
 	xfs_sysctl_val_t inherit_nodump;/* Inherit the "nodump" inode flag. */
 	xfs_sysctl_val_t inherit_noatim;/* Inherit the "noatime" inode flag. */
+	xfs_sysctl_val_t flush_interval;/* interval between runs of the
+					 * delwri flush daemon.  */
+	xfs_sysctl_val_t age_buffer;	/* time for buffer to age before
+					 * we flush it.  */
 } xfs_param_t;
 
 /*
@@ -86,6 +90,8 @@ enum {
 	XFS_INHERIT_SYNC = 13,
 	XFS_INHERIT_NODUMP = 14,
 	XFS_INHERIT_NOATIME = 15,
+	XFS_FLUSH_INTERVAL = 16,
+	XFS_AGE_BUFFER = 17,
 };
 
 extern xfs_param_t	xfs_params;

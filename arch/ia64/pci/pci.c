@@ -57,17 +57,16 @@ struct pci_fixup pcibios_fixups[1];
 	((u64)(seg << 24) | (u64)(bus << 16) | \
 	 (u64)(devfn << 8) | (u64)(reg))
 
-
 static int
 pci_sal_read (int seg, int bus, int devfn, int reg, int len, u32 *value)
 {
 	int result = 0;
 	u64 data = 0;
 
-	if (!value || (seg > 255) || (bus > 255) || (devfn > 255) || (reg > 255))
+	if ((seg > 255) || (bus > 255) || (devfn > 255) || (reg > 255))
 		return -EINVAL;
 
-	result = ia64_sal_pci_config_read(PCI_SAL_ADDRESS(seg, bus, devfn, reg), len, &data);
+	result = ia64_sal_pci_config_read(PCI_SAL_ADDRESS(seg, bus, devfn, reg), 0, len, &data);
 
 	*value = (u32) data;
 
@@ -80,15 +79,62 @@ pci_sal_write (int seg, int bus, int devfn, int reg, int len, u32 value)
 	if ((seg > 255) || (bus > 255) || (devfn > 255) || (reg > 255))
 		return -EINVAL;
 
-	return ia64_sal_pci_config_write(PCI_SAL_ADDRESS(seg, bus, devfn, reg), len, value);
+	return ia64_sal_pci_config_write(PCI_SAL_ADDRESS(seg, bus, devfn, reg), 0, len, value);
 }
 
-struct pci_raw_ops pci_sal_ops = {
+static struct pci_raw_ops pci_sal_ops = {
 	.read = 	pci_sal_read,
 	.write =	pci_sal_write
 };
 
-struct pci_raw_ops *raw_pci_ops = &pci_sal_ops;	/* default to SAL */
+/* SAL 3.2 adds support for extended config space. */
+
+#define PCI_SAL_EXT_ADDRESS(seg, bus, devfn, reg) \
+	((u64)(seg << 28) | (u64)(bus << 20) | \
+	 (u64)(devfn << 12) | (u64)(reg))
+
+static int
+pci_sal_ext_read (int seg, int bus, int devfn, int reg, int len, u32 *value)
+{
+	int result = 0;
+	u64 data = 0;
+
+	if ((seg > 65535) || (bus > 255) || (devfn > 255) || (reg > 4095))
+		return -EINVAL;
+
+	result = ia64_sal_pci_config_read(PCI_SAL_EXT_ADDRESS(seg, bus, devfn, reg), 1, len, &data);
+
+	*value = (u32) data;
+
+	return result;
+}
+
+static int
+pci_sal_ext_write (int seg, int bus, int devfn, int reg, int len, u32 value)
+{
+	if ((seg > 65535) || (bus > 255) || (devfn > 255) || (reg > 4095))
+		return -EINVAL;
+
+	return ia64_sal_pci_config_write(PCI_SAL_EXT_ADDRESS(seg, bus, devfn, reg), 1, len, value);
+}
+
+static struct pci_raw_ops pci_sal_ext_ops = {
+	.read = 	pci_sal_ext_read,
+	.write =	pci_sal_ext_write
+};
+
+struct pci_raw_ops *raw_pci_ops = &pci_sal_ops;	/* default to SAL < 3.2 */
+
+static int __init
+pci_set_sal_ops (void)
+{
+	if (sal_version >= SAL_VERSION_CODE(3, 2)) {
+		raw_pci_ops = &pci_sal_ext_ops;
+	}
+	return 0;
+}
+
+arch_initcall(pci_set_sal_ops);
 
 
 static int
@@ -139,7 +185,8 @@ alloc_pci_controller (int seg)
 }
 
 static int __devinit
-alloc_resource (char *name, struct resource *root, unsigned long start, unsigned long end, unsigned long flags)
+alloc_resource (char *name, struct resource *root, unsigned long start, unsigned long end,
+		unsigned long flags)
 {
 	struct resource *res;
 
@@ -320,6 +367,7 @@ pcibios_fixup_device_resources (struct pci_dev *dev, struct pci_bus *bus)
 				dev->resource[i].end   += window->offset;
 			}
 		}
+		pci_claim_resource(dev, i);
 	}
 }
 

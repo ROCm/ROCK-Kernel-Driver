@@ -544,14 +544,8 @@ static void netwave_detach(dev_link_t *link)
 	  the release() function is called, that will trigger a proper
 	  detach().
 	*/
-    if (link->state & DEV_CONFIG) {
+    if (link->state & DEV_CONFIG)
 	netwave_release(link);
-	if (link->state & DEV_STALE_CONFIG) {
-	    DEBUG(1, "netwave_cs: detach postponed, '%s' still "
-		  "locked\n", link->dev->dev_name);
-	    return;
-	}
-    }
 	
     /* Break the link with Card Services */
     if (link->handle)
@@ -1130,17 +1124,6 @@ static void netwave_release(dev_link_t *link)
 
     DEBUG(0, "netwave_release(0x%p)\n", link);
 
-    /*
-      If the device is currently in use, we won't release until it
-      is actually closed.
-      */
-    if (link->open) {
-	printk(KERN_DEBUG "netwave_cs: release postponed, '%s' still open\n",
-	       link->dev->dev_name);
-	link->state |= DEV_STALE_CONFIG;
-	return;
-    }
-
     /* Don't bother checking to see if these succeed or not */
     if (link->win) {
 	iounmap(priv->ramBase);
@@ -1151,9 +1134,6 @@ static void netwave_release(dev_link_t *link)
     pcmcia_release_irq(link->handle, &link->irq);
 
     link->state &= ~DEV_CONFIG;
-
-    if (link->state & DEV_STALE_CONFIG)
-	netwave_detach(link);
 }
 
 /*
@@ -1703,8 +1683,7 @@ static int netwave_close(struct net_device *dev) {
 
     link->open--;
     netif_stop_queue(dev);
-    if (link->state & DEV_STALE_CONFIG)
-	    netwave_release(link);
+
     return 0;
 }
 

@@ -178,7 +178,7 @@ static void print_binary(unsigned int number)
 static void netdev_get_drvinfo(struct net_device *dev,
 			       struct ethtool_drvinfo *info)
 {
-	struct xircom_private *private = dev->priv;
+	struct xircom_private *private = netdev_priv(dev);
 
 	strcpy(info->driver, "xircom_cb");
 	strcpy(info->bus_info, pci_name(private->pdev));
@@ -235,7 +235,7 @@ static int __devinit xircom_probe(struct pci_dev *pdev, const struct pci_device_
 		printk(KERN_ERR "xircom_probe: failed to allocate etherdev\n");
 		goto device_fail;
 	}
-	private = dev->priv;
+	private = netdev_priv(dev);
 	
 	/* Allocate the send/receive buffers */
 	private->rx_buffer = pci_alloc_consistent(pdev,8192,&private->rx_dma_handle);
@@ -312,7 +312,7 @@ device_fail:
 static void __devexit xircom_remove(struct pci_dev *pdev)
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
-	struct xircom_private *card = dev->priv;
+	struct xircom_private *card = netdev_priv(dev);
 
 	enter("xircom_remove");
 	pci_free_consistent(pdev,8192,card->rx_buffer,card->rx_dma_handle);
@@ -328,7 +328,7 @@ static void __devexit xircom_remove(struct pci_dev *pdev)
 static irqreturn_t xircom_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 {
 	struct net_device *dev = (struct net_device *) dev_instance;
-	struct xircom_private *card = (struct xircom_private *) dev->priv;
+	struct xircom_private *card = netdev_priv(dev);
 	unsigned int status;
 	int i;
 
@@ -385,7 +385,7 @@ static int xircom_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	int desc;
 	enter("xircom_start_xmit");
 	
-	card = (struct xircom_private*)dev->priv;
+	card = netdev_priv(dev);
 	spin_lock_irqsave(&card->lock,flags);
 	
 	/* First see if we can free some descriptors */
@@ -444,7 +444,7 @@ static int xircom_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 static int xircom_open(struct net_device *dev)
 {
-	struct xircom_private *xp = (struct xircom_private *) dev->priv;
+	struct xircom_private *xp = netdev_priv(dev);
 	int retval;
 	enter("xircom_open");
 	printk(KERN_INFO "xircom cardbus adaptor found, registering as %s, using irq %i \n",dev->name,dev->irq);
@@ -466,7 +466,7 @@ static int xircom_close(struct net_device *dev)
 	unsigned long flags;
 	
 	enter("xircom_close");
-	card = dev->priv;
+	card = netdev_priv(dev);
 	netif_stop_queue(dev); /* we don't want new packets */
 
 	
@@ -495,7 +495,7 @@ static int xircom_close(struct net_device *dev)
 
 static struct net_device_stats *xircom_get_stats(struct net_device *dev)
 {
-        struct xircom_private *card = (struct xircom_private *)dev->priv;
+        struct xircom_private *card = netdev_priv(dev);
         return &card->stats;
 } 
                                                  

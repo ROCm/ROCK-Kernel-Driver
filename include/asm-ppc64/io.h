@@ -27,8 +27,6 @@
 #define SIO_CONFIG_RD	0x399
 
 #define SLOW_DOWN_IO
-/* Define this if you want to see virt_to_* messages */
-#undef __IO_DEBUG
 
 extern unsigned long isa_io_base;
 extern unsigned long pci_io_base;
@@ -58,6 +56,13 @@ extern unsigned long pci_io_base;
 #define outb(data,addr)		writeb(data,((unsigned long)(addr)))  
 #define outw(data,addr)		writew(data,((unsigned long)(addr)))  
 #define outl(data,addr)		writel(data,((unsigned long)(addr)))
+/*
+ * The *_ns versions below don't do byte-swapping.
+ * Neither do the standard versions now, these are just here
+ * for older code.
+ */
+#define insw_ns(port, buf, ns)	_insw_ns((u16 *)((port)+pci_io_base), (buf), (ns))
+#define insl_ns(port, buf, nl)	_insl_ns((u32 *)((port)+pci_io_base), (buf), (nl))
 #else
 #define __raw_readb(addr)       (*(volatile unsigned char *)(addr))
 #define __raw_readw(addr)       (*(volatile unsigned short *)(addr))
@@ -90,12 +95,16 @@ extern unsigned long pci_io_base;
  * They are only used in practice for transferring buffers which
  * are arrays of bytes, and byte-swapping is not appropriate in
  * that case.  - paulus */
-#define insb(port, buf, ns)	_insb((u8 *)((port)+pci_io_base), (buf), (ns))
-#define outsb(port, buf, ns)	_outsb((u8 *)((port)+pci_io_base), (buf), (ns))
-#define insw(port, buf, ns)	_insw_ns((u16 *)((port)+pci_io_base), (buf), (ns))
-#define outsw(port, buf, ns)	_outsw_ns((u16 *)((port)+pci_io_base), (buf), (ns))
-#define insl(port, buf, nl)	_insl_ns((u32 *)((port)+pci_io_base), (buf), (nl))
-#define outsl(port, buf, nl)	_outsl_ns((u32 *)((port)+pci_io_base), (buf), (nl))
+#define insb(port, buf, ns)	eeh_insb((port), (buf), (ns))
+#define insw(port, buf, ns)	eeh_insw_ns((port), (buf), (ns))
+#define insl(port, buf, nl)	eeh_insl_ns((port), (buf), (nl))
+#define insw_ns(port, buf, ns)	eeh_insw_ns((port), (buf), (ns))
+#define insl_ns(port, buf, nl)	eeh_insl_ns((port), (buf), (nl))
+
+#define outsb(port, buf, ns)  _outsb((u8 *)((port)+pci_io_base), (buf), (ns))
+#define outsw(port, buf, ns)  _outsw_ns((u16 *)((port)+pci_io_base), (buf), (ns))
+#define outsl(port, buf, nl)  _outsl_ns((u32 *)((port)+pci_io_base), (buf), (nl))
+
 #endif
 
 #define readb_relaxed(addr) readb(addr)
@@ -130,9 +139,7 @@ extern void _outsl_ns(volatile u32 *port, const void *buf, int nl);
  * Neither do the standard versions now, these are just here
  * for older code.
  */
-#define insw_ns(port, buf, ns)	_insw_ns((u16 *)((port)+pci_io_base), (buf), (ns))
 #define outsw_ns(port, buf, ns)	_outsw_ns((u16 *)((port)+pci_io_base), (buf), (ns))
-#define insl_ns(port, buf, nl)	_insl_ns((u32 *)((port)+pci_io_base), (buf), (nl))
 #define outsl_ns(port, buf, nl)	_outsl_ns((u32 *)((port)+pci_io_base), (buf), (nl))
 
 
@@ -140,40 +147,61 @@ extern void _outsl_ns(volatile u32 *port, const void *buf, int nl);
 
 
 #ifdef __KERNEL__
-/*
- * Map in an area of physical address space, for accessing
- * I/O devices etc.
- */
 extern int __ioremap_explicit(unsigned long p_addr, unsigned long v_addr,
 		     	      unsigned long size, unsigned long flags);
 extern void *__ioremap(unsigned long address, unsigned long size,
 		       unsigned long flags);
+
+/**
+ * ioremap     -   map bus memory into CPU space
+ * @address:   bus address of the memory
+ * @size:      size of the resource to map
+ *
+ * ioremap performs a platform specific sequence of operations to
+ * make bus memory CPU accessible via the readb/readw/readl/writeb/
+ * writew/writel functions and the other mmio helpers. The returned
+ * address is not guaranteed to be usable directly as a virtual
+ * address.
+ */
 extern void *ioremap(unsigned long address, unsigned long size);
+
 #define ioremap_nocache(addr, size)	ioremap((addr), (size))
 extern int iounmap_explicit(void *addr, unsigned long size);
 extern void iounmap(void *addr);
 extern void * reserve_phb_iospace(unsigned long size);
 
-/*
- * Change virtual addresses to physical addresses and vv, for
- * addresses in the area where the kernel has the RAM mapped.
+/**
+ *	virt_to_phys	-	map virtual addresses to physical
+ *	@address: address to remap
+ *
+ *	The returned physical address is the physical (CPU) mapping for
+ *	the memory address given. It is only valid to use this function on
+ *	addresses directly mapped or allocated via kmalloc.
+ *
+ *	This function does not give bus mappings for DMA transfers. In
+ *	almost all conceivable cases a device driver should not be using
+ *	this function
  */
 static inline unsigned long virt_to_phys(volatile void * address)
 {
-#ifdef __IO_DEBUG
-	printk("virt_to_phys: 0x%08lx -> 0x%08lx\n", 
-			(unsigned long) address,
-			__pa((unsigned long)address));
-#endif
 	return __pa((unsigned long)address);
 }
 
+/**
+ *	phys_to_virt	-	map physical address to virtual
+ *	@address: address to remap
+ *
+ *	The returned virtual address is a current CPU mapping for
+ *	the memory address given. It is only valid to use this function on
+ *	addresses that have a kernel mapping
+ *
+ *	This function does not handle bus mappings for DMA transfers. In
+ *	almost all conceivable cases a device driver should not be using
+ *	this function
+ */
 static inline void * phys_to_virt(unsigned long address)
 {
-#ifdef __IO_DEBUG
-	printk("phys_to_virt: 0x%08lx -> 0x%08lx\n", address, __va(address));
-#endif
-	return (void *) __va(address);
+	return (void *)__va(address);
 }
 
 /*
@@ -204,6 +232,9 @@ static inline void iosync(void)
 
 /*
  * 8, 16 and 32 bit, big and little endian I/O operations, with barrier.
+ * These routines do not perform EEH-related I/O address translation,
+ * and should not be used directly by device drivers.  Use inb/readb
+ * instead.
  */
 static inline int in_8(volatile unsigned char *addr)
 {
@@ -332,6 +363,17 @@ static inline void out_be64(volatile unsigned long *addr, int val)
 #endif
 
 #ifdef __KERNEL__
+
+/**
+ *	check_signature		-	find BIOS signatures
+ *	@io_addr: mmio address to check
+ *	@signature:  signature block
+ *	@length: length of signature
+ *
+ *	Perform a signature comparison with the mmio address io_addr. This
+ *	address should have been obtained by ioremap.
+ *	Returns 1 on a match.
+ */
 static inline int check_signature(unsigned long io_addr,
 	const unsigned char *signature, int length)
 {

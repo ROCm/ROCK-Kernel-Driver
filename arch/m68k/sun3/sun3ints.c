@@ -15,7 +15,6 @@
 #include <asm/intersil.h>
 #include <asm/oplib.h>
 #include <asm/sun3ints.h>
-#include <asm/unistd.h>
 #include <linux/seq_file.h>
 
 extern void sun3_leds (unsigned char);
@@ -154,8 +153,8 @@ void sun3_init_IRQ(void)
 	for(i = 0; i < SYS_IRQS; i++)
 	{
 		if(dev_names[i])
-			sys_request_irq(i, sun3_default_handler[i],
-					0, dev_names[i], NULL);
+			cpu_request_irq(i, sun3_default_handler[i], 0,
+					dev_names[i], NULL);
 	}
 
 	for(i = 0; i < 192; i++) 
@@ -179,7 +178,8 @@ int sun3_request_irq(unsigned int irq, irqreturn_t (*handler)(int, void *, struc
 		dev_names[irq] = devname;
 		
 		/* setting devname would be nice */
-		sys_request_irq(irq, sun3_default_handler[irq], 0, devname, NULL);
+		cpu_request_irq(irq, sun3_default_handler[irq], 0, devname,
+				NULL);
 
 		return 0;
 	} else {

@@ -20,7 +20,6 @@
 #include <asm/system.h>
 #include <asm/irq.h>
 #include <asm/traps.h>
-#include <asm/unistd.h>
 
 static irqreturn_t bvme6000_defhand (int irq, void *dev_id, struct pt_regs *fp);
 
@@ -74,7 +73,7 @@ int bvme6000_request_irq(unsigned int irq,
 	 */
 
 	if (irq >= VEC_INT1 && irq <= VEC_INT7)
-		return sys_request_irq(irq - VEC_SPUR, handler, flags,
+		return cpu_request_irq(irq - VEC_SPUR, handler, flags,
 						devname, dev_id);
 #endif
 	if (!(irq_tab[irq].flags & IRQ_FLG_STD)) {
@@ -104,7 +103,7 @@ void bvme6000_free_irq(unsigned int irq, void *dev_id)
 	}
 #if 0
 	if (irq >= VEC_INT1 && irq <= VEC_INT7) {
-		sys_free_irq(irq - VEC_SPUR, dev_id);
+		cpu_free_irq(irq - VEC_SPUR, dev_id);
 		return;
 	}
 #endif

@@ -763,8 +763,9 @@ static void gem_rx(struct gem *gp)
 			copy_skb->dev = gp->dev;
 			skb_reserve(copy_skb, 2);
 			skb_put(copy_skb, len);
-			pci_dma_sync_single(gp->pdev, dma_addr, len, PCI_DMA_FROMDEVICE);
+			pci_dma_sync_single_for_cpu(gp->pdev, dma_addr, len, PCI_DMA_FROMDEVICE);
 			memcpy(copy_skb->data, skb->data, len);
+			pci_dma_sync_single_for_device(gp->pdev, dma_addr, len, PCI_DMA_FROMDEVICE);
 
 			/* We'll reuse the original ring buffer. */
 			skb = copy_skb;

@@ -70,13 +70,6 @@
 #define	SYM_CONF_DMA_ADDRESSING_MODE CONFIG_SCSI_SYM53C8XX_DMA_ADDRESSING_MODE
 
 /*
- *  NCR PQS/PDS special device support.
- */
-#if 1
-#define SYM_CONF_PQS_PDS_SUPPORT
-#endif
-
-/*
  *  NVRAM support.
  */
 #if 1

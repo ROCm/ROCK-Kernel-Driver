@@ -202,4 +202,4 @@ config USB_W9968CF
 	  This code is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
 	  The module will be called w9968cf.o. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  module, say M here and read <file:Documentation/kbuild/modules.txt>.

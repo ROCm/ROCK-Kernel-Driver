@@ -157,10 +157,9 @@ ext3_iset_acl(struct inode *inode, struct posix_acl **i_acl,
 static struct posix_acl *
 ext3_get_acl(struct inode *inode, int type)
 {
-	const size_t max_size = ext3_acl_size(EXT3_ACL_MAX_ENTRIES);
 	struct ext3_inode_info *ei = EXT3_I(inode);
 	int name_index;
-	char *value;
+	char *value = NULL;
 	struct posix_acl *acl;
 	int retval;
 
@@ -185,17 +184,21 @@ ext3_get_acl(struct inode *inode, int type)
 		default:
 			return ERR_PTR(-EINVAL);
 	}
-	value = kmalloc(max_size, GFP_KERNEL);
-	if (!value)
-		return ERR_PTR(-ENOMEM);
-
-	retval = ext3_xattr_get(inode, name_index, "", value, max_size);
-	acl = ERR_PTR(retval);
+	retval = ext3_xattr_get(inode, name_index, "", NULL, 0);
+	if (retval > 0) {
+		value = kmalloc(retval, GFP_KERNEL);
+		if (!value)
+			return ERR_PTR(-ENOMEM);
+		retval = ext3_xattr_get(inode, name_index, "", value, retval);
+	}
 	if (retval > 0)
 		acl = ext3_acl_from_disk(value, retval);
 	else if (retval == -ENODATA || retval == -ENOSYS)
 		acl = NULL;
-	kfree(value);
+	else
+		acl = ERR_PTR(retval);
+	if (value)
+		kfree(value);
 
 	if (!IS_ERR(acl)) {
 		switch(type) {

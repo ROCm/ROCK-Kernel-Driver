@@ -178,7 +178,7 @@ static dev_link_t *ibmtr_attach(void)
 
     link = &info->link;
     link->priv = info;
-    info->ti = dev->priv; 
+    info->ti = netdev_priv(dev);
 
     link->io.Attributes1 = IO_DATA_PATH_WIDTH_8;
     link->io.NumPorts1 = 4;
@@ -256,7 +256,7 @@ static void ibmtr_detach(dev_link_t *link)
 	unregister_netdev(dev);
 
     {
-	struct tok_info *ti = (struct tok_info *)dev->priv;
+	struct tok_info *ti = netdev_priv(dev);
 	del_timer_sync(&(ti->tr_timer));
     }
     if (link->state & DEV_CONFIG)
@@ -287,7 +287,7 @@ static void ibmtr_config(dev_link_t *link)
     client_handle_t handle = link->handle;
     ibmtr_dev_t *info = link->priv;
     struct net_device *dev = info->dev;
-    struct tok_info *ti = dev->priv;
+    struct tok_info *ti = netdev_priv(dev);
     tuple_t tuple;
     cisparse_t parse;
     win_req_t req;
@@ -412,7 +412,7 @@ static void ibmtr_release(dev_link_t *link)
     pcmcia_release_io(link->handle, &link->io);
     pcmcia_release_irq(link->handle, &link->irq);
     if (link->win) {
-	struct tok_info *ti = dev->priv;
+	struct tok_info *ti = netdev_priv(dev);
 	iounmap((void *)ti->mmio);
 	pcmcia_release_window(link->win);
 	pcmcia_release_window(info->sram_win_handle);

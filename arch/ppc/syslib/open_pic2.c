@@ -699,7 +699,7 @@ static int __init init_openpic2_sysfs(void)
 		printk(KERN_ERR "Failed registering openpic sys class\n");
 		return -ENODEV;
 	}
-	rc = sys_device_register(&device_openpic2);
+	rc = sysdev_register(&device_openpic2);
 	if (rc) {
 		printk(KERN_ERR "Failed registering openpic sys device\n");
 		return -ENODEV;

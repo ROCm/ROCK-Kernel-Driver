@@ -427,6 +427,7 @@ int aac_rkt_init(struct aac_dev *dev, unsigned long num)
 	dev->a_ops.adapter_disable_int = aac_rkt_disable_interrupt;
 	dev->a_ops.adapter_notify = aac_rkt_notify_adapter;
 	dev->a_ops.adapter_sync_cmd = rkt_sync_cmd;
+	dev->a_ops.adapter_check_health = aac_rkt_check_health;
 
 	if (aac_init_adapter(dev) == NULL)
 		return -1;

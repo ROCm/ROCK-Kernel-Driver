@@ -533,7 +533,7 @@ __kernel_thread:
 	ldil	L%CLONE_UNTRACED, %r26
 	ldo	CLONE_VM(%r26), %r26   /* Force CLONE_VM since only init_mm */
 	or	%r26, %r24, %r26      /* will have kernel mappings.	 */
-	copy	%r0, %r25		/* stack_start */
+	ldi	1, %r25			/* stack_start, signals kernel thread */
 	stw	%r0, -52(%r30)	     	/* user_tid */
 #ifdef __LP64__
 	ldo	-16(%r30),%r29		/* Reference param save area */

@@ -52,7 +52,7 @@
 #include <asm/semaphore.h>
 #include <asm/hvcall.h>
 #include <asm/atomic.h>
-#include <asm/pci_dma.h>
+#include <asm/iommu.h>
 #include <asm/vio.h>
 #include <asm/uaccess.h>
 #include <linux/proc_fs.h>
@@ -66,16 +66,16 @@
   printk(KERN_INFO "%s: " fmt, __FILE__, ## args)
 
 #define ibmveth_error_printk(fmt, args...) \
-  printk(KERN_ERR "(%s:%3.3d ua:%lx) ERROR: " fmt, __FILE__, __LINE__ , adapter->vdev->unit_address, ## args)
+  printk(KERN_ERR "(%s:%3.3d ua:%x) ERROR: " fmt, __FILE__, __LINE__ , adapter->vdev->unit_address, ## args)
 
 #ifdef DEBUG
 #define ibmveth_debug_printk_no_adapter(fmt, args...) \
   printk(KERN_DEBUG "(%s:%3.3d): " fmt, __FILE__, __LINE__ , ## args)
 #define ibmveth_debug_printk(fmt, args...) \
-  printk(KERN_DEBUG "(%s:%3.3d ua:%lx): " fmt, __FILE__, __LINE__ , adapter->vdev->unit_address, ## args)
+  printk(KERN_DEBUG "(%s:%3.3d ua:%x): " fmt, __FILE__, __LINE__ , adapter->vdev->unit_address, ## args)
 #define ibmveth_assert(expr) \
   if(!(expr)) {                                   \
-    printk(KERN_DEBUG "assertion failed (%s:%3.3d ua:%lx): %s\n", __FILE__, __LINE__, adapter->vdev->unit_address, #expr); \
+    printk(KERN_DEBUG "assertion failed (%s:%3.3d ua:%x): %s\n", __FILE__, __LINE__, adapter->vdev->unit_address, #expr); \
     BUG(); \
   }
 #else
@@ -527,7 +527,10 @@ static int ibmveth_open(struct net_device *netdev)
 	ibmveth_debug_printk("registering irq 0x%x\n", netdev->irq);
 	if((rc = request_irq(netdev->irq, &ibmveth_interrupt, 0, netdev->name, netdev)) != 0) {
 		ibmveth_error_printk("unable to request irq 0x%x, rc %d\n", netdev->irq, rc);
-		h_free_logical_lan(adapter->vdev->unit_address);
+		do {
+			rc = h_free_logical_lan(adapter->vdev->unit_address);
+		} while H_isLongBusy(rc);
+
 		ibmveth_cleanup(adapter);
 		return rc;
 	}
@@ -556,7 +559,9 @@ static int ibmveth_close(struct net_device *netdev)
 	cancel_delayed_work(&adapter->replenish_task);
 	flush_scheduled_work();
 
-	lpar_rc = h_free_logical_lan(adapter->vdev->unit_address);
+	do {
+		lpar_rc = h_free_logical_lan(adapter->vdev->unit_address);
+	} while H_isLongBusy(lpar_rc);
 
 	if(lpar_rc != H_Success)
 	{
@@ -617,6 +622,8 @@ static int ibmveth_start_xmit(struct sk_buff *skb, struct net_device *netdev)
 	union ibmveth_buf_desc desc[IbmVethMaxSendFrags];
 	unsigned long lpar_rc;
 	int nfrags = 0, curfrag;
+	unsigned long correlator;
+	unsigned int retry_count;
 
 	if ((skb_shinfo(skb)->nr_frags + 1) > IbmVethMaxSendFrags) {
 		adapter->stats.tx_dropped++;
@@ -674,8 +681,8 @@ static int ibmveth_start_xmit(struct sk_buff *skb, struct net_device *netdev)
 	}
 
 	/* send the frame. Arbitrarily set retrycount to 1024 */
-	unsigned long correlator = 0;
-	unsigned int retry_count = 1024;
+	correlator = 0;
+	retry_count = 1024;
 	do {
 		lpar_rc = h_send_logical_lan(adapter->vdev->unit_address,
 					     desc[0].desc,
@@ -869,7 +876,7 @@ static int __devinit ibmveth_probe(struct vio_dev *dev, const struct vio_device_
 	unsigned int *mcastFilterSize_p;
 
 
-	ibmveth_debug_printk_no_adapter("entering ibmveth_probe for UA 0x%lx\n", 
+	ibmveth_debug_printk_no_adapter("entering ibmveth_probe for UA 0x%x\n", 
 					dev->unit_address);
 
 	mac_addr_p = (unsigned int *) vio_get_attribute(dev, VETH_MAC_ADDR, 0);
@@ -913,7 +920,7 @@ static int __devinit ibmveth_probe(struct vio_dev *dev, const struct vio_device_
 	adapter->mac_addr = 0;
 	memcpy(&adapter->mac_addr, mac_addr_p, 6);
 
-	adapter->liobn = dev->tce_table->index;
+	adapter->liobn = dev->iommu_table->it_index;
 	
 	netdev->irq = dev->irq;
 	netdev->open               = ibmveth_open;
@@ -1014,7 +1021,7 @@ static int ibmveth_seq_show(struct seq_file *seq, void *v)
 
 	seq_printf(seq, "%s %s\n\n", ibmveth_driver_string, ibmveth_driver_version);
 	
-	seq_printf(seq, "Unit Address:    0x%lx\n", adapter->vdev->unit_address);
+	seq_printf(seq, "Unit Address:    0x%x\n", adapter->vdev->unit_address);
 	seq_printf(seq, "LIOBN:           0x%lx\n", adapter->liobn);
 	seq_printf(seq, "Current MAC:     %02X:%02X:%02X:%02X:%02X:%02X\n",
 		   current_mac[0], current_mac[1], current_mac[2],

@@ -49,6 +49,7 @@
 
 /* Global variables */
 int cpqhp_debug;
+int cpqhp_legacy_mode;
 struct controller *cpqhp_ctrl_list;	/* = NULL */
 struct pci_func *cpqhp_slot_list[256];
 
@@ -1169,6 +1170,10 @@ static int cpqhpc_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	 */
 	// The next line is required for cpqhp_find_available_resources
 	ctrl->interrupt = pdev->irq;
+	if (ctrl->interrupt < 0x10) {
+		cpqhp_legacy_mode = 1;
+		dbg("System seems to be configured for Full Table Mapped MPS mode\n");
+	}
 
 	ctrl->cfgspc_irq = 0;
 	pci_read_config_byte(pdev, PCI_INTERRUPT_LINE, &ctrl->cfgspc_irq);

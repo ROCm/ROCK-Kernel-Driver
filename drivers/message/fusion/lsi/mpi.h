@@ -1,12 +1,12 @@
 /*
- *  Copyright (c) 2000-2002 LSI Logic Corporation.
+ *  Copyright (c) 2000-2003 LSI Logic Corporation.
  *
  *
- *           Name:  MPI.H
+ *           Name:  mpi.h
  *          Title:  MPI Message independent structures and definitions
  *  Creation Date:  July 27, 2000
  *
- *    MPI.H Version:  01.02.07
+ *    mpi.h Version:  01.05.xx
  *
  *  Version History
  *  ---------------
@@ -48,6 +48,10 @@
  *  05-31-02  01.02.05  Bumped MPI_HEADER_VERSION_UNIT.
  *  07-12-02  01.02.06  Added define for MPI_FUNCTION_MAILBOX.
  *  09-16-02  01.02.07  Bumped value for MPI_HEADER_VERSION_UNIT.
+ *  11-15-02  01.02.08  Added define MPI_IOCSTATUS_TARGET_INVALID_IO_INDEX and
+ *                      obsoleted define MPI_IOCSTATUS_TARGET_INVALID_IOCINDEX.
+ *  04-01-03  01.02.09  New IOCStatus code: MPI_IOCSTATUS_FC_EXCHANGE_CANCELED
+ *  06-26-03  01.02.10  Bumped MPI_HEADER_VERSION_UNIT value.
  *  --------------------------------------------------------------------------
  */
 
@@ -62,7 +66,7 @@
 *****************************************************************************/
 
 #define MPI_VERSION_MAJOR                   (0x01)
-#define MPI_VERSION_MINOR                   (0x02)
+#define MPI_VERSION_MINOR                   (0x05)
 #define MPI_VERSION_MAJOR_MASK              (0xFF00)
 #define MPI_VERSION_MAJOR_SHIFT             (8)
 #define MPI_VERSION_MINOR_MASK              (0x00FF)
@@ -73,10 +77,12 @@
 #define MPI_VERSION_01_00                   (0x0100)
 #define MPI_VERSION_01_01                   (0x0101)
 #define MPI_VERSION_01_02                   (0x0102)
+#define MPI_VERSION_01_03                   (0x0103)
+#define MPI_VERSION_01_05                   (0x0105)
 /* Note: The major versions of 0xe0 through 0xff are reserved */
 
 /* versioning for this MPI header set */
-#define MPI_HEADER_VERSION_UNIT             (0x09)
+#define MPI_HEADER_VERSION_UNIT             (0x00)
 #define MPI_HEADER_VERSION_DEV              (0x00)
 #define MPI_HEADER_VERSION_UNIT_MASK        (0xFF00)
 #define MPI_HEADER_VERSION_UNIT_SHIFT       (8)
@@ -171,6 +177,8 @@
 #define MPI_REPLY_POST_FIFO_OFFSET          (0x00000044)
 #define MPI_REPLY_FREE_FIFO_OFFSET          (0x00000044)
 
+#define MPI_HI_PRI_REQUEST_QUEUE_OFFSET     (0x00000048)
+
 
 
 /*****************************************************************************
@@ -230,10 +238,6 @@
 #define MPI_FUNCTION_TARGET_ASSIST                  (0x0B)
 #define MPI_FUNCTION_TARGET_STATUS_SEND             (0x0C)
 #define MPI_FUNCTION_TARGET_MODE_ABORT              (0x0D)
-#define MPI_FUNCTION_TARGET_FC_BUF_POST_LINK_SRVC   (0x0E) /* obsolete name */
-#define MPI_FUNCTION_TARGET_FC_RSP_LINK_SRVC        (0x0F) /* obsolete name */
-#define MPI_FUNCTION_TARGET_FC_EX_SEND_LINK_SRVC    (0x10) /* obsolete name */
-#define MPI_FUNCTION_TARGET_FC_ABORT                (0x11) /* obsolete name */
 #define MPI_FUNCTION_FC_LINK_SRVC_BUF_POST          (0x0E)
 #define MPI_FUNCTION_FC_LINK_SRVC_RSP               (0x0F)
 #define MPI_FUNCTION_FC_EX_LINK_SRVC_SEND           (0x10)
@@ -251,15 +255,45 @@
 
 #define MPI_FUNCTION_MAILBOX                        (0x19)
 
+#define MPI_FUNCTION_SMP_PASSTHROUGH                (0x1A)
+#define MPI_FUNCTION_SAS_IO_UNIT_CONTROL            (0x1B)
+
+#define MPI_DIAG_BUFFER_POST                        (0x1D)
+#define MPI_DIAG_RELEASE                            (0x1E)
+
+#define MPI_FUNCTION_SCSI_IO_32                     (0x1F)
+
 #define MPI_FUNCTION_LAN_SEND                       (0x20)
 #define MPI_FUNCTION_LAN_RECEIVE                    (0x21)
 #define MPI_FUNCTION_LAN_RESET                      (0x22)
+
+#define MPI_FUNCTION_INBAND_BUFFER_POST             (0x28)
+#define MPI_FUNCTION_INBAND_SEND                    (0x29)
+#define MPI_FUNCTION_INBAND_RSP                     (0x2A)
+#define MPI_FUNCTION_INBAND_ABORT                   (0x2B)
 
 #define MPI_FUNCTION_IOC_MESSAGE_UNIT_RESET         (0x40)
 #define MPI_FUNCTION_IO_UNIT_RESET                  (0x41)
 #define MPI_FUNCTION_HANDSHAKE                      (0x42)
 #define MPI_FUNCTION_REPLY_FRAME_REMOVAL            (0x43)
 
+
+/* standard version format */
+typedef struct _MPI_VERSION_STRUCT
+{
+    U8                      Dev;                        /* 00h */
+    U8                      Unit;                       /* 01h */
+    U8                      Minor;                      /* 02h */
+    U8                      Major;                      /* 03h */
+} MPI_VERSION_STRUCT, MPI_POINTER PTR_MPI_VERSION_STRUCT,
+  MpiVersionStruct_t, MPI_POINTER pMpiVersionStruct;
+
+typedef union _MPI_VERSION_FORMAT
+{
+    MPI_VERSION_STRUCT      Struct;
+    U32                     Word;
+} MPI_VERSION_FORMAT, MPI_POINTER PTR_MPI_VERSION_FORMAT,
+  MpiVersionFormat_t, MPI_POINTER pMpiVersionFormat_t;
 
 
 /*****************************************************************************
@@ -573,44 +607,54 @@ typedef struct _MSG_DEFAULT_REPLY
 /*  Common IOCStatus values for all replies                                 */
 /****************************************************************************/
 
-#define MPI_IOCSTATUS_SUCCESS                  (0x0000)
-#define MPI_IOCSTATUS_INVALID_FUNCTION         (0x0001)
-#define MPI_IOCSTATUS_BUSY                     (0x0002)
-#define MPI_IOCSTATUS_INVALID_SGL              (0x0003)
-#define MPI_IOCSTATUS_INTERNAL_ERROR           (0x0004)
-#define MPI_IOCSTATUS_RESERVED                 (0x0005)
-#define MPI_IOCSTATUS_INSUFFICIENT_RESOURCES   (0x0006)
-#define MPI_IOCSTATUS_INVALID_FIELD            (0x0007)
-#define MPI_IOCSTATUS_INVALID_STATE            (0x0008)
+#define MPI_IOCSTATUS_SUCCESS                   (0x0000)
+#define MPI_IOCSTATUS_INVALID_FUNCTION          (0x0001)
+#define MPI_IOCSTATUS_BUSY                      (0x0002)
+#define MPI_IOCSTATUS_INVALID_SGL               (0x0003)
+#define MPI_IOCSTATUS_INTERNAL_ERROR            (0x0004)
+#define MPI_IOCSTATUS_RESERVED                  (0x0005)
+#define MPI_IOCSTATUS_INSUFFICIENT_RESOURCES    (0x0006)
+#define MPI_IOCSTATUS_INVALID_FIELD             (0x0007)
+#define MPI_IOCSTATUS_INVALID_STATE             (0x0008)
+#define MPI_IOCSTATUS_OP_STATE_NOT_SUPPORTED    (0x0009)
 
 /****************************************************************************/
 /*  Config IOCStatus values                                                 */
 /****************************************************************************/
 
-#define MPI_IOCSTATUS_CONFIG_INVALID_ACTION    (0x0020)
-#define MPI_IOCSTATUS_CONFIG_INVALID_TYPE      (0x0021)
-#define MPI_IOCSTATUS_CONFIG_INVALID_PAGE      (0x0022)
-#define MPI_IOCSTATUS_CONFIG_INVALID_DATA      (0x0023)
-#define MPI_IOCSTATUS_CONFIG_NO_DEFAULTS       (0x0024)
-#define MPI_IOCSTATUS_CONFIG_CANT_COMMIT       (0x0025)
+#define MPI_IOCSTATUS_CONFIG_INVALID_ACTION     (0x0020)
+#define MPI_IOCSTATUS_CONFIG_INVALID_TYPE       (0x0021)
+#define MPI_IOCSTATUS_CONFIG_INVALID_PAGE       (0x0022)
+#define MPI_IOCSTATUS_CONFIG_INVALID_DATA       (0x0023)
+#define MPI_IOCSTATUS_CONFIG_NO_DEFAULTS        (0x0024)
+#define MPI_IOCSTATUS_CONFIG_CANT_COMMIT        (0x0025)
 
 /****************************************************************************/
 /*  SCSIIO Reply (SPI & FCP) initiator values                               */
 /****************************************************************************/
 
-#define MPI_IOCSTATUS_SCSI_RECOVERED_ERROR     (0x0040)
-#define MPI_IOCSTATUS_SCSI_INVALID_BUS         (0x0041)
-#define MPI_IOCSTATUS_SCSI_INVALID_TARGETID    (0x0042)
-#define MPI_IOCSTATUS_SCSI_DEVICE_NOT_THERE    (0x0043)
-#define MPI_IOCSTATUS_SCSI_DATA_OVERRUN        (0x0044)
-#define MPI_IOCSTATUS_SCSI_DATA_UNDERRUN       (0x0045)
-#define MPI_IOCSTATUS_SCSI_IO_DATA_ERROR       (0x0046)
-#define MPI_IOCSTATUS_SCSI_PROTOCOL_ERROR      (0x0047)
-#define MPI_IOCSTATUS_SCSI_TASK_TERMINATED     (0x0048)
-#define MPI_IOCSTATUS_SCSI_RESIDUAL_MISMATCH   (0x0049)
-#define MPI_IOCSTATUS_SCSI_TASK_MGMT_FAILED    (0x004A)
-#define MPI_IOCSTATUS_SCSI_IOC_TERMINATED      (0x004B)
-#define MPI_IOCSTATUS_SCSI_EXT_TERMINATED      (0x004C)
+#define MPI_IOCSTATUS_SCSI_RECOVERED_ERROR      (0x0040)
+#define MPI_IOCSTATUS_SCSI_INVALID_BUS          (0x0041)
+#define MPI_IOCSTATUS_SCSI_INVALID_TARGETID     (0x0042)
+#define MPI_IOCSTATUS_SCSI_DEVICE_NOT_THERE     (0x0043)
+#define MPI_IOCSTATUS_SCSI_DATA_OVERRUN         (0x0044)
+#define MPI_IOCSTATUS_SCSI_DATA_UNDERRUN        (0x0045)
+#define MPI_IOCSTATUS_SCSI_IO_DATA_ERROR        (0x0046)
+#define MPI_IOCSTATUS_SCSI_PROTOCOL_ERROR       (0x0047)
+#define MPI_IOCSTATUS_SCSI_TASK_TERMINATED      (0x0048)
+#define MPI_IOCSTATUS_SCSI_RESIDUAL_MISMATCH    (0x0049)
+#define MPI_IOCSTATUS_SCSI_TASK_MGMT_FAILED     (0x004A)
+#define MPI_IOCSTATUS_SCSI_IOC_TERMINATED       (0x004B)
+#define MPI_IOCSTATUS_SCSI_EXT_TERMINATED       (0x004C)
+
+/****************************************************************************/
+/*  For use by SCSI Initiator and SCSI Target end-to-end data protection    */
+/****************************************************************************/
+
+#define MPI_IOCSTATUS_EEDP_CRC_ERROR            (0x004D)
+#define MPI_IOCSTATUS_EEDP_LBA_TAG_ERROR        (0x004E)
+#define MPI_IOCSTATUS_EEDP_APP_TAG_ERROR        (0x004F)
+
 
 /****************************************************************************/
 /*  SCSI (SPI & FCP) target values                                          */
@@ -618,7 +662,8 @@ typedef struct _MSG_DEFAULT_REPLY
 
 #define MPI_IOCSTATUS_TARGET_PRIORITY_IO         (0x0060)
 #define MPI_IOCSTATUS_TARGET_INVALID_PORT        (0x0061)
-#define MPI_IOCSTATUS_TARGET_INVALID_IOCINDEX    (0x0062)
+#define MPI_IOCSTATUS_TARGET_INVALID_IOCINDEX    (0x0062)   /* obsolete */
+#define MPI_IOCSTATUS_TARGET_INVALID_IO_INDEX    (0x0062)
 #define MPI_IOCSTATUS_TARGET_ABORTED             (0x0063)
 #define MPI_IOCSTATUS_TARGET_NO_CONN_RETRYABLE   (0x0064)
 #define MPI_IOCSTATUS_TARGET_NO_CONNECTION       (0x0065)
@@ -626,7 +671,7 @@ typedef struct _MSG_DEFAULT_REPLY
 #define MPI_IOCSTATUS_TARGET_STS_DATA_NOT_SENT   (0x006B)
 
 /****************************************************************************/
-/*  Additional FCP target values                                            */
+/*  Additional FCP target values (obsolete)                                 */
 /****************************************************************************/
 
 #define MPI_IOCSTATUS_TARGET_FC_ABORTED         (0x0066)    /* obsolete */
@@ -642,6 +687,7 @@ typedef struct _MSG_DEFAULT_REPLY
 #define MPI_IOCSTATUS_FC_RX_ID_INVALID          (0x0067)
 #define MPI_IOCSTATUS_FC_DID_INVALID            (0x0068)
 #define MPI_IOCSTATUS_FC_NODE_LOGGED_OUT        (0x0069)
+#define MPI_IOCSTATUS_FC_EXCHANGE_CANCELED      (0x006C)
 
 /****************************************************************************/
 /*  LAN values                                                              */
@@ -656,6 +702,25 @@ typedef struct _MSG_DEFAULT_REPLY
 #define MPI_IOCSTATUS_LAN_PARTIAL_PACKET        (0x0086)
 #define MPI_IOCSTATUS_LAN_CANCELED              (0x0087)
 
+/****************************************************************************/
+/*  Serial Attached SCSI values                                                              */
+/****************************************************************************/
+
+#define MPI_IOCSTATUS_SAS_SMP_REQUEST_FAILED    (0x0090)
+
+/****************************************************************************/
+/*  Inband values                                                           */
+/****************************************************************************/
+
+#define MPI_IOCSTATUS_INBAND_ABORTED            (0x0098)
+#define MPI_IOCSTATUS_INBAND_NO_CONNECTION      (0x0099)
+
+/****************************************************************************/
+/*  Diagnostic Tools values                                                 */
+/****************************************************************************/
+
+#define MPI_IOCSTATUS_DIAGNOSTIC_RELEASED       (0x00A0)
+
 
 /****************************************************************************/
 /*  IOCStatus flag to indicate that log info is available                   */
@@ -669,9 +734,12 @@ typedef struct _MSG_DEFAULT_REPLY
 /****************************************************************************/
 
 #define MPI_IOCLOGINFO_TYPE_MASK                (0xF0000000)
+#define MPI_IOCLOGINFO_TYPE_SHIFT               (28)
 #define MPI_IOCLOGINFO_TYPE_NONE                (0x0)
 #define MPI_IOCLOGINFO_TYPE_SCSI                (0x1)
 #define MPI_IOCLOGINFO_TYPE_FC                  (0x2)
+#define MPI_IOCLOGINFO_TYPE_SAS                 (0x3)
+#define MPI_IOCLOGINFO_TYPE_ISCSI               (0x4)
 #define MPI_IOCLOGINFO_LOG_DATA_MASK            (0x0FFFFFFF)
 
 

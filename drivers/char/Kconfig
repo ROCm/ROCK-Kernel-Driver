@@ -599,30 +599,6 @@ config PC9800_OLDLP_CONSOLE
 	bool "Support for console on line printer"
 	depends on PC9800_OLDLP
 
-
-menu "Mice"
-
-config BUSMOUSE
-	tristate "Bus Mouse Support"
-	---help---
-	  Say Y here if your machine has a bus mouse as opposed to a serial
-	  mouse. Most people have a regular serial MouseSystem or
-	  Microsoft mouse (made by Logitech) that plugs into a COM port
-	  (rectangular with 9 or 25 pins). These people say N here. 
-
-	  If you have a laptop, you either have to check the documentation or
-	  experiment a bit to find out whether the trackball is a serial mouse
-	  or not; it's best to say Y here for you.
-
-	  This is the generic bus mouse driver code. If you have a bus mouse,
-	  you will have to say Y here and also to the specific driver for your
-	  mouse below.
-
-	  To compile this driver as a module, choose M here: the
-	  module will be called busmouse.
-
-endmenu
-
 config QIC02_TAPE
 	tristate "QIC-02 tape support"
 	help
@@ -740,6 +716,7 @@ config HW_RANDOM
 
 config NVRAM
 	tristate "/dev/nvram support"
+	depends on ATARI || X86 || X86_64 || ARM || GENERIC_NVRAM
 	---help---
 	  If you say Y here and create a character special file /dev/nvram
 	  with major number 10 and minor number 144 using mknod ("man mknod"),

@@ -971,10 +971,10 @@ static void __devexit fcpnp_remove(struct pnp_dev *pdev)
 }
 
 static struct pnp_driver fcpnp_driver = {
-	name:     "fcpnp",
-	probe:    fcpnp_probe,
-	remove:   __devexit_p(fcpnp_remove),
-	id_table: fcpnp_ids,
+	.name		= "fcpnp",
+	.probe		= fcpnp_probe,
+	.remove		= __devexit_p(fcpnp_remove),
+	.id_table	= fcpnp_ids,
 };
 #endif
 
@@ -988,10 +988,10 @@ static void __devexit fcpci_remove(struct pci_dev *pdev)
 }
 
 static struct pci_driver fcpci_driver = {
-	name:     "fcpci",
-	probe:    fcpci_probe,
-	remove:   __devexit_p(fcpci_remove),
-	id_table: fcpci_ids,
+	.name		= "fcpci",
+	.probe		= fcpci_probe,
+	.remove		= __devexit_p(fcpci_remove),
+	.id_table	= fcpci_ids,
 };
 
 static int __init hisax_fcpcipnp_init(void)

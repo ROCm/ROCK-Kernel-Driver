@@ -483,7 +483,7 @@ static int ide_tcq_check_autopoll(ide_drive_t *drive)
 
 	args->tfRegister[IDE_FEATURE_OFFSET] = 0x01;
 	args->tfRegister[IDE_COMMAND_OFFSET] = WIN_NOP;
-	args->command_type = ide_cmd_type_parser(args);
+	args->command_type = IDE_DRIVE_TASK_NO_DATA;
 	args->handler = ide_tcq_nop_handler;
 	return ide_raw_taskfile(drive, args, NULL);
 }
@@ -513,7 +513,8 @@ static int ide_tcq_configure(ide_drive_t *drive)
 	memset(args, 0, sizeof(ide_task_t));
 	args->tfRegister[IDE_COMMAND_OFFSET] = WIN_SETFEATURES;
 	args->tfRegister[IDE_FEATURE_OFFSET] = SETFEATURES_EN_WCACHE;
-	args->command_type = ide_cmd_type_parser(args);
+	args->command_type = IDE_DRIVE_TASK_NO_DATA;
+	args->handler	   = &task_no_data_intr;
 
 	if (ide_raw_taskfile(drive, args, NULL)) {
 		printk(KERN_WARNING "%s: failed to enable write cache\n", drive->name);
@@ -527,7 +528,8 @@ static int ide_tcq_configure(ide_drive_t *drive)
 	memset(args, 0, sizeof(ide_task_t));
 	args->tfRegister[IDE_COMMAND_OFFSET] = WIN_SETFEATURES;
 	args->tfRegister[IDE_FEATURE_OFFSET] = SETFEATURES_DIS_RI;
-	args->command_type = ide_cmd_type_parser(args);
+	args->command_type = IDE_DRIVE_TASK_NO_DATA;
+	args->handler	   = &task_no_data_intr;
 
 	if (ide_raw_taskfile(drive, args, NULL)) {
 		printk(KERN_ERR "%s: disabling release interrupt fail\n", drive->name);
@@ -541,7 +543,8 @@ static int ide_tcq_configure(ide_drive_t *drive)
 	memset(args, 0, sizeof(ide_task_t));
 	args->tfRegister[IDE_COMMAND_OFFSET] = WIN_SETFEATURES;
 	args->tfRegister[IDE_FEATURE_OFFSET] = SETFEATURES_EN_SI;
-	args->command_type = ide_cmd_type_parser(args);
+	args->command_type = IDE_DRIVE_TASK_NO_DATA;
+	args->handler	   = &task_no_data_intr;
 
 	if (ide_raw_taskfile(drive, args, NULL)) {
 		printk(KERN_ERR "%s: enabling service interrupt fail\n", drive->name);

@@ -256,8 +256,6 @@ static struct miscdevice advwdt_miscdev = {
 
 static struct notifier_block advwdt_notifier = {
 	.notifier_call = advwdt_notify_sys,
-	.next = NULL,
-	.priority = 0,
 };
 
 static int __init

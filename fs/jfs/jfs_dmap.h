@@ -286,8 +286,6 @@ extern int dbNextAG(struct inode *ipbmap);
 
 extern int dbAlloc(struct inode *ipbmap, s64 hint, s64 nblocks, s64 * results);
 
-extern int dbAllocExact(struct inode *ip, s64 blkno, int nblocks);
-
 extern int dbReAlloc(struct inode *ipbmap,
 		     s64 blkno, s64 nblocks, s64 addnblocks, s64 * results);
 

@@ -213,6 +213,9 @@ int autofs4_fill_super(struct super_block *s, void *data, int silent)
 	 * Get the root inode and dentry, but defer checking for errors.
 	 */
 	root_inode = autofs4_get_inode(s, autofs4_mkroot(sbi));
+	if (!root_inode)
+		goto fail_free;
+
 	root_inode->i_op = &autofs4_root_inode_operations;
 	root_inode->i_fop = &autofs4_root_operations;
 	root = d_alloc_root(root_inode);
@@ -264,22 +267,13 @@ int autofs4_fill_super(struct super_block *s, void *data, int silent)
 	 */
 fail_fput:
 	printk("autofs: pipe file descriptor does not contain proper ops\n");
-	/*
-	 * fput() can block, so we clear the super block first.
-	 */
 	fput(pipe);
 	/* fall through */
 fail_dput:
-	/*
-	 * dput() can block, so we clear the super block first.
-	 */
 	dput(root);
 	goto fail_free;
 fail_iput:
 	printk("autofs: get root dentry failed\n");
-	/*
-	 * iput() can block, so we clear the super block first.
-	 */
 	iput(root_inode);
 fail_free:
 	kfree(sbi);

@@ -164,7 +164,7 @@ static void load_csrs (struct lance_private *lp)
 /* Setup the Lance Rx and Tx rings */
 static void lance_init_ring (struct net_device *dev)
 {
-	struct lance_private *lp = (struct lance_private *) dev->priv;
+	struct lance_private *lp = netdev_priv(dev);
 	volatile struct lance_init_block *ib = lp->init_block;
 	volatile struct lance_init_block *aib; /* for LANCE_ADDR computations */
 	int leptr;
@@ -265,7 +265,7 @@ static int init_restart_lance (struct lance_private *lp)
 
 static int lance_rx (struct net_device *dev)
 {
-	struct lance_private *lp = (struct lance_private *) dev->priv;
+	struct lance_private *lp = netdev_priv(dev);
 	volatile struct lance_init_block *ib = lp->init_block;
 	volatile struct lance_regs *ll = lp->ll;
 	volatile struct lance_rx_desc *rd;
@@ -342,7 +342,7 @@ static int lance_rx (struct net_device *dev)
 
 static int lance_tx (struct net_device *dev)
 {
-	struct lance_private *lp = (struct lance_private *) dev->priv;
+	struct lance_private *lp = netdev_priv(dev);
 	volatile struct lance_init_block *ib = lp->init_block;
 	volatile struct lance_regs *ll = lp->ll;
 	volatile struct lance_tx_desc *td;
@@ -433,7 +433,7 @@ lance_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 
 	dev = (struct net_device *) dev_id;
 
-	lp = (struct lance_private *) dev->priv;
+	lp = netdev_priv(dev);
 	ll = lp->ll;
 
 	ll->rap = LE_CSR0;		/* LANCE Controller Status */
@@ -481,7 +481,7 @@ struct net_device *last_dev = 0;
 
 static int lance_open (struct net_device *dev)
 {
-	struct lance_private *lp = (struct lance_private *)dev->priv;
+	struct lance_private *lp = netdev_priv(dev);
 	volatile struct lance_regs *ll = lp->ll;
 	int ret;
 
@@ -506,7 +506,7 @@ static int lance_open (struct net_device *dev)
 
 static int lance_close (struct net_device *dev)
 {
-	struct lance_private *lp = (struct lance_private *) dev->priv;
+	struct lance_private *lp = netdev_priv(dev);
 	volatile struct lance_regs *ll = lp->ll;
 
 	netif_stop_queue(dev);
@@ -522,7 +522,7 @@ static int lance_close (struct net_device *dev)
 
 static inline int lance_reset (struct net_device *dev)
 {
-	struct lance_private *lp = (struct lance_private *)dev->priv;
+	struct lance_private *lp = netdev_priv(dev);
 	volatile struct lance_regs *ll = lp->ll;
 	int status;
     
@@ -545,7 +545,7 @@ static inline int lance_reset (struct net_device *dev)
 
 static void lance_tx_timeout(struct net_device *dev)
 {
-	struct lance_private *lp = (struct lance_private *) dev->priv;
+	struct lance_private *lp = netdev_priv(dev);
 	volatile struct lance_regs *ll = lp->ll;
 
 	printk(KERN_ERR "%s: transmit timed out, status %04x, reset\n",
@@ -556,7 +556,7 @@ static void lance_tx_timeout(struct net_device *dev)
 
 static int lance_start_xmit (struct sk_buff *skb, struct net_device *dev)
 {
-	struct lance_private *lp = (struct lance_private *)dev->priv;
+	struct lance_private *lp = netdev_priv(dev);
 	volatile struct lance_regs *ll = lp->ll;
 	volatile struct lance_init_block *ib = lp->init_block;
 	int entry, skblen, len;
@@ -624,7 +624,7 @@ static int lance_start_xmit (struct sk_buff *skb, struct net_device *dev)
 
 static struct net_device_stats *lance_get_stats (struct net_device *dev)
 {
-	struct lance_private *lp = (struct lance_private *) dev->priv;
+	struct lance_private *lp = netdev_priv(dev);
 
 	return &lp->stats;
 }
@@ -632,7 +632,7 @@ static struct net_device_stats *lance_get_stats (struct net_device *dev)
 /* taken from the depca driver */
 static void lance_load_multicast (struct net_device *dev)
 {
-	struct lance_private *lp = (struct lance_private *) dev->priv;
+	struct lance_private *lp = netdev_priv(dev);
 	volatile struct lance_init_block *ib = lp->init_block;
 	volatile u16 *mcast_table = (u16 *)&ib->filter;
 	struct dev_mc_list *dmi=dev->mc_list;
@@ -668,7 +668,7 @@ static void lance_load_multicast (struct net_device *dev)
 
 static void lance_set_multicast (struct net_device *dev)
 {
-	struct lance_private *lp = (struct lance_private *) dev->priv;
+	struct lance_private *lp = netdev_priv(dev);
 	volatile struct lance_init_block *ib = lp->init_block;
 	volatile struct lance_regs *ll = lp->ll;
 
@@ -748,7 +748,7 @@ static int __devinit a2065_init_one(struct zorro_dev *z,
 	}
 
 	SET_MODULE_OWNER(dev);
-	priv = dev->priv;
+	priv = netdev_priv(dev);
 
 	r1->name = dev->name;
 	r2->name = dev->name;

@@ -244,7 +244,7 @@ static int open_32bit_htlbpage_range(struct mm_struct *mm)
 	struct vm_area_struct *vma;
 	unsigned long addr;
 
-	if (mm->context & CONTEXT_LOW_HPAGES)
+	if (mm->context.low_hpages)
 		return 0; /* The window is already open */
 	
 	/* Check no VMAs are in the region */
@@ -281,7 +281,7 @@ static int open_32bit_htlbpage_range(struct mm_struct *mm)
 
 	/* FIXME: do we need to scan for PTEs too? */
 
-	mm->context |= CONTEXT_LOW_HPAGES;
+	mm->context.low_hpages = 1;
 
 	/* the context change must make it to memory before the slbia,
 	 * so that further SLB misses do the right thing. */
@@ -589,7 +589,6 @@ full_search:
 	}
 }
 
-
 unsigned long hugetlb_get_unmapped_area(struct file *file, unsigned long addr,
 					unsigned long len, unsigned long pgoff,
 					unsigned long flags)
@@ -778,7 +777,7 @@ static void flush_hash_hugepage(mm_context_t context, unsigned long ea,
 	BUG_ON(hugepte_bad(pte));
 	BUG_ON(!in_hugepage_area(context, ea));
 
-	vsid = get_vsid(context, ea);
+	vsid = get_vsid(context.id, ea);
 
 	va = (vsid << 28) | (ea & 0x0fffffff);
 	vpn = va >> LARGE_PAGE_SHIFT;

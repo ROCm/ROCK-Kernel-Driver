@@ -140,7 +140,7 @@ static char *BusLogic_CommandFailureReason;
   Name, Copyright Notice, and Electronic Mail Address.
 */
 
-static void __init BusLogic_AnnounceDriver(struct BusLogic_HostAdapter *HostAdapter)
+static void BusLogic_AnnounceDriver(struct BusLogic_HostAdapter *HostAdapter)
 {
   BusLogic_Announce("***** BusLogic SCSI Driver Version "
 		    BusLogic_DriverVersion " of "
@@ -189,7 +189,7 @@ static void __init BusLogic_RegisterHostAdapter(struct BusLogic_HostAdapter *Hos
   registered BusLogic Host Adapters.
 */
 
-static void __init BusLogic_UnregisterHostAdapter(struct BusLogic_HostAdapter *HostAdapter)
+static void BusLogic_UnregisterHostAdapter(struct BusLogic_HostAdapter *HostAdapter)
 {
   if (HostAdapter == BusLogic_FirstRegisteredHostAdapter)
     {

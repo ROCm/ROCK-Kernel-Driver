@@ -91,8 +91,8 @@
 
 #undef RTC_IRQ
 #define RTC_IRQ		IRQ_ISA_RTC_ALARM
-#undef AUX_IRQ
-#define AUX_IRQ		(machine_is_netwinder() ? IRQ_NETWINDER_PS2MOUSE : IRQ_ISA_PS2MOUSE)
+#define I8042_KBD_IRQ	IRQ_ISA_KEYBOARD
+#define I8042_AUX_IRQ	(machine_is_netwinder() ? IRQ_NETWINDER_PS2MOUSE : IRQ_ISA_PS2MOUSE)
 #define IRQ_FLOPPYDISK	IRQ_ISA_FLOPPY
 
 #define irq_canonicalize(_i)	(((_i) == IRQ_ISA_CASCADE) ? IRQ_ISA_2 : _i)

@@ -1300,13 +1300,9 @@ int presto_ioctl(struct inode *inode, struct file *file,
                 return rc;
         }
 
-        case TCGETS:
-                EXIT;
-                return -EINVAL;
-
         default:
                 EXIT;
-                return -EINVAL;
+                return -ENOTTY;
                 
         }
         EXIT;

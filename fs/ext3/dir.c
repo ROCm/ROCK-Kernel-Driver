@@ -224,7 +224,6 @@ revalidate:
 		offset = 0;
 		brelse (bh);
 	}
-       update_atime(inode);
 out:
 	return ret;
 }
@@ -506,7 +505,6 @@ static int ext3_dx_readdir(struct file * filp,
 	}
 finished:
 	info->last_pos = filp->f_pos;
-	update_atime(inode);
 	return 0;
 }
 

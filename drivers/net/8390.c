@@ -516,6 +516,15 @@ irqreturn_t ei_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 	return IRQ_RETVAL(nr_serviced > 0);
 }
 
+#ifdef CONFIG_NET_POLL_CONTROLLER
+void ei_poll(struct net_device *dev)
+{
+	disable_irq(dev->irq);
+	ei_interrupt(dev->irq, dev, NULL);
+	enable_irq(dev->irq);
+}
+#endif
+
 /**
  * ei_tx_err - handle transmitter error
  * @dev: network device which threw the exception
@@ -1124,6 +1133,9 @@ static void NS8390_trigger_send(struct net_device *dev, unsigned int length,
 EXPORT_SYMBOL(ei_open);
 EXPORT_SYMBOL(ei_close);
 EXPORT_SYMBOL(ei_interrupt);
+#ifdef CONFIG_NET_POLL_CONTROLLER
+EXPORT_SYMBOL(ei_poll);
+#endif
 EXPORT_SYMBOL(ei_tx_timeout);
 EXPORT_SYMBOL(NS8390_init);
 EXPORT_SYMBOL(__alloc_ei_netdev);

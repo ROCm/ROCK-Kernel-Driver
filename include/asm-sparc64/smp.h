@@ -35,11 +35,6 @@ extern unsigned char boot_cpu_id;
 extern cpumask_t phys_cpu_present_map;
 #define cpu_possible_map phys_cpu_present_map
 
-#define cpu_online(cpu)		cpu_isset(cpu, cpu_online_map)
-
-extern atomic_t sparc64_num_cpus_possible;
-#define num_possible_cpus()	(atomic_read(&sparc64_num_cpus_possible))
-
 /*
  *	General functions that each host system must provide.
  */
@@ -74,10 +69,6 @@ static __inline__ int hard_smp_processor_id(void)
 #define smp_processor_id() (current_thread_info()->cpu)
 
 #endif /* !(__ASSEMBLY__) */
-
-#else
-
-#define num_possible_cpus()	(1)
 
 #endif /* !(CONFIG_SMP) */
 

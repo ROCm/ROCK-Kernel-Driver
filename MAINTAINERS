@@ -172,7 +172,7 @@ ACPI
 P:	Len Brown
 M:	len.brown@intel.com
 L:	acpi-devel@lists.sourceforge.net
-W:	http://sf.net/projects/acpi/
+W:	http://acpi.sourceforge.net/
 S:	Maintained
 
 AD1816 SOUND DRIVER
@@ -1966,13 +1966,6 @@ P:     Romain Lievin
 M:     roms@lpg.ticalc.org
 S:     Maintained
 
-TIEMAN VOYAGER USB BRAILLE DISPLAY DRIVER
-P:	Stephane Dalton
-M:	sdalton@videotron.ca
-P:	Stéphane Doyon
-M:	s.doyon@videotron.ca
-S:	Maintained
-
 TLAN NETWORK DRIVER
 P:	Samuel Chessman
 M:	chessman@tux.org
@@ -2037,8 +2030,6 @@ S:	Maintained
 UDF FILESYSTEM
 P:	Ben Fennema
 M:	bfennema@falcon.csc.calpoly.edu
-P:	Dave Boynton
-M:	dave@trylinux.com
 L:	linux_udf@hpesjro.fc.hp.com
 W:	http://linux-udf.sourceforge.net
 S:	Maintained
@@ -2152,14 +2143,6 @@ M:	petkan@users.sourceforge.net
 L:	linux-usb-users@lists.sourceforge.net
 L:	linux-usb-devel@lists.sourceforge.net
 W:	http://pegasus2.sourceforge.net/
-S:	Maintained
-
-USB SCANNER DRIVER
-P:	Henning Meier-Geinitz
-M:	henning@meier-geinitz.de
-L:	linux-usb-users@lists.sourceforge.net
-L:	linux-usb-devel@lists.sourceforge.net
-W:	http://www.meier-geinitz.de/kernel/
 S:	Maintained
 
 USB SE401 DRIVER
@@ -2395,7 +2378,7 @@ S:	Maintained
 
 ZR36067 VIDEO FOR LINUX DRIVER
 P:	Ronald Bultje
-M:	R.S.Bultje@pharm.uu.nl
+M:	rbultje@ronald.bitfreak.net
 L:	mjpeg-users@lists.sourceforge.net
 W:	http://mjpeg.sourceforge.net/driver-zoran/
 S:	Maintained

@@ -375,6 +375,7 @@ __syscall_return(type,__res); \
 
 #include <linux/compiler.h>
 #include <linux/types.h>
+#include <linux/linkage.h>
 #include <asm/ptrace.h>
 
 /*

@@ -199,6 +199,7 @@
 #define  PCI_CAP_ID_MSI		0x05	/* Message Signalled Interrupts */
 #define  PCI_CAP_ID_CHSWP	0x06	/* CompactPCI HotSwap */
 #define  PCI_CAP_ID_PCIX	0x07	/* PCI-X */
+#define  PCI_CAP_ID_SHPC 	0x0C	/* PCI Standard Hot-Plug Controller */
 #define  PCI_CAP_ID_EXP 	0x10	/* PCI Express */
 #define  PCI_CAP_ID_MSIX	0x11	/* MSI-X */
 #define PCI_CAP_LIST_NEXT	1	/* Next capability in the list */
@@ -392,11 +393,6 @@ struct pci_dev {
 					   this if your device has broken DMA
 					   or supports 64-bit transfers.  */
 
-	u64		consistent_dma_mask;/* Like dma_mask, but for
-					       pci_alloc_consistent mappings as
-					       not all hardware supports
-					       64 bit addresses for consistent
-					       allocations such descriptors. */
 	u32             current_state;  /* Current operating state. In ACPI-speak,
 					   this is D0-D3, D0 being fully functional,
 					   and D3 being off. */
@@ -468,6 +464,8 @@ struct pci_bus {
 
 	char		name[48];
 
+	unsigned short  bridge_ctl;	/* manage NO_ISA/FBB/et al behaviors */
+	unsigned short  pad2;
 	struct device		*bridge;
 	struct class_device	class_dev;
 };
@@ -720,6 +718,10 @@ extern int msi_free_vectors(struct pci_dev* dev, int *vector, int nvec);
 /* Include architecture-dependent settings and functions */
 
 #include <asm/pci.h>
+
+/* Backwards compat, remove in 2.7.x */
+#define pci_dma_sync_single	pci_dma_sync_single_for_cpu
+#define pci_dma_sync_sg		pci_dma_sync_sg_for_cpu
 
 /*
  *  If the system does not have PCI, clearly these return errors.  Define

@@ -14,7 +14,7 @@
  *	   trini@mvista.com
  * Derived from arch/ppc/boot/prep/head.S (Cort Dougan, many others).
  *
- * 2001-2003 (c) MontaVista, Software, Inc.  This file is licensed under
+ * 2001-2004 (c) MontaVista, Software, Inc.  This file is licensed under
  * the terms of the GNU General Public License version 2.  This program
  * is licensed "as is" without any warranty of any kind, whether express
  * or implied.
@@ -36,6 +36,13 @@ disable_6xx_mmu:
 	 */
 	li	r8,MSR_IP|MSR_FP
 	mtmsr	r8
+	isync
+
+	/* Test for a 601 */
+	mfpvr	r10
+	srwi	r10,r10,16
+	cmpi	0,r10,1		/* 601 ? */
+	beq	.clearbats_601
 
 	/* Clear BATs */
 	li	r8,0
@@ -47,6 +54,7 @@ disable_6xx_mmu:
 	mtspr	DBAT2L,r8
 	mtspr	DBAT3U,r8
 	mtspr	DBAT3L,r8
+.clearbats_601:
 	mtspr	IBAT0U,r8
 	mtspr	IBAT0L,r8
 	mtspr	IBAT1U,r8
@@ -68,6 +76,7 @@ disable_6xx_mmu:
 	addi	r8,r8,0x111	/* increment VSID */
 	addis	r10,r10,0x1000	/* address of next segment */
 	bdnz	3b
+	blr
 
 	.globl	disable_6xx_l1cache
 disable_6xx_l1cache:

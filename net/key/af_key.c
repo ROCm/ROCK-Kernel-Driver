@@ -901,6 +901,7 @@ static struct xfrm_state * pfkey_msg2xfrm_state(struct sadb_msg *hdr,
 	struct sadb_sa *sa;
 	struct sadb_key *key;
 	uint16_t proto;
+	int err;
 	
 
 	sa = (struct sadb_sa *) ext_hdrs[SADB_EXT_SA-1];
@@ -921,6 +922,9 @@ static struct xfrm_state * pfkey_msg2xfrm_state(struct sadb_msg *hdr,
 	proto = pfkey_satype2proto(hdr->sadb_msg_satype);
 	if (proto == 0)
 		return ERR_PTR(-EINVAL);
+
+	/* default error is no buffer space */
+	err = -ENOBUFS;
 
 	/* RFC2367:
 
@@ -980,8 +984,10 @@ static struct xfrm_state * pfkey_msg2xfrm_state(struct sadb_msg *hdr,
 	if (sa->sadb_sa_auth) {
 		int keysize = 0;
 		struct xfrm_algo_desc *a = xfrm_aalg_get_byid(sa->sadb_sa_auth);
-		if (!a)
+		if (!a) {
+			err = -ENOSYS;
 			goto out;
+		}
 		if (key)
 			keysize = (key->sadb_key_bits + 7) / 8;
 		x->aalg = kmalloc(sizeof(*x->aalg) + keysize, GFP_KERNEL);
@@ -999,8 +1005,10 @@ static struct xfrm_state * pfkey_msg2xfrm_state(struct sadb_msg *hdr,
 	if (sa->sadb_sa_encrypt) {
 		if (hdr->sadb_msg_satype == SADB_X_SATYPE_IPCOMP) {
 			struct xfrm_algo_desc *a = xfrm_calg_get_byid(sa->sadb_sa_encrypt);
-			if (!a)
+			if (!a) {
+				err = -ENOSYS;
 				goto out;
+			}
 			x->calg = kmalloc(sizeof(*x->calg), GFP_KERNEL);
 			if (!x->calg)
 				goto out;
@@ -1009,8 +1017,10 @@ static struct xfrm_state * pfkey_msg2xfrm_state(struct sadb_msg *hdr,
 		} else {
 			int keysize = 0;
 			struct xfrm_algo_desc *a = xfrm_ealg_get_byid(sa->sadb_sa_encrypt);
-			if (!a)
+			if (!a) {
+				err = -ENOSYS;
 				goto out;
+			}
 			key = (struct sadb_key*) ext_hdrs[SADB_EXT_KEY_ENCRYPT-1];
 			if (key)
 				keysize = (key->sadb_key_bits + 7) / 8;
@@ -1030,8 +1040,10 @@ static struct xfrm_state * pfkey_msg2xfrm_state(struct sadb_msg *hdr,
 
 	x->props.family = pfkey_sadb_addr2xfrm_addr((struct sadb_address *) ext_hdrs[SADB_EXT_ADDRESS_SRC-1], 
 						    &x->props.saddr);
-	if (!x->props.family)
+	if (!x->props.family) {
+		err = -EAFNOSUPPORT;
 		goto out;
+	}
 	pfkey_sadb_addr2xfrm_addr((struct sadb_address *) ext_hdrs[SADB_EXT_ADDRESS_DST-1], 
 				  &x->id.daddr);
 
@@ -1076,10 +1088,14 @@ static struct xfrm_state * pfkey_msg2xfrm_state(struct sadb_msg *hdr,
 	}
 
 	x->type = xfrm_get_type(proto, x->props.family);
-	if (x->type == NULL)
+	if (x->type == NULL) {
+		err = -ENOPROTOOPT;
 		goto out;
-	if (x->type->init_state(x, NULL))
+	}
+	if (x->type->init_state(x, NULL)) {
+		err = -EINVAL;
 		goto out;
+	}
 	x->km.seq = hdr->sadb_msg_seq;
 	x->km.state = XFRM_STATE_VALID;
 	return x;
@@ -1087,7 +1103,7 @@ static struct xfrm_state * pfkey_msg2xfrm_state(struct sadb_msg *hdr,
 out:
 	x->km.state = XFRM_STATE_DEAD;
 	xfrm_state_put(x);
-	return ERR_PTR(-ENOBUFS);
+	return ERR_PTR(err);
 }
 
 static int pfkey_reserved(struct sock *sk, struct sk_buff *skb, struct sadb_msg *hdr, void **ext_hdrs)

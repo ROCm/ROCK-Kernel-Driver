@@ -540,7 +540,7 @@ void sbus_unmap_sg(struct sbus_dev *sdev, struct scatterlist *sg, int nents, int
 	spin_unlock_irqrestore(&iommu->lock, flags);
 }
 
-void sbus_dma_sync_single(struct sbus_dev *sdev, dma_addr_t base, size_t size, int direction)
+void sbus_dma_sync_single_for_cpu(struct sbus_dev *sdev, dma_addr_t base, size_t size, int direction)
 {
 	struct sbus_iommu *iommu = sdev->bus->iommu;
 	unsigned long flags;
@@ -552,7 +552,11 @@ void sbus_dma_sync_single(struct sbus_dev *sdev, dma_addr_t base, size_t size, i
 	spin_unlock_irqrestore(&iommu->lock, flags);
 }
 
-void sbus_dma_sync_sg(struct sbus_dev *sdev, struct scatterlist *sg, int nents, int direction)
+void sbus_dma_sync_single_for_device(struct sbus_dev *sdev, dma_addr_t base, size_t size, int direction)
+{
+}
+
+void sbus_dma_sync_sg_for_cpu(struct sbus_dev *sdev, struct scatterlist *sg, int nents, int direction)
 {
 	struct sbus_iommu *iommu = sdev->bus->iommu;
 	unsigned long flags, size;
@@ -570,6 +574,10 @@ void sbus_dma_sync_sg(struct sbus_dev *sdev, struct scatterlist *sg, int nents, 
 	spin_lock_irqsave(&iommu->lock, flags);
 	strbuf_flush(iommu, base, size >> IO_PAGE_SHIFT);
 	spin_unlock_irqrestore(&iommu->lock, flags);
+}
+
+void sbus_dma_sync_sg_for_device(struct sbus_dev *sdev, struct scatterlist *sg, int nents, int direction)
+{
 }
 
 /* Enable 64-bit DVMA mode for the given device. */

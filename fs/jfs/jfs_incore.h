@@ -1,6 +1,6 @@
 /*
- *   Copyright (c) International Business Machines Corp., 2000-2003
- *   Portions Copyright (c) Christoph Hellwig, 2001-2002
+ *   Copyright (C) International Business Machines Corp., 2000-2004
+ *   Portions Copyright (C) Christoph Hellwig, 2001-2002
  *
  *   This program is free software;  you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -114,7 +114,6 @@ struct jfs_inode_info {
  * cflag
  */
 enum cflags {
-	COMMIT_New,		/* never committed inode   */
 	COMMIT_Nolink,		/* inode committed with zero link count */
 	COMMIT_Inlineea,	/* commit inode inline EA */
 	COMMIT_Freewmap,	/* free WMAP at iClose() */
@@ -133,12 +132,14 @@ enum cflags {
  * JFS-private superblock information.
  */
 struct jfs_sb_info {
+	struct super_block *sb;		/* Point back to vfs super block */
 	unsigned long	mntflag;	/* aggregate attributes	*/
 	struct inode	*ipbmap;	/* block map inode		*/
 	struct inode	*ipaimap;	/* aggregate inode map inode	*/
 	struct inode	*ipaimap2;	/* secondary aimap inode	*/
 	struct inode	*ipimap;	/* aggregate inode map inode	*/
 	struct jfs_log	*log;		/* log			*/
+	struct list_head log_list;	/* volumes associated with a journal */
 	short		bsize;		/* logical block size	*/
 	short		l2bsize;	/* log2 logical block size	*/
 	short		nbperpage;	/* blocks per page		*/

@@ -1213,7 +1213,7 @@ static int hcd_unlink_urb (struct urb *urb)
 			break;
 	}
 	if (tmp != &urb->urb_list) {
-		retval = -EINVAL;
+		retval = -EIDRM;
 		goto done;
 	}
 
@@ -1294,7 +1294,7 @@ done:
 	spin_unlock (&hcd_data_lock);
 	spin_unlock_irqrestore (&urb->lock, flags);
 bye:
-	if (retval && sys && sys->driver)
+	if (retval != -EIDRM && sys && sys->driver)
 		dev_dbg (sys, "hcd_unlink_urb %p fail %d\n", urb, retval);
 	return retval;
 }

@@ -261,10 +261,6 @@ mega_query_adapter(adapter_t *adapter)
 			"megaraid: Product_info cmd failed with error: %d\n",
 				retval);
 
-		pci_dma_sync_single(adapter->dev, prod_info_dma_handle,
-				sizeof(mega_product_info),
-				PCI_DMA_FROMDEVICE);
-
 		pci_unmap_single(adapter->dev, prod_info_dma_handle,
 				sizeof(mega_product_info), PCI_DMA_FROMDEVICE);
 	}
@@ -1651,26 +1647,11 @@ mega_free_scb(adapter_t *adapter, scb_t *scb)
 	case MEGA_BULK_DATA:
 		pci_unmap_page(adapter->dev, scb->dma_h_bulkdata,
 			scb->cmd->request_bufflen, scb->dma_direction);
-
-		if( scb->dma_direction == PCI_DMA_FROMDEVICE ) {
-			pci_dma_sync_single(adapter->dev,
-					scb->dma_h_bulkdata,
-					scb->cmd->request_bufflen,
-					PCI_DMA_FROMDEVICE);
-		}
-
 		break;
 
 	case MEGA_SGLIST:
 		pci_unmap_sg(adapter->dev, scb->cmd->request_buffer,
 			scb->cmd->use_sg, scb->dma_direction);
-
-		if( scb->dma_direction == PCI_DMA_FROMDEVICE ) {
-			pci_dma_sync_sg(adapter->dev,
-					scb->cmd->request_buffer,
-					scb->cmd->use_sg, PCI_DMA_FROMDEVICE);
-		}
-
 		break;
 
 	default:
@@ -1758,14 +1739,6 @@ mega_build_sglist(adapter_t *adapter, scb_t *scb, u32 *buf, u32 *len)
 			*buf = (u32)scb->dma_h_bulkdata;
 			*len = (u32)cmd->request_bufflen;
 		}
-
-		if( scb->dma_direction == PCI_DMA_TODEVICE ) {
-			pci_dma_sync_single(adapter->dev,
-					scb->dma_h_bulkdata,
-					cmd->request_bufflen,
-					PCI_DMA_TODEVICE);
-		}
-
 		return 0;
 	}
 
@@ -1803,11 +1776,6 @@ mega_build_sglist(adapter_t *adapter, scb_t *scb, u32 *buf, u32 *len)
 	 * with a sg list
 	 */
 	*len = (u32)cmd->request_bufflen;
-
-	if( scb->dma_direction == PCI_DMA_TODEVICE ) {
-		pci_dma_sync_sg(adapter->dev, sgl, cmd->use_sg,
-				PCI_DMA_TODEVICE);
-	}
 
 	/* Return count of SG requests */
 	return sgcnt;
@@ -4614,6 +4582,7 @@ free_local_pdev(struct pci_dev *pdev)
 }
 
 static struct scsi_host_template megaraid_template = {
+	.module				= THIS_MODULE,
 	.name				= "MegaRAID",
 	.proc_name			= "megaraid",
 	.info				= megaraid_info,
@@ -5118,10 +5087,6 @@ static int __init megaraid_init(void)
 	if (max_mbox_busy_wait > MBOX_BUSY_WAIT)
 		max_mbox_busy_wait = MBOX_BUSY_WAIT;
 
-	error = pci_module_init(&megaraid_pci_driver);
-	if (error) 
-		return error;
-	
 #ifdef CONFIG_PROC_FS
 	mega_proc_dir_entry = proc_mkdir("megaraid", &proc_root);
 	if (!mega_proc_dir_entry) {
@@ -5129,6 +5094,13 @@ static int __init megaraid_init(void)
 				"megaraid: failed to create megaraid root\n");
 	}
 #endif
+	error = pci_module_init(&megaraid_pci_driver);
+	if (error) {
+#ifdef CONFIG_PROC_FS
+		remove_proc_entry("megaraid", &proc_root);
+#endif
+		return error;
+	}
 
 	/*
 	 * Register the driver as a character device, for applications

@@ -168,7 +168,7 @@ dma_addr_t dma_region_offset_to_bus(struct dma_region *dma, unsigned long offset
 	return sg_dma_address(sg) + rem;
 }
 
-void dma_region_sync(struct dma_region *dma, unsigned long offset, unsigned long len)
+void dma_region_sync_for_cpu(struct dma_region *dma, unsigned long offset, unsigned long len)
 {
 	int first, last;
 	unsigned long rem;
@@ -179,7 +179,21 @@ void dma_region_sync(struct dma_region *dma, unsigned long offset, unsigned long
 	first = dma_region_find(dma, offset, &rem);
 	last = dma_region_find(dma, offset + len - 1, &rem);
 
-	pci_dma_sync_sg(dma->dev, &dma->sglist[first], last - first + 1, dma->direction);
+	pci_dma_sync_sg_for_cpu(dma->dev, &dma->sglist[first], last - first + 1, dma->direction);
+}
+
+void dma_region_sync_for_device(struct dma_region *dma, unsigned long offset, unsigned long len)
+{
+	int first, last;
+	unsigned long rem;
+
+	if (!len)
+		len = 1;
+
+	first = dma_region_find(dma, offset, &rem);
+	last = dma_region_find(dma, offset + len - 1, &rem);
+
+	pci_dma_sync_sg_for_device(dma->dev, &dma->sglist[first], last - first + 1, dma->direction);
 }
 
 /* nopage() handler for mmap access */

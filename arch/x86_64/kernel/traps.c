@@ -352,7 +352,17 @@ void oops_end(void)
 void __die(const char * str, struct pt_regs * regs, long err)
 {
 	static int die_counter;
-	printk(KERN_EMERG "%s: %04lx [%u]\n", str, err & 0xffff,++die_counter);
+	printk(KERN_EMERG "%s: %04lx [%u] ", str, err & 0xffff,++die_counter);
+#ifdef CONFIG_PREEMPT
+	printk("PREEMPT ");
+#endif
+#ifdef CONFIG_SMP
+	printk("SMP ");
+#endif
+#ifdef CONFIG_DEBUG_PAGEALLOC
+	printk("DEBUG_PAGEALLOC");
+#endif
+		printk("\n");
 	notify_die(DIE_OOPS, (char *)str, regs, err, 255, SIGSEGV);
 	show_registers(regs);
 	/* Executive summary in case the oops scrolled away */
@@ -460,13 +470,28 @@ DO_ERROR( 4, SIGSEGV, "overflow", overflow)
 DO_ERROR( 5, SIGSEGV, "bounds", bounds)
 DO_ERROR_INFO( 6, SIGILL,  "invalid operand", invalid_op, ILL_ILLOPN, regs->rip)
 DO_ERROR( 7, SIGSEGV, "device not available", device_not_available)
-DO_ERROR( 8, SIGSEGV, "double fault", double_fault)
 DO_ERROR( 9, SIGFPE,  "coprocessor segment overrun", coprocessor_segment_overrun)
 DO_ERROR(10, SIGSEGV, "invalid TSS", invalid_TSS)
 DO_ERROR(11, SIGBUS,  "segment not present", segment_not_present)
-DO_ERROR(12, SIGBUS,  "stack segment", stack_segment)
 DO_ERROR_INFO(17, SIGBUS, "alignment check", alignment_check, BUS_ADRALN, get_cr2())
 DO_ERROR(18, SIGSEGV, "reserved", reserved)
+
+#define DO_ERROR_STACK(trapnr, signr, str, name) \
+asmlinkage void *do_##name(struct pt_regs * regs, long error_code) \
+{ \
+	struct pt_regs *pr = ((struct pt_regs *)(current->thread.rsp0))-1; \
+	if (notify_die(DIE_TRAP, str, regs, error_code, trapnr, signr) == NOTIFY_BAD) \
+		return regs; \
+	if (regs->cs & 3) { \
+		memcpy(pr, regs, sizeof(struct pt_regs)); \
+		regs = pr; \
+	} \
+	do_trap(trapnr, signr, str, regs, error_code, NULL); \
+	return regs;		\
+}
+
+DO_ERROR_STACK(12, SIGBUS,  "stack segment", stack_segment)
+DO_ERROR_STACK( 8, SIGSEGV, "double fault", double_fault)
 
 asmlinkage void do_general_protection(struct pt_regs * regs, long error_code)
 {
@@ -581,11 +606,19 @@ asmlinkage void default_do_nmi(struct pt_regs * regs)
 	inb(0x71);		/* dummy */
 }
 
-asmlinkage void do_debug(struct pt_regs * regs, long error_code)
+/* runs on IST stack. */
+asmlinkage void *do_debug(struct pt_regs * regs, unsigned long error_code)
 {
+	struct pt_regs *pr;
 	unsigned long condition;
 	struct task_struct *tsk = current;
 	siginfo_t info;
+
+	pr = (struct pt_regs *)(current->thread.rsp0)-1;
+	if (regs->cs & 3) {
+		memcpy(pr, regs, sizeof(struct pt_regs));
+		regs = pr;
+	}	
 
 #ifdef CONFIG_CHECKING
        { 
@@ -643,17 +676,19 @@ asmlinkage void do_debug(struct pt_regs * regs, long error_code)
 	force_sig_info(SIGTRAP, &info, tsk);	
 clear_dr7:
 	asm volatile("movq %0,%%db7"::"r"(0UL));
-	notify_die(DIE_DEBUG, "debug", regs, error_code, 1, SIGTRAP);
-	return;
+	notify_die(DIE_DEBUG, "debug", regs, condition, 1, SIGTRAP);
+	return regs;
 
 clear_TF_reenable:
+	printk("clear_tf_reenable\n");
 	set_tsk_thread_flag(tsk, TIF_SINGLESTEP);
 
 clear_TF:
 	/* RED-PEN could cause spurious errors */
-	if (notify_die(DIE_DEBUG, "debug2", regs, error_code, 1, SIGTRAP) != NOTIFY_BAD)
+	if (notify_die(DIE_DEBUG, "debug2", regs, condition, 1, SIGTRAP) 
+	    != NOTIFY_BAD)
 	regs->eflags &= ~TF_MASK;
-	return;
+	return regs;	
 }
 
 /*
@@ -715,7 +750,7 @@ void math_error(void *rip)
 	force_sig_info(SIGFPE, &info, task);
 }
 
-asmlinkage void do_coprocessor_error(struct pt_regs * regs, long error_code)
+asmlinkage void do_coprocessor_error(struct pt_regs * regs)
 {
 	conditional_sti(regs);
 	math_error((void *)regs->rip);
@@ -774,8 +809,7 @@ static inline void simd_math_error(void *rip)
 	force_sig_info(SIGFPE, &info, task);
 }
 
-asmlinkage void do_simd_coprocessor_error(struct pt_regs * regs,
-					  long error_code)
+asmlinkage void do_simd_coprocessor_error(struct pt_regs * regs)
 {
 	conditional_sti(regs);
 		simd_math_error((void *)regs->rip);
@@ -803,11 +837,6 @@ asmlinkage void math_state_restore(void)
 	me->thread_info->status |= TS_USEDFPU;
 }
 
-asmlinkage void math_emulate(void)
-{
-	BUG();
-}
-
 void do_call_debug(struct pt_regs *regs) 
 { 
 	notify_die(DIE_CALL, "debug call", regs, 0, 255, SIGINT); 
@@ -816,7 +845,7 @@ void do_call_debug(struct pt_regs *regs)
 void __init trap_init(void)
 {
 	set_intr_gate(0,&divide_error);
-	set_intr_gate(1,&debug);
+	set_intr_gate_ist(1,&debug,DEBUG_STACK);
 	set_intr_gate_ist(2,&nmi,NMI_STACK);
 	set_system_gate(3,&int3);	/* int3-5 can be called from all */
 	set_system_gate(4,&overflow);
@@ -833,7 +862,7 @@ void __init trap_init(void)
 	set_intr_gate(15,&spurious_interrupt_bug);
 	set_intr_gate(16,&coprocessor_error);
 	set_intr_gate(17,&alignment_check);
-	set_intr_gate(18,&machine_check); 
+	set_intr_gate_ist(18,&machine_check, MCE_STACK); 
 	set_intr_gate(19,&simd_coprocessor_error);
 
 #ifdef CONFIG_IA32_EMULATION

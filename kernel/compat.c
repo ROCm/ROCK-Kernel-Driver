@@ -30,7 +30,7 @@ int get_compat_timespec(struct timespec *ts, const struct compat_timespec *cts)
 			__get_user(ts->tv_nsec, &cts->tv_nsec)) ? -EFAULT : 0;
 }
 
-int put_compat_timespec(struct timespec *ts, const struct compat_timespec *cts)
+int put_compat_timespec(const struct timespec *ts, struct compat_timespec *cts)
 {
 	return (verify_area(VERIFY_WRITE, cts, sizeof(*cts)) ||
 			__put_user(ts->tv_sec, &cts->tv_sec) ||

@@ -29,12 +29,15 @@
  *	In general the firmware wants to help. Where its help isn't performance
  *	useful we just ignore the aid. Its not worth the code in truth.
  *
- *	Fixes:
- *		Steve Ralston	:	Scatter gather now works
+ * Fixes/additions:
+ *	Steve Ralston:
+ *		Scatter gather now works
+ *	Markus Lidel <Markus.Lidel@shadowconnect.com>:
+ *		Minor fixes for 2.6.
  *
- *	To Do
- *		64bit cleanups
- *		Fix the resource management problems.
+ * To Do:
+ *	64bit cleanups
+ *	Fix the resource management problems.
  */
 
 
@@ -66,7 +69,13 @@
 
 #define VERSION_STRING        "Version 0.1.2"
 
-#define dprintk(x)
+//#define DRIVERDEBUG
+
+#ifdef DRIVERDEBUG
+#define dprintk(s, args...) printk(s, ## args)
+#else
+#define dprintk(s, args...)
+#endif
 
 #define I2O_SCSI_CAN_QUEUE	4
 #define MAXHOSTS		32
@@ -252,15 +261,15 @@ static void i2o_scsi_reply(struct i2o_handler *h, struct i2o_controller *c, stru
 	as=(u8)le32_to_cpu(m[4]>>8);
 	st=(u8)le32_to_cpu(m[4]>>24);
 	
-	dprintk(("i2o got a scsi reply %08X: ", m[0]));
-	dprintk(("m[2]=%08X: ", m[2]));
-	dprintk(("m[4]=%08X\n", m[4]));
+	dprintk(KERN_INFO "i2o got a scsi reply %08X: ", m[0]);
+	dprintk(KERN_INFO "m[2]=%08X: ", m[2]);
+	dprintk(KERN_INFO "m[4]=%08X\n", m[4]);
  
 	if(m[2]&0x80000000)
 	{
 		if(m[2]&0x40000000)
 		{
-			dprintk(("Event.\n"));
+			dprintk(KERN_INFO "Event.\n");
 			lun_done=1;
 			return;
 		}
@@ -280,12 +289,12 @@ static void i2o_scsi_reply(struct i2o_handler *h, struct i2o_controller *c, stru
 	if(current_command==NULL)
 	{
 		if(st)
-			dprintk(("SCSI abort: %08X", m[4]));
-		dprintk(("SCSI abort completed.\n"));
+			dprintk(KERN_WARNING "SCSI abort: %08X", m[4]);
+		dprintk(KERN_INFO "SCSI abort completed.\n");
 		return;
 	}
 	
-	dprintk(("Completed %ld\n", current_command->serial_number));
+	dprintk(KERN_INFO "Completed %ld\n", current_command->serial_number);
 	
 	atomic_dec(&queue_depth);
 	
@@ -308,7 +317,7 @@ static void i2o_scsi_reply(struct i2o_handler *h, struct i2o_controller *c, stru
 	{
 		/* An error has occurred */
 
-		dprintk((KERN_DEBUG "SCSI error %08X", m[4]));
+		dprintk(KERN_WARNING "SCSI error %08X", m[4]);
 			
 		if (as == 0x0E) 
 			/* SCSI Reset */
@@ -368,7 +377,7 @@ static int i2o_find_lun(struct i2o_controller *c, struct i2o_device *d, int *tar
 
 	*lun=reply[1];
 
-	dprintk(("SCSI (%d,%d)\n", *target, *lun));
+	dprintk(KERN_INFO "SCSI (%d,%d)\n", *target, *lun);
 	return 0;
 }
 
@@ -401,8 +410,8 @@ static void i2o_scsi_init(struct i2o_controller *c, struct i2o_device *d, struct
 			
 	for(unit=c->devices;unit!=NULL;unit=unit->next)
 	{
-		dprintk(("Class %03X, parent %d, want %d.\n",
-			unit->lct_data.class_id, unit->lct_data.parent_tid, d->lct_data.tid));
+		dprintk(KERN_INFO "Class %03X, parent %d, want %d.\n",
+			unit->lct_data.class_id, unit->lct_data.parent_tid, d->lct_data.tid);
 			
 		/* Only look at scsi and fc devices */
 		if (    (unit->lct_data.class_id != I2O_CLASS_SCSI_PERIPHERAL)
@@ -411,19 +420,19 @@ static void i2o_scsi_init(struct i2o_controller *c, struct i2o_device *d, struct
 			continue;
 
 		/* On our bus ? */
-		dprintk(("Found a disk (%d).\n", unit->lct_data.tid));
+		dprintk(KERN_INFO "Found a disk (%d).\n", unit->lct_data.tid);
 		if ((unit->lct_data.parent_tid == d->lct_data.tid)
 		     || (unit->lct_data.parent_tid == d->lct_data.parent_tid)
 		   )
 		{
 			u16 limit;
-			dprintk(("Its ours.\n"));
+			dprintk(KERN_INFO "Its ours.\n");
 			if(i2o_find_lun(c, unit, &target, &lun)==-1)
 			{
 				printk(KERN_ERR "i2o_scsi: Unable to get lun for tid %d.\n", unit->lct_data.tid);
 				continue;
 			}
-			dprintk(("Found disk %d %d.\n", target, lun));
+			dprintk(KERN_INFO "Found disk %d %d.\n", target, lun);
 			h->task[target][lun]=unit->lct_data.tid;
 			h->tagclock[target][lun]=jiffies;
 
@@ -439,8 +448,8 @@ static void i2o_scsi_init(struct i2o_controller *c, struct i2o_device *d, struct
 			
 			shpnt->sg_tablesize = limit;
 
-			dprintk(("i2o_scsi: set scatter-gather to %d.\n", 
-				shpnt->sg_tablesize));
+			dprintk(KERN_INFO "i2o_scsi: set scatter-gather to %d.\n",
+				shpnt->sg_tablesize);
 		}
 	}		
 }
@@ -558,6 +567,9 @@ static int i2o_scsi_release(struct Scsi_Host *host)
 		del_timer(&retry_timer);
 		i2o_remove_handler(&i2o_scsi_handler);
 	}
+
+	scsi_unregister(host);
+
 	return 0;
 }
 
@@ -624,7 +636,7 @@ static int i2o_scsi_queuecommand(Scsi_Cmnd * SCpnt, void (*done) (Scsi_Cmnd *))
 	
 	tid = hostdata->task[SCpnt->device->id][SCpnt->device->lun];
 	
-	dprintk(("qcmd: Tid = %d\n", tid));
+	dprintk(KERN_INFO "qcmd: Tid = %d\n", tid);
 	
 	current_command = SCpnt;		/* set current command                */
 	current_command->scsi_done = done;	/* set ptr to done function           */
@@ -641,7 +653,7 @@ static int i2o_scsi_queuecommand(Scsi_Cmnd * SCpnt, void (*done) (Scsi_Cmnd *))
 		return 0;
 	}
 	
-	dprintk(("Real scsi messages.\n"));
+	dprintk(KERN_INFO "Real scsi messages.\n");
 
 	/*
 	 *	Obtain an I2O message. If there are none free then 
@@ -821,8 +833,8 @@ static int i2o_scsi_queuecommand(Scsi_Cmnd * SCpnt, void (*done) (Scsi_Cmnd *))
 	}
 	else
 	{
-		dprintk(("non sg for %p, %d\n", SCpnt->request_buffer,
-				SCpnt->request_bufflen));
+		dprintk(KERN_INFO "non sg for %p, %d\n", SCpnt->request_buffer,
+				SCpnt->request_bufflen);
 		i2o_raw_writel(len = SCpnt->request_bufflen, lenptr);
 		if(len == 0)
 		{
@@ -861,7 +873,7 @@ static int i2o_scsi_queuecommand(Scsi_Cmnd * SCpnt, void (*done) (Scsi_Cmnd *))
 	}
 	
 	mb();
-	dprintk(("Issued %ld\n", current_command->serial_number));
+	dprintk(KERN_INFO "Issued %ld\n", current_command->serial_number);
 	
 	return 0;
 }

@@ -567,7 +567,7 @@ characters and digits are allowed.
         nvram:n     do not look for serial NVRAM
         nvram:y     test controllers for onboard serial NVRAM
         (alternate binary form)
-        mvram=<bits options>
+        nvram=<bits options>
         0x01   look for NVRAM  (equivalent to nvram=y)
         0x02   ignore NVRAM "Synchronous negotiation" parameters for all devices
         0x04   ignore NVRAM "Wide negotiation"  parameter for all devices
@@ -661,7 +661,7 @@ optimized parameters value.
 The 'nvram' boot option can be entered in hexadecimal form in order 
 to ignore some options configured in the NVRAM, as follow:
 
-mvram=<bits options>
+nvram=<bits options>
       0x01   look for NVRAM  (equivalent to nvram=y)
       0x02   ignore NVRAM "Synchronous negotiation" parameters for all devices
       0x04   ignore NVRAM "Wide negotiation"  parameter for all devices

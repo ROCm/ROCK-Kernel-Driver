@@ -65,9 +65,8 @@ asmlinkage long sys_fadvise64_64(int fd, loff_t offset, loff_t len, int advice)
 	case POSIX_FADV_DONTNEED:
 		if (!bdi_write_congested(mapping->backing_dev_info))
 			filemap_flush(mapping);
-		start_index = offset >> PAGE_CACHE_SHIFT;
-		end_index = (offset + len + PAGE_CACHE_SIZE - 1) >>
-						PAGE_CACHE_SHIFT;
+		start_index = (offset + PAGE_CACHE_SIZE-1) >> PAGE_CACHE_SHIFT;
+		end_index = ((offset + len) >> PAGE_CACHE_SHIFT) - 1;
 		invalidate_mapping_pages(mapping, start_index, end_index);
 		break;
 	default:

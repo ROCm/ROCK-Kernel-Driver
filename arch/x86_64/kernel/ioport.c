@@ -95,7 +95,5 @@ asmlinkage long sys_iopl(unsigned int level, struct pt_regs regs)
 			return -EPERM;
 	}
 	regs.eflags = (regs.eflags &~ 0x3000UL) | (level << 12);
-	/* Make sure we return the long way (not sysenter) */
-	set_thread_flag(TIF_IRET);
 	return 0;
 }

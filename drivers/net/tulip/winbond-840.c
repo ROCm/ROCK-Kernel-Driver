@@ -1289,9 +1289,9 @@ static int netdev_rx(struct net_device *dev)
 				&& (skb = dev_alloc_skb(pkt_len + 2)) != NULL) {
 				skb->dev = dev;
 				skb_reserve(skb, 2);	/* 16 byte align the IP header */
-				pci_dma_sync_single(np->pci_dev,np->rx_addr[entry],
-							np->rx_skbuff[entry]->len,
-							PCI_DMA_FROMDEVICE);
+				pci_dma_sync_single_for_cpu(np->pci_dev,np->rx_addr[entry],
+							    np->rx_skbuff[entry]->len,
+							    PCI_DMA_FROMDEVICE);
 				/* Call copy + cksum if available. */
 #if HAS_IP_COPYSUM
 				eth_copy_and_sum(skb, np->rx_skbuff[entry]->tail, pkt_len, 0);
@@ -1300,6 +1300,9 @@ static int netdev_rx(struct net_device *dev)
 				memcpy(skb_put(skb, pkt_len), np->rx_skbuff[entry]->tail,
 					   pkt_len);
 #endif
+				pci_dma_sync_single_for_device(np->pci_dev,np->rx_addr[entry],
+							       np->rx_skbuff[entry]->len,
+							       PCI_DMA_FROMDEVICE);
 			} else {
 				pci_unmap_single(np->pci_dev,np->rx_addr[entry],
 							np->rx_skbuff[entry]->len,

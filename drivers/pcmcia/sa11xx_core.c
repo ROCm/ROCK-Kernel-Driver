@@ -35,6 +35,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/init.h>
 #include <linux/config.h>
 #include <linux/cpufreq.h>
@@ -54,8 +55,19 @@
 #include "sa11xx_core.h"
 #include "sa1100.h"
 
-#ifdef PCMCIA_DEBUG
+#ifdef DEBUG
 static int pc_debug;
+
+module_param(pc_debug, int, 0644);
+
+#define debug(skt, lvl, fmt, arg...) do {			\
+	if (pc_debug > (lvl))					\
+		printk(KERN_DEBUG "skt%u: %s: " fmt,		\
+		       (skt)->nr, __func__ , ## arg);		\
+} while (0)
+
+#else
+#define debug(skt, lvl, fmt, arg...) do { } while (0)
 #endif
 
 #define to_sa1100_socket(x)	container_of(x, struct sa1100_pcmcia_socket, socket)
@@ -133,8 +145,8 @@ sa1100_pcmcia_set_mecr(struct sa1100_pcmcia_socket *skt, unsigned int cpu_clock)
 
 	local_irq_restore(flags);
 
-	DEBUG(4, "%s(): sock %u FAST %X  BSM %X  BSA %X  BSIO %X\n",
-	      __FUNCTION__, skt->nr, MECR_FAST_GET(mecr, skt->nr),
+	debug(skt, 2, "FAST %X  BSM %X  BSA %X  BSIO %X\n",
+	      MECR_FAST_GET(mecr, skt->nr),
 	      MECR_BSM_GET(mecr, skt->nr), MECR_BSA_GET(mecr, skt->nr),
 	      MECR_BSIO_GET(mecr, skt->nr));
 
@@ -221,7 +233,7 @@ static int sa1100_pcmcia_sock_init(struct pcmcia_socket *sock)
 {
 	struct sa1100_pcmcia_socket *skt = to_sa1100_socket(sock);
 
-	DEBUG(2, "%s(): initializing socket %u\n", __FUNCTION__, skt->nr);
+	debug(skt, 2, "initializing socket\n");
 
 	skt->ops->socket_init(skt);
 	return 0;
@@ -242,7 +254,7 @@ static int sa1100_pcmcia_suspend(struct pcmcia_socket *sock)
 	struct sa1100_pcmcia_socket *skt = to_sa1100_socket(sock);
 	int ret;
 
-	DEBUG(2, "%s(): suspending socket %u\n", __FUNCTION__, skt->nr);
+	debug(skt, 2, "suspending socket\n");
 
 	ret = sa1100_pcmcia_config_skt(skt, &dead_socket);
 	if (ret == 0)
@@ -260,7 +272,7 @@ static void sa1100_check_status(struct sa1100_pcmcia_socket *skt)
 {
 	unsigned int events;
 
-	DEBUG(4, "%s(): entering PCMCIA monitoring thread\n", __FUNCTION__);
+	debug(skt, 4, "entering PCMCIA monitoring thread\n");
 
 	do {
 		unsigned int status;
@@ -273,7 +285,7 @@ static void sa1100_check_status(struct sa1100_pcmcia_socket *skt)
 		skt->status = status;
 		spin_unlock_irqrestore(&status_lock, flags);
 
-		DEBUG(2, "events: %s%s%s%s%s%s\n",
+		debug(skt, 4, "events: %s%s%s%s%s%s\n",
 			events == 0         ? "<NONE>"   : "",
 			events & SS_DETECT  ? "DETECT "  : "",
 			events & SS_READY   ? "READY "   : "",
@@ -293,7 +305,7 @@ static void sa1100_check_status(struct sa1100_pcmcia_socket *skt)
 static void sa1100_pcmcia_poll_event(unsigned long dummy)
 {
 	struct sa1100_pcmcia_socket *skt = (struct sa1100_pcmcia_socket *)dummy;
-	DEBUG(4, "%s(): polling for events\n", __FUNCTION__);
+	debug(skt, 4, "polling for events\n");
 
 	mod_timer(&skt->poll_timer, jiffies + SA1100_PCMCIA_POLL_PERIOD);
 
@@ -314,7 +326,7 @@ static irqreturn_t sa1100_pcmcia_interrupt(int irq, void *dev, struct pt_regs *r
 {
 	struct sa1100_pcmcia_socket *skt = dev;
 
-	DEBUG(3, "%s(): servicing IRQ %d\n", __FUNCTION__, irq);
+	debug(skt, 3, "servicing IRQ %d\n", irq);
 
 	sa1100_check_status(skt);
 
@@ -363,7 +375,7 @@ sa1100_pcmcia_get_socket(struct pcmcia_socket *sock, socket_state_t *state)
 {
   struct sa1100_pcmcia_socket *skt = to_sa1100_socket(sock);
 
-  DEBUG(2, "%s() for sock %u\n", __FUNCTION__, skt->nr);
+  debug(skt, 2, "\n");
 
   *state = skt->cs_state;
 
@@ -385,22 +397,19 @@ sa1100_pcmcia_set_socket(struct pcmcia_socket *sock, socket_state_t *state)
 {
   struct sa1100_pcmcia_socket *skt = to_sa1100_socket(sock);
 
-  DEBUG(2, "%s() for sock %u\n", __FUNCTION__, skt->nr);
-
-  DEBUG(3, "\tmask:  %s%s%s%s%s%s\n\tflags: %s%s%s%s%s%s\n",
-	(state->csc_mask==0)?"<NONE>":"",
+  debug(skt, 2, "mask: %s%s%s%s%s%sflags: %s%s%s%s%s%sVcc %d Vpp %d irq %d\n",
+	(state->csc_mask==0)?"<NONE> ":"",
 	(state->csc_mask&SS_DETECT)?"DETECT ":"",
 	(state->csc_mask&SS_READY)?"READY ":"",
 	(state->csc_mask&SS_BATDEAD)?"BATDEAD ":"",
 	(state->csc_mask&SS_BATWARN)?"BATWARN ":"",
 	(state->csc_mask&SS_STSCHG)?"STSCHG ":"",
-	(state->flags==0)?"<NONE>":"",
+	(state->flags==0)?"<NONE> ":"",
 	(state->flags&SS_PWR_AUTO)?"PWR_AUTO ":"",
 	(state->flags&SS_IOCARD)?"IOCARD ":"",
 	(state->flags&SS_RESET)?"RESET ":"",
 	(state->flags&SS_SPKR_ENA)?"SPKR_ENA ":"",
-	(state->flags&SS_OUTPUT_ENA)?"OUTPUT_ENA ":"");
-  DEBUG(3, "\tVcc %d  Vpp %d  irq %d\n",
+	(state->flags&SS_OUTPUT_ENA)?"OUTPUT_ENA ":"",
 	state->Vcc, state->Vpp, state->io_irq);
 
   return sa1100_pcmcia_config_skt(skt, state);
@@ -422,11 +431,9 @@ sa1100_pcmcia_set_io_map(struct pcmcia_socket *sock, struct pccard_io_map *map)
 	struct sa1100_pcmcia_socket *skt = to_sa1100_socket(sock);
 	unsigned short speed = map->speed;
 
-	DEBUG(2, "%s() for sock %u\n", __FUNCTION__, skt->nr);
-
-	DEBUG(3, "\tmap %u  speed %u\n\tstart 0x%08x  stop 0x%08x\n",
+	debug(skt, 2, "map %u  speed %u start 0x%08x stop 0x%08x\n",
 		map->map, map->speed, map->start, map->stop);
-	DEBUG(3, "\tflags: %s%s%s%s%s%s%s%s\n",
+	debug(skt, 2, "flags: %s%s%s%s%s%s%s%s\n",
 		(map->flags==0)?"<NONE>":"",
 		(map->flags&MAP_ACTIVE)?"ACTIVE ":"",
 		(map->flags&MAP_16BIT)?"16BIT ":"",
@@ -479,11 +486,9 @@ sa1100_pcmcia_set_mem_map(struct pcmcia_socket *sock, struct pccard_mem_map *map
 	struct resource *res;
 	unsigned short speed = map->speed;
 
-	DEBUG(2, "%s() for sock %u\n", __FUNCTION__, skt->nr);
-
-	DEBUG(3, "\tmap %u speed %u card_start %08x\n",
+	debug(skt, 2, "map %u speed %u card_start %08x\n",
 		map->map, map->speed, map->card_start);
-	DEBUG(3, "\tflags: %s%s%s%s%s%s%s%s\n",
+	debug(skt, 2, "flags: %s%s%s%s%s%s%s%s\n",
 		(map->flags==0)?"<NONE>":"",
 		(map->flags&MAP_ACTIVE)?"ACTIVE ":"",
 		(map->flags&MAP_16BIT)?"16BIT ":"",
@@ -920,23 +925,13 @@ sa1100_pcmcia_notifier(struct notifier_block *nb, unsigned long val,
 
 	switch (val) {
 	case CPUFREQ_PRECHANGE:
-		if (freqs->new > freqs->old) {
-			DEBUG(2, "%s(): new frequency %u.%uMHz > %u.%uMHz, "
-				"pre-updating\n", __FUNCTION__,
-			    freqs->new / 1000, (freqs->new / 100) % 10,
-			    freqs->old / 1000, (freqs->old / 100) % 10);
+		if (freqs->new > freqs->old)
 			sa1100_pcmcia_update_mecr(freqs->new);
-		}
 		break;
 
 	case CPUFREQ_POSTCHANGE:
-		if (freqs->new < freqs->old) {
-			DEBUG(2, "%s(): new frequency %u.%uMHz < %u.%uMHz, "
-				"post-updating\n", __FUNCTION__,
-			    freqs->new / 1000, (freqs->new / 100) % 10,
-			    freqs->old / 1000, (freqs->old / 100) % 10);
+		if (freqs->new < freqs->old)
 			sa1100_pcmcia_update_mecr(freqs->new);
-		}
 		break;
 	}
 

@@ -53,7 +53,7 @@ extern	void nfs_release_request(struct nfs_page *req);
 extern	void nfs_list_add_request(struct nfs_page *, struct list_head *);
 
 extern	int nfs_scan_list(struct list_head *, struct list_head *,
-			  struct file *, unsigned long, unsigned int);
+			  unsigned long, unsigned int);
 extern	int nfs_coalesce_requests(struct list_head *, struct list_head *,
 				  unsigned int);
 extern  int nfs_wait_on_request(struct nfs_page *);

@@ -465,7 +465,7 @@ static void smc_setmulticast( int ioaddr, int count, struct dev_mc_list * addrs 
 */
 static int smc_wait_to_send_packet( struct sk_buff * skb, struct net_device * dev )
 {
-	struct smc_local *lp 	= (struct smc_local *)dev->priv;
+	struct smc_local *lp = netdev_priv(dev);
 	unsigned short ioaddr 	= dev->base_addr;
 	word 			length;
 	unsigned short 		numPages;
@@ -576,7 +576,7 @@ static int smc_wait_to_send_packet( struct sk_buff * skb, struct net_device * de
 */
 static void smc_hardware_send_packet( struct net_device * dev )
 {
-	struct smc_local *lp = (struct smc_local *)dev->priv;
+	struct smc_local *lp = netdev_priv(dev);
 	byte	 		packet_no;
 	struct sk_buff * 	skb = lp->saved_skb;
 	word			length;
@@ -1150,7 +1150,7 @@ static irqreturn_t smc_interrupt(int irq, void * dev_id,  struct pt_regs * regs)
 {
 	struct net_device *dev 	= dev_id;
 	int ioaddr 		= dev->base_addr;
-	struct smc_local *lp 	= (struct smc_local *)dev->priv;
+	struct smc_local *lp = netdev_priv(dev);
 
 	byte	status;
 	word	card_stats;
@@ -1274,7 +1274,7 @@ static irqreturn_t smc_interrupt(int irq, void * dev_id,  struct pt_regs * regs)
 */
 static void smc_rcv(struct net_device *dev)
 {
-	struct smc_local *lp = (struct smc_local *)dev->priv;
+	struct smc_local *lp = netdev_priv(dev);
 	int 	ioaddr = dev->base_addr;
 	int 	packet_number;
 	word	status;
@@ -1401,7 +1401,7 @@ done:
 static void smc_tx( struct net_device * dev )
 {
 	int	ioaddr = dev->base_addr;
-	struct smc_local *lp = (struct smc_local *)dev->priv;
+	struct smc_local *lp = netdev_priv(dev);
 	byte saved_packet;
 	byte packet_no;
 	word tx_status;
@@ -1474,7 +1474,7 @@ static int smc_close(struct net_device *dev)
  . This may be called with the card open or closed.
  .-------------------------------------------------------------*/
 static struct net_device_stats* smc_query_statistics(struct net_device *dev) {
-	struct smc_local *lp = (struct smc_local *)dev->priv;
+	struct smc_local *lp = netdev_priv(dev);
 
 	return &lp->stats;
 }

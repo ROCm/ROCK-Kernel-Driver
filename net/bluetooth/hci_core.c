@@ -189,6 +189,10 @@ static void hci_init_req(struct hci_dev *hdev, unsigned long opt)
 
 	/* Mandatory initialization */
 
+	/* Reset */
+	if (test_bit(HCI_QUIRK_RESET_ON_INIT, &hdev->quirks))
+			hci_send_cmd(hdev, OGF_HOST_CTL, OCF_RESET, 0, NULL);
+
 	/* Read Local Supported Features */
 	hci_send_cmd(hdev, OGF_INFO_PARAM, OCF_READ_LOCAL_FEATURES, 0, NULL);
 

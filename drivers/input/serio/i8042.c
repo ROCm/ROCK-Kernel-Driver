@@ -52,6 +52,13 @@ static unsigned int i8042_dumbkbd;
 module_param_named(dumbkbd, i8042_dumbkbd, bool, 0);
 MODULE_PARM_DESC(dumbkbd, "Pretend that controller can only read data from keyboard");
 
+__obsolete_setup("i8042_noaux");
+__obsolete_setup("i8042_nomux");
+__obsolete_setup("i8042_unlock");
+__obsolete_setup("i8042_reset");
+__obsolete_setup("i8042_direct");
+__obsolete_setup("i8042_dumbkbd");
+
 #undef DEBUG
 #include "i8042.h"
 
@@ -379,6 +386,8 @@ static irqreturn_t i8042_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	unsigned int dfl;
 	int ret;
 
+	mod_timer(&i8042_timer, jiffies + I8042_POLL_PERIOD);
+
 	spin_lock_irqsave(&i8042_lock, flags);
 	str = i8042_read_status();
 	if (str & I8042_STR_OBF)
@@ -433,7 +442,6 @@ static irqreturn_t i8042_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 irq_ret:
 	ret = 1;
 out:
-	mod_timer(&i8042_timer, jiffies + I8042_POLL_PERIOD);
 	return IRQ_RETVAL(ret);
 }
 
@@ -521,6 +529,11 @@ static int __init i8042_check_mux(struct i8042_values *values)
 	unsigned char mux_version;
 
 	if (i8042_enable_mux_mode(values, &mux_version))
+		return -1;
+	
+	/* Workaround for broken chips which seem to support MUX, but in reality don't. */
+	/* They all report version 12.10 */
+	if (mux_version == 0xCA)
 		return -1;
 
 	printk(KERN_INFO "i8042.c: Detected active multiplexing controller, rev %d.%d.\n",
@@ -707,14 +720,6 @@ static int i8042_controller_init(void)
 		 else
 			printk(KERN_WARNING "i8042.c: Warning: Keylock active.\n");
 	}
-
-/*
- * If the chip is configured into nontranslated mode by the BIOS, don't
- * bother enabling translating and be happy.
- */
-
-	if (~i8042_ctr & I8042_CTR_XLATE)
-		i8042_direct = 1;
 
 /*
  * Set nontranslated mode for the kbd interface if requested by an option.
@@ -957,7 +962,7 @@ int __init i8042_init(void)
 	mod_timer(&i8042_timer, jiffies + I8042_POLL_PERIOD);
 
         if (sysdev_class_register(&kbc_sysclass) == 0) {
-                if (sys_device_register(&device_i8042) == 0)
+                if (sysdev_register(&device_i8042) == 0)
 			i8042_sysdev_initialized = 1;
 		else
 			sysdev_class_unregister(&kbc_sysclass);
@@ -980,7 +985,7 @@ void __exit i8042_exit(void)
 		pm_unregister(i8042_pm_dev);
 
 	if (i8042_sysdev_initialized) {
-		sys_device_unregister(&device_i8042);
+		sysdev_unregister(&device_i8042);
 		sysdev_class_unregister(&kbc_sysclass);
 	}
 

@@ -140,6 +140,16 @@ config CRYPTO_CAST6
 	  The CAST6 encryption algorithm (synonymous with CAST-256) is
 	  described in RFC2612.
 
+config CRYPTO_ARC4
+	tristate "ARC4 cipher algorithm"
+	depends on CRYPTO
+	help
+	  ARC4 cipher algorithm.
+
+	  This is a stream cipher using keys ranging from 8 bits to 2048
+	  bits in length.  ARC4 is commonly used in protocols such as WEP 
+	  and SSL.
+
 config CRYPTO_DEFLATE
 	tristate "Deflate compression algorithm"
 	depends on CRYPTO

@@ -662,7 +662,7 @@ static void eepro_recalc (struct net_device *dev)
 {
 	struct eepro_local *	lp;
 
-	lp = dev->priv;
+	lp = netdev_priv(dev);
 	lp->xmt_ram = RAM_SIZE - lp->rcv_ram;
 
 	if (lp->eepro == LAN595FX_10ISA) {
@@ -680,9 +680,9 @@ static void eepro_recalc (struct net_device *dev)
 }
 
 /* prints boot-time info */
-static void eepro_print_info (struct net_device *dev)
+static void __init eepro_print_info (struct net_device *dev)
 {
-	struct eepro_local *	lp = dev->priv;
+	struct eepro_local *	lp = netdev_priv(dev);
 	int			i;
 	const char *		ifmap[] = {"AUI", "10Base2", "10BaseT"};
 
@@ -769,7 +769,7 @@ static int __init eepro_probe1(struct net_device *dev, int autoprobe)
 	if ((inb(ioaddr + ID_REG) & R_ROBIN_BITS) != (counter + 0x40))
 		goto exit;
 
-	lp = (struct eepro_local *)dev->priv;
+	lp = netdev_priv(dev);
 	memset(lp, 0, sizeof(struct eepro_local));
 	lp->xmt_bar = XMT_BAR_PRO;
 	lp->xmt_lower_limit_reg = XMT_LOWER_LIMIT_REG_PRO;
@@ -932,7 +932,7 @@ static int eepro_open(struct net_device *dev)
 	unsigned short temp_reg, old8, old9;
 	int irqMask;
 	int i, ioaddr = dev->base_addr;
-	struct eepro_local *lp = (struct eepro_local *)dev->priv;
+	struct eepro_local *lp = netdev_priv(dev);
 
 	if (net_debug > 3)
 		printk(KERN_DEBUG "%s: entering eepro_open routine.\n", dev->name);
@@ -1106,7 +1106,7 @@ static int eepro_open(struct net_device *dev)
 
 static void eepro_tx_timeout (struct net_device *dev)
 {
-	struct eepro_local *lp = (struct eepro_local *) dev->priv;
+	struct eepro_local *lp = netdev_priv(dev);
 	int ioaddr = dev->base_addr;
 
 	/* if (net_debug > 1) */
@@ -1122,7 +1122,7 @@ static void eepro_tx_timeout (struct net_device *dev)
 
 static int eepro_send_packet(struct sk_buff *skb, struct net_device *dev)
 {
-	struct eepro_local *lp = (struct eepro_local *)dev->priv;
+	struct eepro_local *lp = netdev_priv(dev);
 	unsigned long flags;
 	int ioaddr = dev->base_addr;
 	short length = skb->len;
@@ -1187,7 +1187,7 @@ eepro_interrupt(int irq, void *dev_id, struct pt_regs * regs)
                 return IRQ_NONE;
         }
 
-	lp = (struct eepro_local *)dev->priv;
+	lp = netdev_priv(dev);
 
         spin_lock(&lp->lock);
 
@@ -1235,7 +1235,7 @@ eepro_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 
 static int eepro_close(struct net_device *dev)
 {
-	struct eepro_local *lp = (struct eepro_local *)dev->priv;
+	struct eepro_local *lp = netdev_priv(dev);
 	int ioaddr = dev->base_addr;
 	short temp_reg;
 
@@ -1280,7 +1280,7 @@ static int eepro_close(struct net_device *dev)
 static struct net_device_stats *
 eepro_get_stats(struct net_device *dev)
 {
-	struct eepro_local *lp = (struct eepro_local *)dev->priv;
+	struct eepro_local *lp = netdev_priv(dev);
 
 	return &lp->stats;
 }
@@ -1290,7 +1290,7 @@ eepro_get_stats(struct net_device *dev)
 static void
 set_multicast_list(struct net_device *dev)
 {
-	struct eepro_local *lp = (struct eepro_local *)dev->priv;
+	struct eepro_local *lp = netdev_priv(dev);
 	short ioaddr = dev->base_addr;
 	unsigned short mode;
 	struct dev_mc_list *dmi=dev->mc_list;
@@ -1424,7 +1424,7 @@ read_eeprom(int ioaddr, int location, struct net_device *dev)
 {
 	int i;
 	unsigned short retval = 0;
-	struct eepro_local *lp = dev->priv;
+	struct eepro_local *lp = netdev_priv(dev);
 	short ee_addr = ioaddr + lp->eeprom_reg;
 	int read_cmd = location | EE_READ_CMD;
 	short ctrl_val = EECS ;
@@ -1468,7 +1468,7 @@ read_eeprom(int ioaddr, int location, struct net_device *dev)
 static int
 hardware_send_packet(struct net_device *dev, void *buf, short length)
 {
-	struct eepro_local *lp = (struct eepro_local *)dev->priv;
+	struct eepro_local *lp = netdev_priv(dev);
 	short ioaddr = dev->base_addr;
 	unsigned status, tx_available, last, end;
 
@@ -1553,7 +1553,7 @@ hardware_send_packet(struct net_device *dev, void *buf, short length)
 static void
 eepro_rx(struct net_device *dev)
 {
-	struct eepro_local *lp = (struct eepro_local *)dev->priv;
+	struct eepro_local *lp = netdev_priv(dev);
 	short ioaddr = dev->base_addr;
 	short boguscount = 20;
 	short rcv_car = lp->rx_start;
@@ -1651,7 +1651,7 @@ eepro_rx(struct net_device *dev)
 static void
 eepro_transmit_interrupt(struct net_device *dev)
 {
-	struct eepro_local *lp = (struct eepro_local *)dev->priv;
+	struct eepro_local *lp = netdev_priv(dev);
 	short ioaddr = dev->base_addr;
 	short boguscount = 25; 
 	short xmt_status;

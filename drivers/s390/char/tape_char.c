@@ -20,6 +20,7 @@
 
 #include "tape.h"
 #include "tape_std.h"
+#include "tape_class.h"
 
 #define PRINTK_HEADER "TAPE_CHAR: "
 
@@ -53,14 +54,35 @@ static int tapechar_major = TAPECHAR_MAJOR;
 int
 tapechar_setup_device(struct tape_device * device)
 {
-	tape_hotplug_event(device, tapechar_major, TAPE_HOTPLUG_CHAR_ADD);
+	char	device_name[20];
+
+	sprintf(device_name, "ntibm%i", device->first_minor / 2);
+	device->nt = register_tape_dev(
+		&device->cdev->dev,
+		MKDEV(tapechar_major, device->first_minor),
+		&tape_fops,
+		device_name,
+		"non-rewinding"
+	);
+	device_name[0] = 'r';
+	device->rt = register_tape_dev(
+		&device->cdev->dev,
+		MKDEV(tapechar_major, device->first_minor + 1),
+		&tape_fops,
+		device_name,
+		"rewinding"
+	);
+
 	return 0;
 }
 
 void
 tapechar_cleanup_device(struct tape_device *device)
 {
-	tape_hotplug_event(device, tapechar_major, TAPE_HOTPLUG_CHAR_REMOVE);
+	unregister_tape_dev(device->rt);
+	device->rt = NULL;
+	unregister_tape_dev(device->nt);
+	device->nt = NULL;
 }
 
 /*
@@ -461,20 +483,14 @@ tapechar_ioctl(struct inode *inp, struct file *filp,
 int
 tapechar_init (void)
 {
-	int rc;
+	dev_t	dev;
 
-	/* Register the tape major number to the kernel */
-	rc = register_chrdev(tapechar_major, "tape", &tape_fops);
-	if (rc < 0) {
-		PRINT_ERR("can't get major %d\n", tapechar_major);
-		DBF_EVENT(3, "TCHAR:initfail\n");
-		return rc;
-	}
-	if (tapechar_major == 0)
-		tapechar_major = rc;  /* accept dynamic major number */
-	PRINT_ERR("Tape gets major %d for char device\n", tapechar_major);
-	DBF_EVENT(3, "Tape gets major %d for char device\n", rc);
-	DBF_EVENT(3, "TCHAR:init ok\n");
+	if (alloc_chrdev_region(&dev, 0, 256, "tape") != 0)
+		return -1;
+
+	tapechar_major = MAJOR(dev);
+	PRINT_INFO("tape gets major %d for character devices\n", MAJOR(dev));
+
 	return 0;
 }
 
@@ -484,5 +500,7 @@ tapechar_init (void)
 void
 tapechar_exit(void)
 {
-	unregister_chrdev (tapechar_major, "tape");
+	PRINT_INFO("tape releases major %d for character devices\n",
+		tapechar_major);
+	unregister_chrdev_region(MKDEV(tapechar_major, 0), 256);
 }

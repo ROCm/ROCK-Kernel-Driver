@@ -20,7 +20,8 @@
 extern  void pcibios_sort(void);
 #endif
 
-unsigned int pci_probe = PCI_PROBE_BIOS | PCI_PROBE_CONF1 | PCI_PROBE_CONF2;
+unsigned int pci_probe = PCI_PROBE_BIOS | PCI_PROBE_CONF1 | PCI_PROBE_CONF2 |
+				PCI_PROBE_MMCONF;
 
 int pcibios_last_bus = -1;
 struct pci_bus *pci_root_bus = NULL;
@@ -195,6 +196,12 @@ char * __devinit  pcibios_setup(char *str)
 	}
 	else if (!strcmp(str, "conf2")) {
 		pci_probe = PCI_PROBE_CONF2 | PCI_NO_CHECKS;
+		return NULL;
+	}
+#endif
+#ifdef CONFIG_PCI_MMCONFIG
+	else if (!strcmp(str, "nommconf")) {
+		pci_probe &= ~PCI_PROBE_MMCONF;
 		return NULL;
 	}
 #endif

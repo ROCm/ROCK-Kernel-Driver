@@ -31,6 +31,7 @@
 #include <sound/pcm.h>
 #include <sound/control.h>
 #include <sound/ac97_codec.h>
+#include <sound/asoundef.h>
 #include "ac97_patch.h"
 #include "ac97_id.h"
 #include "ac97_local.h"
@@ -176,6 +177,7 @@ static unsigned char get_slot_reg(struct ac97_pcm *pcm, unsigned short cidx,
 static int set_spdif_rate(ac97_t *ac97, unsigned short rate)
 {
 	unsigned short old, bits, reg, mask;
+	unsigned int sbits;
 
 	if (! (ac97->ext_id & AC97_EI_SPDIF))
 		return -ENODEV;
@@ -213,6 +215,26 @@ static int set_spdif_rate(ac97_t *ac97, unsigned short rate)
 	if (old != bits) {
 		snd_ac97_update_bits(ac97, AC97_EXTENDED_STATUS, AC97_EA_SPDIF, 0);
 		snd_ac97_update_bits(ac97, reg, mask, bits);
+		/* update the internal spdif bits */
+		spin_lock(&ac97->reg_lock);
+		sbits = ac97->spdif_status;
+		if (sbits & IEC958_AES0_PROFESSIONAL) {
+			sbits &= ~IEC958_AES0_PRO_FS;
+			switch (rate) {
+			case 44100: sbits |= IEC958_AES0_PRO_FS_44100; break;
+			case 48000: sbits |= IEC958_AES0_PRO_FS_48000; break;
+			case 32000: sbits |= IEC958_AES0_PRO_FS_32000; break;
+			}
+		} else {
+			sbits &= ~(IEC958_AES3_CON_FS << 24);
+			switch (rate) {
+			case 44100: sbits |= IEC958_AES3_CON_FS_44100<<24; break;
+			case 48000: sbits |= IEC958_AES3_CON_FS_48000<<24; break;
+			case 32000: sbits |= IEC958_AES3_CON_FS_32000<<24; break;
+			}
+		}
+		ac97->spdif_status = sbits;
+		spin_unlock(&ac97->reg_lock);
 	}
 	snd_ac97_update_bits(ac97, AC97_EXTENDED_STATUS, AC97_EA_SPDIF, AC97_EA_SPDIF);
 	return 0;

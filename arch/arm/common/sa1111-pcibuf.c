@@ -457,8 +457,8 @@ void sa1111_unmap_sg(struct device *dev, struct scatterlist *sg,
 	local_irq_restore(flags);
 }
 
-void sa1111_dma_sync_single(struct device *dev, dma_addr_t dma_addr,
-			    size_t size, enum dma_data_direction dir)
+void sa1111_dma_sync_single_for_cpu(struct device *dev, dma_addr_t dma_addr,
+				    size_t size, enum dma_data_direction dir)
 {
 	unsigned long flags;
 
@@ -472,8 +472,44 @@ void sa1111_dma_sync_single(struct device *dev, dma_addr_t dma_addr,
 	local_irq_restore(flags);
 }
 
-void sa1111_dma_sync_sg(struct device *dev, struct scatterlist *sg,
-			int nents, enum dma_data_direction dir)
+void sa1111_dma_sync_single_for_device(struct device *dev, dma_addr_t dma_addr,
+				       size_t size, enum dma_data_direction dir)
+{
+	unsigned long flags;
+
+	dev_dbg(dev, "%s(ptr=%08lx,size=%d,dir=%x)\n",
+		__func__, dma_addr, size, dir);
+
+	local_irq_save(flags);
+
+	sync_single(dev, dma_addr, size, dir);
+
+	local_irq_restore(flags);
+}
+
+void sa1111_dma_sync_sg_for_cpu(struct device *dev, struct scatterlist *sg,
+				int nents, enum dma_data_direction dir)
+{
+	unsigned long flags;
+	int i;
+
+	dev_dbg(dev, "%s(sg=%p,nents=%d,dir=%x)\n",
+		__func__, sg, nents, dir);
+
+	local_irq_save(flags);
+
+	for (i = 0; i < nents; i++, sg++) {
+		dma_addr_t dma_addr = sg->dma_address;
+		unsigned int length = sg->length;
+
+		sync_single(dev, dma_addr, length, dir);
+	}
+
+	local_irq_restore(flags);
+}
+
+void sa1111_dma_sync_sg_for_device(struct device *dev, struct scatterlist *sg,
+				   int nents, enum dma_data_direction dir)
 {
 	unsigned long flags;
 	int i;
@@ -497,8 +533,10 @@ EXPORT_SYMBOL(sa1111_map_single);
 EXPORT_SYMBOL(sa1111_unmap_single);
 EXPORT_SYMBOL(sa1111_map_sg);
 EXPORT_SYMBOL(sa1111_unmap_sg);
-EXPORT_SYMBOL(sa1111_dma_sync_single);
-EXPORT_SYMBOL(sa1111_dma_sync_sg);
+EXPORT_SYMBOL(sa1111_dma_sync_single_for_cpu);
+EXPORT_SYMBOL(sa1111_dma_sync_single_for_device);
+EXPORT_SYMBOL(sa1111_dma_sync_sg_for_cpu);
+EXPORT_SYMBOL(sa1111_dma_sync_sg_for_device);
 
 /* **************************************** */
 

@@ -1637,10 +1637,13 @@ static int __netdev_rx(struct net_device *dev, int *quota)
 		    && (skb = dev_alloc_skb(pkt_len + 2)) != NULL) {
 			skb->dev = dev;
 			skb_reserve(skb, 2);	/* 16 byte align the IP header */
-			pci_dma_sync_single(np->pci_dev,
-					    np->rx_info[entry].mapping,
-					    pkt_len, PCI_DMA_FROMDEVICE);
+			pci_dma_sync_single_for_cpu(np->pci_dev,
+						    np->rx_info[entry].mapping,
+						    pkt_len, PCI_DMA_FROMDEVICE);
 			eth_copy_and_sum(skb, np->rx_info[entry].skb->tail, pkt_len, 0);
+			pci_dma_sync_single_for_device(np->pci_dev,
+						       np->rx_info[entry].mapping,
+						       pkt_len, PCI_DMA_FROMDEVICE);
 			skb_put(skb, pkt_len);
 		} else {
 			pci_unmap_single(np->pci_dev, np->rx_info[entry].mapping, np->rx_buf_sz, PCI_DMA_FROMDEVICE);

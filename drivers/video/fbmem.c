@@ -955,7 +955,8 @@ fb_set_var(struct fb_info *info, struct fb_var_screeninfo *var)
 {
 	int err;
 
-	if (memcmp(&info->var, var, sizeof(struct fb_var_screeninfo))) {
+	if ((var->activate & FB_ACTIVATE_FORCE) ||
+	    memcmp(&info->var, var, sizeof(struct fb_var_screeninfo))) {
 		if (!info->fbops->fb_check_var) {
 			*var = info->var;
 			return 0;

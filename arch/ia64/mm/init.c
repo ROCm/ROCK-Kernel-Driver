@@ -279,9 +279,7 @@ ia64_mmu_init (void *my_cpu_data)
 {
 	unsigned long psr, pta, impl_va_bits;
 	extern void __init tlb_init (void);
-#ifdef CONFIG_IA64_MCA
 	int cpu;
-#endif
 
 #ifdef CONFIG_DISABLE_VHPT
 #	define VHPT_ENABLE_BIT	0
@@ -342,7 +340,10 @@ ia64_mmu_init (void *my_cpu_data)
 
 	ia64_tlb_init();
 
-#ifdef	CONFIG_IA64_MCA
+#ifdef	CONFIG_HUGETLB_PAGE
+	ia64_set_rr(HPAGE_REGION_BASE, HPAGE_SHIFT << 2);
+#endif
+
 	cpu = smp_processor_id();
 
 	/* mca handler uses cr.lid as key to pick the right entry */
@@ -356,7 +357,6 @@ ia64_mmu_init (void *my_cpu_data)
 	ia64_mca_tlb_list[cpu].ptce_count[1] = local_cpu_data->ptce_count[1];
 	ia64_mca_tlb_list[cpu].ptce_stride[0] = local_cpu_data->ptce_stride[0];
 	ia64_mca_tlb_list[cpu].ptce_stride[1] = local_cpu_data->ptce_stride[1];
-#endif
 }
 
 #ifdef CONFIG_VIRTUAL_MEM_MAP
@@ -455,8 +455,11 @@ int
 ia64_pfn_valid (unsigned long pfn)
 {
 	char byte;
+	struct page *pg = pfn_to_page(pfn);
 
-	return __get_user(byte, (char *) pfn_to_page(pfn)) == 0;
+	return     (__get_user(byte, (char *) pg) == 0)
+		&& ((((u64)pg & PAGE_MASK) == (((u64)(pg + 1) - 1) & PAGE_MASK))
+			|| (__get_user(byte, (char *) (pg + 1) - 1) == 0));
 }
 EXPORT_SYMBOL(ia64_pfn_valid);
 

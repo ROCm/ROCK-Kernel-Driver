@@ -39,9 +39,6 @@
 #include <asm/mmu_context.h>
 #include <asm/tlbflush.h>
 
-#define __KERNEL_SYSCALLS__
-#include <asm/unistd.h>
-
 #include "proto.h"
 #include "irq_impl.h"
 

@@ -890,7 +890,7 @@ static inline void __put_unused_fd(struct files_struct *files, unsigned int fd)
 		files->next_fd = fd;
 }
 
-void put_unused_fd(unsigned int fd)
+void fastcall put_unused_fd(unsigned int fd)
 {
 	struct files_struct *files = current->files;
 	spin_lock(&files->file_lock);
@@ -913,7 +913,7 @@ EXPORT_SYMBOL(put_unused_fd);
  * will follow.
  */
 
-void fd_install(unsigned int fd, struct file * file)
+void fastcall fd_install(unsigned int fd, struct file * file)
 {
 	struct files_struct *files = current->files;
 	spin_lock(&files->file_lock);
@@ -954,6 +954,7 @@ out_error:
 	fd = error;
 	goto out;
 }
+EXPORT_SYMBOL_GPL(sys_open);
 
 #ifndef __alpha__
 

@@ -1108,17 +1108,7 @@ _GLOBAL(name) \
 	li	r3,-1; \
 	blr
 
-#define __NR__exit __NR_exit
-
-SYSCALL(setsid)
-SYSCALL(open)
-SYSCALL(read)
-SYSCALL(write)
-SYSCALL(lseek)
-SYSCALL(close)
-SYSCALL(dup)
 SYSCALL(execve)
-SYSCALL(waitpid)
 
 /* Why isn't this a) automatic, b) written in 'C'? */
 	.data

@@ -2753,9 +2753,7 @@ int __init ip_rt_init(void)
 		panic("IP: failed to allocate ip_dst_cache\n");
 
 	goal = num_physpages >> (26 - PAGE_SHIFT);
-	if (!rhash_entries)
-		goal = min(10, goal);
-	else
+	if (rhash_entries)
 		goal = (rhash_entries * sizeof(struct rt_hash_bucket)) >> PAGE_SHIFT;
 	for (order = 0; (1UL << order) < goal; order++)
 		/* NOTHING */;

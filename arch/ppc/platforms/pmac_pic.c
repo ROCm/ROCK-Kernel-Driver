@@ -646,7 +646,7 @@ static int __init init_pmacpic_sysfs(void)
 
 	printk(KERN_DEBUG "Registering pmac pic with sysfs...\n");
 	sysdev_class_register(&pmacpic_sysclass);
-	sys_device_register(&device_pmacpic);
+	sysdev_register(&device_pmacpic);
 	sysdev_driver_register(&pmacpic_sysclass, &driver_pmacpic);
 	return 0;
 }

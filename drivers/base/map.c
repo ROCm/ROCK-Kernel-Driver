@@ -96,7 +96,7 @@ struct kobject *kobj_lookup(struct kobj_map *domain, dev_t dev, int *index)
 {
 	struct kobject *kobj;
 	struct probe *p;
-	unsigned best = ~0U;
+	unsigned long best = ~0UL;
 
 retry:
 	down_read(domain->sem);

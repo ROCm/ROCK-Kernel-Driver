@@ -239,6 +239,11 @@ int hpsb_packet_success(struct hpsb_packet *packet)
                         return -EAGAIN;
                 }
 
+        case ACK_ADDRESS_ERROR:
+                return -EINVAL;
+
+        case ACK_TARDY:
+        case ACK_CONFLICT_ERROR:
         case ACKX_NONE:
         case ACKX_SEND_ERROR:
         case ACKX_ABORTED:
@@ -263,7 +268,7 @@ struct hpsb_packet *hpsb_make_readpacket(struct hpsb_host *host, nodeid_t node,
 	if (length == 0)
 		return NULL;
 
-	packet = hpsb_alloc_packet(length + (length % 4 ? 4 - (length % 4) : 0));
+	packet = hpsb_alloc_packet((length + 3) & ~3);
 	if (!packet)
 		return NULL;
 
@@ -291,7 +296,7 @@ struct hpsb_packet *hpsb_make_writepacket (struct hpsb_host *host, nodeid_t node
 	if (length == 0)
 		return NULL;
 
-	packet = hpsb_alloc_packet(length + (length % 4 ? 4 - (length % 4) : 0));
+	packet = hpsb_alloc_packet((length + 3) & ~3);
 	if (!packet)
 		return NULL;
 
@@ -325,7 +330,7 @@ struct hpsb_packet *hpsb_make_streampacket(struct hpsb_host *host, u8 *buffer, i
 	if (length == 0)
 		return NULL;
 
-	packet = hpsb_alloc_packet(length + (length % 4 ? 4 - (length % 4) : 0));
+	packet = hpsb_alloc_packet((length + 3) & ~3);
 	if (!packet)
 		return NULL;
 

@@ -603,11 +603,6 @@ static int __init set_preferred_console(void)
 }
 console_initcall(set_preferred_console);
 
-asmlinkage long sys_ioperm(unsigned long from, unsigned long num, int on)
-{
-	return -EIO;
-}
-
 /* BUFFER is PAGE_SIZE bytes long. */
 
 extern char *sparc_cpu_type;

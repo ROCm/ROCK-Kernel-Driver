@@ -768,7 +768,6 @@ __setup("acpi_irq_pci=", acpi_irq_pci);
 
 static int __init acpi_irq_nobalance_set(char *str)
 {
-printk("ACPI STATIC SET\n");
 	acpi_irq_balance = 0;
 	return(1);
 }
@@ -776,7 +775,6 @@ __setup("acpi_irq_nobalance", acpi_irq_nobalance_set);
 
 int __init acpi_irq_balance_set(char *str)
 {
-printk("ACPI BALANCE SET\n");
 	acpi_irq_balance = 1;
 	return(1);
 }

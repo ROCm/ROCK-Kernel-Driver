@@ -535,11 +535,6 @@ int pci_request_regions(struct pci_dev *pdev, char *res_name)
 	return 0;
 
 err_out:
-	printk (KERN_WARNING "PCI: Unable to reserve %s region #%d:%lx@%lx for device %s\n",
-		pci_resource_flags(pdev, i) & IORESOURCE_IO ? "I/O" : "mem",
-		i + 1, /* PCI BAR # */
-		pci_resource_len(pdev, i), pci_resource_start(pdev, i),
-		pci_name(pdev));
 	while(--i >= 0)
 		pci_release_region(pdev, i);
 		
@@ -691,7 +686,7 @@ pci_set_consistent_dma_mask(struct pci_dev *dev, u64 mask)
 	if (!pci_dma_supported(dev, mask))
 		return -EIO;
 
-	dev->consistent_dma_mask = mask;
+	dev->dev.coherent_dma_mask = mask;
 
 	return 0;
 }

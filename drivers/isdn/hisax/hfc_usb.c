@@ -1349,9 +1349,11 @@ static int __devinit hfc_usb_probe(struct usb_interface *intf, const struct usb_
 {
 	struct usb_device *dev= interface_to_usbdev(intf);
 	hfcusb_data *context;
-	struct usb_host_interface *iface = intf->altsetting + intf->act_altsetting;
+	struct usb_host_interface *iface = intf->cur_altsetting;
+	struct usb_host_interface *iface_used = NULL;
 	struct usb_host_endpoint *ep;
-	int i, idx, probe_alt_setting,vend_idx, cfg_used, *vcf, attr, cfg_found, cidx, ep_addr;
+	int ifnum = iface->desc.bInterfaceNumber;
+	int i, idx, alt_idx, probe_alt_setting, vend_idx, cfg_used, *vcf, attr, cfg_found, cidx, ep_addr;
 	int cmptbl[16],small_match,iso_packet_size,packet_size,alt_used=0;
 
 //        usb_show_device(dev);
@@ -1366,7 +1368,7 @@ static int __devinit hfc_usb_probe(struct usb_interface *intf, const struct usb_
 
 #ifdef VERBOSE_USB_DEBUG	
 	printk(KERN_INFO "HFC-USB: probing interface(%d) actalt(%d) minor(%d)\n",
-		intf->altsetting->desc.bInterfaceNumber, intf->act_altsetting, intf->minor);
+		ifnum, iface->desc.bAlternateSetting, intf->minor);
 #endif
 
 	if (vend_idx != 0xffff) {
@@ -1374,14 +1376,15 @@ static int __devinit hfc_usb_probe(struct usb_interface *intf, const struct usb_
 		printk(KERN_INFO "HFC-USB: found vendor idx:%d  name:%s\n",vend_idx,vdata[vend_idx].vend_name);
 #endif
 		/* if vendor and product ID is OK, start probing a matching alternate setting ... */
-		probe_alt_setting = 0;
+		alt_idx = 0;
 		small_match=0xffff;
 		// default settings
 		iso_packet_size=16;
 		packet_size=64;
 
-		while(probe_alt_setting < intf->num_altsetting) {
-			iface = intf->altsetting + probe_alt_setting;
+		while (alt_idx < intf->num_altsetting) {
+			iface = intf->altsetting + alt_idx;
+			probe_alt_setting = iface->desc.bAlternateSetting;
 			cfg_used=0;
 
 #ifdef VERBOSE_USB_DEBUG
@@ -1395,7 +1398,7 @@ static int __devinit hfc_usb_probe(struct usb_interface *intf, const struct usb_
 
 #ifdef VERBOSE_USB_DEBUG
 				printk(KERN_INFO "HFC-USB: (if=%d alt=%d cfg_used=%d)\n",
-					probe_alt_setting, intf->act_altsetting,cfg_used);
+					ifnum, probe_alt_setting, cfg_used);
 #endif
 				// copy table
 				memcpy(cmptbl,vcf,16*sizeof(int));
@@ -1448,6 +1451,7 @@ static int __devinit hfc_usb_probe(struct usb_interface *intf, const struct usb_
 					if (cfg_used < small_match) {
 						small_match = cfg_used;
 						alt_used = probe_alt_setting;
+						iface_used = iface;
 					}
 #ifdef VERBOSE_USB_DEBUG
 					printk(KERN_INFO "HFC-USB: small_match=%x %x\n", small_match, alt_used);
@@ -1457,15 +1461,14 @@ static int __devinit hfc_usb_probe(struct usb_interface *intf, const struct usb_
 				cfg_used++;
 			}
 
-			probe_alt_setting++;
-		}		/* (probe_alt_setting < intf->num_altsetting) */
+			alt_idx++;
+		}		/* (alt_idx < intf->num_altsetting) */
 #ifdef VERBOSE_USB_DEBUG
 		printk(KERN_INFO "HFC-USB: final small_match=%x alt_used=%x\n",small_match, alt_used);
 #endif
 		// yiipiee, we found a valid config
 		if (small_match != 0xffff) {
-			intf->act_altsetting = alt_used;
-			iface = intf->altsetting + intf->act_altsetting;
+			iface = iface_used;
 
 			if (!(context = kmalloc(sizeof(hfcusb_data), GFP_KERNEL)))
 				return(-ENOMEM);  /* got no mem */
@@ -1542,8 +1545,8 @@ static int __devinit hfc_usb_probe(struct usb_interface *intf, const struct usb_
 
 			// now share our luck
 			context->dev = dev;						/* save device */
-			context->if_used = intf->altsetting->desc.bInterfaceNumber;	/* save used interface */
-			context->alt_used = intf->act_altsetting;			/* and alternate config */
+			context->if_used = ifnum;					/* save used interface */
+			context->alt_used = alt_used;					/* and alternate config */
 			context->ctrl_paksize = dev->descriptor.bMaxPacketSize0;	/* control size */
 			context->cfg_used=vcf[16];					// store used config
 			context->vend_idx=vend_idx;					// store found vendor

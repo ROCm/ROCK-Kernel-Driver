@@ -55,6 +55,8 @@ MODULE_DEVICES("{{Intel,82801AA-ICH},"
 		"{Intel,82801CA-ICH3},"
 		"{Intel,82801DB-ICH4},"
 		"{Intel,ICH5},"
+		"{Intel,ICH6},"
+		"{Intel,6300ESB},"
 		"{Intel,MX440},"
 		"{SiS,SI7012},"
 		"{NVidia,nForce Audio},"
@@ -131,6 +133,12 @@ MODULE_PARM_SYNTAX(mpu_port, SNDRV_ENABLED ",allows:{{0},{0x330},{0x300}},dialog
 #ifndef PCI_DEVICE_ID_INTEL_ICH5
 #define PCI_DEVICE_ID_INTEL_ICH5	0x24d5
 #endif
+#ifndef PCI_DEVICE_ID_INTEL_ESB_5
+#define PCI_DEVICE_ID_INTEL_ESB_5	0x25a6
+#endif
+#ifndef PCI_DEVICE_ID_INTEL_ICH6_3
+#define PCI_DEVICE_ID_INTEL_ICH6_3	0x266e
+#endif
 #ifndef PCI_DEVICE_ID_SI_7012
 #define PCI_DEVICE_ID_SI_7012		0x7012
 #endif
@@ -142,6 +150,9 @@ MODULE_PARM_SYNTAX(mpu_port, SNDRV_ENABLED ",allows:{{0},{0x330},{0x300}},dialog
 #endif
 #ifndef PCI_DEVICE_ID_NVIDIA_MCP3_AUDIO
 #define PCI_DEVICE_ID_NVIDIA_MCP3_AUDIO	0x00da
+#endif
+#ifndef PCI_DEVICE_ID_NVIDIA_CK8S_AUDIO
+#define PCI_DEVICE_ID_NVIDIA_CK8S_AUDIO	0x00ea
 #endif
 
 enum { DEVICE_INTEL, DEVICE_INTEL_ICH4, DEVICE_SIS, DEVICE_ALI, DEVICE_NFORCE };
@@ -195,6 +206,11 @@ DEFINE_REGSET(SP, 0x60);	/* SPDIF out */
 
 /* global block */
 #define ICH_REG_GLOB_CNT		0x2c	/* dword - global control */
+#define   ICH_PCM_SPDIF_MASK	0xc0000000	/* s/pdif pcm slot mask (ICH4) */
+#define   ICH_PCM_SPDIF_NONE	0x00000000	/* reserved - undefined */
+#define   ICH_PCM_SPDIF_78	0x40000000	/* s/pdif pcm on slots 7&8 */
+#define   ICH_PCM_SPDIF_69	0x80000000	/* s/pdif pcm on slots 6&9 */
+#define   ICH_PCM_SPDIF_1011	0xc0000000	/* s/pdif pcm on slots 10&11 */
 #define   ICH_PCM_20BIT		0x00400000	/* 20-bit samples (ICH4) */
 #define   ICH_PCM_246_MASK	0x00300000	/* 6 channels (not all chips) */
 #define   ICH_PCM_6		0x00200000	/* 6 channels (not all chips) */
@@ -396,6 +412,8 @@ struct _snd_intel8x0 {
 	unsigned long remap_bmaddr;
 	struct resource *res_bm;
 
+	struct snd_dma_device dma_dev;
+
 	struct pci_dev *pci;
 	snd_card_t *card;
 
@@ -420,8 +438,7 @@ struct _snd_intel8x0 {
 	spinlock_t ac97_lock;
 	
 	u32 bdbars_count;
-	u32 *bdbars;
-	dma_addr_t bdbars_addr;
+	struct snd_dma_buffer bdbars;
 	u32 int_sta_reg;		/* interrupt status register */
 	u32 int_sta_mask;		/* interrupt status mask */
 	unsigned int pcm_pos_shift;
@@ -438,11 +455,14 @@ static struct pci_device_id snd_intel8x0_ids[] = {
 	{ 0x8086, 0x2485, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_INTEL },	/* ICH3 */
 	{ 0x8086, 0x24c5, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_INTEL_ICH4 }, /* ICH4 */
 	{ 0x8086, 0x24d5, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_INTEL_ICH4 }, /* ICH5 */
+	{ 0x8086, 0x25a6, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_INTEL_ICH4 }, /* ESB */
+	{ 0x8086, 0x266e, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_INTEL_ICH4 }, /* ICH6 */
 	{ 0x8086, 0x7195, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_INTEL },	/* 440MX */
 	{ 0x1039, 0x7012, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_SIS },	/* SI7012 */
 	{ 0x10de, 0x01b1, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_NFORCE },	/* NFORCE */
 	{ 0x10de, 0x006a, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_NFORCE },	/* NFORCE2 */
 	{ 0x10de, 0x00da, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_NFORCE },	/* NFORCE3 */
+	{ 0x10de, 0x00ea, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_NFORCE },	/* CK8S */
 	{ 0x1022, 0x746d, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_INTEL },	/* AMD8111 */
 	{ 0x1022, 0x7445, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_INTEL },	/* AMD768 */
 	{ 0x10b9, 0x5455, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_ALI },   /* Ali5455 */
@@ -804,10 +824,20 @@ static irqreturn_t snd_intel8x0_interrupt(int irq, void *dev_id, struct pt_regs 
 	spin_lock(&chip->reg_lock);
 	status = igetdword(chip, chip->int_sta_reg);
 	if ((status & chip->int_sta_mask) == 0) {
-		if (status)
+		static int err_count = 10;
+		if (status) {
+			/* ack */
 			iputdword(chip, chip->int_sta_reg, status);
+			if (chip->device_type != DEVICE_NFORCE)
+				status ^= igetdword(chip, chip->int_sta_reg);
+		}
 		spin_unlock(&chip->reg_lock);
-		return IRQ_NONE;
+		if (chip->device_type != DEVICE_NFORCE && status && err_count) {
+			err_count--;
+			snd_printd("intel8x0: unknown IRQ bits 0x%x (sta_mask=0x%x)\n",
+				   status, chip->int_sta_mask);
+		}
+		return IRQ_RETVAL(status);
 	}
 
 	for (i = 0; i < chip->bdbars_count; i++) {
@@ -1017,6 +1047,7 @@ static snd_pcm_uframes_t snd_intel8x0_pcm_pointer(snd_pcm_substream_t * substrea
 {
 	intel8x0_t *chip = snd_pcm_substream_chip(substream);
 	ichdev_t *ichdev = get_ichdev(substream);
+	unsigned long flags;
 	size_t ptr1, ptr;
 
 	ptr1 = igetword(chip, ichdev->reg_offset + ichdev->roff_picb) << chip->pcm_pos_shift;
@@ -1024,7 +1055,9 @@ static snd_pcm_uframes_t snd_intel8x0_pcm_pointer(snd_pcm_substream_t * substrea
 		ptr = ichdev->fragsize1 - ptr1;
 	else
 		ptr = 0;
+	spin_lock_irqsave(&chip->reg_lock, flags);
 	ptr += ichdev->position;
+	spin_unlock_irqrestore(&chip->reg_lock, flags);
 	if (ptr >= ichdev->size)
 		return 0;
 	return bytes_to_frames(substream->runtime, ptr);
@@ -1079,21 +1112,12 @@ static int snd_intel8x0_pcm_open(snd_pcm_substream_t * substream, ichdev_t *ichd
 {
 	intel8x0_t *chip = snd_pcm_substream_chip(substream);
 	snd_pcm_runtime_t *runtime = substream->runtime;
-	static unsigned int i, rates[] = {
-		/* ATTENTION: these values depend on the definition in pcm.h! */
-		5512, 8000, 11025, 16000, 22050, 32000, 44100, 48000
-	};
 	int err;
 
 	ichdev->substream = substream;
 	runtime->hw = snd_intel8x0_stream;
 	runtime->hw.rates = ichdev->pcm->rates;
-	for (i = 0; i < ARRAY_SIZE(rates); i++) {
-		if (runtime->hw.rates & (1 << i)) {
-			runtime->hw.rate_min = rates[i];
-			break;
-		}
-	}
+	snd_pcm_limit_hw_rates(runtime);
 	if (chip->device_type == DEVICE_SIS) {
 		runtime->hw.buffer_bytes_max = 64*1024;
 		runtime->hw.period_bytes_max = 64*1024;
@@ -1443,8 +1467,8 @@ static int __devinit snd_intel8x0_pcm1(intel8x0_t *chip, int device, struct ich_
 		strcpy(pcm->name, chip->card->shortname);
 	chip->pcm[device] = pcm;
 
-	snd_pcm_lib_preallocate_pci_pages_for_all(chip->pci, pcm, rec->prealloc_size,
-						  rec->prealloc_max_size);
+	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_DEV, snd_dma_pci_data(chip->pci),
+					      rec->prealloc_size, rec->prealloc_max_size);
 
 	return 0;
 }
@@ -1666,6 +1690,12 @@ static struct ac97_pcm ac97_pcm_defs[] __devinitdata = {
 
 static struct ac97_quirk ac97_quirks[] __devinitdata = {
 	{
+		.vendor = 0x1014,
+		.device = 0x1f00,
+		.name = "MS-9128",
+		.type = AC97_TUNE_ALC_JACK
+	},
+	{
 		.vendor = 0x1028,
 		.device = 0x00d8,
 		.name = "Dell Precision 530",	/* AD1885 */
@@ -1741,6 +1771,12 @@ static struct ac97_quirk ac97_quirks[] __devinitdata = {
 	},
 	{
 		.vendor = 0x8086,
+		.device = 0x4856,
+		.name = "Intel D845WN (82801BA)",
+		.type = AC97_TUNE_SWAP_HP
+	},
+	{
+		.vendor = 0x8086,
 		.device = 0x4d44,
 		.name = "Intel D850EMV2",	/* AD1885 */
 		.type = AC97_TUNE_HP_ONLY
@@ -1759,6 +1795,7 @@ static struct ac97_quirk ac97_quirks[] __devinitdata = {
 		.name = "Intel ICH5/AD1985",
 		.type = AC97_TUNE_AD_SHARING
 	},
+#if 0 /* FIXME: this seems wrong on most boards */
 	{
 		.vendor = 0x8086,
 		.device = 0xa000,
@@ -1766,6 +1803,7 @@ static struct ac97_quirk ac97_quirks[] __devinitdata = {
 		.name = "Intel ICH5/AD1985",
 		.type = AC97_TUNE_HP_ONLY
 	},
+#endif
 	{ } /* terminator */
 };
 
@@ -2116,10 +2154,10 @@ static int snd_intel8x0_free(intel8x0_t *chip)
 	/* --- */
 	synchronize_irq(chip->irq);
       __hw_end:
-	if (chip->bdbars) {
+	if (chip->bdbars.area) {
 		if (chip->fix_nocache)
-			fill_nocache(chip->bdbars, chip->bdbars_count * sizeof(u32) * ICH_MAX_FRAGS * 2, 0);
-		snd_free_pci_pages(chip->pci, chip->bdbars_count * sizeof(u32) * ICH_MAX_FRAGS * 2, chip->bdbars, chip->bdbars_addr);
+			fill_nocache(chip->bdbars.area, chip->bdbars.bytes, 0);
+		snd_dma_free_pages(&chip->dma_dev, &chip->bdbars);
 	}
 	if (chip->remap_addr)
 		iounmap((void *) chip->remap_addr);
@@ -2509,23 +2547,27 @@ static int __devinit snd_intel8x0_create(snd_card_t * card,
 	/* SIS7012 handles the pcm data in bytes, others are in words */
 	chip->pcm_pos_shift = (device_type == DEVICE_SIS) ? 0 : 1;
 
+	memset(&chip->dma_dev, 0, sizeof(chip->dma_dev));
+	chip->dma_dev.type = SNDRV_DMA_TYPE_DEV;
+	chip->dma_dev.dev = snd_dma_pci_data(pci);
+
 	/* allocate buffer descriptor lists */
 	/* the start of each lists must be aligned to 8 bytes */
-	chip->bdbars = (u32 *)snd_malloc_pci_pages(pci, chip->bdbars_count * sizeof(u32) * ICH_MAX_FRAGS * 2, &chip->bdbars_addr);
-	if (chip->bdbars == NULL) {
+	if (snd_dma_alloc_pages(&chip->dma_dev, chip->bdbars_count * sizeof(u32) * ICH_MAX_FRAGS * 2, &chip->bdbars) < 0) {
 		snd_intel8x0_free(chip);
+		snd_printk(KERN_ERR "intel8x0: cannot allocate buffer descriptors\n");
 		return -ENOMEM;
 	}
 	/* tables must be aligned to 8 bytes here, but the kernel pages
 	   are much bigger, so we don't care (on i386) */
 	/* workaround for 440MX */
 	if (chip->fix_nocache)
-		fill_nocache(chip->bdbars, chip->bdbars_count * sizeof(u32) * ICH_MAX_FRAGS * 2, 1);
+		fill_nocache(chip->bdbars.area, chip->bdbars.bytes, 1);
 	int_sta_masks = 0;
 	for (i = 0; i < chip->bdbars_count; i++) {
 		ichdev = &chip->ichd[i];
-		ichdev->bdbar = chip->bdbars + (i * ICH_MAX_FRAGS * 2);
-		ichdev->bdbar_addr = chip->bdbars_addr + (i * sizeof(u32) * ICH_MAX_FRAGS * 2);
+		ichdev->bdbar = ((u32 *)chip->bdbars.area) + (i * ICH_MAX_FRAGS * 2);
+		ichdev->bdbar_addr = chip->bdbars.addr + (i * sizeof(u32) * ICH_MAX_FRAGS * 2);
 		int_sta_masks |= ichdev->int_sta_mask;
 	}
 	chip->int_sta_reg = device_type == DEVICE_ALI ? ICH_REG_ALI_INTERRUPTSR : ICH_REG_GLOB_STA;
@@ -2563,10 +2605,13 @@ static struct shortname_table {
 	{ PCI_DEVICE_ID_INTEL_ICH3, "Intel 82801CA-ICH3" },
 	{ PCI_DEVICE_ID_INTEL_ICH4, "Intel 82801DB-ICH4" },
 	{ PCI_DEVICE_ID_INTEL_ICH5, "Intel ICH5" },
+	{ PCI_DEVICE_ID_INTEL_ESB_5, "Intel 6300ESB" },
+	{ PCI_DEVICE_ID_INTEL_ICH6_3, "Intel ICH6" },
 	{ PCI_DEVICE_ID_SI_7012, "SiS SI7012" },
 	{ PCI_DEVICE_ID_NVIDIA_MCP_AUDIO, "NVidia nForce" },
 	{ PCI_DEVICE_ID_NVIDIA_MCP2_AUDIO, "NVidia nForce2" },
 	{ PCI_DEVICE_ID_NVIDIA_MCP3_AUDIO, "NVidia nForce3" },
+	{ PCI_DEVICE_ID_NVIDIA_CK8S_AUDIO, "NVidia CK8S" },
 	{ 0x746d, "AMD AMD8111" },
 	{ 0x7445, "AMD AMD768" },
 	{ 0x5455, "ALi M5455" },

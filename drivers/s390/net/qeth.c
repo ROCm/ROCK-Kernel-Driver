@@ -6404,6 +6404,8 @@ qeth_register_netdev(struct qeth_card *card)
 
 	QETH_DBF_CARD3(0, trace, "rgnd", card);
 
+	/* sysfs magic */
+	SET_NETDEV_DEV(card->dev, &card->gdev->dev);
 	result = register_netdev(card->dev);
 
 	return result;
@@ -6681,10 +6683,6 @@ qeth_remove_card(struct qeth_card *card, int method)
 						   hard_start_xmit */
 
 	if (atomic_read(&card->is_registered)) {
-		/* Remove sysfs symlinks. */
-		sysfs_remove_link(&card->gdev->dev.kobj, card->dev_name);
-		sysfs_remove_link(&card->dev->class_dev.kobj,
-				  CARD_BUS_ID(card));
 		QETH_DBF_TEXT2(0, trace, "unregdev");
 		qeth_unregister_netdev(card);
 		qeth_wait_nonbusy(QETH_REMOVE_WAIT_TIME);
@@ -10694,17 +10692,6 @@ qeth_activate(struct qeth_card *card)
 	if (qeth_init_netdev(card))
 		goto out_remove;
 
-	if (sysfs_create_link(&card->gdev->dev.kobj, &card->dev->class_dev.kobj,
-			      card->dev_name)) {
-		qeth_unregister_netdev(card);
-		goto out_remove;
-	}
-	if (sysfs_create_link(&card->dev->class_dev.kobj, &card->gdev->dev.kobj,
-			      CARD_BUS_ID(card))) {
-		sysfs_remove_link(&card->gdev->dev.kobj, card->dev_name);
-		qeth_unregister_netdev(card);
-		goto out_remove;
-	}
 	return 0;		/* success */
 
 out_remove:
@@ -10773,6 +10760,7 @@ qeth_remove_device(struct ccwgroup_device *gdev)
 }
 
 static struct ccwgroup_driver qeth_ccwgroup_driver = {
+	.owner = THIS_MODULE,
 	.name = "qeth",
 	.driver_id = 0xD8C5E3C8,
 	.probe = qeth_probe_device,

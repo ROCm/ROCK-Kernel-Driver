@@ -250,26 +250,18 @@ static int sticon_set_origin(struct vc_data *conp)
     return 0;
 }
 
-static int sticon_blank(struct vc_data *c, int blank)
+static int sticon_blank(struct vc_data *c, int blank, int mode_switch)
 {
-    switch (blank) {
-    case 0:		/* unblank */
-	vga_is_gfx = 0;
-	/* Tell console.c that it has to restore the screen itself */
-	return 1;
-    case 1:		/* normal blanking */
-    default:		/* VESA blanking */
-	if (vga_is_gfx)
-		return 0;
-	sticon_set_origin(c);
-	sti_clear(sticon_sti, 0,0, c->vc_rows, c->vc_cols, BLANK);
-	return 1;
-    case -1:		/* Entering graphic mode */
-	sti_clear(sticon_sti, 0,0, c->vc_rows, c->vc_cols, BLANK);
-	vga_is_gfx = 1;
+    if (blank == 0) {
+	if (mode_switch)
+	    vga_is_gfx = 0;
 	return 1;
     }
-    return 1;		/* console needs to restore screen itself */
+    sticon_set_origin(c);
+    sti_clear(sticon_sti, 0,0, c->vc_rows, c->vc_cols, BLANK);
+    if (mode_switch)
+	vga_is_gfx = 1;
+    return 1;
 }
 
 static int sticon_scrolldelta(struct vc_data *conp, int lines)

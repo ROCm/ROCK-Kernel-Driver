@@ -31,7 +31,10 @@
 #include <linux/buffer_head.h>
 #include "swab.h"	/* will go away - see comment in mknod() */
 
+/*
 #undef UFS_NAMEI_DEBUG
+*/
+#define UFS_NAMEI_DEBUG
 
 #ifdef UFS_NAMEI_DEBUG
 #define UFSD(x) printk("(%s, %d), %s: ", __FILE__, __LINE__, __FUNCTION__); printk x;

@@ -1365,6 +1365,7 @@ static int __init viocons_init2(void)
 	viotty_driver->driver_name = "vioconsole";
 	viotty_driver->devfs_name = "vcs/";
 	viotty_driver->name = "tty";
+	viotty_driver->name_base = 1;
 	viotty_driver->major = TTY_MAJOR;
 	viotty_driver->minor_start = 1;
 	viotty_driver->type = TTY_DRIVER_TYPE_CONSOLE;

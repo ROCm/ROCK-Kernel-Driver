@@ -24,7 +24,7 @@
 #include "scsi_logging.h"
 
 
-#define SG_MEMPOOL_NR		5
+#define SG_MEMPOOL_NR		(sizeof(scsi_sg_pools)/sizeof(struct scsi_host_sg_pool))
 #define SG_MEMPOOL_SIZE		32
 
 struct scsi_host_sg_pool {
@@ -34,9 +34,27 @@ struct scsi_host_sg_pool {
 	mempool_t	*pool;
 };
 
+#if (SCSI_MAX_PHYS_SEGMENTS < 32)
+#error SCSI_MAX_PHYS_SEGMENTS is too small
+#endif
+
 #define SP(x) { x, "sgpool-" #x } 
-struct scsi_host_sg_pool scsi_sg_pools[SG_MEMPOOL_NR] = { 
-	SP(8), SP(16), SP(32), SP(64), SP(MAX_PHYS_SEGMENTS)
+struct scsi_host_sg_pool scsi_sg_pools[] = { 
+	SP(8),
+	SP(16),
+	SP(32),
+#if (SCSI_MAX_PHYS_SEGMENTS > 32)
+	SP(64),
+#if (SCSI_MAX_PHYS_SEGMENTS > 64)
+	SP(128),
+#if (SCSI_MAX_PHYS_SEGMENTS > 128)
+	SP(256),
+#if (SCSI_MAX_PHYS_SEGMENTS > 256)
+#error SCSI_MAX_PHYS_SEGMENTS is too large
+#endif
+#endif
+#endif
+#endif
 }; 	
 #undef SP
 
@@ -172,6 +190,10 @@ int scsi_queue_insert(struct scsi_cmnd *cmd, int reason)
  *		like ioctls and character device requests - this is because
  *		we essentially just inject a request into the queue for the
  *		device.
+ *
+ *		In order to support the scsi_device_quiesce function, we
+ *		now inject requests on the *head* of the device queue
+ *		rather than the tail.
  */
 void scsi_do_req(struct scsi_request *sreq, const void *cmnd,
 		 void *buffer, unsigned bufflen,
@@ -202,11 +224,9 @@ void scsi_do_req(struct scsi_request *sreq, const void *cmnd,
 		sreq->sr_cmd_len = COMMAND_SIZE(sreq->sr_cmnd[0]);
 
 	/*
-	 * At this point, we merely set up the command, stick it in the normal
-	 * request queue, and return.  Eventually that request will come to the
-	 * top of the list, and will be dispatched.
+	 * head injection *required* here otherwise quiesce won't work
 	 */
-	scsi_insert_special_req(sreq, 0);
+	scsi_insert_special_req(sreq, 1);
 }
  
 static void scsi_wait_done(struct scsi_cmnd *cmd)
@@ -558,12 +578,21 @@ static struct scatterlist *scsi_alloc_sgtable(struct scsi_cmnd *cmd, int gfp_mas
 	case 17 ... 32:
 		cmd->sglist_len = 2;
 		break;
+#if (SCSI_MAX_PHYS_SEGMENTS > 32)
 	case 33 ... 64:
 		cmd->sglist_len = 3;
 		break;
-	case 65 ... MAX_PHYS_SEGMENTS:
+#if (SCSI_MAX_PHYS_SEGMENTS > 64)
+	case 65 ... 128:
 		cmd->sglist_len = 4;
 		break;
+#if (SCSI_MAX_PHYS_SEGMENTS  > 128)
+	case 129 ... 256:
+		cmd->sglist_len = 5;
+		break;
+#endif
+#endif
+#endif
 	default:
 		return NULL;
 	}
@@ -917,6 +946,7 @@ static int scsi_init_io(struct scsi_cmnd *cmd)
 			req->current_nr_sectors);
 
 	/* release the command and kill it */
+	scsi_release_buffers(cmd);
 	scsi_put_command(cmd);
 	return BLKPREP_KILL;
 }
@@ -939,7 +969,7 @@ static int scsi_prep_fn(struct request_queue *q, struct request *req)
 		}
 		/* OK, we only allow special commands (i.e. not
 		 * user initiated ones */
-		specials_only = 1;
+		specials_only = sdev->sdev_state;
 	}
 
 	/*
@@ -965,6 +995,9 @@ static int scsi_prep_fn(struct request_queue *q, struct request *req)
 	} else if (req->flags & (REQ_CMD | REQ_BLOCK_PC)) {
 
 		if(unlikely(specials_only)) {
+			if(specials_only == SDEV_QUIESCE)
+				return BLKPREP_DEFER;
+			
 			printk(KERN_ERR "scsi%d (%d:%d): rejecting I/O to device being removed\n",
 			       sdev->host->host_no, sdev->id, sdev->lun);
 			return BLKPREP_KILL;
@@ -1285,7 +1318,7 @@ struct request_queue *scsi_alloc_queue(struct scsi_device *sdev)
 	blk_queue_prep_rq(q, scsi_prep_fn);
 
 	blk_queue_max_hw_segments(q, shost->sg_tablesize);
-	blk_queue_max_phys_segments(q, MAX_PHYS_SEGMENTS);
+	blk_queue_max_phys_segments(q, SCSI_MAX_PHYS_SEGMENTS);
 	blk_queue_max_sectors(q, shost->max_sectors);
 	blk_queue_bounce_limit(q, scsi_calculate_bounce_limit(shost));
 	blk_queue_segment_boundary(q, shost->dma_boundary);
@@ -1508,3 +1541,95 @@ scsi_mode_sense(struct scsi_device *sdev, int dbd, int modepage,
 
 	return ret;
 }
+
+/**
+ *	scsi_device_set_state - Take the given device through the device
+ *		state model.
+ *	@sdev:	scsi device to change the state of.
+ *	@state:	state to change to.
+ *
+ *	Returns zero if unsuccessful or an error if the requested 
+ *	transition is illegal.
+ **/
+int
+scsi_device_set_state(struct scsi_device *sdev, enum scsi_device_state state)
+{
+	enum scsi_device_state oldstate = sdev->sdev_state;
+
+	/* FIXME: eventually we will enforce all the state model
+	 * transitions here */
+
+	if(oldstate == state)
+		return 0;
+
+	switch(state) {
+	case SDEV_RUNNING:
+		if(oldstate != SDEV_CREATED && oldstate != SDEV_QUIESCE)
+			return -EINVAL;
+		break;
+
+	case SDEV_QUIESCE:
+		if(oldstate != SDEV_RUNNING)
+			return -EINVAL;
+		break;
+
+	default:
+		break;
+	}
+	sdev->sdev_state = state;
+
+	return 0;
+}
+EXPORT_SYMBOL(scsi_device_set_state);
+
+/**
+ *	scsi_device_quiesce - Block user issued commands.
+ *	@sdev:	scsi device to quiesce.
+ *
+ *	This works by trying to transition to the SDEV_QUIESCE state
+ *	(which must be a legal transition).  When the device is in this
+ *	state, only special requests will be accepted, all others will
+ *	be deferred.  Since special requests may also be requeued requests,
+ *	a successful return doesn't guarantee the device will be 
+ *	totally quiescent.
+ *
+ *	Must be called with user context, may sleep.
+ *
+ *	Returns zero if unsuccessful or an error if not.
+ **/
+int
+scsi_device_quiesce(struct scsi_device *sdev)
+{
+	int err = scsi_device_set_state(sdev, SDEV_QUIESCE);
+	if(err)
+		return err;
+
+	scsi_run_queue(sdev->request_queue);
+	while(sdev->device_busy) {
+		schedule_timeout(HZ/5);
+		scsi_run_queue(sdev->request_queue);
+	}
+	return 0;
+}
+EXPORT_SYMBOL(scsi_device_quiesce);
+
+/**
+ *	scsi_device_resume - Restart user issued commands to a quiesced device.
+ *	@sdev:	scsi device to resume.
+ *
+ *	Moves the device from quiesced back to running and restarts the
+ *	queues.
+ *
+ *	Must be called with user context, may sleep.
+ **/
+void
+scsi_device_resume(struct scsi_device *sdev)
+{
+	if(sdev->sdev_state != SDEV_QUIESCE)
+		return;
+
+	scsi_device_set_state(sdev, SDEV_RUNNING);
+	scsi_run_queue(sdev->request_queue);
+}
+EXPORT_SYMBOL(scsi_device_resume);
+

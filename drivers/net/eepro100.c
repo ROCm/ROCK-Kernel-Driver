@@ -113,6 +113,7 @@ static int options[] = {-1, -1, -1, -1, -1, -1, -1, -1};
 #include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>
+#include <asm/irq.h>
 
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
@@ -654,6 +655,23 @@ err_out_none:
 	return -ENODEV;
 }
 
+#ifdef CONFIG_NET_POLL_CONTROLLER
+/*
+ * Polling 'interrupt' - used by things like netconsole to send skbs
+ * without having to re-enable interrupts. It's not called while
+ * the interrupt routine is executing.
+ */
+
+static void poll_speedo (struct net_device *dev)
+{
+	/* disable_irq is not very nice, but with the funny lockless design
+	   we have no other choice. */
+	disable_irq(dev->irq);
+	speedo_interrupt (dev->irq, dev, NULL);
+	enable_irq(dev->irq);
+}
+#endif
+
 static int __devinit speedo_found1(struct pci_dev *pdev,
 		long ioaddr, int card_idx, int acpi_idle_state)
 {
@@ -839,7 +857,7 @@ static int __devinit speedo_found1(struct pci_dev *pdev,
 
 	dev->irq = pdev->irq;
 
-	sp = dev->priv;
+	sp = netdev_priv(dev);
 	sp->pdev = pdev;
 	sp->msg_enable = DEBUG;
 	sp->acpi_pwr = acpi_idle_state;
@@ -885,6 +903,9 @@ static int __devinit speedo_found1(struct pci_dev *pdev,
 	dev->get_stats = &speedo_get_stats;
 	dev->set_multicast_list = &set_rx_mode;
 	dev->do_ioctl = &speedo_ioctl;
+#ifdef CONFIG_NET_POLL_CONTROLLER
+	dev->poll_controller = &poll_speedo;
+#endif
 
 	if (register_netdevice(dev))
 		goto err_free_unlock;
@@ -995,7 +1016,7 @@ static void mdio_write(struct net_device *dev, int phy_id, int location, int val
 static int
 speedo_open(struct net_device *dev)
 {
-	struct speedo_private *sp = (struct speedo_private *)dev->priv;
+	struct speedo_private *sp = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 	int retval;
 
@@ -1082,7 +1103,7 @@ speedo_open(struct net_device *dev)
 /* Start the chip hardware after a full reset. */
 static void speedo_resume(struct net_device *dev)
 {
-	struct speedo_private *sp = dev->priv;
+	struct speedo_private *sp = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 
 	/* Start with a Tx threshold of 256 (0x..20.... 8 byte units). */
@@ -1162,7 +1183,7 @@ static void speedo_resume(struct net_device *dev)
 static void
 speedo_rx_soft_reset(struct net_device *dev)
 {
-	struct speedo_private *sp = dev->priv;
+	struct speedo_private *sp = netdev_priv(dev);
 	struct RxFD *rfd;
 	long ioaddr;
 
@@ -1194,7 +1215,7 @@ speedo_rx_soft_reset(struct net_device *dev)
 static void speedo_timer(unsigned long data)
 {
 	struct net_device *dev = (struct net_device *)data;
-	struct speedo_private *sp = (struct speedo_private *)dev->priv;
+	struct speedo_private *sp = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 	int phy_num = sp->phy[0] & 0x1f;
 
@@ -1239,7 +1260,7 @@ static void speedo_timer(unsigned long data)
 
 static void speedo_show_state(struct net_device *dev)
 {
-	struct speedo_private *sp = (struct speedo_private *)dev->priv;
+	struct speedo_private *sp = netdev_priv(dev);
 	int i;
 
 	if (netif_msg_pktdata(sp)) {
@@ -1282,7 +1303,7 @@ static void speedo_show_state(struct net_device *dev)
 static void
 speedo_init_rx_ring(struct net_device *dev)
 {
-	struct speedo_private *sp = (struct speedo_private *)dev->priv;
+	struct speedo_private *sp = netdev_priv(dev);
 	struct RxFD *rxf, *last_rxf = NULL;
 	dma_addr_t last_rxf_dma = 0 /* to shut up the compiler */;
 	int i;
@@ -1306,8 +1327,8 @@ speedo_init_rx_ring(struct net_device *dev)
 		skb_reserve(skb, sizeof(struct RxFD));
 		if (last_rxf) {
 			last_rxf->link = cpu_to_le32(sp->rx_ring_dma[i]);
-			pci_dma_sync_single(sp->pdev, last_rxf_dma,
-					sizeof(struct RxFD), PCI_DMA_TODEVICE);
+			pci_dma_sync_single_for_device(sp->pdev, last_rxf_dma,
+										   sizeof(struct RxFD), PCI_DMA_TODEVICE);
 		}
 		last_rxf = rxf;
 		last_rxf_dma = sp->rx_ring_dma[i];
@@ -1316,21 +1337,21 @@ speedo_init_rx_ring(struct net_device *dev)
 		/* This field unused by i82557. */
 		rxf->rx_buf_addr = 0xffffffff;
 		rxf->count = cpu_to_le32(PKT_BUF_SZ << 16);
-		pci_dma_sync_single(sp->pdev, sp->rx_ring_dma[i],
-				sizeof(struct RxFD), PCI_DMA_TODEVICE);
+		pci_dma_sync_single_for_device(sp->pdev, sp->rx_ring_dma[i],
+									   sizeof(struct RxFD), PCI_DMA_TODEVICE);
 	}
 	sp->dirty_rx = (unsigned int)(i - RX_RING_SIZE);
 	/* Mark the last entry as end-of-list. */
 	last_rxf->status = cpu_to_le32(0xC0000002);	/* '2' is flag value only. */
-	pci_dma_sync_single(sp->pdev, sp->rx_ring_dma[RX_RING_SIZE-1],
-			sizeof(struct RxFD), PCI_DMA_TODEVICE);
+	pci_dma_sync_single_for_device(sp->pdev, sp->rx_ring_dma[RX_RING_SIZE-1],
+								   sizeof(struct RxFD), PCI_DMA_TODEVICE);
 	sp->last_rxf = last_rxf;
 	sp->last_rxf_dma = last_rxf_dma;
 }
 
 static void speedo_purge_tx(struct net_device *dev)
 {
-	struct speedo_private *sp = (struct speedo_private *)dev->priv;
+	struct speedo_private *sp = netdev_priv(dev);
 	int entry;
 
 	while ((int)(sp->cur_tx - sp->dirty_tx) > 0) {
@@ -1362,7 +1383,7 @@ static void speedo_purge_tx(struct net_device *dev)
 
 static void reset_mii(struct net_device *dev)
 {
-	struct speedo_private *sp = (struct speedo_private *)dev->priv;
+	struct speedo_private *sp = netdev_priv(dev);
 
 	/* Reset the MII transceiver, suggested by Fred Young @ scalable.com. */
 	if ((sp->phy[0] & 0x8000) == 0) {
@@ -1385,7 +1406,7 @@ static void reset_mii(struct net_device *dev)
 
 static void speedo_tx_timeout(struct net_device *dev)
 {
-	struct speedo_private *sp = (struct speedo_private *)dev->priv;
+	struct speedo_private *sp = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 	int status = inw(ioaddr + SCBStatus);
 	unsigned long flags;
@@ -1447,7 +1468,7 @@ static void speedo_tx_timeout(struct net_device *dev)
 static int
 speedo_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
-	struct speedo_private *sp = (struct speedo_private *)dev->priv;
+	struct speedo_private *sp = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 	int entry;
 
@@ -1518,7 +1539,7 @@ speedo_start_xmit(struct sk_buff *skb, struct net_device *dev)
 static void speedo_tx_buffer_gc(struct net_device *dev)
 {
 	unsigned int dirty_tx;
-	struct speedo_private *sp = (struct speedo_private *)dev->priv;
+	struct speedo_private *sp = netdev_priv(dev);
 
 	dirty_tx = sp->dirty_tx;
 	while ((int)(sp->cur_tx - dirty_tx) > 0) {
@@ -1585,7 +1606,7 @@ static irqreturn_t speedo_interrupt(int irq, void *dev_instance, struct pt_regs 
 	unsigned int handled = 0;
 
 	ioaddr = dev->base_addr;
-	sp = (struct speedo_private *)dev->priv;
+	sp = netdev_priv(dev);
 
 #ifndef final_version
 	/* A lock to prevent simultaneous entry on SMP machines. */
@@ -1677,7 +1698,7 @@ static irqreturn_t speedo_interrupt(int irq, void *dev_instance, struct pt_regs 
 
 static inline struct RxFD *speedo_rx_alloc(struct net_device *dev, int entry)
 {
-	struct speedo_private *sp = (struct speedo_private *)dev->priv;
+	struct speedo_private *sp = netdev_priv(dev);
 	struct RxFD *rxf;
 	struct sk_buff *skb;
 	/* Get a fresh skbuff to replace the consumed one. */
@@ -1696,29 +1717,29 @@ static inline struct RxFD *speedo_rx_alloc(struct net_device *dev, int entry)
 	skb->dev = dev;
 	skb_reserve(skb, sizeof(struct RxFD));
 	rxf->rx_buf_addr = 0xffffffff;
-	pci_dma_sync_single(sp->pdev, sp->rx_ring_dma[entry],
-			sizeof(struct RxFD), PCI_DMA_TODEVICE);
+	pci_dma_sync_single_for_device(sp->pdev, sp->rx_ring_dma[entry],
+								   sizeof(struct RxFD), PCI_DMA_TODEVICE);
 	return rxf;
 }
 
 static inline void speedo_rx_link(struct net_device *dev, int entry,
 								  struct RxFD *rxf, dma_addr_t rxf_dma)
 {
-	struct speedo_private *sp = (struct speedo_private *)dev->priv;
+	struct speedo_private *sp = netdev_priv(dev);
 	rxf->status = cpu_to_le32(0xC0000001); 	/* '1' for driver use only. */
 	rxf->link = 0;			/* None yet. */
 	rxf->count = cpu_to_le32(PKT_BUF_SZ << 16);
 	sp->last_rxf->link = cpu_to_le32(rxf_dma);
 	sp->last_rxf->status &= cpu_to_le32(~0xC0000000);
-	pci_dma_sync_single(sp->pdev, sp->last_rxf_dma,
-			sizeof(struct RxFD), PCI_DMA_TODEVICE);
+	pci_dma_sync_single_for_device(sp->pdev, sp->last_rxf_dma,
+								   sizeof(struct RxFD), PCI_DMA_TODEVICE);
 	sp->last_rxf = rxf;
 	sp->last_rxf_dma = rxf_dma;
 }
 
 static int speedo_refill_rx_buf(struct net_device *dev, int force)
 {
-	struct speedo_private *sp = (struct speedo_private *)dev->priv;
+	struct speedo_private *sp = netdev_priv(dev);
 	int entry;
 	struct RxFD *rxf;
 
@@ -1760,7 +1781,7 @@ static int speedo_refill_rx_buf(struct net_device *dev, int force)
 
 static void speedo_refill_rx_buffers(struct net_device *dev, int force)
 {
-	struct speedo_private *sp = (struct speedo_private *)dev->priv;
+	struct speedo_private *sp = netdev_priv(dev);
 
 	/* Refill the RX ring. */
 	while ((int)(sp->cur_rx - sp->dirty_rx) > 0 &&
@@ -1770,7 +1791,7 @@ static void speedo_refill_rx_buffers(struct net_device *dev, int force)
 static int
 speedo_rx(struct net_device *dev)
 {
-	struct speedo_private *sp = (struct speedo_private *)dev->priv;
+	struct speedo_private *sp = netdev_priv(dev);
 	int entry = sp->cur_rx % RX_RING_SIZE;
 	int rx_work_limit = sp->dirty_rx + RX_RING_SIZE - sp->cur_rx;
 	int alloc_ok = 1;
@@ -1783,8 +1804,8 @@ speedo_rx(struct net_device *dev)
 		int status;
 		int pkt_len;
 
-		pci_dma_sync_single(sp->pdev, sp->rx_ring_dma[entry],
-			sizeof(struct RxFD), PCI_DMA_FROMDEVICE);
+		pci_dma_sync_single_for_cpu(sp->pdev, sp->rx_ring_dma[entry],
+									sizeof(struct RxFD), PCI_DMA_FROMDEVICE);
 		status = le32_to_cpu(sp->rx_ringp[entry]->status);
 		pkt_len = le32_to_cpu(sp->rx_ringp[entry]->count) & 0x3fff;
 
@@ -1830,8 +1851,9 @@ speedo_rx(struct net_device *dev)
 				skb->dev = dev;
 				skb_reserve(skb, 2);	/* Align IP on 16 byte boundaries */
 				/* 'skb_put()' points to the start of sk_buff data area. */
-				pci_dma_sync_single(sp->pdev, sp->rx_ring_dma[entry],
-					sizeof(struct RxFD) + pkt_len, PCI_DMA_FROMDEVICE);
+				pci_dma_sync_single_for_cpu(sp->pdev, sp->rx_ring_dma[entry],
+											sizeof(struct RxFD) + pkt_len,
+											PCI_DMA_FROMDEVICE);
 
 #if 1 || USE_IP_CSUM
 				/* Packet is in one chunk -- we can copy + cksum. */
@@ -1841,6 +1863,9 @@ speedo_rx(struct net_device *dev)
 				memcpy(skb_put(skb, pkt_len), sp->rx_skbuff[entry]->tail,
 					   pkt_len);
 #endif
+				pci_dma_sync_single_for_device(sp->pdev, sp->rx_ring_dma[entry],
+											   sizeof(struct RxFD) + pkt_len,
+											   PCI_DMA_FROMDEVICE);
 				npkts++;
 			} else {
 				/* Pass up the already-filled skbuff. */
@@ -1855,7 +1880,8 @@ speedo_rx(struct net_device *dev)
 				npkts++;
 				sp->rx_ringp[entry] = NULL;
 				pci_unmap_single(sp->pdev, sp->rx_ring_dma[entry],
-						PKT_BUF_SZ + sizeof(struct RxFD), PCI_DMA_FROMDEVICE);
+								 PKT_BUF_SZ + sizeof(struct RxFD),
+								 PCI_DMA_FROMDEVICE);
 			}
 			skb->protocol = eth_type_trans(skb, dev);
 			netif_rx(skb);
@@ -1884,7 +1910,7 @@ static int
 speedo_close(struct net_device *dev)
 {
 	long ioaddr = dev->base_addr;
-	struct speedo_private *sp = (struct speedo_private *)dev->priv;
+	struct speedo_private *sp = netdev_priv(dev);
 	int i;
 
 	netdevice_stop(dev);
@@ -1962,7 +1988,7 @@ speedo_close(struct net_device *dev)
 static struct net_device_stats *
 speedo_get_stats(struct net_device *dev)
 {
-	struct speedo_private *sp = (struct speedo_private *)dev->priv;
+	struct speedo_private *sp = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 
 	/* Update only if the previous dump finished. */
@@ -1995,7 +2021,7 @@ speedo_get_stats(struct net_device *dev)
 static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
 {
 	u32 ethcmd;
-	struct speedo_private *sp = dev->priv;
+	struct speedo_private *sp = netdev_priv(dev);
 		
 	if (copy_from_user(&ethcmd, useraddr, sizeof(ethcmd)))
 		return -EFAULT;
@@ -2070,7 +2096,7 @@ static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
 
 static int speedo_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
-	struct speedo_private *sp = (struct speedo_private *)dev->priv;
+	struct speedo_private *sp = netdev_priv(dev);
 	struct mii_ioctl_data *data = (struct mii_ioctl_data *)&rq->ifr_data;
 	int phy = sp->phy[0] & 0x1f;
 	int saved_acpi;
@@ -2121,7 +2147,7 @@ static int speedo_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 */
 static void set_rx_mode(struct net_device *dev)
 {
-	struct speedo_private *sp = (struct speedo_private *)dev->priv;
+	struct speedo_private *sp = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 	struct descriptor *last_cmd;
 	char new_rx_mode;
@@ -2287,8 +2313,8 @@ static void set_rx_mode(struct net_device *dev)
 		mc_setup_frm->link =
 			cpu_to_le32(TX_RING_ELEM_DMA(sp, (entry + 1) % TX_RING_SIZE));
 
-		pci_dma_sync_single(sp->pdev, mc_blk->frame_dma,
-				mc_blk->len, PCI_DMA_TODEVICE);
+		pci_dma_sync_single_for_device(sp->pdev, mc_blk->frame_dma,
+									   mc_blk->len, PCI_DMA_TODEVICE);
 
 		wait_for_cmd_done(dev);
 		clear_suspend(last_cmd);
@@ -2313,7 +2339,7 @@ static void set_rx_mode(struct net_device *dev)
 static int eepro100_suspend(struct pci_dev *pdev, u32 state)
 {
 	struct net_device *dev = pci_get_drvdata (pdev);
-	struct speedo_private *sp = (struct speedo_private *)dev->priv;
+	struct speedo_private *sp = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 
 	pci_save_state(pdev, sp->pm_state);
@@ -2333,7 +2359,7 @@ static int eepro100_suspend(struct pci_dev *pdev, u32 state)
 static int eepro100_resume(struct pci_dev *pdev)
 {
 	struct net_device *dev = pci_get_drvdata (pdev);
-	struct speedo_private *sp = (struct speedo_private *)dev->priv;
+	struct speedo_private *sp = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 
 	pci_restore_state(pdev, sp->pm_state);
@@ -2363,7 +2389,7 @@ static int eepro100_resume(struct pci_dev *pdev)
 static void __devexit eepro100_remove_one (struct pci_dev *pdev)
 {
 	struct net_device *dev = pci_get_drvdata (pdev);
-	struct speedo_private *sp = (struct speedo_private *)dev->priv;
+	struct speedo_private *sp = netdev_priv(dev);
 	
 	unregister_netdev(dev);
 

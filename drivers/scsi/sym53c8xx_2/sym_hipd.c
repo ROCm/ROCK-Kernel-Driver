@@ -50,13 +50,10 @@
  * SUCH DAMAGE.
  */
 
-#define SYM_DRIVER_NAME	"sym-2.1.18f"
+#define SYM_DRIVER_NAME	"sym-2.1.18i"
 
-#ifdef __FreeBSD__
-#include <dev/sym/sym_glue.h>
-#else
 #include "sym_glue.h"
-#endif
+#include "sym_nvram.h"
 
 #if 0
 #define SYM_DEBUG_GENERIC_SUPPORT
@@ -616,8 +613,7 @@ sym_getsync(hcb_p np, u_char dt, u_char sfac, u_char *divp, u_char *fakp)
 	if (dt) {
 		fak = (kpc - 1) / (div_10M[div] << 1) + 1 - 2;
 		/* ret = ((2+fak)*div_10M[div])/np->clock_khz; */
-	}
-	else {
+	} else {
 		fak = (kpc - 1) / div_10M[div] + 1 - 4;
 		/* ret = ((4+fak)*div_10M[div])/np->clock_khz; */
 	}
@@ -625,8 +621,10 @@ sym_getsync(hcb_p np, u_char dt, u_char sfac, u_char *divp, u_char *fakp)
 	/*
 	 *  Check against our hardware limits, or bugs :).
 	 */
-	if (fak < 0)	{fak = 0; ret = -1;}
-	if (fak > 2)	{fak = 2; ret = -1;}
+	if (fak > 2) {
+		fak = 2;
+		ret = -1;
+	}
 
 	/*
 	 *  Compute and return sync parameters.
@@ -1054,8 +1052,9 @@ static int sym_prepare_setting(hcb_p np, struct sym_nvram *nvram)
 		sym_nvram_setup_target (np, i, nvram);
 
 		/*
-		 *  For now, guess PPR/DT support from the period 
-		 *  and BUS width.
+		 * Some single-ended devices may crash on receiving a
+		 * PPR negotiation attempt.  Only try PPR if we're in
+		 * LVD mode.
 		 */
 		if (np->features & FE_ULTRA3) {
 			tp->tinfo.user.options |= PPR_OPT_DT;

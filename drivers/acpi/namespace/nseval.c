@@ -82,11 +82,11 @@ acpi_ns_evaluate_relative (
 	union acpi_operand_object       **params,
 	union acpi_operand_object       **return_object)
 {
-	struct acpi_namespace_node      *prefix_node;
 	acpi_status                     status;
+	struct acpi_namespace_node      *prefix_node;
 	struct acpi_namespace_node      *node = NULL;
+	union acpi_generic_state        *scope_info;
 	char                            *internal_path = NULL;
-	union acpi_generic_state        scope_info;
 
 
 	ACPI_FUNCTION_TRACE ("ns_evaluate_relative");
@@ -106,11 +106,16 @@ acpi_ns_evaluate_relative (
 		return_ACPI_STATUS (status);
 	}
 
+	scope_info = acpi_ut_create_generic_state ();
+	if (!scope_info) {
+		goto cleanup1;
+	}
+
 	/* Get the prefix handle and Node */
 
 	status = acpi_ut_acquire_mutex (ACPI_MTX_NAMESPACE);
 	if (ACPI_FAILURE (status)) {
-		return_ACPI_STATUS (status);
+		goto cleanup;
 	}
 
 	prefix_node = acpi_ns_map_handle_to_node (handle);
@@ -122,8 +127,8 @@ acpi_ns_evaluate_relative (
 
 	/* Lookup the name in the namespace */
 
-	scope_info.scope.node = prefix_node;
-	status = acpi_ns_lookup (&scope_info, internal_path, ACPI_TYPE_ANY,
+	scope_info->scope.node = prefix_node;
+	status = acpi_ns_lookup (scope_info, internal_path, ACPI_TYPE_ANY,
 			 ACPI_IMODE_EXECUTE, ACPI_NS_NO_UPSEARCH, NULL,
 			 &node);
 
@@ -148,7 +153,9 @@ acpi_ns_evaluate_relative (
 		pathname));
 
 cleanup:
+	acpi_ut_delete_generic_state (scope_info);
 
+cleanup1:
 	ACPI_MEM_FREE (internal_path);
 	return_ACPI_STATUS (status);
 }
@@ -197,7 +204,7 @@ acpi_ns_evaluate_by_name (
 
 	status = acpi_ut_acquire_mutex (ACPI_MTX_NAMESPACE);
 	if (ACPI_FAILURE (status)) {
-		return_ACPI_STATUS (status);
+		goto cleanup;
 	}
 
 	/* Lookup the name in the namespace */

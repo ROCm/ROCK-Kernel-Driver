@@ -391,7 +391,7 @@ struct usb_serial *usb_serial_get_by_index(unsigned index)
 	struct usb_serial *serial = serial_table[index];
 
 	if (serial)
-		kobject_get (&serial->kobj);
+		kref_get(&serial->kref);
 	return serial;
 }
 
@@ -486,7 +486,7 @@ static int serial_open (struct tty_struct *tty, struct file * filp)
 		if (retval) {
 			port->open_count = 0;
 			module_put(serial->type->owner);
-			kobject_put(&serial->kobj);
+			kref_put(&serial->kref);
 		}
 	}
 bailout:
@@ -518,7 +518,7 @@ static void serial_close(struct tty_struct *tty, struct file * filp)
 	}
 
 	module_put(port->serial->type->owner);
-	kobject_put(&port->serial->kobj);
+	kref_put(&port->serial->kref);
 }
 
 static int serial_write (struct tty_struct * tty, int from_user, const unsigned char *buf, int count)
@@ -748,7 +748,7 @@ static int serial_read_proc (char *page, char **start, off_t off, int count, int
 			begin += length;
 			length = 0;
 		}
-		kobject_put(&serial->kobj);
+		kref_put(&serial->kref);
 	}
 	*eof = 1;
 done:
@@ -830,15 +830,15 @@ void usb_serial_port_softint(void *private)
 	wake_up_interruptible(&tty->write_wait);
 }
 
-static void destroy_serial (struct kobject *kobj)
+static void destroy_serial(struct kref *kref)
 {
 	struct usb_serial *serial;
 	struct usb_serial_port *port;
 	int i;
 
-	dbg ("%s - %s", __FUNCTION__, kobj->name);
+	serial = to_usb_serial(kref);
 
-	serial = to_usb_serial(kobj);
+	dbg ("%s - %s", __FUNCTION__, serial->type->name);
 	serial_shutdown (serial);
 
 	/* return the minor range that this device had */
@@ -886,10 +886,6 @@ static void destroy_serial (struct kobject *kobj)
 	kfree (serial);
 }
 
-static struct kobj_type usb_serial_kobj_type = {
-	.release = destroy_serial,
-};
-
 static void port_release(struct device *dev)
 {
 	struct usb_serial_port *port = to_usb_serial_port(dev);
@@ -930,10 +926,7 @@ static struct usb_serial * create_serial (struct usb_device *dev,
 	serial->interface = interface;
 	serial->vendor = dev->descriptor.idVendor;
 	serial->product = dev->descriptor.idProduct;
-
-	/* initialize the kobject portion of the usb_device */
-	kobject_init(&serial->kobj);
-	serial->kobj.ktype = &usb_serial_kobj_type;
+	kref_init(&serial->kref, destroy_serial);
 
 	return serial;
 }
@@ -1006,7 +999,7 @@ int usb_serial_probe(struct usb_interface *interface,
 
 	/* descriptor matches, let's find the endpoints needed */
 	/* check out the endpoints */
-	iface_desc = &interface->altsetting[0];
+	iface_desc = interface->cur_altsetting;
 	for (i = 0; i < iface_desc->desc.bNumEndpoints; ++i) {
 		endpoint = &iface_desc->endpoint[i].desc;
 		
@@ -1284,7 +1277,7 @@ void usb_serial_disconnect(struct usb_interface *interface)
 	if (serial) {
 		/* let the last holder of this object 
 		 * cause it to be cleaned up */
-		kobject_put (&serial->kobj);
+		kref_put(&serial->kref);
 	}
 	dev_info(dev, "device disconnected\n");
 }

@@ -1335,7 +1335,8 @@ static inline loff_t max_reiserfs_offset (struct inode * inode)
 #define fs_generation(s) (REISERFS_SB(s)->s_generation_counter)
 #define get_generation(s) atomic_read (&fs_generation(s))
 #define FILESYSTEM_CHANGED_TB(tb)  (get_generation((tb)->tb_sb) != (tb)->fs_gen)
-#define fs_changed(gen,s) (gen != get_generation (s))
+#define __fs_changed(gen,s) (gen != get_generation (s))
+#define fs_changed(gen,s) ({cond_resched(); __fs_changed(gen, s);})
 
 
 /***************************************************************************/
@@ -1943,11 +1944,10 @@ int reiserfs_global_version_in_proc( char *buffer, char **start, off_t offset,
 
 #define PROC_EXP( e )   e
 
-#define MAX( a, b ) ( ( ( a ) > ( b ) ) ? ( a ) : ( b ) )
 #define __PINFO( sb ) REISERFS_SB(sb) -> s_proc_info_data
 #define PROC_INFO_MAX( sb, field, value )								\
     __PINFO( sb ).field =												\
-        MAX( REISERFS_SB( sb ) -> s_proc_info_data.field, value )
+        max( REISERFS_SB( sb ) -> s_proc_info_data.field, value )
 #define PROC_INFO_INC( sb, field ) ( ++ ( __PINFO( sb ).field ) )
 #define PROC_INFO_ADD( sb, field, val ) ( __PINFO( sb ).field += ( val ) )
 #define PROC_INFO_BH_STAT( sb, bh, level )							\

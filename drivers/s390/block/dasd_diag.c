@@ -6,7 +6,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999,2000
  *
- * $Revision: 1.33 $
+ * $Revision: 1.34 $
  */
 
 #include <linux/config.h>
@@ -173,7 +173,6 @@ dasd_ext_handler(struct pt_regs *regs, __u16 code)
 
 	if (!ip) {		/* no intparm: unsolicited interrupt */
 		MESSAGE(KERN_DEBUG, "%s", "caught unsolicited interrupt");
-		irq_exit();
 		return;
 	}
 	cqr = (struct dasd_ccw_req *)(addr_t) ip;
@@ -183,7 +182,6 @@ dasd_ext_handler(struct pt_regs *regs, __u16 code)
 			    " magic number of dasd_ccw_req 0x%08X doesn't"
 			    " match discipline 0x%08X",
 			    cqr->magic, *(int *) (&device->discipline->name));
-		irq_exit();
 		return;
 	}
 

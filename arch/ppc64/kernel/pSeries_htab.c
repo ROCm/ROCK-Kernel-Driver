@@ -103,7 +103,7 @@ long pSeries_hpte_insert(unsigned long hpte_group, unsigned long va,
 
 	__asm__ __volatile__ ("ptesync" : : : "memory");
 
-	return i;
+	return i | (secondary << 3);
 }
 
 static long pSeries_hpte_remove(unsigned long hpte_group)

@@ -496,11 +496,17 @@ typedef enum
 } AML_ACCESS_ATTRIBUTE;
 
 
-/* bit fields in method_flags byte */
+/* Bit fields in method_flags byte */
 
-#define METHOD_FLAGS_ARG_COUNT      0x07
-#define METHOD_FLAGS_SERIALIZED     0x08
-#define METHOD_FLAGS_SYNCH_LEVEL    0xF0
+#define AML_METHOD_ARG_COUNT        0x07
+#define AML_METHOD_SERIALIZED       0x08
+#define AML_METHOD_SYNCH_LEVEL      0xF0
+
+/* METHOD_FLAGS_ARG_COUNT is not used internally, define additional flags */
+
+#define AML_METHOD_INTERNAL_ONLY    0x01
+#define AML_METHOD_RESERVED1        0x02
+#define AML_METHOD_RESERVED2        0x04
 
 
 #endif /* __AMLCODE_H__ */

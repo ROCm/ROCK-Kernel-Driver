@@ -814,6 +814,14 @@ static void  __init TLan_EisaProbe (void)
 
 } /* TLan_EisaProbe */
 
+#ifdef CONFIG_NET_POLL_CONTROLLER
+static void TLan_Poll(struct net_device *dev)
+{
+	disable_irq(dev->irq);
+	TLan_HandleInterrupt(dev->irq, dev, NULL);
+	enable_irq(dev->irq);
+}
+#endif
 
 	
 
@@ -893,6 +901,9 @@ static int TLan_Init( struct net_device *dev )
 	dev->get_stats = &TLan_GetStats;
 	dev->set_multicast_list = &TLan_SetMulticastList;
 	dev->do_ioctl = &TLan_ioctl;
+#ifdef CONFIG_NET_POLL_CONTROLLER
+	dev->poll_controller = &TLan_Poll;
+#endif
 	dev->tx_timeout = &TLan_tx_timeout;
 	dev->watchdog_timeo = TX_TIMEOUT;
 

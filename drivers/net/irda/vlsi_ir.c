@@ -173,7 +173,7 @@ static int vlsi_proc_pdev(struct pci_dev *pdev, char *buf, int len)
 			PCIDEV_NAME(pdev), (int)pdev->vendor, (int)pdev->device);
 	out += sprintf(out, "pci-power-state: %u\n", (unsigned) pdev->current_state);
 	out += sprintf(out, "resources: irq=%u / io=0x%04x / dma_mask=0x%016Lx\n",
-			pdev->irq, (unsigned)pci_resource_start(pdev, 0), (u64)pdev->dma_mask);
+			pdev->irq, (unsigned)pci_resource_start(pdev, 0), (unsigned long long)pdev->dma_mask);
 	out += sprintf(out, "hw registers: ");
 	for (i = 0; i < 0x20; i++)
 		out += sprintf(out, "%02x", (unsigned)inb((iobase+i)));
@@ -566,7 +566,6 @@ static struct vlsi_ring *vlsi_alloc_ring(struct pci_dev *pdev, struct ring_descr
 			return NULL;
 		}
 		rd_set_addr_status(rd, busaddr, 0);
-		pci_dma_sync_single(pdev, busaddr, len, dir);
 		/* initially, the dma buffer is owned by the CPU */
 		rd->skb = NULL;
 	}
@@ -660,7 +659,7 @@ static int vlsi_process_rx(struct vlsi_ring *r, struct ring_descr *rd)
 	struct net_device *ndev = (struct net_device *)pci_get_drvdata(r->pdev);
 	vlsi_irda_dev_t *idev = ndev->priv;
 
-	pci_dma_sync_single(r->pdev, rd_get_addr(rd), r->len, r->dir);
+	pci_dma_sync_single_for_cpu(r->pdev, rd_get_addr(rd), r->len, r->dir);
 	/* dma buffer now owned by the CPU */
 	status = rd_get_status(rd);
 	if (status & RD_RX_ERROR) {
@@ -746,7 +745,7 @@ static void vlsi_fill_rx(struct vlsi_ring *r)
 				break;	/* probably not worth logging? */
 		}
 		/* give dma buffer back to busmaster */
-		pci_dma_prep_single(r->pdev, rd_get_addr(rd), r->len, r->dir);
+		pci_dma_sync_single_for_device(r->pdev, rd_get_addr(rd), r->len, r->dir);
 		rd_activate(rd);
 	}
 }
@@ -816,7 +815,7 @@ static void vlsi_unarm_rx(vlsi_irda_dev_t *idev)
 				ret = -VLSI_RX_DROP;
 			}
 			rd_set_count(rd, 0);
-			pci_dma_sync_single(r->pdev, rd_get_addr(rd), r->len, r->dir);
+			pci_dma_sync_single_for_cpu(r->pdev, rd_get_addr(rd), r->len, r->dir);
 			if (rd->skb) {
 				dev_kfree_skb_any(rd->skb);
 				rd->skb = NULL;
@@ -854,7 +853,7 @@ static int vlsi_process_tx(struct vlsi_ring *r, struct ring_descr *rd)
 	int		len;
 	int		ret;
 
-	pci_dma_sync_single(r->pdev, rd_get_addr(rd), r->len, r->dir);
+	pci_dma_sync_single_for_cpu(r->pdev, rd_get_addr(rd), r->len, r->dir);
 	/* dma buffer now owned by the CPU */
 	status = rd_get_status(rd);
 	if (status & RD_TX_UNDRN)
@@ -1077,8 +1076,8 @@ static int vlsi_hard_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 		}
 	}
 
-	/* tx buffer already owned by CPU due to pci_dma_sync_single() either
-	 * after initial pci_map_single or after subsequent tx-completion
+	/* tx buffer already owned by CPU due to pci_dma_sync_single_for_cpu()
+	 * after subsequent tx-completion
 	 */
 
 	if (idev->mode == IFF_SIR) {
@@ -1120,7 +1119,7 @@ static int vlsi_hard_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 	 * CPU-driven changes visible from the pci bus).
 	 */
 
-	pci_dma_prep_single(r->pdev, rd_get_addr(rd), r->len, r->dir);
+	pci_dma_sync_single_for_device(r->pdev, rd_get_addr(rd), r->len, r->dir);
 
 /*	Switching to TX mode here races with the controller
  *	which may stop TX at any time when fetching an inactive descriptor
@@ -1248,7 +1247,7 @@ static void vlsi_unarm_tx(vlsi_irda_dev_t *idev)
 		if (rd_is_active(rd)) {
 			rd_set_status(rd, 0);
 			rd_set_count(rd, 0);
-			pci_dma_sync_single(r->pdev, rd_get_addr(rd), r->len, r->dir);
+			pci_dma_sync_single_for_cpu(r->pdev, rd_get_addr(rd), r->len, r->dir);
 			if (rd->skb) {
 				dev_kfree_skb_any(rd->skb);
 				rd->skb = NULL;

@@ -587,27 +587,33 @@ acpi_ex_create_method (
 	obj_desc->method.aml_start = aml_start;
 	obj_desc->method.aml_length = aml_length;
 
-	/* disassemble the method flags */
-
+	/*
+	 * Disassemble the method flags.  Split off the Arg Count
+	 * for efficiency
+	 */
 	method_flags = (u8) operand[1]->integer.value;
 
-	obj_desc->method.method_flags = method_flags;
-	obj_desc->method.param_count = (u8) (method_flags & METHOD_FLAGS_ARG_COUNT);
+	obj_desc->method.method_flags = (u8) (method_flags & ~AML_METHOD_ARG_COUNT);
+	obj_desc->method.param_count = (u8) (method_flags & AML_METHOD_ARG_COUNT);
 
 	/*
 	 * Get the concurrency count.  If required, a semaphore will be
 	 * created for this method when it is parsed.
 	 */
-	if (method_flags & METHOD_FLAGS_SERIALIZED) {
+	if (acpi_gbl_all_methods_serialized) {
+		obj_desc->method.concurrency = 1;
+		obj_desc->method.method_flags |= AML_METHOD_SERIALIZED;
+	}
+	else if (method_flags & AML_METHOD_SERIALIZED) {
 		/*
 		 * ACPI 1.0: Concurrency = 1
 		 * ACPI 2.0: Concurrency = (sync_level (in method declaration) + 1)
 		 */
 		obj_desc->method.concurrency = (u8)
-				  (((method_flags & METHOD_FLAGS_SYNCH_LEVEL) >> 4) + 1);
+				  (((method_flags & AML_METHOD_SYNCH_LEVEL) >> 4) + 1);
 	}
 	else {
-		obj_desc->method.concurrency = INFINITE_CONCURRENCY;
+		obj_desc->method.concurrency = ACPI_INFINITE_CONCURRENCY;
 	}
 
 	/* Attach the new object to the method Node */

@@ -874,8 +874,6 @@ receive_packet (struct net_device *dev)
 		frame_status = le64_to_cpu (desc->status);
 		if (--cnt < 0)
 			break;
-		pci_dma_sync_single (np->pdev, desc->fraginfo, np->rx_buf_sz,
-				     PCI_DMA_FROMDEVICE);
 		/* Update rx error statistics, drop packet. */
 		if (frame_status & RFS_Errors) {
 			np->stats.rx_errors++;
@@ -898,6 +896,10 @@ receive_packet (struct net_device *dev)
 				skb_put (skb = np->rx_skbuff[entry], pkt_len);
 				np->rx_skbuff[entry] = NULL;
 			} else if ((skb = dev_alloc_skb (pkt_len + 2)) != NULL) {
+				pci_dma_sync_single_for_cpu(np->pdev,
+							    desc->fraginfo,
+							    np->rx_buf_sz,
+							    PCI_DMA_FROMDEVICE);
 				skb->dev = dev;
 				/* 16 byte align the IP header */
 				skb_reserve (skb, 2);
@@ -905,6 +907,10 @@ receive_packet (struct net_device *dev)
 						  np->rx_skbuff[entry]->tail,
 						  pkt_len, 0);
 				skb_put (skb, pkt_len);
+				pci_dma_sync_single_for_device(np->pdev,
+							       desc->fraginfo,
+							       np->rx_buf_sz,
+							       PCI_DMA_FROMDEVICE);
 			}
 			skb->protocol = eth_type_trans (skb, dev);
 #if 0			

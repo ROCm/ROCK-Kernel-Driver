@@ -278,7 +278,7 @@ static struct sys_device sa1100irq_device = {
 static int __init sa1100irq_init_devicefs(void)
 {
 	sysdev_class_register(&sa1100irq_sysclass);
-	return sys_device_register(&sa1100irq_device);
+	return sysdev_register(&sa1100irq_device);
 }
 
 device_initcall(sa1100irq_init_devicefs);

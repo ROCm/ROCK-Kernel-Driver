@@ -369,9 +369,12 @@ struct request_queue
 #define	QUEUE_FLAG_READFULL	3	/* write queue has been filled */
 #define QUEUE_FLAG_WRITEFULL	4	/* read queue has been filled */
 #define QUEUE_FLAG_DEAD		5	/* queue being torn down */
+#define QUEUE_FLAG_REENTER	6	/* Re-entrancy avoidance */
 
 #define blk_queue_plugged(q)	!list_empty(&(q)->plug_list)
 #define blk_queue_tagged(q)	test_bit(QUEUE_FLAG_QUEUED, &(q)->queue_flags)
+#define blk_queue_stopped(q)	test_bit(QUEUE_FLAG_STOPPED, &(q)->queue_flags)
+
 #define blk_fs_request(rq)	((rq)->flags & REQ_CMD)
 #define blk_pc_request(rq)	((rq)->flags & REQ_BLOCK_PC)
 #define blk_noretry_request(rq)	((rq)->flags & REQ_FAILFAST)
@@ -514,6 +517,9 @@ extern void blk_stop_queue(request_queue_t *q);
 extern void __blk_stop_queue(request_queue_t *q);
 extern void blk_run_queue(request_queue_t *q);
 extern void blk_queue_activity_fn(request_queue_t *, activity_fn *, void *);
+extern struct request *blk_rq_map_user(request_queue_t *, int, void __user *, unsigned int);
+extern int blk_rq_unmap_user(struct request *, void __user *, unsigned int);
+extern int blk_execute_rq(request_queue_t *, struct gendisk *, struct request *);
 
 static inline request_queue_t *bdev_get_queue(struct block_device *bdev)
 {
@@ -586,7 +592,7 @@ extern int blk_queue_init_tags(request_queue_t *, int, struct blk_queue_tag *);
 extern void blk_queue_free_tags(request_queue_t *);
 extern int blk_queue_resize_tags(request_queue_t *, int);
 extern void blk_queue_invalidate_tags(request_queue_t *);
-extern void blk_congestion_wait(int rw, long timeout);
+extern long blk_congestion_wait(int rw, long timeout);
 
 extern void blk_rq_bio_prep(request_queue_t *, struct request *, struct bio *);
 extern void blk_rq_prep_restart(struct request *);

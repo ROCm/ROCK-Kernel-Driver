@@ -479,6 +479,7 @@ static int ncp_fill_super(struct super_block *sb, void *raw_data, int silent)
 	else
 		default_bufsize = 1024;
 
+	sb->s_flags |= MS_NODIRATIME;	/* probably even noatime */
 	sb->s_maxbytes = 0xFFFFFFFFU;
 	sb->s_blocksize = 1024;	/* Eh...  Is this correct? */
 	sb->s_blocksize_bits = 10;

@@ -673,7 +673,11 @@ asmlinkage void do_magic_suspend_2(void)
 
 	free_pages((unsigned long) pagedir_nosave, pagedir_order);
 	spin_unlock_irq(&suspend_pagedir_lock);
+
+	device_resume();
+	PRINTK( "Fixing swap signatures... " );
 	mark_swapfiles(((swp_entry_t) {0}), MARK_SWAP_RESUME);
+	PRINTK( "ok\n" );
 }
 
 /*

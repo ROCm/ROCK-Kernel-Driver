@@ -34,6 +34,7 @@
 #include <linux/console.h>
 #include <linux/sysrq.h>
 #include <linux/spinlock.h>
+#include <linux/device.h>
 
 #include <asm/hardware.h>
 #include <asm/io.h>
@@ -49,18 +50,9 @@
 
 #define UART_NR		2
 
-#ifndef CONFIG_SERIAL_CLPS711X_OLD_NAME
 #define SERIAL_CLPS711X_MAJOR	204
 #define SERIAL_CLPS711X_MINOR	40
 #define SERIAL_CLPS711X_NR	UART_NR
-
-#else
-#warning The old names/device number for this driver if compatabity is needed
-#define SERIAL_CLPS711X_MAJOR   204
-#define SERIAL_CLPS711X_MINOR   16
-#define SERIAL_CLPS711X_NR      UART_NR
-
-#endif
 
 /*
  * We use the relevant SYSCON register as a base address for these ports.
@@ -620,3 +612,4 @@ module_exit(clps711xuart_exit);
 MODULE_AUTHOR("Deep Blue Solutions Ltd");
 MODULE_DESCRIPTION("CLPS-711x generic serial driver $Revision: 1.42 $");
 MODULE_LICENSE("GPL");
+MODULE_ALIAS_CHARDEV(SERIAL_CLPS711X_MAJOR, SERIAL_CLPS711X_MINOR);

@@ -154,9 +154,6 @@ struct resource_lists {
 /* Define AMD SHPC ID  */
 #define PCI_DEVICE_ID_AMD_GOLAM_7450	0x7450 
 
-/* Define SHPC CAP ID - not defined in kernel yet */
-#define PCI_CAP_ID_SHPC			0x0C 
-
 #define INT_BUTTON_IGNORE		0
 #define INT_PRESENCE_ON			1
 #define INT_PRESENCE_OFF		2
@@ -390,8 +387,8 @@ static inline int wait_for_ctrl_irq (struct controller *ctrl)
 		/* Sleep for up to 1 second */
 		schedule_timeout(1*HZ);
 	} else {
-		/* Sleep for up to 1.5 second */
-		schedule_timeout(1.5*HZ);
+		/* Sleep for up to 2 seconds */
+		schedule_timeout(2*HZ);
 	}
 	set_current_state(TASK_RUNNING);
 	remove_wait_queue(&ctrl->queue, &wait);

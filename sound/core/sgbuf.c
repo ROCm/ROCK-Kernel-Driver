@@ -20,7 +20,6 @@
  */
 
 #include <linux/config.h>
-#include <linux/pci.h>
 #include <linux/slab.h>
 #include <linux/mm.h>
 #include <linux/vmalloc.h>
@@ -31,27 +30,42 @@
 #define SGBUF_TBL_ALIGN		32
 #define sgbuf_align_table(tbl)	((((tbl) + SGBUF_TBL_ALIGN - 1) / SGBUF_TBL_ALIGN) * SGBUF_TBL_ALIGN)
 
+int snd_free_sgbuf_pages(struct snd_dma_buffer *dmab)
+{
+	struct snd_sg_buf *sgbuf = dmab->private_data;
+	struct snd_dma_buffer tmpb;
+	int i;
 
-/**
- * snd_malloc_sgbuf_pages - allocate the pages for the PCI SG buffer
- * @pci: the pci device pointer
- * @size: the requested buffer size in bytes
- * @dmab: the buffer record to store
- *
- * Initializes the SG-buffer table and allocates the buffer pages
- * for the given size.
- * The pages are mapped to the virtually continuous memory.
- *
- * This function is usually called from the middle-level functions such as
- * snd_pcm_lib_malloc_pages().
- *
- * Returns the mapped virtual address of the buffer if allocation was
- * successful, or NULL at error.
- */
-void *snd_malloc_sgbuf_pages(struct pci_dev *pci, size_t size, struct snd_dma_buffer *dmab)
+	if (! sgbuf)
+		return -EINVAL;
+
+	for (i = 0; i < sgbuf->pages; i++) {
+		tmpb.area = sgbuf->table[i].buf;
+		tmpb.addr = sgbuf->table[i].addr;
+		tmpb.bytes = PAGE_SIZE;
+		snd_dma_free_pages(&sgbuf->dev, &tmpb);
+	}
+	if (dmab->area)
+		vunmap(dmab->area);
+	dmab->area = NULL;
+
+	if (sgbuf->table)
+		kfree(sgbuf->table);
+	if (sgbuf->page_table)
+		kfree(sgbuf->page_table);
+	kfree(sgbuf);
+	dmab->private_data = NULL;
+	
+	return 0;
+}
+
+void *snd_malloc_sgbuf_pages(const struct snd_dma_device *dev,
+			     size_t size, struct snd_dma_buffer *dmab,
+			     size_t *res_size)
 {
 	struct snd_sg_buf *sgbuf;
 	unsigned int i, pages;
+	struct snd_dma_buffer tmpb;
 
 	dmab->area = NULL;
 	dmab->addr = 0;
@@ -59,7 +73,8 @@ void *snd_malloc_sgbuf_pages(struct pci_dev *pci, size_t size, struct snd_dma_bu
 	if (! sgbuf)
 		return NULL;
 	memset(sgbuf, 0, sizeof(*sgbuf));
-	sgbuf->pci = pci;
+	sgbuf->dev = *dev;
+	sgbuf->dev.type = SNDRV_DMA_TYPE_DEV;
 	pages = snd_sgbuf_aligned_pages(size);
 	sgbuf->tblsize = sgbuf_align_table(pages);
 	sgbuf->table = kmalloc(sizeof(*sgbuf->table) * sgbuf->tblsize, GFP_KERNEL);
@@ -73,14 +88,15 @@ void *snd_malloc_sgbuf_pages(struct pci_dev *pci, size_t size, struct snd_dma_bu
 
 	/* allocate each page */
 	for (i = 0; i < pages; i++) {
-		void *ptr;
-		dma_addr_t addr;
-		ptr = snd_malloc_pci_page(sgbuf->pci, &addr);
-		if (! ptr)
-			goto _failed;
-		sgbuf->table[i].buf = ptr;
-		sgbuf->table[i].addr = addr;
-		sgbuf->page_table[i] = virt_to_page(ptr);
+		if (snd_dma_alloc_pages(&sgbuf->dev, PAGE_SIZE, &tmpb) < 0) {
+			if (res_size == NULL)
+				goto _failed;
+			*res_size = size = sgbuf->pages * PAGE_SIZE;
+			break;
+		}
+		sgbuf->table[i].buf = tmpb.area;
+		sgbuf->table[i].addr = tmpb.addr;
+		sgbuf->page_table[i] = virt_to_page(tmpb.area);
 		sgbuf->pages++;
 	}
 
@@ -93,39 +109,4 @@ void *snd_malloc_sgbuf_pages(struct pci_dev *pci, size_t size, struct snd_dma_bu
  _failed:
 	snd_free_sgbuf_pages(dmab); /* free the table */
 	return NULL;
-}
-
-/**
- * snd_free_sgbuf_pages - free the sg buffer
- * @dmab: buffer record
- *
- * Releases the pages and the SG-buffer table.
- *
- * This function is called usually from the middle-level function
- * such as snd_pcm_lib_free_pages().
- *
- * Returns zero if successful, or a negative error code on failure.
- */
-int snd_free_sgbuf_pages(struct snd_dma_buffer *dmab)
-{
-	struct snd_sg_buf *sgbuf = dmab->private_data;
-	int i;
-
-	if (! sgbuf)
-		return -EINVAL;
-
-	for (i = 0; i < sgbuf->pages; i++)
-		snd_free_pci_page(sgbuf->pci, sgbuf->table[i].buf, sgbuf->table[i].addr);
-	if (dmab->area)
-		vunmap(dmab->area);
-	dmab->area = NULL;
-
-	if (sgbuf->table)
-		kfree(sgbuf->table);
-	if (sgbuf->page_table)
-		kfree(sgbuf->page_table);
-	kfree(sgbuf);
-	dmab->private_data = NULL;
-	
-	return 0;
 }

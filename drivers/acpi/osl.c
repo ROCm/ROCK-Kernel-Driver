@@ -1012,3 +1012,39 @@ acpi_os_name_setup(char *str)
 }
 
 __setup("acpi_os_name=", acpi_os_name_setup);
+
+/*
+ * _OSI control
+ * empty string disables _OSI
+ * TBD additional string adds to _OSI
+ */
+int __init
+acpi_osi_setup(char *str)
+{
+	if (str == NULL || *str == '\0') {
+		printk(KERN_INFO PREFIX "_OSI method disabled\n");
+		acpi_gbl_create_osi_method = FALSE;
+	} else
+	{
+		/* TBD */
+		printk(KERN_ERR PREFIX "_OSI additional string ignored -- %s\n", str);
+	}
+
+	return 1;
+}
+
+__setup("acpi_osi=", acpi_osi_setup);
+
+/* enable serialization to combat AE_ALREADY_EXISTS errors */
+int __init
+acpi_serialize_setup(char *str)
+{
+	printk(KERN_INFO PREFIX "serialize enabled\n");
+
+	acpi_gbl_all_methods_serialized = TRUE;
+
+	return 1;
+}
+
+__setup("acpi_serialize", acpi_serialize_setup);
+

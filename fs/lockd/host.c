@@ -188,14 +188,14 @@ nlm_bind_host(struct nlm_host *host)
 		}
 	} else {
 		xprt = xprt_create_proto(host->h_proto, &host->h_addr, NULL);
-		if (xprt == NULL)
+		if (IS_ERR(xprt))
 			goto forgetit;
 
 		xprt_set_timeout(&xprt->timeout, 5, nlmsvc_timeout);
 
 		clnt = rpc_create_client(xprt, host->h_name, &nlm_program,
 					host->h_version, host->h_authflavor);
-		if (clnt == NULL) {
+		if (IS_ERR(clnt)) {
 			xprt_destroy(xprt);
 			goto forgetit;
 		}

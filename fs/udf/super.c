@@ -26,7 +26,7 @@
  *  Each contributing author retains all rights to their own work.
  *
  *  (C) 1998 Dave Boynton
- *  (C) 1998-2001 Ben Fennema
+ *  (C) 1998-2004 Ben Fennema
  *  (C) 2000 Stelias Computing Inc
  *
  * HISTORY
@@ -57,6 +57,7 @@
 #include <linux/smp_lock.h>
 #include <linux/buffer_head.h>
 #include <linux/vfs.h>
+#include <linux/vmalloc.h>
 #include <asm/byteorder.h>
 
 #include <linux/udf_fs.h>
@@ -133,7 +134,8 @@ static void init_once(void * foo, kmem_cache_t * cachep, unsigned long flags)
 	struct udf_inode_info *ei = (struct udf_inode_info *) foo;
 
 	if ((flags & (SLAB_CTOR_VERIFY|SLAB_CTOR_CONSTRUCTOR)) ==
-	    SLAB_CTOR_CONSTRUCTOR) {
+	    SLAB_CTOR_CONSTRUCTOR)
+	{
 		ei->i_ext.i_data = NULL;
 		inode_init_once(&ei->vfs_inode);
 	}
@@ -324,106 +326,106 @@ udf_parse_options(char *options, struct udf_options *uopt)
 	if (!options)
 		return 1;
 
-	while ((p = strsep(&options, ",")) != NULL) {
+	while ((p = strsep(&options, ",")) != NULL)
+	{
 		substring_t args[MAX_OPT_ARGS];
 		int token;
 		if (!*p)
 			continue;
 
 		token = match_token(p, tokens, args);
-		switch (token) {
-		case Opt_novrs:
-			uopt->novrs = 1;
-			break;
-		case Opt_bs:
-			if (match_int(&args[0], &option))
-				return 0;
-			uopt->blocksize = option;
-			break;
-		case Opt_unhide:
-			uopt->flags |= (1 << UDF_FLAG_UNHIDE);
-			break;
-		case Opt_undelete:
-			uopt->flags |= (1 << UDF_FLAG_UNDELETE);
-			break;
-		case Opt_noadinicb:
-			uopt->flags &= ~(1 << UDF_FLAG_USE_AD_IN_ICB);
-			break;
-		case Opt_adinicb:
-			uopt->flags |= (1 << UDF_FLAG_USE_AD_IN_ICB);
-			break;
-		case Opt_shortad:
-			uopt->flags |= (1 << UDF_FLAG_USE_SHORT_AD);
-			break;
-		case Opt_longad:
-			uopt->flags &= ~(1 << UDF_FLAG_USE_SHORT_AD);
-			break;
-		case Opt_gid:
-			if (match_int(args, &option))
-				return 0;
-			uopt->gid = option;
-			break;
-		case Opt_uid:
-			if (match_int(args, &option))
-				return 0;
-			uopt->uid = option;
-			break;
-		case Opt_umask:
-			if (match_octal(args, &option))
-				return 0;
-			uopt->umask = option;
-			break;
-		case Opt_nostrict:
-			uopt->flags &= ~(1 << UDF_FLAG_STRICT);
-			break;
-		case Opt_session:
-			if (match_int(args, &option))
-				return 0;
-			uopt->session = option;
-			break;
-		case Opt_lastblock:
-			if (match_int(args, &option))
-				return 0;
-			uopt->lastblock = option;
-			break;
-		case Opt_anchor:
-			if (match_int(args, &option))
-				return 0;
-			uopt->anchor = option;
-			break;
-		case Opt_volume:
-			if (match_int(args, &option))
-				return 0;
-			uopt->volume = option;
-			break;
-		case Opt_partition:
-			if (match_int(args, &option))
-				return 0;
-			uopt->partition = option;
-			break;
-		case Opt_fileset:
-			if (match_int(args, &option))
-				return 0;
-			uopt->fileset = option;
-			break;
-		case Opt_rootdir:
-			if (match_int(args, &option))
-				return 0;
-			uopt->rootdir = option;
-			break;
-		case Opt_utf8:
-			uopt->flags |= (1 << UDF_FLAG_UTF8);
-			break;
+		switch (token)
+		{
+			case Opt_novrs:
+				uopt->novrs = 1;
+			case Opt_bs:
+				if (match_int(&args[0], &option))
+					return 0;
+				uopt->blocksize = option;
+				break;
+			case Opt_unhide:
+				uopt->flags |= (1 << UDF_FLAG_UNHIDE);
+				break;
+			case Opt_undelete:
+				uopt->flags |= (1 << UDF_FLAG_UNDELETE);
+				break;
+			case Opt_noadinicb:
+				uopt->flags &= ~(1 << UDF_FLAG_USE_AD_IN_ICB);
+				break;
+			case Opt_adinicb:
+				uopt->flags |= (1 << UDF_FLAG_USE_AD_IN_ICB);
+				break;
+			case Opt_shortad:
+				uopt->flags |= (1 << UDF_FLAG_USE_SHORT_AD);
+				break;
+			case Opt_longad:
+				uopt->flags &= ~(1 << UDF_FLAG_USE_SHORT_AD);
+				break;
+			case Opt_gid:
+				if (match_int(args, &option))
+					return 0;
+				uopt->gid = option;
+				break;
+			case Opt_uid:
+				if (match_int(args, &option))
+					return 0;
+				uopt->uid = option;
+				break;
+			case Opt_umask:
+				if (match_octal(args, &option))
+					return 0;
+				uopt->umask = option;
+				break;
+			case Opt_nostrict:
+				uopt->flags &= ~(1 << UDF_FLAG_STRICT);
+				break;
+			case Opt_session:
+				if (match_int(args, &option))
+					return 0;
+				uopt->session = option;
+				break;
+			case Opt_lastblock:
+				if (match_int(args, &option))
+					return 0;
+				uopt->lastblock = option;
+				break;
+			case Opt_anchor:
+				if (match_int(args, &option))
+					return 0;
+				uopt->anchor = option;
+				break;
+			case Opt_volume:
+				if (match_int(args, &option))
+					return 0;
+				uopt->volume = option;
+				break;
+			case Opt_partition:
+				if (match_int(args, &option))
+					return 0;
+				uopt->partition = option;
+				break;
+			case Opt_fileset:
+				if (match_int(args, &option))
+					return 0;
+				uopt->fileset = option;
+				break;
+			case Opt_rootdir:
+				if (match_int(args, &option))
+					return 0;
+				uopt->rootdir = option;
+				break;
+			case Opt_utf8:
+				uopt->flags |= (1 << UDF_FLAG_UTF8);
+				break;
 #if defined(CONFIG_NLS) || defined(CONFIG_NLS_MODULE)
-		case Opt_iocharset:
-			uopt->nls_map = load_nls(args[0].from);
-			uopt->flags |= (1 << UDF_FLAG_NLS_MAP);
-			break;
+			case Opt_iocharset:
+				uopt->nls_map = load_nls(args[0].from);
+				uopt->flags |= (1 << UDF_FLAG_NLS_MAP);
+				break;
 #endif
-		default:
-			printk(KERN_ERR "udf: bad mount option \"%s\" "
-					"or missing value\n",
-				p);
+			default:
+				printk(KERN_ERR "udf: bad mount option \"%s\" "
+						"or missing value\n", p);
 			return 0;
 		}
 	}
@@ -1651,23 +1653,9 @@ error_out:
 		if (UDF_SB_PARTFLAGS(sb, UDF_SB_PARTITION(sb)) & UDF_PART_FLAG_FREED_TABLE)
 			iput(UDF_SB_PARTMAPS(sb)[UDF_SB_PARTITION(sb)].s_fspace.s_table);
 		if (UDF_SB_PARTFLAGS(sb, UDF_SB_PARTITION(sb)) & UDF_PART_FLAG_UNALLOC_BITMAP)
-		{
-			for (i=0; i<UDF_SB_BITMAP_NR_GROUPS(sb,UDF_SB_PARTITION(sb),s_uspace); i++)
-			{
-				if (UDF_SB_BITMAP(sb,UDF_SB_PARTITION(sb),s_uspace,i))
-					udf_release_data(UDF_SB_BITMAP(sb,UDF_SB_PARTITION(sb),s_uspace,i));
-			}
-			kfree(UDF_SB_PARTMAPS(sb)[UDF_SB_PARTITION(sb)].s_uspace.s_bitmap);
-		}
+			UDF_SB_FREE_BITMAP(sb,UDF_SB_PARTITION(sb),s_uspace);
 		if (UDF_SB_PARTFLAGS(sb, UDF_SB_PARTITION(sb)) & UDF_PART_FLAG_FREED_BITMAP)
-		{
-			for (i=0; i<UDF_SB_BITMAP_NR_GROUPS(sb,UDF_SB_PARTITION(sb),s_fspace); i++)
-			{
-				if (UDF_SB_BITMAP(sb,UDF_SB_PARTITION(sb),s_fspace,i))
-					udf_release_data(UDF_SB_BITMAP(sb,UDF_SB_PARTITION(sb),s_fspace,i));
-			}
-			kfree(UDF_SB_PARTMAPS(sb)[UDF_SB_PARTITION(sb)].s_fspace.s_bitmap);
-		}
+			UDF_SB_FREE_BITMAP(sb,UDF_SB_PARTITION(sb),s_fspace);
 		if (UDF_SB_PARTTYPE(sb, UDF_SB_PARTITION(sb)) == UDF_SPARABLE_MAP15)
 		{
 			for (i=0; i<4; i++)
@@ -1743,23 +1731,9 @@ udf_put_super(struct super_block *sb)
 		if (UDF_SB_PARTFLAGS(sb, UDF_SB_PARTITION(sb)) & UDF_PART_FLAG_FREED_TABLE)
 			iput(UDF_SB_PARTMAPS(sb)[UDF_SB_PARTITION(sb)].s_fspace.s_table);
 		if (UDF_SB_PARTFLAGS(sb, UDF_SB_PARTITION(sb)) & UDF_PART_FLAG_UNALLOC_BITMAP)
-		{
-			for (i=0; i<UDF_SB_BITMAP_NR_GROUPS(sb,UDF_SB_PARTITION(sb),s_uspace); i++)
-			{
-				if (UDF_SB_BITMAP(sb,UDF_SB_PARTITION(sb),s_uspace,i))
-					udf_release_data(UDF_SB_BITMAP(sb,UDF_SB_PARTITION(sb),s_uspace,i));
-			}
-			kfree(UDF_SB_PARTMAPS(sb)[UDF_SB_PARTITION(sb)].s_uspace.s_bitmap);
-		}
+			UDF_SB_FREE_BITMAP(sb,UDF_SB_PARTITION(sb),s_uspace);
 		if (UDF_SB_PARTFLAGS(sb, UDF_SB_PARTITION(sb)) & UDF_PART_FLAG_FREED_BITMAP)
-		{
-			for (i=0; i<UDF_SB_BITMAP_NR_GROUPS(sb,UDF_SB_PARTITION(sb),s_fspace); i++)
-			{
-				if (UDF_SB_BITMAP(sb,UDF_SB_PARTITION(sb),s_fspace,i))
-					udf_release_data(UDF_SB_BITMAP(sb,UDF_SB_PARTITION(sb),s_fspace,i));
-			}
-			kfree(UDF_SB_PARTMAPS(sb)[UDF_SB_PARTITION(sb)].s_fspace.s_bitmap);
-		}
+			UDF_SB_FREE_BITMAP(sb,UDF_SB_PARTITION(sb),s_fspace);
 		if (UDF_SB_PARTTYPE(sb, UDF_SB_PARTITION(sb)) == UDF_SPARABLE_MAP15)
 		{
 			for (i=0; i<4; i++)
@@ -1804,7 +1778,7 @@ udf_statfs(struct super_block *sb, struct kstatfs *buf)
 		le32_to_cpu(UDF_SB_LVIDIU(sb)->numDirs)) : 0) + buf->f_bfree;
 	buf->f_ffree = buf->f_bfree;
 	/* __kernel_fsid_t f_fsid */
-	buf->f_namelen = UDF_NAME_LEN;
+	buf->f_namelen = UDF_NAME_LEN-2;
 
 	return 0;
 }

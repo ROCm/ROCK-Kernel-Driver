@@ -4,7 +4,7 @@
  *      (Ultimately) SCSI-3 definitions; for now, inheriting
  *      SCSI-2 definitions.
  *
- *  Copyright (c) 1996-2003 Steven J. Ralston
+ *  Copyright (c) 1996-2004 Steven J. Ralston
  *  Written By: Steven J. Ralston (19960517)
  *  (mailto:sjralston1@netscape.net)
  *  (mailto:mpt_linux_developer@lsil.com)

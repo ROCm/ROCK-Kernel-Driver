@@ -327,8 +327,9 @@ static void snd_pcm_substream_proc_hw_params_read(snd_info_entry_t *entry, snd_i
 		snd_iprintf(buffer, "OSS format: %s\n", snd_pcm_oss_format_name(runtime->oss.format));
 		snd_iprintf(buffer, "OSS channels: %u\n", runtime->oss.channels);	
 		snd_iprintf(buffer, "OSS rate: %u\n", runtime->oss.rate);
-		snd_iprintf(buffer, "OSS period bytes: %lu\n", (unsigned long)runtime->oss.period_bytes);	
+		snd_iprintf(buffer, "OSS period bytes: %lu\n", (unsigned long)runtime->oss.period_bytes);
 		snd_iprintf(buffer, "OSS periods: %u\n", runtime->oss.periods);
+		snd_iprintf(buffer, "OSS period frames: %lu\n", (unsigned long)runtime->oss.period_frames);
 	}
 #endif
 	snd_pcm_stream_unlock_irq(substream);
@@ -1060,3 +1061,4 @@ EXPORT_SYMBOL(snd_pcm_format_size);
 EXPORT_SYMBOL(snd_pcm_format_silence_64);
 EXPORT_SYMBOL(snd_pcm_format_set_silence);
 EXPORT_SYMBOL(snd_pcm_build_linear_format);
+EXPORT_SYMBOL(snd_pcm_limit_hw_rates);

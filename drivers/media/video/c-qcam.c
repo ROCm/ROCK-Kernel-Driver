@@ -818,10 +818,9 @@ static void cq_detach(struct parport *port)
 }
 
 static struct parport_driver cqcam_driver = {
-	"cqcam",
-	cq_attach,
-	cq_detach,
-	NULL
+	.name = "cqcam",
+	.attach = cq_attach,
+	.detach = cq_detach,
 };
 
 static int __init cqcam_init (void)

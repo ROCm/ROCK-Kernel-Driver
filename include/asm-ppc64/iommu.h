@@ -24,6 +24,7 @@
 
 #include <asm/types.h>
 #include <linux/spinlock.h>
+#include <linux/device.h>
 
 /*
  * IOMAP_MAX_ORDER defines the largest contiguous block
@@ -78,6 +79,7 @@ struct iommu_table {
 	unsigned long  it_blocksize; /* Entries in each block (cacheline) */
 	unsigned long  it_hint;      /* Hint for next alloc */
 	unsigned long  it_largehint; /* Hint for large allocs */
+	unsigned long  it_halfpoint; /* Breaking point for small/large allocs */
 	spinlock_t     it_lock;      /* Protects it_map */
 	unsigned long  it_mapsize;   /* Size of map in # of entries (bits) */
 	unsigned long *it_map;       /* A simple allocation bitmap for now */
@@ -132,16 +134,16 @@ extern struct iommu_table *iommu_init_table(struct iommu_table * tbl);
 
 /* allocates a range of tces and sets them to the pages  */
 extern dma_addr_t iommu_alloc(struct iommu_table *, void *page, 
-			      unsigned int numPages, int direction,
-			      unsigned long *handle);
+			      unsigned int numPages, int direction);
 extern void iommu_free(struct iommu_table *tbl, dma_addr_t dma_addr, 
 		       unsigned int npages);
 
 /* same with sg lists */
-extern int iommu_alloc_sg(struct iommu_table *table, struct scatterlist *sglist,
-			  int nelems, int direction, unsigned long *handle);
+extern int iommu_alloc_sg(struct iommu_table *table, struct device *dev,
+			  struct scatterlist *sglist, int nelems,
+			  int direction);
 extern void iommu_free_sg(struct iommu_table *tbl, struct scatterlist *sglist,
-			  int nelems, int direction);
+			  int nelems);
 
 
 extern void tce_init_pSeries(void);

@@ -261,12 +261,6 @@ asmlinkage int sys_ipc (uint call, int first, int second,
 	return -EINVAL;
 }
 
-asmlinkage long sys_ioperm(unsigned long from, unsigned long num, int on)
-{
-  return -ENOSYS;
-}
-
-
 /* Convert virtual (user) address VADDR to physical address PADDR */
 #define virt_to_phys_040(vaddr)						\
 ({									\

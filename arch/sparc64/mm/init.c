@@ -1423,7 +1423,6 @@ unsigned long __init bootmem_init(unsigned long *pages_avail)
 
 /* paging_init() sets up the page tables */
 
-extern void sun_serial_setup(void);
 extern void cheetah_ecache_flush_init(void);
 
 static unsigned long last_valid_pfn;
@@ -1547,15 +1546,6 @@ void __init paging_init(void)
 	}
 
 	inherit_locked_prom_mappings(1);
-
-#ifdef CONFIG_SUN_SERIAL
-	/* This does not logically belong here, but we need to call it at
-	 * the moment we are able to use the bootmem allocator. This _has_
-	 * to be done after the prom_mappings above so since
-	 * __alloc_bootmem() doesn't work correctly until then.
-	 */
-	sun_serial_setup();
-#endif
 
 	/* We only created DTLB mapping of this stuff. */
 	spitfire_flush_dtlb_nucleus_page(alias_base);

@@ -51,6 +51,7 @@ DRV_NAME ".c:v" DRV_VERSION " " DRV_RELDATE " tsbogend@alpha.franken.de\n";
 #include <asm/dma.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>
+#include <asm/irq.h>
 
 /*
  * PCI device identifiers for "new style" Linux PCI Device Drivers
@@ -69,7 +70,7 @@ static struct pci_device_id pcnet32_pci_tbl[] = {
 
 MODULE_DEVICE_TABLE (pci, pcnet32_pci_tbl);
 
-int cards_found __initdata;
+static int cards_found;
 
 /*
  * VLB I/O addresses
@@ -225,10 +226,12 @@ static int full_duplex[MAX_UNITS];
  * v1.27b  Sep 30 2002 Kent Yoder <yoder1@us.ibm.com>
  * 	   Added timer for cable connection state changes.
  * v1.28   20 Feb 2004 Don Fry <brazilnut@us.ibm.com>
- *	   Jon Lewis <jonmason@us.ibm.com>, Chinmay Albal <albal@in.ibm.com>
+ *	   Jon Mason <jonmason@us.ibm.com>, Chinmay Albal <albal@in.ibm.com>
  *	   Now uses ethtool_ops, netif_msg_* and generic_mii_ioctl.
  *	   Fixes bogus 'Bus master arbitration failure', pci_[un]map_single
  *	   length errors, and transmit hangs.  Cleans up after errors in open.
+ *	   Jim Lewis <jklewis@us.ibm.com> added ethernet loopback test.
+ *	   Thomas Munck Steenholdt <tmus@tmus.dk> non-mii ioctl corrections.
  */
 
 
@@ -479,6 +482,14 @@ static struct pcnet32_access pcnet32_dwio = {
     .reset	= pcnet32_dwio_reset
 };
 
+#ifdef CONFIG_NET_POLL_CONTROLLER
+static void pcnet32_poll_controller(struct net_device *dev)
+{ 
+	disable_irq(dev->irq);
+	pcnet32_interrupt(0, dev, NULL);
+	enable_irq(dev->irq);
+} 
+#endif
 
 
 static int pcnet32_get_settings(struct net_device *dev, struct ethtool_cmd *cmd)
@@ -1106,6 +1117,10 @@ pcnet32_probe1(unsigned long ioaddr, unsigned int irq_line, int shared,
     dev->tx_timeout = pcnet32_tx_timeout;
     dev->watchdog_timeo = (5*HZ);
 
+#ifdef CONFIG_NET_POLL_CONTROLLER
+    dev->poll_controller = pcnet32_poll_controller;
+#endif    
+
     /* Fill in the generic fields of the device structure. */
     if (register_netdev(dev))
 	goto err_free_consistent;
@@ -1452,11 +1467,12 @@ pcnet32_start_xmit(struct sk_buff *skb, struct net_device *dev)
     status = 0x8300;
     entry = (lp->cur_tx - lp->dirty_tx) & TX_RING_MOD_MASK;
     if ((lp->ltint) &&
-	((entry == TX_RING_SIZE/2) ||
+	((entry == TX_RING_SIZE/3) ||
+	 (entry == (TX_RING_SIZE*2)/3) ||
 	 (entry >= TX_RING_SIZE-2)))
     {
 	/* Enable Successful-TxDone interrupt if we have
-	 * 1/2 of, or nearly all of, our ring buffer Tx'd
+	 * 1/3, 2/3 or nearly all of, our ring buffer Tx'd
 	 * but not yet cleaned up.  Thus, most of the time,
 	 * we will not enable Successful-TxDone interrupts.
 	 */
@@ -1732,13 +1748,17 @@ pcnet32_rx(struct net_device *dev)
 		if (!rx_in_place) {
 		    skb_reserve(skb,2); /* 16 byte align */
 		    skb_put(skb,pkt_len);	/* Make room */
-		    pci_dma_sync_single(lp->pci_dev,
-		                        lp->rx_dma_addr[entry],
-		                        PKT_BUF_SZ-2,
-		                        PCI_DMA_FROMDEVICE);
+		    pci_dma_sync_single_for_cpu(lp->pci_dev,
+						lp->rx_dma_addr[entry],
+						PKT_BUF_SZ-2,
+						PCI_DMA_FROMDEVICE);
 		    eth_copy_and_sum(skb,
 			    (unsigned char *)(lp->rx_skbuff[entry]->tail),
 			    pkt_len,0);
+		    pci_dma_sync_single_for_device(lp->pci_dev,
+						   lp->rx_dma_addr[entry],
+						   PKT_BUF_SZ-2,
+						   PCI_DMA_FROMDEVICE);
 		}
 		lp->stats.rx_bytes += skb->len;
 		skb->protocol=eth_type_trans(skb,dev);

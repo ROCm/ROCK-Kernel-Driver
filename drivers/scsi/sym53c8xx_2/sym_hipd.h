@@ -171,6 +171,15 @@
 #define	SYM_CONF_MIN_ASYNC (40)
 
 /*
+ *  Shortest memory chunk is (1<<SYM_MEM_SHIFT), currently 16.
+ *  Actual allocations happen as SYM_MEM_CLUSTER_SIZE sized.
+ *  (1 PAGE at a time is just fine).
+ */
+#define SYM_MEM_SHIFT	4
+#define SYM_MEM_CLUSTER_SIZE	(1UL << SYM_MEM_CLUSTER_SHIFT)
+#define SYM_MEM_CLUSTER_MASK	(SYM_MEM_CLUSTER_SIZE-1)
+
+/*
  *  Number of entries in the START and DONE queues.
  *
  *  We limit to 1 PAGE in order to succeed allocation of 
@@ -194,21 +203,6 @@
  *  For this one, we want a short name :-)
  */
 #define MAX_QUEUE	SYM_CONF_MAX_QUEUE
-
-/*
- *  Union of supported NVRAM formats.
- */
-struct sym_nvram {
-	int type;
-#define	SYM_SYMBIOS_NVRAM	(1)
-#define	SYM_TEKRAM_NVRAM	(2)
-#if SYM_CONF_NVRAM_SUPPORT
-	union {
-		Symbios_nvram Symbios;
-		Tekram_nvram Tekram;
-	} data;
-#endif
-};
 
 /*
  *  Common definitions for both bus space based and legacy IO methods.
@@ -1114,23 +1108,6 @@ struct sym_hcb {
 
 #define HCB_BA(np, lbl)	(np->hcb_ba + offsetof(struct sym_hcb, lbl))
 
-/*
- *  NVRAM reading (sym_nvram.c).
- */
-#if SYM_CONF_NVRAM_SUPPORT
-void sym_nvram_setup_host (hcb_p np, struct sym_nvram *nvram);
-void sym_nvram_setup_target (hcb_p np, int target, struct sym_nvram *nvp);
-int sym_read_nvram (sdev_p np, struct sym_nvram *nvp);
-#else
-static inline void sym_nvram_setup_host(hcb_p np, struct sym_nvram *nvram) { }
-static inline void sym_nvram_setup_target(hcb_p np, struct sym_nvram *nvram) { }
-static inline int sym_read_nvram(sdev_p np, struct sym_nvram *nvp)
-{
-	nvp->type = 0;
-	return 0;
-}
-#endif
-
 
 /*
  *  FIRMWARES (sym_fw.c)
@@ -1257,8 +1234,8 @@ bad:
  *  Set up data pointers used by SCRIPTS.
  *  Called from O/S specific code.
  */
-static void __inline 
-sym_setup_data_pointers(hcb_p np, ccb_p cp, int dir)
+static inline void sym_setup_data_pointers(struct sym_hcb *np,
+		struct sym_ccb *cp, int dir)
 {
 	u32 lastp, goalp;
 
@@ -1321,15 +1298,6 @@ sym_setup_data_pointers(hcb_p np, ccb_p cp, int dir)
 /*
  *  MEMORY ALLOCATOR.
  */
-
-/*
- *  Shortest memory chunk is (1<<SYM_MEM_SHIFT), currently 16.
- *  Actual allocations happen as SYM_MEM_CLUSTER_SIZE sized.
- *  (1 PAGE at a time is just fine).
- */
-#define SYM_MEM_SHIFT	4
-#define SYM_MEM_CLUSTER_SIZE	(1UL << SYM_MEM_CLUSTER_SHIFT)
-#define SYM_MEM_CLUSTER_MASK	(SYM_MEM_CLUSTER_SIZE-1)
 
 /*
  *  Link between free memory chunks of a given size.

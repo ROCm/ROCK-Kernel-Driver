@@ -640,6 +640,7 @@ static int ea_put(struct inode *inode, struct ea_buffer *ea_buf, int new_size)
 	}
 
 	inode->i_blocks += LBLK2PBLK(inode->i_sb, new_blocks - old_blocks);
+	inode->i_ctime = CURRENT_TIME;
 	rc = txCommit(tid, 1, &inode, 0);
 	txEnd(tid);
 	up(&ji->commit_sem);

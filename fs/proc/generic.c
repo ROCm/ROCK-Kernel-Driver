@@ -37,10 +37,6 @@ static struct file_operations proc_file_operations = {
 	.write		= proc_file_write,
 };
 
-#ifndef MIN
-#define MIN(a,b) (((a) < (b)) ? (a) : (b))
-#endif
-
 /* buffer size is one page but our output routines use some slack for overruns */
 #define PROC_BLOCK_SIZE	(PAGE_SIZE - 1024)
 
@@ -61,7 +57,7 @@ proc_file_read(struct file *file, char __user *buf, size_t nbytes,
 		return -ENOMEM;
 
 	while ((nbytes > 0) && !eof) {
-		count = MIN(PROC_BLOCK_SIZE, nbytes);
+		count = min_t(ssize_t, PROC_BLOCK_SIZE, nbytes);
 
 		start = NULL;
 		if (dp->get_info) {
@@ -661,6 +657,7 @@ void remove_proc_entry(const char *name, struct proc_dir_entry *parent)
 			  proc_alloc_map);
 		proc_kill_inodes(de);
 		de->nlink = 0;
+		WARN_ON(de->subdir);
 		if (!atomic_read(&de->count))
 			free_proc_entry(de);
 		else {
