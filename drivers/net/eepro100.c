@@ -459,8 +459,8 @@ enum Rx_ring_state_bits {
    Unfortunately, all the positions have been shifted since there.
    A new re-alignment is required.  2000/03/06  SAW */
 struct speedo_private {
-	struct TxFD	*tx_ring;				/* Commands (usually CmdTxPacket). */
-	struct RxFD *rx_ringp[RX_RING_SIZE];/* Rx descriptor, used as ring. */
+	struct TxFD	*tx_ring;		/* Commands (usually CmdTxPacket). */
+	struct RxFD *rx_ringp[RX_RING_SIZE];	/* Rx descriptor, used as ring. */
 	/* The addresses of a Tx/Rx-in-place packets/buffers. */
 	struct sk_buff *tx_skbuff[TX_RING_SIZE];
 	struct sk_buff *rx_skbuff[RX_RING_SIZE];
@@ -470,9 +470,9 @@ struct speedo_private {
 	dma_addr_t rx_ring_dma[RX_RING_SIZE];
 	struct descriptor *last_cmd;		/* Last command sent. */
 	unsigned int cur_tx, dirty_tx;		/* The ring entries to be free()ed. */
-	spinlock_t lock;					/* Group with Tx control cache line. */
-	u32 tx_threshold;					/* The value for txdesc.count. */
-	struct RxFD *last_rxf;				/* Last filled RX buffer. */
+	spinlock_t lock;			/* Group with Tx control cache line. */
+	u32 tx_threshold;			/* The value for txdesc.count. */
+	struct RxFD *last_rxf;			/* Last filled RX buffer. */
 	dma_addr_t last_rxf_dma;
 	unsigned int cur_rx, dirty_rx;		/* The next free ring entry */
 	long last_rx_time;			/* Last Rx, in jiffies, to handle Rx hang. */
@@ -481,21 +481,21 @@ struct speedo_private {
 	dma_addr_t lstats_dma;
 	int chip_id;
 	struct pci_dev *pdev;
-	struct timer_list timer;			/* Media selection timer. */
-	struct speedo_mc_block *mc_setup_head;/* Multicast setup frame list head. */
-	struct speedo_mc_block *mc_setup_tail;/* Multicast setup frame list tail. */
-	long in_interrupt;					/* Word-aligned dev->interrupt */
+	struct timer_list timer;		/* Media selection timer. */
+	struct speedo_mc_block *mc_setup_head;	/* Multicast setup frame list head. */
+	struct speedo_mc_block *mc_setup_tail;	/* Multicast setup frame list tail. */
+	long in_interrupt;			/* Word-aligned dev->interrupt */
 	unsigned char acpi_pwr;
-	signed char rx_mode;					/* Current PROMISC/ALLMULTI setting. */
-	unsigned int tx_full:1;				/* The Tx queue is full. */
-	unsigned int full_duplex:1;			/* Full-duplex operation requested. */
-	unsigned int flow_ctrl:1;			/* Use 802.3x flow control. */
-	unsigned int rx_bug:1;				/* Work around receiver hang errata. */
+	signed char rx_mode;			/* Current PROMISC/ALLMULTI setting. */
+	unsigned int tx_full:1;			/* The Tx queue is full. */
+	unsigned int full_duplex:1;		/* Full-duplex operation requested. */
+	unsigned int flow_ctrl:1;		/* Use 802.3x flow control. */
+	unsigned int rx_bug:1;			/* Work around receiver hang errata. */
 	unsigned char default_port:8;		/* Last dev->if_port value. */
 	unsigned char rx_ring_state;		/* RX ring status flags. */
-	unsigned short phy[2];				/* PHY media interfaces available. */
-	unsigned short advertising;			/* Current PHY advertised caps. */
-	unsigned short partner;				/* Link partner caps. */
+	unsigned short phy[2];			/* PHY media interfaces available. */
+	unsigned short partner;			/* Link partner caps. */
+	struct mii_if_info mii_if;		/* MII API hooks, info */
 #ifdef CONFIG_PM
 	u32 pm_state[16];
 #endif
@@ -533,7 +533,7 @@ static void eepro100_remove_one (struct pci_dev *pdev);
 
 static int do_eeprom_cmd(long ioaddr, int cmd, int cmd_len);
 static int mdio_read(struct net_device *dev, int phy_id, int location);
-static int mdio_write(struct net_device *dev, int phy_id, int location, int value);
+static void mdio_write(struct net_device *dev, int phy_id, int location, int value);
 static int speedo_open(struct net_device *dev);
 static void speedo_resume(struct net_device *dev);
 static void speedo_timer(unsigned long data);
@@ -822,15 +822,21 @@ static int __devinit speedo_found1(struct pci_dev *pdev,
 	sp->lstats_dma = TX_RING_ELEM_DMA(sp, TX_RING_SIZE);
 	init_timer(&sp->timer); /* used in ioctl() */
 
-	sp->full_duplex = option >= 0 && (option & 0x10) ? 1 : 0;
+	sp->mii_if.full_duplex = option >= 0 && (option & 0x10) ? 1 : 0;
 	if (card_idx >= 0) {
 		if (full_duplex[card_idx] >= 0)
-			sp->full_duplex = full_duplex[card_idx];
+			sp->mii_if.full_duplex = full_duplex[card_idx];
 	}
 	sp->default_port = option >= 0 ? (option & 0x0f) : 0;
 
 	sp->phy[0] = eeprom[6];
 	sp->phy[1] = eeprom[7];
+
+	sp->mii_if.phy_id = eeprom[6];
+	sp->mii_if.dev = dev;
+	sp->mii_if.mdio_read = mdio_read;
+	sp->mii_if.mdio_write = mdio_write;
+	
 	sp->rx_bug = (eeprom[3] & 0x03) == 3 ? 0 : 1;
 	if (((pdev->device > 0x1030 && (pdev->device < 0x103F))) 
 	    || (pdev->device == 0x2449) || (pdev->device == 0x2459) 
@@ -932,7 +938,7 @@ static int mdio_read(struct net_device *dev, int phy_id, int location)
 	return val & 0xffff;
 }
 
-static int mdio_write(struct net_device *dev, int phy_id, int location, int value)
+static void mdio_write(struct net_device *dev, int phy_id, int location, int value)
 {
 	long ioaddr = dev->base_addr;
 	int val, boguscnt = 64*10;		/* <64 usec. to complete, typ 27 ticks */
@@ -945,7 +951,6 @@ static int mdio_write(struct net_device *dev, int phy_id, int location, int valu
 			break;
 		}
 	} while (! (val & 0x10000000));
-	return val & 0xffff;
 }
 
 static int
@@ -1010,7 +1015,7 @@ speedo_open(struct net_device *dev)
 	sp->rx_mode = -1;			/* Invalid -> always reset the mode. */
 	set_rx_mode(dev);
 	if ((sp->phy[0] & 0x8000) == 0)
-		sp->advertising = mdio_read(dev, sp->phy[0] & 0x1f, MII_ADVERTISE);
+		sp->mii_if.advertising = mdio_read(dev, sp->phy[0] & 0x1f, MII_ADVERTISE);
 
 	if (mdio_read(dev, sp->phy[0] & 0x1f, MII_BMSR) & BMSR_LSTATUS)
 		netif_carrier_on(dev);
@@ -1166,11 +1171,11 @@ static void speedo_timer(unsigned long data)
 	if ((sp->phy[0] & 0x8000) == 0) {
 		int partner = mdio_read(dev, phy_num, MII_LPA);
 		if (partner != sp->partner) {
-			int flow_ctrl = sp->advertising & partner & 0x0400 ? 1 : 0;
+			int flow_ctrl = sp->mii_if.advertising & partner & 0x0400 ? 1 : 0;
 			if (speedo_debug > 2) {
 				printk(KERN_DEBUG "%s: Link status change.\n", dev->name);
 				printk(KERN_DEBUG "%s: Old partner %x, new %x, adv %x.\n",
-					   dev->name, sp->partner, partner, sp->advertising);
+					   dev->name, sp->partner, partner, sp->mii_if.advertising);
 			}
 			sp->partner = partner;
 			if (flow_ctrl != sp->flow_ctrl) {
@@ -1971,6 +1976,7 @@ static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
 		return -EFAULT;
 	
         switch (ethcmd) {
+	/* get driver-specific version/etc. info */
 	case ETHTOOL_GDRVINFO: {
 		struct ethtool_drvinfo info = {ETHTOOL_GDRVINFO};
 		strncpy(info.driver, "eepro100", sizeof(info.driver)-1);
@@ -1982,14 +1988,44 @@ static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
 		return 0;
 	}
 	
+	/* get settings */
+	case ETHTOOL_GSET: {
+		struct ethtool_cmd ecmd = { ETHTOOL_GSET };
+		spin_lock_irq(&sp->lock);
+		mii_ethtool_gset(&sp->mii_if, &ecmd);
+		spin_unlock_irq(&sp->lock);
+		if (copy_to_user(useraddr, &ecmd, sizeof(ecmd)))
+			return -EFAULT;
+		return 0;
+	}
+	/* set settings */
+	case ETHTOOL_SSET: {
+		int r;
+		struct ethtool_cmd ecmd;
+		if (copy_from_user(&ecmd, useraddr, sizeof(ecmd)))
+			return -EFAULT;
+		spin_lock_irq(&sp->lock);
+		r = mii_ethtool_sset(&sp->mii_if, &ecmd);
+		spin_unlock_irq(&sp->lock);
+		return r;
+	}
+	/* restart autonegotiation */
+	case ETHTOOL_NWAY_RST: {
+		return mii_nway_restart(&sp->mii_if);
+	}
+	/* get link status */
+	case ETHTOOL_GLINK: {
+		struct ethtool_value edata = {ETHTOOL_GLINK};
+		edata.data = mii_link_ok(&sp->mii_if);
+		if (copy_to_user(useraddr, &edata, sizeof(edata)))
+			return -EFAULT;
+		return 0;
+	}
+
         }
 	
 	return -EOPNOTSUPP;
 }
-
-
-
-
 
 static int speedo_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
@@ -2093,7 +2129,7 @@ static void set_rx_mode(struct net_device *dev)
 		   Disable Flow control since we are not ACK-ing any FC interrupts
 		   for now. --Dragan */
 		config_cmd_data[19] = 0x84;
-		config_cmd_data[19] |= sp->full_duplex ? 0x40 : 0;
+		config_cmd_data[19] |= sp->mii_if.full_duplex ? 0x40 : 0;
 		config_cmd_data[21] = (new_rx_mode & 1) ? 0x0D : 0x05;
 		if (sp->phy[0] & 0x8000) {			/* Use the AUI port instead. */
 			config_cmd_data[15] |= 0x80;
