@@ -1,8 +1,8 @@
 /* SCTP kernel reference Implementation
+ * (C) Copyright IBM Corp. 2001, 2003
  * Copyright (c) 1999-2000 Cisco, Inc.
  * Copyright (c) 1999-2001 Motorola, Inc.
  * Copyright (c) 2001 Intel Corp.
- * Copyright (c) 2001-2003 International Business Machines Corp.
  *
  * This file is part of the SCTP kernel reference Implementation
  *
@@ -45,6 +45,7 @@
  *    Ardelle Fan	    <ardelle.fan@intel.com>
  *    Ryan Layer	    <rmlayer@us.ibm.com>
  *    Anup Pemmaiah	    <pemmaiah@cc.usu.edu>
+ *    Kevin Gao             <kevin.gao@intel.com>
  *
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
@@ -216,86 +217,6 @@ extern struct sctp_globals {
 #define sctp_port_hashtable		(sctp_globals.port_hashtable)
 #define sctp_local_addr_list		(sctp_globals.local_addr_list)
 #define sctp_local_addr_lock		(sctp_globals.local_addr_lock)
-
-/*
- * Pointers to address related SCTP functions.
- * (i.e. things that depend on the address family.)
- */
-struct sctp_af {
-	int		(*sctp_xmit)	(struct sk_buff *skb,
-					 struct sctp_transport *,
-					 int ipfragok);
-	int		(*setsockopt)	(struct sock *sk,
-					 int level,
-					 int optname,
-					 char *optval,
-					 int optlen);
-	int		(*getsockopt)	(struct sock *sk,
-					 int level,
-					 int optname,
-					 char *optval,
-					 int *optlen);
-	struct dst_entry *(*get_dst)	(struct sctp_association *asoc,
-					 union sctp_addr *daddr,
-					 union sctp_addr *saddr);
-	void		(*get_saddr)	(struct sctp_association *asoc,
-					 struct dst_entry *dst,
-					 union sctp_addr *daddr,
-					 union sctp_addr *saddr);
-	void		(*copy_addrlist) (struct list_head *,
-					  struct net_device *);
-	void		(*dst_saddr)	(union sctp_addr *saddr,
-					 struct dst_entry *dst,
-					 unsigned short port);
-	int		(*cmp_addr)	(const union sctp_addr *addr1,
-					 const union sctp_addr *addr2);
-	void		(*addr_copy)	(union sctp_addr *dst,
-					 union sctp_addr *src);
-	void		(*from_skb)	(union sctp_addr *,
-					 struct sk_buff *skb,
-					 int saddr);
-	void		(*from_sk)	(union sctp_addr *,
-					 struct sock *sk);
-	void		(*to_sk_saddr)	(union sctp_addr *,
-					 struct sock *sk);
-	void		(*to_sk_daddr)	(union sctp_addr *,
-					 struct sock *sk);
-	int		(*addr_valid)	(union sctp_addr *,
-					 struct sctp_opt *);
-	sctp_scope_t	(*scope) (union sctp_addr *);
-	void		(*inaddr_any)	(union sctp_addr *, unsigned short);
-	int		(*is_any)	(const union sctp_addr *);
-	int		(*available)	(union sctp_addr *,
-					 struct sctp_opt *);
-	int		(*skb_iif)	(const struct sk_buff *sk);
-	int		(*is_ce)	(const struct sk_buff *sk);
-	void		(*seq_dump_addr)(struct seq_file *seq,
-					 union sctp_addr *addr);
-	__u16		net_header_len;
-	int		sockaddr_len;
-	sa_family_t	sa_family;
-	struct list_head list;
-};
-
-struct sctp_af *sctp_get_af_specific(sa_family_t);
-int sctp_register_af(struct sctp_af *);
-
-/* Protocol family functions. */
-struct sctp_pf {
-	void (*event_msgname)(struct sctp_ulpevent *, char *, int *);
-	void (*skb_msgname)  (struct sk_buff *, char *, int *);
-	int  (*af_supported) (sa_family_t, struct sctp_opt *);
-	int  (*cmp_addr) (const union sctp_addr *,
-			  const union sctp_addr *,
-			  struct sctp_opt *);
-	int  (*bind_verify) (struct sctp_opt *, union sctp_addr *);
-	int  (*send_verify) (struct sctp_opt *, union sctp_addr *);
-	int  (*supported_addrs)(const struct sctp_opt *, __u16 *);
-	struct sock *(*create_accept_sk) (struct sock *sk,
-					  struct sctp_association *asoc);
-	void (*addr_v4map) (struct sctp_opt *, union sctp_addr *);
-	struct sctp_af *af;
-};
 
 /* SCTP Socket type: UDP or TCP style. */
 typedef enum {
@@ -487,6 +408,92 @@ static inline __u16 sctp_ssn_next(struct sctp_stream *stream, __u16 id)
 {
 	return stream->ssn[id]++;
 }
+
+/*
+ * Pointers to address related SCTP functions.
+ * (i.e. things that depend on the address family.)
+ */
+struct sctp_af {
+	int		(*sctp_xmit)	(struct sk_buff *skb,
+					 struct sctp_transport *,
+					 int ipfragok);
+	int		(*setsockopt)	(struct sock *sk,
+					 int level,
+					 int optname,
+					 char *optval,
+					 int optlen);
+	int		(*getsockopt)	(struct sock *sk,
+					 int level,
+					 int optname,
+					 char *optval,
+					 int *optlen);
+	struct dst_entry *(*get_dst)	(struct sctp_association *asoc,
+					 union sctp_addr *daddr,
+					 union sctp_addr *saddr);
+	void		(*get_saddr)	(struct sctp_association *asoc,
+					 struct dst_entry *dst,
+					 union sctp_addr *daddr,
+					 union sctp_addr *saddr);
+	void		(*copy_addrlist) (struct list_head *,
+					  struct net_device *);
+	void		(*dst_saddr)	(union sctp_addr *saddr,
+					 struct dst_entry *dst,
+					 unsigned short port);
+	int		(*cmp_addr)	(const union sctp_addr *addr1,
+					 const union sctp_addr *addr2);
+	void		(*addr_copy)	(union sctp_addr *dst,
+					 union sctp_addr *src);
+	void		(*from_skb)	(union sctp_addr *,
+					 struct sk_buff *skb,
+					 int saddr);
+	void		(*from_sk)	(union sctp_addr *,
+					 struct sock *sk);
+	void		(*to_sk_saddr)	(union sctp_addr *,
+					 struct sock *sk);
+	void		(*to_sk_daddr)	(union sctp_addr *,
+					 struct sock *sk);
+	void		(*from_addr_param) (union sctp_addr *,
+					    union sctp_addr_param *,
+					    __u16 port, int iif);	
+	int		(*to_addr_param) (const union sctp_addr *,
+					  union sctp_addr_param *); 
+	int		(*addr_valid)	(union sctp_addr *,
+					 struct sctp_opt *);
+	sctp_scope_t	(*scope) (union sctp_addr *);
+	void		(*inaddr_any)	(union sctp_addr *, unsigned short);
+	int		(*is_any)	(const union sctp_addr *);
+	int		(*available)	(union sctp_addr *,
+					 struct sctp_opt *);
+	int		(*skb_iif)	(const struct sk_buff *sk);
+	int		(*is_ce)	(const struct sk_buff *sk);
+	void		(*seq_dump_addr)(struct seq_file *seq,
+					 union sctp_addr *addr);
+	__u16		net_header_len;
+	int		sockaddr_len;
+	sa_family_t	sa_family;
+	struct list_head list;
+};
+
+struct sctp_af *sctp_get_af_specific(sa_family_t);
+int sctp_register_af(struct sctp_af *);
+
+/* Protocol family functions. */
+struct sctp_pf {
+	void (*event_msgname)(struct sctp_ulpevent *, char *, int *);
+	void (*skb_msgname)  (struct sk_buff *, char *, int *);
+	int  (*af_supported) (sa_family_t, struct sctp_opt *);
+	int  (*cmp_addr) (const union sctp_addr *,
+			  const union sctp_addr *,
+			  struct sctp_opt *);
+	int  (*bind_verify) (struct sctp_opt *, union sctp_addr *);
+	int  (*send_verify) (struct sctp_opt *, union sctp_addr *);
+	int  (*supported_addrs)(const struct sctp_opt *, __u16 *);
+	struct sock *(*create_accept_sk) (struct sock *sk,
+					  struct sctp_association *asoc);
+	void (*addr_v4map) (struct sctp_opt *, union sctp_addr *);
+	struct sctp_af *af;
+};
+
 
 /* Structure to track chunk fragments that have been acked, but peer
  * fragments of the same message have not.
@@ -1688,6 +1695,8 @@ struct sctp_transport *sctp_assoc_choose_shutdown_transport(
 void sctp_assoc_update_retran_path(struct sctp_association *);
 struct sctp_transport *sctp_assoc_lookup_paddr(const struct sctp_association *,
 					  const union sctp_addr *);
+int sctp_assoc_lookup_laddr(struct sctp_association *asoc,
+			    const union sctp_addr *laddr);
 struct sctp_transport *sctp_assoc_add_peer(struct sctp_association *,
 				     const union sctp_addr *address,
 				     const int gfp);

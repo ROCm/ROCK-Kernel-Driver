@@ -551,13 +551,15 @@ struct sctp_status {
 };
 
 /*
- * 8.3, 8.5 get all peer/local addresses on a socket
- * This parameter struct is for getsockopt
+ * 8.3, 8.5 get all peer/local addresses in an association.
+ * This parameter struct is used by SCTP_GET_PEER_ADDRS and 
+ * SCTP_GET_LOCAL_ADDRS socket options used internally to implement
+ * sctp_getpaddrs() and sctp_getladdrs() API. 
  */
 struct sctp_getaddrs {
 	sctp_assoc_t            assoc_id;
 	int			addr_num;
-	struct sockaddr_storage *addrs;
+	struct sockaddr		*addrs;
 };
 
 /* These are bit fields for msghdr->msg_flags.  See section 5.1.  */
