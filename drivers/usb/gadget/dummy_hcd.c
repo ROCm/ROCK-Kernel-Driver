@@ -1686,6 +1686,9 @@ clean2:
 		goto clean1;
 	}
 
+	/* only show a low-power port: just 8mA */
+	hub_set_power_budget (root, 8);
+
 	dum->started = 1;
 
 	if ((retval = dummy_register_udc (dum)) != 0) {
