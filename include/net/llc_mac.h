@@ -19,14 +19,4 @@
 extern int llc_rcv(struct sk_buff *skb, struct net_device *dev,
 		   struct packet_type *pt);
 extern u16 lan_hdrs_init(struct sk_buff *skb, u8 *sa, u8 *da);
-
-static __inline__ void llc_set_backlog_type(struct sk_buff *skb, char type)
-{
-	skb->cb[sizeof(skb->cb) - 1] = type;
-}
-
-static __inline__ char llc_backlog_type(struct sk_buff *skb)
-{
-	return skb->cb[sizeof(skb->cb) - 1];
-}
 #endif /* LLC_MAC_H */

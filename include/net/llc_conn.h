@@ -69,6 +69,16 @@ struct llc_opt {
 
 #define llc_sk(__sk) ((struct llc_opt *)(__sk)->sk_protinfo)
 
+static __inline__ void llc_set_backlog_type(struct sk_buff *skb, char type)
+{
+	skb->cb[sizeof(skb->cb) - 1] = type;
+}
+
+static __inline__ char llc_backlog_type(struct sk_buff *skb)
+{
+	return skb->cb[sizeof(skb->cb) - 1];
+}
+
 extern struct sock *llc_sk_alloc(int family, int priority);
 extern void llc_sk_free(struct sock *sk);
 
