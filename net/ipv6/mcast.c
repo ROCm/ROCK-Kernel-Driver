@@ -1233,12 +1233,13 @@ static struct sk_buff *mld_newpack(struct net_device *dev, int size)
 		     IPV6_TLV_ROUTERALERT, 2, 0, 0,
 		     IPV6_TLV_PADN, 0 };
 
-	skb = sock_alloc_send_skb(sk, size + dev->hard_header_len+15, 1, &err);
+	/* we assume size > sizeof(ra) here */
+	skb = sock_alloc_send_skb(sk, size + LL_RESERVED_SPACE(dev), 1, &err);
 
 	if (skb == 0)
 		return 0;
 
-	skb_reserve(skb, (dev->hard_header_len + 15) & ~15);
+	skb_reserve(skb, LL_RESERVED_SPACE(dev));
 	if (dev->hard_header) {
 		unsigned char ha[MAX_ADDR_LEN];
 
@@ -1580,12 +1581,12 @@ static void igmp6_send(struct in6_addr *addr, struct net_device *dev, int type)
 	payload_len = len + sizeof(ra);
 	full_len = sizeof(struct ipv6hdr) + payload_len;
 
-	skb = sock_alloc_send_skb(sk, dev->hard_header_len + full_len + 15, 1, &err);
+	skb = sock_alloc_send_skb(sk, LL_RESERVED_SPACE(dev) + full_len, 1, &err);
 
 	if (skb == NULL)
 		return;
 
-	skb_reserve(skb, (dev->hard_header_len + 15) & ~15);
+	skb_reserve(skb, LL_RESERVED_SPACE(dev));
 	if (dev->hard_header) {
 		unsigned char ha[MAX_ADDR_LEN];
 		ndisc_mc_map(snd_addr, ha, dev, 1);
