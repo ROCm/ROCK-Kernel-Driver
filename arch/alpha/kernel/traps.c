@@ -210,8 +210,7 @@ long alpha_fp_emul (unsigned long pc);
 
 asmlinkage void
 do_entArith(unsigned long summary, unsigned long write_mask,
-	    unsigned long a2, unsigned long a3, unsigned long a4,
-	    unsigned long a5, struct pt_regs regs)
+	    struct pt_regs *regs)
 {
 	long si_code = FPE_FLTINV;
 	siginfo_t info;
@@ -221,23 +220,21 @@ do_entArith(unsigned long summary, unsigned long write_mask,
 		   emulate the instruction.  If the processor supports
 		   precise exceptions, we don't have to search.  */
 		if (!amask(AMASK_PRECISE_TRAP))
-			si_code = alpha_fp_emul(regs.pc - 4);
+			si_code = alpha_fp_emul(regs->pc - 4);
 		else
-			si_code = alpha_fp_emul_imprecise(&regs, write_mask);
+			si_code = alpha_fp_emul_imprecise(regs, write_mask);
 	}
-	die_if_kernel("Arithmetic fault", &regs, 0, 0);
+	die_if_kernel("Arithmetic fault", regs, 0, 0);
 
 	info.si_signo = SIGFPE;
 	info.si_errno = 0;
 	info.si_code = si_code;
-	info.si_addr = (void *) regs.pc;
+	info.si_addr = (void *) regs->pc;
 	send_sig_info(SIGFPE, &info, current);
 }
 
 asmlinkage void
-do_entIF(unsigned long type, unsigned long a1,
-	 unsigned long a2, unsigned long a3, unsigned long a4,
-	 unsigned long a5, struct pt_regs regs)
+do_entIF(unsigned long type, struct pt_regs *regs)
 {
 	siginfo_t info;
 	int signo, code;
@@ -245,13 +242,13 @@ do_entIF(unsigned long type, unsigned long a1,
 	if (!opDEC_testing || type != 4) {
 		if (type == 1) {
 			const unsigned int *data
-			  = (const unsigned int *) regs.pc;
+			  = (const unsigned int *) regs->pc;
 			printk("Kernel bug at %s:%d\n",
 			       (const char *)(data[1] | (long)data[2] << 32), 
 			       data[0]);
 		}
 		die_if_kernel((type == 1 ? "Kernel Bug" : "Instruction fault"),
-		      &regs, type, 0);
+			      regs, type, 0);
 	}
 
 	switch (type) {
@@ -260,10 +257,10 @@ do_entIF(unsigned long type, unsigned long a1,
 		info.si_errno = 0;
 		info.si_code = TRAP_BRKPT;
 		info.si_trapno = 0;
-		info.si_addr = (void *) regs.pc;
+		info.si_addr = (void *) regs->pc;
 
 		if (ptrace_cancel_bpt(current)) {
-			regs.pc -= 4;	/* make pc point to former bpt */
+			regs->pc -= 4;	/* make pc point to former bpt */
 		}
 
 		send_sig_info(SIGTRAP, &info, current);
@@ -273,15 +270,15 @@ do_entIF(unsigned long type, unsigned long a1,
 		info.si_signo = SIGTRAP;
 		info.si_errno = 0;
 		info.si_code = __SI_FAULT;
-		info.si_addr = (void *) regs.pc;
+		info.si_addr = (void *) regs->pc;
 		info.si_trapno = 0;
 		send_sig_info(SIGTRAP, &info, current);
 		return;
 		
 	      case 2: /* gentrap */
-		info.si_addr = (void *) regs.pc;
-		info.si_trapno = regs.r16;
-		switch ((long) regs.r16) {
+		info.si_addr = (void *) regs->pc;
+		info.si_trapno = regs->r16;
+		switch ((long) regs->r16) {
 		case GEN_INTOVF:
 			signo = SIGFPE;
 			code = FPE_INTOVF;
@@ -341,7 +338,7 @@ do_entIF(unsigned long type, unsigned long a1,
 		info.si_signo = signo;
 		info.si_errno = 0;
 		info.si_code = code;
-		info.si_addr = (void *) regs.pc;
+		info.si_addr = (void *) regs->pc;
 		send_sig_info(signo, &info, current);
 		return;
 
@@ -358,26 +355,26 @@ do_entIF(unsigned long type, unsigned long a1,
 			   we get the correct PC.  If not, we set a flag
 			   to correct it every time through.  */
 			if (opDEC_testing) {
-				if (regs.pc == opDEC_test_pc) {
+				if (regs->pc == opDEC_test_pc) {
 					opDEC_fix = 4;
-					regs.pc += 4;
+					regs->pc += 4;
 					printk("opDEC fixup enabled.\n");
 				}
 				return;
 			}
-			regs.pc += opDEC_fix; 
+			regs->pc += opDEC_fix; 
 			
 			/* EV4 does not implement anything except normal
 			   rounding.  Everything else will come here as
 			   an illegal instruction.  Emulate them.  */
-			si_code = alpha_fp_emul(regs.pc - 4);
+			si_code = alpha_fp_emul(regs->pc - 4);
 			if (si_code == 0)
 				return;
 			if (si_code > 0) {
 				info.si_signo = SIGFPE;
 				info.si_errno = 0;
 				info.si_code = si_code;
-				info.si_addr = (void *) regs.pc;
+				info.si_addr = (void *) regs->pc;
 				send_sig_info(SIGFPE, &info, current);
 				return;
 			}
@@ -406,7 +403,7 @@ do_entIF(unsigned long type, unsigned long a1,
 	info.si_signo = SIGILL;
 	info.si_errno = 0;
 	info.si_code = ILL_ILLOPC;
-	info.si_addr = regs.pc;
+	info.si_addr = (void *) regs->pc;
 	send_sig_info(SIGILL, &info, current);
 }
 
@@ -418,18 +415,16 @@ do_entIF(unsigned long type, unsigned long a1,
    and if we don't put something on the entry point we'll oops.  */
 
 asmlinkage void
-do_entDbg(unsigned long type, unsigned long a1,
-	  unsigned long a2, unsigned long a3, unsigned long a4,
-	  unsigned long a5, struct pt_regs regs)
+do_entDbg(struct pt_regs *regs)
 {
 	siginfo_t info;
 
-	die_if_kernel("Instruction fault", &regs, type, 0);
+	die_if_kernel("Instruction fault", regs, 0, 0);
 
 	info.si_signo = SIGILL;
 	info.si_errno = 0;
 	info.si_code = ILL_ILLOPC;
-	info.si_addr = regs.pc;
+	info.si_addr = (void *) regs->pc;
 	force_sig_info(SIGILL, &info, current);
 }
 
@@ -1083,22 +1078,6 @@ give_sigbus:
 	return;
 }
 
-/*
- * Unimplemented system calls.
- */
-asmlinkage long
-alpha_ni_syscall(unsigned long a0, unsigned long a1, unsigned long a2,
-		 unsigned long a3, unsigned long a4, unsigned long a5,
-		 struct pt_regs regs)
-{
-	/* We only get here for OSF system calls, minus #112;
-	   the rest go to sys_ni_syscall.  */
-#if 0
-	printk("<sc %ld(%lx,%lx,%lx)>", regs.r0, a0, a1, a2);
-#endif
-	return -ENOSYS;
-}
-
 void
 trap_init(void)
 {
@@ -1114,9 +1093,7 @@ trap_init(void)
 	wrent(entDbg, 6);
 
 	/* Hack for Multia (UDB) and JENSEN: some of their SRMs have
-	 * a bug in the handling of the opDEC fault.  Fix it up if so.
-	 */
-	if (implver() == IMPLVER_EV4) {
+	   a bug in the handling of the opDEC fault.  Fix it up if so.  */
+	if (implver() == IMPLVER_EV4)
 		opDEC_check();
-	}
 }
