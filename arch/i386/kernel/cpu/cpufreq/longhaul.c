@@ -300,7 +300,7 @@ static int __init longhaul_get_ranges(void)
 		maxmult = longhaul_get_cpu_mult();
 		rdmsr (MSR_IA32_EBL_CR_POWERON, lo, hi);
 		invalue = (lo & (1<<18|1<<19)) >>18;
-		if (cpu_model==CPU_SAMUEL)
+		if (cpu_model==CPU_SAMUEL || cpu_model==CPU_SAMUEL2)
 			fsb = eblcr_fsb_table_v1[invalue];
 		else
 			fsb = guess_fsb();
