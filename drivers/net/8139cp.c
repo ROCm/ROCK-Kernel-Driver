@@ -107,6 +107,11 @@ MODULE_PARM_DESC (multicast_filter_limit, "8139cp: maximum number of filtered mu
 
 #define PFX			DRV_NAME ": "
 
+#ifndef TRUE
+#define FALSE 0
+#define TRUE (!FALSE)
+#endif
+
 #define CP_DEF_MSG_ENABLE	(NETIF_MSG_DRV		| \
 				 NETIF_MSG_PROBE 	| \
 				 NETIF_MSG_LINK)
@@ -678,7 +683,7 @@ static void cp_interrupt (int irq, void *dev_instance, struct pt_regs *regs)
 	if (status & (TxOK | TxErr | TxEmpty | SWInt))
 		cp_tx(cp);
 	if (status & LinkChg)
-		mii_check_media(&cp->mii_if, netif_msg_link(cp));
+		mii_check_media(&cp->mii_if, netif_msg_link(cp), FALSE);
 
 	if (status & PciErr) {
 		u16 pci_status;
@@ -988,8 +993,6 @@ static struct net_device_stats *cp_get_stats(struct net_device *dev)
 
 static void cp_stop_hw (struct cp_private *cp)
 {
-	struct net_device *dev = cp->dev;
-
 	cpw16(IntrMask, 0);
 	cpr16(IntrMask);
 	cpw8(Cmd, 0);
@@ -1195,7 +1198,7 @@ static int cp_open (struct net_device *dev)
 		goto err_out_hw;
 
 	netif_carrier_off(dev);
-	mii_check_media(&cp->mii_if, netif_msg_link(cp));
+	mii_check_media(&cp->mii_if, netif_msg_link(cp), TRUE);
 	netif_start_queue(dev);
 
 	return 0;

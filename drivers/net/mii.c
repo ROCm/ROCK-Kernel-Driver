@@ -3,7 +3,7 @@
 	mii.c: MII interface library
 
 	Maintained by Jeff Garzik <jgarzik@mandrakesoft.com>
-	Copyright 2001 Jeff Garzik
+	Copyright 2001,2002 Jeff Garzik
 
  */
 
@@ -178,7 +178,9 @@ void mii_check_link (struct mii_if_info *mii)
 		netif_carrier_off(mii->dev);
 }
 
-unsigned int mii_check_media (struct mii_if_info *mii, unsigned int ok_to_print)
+unsigned int mii_check_media (struct mii_if_info *mii,
+			      unsigned int ok_to_print,
+			      unsigned int init_media)
 {
 	unsigned int old_carrier, new_carrier;
 	int advertise, lpa, media, duplex;
@@ -194,7 +196,7 @@ unsigned int mii_check_media (struct mii_if_info *mii, unsigned int ok_to_print)
 	/* if carrier state did not change, this is a "bounce",
 	 * just exit as everything is already set correctly
 	 */
-	if (old_carrier == new_carrier)
+	if ((!init_media) && (old_carrier == new_carrier))
 		return 0; /* duplex did not change */
 
 	/* no carrier, nothing much to do */
@@ -211,7 +213,7 @@ unsigned int mii_check_media (struct mii_if_info *mii, unsigned int ok_to_print)
 	netif_carrier_on(mii->dev);
 
 	/* get MII advertise and LPA values */
-	if (mii->advertising)
+	if ((!init_media) && (mii->advertising))
 		advertise = mii->advertising;
 	else {
 		advertise = mii->mdio_read(mii->dev, mii->phy_id, MII_ADVERTISE);
@@ -231,7 +233,7 @@ unsigned int mii_check_media (struct mii_if_info *mii, unsigned int ok_to_print)
 		       duplex ? "full" : "half",
 		       lpa);
 
-	if (mii->full_duplex != duplex) {
+	if ((init_media) || (mii->full_duplex != duplex)) {
 		mii->full_duplex = duplex;
 		return 1; /* duplex changed */
 	}
