@@ -1609,7 +1609,7 @@ static int migration_thread(void * unused)
 
 		spin_lock_irqsave(&rq->lock, flags);
 		head = &rq->migration_queue;
-		current->state = TASK_UNINTERRUPTIBLE;
+		current->state = TASK_INTERRUPTIBLE;
 		if (list_empty(head)) {
 			spin_unlock_irqrestore(&rq->lock, flags);
 			schedule();
