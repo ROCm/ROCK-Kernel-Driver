@@ -49,12 +49,10 @@ int agp_backend_acquire(void)
 	if (agp_bridge.type == NOT_SUPPORTED)
 		return -EINVAL;
 
-	atomic_inc(&agp_bridge.agp_in_use);
-
-	if (atomic_read(&agp_bridge.agp_in_use) != 1) {
-		atomic_dec(&agp_bridge.agp_in_use);
+	if (atomic_read(&agp_bridge.agp_in_use) != 0)
 		return -EBUSY;
-	}
+
+	atomic_inc(&agp_bridge.agp_in_use);
 	return 0;
 }
 
