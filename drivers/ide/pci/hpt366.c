@@ -958,7 +958,7 @@ static int __devinit init_hpt37x(struct pci_dev *dev)
 			/* Unsupported */
 		} else if (pll == F_LOW_PCI_50) {
 			if (hpt_minimum_revision(dev,8))
-				pci_set_drvdata(dev, NULL);
+				pci_set_drvdata(dev, (void *) fifty_base_hpt370a);
 			else if (hpt_minimum_revision(dev,5))
 				pci_set_drvdata(dev, (void *) fifty_base_hpt372);
 			else if (hpt_minimum_revision(dev,4))
