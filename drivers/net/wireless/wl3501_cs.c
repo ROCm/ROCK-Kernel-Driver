@@ -79,13 +79,6 @@ MODULE_PARM(pc_debug, "i");
 #define dprintk(n, format, args...)
 #endif
 
-static u8 wl3501_fpage[] = {
-	[0] = WL3501_BSS_FPAGE0,
-	[1] = WL3501_BSS_FPAGE1,
-	[2] = WL3501_BSS_FPAGE2,
-	[3] = WL3501_BSS_FPAGE3,
-};
-
 /*
  * Conversion from Channel (this->chan) to frequency, this information
  * was obtained from the Planet WAP 1000 Access Point web interface. -acme
@@ -152,34 +145,6 @@ static __inline__ void wl3501_switch_page(struct wl3501_card *this, u8 page)
 }
 
 /*
- * Hold SUTRO. (i.e. make SUTRO stop)
- * Return: 1 if SUTRO is originally running
- */
-static int wl3501_hold_sutro(struct wl3501_card *this)
-{
-	u8 old = inb(this->base_addr + WL3501_NIC_GCR);
-	u8 new = (old & ~(WL3501_GCR_ECINT | WL3501_GCR_INT2EC)) |
-		  WL3501_GCR_ECWAIT;
-
-	wl3501_outb(new, this->base_addr + WL3501_NIC_GCR);
-	return !(old & WL3501_GCR_ECWAIT);
-}
-
-/*
- * UnHold SUTRO. (i.e. make SUTRO running)
- * Return: 1 if SUTRO is originally running
- */
-static int wl3501_unhold_sutro(struct wl3501_card *this)
-{
-	u8 old = inb(this->base_addr + WL3501_NIC_GCR);
-	u8 new = old & (~(WL3501_GCR_ECINT | WL3501_GCR_INT2EC |
-			WL3501_GCR_ECWAIT));
-
-	wl3501_outb(new, this->base_addr + WL3501_NIC_GCR);
-	return !(old & WL3501_GCR_ECWAIT);
-}
-
-/*
  * Get Ethernet MAC addresss.
  *
  * WARNING: We switch to FPAGE0 and switc back again.
@@ -223,6 +188,43 @@ static int wl3501_get_flash_mac_addr(struct wl3501_card *this)
 	/* The MAC addr should be 00:60:... */
 	return this->mac_addr.b0 == 0x00 && this->mac_addr.b1 == 0x60;
 }
+
+#if 0
+static u8 wl3501_fpage[] = {
+	[0] = WL3501_BSS_FPAGE0,
+	[1] = WL3501_BSS_FPAGE1,
+	[2] = WL3501_BSS_FPAGE2,
+	[3] = WL3501_BSS_FPAGE3,
+};
+
+/*
+ * Hold SUTRO. (i.e. make SUTRO stop)
+ * Return: 1 if SUTRO is originally running
+ */
+static int wl3501_hold_sutro(struct wl3501_card *this)
+{
+	u8 old = inb(this->base_addr + WL3501_NIC_GCR);
+	u8 new = (old & ~(WL3501_GCR_ECINT | WL3501_GCR_INT2EC)) |
+		  WL3501_GCR_ECWAIT;
+
+	wl3501_outb(new, this->base_addr + WL3501_NIC_GCR);
+	return !(old & WL3501_GCR_ECWAIT);
+}
+
+/*
+ * UnHold SUTRO. (i.e. make SUTRO running)
+ * Return: 1 if SUTRO is originally running
+ */
+static int wl3501_unhold_sutro(struct wl3501_card *this)
+{
+	u8 old = inb(this->base_addr + WL3501_NIC_GCR);
+	u8 new = old & (~(WL3501_GCR_ECINT | WL3501_GCR_INT2EC |
+			WL3501_GCR_ECWAIT));
+
+	wl3501_outb(new, this->base_addr + WL3501_NIC_GCR);
+	return !(old & WL3501_GCR_ECWAIT);
+}
+
 
 static void wl3501_flash_outb(struct wl3501_card *this, u16 page, u16 addr,
 			      u8 data)
@@ -407,6 +409,7 @@ static int wl3501_write_flash(struct wl3501_card *this, unsigned char *bf,
 out:
 	return rc;
 }
+#endif
 
 /**
  * wl3501_set_to_wla - Move 'size' bytes from PC to card
@@ -421,8 +424,6 @@ void wl3501_set_to_wla(struct wl3501_card *this, u16 dest, void *src, int size)
 	/* switch to SRAM Page 0 */
 	wl3501_switch_page(this, (dest & 0x8000) ? WL3501_BSS_SPAGE1 :
 						   WL3501_BSS_SPAGE0);
-	/* wl3501_outb(((dest>> 11) & 0x18), this->base_addr +
-	  				     WL3501_NIC_BSS); */
 	/* set LMAL and LMAH */
 	wl3501_outb(dest & 0xff, this->base_addr + WL3501_NIC_LMAL);
 	wl3501_outb(((dest >> 8) & 0x7f), this->base_addr + WL3501_NIC_LMAH);
@@ -527,7 +528,7 @@ static int wl3501_esbq_req_test(struct wl3501_card *this)
 	return tmp & 0x80;
 }
 
-static void wl3501_esbq_req(struct wl3501_card *this, u16 * ptr)
+static void wl3501_esbq_req(struct wl3501_card *this, u16 *ptr)
 {
 	u16 tmp = 0;
 
@@ -536,6 +537,32 @@ static void wl3501_esbq_req(struct wl3501_card *this, u16 * ptr)
 	this->esbq_req_head += 4;
 	if (this->esbq_req_head >= this->esbq_req_end)
 		this->esbq_req_head = this->esbq_req_start;
+}
+
+static int wl3501_get_mib_value(struct wl3501_card *this, u8 index,
+				void *bf, int size)
+{
+	struct wl3501_get_req signal;
+	int rc = -EIO;
+    
+	signal.next_blk	  = 0;
+	signal.sig_id	  = WL3501_SIG_GET_REQ;
+	signal.mib_attrib = index;
+
+	if (wl3501_esbq_req_test(this)) {
+		u16 ptr = wl3501_get_tx_buffer(this, sizeof(signal));
+		if (ptr) {
+			wl3501_set_to_wla(this, ptr, &signal, sizeof(signal));
+			wl3501_esbq_req(this, &ptr);
+			this->sig_get_confirm.mib_status = 255;
+			rc = wait_event_interruptible(this->wait,
+				this->sig_get_confirm.mib_status != 255);
+			if (!rc)
+				memcpy(bf, this->sig_get_confirm.mib_value,
+				       size);
+		}
+	}
+	return rc;
 }
 
 /**
@@ -1013,8 +1040,8 @@ static void wl3501_online(struct net_device *dev)
 {
 	struct wl3501_card *this = (struct wl3501_card *)dev->priv;
 
-	printk(KERN_INFO "Wireless LAN online. BSSID: "
-	       "%02X %02X %02X %02X %02X %02X\n",
+	printk(KERN_INFO "%s: Wireless LAN online. BSSID: "
+	       "%02X %02X %02X %02X %02X %02X\n", dev->name,
 	       this->bssid.b0, this->bssid.b1, this->bssid.b2,
 	       this->bssid.b3, this->bssid.b4, this->bssid.b5);
 	netif_wake_queue(dev);
@@ -1209,20 +1236,10 @@ static inline void wl3501_md_ind_interrupt(struct net_device *dev,
 static inline void wl3501_get_confirm_interrupt(struct wl3501_card *this,
 						u16 addr)
 {
-	struct wl3501_get_confirm sig;
-
 	dprintk(3, "entry");
-	wl3501_get_from_wla(this, addr, &sig, sizeof(sig));
-#if 0
-	if (!sig.mib_status) {
-		switch (sig.mib_attrib) {
-		case wl3501_mib_mac_addr:
-			break;
-		case wl3501_mib_current_reg_domain:
-			break;
-		}
-	}
-#endif
+	wl3501_get_from_wla(this, addr, &this->sig_get_confirm,
+			    sizeof(this->sig_get_confirm));
+	wake_up(&this->wait);
 }
 
 static inline void wl3501_start_confirm_interrupt(struct net_device *dev,
@@ -1412,13 +1429,10 @@ static int wl3501_init_firmware(struct wl3501_card *this)
 	wl3501_get_from_wla(this, 0x1a00,
 			    this->card_name, sizeof(this->card_name));
 	this->card_name[sizeof(this->card_name) - 1] = '\0';
-	printk(KERN_INFO "%s: card_name=%s\n", __FUNCTION__, this->card_name);
 	this->firmware_date[0] = '\0';
 	wl3501_get_from_wla(this, 0x1a40,
 			    this->firmware_date, sizeof(this->firmware_date));
 	this->firmware_date[sizeof(this->firmware_date) - 1] = '\0';
-	printk(KERN_INFO "%s: firmware_date=%s\n", __FUNCTION__,
-	       this->firmware_date);
 	/* Switch to SRAM Page 0 */
 	wl3501_switch_page(this, WL3501_BSS_SPAGE0);
 	/* Read parameter from card */
@@ -1501,11 +1515,7 @@ static int wl3501_reset(struct net_device *dev)
 	struct wl3501_card *this = (struct wl3501_card *)dev->priv;
 	int rc = -ENODEV;
 
-	/* Stop processing interrupt from the card */
 	wl3501_block_interrupt(this);
-
-	/* Initial WL3501 firmware */
-	printk(KERN_INFO "%s: Initialize WL3501 firmware...\n", dev->name);
 
 	if (wl3501_init_firmware(this)) {
 		printk(KERN_WARNING "%s: Can't initialize Firmware!\n",
@@ -1515,15 +1525,15 @@ static int wl3501_reset(struct net_device *dev)
 		goto out;
 	}
 
-	/* queue has to be started only when the Card is Started */
+	/*
+	 * Queue has to be started only when the Card is Started
+	 */
 	netif_stop_queue(dev);
 	this->adhoc_times = 0;
 	wl3501_ack_interrupt(this);
-
-	/* Enable interrupt from card */
 	wl3501_unblock_interrupt(this);
 	wl3501_mgmt_scan(this, 100);
-	printk(KERN_INFO "%s: device reset\n", dev->name);
+	dprintk(1, "%s: device reset", dev->name);
 	rc = 0;
 out:
 	return rc;
@@ -1599,7 +1609,7 @@ static int wl3501_open(struct net_device *dev)
 	link->open++;
 
 	/* Initial WL3501 firmware */
-	printk(KERN_INFO "%s: Initialize WL3501 firmware...\n", dev->name);
+	dprintk(1, "%s: Initialize WL3501 firmware...", dev->name);
 	if (wl3501_init_firmware(this))
 		goto fail;
 	/* Initial device variables */
@@ -1611,7 +1621,11 @@ static int wl3501_open(struct net_device *dev)
 	wl3501_unblock_interrupt(this);
 	wl3501_mgmt_scan(this, 100);
 	rc = 0;
-	printk(KERN_INFO "%s: WL3501 opened\n", dev->name);
+	dprintk(1, "%s: WL3501 opened", dev->name);
+	printk(KERN_INFO "%s: Card Name: %s\n"
+			 "%s: Firmware Date: %s\n",
+			 dev->name, this->card_name,
+			 dev->name, this->firmware_date);
 out:
 	spin_unlock_irqrestore(&this->lock, flags);
 	return rc;
@@ -2058,25 +2072,42 @@ static int wl3501_get_rate(struct net_device *dev, struct iw_request_info *info,
 	return 0;
 }
 
+static int wl3501_get_rts_threshold(struct net_device *dev,
+				    struct iw_request_info *info,
+				    union iwreq_data *wrqu, char *extra)
+{
+	u16 threshold;
+	struct wl3501_card *this = (struct wl3501_card *)dev->priv;
+	int rc = wl3501_get_mib_value(this, WL3501_MIB_ATTR_RTS_THRESHOLD,
+				      &threshold, sizeof(threshold));
+	if (!rc) {
+		wrqu->rts.value = threshold;
+		wrqu->rts.disabled = threshold >= 2347;
+		wrqu->rts.fixed = 1;
+	}
+	return rc;
+}
+
 static const iw_handler	wl3501_handler[] = {
-	[SIOCGIWNAME	- SIOCSIWCOMMIT] = wl3501_get_name,
-	[SIOCSIWFREQ	- SIOCSIWCOMMIT] = wl3501_set_freq,
-	[SIOCGIWFREQ	- SIOCSIWCOMMIT] = wl3501_get_freq,
-	[SIOCSIWMODE	- SIOCSIWCOMMIT] = wl3501_set_mode,
-	[SIOCGIWMODE	- SIOCSIWCOMMIT] = wl3501_get_mode,
-	[SIOCGIWSENS	- SIOCSIWCOMMIT] = wl3501_get_sens,
-	[SIOCGIWRANGE	- SIOCSIWCOMMIT] = wl3501_get_range,
-	[SIOCSIWSPY	- SIOCSIWCOMMIT] = iw_handler_set_spy,
-	[SIOCGIWSPY	- SIOCSIWCOMMIT] = iw_handler_get_spy,
-	[SIOCSIWTHRSPY	- SIOCSIWCOMMIT] = iw_handler_set_thrspy,
-	[SIOCGIWTHRSPY	- SIOCSIWCOMMIT] = iw_handler_get_thrspy,
-	[SIOCSIWAP	- SIOCSIWCOMMIT] = wl3501_set_wap,
-	[SIOCGIWAP	- SIOCSIWCOMMIT] = wl3501_get_wap,
-	[SIOCSIWESSID	- SIOCSIWCOMMIT] = wl3501_set_essid,
-	[SIOCGIWESSID	- SIOCSIWCOMMIT] = wl3501_get_essid,
-	[SIOCSIWNICKN	- SIOCSIWCOMMIT] = wl3501_set_nick,
-	[SIOCGIWNICKN	- SIOCSIWCOMMIT] = wl3501_get_nick,
-	[SIOCGIWRATE	- SIOCSIWCOMMIT] = wl3501_get_rate,
+	[SIOCGIWNAME	- SIOCIWFIRST] = wl3501_get_name,
+	[SIOCSIWFREQ	- SIOCIWFIRST] = wl3501_set_freq,
+	[SIOCGIWFREQ	- SIOCIWFIRST] = wl3501_get_freq,
+	[SIOCSIWMODE	- SIOCIWFIRST] = wl3501_set_mode,
+	[SIOCGIWMODE	- SIOCIWFIRST] = wl3501_get_mode,
+	[SIOCGIWSENS	- SIOCIWFIRST] = wl3501_get_sens,
+	[SIOCGIWRANGE	- SIOCIWFIRST] = wl3501_get_range,
+	[SIOCSIWSPY	- SIOCIWFIRST] = iw_handler_set_spy,
+	[SIOCGIWSPY	- SIOCIWFIRST] = iw_handler_get_spy,
+	[SIOCSIWTHRSPY	- SIOCIWFIRST] = iw_handler_set_thrspy,
+	[SIOCGIWTHRSPY	- SIOCIWFIRST] = iw_handler_get_thrspy,
+	[SIOCSIWAP	- SIOCIWFIRST] = wl3501_set_wap,
+	[SIOCGIWAP	- SIOCIWFIRST] = wl3501_get_wap,
+	[SIOCSIWESSID	- SIOCIWFIRST] = wl3501_set_essid,
+	[SIOCGIWESSID	- SIOCIWFIRST] = wl3501_get_essid,
+	[SIOCSIWNICKN	- SIOCIWFIRST] = wl3501_set_nick,
+	[SIOCGIWNICKN	- SIOCIWFIRST] = wl3501_get_nick,
+	[SIOCGIWRATE	- SIOCIWFIRST] = wl3501_get_rate,
+	[SIOCGIWRTS	- SIOCIWFIRST] = wl3501_get_rts_threshold,
 };
 
 static const struct iw_handler_def wl3501_handler_def = {
@@ -2293,6 +2324,7 @@ static void wl3501_config(dev_link_t *link)
 	this->rssi		= 255;
 	strlcpy(this->nick, "Planet WL3501", sizeof(this->nick));
 	spin_lock_init(&this->lock);
+	init_waitqueue_head(&this->wait);
 
 	switch (this->freq_domain) {
 	case 0x31:
