@@ -54,15 +54,6 @@
 #define ACPI_ENABLE_IRQS()  local_irq_enable()
 #define ACPI_FLUSH_CPU_CACHE()	wbinvd()
 
-/*
- * A brief explanation as GNU inline assembly is a bit hairy
- *  %0 is the output parameter in EAX ("=a")
- *  %1 and %2 are the input parameters in ECX ("c")
- *  and an immediate value ("i") respectively
- *  All actual register references are preceded with "%%" as in "%%edx"
- *  Immediate values in the assembly are preceded by "$" as in "$0x1"
- *  The final asm parameter are the operation altered non-output registers.
- */
 
 static inline int
 __acpi_acquire_global_lock (unsigned int *lock)
