@@ -71,7 +71,6 @@
 #include <linux/mii.h>
 #include <linux/ethtool.h>
 #include <linux/if_vlan.h>
-#include <linux/moduleparam.h>
 
 #define BAR_0		0
 #define BAR_1		1
