@@ -1024,9 +1024,7 @@ static int hcd_submit_urb (struct urb *urb, int mem_flags)
 		 */
 		urb->transfer_flags |= URB_NO_DMA_MAP;
 		status = rh_urb_enqueue (hcd, urb);
-		if (status)
-			urb_unlink (urb);
-		return status;
+		goto done;
 	}
 
 	/* lower level hcd code should use *_dma exclusively,
@@ -1051,8 +1049,11 @@ static int hcd_submit_urb (struct urb *urb, int mem_flags)
 	}
 
 	status = hcd->driver->urb_enqueue (hcd, urb, mem_flags);
-	if (status)
+done:
+	if (status) {
+		usb_put_urb (urb);
 		urb_unlink (urb);
+	}
 	return status;
 }
 
