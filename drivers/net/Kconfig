@@ -2028,9 +2028,11 @@ config PPPOE
 	help
 	  Support for PPP over Ethernet.
 
-	  This driver requires a specially patched pppd daemon.  The patch to
-	  pppd, along with binaries of a patched pppd package can be found at:
-	  <http://www.shoshin.uwaterloo.ca/~mostrows/>.
+	  This driver requires the latest version of pppd from the CVS
+	  repository at cvs.samba.org.  Alternatively, see the 
+	  RoaringPenguin package (http://www.roaringpenguin.com/pppoe)
+	  which contains instruction on how to use this driver (under 
+	  the heading "Kernel mode PPPoE").
 
 config PPPOATM
 	tristate "PPP over ATM"
