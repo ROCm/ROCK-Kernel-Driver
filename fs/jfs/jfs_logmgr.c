@@ -1109,7 +1109,7 @@ int lmLogOpen(struct super_block *sb, log_t ** logptr)
 
 	if ((rc = blkdev_get(bdev, FMODE_READ|FMODE_WRITE, 0, BDEV_FS))) {
 		rc = -rc;
-		goto bdput;
+		goto free;
 	}
 
 	if ((rc = bd_claim(bdev, log))) {
@@ -1148,9 +1148,6 @@ int lmLogOpen(struct super_block *sb, log_t ** logptr)
 
       close:		/* close external log device */
 	blkdev_put(bdev, BDEV_FS);
-
-      bdput:
-	bdput(bdev);
 
       free:		/* free log descriptor */
 	kfree(log);
@@ -1398,7 +1395,6 @@ int lmLogClose(struct super_block *sb, log_t * log)
 
 	bd_release(bdev);
 	blkdev_put(bdev, BDEV_FS);
-	bdput(bdev);
 
       out:
 	jFYI(0, ("lmLogClose: exit(%d)\n", rc));
