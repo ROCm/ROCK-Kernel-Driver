@@ -35,6 +35,7 @@
 #include "irq_user.h"
 #include "syscall_user.h"
 #include "ptrace_user.h"
+#include "time_user.h"
 #include "init.h"
 #include "os.h"
 

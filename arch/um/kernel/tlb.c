@@ -99,7 +99,7 @@ void flush_kernel_range(unsigned long start, unsigned long end, int update_seq)
 	int updated = 0, err;
 
 	mm = &init_mm;
-	for(addr = start_vm; addr < end_vm;){
+	for(addr = start; addr < end;){
 		pgd = pgd_offset(mm, addr);
 		pmd = pmd_offset(pgd, addr);
 		if(pmd_present(*pmd)){

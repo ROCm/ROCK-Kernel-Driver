@@ -53,6 +53,28 @@ static void set_interval(int timer_type)
 		panic("setitimer failed - errno = %d\n", errno);
 }
 
+void switch_timers(int to_real)
+{
+	struct itimerval disable = ((struct itimerval) { { 0, 0 }, { 0, 0 }});
+	struct itimerval enable = ((struct itimerval) { { 0, 1000000/hz() },
+							{ 0, 1000000/hz() }});
+	int old, new;
+
+	if(to_real){
+		old = ITIMER_VIRTUAL;
+		new = ITIMER_REAL;
+	}
+	else {
+		old = ITIMER_REAL;
+		new = ITIMER_VIRTUAL;
+	}
+
+	if((setitimer(old, &disable, NULL) < 0) ||
+	   (setitimer(new, &enable, NULL)))
+		printk("switch_timers - setitimer failed, errno = %d\n",
+		       errno);
+}
+
 void idle_timer(void)
 {
 	if(signal(SIGVTALRM, SIG_IGN) == SIG_ERR)
