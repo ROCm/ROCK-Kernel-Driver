@@ -66,9 +66,10 @@
 #  include <asm/irq.h>
 #endif
 
+#include <scsi/scsi.h>
 #include <scsi/scsi_cmnd.h>
+#include <scsi/scsi_device.h>
 #include <scsi/scsi_host.h>
-#include "../scsi.h"		/* XXX: DID_* */
 
 #ifndef bzero
 #define bzero(d, n)	memset((d), 0, (n))
@@ -341,18 +342,12 @@ typedef struct scsi_cmnd *cam_scsiio_p;/* SCSI I/O */
 #define	CAM_RESRC_UNAVAIL	DID_ERROR
 
 /*
- *  Remap SCSI data direction values.
+ *  Remap data direction values.
  */
-#ifndef	SCSI_DATA_UNKNOWN
-#define	SCSI_DATA_UNKNOWN	0
-#define	SCSI_DATA_WRITE		1
-#define	SCSI_DATA_READ		2
-#define	SCSI_DATA_NONE		3
-#endif
-#define CAM_DIR_NONE		SCSI_DATA_NONE
-#define CAM_DIR_IN		SCSI_DATA_READ
-#define CAM_DIR_OUT		SCSI_DATA_WRITE
-#define CAM_DIR_UNKNOWN		SCSI_DATA_UNKNOWN
+#define CAM_DIR_NONE		DMA_NONE
+#define CAM_DIR_IN		DMA_FROM_DEVICE
+#define CAM_DIR_OUT		DMA_TO_DEVICE
+#define CAM_DIR_UNKNOWN		DMA_BIDIRECTIONAL
 
 /*
  *  These ones are used as return code from 
