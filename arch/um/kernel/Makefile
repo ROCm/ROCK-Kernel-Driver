@@ -52,7 +52,7 @@ arch/um/kernel/unmap_fin.o : arch/um/kernel/unmap.o
 	ld -r -o $@ $< -lc -L/usr/lib
 
 arch/um/kernel/frame.o: arch/um/kernel/frame.c
-	$(CC) $(CFLAGS_$@) -c -o $@ $<
+	$(CC) $(CFLAGS_$(notdir $@)) -c -o $@ $<
 
 QUOTE = 'my $$config=`cat $(TOPDIR)/.config`; $$config =~ s/"/\\"/g ; while(<STDIN>) { $$_ =~ s/CONFIG/$$config/; print $$_ }'
 
