@@ -561,6 +561,10 @@ nlmclnt_lock(struct nlm_rqst *req, struct file_lock *fl)
 	if (resp->status == NLM_LCK_GRANTED) {
 		fl->fl_u.nfs_fl.state = host->h_state;
 		fl->fl_u.nfs_fl.flags |= NFS_LCK_GRANTED;
+		fl->fl_flags |= FL_SLEEP;
+		if (posix_lock_file_wait(fl->fl_file, fl) < 0)
+				printk(KERN_WARNING "%s: VFS is out of sync with lock manager!\n",
+						__FUNCTION__);
 	}
 	status = nlm_stat_to_errno(resp->status);
 out:
@@ -627,6 +631,9 @@ nlmclnt_unlock(struct nlm_rqst *req, struct file_lock *fl)
 	if (req->a_flags & RPC_TASK_ASYNC) {
 		status = nlmclnt_async_call(req, NLMPROC_UNLOCK,
 					nlmclnt_unlock_callback);
+		/* Hrmf... Do the unlock early since locks_remove_posix()
+		 * really expects us to free the lock synchronously */
+		posix_lock_file(fl->fl_file, fl);
 		if (status < 0) {
 			nlmclnt_release_lockargs(req);
 			kfree(req);
@@ -639,6 +646,7 @@ nlmclnt_unlock(struct nlm_rqst *req, struct file_lock *fl)
 	if (status < 0)
 		return status;
 
+	posix_lock_file(fl->fl_file, fl);
 	if (resp->status == NLM_LCK_GRANTED)
 		return 0;
 
@@ -669,7 +677,6 @@ nlmclnt_unlock_callback(struct rpc_task *task)
 	}
 	if (status != NLM_LCK_GRANTED)
 		printk(KERN_WARNING "lockd: unexpected unlock status: %d\n", status);
-
 die:
 	nlm_release_host(req->a_host);
 	nlmclnt_release_lockargs(req);

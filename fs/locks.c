@@ -907,6 +907,34 @@ int posix_lock_file(struct file *filp, struct file_lock *fl)
 }
 
 /**
+ * posix_lock_file_wait - Apply a POSIX-style lock to a file
+ * @filp: The file to apply the lock to
+ * @fl: The lock to be applied
+ *
+ * Add a POSIX style lock to a file.
+ * We merge adjacent & overlapping locks whenever possible.
+ * POSIX locks are sorted by owner task, then by starting address
+ */
+int posix_lock_file_wait(struct file *filp, struct file_lock *fl)
+{
+	int error;
+	might_sleep ();
+	for (;;) {
+		error = __posix_lock_file(filp->f_dentry->d_inode, fl);
+		if ((error != -EAGAIN) || !(fl->fl_flags & FL_SLEEP))
+			break;
+		error = wait_event_interruptible(fl->fl_wait, !fl->fl_next);
+		if (!error)
+			continue;
+
+		locks_delete_block(fl);
+		break;
+	}
+	return error;
+}
+EXPORT_SYMBOL(posix_lock_file_wait);
+
+/**
  * locks_mandatory_locked - Check for an active lock
  * @inode: the file to check
  *
@@ -1483,8 +1511,7 @@ int fcntl_setlk(struct file *filp, unsigned int cmd, struct flock __user *l)
 
 	if (filp->f_op && filp->f_op->lock != NULL) {
 		error = filp->f_op->lock(filp, cmd, file_lock);
-		if (error < 0)
-			goto out;
+		goto out;
 	}
 
 	for (;;) {
@@ -1618,8 +1645,7 @@ int fcntl_setlk64(struct file *filp, unsigned int cmd, struct flock64 __user *l)
 
 	if (filp->f_op && filp->f_op->lock != NULL) {
 		error = filp->f_op->lock(filp, cmd, file_lock);
-		if (error < 0)
-			goto out;
+		goto out;
 	}
 
 	for (;;) {
@@ -1671,7 +1697,7 @@ void locks_remove_posix(struct file *filp, fl_owner_t owner)
 
 	if (filp->f_op && filp->f_op->lock != NULL) {
 		filp->f_op->lock(filp, F_SETLK, &lock);
-		/* Ignore any error -- we must remove the locks anyway */
+		goto out;
 	}
 
 	/* Can't use posix_lock_file here; we need to remove it no matter
@@ -1687,6 +1713,7 @@ void locks_remove_posix(struct file *filp, fl_owner_t owner)
 		before = &fl->fl_next;
 	}
 	unlock_kernel();
+out:
 	if (lock.fl_ops && lock.fl_ops->fl_release_private)
 		lock.fl_ops->fl_release_private(&lock);
 }
