@@ -95,6 +95,26 @@ if BLK_DEV_IDE
 
 comment "Please see Documentation/ide.txt for help/info on IDE drives"
 
+config BLK_DEV_IDE_SATA
+	bool "Support for SATA (deprecated; conflicts with libata SATA driver)"
+	default n
+	---help---
+	  There are two drivers for Serial ATA controllers.
+
+	  The main driver, "libata", exists inside the SCSI subsystem
+	  and supports most modern SATA controllers.
+
+	  The IDE driver (which you are currently configuring) supports
+	  a few first-generation SATA controllers.
+
+	  In order to eliminate conflicts between the two subsystems,
+	  this config option enables the IDE driver's SATA support.
+	  Normally this is disabled, as it is preferred that libata
+	  supports SATA controllers, and this (IDE) driver supports
+	  PATA controllers.
+
+	  If unsure, say N.
+
 config BLK_DEV_HD_IDE
 	bool "Use old disk-only driver on primary interface"
 	depends on ((X86 && X86_PC9800!=y) || SH_MPC1211)
