@@ -80,6 +80,7 @@
 #include <linux/blkdev.h>
 #include <linux/init.h>
 #include <linux/smp_lock.h>
+#include <linux/buffer_head.h>
 
 #include "swab.h"
 #include "util.h"

@@ -6,6 +6,7 @@
  * Portions derived from work (c) 1995,1996 Christian Vogelgsang.
  */
 
+#include <linux/buffer_head.h>
 #include <linux/string.h>
 #include <linux/efs_fs.h>
 #include <linux/smp_lock.h>

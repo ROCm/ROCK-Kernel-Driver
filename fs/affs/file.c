@@ -28,6 +28,7 @@
 #include <linux/amigaffs.h>
 #include <linux/mm.h>
 #include <linux/pagemap.h>
+#include <linux/buffer_head.h>
 
 #if PAGE_SIZE < 4096
 #error PAGE_SIZE must be at least 4096

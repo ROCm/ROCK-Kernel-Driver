@@ -7,6 +7,7 @@
 #include <linux/string.h>
 #include <linux/time.h>
 #include <linux/reiserfs_fs.h>
+#include <linux/buffer_head.h>
 
 /* these are used in do_balance.c */
 

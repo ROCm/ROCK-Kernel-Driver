@@ -7,6 +7,7 @@
  */
 
 #include "hpfs_fn.h"
+#include <linux/buffer_head.h>
 #include <linux/time.h>
 #include <linux/smp_lock.h>
 

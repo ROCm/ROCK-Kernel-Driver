@@ -27,6 +27,7 @@
 #include <linux/ctype.h>
 #include <linux/smp_lock.h>
 #include <linux/blkdev.h>
+#include <linux/buffer_head.h>
 
 #include <asm/system.h>
 #include <asm/uaccess.h>

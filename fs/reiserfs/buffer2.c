@@ -7,6 +7,7 @@
 #include <linux/reiserfs_fs.h>
 #include <linux/smp_lock.h>
 #include <linux/kernel_stat.h>
+#include <linux/buffer_head.h>
 
 /*
  *  wait_buffer_until_released

@@ -8,6 +8,7 @@
 
 #include <linux/pagemap.h>
 #include <linux/string.h>
+#include <linux/buffer_head.h>
 #include "hpfs_fn.h"
 
 int hpfs_mkdir(struct inode *dir, struct dentry *dentry, int mode)

@@ -16,6 +16,7 @@
 #include <linux/errno.h>
 #include <linux/config.h>	/* Joliet? */
 #include <linux/smp_lock.h>
+#include <linux/buffer_head.h>
 
 #include <asm/uaccess.h>
 

@@ -11,6 +11,7 @@
 
 #include <linux/module.h>
 #include "minix.h"
+#include <linux/buffer_head.h>
 #include <linux/slab.h>
 #include <linux/init.h>
 #include <linux/highuid.h>

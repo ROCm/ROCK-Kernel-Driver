@@ -4,6 +4,7 @@
  *  Copyright (C) 1991, 1992  Linus Torvalds
  */
 
+#include <linux/buffer_head.h>	/* for block_symlink() */
 #include "minix.h"
 
 static inline void inc_count(struct inode *inode)

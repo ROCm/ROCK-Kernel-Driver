@@ -22,6 +22,7 @@
 #include <linux/ctype.h>
 #include <linux/slab.h>
 #include <linux/smp_lock.h>
+#include <linux/buffer_head.h>
 
 #define DEBUG_LEVEL 0
 #if (DEBUG_LEVEL >= 1)

@@ -20,6 +20,7 @@
 #include <linux/stat.h>
 #include <linux/string.h>
 #include <linux/quotaops.h>
+#include <linux/buffer_head.h>
 
 #include <asm/bitops.h>
 #include <asm/byteorder.h>

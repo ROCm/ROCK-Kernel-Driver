@@ -23,6 +23,7 @@
 #include <linux/mm.h>
 #include <linux/amigaffs.h>
 #include <linux/smp_lock.h>
+#include <linux/buffer_head.h>
 
 static int affs_readdir(struct file *, void *, filldir_t);
 

@@ -37,6 +37,7 @@
 
 #include <linux/blkdev.h>
 #include <linux/fs.h>
+#include <linux/buffer_head.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>
 #include <linux/stat.h>

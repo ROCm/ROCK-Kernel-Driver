@@ -22,6 +22,7 @@
 #include <linux/fcntl.h>
 #include <linux/errno.h>
 #include <linux/smp_lock.h>
+#include <linux/buffer_head.h>
 
 
 /*

@@ -29,6 +29,7 @@
 #include <linux/pagemap.h>
 #include <linux/quotaops.h>
 #include <linux/module.h>
+#include <linux/buffer_head.h>
 
 MODULE_AUTHOR("Remy Card and others");
 MODULE_DESCRIPTION("Second Extended Filesystem");

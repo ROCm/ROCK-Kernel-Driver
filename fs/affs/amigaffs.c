@@ -15,6 +15,7 @@
 #include <linux/string.h>
 #include <linux/mm.h>
 #include <linux/amigaffs.h>
+#include <linux/buffer_head.h>
 
 extern struct timezone sys_tz;
 

@@ -15,6 +15,7 @@
 #include <linux/amigaffs.h>
 #include <linux/pagemap.h>
 #include <linux/smp_lock.h>
+#include <linux/buffer_head.h>
 
 static int affs_symlink_readpage(struct file *file, struct page *page)
 {

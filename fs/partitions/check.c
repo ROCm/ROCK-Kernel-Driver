@@ -21,6 +21,7 @@
 #include <linux/blk.h>
 #include <linux/init.h>
 #include <linux/raid/md.h>
+#include <linux/buffer_head.h>	/* for invalidate_bdev() */
 
 #include "check.h"
 

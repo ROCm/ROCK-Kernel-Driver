@@ -35,6 +35,7 @@
 #include <linux/slab.h>
 #include <linux/pagemap.h>
 #include <linux/smp_lock.h>
+#include <linux/buffer_head.h>
 #include "udf_i.h"
 
 static void udf_pc_to_char(char *from, int fromlen, char *to)

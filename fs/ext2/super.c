@@ -24,6 +24,7 @@
 #include <linux/init.h>
 #include <linux/blkdev.h>
 #include <linux/random.h>
+#include <linux/buffer_head.h>
 #include <linux/smp_lock.h>
 #include <asm/uaccess.h>
 

@@ -15,6 +15,7 @@
 #include <linux/string.h>
 #include <linux/bitops.h>
 #include <linux/amigaffs.h>
+#include <linux/buffer_head.h>
 
 /* This is, of course, shamelessly stolen from fs/minix */
 

@@ -20,6 +20,7 @@
 #include <asm/uaccess.h>
 #include <linux/time.h>
 #include <linux/reiserfs_fs.h>
+#include <linux/buffer_head.h>
 
 #ifdef CONFIG_REISERFS_CHECK
 

@@ -31,6 +31,7 @@
 #include <linux/string.h>
 #include <linux/udf_fs.h>
 #include <linux/slab.h>
+#include <linux/buffer_head.h>
 
 inline uint32_t udf_get_pblock(struct super_block *sb, uint32_t block, uint16_t partition, uint32_t offset)
 {

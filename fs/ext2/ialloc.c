@@ -16,6 +16,7 @@
 #include "ext2.h"
 #include <linux/quotaops.h>
 #include <linux/sched.h>
+#include <linux/buffer_head.h>
 
 
 /*

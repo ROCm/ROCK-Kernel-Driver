@@ -20,6 +20,7 @@
 
 #include <linux/fs.h>
 #include <linux/string.h>
+#include <linux/buffer_head.h>
 
 uint8_t * udf_filead_read(struct inode *dir, uint8_t *tmpad, uint8_t ad_size,
 	lb_addr fe_loc, int *pos, int *offset, struct buffer_head **bh, int *error)

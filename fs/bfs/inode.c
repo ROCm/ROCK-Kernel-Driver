@@ -11,6 +11,7 @@
 #include <linux/init.h>
 #include <linux/fs.h>
 #include <linux/smp_lock.h>
+#include <linux/buffer_head.h>
 #include <asm/uaccess.h>
 #include "bfs.h"
 

@@ -33,6 +33,7 @@
  * Veritas filesystem driver - fileset header routines.
  */
 #include <linux/fs.h>
+#include <linux/buffer_head.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>
 

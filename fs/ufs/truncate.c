@@ -37,6 +37,8 @@
 #include <linux/stat.h>
 #include <linux/string.h>
 #include <linux/smp_lock.h>
+#include <linux/buffer_head.h>
+#include <linux/sched.h>
 
 #include "swab.h"
 #include "util.h"

@@ -13,6 +13,7 @@
 #include <linux/msdos_fs_sb.h>
 #include <linux/fat_cvf.h>
 #include <linux/config.h>
+#include <linux/buffer_head.h>
 #ifdef CONFIG_KMOD
 #include <linux/kmod.h>
 #endif

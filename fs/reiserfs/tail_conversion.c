@@ -5,6 +5,7 @@
 #include <linux/config.h>
 #include <linux/time.h>
 #include <linux/pagemap.h>
+#include <linux/buffer_head.h>
 #include <linux/reiserfs_fs.h>
 
 /* access to tail : when one is going to read tail it must make sure, that is not running.

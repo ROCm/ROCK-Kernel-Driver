@@ -33,6 +33,7 @@
 #include <linux/mempool.h>
 #include <linux/hash.h>
 #include <linux/suspend.h>
+#include <linux/buffer_head.h>
 #include <asm/bitops.h>
 
 #define BH_ENTRY(list) list_entry((list), struct buffer_head, b_assoc_buffers)
