@@ -340,15 +340,9 @@ static int exact_lock(dev_t dev, void *data)
 
 int cdev_add(struct cdev *p, dev_t dev, unsigned count)
 {
-	int err = kobject_add(&p->kobj);
-	if (err)
-		return err;
-	err = kobj_map(cdev_map, dev, count, NULL, exact_match, exact_lock, p);
-	if (err)
-		kobject_del(&p->kobj);
 	p->dev = dev;
 	p->count = count;
-	return err;
+	return kobj_map(cdev_map, dev, count, NULL, exact_match, exact_lock, p);
 }
 
 static void cdev_unmap(dev_t dev, unsigned count)
@@ -359,7 +353,6 @@ static void cdev_unmap(dev_t dev, unsigned count)
 void cdev_del(struct cdev *p)
 {
 	cdev_unmap(p->dev, p->count);
-	kobject_del(&p->kobj);
 	kobject_put(&p->kobj);
 }
 
@@ -407,18 +400,12 @@ static struct kobj_type ktype_cdev_dynamic = {
 	.release	= cdev_dynamic_release,
 };
 
-static struct kset kset_dynamic = {
-	.subsys = &cdev_subsys,
-	.kobj = {.name = "major",},
-	.ktype = &ktype_cdev_dynamic,
-};
-
 struct cdev *cdev_alloc(void)
 {
 	struct cdev *p = kmalloc(sizeof(struct cdev), GFP_KERNEL);
 	if (p) {
 		memset(p, 0, sizeof(struct cdev));
-		p->kobj.kset = &kset_dynamic;
+		p->kobj.ktype = &ktype_cdev_dynamic;
 		INIT_LIST_HEAD(&p->list);
 		kobject_init(&p->kobj);
 	}
@@ -428,7 +415,6 @@ struct cdev *cdev_alloc(void)
 void cdev_init(struct cdev *cdev, struct file_operations *fops)
 {
 	INIT_LIST_HEAD(&cdev->list);
-	kobj_set_kset_s(cdev, cdev_subsys);
 	cdev->kobj.ktype = &ktype_cdev_default;
 	kobject_init(&cdev->kobj);
 	cdev->ops = fops;
@@ -444,8 +430,12 @@ static struct kobject *base_probe(dev_t dev, int *part, void *data)
 
 void __init chrdev_init(void)
 {
-	subsystem_register(&cdev_subsys);
-	kset_register(&kset_dynamic);
+/*
+ * Keep cdev_subsys around because (and only because) the kobj_map code
+ * depends on the rwsem it contains.  We don't make it public in sysfs,
+ * however.
+ */
+	subsystem_init(&cdev_subsys);
 	cdev_map = kobj_map_init(base_probe, &cdev_subsys);
 }
 

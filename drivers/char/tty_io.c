@@ -2175,8 +2175,6 @@ void tty_unregister_device(struct tty_driver *driver, unsigned index)
 EXPORT_SYMBOL(tty_register_device);
 EXPORT_SYMBOL(tty_unregister_device);
 
-static struct kobject tty_kobj = {.name = "tty"};
-
 struct tty_driver *alloc_tty_driver(int lines)
 {
 	struct tty_driver *driver;
@@ -2276,7 +2274,6 @@ int tty_register_driver(struct tty_driver *driver)
 		driver->termios_locked = NULL;
 	}
 
-	driver->cdev.kobj.parent = &tty_kobj;
 	strcpy(driver->cdev.kobj.name, driver->name);
 	for (s = strchr(driver->cdev.kobj.name, '/'); s; s = strchr(s, '/'))
 		*s = '!';
@@ -2400,7 +2397,9 @@ static int __init tty_class_init(void)
 }
 
 postcore_initcall(tty_class_init);
- 
+
+/* 3/2004 jmc: why do these devices exist? */
+
 static struct cdev tty_cdev, console_cdev;
 #ifdef CONFIG_UNIX98_PTYS
 static struct cdev ptmx_cdev;
@@ -2430,9 +2429,6 @@ static int __init tty_init(void)
 		panic("Couldn't register /dev/console driver\n");
 	devfs_mk_cdev(MKDEV(TTYAUX_MAJOR, 1), S_IFCHR|S_IRUSR|S_IWUSR, "console");
 	class_simple_device_add(tty_class, MKDEV(TTYAUX_MAJOR, 1), NULL, "console");
-
-	tty_kobj.kset = tty_cdev.kobj.kset;
-	kobject_register(&tty_kobj);
 
 #ifdef CONFIG_UNIX98_PTYS
 	strcpy(ptmx_cdev.kobj.name, "dev.ptmx");
