@@ -2026,8 +2026,6 @@ extern void sk_init(void);
 
 void __init sock_init(void)
 {
-	int i;
-
 	/*
 	 *	Initialize sock SLAB cache.
 	 */
