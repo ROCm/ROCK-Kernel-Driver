@@ -2463,6 +2463,7 @@ int ata_attach(ide_drive_t *drive)
 		if (driver->attach(drive) == 0) {
 			if (driver->owner)
 				__MOD_DEC_USE_COUNT(driver->owner);
+			drive->gendev.driver = &driver->gen_driver;
 			return 0;
 		}
 		spin_lock(&drivers_lock);
@@ -3422,6 +3423,16 @@ int ide_unregister_subdriver (ide_drive_t *drive)
 
 EXPORT_SYMBOL(ide_unregister_subdriver);
 
+static int ide_drive_remove(struct device * dev)
+{
+	ide_drive_t * drive = container_of(dev,ide_drive_t,gendev);
+	ide_driver_t * driver = drive->driver;
+
+	if (driver && driver->standby)
+		driver->standby(drive);
+	return 0;
+}
+
 int ide_register_driver(ide_driver_t *driver)
 {
 	struct list_head list;
@@ -3442,6 +3453,7 @@ int ide_register_driver(ide_driver_t *driver)
 	}
 	driver->gen_driver.name = driver->name;
 	driver->gen_driver.bus = &ide_bus_type;
+	driver->gen_driver.remove = ide_drive_remove;
 	return driver_register(&driver->gen_driver);
 }
 
@@ -3493,52 +3505,6 @@ EXPORT_SYMBOL(ide_lock);
 EXPORT_SYMBOL(ide_probe);
 EXPORT_SYMBOL(ide_devfs_handle);
 
-static int ide_notify_reboot (struct notifier_block *this, unsigned long event, void *x)
-{
-	ide_hwif_t *hwif;
-	ide_drive_t *drive;
-	int i, unit;
-
-	switch (event) {
-		case SYS_HALT:
-		case SYS_POWER_OFF:
-		case SYS_RESTART:
-			break;
-		default:
-			return NOTIFY_DONE;
-	}
-
-	printk(KERN_INFO "flushing ide devices: ");
-
-	for (i = 0; i < MAX_HWIFS; i++) {
-		hwif = &ide_hwifs[i];
-		if (!hwif->present)
-			continue;
-		for (unit = 0; unit < MAX_DRIVES; ++unit) {
-			drive = &hwif->drives[unit];
-			if (!drive->present)
-				continue;
-
-			/* set the drive to standby */
-			printk("%s ", drive->name);
-			if (event != SYS_RESTART)
-				if (drive->driver != NULL && DRIVER(drive)->standby(drive))
-				continue;
-
-			if (drive->driver != NULL && DRIVER(drive)->cleanup(drive))
-				continue;
-		}
-	}
-	printk("\n");
-	return NOTIFY_DONE;
-}
-
-static struct notifier_block ide_notifier = {
-	ide_notify_reboot,
-	NULL,
-	5
-};
-
 struct bus_type ide_bus_type = {
 	.name		= "ide",
 };
@@ -3564,7 +3530,6 @@ int __init ide_init (void)
 	ide_init_builtin_drivers();
 	initializing = 0;
 
-	register_reboot_notifier(&ide_notifier);
 	return 0;
 }
 
@@ -3599,7 +3564,6 @@ void cleanup_module (void)
 {
 	int index;
 
-	unregister_reboot_notifier(&ide_notifier);
 	for (index = 0; index < MAX_HWIFS; ++index) {
 		ide_unregister(index);
 #if defined(CONFIG_BLK_DEV_IDEDMA) && !defined(CONFIG_DMA_NONPCI)
