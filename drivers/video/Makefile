@@ -6,10 +6,9 @@
 # This list comes from 'grep -l EXPORT_SYMBOL *.[hc]'.
 
 export-objs    	:= fbmem.o fbcmap.o fbcon.o fbmon.o modedb.o fbgen.o \
-		   fbcon-afb.o fbcon-ilbm.o fbcon-hga.o fbcon-accel.o \
+		   fbcon-afb.o fbcon-ilbm.o fbcon-accel.o cyber2000fb.o \
 		   fbcon-iplan2p2.o fbcon-iplan2p4.o fbcon-iplan2p8.o \
-		   fbcon-vga-planes.o fbcon-vga8-planes.o \
-		   cyber2000fb.o sa1100fb.o
+		   fbcon-vga-planes.o fbcon-vga8-planes.o fbcon-hga.o
 
 # Each configuration option enables a list of files.
 
