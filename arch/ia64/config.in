@@ -64,12 +64,13 @@ if [ "$CONFIG_MCKINLEY" = "y" ]; then
 	fi
 fi
 
-if [ "$CONFIG_IA64_GENERIC" = "y" ] || [ "$CONFIG_IA64_DIG" = "y" ] || [ "$CONFIG_IA64_HP_ZX1" = "y" ]; then
+if [ "$CONFIG_IA64_GENERIC" = "y" -o "$CONFIG_IA64_DIG" = "y" -o "$CONFIG_IA64_HP_ZX1" = "y" ];
+then
 	bool '  Enable IA-64 Machine Check Abort' CONFIG_IA64_MCA
 	define_bool CONFIG_PM y
 fi
 
-if [ "$CONFIG_IA64_SGI_SN1" = "y" ] || [ "$CONFIG_IA64_SGI_SN2" = "y" ]; then
+if [ "$CONFIG_IA64_SGI_SN1" = "y" -o "$CONFIG_IA64_SGI_SN2" = "y" ]; then
 	define_bool CONFIG_IA64_SGI_SN y
 	bool '  Enable extra debugging code' CONFIG_IA64_SGI_SN_DEBUG n
 	bool '  Enable SGI Medusa Simulator Support' CONFIG_IA64_SGI_SN_SIM
@@ -124,6 +125,10 @@ if [ "$CONFIG_NET" = "y" ]; then
 fi
 
 if [ "$CONFIG_IA64_HP_SIM" = "n" ]; then
+
+define_tristate CONFIG_BLK_DEV_LOOP n
+define_tristate CONFIG_BLK_DEV_NBD n
+define_tristate CONFIG_BLK_DEV_RAM n
 
 source drivers/mtd/Config.in
 source drivers/pnp/Config.in
