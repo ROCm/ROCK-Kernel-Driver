@@ -787,7 +787,8 @@ static inline void kmem_freepages (kmem_cache_t *cachep, void *addr)
 	 * vm_scan(). Shouldn't be a worry.
 	 */
 	while (i--) {
-		ClearPageSlab(page);
+		if (!TestClearPageSlab(page))
+			BUG();
 		page++;
 	}
 	sub_page_state(nr_slab, nr_freed);

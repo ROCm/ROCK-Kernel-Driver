@@ -220,6 +220,7 @@ static inline void free_pages_check(const char *function, struct page *page)
 			1 << PG_locked	|
 			1 << PG_active	|
 			1 << PG_reclaim	|
+			1 << PG_slab	|
 			1 << PG_writeback )))
 		bad_page(function, page);
 	if (PageDirty(page))
