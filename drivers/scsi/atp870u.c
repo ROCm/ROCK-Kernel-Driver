@@ -2304,9 +2304,7 @@ static int atp870u_detect(Scsi_Host_Template * tpnt)
 	printk(KERN_INFO "aec671x_detect: \n");
 	tpnt->proc_name = "atp870u";
 
-	h = 0;
-	while (devid[h] != 0)
-	{
+	for (h = 0; devid[h]; h++) {
 		struct pci_dev *dev = NULL;
 		
 		while((dev = pci_find_device(0x1191, devid[h], dev))!=NULL)
