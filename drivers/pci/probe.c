@@ -291,9 +291,9 @@ static unsigned int __devinit pci_scan_child_bus(struct pci_bus *bus);
  */
 int __devinit pci_scan_bridge(struct pci_bus *bus, struct pci_dev * dev, int max, int pass)
 {
-	unsigned int buses;
 	struct pci_bus *child;
 	int is_cardbus = (dev->hdr_type == PCI_HEADER_TYPE_CARDBUS);
+	u32 buses;
 
 	pci_read_config_dword(dev, PCI_PRIMARY_BUS, &buses);
 
