@@ -2819,8 +2819,6 @@ int __init atafb_init(void)
 	       fb_info.node, fb_info.modename, screen_len>>10);
 
 	/* TODO: This driver cannot be unloaded yet */
-	MOD_INC_USE_COUNT;
-
 	return 0;
 }
 
@@ -3096,14 +3094,5 @@ MODULE_LICENSE("GPL");
 int init_module(void)
 {
 	return atafb_init();
-}
-
-void cleanup_module(void)
-{
-	/* Not reached because the usecount will never
-	   be decremented to zero */
-	unregister_framebuffer(&fb_info);
-	/* atari_stram_free( screen_base ); */
-	/* TODO: further clean up ... */
 }
 #endif /* MODULE */
