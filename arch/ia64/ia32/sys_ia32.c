@@ -170,9 +170,9 @@ sys32_execve (char *filename, unsigned int argv, unsigned int envp,
 		current->thread.map_base  = old_map_base;
 		current->thread.task_size = old_task_size;
 		set_fs(USER_DS);	/* establish new task-size as the address-limit */
-	  out:
-		kfree(av);
 	}
+  out:
+	kfree(av);
 	return r;
 }
 
