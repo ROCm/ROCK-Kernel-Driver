@@ -107,7 +107,7 @@ static struct frv_dma_channel frv_dma_channels[FRV_DMA_NCHANS] = {
 	},
 };
 
-static rwlock_t frv_dma_channels_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(frv_dma_channels_lock);
 
 unsigned long frv_dma_inprogress;
 

@@ -77,7 +77,7 @@ void __set_pmd(pmd_t *pmdptr, unsigned long pmd)
  * manfred's recommendations and having no core impact whatsoever.
  * -- wli
  */
-spinlock_t pgd_lock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(pgd_lock);
 struct page *pgd_list;
 
 static inline void pgd_list_add(pgd_t *pgd)
