@@ -380,8 +380,8 @@ static int saa7146_init_one(struct pci_dev *pci, const struct pci_device_id *ent
 	/* disable all irqs */
 	saa7146_write(dev, IER, 0);
 
-	/* shut down all dma transfers */
-	saa7146_write(dev, MC1, 0x00ff0000);
+	/* shut down all dma transfers and rps tasks */
+	saa7146_write(dev, MC1, 0x30ff0000);
 
 	/* clear out any rps-signals pending */
 	saa7146_write(dev, MC2, 0xf8000000);
