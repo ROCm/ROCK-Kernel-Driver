@@ -341,7 +341,7 @@ static int jumpshot_read_data(struct us_data *us,
                         while (sg_idx < use_sg && transferred < len) {
                                 if (len - transferred >= sg[sg_idx].length - current_sg_offset) {
                                         US_DEBUGP("jumpshot_read_data:  adding %d bytes to %d byte sg buffer\n", sg[sg_idx].length - current_sg_offset, sg[sg_idx].length);
-                                        memcpy(sg[sg_idx].address + current_sg_offset,
+                                        memcpy(page_address(sg[sg_idx].page) + sg[sg_idx].offset + current_sg_offset,
                                                buffer + transferred,
                                                sg[sg_idx].length - current_sg_offset);
                                         transferred += sg[sg_idx].length - current_sg_offset;
@@ -350,7 +350,7 @@ static int jumpshot_read_data(struct us_data *us,
                                         ++sg_idx;
                                 } else {
                                         US_DEBUGP("jumpshot_read_data:  adding %d bytes to %d byte sg buffer\n", len - transferred, sg[sg_idx].length);
-                                        memcpy(sg[sg_idx].address + current_sg_offset,
+                                        memcpy(page_address(sg[sg_idx].page) + sg[sg_idx].offset + current_sg_offset,
                                                buffer + transferred,
                                                len - transferred);
                                         current_sg_offset += len - transferred;
@@ -423,7 +423,7 @@ static int jumpshot_write_data(struct us_data *us,
                                 if (len - transferred >= sg[sg_idx].length - current_sg_offset) {
                                         US_DEBUGP("jumpshot_write_data:  getting %d bytes from %d byte sg buffer\n", sg[sg_idx].length - current_sg_offset, sg[sg_idx].length);
                                         memcpy(ptr + transferred,
-                                               sg[sg_idx].address + current_sg_offset,
+                                               page_address(sg[sg_idx].page) + sg[sg_idx].offset + current_sg_offset,
                                                sg[sg_idx].length - current_sg_offset);
                                         transferred += sg[sg_idx].length - current_sg_offset;
                                         current_sg_offset = 0;
@@ -432,7 +432,7 @@ static int jumpshot_write_data(struct us_data *us,
                                 } else {
                                         US_DEBUGP("jumpshot_write_data:  getting %d bytes from %d byte sg buffer\n", len - transferred, sg[sg_idx].length);
                                         memcpy(ptr + transferred,
-                                               sg[sg_idx].address + current_sg_offset,
+                                               page_address(sg[sg_idx].page) + sg[sg_idx].offset + current_sg_offset,
                                                len - transferred);
                                         current_sg_offset += len - transferred;
                                         // we only copied part of this sg buffer
