@@ -142,6 +142,19 @@ GLOBAL_ENTRY(ia32_trace_syscall)
 	;;
 	st8 [r2]=r3				// initialize return code to -ENOSYS
 	br.call.sptk.few rp=invoke_syscall_trace // give parent a chance to catch syscall args
+	// Need to reload arguments (they may be changed by the tracing process)
+	adds r2=IA64_PT_REGS_R9_OFFSET+16,sp	// r2 = &pt_regs.r9
+	adds r3=IA64_PT_REGS_R13_OFFSET+16,sp	// r3 = &pt_regs.r13
+	;;
+	ld4 r33=[r2],8				// r9 == ecx
+	ld4 r37=[r3],16				// r13 == ebp
+	;;
+	ld4 r34=[r2],8				// r10 == edx
+	ld4 r36=[r3],8				// r15 == edi
+	;;
+	ld4 r32=[r2],8				// r11 == ebx
+	ld4 r35=[r3],8				// r14 == esi
+	;;
 .ret2:	br.call.sptk.few rp=b6			// do the syscall
 .ia32_strace_check_retval:
 	cmp.lt p6,p0=r8,r0			// syscall failed?
