@@ -1371,14 +1371,13 @@ int lmLogInit(struct jfs_log * log)
 			 le32_to_cpu(logsuper->end), log->page, log->eor,
 			 le16_to_cpu(lp->h.eor));
 
-		/* if current page is full, move on to next page */
-		if (log->eor >= LOGPSIZE - LOGPTLRSIZE)
-			lmNextPage(log);
-
 		log->bp = bp;
 		bp->l_pn = log->page;
 		bp->l_eor = log->eor;
 
+		/* if current page is full, move on to next page */
+		if (log->eor >= LOGPSIZE - LOGPTLRSIZE)
+			lmNextPage(log);
 
 		/*
 		 * initialize log syncpoint
