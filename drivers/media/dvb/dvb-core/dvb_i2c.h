@@ -54,10 +54,10 @@ void dvb_unregister_i2c_bus (int (*xfer) (struct dvb_i2c_bus *i2c,
 
 
 extern int dvb_register_i2c_device (struct module *owner,
-				    int (*attach) (struct dvb_i2c_bus *i2c),
-				    void (*detach) (struct dvb_i2c_bus *i2c));
+				    int (*attach) (struct dvb_i2c_bus *i2c, void **data),
+				    void (*detach) (struct dvb_i2c_bus *i2c, void *data));
 
-extern int dvb_unregister_i2c_device (int (*attach) (struct dvb_i2c_bus *i2c));
+extern int dvb_unregister_i2c_device (int (*attach) (struct dvb_i2c_bus *i2c, void **data));
 
 #endif
 

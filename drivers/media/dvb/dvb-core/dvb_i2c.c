@@ -32,8 +32,9 @@
 struct dvb_i2c_device {
 	struct list_head list_head;
 	struct module *owner;
-	int (*attach) (struct dvb_i2c_bus *i2c);
-	void (*detach) (struct dvb_i2c_bus *i2c);
+	int (*attach) (struct dvb_i2c_bus *i2c, void **data);
+	void (*detach) (struct dvb_i2c_bus *i2c, void *data);
+	void *data;
 };
 
 LIST_HEAD(dvb_i2c_buslist);
@@ -66,7 +67,7 @@ static void try_attach_device (struct dvb_i2c_bus *i2c, struct dvb_i2c_device *d
 			return;
 	}
 
-	if (dev->attach (i2c) == 0) {
+	if (dev->attach (i2c, &dev->data) == 0) {
 		register_i2c_client (i2c, dev);
 	} else {
 		if (dev->owner)
@@ -77,7 +78,7 @@ static void try_attach_device (struct dvb_i2c_bus *i2c, struct dvb_i2c_device *d
 
 static void detach_device (struct dvb_i2c_bus *i2c, struct dvb_i2c_device *dev)
 {
-	dev->detach (i2c);
+	dev->detach (i2c, dev->data);
 
 	if (dev->owner)
 		module_put (dev->owner);
@@ -229,8 +230,8 @@ void dvb_unregister_i2c_bus (int (*xfer) (struct dvb_i2c_bus *i2c,
 
 
 int dvb_register_i2c_device (struct module *owner,
-			     int (*attach) (struct dvb_i2c_bus *i2c),
-			     void (*detach) (struct dvb_i2c_bus *i2c))
+			     int (*attach) (struct dvb_i2c_bus *i2c, void **data),
+			     void (*detach) (struct dvb_i2c_bus *i2c, void *data))
 {
 	struct dvb_i2c_device *entry;
 
@@ -256,7 +257,7 @@ int dvb_register_i2c_device (struct module *owner,
 }
 
 
-int dvb_unregister_i2c_device (int (*attach) (struct dvb_i2c_bus *i2c))
+int dvb_unregister_i2c_device (int (*attach) (struct dvb_i2c_bus *i2c, void **data))
 {
 	struct list_head *entry, *n;
 

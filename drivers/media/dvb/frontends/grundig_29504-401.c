@@ -415,7 +415,7 @@ int grundig_29504_401_ioctl (struct dvb_frontend *fe,
 } 
 
 
-static int l64781_attach (struct dvb_i2c_bus *i2c)
+static int l64781_attach (struct dvb_i2c_bus *i2c, void **data)
 {
 	u8 reg0x3e;
 	u8 b0 [] = { 0x1a };
@@ -465,9 +465,8 @@ static int l64781_attach (struct dvb_i2c_bus *i2c)
 	        goto bailout;
 	}
 
-	dvb_register_frontend (grundig_29504_401_ioctl, i2c, NULL,
+	return dvb_register_frontend (grundig_29504_401_ioctl, i2c, NULL,
 			       &grundig_29504_401_info);
-	return 0;
 
  bailout:
 	l64781_writereg (i2c, 0x3e, reg0x3e);  /* restore reg 0x3e */
@@ -475,7 +474,8 @@ static int l64781_attach (struct dvb_i2c_bus *i2c)
 }
 
 
-static void l64781_detach (struct dvb_i2c_bus *i2c)
+
+static void l64781_detach (struct dvb_i2c_bus *i2c, void *data)
 {
 	dvb_unregister_frontend (grundig_29504_401_ioctl, i2c);
 }

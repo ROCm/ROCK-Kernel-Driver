@@ -140,17 +140,15 @@ static int dec2000_frontend_ioctl(struct dvb_frontend *fe, unsigned int cmd,
 	return 0;
 }
 
-static int dec2000_frontend_attach(struct dvb_i2c_bus *i2c)
+static int dec2000_frontend_attach(struct dvb_i2c_bus *i2c, void **data)
 {
 	dprintk("%s\n", __FUNCTION__);
 
-	dvb_register_frontend(dec2000_frontend_ioctl, i2c, NULL,
+	return dvb_register_frontend(dec2000_frontend_ioctl, i2c, NULL,
 			      &dec2000_frontend_info);
-
-	return 0;
 }
 
-static void dec2000_frontend_detach(struct dvb_i2c_bus *i2c)
+static void dec2000_frontend_detach(struct dvb_i2c_bus *i2c, void *data)
 {
 	dprintk("%s\n", __FUNCTION__);
 

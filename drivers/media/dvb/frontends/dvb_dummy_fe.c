@@ -173,14 +173,13 @@ static int dvbdummyfe_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *ar
 } 
 
 
-static int dvbdummyfe_attach (struct dvb_i2c_bus *i2c)
+static int dvbdummyfe_attach (struct dvb_i2c_bus *i2c, void **data)
 {
-	dvb_register_frontend (dvbdummyfe_ioctl, i2c, NULL, frontend_info());
-	return 0;
+	return dvb_register_frontend (dvbdummyfe_ioctl, i2c, NULL, frontend_info());
 }
 
 
-static void dvbdummyfe_detach (struct dvb_i2c_bus *i2c)
+static void dvbdummyfe_detach (struct dvb_i2c_bus *i2c, void *data)
 {
 	dvb_unregister_frontend (dvbdummyfe_ioctl, i2c);
 }
@@ -191,14 +190,12 @@ static int __init init_dvbdummyfe (void)
 	return dvb_register_i2c_device (THIS_MODULE,
 					dvbdummyfe_attach, 
 					dvbdummyfe_detach);
-	return 0;
 }
 
 
 static void __exit exit_dvbdummyfe (void)
 {
 	dvb_unregister_i2c_device (dvbdummyfe_attach);
-	return;
 }
 
 

@@ -402,7 +402,7 @@ static int tdmb7_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
 
 
 
-static int tdmb7_attach (struct dvb_i2c_bus *i2c)
+static int tdmb7_attach (struct dvb_i2c_bus *i2c, void **data)
 {
 	struct i2c_msg msg = { .addr = 0x43, .flags = 0, .buf = NULL,. len = 0 };
 
@@ -411,13 +411,11 @@ static int tdmb7_attach (struct dvb_i2c_bus *i2c)
 	if (i2c->xfer (i2c, &msg, 1) != 1)
                 return -ENODEV;
 
-	dvb_register_frontend (tdmb7_ioctl, i2c, NULL, &tdmb7_info);
-
-	return 0;
+	return dvb_register_frontend (tdmb7_ioctl, i2c, NULL, &tdmb7_info);
 }
 
 
-static void tdmb7_detach (struct dvb_i2c_bus *i2c)
+static void tdmb7_detach (struct dvb_i2c_bus *i2c, void *data)
 {
 	dprintk ("%s\n", __FUNCTION__);
 

@@ -1055,7 +1055,7 @@ static int tda1004x_ioctl(struct dvb_frontend *fe, unsigned int cmd, void *arg)
 }
 
 
-static int tda1004x_attach(struct dvb_i2c_bus *i2c)
+static int tda1004x_attach(struct dvb_i2c_bus *i2c, void **data)
 {
         int tda1004x_address = -1;
 	int tuner_address = -1;
@@ -1113,17 +1113,15 @@ static int tda1004x_attach(struct dvb_i2c_bus *i2c)
 	// register
         switch(tda_state.tda1004x_address) {
         case TDA10045H_ADDRESS:
-        	dvb_register_frontend(tda1004x_ioctl, i2c, (void *)(*((u32*) &tda_state)), &tda10045h_info);
-                break;
+        	return dvb_register_frontend(tda1004x_ioctl, i2c, (void *)(*((u32*) &tda_state)), &tda10045h_info);
+	default:
+		return -ENODEV;
         }
-
-	// success
-	return 0;
 }
 
 
 static
-void tda1004x_detach(struct dvb_i2c_bus *i2c)
+void tda1004x_detach(struct dvb_i2c_bus *i2c, void *data)
 {
 	dprintk("%s\n", __FUNCTION__);
 
