@@ -604,6 +604,9 @@ MODULE_PARM_DESC(io, "0 to probe common ports (unsafe), or the I/O base of the b
 
 
 #ifdef MODULE
+
+static struct net_device *SK_dev;
+
 static int __init SK_init_module (void)
 {
  	SK_dev = SK_init(-1);
