@@ -51,8 +51,11 @@
 	 * setup a null register window frame.
 	 */
 ENTRY(ia64_execve)
-	.prologue ASM_UNW_PRLG_RP|ASM_UNW_PRLG_PFS, ASM_UNW_PRLG_GRSAVE(3)
-	alloc loc1=ar.pfs,3,2,4,0
+	/*
+	 * Allocate 8 input registers since ptrace() may clobber them
+	 */
+	.prologue ASM_UNW_PRLG_RP|ASM_UNW_PRLG_PFS, ASM_UNW_PRLG_GRSAVE(8)
+	alloc loc1=ar.pfs,8,2,4,0
 	mov loc0=rp
 	.body
 	mov out0=in0			// filename
@@ -113,8 +116,11 @@ END(ia64_execve)
  *	      u64 tls)
  */
 GLOBAL_ENTRY(sys_clone2)
-	.prologue ASM_UNW_PRLG_RP|ASM_UNW_PRLG_PFS, ASM_UNW_PRLG_GRSAVE(6)
-	alloc r16=ar.pfs,6,2,6,0
+	/*
+	 * Allocate 8 input registers since ptrace() may clobber them
+	 */
+	.prologue ASM_UNW_PRLG_RP|ASM_UNW_PRLG_PFS, ASM_UNW_PRLG_GRSAVE(8)
+	alloc r16=ar.pfs,8,2,6,0
 	DO_SAVE_SWITCH_STACK
 	adds r2=PT(R16)+IA64_SWITCH_STACK_SIZE+16,sp
 	mov loc0=rp
@@ -142,8 +148,11 @@ END(sys_clone2)
  *	Deprecated.  Use sys_clone2() instead.
  */
 GLOBAL_ENTRY(sys_clone)
-	.prologue ASM_UNW_PRLG_RP|ASM_UNW_PRLG_PFS, ASM_UNW_PRLG_GRSAVE(5)
-	alloc r16=ar.pfs,5,2,6,0
+	/*
+	 * Allocate 8 input registers since ptrace() may clobber them
+	 */
+	.prologue ASM_UNW_PRLG_RP|ASM_UNW_PRLG_PFS, ASM_UNW_PRLG_GRSAVE(8)
+	alloc r16=ar.pfs,8,2,6,0
 	DO_SAVE_SWITCH_STACK
 	adds r2=PT(R16)+IA64_SWITCH_STACK_SIZE+16,sp
 	mov loc0=rp
@@ -1212,7 +1221,10 @@ END(sys_rt_sigsuspend)
 
 ENTRY(sys_rt_sigreturn)
 	PT_REGS_UNWIND_INFO(0)
-	alloc r2=ar.pfs,0,0,1,0
+	/*
+	 * Allocate 8 input registers since ptrace() may clobber them
+	 */
+	alloc r2=ar.pfs,8,0,1,0
 	.prologue
 	PT_REGS_SAVES(16)
 	adds sp=-16,sp

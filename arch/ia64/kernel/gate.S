@@ -81,6 +81,7 @@ GLOBAL_ENTRY(__kernel_syscall_via_epc)
 	LOAD_FSYSCALL_TABLE(r14)
 
 	mov r16=IA64_KR(CURRENT)		// 12 cycle read latency
+	tnat.nz p10,p9=r15
 	mov r19=NR_syscalls-1
 	;;
 	shladd r18=r17,3,r14
@@ -119,7 +120,8 @@ GLOBAL_ENTRY(__kernel_syscall_via_epc)
 #endif
 
 	mov r10=-1
-	mov r8=ENOSYS
+(p10)	mov r8=EINVAL
+(p9)	mov r8=ENOSYS
 	FSYS_RETURN
 END(__kernel_syscall_via_epc)
 

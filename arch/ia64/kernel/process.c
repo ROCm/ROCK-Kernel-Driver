@@ -632,7 +632,7 @@ dump_fpu (struct pt_regs *pt, elf_fpregset_t dst)
 	return 1;	/* f0-f31 are always valid so we always return 1 */
 }
 
-asmlinkage long
+long
 sys_execve (char __user *filename, char __user * __user *argv, char __user * __user *envp,
 	    struct pt_regs *regs)
 {

@@ -51,6 +51,7 @@
 #include <asm/system.h>
 #include <asm/thread_info.h>
 #include <asm/unistd.h>
+#include <asm/errno.h>
 
 #if 1
 # define PSR_DEFAULT_BITS	psr.ac
@@ -732,10 +733,12 @@ ENTRY(break_fault)
 	ssm psr.ic | PSR_DEFAULT_BITS
 	;;
 	srlz.i					// guarantee that interruption collection is on
+	mov r3=NR_syscalls - 1
 	;;
 (p15)	ssm psr.i				// restore psr.i
+	// p10==true means out registers are more than 8 or r15's Nat is true
+(p10)	br.cond.spnt.many ia64_ret_from_syscall
 	;;
-	mov r3=NR_syscalls - 1
 	movl r16=sys_call_table
 
 	adds r15=-1024,r15			// r15 contains the syscall number---subtract 1024
@@ -836,8 +839,11 @@ END(interrupt)
 	 * On exit:
 	 *	- executing on bank 1 registers
 	 *	- psr.ic enabled, interrupts restored
+	 *	-  p10: TRUE if syscall is invoked with more than 8 out
+	 *		registers or r15's Nat is true
 	 *	-  r1: kernel's gp
 	 *	-  r3: preserved (same as on entry)
+	 *	-  r8: -EINVAL if p10 is true
 	 *	- r12: points to kernel stack
 	 *	- r13: points to current task
 	 *	- p15: TRUE if interrupts need to be re-enabled
@@ -871,12 +877,17 @@ GLOBAL_ENTRY(ia64_syscall_setup)
 	;;
 
 	st8 [r16]=r19,PT(AR_RNAT)-PT(CR_IFS)	// store ar.pfs.pfm in cr.ifs
+	extr.u r11=r19,7,7	// I0		// get sol of ar.pfs
+	and r8=0x7f,r19		// A		// get sof of ar.pfs
+
 	st8 [r17]=r27,PT(AR_BSPSTORE)-PT(AR_RSC)// save ar.rsc
+	tbit.nz p15,p0=r29,IA64_PSR_I_BIT // I0
 (p9)	mov in1=-1
+	;;
 
 (pUStk) sub r18=r18,r22				// r18=RSE.ndirty*8
-	tbit.nz p15,p0=r29,IA64_PSR_I_BIT
 	tnat.nz p10,p0=in2
+	add r11=8,r11
 	;;
 (pKStk) adds r16=PT(PR)-PT(AR_RNAT),r16		// skip over ar_rnat field
 (pKStk) adds r17=PT(B0)-PT(AR_BSPSTORE),r17	// skip over ar_bspstore field
@@ -904,25 +915,29 @@ GLOBAL_ENTRY(ia64_syscall_setup)
 (p13)	mov in5=-1
 	;;
 	st8 [r16]=r21,PT(R8)-PT(AR_FPSR)	// save ar.fpsr
-	st8.spill [r17]=r15			// save r15
 	tnat.nz p14,p0=in6
+	cmp.lt p10,p9=r11,r8	// frame size can't be more than local+8
 	;;
 	stf8 [r16]=f1		// ensure pt_regs.r8 != 0 (see handle_syscall_error)
+(p9)	tnat.nz p10,p0=r15
 	adds r12=-16,r1		// switch to kernel memory stack (with 16 bytes of scratch)
+
+	st8.spill [r17]=r15			// save r15
 	tnat.nz p8,p0=in7
+	nop.i 0
 
 	mov r13=r2				// establish `current'
 	movl r1=__gp				// establish kernel global pointer
 	;;
 (p14)	mov in6=-1
 (p8)	mov in7=-1
-	tnat.nz p9,p0=r15
+	nop.i 0
 
 	cmp.eq pSys,pNonSys=r0,r0		// set pSys=1, pNonSys=0
 	movl r17=FPSR_DEFAULT
 	;;
 	mov.m ar.fpsr=r17			// set ar.fpsr to kernel default value
-(p9)	mov r15=-1
+(p10)	mov r8=-EINVAL
 	br.ret.sptk.many b7
 END(ia64_syscall_setup)
 
