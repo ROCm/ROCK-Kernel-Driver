@@ -115,8 +115,11 @@ Once the CIFS VFS support is built into the kernel or installed as a module
 servers: 
 
   mount -t cifs //9.53.216.11/e$ /mnt -o user=myname,pass=mypassword
-  
-after -o the following cifs vfs specific options are supported:
+
+Before -o the option -v may be specified to make the mount.cifs
+mount helper display the mount steps more verbosely.  
+After -o the following commonly used cifs vfs specific options
+are supported:
 
   user=<username>
   pass=<password>
@@ -129,6 +132,18 @@ cifs signing enabled (and the physical network is insecure), consider use
 of the standard mount options "noexec" and "nosuid" to reduce the risk of 
 running an altered binary on your local system (downloaded from a hostile server
 or altered by a hostile router).
+
+When using the mount helper mount.cifs, passwords may be specified via alternate
+mechanisms, instead of specifying it after -o using the normal "pass=" syntax
+on the command line:
+1) By including it in a credential file. Specify credentials=filename as one
+of the mount options. Credential files contain two lines
+        username=someuser
+        password=your_password
+2) By specifying the password in the PASSWD environment variable (similarly
+the user name can be taken from the USER environment variable).
+
+If no password is provided, mount.cifs will prompt for password entry
 
 Restrictions
 ============
@@ -194,6 +209,9 @@ A partial list of the supported mount options follows:
   suid          Allow remote files on this mountpoint with suid enabled to 
 		be executed (default for mounts when executed as root,
 		nosuid is default for user mounts).
+  credentials   (allow valid when the cifs mount helper, mount.cifs, is
+		installed. Specifies the name of the credential file which 
+		will be read to obtain the userid and password.
 
 Misc /proc/fs/cifs Flags and Debug Info
 =======================================
