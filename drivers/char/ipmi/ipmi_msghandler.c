@@ -3098,7 +3098,7 @@ static struct notifier_block panic_block = {
 	200   /* priority: INT_MAX >= x >= 0 */
 };
 
-static __init int ipmi_init_msghandler(void)
+static int ipmi_init_msghandler(void)
 {
 	int i;
 
@@ -3130,6 +3130,12 @@ static __init int ipmi_init_msghandler(void)
 
 	initialized = 1;
 
+	return 0;
+}
+
+static __init int ipmi_init_msghandler_mod(void)
+{
+	ipmi_init_msghandler();
 	return 0;
 }
 
@@ -3169,7 +3175,7 @@ static __exit void cleanup_ipmi(void)
 }
 module_exit(cleanup_ipmi);
 
-module_init(ipmi_init_msghandler);
+module_init(ipmi_init_msghandler_mod);
 MODULE_LICENSE("GPL");
 
 EXPORT_SYMBOL(ipmi_alloc_recv_msg);
