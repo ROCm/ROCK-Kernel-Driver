@@ -327,8 +327,6 @@ static void cdrom_count_tracks(struct cdrom_device_info *, tracktype*);
 static void cdrom_sysctl_register(void);
 #endif /* CONFIG_SYSCTL */ 
 static struct cdrom_device_info *topCdromPtr;
-static devfs_handle_t devfs_handle;
-static struct unique_numspace cdrom_numspace = UNIQUE_NUMBERSPACE_INITIALISER;
 
 /* This macro makes sure we don't have to check on cdrom_device_ops
  * existence in the run-time routines below. Change_capability is a
@@ -381,26 +379,6 @@ int register_cdrom(struct cdrom_device_info *cdi)
 	if (check_media_type==1)
 		cdi->options |= (int) CDO_CHECK_TYPE;
 
-	if (!devfs_handle)
-		devfs_handle = devfs_mk_dir (NULL, "cdroms", NULL);
-	cdi->number = devfs_alloc_unique_number (&cdrom_numspace);
-	if (cdi->de) {
-		int pos;
-		devfs_handle_t slave;
-		char rname[64];
-
-		pos = devfs_generate_path (cdi->de, rname + 3,
-					   sizeof rname - 3);
-		if (pos >= 0) {
-			char vname[16];
-			sprintf (vname, "cdrom%d", cdi->number);
-			strncpy (rname + pos, "../", 3);
-			devfs_mk_symlink (devfs_handle, vname,
-					  DEVFS_FL_DEFAULT,
-					  rname + pos, &slave, NULL);
-			devfs_auto_unregister (cdi->de, slave);
-		}
-	}
 	cdinfo(CD_REG_UNREG, "drive \"/dev/%s\" registered\n", cdi->name);
 	cdi->next = topCdromPtr; 	
 	topCdromPtr = cdi;
@@ -432,8 +410,6 @@ int unregister_cdrom(struct cdrom_device_info *unreg)
 	else
 		topCdromPtr = cdi->next;
 	cdi->ops->n_minors--;
-	devfs_unregister (cdi->de);
-	devfs_dealloc_unique_number (&cdrom_numspace, cdi->number);
 	cdinfo(CD_REG_UNREG, "drive \"/dev/%s\" unregistered\n", cdi->name);
 	return 0;
 }
@@ -2618,8 +2594,6 @@ static int __init cdrom_init(void)
 #ifdef CONFIG_SYSCTL
 	cdrom_sysctl_register();
 #endif
-	if (!devfs_handle)
-		devfs_handle = devfs_mk_dir(NULL, "cdroms", NULL);
 	return 0;
 }
 
@@ -2629,7 +2603,6 @@ static void __exit cdrom_exit(void)
 #ifdef CONFIG_SYSCTL
 	cdrom_sysctl_unregister();
 #endif
-	devfs_unregister(devfs_handle);
 }
 
 module_init(cdrom_init);

@@ -94,12 +94,6 @@ MODULE_PARM(shuffle_freq, "i");
 
 /* Funky stuff for setting up a block device */
 #define MAJOR_NR		FTL_MAJOR
-#define DEVICE_OFF(device)
-
-#define DEVICE_NR(minor)	((minor)>>5)
-#define REGION_NR(minor)	(((minor)>>3)&3)
-#define PART_NR(minor)		((minor)&7)
-#define MINOR_NR(dev,reg,part)	(((dev)<<5)+((reg)<<3)+(part))
 
 #include <linux/blk.h>
 
@@ -1258,10 +1252,8 @@ static void ftl_notify_add(struct mtd_info *mtd)
 		partition->state = FTL_FORMATTED;
 		atomic_set(&partition->open, 0);
 		myparts[device] = partition;
-		add_gendisk(disk);
-		register_disk(disk, mk_kdev(MAJOR_NR, device << 4),
-			      MAX_PART, &ftl_blk_fops,
-			      le32_to_cpu(partition->header.FormattedSize)/SECTOR_SIZE);
+		set_capacity(disk, le32_to_cpu(partition->header.FormattedSize)/SECTOR_SIZE);
+		add_disk(disk);
 #ifdef PCMCIA_DEBUG
 		printk(KERN_INFO "ftl_cs: opening %d kb FTL partition\n",
 		       le32_to_cpu(partition->header.FormattedSize) >> 10);

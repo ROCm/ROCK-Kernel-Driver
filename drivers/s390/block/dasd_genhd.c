@@ -259,10 +259,8 @@ dasd_setup_partitions(dasd_device_t * device)
 	struct gendisk *disk = dasd_gendisk_by_dev(device->kdev);
 	if (disk == NULL)
 		return;
-	add_gendisk(disk);
-	register_disk(disk, mk_kdev(disk->major, disk->first_minor),
-			1<<disk->minor_shift, disk->fops,
-			device->blocks << device->s2b_shift);
+	set_capacity(disk, device->blocks << device->s2b_shift);
+	add_disk(disk);
 }
 
 /*

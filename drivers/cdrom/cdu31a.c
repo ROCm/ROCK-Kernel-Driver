@@ -3154,40 +3154,49 @@ static void scd_release(struct cdrom_device_info *cdi)
 
 struct block_device_operations scd_bdops =
 {
-	owner:			THIS_MODULE,
-	open:			cdrom_open,
-	release:		cdrom_release,
-	ioctl:			cdrom_ioctl,
-	check_media_change:	cdrom_media_changed,
+	.owner			= THIS_MODULE,
+	.open			= cdrom_open,
+	.release		= cdrom_release,
+	.ioctl			= cdrom_ioctl,
+	.check_media_change	= cdrom_media_changed,
 };
 
 static struct cdrom_device_ops scd_dops = {
-	open:scd_open,
-	release:scd_release,
-	drive_status:scd_drive_status,
-	media_changed:scd_media_changed,
-	tray_move:scd_tray_move,
-	lock_door:scd_lock_door,
-	select_speed:scd_select_speed,
-	get_last_session:scd_get_last_session,
-	get_mcn:scd_get_mcn,
-	reset:scd_reset,
-	audio_ioctl:scd_audio_ioctl,
-	dev_ioctl:scd_dev_ioctl,
-	capability:CDC_OPEN_TRAY | CDC_CLOSE_TRAY | CDC_LOCK |
-	    CDC_SELECT_SPEED | CDC_MULTI_SESSION |
-	    CDC_MULTI_SESSION | CDC_MCN |
-	    CDC_MEDIA_CHANGED | CDC_PLAY_AUDIO |
-	    CDC_RESET | CDC_IOCTLS | CDC_DRIVE_STATUS,
-	n_minors:1,
+	.open			= scd_open,
+	.release		= scd_release,
+	.drive_status		= scd_drive_status,
+	.media_changed		= scd_media_changed,
+	.tray_move		= scd_tray_move,
+	.lock_door		= scd_lock_door,
+	.select_speed		= scd_select_speed,
+	.get_last_session	= scd_get_last_session,
+	.get_mcn		= scd_get_mcn,
+	.reset			= scd_reset,
+	.audio_ioctl		= scd_audio_ioctl,
+	.dev_ioctl		= scd_dev_ioctl,
+	.capability		= CDC_OPEN_TRAY | CDC_CLOSE_TRAY | CDC_LOCK |
+				  CDC_SELECT_SPEED | CDC_MULTI_SESSION |
+				  CDC_MULTI_SESSION | CDC_MCN |
+				  CDC_MEDIA_CHANGED | CDC_PLAY_AUDIO |
+				  CDC_RESET | CDC_IOCTLS | CDC_DRIVE_STATUS,
+	.n_minors		= 1,
 };
 
 static struct cdrom_device_info scd_info = {
-	ops:&scd_dops,
-	speed:2,
-	capacity:1,
-	name:"cdu31a"
+	.ops		= &scd_dops,
+	.speed		= 2,
+	.capacity	= 1,
+	.name		= "cdu31a"
 };
+
+static struct gendisk scd_gendisk = {
+	.major		= MAJOR_NR,
+	.first_minor	= 0,
+	.minor_shift	= 0,
+	.major_name	= "cdu31a"
+	.fops		= &scd_bdops,
+	.flags		= GENHD_FL_CD,
+}
 
 /* The different types of disc loading mechanisms supported */
 static char *load_mech[] __initdata =
@@ -3291,6 +3300,7 @@ __setup("cdu31a=", cdu31a_setup);
 int __init cdu31a_init(void)
 {
 	struct s_sony_drive_config drive_config;
+	struct gendisk *disk = &scd_gendisk;
 	unsigned int res_size;
 	char msg[255];
 	char buf[40];
@@ -3431,12 +3441,9 @@ int __init cdu31a_init(void)
 
 		scd_info.dev = mk_kdev(MAJOR_NR, 0);
 		scd_info.mask = deficiency;
-		strncpy(scd_info.name, "cdu31a", sizeof(scd_info.name));
-
-		if (register_cdrom(&scd_info)) {
+		if (register_cdrom(&scd_info))
 			goto errout0;
-		}
-		devfs_plain_cdrom(&scd_info, &scd_bdops);
+		add_disk(disk);
 	}
 
 
@@ -3462,6 +3469,7 @@ int __init cdu31a_init(void)
 
 void __exit cdu31a_exit(void)
 {
+	del_gendisk(&scd_gendisk);
 	if (unregister_cdrom(&scd_info)) {
 		printk
 		    ("Can't unregister cdu31a from Uniform cdrom driver\n");

@@ -730,9 +730,7 @@ struct cdrom_device_info {
 	struct cdrom_device_ops  *ops;  /* link to device_ops */
 	struct cdrom_device_info *next; /* next device_info for this major */
 	void *handle;		        /* driver-dependent data */
-	devfs_handle_t de;		/* real driver should create this  */
 	struct device cdrom_driverfs_dev; /* driverfs implementation */
-	int number;			/* generic driver updates this  */
 /* specifications */
         kdev_t dev;	                /* device number */
 	int mask;                       /* mask of capability: disables them */
@@ -786,18 +784,6 @@ extern int cdrom_media_changed(kdev_t);
 
 extern int register_cdrom(struct cdrom_device_info *cdi);
 extern int unregister_cdrom(struct cdrom_device_info *cdi);
-
-static inline void devfs_plain_cdrom(struct cdrom_device_info *cdi,
-				struct block_device_operations *ops)
-{
-	char vname[23];
-
-	sprintf (vname, "cdroms/cdrom%d", cdi->number);
-	cdi->de = devfs_register (NULL, vname, DEVFS_FL_DEFAULT,
-				    major(cdi->dev), minor(cdi->dev),
-				    S_IFBLK | S_IRUGO | S_IWUGO,
-				    ops, NULL);
-}
 
 typedef struct {
     int data;

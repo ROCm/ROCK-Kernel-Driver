@@ -719,11 +719,7 @@ static int i2ob_evt(void *dummy)
 				struct gendisk *p = &i2o_disk[unit>>4];
 				i2ob_install_device(i2ob_dev[unit].i2odev->controller, 
 					i2ob_dev[unit].i2odev, unit);
-				add_gendisk(p);
-				register_disk(p,
-					      mk_kdev(p->major, p->first_minor),
-					      1<<p->minor_shift, p->fops,
-					      get_capacity(p));
+				add_disk(p);
 				break;
 			}
 
@@ -1465,12 +1461,7 @@ static void i2ob_scan(int bios)
 					printk(KERN_WARNING "Could not install I2O block device\n");
 				else
 				{
-					struct gendisk *p = &i2o_disk[scan_unit>>4];
-					add_gendisk(p);
-					register_disk(p,
-						      mk_kdev(p->major, p->first_minor),
-						      1<<p->minor_shift, p->fops,
-						      get_capacity(p));
+					add_disk(&i2o_disk[scan_unit>>4]);
 					scan_unit+=16;
 					i2ob_dev_count++;
 
@@ -1558,12 +1549,7 @@ void i2ob_new_device(struct i2o_controller *c, struct i2o_device *d)
 		printk(KERN_ERR "i2o_block: Could not install new device\n");
 	else	
 	{
-		struct gendisk *p = &i2o_disk[unit>>4];
-		add_gendisk(p);
-		register_disk(p,
-			      mk_kdev(p->major, p->first_minor),
-			      1<<p->minor_shift, p->fops,
-			      get_capacity(p));
+		add_disk(&i2o_disk[unit>>4]);
 		i2ob_dev_count++;
 		i2o_device_notify_on(d, &i2o_block_handler);
 	}

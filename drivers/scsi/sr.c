@@ -762,6 +762,7 @@ void sr_finish()
 		disk->minor_shift = 0;
 		disk->major_name = cd->cdi.name;
 		disk->fops = &sr_bdops;
+		disk->flags = GENHD_FL_CD;
 		cd->disk = disk;
 		cd->capacity = 0x1fffff;
 		cd->device->sector_size = 2048;/* A guess, just in case */
@@ -805,14 +806,10 @@ void sr_finish()
 				   &dev_attr_type);
 		device_create_file(&cd->cdi.cdrom_driverfs_dev,
 				   &dev_attr_kdev);
-                cd->cdi.de = devfs_register(cd->device->de, "cd",
-                                    DEVFS_FL_DEFAULT, MAJOR_NR, i,
-                                    S_IFBLK | S_IRUGO | S_IWUGO,
-                                    &sr_bdops, NULL);
+		disk->de = cd->device->de;
 		register_cdrom(&cd->cdi);
-		add_gendisk(disk);
-		register_disk(disk, mk_kdev(disk->major, disk->first_minor),
-				1<<disk->minor_shift, disk->fops, cd->capacity);
+		set_capacity(disk, cd->capacity);
+		add_disk(disk);
 	}
 }
 

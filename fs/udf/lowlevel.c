@@ -78,13 +78,10 @@ udf_get_last_block(struct super_block *sb)
 
 	if (ret) /* Hard Disk */
 	{
-		ret = ioctl_by_bdev(bdev, BLKGETSIZE, (unsigned long) &lblock);
-
-		if (!ret && lblock != 0x7FFFFFFF)
-			lblock = ((512 * lblock) / sb->s_blocksize);
+		lblock = bdev->bd_inode->i_size / sb->s_blocksize;
 	}
 
-	if (!ret && lblock)
+	if (lblock)
 		return lblock - 1;
 	else
 		return 0;

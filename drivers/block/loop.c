@@ -83,7 +83,8 @@
 
 static int max_loop = 8;
 static struct loop_device *loop_dev;
-static int *loop_sizes;
+static struct gendisk *disks;
+static char *names;
 static devfs_handle_t devfs_handle;      /*  For the directory */
 
 /*
@@ -165,8 +166,8 @@ compute_loop_size(struct loop_device *lo, struct dentry * lo_dentry)
 
 static void figure_loop_size(struct loop_device *lo)
 {
-	loop_sizes[lo->lo_number] = compute_loop_size(lo,
-					lo->lo_backing_file->f_dentry);
+	set_capacity(disks + lo->lo_number, compute_loop_size(lo,
+					lo->lo_backing_file->f_dentry));
 					
 }
 
@@ -792,8 +793,8 @@ static int loop_clr_fd(struct loop_device *lo, struct block_device *bdev)
 	lo->lo_flags = 0;
 	memset(lo->lo_encrypt_key, 0, LO_KEY_SIZE);
 	memset(lo->lo_name, 0, LO_NAME_SIZE);
-	loop_sizes[lo->lo_number] = 0;
 	invalidate_bdev(bdev, 0);
+	set_capacity(disks + lo->lo_number, 0);
 	filp->f_dentry->d_inode->i_mapping->gfp_mask = gfp;
 	lo->lo_state = Lo_unbound;
 	fput(filp);
@@ -906,20 +907,6 @@ static int lo_ioctl(struct inode * inode, struct file * file,
 	case LOOP_GET_STATUS:
 		err = loop_get_status(lo, (struct loop_info *) arg);
 		break;
-	case BLKGETSIZE:
-		if (lo->lo_state != Lo_bound) {
-			err = -ENXIO;
-			break;
-		}
-		err = put_user((unsigned long) loop_sizes[lo->lo_number] << 1, (unsigned long *) arg);
-		break;
-	case BLKGETSIZE64:
-		if (lo->lo_state != Lo_bound) {
-			err = -ENXIO;
-			break;
-		}
-		err = put_user((u64)loop_sizes[lo->lo_number] << 10, (u64*)arg);
-		break;
 	default:
 		err = lo->ioctl ? lo->ioctl(lo, cmd, arg) : -EINVAL;
 	}
@@ -932,18 +919,11 @@ static int lo_open(struct inode *inode, struct file *file)
 	struct loop_device *lo;
 	int	dev, type;
 
-	if (!inode)
-		return -EINVAL;
-	if (major(inode->i_rdev) != MAJOR_NR) {
-		printk(KERN_WARNING "lo_open: pseudo-major != %d\n", MAJOR_NR);
-		return -ENODEV;
-	}
 	dev = minor(inode->i_rdev);
 	if (dev >= max_loop)
 		return -ENODEV;
 
 	lo = &loop_dev[dev];
-	MOD_INC_USE_COUNT;
 	down(&lo->lo_ctl_mutex);
 
 	type = lo->lo_encrypt_type; 
@@ -959,13 +939,6 @@ static int lo_release(struct inode *inode, struct file *file)
 	struct loop_device *lo;
 	int	dev, type;
 
-	if (!inode)
-		return 0;
-	if (major(inode->i_rdev) != MAJOR_NR) {
-		printk(KERN_WARNING "lo_release: pseudo-major != %d\n",
-		       MAJOR_NR);
-		return 0;
-	}
 	dev = minor(inode->i_rdev);
 	if (dev >= max_loop)
 		return 0;
@@ -978,7 +951,6 @@ static int lo_release(struct inode *inode, struct file *file)
 		xfer_funcs[type]->unlock(lo);
 
 	up(&lo->lo_ctl_mutex);
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
@@ -1051,46 +1023,56 @@ int __init loop_init(void)
 	if (!loop_dev)
 		return -ENOMEM;
 
-	loop_sizes = kmalloc(max_loop * sizeof(int), GFP_KERNEL);
-	if (!loop_sizes)
+	disks = kmalloc(max_loop * sizeof(struct gendisk), GFP_KERNEL);
+	if (!disks)
 		goto out_mem;
+
+	names = kmalloc(max_loop * 8, GFP_KERNEL);
 
 	blk_queue_make_request(BLK_DEFAULT_QUEUE(MAJOR_NR), loop_make_request);
 	blk_queue_bounce_limit(BLK_DEFAULT_QUEUE(MAJOR_NR), BLK_BOUNCE_HIGH);
 
 	for (i = 0; i < max_loop; i++) {
 		struct loop_device *lo = &loop_dev[i];
+		struct gendisk *disk = disks + i;
 		memset(lo, 0, sizeof(struct loop_device));
 		init_MUTEX(&lo->lo_ctl_mutex);
 		init_MUTEX_LOCKED(&lo->lo_sem);
 		init_MUTEX_LOCKED(&lo->lo_bh_mutex);
 		lo->lo_number = i;
 		spin_lock_init(&lo->lo_lock);
+		memset(disk, 0, sizeof(struct gendisk));
+		disk->major = LOOP_MAJOR;
+		disk->first_minor = i;
+		disk->fops = &lo_fops;
+		sprintf(names + 8*i, "loop%d", i);
+		disk->major_name = names + 8 * i;
+		add_disk(disk);
 	}
-
-	memset(loop_sizes, 0, max_loop * sizeof(int));
-	blk_size[MAJOR_NR] = loop_sizes;
-	for (i = 0; i < max_loop; i++)
-		register_disk(NULL, mk_kdev(MAJOR_NR, i), 1, &lo_fops, 0);
 
 	printk(KERN_INFO "loop: loaded (max %d devices)\n", max_loop);
 	return 0;
 
 out_mem:
+	kfree(names);
+	kfree(disks);
 	kfree(loop_dev);
-	kfree(loop_sizes);
 	printk(KERN_ERR "loop: ran out of memory\n");
 	return -ENOMEM;
 }
 
 void loop_exit(void) 
 {
+	int i;
+	for (i = 0; i < max_loop; i++)
+		del_gendisk(disks + i);
 	devfs_unregister(devfs_handle);
 	if (unregister_blkdev(MAJOR_NR, "loop"))
 		printk(KERN_WARNING "loop: cannot unregister blkdev\n");
 
+	kfree(names);
+	kfree(disks);
 	kfree(loop_dev);
-	kfree(loop_sizes);
 }
 
 module_init(loop_init);
