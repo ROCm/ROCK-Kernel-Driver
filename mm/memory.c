@@ -1123,12 +1123,12 @@ no_new_page:
 static inline void unmap_mapping_range_list(struct prio_tree_root *root,
 					    struct zap_details *details)
 {
-	struct vm_area_struct *vma = NULL;
+	struct vm_area_struct *vma;
 	struct prio_tree_iter iter;
 	pgoff_t vba, vea, zba, zea;
 
-	while ((vma = vma_prio_tree_next(vma, root, &iter,
-			details->first_index, details->last_index)) != NULL) {
+	vma_prio_tree_foreach(vma, &iter, root,
+			details->first_index, details->last_index) {
 		vba = vma->vm_pgoff;
 		vea = vba + ((vma->vm_end - vma->vm_start) >> PAGE_SHIFT) - 1;
 		/* Assume for now that PAGE_CACHE_SHIFT == PAGE_SHIFT */

@@ -245,7 +245,7 @@ void disable_sr_hashing(void)
 void flush_dcache_page(struct page *page)
 {
 	struct address_space *mapping = page_mapping(page);
-	struct vm_area_struct *mpnt = NULL;
+	struct vm_area_struct *mpnt;
 	struct prio_tree_iter iter;
 	unsigned long offset;
 	unsigned long addr;
@@ -272,8 +272,7 @@ void flush_dcache_page(struct page *page)
 	 * to flush one address here for them all to become coherent */
 
 	flush_dcache_mmap_lock(mapping);
-	while ((mpnt = vma_prio_tree_next(mpnt, &mapping->i_mmap,
-					&iter, pgoff, pgoff)) != NULL) {
+	vma_prio_tree_foreach(mpnt, &iter, &mapping->i_mmap, pgoff, pgoff) {
 		offset = (pgoff - mpnt->vm_pgoff) << PAGE_SHIFT;
 		addr = mpnt->vm_start + offset;
 

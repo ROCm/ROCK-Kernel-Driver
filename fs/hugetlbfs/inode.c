@@ -272,11 +272,10 @@ static void hugetlbfs_drop_inode(struct inode *inode)
 static inline void
 hugetlb_vmtruncate_list(struct prio_tree_root *root, unsigned long h_pgoff)
 {
-	struct vm_area_struct *vma = NULL;
+	struct vm_area_struct *vma;
 	struct prio_tree_iter iter;
 
-	while ((vma = vma_prio_tree_next(vma, root, &iter,
-					h_pgoff, ULONG_MAX)) != NULL) {
+	vma_prio_tree_foreach(vma, &iter, root, h_pgoff, ULONG_MAX) {
 		unsigned long h_vm_pgoff;
 		unsigned long v_length;
 		unsigned long v_offset;
