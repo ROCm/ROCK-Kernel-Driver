@@ -641,7 +641,8 @@ static void e100_eeprom_write(struct nic *nic, u16 addr_len, u16 addr, u16 data)
 
 	/* Three cmds: write/erase enable, write data, write/erase disable */
 	cmd_addr_data[0] = op_ewen << (addr_len - 2);
-	cmd_addr_data[1] = (((op_write << addr_len) | addr) << 16) | data;
+	cmd_addr_data[1] = (((op_write << addr_len) | addr) << 16) |
+		cpu_to_le16(data);
 	cmd_addr_data[2] = op_ewds << (addr_len - 2);
 
 	/* Bit-bang cmds to write word to eeprom */
@@ -668,7 +669,6 @@ static void e100_eeprom_write(struct nic *nic, u16 addr_len, u16 addr, u16 data)
 		writeb(0, &nic->csr->eeprom_ctrl_lo);
 		e100_write_flush(nic); udelay(4);
 	}
-
 };
 
 /* General technique stolen from the eepro100 driver - very clever */
@@ -709,7 +709,7 @@ static u16 e100_eeprom_read(struct nic *nic, u16 *addr_len, u16 addr)
 	writeb(0, &nic->csr->eeprom_ctrl_lo);
 	e100_write_flush(nic); udelay(4);
 
-	return data;
+	return le16_to_cpu(data);
 };
 
 /* Load entire EEPROM image into driver cache and validate checksum */
@@ -724,12 +724,12 @@ static int e100_eeprom_load(struct nic *nic)
 	for(addr = 0; addr < nic->eeprom_wc; addr++) {
 		nic->eeprom[addr] = e100_eeprom_read(nic, &addr_len, addr);
 		if(addr < nic->eeprom_wc - 1)
-			checksum += nic->eeprom[addr];
+			checksum += cpu_to_le16(nic->eeprom[addr]);
 	}
 
 	/* The checksum, stored in the last word, is calculated such that
 	 * the sum of words should be 0xBABA */
-	checksum = 0xBABA - checksum;
+	checksum = le16_to_cpu(0xBABA - checksum);
 	if(checksum != nic->eeprom[nic->eeprom_wc - 1]) {
 		DPRINTK(PROBE, ERR, "EEPROM corrupted\n");
 		return -EAGAIN;
@@ -756,9 +756,10 @@ static int e100_eeprom_save(struct nic *nic, u16 start, u16 count)
 	/* The checksum, stored in the last word, is calculated such that
 	 * the sum of words should be 0xBABA */
 	for(addr = 0; addr < nic->eeprom_wc - 1; addr++)
-		checksum += nic->eeprom[addr];
-	nic->eeprom[nic->eeprom_wc - 1] = 0xBABA - checksum;
-	e100_eeprom_write(nic, addr_len, nic->eeprom_wc - 1, 0xBABA - checksum);
+		checksum += cpu_to_le16(nic->eeprom[addr]);
+	nic->eeprom[nic->eeprom_wc - 1] = le16_to_cpu(0xBABA - checksum);
+	e100_eeprom_write(nic, addr_len, nic->eeprom_wc - 1,
+		nic->eeprom[nic->eeprom_wc - 1]);
 
 	return 0;
 }
@@ -1901,6 +1902,7 @@ static int e100_set_eeprom(struct net_device *netdev,
 
 	if(eeprom->magic != E100_EEPROM_MAGIC)
 		return -EINVAL;
+
 	memcpy(&((u8 *)nic->eeprom)[eeprom->offset], bytes, eeprom->len);
 
 	return e100_eeprom_save(nic, eeprom->offset >> 1,
@@ -2209,9 +2211,8 @@ static int __devinit e100_probe(struct pci_dev *pdev,
 
 	if((err = e100_eeprom_load(nic)))
 		goto err_out_free;
-	((u16 *)netdev->dev_addr)[0] = le16_to_cpu(nic->eeprom[0]);
-	((u16 *)netdev->dev_addr)[1] = le16_to_cpu(nic->eeprom[1]);
-	((u16 *)netdev->dev_addr)[2] = le16_to_cpu(nic->eeprom[2]);
+
+	memcpy(netdev->dev_addr, nic->eeprom, ETH_ALEN);
 	if(!is_valid_ether_addr(netdev->dev_addr)) {
 		DPRINTK(PROBE, ERR, "Invalid MAC address from "
 			"EEPROM, aborting.\n");
