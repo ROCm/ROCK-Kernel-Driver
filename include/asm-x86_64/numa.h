@@ -19,5 +19,6 @@ extern int compute_hash_shift(struct node *nodes);
 
 extern void numa_add_cpu(int cpu);
 extern void numa_init_array(void);
+extern int numa_off;
 
 #endif

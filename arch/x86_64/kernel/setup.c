@@ -76,6 +76,8 @@ extern acpi_interrupt_flags	acpi_sci_flags;
 int __initdata acpi_force = 0;
 #endif
 
+int acpi_numa __initdata;
+
 /* For PCI or other memory-mapped resources */
 unsigned long pci_mem_start = 0x10000000;
 
@@ -498,6 +500,13 @@ void __init setup_arch(char **cmdline_p)
 	acpi_boot_table_init();
 #endif
 
+#ifdef CONFIG_ACPI_NUMA
+	/*
+	 * Parse SRAT to discover nodes.
+	 */
+	acpi_numa_init();
+#endif
+
 #ifdef CONFIG_DISCONTIGMEM
 	numa_initmem_init(0, end_pfn); 
 #else
@@ -674,6 +683,7 @@ static int __init init_amd(struct cpuinfo_x86 *c)
 {
 	int r;
 	int level;
+	int cpu;
 
 	/* Bit 31 in normal CPUID used for nonstandard 3DNow ID;
 	   3DNow is IDd by bit 31 in extended CPUID (1*32+31) anyway */
@@ -705,13 +715,14 @@ static int __init init_amd(struct cpuinfo_x86 *c)
 		/* On a dual core setup the lower bits of apic id
 		   distingush the cores. Fix up the CPU<->node mappings
 		   here based on that.
-		   Assumes number of cores is a power of two. */
-		if (c->x86_num_cores > 1) {
-			int cpu = c->x86_apicid;
+		   Assumes number of cores is a power of two.
+		   When using SRAT use mapping from SRAT. */
+		cpu = c->x86_apicid;
+		if (acpi_numa <= 0 && c->x86_num_cores > 1) {
 			cpu_to_node[cpu] = cpu >> hweight32(c->x86_num_cores - 1);
-			printk(KERN_INFO "CPU %d -> Node %d\n",
-			       cpu, cpu_to_node[cpu]);
 		}
+		printk(KERN_INFO "CPU %d(%d) -> Node %d\n",
+				cpu, c->x86_num_cores, cpu_to_node[cpu]);
 #endif
 	}
 

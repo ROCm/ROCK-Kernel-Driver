@@ -2,9 +2,7 @@
  * AMD K8 NUMA support.
  * Discover the memory map and associated nodes.
  * 
- * Doesn't use the ACPI SRAT table because it has a questionable license.
- * Instead the northbridge registers are read directly. 
- * XXX in 2.5 we could use the generic SRAT code
+ * This version reads it directly from the K8 northbridge.
  * 
  * Copyright 2002,2003 Andi Kleen, SuSE Labs.
  */
