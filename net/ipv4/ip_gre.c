@@ -262,13 +262,10 @@ static struct ip_tunnel * ipgre_tunnel_locate(struct ip_tunnel_parm *parms, int 
 	if (!create)
 		return NULL;
 
-	if (!try_module_get(THIS_MODULE))
-		return NULL;
 	dev = kmalloc(sizeof(*dev) + sizeof(*t), GFP_KERNEL);
-	if (dev == NULL) {
-		module_put(THIS_MODULE);
+	if (dev == NULL)
 		return NULL;
-	}
+
 	memset(dev, 0, sizeof(*dev) + sizeof(*t));
 	dev->priv = (void*)(dev+1);
 	nt = (struct ip_tunnel*)dev->priv;
@@ -288,6 +285,7 @@ static struct ip_tunnel * ipgre_tunnel_locate(struct ip_tunnel_parm *parms, int 
 			goto failed;
 		memcpy(nt->parms.name, dev->name, IFNAMSIZ);
 	}
+	SET_MODULE_OWNER(dev);
 	if (register_netdevice(dev) < 0)
 		goto failed;
 
@@ -298,16 +296,13 @@ static struct ip_tunnel * ipgre_tunnel_locate(struct ip_tunnel_parm *parms, int 
 
 failed:
 	kfree(dev);
-	module_put(THIS_MODULE);
 	return NULL;
 }
 
 static void ipgre_tunnel_destructor(struct net_device *dev)
 {
-	if (dev != &ipgre_fb_tunnel_dev) {
+	if (dev != &ipgre_fb_tunnel_dev)
 		kfree(dev);
-		module_put(THIS_MODULE);
-	}
 }
 
 static void ipgre_tunnel_uninit(struct net_device *dev)
@@ -921,9 +916,6 @@ ipgre_tunnel_ioctl (struct net_device *dev, struct ifreq *ifr, int cmd)
 	struct ip_tunnel_parm p;
 	struct ip_tunnel *t;
 
-	if (!try_module_get(THIS_MODULE))
-		return -EBUSY;
-
 	switch (cmd) {
 	case SIOCGETTUNNEL:
 		t = NULL;
@@ -1037,7 +1029,6 @@ ipgre_tunnel_ioctl (struct net_device *dev, struct ifreq *ifr, int cmd)
 	}
 
 done:
-	module_put(THIS_MODULE);
 	return err;
 }
 
@@ -1117,8 +1108,6 @@ static int ipgre_open(struct net_device *dev)
 {
 	struct ip_tunnel *t = (struct ip_tunnel*)dev->priv;
 
-	if (!try_module_get(THIS_MODULE))
-		return -EBUSY;
 	if (MULTICAST(t->parms.iph.daddr)) {
 		struct flowi fl = { .oif = t->parms.link,
 				    .nl_u = { .ip4_u =
@@ -1127,16 +1116,12 @@ static int ipgre_open(struct net_device *dev)
 						.tos = RT_TOS(t->parms.iph.tos) } },
 				    .proto = IPPROTO_GRE };
 		struct rtable *rt;
-		if (ip_route_output_key(&rt, &fl)) {
-			module_put(THIS_MODULE);
+		if (ip_route_output_key(&rt, &fl))
 			return -EADDRNOTAVAIL;
-		}
 		dev = rt->u.dst.dev;
 		ip_rt_put(rt);
-		if (__in_dev_get(dev) == NULL) {
-			module_put(THIS_MODULE);
+		if (__in_dev_get(dev) == NULL)
 			return -EADDRNOTAVAIL;
-		}
 		t->mlink = dev->ifindex;
 		ip_mc_inc_group(__in_dev_get(dev), t->parms.iph.daddr);
 	}
@@ -1153,7 +1138,6 @@ static int ipgre_close(struct net_device *dev)
 			in_dev_put(in_dev);
 		}
 	}
-	module_put(THIS_MODULE);
 	return 0;
 }
 
@@ -1247,31 +1231,12 @@ static int ipgre_tunnel_init(struct net_device *dev)
 	return 0;
 }
 
-#ifdef MODULE
-static int ipgre_fb_tunnel_open(struct net_device *dev)
-{
-	if (!try_module_get(THIS_MODULE))
-		return -EBUSY;
-	return 0;
-}
-
-static int ipgre_fb_tunnel_close(struct net_device *dev)
-{
-	module_put(THIS_MODULE);
-	return 0;
-}
-#endif
-
 int __init ipgre_fb_tunnel_init(struct net_device *dev)
 {
 	struct ip_tunnel *tunnel = (struct ip_tunnel*)dev->priv;
 	struct iphdr *iph;
 
 	ipgre_tunnel_init_gen(dev);
-#ifdef MODULE
-	dev->open		= ipgre_fb_tunnel_open;
-	dev->stop		= ipgre_fb_tunnel_close;
-#endif
 
 	iph = &ipgre_fb_tunnel.parms.iph;
 	iph->version		= 4;
@@ -1295,11 +1260,7 @@ static struct inet_protocol ipgre_protocol = {
  *	And now the modules code and kernel interface.
  */
 
-#ifdef MODULE
-int init_module(void) 
-#else
 int __init ipgre_init(void)
-#endif
 {
 	printk(KERN_INFO "GRE over IPv4 tunneling driver\n");
 
@@ -1309,13 +1270,12 @@ int __init ipgre_init(void)
 	}
 
 	ipgre_fb_tunnel_dev.priv = (void*)&ipgre_fb_tunnel;
+	SET_MODULE_OWNER(&ipgre_fb_tunnel_dev);
 	register_netdev(&ipgre_fb_tunnel_dev);
 	return 0;
 }
 
-#ifdef MODULE
-
-void cleanup_module(void)
+void ipgre_fini(void)
 {
 	if (inet_del_protocol(&ipgre_protocol, IPPROTO_GRE) < 0)
 		printk(KERN_INFO "ipgre close: can't remove protocol\n");
@@ -1323,5 +1283,8 @@ void cleanup_module(void)
 	unregister_netdev(&ipgre_fb_tunnel_dev);
 }
 
+#ifdef MODULE
+module_init(ipgre_init);
 #endif
+module_exit(ipgre_fini);
 MODULE_LICENSE("GPL");
