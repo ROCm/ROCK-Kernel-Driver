@@ -65,7 +65,6 @@ dasd_generic_close (struct inode *inode, struct file *file)
 			vfree (info->data);
 		kfree (info);
 	}
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
@@ -223,12 +222,10 @@ dasd_devices_open(struct inode *inode, struct file *file)
 	int size, len;
 	int devindex;
 
-	MOD_INC_USE_COUNT;
 	info = (tempinfo_t *) kmalloc(sizeof (tempinfo_t), GFP_KERNEL);
 	if (info == NULL) {
 		MESSAGE(KERN_WARNING, "%s",
 			"No memory available for data (tempinfo)");
-		MOD_DEC_USE_COUNT;
 		return -ENOMEM;
 
 	}
@@ -239,7 +236,6 @@ dasd_devices_open(struct inode *inode, struct file *file)
 		MESSAGE(KERN_WARNING, "%s",
 			"No memory available for data (info->data)");
 		kfree(info);
-		MOD_DEC_USE_COUNT;
 		return -ENOMEM;
 	}
 	file->private_data = (void *) info;
@@ -266,6 +262,7 @@ dasd_devices_open(struct inode *inode, struct file *file)
 }
 
 static struct file_operations dasd_devices_file_ops = {
+	owner:THIS_MODULE,
 	read:dasd_generic_read,		/* read */
 	write:dasd_devices_write,	/* write */
 	open:dasd_devices_open,		/* open */
@@ -299,12 +296,10 @@ dasd_statistics_open(struct inode *inode, struct file *file)
 	int shift;
 #endif
 
-	MOD_INC_USE_COUNT;
 	info = (tempinfo_t *) kmalloc(sizeof (tempinfo_t), GFP_KERNEL);
 	if (info == NULL) {
 		MESSAGE(KERN_WARNING, "%s",
 			"No memory available for data (tempinfo)");
-		MOD_DEC_USE_COUNT;
 		return -ENOMEM;
 	}
 
@@ -317,7 +312,6 @@ dasd_statistics_open(struct inode *inode, struct file *file)
 			"No memory available for data (info->data)");
 		kfree(info);
 		file->private_data = NULL;
-		MOD_DEC_USE_COUNT;
 		return -ENOMEM;
 	}
 #ifdef CONFIG_DASD_PROFILE
@@ -422,6 +416,7 @@ out_error:
 }
 
 static struct file_operations dasd_statistics_file_ops = {
+	owner:	THIS_MODULE,
 	read:	dasd_generic_read,	/* read */
 	write:	dasd_statistics_write,	/* write */
 	open:	dasd_statistics_open,	/* open */

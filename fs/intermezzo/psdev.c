@@ -311,8 +311,6 @@ static int presto_psdev_open(struct inode * inode, struct file * file)
 
         file->private_data = NULL;  
 
-        MOD_INC_USE_COUNT;
-
         CDEBUG(D_PSDEV, "Psdev_open: caller: %d, flags: %d\n", current->pid, file->f_flags);
 
         EXIT;
@@ -333,7 +331,6 @@ static int presto_psdev_release(struct inode * inode, struct file * file)
                 return -EBADF;
         }
 
-        MOD_DEC_USE_COUNT;
         CDEBUG(D_PSDEV, "Lento: pid %d\n", current->pid);
         channel->uc_pid = 0;
 
@@ -369,6 +366,7 @@ static int presto_psdev_release(struct inode * inode, struct file * file)
 }
 
 static struct file_operations presto_psdev_fops = {
+	.owner	 = THIS_MODULE,
         .read    = presto_psdev_read,
         .write   = presto_psdev_write,
         .poll    = presto_psdev_poll,

@@ -403,8 +403,6 @@ open_scanner(struct inode * inode, struct file * file)
 
 	int err=0;
 
-	MOD_INC_USE_COUNT;
-
 	down(&scn_mutex);
 
 	scn_minor = USB_SCN_MINOR(inode);
@@ -413,7 +411,6 @@ open_scanner(struct inode * inode, struct file * file)
 
 	if (!p_scn_table[scn_minor]) {
 		up(&scn_mutex);
-		MOD_DEC_USE_COUNT;
 		err("open_scanner(%d): Unable to access minor data", scn_minor);
 		return -ENODEV;
 	}
@@ -455,9 +452,6 @@ out_error:
 
 	up(&(scn->sem)); /* Wake up any possible contending processes */
 
-	if (err)
-		MOD_DEC_USE_COUNT;
-
 	return err;
 }
 
@@ -487,8 +481,6 @@ close_scanner(struct inode * inode, struct file * file)
 
 	up(&scn_mutex);
 	up(&(scn->sem));
-
-	MOD_DEC_USE_COUNT;
 
 	return 0;
 }
@@ -826,6 +818,7 @@ ioctl_scanner(struct inode *inode, struct file *file,
 
 static struct
 file_operations usb_scanner_fops = {
+	.owner =	THIS_MODULE,
 	.read =		read_scanner,
 	.write =	write_scanner,
 	.ioctl =	ioctl_scanner,

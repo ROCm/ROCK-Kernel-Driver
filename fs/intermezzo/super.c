@@ -246,14 +246,11 @@ struct super_block * presto_get_sb(struct file_system_type *izo_type,
         CDEBUG(D_SUPER, "Presto: type=%s, fset=%s, dev= %d, flags %x\n",
                cache_type, fileset?fileset:"NULL", minor, cache->cache_flags);
 
-        MOD_INC_USE_COUNT;
-
         /* get the filter for the cache */
         fstype = get_fs_type(cache_type);
         cache->cache_filter = filter_get_filter_fs((const char *)cache_type); 
         if ( !fstype || !cache->cache_filter) {
                 CERROR("Presto: unrecognized fs type or cache type\n");
-                MOD_DEC_USE_COUNT;
                 EXIT;
                 goto out_err;
         }
@@ -262,7 +259,6 @@ struct super_block * presto_get_sb(struct file_system_type *izo_type,
 
         if ( !sb || IS_ERR(sb)) {
                 CERROR("InterMezzo: cache mount failure.\n");
-                MOD_DEC_USE_COUNT;
                 EXIT;
                 goto out_err;
         }
@@ -270,7 +266,6 @@ struct super_block * presto_get_sb(struct file_system_type *izo_type,
         /* can we in fact mount the cache */ 
         if (sb->s_bdev && (strcmp(fstype->name, "vintermezzo") == 0)) {
                 CERROR("vintermezzo must not be used with a  block device\n");
-                MOD_DEC_USE_COUNT;
                 EXIT;
                 goto out_err;
         }

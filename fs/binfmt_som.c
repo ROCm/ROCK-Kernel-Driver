@@ -54,7 +54,11 @@ static int som_core_dump(long signr, struct pt_regs * regs);
 #define SOM_PAGEALIGN(_v) (((_v) + SOM_PAGESIZE - 1) & ~(SOM_PAGESIZE - 1))
 
 static struct linux_binfmt som_format = {
-	NULL, THIS_MODULE, load_som_binary, load_som_library, som_core_dump, SOM_PAGESIZE
+	.module		= THIS_MODULE,
+	.load_binary	= load_som_binary,
+	.load_library	= load_som_library,
+	.core_dump	= som_core_dump,
+	.min_coredump	= SOM_PAGESIZE
 };
 
 /*
@@ -182,8 +186,8 @@ out:
  * libraries.  There is no binary dependent code anywhere else.
  */
 
-static inline int
-do_load_som_binary(struct linux_binprm * bprm, struct pt_regs * regs)
+static int
+load_som_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 {
 	int som_exec_fileno;
 	int retval;
@@ -280,34 +284,11 @@ out:
 	return retval;
 }
 
-static int
-load_som_binary(struct linux_binprm * bprm, struct pt_regs * regs)
-{
-	int retval;
-
-	MOD_INC_USE_COUNT;
-	retval = do_load_som_binary(bprm, regs);
-	MOD_DEC_USE_COUNT;
-	return retval;
-}
-
-static inline int
-do_load_som_library(struct file *f)
+static int load_som_library(struct file *f)
 {
 /* No lib support in SOM yet.  gizza chance.. */
 	return -ENOEXEC;
 }
-
-static int load_som_library(struct file *f)
-{
-	int retval;
-
-	MOD_INC_USE_COUNT;
-	retval = do_load_som_library(f);
-	MOD_DEC_USE_COUNT;
-	return retval;
-}
-
 	/* Install the SOM loader.
 	 * N.B. We *rely* on the table being the right size with the
 	 * right number of free slots...
@@ -326,4 +307,3 @@ static void __exit exit_som_binfmt(void)
 
 module_init(init_som_binfmt);
 module_exit(exit_som_binfmt);
-
