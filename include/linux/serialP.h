@@ -26,11 +26,6 @@
 #include <linux/interrupt.h>
 #include <linux/circ_buf.h>
 #include <linux/wait.h>
-#if (LINUX_VERSION_CODE < 0x020300)
-/* Unfortunate, but Linux 2.2 needs async_icount defined here and
- * it got moved in 2.3 */
-#include <linux/serial.h>
-#endif
 
 struct serial_state {
 	int	magic;
