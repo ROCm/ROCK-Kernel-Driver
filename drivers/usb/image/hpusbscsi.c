@@ -93,17 +93,6 @@ hpusbscsi_usb_probe(struct usb_interface *intf,
 		}
 	}
 
-	/* USB initialisation magic for the simple case */
-	result = usb_set_interface(dev, altsetting->desc.bInterfaceNumber, 0);
-	switch (result) {
-	case 0:		/* no error */
-		break;
-	default:
-		printk(KERN_ERR "unknown error %d from usb_set_interface\n",
-			 result);
-		goto out_free_controlurb;
-	}
-
 	/* build and submit an interrupt URB for status byte handling */
  	usb_fill_int_urb(new->controlurb, new->dev,
 			usb_rcvintpipe(new->dev, new->ep_int),
