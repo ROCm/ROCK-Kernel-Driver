@@ -267,7 +267,7 @@ static void sil_scr_write (struct ata_port *ap, unsigned int sc_reg, u32 val)
  *
  *	20040111 - Seagate drives affected by the Mod15Write bug are blacklisted
  *	The Maxtor quirk is in the blacklist, but I'm keeping the original
- *	pessimistic fix for the following reasons:
+ *	pessimistic fix for the following reasons...
  *	- There seems to be less info on it, only one device gleaned off the
  *	Windows	driver, maybe only one is affected.  More info would be greatly
  *	appreciated.

@@ -98,7 +98,7 @@ static const char *ata_thr_state_name(unsigned int thr_state)
 
 /**
  *	ata_tf_load_pio - send taskfile registers to host controller
- *	@ioaddr: set of IO ports to which output is sent
+ *	@ap: Port to which output is sent
  *	@tf: ATA taskfile register set
  *
  *	Outputs ATA taskfile to standard ATA host controller using PIO.
@@ -156,7 +156,7 @@ void ata_tf_load_pio(struct ata_port *ap, struct ata_taskfile *tf)
 
 /**
  *	ata_tf_load_mmio - send taskfile registers to host controller
- *	@ioaddr: set of IO ports to which output is sent
+ *	@ap: Port to which output is sent
  *	@tf: ATA taskfile register set
  *
  *	Outputs ATA taskfile to standard ATA host controller using MMIO.
@@ -316,7 +316,7 @@ void ata_tf_to_host_nolock(struct ata_port *ap, struct ata_taskfile *tf)
 
 /**
  *	ata_tf_read_pio - input device's ATA taskfile shadow registers
- *	@ioaddr: set of IO ports from which input is read
+ *	@ap: Port from which input is read
  *	@tf: ATA taskfile register set for storing input
  *
  *	Reads ATA taskfile registers for currently-selected device
@@ -348,7 +348,7 @@ void ata_tf_read_pio(struct ata_port *ap, struct ata_taskfile *tf)
 
 /**
  *	ata_tf_read_mmio - input device's ATA taskfile shadow registers
- *	@ioaddr: set of IO ports from which input is read
+ *	@ap: Port from which input is read
  *	@tf: ATA taskfile register set for storing input
  *
  *	Reads ATA taskfile registers for currently-selected device
@@ -414,6 +414,7 @@ u8 ata_check_status_mmio(struct ata_port *ap)
  *	ata_tf_to_fis - Convert ATA taskfile to SATA FIS structure
  *	@tf: Taskfile to convert
  *	@fis: Buffer into which data will output
+ *	@pmp: Port multiplier port
  *
  *	Converts a standard ATA taskfile to a Serial ATA
  *	FIS structure (Register - Host to Device).
@@ -1680,9 +1681,9 @@ err_out:
 }
 
 /**
- *	ata_dev_set_xfermode -
- *	@ap:
- *	@dev:
+ *	ata_dev_set_xfermode - Issue SET FEATURES - XFER MODE command
+ *	@ap: Port associated with device @dev
+ *	@dev: Device to which command will be sent
  *
  *	LOCKING:
  */
@@ -1721,9 +1722,9 @@ static void ata_dev_set_xfermode(struct ata_port *ap, struct ata_device *dev)
 }
 
 /**
- *	ata_dev_set_udma -
- *	@ap:
- *	@device:
+ *	ata_dev_set_udma - Set ATA device's transfer mode to Ultra DMA
+ *	@ap: Port associated with device @dev
+ *	@device: Device whose mode will be set
  *
  *	LOCKING:
  */
@@ -1745,9 +1746,9 @@ static void ata_dev_set_udma(struct ata_port *ap, unsigned int device)
 }
 
 /**
- *	ata_dev_set_pio -
- *	@ap:
- *	@device:
+ *	ata_dev_set_pio - Set ATA device's transfer mode to PIO
+ *	@ap: Port associated with device @dev
+ *	@device: Device whose mode will be set
  *
  *	LOCKING:
  */
@@ -2223,9 +2224,9 @@ out:
 }
 
 /**
- *	ata_qc_new -
- *	@ap:
- *	@dev:
+ *	ata_qc_new - Request an available ATA command, for queueing
+ *	@ap: Port associated with device @dev
+ *	@dev: Device from whom we request an available command structure
  *
  *	LOCKING:
  */
@@ -2248,9 +2249,9 @@ static struct ata_queued_cmd *ata_qc_new(struct ata_port *ap)
 }
 
 /**
- *	ata_qc_new_init -
- *	@ap:
- *	@dev:
+ *	ata_qc_new_init - Request an available ATA command, and initialize it
+ *	@ap: Port associated with device @dev
+ *	@dev: Device from whom we request an available command structure
  *
  *	LOCKING:
  */
@@ -2282,9 +2283,9 @@ struct ata_queued_cmd *ata_qc_new_init(struct ata_port *ap,
 }
 
 /**
- *	ata_qc_complete -
- *	@qc:
- *	@drv_stat:
+ *	ata_qc_complete - Complete an active ATA command
+ *	@qc: Command to complete
+ *	@drv_stat: ATA status register contents
  *
  *	LOCKING:
  *
@@ -2551,9 +2552,9 @@ void ata_bmdma_start_pio (struct ata_queued_cmd *qc)
 }
 
 /**
- *	ata_dma_complete -
- *	@qc:
- *	@host_stat:
+ *	ata_dma_complete - Complete an active ATA BMDMA command
+ *	@qc: Command to complete
+ *	@host_stat: BMDMA status register contents
  *
  *	LOCKING:
  */
@@ -2670,10 +2671,10 @@ inline unsigned int ata_host_intr (struct ata_port *ap,
 }
 
 /**
- *	ata_interrupt -
- *	@irq:
- *	@dev_instance:
- *	@regs:
+ *	ata_interrupt - Default ATA host interrupt handler
+ *	@irq: irq line
+ *	@dev_instance: pointer to our host information structure
+ *	@regs: unused
  *
  *	LOCKING:
  *
@@ -2862,9 +2863,9 @@ static void ata_probe_task(void *_data)
 }
 
 /**
- *	ata_host_remove -
- *	@ap:
- *	@do_unregister:
+ *	ata_host_remove - Unregister SCSI host structure with upper layers
+ *	@ap: Port to unregister
+ *	@do_unregister: 1 if we fully unregister, 0 to just stop the port
  *
  *	LOCKING:
  */
@@ -2882,10 +2883,12 @@ static void ata_host_remove(struct ata_port *ap, unsigned int do_unregister)
 }
 
 /**
- *	ata_host_init -
- *	@host:
- *	@ent:
- *	@port_no:
+ *	ata_host_init - Initialize an ata_port structure
+ *	@ap: Structure to initialize
+ *	@host: associated SCSI mid-layer structure
+ *	@host_set: Collection of hosts to which @ap belongs
+ *	@ent: Probe information provided by low-level driver
+ *	@port_no: Port number associated with this ata_port
  *
  *	LOCKING:
  *
@@ -2939,10 +2942,10 @@ static void ata_host_init(struct ata_port *ap, struct Scsi_Host *host,
 }
 
 /**
- *	ata_host_add -
- *	@ent:
- *	@host_set:
- *	@port_no:
+ *	ata_host_add - Attach low-level ATA driver to system
+ *	@ent: Information provided by low-level driver
+ *	@host_set: Collections of ports to which we add
+ *	@port_no: Port number associated with this host
  *
  *	LOCKING:
  *
@@ -3098,7 +3101,7 @@ err_out:
  *	ata_scsi_release - SCSI layer callback hook for host unload
  *	@host: libata host to be unloaded
  *
- *	Performs all duties necessary to shut down a libata port:
+ *	Performs all duties necessary to shut down a libata port...
  *	Kill port kthread, disable port, and release resources.
  *
  *	LOCKING:
@@ -3123,7 +3126,7 @@ int ata_scsi_release(struct Scsi_Host *host)
 
 /**
  *	ata_std_ports - initialize ioaddr with standard port offsets.
- *	@ioaddr:
+ *	@ioaddr: IO address structure to be initialized
  */
 void ata_std_ports(struct ata_ioports *ioaddr)
 {
@@ -3140,10 +3143,10 @@ void ata_std_ports(struct ata_ioports *ioaddr)
 }
 
 /**
- *	ata_pci_init_one -
- *	@pdev:
- *	@port_info:
- *	@n_ports:
+ *	ata_pci_init_one - Initialize/register PCI IDE host controller
+ *	@pdev: Controller to be initialized
+ *	@port_info: Information from low-level host driver
+ *	@n_ports: Number of ports attached to host controller
  *
  *	LOCKING:
  *	Inherited from PCI layer (may sleep).
