@@ -350,8 +350,8 @@ static void __devinit quirk_amd_ioapic(struct pci_dev *dev)
 
 static void __init quirk_ioapic_rmw(struct pci_dev *dev)
 {
-	if(dev->devfn == 0 && dev->bus->number == 0)
-		apic_sys_bug = 1;
+	if (dev->devfn == 0 && dev->bus->number == 0)
+		sis_apic_bug = 1;
 }
 
 

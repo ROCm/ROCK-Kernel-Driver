@@ -123,9 +123,10 @@ static inline void io_apic_write(unsigned int apic, unsigned int reg, unsigned i
  *
  * Older SiS APIC requires we rewrite the index regiser
  */
+extern int sis_apic_bug;
 static inline void io_apic_modify(unsigned int apic, unsigned int reg, unsigned int value)
 {
-	if(apic_sis_bug)
+	if (sis_apic_bug)
 		*IO_APIC_BASE(apic) = reg;
 	*(IO_APIC_BASE(apic)+4) = value;
 }
