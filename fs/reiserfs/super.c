@@ -510,6 +510,14 @@ typedef struct {
 		    applied BEFORE setmask */
 } opt_desc_t;
 
+/* possible values for -o data= */
+static const arg_desc_t logging_mode[] = {
+    {"ordered", 1<<REISERFS_DATA_ORDERED, (1<<REISERFS_DATA_LOG|1<<REISERFS_DATA_WRITEBACK)},
+    {"journal", 1<<REISERFS_DATA_LOG, (1<<REISERFS_DATA_ORDERED|1<<REISERFS_DATA_WRITEBACK)},
+    {"writeback", 1<<REISERFS_DATA_WRITEBACK, (1<<REISERFS_DATA_ORDERED|1<<REISERFS_DATA_LOG)},
+    {NULL, 0}
+};
+
 /* possible values for "-o block-allocator=" and bits which are to be set in
    s_mount_opt of reiserfs specific part of in-core super block */
 static const arg_desc_t balloc[] = {
@@ -664,6 +672,7 @@ static int reiserfs_parse_options (struct super_block * s, char * options, /* st
 	{"nolog", 0, 0, 0, 0}, /* This is unsupported */
 	{"replayonly", 0, 0, 1<<REPLAYONLY, 0},
 	{"block-allocator", 'a', balloc, 0, 0},
+	{"data", 'd', logging_mode, 0, 0},
 	{"resize", 'r', 0, 0, 0},
 	{"jdev", 'j', 0, 0, 0},
 	{"nolargeio", 'w', 0, 0, 0},
@@ -735,6 +744,33 @@ static int reiserfs_parse_options (struct super_block * s, char * options, /* st
     }
     
     return 1;
+}
+
+static void switch_data_mode(struct super_block *s, unsigned long mode) {
+    REISERFS_SB(s)->s_mount_opt &= ~((1 << REISERFS_DATA_LOG) |
+                                       (1 << REISERFS_DATA_ORDERED) |
+				       (1 << REISERFS_DATA_WRITEBACK));
+    REISERFS_SB(s)->s_mount_opt |= (1 << mode);
+}
+
+static void handle_data_mode(struct super_block *s, unsigned long mount_options)
+{
+    if (mount_options & (1 << REISERFS_DATA_LOG)) {
+        if (!reiserfs_data_log(s)) {
+	    switch_data_mode(s, REISERFS_DATA_LOG);
+	    printk("reiserfs: switching to journaled data mode\n");
+	}
+    } else if (mount_options & (1 << REISERFS_DATA_ORDERED)) {
+        if (!reiserfs_data_ordered(s)) {
+	    switch_data_mode(s, REISERFS_DATA_ORDERED);
+	    printk("reiserfs: switching to ordered data mode\n");
+	}
+    } else if (mount_options & (1 << REISERFS_DATA_WRITEBACK)) {
+        if (!reiserfs_data_writeback(s)) {
+	    switch_data_mode(s, REISERFS_DATA_WRITEBACK);
+	    printk("reiserfs: switching to writeback data mode\n");
+	}
+    }
 }
 
 static void handle_attrs( struct super_block *s )
@@ -814,6 +850,7 @@ static int reiserfs_remount (struct super_block * s, int * mount_flags, char * a
     if (!(s->s_flags & MS_RDONLY))
 	return 0; /* We are read-write already */
 
+    handle_data_mode(s, mount_options);
     REISERFS_SB(s)->s_mount_state = sb_umount_state(rs) ;
     s->s_flags &= ~MS_RDONLY ; /* now it is safe to call journal_begin */
     journal_begin(&th, s, 10) ;
@@ -1305,6 +1342,21 @@ static int reiserfs_fill_super (struct super_block * s, void * data, int silent)
     SPRINTK(silent, "reiserfs:warning: CONFIG_REISERFS_CHECK is set ON\n");
     SPRINTK(silent, "reiserfs:warning: - it is slow mode for debugging.\n");
 #endif
+
+    /* make data=ordered the default */
+    if (!reiserfs_data_log(s) && !reiserfs_data_ordered(s) &&
+        !reiserfs_data_writeback(s))
+    {
+         REISERFS_SB(s)->s_mount_opt |= (1 << REISERFS_DATA_ORDERED);
+    }
+
+    if (reiserfs_data_log(s)) {
+        printk("reiserfs: using journaled data mode\n");
+    } else if (reiserfs_data_ordered(s)) {
+        printk("reiserfs: using ordered data mode\n");
+    } else {
+        printk("reiserfs: using writeback data mode\n");
+    }
 
     // set_device_ro(s->s_dev, 1) ;
     if( journal_init(s, jdev_name, old_format, commit_max_age) ) {

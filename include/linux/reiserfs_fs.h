@@ -1707,6 +1707,15 @@ struct reiserfs_journal_header {
 #define journal_getblk(s, block) __getblk(SB_JOURNAL(s)->j_dev_bd, block, s->s_blocksize)
 #define journal_bread(s, block) __bread(SB_JOURNAL(s)->j_dev_bd, block, s->s_blocksize)
 
+enum reiserfs_bh_state_bits {
+    BH_JDirty = BH_PrivateStart,
+    BH_JDirty_wait,
+    BH_JNew,
+    BH_JPrepared,
+    BH_JRestore_dirty,
+    BH_JTest, // debugging only will go away
+};
+
 /*
 ** transaction handle which is passed around for all journal calls
 */
@@ -1726,7 +1735,36 @@ struct reiserfs_transaction_handle {
 				   should be displaced from others */
 } ;
 
+/* used to keep track of ordered and tail writes, attached to the buffer
+ * head through b_journal_head.
+ */
+struct reiserfs_jh {
+    struct reiserfs_journal_list *jl;
+    struct buffer_head *bh;
+    struct list_head list;
+};
+
+void reiserfs_free_jh(struct buffer_head *bh);
+int reiserfs_add_tail_list(struct inode *inode, struct buffer_head *bh);
+int reiserfs_add_ordered_list(struct inode *inode, struct buffer_head *bh);
 int journal_mark_dirty(struct reiserfs_transaction_handle *, struct super_block *, struct buffer_head *bh) ;
+
+static inline int reiserfs_transaction_running(struct super_block *s) {
+    struct reiserfs_transaction_handle *th = current->journal_info ;
+    if (th && th->t_super == s)
+        return 1 ;
+    if (th && th->t_super == NULL)
+        BUG();
+    return 0 ;
+}
+
+int reiserfs_async_progress_wait(struct super_block *s);
+
+struct reiserfs_transaction_handle *
+reiserfs_persistent_transaction(struct super_block *, int count);
+int reiserfs_end_persistent_transaction(struct reiserfs_transaction_handle *);
+int reiserfs_commit_page(struct inode *inode, struct page *page,
+		unsigned from, unsigned to);
 int reiserfs_flush_old_commits(struct super_block *);
 void reiserfs_commit_for_inode(struct inode *) ;
 void reiserfs_update_inode_transaction(struct inode *) ;
@@ -1741,7 +1779,6 @@ int journal_release(struct reiserfs_transaction_handle*, struct super_block *) ;
 int journal_release_error(struct reiserfs_transaction_handle*, struct super_block *) ;
 int journal_end(struct reiserfs_transaction_handle *, struct super_block *, unsigned long) ;
 int journal_end_sync(struct reiserfs_transaction_handle *, struct super_block *, unsigned long) ;
-int journal_mark_dirty_nolog(struct reiserfs_transaction_handle *, struct super_block *, struct buffer_head *bh) ;
 int journal_mark_freed(struct reiserfs_transaction_handle *, struct super_block *, b_blocknr_t blocknr) ;
 int journal_transaction_should_end(struct reiserfs_transaction_handle *, int) ;
 int reiserfs_in_journal(struct super_block *p_s_sb, int bmap_nr, int bit_nr, int searchall, b_blocknr_t *next) ;
@@ -1749,11 +1786,6 @@ int journal_begin(struct reiserfs_transaction_handle *, struct super_block *p_s_
 
 int buffer_journaled(const struct buffer_head *bh) ;
 int mark_buffer_journal_new(struct buffer_head *bh) ;
-int reiserfs_add_page_to_flush_list(struct reiserfs_transaction_handle *,
-                                    struct inode *, struct buffer_head *) ;
-int reiserfs_remove_page_from_flush_list(struct reiserfs_transaction_handle *,
-                                         struct inode *) ;
-
 int reiserfs_allocate_list_bitmaps(struct super_block *s, struct reiserfs_list_bitmap *, int) ;
 
 				/* why is this kerplunked right here? */

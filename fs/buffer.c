@@ -1583,6 +1583,7 @@ int try_to_release_page(struct page *page, int gfp_mask)
 		return mapping->a_ops->releasepage(page, gfp_mask);
 	return try_to_free_buffers(page);
 }
+EXPORT_SYMBOL(try_to_release_page);
 
 /**
  * block_invalidatepage - invalidate part of all of a buffer-backed page

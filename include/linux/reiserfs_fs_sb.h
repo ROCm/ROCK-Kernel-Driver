@@ -107,21 +107,6 @@ typedef enum {
 #define JOURNAL_HASH_SIZE 8192   
 #define JOURNAL_NUM_BITMAPS 5 /* number of copies of the bitmaps to have floating.  Must be >= 2 */
 
-/* these are bh_state bit flag offset numbers, for use in the buffer head */
-
-#define BH_JDirty       16      /* journal data needs to be written before buffer can be marked dirty */
-#define BH_JDirty_wait 18	/* commit is done, buffer marked dirty */
-#define BH_JNew 19		/* buffer allocated during this transaction, no need to write if freed during this trans too */
-
-/* ugly.  metadata blocks must be prepared before they can be logged.  
-** prepared means unlocked and cleaned.  If the block is prepared, but not
-** logged for some reason, any bits cleared while preparing it must be 
-** set again.
-*/
-#define BH_JPrepared 20		/* block has been prepared for the log */
-#define BH_JRestore_dirty 22    /* restore the dirty bit later */
-#define BH_JTest 23             /* debugging use only */
-
 /* One of these for every block in every transaction
 ** Each one is in two hash tables.  First, a hash of the current transaction, and after journal_end, a
 ** hash of all the in memory transactions.
@@ -178,6 +163,11 @@ struct reiserfs_journal_list {
 
   /* time ordered list of all transactions we haven't tried to flush yet */
   struct list_head j_working_list;
+
+  /* list of tail conversion targets in need of flush before commit */
+  struct list_head j_tail_bh_list;
+  /* list of data=ordered buffers in need of flush before commit */
+  struct list_head j_bh_list;
   int j_refcount;
 } ;
 
@@ -253,7 +243,9 @@ struct reiserfs_journal {
   unsigned long j_max_trans_size ;
   unsigned long j_max_batch_size ;
 
+  /* when flushing ordered buffers, throttle new ordered writers */
   struct work_struct j_work;
+  atomic_t j_async_throttle;
 };
 
 #define JOURNAL_DESC_MAGIC "ReIsErLB" /* ick.  magic string to find desc blocks in the journal */
@@ -408,11 +400,12 @@ struct reiserfs_sb_info
 #define REISERFS_3_5 0
 #define REISERFS_3_6 1
 
+enum reiserfs_mount_options {
 /* Mount options */
-#define REISERFS_LARGETAIL 0  /* large tails will be created in a session */
-#define REISERFS_SMALLTAIL 17  /* small (for files less than block size) tails will be created in a session */
-#define REPLAYONLY 3 /* replay journal and return 0. Use by fsck */
-#define REISERFS_CONVERT 5    /* -o conv: causes conversion of old
+    REISERFS_LARGETAIL,  /* large tails will be created in a session */
+    REISERFS_SMALLTAIL,  /* small (for files less than block size) tails will be created in a session */
+    REPLAYONLY, /* replay journal and return 0. Use by fsck */
+    REISERFS_CONVERT,    /* -o conv: causes conversion of old
                                  format super block to the new
                                  format. If not specified - old
                                  partition will be dealt with in a
@@ -426,26 +419,29 @@ struct reiserfs_sb_info
 ** the existing hash on the FS, so if you have a tea hash disk, and mount
 ** with -o hash=rupasov, the mount will fail.
 */
-#define FORCE_TEA_HASH 6      /* try to force tea hash on mount */
-#define FORCE_RUPASOV_HASH 7  /* try to force rupasov hash on mount */
-#define FORCE_R5_HASH 8       /* try to force rupasov hash on mount */
-#define FORCE_HASH_DETECT 9   /* try to detect hash function on mount */
+    FORCE_TEA_HASH,      /* try to force tea hash on mount */
+    FORCE_RUPASOV_HASH,  /* try to force rupasov hash on mount */
+    FORCE_R5_HASH,       /* try to force rupasov hash on mount */
+    FORCE_HASH_DETECT,   /* try to detect hash function on mount */
 
+    REISERFS_DATA_LOG,
+    REISERFS_DATA_ORDERED,
+    REISERFS_DATA_WRITEBACK,
 
 /* used for testing experimental features, makes benchmarking new
    features with and without more convenient, should never be used by
    users in any code shipped to users (ideally) */
 
-#define REISERFS_NO_BORDER 11
-#define REISERFS_NO_UNHASHED_RELOCATION 12
-#define REISERFS_HASHED_RELOCATION 13
+    REISERFS_NO_BORDER,
+    REISERFS_NO_UNHASHED_RELOCATION,
+    REISERFS_HASHED_RELOCATION,
+    REISERFS_ATTRS,
 
-#define REISERFS_ATTRS 15
-
-#define REISERFS_TEST1 11
-#define REISERFS_TEST2 12
-#define REISERFS_TEST3 13
-#define REISERFS_TEST4 14 
+    REISERFS_TEST1,
+    REISERFS_TEST2,
+    REISERFS_TEST3,
+    REISERFS_TEST4,
+};
 
 #define reiserfs_r5_hash(s) (REISERFS_SB(s)->s_mount_opt & (1 << FORCE_R5_HASH))
 #define reiserfs_rupasov_hash(s) (REISERFS_SB(s)->s_mount_opt & (1 << FORCE_RUPASOV_HASH))
@@ -459,11 +455,12 @@ struct reiserfs_sb_info
 #define have_large_tails(s) (REISERFS_SB(s)->s_mount_opt & (1 << REISERFS_LARGETAIL))
 #define have_small_tails(s) (REISERFS_SB(s)->s_mount_opt & (1 << REISERFS_SMALLTAIL))
 #define replay_only(s) (REISERFS_SB(s)->s_mount_opt & (1 << REPLAYONLY))
-#define reiserfs_dont_log(s) (REISERFS_SB(s)->s_mount_opt & (1 << REISERFS_NOLOG))
 #define reiserfs_attrs(s) (REISERFS_SB(s)->s_mount_opt & (1 << REISERFS_ATTRS))
 #define old_format_only(s) (REISERFS_SB(s)->s_properties & (1 << REISERFS_3_5))
 #define convert_reiserfs(s) (REISERFS_SB(s)->s_mount_opt & (1 << REISERFS_CONVERT))
-
+#define reiserfs_data_log(s) (REISERFS_SB(s)->s_mount_opt & (1 << REISERFS_DATA_LOG))
+#define reiserfs_data_ordered(s) (REISERFS_SB(s)->s_mount_opt & (1 << REISERFS_DATA_ORDERED))
+#define reiserfs_data_writeback(s) (REISERFS_SB(s)->s_mount_opt & (1 << REISERFS_DATA_WRITEBACK))
 
 void reiserfs_file_buffer (struct buffer_head * bh, int list);
 extern struct file_system_type reiserfs_fs_type;

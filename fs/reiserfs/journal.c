@@ -54,6 +54,7 @@
 #include <linux/buffer_head.h>
 #include <linux/workqueue.h>
 #include <linux/writeback.h>
+#include <linux/blkdev.h>
 
 
 /* gets a struct reiserfs_journal_list * from a list head */
@@ -595,6 +596,248 @@ static int journal_list_still_alive(struct super_block *s,
     return 0;
 }
 
+static void reiserfs_end_buffer_io_sync(struct buffer_head *bh, int uptodate) {
+    char b[BDEVNAME_SIZE];
+
+    if (buffer_journaled(bh)) {
+        reiserfs_warning("clm-2084: pinned buffer %lu:%s sent to disk\n",
+	                 bh->b_blocknr, bdevname(bh->b_bdev, b)) ;
+    }
+    if (uptodate)
+    	set_buffer_uptodate(bh) ;
+    else
+    	clear_buffer_uptodate(bh) ;
+    unlock_buffer(bh) ;
+    put_bh(bh) ;
+}
+
+static void reiserfs_end_ordered_io(struct buffer_head *bh, int uptodate) {
+    if (uptodate)
+    	set_buffer_uptodate(bh) ;
+    else
+    	clear_buffer_uptodate(bh) ;
+    unlock_buffer(bh) ;
+    put_bh(bh) ;
+}
+
+static void submit_logged_buffer(struct buffer_head *bh) {
+    get_bh(bh) ;
+    bh->b_end_io = reiserfs_end_buffer_io_sync ;
+    mark_buffer_notjournal_new(bh) ;
+    clear_buffer_dirty(bh) ;
+    if (!test_and_clear_bit(BH_JTest, &bh->b_state))
+        BUG();
+    if (!buffer_uptodate(bh))
+        BUG();
+    submit_bh(WRITE, bh) ;
+}
+
+static void submit_ordered_buffer(struct buffer_head *bh) {
+    get_bh(bh) ;
+    bh->b_end_io = reiserfs_end_ordered_io;
+    clear_buffer_dirty(bh) ;
+    if (!buffer_uptodate(bh))
+        BUG();
+    submit_bh(WRITE, bh) ;
+}
+
+#define CHUNK_SIZE 32
+struct buffer_chunk {
+    struct buffer_head *bh[CHUNK_SIZE];
+    int nr;
+};
+
+static void write_chunk(struct buffer_chunk *chunk) {
+    int i;
+    for (i = 0; i < chunk->nr ; i++) {
+	submit_logged_buffer(chunk->bh[i]) ;
+    }
+    chunk->nr = 0;
+}
+
+static void write_ordered_chunk(struct buffer_chunk *chunk) {
+    int i;
+    for (i = 0; i < chunk->nr ; i++) {
+	submit_ordered_buffer(chunk->bh[i]) ;
+    }
+    chunk->nr = 0;
+}
+
+static int add_to_chunk(struct buffer_chunk *chunk, struct buffer_head *bh,
+			 spinlock_t *lock,
+			 void (fn)(struct buffer_chunk *))
+{
+    int ret = 0;
+    if (chunk->nr >= CHUNK_SIZE)
+        BUG();
+    chunk->bh[chunk->nr++] = bh;
+    if (chunk->nr >= CHUNK_SIZE) {
+	ret = 1;
+        if (lock)
+	    spin_unlock(lock);
+        fn(chunk);
+        if (lock)
+	    spin_lock(lock);
+    }
+    return ret;
+}
+
+
+atomic_t nr_reiserfs_jh = ATOMIC_INIT(0);
+static struct reiserfs_jh *alloc_jh(void) {
+    struct reiserfs_jh *jh;
+    while(1) {
+	jh = kmalloc(sizeof(*jh), GFP_NOFS);
+	if (jh) {
+	    atomic_inc(&nr_reiserfs_jh);
+	    return jh;
+	}
+        yield();
+    }
+}
+
+/*
+ * we want to free the jh when the buffer has been written
+ * and waited on
+ */
+void reiserfs_free_jh(struct buffer_head *bh) {
+    struct reiserfs_jh *jh;
+
+    jh = bh->b_private;
+    if (jh) {
+	bh->b_private = NULL;
+	jh->bh = NULL;
+	list_del_init(&jh->list);
+	kfree(jh);
+	if (atomic_read(&nr_reiserfs_jh) <= 0)
+	    BUG();
+	atomic_dec(&nr_reiserfs_jh);
+	put_bh(bh);
+    }
+}
+
+static inline int __add_jh(struct reiserfs_journal *j, struct buffer_head *bh,
+                           int tail)
+{
+    struct reiserfs_jh *jh;
+
+    if (bh->b_private) {
+	spin_lock(&j->j_dirty_buffers_lock);
+	if (!bh->b_private) {
+	    spin_unlock(&j->j_dirty_buffers_lock);
+	    goto no_jh;
+	}
+        jh = bh->b_private;
+	list_del_init(&jh->list);
+    } else {
+no_jh:
+	get_bh(bh);
+	jh = alloc_jh();
+	spin_lock(&j->j_dirty_buffers_lock);
+	/* buffer must be locked for __add_jh, should be able to have
+	 * two adds at the same time
+	 */
+	if (bh->b_private)
+	    BUG();
+	jh->bh = bh;
+	bh->b_private = jh;
+    }
+    jh->jl = j->j_current_jl;
+    if (tail)
+	list_add_tail(&jh->list, &jh->jl->j_tail_bh_list);
+    else {
+	list_add_tail(&jh->list, &jh->jl->j_bh_list);
+    }
+    spin_unlock(&j->j_dirty_buffers_lock);
+    return 0;
+}
+
+int reiserfs_add_tail_list(struct inode *inode, struct buffer_head *bh) {
+    return __add_jh(SB_JOURNAL(inode->i_sb), bh, 1);
+}
+int reiserfs_add_ordered_list(struct inode *inode, struct buffer_head *bh) {
+    return __add_jh(SB_JOURNAL(inode->i_sb), bh, 0);
+}
+
+#define JH_ENTRY(l) list_entry((l), struct reiserfs_jh, list)
+static int write_ordered_buffers(spinlock_t *lock,
+				 struct reiserfs_journal *j,
+                                 struct reiserfs_journal_list *jl,
+				 struct list_head *list)
+{
+    struct buffer_head *bh;
+    struct reiserfs_jh *jh;
+    int ret = 0;
+    struct buffer_chunk chunk;
+    struct list_head tmp;
+    INIT_LIST_HEAD(&tmp);
+
+    chunk.nr = 0;
+    spin_lock(lock);
+    while(!list_empty(list)) {
+        jh = JH_ENTRY(list->next);
+	bh = jh->bh;
+	get_bh(bh);
+	if (test_set_buffer_locked(bh)) {
+	    if (!buffer_dirty(bh)) {
+		list_del_init(&jh->list);
+		list_add(&jh->list, &tmp);
+		goto loop_next;
+	    }
+	    spin_unlock(lock);
+	    if (chunk.nr)
+		write_ordered_chunk(&chunk);
+	    wait_on_buffer(bh);
+	    if (need_resched)
+	        schedule();
+	    spin_lock(lock);
+	    goto loop_next;
+	}
+	if (buffer_dirty(bh)) {
+	    list_del_init(&jh->list);
+	    list_add(&jh->list, &tmp);
+	    add_to_chunk(&chunk, bh, lock, write_ordered_chunk);
+	} else {
+	    reiserfs_free_jh(bh);
+	    unlock_buffer(bh);
+	}
+loop_next:
+	put_bh(bh);
+	if (chunk.nr == 0 && need_resched) {
+	    spin_unlock(lock);
+	    schedule();
+	    spin_lock(lock);
+	}
+    }
+    if (chunk.nr) {
+	spin_unlock(lock);
+        write_ordered_chunk(&chunk);
+	spin_lock(lock);
+    }
+    while(!list_empty(&tmp)) {
+        jh = JH_ENTRY(tmp.prev);
+	bh = jh->bh;
+	get_bh(bh);
+	reiserfs_free_jh(bh);
+
+	if (buffer_locked(bh)) {
+	    spin_unlock(lock);
+	    wait_on_buffer(bh);
+	    spin_lock(lock);
+	}
+	if (!buffer_uptodate(bh))
+	    ret = -EIO;
+	put_bh(bh);
+	if (need_resched()) {
+	    spin_unlock(lock);
+	    schedule();
+	    spin_lock(lock);
+	}
+    }
+    spin_unlock(lock);
+    return ret;
+}
+
 static int flush_older_commits(struct super_block *s, struct reiserfs_journal_list *jl) {
     struct reiserfs_journal_list *other_jl;
     struct reiserfs_journal_list *first_jl;
@@ -656,6 +899,13 @@ find_first:
     }
     return 0;
 }
+int reiserfs_async_progress_wait(struct super_block *s) {
+    DEFINE_WAIT(wait);
+    struct reiserfs_journal *j = SB_JOURNAL(s);
+    if (atomic_read(&j->j_async_throttle))
+    	blk_congestion_wait(WRITE, HZ/10);
+    return 0;
+}
 
 /*
 ** if this journal list still has commit blocks unflushed, send them to disk.
@@ -710,28 +960,40 @@ static int flush_commit_list(struct super_block *s, struct reiserfs_journal_list
     goto put_jl;
   }
 
+  if (!list_empty(&jl->j_bh_list)) {
+      unlock_kernel();
+      write_ordered_buffers(&SB_JOURNAL(s)->j_dirty_buffers_lock,
+                            SB_JOURNAL(s), jl, &jl->j_bh_list);
+      lock_kernel();
+  }
+  if (!list_empty(&jl->j_bh_list))
+      BUG();
   /*
    * for the description block and all the log blocks, submit any buffers
    * that haven't already reached the disk
    */
+  atomic_inc(&SB_JOURNAL(s)->j_async_throttle);
   for (i = 0 ; i < (jl->j_len + 1) ; i++) {
     bn = SB_ONDISK_JOURNAL_1st_BLOCK(s) + (jl->j_start+i) %
          SB_ONDISK_JOURNAL_SIZE(s);
     tbh = journal_find_get_block(s, bn) ;
-    wait_on_buffer(tbh) ;
-    ll_rw_block(WRITE, 1, &tbh) ;
+    if (buffer_dirty(tbh))
+	ll_rw_block(WRITE, 1, &tbh) ;
     put_bh(tbh) ;
   }
+  atomic_dec(&SB_JOURNAL(s)->j_async_throttle);
 
   /* wait on everything written so far before writing the commit */
   for (i = 0 ;  i < (jl->j_len + 1) ; i++) {
     bn = SB_ONDISK_JOURNAL_1st_BLOCK(s) +
 	 (jl->j_start + i) % SB_ONDISK_JOURNAL_SIZE(s) ;
     tbh = journal_find_get_block(s, bn) ;
-
     wait_on_buffer(tbh) ;
+    // since we're using ll_rw_blk above, it might have skipped over
+    // a locked buffer.  Double check here
+    //
     if (buffer_dirty(tbh))
-      BUG();
+      sync_dirty_buffer(tbh);
     if (!buffer_uptodate(tbh)) {
       reiserfs_panic(s, "journal-601, buffer write failed\n") ;
     }
@@ -890,33 +1152,6 @@ restart:
 	goto restart;
     }
     return 0 ;
-}
-
-static void reiserfs_end_buffer_io_sync(struct buffer_head *bh, int uptodate) {
-    char b[BDEVNAME_SIZE];
-
-    if (buffer_journaled(bh)) {
-        reiserfs_warning("clm-2084: pinned buffer %lu:%s sent to disk\n",
-	                 bh->b_blocknr, bdevname(bh->b_bdev, b)) ;
-    }
-    if (uptodate)
-    	set_buffer_uptodate(bh) ;
-    else
-    	clear_buffer_uptodate(bh) ;
-    unlock_buffer(bh) ;
-    put_bh(bh) ;
-}
-
-static void submit_logged_buffer(struct buffer_head *bh) {
-    get_bh(bh) ;
-    bh->b_end_io = reiserfs_end_buffer_io_sync ;
-    mark_buffer_notjournal_new(bh) ;
-    clear_buffer_dirty(bh) ;
-    if (!test_and_clear_bit(BH_JTest, &bh->b_state))
-        BUG();
-    if (!buffer_uptodate(bh))
-        BUG();
-    submit_bh(WRITE, bh) ;
 }
 
 static void del_from_work_list(struct super_block *s,
@@ -1158,28 +1393,6 @@ flush_older_and_return:
   return 0 ;
 } 
 
-#define CHUNK_SIZE 32
-struct buffer_chunk {
-    struct buffer_head *bh[CHUNK_SIZE];
-    int nr;
-};
-
-static void write_chunk(struct buffer_chunk *chunk) {
-    int i;
-    for (i = 0; i < chunk->nr ; i++) {
-	submit_logged_buffer(chunk->bh[i]) ;
-    }
-    chunk->nr = 0;
-}
-
-static void add_to_chunk(struct buffer_chunk *chunk, struct buffer_head *bh) {
-    if (chunk->nr >= CHUNK_SIZE)
-        BUG();
-    chunk->bh[chunk->nr++] = bh;
-    if (chunk->nr >= CHUNK_SIZE)
-        write_chunk(chunk);
-}
-
 static int write_one_transaction(struct super_block *s,
                                  struct reiserfs_journal_list *jl,
 				 struct buffer_chunk *chunk)
@@ -1214,7 +1427,7 @@ static int write_one_transaction(struct super_block *s,
 		if (!buffer_journal_dirty(tmp_bh) ||
 		    reiserfs_buffer_prepared(tmp_bh))
 		    BUG();
-		add_to_chunk(chunk, tmp_bh);
+		add_to_chunk(chunk, tmp_bh, NULL, write_chunk);
 		ret++;
 	    } else {
 		/* note, cn->bh might be null now */
@@ -1937,6 +2150,8 @@ retry:
     memset(jl, 0, sizeof(*jl));
     INIT_LIST_HEAD(&jl->j_list);
     INIT_LIST_HEAD(&jl->j_working_list);
+    INIT_LIST_HEAD(&jl->j_tail_bh_list);
+    INIT_LIST_HEAD(&jl->j_bh_list);
     sema_init(&jl->j_commit_lock, 1);
     SB_JOURNAL(s)->j_num_lists++;
     get_journal_list(jl);
@@ -2166,6 +2381,7 @@ int journal_init(struct super_block *p_s_sb, const char * j_dev_name, int old_fo
   SB_JOURNAL(p_s_sb)->j_len = 0 ;
   SB_JOURNAL(p_s_sb)->j_len_alloc = 0 ;
   atomic_set(&(SB_JOURNAL(p_s_sb)->j_wcount), 0) ;
+  atomic_set(&(SB_JOURNAL(p_s_sb)->j_async_throttle), 0) ;
   SB_JOURNAL(p_s_sb)->j_bcount = 0 ;	  
   SB_JOURNAL(p_s_sb)->j_trans_start_time = 0 ;	  
   SB_JOURNAL(p_s_sb)->j_last = NULL ;	  
@@ -2376,6 +2592,43 @@ relock:
   return 0 ;
 }
 
+struct reiserfs_transaction_handle *
+reiserfs_persistent_transaction(struct super_block *s, int nblocks) {
+    int ret ;
+    struct reiserfs_transaction_handle *th ;
+
+    /* if we're nesting into an existing transaction.  It will be
+    ** persistent on its own
+    */
+    if (reiserfs_transaction_running(s)) {
+        th = current->journal_info ;
+	th->t_refcount++ ;
+	if (th->t_refcount < 2) {
+	    BUG() ;
+	}
+	return th ;
+    }
+    th = reiserfs_kmalloc(sizeof(struct reiserfs_transaction_handle), GFP_NOFS, s) ;
+    if (!th)
+       return NULL;
+    ret = journal_begin(th, s, nblocks) ;
+    if (ret) {
+	reiserfs_kfree(th, sizeof(struct reiserfs_transaction_handle), s) ;
+        return NULL;
+    }
+    return th ;
+}
+
+int
+reiserfs_end_persistent_transaction(struct reiserfs_transaction_handle *th) {
+    struct super_block *s = th->t_super;
+    int ret;
+    ret = journal_end(th, th->t_super, th->t_blocks_allocated);
+    if (th->t_refcount == 0)
+	reiserfs_kfree(th, sizeof(struct reiserfs_transaction_handle), s) ;
+    return ret;
+}
+
 static int journal_join(struct reiserfs_transaction_handle *th, struct super_block *p_s_sb, unsigned long nblocks) {
   struct reiserfs_transaction_handle *cur_th = current->journal_info;
 
@@ -2522,7 +2775,9 @@ int journal_mark_dirty(struct reiserfs_transaction_handle *th, struct super_bloc
 int journal_end(struct reiserfs_transaction_handle *th, struct super_block *p_s_sb, unsigned long nblocks) {
   if (!current->journal_info && th->t_refcount > 1)
     printk("REISER-NESTING: th NULL, refcount %d\n", th->t_refcount);
-  if (th->t_refcount > 1) {
+
+  th->t_refcount--;
+  if (th->t_refcount > 0) {
     struct reiserfs_transaction_handle *cur_th = current->journal_info ;
 
     /* we aren't allowed to close a nested transaction on a different
@@ -2531,7 +2786,6 @@ int journal_end(struct reiserfs_transaction_handle *th, struct super_block *p_s_
     if (cur_th->t_super != th->t_super)
       BUG() ;
 
-    th->t_refcount--;
     if (th != cur_th) {
       memcpy(current->journal_info, th, sizeof(*th));
       th->t_trans_id = 0;
@@ -2648,14 +2902,7 @@ int journal_end_sync(struct reiserfs_transaction_handle *th, struct super_block 
 }
 
 /*
-** used to get memory back from async commits that are floating around
-** and to reclaim any blocks deleted but unusable because their commits
-** haven't hit disk yet.  called from bitmap.c
-**
-** if it starts flushing things, it ors SCHEDULE_OCCURRED into repeat.
-** note, this is just if schedule has a chance of occurring.  I need to 
-** change flush_commit_lists to have a repeat parameter too.
-**
+** writeback the pending async commits to disk
 */
 static void flush_async_commits(void *p) {
   struct super_block *p_s_sb = p;
@@ -2670,6 +2917,9 @@ static void flush_async_commits(void *p) {
       flush_commit_list(p_s_sb, jl, 1);
   }
   unlock_kernel();
+  atomic_inc(&SB_JOURNAL(p_s_sb)->j_async_throttle);
+  filemap_fdatawrite(p_s_sb->s_bdev->bd_inode->i_mapping);
+  atomic_dec(&SB_JOURNAL(p_s_sb)->j_async_throttle);
 }
 
 /*
@@ -3072,6 +3322,7 @@ static int do_journal_end(struct reiserfs_transaction_handle *th, struct super_b
   if (!check_journal_end(th, p_s_sb, nblocks, flags)) {
     p_s_sb->s_dirt = 1;
     wake_queued_writers(p_s_sb);
+    reiserfs_async_progress_wait(p_s_sb);
     goto out ;
   }
 
@@ -3248,23 +3499,38 @@ static int do_journal_end(struct reiserfs_transaction_handle *th, struct super_b
   SB_JOURNAL(p_s_sb)->j_next_async_flush = 0 ;
   init_journal_hash(p_s_sb) ; 
 
+  // make sure reiserfs_add_jh sees the new current_jl before we
+  // write out the tails
+  smp_mb();
+
   /* tail conversion targets have to hit the disk before we end the
    * transaction.  Otherwise a later transaction might repack the tail
    * before this transaction commits, leaving the data block unflushed and
    * clean, if we crash before the later transaction commits, the data block
    * is lost.
    */
-  fsync_buffers_list(&(SB_JOURNAL(p_s_sb)->j_dirty_buffers_lock),
-		     &(SB_JOURNAL(p_s_sb)->j_dirty_buffers)) ;
+  if (!list_empty(&jl->j_tail_bh_list)) {
+      unlock_kernel();
+      write_ordered_buffers(&SB_JOURNAL(p_s_sb)->j_dirty_buffers_lock,
+			    SB_JOURNAL(p_s_sb), jl, &jl->j_tail_bh_list);
+      lock_kernel();
+  }
+  if (!list_empty(&jl->j_tail_bh_list))
+      BUG();
   up(&jl->j_commit_lock);
 
   /* honor the flush wishes from the caller, simple commits can
   ** be done outside the journal lock, they are done below
+  **
+  ** if we don't flush the commit list right now, we put it into
+  ** the work queue so the people waiting on the async progress work
+  ** queue don't wait for this proc to flush journal lists and such.
   */
   if (flush) {
     flush_commit_list(p_s_sb, jl, 1) ;
     flush_journal_list(p_s_sb, jl, 1) ;
-  }
+  } else
+    queue_work(commit_wq, &SB_JOURNAL(p_s_sb)->j_work);
 
 
   /* if the next transaction has any chance of wrapping, flush 
@@ -3322,15 +3588,12 @@ first_jl:
   clear_bit(WRITERS_QUEUED, &SB_JOURNAL(p_s_sb)->j_state);
   wake_up(&(SB_JOURNAL(p_s_sb)->j_join_wait)) ;
 
-  if (!flush) {
-      if (wait_on_commit) {
-	  if (journal_list_still_alive(p_s_sb, commit_trans_id))
-	      flush_commit_list(p_s_sb, jl, 1) ;
-      } else {
-          queue_work(commit_wq, &SB_JOURNAL(p_s_sb)->j_work);
-      }
+  if (!flush && wait_on_commit &&
+      journal_list_still_alive(p_s_sb, commit_trans_id)) {
+	  flush_commit_list(p_s_sb, jl, 1) ;
   }
 out:
   reiserfs_check_lock_depth("journal end2");
+  th->t_trans_id = 0;
   return 0 ;
 }
