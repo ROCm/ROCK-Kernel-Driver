@@ -463,9 +463,6 @@ struct net_device
 
 	/* class/net/name entry */
 	struct class_device	class_dev;
-
-	/* statistics sub-directory */
-	struct kobject		stats_kobj;
 };
 
 #define SET_MODULE_OWNER(dev) do { } while (0)
