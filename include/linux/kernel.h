@@ -89,6 +89,8 @@ extern int sscanf(const char *, const char *, ...)
 	__attribute__ ((format (scanf,2,3)));
 extern int vsscanf(const char *, const char *, va_list);
 
+extern void qsort(void *, size_t, size_t, int (*)(const void *,const void *));
+
 extern int get_option(char **str, int *pint);
 extern char *get_options(const char *str, int nints, int *ints);
 extern unsigned long long memparse(char *ptr, char **retptr);

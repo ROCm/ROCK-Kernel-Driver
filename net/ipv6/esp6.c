@@ -306,7 +306,7 @@ int esp6_init_state(struct xfrm_state *x, void *args)
 		if (x->aalg->alg_key_len == 0 || x->aalg->alg_key_len > 512)
 			goto error;
 	}
-	if (x->ealg == NULL)
+	if (x->ealg == NULL || (x->ealg->alg_key_len == 0 && x->props.ealgo != SADB_EALG_NULL))
 		goto error;
 
 	esp = kmalloc(sizeof(*esp), GFP_KERNEL);
@@ -345,11 +345,13 @@ int esp6_init_state(struct xfrm_state *x, void *args)
 			goto error;
 	}
 	esp->conf.key = x->ealg->alg_key;
-	esp->conf.key_len = (x->ealg->alg_key_len+7)/8;
-	if (x->props.ealgo == SADB_EALG_NULL)
+	if (x->props.ealgo == SADB_EALG_NULL) {
+		esp->conf.key_len = 0;
 		esp->conf.tfm = crypto_alloc_tfm(x->ealg->alg_name, CRYPTO_TFM_MODE_ECB);
-	else
+	} else {
+		esp->conf.key_len = (x->ealg->alg_key_len+7)/8;
 		esp->conf.tfm = crypto_alloc_tfm(x->ealg->alg_name, CRYPTO_TFM_MODE_CBC);
+	}
 	if (esp->conf.tfm == NULL)
 		goto error;
 	esp->conf.ivlen = crypto_tfm_alg_ivsize(esp->conf.tfm);

@@ -30,6 +30,9 @@ config LIBCRC32C
 	  require M here.  See Castagnoli93.
 	  Module will be libcrc32c.
 
+config QSORT
+	bool "Quick Sort"
+
 #
 # compression support is select'ed if needed
 #
