@@ -1,5 +1,5 @@
 /*
- *  acpi_thermal.c - ACPI Thermal Zone Driver ($Revision: 36 $)
+ *  acpi_thermal.c - ACPI Thermal Zone Driver ($Revision: 39 $)
  *
  *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
  *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
@@ -35,6 +35,8 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/types.h>
+#include <linux/compatmac.h>
+#include <linux/proc_fs.h>
 #include <linux/sched.h>
 #include <linux/kmod.h>
 #include "acpi_bus.h"
@@ -399,7 +401,7 @@ acpi_thermal_critical (
 		tz->trips.critical.flags.enabled = 0;
 
 	result = acpi_bus_get_device(tz->handle, &device);
-	if (0 != result)
+	if (result)
 		return_VALUE(result);
 
 	acpi_bus_generate_event(device, ACPI_THERMAL_NOTIFY_CRITICAL, tz->trips.critical.flags.enabled);
@@ -430,7 +432,7 @@ acpi_thermal_hot (
 		tz->trips.hot.flags.enabled = 0;
 
 	result = acpi_bus_get_device(tz->handle, &device);
-	if (0 != result)
+	if (result)
 		return_VALUE(result);
 
 	acpi_bus_generate_event(device, ACPI_THERMAL_NOTIFY_HOT, tz->trips.hot.flags.enabled);
@@ -497,7 +499,7 @@ acpi_thermal_passive (
 			result = acpi_processor_set_thermal_limit(
 				passive->devices.handles[i], 
 				ACPI_PROCESSOR_LIMIT_DECREMENT);
-		if (1 == result) {
+		if (result == 1) {
 			tz->trips.passive.flags.enabled = 0;
 			ACPI_DEBUG_PRINT((ACPI_DB_INFO, 
 				"Disabling passive cooling (zone is cool)\n"));
@@ -539,7 +541,7 @@ acpi_thermal_active (
 			if (!active->flags.enabled) {
 				for (j = 0; j < active->devices.count; j++) {
 					result = acpi_bus_set_power(active->devices.handles[j], ACPI_STATE_D0);
-					if (0 != result) {
+					if (result) {
 						ACPI_DEBUG_PRINT((ACPI_DB_WARN, "Unable to turn cooling device [%p] 'on'\n", active->devices.handles[j]));
 						continue;
 					}
@@ -557,7 +559,7 @@ acpi_thermal_active (
 		else if (active->flags.enabled) {
 			for (j = 0; j < active->devices.count; j++) {
 				result = acpi_bus_set_power(active->devices.handles[j], ACPI_STATE_D3);
-				if (0 != result) {
+				if (result) {
 					ACPI_DEBUG_PRINT((ACPI_DB_WARN, "Unable to turn cooling device [%p] 'off'\n", active->devices.handles[j]));
 					continue;
 				}
@@ -598,7 +600,7 @@ acpi_thermal_check (
 	}
 
 	result = acpi_thermal_get_temperature(tz);
-	if (0 != result)
+	if (result)
 		return_VOID;
 	
 	memset(&tz->state, 0, sizeof(tz->state));
@@ -696,9 +698,6 @@ acpi_thermal_check (
                               FS Interface (/proc)
    -------------------------------------------------------------------------- */
 
-#include <linux/compatmac.h>
-#include <linux/proc_fs.h>
-
 struct proc_dir_entry		*acpi_thermal_dir = NULL;
 
 
@@ -768,7 +767,7 @@ acpi_thermal_read_temperature (
 		goto end;
 
 	result = acpi_thermal_get_temperature(tz);
-	if (0 != result)
+	if (result)
 		goto end;
 
 	p += sprintf(p, "temperature:             %lu C\n", 
@@ -914,7 +913,7 @@ acpi_thermal_write_cooling_mode (
 	
 	result = acpi_thermal_set_cooling_mode(tz, 
 		simple_strtoul(mode_string, NULL, 0));
-	if (0 != result)
+	if (result)
 		return_VALUE(result);
 
 	return_VALUE(count);
@@ -984,7 +983,7 @@ acpi_thermal_write_polling (
 	seconds = simple_strtoul(polling_string, NULL, 0);
 	
 	result = acpi_thermal_set_polling(tz, seconds);
-	if (0 != result)
+	if (result)
 		return_VALUE(result);
 
 	acpi_thermal_check(tz);
@@ -1115,7 +1114,7 @@ acpi_thermal_notify (
 	if (!tz)
 		return_VOID;
 
-	if (0 != acpi_bus_get_device(tz->handle, &device))
+	if (acpi_bus_get_device(tz->handle, &device))
 		return_VOID;
 
 	switch (event) {
@@ -1155,17 +1154,17 @@ acpi_thermal_get_info (
 
 	/* Get temperature [_TMP] (required) */
 	result = acpi_thermal_get_temperature(tz);
-	if (0 != result)
+	if (result)
 		return_VALUE(result);
 
 	/* Set the cooling mode [_SCP] to active cooling (default) */
 	result = acpi_thermal_set_cooling_mode(tz, ACPI_THERMAL_MODE_ACTIVE);
-	if (0 == result)
+	if (!result)
 		tz->flags.cooling_mode = 1;
 
 	/* Get trip points [_CRT, _PSV, etc.] (required) */
 	result = acpi_thermal_get_trip_points(tz);
-	if (0 != result)
+	if (result)
 		return_VALUE(result);
 
 	/* Get default polling frequency [_TZP] (optional) */
@@ -1176,7 +1175,7 @@ acpi_thermal_get_info (
 
 	/* Get devices in this thermal zone [_TZD] (optional) */
 	result = acpi_thermal_get_devices(tz);
-	if (0 == result)
+	if (!result)
 		tz->flags.devices = 1;
 
 	return_VALUE(0);
@@ -1208,11 +1207,11 @@ acpi_thermal_add (
 	acpi_driver_data(device) = tz;
 
 	result = acpi_thermal_get_info(tz);
-	if (0 != result)
+	if (result)
 		goto end;
 
 	result = acpi_thermal_add_fs(device);
-	if (0 != result)
+	if (result)
 		return_VALUE(result);
 
 	acpi_thermal_check(tz);
@@ -1292,7 +1291,7 @@ acpi_thermal_init (void)
 	ACPI_FUNCTION_TRACE("acpi_thermal_init");
 
 	result = acpi_bus_register_driver(&acpi_thermal_driver);
-	if (0 > result)
+	if (result < 0)
 		return_VALUE(-ENODEV);
 
 	return_VALUE(0);
@@ -1307,7 +1306,7 @@ acpi_thermal_exit (void)
 	ACPI_FUNCTION_TRACE("acpi_thermal_exit");
 
 	result = acpi_bus_unregister_driver(&acpi_thermal_driver);
-	if (0 == result)
+	if (!result)
 		remove_proc_entry(ACPI_THERMAL_CLASS, acpi_root_dir);
 
 	return_VOID;

@@ -1,5 +1,5 @@
 /*
- *  acpi_fan.c - ACPI Fan Driver ($Revision: 25 $)
+ *  acpi_fan.c - ACPI Fan Driver ($Revision: 28 $)
  *
  *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
  *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
@@ -27,6 +27,8 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/types.h>
+#include <linux/compatmac.h>
+#include <linux/proc_fs.h>
 #include "acpi_bus.h"
 #include "acpi_drivers.h"
 
@@ -63,9 +65,6 @@ struct acpi_fan {
                               FS Interface (/proc)
    -------------------------------------------------------------------------- */
 
-#include <linux/compatmac.h>
-#include <linux/proc_fs.h>
-
 struct proc_dir_entry		*acpi_fan_dir = NULL;
 
 
@@ -88,7 +87,7 @@ acpi_fan_read_state (
 	if (!fan || (off != 0))
 		goto end;
 
-	if (0 != acpi_bus_get_power(fan->handle, &state))
+	if (acpi_bus_get_power(fan->handle, &state))
 		goto end;
 
 	p += sprintf(p, "status:                  %s\n",
@@ -129,7 +128,7 @@ acpi_fan_write_state (
 	
 	result = acpi_bus_set_power(fan->handle, 
 		simple_strtoul(state_string, NULL, 0));
-	if (0 != result)
+	if (result)
 		return_VALUE(result);
 
 	return_VALUE(count);
@@ -221,14 +220,14 @@ acpi_fan_add (
 	acpi_driver_data(device) = fan;
 
 	result = acpi_bus_get_power(fan->handle, &state);
-	if (0 != result) {
+	if (result) {
 		ACPI_DEBUG_PRINT((ACPI_DB_ERROR,
 			"Error reading power state\n"));
 		goto end;
 	}
 
 	result = acpi_fan_add_fs(device);
-	if (0 != result)
+	if (result)
 		goto end;
 
 	printk(KERN_INFO PREFIX "%s [%s] (%s)\n",
@@ -236,7 +235,7 @@ acpi_fan_add (
 		!device->power.state?"on":"off");
 
 end:
-	if (0 != result)
+	if (result)
 		kfree(fan);
 
 	return_VALUE(result);
@@ -273,7 +272,7 @@ acpi_fan_init (void)
 	ACPI_FUNCTION_TRACE("acpi_fan_init");
 
 	result = acpi_bus_register_driver(&acpi_fan_driver);
-	if (0 > result)
+	if (result < 0)
 		return_VALUE(-ENODEV);
 
 	return_VALUE(0);
@@ -288,7 +287,7 @@ acpi_fan_exit (void)
 	ACPI_FUNCTION_TRACE("acpi_fan_exit");
 
 	result = acpi_bus_unregister_driver(&acpi_fan_driver);
-	if (0 == result)
+	if (!result)
 		remove_proc_entry(ACPI_FAN_CLASS, acpi_root_dir);
 
 	return_VOID;

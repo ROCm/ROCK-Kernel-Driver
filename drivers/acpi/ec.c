@@ -1,5 +1,5 @@
 /*
- *  acpi_ec.c - ACPI Embedded Controller Driver ($Revision: 28 $)
+ *  acpi_ec.c - ACPI Embedded Controller Driver ($Revision: 31 $)
  *
  *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
  *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
@@ -28,6 +28,8 @@
 #include <linux/init.h>
 #include <linux/types.h>
 #include <linux/delay.h>
+#include <linux/compatmac.h>
+#include <linux/proc_fs.h>
 #include <asm/io.h>
 #include "acpi_bus.h"
 #include "acpi_drivers.h"
@@ -151,12 +153,12 @@ acpi_ec_read (
 
 	outb(ACPI_EC_COMMAND_READ, ec->command_port);
 	result = acpi_ec_wait(ec, ACPI_EC_EVENT_IBE);
-	if (0 != result)
+	if (result)
 		goto end;
 
 	outb(address, ec->data_port);
 	result = acpi_ec_wait(ec, ACPI_EC_EVENT_OBF);
-	if (0 != result)
+	if (result)
 		goto end;
 
 	*data = inb(ec->data_port);
@@ -200,17 +202,17 @@ acpi_ec_write (
 
 	outb(ACPI_EC_COMMAND_WRITE, ec->command_port);
 	result = acpi_ec_wait(ec, ACPI_EC_EVENT_IBE);
-	if (0 != result)
+	if (result)
 		goto end;
 
 	outb(address, ec->data_port);
 	result = acpi_ec_wait(ec, ACPI_EC_EVENT_IBE);
-	if (0 != result)
+	if (result)
 		goto end;
 
 	outb(data, ec->data_port);
 	result = acpi_ec_wait(ec, ACPI_EC_EVENT_IBE);
-	if (0 != result)
+	if (result)
 		goto end;
 
 	ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Wrote [%02x] to address [%02x]\n",
@@ -259,7 +261,7 @@ acpi_ec_query (
 
 	outb(ACPI_EC_COMMAND_QUERY, ec->command_port);
 	result = acpi_ec_wait(ec, ACPI_EC_EVENT_OBF);
-	if (0 != result)
+	if (result)
 		goto end;
 	
 	*data = inb(ec->data_port);
@@ -342,7 +344,7 @@ acpi_ec_gpe_handler (
 	if (!(value & ACPI_EC_FLAG_SCI))
 		return;
 
-	if (0 != acpi_ec_query(ec, &value))
+	if (acpi_ec_query(ec, &value))
 		return;
 
 	query_data = kmalloc(sizeof(struct acpi_ec_query_data), GFP_ATOMIC);
@@ -432,9 +434,6 @@ acpi_ec_space_handler (
 /* --------------------------------------------------------------------------
                               FS Interface (/proc)
    -------------------------------------------------------------------------- */
-
-#include <linux/compatmac.h>
-#include <linux/proc_fs.h>
 
 struct proc_dir_entry		*acpi_ec_dir = NULL;
 
@@ -566,7 +565,7 @@ acpi_ec_add (
 	}
 
 	result = acpi_ec_add_fs(device);
-	if (0 != result)
+	if (result)
 		goto end;
 
 	printk(KERN_INFO PREFIX "%s [%s] (gpe %d)\n",
@@ -574,7 +573,7 @@ acpi_ec_add (
 		(u32) ec->gpe_bit);
 
 end:
-	if (0 != result)
+	if (result)
 		kfree(ec);
 
 	return_VALUE(result);
@@ -712,7 +711,7 @@ acpi_ec_init (void)
 	ACPI_FUNCTION_TRACE("acpi_ec_init");
 
 	result = acpi_bus_register_driver(&acpi_ec_driver);
-	if (0 > result) {
+	if (result < 0) {
 		remove_proc_entry(ACPI_EC_CLASS, acpi_root_dir);
 		return_VALUE(-ENODEV);
 	}
@@ -729,7 +728,7 @@ acpi_ec_exit (void)
 	ACPI_FUNCTION_TRACE("acpi_ec_exit");
 
 	result = acpi_bus_unregister_driver(&acpi_ec_driver);
-	if (0 == result)
+	if (!result)
 		remove_proc_entry(ACPI_EC_CLASS, acpi_root_dir);
 
 	return_VOID;

@@ -1,5 +1,5 @@
 /*
- *  acpi_battery.c - ACPI Battery Driver ($Revision: 32 $)
+ *  acpi_battery.c - ACPI Battery Driver ($Revision: 35 $)
  *
  *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
  *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
@@ -27,6 +27,8 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/types.h>
+#include <linux/compatmac.h>
+#include <linux/proc_fs.h>
 #include "acpi_bus.h"
 #include "acpi_drivers.h"
 
@@ -162,7 +164,7 @@ acpi_battery_get_info (
 end:
 	kfree(buffer.pointer);
 
-	if (0 == result)
+	if (!result)
 		(*bif) = (struct acpi_battery_info *) data.pointer;
 
 	return_VALUE(result);
@@ -223,7 +225,7 @@ acpi_battery_get_status (
 end:
 	kfree(buffer.pointer);
 
-	if (0 == result)
+	if (!result)
 		(*bst) = (struct acpi_battery_status *) data.pointer;
 
 	return_VALUE(result);
@@ -277,11 +279,11 @@ acpi_battery_check (
 		return_VALUE(-EINVAL);
 
 	result = acpi_bus_get_device(battery->handle, &device);
-	if (0 != result)
+	if (result)
 		return_VALUE(result);
 
 	result = acpi_bus_get_status(device);
-	if (0 != result)
+	if (result)
 		return_VALUE(result);
 
 	/* Insertion? */
@@ -293,7 +295,7 @@ acpi_battery_check (
 		/* Evalute _BIF to get certain static information */
 
 		result = acpi_battery_get_info(battery, &bif);
-		if (0 != result)
+		if (result)
 			return_VALUE(result);
 
 		battery->flags.power_unit = bif->power_unit;
@@ -325,9 +327,6 @@ acpi_battery_check (
 /* --------------------------------------------------------------------------
                               FS Interface (/proc)
    -------------------------------------------------------------------------- */
-
-#include <linux/compatmac.h>
-#include <linux/proc_fs.h>
 
 struct proc_dir_entry		*acpi_battery_dir = NULL;
 
@@ -362,7 +361,7 @@ acpi_battery_read_info (
 	/* Battery Info (_BIF) */
 
 	result = acpi_battery_get_info(battery, &bif);
-	if ((0 != result) || !bif) {
+	if (result || !bif) {
 		p += sprintf(p, "ERROR: Unable to read battery information\n");
 		goto end;
 	}
@@ -465,7 +464,7 @@ acpi_battery_read_state (
 	/* Battery Status (_BST) */
 
 	result = acpi_battery_get_status(battery, &bst);
-	if ((0 != result) || !bst) {
+	if (result || !bst) {
 		p += sprintf(p, "ERROR: Unable to read battery status\n");
 		goto end;
 	}
@@ -590,7 +589,7 @@ acpi_battery_write_alarm (
 
 	result = acpi_battery_set_alarm(battery, 
 		simple_strtoul(alarm_string, NULL, 0));
-	if (0 != result)
+	if (result)
 		return_VALUE(result);
 
 	return_VALUE(count);
@@ -693,7 +692,7 @@ acpi_battery_notify (
 	if (!battery)
 		return_VOID;
 
-	if (0 != acpi_bus_get_device(handle, &device))
+	if (acpi_bus_get_device(handle, &device))
 		return_VOID;
 
 	switch (event) {
@@ -736,11 +735,11 @@ acpi_battery_add (
 	acpi_driver_data(device) = battery;
 
 	result = acpi_battery_check(battery);
-	if (0 != result)
+	if (result)
 		goto end;
 
 	result = acpi_battery_add_fs(device);
-	if (0 != result)
+	if (result)
 		goto end;
 
 	status = acpi_install_notify_handler(battery->handle,
@@ -757,7 +756,7 @@ acpi_battery_add (
 		device->status.battery_present?"present":"absent");
 		
 end:
-	if (0 != result) {
+	if (result) {
 		acpi_battery_remove_fs(device);
 		kfree(battery);
 	}
@@ -803,7 +802,7 @@ acpi_battery_init (void)
 	ACPI_FUNCTION_TRACE("acpi_battery_init");
 
 	result = acpi_bus_register_driver(&acpi_battery_driver);
-	if (0 > result) {
+	if (result < 0) {
 		remove_proc_entry(ACPI_BATTERY_CLASS, acpi_root_dir);
 		return_VALUE(-ENODEV);
 	}
@@ -820,7 +819,7 @@ acpi_battery_exit (void)
 	ACPI_FUNCTION_TRACE("acpi_battery_exit");
 
 	result = acpi_bus_unregister_driver(&acpi_battery_driver);
-	if (0 == result)
+	if (!result)
 		remove_proc_entry(ACPI_BATTERY_CLASS, acpi_root_dir);
 
 	return_VOID;

@@ -1,5 +1,5 @@
 /*
- *  acpi_drivers.h  ($Revision: 23 $)
+ *  acpi_drivers.h  ($Revision: 29 $)
  *
  *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
  *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
@@ -30,7 +30,6 @@
 #include "acpi_bus.h"
 
 
-#define ACPI_DRIVER_VERSION		0x20020404
 #define ACPI_MAX_STRING			80
 
 
@@ -148,41 +147,53 @@ void acpi_ec_exit (void);
                                        PCI
    -------------------------------------------------------------------------- */
 
-#define ACPI_PCI_LINK_COMPONENT		0x00400000
-#define ACPI_PCI_LINK_CLASS		"irq_routing"
+#ifdef CONFIG_ACPI_PCI
+
+#define ACPI_PCI_COMPONENT		0x00400000
+
+/* ACPI PCI Root Bridge (pci_root.c) */
+
+#define ACPI_PCI_ROOT_CLASS		"pci_bridge"
+#define ACPI_PCI_ROOT_HID		"PNP0A03"
+#define ACPI_PCI_ROOT_DRIVER_NAME	"ACPI PCI Root Bridge Driver"
+#define ACPI_PCI_ROOT_DEVICE_NAME	"PCI Root Bridge"
+
+int acpi_pci_root_init (void);
+void acpi_pci_root_exit (void);
+
+/* ACPI PCI Interrupt Link (pci_link.c) */
+
+#define ACPI_PCI_LINK_CLASS		"pci_irq_routing"
 #define ACPI_PCI_LINK_HID		"PNP0C0F"
 #define ACPI_PCI_LINK_DRIVER_NAME	"ACPI PCI Interrupt Link Driver"
 #define ACPI_PCI_LINK_DEVICE_NAME	"PCI Interrupt Link"
 #define ACPI_PCI_LINK_FILE_INFO		"info"
 #define ACPI_PCI_LINK_FILE_STATUS	"state"
 
-#define ACPI_PCI_ROOT_COMPONENT		0x00800000
-#define ACPI_PCI_ROOT_CLASS		"bridge"
-#define ACPI_PCI_ROOT_HID		"PNP0A03"
-#define ACPI_PCI_ROOT_DRIVER_NAME	"ACPI PCI Root Bridge Driver"
-#define ACPI_PCI_ROOT_DEVICE_NAME	"PCI Root Bridge"
-
-#define ACPI_PCI_PRT_DEVICE_NAME	"PCI Interrupt Routing Table"
-
-#ifdef CONFIG_ACPI_PCI
-
-
-int acpi_pci_link_get_irq (struct acpi_prt_entry *entry, int *irq);
-int acpi_pci_link_set_irq (struct acpi_prt_entry *entry, int irq);
+int acpi_pci_link_check (void);
+int acpi_pci_link_get_irq (acpi_handle handle, int index);
 int acpi_pci_link_init (void);
 void acpi_pci_link_exit (void);
 
-int acpi_pci_root_init (void);
-void acpi_pci_root_exit (void);
+/* ACPI PCI Interrupt Routing (pci_irq.c) */
 
-#endif
+int acpi_pci_irq_add_prt (acpi_handle handle, int segment, int bus);
+
+/* ACPI PCI Device Binding (pci_bind.c) */
+
+struct pci_bus;
+
+int acpi_pci_bind (struct acpi_device *device);
+int acpi_pci_bind_root (struct acpi_device *device, acpi_pci_id *id, struct pci_bus *bus);
+
+#endif /*CONFIG_ACPI_PCI*/
 
 
 /* --------------------------------------------------------------------------
                                   Power Resource
    -------------------------------------------------------------------------- */
 
-#define ACPI_POWER_COMPONENT		0x01000000
+#define ACPI_POWER_COMPONENT		0x00800000
 #define ACPI_POWER_CLASS		"power_resource"
 #define ACPI_POWER_HID			"ACPI_PWR"
 #define ACPI_POWER_DRIVER_NAME		"ACPI Power Resource Driver"
@@ -207,7 +218,7 @@ void acpi_power_exit (void);
                                     Processor
    -------------------------------------------------------------------------- */
 
-#define ACPI_PROCESSOR_COMPONENT	0x02000000
+#define ACPI_PROCESSOR_COMPONENT	0x01000000
 #define ACPI_PROCESSOR_CLASS		"processor"
 #define ACPI_PROCESSOR_HID		"ACPI_CPU"
 #define ACPI_PROCESSOR_DRIVER_NAME	"ACPI Processor Driver"
@@ -230,7 +241,7 @@ int acpi_processor_set_thermal_limit(acpi_handle handle, int type);
                                      System
    -------------------------------------------------------------------------- */
 
-#define ACPI_SYSTEM_COMPONENT		0x04000000
+#define ACPI_SYSTEM_COMPONENT		0x02000000
 #define ACPI_SYSTEM_CLASS		"system"
 #define ACPI_SYSTEM_HID			"ACPI_SYS"
 #define ACPI_SYSTEM_DRIVER_NAME		"ACPI System Driver"
@@ -256,7 +267,7 @@ void acpi_system_exit (void);
                                  Thermal Zone
    -------------------------------------------------------------------------- */
 
-#define ACPI_THERMAL_COMPONENT		0x08000000
+#define ACPI_THERMAL_COMPONENT		0x04000000
 #define ACPI_THERMAL_CLASS		"thermal_zone"
 #define ACPI_THERMAL_HID		"ACPI_THM"
 #define ACPI_THERMAL_DRIVER_NAME	"ACPI Thermal Zone Driver"

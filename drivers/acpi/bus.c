@@ -1,5 +1,5 @@
 /*
- *  acpi_bus.c - ACPI Bus Driver ($Revision: 66 $)
+ *  acpi_bus.c - ACPI Bus Driver ($Revision: 77 $)
  *
  *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
  *
@@ -47,9 +47,9 @@ MODULE_LICENSE("GPL");
 #define	PREFIX			"ACPI: "
 
 FADT_DESCRIPTOR			acpi_fadt;
-static u8			acpi_disabled = 0;
-struct acpi_device		*acpi_root = NULL;
-struct proc_dir_entry		*acpi_root_dir = NULL;
+static u8			acpi_disabled;
+struct acpi_device		*acpi_root;
+struct proc_dir_entry		*acpi_root_dir;
 
 #define STRUCT_TO_INT(s)	(*((int*)&s))
 
@@ -71,6 +71,8 @@ static struct acpi_blacklist_item acpi_blacklist[] __initdata =
 	{"ASUS  ", "K7M     ", 0x00001000, ACPI_TABLE_DSDT, less_than_or_equal, "Field beyond end of region", 0},
 	/* Intel 810 Motherboard? */
 	{"MNTRAL", "MO81010A", 0x00000012, ACPI_TABLE_DSDT, less_than_or_equal, "Field beyond end of region", 0},
+	/* Compaq Presario 711FR */
+	{"COMAPQ", "EAGLES", 0x06040000, ACPI_TABLE_DSDT, less_than_or_equal, "SCI issues (C2 disabled)", 0},
 	/* Compaq Presario 1700 */
 	{"PTLTD ", "  DSDT  ", 0x06040000, ACPI_TABLE_DSDT, less_than_or_equal, "Multiple problems", 1},
 	/* Sony FX120, FX140, FX150? */
@@ -398,7 +400,7 @@ acpi_bus_get_power (
 	ACPI_FUNCTION_TRACE("acpi_bus_get_power");
 
 	result = acpi_bus_get_device(handle, &device);
-	if (0 != result)
+	if (result)
 		return_VALUE(result);
 
 	*state = ACPI_STATE_UNKNOWN;
@@ -424,7 +426,7 @@ acpi_bus_get_power (
 		}
 		else if (device->power.flags.power_resources) {
 			result = acpi_power_get_inferred_state(device);
-			if (0 != result)
+			if (result)
 				return_VALUE(result);
 		}
 
@@ -451,7 +453,7 @@ acpi_bus_set_power (
 	ACPI_FUNCTION_TRACE("acpi_bus_set_power");
 
 	result = acpi_bus_get_device(handle, &device);
-	if (0 != result)
+	if (result)
 		return_VALUE(result);
 
 	if ((state < ACPI_STATE_D0) || (state > ACPI_STATE_D3))
@@ -486,7 +488,7 @@ acpi_bus_set_power (
 	if (state < device->power.state) {
 		if (device->power.flags.power_resources) {
 			result = acpi_power_transition(device, state);
-			if (0 != result)
+			if (result)
 				goto end;
 		}
 		if (device->power.states[state].flags.explicit_set) {
@@ -509,13 +511,13 @@ acpi_bus_set_power (
 		}
 		if (device->power.flags.power_resources) {
 			result = acpi_power_transition(device, state);
-			if (0 != result)
+			if (result)
 				goto end;
 		}
 	}
 
 end:
-	if (0 != result)
+	if (result)
 		ACPI_DEBUG_PRINT((ACPI_DB_WARN, "Error transitioning device [%s] to D%d\n",
 			device->pnp.bus_id, state));
 	else
@@ -893,7 +895,7 @@ acpi_bus_check_scope (
 
 	/* Status Change? */
 	result = acpi_bus_check_device(device, &status_changed);
-	if (0 != result)
+	if (result)
 		return_VALUE(result);
 
 	if (!status_changed)
@@ -924,7 +926,7 @@ acpi_bus_notify (
 
 	ACPI_FUNCTION_TRACE("acpi_bus_notify");
 
-	if (0 != acpi_bus_get_device(handle, &device))
+	if (acpi_bus_get_device(handle, &device))
 		return_VOID;
 
 	switch (type) {
@@ -1019,7 +1021,7 @@ acpi_bus_match (
 		return -EINVAL;
 
 	if (device->flags.hardware_id) {
-		if (0 != strstr(driver->ids, device->pnp.hardware_id))
+		if (strstr(driver->ids, device->pnp.hardware_id))
 			return 0;
 	}
 
@@ -1048,12 +1050,13 @@ acpi_bus_match (
 			break;
 		case ACPI_TYPE_PACKAGE:
 			/* TBD: Support CID packages */
+			break;
 		}
 
 		if (!cid[0])
 			return -ENOENT;
 
-		if (0 != strstr(cid, device->pnp.hardware_id))
+		if (strstr(driver->ids, cid))
 			return 0;
 	}
 
@@ -1083,7 +1086,7 @@ acpi_bus_driver_init (
 		return_VALUE(-ENOSYS);
 
 	result = driver->ops.add(device);
-	if (0 != result) {
+	if (result) {
 		device->driver = NULL;
 		acpi_driver_data(device) = NULL;
 		return_VALUE(result);
@@ -1096,7 +1099,7 @@ acpi_bus_driver_init (
 
 	if (driver->ops.start) {
 		result = driver->ops.start(device);
-		if ((0 != result) && (driver->ops.remove))
+		if (result && driver->ops.remove)
 			driver->ops.remove(device, ACPI_BUS_REMOVAL_NORMAL);
 		return_VALUE(result);
 	}
@@ -1149,14 +1152,14 @@ acpi_bus_attach (
 		return_VALUE(-ENODEV);
 
 	result = acpi_bus_match(device, driver);
-	if (0 != result)
+	if (result)
 		return_VALUE(result);
 
 	ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Found driver [%s] for device [%s]\n",
 		driver->name, device->pnp.bus_id));
 	
 	result = acpi_bus_driver_init(device, driver);
-	if (0 != result)
+	if (result)
 		return_VALUE(result);
 
 	down(&acpi_bus_drivers_lock);
@@ -1194,7 +1197,7 @@ acpi_bus_unattach (
 		return_VALUE(-ENOSYS);
 
 	result = driver->ops.remove(device, ACPI_BUS_REMOVAL_NORMAL);
-	if (0 != result)
+	if (result)
 		return_VALUE(result);
 
 	device->driver = NULL;
@@ -1233,11 +1236,11 @@ acpi_bus_find_driver (
 
 		driver = list_entry(entry, struct acpi_driver, node);
 
-		if (0 != acpi_bus_match(device, driver))
+		if (acpi_bus_match(device, driver))
 			continue;
 
 		result = acpi_bus_driver_init(device, driver);
-		if (0 == result)
+		if (!result)
 			++driver->references;
 
 		break;
@@ -1431,7 +1434,7 @@ acpi_bus_add (
 	 * present and properly initialized.
 	 */
 	result = acpi_bus_get_flags(device);
-	if (0 != result)
+	if (result)
 		goto end;
 
 	/*
@@ -1446,7 +1449,7 @@ acpi_bus_add (
 	switch (type) {
 	case ACPI_BUS_TYPE_DEVICE:
 		result = acpi_bus_get_status(device);
-		if (0 != result)
+		if (result)
 			goto end;
 		break;
 	default:
@@ -1535,7 +1538,7 @@ acpi_bus_add (
 	 */
 	if (device->flags.power_manageable) {
 		result = acpi_bus_get_power_flags(device);
-		if (0 != result)
+		if (result)
 			goto end;
 	}
 
@@ -1545,7 +1548,7 @@ acpi_bus_add (
 	 */
 	if (device->flags.performance_manageable) {
 		result = acpi_bus_get_perf_flags(device);
-		if (0 != result)
+		if (result)
 			goto end;
 	}
 
@@ -1655,7 +1658,7 @@ acpi_bus_add (
 		acpi_bus_find_driver(device);
 
 end:
-	if (0 != result) {
+	if (result) {
 		kfree(device);
 		return_VALUE(result);
 	}
@@ -1877,15 +1880,12 @@ acpi_blacklisted(void)
 	return blacklisted;
 }
 
-
 static int __init
 acpi_bus_init_irq (void)
 {
-	int			result = 0;
 	acpi_status		status = AE_OK;
 	acpi_object		arg = {ACPI_TYPE_INTEGER};
 	acpi_object_list        arg_list = {1, &arg};
-	int			irq_model = 0;
 	char			*message = NULL;
 
 	ACPI_FUNCTION_TRACE("acpi_bus_init_irq");
@@ -1894,28 +1894,25 @@ acpi_bus_init_irq (void)
 	 * Let the system know what interrupt model we are using by
 	 * evaluating the \_PIC object, if exists.
 	 */
-	result = acpi_get_interrupt_model(&irq_model);
-	if (0 != result)
-		return_VALUE(result);
 
-	switch (irq_model) {
-	case ACPI_INT_MODEL_PIC:
+	switch (acpi_irq_model) {
+	case ACPI_IRQ_MODEL_PIC:
 		message = "PIC";
 		break;
-	case ACPI_INT_MODEL_IOAPIC:
+	case ACPI_IRQ_MODEL_IOAPIC:
 		message = "IOAPIC";
 		break;
-	case ACPI_INT_MODEL_IOSAPIC:
+	case ACPI_IRQ_MODEL_IOSAPIC:
 		message = "IOSAPIC";
 		break;
 	default:
-		message = "UNKNOWN";
-		break;
+		printk(KERN_WARNING PREFIX "Unknown interrupt routing model\n");
+		return_VALUE(-ENODEV);
 	}
 
 	printk(KERN_INFO PREFIX "Using %s for interrupt routing\n", message);
 
-	arg.integer.value = irq_model;
+	arg.integer.value = acpi_irq_model;
 
 	status = acpi_evaluate_object(NULL, "\\_PIC", &arg_list, NULL);
 	if (ACPI_FAILURE(status) && (status != AE_NOT_FOUND)) {
@@ -1998,11 +1995,13 @@ acpi_bus_init (void)
 	progress++;
 
 	/*
-	 * [5] Register for all standard device notifications.
+	 * [5] Get the system interrupt model and evaluate \_PIC.
 	 */
 	result = acpi_bus_init_irq();
-	if (0 != result)
+	if (result)
 		goto end;
+
+	progress++;
 
 	/*
 	 * [6] Register for all standard device notifications.
@@ -2021,7 +2020,7 @@ acpi_bus_init (void)
 	 */
 	result = acpi_bus_add(&acpi_root, NULL, ACPI_ROOT_OBJECT, 
 		ACPI_BUS_TYPE_SYSTEM);
-	if (0 != result)
+	if (result)
 		goto end;
 
 	progress++;
@@ -2056,17 +2055,18 @@ acpi_bus_init (void)
 	/*
 	 * [10] Enumerate devices in the ACPI namespace.
 	 */
-
 	result = acpi_bus_scan_fixed(acpi_root);
-	if (0 != result)
+	if (result)
 		goto end;
-
 	result = acpi_bus_scan(acpi_root);
-	if (0 != result)
+	if (result)
 		goto end;
 
 end:
-	if (0 != result) {
+	/*
+	 * Clean up if anything went awry.
+	 */
+	if (result) {
 		switch (progress) {
 		case 10:
 		case 9: remove_proc_entry("ACPI", NULL);
@@ -2132,9 +2132,7 @@ acpi_init (void)
 
 	ACPI_FUNCTION_TRACE("acpi_init");
 
-	printk(KERN_INFO PREFIX "Bus Driver revision %08x\n",
-		ACPI_DRIVER_VERSION);
-	printk(KERN_INFO PREFIX "Core Subsystem revision %08x\n",
+	printk(KERN_INFO PREFIX "Subsystem revision %08x\n",
 		ACPI_CA_VERSION);
 
 	/* Initial core debug level excludes drivers, so include them now */
@@ -2153,7 +2151,7 @@ acpi_init (void)
 #endif
 
 	result = acpi_bus_init();
-	if (0 != result)
+	if (result)
 		return_VALUE(result);
 
 #ifdef CONFIG_PM
@@ -2192,10 +2190,6 @@ acpi_setup(char *str)
 	return 1;
 }
 
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
 subsys_initcall(acpi_init);
-#endif
 
 __setup("acpi=", acpi_setup);
-

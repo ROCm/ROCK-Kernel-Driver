@@ -1,5 +1,5 @@
 /*
- *  acpi_ac.c - ACPI AC Adapter Driver ($Revision: 23 $)
+ *  acpi_ac.c - ACPI AC Adapter Driver ($Revision: 26 $)
  *
  *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
  *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
@@ -27,6 +27,8 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/types.h>
+#include <linux/compatmac.h>
+#include <linux/proc_fs.h>
 #include "acpi_bus.h"
 #include "acpi_drivers.h"
 
@@ -91,9 +93,6 @@ acpi_ac_get_state (
                               FS Interface (/proc)
    -------------------------------------------------------------------------- */
 
-#include <linux/compatmac.h>
-#include <linux/proc_fs.h>
-
 struct proc_dir_entry		*acpi_ac_dir = NULL;
 
 static int
@@ -114,7 +113,7 @@ acpi_ac_read_state (
 	if (!ac || (off != 0))
 		goto end;
 
-	if (0 != acpi_ac_get_state(ac)) {
+	if (acpi_ac_get_state(ac)) {
 		p += sprintf(p, "ERROR: Unable to read AC Adapter state\n");
 		goto end;
 	}
@@ -215,7 +214,7 @@ acpi_ac_notify (
 	if (!ac)
 		return;
 
-	if (0 != acpi_bus_get_device(ac->handle, &device))
+	if (acpi_bus_get_device(ac->handle, &device))
 		return_VOID;
 
 	switch (event) {
@@ -257,11 +256,11 @@ acpi_ac_add (
 	acpi_driver_data(device) = ac;
 
 	result = acpi_ac_get_state(ac);
-	if (0 != result)
+	if (result)
 		goto end;
 
 	result = acpi_ac_add_fs(device);
-	if (0 != result)
+	if (result)
 		goto end;
 
 	status = acpi_install_notify_handler(ac->handle,
@@ -278,7 +277,7 @@ acpi_ac_add (
 		ac->state?"on-line":"off-line");
 
 end:
-	if (0 != result) {
+	if (result) {
 		acpi_ac_remove_fs(device);
 		kfree(ac);
 	}
@@ -324,7 +323,7 @@ acpi_ac_init (void)
 	ACPI_FUNCTION_TRACE("acpi_ac_init");
 
 	result = acpi_bus_register_driver(&acpi_ac_driver);
-	if (0 > result) {
+	if (result < 0) {
 		remove_proc_entry(ACPI_AC_CLASS, acpi_root_dir);
 		return_VALUE(-ENODEV);
 	}
@@ -341,7 +340,7 @@ acpi_ac_exit (void)
 	ACPI_FUNCTION_TRACE("acpi_ac_exit");
 
 	result = acpi_bus_unregister_driver(&acpi_ac_driver);
-	if (0 == result)
+	if (!result)
 		remove_proc_entry(ACPI_AC_CLASS, acpi_root_dir);
 
 	return_VOID;
