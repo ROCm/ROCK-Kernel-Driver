@@ -53,7 +53,6 @@ struct hiddev {
 	wait_queue_head_t wait;
 	struct hid_device *hid;
 	struct hiddev_list *list;
-	struct usb_interface intf;
 };
 
 struct hiddev_list {
@@ -234,7 +233,7 @@ static int hiddev_fasync(int fd, struct file *file, int on)
 static struct usb_class_driver hiddev_class;
 static void hiddev_cleanup(struct hiddev *hiddev)
 {
-	usb_deregister_dev(&hiddev->intf, &hiddev_class);
+	usb_deregister_dev(hiddev->hid->intf, &hiddev_class);
 	hiddev_table[hiddev->minor] = NULL;
 	kfree(hiddev);
 }
@@ -775,7 +774,7 @@ int hiddev_connect(struct hid_device *hid)
 		return -1;
 	memset(hiddev, 0, sizeof(struct hiddev));
 
- 	retval = usb_register_dev(&hiddev->intf, &hiddev_class);
+ 	retval = usb_register_dev(hid->intf, &hiddev_class);
 	if (retval) {
 		err("Not able to get a minor for this device.");
 		kfree(hiddev);
@@ -784,13 +783,13 @@ int hiddev_connect(struct hid_device *hid)
 
 	init_waitqueue_head(&hiddev->wait);
 
- 	hiddev->minor = hiddev->intf.minor;
- 	hiddev_table[hiddev->intf.minor - HIDDEV_MINOR_BASE] = hiddev;
+ 	hiddev->minor = hid->intf->minor;
+ 	hiddev_table[hid->intf->minor - HIDDEV_MINOR_BASE] = hiddev;
 
 	hiddev->hid = hid;
 	hiddev->exist = 1;
 
- 	hid->minor = hiddev->intf.minor;
+ 	hid->minor = hid->intf->minor;
 	hid->hiddev = hiddev;
 
 	return 0;
