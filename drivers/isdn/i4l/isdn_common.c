@@ -356,10 +356,15 @@ slot_icall(struct fsm_inst *fi, int pr, void *arg)
 	return 0;
 }
 
+/* should become broadcast later */
 static int
 slot_in_dhup(struct fsm_inst *fi, int pr, void *arg)
 {
+	struct isdn_slot *slot = fi->userdata;
+	isdn_ctrl *ctrl = arg;
+
 	fsm_change_state(fi, ST_SLOT_NULL);
+	do_stat_cb(slot, ctrl);
 	return 0;
 }
 
@@ -1847,14 +1852,14 @@ isdn_ctrl_ioctl(struct inode *inode, struct file *file, uint cmd, ulong arg)
 				return ret;
 
 			for (i = 0; i < ISDN_MAX_CHANNELS; i++) {
-				if (copy_to_user(p, dev->mdm.info[i].emu.profile,
+				if (copy_to_user(p, isdn_mdm.info[i].emu.profile,
 						 ISDN_MODEM_NUMREG))
 					return -EFAULT;
 				p += ISDN_MODEM_NUMREG;
-				if (copy_to_user(p, dev->mdm.info[i].emu.pmsn, ISDN_MSNLEN))
+				if (copy_to_user(p, isdn_mdm.info[i].emu.pmsn, ISDN_MSNLEN))
 					return -EFAULT;
 				p += ISDN_MSNLEN;
-				if (copy_to_user(p, dev->mdm.info[i].emu.plmsn, ISDN_LMSNLEN))
+				if (copy_to_user(p, isdn_mdm.info[i].emu.plmsn, ISDN_LMSNLEN))
 					return -EFAULT;
 				p += ISDN_LMSNLEN;
 			}
@@ -1874,14 +1879,14 @@ isdn_ctrl_ioctl(struct inode *inode, struct file *file, uint cmd, ulong arg)
 				return ret;
 
 			for (i = 0; i < ISDN_MAX_CHANNELS; i++) {
-				if (copy_from_user(dev->mdm.info[i].emu.profile, p,
+				if (copy_from_user(isdn_mdm.info[i].emu.profile, p,
 						   ISDN_MODEM_NUMREG))
 					return -EFAULT;
 				p += ISDN_MODEM_NUMREG;
-				if (copy_from_user(dev->mdm.info[i].emu.plmsn, p, ISDN_LMSNLEN))
+				if (copy_from_user(isdn_mdm.info[i].emu.plmsn, p, ISDN_LMSNLEN))
 					return -EFAULT;
 				p += ISDN_LMSNLEN;
-				if (copy_from_user(dev->mdm.info[i].emu.pmsn, p, ISDN_MSNLEN))
+				if (copy_from_user(isdn_mdm.info[i].emu.pmsn, p, ISDN_MSNLEN))
 					return -EFAULT;
 				p += ISDN_MSNLEN;
 			}
@@ -2403,7 +2408,6 @@ isdn_slot_command(int sl, int cmd, isdn_ctrl *ctrl)
 		return fsm_event(&slots[sl].fi, EV_SLOT_CMD_HANGUP, ctrl);
 	}
 	HERE;
-//	return isdn_command(ctrl);
 	return -1;
 }
 
@@ -2683,8 +2687,8 @@ static int __init isdn_init(void)
 		slots[i].ch = -1;
 		slots[i].m_idx = -1;
 		strcpy(isdn_slot_num(i), "???");
-		init_waitqueue_head(&dev->mdm.info[i].open_wait);
-		init_waitqueue_head(&dev->mdm.info[i].close_wait);
+		init_waitqueue_head(&isdn_mdm.info[i].open_wait);
+		init_waitqueue_head(&isdn_mdm.info[i].close_wait);
 		slots[i].fi.fsm = &slot_fsm;
 		slots[i].fi.state = ST_SLOT_NULL;
 		slots[i].fi.debug = 1;

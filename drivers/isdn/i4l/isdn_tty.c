@@ -48,6 +48,8 @@ static char *isdn_ttyname_ttyI = "ttyI";
 static char *isdn_ttyname_cui = "cui";
 #endif
 
+struct isdn_modem isdn_mdm;
+
 static int bit2si[8] =
 {1, 5, 7, 7, 7, 7, 7, 7};
 static int si2bit[8] =
@@ -126,7 +128,7 @@ isdn_tty_readmodem(void)
 
 	for (i = 0; i < ISDN_MAX_CHANNELS; i++) {
 		if ((midx = isdn_slot_m_idx(i)) >= 0) {
-			info = &dev->mdm.info[midx];
+			info = &isdn_mdm.info[midx];
 			if (info->online) {
 				r = 0;
 #ifdef CONFIG_ISDN_AUDIO
@@ -1669,7 +1671,7 @@ isdn_tty_open(struct tty_struct *tty, struct file *filp)
 	line = minor(tty->device) - tty->driver.minor_start;
 	if (line < 0 || line > ISDN_MAX_CHANNELS)
 		return -ENODEV;
-	info = &dev->mdm.info[line];
+	info = &isdn_mdm.info[line];
 	if (isdn_tty_paranoia_check(info, tty->device, "isdn_tty_open"))
 		return -ENODEV;
 #ifdef ISDN_DEBUG_MODEM_OPEN
@@ -1939,11 +1941,11 @@ modem_write_profile(atemu * m)
 int
 isdn_tty_init(void)
 {
-	modem *m;
+	struct isdn_modem *m;
 	int i, retval;
 	modem_info *info;
 
-	m = &dev->mdm;
+	m = &isdn_mdm;
 	memset(&m->tty_modem, 0, sizeof(struct tty_driver));
 	m->tty_modem.magic = TTY_DRIVER_MAGIC;
 	m->tty_modem.name = isdn_ttyname_ttyI;
@@ -2049,9 +2051,9 @@ isdn_tty_init(void)
 #endif
 		kfree(info->xmit_buf - 4);
 	}
-	tty_unregister_driver(&dev->mdm.cua_modem);
+	tty_unregister_driver(&isdn_mdm.cua_modem);
  err_unregister_tty:
-	tty_unregister_driver(&dev->mdm.tty_modem);
+	tty_unregister_driver(&isdn_mdm.tty_modem);
  err:
 	return retval;
 }
@@ -2059,20 +2061,19 @@ isdn_tty_init(void)
 void
 isdn_tty_exit(void)
 {
-	modem *m = &dev->mdm;
 	modem_info *info;
 	int i;
 
 	for (i = 0; i < ISDN_MAX_CHANNELS; i++) {
-		info = &m->info[i];
+		info = &isdn_mdm.info[i];
 		isdn_tty_cleanup_xmit(info);
 #ifdef CONFIG_ISDN_TTY_FAX
 		kfree(info->fax);
 #endif
 		kfree(info->xmit_buf - 4);
 	}
-	tty_unregister_driver(&dev->mdm.cua_modem);
-	tty_unregister_driver(&dev->mdm.tty_modem);
+	tty_unregister_driver(&isdn_mdm.cua_modem);
+	tty_unregister_driver(&isdn_mdm.tty_modem);
 }
 
 /*
@@ -2168,7 +2169,7 @@ isdn_tty_find_icall(int di, int ch, int sl, setup_parm *setup)
 	save_flags(flags);
 	cli();
 	for (i = 0; i < ISDN_MAX_CHANNELS; i++) {
-		modem_info *info = &dev->mdm.info[i];
+		modem_info *info = &isdn_mdm.info[i];
 
                 if (info->count == 0)
                     continue;
@@ -2354,7 +2355,7 @@ isdn_tty_stat_callback(int i, isdn_ctrl *c)
 				printk(KERN_DEBUG "tty_STAT_UNLOAD ttyI%d\n", info->line);
 #endif
 				for (i = 0; i < ISDN_MAX_CHANNELS; i++) {
-					info = &dev->mdm.info[i];
+					info = &isdn_mdm.info[i];
 					if (isdn_slot_driver(info->isdn_slot) == c->driver) {
 						if (info->online)
 							isdn_tty_modem_hup(info, 1);
@@ -3905,7 +3906,7 @@ isdn_tty_modem_escape(void)
 	for (i = 0; i < ISDN_MAX_CHANNELS; i++)
 		if (USG_MODEM(isdn_slot_usage(i)))
 			if ((midx = isdn_slot_m_idx(i)) >= 0) {
-				modem_info *info = &dev->mdm.info[midx];
+				modem_info *info = &isdn_mdm.info[midx];
 				if (info->online) {
 					ton = 1;
 					if ((info->emu.pluscount == 3) &&
@@ -3931,7 +3932,7 @@ isdn_tty_modem_ring(void)
 	int i;
 
 	for (i = 0; i < ISDN_MAX_CHANNELS; i++) {
-		modem_info *info = &dev->mdm.info[i];
+		modem_info *info = &isdn_mdm.info[i];
 		if (info->msr & UART_MSR_RI) {
 			ton = 1;
 			isdn_tty_modem_result(RESULT_RING, info);
@@ -3951,7 +3952,7 @@ isdn_tty_modem_xmit(void)
 	int i;
 
 	for (i = 0; i < ISDN_MAX_CHANNELS; i++) {
-		modem_info *info = &dev->mdm.info[i];
+		modem_info *info = &isdn_mdm.info[i];
 		if (info->online) {
 			ton = 1;
 			isdn_tty_senddown(info);
@@ -3972,7 +3973,7 @@ isdn_tty_carrier_timeout(void)
 	int i;
 
 	for (i = 0; i < ISDN_MAX_CHANNELS; i++) {
-		modem_info *info = &dev->mdm.info[i];
+		modem_info *info = &isdn_mdm.info[i];
 		if (info->dialing) {
 			if (info->emu.carrierwait++ > info->emu.mdmreg[REG_WAITC]) {
 				info->dialing = 0;

@@ -368,17 +368,6 @@ typedef struct modem_info {
 
 #define ISDN_MODEM_WINSIZE 8
 
-/* Description of one ISDN-tty */
-typedef struct {
-  int                refcount;			   /* Number of opens        */
-  struct tty_driver  tty_modem;			   /* tty-device             */
-  struct tty_driver  cua_modem;			   /* cua-device             */
-  struct tty_struct  *modem_table[ISDN_MAX_CHANNELS]; /* ?? copied from Orig */
-  struct termios     *modem_termios[ISDN_MAX_CHANNELS];
-  struct termios     *modem_termios_locked[ISDN_MAX_CHANNELS];
-  modem_info         info[ISDN_MAX_CHANNELS];	   /* Private data           */
-} modem;
-
 /*======================= End of ISDN-tty stuff ============================*/
 
 /*======================== Start of V.110 stuff ============================*/
@@ -427,7 +416,6 @@ typedef struct isdn_devt {
 	wait_queue_head_t info_waitq;               /* Wait-Queue for isdninfo    */
 	struct timer_list timer;		       /* Misc.-function Timer       */
 	struct task_struct *profd;                   /* For iprofd                 */
-	modem             mdm;		       /* tty-driver-data            */
 	struct semaphore  sem;                       /* serialize list access*/
 	unsigned long     global_features;
 #ifdef CONFIG_DEVFS_FS

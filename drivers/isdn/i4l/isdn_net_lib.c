@@ -408,7 +408,7 @@ isdn_net_addif(char *name, isdn_net_local *mlp)
 		mlp->hupflags = ISDN_INHUP;
 		mlp->onhtime = 10;
 		mlp->dialmax = 1;
-		mlp->flags = ISDN_NET_CBHUP | ISDN_NET_DM_MANUAL;
+		mlp->flags = ISDN_NET_CBHUP | ISDN_NET_DM_MANUAL | ISDN_NET_SECURE;
 		mlp->cbdelay = 5 * HZ;	   /* Wait 5 secs before call-back  */
 		mlp->dialtimeout = 60 * HZ;/* Wait 1 min for connection     */
 		mlp->dialwait = 5 * HZ;    /* Wait 5 sec. after failed dial */
