@@ -114,8 +114,10 @@ config IPV6
 	tristate "The IPv6 protocol (EXPERIMENTAL)"
 	depends on INET && EXPERIMENTAL
 	---help---
-	  This is experimental support for the next version of the Internet
-	  Protocol: IP version 6 (also called IPng "IP next generation").
+	  This is experimental support for the IP version 6 (formerly called
+	  IPng "IP next generation").  You will still be able to do
+	  regular IPv4 networking as well.
+
 	  Features of this new protocol include: expanded address space,
 	  authentication and privacy, and seamless interoperability with the
 	  current version of IP (IP version 4). For general information about
@@ -124,12 +126,10 @@ config IPV6
 	  <http://www.bieringer.de/linux/IPv6/> and the file net/ipv6/README
 	  in the kernel source.
 
-	  If you want to use IPv6, please upgrade to the newest net-tools as
-	  given in <file:Documentation/Changes>. You will still be able to do
-	  regular IPv4 networking as well.
-
-	  To compile this protocol support as a module, choose M here: the
-	  module will be called ipv6.
+	  To compile this protocol support as a module, choose M here: the 
+	  module will be called ipv6.  If you try building this as a module 
+	  and you have said Y to "Kernel module loader support" above, 
+	  be sure to add 'alias net-pf-10 ipv6' to your /etc/modules.conf file.
 
 	  It is safe to say N here for now.
 
