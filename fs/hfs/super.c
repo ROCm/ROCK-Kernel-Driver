@@ -276,6 +276,7 @@ static int hfs_fill_super(struct super_block *sb, void *data, int silent)
 		if (!silent)
 			hfs_warn("VFS: Can't find a HFS filesystem on dev %s.\n",
 				hfs_mdb_name(sb));
+		res = -EINVAL;
 		goto bail2;
 	}
 
