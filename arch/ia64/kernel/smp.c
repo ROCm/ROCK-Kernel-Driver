@@ -91,9 +91,6 @@ handle_IPI (int irq, void *dev_id, struct pt_regs *regs)
 	unsigned long *pending_ipis = &__ia64_per_cpu_var(ipi_operation);
 	unsigned long ops;
 
-	/* Count this now; we may make a call that never returns. */
-	local_cpu_data->ipi_count++;
-
 	mb();	/* Order interrupt and bit testing. */
 	while ((ops = xchg(pending_ipis, 0)) != 0) {
 		mb();	/* Order bit clearing and data access. */
@@ -337,17 +334,6 @@ smp_call_function (void (*func) (void *info), void *info, int nonatomic, int wai
 	return 0;
 }
 EXPORT_SYMBOL(smp_call_function);
-
-void
-smp_do_timer (struct pt_regs *regs)
-{
-	int user = user_mode(regs);
-
-	if (--local_cpu_data->prof_counter <= 0) {
-		local_cpu_data->prof_counter = local_cpu_data->prof_multiplier;
-		update_process_times(user);
-	}
-}
 
 /*
  * this function calls the 'stop' function on all other CPUs in the system.
