@@ -1880,9 +1880,12 @@ int __devinit snd_ymfpci_joystick(ymfpci_t *chip)
 static void snd_ymfpci_proc_read(snd_info_entry_t *entry, 
 				 snd_info_buffer_t * buffer)
 {
-	// ymfpci_t *chip = snd_magic_cast(ymfpci_t, private_data, return);
+	ymfpci_t *chip = snd_magic_cast(ymfpci_t, entry->private_data, return);
+	int i;
 	
 	snd_iprintf(buffer, "YMFPCI\n\n");
+	for (i = 0; i <= YDSXGR_WORKBASE; i += 4)
+		snd_iprintf(buffer, "%04x: %04x\n", i, snd_ymfpci_readl(chip, i));
 }
 
 static int __devinit snd_ymfpci_proc_init(snd_card_t * card, ymfpci_t *chip)
