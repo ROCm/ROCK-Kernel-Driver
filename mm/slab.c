@@ -49,7 +49,8 @@
  *  constructors and destructors are called without any locking.
  *  Several members in kmem_cache_t and slab_t never change, they
  *	are accessed without any locking.
- *  The per-cpu arrays are never accessed from the wrong cpu, no locking.
+ *  The per-cpu arrays are never accessed from the wrong cpu, no locking,
+ *  	and local interrupts are disabled so slab code is preempt-safe.
  *  The non-constant members are protected with a per-cache irq spinlock.
  *
  * Further notes from the original documentation:

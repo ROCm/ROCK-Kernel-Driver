@@ -1239,6 +1239,14 @@ P:	Michal Ostrowski
 M:	mostrows@styx.uwaterloo.ca
 S:	Maintained
 
+PREEMPTIBLE KERNEL
+P:	Robert Love
+M:	rml@tech9.net
+L:	linux-kernel@vger.kernel.org
+L:	kpreempt-tech@lists.sourceforge.net
+W:	ftp://ftp.kernel.org/pub/linux/kernel/people/rml/preempt-kernel
+S:	Supported
+
 PROMISE DC4030 CACHING DISK CONTROLLER DRIVER
 P:	Peter Denison
 M:	promise@pnd-pc.demon.co.uk

@@ -990,8 +990,8 @@ S: Brazil
 
 N: Nigel Gamble
 E: nigel@nrg.org
-E: nigel@sgi.com
 D: Interrupt-driven printer driver
+D: Preemptible kernel
 S: 120 Alley Way
 S: Mountain View, California 94040
 S: USA
