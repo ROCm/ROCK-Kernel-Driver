@@ -213,6 +213,13 @@ pci_dac_dma_sync_single_for_device(struct pci_dev *pdev, dma64_addr_t dma_addr, 
 	 */
 }
 
+#define PCI_DMA_ERROR_CODE	(~(dma_addr_t)0x0)
+
+static inline int pci_dma_error(dma_addr_t dma_addr)
+{
+	return (dma_addr == PCI_DMA_ERROR_CODE);
+}
+
 /* Return the index of the PCI controller for device PDEV. */
 
 extern int pci_domain_nr(struct pci_bus *bus);

@@ -352,8 +352,7 @@ dma_addr_t pci_map_single(struct pci_dev *pdev, void *ptr, size_t sz, int direct
 
 bad:
 	spin_unlock_irqrestore(&iommu->lock, flags);
-	BUG();
-	return 0;
+	return PCI_DMA_ERROR_CODE;
 }
 
 /* Unmap a single streaming mode DMA translation. */
@@ -580,8 +579,7 @@ int pci_map_sg(struct pci_dev *pdev, struct scatterlist *sglist, int nelems, int
 
 bad:
 	spin_unlock_irqrestore(&iommu->lock, flags);
-	BUG();
-	return 0;
+	return PCI_DMA_ERROR_CODE;
 }
 
 /* Unmap a set of streaming mode DMA translations. */
