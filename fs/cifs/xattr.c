@@ -72,7 +72,7 @@ int cifs_removexattr(struct dentry * direntry, const char * ea_name)
 		system and perhaps security prefixes? */
 	} else {
 		ea_name+=5; /* skip past user. prefix */
-		rc = CIFSSMBSetEA(xid,pTcon,full_path,ea_name,0,
+		rc = CIFSSMBSetEA(xid,pTcon,full_path,ea_name,NULL,
 			(__u16)0, cifs_sb->local_nls);
 	}
 	if (full_path)
