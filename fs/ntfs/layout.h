@@ -260,7 +260,7 @@ typedef enum {
 enum {
 	MFT_RECORD_IN_USE	= const_cpu_to_le16(0x0001),
 	MFT_RECORD_IS_DIRECTORY = const_cpu_to_le16(0x0002),
-} __attrobite__ ((__packed__));
+} __attribute__ ((__packed__));
 
 typedef le16 MFT_RECORD_FLAGS;
 

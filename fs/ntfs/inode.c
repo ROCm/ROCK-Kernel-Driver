@@ -2289,6 +2289,8 @@ void ntfs_truncate(struct inode *vi)
 	MFT_RECORD *m;
 	int err;
 
+	BUG_ON(NInoAttr(ni));
+	BUG_ON(ni->nr_extents < 0);
 	m = map_mft_record(ni);
 	if (IS_ERR(m)) {
 		ntfs_error(vi->i_sb, "Failed to map mft record for inode 0x%lx "
