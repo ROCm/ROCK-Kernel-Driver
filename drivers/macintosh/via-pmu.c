@@ -492,7 +492,7 @@ static int __init via_pmu_dev_init(void)
 	}
 #endif /* CONFIG_PMAC_PBOOK */
 	/* Create /proc/pmu */
-	proc_pmu_root = proc_mkdir("pmu", 0);
+	proc_pmu_root = proc_mkdir("pmu", NULL);
 	if (proc_pmu_root) {
 		int i;
 		proc_pmu_info = create_proc_read_entry("info", 0, proc_pmu_root,
@@ -549,7 +549,7 @@ init_pmu(void)
 		}
 		if (pmu_state == idle)
 			adb_int_pending = 1;
-		via_pmu_interrupt(0, 0, 0);
+		via_pmu_interrupt(0, NULL, NULL);
 		udelay(10);
 	}
 
@@ -1122,7 +1122,7 @@ pmu_queue_request(struct adb_request *req)
 		return -EINVAL;
 	}
 
-	req->next = 0;
+	req->next = NULL;
 	req->sent = 0;
 	req->complete = 0;
 
@@ -1225,7 +1225,7 @@ pmu_poll(void)
 		return;
 	if (disable_poll)
 		return;
-	via_pmu_interrupt(0, 0, 0);
+	via_pmu_interrupt(0, NULL, NULL);
 }
 
 void __openfirmware
@@ -1238,7 +1238,7 @@ pmu_poll_adb(void)
 	/* Kicks ADB read when PMU is suspended */
 	adb_int_pending = 1;
 	do {
-		via_pmu_interrupt(0, 0, 0);
+		via_pmu_interrupt(0, NULL, NULL);
 	} while (pmu_suspended && (adb_int_pending || pmu_state != idle
 		|| req_awaiting_reply));
 }
@@ -1249,7 +1249,7 @@ pmu_wait_complete(struct adb_request *req)
 	if (!via)
 		return;
 	while((pmu_state != idle && pmu_state != locked) || !req->complete)
-		via_pmu_interrupt(0, 0, 0);
+		via_pmu_interrupt(0, NULL, NULL);
 }
 
 /* This function loops until the PMU is idle and prevents it from
@@ -1278,7 +1278,7 @@ pmu_suspend(void)
 		spin_unlock_irqrestore(&pmu_lock, flags);
 		if (req_awaiting_reply)
 			adb_int_pending = 1;
-		via_pmu_interrupt(0, 0, 0);
+		via_pmu_interrupt(0, NULL, NULL);
 		spin_lock_irqsave(&pmu_lock, flags);
 		if (!adb_int_pending && pmu_state == idle && !req_awaiting_reply) {
 #ifdef SUSPEND_USES_PMU
@@ -1377,7 +1377,7 @@ next:
 				printk(KERN_ERR "PMU: extra ADB reply\n");
 				return;
 			}
-			req_awaiting_reply = 0;
+			req_awaiting_reply = NULL;
 			if (len <= 2)
 				req->reply_len = 0;
 			else {
@@ -1662,7 +1662,7 @@ gpio1_interrupt(int irq, void *arg, struct pt_regs *regs)
 		pmu_irq_stats[1]++;
 		adb_int_pending = 1;
 		spin_unlock_irqrestore(&pmu_lock, flags);
-		via_pmu_interrupt(0, 0, 0);
+		via_pmu_interrupt(0, NULL, NULL);
 		return IRQ_HANDLED;
 	}
 	return IRQ_NONE;
@@ -2071,7 +2071,7 @@ pmu_unregister_sleep_notifier(struct pmu_sleep_notifier* n)
 	if (n->list.next == 0)
 		return -ENOENT;
 	list_del(&n->list);
-	n->list.next = 0;
+	n->list.next = NULL;
 	return 0;
 }
 
@@ -2406,7 +2406,7 @@ pmac_wakeup_devices(void)
 
 	/* Force a poll of ADB interrupts */
 	adb_int_pending = 1;
-	via_pmu_interrupt(0, 0, 0);
+	via_pmu_interrupt(0, NULL, NULL);
 
 	/* Restart jiffies & scheduling */
 	wakeup_decrementer();
@@ -2857,7 +2857,7 @@ pmu_release(struct inode *inode, struct file *file)
 
 	lock_kernel();
 	if (pp != 0) {
-		file->private_data = 0;
+		file->private_data = NULL;
 		spin_lock_irqsave(&all_pvt_lock, flags);
 		list_del(&pp->list);
 		spin_unlock_irqrestore(&all_pvt_lock, flags);

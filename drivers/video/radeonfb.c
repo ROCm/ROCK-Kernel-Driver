@@ -1221,7 +1221,7 @@ static int radeon_read_OF (struct radeonfb_info *rinfo)
 
 	dp = pci_device_to_OF_node(rinfo->pdev);
 
-	xtal = (unsigned int *) get_property(dp, "ATY,RefCLK", 0);
+	xtal = (unsigned int *) get_property(dp, "ATY,RefCLK", NULL);
 
 	rinfo->pll.ref_clk = *xtal / 10;
 

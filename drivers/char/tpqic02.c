@@ -2589,7 +2589,7 @@ static void qic02_release_resources(void)
 	release_region(QIC02_TAPE_PORT, QIC02_TAPE_PORT_RANGE);
 	if (buffaddr)
 		free_pages((unsigned long) buffaddr, get_order(TPQBUF_SIZE));
-	buffaddr = 0;		/* Better to cause a panic than overwite someone else */
+	buffaddr = NULL;	/* Better to cause a panic than overwite someone else */
 	status_zombie = YES;
 }				/* qic02_release_resources */
 

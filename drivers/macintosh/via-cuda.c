@@ -386,7 +386,7 @@ cuda_write(struct adb_request *req)
 	req->complete = 1;
 	return -EINVAL;
     }
-    req->next = 0;
+    req->next = NULL;
     req->sent = 0;
     req->complete = 0;
     req->reply_len = 0;
@@ -437,7 +437,7 @@ cuda_poll(void)
      * disable_irq(), would that work on m68k ? --BenH
      */
     local_irq_save(flags);
-    cuda_interrupt(0, 0, 0);
+    cuda_interrupt(0, NULL, NULL);
     local_irq_restore(flags);
 }
 

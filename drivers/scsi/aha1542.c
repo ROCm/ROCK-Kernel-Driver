@@ -545,7 +545,7 @@ static void aha1542_intr_handle(struct Scsi_Host *shost, void *dev_id, struct pt
 		my_done = SCtmp->scsi_done;
 		if (SCtmp->host_scribble) {
 			kfree(SCtmp->host_scribble);
-			SCtmp->host_scribble = 0;
+			SCtmp->host_scribble = NULL;
 		}
 		/* Fetch the sense data, and tuck it away, in the required slot.  The
 		   Adaptec automatically fetches it, and there is no guarantee that

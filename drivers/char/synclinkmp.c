@@ -796,7 +796,7 @@ static int open(struct tty_struct *tty, struct file *filp)
 cleanup:
 	if (retval) {
 		if (tty->count == 1)
-			info->tty = 0; /* tty layer will release tty struct */
+			info->tty = NULL;/* tty layer will release tty struct */
 		if(info->count)
 			info->count--;
 	}
@@ -871,7 +871,7 @@ static void close(struct tty_struct *tty, struct file *filp)
 	shutdown(info);
 
 	tty->closing = 0;
-	info->tty = 0;
+	info->tty = NULL;
 
 	if (info->blocked_open) {
 		if (info->close_delay) {
@@ -910,7 +910,7 @@ static void hangup(struct tty_struct *tty)
 
 	info->count = 0;
 	info->flags &= ~ASYNC_NORMAL_ACTIVE;
-	info->tty = 0;
+	info->tty = NULL;
 
 	wake_up_interruptible(&info->open_wait);
 }
@@ -2607,7 +2607,7 @@ static void shutdown(SLMP_INFO * info)
 
 	if (info->tx_buf) {
 		kfree(info->tx_buf);
-		info->tx_buf = 0;
+		info->tx_buf = NULL;
 	}
 
 	spin_lock_irqsave(&info->lock,flags);
@@ -3548,22 +3548,22 @@ void release_resources(SLMP_INFO *info)
 
 	if (info->memory_base){
 		iounmap(info->memory_base);
-		info->memory_base = 0;
+		info->memory_base = NULL;
 	}
 
 	if (info->sca_base) {
 		iounmap(info->sca_base - info->sca_offset);
-		info->sca_base=0;
+		info->sca_base=NULL;
 	}
 
 	if (info->statctrl_base) {
 		iounmap(info->statctrl_base - info->statctrl_offset);
-		info->statctrl_base=0;
+		info->statctrl_base=NULL;
 	}
 
 	if (info->lcr_base){
 		iounmap(info->lcr_base - info->lcr_offset);
-		info->lcr_base = 0;
+		info->lcr_base = NULL;
 	}
 
 	if ( debug_level >= DEBUG_LEVEL_INFO )
@@ -5143,7 +5143,7 @@ int loopback_test(SLMP_INFO *info)
 	u32 speed = info->params.clock_speed;
 
 	info->params.clock_speed = 3686400;
-	info->tty = 0;
+	info->tty = NULL;
 
 	/* assume failure */
 	info->init_error = DiagStatus_DmaFailure;

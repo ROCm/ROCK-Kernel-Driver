@@ -9335,7 +9335,7 @@ aic7xxx_detect(Scsi_Host_Template *template)
                 printk(KERN_INFO "aic7xxx: MMAPed I/O failed, reverting to "
                                  "Programmed I/O.\n");
                 iounmap((void *) (((unsigned long) temp_p->maddr) & PAGE_MASK));
-                temp_p->maddr = 0;
+                temp_p->maddr = NULL;
                 if(temp_p->base == 0)
                 {
                   printk("aic7xxx: <%s> at PCI %d/%d/%d\n", 
@@ -9743,7 +9743,7 @@ skip_pci_controller:
     temp_p->pause = hcntrl | PAUSE | INTEN;
     temp_p->base = base;
     temp_p->mbase = 0;
-    temp_p->maddr = 0;
+    temp_p->maddr = NULL;
     temp_p->pci_bus = 0;
     temp_p->pci_device_fn = slot;
     aic_outb(temp_p, hcntrl | PAUSE, HCNTRL);
