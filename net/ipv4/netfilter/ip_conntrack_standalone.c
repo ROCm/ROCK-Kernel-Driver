@@ -805,6 +805,12 @@ static int init_or_cleanup(int init)
  cleanup_defraglocalops:
 	nf_unregister_hook(&ip_conntrack_defrag_local_out_ops);
  cleanup_defragops:
+	/* Frag queues may hold fragments with skb->dst == NULL */
+	ip_ct_no_defrag = 1;
+	smp_wmb();
+	local_bh_disable();
+	ipfrag_flush();
+	local_bh_enable();
 	nf_unregister_hook(&ip_conntrack_defrag_ops);
  cleanup_proc_stat:
 	proc_net_remove("ip_conntrack_stat");

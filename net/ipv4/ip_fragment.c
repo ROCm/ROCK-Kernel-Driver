@@ -241,15 +241,15 @@ static void ipq_kill(struct ipq *ipq)
 }
 
 /* Memory limiting on fragments.  Evictor trashes the oldest 
- * fragment queue until we are back under the low threshold.
+ * fragment queue until we are back under the threshold.
  */
-static void ip_evictor(void)
+static void __ip_evictor(int threshold)
 {
 	struct ipq *qp;
 	struct list_head *tmp;
 	int work;
 
-	work = atomic_read(&ip_frag_mem) - sysctl_ipfrag_low_thresh;
+	work = atomic_read(&ip_frag_mem) - threshold;
 	if (work <= 0)
 		return;
 
@@ -272,6 +272,11 @@ static void ip_evictor(void)
 		ipq_put(qp, &work);
 		IP_INC_STATS_BH(IPSTATS_MIB_REASMFAILS);
 	}
+}
+
+static inline void ip_evictor(void)
+{
+	__ip_evictor(sysctl_ipfrag_low_thresh);
 }
 
 /*
@@ -684,4 +689,10 @@ void ipfrag_init(void)
 	add_timer(&ipfrag_secret_timer);
 }
 
+void ipfrag_flush(void)
+{
+	__ip_evictor(0);
+}
+
 EXPORT_SYMBOL(ip_defrag);
+EXPORT_SYMBOL(ipfrag_flush);
