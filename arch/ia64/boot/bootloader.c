@@ -181,10 +181,10 @@ _start (void)
 			continue;
 
 		req.len = elf_phdr->p_filesz;
-		req.addr = __pa(elf_phdr->p_vaddr);
+		req.addr = __pa(elf_phdr->p_paddr);
 		ssc(fd, 1, (long) &req, elf_phdr->p_offset, SSC_READ);
 		ssc((long) &stat, 0, 0, 0, SSC_WAIT_COMPLETION);
-		memset((char *)__pa(elf_phdr->p_vaddr) + elf_phdr->p_filesz, 0,
+		memset((char *)__pa(elf_phdr->p_paddr) + elf_phdr->p_filesz, 0,
 		       elf_phdr->p_memsz - elf_phdr->p_filesz);
 	}
 	ssc(fd, 0, 0, 0, SSC_CLOSE);
