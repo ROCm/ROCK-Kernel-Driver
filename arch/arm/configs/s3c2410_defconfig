@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.10-rc2
-# Mon Nov 15 12:26:18 2004
+# Mon Nov 15 15:29:42 2004
 #
 CONFIG_ARM=y
 CONFIG_MMU=y
@@ -98,6 +98,7 @@ CONFIG_S3C2410_DMA=y
 # CONFIG_S3C2410_DMA_DEBUG is not set
 # CONFIG_S3C2410_PM_DEBUG is not set
 # CONFIG_S3C2410_PM_CHECK is not set
+CONFIG_S3C2410_LOWLEVEL_UART_PORT=0
 
 #
 # Processor Type

@@ -14,12 +14,13 @@
  *  08-Sep-2003 BJD  Moved to linux v2.6
  *  12-Mar-2004 BJD  Updated header protection
  *  12-Oct-2004 BJD  Take account of debug uart configuration
+ *  15-Nov-2004 BJD  Fixed uart configuration
 */
 
 #ifndef __ASM_ARCH_UNCOMPRESS_H
 #define __ASM_ARCH_UNCOMPRESS_H
 
-#include <config/debug/s3c2410/port.h>
+#include <linux/config.h>
 
 /* defines for UART registers */
 #include "asm/arch/regs-serial.h"
@@ -34,11 +35,7 @@
 /* how many bytes we allow into the FIFO at a time in FIFO mode */
 #define FIFO_MAX	 (14)
 
-#if 1
-#define uart_base S3C2410_PA_UART + (0x4000 * CONFIG_DEBUG_S3C2410_UART)
-#else
-static unsigned int uart_base = S3C2410_PA_UART;
-#endif
+#define uart_base S3C2410_PA_UART + (0x4000*CONFIG_S3C2410_LOWLEVEL_UART_PORT)
 
 static __inline__ void
 uart_wr(unsigned int reg, unsigned int val)
