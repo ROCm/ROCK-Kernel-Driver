@@ -201,8 +201,6 @@ struct dqstats {
 
 extern struct dqstats dqstats;
 
-#define NR_DQHASH 43            /* Just an arbitrary number */
-
 #define DQ_MOD_B	0	/* dquot modified since read */
 #define DQ_BLKS_B	1	/* uid/gid has been warned about blk limit */
 #define DQ_INODES_B	2	/* uid/gid has been warned about inode limit */
@@ -212,7 +210,7 @@ extern struct dqstats dqstats;
 #define DQ_WAITFREE_B	6	/* dquot being waited (by invalidate_dquots) */
 
 struct dquot {
-	struct list_head dq_hash;	/* Hash list in memory */
+	struct hlist_node dq_hash;	/* Hash list in memory */
 	struct list_head dq_inuse;	/* List of all quotas */
 	struct list_head dq_free;	/* Free list element */
 	struct semaphore dq_lock;	/* dquot IO lock */

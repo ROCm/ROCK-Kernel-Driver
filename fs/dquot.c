@@ -194,7 +194,8 @@ static void put_quota_format(struct quota_format_type *fmt)
 
 static LIST_HEAD(inuse_list);
 static LIST_HEAD(free_dquots);
-static struct list_head dquot_hash[NR_DQHASH];
+unsigned int dq_hash_bits, dq_hash_mask;
+static struct hlist_head *dquot_hash;
 
 struct dqstats dqstats;
 
@@ -202,7 +203,8 @@ static void dqput(struct dquot *dquot);
 
 static inline int const hashfn(struct super_block *sb, unsigned int id, int type)
 {
-	return((((unsigned long)sb>>L1_CACHE_SHIFT) ^ id) * (MAXQUOTAS - type)) % NR_DQHASH;
+	unsigned long tmp = (((unsigned long)sb>>L1_CACHE_SHIFT) ^ id) * (MAXQUOTAS - type);
+	return (tmp + (tmp >> dq_hash_bits)) & dq_hash_mask;
 }
 
 /*
@@ -210,22 +212,22 @@ static inline int const hashfn(struct super_block *sb, unsigned int id, int type
  */
 static inline void insert_dquot_hash(struct dquot *dquot)
 {
-	struct list_head *head = dquot_hash + hashfn(dquot->dq_sb, dquot->dq_id, dquot->dq_type);
-	list_add(&dquot->dq_hash, head);
+	struct hlist_head *head = dquot_hash + hashfn(dquot->dq_sb, dquot->dq_id, dquot->dq_type);
+	hlist_add_head(&dquot->dq_hash, head);
 }
 
 static inline void remove_dquot_hash(struct dquot *dquot)
 {
-	list_del_init(&dquot->dq_hash);
+	hlist_del_init(&dquot->dq_hash);
 }
 
 static inline struct dquot *find_dquot(unsigned int hashent, struct super_block *sb, unsigned int id, int type)
 {
-	struct list_head *head;
+	struct hlist_node *node;
 	struct dquot *dquot;
 
-	for (head = dquot_hash[hashent].next; head != dquot_hash+hashent; head = head->next) {
-		dquot = list_entry(head, struct dquot, dq_hash);
+	hlist_for_each (node, dquot_hash+hashent) {
+		dquot = hlist_entry(node, struct dquot, dq_hash);
 		if (dquot->dq_sb == sb && dquot->dq_id == id && dquot->dq_type == type)
 			return dquot;
 	}
@@ -541,7 +543,7 @@ static struct dquot *get_empty_dquot(struct super_block *sb, int type)
 	sema_init(&dquot->dq_lock, 1);
 	INIT_LIST_HEAD(&dquot->dq_free);
 	INIT_LIST_HEAD(&dquot->dq_inuse);
-	INIT_LIST_HEAD(&dquot->dq_hash);
+	INIT_HLIST_NODE(&dquot->dq_hash);
 	dquot->dq_sb = sb;
 	dquot->dq_type = type;
 	atomic_set(&dquot->dq_count, 1);
@@ -1695,17 +1697,38 @@ kmem_cache_t *dquot_cachep;
 static int __init dquot_init(void)
 {
 	int i;
+	unsigned long nr_hash, order;
+
+	printk(KERN_NOTICE "VFS: Disk quotas %s\n", __DQUOT_VERSION__);
 
 	register_sysctl_table(sys_table, 0);
-	for (i = 0; i < NR_DQHASH; i++)
-		INIT_LIST_HEAD(dquot_hash + i);
-	printk(KERN_NOTICE "VFS: Disk quotas %s\n", __DQUOT_VERSION__);
 
 	dquot_cachep = kmem_cache_create("dquot", 
 			sizeof(struct dquot), sizeof(unsigned long) * 4,
 			SLAB_HWCACHE_ALIGN|SLAB_RECLAIM_ACCOUNT, NULL, NULL);
 	if (!dquot_cachep)
 		panic("Cannot create dquot SLAB cache");
+
+	order = 0;
+	dquot_hash = (struct hlist_head *)__get_free_pages(GFP_ATOMIC, order);
+	if (!dquot_hash)
+		panic("Cannot create dquot hash table");
+
+	/* Find power-of-two hlist_heads which can fit into allocation */
+	nr_hash = (1UL << order) * PAGE_SIZE / sizeof(struct hlist_head);
+	dq_hash_bits = 0;
+	do {
+		dq_hash_bits++;
+	} while (nr_hash >> dq_hash_bits);
+	dq_hash_bits--;
+
+	nr_hash = 1UL << dq_hash_bits;
+	dq_hash_mask = nr_hash - 1;
+	for (i = 0; i < nr_hash; i++)
+		INIT_HLIST_HEAD(dquot_hash + i);
+
+	printk("Dquot-cache hash table entries: %ld (order %ld, %ld bytes)\n",
+			nr_hash, order, (PAGE_SIZE << order));
 
 	set_shrinker(DEFAULT_SEEKS, shrink_dqcache_memory);
 
