@@ -942,16 +942,15 @@ prom_initialize_tce_table(void)
                              path, sizeof(path)-1) <= 0) {
                         prom_print(RELOC("package-to-path failed\n"));
                 } else {
-                        prom_print(RELOC("opened "));
+                        prom_print(RELOC("opening PHB "));
                         prom_print(path);
-                        prom_print_nl();
                 }
 
                 phb_node = (ihandle)call_prom(RELOC("open"), 1, 1, path);
                 if ( (long)phb_node <= 0) {
-                        prom_print(RELOC("open failed\n"));
+                        prom_print(RELOC("... failed\n"));
                 } else {
-                        prom_print(RELOC("open success\n"));
+                        prom_print(RELOC("... done\n"));
                 }
                 call_prom(RELOC("call-method"), 6, 0,
                              RELOC("set-64-bit-addressing"),
@@ -1148,7 +1147,7 @@ prom_hold_cpus(unsigned long mem)
 			prom_print_hex(cpuid);
 			prom_print(RELOC(" : starting cpu "));
 			prom_print(path);
-			prom_print(RELOC("..."));
+			prom_print(RELOC("... "));
 			call_prom(RELOC("start-cpu"), 3, 0, node, 
 				  secondary_hold, cpuid);
 
@@ -1156,7 +1155,7 @@ prom_hold_cpus(unsigned long mem)
 			      (*acknowledge == ((unsigned long)-1)); i++ ) ;
 
 			if (*acknowledge == cpuid) {
-				prom_print(RELOC("ok\n"));
+				prom_print(RELOC("... done\n"));
 				/* We have to get every CPU out of OF,
 				 * even if we never start it. */
 				if (cpuid >= NR_CPUS)
@@ -1169,10 +1168,9 @@ prom_hold_cpus(unsigned long mem)
 				cpu_set(cpuid, RELOC(cpu_present_at_boot));
 #endif
 			} else {
-				prom_print(RELOC("failed: "));
+				prom_print(RELOC("... failed: "));
 				prom_print_hex(*acknowledge);
 				prom_print_nl();
-				/* prom_panic(RELOC("cpu failed to start")); */
 			}
 		}
 #ifdef CONFIG_SMP
@@ -1705,7 +1703,7 @@ check_display(unsigned long mem)
 
 	prom_print(RELOC("Looking for displays\n"));
 	if (RELOC(of_stdout_device) != 0) {
-		prom_print(RELOC("OF stdout is   : "));
+		prom_print(RELOC("OF stdout is    : "));
 		prom_print(PTRRELOC(RELOC(of_stdout_device)));
 		prom_print(RELOC("\n"));
 	}
@@ -1765,7 +1763,7 @@ check_display(unsigned long mem)
 			continue;
 		}
 
-		prom_print(RELOC("... ok\n"));
+		prom_print(RELOC("... done\n"));
 
 		/* Setup a useable color table when the appropriate
 		 * method is available. Should update this to set-colors */
