@@ -156,7 +156,7 @@ struct cosa_data {
 	unsigned short startaddr;	/* Firmware start address */
 	unsigned short busmaster;	/* Use busmastering? */
 	int nchannels;			/* # of channels on this card */
-	int driver_status;		/* For communicating with firware */
+	int driver_status;		/* For communicating with firmware */
 	int firmware_status;		/* Downloaded, reseted, etc. */
 	long int rxbitmap, txbitmap;	/* Bitmap of channels who are willing to send/receive data */
 	long int rxtx;			/* RX or TX in progress? */
