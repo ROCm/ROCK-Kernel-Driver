@@ -27,19 +27,11 @@ menu "General setup"
 
 source "fs/Kconfig.binfmt"
 
-config ETRAX_KGDB
-	bool "Use kernel gdb debugger"
-	---help---
-	  The CRIS version of gdb can be used to remotely debug a running
-	  Linux kernel via the serial debug port.  Provided you have gdb-cris
-	  installed, run gdb-cris vmlinux, then type
-
-	  (gdb) set remotebaud 115200           <- kgdb uses 115200 as default
-	  (gdb) target remote /dev/ttyS0        <- maybe you use another port
-
-	  This should connect you to your booted kernel (or boot it now if you
-	  didn't before).  The kernel halts when it boots, waiting for gdb if
-	  this option is turned on!
+config ETRAX_CMDLINE
+	string "Kernel command line"
+	default "root=/dev/mtdblock3"
+	help
+	  Pass additional commands to the kernel.
 
 config ETRAX_WATCHDOG
 	bool "Enable ETRAX watchdog"
@@ -99,22 +91,12 @@ config SVINTO_SIM
 	help
 	  Support the xsim ETRAX Simulator.
 
-config ETRAX200LX
-	bool "ETRAX-200LX-V32"
-	help
-	  Support CRIS V32.
-
 endchoice
 
 config ETRAX_ARCH_V10
        bool
        default y if ETRAX100LX || ETRAX100LX_V2
        default n if !(ETRAX100LX || ETRAX100LX_V2) 
-
-config ETRAX_ARCH_V32
-       bool
-       default y if ETRAX200LX
-       default n if !(ETRAX200LX) 
 
 config ETRAX_DRAM_SIZE
 	int "DRAM size (dec, in MB)"
@@ -128,34 +110,17 @@ config ETRAX_FLASH_BUSWIDTH
 	help
 	  Width in bytes of the Flash bus (1, 2 or 4). Is usually 2.
 
-config ETRAX_ROOT_DEVICE
-	string "Root device name"
-	default "/dev/mtdblock3"
-	help
-	  Specifies the device that should be mounted as root file system
-	  when booting from flash. The axisflashmap driver adds an additional
-	  mtd partition for the appended root file system image, so this option
-	  should normally be the mtdblock device for the partition after the
-	  last partition in the partition table.
-
-# duplicate choice configs are not yet supported, so the followinguse 
-# doesn't work:
-
 source arch/cris/arch-v10/Kconfig
 
 endmenu
 
 # bring in ETRAX built-in drivers
 menu "Drivers for built-in interfaces"
-
 source arch/cris/arch-v10/drivers/Kconfig
 
 endmenu
 
 source "drivers/base/Kconfig"
-
-# bring in Etrax built-in drivers
-source "arch/cris/drivers/Kconfig"
 
 # standard linux drivers
 source "drivers/mtd/Kconfig"
@@ -211,6 +176,37 @@ config PROFILE_SHIFT
 	int "Profile shift count"
 	depends on PROFILE
 	default "2"
+
+config ETRAX_KGDB
+	bool "Use kernel GDB debugger"
+	---help---
+	  The CRIS version of gdb can be used to remotely debug a running
+	  Linux kernel via the serial debug port.  Provided you have gdb-cris
+	  installed, run gdb-cris vmlinux, then type
+
+	  (gdb) set remotebaud 115200           <- kgdb uses 115200 as default
+	  (gdb) target remote /dev/ttyS0        <- maybe you use another port
+
+	  This should connect you to your booted kernel (or boot it now if you
+	  didn't before).  The kernel halts when it boots, waiting for gdb if
+	  this option is turned on!
+
+
+config DEBUG_INFO
+        bool "Compile the kernel with debug info"
+        help
+          If you say Y here the resulting kernel image will include
+          debugging info resulting in a larger kernel image.
+          Say Y here only if you plan to use gdb to debug the kernel.
+          If you don't debug the kernel, you can say N.
+
+config FRAME_POINTER
+        bool "Compile the kernel with frame pointers"
+        help
+          If you say Y here the resulting kernel image will be slightly larger
+          and slower, but it will give very useful debugging information.
+          If you don't debug the kernel, you can say N, but we may not be able
+          to solve problems without frame pointers.
 
 endmenu
 

@@ -1,10 +1,16 @@
-/* $Id: fasttimer.c,v 1.4 2003/07/04 08:27:41 starvik Exp $
+/* $Id: fasttimer.c,v 1.6 2004/05/14 10:18:39 starvik Exp $
  * linux/arch/cris/kernel/fasttimer.c
  *
  * Fast timers for ETRAX100/ETRAX100LX
  * This may be useful in other OS than Linux so use 2 space indentation...
  *
  * $Log: fasttimer.c,v $
+ * Revision 1.6  2004/05/14 10:18:39  starvik
+ * Export fast_timer_list
+ *
+ * Revision 1.5  2004/05/14 07:58:01  starvik
+ * Merge of changes from 2.4
+ *
  * Revision 1.4  2003/07/04 08:27:41  starvik
  * Merge of Linux 2.5.74
  *
@@ -130,7 +136,7 @@ static int fast_timers_deleted = 0;
 static int fast_timer_is_init = 0;
 static int fast_timer_ints = 0;
 
-static struct fast_timer *fast_timer_list = NULL;
+struct fast_timer *fast_timer_list = NULL;
 
 #ifdef DEBUG_LOG_INCLUDED
 #define DEBUG_LOG_MAX 128
@@ -325,7 +331,8 @@ void start_one_shot_timer(struct fast_timer *t,
     {
       if (tmp == t)
       {
-        printk("timer name: %s data: 0x%08lX already in list!\n", name, data);
+        printk(KERN_WARNING
+               "timer name: %s data: 0x%08lX already in list!\n", name, data);
         sanity_failed++;
         return;
       }
@@ -784,7 +791,7 @@ static int proc_fasttimer_read(char *buf, char **start, off_t offset, int len
       cli();
       if (t->next != nextt)
       {
-        printk("timer removed!\n");
+        printk(KERN_WARNING "timer removed!\n");
       }
       t = nextt;
     }
@@ -965,7 +972,7 @@ void fast_timer_init(void)
     int i;
 #endif
 
-    printk("fast_timer_init()\n");
+    printk(KERN_INFO "fast_timer_init()\n");
 
 #if 0 && defined(FAST_TIMER_TEST)
     for (i = 0; i <= TIMER0_DIV; i++)

@@ -1,4 +1,4 @@
-/* $Id: setup.c,v 1.1 2002/12/11 15:42:02 starvik Exp $
+/*
  *
  *  linux/arch/cris/arch-v10/kernel/setup.c
  *
@@ -94,3 +94,10 @@ int show_cpuinfo(struct seq_file *m, void *v)
 }
 
 #endif /* CONFIG_PROC_FS */
+
+void
+show_etrax_copyright(void)
+{
+	printk(KERN_INFO
+               "Linux/CRIS port on ETRAX 100LX (c) 2001 Axis Communications AB\n");
+}

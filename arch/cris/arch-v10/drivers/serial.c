@@ -1,4 +1,4 @@
-/* $Id: serial.c,v 1.17 2003/07/04 08:27:37 starvik Exp $
+/* $Id: serial.c,v 1.20 2004/05/24 12:00:20 starvik Exp $
  *
  * Serial port driver for the ETRAX 100LX chip
  *
@@ -7,6 +7,16 @@
  *    Many, many authors. Based once upon a time on serial.c for 16x50.
  *
  * $Log: serial.c,v $
+ * Revision 1.20  2004/05/24 12:00:20  starvik
+ * Big merge of stuff from Linux 2.4 (e.g. manual mode for the serial port).
+ *
+ * Revision 1.19  2004/05/17 13:12:15  starvik
+ * Kernel console hook
+ * Big merge from Linux 2.4 still pending.
+ *
+ * Revision 1.18  2003/10/28 07:18:30  starvik
+ * Compiles with debug info
+ *
  * Revision 1.17  2003/07/04 08:27:37  starvik
  * Merge of Linux 2.5.74
  *
@@ -399,7 +409,7 @@
  *
  */
 
-static char *serial_version = "$Revision: 1.17 $";
+static char *serial_version = "$Revision: 1.20 $";
 
 #include <linux/config.h>
 #include <linux/version.h>
@@ -447,6 +457,10 @@ static char *serial_version = "$Revision: 1.17 $";
 #error "RX_TIMEOUT_TICKS == 0 not allowed, use 1"
 #endif
 
+#if defined(CONFIG_ETRAX_RS485_ON_PA) && defined(CONFIG_ETRAX_RS485_ON_PORT_G)
+#error "Disable either CONFIG_ETRAX_RS485_ON_PA or CONFIG_ETRAX_RS485_ON_PORT_G"
+#endif
+
 /*
  * All of the compatibilty code so we can compile serial.c against
  * older kernels is hidden in serial_compat.h
@@ -473,7 +487,7 @@ struct tty_driver *serial_driver;
 //#define SERIAL_DEBUG_DATA
 //#define SERIAL_DEBUG_THROTTLE
 //#define SERIAL_DEBUG_IO  /* Debug for Extra control and status pins */
-#define SERIAL_DEBUG_LINE 0 /* What serport we want to debug */
+//#define SERIAL_DEBUG_LINE 0 /* What serport we want to debug */
 
 /* Enable this to use serial interrupts to handle when you
    expect the first received event on the serial port to
@@ -481,14 +495,74 @@ struct tty_driver *serial_driver;
    from eLinux */
 #define SERIAL_HANDLE_EARLY_ERRORS
 
-#define TTY_THROTTLE_LIMIT (TTY_FLIPBUF_SIZE/10)
+/* Defined and used in n_tty.c, but we need it here as well */
+#define TTY_THRESHOLD_THROTTLE 128
 
+/* Due to buffersizes and threshold values, our SERIAL_DESCR_BUF_SIZE
+ * must not be to high or flow control won't work if we leave it to the tty
+ * layer so we have our own throttling in flush_to_flip
+ * TTY_FLIPBUF_SIZE=512,
+ * TTY_THRESHOLD_THROTTLE/UNTHROTTLE=128
+ * BUF_SIZE can't be > 128
+ */
+/* Currently 16 descriptors x 128 bytes = 2048 bytes */
 #define SERIAL_DESCR_BUF_SIZE 256
+
+#define SERIAL_PRESCALE_BASE 3125000 /* 3.125MHz */
+#define DEF_BAUD_BASE SERIAL_PRESCALE_BASE
+
+/* We don't want to load the system with massive fast timer interrupt
+ * on high baudrates so limit it to 250 us (4kHz) */
+#define MIN_FLUSH_TIME_USEC 250
 
 /* Add an x here to log a lot of timer stuff */
 #define TIMERD(x)
+/* Debug details of interrupt handling */
+#define DINTR1(x)  /* irq on/off, errors */
+#define DINTR2(x)    /* tx and rx */
+/* Debug flip buffer stuff */
+#define DFLIP(x)
+/* Debug flow control and overview of data flow */
+#define DFLOW(x)
+#define DBAUD(x)
+#define DLOG_INT_TRIG(x)
 
+//#define DEBUG_LOG_INCLUDED
+#ifndef DEBUG_LOG_INCLUDED
 #define DEBUG_LOG(line, string, value)
+#else
+struct debug_log_info
+{
+	unsigned long time;
+	unsigned long timer_data;
+//  int line;
+	const char *string;
+	int value;
+};
+#define DEBUG_LOG_SIZE 4096
+
+struct debug_log_info debug_log[DEBUG_LOG_SIZE];
+int debug_log_pos = 0;
+
+#define DEBUG_LOG(_line, _string, _value) do { \
+  if ((_line) == SERIAL_DEBUG_LINE) {\
+    debug_log_func(_line, _string, _value); \
+  }\
+}while(0)
+
+void debug_log_func(int line, const char *string, int value)
+{
+	if (debug_log_pos < DEBUG_LOG_SIZE) {
+		debug_log[debug_log_pos].time = jiffies;
+		debug_log[debug_log_pos].timer_data = *R_TIMER_DATA;
+//    debug_log[debug_log_pos].line = line;
+		debug_log[debug_log_pos].string = string;
+		debug_log[debug_log_pos].value = value;
+		debug_log_pos++;
+	}
+	/*printk(string, value);*/
+}
+#endif
 
 #ifndef CONFIG_ETRAX_SERIAL_RX_TIMEOUT_TICKS
 /* Default number of timer ticks before flushing rx fifo 
@@ -498,11 +572,14 @@ struct tty_driver *serial_driver;
 #define CONFIG_ETRAX_SERIAL_RX_TIMEOUT_TICKS 5 
 #endif
 
+unsigned long timer_data_to_ns(unsigned long timer_data);
+
 static void change_speed(struct e100_serial *info);
+static void rs_throttle(struct tty_struct * tty);
 static void rs_wait_until_sent(struct tty_struct *tty, int timeout);
 static int rs_write(struct tty_struct * tty, int from_user,
                     const unsigned char *buf, int count);
-static inline int raw_write(struct tty_struct * tty, int from_user,
+extern _INLINE_ int rs_raw_write(struct tty_struct * tty, int from_user,
                             const unsigned char *buf, int count);
 #ifdef CONFIG_ETRAX_RS485
 static int e100_write_rs485(struct tty_struct * tty, int from_user,
@@ -511,7 +588,7 @@ static int e100_write_rs485(struct tty_struct * tty, int from_user,
 static int get_lsr_info(struct e100_serial * info, unsigned int *value);
 
 
-#define DEF_BAUD 0x99   /* 115.2 kbit/s */
+#define DEF_BAUD 115200   /* 115.2 kbit/s */
 #define STD_FLAGS (ASYNC_BOOT_AUTOCONF | ASYNC_SKIP_TEST)
 #define DEF_RX 0x20  /* or SERIAL_CTRL_W >> 8 */
 /* Default value of tx_ctrl register: has txd(bit 7)=1 (idle) as default */
@@ -520,6 +597,7 @@ static int get_lsr_info(struct e100_serial * info, unsigned int *value);
 /* offsets from R_SERIALx_CTRL */
 
 #define REG_DATA 0
+#define REG_DATA_STATUS32 0 /* this is the 32 bit register R_SERIALx_READ */
 #define REG_TR_DATA 0
 #define REG_STATUS 1
 #define REG_TR_CTRL 1
@@ -555,60 +633,162 @@ static int get_lsr_info(struct e100_serial * info, unsigned int *value);
  */
 
 
+/* Mask for the irqs possibly enabled in R_IRQ_MASK1_RD etc. */
+static const unsigned long e100_ser_int_mask = 0
+#ifdef CONFIG_ETRAX_SERIAL_PORT0
+| IO_MASK(R_IRQ_MASK1_RD, ser0_data) | IO_MASK(R_IRQ_MASK1_RD, ser0_ready)
+#endif
+#ifdef CONFIG_ETRAX_SERIAL_PORT1
+| IO_MASK(R_IRQ_MASK1_RD, ser1_data) | IO_MASK(R_IRQ_MASK1_RD, ser1_ready)
+#endif
+#ifdef CONFIG_ETRAX_SERIAL_PORT2
+| IO_MASK(R_IRQ_MASK1_RD, ser2_data) | IO_MASK(R_IRQ_MASK1_RD, ser2_ready)
+#endif
+#ifdef CONFIG_ETRAX_SERIAL_PORT3
+| IO_MASK(R_IRQ_MASK1_RD, ser3_data) | IO_MASK(R_IRQ_MASK1_RD, ser3_ready)
+#endif
+;
+unsigned long r_alt_ser_baudrate_shadow = 0;
+
 /* this is the data for the four serial ports in the etrax100 */
 /*  DMA2(ser2), DMA4(ser3), DMA6(ser0) or DMA8(ser1) */
 /* R_DMA_CHx_CLR_INTR, R_DMA_CHx_FIRST, R_DMA_CHx_CMD */
 
 static struct e100_serial rs_table[] = {
-	{ DEF_BAUD, (unsigned char *)R_SERIAL0_CTRL, 1U << 12, /* uses DMA 6 and 7 */
-	  R_DMA_CH6_CLR_INTR, R_DMA_CH6_FIRST, R_DMA_CH6_CMD,
-	  R_DMA_CH6_STATUS, R_DMA_CH6_HWSW, R_DMA_CH6_DESCR,
-	  R_DMA_CH7_CLR_INTR, R_DMA_CH7_FIRST, R_DMA_CH7_CMD,
-	  R_DMA_CH7_STATUS, R_DMA_CH7_HWSW, R_DMA_CH7_DESCR,
-	  STD_FLAGS, DEF_RX, DEF_TX, 2,
+	{ .baud        = DEF_BAUD,
+	  .port        = (unsigned char *)R_SERIAL0_CTRL,
+	  .irq         = 1U << 12, /* uses DMA 6 and 7 */
+	  .oclrintradr = R_DMA_CH6_CLR_INTR,
+	  .ofirstadr   = R_DMA_CH6_FIRST,
+	  .ocmdadr     = R_DMA_CH6_CMD,
+	  .ostatusadr  = R_DMA_CH6_STATUS,
+	  .iclrintradr = R_DMA_CH7_CLR_INTR,
+	  .ifirstadr   = R_DMA_CH7_FIRST,
+	  .icmdadr     = R_DMA_CH7_CMD,
+	  .idescradr   = R_DMA_CH7_DESCR,
+	  .flags       = STD_FLAGS,
+	  .rx_ctrl     = DEF_RX,
+	  .tx_ctrl     = DEF_TX,
+	  .iseteop     = 2,
 #ifdef CONFIG_ETRAX_SERIAL_PORT0
-          1
+          .enabled  = 1,
+#ifdef CONFIG_ETRAX_SERIAL_PORT0_DMA6_OUT
+	  .dma_out_enabled = 1,
 #else
-          0
+	  .dma_out_enabled = 0,
 #endif
+#ifdef CONFIG_ETRAX_SERIAL_PORT0_DMA7_IN
+	  .dma_in_enabled = 1,
+#else
+	  .dma_in_enabled = 0
+#endif
+#else
+          .enabled  = 0,
+	  .dma_out_enabled = 0,
+	  .dma_in_enabled = 0
+#endif
+
 },  /* ttyS0 */
 #ifndef CONFIG_SVINTO_SIM
-	{ DEF_BAUD, (unsigned char *)R_SERIAL1_CTRL, 1U << 16, /* uses DMA 8 and 9 */
-	  R_DMA_CH8_CLR_INTR, R_DMA_CH8_FIRST, R_DMA_CH8_CMD,
-	  R_DMA_CH8_STATUS, R_DMA_CH8_HWSW, R_DMA_CH8_DESCR,
-	  R_DMA_CH9_CLR_INTR, R_DMA_CH9_FIRST, R_DMA_CH9_CMD,
-	  R_DMA_CH9_STATUS, R_DMA_CH9_HWSW, R_DMA_CH9_DESCR,
-	  STD_FLAGS, DEF_RX, DEF_TX, 3 ,
+	{ .baud        = DEF_BAUD,
+	  .port        = (unsigned char *)R_SERIAL1_CTRL,
+	  .irq         = 1U << 16, /* uses DMA 8 and 9 */
+	  .oclrintradr = R_DMA_CH8_CLR_INTR,
+	  .ofirstadr   = R_DMA_CH8_FIRST,
+	  .ocmdadr     = R_DMA_CH8_CMD,
+	  .ostatusadr  = R_DMA_CH8_STATUS,
+	  .iclrintradr = R_DMA_CH9_CLR_INTR,
+	  .ifirstadr   = R_DMA_CH9_FIRST,
+	  .icmdadr     = R_DMA_CH9_CMD,
+	  .idescradr   = R_DMA_CH9_DESCR,
+	  .flags       = STD_FLAGS,
+	  .rx_ctrl     = DEF_RX,
+	  .tx_ctrl     = DEF_TX,
+	  .iseteop     = 3,
 #ifdef CONFIG_ETRAX_SERIAL_PORT1
-          1
+          .enabled  = 1,
+#ifdef CONFIG_ETRAX_SERIAL_PORT1_DMA8_OUT
+	  .dma_out_enabled = 1,
 #else
-          0
+	  .dma_out_enabled = 0,
+#endif
+#ifdef CONFIG_ETRAX_SERIAL_PORT1_DMA9_IN
+	  .dma_in_enabled = 1,
+#else
+	  .dma_in_enabled = 0
+#endif
+#else
+          .enabled  = 0,
+	  .dma_out_enabled = 0,
+	  .dma_in_enabled = 0
 #endif
 },  /* ttyS1 */
 
-	{ DEF_BAUD, (unsigned char *)R_SERIAL2_CTRL, 1U << 4,  /* uses DMA 2 and 3 */
-	  R_DMA_CH2_CLR_INTR, R_DMA_CH2_FIRST, R_DMA_CH2_CMD,
-	  R_DMA_CH2_STATUS, R_DMA_CH2_HWSW, R_DMA_CH2_DESCR,
-	  R_DMA_CH3_CLR_INTR, R_DMA_CH3_FIRST, R_DMA_CH3_CMD,
-	  R_DMA_CH3_STATUS, R_DMA_CH3_HWSW, R_DMA_CH3_DESCR,
-	  STD_FLAGS, DEF_RX, DEF_TX, 0,
+	{ .baud        = DEF_BAUD,
+	  .port        = (unsigned char *)R_SERIAL2_CTRL,
+	  .irq         = 1U << 4,  /* uses DMA 2 and 3 */
+	  .oclrintradr = R_DMA_CH2_CLR_INTR,
+	  .ofirstadr   = R_DMA_CH2_FIRST,
+	  .ocmdadr     = R_DMA_CH2_CMD,
+	  .ostatusadr  = R_DMA_CH2_STATUS,
+	  .iclrintradr = R_DMA_CH3_CLR_INTR,
+	  .ifirstadr   = R_DMA_CH3_FIRST,
+	  .icmdadr     = R_DMA_CH3_CMD,
+	  .idescradr   = R_DMA_CH3_DESCR,
+	  .flags       = STD_FLAGS,
+	  .rx_ctrl     = DEF_RX,
+	  .tx_ctrl     = DEF_TX,
+	  .iseteop     = 0,
 #ifdef CONFIG_ETRAX_SERIAL_PORT2
-          1
+          .enabled  = 1,
+#ifdef CONFIG_ETRAX_SERIAL_PORT2_DMA2_OUT
+	  .dma_out_enabled = 1,
 #else
-          0
+	  .dma_out_enabled = 0,
+#endif
+#ifdef CONFIG_ETRAX_SERIAL_PORT2_DMA3_IN
+	  .dma_in_enabled = 1,
+#else
+	  .dma_in_enabled = 0
+#endif
+#else
+          .enabled  = 0,
+	  .dma_out_enabled = 0,
+	  .dma_in_enabled = 0
 #endif
  },  /* ttyS2 */
 
-	{ DEF_BAUD, (unsigned char *)R_SERIAL3_CTRL, 1U << 8,  /* uses DMA 4 and 5 */
-	  R_DMA_CH4_CLR_INTR, R_DMA_CH4_FIRST, R_DMA_CH4_CMD,
-	  R_DMA_CH4_STATUS, R_DMA_CH4_HWSW, R_DMA_CH4_DESCR,
-	  R_DMA_CH5_CLR_INTR, R_DMA_CH5_FIRST, R_DMA_CH5_CMD,
-	  R_DMA_CH5_STATUS, R_DMA_CH5_HWSW, R_DMA_CH5_DESCR,
-	  STD_FLAGS, DEF_RX, DEF_TX, 1,
+	{ .baud        = DEF_BAUD,
+	  .port        = (unsigned char *)R_SERIAL3_CTRL,
+	  .irq         = 1U << 8,  /* uses DMA 4 and 5 */
+	  .oclrintradr = R_DMA_CH4_CLR_INTR,
+	  .ofirstadr   = R_DMA_CH4_FIRST,
+	  .ocmdadr     = R_DMA_CH4_CMD,
+	  .ostatusadr  = R_DMA_CH4_STATUS,
+	  .iclrintradr = R_DMA_CH5_CLR_INTR,
+	  .ifirstadr   = R_DMA_CH5_FIRST,
+	  .icmdadr     = R_DMA_CH5_CMD,
+	  .idescradr   = R_DMA_CH5_DESCR,
+	  .flags       = STD_FLAGS,
+	  .rx_ctrl     = DEF_RX,
+	  .tx_ctrl     = DEF_TX,
+	  .iseteop     = 1,
 #ifdef CONFIG_ETRAX_SERIAL_PORT3
-          1
+          .enabled  = 1,
+#ifdef CONFIG_ETRAX_SERIAL_PORT3_DMA4_OUT
+	  .dma_out_enabled = 1,
 #else
-          0
+	  .dma_out_enabled = 0,
+#endif
+#ifdef CONFIG_ETRAX_SERIAL_PORT3_DMA5_IN
+	  .dma_in_enabled = 1,
+#else
+	  .dma_in_enabled = 0
+#endif
+#else
+          .enabled  = 0,
+	  .dma_out_enabled = 0,
+	  .dma_in_enabled = 0
 #endif
  }   /* ttyS3 */
 #endif
@@ -616,6 +796,9 @@ static struct e100_serial rs_table[] = {
 
 
 #define NR_PORTS (sizeof(rs_table)/sizeof(struct e100_serial))
+
+static struct termios *serial_termios[NR_PORTS];
+static struct termios *serial_termios_locked[NR_PORTS];
 #ifdef CONFIG_ETRAX_SERIAL_FAST_TIMER
 static struct fast_timer fast_timers[NR_PORTS];
 #endif
@@ -651,6 +834,9 @@ static struct fast_timer fast_timers_rs485[NR_PORTS];
 #endif
 #if defined(CONFIG_ETRAX_RS485_ON_PA)
 static int rs485_pa_bit = CONFIG_ETRAX_RS485_ON_PA_BIT;
+#endif
+#if defined(CONFIG_ETRAX_RS485_ON_PORT_G)
+static int rs485_port_g_bit = CONFIG_ETRAX_RS485_ON_PORT_G_BIT;
 #endif
 #endif
 
@@ -761,7 +947,7 @@ static unsigned char dummy_ser[NR_PORTS] = {0xFF, 0xFF, 0xFF,0xFF};
 #  endif
 #endif
 
-#define SER0_PB_BITSUM (CONFIG_ETRAX_SER1_DTR_ON_PB_BIT+CONFIG_ETRAX_SER1_RI_ON_PB_BIT+CONFIG_ETRAX_SER1_DSR_ON_PB_BIT+CONFIG_ETRAX_SER1_CD_ON_PB_BIT)
+#define SER1_PB_BITSUM (CONFIG_ETRAX_SER1_DTR_ON_PB_BIT+CONFIG_ETRAX_SER1_RI_ON_PB_BIT+CONFIG_ETRAX_SER1_DSR_ON_PB_BIT+CONFIG_ETRAX_SER1_CD_ON_PB_BIT)
 
 #if SER1_PB_BITSUM != -4
 #  if CONFIG_ETRAX_SER1_DTR_ON_PB_BIT == -1
@@ -1081,14 +1267,8 @@ static const struct control_pins e100_modem_pins[NR_PORTS] =
 };
 #endif /* !CONFIG_ETRAX_SERX_DTR_RI_DSR_CD_MIXED */
 
-#if defined(CONFIG_ETRAX_RS485) && defined(CONFIG_ETRAX_RS485_ON_PA)
-unsigned char rs485_pa_port = CONFIG_ETRAX_RS485_ON_PA_BIT;
-#endif
-
-
 #define E100_RTS_MASK 0x20
 #define E100_CTS_MASK 0x40
-
 
 /* All serial port signals are active low:
  * active   = 0 -> 3.3V to RS-232 driver -> -12V on RS-232 level
@@ -1151,6 +1331,10 @@ static void update_char_time(struct e100_serial * info)
 
 	/* calc timeout */
 	info->char_time_usec = ((bits * 1000000) / info->baud) + 1;
+	info->flush_time_usec = 4*info->char_time_usec;
+	if (info->flush_time_usec < MIN_FLUSH_TIME_USEC)
+		info->flush_time_usec = MIN_FLUSH_TIME_USEC;
+
 }
 
 /*
@@ -1250,9 +1434,13 @@ static inline void
 e100_rts(struct e100_serial *info, int set)
 {
 #ifndef CONFIG_SVINTO_SIM
+	unsigned long flags;
+	save_flags(flags);
+	cli();
 	info->rx_ctrl &= ~E100_RTS_MASK;
 	info->rx_ctrl |= (set ? 0 : E100_RTS_MASK);  /* RTS is active low */
 	info->port[REG_REC_CTRL] = info->rx_ctrl;
+	restore_flags(flags);
 #ifdef SERIAL_DEBUG_IO  
 	printk("ser%i rts %i\n", info->line, set);
 #endif
@@ -1326,6 +1514,7 @@ e100_disable_rxdma_irq(struct e100_serial *info)
 #ifdef SERIAL_DEBUG_INTR
 	printk("rxdma_irq(%d): 0\n",info->line);
 #endif
+	DINTR1(DEBUG_LOG(info->line,"IRQ disable_rxdma_irq %i\n", info->line));
 	*R_IRQ_MASK2_CLR = (info->irq << 2) | (info->irq << 3);
 }
 
@@ -1335,30 +1524,33 @@ e100_enable_rxdma_irq(struct e100_serial *info)
 #ifdef SERIAL_DEBUG_INTR
 	printk("rxdma_irq(%d): 1\n",info->line);
 #endif
+	DINTR1(DEBUG_LOG(info->line,"IRQ enable_rxdma_irq %i\n", info->line));
 	*R_IRQ_MASK2_SET = (info->irq << 2) | (info->irq << 3);
 }
 
 /* the tx DMA uses only dma_descr interrupt */
 
-static inline void
+static _INLINE_ void
 e100_disable_txdma_irq(struct e100_serial *info) 
 {
 #ifdef SERIAL_DEBUG_INTR
 	printk("txdma_irq(%d): 0\n",info->line);
 #endif
+	DINTR1(DEBUG_LOG(info->line,"IRQ disable_txdma_irq %i\n", info->line));
 	*R_IRQ_MASK2_CLR = info->irq;
 }
 
-static inline void
+static _INLINE_ void
 e100_enable_txdma_irq(struct e100_serial *info) 
 {
 #ifdef SERIAL_DEBUG_INTR
 	printk("txdma_irq(%d): 1\n",info->line);
 #endif
+	DINTR1(DEBUG_LOG(info->line,"IRQ enable_txdma_irq %i\n", info->line));
 	*R_IRQ_MASK2_SET = info->irq;
 }
 
-static inline void
+static _INLINE_ void
 e100_disable_txdma_channel(struct e100_serial *info)
 {
 	unsigned long flags;
@@ -1367,32 +1559,46 @@ e100_disable_txdma_channel(struct e100_serial *info)
 	 * ( set to something other then serialX)
 	 */
 	save_flags(flags);
-	cli();  
+	cli();
+	DFLOW(DEBUG_LOG(info->line, "disable_txdma_channel %i\n", info->line));
 	if (info->line == 0) {
-		genconfig_shadow &=  ~IO_MASK(R_GEN_CONFIG, dma6);
-		genconfig_shadow |= IO_STATE(R_GEN_CONFIG, dma6, unused);
+		if ((genconfig_shadow & IO_MASK(R_GEN_CONFIG, dma6)) ==
+		    IO_STATE(R_GEN_CONFIG, dma6, serial0)) {
+			genconfig_shadow &=  ~IO_MASK(R_GEN_CONFIG, dma6);
+			genconfig_shadow |= IO_STATE(R_GEN_CONFIG, dma6, unused);
+		}
 	} else if (info->line == 1) {
-		genconfig_shadow &=  ~IO_MASK(R_GEN_CONFIG, dma8);
-		genconfig_shadow |= IO_STATE(R_GEN_CONFIG, dma8, usb);
+		if ((genconfig_shadow & IO_MASK(R_GEN_CONFIG, dma8)) ==
+		    IO_STATE(R_GEN_CONFIG, dma8, serial1)) {
+			genconfig_shadow &=  ~IO_MASK(R_GEN_CONFIG, dma8);
+			genconfig_shadow |= IO_STATE(R_GEN_CONFIG, dma8, usb);
+		}
 	} else if (info->line == 2) {
-		genconfig_shadow &=  ~IO_MASK(R_GEN_CONFIG, dma2);
-		genconfig_shadow |= IO_STATE(R_GEN_CONFIG, dma2, par0);
+		if ((genconfig_shadow & IO_MASK(R_GEN_CONFIG, dma2)) ==
+		    IO_STATE(R_GEN_CONFIG, dma2, serial2)) {
+			genconfig_shadow &=  ~IO_MASK(R_GEN_CONFIG, dma2);
+			genconfig_shadow |= IO_STATE(R_GEN_CONFIG, dma2, par0);
+		}
 	} else if (info->line == 3) {
-		genconfig_shadow &=  ~IO_MASK(R_GEN_CONFIG, dma4);
-		genconfig_shadow |= IO_STATE(R_GEN_CONFIG, dma4, par1);
+		if ((genconfig_shadow & IO_MASK(R_GEN_CONFIG, dma4)) ==
+		    IO_STATE(R_GEN_CONFIG, dma4, serial3)) {
+			genconfig_shadow &=  ~IO_MASK(R_GEN_CONFIG, dma4);
+			genconfig_shadow |= IO_STATE(R_GEN_CONFIG, dma4, par1);
+		}
 	}
 	*R_GEN_CONFIG = genconfig_shadow;
 	restore_flags(flags);
 }
 
 
-static inline void
+static _INLINE_ void
 e100_enable_txdma_channel(struct e100_serial *info)
 {
 	unsigned long flags;
   
 	save_flags(flags);
-	cli();  
+	cli();
+	DFLOW(DEBUG_LOG(info->line, "enable_txdma_channel %i\n", info->line));
 	/* Enable output DMA channel for the serial port in question */
 	if (info->line == 0) {
 		genconfig_shadow &=  ~IO_MASK(R_GEN_CONFIG, dma6);
@@ -1411,6 +1617,70 @@ e100_enable_txdma_channel(struct e100_serial *info)
 	restore_flags(flags);
 }
 
+static _INLINE_ void
+e100_disable_rxdma_channel(struct e100_serial *info)
+{
+	unsigned long flags;
+
+	/* Disable input DMA channel for the serial port in question
+	 * ( set to something other then serialX)
+	 */
+	save_flags(flags);
+	cli();
+	if (info->line == 0) {
+		if ((genconfig_shadow & IO_MASK(R_GEN_CONFIG, dma7)) ==
+		    IO_STATE(R_GEN_CONFIG, dma7, serial0)) {
+			genconfig_shadow &=  ~IO_MASK(R_GEN_CONFIG, dma7);
+			genconfig_shadow |= IO_STATE(R_GEN_CONFIG, dma7, unused);
+		}
+	} else if (info->line == 1) {
+		if ((genconfig_shadow & IO_MASK(R_GEN_CONFIG, dma9)) ==
+		    IO_STATE(R_GEN_CONFIG, dma9, serial1)) {
+			genconfig_shadow &=  ~IO_MASK(R_GEN_CONFIG, dma9);
+			genconfig_shadow |= IO_STATE(R_GEN_CONFIG, dma9, usb);
+		}
+	} else if (info->line == 2) {
+		if ((genconfig_shadow & IO_MASK(R_GEN_CONFIG, dma3)) ==
+		    IO_STATE(R_GEN_CONFIG, dma3, serial2)) {
+			genconfig_shadow &=  ~IO_MASK(R_GEN_CONFIG, dma3);
+			genconfig_shadow |= IO_STATE(R_GEN_CONFIG, dma3, par0);
+		}
+	} else if (info->line == 3) {
+		if ((genconfig_shadow & IO_MASK(R_GEN_CONFIG, dma5)) ==
+		    IO_STATE(R_GEN_CONFIG, dma5, serial3)) {
+			genconfig_shadow &=  ~IO_MASK(R_GEN_CONFIG, dma5);
+			genconfig_shadow |= IO_STATE(R_GEN_CONFIG, dma5, par1);
+		}
+	}
+	*R_GEN_CONFIG = genconfig_shadow;
+	restore_flags(flags);
+}
+
+
+static _INLINE_ void
+e100_enable_rxdma_channel(struct e100_serial *info)
+{
+	unsigned long flags;
+
+	save_flags(flags);
+	cli();
+	/* Enable input DMA channel for the serial port in question */
+	if (info->line == 0) {
+		genconfig_shadow &=  ~IO_MASK(R_GEN_CONFIG, dma7);
+		genconfig_shadow |= IO_STATE(R_GEN_CONFIG, dma7, serial0);
+	} else if (info->line == 1) {
+		genconfig_shadow &=  ~IO_MASK(R_GEN_CONFIG, dma9);
+		genconfig_shadow |= IO_STATE(R_GEN_CONFIG, dma9, serial1);
+	} else if (info->line == 2) {
+		genconfig_shadow &=  ~IO_MASK(R_GEN_CONFIG, dma3);
+		genconfig_shadow |= IO_STATE(R_GEN_CONFIG, dma3, serial2);
+	} else if (info->line == 3) {
+		genconfig_shadow &=  ~IO_MASK(R_GEN_CONFIG, dma5);
+		genconfig_shadow |= IO_STATE(R_GEN_CONFIG, dma5, serial3);
+	}
+	*R_GEN_CONFIG = genconfig_shadow;
+	restore_flags(flags);
+}
 
 #ifdef SERIAL_HANDLE_EARLY_ERRORS
 /* in order to detect and fix errors on the first byte
@@ -1422,6 +1692,7 @@ e100_disable_serial_data_irq(struct e100_serial *info)
 #ifdef SERIAL_DEBUG_INTR
 	printk("ser_irq(%d): 0\n",info->line);
 #endif
+	DINTR1(DEBUG_LOG(info->line,"IRQ disable data_irq %i\n", info->line));
 	*R_IRQ_MASK1_CLR = (1U << (8+2*info->line));
 }
 
@@ -1434,9 +1705,48 @@ e100_enable_serial_data_irq(struct e100_serial *info)
 	       (8+2*info->line),
 	       (1U << (8+2*info->line)));
 #endif
+	DINTR1(DEBUG_LOG(info->line,"IRQ enable data_irq %i\n", info->line));
 	*R_IRQ_MASK1_SET = (1U << (8+2*info->line));
 }
 #endif
+
+static inline void
+e100_disable_serial_tx_ready_irq(struct e100_serial *info)
+{
+#ifdef SERIAL_DEBUG_INTR
+	printk("ser_tx_irq(%d): 0\n",info->line);
+#endif
+	DINTR1(DEBUG_LOG(info->line,"IRQ disable ready_irq %i\n", info->line));
+	*R_IRQ_MASK1_CLR = (1U << (8+1+2*info->line));
+}
+
+static inline void
+e100_enable_serial_tx_ready_irq(struct e100_serial *info)
+{
+#ifdef SERIAL_DEBUG_INTR
+	printk("ser_tx_irq(%d): 1\n",info->line);
+	printk("**** %d = %d\n",
+	       (8+1+2*info->line),
+	       (1U << (8+1+2*info->line)));
+#endif
+	DINTR2(DEBUG_LOG(info->line,"IRQ enable ready_irq %i\n", info->line));
+	*R_IRQ_MASK1_SET = (1U << (8+1+2*info->line));
+}
+
+static inline void e100_enable_rx_irq(struct e100_serial *info)
+{
+	if (info->uses_dma_in)
+		e100_enable_rxdma_irq(info);
+	else
+		e100_enable_serial_data_irq(info);
+}
+static inline void e100_disable_rx_irq(struct e100_serial *info)
+{
+	if (info->uses_dma_in)
+		e100_disable_rxdma_irq(info);
+	else
+		e100_disable_serial_data_irq(info);
+}
 
 #if defined(CONFIG_ETRAX_RS485)
 /* Enable RS-485 mode on selected port. This is UGLY. */
@@ -1448,10 +1758,23 @@ e100_enable_rs485(struct tty_struct *tty,struct rs485_control *r)
 #if defined(CONFIG_ETRAX_RS485_ON_PA)	
 	*R_PORT_PA_DATA = port_pa_data_shadow |= (1 << rs485_pa_bit);
 #endif
+#if defined(CONFIG_ETRAX_RS485_ON_PORT_G)
+	REG_SHADOW_SET(R_PORT_G_DATA,  port_g_data_shadow,
+		       rs485_port_g_bit, 1);
+#endif
+#if defined(CONFIG_ETRAX_RS485_LTC1387)
+	REG_SHADOW_SET(R_PORT_G_DATA, port_g_data_shadow,
+		       CONFIG_ETRAX_RS485_LTC1387_DXEN_PORT_G_BIT, 1);
+	REG_SHADOW_SET(R_PORT_G_DATA, port_g_data_shadow,
+		       CONFIG_ETRAX_RS485_LTC1387_RXEN_PORT_G_BIT, 1);
+#endif
 
 	info->rs485.rts_on_send = 0x01 & r->rts_on_send;
 	info->rs485.rts_after_sent = 0x01 & r->rts_after_sent;
-	info->rs485.delay_rts_before_send = r->delay_rts_before_send;
+	if (r->delay_rts_before_send >= 1000)
+		info->rs485.delay_rts_before_send = 1000;
+	else
+		info->rs485.delay_rts_before_send = r->delay_rts_before_send;
 	info->rs485.enabled = r->enabled;
 /*	printk("rts: on send = %i, after = %i, enabled = %i",
 		    info->rs485.rts_on_send,
@@ -1491,7 +1814,7 @@ static void rs485_toggle_rts_timer_function(unsigned long data)
 	e100_rts(info, info->rs485.rts_after_sent);
 #if defined(CONFIG_ETRAX_RS485_DISABLE_RECEIVER)
 	e100_enable_rx(info);
-	e100_enable_rxdma_irq(info);
+	e100_enable_rx_irq(info);
 #endif
 }
 #endif
@@ -1513,8 +1836,12 @@ rs_stop(struct tty_struct *tty)
 	if (info) {
 		unsigned long flags;
 		unsigned long xoff;
-		
+
 		save_flags(flags); cli();
+		DFLOW(DEBUG_LOG(info->line, "XOFF rs_stop xmit %i\n",
+				CIRC_CNT(info->xmit.head,
+					 info->xmit.tail,SERIAL_XMIT_SIZE)));
+
 		xoff = IO_FIELD(R_SERIAL0_XOFF, xoff_char, STOP_CHAR(info->tty));
 		xoff |= IO_STATE(R_SERIAL0_XOFF, tx_stop, stop);
 		if (tty->termios->c_iflag & IXON ) {
@@ -1535,6 +1862,9 @@ rs_start(struct tty_struct *tty)
 		unsigned long xoff;
 
 		save_flags(flags); cli();
+		DFLOW(DEBUG_LOG(info->line, "XOFF rs_start xmit %i\n",
+				CIRC_CNT(info->xmit.head,
+					 info->xmit.tail,SERIAL_XMIT_SIZE)));
 		xoff = IO_FIELD(R_SERIAL0_XOFF, xoff_char, STOP_CHAR(tty));
 		xoff |= IO_STATE(R_SERIAL0_XOFF, tx_stop, enable);
 		if (tty->termios->c_iflag & IXON ) {
@@ -1542,6 +1872,9 @@ rs_start(struct tty_struct *tty)
 		}
 	
 		*((unsigned long *)&info->port[REG_XOFF]) = xoff;
+		if (!info->uses_dma_out &&
+		    info->xmit.head != info->xmit.tail && info->xmit.buf)
+			e100_enable_serial_tx_ready_irq(info);
 		
 		restore_flags(flags);
 	}
@@ -1576,6 +1909,8 @@ static _INLINE_ void
 rs_sched_event(struct e100_serial *info,
 				    int event)
 {
+	if (info->event & (1 << event))
+		return;
 	info->event |= 1 << event;
 	schedule_work(&info->work);
 }
@@ -1592,7 +1927,7 @@ rs_sched_event(struct e100_serial *info,
  */
 
 static void 
-transmit_chars(struct e100_serial *info)
+transmit_chars_dma(struct e100_serial *info)
 {
 	unsigned int c, sentl;
 	struct etrax_dma_descr *descr;
@@ -1600,11 +1935,11 @@ transmit_chars(struct e100_serial *info)
 #ifdef CONFIG_SVINTO_SIM
 	/* This will output too little if tail is not 0 always since
 	 * we don't reloop to send the other part. Anyway this SHOULD be a
-	 * no-op - transmit_chars would never really be called during sim
+	 * no-op - transmit_chars_dma would never really be called during sim
 	 * since rs_write does not write into the xmit buffer then.
 	 */
 	if (info->xmit.tail)
-		printk("Error in serial.c:transmit_chars(), tail!=0\n");
+		printk("Error in serial.c:transmit_chars-dma(), tail!=0\n");
 	if (info->xmit.head != info->xmit.tail) {
 		SIMCOUT(info->xmit.buf + info->xmit.tail,
 			CIRC_CNT(info->xmit.head,
@@ -1626,7 +1961,7 @@ transmit_chars(struct e100_serial *info)
 #endif
 	if (!info->tr_running) {
 		/* weirdo... we shouldn't get here! */
-		printk(KERN_WARNING "Achtung: transmit_chars with !tr_running\n");
+		printk(KERN_WARNING "Achtung: transmit_chars_dma with !tr_running\n");
 		return;
 	}
 
@@ -1641,6 +1976,8 @@ transmit_chars(struct e100_serial *info)
 	} else 
 		/* otherwise we find the amount of data sent here */
 		sentl = descr->hw_len;
+
+	DFLOW(DEBUG_LOG(info->line, "TX %i done\n", sentl));
 
 	/* update stats */
 	info->icount.tx += sentl;
@@ -1658,6 +1995,13 @@ transmit_chars(struct e100_serial *info)
 	/* find out the largest amount of consecutive bytes we want to send now */
 
 	c = CIRC_CNT_TO_END(info->xmit.head, info->xmit.tail, SERIAL_XMIT_SIZE);
+
+	/* Don't send all in one DMA transfer - divide it so we wake up
+	 * application before all is sent
+	 */
+
+	if (c >= 4*WAKEUP_CHARS)
+		c = c/2;
 
 	if (c <= 0) {
 		/* our job here is done, don't schedule any new DMA transfer */
@@ -1678,17 +2022,17 @@ transmit_chars(struct e100_serial *info)
 
 	/* ok we can schedule a dma send of c chars starting at info->xmit.tail */
 	/* set up the descriptor correctly for output */
-
+	DFLOW(DEBUG_LOG(info->line, "TX %i\n", c));
 	descr->ctrl = d_int | d_eol | d_wait; /* Wait needed for tty_wait_until_sent() */
 	descr->sw_len = c;
 	descr->buf = virt_to_phys(info->xmit.buf + info->xmit.tail);
 	descr->status = 0;
 
 	*info->ofirstadr = virt_to_phys(descr); /* write to R_DMAx_FIRST */
-	*info->ocmdadr = 1;       /* dma command start -> R_DMAx_CMD */
+	*info->ocmdadr = IO_STATE(R_DMA_CH6_CMD, cmd, start);
 	
 	/* DMA is now running (hopefully) */
-} /* transmit_chars */
+} /* transmit_chars_dma */
 
 static void 
 start_transmit(struct e100_serial *info)
@@ -1702,15 +2046,17 @@ start_transmit(struct e100_serial *info)
 	info->tr_descr.hw_len = 0;
 	info->tr_descr.status = 0;
 	info->tr_running = 1;
-
-	transmit_chars(info);
+	if (info->uses_dma_out)
+		transmit_chars_dma(info);
+	else
+		e100_enable_serial_tx_ready_irq(info);
 } /* start_transmit */
 
 #ifdef CONFIG_ETRAX_SERIAL_FAST_TIMER
 static int serial_fast_timer_started = 0;
 static int serial_fast_timer_expired = 0;
 static void flush_timeout_function(unsigned long data);
-#define START_FLUSH_FAST_TIMER(info, string) {\
+#define START_FLUSH_FAST_TIMER_TIME(info, string, usec) {\
   unsigned long timer_flags; \
   save_flags(timer_flags); \
   cli(); \
@@ -1721,7 +2067,7 @@ static void flush_timeout_function(unsigned long data);
     start_one_shot_timer(&fast_timers[info->line], \
                          flush_timeout_function, \
                          (unsigned long)info, \
-                         info->char_time_usec*4, \
+                         (usec), \
                          string); \
   } \
   else { \
@@ -1729,8 +2075,10 @@ static void flush_timeout_function(unsigned long data);
   } \
   restore_flags(timer_flags); \
 }
+#define START_FLUSH_FAST_TIMER(info, string) START_FLUSH_FAST_TIMER_TIME(info, string, info->flush_time_usec)
 
 #else
+#define START_FLUSH_FAST_TIMER_TIME(info, string, usec)
 #define START_FLUSH_FAST_TIMER(info, string)
 #endif
 
@@ -1775,17 +2123,26 @@ static int
 add_char_and_flag(struct e100_serial *info, unsigned char data, unsigned char flag)
 {
 	struct etrax_recv_buffer *buffer;
+	if (info->uses_dma_in) {
+		if (!(buffer = alloc_recv_buffer(4)))
+			return 0;
 
-	if (!(buffer = alloc_recv_buffer(4)))
-		return 0;
-
-	buffer->length = 1;
-	buffer->error = flag;
-	buffer->buffer[0] = data;
+		buffer->length = 1;
+		buffer->error = flag;
+		buffer->buffer[0] = data;
 	
-	append_recv_buffer(info, buffer);
+		append_recv_buffer(info, buffer);
 
-	info->icount.rx++;
+		info->icount.rx++;
+	} else {
+		struct tty_struct *tty = info->tty;
+		*tty->flip.char_buf_ptr = data;
+		*tty->flip.flag_buf_ptr = flag;
+		tty->flip.flag_buf_ptr++;
+		tty->flip.char_buf_ptr++;
+		tty->flip.count++;
+		info->icount.rx++;
+	}
 
 	return 1;
 }
@@ -1847,7 +2204,14 @@ handle_all_descr_data(struct e100_serial *info)
 		/* Reset the status information */
 		descr->status = 0;
 
-		DEBUG_LOG(info->line, "recvl %lu\n", recvl);
+		DFLOW(  DEBUG_LOG(info->line, "RX %lu\n", recvl);
+			if (info->tty->stopped) {
+				unsigned char *buf = phys_to_virt(descr->buf);
+				DEBUG_LOG(info->line, "rx 0x%02X\n", buf[0]);
+				DEBUG_LOG(info->line, "rx 0x%02X\n", buf[1]);
+				DEBUG_LOG(info->line, "rx 0x%02X\n", buf[2]);
+			}
+			);
 
 		/* update stats */
 		info->icount.rx += recvl;
@@ -1859,7 +2223,7 @@ handle_all_descr_data(struct e100_serial *info)
 }
 
 static _INLINE_ void 
-receive_chars(struct e100_serial *info)
+receive_chars_dma(struct e100_serial *info)
 {
 	struct tty_struct *tty;
 	unsigned char rstat;
@@ -1881,7 +2245,8 @@ receive_chars(struct e100_serial *info)
 		return;
 
 #ifdef SERIAL_HANDLE_EARLY_ERRORS
-	e100_enable_serial_data_irq(info);
+	if (info->uses_dma_in)
+		e100_enable_serial_data_irq(info);
 #endif	
 
 	if (info->errorcode == ERRCODE_INSERT_BREAK)
@@ -1891,6 +2256,9 @@ receive_chars(struct e100_serial *info)
 
 	/* Read the status register to detect errors */
 	rstat = info->port[REG_STATUS];
+	if (rstat & IO_MASK(R_SERIAL0_STATUS, xoff_detect) ) {
+		DFLOW(DEBUG_LOG(info->line, "XOFF detect stat %x\n", rstat));
+	}
 
 	if (rstat & SER_ERROR_MASK) {
 		/* If we got an error, we must reset it by reading the
@@ -1959,16 +2327,16 @@ start_receive(struct e100_serial *info)
 	 */
 	return;
 #endif
-
-	/* reset the input dma channel to be sure it works */
-
-	*info->icmdadr = IO_STATE(R_DMA_CH6_CMD, cmd, reset);
-	while (IO_EXTRACT(R_DMA_CH6_CMD, cmd, *info->icmdadr) ==
-	       IO_STATE_VALUE(R_DMA_CH6_CMD, cmd, reset));
-
 	info->tty->flip.count = 0;
+	if (info->uses_dma_in) {
+		/* reset the input dma channel to be sure it works */
 
-	start_recv_dma(info);
+		*info->icmdadr = IO_STATE(R_DMA_CH6_CMD, cmd, reset);
+		while (IO_EXTRACT(R_DMA_CH6_CMD, cmd, *info->icmdadr) ==
+		       IO_STATE_VALUE(R_DMA_CH6_CMD, cmd, reset));
+
+		start_recv_dma(info);
+	}
 }
 
 
@@ -2014,27 +2382,27 @@ tr_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 	
 	for (i = 0; i < NR_PORTS; i++) {
 		info = rs_table + i;
-		if (!info->enabled || !info->uses_dma) 
+		if (!info->enabled || !info->uses_dma_out)
 			continue; 
 		/* check for dma_descr (don't need to check for dma_eop in output dma for serial */
 		if (ireg & info->irq) {  
 			handled = 1;
 			/* we can send a new dma bunch. make it so. */
-			DEBUG_LOG(info->line, "tr_interrupt %i\n", i);
+			DINTR2(DEBUG_LOG(info->line, "tr_interrupt %i\n", i));
 			/* Read jiffies_usec first, 
 			 * we want this time to be as late as possible
 			 */
  			PROCSTAT(ser_stat[info->line].tx_dma_ints++);
 			info->last_tx_active_usec = GET_JIFFIES_USEC();
 			info->last_tx_active = jiffies;
-			transmit_chars(info);
+			transmit_chars_dma(info);
 		}
 		
 		/* FIXME: here we should really check for a change in the
 		   status lines and if so call status_handle(info) */
 	}
 	return IRQ_RETVAL(handled);
-}
+} /* tr_interrupt */
 
 /* dma input channel interrupt handler */
 
@@ -2054,7 +2422,7 @@ rec_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 		const char *s = "What? rec_interrupt in simulator??\n";
 		SIMCOUT(s,strlen(s));
 	}
-	return;
+	return IRQ_HANDLED;
 #endif
 	
 	/* find out the line that caused this irq and get it from rs_table */
@@ -2063,20 +2431,20 @@ rec_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 	
 	for (i = 0; i < NR_PORTS; i++) {
 		info = rs_table + i;
-		if (!info->enabled || !info->uses_dma) 
+		if (!info->enabled || !info->uses_dma_in)
 			continue; 
 		/* check for both dma_eop and dma_descr for the input dma channel */
 		if (ireg & ((info->irq << 2) | (info->irq << 3))) {
 			handled = 1; 
 			/* we have received something */
-			receive_chars(info);
+			receive_chars_dma(info);
 		}
 		
 		/* FIXME: here we should really check for a change in the
 		   status lines and if so call status_handle(info) */
 	}
 	return IRQ_RETVAL(handled);
-}
+} /* rec_interrupt */
 
 static _INLINE_ int
 force_eop_if_needed(struct e100_serial *info)
@@ -2116,20 +2484,21 @@ force_eop_if_needed(struct e100_serial *info)
 	if (!info->forced_eop) {
 		info->forced_eop = 1;
 		PROCSTAT(ser_stat[info->line].timeout_flush_cnt++);
-		DEBUG_LOG(info->line, "timeout EOP %i\n", info->line);
+		TIMERD(DEBUG_LOG(info->line, "timeout EOP %i\n", info->line));
 		FORCE_EOP(info);
 	}
 
 	return 1;
 }
 
-static _INLINE_ void
+extern _INLINE_ void
 flush_to_flip_buffer(struct e100_serial *info)
 {
 	struct tty_struct *tty;
 	struct etrax_recv_buffer *buffer;
 	unsigned int length;
 	unsigned long flags;
+	int max_flip_size;
 
 	if (!info->first_recv_buffer)
 		return;
@@ -2143,12 +2512,46 @@ flush_to_flip_buffer(struct e100_serial *info)
 	}
 
 	length = tty->flip.count;
+	/* Don't flip more than the ldisc has room for.
+	 * The return value from ldisc.receive_room(tty) - might not be up to
+	 * date, the previous flip of up to TTY_FLIPBUF_SIZE might be on the
+	 * processed and not accounted for yet.
+	 * Since we use DMA, 1 SERIAL_DESCR_BUF_SIZE could be on the way.
+	 * Lets buffer data here and let flow control take care of it.
+	 * Since we normally flip large chunks, the ldisc don't react
+	 * with throttle until too late if we flip to much.
+	 */
+	max_flip_size = tty->ldisc.receive_room(tty);
+	if (max_flip_size < 0)
+		max_flip_size = 0;
+	if (max_flip_size <= (TTY_FLIPBUF_SIZE +         /* Maybe not accounted for */
+			      length + info->recv_cnt +  /* We have this queued */
+			      2*SERIAL_DESCR_BUF_SIZE +    /* This could be on the way */
+			      TTY_THRESHOLD_THROTTLE)) { /* Some slack */
+		/* check TTY_THROTTLED first so it indicates our state */
+		if (!test_and_set_bit(TTY_THROTTLED, &tty->flags)) {
+			DFLOW(DEBUG_LOG(info->line,"flush_to_flip throttles room %lu\n", max_flip_size));
+			rs_throttle(tty);
+		}
+#if 0
+		else if (max_flip_size <= (TTY_FLIPBUF_SIZE +         /* Maybe not accounted for */
+					   length + info->recv_cnt +  /* We have this queued */
+					   SERIAL_DESCR_BUF_SIZE +    /* This could be on the way */
+					   TTY_THRESHOLD_THROTTLE)) { /* Some slack */
+			DFLOW(DEBUG_LOG(info->line,"flush_to_flip throttles again! %lu\n", max_flip_size));
+			rs_throttle(tty);
+		}
+#endif
+	}
 
-	while ((buffer = info->first_recv_buffer) && length < TTY_FLIPBUF_SIZE) {
+	if (max_flip_size > TTY_FLIPBUF_SIZE)
+		max_flip_size = TTY_FLIPBUF_SIZE;
+
+	while ((buffer = info->first_recv_buffer) && length < max_flip_size) {
 		unsigned int count = buffer->length;
 
-		if (length + count > TTY_FLIPBUF_SIZE)
-			count = TTY_FLIPBUF_SIZE - length;
+		if (length + count > max_flip_size)
+			count = max_flip_size - length;
 
 		memcpy(tty->flip.char_buf_ptr + length, buffer->buffer, count);
 		memset(tty->flip.flag_buf_ptr + length, TTY_NORMAL, count);
@@ -2156,6 +2559,7 @@ flush_to_flip_buffer(struct e100_serial *info)
 
 		length += count;
 		info->recv_cnt -= count;
+		DFLIP(DEBUG_LOG(info->line,"flip: %i\n", length));
 
 		if (count == buffer->length) {
 			info->first_recv_buffer = buffer->next;
@@ -2171,8 +2575,29 @@ flush_to_flip_buffer(struct e100_serial *info)
 		info->last_recv_buffer = NULL;
 
 	tty->flip.count = length;
-
+	DFLIP(if (tty->ldisc.chars_in_buffer(tty) > 3500) {
+		DEBUG_LOG(info->line, "ldisc %lu\n",
+			  tty->ldisc.chars_in_buffer(tty));
+		DEBUG_LOG(info->line, "flip.count %lu\n",
+			  tty->flip.count);
+	      }
+	      );
 	restore_flags(flags);
+
+	DFLIP(
+	  if (1) {
+
+		  if (test_bit(TTY_DONT_FLIP, &tty->flags)) {
+			  DEBUG_LOG(info->line, "*** TTY_DONT_FLIP set flip.count %i ***\n", tty->flip.count);
+			  DEBUG_LOG(info->line, "*** recv_cnt %i\n", info->recv_cnt);
+		  } else {
+		  }
+		  DEBUG_LOG(info->line, "*** rxtot %i\n", info->icount.rx);
+		  DEBUG_LOG(info->line, "ldisc %lu\n", tty->ldisc.chars_in_buffer(tty));
+		  DEBUG_LOG(info->line, "room  %lu\n", tty->ldisc.receive_room(tty));
+	  }
+
+	);
 
 	/* this includes a check for low-latency */
 	tty_flip_buffer_push(tty);
@@ -2181,12 +2606,19 @@ flush_to_flip_buffer(struct e100_serial *info)
 static _INLINE_ void
 check_flush_timeout(struct e100_serial *info)
 {
-	force_eop_if_needed(info);
-
+	/* Flip what we've got (if we can) */
 	flush_to_flip_buffer(info);
 
+	/* We might need to flip later, but not to fast
+	 * since the system is busy processing input... */
 	if (info->first_recv_buffer)
-		START_FLUSH_FAST_TIMER(info, "flip");
+		START_FLUSH_FAST_TIMER_TIME(info, "flip", 2000);
+
+	/* Force eop last, since data might have come while we're processing
+	 * and if we started the slow timer above, we won't start a fast
+	 * below.
+	 */
+	force_eop_if_needed(info);
 }
 
 #ifdef CONFIG_ETRAX_SERIAL_FAST_TIMER
@@ -2222,7 +2654,7 @@ timed_flush_handler(unsigned long ptr)
 	
 	for (i = 0; i < NR_PORTS; i++) {
 		info = rs_table + i;
-		if (info->uses_dma) 
+		if (info->uses_dma_in)
 			check_flush_timeout(info);
 	}
 
@@ -2301,14 +2733,158 @@ TODO: The break will be delayed until an F or V character is received.
 
 */
 
-extern irqreturn_t _INLINE_ handle_ser_interrupt(struct e100_serial *info)
+extern _INLINE_
+struct e100_serial * handle_ser_rx_interrupt_no_dma(struct e100_serial *info)
 {
-	unsigned char rstat = info->port[REG_STATUS];
+	unsigned long data_read;
+	struct tty_struct *tty = info->tty;
+
+	if (!tty) {
+		printk("!NO TTY!\n");
+		return info;
+	}
+	if (tty->flip.count >= TTY_FLIPBUF_SIZE - TTY_THRESHOLD_THROTTLE) {
+		/* check TTY_THROTTLED first so it indicates our state */
+		if (!test_and_set_bit(TTY_THROTTLED, &tty->flags)) {
+			DFLOW(DEBUG_LOG(info->line, "rs_throttle flip.count: %i\n", tty->flip.count));
+			rs_throttle(tty);
+		}
+	}
+	if (tty->flip.count >= TTY_FLIPBUF_SIZE) {
+		DEBUG_LOG(info->line, "force FLIP! %i\n", tty->flip.count);
+		tty->flip.work.func((void *) tty);
+		if (tty->flip.count >= TTY_FLIPBUF_SIZE) {
+			DEBUG_LOG(info->line, "FLIP FULL! %i\n", tty->flip.count);
+			return info;		/* if TTY_DONT_FLIP is set */
+		}
+	}
+	/* Read data and status at the same time */
+	data_read = *((unsigned long *)&info->port[REG_DATA_STATUS32]);
+more_data:
+	if (data_read & IO_MASK(R_SERIAL0_READ, xoff_detect) ) {
+		DFLOW(DEBUG_LOG(info->line, "XOFF detect\n", 0));
+	}
+	DINTR2(DEBUG_LOG(info->line, "ser_rx   %c\n", IO_EXTRACT(R_SERIAL0_READ, data_in, data_read)));
+
+	if (data_read & ( IO_MASK(R_SERIAL0_READ, framing_err) |
+			  IO_MASK(R_SERIAL0_READ, par_err) |
+			  IO_MASK(R_SERIAL0_READ, overrun) )) {
+		/* An error */
+		info->last_rx_active_usec = GET_JIFFIES_USEC();
+		info->last_rx_active = jiffies;
+		DINTR1(DEBUG_LOG(info->line, "ser_rx err stat_data %04X\n", data_read));
+		DLOG_INT_TRIG(
+		if (!log_int_trig1_pos) {
+			log_int_trig1_pos = log_int_pos;
+			log_int(rdpc(), 0, 0);
+		}
+		);
+
+
+		if ( ((data_read & IO_MASK(R_SERIAL0_READ, data_in)) == 0) &&
+		     (data_read & IO_MASK(R_SERIAL0_READ, framing_err)) ) {
+			/* Most likely a break, but we get interrupts over and
+			 * over again.
+			 */
+
+			if (!info->break_detected_cnt) {
+				DEBUG_LOG(info->line, "#BRK start\n", 0);
+			}
+			if (data_read & IO_MASK(R_SERIAL0_READ, rxd)) {
+				/* The RX pin is high now, so the break
+				 * must be over, but....
+				 * we can't really know if we will get another
+				 * last byte ending the break or not.
+				 * And we don't know if the byte (if any) will
+				 * have an error or look valid.
+				 */
+				DEBUG_LOG(info->line, "# BL BRK\n", 0);
+				info->errorcode = ERRCODE_INSERT_BREAK;
+			}
+			info->break_detected_cnt++;
+		} else {
+			/* The error does not look like a break, but could be
+			 * the end of one
+			 */
+			if (info->break_detected_cnt) {
+				DEBUG_LOG(info->line, "EBRK %i\n", info->break_detected_cnt);
+				info->errorcode = ERRCODE_INSERT_BREAK;
+			} else {
+				if (info->errorcode == ERRCODE_INSERT_BREAK) {
+					info->icount.brk++;
+					*tty->flip.char_buf_ptr = 0;
+					*tty->flip.flag_buf_ptr = TTY_BREAK;
+					tty->flip.flag_buf_ptr++;
+					tty->flip.char_buf_ptr++;
+					tty->flip.count++;
+					info->icount.rx++;
+				}
+				*tty->flip.char_buf_ptr = IO_EXTRACT(R_SERIAL0_READ, data_in, data_read);
+
+				if (data_read & IO_MASK(R_SERIAL0_READ, par_err)) {
+					info->icount.parity++;
+					*tty->flip.flag_buf_ptr = TTY_PARITY;
+				} else if (data_read & IO_MASK(R_SERIAL0_READ, overrun)) {
+					info->icount.overrun++;
+					*tty->flip.flag_buf_ptr = TTY_OVERRUN;
+				} else if (data_read & IO_MASK(R_SERIAL0_READ, framing_err)) {
+					info->icount.frame++;
+					*tty->flip.flag_buf_ptr = TTY_FRAME;
+				}
+				info->errorcode = 0;
+			}
+			info->break_detected_cnt = 0;
+		}
+	} else if (data_read & IO_MASK(R_SERIAL0_READ, data_avail)) {
+		/* No error */
+		DLOG_INT_TRIG(
+		if (!log_int_trig1_pos) {
+			if (log_int_pos >= log_int_size) {
+				log_int_pos = 0;
+			}
+			log_int_trig0_pos = log_int_pos;
+			log_int(rdpc(), 0, 0);
+		}
+		);
+		*tty->flip.char_buf_ptr = IO_EXTRACT(R_SERIAL0_READ, data_in, data_read);
+		*tty->flip.flag_buf_ptr = 0;
+	} else {
+		DEBUG_LOG(info->line, "ser_rx int but no data_avail  %08lX\n", data_read);
+	}
+
+
+	tty->flip.flag_buf_ptr++;
+	tty->flip.char_buf_ptr++;
+	tty->flip.count++;
+	info->icount.rx++;
+	data_read = *((unsigned long *)&info->port[REG_DATA_STATUS32]);
+	if (data_read & IO_MASK(R_SERIAL0_READ, data_avail)) {
+		DEBUG_LOG(info->line, "ser_rx   %c in loop\n", IO_EXTRACT(R_SERIAL0_READ, data_in, data_read));
+		goto more_data;
+	}
+
+	tty_flip_buffer_push(info->tty);
+	return info;
+}
+
+extern _INLINE_
+struct e100_serial* handle_ser_rx_interrupt(struct e100_serial *info)
+{
+	unsigned char rstat;
 
 #ifdef SERIAL_DEBUG_INTR
 	printk("Interrupt from serport %d\n", i);
 #endif
 /*	DEBUG_LOG(info->line, "ser_interrupt stat %03X\n", rstat | (i << 8)); */
+	if (!info->uses_dma_in) {
+		return handle_ser_rx_interrupt_no_dma(info);
+	}
+	/* DMA is used */
+	rstat = info->port[REG_STATUS];
+	if (rstat & IO_MASK(R_SERIAL0_STATUS, xoff_detect) ) {
+		DFLOW(DEBUG_LOG(info->line, "XOFF detect\n", 0));
+	}
+
 	if (rstat & SER_ERROR_MASK) {
 		unsigned char data;
 
@@ -2318,7 +2894,8 @@ extern irqreturn_t _INLINE_ handle_ser_interrupt(struct e100_serial *info)
 		 * data_in field
 		 */
 		data = info->port[REG_DATA];
-
+		DINTR1(DEBUG_LOG(info->line, "ser_rx!  %c\n", data));
+		DINTR1(DEBUG_LOG(info->line, "ser_rx err stat %02X\n", rstat));
 		if (!data && (rstat & SER_FRAMING_ERR_MASK)) {
 			/* Most likely a break, but we get interrupts over and
 			 * over again.
@@ -2347,15 +2924,22 @@ extern irqreturn_t _INLINE_ handle_ser_interrupt(struct e100_serial *info)
 				DEBUG_LOG(info->line, "EBRK %i\n", info->break_detected_cnt);
 				info->errorcode = ERRCODE_INSERT_BREAK;
 			} else {
-				if (info->errorcode == ERRCODE_INSERT_BREAK)
+				if (info->errorcode == ERRCODE_INSERT_BREAK) {
+					info->icount.brk++;
 					add_char_and_flag(info, '\0', TTY_BREAK);
+				}
 
-				if (rstat & SER_PAR_ERR_MASK)
+				if (rstat & SER_PAR_ERR_MASK) {
+					info->icount.parity++;
 					add_char_and_flag(info, data, TTY_PARITY);
-				else if (rstat & SER_OVERRUN_MASK)
+				} else if (rstat & SER_OVERRUN_MASK) {
+					info->icount.overrun++;
 					add_char_and_flag(info, data, TTY_OVERRUN);
-				else if (rstat & SER_FRAMING_ERR_MASK)
+				} else if (rstat & SER_FRAMING_ERR_MASK) {
+					info->icount.frame++;
 					add_char_and_flag(info, data, TTY_FRAME);
+				}
+
 				info->errorcode = 0;
 			}
 			info->break_detected_cnt = 0;
@@ -2379,7 +2963,7 @@ extern irqreturn_t _INLINE_ handle_ser_interrupt(struct e100_serial *info)
 			if (elapsed_usec < 2*info->char_time_usec) {
 				DEBUG_LOG(info->line, "FBRK %i\n", info->line);
 				/* Report as BREAK (error) and let
-				 * receive_chars() handle it
+				 * receive_chars_dma() handle it
 				 */
 				info->errorcode = ERRCODE_SET_BREAK;
 			} else {
@@ -2392,38 +2976,196 @@ extern irqreturn_t _INLINE_ handle_ser_interrupt(struct e100_serial *info)
 		printk("** OK, disabling ser_interrupts\n");
 #endif
 		e100_disable_serial_data_irq(info);
-
+		DINTR2(DEBUG_LOG(info->line, "ser_rx OK %d\n", info->line));
 		info->break_detected_cnt = 0;
 
 		PROCSTAT(ser_stat[info->line].ser_ints_ok_cnt++);
-		DEBUG_LOG(info->line, "ser_int OK %d\n", info->line);
 	}
-
 	/* Restarting the DMA never hurts */
 	*info->icmdadr = IO_STATE(R_DMA_CH6_CMD, cmd, restart);
 	START_FLUSH_FAST_TIMER(info, "ser_int");
-	return IRQ_HANDLED;
-} /* handle_ser_interrupt */
+	return info;
+} /* handle_ser_rx_interrupt */
 
+extern _INLINE_ void handle_ser_tx_interrupt(struct e100_serial *info)
+{
+	unsigned long flags;
+
+	if (info->x_char) {
+		unsigned char rstat;
+		DFLOW(DEBUG_LOG(info->line, "tx_int: xchar 0x%02X\n", info->x_char));
+		save_flags(flags); cli();
+		rstat = info->port[REG_STATUS];
+		DFLOW(DEBUG_LOG(info->line, "stat %x\n", rstat));
+
+		info->port[REG_TR_DATA] = info->x_char;
+		info->icount.tx++;
+		info->x_char = 0;
+		/* We must enable since it is disabled in ser_interrupt */
+		e100_enable_serial_tx_ready_irq(info);
+		restore_flags(flags);
+		return;
+	}
+	if (info->uses_dma_out) {
+		unsigned char rstat;
+		int i;
+		/* We only use normal tx interrupt when sending x_char */
+		DFLOW(DEBUG_LOG(info->line, "tx_int: xchar sent\n", 0));
+		save_flags(flags); cli();
+		rstat = info->port[REG_STATUS];
+		DFLOW(DEBUG_LOG(info->line, "stat %x\n", rstat));
+		e100_disable_serial_tx_ready_irq(info);
+		if (info->tty->stopped)
+			rs_stop(info->tty);
+		/* Enable the DMA channel and tell it to continue */
+		e100_enable_txdma_channel(info);
+		/* Wait 12 cycles before doing the DMA command */
+		for(i = 6;  i > 0; i--)
+			nop();
+
+		*info->ocmdadr = IO_STATE(R_DMA_CH6_CMD, cmd, continue);
+		restore_flags(flags);
+		return;
+	}
+	/* Normal char-by-char interrupt */
+	if (info->xmit.head == info->xmit.tail
+	    || info->tty->stopped
+	    || info->tty->hw_stopped) {
+		DFLOW(DEBUG_LOG(info->line, "tx_int: stopped %i\n", info->tty->stopped));
+		e100_disable_serial_tx_ready_irq(info);
+		info->tr_running = 0;
+		return;
+	}
+	DINTR2(DEBUG_LOG(info->line, "tx_int %c\n", info->xmit.buf[info->xmit.tail]));
+	/* Send a byte, rs485 timing is critical so turn of ints */
+	save_flags(flags); cli();
+	info->port[REG_TR_DATA] = info->xmit.buf[info->xmit.tail];
+	info->xmit.tail = (info->xmit.tail + 1) & (SERIAL_XMIT_SIZE-1);
+	info->icount.tx++;
+	if (info->xmit.head == info->xmit.tail) {
+#if defined(CONFIG_ETRAX_RS485) && defined(CONFIG_ETRAX_FAST_TIMER)
+		if (info->rs485.enabled) {
+			/* Set a short timer to toggle RTS */
+			start_one_shot_timer(&fast_timers_rs485[info->line],
+			                     rs485_toggle_rts_timer_function,
+			                     (unsigned long)info,
+			                     info->char_time_usec*2,
+			                     "RS-485");
+		}
+#endif /* RS485 */
+		info->last_tx_active_usec = GET_JIFFIES_USEC();
+		info->last_tx_active = jiffies;
+		e100_disable_serial_tx_ready_irq(info);
+		info->tr_running = 0;
+		DFLOW(DEBUG_LOG(info->line, "tx_int: stop2\n", 0));
+	} else {
+		/* We must enable since it is disabled in ser_interrupt */
+		e100_enable_serial_tx_ready_irq(info);
+	}
+	restore_flags(flags);
+
+	if (CIRC_CNT(info->xmit.head,
+		     info->xmit.tail,
+		     SERIAL_XMIT_SIZE) < WAKEUP_CHARS)
+		rs_sched_event(info, RS_EVENT_WRITE_WAKEUP);
+
+} /* handle_ser_tx_interrupt */
+
+/* result of time measurements:
+ * RX duration 54-60 us when doing something, otherwise 6-9 us
+ * ser_int duration: just sending: 8-15 us normally, up to 73 us
+ */
 static irqreturn_t
 ser_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
+	static volatile int tx_started = 0;
 	struct e100_serial *info;
 	int i;
+	unsigned long flags;
+	unsigned long irq_mask1_rd;
+	unsigned long data_mask = (1 << (8+2*0)); /* ser0 data_avail */
 	int handled = 0;
+	static volatile unsigned long reentered_ready_mask = 0;
 
+	save_flags(flags); cli();
+	irq_mask1_rd = *R_IRQ_MASK1_RD;
+	/* First handle all rx interrupts with ints disabled */
+	info = rs_table;
+	irq_mask1_rd &= e100_ser_int_mask;
 	for (i = 0; i < NR_PORTS; i++) {
-		info = rs_table + i;
-
-		if (!info->enabled || !info->uses_dma) 
-			continue; 
-
-		/* Which line caused the irq? */
-		if (*R_IRQ_MASK1_RD & (1U << (8+2*info->line))) { 
+		/* Which line caused the data irq? */
+		if (irq_mask1_rd & data_mask) {
 			handled = 1;
-			handle_ser_interrupt(info);
+			handle_ser_rx_interrupt(info);
+		}
+		info += 1;
+		data_mask <<= 2;
+	}
+	/* Handle tx interrupts with interrupts enabled so we
+	 * can take care of new data interrupts while transmitting
+	 * We protect the tx part with the tx_started flag.
+	 * We disable the tr_ready interrupts we are about to handle and
+	 * unblock the serial interrupt so new serial interrupts may come.
+	 *
+	 * If we get a new interrupt:
+	 *  - it migth be due to synchronous serial ports.
+	 *  - serial irq will be blocked by general irq handler.
+	 *  - async data will be handled above (sync will be ignored).
+	 *  - tx_started flag will prevent us from trying to send again and
+	 *    we will exit fast - no need to unblock serial irq.
+	 *  - Next (sync) serial interrupt handler will be runned with
+	 *    disabled interrupt due to restore_flags() at end of function,
+	 *    so sync handler will not be preempted or reentered.
+	 */
+	if (!tx_started) {
+		unsigned long ready_mask;
+		unsigned long
+		tx_started = 1;
+		/* Only the tr_ready interrupts left */
+		irq_mask1_rd &= (IO_MASK(R_IRQ_MASK1_RD, ser0_ready) |
+				 IO_MASK(R_IRQ_MASK1_RD, ser1_ready) |
+				 IO_MASK(R_IRQ_MASK1_RD, ser2_ready) |
+				 IO_MASK(R_IRQ_MASK1_RD, ser3_ready));
+		while (irq_mask1_rd) {
+			/* Disable those we are about to handle */
+			*R_IRQ_MASK1_CLR = irq_mask1_rd;
+			/* Unblock the serial interrupt */
+			*R_VECT_MASK_SET = IO_STATE(R_VECT_MASK_SET, serial, set);
+
+			sti();
+			ready_mask = (1 << (8+1+2*0)); /* ser0 tr_ready */
+			info = rs_table;
+			for (i = 0; i < NR_PORTS; i++) {
+				/* Which line caused the ready irq? */
+				if (irq_mask1_rd & ready_mask) {
+					handled = 1;
+					handle_ser_tx_interrupt(info);
+				}
+				info += 1;
+				ready_mask <<= 2;
+			}
+			/* handle_ser_tx_interrupt enables tr_ready interrupts */
+			cli();
+			/* Handle reentered TX interrupt */
+			irq_mask1_rd = reentered_ready_mask;
+		}
+		cli();
+		tx_started = 0;
+	} else {
+		unsigned long ready_mask;
+		ready_mask = irq_mask1_rd & (IO_MASK(R_IRQ_MASK1_RD, ser0_ready) |
+					     IO_MASK(R_IRQ_MASK1_RD, ser1_ready) |
+					     IO_MASK(R_IRQ_MASK1_RD, ser2_ready) |
+					     IO_MASK(R_IRQ_MASK1_RD, ser3_ready));
+		if (ready_mask) {
+			reentered_ready_mask |= ready_mask;
+			/* Disable those we are about to handle */
+			*R_IRQ_MASK1_CLR = ready_mask;
+			DFLOW(DEBUG_LOG(SERIAL_DEBUG_LINE, "ser_int reentered with TX %X\n", ready_mask));
 		}
 	}
+
+	restore_flags(flags);
 	return IRQ_RETVAL(handled);
 } /* ser_interrupt */
 #endif
@@ -2489,7 +3231,7 @@ startup(struct e100_serial * info)
 		info->xmit.buf = (unsigned char *) xmit_page;
 
 #ifdef SERIAL_DEBUG_OPEN
-	printk("starting up ttyS%d (xmit_buf 0x%p, recv_buf 0x%p)...\n", info->line, info->xmit.buf, info->recv.buf);
+	printk("starting up ttyS%d (xmit_buf 0x%p)...\n", info->line, info->xmit.buf);
 #endif
 
 #ifdef CONFIG_SVINTO_SIM
@@ -2520,24 +3262,39 @@ startup(struct e100_serial * info)
 	 * Reset the DMA channels and make sure their interrupts are cleared
 	 */
 
-	info->uses_dma = 1;
-	*info->icmdadr = IO_STATE(R_DMA_CH6_CMD, cmd, reset);
-	*info->ocmdadr = IO_STATE(R_DMA_CH6_CMD, cmd, reset);
+	if (info->dma_in_enabled) {
+		info->uses_dma_in = 1;
+		e100_enable_rxdma_channel(info);
 
-	/* Wait until reset cycle is complete */
-	while (IO_EXTRACT(R_DMA_CH6_CMD, cmd, *info->icmdadr) ==
-	       IO_STATE_VALUE(R_DMA_CH6_CMD, cmd, reset));
+		*info->icmdadr = IO_STATE(R_DMA_CH6_CMD, cmd, reset);
 
-	while (IO_EXTRACT(R_DMA_CH6_CMD, cmd, *info->ocmdadr) ==
-	       IO_STATE_VALUE(R_DMA_CH6_CMD, cmd, reset));
+		/* Wait until reset cycle is complete */
+		while (IO_EXTRACT(R_DMA_CH6_CMD, cmd, *info->icmdadr) ==
+		       IO_STATE_VALUE(R_DMA_CH6_CMD, cmd, reset));
 
-	/* Make sure the irqs are cleared */
-	*info->iclrintradr =
-		IO_STATE(R_DMA_CH6_CLR_INTR, clr_descr, do) |
-		IO_STATE(R_DMA_CH6_CLR_INTR, clr_eop, do);
-	*info->oclrintradr =
-		IO_STATE(R_DMA_CH6_CLR_INTR, clr_descr, do) |
-		IO_STATE(R_DMA_CH6_CLR_INTR, clr_eop, do);
+		/* Make sure the irqs are cleared */
+		*info->iclrintradr =
+			IO_STATE(R_DMA_CH6_CLR_INTR, clr_descr, do) |
+			IO_STATE(R_DMA_CH6_CLR_INTR, clr_eop, do);
+	} else {
+		e100_disable_rxdma_channel(info);
+	}
+
+	if (info->dma_out_enabled) {
+		info->uses_dma_out = 1;
+		e100_enable_txdma_channel(info);
+		*info->ocmdadr = IO_STATE(R_DMA_CH6_CMD, cmd, reset);
+
+		while (IO_EXTRACT(R_DMA_CH6_CMD, cmd, *info->ocmdadr) ==
+		       IO_STATE_VALUE(R_DMA_CH6_CMD, cmd, reset));
+
+		/* Make sure the irqs are cleared */
+		*info->oclrintradr =
+			IO_STATE(R_DMA_CH6_CLR_INTR, clr_descr, do) |
+			IO_STATE(R_DMA_CH6_CLR_INTR, clr_eop, do);
+	} else {
+		e100_disable_txdma_channel(info);
+	}
 
 	if (info->tty)
 		clear_bit(TTY_IO_ERROR, &info->tty->flags);
@@ -2563,9 +3320,10 @@ startup(struct e100_serial * info)
 	(void)info->port[REG_DATA];
 
 	/* enable the interrupts */
+	if (info->uses_dma_out)
+		e100_enable_txdma_irq(info);
 
-	e100_enable_txdma_irq(info);
-	e100_enable_rxdma_irq(info);
+	e100_enable_rx_irq(info);
 
 	info->tr_running = 0; /* to be sure we don't lock up the transmitter */
 
@@ -2606,20 +3364,28 @@ shutdown(struct e100_serial * info)
 
 #ifndef CONFIG_SVINTO_SIM	
 	/* shut down the transmitter and receiver */
-
+	DFLOW(DEBUG_LOG(info->line, "shutdown %i\n", info->line));
 	e100_disable_rx(info);
 	info->port[REG_TR_CTRL] = (info->tx_ctrl &= ~0x40);
 
-	e100_disable_rxdma_irq(info);
-	e100_disable_txdma_irq(info);
+	/* disable interrupts, reset dma channels */
+	if (info->uses_dma_in) {
+		e100_disable_rxdma_irq(info);
+		*info->icmdadr = IO_STATE(R_DMA_CH6_CMD, cmd, reset);
+		info->uses_dma_in = 0;
+	} else {
+		e100_disable_serial_data_irq(info);
+	}
 
-	info->tr_running = 0;
-
-	/* reset both dma channels */
-
-	*info->icmdadr = IO_STATE(R_DMA_CH6_CMD, cmd, reset);
-	*info->ocmdadr = IO_STATE(R_DMA_CH6_CMD, cmd, reset);
-	info->uses_dma = 0;
+	if (info->uses_dma_out) {
+		e100_disable_txdma_irq(info);
+		info->tr_running = 0;
+		*info->ocmdadr = IO_STATE(R_DMA_CH6_CMD, cmd, reset);
+		info->uses_dma_out = 0;
+	} else {
+		e100_disable_serial_tx_ready_irq(info);
+		info->tr_running = 0;
+	}
 
 #endif /* CONFIG_SVINTO_SIM */
 
@@ -2667,7 +3433,7 @@ change_speed(struct e100_serial *info)
 {
 	unsigned int cflag;
 	unsigned long xoff;
-
+	unsigned long flags;
 	/* first some safety checks */
 	
 	if (!info->tty || !info->tty->termios)
@@ -2676,17 +3442,80 @@ change_speed(struct e100_serial *info)
 		return;
 	
 	cflag = info->tty->termios->c_cflag;
-	
+
 	/* possibly, the tx/rx should be disabled first to do this safely */
 	
 	/* change baud-rate and write it to the hardware */
-	
-	info->baud = cflag_to_baud(cflag);
+	if ((info->flags & ASYNC_SPD_MASK) == ASYNC_SPD_CUST) {
+		/* Special baudrate */
+		u32 mask = 0xFF << (info->line*8); /* Each port has 8 bits */
+		unsigned long alt_source =
+				IO_STATE(R_ALT_SER_BAUDRATE, ser0_rec, normal) |
+				IO_STATE(R_ALT_SER_BAUDRATE, ser0_tr, normal);
+		/* R_ALT_SER_BAUDRATE selects the source */
+		DBAUD(printk("Custom baudrate: baud_base/divisor %lu/%i\n",
+		       (unsigned long)info->baud_base, info->custom_divisor));
+		if (info->baud_base == SERIAL_PRESCALE_BASE) {
+			/* 0, 2-65535 (0=65536) */
+			u16 divisor = info->custom_divisor;
+			/* R_SERIAL_PRESCALE (upper 16 bits of R_CLOCK_PRESCALE) */
+			/* baudrate is 3.125MHz/custom_divisor */
+			alt_source =
+				IO_STATE(R_ALT_SER_BAUDRATE, ser0_rec, prescale) |
+				IO_STATE(R_ALT_SER_BAUDRATE, ser0_tr, prescale);
+			alt_source = 0x11;
+			DBAUD(printk("Writing SERIAL_PRESCALE: divisor %i\n", divisor));
+			*R_SERIAL_PRESCALE = divisor;
+			info->baud = SERIAL_PRESCALE_BASE/divisor;
+		}
+#ifdef CONFIG_ETRAX_EXTERN_PB6CLK_ENABLED
+		else if ((info->baud_base==CONFIG_ETRAX_EXTERN_PB6CLK_FREQ/8 &&
+			  info->custom_divisor == 1) ||
+			 (info->baud_base==CONFIG_ETRAX_EXTERN_PB6CLK_FREQ &&
+			  info->custom_divisor == 8)) {
+				/* ext_clk selected */
+				alt_source =
+					IO_STATE(R_ALT_SER_BAUDRATE, ser0_rec, extern) |
+					IO_STATE(R_ALT_SER_BAUDRATE, ser0_tr, extern);
+				DBAUD(printk("using external baudrate: %lu\n", CONFIG_ETRAX_EXTERN_PB6CLK_FREQ/8));
+				info->baud = CONFIG_ETRAX_EXTERN_PB6CLK_FREQ/8;
+			}
+		}
+#endif
+		else
+		{
+			/* Bad baudbase, we don't support using timer0
+			 * for baudrate.
+			 */
+			printk(KERN_WARNING "Bad baud_base/custom_divisor: %lu/%i\n",
+			       (unsigned long)info->baud_base, info->custom_divisor);
+		}
+		r_alt_ser_baudrate_shadow &= ~mask;
+		r_alt_ser_baudrate_shadow |= (alt_source << (info->line*8));
+		*R_ALT_SER_BAUDRATE = r_alt_ser_baudrate_shadow;
+	} else {
+		/* Normal baudrate */
+		/* Make sure we use normal baudrate */
+		u32 mask = 0xFF << (info->line*8); /* Each port has 8 bits */
+		unsigned long alt_source =
+			IO_STATE(R_ALT_SER_BAUDRATE, ser0_rec, normal) |
+			IO_STATE(R_ALT_SER_BAUDRATE, ser0_tr, normal);
+		r_alt_ser_baudrate_shadow &= ~mask;
+		r_alt_ser_baudrate_shadow |= (alt_source << (info->line*8));
+#ifndef CONFIG_SVINTO_SIM
+		*R_ALT_SER_BAUDRATE = r_alt_ser_baudrate_shadow;
+#endif /* CONFIG_SVINTO_SIM */
+
+		info->baud = cflag_to_baud(cflag);
+#ifndef CONFIG_SVINTO_SIM
+		info->port[REG_BAUD] = cflag_to_etrax_baud(cflag);
+#endif /* CONFIG_SVINTO_SIM */
+	}
 	
 #ifndef CONFIG_SVINTO_SIM
-	info->port[REG_BAUD] = cflag_to_etrax_baud(cflag);
 	/* start with default settings and then fill in changes */
-
+	save_flags(flags);
+	cli();
 	/* 8 bit, no/even parity */
 	info->rx_ctrl &= ~(IO_MASK(R_SERIAL0_REC_CTRL, rec_bitnr) |
 			   IO_MASK(R_SERIAL0_REC_CTRL, rec_par_en) |
@@ -2717,24 +3546,19 @@ change_speed(struct e100_serial *info)
 	}
 	
 	if (cflag & CMSPAR) {
-		/* enable stick parity */
+		/* enable stick parity, PARODD mean Mark which matches ETRAX */
 		info->tx_ctrl |= IO_STATE(R_SERIAL0_TR_CTRL, tr_stick_par, stick);
 		info->rx_ctrl |= IO_STATE(R_SERIAL0_REC_CTRL, rec_stick_par, stick);
-		if (!(cflag & PARODD)) {
-			/* set mark parity */
-			info->tx_ctrl |= IO_STATE(R_SERIAL0_TR_CTRL, tr_par, odd);
-			info->rx_ctrl |= IO_STATE(R_SERIAL0_REC_CTRL, rec_par, odd);
-		}
-	} else {
-		if (cflag & PARODD) {
-			/* set odd parity */
-			info->tx_ctrl |= IO_STATE(R_SERIAL0_TR_CTRL, tr_par, odd);
-			info->rx_ctrl |= IO_STATE(R_SERIAL0_REC_CTRL, rec_par, odd);
-		}
+	}
+	if (cflag & PARODD) {
+		/* set odd parity (or Mark if CMSPAR) */
+		info->tx_ctrl |= IO_STATE(R_SERIAL0_TR_CTRL, tr_par, odd);
+		info->rx_ctrl |= IO_STATE(R_SERIAL0_REC_CTRL, rec_par, odd);
 	}
 	
 	if (cflag & CRTSCTS) {
 		/* enable automatic CTS handling */
+		DFLOW(DEBUG_LOG(info->line, "FLOW auto_cts enabled\n", 0));
 		info->tx_ctrl |= IO_STATE(R_SERIAL0_TR_CTRL, auto_cts, active);
 	}
 	
@@ -2750,13 +3574,16 @@ change_speed(struct e100_serial *info)
 	xoff = IO_FIELD(R_SERIAL0_XOFF, xoff_char, STOP_CHAR(info->tty));
 	xoff |= IO_STATE(R_SERIAL0_XOFF, tx_stop, enable);
 	if (info->tty->termios->c_iflag & IXON ) {
+		DFLOW(DEBUG_LOG(info->line, "FLOW XOFF enabled 0x%02X\n", STOP_CHAR(info->tty)));
 		xoff |= IO_STATE(R_SERIAL0_XOFF, auto_xoff, enable);
 	}
 	
 	*((unsigned long *)&info->port[REG_XOFF]) = xoff;
+	restore_flags(flags);
 #endif /* !CONFIG_SVINTO_SIM */
 
 	update_char_time(info);
+
 } /* change_speed */
 
 /* start transmitting chars NOW */
@@ -2786,8 +3613,8 @@ rs_flush_chars(struct tty_struct *tty)
 	restore_flags(flags);
 }
 
-extern inline int 
-raw_write(struct tty_struct * tty, int from_user,
+extern _INLINE_ int
+rs_raw_write(struct tty_struct * tty, int from_user,
 	  const unsigned char *buf, int count)
 {
 	int	c, ret = 0;
@@ -2801,7 +3628,7 @@ raw_write(struct tty_struct * tty, int from_user,
 	
 #ifdef SERIAL_DEBUG_DATA
 	if (info->line == SERIAL_DEBUG_LINE)
-		printk("raw_write (%d), status %d\n", 
+		printk("rs_raw_write (%d), status %d\n",
 		       count, info->port[REG_STATUS]);
 #endif
 
@@ -2811,6 +3638,9 @@ raw_write(struct tty_struct * tty, int from_user,
 	return count;
 #endif
 	save_flags(flags);
+	DFLOW(DEBUG_LOG(info->line, "write count %i ", count));
+	DFLOW(DEBUG_LOG(info->line, "ldisc %i\n", tty->ldisc.chars_in_buffer(tty)));
+
 	
 	/* the cli/restore_flags pairs below are needed because the
 	 * DMA interrupt handler moves the info->xmit values. the memcpy
@@ -2878,6 +3708,7 @@ raw_write(struct tty_struct * tty, int from_user,
 	 * this does not need IRQ protection since if tr_running == 0
 	 * the IRQ's are not running anyway for this port.
 	 */
+	DFLOW(DEBUG_LOG(info->line, "write ret %i\n", ret));
 	
 	if (info->xmit.head != info->xmit.tail &&
 	    !tty->stopped &&
@@ -2887,7 +3718,7 @@ raw_write(struct tty_struct * tty, int from_user,
 	}
  	
 	return ret;
-} /* raw_write() */
+} /* raw_raw_write() */
 
 static int 
 rs_write(struct tty_struct * tty, int from_user,
@@ -2909,7 +3740,7 @@ rs_write(struct tty_struct * tty, int from_user,
 		e100_rts(info, info->rs485.rts_on_send);
 #if defined(CONFIG_ETRAX_RS485_DISABLE_RECEIVER)
 		e100_disable_rx(info);
-		e100_disable_rxdma_irq(info);
+		e100_enable_rx_irq(info);
 #endif
 
 		if (info->rs485.delay_rts_before_send > 0) {
@@ -2919,7 +3750,7 @@ rs_write(struct tty_struct * tty, int from_user,
 	}
 #endif /* CONFIG_ETRAX_RS485 */
 
-	count = raw_write(tty, from_user, buf, count);
+	count = rs_raw_write(tty, from_user, buf, count);
 
 #if defined(CONFIG_ETRAX_RS485)
 	if (info->rs485.enabled)
@@ -3003,23 +3834,33 @@ rs_flush_buffer(struct tty_struct *tty)
  * This function is used to send a high-priority XON/XOFF character to
  * the device
  *
- * Since we use DMA we don't check for info->x_char in transmit_chars,
- * just disable DMA channel and write the character when possible.
+ * Since we use DMA we don't check for info->x_char in transmit_chars_dma(),
+ * but we do it in handle_ser_tx_interrupt().
+ * We disable DMA channel and enable tx ready interrupt and write the
+ * character when possible.
  */
 static void rs_send_xchar(struct tty_struct *tty, char ch)
 {
 	struct e100_serial *info = (struct e100_serial *)tty->driver_data;
+	unsigned long flags;
+	save_flags(flags); cli();
+	if (info->uses_dma_out) {
+		/* Put the DMA on hold and disable the channel */
+		*info->ocmdadr = IO_STATE(R_DMA_CH6_CMD, cmd, hold);
+		while (IO_EXTRACT(R_DMA_CH6_CMD, cmd, *info->ocmdadr) !=
+		       IO_STATE_VALUE(R_DMA_CH6_CMD, cmd, hold));
+		e100_disable_txdma_channel(info);
+	}
 
-	e100_disable_txdma_channel(info);
+	/* Must make sure transmitter is not stopped before we can transmit */
+	if (tty->stopped)
+		rs_start(tty);
 
-	/* Wait for tr_ready */
-	while (!(info->port[REG_STATUS] & IO_MASK(R_SERIAL0_STATUS, tr_ready)))
-		/* wait */;
-
-	/* Write the XON/XOFF char */
-	info->port[REG_TR_DATA] = ch;
-
-	e100_enable_txdma_channel(info);
+	/* Enable manual transmit interrupt and send from there */
+	DFLOW(DEBUG_LOG(info->line, "rs_send_xchar 0x%02X\n", ch));
+	info->x_char = ch;
+	e100_enable_serial_tx_ready_irq(info);
+	restore_flags(flags);
 }
 
 /*
@@ -3034,21 +3875,18 @@ static void
 rs_throttle(struct tty_struct * tty)
 {
 	struct e100_serial *info = (struct e100_serial *)tty->driver_data;
-	unsigned long flags;
 #ifdef SERIAL_DEBUG_THROTTLE
 	char	buf[64];
 
-	printk("throttle %s: %d....\n", _tty_name(tty, buf),
-	       tty->ldisc.chars_in_buffer(tty));
+	printk("throttle %s: %lu....\n", tty_name(tty, buf),
+	       (unsigned long)tty->ldisc.chars_in_buffer(tty));
 #endif
+	DFLOW(DEBUG_LOG(info->line,"rs_throttle %lu\n", tty->ldisc.chars_in_buffer(tty)));
 
 	/* Do RTS before XOFF since XOFF might take some time */
 	if (tty->termios->c_cflag & CRTSCTS) {
-		/* Turn off RTS line (do this atomic) */
-		save_flags(flags); 
-		cli();
+		/* Turn off RTS line */
 		e100_rts(info, 0);
-		restore_flags(flags);
 	}
 	if (I_IXOFF(tty))
 		rs_send_xchar(tty, STOP_CHAR(tty));
@@ -3059,21 +3897,18 @@ static void
 rs_unthrottle(struct tty_struct * tty)
 {
 	struct e100_serial *info = (struct e100_serial *)tty->driver_data;
-	unsigned long flags;
 #ifdef SERIAL_DEBUG_THROTTLE
 	char	buf[64];
 
-	printk("unthrottle %s: %d....\n", _tty_name(tty, buf),
-	       tty->ldisc.chars_in_buffer(tty));
+	printk("unthrottle %s: %lu....\n", tty_name(tty, buf),
+	       (unsigned long)tty->ldisc.chars_in_buffer(tty));
 #endif
-
+	DFLOW(DEBUG_LOG(info->line,"rs_unthrottle ldisc %d\n", tty->ldisc.chars_in_buffer(tty)));
+	DFLOW(DEBUG_LOG(info->line,"rs_unthrottle flip.count: %i\n", tty->flip.count));
 	/* Do RTS before XOFF since XOFF might take some time */
 	if (tty->termios->c_cflag & CRTSCTS) {
-		/* Assert RTS line (do this atomic) */
-		save_flags(flags); 
-		cli();
+		/* Assert RTS line  */
 		e100_rts(info, 1);
-		restore_flags(flags);
 	}
 
 	if (I_IXOFF(tty)) {
@@ -3110,8 +3945,10 @@ get_serial_info(struct e100_serial * info,
 	tmp.port = (int)info->port;
 	tmp.irq = info->irq;
 	tmp.flags = info->flags;
+	tmp.baud_base = info->baud_base;
 	tmp.close_delay = info->close_delay;
 	tmp.closing_wait = info->closing_wait;
+	tmp.custom_divisor = info->custom_divisor;
 	if (copy_to_user(retinfo, &tmp, sizeof(*retinfo)))
 		return -EFAULT;
 	return 0;
@@ -3149,8 +3986,10 @@ set_serial_info(struct e100_serial *info,
 	 * At this point, we start making changes.....
 	 */
 	
+	info->baud_base = new_serial.baud_base;
 	info->flags = ((info->flags & ~ASYNC_FLAGS) |
 		       (new_serial.flags & ASYNC_FLAGS));
+	info->custom_divisor = new_serial.custom_divisor;
 	info->type = new_serial.type;
 	info->close_delay = new_serial.close_delay;
 	info->closing_wait = new_serial.closing_wait;
@@ -3418,12 +4257,49 @@ rs_set_termios(struct tty_struct *tty, struct termios *old_termios)
 
 	change_speed(info);
 
+	/* Handle turning off CRTSCTS */
 	if ((old_termios->c_cflag & CRTSCTS) &&
 	    !(tty->termios->c_cflag & CRTSCTS)) {
 		tty->hw_stopped = 0;
 		rs_start(tty);
 	}
 	
+}
+
+/* In debugport.c - register a console write function that uses the normal
+ * serial driver
+ */
+typedef int (*debugport_write_function)(int i, const char *buf, unsigned int len);
+
+extern debugport_write_function debug_write_function;
+
+static int rs_debug_write_function(int i, const char *buf, unsigned int len)
+{
+	int cnt;
+        struct tty_struct *tty;
+        static int recurse_cnt = 0;
+
+        tty = rs_table[i].tty;
+        if (tty)  {
+		unsigned long flags;
+		if (recurse_cnt > 5) /* We skip this debug output */
+			return 1;
+
+		local_irq_save(flags);
+		recurse_cnt++;
+                do {
+                        cnt = rs_write(tty, 0, buf, len);
+                        if (cnt >= 0) {
+                                buf += cnt;
+                                len -= cnt;
+                        } else
+                                len = cnt;
+                } while(len > 0);
+		recurse_cnt--;
+		local_irq_restore(flags);
+                return 1;
+        }
+        return 0;
 }
 
 /*
@@ -3483,6 +4359,12 @@ rs_close(struct tty_struct *tty, struct file * filp)
 	}
 	info->flags |= ASYNC_CLOSING;
 	/*
+	 * Save the termios structure, since this port may have
+	 * separate termios for callout and dialin.
+	 */
+	if (info->flags & ASYNC_NORMAL_ACTIVE)
+		info->normal_termios = *tty->termios;
+	/*
 	 * Now we wait for the transmit buffer to clear; and we notify 
 	 * the line discipline to only process XON/XOFF characters.
 	 */
@@ -3499,7 +4381,7 @@ rs_close(struct tty_struct *tty, struct file * filp)
 
 #ifndef CONFIG_SVINTO_SIM
 	e100_disable_rx(info);
-	e100_disable_rxdma_irq(info);
+	e100_disable_rx_irq(info);
 
 	if (info->flags & ASYNC_INITIALIZED) {
 		/*
@@ -3537,6 +4419,16 @@ rs_close(struct tty_struct *tty, struct file * filp)
 		info->rs485.enabled = 0;
 #if defined(CONFIG_ETRAX_RS485_ON_PA)
 		*R_PORT_PA_DATA = port_pa_data_shadow &= ~(1 << rs485_pa_bit);
+#endif
+#if defined(CONFIG_ETRAX_RS485_ON_PORT_G)
+		REG_SHADOW_SET(R_PORT_G_DATA, port_g_data_shadow,
+			       rs485_port_g_bit, 0);
+#endif
+#if defined(CONFIG_ETRAX_RS485_LTC1387)
+		REG_SHADOW_SET(R_PORT_G_DATA, port_g_data_shadow,
+			       CONFIG_ETRAX_RS485_LTC1387_DXEN_PORT_G_BIT, 0);
+		REG_SHADOW_SET(R_PORT_G_DATA, port_g_data_shadow,
+			       CONFIG_ETRAX_RS485_LTC1387_RXEN_PORT_G_BIT, 0);
 #endif
 	}
 #endif
@@ -3637,8 +4529,9 @@ block_til_ready(struct tty_struct *tty, struct file * filp,
 		return 0;
 	}
 	
-	if (tty->termios->c_cflag & CLOCAL)
-		do_clocal = 1;
+	if (tty->termios->c_cflag & CLOCAL) {
+			do_clocal = 1;
+	}
 	
 	/*
 	 * Block waiting for the carrier detect and the line to become
@@ -3664,7 +4557,7 @@ block_til_ready(struct tty_struct *tty, struct file * filp,
 	while (1) {
 		save_flags(flags);
 		cli();
-                /* assert RTS and DTR */
+		/* assert RTS and DTR */
 		e100_rts(info, 1);
 		e100_dtr(info, 1);
 		restore_flags(flags);
@@ -3681,7 +4574,7 @@ block_til_ready(struct tty_struct *tty, struct file * filp,
 #endif
 			break;
 		}
-                if (!(info->flags & ASYNC_CLOSING) && do_clocal)
+		if (!(info->flags & ASYNC_CLOSING) && do_clocal)
 			/* && (do_clocal || DCD_IS_ASSERTED) */
 			break;
 		if (signal_pending(current)) {
@@ -3787,10 +4680,21 @@ rs_open(struct tty_struct *tty, struct file * filp)
 #endif
 		return retval;
 	}
-  
+
+	if ((info->count == 1) && (info->flags & ASYNC_SPLIT_TERMIOS)) {
+		*tty->termios = info->normal_termios;
+		change_speed(info);
+	}
+
 #ifdef SERIAL_DEBUG_OPEN
 	printk("rs_open ttyS%d successful...\n", info->line);
 #endif
+	DLOG_INT_TRIG( log_int_pos = 0);
+
+	DFLIP(	if (info->line == SERIAL_DEBUG_LINE) {
+			info->icount.rx = 0;
+		} );
+
 	return 0;
 }
 
@@ -3798,10 +4702,11 @@ rs_open(struct tty_struct *tty, struct file * filp)
  * /proc fs routines....
  */
 
-extern inline int line_info(char *buf, struct e100_serial *info)
+extern _INLINE_ int line_info(char *buf, struct e100_serial *info)
 {
 	char	stat_buf[30];
 	int	ret;
+	unsigned long tmp;
 
 	ret = sprintf(buf, "%d: uart:E100 port:%lX irq:%d",
 		      info->line, (unsigned long)info->port, info->irq);
@@ -3831,10 +4736,38 @@ extern inline int line_info(char *buf, struct e100_serial *info)
 	ret += sprintf(buf+ret, " tx:%lu rx:%lu",
 		       (unsigned long)info->icount.tx,
 		       (unsigned long)info->icount.rx);
+	tmp = CIRC_CNT(info->xmit.head, info->xmit.tail, SERIAL_XMIT_SIZE);
+	if (tmp) {
+		ret += sprintf(buf+ret, " tx_pend:%lu/%lu",
+			       (unsigned long)tmp,
+			       (unsigned long)SERIAL_XMIT_SIZE);
+	}
 
 	ret += sprintf(buf+ret, " rx_pend:%lu/%lu",
 		       (unsigned long)info->recv_cnt,
 		       (unsigned long)info->max_recv_cnt);
+
+#if 1
+	if (info->tty) {
+
+		if (info->tty->stopped)
+			ret += sprintf(buf+ret, " stopped:%i",
+				       (int)info->tty->stopped);
+		if (info->tty->hw_stopped)
+			ret += sprintf(buf+ret, " hw_stopped:%i",
+				       (int)info->tty->hw_stopped);
+	}
+
+	{
+		unsigned char rstat = info->port[REG_STATUS];
+		if (rstat & IO_MASK(R_SERIAL0_STATUS, xoff_detect) )
+			ret += sprintf(buf+ret, " xoff_detect:1");
+	}
+
+#endif
+
+
+
 
 	if (info->icount.frame)
 		ret += sprintf(buf+ret, " fe:%lu",
@@ -3879,6 +4812,22 @@ int rs_read_proc(char *page, char **start, off_t off, int count,
 			len = 0;
 		}
 	}
+#ifdef DEBUG_LOG_INCLUDED
+	for (i = 0; i < debug_log_pos; i++) {
+		len += sprintf(page + len, "%-4i %lu.%lu ", i, debug_log[i].time, timer_data_to_ns(debug_log[i].timer_data));
+		len += sprintf(page + len, debug_log[i].string, debug_log[i].value);
+		if (len+begin > off+count)
+			goto done;
+		if (len+begin < off) {
+			begin += len;
+			len = 0;
+		}
+	}
+	len += sprintf(page + len, "debug_log %i/%i  %li bytes\n",
+		       i, DEBUG_LOG_SIZE, begin+len);
+	debug_log_pos = 0;
+#endif
+
 	*eof = 1;
 done:
 	if (off >= len+begin)
@@ -3893,7 +4842,7 @@ static void
 show_serial_version(void)
 {
 	printk(KERN_INFO
-	       "ETRAX 100LX serial-driver %s, (c) 2000-2003 Axis Communications AB\r\n",
+	       "ETRAX 100LX serial-driver %s, (c) 2000-2004 Axis Communications AB\r\n",
 	       &serial_version[11]); /* "$Revision: x.yy" */
 }
 
@@ -3952,20 +4901,25 @@ rs_init(void)
 	driver->init_termios.c_cflag =
 		B115200 | CS8 | CREAD | HUPCL | CLOCAL; /* is normally B9600 default... */
 	driver->flags = TTY_DRIVER_REAL_RAW | TTY_DRIVER_NO_DEVFS;
+	driver->termios = serial_termios;
+	driver->termios_locked = serial_termios_locked;
+
 	tty_set_operations(driver, &rs_ops);
+        serial_driver = driver;
 	if (tty_register_driver(driver))
 		panic("Couldn't register serial driver\n");
-        serial_driver = driver;
-  
 	/* do some initializing for the separate ports */
   
 	for (i = 0, info = rs_table; i < NR_PORTS; i++,info++) {
-		info->uses_dma = 0;   
+		info->uses_dma_in = 0;
+		info->uses_dma_out = 0;
 		info->line = i;
 		info->tty = 0;
 		info->type = PORT_ETRAX;
 		info->tr_running = 0;
 		info->forced_eop = 0;
+		info->baud_base = DEF_BAUD_BASE;
+		info->custom_divisor = 0;
 		info->flags = 0;
 		info->close_delay = 5*HZ/10;
 		info->closing_wait = 30*HZ;
@@ -3973,6 +4927,7 @@ rs_init(void)
 		info->event = 0;
 		info->count = 0;
 		info->blocked_open = 0;
+		info->normal_termios = driver->init_termios;
 		init_waitqueue_head(&info->open_wait);
 		init_waitqueue_head(&info->close_wait);
 		info->xmit.buf = NULL;
@@ -4009,39 +4964,62 @@ rs_init(void)
 #ifndef CONFIG_SVINTO_SIM
 	/* Not needed in simulator.  May only complicate stuff. */
 	/* hook the irq's for DMA channel 6 and 7, serial output and input, and some more... */
+
+	if (request_irq(SERIAL_IRQ_NBR, ser_interrupt, SA_SHIRQ | SA_INTERRUPT, "serial ", NULL))
+		panic("irq8");
+
 #ifdef CONFIG_ETRAX_SERIAL_PORT0
+#ifdef CONFIG_ETRAX_SERIAL_PORT0_DMA6_OUT
 	if (request_irq(SER0_DMA_TX_IRQ_NBR, tr_interrupt, SA_INTERRUPT, "serial 0 dma tr", NULL))
 		panic("irq22");
+#endif
+#ifdef CONFIG_ETRAX_SERIAL_PORT0_DMA7_IN
 	if (request_irq(SER0_DMA_RX_IRQ_NBR, rec_interrupt, SA_INTERRUPT, "serial 0 dma rec", NULL))
 		panic("irq23");
 #endif
-#ifdef SERIAL_HANDLE_EARLY_ERRORS
-	if (request_irq(SERIAL_IRQ_NBR, ser_interrupt, SA_SHIRQ | SA_INTERRUPT, "serial ", NULL))
-		panic("irq8");
 #endif
+
 #ifdef CONFIG_ETRAX_SERIAL_PORT1
+#ifdef CONFIG_ETRAX_SERIAL_PORT1_DMA8_OUT
 	if (request_irq(SER1_DMA_TX_IRQ_NBR, tr_interrupt, SA_INTERRUPT, "serial 1 dma tr", NULL))
 		panic("irq24");
+#endif
+#ifdef CONFIG_ETRAX_SERIAL_PORT1_DMA9_IN
 	if (request_irq(SER1_DMA_RX_IRQ_NBR, rec_interrupt, SA_INTERRUPT, "serial 1 dma rec", NULL))
 		panic("irq25");
 #endif
+#endif
 #ifdef CONFIG_ETRAX_SERIAL_PORT2
 	/* DMA Shared with par0 (and SCSI0 and ATA) */
-	if (request_irq(SER2_DMA_TX_IRQ_NBR, tr_interrupt, SA_SHIRQ, "serial 2 dma tr", NULL))
+#ifdef CONFIG_ETRAX_SERIAL_PORT2_DMA2_OUT
+	if (request_irq(SER2_DMA_TX_IRQ_NBR, tr_interrupt, SA_SHIRQ | SA_INTERRUPT, "serial 2 dma tr", NULL))
 		panic("irq18");
-	if (request_irq(SER2_DMA_RX_IRQ_NBR, rec_interrupt, SA_SHIRQ, "serial 2 dma rec", NULL))
+#endif
+#ifdef CONFIG_ETRAX_SERIAL_PORT2_DMA3_IN
+	if (request_irq(SER2_DMA_RX_IRQ_NBR, rec_interrupt, SA_SHIRQ | SA_INTERRUPT, "serial 2 dma rec", NULL))
 		panic("irq19");
+#endif
 #endif
 #ifdef CONFIG_ETRAX_SERIAL_PORT3
 	/* DMA Shared with par1 (and SCSI1 and Extern DMA 0) */
-	if (request_irq(SER3_DMA_TX_IRQ_NBR, tr_interrupt, SA_SHIRQ, "serial 3 dma tr", NULL))
+#ifdef CONFIG_ETRAX_SERIAL_PORT3_DMA4_OUT
+	if (request_irq(SER3_DMA_TX_IRQ_NBR, tr_interrupt, SA_SHIRQ | SA_INTERRUPT, "serial 3 dma tr", NULL))
 		panic("irq20");
-	if (request_irq(SER3_DMA_RX_IRQ_NBR, rec_interrupt, SA_SHIRQ, "serial 3 dma rec", NULL))
+#endif
+#ifdef CONFIG_ETRAX_SERIAL_PORT3_DMA5_IN
+	if (request_irq(SER3_DMA_RX_IRQ_NBR, rec_interrupt, SA_SHIRQ | SA_INTERRUPT, "serial 3 dma rec", NULL))
 		panic("irq21");
 #endif
+#endif
 
+#ifdef CONFIG_ETRAX_SERIAL_FLUSH_DMA_FAST
+	if (request_irq(TIMER1_IRQ_NBR, timeout_interrupt, SA_SHIRQ | SA_INTERRUPT,
+		       "fast serial dma timeout", NULL)) {
+		printk(KERN_CRIT "err: timer1 irq\n");
+	}
+#endif
 #endif /* CONFIG_SVINTO_SIM */
-
+	debug_write_function = rs_debug_write_function;
 	return 0;
 }
 
