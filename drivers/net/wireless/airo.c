@@ -2466,11 +2466,8 @@ static irqreturn_t airo_interrupt ( int irq, void* dev_id, struct pt_regs *regs)
 			OUT4500( apriv, EVACK, EV_MIC );
 #ifdef MICSUPPORT
 			if (test_bit(FLAG_MIC_CAPABLE, &apriv->flags)) {
-				if (down_trylock(&apriv->sem) != 0) {
-					set_bit(JOB_MIC, &apriv->flags);
-					wake_up_interruptible(&apriv->thr_wait);
-				} else
-					micinit (apriv);
+				set_bit(JOB_MIC, &apriv->flags);
+				wake_up_interruptible(&apriv->thr_wait);
 			}
 #endif
 		}
