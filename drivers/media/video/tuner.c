@@ -30,24 +30,24 @@ I2C_CLIENT_INSMOD;
 /* insmod options used at init time => read/only */
 static unsigned int type  =  UNSET;
 static unsigned int addr  =  0;
-module_param(type, int, 444);
-module_param(addr, int, 444);
+module_param(type, int, 0444);
+module_param(addr, int, 0444);
 
 /* insmod options used at runtime => read/write */
 static unsigned int debug         = 0;
 static unsigned int tv_antenna    = 1;
 static unsigned int radio_antenna = 0;
 static unsigned int optimize_vco  = 1;
-module_param(debug,             int, 644);
-module_param(tv_antenna,        int, 644);
-module_param(radio_antenna,     int, 644);
-module_param(optimize_vco,      int, 644);
+module_param(debug,             int, 0644);
+module_param(tv_antenna,        int, 0644);
+module_param(radio_antenna,     int, 0644);
+module_param(optimize_vco,      int, 0644);
 
 static unsigned int tv_range[2]    = { 44, 958 };
 static unsigned int radio_range[2] = { 65, 108 };
 
-module_param_array(tv_range,    int, NULL, 644);
-module_param_array(radio_range, int, NULL, 644);
+module_param_array(tv_range,    int, NULL, 0644);
+module_param_array(radio_range, int, NULL, 0644);
 
 MODULE_DESCRIPTION("device driver for various TV and TV+FM radio tuners");
 MODULE_AUTHOR("Ralph Metzler, Gerd Knorr, Gunther Mayer");
