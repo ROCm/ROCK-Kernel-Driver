@@ -21,10 +21,10 @@
 #ifdef __KERNEL__
 
 #include <linux/interrupt.h>
+#include <asm/fixmap.h>
+#include <asm/vaddrs.h>
 #include <asm/kmap_types.h>
-
-/* undef for production */
-#define HIGHMEM_DEBUG 1
+#include <asm/pgtsrmmu.h>
 
 /* declarations for highmem.c */
 extern unsigned long highstart_pfn, highend_pfn;
@@ -33,12 +33,6 @@ extern pte_t *kmap_pte;
 extern pgprot_t kmap_prot;
 extern pte_t *pkmap_page_table;
 
-/* This gets set in {srmmu,sun4c}_paging_init() */
-extern unsigned long fix_kmap_begin;
-
-/* Only used and set with srmmu? */
-extern unsigned long pkmap_base;
-
 extern void kmap_init(void) __init;
 
 /*
@@ -46,19 +40,21 @@ extern void kmap_init(void) __init;
  * easily, subsequent pte tables have to be allocated in one physical
  * chunk of RAM.
  */
+#define PKMAP_BASE (SRMMU_NOCACHE_VADDR + (SRMMU_MAX_NOCACHE_PAGES << PAGE_SHIFT))
 #define LAST_PKMAP 1024
 
 #define LAST_PKMAP_MASK (LAST_PKMAP - 1)
-#define PKMAP_NR(virt)  ((virt - pkmap_base) >> PAGE_SHIFT)
-#define PKMAP_ADDR(nr)  (pkmap_base + ((nr) << PAGE_SHIFT))
+#define PKMAP_NR(virt)  ((virt - PKMAP_BASE) >> PAGE_SHIFT)
+#define PKMAP_ADDR(nr)  (PKMAP_BASE + ((nr) << PAGE_SHIFT))
+
+#define PKMAP_END (PKMAP_ADDR(LAST_PKMAP))
 
 extern void *kmap_high(struct page *page);
 extern void kunmap_high(struct page *page);
 
 static inline void *kmap(struct page *page)
 {
-	if (in_interrupt())
-		BUG();
+	BUG_ON(in_interrupt());
 	if (page < highmem_start_page)
 		return page_address(page);
 	return kmap_high(page);
@@ -66,8 +62,7 @@ static inline void *kmap(struct page *page)
 
 static inline void kunmap(struct page *page)
 {
-	if (in_interrupt())
-		BUG();
+	BUG_ON(in_interrupt());
 	if (page < highmem_start_page)
 		return;
 	kunmap_high(page);
@@ -75,19 +70,7 @@ static inline void kunmap(struct page *page)
 
 extern void *kmap_atomic(struct page *page, enum km_type type);
 extern void kunmap_atomic(void *kvaddr, enum km_type type);
-
-static inline struct page *kmap_atomic_to_page(void *ptr)
-{
-	unsigned long idx, vaddr = (unsigned long)ptr;
-	pte_t *pte;
-
-	if (vaddr < fix_kmap_begin)
-		return virt_to_page(ptr);
-
-	idx = ((vaddr - fix_kmap_begin) >> PAGE_SHIFT);
-	pte = kmap_pte + idx;
-	return pte_page(*pte);
-}
+extern struct page *kmap_atomic_to_page(void *vaddr);
 
 #define flush_cache_kmaps()	flush_cache_all()
 

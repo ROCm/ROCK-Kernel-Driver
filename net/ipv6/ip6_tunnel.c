@@ -821,6 +821,8 @@ static void ip6ip6_tnl_link_config(struct ip6_tnl *t)
 	else
 		dev->flags &= ~IFF_POINTOPOINT;
 
+	dev->iflink = p->link;
+
 	if (p->flags & IP6_TNL_F_CAP_XMIT) {
 		struct rt6_info *rt = rt6_lookup(&p->raddr, &p->laddr,
 						 p->link, 0);
@@ -829,8 +831,6 @@ static void ip6ip6_tnl_link_config(struct ip6_tnl *t)
 			return;
 
 		if (rt->rt6i_dev) {
-			dev->iflink = rt->rt6i_dev->ifindex;
-
 			dev->hard_header_len = rt->rt6i_dev->hard_header_len +
 				sizeof (struct ipv6hdr);
 
@@ -1040,7 +1040,6 @@ static void ip6ip6_tnl_dev_setup(struct net_device *dev)
 	dev->hard_header_len = LL_MAX_HEADER + sizeof (struct ipv6hdr);
 	dev->mtu = ETH_DATA_LEN - sizeof (struct ipv6hdr);
 	dev->flags |= IFF_NOARP;
-	dev->iflink = 0;
 	dev->addr_len = sizeof(struct in6_addr);
 }
 

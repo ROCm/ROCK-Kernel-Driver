@@ -74,7 +74,7 @@
 #define HTB_HYSTERESIS 1/* whether to use mode hysteresis for speedup */
 #define HTB_QLOCK(S) spin_lock_bh(&(S)->dev->queue_lock)
 #define HTB_QUNLOCK(S) spin_unlock_bh(&(S)->dev->queue_lock)
-#define HTB_VER 0x3000e	/* major must be matched with number suplied by TC as version */
+#define HTB_VER 0x3000f	/* major must be matched with number suplied by TC as version */
 
 #if HTB_VER >> 16 != TC_HTB_PROTOVER
 #error "Mismatched sch_htb.c and pkt_sch.h"
@@ -308,7 +308,7 @@ static struct htb_class *htb_classify(struct sk_buff *skb, struct Qdisc *sch)
 	   rules in it */
 	if (skb->priority == sch->handle)
 		return HTB_DIRECT;  /* X:0 (direct flow) selected */
-	if ((cl = htb_find(skb->priority,sch)) != NULL) 
+	if ((cl = htb_find(skb->priority,sch)) != NULL && cl->level == 0) 
 		return cl;
 
 	tcf = q->filter_list;

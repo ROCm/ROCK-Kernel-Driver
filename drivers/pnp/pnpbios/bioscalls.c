@@ -493,7 +493,7 @@ static int __pnp_bios_read_escd(char *data, u32 nvram_base)
 	if (!pnp_bios_present())
 		return ESCD_FUNCTION_NOT_SUPPORTED;
 	status = call_pnp_bios(PNP_READ_ESCD, 0, PNP_TS1, PNP_TS2, PNP_DS, 0, 0, 0,
-			       data, 65536, (void *)nvram_base, 65536);
+			       data, 65536, __va(nvram_base), 65536);
 	return status;
 }
 
@@ -516,7 +516,7 @@ static int pnp_bios_write_escd(char *data, u32 nvram_base)
 	if (!pnp_bios_present())
 		return ESCD_FUNCTION_NOT_SUPPORTED;
 	status = call_pnp_bios(PNP_WRITE_ESCD, 0, PNP_TS1, PNP_TS2, PNP_DS, 0, 0, 0,
-			       data, 65536, nvram_base, 65536);
+			       data, 65536, __va(nvram_base), 65536);
 	return status;
 }
 #endif

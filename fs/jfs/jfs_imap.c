@@ -481,7 +481,6 @@ struct inode *diReadSpecial(struct super_block *sb, ino_t inum, int secondary)
 	/* read the page of fixed disk inode (AIT) in raw mode */
 	mp = read_metapage(ip, address << sbi->l2nbperpage, PSIZE, 1);
 	if (mp == NULL) {
-		ip->i_sb = NULL;
 		ip->i_nlink = 1;	/* Don't want iput() deleting it */
 		iput(ip);
 		return (NULL);
@@ -494,7 +493,6 @@ struct inode *diReadSpecial(struct super_block *sb, ino_t inum, int secondary)
 	/* copy on-disk inode to in-memory inode */
 	if ((copy_from_dinode(dp, ip)) != 0) {
 		/* handle bad return by returning NULL for ip */
-		ip->i_sb = NULL;
 		ip->i_nlink = 1;	/* Don't want iput() deleting it */
 		iput(ip);
 		/* release the page */

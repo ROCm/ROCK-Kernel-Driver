@@ -181,15 +181,15 @@ void __exit ircomm_tty_cleanup(void)
 static int ircomm_tty_startup(struct ircomm_tty_cb *self)
 {
 	notify_t notify;
-	int ret;
+	int ret = -ENODEV;
 
 	IRDA_DEBUG(2, "%s()\n", __FUNCTION__ );
 
 	ASSERT(self != NULL, return -1;);
 	ASSERT(self->magic == IRCOMM_TTY_MAGIC, return -1;);
 
-	/* Already open */
-	if (self->flags & ASYNC_INITIALIZED) {
+	/* Check if already open */
+	if (test_and_set_bit(ASYNC_B_INITIALIZED, &self->flags)) {
 		IRDA_DEBUG(2, "%s(), already open so break out!\n", __FUNCTION__ );
 		return 0;
 	}
@@ -213,7 +213,7 @@ static int ircomm_tty_startup(struct ircomm_tty_cb *self)
 					   self->line);
 	}
 	if (!self->ircomm)
-		return -ENODEV;
+		goto err;
 
 	self->slsap_sel = self->ircomm->slsap_sel;
 
@@ -221,12 +221,13 @@ static int ircomm_tty_startup(struct ircomm_tty_cb *self)
 	ret = ircomm_tty_attach_cable(self);
 	if (ret < 0) {
 		ERROR("%s(), error attaching cable!\n", __FUNCTION__);
-		return ret;
+		goto err;
 	}
 
-	self->flags |= ASYNC_INITIALIZED;
-
 	return 0;
+err:
+	clear_bit(ASYNC_B_INITIALIZED, &self->flags);
+	return ret;
 }
 
 /*
@@ -299,7 +300,8 @@ static int ircomm_tty_block_til_ready(struct ircomm_tty_cb *self,
 		
 		current->state = TASK_INTERRUPTIBLE;
 		
-		if (tty_hung_up_p(filp) || !(self->flags & ASYNC_INITIALIZED)){
+		if (tty_hung_up_p(filp) ||
+		    !test_bit(ASYNC_B_INITIALIZED, &self->flags)) {
 			retval = (self->flags & ASYNC_HUP_NOTIFY) ?
 					-EAGAIN : -ERESTARTSYS;
 			break;
@@ -310,7 +312,7 @@ static int ircomm_tty_block_til_ready(struct ircomm_tty_cb *self,
 		 * specified, we cannot return before the IrCOMM link is
 		 * ready 
 		 */
- 		if (!(self->flags & ASYNC_CLOSING) &&
+ 		if (!test_bit(ASYNC_B_CLOSING, &self->flags) &&
  		    (do_clocal || (self->settings.dce & IRCOMM_CD)) &&
 		    self->state == IRCOMM_TTY_READY)
 		{
@@ -425,7 +427,7 @@ static int ircomm_tty_open(struct tty_struct *tty, struct file *filp)
 	 * If the port is the middle of closing, bail out now
 	 */
 	if (tty_hung_up_p(filp) ||
-	    (self->flags & ASYNC_CLOSING)) {
+	    test_bit(ASYNC_B_CLOSING, &self->flags)) {
 
 		/* Hm, why are we blocking on ASYNC_CLOSING if we
 		 * do return -EAGAIN/-ERESTARTSYS below anyway?
@@ -435,7 +437,7 @@ static int ircomm_tty_open(struct tty_struct *tty, struct file *filp)
 		 * probably better sleep uninterruptible?
 		 */
 
-		if (wait_event_interruptible(self->close_wait, !(self->flags&ASYNC_CLOSING))) {
+		if (wait_event_interruptible(self->close_wait, !test_bit(ASYNC_B_CLOSING, &self->flags))) {
 			WARNING("%s - got signal while blocking on ASYNC_CLOSING!\n",
 				__FUNCTION__);
 			return -ERESTARTSYS;
@@ -530,11 +532,13 @@ static void ircomm_tty_close(struct tty_struct *tty, struct file *filp)
 		IRDA_DEBUG(0, "%s(), open count > 0\n", __FUNCTION__ );
 		return;
 	}
-	self->flags |= ASYNC_CLOSING;
+
+	/* Hum... Should be test_and_set_bit ??? - Jean II */
+	set_bit(ASYNC_B_CLOSING, &self->flags);
 
 	/* We need to unlock here (we were unlocking at the end of this
 	 * function), because tty_wait_until_sent() may schedule.
-	 * I don't know if the rest should be locked somehow,
+	 * I don't know if the rest should be protected somehow,
 	 * so someone should check. - Jean II */
 	spin_unlock_irqrestore(&self->spinlock, flags);
 
@@ -978,9 +982,11 @@ static void ircomm_tty_shutdown(struct ircomm_tty_cb *self)
 	ASSERT(self->magic == IRCOMM_TTY_MAGIC, return;);
 
 	IRDA_DEBUG(0, "%s()\n", __FUNCTION__ );
-	
-	if (!(self->flags & ASYNC_INITIALIZED))
+
+	if (!test_and_clear_bit(ASYNC_B_INITIALIZED, &self->flags))
 		return;
+
+	ircomm_tty_detach_cable(self);
 
 	spin_lock_irqsave(&self->spinlock, flags);
 
@@ -998,13 +1004,10 @@ static void ircomm_tty_shutdown(struct ircomm_tty_cb *self)
 		self->tx_skb = NULL;
 	}
 
-	ircomm_tty_detach_cable(self);
-
 	if (self->ircomm) {
 		ircomm_close(self->ircomm);
 		self->ircomm = NULL;
 	}
-	self->flags &= ~ASYNC_INITIALIZED;
 
 	spin_unlock_irqrestore(&self->spinlock, flags);
 }

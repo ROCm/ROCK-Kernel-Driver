@@ -1056,7 +1056,7 @@ config PCI_DIRECT
 
 config PCI_USE_VECTOR
 	bool "Vector-based interrupt indexing"
-	depends on X86_LOCAL_APIC
+	depends on X86_LOCAL_APIC && X86_IO_APIC
 	default n
 	help
 	   This replaces the current existing IRQ-based index interrupt scheme

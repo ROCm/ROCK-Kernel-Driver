@@ -575,6 +575,9 @@ int main(int ac, char **av)
 		conf_cnt = 0;
 		check_conf(&rootmenu);
 	} while (conf_cnt);
-	conf_write(NULL);
+	if (conf_write(NULL)) {
+		fprintf(stderr, "\n*** Error during writing of the kernel configuration.\n\n");
+		return 1;
+	}
 	return 0;
 }

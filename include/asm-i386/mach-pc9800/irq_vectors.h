@@ -85,6 +85,7 @@
 #define NR_IRQS 16
 #endif
 
+#define NR_VECTORS 256
 #define NR_IRQ_VECTORS NR_IRQS
 
 #define FPU_IRQ			8
