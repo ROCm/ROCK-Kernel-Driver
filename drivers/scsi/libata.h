@@ -31,8 +31,8 @@
 struct ata_scsi_args {
 	struct ata_port		*ap;
 	struct ata_device	*dev;
-	Scsi_Cmnd		*cmd;
-	void			(*done)(Scsi_Cmnd *);
+	struct scsi_cmnd		*cmd;
+	void			(*done)(struct scsi_cmnd *);
 };
 
 
@@ -51,7 +51,7 @@ extern void ata_thread_wake(struct ata_port *ap, unsigned int thr_state);
 /* libata-scsi.c */
 extern void ata_to_sense_error(struct ata_queued_cmd *qc);
 extern void ata_scsi_rw_queue(struct ata_port *ap, struct ata_device *dev,
-		      Scsi_Cmnd *cmd, void (*done)(Scsi_Cmnd *),
+		      struct scsi_cmnd *cmd, void (*done)(struct scsi_cmnd *),
 		      unsigned int cmd_size);
 extern int ata_scsi_error(struct Scsi_Host *host);
 extern unsigned int ata_scsiop_inq_std(struct ata_scsi_args *args, u8 *rbuf,
@@ -74,19 +74,19 @@ extern unsigned int ata_scsiop_read_cap(struct ata_scsi_args *args, u8 *rbuf,
 			        unsigned int buflen);
 extern unsigned int ata_scsiop_report_luns(struct ata_scsi_args *args, u8 *rbuf,
 				   unsigned int buflen);
-extern void ata_scsi_badcmd(Scsi_Cmnd *cmd,
-			    void (*done)(Scsi_Cmnd *),
+extern void ata_scsi_badcmd(struct scsi_cmnd *cmd,
+			    void (*done)(struct scsi_cmnd *),
 			    u8 asc, u8 ascq);
 extern void ata_scsi_rbuf_fill(struct ata_scsi_args *args, 
                         unsigned int (*actor) (struct ata_scsi_args *args,
                                            u8 *rbuf, unsigned int buflen));
 
-static inline void ata_bad_scsiop(Scsi_Cmnd *cmd, void (*done)(Scsi_Cmnd *))
+static inline void ata_bad_scsiop(struct scsi_cmnd *cmd, void (*done)(struct scsi_cmnd *))
 {
 	ata_scsi_badcmd(cmd, done, 0x20, 0x00);
 }
 
-static inline void ata_bad_cdb(Scsi_Cmnd *cmd, void (*done)(Scsi_Cmnd *))
+static inline void ata_bad_cdb(struct scsi_cmnd *cmd, void (*done)(struct scsi_cmnd *))
 {
 	ata_scsi_badcmd(cmd, done, 0x24, 0x00);
 }
