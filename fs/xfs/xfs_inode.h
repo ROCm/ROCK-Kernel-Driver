@@ -362,6 +362,7 @@ void xfs_ifork_next_set(xfs_inode_t *ip, int w, int n);
 #define XFS_IUIOSZ	0x0002  /* inode i/o sizes have been explicitly set */
 #define XFS_IQUIESCE    0x0004  /* we have started quiescing for this inode */
 #define XFS_IRECLAIM    0x0008  /* we have started reclaiming this inode    */
+#define XFS_IRECLAIMABLE 0x0010 /* inode can be reclaimed */
 
 /*
  * Flags for inode locking.

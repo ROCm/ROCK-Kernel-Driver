@@ -214,7 +214,13 @@ again:
 
 				XFS_STATS_INC(xfsstats.xs_ig_found);
 
+				ip->i_flags &= ~XFS_IRECLAIMABLE;
 				read_unlock(&ih->ih_lock);
+
+				XFS_MOUNT_ILOCK(mp);
+				list_del_init(&ip->i_reclaim);
+				XFS_MOUNT_IUNLOCK(mp);
+
 				goto finish_inode;
 
 			} else if (vp != inode_vp) {
@@ -252,10 +258,6 @@ finish_inode:
 			if (newnode) {
 				xfs_iocore_inode_reinit(ip);
 			}
-
-			XFS_MOUNT_ILOCK(mp);
-			list_del_init(&ip->i_reclaim);
-			XFS_MOUNT_IUNLOCK(mp);
 
 			vn_trace_exit(vp, "xfs_iget.found",
 						(inst_t *)__return_address);

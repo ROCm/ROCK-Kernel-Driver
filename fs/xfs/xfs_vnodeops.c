@@ -3930,6 +3930,7 @@ xfs_reclaim(
 	 */
 	if (!ip->i_update_core && (ip->i_itemp == NULL)) {
 		xfs_ilock(ip, XFS_ILOCK_EXCL);
+		xfs_iflock(ip);
 		return xfs_finish_reclaim(ip, 1, XFS_IFLUSH_DELWRI_ELSE_SYNC);
 	} else {
 		xfs_mount_t	*mp = ip->i_mount;
@@ -3938,7 +3939,7 @@ xfs_reclaim(
 		XFS_MOUNT_ILOCK(mp);
 		vn_bhv_remove(VN_BHV_HEAD(vp), XFS_ITOBHV(ip));
 		list_add_tail(&ip->i_reclaim, &mp->m_del_inodes);
-
+		ip->i_flags |= XFS_IRECLAIMABLE;
 		XFS_MOUNT_IUNLOCK(mp);
 	}
 	return 0;
@@ -3953,19 +3954,20 @@ xfs_finish_reclaim(
 	xfs_ihash_t	*ih = ip->i_hash;
 	int		error;
 
-	if (!locked)
-		xfs_ilock(ip, XFS_ILOCK_EXCL);
-
 	/* The hash lock here protects a thread in xfs_iget_core from
 	 * racing with us on linking the inode back with a vnode.
 	 * Once we have the XFS_IRECLAIM flag set it will not touch
 	 * us.
 	 */
 	write_lock(&ih->ih_lock);
-	if (ip->i_flags & XFS_IRECLAIM || (!locked && XFS_ITOV_NULL(ip))) {
+	if ((ip->i_flags & XFS_IRECLAIM) ||
+	    (!(ip->i_flags & XFS_IRECLAIMABLE) &&
+	      (XFS_ITOV_NULL(ip) == NULL))) {
 		write_unlock(&ih->ih_lock);
-		if (!locked)
+		if (locked) {
+			xfs_ifunlock(ip);
 			xfs_iunlock(ip, XFS_ILOCK_EXCL);
+		}
 		return(1);
 	}
 	ip->i_flags |= XFS_IRECLAIM;
@@ -3984,6 +3986,7 @@ xfs_finish_reclaim(
 	 */
 	if (!XFS_FORCED_SHUTDOWN(ip->i_mount)) {
 		if (!locked) {
+			xfs_ilock(ip, XFS_ILOCK_EXCL);
 			xfs_iflock(ip);
 		}
 
@@ -4007,8 +4010,16 @@ xfs_finish_reclaim(
 		ASSERT(ip->i_update_core == 0);
 		ASSERT(ip->i_itemp == NULL ||
 		       ip->i_itemp->ili_format.ilf_fields == 0);
+		xfs_iunlock(ip, XFS_ILOCK_EXCL);
+	} else if (locked) {
+		/*
+		 * We are not interested in doing an iflush if we're
+		 * in the process of shutting down the filesystem forcibly.
+		 * So, just reclaim the inode.
+		 */
+		xfs_ifunlock(ip);
+		xfs_iunlock(ip, XFS_ILOCK_EXCL);
 	}
-	xfs_iunlock(ip, XFS_ILOCK_EXCL);
 
 	xfs_ireclaim(ip);
 	return 0;
