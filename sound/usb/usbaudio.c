@@ -2738,23 +2738,21 @@ static int snd_usb_audio_create(snd_card_t *card, struct usb_device *dev,
 	}
 
 	strcpy(card->driver, "USB-Audio");
-	sprintf(component, "USB%#04x:%#04x",
+	sprintf(component, "USB%04x:%04x",
 		dev->descriptor.idVendor, dev->descriptor.idProduct);
 	snd_component_add(card, component);
 
 	/* retrieve the device string as shortname */
  	if (quirk && quirk->product_name) {
-		len = strlcpy(card->shortname, quirk->product_name, sizeof(card->shortname));
+		strlcpy(card->shortname, quirk->product_name, sizeof(card->shortname));
 	} else {
-		if (dev->descriptor.iProduct)
-			len = usb_string(dev, dev->descriptor.iProduct,
-					 card->shortname, sizeof(card->shortname));
-		else
-			len = 0;
-	}
-	if (len <= 0) {
-		sprintf(card->shortname, "USB Device %#04x:%#04x",
-			dev->descriptor.idVendor, dev->descriptor.idProduct);
+		if (!dev->descriptor.iProduct ||
+		    usb_string(dev, dev->descriptor.iProduct,
+      			       card->shortname, sizeof(card->shortname)) <= 0) {
+			/* no name available from anywhere, so use ID */
+			sprintf(card->shortname, "USB Device %#04x:%#04x",
+				dev->descriptor.idVendor, dev->descriptor.idProduct);
+		}
 	}
 
 	/* retrieve the vendor and device strings as longname */
@@ -2766,14 +2764,12 @@ static int snd_usb_audio_create(snd_card_t *card, struct usb_device *dev,
 					 card->longname, sizeof(card->longname));
 		else
 			len = 0;
+		/* we don't really care if there isn't any vendor string */
 	}
 	if (len > 0)
 		strlcat(card->longname, " ", sizeof(card->longname));
 
-	len = strlen(card->longname);
-
-	if (quirk && quirk->product_name)
-		strlcat(card->longname, quirk->product_name, sizeof(card->longname));
+	strlcat(card->longname, card->shortname, sizeof(card->longname));
 
 	len = strlcat(card->longname, " at ", sizeof(card->longname));
 
