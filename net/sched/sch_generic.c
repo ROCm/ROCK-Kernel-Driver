@@ -31,6 +31,7 @@
 #include <linux/rtnetlink.h>
 #include <linux/init.h>
 #include <linux/rcupdate.h>
+#include <linux/list.h>
 #include <net/sock.h>
 #include <net/pkt_sched.h>
 
@@ -45,10 +46,11 @@
    The idea is the following:
    - enqueue, dequeue are serialized via top level device
      spinlock dev->queue_lock.
-   - tree walking is protected by read_lock(qdisc_tree_lock)
+   - tree walking is protected by read_lock_bh(qdisc_tree_lock)
      and this lock is used only in process context.
-   - updates to tree are made only under rtnl semaphore,
-     hence this lock may be made without local bh disabling.
+   - updates to tree are made under rtnl semaphore or
+     from softirq context (__qdisc_destroy rcu-callback)
+     hence this lock needs local bh disabling.
 
    qdisc_tree_lock must be grabbed BEFORE dev->queue_lock!
  */
@@ -56,14 +58,14 @@ rwlock_t qdisc_tree_lock = RW_LOCK_UNLOCKED;
 
 void qdisc_lock_tree(struct net_device *dev)
 {
-	write_lock(&qdisc_tree_lock);
+	write_lock_bh(&qdisc_tree_lock);
 	spin_lock_bh(&dev->queue_lock);
 }
 
 void qdisc_unlock_tree(struct net_device *dev)
 {
 	spin_unlock_bh(&dev->queue_lock);
-	write_unlock(&qdisc_tree_lock);
+	write_unlock_bh(&qdisc_tree_lock);
 }
 
 /* 
@@ -283,10 +285,9 @@ static const u8 prio2band[TC_PRIO_MAX+1] =
 static int
 pfifo_fast_enqueue(struct sk_buff *skb, struct Qdisc* qdisc)
 {
-	struct sk_buff_head *list;
+	struct sk_buff_head *list = qdisc_priv(qdisc);
 
-	list = ((struct sk_buff_head*)qdisc->data) +
-		prio2band[skb->priority&TC_PRIO_MAX];
+	list += prio2band[skb->priority&TC_PRIO_MAX];
 
 	if (list->qlen < qdisc->dev->tx_queue_len) {
 		__skb_queue_tail(list, skb);
@@ -304,7 +305,7 @@ static struct sk_buff *
 pfifo_fast_dequeue(struct Qdisc* qdisc)
 {
 	int prio;
-	struct sk_buff_head *list = ((struct sk_buff_head*)qdisc->data);
+	struct sk_buff_head *list = qdisc_priv(qdisc);
 	struct sk_buff *skb;
 
 	for (prio = 0; prio < 3; prio++, list++) {
@@ -320,10 +321,9 @@ pfifo_fast_dequeue(struct Qdisc* qdisc)
 static int
 pfifo_fast_requeue(struct sk_buff *skb, struct Qdisc* qdisc)
 {
-	struct sk_buff_head *list;
+	struct sk_buff_head *list = qdisc_priv(qdisc);
 
-	list = ((struct sk_buff_head*)qdisc->data) +
-		prio2band[skb->priority&TC_PRIO_MAX];
+	list += prio2band[skb->priority&TC_PRIO_MAX];
 
 	__skb_queue_head(list, skb);
 	qdisc->q.qlen++;
@@ -334,7 +334,7 @@ static void
 pfifo_fast_reset(struct Qdisc* qdisc)
 {
 	int prio;
-	struct sk_buff_head *list = ((struct sk_buff_head*)qdisc->data);
+	struct sk_buff_head *list = qdisc_priv(qdisc);
 
 	for (prio=0; prio < 3; prio++)
 		skb_queue_purge(list+prio);
@@ -359,9 +359,7 @@ rtattr_failure:
 static int pfifo_fast_init(struct Qdisc *qdisc, struct rtattr *opt)
 {
 	int i;
-	struct sk_buff_head *list;
-
-	list = ((struct sk_buff_head*)qdisc->data);
+	struct sk_buff_head *list = qdisc_priv(qdisc);
 
 	for (i=0; i<3; i++)
 		skb_queue_head_init(list+i);
@@ -385,19 +383,30 @@ static struct Qdisc_ops pfifo_fast_ops = {
 
 struct Qdisc * qdisc_create_dflt(struct net_device *dev, struct Qdisc_ops *ops)
 {
+	void *p;
 	struct Qdisc *sch;
-	int size = sizeof(*sch) + ops->priv_size;
+	int size;
 
-	sch = kmalloc(size, GFP_KERNEL);
-	if (!sch)
+	/* ensure that the Qdisc and the private data are 32-byte aligned */
+	size = ((sizeof(*sch) + QDISC_ALIGN_CONST) & ~QDISC_ALIGN_CONST);
+	size += ops->priv_size + QDISC_ALIGN_CONST;
+
+	p = kmalloc(size, GFP_KERNEL);
+	if (!p)
 		return NULL;
-	memset(sch, 0, size);
+	memset(p, 0, size);
 
+	sch = (struct Qdisc *)(((unsigned long)p + QDISC_ALIGN_CONST) 
+			       & ~QDISC_ALIGN_CONST);
+	sch->padded = (char *)sch - (char *)p;
+
+	INIT_LIST_HEAD(&sch->list);
 	skb_queue_head_init(&sch->q);
 	sch->ops = ops;
 	sch->enqueue = ops->enqueue;
 	sch->dequeue = ops->dequeue;
 	sch->dev = dev;
+	dev_hold(dev);
 	sch->stats_lock = &dev->queue_lock;
 	atomic_set(&sch->refcnt, 1);
 	/* enqueue is accessed locklessly - make sure it's visible
@@ -406,7 +415,7 @@ struct Qdisc * qdisc_create_dflt(struct net_device *dev, struct Qdisc_ops *ops)
 	if (!ops->init || ops->init(sch, NULL) == 0)
 		return sch;
 
-	kfree(sch);
+	kfree(p);
 	return NULL;
 }
 
@@ -431,39 +440,28 @@ static void __qdisc_destroy(struct rcu_head *head)
 #ifdef CONFIG_NET_ESTIMATOR
 	qdisc_kill_estimator(&qdisc->stats);
 #endif
+	write_lock(&qdisc_tree_lock);
 	if (ops->reset)
 		ops->reset(qdisc);
 	if (ops->destroy)
 		ops->destroy(qdisc);
+	write_unlock(&qdisc_tree_lock);
 	module_put(ops->owner);
 
+	dev_put(qdisc->dev);
 	if (!(qdisc->flags&TCQ_F_BUILTIN))
-		kfree(qdisc);
+		kfree((char *) qdisc - qdisc->padded);
 }
 
 /* Under dev->queue_lock and BH! */
 
 void qdisc_destroy(struct Qdisc *qdisc)
 {
-	struct net_device *dev = qdisc->dev;
-
 	if (!atomic_dec_and_test(&qdisc->refcnt))
 		return;
-
-	if (dev) {
-		struct Qdisc *q, **qp;
-		for (qp = &qdisc->dev->qdisc_list; (q=*qp) != NULL; qp = &q->next) {
-			if (q == qdisc) {
-				*qp = q->next;
-				break;
-			}
-		}
-	}
-
+	list_del(&qdisc->list);
 	call_rcu(&qdisc->q_rcu, __qdisc_destroy);
-
 }
-
 
 void dev_activate(struct net_device *dev)
 {
@@ -481,18 +479,15 @@ void dev_activate(struct net_device *dev)
 				printk(KERN_INFO "%s: activation failed\n", dev->name);
 				return;
 			}
-
-			write_lock(&qdisc_tree_lock);
-			qdisc->next = dev->qdisc_list;
-			dev->qdisc_list = qdisc;
-			write_unlock(&qdisc_tree_lock);
-
+			write_lock_bh(&qdisc_tree_lock);
+			list_add_tail(&qdisc->list, &dev->qdisc_list);
+			write_unlock_bh(&qdisc_tree_lock);
 		} else {
 			qdisc =  &noqueue_qdisc;
 		}
-		write_lock(&qdisc_tree_lock);
+		write_lock_bh(&qdisc_tree_lock);
 		dev->qdisc_sleeping = qdisc;
-		write_unlock(&qdisc_tree_lock);
+		write_unlock_bh(&qdisc_tree_lock);
 	}
 
 	spin_lock_bh(&dev->queue_lock);
@@ -528,7 +523,7 @@ void dev_init_scheduler(struct net_device *dev)
 	qdisc_lock_tree(dev);
 	dev->qdisc = &noop_qdisc;
 	dev->qdisc_sleeping = &noop_qdisc;
-	dev->qdisc_list = NULL;
+	INIT_LIST_HEAD(&dev->qdisc_list);
 	qdisc_unlock_tree(dev);
 
 	dev_watchdog_init(dev);
@@ -549,9 +544,7 @@ void dev_shutdown(struct net_device *dev)
 		qdisc_destroy(qdisc);
         }
 #endif
-	BUG_TRAP(dev->qdisc_list == NULL);
 	BUG_TRAP(!timer_pending(&dev->watchdog_timer));
-	dev->qdisc_list = NULL;
 	qdisc_unlock_tree(dev);
 }
 

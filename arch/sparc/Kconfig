@@ -83,6 +83,7 @@ config HW_CONSOLE
 
 config SMP
 	bool "Symmetric multi-processing support (does not work on sun4/sun4c)"
+	depends on BROKEN
 	---help---
 	  This enables support for systems with more than one CPU. If you have
 	  a system with only one CPU, like most personal computers, say N. If
@@ -221,6 +222,7 @@ config SUN_PM
 
 config SUN4
 	bool "Support for SUN4 machines (disables SUN4[CDM] support)"
+	depends on !SMP
 	help
 	  Say Y here if, and only if, your machine is a sun4. Note that
 	  a kernel compiled with this option will run only on sun4.

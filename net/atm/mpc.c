@@ -3,6 +3,7 @@
 #include <linux/timer.h>
 #include <linux/init.h>
 #include <linux/bitops.h>
+#include <linux/seq_file.h>
 
 /* We are an ethernet device */
 #include <linux/if_ether.h>
@@ -224,29 +225,27 @@ int atm_mpoa_delete_qos(struct atm_mpoa_qos *entry)
 	return 0;
 }
 
-void atm_mpoa_disp_qos(char *page, ssize_t *len)
+/* this is buggered - we need locking for qos_head */
+void atm_mpoa_disp_qos(struct seq_file *m)
 {
-
 	unsigned char *ip;
 	char ipaddr[16];
 	struct atm_mpoa_qos *qos;
 
 	qos = qos_head;
-	*len += sprintf(page + *len, "QoS entries for shortcuts:\n");
-	*len += sprintf(page + *len, "IP address\n  TX:max_pcr pcr     min_pcr max_cdv max_sdu\n  RX:max_pcr pcr     min_pcr max_cdv max_sdu\n");
+	seq_printf(m, "QoS entries for shortcuts:\n");
+	seq_printf(m, "IP address\n  TX:max_pcr pcr     min_pcr max_cdv max_sdu\n  RX:max_pcr pcr     min_pcr max_cdv max_sdu\n");
 
 	ipaddr[sizeof(ipaddr)-1] = '\0';
 	while (qos != NULL) {
 		ip = (unsigned char *)&qos->ipaddr;
 		sprintf(ipaddr, "%u.%u.%u.%u", NIPQUAD(ip));
-		*len += sprintf(page + *len, "%u.%u.%u.%u\n     %-7d %-7d %-7d %-7d %-7d\n     %-7d %-7d %-7d %-7d %-7d\n",
+		seq_printf(m, "%u.%u.%u.%u\n     %-7d %-7d %-7d %-7d %-7d\n     %-7d %-7d %-7d %-7d %-7d\n",
 				NIPQUAD(ipaddr),
 				qos->qos.txtp.max_pcr, qos->qos.txtp.pcr, qos->qos.txtp.min_pcr, qos->qos.txtp.max_cdv, qos->qos.txtp.max_sdu,
 				qos->qos.rxtp.max_pcr, qos->qos.rxtp.pcr, qos->qos.rxtp.min_pcr, qos->qos.rxtp.max_cdv, qos->qos.rxtp.max_sdu);
 		qos = qos->next;
 	}
-	
-	return;
 }
 
 static struct net_device *find_lec_by_itfnum(int itf)

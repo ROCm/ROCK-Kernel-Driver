@@ -69,12 +69,12 @@ void reset_coda_cache_inv_stats( void )
 }
 
 int do_reset_coda_vfs_stats( ctl_table * table, int write, struct file * filp,
-			     void __user * buffer, size_t * lenp )
+			     void __user * buffer, size_t * lenp, loff_t * ppos )
 {
 	if ( write ) {
 		reset_coda_vfs_stats();
 
-		filp->f_pos += *lenp;
+		*ppos += *lenp;
 	} else {
 		*lenp = 0;
 	}
@@ -84,12 +84,12 @@ int do_reset_coda_vfs_stats( ctl_table * table, int write, struct file * filp,
 
 int do_reset_coda_cache_inv_stats( ctl_table * table, int write, 
 				   struct file * filp, void __user * buffer, 
-				   size_t * lenp )
+				   size_t * lenp, loff_t * ppos )
 {
 	if ( write ) {
 		reset_coda_cache_inv_stats();
 
-		filp->f_pos += *lenp;
+		*ppos += *lenp;
 	} else {
 		*lenp = 0;
 	}

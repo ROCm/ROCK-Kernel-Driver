@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/device_ops.c
  *
- *   $Revision: 1.49 $
+ *   $Revision: 1.50 $
  *
  *    Copyright (C) 2002 IBM Deutschland Entwicklung GmbH,
  *			 IBM Corporation
@@ -295,7 +295,7 @@ __ccw_device_retry_loop(struct ccw_device *cdev, struct ccw1 *ccw, long magic)
 			break;
 		/* Try again later. */
 		spin_unlock_irq(&sch->lock);
-		schedule_timeout(1);
+		msleep(10);
 		spin_lock_irq(&sch->lock);
 	} while (1);
 

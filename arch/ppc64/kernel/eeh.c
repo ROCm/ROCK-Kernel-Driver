@@ -618,7 +618,7 @@ void __init eeh_init(void)
 
 		info.buid_lo = BUID_LO(buid);
 		info.buid_hi = BUID_HI(buid);
-		traverse_pci_devices(phb, early_enable_eeh, NULL, &info);
+		traverse_pci_devices(phb, early_enable_eeh, &info);
 	}
 
 	if (eeh_subsystem_enabled) {

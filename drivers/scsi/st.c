@@ -1001,6 +1001,7 @@ static int st_open(struct inode *inode, struct file *filp)
 	int dev = TAPE_NR(inode);
 	char *name;
 
+	nonseekable_open(inode, filp);
 	write_lock(&st_dev_arr_lock);
 	if (dev >= st_dev_max || scsi_tapes == NULL ||
 	    ((STp = scsi_tapes[dev]) == NULL)) {
@@ -1203,7 +1204,7 @@ static int st_release(struct inode *inode, struct file *filp)
 }
 
 /* The checks common to both reading and writing */
-static ssize_t rw_checks(Scsi_Tape *STp, struct file *filp, size_t count, loff_t *ppos)
+static ssize_t rw_checks(Scsi_Tape *STp, struct file *filp, size_t count)
 {
 	ssize_t retval = 0;
 
@@ -1214,12 +1215,6 @@ static ssize_t rw_checks(Scsi_Tape *STp, struct file *filp, size_t count, loff_t
 	 * access to the device is prohibited.
 	 */
 	if (!scsi_block_when_processing_errors(STp->device)) {
-		retval = (-ENXIO);
-		goto out;
-	}
-
-	if (ppos != &filp->f_pos) {
-		/* "A request was outside the capabilities of the device." */
 		retval = (-ENXIO);
 		goto out;
 	}
@@ -1367,7 +1362,7 @@ st_write(struct file *filp, const char __user *buf, size_t count, loff_t * ppos)
 	if (down_interruptible(&STp->lock))
 		return -ERESTARTSYS;
 
-	retval = rw_checks(STp, filp, count, ppos);
+	retval = rw_checks(STp, filp, count);
 	if (retval || count == 0)
 		goto out;
 
@@ -1833,7 +1828,7 @@ st_read(struct file *filp, char __user *buf, size_t count, loff_t * ppos)
 	if (down_interruptible(&STp->lock))
 		return -ERESTARTSYS;
 
-	retval = rw_checks(STp, filp, count, ppos);
+	retval = rw_checks(STp, filp, count);
 	if (retval || count == 0)
 		goto out;
 

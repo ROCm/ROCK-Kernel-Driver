@@ -298,8 +298,7 @@ chrp_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	       cur_cpu_spec->firmware_features);
 }
 
-void
-chrp_progress(char *s, unsigned short hex)
+void chrp_progress(char *s, unsigned short hex)
 {
 	struct device_node *root;
 	int width, *p;
@@ -313,60 +312,55 @@ chrp_progress(char *s, unsigned short hex)
 		return;
 
 	if (max_width == 0) {
-		if ( (root = find_path_device("/rtas")) &&
+		if ((root = find_path_device("/rtas")) &&
 		     (p = (unsigned int *)get_property(root,
 						       "ibm,display-line-length",
-						       NULL)) )
+						       NULL)))
 			max_width = *p;
 		else
 			max_width = 0x10;
 		display_character = rtas_token("display-character");
 		set_indicator = rtas_token("set-indicator");
 	}
-	if (display_character == RTAS_UNKNOWN_SERVICE) {
-		/* use hex display */
-		if (set_indicator == RTAS_UNKNOWN_SERVICE)
-			return;
-		rtas_call(set_indicator, 3, 1, NULL, 6, 0, hex);
-		return;
-	}
 
-	if(display_character == RTAS_UNKNOWN_SERVICE) {
+	if (display_character == RTAS_UNKNOWN_SERVICE) {
 		/* use hex display if available */
-		if(set_indicator != RTAS_UNKNOWN_SERVICE)
+		if (set_indicator != RTAS_UNKNOWN_SERVICE)
 			rtas_call(set_indicator, 3, 1, NULL, 6, 0, hex);
 		return;
 	}
 
 	spin_lock(&progress_lock);
 
-	/* Last write ended with newline, but we didn't print it since
+	/*
+	 * Last write ended with newline, but we didn't print it since
 	 * it would just clear the bottom line of output. Print it now
 	 * instead.
 	 *
 	 * If no newline is pending, print a CR to start output at the
 	 * beginning of the line.
 	 */
-	if(pending_newline) {
+	if (pending_newline) {
 		rtas_call(display_character, 1, 1, NULL, '\r');
 		rtas_call(display_character, 1, 1, NULL, '\n');
 		pending_newline = 0;
-	} else
+	} else {
 		rtas_call(display_character, 1, 1, NULL, '\r');
+	}
  
 	width = max_width;
 	os = s;
 	while (*os) {
-		if(*os == '\n' || *os == '\r') {
+		if (*os == '\n' || *os == '\r') {
 			/* Blank to end of line. */
-			while(width-- > 0)
+			while (width-- > 0)
 				rtas_call(display_character, 1, 1, NULL, ' ');
  
 			/* If newline is the last character, save it
 			 * until next call to avoid bumping up the
 			 * display output.
 			 */
-			if(*os == '\n' && !os[1]) {
+			if (*os == '\n' && !os[1]) {
 				pending_newline = 1;
 				spin_unlock(&progress_lock);
 				return;
@@ -374,7 +368,7 @@ chrp_progress(char *s, unsigned short hex)
  
 			/* RTAS wants CR-LF, not just LF */
  
-			if(*os == '\n') {
+			if (*os == '\n') {
 				rtas_call(display_character, 1, 1, NULL, '\r');
 				rtas_call(display_character, 1, 1, NULL, '\n');
 			} else {
@@ -393,14 +387,14 @@ chrp_progress(char *s, unsigned short hex)
 		os++;
  
 		/* if we overwrite the screen length */
-		if ( width <= 0 )
-			while ( (*os != 0) && (*os != '\n') && (*os != '\r') )
+		if (width <= 0)
+			while ((*os != 0) && (*os != '\n') && (*os != '\r'))
 				os++;
 	}
  
 	/* Blank to end of line. */
-	while ( width-- > 0 )
-		rtas_call(display_character, 1, 1, NULL, ' ' );
+	while (width-- > 0)
+		rtas_call(display_character, 1, 1, NULL, ' ');
 
 	spin_unlock(&progress_lock);
 }

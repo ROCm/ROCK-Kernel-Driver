@@ -619,12 +619,7 @@ $(sort $(vmlinux-objs)) arch/$(ARCH)/kernel/vmlinux.lds.s: $(vmlinux-dirs) ;
 
 .PHONY: $(vmlinux-dirs)
 $(vmlinux-dirs): prepare-all scripts
-	$(Q)if [ ! -z $$LC_ALL ]; then          \
-		export LANG=$$LC_ALL;           \
-		export LC_ALL= ;                \
-	fi;                                     \
-	export LC_COLLATE=C; export LC_CTYPE=C; \
-	$(MAKE) $(build)=$@
+	$(Q)$(MAKE) $(build)=$@
 
 # Things we need to do before we recursively start building the kernel
 # or the modules are listed in "prepare-all".

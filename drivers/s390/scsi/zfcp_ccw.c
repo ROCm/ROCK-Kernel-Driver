@@ -26,7 +26,7 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#define ZFCP_CCW_C_REVISION "$Revision: 1.55 $"
+#define ZFCP_CCW_C_REVISION "$Revision: 1.56 $"
 
 #include "zfcp_ext.h"
 
@@ -37,6 +37,7 @@ static void zfcp_ccw_remove(struct ccw_device *);
 static int zfcp_ccw_set_online(struct ccw_device *);
 static int zfcp_ccw_set_offline(struct ccw_device *);
 static int zfcp_ccw_notify(struct ccw_device *, int);
+static void zfcp_ccw_shutdown(struct device *);
 
 static struct ccw_device_id zfcp_ccw_device_id[] = {
 	{CCW_DEVICE_DEVTYPE(ZFCP_CONTROL_UNIT_TYPE,
@@ -59,6 +60,9 @@ static struct ccw_driver zfcp_ccw_driver = {
 	.set_online  = zfcp_ccw_set_online,
 	.set_offline = zfcp_ccw_set_offline,
 	.notify      = zfcp_ccw_notify,
+	.driver      = {
+		.shutdown = zfcp_ccw_shutdown,
+	},
 };
 
 MODULE_DEVICE_TABLE(ccw, zfcp_ccw_device_id);
@@ -285,6 +289,21 @@ zfcp_ccw_unregister(void)
 {
 	zfcp_sysfs_driver_remove_files(&zfcp_ccw_driver.driver);
 	ccw_driver_unregister(&zfcp_ccw_driver);
+}
+
+/**
+ * zfcp_ccw_shutdown - gets called on reboot/shutdown
+ *
+ * Makes sure that QDIO queues are down when the system gets stopped.
+ */
+static void
+zfcp_ccw_shutdown(struct device *dev)
+{
+	struct zfcp_adapter *adapter;
+
+	adapter = dev_get_drvdata(dev);
+	zfcp_erp_adapter_shutdown(adapter, 0);
+	zfcp_erp_wait(adapter);
 }
 
 #undef ZFCP_LOG_AREA

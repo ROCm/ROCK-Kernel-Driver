@@ -399,9 +399,9 @@ static void wb_kupdate(unsigned long arg)
  * sysctl handler for /proc/sys/vm/dirty_writeback_centisecs
  */
 int dirty_writeback_centisecs_handler(ctl_table *table, int write,
-		struct file *file, void __user *buffer, size_t *length)
+		struct file *file, void __user *buffer, size_t *length, loff_t *ppos)
 {
-	proc_dointvec(table, write, file, buffer, length);
+	proc_dointvec(table, write, file, buffer, length, ppos);
 	if (dirty_writeback_centisecs) {
 		mod_timer(&wb_timer,
 			jiffies + (dirty_writeback_centisecs * HZ) / 100);

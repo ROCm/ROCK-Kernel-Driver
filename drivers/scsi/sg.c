@@ -234,6 +234,7 @@ sg_open(struct inode *inode, struct file *filp)
 	int res;
 	int retval;
 
+	nonseekable_open(inode, filp);
 	SCSI_LOG_TIMEOUT(3, printk("sg_open: dev=%d, flags=0x%x\n", dev, flags));
 	sdp = sg_get_dev(dev);
 	if ((!sdp) || (!sdp->device))
@@ -343,7 +344,6 @@ sg_read(struct file *filp, char __user *buf, size_t count, loff_t * ppos)
 		return -ENXIO;
 	SCSI_LOG_TIMEOUT(3, printk("sg_read: %s, count=%d\n",
 				   sdp->disk->disk_name, (int) count));
-	if (ppos != &filp->f_pos) ;	/* FIXME: Hmm.  Seek to the right place, or fail?  */
 	if ((k = verify_area(VERIFY_WRITE, buf, count)))
 		return k;
 	if (sfp->force_packid && (count >= SZ_SG_HEADER)) {
@@ -501,7 +501,6 @@ sg_write(struct file *filp, const char __user *buf, size_t count, loff_t * ppos)
 	if (!((filp->f_flags & O_NONBLOCK) ||
 	      scsi_block_when_processing_errors(sdp->device)))
 		return -ENXIO;
-	if (ppos != &filp->f_pos) ;	/* FIXME: Hmm.  Seek to the right place, or fail?  */
 
 	if ((k = verify_area(VERIFY_READ, buf, count)))
 		return k;	/* protects following copy_from_user()s + get_user()s */

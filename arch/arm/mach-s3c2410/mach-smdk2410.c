@@ -101,7 +101,7 @@ void __init smdk2410_init_irq(void)
 
 void __init smdk2410_init_time(void)
 {
-	s3c2401_init_time();
+	s3c2410_init_time();
 }
 
 MACHINE_START(SMDK2410, "SMDK2410") /* @TODO: request a new identifier and switch

@@ -399,7 +399,7 @@ static int arlan_setup_card_by_book(struct net_device *dev)
 static char arlan_drive_info[ARLAN_STR_SIZE] = "A655\n\0";
 
 static int arlan_sysctl_info(ctl_table * ctl, int write, struct file *filp,
-		      void __user *buffer, size_t * lenp)
+		      void __user *buffer, size_t * lenp, loff_t *ppos)
 {
 	int i;
 	int retv, pos, devnum;
@@ -625,7 +625,7 @@ final:
 	*lenp = pos;
 
 	if (!write)
-		retv = proc_dostring(ctl, write, filp, buffer, lenp);
+		retv = proc_dostring(ctl, write, filp, buffer, lenp, ppos);
 	else
 	{
 		*lenp = 0;
@@ -636,7 +636,7 @@ final:
 
 
 static int arlan_sysctl_info161719(ctl_table * ctl, int write, struct file *filp,
-			    void __user *buffer, size_t * lenp)
+			    void __user *buffer, size_t * lenp, loff_t *ppos)
 {
 	int i;
 	int retv, pos, devnum;
@@ -665,12 +665,12 @@ static int arlan_sysctl_info161719(ctl_table * ctl, int write, struct file *filp
 
 final:
 	*lenp = pos;
-	retv = proc_dostring(ctl, write, filp, buffer, lenp);
+	retv = proc_dostring(ctl, write, filp, buffer, lenp, ppos);
 	return retv;
 }
 
 static int arlan_sysctl_infotxRing(ctl_table * ctl, int write, struct file *filp,
-			    void __user *buffer, size_t * lenp)
+			    void __user *buffer, size_t * lenp, loff_t *ppos)
 {
 	int i;
 	int retv, pos, devnum;
@@ -694,12 +694,12 @@ static int arlan_sysctl_infotxRing(ctl_table * ctl, int write, struct file *filp
 	SARLBNpln(u_char, txBuffer, 0x800);
 final:
 	*lenp = pos;
-	retv = proc_dostring(ctl, write, filp, buffer, lenp);
+	retv = proc_dostring(ctl, write, filp, buffer, lenp, ppos);
 	return retv;
 }
 
 static int arlan_sysctl_inforxRing(ctl_table * ctl, int write, struct file *filp,
-			    void __user *buffer, size_t * lenp)
+			    void __user *buffer, size_t * lenp, loff_t *ppos)
 {
 	int i;
 	int retv, pos, devnum;
@@ -722,12 +722,12 @@ static int arlan_sysctl_inforxRing(ctl_table * ctl, int write, struct file *filp
 	SARLBNpln(u_char, rxBuffer, 0x800);
 final:
 	*lenp = pos;
-	retv = proc_dostring(ctl, write, filp, buffer, lenp);
+	retv = proc_dostring(ctl, write, filp, buffer, lenp, ppos);
 	return retv;
 }
 
 static int arlan_sysctl_info18(ctl_table * ctl, int write, struct file *filp,
-			void __user *buffer, size_t * lenp)
+			void __user *buffer, size_t * lenp, loff_t *ppos)
 {
 	int i;
 	int retv, pos, devnum;
@@ -752,7 +752,7 @@ static int arlan_sysctl_info18(ctl_table * ctl, int write, struct file *filp,
 
 final:
 	*lenp = pos;
-	retv = proc_dostring(ctl, write, filp, buffer, lenp);
+	retv = proc_dostring(ctl, write, filp, buffer, lenp, ppos);
 	return retv;
 }
 
@@ -763,7 +763,7 @@ final:
 static char conf_reset_result[200];
 
 static int arlan_configure(ctl_table * ctl, int write, struct file *filp,
-		    void __user *buffer, size_t * lenp)
+		    void __user *buffer, size_t * lenp, loff_t *ppos)
 {
 	int pos = 0;
 	int devnum = ctl->procname[6] - '0';
@@ -784,11 +784,11 @@ static int arlan_configure(ctl_table * ctl, int write, struct file *filp,
 		return -1;
 
 	*lenp = pos;
-	return proc_dostring(ctl, write, filp, buffer, lenp);
+	return proc_dostring(ctl, write, filp, buffer, lenp, ppos);
 }
 
 static int arlan_sysctl_reset(ctl_table * ctl, int write, struct file *filp,
-		       void __user *buffer, size_t * lenp)
+		       void __user *buffer, size_t * lenp, loff_t *ppos)
 {
 	int pos = 0;
 	int devnum = ctl->procname[5] - '0';
@@ -807,7 +807,7 @@ static int arlan_sysctl_reset(ctl_table * ctl, int write, struct file *filp,
 	} else
 		return -1;
 	*lenp = pos + 3;
-	return proc_dostring(ctl, write, filp, buffer, lenp);
+	return proc_dostring(ctl, write, filp, buffer, lenp, ppos);
 }
 
 

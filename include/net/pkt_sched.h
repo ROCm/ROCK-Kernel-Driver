@@ -77,12 +77,13 @@ struct Qdisc
 #define TCQ_F_BUILTIN	1
 #define TCQ_F_THROTTLED	2
 #define TCQ_F_INGRES	4
+	int			padded;
 	struct Qdisc_ops	*ops;
-	struct Qdisc		*next;
 	u32			handle;
 	atomic_t		refcnt;
 	struct sk_buff_head	q;
 	struct net_device	*dev;
+	struct list_head	list;
 
 	struct tc_stats		stats;
 	spinlock_t		*stats_lock;
@@ -93,9 +94,16 @@ struct Qdisc
 	 * and it will live until better solution will be invented.
 	 */
 	struct Qdisc		*__parent;
-
-	char			data[0];
 };
+
+#define	QDISC_ALIGN		32
+#define	QDISC_ALIGN_CONST	(QDISC_ALIGN - 1)
+
+static inline void *qdisc_priv(struct Qdisc *q)
+{
+	return (char *)q + ((sizeof(struct Qdisc) + QDISC_ALIGN_CONST)
+			      & ~QDISC_ALIGN_CONST);
+}
 
 struct qdisc_rate_table
 {

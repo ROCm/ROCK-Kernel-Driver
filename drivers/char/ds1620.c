@@ -218,10 +218,6 @@ ds1620_read(struct file *file, char *buf, size_t count, loff_t *ptr)
 	signed int cur_temp;
 	signed char cur_temp_degF;
 
-	/* Can't seek (pread) on this device */
-	if (ptr != &file->f_pos)
-		return -ESPIPE;
-
 	cur_temp = cvt_9_to_int(ds1620_in(THERM_READ_TEMP, 9)) >> 1;
 
 	/* convert to Fahrenheit, as per wdt.c */
@@ -338,6 +334,7 @@ static struct proc_dir_entry *proc_therm_ds1620;
 
 static struct file_operations ds1620_fops = {
 	.owner		= THIS_MODULE,
+	.open		= nonseekable_open,
 	.read		= ds1620_read,
 	.ioctl		= ds1620_ioctl,
 };

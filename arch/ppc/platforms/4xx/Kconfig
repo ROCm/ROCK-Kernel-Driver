@@ -175,6 +175,15 @@ config IBM_OPENBIOS
 	depends on ASH || BUBINGA || REDWOOD_5 || REDWOOD_6 || SYCAMORE || WALNUT
 	default y
 
+config PPC4xx_DMA
+	bool "PPC4xx DMA controller support"
+	depends on 4xx
+
+config PPC4xx_EDMA
+	bool
+	depends on !STB03xxx && PPC4xx_DMA
+	default y
+
 config PM
 	bool "Power Management support (EXPERIMENTAL)"
 	depends on 4xx && EXPERIMENTAL
