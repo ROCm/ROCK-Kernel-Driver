@@ -189,228 +189,6 @@ static int wl3501_get_flash_mac_addr(struct wl3501_card *this)
 	return this->mac_addr.b0 == 0x00 && this->mac_addr.b1 == 0x60;
 }
 
-#if 0
-static u8 wl3501_fpage[] = {
-	[0] = WL3501_BSS_FPAGE0,
-	[1] = WL3501_BSS_FPAGE1,
-	[2] = WL3501_BSS_FPAGE2,
-	[3] = WL3501_BSS_FPAGE3,
-};
-
-/*
- * Hold SUTRO. (i.e. make SUTRO stop)
- * Return: 1 if SUTRO is originally running
- */
-static int wl3501_hold_sutro(struct wl3501_card *this)
-{
-	u8 old = inb(this->base_addr + WL3501_NIC_GCR);
-	u8 new = (old & ~(WL3501_GCR_ECINT | WL3501_GCR_INT2EC)) |
-		  WL3501_GCR_ECWAIT;
-
-	wl3501_outb(new, this->base_addr + WL3501_NIC_GCR);
-	return !(old & WL3501_GCR_ECWAIT);
-}
-
-/*
- * UnHold SUTRO. (i.e. make SUTRO running)
- * Return: 1 if SUTRO is originally running
- */
-static int wl3501_unhold_sutro(struct wl3501_card *this)
-{
-	u8 old = inb(this->base_addr + WL3501_NIC_GCR);
-	u8 new = old & (~(WL3501_GCR_ECINT | WL3501_GCR_INT2EC |
-			WL3501_GCR_ECWAIT));
-
-	wl3501_outb(new, this->base_addr + WL3501_NIC_GCR);
-	return !(old & WL3501_GCR_ECWAIT);
-}
-
-
-static void wl3501_flash_outb(struct wl3501_card *this, u16 page, u16 addr,
-			      u8 data)
-{
-	/* switch to Flash RAM Page page */
-	wl3501_outb(wl3501_fpage[page], this->base_addr + WL3501_NIC_BSS);
-
-	/* set LMAL and LMAH */
-	wl3501_outb(addr & 0xff, this->base_addr + WL3501_NIC_LMAL);
-	wl3501_outb(addr >> 8, this->base_addr + WL3501_NIC_LMAH);
-
-	/* out data to Port A */
-	wl3501_outb(data, this->base_addr + WL3501_NIC_IODPA);
-}
-
-static u8 wl3501_flash_inb(struct wl3501_card *this, u16 page, u16 addr)
-{
-	/* switch to Flash RAM Page page */
-	wl3501_outb(wl3501_fpage[page], this->base_addr + WL3501_NIC_BSS);
-
-	/* set LMAL and LMAH */
-	wl3501_outb(addr & 0xff, this->base_addr + WL3501_NIC_LMAL);
-	wl3501_outb(addr >> 8, this->base_addr + WL3501_NIC_LMAH);
-
-	/* out data to Port A */
-	return inb(this->base_addr + WL3501_NIC_IODPA);
-}
-
-/*
- * When calling this function, must hold SUTRO first.
- */
-static u16 wl3501_get_flash_id(struct wl3501_card *this)
-{
-	u8 byte0, byte1;
-	u16 id;
-
-	/* Autoselect command */
-	wl3501_flash_outb(this, 0, 0x5555, 0xaa);
-	wl3501_flash_outb(this, 0, 0x2aaa, 0x55);
-	wl3501_flash_outb(this, 0, 0x5555, 0x90);
-	WL3501_NOPLOOP(10000);
-
-	byte0 = wl3501_flash_inb(this, 0, 0x0);
-	byte1 = wl3501_flash_inb(this, 0, 0x1);
-
-	id = (byte0 << 8) | byte1;
-
-	wl3501_flash_outb(this, 0, 0x5555, 0xAA);
-	wl3501_flash_outb(this, 0, 0x2AAA, 0x55);
-	wl3501_flash_outb(this, 0, 0x5555, 0x0f0);
-	WL3501_NOPLOOP(10000);
-
-	printk(KERN_INFO "Flash ROM ID = 0x%x\n", id);
-	return id;
-}
-
-/*
- * Polling if Erase/Programming command is completed
- * Note: IF a == b THEN XOR(a,b) = 0
- *
- * When calling this function, must hold SUTRO first.
- */
-static int wl3501_flash_write_ok(struct wl3501_card *this)
-{
-	u8 byte0, byte1;
-
-	/* Check 'Toggle Bit' (DQ6) to see if completed */
-	do {
-		byte0 = wl3501_flash_inb(this, 0, 0x0);
-		byte1 = wl3501_flash_inb(this, 0, 0x0);
-
-		/* Test if exceeded Time Limits (DQ5) */
-		if (byte1 & 0x20) {
-			/* Must test DQ6 again before return 0 */
-			byte0 = wl3501_flash_inb(this, 0, 0x0);
-			byte1 = wl3501_flash_inb(this, 0, 0x0);
-
-			return !((byte0 ^ byte1) & 0x40);
-		}
-	} while ((byte0 ^ byte1) & 0x40);
-
-	return 1;
-}
-
-/*
- * When calling this function, must hold SUTRO first.
- */
-static int wl3501_flash_erase_sector(struct wl3501_card *this, u16 sector)
-{
-	u16 page = sector / 2;
-	u16 addr = (sector & 1) ? 0x4000 : 0x0;
-
-	/* Sector Erase command (6 commands must within 100 uS) */
-	wl3501_flash_outb(this, 0, 0x5555, 0xaa);
-	wl3501_flash_outb(this, 0, 0x2aaa, 0x55);
-	wl3501_flash_outb(this, 0, 0x5555, 0x80);
-	wl3501_flash_outb(this, 0, 0x5555, 0xaa);
-	wl3501_flash_outb(this, 0, 0x2aaa, 0x55);
-	wl3501_flash_outb(this, page, addr, 0x30);
-
-	return wl3501_flash_write_ok(this);
-}
-
-/*
- * When calling this function, must hold SUTRO first.
- */
-int wl3501_flash_writeb(struct wl3501_card *this, u16 page, u16 addr,
-			u8 data)
-{
-	/* Autoselect command */
-	wl3501_flash_outb(this, 0, 0x5555, 0xaa);
-	wl3501_flash_outb(this, 0, 0x2aaa, 0x55);
-	wl3501_flash_outb(this, 0, 0x5555, 0xa0);
-	wl3501_flash_outb(this, page, addr, data);
-	return wl3501_flash_write_ok(this);
-}
-
-/**
- * wl3501_write_flash -  Write mibExtra into flash ROM
- * @this - card
- * @bf - buffer to write
- * @len = buffer length
- *
- * In fact, only first 29 bytes are used. (not all of extra MIB)
- * To prevent alter other data will be used by future versions, we preserve
- * 256 bytes.
- */
-static int wl3501_write_flash(struct wl3501_card *this, unsigned char *bf,
-			      int len)
-{
-	int i, rc = -EIO;
-	u32 bf_addr = *(u32 *)bf;
-	int running = wl3501_hold_sutro(this);
-	u16 flash_id = wl3501_get_flash_id(this);
-
-	bf += 4;
-	len -= 4;
-
-	if (flash_id == 0x0120 || flash_id == 0x016E) {
-		/* It's AMD AM29F010, must be erase before programming */
-		/* Erase 1st 16 Kbytes within Page 0 */
-		if (!(bf_addr & 0x3fff)) {
-			if (!wl3501_flash_erase_sector(this, bf_addr >> 14)) {
-				printk(KERN_WARNING
-				       "wl3501_flash_erase_sector(0) failed\n");
-				if (running)
-					wl3501_unhold_sutro(this);
-				goto out;
-			}
-		}
-	} else if (flash_id != 0xf51d) {
-		/* It's not AT29C010A */
-		printk(KERN_WARNING "Flash ROM type (0x%x) is unknown!\n",
-		       flash_id);
-		if (running)
-			wl3501_unhold_sutro(this);
-		goto out;
-	}
-
-	/* Programming flash ROM byte by byte */
-	for (i = 0; i < len; i++) {
-		if (!wl3501_flash_writeb(this, bf_addr >> 15, i, *bf)) {
-			printk(KERN_WARNING
-			       "wl3501_flash_writeb(buf[%d]) failed!\n", i);
-			if (running)
-				wl3501_unhold_sutro(this);
-			goto out;
-		}
-		bf++;
-	}
-#if 0
-	/* Reset command */
-	wl3501_outb(this, 0, 0x5555, 0xaa);
-	wl3501_outb(this, 0, 0x2aaa, 0x55);
-	wl3501_outb(this, 0, 0x5555, 0xf0);
-	WL3501_NOPLOOP(10000);
-
-	if (running)
-		wl3501_unhold_sutro(this);
-#endif
-	rc = 0;
-out:
-	return rc;
-}
-#endif
-
 /**
  * wl3501_set_to_wla - Move 'size' bytes from PC to card
  * @dest: Card addressing space
@@ -1694,37 +1472,6 @@ struct iw_statistics *wl3501_get_wireless_stats(struct net_device *dev)
 	return wstats;
 }
 
-/**
- * wl3501_set_multicast_list - Set or clear the multicast filter
- * @dev - network device
- *
- * Set or clear the multicast filter for this card.
- *
- * CAUTION: To prevent interrupted by WL_Interrupt() and timer-based
- * wl3501_hard_start_xmit() from other interrupts, this should be run
- * single-threaded.
- */
-static void wl3501_set_multicast_list(struct net_device *dev)
-{
-#if 0
-	struct wl3501_card *this = (struct wl3501_card *)dev->priv;
-	unsigned long flags;
-	u8 filter = RMR_UNICAST | RMR_BROADCAST;	/* Normal mode */
-
-	if (dev->flags & IFF_PROMISC)	/* Promiscuous mode */
-		filter |= RMR_PROMISCUOUS | RMR_ALL_MULTICAST;
-	else if (dev->mc_count || (dev->flags & IFF_ALLMULTI))
-		/* Allow multicast */
-		filter |= RMR_ALL_MULTICAST;
-
-	spin_lock_irqsave(&this->lock, flags);
-	/* Must not be interrupted */
-	wl3501_set_mib_value(this, TYPE_EXTRA_MIB, IDX_RECEIVEMODE,
-			     &filter, sizeof(filter));
-	spin_unlock_irqrestore(&this->lock, flags);
-#endif
-}
-
 static inline int wl3501_ethtool_ioctl(struct net_device *dev, void *uaddr)
 {
 	u32 ethcmd;
@@ -1774,71 +1521,6 @@ static int wl3501_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 	case SIOCETHTOOL:
 		rc = wl3501_ethtool_ioctl(dev, (void *)rq->ifr_data);
 		break;
-#if 0
-	/* FIXME: has to go to the private stuff in iw_handler_def */
-	/*
-	 * Private IOCTLs
-	 */
-	case WL3501_IOCTL_CMD_SET_RESET:
-		rc = -EPERM;
-		if (!capable(CAP_NET_ADMIN))
-			break;
-		spin_lock_irqsave(&this->lock, flags);
-		rc = wl3501_reset(dev);
-		spin_unlock_irqrestore(&this->lock, flags);
-		break;
-	case WL3501_IOCTL_CMD_WRITE_FLASH: {
-		unsigned char bf[1028];
-
-		rc = -EPERM;
-		if (!capable(CAP_NET_ADMIN))
-			break;
-		rc = -EFBIG;
-		if (blk->len > sizeof(bf))
-			break;
-		rc = -EFAULT;
-		if (copy_from_user(bf, blk->data, blk->len))
-			break;
-		spin_lock_irqsave(&this->lock, flags);
-		rc = wl3501_write_flash(this, bf, blk->len);
-		spin_unlock_irqrestore(&this->lock, flags);
-	}
-		break;
-	case WL3501_IOCTL_CMD_GET_PARAMETER:
-		spin_lock_irqsave(&this->lock, flags);
-		parm.def_chan = this->def_chan;
-		parm.chan = this->chan;
-		parm.net_type = this->net_type;
-		parm.version[0] = this->version[0];
-		parm.version[1] = this->version[1];
-		parm.freq_domain = this->freq_domain;
-		memcpy((char *)&(parm.keep_essid[0]),
-		       (char *)&(this->keep_essid[0]), WL3501_ESSID_MAX_LEN);
-		memcpy((char *)&(parm.essid[0]), (char *)&(this->essid[0]),
-		       WL3501_ESSID_MAX_LEN);
-		spin_unlock_irqrestore(&this->lock, flags);
-		blk->len = sizeof(parm);
-		rc = -EFAULT;
-		if (copy_to_user(blk->data, &parm, blk->len))
-			break;
-		rc = 0;
-		break;
-	case WL3501_IOCTL_CMD_SET_PARAMETER:
-		rc = -EPERM;
-		if (!capable(CAP_NET_ADMIN))
-			break;
-		rc = -EFAULT;
-		if (copy_from_user(&parm, blk->data, sizeof(parm)))
-			break;
-		spin_lock_irqsave(&this->lock, flags);
-		this->def_chan = parm.def_chan;
-		this->net_type = parm.net_type;
-		memcpy((char *)&(this->essid[0]), (char *)&(parm.essid[0]),
-		       WL3501_ESSID_MAX_LEN);
-		rc = wl3501_reset(dev);
-		spin_unlock_irqrestore(&this->lock, flags);
-		break;
-#endif
 	default:
 		rc = -EOPNOTSUPP;
 	}
@@ -2327,7 +2009,6 @@ static dev_link_t *wl3501_attach(void)
 	dev->watchdog_timeo	= 5 * HZ;
 	dev->get_stats		= wl3501_get_stats;
 	dev->get_wireless_stats = wl3501_get_wireless_stats;
-	dev->set_multicast_list = wl3501_set_multicast_list;
 	dev->do_ioctl		= wl3501_ioctl;
 	dev->wireless_handlers	= (struct iw_handler_def *)&wl3501_handler_def;
 	netif_stop_queue(dev);
@@ -2503,7 +2184,7 @@ out:
 
 /**
  * wl3501_release - unregister the net, release PCMCIA configuration
- * @arg - FILL_IN
+ * @arg - link
  *
  * After a card is removed, wl3501_release() will unregister the net device,
  * and release the PCMCIA configuration.  If the device is still open, this
