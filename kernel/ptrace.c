@@ -319,18 +319,33 @@ static int ptrace_setoptions(struct task_struct *child, long data)
 
 static int ptrace_getsiginfo(struct task_struct *child, siginfo_t __user * data)
 {
-	if (child->last_siginfo == NULL)
-		return -EINVAL;
-	return copy_siginfo_to_user(data, child->last_siginfo);
+	siginfo_t lastinfo;
+
+	spin_lock_irq(&child->sighand->siglock);
+	if (likely(child->last_siginfo != NULL)) {
+		memcpy(&lastinfo, child->last_siginfo, sizeof (siginfo_t));
+		spin_unlock_irq(&child->sighand->siglock);
+		return copy_siginfo_to_user(data, &lastinfo);
+	}
+	spin_unlock_irq(&child->sighand->siglock);
+	return -EINVAL;
 }
 
 static int ptrace_setsiginfo(struct task_struct *child, siginfo_t __user * data)
 {
-	if (child->last_siginfo == NULL)
-		return -EINVAL;
-	if (copy_from_user(child->last_siginfo, data, sizeof (siginfo_t)) != 0)
+	siginfo_t newinfo;
+
+	if (copy_from_user(&newinfo, data, sizeof (siginfo_t)) != 0)
 		return -EFAULT;
-	return 0;
+
+	spin_lock_irq(&child->sighand->siglock);
+	if (likely(child->last_siginfo != NULL)) {
+		memcpy(child->last_siginfo, &newinfo, sizeof (siginfo_t));
+		spin_unlock_irq(&child->sighand->siglock);
+		return 0;
+	}
+	spin_unlock_irq(&child->sighand->siglock);
+	return -EINVAL;
 }
 
 int ptrace_request(struct task_struct *child, long request,
