@@ -23,6 +23,8 @@
 #ifndef _LINUX_NTFS_BITMAP_H
 #define _LINUX_NTFS_BITMAP_H
 
+#ifdef NTFS_RW
+
 #include <linux/fs.h>
 
 #include "types.h"
@@ -110,5 +112,7 @@ static inline int ntfs_bitmap_clear_bit(struct inode *vi, const s64 bit)
 {
 	return ntfs_bitmap_clear_run(vi, bit, 1);
 }
+
+#endif /* NTFS_RW */
 
 #endif /* defined _LINUX_NTFS_BITMAP_H */

@@ -19,6 +19,8 @@
  * Foundation,Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#ifdef NTFS_RW
+
 #include <linux/pagemap.h>
 
 #include "bitmap.h"
@@ -181,3 +183,5 @@ rollback:
 	}
 	return PTR_ERR(page);
 }
+
+#endif /* NTFS_RW */
