@@ -35,7 +35,10 @@ void dpm_resume(void)
 		struct list_head * entry = dpm_off.next;
 		struct device * dev = to_device(entry);
 		list_del_init(entry);
-		resume_device(dev);
+
+		if (!dev->power.prev_state)
+			resume_device(dev);
+
 		list_add_tail(entry,&dpm_active);
 	}
 }
