@@ -13,15 +13,41 @@
 #include <linux/kernel.h>
 #include <linux/smp.h>
 #include <linux/init.h>
+#include <linux/dmi.h>
 #include <asm/mach-bigsmp/mach_apic.h>
 #include <asm/mach-bigsmp/mach_apicdef.h>
 #include <asm/mach-bigsmp/mach_ipi.h>
 #include <asm/mach-default/mach_mpparse.h>
 
-int dmi_bigsmp; /* can be set by dmi scanners */
+static int dmi_bigsmp; /* can be set by dmi scanners */
+
+static __init int hp_ht_bigsmp(struct dmi_system_id *d)
+{
+#ifdef CONFIG_X86_GENERICARCH
+	printk(KERN_NOTICE "%s detected: force use of apic=bigsmp\n", d->ident);
+	dmi_bigsmp = 1;
+#endif
+	return 0;
+}
+
+
+static struct dmi_system_id __initdata bigsmp_dmi_table[] = {
+	{ hp_ht_bigsmp, "HP ProLiant DL760 G2", {
+		DMI_MATCH(DMI_BIOS_VENDOR, "HP"),
+		DMI_MATCH(DMI_BIOS_VERSION, "P44-"),
+	}},
+
+	{ hp_ht_bigsmp, "HP ProLiant DL740", {
+		DMI_MATCH(DMI_BIOS_VENDOR, "HP"),
+		DMI_MATCH(DMI_BIOS_VERSION, "P47-"),
+	 }},
+	 { }
+};
+
 
 static __init int probe_bigsmp(void)
 { 
+	dmi_check_system(bigsmp_dmi_table);
 	return dmi_bigsmp; 
 } 
 
