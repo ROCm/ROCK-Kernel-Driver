@@ -530,7 +530,7 @@ machine_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	strcpy(cmd_line, CONFIG_CMDLINE);
 #endif /* CONFIG_CMDLINE */
 
-#if defined(CONFIG_6xx) || defined(CONFIG_ALL_PPC)
+#if defined(CONFIG_6xx)
 	ppc_md.power_save = ppc6xx_idle;
 #endif
 
