@@ -826,29 +826,34 @@ xfs_setattr(
 				mp->m_sb.sb_blocklog;
 		}
 		if (mask & XFS_AT_XFLAGS) {
+			uint	di_flags;
+
 			/* can't set PREALLOC this way, just preserve it */
-			ip->i_d.di_flags =
-				(ip->i_d.di_flags & XFS_DIFLAG_PREALLOC);
-			if (vap->va_xflags & XFS_XFLAG_REALTIME &&
-			    (ip->i_d.di_mode & S_IFMT) == S_IFREG) {
-				ip->i_d.di_flags |= XFS_DIFLAG_REALTIME;
-				ip->i_iocore.io_flags |= XFS_IOCORE_RT;
-			} else {
-				ip->i_iocore.io_flags &= ~XFS_IOCORE_RT;
-			}
+			di_flags = (ip->i_d.di_flags & XFS_DIFLAG_PREALLOC);
 			if (vap->va_xflags & XFS_XFLAG_IMMUTABLE)
-				ip->i_d.di_flags |= XFS_DIFLAG_IMMUTABLE;
+				di_flags |= XFS_DIFLAG_IMMUTABLE;
 			if (vap->va_xflags & XFS_XFLAG_APPEND)
-				ip->i_d.di_flags |= XFS_DIFLAG_APPEND;
+				di_flags |= XFS_DIFLAG_APPEND;
 			if (vap->va_xflags & XFS_XFLAG_SYNC)
-				ip->i_d.di_flags |= XFS_DIFLAG_SYNC;
+				di_flags |= XFS_DIFLAG_SYNC;
 			if (vap->va_xflags & XFS_XFLAG_NOATIME)
-				ip->i_d.di_flags |= XFS_DIFLAG_NOATIME;
+				di_flags |= XFS_DIFLAG_NOATIME;
 			if (vap->va_xflags & XFS_XFLAG_NODUMP)
-				ip->i_d.di_flags |= XFS_DIFLAG_NODUMP;
-			if ((vap->va_xflags & XFS_XFLAG_RTINHERIT) &&
-			    (ip->i_d.di_mode & S_IFMT) == S_IFDIR)
-				ip->i_d.di_flags |= XFS_DIFLAG_RTINHERIT;
+				di_flags |= XFS_DIFLAG_NODUMP;
+			if ((ip->i_d.di_mode & S_IFMT) == S_IFDIR) {
+				if (vap->va_xflags & XFS_XFLAG_REALTIME) {
+					ip->i_iocore.io_flags |= XFS_IOCORE_RT;
+					di_flags |= XFS_DIFLAG_REALTIME;
+				}
+				if (vap->va_xflags & XFS_XFLAG_RTINHERIT)
+					di_flags |= XFS_DIFLAG_RTINHERIT;
+				if (vap->va_xflags & XFS_XFLAG_NOSYMLINKS)
+					di_flags |= XFS_DIFLAG_NOSYMLINKS;
+			} else {
+				if (!(vap->va_xflags & XFS_XFLAG_REALTIME))
+					ip->i_iocore.io_flags &= ~XFS_IOCORE_RT;
+			}
+			ip->i_d.di_flags = di_flags;
 		}
 		xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 		timeflags |= XFS_ICHGTIME_CHG;
@@ -3388,6 +3393,14 @@ xfs_symlink(
 	}
 
 	xfs_ilock(dp, XFS_ILOCK_EXCL);
+
+	/*
+	 * Check whether the directory allows new symlinks or not.
+	 */
+	if (dp->i_d.di_flags & XFS_DIFLAG_NOSYMLINKS) {
+		error = XFS_ERROR(EPERM);
+		goto error_return;
+	}
 
 	/*
 	 * Reserve disk quota : blocks and inode.

@@ -304,7 +304,7 @@ linvfs_symlink(
 {
 	struct inode	*ip;
 	vattr_t		va;
-	vnode_t		*dvp;	/* directory containing name to remove */
+	vnode_t		*dvp;	/* directory containing name of symlink */
 	vnode_t		*cvp;	/* used to lookup symlink to put in dentry */
 	int		error;
 
