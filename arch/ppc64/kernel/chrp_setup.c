@@ -158,7 +158,6 @@ chrp_setup_arch(void)
 		for (openpic = 0; n > 0; --n)
 			openpic = (openpic << 32) + *opprop++;
 		printk(KERN_DEBUG "OpenPIC addr: %lx\n", openpic);
-		udbg_printf("OpenPIC addr: %lx\n", openpic);
 		OpenPIC_Addr = __ioremap(openpic, 0x40000, _PAGE_NO_CACHE);
 	}
 
@@ -175,7 +174,9 @@ chrp_init2(void)
 	 * -- tibit
 	 */
 	chrp_request_regions();
-	ppc_md.progress(UTS_RELEASE, 0x7777);
+	/* Manually leave the kernel version on the panel. */
+	ppc_md.progress("Linux ppc64\n", 0);
+	ppc_md.progress(UTS_RELEASE, 0);
 }
 
 /* Initialize firmware assisted non-maskable interrupts if
@@ -268,7 +269,6 @@ chrp_init(unsigned long r3, unsigned long r4, unsigned long r5,
 
 	ppc_md.progress = chrp_progress;
 
-	ppc_md.progress("Linux ppc64\n", 0x0);
 }
 
 void
@@ -280,10 +280,7 @@ chrp_progress(char *s, unsigned short hex)
 	static int display_character, set_indicator;
 	static int max_width;
 
-	if (hex)
-		udbg_printf("<chrp_progress> %s\n", s);
-
-	if (!rtas.base || (naca->platform != PLATFORM_PSERIES))
+	if (!rtas.base)
 		return;
 
 	if (max_width == 0) {

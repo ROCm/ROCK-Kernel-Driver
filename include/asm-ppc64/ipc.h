@@ -4,7 +4,7 @@
 /* 
  * These are used to wrap system calls on PowerPC.
  *
- * See arch/ppc/kernel/syscalls.c for ugly details..
+ * See arch/ppc64/kernel/syscalls.c for ugly details..
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -12,8 +12,8 @@
  * 2 of the License, or (at your option) any later version.
  */
 struct ipc_kludge {
-	u32 msgp;
-	s32 msgtyp;
+	struct msgbuf *msgp;
+	long msgtyp;
 };
 
 #define SEMOP		 1

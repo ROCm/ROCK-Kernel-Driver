@@ -620,6 +620,7 @@ prom_initialize_lmb(unsigned long mem)
 	return mem;
 }
 
+static char hypertas_funcs[1024];
 
 static void __init
 prom_instantiate_rtas(void)
@@ -636,7 +637,6 @@ prom_instantiate_rtas(void)
 #endif
 	prom_rtas = (ihandle)call_prom(RELOC("finddevice"), 1, 1, RELOC("/rtas"));
 	if (prom_rtas != (ihandle) -1) {
-		char hypertas_funcs[1024];
 		int  rc; 
 		
 		if ((rc = call_prom(RELOC("getprop"), 

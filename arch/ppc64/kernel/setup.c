@@ -21,6 +21,8 @@
 #include <linux/ide.h>
 #include <linux/seq_file.h>
 #include <linux/ioport.h>
+#include <linux/console.h>
+#include <linux/version.h>
 #include <linux/tty.h>
 #include <linux/root_dev.h>
 #include <asm/io.h>
@@ -116,6 +118,23 @@ void ppcdbg_initialize(void) {
 	_naca->debug_switch = PPC_DEBUG_DEFAULT; /* | PPCDBG_BUSWALK | PPCDBG_PHBINIT | PPCDBG_MM | PPCDBG_MMINIT | PPCDBG_TCEINIT | PPCDBG_TCE */;
 }
 
+static struct console udbg_console = {
+	name:	"udbg",
+	write:	udbg_console_write,
+	flags:	CON_PRINTBUFFER,
+	index:	-1,
+};
+
+static int early_console_initialized;
+
+void __init disable_early_printk(void)
+{
+	if (!early_console_initialized)
+		return;
+	unregister_console(&udbg_console);
+	early_console_initialized = 0;
+}
+
 /*
  * Do some initial setup of the system.  The paramters are those which 
  * were passed in from the bootloader.
@@ -162,62 +181,31 @@ void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
 #endif
 	}
 
-	udbg_puts("\n-----------------------------------------------------\n");
-	udbg_puts("Naca Info...\n\n");
-	udbg_puts("naca                       = 0x");
-	udbg_puthex((unsigned long)naca);
-	udbg_putc('\n');
+	if (naca->platform & PLATFORM_PSERIES) {
+		early_console_initialized = 1;
+		register_console(&udbg_console);
+	}
 
-	udbg_puts("naca->physicalMemorySize   = 0x");
-	udbg_puthex(naca->physicalMemorySize);
-	udbg_putc('\n');
+	printk("Starting Linux PPC64 %s\n", UTS_RELEASE);
 
-	udbg_puts("naca->dCacheL1LineSize     = 0x");
-	udbg_puthex(naca->dCacheL1LineSize);
-	udbg_putc('\n');
-
-	udbg_puts("naca->dCacheL1LogLineSize  = 0x");
-	udbg_puthex(naca->dCacheL1LogLineSize);
-	udbg_putc('\n');
-
-	udbg_puts("naca->dCacheL1LinesPerPage = 0x");
-	udbg_puthex(naca->dCacheL1LinesPerPage);
-	udbg_putc('\n');
-
-	udbg_puts("naca->iCacheL1LineSize     = 0x");
-	udbg_puthex(naca->iCacheL1LineSize);
-	udbg_putc('\n');
-
-	udbg_puts("naca->iCacheL1LogLineSize  = 0x");
-	udbg_puthex(naca->iCacheL1LogLineSize);
-	udbg_putc('\n');
-
-	udbg_puts("naca->iCacheL1LinesPerPage = 0x");
-	udbg_puthex(naca->iCacheL1LinesPerPage);
-	udbg_putc('\n');
-
-	udbg_puts("naca->pftSize              = 0x");
-	udbg_puthex(naca->pftSize);
-	udbg_putc('\n');
-
-	udbg_puts("naca->serialPortAddr       = 0x");
-	udbg_puthex(naca->serialPortAddr);
-	udbg_putc('\n');
-
-	udbg_puts("naca->interrupt_controller = 0x");
-	udbg_puthex(naca->interrupt_controller);
-	udbg_putc('\n');
-
-	udbg_printf("\nHTAB Info ...\n\n"); 
-	udbg_puts("htab_data.htab             = 0x");
-	udbg_puthex((unsigned long)htab_data.htab);
-	udbg_putc('\n');
-	udbg_puts("htab_data.num_ptegs        = 0x");
-	udbg_puthex(htab_data.htab_num_ptegs);
-	udbg_putc('\n');
-
-	udbg_puts("\n-----------------------------------------------------\n");
-
+	printk("-----------------------------------------------------\n");
+	printk("naca                       = 0x%p\n", naca);
+#if 0
+	printk("naca->processorCount       = 0x%x\n", naca->processorCount);
+#endif
+	printk("naca->physicalMemorySize   = 0x%lx\n", naca->physicalMemorySize);
+	printk("naca->dCacheL1LineSize     = 0x%x\n", naca->dCacheL1LineSize);
+	printk("naca->dCacheL1LogLineSize  = 0x%x\n", naca->dCacheL1LogLineSize);
+	printk("naca->dCacheL1LinesPerPage = 0x%x\n", naca->dCacheL1LinesPerPage);
+	printk("naca->iCacheL1LineSize     = 0x%x\n", naca->iCacheL1LineSize);
+	printk("naca->iCacheL1LogLineSize  = 0x%x\n", naca->iCacheL1LogLineSize);
+	printk("naca->iCacheL1LinesPerPage = 0x%x\n", naca->iCacheL1LinesPerPage);
+	printk("naca->pftSize              = 0x%lx\n", naca->pftSize);
+	printk("naca->debug_switch         = 0x%lx\n", naca->debug_switch);
+	printk("naca->interrupt_controller = 0x%d\n", naca->interrupt_controller);
+	printk("htab_data.htab             = 0x%p\n", htab_data.htab);
+	printk("htab_data.num_ptegs        = 0x%lx\n", htab_data.htab_num_ptegs);
+	printk("-----------------------------------------------------\n");
 
 	if (naca->platform & PLATFORM_PSERIES) {
 		finish_device_tree();
@@ -411,7 +399,6 @@ void parse_cmd_line(unsigned long r3, unsigned long r4, unsigned long r5,
 		}
 		__max_memory = maxmem;
 	}
-	ppc_md.progress("id mach: done", 0x200);
 }
 
 
@@ -492,7 +479,6 @@ void __init ppc64_calibrate_delay(void)
 	printk("Calibrating delay loop... %lu.%02lu BogoMips\n",
 			       loops_per_jiffy/(500000/HZ),
 			       loops_per_jiffy/(5000/HZ) % 100);
-
 }	
 
 extern void (*calibrate_delay)(void);
@@ -511,13 +497,13 @@ void __init setup_arch(char **cmdline_p)
 
 	calibrate_delay = ppc64_calibrate_delay;
 
+	ppc64_boot_msg(0x12, "Setup Arch");
 #ifdef CONFIG_XMON
 	xmon_map_scc();
 	if (strstr(cmd_line, "xmon"))
 		xmon(0);
 #endif /* CONFIG_XMON */
 
-	ppc_md.progress("setup_arch:enter", 0x3eab);
 
 	/*
 	 * Set cache line size based on type of cpu as a default.
@@ -541,13 +527,59 @@ void __init setup_arch(char **cmdline_p)
 
 	/* set up the bootmem stuff with available memory */
 	do_init_bootmem();
-	ppc_md.progress("setup_arch:bootmem", 0x3eab);
 
 	ppc_md.setup_arch();
 
 	paging_init();
 	sort_exception_table();
-	ppc_md.progress("setup_arch: exit", 0x3eab);
+	ppc64_boot_msg(0x15, "Setup Done");
+}
+
+/* ToDo: do something useful if ppc_md is not yet setup. */
+#define PPC64_LINUX_FUNCTION 0x0f000000
+#define PPC64_IPL_MESSAGE 0xc0000000
+#define PPC64_TERM_MESSAGE 0xb0000000
+#define PPC64_ATTN_MESSAGE 0xa0000000
+#define PPC64_DUMP_MESSAGE 0xd0000000
+
+static void ppc64_do_msg(unsigned int src, const char *msg)
+{
+	if (ppc_md.progress) {
+		char buf[32];
+
+		sprintf(buf, "%08x        \n", src);
+		ppc_md.progress(buf, 0);
+		sprintf(buf, "%-16s", msg);
+		ppc_md.progress(buf, 0);
+	}
+}
+
+/* Print a boot progress message. */
+void ppc64_boot_msg(unsigned int src, const char *msg)
+{
+	ppc64_do_msg(PPC64_LINUX_FUNCTION|PPC64_IPL_MESSAGE|src, msg);
+	printk("[boot]%04x %s\n", src, msg);
+}
+
+/* Print a termination message (print only -- does not stop the kernel) */
+void ppc64_terminate_msg(unsigned int src, const char *msg)
+{
+	ppc64_do_msg(PPC64_LINUX_FUNCTION|PPC64_TERM_MESSAGE|src, msg);
+	printk("[terminate]%04x %s\n", src, msg);
+}
+
+/* Print something that needs attention (device error, etc) */
+void ppc64_attention_msg(unsigned int src, const char *msg)
+{
+	ppc64_do_msg(PPC64_LINUX_FUNCTION|PPC64_ATTN_MESSAGE|src, msg);
+	printk("[attention]%04x %s\n", src, msg);
+}
+
+/* Print a dump progress message. */
+void ppc64_dump_msg(unsigned int src, const char *msg)
+{
+	ppc64_do_msg(PPC64_LINUX_FUNCTION|PPC64_DUMP_MESSAGE|src, msg);
+	printk("[dump]%04x %s\n", src, msg);
 }
 
 int set_spread_lpevents( char * str )
