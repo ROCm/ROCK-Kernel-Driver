@@ -1986,13 +1986,18 @@ static int do_blkgetsize64(unsigned int fd, unsigned int cmd,
 }
 
 /* Bluetooth ioctls */
-#define HCIUARTSETPROTO        _IOW('U', 200, int)
-#define HCIUARTGETPROTO        _IOR('U', 201, int)
+#define HCIUARTSETPROTO	_IOW('U', 200, int)
+#define HCIUARTGETPROTO	_IOR('U', 201, int)
 
-#define BNEPCONNADD    _IOW('B', 200, int)
-#define BNEPCONNDEL    _IOW('B', 201, int)
-#define BNEPGETCONNLIST        _IOR('B', 210, int)
-#define BNEPGETCONNINFO        _IOR('B', 211, int)
+#define BNEPCONNADD	_IOW('B', 200, int)
+#define BNEPCONNDEL	_IOW('B', 201, int)
+#define BNEPGETCONNLIST	_IOR('B', 210, int)
+#define BNEPGETCONNINFO	_IOR('B', 211, int)
+
+#define CMTPCONNADD	_IOW('C', 200, int)
+#define CMTPCONNDEL	_IOW('C', 201, int)
+#define CMTPGETCONNLIST	_IOR('C', 210, int)
+#define CMTPGETCONNINFO	_IOR('C', 211, int)
 
 struct floppy_struct32 {
 	compat_uint_t	size;
