@@ -193,6 +193,12 @@ static void cramfs_put_super(struct super_block *sb)
 	sb->s_fs_info = NULL;
 }
 
+static int cramfs_remount(struct super_block *sb, int *flags, char *data)
+{
+	*flags |= MS_RDONLY;
+	return 0;
+}
+
 static int cramfs_fill_super(struct super_block *sb, void *data, int silent)
 {
 	int i;
@@ -483,6 +489,7 @@ static struct inode_operations cramfs_dir_inode_operations = {
 
 static struct super_operations cramfs_ops = {
 	.put_super	= cramfs_put_super,
+	.remount_fs	= cramfs_remount,
 	.statfs		= cramfs_statfs,
 };
 
