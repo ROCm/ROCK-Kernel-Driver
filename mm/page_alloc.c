@@ -44,14 +44,18 @@ static int zone_balance_min[MAX_NR_ZONES] __initdata = { 20 , 20, 20, };
 static int zone_balance_max[MAX_NR_ZONES] __initdata = { 255 , 255, 255, };
 
 /*
- * Temporary debugging check.
+ * Temporary debugging check for pages not lying within a given zone.
  */
-#define BAD_RANGE(zone, page)						\
-(									\
-	(((page) - mem_map) >= ((zone)->zone_start_mapnr+(zone)->size))	\
-	|| (((page) - mem_map) < (zone)->zone_start_mapnr)		\
-	|| ((zone) != page_zone(page))					\
-)
+static inline int bad_range(zone_t *zone, struct page *page)
+{
+	if (page - mem_map >= zone->zone_start_mapnr + zone->size)
+		return 1;
+	if (page - mem_map < zone->zone_start_mapnr)
+		return 1;
+	if (zone != page_zone(page))
+		return 1;
+	return 0;
+}
 
 /*
  * Freeing function for a buddy system allocator.
@@ -135,9 +139,9 @@ static void __free_pages_ok (struct page *page, unsigned int order)
 		 */
 		buddy1 = base + (page_idx ^ -mask);
 		buddy2 = base + page_idx;
-		if (BAD_RANGE(zone,buddy1))
+		if (bad_range(zone, buddy1))
 			BUG();
-		if (BAD_RANGE(zone,buddy2))
+		if (bad_range(zone, buddy2))
 			BUG();
 
 		list_del(&buddy1->list);
@@ -171,7 +175,7 @@ static inline struct page * expand (zone_t *zone, struct page *page,
 	unsigned long size = 1 << high;
 
 	while (high > low) {
-		if (BAD_RANGE(zone,page))
+		if (bad_range(zone, page))
 			BUG();
 		area--;
 		high--;
@@ -181,7 +185,7 @@ static inline struct page * expand (zone_t *zone, struct page *page,
 		index += size;
 		page += size;
 	}
-	if (BAD_RANGE(zone,page))
+	if (bad_range(zone, page))
 		BUG();
 	return page;
 }
@@ -204,7 +208,7 @@ static struct page * rmqueue(zone_t *zone, unsigned int order)
 			unsigned int index;
 
 			page = list_entry(curr, struct page, list);
-			if (BAD_RANGE(zone,page))
+			if (bad_range(zone, page))
 				BUG();
 			list_del(curr);
 			index = page - zone->zone_mem_map;
@@ -216,7 +220,7 @@ static struct page * rmqueue(zone_t *zone, unsigned int order)
 			spin_unlock_irqrestore(&zone->lock, flags);
 
 			set_page_count(page, 1);
-			if (BAD_RANGE(zone,page))
+			if (bad_range(zone, page))
 				BUG();
 			if (PageLRU(page))
 				BUG();
