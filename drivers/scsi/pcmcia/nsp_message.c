@@ -10,7 +10,7 @@
 
 static void nsp_message_in(Scsi_Cmnd *SCpnt, nsp_hw_data *data)
 {
-	unsigned int  base = SCpnt->host->io_port;
+	unsigned int  base = SCpnt->device->host->io_port;
 	unsigned char data_reg, control_reg;
 	int           ret, len;
 

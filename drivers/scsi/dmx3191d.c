@@ -86,7 +86,7 @@ static int __init dmx3191d_detect(Scsi_Host_Template *tmpl) {
 			release_region(port, DMX3191D_REGION);
 			continue;
 		}
-		scsi_set_pci_device(instance, pdev);
+		scsi_set_device(instance, &pdev->dev);
 		instance->io_port = port;
 		instance->irq = pdev->irq;
 		NCR5380_init(instance, FLAG_NO_PSEUDO_DMA | FLAG_DTC3181E);

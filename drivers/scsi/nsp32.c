@@ -1661,7 +1661,7 @@ static int nsp32_detect(Scsi_Host_Template *sht)
 	host->unique_id	  = data->BaseAddress;
 	host->n_io_port	  = data->NumAddress;
 	host->base        = data->MmioAddress;
-	scsi_set_pci_device(host, data->Pci);
+	scsi_set_device(host, &data->Pci->dev);
 
 	data->Host        = host;
 	spin_lock_init(&(data->Lock));

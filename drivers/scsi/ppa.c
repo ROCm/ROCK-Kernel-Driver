@@ -106,7 +106,7 @@ static Scsi_Host_Template driver_template = PPA;
 
 int ppa_detect(Scsi_Host_Template * host)
 {
-    struct Scsi_Host *hreg;
+    struct Scsi_Host *hreg = NULL;
     int ports;
     int i, nhosts, try_again;
     struct parport *pb;

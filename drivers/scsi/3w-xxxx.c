@@ -960,7 +960,9 @@ int tw_findcards(Scsi_Host_Template *tw_host)
 			host->max_sectors = TW_MAX_SECTORS;
 #endif
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,4)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
+			scsi_set_device(host, &tw_pci_dev->dev);
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,4)
 			scsi_set_pci_device(host, tw_pci_dev);
 #endif
 
