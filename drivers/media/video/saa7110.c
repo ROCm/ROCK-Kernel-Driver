@@ -33,7 +33,7 @@
 #define DEBUG(x...)			/* remove when no long debugging */
 
 #define SAA7110_MAX_INPUT	9	/* 6 CVBS, 3 SVHS */
-#define SAA7110_MAX_OUTPUT	0	/* its a decoder only */
+#define SAA7110_MAX_OUTPUT	0	/* it's a decoder only */
 
 #define	I2C_SAA7110		0x9C	/* or 0x9E */
 

@@ -338,7 +338,7 @@ restore_ia32_fpstate_live (struct _fpstate_ia32 *save)
 	/*
 	 * Updating fsr, fcr, fir, fdr.
 	 * Just a bit more complicated than save.
-	 * - Need to make sure that we dont write any value other than the
+	 * - Need to make sure that we don't write any value other than the
 	 *   specific fpstate info
 	 * - Need to make sure that the untouched part of frs, fdr, fir, fcr
 	 *   should remain same while writing.

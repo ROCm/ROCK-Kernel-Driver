@@ -170,7 +170,7 @@ valid_k7:
 /*
  * TSC synchronization.
  *
- * We first check wether all CPUs have their TSC's synchronized,
+ * We first check whether all CPUs have their TSC's synchronized,
  * then we print a warning if not, and always resync.
  */
 
@@ -956,7 +956,7 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 	smp_tune_scheduling();
 
 	/*
-	 * If we couldnt find an SMP configuration at boot time,
+	 * If we couldn't find an SMP configuration at boot time,
 	 * get out of here now!
 	 */
 	if (!smp_found_config) {

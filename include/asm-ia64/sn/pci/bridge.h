@@ -14,7 +14,7 @@
  * bridge.h - header file for bridge chip and bridge portion of xbridge chip
  *
  * Also including offsets for unique PIC registers.
- * The PIC asic is a follow-on to Xbridge and most of it's registers are
+ * The PIC asic is a follow-on to Xbridge and most of its registers are
  * identical to those of Xbridge.  PIC is different than Xbridge in that
  * it will accept 64 bit register access and that, in some cases, data
  * is kept in bits 63:32.   PIC registers that are identical to Xbridge
@@ -1684,7 +1684,7 @@ typedef volatile struct bridge_s {
 /* RRB clear register */
 #define	BRIDGE_RRB_CLEAR(r)	(0x00000001<<(r))
 
-/* Defines for the virtual channels so we dont hardcode 0-3 within code */
+/* Defines for the virtual channels so we don't hardcode 0-3 within code */
 #define VCHAN0	0	/* virtual channel 0 (ie. the "normal" channel) */
 #define VCHAN1	1	/* virtual channel 1 */
 #define VCHAN2	2	/* virtual channel 2 - PIC only */

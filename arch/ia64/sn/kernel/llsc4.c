@@ -301,7 +301,7 @@ ran_conf_llsc(int thread)
 		 */
 		linei = randn(linecount, &seed);
 		sharei = randn(2, &seed);
-		slinei = (linei + (linecount/2))%linecount;		/* I dont like this - fix later */
+		slinei = (linei + (linecount/2))%linecount;		/* I don't like this - fix later */
 
 		linep = (dataline_t *)blocks[linei];
 		slinep = (dataline_t *)blocks[slinei];

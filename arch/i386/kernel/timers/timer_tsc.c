@@ -264,7 +264,7 @@ static int init_tsc(void)
  	 *	the ident/bugs checks so we must run this hook as it
  	 *	may turn off the TSC flag.
  	 *
- 	 *	NOTE: this doesnt yet handle SMP 486 machines where only
+ 	 *	NOTE: this doesn't yet handle SMP 486 machines where only
  	 *	some CPU's have a TSC. Thats never worked and nobody has
  	 *	moaned if you have the only one in the world - you fix it!
  	 */

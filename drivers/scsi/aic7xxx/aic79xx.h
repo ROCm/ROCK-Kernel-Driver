@@ -180,7 +180,7 @@ do {								\
 
 /*
  * Define the size of our QIN and QOUT FIFOs.  They must be a power of 2
- * in size and accomodate as many transactions as can be queued concurrently.
+ * in size and accommodate as many transactions as can be queued concurrently.
  */
 #define	AHD_QIN_SIZE	AHD_MAX_QUEUE
 #define	AHD_QOUT_SIZE	AHD_MAX_QUEUE

@@ -340,7 +340,7 @@ int i2o_remove_handler(struct i2o_handler *h)
 
 /*
  *	Each I2O controller has a chain of devices on it.
- * Each device has a pointer to it's LCT entry to be used
+ * Each device has a pointer to its LCT entry to be used
  * for fun purposes.
  */
 

@@ -702,7 +702,7 @@ hycapi_cleanup(void)
 /********************************************************************
 hycapi_capi_create(hysdn_card *card)
 
-Attach the card with it's capi-ctrl.
+Attach the card with its capi-ctrl.
 *********************************************************************/
 
 static void hycapi_fill_profile(hysdn_card *card)

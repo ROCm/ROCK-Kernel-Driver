@@ -2963,7 +2963,7 @@ static int nbr_partitions(Scsi_Tape *STp)
    set the size of partition 1. There is no size field for the default partition.
    Michael Schaefer's Sony SDT-7000 returns two descriptors and the second is
    used to set the size of partition 1 (this is what the SCSI-3 standard specifies).
-   The following algorithm is used to accomodate both drives: if the number of
+   The following algorithm is used to accommodate both drives: if the number of
    partition size fields is greater than the maximum number of additional partitions
    in the mode page, the second field is used. Otherwise the first field is used.
 

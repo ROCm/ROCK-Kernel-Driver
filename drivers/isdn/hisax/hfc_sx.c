@@ -97,7 +97,7 @@ fifo_select(struct IsdnCardState *cs, u8 fifo)
 
 /******************************************/
 /* reset the specified fifo to defaults.  */
-/* If its a send fifo init needed markers */
+/* If it's a send fifo init needed markers */
 /******************************************/
 static void
 reset_fifo(struct IsdnCardState *cs, u8 fifo)
@@ -1200,7 +1200,7 @@ setup_hfcsx(struct IsdnCard *card)
 						printk(KERN_ERR "HFC PnP: attach failed\n");
 						return 0;
 					}
-					if (pnp_activate_dev(pd, NULL) < 0) {
+					if (pnp_activate_dev(pd) < 0) {
 						printk(KERN_ERR "HFC PnP: activate failed\n");
 						pnp_device_detach(pd);
 						return 0;

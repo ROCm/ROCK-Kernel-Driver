@@ -499,7 +499,7 @@ u_char *addr;
 		fi->q.ptr_tachyon_header[i] = fi->q.ptr_tachyon_header_base + 16*i;
 	
 	/* Allocate memory for indices.
-	 * Indices should be aligned on 32 byte boundries. 
+	 * Indices should be aligned on 32 byte boundaries. 
 	 */
 	fi->q.host_ocq_cons_indx = kmalloc(2*32, GFP_KERNEL);
 	if (fi->q.host_ocq_cons_indx == NULL){ 
@@ -748,7 +748,7 @@ int index, no_of_entries = 0;
 	else
 		if (current_IMQ_index < fi->q.imq_cons_indx)
 			no_of_entries = IMQ_LENGTH - (fi->q.imq_cons_indx - current_IMQ_index);
-	/* We dont want to look at the same IMQ entry again. 
+	/* We don't want to look at the same IMQ entry again. 
 	 */
 	temp_imq_cons_indx = fi->q.imq_cons_indx + 1;
 	if (no_of_entries != 0)
@@ -2263,7 +2263,7 @@ u_int r_ctl = RCTL_ELS_UCTL;
 u_int type  = TYPE_ELS | SEQUENCE_INITIATIVE | FIRST_SEQUENCE;
 u_int my_mtu = fi->g.my_mtu;
 	ENTER("tx_logi");
-	/* We dont want interrupted for our own logi. 
+	/* We don't want interrupted for our own logi. 
 	 * It screws up the port discovery process. 
 	 */
 	if (d_id == fi->g.my_id)
@@ -2567,7 +2567,7 @@ int count = 0;
 	}
 	/* Perform Port Discovery after timer expires.
 	 * We are giving time for the ADISCed nodes to respond
-	 * so that we dont have to perform PLOGI to those whose
+	 * so that we don't have to perform PLOGI to those whose
 	 * login are _still_ valid.
 	 */
 	fi->explore_timer.function = port_discovery_timer;
@@ -3527,7 +3527,7 @@ u_int s_id;
 						/* There might be some new nodes to be 
 						 * discovered. But, some of the earlier 
 						 * requests as a result of the RSCN might be 
-						 * in progress. We dont want to duplicate that 
+						 * in progress. We don't want to duplicate that 
 						 * effort. So letz call SCR after a lag.
 						 */
 						fi->explore_timer.function = scr_timer;

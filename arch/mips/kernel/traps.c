@@ -793,7 +793,7 @@ void __init trap_init(void)
 	/* Some firmware leaves the BEV flag set, clear it.  */
 	clear_cp0_status(ST0_BEV);
 
-	/* Copy the generic exception handler code to it's final destination. */
+	/* Copy the generic exception handler code to its final destination. */
 	memcpy((void *)(KSEG0 + 0x80), &except_vec1_generic, 0x80);
 	memcpy((void *)(KSEG0 + 0x100), &except_vec2_generic, 0x80);
 	memcpy((void *)(KSEG0 + 0x180), &except_vec3_generic, 0x80);
@@ -805,7 +805,7 @@ void __init trap_init(void)
 		set_except_vector(i, handle_reserved);
 
 	/* 
-	 * Copy the EJTAG debug exception vector handler code to it's final 
+	 * Copy the EJTAG debug exception vector handler code to its final 
 	 * destination.
 	 */
 	memcpy((void *)(KSEG0 + 0x300), &except_vec_ejtag_debug, 0x80);

@@ -1215,7 +1215,7 @@ static void get_sample_stats(int cpu)
 #ifdef OFFLINE_SAMPLE
 static void sample_queue(unsigned long dummy)
 {
-/* 10 ms 0r 1ms -- i dont care -- JHS */
+/* 10 ms 0r 1ms -- i don't care -- JHS */
 	int next_tick = 1;
 	int cpu = smp_processor_id();
 

@@ -435,7 +435,7 @@ void DivasOut(ADAPTER * a)
     a->ram_out(a, &ReqOut->ReqId, this->Id);
     a->ram_out(a, &ReqOut->ReqCh, this->ReqCh);
 
-        /* if its a specific request (no ASSIGN) ...                */
+        /* if it's a specific request (no ASSIGN) ...                */
 
     if(this->Id &0x1f) {
 

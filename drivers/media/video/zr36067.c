@@ -3629,7 +3629,7 @@ static int do_zoran_ioctl(struct zoran *zr, unsigned int cmd,
 			       ("%s: ioctl VIDIOCCAPTURE: %d\n", zr->name,
 				v));
 
-			/* If there is nothing to do, return immediatly */
+			/* If there is nothing to do, return immediately */
 
 			if ((v && zr->v4l_overlay_active)
 			    || (!v && !zr->v4l_overlay_active))
@@ -4048,7 +4048,7 @@ static int do_zoran_ioctl(struct zoran *zr, unsigned int cmd,
 
 			zr->params = bp;
 
-			/* Make changes of input and norm go into effect immediatly */
+			/* Make changes of input and norm go into effect immediately */
 
 			/* We switch overlay off and on since a change in the norm
 			   needs different VFE settings */

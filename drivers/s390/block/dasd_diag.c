@@ -467,7 +467,7 @@ dasd_diag_dump_sense(dasd_device_t *device, dasd_ccw_req_t * req,
  * the diag_bio_t for each block has 16 bytes. 
  * That makes:
  * (8192 - 96 - 8) / 16 = 505.5 blocks at maximum.
- * We want to fit two into the available memory so that we can immediatly
+ * We want to fit two into the available memory so that we can immediately
  * start the next request if one finishes off. That makes 252.75 blocks
  * for one request. Give a little safety and the result is 240.
  */

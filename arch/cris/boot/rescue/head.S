@@ -130,7 +130,7 @@ in_cache:
 
 	;; first put a jump test to give a possibility of upgrading the rescue code
 	;; without erasing/reflashing the sector. we put a longword of -1 here and if
-	;; its not -1, we jump using the value as jump target. since we can always
+	;; it is not -1, we jump using the value as jump target. since we can always
 	;; change 1's to 0's without erasing the sector, it is possible to add new
 	;; code after this and altering the jumptarget in an upgrade.
 

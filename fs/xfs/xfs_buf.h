@@ -153,7 +153,7 @@ typedef struct pb_target xfs_buftarg_t;
 
 #define XFS_BUF_PTR(bp)		(xfs_caddr_t)((bp)->pb_addr)
 
-extern inline xfs_caddr_t xfs_buf_offset(page_buf_t *bp, off_t offset)
+extern inline xfs_caddr_t xfs_buf_offset(page_buf_t *bp, size_t offset)
 {
 	if (bp->pb_flags & PBF_MAPPED)
 		return XFS_BUF_PTR(bp) + offset;

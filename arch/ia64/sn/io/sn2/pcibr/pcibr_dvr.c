@@ -849,7 +849,7 @@ pcibr_device_info_new(
      * will set the c_slot (which is suppose to represent the external
      * slot (i.e the slot number silk screened on the back of the I/O
      * brick)).  So for PIC we need to adjust this "internal slot" num
-     * passed into us, into it's external representation.  See comment
+     * passed into us, into its external representation.  See comment
      * for the PCIBR_DEVICE_TO_SLOT macro for more information.
      */
     NEW(pcibr_info);
@@ -1527,7 +1527,7 @@ pcibr_attach2(devfs_handle_t xconn_vhdl, bridge_t *bridge,
 	/* enable parity checking on PICs internal RAM */
 	pic_ctrl_reg |= PIC_CTRL_PAR_EN_RESP;
 	pic_ctrl_reg |= PIC_CTRL_PAR_EN_ATE;
-	/* PIC BRINGUP WAR (PV# 862253): dont enable write request
+	/* PIC BRINGUP WAR (PV# 862253): don't enable write request
 	 * parity checking.
 	 */
 	if (!PCIBR_WAR_ENABLED(PV862253, pcibr_soft)) {

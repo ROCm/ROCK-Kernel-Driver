@@ -97,7 +97,7 @@ extern dma_addr_t pci_map_page(struct pci_dev *, struct page *,
 /* Unmap a single streaming mode DMA translation.  The DMA_ADDR and
    SIZE must match what was provided for in a previous pci_map_single
    call.  All other usages are undefined.  After this call, reads by
-   the cpu to the buffer are guarenteed to see whatever the device
+   the cpu to the buffer are guaranteed to see whatever the device
    wrote there.  */
 
 extern void pci_unmap_single(struct pci_dev *, dma_addr_t, size_t, int);

@@ -976,7 +976,7 @@ RIORemoveFromSavedTable(struct rio_info *p, struct Map *pMap)
     /*
     ** We loop for all entries even after finding an entry and
     ** zeroing it because we may have two entries to delete if
-    ** its a 16 port RTA.
+    ** it's a 16 port RTA.
     */
     for (entry = 0; entry < TOTAL_MAP_ENTRIES; entry++)
     {

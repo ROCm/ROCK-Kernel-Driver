@@ -40,6 +40,18 @@
 #define	MCFTIMER_TCN		0x06		/* Timer Counter reg (r/w) */
 #define	MCFTIMER_TER		0x11		/* Timer Event reg (r/w) */
 
+struct mcftimer {
+	unsigned short	tmr;			/* Timer Mode reg (r/w) */
+	unsigned short	reserved1;
+	unsigned short	trr;			/* Timer Reference (r/w) */
+	unsigned short	reserved2;
+	unsigned short	tcr;			/* Timer Capture reg (r/w) */
+	unsigned short	reserved3;
+	unsigned short	tcn;			/* Timer Counter reg (r/w) */
+	unsigned short	reserved4;
+	unsigned char	reserved5;
+	unsigned char	ter;			/* Timer Event reg (r/w) */
+} __attribute__((packed));
 
 /*
  *	Bit definitions for the Timer Mode Register (TMR).

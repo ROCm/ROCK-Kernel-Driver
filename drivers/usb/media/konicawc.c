@@ -266,7 +266,7 @@ static int konicawc_compress_iso(struct uvd *uvd, struct urb *dataurb, struct ur
 			sts &= ~0x40;
 		}
 		
-		/* work out the button status, but dont do
+		/* work out the button status, but don't do
 		   anything with it for now */
 
 		if(button != cam->buttonsts) {
@@ -607,7 +607,7 @@ static int konicawc_set_video_mode(struct uvd *uvd, struct video_window *vw)
 	}
 
 	if(newsize > MAX_FRAME_SIZE) {
-		DEBUG(1, "couldnt find size %d,%d", x, y);
+		DEBUG(1, "couldn't find size %d,%d", x, y);
 		return -EINVAL;
 	}
 
@@ -806,7 +806,7 @@ static int konicawc_probe(struct usb_interface *intf, const struct usb_device_id
 				while(i--) {
 					usb_free_urb(cam->sts_urb[i]);
 				}
-				err("cant allocate urbs");
+				err("can't allocate urbs");
 				return -ENOMEM;
 			}
 		}

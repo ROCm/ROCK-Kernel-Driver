@@ -35,7 +35,7 @@
       wich one should i use ? is there any preferred one ? It seems ARGB is
       the one ...
 -TODO: in  set_var check the validity of timings (hsync vsync)...
--TODO: check and recheck the use of sst_wait_idle : we dont flush the fifo via
+-TODO: check and recheck the use of sst_wait_idle : we don't flush the fifo via
        a nop command. so it's ok as long as the commands we pass don't go
        through the fifo. warning: issuing a nop command seems to need pci_fifo
 -FIXME: in case of failure in the init sequence, be sure we return to a safe

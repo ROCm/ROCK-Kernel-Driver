@@ -198,7 +198,7 @@ extern unsigned long empty_zero_page[PAGE_SIZE/sizeof(unsigned long)];
  * Find an entry in a page-table-directory.  We combine the address region 
  * (the high order N bits) and the pgd portion of the address.
  */
-/* to avoid overflow in free_pgtables we dont use PTRS_PER_PGD here */
+/* to avoid overflow in free_pgtables we don't use PTRS_PER_PGD here */
 #define pgd_index(address) (((address) >> (PGDIR_SHIFT)) & 0x7ff)
 
 #define pgd_offset(mm, address)	 ((mm)->pgd + pgd_index(address))

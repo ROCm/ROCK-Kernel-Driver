@@ -85,8 +85,8 @@ void
 cmn_err(register int level, char *fmt, ...)
 {
 	char	*fp = fmt;
+	ulong	flags;
 	int	len;
-	unsigned long flags;
 	va_list	ap;
 
 	level &= XFS_ERR_MASK;
@@ -110,8 +110,8 @@ cmn_err(register int level, char *fmt, ...)
 void
 icmn_err(register int level, char *fmt, va_list ap)
 {
+	ulong	flags;
 	int	len;
-	int	flags;
 
 	level &= XFS_ERR_MASK;
 	if(level > XFS_MAX_ERR_LEVEL)

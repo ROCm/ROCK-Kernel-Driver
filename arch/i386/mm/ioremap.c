@@ -205,6 +205,7 @@ void *ioremap_nocache (unsigned long phys_addr, unsigned long size)
 			iounmap(p); 
 			p = NULL;
 		}
+		global_flush_tlb();
 	} 
 
 	return p;					
@@ -226,6 +227,7 @@ void iounmap(void *addr)
 		change_page_attr(virt_to_page(__va(p->phys_addr)),
 				 p->size >> PAGE_SHIFT,
 				 PAGE_KERNEL); 				 
+		global_flush_tlb();
 	} 
 	kfree(p); 
 }

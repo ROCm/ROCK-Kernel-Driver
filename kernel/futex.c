@@ -297,7 +297,7 @@ static int futex_wait(unsigned long uaddr,
 		time = schedule_timeout(time);
 	set_current_state(TASK_RUNNING);
 	/*
-	 * NOTE: we dont remove ourselves from the waitqueue because
+	 * NOTE: we don't remove ourselves from the waitqueue because
 	 * we are the only user of it.
 	 */
 	if (time == 0) {

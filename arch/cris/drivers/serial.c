@@ -132,7 +132,7 @@
  *   Items worth noticing:
  *
  *      No Etrax100 port 1 workarounds (does only compile on 2.4 anyway now)
- *      RS485 is not ported (why cant it be done in userspace as on x86 ?)
+ *      RS485 is not ported (why can't it be done in userspace as on x86 ?)
  *      Statistics done through async_icount - if any more stats are needed,
  *      that's the place to put them or in an arch-dep version of it.
  *      timeout_interrupt and the other fast timeout stuff not ported yet
@@ -1766,7 +1766,7 @@ will look differently:
 
 B= Break character (0x00) with framing error.
 E= Error byte with parity error received after B characters.
-F= "Faked" valid byte received immediatly after B characters.
+F= "Faked" valid byte received immediately after B characters.
 V= Valid byte
 
 1.

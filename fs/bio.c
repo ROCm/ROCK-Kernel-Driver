@@ -334,7 +334,7 @@ oom:
  *	@bdev:  I/O target
  *
  *	Return the approximate number of pages we can send to this target.
- *	There's no guarentee that you will be able to fit this number of pages
+ *	There's no guarantee that you will be able to fit this number of pages
  *	into a bio, it does not account for dynamic restrictions that vary
  *	on offset.
  */

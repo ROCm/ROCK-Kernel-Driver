@@ -1112,7 +1112,7 @@ int dbExtend(struct inode *ip, s64 blkno, s64 nblocks, s64 addnblocks)
 	 * current allocation in place if the number of additional blocks
 	 * can fit into a dmap, the last block of the current allocation
 	 * is not the last block of the file system, and the start of the
-	 * inplace extension is not on an allocation group boundry.
+	 * inplace extension is not on an allocation group boundary.
 	 */
 	if (addnblocks > BPERDMAP || extblkno >= bmp->db_mapsize ||
 	    (extblkno & (bmp->db_agsize - 1)) == 0) {

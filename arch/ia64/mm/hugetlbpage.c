@@ -26,6 +26,8 @@ static long    htlbzone_pages;
 static LIST_HEAD(htlbpage_freelist);
 static spinlock_t htlbpage_lock = SPIN_LOCK_UNLOCKED;
 
+void free_huge_page(struct page *page);
+
 static struct page *alloc_hugetlb_page(void)
 {
 	int i;
@@ -42,6 +44,7 @@ static struct page *alloc_hugetlb_page(void)
 	htlbpagemem--;
 	spin_unlock(&htlbpage_lock);
 	set_page_count(page, 1);
+	page->lru.prev = (void *)free_huge_page;
 	for (i = 0; i < (HPAGE_SIZE/PAGE_SIZE); ++i)
 		clear_highpage(&page[i]);
 	return page;

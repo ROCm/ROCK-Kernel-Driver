@@ -84,10 +84,10 @@ typedef struct pda_s {
  * the IA64 cpu_data area. A full page is allocated for the cp_data area for each
  * cpu but only a small amout of the page is actually used. We put the SNIA PDA
  * in the same page as the cpu_data area. Note that there is a check in the setup
- * code to verify that we dont overflow the page.
+ * code to verify that we don't overflow the page.
  *
  * Seems like we should should cache-line align the pda so that any changes in the
- * size of the cpu_data area dont change cache layout. Should we align to 32, 64, 128
+ * size of the cpu_data area don't change cache layout. Should we align to 32, 64, 128
  * or 512 boundary. Each has merits. For now, pick 128 but should be revisited later.
  */
 DECLARE_PER_CPU(struct pda_s, pda_percpu);

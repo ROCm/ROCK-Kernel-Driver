@@ -311,18 +311,14 @@ static int adm1021_detect(struct i2c_adapter *adapter, int address,
 		goto error3;
 
 	/* Register a new directory entry with module sensors */
-	if ((i = i2c_register_entry(new_client,
-					type_name,
-					data->type ==
-					adm1021 ?
-					adm1021_dir_table_template :
-					adm1021_max_dir_table_template,
-					THIS_MODULE)) < 0) {
-		err = i;
+	err = i2c_register_entry(new_client, type_name,
+			(data->type == adm1021) ?
+				adm1021_dir_table_template :
+				adm1021_max_dir_table_template);
+	if (err < 0)
 		goto error4;
-	}
-	data->sysctl_id = i;
 
+	data->sysctl_id = err;
 	/* Initialize the ADM1021 chip */
 	adm1021_init_client(new_client);
 	return 0;

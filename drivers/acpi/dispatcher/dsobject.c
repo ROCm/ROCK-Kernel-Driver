@@ -396,7 +396,7 @@ acpi_ds_create_node (
 		return_ACPI_STATUS (status);
 	}
 
-	/* Re-type the object according to it's argument */
+	/* Re-type the object according to its argument */
 
 	node->type = ACPI_GET_OBJECT_TYPE (obj_desc);
 

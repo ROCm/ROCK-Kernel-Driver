@@ -127,7 +127,7 @@ int probe_cs4232(struct address_info *hw_config, int isapnp_configured)
 	 * method conflicts with possible PnP support in the OS. For this reason 
 	 * driver is just a temporary kludge.
 	 *
-	 * Also the Cirrus/Crystal method doesnt always work. Try ISA PnP first ;)
+	 * Also the Cirrus/Crystal method doesn't always work. Try ISA PnP first ;)
 	 */
 
 	/*

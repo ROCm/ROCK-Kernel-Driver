@@ -830,8 +830,8 @@ xfs_da_node_toosmall(xfs_da_state_t *state, int *action)
 	node = (xfs_da_intnode_t *)info;
 	count = INT_GET(node->hdr.count, ARCH_CONVERT);
 	if (count > (state->node_ents >> 1)) {
-		*action = 0;	/* blk over 50%, dont try to join */
-		return(0);	/* blk over 50%, dont try to join */
+		*action = 0;	/* blk over 50%, don't try to join */
+		return(0);	/* blk over 50%, don't try to join */
 	}
 
 	/*

@@ -100,7 +100,7 @@ extern void smp_send_flush_tlb (void) __attribute((weak));
 
 /*
  * The following table/struct is for remembering PTC coherency domains. It
- * is also used to translate sapicid into cpuids. We dont want to start 
+ * is also used to translate sapicid into cpuids. We don't want to start 
  * cpus unless we know their cache domain.
  */
 #ifdef PTC_NOTYET

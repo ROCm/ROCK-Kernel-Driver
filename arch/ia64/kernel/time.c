@@ -27,7 +27,7 @@
 extern unsigned long wall_jiffies;
 extern unsigned long last_time_offset;
 
-u64 jiffies_64;
+u64 jiffies_64 = INITIAL_JIFFIES;
 
 #ifdef CONFIG_IA64_DEBUG_IRQ
 

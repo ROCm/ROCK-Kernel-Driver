@@ -50,7 +50,7 @@ extern unsigned long powersave_nap;
 
 /*
  * We use a single global lock to protect accesses. Each driver has
- * to take care of it's own locking
+ * to take care of its own locking
  */
 static spinlock_t feature_lock  __pmacdata = SPIN_LOCK_UNLOCKED;
 

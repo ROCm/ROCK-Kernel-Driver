@@ -64,8 +64,8 @@ extern xfs_param_t	xfs_params;
 extern void xfs_sysctl_register(void);
 extern void xfs_sysctl_unregister(void);
 #else
-static __inline void xfs_sysctl_register(void) { };
-static __inline void xfs_sysctl_unregister(void) { };
-#endif
+# define xfs_sysctl_register()		do { } while (0)
+# define xfs_sysctl_unregister()	do { } while (0)
+#endif /* CONFIG_SYSCTL */
 
 #endif /* __XFS_SYSCTL_H__ */

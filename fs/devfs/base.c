@@ -1312,7 +1312,7 @@ static struct devfs_entry *get_devfs_entry_from_vfs_inode (struct inode *inode)
  *	free_dentry - Free the dentry for a device entry and invalidate inode.
  *	@de: The entry.
  *
- *	This must only be called after the entry has been unhooked from it's
+ *	This must only be called after the entry has been unhooked from its
  *	 parent directory.
  */
 
@@ -1584,7 +1584,7 @@ static int _devfs_unhook (struct devfs_entry *de)
 
 
 /**
- *	_devfs_unregister - Unregister a device entry from it's parent.
+ *	_devfs_unregister - Unregister a device entry from its parent.
  *	@dir: The parent directory.
  *	@de: The entry to unregister.
  *
@@ -2658,7 +2658,7 @@ static int devfs_rmdir (struct inode *dir, struct dentry *dentry)
     else de->u.dir.no_more_additions = TRUE;
     write_unlock (&de->u.dir.lock);
     if (err) return err;
-    /*  Now unhook the directory from it's parent  */
+    /*  Now unhook the directory from its parent  */
     write_lock (&de->parent->u.dir.lock);
     if ( !_devfs_unhook (de) ) err = -ENOENT;
     write_unlock (&de->parent->u.dir.lock);

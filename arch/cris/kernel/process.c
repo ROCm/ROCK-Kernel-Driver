@@ -154,7 +154,7 @@ void hard_reset_now (void)
 #if defined(CONFIG_ETRAX_WATCHDOG) && !defined(CONFIG_SVINTO_SIM)
 	cause_of_death = 0xbedead;
 #else
-	/* Since we dont plan to keep on reseting the watchdog,
+	/* Since we don't plan to keep on reseting the watchdog,
 	   the key can be arbitrary hence three */
 	*R_WATCHDOG = IO_FIELD(R_WATCHDOG, key, 3) |
 		IO_STATE(R_WATCHDOG, enable, start);
@@ -226,7 +226,7 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 
 	swstack = ((struct switch_stack *)childregs) - 1;
 
-	swstack->r9 = 0; /* parameter to ret_from_sys_call, 0 == dont restart the syscall */
+	swstack->r9 = 0; /* parameter to ret_from_sys_call, 0 == don't restart the syscall */
 
 	/* we want to return into ret_from_sys_call after the _resume */
 

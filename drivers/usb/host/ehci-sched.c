@@ -417,7 +417,7 @@ static int qh_schedule (struct ehci_hcd *ehci, struct ehci_qh *qh)
 		if (unlikely (ehci->pshadow [frame].ptr != 0)) {
 
 // FIXME -- just link toward the end, before any qh with a shorter period,
-// AND accomodate it already having been linked here (after some other qh)
+// AND accommodate it already having been linked here (after some other qh)
 // AS WELL AS updating the schedule checking logic
 
 			BUG ();

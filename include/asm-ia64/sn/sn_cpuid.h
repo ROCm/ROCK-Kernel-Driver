@@ -47,7 +47,7 @@
  *			hard_smp_processor_id()- cpu_physical_id of current processor
  *			cpu_physical_id(cpuid) - convert a <cpuid> to a <physical_cpuid>
  *			cpu_logical_id(phy_id) - convert a <physical_cpuid> to a <cpuid> 
- *				* not real efficient - dont use in perf critical code
+ *				* not real efficient - don't use in perf critical code
  *
  *         LID - processor defined register (see PRM V2).
  *

@@ -1001,7 +1001,7 @@ xfs_iread_extents(
 }
 
 /*
- * Allocate an inode on disk and return a copy of it's in-core version.
+ * Allocate an inode on disk and return a copy of its in-core version.
  * The in-core inode is locked exclusively.  Set mode, nlink, and rdev
  * appropriately within the inode.  The uid and gid for the inode are
  * set according to the contents of the given cred structure.

@@ -454,7 +454,7 @@ static int config_drive_for_dma (ide_drive_t *drive)
  *	An IDE DMA transfer timed out. In the event of an error we ask
  *	the driver to resolve the problem, if a DMA transfer is still
  *	in progress we continue to wait (arguably we need to add a 
- *	secondary 'I dont care what the drive thinks' timeout here)
+ *	secondary 'I don't care what the drive thinks' timeout here)
  *	Finally if we have an interrupt but for some reason got the
  *	timeout first we complete the I/O. This can occur if an 
  *	interrupt is lost or due to bugs.

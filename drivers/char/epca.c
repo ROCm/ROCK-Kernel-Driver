@@ -1865,7 +1865,7 @@ int __init pc_init(void)
 			case PCXI:
 				board_id = inb((int)bd->port);
 				if ((board_id & 0x1) == 0x1) 
-				{ /* Begin its an XI card */ 
+				{ /* Begin it's an XI card */ 
 
 					/* Is it a 64K board */
 					if ((board_id & 0x30) == 0) 

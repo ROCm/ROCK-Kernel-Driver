@@ -69,7 +69,7 @@
 /*
  * The maximum size (into the kernel or returned from the kernel) of an
  * attribute value or the buffer used for an attr_list() call.	Larger
- * sizes will result in an E2BIG return code.
+ * sizes will result in an ERANGE return code.
  */
 #define ATTR_MAX_VALUELEN	(64*1024)	/* max length of a value */
 

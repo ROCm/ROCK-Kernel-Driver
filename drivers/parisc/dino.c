@@ -755,7 +755,7 @@ static int __init dino_common_init(struct parisc_device *dev,
 
 	/*
 	** This enables DINO to generate interrupts when it sees
-	** any of it's inputs *change*. Just asserting an IRQ
+	** any of its inputs *change*. Just asserting an IRQ
 	** before it's enabled (ie unmasked) isn't good enough.
 	*/
 	gsc_writel(eim, dino_dev->hba.base_addr+DINO_IAR0);

@@ -191,9 +191,8 @@ static int lm75_detect(struct i2c_adapter *adapter, int address,
 		goto error3;
 
 	/* Register a new directory entry with module sensors */
-	if ((i = i2c_register_entry(new_client, type_name,
-					lm75_dir_table_template,
-					THIS_MODULE)) < 0) {
+	i = i2c_register_entry(new_client, type_name, lm75_dir_table_template);
+	if (i < 0) {
 		err = i;
 		goto error4;
 	}

@@ -252,7 +252,7 @@ static int debug=0;
 
 /* we try to setup 2^(dsps_order) /dev/dsp devices */
 static int dsps_order=0;
-/* wether or not we mess around with power management */
+/* whether or not we mess around with power management */
 static int use_pm=2; /* set to 1 for force */
 /* clocking for broken hardware - a few laptops seem to use a 50Khz clock
 	ie insmod with clocking=50000 or so */
@@ -292,7 +292,7 @@ MODULE_PARM(clocking, "i");
 
 
 /* changed so that I could actually find all the
-	references and fix them up.  its a little more readable now. */
+	references and fix them up.  it's a little more readable now. */
 #define ESS_FMT_STEREO	0x01
 #define ESS_FMT_16BIT	0x02
 #define ESS_FMT_MASK	0x03
@@ -804,7 +804,7 @@ ac97_recmask_io(struct ess_card *card, int read, int mask)
 
 	if (read) return val;
 
-	/* oss can have many inputs, maestro cant.  try
+	/* oss can have many inputs, maestro can't.  try
 		to pick the 'new' one */
 
 	if (mask != val) mask &= ~val;
@@ -1518,7 +1518,7 @@ ess_rec_setup(struct ess_state *ess, int mode, u32 rate, void *buffer, int size)
 				pa = virt_to_bus(buffer);
 			} else {
 				/* right channel records its split half.
-				*2 accomodates for rampant shifting earlier */
+				*2 accommodates for rampant shifting earlier */
 				pa = virt_to_bus(buffer + size*2);
 			}
 
@@ -3271,7 +3271,7 @@ maestro_config(struct ess_card *card)
 	outb(0x88, iobase+0x1f);
 
 	/* it appears some maestros (dell 7500) only work if these are set,
-		regardless of wether we use the assp or not. */
+		regardless of whether we use the assp or not. */
 
 	outb(0, iobase+0xA4); 
 	outb(3, iobase+0xA2); 
@@ -3507,7 +3507,7 @@ maestro_probe(struct pci_dev *pcidev,const struct pci_device_id *pdid)
 	 * 		or
 	 *		- we're not a 2e, lesser chipps seem to have problems.
 	 *		- we're not on our _very_ small whitelist.  some implemenetations
-	 *			really dont' like the pm code, others require it.
+	 *			really don't like the pm code, others require it.
 	 *			feel free to expand this as required.
 	 */
 #define SUBSYSTEM_VENDOR(x) (x&0xffff)

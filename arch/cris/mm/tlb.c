@@ -58,7 +58,7 @@ flush_tlb_all(void)
 	int i;
 	unsigned long flags;
 
-	/* the vpn of i & 0xf is so we dont write similar TLB entries
+	/* the vpn of i & 0xf is so we don't write similar TLB entries
 	 * in the same 4-way entry group. details.. 
 	 */
 

@@ -840,7 +840,7 @@ xfs_qm_dqlookup(
  * Given the file system, inode OR id, and type (UDQUOT/GDQUOT), return a
  * a locked dquot, doing an allocation (if requested) as needed.
  * When both an inode and an id are given, the inode's id takes precedence.
- * That is, if the id changes while we dont hold the ilock inside this
+ * That is, if the id changes while we don't hold the ilock inside this
  * function, the new dquot is returned, not necessarily the one requested
  * in the id argument.
  */

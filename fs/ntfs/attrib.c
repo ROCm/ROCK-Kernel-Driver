@@ -830,7 +830,7 @@ run_list_element *decompress_mapping_pairs(const ntfs_volume *vol,
 				goto io_error;
 			for (deltaxcn = (s8)buf[b--]; b > b2; b--)
 				deltaxcn = (deltaxcn << 8) + buf[b];
-			/* Change the current lcn to it's new value. */
+			/* Change the current lcn to its new value. */
 			lcn += deltaxcn;
 #ifdef DEBUG
 			/*

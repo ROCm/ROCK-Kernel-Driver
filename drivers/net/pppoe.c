@@ -292,7 +292,7 @@ static void pppoe_flush_dev(struct net_device *dev)
 
 				/* Now restart from the beginning of this
 				 * hash chain.  We always NULL out pppoe_dev
-				 * so we are guarenteed to make forward
+				 * so we are guaranteed to make forward
 				 * progress.
 				 */
 				po = item_hash_table[hash];

@@ -79,7 +79,7 @@ typedef struct {
 
 struct acpi_table_rsdt {
 	struct acpi_table_header header;
-	u32			entry[1];
+	u32			entry[8];
 } __attribute__ ((packed));
 
 /* Extended System Description Table (XSDT) */

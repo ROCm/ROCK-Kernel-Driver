@@ -293,7 +293,7 @@ typedef struct kl_config_hdr {
  * Each BOARD consists of COMPONENTs and the BOARD structure has 
  * pointers (offsets) to its COMPONENT structure.
  * The COMPONENT structure has version info, size and speed info, revision,
- * error info and the NIC info. This structure can accomodate any
+ * error info and the NIC info. This structure can accommodate any
  * BOARD with arbitrary COMPONENT composition.
  *
  * The ERRORINFO part of each BOARD has error information

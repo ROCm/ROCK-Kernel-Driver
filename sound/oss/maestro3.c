@@ -1916,8 +1916,8 @@ allocate_dmabuf(struct pci_dev *pci_dev, struct dmabuf *db)
      * the amazingly complicated prog_dmabuf wants it.
      *
      * pci_alloc_sonsistent guarantees that it won't cross a natural
-     * boundry; the m3 hardware can't have dma cross a 64k bus
-     * address boundry.
+     * boundary; the m3 hardware can't have dma cross a 64k bus
+     * address boundary.
      */
     for (order = 16-PAGE_SHIFT; order >= 1; order--) {
         db->rawbuf = pci_alloc_consistent(pci_dev, PAGE_SIZE << order,

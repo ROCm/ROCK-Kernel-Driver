@@ -830,7 +830,7 @@ struct gem_txd {
  * RX Kick register) by the driver it must make sure the buffers are
  * truly ready and that the ownership bits are set properly.
  *
- * Even though GEM modifies the RX descriptors, it guarentees that the
+ * Even though GEM modifies the RX descriptors, it guarantees that the
  * buffer DMA address field will stay the same when it performs these
  * updates.  Therefore it can be used to keep track of DMA mappings
  * by the host driver just as in the TX descriptor case above.

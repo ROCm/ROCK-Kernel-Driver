@@ -833,7 +833,7 @@ static unsigned int n_hdlc_tty_poll (struct tty_struct *tty,
 		poll_wait(filp, &tty->read_wait, wait);
 		poll_wait(filp, &tty->write_wait, wait);
 
-		/* set bits for operations that wont block */
+		/* set bits for operations that won't block */
 		if(n_hdlc->rx_buf_list.head)
 			mask |= POLLIN | POLLRDNORM;	/* readable */
 		if (test_bit(TTY_OTHER_CLOSED, &tty->flags))

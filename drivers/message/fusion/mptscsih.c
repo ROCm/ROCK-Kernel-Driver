@@ -4207,7 +4207,7 @@ static const char * ascq_set_strings_4max(
 	/*
 	 * Need to check ASC here; if it is "special," then
 	 * the ASCQ is variable, and indicates failed component number.
-	 * We must treat the ASCQ as a "dont care" while searching the
+	 * We must treat the ASCQ as a "don't care" while searching the
 	 * mptscsih_ASCQ_Table[] by masking it off, and then restoring it later
 	 * on when we actually need to identify the failed component.
 	 */

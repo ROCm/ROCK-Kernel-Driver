@@ -15,7 +15,7 @@
  * an odd scheme for converting hardware values to/from framebuffer values, here are
  * some hacked-up formulas:
  *
- *  The Dreamcast has screen offsets from each side of it's four borders and the start
+ *  The Dreamcast has screen offsets from each side of its four borders and the start
  *  offsets of the display window.  I used these values to calculate 'pseudo' values
  *  (think of them as placeholders) for the fb video mode, so that when it came time
  *  to convert these values back into their hardware values, I could just add mode-

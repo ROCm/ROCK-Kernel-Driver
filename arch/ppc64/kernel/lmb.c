@@ -73,7 +73,7 @@ lmb_init(void)
 	_lmb->reserved.cnt = 1;
 }
 
-/* This is only used here, it doesnt deserve to be in bitops.h */
+/* This is only used here, it doesn't deserve to be in bitops.h */
 static __inline__ long cnt_trailing_zeros(unsigned long mask)
 {
         long cnt;

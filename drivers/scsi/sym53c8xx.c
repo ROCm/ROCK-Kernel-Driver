@@ -4631,7 +4631,7 @@ ncr_script_copy_and_bind (ncb_p np,ncrcmd *src,ncrcmd *dst,int len)
 		case 0x8:
 			/*
 			**	JUMP / CALL
-			**	dont't relocate if relative :-)
+			**	don't relocate if relative :-)
 			*/
 			if (opcode & 0x00800000)
 				relocs = 0;
@@ -7953,7 +7953,7 @@ static void ncr_getsync(ncb_p np, u_char sfac, u_char *fakp, u_char *scntl3p)
 	/*
 	**	Why not to try the immediate lower divisor and to choose 
 	**	the one that allows the fastest output speed ?
-	**	We dont want input speed too much greater than output speed.
+	**	We don't want input speed too much greater than output speed.
 	*/
 	if (div >= 1 && fak < 8) {
 		u_long fak2, per2;

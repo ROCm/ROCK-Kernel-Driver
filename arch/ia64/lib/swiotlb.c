@@ -359,7 +359,7 @@ mark_clean (void *addr, size_t size)
  * was provided for in a previous swiotlb_map_single call.  All other usages are
  * undefined.
  *
- * After this call, reads by the cpu to the buffer are guarenteed to see whatever the
+ * After this call, reads by the cpu to the buffer are guaranteed to see whatever the
  * device wrote there.
  */
 void

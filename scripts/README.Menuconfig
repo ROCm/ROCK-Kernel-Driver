@@ -127,7 +127,7 @@ The windowing utility, lxdialog, will only be rebuilt if your kernel
 source tree is fresh, or changes are patched into it via a kernel
 patch or you do 'make mrproper'.  If changes to lxdialog are patched
 in, most likely the rebuild time will be short.  You may force a
-complete rebuild of lxdialog by changing to it's directory and doing
+complete rebuild of lxdialog by changing to its directory and doing
 'make clean all'
 
 If you use Menuconfig in an XTERM window make sure you have your 

@@ -309,7 +309,7 @@
  *	Thu Mar 15 18:38:11 EST 2001 - AM
  *
  *	Firmware version check removed if subsysid==0x1111 and
- *	subsysvid==0x1111, since its not yet initialized.
+ *	subsysvid==0x1111, since it's not yet initialized.
  *
  *	changes made to correctly calculate the base in mega_findCard.
  *
@@ -1714,7 +1714,7 @@ static int mega_driver_ioctl (mega_host_config * megaCfg, Scsi_Cmnd * SCpnt)
 	unsigned char *data = (unsigned char *) SCpnt->request_buffer;
 	mega_driver_info driver_info;
 
-	/* If this is not our command dont do anything */
+	/* If this is not our command don't do anything */
 	if (SCpnt->cmnd[0] != M_RD_DRIVER_IOCTL_INTERFACE)
 		return 0;
 
@@ -2879,7 +2879,7 @@ static int mega_findCard (Scsi_Host_Template * pHostTmpl,
 #endif
 		}
 
-		/* Hmmm...Should we not make this more modularized so that in future we dont add
+		/* Hmmm...Should we not make this more modularized so that in future we don't add
 		   for each firmware */
 
 		if (flag & BOARD_QUARTZ) {
@@ -2906,7 +2906,7 @@ static int mega_findCard (Scsi_Host_Template * pHostTmpl,
 			 * pci_vendor_id not subsysvid - AM
 			 */
 
-			/* If we dont detect this valid subsystem vendor id's 
+			/* If we don't detect this valid subsystem vendor id's 
 			   we refuse to load the driver 
 			   PART of PC200X compliance
 			 */

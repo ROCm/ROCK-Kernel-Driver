@@ -14,7 +14,7 @@
  *                         --------------------
  * 
  *	Top level handler for the sound subsystem. Various devices can
- *	plug into this. The fact they dont all go via OSS doesn't mean 
+ *	plug into this. The fact they don't all go via OSS doesn't mean 
  *	they don't have to implement the OSS API. There is a lot of logic
  *	to keeping much of the OSS weight out of the code in a compatibility
  *	module, but it's up to the driver to rember to load it...

@@ -1,6 +1,6 @@
 /*
  *    Copyright (c) 1996 Paul Mackerras <paulus@cs.anu.edu.au>
- *      Changes to accomodate Power Macintoshes.
+ *      Changes to accommodate Power Macintoshes.
  *    Cort Dougan <cort@cs.nmt.edu>
  *      Rewrites.
  *    Grant Erickson <grant@lcse.umn.edu>

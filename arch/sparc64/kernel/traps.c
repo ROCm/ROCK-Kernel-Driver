@@ -571,7 +571,7 @@ unsigned long __init cheetah_tune_scheduling(void)
 	unsigned long flush_linesize = ecache_flush_linesize;
 	unsigned long flush_size = ecache_flush_size;
 
-	/* Run through the whole cache to guarentee the timed loop
+	/* Run through the whole cache to guarantee the timed loop
 	 * is really displacing cache lines.
 	 */
 	__asm__ __volatile__("1: subcc	%0, %4, %0\n\t"

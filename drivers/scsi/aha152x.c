@@ -1131,7 +1131,7 @@ int aha152x_detect(Scsi_Host_Template * tpnt)
 	while ( setup_count<ARRAY_SIZE(setup) && (dev=pnp_find_dev(NULL, ISAPNP_VENDOR('A','D','P'), ISAPNP_FUNCTION(0x1505), dev)) ) {
 		if (pnp_device_attach(dev) < 0)
 			continue;
-		if (pnp_activate_dev(dev, NULL) < 0) {
+		if (pnp_activate_dev(dev) < 0) {
 			pnp_device_detach(dev);
 			continue;
 		}

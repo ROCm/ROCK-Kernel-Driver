@@ -30,7 +30,7 @@
 #include <asm/apic.h>
 #endif
 
-u64 jiffies_64; 
+u64 jiffies_64;
 
 extern int using_apic_timer;
 

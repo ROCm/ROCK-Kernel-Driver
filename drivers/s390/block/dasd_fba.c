@@ -389,7 +389,7 @@ dasd_fba_dump_sense(struct dasd_device_t *device, dasd_ccw_req_t * req,
  * locate record ccw for each block (stupid devices!) + 16 bytes of data.
  * That makes:
  * (8192 - 24 - 136 - 8 - 16) / 40 = 200.2 blocks at maximum.
- * We want to fit two into the available memory so that we can immediatly
+ * We want to fit two into the available memory so that we can immediately
  * start the next request if one finishes off. That makes 100.1 blocks
  * for one request. Give a little safety and the result is 96.
  */
