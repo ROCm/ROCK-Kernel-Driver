@@ -521,7 +521,12 @@ get_target_cpu (unsigned int gsi, int vector)
 			goto skip_numa_setup;
 
 		cpu_mask = node_to_cpumask(iosapic_lists[iosapic_index].node);
-		
+
+		for_each_cpu_mask(numa_cpu, cpu_mask) {
+			if (!cpu_online(numa_cpu))
+				cpu_clear(numa_cpu, cpu_mask);
+		}
+
 		num_cpus = cpus_weight(cpu_mask);
 
 		if (!num_cpus)

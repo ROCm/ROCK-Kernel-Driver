@@ -33,6 +33,8 @@
 #include <asm/sections.h>
 #include <asm/cputable.h>
 #include <asm/time.h>
+#include <asm/system.h>
+#include <asm/open_pic.h>
 
 /* WARNING !!! This will cause calibrate_delay() to be called,
  * but this is an __init function ! So you MUST go edit
@@ -51,10 +53,6 @@
 extern void low_choose_7447a_dfs(int dfs);
 extern void low_choose_750fx_pll(int pll);
 extern void low_sleep_handler(void);
-extern void openpic_suspend(struct sys_device *sysdev, u32 state);
-extern void openpic_resume(struct sys_device *sysdev);
-extern void enable_kernel_altivec(void);
-extern void enable_kernel_fp(void);
 
 /*
  * Currently, PowerMac cpufreq supports only high & low frequencies
@@ -208,7 +206,7 @@ static int __pmac pmu_set_cpu_speed(int low_speed)
 	printk(KERN_DEBUG "HID1, before: %x\n", mfspr(SPRN_HID1));
 #endif
 	/* Disable all interrupt sources on openpic */
-	openpic_suspend(NULL, 1);
+ 	openpic_set_priority(0xf);
 
 	/* Make sure the decrementer won't interrupt us */
 	asm volatile("mtdec %0" : : "r" (0x7fffffff));
@@ -275,7 +273,7 @@ static int __pmac pmu_set_cpu_speed(int low_speed)
 	wakeup_decrementer();
 
 	/* Restore interrupts */
-	openpic_resume(NULL);
+ 	openpic_set_priority(0);
 
 	/* Let interrupts flow again ... */
 	local_irq_enable();

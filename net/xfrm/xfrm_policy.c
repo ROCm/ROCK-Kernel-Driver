@@ -353,6 +353,7 @@ int xfrm_policy_insert(int dir, struct xfrm_policy *policy, int excl)
 			newpos = p;
 		if (delpol)
 			break;
+		p = &pol->next;
 	}
 	if (newpos)
 		p = newpos;

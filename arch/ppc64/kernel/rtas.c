@@ -572,15 +572,15 @@ void __init rtas_initialize(void)
 	 */
 	rtas.dev = of_find_node_by_name(NULL, "rtas");
 	if (rtas.dev) {
-		u64 *basep, *entryp;
+		u32 *basep, *entryp;
 		u32 *sizep;
 
-		basep = (u64 *)get_property(of_chosen, "linux,rtas-base", NULL);
-		sizep = (u32 *)get_property(of_chosen, "linux,rtas-size", NULL);
+		basep = (u32 *)get_property(rtas.dev, "linux,rtas-base", NULL);
+		sizep = (u32 *)get_property(rtas.dev, "rtas-size", NULL);
 		if (basep != NULL && sizep != NULL) {
 			rtas.base = *basep;
 			rtas.size = *sizep;
-			entryp = (u64 *)get_property(of_chosen, "linux,rtas-entry", NULL);
+			entryp = (u32 *)get_property(rtas.dev, "linux,rtas-entry", NULL);
 			if (entryp == NULL) /* Ugh */
 				rtas.entry = rtas.base;
 			else

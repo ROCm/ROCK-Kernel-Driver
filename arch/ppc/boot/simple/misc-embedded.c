@@ -218,7 +218,7 @@ load_kernel(unsigned long load_addr, int num_words, unsigned long cksum, bd_t *b
 	puts("done.\n");
 	{
 		struct bi_record *rec;
-		unsigned long initrd_loc;
+		unsigned long initrd_loc = 0;
 		unsigned long rec_loc = _ALIGN((unsigned long)(zimage_size) +
 				(1 << 20) - 1, (1 << 20));
 		rec = (struct bi_record *)rec_loc;

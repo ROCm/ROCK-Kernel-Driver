@@ -51,12 +51,14 @@
  *************************************************************************/
 static void ixdp2x01_irq_mask(unsigned int irq)
 {
-	*IXDP2X01_INT_MASK_SET_REG = IXP2000_BOARD_IRQ_MASK(irq);
+	ixp2000_reg_write(IXDP2X01_INT_MASK_SET_REG,
+				IXP2000_BOARD_IRQ_MASK(irq));
 }
 
 static void ixdp2x01_irq_unmask(unsigned int irq)
 {
-	*IXDP2X01_INT_MASK_CLR_REG = IXP2000_BOARD_IRQ_MASK(irq);
+	ixp2000_reg_write(IXDP2X01_INT_MASK_CLR_REG,
+				IXP2000_BOARD_IRQ_MASK(irq));
 }
 
 static u32 valid_irq_mask;
@@ -111,8 +113,8 @@ void __init ixdp2x01_init_irq(void)
 		valid_irq_mask = IXDP2801_VALID_IRQ_MASK;
 
 	/* Mask all interrupts from CPLD, disable simulation */
-	*IXDP2X01_INT_MASK_SET_REG = 0xffffffff;
-	*IXDP2X01_INT_SIM_REG = 0;
+	ixp2000_reg_write(IXDP2X01_INT_MASK_SET_REG, 0xffffffff);
+	ixp2000_reg_write(IXDP2X01_INT_SIM_REG, 0);
 
 	for (irq = NR_IXP2000_IRQS; irq < NR_IXDP2X01_IRQS; irq++) {
 		if (irq & valid_irq_mask) {
@@ -314,8 +316,8 @@ static struct flash_platform_data ixdp2x01_flash_platform_data = {
 
 static unsigned long ixdp2x01_flash_bank_setup(unsigned long ofs)
 {
-	*IXDP2X01_CPLD_FLASH_REG = 
-		((ofs >> IXDP2X01_FLASH_WINDOW_BITS) | IXDP2X01_CPLD_FLASH_INTERN);
+	ixp2000_reg_write(IXDP2X01_CPLD_FLASH_REG,
+		((ofs >> IXDP2X01_FLASH_WINDOW_BITS) | IXDP2X01_CPLD_FLASH_INTERN));
 	return (ofs & IXDP2X01_FLASH_WINDOW_MASK);
 }
 
@@ -340,14 +342,29 @@ static struct platform_device ixdp2x01_flash = {
 	.resource	= &ixdp2x01_flash_resource,
 };
 
+static struct ixp2000_i2c_pins ixdp2x01_i2c_gpio_pins = {
+	.sda_pin	= IXDP2X01_GPIO_SDA,
+	.scl_pin	= IXDP2X01_GPIO_SCL,
+};
+
+static struct platform_device ixdp2x01_i2c_controller = {
+	.name		= "IXP2000-I2C",
+	.id		= 0,
+	.dev		= {
+		.platform_data = &ixdp2x01_i2c_gpio_pins,
+	},
+	.num_resources	= 0
+};
+
 static struct platform_device *ixdp2x01_devices[] __initdata = {
-	&ixdp2x01_flash
+	&ixdp2x01_flash,
+	&ixdp2x01_i2c_controller
 };
 
 static void __init ixdp2x01_init_machine(void)
 {
-	*IXDP2X01_CPLD_FLASH_REG = 
-		(IXDP2X01_CPLD_FLASH_BANK_MASK | IXDP2X01_CPLD_FLASH_INTERN);
+	ixp2000_reg_write(IXDP2X01_CPLD_FLASH_REG,
+		(IXDP2X01_CPLD_FLASH_BANK_MASK | IXDP2X01_CPLD_FLASH_INTERN));
 	
 	ixdp2x01_flash_data.nr_banks =
 		((*IXDP2X01_CPLD_FLASH_REG & IXDP2X01_CPLD_FLASH_BANK_MASK) + 1);

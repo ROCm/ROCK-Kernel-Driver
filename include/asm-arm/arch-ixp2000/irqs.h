@@ -28,7 +28,7 @@
  * shift operation instead of having to map the IRQ number to
  * a HW IRQ number.
  */
-#define	IRQ_IXP2000_SWI			0 /* soft interrupt */
+#define	IRQ_IXP2000_SOFT_INT		0 /* soft interrupt */
 #define	IRQ_IXP2000_ERRSUM		1 /* OR of all bits in ErrorStatus reg*/
 #define	IRQ_IXP2000_UART		2
 #define	IRQ_IXP2000_GPIO		3
@@ -67,22 +67,7 @@
 #define IRQ_IXP2000_PCIA		40
 #define IRQ_IXP2000_PCIB		41
 
-/* Int sources from IRQ_ERROR_STATUS */
-#define IRQ_IXP2000_DRAM0_MIN_ERR	42
-#define IRQ_IXP2000_DRAM0_MAJ_ERR	43
-#define IRQ_IXP2000_DRAM1_MIN_ERR	44
-#define IRQ_IXP2000_DRAM1_MAJ_ERR	45
-#define IRQ_IXP2000_DRAM2_MIN_ERR	46
-#define IRQ_IXP2000_DRAM2_MAJ_ERR	47
-#define IRQ_IXP2000_SRAM0_ERR		48
-#define IRQ_IXP2000_SRAM1_ERR		49
-#define IRQ_IXP2000_SRAM2_ERR           50
-#define IRQ_IXP2000_SRAM3_ERR		51
-#define IRQ_IXP2000_MEDIA_ERR		52
-#define IRQ_IXP2000_PCI_ERR		53
-#define IRQ_IXP2000_SP_INT		54
-
-#define NR_IXP2000_IRQS                 55
+#define NR_IXP2000_IRQS                 42
 
 #define	IXP2000_BOARD_IRQ(x)		(NR_IXP2000_IRQS + (x))
 
