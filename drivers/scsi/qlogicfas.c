@@ -475,7 +475,6 @@ int qlogicfas_queuecommand(Scsi_Cmnd * cmd, void (*done) (Scsi_Cmnd *))
 struct Scsi_Host *__qlogicfas_detect(Scsi_Host_Template *host, int qbase,
 								int qlirq)
 {
-	int i, j;		/* these are only used by IRQ detect */
 	int qltyp;		/* type of chip */
 	int qinitid;
 	struct Scsi_Host *hreg;	/* registered host structure */
@@ -490,20 +489,26 @@ struct Scsi_Host *__qlogicfas_detect(Scsi_Host_Template *host, int qbase,
 	 *	the second card, but I haven't tested this.
 	 */
 
-	if (!qbase) {
-		for (qbase = 0x230; qbase < 0x430; qbase += 0x100) {
-			if (!request_region(qbase, 0x10, qlogicfas_name))
-				continue;
-			REG1;
-			if (((inb(qbase + 0xe) ^ inb(qbase + 0xe)) == 7)
-			    && ((inb(qbase + 0xe) ^ inb(qbase + 0xe)) == 7))
-				break;
-			release_region(qbase, 0x10);
-		}
-		if (qbase == 0x430)
-			return NULL;
-	} else
-		printk(KERN_INFO "Ql: Using preset base address of %03x\n", qbase);
+	if (!qbase || qlirq == -1)
+		goto err;
+
+	if (!request_region(qbase, 0x10, qlogicfas_name)) {
+		printk(KERN_INFO "%s: address %#x is busy\n", qlogicfas_name,
+							      qbase);
+		goto err;
+	}
+
+	REG1;
+	if (((inb(qbase + 0xe) ^ inb(qbase + 0xe)) != 7)
+	    || ((inb(qbase + 0xe) ^ inb(qbase + 0xe)) != 7)) {
+		printk(KERN_WARNING "%s: probe failed for %#x\n",
+								qlogicfas_name,
+								qbase);
+		goto err_release_mem;
+	}
+
+	printk(KERN_INFO "%s: Using preset base address of %03x,"
+			 " IRQ %d\n", qlogicfas_name, qbase, qlirq);
 
 	qltyp = inb(qbase + 0xe) & 0xf8;
 	qinitid = host->this_id;
@@ -523,32 +528,6 @@ struct Scsi_Host *__qlogicfas_detect(Scsi_Host_Template *host, int qbase,
 		cpu_relax();
 	REG0;
 #endif
-
-	/*
-	 *	IRQ probe - toggle pin and check request pending 
-	 */
-
-	if (qlirq == -1) {
-		i = 0xffff;
-		j = 3;
-		outb(0x90, qbase + 3);	/* illegal command - cause interrupt */
-		REG1;
-		outb(10, 0x20);	/* access pending interrupt map */
-		outb(10, 0xa0);
-		while (j--) {
-			outb(0xb0 | QL_INT_ACTIVE_HIGH, qbase + 0xd);	/* int pin off */
-			i &= ~(inb(0x20) | (inb(0xa0) << 8));		/* find IRQ off */
-			outb(0xb4 | QL_INT_ACTIVE_HIGH, qbase + 0xd);	/* int pin on */
-			i &= inb(0x20) | (inb(0xa0) << 8);		/* find IRQ on */
-		}
-		REG0;
-		while (inb(qbase + 5));	/* purge int */
-		j = -1;
-		while (i)	/* find on bit */
-			i >>= 1, j++;	/* should check for exactly 1 on */
-		qlirq = j;
-	} else
-		printk(KERN_INFO "Ql: Using preset IRQ %d\n", qlirq);
 
 	hreg = scsi_host_alloc(host, sizeof(struct qlogicfas_priv));
 	if (!hreg)
@@ -587,6 +566,7 @@ free_scsi_host:
 
 err_release_mem:
 	release_region(qbase, 0x10);
+err:
 	return NULL;
 }
 
@@ -603,10 +583,9 @@ int __devinit qlogicfas_detect(Scsi_Host_Template *sht)
 {
 	struct Scsi_Host	*shost;
 	qlogicfas_priv_t	priv;
-	int	i,
-		num = 0;
+	int	num;
 
-	for (i = 0; i < MAX_QLOGICFAS; i++) {
+	for (num = 0; num < MAX_QLOGICFAS; num++) {
 		shost = __qlogicfas_detect(sht, iobase[num], irq[num]);
 		if (shost == NULL) {
 			/* no more devices */
@@ -615,7 +594,6 @@ int __devinit qlogicfas_detect(Scsi_Host_Template *sht)
 		priv = (qlogicfas_priv_t)&(shost->hostdata[0]);
 		priv->next = cards;
 		cards = priv;
-		num++;
 	}
 
 	return num;
@@ -747,6 +725,9 @@ static __init int qlogicfas_init(void)
 {
 	if (!qlogicfas_detect(&qlogicfas_driver_template)) {
 		/* no cards found */
+		printk(KERN_INFO "%s: no cards were found, please specify "
+				 "I/O address and IRQ using iobase= and irq= "
+				 "options", qlogicfas_name);
 		return -ENODEV;
 	}
 
