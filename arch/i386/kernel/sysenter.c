@@ -16,6 +16,7 @@
 #include <asm/cpufeature.h>
 #include <asm/msr.h>
 #include <asm/pgtable.h>
+#include <asm/unistd.h>
 
 extern asmlinkage void sysenter_entry(void);
 
@@ -73,10 +74,23 @@ static int __init sysenter_setup(void)
 		0x59,			/* pop %ecx */
 		0xc3			/* ret */
 	};
+	static const char sigreturn[] = {
+	/* 32: sigreturn point */
+		0x58,				/* popl %eax */
+		0xb8, __NR_sigreturn, 0, 0, 0,	/* movl $__NR_sigreturn, %eax */
+		0xcd, 0x80,			/* int $0x80 */
+	};
+	static const char rt_sigreturn[] = {
+	/* 64: rt_sigreturn point */
+		0xb8, __NR_rt_sigreturn, 0, 0, 0,	/* movl $__NR_rt_sigreturn, %eax */
+		0xcd, 0x80,			/* int $0x80 */
+	};
 	unsigned long page = get_zeroed_page(GFP_ATOMIC);
 
 	__set_fixmap(FIX_VSYSCALL, __pa(page), PAGE_READONLY);
 	memcpy((void *) page, int80, sizeof(int80));
+	memcpy((void *)(page + 32), sigreturn, sizeof(sigreturn));
+	memcpy((void *)(page + 64), rt_sigreturn, sizeof(rt_sigreturn));
 	if (!boot_cpu_has(X86_FEATURE_SEP))
 		return 0;
 
