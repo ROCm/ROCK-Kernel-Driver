@@ -511,7 +511,9 @@ int rescan_partitions(struct gendisk *disk, struct block_device *bdev)
 	bdev->bd_invalidated = 0;
 	for (p = 1; p < disk->minors; p++)
 		delete_partition(disk, p);
-	if (bdev->bd_op->revalidate)
+	if (bdev->bd_op->revalidate_disk)
+		bdev->bd_op->revalidate_disk(disk);
+	else if (bdev->bd_op->revalidate)
 		bdev->bd_op->revalidate(dev);
 	if (!get_capacity(disk) || !(state = check_partition(disk, bdev)))
 		return res;

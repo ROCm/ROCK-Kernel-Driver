@@ -80,6 +80,8 @@ struct gendisk {
 	char disk_name[16];		/* name of major driver */
 	struct hd_struct *part;		/* [indexed by minor] */
 	struct block_device_operations *fops;
+	struct request_queue *queue;
+	void *private_data;
 	sector_t capacity;
 	struct list_head list;
 	struct list_head full_list;

@@ -527,15 +527,20 @@ int check_disk_change(struct block_device *bdev)
 	struct block_device_operations * bdops = bdev->bd_op;
 	kdev_t dev = to_kdev_t(bdev->bd_dev);
 
-	if (bdops->check_media_change == NULL)
-		return 0;
-	if (!bdops->check_media_change(dev))
+	if (!bdops->media_changed) {
+		if (bdops->check_media_change == NULL)
+			return 0;
+		if (!bdops->check_media_change(dev))
+			return 0;
+	} else if (!bdops->media_changed(bdev->bd_disk))
 		return 0;
 
 	if (invalidate_device(dev, 0))
 		printk("VFS: busy inodes on changed media.\n");
 
-	if (bdops->revalidate)
+	if (bdops->revalidate_disk)
+		bdops->revalidate_disk(bdev->bd_disk);
+	else if (bdops->revalidate)
 		bdops->revalidate(dev);
 	if (bdev->bd_disk->minors > 1)
 		bdev->bd_invalidated = 1;
@@ -633,10 +638,14 @@ static int do_open(struct block_device *bdev, struct inode *inode, struct file *
 		if (!bdev->bd_openers)
 			bdev->bd_disk = disk;
 		if (!bdev->bd_queue) {
-			struct blk_dev_struct *p = blk_dev + major(dev);
-			bdev->bd_queue = &p->request_queue;
-			if (p->queue)
-				bdev->bd_queue =  p->queue(dev);
+			if (disk->queue)
+				bdev->bd_queue = disk->queue;
+			else {
+				struct blk_dev_struct *p = blk_dev + major(dev);
+				bdev->bd_queue = &p->request_queue;
+				if (p->queue)
+					bdev->bd_queue =  p->queue(dev);
+			}
 		}
 		if (bdev->bd_op->open) {
 			ret = bdev->bd_op->open(inode, file);
@@ -650,7 +659,6 @@ static int do_open(struct block_device *bdev, struct inode *inode, struct file *
 			bdi = blk_get_backing_dev_info(bdev);
 			if (bdi == NULL)
 				bdi = &default_backing_dev_info;
-			inode->i_data.backing_dev_info = bdi;
 			bdev->bd_inode->i_data.backing_dev_info = bdi;
 		}
 		if (bdev->bd_invalidated)
@@ -661,8 +669,7 @@ static int do_open(struct block_device *bdev, struct inode *inode, struct file *
 		if (!bdev->bd_openers) {
 			struct hd_struct *p;
 			p = disk->part + part - 1;
-			inode->i_data.backing_dev_info =
-			   bdev->bd_inode->i_data.backing_dev_info =
+			bdev->bd_inode->i_data.backing_dev_info =
 			   bdev->bd_contains->bd_inode->i_data.backing_dev_info;
 			if (!(disk->flags & GENHD_FL_UP) || !p->nr_sects) {
 				bdev->bd_contains->bd_part_count--;
@@ -685,6 +692,8 @@ static int do_open(struct block_device *bdev, struct inode *inode, struct file *
 
 out2:
 	if (!bdev->bd_openers) {
+		bdev->bd_queue = NULL;
+		bdev->bd_disk = NULL;
 		bdev->bd_inode->i_data.backing_dev_info = &default_backing_dev_info;
 		if (bdev != bdev->bd_contains) {
 			blkdev_put(bdev->bd_contains, BDEV_RAW);
