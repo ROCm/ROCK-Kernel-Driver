@@ -2785,7 +2785,8 @@ static int ipr_biosparam(struct scsi_device *sdev,
 			 struct block_device *block_device,
 			 sector_t capacity, int *parm)
 {
-	int heads, sectors, cylinders;
+	int heads, sectors;
+	sector_t cylinders;
 
 	heads = 128;
 	sectors = 32;
