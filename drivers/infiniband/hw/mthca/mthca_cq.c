@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004 Topspin Communications.  All rights reserved.
+ * Copyright (c) 2004, 2005 Topspin Communications.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
  * licenses.  You may choose to be licensed under the terms of the GNU
@@ -391,6 +391,10 @@ static inline int mthca_poll_one(struct mthca_dev *dev,
 	if (!next_cqe_sw(cq))
 		return -EAGAIN;
 
+	/*
+	 * Make sure we read CQ entry contents after we've checked the
+	 * ownership bit.
+	 */
 	rmb();
 
 	cqe = get_cqe(cq, cq->cons_index);
@@ -768,7 +772,8 @@ void mthca_free_cq(struct mthca_dev *dev,
 		u32 *ctx = MAILBOX_ALIGN(mailbox);
 		int j;
 
-		printk(KERN_ERR "context for CQN %x\n", cq->cqn);
+		printk(KERN_ERR "context for CQN %x (cons index %x, next sw %d)\n",
+		       cq->cqn, cq->cons_index, next_cqe_sw(cq));
 		for (j = 0; j < 16; ++j)
 			printk(KERN_ERR "[%2x] %08x\n", j * 4, be32_to_cpu(ctx[j]));
 	}
