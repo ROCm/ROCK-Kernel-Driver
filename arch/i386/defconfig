@@ -98,6 +98,7 @@ CONFIG_CARDBUS=y
 # CONFIG_I82092 is not set
 # CONFIG_I82365 is not set
 # CONFIG_TCIC is not set
+# CONFIG_PCMCIA_SA1100 is not set
 
 #
 # PCI Hotplug Support
@@ -241,7 +242,7 @@ CONFIG_BLK_DEV_IDECD=y
 # CONFIG_BLK_DEV_IDESCSI is not set
 
 #
-# IDE chipset support/bugfixes
+# IDE chipset support
 #
 CONFIG_BLK_DEV_CMD640=y
 # CONFIG_BLK_DEV_CMD640_ENHANCED is not set
@@ -655,6 +656,9 @@ CONFIG_RAMFS=y
 CONFIG_ISO9660_FS=y
 # CONFIG_JOLIET is not set
 # CONFIG_ZISOFS is not set
+# CONFIG_JFS_FS is not set
+# CONFIG_JFS_DEBUG is not set
+# CONFIG_JFS_STATISTICS is not set
 # CONFIG_MINIX_FS is not set
 # CONFIG_VXFS_FS is not set
 # CONFIG_NTFS_FS is not set
