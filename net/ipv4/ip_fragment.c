@@ -126,7 +126,7 @@ static unsigned int ipqhashfn(u16 id, u32 saddr, u32 daddr, u8 prot)
 }
 
 static struct timer_list ipfrag_secret_timer;
-static int ipfrag_secret_interval = 10 * 60 * HZ;
+int sysctl_ipfrag_secret_interval = 10 * 60 * HZ;
 
 static void ipfrag_secret_rebuild(unsigned long dummy)
 {
@@ -162,7 +162,7 @@ static void ipfrag_secret_rebuild(unsigned long dummy)
 	}
 	write_unlock(&ipfrag_lock);
 
-	mod_timer(&ipfrag_secret_timer, now + ipfrag_secret_interval);
+	mod_timer(&ipfrag_secret_timer, now + sysctl_ipfrag_secret_interval);
 }
 
 atomic_t ip_frag_mem = ATOMIC_INIT(0);	/* Memory used for fragments */
@@ -672,6 +672,6 @@ void ipfrag_init(void)
 
 	init_timer(&ipfrag_secret_timer);
 	ipfrag_secret_timer.function = ipfrag_secret_rebuild;
-	ipfrag_secret_timer.expires = jiffies + ipfrag_secret_interval;
+	ipfrag_secret_timer.expires = jiffies + sysctl_ipfrag_secret_interval;
 	add_timer(&ipfrag_secret_timer);
 }

@@ -27,6 +27,7 @@ extern int sysctl_icmp_ignore_bogus_error_responses;
 extern int sysctl_ipfrag_low_thresh;
 extern int sysctl_ipfrag_high_thresh; 
 extern int sysctl_ipfrag_time;
+extern int sysctl_ipfrag_secret_interval;
 
 /* From ip_output.c */
 extern int sysctl_ip_dynaddr;
@@ -571,6 +572,15 @@ ctl_table ipv4_table[] = {
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
 		.proc_handler	= &proc_dointvec
+	},
+	{
+		.ctl_name	= NET_IPV4_IPFRAG_SECRET_INTERVAL,
+		.procname	= "ipfrag_secret_interval",
+		.data		= &sysctl_ipfrag_secret_interval,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec_jiffies,
+		.strategy	= &sysctl_jiffies
 	},
 	{ .ctl_name = 0 }
 };
