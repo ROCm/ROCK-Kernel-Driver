@@ -122,8 +122,11 @@ static struct {
   au1500_iflist[NUM_INTERFACES] = {
 		{AU1500_ETH0_BASE, AU1000_ETH0_IRQ}, 
 		{AU1500_ETH1_BASE, AU1000_ETH1_IRQ}
+	},
+  au1100_iflist[NUM_INTERFACES] = {
+		{AU1000_ETH0_BASE, AU1000_ETH0_IRQ}, 
+		{NULL, NULL}
 	};
-
 
 static char version[] __devinitdata =
     "au1000eth.c:1.0 ppopov@mvista.com\n";
@@ -175,6 +178,11 @@ int bcm_5201_init(struct net_device *dev, int phy_addr)
 	data = mdio_read(dev, phy_addr, MII_CONTROL);
 	data |= MII_CNTL_RST_AUTO | MII_CNTL_AUTO;
 	mdio_write(dev, phy_addr, MII_CONTROL, data);
+
+	/* Enable TX LED instead of FDX */
+	data = mdio_read(dev, phy_addr, MII_INT);
+	data &= ~MII_FDX_LED;
+	mdio_write(dev, phy_addr, MII_INT, data);
 
 	if (au1000_debug > 4) dump_mii(dev, phy_addr);
 	return 0;
@@ -248,6 +256,8 @@ int lsi_80227_init(struct net_device *dev, int phy_addr)
 
 	/* restart auto-negotiation */
 	mdio_write(dev, phy_addr, 0, 0x3200);
+
+	mdelay(1);
 
 	/* set up LEDs to correct display */
 	mdio_write(dev, phy_addr, 17, 0xffc0);
@@ -367,6 +377,7 @@ static struct mii_chip_info {
 	{"Broadcom BCM5201 10/100 BaseT PHY",  0x0040, 0x6212, &bcm_5201_ops },
 	{"AMD 79C901 HomePNA PHY",  0x0000, 0x35c8, &am79c901_ops },
 	{"LSI 80227 10/100 BaseT PHY", 0x0016, 0xf840, &lsi_80227_ops },
+	{"Broadcom BCM5221 10/100 BaseT PHY",  0x0040, 0x61e4, &bcm_5201_ops },
 	{0,},
 };
 
@@ -637,13 +648,19 @@ static int __init au1000_init_module(void)
 		} else if ( (prid & 0xffff0000) == 0x01030000 ) {
 			base_addr = au1500_iflist[i].port;
 			irq = au1500_iflist[i].irq;
+		} else if ( (prid & 0xffff0000) == 0x02030000 ) {
+			base_addr = au1100_iflist[i].port;
+			irq = au1100_iflist[i].irq;
 		} else {
 			printk(KERN_ERR "au1000 eth: unknown Processor ID\n");
 			return -ENODEV;
 		}
+		// check for valid entries, au1100 only has one entry
+		if (base_addr && irq) {
 		if (au1000_probe1(NULL, base_addr, irq, i) != 0) {
 			return -ENODEV;
 		}
+	}
 	}
 	return 0;
 }
