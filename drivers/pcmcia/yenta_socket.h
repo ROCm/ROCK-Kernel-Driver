@@ -99,6 +99,7 @@ struct yenta_socket;
 
 struct cardbus_type {
 	int	(*override)(struct yenta_socket *);
+	int	(*sock_init)(struct yenta_socket *);
 };
 
 struct yenta_socket {

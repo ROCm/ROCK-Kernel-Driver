@@ -576,30 +576,35 @@ static void yenta_config_init(struct yenta_socket *socket)
 }
 
 /* Called at resume and initialization events */
-static int yenta_init(struct pcmcia_socket *sock)
+static int yenta_sock_init(struct pcmcia_socket *sock)
 {
 	struct yenta_socket *socket = container_of(sock, struct yenta_socket, socket);
+
 	yenta_config_init(socket);
 	yenta_clear_maps(socket);
 
-	/* Re-enable interrupts */
+	if (socket->type && socket->type->sock_init)
+		socket->type->sock_init(socket);
+
+	/* Re-enable CSC interrupts */
 	cb_writel(socket, CB_SOCKET_MASK, CB_CDMASK);
+
 	return 0;
 }
 
-static int yenta_suspend(struct pcmcia_socket *sock)
+static int yenta_sock_suspend(struct pcmcia_socket *sock)
 {
 	struct yenta_socket *socket = container_of(sock, struct yenta_socket, socket);
 
 	yenta_set_socket(sock, &dead_socket);
 
-	/* Disable interrupts */
+	/* Disable CSC interrupts */
 	cb_writel(socket, CB_SOCKET_MASK, 0x0);
 
 	/*
 	 * This does not work currently. The controller
 	 * loses too much information during D3 to come up
-	 * cleanly. We should probably fix yenta_init()
+	 * cleanly. We should probably fix yenta_sock_init()
 	 * to update all the critical registers, notably
 	 * the IO and MEM bridging region data.. That is
 	 * something that pci_set_power_state() should
@@ -758,8 +763,8 @@ static void yenta_close(struct pci_dev *dev)
 
 
 static struct pccard_operations yenta_socket_operations = {
-	.init			= yenta_init,
-	.suspend		= yenta_suspend,
+	.init			= yenta_sock_init,
+	.suspend		= yenta_sock_suspend,
 	.get_status		= yenta_get_status,
 	.get_socket		= yenta_get_socket,
 	.set_socket		= yenta_set_socket,
@@ -787,18 +792,23 @@ enum {
 struct cardbus_type cardbus_type[] = {
 	[CARDBUS_TYPE_TI]	= {
 		.override	= ti_override,
+		.sock_init	= ti_init,
 	},
 	[CARDBUS_TYPE_TI113X]	= {
 		.override	= ti113x_override,
+		.sock_init	= ti113x_init,
 	},
 	[CARDBUS_TYPE_TI12XX]	= {
 		.override	= ti12xx_override,
+		.sock_init	= ti113x_init,
 	},
 	[CARDBUS_TYPE_TI1250]	= {
 		.override	= ti1250_override,
+		.sock_init	= ti1250_init,
 	},
 	[CARDBUS_TYPE_RICOH]	= {
 		.override	= ricoh_override,
+		.sock_init	= ricoh_init,
 	},
 };
 

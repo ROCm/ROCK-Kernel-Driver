@@ -142,27 +142,22 @@ static void ricoh_zoom_video(struct pcmcia_socket *sock, int onoff)
         config_writeb(socket, RL5C4XX_MISC_CONTROL, reg);
 }
 
-static void ricoh_set_zv(struct pcmcia_socket *sock)
+static void ricoh_set_zv(struct yenta_socket *socket)
 {
-	struct yenta_socket *socket = container_of(sock, struct yenta_socket, socket);
         if(socket->dev->vendor == PCI_VENDOR_ID_RICOH)
         {
                 switch(socket->dev->device)
                 {
                         /* There may be more .. */
 		case  PCI_DEVICE_ID_RICOH_RL5C478:
-			sock->zoom_video = ricoh_zoom_video;
+			socket->socket.zoom_video = ricoh_zoom_video;
 			break;  
                 }
         }
 }
 
-static int ricoh_init(struct pcmcia_socket *sock)
+static int ricoh_init(struct yenta_socket *socket)
 {
-	struct yenta_socket *socket = container_of(sock, struct yenta_socket, socket);
-	yenta_init(sock);
-	ricoh_set_zv(sock);
-
 	config_writew(socket, RL5C4XX_MISC, rl_misc(socket));
 	config_writew(socket, RL5C4XX_16BIT_CTL, rl_ctl(socket));
 	config_writew(socket, RL5C4XX_16BIT_IO_0, rl_io(socket));
@@ -194,7 +189,7 @@ static int ricoh_override(struct yenta_socket *socket)
 		rl_config(socket) |= RL5C4XX_CONFIG_PREFETCH;
 	}
 
-	socket->socket.ops->init = ricoh_init;
+	ricoh_set_zv(socket);
 
 	return 0;
 }

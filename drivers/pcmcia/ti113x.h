@@ -136,6 +136,16 @@
 
 #ifdef CONFIG_CARDBUS
 
+/*
+ * Texas Instruments CardBus controller overrides.
+ */
+#define ti_sysctl(socket)	((socket)->private[0])
+#define ti_cardctl(socket)	((socket)->private[1])
+#define ti_devctl(socket)	((socket)->private[2])
+#define ti_diag(socket)		((socket)->private[3])
+#define ti_irqmux(socket)	((socket)->private[4])
+
+
 static int ti_intctl(struct yenta_socket *socket)
 {
 	u8 new, reg = exca_readb(socket, I365_INTCTL);
@@ -207,9 +217,8 @@ static void ti1250_zoom_video(struct pcmcia_socket *sock, int onoff)
 	config_writeb(socket, TI1250_MULTIMEDIA_CTL, reg);
 }
 
-static void ti_set_zv(struct pcmcia_socket *sock)
+static void ti_set_zv(struct yenta_socket *socket)
 {
-	struct yenta_socket *socket = container_of(sock, struct yenta_socket, socket);
 	if(socket->dev->vendor == PCI_VENDOR_ID_TI)
 	{
 		switch(socket->dev->device)
@@ -218,21 +227,18 @@ static void ti_set_zv(struct pcmcia_socket *sock)
 			case PCI_DEVICE_ID_TI_1220:
 			case PCI_DEVICE_ID_TI_1221:
 			case PCI_DEVICE_ID_TI_1225:
-				sock->zoom_video = ti_zoom_video;
+				socket->socket.zoom_video = ti_zoom_video;
 				break;	
 			case PCI_DEVICE_ID_TI_1250:
 			case PCI_DEVICE_ID_TI_1251A:
 			case PCI_DEVICE_ID_TI_1251B:
 			case PCI_DEVICE_ID_TI_1450:
-				sock->zoom_video = ti1250_zoom_video;
+				socket->socket.zoom_video = ti1250_zoom_video;
 		}
 	}
 }
-static int ti_init(struct pcmcia_socket *sock)
+static int ti_init(struct yenta_socket *socket)
 {
-	struct yenta_socket *socket = container_of(sock, struct yenta_socket, socket);
-	yenta_init(sock);
-	ti_set_zv(sock);
 	ti_intctl(socket);
 	return 0;
 }
@@ -257,6 +263,8 @@ static int ti_override(struct yenta_socket *socket)
 	new = reg & ~I365_INTR_ENA;
 	if (new != reg)
 		exca_writeb(socket, I365_INTCTL, new);
+
+	ti_set_zv(socket);
 
 #if 0
 	/*
@@ -285,23 +293,11 @@ static int ti_override(struct yenta_socket *socket)
 	}
 #endif
 
-	socket->socket.ops->init = ti_init;
 	return 0;
 }
 
-#define ti_sysctl(socket)	((socket)->private[0])
-#define ti_cardctl(socket)	((socket)->private[1])
-#define ti_devctl(socket)	((socket)->private[2])
-#define ti_diag(socket)		((socket)->private[3])
-#define ti_irqmux(socket)	((socket)->private[4])
-
-
-static int ti113x_init(struct pcmcia_socket *sock)
+static int ti113x_init(struct yenta_socket *socket)
 {
-	struct yenta_socket *socket = container_of(sock, struct yenta_socket, socket);
-	yenta_init(sock);
-	ti_set_zv(sock);
-
 	config_writel(socket, TI113X_SYSTEM_CONTROL, ti_sysctl(socket));
 	config_writeb(socket, TI113X_CARD_CONTROL, ti_cardctl(socket));
 	config_writeb(socket, TI113X_DEVICE_CONTROL, ti_devctl(socket));
@@ -318,16 +314,13 @@ static int ti113x_override(struct yenta_socket *socket)
 	ti_cardctl(socket) &= ~(TI113X_CCR_PCI_IRQ_ENA | TI113X_CCR_PCI_IREQ | TI113X_CCR_PCI_CSC);
 	if (socket->cb_irq)
 		ti_cardctl(socket) |= TI113X_CCR_PCI_IRQ_ENA | TI113X_CCR_PCI_CSC | TI113X_CCR_PCI_IREQ;
-	ti_override(socket);
-	socket->socket.ops->init = ti113x_init;
-	return 0;
+	return ti_override(socket);
 }
 
 
-static int ti1250_init(struct pcmcia_socket *sock)
+static int ti1250_init(struct yenta_socket *socket)
 {
-	struct yenta_socket *socket = container_of(sock, struct yenta_socket, socket);
-	ti113x_init(sock);
+	ti113x_init(socket);
 	ti_irqmux(socket) = config_readl(socket, TI122X_IRQMUX);
 #if 0
 	ti_irqmux(socket) = (ti_irqmux(socket) & ~0x0f) | 0x02; /* route INTA */
@@ -348,9 +341,7 @@ static int ti1250_override(struct yenta_socket *socket)
 	ti_diag(socket) &= ~(TI1250_DIAG_PCI_CSC | TI1250_DIAG_PCI_IREQ);
 	if (socket->cb_irq)
 		ti_diag(socket) |= TI1250_DIAG_PCI_CSC | TI1250_DIAG_PCI_IREQ;
-	ti113x_override(socket);
-	socket->socket.ops->init = ti1250_init;
-	return 0;
+	return ti113x_override(socket);
 }
 
 
