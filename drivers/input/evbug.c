@@ -37,6 +37,8 @@ MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
 MODULE_DESCRIPTION("Input driver event debug module"); 
 MODULE_LICENSE("GPL");
 
+static char evbug_name[] = "evbug";
+
 static void evbug_event(struct input_handle *handle, unsigned int type, unsigned int code, int value)
 {
 	printk(KERN_DEBUG "evbug.c: Event. Dev: %s, Type: %d, Code: %d, Value: %d\n", handle->dev->phys, type, code, value);
@@ -52,6 +54,7 @@ static struct input_handle *evbug_connect(struct input_handler *handler, struct 
 
 	handle->dev = dev;
 	handle->handler = handler;
+	handle->name = evbug_name;
 
 	input_open_device(handle);
 

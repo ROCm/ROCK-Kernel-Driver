@@ -82,6 +82,7 @@ void serio_handle_events(void)
 		}
 
 		serio->event = 0;
+		serio = serio->next;
 	}
 }
 
@@ -95,7 +96,7 @@ static int serio_thread(void *nothing)
 		serio_handle_events();
 		if (current->flags & PF_FREEZE)
 			refrigerator(PF_IOTHREAD);
-		wait_event_interruptible(serio_wait, 1); 
+		interruptible_sleep_on(&serio_wait); 
 	} while (!signal_pending(current));
 
 	printk(KERN_DEBUG "serio: kseriod exiting");

@@ -912,6 +912,8 @@ static char * __init initialize_kbd(void)
 
 void __init pckbd_init_hw(void)
 {
+#ifndef CONFIG_SERIO_I8042
+
 	kbd_request_region();
 
 	/* Flush any pending input. */
@@ -935,6 +937,7 @@ void __init pckbd_init_hw(void)
 
 	/* Ok, finally allocate the IRQ, and off we go.. */
 	kbd_request_irq(keyboard_interrupt);
+#endif
 }
 
 #if defined CONFIG_PSMOUSE
@@ -1213,6 +1216,7 @@ static struct miscdevice psaux_mouse = {
 
 static int __init psaux_init(void)
 {
+#ifndef CONFIG_SERIO_I8042
 	int retval;
 
 	if (!detect_auxiliary_port())
@@ -1241,6 +1245,7 @@ static int __init psaux_init(void)
 #endif /* INITIALIZE_MOUSE */
 	kbd_write_command(KBD_CCMD_MOUSE_DISABLE); /* Disable aux device. */
 	kbd_write_cmd(AUX_INTS_OFF); /* Disable controller ints. */
+#endif
 
 	return 0;
 }
