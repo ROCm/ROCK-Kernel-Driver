@@ -193,11 +193,29 @@ static int sysctl_pm_do_suspend(void)
 {
 	int retval;
 
+	/*
+	 * Suspend "legacy" devices.
+	 */
 	retval = pm_send_all(PM_SUSPEND, (void *)3);
-
 	if (retval == 0) {
+		/*
+		 * Suspend LDM devices.
+		 */
+		device_suspend(4, SUSPEND_NOTIFY);
+		device_suspend(4, SUSPEND_SAVE_STATE);
+		device_suspend(4, SUSPEND_DISABLE);
+
 		retval = pm_do_suspend();
 
+		/*
+		 * Resume LDM devices.
+		 */
+		device_resume(RESUME_RESTORE_STATE);
+		device_resume(RESUME_ENABLE);
+
+		/*
+		 * Resume "legacy" devices.
+		 */
 		pm_send_all(PM_RESUME, (void *)0);
 	}
 
