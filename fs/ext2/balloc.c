@@ -13,7 +13,6 @@
 
 #include <linux/config.h>
 #include "ext2.h"
-#include <linux/locks.h>
 #include <linux/quotaops.h>
 
 /*

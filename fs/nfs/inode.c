@@ -23,7 +23,6 @@
 #include <linux/string.h>
 #include <linux/stat.h>
 #include <linux/errno.h>
-#include <linux/locks.h>
 #include <linux/unistd.h>
 #include <linux/sunrpc/clnt.h>
 #include <linux/sunrpc/stats.h>

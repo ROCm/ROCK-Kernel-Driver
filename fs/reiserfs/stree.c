@@ -56,7 +56,6 @@
 #include <linux/config.h>
 #include <linux/time.h>
 #include <linux/string.h>
-#include <linux/locks.h>
 #include <linux/pagemap.h>
 #include <linux/reiserfs_fs.h>
 #include <linux/smp_lock.h>

@@ -16,7 +16,6 @@
 #include <linux/errno.h>
 #include <linux/vmalloc.h>
 #include <linux/slab.h>
-#include <linux/locks.h>
 #include <asm/uaccess.h>
 #include <linux/string.h>
 #include <linux/smp_lock.h>

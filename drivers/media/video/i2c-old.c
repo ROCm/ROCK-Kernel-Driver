@@ -12,7 +12,6 @@
 #include <linux/types.h>
 #include <linux/string.h>
 #include <linux/delay.h>
-#include <linux/locks.h>
 #include <linux/sched.h>
 #include <linux/slab.h>
 #include <linux/i2c-old.h>

@@ -17,7 +17,6 @@
  */
 
 #include <linux/fs.h>
-#include <linux/locks.h>
 #include "jfs_incore.h"
 #include "jfs_inode.h"
 #include "jfs_dinode.h"

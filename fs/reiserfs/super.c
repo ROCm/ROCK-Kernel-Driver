@@ -17,7 +17,6 @@
 #include <asm/uaccess.h>
 #include <linux/reiserfs_fs.h>
 #include <linux/smp_lock.h>
-#include <linux/locks.h>
 #include <linux/init.h>
 #include <linux/blkdev.h>
 

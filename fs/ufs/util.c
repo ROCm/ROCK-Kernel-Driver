@@ -8,7 +8,6 @@
  
 #include <linux/string.h>
 #include <linux/slab.h>
-#include <linux/locks.h>
 #include <linux/ufs_fs.h>
 
 #include "swab.h"

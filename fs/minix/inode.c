@@ -12,7 +12,6 @@
 #include <linux/module.h>
 #include "minix.h"
 #include <linux/slab.h>
-#include <linux/locks.h>
 #include <linux/init.h>
 #include <linux/highuid.h>
 

@@ -15,7 +15,6 @@
 #include <linux/file.h>
 #include <linux/stat.h>
 #include <linux/errno.h>
-#include <linux/locks.h>
 #include <linux/string.h>
 #include <linux/smp_lock.h>
 

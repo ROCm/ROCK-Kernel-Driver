@@ -23,7 +23,6 @@
 #include <linux/time.h>
 #include <linux/stat.h>
 #include <linux/string.h>
-#include <linux/locks.h>
 #include <linux/blkdev.h>
 #include <linux/init.h>
 #define __NO_VERSION__

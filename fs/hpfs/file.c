@@ -9,6 +9,7 @@
 #include <linux/string.h>
 #include <linux/time.h>
 #include <linux/smp_lock.h>
+#include <linux/pagemap.h>
 #include "hpfs_fn.h"
 
 #define BLOCKS(size) (((size) + 511) >> 9)

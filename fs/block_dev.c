@@ -8,7 +8,6 @@
 #include <linux/config.h>
 #include <linux/init.h>
 #include <linux/mm.h>
-#include <linux/locks.h>
 #include <linux/fcntl.h>
 #include <linux/slab.h>
 #include <linux/kmod.h>

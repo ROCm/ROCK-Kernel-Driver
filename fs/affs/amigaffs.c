@@ -13,7 +13,6 @@
 #include <linux/time.h>
 #include <linux/affs_fs.h>
 #include <linux/string.h>
-#include <linux/locks.h>
 #include <linux/mm.h>
 #include <linux/amigaffs.h>
 

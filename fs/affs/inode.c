@@ -20,7 +20,6 @@
 #include <linux/kernel.h>
 #include <linux/mm.h>
 #include <linux/string.h>
-#include <linux/locks.h>
 #include <linux/genhd.h>
 #include <linux/amigaffs.h>
 #include <linux/major.h>

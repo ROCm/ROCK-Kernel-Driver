@@ -26,7 +26,6 @@ printk(KERN_DEBUG __FUNCTION__ ": " format "\n" , ## arg); \
 #include <linux/tqueue.h>
 #include <linux/capi.h>
 #include <linux/kernelcapi.h>
-#include <linux/locks.h>
 #include <linux/init.h>
 #include <asm/uaccess.h>
 #include <linux/isdn/capicmd.h>

@@ -23,7 +23,6 @@
 #include <linux/stddef.h>
 #include <linux/init.h>
 #include <linux/string.h>
-#include <linux/locks.h>
 #include <linux/spinlock.h>
 #include <linux/blkdev.h>	/* For bdev_hardsect_size(). */
 #include <linux/backing-dev.h>

@@ -18,7 +18,6 @@
 
 #include <linux/config.h>
 #include <linux/module.h>
-#include <linux/locks.h>
 #include <linux/slab.h>
 #include <linux/raid/raid5.h>
 #include <asm/bitops.h>

@@ -22,10 +22,10 @@
 #include <linux/jbd.h>
 #include <linux/errno.h>
 #include <linux/slab.h>
-#include <linux/locks.h>
 #include <linux/timer.h>
 #include <linux/smp_lock.h>
 #include <linux/mm.h>
+#include <linux/highmem.h>
 
 extern spinlock_t journal_datalist_lock;
 

@@ -54,7 +54,6 @@
 #include <linux/kernel.h>
 #include <linux/errno.h>
 #include <linux/fcntl.h>
-#include <linux/locks.h>
 #include <linux/stat.h>
 #include <linux/string.h>
 #include <linux/smp_lock.h>

@@ -8,7 +8,6 @@
 
 #include <linux/init.h>
 #include <linux/module.h>
-#include <linux/locks.h>
 #include <linux/efs_fs.h>
 #include <linux/efs_vh.h>
 #include <linux/efs_fs_sb.h>

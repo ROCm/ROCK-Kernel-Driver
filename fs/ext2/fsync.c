@@ -23,7 +23,6 @@
  */
 
 #include "ext2.h"
-#include <linux/locks.h>
 #include <linux/smp_lock.h>
 
 

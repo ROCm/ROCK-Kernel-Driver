@@ -3,7 +3,6 @@
 
 #include <linux/blkdev.h>
 #include <linux/elevator.h>
-#include <linux/locks.h>
 #include <linux/config.h>
 #include <linux/spinlock.h>
 #include <linux/compiler.h>

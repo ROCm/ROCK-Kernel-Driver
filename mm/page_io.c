@@ -12,8 +12,8 @@
 
 #include <linux/mm.h>
 #include <linux/kernel_stat.h>
+#include <linux/pagemap.h>
 #include <linux/swap.h>
-#include <linux/locks.h>
 #include <linux/swapctl.h>
 
 #include <asm/pgtable.h>

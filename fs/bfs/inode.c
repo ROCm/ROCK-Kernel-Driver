@@ -9,7 +9,6 @@
 #include <linux/mm.h>
 #include <linux/slab.h>
 #include <linux/init.h>
-#include <linux/locks.h>
 #include <linux/bfs_fs.h>
 #include <linux/smp_lock.h>
 

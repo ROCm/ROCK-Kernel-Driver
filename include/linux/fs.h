@@ -683,6 +683,19 @@ struct super_block {
 };
 
 /*
+ * Superblock locking.
+ */
+static inline void lock_super(struct super_block * sb)
+{
+	down(&sb->s_lock);
+}
+
+static inline void unlock_super(struct super_block * sb)
+{
+	up(&sb->s_lock);
+}
+
+/*
  * VFS helper functions..
  */
 extern int vfs_create(struct inode *, struct dentry *, int);

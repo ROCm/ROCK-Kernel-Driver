@@ -5,8 +5,8 @@
 #include <linux/config.h>
 #include <linux/time.h>
 #include <linux/reiserfs_fs.h>
-#include <linux/locks.h>
 #include <linux/smp_lock.h>
+#include <linux/pagemap.h>
 #include <asm/uaccess.h>
 #include <asm/unaligned.h>
 

@@ -6,6 +6,7 @@
  *  inode VFS functions
  */
 
+#include <linux/fs.h>
 #include <linux/time.h>
 #include <linux/smp_lock.h>
 #include "hpfs_fn.h"

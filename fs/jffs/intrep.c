@@ -63,7 +63,6 @@
 #include <linux/fs.h>
 #include <linux/stat.h>
 #include <linux/pagemap.h>
-#include <linux/locks.h>
 #include <asm/semaphore.h>
 #include <asm/byteorder.h>
 #include <linux/version.h>

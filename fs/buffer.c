@@ -23,7 +23,6 @@
 #include <linux/fs.h>
 #include <linux/mm.h>
 #include <linux/slab.h>
-#include <linux/locks.h>
 #include <linux/smp_lock.h>
 #include <linux/blkdev.h>
 #include <linux/file.h>

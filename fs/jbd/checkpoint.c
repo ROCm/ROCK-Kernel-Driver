@@ -22,7 +22,6 @@
 #include <linux/jbd.h>
 #include <linux/errno.h>
 #include <linux/slab.h>
-#include <linux/locks.h>
 
 extern spinlock_t journal_datalist_lock;
 

@@ -22,7 +22,6 @@
 
 #include <linux/config.h>
 #include <linux/slab.h>
-#include <linux/locks.h>
 #include <linux/smp_lock.h>
 #include <linux/devfs_fs_kernel.h>
 #include <linux/acct.h>

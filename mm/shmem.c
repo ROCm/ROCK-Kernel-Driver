@@ -25,7 +25,6 @@
 #include <linux/swap.h>
 #include <linux/pagemap.h>
 #include <linux/string.h>
-#include <linux/locks.h>
 #include <linux/slab.h>
 #include <linux/smp_lock.h>
 #include <linux/shmem_fs.h>

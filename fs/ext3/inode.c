@@ -22,15 +22,16 @@
  *  Assorted race fixes, rewrite of ext3_get_block() by Al Viro, 2000
  */
 
+#include <linux/module.h>
 #include <linux/fs.h>
 #include <linux/time.h>
 #include <linux/ext3_jbd.h>
 #include <linux/jbd.h>
-#include <linux/locks.h>
 #include <linux/smp_lock.h>
 #include <linux/highuid.h>
+#include <linux/pagemap.h>
 #include <linux/quotaops.h>
-#include <linux/module.h>
+#include <linux/string.h>
 
 /*
  * SEARCH_FROM_ZERO forces each block allocation to search from the start

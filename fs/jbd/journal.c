@@ -28,11 +28,11 @@
 #include <linux/jbd.h>
 #include <linux/errno.h>
 #include <linux/slab.h>
-#include <linux/locks.h>
 #include <linux/smp_lock.h>
 #include <linux/init.h>
 #include <linux/mm.h>
 #include <linux/slab.h>
+#include <linux/pagemap.h>
 #include <asm/uaccess.h>
 #include <linux/proc_fs.h>
 
