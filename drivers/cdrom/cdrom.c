@@ -472,6 +472,9 @@ int cdrom_get_media_event(struct cdrom_device_info *cdi,
 	if (be16_to_cpu(eh->data_len) < sizeof(*med))
 		return 1;
 
+	if (eh->nea || eh->notification_class != 0x4)
+		return 1;
+
 	memcpy(med, &buffer[sizeof(*eh)], sizeof(*med));
 	return 0;
 }
