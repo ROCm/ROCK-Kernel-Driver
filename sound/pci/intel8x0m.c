@@ -94,17 +94,19 @@ MODULE_PARM_DESC(ac97_clock, "AC'97 codec clock (0 = auto-detect).");
 #ifndef PCI_DEVICE_ID_SI_7013
 #define PCI_DEVICE_ID_SI_7013		0x7013
 #endif
-#if 0
-#ifndef PCI_DEVICE_ID_NVIDIA_MCP_AUDIO
-#define PCI_DEVICE_ID_NVIDIA_MCP_AUDIO	0x01b1
+#ifndef PCI_DEVICE_ID_NVIDIA_MCP_MODEM
+#define PCI_DEVICE_ID_NVIDIA_MCP_MODEM	0x01c1
 #endif
-#ifndef PCI_DEVICE_ID_NVIDIA_MCP2_AUDIO
-#define PCI_DEVICE_ID_NVIDIA_MCP2_AUDIO	0x006a
+#ifndef PCI_DEVICE_ID_NVIDIA_MCP2_MODEM
+#define PCI_DEVICE_ID_NVIDIA_MCP2_MODEM	0x0069
 #endif
-#ifndef PCI_DEVICE_ID_NVIDIA_MCP3_AUDIO
-#define PCI_DEVICE_ID_NVIDIA_MCP3_AUDIO	0x00da
+#ifndef PCI_DEVICE_ID_NVIDIA_MCP2S_MODEM
+#define PCI_DEVICE_ID_NVIDIA_MCP2S_MODEM 0x0089
 #endif
+#ifndef PCI_DEVICE_ID_NVIDIA_MCP3_MODEM
+#define PCI_DEVICE_ID_NVIDIA_MCP3_MODEM	0x00d9
 #endif
+
 
 enum { DEVICE_INTEL, DEVICE_SIS, DEVICE_ALI, DEVICE_NFORCE };
 
@@ -267,10 +269,7 @@ static struct pci_device_id snd_intel8x0m_ids[] = {
 	{ 0x8086, 0x24d6, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_INTEL }, /* ICH5 */
 	{ 0x8086, 0x7196, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_INTEL },	/* 440MX */
 	{ 0x1022, 0x7446, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_INTEL },	/* AMD768 */
-#if 0
-	/* TODO: support needed */
 	{ 0x1039, 0x7013, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_SIS },	/* SI7013 */
-#endif
 	{ 0x10de, 0x01c1, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_NFORCE }, /* NFORCE */
 	{ 0x10de, 0x0069, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_NFORCE }, /* NFORCE2 */
 	{ 0x10de, 0x0089, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_NFORCE }, /* NFORCE2s */
@@ -318,6 +317,14 @@ static void iputbyte(intel8x0_t *chip, u32 offset, u8 val)
 		writeb(val, chip->remap_bmaddr + offset);
 	else
 		outb(val, chip->bmaddr + offset);
+}
+
+static void iputword(intel8x0_t *chip, u32 offset, u16 val)
+{
+	if (chip->bm_mmio)
+		writew(val, chip->remap_bmaddr + offset);
+	else
+		outw(val, chip->bmaddr + offset);
 }
 
 static void iputdword(intel8x0_t *chip, u32 offset, u32 val)
@@ -676,9 +683,9 @@ static snd_pcm_hardware_t snd_intel8x0m_stream =
 	.rate_max =		16000,
 	.channels_min =		1,
 	.channels_max =		1,
-	.buffer_bytes_max =	32 * 1024,
+	.buffer_bytes_max =	64 * 1024,
 	.period_bytes_min =	32,
-	.period_bytes_max =	32 * 1024,
+	.period_bytes_max =	64 * 1024,
 	.periods_min =		1,
 	.periods_max =		1024,
 	.fifo_size =		0,
@@ -810,8 +817,8 @@ static struct ich_pcm_table intel_pcms[] __devinitdata = {
 		.suffix = "Modem",
 		.playback_ops = &snd_intel8x0m_playback_ops,
 		.capture_ops = &snd_intel8x0m_capture_ops,
-		.prealloc_size = 4 * 1024,
-		.prealloc_max_size = 16 * 1024,
+		.prealloc_size = 32 * 1024,
+		.prealloc_max_size = 64 * 1024,
 	},
 };
 
@@ -1006,6 +1013,11 @@ static int snd_intel8x0m_ich_chip_init(intel8x0_t *chip, int probing)
 				break;
 			do_delay(chip);
 		} while (time_after_eq(end_time, jiffies));
+	}
+
+	if (chip->device_type == DEVICE_SIS) {
+		/* unmute the output on SIS7012 */
+		iputword(chip, 0x4c, igetword(chip, 0x4c) | 1);
 	}
 
       	return 0;
@@ -1284,11 +1296,12 @@ static struct shortname_table {
 	{ PCI_DEVICE_ID_INTEL_ICH4_6, "Intel 82801DB-ICH4" },
 	{ PCI_DEVICE_ID_INTEL_ICH5_6, "Intel ICH5" },
 	{ 0x7446, "AMD AMD768" },
-#if 0
 	{ PCI_DEVICE_ID_SI_7013, "SiS SI7013" },
-	{ PCI_DEVICE_ID_NVIDIA_MCP_AUDIO, "NVidia nForce" },
-	{ PCI_DEVICE_ID_NVIDIA_MCP2_AUDIO, "NVidia nForce2" },
-	{ PCI_DEVICE_ID_NVIDIA_MCP3_AUDIO, "NVidia nForce3" },
+	{ PCI_DEVICE_ID_NVIDIA_MCP_MODEM, "NVidia nForce" },
+	{ PCI_DEVICE_ID_NVIDIA_MCP2_MODEM, "NVidia nForce2" },
+	{ PCI_DEVICE_ID_NVIDIA_MCP2S_MODEM, "NVidia nForce2s" },
+	{ PCI_DEVICE_ID_NVIDIA_MCP3_MODEM, "NVidia nForce3" },
+#if 0
 	{ 0x5455, "ALi M5455" },
 	{ 0x746d, "AMD AMD8111" },
 #endif
