@@ -75,7 +75,8 @@ enum chipset_type {
 	ALI_GENERIC,
 	SVWRKS_HE,
 	SVWRKS_LE,
-	SVWRKS_GENERIC
+	SVWRKS_GENERIC,
+	HP_ZX1,
 };
 
 typedef struct _agp_version {
