@@ -20,7 +20,7 @@
 #include <linux/security.h>
 #include <linux/skbuff.h>
 #include <linux/netlink.h>
-
+#include <net/sock.h>
 
 static int dummy_ptrace (struct task_struct *parent, struct task_struct *child)
 {
@@ -598,6 +598,82 @@ static int dummy_sem_semop (struct sem_array *sma,
 }
 
 #ifdef CONFIG_SECURITY_NETWORK
+static int dummy_socket_create (int family, int type, int protocol)
+{
+	return 0;
+}
+
+static void dummy_socket_post_create (struct socket *sock, int family, int type,
+				      int protocol)
+{
+	return;
+}
+
+static int dummy_socket_bind (struct socket *sock, struct sockaddr *address,
+			      int addrlen)
+{
+	return 0;
+}
+
+static int dummy_socket_connect (struct socket *sock, struct sockaddr *address,
+				 int addrlen)
+{
+	return 0;
+}
+
+static int dummy_socket_listen (struct socket *sock, int backlog)
+{
+	return 0;
+}
+
+static int dummy_socket_accept (struct socket *sock, struct socket *newsock)
+{
+	return 0;
+}
+
+static void dummy_socket_post_accept (struct socket *sock, 
+				      struct socket *newsock)
+{
+	return;
+}
+
+static int dummy_socket_sendmsg (struct socket *sock, struct msghdr *msg,
+				 int size)
+{
+	return 0;
+}
+
+static int dummy_socket_recvmsg (struct socket *sock, struct msghdr *msg,
+				 int size, int flags)
+{
+	return 0;
+}
+
+static int dummy_socket_getsockname (struct socket *sock)
+{
+	return 0;
+}
+
+static int dummy_socket_getpeername (struct socket *sock)
+{
+	return 0;
+}
+
+static int dummy_socket_setsockopt (struct socket *sock, int level, int optname)
+{
+	return 0;
+}
+
+static int dummy_socket_getsockopt (struct socket *sock, int level, int optname)
+{
+	return 0;
+}
+
+static int dummy_socket_shutdown (struct socket *sock, int how)
+{
+	return 0;
+}
+
 #endif	/* CONFIG_SECURITY_NETWORK */
 
 static int dummy_register_security (const char *name, struct security_operations *ops)
@@ -729,6 +805,20 @@ void security_fixup_ops (struct security_operations *ops)
 	set_to_dummy_if_null(ops, register_security);
 	set_to_dummy_if_null(ops, unregister_security);
 #ifdef CONFIG_SECURITY_NETWORK
+	set_to_dummy_if_null(ops, socket_create);
+	set_to_dummy_if_null(ops, socket_post_create);
+	set_to_dummy_if_null(ops, socket_bind);
+	set_to_dummy_if_null(ops, socket_connect);
+	set_to_dummy_if_null(ops, socket_listen);
+	set_to_dummy_if_null(ops, socket_accept);
+	set_to_dummy_if_null(ops, socket_post_accept);
+	set_to_dummy_if_null(ops, socket_sendmsg);
+	set_to_dummy_if_null(ops, socket_recvmsg);
+	set_to_dummy_if_null(ops, socket_getsockname);
+	set_to_dummy_if_null(ops, socket_getpeername);
+	set_to_dummy_if_null(ops, socket_setsockopt);
+	set_to_dummy_if_null(ops, socket_getsockopt);
+	set_to_dummy_if_null(ops, socket_shutdown);
 #endif	/* CONFIG_SECURITY_NETWORK */
 }
 
