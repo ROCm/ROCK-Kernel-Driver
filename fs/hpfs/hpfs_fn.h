@@ -87,6 +87,7 @@ struct hpfs_sb_info {
 					/*	128 bytes lowercasing table */
 	unsigned *sb_bmp_dir;		/* main bitmap directory */
 	unsigned sb_c_bitmap;		/* current bitmap */
+	unsigned sb_max_fwd_alloc;	/* max forwad allocation */
 	struct semaphore hpfs_creation_de; /* when creating dirents, nobody else
 					   can alloc blocks */
 	/*unsigned sb_mounting : 1;*/
@@ -141,12 +142,12 @@ static inline struct hpfs_dirent *de_next_de (struct hpfs_dirent *de)
 
 static inline struct extended_attribute *fnode_ea(struct fnode *fnode)
 {
-	return (struct extended_attribute *)((char *)fnode + fnode->ea_offs);
+	return (struct extended_attribute *)((char *)fnode + fnode->ea_offs + fnode->acl_size_s);
 }
 
 static inline struct extended_attribute *fnode_end_ea(struct fnode *fnode)
 {
-	return (struct extended_attribute *)((char *)fnode + fnode->ea_offs + fnode->ea_size_s);
+	return (struct extended_attribute *)((char *)fnode + fnode->ea_offs + fnode->acl_size_s + fnode->ea_size_s);
 }
 
 static inline struct extended_attribute *next_ea(struct extended_attribute *ea)

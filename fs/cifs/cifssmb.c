@@ -387,6 +387,7 @@ CIFSSMBLogoff(const int xid, struct cifsSesInfo *ses)
 			spin_lock(&GlobalMid_Lock);
 			ses->server->tcpStatus = CifsExiting;
 			spin_unlock(&GlobalMid_Lock);
+			rc = -ESHUTDOWN;
 		}
 	}
 	if (pSMB)
@@ -819,14 +820,20 @@ CIFSSMBLock(const int xid, struct cifsTconInfo *tcon,
 	pSMB->AndXCommand = 0xFF;	/* none */
 	pSMB->Fid = smb_file_id; /* netfid stays le */
 
-	pSMB->Locks[0].Pid = cpu_to_le16(current->tgid);
-	temp = cpu_to_le64(len);
-	pSMB->Locks[0].LengthLow = (__u32)(len & 0xFFFFFFFF);
-	pSMB->Locks[0].LengthHigh =  (__u32)(len>>32);
-	temp = cpu_to_le64(offset);
-	pSMB->Locks[0].OffsetLow = (__u32)(offset & 0xFFFFFFFF);
-	pSMB->Locks[0].OffsetHigh = (__u32)(offset>>32);
-	pSMB->ByteCount = sizeof (LOCKING_ANDX_RANGE);
+	if(numLock != 0) {
+		pSMB->Locks[0].Pid = cpu_to_le16(current->tgid);
+		/* BB where to store pid high? */
+		temp = cpu_to_le64(len);
+		pSMB->Locks[0].LengthLow = (__u32)(temp & 0xFFFFFFFF);
+		pSMB->Locks[0].LengthHigh =  (__u32)(temp>>32);
+		temp = cpu_to_le64(offset);
+		pSMB->Locks[0].OffsetLow = (__u32)(temp & 0xFFFFFFFF);
+		pSMB->Locks[0].OffsetHigh = (__u32)(temp>>32);
+		pSMB->ByteCount = sizeof (LOCKING_ANDX_RANGE);
+	} else {
+		/* oplock break */
+		pSMB->ByteCount = 0;
+	}
 	pSMB->hdr.smb_buf_length += pSMB->ByteCount;
 	pSMB->ByteCount = cpu_to_le16(pSMB->ByteCount);
 
@@ -941,7 +948,14 @@ renameRetry:
 			 (struct smb_hdr *) pSMBr, &bytes_returned, 0);
 	if (rc) {
 		cFYI(1, ("Send error in rename = %d", rc));
+	} 
+
+#ifdef CONFIG_CIFS_STATS
+	  else {
+		atomic_inc(&tcon->num_renames);
 	}
+#endif
+
 	if (pSMB)
 		cifs_buf_release(pSMB);
 
@@ -1017,7 +1031,11 @@ int CIFSSMBRenameOpenFile(const int xid,struct cifsTconInfo *pTcon,
 	if (rc) {
 		cFYI(1,("Send error in Rename (by file handle) = %d", rc));
 	}
-
+#ifdef CONFIG_CIFS_STATS
+	  else {
+		atomic_inc(&pTcon->num_t2renames);
+	}
+#endif
 	if (pSMB)
 		cifs_buf_release(pSMB);
 

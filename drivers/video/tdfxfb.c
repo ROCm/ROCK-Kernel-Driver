@@ -1101,7 +1101,7 @@ static int tdfxfb_cursor(struct fb_info *info, struct fb_cursor *cursor)
 		 */
 		u8 *cursorbase = (u8 *) info->cursor.image.data;
 		char *bitmap = (char *)cursor->image.data;
-		char *mask = cursor->mask;
+		const char *mask = cursor->mask;
 		int i, j, k, h = 0;
 
 		for (i = 0; i < 64; i++) {

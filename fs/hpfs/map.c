@@ -142,7 +142,7 @@ struct fnode *hpfs_map_fnode(struct super_block *s, ino_t ino, struct buffer_hea
 				}
 			}
 			if (fnode->ea_size_s && ((signed int)fnode->ea_offs < 0xc4 ||
-			   (signed int)fnode->ea_offs + fnode->ea_size_s > 0x200)) {
+			   (signed int)fnode->ea_offs + fnode->acl_size_s + fnode->ea_size_s > 0x200)) {
 				hpfs_error(s, "bad EA info in fnode %08x: ea_offs == %04x ea_size_s == %04x",
 					ino, fnode->ea_offs, fnode->ea_size_s);
 				goto bail;
@@ -225,14 +225,16 @@ struct dnode *hpfs_map_dnode(struct super_block *s, unsigned secno,
 			}
 			for (p = 20; p < dnode->first_free; p += d[p] + (d[p+1] << 8)) {
 				struct hpfs_dirent *de = (struct hpfs_dirent *)((char *)dnode + p);
-				if (de->length > 292 || (de->length < 32) || (de->length & 3)) {
+				if (de->length > 292 || (de->length < 32) || (de->length & 3) || p + de->length > 2048) {
 					hpfs_error(s, "bad dirent size in dnode %08x, dirent %03x, last %03x", secno, p, pp);
 					goto bail;
 				}
 				if (((31 + de->namelen + de->down*4 + 3) & ~3) != de->length) {
+					if (((31 + de->namelen + de->down*4 + 3) & ~3) < de->length && s->s_flags & MS_RDONLY) goto ok;
 					hpfs_error(s, "namelen does not match dirent size in dnode %08x, dirent %03x, last %03x", secno, p, pp);
 					goto bail;
 				}
+				ok:
 				if (hpfs_sb(s)->sb_chk >= 2) b |= 1 << de->down;
 				if (de->down) if (de_down_pointer(de) < 0x10) {
 					hpfs_error(s, "bad down pointer in dnode %08x, dirent %03x, last %03x", secno, p, pp);

@@ -197,6 +197,10 @@ ia32_setup_arg_pages (struct linux_binprm *bprm, int executable_stack)
 	}
 	up_write(&current->mm->mmap_sem);
 
+	/* Can't do it in ia64_elf32_init(). Needs to be done before calls to
+	   elf32_map() */
+	current->thread.ppl = ia32_init_pp_list();
+
 	return 0;
 }
 

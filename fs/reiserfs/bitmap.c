@@ -949,10 +949,7 @@ static inline int blocknrs_and_prealloc_arrays_from_search_start
 		hint->preallocate=hint->prealloc_size=0;
 	}
 	/* for unformatted nodes, force large allocations */
-	bigalloc = amount_needed + hint->prealloc_size;
-	/* try to make things even */
-	if (bigalloc & 1 && hint->prealloc_size)
-	    bigalloc--;
+	bigalloc = amount_needed;
     }
 
     do {

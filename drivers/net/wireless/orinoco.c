@@ -1519,7 +1519,8 @@ static void __orinoco_ev_wterr(struct net_device *dev, hermes_t *hw)
 
 static void __orinoco_ev_infdrop(struct net_device *dev, hermes_t *hw)
 {
-	printk(KERN_WARNING "%s: Information frame lost.\n", dev->name);
+	if (net_ratelimit())
+		printk(KERN_WARNING "%s: Information frame lost.\n", dev->name);
 }
 
 static void print_linkstatus(struct net_device *dev, u16 status)

@@ -53,6 +53,7 @@
 
 #include <asm/atomic.h>
 #include <net/dst.h>
+#include <net/checksum.h>
 
 /*
  * This structure really needs to be cleaned up.
@@ -427,6 +428,11 @@ static inline int sk_stream_wspace(struct sock *sk)
 }
 
 extern void sk_stream_write_space(struct sock *sk);
+
+static inline int sk_stream_memory_free(struct sock *sk)
+{
+	return sk->sk_wmem_queued < sk->sk_sndbuf;
+}
 
 /* The per-socket spinlock must be held here. */
 #define sk_add_backlog(__sk, __skb)				\
@@ -921,6 +927,29 @@ static inline void sk_charge_skb(struct sock *sk, struct sk_buff *skb)
 {
 	sk->sk_wmem_queued   += skb->truesize;
 	sk->sk_forward_alloc -= skb->truesize;
+}
+
+static inline int skb_copy_to_page(struct sock *sk, char __user *from,
+				   struct sk_buff *skb, struct page *page,
+				   int off, int copy)
+{
+	if (skb->ip_summed == CHECKSUM_NONE) {
+		int err = 0;
+		unsigned int csum = csum_and_copy_from_user(from,
+						     page_address(page) + off,
+							    copy, 0, &err);
+		if (err)
+			return err;
+		skb->csum = csum_block_add(skb->csum, csum, skb->len);
+	} else if (copy_from_user(page_address(page) + off, from, copy))
+		return -EFAULT;
+
+	skb->len	     += copy;
+	skb->data_len	     += copy;
+	skb->truesize	     += copy;
+	sk->sk_wmem_queued   += copy;
+	sk->sk_forward_alloc -= copy;
+	return 0;
 }
 
 /*

@@ -180,7 +180,7 @@ struct module_s {
 };
 
 /* module.c */
-extern module_t	       *modules[MODULE_MAX];	/* Indexed by cmoduleid_t   */
+extern module_t	       *sn_modules[MODULE_MAX];	/* Indexed by cmoduleid_t   */
 extern int		nummodules;
 
 extern module_t	       *module_lookup(moduleid_t id);

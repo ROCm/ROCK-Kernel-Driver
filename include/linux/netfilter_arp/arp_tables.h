@@ -16,7 +16,7 @@
 #include <linux/if_arp.h>
 #include <linux/skbuff.h>
 #endif
-
+#include <linux/compiler.h>
 #include <linux/netfilter_arp.h>
 
 #define ARPT_FUNCTION_MAXNAMELEN 30

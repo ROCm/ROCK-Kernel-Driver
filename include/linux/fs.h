@@ -214,15 +214,17 @@ extern int leases_enable, dir_notify_enable, lease_break_time;
 #include <linux/list.h>
 #include <linux/radix-tree.h>
 #include <linux/audit.h>
+#include <linux/init.h>
 #include <asm/semaphore.h>
 #include <asm/byteorder.h>
 
 /* Used to be a macro which just called the function, now just a function */
 extern void update_atime (struct inode *);
 
-extern void inode_init(unsigned long);
-extern void mnt_init(unsigned long);
-extern void files_init(unsigned long);
+extern void __init inode_init(unsigned long);
+extern void __init inode_init_early(void);
+extern void __init mnt_init(unsigned long);
+extern void __init files_init(unsigned long);
 
 struct buffer_head;
 typedef int (get_block_t)(struct inode *inode, sector_t iblock,
@@ -977,7 +979,8 @@ static inline void touch_atime(struct vfsmount *mnt, struct dentry *dentry)
 
 static inline void file_accessed(struct file *file)
 {
-	touch_atime(file->f_vfsmnt, file->f_dentry);
+	if (!(file->f_flags & O_NOATIME))
+		touch_atime(file->f_vfsmnt, file->f_dentry);
 }
 
 int sync_inode(struct inode *inode, struct writeback_control *wbc);
@@ -1199,7 +1202,8 @@ extern int filp_close(struct file *, fl_owner_t id);
 extern char * getname(const char __user *);
 
 /* fs/dcache.c */
-extern void vfs_caches_init(unsigned long);
+extern void __init vfs_caches_init_early(void);
+extern void __init vfs_caches_init(unsigned long);
 
 #define __getname()	kmem_cache_alloc(names_cachep, SLAB_KERNEL)
 #define __putname(name) kmem_cache_free(names_cachep, (void *)(name))

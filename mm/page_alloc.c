@@ -55,6 +55,9 @@ EXPORT_SYMBOL(zone_table);
 static char *zone_names[MAX_NR_ZONES] = { "DMA", "Normal", "HighMem" };
 int min_free_kbytes = 1024;
 
+static unsigned long __initdata nr_kernel_pages;
+static unsigned long __initdata nr_all_pages;
+
 /*
  * Temporary debugging check for pages not lying within a given zone.
  */
@@ -1430,6 +1433,10 @@ static void __init free_area_init_core(struct pglist_data *pgdat,
 		if (zholes_size)
 			realsize -= zholes_size[j];
 
+		if (j == ZONE_DMA || j == ZONE_NORMAL)
+			nr_kernel_pages += realsize;
+		nr_all_pages += realsize;
+
 		zone->spanned_pages = size;
 		zone->present_pages = realsize;
 		zone->name = zone_names[j];
@@ -1969,4 +1976,70 @@ int lower_zone_protection_sysctl_handler(ctl_table *table, int write,
 	proc_dointvec_minmax(table, write, file, buffer, length);
 	setup_per_zone_protection();
 	return 0;
+}
+
+/*
+ * allocate a large system hash table from bootmem
+ * - it is assumed that the hash table must contain an exact power-of-2
+ *   quantity of entries
+ */
+void *__init alloc_large_system_hash(const char *tablename,
+				     unsigned long bucketsize,
+				     unsigned long numentries,
+				     int scale,
+				     int consider_highmem,
+				     unsigned int *_hash_shift,
+				     unsigned int *_hash_mask)
+{
+	unsigned long mem, max, log2qty, size;
+	void *table;
+
+	/* round applicable memory size up to nearest megabyte */
+	mem = consider_highmem ? nr_all_pages : nr_kernel_pages;
+	mem += (1UL << (20 - PAGE_SHIFT)) - 1;
+	mem >>= 20 - PAGE_SHIFT;
+	mem <<= 20 - PAGE_SHIFT;
+
+	/* limit to 1 bucket per 2^scale bytes of low memory (rounded up to
+	 * nearest power of 2 in size) */
+	if (scale > PAGE_SHIFT)
+		mem >>= (scale - PAGE_SHIFT);
+	else
+		mem <<= (PAGE_SHIFT - scale);
+
+	mem = 1UL << (long_log2(mem) + 1);
+
+	/* limit allocation size */
+	max = (1UL << (PAGE_SHIFT + MAX_SYS_HASH_TABLE_ORDER)) / bucketsize;
+	if (max > mem)
+		max = mem;
+
+	/* allow the kernel cmdline to have a say */
+	if (!numentries || numentries > max)
+		numentries = max;
+
+	log2qty = long_log2(numentries);
+
+	do {
+		size = bucketsize << log2qty;
+
+		table = (void *) alloc_bootmem(size);
+
+	} while (!table && size > PAGE_SIZE);
+
+	if (!table)
+		panic("Failed to allocate %s hash table\n", tablename);
+
+	printk("%s hash table entries: %d (order: %d, %lu bytes)\n",
+	       tablename,
+	       (1U << log2qty),
+	       long_log2(size) - PAGE_SHIFT,
+	       size);
+
+	if (_hash_shift)
+		*_hash_shift = log2qty;
+	if (_hash_mask)
+		*_hash_mask = (1 << log2qty) - 1;
+
+	return table;
 }

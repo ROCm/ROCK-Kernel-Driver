@@ -83,10 +83,10 @@
 #include <linux/pci.h>
 #include <linux/miscdevice.h>
 #include <linux/smp_lock.h>
+#include <linux/compat.h>
 
 #include <asm/io.h>
 #include <asm/uaccess.h>
-#include <asm/compat.h>
 
 #include <linux/kdev_t.h>	/* needed for access to Scsi_Host struct */
 #include <linux/blkdev.h>

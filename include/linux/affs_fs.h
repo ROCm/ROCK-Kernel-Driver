@@ -36,7 +36,8 @@ extern u32	affs_count_free_bits(u32 blocksize, const void *data);
 extern u32	affs_count_free_blocks(struct super_block *s);
 extern void	affs_free_block(struct super_block *sb, u32 block);
 extern u32	affs_alloc_block(struct inode *inode, u32 goal);
-extern int	affs_init_bitmap(struct super_block *sb);
+extern int	affs_init_bitmap(struct super_block *sb, int *flags);
+extern void	affs_free_bitmap(struct super_block *sb);
 
 /* namei.c */
 

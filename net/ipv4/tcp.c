@@ -670,11 +670,6 @@ static int wait_for_tcp_connect(struct sock *sk, int flags, long *timeo_p)
 	return 0;
 }
 
-static inline int tcp_memory_free(struct sock *sk)
-{
-	return sk->sk_wmem_queued < sk->sk_sndbuf;
-}
-
 /*
  *	Wait for more memory for a socket
  */
@@ -686,7 +681,7 @@ static int wait_for_tcp_memory(struct sock *sk, long *timeo)
 	long current_timeo = *timeo;
 	DEFINE_WAIT(wait);
 
-	if (tcp_memory_free(sk))
+	if (sk_stream_memory_free(sk))
 		current_timeo = vm_wait = (net_random() % (HZ / 5)) + 2;
 
 	for (;;) {
@@ -701,13 +696,13 @@ static int wait_for_tcp_memory(struct sock *sk, long *timeo)
 		if (signal_pending(current))
 			goto do_interrupted;
 		clear_bit(SOCK_ASYNC_NOSPACE, &sk->sk_socket->flags);
-		if (tcp_memory_free(sk) && !vm_wait)
+		if (sk_stream_memory_free(sk) && !vm_wait)
 			break;
 
 		set_bit(SOCK_NOSPACE, &sk->sk_socket->flags);
 		tp->write_pending++;
 		release_sock(sk);
-		if (!tcp_memory_free(sk) || vm_wait)
+		if (!sk_stream_memory_free(sk) || vm_wait)
 			current_timeo = schedule_timeout(current_timeo);
 		lock_sock(sk);
 		tp->write_pending--;
@@ -735,17 +730,6 @@ do_nonblock:
 do_interrupted:
 	err = sock_intr_errno(*timeo);
 	goto out;
-}
-
-static inline int can_coalesce(struct sk_buff *skb, int i, struct page *page,
-			       int off)
-{
-	if (i) {
-		skb_frag_t *frag = &skb_shinfo(skb)->frags[i - 1];
-		return page == frag->page &&
-		       off == frag->page_offset + frag->size;
-	}
-	return 0;
 }
 
 static inline void fill_page_desc(struct sk_buff *skb, int i,
@@ -849,7 +833,7 @@ static ssize_t do_tcp_sendpages(struct sock *sk, struct page **pages, int poffse
 
 		if (!tp->send_head || (copy = mss_now - skb->len) <= 0) {
 new_segment:
-			if (!tcp_memory_free(sk))
+			if (!sk_stream_memory_free(sk))
 				goto wait_for_sndbuf;
 
 			skb = tcp_alloc_pskb(sk, 0, tp->mss_cache,
@@ -865,7 +849,7 @@ new_segment:
 			copy = size;
 
 		i = skb_shinfo(skb)->nr_frags;
-		if (can_coalesce(skb, i, page, offset)) {
+		if (skb_can_coalesce(skb, i, page, offset)) {
 			skb_shinfo(skb)->frags[i - 1].size += copy;
 		} else if (i < MAX_SKB_FRAGS) {
 			get_page(page);
@@ -948,53 +932,6 @@ ssize_t tcp_sendpage(struct socket *sock, struct page *page, int offset,
 #define TCP_PAGE(sk)	(inet_sk(sk)->sndmsg_page)
 #define TCP_OFF(sk)	(inet_sk(sk)->sndmsg_off)
 
-static inline int tcp_copy_to_page(struct sock *sk, char __user *from,
-				   struct sk_buff *skb, struct page *page,
-				   int off, int copy)
-{
-	int err = 0;
-	unsigned int csum;
-
-	if (skb->ip_summed == CHECKSUM_NONE) {
-		csum = csum_and_copy_from_user(from, page_address(page) + off,
-				       copy, 0, &err);
-		if (err) return err;
-		skb->csum = csum_block_add(skb->csum, csum, skb->len);
-	} else {
-		if (copy_from_user(page_address(page) + off, from, copy))
-			return -EFAULT;
-	}
-
-	skb->len += copy;
-	skb->data_len += copy;
-	skb->truesize += copy;
-	sk->sk_wmem_queued += copy;
-	sk->sk_forward_alloc -= copy;
-	return 0;
-}
-
-static inline int skb_add_data(struct sk_buff *skb, char __user *from, int copy)
-{
-	int err = 0;
-	unsigned int csum;
-	int off = skb->len;
-
-	if (skb->ip_summed == CHECKSUM_NONE) {
-		csum = csum_and_copy_from_user(from, skb_put(skb, copy),
-				       copy, 0, &err);
-		if (!err) {
-			skb->csum = csum_block_add(skb->csum, csum, off);
-			return 0;
-		}
-	} else {
-		if (!copy_from_user(skb_put(skb, copy), from, copy))
-			return 0;
-	}
-
-	__skb_trim(skb, off);
-	return -EFAULT;
-}
-
 static inline int select_size(struct sock *sk, struct tcp_opt *tp)
 {
 	int tmp = tp->mss_cache_std;
@@ -1063,7 +1000,7 @@ new_segment:
 				/* Allocate new segment. If the interface is SG,
 				 * allocate skb fitting to single page.
 				 */
-				if (!tcp_memory_free(sk))
+				if (!sk_stream_memory_free(sk))
 					goto wait_for_sndbuf;
 
 				skb = tcp_alloc_pskb(sk, select_size(sk, tp),
@@ -1100,7 +1037,7 @@ new_segment:
 				struct page *page = TCP_PAGE(sk);
 				int off = TCP_OFF(sk);
 
-				if (can_coalesce(skb, i, page, off) &&
+				if (skb_can_coalesce(skb, i, page, off) &&
 				    off != PAGE_SIZE) {
 					/* We can extend the last page
 					 * fragment. */
@@ -1138,7 +1075,7 @@ new_segment:
 
 				/* Time to copy data. We are close to
 				 * the end! */
-				err = tcp_copy_to_page(sk, from, skb, page,
+				err = skb_copy_to_page(sk, from, skb, page,
 						       off, copy);
 				if (err) {
 					/* If this page was new, give it to the

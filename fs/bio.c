@@ -116,6 +116,8 @@ inline void bio_init(struct bio *bio)
 	bio->bi_idx = 0;
 	bio->bi_phys_segments = 0;
 	bio->bi_hw_segments = 0;
+	bio->bi_hw_front_size = 0;
+	bio->bi_hw_back_size = 0;
 	bio->bi_size = 0;
 	bio->bi_max_vecs = 0;
 	bio->bi_end_io = NULL;
@@ -304,14 +306,15 @@ static int __bio_add_page(request_queue_t *q, struct bio *bio, struct page
 	 * make this too complex.
 	 */
 
-	while (bio_phys_segments(q, bio) >= q->max_phys_segments
-	    || bio_hw_segments(q, bio) >= q->max_hw_segments) {
+	while (bio->bi_phys_segments >= q->max_phys_segments
+	       || bio->bi_hw_segments >= q->max_hw_segments
+	       || BIOVEC_VIRT_OVERSIZE(bio->bi_size)) {
 
 		if (retried_segments)
 			return 0;
 
-		bio->bi_flags &= ~(1 << BIO_SEG_VALID);
 		retried_segments = 1;
+		blk_recount_segments(q, bio);
 	}
 
 	/*
@@ -340,6 +343,11 @@ static int __bio_add_page(request_queue_t *q, struct bio *bio, struct page
 			return 0;
 		}
 	}
+
+	/* If we may be able to merge these biovecs, force a recount */
+	if (bio->bi_vcnt && (BIOVEC_PHYS_MERGEABLE(bvec-1, bvec) ||
+	    BIOVEC_VIRT_MERGEABLE(bvec-1, bvec)))
+		bio->bi_flags &= ~(1 << BIO_SEG_VALID);
 
 	bio->bi_vcnt++;
 	bio->bi_phys_segments++;

@@ -290,9 +290,7 @@ static inline void * __memset_g(void * s, int c, size_t count)
 static inline void * __memset_page(void * s,int c,size_t count)
 {
   unsigned long data, tmp;
-  void *xs, *sp;
-
-  xs = sp = s;
+  void *xs = s;
 
   c = c & 255;
   data = c | (c << 8);
@@ -303,10 +301,11 @@ static inline void * __memset_page(void * s,int c,size_t count)
   if (((unsigned long) s) & 0x0f)
 	  __memset_g(s, c, count);
   else{
-	  *((unsigned long *)(s))++ = data;
-	  *((unsigned long *)(s))++ = data;
-	  *((unsigned long *)(s))++ = data;
-	  *((unsigned long *)(s))++ = data;
+	  unsigned long *sp = s;
+	  *sp++ = data;
+	  *sp++ = data;
+	  *sp++ = data;
+	  *sp++ = data;
 
 	  __asm__ __volatile__("1:\t"
 			       ".chip 68040\n\t"
@@ -315,8 +314,8 @@ static inline void * __memset_page(void * s,int c,size_t count)
 			       "subqw  #8,%2\n\t"
 			       "subqw  #8,%2\n\t"
 			       "dbra   %1,1b\n\t"
-			       : "=a" (s), "=d" (tmp)
-			       : "a" (sp), "0" (s), "1" ((count - 16) / 16 - 1)
+			       : "=a" (sp), "=d" (tmp)
+			       : "a" (s), "0" (sp), "1" ((count - 16) / 16 - 1)
 			       );
   }
 

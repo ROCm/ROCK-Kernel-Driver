@@ -163,11 +163,15 @@ int ah6_output(struct sk_buff **pskb)
 	}
 
 	spin_lock_bh(&x->lock);
-	err = xfrm_check_output(x, *pskb, AF_INET6);
+	err = xfrm_state_check(x, *pskb);
 	if (err)
 		goto error;
 
 	if (x->props.mode) {
+		err = xfrm6_tunnel_check_size(*pskb);
+		if (err)
+			goto error;
+
 		iph = (*pskb)->nh.ipv6h;
 		(*pskb)->nh.ipv6h = (struct ipv6hdr*)skb_push(*pskb, x->props.header_len);
 		(*pskb)->nh.ipv6h->version = 6;

@@ -211,6 +211,8 @@ struct cifsTconInfo {
 	atomic_t num_deletes;
 	atomic_t num_mkdirs;
 	atomic_t num_rmdirs;
+	atomic_t num_renames;
+	atomic_t num_t2renames;
 	__u64    bytes_read;
 	__u64    bytes_written;
 	spinlock_t stat_lock;

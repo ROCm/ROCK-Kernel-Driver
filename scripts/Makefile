@@ -13,7 +13,7 @@ modpost-objs	:= modpost.o file2alias.o sumversion.o
 subdir-$(CONFIG_MODVERSIONS)	+= genksyms
 
 # Let clean descend into subdirs
-subdir-	+= basic lxdialog kconfig
+subdir-	+= basic lxdialog kconfig package
 
 # dependencies on generated files need to be listed explicitly
 

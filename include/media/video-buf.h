@@ -18,6 +18,8 @@
 
 #include <linux/videodev.h>
 
+#define UNSET (-1U)
+
 /* --------------------------------------------------------------------- */
 
 /*
@@ -34,8 +36,6 @@ struct scatterlist* videobuf_vmalloc_to_sg(unsigned char *virt, int nr_pages);
  */
 struct scatterlist* videobuf_pages_to_sg(struct page **pages, int nr_pages,
 					 int offset);
-int videobuf_lock(struct page **pages, int nr_pages);
-int videobuf_unlock(struct page **pages, int nr_pages);
 
 /* --------------------------------------------------------------------- */
 
@@ -59,6 +59,8 @@ int videobuf_unlock(struct page **pages, int nr_pages);
  */
 
 struct videobuf_dmabuf {
+	u32                 magic;
+
 	/* for userland buffer */
 	int                 offset;
 	struct page         **pages;
@@ -76,6 +78,7 @@ struct videobuf_dmabuf {
 	int                 direction;
 };
 
+void videobuf_dma_init(struct videobuf_dmabuf *dma);
 int videobuf_dma_init_user(struct videobuf_dmabuf *dma, int direction,
 			   unsigned long data, unsigned long size);
 int videobuf_dma_init_kernel(struct videobuf_dmabuf *dma, int direction,
@@ -134,12 +137,14 @@ enum videobuf_state {
 
 struct videobuf_buffer {
 	unsigned int            i;
+	u32                     magic;
 
 	/* info about the buffer */
 	unsigned int            width;
 	unsigned int            height;
 	unsigned int            bytesperline; /* use only if != 0 */
 	unsigned long           size;
+	unsigned int            input;
 	enum v4l2_field         field;
 	enum videobuf_state     state;
 	struct videobuf_dmabuf  dma;
@@ -174,9 +179,10 @@ struct videobuf_queue {
 	struct pci_dev             *pci;
 
 	enum v4l2_buf_type         type;
+	unsigned int               inputs; /* for V4L2_BUF_FLAG_INPUT */
 	unsigned int               msize;
 	enum v4l2_field            field;
-	enum v4l2_field            last; /* for field=V4L2_FIELD_ALTERNATE */
+	enum v4l2_field            last;   /* for field=V4L2_FIELD_ALTERNATE */
 	struct videobuf_buffer     *bufs[VIDEO_MAX_FRAME];
 	struct videobuf_queue_ops  *ops;
 

@@ -458,6 +458,7 @@ asmlinkage void __init start_kernel(void)
 		initrd_start = 0;
 	}
 #endif
+	vfs_caches_init_early();
 	mem_init();
 	kmem_cache_init();
 	numa_policy_init();
