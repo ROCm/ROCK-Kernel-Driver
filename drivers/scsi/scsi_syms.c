@@ -21,6 +21,7 @@
 #include "scsi.h"
 #include <scsi/scsi_ioctl.h>
 #include "hosts.h"
+#include "scsi_logging.h"
 
 #include <scsi/scsicam.h>
 
