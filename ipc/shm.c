@@ -117,7 +117,7 @@ static void shm_destroy (struct shmid_kernel *shp)
 		shmem_lock(shp->shm_file, 0);
 	fput (shp->shm_file);
 	security_shm_free(shp);
-	ipc_rcu_free(shp, sizeof(struct shmid_kernel));
+	ipc_rcu_putref(shp);
 }
 
 /*
@@ -194,7 +194,7 @@ static int newseg (key_t key, int shmflg, size_t size)
 	shp->shm_perm.security = NULL;
 	error = security_shm_alloc(shp);
 	if (error) {
-		ipc_rcu_free(shp, sizeof(*shp));
+		ipc_rcu_putref(shp);
 		return error;
 	}
 
@@ -234,7 +234,7 @@ no_id:
 	fput(file);
 no_file:
 	security_shm_free(shp);
-	ipc_rcu_free(shp, sizeof(*shp));
+	ipc_rcu_putref(shp);
 	return error;
 }
 

@@ -100,14 +100,14 @@ static int newque (key_t key, int msgflg)
 	msq->q_perm.security = NULL;
 	retval = security_msg_queue_alloc(msq);
 	if (retval) {
-		ipc_rcu_free(msq, sizeof(*msq));
+		ipc_rcu_putref(msq);
 		return retval;
 	}
 
 	id = ipc_addid(&msg_ids, &msq->q_perm, msg_ctlmni);
 	if(id == -1) {
 		security_msg_queue_free(msq);
-		ipc_rcu_free(msq, sizeof(*msq));
+		ipc_rcu_putref(msq);
 		return -ENOSPC;
 	}
 
@@ -193,7 +193,7 @@ static void freeque (struct msg_queue *msq, int id)
 	}
 	atomic_sub(msq->q_cbytes, &msg_bytes);
 	security_msg_queue_free(msq);
-	ipc_rcu_free(msq, sizeof(struct msg_queue));
+	ipc_rcu_putref(msq);
 }
 
 asmlinkage long sys_msgget (key_t key, int msgflg)

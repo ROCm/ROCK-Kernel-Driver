@@ -179,14 +179,14 @@ static int newary (key_t key, int nsems, int semflg)
 	sma->sem_perm.security = NULL;
 	retval = security_sem_alloc(sma);
 	if (retval) {
-		ipc_rcu_free(sma, size);
+		ipc_rcu_putref(sma);
 		return retval;
 	}
 
 	id = ipc_addid(&sem_ids, &sma->sem_perm, sc_semmni);
 	if(id == -1) {
 		security_sem_free(sma);
-		ipc_rcu_free(sma, size);
+		ipc_rcu_putref(sma);
 		return -ENOSPC;
 	}
 	used_sems += nsems;
@@ -473,7 +473,7 @@ static void freeary (struct sem_array *sma, int id)
 	used_sems -= sma->sem_nsems;
 	size = sizeof (*sma) + sma->sem_nsems * sizeof (struct sem);
 	security_sem_free(sma);
-	ipc_rcu_free(sma, size);
+	ipc_rcu_putref(sma);
 }
 
 static unsigned long copy_semid_to_user(void __user *buf, struct semid64_ds *in, int version)
