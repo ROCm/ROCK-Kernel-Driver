@@ -38,8 +38,6 @@ static char *symtab_name[SYM_NUM] = {
 };
 #endif
 
-int policydb_loaded_version;
-
 static unsigned int symtab_sizes[SYM_NUM] = {
 	2,
 	32,
@@ -1100,7 +1098,7 @@ int policydb_read(struct policydb *p, void *fp)
 	struct role_trans *tr, *ltr;
 	struct ocontext *l, *c, *newc;
 	struct genfs *genfs_p, *genfs, *newgenfs;
-	int i, j, rc, r_policyvers = 0;
+	int i, j, rc;
 	u32 buf[8], len, len2, config, nprim, nel, nel2;
 	char *policydb_str;
 	struct policydb_compat_info *info;
@@ -1165,9 +1163,9 @@ int policydb_read(struct policydb *p, void *fp)
 	for (i = 0; i < 4; i++)
 		buf[i] = le32_to_cpu(buf[i]);
 
-	r_policyvers = buf[0];
-	if (r_policyvers < POLICYDB_VERSION_MIN ||
-	    r_policyvers > POLICYDB_VERSION_MAX) {
+	p->policyvers = buf[0];
+	if (p->policyvers < POLICYDB_VERSION_MIN ||
+	    p->policyvers > POLICYDB_VERSION_MAX) {
 	    	printk(KERN_ERR "security:  policydb version %d does not match "
 	    	       "my version range %d-%d\n",
 	    	       buf[0], POLICYDB_VERSION_MIN, POLICYDB_VERSION_MAX);
@@ -1183,10 +1181,10 @@ int policydb_read(struct policydb *p, void *fp)
 	}
 
 
-	info = policydb_lookup_compat(r_policyvers);
+	info = policydb_lookup_compat(p->policyvers);
 	if (!info) {
 		printk(KERN_ERR "security:  unable to find policy compat info "
-		       "for version %d\n", r_policyvers);
+		       "for version %d\n", p->policyvers);
 		goto bad;
 	}
 
@@ -1220,7 +1218,7 @@ int policydb_read(struct policydb *p, void *fp)
 	if (rc)
 		goto bad;
 
-	if (r_policyvers >= POLICYDB_VERSION_BOOL) {
+	if (p->policyvers >= POLICYDB_VERSION_BOOL) {
 		rc = cond_read_list(p, fp);
 		if (rc)
 			goto bad;
@@ -1507,7 +1505,6 @@ int policydb_read(struct policydb *p, void *fp)
 
 	rc = 0;
 out:
-	policydb_loaded_version = r_policyvers;
 	return rc;
 bad_newc:
 	ocontext_destroy(newc,OCON_FSUSE);
