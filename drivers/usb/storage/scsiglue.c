@@ -255,7 +255,7 @@ static int bus_reset( Scsi_Cmnd *srb )
 	/* FIXME: This needs to lock out driver probing while it's working
 	 * or we can have race conditions */
 	/* Is that still true?  I don't see how...  AS */
-        for (i = 0; i < pusb_dev_save->actconfig->bNumInterfaces; i++) {
+	for (i = 0; i < pusb_dev_save->actconfig->bNumInterfaces; i++) {
  		struct usb_interface *intf =
 			&pusb_dev_save->actconfig->interface[i];
 		const struct usb_device_id *id;
@@ -560,11 +560,11 @@ int usb_stor_scsiSense10to6( Scsi_Cmnd* the10 )
 
 	  /* copy one byte */
 	  {
-	        char *src = page_address(sg[sb].page) + sg[sb].offset + si;
-	        char *dst = page_address(sg[db].page) + sg[db].offset + di;
+		char *src = page_address(sg[sb].page) + sg[sb].offset + si;
+		char *dst = page_address(sg[db].page) + sg[db].offset + di;
 
-                 *dst = *src;
-          }
+		 *dst = *src;
+	  }
 
 	  /* get next destination */
 	  if ( sg[db].length-1 == di )
@@ -753,11 +753,11 @@ int usb_stor_scsiSense6to10( Scsi_Cmnd* the6 )
 
 	  /* copy one byte */
 	  {
-	        char *src = page_address(sg[sb].page) + sg[sb].offset + si;
-	        char *dst = page_address(sg[db].page) + sg[db].offset + di;
+		char *src = page_address(sg[sb].page) + sg[sb].offset + si;
+		char *dst = page_address(sg[db].page) + sg[db].offset + di;
 
-                 *dst = *src;
-          }
+		 *dst = *src;
+	  }
 
 	  /* get next destination */
 	  if ( di == 0 )
@@ -794,11 +794,11 @@ int usb_stor_scsiSense6to10( Scsi_Cmnd* the6 )
 	      break;
 	    }
 
-         {
-                 char *dst = page_address(sg[db].page) + sg[db].offset + di;
+	 {
+		 char *dst = page_address(sg[db].page) + sg[db].offset + di;
 
-                 *dst = tempBuffer[element-USB_STOR_SCSI_SENSE_HDRSZ];
-         }
+		 *dst = tempBuffer[element-USB_STOR_SCSI_SENSE_HDRSZ];
+	 }
 
 
 	  /* get next destination */
@@ -852,14 +852,14 @@ void usb_stor_scsiSenseParseBuffer( Scsi_Cmnd* srb, Usb_Stor_Scsi_Sense_Hdr_u* t
 		      the6->array[element] = page_address(sg[i].page) +
 			      			sg[i].offset + j;
 		      the10->array[element] = page_address(sg[i].page) +
-			                        sg[i].offset + j;
+						sg[i].offset + j;
 
 		    }
 		  else if ( element < USB_STOR_SCSI_SENSE_10_HDRSZ )
 		    {
 		      /* only the longer headers still cares now */
 		      the10->array[element] = page_address(sg[i].page) +
-			                        sg[i].offset + j;
+						sg[i].offset + j;
 		       
 		    }
 		  /* increase element counter */
