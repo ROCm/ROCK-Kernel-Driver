@@ -26,10 +26,6 @@
      execution. Hence, we get something sort of weak cpu binding.
      Though it is still not clear, will it result in better locality
      or will not.
-   - These softirqs are not masked by global cli() and start_bh_atomic()
-     (by clear reasons). Hence, old parts of code still using global locks
-     MUST NOT use softirqs, but insert interfacing routines acquiring
-     global locks. F.e. look at BHs implementation.
 
    Examples:
    - NET RX softirq. It is multithreaded and does not require
