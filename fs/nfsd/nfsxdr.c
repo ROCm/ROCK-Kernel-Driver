@@ -234,7 +234,7 @@ int
 nfssvc_decode_readargs(struct svc_rqst *rqstp, u32 *p,
 					struct nfsd_readargs *args)
 {
-	int len;
+	unsigned int len;
 	int v,pn;
 	if (!(p = decode_fh(p, &args->fh)))
 		return 0;
@@ -266,7 +266,7 @@ int
 nfssvc_decode_writeargs(struct svc_rqst *rqstp, u32 *p,
 					struct nfsd_writeargs *args)
 {
-	int len;
+	unsigned int len;
 	int v;
 	if (!(p = decode_fh(p, &args->fh)))
 		return 0;
