@@ -21,6 +21,7 @@
 #include <linux/list.h>
 #include <linux/sched.h>
 #include <linux/fs.h>
+#include <linux/binfmts.h>
 #include <linux/in.h>
 #include "flask.h"
 #include "avc.h"
@@ -83,6 +84,13 @@ struct ipc_security_struct {
 	u16 sclass;	/* security class of this object */
 	u32 sid;              /* SID of IPC resource */
         struct avc_entry_ref avcr;	/* reference to permissions */
+};
+
+struct bprm_security_struct {
+	unsigned long magic;           /* magic number for this module */
+	struct linux_binprm *bprm;     /* back pointer to bprm object */
+	u32 sid;                       /* SID for transformed process */
+	unsigned char set;
 };
 
 extern int inode_security_set_sid(struct inode *inode, u32 sid);
