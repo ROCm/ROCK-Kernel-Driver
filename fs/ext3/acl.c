@@ -259,8 +259,6 @@ ext3_set_acl(handle_t *handle, struct inode *inode, int type,
 			return -EINVAL;
 	}
  	if (acl) {
-		if (acl->a_count > EXT3_ACL_MAX_ENTRIES)
-			return -EINVAL;
 		value = ext3_acl_to_disk(acl, &size);
 		if (IS_ERR(value))
 			return (int)PTR_ERR(value);
