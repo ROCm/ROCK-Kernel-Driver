@@ -345,7 +345,7 @@ acpi_system_write_alarm (
 
 	acpi_set_register(ACPI_BITREG_RT_CLOCK_ENABLE, 1, ACPI_MTX_LOCK);
 
-	file->f_pos += count;
+	*ppos += count;
 
 	result = 0;
 end:

@@ -74,16 +74,12 @@ ixp2000_wdt_open(struct inode *inode, struct file *file)
 
 	wdt_enable();
 
-	return 0;
+	return nonseekable_open(inode, file);
 }
 
 static ssize_t
 ixp2000_wdt_write(struct file *file, const char *data, size_t len, loff_t *ppos)
 {
-	/* Can't seek (pwrite) on this device  */
-	if (ppos != &file->f_pos)
-		return -ESPIPE;
-
 	if (len) {
 		if (!nowayout) {
 			size_t i;

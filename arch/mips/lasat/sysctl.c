@@ -60,11 +60,11 @@ int sysctl_lasatstring(ctl_table *table, int *name, int nlen,
 
 /* And the same for proc */
 int proc_dolasatstring(ctl_table *table, int write, struct file *filp,
-		       void *buffer, size_t *lenp)
+		       void *buffer, size_t *lenp, loff_t *ppos)
 {
 	int r;
 	down(&lasat_info_sem);
-	r = proc_dostring(table, write, filp, buffer, lenp);
+	r = proc_dostring(table, write, filp, buffer, lenp, ppos);
 	if ( (!write) || r) {
 		up(&lasat_info_sem);
 		return r;
@@ -76,11 +76,11 @@ int proc_dolasatstring(ctl_table *table, int write, struct file *filp,
 
 /* proc function to write EEPROM after changing int entry */ 
 int proc_dolasatint(ctl_table *table, int write, struct file *filp,
-		       void *buffer, size_t *lenp)
+		       void *buffer, size_t *lenp, loff_t *ppos)
 {
 	int r;
 	down(&lasat_info_sem);
-	r = proc_dointvec(table, write, filp, buffer, lenp);
+	r = proc_dointvec(table, write, filp, buffer, lenp, ppos);
 	if ( (!write) || r) {
 		up(&lasat_info_sem);
 		return r;
@@ -95,7 +95,7 @@ static int rtctmp;
 #ifdef CONFIG_DS1603
 /* proc function to read/write RealTime Clock */ 
 int proc_dolasatrtc(ctl_table *table, int write, struct file *filp,
-		       void *buffer, size_t *lenp)
+		       void *buffer, size_t *lenp, loff_t *ppos)
 {
 	int r;
 	down(&lasat_info_sem);
@@ -105,7 +105,7 @@ int proc_dolasatrtc(ctl_table *table, int write, struct file *filp,
 		if (rtctmp < 0)
 			rtctmp = 0;
 	}
-	r = proc_dointvec(table, write, filp, buffer, lenp);
+	r = proc_dointvec(table, write, filp, buffer, lenp, ppos);
 	if ( (!write) || r) {
 		up(&lasat_info_sem);
 		return r;
@@ -180,14 +180,14 @@ void update_bcastaddr(void)
 static char proc_lasat_ipbuf[32];
 /* Parsing of IP address */
 int proc_lasat_ip(ctl_table *table, int write, struct file *filp,
-		       void *buffer, size_t *lenp)
+		       void *buffer, size_t *lenp, loff_t *ppos)
 {
 	int len;
         unsigned int ip;
 	char *p, c;
 
 	if (!table->data || !table->maxlen || !*lenp ||
-	    (filp->f_pos && !write)) {
+	    (*ppos && !write)) {
 		*lenp = 0;
 		return 0;
 	}
@@ -213,7 +213,7 @@ int proc_lasat_ip(ctl_table *table, int write, struct file *filp,
 			return -EFAULT;
 		}
 		proc_lasat_ipbuf[len] = 0;
-		filp->f_pos += *lenp;
+		*ppos += *lenp;
 		/* Now see if we can convert it to a valid IP */
 		ip = in_aton(proc_lasat_ipbuf);
 		*(unsigned int *)(table->data) = ip;
@@ -241,7 +241,7 @@ int proc_lasat_ip(ctl_table *table, int write, struct file *filp,
 			len++;
 		}
 		*lenp = len;
-		filp->f_pos += len;
+		*ppos += len;
 	}
 	update_bcastaddr();
 	up(&lasat_info_sem);
@@ -277,11 +277,11 @@ static int sysctl_lasat_eeprom_value(ctl_table *table, int *name, int nlen,
 }
 
 int proc_lasat_eeprom_value(ctl_table *table, int write, struct file *filp,
-		       void *buffer, size_t *lenp)
+		       void *buffer, size_t *lenp, loff_t *ppos)
 {
 	int r;
 	down(&lasat_info_sem);
-	r = proc_dointvec(table, write, filp, buffer, lenp);
+	r = proc_dointvec(table, write, filp, buffer, lenp, ppos);
 	if ( (!write) || r) {
 		up(&lasat_info_sem);
 		return r;

@@ -43,11 +43,7 @@
 static void kick_open(void);
 static int get_flash_id(void);
 static int erase_block(int nBlock);
-static int write_block(unsigned long p, const char *buf, int count);
-static int flash_ioctl(struct inode *inodep, struct file *filep, unsigned int cmd, unsigned long arg);
-static ssize_t flash_read(struct file *file, char *buf, size_t count, loff_t * ppos);
-static ssize_t flash_write(struct file *file, const char *buf, size_t count, loff_t * ppos);
-static loff_t flash_llseek(struct file *file, loff_t offset, int orig);
+static int write_block(unsigned long p, const char __user *buf, int count);
 
 #define KFLASH_SIZE	1024*1024	//1 Meg
 #define KFLASH_SIZE4	4*1024*1024	//4 Meg
@@ -132,15 +128,16 @@ static int flash_ioctl(struct inode *inodep, struct file *filep, unsigned int cm
 	return 0;
 }
 
-static ssize_t flash_read(struct file *file, char *buf, size_t size, loff_t * ppos)
+static ssize_t flash_read(struct file *file, char __user *buf, size_t size,
+			  loff_t *ppos)
 {
 	unsigned long p = *ppos;
 	unsigned int count = size;
 	int ret = 0;
 
 	if (flashdebug)
-		printk(KERN_DEBUG "flash_read: flash_read: offset=0x%lX, buffer=%p, count=0x%X.\n",
-		       p, buf, count);
+		printk(KERN_DEBUG "flash_read: flash_read: offset=0x%lX, "
+		       "buffer=%p, count=0x%X.\n", p, buf, count);
 
 	if (count)
 		ret = -ENXIO;
@@ -166,7 +163,8 @@ static ssize_t flash_read(struct file *file, char *buf, size_t size, loff_t * pp
 	return ret;
 }
 
-static ssize_t flash_write(struct file *file, const char *buf, size_t size, loff_t * ppos)
+static ssize_t flash_write(struct file *file, const char __user *buf,
+			   size_t size, loff_t * ppos)
 {
 	unsigned long p = *ppos;
 	unsigned int count = size;
@@ -244,8 +242,9 @@ static ssize_t flash_write(struct file *file, const char *buf, size_t size, loff
 			break;
 		}
 		if (flashdebug)
-			printk(KERN_DEBUG "flash_write: writing offset %lX, from buf "
-				"%p, bytes left %X.\n", p, buf, count - written);
+			printk(KERN_DEBUG "flash_write: writing offset %lX, "
+			       "from buf %p, bytes left %X.\n", p, buf,
+			       count - written);
 
 		/*
 		 * write_block will limit write to space left in this block
@@ -460,7 +459,7 @@ static int erase_block(int nBlock)
 /*
  * write_block will limit number of bytes written to the space in this block
  */
-static int write_block(unsigned long p, const char *buf, int count)
+static int write_block(unsigned long p, const char __user *buf, int count)
 {
 	volatile unsigned int c1;
 	volatile unsigned int c2;

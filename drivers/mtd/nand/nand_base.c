@@ -37,7 +37,7 @@
  *	The AG-AND chips have nice features for speed improvement,
  *	which are not supported yet. Read / program 4 pages in one go.
  *
- * $Id: nand_base.c,v 1.113 2004/07/14 16:31:31 gleixner Exp $
+ * $Id: nand_base.c,v 1.115 2004/08/09 13:19:45 dwmw2 Exp $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -58,7 +58,7 @@
 #include <linux/bitops.h>
 #include <asm/io.h>
 
-#if defined(CONFIG_MTD_PARTITIONS) || defined(CONFIG_MTD_PARTITIONS_MODULE)
+#ifdef CONFIG_MTD_PARTITIONS
 #include <linux/mtd/partitions.h>
 #endif
 
@@ -1284,12 +1284,12 @@ static int nand_read_ecc (struct mtd_info *mtd, loff_t from, size_t len,
 	nand_release_chip(mtd);
 
 	/*
-	 * Return success, if no ECC failures, else -EIO
+	 * Return success, if no ECC failures, else -EBADMSG
 	 * fs driver will take care of that, because
-	 * retlen == desired len and result == -EIO
+	 * retlen == desired len and result == -EBADMSG
 	 */
 	*retlen = read;
-	return ecc_failed ? -EIO : 0;
+	return ecc_failed ? -EBADMSG : 0;
 }
 
 /**
@@ -2108,8 +2108,8 @@ erase_exit:
 
 	ret = instr->state == MTD_ERASE_DONE ? 0 : -EIO;
 	/* Do call back function */
-	if (!ret && instr->callback)
-		instr->callback (instr);
+	if (!ret)
+		mtd_erase_callback(instr);
 
 	/* Deselect and wake up anyone waiting on the device */
 	nand_release_chip(mtd);
@@ -2555,11 +2555,11 @@ void nand_release (struct mtd_info *mtd)
 {
 	struct nand_chip *this = mtd->priv;
 
-#if defined(CONFIG_MTD_PARTITIONS) || defined(CONFIG_MTD_PARTITIONS_MODULE)
-	/* Unregister partitions */
+#ifdef CONFIG_MTD_PARTITIONS
+	/* Deregister partitions */
 	del_mtd_partitions (mtd);
 #endif
-	/* Unregister the device */
+	/* Deregister the device */
 	del_mtd_device (mtd);
 
 	/* Free bad block table memory, if allocated */

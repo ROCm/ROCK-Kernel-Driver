@@ -616,7 +616,7 @@ static int dabusb_open (struct inode *inode, struct file *file)
 	file->f_pos = 0;
 	file->private_data = s;
 
-	return 0;
+	return nonseekable_open(inode, file);
 }
 
 static int dabusb_release (struct inode *inode, struct file *file)

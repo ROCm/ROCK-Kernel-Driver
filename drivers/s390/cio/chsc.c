@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/chsc.c
  *   S/390 common I/O routines -- channel subsystem call
- *   $Revision: 1.114 $
+ *   $Revision: 1.115 $
  *
  *    Copyright (C) 1999-2002 IBM Deutschland Entwicklung GmbH,
  *			      IBM Corporation
@@ -906,8 +906,6 @@ new_channel_path(int chpid)
 		return -ENOMEM;
 	memset(chp, 0, sizeof(struct channel_path));
 
-	chps[chpid] = chp;
-
 	/* fill in status, etc. */
 	chp->id = chpid;
 	chp->state = 1;
@@ -922,12 +920,17 @@ new_channel_path(int chpid)
 	if (ret) {
 		printk(KERN_WARNING "%s: could not register %02x\n",
 		       __func__, chpid);
-		return ret;
+		goto out_free;
 	}
 	ret = device_create_file(&chp->dev, &dev_attr_status);
-	if (ret)
+	if (ret) {
 		device_unregister(&chp->dev);
-
+		goto out_free;
+	} else
+		chps[chpid] = chp;
+	return ret;
+out_free:
+	kfree(chp);
 	return ret;
 }
 

@@ -152,7 +152,8 @@ __handle_signal:
 		.globl			rtrap_irq, rtrap_clr_l6, rtrap, irqsz_patchme, rtrap_xcall
 rtrap_irq:
 rtrap_clr_l6:	clr			%l6
-rtrap:		ldub			[%g6 + TI_CPU], %l0
+rtrap:
+		ldub			[%g6 + TI_CPU], %l0
 		sethi			%hi(irq_stat), %l2	! &softirq_active
 		or			%l2, %lo(irq_stat), %l2	! &softirq_active
 irqsz_patchme:	sllx			%l0, 0, %l0

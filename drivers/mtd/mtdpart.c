@@ -5,7 +5,7 @@
  *
  * This code is GPL
  *
- * $Id: mtdpart.c,v 1.46 2004/07/12 13:28:07 dwmw2 Exp $
+ * $Id: mtdpart.c,v 1.50 2004/08/10 16:18:34 dwmw2 Exp $
  *
  * 	02-21-2002	Thomas Gleixner <gleixner@autronix.de>
  *			added support for read_oob, write_oob
@@ -246,10 +246,22 @@ static int part_erase (struct mtd_info *mtd, struct erase_info *instr)
 		return -EINVAL;
 	instr->addr += part->offset;
 	ret = part->master->erase(part->master, instr);
-	if (instr->fail_addr != 0xffffffff)
-		instr->fail_addr -= part->offset;
 	return ret;
 }
+
+void mtd_erase_callback(struct erase_info *instr)
+{
+	if (instr->mtd->erase == part_erase) {
+		struct mtd_part *part = PART(instr->mtd);
+
+		if (instr->fail_addr != 0xffffffff)
+			instr->fail_addr -= part->offset;
+		instr->addr -= part->offset;
+	}
+	if (instr->callback)
+		instr->callback(instr);
+}
+EXPORT_SYMBOL_GPL(mtd_erase_callback);
 
 static int part_lock (struct mtd_info *mtd, loff_t ofs, size_t len)
 {

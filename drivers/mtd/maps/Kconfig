@@ -1,5 +1,5 @@
 # drivers/mtd/maps/Kconfig
-# $Id: Kconfig,v 1.29 2004/07/15 15:29:17 dwmw2 Exp $
+# $Id: Kconfig,v 1.30 2004/07/21 00:16:14 jwboyer Exp $
 
 menu "Mapping drivers for chip access"
 	depends on MTD!=n
@@ -19,7 +19,8 @@ config MTD_PHYSMAP
 	  command set driver code to communicate with flash chips which
 	  are mapped physically into the CPU's memory. You will need to
 	  configure the physical address and size of the flash chips on
-	  your particular board as well as the bus width.
+	  your particular board as well as the bus width, either statically
+	  with config options or at run-time.
 
 config MTD_PHYSMAP_START
 	hex "Physical start address of flash mapping"
@@ -30,6 +31,8 @@ config MTD_PHYSMAP_START
 	  are mapped on your particular target board. Refer to the
 	  memory map which should hopefully be in the documentation for
 	  your board.
+	  Ignore this option if you use run-time physmap configuration
+	  (i.e., run-time calling physmap_configure()).
 
 config MTD_PHYSMAP_LEN
 	hex "Physical length of flash mapping"
@@ -42,9 +45,11 @@ config MTD_PHYSMAP_LEN
 	  than the total amount of flash present. Refer to the memory
 	  map which should hopefully be in the documentation for your
 	  board.
+	  Ignore this option if you use run-time physmap configuration
+	  (i.e., run-time calling physmap_configure()).
 
-config MTD_PHYSMAP_BUSWIDTH
-	int "Bus width in octets"
+config MTD_PHYSMAP_BANKWIDTH
+	int "Bank width in octets"
 	depends on MTD_PHYSMAP
 	default "2"
 	help
@@ -52,6 +57,8 @@ config MTD_PHYSMAP_BUSWIDTH
 	  in octets. For example, if you have a data bus width of 32
 	  bits, you would set the bus width octect value to 4. This is
 	  used internally by the CFI drivers.
+	  Ignore this option if you use run-time physmap configuration
+	  (i.e., run-time calling physmap_configure()).
 
 config MTD_SUN_UFLASH
 	tristate "Sun Microsystems userflash support"

@@ -190,10 +190,6 @@ static void wdt_keepalive(void)
 
 static ssize_t fop_write(struct file * file, const char __user * buf, size_t count, loff_t * ppos)
 {
-	/* We can't seek */
-	if(ppos != &file->f_pos)
-		return -ESPIPE;
-
 	/* See if we got the magic character 'V' and reload the timer */
 	if(count)
 	{
@@ -230,7 +226,7 @@ static int fop_open(struct inode * inode, struct file * file)
 
 	/* Good, fire up the show */
 	wdt_startup();
-	return 0;
+	return nonseekable_open(inode, file);
 }
 
 static int fop_close(struct inode * inode, struct file * file)

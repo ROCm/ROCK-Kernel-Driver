@@ -1874,8 +1874,6 @@ trident_read(struct file *file, char __user *buffer, size_t count, loff_t * ppos
 	pr_debug("trident: trident_read called, count = %d\n", count);
 
 	VALIDATE_STATE(state);
-	if (ppos != &file->f_pos)
-		return -ESPIPE;
 
 	if (dmabuf->mapped)
 		return -ENXIO;
@@ -1992,8 +1990,6 @@ trident_write(struct file *file, const char __user *buffer, size_t count, loff_t
 	pr_debug("trident: trident_write called, count = %d\n", count);
 
 	VALIDATE_STATE(state);
-	if (ppos != &file->f_pos)
-		return -ESPIPE;
 
 	/*
 	 *      Guard against an mmap or ioctl while writing
@@ -2823,7 +2819,7 @@ trident_open(struct inode *inode, struct file *file)
 	pr_debug("trident: open virtual channel %d, hard channel %d\n",
 		 state->virt, dmabuf->channel->num);
 
-	return 0;
+	return nonseekable_open(inode, file);
 }
 
 static int
@@ -4079,7 +4075,7 @@ trident_open_mixdev(struct inode *inode, struct file *file)
       match:
 	file->private_data = card->ac97_codec[i];
 
-	return 0;
+	return nonseekable_open(inode, file);
 }
 
 static int

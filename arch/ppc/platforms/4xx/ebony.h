@@ -64,7 +64,8 @@
 #define UART0_IO_BASE	(u8 *) 0xE0000200
 #define UART1_IO_BASE	(u8 *) 0xE0000300
 
-#define BASE_BAUD	33000000/3/16
+/* external Epson SG-615P */
+#define BASE_BAUD	691200
 
 #define STD_UART_OP(num)					\
 	{ 0, BASE_BAUD, 0, UART##num##_INT,			\

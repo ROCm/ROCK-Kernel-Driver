@@ -56,7 +56,7 @@ extern struct socket *sockfd_lookup(int fd, int *err); /* @@@ fix this */
  */
 
 
-#define PRIV(sch) ((struct atm_qdisc_data *) (sch)->data)
+#define PRIV(sch) qdisc_priv(sch)
 #define VCC2FLOW(vcc) ((struct atm_flow_data *) ((vcc)->user_back))
 
 
@@ -104,9 +104,10 @@ static int find_flow(struct atm_qdisc_data *qdisc,struct atm_flow_data *flow)
 static __inline__ struct atm_flow_data *lookup_flow(struct Qdisc *sch,
     u32 classid)
 {
+	struct atm_qdisc_data *p = PRIV(sch);
 	struct atm_flow_data *flow;
 
-        for (flow = PRIV(sch)->flows; flow; flow = flow->next)
+        for (flow = p->flows; flow; flow = flow->next)
 		if (flow->classid == classid) break;
 	return flow;
 }

@@ -74,7 +74,7 @@ decode_fh(u32 *p, struct svc_fh *fhp)
 static inline u32 *
 encode_fh(u32 *p, struct svc_fh *fhp)
 {
-	int size = fhp->fh_handle.fh_size;
+	unsigned int size = fhp->fh_handle.fh_size;
 	*p++ = htonl(size);
 	if (size) p[XDR_QUADLEN(size)-1]=0;
 	memcpy(p, &fhp->fh_handle.fh_base, size);
@@ -328,7 +328,7 @@ int
 nfs3svc_decode_readargs(struct svc_rqst *rqstp, u32 *p,
 					struct nfsd3_readargs *args)
 {
-	int len;
+	unsigned int len;
 	int v,pn;
 
 	if (!(p = decode_fh(p, &args->fh))
@@ -347,8 +347,8 @@ nfs3svc_decode_readargs(struct svc_rqst *rqstp, u32 *p,
 		svc_take_page(rqstp);
 		args->vec[v].iov_base = page_address(rqstp->rq_respages[pn]);
 		args->vec[v].iov_len = len < PAGE_SIZE? len : PAGE_SIZE;
+		len -= args->vec[v].iov_len;
 		v++;
-		len -= PAGE_SIZE;
 	}
 	args->vlen = v;
 	return xdr_argsize_check(rqstp, p);
@@ -358,7 +358,7 @@ int
 nfs3svc_decode_writeargs(struct svc_rqst *rqstp, u32 *p,
 					struct nfsd3_writeargs *args)
 {
-	int len, v;
+	unsigned int len, v, hdr;
 
 	if (!(p = decode_fh(p, &args->fh))
 	 || !(p = xdr_decode_hyper(p, &args->offset)))
@@ -368,9 +368,12 @@ nfs3svc_decode_writeargs(struct svc_rqst *rqstp, u32 *p,
 	args->stable = ntohl(*p++);
 	len = args->len = ntohl(*p++);
 
+	hdr = (void*)p - rqstp->rq_arg.head[0].iov_base;
+	if (rqstp->rq_arg.len < len + hdr)
+		return 0;
+
 	args->vec[0].iov_base = (void*)p;
-	args->vec[0].iov_len = rqstp->rq_arg.head[0].iov_len -
-		(((void*)p) - rqstp->rq_arg.head[0].iov_base);
+	args->vec[0].iov_len = rqstp->rq_arg.head[0].iov_len - hdr;
 
 	if (len > NFSSVC_MAXBLKSIZE)
 		len = NFSSVC_MAXBLKSIZE;
@@ -427,7 +430,7 @@ int
 nfs3svc_decode_symlinkargs(struct svc_rqst *rqstp, u32 *p,
 					struct nfsd3_symlinkargs *args)
 {
-	int len;
+	unsigned int len;
 	int avail;
 	char *old, *new;
 	struct kvec *vec;
@@ -444,7 +447,7 @@ nfs3svc_decode_symlinkargs(struct svc_rqst *rqstp, u32 *p,
 	 */
 	svc_take_page(rqstp);
 	len = ntohl(*p++);
-	if (len <= 0 || len > NFS3_MAXPATHLEN || len >= PAGE_SIZE)
+	if (len == 0 || len > NFS3_MAXPATHLEN || len >= PAGE_SIZE)
 		return 0;
 	args->tname = new = page_address(rqstp->rq_respages[rqstp->rq_resused-1]);
 	args->tlen = len;

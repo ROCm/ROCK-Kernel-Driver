@@ -141,10 +141,6 @@ static int ali_settimer(int t)
 static ssize_t ali_write(struct file *file, const char __user *data,
 			      size_t len, loff_t * ppos)
 {
-	/*  Can't seek (pwrite) on this device  */
-	if (ppos != &file->f_pos)
-		return -ESPIPE;
-
 	/* See if we got the magic character 'V' and reload the timer */
 	if (len) {
 		if (!nowayout) {
@@ -266,7 +262,7 @@ static int ali_open(struct inode *inode, struct file *file)
 
 	/* Activate */
 	ali_start();
-	return 0;
+	return nonseekable_open(inode, file);
 }
 
 /*

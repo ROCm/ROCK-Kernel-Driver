@@ -1,6 +1,6 @@
 /*
  *
- * linux/drivers/s390/net/ctcdbug.h ($Revision: 1.2 $)
+ * linux/drivers/s390/net/ctcdbug.h ($Revision: 1.3 $)
  *
  * CTC / ESCON network driver - s390 dbf exploit.
  *
@@ -9,7 +9,7 @@
  *    Author(s): Original Code written by
  *			  Peter Tiedemann (ptiedem@de.ibm.com)
  *
- *    $Revision: 1.2 $	 $Date: 2004/07/15 16:03:08 $
+ *    $Revision: 1.3 $	 $Date: 2004/07/28 12:27:54 $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -51,38 +51,38 @@
 
 #define DBF_TEXT(name,level,text) \
 	do { \
-		debug_text_event(dbf_##name,level,text); \
+		debug_text_event(ctc_dbf_##name,level,text); \
 	} while (0)
 
 #define DBF_HEX(name,level,addr,len) \
 	do { \
-		debug_event(dbf_##name,level,(void*)(addr),len); \
+		debug_event(ctc_dbf_##name,level,(void*)(addr),len); \
 	} while (0)
 
-extern DEFINE_PER_CPU(char[256], dbf_txt_buf);
-extern debug_info_t *dbf_setup;
-extern debug_info_t *dbf_data;
-extern debug_info_t *dbf_trace;
+extern DEFINE_PER_CPU(char[256], ctc_dbf_txt_buf);
+extern debug_info_t *ctc_dbf_setup;
+extern debug_info_t *ctc_dbf_data;
+extern debug_info_t *ctc_dbf_trace;
 
 
 #define DBF_TEXT_(name,level,text...)				\
 	do {								\
-		char* dbf_txt_buf = get_cpu_var(dbf_txt_buf);	\
-		sprintf(dbf_txt_buf, text);			  	\
-		debug_text_event(dbf_##name,level,dbf_txt_buf);	\
-		put_cpu_var(dbf_txt_buf);				\
+		char* ctc_dbf_txt_buf = get_cpu_var(ctc_dbf_txt_buf);	\
+		sprintf(ctc_dbf_txt_buf, text);			  	\
+		debug_text_event(ctc_dbf_##name,level,ctc_dbf_txt_buf);	\
+		put_cpu_var(ctc_dbf_txt_buf);				\
 	} while (0)
 
 #define DBF_SPRINTF(name,level,text...) \
 	do { \
-		debug_sprintf_event(dbf_trace, level, ##text ); \
-		debug_sprintf_event(dbf_trace, level, text ); \
+		debug_sprintf_event(ctc_dbf_trace, level, ##text ); \
+		debug_sprintf_event(ctc_dbf_trace, level, text ); \
 	} while (0)
 
 
-int register_dbf_views(void);
+int ctc_register_dbf_views(void);
 
-void unregister_dbf_views(void);
+void ctc_unregister_dbf_views(void);
 
 /**
  * some more debug stuff

@@ -94,7 +94,7 @@ isdn_divert_read(struct file *file, char *buf, size_t count, loff_t * off)
 	if ((len = strlen(inf->info_start)) <= count) {
 		if (copy_to_user(buf, inf->info_start, len))
 			return -EFAULT;
-		file->f_pos += len;
+		*off += len;
 		return (len);
 	}
 	return (0);
@@ -142,7 +142,7 @@ isdn_divert_open(struct inode *ino, struct file *filep)
 		(struct divert_info **) filep->private_data = &divert_info_head;
 	spin_unlock_irqrestore( &divert_info_lock, flags );
 	/*  start_divert(); */
-	return (0);
+	return nonseekable_open(ino, filep);
 }				/* isdn_divert_open */
 
 /*******************/

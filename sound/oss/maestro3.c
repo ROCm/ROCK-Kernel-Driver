@@ -1333,8 +1333,6 @@ static ssize_t m3_read(struct file *file, char __user *buffer, size_t count, lof
     int cnt;
     
     VALIDATE_STATE(s);
-    if (ppos != &file->f_pos)
-        return -ESPIPE;
     if (s->dma_adc.mapped)
         return -ENXIO;
     if (!s->dma_adc.ready && (ret = prog_dmabuf(s, 1)))
@@ -1414,8 +1412,6 @@ static ssize_t m3_write(struct file *file, const char __user *buffer, size_t cou
     int cnt;
     
     VALIDATE_STATE(s);
-    if (ppos != &file->f_pos)
-        return -ESPIPE;
     if (s->dma_dac.mapped)
         return -ENXIO;
     if (!s->dma_dac.ready && (ret = prog_dmabuf(s, 0)))
@@ -2051,7 +2047,7 @@ static int m3_open(struct inode *inode, struct file *file)
 
     up(&s->open_sem);
     spin_unlock_irqrestore(&c->lock, flags);
-    return 0;
+    return nonseekable_open(inode, file);
 }
 
 static int m3_release(struct inode *inode, struct file *file)
@@ -2165,7 +2161,7 @@ static int m3_open_mixdev(struct inode *inode, struct file *file)
 
     file->private_data = card->ac97;
 
-    return 0;
+    return nonseekable_open(inode, file);
 }
 
 static int m3_release_mixdev(struct inode *inode, struct file *file)

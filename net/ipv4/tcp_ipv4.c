@@ -2113,6 +2113,14 @@ int tcp_v4_destroy_sock(struct sock *sk)
 	if (tp->bind_hash)
 		tcp_put_port(sk);
 
+	/*
+	 * If sendmsg cached page exists, toss it.
+	 */
+	if (sk->sk_sndmsg_page) {
+		__free_page(sk->sk_sndmsg_page);
+		sk->sk_sndmsg_page = NULL;
+	}
+
 	atomic_dec(&tcp_sockets_allocated);
 
 	return 0;

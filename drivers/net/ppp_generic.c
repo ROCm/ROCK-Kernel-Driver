@@ -1026,11 +1026,7 @@ ppp_send_frame(struct ppp *ppp, struct sk_buff *skb)
 		/* check if we should pass this packet */
 		/* the filter instructions are constructed assuming
 		   a four-byte PPP header on each packet */
-		{
-			u_int16_t *p = (u_int16_t *) skb_push(skb, 2);
-
-			*p = htons(4); /* indicate outbound in DLT_LINUX_SLL */;
-		}
+		*skb_push(skb, 2) = 1;
 		if (ppp->pass_filter
 		    && sk_run_filter(skb, ppp->pass_filter,
 				     ppp->pass_len) == 0) {
@@ -1573,11 +1569,7 @@ ppp_receive_nonmp_frame(struct ppp *ppp, struct sk_buff *skb)
 		/* check if the packet passes the pass and active filters */
 		/* the filter instructions are constructed assuming
 		   a four-byte PPP header on each packet */
-		{
-			u_int16_t *p = (u_int16_t *) skb_push(skb, 2);
-
-			*p = 0; /* indicate inbound in DLT_LINUX_SLL */
-		}
+		*skb_push(skb, 2) = 0;
 		if (ppp->pass_filter
 		    && sk_run_filter(skb, ppp->pass_filter,
 				     ppp->pass_len) == 0) {

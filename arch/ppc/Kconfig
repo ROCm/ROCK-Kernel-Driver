@@ -825,39 +825,6 @@ config PROC_DEVICETREE
 	  an image of the device tree that the kernel copies from Open
 	  Firmware. If unsure, say Y here.
 
-config PPC_RTAS
-	bool "Support for RTAS (RunTime Abstraction Services) in /proc"
-	depends on PPC_OF && PROC_FS
-	---help---
-	  When you use this option, you will be able to use RTAS from
-	  userspace.
-
-	  RTAS stands for RunTime Abstraction Services and should
-	  provide a portable way to access and set system information. This is
-	  commonly used on RS/6000 (pSeries) computers.
-
-	  You can access RTAS via the special proc file system entry rtas.
-	  Don't confuse this rtas entry with the one in /proc/device-tree/rtas
-	  which is readonly.
-
-	  If you don't know if you can use RTAS look into
-	  /proc/device-tree/rtas. If there are some entries, it is very likely
-	  that you will be able to use RTAS.
-
-	  You can do cool things with rtas. To print out information about
-	  various sensors in the system, just do a
-
-	  $ cat /proc/rtas/sensors
-
-	  or if you power off your machine at night but want it running when
-	  you enter your office at 7:45 am, do a
-
-	  # date -d 'tomorrow 7:30' +%s > /proc/rtas/poweron
-
-	  and shutdown.
-
-	  If unsure, say Y.
-
 config PREP_RESIDUAL
 	bool "Support for PReP Residual Data"
 	depends on PPC_PREP

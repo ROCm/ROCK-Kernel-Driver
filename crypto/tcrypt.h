@@ -1818,7 +1818,103 @@ struct cipher_testvec xtea_dec_tv_template[] =
 	}
 };
 
+/*
+ * KHAZAD test vectors.
+ */
+#define KHAZAD_ENC_TEST_VECTORS 5
+#define KHAZAD_DEC_TEST_VECTORS 5
 
+struct cipher_testvec khazad_enc_tv_template[] = { 
+	{ 
+		.key	= { 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+			    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 },
+		.klen	= 16,
+		.input	= { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 },
+		.ilen	= 8,
+		.result	= { 0x49, 0xa4, 0xce, 0x32, 0xac, 0x19, 0x0e, 0x3f },
+		.rlen	= 8,
+	}, {
+		.key	= { 0x38, 0x38, 0x38, 0x38, 0x38, 0x38, 0x38, 0x38,
+			    0x38, 0x38, 0x38, 0x38, 0x38, 0x38, 0x38, 0x38 },
+		.klen	= 16,
+		.input	= { 0x38, 0x38, 0x38, 0x38, 0x38, 0x38, 0x38, 0x38 },
+		.ilen	= 8,
+		.result	= { 0x7e, 0x82, 0x12, 0xa1, 0Xd9, 0X5b, 0Xe4, 0Xf9 },
+		.rlen	= 8,
+	}, {
+		.key	= { 0Xa2, 0Xa2, 0Xa2, 0Xa2, 0Xa2, 0Xa2, 0Xa2, 0Xa2,
+			    0Xa2, 0Xa2, 0Xa2, 0Xa2, 0Xa2, 0Xa2, 0Xa2, 0Xa2 },
+		.klen	= 16,
+		.input	= { 0Xa2, 0Xa2, 0Xa2, 0Xa2, 0Xa2, 0Xa2, 0Xa2, 0Xa2 },
+		.ilen	= 8,
+		.result	= { 0Xaa, 0Xbe, 0Xc1, 0X95, 0Xc5, 0X94, 0X1a, 0X9c },
+		.rlen	= 8,
+	}, {
+		.key	= { 0X2f, 0X2f, 0X2f, 0X2f, 0X2f, 0X2f, 0X2f, 0X2f,
+			    0X2f, 0X2f, 0X2f, 0X2f, 0X2f, 0X2f, 0X2f, 0X2f },
+		.klen	= 16,
+		.input	= { 0X2f, 0X2f, 0X2f, 0X2f, 0X2f, 0X2f, 0X2f, 0X2f },
+		.ilen	= 8,
+		.result = { 0X04, 0X74, 0Xf5, 0X70, 0X50, 0X16, 0Xd3, 0Xb8 },
+		.rlen	= 8,
+	}, {
+		.key	= { 0X2f, 0X2f, 0X2f, 0X2f, 0X2f, 0X2f, 0X2f, 0X2f,
+			    0X2f, 0X2f, 0X2f, 0X2f, 0X2f, 0X2f, 0X2f, 0X2f },
+		.klen	= 16,
+		.input	= { 0X2f, 0X2f, 0X2f, 0X2f, 0X2f, 0X2f, 0X2f, 0X2f ,
+			    0X2f, 0X2f, 0X2f, 0X2f, 0X2f, 0X2f, 0X2f, 0X2f },
+		.ilen	= 16,
+		.result = { 0X04, 0X74, 0Xf5, 0X70, 0X50, 0X16, 0Xd3, 0Xb8 ,
+			    0X04, 0X74, 0Xf5, 0X70, 0X50, 0X16, 0Xd3, 0Xb8 },
+		.rlen	= 16,
+	},
+};
+
+struct cipher_testvec khazad_dec_tv_template[] = { 
+	{
+		.key	= { 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+			    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 },
+		.klen	= 16,
+		.input	= { 0X49, 0Xa4, 0Xce, 0X32, 0Xac, 0X19, 0X0e, 0X3f },
+		.ilen	= 8,
+		.result	= { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 },
+		.rlen	= 8,
+	}, {
+		.key	= { 0x38, 0x38, 0x38, 0x38, 0x38, 0x38, 0x38, 0x38,
+			    0x38, 0x38, 0x38, 0x38, 0x38, 0x38, 0x38, 0x38 },
+		.klen	= 16,
+		.input	= { 0X7e, 0X82, 0X12, 0Xa1, 0Xd9, 0X5b, 0Xe4, 0Xf9 },
+		.ilen	= 8,
+		.result	= { 0x38, 0x38, 0x38, 0x38, 0x38, 0x38, 0x38, 0x38 },
+		.rlen	= 8,
+	}, {
+		.key	= { 0Xa2, 0Xa2, 0Xa2, 0Xa2, 0Xa2, 0Xa2, 0Xa2, 0Xa2,
+			    0Xa2, 0Xa2, 0Xa2, 0Xa2, 0Xa2, 0Xa2, 0Xa2, 0Xa2 },
+		.klen	= 16,
+		.input	= { 0Xaa, 0Xbe, 0Xc1, 0X95, 0Xc5, 0X94, 0X1a, 0X9c },
+		.ilen	= 8,
+		.result	= { 0Xa2, 0Xa2, 0Xa2, 0Xa2, 0Xa2, 0Xa2, 0Xa2, 0Xa2 },
+		.rlen	= 8,
+	}, {
+		.key	= { 0x2f, 0X2f, 0X2f, 0X2f, 0X2f, 0X2f, 0X2f, 0X2f,
+			    0X2f, 0X2f, 0X2f, 0X2f, 0X2f, 0X2f, 0X2f, 0X2f },
+		.klen	= 16,
+		.input = { 0X04, 0X74, 0Xf5, 0X70, 0X50, 0X16, 0Xd3, 0Xb8 },
+		.ilen	= 8,
+		.result	= { 0X2f, 0X2f, 0X2f, 0X2f, 0X2f, 0X2f, 0X2f, 0X2f },
+		.rlen	= 8,
+	}, {
+		.key	= { 0X2f, 0X2f, 0X2f, 0X2f, 0X2f, 0X2f, 0X2f, 0X2f,
+			    0X2f, 0X2f, 0X2f, 0X2f, 0X2f, 0X2f, 0X2f, 0X2f },
+		.klen	= 16,
+		.input = { 0X04, 0X74, 0Xf5, 0X70, 0X50, 0X16, 0Xd3, 0Xb8 ,
+			    0X04, 0X74, 0Xf5, 0X70, 0X50, 0X16, 0Xd3, 0Xb8 },
+		.ilen	= 16,
+		.result	= { 0X2f, 0X2f, 0X2f, 0X2f, 0X2f, 0X2f, 0X2f, 0X2f ,
+			    0X2f, 0X2f, 0X2f, 0X2f, 0X2f, 0X2f, 0X2f, 0X2f },
+		.rlen	= 16,
+	},
+};
 
 /*
  * Compression stuff.

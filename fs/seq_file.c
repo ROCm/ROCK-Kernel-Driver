@@ -35,6 +35,9 @@ int seq_open(struct file *file, struct seq_operations *op)
 	sema_init(&p->sem, 1);
 	p->op = op;
 	file->private_data = p;
+
+	/* SEQ files support lseek, but not pread/pwrite */
+	file->f_mode &= ~(FMODE_PREAD | FMODE_PWRITE);
 	return 0;
 }
 EXPORT_SYMBOL(seq_open);
@@ -53,9 +56,6 @@ ssize_t seq_read(struct file *file, char __user *buf, size_t size, loff_t *ppos)
 	size_t n;
 	void *p;
 	int err = 0;
-
-	if (ppos != &file->f_pos)
-		return -EPIPE;
 
 	down(&m->sem);
 	/* grab buffer if we didn't have one */

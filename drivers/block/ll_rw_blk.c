@@ -632,6 +632,8 @@ int blk_queue_resize_tags(request_queue_t *q, int new_depth)
 	return 0;
 }
 
+EXPORT_SYMBOL(blk_queue_resize_tags);
+
 /**
  * blk_queue_end_tag - end tag operations for a request
  * @q:  the request queue for the device
@@ -2864,6 +2866,8 @@ int kblockd_schedule_work(struct work_struct *work)
 {
 	return queue_work(kblockd_workqueue, work);
 }
+
+EXPORT_SYMBOL(kblockd_schedule_work);
 
 void kblockd_flush(void)
 {

@@ -1265,7 +1265,7 @@ forte_dsp_open (struct inode *inode, struct file *file)
 	if (file->f_mode & FMODE_READ)
 		forte_channel_init (forte, &forte->rec);
 
-	return 0;
+	return nonseekable_open(inode, file);
 }
 
 
@@ -1438,9 +1438,6 @@ forte_dsp_write (struct file *file, const char __user *buffer, size_t bytes,
 	unsigned int i = bytes, sz = 0;
 	unsigned long flags;
 
-	if (ppos != &file->f_pos)
-		return -ESPIPE;
-
 	if (!access_ok (VERIFY_READ, buffer, bytes))
 		return -EFAULT;
 
@@ -1545,9 +1542,6 @@ forte_dsp_read (struct file *file, char __user *buffer, size_t bytes,
 	struct forte_channel *channel;
 	unsigned int i = bytes, sz;
 	unsigned long flags;
-
-	if (ppos != &file->f_pos)
-		return -ESPIPE;
 
 	if (!access_ok (VERIFY_WRITE, buffer, bytes))
 		return -EFAULT;

@@ -194,6 +194,7 @@ syscall_exit_trace_cont:
 	mtspr	SRR0,r7
 	mtspr	SRR1,r8
 	rfid
+	b	.	/* prevent speculative execution */
 
 syscall_enosys:
 	li	r3,-ENOSYS
@@ -540,7 +541,7 @@ restore:
 	ld	r1,GPR1(r1)
 
 	rfid
-	b	.
+	b	.	/* prevent speculative execution */
 
 /* Note: this must change if we start using the TIF_NOTIFY_RESUME bit */
 do_work:
@@ -684,6 +685,7 @@ _GLOBAL(enter_rtas)
 	mtspr	SRR0,r5
 	mtspr	SRR1,r6
 	rfid
+	b	.	/* prevent speculative execution */
 
 _STATIC(rtas_return_loc)
 	/* relocation is off at this point */
@@ -704,6 +706,7 @@ _STATIC(rtas_return_loc)
 	mtspr	SRR0,r3
 	mtspr	SRR1,r4
 	rfid
+	b	.	/* prevent speculative execution */
 
 _STATIC(rtas_restore_regs)
 	/* relocation is on at this point */

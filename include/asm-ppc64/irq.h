@@ -9,8 +9,8 @@
  * 2 of the License, or (at your option) any later version.
  */
 
+#include <linux/config.h>
 #include <linux/threads.h>
-#include <asm/atomic.h>
 
 /*
  * Maximum number of interrupt sources that we can handle.
@@ -45,6 +45,8 @@ static inline unsigned int virt_irq_to_real(unsigned int virt_irq)
 {
 	return virt_irq_to_real_map[virt_irq];
 }
+
+extern unsigned int real_irq_to_virt_slowpath(unsigned int real_irq);
 
 /*
  * Because many systems have two overlapping names spaces for
