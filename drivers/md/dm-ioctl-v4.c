@@ -13,6 +13,7 @@
 #include <linux/wait.h>
 #include <linux/slab.h>
 #include <linux/devfs_fs_kernel.h>
+#include <linux/dm-ioctl.h>
 
 #include <asm/uaccess.h>
 
