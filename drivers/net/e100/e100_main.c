@@ -147,6 +147,23 @@ static void e100_do_wol(struct pci_dev *pcid, struct e100_private *bdp);
 static u16 e100_get_ip_lbytes(struct net_device *dev);
 extern void e100_config_wol(struct e100_private *bdp);
 #endif
+#ifdef ETHTOOL_TEST
+extern u32 e100_run_diag(struct net_device *dev, u64 *test_info, u32 flags);
+static int e100_ethtool_test(struct net_device *, struct ifreq *);
+#endif
+#ifdef ETHTOOL_GSTRINGS
+static int e100_ethtool_gstrings(struct net_device *, struct ifreq *);
+static char *test_strings[] = {
+	"E100_EEPROM_TEST_FAIL",
+	"E100_CHIP_TIMEOUT",
+	"E100_ROM_TEST_FAIL",
+	"E100_REG_TEST_FAIL",
+	"E100_MAC_TEST_FAIL",
+	"E100_LPBK_MAC_FAIL",
+	"E100_LPBK_PHY_FAIL"
+};
+
+#endif
 #endif /*E100_ETHTOOL_IOCTL */
 
 #ifdef SIOCGMIIPHY
@@ -165,7 +182,7 @@ static void e100_non_tx_background(unsigned long);
 /* Global Data structures and variables */
 char e100_copyright[] __devinitdata = "Copyright (c) 2002 Intel Corporation";
 
-#define E100_VERSION  "2.0.24-pre1"
+#define E100_VERSION  "2.0.25-pre1"
 
 #define E100_FULL_DRIVER_NAME 	"Intel(R) PRO/100 Fast Ethernet Adapter - Loadable driver, ver "
 
@@ -382,6 +399,7 @@ static void e100_set_multi_exec(struct net_device *dev);
 MODULE_AUTHOR("Intel Corporation, <linux.nics@intel.com>");
 MODULE_DESCRIPTION(E100_FULL_DRIVER_NAME E100_VERSION);
 MODULE_LICENSE("Dual BSD/GPL");
+EXPORT_NO_SYMBOLS;
 
 E100_PARAM(TxDescriptors, "Number of transmit descriptors");
 E100_PARAM(RxDescriptors, "Number of receive descriptors");
@@ -2715,8 +2733,10 @@ e100_exec_non_cu_cmd(struct e100_private *bdp, nxmit_cb_entry_t *command)
 	ntcb_hdr->cb_lnk_ptr = 0;
 
 	wmb();
+	if (in_interrupt())
+		return e100_delayed_exec_non_cu_cmd(bdp, command);
 
-	if (in_interrupt() || netif_running(bdp->device))
+	if (netif_running(bdp->device) && (!bdp->driver_isolated))
 		return e100_delayed_exec_non_cu_cmd(bdp, command);
 
 	spin_lock_bh(&(bdp->bd_non_tx_lock));
@@ -3302,6 +3322,16 @@ e100_do_ethtool_ioctl(struct net_device *dev, struct ifreq *ifr)
 		rc = e100_ethtool_wol(dev, ifr);
 		break;
 #endif
+#ifdef ETHTOOL_TEST
+	case ETHTOOL_TEST:
+		rc = e100_ethtool_test(dev, ifr);
+		break;
+#endif
+#ifdef ETHTOOL_GSTRINGS
+	case ETHTOOL_GSTRINGS:
+		rc = e100_ethtool_gstrings(dev,ifr);
+		break;
+#endif
 	default:
 		break;
 	}			//switch
@@ -3464,6 +3494,36 @@ e100_ethtool_glink(struct net_device *dev, struct ifreq *ifr)
 }
 #endif
 
+#ifdef ETHTOOL_TEST
+static int
+e100_ethtool_test(struct net_device *dev, struct ifreq *ifr)
+{
+	struct ethtool_test *info;
+	int rc = -EFAULT;
+
+	info = kmalloc(sizeof(*info) + E100_MAX_TEST_RES * sizeof(u64),
+		       GFP_ATOMIC);
+
+	if (!info)
+		return -EFAULT;
+
+	memset((void *) info, 0, sizeof(*info) +
+				 E100_MAX_TEST_RES * sizeof(u64));
+
+	if (copy_from_user(info, ifr->ifr_data, sizeof(*info)))
+		goto exit;
+
+	info->flags = e100_run_diag(dev, info->data, info->flags);
+
+	if (!copy_to_user(ifr->ifr_data, info,
+			 sizeof(*info) + E100_MAX_TEST_RES * sizeof(u64)))
+		rc = 0;
+exit:
+	kfree(info);
+	return rc;
+}
+#endif
+
 #ifdef ETHTOOL_NWAY_RST
 static int
 e100_ethtool_nway_rst(struct net_device *dev, struct ifreq *ifr)
@@ -3505,7 +3565,9 @@ e100_ethtool_get_drvinfo(struct net_device *dev, struct ifreq *ifr)
 #ifdef ETHTOOL_GEEPROM
 	info.eedump_len = (bdp->eeprom_size << 1);	
 #endif
-
+#ifdef ETHTOOL_TEST
+	info.testinfo_len = E100_MAX_TEST_RES;
+#endif
 	if (copy_to_user(ifr->ifr_data, &info, sizeof (info)))
 		return -EFAULT;
 
@@ -3737,6 +3799,51 @@ e100_ethtool_wol(struct net_device *dev, struct ifreq *ifr)
 	return res;
 }
 
+#endif
+
+#ifdef ETHTOOL_GSTRINGS
+static int e100_ethtool_gstrings(struct net_device *dev, struct ifreq *ifr)
+{
+	struct ethtool_gstrings info;
+	char *strings = NULL;
+	char *usr_strings;
+	int i;
+
+	memset((void *) &info, 0, sizeof(info));
+
+	usr_strings = (u8 *) (ifr->ifr_data + 
+			      offsetof(struct ethtool_gstrings, data));
+
+	if (copy_from_user(&info, ifr->ifr_data, sizeof (info)))
+		return -EFAULT;
+
+	switch (info.string_set) {
+	case ETH_SS_TEST:
+		if (info.len > E100_MAX_TEST_RES)
+			info.len = E100_MAX_TEST_RES;
+		strings = kmalloc(info.len * ETH_GSTRING_LEN, GFP_ATOMIC);
+		if (!strings)
+			return -EFAULT;
+		memset(strings, 0, info.len * ETH_GSTRING_LEN);
+
+		for (i = 0; i < info.len; i++) {
+			sprintf(strings + i * ETH_GSTRING_LEN, "%-31s",
+				test_strings[i]);
+		}
+		break;
+	default:
+		return -EOPNOTSUPP;
+	}
+
+	if (copy_to_user(ifr->ifr_data, &info, sizeof (info)))
+		return -EFAULT;
+
+	if (copy_to_user(usr_strings, strings, info.len * ETH_GSTRING_LEN))
+		return -EFAULT;
+
+	kfree(strings);
+	return 0;
+}
 #endif
 #endif /*E100_ETHTOOL_IOCTL */
 
