@@ -51,12 +51,14 @@ static int nfs_link(struct dentry *, struct inode *, struct dentry *);
 static int nfs_mknod(struct inode *, struct dentry *, int, dev_t);
 static int nfs_rename(struct inode *, struct dentry *,
 		      struct inode *, struct dentry *);
+static int nfs_fsync_dir(struct file *, struct dentry *, int);
 
 struct file_operations nfs_dir_operations = {
 	.read		= generic_read_dir,
 	.readdir	= nfs_readdir,
 	.open		= nfs_opendir,
 	.release	= nfs_release,
+	.fsync		= nfs_fsync_dir,
 };
 
 struct inode_operations nfs_dir_inode_operations = {
@@ -489,6 +491,15 @@ static int nfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 		return desc->error;
 	if (res < 0)
 		return res;
+	return 0;
+}
+
+/*
+ * All directory operations under NFS are synchronous, so fsync()
+ * is a dummy operation.
+ */
+int nfs_fsync_dir(struct file *filp, struct dentry *dentry, int datasync)
+{
 	return 0;
 }
 
