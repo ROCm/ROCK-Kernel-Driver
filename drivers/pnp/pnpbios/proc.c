@@ -31,7 +31,6 @@
 
 static struct proc_dir_entry *proc_pnp = NULL;
 static struct proc_dir_entry *proc_pnp_boot = NULL;
-static struct pnp_dev_node_info node_info;
 
 static int proc_read_pnpconfig(char *buf, char **start, off_t pos,
                                int count, int *eof, void *data)
@@ -136,7 +135,7 @@ static int proc_read_devices(char *buf, char **start, off_t pos,
 		/* 26 = the number of characters per line sprintf'ed */
 		if ((p - buf + 26) > count)
 			break;
-		if (pnp_bios_get_dev_node(&nodenum, 1, node))
+		if (pnp_bios_get_dev_node(&nodenum, PNPMODE_STATIC, node))
 			break;
 		p += sprintf(p, "%02x\t%08x\t%02x:%02x:%02x\t%04x\n",
 			     node->handle, node->eisa_id,
@@ -193,6 +192,30 @@ static int proc_write_node(struct file *file, const char *buf,
 	return count;
 }
 
+int pnpbios_interface_attach_device(struct pnp_bios_node * node)
+{
+	char name[3];
+	struct proc_dir_entry *ent;
+
+	sprintf(name, "%02x", node->handle);
+	if ( !pnpbios_dont_use_current_config ) {
+		ent = create_proc_entry(name, 0, proc_pnp);
+		if (ent) {
+			ent->read_proc = proc_read_node;
+			ent->write_proc = proc_write_node;
+			ent->data = (void *)(long)(node->handle);
+		}
+	}
+	ent = create_proc_entry(name, 0, proc_pnp_boot);
+	if (ent) {
+		ent->read_proc = proc_read_node;
+		ent->write_proc = proc_write_node;
+		ent->data = (void *)(long)(node->handle+0x100);
+		return 0;
+	}
+	return -EIO;
+}
+
 /*
  * When this is called, pnpbios functions are assumed to
  * work and the pnpbios_dont_use_current_config flag
@@ -200,14 +223,6 @@ static int proc_write_node(struct file *file, const char *buf,
  */
 int __init pnpbios_proc_init( void )
 {
-	struct pnp_bios_node *node;
-	struct proc_dir_entry *ent;
-	char name[3];
-	u8 nodenum;
-
-	if (pnp_bios_dev_node_info(&node_info))
-		return -EIO;
-	
 	proc_pnp = proc_mkdir("pnp", proc_bus);
 	if (!proc_pnp)
 		return -EIO;
@@ -219,36 +234,6 @@ int __init pnpbios_proc_init( void )
 	create_proc_read_entry("escd_info", 0, proc_pnp, proc_read_escdinfo, NULL);
 	create_proc_read_entry("escd", S_IRUSR, proc_pnp, proc_read_escd, NULL);
 	create_proc_read_entry("legacy_device_resources", 0, proc_pnp, proc_read_legacyres, NULL);
-	
-	node = pnpbios_kmalloc(node_info.max_node_size, GFP_KERNEL);
-	if (!node)
-		return -ENOMEM;
-
-	for (nodenum=0; nodenum<0xff; ) {
-		u8 thisnodenum = nodenum;
-		if (pnp_bios_get_dev_node(&nodenum, 1, node) != 0)
-			break;
-		sprintf(name, "%02x", node->handle);
-		if ( !pnpbios_dont_use_current_config ) {
-			ent = create_proc_entry(name, 0, proc_pnp);
-			if (ent) {
-				ent->read_proc = proc_read_node;
-				ent->write_proc = proc_write_node;
-				ent->data = (void *)(long)(node->handle);
-			}
-		}
-		ent = create_proc_entry(name, 0, proc_pnp_boot);
-		if (ent) {
-			ent->read_proc = proc_read_node;
-			ent->write_proc = proc_write_node;
-			ent->data = (void *)(long)(node->handle+0x100);
-		}
-		if (nodenum <= thisnodenum) {
-			printk(KERN_ERR "%s Node number 0x%x is out of sequence following node 0x%x. Aborting.\n", "PnPBIOS: proc_init:", (unsigned int)nodenum, (unsigned int)thisnodenum);
-			break;
-		}
-	}
-	kfree(node);
 
 	return 0;
 }

@@ -19,11 +19,12 @@
 #include "base.h"
 
 LIST_HEAD(pnp_cards);
+LIST_HEAD(pnp_card_drivers);
 
 
-static const struct pnp_card_id * match_card(struct pnp_card_driver * drv, struct pnp_card * card)
+static const struct pnp_card_device_id * match_card(struct pnp_card_driver * drv, struct pnp_card * card)
 {
-	const struct pnp_card_id * drv_id = drv->id_table;
+	const struct pnp_card_device_id * drv_id = drv->id_table;
 	while (*drv_id->id){
 		if (compare_pnp_id(card->id,drv_id->id))
 			return drv_id;
@@ -32,21 +33,41 @@ static const struct pnp_card_id * match_card(struct pnp_card_driver * drv, struc
 	return NULL;
 }
 
-static void generic_card_remove(struct pnp_dev * dev)
+static void card_remove(struct pnp_dev * dev)
 {
 	dev->card_link = NULL;
 }
-
-static void generic_card_remove_first(struct pnp_dev * dev)
+ 
+static void card_remove_first(struct pnp_dev * dev)
 {
 	struct pnp_card_driver * drv = to_pnp_card_driver(dev->driver);
 	if (!dev->card || !drv)
 		return;
 	if (drv->remove)
 		drv->remove(dev->card_link);
-	drv->link.remove = &generic_card_remove;
+	drv->link.remove = &card_remove;
 	kfree(dev->card_link);
-	generic_card_remove(dev);
+	card_remove(dev);
+}
+
+static int card_probe(struct pnp_card * card, struct pnp_card_driver * drv)
+{
+	const struct pnp_card_device_id *id = match_card(drv,card);
+	if (id) {
+		struct pnp_card_link * clink = pnp_alloc(sizeof(struct pnp_card_link));
+		if (!clink)
+			return 0;
+		clink->card = card;
+		clink->driver = drv;
+		if (drv->probe) {
+			if (drv->probe(clink, id)>=0)
+				return 1;
+			else
+				kfree(clink);
+		} else
+			return 1;
+	}
+	return 0;
 }
 
 /**
@@ -103,7 +124,7 @@ static void pnp_release_card(struct device *dmdev)
 int pnp_add_card(struct pnp_card * card)
 {
 	int error;
-	struct list_head * pos;
+	struct list_head * pos, * temp;
 	if (!card || !card->protocol)
 		return -EINVAL;
 
@@ -112,6 +133,7 @@ int pnp_add_card(struct pnp_card * card)
 	card->dev.bus = NULL;
 	card->dev.release = &pnp_release_card;
 	error = device_register(&card->dev);
+
 	if (error == 0) {
 		spin_lock(&pnp_lock);
 		list_add_tail(&card->global_list, &pnp_cards);
@@ -124,6 +146,12 @@ int pnp_add_card(struct pnp_card * card)
 		list_for_each(pos,&card->devices){
 			struct pnp_dev *dev = card_to_pnp_dev(pos);
 			__pnp_add_device(dev);
+		}
+
+		/* match with card drivers */
+		list_for_each_safe(pos,temp,&pnp_card_drivers){
+			struct pnp_card_driver * drv = list_entry(pos, struct pnp_card_driver, global_list);
+			card_probe(card,drv);
 		}
 	} else
 		pnp_err("sysfs failure, card '%s' will be unavailable", card->dev.bus_id);
@@ -248,9 +276,9 @@ void pnp_release_card_device(struct pnp_dev * dev)
 	if (!drv)
 		return;
 	down_write(&dev->dev.bus->subsys.rwsem);
-	drv->link.remove = &generic_card_remove;
+	drv->link.remove = &card_remove;
 	device_release_driver(&dev->dev);
-	drv->link.remove = &generic_card_remove_first;
+	drv->link.remove = &card_remove_first;
 	up_write(&dev->dev.bus->subsys.rwsem);
 }
 
@@ -268,25 +296,16 @@ int pnp_register_card_driver(struct pnp_card_driver * drv)
 	drv->link.id_table = NULL;	/* this will disable auto matching */
 	drv->link.flags = drv->flags;
 	drv->link.probe = NULL;
-	drv->link.remove = &generic_card_remove_first;
+	drv->link.remove = &card_remove_first;
 
+	spin_lock(&pnp_lock);
+	list_add_tail(&drv->global_list, &pnp_card_drivers);
+	spin_unlock(&pnp_lock);
 	pnp_register_driver(&drv->link);
 
 	list_for_each_safe(pos,temp,&pnp_cards){
 		struct pnp_card *card = list_entry(pos, struct pnp_card, global_list);
-		const struct pnp_card_id *id = match_card(drv,card);
-		if (id) {
-			struct pnp_card_link * clink = pnp_alloc(sizeof(struct pnp_card_link));
-			if (!clink)
-				continue;
-			clink->card = card;
-			clink->driver = drv;
-			if (drv->probe) {
-				if (drv->probe(clink, id)>=0)
-					count++;
-			} else
-				count++;
-		}
+		count += card_probe(card,drv);
 	}
 	return count;
 }
@@ -298,9 +317,10 @@ int pnp_register_card_driver(struct pnp_card_driver * drv)
 
 void pnp_unregister_card_driver(struct pnp_card_driver * drv)
 {
+	spin_lock(&pnp_lock);
+	list_del(&drv->global_list);
+	spin_unlock(&pnp_lock);
 	pnp_unregister_driver(&drv->link);
-
-	pnp_dbg("the card driver '%s' has been unregistered", drv->name);
 }
 
 EXPORT_SYMBOL(pnp_add_card);
