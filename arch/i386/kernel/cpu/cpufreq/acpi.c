@@ -428,7 +428,9 @@ acpi_cpufreq_cpu_init (
 	if (result) {
 		goto err_freqfree;
 	}
-		
+
+	/* notify BIOS that we exist */
+	acpi_processor_notify_smm(THIS_MODULE);
 
 	printk(KERN_INFO "cpufreq: CPU%u - ACPI performance management activated.\n",
 	       cpu);

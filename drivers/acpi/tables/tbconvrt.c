@@ -50,6 +50,8 @@
 	 ACPI_MODULE_NAME    ("tbconvrt")
 
 
+u8 acpi_fadt_is_v1;
+
 /*******************************************************************************
  *
  * FUNCTION:    acpi_tb_get_table_count
@@ -212,6 +214,7 @@ acpi_tb_convert_fadt1 (
 
 	/* ACPI 1.0 FACS */
 	/* The BIOS stored FADT should agree with Revision 1.0 */
+	acpi_fadt_is_v1 = 1;
 
 	/*
 	 * Copy the table header and the common part of the tables.
@@ -240,9 +243,12 @@ acpi_tb_convert_fadt1 (
 	/*
 	 * Processor Performance State Control. This is the value OSPM writes to
 	 * the SMI_CMD register to assume processor performance state control
-	 * responsibility. There isn't any equivalence in 1.0, leave it zeroed.
+	 * responsibility. There isn't any equivalence in 1.0, but as many 1.x
+	 * ACPI tables contain _PCT and _PSS we also keep this value, unless
+	 * acpi_strict is set.
 	 */
-	local_fadt->pstate_cnt = 0;
+	if (acpi_strict)
+		local_fadt->pstate_cnt = 0;
 
 	/*
 	 * Support for the _CST object and C States change notification.
