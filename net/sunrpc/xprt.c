@@ -89,6 +89,7 @@ static void	xprt_disconnect(struct rpc_xprt *);
 static void	xprt_reconn_status(struct rpc_task *task);
 static struct socket *xprt_create_socket(int, struct rpc_timeout *);
 static int	xprt_bind_socket(struct rpc_xprt *, struct socket *);
+static int      __xprt_get_cong(struct rpc_xprt *, struct rpc_task *);
 
 #ifdef RPC_DEBUG_DATA
 /*
@@ -251,6 +252,40 @@ xprt_sendmsg(struct rpc_xprt *xprt, struct rpc_rqst *req)
 		printk(KERN_NOTICE "RPC: sendmsg returned error %d\n", -result);
 	}
 	return result;
+}
+
+/*
+ * Van Jacobson congestion avoidance. Check if the congestion window
+ * overflowed. Put the task to sleep if this is the case.
+ */
+static int
+__xprt_get_cong(struct rpc_xprt *xprt, struct rpc_task *task)
+{
+	struct rpc_rqst *req = task->tk_rqstp;
+
+	if (req->rq_cong)
+		return 1;
+	dprintk("RPC: %4d xprt_cwnd_limited cong = %ld cwnd = %ld\n",
+			task->tk_pid, xprt->cong, xprt->cwnd);
+	if (RPCXPRT_CONGESTED(xprt))
+		return 0;
+	req->rq_cong = 1;
+	xprt->cong += RPC_CWNDSCALE;
+	return 1;
+}
+
+/*
+ * Adjust the congestion window, and wake up the next task
+ * that has been sleeping due to congestion
+ */
+static void
+__xprt_put_cong(struct rpc_xprt *xprt, struct rpc_rqst *req)
+{
+	if (!req->rq_cong)
+		return;
+	req->rq_cong = 0;
+	xprt->cong -= RPC_CWNDSCALE;
+	__xprt_lock_write_next(xprt);
 }
 
 /*
@@ -1146,8 +1181,6 @@ xprt_reserve(struct rpc_task *task)
 	if (task->tk_rqstp)
 		return 0;
 
-	dprintk("RPC: %4d xprt_reserve cong = %ld cwnd = %ld\n",
-				task->tk_pid, xprt->cong, xprt->cwnd);
 	spin_lock_bh(&xprt->xprt_lock);
 	xprt_reserve_status(task);
 	if (task->tk_rqstp) {
@@ -1181,13 +1214,14 @@ xprt_reserve_status(struct rpc_task *task)
 	} else if (task->tk_rqstp) {
 		/* We've already been given a request slot: NOP */
 	} else {
-		if (RPCXPRT_CONGESTED(xprt) || !(req = xprt->free))
+		if (!(req = xprt->free))
+			goto out_nofree;
+		if (!(xprt->nocong || __xprt_get_cong(xprt, req)))
 			goto out_nofree;
 		/* OK: There's room for us. Grab a free slot and bump
 		 * congestion value */
 		xprt->free     = req->rq_next;
 		req->rq_next   = NULL;
-		xprt->cong    += RPC_CWNDSCALE;
 		task->tk_rqstp = req;
 		xprt_request_init(task, xprt);
 
@@ -1252,9 +1286,7 @@ xprt_release(struct rpc_task *task)
 	req->rq_next = xprt->free;
 	xprt->free   = req;
 
-	/* Decrease congestion value. */
-	xprt->cong -= RPC_CWNDSCALE;
-
+	__xprt_put_cong(xprt, req);
 	xprt_clear_backlog(xprt);
 	spin_unlock_bh(&xprt->xprt_lock);
 }

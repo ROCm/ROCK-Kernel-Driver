@@ -19,7 +19,7 @@
  * The transport code maintains an estimate on the maximum number of out-
  * standing RPC requests, using a smoothed version of the congestion
  * avoidance implemented in 44BSD. This is basically the Van Jacobson
- * slow start algorithm: If a retransmit occurs, the congestion window is
+ * congestion algorithm: If a retransmit occurs, the congestion window is
  * halved; otherwise, it is incremented by 1/cwnd when
  *
  *	-	a reply is received and
@@ -32,15 +32,13 @@
  * Note: on machines with low memory we should probably use a smaller
  * MAXREQS value: At 32 outstanding reqs with 8 megs of RAM, fragment
  * reassembly will frequently run out of memory.
- * Come Linux 2.3, we'll handle fragments directly.
  */
 #define RPC_MAXCONG		16
 #define RPC_MAXREQS		(RPC_MAXCONG + 1)
 #define RPC_CWNDSCALE		256
 #define RPC_MAXCWND		(RPC_MAXCONG * RPC_CWNDSCALE)
 #define RPC_INITCWND		RPC_CWNDSCALE
-#define RPCXPRT_CONGESTED(xprt) \
-	((xprt)->cong >= (xprt)->cwnd)
+#define RPCXPRT_CONGESTED(xprt) ((xprt)->cong >= (xprt)->cwnd)
 
 /* Default timeout values */
 #define RPC_MAX_UDP_TIMEOUT	(60*HZ)
@@ -83,6 +81,7 @@ struct rpc_rqst {
 	struct rpc_task *	rq_task;	/* RPC task data */
 	__u32			rq_xid;		/* request XID */
 	struct rpc_rqst *	rq_next;	/* free list */
+	int			rq_cong;	/* has incremented xprt->cong */
 	int			rq_received;	/* receive completed */
 
 	struct list_head	rq_list;
