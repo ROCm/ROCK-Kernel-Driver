@@ -84,6 +84,17 @@ config 977_WATCHDOG
 
 	  Not sure? It's safe to say N.
 
+config IXP4XX_WATCHDOG
+	tristate "IXP4xx Watchdog"
+	depends on WATCHDOG && ARCH_IXP4XX
+	help
+	  Say Y here if to include support for the watchdog timer
+	  in the Intel IXP4xx network processors. This driver can
+	  be built as a module by choosing M. The module will
+	  be called ixp4xx_wdt.
+
+	  Say N if you are unsure.
+
 config SA1100_WATCHDOG
 	tristate "SA1100 watchdog"
 	depends on WATCHDOG && ARCH_SA1100

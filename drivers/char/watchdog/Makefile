@@ -35,3 +35,4 @@ obj-$(CONFIG_CPU5_WDT) += cpu5wdt.o
 obj-$(CONFIG_INDYDOG) += indydog.o
 obj-$(CONFIG_PCIPCWATCHDOG) += pcwd_pci.o
 obj-$(CONFIG_USBPCWATCHDOG) += pcwd_usb.o
+obj-$(CONFIG_IXP4XX_WATCHDOG) += ixp4xx_wdt.o
