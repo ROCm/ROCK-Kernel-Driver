@@ -1904,7 +1904,8 @@ static void airo_interrupt ( int irq, void* dev_id, struct pt_regs *regs) {
 				} else {
 					bap_read (apriv, buffer,len + hdrlen,BAP0);
 				}
-				OUT4500( apriv, EVACK, EV_RX);
+			}
+			if (len) {
 #ifdef WIRELESS_SPY
 				if (apriv->spy_number > 0) {
 					int i;
@@ -1930,6 +1931,8 @@ static void airo_interrupt ( int irq, void* dev_id, struct pt_regs *regs) {
 						}
 				}
 #endif /* WIRELESS_SPY  */
+				OUT4500( apriv, EVACK, EV_RX);
+
 				if (apriv->flags & FLAG_802_11) {
 					skb->mac.raw = skb->data;
 					skb->pkt_type = PACKET_OTHERHOST;
