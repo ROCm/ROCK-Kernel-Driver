@@ -13,6 +13,43 @@
 #define SCSI_NO_TAG	(-1)    /* identify no tag in use */
 
 
+
+/**
+ * scsi_get_tag_type - get the type of tag the device supports
+ * @sdev:	the scsi device
+ *
+ * Notes:
+ *	If the drive only supports simple tags, returns MSG_SIMPLE_TAG
+ *	if it supports all tag types, returns MSG_ORDERED_TAG.
+ */
+static inline int scsi_get_tag_type(struct scsi_device *sdev)
+{
+	if (!sdev->tagged_supported)
+		return 0;
+	if (sdev->ordered_tags)
+		return MSG_ORDERED_TAG;
+	if (sdev->simple_tags)
+		return MSG_SIMPLE_TAG;
+	return 0;
+}
+
+static inline void scsi_set_tag_type(struct scsi_device *sdev, int tag)
+{
+	switch (tag) {
+	case MSG_ORDERED_TAG:
+		sdev->ordered_tags = 1;
+		/* fall through */
+	case MSG_SIMPLE_TAG:
+		sdev->simple_tags = 1;
+		break;
+	case 0:
+		/* fall through */
+	default:
+		sdev->ordered_tags = 0;
+		sdev->simple_tags = 0;
+		break;
+	}
+}
 /**
  * scsi_activate_tcq - turn on tag command queueing
  * @SDpnt:	device to turn on TCQ for
@@ -25,11 +62,13 @@
  **/
 static inline void scsi_activate_tcq(struct scsi_device *sdev, int depth)
 {
-        if (sdev->tagged_supported) {
-		if (!blk_queue_tagged(sdev->request_queue))
-			blk_queue_init_tags(sdev->request_queue, depth, NULL);
-		scsi_adjust_queue_depth(sdev, MSG_ORDERED_TAG, depth);
-        }
+	if (!sdev->tagged_supported)
+		return;
+
+	if (!blk_queue_tagged(sdev->request_queue))
+		blk_queue_init_tags(sdev->request_queue, depth, NULL);
+
+	scsi_adjust_queue_depth(sdev, scsi_get_tag_type(sdev), depth);
 }
 
 /**
@@ -56,9 +95,10 @@ static inline void scsi_deactivate_tcq(struct scsi_device *sdev, int depth)
 static inline int scsi_populate_tag_msg(struct scsi_cmnd *cmd, char *msg)
 {
         struct request *req = cmd->request;
+	struct scsi_device *sdev = cmd->device;
 
         if (blk_rq_tagged(req)) {
-		if (req->flags & REQ_HARDBARRIER)
+		if (sdev->ordered_tags && req->flags & REQ_HARDBARRIER)
         	        *msg++ = MSG_ORDERED_TAG;
         	else
         	        *msg++ = MSG_SIMPLE_TAG;

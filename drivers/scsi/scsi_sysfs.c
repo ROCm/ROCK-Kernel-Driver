@@ -15,6 +15,7 @@
 #include <scsi/scsi.h>
 #include <scsi/scsi_device.h>
 #include <scsi/scsi_host.h>
+#include <scsi/scsi_tcq.h>
 #include <scsi/scsi_transport.h>
 
 #include "scsi_priv.h"
@@ -393,11 +394,28 @@ show_state_field(struct device *dev, char *buf)
 
 static DEVICE_ATTR(state, S_IRUGO | S_IWUSR, show_state_field, store_state_field);
 
+static ssize_t
+show_queue_type_field(struct device *dev, char *buf)
+{
+	struct scsi_device *sdev = to_scsi_device(dev);
+	const char *name = "none";
+
+	if (sdev->ordered_tags)
+		name = "ordered";
+	else if (sdev->simple_tags)
+		name = "simple";
+
+	return snprintf(buf, 20, "%s\n", name);
+}
+
+static DEVICE_ATTR(queue_type, S_IRUGO, show_queue_type_field, NULL);
+
 
 /* Default template for device attributes.  May NOT be modified */
 static struct device_attribute *scsi_sysfs_sdev_attrs[] = {
 	&dev_attr_device_blocked,
 	&dev_attr_queue_depth,
+	&dev_attr_queue_type,
 	&dev_attr_type,
 	&dev_attr_scsi_level,
 	&dev_attr_vendor,
@@ -421,6 +439,10 @@ static ssize_t sdev_store_queue_depth_rw(struct device *dev, const char *buf,
 		return -EINVAL;
 
 	depth = simple_strtoul(buf, NULL, 0);
+
+	if (depth < 1)
+		return -EINVAL;
+
 	retval = sht->change_queue_depth(sdev, depth);
 	if (retval < 0)
 		return retval;
@@ -432,6 +454,38 @@ static struct device_attribute sdev_attr_queue_depth_rw =
 	__ATTR(queue_depth, S_IRUGO | S_IWUSR, sdev_show_queue_depth,
 	       sdev_store_queue_depth_rw);
 
+static ssize_t sdev_store_queue_type_rw(struct device *dev, const char *buf,
+					size_t count)
+{
+	struct scsi_device *sdev = to_scsi_device(dev);
+	struct scsi_host_template *sht = sdev->host->hostt;
+	int tag_type = 0, retval;
+	int prev_tag_type = scsi_get_tag_type(sdev);
+
+	if (!sdev->tagged_supported || !sht->change_queue_type)
+		return -EINVAL;
+
+	if (strncmp(buf, "ordered", 7) == 0)
+		tag_type = MSG_ORDERED_TAG;
+	else if (strncmp(buf, "simple", 6) == 0)
+		tag_type = MSG_SIMPLE_TAG;
+	else if (strncmp(buf, "none", 4) != 0)
+		return -EINVAL;
+
+	if (tag_type == prev_tag_type)
+		return count;
+
+	retval = sht->change_queue_type(sdev, tag_type);
+	if (retval < 0)
+		return retval;
+
+	return count;
+}
+
+static struct device_attribute sdev_attr_queue_type_rw =
+	__ATTR(queue_type, S_IRUGO | S_IWUSR, show_queue_type_field,
+	       sdev_store_queue_type_rw);
+
 static struct device_attribute *attr_changed_internally(
 		struct Scsi_Host *shost,
 		struct device_attribute * attr)
@@ -439,6 +493,9 @@ static struct device_attribute *attr_changed_internally(
 	if (!strcmp("queue_depth", attr->attr.name)
 	    && shost->hostt->change_queue_depth)
 		return &sdev_attr_queue_depth_rw;
+	else if (!strcmp("queue_type", attr->attr.name)
+	    && shost->hostt->change_queue_type)
+		return &sdev_attr_queue_type_rw;
 	return attr;
 }
 
