@@ -212,6 +212,8 @@ csum_partial:
 	mov		1, %g5			/*  IEU0	Group		*/
 	cmp		%o1, 6			/*  IEU1			*/
 	bl,pn		%icc, 21f		/*  CTI				*/
+	 andcc		%o0, 1, %g0		/*  IEU1	Group		*/
+	bne,pn		%icc, csump_really_slow /*  CTI				*/
 	 andcc		%o0, 2, %g0		/*  IEU1	Group		*/
 	be,pt		%icc, 1f		/*  CTI				*/
 	 and		%o0, 4, %g7		/*  IEU0			*/
@@ -449,3 +451,83 @@ csum_partial:
 	 add		%o2, 1, %o2		/*  IEU0			*/
 1:	ba,pt		%xcc, 25b		/*  CTI		Group		*/
 	 sllx		%o2, 32, %g1		/*  IEU0			*/
+
+	/* When buff is byte aligned and len is large, we backoff to
+	 * this really slow handling.  The issue is that we cannot do
+	 * the VIS stuff when buff is byte aligned as unaligned.c will
+	 * not fix it up.
+	 */
+csump_really_slow:
+	cmp	%o1, 0
+	ble,pn	%icc, 9f
+	 mov	0, %o3
+	andcc	%o0, 1, %o4
+	be,pt	%icc, 1f
+	 sra	%o1, 1, %g3
+	add	%o1, -1, %o1
+	ldub	[%o0], %g1
+	add	%o0, 1, %o0
+	sll	%g1, 8, %o3
+	sra	%o1, 1, %g3
+1:
+	cmp	%g3, 0
+	be,pt	%icc, 3f
+	 and	%o1, 1, %g5
+	and	%o0, 2, %g1
+	brz,a,pt %g1, 1f
+	 sra	%g3, 1, %g3
+	add	%g3, -1, %g3
+	add	%o1, -2, %o1
+	lduh	[%o0], %g5
+	add	%o0, 2, %o0
+	add	%o3, %g5, %o3
+	sra	%g3, 1, %g3
+1:
+	cmp	%g3, 0
+	be,a,pt	%icc, 2f
+	 and	%o1, 2, %g3
+1:
+	ld	[%o0], %g7
+	addcc	%o3, %g7, %o3
+	addx	%o3, %g0, %o3
+	addcc	%g3, -1, %g3
+	bne,pt	%icc, 1b
+	 add	%o0, 4, %o0
+	and	%o1, 2, %g3
+2:
+	cmp	%g3, 0
+	be,pt	%icc, 3f
+	 and	%o1, 1, %g5
+	lduh	[%o0], %g1
+	add	%o0, 2, %o0
+	add	%o3, %g1, %o3
+3:
+	cmp	%g5, 0
+	be,pt	%icc, 1f
+	 srl	%o3, 16, %g3
+	ldub	[%o0], %o1
+	add	%o3, %o1, %o3
+	srl	%o3, 16, %g3
+1:
+	sethi	%hi(64512), %o1
+	or	%o1, 1023, %o0
+	cmp	%o4, 0
+	and	%o3, %o0, %g7
+	add	%g7, %g3, %o4
+	srl	%o4, 16, %g1
+	and	%o4, %o0, %g5
+	add	%g5, %g1, %o3
+	sll	%o3, 16, %g2
+	srl	%g2, 16, %o3
+	srl	%g2, 24, %o4
+	and	%o3, 255, %g7
+	sll	%g7, 8, %o0
+	bne,pt	%icc, 1f
+	 or	%o4, %o0, %g2
+9:
+	mov	%o3, %g2
+1:
+	addcc	%g2, %o2, %g2
+	addx	%g2, %g0, %g2
+	retl
+	 srl	%g2, 0, %o0
