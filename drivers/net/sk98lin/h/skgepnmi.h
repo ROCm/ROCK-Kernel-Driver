@@ -1,9 +1,9 @@
 /*****************************************************************************
  *
  * Name:	skgepnmi.h
- * Project:	GEnesis, PCI Gigabit Ethernet Adapter
- * Version:	$Revision: 1.62 $
- * Date:	$Date: 2003/08/15 12:31:52 $
+ * Project:	Gigabit Ethernet Adapters, PNMI-Module
+ * Version:	$Revision: 2.8 $
+ * Date:	$Date: 2004/06/14 06:55:26 $
  * Purpose:	Defines for Private Network Management Interface
  *
  ****************************************************************************/
@@ -31,7 +31,7 @@
 #include "h/sktypes.h"
 #include "h/skerror.h"
 #include "h/sktimer.h"
-#include "h/ski2c.h"
+#include "h/sktwsi.h"
 #include "h/skaddr.h"
 #include "h/skrlmt.h"
 #include "h/skvpd.h"
@@ -40,7 +40,6 @@
  * Management Database Version
  */
 #define SK_PNMI_MDB_VERSION		0x00030001	/* 3.1 */
-
 
 /*
  * Event definitions
@@ -54,16 +53,13 @@
 #define SK_PNMI_EVT_UTILIZATION_TIMER	7	/* Timer event for Utiliza. */
 #define SK_PNMI_EVT_CLEAR_COUNTER		8	/* Clear statistic counters */
 #define SK_PNMI_EVT_XMAC_RESET			9	/* XMAC will be reset */
-
 #define SK_PNMI_EVT_RLMT_PORT_UP		10	/* Port came logically up */
 #define SK_PNMI_EVT_RLMT_PORT_DOWN		11	/* Port went logically down */
 #define SK_PNMI_EVT_RLMT_SEGMENTATION	13	/* Two SP root bridges found */
 #define SK_PNMI_EVT_RLMT_ACTIVE_DOWN	14	/* Port went logically down */
 #define SK_PNMI_EVT_RLMT_ACTIVE_UP		15	/* Port came logically up */
-#define SK_PNMI_EVT_RLMT_SET_NETS		16	/* 1. Parameter is number of nets
-												1 = single net; 2 = dual net */
-#define SK_PNMI_EVT_VCT_RESET		17	/* VCT port reset timer event started with SET. */
-
+#define SK_PNMI_EVT_RLMT_SET_NETS		16	/* Number of nets (1 or 2). */
+#define SK_PNMI_EVT_VCT_RESET			17	/* VCT port reset timer event started with SET. */
 
 /*
  * Return values
@@ -78,7 +74,6 @@
 #define SK_PNMI_ERR_UNKNOWN_NET 	7
 #define SK_PNMI_ERR_NOT_SUPPORTED	10
 
-
 /*
  * Return values of driver reset function SK_DRIVER_RESET() and
  * driver event function SK_DRIVER_EVENT()
@@ -86,18 +81,16 @@
 #define SK_PNMI_ERR_OK			0
 #define SK_PNMI_ERR_FAIL		1
 
-
 /*
  * Return values of driver test function SK_DRIVER_SELFTEST()
  */
 #define SK_PNMI_TST_UNKNOWN		(1 << 0)
-#define SK_PNMI_TST_TRANCEIVER		(1 << 1)
+#define SK_PNMI_TST_TRANCEIVER	(1 << 1)
 #define SK_PNMI_TST_ASIC		(1 << 2)
 #define SK_PNMI_TST_SENSOR		(1 << 3)
-#define SK_PNMI_TST_POWERMGMT		(1 << 4)
+#define SK_PNMI_TST_POWERMGMT	(1 << 4)
 #define SK_PNMI_TST_PCI			(1 << 5)
 #define SK_PNMI_TST_MAC			(1 << 6)
-
 
 /*
  * RLMT specific definitions
@@ -352,6 +345,7 @@
 #define OID_SKGE_VCT_GET				0xFF020200
 #define OID_SKGE_VCT_SET				0xFF020201
 #define OID_SKGE_VCT_STATUS				0xFF020202
+#define OID_SKGE_VCT_CAPABILITIES		0xFF020203
 
 #ifdef SK_DIAG_SUPPORT
 /* Defines for driver DIAG mode. */
@@ -367,22 +361,66 @@
 #define OID_SKGE_PHY_TYPE				0xFF020215
 #define OID_SKGE_PHY_LP_MODE			0xFF020216
 
+/*
+ * Added for new DualNet IM driver V2
+ * these OIDs should later  be in pnmi.h
+ */
+#define OID_SKGE_MAC_COUNT		0xFF020217
+#define OID_SKGE_DUALNET_MODE		0xFF020218
+#define OID_SKGE_SET_TAGHEADER	0xFF020219
+
+#ifdef SK_ASF
+/* Defines for ASF */
+#define OID_SKGE_ASF                    0xFF02021a
+#define OID_SKGE_ASF_STORE_CONFIG       0xFF02021b
+#define OID_SKGE_ASF_ENA                0xFF02021c
+#define OID_SKGE_ASF_RETRANS            0xFF02021d
+#define OID_SKGE_ASF_RETRANS_INT        0xFF02021e
+#define OID_SKGE_ASF_HB_ENA             0xFF02021f
+#define OID_SKGE_ASF_HB_INT             0xFF020220
+#define OID_SKGE_ASF_WD_ENA             0xFF020221
+#define OID_SKGE_ASF_WD_TIME            0xFF020222
+#define OID_SKGE_ASF_IP_SOURCE          0xFF020223
+#define OID_SKGE_ASF_MAC_SOURCE			0xFF020224
+#define OID_SKGE_ASF_IP_DEST            0xFF020225
+#define OID_SKGE_ASF_MAC_DEST           0xFF020226
+#define OID_SKGE_ASF_COMMUNITY_NAME     0xFF020227
+#define OID_SKGE_ASF_RSP_ENA            0xFF020228  
+#define OID_SKGE_ASF_RETRANS_COUNT_MIN	0xFF020229
+#define OID_SKGE_ASF_RETRANS_COUNT_MAX	0xFF02022a
+#define OID_SKGE_ASF_RETRANS_INT_MIN	0xFF02022b
+#define OID_SKGE_ASF_RETRANS_INT_MAX	0xFF02022c
+#define OID_SKGE_ASF_HB_INT_MIN			0xFF02022d
+#define OID_SKGE_ASF_HB_INT_MAX			0xFF02022e
+#define OID_SKGE_ASF_WD_TIME_MIN		0xFF02022f
+#define OID_SKGE_ASF_WD_TIME_MAX		0xFF020230
+#define OID_SKGE_ASF_HB_CAP				0xFF020231
+#define OID_SKGE_ASF_WD_TIMER_RES		0xFF020232
+#define OID_SKGE_ASF_GUID				0xFF020233
+#define OID_SKGE_ASF_KEY_OP				0xFF020234
+#define OID_SKGE_ASF_KEY_ADM			0xFF020235
+#define OID_SKGE_ASF_KEY_GEN			0xFF020236
+#define OID_SKGE_ASF_CAP				0xFF020237
+#define OID_SKGE_ASF_PAR_1				0xFF020238
+#define OID_SKGE_ASF_OVERALL_OID        0xFF020239
+#endif /* SK_ASF */
+
 /* VCT struct to store a backup copy of VCT data after a port reset. */
 typedef struct s_PnmiVct {
 	SK_U8			VctStatus;
-	SK_U8			PCableLen;
-	SK_U32			PMdiPairLen[4];
-	SK_U8			PMdiPairSts[4];
+	SK_U8			CableLen;
+	SK_U32			MdiPairLen[4];
+	SK_U8			MdiPairSts[4];
 } SK_PNMI_VCT;
 
 
 /* VCT status values (to be given to CPA via OID_SKGE_VCT_STATUS). */
-#define SK_PNMI_VCT_NONE		0
-#define SK_PNMI_VCT_OLD_VCT_DATA	1
-#define SK_PNMI_VCT_NEW_VCT_DATA	2
-#define SK_PNMI_VCT_OLD_DSP_DATA	4
-#define SK_PNMI_VCT_NEW_DSP_DATA	8
-#define SK_PNMI_VCT_RUNNING		16
+#define SK_PNMI_VCT_NONE			0x00
+#define SK_PNMI_VCT_OLD_VCT_DATA	0x01
+#define SK_PNMI_VCT_NEW_VCT_DATA	0x02
+#define SK_PNMI_VCT_OLD_DSP_DATA	0x04
+#define SK_PNMI_VCT_NEW_DSP_DATA	0x08
+#define SK_PNMI_VCT_RUNNING			0x10
 
 
 /* VCT cable test status. */
@@ -390,7 +428,12 @@ typedef struct s_PnmiVct {
 #define SK_PNMI_VCT_SHORT_CABLE			1
 #define SK_PNMI_VCT_OPEN_CABLE			2
 #define SK_PNMI_VCT_TEST_FAIL			3
-#define SK_PNMI_VCT_IMPEDANCE_MISMATCH		4
+#define SK_PNMI_VCT_IMPEDANCE_MISMATCH	4
+#define SK_PNMI_VCT_NOT_PRESENT			5
+
+/* VCT capabilities (needed for OID_SKGE_VCT_CAPABILITIES. */
+#define SK_PNMI_VCT_SUPPORTED			1
+#define SK_PNMI_VCT_NOT_SUPPORTED		0
 
 #define	OID_SKGE_TRAP_SEN_WAR_LOW		500
 #define OID_SKGE_TRAP_SEN_WAR_UPP		501
@@ -418,7 +461,6 @@ typedef struct s_PnmiVct {
 #define	SK_GET_FULL_MIB			4
 #define	SK_SET_FULL_MIB			5
 #define	SK_PRESET_FULL_MIB		6
-
 
 /*
  * Define error numbers and messages for syslog
@@ -452,7 +494,7 @@ typedef struct s_PnmiVct {
 #define SK_PNMI_ERR014		(SK_ERRBASE_PNMI + 14)
 #define SK_PNMI_ERR014MSG	"Vpd: Cannot read VPD keys"
 #define SK_PNMI_ERR015		(SK_ERRBASE_PNMI + 15)
-#define SK_PNMI_ERR015MSG	"Vpd: Internal array for VPD keys to small"
+#define SK_PNMI_ERR015MSG	"Vpd: Internal array for VPD keys too small"
 #define SK_PNMI_ERR016		(SK_ERRBASE_PNMI + 16)
 #define SK_PNMI_ERR016MSG	"Vpd: Key string too long"
 #define SK_PNMI_ERR017		(SK_ERRBASE_PNMI + 17)
@@ -494,9 +536,9 @@ typedef struct s_PnmiVct {
 #define SK_PNMI_ERR036		(SK_ERRBASE_PNMI + 36)
 #define SK_PNMI_ERR036MSG	""
 #define SK_PNMI_ERR037		(SK_ERRBASE_PNMI + 37)
-#define SK_PNMI_ERR037MSG	"Rlmt: SK_RLMT_MODE_CHANGE event return not 0"
+#define SK_PNMI_ERR037MSG	"Rlmt: SK_RLMT_MODE_CHANGE event returned not 0"
 #define SK_PNMI_ERR038		(SK_ERRBASE_PNMI + 38)
-#define SK_PNMI_ERR038MSG	"Rlmt: SK_RLMT_PREFPORT_CHANGE event return not 0"
+#define SK_PNMI_ERR038MSG	"Rlmt: SK_RLMT_PREFPORT_CHANGE event returned not 0"
 #define SK_PNMI_ERR039		(SK_ERRBASE_PNMI + 39)
 #define SK_PNMI_ERR039MSG	"RlmtStat: Unknown OID"
 #define SK_PNMI_ERR040		(SK_ERRBASE_PNMI + 40)
@@ -514,9 +556,9 @@ typedef struct s_PnmiVct {
 #define SK_PNMI_ERR046		(SK_ERRBASE_PNMI + 46)
 #define SK_PNMI_ERR046MSG	"Monitor: Unknown OID"
 #define SK_PNMI_ERR047		(SK_ERRBASE_PNMI + 47)
-#define SK_PNMI_ERR047MSG	"SirqUpdate: Event function returns not 0"
+#define SK_PNMI_ERR047MSG	"SirqUpdate: Event function returned not 0"
 #define SK_PNMI_ERR048		(SK_ERRBASE_PNMI + 48)
-#define SK_PNMI_ERR048MSG	"RlmtUpdate: Event function returns not 0"
+#define SK_PNMI_ERR048MSG	"RlmtUpdate: Event function returned not 0"
 #define SK_PNMI_ERR049		(SK_ERRBASE_PNMI + 49)
 #define SK_PNMI_ERR049MSG	"SkPnmiInit: Invalid size of 'CounterOffset' struct!!"
 #define SK_PNMI_ERR050		(SK_ERRBASE_PNMI + 50)
@@ -826,23 +868,25 @@ typedef struct s_PnmiStrucData {
 } SK_PNMI_STRUCT_DATA;
 
 #define SK_PNMI_STRUCT_SIZE	(sizeof(SK_PNMI_STRUCT_DATA))
+
+/* The ReturnStatus field must be located before VpdFreeBytes! */
 #define SK_PNMI_MIN_STRUCT_SIZE	((unsigned int)(SK_UPTR)\
 				 &(((SK_PNMI_STRUCT_DATA *)0)->VpdFreeBytes))
-														/*
-														 * ReturnStatus field
-														 * must be located
-														 * before VpdFreeBytes
-														 */
 
 /*
  * Various definitions
  */
+#define SK_PNMI_EVT_TIMER_CHECK		28125000L	/* 28125 ms */
+
+#define SK_PNMI_VCT_TIMER_CHECK		 4000000L	/* 4 sec. */
+
 #define SK_PNMI_MAX_PROTOS		3
 
-#define SK_PNMI_CNT_NO			66	/* Must have the value of the enum
-									 * SK_PNMI_MAX_IDX. Define SK_PNMI_CHECK
-									 * for check while init phase 1
-									 */
+/*
+ * SK_PNMI_CNT_NO must have the value of the enum SK_PNMI_MAX_IDX.
+ * Define SK_PNMI_CHECK to check this during init level SK_INIT_IO.
+ */
+#define SK_PNMI_CNT_NO			66
 
 /*
  * Estimate data structure
@@ -853,14 +897,6 @@ typedef struct s_PnmiEstimate {
 	SK_U64			Estimate;
 	SK_TIMER		EstTimer;
 } SK_PNMI_ESTIMATE;
-
-
-/*
- * VCT timer data structure
- */
-typedef struct s_VctTimer {
-	SK_TIMER		VctTimer;
-} SK_PNMI_VCT_TIMER;
 
 
 /*
@@ -933,9 +969,9 @@ typedef struct s_PnmiData {
 	unsigned int	TrapQueueEnd;
 	unsigned int	TrapBufPad;
 	unsigned int	TrapUnique;
-	SK_U8		VctStatus[SK_MAX_MACS];
-	SK_PNMI_VCT	VctBackup[SK_MAX_MACS];
-	SK_PNMI_VCT_TIMER VctTimeout[SK_MAX_MACS];
+	SK_U8			VctStatus[SK_MAX_MACS];
+	SK_PNMI_VCT		VctBackup[SK_MAX_MACS];
+	SK_TIMER		VctTimeout[SK_MAX_MACS];
 #ifdef SK_DIAG_SUPPORT
 	SK_U32			DiagAttached;
 #endif /* SK_DIAG_SUPPORT */

@@ -2,8 +2,8 @@
  *
  * Name:	skgeinit.h
  * Project:	Gigabit Ethernet Adapters, Common Modules
- * Version:	$Revision: 1.83 $
- * Date:	$Date: 2003/09/16 14:07:37 $
+ * Version:	$Revision: 2.28 $
+ * Date:	$Date: 2004/06/15 14:23:14 $
  * Purpose:	Structures and prototypes for the GE Init Module
  *
  ******************************************************************************/
@@ -11,13 +11,12 @@
 /******************************************************************************
  *
  *	(C)Copyright 1998-2002 SysKonnect.
- *	(C)Copyright 2002-2003 Marvell.
+ *	(C)Copyright 2002-2004 Marvell.
  *
  *	This program is free software; you can redistribute it and/or modify
  *	it under the terms of the GNU General Public License as published by
  *	the Free Software Foundation; either version 2 of the License, or
  *	(at your option) any later version.
- *
  *	The information in this file is provided "AS IS" without warranty.
  *
  ******************************************************************************/
@@ -60,14 +59,16 @@ extern "C" {
 #define SK_XMIT_DUR		0x002faf08UL	/*  50 ms */
 #define SK_BLK_DUR		0x01dcd650UL	/* 500 ms */
 
-#define SK_DPOLL_DEF	0x00ee6b28UL	/* 250 ms at 62.5 MHz */
+#define SK_DPOLL_DEF	0x00ee6b28UL	/* 250 ms at 62.5 MHz (Genesis) */
+#define SK_DPOLL_DEF_Y2	0x0000124fUL	/*  75 us (Yukon-2) */
 
 #define SK_DPOLL_MAX	0x00ffffffUL	/* 268 ms at 62.5 MHz */
-										/* 215 ms at 78.12 MHz */
+										/* 215 ms at 78.12 MHz (Yukon) */
 
 #define SK_FACT_62		100			/* is given in percent */
 #define SK_FACT_53		 85         /* on GENESIS:	53.12 MHz */
 #define SK_FACT_78		125			/* on YUKON:	78.12 MHz */
+#define SK_FACT_125		202			/* on YUKON-EC:	125 MHz */
 
 /* Timeout values */
 #define SK_MAC_TO_53	72			/* MAC arbiter timeout */
@@ -83,10 +84,16 @@ extern "C" {
 #define SK_RB_LLPP_B	(16 * 1024)	/* Lower Level for big Queues */
 
 #ifndef SK_BMU_RX_WM
-#define SK_BMU_RX_WM	0x600		/* BMU Rx Watermark */
+#define SK_BMU_RX_WM		0x600	/* BMU Rx Watermark */
 #endif
+
 #ifndef SK_BMU_TX_WM
-#define SK_BMU_TX_WM	0x600		/* BMU Tx Watermark */
+#define SK_BMU_TX_WM		0x600	/* BMU Tx Watermark */
+#endif
+
+/* performance sensitive drivers should set this define to 0x80 */
+#ifndef SK_BMU_RX_WM_PEX
+#define SK_BMU_RX_WM_PEX	0x600	/* BMU Rx Watermark for PEX */
 #endif
 
 /* XMAC II Rx High Watermark */
@@ -104,30 +111,24 @@ extern "C" {
 #define SK_JUMBO_LINK	3		/* driver uses jumbo frames */
 
 /* Minimum RAM Buffer Rx Queue Size */
-#define SK_MIN_RXQ_SIZE	16		/* 16 kB */
+#define SK_MIN_RXQ_SIZE	(((pAC)->GIni.GIYukon2) ? 10 : 16)		/* 10/16 kB */
 
 /* Minimum RAM Buffer Tx Queue Size */
-#define SK_MIN_TXQ_SIZE	16		/* 16 kB */
+#define SK_MIN_TXQ_SIZE	(((pAC)->GIni.GIYukon2) ? 10 : 16)		/* 10/16 kB */
 
-/* Queue Size units */
-#define QZ_UNITS		0x7
+/* Queue Size units (Genesis/Yukon) */
+#define QZ_UNITS		7
 #define QZ_STEP			8
+
+/* Queue Size units (Yukon-2) */
+#define QZ_STEP_Y2		1
 
 /* Percentage of queue size from whole memory */
 /* 80 % for receive */
-#define RAM_QUOTA_RX	80L
+#define RAM_QUOTA_RX	80
 /* 0% for sync transfer */
-#define	RAM_QUOTA_SYNC	0L
+#define	RAM_QUOTA_SYNC	0
 /* the rest (20%) is taken for async transfer */
-
-/* Get the rounded queue size in Bytes in 8k steps */
-#define ROUND_QUEUE_SIZE(SizeInBytes)					\
-	((((unsigned long) (SizeInBytes) + (QZ_STEP*1024L)-1) / 1024) &	\
-	~(QZ_STEP-1))
-
-/* Get the rounded queue size in KBytes in 8k steps */
-#define ROUND_QUEUE_SIZE_KB(Kilobytes) \
-	ROUND_QUEUE_SIZE((Kilobytes) * 1024L)
 
 /* Types of RAM Buffer Queues */
 #define SK_RX_SRAM_Q	1	/* small receive queue */
@@ -266,10 +267,15 @@ extern "C" {
 
 /* PHY power down modes */
 #define PHY_PM_OPERATIONAL_MODE		0	/* PHY operational mode */
-#define PHY_PM_DEEP_SLEEP			1	/* coma mode --> minimal power */
+#define PHY_PM_DEEP_SLEEP			1	/* Coma mode --> minimal power */
 #define PHY_PM_IEEE_POWER_DOWN		2	/* IEEE 22.2.4.1.5 compl. power down */
-#define PHY_PM_ENERGY_DETECT		3	/* energy detect */
-#define PHY_PM_ENERGY_DETECT_PLUS	4	/* energy detect plus */
+#define PHY_PM_ENERGY_DETECT		3	/* Energy detect */
+#define PHY_PM_ENERGY_DETECT_PLUS	4	/* Energy detect plus */
+
+/* PCI Bus Types */
+#define SK_PCI_BUS		0x0001		/* normal PCI bus */
+#define SK_PCIX_BUS		0x0002      /* PCI-X bus */
+#define SK_PEX_BUS		0x0004      /* PCI-Express bus */
 
 /* Default receive frame limit for Workaround of XMAC Errata */
 #define SK_DEF_RX_WA_LIM	SK_CONSTU64(100)
@@ -290,18 +296,155 @@ extern "C" {
 /* Max. Auto-neg. timeouts before link detection in sense mode is reset */
 #define SK_MAX_ANEG_TO	10	/* Max. 10 times the sense mode is reset */
 
+
+/******************************************************************************
+ *
+ * HW_FEATURE() macro
+ */
+
+/* DWORD 0: Features */
+#define HWF_SYNC_TX_SUP			0x00800000UL	/* synch tx queue available */
+#define HWF_SINGLE_PORT_DEVICE	0x00400000UL	/* device has only one LAN IF */
+#define HWF_JUMBO_FRAMES_SUP	0x00200000UL	/* Jumbo frames supported */
+#define HWF_TX_TCP_CSUM_SUP		0x00100000UL	/* TCP tx checksum supported */
+#define HWF_TX_UDP_CSUM_SUP		0x00080000UL	/* UDP tx checksum supported */
+#define HWF_RX_CSUM_SUP			0x00040000UL	/* RX checksum supported */
+#define HWF_TCP_SEGM_SUP		0x00020000UL	/* TCP segmentation supported */
+#define HWF_RSS_HASH_SUP		0x00010000UL	/* RSS Hash supported */
+#define HWF_PORT_VLAN_SUP		0x00008000UL	/* VLAN can be config per port*/
+#define HWF_ROLE_PARAM_SUP		0x00004000UL	/* Role parameter supported */
+#define HWF_LOW_PMODE_SUP		0x00002000UL	/* Low Power Mode supported */
+#define HWF_ENERGIE_DEMO_SUP	0x00001000UL	/* Energie detect mode supp. */
+#define HWF_SPEED1000_SUP		0x00000800UL	/* Line Speed 1000 supported */
+#define HWF_SPEED100_SUP		0x00000400UL	/* Line Speed 100 supported */
+#define HWF_SPEED10_SUP			0x00000200UL	/* Line Speed 10 supported */
+#define HWF_AUTONEGSENSE_SUP	0x00000100UL	/* Autoneg Sense supported */
+#define HWF_PHY_LOOPB_MD_SUP	0x00000080UL	/* PHY loopback mode supp. */
+#define HWF_ASF_SUP				0x00000040UL	/* ASF support possible */
+#define HWF_QS_STEPS_1kB		0x00000020UL	/* The rx/tx queues can be */
+												/* configured in units of 1 kB*/
+#define HWF_OWN_RAM_PER_PORT	0x00000010UL	/* Each port has a separate */
+												/* RAM buffer */
+#define HWF_MIN_LED_IF			0x00000008UL	/* Minimal LED interface */
+												/* (e.g. for Yukon-EC) */
+#define HWF_LIST_ELEMENTS_USED	0x00000004UL	/* HW uses list elements */
+												/* (otherwise desc. are used) */
+#define HWF_GMAC_INSIDE			0x00000002UL	/* device contains GMAC */
+#define HWF_TWSI_PRESENT		0x00000001UL	/* TWSI sensor bus present */
+
+/*-RMV- DWORD 1: Deviations */
+#define HWF_WA_DEV_427			0x10000400UL	/*-RMV- 4.27 (Tx Done Rep) */
+#define HWF_WA_DEV_42			0x10000200UL	/*-RMV- 4.2 (pref unit burst)*/
+#define HWF_WA_DEV_46			0x10000100UL	/*-RMV- 4.6 (CPU crash II) */
+#define HWF_WA_DEV_43_418		0x10000080UL	/*-RMV- 4.3 & 4.18 (PCI unexp */
+												/*-RMV- compl&Stat BMU deadl) */
+#define HWF_WA_DEV_420			0x10000040UL	/*-RMV- 4.20 (Status BMU ov) */
+#define HWF_WA_DEV_423			0x10000020UL	/*-RMV- 4.23 (TCP Segm Hang) */
+#define HWF_WA_DEV_424			0x10000010UL	/*-RMV- 4.24 (MAC reg over wr)*/
+#define HWF_WA_DEV_425			0x10000008UL	/*-RMV- 4.25 (Magic packet */
+												/*-RMV- with odd offset) */
+#define HWF_WA_DEV_428			0x10000004UL	/*-RMV- 4.28 (Poll-U &BigEndi)*/
+#define HWF_WA_FIFO_FLUSH_YLA0	0x10000002UL	/*-RMV- dis Rx GMAC FIFO Flush*/
+												/*-RMV- for Yu-L Rev. A0 only */
+#define HWF_WA_COMA_MODE		0x10000001UL	/*-RMV- Coma Mode WA req */
+
+/* DWORD 2: still unused */
+/* DWORD 3: still unused */
+
+
+/*
+ * HW_FEATURE()	-	returns whether the feature is serviced or not
+ */
+#define HW_FEATURE(pAC, ReqFeature) \
+	(((pAC)->GIni.HwF.Features[((ReqFeature) & 0x30000000UL) >> 28] &\
+	 ((ReqFeature) & 0x0fffffffUL)) != 0)
+
+#define HW_FEAT_LIST	0
+#define HW_DEV_LIST		1
+
+#define SET_HW_FEATURE_MASK(pAC, List, OffMaskValue, OnMaskValue) {	\
+	if ((List) == HW_FEAT_LIST || (List) == HW_DEV_LIST) {			\
+		(pAC)->GIni.HwF.OffMask[List] = (OffMaskValue);				\
+		(pAC)->GIni.HwF.OnMask[List] = (OnMaskValue);				\
+	}																\
+}
+
+/* driver access macros for GIni structure ***********************************/
+
+#define CHIP_ID_YUKON_2(pAC)		((pAC)->GIni.GIYukon2)
+#define HW_SYNC_TX_SUPPORTED(pAC)						\
+		((pAC)->GIni.GIChipId != CHIP_ID_YUKON_EC &&	\
+		 (pAC)->GIni.GIChipId != CHIP_ID_YUKON_FE)
+
+#define HW_MS_TO_TICKS(pAC, MsTime) \
+	((MsTime) * (62500L/100) * (pAC)->GIni.GIHstClkFact)
+
+#if 0
+/* still under construction */
+/* klammern ( ) */
+#define HW_IS_SINGLE_PORT(pAC)		((pAC)->GIni.GIMacsFound == 1)
+#define HW_NUMBER_OF_PORTS(pAC)		((pAC)->GIni.GIMacsFound)
+
+#define HW_TX_UDP_CSUM_SUPPORTED(pAC) \
+	((((pAC)->GIni.GIChipId >= CHIP_ID_YUKON) && ((pAC)->GIni.GIChipRev != 0))
+
+#define HW_DEFAULT_LINESPEED(pAC)	\
+	((!(pAC)->GIni.GIGenesis && (pAC)->GIni.GICopperType) ? \
+	SK_LSPEED_AUTO : SK_LSPEED_1000MBPS)
+
+#define HW_ROLE_PARAM_SUPPORTED(pAC)	(pAC)->GIni.GICopperType
+#define HW_SPEED1000_SUPPORTED(pAC)		(SK_TRUE) /* falsch, Y-EC 10/100 */
+#define HW_SPEED100_SUPPORTED(pAC)		(pAC)->GIni.GICopperType
+#define HW_SPEED10_SUPPORTED(pAC)		(pAC)->GIni.GICopperType
+#define HW_AUTONEGSENSE_SUPPORTED(pAC)  ((pAC)->GIni.GP[0].PhyType==SK_PHY_XMAC)
+
+#define HW_FREQ_TO_CARD_TICKS(pAC, AdapterClkSpeed, Freq) \
+	(((AdapterClkSpeed / 100) * (pAC)->GIni.GIHstClkFact) / Freq)
+
+#define HW_IS_LINK_UP(pAC, Port)		(pAC)->GIni.GP[Port].PHWLinkUp	
+#define HW_GET_LINK_SPEED_USED(pAC, Port) (pAC)->GIni.GP[Port].PLinkSpeedUsed
+#define HW_GET_RAM_SIZE(pAC, RAM_SELECT) /* falsch, nicht a chip ID fest machen */
+	(CHIP_ID_YUKON_2(pAC) ? (pAC)->GIni.GIRamSize : (pAC)->GIni.GIRamSize)
+
+#define HW_ENA_JUMBO_FRAME_SUPPORT(pAC) (pAC)->GIni.GIPortUsage = SK_JUMBO_LINK
+#define HW_DIS_JUMBO_FRAME_SUPPORT(pAC) (pAC)->GIni.GIPortUsage = ????
+#define HW_PHY_LP_MODE_SUPPORTED(pAC)	(pAC0->???
+#define HW_ASF_ACTIVE(pAC)				???
+#define RAWIO_OUT32(pAC, pAC->RegIrqMask, pAC->GIni.GIValIrqMask)...
+
+/* macro to check whether tx csum is supported */
+#define HW_TX_CSUM_SUPPORTED(pAC)	((pAC)->GIni.GIChipId != CHIP_ID_GENESIS)
+
+BMU_UDP_CHECK : BMU_TCP_CHECK;
+
+/* macro for - Own Bit mirrored to DWORD7 (Yukon LP receive descriptor) */
+#endif /* 0 */
+
+
 /* structures *****************************************************************/
+
+/*
+ * HW Feature structure
+ */
+typedef struct s_HwFeatures {
+	SK_U32	Features[4];	/* Feature list */
+	SK_U32	OffMask[4];		/* Off Mask */
+	SK_U32	OnMask[4];		/* On Mask */
+} SK_HW_FEATURES;
 
 /*
  * MAC specific functions
  */
 typedef struct s_GeMacFunc {
-	int  (*pFnMacUpdateStats)(SK_AC *pAC, SK_IOC IoC, unsigned int Port);
-	int  (*pFnMacStatistic)(SK_AC *pAC, SK_IOC IoC, unsigned int Port,
-							SK_U16 StatAddr, SK_U32 SK_FAR *pVal);
-	int  (*pFnMacResetCounter)(SK_AC *pAC, SK_IOC IoC, unsigned int Port);
-	int  (*pFnMacOverflow)(SK_AC *pAC, SK_IOC IoC, unsigned int Port,
-						   SK_U16 IStatus, SK_U64 SK_FAR *pVal);
+	int	(*pFnMacUpdateStats)(SK_AC *, SK_IOC, unsigned int);
+	int	(*pFnMacStatistic)(SK_AC *, SK_IOC, unsigned int, SK_U16, SK_U32 SK_FAR *);
+	int	(*pFnMacResetCounter)(SK_AC *, SK_IOC, unsigned int);
+	int	(*pFnMacOverflow)(SK_AC *, SK_IOC, unsigned int, SK_U16, SK_U64 SK_FAR *);
+	void (*pSkGeSirqIsr)(SK_AC *, SK_IOC, SK_U32);
+#ifdef SK_DIAG
+	int	(*pFnMacPhyRead)(SK_AC *, SK_IOC, int, int, SK_U16 SK_FAR *);
+	int	(*pFnMacPhyWrite)(SK_AC *, SK_IOC, int, int, SK_U16);
+#endif /* SK_DIAG */
 } SK_GEMACFUNC;
 
 /*
@@ -311,7 +454,7 @@ typedef	struct s_GePort {
 #ifndef SK_DIAG
 	SK_TIMER	PWaTimer;	/* Workaround Timer */
 	SK_TIMER	HalfDupChkTimer;
-#endif /* SK_DIAG */
+#endif /* !SK_DIAG */
 	SK_U32	PPrevShorts;	/* Previous Short Counter checking */
 	SK_U32	PPrevFcs;		/* Previous FCS Error Counter checking */
 	SK_U64	PPrevRx;		/* Previous RxOk Counter checking */
@@ -367,6 +510,7 @@ typedef	struct s_GePort {
 	int		PMacJamLen;		/* MAC Jam length */
 	int		PMacJamIpgVal;	/* MAC Jam IPG */
 	int		PMacJamIpgData;	/* MAC IPG Jam to Data */
+	int		PMacDataBlind;	/* MAC Data Blinder */
 	int		PMacIpgData;	/* MAC Data IPG */
 	SK_BOOL PMacLimit4;		/* reset collision counter and backoff algorithm */
 } SK_GEPORT;
@@ -379,18 +523,24 @@ typedef	struct s_GeInit {
 	int			GIChipId;		/* Chip Identification Number */
 	int			GIChipRev;		/* Chip Revision Number */
 	SK_U8		GIPciHwRev;		/* PCI HW Revision Number */
+	SK_U8		GIPciBus;		/* PCI Bus Type (PCI / PCIX / PEX)*/
 	SK_BOOL		GIGenesis;		/* Genesis adapter ? */
-	SK_BOOL		GIYukon;		/* YUKON-A1/Bx chip */
+	SK_BOOL		GIYukon;		/* YUKON family (1 and 2) */
 	SK_BOOL		GIYukonLite;	/* YUKON-Lite chip */
+	SK_BOOL		GIYukon2;		/* YUKON-2 or YUKON-EC chip */
+	SK_U8		GIConTyp;		/* Connector Type */
+	SK_U8		GIPmdTyp;		/* PMD Type */
 	SK_BOOL		GICopperType;	/* Copper Type adapter ? */
 	SK_BOOL		GIPciSlot64;	/* 64-bit PCI Slot */
 	SK_BOOL		GIPciClock66;	/* 66 MHz PCI Clock */
 	SK_BOOL		GIVauxAvail;	/* VAUX available (YUKON) */
 	SK_BOOL		GIYukon32Bit;	/* 32-Bit YUKON adapter */
+	SK_BOOL		GIAsfEnabled;	/* ASF subsystem enabled */
 	SK_U16		GILedBlinkCtrl;	/* LED Blink Control */
 	int			GIMacsFound;	/* Number of MACs found on this adapter */
 	int			GIMacType;		/* MAC Type used on this adapter */
-	int			GIHstClkFact;	/* Host Clock Factor (62.5 / HstClk * 100) */
+	int			GIChipCap;		/* Adapter's Capabilities */
+	int			GIHstClkFact;	/* Host Clock Factor (HstClk / 62.5 * 100) */
 	int			GIPortUsage;	/* Driver Port Usage */
 	int			GILevel;		/* Initialization Level completed */
 	int			GIRamSize;		/* The RAM size of the adapter in kB */
@@ -398,8 +548,10 @@ typedef	struct s_GeInit {
 	SK_U32		GIRamOffs;		/* RAM Address Offset for addr calculation */
 	SK_U32		GIPollTimerVal;	/* Descr. Poll Timer Init Val (HstClk ticks) */
 	SK_U32		GIValIrqMask;	/* Value for Interrupt Mask */
+	SK_U32		GIValHwIrqMask;	/* Value for Interrupt Mask */
 	SK_U32		GITimeStampCnt;	/* Time Stamp High Counter (YUKON only) */
 	SK_GEPORT	GP[SK_MAX_MACS];/* Port Dependent Information */
+	SK_HW_FEATURES HwF;			/* HW Features struct */
 	SK_GEMACFUNC GIFunc;		/* MAC depedent functions */
 } SK_GEINIT;
 
@@ -464,6 +616,24 @@ typedef	struct s_GeInit {
 /*
  * public functions in skgeinit.c
  */
+extern void SkGePortVlan(
+	SK_AC	*pAC,
+	SK_IOC	IoC,
+	int		Port,
+	SK_BOOL Enable);
+
+extern void SkGeRxRss(
+	SK_AC	*pAC,
+	SK_IOC	IoC,
+	int		Port,
+	SK_BOOL	Enable);
+
+extern void SkGeRxCsum(
+	SK_AC	*pAC,
+	SK_IOC	IoC,
+	int		Port,
+	SK_BOOL Enable);
+
 extern void	SkGePollRxD(
 	SK_AC	*pAC,
 	SK_IOC	IoC,
@@ -624,28 +794,28 @@ extern void	SkMacHashing(
 	int		Port,
 	SK_BOOL	Enable);
 
-extern void	SkXmPhyRead(
+extern int	SkXmPhyRead(
 	SK_AC	*pAC,
 	SK_IOC	IoC,
 	int		Port,
 	int		Addr,
 	SK_U16	SK_FAR *pVal);
 
-extern void	SkXmPhyWrite(
+extern int	SkXmPhyWrite(
 	SK_AC	*pAC,
 	SK_IOC	IoC,
 	int		Port,
 	int		Addr,
 	SK_U16	Val);
 
-extern void	SkGmPhyRead(
+extern int	SkGmPhyRead(
 	SK_AC	*pAC,
 	SK_IOC	IoC,
 	int		Port,
 	int		Addr,
 	SK_U16	SK_FAR *pVal);
 
-extern void	SkGmPhyWrite(
+extern int	SkGmPhyWrite(
 	SK_AC	*pAC,
 	SK_IOC	IoC,
 	int		Port,
@@ -794,6 +964,9 @@ extern int	SkGeInitPort();
 extern void	SkGeXmitLED();
 extern void	SkGeInitRamIface();
 extern int	SkGeInitAssignRamToQueues();
+extern void SkGePortVlan();
+extern void SkGeRxCsum();
+extern void SkGeRxRss();
 
 /*
  * public functions in skxmac2.c
@@ -814,11 +987,11 @@ extern int	SkMacAutoNegDone();
 extern void	SkMacAutoNegLipaPhy();
 extern void SkMacSetRxTxEn();
 extern void	SkXmInitMac();
-extern void	SkXmPhyRead();
-extern void	SkXmPhyWrite();
+extern int	SkXmPhyRead();
+extern int	SkXmPhyWrite();
 extern void	SkGmInitMac();
-extern void	SkGmPhyRead();
-extern void	SkGmPhyWrite();
+extern int	SkGmPhyRead();
+extern int	SkGmPhyWrite();
 extern void	SkXmClrExactAddr();
 extern void	SkXmInitDupMd();
 extern void	SkXmInitPauseMd();
@@ -844,10 +1017,11 @@ extern void	SkMacTimeStamp();
 extern void	SkXmSendCont();
 #endif /* SK_DIAG */
 
-#endif	/* SK_KR_PROTO */
+#endif /* SK_KR_PROTO */
 
 #ifdef __cplusplus
 }
 #endif	/* __cplusplus */
 
 #endif	/* __INC_SKGEINIT_H_ */
+

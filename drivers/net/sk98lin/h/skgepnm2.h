@@ -2,8 +2,8 @@
  *
  * Name:	skgepnm2.h
  * Project:	GEnesis, PCI Gigabit Ethernet Adapter
- * Version:	$Revision: 1.36 $
- * Date:	$Date: 2003/05/23 12:45:13 $
+ * Version:	$Revision: 2.3 $
+ * Date:	$Date: 2004/03/19 16:19:59 $
  * Purpose:	Defines for Private Network Management Interface
  *
  ****************************************************************************/
@@ -70,9 +70,9 @@
 /*
  * VCT internal status values
  */
-#define SK_PNMI_VCT_PENDING	32
-#define SK_PNMI_VCT_TEST_DONE	64
-#define SK_PNMI_VCT_LINK	128
+#define SK_PNMI_VCT_PENDING		0x20
+#define SK_PNMI_VCT_TEST_DONE	0x40
+#define SK_PNMI_VCT_LINK		0x80
 
 /*
  * Internal table definitions
@@ -323,7 +323,7 @@ typedef struct s_PnmiStatAddr {
 						vSt, \
 						pAC->Pnmi.MacUpdatedFlag, \
 						pAC->Pnmi.RlmtUpdatedFlag, \
-						pAC->Pnmi.SirqUpdatedFlag))}}
+						pAC->Pnmi.SirqUpdatedFlag));}}
 
 #else	/* !DEBUG */
 

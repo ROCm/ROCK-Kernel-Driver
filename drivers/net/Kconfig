@@ -2049,6 +2049,7 @@ config R8169_NAPI
 	depends on R8169 && EXPERIMENTAL 
 
 
+
 config SK98LIN
 	tristate "Marvell Yukon Chipset / SysKonnect SK-98xx Support"
 	depends on PCI
@@ -2070,29 +2071,57 @@ config SK98LIN
 	    - DGE-530T Gigabit Ethernet Adapter
 	    - EG1032 v2 Instant Gigabit Network Adapter
 	    - EG1064 v2 Instant Gigabit Network Adapter
-	    - Marvell 88E8001 Gigabit LOM Ethernet Adapter (Abit)
-	    - Marvell 88E8001 Gigabit LOM Ethernet Adapter (Albatron)
-	    - Marvell 88E8001 Gigabit LOM Ethernet Adapter (Asus)
-	    - Marvell 88E8001 Gigabit LOM Ethernet Adapter (ECS)
-	    - Marvell 88E8001 Gigabit LOM Ethernet Adapter (Epox)
-	    - Marvell 88E8001 Gigabit LOM Ethernet Adapter (Foxconn)
-	    - Marvell 88E8001 Gigabit LOM Ethernet Adapter (Gigabyte)
-	    - Marvell 88E8001 Gigabit LOM Ethernet Adapter (Iwill)
-	    - Marvell 88E8050 Gigabit LOM Ethernet Adapter (Intel)
+	    - Marvell 88E8001 Gigabit Ethernet Controller (Abit)
+	    - Marvell 88E8001 Gigabit Ethernet Controller (Albatron)
+	    - Marvell 88E8001 Gigabit Ethernet Controller (Asus)
+	    - Marvell 88E8001 Gigabit Ethernet Controller (Chaintech)
+	    - Marvell 88E8001 Gigabit Ethernet Controller (ECS)
+	    - Marvell 88E8001 Gigabit Ethernet Controller (Epox)
+	    - Marvell 88E8001 Gigabit Ethernet Controller (Foxconn)
+	    - Marvell 88E8001 Gigabit Ethernet Controller (Gigabyte)
+	    - Marvell 88E8001 Gigabit Ethernet Controller (Iwill)
+	    - Marvell 88E8035 Fast Ethernet Controller (LGE)
+	    - Marvell 88E8035 Fast Ethernet Controller (Toshiba)
+	    - Marvell 88E8036 Fast Ethernet Controller (LGE)
+	    - Marvell 88E8036 Fast Ethernet Controller (Toshiba)
+	    - Marvell 88E8050 Gigabit Ethernet Controller (Intel)
+	    - Marvell 88E8052 Gigabit Ethernet Controller (ASRock)
+	    - Marvell 88E8052 Gigabit Ethernet Controller (Asus)
+	    - Marvell 88E8052 Gigabit Ethernet Controller (Gigabyte)
+	    - Marvell 88E8052 Gigabit Ethernet Controller (MSI)
+	    - Marvell 88E8053 Gigabit Ethernet Controller (ASRock)
+	    - Marvell 88E8053 Gigabit Ethernet Controller (Albatron)
+	    - Marvell 88E8053 Gigabit Ethernet Controller (Aopen)
+	    - Marvell 88E8053 Gigabit Ethernet Controller (Asus)
+	    - Marvell 88E8053 Gigabit Ethernet Controller (Chaintech)
+	    - Marvell 88E8053 Gigabit Ethernet Controller (Clevo)
+	    - Marvell 88E8053 Gigabit Ethernet Controller (DFI)
+	    - Marvell 88E8053 Gigabit Ethernet Controller (Epox)
+	    - Marvell 88E8053 Gigabit Ethernet Controller (Gigabyte)
+	    - Marvell 88E8053 Gigabit Ethernet Controller (LGE)
+	    - Marvell 88E8053 Gigabit Ethernet Controller (MSI)
+	    - Marvell 88E8053 Gigabit Ethernet Controller (SOYO)
+	    - Marvell 88E8053 Gigabit Ethernet Controller (Toshiba)
+	    - Marvell 88E8053 Gigabit Ethernet Controller (Trigem)
+	    - Marvell RDK-8001 
 	    - Marvell RDK-8001 Adapter
 	    - Marvell RDK-8002 Adapter
+	    - Marvell RDK-8003 
 	    - Marvell RDK-8003 Adapter
 	    - Marvell RDK-8004 Adapter
 	    - Marvell RDK-8006 Adapter
 	    - Marvell RDK-8007 Adapter
 	    - Marvell RDK-8008 Adapter
 	    - Marvell RDK-8009 Adapter
-	    - Marvell RDK-8010 Adapter
+	    - Marvell RDK-8010 
 	    - Marvell RDK-8011 Adapter
 	    - Marvell RDK-8012 Adapter
-	    - Marvell RDK-8052 Adapter
-	    - Marvell Yukon Gigabit Ethernet 10/100/1000Base-T Adapter (32 bit)
-	    - Marvell Yukon Gigabit Ethernet 10/100/1000Base-T Adapter (64 bit)
+	    - Marvell RDK-8035 
+	    - Marvell RDK-8036 
+	    - Marvell RDK-8052 
+	    - Marvell RDK-8053 
+	    - Marvell Yukon Gigabit Ethernet 10/100/1000Base-T Controller (32 bit)
+	    - Marvell Yukon Gigabit Ethernet 10/100/1000Base-T Controller (64 bit)
 	    - N-Way PCI-Bus Giga-Card 1000/100/10Mbps(L)
 	    - SK-9521 10/100/1000Base-T Adapter
 	    - SK-9521 V2.0 10/100/1000Base-T Adapter
@@ -2125,8 +2154,16 @@ config SK98LIN
 	  
 	  If you want to compile this driver as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read Documentation/kbuild/modules.txt. The module will
-	  be called sk98lin. This is recommended.
+	  say M here and read Documentation/modules.txt. This is recommended.
+	  The module will be called sk98lin. This is recommended.
+
+config SK98LIN_NAPI
+	bool "Use Rx polling (NAPI)"
+	depends on SK98LIN
+	help
+	  NAPI is a new driver API designed to reduce CPU and interrupt load
+	  when the driver is receiving lots of packets from the card.
+
 
 config TIGON3
 	tristate "Broadcom Tigon3 support"

@@ -1,9 +1,9 @@
 /******************************************************************************
  *
- * Name:	skgei2c.h
+ * Name:	skgetwsi.h
  * Project:	Gigabit Ethernet Adapters, TWSI-Module
- * Version:	$Revision: 1.25 $
- * Date:	$Date: 2003/10/20 09:06:05 $
+ * Version:	$Revision: 1.1 $
+ * Date:	$Date: 2003/12/19 14:02:56 $
  * Purpose:	Special defines for TWSI
  *
  ******************************************************************************/
@@ -23,11 +23,11 @@
  ******************************************************************************/
 
 /*
- * SKGEI2C.H	contains all SK-98xx specific defines for the TWSI handling
+ * SKGETWSI.H	contains all SK-98xx specific defines for the TWSI handling
  */
 
-#ifndef _INC_SKGEI2C_H_
-#define _INC_SKGEI2C_H_
+#ifndef _INC_SKGETWSI_H_
+#define _INC_SKGETWSI_H_
 
 /*
  * Macros to access the B2_I2C_CTRL
@@ -207,4 +207,4 @@
 #define	SK_SEN_DYN_INIT_VAUX		11  /* Init VAUX with new thresholds */
 
 extern	int SkLm80ReadSensor(SK_AC *pAC, SK_IOC IoC, SK_SENSOR *pSen);
-#endif	/* n_INC_SKGEI2C_H */
+#endif	/* n_INC_SKGETWSI_H */

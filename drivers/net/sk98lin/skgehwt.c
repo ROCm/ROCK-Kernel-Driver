@@ -2,8 +2,8 @@
  *
  * Name:	skgehwt.c
  * Project:	Gigabit Ethernet Adapters, Event Scheduler Module
- * Version:	$Revision: 1.15 $
- * Date:	$Date: 2003/09/16 13:41:23 $
+ * Version:	$Revision: 2.2 $
+ * Date:	$Date: 2004/05/28 13:39:04 $
  * Purpose:	Hardware Timer
  *
  ******************************************************************************/
@@ -11,7 +11,7 @@
 /******************************************************************************
  *
  *	(C)Copyright 1998-2002 SysKonnect GmbH.
- *	(C)Copyright 2002-2003 Marvell.
+ *	(C)Copyright 2002-2004 Marvell.
  *
  *	This program is free software; you can redistribute it and/or modify
  *	it under the terms of the GNU General Public License as published by
@@ -27,7 +27,7 @@
  */
 #if (defined(DEBUG) || ((!defined(LINT)) && (!defined(SK_SLIM))))
 static const char SysKonnectFileId[] =
-	"@(#) $Id: skgehwt.c,v 1.15 2003/09/16 13:41:23 rschmidt Exp $ (C) Marvell.";
+	"@(#) $Id: skgehwt.c,v 2.2 2004/05/28 13:39:04 rschmidt Exp $ (C) Marvell.";
 #endif
 
 #include "h/skdrv1st.h"		/* Driver Specific Definitions */
@@ -44,10 +44,10 @@ intro()
 /*
  * Prototypes of local functions.
  */
-#define	SK_HWT_MAX	(65000)
+#define	SK_HWT_MAX	65000UL * 160		/* ca. 10 sec. */
 
 /* correction factor */
-#define	SK_HWT_FAC	(1000 * (SK_U32)pAC->GIni.GIHstClkFact / 100)
+#define	SK_HWT_FAC	(10 * (SK_U32)pAC->GIni.GIHstClkFact / 16)
 
 /*
  * Initialize hardware timer.
@@ -73,29 +73,21 @@ SK_IOC	Ioc)	/* IoContext */
 void	SkHwtStart(
 SK_AC	*pAC,	/* Adapters context */
 SK_IOC	Ioc,	/* IoContext */
-SK_U32	Time)	/* Time in units of 16us to load the timer with. */
+SK_U32	Time)	/* Time in usec to load the timer */
 {
-	SK_U32	Cnt;
-
 	if (Time > SK_HWT_MAX)
 		Time = SK_HWT_MAX;
 
 	pAC->Hwt.TStart = Time;
 	pAC->Hwt.TStop = 0L;
 
-	Cnt = Time;
-
-	/*
-	 * if time < 16 us
-	 *	time = 16 us
-	 */
-	if (!Cnt) {
-		Cnt++;
+	if (!Time) {
+		Time = 1L;
 	}
 
-	SK_OUT32(Ioc, B2_TI_INI, Cnt * SK_HWT_FAC);
-	
-	SK_OUT16(Ioc, B2_TI_CTRL, TIM_START);	/* Start timer. */
+	SK_OUT32(Ioc, B2_TI_INI, Time * SK_HWT_FAC);
+
+	SK_OUT16(Ioc, B2_TI_CTRL, TIM_START);	/* Start timer */
 
 	pAC->Hwt.TActive = SK_TRUE;
 }
@@ -109,12 +101,11 @@ SK_AC	*pAC,	/* Adapters context */
 SK_IOC	Ioc)	/* IoContext */
 {
 	SK_OUT16(Ioc, B2_TI_CTRL, TIM_STOP);
-	
+
 	SK_OUT16(Ioc, B2_TI_CTRL, TIM_CLR_IRQ);
 
 	pAC->Hwt.TActive = SK_FALSE;
 }
-
 
 /*
  *	Stop hardware timer and read time elapsed since last start.
@@ -129,6 +120,9 @@ SK_IOC	Ioc)	/* IoContext */
 {
 	SK_U32	TRead;
 	SK_U32	IStatus;
+	SK_U32	TimerInt;
+
+	TimerInt = CHIP_ID_YUKON_2(pAC) ? Y2_IS_TIMINT : IS_TIMINT;
 
 	if (pAC->Hwt.TActive) {
 		
@@ -139,15 +133,15 @@ SK_IOC	Ioc)	/* IoContext */
 
 		SK_IN32(Ioc, B0_ISRC, &IStatus);
 
-		/* Check if timer expired (or wraped around) */
-		if ((TRead > pAC->Hwt.TStart) || (IStatus & IS_TIMINT)) {
-			
+		/* Check if timer expired (or wrapped around) */
+		if ((TRead > pAC->Hwt.TStart) || ((IStatus & TimerInt) != 0)) {
+
 			SkHwtStop(pAC, Ioc);
-			
+
 			pAC->Hwt.TStop = pAC->Hwt.TStart;
 		}
 		else {
-			
+
 			pAC->Hwt.TStop = pAC->Hwt.TStart - TRead;
 		}
 	}
@@ -162,9 +156,9 @@ SK_AC	*pAC,	/* Adapters context */
 SK_IOC	Ioc)	/* IoContext */
 {
 	SkHwtStop(pAC, Ioc);
-	
+
 	pAC->Hwt.TStop = pAC->Hwt.TStart;
-	
+
 	SkTimerDone(pAC, Ioc);
 }
 

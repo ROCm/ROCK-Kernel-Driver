@@ -1,9 +1,9 @@
 /******************************************************************************
  *
- * Name:	ski2c.h
+ * Name:	sktwsi.h
  * Project:	Gigabit Ethernet Adapters, TWSI-Module
- * Version:	$Revision: 1.35 $
- * Date:	$Date: 2003/10/20 09:06:30 $
+ * Version:	$Revision: 1.1 $
+ * Date:	$Date: 2003/12/19 14:02:56 $
  * Purpose:	Defines to access Voltage and Temperature Sensor
  *
  ******************************************************************************/
@@ -23,18 +23,18 @@
  ******************************************************************************/
 
 /*
- * SKI2C.H	contains all I2C specific defines
+ * SKTWSI.H	contains all TWSI specific defines
  */
 
-#ifndef _SKI2C_H_
-#define _SKI2C_H_
+#ifndef _SKTWSI_H_
+#define _SKTWSI_H_
 
 typedef struct  s_Sensor SK_SENSOR;
 
-#include "h/skgei2c.h"
+#include "h/skgetwsi.h"
 
 /*
- * Define the I2C events.
+ * Define the TWSI events.
  */
 #define SK_I2CEV_IRQ	1	/* IRQ happened Event */
 #define SK_I2CEV_TIM	2	/* Timeout event */
@@ -173,5 +173,5 @@ extern int SkI2cEvent(SK_AC *pAC, SK_IOC IoC, SK_U32 Event, SK_EVPARA Para);
 extern void SkI2cWaitIrq(SK_AC *pAC, SK_IOC IoC);
 extern void SkI2cIsr(SK_AC *pAC, SK_IOC IoC);
 #endif /* !SK_DIAG */
-#endif /* n_SKI2C_H */
+#endif /* n_SKTWSI_H */
 

@@ -2,8 +2,8 @@
  *
  * Name:	skqueue.c
  * Project:	Gigabit Ethernet Adapters, Event Scheduler Module
- * Version:	$Revision: 1.20 $
- * Date:	$Date: 2003/09/16 13:44:00 $
+ * Version:	$Revision: 2.3 $
+ * Date:	$Date: 2004/05/14 13:28:18 $
  * Purpose:	Management of an event queue.
  *
  ******************************************************************************/
@@ -28,7 +28,7 @@
  */
 #if (defined(DEBUG) || ((!defined(LINT)) && (!defined(SK_SLIM))))
 static const char SysKonnectFileId[] =
-	"@(#) $Id: skqueue.c,v 1.20 2003/09/16 13:44:00 rschmidt Exp $ (C) Marvell.";
+	"@(#) $Id: skqueue.c,v 2.3 2004/05/14 13:28:18 malthoff Exp $ (C) Marvell.";
 #endif
 
 #include "h/skdrv1st.h"		/* Driver Specific Definitions */
@@ -48,10 +48,16 @@ intro()
 
 #define PRINTF(a,b,c)
 
-/*
- * init event queue management
+/******************************************************************************
  *
- * Must be called during init level 0.
+ *	SkEventInit() - init event queue management
+ *
+ * Description:
+ * 	This function initializes event queue management.
+ *	It must be called during init level 0.
+ *
+ * Returns:
+ *	nothing
  */
 void	SkEventInit(
 SK_AC	*pAC,	/* Adapter context */
@@ -67,8 +73,17 @@ int		Level)	/* Init level */
 	}
 }
 
-/*
- * add event to queue
+/******************************************************************************
+ *
+ *	SkEventQueue()	-	add event to queue
+ *
+ * Description:
+ *	This function adds an event to the event queue.
+ *	At least Init Level 1 is required to queue events,
+ *	but will be scheduled add Init Level 2.
+ *
+ * returns:
+ *	nothing
  */
 void	SkEventQueue(
 SK_AC		*pAC,	/* Adapters context */
@@ -76,26 +91,45 @@ SK_U32		Class,	/* Event Class */
 SK_U32		Event,	/* Event to be queued */
 SK_EVPARA	Para)	/* Event parameter */
 {
-	pAC->Event.EvPut->Class = Class;
-	pAC->Event.EvPut->Event = Event;
-	pAC->Event.EvPut->Para = Para;
-	
-	if (++pAC->Event.EvPut == &pAC->Event.EvQueue[SK_MAX_EVENT])
-		pAC->Event.EvPut = pAC->Event.EvQueue;
 
-	if (pAC->Event.EvPut == pAC->Event.EvGet) {
-		SK_ERR_LOG(pAC, SK_ERRCL_NORES, SKERR_Q_E001, SKERR_Q_E001MSG);
+	if (pAC->GIni.GILevel == SK_INIT_DATA) {
+		SK_ERR_LOG(pAC, SK_ERRCL_NORES, SKERR_Q_E003, SKERR_Q_E003MSG);
+	}
+	else {
+		pAC->Event.EvPut->Class = Class;
+		pAC->Event.EvPut->Event = Event;
+		pAC->Event.EvPut->Para = Para;
+	
+		if (++pAC->Event.EvPut == &pAC->Event.EvQueue[SK_MAX_EVENT])
+			pAC->Event.EvPut = pAC->Event.EvQueue;
+
+		if (pAC->Event.EvPut == pAC->Event.EvGet) {
+			SK_ERR_LOG(pAC, SK_ERRCL_NORES, SKERR_Q_E001, SKERR_Q_E001MSG);
+		}
 	}
 }
 
-/*
- * event dispatcher
- *	while event queue is not empty
- *		get event from queue
- *		send command to state machine
- *	end
- *	return error reported by individual Event function
- *		0 if no error occured.
+/******************************************************************************
+ *
+ *	SkEventDispatcher() -	 Event Dispatcher
+ *
+ * Description:
+ *	The event dispatcher performs the following operations:
+ *		o while event queue is not empty
+ *			- get event from queue
+ *			- send event to state machine
+ *		  end
+ *
+ * CAUTION:
+ *	The event functions MUST report an error if performing a reinitialization
+ *	of the event queue, e.g. performing level Init 0..2 while in dispatcher
+ *	call!
+ *  ANY OTHER return value delays scheduling the other events in the
+ *	queue. In this case the event blocks the queue until
+ *  the error condition is cleared!
+ *
+ * Returns:
+ *	The return value error reported by individual event function
  */
 int	SkEventDispatcher(
 SK_AC	*pAC,	/* Adapters Context */
@@ -104,6 +138,10 @@ SK_IOC	Ioc)	/* Io context */
 	SK_EVENTELEM	*pEv;	/* pointer into queue */
 	SK_U32			Class;
 	int			Rtv;
+
+	if (pAC->GIni.GILevel != SK_INIT_RUN) {
+		SK_ERR_LOG(pAC, SK_ERRCL_NORES, SKERR_Q_E005, SKERR_Q_E005MSG);
+	}
 
 	pEv = pAC->Event.EvGet;
 	
@@ -152,6 +190,11 @@ SK_IOC	Ioc)	/* Io context */
 			Rtv = SkFdEvent(pAC, Ioc, pEv->Event, pEv->Para);
 			break;
 #endif /* SK_USE_LAC_EV */
+#ifdef SK_ASF
+		case SKGE_ASF :
+			Rtv = SkAsfEvent(pAC,Ioc,pEv->Event,pEv->Para);
+			break ;
+#endif
 #ifdef	SK_USE_CSUM
 		case SKGE_CSUM :
 			Rtv = SkCsEvent(pAC, Ioc, pEv->Event, pEv->Para);
@@ -163,6 +206,20 @@ SK_IOC	Ioc)	/* Io context */
 		}
 
 		if (Rtv != 0) {
+			/* 
+			 * Special Case: See CAUTION statement above.
+			 * We assume the event queue is reset.
+			 */
+			if (pAC->Event.EvGet != pAC->Event.EvQueue &&
+				pAC->Event.EvGet != pEv) {
+				/*
+				 * Create an error log entry if the
+				 * event queue isn't reset.
+				 * In this case it may be blocked.
+				 */
+				SK_ERR_LOG(pAC, SK_ERRCL_SW, SKERR_Q_E004, SKERR_Q_E004MSG);
+			}
+
 			return(Rtv);
 		}
 
