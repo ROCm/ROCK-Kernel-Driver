@@ -1486,7 +1486,14 @@ hub_power_remaining (struct usb_hub *hub, struct usb_device *hdev)
 	}
 	return remaining;
 }
- 
+
+/* Handle physical or logical connection change events.
+ * This routine is called when:
+ * 	a port connection-change occurs;
+ *	a port enable-change occurs (often caused by EMI);
+ *	usb_reset_device() encounters changed descriptors (as from
+ *		a firmware download)
+ */
 static void hub_port_connect_change(struct usb_hub *hub, int port,
 					u16 portstatus, u16 portchange)
 {
@@ -1497,9 +1504,6 @@ static void hub_port_connect_change(struct usb_hub *hub, int port,
 	dev_dbg (hub_dev,
 		"port %d, status %04x, change %04x, %s\n",
 		port + 1, portstatus, portchange, portspeed (portstatus));
- 
-	/* Clear the connection change status */
-	clear_port_feature(hdev, port + 1, USB_PORT_FEAT_C_CONNECTION);
 
 	if (hub->has_indicators) {
 		set_port_led(hdev, port + 1, HUB_LED_AUTO);
@@ -1509,6 +1513,18 @@ static void hub_port_connect_change(struct usb_hub *hub, int port,
 	/* Disconnect any existing devices under this port */
 	if (hdev->children[port])
 		usb_disconnect(&hdev->children[port]);
+
+	if (portchange & USB_PORT_STAT_C_CONNECTION) {
+		status = hub_port_debounce(hdev, port);
+		if (status == -ENOTCONN)
+			portstatus = 0;
+		else if (status < 0) {
+			dev_err (hub_dev,
+				"connect-debounce failed, port %d disabled\n",
+				port+1);
+			goto done;
+		}
+	}
 
 	/* Return now if nothing is connected */
 	if (!(portstatus & USB_PORT_STAT_CONNECTION)) {
@@ -1522,13 +1538,6 @@ static void hub_port_connect_change(struct usb_hub *hub, int port,
 		if (portstatus & USB_PORT_STAT_ENABLE)
   			goto done;
 		return;
-	}
-  
-	if (hub_port_debounce(hdev, port)) {
-		dev_err (hub_dev,
-			"connect-debounce failed, port %d disabled\n",
-			port+1);
-		goto done;
 	}
 
 	for (i = 0; i < SET_CONFIG_TRIES; i++) {
@@ -1631,6 +1640,7 @@ static void hub_events(void)
 	u16 portstatus;
 	u16 portchange;
 	int i, ret;
+	int connect_change;
 
 	/*
 	 *  We restart the list every time to avoid a deadlock with
@@ -1676,16 +1686,22 @@ static void hub_events(void)
 
 		for (i = 0; i < hub->descriptor->bNbrPorts; i++) {
 			ret = hub_port_status(hdev, i, &portstatus, &portchange);
-			if (ret < 0) {
+			if (ret < 0)
 				continue;
-			}
+			connect_change = 0;
 
 			if (portchange & USB_PORT_STAT_C_CONNECTION) {
-				hub_port_connect_change(hub, i, portstatus, portchange);
-			} else if (portchange & USB_PORT_STAT_C_ENABLE) {
-				dev_dbg (hub_dev,
-					"port %d enable change, status %08x\n",
-					i + 1, portstatus);
+				clear_port_feature(hdev,
+					i + 1, USB_PORT_FEAT_C_CONNECTION);
+				connect_change = 1;
+			}
+
+			if (portchange & USB_PORT_STAT_C_ENABLE) {
+				if (!connect_change)
+					dev_dbg (hub_dev,
+						"port %d enable change, "
+						"status %08x\n",
+						i + 1, portstatus);
 				clear_port_feature(hdev,
 					i + 1, USB_PORT_FEAT_C_ENABLE);
 
@@ -1696,15 +1712,14 @@ static void hub_events(void)
 				 * Works at least with mouse driver. 
 				 */
 				if (!(portstatus & USB_PORT_STAT_ENABLE)
-				    && (portstatus & USB_PORT_STAT_CONNECTION)
-				    && (hdev->children[i])) {
+				    && !connect_change
+				    && hdev->children[i]) {
 					dev_err (hub_dev,
 					    "port %i "
 					    "disabled by hub (EMI?), "
 					    "re-enabling...",
 						i + 1);
-					hub_port_connect_change(hub,
-						i, portstatus, portchange);
+					connect_change = 1;
 				}
 			}
 
@@ -1732,6 +1747,10 @@ static void hub_events(void)
 				clear_port_feature(hdev,
 					i + 1, USB_PORT_FEAT_C_RESET);
 			}
+
+			if (connect_change)
+				hub_port_connect_change(hub, i,
+						portstatus, portchange);
 		} /* end for i */
 
 		/* deal with hub status changes */
