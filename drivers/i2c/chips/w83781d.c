@@ -28,6 +28,7 @@
     asb100 "bach" (type_name = as99127f)	0x30	0x0694	yes	no
     w83781d	7	3	0	3	0x10	0x5ca3	yes	yes
     w83627hf	9	3	2	3	0x20	0x5ca3	yes	yes(LPC)
+    w83627thf	9	3	2	3	0x90	0x5ca3	no	yes(LPC)
     w83782d	9	3	2-4	3	0x30	0x5ca3	yes	yes
     w83783s	5-6	3	2	1-2	0x40	0x5ca3	yes	no
     w83697hf	8	2	2	2	0x60	0x5ca3	no	yes(LPC)
@@ -1285,7 +1286,7 @@ w83781d_detect(struct i2c_adapter *adapter, int address, int kind)
 			kind = w83782d;
 		else if (val1 == 0x40 && vendid == winbond && !is_isa)
 			kind = w83783s;
-		else if ((val1 == 0x20 || val1 == 0x72) && vendid == winbond)
+		else if ((val1 == 0x20 || val1 == 0x90) && vendid == winbond)
 			kind = w83627hf;
 		else if (val1 == 0x30 && vendid == asus && !is_isa)
 			kind = as99127f;
@@ -1309,7 +1310,10 @@ w83781d_detect(struct i2c_adapter *adapter, int address, int kind)
 	} else if (kind == w83783s) {
 		client_name = "W83783S chip";
 	} else if (kind == w83627hf) {
-		client_name = "W83627HF chip";
+		if (val1 == 0x90)
+			client_name = "W83627THF chip";
+		else
+			client_name = "W83627HF chip";
 	} else if (kind == as99127f) {
 		client_name = "AS99127F chip";
 	} else if (kind == w83697hf) {
