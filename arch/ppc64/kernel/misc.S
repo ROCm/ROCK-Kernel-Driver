@@ -522,7 +522,7 @@ _GLOBAL(sys_call_table32)
 	.llong .sys_chmod		/* 15 */
 	.llong .sys_lchown
 	.llong .sys_ni_syscall			/* old break syscall holder */
-	.llong .sys32_stat
+	.llong .sys_ni_syscall		/* old stat syscall holder */
 	.llong .sys32_lseek
 	.llong .sys_getpid              /* 20 */
 	.llong .sys32_mount
@@ -532,7 +532,7 @@ _GLOBAL(sys_call_table32)
 	.llong .ppc64_sys32_stime       /* 25 */
 	.llong .sys32_ptrace
 	.llong .sys_alarm
-	.llong .sys32_fstat
+	.llong .sys_ni_syscall		/* old fstat syscall holder */
 	.llong .sys32_pause
 	.llong .sys32_utime		/* 30 */
 	.llong .sys_ni_syscall			/* old stty syscall holder */
@@ -588,7 +588,7 @@ _GLOBAL(sys_call_table32)
 	.llong .sys32_setgroups
 	.llong .ppc32_select
 	.llong .sys_symlink
-	.llong .sys32_lstat
+	.llong .sys_ni_syscall		/* old sys_lstat syscall holder */
 	.llong .sys32_readlink	        /* 85 */
 	.llong .sys_uselib
 	.llong .sys_swapon
@@ -756,7 +756,7 @@ _GLOBAL(sys_call_table)
 	.llong .sys_chmod		/* 15 */
 	.llong .sys_lchown
 	.llong .sys_ni_syscall			/* old break syscall holder */
-	.llong .sys_stat
+	.llong .sys_ni_syscall		/* old stat syscall holder */
 	.llong .sys_lseek
 	.llong .sys_getpid	/* 20 */
 	.llong .sys_mount
@@ -766,7 +766,7 @@ _GLOBAL(sys_call_table)
 	.llong .ppc64_sys_stime		/* 25 */
 	.llong .sys_ptrace
 	.llong .sys_alarm
-	.llong .sys_fstat
+	.llong .sys_ni_syscall		/* old sys_fstat syscall holder */
 	.llong .sys_pause
 	.llong .sys_utime		/* 30 */
 	.llong .sys_ni_syscall			/* old stty syscall holder */
@@ -822,7 +822,7 @@ _GLOBAL(sys_call_table)
 	.llong .sys_setgroups
 	.llong .sys_select
 	.llong .sys_symlink
-	.llong .sys_lstat
+	.llong .sys_ni_syscall		/* old sys_lstat syscall holder */
 	.llong .sys_readlink	/* 85 */
 	.llong .sys_uselib
 	.llong .sys_swapon

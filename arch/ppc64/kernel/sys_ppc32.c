@@ -2759,69 +2759,6 @@ asmlinkage long sys32_ipc(u32 call, u32 first_parm, u32 second_parm, u32 third_p
 	return err;
 }
 
-/* stat syscall methods. */
-extern asmlinkage int sys_stat(char* filename, struct __old_kernel_stat* statbuf);
-
-static int cp_old_stat32(struct kstat *stat, struct __old_kernel_stat32* statbuf)
-{
-	static int warncount = 5;
-	struct __old_kernel_stat32 tmp;
-
-	if (warncount) {
-		warncount--;
-		printk("VFS: Warning: %s using old stat() call. Recompile your binary.\n",
-			current->comm);
-	}
-
-	tmp.st_dev = stat->dev;
-	tmp.st_ino = stat->ino;
-	tmp.st_mode = stat->mode;
-	tmp.st_nlink = stat->nlink;
-	SET_OLDSTAT_UID(tmp, stat->uid);
-	SET_OLDSTAT_GID(tmp, stat->gid);
-	tmp.st_rdev = stat->rdev;
-	if (stat->size > MAX_NON_LFS)
-		return -EOVERFLOW;
-	tmp.st_size = stat->size;
-	tmp.st_atime = stat->atime;
-	tmp.st_mtime = stat->mtime;
-	tmp.st_ctime = stat->ctime;
-	return copy_to_user(statbuf,&tmp,sizeof(tmp)) ? -EFAULT : 0;
-}
-
-asmlinkage long sys32_stat(char* filename, struct __old_kernel_stat32* statbuf)
-{
-	struct kstat stat;
-	int error = vfs_stat(filename, &stat);
-	
-	if (!error)
-		error = cp_old_stat32(&stat, statbuf);
-
-	return error;
-}
-
-asmlinkage long sys32_fstat(unsigned int fd, struct __old_kernel_stat32* statbuf)
-{
-	struct kstat stat;
-	int error = vfs_fstat(fd, &stat);
-	
-	if (!error)
-		error = cp_old_stat32(&stat, statbuf);
-
-	return error;
-}
-
-asmlinkage long sys32_lstat(char* filename, struct __old_kernel_stat32* statbuf)
-{
-	struct kstat stat;
-	int error = vfs_lstat(filename, &stat);
-	
-	if (!error)
-		error = cp_old_stat32(&stat, statbuf);
-
-	return error;
-}
-
 extern asmlinkage ssize_t sys_sendfile(int out_fd, int in_fd, off_t* offset, size_t count);
 
 /* Note: it is necessary to treat out_fd and in_fd as unsigned ints, 
