@@ -2454,32 +2454,30 @@ static void con_flush_chars(struct tty_struct *tty)
 /*
  * Allocate the console screen memory.
  */
-static int con_open(struct tty_struct *tty, struct file * filp)
+static int con_open(struct tty_struct *tty, struct file *filp)
 {
-	unsigned int	currcons;
-	int i;
-
-	currcons = tty->index;
+	unsigned int currcons = tty->index;
+	int ret = 0;
 
 	acquire_console_sem();
-	i = vc_allocate(currcons);
-	if (i) {
-		release_console_sem();
-		return i;
-	}
-	vt_cons[currcons]->vc_num = currcons;
-	tty->driver_data = vt_cons[currcons];
-	vc_cons[currcons].d->vc_tty = tty;
+	if (tty->count == 1) {
+		ret = vc_allocate(currcons);
+		if (ret == 0) {
+			vt_cons[currcons]->vc_num = currcons;
+			tty->driver_data = vt_cons[currcons];
+			vc_cons[currcons].d->vc_tty = tty;
 
+			if (!tty->winsize.ws_row && !tty->winsize.ws_col) {
+				tty->winsize.ws_row = video_num_lines;
+				tty->winsize.ws_col = video_num_columns;
+			}
+			release_console_sem();
+			vcs_make_devfs(tty);
+			return ret;
+		}
+	}
 	release_console_sem();
-
-	if (!tty->winsize.ws_row && !tty->winsize.ws_col) {
-		tty->winsize.ws_row = video_num_lines;
-		tty->winsize.ws_col = video_num_columns;
-	}
-	if (tty->count == 1)
-		vcs_make_devfs(tty);
-	return 0;
+	return ret;
 }
 
 static void con_close(struct tty_struct *tty, struct file *filp)
