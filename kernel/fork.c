@@ -733,6 +733,7 @@ static inline int copy_signal(unsigned long clone_flags, struct task_struct * ts
 		return -ENOMEM;
 	atomic_set(&sig->count, 1);
 	atomic_set(&sig->live, 1);
+	init_waitqueue_head(&sig->wait_chldexit);
 	sig->flags = 0;
 	sig->group_exit_code = 0;
 	sig->group_exit_task = NULL;
@@ -860,7 +861,6 @@ static task_t *copy_process(unsigned long clone_flags,
 
 	INIT_LIST_HEAD(&p->children);
 	INIT_LIST_HEAD(&p->sibling);
-	init_waitqueue_head(&p->wait_chldexit);
 	p->vfork_done = NULL;
 	spin_lock_init(&p->alloc_lock);
 	spin_lock_init(&p->proc_lock);

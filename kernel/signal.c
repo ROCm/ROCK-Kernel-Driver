@@ -1437,28 +1437,12 @@ out:
 }
 
 /*
- * Joy. Or not. Pthread wants us to wake up every thread
- * in our parent group.
+ * Wake up any threads in the parent blocked in wait* syscalls.
  */
-static void __wake_up_parent(struct task_struct *p,
+static inline void __wake_up_parent(struct task_struct *p,
 				    struct task_struct *parent)
 {
-	struct task_struct *tsk = parent;
-
-	/*
-	 * Fortunately this is not necessary for thread groups:
-	 */
-	if (p->tgid == tsk->tgid) {
-		wake_up_interruptible_sync(&tsk->wait_chldexit);
-		return;
-	}
-
-	do {
-		wake_up_interruptible_sync(&tsk->wait_chldexit);
-		tsk = next_thread(tsk);
-		if (tsk->signal != parent->signal)
-			BUG();
-	} while (tsk != parent);
+	wake_up_interruptible_sync(&parent->signal->wait_chldexit);
 }
 
 /*

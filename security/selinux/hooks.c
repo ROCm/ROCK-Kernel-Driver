@@ -1908,7 +1908,7 @@ static void selinux_bprm_apply_creds(struct linux_binprm *bprm, int unsafe)
 
 		/* Wake up the parent if it is waiting so that it can
 		   recheck wait permission to the new task SID. */
-		wake_up_interruptible(&current->parent->wait_chldexit);
+		wake_up_interruptible(&current->parent->signal->wait_chldexit);
 
 lock_out:
 		task_lock(current);

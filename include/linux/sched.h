@@ -274,6 +274,8 @@ struct signal_struct {
 	atomic_t		count;
 	atomic_t		live;
 
+	wait_queue_head_t	wait_chldexit;	/* for wait4() */
+
 	/* current thread group signal load-balancing target: */
 	task_t			*curr_target;
 
@@ -586,7 +588,6 @@ struct task_struct {
 	/* PID/PID hash table linkage. */
 	struct pid pids[PIDTYPE_MAX];
 
-	wait_queue_head_t wait_chldexit;	/* for wait4() */
 	struct completion *vfork_done;		/* for vfork() */
 	int __user *set_child_tid;		/* CLONE_CHILD_SETTID */
 	int __user *clear_child_tid;		/* CLONE_CHILD_CLEARTID */

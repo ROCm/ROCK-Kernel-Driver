@@ -1319,7 +1319,7 @@ static long do_wait(pid_t pid, int options, struct siginfo __user *infop,
 	struct task_struct *tsk;
 	int flag, retval;
 
-	add_wait_queue(&current->wait_chldexit,&wait);
+	add_wait_queue(&current->signal->wait_chldexit,&wait);
 repeat:
 	/*
 	 * We will set this flag if we see any child that might later
@@ -1433,7 +1433,7 @@ check_continued:
 	retval = -ECHILD;
 end:
 	current->state = TASK_RUNNING;
-	remove_wait_queue(&current->wait_chldexit,&wait);
+	remove_wait_queue(&current->signal->wait_chldexit,&wait);
 	if (infop) {
 		if (retval > 0)
 		retval = 0;
