@@ -2717,6 +2717,7 @@ static int snd_usb_audio_create(snd_card_t *card, struct usb_device *dev,
 {
 	snd_usb_audio_t *chip;
 	int err, len;
+	char component[14];
 	static snd_device_ops_t ops = {
 		.dev_free =	snd_usb_audio_dev_free,
 	};
@@ -2737,46 +2738,42 @@ static int snd_usb_audio_create(snd_card_t *card, struct usb_device *dev,
 	}
 
 	strcpy(card->driver, "USB-Audio");
+	sprintf(component, "USB%#04x:%#04x",
+		dev->descriptor.idVendor, dev->descriptor.idProduct);
+	snd_component_add(card, component);
 
 	/* retrieve the device string as shortname */
-	if (dev->descriptor.iProduct)
-		len = usb_string(dev, dev->descriptor.iProduct,
-				 card->shortname, sizeof(card->shortname));
-	else
-		len = 0;
+ 	if (quirk && quirk->product_name) {
+		len = strlcpy(card->shortname, quirk->product_name, sizeof(card->shortname));
+	} else {
+		if (dev->descriptor.iProduct)
+			len = usb_string(dev, dev->descriptor.iProduct,
+					 card->shortname, sizeof(card->shortname));
+		else
+			len = 0;
+	}
 	if (len <= 0) {
- 		if (quirk && quirk->product_name) {
-			strlcpy(card->shortname, quirk->product_name, sizeof(card->shortname));
-		} else {
-			sprintf(card->shortname, "USB Device %#04x:%#04x",
-				dev->descriptor.idVendor, dev->descriptor.idProduct);
-		}
+		sprintf(card->shortname, "USB Device %#04x:%#04x",
+			dev->descriptor.idVendor, dev->descriptor.idProduct);
 	}
 
 	/* retrieve the vendor and device strings as longname */
-	if (dev->descriptor.iManufacturer)
-		len = usb_string(dev, dev->descriptor.iManufacturer,
-				 card->longname, sizeof(card->longname));
-	else
-		len = 0;
-	if (len <= 0) {
-		if (quirk && quirk->vendor_name) {
-			len = strlcpy(card->longname, quirk->vendor_name, sizeof(card->longname));
-		} else {
+	if (quirk && quirk->vendor_name) {
+		len = strlcpy(card->longname, quirk->vendor_name, sizeof(card->longname));
+	} else {
+		if (dev->descriptor.iManufacturer)
+			len = usb_string(dev, dev->descriptor.iManufacturer,
+					 card->longname, sizeof(card->longname));
+		else
 			len = 0;
-		}
 	}
 	if (len > 0)
 		strlcat(card->longname, " ", sizeof(card->longname));
 
 	len = strlen(card->longname);
 
-	if ((!dev->descriptor.iProduct
-	     || usb_string(dev, dev->descriptor.iProduct,
-			   card->longname + len, sizeof(card->longname) - len) <= 0)
-	    && quirk && quirk->product_name) {
+	if (quirk && quirk->product_name)
 		strlcat(card->longname, quirk->product_name, sizeof(card->longname));
-	}
 
 	len = strlcat(card->longname, " at ", sizeof(card->longname));
 
@@ -2815,7 +2812,7 @@ static void *snd_usb_audio_probe(struct usb_device *dev,
 	alts = &intf->altsetting[0];
 	ifnum = get_iface_desc(alts)->bInterfaceNumber;
 
-	if (quirk && quirk->ifnum != QUIRK_ANY_INTERFACE && ifnum != quirk->ifnum)
+	if (quirk && quirk->ifnum >= 0 && ifnum != quirk->ifnum)
 		goto __err_val;
 
 	/* SB Extigy needs special boot-up sequence */
@@ -2876,7 +2873,7 @@ static void *snd_usb_audio_probe(struct usb_device *dev,
 	}
 
 	err = 1; /* continue */
-	if (quirk) {
+	if (quirk && quirk->ifnum != QUIRK_NO_INTERFACE) {
 		/* need some special handlings */
 		if ((err = snd_usb_create_quirk(chip, intf, quirk)) < 0)
 			goto __error;

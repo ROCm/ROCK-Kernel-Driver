@@ -668,4 +668,15 @@ YAMAHA_DEVICE(0x5008, "01V96"),
 	}
 },
 
+{
+	/* Creative Sound Blaster MP3+ */
+	USB_DEVICE(0x041e, 0x3010),
+	.driver_info = (unsigned long) & (const snd_usb_audio_quirk_t) {
+		.vendor_name = "Creative Labs",
+		.product_name = "Sound Blaster MP3+",
+		.ifnum = QUIRK_NO_INTERFACE
+	}
+	
+},
+
 #undef USB_DEVICE_VENDOR_SPEC
