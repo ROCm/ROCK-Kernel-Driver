@@ -87,6 +87,7 @@ enum nfs_opnum4 {
 	OP_VERIFY = 37,
 	OP_WRITE = 38,
 	OP_RELEASE_LOCKOWNER = 39,
+	OP_ILLEGAL = 10044,
 };
 
 enum nfsstat4 {
