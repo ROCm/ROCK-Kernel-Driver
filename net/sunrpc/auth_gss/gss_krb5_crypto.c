@@ -135,10 +135,9 @@ buf_to_sg(struct scatterlist *sg, char *ptr, int len) {
 	sg->length = len;
 }
 
-/* checksum the plaintext data and the first 8 bytes of the krb5 token header,
- * as specified by the rfc: */
+/* checksum the plaintext data and hdrlen bytes of the token header */
 s32
-krb5_make_checksum(s32 cksumtype, char *header, struct xdr_buf *body,
+make_checksum(s32 cksumtype, char *header, int hdrlen, struct xdr_buf *body,
 		   struct xdr_netobj *cksum)
 {
 	char                            *cksumname;
@@ -164,7 +163,7 @@ krb5_make_checksum(s32 cksumtype, char *header, struct xdr_buf *body,
 		goto out;
 
 	crypto_digest_init(tfm);
-	buf_to_sg(sg, header, 8);
+	buf_to_sg(sg, header, hdrlen);
 	crypto_digest_update(tfm, sg, 1);
 	if (body->head[0].iov_len) {
 		buf_to_sg(sg, body->head[0].iov_base, body->head[0].iov_len);

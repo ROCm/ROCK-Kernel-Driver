@@ -10,6 +10,7 @@
 #include <linux/sunrpc/auth_gss.h>
 #include <linux/sunrpc/svcauth_gss.h>
 #include <linux/sunrpc/gss_asn1.h>
+#include <linux/sunrpc/gss_krb5.h>
 
 /* sec_triples: */
 EXPORT_SYMBOL(gss_register_triple);
@@ -30,6 +31,9 @@ EXPORT_SYMBOL(gss_mech_put);
 EXPORT_SYMBOL(g_make_token_header);
 EXPORT_SYMBOL(g_verify_token_header);
 EXPORT_SYMBOL(g_token_size);
+EXPORT_SYMBOL(make_checksum);
+EXPORT_SYMBOL(krb5_encrypt);
+EXPORT_SYMBOL(krb5_decrypt);
 
 /* debug */
 EXPORT_SYMBOL(print_hexl);
