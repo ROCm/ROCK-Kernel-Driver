@@ -232,18 +232,22 @@ static int __init acpi20_parse_srat(struct acpi_table_srat *sratp)
 	 * a set of sequential node IDs starting at zero.  (ACPI doesn't seem
 	 * to specify the range of _PXM values.)
 	 */
-	numnodes = 0;		/* init total nodes in system */
+	/*
+	 * MCD - we no longer HAVE to number nodes sequentially.  PXM domain
+	 * numbers could go as high as 256, and MAX_NUMNODES for i386 is typically
+	 * 32, so we will continue numbering them in this manner until MAX_NUMNODES
+	 * approaches MAX_PXM_DOMAINS for i386.
+	 */
+	nodes_clear(node_online_map);
 	for (i = 0; i < MAX_PXM_DOMAINS; i++) {
 		if (BMAP_TEST(pxm_bitmap, i)) {
-			pxm_to_nid_map[i] = numnodes;
-			nid_to_pxm_map[numnodes] = i;
-			node_set_online(numnodes);
-			++numnodes;
+			nid = num_online_nodes();
+			pxm_to_nid_map[i] = nid;
+			nid_to_pxm_map[nid] = i;
+			node_set_online(nid);
 		}
 	}
-
-	if (numnodes == 0)
-		BUG();
+	BUG_ON(num_online_nodes() == 0);
 
 	/* set cnode id in memory chunk structure */
 	for (i = 0; i < num_memory_chunks; i++)
@@ -254,7 +258,7 @@ static int __init acpi20_parse_srat(struct acpi_table_srat *sratp)
 		printk("%02X ", pxm_bitmap[i]);
 	}
 	printk("\n");
-	printk("Number of logical nodes in system = %d\n", numnodes);
+	printk("Number of logical nodes in system = %d\n", num_online_nodes());
 	printk("Number of memory chunks in system = %d\n", num_memory_chunks);
 
 	for (j = 0; j < num_memory_chunks; j++){
@@ -265,7 +269,7 @@ static int __init acpi20_parse_srat(struct acpi_table_srat *sratp)
 	}
  
 	/*calculate node_start_pfn/node_end_pfn arrays*/
-	for (nid = 0; nid < numnodes; nid++) {
+	for_each_online_node(nid) {
 		int been_here_before = 0;
 
 		for (j = 0; j < num_memory_chunks; j++){
@@ -397,7 +401,7 @@ static void __init get_zholes_init(void)
 	int first;
 	unsigned long end = 0;
 
-	for (nid = 0; nid < numnodes; nid++) {
+	for_each_online_node(nid) {
 		first = 1;
 		for (c = 0; c < num_memory_chunks; c++){
 			if (node_memory_chunk[c].nid == nid) {
@@ -425,8 +429,8 @@ unsigned long * __init get_zholes_size(int nid)
 		zholes_size_init++;
 		get_zholes_init();
 	}
-	if((nid >= numnodes) | (nid >= MAX_NUMNODES))
-		printk("%s: nid = %d is invalid. numnodes = %d",
-		       __FUNCTION__, nid, numnodes);
+	if (nid >= MAX_NUMNODES || !node_online(nid))
+		printk("%s: nid = %d is invalid/offline. num_online_nodes = %d",
+		       __FUNCTION__, nid, num_online_nodes());
 	return &zholes_size[nid * MAX_NR_ZONES];
 }
