@@ -235,7 +235,7 @@ void rb_erase(struct rb_node *node, struct rb_root *root)
 		struct rb_node *old = node, *left;
 
 		node = node->rb_right;
-		while ((left = node->rb_left))
+		while ((left = node->rb_left) != NULL)
 			node = left;
 		child = node->rb_right;
 		parent = node->rb_parent;
@@ -305,7 +305,7 @@ struct rb_node *rb_first(struct rb_root *root)
 
 	n = root->rb_node;
 	if (!n)
-		return 0;
+		return NULL;
 	while (n->rb_left)
 		n = n->rb_left;
 	return n;

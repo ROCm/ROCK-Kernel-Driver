@@ -108,7 +108,7 @@ int clk_set_rate(struct clk *clk, unsigned long rate);
  * Returns success (0) or negative errno.
  */
 int clk_set_parent(struct clk *clk, struct clk *parent);
-                                                                                
+
 /**
  * clk_get_parent - get the parent clock source for this clock
  * @clk: clock source

@@ -121,7 +121,7 @@ int esp_output(struct sk_buff **pskb)
 		top_iph->tot_len = htons((*pskb)->len + alen);
 		top_iph->frag_off = iph->frag_off&htons(IP_DF);
 		if (!(top_iph->frag_off))
-			ip_select_ident(top_iph, dst, 0);
+			ip_select_ident(top_iph, dst, NULL);
 		top_iph->ttl = iph->ttl;	/* TTL disclosed */
 		top_iph->check = 0;
 		top_iph->saddr = x->props.saddr.a4;

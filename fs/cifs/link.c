@@ -188,10 +188,10 @@ cifs_symlink(struct inode *inode, struct dentry *direntry, const char *symname)
 	if (rc == 0) {
 		if (pTcon->ses->capabilities & CAP_UNIX)
 			rc = cifs_get_inode_info_unix(&newinode, full_path,
-						      inode->i_sb);
+						      inode->i_sb,xid);
 		else
 			rc = cifs_get_inode_info(&newinode, full_path, NULL,
-						 inode->i_sb);
+						 inode->i_sb,xid);
 
 		if (rc != 0) {
 			cFYI(1,

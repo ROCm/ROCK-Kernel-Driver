@@ -182,7 +182,7 @@ GLOBAL_ENTRY(ia64_switch_to)
 	movl r25=init_task
 	mov r27=IA64_KR(CURRENT_STACK)
 	adds r21=IA64_TASK_THREAD_KSP_OFFSET,in0
-	dep r20=0,in0,61,3		// physical address of "current"
+	dep r20=0,in0,61,3		// physical address of "next"
 	;;
 	st8 [r22]=sp			// save kernel stack pointer of old task
 	shr.u r26=r20,IA64_GRANULE_SHIFT
@@ -195,7 +195,7 @@ GLOBAL_ENTRY(ia64_switch_to)
 (p6)	br.cond.dpnt .map
 	;;
 .done:
-(p6)	ssm psr.ic			// if we we had to map, renable the psr.ic bit FIRST!!!
+(p6)	ssm psr.ic			// if we had to map, reenable the psr.ic bit FIRST!!!
 	;;
 (p6)	srlz.d
 	ld8 sp=[r21]			// load kernel stack pointer of new task

@@ -669,7 +669,7 @@ out:
 static inline struct page *get_page_map(struct page *page)
 {
 	if (!pfn_valid(page_to_pfn(page)))
-		return 0;
+		return NULL;
 	return page;
 }
 
@@ -1078,7 +1078,8 @@ static int do_wp_page(struct mm_struct *mm, struct vm_area_struct * vma,
 	/*
 	 * Ok, we need to copy. Oh, well..
 	 */
-	page_cache_get(old_page);
+	if (!PageReserved(old_page))
+		page_cache_get(old_page);
 	spin_unlock(&mm->page_table_lock);
 
 	if (unlikely(anon_vma_prepare(vma)))
@@ -1805,7 +1806,7 @@ struct vm_area_struct *get_gate_vma(struct task_struct *tsk)
 #ifdef AT_SYSINFO_EHDR
 	return &gate_vma;
 #else
-	return 0;
+	return NULL;
 #endif
 }
 

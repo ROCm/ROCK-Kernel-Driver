@@ -1923,7 +1923,7 @@ int uart_suspend_port(struct uart_driver *drv, struct uart_port *port)
 	 * Disable the console device before suspending.
 	 */
 	if (uart_console(port))
-		port->cons->flags &= ~CON_ENABLED;
+		console_stop(port->cons);
 
 	uart_change_pm(state, 3);
 
@@ -1945,7 +1945,7 @@ int uart_resume_port(struct uart_driver *drv, struct uart_port *port)
 	 */
 	if (uart_console(port)) {
 		uart_change_speed(state, NULL);
-		port->cons->flags |= CON_ENABLED;
+		console_start(port->cons);
 	}
 
 	if (state->info && state->info->flags & UIF_INITIALIZED) {

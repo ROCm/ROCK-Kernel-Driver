@@ -177,7 +177,7 @@ void locks_init_lock(struct file_lock *fl)
 	init_waitqueue_head(&fl->fl_wait);
 	fl->fl_next = NULL;
 	fl->fl_fasync = NULL;
-	fl->fl_owner = 0;
+	fl->fl_owner = NULL;
 	fl->fl_pid = 0;
 	fl->fl_file = NULL;
 	fl->fl_flags = 0;

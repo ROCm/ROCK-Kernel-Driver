@@ -2,7 +2,7 @@
  * linux/arch/i386/kernel/edd.c
  *  Copyright (C) 2002, 2003, 2004 Dell Inc.
  *  by Matt Domsch <Matt_Domsch@dell.com>
- *  disk80 signature by Matt Domsch, Andrew Wilks, and Sandeep K. Shandilya
+ *  disk signature by Matt Domsch, Andrew Wilks, and Sandeep K. Shandilya
  *  legacy CHS by Patrick J. LoPresti <patl@users.sourceforge.net>
  *
  * BIOS Enhanced Disk Drive Services (EDD)
@@ -43,8 +43,8 @@
 #include <linux/blkdev.h>
 #include <linux/edd.h>
 
-#define EDD_VERSION "0.15"
-#define EDD_DATE    "2004-May-17"
+#define EDD_VERSION "0.16"
+#define EDD_DATE    "2004-Jun-25"
 
 MODULE_AUTHOR("Matt Domsch <Matt_Domsch@Dell.com>");
 MODULE_DESCRIPTION("sysfs interface to BIOS EDD information");
@@ -54,6 +54,8 @@ MODULE_VERSION(EDD_VERSION);
 #define left (PAGE_SIZE - (p - buf) - 1)
 
 struct edd_device {
+	unsigned int index;
+	unsigned int mbr_signature;
 	struct edd_info *info;
 	struct kobject kobj;
 };
@@ -77,6 +79,18 @@ struct edd_attribute edd_attr_##_name = { 	\
 	.test	= _test,				\
 };
 
+static int
+edd_has_mbr_signature(struct edd_device *edev)
+{
+	return edev->index < min_t(unsigned char, edd.mbr_signature_nr, EDD_MBR_SIG_MAX);
+}
+
+static int
+edd_has_edd_info(struct edd_device *edev)
+{
+	return edev->index < min_t(unsigned char, edd.edd_info_nr, EDDMAXNR);
+}
+
 static inline struct edd_info *
 edd_dev_get_info(struct edd_device *edev)
 {
@@ -84,9 +98,13 @@ edd_dev_get_info(struct edd_device *edev)
 }
 
 static inline void
-edd_dev_set_info(struct edd_device *edev, struct edd_info *info)
+edd_dev_set_info(struct edd_device *edev, int i)
 {
-	edev->info = info;
+	edev->index = i;
+	if (edd_has_mbr_signature(edev))
+		edev->mbr_signature = edd.mbr_signature[i];
+	if (edd_has_edd_info(edev))
+		edev->info = &edd.edd_info[i];
 }
 
 #define to_edd_attr(_attr) container_of(_attr,struct edd_attribute,attr)
@@ -256,10 +274,10 @@ edd_show_version(struct edd_device *edev, char *buf)
 }
 
 static ssize_t
-edd_show_disk80_sig(struct edd_device *edev, char *buf)
+edd_show_mbr_signature(struct edd_device *edev, char *buf)
 {
 	char *p = buf;
-	p += scnprintf(p, left, "0x%08x\n", edd_disk80_sig);
+	p += scnprintf(p, left, "0x%08x\n", edev->mbr_signature);
 	return (p - buf);
 }
 
@@ -440,10 +458,10 @@ edd_has_legacy_max_cylinder(struct edd_device *edev)
 {
 	struct edd_info *info;
 	if (!edev)
-		return -EINVAL;
+		return 0;
 	info = edd_dev_get_info(edev);
 	if (!info)
-		return -EINVAL;
+		return 0;
 	return info->legacy_max_cylinder > 0;
 }
 
@@ -452,10 +470,10 @@ edd_has_legacy_max_head(struct edd_device *edev)
 {
 	struct edd_info *info;
 	if (!edev)
-		return -EINVAL;
+		return 0;
 	info = edd_dev_get_info(edev);
 	if (!info)
-		return -EINVAL;
+		return 0;
 	return info->legacy_max_head > 0;
 }
 
@@ -464,10 +482,10 @@ edd_has_legacy_sectors_per_track(struct edd_device *edev)
 {
 	struct edd_info *info;
 	if (!edev)
-		return -EINVAL;
+		return 0;
 	info = edd_dev_get_info(edev);
 	if (!info)
-		return -EINVAL;
+		return 0;
 	return info->legacy_sectors_per_track > 0;
 }
 
@@ -476,10 +494,10 @@ edd_has_default_cylinders(struct edd_device *edev)
 {
 	struct edd_info *info;
 	if (!edev)
-		return -EINVAL;
+		return 0;
 	info = edd_dev_get_info(edev);
 	if (!info)
-		return -EINVAL;
+		return 0;
 	return info->params.num_default_cylinders > 0;
 }
 
@@ -488,10 +506,10 @@ edd_has_default_heads(struct edd_device *edev)
 {
 	struct edd_info *info;
 	if (!edev)
-		return -EINVAL;
+		return 0;
 	info = edd_dev_get_info(edev);
 	if (!info)
-		return -EINVAL;
+		return 0;
 	return info->params.num_default_heads > 0;
 }
 
@@ -500,10 +518,10 @@ edd_has_default_sectors_per_track(struct edd_device *edev)
 {
 	struct edd_info *info;
 	if (!edev)
-		return -EINVAL;
+		return 0;
 	info = edd_dev_get_info(edev);
 	if (!info)
-		return -EINVAL;
+		return 0;
 	return info->params.sectors_per_track > 0;
 }
 
@@ -538,23 +556,12 @@ edd_has_edd30(struct edd_device *edev)
 	return 1;
 }
 
-static int
-edd_has_disk80_sig(struct edd_device *edev)
-{
-	struct edd_info *info;
-	if (!edev)
-		return 0;
-	info = edd_dev_get_info(edev);
-	if (!info)
-		return 0;
-	return info->device == 0x80;
-}
 
-static EDD_DEVICE_ATTR(raw_data, 0444, edd_show_raw_data, NULL);
-static EDD_DEVICE_ATTR(version, 0444, edd_show_version, NULL);
-static EDD_DEVICE_ATTR(extensions, 0444, edd_show_extensions, NULL);
-static EDD_DEVICE_ATTR(info_flags, 0444, edd_show_info_flags, NULL);
-static EDD_DEVICE_ATTR(sectors, 0444, edd_show_sectors, NULL);
+static EDD_DEVICE_ATTR(raw_data, 0444, edd_show_raw_data, edd_has_edd_info);
+static EDD_DEVICE_ATTR(version, 0444, edd_show_version, edd_has_edd_info);
+static EDD_DEVICE_ATTR(extensions, 0444, edd_show_extensions, edd_has_edd_info);
+static EDD_DEVICE_ATTR(info_flags, 0444, edd_show_info_flags, edd_has_edd_info);
+static EDD_DEVICE_ATTR(sectors, 0444, edd_show_sectors, edd_has_edd_info);
 static EDD_DEVICE_ATTR(legacy_max_cylinder, 0444,
                        edd_show_legacy_max_cylinder,
 		       edd_has_legacy_max_cylinder);
@@ -572,23 +579,23 @@ static EDD_DEVICE_ATTR(default_sectors_per_track, 0444,
 		       edd_has_default_sectors_per_track);
 static EDD_DEVICE_ATTR(interface, 0444, edd_show_interface, edd_has_edd30);
 static EDD_DEVICE_ATTR(host_bus, 0444, edd_show_host_bus, edd_has_edd30);
-static EDD_DEVICE_ATTR(mbr_signature, 0444, edd_show_disk80_sig, edd_has_disk80_sig);
+static EDD_DEVICE_ATTR(mbr_signature, 0444, edd_show_mbr_signature, edd_has_mbr_signature);
 
 
 /* These are default attributes that are added for every edd
- * device discovered.
+ * device discovered.  There are none.
  */
 static struct attribute * def_attrs[] = {
-	&edd_attr_raw_data.attr,
-	&edd_attr_version.attr,
-	&edd_attr_extensions.attr,
-	&edd_attr_info_flags.attr,
-	&edd_attr_sectors.attr,
 	NULL,
 };
 
 /* These attributes are conditional and only added for some devices. */
 static struct edd_attribute * edd_attrs[] = {
+	&edd_attr_raw_data,
+	&edd_attr_version,
+	&edd_attr_extensions,
+	&edd_attr_info_flags,
+	&edd_attr_sectors,
 	&edd_attr_legacy_max_cylinder,
 	&edd_attr_legacy_max_head,
 	&edd_attr_legacy_sectors_per_track,
@@ -709,9 +716,9 @@ edd_device_register(struct edd_device *edev, int i)
 	if (!edev)
 		return 1;
 	memset(edev, 0, sizeof (*edev));
-	edd_dev_set_info(edev, &edd[i]);
+	edd_dev_set_info(edev, i);
 	kobject_set_name(&edev->kobj, "int13_dev%02x",
-			 edd[i].device);
+			 0x80 + i);
 	kobj_set_kset_s(edev,edd_subsys);
 	error = kobject_register(&edev->kobj);
 	if (!error)
@@ -719,11 +726,15 @@ edd_device_register(struct edd_device *edev, int i)
 	return error;
 }
 
+static inline int edd_num_devices(void)
+{
+	return min_t(unsigned char,
+		     max_t(unsigned char, edd.edd_info_nr, edd.mbr_signature_nr),
+		     max_t(unsigned char, EDD_MBR_SIG_MAX, EDDMAXNR));
+}
+
 /**
  * edd_init() - creates sysfs tree of EDD data
- *
- * This assumes that eddnr and edd were
- * assigned in setup.c already.
  */
 static int __init
 edd_init(void)
@@ -733,9 +744,9 @@ edd_init(void)
 	struct edd_device *edev;
 
 	printk(KERN_INFO "BIOS EDD facility v%s %s, %d devices found\n",
-	       EDD_VERSION, EDD_DATE, eddnr);
+	       EDD_VERSION, EDD_DATE, edd_num_devices());
 
-	if (!eddnr) {
+	if (!edd_num_devices()) {
 		printk(KERN_INFO "EDD information not available.\n");
 		return 1;
 	}
@@ -744,7 +755,7 @@ edd_init(void)
 	if (rc)
 		return rc;
 
-	for (i = 0; i < eddnr && i < EDDMAXNR && !rc; i++) {
+	for (i = 0; i < edd_num_devices() && !rc; i++) {
 		edev = kmalloc(sizeof (*edev), GFP_KERNEL);
 		if (!edev)
 			return -ENOMEM;
@@ -768,7 +779,7 @@ edd_exit(void)
 	int i;
 	struct edd_device *edev;
 
-	for (i = 0; i < eddnr && i < EDDMAXNR; i++) {
+	for (i = 0; i < edd_num_devices(); i++) {
 		if ((edev = edd_devices[i]))
 			edd_device_unregister(edev);
 	}

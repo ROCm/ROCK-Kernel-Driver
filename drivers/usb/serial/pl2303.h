@@ -42,5 +42,11 @@
 #define SITECOM_VENDOR_ID	0x6189
 #define SITECOM_PRODUCT_ID	0x2068
 
+/* Alcatel OT535/735 USB cable */
 #define ALCATEL_VENDOR_ID	0x11f7
 #define ALCATEL_PRODUCT_ID	0x02df
+
+/* Samsung I330 phone cradle */
+#define SAMSUNG_VENDOR_ID       0x04e8
+#define SAMSUNG_PRODUCT_ID      0x8001
+

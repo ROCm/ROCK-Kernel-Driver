@@ -474,7 +474,7 @@ struct cache_names {
 static struct cache_names __initdata cache_names[] = {
 #define CACHE(x) { .name = "size-" #x, .name_dma = "size-" #x "(DMA)" },
 #include <linux/kmalloc_sizes.h>
-	{ 0, }
+	{ NULL, }
 #undef CACHE
 };
 

@@ -215,8 +215,14 @@ SendReceive(const unsigned int xid, struct cifsSesInfo *ses,
 					 < CIFS_MAX_REQ);
 				spin_lock(&GlobalMid_Lock);
 			} else {
+				if(ses->server->tcpStatus == CifsExiting) {
+					spin_unlock(&GlobalMid_Lock);
+					return -ENOENT;
+				}
+
 			/* can not count locking commands against total since
 			   they are allowed to block on server */
+					
 				if(long_op < 3) {
 				/* update # of requests on the wire to server */
 					atomic_inc(&ses->server->inFlight);

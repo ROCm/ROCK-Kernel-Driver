@@ -367,7 +367,7 @@ static void htb_debug_dump (struct htb_sched *q)
 		struct list_head *l;
 		list_for_each (l,q->hash+i) {
 			struct htb_class *cl = list_entry(l,struct htb_class,hlist);
-			long diff = PSCHED_TDIFF_SAFE(q->now, cl->t_c, (u32)cl->mbuffer, (void)0);
+			long diff = PSCHED_TDIFF_SAFE(q->now, cl->t_c, (u32)cl->mbuffer);
 			printk(KERN_DEBUG "htb*c%x m=%d t=%ld c=%ld pq=%lu df=%ld ql=%d "
 					"pa=%x f:",
 				cl->classid,cl->cmode,cl->tokens,cl->ctokens,
@@ -807,7 +807,7 @@ static void htb_charge_class(struct htb_sched *q,struct htb_class *cl,
 
 	while (cl) {
 		HTB_CHCL(cl);
-		diff = PSCHED_TDIFF_SAFE(q->now, cl->t_c, (u32)cl->mbuffer, (void)0);
+		diff = PSCHED_TDIFF_SAFE(q->now, cl->t_c, (u32)cl->mbuffer);
 #ifdef HTB_DEBUG
 		if (diff > cl->mbuffer || diff < 0 || PSCHED_TLESS(q->now, cl->t_c)) {
 			if (net_ratelimit())
@@ -878,7 +878,7 @@ static long htb_do_events(struct htb_sched *q,int level)
 			return cl->pq_key - q->jiffies;
 		}
 		htb_safe_rb_erase(p,q->wait_pq+level);
-		diff = PSCHED_TDIFF_SAFE(q->now, cl->t_c, (u32)cl->mbuffer, (void)0);
+		diff = PSCHED_TDIFF_SAFE(q->now, cl->t_c, (u32)cl->mbuffer);
 #ifdef HTB_DEBUG
 		if (diff > cl->mbuffer || diff < 0 || PSCHED_TLESS(q->now, cl->t_c)) {
 			if (net_ratelimit())

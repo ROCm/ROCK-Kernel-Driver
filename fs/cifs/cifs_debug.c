@@ -175,19 +175,6 @@ cifs_debug_data_read(char *buf, char **beginBuffer, off_t offset,
 	return length;
 }
 
-int
-cifs_total_xid_read(char *buf, char **beginBuffer, off_t offset,
-		    int length, int *eof, void *data)
-{
-
-	length =
-	    sprintf(buf,
-		    "Total vfs operations: %d and maximum simultaneous serviced by this filesystem: %d\n",
-		    GlobalCurrentXid,GlobalMaxActiveXid);
-
-	return length;
-}
-
 #ifdef CONFIG_CIFS_STATS
 int
 cifs_stats_read(char *buf, char **beginBuffer, off_t offset,
@@ -221,6 +208,12 @@ cifs_stats_read(char *buf, char **beginBuffer, off_t offset,
 	item_length = sprintf(buf,
 		"\n%d session %d share reconnects\n",
 		tcpSesReconnectCount.counter,tconInfoReconnectCount.counter);
+	length += item_length;
+	buf += item_length;
+
+	item_length = sprintf(buf,
+		"Total vfs operations: %d maximum at one time: %d\n",
+		GlobalCurrentXid,GlobalMaxActiveXid);
 	length += item_length;
 	buf += item_length;
 
@@ -322,8 +315,6 @@ cifs_proc_init(void)
 	create_proc_read_entry("DebugData", 0, proc_fs_cifs,
 				cifs_debug_data_read, 0);
 
-	create_proc_read_entry("SimultaneousOps", 0, proc_fs_cifs,
-				cifs_total_xid_read, 0);
 #ifdef CONFIG_CIFS_STATS
 	create_proc_read_entry("Stats", 0, proc_fs_cifs,
 				cifs_stats_read, 0);
@@ -394,7 +385,6 @@ cifs_proc_clean(void)
 	remove_proc_entry("DebugData", proc_fs_cifs);
 	remove_proc_entry("cifsFYI", proc_fs_cifs);
 	remove_proc_entry("traceSMB", proc_fs_cifs);
-	remove_proc_entry("SimultaneousOps", proc_fs_cifs);
 #ifdef CONFIG_CIFS_STATS
 	remove_proc_entry("Stats", proc_fs_cifs);
 #endif

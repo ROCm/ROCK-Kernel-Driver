@@ -67,7 +67,7 @@ start_ap:
 	 * Initialize kernel region registers:
 	 *	rr[5]: VHPT enabled, page size = PAGE_SHIFT
 	 *	rr[6]: VHPT disabled, page size = IA64_GRANULE_SHIFT
-	 *	rr[5]: VHPT disabled, page size = IA64_GRANULE_SHIFT
+	 *	rr[7]: VHPT disabled, page size = IA64_GRANULE_SHIFT
 	 */
 	mov r16=((ia64_rid(IA64_REGION_ID_KERNEL, (5<<61)) << 8) | (PAGE_SHIFT << 2) | 1)
 	movl r17=(5<<61)
@@ -154,8 +154,7 @@ start_ap:
 #endif
 	;;
 	tpa r3=r2		// r3 == phys addr of task struct
-	;;
-	shr.u r16=r3,IA64_GRANULE_SHIFT
+	mov r16=-1
 (isBP)	br.cond.dpnt .load_current // BP stack is on region 5 --- no need to map it
 
 	// load mapping for stack (virtaddr in r2, physaddr in r3)
@@ -169,6 +168,7 @@ start_ap:
 	dep r2=-1,r3,61,3	// IMVA of task
 	;;
 	mov r17=rr[r2]
+	shr.u r16=r3,IA64_GRANULE_SHIFT
 	;;
 	dep r17=0,r17,8,24
 	;;
@@ -706,6 +706,9 @@ END(__ia64_init_fpu)
  *
  * Inputs:
  *	r16 = new psr to establish
+ * Output:
+ *	r19 = old virtual address of ar.bsp
+ *	r20 = old virtual address of sp
  *
  * Note: RSE must already be in enforced lazy mode
  */
@@ -724,12 +727,13 @@ GLOBAL_ENTRY(ia64_switch_mode_phys)
 	mov cr.ipsr=r16			// set new PSR
 	add r3=1f-ia64_switch_mode_phys,r15
 
-	mov r17=ar.bsp
+	mov r19=ar.bsp
+	mov r20=sp
 	mov r14=rp			// get return address into a general register
 	;;
 
 	// going to physical mode, use tpa to translate virt->phys
-	tpa r17=r17
+	tpa r17=r19
 	tpa r3=r3
 	tpa sp=sp
 	tpa r14=r14
@@ -752,6 +756,8 @@ END(ia64_switch_mode_phys)
  *
  * Inputs:
  *	r16 = new psr to establish
+ *	r19 = new bspstore to establish
+ *	r20 = new sp to establish
  *
  * Note: RSE must already be in enforced lazy mode
  */
@@ -770,7 +776,6 @@ GLOBAL_ENTRY(ia64_switch_mode_virt)
 	mov cr.ipsr=r16			// set new PSR
 	add r3=1f-ia64_switch_mode_virt,r15
 
-	mov r17=ar.bsp
 	mov r14=rp			// get return address into a general register
 	;;
 
@@ -781,15 +786,14 @@ GLOBAL_ENTRY(ia64_switch_mode_virt)
 	movl r18=KERNEL_START
 	dep r3=0,r3,KERNEL_TR_PAGE_SHIFT,64-KERNEL_TR_PAGE_SHIFT
 	dep r14=0,r14,KERNEL_TR_PAGE_SHIFT,64-KERNEL_TR_PAGE_SHIFT
-	dep r17=-1,r17,61,3
-	dep sp=-1,sp,61,3
+	mov sp=r20
 	;;
 	or r3=r3,r18
 	or r14=r14,r18
 	;;
 
 	mov r18=ar.rnat			// save ar.rnat
-	mov ar.bspstore=r17		// this steps on ar.rnat
+	mov ar.bspstore=r19		// this steps on ar.rnat
 	mov cr.iip=r3
 	mov cr.ifs=r0
 	;;

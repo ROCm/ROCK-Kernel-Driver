@@ -1834,6 +1834,7 @@ int netif_receive_skb(struct sk_buff *skb)
 #ifdef CONFIG_NET_CLS_ACT
 	if (skb->tc_verd & TC_NCLS) {
 		skb->tc_verd = CLR_TC_NCLS(skb->tc_verd);
+		rcu_read_lock();
 		goto ncls;
 	}
  #endif

@@ -264,7 +264,7 @@ next_signal(struct sigpending *pending, sigset_t *mask)
 
 static struct sigqueue *__sigqueue_alloc(void)
 {
-	struct sigqueue *q = 0;
+	struct sigqueue *q = NULL;
 
 	if (atomic_read(&current->user->sigpending) <
 			current->rlim[RLIMIT_SIGPENDING].rlim_cur)
@@ -272,7 +272,7 @@ static struct sigqueue *__sigqueue_alloc(void)
 	if (q) {
 		INIT_LIST_HEAD(&q->list);
 		q->flags = 0;
-		q->lock = 0;
+		q->lock = NULL;
 		q->user = get_uid(current->user);
 		atomic_inc(&q->user->sigpending);
 	}
@@ -454,7 +454,7 @@ unblock_all_signals(void)
 
 static inline int collect_signal(int sig, struct sigpending *list, siginfo_t *info)
 {
-	struct sigqueue *q, *first = 0;
+	struct sigqueue *q, *first = NULL;
 	int still_pending = 0;
 
 	if (unlikely(!sigismember(&list->signal, sig)))

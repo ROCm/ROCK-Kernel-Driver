@@ -12,6 +12,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/config.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
@@ -87,12 +88,9 @@ static int indydog_release(struct inode *inode, struct file *file)
 {
 	/* Shut off the timer.
 	 * Lock it in if it's a module and we defined ...NOWAYOUT */
-	if (!nowayout) {
-		u32 mc_ctrl0 = sgimc->cpuctrl0;
-		mc_ctrl0 &= ~SGIMC_CCTRL0_WDOG;
-		sgimc->cpuctrl0 = mc_ctrl0;
-		printk(KERN_INFO "Stopped watchdog timer.\n");
-	}
+	if (!nowayout)
+		indydog_stop();		/* Turn the WDT off */
+
 	indydog_alive = 0;
 
 	return 0;

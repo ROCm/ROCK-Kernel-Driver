@@ -49,8 +49,6 @@ typedef struct pda_s {
 	volatile unsigned long *pio_shub_war_cam_addr;
 	volatile unsigned long *mem_write_status_addr;
 
-	struct bteinfo_s *cpu_bte_if[BTES_PER_NODE];	/* cpu interface order */
-
 	unsigned long	sn_soft_irr[4];
 	unsigned long	sn_in_service_ivecs[4];
 	short		cnodeid_to_nasid_table[MAX_NUMNODES];

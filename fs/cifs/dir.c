@@ -233,10 +233,10 @@ cifs_create(struct inode *inode, struct dentry *direntry, int mode,
 	/* BB server might mask mode so we have to query for Unix case*/
 		if (pTcon->ses->capabilities & CAP_UNIX)
 			rc = cifs_get_inode_info_unix(&newinode, full_path,
-						 inode->i_sb);
+						 inode->i_sb,xid);
 		else {
 			rc = cifs_get_inode_info(&newinode, full_path,
-						 buf, inode->i_sb);
+						 buf, inode->i_sb,xid);
 			if(newinode)
 				newinode->i_mode = mode;
 		}
@@ -329,7 +329,7 @@ int cifs_mknod(struct inode *inode, struct dentry *direntry, int mode, dev_t dev
 			device_number, cifs_sb->local_nls);
 		if(!rc) {
 			rc = cifs_get_inode_info_unix(&newinode, full_path,
-						inode->i_sb);
+						inode->i_sb,xid);
 			direntry->d_op = &cifs_dentry_ops;
 			if(rc == 0)
 				d_instantiate(direntry, newinode);
@@ -389,10 +389,10 @@ cifs_lookup(struct inode *parent_dir_inode, struct dentry *direntry, struct name
 
 	if (pTcon->ses->capabilities & CAP_UNIX)
 		rc = cifs_get_inode_info_unix(&newInode, full_path,
-					      parent_dir_inode->i_sb);
+					      parent_dir_inode->i_sb,xid);
 	else
 		rc = cifs_get_inode_info(&newInode, full_path, NULL,
-					 parent_dir_inode->i_sb);
+					 parent_dir_inode->i_sb,xid);
 
 	if ((rc == 0) && (newInode != NULL)) {
 		direntry->d_op = &cifs_dentry_ops;
