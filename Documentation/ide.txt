@@ -37,9 +37,27 @@
 ***
 ***  Use of the "serialize" option is no longer necessary.
 
-This is the multiple IDE interface driver, as evolved from hd.c.  It supports
-up to 9 IDE interfaces per default, on one or more IRQs (usually 14 & 15).
-There can be up to two drives per interface, as per the ATA-6 spec.
+================================================================================
+Common pitfalls:
+
+- 40-conductor IDE cables are capable of transfering data in DMA modes up to
+  udma2, but no faster.
+
+- If possible devices should be attached to separate channels if they are
+  available. Typically the disk on the first and CD-ROM on the second.
+
+- If you mix devices on the same cable, please consider using similar devices
+  in respect of the data transfer mode they support.
+
+- Even better tru to stick to the same vendor and device type on the same
+  cable.
+
+================================================================================
+
+This is the multiple IDE interface driver, as evolved from hd.c.  
+
+It supports up to 9 IDE interfaces per default, on one or more IRQs (usually
+14 & 15).  There can be up to two drives per interface, as per the ATA-6 spec.
 
 Primary:    ide0, port 0x1f0; major=3;  hda is minor=0; hdb is minor=64
 Secondary:  ide1, port 0x170; major=22; hdc is minor=0; hdd is minor=64

@@ -911,7 +911,7 @@ static void idedisk_setup(struct ata_device *drive)
 	if ((capacity >= (drive->bios_cyl * drive->bios_sect * drive->bios_head)) &&
 	    (!drive->forced_geom) && drive->bios_sect && drive->bios_head)
 		drive->bios_cyl = (capacity / drive->bios_sect) / drive->bios_head;
-	printk(KERN_INFO "%s: %ld sectors", drive->name, capacity);
+	printk(KERN_INFO " %s: %ld sectors", drive->name, capacity);
 
 #if 0
 
@@ -1147,12 +1147,14 @@ static int idedisk_ioctl(struct ata_device *drive, struct inode *inode, struct f
 	}
 }
 
+static void idedisk_attach(struct ata_device *drive);
 
 /*
  * Subdriver functions.
  */
 static struct ata_operations idedisk_driver = {
 	owner:			THIS_MODULE,
+	attach:			idedisk_attach,
 	cleanup:		idedisk_cleanup,
 	standby:		idedisk_standby,
 	do_request:		idedisk_do_request,
@@ -1165,46 +1167,49 @@ static struct ata_operations idedisk_driver = {
 	capacity:		idedisk_capacity,
 };
 
-MODULE_DESCRIPTION("ATA DISK Driver");
-
-static void __exit idedisk_exit (void)
+static void idedisk_attach(struct ata_device *drive)
 {
-	struct ata_device *drive;
-	int failed = 0;
+	char *req;
+	struct ata_channel *channel;
+	int unit;
 
-	while ((drive = ide_scan_devices(ATA_DISK, "ide-disk", &idedisk_driver, failed)) != NULL) {
-		if (idedisk_cleanup (drive)) {
-			printk(KERN_ERR "%s: cleanup_module() called while still busy\n", drive->name);
-			++failed;
-		}
+	if (drive->type != ATA_DISK)
+		return;
+
+	req = drive->driver_req;
+	if (req[0] != '\0' && strcmp(req, "ide-disk"))
+		return;
+
+	if (ide_register_subdriver(drive, &idedisk_driver)) {
+		printk (KERN_ERR "ide-disk: %s: Failed to register the driver with ide.c\n", drive->name);
+		return;
 	}
+
+	idedisk_setup(drive);
+	if ((!drive->head || drive->head > 16) && !drive->select.b.lba) {
+		printk(KERN_ERR "%s: INVALID GEOMETRY: %d PHYSICAL HEADS?\n", drive->name, drive->head);
+		idedisk_cleanup(drive);
+		return;
+	}
+
+	channel = drive->channel;
+	unit = drive - channel->drives;
+
+	ide_revalidate_disk(mk_kdev(channel->major, unit << PARTN_BITS));
 }
 
-int idedisk_init(void)
+static void __exit idedisk_exit(void)
 {
-	struct ata_device *drive;
-	int failed = 0;
+	unregister_ata_driver(&idedisk_driver);
+}
 
-	MOD_INC_USE_COUNT;
-	while ((drive = ide_scan_devices(ATA_DISK, "ide-disk", NULL, failed++)) != NULL) {
-		if (ide_register_subdriver (drive, &idedisk_driver)) {
-			printk (KERN_ERR "ide-disk: %s: Failed to register the driver with ide.c\n", drive->name);
-			continue;
-		}
-		idedisk_setup(drive);
-		if ((!drive->head || drive->head > 16) && !drive->select.b.lba) {
-			printk(KERN_ERR "%s: INVALID GEOMETRY: %d PHYSICAL HEADS?\n", drive->name, drive->head);
-			idedisk_cleanup(drive);
-			continue;
-		}
-		--failed;
-	}
-	revalidate_drives();
-	MOD_DEC_USE_COUNT;
-
-	return 0;
+int __init idedisk_init(void)
+{
+	return ata_driver_module(&idedisk_driver);
 }
 
 module_init(idedisk_init);
 module_exit(idedisk_exit);
+
+MODULE_DESCRIPTION("ATA DISK Driver");
 MODULE_LICENSE("GPL");

@@ -192,7 +192,7 @@ unsigned char IN_BYTE(ide_ioreg_t reg) {
 #define ATA_PIO0_HOLD    4
 
 static int e100_dmaproc(ide_dma_action_t func, struct ata_device *drive, struct request *rq);
-static void e100_ideproc (ide_ide_action_t func, ide_drive_t *drive,
+static void e100_ideproc (ide_ide_action_t func, struct ata_device *drive,
 			  void *buffer, unsigned int length);
 
 /*
@@ -206,7 +206,7 @@ const char *good_dma_drives[] = {"Micropolis 2112A",
 				 "CONNER CTT8000-A",
 				 NULL};
 
-static void tune_e100_ide(ide_drive_t *drive, byte pio)
+static void tune_e100_ide(struct ata_device *drive, byte pio)
 {
 	unsigned long flags;
 	
@@ -380,7 +380,7 @@ static etrax_dma_descr mydescr;
  * extra byte allocated for the buffer.
  */
 static void
-e100_atapi_read(ide_drive_t *drive, void *buffer, unsigned int bytecount)
+e100_atapi_read(struct ata_device *drive, void *buffer, unsigned int bytecount)
 {
 	ide_ioreg_t data_reg = IDE_DATA_REG;
 
@@ -459,7 +459,7 @@ e100_atapi_read(ide_drive_t *drive, void *buffer, unsigned int bytecount)
 }
 
 static void
-e100_atapi_write(ide_drive_t *drive, void *buffer, unsigned int bytecount)
+e100_atapi_write(struct ata_device *drive, void *buffer, unsigned int bytecount)
 {
 	ide_ioreg_t data_reg = IDE_DATA_REG;
 	
@@ -546,7 +546,7 @@ e100_atapi_write(ide_drive_t *drive, void *buffer, unsigned int bytecount)
  * This is used for most PIO data transfers *from* the IDE interface
  */
 static void 
-e100_ide_input_data (ide_drive_t *drive, void *buffer, unsigned int wcount)
+e100_ide_input_data (struct ata_device *drive, void *buffer, unsigned int wcount)
 {
 	e100_atapi_read(drive, buffer, wcount << 2);
 }
@@ -555,7 +555,7 @@ e100_ide_input_data (ide_drive_t *drive, void *buffer, unsigned int wcount)
  * This is used for most PIO data transfers *to* the IDE interface
  */
 static void
-e100_ide_output_data (ide_drive_t *drive, void *buffer, unsigned int wcount)
+e100_ide_output_data (struct ata_device *drive, void *buffer, unsigned int wcount)
 {
 	e100_atapi_write(drive, buffer, wcount << 2);
 }
@@ -661,7 +661,7 @@ static int e100_udma_new_table(struct ata_channel *ch, struct request *rq)
 	return 1;	/* let the PIO routines handle this weirdness */
 }
 
-static int config_drive_for_dma (ide_drive_t *drive)
+static int config_drive_for_dma (struct ata_device *drive)
 {
         const char **list;
         struct hd_driveid *id = drive->id;

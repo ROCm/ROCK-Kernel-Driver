@@ -187,13 +187,38 @@ int check_in_drive_lists(struct ata_device *drive)
 	return 0;
 }
 
+static int pdc202xx_ratemask(struct ata_device *drive)
+{
+	struct pci_dev *dev = drive->channel->pci_dev;
+	int map = 0;
+
+	if (!eighty_ninty_three(drive))
+		return XFER_UDMA;
+
+	switch(dev->device) {
+		case PCI_DEVICE_ID_PROMISE_20276:
+		case PCI_DEVICE_ID_PROMISE_20275:
+		case PCI_DEVICE_ID_PROMISE_20269:
+			map |= XFER_UDMA_133;
+		case PCI_DEVICE_ID_PROMISE_20268R:
+		case PCI_DEVICE_ID_PROMISE_20268:
+		case PCI_DEVICE_ID_PROMISE_20267:
+		case PCI_DEVICE_ID_PROMISE_20265:
+			map |= XFER_UDMA_100;
+		case PCI_DEVICE_ID_PROMISE_20262:
+			map |= XFER_UDMA_66;
+		case PCI_DEVICE_ID_PROMISE_20246:
+			map |= XFER_UDMA;
+	}
+	return map;
+}
+
 static int pdc202xx_tune_chipset(struct ata_device *drive, byte speed)
 {
 	struct ata_channel *hwif = drive->channel;
 	struct pci_dev *dev = hwif->pci_dev;
 
 	unsigned int		drive_conf;
-	int			err;
 	byte			drive_pci, AP, BP, CP, DP;
 	byte			TA = 0, TB = 0, TC = 0;
 
@@ -298,7 +323,6 @@ static int pdc202xx_tune_chipset(struct ata_device *drive, byte speed)
 
 	if (!drive->init_speed)
 		drive->init_speed = speed;
-	err = ide_config_drive_speed(drive, speed);
 	drive->current_speed = speed;
 
 #if PDC202XX_DEBUG_DRIVE_INFO
@@ -308,7 +332,8 @@ static int pdc202xx_tune_chipset(struct ata_device *drive, byte speed)
 		pci_read_config_dword(dev, drive_pci, &drive_conf);
 	printk("0x%08x\n", drive_conf);
 #endif /* PDC202XX_DEBUG_DRIVE_INFO */
-	return err;
+
+	return ide_config_drive_speed(drive, speed);
 }
 
 #define set_2regs(a, b) \
@@ -334,8 +359,6 @@ static int pdc202xx_new_tune_chipset(struct ata_device *drive, byte speed)
 #endif /* CONFIG_BLK_DEV_IDEDMA */
 	byte thold		= 0x10;
 	byte adj		= (drive->dn%2) ? 0x08 : 0x00;
-
-	int                     err;
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	if (speed == XFER_UDMA_2) {
@@ -426,10 +449,9 @@ static int pdc202xx_new_tune_chipset(struct ata_device *drive, byte speed)
 
 	if (!drive->init_speed)
 		drive->init_speed = speed;
-	err = ide_config_drive_speed(drive, speed);
 	drive->current_speed = speed;
 
-	return err;
+	return ide_config_drive_speed(drive, speed);
 }
 
 /*   0    1    2    3    4    5    6   7   8
@@ -451,10 +473,11 @@ static void config_chipset_for_pio(struct ata_device *drive, byte pio)
 }
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
-static int config_chipset_for_dma(struct ata_device *drive, byte ultra)
+static int config_chipset_for_dma(struct ata_device *drive, byte udma)
 {
 	struct hd_driveid *id	= drive->id;
 	struct ata_channel *hwif = drive->channel;
+	struct hd_driveid *mate_id = hwif->drives[!(drive->dn%2)].id;
 	struct pci_dev *dev	= hwif->pci_dev;
 	unsigned long high_16   = pci_resource_start(dev, 4);
 	unsigned long dma_base  = hwif->dma_base;
@@ -464,65 +487,41 @@ static int config_chipset_for_dma(struct ata_device *drive, byte ultra)
 	byte adj		= (drive->dn%2) ? 0x08 : 0x00;
 	byte cable		= 0;
 	byte jumpbit		= 0;
-	byte unit		= (drive->select.b.unit & 0x01);
 	unsigned int		drive_conf;
-	byte			drive_pci = 0;
-	byte			test1, test2, speed = -1;
+	byte drive_pci = 0, mate_pci = 0;
+	byte			test1, test2, mode = -1;
 	byte			AP;
 	unsigned short		EP;
 	byte CLKSPD		= 0;
-	byte udma_33		= ultra;
-//	byte udma_33		= ultra ? (IN_BYTE(high_16 + 0x001f) & 1) : 0;
-	byte udma_66		= ((eighty_ninty_three(drive)) && udma_33) ? 1 : 0;
-	byte udma_100		= 0;
-	byte udma_133		= 0;
+	/* primary - second bit, secondary - fourth bit */
 	byte mask		= hwif->unit ? 0x08 : 0x02;
 	unsigned short c_mask	= hwif->unit ? (1<<11) : (1<<10);
+	int map;
 
-	byte ultra_66		= ((id->dma_ultra & 0x0010) ||
-				   (id->dma_ultra & 0x0008)) ? 1 : 0;
-	byte ultra_100		= ((id->dma_ultra & 0x0020) ||
-				   (ultra_66)) ? 1 : 0;
-	byte ultra_133		= ((id->dma_ultra & 0x0040) ||
-				   (ultra_100)) ? 1 : 0;
+	byte needs_80w = ((id->dma_ultra & 0x0008) ||
+			  (id->dma_ultra & 0x0010) ||
+			  (id->dma_ultra & 0x0020) ||
+			  (id->dma_ultra & 0x0040));
 
 	switch(dev->device) {
 		case PCI_DEVICE_ID_PROMISE_20275:
 		case PCI_DEVICE_ID_PROMISE_20276:
 		case PCI_DEVICE_ID_PROMISE_20269:
-			udma_133 = (udma_66) ? 1 : 0;
-			udma_100 = (udma_66) ? 1 : 0;
-			OUT_BYTE(0x0b, (hwif->dma_base + 1));
-			cable = ((IN_BYTE((hwif->dma_base + 3)) & 0x04));
-			jumpbit = 1;
-			break;
 		case PCI_DEVICE_ID_PROMISE_20268R:
-			udma_100 = 1;
-			udma_66 = 1;
-			OUT_BYTE(0x0b, (hwif->dma_base + 1));
-			cable = ((IN_BYTE((hwif->dma_base + 3)) & 0x04));
-			jumpbit = 1;
-			break;
 		case PCI_DEVICE_ID_PROMISE_20268:
-			udma_100 = (udma_66) ? 1 : 0;
-			OUT_BYTE(0x0b, (hwif->dma_base + 1));
-			cable = ((IN_BYTE((hwif->dma_base + 3)) & 0x04));
+			OUT_BYTE(0x0b, indexreg);
+			cable = ((IN_BYTE(datareg) & 0x04));
 			jumpbit = 1;
 			break;
 		case PCI_DEVICE_ID_PROMISE_20267:
 		case PCI_DEVICE_ID_PROMISE_20265:
-			udma_100 = (udma_66) ? 1 : 0;
-			pci_read_config_word(dev, 0x50, &EP);
-			cable = (EP & c_mask);
-			jumpbit = 0;
-			break;
 		case PCI_DEVICE_ID_PROMISE_20262:
 			pci_read_config_word(dev, 0x50, &EP);
 			cable = (EP & c_mask);
 			jumpbit = 0;
 			break;
 		default:
-			udma_100 = 0; udma_133 = 0; cable = 1; jumpbit = 0;
+			cable = 1; jumpbit = 0;
 			break;
 	}
 
@@ -540,40 +539,26 @@ static int config_chipset_for_dma(struct ata_device *drive, byte ultra)
 	 * leave the 66Mhz clock on and readjust the timing
 	 * parameters.
 	 */
-
-	if (((ultra_66) || (ultra_100) || (ultra_133)) && (cable)) {
-#ifdef DEBUG
-		printk("ULTRA66: %s channel of Ultra 66 requires an 80-pin cable for Ultra66 operation.\n", hwif->unit ? "Secondary" : "Primary");
-		printk("         Switching to Ultra33 mode.\n");
-#endif /* DEBUG */
-		/* Primary   : zero out second bit */
-		/* Secondary : zero out fourth bit */
-		if (!jumpbit)
-			OUT_BYTE(CLKSPD & ~mask, (high_16 + 0x11));
-		printk("Warning: %s channel requires an 80-pin cable for operation.\n", hwif->unit ? "Secondary":"Primary");
-		printk("%s reduced to Ultra33 mode.\n", drive->name);
-		udma_66 = 0; udma_100 = 0; udma_133 = 0;
-	} else {
-		if ((ultra_66) || (ultra_100) || (ultra_133)) {
-			/*
-			 * check to make sure drive on same channel
-			 * is u66 capable
-			 */
-			if (hwif->drives[!(drive->dn%2)].id) {
-				if ((hwif->drives[!(drive->dn%2)].id->dma_ultra & 0x0040) ||
-				    (hwif->drives[!(drive->dn%2)].id->dma_ultra
-& 0x0020) ||
-				    (hwif->drives[!(drive->dn%2)].id->dma_ultra & 0x0010) ||
-				    (hwif->drives[!(drive->dn%2)].id->dma_ultra & 0x0008)) {
-					if (!jumpbit)
-						OUT_BYTE(CLKSPD | mask, (high_16 + 0x11));
-				} else {
-					if (!jumpbit)
-						OUT_BYTE(CLKSPD & ~mask, (high_16 + 0x11));
-				}
-			} else { /* udma4 drive by itself */
-				if (!jumpbit)
+	if (needs_80w) {
+		/* FIXME: this check is wrong for 20246 --bkz */
+		if (cable) {
+			printk(KERN_WARNING "%s: channel requires an 80-pin cable.\n", hwif->name);
+			printk(KERN_WARNING "%s: reduced to UDMA(33) mode.\n", drive->name);
+			if (!jumpbit)
+				OUT_BYTE(CLKSPD & ~mask, (high_16 + 0x11));
+		}
+		if (!jumpbit) {
+			if (mate_id) {	/* check if mate is at least udma3 */
+				if ((mate_id->dma_ultra & 0x0040) ||
+				    (mate_id->dma_ultra & 0x0020) ||
+				    (mate_id->dma_ultra & 0x0010) ||
+				    (mate_id->dma_ultra & 0x0008)) {
 					OUT_BYTE(CLKSPD | mask, (high_16 + 0x11));
+				} else {
+					OUT_BYTE(CLKSPD & ~mask, (high_16 + 0x11));
+				}
+			} else {	/* single drive */
+				OUT_BYTE(CLKSPD | mask, (high_16 + 0x11));
 			}
 		}
 	}
@@ -589,38 +574,23 @@ static int config_chipset_for_dma(struct ata_device *drive, byte ultra)
 
 	switch(drive->dn) {
 		case 0:	drive_pci = 0x60;
-			pci_read_config_dword(dev, drive_pci, &drive_conf);
-			if ((drive_conf != 0x004ff304) && (drive_conf != 0x004ff3c4))
-				goto chipset_is_set;
-			pci_read_config_byte(dev, (drive_pci), &test1);
-			if (!(test1 & SYNC_ERRDY_EN))
-				pci_write_config_byte(dev, (drive_pci), test1|SYNC_ERRDY_EN);
-			break;
-		case 1:	drive_pci = 0x64;
-			pci_read_config_dword(dev, drive_pci, &drive_conf);
-			if ((drive_conf != 0x004ff304) && (drive_conf != 0x004ff3c4))
-				goto chipset_is_set;
-			pci_read_config_byte(dev, 0x60, &test1);
-			pci_read_config_byte(dev, (drive_pci), &test2);
-			if ((test1 & SYNC_ERRDY_EN) && !(test2 & SYNC_ERRDY_EN))
-				pci_write_config_byte(dev, (drive_pci), test2|SYNC_ERRDY_EN);
-			break;
 		case 2:	drive_pci = 0x68;
 			pci_read_config_dword(dev, drive_pci, &drive_conf);
 			if ((drive_conf != 0x004ff304) && (drive_conf != 0x004ff3c4))
 				goto chipset_is_set;
-			pci_read_config_byte(dev, (drive_pci), &test1);
+			pci_read_config_byte(dev, drive_pci, &test1);
 			if (!(test1 & SYNC_ERRDY_EN))
-				pci_write_config_byte(dev, (drive_pci), test1|SYNC_ERRDY_EN);
+				pci_write_config_byte(dev, drive_pci, test1|SYNC_ERRDY_EN);
 			break;
-		case 3:	drive_pci = 0x6c;
+		case 1:	drive_pci = 0x64; mate_pci = 0x60;
+		case 3:	drive_pci = 0x6c; mate_pci = 0x68;
 			pci_read_config_dword(dev, drive_pci, &drive_conf);
 			if ((drive_conf != 0x004ff304) && (drive_conf != 0x004ff3c4))
 				goto chipset_is_set;
-			pci_read_config_byte(dev, 0x68, &test1);
-			pci_read_config_byte(dev, (drive_pci), &test2);
+			pci_read_config_byte(dev, mate_pci, &test1);
+			pci_read_config_byte(dev, drive_pci, &test2);
 			if ((test1 & SYNC_ERRDY_EN) && !(test2 & SYNC_ERRDY_EN))
-				pci_write_config_byte(dev, (drive_pci), test2|SYNC_ERRDY_EN);
+				pci_write_config_byte(dev, drive_pci, test2|SYNC_ERRDY_EN);
 			break;
 		default:
 			return 0;
@@ -640,35 +610,24 @@ chipset_is_set:
 
 jumpbit_is_set:
 
-	if ((id->dma_ultra & 0x0040)&&(udma_133))	speed = XFER_UDMA_6;
-	else if ((id->dma_ultra & 0x0020)&&(udma_100))	speed = XFER_UDMA_5;
-	else if ((id->dma_ultra & 0x0010)&&(udma_66))	speed = XFER_UDMA_4;
-	else if ((id->dma_ultra & 0x0008)&&(udma_66))	speed = XFER_UDMA_3;
-	else if ((id->dma_ultra & 0x0004)&&(udma_33))	speed = XFER_UDMA_2;
-	else if ((id->dma_ultra & 0x0002)&&(udma_33))	speed = XFER_UDMA_1;
-	else if ((id->dma_ultra & 0x0001)&&(udma_33))	speed = XFER_UDMA_0;
-	else if (id->dma_mword & 0x0004)		speed = XFER_MW_DMA_2;
-	else if (id->dma_mword & 0x0002)		speed = XFER_MW_DMA_1;
-	else if (id->dma_mword & 0x0001)		speed = XFER_MW_DMA_0;
-	else if ((id->dma_1word & 0x0004)&&(!jumpbit))	speed = XFER_SW_DMA_2;
-	else if ((id->dma_1word & 0x0002)&&(!jumpbit))	speed = XFER_SW_DMA_1;
-	else if ((id->dma_1word & 0x0001)&&(!jumpbit))	speed = XFER_SW_DMA_0;
-	else {
+	if (udma) {
+		map = pdc202xx_ratemask(drive);
+	} else {
+		if (!jumpbit)
+			map = XFER_SWDMA | XFER_MWDMA;
+		else
+			map = XFER_MWDMA;
+	}
+
+	mode = ata_timing_mode(drive, map);
+	if (mode < XFER_SW_DMA_0) {
 		/* restore original pci-config space */
 		if (!jumpbit)
 			pci_write_config_dword(dev, drive_pci, drive_conf);
 		return 0;
 	}
 
-	outb(inb(dma_base+2) & ~(1<<(5+unit)), dma_base+2);
-	(void) hwif->speedproc(drive, speed);
-
-	return ((int)	((id->dma_ultra >> 14) & 3) ? 1 :
-			((id->dma_ultra >> 11) & 7) ? 1 :
-			((id->dma_ultra >> 8) & 7) ? 1 :
-			((id->dma_mword >> 8) & 7) ? 1 :
-			((id->dma_1word >> 8) & 7) ? 1 :
-						     0);
+	return !(hwif->speedproc(drive, mode));
 }
 
 static int config_drive_xfer_rate(struct ata_device *drive)
@@ -729,31 +688,23 @@ no_dma_set:
 
 static int pdc202xx_udma_start(struct ata_device *drive, struct request *rq)
 {
-	u8 clock		= 0;
-	u8 hardware48hack	= 0;
+	u8 lba48hack = 0, clock = 0;
 	struct ata_channel *ch = drive->channel;
 	struct pci_dev *dev	= ch->pci_dev;
 	unsigned long high_16	= pci_resource_start(dev, 4);
 	unsigned long atapi_reg	= high_16 + (ch->unit ? 0x24 : 0x00);
 
-
 	switch (dev->device) {
-		case PCI_DEVICE_ID_PROMISE_20275:
-		case PCI_DEVICE_ID_PROMISE_20276:
-		case PCI_DEVICE_ID_PROMISE_20269:
-		case PCI_DEVICE_ID_PROMISE_20268R:
-		case PCI_DEVICE_ID_PROMISE_20268:
-			break;
 		case PCI_DEVICE_ID_PROMISE_20267:
 		case PCI_DEVICE_ID_PROMISE_20265:
 		case PCI_DEVICE_ID_PROMISE_20262:
-			hardware48hack = 1;
+			lba48hack = 1;
 			clock = IN_BYTE(high_16 + 0x11);
 		default:
 			break;
 	}
 
-	if ((drive->addressing) && (hardware48hack)) {
+	if (drive->addressing && lba48hack) {
 		unsigned long word_count = 0;
 
 		outb(clock|(ch->unit ? 0x08 : 0x02), high_16 + 0x11);
@@ -774,9 +725,7 @@ static int pdc202xx_udma_start(struct ata_device *drive, struct request *rq)
 
 int pdc202xx_udma_stop(struct ata_device *drive)
 {
-	u8 newchip		= 0;
-	u8 clock		= 0;
-	u8 hardware48hack	= 0;
+	u8 lba48hack = 0, clock = 0;
 	struct ata_channel *ch = drive->channel;
 	struct pci_dev *dev	= ch->pci_dev;
 	unsigned long high_16	= pci_resource_start(dev, 4);
@@ -785,22 +734,17 @@ int pdc202xx_udma_stop(struct ata_device *drive)
 	u8 dma_stat;
 
 	switch (dev->device) {
-		case PCI_DEVICE_ID_PROMISE_20275:
-		case PCI_DEVICE_ID_PROMISE_20276:
-		case PCI_DEVICE_ID_PROMISE_20269:
-		case PCI_DEVICE_ID_PROMISE_20268R:
-		case PCI_DEVICE_ID_PROMISE_20268:
-			newchip = 1;
-			break;
 		case PCI_DEVICE_ID_PROMISE_20267:
 		case PCI_DEVICE_ID_PROMISE_20265:
 		case PCI_DEVICE_ID_PROMISE_20262:
-			hardware48hack = 1;
+			lba48hack = 1;
+			/* FIXME: why do we need this here --bkz */
 			clock = IN_BYTE(high_16 + 0x11);
  		default:
 			break;
 	}
-	if ((drive->addressing) && (hardware48hack)) {
+
+	if (drive->addressing && lba48hack) {
 		outl(0, atapi_reg);	/* zero out extra */
 		clock = IN_BYTE(high_16 + 0x11);
 		OUT_BYTE(clock & ~(ch->unit ? 0x08:0x02), high_16 + 0x11);
@@ -822,7 +766,6 @@ static int pdc202xx_udma_irq_status(struct ata_device *drive)
 	u8 sc1d	= 0;
 	u8 newchip = 0;
 	u8 clock = 0;
-	u8 hardware48hack = 0;
 	struct pci_dev *dev = ch->pci_dev;
 	unsigned long high_16 = pci_resource_start(dev, 4);
 	unsigned long dma_base = ch->dma_base;
@@ -838,7 +781,7 @@ static int pdc202xx_udma_irq_status(struct ata_device *drive)
 		case PCI_DEVICE_ID_PROMISE_20267:
 		case PCI_DEVICE_ID_PROMISE_20265:
 		case PCI_DEVICE_ID_PROMISE_20262:
-			hardware48hack = 1;
+			/* FIXME: why do we need this here --bkz */
 			clock = IN_BYTE(high_16 + 0x11);
 		default:
 			break;
@@ -918,22 +861,21 @@ static unsigned int __init pdc202xx_init_chipset(struct pci_dev *dev)
 			break;
 		case PCI_DEVICE_ID_PROMISE_20267:
 		case PCI_DEVICE_ID_PROMISE_20265:
-			set_reg_and_wait(udma_speed_flag | 0x10, high_16 + 0x001f, 100);
-			set_reg_and_wait(udma_speed_flag & ~0x10, high_16 + 0x001f, 2000);   /* 2 seconds ?! */
-			break;
 		case PCI_DEVICE_ID_PROMISE_20262:
 			/*
-			 * software reset -  this is required because the bios
-			 * will set UDMA timing on if the hdd supports it. The
-			 * user may want to turn udma off. A bug in the pdc20262
-			 * is that it cannot handle a downgrade in timing from
+			 * software reset - this is required because the BIOS
+			 * will set UDMA timing on if the drive supports it.
+			 * The user may want to turn udma off. A bug is that
+			 * that device cannot handle a downgrade in timing from
 			 * UDMA to DMA. Disk accesses after issuing a set
-			 * feature command will result in errors. A software
-			 * reset leaves the timing registers intact,
+			 * feature command will result in errors.
+			 *
+			 * A software reset leaves the timing registers intact,
 			 * but resets the drives.
 			 */
 			set_reg_and_wait(udma_speed_flag | 0x10, high_16 + 0x001f, 100);
-			set_reg_and_wait(udma_speed_flag & ~0x10, high_16 + 0x001f, 2000);	/* 2 seconds ?! */
+			set_reg_and_wait(udma_speed_flag & ~0x10, high_16 + 0x001f, 2000);   /* 2 seconds ?! */
+			break;
 		default:
 			if ((dev->class >> 8) != PCI_CLASS_STORAGE_IDE) {
 				byte irq = 0, irq2 = 0;
@@ -1039,78 +981,44 @@ static void __init ide_init_pdc202xx(struct ata_channel *hwif)
 
 /* module data table */
 static struct ata_pci_device chipsets[] __initdata = {
-#ifdef CONFIG_PDC202XX_FORCE
-        {
+	{
 		vendor: PCI_VENDOR_ID_PROMISE,
 		device: PCI_DEVICE_ID_PROMISE_20246,
 		init_chipset: pdc202xx_init_chipset,
 		ata66_check: NULL,
 		init_channel: ide_init_pdc202xx,
+#ifndef CONFIG_PDC202XX_FORCE
+		enablebits: {{0x50,0x02,0x02}, {0x50,0x04,0x04}},
+#endif
 		bootable: OFF_BOARD,
 		extra: 16,
 		flags: ATA_F_IRQ | ATA_F_DMA
 	},
-        {
+	{
 		vendor: PCI_VENDOR_ID_PROMISE,
 		device: PCI_DEVICE_ID_PROMISE_20262,
 		init_chipset: pdc202xx_init_chipset,
 		ata66_check: ata66_pdc202xx,
 		init_channel: ide_init_pdc202xx,
+#ifndef CONFIG_PDC202XX_FORCE
+		enablebits: {{0x50,0x02,0x02}, {0x50,0x04,0x04}},
+#endif
 		bootable: OFF_BOARD,
 		extra: 48,
 		flags: ATA_F_IRQ | ATA_F_PHACK | ATA_F_DMA
 	},
-        {
+	{
 		vendor: PCI_VENDOR_ID_PROMISE,
 		device: PCI_DEVICE_ID_PROMISE_20265,
 		init_chipset: pdc202xx_init_chipset,
 		ata66_check: ata66_pdc202xx,
 		init_channel: ide_init_pdc202xx,
-		bootable: ON_BOARD,
-		extra: 48,
-		flags: ATA_F_IRQ | ATA_F_PHACK | ATA_F_DMA
-	},
-        {
-		vendor: PCI_VENDOR_ID_PROMISE,
-		device: PCI_DEVICE_ID_PROMISE_20267,
-		init_chipset: pdc202xx_init_chipset,
-		ata66_check: ata66_pdc202xx,
-		init_channel: ide_init_pdc202xx,
+#ifndef CONFIG_PDC202XX_FORCE
+		enablebits: {{0x50,0x02,0x02}, {0x50,0x04,0x04}},
 		bootable: OFF_BOARD,
-		extra: 48,
-		flags: ATA_F_IRQ | ATA_F_DMA
-	},
 #else
-	{
-		vendor: PCI_VENDOR_ID_PROMISE,
-		device: PCI_DEVICE_ID_PROMISE_20246,
-		init_chipset: pdc202xx_init_chipset,
-		ata66_check: NULL,
-		init_channel: ide_init_pdc202xx,
-		enablebits: {{0x50,0x02,0x02}, {0x50,0x04,0x04}},
-		bootable: OFF_BOARD,
-		extra: 16,
-		flags: ATA_F_IRQ | ATA_F_DMA
-	},
-	{
-		vendor: PCI_VENDOR_ID_PROMISE,
-		device: PCI_DEVICE_ID_PROMISE_20262,
-		init_chipset: pdc202xx_init_chipset,
-		ata66_check: ata66_pdc202xx,
-		init_channel: ide_init_pdc202xx,
-		enablebits: {{0x50,0x02,0x02}, {0x50,0x04,0x04}},
-		bootable: OFF_BOARD,
-		extra: 48,
-		flags: ATA_F_IRQ | ATA_F_PHACK | ATA_F_DMA
-	},
-	{
-		vendor: PCI_VENDOR_ID_PROMISE,
-		device: PCI_DEVICE_ID_PROMISE_20265,
-		init_chipset: pdc202xx_init_chipset,
-		ata66_check: ata66_pdc202xx,
-		init_channel: ide_init_pdc202xx,
-		enablebits: {{0x50,0x02,0x02}, {0x50,0x04,0x04}},
-		bootable: OFF_BOARD,
+		bootable: ON_BOARD,
+#endif
 		extra: 48,
 		flags: ATA_F_IRQ | ATA_F_PHACK  | ATA_F_DMA
 	},
@@ -1120,12 +1028,13 @@ static struct ata_pci_device chipsets[] __initdata = {
 		init_chipset: pdc202xx_init_chipset,
 		ata66_check: ata66_pdc202xx,
 		init_channel: ide_init_pdc202xx,
+#ifndef CONFIG_PDC202XX_FORCE
 		enablebits: {{0x50,0x02,0x02}, {0x50,0x04,0x04}},
+#endif
 		bootable: OFF_BOARD,
 		extra: 48,
 		flags: ATA_F_IRQ  | ATA_F_DMA
 	},
-#endif
 	{
 		vendor: PCI_VENDOR_ID_PROMISE,
 		device: PCI_DEVICE_ID_PROMISE_20268,

@@ -94,9 +94,9 @@ static int hpt34x_get_info (char *buffer, char **addr, off_t offset, int count)
 
 byte hpt34x_proc = 0;
 
-extern char *ide_xfer_verbose (byte xfer_rate);
+extern char *ide_xfer_verbose(byte xfer_rate);
 
-static void hpt34x_clear_chipset (ide_drive_t *drive)
+static void hpt34x_clear_chipset(struct ata_device *drive)
 {
 	unsigned int reg1	= 0, tmp1 = 0;
 	unsigned int reg2	= 0, tmp2 = 0;
@@ -109,7 +109,7 @@ static void hpt34x_clear_chipset (ide_drive_t *drive)
 	pci_write_config_dword(drive->channel->pci_dev, 0x48, tmp2);
 }
 
-static int hpt34x_tune_chipset (ide_drive_t *drive, byte speed)
+static int hpt34x_tune_chipset(struct ata_device *drive, byte speed)
 {
 	byte			hi_speed, lo_speed;
 	unsigned int reg1	= 0, tmp1 = 0;
@@ -145,7 +145,7 @@ static int hpt34x_tune_chipset (ide_drive_t *drive, byte speed)
 	return ide_config_drive_speed(drive, speed);
 }
 
-static void config_chipset_for_pio(ide_drive_t *drive)
+static void config_chipset_for_pio(struct ata_device *drive)
 {
 	unsigned short eide_pio_timing[6] = {960, 480, 240, 180, 120, 90};
 	unsigned short xfer_pio = drive->id->eide_pio_modes;
@@ -182,7 +182,7 @@ static void config_chipset_for_pio(ide_drive_t *drive)
 	(void) hpt34x_tune_chipset(drive, speed);
 }
 
-static void hpt34x_tune_drive (ide_drive_t *drive, byte pio)
+static void hpt34x_tune_drive(struct ata_device *drive, byte pio)
 {
 	byte speed;
 

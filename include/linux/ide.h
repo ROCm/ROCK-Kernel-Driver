@@ -317,7 +317,6 @@ typedef union {
 /*
  * ATA/ATAPI device structure :
  */
-typedef
 struct ata_device {
 	struct ata_channel *	channel;
 	char			name[6];	/* device name */
@@ -409,7 +408,7 @@ struct ata_device {
 	unsigned long	immed_comp;
 	int		max_last_depth;
 	int		max_depth;
-} ide_drive_t;
+};
 
 /*
  * Status returned by various functions.
@@ -590,6 +589,7 @@ static inline int ata_can_queue(struct ata_device *drive)
 
 struct ata_operations {
 	struct module *owner;
+	void (*attach) (struct ata_device *);
 	int (*cleanup)(struct ata_device *);
 	int (*standby)(struct ata_device *);
 	ide_startstop_t	(*do_request)(struct ata_device *, struct request *, sector_t);
@@ -602,6 +602,9 @@ struct ata_operations {
 	void (*revalidate)(struct ata_device *);
 
 	sector_t (*capacity)(struct ata_device *);
+
+	/* linked list of rgistered device type drivers */
+	struct ata_operations *next;
 };
 
 /* Alas, no aliases. Too much hassle with bringing module.h everywhere */
@@ -618,11 +621,20 @@ do {	\
 
 extern sector_t ata_capacity(struct ata_device *drive);
 
-/* FIXME: Actually implement and use them as soon as possible!  to make the
- * ide_scan_devices() go away! */
-
-extern int unregister_ata_driver(unsigned int type, struct ata_operations *driver);
-extern int register_ata_driver(unsigned int type, struct ata_operations *driver);
+extern void unregister_ata_driver(struct ata_operations *driver);
+extern int register_ata_driver(struct ata_operations *driver);
+static inline int ata_driver_module(struct ata_operations *driver)
+{
+#ifdef MODULE
+	if (register_ata_driver(driver) <= 0) {
+		unregister_ata_driver(driver);
+		return -ENODEV;
+	}
+#else
+	register_ata_driver(driver);
+#endif
+	return 0;
+}
 
 #define ata_ops(drive)		((drive)->driver)
 
@@ -797,9 +809,9 @@ extern int idefloppy_init (void);
 extern int idescsi_init (void);
 #endif
 
-extern struct ata_device *ide_scan_devices(byte, const char *, struct ata_operations *, int);
 extern int ide_register_subdriver(struct ata_device *, struct ata_operations *);
 extern int ide_unregister_subdriver(struct ata_device *drive);
+extern int ide_revalidate_disk(kdev_t i_rdev);
 
 #ifdef CONFIG_PCI
 # define ON_BOARD		0
@@ -890,6 +902,5 @@ extern spinlock_t ide_lock;
 #define DRIVE_LOCK(drive)		((drive)->queue.queue_lock)
 
 extern int drive_is_ready(struct ata_device *drive);
-extern void revalidate_drives(void);
 
 #endif
