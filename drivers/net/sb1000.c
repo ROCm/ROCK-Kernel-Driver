@@ -405,7 +405,7 @@ sb1000_wait_for_ready(const int ioaddr[], const char* name)
 	}
 	timeout = jiffies + Sb1000TimeOutJiffies;
 	while (!(inb(ioaddr[1] + 6) & 0x40)) {
-		if (jiffies >= timeout) {
+		if (time_after_eq(jiffies, timeout)) {
 			printk(KERN_WARNING "%s: sb1000_wait_for_ready timeout\n",
 				name);
 			return -ETIME;
@@ -423,7 +423,7 @@ sb1000_wait_for_ready_clear(const int ioaddr[], const char* name)
 
 	timeout = jiffies + Sb1000TimeOutJiffies;
 	while (inb(ioaddr[1] + 6) & 0x80) {
-		if (jiffies >= timeout) {
+		if (time_after_eq(jiffies, timeout)) {
 			printk(KERN_WARNING "%s: sb1000_wait_for_ready_clear timeout\n",
 				name);
 			return -ETIME;
@@ -431,7 +431,7 @@ sb1000_wait_for_ready_clear(const int ioaddr[], const char* name)
 	}
 	timeout = jiffies + Sb1000TimeOutJiffies;
 	while (inb(ioaddr[1] + 6) & 0x40) {
-		if (jiffies >= timeout) {
+		if (time_after_eq(jiffies, timeout)) {
 			printk(KERN_WARNING "%s: sb1000_wait_for_ready_clear timeout\n",
 				name);
 			return -ETIME;

@@ -308,7 +308,8 @@ static const unsigned char chktabh[256] =
 static void delay(int ms)
 {
 	unsigned long timeout = jiffies + ((ms * HZ) / 1000);
-	while (jiffies < timeout);
+	while (time_before(jiffies, timeout))
+		cpu_relax();
 }
 
 /*
