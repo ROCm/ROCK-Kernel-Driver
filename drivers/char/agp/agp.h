@@ -167,8 +167,10 @@ struct agp_bridge_data {
 
 #define PGE_EMPTY(b, p)	(!(p) || (p) == (unsigned long) (b)->scratch_page)
 
+/* Chipset independant registers (from AGP Spec) */
+#define AGP_APBASE	0x10
+
 /* intel register */
-#define INTEL_APBASE	0x10
 #define INTEL_APSIZE	0xb4
 #define INTEL_ATTBASE	0xb8
 #define INTEL_AGPCTRL	0xb0
@@ -176,7 +178,6 @@ struct agp_bridge_data {
 #define INTEL_ERRSTS	0x91
 
 /* Intel 460GX Registers */
-#define INTEL_I460_APBASE		0x10
 #define INTEL_I460_BAPBASE		0x98
 #define INTEL_I460_GXBCTL		0xa0
 #define INTEL_I460_AGPSIZ		0xa2
@@ -261,7 +262,6 @@ struct agp_bridge_data {
 #define I810_DRAM_ROW_0_SDRAM	0x00000001
 
 /* Intel 7505 registers */
-#define INTEL_I7505_NAPBASELO	0x10
 #define INTEL_I7505_APSIZE	0x74
 #define INTEL_I7505_NCAPID	0x60
 #define INTEL_I7505_NISTAT	0x6c
@@ -271,7 +271,6 @@ struct agp_bridge_data {
 #define INTEL_I7505_MCHCFG	0x50
 
 /* VIA register */
-#define VIA_APBASE	0x10
 #define VIA_GARTCTRL	0x80
 #define VIA_APSIZE	0x84
 #define VIA_ATTBASE	0x88
@@ -283,14 +282,12 @@ struct agp_bridge_data {
 #define VIA_AGPSEL	0xfd
 
 /* SiS registers */
-#define SIS_APBASE	0x10
 #define SIS_ATTBASE	0x90
 #define SIS_APSIZE	0x94
 #define SIS_TLBCNTRL	0x97
 #define SIS_TLBFLUSH	0x98
 
 /* AMD registers */
-#define AMD_APBASE	0x10
 #define AMD_MMBASE	0x14
 #define AMD_APSIZE	0xac
 #define AMD_MODECNTL	0xb0
@@ -309,7 +306,6 @@ struct agp_bridge_data {
 #define AMD_X86_64_GARTCACHECTL		0x9c
 #define AMD_X86_64_GARTEN	1<<0
 
-#define AMD_8151_VMAPERTURE		0x10
 #define AMD_8151_AGP_CTL		0xb0
 #define AMD_8151_APERTURESIZE	0xb4
 #define AMD_8151_GARTPTR		0xb8
@@ -317,7 +313,6 @@ struct agp_bridge_data {
 #define AMD_8151_APEREN	1<<8
 
 /* ALi registers */
-#define ALI_APBASE			0x10
 #define ALI_AGPCTRL			0xb8
 #define ALI_ATTBASE			0xbc
 #define ALI_TLBCTRL			0xc0
@@ -327,7 +322,6 @@ struct agp_bridge_data {
 #define ALI_CACHE_FLUSH_EN		0x100
 
 /* ATI register */
-#define ATI_APBASE                  0x10
 #define ATI_GART_MMBASE_ADDR        0x14
 #define ATI_RS100_APSIZE            0xac
 #define ATI_RS300_APSIZE            0xf8

@@ -148,7 +148,7 @@ static int amd_create_gatt_table(void)
 	 * used to program the agp master not the cpu
 	 */
 
-	pci_read_config_dword(agp_bridge->dev, AMD_APBASE, &temp);
+	pci_read_config_dword(agp_bridge->dev, AGP_APBASE, &temp);
 	addr = (temp & PCI_BASE_ADDRESS_MEM_MASK);
 	agp_bridge->gart_bus_addr = addr;
 

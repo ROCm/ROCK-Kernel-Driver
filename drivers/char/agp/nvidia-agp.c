@@ -15,7 +15,6 @@
 
 
 /* registers */
-#define NVIDIA_0_APBASE		0x10
 #define NVIDIA_0_APSIZE		0x80
 #define NVIDIA_1_WBC		0xf0
 #define NVIDIA_2_GARTCTRL	0xd0
@@ -73,7 +72,7 @@ static int nvidia_configure(void)
 		current_size->size_value);
 
     /* address to map to */
-	pci_read_config_dword(agp_bridge->dev, NVIDIA_0_APBASE, &apbase);
+	pci_read_config_dword(agp_bridge->dev, AGP_APBASE, &apbase);
 	apbase &= PCI_BASE_ADDRESS_MEM_MASK;
 	agp_bridge->gart_bus_addr = apbase;
 	aplimit = apbase + (current_size->size * 1024 * 1024) - 1;
