@@ -101,7 +101,7 @@ static int do_ncp_rpc_call(struct ncp_server *server, int size,
 	struct ncp_reply_header reply;
 
 	file = server->ncp_filp;
-	sock = &file->f_dentry->d_inode->u.socket_i;
+	sock = SOCKET_I(file->f_dentry->d_inode);
 
 	init_timeout = server->m.time_out;
 	max_timeout = NCP_MAX_RPC_TIMEOUT;
@@ -269,7 +269,7 @@ static int do_tcp_rcv(struct ncp_server *server, void *buffer, size_t len) {
 	int result = 0;
 	
 	file = server->ncp_filp;
-	sock = &file->f_dentry->d_inode->u.socket_i;
+	sock = SOCKET_I(file->f_dentry->d_inode);
 	
 	dataread = 0;
 
@@ -348,7 +348,7 @@ static int do_ncp_tcp_rpc_call(struct ncp_server *server, int size,
 	*((struct ncp_request_header *) (server->packet));
 
 	file = server->ncp_filp;
-	sock = &file->f_dentry->d_inode->u.socket_i;
+	sock = SOCKET_I(file->f_dentry->d_inode);
 	
 	ncptcp_xmit_hdr[0] = htonl(NCP_TCP_XMIT_MAGIC);
 	ncptcp_xmit_hdr[1] = htonl(size + 16);
@@ -444,7 +444,7 @@ static int ncp_do_request(struct ncp_server *server, int size,
 	}
 #endif /* CONFIG_NCPFS_PACKET_SIGNING */
 	file = server->ncp_filp;
-	sock = &file->f_dentry->d_inode->u.socket_i;
+	sock = SOCKET_I(file->f_dentry->d_inode);
 	/* N.B. this isn't needed ... check socket type? */
 	if (!sock) {
 		printk(KERN_ERR "ncp_rpc_call: socki_lookup failed\n");

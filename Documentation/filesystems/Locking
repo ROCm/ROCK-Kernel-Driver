@@ -237,7 +237,10 @@ writev:		no
 
 ->llseek() locking has moved from llseek to the individual llseek
 implementations.  If your fs is not using generic_file_llseek, you
-need to acquire and release the BKL in your ->llseek().
+need to acquire and release the appropriate locks in your ->llseek().
+For many filesystems, it is probably safe to acquire the inode
+semaphore.  Note some filesystems (i.e. remote ones) provide no
+protection for i_size so you will need to use the BKL.
 
 ->open() locking is in-transit: big lock partially moved into the methods.
 The only exception is ->open() in the instances of file_operations that never

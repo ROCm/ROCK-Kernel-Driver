@@ -679,10 +679,7 @@ int do_signal(int canrestart, sigset_t *oldset, struct pt_regs *regs)
 
 			default:
 				lock_kernel();
-				sigaddset(&current->pending.signal, signr);
-				recalc_sigpending(current);
-				current->flags |= PF_SIGNALED;
-				do_exit(exit_code);
+				sig_exit(signr, exit_code, &info);
 				/* NOTREACHED */
 			}
 		}

@@ -534,7 +534,7 @@ static int usb_stor_allocate_irq(struct us_data *ss)
 		     usb_stor_CBI_irq, ss, ss->ep_int->bInterval); 
 
 	/* submit the URB for processing */
-	result = usb_submit_urb(ss->irq_urb);
+	result = usb_submit_urb(ss->irq_urb, GFP_KERNEL);
 	US_DEBUGP("usb_submit_urb() returns %d\n", result);
 	if (result) {
 		usb_free_urb(ss->irq_urb);

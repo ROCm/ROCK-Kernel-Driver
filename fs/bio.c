@@ -33,20 +33,24 @@ static kmem_cache_t *bio_slab;
 
 struct biovec_pool {
 	int size;
+	char *name; 
 	kmem_cache_t *slab;
 	mempool_t *pool;
 };
-
-static struct biovec_pool bvec_array[BIOVEC_NR_POOLS];
 
 /*
  * if you change this list, also change bvec_alloc or things will
  * break badly! cannot be bigger than what you can fit into an
  * unsigned short
  */
-static const int bvec_pool_sizes[BIOVEC_NR_POOLS] = { 1, 4, 16, 64, 128, 256 };
 
-#define BIO_MAX_PAGES	(bvec_pool_sizes[BIOVEC_NR_POOLS - 1])
+#define BV(x) { x, "biovec-" #x }
+static struct biovec_pool bvec_array[BIOVEC_NR_POOLS] = { 
+	BV(1), BV(4), BV(16), BV(64), BV(128), BV(256)
+}; 
+#undef BV
+
+#define BIO_MAX_PAGES	(bvec_array[BIOVEC_NR_POOLS - 1].size)
 
 static void *slab_pool_alloc(int gfp_mask, void *data)
 {
@@ -64,7 +68,7 @@ static inline struct bio_vec *bvec_alloc(int gfp_mask, int nr, int *idx)
 	struct bio_vec *bvl;
 
 	/*
-	 * see comment near bvec_pool_sizes define!
+	 * see comment near bvec_array define!
 	 */
 	switch (nr) {
 		case   1        : *idx = 0; break;
@@ -452,21 +456,17 @@ int bio_endio(struct bio *bio, int uptodate, int nr_sectors)
 
 static void __init biovec_init_pool(void)
 {
-	char name[16];
 	int i, size;
-
-	memset(&bvec_array, 0, sizeof(bvec_array));
 
 	for (i = 0; i < BIOVEC_NR_POOLS; i++) {
 		struct biovec_pool *bp = bvec_array + i;
 
-		size = bvec_pool_sizes[i] * sizeof(struct bio_vec);
+		size = bp->size * sizeof(struct bio_vec);
 
 		printk("biovec: init pool %d, %d entries, %d bytes\n", i,
-						bvec_pool_sizes[i], size);
+						bp->size, size);
 
-		snprintf(name, sizeof(name) - 1,"biovec-%d",bvec_pool_sizes[i]);
-		bp->slab = kmem_cache_create(name, size, 0,
+		bp->slab = kmem_cache_create(bp->name, size, 0,
 						SLAB_HWCACHE_ALIGN, NULL, NULL);
 		if (!bp->slab)
 			panic("biovec: can't init slab cache\n");
@@ -474,7 +474,7 @@ static void __init biovec_init_pool(void)
 					slab_pool_free, bp->slab);
 		if (!bp->pool)
 			panic("biovec: can't init mempool\n");
-		bp->size = size;
+		bp->size = size;	
 	}
 }
 

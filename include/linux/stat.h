@@ -52,6 +52,25 @@
 #define S_IRUGO		(S_IRUSR|S_IRGRP|S_IROTH)
 #define S_IWUGO		(S_IWUSR|S_IWGRP|S_IWOTH)
 #define S_IXUGO		(S_IXUSR|S_IXGRP|S_IXOTH)
+
+#include <linux/types.h>
+
+struct kstat {
+	unsigned long	ino;
+	dev_t		dev;
+	umode_t		mode;
+	nlink_t		nlink;
+	uid_t		uid;
+	gid_t		gid;
+	dev_t		rdev;
+	loff_t		size;
+	time_t		atime;
+	time_t		mtime;
+	time_t		ctime;
+	unsigned long	blksize;
+	unsigned long	blocks;
+};
+
 #endif
 
 #endif

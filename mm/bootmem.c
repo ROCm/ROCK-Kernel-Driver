@@ -247,19 +247,30 @@ static unsigned long __init free_all_bootmem_core(pg_data_t *pgdat)
 	bootmem_data_t *bdata = pgdat->bdata;
 	unsigned long i, count, total = 0;
 	unsigned long idx;
+	unsigned long *map; 
 
 	if (!bdata->node_bootmem_map) BUG();
 
 	count = 0;
 	idx = bdata->node_low_pfn - (bdata->node_boot_start >> PAGE_SHIFT);
-	for (i = 0; i < idx; i++, page++) {
-		if (!test_bit(i, bdata->node_bootmem_map)) {
+	map = bdata->node_bootmem_map;
+	for (i = 0; i < idx; ) {
+		unsigned long v = ~map[i / BITS_PER_LONG];
+		if (v) { 
+			unsigned long m;
+			for (m = 1; m && i < idx; m<<=1, page++, i++) { 
+				if (v & m) {
 			count++;
 			ClearPageReserved(page);
 			set_page_count(page, 1);
 			__free_page(page);
 		}
 	}
+		} else {
+			i+=BITS_PER_LONG;
+			page+=BITS_PER_LONG; 
+		} 	
+	}	
 	total += count;
 
 	/*

@@ -427,8 +427,8 @@ struct super_block *hpfs_read_super(struct super_block *s, void *options,
 	s->s_hpfs_bmp_dir = NULL;
 	s->s_hpfs_cp_table = NULL;
 
-	s->s_hpfs_creation_de_lock = s->s_hpfs_rd_inode = 0;
-	init_waitqueue_head(&s->s_hpfs_creation_de);
+	s->s_hpfs_rd_inode = 0;
+	init_MUTEX(&s->u.hpfs_sb.hpfs_creation_de);
 	init_waitqueue_head(&s->s_hpfs_iget_q);
 
 	uid = current->uid;

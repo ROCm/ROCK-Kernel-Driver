@@ -1916,7 +1916,7 @@ int usbvideo_StartDataPump(uvd_t *uvd)
 
 	/* Submit all URBs */
 	for (i=0; i < USBVIDEO_NUMSBUF; i++) {
-		errFlag = usb_submit_urb(uvd->sbuf[i].urb);
+		errFlag = usb_submit_urb(uvd->sbuf[i].urb, GFP_KERNEL);
 		if (errFlag)
 			err("%s: usb_submit_isoc(%d) ret %d", proc, i, errFlag);
 	}

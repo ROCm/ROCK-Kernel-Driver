@@ -251,6 +251,7 @@ EXPORT_SYMBOL(vfs_rename);
 EXPORT_SYMBOL(vfs_statfs);
 EXPORT_SYMBOL(generic_read_dir);
 EXPORT_SYMBOL(generic_file_llseek);
+EXPORT_SYMBOL(remote_llseek);
 EXPORT_SYMBOL(no_llseek);
 EXPORT_SYMBOL(__pollwait);
 EXPORT_SYMBOL(poll_freewait);
@@ -274,6 +275,9 @@ EXPORT_SYMBOL(lock_may_write);
 EXPORT_SYMBOL(dcache_readdir);
 EXPORT_SYMBOL(fd_install);
 EXPORT_SYMBOL(put_unused_fd);
+EXPORT_SYMBOL(get_sb_bdev);
+EXPORT_SYMBOL(get_sb_nodev);
+EXPORT_SYMBOL(get_sb_single);
 
 /* for stackable file systems (lofs, wrapfs, cryptfs, etc.) */
 EXPORT_SYMBOL(default_llseek);

@@ -278,7 +278,7 @@ static int bus_reset( Scsi_Cmnd *srb )
 	if (us->protocol == US_PR_CBI) {
 		down(&(us->irq_urb_sem));
 		us->irq_urb->dev = us->pusb_dev;
-		result = usb_submit_urb(us->irq_urb);
+		result = usb_submit_urb(us->irq_urb, GFP_NOIO);
 		US_DEBUGP("usb_submit_urb() returns %d\n", result);
 		up(&(us->irq_urb_sem));
 	}

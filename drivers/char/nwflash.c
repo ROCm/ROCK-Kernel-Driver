@@ -26,6 +26,7 @@
 #include <linux/spinlock.h>
 #include <linux/rwsem.h>
 #include <linux/init.h>
+#include <linux/smp_lock.h>
 
 #include <asm/hardware/dec21285.h>
 #include <asm/io.h>
@@ -301,30 +302,45 @@ static ssize_t flash_write(struct file *file, const char *buf, size_t size, loff
  */
 static long long flash_llseek(struct file *file, long long offset, int orig)
 {
+	long long ret;
+
+	lock_kernel();
 	if (flashdebug)
 		printk(KERN_DEBUG "flash_llseek: offset=0x%X, orig=0x%X.\n",
 		       (unsigned int) offset, orig);
 
 	switch (orig) {
 	case 0:
-		if (offset < 0)
-			return -EINVAL;
+		if (offset < 0) {
+			ret = -EINVAL;
+			break;
+		}
 
-		if ((unsigned int) offset > gbFlashSize)
-			return -EINVAL;
+		if ((unsigned int) offset > gbFlashSize) {
+			ret = -EINVAL;
+			break;
+		}
 
 		file->f_pos = (unsigned int) offset;
-		return file->f_pos;
+		ret = file->f_pos;
+		break;
 	case 1:
-		if ((file->f_pos + offset) > gbFlashSize)
-			return -EINVAL;
-		if ((file->f_pos + offset) < 0)
-			return -EINVAL;
+		if ((file->f_pos + offset) > gbFlashSize) {
+			ret = -EINVAL;
+			break;
+		}
+		if ((file->f_pos + offset) < 0) {
+			ret = -EINVAL;
+			break;
+		}
 		file->f_pos += offset;
-		return file->f_pos;
+		ret = file->f_pos;
+		break;
 	default:
-		return -EINVAL;
+		ret = -EINVAL;
 	}
+	unlock_kernel();
+	return ret;
 }
 
 

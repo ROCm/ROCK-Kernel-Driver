@@ -441,8 +441,7 @@ static loff_t ext2_max_size(int bits)
 	return res;
 }
 
-struct super_block * ext2_read_super (struct super_block * sb, void * data,
-				      int silent)
+static int ext2_fill_super(struct super_block *sb, void *data, int silent)
 {
 	struct buffer_head * bh;
 	struct ext2_super_block * es;
@@ -465,14 +464,13 @@ struct super_block * ext2_read_super (struct super_block * sb, void * data,
 
 	sb->u.ext2_sb.s_mount_opt = 0;
 	if (!parse_options ((char *) data, &sb_block, &resuid, &resgid,
-	    &sb->u.ext2_sb.s_mount_opt)) {
-		return NULL;
-	}
+	    &sb->u.ext2_sb.s_mount_opt))
+		return -EINVAL;
 
 	blocksize = sb_min_blocksize(sb, BLOCK_SIZE);
 	if (!blocksize) {
 		printk ("EXT2-fs: unable to set blocksize\n");
-		return NULL;
+		return -EINVAL;
 	}
 
 	/*
@@ -487,7 +485,7 @@ struct super_block * ext2_read_super (struct super_block * sb, void * data,
 
 	if (!(bh = sb_bread(sb, logic_sb_block))) {
 		printk ("EXT2-fs: unable to read superblock\n");
-		return NULL;
+		return -EINVAL;
 	}
 	/*
 	 * Note: s_es must be initialized as soon as possible because
@@ -533,7 +531,7 @@ struct super_block * ext2_read_super (struct super_block * sb, void * data,
 
 		if (!sb_set_blocksize(sb, blocksize)) {
 			printk(KERN_ERR "EXT2-fs: blocksize too small for device.\n");
-			return NULL;
+			return -EINVAL;
 		}
 
 		logic_sb_block = (sb_block*BLOCK_SIZE) / blocksize;
@@ -684,14 +682,14 @@ struct super_block * ext2_read_super (struct super_block * sb, void * data,
 		goto failed_mount2;
 	}
 	ext2_setup_super (sb, es, sb->s_flags & MS_RDONLY);
-	return sb;
+	return 0;
 failed_mount2:
 	for (i = 0; i < db_count; i++)
 		brelse(sb->u.ext2_sb.s_group_desc[i]);
 	kfree(sb->u.ext2_sb.s_group_desc);
 failed_mount:
 	brelse(bh);
-	return NULL;
+	return -EINVAL;
 }
 
 static void ext2_commit_super (struct super_block * sb,
@@ -843,7 +841,18 @@ int ext2_statfs (struct super_block * sb, struct statfs * buf)
 	return 0;
 }
 
-static DECLARE_FSTYPE_DEV(ext2_fs_type, "ext2", ext2_read_super);
+static struct super_block *ext2_get_sb(struct file_system_type *fs_type,
+	int flags, char *dev_name, void *data)
+{
+	return get_sb_bdev(fs_type, flags, dev_name, data, ext2_fill_super);
+}
+
+static struct file_system_type ext2_fs_type = {
+	owner:		THIS_MODULE,
+	name:		"ext2",
+	get_sb:		ext2_get_sb,
+	fs_flags:	FS_REQUIRES_DEV,
+};
 
 static int __init init_ext2_fs(void)
 {

@@ -236,6 +236,8 @@ __syscall_start:
 		.long	SYMBOL_NAME(sys_mincore)
 /* 220 */	.long	SYMBOL_NAME(sys_madvise)
 		.long	SYMBOL_NAME(sys_fcntl64)
+		.long	SYMBOL_NAME(sys_gettid)
+		.long	SYMBOL_NAME(sys_tkill)
 __syscall_end:
 
 		.rept	NR_syscalls - (__syscall_end - __syscall_start) / 4

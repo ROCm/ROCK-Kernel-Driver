@@ -245,8 +245,7 @@ nfs_get_root(struct super_block *sb, struct nfs_fh *rootfh)
  * and the root file handle obtained from the server's mount
  * daemon. We stash these away in the private superblock fields.
  */
-struct super_block *
-nfs_read_super(struct super_block *sb, void *raw_data, int silent)
+int nfs_fill_super(struct super_block *sb, void *raw_data, int silent)
 {
 	struct nfs_mount_data	*data = (struct nfs_mount_data *) raw_data;
 	struct nfs_server	*server;
@@ -455,6 +454,8 @@ nfs_read_super(struct super_block *sb, void *raw_data, int silent)
                 server->namelen = maxlen;
 
 	sb->s_maxbytes = fsinfo.maxfilesize;
+	if (sb->s_maxbytes > MAX_LFS_FILESIZE) 
+		sb->s_maxbytes = MAX_LFS_FILESIZE; 
 
 	/* Fire up the writeback cache */
 	if (nfs_reqlist_alloc(server) < 0) {
@@ -467,7 +468,7 @@ nfs_read_super(struct super_block *sb, void *raw_data, int silent)
 	/* Check whether to start the lockd process */
 	if (!(server->flags & NFS_MOUNT_NONLM))
 		lockd_up();
-	return sb;
+	return 0;
 
 	/* Yargs. It didn't work out. */
  failure_kill_reqlist:
@@ -506,7 +507,7 @@ out_miss_args:
 	printk("nfs_read_super: missing data argument\n");
 
 out_fail:
-	return NULL;
+	return -EINVAL;
 }
 
 static int
@@ -1137,7 +1138,25 @@ __nfs_refresh_inode(struct inode *inode, struct nfs_fattr *fattr)
 /*
  * File system information
  */
-static DECLARE_FSTYPE(nfs_fs_type, "nfs", nfs_read_super, FS_ODD_RENAME);
+
+/*
+ *  Right now we are using get_sb_nodev, but we ought to switch to
+ *  get_anon_super() with appropriate comparison function.  The only
+ *  question being, when two NFS mounts are the same?  Identical IP
+ *  of server + identical root fhandle?  Trond?
+ */
+static struct super_block *nfs_get_sb(struct file_system_type *fs_type,
+	int flags, char *dev_name, void *data)
+{
+	return get_sb_nodev(fs_type, flags, data, nfs_fill_super);
+}
+
+static struct file_system_type nfs_fs_type = {
+	owner:		THIS_MODULE,
+	name:		"nfs",
+	get_sb:		nfs_get_sb,
+	fs_flags:	FS_ODD_RENAME,
+};
 
 extern int nfs_init_nfspagecache(void);
 extern void nfs_destroy_nfspagecache(void);

@@ -857,7 +857,7 @@ extern struct urb *usb_alloc_urb(int iso_packets);
 extern void usb_free_urb(struct urb *urb);
 #define usb_put_urb usb_free_urb
 extern struct urb *usb_get_urb(struct urb *urb);
-extern int usb_submit_urb(struct urb *urb);
+extern int usb_submit_urb(struct urb *urb, int mem_flags);
 extern int usb_unlink_urb(struct urb *urb);
 
 /*-------------------------------------------------------------------*
@@ -906,7 +906,7 @@ struct usb_operations {
 	int (*allocate)(struct usb_device *);
 	int (*deallocate)(struct usb_device *);
 	int (*get_frame_number) (struct usb_device *usb_dev);
-	int (*submit_urb) (struct urb *urb);
+	int (*submit_urb) (struct urb *urb, int mem_flags);
 	int (*unlink_urb) (struct urb *urb);
 };
 

@@ -115,6 +115,7 @@ typedef struct siginfo {
 #define SI_MESGQ	-3	/* sent by real time mesq state change */
 #define SI_ASYNCIO	-4	/* sent by AIO completion */
 #define SI_SIGIO	-5	/* sent by queued SIGIO */
+#define SI_TKILL	-6	/* sent by tkill system call */
 
 #define SI_FROMUSER(siptr)	((siptr)->si_code <= 0)
 #define SI_FROMKERNEL(siptr)	((siptr)->si_code > 0)

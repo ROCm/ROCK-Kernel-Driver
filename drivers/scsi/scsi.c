@@ -87,13 +87,16 @@ static void scsi_dump_status(int level);
 
 struct scsi_host_sg_pool {
 	int size;
+	char *name; 
 	kmem_cache_t *slab;
 	mempool_t *pool;
 };
 
-static const int scsi_host_sg_pool_sizes[SG_MEMPOOL_NR] = { 8, 16, 32, 64, MAX_PHYS_SEGMENTS };
-struct scsi_host_sg_pool scsi_sg_pools[SG_MEMPOOL_NR];
-
+#define SP(x) { x, "sgpool-" #x } 
+struct scsi_host_sg_pool scsi_sg_pools[SG_MEMPOOL_NR] = { 
+	SP(8), SP(16), SP(32), SP(64), SP(MAX_PHYS_SEGMENTS)
+}; 	
+#undef SP 	
 /*
    static const char RCSid[] = "$Header: /vger/u4/cvs/linux/drivers/scsi/scsi.c,v 1.38 1997/01/19 23:07:18 davem Exp $";
  */
@@ -2489,7 +2492,6 @@ void scsi_free_sgtable(struct scatterlist *sgl, int index)
 static int __init init_scsi(void)
 {
 	struct proc_dir_entry *generic;
-	char name[16];
 	int i;
 
 	printk(KERN_INFO "SCSI subsystem driver " REVISION "\n");
@@ -2499,18 +2501,15 @@ static int __init init_scsi(void)
 	 */
 	for (i = 0; i < SG_MEMPOOL_NR; i++) {
 		struct scsi_host_sg_pool *sgp = scsi_sg_pools + i;
-		int size = scsi_host_sg_pool_sizes[i] * sizeof(struct scatterlist);
+		int size = sgp->size * sizeof(struct scatterlist);
 
-		snprintf(name, sizeof(name) - 1, "sgpool-%d", scsi_host_sg_pool_sizes[i]);
-		sgp->slab = kmem_cache_create(name, size, 0, SLAB_HWCACHE_ALIGN, NULL, NULL);
+		sgp->slab = kmem_cache_create(sgp->name, size, 0, SLAB_HWCACHE_ALIGN, NULL, NULL);
 		if (!sgp->slab)
 			panic("SCSI: can't init sg slab\n");
 
 		sgp->pool = mempool_create(SG_MEMPOOL_SIZE, scsi_pool_alloc, scsi_pool_free, sgp->slab);
 		if (!sgp->pool)
 			panic("SCSI: can't init sg mempool\n");
-
-		sgp->size = size;
 	}
 
 	/*

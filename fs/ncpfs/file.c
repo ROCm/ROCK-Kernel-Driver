@@ -18,6 +18,7 @@
 #include <linux/locks.h>
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
+#include <linux/smp_lock.h>
 
 #include <linux/ncp_fs.h>
 #include "ncplib_kernel.h"
@@ -281,7 +282,7 @@ static int ncp_release(struct inode *inode, struct file *file) {
 
 struct file_operations ncp_file_operations =
 {
-	llseek:		generic_file_llseek,
+	llseek:		remote_llseek,
 	read:		ncp_file_read,
 	write:		ncp_file_write,
 	ioctl:		ncp_ioctl,

@@ -36,6 +36,7 @@
 #include <linux/selection.h>
 #include <linux/kbd_kern.h>
 #include <linux/console.h>
+#include <linux/smp_lock.h>
 #include <asm/uaccess.h>
 #include <asm/byteorder.h>
 #include <asm/unaligned.h>
@@ -67,10 +68,13 @@ vcs_size(struct inode *inode)
 
 static loff_t vcs_lseek(struct file *file, loff_t offset, int orig)
 {
-	int size = vcs_size(file->f_dentry->d_inode);
+	int size;
 
+	lock_kernel();
+	size = vcs_size(file->f_dentry->d_inode);
 	switch (orig) {
 		default:
+			unlock_kernel();
 			return -EINVAL;
 		case 2:
 			offset += size;
@@ -80,9 +84,12 @@ static loff_t vcs_lseek(struct file *file, loff_t offset, int orig)
 		case 0:
 			break;
 	}
-	if (offset < 0 || offset > size)
+	if (offset < 0 || offset > size) {
+		unlock_kernel();
 		return -EINVAL;
+	}
 	file->f_pos = offset;
+	unlock_kernel();
 	return file->f_pos;
 }
 

@@ -271,10 +271,7 @@ struct hfs_mdb {
 						   512-byte blocks per
 						   "allocation block" */
 	hfs_u16			attrib;		/* Attribute word */
-	hfs_wait_queue		rename_wait;
-	int			rename_lock;
-	hfs_wait_queue		bitmap_wait;
-	int			bitmap_lock;
+	struct semaphore	bitmap_sem;
         struct list_head        entry_dirty;
 };
 

@@ -226,7 +226,6 @@ unsigned long page_index(struct page *page)
 /*
  * linux/fs/nfs/inode.c
  */
-extern struct super_block *nfs_read_super(struct super_block *, void *, int);
 extern void nfs_zap_caches(struct inode *);
 extern int nfs_inode_is_stale(struct inode *, struct nfs_fh *,
 				struct nfs_fattr *);

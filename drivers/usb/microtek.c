@@ -499,7 +499,7 @@ void mts_int_submit_urb (struct urb* transfer,
 
 	transfer->status = 0;
 
-	res = usb_submit_urb( transfer );
+	res = usb_submit_urb( transfer, GFP_ATOMIC );
 	if ( unlikely(res) ) {
 		MTS_INT_ERROR( "could not submit URB! Error was %d\n",(int)res );
 		context->srb->result = DID_ERROR << 16;
@@ -720,7 +720,8 @@ int mts_scsi_queuecommand( Scsi_Cmnd *srb, mts_scsi_cmnd_callback callback )
 	mts_build_transfer_context( srb, desc );
 	desc->context.final_callback = callback;
 	
-	res=usb_submit_urb(desc->urb);
+	/* here we need ATOMIC as we are called with the iolock */
+	res=usb_submit_urb(desc->urb, GFP_ATOMIC);
 
 	if(unlikely(res)){
 		MTS_ERROR("error %d submitting URB\n",(int)res);

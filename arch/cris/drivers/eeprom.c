@@ -74,6 +74,7 @@
 #include <linux/fs.h>
 #include <linux/init.h>
 #include <linux/delay.h>
+#include <linux/smp_lock.h>
 #include <asm/uaccess.h>
 #include "i2c.h"
 
@@ -448,36 +449,39 @@ static loff_t eeprom_lseek(struct file * file, loff_t offset, int orig)
  *  orig 1: relative from current position
  *  orig 2: position from last eeprom address
  */
-  
+  loff_t ret;
+
+  lock_kernel();
   switch (orig)
   {
    case 0:
-     file->f_pos = offset;
+     ret = file->f_pos = offset;
      break;
    case 1:
-     file->f_pos += offset;
+     ret = file->f_pos += offset;
      break;
    case 2:
-     file->f_pos = eeprom.size - offset;
+     ret = file->f_pos = eeprom.size - offset;
      break;
    default:
-     return -EINVAL;
+     ret = -EINVAL;
   }
 
   /* truncate position */
   if (file->f_pos < 0)
   {
     file->f_pos = 0;    
-    return(-EOVERFLOW);
+    unlock_kernel();
+    ret = -EOVERFLOW;
   }
   
   if (file->f_pos >= eeprom.size)
   {
     file->f_pos = eeprom.size - 1;
-    return(-EOVERFLOW);
+    ret = -EOVERFLOW;
   }
 
-  return ( file->f_pos );
+  return ( ret );
 }
 
 /* Reads data from eeprom. */

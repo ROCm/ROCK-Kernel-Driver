@@ -635,6 +635,8 @@ sys_call_table:
 	.long  SYSCALL(sys_ni_syscall,sys_ni_syscall) /* 224 - reserved for posix_acl */
         .rept  255-224
 	.long  SYSCALL(sys_ni_syscall,sys_ni_syscall)
+	.long  SYSCALL(sys_gettid,sys_gettid)
+	.long  SYSCALL(sys_tkill,sys_tkill)
 	.endr
 
 /*

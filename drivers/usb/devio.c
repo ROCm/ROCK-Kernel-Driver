@@ -58,21 +58,26 @@ struct async {
 
 static loff_t usbdev_lseek(struct file *file, loff_t offset, int orig)
 {
+	loff_t ret;
+
+	lock_kernel();
+
 	switch (orig) {
 	case 0:
 		file->f_pos = offset;
-		return file->f_pos;
-
+		ret = file->f_pos;
+		break;
 	case 1:
 		file->f_pos += offset;
-		return file->f_pos;
-
+		ret = file->f_pos;
+		break;
 	case 2:
-		return -EINVAL;
-
 	default:
-		return -EINVAL;
+		ret = -EINVAL;
 	}
+
+	unlock_kernel();
+	return ret;
 }
 
 static ssize_t usbdev_read(struct file *file, char * buf, size_t nbytes, loff_t *ppos)
@@ -364,7 +369,7 @@ static int checkintf(struct dev_state *ps, unsigned int intf)
 	if (test_bit(intf, &ps->ifclaimed))
 		return 0;
 	/* if not yet claimed, claim it for the driver */
-	printk(KERN_WARNING "usbdevfs: process %d (%s) did not claim interface %u before use\n",
+	printk(KERN_WARNING "usbfs: process %d (%s) did not claim interface %u before use\n",
 	       current->pid, current->comm, intf);
 	return claimintf(ps, intf);
 }
@@ -563,7 +568,7 @@ static int proc_control(struct dev_state *ps, void *arg)
 	}
 	free_page((unsigned long)tbuf);
 	if (i<0) {
-		printk(KERN_DEBUG "usbdevfs: USBDEVFS_CONTROL failed dev %d rqt %u rq %u len %u ret %d\n", 
+		printk(KERN_DEBUG "usbfs: USBDEVFS_CONTROL failed dev %d rqt %u rq %u len %u ret %d\n", 
 		       dev->devnum, ctrl.bRequestType, ctrl.bRequest, ctrl.wLength, i);
 	}
 	return i;
@@ -619,7 +624,7 @@ static int proc_bulk(struct dev_state *ps, void *arg)
 	}
 	free_page((unsigned long)tbuf);
 	if (i < 0) {
-		printk(KERN_WARNING "usbdevfs: USBDEVFS_BULK failed dev %d ep 0x%x len %u ret %d\n", 
+		printk(KERN_WARNING "usbfs: USBDEVFS_BULK failed dev %d ep 0x%x len %u ret %d\n", 
 		       dev->devnum, bulk.ep, bulk.len, i);
 		return i;
 	}
@@ -906,8 +911,8 @@ static int proc_submiturb(struct dev_state *ps, void *arg)
 		}
 	}
         async_newpending(as);
-        if ((ret = usb_submit_urb(as->urb))) {
-		printk(KERN_DEBUG "usbdevfs: usb_submit_urb returned %d\n", ret);
+        if ((ret = usb_submit_urb(as->urb, GFP_KERNEL))) {
+		printk(KERN_DEBUG "usbfs: usb_submit_urb returned %d\n", ret);
                 async_removepending(as);
                 free_async(as);
                 return ret;

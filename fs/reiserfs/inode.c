@@ -890,6 +890,13 @@ static void init_inode (struct inode * inode, struct path * path)
     inode->i_blksize = PAGE_SIZE;
 
     INIT_LIST_HEAD(&(REISERFS_I(inode)->i_prealloc_list ));
+    REISERFS_I(inode)->i_flags = 0;
+    REISERFS_I(inode)->i_prealloc_block = 0;
+    REISERFS_I(inode)->i_prealloc_count = 0;
+    REISERFS_I(inode)->i_trans_id = 0;
+    REISERFS_I(inode)->i_trans_index = 0;
+    /* nopack = 0, by default */
+    REISERFS_I(inode)->i_flags &= ~i_nopack_mask;
 
     if (stat_data_v1 (ih)) {
 	struct stat_data_v1 * sd = (struct stat_data_v1 *)B_I_PITEM (bh, ih);
@@ -950,13 +957,6 @@ static void init_inode (struct inode * inode, struct path * path)
 	    set_inode_item_key_version (inode, KEY_FORMAT_3_6);
 	REISERFS_I(inode)->i_first_direct_byte = 0;
     }
-    REISERFS_I(inode)->i_flags = 0;
-    REISERFS_I(inode)->i_prealloc_block = 0;
-    REISERFS_I(inode)->i_prealloc_count = 0;
-    REISERFS_I(inode)->i_trans_id = 0;
-    REISERFS_I(inode)->i_trans_index = 0;
-    /* nopack = 0, by default */
-    REISERFS_I(inode)->i_flags &= ~i_nopack_mask;
 
     pathrelse (path);
     if (S_ISREG (inode->i_mode)) {

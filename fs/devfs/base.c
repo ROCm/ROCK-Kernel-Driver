@@ -3218,8 +3218,7 @@ static struct inode_operations devfs_symlink_iops =
     setattr:        devfs_notify_change,
 };
 
-static struct super_block *devfs_read_super (struct super_block *sb,
-					     void *data, int silent)
+static int devfs_fill_super (struct super_block *sb, void *data, int silent)
 {
     struct inode *root_inode = NULL;
 
@@ -3238,17 +3237,24 @@ static struct super_block *devfs_read_super (struct super_block *sb,
     sb->s_root = d_alloc_root (root_inode);
     if (!sb->s_root) goto out_no_root;
     DPRINTK (DEBUG_S_READ, "(): made devfs ptr: %p\n", sb->u.generic_sbp);
-    return sb;
+    return 0;
 
 out_no_root:
     PRINTK ("(): get root inode failed\n");
     if (root_inode) iput (root_inode);
-    return NULL;
+    return -EINVAL;
 }   /*  End Function devfs_read_super  */
 
+static struct super_block *devfs_get_sb(struct file_system_type *fs_type,
+	int flags, char *dev_name, void *data)
+{
+	return get_sb_single(fs_type, flags, data, devfs_fill_super);
+}
 
-static DECLARE_FSTYPE (devfs_fs_type, DEVFS_NAME, devfs_read_super, FS_SINGLE);
-
+static struct file_system_type devfs_fs_type = {
+	name:		DEVFS_NAME,
+	get_sb:		devfs_get_sb,
+};
 
 /*  File operations for devfsd follow  */
 

@@ -637,21 +637,11 @@ int __init icmpv6_init(struct net_proto_family *ops)
 	struct sock *sk;
 	int err;
 
-	icmpv6_socket = sock_alloc();
-	if (icmpv6_socket == NULL) {
-		printk(KERN_ERR
-		       "Failed to create the ICMP6 control socket.\n");
-		return -1;
-	}
-	icmpv6_socket->inode->i_uid = 0;
-	icmpv6_socket->inode->i_gid = 0;
-	icmpv6_socket->type = SOCK_RAW;
-
-	if ((err = ops->create(icmpv6_socket, IPPROTO_ICMPV6)) < 0) {
+	err = sock_create(PF_INET6, SOCK_RAW, IPPROTO_ICMPV6, &icmpv6_socket);
+	if (err < 0) {
 		printk(KERN_ERR
 		       "Failed to initialize the ICMP6 control socket (err %d).\n",
 		       err);
-		sock_release(icmpv6_socket);
 		icmpv6_socket = NULL; /* for safety */
 		return err;
 	}

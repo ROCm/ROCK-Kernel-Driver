@@ -215,6 +215,7 @@
 #define __NR_madvise		205
 #define __NR_mincore		206
 #define __NR_gettid		207
+#define __NR_tkill		208
 
 #define __NR(n)	#n
 

@@ -245,7 +245,7 @@ hpusbscsi_scsi_detect (struct SHT *sht)
 			desc->interrupt_interval
 	);
 
-	if ( 0  >  usb_submit_urb(desc->controlurb)) {
+	if ( 0  >  usb_submit_urb(desc->controlurb, GFP_KERNEL)) {
 		kfree(sht->proc_name);
 		return 0;
 	}
@@ -321,7 +321,7 @@ static int hpusbscsi_scsi_queuecommand (Scsi_Cmnd *srb, scsi_callback callback)
 	hpusbscsi->scallback = callback;
 	hpusbscsi->srb = srb;
 
-	res = usb_submit_urb(hpusbscsi->dataurb);
+	res = usb_submit_urb(hpusbscsi->dataurb, GFP_ATOMIC);
 	if (unlikely(res)) {
 		hpusbscsi->state = HP_STATE_FREE;
 		TRACE_STATE;
@@ -461,7 +461,7 @@ static void scatter_gather_callback(struct urb *u)
                 hpusbscsi
         );
 
-        res = usb_submit_urb(u);
+        res = usb_submit_urb(u, GFP_ATOMIC);
         if (unlikely(res))
                 hpusbscsi->state = HP_STATE_ERROR;
 	TRACE_STATE;
@@ -510,7 +510,7 @@ static void simple_payload_callback (struct urb *u)
 		hpusbscsi
 	);
 
-	res = usb_submit_urb(u);
+	res = usb_submit_urb(u, GFP_ATOMIC);
 	if (unlikely(res)) {
                 handle_usb_error(hpusbscsi);
 		return;

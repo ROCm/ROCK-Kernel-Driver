@@ -1,7 +1,8 @@
 /*
  * USB IBM C-It Video Camera driver
  *
- * Supports IBM C-It Video Camera.
+ * Supports Xirlink C-It Video Camera, IBM PC Camera,
+ * IBM NetCamera and Veo Stingray.
  *
  * This driver is based on earlier work of:
  *
@@ -33,9 +34,11 @@
 
 #include "usbvideo.h"
 
-#define	IBMCAM_VENDOR_ID	0x0545
-#define	IBMCAM_PRODUCT_ID	0x8080
+#define IBMCAM_VENDOR_ID	0x0545
+#define IBMCAM_PRODUCT_ID	0x8080
 #define NETCAM_PRODUCT_ID	0x8002	/* IBM NetCamera, close to model 2 */
+#define VEO_800C_PRODUCT_ID	0x800C	/* Veo Stingray, repackaged Model 2 */
+#define VEO_800D_PRODUCT_ID	0x800D	/* Veo Stingray, repackaged Model 4 */
 
 #define MAX_IBMCAM		4	/* How many devices we allow to connect */
 #define USES_IBMCAM_PUTPIXEL    0       /* 0=Fast/oops 1=Slow/secure */
@@ -3671,6 +3674,8 @@ static void *ibmcam_probe(struct usb_device *dev, unsigned int ifnum, const stru
 	if (dev->descriptor.idVendor != IBMCAM_VENDOR_ID)
 		return NULL;
 	if ((dev->descriptor.idProduct != IBMCAM_PRODUCT_ID) &&
+	    (dev->descriptor.idProduct != VEO_800C_PRODUCT_ID) &&
+	    (dev->descriptor.idProduct != VEO_800D_PRODUCT_ID) &&
 	    (dev->descriptor.idProduct != NETCAM_PRODUCT_ID))
 		return NULL;
 
@@ -3684,7 +3689,8 @@ static void *ibmcam_probe(struct usb_device *dev, unsigned int ifnum, const stru
 	case 0x030A:
 		if (ifnum != 0)
 			return NULL;
-		if (dev->descriptor.idProduct == NETCAM_PRODUCT_ID)
+		if ((dev->descriptor.idProduct == NETCAM_PRODUCT_ID) ||
+		    (dev->descriptor.idProduct == VEO_800D_PRODUCT_ID))
 			model = IBMCAM_MODEL_4;
 		else
 			model = IBMCAM_MODEL_2;
@@ -3699,8 +3705,28 @@ static void *ibmcam_probe(struct usb_device *dev, unsigned int ifnum, const stru
 			dev->descriptor.bcdDevice);
 		return NULL;
 	}
-	info("IBM USB camera found (model %d, rev. 0x%04x)",
-		model, dev->descriptor.bcdDevice);
+
+	/* Print detailed info on what we found so far */
+	do {
+		char *brand = NULL;
+		switch (dev->descriptor.idProduct) {
+		case NETCAM_PRODUCT_ID:
+			brand = "IBM NetCamera";
+			break;
+		case VEO_800C_PRODUCT_ID:
+			brand = "Veo Stingray [800C]";
+			break;
+		case VEO_800D_PRODUCT_ID:
+			brand = "Veo Stingray [800D]";
+			break;
+		case IBMCAM_PRODUCT_ID:
+		default:
+			brand = "IBM PC Camera"; /* a.k.a. Xirlink C-It */
+			break;
+		}
+		info("%s USB camera found (model %d, rev. 0x%04x)",
+		     brand, model, dev->descriptor.bcdDevice);
+	} while (0);
 
 	/* Validate found interface: must have one ISO endpoint */
 	nas = dev->actconfig->interface[ifnum].num_altsetting;
@@ -3908,18 +3934,16 @@ static void __exit ibmcam_cleanup(void)
 	usbvideo_Deregister(&cams);
 }
 
-#if defined(usb_device_id_ver)
-
 static __devinitdata struct usb_device_id id_table[] = {
 	{ USB_DEVICE_VER(IBMCAM_VENDOR_ID, IBMCAM_PRODUCT_ID, 0x0002, 0x0002) },	/* Model 1 */
 	{ USB_DEVICE_VER(IBMCAM_VENDOR_ID, IBMCAM_PRODUCT_ID, 0x030a, 0x030a) },	/* Model 2 */
 	{ USB_DEVICE_VER(IBMCAM_VENDOR_ID, IBMCAM_PRODUCT_ID, 0x0301, 0x0301) },	/* Model 3 */
 	{ USB_DEVICE_VER(IBMCAM_VENDOR_ID, NETCAM_PRODUCT_ID, 0x030a, 0x030a) },	/* Model 4 */
+	{ USB_DEVICE_VER(IBMCAM_VENDOR_ID, VEO_800C_PRODUCT_ID, 0x030a, 0x030a) },	/* Model 2 */
+	{ USB_DEVICE_VER(IBMCAM_VENDOR_ID, VEO_800D_PRODUCT_ID, 0x030a, 0x030a) },	/* Model 4 */
 	{ }  /* Terminating entry */
 };
 MODULE_DEVICE_TABLE(usb, id_table);
-
-#endif /* defined(usb_device_id_ver) */
 
 module_init(ibmcam_init);
 module_exit(ibmcam_cleanup);

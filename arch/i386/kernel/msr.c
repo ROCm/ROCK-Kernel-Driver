@@ -33,6 +33,7 @@
 #include <linux/init.h>
 #include <linux/poll.h>
 #include <linux/smp.h>
+#include <linux/smp_lock.h>
 #include <linux/major.h>
 
 #include <asm/processor.h>
@@ -162,16 +163,19 @@ static inline int do_rdmsr(int cpu, u32 reg, u32 *eax, u32 *edx)
 
 static loff_t msr_seek(struct file *file, loff_t offset, int orig)
 {
+  loff_t ret = -EINVAL;
+  lock_kernel();
   switch (orig) {
   case 0:
     file->f_pos = offset;
-    return file->f_pos;
+    ret = file->f_pos;
+    break;
   case 1:
     file->f_pos += offset;
-    return file->f_pos;
-  default:
-    return -EINVAL;	/* SEEK_END not supported */
+    ret = file->f_pos;
   }
+  unlock_kernel();
+  return ret;
 }
 
 static ssize_t msr_read(struct file * file, char * buf,

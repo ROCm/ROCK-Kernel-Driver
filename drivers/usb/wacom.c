@@ -336,7 +336,7 @@ static int wacom_open(struct input_dev *dev)
 		return 0;
 
 	wacom->irq->dev = wacom->usbdev;
-	if (usb_submit_urb(wacom->irq))
+	if (usb_submit_urb(wacom->irq, GFP_KERNEL))
 		return -EIO;
 
 	return 0;

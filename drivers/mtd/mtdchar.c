@@ -10,6 +10,7 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/mtd/mtd.h>
+#include <linux/smp_lock.h>
 #include <linux/slab.h>
 
 #ifdef CONFIG_DEVFS_FS
@@ -31,6 +32,7 @@ static loff_t mtd_lseek (struct file *file, loff_t offset, int orig)
 {
 	struct mtd_info *mtd=(struct mtd_info *)file->private_data;
 
+	lock_kernel();
 	switch (orig) {
 	case 0:
 		/* SEEK_SET */
@@ -45,6 +47,7 @@ static loff_t mtd_lseek (struct file *file, loff_t offset, int orig)
 		file->f_pos =mtd->size + offset;
 		break;
 	default:
+		unlock_kernel();
 		return -EINVAL;
 	}
 
@@ -53,6 +56,7 @@ static loff_t mtd_lseek (struct file *file, loff_t offset, int orig)
 	else if (file->f_pos >= mtd->size)
 		file->f_pos = mtd->size - 1;
 
+	unlock_kernel();
 	return file->f_pos;
 }
 

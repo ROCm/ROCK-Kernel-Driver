@@ -278,7 +278,7 @@ static void irda_usb_change_speed_xbofs(struct irda_usb_cb *self)
 	urb->transfer_flags = USB_QUEUE_BULK | USB_ASYNC_UNLINK;
 	urb->timeout = MSECS_TO_JIFFIES(100);
 
-	if ((ret = usb_submit_urb(urb))) {
+	if ((ret = usb_submit_urb(urb, GFP_KERNEL))) {
 		WARNING(__FUNCTION__ "(), failed Speed URB\n");
 	}
 	spin_unlock_irqrestore(&self->lock, flags);
@@ -451,7 +451,7 @@ static int irda_usb_hard_xmit(struct sk_buff *skb, struct net_device *netdev)
 	}
 	
 	/* Ask USB to send the packet */
-	if ((res = usb_submit_urb(urb))) {
+	if ((res = usb_submit_urb(urb, GFP_KERNEL))) {
 		WARNING(__FUNCTION__ "(), failed Tx URB\n");
 		self->stats.tx_errors++;
 		/* Let USB recover : We will catch that in the watchdog */
@@ -730,7 +730,7 @@ static void irda_usb_submit(struct irda_usb_cb *self, struct sk_buff *skb, struc
 	urb->status = 0;
 	urb->next = NULL;	/* Don't auto resubmit URBs */
 	
-	ret = usb_submit_urb(urb);
+	ret = usb_submit_urb(urb, GFP_KERNEL);
 	if (ret) {
 		/* If this ever happen, we are in deep s***.
 		 * Basically, the Rx path will stop... */

@@ -1214,21 +1214,11 @@ int __init ndisc_init(struct net_proto_family *ops)
 	struct sock *sk;
         int err;
 
-	ndisc_socket = sock_alloc();
-	if (ndisc_socket == NULL) {
+	err = sock_create(PF_INET6, SOCK_RAW, IPPROTO_ICMPV6, &ndisc_socket);
+	if (err < 0) {
 		printk(KERN_ERR
-		       "Failed to create the NDISC control socket.\n");
-		return -1;
-	}
-	ndisc_socket->inode->i_uid = 0;
-	ndisc_socket->inode->i_gid = 0;
-	ndisc_socket->type = SOCK_RAW;
-
-	if((err = ops->create(ndisc_socket, IPPROTO_ICMPV6)) < 0) {
-		printk(KERN_DEBUG 
 		       "Failed to initialize the NDISC control socket (err %d).\n",
 		       err);
-		sock_release(ndisc_socket);
 		ndisc_socket = NULL; /* For safety. */
 		return err;
 	}

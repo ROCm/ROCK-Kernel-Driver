@@ -257,7 +257,7 @@ static void catc_irq_done(struct urb *urb)
 
 	if ((data[1] & 0x80) && !test_and_set_bit(RX_RUNNING, &catc->flags)) {
 		catc->rx_urb->dev = catc->usbdev;
-		if ((status = usb_submit_urb(catc->rx_urb)) < 0) {
+		if ((status = usb_submit_urb(catc->rx_urb, GFP_KERNEL)) < 0) {
 			err("submit(rx_urb) status %d", status);
 			return;
 		} 
@@ -286,7 +286,7 @@ static void catc_tx_run(struct catc *catc)
 	catc->tx_urb->transfer_buffer = catc->tx_buf[catc->tx_idx];
 	catc->tx_urb->dev = catc->usbdev;
 
-	if ((status = usb_submit_urb(catc->tx_urb)) < 0)
+	if ((status = usb_submit_urb(catc->tx_urb, GFP_KERNEL)) < 0)
 		err("submit(tx_urb), status %d", status);
 
 	catc->tx_idx = !catc->tx_idx;
@@ -402,7 +402,7 @@ static void catc_ctrl_run(struct catc *catc)
 	if (!q->dir && q->buf && q->len)
 		memcpy(catc->ctrl_buf, q->buf, q->len);
 
-	if ((status = usb_submit_urb(catc->ctrl_urb)))
+	if ((status = usb_submit_urb(catc->ctrl_urb, GFP_KERNEL)))
 		err("submit(ctrl_urb) status %d", status);
 }
 
@@ -625,7 +625,7 @@ static int catc_open(struct net_device *netdev)
 	int status;
 
 	catc->irq_urb->dev = catc->usbdev;
-	if ((status = usb_submit_urb(catc->irq_urb)) < 0) {
+	if ((status = usb_submit_urb(catc->irq_urb, GFP_KERNEL)) < 0) {
 		err("submit(irq_urb) status %d", status);
 		return -1;
 	}

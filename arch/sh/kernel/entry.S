@@ -1195,6 +1195,8 @@ ENTRY(sys_call_table)
 	.long SYMBOL_NAME(sys_madvise)
 	.long SYMBOL_NAME(sys_getdents64)	/* 220 */
 	.long SYMBOL_NAME(sys_fcntl64)
+	.long SYMBOL_NAME(sys_gettid)
+	.long SYMBOL_NAME(sys_tkill)
 
 	/*
 	 * NOTE!! This doesn't have to be exact - we just have

@@ -1148,3 +1148,4 @@ sys_call_table:
 	.quad sys_gettid
 	.quad sys_readahead
 	.quad sys_ni_syscall			/* 380, sys_security */
+	.quad sys_tkill

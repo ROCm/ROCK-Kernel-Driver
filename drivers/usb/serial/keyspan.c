@@ -378,7 +378,7 @@ static int keyspan_write(struct usb_serial_port *port, int from_user,
 
 		this_urb->transfer_flags &= ~USB_ASYNC_UNLINK;
 		this_urb->dev = port->serial->dev;
-		if ((err = usb_submit_urb(this_urb)) != 0) {
+		if ((err = usb_submit_urb(this_urb, GFP_KERNEL)) != 0) {
 			dbg("usb_submit_urb(write bulk) failed (%d)\n", err);
 		}
 		p_priv->tx_start_time[flip] = jiffies;
@@ -436,7 +436,7 @@ static void	usa26_indat_callback(struct urb *urb)
 				
 		/* Resubmit urb so we continue receiving */
 	urb->dev = port->serial->dev;
-	if ((err = usb_submit_urb(urb)) != 0) {
+	if ((err = usb_submit_urb(urb, GFP_KERNEL)) != 0) {
 		dbg(__FUNCTION__ "resubmit read urb failed. (%d)\n", err);
 	}
 	return;
@@ -535,7 +535,7 @@ static void	usa26_instat_callback(struct urb *urb)
 exit:
 	/* Resubmit urb so we continue receiving */
 	urb->dev = serial->dev;
-	if ((err = usb_submit_urb(urb)) != 0) {
+	if ((err = usb_submit_urb(urb, GFP_KERNEL)) != 0) {
 		dbg(__FUNCTION__ "resubmit read urb failed. (%d)\n", err);
 	}
 }
@@ -586,7 +586,7 @@ static void     usa28_indat_callback(struct urb *urb)
 
 		/* Resubmit urb so we continue receiving */
 		urb->dev = port->serial->dev;
-		if ((err = usb_submit_urb(urb)) != 0) {
+		if ((err = usb_submit_urb(urb, GFP_KERNEL)) != 0) {
 			dbg(__FUNCTION__ "resubmit read urb failed. (%d)\n",
 err);
 		}
@@ -671,7 +671,7 @@ static void	usa28_instat_callback(struct urb *urb)
 exit:	
 		/* Resubmit urb so we continue receiving */
 	urb->dev = serial->dev;
-	if ((err = usb_submit_urb(urb)) != 0) {
+	if ((err = usb_submit_urb(urb, GFP_KERNEL)) != 0) {
 		dbg(__FUNCTION__ "resubmit read urb failed. (%d)\n", err);
 	}
 }
@@ -764,7 +764,7 @@ exit:
 		/* Resubmit urb so we continue receiving */
 	urb->dev = serial->dev;
 
-	if ((err = usb_submit_urb(urb)) != 0) {
+	if ((err = usb_submit_urb(urb, GFP_KERNEL)) != 0) {
 		dbg(__FUNCTION__ "resubmit read urb failed. (%d)\n", err);
 	}
 }
@@ -819,7 +819,7 @@ static void	usa49_indat_callback(struct urb *urb)
 				
 		/* Resubmit urb so we continue receiving */
 	urb->dev = port->serial->dev;
-	if ((err = usb_submit_urb(urb)) != 0) {
+	if ((err = usb_submit_urb(urb, GFP_KERNEL)) != 0) {
 		dbg(__FUNCTION__ "resubmit read urb failed. (%d)\n", err);
 	}
 }
@@ -880,7 +880,7 @@ static int keyspan_open (struct usb_serial_port *port, struct file *filp)
 		if ((urb = p_priv->in_urbs[i]) == NULL)
 			continue;
 		urb->dev = serial->dev;
-		if ((err = usb_submit_urb(urb)) != 0) {
+		if ((err = usb_submit_urb(urb, GFP_KERNEL)) != 0) {
 			dbg(__FUNCTION__ " submit urb %d failed (%d)\n", i, err);
 		}
 	}
@@ -1408,7 +1408,7 @@ static int keyspan_usa26_send_setup(struct usb_serial *serial,
 	this_urb->transfer_buffer_length = sizeof(msg);
 
 	this_urb->dev = serial->dev;
-	if ((err = usb_submit_urb(this_urb)) != 0) {
+	if ((err = usb_submit_urb(this_urb, GFP_KERNEL)) != 0) {
 		dbg(__FUNCTION__ " usb_submit_urb(setup) failed (%d)\n", err);
 	}
 #if 0
@@ -1494,7 +1494,7 @@ static int keyspan_usa28_send_setup(struct usb_serial *serial,
 	this_urb->transfer_buffer_length = sizeof(msg);
 
 	this_urb->dev = serial->dev;
-	if ((err = usb_submit_urb(this_urb)) != 0) {
+	if ((err = usb_submit_urb(this_urb, GFP_KERNEL)) != 0) {
 		dbg(__FUNCTION__ " usb_submit_urb(setup) failed\n");
 	}
 #if 0
@@ -1622,7 +1622,7 @@ static int keyspan_usa49_send_setup(struct usb_serial *serial,
 	this_urb->transfer_buffer_length = sizeof(msg);
 
 	this_urb->dev = serial->dev;
-	if ((err = usb_submit_urb(this_urb)) != 0) {
+	if ((err = usb_submit_urb(this_urb, GFP_KERNEL)) != 0) {
 		dbg(__FUNCTION__ " usb_submit_urb(setup) failed (%d)\n", err);
 	}
 #if 0
@@ -1708,7 +1708,7 @@ static int keyspan_startup (struct usb_serial *serial)
 	keyspan_setup_urbs(serial);
 
 	s_priv->instat_urb->dev = serial->dev;
-	if ((err = usb_submit_urb(s_priv->instat_urb)) != 0) {
+	if ((err = usb_submit_urb(s_priv->instat_urb, GFP_KERNEL)) != 0) {
 		dbg(__FUNCTION__ " submit instat urb failed %d\n", err);
 	}
 			

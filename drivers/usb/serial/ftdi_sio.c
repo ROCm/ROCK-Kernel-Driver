@@ -356,7 +356,7 @@ static int  ftdi_sio_open (struct usb_serial_port *port, struct file *filp)
 			      usb_rcvbulkpipe(serial->dev, port->bulk_in_endpointAddress),
 			      port->read_urb->transfer_buffer, port->read_urb->transfer_buffer_length,
 			      ftdi_sio_read_bulk_callback, port);
-		result = usb_submit_urb(port->read_urb);
+		result = usb_submit_urb(port->read_urb, GFP_KERNEL);
 		if (result)
 			err(__FUNCTION__ " - failed submitting read urb, error %d", result);
 	}
@@ -479,7 +479,7 @@ static int ftdi_sio_write (struct usb_serial_port *port, int from_user,
 		      port->write_urb->transfer_buffer, count,
 		      ftdi_sio_write_bulk_callback, port);
 		
-	result = usb_submit_urb(port->write_urb);
+	result = usb_submit_urb(port->write_urb, GFP_KERNEL);
 	if (result) {
 		err(__FUNCTION__ " - failed submitting write urb, error %d", result);
 		up (&port->sem);
@@ -644,7 +644,7 @@ static void ftdi_sio_read_bulk_callback (struct urb *urb)
 		      port->read_urb->transfer_buffer, port->read_urb->transfer_buffer_length,
 		      ftdi_sio_read_bulk_callback, port);
 
-	result = usb_submit_urb(port->read_urb);
+	result = usb_submit_urb(port->read_urb, GFP_KERNEL);
 	if (result)
 		err(__FUNCTION__ " - failed resubmitting read urb, error %d", result);
 

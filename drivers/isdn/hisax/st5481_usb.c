@@ -48,7 +48,7 @@ static void usb_next_ctrl_msg(struct urb *urb,
 	// Prepare the URB
 	urb->dev = adapter->usb_dev;
 
-	SUBMIT_URB(urb);
+	SUBMIT_URB(urb, GFP_KERNEL);
 }
 
 /*
@@ -357,7 +357,7 @@ void __devinit st5481_start(struct st5481_adapter *adapter)
 	adapter->leds = RED_LED; 
 
 	// Start receiving on the interrupt endpoint
-	SUBMIT_URB(intr->urb); 
+	SUBMIT_URB(intr->urb, GFP_KERNEL); 
 
 	while ((request = init_cmd_table[i++])) {
 		value = init_cmd_table[i++];
@@ -517,7 +517,7 @@ static void usb_in_complete(struct urb *urb)
 	urb->dev = in->adapter->usb_dev;
 	urb->actual_length = 0;
 
-	SUBMIT_URB(urb);
+	SUBMIT_URB(urb, GFP_KERNEL);
 }
 
 int __devinit st5481_setup_in(struct st5481_in *in)
@@ -603,10 +603,10 @@ static void st5481_start_rcv(void *context)
 	DBG(4,"");
 
 	in->urb[0]->dev = adapter->usb_dev;
-	SUBMIT_URB(in->urb[0]);
+	SUBMIT_URB(in->urb[0], GFP_KERNEL);
 
 	in->urb[1]->dev = adapter->usb_dev;
-	SUBMIT_URB(in->urb[1]);
+	SUBMIT_URB(in->urb[1], GFP_KERNEL);
 }
 
 void st5481_in_mode(struct st5481_in *in, int mode)

@@ -84,18 +84,26 @@ static void isapnp_devid(char *str, unsigned short vendor, unsigned short device
 
 static loff_t isapnp_info_entry_lseek(struct file *file, loff_t offset, int orig)
 {
+	loff_t ret;
+
+	lock_kernel();
+
 	switch (orig) {
 	case 0:	/* SEEK_SET */
 		file->f_pos = offset;
-		return file->f_pos;
+		ret = file->f_pos;
+		break;
 	case 1:	/* SEEK_CUR */
 		file->f_pos += offset;
-		return file->f_pos;
+		ret = file->f_pos;
+		break;
 	case 2:	/* SEEK_END */
 	default:
-		return -EINVAL;
+		ret = -EINVAL;
 	}
-	return -ENXIO;
+
+	unlock_kernel();
+	return ret;
 }
 
 static ssize_t isapnp_info_entry_read(struct file *file, char *buffer,
@@ -211,8 +219,9 @@ static struct file_operations isapnp_info_entry_operations =
 
 static loff_t isapnp_proc_bus_lseek(struct file *file, loff_t off, int whence)
 {
-	loff_t new;
-	
+	loff_t new = -1;
+
+	lock_kernel();
 	switch (whence) {
 	case 0:
 		new = off;
@@ -223,18 +232,19 @@ static loff_t isapnp_proc_bus_lseek(struct file *file, loff_t off, int whence)
 	case 2:
 		new = 256 + off;
 		break;
-	default:
+	}
+	if (new < 0 || new > 256) {
+		unlock_kernel();
 		return -EINVAL;
 	}
-	if (new < 0 || new > 256)
-		return -EINVAL;
+	unlock_kernel();
 	return (file->f_pos = new);
 }
 
 static ssize_t isapnp_proc_bus_read(struct file *file, char *buf, size_t nbytes, loff_t *ppos)
 {
 	struct inode *ino = file->f_dentry->d_inode;
-	struct proc_dir_entry *dp = ino->u.generic_ip;
+	struct proc_dir_entry *dp = PDE(ino);
 	struct pci_dev *dev = dp->data;
 	int pos = *ppos;
 	int cnt, size = 256;

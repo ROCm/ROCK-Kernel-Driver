@@ -49,7 +49,7 @@ do {			\
 
 /*-------------------------------------------------------------------*/
 /* Version Information */
-#define DRIVER_VERSION "0.9.9"
+#define DRIVER_VERSION "0.9.11"
 #define DRIVER_AUTHOR  "Wolfgang Mües <wmues@nexgo.de>"
 #define DRIVER_DESC    "Auerswald PBX/System Telephone usb driver"
 
@@ -191,6 +191,13 @@ typedef struct auerchain
         struct list_head free_list;     /* list of available elements */
 } auerchain_t,*pauerchain_t;
 
+/* urb blocking completion helper struct */
+typedef struct
+{
+	wait_queue_head_t wqh;    	/* wait for completion */
+	unsigned int done;		/* completion flag */
+} auerchain_chs_t,*pauerchain_chs_t;
+
 /* ...................................................................*/
 /* buffer element */
 struct  auerbufctl;                     /* forward */
@@ -330,7 +337,7 @@ static void auerchain_complete (struct urb * urb)
                 urb    = acep->urbp;
                 dbg ("auerchain_complete: submitting next urb from chain");
 		urb->status = 0;	/* needed! */
-		result = usb_submit_urb( urb);
+		result = usb_submit_urb(urb, GFP_KERNEL);
 
                 /* check for submit errors */
                 if (result) {
@@ -408,7 +415,7 @@ static int auerchain_submit_urb_list (pauerchain_t acp, struct urb * urb, int ea
         if (acep) {
                 dbg("submitting urb immediate");
 		urb->status = 0;	/* needed! */
-                result = usb_submit_urb( urb);
+                result = usb_submit_urb(urb, GFP_KERNEL);
                 /* check for submit errors */
                 if (result) {
                         urb->status = result;
@@ -600,8 +607,10 @@ ac_fail:/* free the elements */
 /* completion handler for synchronous chained URBs */
 static void auerchain_blocking_completion (struct urb *urb)
 {
-	wait_queue_head_t *wakeup = (wait_queue_head_t *)urb->context;
-	wake_up (wakeup);
+	pauerchain_chs_t pchs = (pauerchain_chs_t)urb->context;
+	pchs->done = 1;
+	wmb();
+	wake_up (&pchs->wqh);
 }
 
 
@@ -609,36 +618,43 @@ static void auerchain_blocking_completion (struct urb *urb)
 static int auerchain_start_wait_urb (pauerchain_t acp, struct urb *urb, int timeout, int* actual_length)
 {
 	DECLARE_WAITQUEUE (wait, current);
-	DECLARE_WAIT_QUEUE_HEAD (wqh);
+	auerchain_chs_t chs;
 	int status;
 
 	dbg ("auerchain_start_wait_urb called");
-	init_waitqueue_head (&wqh);
-	current->state = TASK_INTERRUPTIBLE;
-	add_wait_queue (&wqh, &wait);
-	urb->context = &wqh;
-	status = auerchain_submit_urb ( acp, urb);
+	init_waitqueue_head (&chs.wqh);
+	chs.done = 0;
+
+	set_current_state (TASK_UNINTERRUPTIBLE);
+	add_wait_queue (&chs.wqh, &wait);
+	urb->context = &chs;
+	status = auerchain_submit_urb (acp, urb);
 	if (status) {
 		/* something went wrong */
-		current->state = TASK_RUNNING;
-		remove_wait_queue (&wqh, &wait);
+		set_current_state (TASK_RUNNING);
+		remove_wait_queue (&chs.wqh, &wait);
 		return status;
 	}
 
-	if (urb->status == -EINPROGRESS) {
-		while (timeout && urb->status == -EINPROGRESS)
-			status = timeout = schedule_timeout (timeout);
-	} else
-		status = 1;
+	while (timeout && !chs.done)
+	{
+		timeout = schedule_timeout (timeout);
+		set_current_state(TASK_UNINTERRUPTIBLE);
+		rmb();
+	}
 
-	current->state = TASK_RUNNING;
-	remove_wait_queue (&wqh, &wait);
+	set_current_state (TASK_RUNNING);
+	remove_wait_queue (&chs.wqh, &wait);
 
-	if (!status) {
-		/* timeout */
-		dbg ("auerchain_start_wait_urb: timeout");
-		auerchain_unlink_urb (acp, urb);  /* remove urb safely */
-		status = -ETIMEDOUT;
+	if (!timeout && !chs.done) {
+		if (urb->status != -EINPROGRESS) {	/* No callback?!! */
+			dbg ("auerchain_start_wait_urb: raced timeout");
+			status = urb->status;
+		} else {
+			dbg ("auerchain_start_wait_urb: timeout");
+			auerchain_unlink_urb (acp, urb);  /* remove urb safely */
+			status = -ETIMEDOUT;
+		}
 	} else
 		status = urb->status;
 
@@ -932,6 +948,8 @@ static void auerswald_ctrlread_complete (struct urb * urb)
 			/* reuse the buffer */
 			err ("control read: transmission error %d, can not retry", urb->status);
 			auerbuf_releasebuf (bp);
+			/* Wake up all processes waiting for a buffer */
+			wake_up (&cp->bufferwait);
 			return;
 		}
 		bp->retries++;
@@ -1128,7 +1146,7 @@ static int auerswald_int_open (pauerswald_t cp)
         FILL_INT_URB (cp->inturbp, cp->usbdev, usb_rcvintpipe (cp->usbdev,AU_IRQENDP), cp->intbufp, irqsize, auerswald_int_complete, cp, ep->bInterval);
         /* start the urb */
 	cp->inturbp->status = 0;	/* needed! */
-	ret = usb_submit_urb (cp->inturbp);
+	ret = usb_submit_urb (cp->inturbp, GFP_KERNEL);
 
 intoend:
         if (ret < 0) {
@@ -1376,9 +1394,6 @@ static int auerchar_open (struct inode *inode, struct file *file)
 	}
 	up (&dev_table_mutex);
 
-	/* prevent module unloading */
-	MOD_INC_USE_COUNT;
-
 	/* we have access to the device. Now lets allocate memory */
 	ccp = (pauerchar_t) kmalloc(sizeof(auerchar_t), GFP_KERNEL);
 	if (ccp == NULL) {
@@ -1415,7 +1430,6 @@ static int auerchar_open (struct inode *inode, struct file *file)
 	/* Error exit */
 ofail:	up (&cp->mutex);
 	auerchar_delete (ccp);
-  	MOD_DEC_USE_COUNT;
 	return ret;
 }
 
@@ -1553,21 +1567,14 @@ static int auerchar_ioctl (struct inode *inode, struct file *file, unsigned int 
 	return ret;
 }
 
-
-/* Seek is not supported */
-static loff_t auerchar_llseek (struct file *file, loff_t offset, int origin)
-{
-        dbg ("auerchar_seek");
-        return -ESPIPE;
-}
-
-
 /* Read data from the device */
 static ssize_t auerchar_read (struct file *file, char *buf, size_t count, loff_t * ppos)
 {
         unsigned long flags;
 	pauerchar_t ccp = (pauerchar_t) file->private_data;
         pauerbuf_t   bp = NULL;
+	wait_queue_t wait;
+
         dbg ("auerchar_read");
 
 	/* Error checking */
@@ -1630,6 +1637,11 @@ doreadbuf:
 
 	/* a read buffer is not available. Try to get the next data block. */
 doreadlist:
+	/* Preparing for sleep */
+	init_waitqueue_entry (&wait, current);
+	set_current_state (TASK_INTERRUPTIBLE);
+	add_wait_queue (&ccp->readwait, &wait);
+
 	bp = NULL;
 	spin_lock_irqsave (&ccp->bufctl.lock, flags);
         if (!list_empty (&ccp->bufctl.rec_buff_list)) {
@@ -1644,20 +1656,25 @@ doreadlist:
 	if (bp) {
 		ccp->readbuf = bp;
 		ccp->readoffset = AUH_SIZE; /* for headerbyte */
+		set_current_state (TASK_RUNNING);
+		remove_wait_queue (&ccp->readwait, &wait);
 		goto doreadbuf;		  /* now we can read! */
 	}
 
 	/* no data available. Should we wait? */
 	if (file->f_flags & O_NONBLOCK) {
                 dbg ("No read buffer available, returning -EAGAIN");
+		set_current_state (TASK_RUNNING);
+		remove_wait_queue (&ccp->readwait, &wait);
 		up (&ccp->readmutex);
 		up (&ccp->mutex);
-                return -EAGAIN;  /* nonblocking, no data available */
+		return -EAGAIN;  /* nonblocking, no data available */
         }
 
 	/* yes, we should wait! */
 	up (&ccp->mutex); /* allow other operations while we wait */
-	interruptible_sleep_on (&ccp->readwait);
+	schedule();
+	remove_wait_queue (&ccp->readwait, &wait);
 	if (signal_pending (current)) {
 		/* waked up by a signal */
 		up (&ccp->readmutex);
@@ -1688,6 +1705,7 @@ static ssize_t auerchar_write (struct file *file, const char *buf, size_t len, l
         pauerbuf_t bp;
         unsigned long flags;
 	int ret;
+	wait_queue_t wait;
 
         dbg ("auerchar_write %d bytes", len);
 
@@ -1724,6 +1742,11 @@ write_again:
 		up (&ccp->mutex);
 		return -EIO;
 	}
+	/* Prepare for sleep */
+	init_waitqueue_entry (&wait, current);
+	set_current_state (TASK_INTERRUPTIBLE);
+	add_wait_queue (&cp->bufferwait, &wait);
+
 	/* Try to get a buffer from the device pool.
 	   We can't use a buffer from ccp->bufctl because the write
 	   command will last beond a release() */
@@ -1744,16 +1767,22 @@ write_again:
 
 		/* NONBLOCK: don't wait */
 		if (file->f_flags & O_NONBLOCK) {
+			set_current_state (TASK_RUNNING);
+			remove_wait_queue (&cp->bufferwait, &wait);
 			return -EAGAIN;
 		}
 
 		/* BLOCKING: wait */
-		interruptible_sleep_on (&cp->bufferwait);
+		schedule();
+		remove_wait_queue (&cp->bufferwait, &wait);
 		if (signal_pending (current)) {
 			/* waked up by a signal */
 			return -ERESTARTSYS;
 		}
 		goto write_again;
+	} else {
+		set_current_state (TASK_RUNNING);
+		remove_wait_queue (&cp->bufferwait, &wait);
 	}
 
 	/* protect against too big write requests */
@@ -1763,6 +1792,8 @@ write_again:
 	if (copy_from_user ( bp->bufp+AUH_SIZE, buf, len)) {
 		dbg ("copy_from_user failed");
 		auerbuf_releasebuf (bp);
+		/* Wake up all processes waiting for a buffer */
+		wake_up (&cp->bufferwait);
 		up (&cp->mutex);
 		up (&ccp->mutex);
 		return -EIO;
@@ -1787,6 +1818,8 @@ write_again:
 	if (ret) {
 		dbg ("auerchar_write: nonzero result of auerchain_submit_urb %d", ret);
 		auerbuf_releasebuf (bp);
+		/* Wake up all processes waiting for a buffer */
+		wake_up (&cp->bufferwait);
 		up (&ccp->mutex);
 		return -EIO;
 	}
@@ -1831,9 +1864,6 @@ static int auerchar_release (struct inode *inode, struct file *file)
 	up (&ccp->mutex);
 	auerchar_delete (ccp);
 
-	/* release the module */
-	MOD_DEC_USE_COUNT;
-
 	return 0;
 }
 
@@ -1843,7 +1873,7 @@ static int auerchar_release (struct inode *inode, struct file *file)
 static struct file_operations auerswald_fops =
 {
 	owner:		THIS_MODULE,
-	llseek:		auerchar_llseek,
+	llseek:		no_llseek,
 	read:		auerchar_read,
 	write:          auerchar_write,
 	ioctl:		auerchar_ioctl,
@@ -2154,3 +2184,4 @@ module_init (auerswald_init);
 module_exit (auerswald_cleanup);
 
 /* --------------------------------------------------------------------- */
+

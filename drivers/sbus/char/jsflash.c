@@ -259,16 +259,23 @@ static void jsfd_do_request(request_queue_t *q)
  */
 static loff_t jsf_lseek(struct file * file, loff_t offset, int orig)
 {
+	loff_t ret;
+
+	lock_kernel();
 	switch (orig) {
 		case 0:
 			file->f_pos = offset;
-			return file->f_pos;
+			ret = file->f_pos;
+			break;
 		case 1:
 			file->f_pos += offset;
-			return file->f_pos;
+			ret = file->f_pos;
+			break;
 		default:
-			return -EINVAL;
+			ret = -EINVAL;
 	}
+	unlock_kernel();
+	return ret;
 }
 
 /*

@@ -47,5 +47,10 @@ static int __init init_fat_fs(void)
 	return fat_init_inodecache();
 }
 
+static void __exit exit_fat_fs(void)
+{
+	fat_destroy_inodecache();
+}
+
 module_init(init_fat_fs)
-module_exit(fat_destroy_inodecache)
+module_exit(exit_fat_fs)

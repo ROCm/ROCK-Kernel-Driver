@@ -302,7 +302,7 @@ static struct super_operations ramfs_ops = {
 	put_inode:	force_delete,
 };
 
-static struct super_block *ramfs_read_super(struct super_block * sb, void * data, int silent)
+static int ramfs_fill_super(struct super_block * sb, void * data, int silent)
 {
 	struct inode * inode;
 	struct dentry * root;
@@ -313,19 +313,33 @@ static struct super_block *ramfs_read_super(struct super_block * sb, void * data
 	sb->s_op = &ramfs_ops;
 	inode = ramfs_get_inode(sb, S_IFDIR | 0755, 0);
 	if (!inode)
-		return NULL;
+		return -ENOMEM;
 
 	root = d_alloc_root(inode);
 	if (!root) {
 		iput(inode);
-		return NULL;
+		return -ENOMEM;
 	}
 	sb->s_root = root;
-	return sb;
+	return 0;
 }
 
-static DECLARE_FSTYPE(ramfs_fs_type, "ramfs", ramfs_read_super, FS_LITTER);
-static DECLARE_FSTYPE(rootfs_fs_type, "rootfs", ramfs_read_super, FS_NOMOUNT|FS_LITTER);
+static struct super_block *ramfs_get_sb(struct file_system_type *fs_type,
+	int flags, char *dev_name, void *data)
+{
+	return get_sb_nodev(fs_type, flags, data, ramfs_fill_super);
+}
+
+static struct file_system_type ramfs_fs_type = {
+	name:		"ramfs",
+	get_sb:		ramfs_get_sb,
+	fs_flags:	FS_LITTER,
+};
+static struct file_system_type rootfs_fs_type = {
+	name:		"rootfs",
+	get_sb:		ramfs_get_sb,
+	fs_flags:	FS_NOMOUNT|FS_LITTER,
+};
 
 static int __init init_ramfs_fs(void)
 {

@@ -751,21 +751,11 @@ int __init igmp6_init(struct net_proto_family *ops)
 	struct sock *sk;
 	int err;
 
-	igmp6_socket = sock_alloc();
-	if (igmp6_socket == NULL) {
+	err = sock_create(PF_INET6, SOCK_RAW, IPPROTO_ICMPV6, &igmp6_socket);
+	if (err < 0) {
 		printk(KERN_ERR
-		       "Failed to create the IGMP6 control socket.\n");
-		return -1;
-	}
-	igmp6_socket->inode->i_uid = 0;
-	igmp6_socket->inode->i_gid = 0;
-	igmp6_socket->type = SOCK_RAW;
-
-	if((err = ops->create(igmp6_socket, IPPROTO_ICMPV6)) < 0) {
-		printk(KERN_DEBUG 
 		       "Failed to initialize the IGMP6 control socket (err %d).\n",
 		       err);
-		sock_release(igmp6_socket);
 		igmp6_socket = NULL; /* For safety. */
 		return err;
 	}

@@ -356,10 +356,10 @@ static void usb_d_out(struct st5481_adapter *adapter, int buf_nr)
 
 	DBG_ISO_PACKET(0x20,urb);
 
-	if (usb_submit_urb(urb) < 0) {
+	if (usb_submit_urb(urb, GFP_KERNEL) < 0) {
 		// There is another URB queued up
 		urb->transfer_flags = USB_ISO_ASAP;
-		SUBMIT_URB(urb);
+		SUBMIT_URB(urb, GFP_KERNEL);
 	}	
 }
 
@@ -450,7 +450,7 @@ static void dout_start_xmit(struct FsmInst *fsm, int event, void *arg)
 	urb->transfer_flags = USB_ISO_ASAP;
 
 	DBG_ISO_PACKET(0x20,urb);
-	SUBMIT_URB(urb);
+	SUBMIT_URB(urb, GFP_KERNEL);
 }
 
 static void dout_short_fifo(struct FsmInst *fsm, int event, void *arg)

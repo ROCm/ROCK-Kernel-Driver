@@ -171,77 +171,65 @@ sys32_execve (char *filename, unsigned int argv, unsigned int envp,
 }
 
 static inline int
-putstat (struct stat32 *ubuf, struct stat *kbuf)
+putstat (struct stat32 *ubuf, struct kstat *stat)
 {
 	int err;
 
-	if (clear_user(ubuf, sizeof(*ubuf)))
-		return 1;
+	if (stat->size > MAX_NON_LFS)
+		return -EOVERFLOW;
 
-	err  = __put_user(kbuf->st_dev, &ubuf->st_dev);
-	err |= __put_user(kbuf->st_ino, &ubuf->st_ino);
-	err |= __put_user(kbuf->st_mode, &ubuf->st_mode);
-	err |= __put_user(kbuf->st_nlink, &ubuf->st_nlink);
-	err |= __put_user(kbuf->st_uid, &ubuf->st_uid);
-	err |= __put_user(kbuf->st_gid, &ubuf->st_gid);
-	err |= __put_user(kbuf->st_rdev, &ubuf->st_rdev);
-	err |= __put_user(kbuf->st_size, &ubuf->st_size);
-	err |= __put_user(kbuf->st_atime, &ubuf->st_atime);
-	err |= __put_user(kbuf->st_mtime, &ubuf->st_mtime);
-	err |= __put_user(kbuf->st_ctime, &ubuf->st_ctime);
-	err |= __put_user(kbuf->st_blksize, &ubuf->st_blksize);
-	err |= __put_user(kbuf->st_blocks, &ubuf->st_blocks);
+	if (clear_user(ubuf, sizeof(*ubuf)))
+		return -EFAULT;
+
+	err  = __put_user(stat->dev, &ubuf->st_dev);
+	err |= __put_user(stat->ino, &ubuf->st_ino);
+	err |= __put_user(stat->mode, &ubuf->st_mode);
+	err |= __put_user(stat->nlink, &ubuf->st_nlink);
+	err |= __put_user(high2lowuid(stat->uid), &ubuf->st_uid);
+	err |= __put_user(high2lowgid(stat->gid), &ubuf->st_gid);
+	err |= __put_user(stat->rdev, &ubuf->st_rdev);
+	err |= __put_user(stat->size, &ubuf->st_size);
+	err |= __put_user(stat->atime, &ubuf->st_atime);
+	err |= __put_user(stat->mtime, &ubuf->st_mtime);
+	err |= __put_user(stat->ctime, &ubuf->st_ctime);
+	err |= __put_user(stat->blksize, &ubuf->st_blksize);
+	err |= __put_user(stat->blocks, &ubuf->st_blocks);
 	return err;
 }
-
-extern asmlinkage long sys_newstat (char * filename, struct stat * statbuf);
 
 asmlinkage long
 sys32_newstat (char *filename, struct stat32 *statbuf)
 {
-	int ret;
-	struct stat s;
-	mm_segment_t old_fs = get_fs();
+	struct kstat stat;
+	int ret = vfs_stat(filename, &stat);
 
-	set_fs(KERNEL_DS);
-	ret = sys_newstat(filename, &s);
-	set_fs(old_fs);
-	if (putstat(statbuf, &s))
-		return -EFAULT;
+	if (!ret)
+		ret = putstat(statbuf, &stat);
+
 	return ret;
 }
-
-extern asmlinkage long sys_newlstat(char * filename, struct stat * statbuf);
 
 asmlinkage long
 sys32_newlstat (char *filename, struct stat32 *statbuf)
 {
-	mm_segment_t old_fs = get_fs();
-	struct stat s;
-	int ret;
+	struct kstat stat;
+	int ret = vfs_lstat(filename, &stat);
 
-	set_fs(KERNEL_DS);
-	ret = sys_newlstat(filename, &s);
-	set_fs(old_fs);
-	if (putstat(statbuf, &s))
-		return -EFAULT;
+	if (!ret)
+		ret = putstat(statbuf, &stat);
+
 	return ret;
 }
-
-extern asmlinkage long sys_newfstat(unsigned int fd, struct stat * statbuf);
 
 asmlinkage long
 sys32_newfstat (unsigned int fd, struct stat32 *statbuf)
 {
-	mm_segment_t old_fs = get_fs();
-	struct stat s;
-	int ret;
+	struct kstat stat;
+	int ret = vfs_fstat(fd, &stat);
 
-	set_fs(KERNEL_DS);
-	ret = sys_newfstat(fd, &s);
-	set_fs(old_fs);
-	if (putstat(statbuf, &s))
-		return -EFAULT;
+	if (!ret)
+		ret = putstat(statbuf, &stat);
+
 	return ret;
 }
 
@@ -3529,74 +3517,59 @@ sys32_ftruncate64 (int fd, unsigned int len_lo, unsigned int len_hi)
 }
 
 static int
-putstat64 (struct stat64 *ubuf, struct stat *kbuf)
+putstat64 (struct stat64 *ubuf, struct kstat *kbuf)
 {
 	int err;
 
 	if (clear_user(ubuf, sizeof(*ubuf)))
-		return 1;
+		return -EFAULT;
 
-	err  = __put_user(kbuf->st_dev, &ubuf->st_dev);
-	err |= __put_user(kbuf->st_ino, &ubuf->__st_ino);
-	err |= __put_user(kbuf->st_ino, &ubuf->st_ino_lo);
-	err |= __put_user(kbuf->st_ino >> 32, &ubuf->st_ino_hi);
-	err |= __put_user(kbuf->st_mode, &ubuf->st_mode);
-	err |= __put_user(kbuf->st_nlink, &ubuf->st_nlink);
-	err |= __put_user(kbuf->st_uid, &ubuf->st_uid);
-	err |= __put_user(kbuf->st_gid, &ubuf->st_gid);
-	err |= __put_user(kbuf->st_rdev, &ubuf->st_rdev);
-	err |= __put_user(kbuf->st_size, &ubuf->st_size_lo);
-	err |= __put_user((kbuf->st_size >> 32), &ubuf->st_size_hi);
-	err |= __put_user(kbuf->st_atime, &ubuf->st_atime);
-	err |= __put_user(kbuf->st_mtime, &ubuf->st_mtime);
-	err |= __put_user(kbuf->st_ctime, &ubuf->st_ctime);
-	err |= __put_user(kbuf->st_blksize, &ubuf->st_blksize);
-	err |= __put_user(kbuf->st_blocks, &ubuf->st_blocks);
+	err  = __put_user(kbuf->dev, &ubuf->st_dev);
+	err |= __put_user(kbuf->ino, &ubuf->__st_ino);
+	err |= __put_user(kbuf->ino, &ubuf->st_ino_lo);
+	err |= __put_user(kbuf->ino >> 32, &ubuf->st_ino_hi);
+	err |= __put_user(kbuf->mode, &ubuf->st_mode);
+	err |= __put_user(kbuf->nlink, &ubuf->st_nlink);
+	err |= __put_user(kbuf->uid, &ubuf->st_uid);
+	err |= __put_user(kbuf->gid, &ubuf->st_gid);
+	err |= __put_user(kbuf->rdev, &ubuf->st_rdev);
+	err |= __put_user(kbuf->size, &ubuf->st_size_lo);
+	err |= __put_user((kbuf->size >> 32), &ubuf->st_size_hi);
+	err |= __put_user(kbuf->atime, &ubuf->st_atime);
+	err |= __put_user(kbuf->mtime, &ubuf->st_mtime);
+	err |= __put_user(kbuf->ctime, &ubuf->st_ctime);
+	err |= __put_user(kbuf->blksize, &ubuf->st_blksize);
+	err |= __put_user(kbuf->blocks, &ubuf->st_blocks);
 	return err;
 }
 
 asmlinkage long
 sys32_stat64 (char *filename, struct stat64 *statbuf)
 {
-	mm_segment_t old_fs = get_fs();
-	struct stat s;
-	long ret;
-
-	set_fs(KERNEL_DS);
-	ret = sys_newstat(filename, &s);
-	set_fs(old_fs);
-	if (putstat64(statbuf, &s))
-		return -EFAULT;
+	struct kstat s;
+	long ret = vfs_stat(filename, &s);
+	if (!ret)
+		ret = putstat64(statbuf, &s);
 	return ret;
 }
 
 asmlinkage long
 sys32_lstat64 (char *filename, struct stat64 *statbuf)
 {
-	mm_segment_t old_fs = get_fs();
-	struct stat s;
-	long ret;
-
-	set_fs(KERNEL_DS);
-	ret = sys_newlstat(filename, &s);
-	set_fs(old_fs);
-	if (putstat64(statbuf, &s))
-		return -EFAULT;
+	struct kstat s;
+	long ret = vfs_lstat(filename, &s);
+	if (!ret)
+		ret = putstat64(statbuf, &s);
 	return ret;
 }
 
 asmlinkage long
 sys32_fstat64 (unsigned int fd, struct stat64 *statbuf)
 {
-	mm_segment_t old_fs = get_fs();
-	struct stat s;
-	long ret;
-
-	set_fs(KERNEL_DS);
-	ret = sys_newfstat(fd, &s);
-	set_fs(old_fs);
-	if (putstat64(statbuf, &s))
-		return -EFAULT;
+	struct kstat s;
+	long ret = vfs_fstat(fd, &s);
+	if (!ret)
+		ret = putstat64(statbuf, &s);
 	return ret;
 }
 

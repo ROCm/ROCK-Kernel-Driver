@@ -1267,7 +1267,7 @@ int shmem_sync_file(struct file * file, struct dentry *dentry, int datasync)
 }
 #endif
 
-static struct super_block *shmem_read_super(struct super_block * sb, void * data, int silent)
+static int shmem_fill_super(struct super_block * sb, void * data, int silent)
 {
 	struct inode * inode;
 	struct dentry * root;
@@ -1286,7 +1286,7 @@ static struct super_block *shmem_read_super(struct super_block * sb, void * data
 #ifdef CONFIG_TMPFS
 	if (shmem_parse_options (data, &mode, &blocks, &inodes)) {
 		printk(KERN_ERR "tmpfs invalid option\n");
-		return NULL;
+		return -EINVAL;
 	}
 #endif
 
@@ -1302,15 +1302,15 @@ static struct super_block *shmem_read_super(struct super_block * sb, void * data
 	sb->s_op = &shmem_ops;
 	inode = shmem_get_inode(sb, S_IFDIR | mode, 0);
 	if (!inode)
-		return NULL;
+		return -ENOMEM;
 
 	root = d_alloc_root(inode);
 	if (!root) {
 		iput(inode);
-		return NULL;
+		return -ENOMEM;
 	}
 	sb->s_root = root;
-	return sb;
+	return 0;
 }
 
 static kmem_cache_t * shmem_inode_cachep;
@@ -1410,12 +1410,33 @@ static struct vm_operations_struct shmem_vm_ops = {
 	nopage:	shmem_nopage,
 };
 
+static struct super_block *shmem_get_sb(struct file_system_type *fs_type,
+	int flags, char *dev_name, void *data)
+{
+	return get_sb_nodev(fs_type, flags, data, shmem_fill_super);
+}
+
 #ifdef CONFIG_TMPFS
 /* type "shm" will be tagged obsolete in 2.5 */
-static DECLARE_FSTYPE(shmem_fs_type, "shm", shmem_read_super, FS_LITTER);
-static DECLARE_FSTYPE(tmpfs_fs_type, "tmpfs", shmem_read_super, FS_LITTER);
+static struct file_system_type shmem_fs_type = {
+	owner:		THIS_MODULE,
+	name:		"shmem",
+	get_sb:		shmem_get_sb,
+	fs_flags:	FS_LITTER,
+};
+static struct file_system_type tmpfs_fs_type = {
+	owner:		THIS_MODULE,
+	name:		"tmpfs",
+	get_sb:		shmem_get_sb,
+	fs_flags:	FS_LITTER,
+};
 #else
-static DECLARE_FSTYPE(tmpfs_fs_type, "tmpfs", shmem_read_super, FS_LITTER|FS_NOMOUNT);
+static struct file_system_type tmpfs_fs_type = {
+	owner:		THIS_MODULE,
+	name:		"tmpfs",
+	get_sb:		shmem_get_sb,
+	fs_flags:	FS_LITTER|FS_NOMOUNT,
+};
 #endif
 static struct vfsmount *shm_mnt;
 

@@ -221,11 +221,6 @@ static ssize_t hci_vhci_chr_read(struct file * file, char * buf, size_t count, l
 	return ret;
 }
 
-static loff_t hci_vhci_chr_lseek(struct file * file, loff_t offset, int origin)
-{
-	return -ESPIPE;
-}
-
 static int hci_vhci_chr_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg)
 {
 	return -EINVAL;
@@ -296,7 +291,7 @@ static int hci_vhci_chr_close(struct inode *inode, struct file *file)
 
 static struct file_operations hci_vhci_fops = {
 	owner:	THIS_MODULE,	
-	llseek:	hci_vhci_chr_lseek,
+	llseek:	no_lseek,
 	read:	hci_vhci_chr_read,
 	write:	hci_vhci_chr_write,
 	poll:	hci_vhci_chr_poll,

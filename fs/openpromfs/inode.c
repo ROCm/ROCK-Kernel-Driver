@@ -998,8 +998,7 @@ static struct super_operations openprom_sops = {
 	statfs:		openprom_statfs,
 };
 
-struct super_block *openprom_read_super(struct super_block *s,void *data, 
-				    int silent)
+static int openprom_fill_super(struct super_block *s, void *data, int silent)
 {
 	struct inode * root_inode;
 
@@ -1013,15 +1012,25 @@ struct super_block *openprom_read_super(struct super_block *s,void *data,
 	s->s_root = d_alloc_root(root_inode);
 	if (!s->s_root)
 		goto out_no_root;
-	return s;
+	return 0;
 
 out_no_root:
-	printk("openprom_read_super: get root inode failed\n");
+	printk("openprom_fill_super: get root inode failed\n");
 	iput(root_inode);
-	return NULL;
+	return -ENOMEM;
 }
 
-static DECLARE_FSTYPE(openprom_fs_type, "openpromfs", openprom_read_super, 0);
+static struct super_block *openprom_get_sb(struct file_system_type *fs_type,
+	int flags, char *dev_name, void *data)
+{
+	return get_sb_single(fs_type, flags, data, openprom_fill_super);
+}
+
+static struct file_system_type openprom_fs_type = {
+	owner:		THIS_MODULE,
+	name:		"openpromfs",
+	get_sb:		openprom_get_sb,
+};
 
 static int __init init_openprom_fs(void)
 {

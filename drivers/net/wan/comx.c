@@ -876,7 +876,7 @@ cleanup_dev:
 
 static int comx_rmdir(struct inode *dir, struct dentry *dentry)
 {
-	struct proc_dir_entry *entry = dentry->d_inode->u.generic_ip;
+	struct proc_dir_entry *entry = PDE(dentry->d_inode);
 	struct net_device *dev = entry->data;
 	struct comx_channel *ch = dev->priv;
 	int ret;
@@ -928,7 +928,7 @@ static struct dentry *comx_lookup(struct inode *dir, struct dentry *dentry)
 	struct proc_dir_entry *de;
 	struct inode *inode = NULL;
 
-	if ((de = (struct proc_dir_entry *) dir->u.generic_ip) != NULL) {
+	if ((de = PDE(dir)) != NULL) {
 		for (de = de->subdir ; de ; de = de->next) {
 			if ((de && de->low_ino) && 
 			    (de->namelen == dentry->d_name.len) &&

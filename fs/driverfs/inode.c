@@ -32,6 +32,7 @@
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/device.h>
+#include <linux/smp_lock.h>
 
 #include <asm/uaccess.h>
 
@@ -341,6 +342,7 @@ driverfs_file_lseek(struct file *file, loff_t offset, int orig)
 {
 	loff_t retval = -EINVAL;
 
+	lock_kernel();
 	switch(orig) {
 	case 0:
 		if (offset > 0) {
@@ -357,6 +359,7 @@ driverfs_file_lseek(struct file *file, loff_t offset, int orig)
 	default:
 		break;
 	}
+	unlock_kernel();
 	return retval;
 }
 
@@ -446,8 +449,7 @@ static struct super_operations driverfs_ops = {
 	put_inode:	force_delete,
 };
 
-static struct super_block*
-driverfs_read_super(struct super_block *sb, void *data, int silent)
+static int driverfs_fill_super(struct super_block *sb, void *data, int silent)
 {
 	struct inode *inode;
 	struct dentry *root;
@@ -460,20 +462,31 @@ driverfs_read_super(struct super_block *sb, void *data, int silent)
 
 	if (!inode) {
 		DBG("%s: could not get inode!\n",__FUNCTION__);
-		return NULL;
+		return -ENOMEM;
 	}
 
 	root = d_alloc_root(inode);
 	if (!root) {
 		DBG("%s: could not get root dentry!\n",__FUNCTION__);
 		iput(inode);
-		return NULL;
+		return -ENOMEM;
 	}
 	sb->s_root = root;
-	return sb;
+	return 0;
 }
 
-static DECLARE_FSTYPE(driverfs_fs_type, "driverfs", driverfs_read_super, FS_SINGLE | FS_LITTER);
+static struct super_block *driverfs_get_sb(struct file_system_type *fs_type,
+	int flags, char *dev_name, void *data)
+{
+	return get_sb_single(fs_type, flags, data, driverfs_fill_super);
+}
+
+static struct file_system_type driverfs_fs_type = {
+	owner:		THIS_MODULE,
+	name:		"driverfs",
+	get_sb:		driverfs_get_sb,
+	fs_flags:	FS_LITTER,
+};
 
 static int get_mount(void)
 {

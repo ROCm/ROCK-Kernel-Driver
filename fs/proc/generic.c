@@ -58,7 +58,7 @@ proc_file_read(struct file * file, char * buf, size_t nbytes, loff_t *ppos)
 	char	*start;
 	struct proc_dir_entry * dp;
 
-	dp = (struct proc_dir_entry *) inode->u.generic_ip;
+	dp = PDE(inode);
 	if (!(page = (char*) __get_free_page(GFP_KERNEL)))
 		return -ENOMEM;
 
@@ -128,7 +128,7 @@ proc_file_write(struct file * file, const char * buffer,
 	struct inode *inode = file->f_dentry->d_inode;
 	struct proc_dir_entry * dp;
 	
-	dp = (struct proc_dir_entry *) inode->u.generic_ip;
+	dp = PDE(inode);
 
 	if (!dp->write_proc)
 		return -EIO;
@@ -221,13 +221,13 @@ out:
 
 static int proc_readlink(struct dentry *dentry, char *buffer, int buflen)
 {
-	char *s=((struct proc_dir_entry *)dentry->d_inode->u.generic_ip)->data;
+	char *s=PDE(dentry->d_inode)->data;
 	return vfs_readlink(dentry, buffer, buflen, s);
 }
 
 static int proc_follow_link(struct dentry *dentry, struct nameidata *nd)
 {
-	char *s=((struct proc_dir_entry *)dentry->d_inode->u.generic_ip)->data;
+	char *s=PDE(dentry->d_inode)->data;
 	return vfs_follow_link(nd, s);
 }
 
@@ -264,7 +264,7 @@ struct dentry *proc_lookup(struct inode * dir, struct dentry *dentry)
 
 	error = -ENOENT;
 	inode = NULL;
-	de = (struct proc_dir_entry *) dir->u.generic_ip;
+	de = PDE(dir);
 	if (de) {
 		for (de = de->subdir; de ; de = de->next) {
 			if (!de || !de->low_ino)
@@ -306,7 +306,7 @@ int proc_readdir(struct file * filp,
 	struct inode *inode = filp->f_dentry->d_inode;
 
 	ino = inode->i_ino;
-	de = (struct proc_dir_entry *) inode->u.generic_ip;
+	de = PDE(inode);
 	if (!de)
 		return -EINVAL;
 	i = filp->f_pos;
@@ -413,7 +413,7 @@ static void proc_kill_inodes(struct proc_dir_entry *de)
 		if (dentry->d_op != &proc_dentry_operations)
 			continue;
 		inode = dentry->d_inode;
-		if (inode->u.generic_ip != de)
+		if (PDE(inode) != de)
 			continue;
 		fops = filp->f_op;
 		filp->f_op = NULL;

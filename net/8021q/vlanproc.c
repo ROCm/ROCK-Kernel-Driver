@@ -236,7 +236,7 @@ static ssize_t vlan_proc_read(struct file *file, char *buf,
 	if (count <= 0)
 		return 0;
 
-	dent = inode->u.generic_ip;
+	dent = PDE(inode);
 	if ((dent == NULL) || (dent->get_info == NULL))
 		return 0;
 

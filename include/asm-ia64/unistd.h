@@ -206,6 +206,7 @@
 #define __NR_getdents64			1214
 #define __NR_getunwind			1215
 #define __NR_readahead			1216
+#define __NR_tkill			1217
 
 #if !defined(__ASSEMBLY__) && !defined(ASSEMBLER)
 

@@ -248,7 +248,7 @@ typedef struct wan_stat_entry
 		if (count <= 0)
 			return 0;
 			
-		dent = inode->u.generic_ip;
+		dent = PDE(inode);
 		if ((dent == NULL) || (dent->get_info == NULL))
 			return 0;
 			
@@ -794,7 +794,7 @@ typedef struct wan_stat_entry
 		if (count <= 0)
 			return 0;
 			
-		dent = inode->u.generic_ip;
+		dent = PDE(inode);
 		if ((dent == NULL) || (dent->get_info == NULL))
 			return 0;
 			
@@ -828,7 +828,7 @@ typedef struct wan_stat_entry
 
 		if (count <= 0)
 			return 0;
-		dent = inode->u.generic_ip;
+		dent = PDE(inode);
 		if ((dent == NULL) || (dent->get_info == NULL))
 			return -ENODATA;
 		err = verify_area(VERIFY_WRITE, buf, count);
@@ -1068,7 +1068,7 @@ static int device_write(
 
         if (err) return err;
 
-        dent = inode->u.generic_ip;
+        dent = PDE(inode);
         if ((dent == NULL) || (dent->data == NULL))
                 return -ENODATA;
 

@@ -51,6 +51,31 @@ loff_t generic_file_llseek(struct file *file, loff_t offset, int origin)
 	return retval;
 }
 
+loff_t remote_llseek(struct file *file, loff_t offset, int origin)
+{
+	long long retval;
+
+	lock_kernel();
+	switch (origin) {
+		case 2:
+			offset += file->f_dentry->d_inode->i_size;
+			break;
+		case 1:
+			offset += file->f_pos;
+	}
+	retval = -EINVAL;
+	if (offset>=0 && offset<=file->f_dentry->d_inode->i_sb->s_maxbytes) {
+		if (offset != file->f_pos) {
+			file->f_pos = offset;
+			file->f_reada = 0;
+			file->f_version = ++event;
+		}
+		retval = offset;
+	}
+	unlock_kernel();
+	return retval;
+}
+
 loff_t no_llseek(struct file *file, loff_t offset, int origin)
 {
 	return -ESPIPE;

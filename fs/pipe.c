@@ -246,12 +246,6 @@ sigpipe:
 	return -EPIPE;
 }
 
-static loff_t
-pipe_lseek(struct file *file, loff_t offset, int orig)
-{
-	return -ESPIPE;
-}
-
 static ssize_t
 bad_pipe_r(struct file *filp, char *buf, size_t count, loff_t *ppos)
 {
@@ -381,7 +375,7 @@ pipe_rdwr_open(struct inode *inode, struct file *filp)
  * are also used in linux/fs/fifo.c to do operations on FIFOs.
  */
 struct file_operations read_fifo_fops = {
-	llseek:		pipe_lseek,
+	llseek:		no_llseek,
 	read:		pipe_read,
 	write:		bad_pipe_w,
 	poll:		fifo_poll,
@@ -391,7 +385,7 @@ struct file_operations read_fifo_fops = {
 };
 
 struct file_operations write_fifo_fops = {
-	llseek:		pipe_lseek,
+	llseek:		no_llseek,
 	read:		bad_pipe_r,
 	write:		pipe_write,
 	poll:		fifo_poll,
@@ -401,7 +395,7 @@ struct file_operations write_fifo_fops = {
 };
 
 struct file_operations rdwr_fifo_fops = {
-	llseek:		pipe_lseek,
+	llseek:		no_llseek,
 	read:		pipe_read,
 	write:		pipe_write,
 	poll:		fifo_poll,
@@ -411,7 +405,7 @@ struct file_operations rdwr_fifo_fops = {
 };
 
 struct file_operations read_pipe_fops = {
-	llseek:		pipe_lseek,
+	llseek:		no_llseek,
 	read:		pipe_read,
 	write:		bad_pipe_w,
 	poll:		pipe_poll,
@@ -421,7 +415,7 @@ struct file_operations read_pipe_fops = {
 };
 
 struct file_operations write_pipe_fops = {
-	llseek:		pipe_lseek,
+	llseek:		no_llseek,
 	read:		bad_pipe_r,
 	write:		pipe_write,
 	poll:		pipe_poll,
@@ -431,7 +425,7 @@ struct file_operations write_pipe_fops = {
 };
 
 struct file_operations rdwr_pipe_fops = {
-	llseek:		pipe_lseek,
+	llseek:		no_llseek,
 	read:		pipe_read,
 	write:		pipe_write,
 	poll:		pipe_poll,
@@ -606,7 +600,7 @@ static struct super_operations pipefs_ops = {
 	statfs:		pipefs_statfs,
 };
 
-static struct super_block * pipefs_read_super(struct super_block *sb, void *data, int silent)
+static int pipefs_fill_super(struct super_block *sb, void *data, int silent)
 {
 	struct inode *root;
 
@@ -616,22 +610,32 @@ static struct super_block * pipefs_read_super(struct super_block *sb, void *data
 	sb->s_op	= &pipefs_ops;
 	root = new_inode(sb);
 	if (!root)
-		return NULL;
+		return -ENOMEM;
 	root->i_mode = S_IFDIR | S_IRUSR | S_IWUSR;
 	root->i_uid = root->i_gid = 0;
 	root->i_atime = root->i_mtime = root->i_ctime = CURRENT_TIME;
 	sb->s_root = d_alloc(NULL, &(const struct qstr) { "pipe:", 5, 0 });
 	if (!sb->s_root) {
 		iput(root);
-		return NULL;
+		return -ENOMEM;
 	}
 	sb->s_root->d_sb = sb;
 	sb->s_root->d_parent = sb->s_root;
 	d_instantiate(sb->s_root, root);
-	return sb;
+	return 0;
 }
 
-static DECLARE_FSTYPE(pipe_fs_type, "pipefs", pipefs_read_super, FS_NOMOUNT);
+static struct super_block *pipefs_get_sb(struct file_system_type *fs_type,
+	int flags, char *dev_name, void *data)
+{
+	return get_sb_nodev(fs_type, flags, data, pipefs_fill_super);
+}
+
+static struct file_system_type pipe_fs_type = {
+	name:		"pipefs",
+	get_sb:		pipefs_get_sb,
+	fs_flags:	FS_NOMOUNT,
+};
 
 static int __init init_pipe_fs(void)
 {

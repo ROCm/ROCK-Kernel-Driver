@@ -656,7 +656,7 @@ static struct super_operations s_ops = {
 	clear_inode:	bm_clear_inode,
 };
 
-static struct super_block *bm_read_super(struct super_block * sb, void * data, int silent)
+static int bm_fill_super(struct super_block * sb, void * data, int silent)
 {
 	struct qstr names[2] = {{name:"status"}, {name:"register"}};
 	struct inode * inode;
@@ -675,13 +675,13 @@ static struct super_block *bm_read_super(struct super_block * sb, void * data, i
 
 	inode = bm_get_inode(sb, S_IFDIR | 0755);
 	if (!inode)
-		return NULL;
+		return -ENOMEM;
 	inode->i_op = &bm_dir_inode_operations;
 	inode->i_fop = &bm_dir_operations;
 	dentry[0] = d_alloc_root(inode);
 	if (!dentry[0]) {
 		iput(inode);
-		return NULL;
+		return -ENOMEM;
 	}
 	dentry[1] = d_alloc(dentry[0], &names[0]);
 	if (!dentry[1])
@@ -701,7 +701,7 @@ static struct super_block *bm_read_super(struct super_block * sb, void * data, i
 	d_add(dentry[2], inode);
 
 	sb->s_root = dentry[0];
-	return sb;
+	return 0;
 
 out3:
 	dput(dentry[2]);
@@ -709,14 +709,26 @@ out2:
 	dput(dentry[1]);
 out1:
 	dput(dentry[0]);
-	return NULL;
+	return -ENOMEM;
+}
+
+static struct super_block *bm_get_sb(struct file_system_type *fs_type,
+	int flags, char *dev_name, void *data)
+{
+	return get_sb_single(fs_type, flags, data, bm_fill_super);
 }
 
 static struct linux_binfmt misc_format = {
-	NULL, THIS_MODULE, load_misc_binary, NULL, NULL, 0
+	module: THIS_MODULE,
+	load_binary: load_misc_binary,
 };
 
-static DECLARE_FSTYPE(bm_fs_type, "binfmt_misc", bm_read_super, FS_SINGLE|FS_LITTER);
+static struct file_system_type bm_fs_type = {
+	owner:		THIS_MODULE,
+	name:		"binfmt_misc",
+	get_sb:		bm_get_sb,
+	fs_flags:	FS_LITTER,
+};
 
 static int __init init_misc_binfmt(void)
 {

@@ -36,7 +36,7 @@
 #include <linux/proc_fs.h>
 #include <linux/usb.h>
 #include <linux/usbdevice_fs.h>
-
+#include <linux/smp_lock.h>
 
 static struct super_operations usbfs_ops;
 static struct address_space_operations usbfs_aops;
@@ -295,6 +295,7 @@ static loff_t default_file_lseek (struct file *file, loff_t offset, int orig)
 {
 	loff_t retval = -EINVAL;
 
+	lock_kernel();
 	switch(orig) {
 	case 0:
 		if (offset > 0) {
@@ -311,6 +312,7 @@ static loff_t default_file_lseek (struct file *file, loff_t offset, int orig)
 	default:
 		break;
 	}
+	unlock_kernel();
 	return retval;
 }
 
@@ -362,15 +364,14 @@ static struct super_operations usbfs_ops = {
 	put_inode:	force_delete,
 };
 
-static struct super_block *usbfs_read_super (struct super_block *sb, void *data, 
-					     int silent)
+static int usbfs_fill_super(struct super_block *sb, void *data, int silent)
 {
 	struct inode *inode;
 	struct dentry *root;
 
 	if (parse_options(sb, data)) {
 		warn("usbfs: mount parameter error:");
-		return NULL;
+		return -EINVAL;
 	}
 
 	sb->s_blocksize = PAGE_CACHE_SIZE;
@@ -381,17 +382,17 @@ static struct super_block *usbfs_read_super (struct super_block *sb, void *data,
 
 	if (!inode) {
 		dbg("%s: could not get inode!\n",__FUNCTION__);
-		return NULL;
+		return -ENOMEM;
 	}
 
 	root = d_alloc_root(inode);
 	if (!root) {
 		dbg("%s: could not get root dentry!\n",__FUNCTION__);
 		iput(inode);
-		return NULL;
+		return -ENOMEM;
 	}
 	sb->s_root = root;
-	return sb;
+	return 0;
 }
 
 /**
@@ -520,8 +521,24 @@ static void fs_remove_file (struct dentry *dentry)
  * It will be removed when the 2.7.x development cycle is started.
  * You have been warned :)
  */
-static DECLARE_FSTYPE(usbdevice_fs_type, "usbdevfs", usbfs_read_super, FS_SINGLE);
-static DECLARE_FSTYPE(usb_fs_type,       "usbfs",    usbfs_read_super, FS_SINGLE);
+
+static struct super_block *usb_get_sb(struct file_system_type *fs_type,
+	int flags, char *dev_name, void *data)
+{
+	return get_sb_single(fs_type, flags, data, usb_fill_super);
+}
+
+static struct file_system_type usbdevice_fs_type = {
+	owner:		THIS_MODULE,
+	name:		"usbdevfs",
+	get_sb:		usb_get_sb,
+};
+
+static struct file_system_type usb_fs_type = {
+	owner:		THIS_MODULE,
+	name:		"usbfs",
+	get_sb:		usb_get_sb,
+};
 
 /* --------------------------------------------------------------------- */
 static int get_mount (void)

@@ -261,7 +261,7 @@ static int usblp_open(struct inode *inode, struct file *file)
 	if (usblp->bidir) {
 		usblp->readcount = 0;
 		usblp->readurb.dev = usblp->dev;
-		if (usb_submit_urb(&usblp->readurb) < 0) {
+		if (usb_submit_urb(&usblp->readurb, GFP_KERNEL) < 0) {
 			retval = -EIO;
 			usblp->used = 0;
 			file->private_data = NULL;
@@ -456,7 +456,7 @@ static ssize_t usblp_write(struct file *file, const char *buffer, size_t count, 
 
 		usblp->writeurb.dev = usblp->dev;
 		usblp->wcomplete = 0;
-		if (usb_submit_urb(&usblp->writeurb)) {
+		if (usb_submit_urb(&usblp->writeurb, GFP_KERNEL)) {
 			count = -EIO;
 			up (&usblp->sem);
 			break;
@@ -521,7 +521,7 @@ static ssize_t usblp_read(struct file *file, char *buffer, size_t count, loff_t 
 			usblp->minor, usblp->readurb.status);
 		usblp->readurb.dev = usblp->dev;
  		usblp->readcount = 0;
-		usb_submit_urb(&usblp->readurb);
+		usb_submit_urb(&usblp->readurb, GFP_KERNEL);
 		count = -EIO;
 		goto done;
 	}
@@ -538,7 +538,7 @@ static ssize_t usblp_read(struct file *file, char *buffer, size_t count, loff_t 
 		usblp->readcount = 0;
 		usblp->readurb.dev = usblp->dev;
 		usblp->rcomplete = 0;
-		if (usb_submit_urb(&usblp->readurb)) {
+		if (usb_submit_urb(&usblp->readurb, GFP_KERNEL)) {
 			count = -EIO;
 			goto done;
 		}

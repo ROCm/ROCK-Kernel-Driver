@@ -246,13 +246,13 @@ static int cpia_usb_open(void *privdata)
 	ucpia->sbuf[1].urb->next = ucpia->sbuf[0].urb;
 	ucpia->sbuf[0].urb->next = ucpia->sbuf[1].urb;
 	
-	err = usb_submit_urb(ucpia->sbuf[0].urb);
+	err = usb_submit_urb(ucpia->sbuf[0].urb, GFP_KERNEL);
 	if (err) {
 		printk(KERN_ERR "cpia_init_isoc: usb_submit_urb 0 ret %d\n",
 			err);
 		goto error_urb1;
 	}
-	err = usb_submit_urb(ucpia->sbuf[1].urb);
+	err = usb_submit_urb(ucpia->sbuf[1].urb, GFP_KERNEL);
 	if (err) {
 		printk(KERN_ERR "cpia_init_isoc: usb_submit_urb 1 ret %d\n",
 			err);

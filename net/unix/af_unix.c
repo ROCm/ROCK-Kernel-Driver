@@ -711,7 +711,7 @@ static int unix_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 		/*
 		 * All right, let's create it.
 		 */
-		mode = S_IFSOCK | (sock->inode->i_mode & ~current->fs->umask);
+		mode = S_IFSOCK | (SOCK_INODE(sock)->i_mode & ~current->fs->umask);
 		err = vfs_mknod(nd.dentry->d_inode, dentry, mode, 0);
 		if (err)
 			goto out_mknod_dput;

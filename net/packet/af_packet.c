@@ -1575,7 +1575,7 @@ static void packet_mm_open(struct vm_area_struct *vma)
 {
 	struct file *file = vma->vm_file;
 	struct inode *inode = file->f_dentry->d_inode;
-	struct socket * sock = &inode->u.socket_i;
+	struct socket * sock = SOCKET_I(inode);
 	struct sock *sk = sock->sk;
 	
 	if (sk)
@@ -1586,7 +1586,7 @@ static void packet_mm_close(struct vm_area_struct *vma)
 {
 	struct file *file = vma->vm_file;
 	struct inode *inode = file->f_dentry->d_inode;
-	struct socket * sock = &inode->u.socket_i;
+	struct socket * sock = SOCKET_I(inode);
 	struct sock *sk = sock->sk;
 	
 	if (sk)

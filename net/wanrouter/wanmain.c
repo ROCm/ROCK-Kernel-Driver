@@ -500,7 +500,7 @@ int wanrouter_ioctl(struct inode *inode, struct file *file,
 	if ((cmd >> 8) != ROUTER_IOCTL)
 		return -EINVAL;
 		
-	dent = inode->u.generic_ip;
+	dent = PDE(inode);
 	if ((dent == NULL) || (dent->data == NULL))
 		return -EINVAL;
 		

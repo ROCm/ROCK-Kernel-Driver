@@ -12,6 +12,7 @@
 #include <linux/proc_fs.h>
 #include <linux/init.h>
 #include <linux/seq_file.h>
+#include <linux/smp_lock.h>
 
 #include <asm/uaccess.h>
 #include <asm/byteorder.h>
@@ -21,8 +22,9 @@
 static loff_t
 proc_bus_pci_lseek(struct file *file, loff_t off, int whence)
 {
-	loff_t new;
+	loff_t new = -1;
 
+	lock_kernel();
 	switch (whence) {
 	case 0:
 		new = off;
@@ -33,9 +35,8 @@ proc_bus_pci_lseek(struct file *file, loff_t off, int whence)
 	case 2:
 		new = PCI_CFG_SPACE_SIZE + off;
 		break;
-	default:
-		return -EINVAL;
 	}
+	unlock_kernel();
 	if (new < 0 || new > PCI_CFG_SPACE_SIZE)
 		return -EINVAL;
 	return (file->f_pos = new);
@@ -45,7 +46,7 @@ static ssize_t
 proc_bus_pci_read(struct file *file, char *buf, size_t nbytes, loff_t *ppos)
 {
 	const struct inode *ino = file->f_dentry->d_inode;
-	const struct proc_dir_entry *dp = ino->u.generic_ip;
+	const struct proc_dir_entry *dp = PDE(ino);
 	struct pci_dev *dev = dp->data;
 	unsigned int pos = *ppos;
 	unsigned int cnt, size;
@@ -127,7 +128,7 @@ static ssize_t
 proc_bus_pci_write(struct file *file, const char *buf, size_t nbytes, loff_t *ppos)
 {
 	const struct inode *ino = file->f_dentry->d_inode;
-	const struct proc_dir_entry *dp = ino->u.generic_ip;
+	const struct proc_dir_entry *dp = PDE(ino);
 	struct pci_dev *dev = dp->data;
 	int pos = *ppos;
 	int cnt;
@@ -199,7 +200,7 @@ struct pci_filp_private {
 
 static int proc_bus_pci_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg)
 {
-	const struct proc_dir_entry *dp = inode->u.generic_ip;
+	const struct proc_dir_entry *dp = PDE(inode);
 	struct pci_dev *dev = dp->data;
 #ifdef HAVE_PCI_MMAP
 	struct pci_filp_private *fpriv = file->private_data;
@@ -241,7 +242,7 @@ static int proc_bus_pci_ioctl(struct inode *inode, struct file *file, unsigned i
 static int proc_bus_pci_mmap(struct file *file, struct vm_area_struct *vma)
 {
 	struct inode *inode = file->f_dentry->d_inode;
-	const struct proc_dir_entry *dp = inode->u.generic_ip;
+	const struct proc_dir_entry *dp = PDE(inode);
 	struct pci_dev *dev = dp->data;
 	struct pci_filp_private *fpriv = file->private_data;
 	int ret;

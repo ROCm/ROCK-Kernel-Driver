@@ -1756,7 +1756,7 @@ static int ax25_get_info(char *buffer, char **start, off_t offset, int length)
 			len += sprintf(buffer + len, " %d %d %ld\n",
 				atomic_read(&ax25->sk->wmem_alloc),
 				atomic_read(&ax25->sk->rmem_alloc),
-				ax25->sk->socket != NULL ? ax25->sk->socket->inode->i_ino : 0L);
+				ax25->sk->socket != NULL ? SOCK_INODE(ax25->sk->socket)->i_ino : 0L);
 		} else {
 			len += sprintf(buffer + len, " * * *\n");
 		}

@@ -21,6 +21,7 @@
 #include <linux/sysctl.h>
 #include <linux/ctype.h>
 #include <linux/threads.h>
+#include <linux/smp_lock.h>
 
 #include <asm/uaccess.h>
 #include <asm/bitops.h>
@@ -430,18 +431,20 @@ static ssize_t ppc_htab_write(struct file * file, const char * buffer,
 static long long
 ppc_htab_lseek(struct file * file, loff_t offset, int orig)
 {
+    long long ret = -EINVAL;
+
+    lock_kernel();
     switch (orig) {
     case 0:
 	file->f_pos = offset;
-	return(file->f_pos);
+	ret = file->f_pos;
+	break;
     case 1:
 	file->f_pos += offset;
-	return(file->f_pos);
-    case 2:
-	return(-EINVAL);
-    default:
-	return(-EINVAL);
+	ret = file->f_pos;
     }
+    unlock_kernel();
+    return ret;
 }
 
 int proc_dol2crvec(ctl_table *table, int write, struct file *filp,
