@@ -1,5 +1,6 @@
 #ifndef _ASM_I386_MODULE_H
 #define _ASM_I386_MODULE_H
+
 /* x86 is simple */
 struct mod_arch_specific
 {
@@ -8,4 +9,47 @@ struct mod_arch_specific
 #define Elf_Shdr Elf32_Shdr
 #define Elf_Sym Elf32_Sym
 #define Elf_Ehdr Elf32_Ehdr
+
+#ifdef CONFIG_M386
+#define MODULE_PROC_FAMILY "386 "
+#elif CONFIG_M486
+#define MODULE_PROC_FAMILY "486 "
+#elif CONFIG_M586
+#define MODULE_PROC_FAMILY "586 "
+#elif CONFIG_M586TSC
+#define MODULE_PROC_FAMILY "586TSC "
+#elif CONFIG_M586MMX
+#define MODULE_PROC_FAMILY "586MMX "
+#elif CONFIG_M686
+#define MODULE_PROC_FAMILY "686 "
+#elif CONFIG_MPENTIUMII
+#define MODULE_PROC_FAMILY "PENTIUMII "
+#elif CONFIG_MPENTIUMIII
+#define MODULE_PROC_FAMILY "PENTIUMIII "
+#elif CONFIG_MPENTIUM4
+#define MODULE_PROC_FAMILY "PENTIUM4 "
+#elif CONFIG_MK6
+#define MODULE_PROC_FAMILY "K6 "
+#elif CONFIG_MK7
+#define MODULE_PROC_FAMILY "K7 "
+#elif CONFIG_MK8
+#define MODULE_PROC_FAMILY "K8 "
+#elif CONFIG_MELAN
+#define MODULE_PROC_FAMILY "ELAN "
+#elif CONFIG_MCRUSOE
+#define MODULE_PROC_FAMILY "CRUSOE "
+#elif CONFIG_MWINCHIPC6
+#define MODULE_PROC_FAMILY "WINCHIPC6 "
+#elif CONFIG_MWINCHIP2
+#define MODULE_PROC_FAMILY "WINCHIP2 "
+#elif CONFIG_MWINCHIP3D
+#define MODULE_PROC_FAMILY "WINCHIP3D "
+#elif CONFIG_MCYRIXIII
+#define MODULE_PROC_FAMILY "CYRIXIII "
+#else
+#error unknown processor family
+#endif
+
+#define MODULE_ARCH_VERMAGIC MODULE_PROC_FAMILY
+
 #endif /* _ASM_I386_MODULE_H */

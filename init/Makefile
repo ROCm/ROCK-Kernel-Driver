@@ -2,7 +2,8 @@
 # Makefile for the linux kernel.
 #
 
-obj-y    := main.o version.o do_mounts.o initramfs.o
+obj-y			:= main.o version.o do_mounts.o initramfs.o
+obj-$(CONFIG_MODULES)	+= vermagic.o
 
 # files to be removed upon make clean
 clean-files := ../include/linux/compile.h

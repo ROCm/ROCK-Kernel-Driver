@@ -10,6 +10,7 @@
  */
 
 #include <linux/config.h>
+#include <asm-generic/vmlinux.lds.h>
 
 /*
  *	Original Palm pilot (same for Xcopilot).
@@ -219,20 +220,13 @@ SECTIONS {
 		_stext = . ;
         	*(.text)
         	*(.text.lock)
-		*(.rodata)
-		*(.rodata.*)
-
-		. = ALIGN(0x4) ;
-		*(.kstrtab)
 
 		. = ALIGN(16);          /* Exception table              */
 		__start___ex_table = .;
 		*(__ex_table)
 		__stop___ex_table = .;
 
-		__start___ksymtab = .;  /* Kernel symbol table          */
-		*(__ksymtab)
-		__stop___ksymtab = .;
+		RODATA
 
 		. = ALIGN(4) ;
 		_etext = . ;

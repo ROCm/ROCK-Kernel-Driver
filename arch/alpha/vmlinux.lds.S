@@ -1,4 +1,5 @@
 #include <linux/config.h>
+#include <asm-generic/vmlinux.lds.h>
 
 OUTPUT_FORMAT("elf64-alpha")
 ENTRY(__start)
@@ -25,29 +26,7 @@ SECTIONS
 	__stop___ex_table = .;
   }
 
-  /* Kernel symbol table */
-  __ksymtab ALIGN(8) : {
-	__start___ksymtab = .;
-	*(__ksymtab)
-	__stop___ksymtab = .;
-  }
-
-  /* Kernel symbol table: GPL only */
-  __gpl_ksymtab ALIGN(8) : {
-	__start___gpl_ksymtab = .;
-	*(__gpl_ksymtab)
-	__stop___gpl_ksymtab = .;
-  }
-
-  /* All kernel symbols */
-  __kallsyms ALIGN(8) : {
-	__start___kallsyms = .;
-	*(__kallsyms)
-	__stop___kallsyms = .;
-  }
-
-  .kstrtab : { *(.kstrtab) }
-  .rodata : { *(.rodata) *(.rodata.*) }
+  RODATA
 
   /* Startup code */
   .init.text ALIGN(8192) : {
