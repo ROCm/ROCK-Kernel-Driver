@@ -396,14 +396,6 @@ static void __write_metapage(struct metapage * mp)
 
 	jfs_info("__write_metapage: mp = 0x%p", mp);
 
-	if (test_bit(META_discard, &mp->flag)) {
-		/*
-		 * This metadata is no longer valid
-		 */
-		clear_bit(META_dirty, &mp->flag);
-		return;
-	}
-
 	page_index = mp->page->index;
 	page_offset =
 	    (mp->index - (page_index << l2BlocksPerPage)) << l2bsize;
@@ -549,6 +541,7 @@ again:
 				goto again;
 			}
 
+			clear_bit(META_dirty, &mp->flag);
 			set_bit(META_discard, &mp->flag);
 			spin_unlock(&meta_lock);
 		} else {
