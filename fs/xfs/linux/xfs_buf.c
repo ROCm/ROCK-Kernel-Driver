@@ -384,8 +384,8 @@ _pagebuf_freepages(
  *	pagebuf_free releases the specified buffer.  The modification
  *	state of any associated pages is left unchanged.
  */
-void
-pagebuf_free(
+STATIC void
+__pagebuf_free(
 	page_buf_t		*pb)
 {
 	pb_hash_t		*hash = pb_hash(pb);
@@ -429,6 +429,17 @@ pagebuf_free(
 	}
 
 	pagebuf_deallocate(pb);
+}
+
+void
+pagebuf_free(
+	page_buf_t		*pb)
+{
+	if (unlikely(!atomic_dec_and_test(&pb->pb_hold))) {
+		printk(KERN_ERR "XFS: freeing inuse buffer!\n");
+		dump_stack();
+	} else
+		__pagebuf_free(pb);
 }
 
 /*
@@ -1028,7 +1039,7 @@ pagebuf_rele(
 		}
 
 		if (do_free) {
-			pagebuf_free(pb);
+			__pagebuf_free(pb);
 		}
 	}
 }
