@@ -36,7 +36,8 @@
 /*
  * Literals
  */
-#define IPR_DRIVER_VERSION "2.0.0-7 (February 27, 2004)"
+#define IPR_DRIVER_VERSION "2.0.0-8"
+#define IPR_DRIVER_DATE "(March 17, 2004)"
 
 /*
  * IPR_DBG_TRACE: Setting this to 1 will turn on some general function tracing
@@ -1059,7 +1060,7 @@ struct ipr_ucode_image_header {
  * Macros
  */
 #if IPR_DEBUG
-#define IPR_DBG_CMD(CMD) { (CMD); }
+#define IPR_DBG_CMD(CMD) do { CMD; } while (0)
 #else
 #define IPR_DBG_CMD(CMD)
 #endif
@@ -1095,11 +1096,11 @@ __FUNCTION__, __LINE__, ipr_cfg
 /*
  * Error logging macros
  */
-#define ipr_err(...) printk(KERN_ERR IPR_NAME ": "__VA_ARGS__);
-#define ipr_info(...) printk(KERN_INFO IPR_NAME ": "__VA_ARGS__);
-#define ipr_crit(...) printk(KERN_CRIT IPR_NAME ": "__VA_ARGS__);
-#define ipr_warn(...) printk(KERN_WARNING IPR_NAME": "__VA_ARGS__);
-#define ipr_dbg(...) IPR_DBG_CMD(printk(KERN_DEBUG IPR_NAME ": "__VA_ARGS__));
+#define ipr_err(...) printk(KERN_ERR IPR_NAME ": "__VA_ARGS__)
+#define ipr_info(...) printk(KERN_INFO IPR_NAME ": "__VA_ARGS__)
+#define ipr_crit(...) printk(KERN_CRIT IPR_NAME ": "__VA_ARGS__)
+#define ipr_warn(...) printk(KERN_WARNING IPR_NAME": "__VA_ARGS__)
+#define ipr_dbg(...) IPR_DBG_CMD(printk(KERN_INFO IPR_NAME ": "__VA_ARGS__))
 
 #define ipr_sdev_printk(level, sdev, fmt, ...) \
 	printk(level IPR_NAME ": %d:%d:%d:%d: " fmt, sdev->host->host_no, \
@@ -1111,21 +1112,24 @@ __FUNCTION__, __LINE__, ipr_cfg
 #define ipr_sdev_info(sdev, fmt, ...) \
 	ipr_sdev_printk(KERN_INFO, sdev, fmt, ##__VA_ARGS__)
 
+#define ipr_sdev_dbg(sdev, fmt, ...) \
+	IPR_DBG_CMD(ipr_sdev_printk(KERN_INFO, sdev, fmt, ##__VA_ARGS__))
+
 #define ipr_res_printk(level, ioa_cfg, res, fmt, ...) \
 	printk(level IPR_NAME ": %d:%d:%d:%d: " fmt, ioa_cfg->host->host_no, \
 		res.bus, res.target, res.lun, ##__VA_ARGS__)
 
 #define ipr_res_err(ioa_cfg, res, fmt, ...) \
-	ipr_res_printk(KERN_ERR, ioa_cfg, res, fmt, ##__VA_ARGS__);
+	ipr_res_printk(KERN_ERR, ioa_cfg, res, fmt, ##__VA_ARGS__)
 #define ipr_res_dbg(ioa_cfg, res, fmt, ...) \
-	ipr_res_printk(KERN_DEBUG, ioa_cfg, res, fmt, ##__VA_ARGS__);
+	IPR_DBG_CMD(ipr_res_printk(KERN_INFO, ioa_cfg, res, fmt, ##__VA_ARGS__))
 
 #define ipr_trace ipr_dbg("%s: %s: Line: %d\n",\
-	__FILE__, __FUNCTION__, __LINE__);
+	__FILE__, __FUNCTION__, __LINE__)
 
 #if IPR_DBG_TRACE
-#define ENTER printk(KERN_DEBUG IPR_NAME": Entering %s\n", __FUNCTION__);
-#define LEAVE printk(KERN_DEBUG IPR_NAME": Leaving %s\n", __FUNCTION__);
+#define ENTER printk(KERN_INFO IPR_NAME": Entering %s\n", __FUNCTION__)
+#define LEAVE printk(KERN_INFO IPR_NAME": Leaving %s\n", __FUNCTION__)
 #else
 #define ENTER
 #define LEAVE
