@@ -412,10 +412,7 @@ ENTRY(_stext)
 
 ALIGN
 /*
- * This contains typically 140 quadwords, depending on NR_CPUS.
- *
- * NOTE! Make sure the gdt descriptor in head.S matches this if you
- * change anything.
+ * The Global Descriptor Table contains 20 quadwords, per-CPU.
  */
 ENTRY(cpu_gdt_table)
 	.quad 0x0000000000000000	/* NULL descriptor */
