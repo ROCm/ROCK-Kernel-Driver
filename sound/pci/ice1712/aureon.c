@@ -291,6 +291,57 @@ static int wm_adc_mux_put(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t *ucont
 }
 
 /*
+ * Taken from prodigy.c
+ */
+static int aureon_set_headphone_amp(ice1712_t *ice, int enable)
+{
+	unsigned int tmp, tmp2;
+
+	tmp2 = tmp = snd_ice1712_gpio_read(ice);
+	if (enable)
+		tmp |= AUREON_HP_SEL;
+	else
+		tmp &= ~ AUREON_HP_SEL;
+	if (tmp != tmp2) {
+		snd_ice1712_gpio_write(ice, tmp);
+		return 1;
+	}
+	return 0;
+}
+
+static int aureon_get_headphone_amp(ice1712_t *ice)
+{
+	unsigned int tmp = snd_ice1712_gpio_read(ice);
+
+	return ( tmp & AUREON_HP_SEL )!= 0;
+}
+
+static int aureon_hpamp_info(snd_kcontrol_t *k, snd_ctl_elem_info_t *uinfo)
+{
+	uinfo->type = SNDRV_CTL_ELEM_TYPE_BOOLEAN;
+	uinfo->count = 1;
+	uinfo->value.integer.min = 0;
+	uinfo->value.integer.max = 1;
+	return 0;
+}
+
+static int aureon_hpamp_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
+{
+	ice1712_t *ice = snd_kcontrol_chip(kcontrol);
+
+	ucontrol->value.integer.value[0] = aureon_get_headphone_amp(ice);
+	return 0;
+}
+
+
+static int aureon_hpamp_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
+{
+	ice1712_t *ice = snd_kcontrol_chip(kcontrol);
+
+	return aureon_set_headphone_amp(ice,ucontrol->value.integer.value[0]);
+}
+
+/*
  * mixers
  */
 
@@ -335,6 +386,13 @@ static snd_kcontrol_new_t wm_controls[] __devinitdata = {
 		.info = wm_adc_mux_info,
 		.get = wm_adc_mux_get,
 		.put = wm_adc_mux_put,
+	},
+	{
+		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+		.name = "Headphone Amplifier Switch",
+		.info = aureon_hpamp_info,
+		.get = aureon_hpamp_get,
+		.put = aureon_hpamp_put
 	},
 };
 
