@@ -21,7 +21,7 @@ CHRPOBJS = ../common/crt0.o $(COMMONOBJS) chrpmain.o
 NEWWORLDOBJS = ../common/crt0.o $(COMMONOBJS) newworldmain.o
 
 EXTRA_TARGETS	:= $(COFFOBJS) $(CHRPOBJS) $(NEWWORLDOBJS)
-LIBS = $(TOPDIR)/lib/lib.a ../lib/zlib.a ../of1275/of1275.a
+LIBS = $(TOPDIR)/lib/lib.a ../lib/lib.a ../of1275/of1275.a
 
 ADDNOTE := ../utils/addnote
 MKNOTE := ../utils/mknote

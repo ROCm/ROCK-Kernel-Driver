@@ -152,7 +152,7 @@ endif
 boot-$(CONFIG_SERIAL_8250_CONSOLE) += ../common/ns16550.o
 
 EXTRA_TARGETS			:= $(boot-y)
-LIBS				:= ../lib/zlib.a
+LIBS				:= ../lib/lib.a
 
 # Tools
 MKBUGBOOT			:= ../utils/mkbugboot

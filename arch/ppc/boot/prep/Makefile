@@ -24,7 +24,7 @@ boot-y				:= head.o ../simple/legacy.o misc.o \
 					../common/misc-common.o \
 					../common/mpc10x_memory.o
 OBJCOPY_ARGS			= -O elf32-powerpc
-LIBS 				= ../lib/zlib.a
+LIBS 				= ../lib/lib.a
 
 boot-$(CONFIG_SERIAL_8250_CONSOLE) += ../common/ns16550.o
 boot-$(CONFIG_VGA_CONSOLE)	+= vreset.o kbd.o
