@@ -348,7 +348,7 @@ void __init pci_addr_cache_build(void)
  * ths routine does *not* convert I/O BAR addresses (which start
  * with 0xE...) to phys addresses!
  */
-static unsigned long eeh_token_to_phys(unsigned long token)
+static inline unsigned long eeh_token_to_phys(unsigned long token)
 {
 	pte_t *ptep;
 	unsigned long pa, vaddr;
@@ -365,24 +365,22 @@ static unsigned long eeh_token_to_phys(unsigned long token)
 }
 
 /**
- * eeh_check_failure - check if all 1's data is due to EEH slot freeze
- * @token i/o token, should be address in the form 0xA....
- * @val value, should be all 1's (XXX why do we need this arg??)
+ * eeh_dn_check_failure - check if all 1's data is due to EEH slot freeze
+ * @dn device node
+ * @dev pci device, if known
  *
- * Check for an eeh failure at the given token address.
- * The given value has been read and it should be 1's (0xff, 0xffff or
- * 0xffffffff).
+ * Check for an EEH failure for the given device node.  Call this
+ * routine if the result of a read was all 0xff's and you want to
+ * find out if this is due to an EEH slot freeze event.  This routine
+ * will query firmware for the EEH status.
  *
- * Probe to determine if an error actually occurred.  If not return val.
- * Otherwise panic.
+ * Returns 0 if there has not been an EEH error; otherwise returns
+ * an error code.
  *
- * Note this routine might be called in an interrupt context ...
+ * It is safe to call this routine in an interrupt context.
  */
-unsigned long eeh_check_failure(void *token, unsigned long val)
+int eeh_dn_check_failure(struct device_node *dn, struct pci_dev *dev)
 {
-	unsigned long addr;
-	struct pci_dev *dev;
-	struct device_node *dn;
 	int ret;
 	int rets[2];
 	unsigned long flags;
@@ -390,30 +388,19 @@ unsigned long eeh_check_failure(void *token, unsigned long val)
 	__get_cpu_var(total_mmio_ffs)++;
 
 	if (!eeh_subsystem_enabled)
-		return val;
+		return 0;
 
-	/* Finding the phys addr + pci device; this is pretty quick. */
-	addr = eeh_token_to_phys((unsigned long)token);
-	dev = pci_get_device_by_addr(addr);
-	if (!dev)
-		return val;
-
-	dn = pci_device_to_OF_node(dev);
-	if (!dn) {
-		pci_dev_put(dev);
-		return val;
-	}
+	if (!dn)
+		return 0;
 
 	/* Access to IO BARs might get this far and still not want checking. */
 	if (!(dn->eeh_mode & EEH_MODE_SUPPORTED) ||
 	    dn->eeh_mode & EEH_MODE_NOCHECK) {
-		pci_dev_put(dev);
-		return val;
+		return 0;
 	}
 
 	if (!dn->eeh_config_addr) {
-		pci_dev_put(dev);
-		return val;
+		return 0;
 	}
 
 	/*
@@ -439,7 +426,7 @@ unsigned long eeh_check_failure(void *token, unsigned long val)
 		                      BUID_LO(dn->phb->buid), NULL, 0,
 		                      virt_to_phys(slot_errbuf),
 		                      eeh_error_buf_size,
-		                      2 /* Permanent Error */);
+		                      1 /* Temporary Error */);
 
 		if (log_event == 0)
 			log_error(slot_errbuf, ERR_TYPE_RTAS_LOG,
@@ -456,19 +443,53 @@ unsigned long eeh_check_failure(void *token, unsigned long val)
 		 */
 		if (panic_on_oops) {
 			panic("EEH: MMIO failure (%d) on device:%s %s\n",
-			      rets[0], pci_name(dev), pci_pretty_name(dev));
+			      rets[0], dn->name, dn->full_name);
 		} else {
 			__get_cpu_var(ignored_failures)++;
 			printk(KERN_INFO "EEH: MMIO failure (%d) on device:%s %s\n",
-			       rets[0], pci_name(dev), pci_pretty_name(dev));
+			       rets[0], dn->name, dn->full_name);
 		}
 	} else {
 		__get_cpu_var(false_positives)++;
 	}
 
+	return 0;
+}
+
+EXPORT_SYMBOL(eeh_dn_check_failure);
+
+/**
+ * eeh_check_failure - check if all 1's data is due to EEH slot freeze
+ * @token i/o token, should be address in the form 0xA....
+ * @val value, should be all 1's (XXX why do we need this arg??)
+ *
+ * Check for an eeh failure at the given token address.
+ * Check for an EEH failure at the given token address.  Call this
+ * routine if the result of a read was all 0xff's and you want to
+ * find out if this is due to an EEH slot freeze event.  This routine
+ * will query firmware for the EEH status.
+ *
+ * Note this routine is safe to call in an interrupt context.
+ */
+unsigned long eeh_check_failure(void *token, unsigned long val)
+{
+	unsigned long addr;
+	struct pci_dev *dev;
+	struct device_node *dn;
+
+	/* Finding the phys addr + pci device; this is pretty quick. */
+	addr = eeh_token_to_phys((unsigned long)token);
+	dev = pci_get_device_by_addr(addr);
+	if (!dev)
+		return val;
+
+	dn = pci_device_to_OF_node(dev);
+	eeh_dn_check_failure (dn, dev);
+
 	pci_dev_put(dev);
 	return val;
 }
+
 EXPORT_SYMBOL(eeh_check_failure);
 
 struct eeh_early_enable_info {
