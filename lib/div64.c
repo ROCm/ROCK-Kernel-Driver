@@ -25,25 +25,34 @@
 
 uint32_t __div64_32(uint64_t *n, uint32_t base)
 {
-	uint32_t low, low2, high, rem;
+	uint64_t rem = *n;
+	uint64_t b = base;
+	uint64_t res, d = 1;
+	uint32_t high = rem >> 32;
 
-	low   = *n   & 0xffffffff;
-	high  = *n  >> 32;
-	rem   = high % (uint32_t)base;
-	high  = high / (uint32_t)base;
-	low2  = low >> 16;
-	low2 += rem << 16;
-	rem   = low2 % (uint32_t)base;
-	low2  = low2 / (uint32_t)base;
-	low   = low  & 0xffff;
-	low  += rem << 16;
-	rem   = low  % (uint32_t)base;
-	low   = low  / (uint32_t)base;
+	/* Reduce the thing a bit first */
+	res = 0;
+	if (high >= base) {
+		high /= base;
+		res = (uint64_t) high << 32;
+		rem -= (uint64_t) (high*base) << 32;
+	}
 
-	*n = low +
-		((uint64_t)low2 << 16) +
-		((uint64_t)high << 32);
+	while ((int64_t)b > 0 && b < rem) {
+		b = b+b;
+		d = d+d;
+	}
 
+	do {
+		if (rem >= b) {
+			rem -= b;
+			res += d;
+		}
+		b >>= 1;
+		d >>= 1;
+	} while (d);
+
+	*n = res;
 	return rem;
 }
 
