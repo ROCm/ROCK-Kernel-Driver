@@ -31,7 +31,6 @@
 #include <linux/moduleparam.h>
 #include <linux/bitops.h>
 #include <linux/kdev_t.h>
-#include <linux/mempool.h>
 #include <asm/byteorder.h>
 #include <asm/semaphore.h>
 
@@ -58,7 +57,6 @@ MODULE_PARM_DESC(disable_nodemgr, "Disable nodemgr functionality.");
 MODULE_LICENSE("GPL");
 
 static kmem_cache_t *hpsb_packet_cache;
-static mempool_t *hpsb_packet_mempool;
 
 /* Some globals used */
 const char *hpsb_speedto_str[] = { "S100", "S200", "S400", "S800", "S1600", "S3200" };
@@ -123,24 +121,33 @@ void hpsb_set_packet_complete_task(struct hpsb_packet *packet,
  */
 struct hpsb_packet *hpsb_alloc_packet(size_t data_size)
 {
-        struct hpsb_packet *packet = NULL;
-        void *data = NULL;
+	struct hpsb_packet *packet = NULL;
+	void *data = NULL;
+	int gfp_flags = (in_atomic() || irqs_disabled()) ? GFP_ATOMIC : GFP_KERNEL;
 
-	packet = mempool_alloc(hpsb_packet_mempool, GFP_ATOMIC);
-        if (packet == NULL)
-                return NULL;
+	packet = kmem_cache_alloc(hpsb_packet_cache, gfp_flags);
+	if (packet == NULL)
+		return NULL;
 
-        if (data_size) {
+	memset(packet, 0, sizeof(*packet));
+
+	packet->header = packet->embedded_header;
+	INIT_LIST_HEAD(&packet->list);
+	packet->state = hpsb_unused;
+	packet->generation = -1;
+	atomic_set(&packet->refcnt, 1);
+
+	if (data_size) {
 		data_size = (data_size + 3) & ~3;
-                data = kmalloc(data_size + 8, GFP_ATOMIC);
-                if (data == NULL) {
-			mempool_free(packet, hpsb_packet_mempool);
-                        return NULL;
-                }
+		data = kmalloc(data_size + 8, gfp_flags);
+		if (data == NULL) {
+			kmem_cache_free(hpsb_packet_cache, packet);
+			return NULL;
+		}
 
-                packet->data = data;
-                packet->data_size = data_size;
-        }
+		packet->data = data;
+		packet->data_size = data_size;
+	}
 
 	return packet;
 }
@@ -156,7 +163,7 @@ void hpsb_free_packet(struct hpsb_packet *packet)
 {
 	if (packet && atomic_dec_and_test(&packet->refcnt)) {
 		kfree(packet->data);
-		mempool_free(packet, hpsb_packet_mempool);
+		kmem_cache_free(hpsb_packet_cache, packet);
 	}
 }
 
@@ -1035,20 +1042,6 @@ static int hpsbpkt_thread(void *__hi)
 }
 
 
-static void hpsb_packet_ctor(void *__packet, kmem_cache_t *hpsb_pkt_cache, unsigned long flags)
-{
-	struct hpsb_packet *packet = __packet;
-
-	memset(packet, 0, sizeof(*packet));
-
-	packet->header = packet->embedded_header;
-
-	INIT_LIST_HEAD(&packet->list);
-	packet->state = hpsb_unused;
-	packet->generation = -1;
-	atomic_set(&packet->refcnt, 1);
-}
-
 static int __init ieee1394_init(void)
 {
 	int i;
@@ -1074,14 +1067,7 @@ static int __init ieee1394_init(void)
 	devfs_mk_dir("ieee1394");
 
 	hpsb_packet_cache = kmem_cache_create("hpsb_packet", sizeof(struct hpsb_packet),
-					      0, SLAB_HWCACHE_ALIGN, hpsb_packet_ctor, NULL);
-	/* Our memory pool keeps 32 packets allocated at all times. The
-	 * default callbacks use the hpsb_packet_cache for the allocation,
-	 * and the hpsb_packet_ctor call back makes sure that the packets
-	 * are setup properly. Smooooth. */
-	hpsb_packet_mempool = mempool_create(32, mempool_alloc_slab,
-					       mempool_free_slab,
-					       hpsb_packet_cache);
+					      0, SLAB_HWCACHE_ALIGN, NULL, NULL);
 
 	bus_register(&ieee1394_bus_type);
 	for (i = 0; fw_bus_attrs[i]; i++)
@@ -1118,7 +1104,6 @@ static void __exit ieee1394_cleanup(void)
 		wait_for_completion(&khpsbpkt_complete);
 	}
 
-	mempool_destroy(hpsb_packet_mempool);
 	kmem_cache_destroy(hpsb_packet_cache);
 
 	hpsb_cleanup_config_roms();
