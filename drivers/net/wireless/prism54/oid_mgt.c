@@ -555,15 +555,18 @@ mgt_commit_list(islpci_private *priv, enum oid_num_t *l, int n)
 		u32 oid = t->oid;
 		BUG_ON(data == NULL);
 		while (j <= t->range) {
-			response = NULL;
-			ret |= islpci_mgt_transaction(priv->ndev, PIMFOR_OP_SET,
+			int r = islpci_mgt_transaction(priv->ndev, PIMFOR_OP_SET,
 						      oid, data, t->size,
 						      &response);
 			if (response) {
-				ret |= (response->header->operation ==
-					PIMFOR_OP_ERROR);
+				r |= (response->header->operation == PIMFOR_OP_ERROR);
 				islpci_mgt_release(response);
 			}
+			if (r)
+				printk(KERN_ERR "%s: mgt_commit_list: failure. "
+					"oid=%08x err=%d\n",
+					priv->ndev->name, oid, r);
+			ret |= r;
 			j++;
 			oid++;
 			data += t->size;
@@ -624,7 +627,7 @@ static enum oid_num_t commit_part2[] = {
 static int
 mgt_update_addr(islpci_private *priv)
 {
-	struct islpci_mgmtframe *res = NULL;
+	struct islpci_mgmtframe *res;
 	int ret;
 
 	ret = islpci_mgt_transaction(priv->ndev, PIMFOR_OP_GET,
@@ -638,8 +641,12 @@ mgt_update_addr(islpci_private *priv)
 	if (res)
 		islpci_mgt_release(res);
 
+	if (ret)
+		printk(KERN_ERR "%s: mgt_update_addr: failure\n", priv->ndev->name);
 	return ret;
 }
+
+#define VEC_SIZE(a) (sizeof(a)/sizeof(a[0]))
 
 void
 mgt_commit(islpci_private *priv)
@@ -650,14 +657,10 @@ mgt_commit(islpci_private *priv)
 	if (islpci_get_state(priv) < PRV_STATE_INIT)
 		return;
 
-	rvalue = mgt_commit_list(priv, commit_part1,
-				 sizeof (commit_part1) /
-				 sizeof (commit_part1[0]));
+	rvalue = mgt_commit_list(priv, commit_part1, VEC_SIZE(commit_part1));
 
 	if (priv->iw_mode != IW_MODE_MONITOR)
-		rvalue |= mgt_commit_list(priv, commit_part2,
-					  sizeof (commit_part2) /
-					  sizeof (commit_part2[0]));
+		rvalue |= mgt_commit_list(priv, commit_part2, VEC_SIZE(commit_part2));
 
 	u = OID_INL_MODE;
 	rvalue |= mgt_commit_list(priv, &u, 1);
@@ -666,8 +669,7 @@ mgt_commit(islpci_private *priv)
 	if (rvalue) {
 		/* some request have failed. The device might be in an
 		   incoherent state. We should reset it ! */
-		printk(KERN_DEBUG "%s: mgt_commit has failed. Restart the "
-		       "device \n", priv->ndev->name);
+		printk(KERN_DEBUG "%s: mgt_commit: failure\n", priv->ndev->name);
 	}
 }
 

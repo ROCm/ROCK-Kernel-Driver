@@ -508,11 +508,12 @@ islpci_eth_tx_timeout(struct net_device *ndev)
 	/* increment the transmit error counter */
 	statistics->tx_errors++;
 
+	printk(KERN_WARNING "%s: tx_timeout", ndev->name);
 	if (!priv->reset_task_pending) {
 		priv->reset_task_pending = 1;
+		printk(", scheduling a reset");
 		netif_stop_queue(ndev);
 		schedule_work(&priv->reset_task);
 	}
-
-	return;
+	printk("\n");
 }

@@ -375,8 +375,6 @@ islpci_open(struct net_device *ndev)
 	u32 rc;
 	islpci_private *priv = netdev_priv(ndev);
 
-	printk(KERN_DEBUG "%s: islpci_open()\n", ndev->name);
-
 	/* reset data structures, upload firmware and reset device */
 	rc = islpci_reset(priv,1);
 	if (rc) {
@@ -462,8 +460,7 @@ islpci_upload_fw(islpci_private *priv)
 		return rc;
 	}
 
-	printk(KERN_DEBUG
-	       "%s: firmware uploaded done, now triggering reset...\n",
+	printk(KERN_DEBUG "%s: firmware upload complete\n",
 	       priv->ndev->name);
 
 	islpci_set_state(priv, PRV_STATE_POSTBOOT);
@@ -499,15 +496,16 @@ islpci_reset_if(islpci_private *priv)
 		/* If we're here it's because our IRQ hasn't yet gone through. 
 		 * Retry a bit more...
 		 */
-		 printk(KERN_ERR "%s: device soft reset timed out\n",
-		       priv->ndev->name);
-
+		printk(KERN_ERR "%s: reset problem: no 'reset complete' IRQ seen\n",
+			priv->ndev->name);
 	}
 
 	finish_wait(&priv->reset_done, &wait);
 
-	if(result)
+	if (result) {
+		printk(KERN_ERR "%s: islpci_reset_if: failure\n", priv->ndev->name);
 		return result;
+	}
 
 	islpci_set_state(priv, PRV_STATE_INIT);
 
@@ -524,6 +522,7 @@ islpci_reset_if(islpci_private *priv)
 
 	islpci_set_state(priv, PRV_STATE_READY);
 
+	printk(KERN_DEBUG "%s: interface reset complete\n", priv->ndev->name);
 	return 0;
 }
 
@@ -584,18 +583,18 @@ islpci_reset(islpci_private *priv, int reload_firmware)
 	/* now that the data structures are cleaned up, upload
 	 * firmware and reset interface */
 		rc = islpci_upload_fw(priv);
-		if (rc) 
+		if (rc) {
+			printk(KERN_ERR "%s: islpci_reset: failure\n",
+				priv->ndev->name);
 			return rc;
+		}
 	}
 
 	/* finally reset interface */
 	rc = islpci_reset_if(priv);
-	if (!rc) /* If successful */
-		return rc;
-	
-	printk(KERN_DEBUG  "prism54: Your card/socket may be faulty, or IRQ line too busy :(\n");
+	if (rc)
+		printk(KERN_ERR "prism54: Your card/socket may be faulty, or IRQ line too busy :(\n");
 	return rc;
-
 }
 
 struct net_device_stats *
@@ -604,7 +603,7 @@ islpci_statistics(struct net_device *ndev)
 	islpci_private *priv = netdev_priv(ndev);
 
 #if VERBOSE > SHOW_ERROR_MESSAGES
-	DEBUG(SHOW_FUNCTION_CALLS, "islpci_statistics \n");
+	DEBUG(SHOW_FUNCTION_CALLS, "islpci_statistics\n");
 #endif
 
 	return &priv->statistics;
