@@ -287,7 +287,7 @@ static void qlogic_release(dev_link_t *link)
 	pcmcia_release_io(link->handle, &link->io);
 	pcmcia_release_irq(link->handle, &link->irq);
 
-	scsi_unregister(info->host);
+	scsi_host_put(info->host);
 
 	link->state &= ~DEV_CONFIG;
 }
