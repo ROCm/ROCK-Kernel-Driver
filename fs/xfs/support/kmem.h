@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -53,14 +53,32 @@
 #define KM_NOSLEEP	0x0002
 #define KM_NOFS		0x0004
 
+typedef unsigned long xfs_pflags_t;
+
+#define PFLAGS_TEST_FSTRANS()		(current->flags & PF_FSTRANS)
+
+#define PFLAGS_SET_FSTRANS(STATEP) do {	\
+	*(STATEP) = current->flags;	\
+	current->flags |= PF_FSTRANS;	\
+} while (0)
+
+#define PFLAGS_RESTORE(STATEP) do {	\
+	current->flags = *(STATEP);	\
+} while (0)
+
+#define PFLAGS_DUP(OSTATEP, NSTATEP) do { \
+	*(NSTATEP) = *(OSTATEP);	\
+} while (0)
 
 /*
  * XXX get rid of the unconditional  __GFP_NOFAIL by adding
  * a KM_FAIL flag and using it where we're allowed to fail.
  */
 static __inline unsigned int
-flag_convert(int flags)
+kmem_flags_convert(int flags)
 {
+	int lflags;
+
 #if DEBUG
 	if (unlikely(flags & ~(KM_SLEEP|KM_NOSLEEP|KM_NOFS))) {
 		printk(KERN_WARNING
@@ -69,12 +87,13 @@ flag_convert(int flags)
 	}
 #endif
 
-	if (flags & KM_NOSLEEP)
-		return GFP_ATOMIC;
-	/* If we're in a transaction, FS activity is not ok */
-	else if ((current->flags & PF_FSTRANS) || (flags & KM_NOFS))
-		return GFP_NOFS | __GFP_NOFAIL;
-	return GFP_KERNEL | __GFP_NOFAIL;
+	lflags = (flags & KM_NOSLEEP) ? GFP_ATOMIC : (GFP_KERNEL|__GFP_NOFAIL);
+
+	/* avoid recusive callbacks to filesystem during transactions */
+	if (PFLAGS_TEST_FSTRANS())
+		lflags &= ~__GFP_FS;
+
+	return lflags;
 }
 
 static __inline void *
@@ -82,8 +101,8 @@ kmem_alloc(size_t size, int flags)
 {
 	if (unlikely(MAX_SLAB_SIZE < size))
 		/* Avoid doing filesystem sensitive stuff to get this */
-		return __vmalloc(size, flag_convert(flags), PAGE_KERNEL);
-	return kmalloc(size, flag_convert(flags));
+		return __vmalloc(size, kmem_flags_convert(flags), PAGE_KERNEL);
+	return kmalloc(size, kmem_flags_convert(flags));
 }
 
 static __inline void *
@@ -128,7 +147,7 @@ kmem_zone_init(int size, char *zone_name)
 static __inline void *
 kmem_zone_alloc(kmem_zone_t *zone, int flags)
 {
-	return kmem_cache_alloc(zone, flag_convert(flags));
+	return kmem_cache_alloc(zone, kmem_flags_convert(flags));
 }
 
 static __inline void *

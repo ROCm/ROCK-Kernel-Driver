@@ -93,6 +93,7 @@ linvfs_unwritten_conv(
 	XFS_BUF_SET_FSPRIVATE(bp, NULL);
 	XFS_BUF_CLR_IODONE_FUNC(bp);
 	XFS_BUF_UNDATAIO(bp);
+	iput(LINVFS_GET_IP(vp));
 	pagebuf_iodone(bp, 0, 0);
 }
 
@@ -384,7 +385,16 @@ map_unwritten(
 	pb = pagebuf_lookup(mp->pbm_target,
 			    mp->pbm_offset, mp->pbm_bsize, 0);
 	if (!pb)
-		return -ENOMEM;
+		return -EAGAIN;
+
+	/* Take a reference to the inode to prevent it from
+	 * being reclaimed while we have outstanding unwritten
+	 * extent IO on it.
+	 */
+	if ((igrab(inode)) != inode) {
+		pagebuf_free(pb);
+		return -EAGAIN;
+	}
 
 	/* Set the count to 1 initially, this will stop an I/O
 	 * completion callout which happens before we have started
@@ -442,8 +452,7 @@ map_unwritten(
 			if (page) {
 				nblocks += bs;
 				atomic_add(bs, &pb->pb_io_remaining);
-				convert_page(inode, page,
-							mp, pb, 1, all_bh);
+				convert_page(inode, page, mp, pb, 1, all_bh);
 			}
 		}
 	}
@@ -617,11 +626,11 @@ cluster_write(
 
 STATIC int
 page_state_convert(
+	struct inode	*inode,
 	struct page	*page,
 	int		startio,
 	int		unmapped) /* also implies page uptodate */
 {
-	struct inode		*inode = page->mapping->host;
 	struct buffer_head	*bh_arr[MAX_BUF_PER_PAGE], *bh, *head;
 	page_buf_bmap_t		*mp, map;
 	unsigned long		p_offset = 0, end_index;
@@ -1021,7 +1030,6 @@ count_page_state(
  * the page, we have to check the process flags first, if we
  * are already in a transaction or disk I/O during allocations
  * is off, we need to fail the writepage and redirty the page.
- * We also need to set PF_NOIO ourselves.
  */
 
 STATIC int
@@ -1057,7 +1065,7 @@ linvfs_writepage(
 	 * then mark the page dirty again and leave the page
 	 * as is.
 	 */
-	if ((current->flags & (PF_FSTRANS)) && need_trans)
+	if (PFLAGS_TEST_FSTRANS() && need_trans)
 		goto out_fail;
 
 	/*
@@ -1071,7 +1079,7 @@ linvfs_writepage(
 	 * Convert delayed allocate, unwritten or unmapped space
 	 * to real space and flush out to disk.
 	 */
-	error = page_state_convert(page, 1, unmapped);
+	error = page_state_convert(inode, page, 1, unmapped);
 	if (error == -EAGAIN)
 		goto out_fail;
 	if (unlikely(error < 0))
@@ -1112,6 +1120,7 @@ linvfs_release_page(
 	struct page		*page,
 	int			gfp_mask)
 {
+	struct inode		*inode = page->mapping->host;
 	int			delalloc, unmapped, unwritten;
 
 	count_page_state(page, &delalloc, &unmapped, &unwritten);
@@ -1127,7 +1136,7 @@ linvfs_release_page(
 	 * Never need to allocate space here - we will always
 	 * come back to writepage in that case.
 	 */
-	if (page_state_convert(page, 0, 0) == 0)
+	if (page_state_convert(inode, page, 0, 0) == 0)
 		goto free_buffers;
 	return 0;
 

@@ -51,15 +51,14 @@ unsigned long xfs_physmem;
  */
 
 xfs_param_t xfs_params = {
-			/*	MIN	DFLT	MAX	*/
-	restrict_chown:	{	0,	1,	1	},
-	sgid_inherit:	{	0,	0,	1	},
-	symlink_mode:	{	0,	0,	1	},
-	panic_mask:	{	0,	0,	127	},
-	error_level:	{	0,	3,	11	},
-	sync_interval:	{	HZ,	30*HZ,	60*HZ	},
-	stats_clear:	{	0,	0,	1	},
-
+			  /*	MIN	DFLT	MAX	*/
+	.restrict_chown	= {	0,	1,	1	},
+	.sgid_inherit	= {	0,	0,	1	},
+	.symlink_mode	= {	0,	0,	1	},
+	.panic_mask	= {	0,	0,	127	},
+	.error_level	= {	0,	3,	11	},
+	.sync_interval	= {	HZ,	30*HZ,	60*HZ	},
+	.stats_clear	= {	0,	0,	1	},
 };
 
 /*

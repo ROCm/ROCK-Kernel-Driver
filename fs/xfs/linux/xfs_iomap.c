@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -172,8 +172,11 @@ xfs_iomap(
 		BUG();
 	}
 
+	ASSERT(offset <= mp->m_maxioffset);
+	if ((xfs_fsize_t)offset + count > mp->m_maxioffset)
+		count = mp->m_maxioffset - offset;
+	end_fsb = XFS_B_TO_FSB(mp, (xfs_ufsize_t)offset + count);
 	offset_fsb = XFS_B_TO_FSBT(mp, offset);
-	end_fsb = XFS_B_TO_FSB(mp, ((xfs_ufsize_t)(offset + count)));
 
 	error = XFS_BMAPI(mp, NULL, io, offset_fsb,
 			(xfs_filblks_t)(end_fsb - offset_fsb) ,

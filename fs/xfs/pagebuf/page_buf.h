@@ -267,6 +267,7 @@ extern page_buf_t *pagebuf_lookup(
 
 extern page_buf_t *pagebuf_get_empty(	/* allocate pagebuf struct with	*/
 					/*  no memory or disk address	*/
+		size_t len,
 		struct pb_target *);	/* mount point "fake" inode	*/
 
 extern page_buf_t *pagebuf_get_no_daddr(/* allocate pagebuf struct	*/
