@@ -60,6 +60,7 @@ struct hfs_inode_info {
 	struct semaphore extents_lock;
 
 	u16 alloc_blocks, clump_blocks;
+	sector_t fs_blocks;
 	/* Allocation extents from catlog record or volume header */
 	hfs_extent_rec first_extents;
 	u16 first_blocks;

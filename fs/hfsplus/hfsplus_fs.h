@@ -155,6 +155,7 @@ struct hfsplus_sb_info {
 struct hfsplus_inode_info {
 	struct semaphore extents_lock;
 	u32 clump_blocks, alloc_blocks;
+	sector_t fs_blocks;
 	/* Allocation extents from catalog record or volume header */
 	hfsplus_extent_rec first_extents;
 	u32 first_blocks;

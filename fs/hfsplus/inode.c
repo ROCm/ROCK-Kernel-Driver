@@ -332,6 +332,7 @@ struct inode *hfsplus_new_inode(struct super_block *sb, int mode)
 	inode->i_gid = current->fsgid;
 	inode->i_nlink = 1;
 	inode->i_mtime = inode->i_atime = inode->i_ctime = CURRENT_TIME;
+	inode->i_blksize = HFSPLUS_SB(sb).alloc_blksz;
 	INIT_LIST_HEAD(&HFSPLUS_I(inode).open_dir_list);
 	init_MUTEX(&HFSPLUS_I(inode).extents_lock);
 	atomic_set(&HFSPLUS_I(inode).opencnt, 0);
@@ -343,6 +344,7 @@ struct inode *hfsplus_new_inode(struct super_block *sb, int mode)
 	HFSPLUS_I(inode).cached_start = 0;
 	HFSPLUS_I(inode).cached_blocks = 0;
 	HFSPLUS_I(inode).phys_size = 0;
+	HFSPLUS_I(inode).fs_blocks = 0;
 	HFSPLUS_I(inode).rsrc_inode = NULL;
 	if (S_ISDIR(inode->i_mode)) {
 		inode->i_size = 2;
@@ -408,7 +410,8 @@ void hfsplus_inode_read_fork(struct inode *inode, struct hfsplus_fork_raw *fork)
 
 	HFSPLUS_I(inode).alloc_blocks = be32_to_cpu(fork->total_blocks);
 	inode->i_size = HFSPLUS_I(inode).phys_size = be64_to_cpu(fork->total_size);
-	inode->i_blocks = (inode->i_size + sb->s_blocksize - 1) >> sb->s_blocksize_bits;
+	HFSPLUS_I(inode).fs_blocks = (inode->i_size + sb->s_blocksize - 1) >> sb->s_blocksize_bits;
+	inode_set_bytes(inode, HFSPLUS_I(inode).fs_blocks << sb->s_blocksize_bits);
 	HFSPLUS_I(inode).clump_blocks = be32_to_cpu(fork->clump_size) >> HFSPLUS_SB(sb).alloc_blksz_shift;
 	if (!HFSPLUS_I(inode).clump_blocks)
 		HFSPLUS_I(inode).clump_blocks = HFSPLUS_IS_RSRC(inode) ? HFSPLUS_SB(sb).rsrc_clump_blocks :
@@ -432,7 +435,7 @@ int hfsplus_cat_read_inode(struct inode *inode, struct hfs_find_data *fd)
 	type = hfs_bnode_read_u16(fd->bnode, fd->entryoffset);
 
 	HFSPLUS_I(inode).dev = 0;
-	inode->i_blksize = PAGE_SIZE; /* Doesn't seem to be useful... */
+	inode->i_blksize = HFSPLUS_SB(inode->i_sb).alloc_blksz;
 	if (type == HFSPLUS_FOLDER) {
 		struct hfsplus_cat_folder *folder = &entry.folder;
 
@@ -446,7 +449,7 @@ int hfsplus_cat_read_inode(struct inode *inode, struct hfs_find_data *fd)
 		inode->i_atime = hfsp_mt2ut(folder->access_date);
 		inode->i_mtime = hfsp_mt2ut(folder->content_mod_date);
 		inode->i_ctime = inode->i_mtime;
-		inode->i_blocks = 0;
+		HFSPLUS_I(inode).fs_blocks = 0;
 		inode->i_op = &hfsplus_dir_inode_operations;
 		inode->i_fop = &hfsplus_dir_operations;
 	} else if (type == HFSPLUS_FILE) {
