@@ -1248,8 +1248,9 @@ static int hwif_init(ide_hwif_t *hwif)
 {
 	int old_irq, unit;
 
+	/* Return success if no device is connected */
 	if (!hwif->present)
-		return 0;
+		return 1;
 
 	if (!hwif->irq) {
 		if (!(hwif->irq = ide_default_irq(hwif->io_ports[IDE_DATA_OFFSET])))

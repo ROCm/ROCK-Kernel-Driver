@@ -60,8 +60,8 @@
 
 #define DRV_MODULE_NAME		"tg3"
 #define PFX DRV_MODULE_NAME	": "
-#define DRV_MODULE_VERSION	"3.19"
-#define DRV_MODULE_RELDATE	"January 26, 2005"
+#define DRV_MODULE_VERSION	"3.20"
+#define DRV_MODULE_RELDATE	"February 2, 2005"
 
 #define TG3_DEF_MAC_MODE	0
 #define TG3_DEF_RX_MODE		0
@@ -2146,8 +2146,9 @@ static int tg3_setup_fiber_hw_autoneg(struct tg3 *tp, u32 mac_status)
 		if (tr32(TG3PCI_DUAL_MAC_CTRL) & DUAL_MAC_CTRL_ID)
 			port_a = 0;
 
-		serdes_cfg = tr32(MAC_SERDES_CFG) &
-			((1 << 23) | (1 << 22) | (1 << 21) | (1 << 20));
+		/* preserve bits 0-11,13,14 for signal pre-emphasis */
+		/* preserve bits 20-23 for voltage regulator */
+		serdes_cfg = tr32(MAC_SERDES_CFG) & 0x00f06fff;
 	}
 
 	sg_dig_ctrl = tr32(SG_DIG_CTRL);
@@ -2158,9 +2159,9 @@ static int tg3_setup_fiber_hw_autoneg(struct tg3 *tp, u32 mac_status)
 				u32 val = serdes_cfg;
 
 				if (port_a)
-					val |= 0xc010880;
+					val |= 0xc010000;
 				else
-					val |= 0x4010880;
+					val |= 0x4010000;
 				tw32_f(MAC_SERDES_CFG, val);
 			}
 			tw32_f(SG_DIG_CTRL, 0x01388400);
@@ -2183,7 +2184,7 @@ static int tg3_setup_fiber_hw_autoneg(struct tg3 *tp, u32 mac_status)
 
 	if (sg_dig_ctrl != expected_sg_dig_ctrl) {
 		if (workaround)
-			tw32_f(MAC_SERDES_CFG, serdes_cfg | 0xc011880);
+			tw32_f(MAC_SERDES_CFG, serdes_cfg | 0xc011000);
 		tw32_f(SG_DIG_CTRL, expected_sg_dig_ctrl | (1 << 30));
 		udelay(5);
 		tw32_f(SG_DIG_CTRL, expected_sg_dig_ctrl);
@@ -2224,9 +2225,9 @@ static int tg3_setup_fiber_hw_autoneg(struct tg3 *tp, u32 mac_status)
 					u32 val = serdes_cfg;
 
 					if (port_a)
-						val |= 0xc010880;
+						val |= 0xc010000;
 					else
-						val |= 0x4010880;
+						val |= 0x4010000;
 
 					tw32_f(MAC_SERDES_CFG, val);
 				}
@@ -2234,8 +2235,12 @@ static int tg3_setup_fiber_hw_autoneg(struct tg3 *tp, u32 mac_status)
 				tw32_f(SG_DIG_CTRL, 0x01388400);
 				udelay(40);
 
+				/* Link parallel detection - link is up */
+				/* only if we have PCS_SYNC and not */
+				/* receiving config code words */
 				mac_status = tr32(MAC_STATUS);
-				if (mac_status & MAC_STATUS_PCS_SYNCED) {
+				if ((mac_status & MAC_STATUS_PCS_SYNCED) &&
+				    !(mac_status & MAC_STATUS_RCVD_CFG)) {
 					tg3_setup_flow_control(tp, 0, 0);
 					current_link_up = 1;
 				}
@@ -5416,8 +5421,10 @@ static int tg3_reset_hw(struct tg3 *tp)
 	udelay(10);
 
 	if (tp->tg3_flags2 & TG3_FLG2_PHY_SERDES) {
-		if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5704) {
+		if ((GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5704) &&
+			!(tp->tg3_flags2 & TG3_FLG2_SERDES_PREEMPHASIS)) {
 			/* Set drive transmission level to 1.2V  */
+			/* only if the signal pre-emphasis bit is not set  */
 			val = tr32(MAC_SERDES_CFG);
 			val &= 0xfffff000;
 			val |= 0x880;
@@ -7513,6 +7520,8 @@ static int __devinit tg3_phy_probe(struct tg3 *tp)
 		tg3_read_mem(tp, NIC_SRAM_DATA_CFG, &nic_cfg);
 		tp->nic_sram_data_cfg = nic_cfg;
 
+		tg3_read_mem(tp, NIC_SRAM_DATA_CFG_2, &cfg2);
+
 		eeprom_signature_found = 1;
 
 		if ((nic_cfg & NIC_SRAM_DATA_CFG_PHY_TYPE_MASK) ==
@@ -7531,8 +7540,7 @@ static int __devinit tg3_phy_probe(struct tg3 *tp)
 			eeprom_phy_id = 0;
 
 		if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5750) {
-			tg3_read_mem(tp, NIC_SRAM_DATA_CFG_2, &led_cfg);
-			led_cfg &= (NIC_SRAM_DATA_CFG_LED_MODE_MASK |
+			led_cfg = cfg2 & (NIC_SRAM_DATA_CFG_LED_MODE_MASK |
 				    SHASTA_EXT_LED_MODE_MASK);
 		} else
 			led_cfg = nic_cfg & NIC_SRAM_DATA_CFG_LED_MODE_MASK;
@@ -7590,9 +7598,13 @@ static int __devinit tg3_phy_probe(struct tg3 *tp)
 		if (nic_cfg & NIC_SRAM_DATA_CFG_FIBER_WOL)
 			tp->tg3_flags |= TG3_FLAG_SERDES_WOL_CAP;
 
-		tg3_read_mem(tp, NIC_SRAM_DATA_PHY_ID, &cfg2);
 		if (cfg2 & (1 << 17))
 			tp->tg3_flags2 |= TG3_FLG2_CAPACITIVE_COUPLING;
+
+		/* serdes signal pre-emphasis in register 0x590 set by */
+		/* bootcode if bit 18 is set */
+		if (cfg2 & (1 << 18))
+			tp->tg3_flags2 |= TG3_FLG2_SERDES_PREEMPHASIS;
 	}
 
 	/* Reading the PHY ID register can conflict with ASF
