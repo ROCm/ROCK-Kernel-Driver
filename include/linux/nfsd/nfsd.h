@@ -228,6 +228,7 @@ extern struct timeval	nfssvc_boot;
 #define COMPOUND_ERR_SLACK_SPACE	12     /* OP_SETATTR */
 
 #define NFSD_LEASE_TIME			60  /* seconds */
+#define NFSD_LAUNDROMAT_MINTIMEOUT      10   /* seconds */
 
 /*
  * The following attributes are currently not supported by the NFSv4 server:
