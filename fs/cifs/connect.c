@@ -503,9 +503,6 @@ cifs_parse_mount_options(char *options, const char *devname, struct smb_vol *vol
 				vol->password = cifs_kcalloc(temp_len + 1, GFP_KERNEL);
 				strcpy(vol->password, value);
 			}
-			printk("\npassword after munging: %s",vol->password);
-			/* allocate memory for password and copy password in to it */
-			
 		} else if (strnicmp(data, "ip", 2) == 0) {
 			if (!value || !*value) {
 				vol->UNCip = NULL;
@@ -905,7 +902,8 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 	struct TCP_Server_Info *srvTcp = NULL;
 
 	xid = GetXid();
-	cFYI(1, ("Entering cifs_mount. Xid: %d with: %s", xid, mount_data));
+
+/* cFYI(1, ("Entering cifs_mount. Xid: %d with: %s", xid, mount_data)); */
 	
 	memset(&volume_info,0,sizeof(struct smb_vol));
 
