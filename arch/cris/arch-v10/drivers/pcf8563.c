@@ -282,6 +282,5 @@ pcf8563_release(struct inode *inode, struct file *filp)
 	return 0;
 }
 
-EXPORT_NO_SYMBOLS;
 module_init(pcf8563_init);
 module_exit(pcf8563_exit);
