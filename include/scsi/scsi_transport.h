@@ -40,6 +40,11 @@ struct scsi_transport_template {
 	int (*target_setup)(struct scsi_target *);
 	int (*host_setup)(struct Scsi_Host *);
 
+	/* Destructor functions */
+	void (*device_destroy)(struct scsi_device *);
+	void (*target_destroy)(struct scsi_target *);
+	void (*host_destroy)(struct Scsi_Host *);
+
 	/* The size of the specific transport attribute structure (a
 	 * space of this size will be left at the end of the
 	 * scsi_* structure */

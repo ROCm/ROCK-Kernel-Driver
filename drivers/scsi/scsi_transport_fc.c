@@ -29,6 +29,8 @@
 
 static void transport_class_release(struct class_device *class_dev);
 static void host_class_release(struct class_device *class_dev);
+static void fc_timeout_blocked_host(void *data);
+static void fc_timeout_blocked_tgt(void *data);
 
 #define FC_STARGET_NUM_ATTRS 	4	/* increase this if you add attributes */
 #define FC_STARGET_OTHER_ATTRS 	0	/* increase this if you add "always on"
@@ -87,8 +89,16 @@ static int fc_setup_starget_transport_attrs(struct scsi_target *starget)
 	fc_starget_port_name(starget) = -1;
 	fc_starget_port_id(starget) = -1;
 	fc_starget_dev_loss_tmo(starget) = -1;
-	init_timer(&fc_starget_dev_loss_timer(starget));
+	INIT_WORK(&fc_starget_dev_loss_work(starget),
+		  fc_timeout_blocked_tgt, starget);
 	return 0;
+}
+
+static void fc_destroy_starget(struct scsi_target *starget)
+{
+	/* Stop the target timer */
+	if (cancel_delayed_work(&fc_starget_dev_loss_work(starget)))
+		flush_scheduled_work();
 }
 
 static int fc_setup_host_transport_attrs(struct Scsi_Host *shost)
@@ -99,8 +109,16 @@ static int fc_setup_host_transport_attrs(struct Scsi_Host *shost)
 	 * all transport attributes to valid values per host.
 	 */
 	fc_host_link_down_tmo(shost) = -1;
-	init_timer(&fc_host_link_down_timer(shost));
+	INIT_WORK(&fc_host_link_down_work(shost),
+		  fc_timeout_blocked_host, shost);
 	return 0;
+}
+
+static void fc_destroy_host(struct Scsi_Host *shost)
+{
+	/* Stop the host timer */
+	if (cancel_delayed_work(&fc_host_link_down_work(shost)))
+		flush_scheduled_work();
 }
 
 static void transport_class_release(struct class_device *class_dev)
@@ -277,11 +295,13 @@ fc_attach_transport(struct fc_function_template *ft)
 	i->t.target_attrs = &i->starget_attrs[0];
 	i->t.target_class = &fc_transport_class;
 	i->t.target_setup = &fc_setup_starget_transport_attrs;
+	i->t.target_destroy = &fc_destroy_starget;
 	i->t.target_size = sizeof(struct fc_starget_attrs);
 
 	i->t.host_attrs = &i->host_attrs[0];
 	i->t.host_class = &fc_host_class;
 	i->t.host_setup = &fc_setup_host_transport_attrs;
+	i->t.host_destroy = &fc_destroy_host;
 	i->t.host_size = sizeof(struct fc_host_attrs);
 	i->f = ft;
 
@@ -353,7 +373,7 @@ static int fc_device_unblock(struct device *dev, void *data)
  *			 that fail to recover in the alloted time.
  * @data:	scsi target that failed to reappear in the alloted time.
  **/
-static void fc_timeout_blocked_tgt(unsigned long data)
+static void fc_timeout_blocked_tgt(void  *data)
 {
 	struct scsi_target *starget = (struct scsi_target *)data;
 
@@ -388,7 +408,7 @@ int
 fc_target_block(struct scsi_target *starget)
 {
 	int timeout = fc_starget_dev_loss_tmo(starget);
-	struct timer_list *timer = &fc_starget_dev_loss_timer(starget);
+	struct work_struct *work = &fc_starget_dev_loss_work(starget);
 
 	if (timeout < 0 || timeout > SCSI_DEVICE_BLOCK_MAX_TIMEOUT)
 		return -EINVAL;
@@ -396,10 +416,7 @@ fc_target_block(struct scsi_target *starget)
 	device_for_each_child(&starget->dev, NULL, fc_device_block);
 
 	/* The scsi lld blocks this target for the timeout period only. */
-	timer->data = (unsigned long)starget;
-	timer->expires = jiffies + timeout * HZ;
-	timer->function = fc_timeout_blocked_tgt;
-	add_timer(timer);
+	schedule_delayed_work(work, timeout * HZ);
 
 	return 0;
 }
@@ -424,7 +441,8 @@ fc_target_unblock(struct scsi_target *starget)
 	 * failure as the state machine state change will validate the
 	 * transaction. 
 	 */
-	del_timer_sync(&fc_starget_dev_loss_timer(starget));
+	if (cancel_delayed_work(&fc_starget_dev_loss_work(starget)))
+		flush_scheduled_work();
 
 	device_for_each_child(&starget->dev, NULL, fc_device_unblock);
 }
@@ -436,7 +454,7 @@ EXPORT_SYMBOL(fc_target_unblock);
  * @data:	scsi host that failed to recover its devices in the alloted
  *		time.
  **/
-static void fc_timeout_blocked_host(unsigned long data)
+static void fc_timeout_blocked_host(void  *data)
 {
 	struct Scsi_Host *shost = (struct Scsi_Host *)data;
 	struct scsi_device *sdev;
@@ -475,7 +493,7 @@ fc_host_block(struct Scsi_Host *shost)
 {
 	struct scsi_device *sdev;
 	int timeout = fc_host_link_down_tmo(shost);
-	struct timer_list *timer = &fc_host_link_down_timer(shost);
+	struct work_struct *work = &fc_host_link_down_work(shost);
 
 	if (timeout < 0 || timeout > SCSI_DEVICE_BLOCK_MAX_TIMEOUT)
 		return -EINVAL;
@@ -484,11 +502,7 @@ fc_host_block(struct Scsi_Host *shost)
 		scsi_internal_device_block(sdev);
 	}
 
-	/* The scsi lld blocks this host for the timeout period only. */
-	timer->data = (unsigned long)shost;
-	timer->expires = jiffies + timeout * HZ;
-	timer->function = fc_timeout_blocked_host;
-	add_timer(timer);
+	schedule_delayed_work(work, timeout * HZ);
 
 	return 0;
 }
@@ -516,7 +530,9 @@ fc_host_unblock(struct Scsi_Host *shost)
 	 * failure as the state machine state change will validate the
 	 * transaction.
 	 */
-	del_timer_sync(&fc_host_link_down_timer(shost));
+	if (cancel_delayed_work(&fc_host_link_down_work(shost)))
+		flush_scheduled_work();
+
 	shost_for_each_device(sdev, shost) {
 		scsi_internal_device_unblock(sdev);
 	}
