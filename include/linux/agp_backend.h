@@ -48,8 +48,6 @@ enum chipset_type {
 	HP_ZX1,
 	ALPHA_CORE_AGP,
 	NVIDIA_GENERIC,
-	NVIDIA_NFORCE,
-	NVIDIA_NFORCE2,
 };
 
 struct agp_version {

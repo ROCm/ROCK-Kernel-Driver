@@ -13,6 +13,19 @@
 #include <linux/mm.h>
 #include "agp.h"
 
+
+/* registers */
+#define NVIDIA_0_APBASE		0x10
+#define NVIDIA_0_APSIZE		0x80
+#define NVIDIA_1_WBC		0xf0
+#define NVIDIA_2_GARTCTRL	0xd0
+#define NVIDIA_2_APBASE		0xd8
+#define NVIDIA_2_APLIMIT	0xdc
+#define NVIDIA_2_ATTBASE(i)	(0xe0 + (i) * 4)
+#define NVIDIA_3_APBASE		0x50
+#define NVIDIA_3_APLIMIT	0x54
+
+
 static int agp_try_unsupported __initdata = 0;
 
 static struct _nvidia_private {
@@ -22,6 +35,7 @@ static struct _nvidia_private {
 	volatile u32 *aperture;
 	int num_active_entries;
 	off_t pg_offset;
+	u32 wbc_mask;
 } nvidia_private;
 
 
@@ -182,34 +196,25 @@ static int nvidia_remove_memory(agp_memory * mem, off_t pg_start, int type)
 
 static void nvidia_tlbflush(agp_memory * mem)
 {
-	int i;
 	unsigned long end;
-	u32 wbc_reg, wbc_mask, temp;
+	u32 wbc_reg, temp;
+	int i;
 
 	/* flush chipset */
-	switch (agp_bridge->type) {
-	case NVIDIA_NFORCE:
-		wbc_mask = 0x00010000;
-		break;
-	case NVIDIA_NFORCE2:
-		wbc_mask = 0x80000000;
-		break;
-	default:
-		wbc_mask = 0;
-		break;
-	}
-
-	if (wbc_mask) {
+	if (nvidia_private.wbc_mask) {
 		pci_read_config_dword(nvidia_private.dev_1, NVIDIA_1_WBC, &wbc_reg);
-		wbc_reg |= wbc_mask;
+		wbc_reg |= nvidia_private.wbc_mask;
 		pci_write_config_dword(nvidia_private.dev_1, NVIDIA_1_WBC, wbc_reg);
 
 		end = jiffies + 3*HZ;
 		do {
-			pci_read_config_dword(nvidia_private.dev_1, NVIDIA_1_WBC, &wbc_reg);
-			if ((signed)(end - jiffies) <= 0)
-				printk(KERN_ERR "TLB flush took more than 3 seconds.\n");
-		} while (wbc_reg & wbc_mask);
+			pci_read_config_dword(nvidia_private.dev_1,
+					NVIDIA_1_WBC, &wbc_reg);
+			if ((signed)(end - jiffies) <= 0) {
+				printk(KERN_ERR
+				    "TLB flush took more than 3 seconds.\n");
+			}
+		} while (wbc_reg & nvidia_private.wbc_mask);
 	}
 
 	/* flush TLB entries */
@@ -238,12 +243,12 @@ static struct gatt_mask nvidia_generic_masks[] =
 
 
 struct agp_bridge_data nvidia_bridge = {
+	.type			= NVIDIA_GENERIC,
 	.masks			= nvidia_generic_masks,
 	.aperture_sizes		= (void *) nvidia_generic_sizes,
 	.size_type		= U8_APER_SIZE,
 	.num_aperture_sizes	= 5,
 	.dev_private_data	= (void *) &nvidia_private,
-	.needs_scratch_page	= FALSE,
 	.configure		= nvidia_configure,
 	.fetch_size		= nvidia_fetch_size,
 	.cleanup		= nvidia_cleanup,
@@ -261,45 +266,26 @@ struct agp_bridge_data nvidia_bridge = {
 	.agp_destroy_page	= agp_generic_destroy_page,
 	.suspend		= agp_generic_suspend,
 	.resume			= agp_generic_resume,
-	.cant_use_aperture	= 0,
 };
-
-struct agp_device_ids nvidia_agp_device_ids[] __initdata =
-{
-	{
-		.device_id	= PCI_DEVICE_ID_NVIDIA_NFORCE,
-		.chipset	= NVIDIA_NFORCE,
-		.chipset_name	= "nForce",
-	},
-	{
-		.device_id	= PCI_DEVICE_ID_NVIDIA_NFORCE2,
-		.chipset	= NVIDIA_NFORCE2,
-		.chipset_name	= "nForce2",
-	},
-	{ }, /* dummy final entry, always present */
-};
-
 
 static struct agp_driver nvidia_agp_driver = {
-	.owner = THIS_MODULE,
+	.owner			= THIS_MODULE,
 };
 
 
-/* Supported Device Scanning routine */
 static int __init agp_nvidia_probe(struct pci_dev *pdev,
-				  const struct pci_device_id *ent)
+				   const struct pci_device_id *ent)
 {
-	struct agp_device_ids *devs = nvidia_agp_device_ids;
 	u8 cap_ptr;
-	int j;
 
-	nvidia_private.dev_1 = pci_find_slot((unsigned int)pdev->bus->number, PCI_DEVFN(0, 1));
-	nvidia_private.dev_2 = pci_find_slot((unsigned int)pdev->bus->number, PCI_DEVFN(0, 2));
-	nvidia_private.dev_3 = pci_find_slot((unsigned int)pdev->bus->number, PCI_DEVFN(30, 0));
+	nvidia_private.dev_1 =
+		pci_find_slot((unsigned int)pdev->bus->number, PCI_DEVFN(0, 1));
+	nvidia_private.dev_2 =
+		pci_find_slot((unsigned int)pdev->bus->number, PCI_DEVFN(0, 2));
+	nvidia_private.dev_3 =
+		pci_find_slot((unsigned int)pdev->bus->number, PCI_DEVFN(30, 0));
 	
-	if((nvidia_private.dev_1 == NULL) ||
-		(nvidia_private.dev_2 == NULL) ||
-		(nvidia_private.dev_3 == NULL)) {
+	if (!nvidia_private.dev_1 || !nvidia_private.dev_2 || !nvidia_private.dev_3) {
 		printk(KERN_INFO PFX "agpgart: Detected an NVIDIA "
 			"nForce/nForce2 chipset, but could not find "
 			"the secondary devices.\n");
@@ -310,30 +296,36 @@ static int __init agp_nvidia_probe(struct pci_dev *pdev,
 	if (!cap_ptr)
 		return -ENODEV;
 
-	for (j = 0; devs[j].chipset_name; j++) {
-		if (pdev->device == devs[j].device_id) {
-			printk (KERN_INFO PFX "Detected NVIDIA %s chipset\n", devs[j].chipset_name);
-			nvidia_bridge.type = devs[j].chipset;
-			goto found;
+	switch (pdev->device) {
+	case PCI_DEVICE_ID_NVIDIA_NFORCE:
+		printk(KERN_INFO PFX "Detected NVIDIA nForce chipset\n");
+		nvidia_private.wbc_mask = 0x00010000;
+		break;
+	case PCI_DEVICE_ID_NVIDIA_NFORCE2:
+		printk(KERN_INFO PFX "Detected NVIDIA nForce2 chipset\n");
+		nvidia_private.wbc_mask = 0x80000000;
+		break;
+	default:
+		if (!agp_try_unsupported) {
+			printk(KERN_ERR PFX
+			    "Unsupported NVIDIA chipset (device id: %04x),"
+			    " you might want to try agp_try_unsupported=1.\n",
+			    pdev->device);
+			return -ENODEV;
 		}
+		printk(KERN_WARNING PFX
+		    "Trying generic NVIDIA routines for device id: %04x\n",
+		    pdev->device);
+		break;
 	}
 
-	if (!agp_try_unsupported) {
-		printk(KERN_ERR PFX "Unsupported NVIDIA chipset (device id: %04x),"
-		    " you might want to try agp_try_unsupported=1.\n", pdev->device);
-		return -ENODEV;
-	}
-
-	printk(KERN_WARNING PFX "Trying generic NVIDIA routines"
-	       " for device id: %04x\n", pdev->device);
-	nvidia_bridge.type = NVIDIA_GENERIC;
-
-found:
 	nvidia_bridge.dev = pdev;
 	nvidia_bridge.capndx = cap_ptr;
 
 	/* Fill in the mode register */
-	pci_read_config_dword(pdev,	nvidia_bridge.capndx+PCI_AGP_STATUS, &nvidia_bridge.mode);
+	pci_read_config_dword(pdev,
+			nvidia_bridge.capndx+PCI_AGP_STATUS,
+			&nvidia_bridge.mode);
 
 	memcpy(agp_bridge, &nvidia_bridge, sizeof(struct agp_bridge_data));
 
@@ -342,6 +334,10 @@ found:
 	return 0;
 }
 
+static void __exit agp_nvidia_remove(struct pci_dev *pdev)
+{
+	agp_unregister_driver(&nvidia_agp_driver);
+}
 
 static struct pci_device_id agp_nvidia_pci_table[] __initdata = {
 	{
@@ -361,6 +357,7 @@ static struct __initdata pci_driver agp_nvidia_pci_driver = {
 	.name		= "agpgart-nvidia",
 	.id_table	= agp_nvidia_pci_table,
 	.probe		= agp_nvidia_probe,
+	.remove		= agp_nvidia_remove,
 };
 
 static int __init agp_nvidia_init(void)
@@ -370,7 +367,6 @@ static int __init agp_nvidia_init(void)
 
 static void __exit agp_nvidia_cleanup(void)
 {
-	agp_unregister_driver(&nvidia_agp_driver);
 	pci_unregister_driver(&agp_nvidia_pci_driver);
 }
 
