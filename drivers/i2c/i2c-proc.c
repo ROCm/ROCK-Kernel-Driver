@@ -97,10 +97,21 @@ int i2c_create_name(char **name, const char *prefix,
 			struct i2c_adapter *adapter, int addr)
 {
 	char name_buffer[50];
-	int id;
+	int id, i, end;
 	if (i2c_is_isa_adapter(adapter))
 		sprintf(name_buffer, "%s-isa-%04x", prefix, addr);
-	else {
+	else if (!adapter->algo->smbus_xfer && !adapter->algo->master_xfer) {
+		/* dummy adapter, generate prefix */
+		sprintf(name_buffer, "%s-", prefix);
+		end = strlen(name_buffer);
+		for(i = 0; i < 32; i++) {
+			if(adapter->algo->name[i] == ' ')
+				break;
+			name_buffer[end++] = tolower(adapter->algo->name[i]);
+		}
+		name_buffer[end] = 0;
+		sprintf(name_buffer + end, "-%04x", addr);
+	} else {
 		if ((id = i2c_adapter_id(adapter)) < 0)
 			return -ENOENT;
 		sprintf(name_buffer, "%s-i2c-%d-%02x", prefix, id, addr);

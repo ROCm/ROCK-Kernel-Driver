@@ -367,6 +367,8 @@ struct i2c_msg {
 #define I2C_M_RD	0x01
 #define I2C_M_NOSTART	0x4000
 #define I2C_M_REV_DIR_ADDR	0x2000
+#define I2C_M_IGNORE_NAK	0x1000
+#define I2C_M_NO_RD_ACK		0x0800
 	short len;		/* msg length				*/
 	char *buf;		/* pointer to msg data			*/
 };
@@ -375,7 +377,7 @@ struct i2c_msg {
 
 #define I2C_FUNC_I2C			0x00000001
 #define I2C_FUNC_10BIT_ADDR		0x00000002
-#define I2C_FUNC_PROTOCOL_MANGLING	0x00000004 /* I2C_M_{REV_DIR_ADDR,NOSTART} */
+#define I2C_FUNC_PROTOCOL_MANGLING	0x00000004 /* I2C_M_{REV_DIR_ADDR,NOSTART,..} */
 #define I2C_FUNC_SMBUS_HWPEC_CALC	0x00000008 /* SMBus 2.0 */
 #define I2C_FUNC_SMBUS_READ_WORD_DATA_PEC  0x00000800 /* SMBus 2.0 */ 
 #define I2C_FUNC_SMBUS_WRITE_WORD_DATA_PEC 0x00001000 /* SMBus 2.0 */ 

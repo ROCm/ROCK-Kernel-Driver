@@ -138,9 +138,9 @@ static ssize_t i2cdev_write (struct file *file, const char *buf, size_t count,
 	struct inode *inode = file->f_dentry->d_inode;
 #endif /* DEBUG */
 
-	if(count > 8192)
+	if (count > 8192)
 		count = 8192;
-		
+
 	/* copy user space data to kernel space. */
 	tmp = kmalloc(count,GFP_KERNEL);
 	if (tmp==NULL)
