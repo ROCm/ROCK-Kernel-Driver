@@ -1355,9 +1355,6 @@ static int ext3_ordered_writepage(struct page *page,
 	if (ext3_journal_current_handle())
 		goto out_fail;
 
-	if (current->flags & PF_MEMALLOC)
-		goto out_fail;
-
 	handle = ext3_journal_start(inode, ext3_writepage_trans_blocks(inode));
 
 	if (IS_ERR(handle)) {
@@ -1403,7 +1400,7 @@ static int ext3_ordered_writepage(struct page *page,
 	return ret;
 
 out_fail:
-	redirty_page_for_writepage(wbc, page);
+	__set_page_dirty_nobuffers(page);
 	unlock_page(page);
 	return ret;
 }
@@ -1419,9 +1416,6 @@ static int ext3_writeback_writepage(struct page *page,
 	if (ext3_journal_current_handle())
 		goto out_fail;
 
-	if (current->flags & PF_MEMALLOC)
-		goto out_fail;
-
 	handle = ext3_journal_start(inode, ext3_writepage_trans_blocks(inode));
 	if (IS_ERR(handle)) {
 		ret = PTR_ERR(handle);
@@ -1435,7 +1429,7 @@ static int ext3_writeback_writepage(struct page *page,
 	return ret;
 
 out_fail:
-	redirty_page_for_writepage(wbc, page);
+	__set_page_dirty_nobuffers(page);
 	unlock_page(page);
 	return ret;
 }
@@ -1449,9 +1443,6 @@ static int ext3_journalled_writepage(struct page *page,
 	int err;
 
 	if (ext3_journal_current_handle())
-		goto no_write;
-
-	if (current->flags & PF_MEMALLOC)
 		goto no_write;
 
 	handle = ext3_journal_start(inode, ext3_writepage_trans_blocks(inode));
@@ -1494,7 +1485,7 @@ out:
 	return ret;
 
 no_write:
-	redirty_page_for_writepage(wbc, page);
+	__set_page_dirty_nobuffers(page);
 out_unlock:
 	unlock_page(page);
 	goto out;

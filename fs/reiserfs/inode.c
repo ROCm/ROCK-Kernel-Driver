@@ -2232,8 +2232,6 @@ static int reiserfs_write_full_page(struct page *page, struct writeback_control 
      * in the BH_Uptodate is just a sanity check.
      */
     if (!page_has_buffers(page)) {
-	if (current->flags & PF_MEMALLOC)
-	    goto redirty_exit;
 	if (!PageUptodate(page))
 	    buffer_error();
 	create_empty_buffers(page, s->s_blocksize,
@@ -2265,8 +2263,6 @@ static int reiserfs_write_full_page(struct page *page, struct writeback_control 
     do {
 	if ((checked || buffer_dirty(bh)) && (!buffer_mapped(bh) ||
 	   (buffer_mapped(bh) && bh->b_blocknr == 0))) {
-	    if (current->flags & PF_MEMALLOC)
-		goto redirty_exit;
 	    /* not mapped yet, or it points to a direct item, search
 	     * the btree for the mapping info, and log any direct
 	     * items found
@@ -2315,7 +2311,7 @@ static int reiserfs_write_full_page(struct page *page, struct writeback_control 
 	    lock_buffer(bh);
 	} else {
 	    if (test_set_buffer_locked(bh)) {
-		redirty_page_for_writepage(wbc, page);
+		__set_page_dirty_nobuffers(page);
 		continue;
 	    }
 	}
@@ -2412,11 +2408,6 @@ fail:
 	bh = next;
     } while(bh != head);
     goto done;
-
-redirty_exit:
-    redirty_page_for_writepage(wbc, page);
-    unlock_page(page);
-    return error;
 }
 
 
