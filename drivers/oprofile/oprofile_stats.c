@@ -9,6 +9,7 @@
 
 #include <linux/oprofile.h>
 #include <linux/smp.h>
+#include <linux/threads.h>
  
 #include "oprofile_stats.h"
 #include "cpu_buffer.h"
