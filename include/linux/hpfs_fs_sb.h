@@ -30,9 +30,8 @@ struct hpfs_sb_info {
 					/*	128 bytes lowercasing table */
 	unsigned *sb_bmp_dir;		/* main bitmap directory */
 	unsigned sb_c_bitmap;		/* current bitmap */
-	wait_queue_head_t sb_creation_de;/* when creating dirents, nobody else
+	struct semaphore hpfs_creation_de; /* when creating dirents, nobody else
 					   can alloc blocks */
-	unsigned sb_creation_de_lock : 1;
 	/*unsigned sb_mounting : 1;*/
 	int sb_timeshift;
 };
@@ -60,8 +59,6 @@ struct hpfs_sb_info {
 #define s_hpfs_cp_table u.hpfs_sb.sb_cp_table
 #define s_hpfs_bmp_dir u.hpfs_sb.sb_bmp_dir
 #define s_hpfs_c_bitmap u.hpfs_sb.sb_c_bitmap
-#define s_hpfs_creation_de u.hpfs_sb.sb_creation_de
-#define s_hpfs_creation_de_lock u.hpfs_sb.sb_creation_de_lock
 #define s_hpfs_iget_q u.hpfs_sb.sb_iget_q
 /*#define s_hpfs_mounting u.hpfs_sb.sb_mounting*/
 #define s_hpfs_timeshift u.hpfs_sb.sb_timeshift

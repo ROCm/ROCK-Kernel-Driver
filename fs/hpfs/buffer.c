@@ -14,8 +14,7 @@ void hpfs_lock_creation(struct super_block *s)
 #ifdef DEBUG_LOCKS
 	printk("lock creation\n");
 #endif
-	while (s->s_hpfs_creation_de_lock) sleep_on(&s->s_hpfs_creation_de);
-	s->s_hpfs_creation_de_lock = 1;
+	down(&s->u.hpfs_sb.hpfs_creation_de);
 }
 
 void hpfs_unlock_creation(struct super_block *s)
@@ -23,8 +22,7 @@ void hpfs_unlock_creation(struct super_block *s)
 #ifdef DEBUG_LOCKS
 	printk("unlock creation\n");
 #endif
-	s->s_hpfs_creation_de_lock = 0;
-	wake_up(&s->s_hpfs_creation_de);
+	up(&s->u.hpfs_sb.hpfs_creation_de);
 }
 
 void hpfs_lock_iget(struct super_block *s, int mode)
