@@ -3636,7 +3636,7 @@ void cpu_attach_domain(struct sched_domain *sd, int cpu)
 
 	spin_lock_irqsave(&rq->lock, flags);
 
-	if (cpu == smp_processor_id() || cpu_is_offline(cpu)) {
+	if (cpu == smp_processor_id() || !cpu_online(cpu)) {
 		rq->sd = sd;
 	} else {
 		init_completion(&req.done);
