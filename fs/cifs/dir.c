@@ -54,9 +54,14 @@ build_path_from_dentry(struct dentry *direntry)
 		we need to reopen the file after it was closed implicitly
 		when the server crashed */
 
+cifs_bp_rename_retry:
 	for (temp = direntry; !IS_ROOT(temp);) {
 		namelen += (1 + temp->d_name.len);
 		temp = temp->d_parent;
+		if(temp == NULL) {
+			cERROR(1,("corrupt dentry"));
+			return NULL;
+		}
 	}
 
 	full_path = kmalloc(namelen+1, GFP_KERNEL);
@@ -75,11 +80,23 @@ build_path_from_dentry(struct dentry *direntry)
 			cFYI(0, (" name: %s ", full_path + namelen));
 		}
 		temp = temp->d_parent;
+		if(temp == NULL) {
+			cERROR(1,("corrupt dentry"));
+			kfree(full_path);
+			return NULL;
+		}
 	}
-	if (namelen != 0)
+	if (namelen != 0) {
 		cERROR(1,
 		       ("We did not end path lookup where we expected namelen is %d",
 			namelen));
+		/* presumably this is only possible if we were racing with a rename 
+		of one of the parent directories  (we can not lock the dentries
+		above us to prevent this, but retrying should be harmless) */
+		kfree(full_path);
+		namelen = 0;
+		goto cifs_bp_rename_retry;
+	}
 
 	return full_path;
 }
