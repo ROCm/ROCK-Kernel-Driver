@@ -99,25 +99,32 @@ acpi_processor_power_activate (
 	struct acpi_processor	*pr,
 	int			state)
 {
+	struct acpi_processor_cx *old, *new;
+
 	if (!pr)
 		return;
 
-	pr->power.states[pr->power.state].promotion.count = 0;
-	pr->power.states[pr->power.state].demotion.count = 0;
+	old = &pr->power.states[pr->power.state];
+	new = &pr->power.states[state];
+
+ 	old->promotion.count = 0;
+ 	new->demotion.count = 0;
 
 	/* Cleanup from old state. */
-	switch (pr->power.state) {
+	switch (old->type) {
 	case ACPI_STATE_C3:
 		/* Disable bus master reload */
-		acpi_set_register(ACPI_BITREG_BUS_MASTER_RLD, 0, ACPI_MTX_DO_NOT_LOCK);
+		if (new->type != ACPI_STATE_C3)
+			acpi_set_register(ACPI_BITREG_BUS_MASTER_RLD, 0, ACPI_MTX_DO_NOT_LOCK);
 		break;
 	}
 
 	/* Prepare to use new state. */
-	switch (state) {
+	switch (new->type) {
 	case ACPI_STATE_C3:
 		/* Enable bus master reload */
-		acpi_set_register(ACPI_BITREG_BUS_MASTER_RLD, 1, ACPI_MTX_DO_NOT_LOCK);
+		if (old->type != ACPI_STATE_C3)
+			acpi_set_register(ACPI_BITREG_BUS_MASTER_RLD, 1, ACPI_MTX_DO_NOT_LOCK);
 		break;
 	}
 
@@ -210,7 +217,7 @@ void acpi_processor_idle (void)
 	 * ------
 	 * Invoke the current Cx state to put the processor to sleep.
 	 */
-	switch (pr->power.state) {
+	switch (cx->type) {
 
 	case ACPI_STATE_C1:
 		/*
@@ -234,7 +241,7 @@ void acpi_processor_idle (void)
 		/* Get start time (ticks) */
 		t1 = inl(acpi_fadt.xpm_tmr_blk.address);
 		/* Invoke C2 */
-		inb(pr->power.states[ACPI_STATE_C2].address);
+		inb(cx->address);
 		/* Dummy op - must do something useless after P_LVL2 read */
 		t2 = inl(acpi_fadt.xpm_tmr_blk.address);
 		/* Get end time (ticks) */
@@ -251,7 +258,7 @@ void acpi_processor_idle (void)
 		/* Get start time (ticks) */
 		t1 = inl(acpi_fadt.xpm_tmr_blk.address);
 		/* Invoke C3 */
-		inb(pr->power.states[ACPI_STATE_C3].address);
+		inb(cx->address);
 		/* Dummy op - must do something useless after P_LVL3 read */
 		t2 = inl(acpi_fadt.xpm_tmr_blk.address);
 		/* Get end time (ticks) */
@@ -448,6 +455,7 @@ int acpi_processor_get_power_info (
 	 * TBD: What about PROC_C1?
 	 */
 	pr->power.states[ACPI_STATE_C1].valid = 1;
+	pr->power.states[ACPI_STATE_C1].type = ACPI_STATE_C1;
 
 	/*
 	 * C2
@@ -481,6 +489,7 @@ int acpi_processor_get_power_info (
 		 */
 		else {
 			pr->power.states[ACPI_STATE_C2].valid = 1;
+			pr->power.states[ACPI_STATE_C2].type = ACPI_STATE_C2;
 			pr->power.states[ACPI_STATE_C2].latency_ticks =
 				US_TO_PM_TIMER_TICKS(acpi_fadt.plvl2_lat);
 		}
@@ -539,6 +548,7 @@ int acpi_processor_get_power_info (
 		 */
 		else {
 			pr->power.states[ACPI_STATE_C3].valid = 1;
+			pr->power.states[ACPI_STATE_C3].type = ACPI_STATE_C3;
 			pr->power.states[ACPI_STATE_C3].latency_ticks =
 				US_TO_PM_TIMER_TICKS(acpi_fadt.plvl3_lat);
 			pr->flags.bm_check = 1;
@@ -582,9 +592,9 @@ static int acpi_processor_power_seq_show(struct seq_file *seq, void *offset)
 	if (!pr)
 		goto end;
 
-	seq_printf(seq, "active state:            C%d\n"
-			"default state:           C%d\n"
-			"max_cstate:              C%d\n"
+	seq_printf(seq, "active state:            %d\n"
+			"default state:           %d\n"
+			"max_cstate:              %d\n"
 			"bus master activity:     %08x\n",
 			pr->power.state,
 			pr->power.default_state,
@@ -594,7 +604,7 @@ static int acpi_processor_power_seq_show(struct seq_file *seq, void *offset)
 	seq_puts(seq, "states:\n");
 
 	for (i = 1; i < ACPI_C_STATE_COUNT; i++) {
-		seq_printf(seq, "   %cC%d:                  ",
+		seq_printf(seq, "   %c%d:                  ",
 			(i == pr->power.state?'*':' '), i);
 
 		if (!pr->power.states[i].valid) {
@@ -602,17 +612,32 @@ static int acpi_processor_power_seq_show(struct seq_file *seq, void *offset)
 			continue;
 		}
 
+		switch (pr->power.states[i].type) {
+		case ACPI_STATE_C1:
+			seq_printf(seq, "type[C1] ");
+			break;
+		case ACPI_STATE_C2:
+			seq_printf(seq, "type[C2] ");
+			break;
+		case ACPI_STATE_C3:
+			seq_printf(seq, "type[C3] ");
+			break;
+		default:
+			seq_printf(seq, "type[--] ");
+			break;
+		}
+
 		if (pr->power.states[i].promotion.state)
-			seq_printf(seq, "promotion[C%d] ",
+			seq_printf(seq, "promotion[%d] ",
 				pr->power.states[i].promotion.state);
 		else
-			seq_puts(seq, "promotion[--] ");
+			seq_puts(seq, "promotion[-] ");
 
 		if (pr->power.states[i].demotion.state)
-			seq_printf(seq, "demotion[C%d] ",
+			seq_printf(seq, "demotion[%d] ",
 				pr->power.states[i].demotion.state);
 		else
-			seq_puts(seq, "demotion[--] ");
+			seq_puts(seq, "demotion[-] ");
 
 		seq_printf(seq, "latency[%03d] usage[%08d]\n",
 			pr->power.states[i].latency,

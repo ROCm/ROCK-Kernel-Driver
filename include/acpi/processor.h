@@ -29,6 +29,7 @@ struct acpi_processor_cx_policy {
 
 struct acpi_processor_cx {
 	u8			valid;
+	u8			type;
 	u32			address;
 	u32			latency;
 	u32			latency_ticks;
