@@ -421,13 +421,12 @@ static inline void statm_pte_range(pmd_t * pmd, unsigned long address, unsigned 
 		++*total;
 		if (!pte_present(page))
 			continue;
+		ptpage = pte_page(page);
+		if ((!VALID_PAGE(ptpage)) || PageReserved(ptpage))
+			continue;
 		++*pages;
 		if (pte_dirty(page))
 			++*dirty;
-		ptpage = pte_page(page);
-		if ((!VALID_PAGE(ptpage)) || 
-					PageReserved(ptpage))
-			continue;
 		if (page_count(pte_page(page)) > 1)
 			++*shared;
 	} while (address < end);

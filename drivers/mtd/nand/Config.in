@@ -1,0 +1,16 @@
+# drivers/mtd/nand/Config.in
+
+# $Id: Config.in,v 1.1 2001/04/20 15:27:38 dwmw2 Exp $
+
+mainmenu_option next_comment
+
+comment 'NAND Flash Device Drivers'
+
+dep_tristate '  NAND Device Support' CONFIG_MTD_NAND $CONFIG_MTD
+if [ "$CONFIG_MTD_NAND" = "y" -o "$CONFIG_MTD_NAND" = "m" ]; then
+   bool '    Enable ECC correction algorithm'  CONFIG_MTD_NAND_ECC y
+   bool '    Verify NAND page writes' CONFIG_MTD_NAND_VERIFY_WRITE y
+fi
+dep_tristate '  NAND Flash device on SPIA board' CONFIG_MTD_NAND_SPIA $CONFIG_MTD_NAND
+
+endmenu

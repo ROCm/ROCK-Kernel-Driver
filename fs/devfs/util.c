@@ -1,6 +1,6 @@
 /*  devfs (Device FileSystem) utilities.
 
-    Copyright (C) 1999-2000  Richard Gooch
+    Copyright (C) 1999-2001  Richard Gooch
 
     This library is free software; you can redistribute it and/or
     modify it under the terms of the GNU Library General Public
@@ -33,6 +33,8 @@
     20000622   Richard Gooch <rgooch@atnf.csiro.au>
                Took account of interface change to <devfs_mk_symlink>.
                Took account of interface change to <devfs_mk_dir>.
+    20010519   Richard Gooch <rgooch@atnf.csiro.au>
+               Documentation cleanup.
 */
 #include <linux/module.h>
 #include <linux/init.h>
@@ -132,9 +134,10 @@ EXPORT_SYMBOL(devfs_register_tape);
 
 /**
  *	devfs_register_series - Register a sequence of device entries.
- *	@dir: The handle to the parent devfs directory entry. If this is %NULL the
- *		new names are relative to the root of the devfs.
+ *	@dir: The handle to the parent devfs directory entry. If this is %NULL
+ *		the new names are relative to the root of the devfs.
  *	@format: The printf-style format string. A single "\%u" is allowed.
+ *	@num_entries: The number of entries to register.
  *	@flags: A set of bitwise-ORed flags (DEVFS_FL_*).
  *	@major: The major number. Not needed for regular files.
  *	@minor_start: The starting minor number. Not needed for regular files.
@@ -142,9 +145,9 @@ EXPORT_SYMBOL(devfs_register_tape);
  *	@ops: The &file_operations or &block_device_operations structure.
  *		This must not be externally deallocated.
  *	@info: An arbitrary pointer which will be written to the private_data
- *		field of the &file structure passed to the device driver. You can set
- *		this to whatever you like, and change it once the file is opened (the next
- *		file opened will not see this change).
+ *		field of the &file structure passed to the device driver. You
+ *		can set this to whatever you like, and change it once the file
+ *		is opened (the next file opened will not see this change).
  */
 
 void devfs_register_series (devfs_handle_t dir, const char *format,

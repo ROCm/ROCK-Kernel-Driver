@@ -1,4 +1,4 @@
-/* $Id: isdnl1.c,v 2.41.6.2 2001/02/16 16:43:27 kai Exp $
+/* $Id: isdnl1.c,v 2.41.6.3 2001/05/26 15:19:57 kai Exp $
  *
  * isdnl1.c     common low level stuff for Siemens Chipsetbased isdn cards
  *              based on the teles driver from Jan den Ouden
@@ -15,7 +15,7 @@
  *
  */
 
-const char *l1_revision = "$Revision: 2.41.6.2 $";
+const char *l1_revision = "$Revision: 2.41.6.3 $";
 
 #define __NO_VERSION__
 #include <linux/init.h>
@@ -736,26 +736,41 @@ static struct FsmNode L1BFnList[] __initdata =
 
 #define L1B_FN_COUNT (sizeof(L1BFnList)/sizeof(struct FsmNode))
 
-void __init 
+int __init
 Isdnl1New(void)
 {
+	int retval;
+
+	l1fsm_s.state_count = L1S_STATE_COUNT;
+	l1fsm_s.event_count = L1_EVENT_COUNT;
+	l1fsm_s.strEvent = strL1Event;
+	l1fsm_s.strState = strL1SState;
+	retval = FsmNew(&l1fsm_s, L1SFnList, L1S_FN_COUNT);
+	if (retval)
+		return retval;
+
+	l1fsm_b.state_count = L1B_STATE_COUNT;
+	l1fsm_b.event_count = L1_EVENT_COUNT;
+	l1fsm_b.strEvent = strL1Event;
+	l1fsm_b.strState = strL1BState;
+	retval = FsmNew(&l1fsm_b, L1BFnList, L1B_FN_COUNT);
+	if (retval) {
+		FsmFree(&l1fsm_s);
+		return retval;
+	}
 #ifdef HISAX_UINTERFACE
 	l1fsm_u.state_count = L1U_STATE_COUNT;
 	l1fsm_u.event_count = L1_EVENT_COUNT;
 	l1fsm_u.strEvent = strL1Event;
 	l1fsm_u.strState = strL1UState;
-	FsmNew(&l1fsm_u, L1UFnList, L1U_FN_COUNT);
+	retval = FsmNew(&l1fsm_u, L1UFnList, L1U_FN_COUNT);
+	if (retval) {
+		FsmFree(&l1fsm_s);
+		FsmFree(&l1fsm_b);
+		return retval;
+	}
 #endif
-	l1fsm_s.state_count = L1S_STATE_COUNT;
-	l1fsm_s.event_count = L1_EVENT_COUNT;
-	l1fsm_s.strEvent = strL1Event;
-	l1fsm_s.strState = strL1SState;
-	FsmNew(&l1fsm_s, L1SFnList, L1S_FN_COUNT);
-	l1fsm_b.state_count = L1B_STATE_COUNT;
-	l1fsm_b.event_count = L1_EVENT_COUNT;
-	l1fsm_b.strEvent = strL1Event;
-	l1fsm_b.strState = strL1BState;
-	FsmNew(&l1fsm_b, L1BFnList, L1B_FN_COUNT);
+	return 0;
 }
 
 void Isdnl1Free(void)

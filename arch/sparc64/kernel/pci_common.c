@@ -1,4 +1,4 @@
-/* $Id: pci_common.c,v 1.18 2001/05/18 23:06:35 davem Exp $
+/* $Id: pci_common.c,v 1.21 2001/06/08 06:57:19 davem Exp $
  * pci_common.c: PCI controller common support.
  *
  * Copyright (C) 1999 David S. Miller (davem@redhat.com)
@@ -93,11 +93,37 @@ static void pci_device_delete(struct pci_dev *pdev)
 }
 
 /* Older versions of OBP on PCI systems encode 64-bit MEM
- * space assignments incorrectly, this fixes them up.
+ * space assignments incorrectly, this fixes them up.  We also
+ * take the opportunity here to hide other kinds of bogus
+ * assignments.
  */
-static void __init fixup_obp_assignments(struct pcidev_cookie *pcp)
+static void __init fixup_obp_assignments(struct pci_dev *pdev,
+					 struct pcidev_cookie *pcp)
 {
 	int i;
+
+	if (pdev->vendor == PCI_VENDOR_ID_AL &&
+	    (pdev->device == PCI_DEVICE_ID_AL_M7101 ||
+	     pdev->device == PCI_DEVICE_ID_AL_M1533)) {
+		int i;
+
+		/* Zap all of the normal resources, they are
+		 * meaningless and generate bogus resource collision
+		 * messages.  This is OpenBoot's ill-fated attempt to
+		 * represent the implicit resources that these devices
+		 * have.
+		 */
+		pcp->num_prom_assignments = 0;
+		for (i = 0; i < 6; i++) {
+			pdev->resource[i].start =
+				pdev->resource[i].end =
+				pdev->resource[i].flags = 0;
+		}
+		pdev->resource[PCI_ROM_RESOURCE].start =
+			pdev->resource[PCI_ROM_RESOURCE].end =
+			pdev->resource[PCI_ROM_RESOURCE].flags = 0;
+		return;
+	}
 
 	for (i = 0; i < pcp->num_prom_assignments; i++) {
 		struct linux_prom_pci_registers *ap;
@@ -194,7 +220,7 @@ static void __init pdev_cookie_fillin(struct pci_pbm_info *pbm,
 				(err / sizeof(pcp->prom_assignments[0]));
 	}
 
-	fixup_obp_assignments(pcp);
+	fixup_obp_assignments(pdev, pcp);
 
 	pdev->sysdata = pcp;
 }
@@ -316,6 +342,19 @@ __init get_device_resource(struct linux_prom_pci_registers *ap,
 	return res;
 }
 
+static int __init pdev_resource_collisions_expected(struct pci_dev *pdev)
+{
+	if (pdev->vendor != PCI_VENDOR_ID_SUN)
+		return 0;
+
+	if (pdev->device == PCI_DEVICE_ID_SUN_RIO_EBUS ||
+	    pdev->device == PCI_DEVICE_ID_SUN_RIO_1394 ||
+	    pdev->device == PCI_DEVICE_ID_SUN_RIO_USB)
+		return 1;
+
+	return 0;
+}
+
 static void __init pdev_record_assignments(struct pci_pbm_info *pbm,
 					   struct pci_dev *pdev)
 {
@@ -374,12 +413,17 @@ static void __init pdev_record_assignments(struct pci_pbm_info *pbm,
 		if (request_resource(root, res) < 0) {
 			/* OK, there is some conflict.  But this is fine
 			 * since we'll reassign it in the fixup pass.
-			 * Nevertheless notify the user that OBP made
-			 * an error.
+			 *
+			 * We notify the user that OBP made an error if it
+			 * is a case we don't expect.
 			 */
-			printk(KERN_ERR "PCI: Address space collision on region %ld "
-			       "of device %s\n",
-			       (res - &pdev->resource[0]), pdev->name);
+			if (!pdev_resource_collisions_expected(pdev)) {
+				printk(KERN_ERR "PCI: Address space collision on region %ld "
+				       "[%016lx:%016lx] of device %s\n",
+				       (res - &pdev->resource[0]),
+				       res->start, res->end,
+				       pdev->name);
+			}
 		}
 	}
 }

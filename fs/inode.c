@@ -1164,14 +1164,13 @@ void update_atime (struct inode *inode)
 void put_dquot_list(struct list_head *);
 int remove_inode_dquot_ref(struct inode *, short, struct list_head *);
 
-void remove_dquot_ref(kdev_t dev, short type)
+void remove_dquot_ref(struct super_block *sb, short type)
 {
-	struct super_block *sb = get_super(dev);
 	struct inode *inode;
 	struct list_head *act_head;
 	LIST_HEAD(tofree_head);
 
-	if (!sb || !sb->dq_op)
+	if (!sb->dq_op)
 		return;	/* nothing to do */
 
 	/* We have to be protected against other CPUs */

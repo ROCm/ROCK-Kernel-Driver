@@ -439,6 +439,7 @@ fore200e_shutdown(struct fore200e* fore200e)
 
     case FORE200E_STATE_BLANK:
 	/* nothing to do for that state */
+	break;
     }
 }
 

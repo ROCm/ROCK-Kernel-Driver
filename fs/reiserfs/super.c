@@ -149,6 +149,9 @@ struct super_operations reiserfs_sops =
   statfs: reiserfs_statfs,
   remount_fs: reiserfs_remount,
 
+  fh_to_dentry: reiserfs_fh_to_dentry,
+  dentry_to_fh: reiserfs_dentry_to_fh,
+
 };
 
 /* this was (ext2)parse_options */

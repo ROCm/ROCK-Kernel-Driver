@@ -6,7 +6,7 @@
  *
  * (C) 2000 Red Hat. GPLd.
  *
- * $Id: flashchip.h,v 1.4 2000/07/03 12:58:41 dwmw2 Exp $
+ * $Id: flashchip.h,v 1.7 2001/01/18 03:52:36 nico Exp $
  *
  */
 
@@ -25,12 +25,17 @@ typedef enum {
 	FL_CFI_QUERY,
 	FL_JEDEC_QUERY,
 	FL_ERASING,
+	FL_ERASE_SUSPENDING,
 	FL_ERASE_SUSPENDED,
 	FL_WRITING,
+	FL_WRITING_TO_BUFFER,
+	FL_WRITE_SUSPENDING,
 	FL_WRITE_SUSPENDED,
 	FL_PM_SUSPENDED,
 	FL_SYNCING,
 	FL_UNLOADING,
+	FL_LOCKING,
+	FL_UNLOCKING,
 	FL_UNKNOWN
 } flstate_t;
 

@@ -32,7 +32,7 @@
 long tick = (1000000 + HZ/2) / HZ;	/* timer interrupt period */
 
 /* The current time */
-volatile struct timeval xtime __attribute__ ((aligned (16)));
+struct timeval xtime __attribute__ ((aligned (16)));
 
 /* Don't completely fail for HZ > 500.  */
 int tickadj = 500/HZ ? : 1;		/* microsecs */

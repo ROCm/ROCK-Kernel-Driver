@@ -40,6 +40,7 @@ __udelay(unsigned long usecs, unsigned long lpj)
 }
 
 #ifdef CONFIG_SMP
+#include <linux/sched.h>	/* for smp_processor_id */
 #define udelay(u)  __udelay((u), cpu_data[smp_processor_id()].loops_per_jiffy)
 #else
 #define udelay(u)  __udelay((u), loops_per_jiffy)

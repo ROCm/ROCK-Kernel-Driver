@@ -599,7 +599,7 @@ static void rx_complete (struct urb *urb)
 	}
 #ifdef	VERBOSE
 	dbg ("no read resubmitted");
-#endif	VERBOSE
+#endif	/* VERBOSE */
 }
 
 /*-------------------------------------------------------------------------*/
@@ -1111,8 +1111,7 @@ static int __init net1080_init (void)
 	get_random_bytes (node_id, sizeof node_id);
 	node_id [0] &= 0x7f;
 
-	info(DRIVER_VERSION " " DRIVER_AUTHOR);
-	info(DRIVER_DESC);
+	info(DRIVER_VERSION ":" DRIVER_DESC);
 
 	return 0;
 }

@@ -1,4 +1,4 @@
-/* $Id: string.h,v 1.18 2000/10/30 21:01:41 davem Exp $
+/* $Id: string.h,v 1.19 2001/06/05 20:56:33 davem Exp $
  * string.h: External definitions for optimized assembly string
  *           routines for the Linux Kernel.
  *
@@ -105,6 +105,7 @@ static inline void *__constant_memset(void *s, int c, __kernel_size_t count)
 })
 
 #define __HAVE_ARCH_MEMCMP
+extern int memcmp(const void *,const void *,__kernel_size_t);
 
 /* Now the str*() stuff... */
 #define __HAVE_ARCH_STRLEN

@@ -4788,7 +4788,7 @@ static ssize_t idetape_chrdev_write (struct file *file, const char *buf,
 
 	if (tape->onstream) {
 		if (count != tape->tape_block_size) {
-			printk(KERN_ERR "ide-tape: %s: chrdev_write: use %d bytes as block size (%d used)\n",
+			printk(KERN_ERR "ide-tape: %s: chrdev_write: use %d bytes as block size (%Zd used)\n",
 					tape->name, tape->tape_block_size, count);
 			return -EINVAL;
 		}

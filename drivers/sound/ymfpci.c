@@ -1829,6 +1829,7 @@ static int ymf_ioctl(struct inode *inode, struct file *file,
 		 * for instance we get SNDCTL_TMR_CONTINUE here.
 		 * XXX Is there sound_generic_ioctl() around?
 		 */
+		 break;
 	}
 	return -ENOTTY;
 }

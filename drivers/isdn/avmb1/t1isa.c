@@ -1,104 +1,10 @@
 /*
- * $Id: t1isa.c,v 1.16.6.4 2001/03/21 08:52:21 kai Exp $
+ * $Id: t1isa.c,v 1.16.6.6 2001/05/17 21:15:33 kai Exp $
  * 
  * Module for AVM T1 HEMA-card.
  * 
  * (c) Copyright 1999 by Carsten Paeth (calle@calle.in-berlin.de)
  * 
- * $Log: t1isa.c,v $
- * Revision 1.16.6.4  2001/03/21 08:52:21  kai
- * merge from main branch: fix buffer for revision string (calle)
- *
- * Revision 1.16.6.3  2001/03/15 15:11:24  kai
- * *** empty log message ***
- *
- * Revision 1.16.6.2  2001/02/16 16:43:24  kai
- * Changes from -ac16, little bug fixes, typos and the like
- *
- * Revision 1.16.6.1  2001/02/13 11:43:29  kai
- * more compatility changes for 2.2.19
- *
- * Revision 1.16  2000/11/23 20:45:14  kai
- * fixed module_init/exit stuff
- * Note: compiled-in kernel doesn't work pre 2.2.18 anymore.
- *
- * Revision 1.15  2000/11/01 14:05:02  calle
- * - use module_init/module_exit from linux/init.h.
- * - all static struct variables are initialized with "membername:" now.
- * - avm_cs.c, let it work with newer pcmcia-cs.
- *
- * Revision 1.14  2000/10/10 17:44:19  kai
- * changes from/for 2.2.18
- *
- * Revision 1.13  2000/08/04 15:36:31  calle
- * copied wrong from file to file :-(
- *
- * Revision 1.12  2000/08/04 12:20:08  calle
- * - Fix unsigned/signed warning in the right way ...
- *
- * Revision 1.11  2000/04/03 13:29:25  calle
- * make Tim Waugh happy (module unload races in 2.3.99-pre3).
- * no real problem there, but now it is much cleaner ...
- *
- * Revision 1.10  2000/02/02 18:36:04  calle
- * - Modules are now locked while init_module is running
- * - fixed problem with memory mapping if address is not aligned
- *
- * Revision 1.9  2000/01/25 14:37:39  calle
- * new message after successful detection including card revision and
- * used resources.
- *
- * Revision 1.8  1999/11/05 16:38:01  calle
- * Cleanups before kernel 2.4:
- * - Changed all messages to use card->name or driver->name instead of
- *   constant string.
- * - Moved some data from struct avmcard into new struct avmctrl_info.
- *   Changed all lowlevel capi driver to match the new structur.
- *
- * Revision 1.7  1999/09/15 08:16:03  calle
- * Implementation of 64Bit extention complete.
- *
- * Revision 1.6  1999/09/07 09:02:53  calle
- * SETDATA removed. Now inside the kernel the datapart of DATA_B3_REQ and
- * DATA_B3_IND is always directly after the CAPI message. The "Data" member
- * ist never used inside the kernel.
- *
- * Revision 1.5  1999/08/22 20:26:28  calle
- * backported changes from kernel 2.3.14:
- * - several #include "config.h" gone, others come.
- * - "struct device" changed to "struct net_device" in 2.3.14, added a
- *   define in isdn_compat.h for older kernel versions.
- *
- * Revision 1.4  1999/07/09 15:05:50  keil
- * compat.h is now isdn_compat.h
- *
- * Revision 1.3  1999/07/06 07:42:04  calle
- * - changes in /proc interface
- * - check and changed calls to [dev_]kfree_skb and [dev_]alloc_skb.
- *
- * Revision 1.2  1999/07/05 15:09:54  calle
- * - renamed "appl_release" to "appl_released".
- * - version und profile data now cleared on controller reset
- * - extended /proc interface, to allow driver and controller specific
- *   informations to include by driver hackers.
- *
- * Revision 1.1  1999/07/01 15:26:44  calle
- * complete new version (I love it):
- * + new hardware independed "capi_driver" interface that will make it easy to:
- *   - support other controllers with CAPI-2.0 (i.e. USB Controller)
- *   - write a CAPI-2.0 for the passive cards
- *   - support serial link CAPI-2.0 boxes.
- * + wrote "capi_driver" for all supported cards.
- * + "capi_driver" (supported cards) now have to be configured with
- *   make menuconfig, in the past all supported cards where included
- *   at once.
- * + new and better informations in /proc/capi/
- * + new ioctl to switch trace of capi messages per controller
- *   using "avmcapictrl trace [contr] on|off|...."
- * + complete testcircle with all supported cards and also the
- *   PCMCIA cards (now patch for pcmcia-cs-3.0.13 needed) done.
- *
- *
  */
 
 #include <linux/module.h>

@@ -13,8 +13,12 @@ O_TARGET := driver.o
 
 export-objs := pci.o
 
-obj-$(CONFIG_PCI) += pci.o quirks.o compat.o names.o setup-res.o
+obj-$(CONFIG_PCI) += pci.o quirks.o compat.o names.o
 obj-$(CONFIG_PROC_FS) += proc.o
+
+ifndef CONFIG_SPARC64
+obj-$(CONFIG_PCI) += setup-res.o
+endif
 
 #
 # Some architectures use the generic PCI setup functions

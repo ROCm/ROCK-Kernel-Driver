@@ -327,6 +327,9 @@ enum pci_mmap_state {
 #define pci_for_each_dev_reverse(dev) \
 	for(dev = pci_dev_g(pci_devices.prev); dev != pci_dev_g(&pci_devices); dev = pci_dev_g(dev->global_list.prev))
 
+#define pci_for_each_bus(bus) \
+for(bus = pci_bus_b(pci_root_buses.next); bus != pci_bus_b(&pci_root_buses); bus = pci_bus_b(bus->node.next))
+
 /*
  * The pci_dev structure is used to describe both PCI and ISAPnP devices.
  */
@@ -355,6 +358,10 @@ struct pci_dev {
 					   0xffffffff.  You only need to change
 					   this if your device has broken DMA
 					   or supports 64-bit transfers.  */
+
+	u32             current_state;  /* Current operating state. In ACPI-speak,
+					   this is D0-D3, D0 being fully functional,
+					   and D3 being off. */
 
 	/* device is compatible with these IDs */
 	unsigned short vendor_compatible[DEVICE_COUNT_COMPATIBLE];
@@ -469,10 +476,11 @@ struct pci_driver {
 	struct list_head node;
 	char *name;
 	const struct pci_device_id *id_table;	/* NULL if wants all devices */
-	int (*probe)(struct pci_dev *dev, const struct pci_device_id *id);	/* New device inserted */
-	void (*remove)(struct pci_dev *dev);	/* Device removed (NULL if not a hot-plug capable driver) */
-	void (*suspend)(struct pci_dev *dev);	/* Device suspended */
-	void (*resume)(struct pci_dev *dev);	/* Device woken up */
+	int  (*probe)  (struct pci_dev *dev, const struct pci_device_id *id);	/* New device inserted */
+	void (*remove) (struct pci_dev *dev);	/* Device removed (NULL if not a hot-plug capable driver) */
+	int  (*suspend)(struct pci_dev *dev, u32 state);	/* Device suspended */
+	int  (*resume) (struct pci_dev *dev);	                /* Device woken up */
+	int  (*enable_wake) (struct pci_dev *dev, u32 state, int enable);   /* Enable wake event */
 };
 
 
@@ -547,13 +555,17 @@ int pci_write_config_byte(struct pci_dev *dev, int where, u8 val);
 int pci_write_config_word(struct pci_dev *dev, int where, u16 val);
 int pci_write_config_dword(struct pci_dev *dev, int where, u32 val);
 
-#define HAVE_PCI_DISABLE_DEVICE
 int pci_enable_device(struct pci_dev *dev);
 void pci_disable_device(struct pci_dev *dev);
 void pci_set_master(struct pci_dev *dev);
 int pci_set_dma_mask(struct pci_dev *dev, dma_addr_t mask);
-int pci_set_power_state(struct pci_dev *dev, int state);
 int pci_assign_resource(struct pci_dev *dev, int i);
+
+/* Power management related routines */
+int pci_save_state(struct pci_dev *dev, u32 *buffer);
+int pci_restore_state(struct pci_dev *dev, u32 *buffer);
+int pci_set_power_state(struct pci_dev *dev, int state);
+int pci_enable_wake(struct pci_dev *dev, u32 state, int enable);
 
 /* Helper functions for low-level code (drivers/pci/setup-[bus,res].c) */
 

@@ -1,6 +1,6 @@
 /*  devfs (Device FileSystem) driver.
 
-    Copyright (C) 1998-2000  Richard Gooch
+    Copyright (C) 1998-2001  Richard Gooch
 
     This library is free software; you can redistribute it and/or
     modify it under the terms of the GNU Library General Public
@@ -481,6 +481,23 @@
 	       Simplified interface to <devfs_find_handle>.
 	       Work sponsored by SGI.
   v0.102
+    20010519   Richard Gooch <rgooch@atnf.csiro.au>
+	       Ensure <devfs_generate_path> terminates string for root entry.
+	       Exported <devfs_get_name> to modules.
+    20010520   Richard Gooch <rgooch@atnf.csiro.au>
+	       Make <devfs_mk_symlink> send events to devfsd.
+	       Cleaned up option processing in <devfs_setup>.
+    20010521   Richard Gooch <rgooch@atnf.csiro.au>
+	       Fixed bugs in handling symlinks: could leak or cause Oops.
+    20010522   Richard Gooch <rgooch@atnf.csiro.au>
+	       Cleaned up directory handling by separating fops.
+  v0.103
+    20010601   Richard Gooch <rgooch@atnf.csiro.au>
+	       Fixed handling of inverted options in <devfs_setup>.
+  v0.104
+    20010604   Richard Gooch <rgooch@atnf.csiro.au>
+	       Adjusted <try_modload> to account for <devfs_generate_path> fix.
+  v0.105
 */
 #include <linux/types.h>
 #include <linux/errno.h>
@@ -515,7 +532,7 @@
 #include <asm/bitops.h>
 #include <asm/atomic.h>
 
-#define DEVFS_VERSION            "0.102 (20000622)"
+#define DEVFS_VERSION            "0.105 (20010604)"
 
 #define DEVFS_NAME "devfs"
 
@@ -560,7 +577,7 @@
 
 #define OPTION_NONE             0x00
 #define OPTION_SHOW             0x01
-#define OPTION_NOMOUNT          0x02
+#define OPTION_MOUNT            0x02
 #define OPTION_ONLY             0x04
 
 #define OOPS(format, args...) {printk (format, ## args); \
@@ -694,9 +711,9 @@ static unsigned int devfs_debug = DEBUG_NONE;
 #endif
 
 #ifdef CONFIG_DEVFS_MOUNT
-static unsigned int boot_options = OPTION_NONE;
+static unsigned int boot_options = OPTION_MOUNT;
 #else
-static unsigned int boot_options = OPTION_NOMOUNT;
+static unsigned int boot_options = OPTION_NONE;
 #endif
 
 /*  Forward function declarations  */
@@ -1392,11 +1409,10 @@ static void unregister (struct devfs_entry *de)
 	de->u.fcb.ops = NULL;
 	return;
     }
-    if ( S_ISLNK (de->mode) )
+    if (S_ISLNK (de->mode) && de->registered)
     {
 	de->registered = FALSE;
-	if (de->u.symlink.linkname != NULL) kfree (de->u.symlink.linkname);
-	de->u.symlink.linkname = NULL;
+	kfree (de->u.symlink.linkname);
 	return;
     }
     if ( S_ISFIFO (de->mode) )
@@ -1441,22 +1457,9 @@ void devfs_unregister (devfs_handle_t de)
     unregister (de);
 }   /*  End Function devfs_unregister  */
 
-
-/**
- *	devfs_mk_symlink Create a symbolic link in the devfs namespace.
- *	@dir: The handle to the parent devfs directory entry. If this is %NULL the
- *		new name is relative to the root of the devfs.
- *	@name: The name of the entry.
- *	@flags: A set of bitwise-ORed flags (DEVFS_FL_*).
- *	@link: The destination name.
- *	@handle: The handle to the symlink entry is written here. This may be %NULL.
- *	@info: An arbitrary pointer which will be associated with the entry.
- *
- *	Returns 0 on success, else a negative error code is returned.
- */
-
-int devfs_mk_symlink (devfs_handle_t dir, const char *name, unsigned int flags,
-		      const char *link, devfs_handle_t *handle, void *info)
+static int devfs_do_symlink (devfs_handle_t dir, const char *name,
+			     unsigned int flags, const char *link,
+			     devfs_handle_t *handle, void *info)
 {
     int is_new;
     unsigned int linklength;
@@ -1466,16 +1469,16 @@ int devfs_mk_symlink (devfs_handle_t dir, const char *name, unsigned int flags,
     if (handle != NULL) *handle = NULL;
     if (name == NULL)
     {
-	printk ("%s: devfs_mk_symlink(): NULL name pointer\n", DEVFS_NAME);
+	printk ("%s: devfs_do_symlink(): NULL name pointer\n", DEVFS_NAME);
 	return -EINVAL;
     }
 #ifdef CONFIG_DEVFS_DEBUG
     if (devfs_debug & DEBUG_REGISTER)
-	printk ("%s: devfs_mk_symlink(%s)\n", DEVFS_NAME, name);
+	printk ("%s: devfs_do_symlink(%s)\n", DEVFS_NAME, name);
 #endif
     if (link == NULL)
     {
-	printk ("%s: devfs_mk_symlink(): NULL link pointer\n", DEVFS_NAME);
+	printk ("%s: devfs_do_symlink(): NULL link pointer\n", DEVFS_NAME);
 	return -EINVAL;
     }
     linklength = strlen (link);
@@ -1484,7 +1487,7 @@ int devfs_mk_symlink (devfs_handle_t dir, const char *name, unsigned int flags,
     if (de == NULL) return -ENOMEM;
     if (!S_ISLNK (de->mode) && de->registered)
     {
-	printk ("%s: devfs_mk_symlink(): non-link entry already exists\n",
+	printk ("%s: devfs_do_symlink(): non-link entry already exists\n",
 		DEVFS_NAME);
 	return -EEXIST;
     }
@@ -1504,7 +1507,6 @@ int devfs_mk_symlink (devfs_handle_t dir, const char *name, unsigned int flags,
     }
     /*  Have to create/update  */
     if (de->registered) return -EEXIST;
-    de->registered = TRUE;
     if ( ( newname = kmalloc (linklength + 1, GFP_KERNEL) ) == NULL )
     {
 	struct devfs_entry *parent = de->parent;
@@ -1518,11 +1520,39 @@ int devfs_mk_symlink (devfs_handle_t dir, const char *name, unsigned int flags,
 	kfree (de);
 	return -ENOMEM;
     }
-    if (de->u.symlink.linkname != NULL) kfree (de->u.symlink.linkname);
     de->u.symlink.linkname = newname;
     memcpy (de->u.symlink.linkname, link, linklength);
     de->u.symlink.linkname[linklength] = '\0';
     de->u.symlink.length = linklength;
+    de->registered = TRUE;
+    return 0;
+}   /*  End Function devfs_do_symlink  */
+
+
+/**
+ *	devfs_mk_symlink Create a symbolic link in the devfs namespace.
+ *	@dir: The handle to the parent devfs directory entry. If this is %NULL the
+ *		new name is relative to the root of the devfs.
+ *	@name: The name of the entry.
+ *	@flags: A set of bitwise-ORed flags (DEVFS_FL_*).
+ *	@link: The destination name.
+ *	@handle: The handle to the symlink entry is written here. This may be %NULL.
+ *	@info: An arbitrary pointer which will be associated with the entry.
+ *
+ *	Returns 0 on success, else a negative error code is returned.
+ */
+
+int devfs_mk_symlink (devfs_handle_t dir, const char *name, unsigned int flags,
+		      const char *link, devfs_handle_t *handle, void *info)
+{
+    int err;
+    devfs_handle_t de;
+
+    if (handle != NULL) *handle = NULL;
+    err = devfs_do_symlink (dir, name, flags, link, &de, info);
+    if (err) return err;
+    if (handle != NULL) *handle = de;
+    devfsd_notify (de, DEVFSD_NOTIFY_REGISTERED, flags & DEVFS_FL_WAIT);
     return 0;
 }   /*  End Function devfs_mk_symlink  */
 
@@ -1737,10 +1767,10 @@ int devfs_generate_path (devfs_handle_t de, char *path, int buflen)
 
     if (de == NULL) return -EINVAL;
     if (de->namelen >= buflen) return -ENAMETOOLONG; /*  Must be first       */
-    if (de->parent == NULL) return buflen;           /*  Don't prepend root  */
+    path[buflen - 1] = '\0';
+    if (de->parent == NULL) return buflen - 1;       /*  Don't prepend root  */
     pos = buflen - de->namelen - 1;
     memcpy (path + pos, de->name, de->namelen);
-    path[buflen - 1] = '\0';
     for (de = de->parent; de->parent != NULL; de = de->parent)
     {
 	if (pos - de->namelen - 1 < 0) return -ENAMETOOLONG;
@@ -1999,84 +2029,56 @@ int devfs_unregister_blkdev (unsigned int major, const char *name)
 
 static int __init devfs_setup (char *str)
 {
-    while ( (*str != '\0') && !isspace (*str) )
+    static struct
+    {
+	char *name;
+	unsigned int mask;
+	unsigned int *opt;
+    } devfs_options_tab[] __initdata =
     {
 #ifdef CONFIG_DEVFS_DEBUG
-	if (strncmp (str, "dall", 4) == 0)
-	{
-	    devfs_debug_init |= DEBUG_ALL;
-	    str += 4;
-	}
-	else if (strncmp (str, "dmod", 4) == 0)
-	{
-	    devfs_debug_init |= DEBUG_MODULE_LOAD;
-	    str += 4;
-	}
-	else if (strncmp (str, "dreg", 4) == 0)
-	{
-	    devfs_debug_init |= DEBUG_REGISTER;
-	    str += 4;
-	}
-	else if (strncmp (str, "dunreg", 6) == 0)
-	{
-	    devfs_debug_init |= DEBUG_UNREGISTER;
-	    str += 6;
-	}
-	else if (strncmp (str, "diread", 6) == 0)
-	{
-	    devfs_debug_init |= DEBUG_I_READ;
-	    str += 6;
-	}
-	else if (strncmp (str, "dchange", 7) == 0)
-	{
-	    devfs_debug_init |= DEBUG_SET_FLAGS;
-	    str += 7;
-	}
-	else if (strncmp (str, "diwrite", 7) == 0)
-	{
-	    devfs_debug_init |= DEBUG_I_WRITE;
-	    str += 7;
-	}
-	else if (strncmp (str, "dimknod", 7) == 0)
-	{
-	    devfs_debug_init |= DEBUG_I_MKNOD;
-	    str += 7;
-	}
-	else if (strncmp (str, "dilookup", 8) == 0)
-	{
-	    devfs_debug_init |= DEBUG_I_LOOKUP;
-	    str += 8;
-	}
-	else if (strncmp (str, "diunlink", 8) == 0)
-	{
-	    devfs_debug_init |= DEBUG_I_UNLINK;
-	    str += 8;
-	}
-	else
+	{"dall",      DEBUG_ALL,          &devfs_debug_init},
+	{"dmod",      DEBUG_MODULE_LOAD,  &devfs_debug_init},
+	{"dreg",      DEBUG_REGISTER,     &devfs_debug_init},
+	{"dunreg",    DEBUG_UNREGISTER,   &devfs_debug_init},
+	{"diread",    DEBUG_I_READ,       &devfs_debug_init},
+	{"dchange",   DEBUG_SET_FLAGS,    &devfs_debug_init},
+	{"diwrite",   DEBUG_I_WRITE,      &devfs_debug_init},
+	{"dimknod",   DEBUG_I_MKNOD,      &devfs_debug_init},
+	{"dilookup",  DEBUG_I_LOOKUP,     &devfs_debug_init},
+	{"diunlink",  DEBUG_I_UNLINK,     &devfs_debug_init},
 #endif  /*  CONFIG_DEVFS_DEBUG  */
-	if (strncmp (str, "show", 4) == 0)
+	{"show",      OPTION_SHOW,        &boot_options},
+	{"only",      OPTION_ONLY,        &boot_options},
+	{"mount",     OPTION_MOUNT,       &boot_options},
+    };
+
+    while ( (*str != '\0') && !isspace (*str) )
+    {
+	int i, found = 0, invert = 0;
+
+	if (strncmp (str, "no", 2) == 0)
 	{
-	    boot_options |= OPTION_SHOW;
-	    str += 4;
+	    invert = 1;
+	    str += 2;
 	}
-	else if (strncmp (str, "only", 4) == 0)
+	for (i = 0; i < sizeof (devfs_options_tab); i++)
 	{
-	    boot_options |= OPTION_ONLY;
-	    str += 4;
+	    int len = strlen (devfs_options_tab[i].name);
+
+	    if (strncmp (str, devfs_options_tab[i].name, len) == 0)
+	    {
+		if (invert)
+		    *devfs_options_tab[i].opt &= ~devfs_options_tab[i].mask;
+		else
+		    *devfs_options_tab[i].opt |= devfs_options_tab[i].mask;
+		str += len;
+		found = 1;
+		break;
+	    }
 	}
-	else if (strncmp (str, "mount", 5) == 0)
-	{
-	    boot_options &= ~OPTION_NOMOUNT;
-	    str += 5;
-	}
-	else if (strncmp (str, "nomount", 7) == 0)
-	{
-	    boot_options |= OPTION_NOMOUNT;
-	    str += 7;
-	}
-	else
-	return 0;
-	if (*str != ',') return 0;
+	if (!found) return 0;       /*  No match         */
+	if (*str != ',') return 0;  /*  No more options  */
 	++str;
     }
     return 1;
@@ -2103,6 +2105,7 @@ EXPORT_SYMBOL(devfs_get_first_child);
 EXPORT_SYMBOL(devfs_get_next_sibling);
 EXPORT_SYMBOL(devfs_auto_unregister);
 EXPORT_SYMBOL(devfs_get_unregister_slave);
+EXPORT_SYMBOL(devfs_get_name);
 EXPORT_SYMBOL(devfs_register_chrdev);
 EXPORT_SYMBOL(devfs_register_blkdev);
 EXPORT_SYMBOL(devfs_unregister_chrdev);
@@ -2125,15 +2128,15 @@ static int try_modload (struct devfs_entry *parent, struct fs_info *fs_info,
 			const char *name, unsigned namelen,
 			char buf[STRING_LENGTH])
 {
-    int pos;
+    int pos = STRING_LENGTH - namelen - 1;
 
     if ( !( fs_info->devfsd_event_mask & (1 << DEVFSD_NOTIFY_LOOKUP) ) )
 	return -ENOENT;
     if ( is_devfsd_or_child (fs_info) ) return -ENOENT;
     if (namelen >= STRING_LENGTH) return -ENAMETOOLONG;
-    memcpy (buf + STRING_LENGTH - namelen - 1, name, namelen);
+    memcpy (buf + pos, name, namelen);
     buf[STRING_LENGTH - 1] = '\0';
-    pos = devfs_generate_path (parent, buf, STRING_LENGTH - namelen - 1);
+    if (parent->parent != NULL) pos = devfs_generate_path (parent, buf, pos);
     if (pos < 0) return pos;
     buf[STRING_LENGTH - namelen - 2] = '/';
     if ( !devfsd_notify_one (buf + pos, DEVFSD_NOTIFY_LOOKUP, 0,
@@ -2229,6 +2232,7 @@ static int get_removable_partition (struct devfs_entry *dir, const char *name,
 static struct inode_operations devfs_iops;
 static struct inode_operations devfs_dir_iops;
 static struct file_operations devfs_fops;
+static struct file_operations devfs_dir_fops;
 static struct inode_operations devfs_symlink_iops;
 
 static void devfs_read_inode (struct inode *inode)
@@ -2273,7 +2277,11 @@ static void devfs_read_inode (struct inode *inode)
     }
     else if ( S_ISFIFO (de->inode.mode) ) inode->i_fop = &def_fifo_fops;
     else if ( S_ISREG (de->inode.mode) ) inode->i_size = de->u.fcb.u.file.size;
-    else if ( S_ISDIR (de->inode.mode) ) inode->i_op = &devfs_dir_iops;
+    else if ( S_ISDIR (de->inode.mode) )
+    {
+	inode->i_op = &devfs_dir_iops;
+    	inode->i_fop = &devfs_dir_fops;
+    }
     else if ( S_ISLNK (de->inode.mode) )
     {
 	inode->i_op = &devfs_symlink_iops;
@@ -2399,12 +2407,6 @@ static struct inode *get_vfs_inode (struct super_block *sb,
 
 /*  File operations for device entries follow  */
 
-static ssize_t devfs_read (struct file *file, char *buf, size_t len, loff_t *ppos)
-{
-    if ( S_ISDIR (file->f_dentry->d_inode->i_mode) ) return -EISDIR;
-    return -EINVAL;
-}   /*  End Function devfs_read  */
-
 static int devfs_readdir (struct file *file, void *dirent, filldir_t filldir)
 {
     int err, count;
@@ -2413,11 +2415,6 @@ static int devfs_readdir (struct file *file, void *dirent, filldir_t filldir)
     struct devfs_entry *parent, *de;
     struct inode *inode = file->f_dentry->d_inode;
 
-    if ( !S_ISDIR (inode->i_mode) )
-    {
-	printk ("%s: readdir(): inode is not a directory\n", DEVFS_NAME);
-	return -ENOTDIR;
-    }
     fs_info = inode->i_sb->u.generic_sbp;
     parent = get_devfs_entry_from_vfs_inode (file->f_dentry->d_inode);
     if ( (long) file->f_pos < 0 ) return -EINVAL;
@@ -2538,7 +2535,12 @@ out:
 
 static struct file_operations devfs_fops =
 {
-    read: devfs_read,
+    open: devfs_open,
+};
+
+static struct file_operations devfs_dir_fops =
+{
+    read: generic_read_dir,
     readdir: devfs_readdir,
     open: devfs_open,
 };
@@ -2723,12 +2725,6 @@ static struct dentry *devfs_lookup (struct inode *dir, struct dentry *dentry)
     /*  Set up the dentry operations before anything else, to ensure cleaning
 	up on any error  */
     dentry->d_op = &devfs_dops;
-    if (dir == NULL)
-    {
-	printk ("%s: lookup(): NULL directory inode\n", DEVFS_NAME);
-	return ERR_PTR (-ENOTDIR);
-    }
-    if ( !S_ISDIR (dir->i_mode) ) return ERR_PTR (-ENOTDIR);
     memset (txt, 0, STRING_LENGTH);
     memcpy (txt, dentry->d_name.name,
 	    (dentry->d_name.len >= STRING_LENGTH) ?
@@ -2845,13 +2841,12 @@ static int devfs_unlink (struct inode *dir, struct dentry *dentry)
     }
 #endif
 
-    if ( !dir || !S_ISDIR (dir->i_mode) ) return -ENOTDIR;
-    if (!dentry || !dentry->d_inode) return -ENOENT;
     de = get_devfs_entry_from_vfs_inode (dentry->d_inode);
     if (de == NULL) return -ENOENT;
     if (!de->registered) return -ENOENT;
     de->registered = FALSE;
     de->hide = TRUE;
+    if ( S_ISLNK (de->mode) ) kfree (de->u.symlink.linkname);
     free_dentries (de);
     return 0;
 }   /*  End Function devfs_unlink  */
@@ -2864,17 +2859,16 @@ static int devfs_symlink (struct inode *dir, struct dentry *dentry,
     struct devfs_entry *parent, *de;
     struct inode *inode;
 
-    if ( !dir || !S_ISDIR (dir->i_mode) ) return -ENOTDIR;
     fs_info = dir->i_sb->u.generic_sbp;
     /*  First try to get the devfs entry for this directory  */
     parent = get_devfs_entry_from_vfs_inode (dir);
     if (parent == NULL) return -EINVAL;
     if (!parent->registered) return -ENOENT;
-    err = devfs_mk_symlink (parent, dentry->d_name.name, DEVFS_FL_NONE,
+    err = devfs_do_symlink (parent, dentry->d_name.name, DEVFS_FL_NONE,
 			    symname, &de, NULL);
 #ifdef CONFIG_DEVFS_DEBUG
     if (devfs_debug & DEBUG_DISABLED)
-	printk ("%s: symlink(): errcode from <devfs_mk_symlink>: %d\n",
+	printk ("%s: symlink(): errcode from <devfs_do_symlink>: %d\n",
 		DEVFS_NAME, err);
 #endif
     if (err < 0) return err;
@@ -2904,9 +2898,7 @@ static int devfs_mkdir (struct inode *dir, struct dentry *dentry, int mode)
     struct inode *inode;
 
     mode = (mode & ~S_IFMT) | S_IFDIR;
-    if ( !dir || !S_ISDIR (dir->i_mode) ) return -ENOTDIR;
     fs_info = dir->i_sb->u.generic_sbp;
-    /*  We are allowed to create the directory  */
     /*  First try to get the devfs entry for this directory  */
     parent = get_devfs_entry_from_vfs_inode (dir);
     if (parent == NULL) return -EINVAL;
@@ -2956,9 +2948,7 @@ static int devfs_rmdir (struct inode *dir, struct dentry *dentry)
     struct devfs_entry *de, *child;
     struct inode *inode = dentry->d_inode;
 
-    if ( !dir || !S_ISDIR (dir->i_mode) ) return -ENOTDIR;
     if (dir->i_sb->u.generic_sbp != inode->i_sb->u.generic_sbp) return -EINVAL;
-    if (inode == dir) return -EPERM;
     fs_info = dir->i_sb->u.generic_sbp;
     de = get_devfs_entry_from_vfs_inode (inode);
     if (de == NULL) return -ENOENT;
@@ -3000,11 +2990,7 @@ static int devfs_mknod (struct inode *dir, struct dentry *dentry, int mode,
     }
 #endif
 
-    if ( !dir || !S_ISDIR (dir->i_mode) ) return -ENOTDIR;
     fs_info = dir->i_sb->u.generic_sbp;
-    if ( !S_ISBLK (mode) && !S_ISCHR (mode) && !S_ISFIFO (mode) &&
-	 !S_ISSOCK (mode) ) return -EPERM;
-    /*  We are allowed to create the node  */
     /*  First try to get the devfs entry for this directory  */
     parent = get_devfs_entry_from_vfs_inode (dir);
     if (parent == NULL) return -EINVAL;
@@ -3079,12 +3065,6 @@ static int devfs_follow_link (struct dentry *dentry, struct nameidata *nd)
 
 static struct inode_operations devfs_iops =
 {
-    link:           devfs_link,
-    unlink:         devfs_unlink,
-    symlink:        devfs_symlink,
-    mkdir:          devfs_mkdir,
-    rmdir:          devfs_rmdir,
-    mknod:          devfs_mknod,
     setattr:        devfs_notify_change,
 };
 
@@ -3362,7 +3342,7 @@ void __init mount_devfs_fs (void)
 {
     int err;
 
-    if ( (boot_options & OPTION_NOMOUNT) ) return;
+    if ( !(boot_options & OPTION_MOUNT) ) return;
     err = do_mount ("none", "/dev", "devfs", 0, "");
     if (err == 0) printk ("Mounted devfs on /dev\n");
     else printk ("Warning: unable to mount devfs, err: %d\n", err);

@@ -19,4 +19,4 @@ int coda_cache_check(struct inode *inode, int mask);
 /* for downcalls and attributes and lookups */
 void coda_flag_inode_children(struct inode *inode, int flag);
 
-#endif _CFSNC_HEADER_
+#endif /* _CFSNC_HEADER_ */

@@ -513,8 +513,8 @@ static int eepro100_init_one(struct pci_dev *pdev,
 		const struct pci_device_id *ent);
 static void eepro100_remove_one (struct pci_dev *pdev);
 #ifdef CONFIG_EEPRO100_PM
-static void eepro100_suspend (struct pci_dev *pdev);
-static void eepro100_resume (struct pci_dev *pdev);
+static int eepro100_suspend (struct pci_dev *pdev, u32 state);
+static int eepro100_resume (struct pci_dev *pdev);
 #endif
 
 static int do_eeprom_cmd(long ioaddr, int cmd, int cmd_len);
@@ -2130,7 +2130,7 @@ static void set_rx_mode(struct net_device *dev)
 }
 
 #ifdef CONFIG_EEPRO100_PM
-static void eepro100_suspend(struct pci_dev *pdev)
+static int eepro100_suspend(struct pci_dev *pdev, u32 state)
 {
 	struct net_device *dev = pdev->driver_data;
 	long ioaddr = dev->base_addr;
@@ -2139,9 +2139,10 @@ static void eepro100_suspend(struct pci_dev *pdev)
 	outl(PortPartialReset, ioaddr + SCBPort);
 	
 	/* XXX call pci_set_power_state ()? */
+	return 0;
 }
 
-static void eepro100_resume(struct pci_dev *pdev)
+static int eepro100_resume(struct pci_dev *pdev)
 {
 	struct net_device *dev = pdev->driver_data;
 	struct speedo_private *sp = (struct speedo_private *)dev->priv;
@@ -2160,6 +2161,7 @@ static void eepro100_resume(struct pci_dev *pdev)
 	sp->rx_mode = -1;
 	sp->flow_ctrl = sp->partner = 0;
 	set_rx_mode(dev);
+	return 0;
 }
 #endif /* CONFIG_EEPRO100_PM */
 

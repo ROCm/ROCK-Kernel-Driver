@@ -2102,6 +2102,7 @@ static void guswave_hw_control(int dev, unsigned char *event_rec)
 			break;
 
 		default:
+			break;
 	}
 }
 
@@ -3282,6 +3283,7 @@ static void do_loop_irq(int voice)
 		break;
 
 		default:
+			break;
 	}
 	restore_flags(flags);
 }
@@ -3423,6 +3425,7 @@ void guswave_dma_irq(void)
 				break;
 
 			default:
+				break;
 	}
 	status = gus_look8(0x49);	/*
 					 * Get Sampling IRQ Status

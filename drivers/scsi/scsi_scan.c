@@ -328,8 +328,8 @@ void scan_scsis(struct Scsi_Host *shpnt,
 	}
 
 	/*
-	 * We need to increment the counter for this one device so we can track when
-	 * things are quiet.
+	 * We need to increment the counter for this one device so we can track
+	 * when things are quiet.
 	 */
 	if (hardcoded == 1) {
 		Scsi_Device *oldSDpnt = SDpnt;
@@ -485,8 +485,8 @@ static int scan_scsis_single(int channel, int dev, int lun, int *max_dev_lun,
 	SDpnt->type = -1;
 
 	/*
-	 * Assume that the device will have handshaking problems, and then fix this
-	 * field later if it turns out it doesn't
+	 * Assume that the device will have handshaking problems, and then fix
+	 * this field later if it turns out it doesn't
 	 */
 	SDpnt->borken = 1;
 	SDpnt->was_reset = 0;
@@ -524,9 +524,21 @@ static int scan_scsis_single(int channel, int dev, int lun, int *max_dev_lun,
 	SCSI_LOG_SCAN_BUS(3, printk("scsi: INQUIRY %s with code 0x%x\n",
 		SRpnt->sr_result ? "failed" : "successful", SRpnt->sr_result));
 
+	/*
+	 * Now that we don't do TEST_UNIT_READY anymore, we must be prepared
+	 * for media change conditions here, so cannot require zero result.
+	 */
 	if (SRpnt->sr_result) {
-		scsi_release_request(SRpnt);
-		return 0;	/* assume no peripheral if any sort of error */
+		if ((driver_byte(SRpnt->sr_result) & DRIVER_SENSE) != 0 &&
+		    (SRpnt->sr_sense_buffer[2] & 0xf) == UNIT_ATTENTION &&
+		    SRpnt->sr_sense_buffer[12] == 0x28 &&
+		    SRpnt->sr_sense_buffer[13] == 0) {
+			/* not-ready to ready transition - good */
+		} else {
+			/* assume no peripheral if any other sort of error */
+			scsi_release_request(SRpnt);
+			return 0;
+		}
 	}
 
 	/*

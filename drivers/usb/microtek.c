@@ -1029,8 +1029,7 @@ int __init microtek_drv_init(void)
 		MTS_DEBUG("driver registered.\n");
 	}
 
-	info(DRIVER_VERSION " " DRIVER_AUTHOR);
-	info(DRIVER_DESC);
+	info(DRIVER_VERSION ":" DRIVER_DESC);
 
 	return 0;
 }

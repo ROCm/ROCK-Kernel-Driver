@@ -2682,7 +2682,7 @@ static void blank_screen(unsigned long dummy)
 void poke_blanked_console(void)
 {
 	del_timer(&console_timer);	/* Can't use _sync here: called from tasklet */
-	if (vt_cons[fg_console]->vc_mode == KD_GRAPHICS)
+	if (!vt_cons[fg_console] || vt_cons[fg_console]->vc_mode == KD_GRAPHICS)
 		return;
 	if (console_blanked) {
 		console_timer.function = unblank_screen_t;

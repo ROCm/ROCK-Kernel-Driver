@@ -213,7 +213,8 @@ exp_export(struct nfsctl_export *nxp)
 
 	err = -EINVAL;
 	if (!(inode->i_sb->s_type->fs_flags & FS_REQUIRES_DEV) ||
-	    inode->i_sb->s_op->read_inode == NULL) {
+	    (inode->i_sb->s_op->read_inode == NULL
+	     && inode->i_sb->s_op->fh_to_dentry == NULL)) {
 		dprintk("exp_export: export of invalid fs type.\n");
 		goto finish;
 	}

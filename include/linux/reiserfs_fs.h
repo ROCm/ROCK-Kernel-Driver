@@ -1806,6 +1806,10 @@ void reiserfs_delete_inode (struct inode * inode);
 extern int reiserfs_notify_change(struct dentry * dentry, struct iattr * attr);
 void reiserfs_write_inode (struct inode * inode, int) ;
 
+/* nfsd support functions */
+struct dentry *reiserfs_fh_to_dentry(struct super_block *sb, __u32 *fh, int len, int fhtype, int parent);
+int reiserfs_dentry_to_fh(struct dentry *, __u32 *fh, int *lenp, int need_parent);
+
 /* we don't mark inodes dirty, we just log them */
 void reiserfs_dirty_inode (struct inode * inode) ;
 

@@ -415,8 +415,7 @@ static struct usb_driver wacom_driver = {
 static int __init wacom_init(void)
 {
 	usb_register(&wacom_driver);
-	info(DRIVER_VERSION " " DRIVER_AUTHOR);
-	info(DRIVER_DESC);
+	info(DRIVER_VERSION ":" DRIVER_DESC);
 	return 0;
 }
 

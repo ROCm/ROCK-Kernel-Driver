@@ -646,8 +646,8 @@ void __invalidate_buffers(kdev_t dev, int destroy_dirty_buffers)
 			/* Another device? */
 			if (bh->b_dev != dev)
 				continue;
-			/* Part of a mapping? */
-			if (bh->b_page->mapping)
+			/* Not hashed? */
+			if (!bh->b_pprev)
 				continue;
 			if (buffer_locked(bh)) {
 				atomic_inc(&bh->b_count);
@@ -710,6 +710,9 @@ void set_blocksize(kdev_t dev, int size)
 		for (i = nr_buffers_type[nlist]; i > 0 ; bh = bh_next, i--) {
 			bh_next = bh->b_next_free;
 			if (bh->b_dev != dev || bh->b_size == size)
+				continue;
+			/* Unhashed? */
+			if (!bh->b_pprev)
 				continue;
 			if (buffer_locked(bh)) {
 				atomic_inc(&bh->b_count);

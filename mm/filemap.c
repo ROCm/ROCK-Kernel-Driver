@@ -230,17 +230,17 @@ static int truncate_list_pages(struct list_head *head, unsigned long start, unsi
 		unsigned long offset;
 
 		page = list_entry(curr, struct page, list);
-		curr = curr->next;
 		offset = page->index;
 
 		/* Is one of the pages to truncate? */
 		if ((offset >= start) || (*partial && (offset + 1) == start)) {
+			list_del(head);
+			list_add(head, curr);
 			if (TryLockPage(page)) {
 				page_cache_get(page);
 				spin_unlock(&pagecache_lock);
 				wait_on_page(page);
-				page_cache_release(page);
-				return 1;
+				goto out_restart;
 			}
 			page_cache_get(page);
 			spin_unlock(&pagecache_lock);
@@ -252,11 +252,15 @@ static int truncate_list_pages(struct list_head *head, unsigned long start, unsi
 				truncate_complete_page(page);
 
 			UnlockPage(page);
-			page_cache_release(page);
-			return 1;
+			goto out_restart;
 		}
+		curr = curr->next;
 	}
 	return 0;
+out_restart:
+	page_cache_release(page);
+	spin_lock(&pagecache_lock);
+	return 1;
 }
 
 
@@ -273,15 +277,19 @@ void truncate_inode_pages(struct address_space * mapping, loff_t lstart)
 {
 	unsigned long start = (lstart + PAGE_CACHE_SIZE - 1) >> PAGE_CACHE_SHIFT;
 	unsigned partial = lstart & (PAGE_CACHE_SIZE - 1);
+	int complete;
 
-repeat:
 	spin_lock(&pagecache_lock);
-	if (truncate_list_pages(&mapping->clean_pages, start, &partial))
-		goto repeat;
-	if (truncate_list_pages(&mapping->dirty_pages, start, &partial))
-		goto repeat;
-	if (truncate_list_pages(&mapping->locked_pages, start, &partial))
-		goto repeat;
+	do {
+		complete = 1;
+		while (truncate_list_pages(&mapping->clean_pages, start, &partial))
+			complete = 0;
+		while (truncate_list_pages(&mapping->dirty_pages, start, &partial))
+			complete = 0;
+		while (truncate_list_pages(&mapping->locked_pages, start, &partial))
+			complete = 0;
+	} while (!complete);
+	/* Traversed all three lists without dropping the lock */
 	spin_unlock(&pagecache_lock);
 }
 

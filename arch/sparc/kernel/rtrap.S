@@ -1,4 +1,4 @@
-/* $Id: rtrap.S,v 1.55 2000/08/05 10:48:40 davem Exp $
+/* $Id: rtrap.S,v 1.56 2001/06/05 09:56:06 davem Exp $
  * rtrap.S: Return from Sparc trap low-level code.
  *
  * Copyright (C) 1995 David S. Miller (davem@caip.rutgers.edu)
@@ -52,9 +52,8 @@ ret_trap_entry:
 	sll	%l3, 5, %l3
 	sethi	%hi(C_LABEL(irq_stat)), %l4		! &softirq_active
 	add	%l4, %l3, %l4
-	ld	[%l4 + %lo(C_LABEL(irq_stat))], %g5	! softirq_active
-	ld	[%l4 + %lo(C_LABEL(irq_stat) + 4)], %g4	! softirq_mask
-	andcc	%g4, %g5, %g0
+	ld	[%l4 + %lo(C_LABEL(irq_stat))], %g5	! softirq_pending
+	cmp	%g5, 0
 	be	C_LABEL(ret_trap_lockless_ipi)
 	 nop
 	call	C_LABEL(do_softirq)

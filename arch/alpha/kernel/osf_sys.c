@@ -44,7 +44,6 @@
 
 extern int do_pipe(int *);
 
-extern asmlinkage int sys_swapon(const char *specialfile, int swap_flags);
 extern asmlinkage unsigned long sys_brk(unsigned long);
 
 /*

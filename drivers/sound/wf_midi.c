@@ -231,6 +231,7 @@ wf_mpu_input_scanner (int devno, int synthdev, unsigned char midic)
 				break;
 		    
 			default:
+				break;
 			}
 		} else {
 			mi->m_prev_status = midic;

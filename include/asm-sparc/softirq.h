@@ -14,8 +14,21 @@
 #include <asm/hardirq.h>
 
 #define local_bh_disable()	(local_bh_count(smp_processor_id())++)
-#define local_bh_enable()	(local_bh_count(smp_processor_id())--)
-
+#define __local_bh_enable()	(local_bh_count(smp_processor_id())--)
+#define local_bh_enable()			  \
+do { if (!--local_bh_count(smp_processor_id()) && \
+	 softirq_pending(smp_processor_id())) {   \
+		do_softirq();			  \
+		__sti();			  \
+     }						  \
+} while (0)
+#define __cpu_raise_softirq(cpu, nr)	(softirq_pending(cpu) |= (1<<nr))
+#define raise_softirq(nr)				\
+do {	unsigned long flags;				\
+	local_irq_save(flags);				\
+	__cpu_raise_softirq(smp_processor_id(), nr);	\
+	local_irq_restore(flags);			\
+} while (0)
 #define in_softirq() (local_bh_count(smp_processor_id()) != 0)
 
 #endif	/* __SPARC_SOFTIRQ_H */

@@ -302,6 +302,8 @@ void usb_stor_show_sense(
 	case 0x1C00: what="defect list not found"; break;
 	case 0x2400: what="invalid field in CDB"; break;
 	case 0x2703: what="associated write protect"; break;
+	case 0x2800: what="not ready to ready transition (media change?)";
+		break;
 	case 0x2903: what="bus device reset function occurred"; break;
 	case 0x2904: what="device internal reset"; break;
 	case 0x2B00: what="copy can't execute since host can't disconnect"; 

@@ -103,6 +103,64 @@ CONFIG_PM=y
 # CONFIG_MTD is not set
 
 #
+# RAM/ROM/Flash chip drivers
+#
+# CONFIG_MTD_CFI is not set
+# CONFIG_MTD_CFI_INTELEXT is not set
+# CONFIG_MTD_CFI_AMDSTD is not set
+# CONFIG_MTD_AMDSTD is not set
+# CONFIG_MTD_SHARP is not set
+# CONFIG_MTD_RAM is not set
+# CONFIG_MTD_ROM is not set
+# CONFIG_MTD_JEDEC is not set
+
+#
+# Mapping drivers for chip access
+#
+# CONFIG_MTD_PHYSMAP is not set
+# CONFIG_MTD_SUN_UFLASH is not set
+# CONFIG_MTD_NORA is not set
+# CONFIG_MTD_PNC2000 is not set
+# CONFIG_MTD_RPXLITE is not set
+# CONFIG_MTD_SC520CDP is not set
+# CONFIG_MTD_NETSC520 is not set
+# CONFIG_MTD_SBC_GXX is not set
+# CONFIG_MTD_ELAN_104NC is not set
+# CONFIG_MTD_SA1100 is not set
+# CONFIG_MTD_SA1100_REDBOOT_PARTITIONS is not set
+# CONFIG_MTD_SA1100_BOOTLDR_PARTITIONS is not set
+# CONFIG_MTD_DC21285 is not set
+# CONFIG_MTD_IQ80310 is not set
+# CONFIG_MTD_DBOX2 is not set
+# CONFIG_MTD_CSTM_MIPS_IXX is not set
+# CONFIG_MTD_CFI_FLAGADM is not set
+# CONFIG_MTD_MIXMEM is not set
+# CONFIG_MTD_OCTAGON is not set
+# CONFIG_MTD_VMAX is not set
+# CONFIG_MTD_OCELOT is not set
+
+#
+# Self-contained MTD device drivers
+#
+# CONFIG_MTD_PMC551 is not set
+# CONFIG_MTD_SLRAM is not set
+# CONFIG_MTD_MTDRAM is not set
+
+#
+# Disk-On-Chip Device Drivers
+#
+# CONFIG_MTD_DOC1000 is not set
+# CONFIG_MTD_DOC2000 is not set
+# CONFIG_MTD_DOC2001 is not set
+# CONFIG_MTD_DOCPROBE is not set
+
+#
+# NAND Flash Device Drivers
+#
+# CONFIG_MTD_NAND is not set
+# CONFIG_MTD_NAND_SPIA is not set
+
+#
 # Parallel port support
 #
 # CONFIG_PARPORT is not set

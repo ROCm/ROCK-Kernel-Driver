@@ -1,5 +1,5 @@
 /*
- * $Id: mtdchar.c,v 1.21.2.3 2001/01/09 00:18:31 dwmw2 Exp $
+ * $Id: mtdchar.c,v 1.38.2.1 2001/06/09 17:31:16 dwmw2 Exp $
  *
  * Character-device access to raw MTD devices.
  *
@@ -7,7 +7,6 @@
 
 
 #include <linux/mtd/compatmac.h>
-
 #include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -18,21 +17,18 @@
 #include <linux/devfs_fs_kernel.h>
 static void mtd_notify_add(struct mtd_info* mtd);
 static void mtd_notify_remove(struct mtd_info* mtd);
+
 static struct mtd_notifier notifier = {
-	mtd_notify_add,
-	mtd_notify_remove,
-	NULL
+	add:	mtd_notify_add,
+	remove:	mtd_notify_remove,
 };
-static devfs_handle_t devfs_dir_handle = NULL;
+
+static devfs_handle_t devfs_dir_handle;
 static devfs_handle_t devfs_rw_handle[MAX_MTD_DEVICES];
 static devfs_handle_t devfs_ro_handle[MAX_MTD_DEVICES];
 #endif
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,2,0)
 static loff_t mtd_lseek (struct file *file, loff_t offset, int orig)
-#else
-static int mtd_lseek (struct inode *inode, struct file *file, off_t offset, int orig)
-#endif
 {
 	struct mtd_info *mtd=(struct mtd_info *)file->private_data;
 
@@ -119,15 +115,18 @@ static release_t mtd_close(struct inode *inode,
 #define FILE_POS file->f_pos
 #endif
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,2,0)
+/* FIXME: This _really_ needs to die. In 2.5, we should lock the
+   userspace buffer down and use it directly with readv/writev.
+*/
+#define MAX_KMALLOC_SIZE 0x20000
+
 static ssize_t mtd_read(struct file *file, char *buf, size_t count,loff_t *ppos)
-#else
-static int mtd_read(struct inode *inode,struct file *file, char *buf, int count)
-#endif
 {
 	struct mtd_info *mtd = (struct mtd_info *)file->private_data;
 	size_t retlen=0;
+	size_t total_retlen=0;
 	int ret=0;
+	int len;
 	char *kbuf;
 	
 	DEBUG(MTD_DEBUG_LEVEL0,"MTD_read\n");
@@ -138,39 +137,50 @@ static int mtd_read(struct inode *inode,struct file *file, char *buf, int count)
 	if (!count)
 		return 0;
 	
-	/* FIXME: Use kiovec in 2.3 or 2.2+rawio, or at
-	 * least split the IO into smaller chunks.
-	 */
-	
-	kbuf = vmalloc(count);
-	if (!kbuf)
-		return -ENOMEM;
-	
-	ret = MTD_READ(mtd, FILE_POS, count, &retlen, kbuf);
-	if (!ret) {
-		FILE_POS += retlen;
-		if (copy_to_user(buf, kbuf, retlen))
-			ret = -EFAULT;
+	/* FIXME: Use kiovec in 2.5 to lock down the user's buffers
+	   and pass them directly to the MTD functions */
+	while (count) {
+		if (count > MAX_KMALLOC_SIZE) 
+			len = MAX_KMALLOC_SIZE;
 		else
-			ret = retlen;
+			len = count;
 
+		kbuf=kmalloc(len,GFP_KERNEL);
+		if (!kbuf)
+			return -ENOMEM;
+		
+		ret = MTD_READ(mtd, FILE_POS, len, &retlen, kbuf);
+		if (!ret) {
+			FILE_POS += retlen;
+			if (copy_to_user(buf, kbuf, retlen)) {
+			        kfree(kbuf);
+				return -EFAULT;
+			}
+			else
+				total_retlen += retlen;
+
+			count -= retlen;
+			buf += retlen;
+		}
+		else {
+			kfree(kbuf);
+			return ret;
+		}
+		
+		kfree(kbuf);
 	}
 	
-	vfree(kbuf);
-	
-	return ret;
+	return total_retlen;
 } /* mtd_read */
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,2,0)
 static ssize_t mtd_write(struct file *file, const char *buf, size_t count,loff_t *ppos)
-#else
-static read_write_t mtd_write(struct inode *inode,struct file *file, const char *buf, count_t count)
-#endif
 {
 	struct mtd_info *mtd = (struct mtd_info *)file->private_data;
 	char *kbuf;
 	size_t retlen;
+	size_t total_retlen=0;
 	int ret=0;
+	int len;
 
 	DEBUG(MTD_DEBUG_LEVEL0,"MTD_write\n");
 	
@@ -183,27 +193,39 @@ static read_write_t mtd_write(struct inode *inode,struct file *file, const char 
 	if (!count)
 		return 0;
 
-	kbuf=vmalloc(count);
+	while (count) {
+		if (count > MAX_KMALLOC_SIZE) 
+			len = MAX_KMALLOC_SIZE;
+		else
+			len = count;
 
-	if (!kbuf)
-		return -ENOMEM;
-	
-	if (copy_from_user(kbuf, buf, count)) {
-		vfree(kbuf);
-		return -EFAULT;
-	}
+		kbuf=kmalloc(len,GFP_KERNEL);
+		if (!kbuf) {
+			printk("kmalloc is null\n");
+			return -ENOMEM;
+		}
+
+		if (copy_from_user(kbuf, buf, len)) {
+			kfree(kbuf);
+			return -EFAULT;
+		}
 		
-
-	ret = (*(mtd->write))(mtd, FILE_POS, count, &retlen, buf);
+	        ret = (*(mtd->write))(mtd, FILE_POS, len, &retlen, kbuf);
+		if (!ret) {
+			FILE_POS += retlen;
+			total_retlen += retlen;
+			count -= retlen;
+			buf += retlen;
+		}
+		else {
+			kfree(kbuf);
+			return ret;
+		}
 		
-	if (!ret) {
-		FILE_POS += retlen;
-		ret = retlen;
+		kfree(kbuf);
 	}
 
-	vfree(kbuf);
-
-	return ret;
+	return total_retlen;
 } /* mtd_write */
 
 /*======================================================================
@@ -236,6 +258,30 @@ static int mtd_ioctl(struct inode *inode, struct file *file,
 	}
 	
 	switch (cmd) {
+	case MEMGETREGIONCOUNT:
+		if (copy_to_user((int *) arg, &(mtd->numeraseregions), sizeof(int)))
+			return -EFAULT;
+		break;
+
+	case MEMGETREGIONINFO:
+	{
+		struct region_info_user ur;
+
+		if (copy_from_user(	&ur, 
+					(struct region_info_user *)arg, 
+					sizeof(struct region_info_user))) {
+			return -EFAULT;
+		}
+
+		if (ur.regionindex >= mtd->numeraseregions)
+			return -EINVAL;
+		if (copy_to_user((struct mtd_erase_region_info *) arg, 
+				&(mtd->eraseregions[ur.regionindex]),
+				sizeof(struct mtd_erase_region_info)))
+			return -EFAULT;
+		break;
+	}
+
 	case MEMGETINFO:
 		if (copy_to_user((struct mtd_info *)arg, mtd,
 				 sizeof(struct mtd_info_user)))
@@ -317,7 +363,7 @@ static int mtd_ioctl(struct inode *inode, struct file *file,
 
 		ret = (mtd->write_oob)(mtd, buf.start, buf.length, &retlen, databuf);
 
-		if (copy_to_user((void *)arg + sizeof(loff_t), &retlen, sizeof(ssize_t)))
+		if (copy_to_user((void *)arg + sizeof(u_int32_t), &retlen, sizeof(u_int32_t)))
 			ret = -EFAULT;
 
 		kfree(databuf);
@@ -351,7 +397,7 @@ static int mtd_ioctl(struct inode *inode, struct file *file,
 		
 		ret = (mtd->read_oob)(mtd, buf.start, buf.length, &retlen, databuf);
 
-		if (copy_to_user((void *)arg + sizeof(loff_t), &retlen, sizeof(ssize_t)))
+		if (copy_to_user((void *)arg + sizeof(u_int32_t), &retlen, sizeof(u_int32_t)))
 			ret = -EFAULT;
 		else if (retlen && copy_to_user(buf.ptr, databuf, retlen))
 			ret = -EFAULT;
@@ -371,6 +417,7 @@ static int mtd_ioctl(struct inode *inode, struct file *file,
 			ret = -EOPNOTSUPP;
 		else
 			ret = mtd->lock(mtd, adrs[0], adrs[1]);
+		break;
 	}
 
 	case MEMUNLOCK:
@@ -384,14 +431,15 @@ static int mtd_ioctl(struct inode *inode, struct file *file,
 			ret = -EOPNOTSUPP;
 		else
 			ret = mtd->unlock(mtd, adrs[0], adrs[1]);
+		break;
 	}
 
 		
 	default:
-	  printk("Invalid ioctl %x (MEMGETINFO = %x)\n",cmd, MEMGETINFO);
-		ret = -EINVAL;
+		DEBUG(MTD_DEBUG_LEVEL0, "Invalid ioctl %x (MEMGETINFO = %x)\n", cmd, MEMGETINFO);
+		ret = -ENOTTY;
 	}
-	
+
 	return ret;
 } /* memory_ioctl */
 

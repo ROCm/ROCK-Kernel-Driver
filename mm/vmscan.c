@@ -265,7 +265,7 @@ out_unlock:
 	return !count;
 }
 
-#define SWAP_MM_SHIFT	2
+#define SWAP_MM_SHIFT	4
 #define SWAP_SHIFT	5
 #define SWAP_MIN	8
 
@@ -407,7 +407,7 @@ out:
 /**
  * page_launder - clean dirty inactive pages, move to inactive_clean list
  * @gfp_mask: what operations we are allowed to do
- * @sync: should we wait synchronously for the cleaning of pages
+ * @sync: are we allowed to do synchronous IO in emergencies ?
  *
  * When this function is called, we are most likely low on free +
  * inactive_clean pages. Since we want to refill those pages as
@@ -426,11 +426,16 @@ out:
 #define MAX_LAUNDER 		(4 * (1 << page_cluster))
 #define CAN_DO_IO		(gfp_mask & __GFP_IO)
 #define CAN_DO_BUFFERS		(gfp_mask & __GFP_BUFFER)
+#define marker_lru		(&marker_page_struct.lru)
 int page_launder(int gfp_mask, int sync)
 {
+	static int cannot_free_pages;
 	int launder_loop, maxscan, cleaned_pages, maxlaunder;
 	struct list_head * page_lru;
 	struct page * page;
+
+	/* Our bookmark of where we are in the inactive_dirty list. */
+	struct page marker_page_struct = { zone: NULL };
 
 	launder_loop = 0;
 	maxlaunder = 0;
@@ -438,10 +443,43 @@ int page_launder(int gfp_mask, int sync)
 
 dirty_page_rescan:
 	spin_lock(&pagemap_lru_lock);
-	maxscan = nr_inactive_dirty_pages;
-	while ((page_lru = inactive_dirty_list.prev) != &inactive_dirty_list &&
-				maxscan-- > 0) {
+	/*
+	 * By not scanning all inactive dirty pages we'll write out
+	 * really old dirty pages before evicting newer clean pages.
+	 * This should cause some LRU behaviour if we have a large
+	 * amount of inactive pages (due to eg. drop behind).
+	 *
+	 * It also makes us accumulate dirty pages until we have enough
+	 * to be worth writing to disk without causing excessive disk
+	 * seeks and eliminates the infinite penalty clean pages incurred
+	 * vs. dirty pages.
+	 */
+	maxscan = nr_inactive_dirty_pages / 4;
+	if (launder_loop)
+		maxscan *= 2;
+	list_add_tail(marker_lru, &inactive_dirty_list);
+	for (;;) {
+		page_lru = marker_lru->prev;
+		if (page_lru == &inactive_dirty_list)
+			break;
+		if (--maxscan < 0)
+			break;
+		if (!free_shortage())
+			break;
+
 		page = list_entry(page_lru, struct page, lru);
+
+		/* Move the bookmark backwards.. */
+		list_del(marker_lru);
+		list_add_tail(marker_lru, page_lru);
+
+		/* Don't waste CPU if chances are we cannot free anything. */
+		if (launder_loop && maxlaunder < 0 && cannot_free_pages)
+			break;
+
+		/* Skip other people's marker pages. */
+		if (!page->zone)
+			continue;
 
 		/* Wrong page on list?! (list corruption, should not happen) */
 		if (!PageInactiveDirty(page)) {
@@ -454,7 +492,6 @@ dirty_page_rescan:
 
 		/* Page is or was in use?  Move it to the active list. */
 		if (PageReferenced(page) || page->age > 0 ||
-				page->zone->free_pages > page->zone->pages_high ||
 				(!page->buffers && page_count(page) > 1) ||
 				page_ramdisk(page)) {
 			del_page_from_inactive_dirty_list(page);
@@ -464,11 +501,9 @@ dirty_page_rescan:
 
 		/*
 		 * The page is locked. IO in progress?
-		 * Move it to the back of the list.
+		 * Skip the page, we'll take a look when it unlocks.
 		 */
 		if (TryLockPage(page)) {
-			list_del(page_lru);
-			list_add(page_lru, &inactive_dirty_list);
 			continue;
 		}
 
@@ -482,10 +517,8 @@ dirty_page_rescan:
 			if (!writepage)
 				goto page_active;
 
-			/* First time through? Move it to the back of the list */
+			/* First time through? Skip the page. */
 			if (!launder_loop || !CAN_DO_IO) {
-				list_del(page_lru);
-				list_add(page_lru, &inactive_dirty_list);
 				UnlockPage(page);
 				continue;
 			}
@@ -497,6 +530,8 @@ dirty_page_rescan:
 
 			writepage(page);
 			page_cache_release(page);
+
+			maxlaunder--;
 
 			/* And re-start the thing.. */
 			spin_lock(&pagemap_lru_lock);
@@ -525,9 +560,9 @@ dirty_page_rescan:
 			spin_unlock(&pagemap_lru_lock);
 
 			/* Will we do (asynchronous) IO? */
-			if (launder_loop && maxlaunder == 0 && sync)
+			if (launder_loop && maxlaunder-- == 0 && sync)
 				wait = 2;	/* Synchrounous IO */
-			else if (launder_loop && maxlaunder-- > 0)
+			else if (launder_loop && maxlaunder > 0)
 				wait = 1;	/* Async IO */
 			else
 				wait = 0;	/* No IO */
@@ -544,7 +579,7 @@ dirty_page_rescan:
 
 			/* The buffers were not freed. */
 			if (!clearedbuf) {
-				add_page_to_inactive_dirty_list(page);
+				add_page_to_inactive_dirty_list_marker(page);
 
 			/* The page was only in the buffer cache. */
 			} else if (!page->mapping) {
@@ -600,6 +635,8 @@ page_active:
 			UnlockPage(page);
 		}
 	}
+	/* Remove our marker. */
+	list_del(marker_lru);
 	spin_unlock(&pagemap_lru_lock);
 
 	/*
@@ -615,15 +652,28 @@ page_active:
 	 */
 	if ((CAN_DO_IO || CAN_DO_BUFFERS) && !launder_loop && free_shortage()) {
 		launder_loop = 1;
-		/* If we cleaned pages, never do synchronous IO. */
-		if (cleaned_pages)
+		/*
+		 * If we, or the previous process running page_launder(),
+		 * managed to free any pages we never do synchronous IO.
+		 */
+		if (cleaned_pages || !cannot_free_pages)
 			sync = 0;
+		/* Else, do synchronous IO (if we are allowed to). */
+		else if (sync)
+			sync = 1;
 		/* We only do a few "out of order" flushes. */
 		maxlaunder = MAX_LAUNDER;
-		/* Kflushd takes care of the rest. */
+		/* Let bdflush take care of the rest. */
 		wakeup_bdflush(0);
 		goto dirty_page_rescan;
 	}
+
+	/*
+	 * If we failed to free pages (because all pages are dirty)
+	 * we remember this for the next time. This will prevent us
+	 * from wasting too much CPU here.
+	 */
+	cannot_free_pages = !cleaned_pages;
 
 	/* Return the number of pages moved to the inactive_clean list. */
 	return cleaned_pages;
@@ -852,7 +902,7 @@ static int do_try_to_free_pages(unsigned int gfp_mask, int user)
 	 * list, so this is a relatively cheap operation.
 	 */
 	if (free_shortage()) {
-		ret += page_launder(gfp_mask, user);
+		ret += page_launder(gfp_mask, 1);
 		shrink_dcache_memory(DEF_PRIORITY, gfp_mask);
 		shrink_icache_memory(DEF_PRIORITY, gfp_mask);
 	}

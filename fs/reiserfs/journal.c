@@ -2553,6 +2553,7 @@ int journal_mark_freed(struct reiserfs_transaction_handle *th, struct super_bloc
   bh = get_hash_table(p_s_sb->s_dev, blocknr, p_s_sb->s_blocksize) ;
   /* if it is journal new, we just remove it from this transaction */
   if (bh && buffer_journal_new(bh)) {
+    mark_buffer_notjournal_new(bh) ;
     clear_prepared_bits(bh) ;
     cleaned = remove_from_transaction(p_s_sb, blocknr, cleaned) ;
   } else {

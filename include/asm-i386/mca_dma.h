@@ -199,4 +199,4 @@ static __inline__ void mca_set_dma_mode(unsigned int dmanr, unsigned int mode)
 	outb(mode, MCA_DMA_REG_EXE);
 }
 
-#endif MCA_DMA_H
+#endif /* MCA_DMA_H */

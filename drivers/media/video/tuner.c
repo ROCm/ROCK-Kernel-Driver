@@ -558,6 +558,7 @@ tuner_command(struct i2c_client *client, unsigned int cmd, void *arg)
 #endif
 	default:
 		/* nothing */
+		break;
 	}
 	
 	return 0;

@@ -626,8 +626,7 @@ static int __init whiteheat_init (void)
 {
 	usb_serial_register (&whiteheat_fake_device);
 	usb_serial_register (&whiteheat_device);
-	info(DRIVER_VERSION " " DRIVER_AUTHOR);
-	info(DRIVER_DESC);
+	info(DRIVER_VERSION ":" DRIVER_DESC);
 	return 0;
 }
 

@@ -1,6 +1,6 @@
 
 /* Overhauled routines for dealing with different mmap regions of flash */
-/* $Id: map.h,v 1.10.2.2 2001/01/09 00:44:51 dwmw2 Exp $ */
+/* $Id: map.h,v 1.24 2001/06/09 19:53:16 dwmw2 Exp $ */
 
 #ifndef __LINUX_MTD_MAP_H__
 #define __LINUX_MTD_MAP_H__
@@ -53,47 +53,23 @@ struct map_info {
 	unsigned long map_priv_1;
 	unsigned long map_priv_2;
 	void *fldrv_priv;
-	void (*fldrv_destroy)(struct mtd_info *);
-	const char *im_name;
+	struct mtd_chip_driver *fldrv;
 };
 
-#ifdef CONFIG_MODULES
-/* 
- * Probe for the contents of a map device and make an MTD structure
- * if anything is recognised. Doesn't register it because the calling
- * map driver needs to set the 'module' field first.
- */
-static inline struct mtd_info *do_map_probe(struct map_info *map, const char *funcname, const char *modname)
-{
-	struct mtd_info *(*probe_p)(struct map_info *);
-	struct mtd_info *mtd = NULL;
 
-	if ((probe_p = inter_module_get_request(modname, funcname)))
-		mtd = (*probe_p)(map);	/* map->im_name is set by probe */
+struct mtd_chip_driver {
+	struct mtd_info *(*probe)(struct map_info *map);
+	void (*destroy)(struct mtd_info *);
+	struct module *module;
+	char *name;
+	struct list_head list;
+};
 
-	return mtd;
-}
+void register_mtd_chip_driver(struct mtd_chip_driver *);
+void unregister_mtd_chip_driver(struct mtd_chip_driver *);
 
+struct mtd_info *do_map_probe(char *name, struct map_info *map);
 
-/* 
- * Commonly-used probe functions for different types of chip.
- */
-#define do_cfi_probe(x) do_map_probe(x, "cfi_probe", "cfi_probe")
-#define do_jedec_probe(x) do_map_probe(x, "jedec_probe", "jedec_probe")
-#define do_ram_probe(x) do_map_probe(x, "map_ram_probe", "map_ram")
-#define do_rom_probe(x) do_map_probe(x, "map_rom_probe", "map_rom")
-#else
-	/* without module support, call probe function directly */
-extern struct mtd_info *cfi_probe(struct map_info *);
-extern struct mtd_info *jedec_probe(struct map_info *);
-extern struct mtd_info *map_ram_probe(struct map_info *);
-extern struct mtd_info *map_rom_probe(struct map_info *);
-
-#define do_cfi_probe(x) cfi_probe(x)
-#define do_jedec_probe(x) jedec_probe(x)
-#define do_ram_probe(x) map_ram_probe(x)
-#define do_rom_probe(x) map_rom_probe(x)
-#endif
 
 /*
  * Destroy an MTD device which was created for a map device.
@@ -103,8 +79,11 @@ static inline void map_destroy(struct mtd_info *mtd)
 {
 	struct map_info *map = mtd->priv;
 
-	map->fldrv_destroy(mtd);
-	inter_module_put(map->im_name);
+	map->fldrv->destroy(mtd);
+#ifdef CONFIG_MODULES
+	if (map->fldrv->module)
+		__MOD_DEC_USE_COUNT(map->fldrv->module);
+#endif
 	kfree(mtd);
 }
 

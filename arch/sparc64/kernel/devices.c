@@ -9,6 +9,7 @@
 #include <linux/threads.h>
 #include <linux/init.h>
 #include <linux/ioport.h>
+#include <linux/string.h>
 
 #include <asm/page.h>
 #include <asm/oplib.h>

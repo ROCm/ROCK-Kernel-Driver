@@ -1,80 +1,10 @@
 /*
- * $Id: t1pci.c,v 1.13.6.3 2001/03/21 08:52:21 kai Exp $
+ * $Id: t1pci.c,v 1.13.6.5 2001/05/17 20:41:51 kai Exp $
  * 
  * Module for AVM T1 PCI-card.
  * 
  * (c) Copyright 1999 by Carsten Paeth (calle@calle.in-berlin.de)
  * 
- * $Log: t1pci.c,v $
- * Revision 1.13.6.3  2001/03/21 08:52:21  kai
- * merge from main branch: fix buffer for revision string (calle)
- *
- * Revision 1.13.6.2  2001/02/13 11:43:29  kai
- * more compatility changes for 2.2.19
- *
- * Revision 1.13.6.1  2000/11/28 12:02:45  kai
- * MODULE_DEVICE_TABLE for 2.4
- *
- * Revision 1.13.2.2  2000/11/26 17:47:53  kai
- * added PCI_DEV_TABLE for 2.4
- *
- * Revision 1.13.2.1  2000/11/26 17:14:19  kai
- * fix device ids
- * also needs patches to include/linux/pci_ids.h
- *
- * Revision 1.13  2000/11/23 20:45:14  kai
- * fixed module_init/exit stuff
- * Note: compiled-in kernel doesn't work pre 2.2.18 anymore.
- *
- * Revision 1.12  2000/11/01 14:05:02  calle
- * - use module_init/module_exit from linux/init.h.
- * - all static struct variables are initialized with "membername:" now.
- * - avm_cs.c, let it work with newer pcmcia-cs.
- *
- * Revision 1.11  2000/08/08 09:24:19  calle
- * calls to pci_enable_device surounded by #ifndef COMPAT_HAS_2_2_PCI
- *
- * Revision 1.10  2000/07/20 10:21:21  calle
- * Bugfix: driver will not be unregistered, if not cards were detected.
- *         this result in an oops in kcapi.c
- *
- * Revision 1.9  2000/05/19 15:43:22  calle
- * added calls to pci_device_start().
- *
- * Revision 1.8  2000/05/06 00:52:36  kai
- * merged changes from kernel tree
- * fixed timer and net_device->name breakage
- *
- * Revision 1.7  2000/04/07 15:26:55  calle
- * better error message if cabel not connected or T1 has no power.
- *
- * Revision 1.6  2000/04/03 13:29:25  calle
- * make Tim Waugh happy (module unload races in 2.3.99-pre3).
- * no real problem there, but now it is much cleaner ...
- *
- * Revision 1.5  2000/02/02 18:36:04  calle
- * - Modules are now locked while init_module is running
- * - fixed problem with memory mapping if address is not aligned
- *
- * Revision 1.4  2000/01/25 14:33:38  calle
- * - Added Support AVM B1 PCI V4.0 (tested with prototype)
- *   - splitted up t1pci.c into b1dma.c for common function with b1pciv4
- *   - support for revision register
- *
- * Revision 1.3  1999/11/13 21:27:16  keil
- * remove KERNELVERSION
- *
- * Revision 1.2  1999/11/05 16:38:02  calle
- * Cleanups before kernel 2.4:
- * - Changed all messages to use card->name or driver->name instead of
- *   constant string.
- * - Moved some data from struct avmcard into new struct avmctrl_info.
- *   Changed all lowlevel capi driver to match the new structur.
- *
- * Revision 1.1  1999/10/26 15:31:42  calle
- * Added driver for T1-PCI card.
- *
- *
  */
 
 #include <linux/config.h>

@@ -1,4 +1,4 @@
-/* $Id: isdn_ppp.c,v 1.85.6.4 2001/04/08 18:53:07 kai Exp $
+/* $Id: isdn_ppp.c,v 1.85.6.5 2001/05/26 15:19:56 kai Exp $
  *
  * Linux ISDN subsystem, functions for synchronous PPP (linklevel).
  *
@@ -83,7 +83,7 @@ static void isdn_ppp_mp_cleanup( isdn_net_local * lp );
 static int isdn_ppp_bundle(struct ippp_struct *, int unit);
 #endif	/* CONFIG_ISDN_MPP */
   
-char *isdn_ppp_revision = "$Revision: 1.85.6.4 $";
+char *isdn_ppp_revision = "$Revision: 1.85.6.5 $";
 
 static struct ippp_struct *ippp_table[ISDN_MAX_CHANNELS];
 
@@ -785,7 +785,10 @@ isdn_ppp_write(int min, struct file *file, const char *buf, int count)
 			}
 			skb_reserve(skb, hl);
 			if (copy_from_user(skb_put(skb, count), buf, count))
+			{
+				kfree_skb(skb);
 				return -EFAULT;
+			}
 			if (is->debug & 0x40) {
 				printk(KERN_DEBUG "ppp xmit: len %d\n", (int) skb->len);
 				isdn_ppp_frame_log("xmit", skb->data, skb->len, 32,is->unit,lp->ppp_slot);

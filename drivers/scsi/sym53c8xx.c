@@ -11564,6 +11564,7 @@ out_clrack:
 	OUTL_DSP (NCB_SCRIPT_PHYS (np, clrack));
 	return;
 out_stuck:
+	return;
 }
 
 

@@ -45,6 +45,8 @@
  *        ioctl bugfix, and integration of solo-mode into OSS-API,
  *        added (OSS-limited) equalizer support, return value bugfix,
  *        changed param aci_reset to reset, new params: ide, wss.
+ *   2001-04-20  Robert Siemer
+ *        even more cleanups...
  */
 
 #include <linux/kernel.h>
@@ -95,17 +97,19 @@ MODULE_PARM(wss,"i");
 MODULE_PARM_DESC(wss,"change between ACI/WSS-mixer; use 0 and 1 - untested"
 		 " default: do nothing; for PCM1-pro only");
 
+#if DEBUG
 static void print_bits(unsigned char c)
 {
 	int j;
 	printk(KERN_DEBUG "aci: ");
 
 	for (j=7; j>=0; j--) {
-		printk(KERN_DEBUG "%d", (c >> j) & 0x1);
+		printk("%d", (c >> j) & 0x1);
 	}
 
-	printk(KERN_DEBUG "\n");
+	printk("\n");
 }
+#endif
 
 /*
  * This busy wait code normally requires less than 15 loops and
@@ -269,12 +273,12 @@ static int getvolume(caddr_t arg,
 	int buf;
 
 	/* left channel */
-	if ((buf=aci_indexed_cmd(0xf0, left_index))<0)
+	if ((buf=aci_indexed_cmd(ACI_STATUS, left_index))<0)
 		return buf;
 	vol = SCALE(0x20, 100, buf < 0x20 ? 0x20-buf : 0);
 	
 	/* right channel */
-	if ((buf=aci_indexed_cmd(0xf0, right_index))<0)
+	if ((buf=aci_indexed_cmd(ACI_STATUS, right_index))<0)
 		return buf;
 	vol |= SCALE(0x20, 100, buf < 0x20 ? 0x20-buf : 0) << 8;
 
@@ -342,12 +346,12 @@ static int getequalizer(caddr_t arg,
 	unsigned int vol;
 
 	/* left channel */
-	if ((buf=aci_indexed_cmd(0xf0, left_index))<0)
+	if ((buf=aci_indexed_cmd(ACI_STATUS, left_index))<0)
 		return buf;
 	vol = eq_aci2oss(buf);
 	
 	/* right channel */
-	if ((buf=aci_indexed_cmd(0xf0, right_index))<0)
+	if ((buf=aci_indexed_cmd(ACI_STATUS, right_index))<0)
 		return buf;
 	vol |= eq_aci2oss(buf) << 8;
 
@@ -399,7 +403,7 @@ static int aci_mixer_ioctl (int dev, unsigned int cmd, caddr_t arg)
 			if (vol > 100)
 				vol = 100;
 			vol = SCALE(100, 3, vol);
-			if ((buf=aci_write_cmd(0x03, vol))<0)
+			if ((buf=aci_write_cmd(ACI_WRITE_IGAIN, vol))<0)
 				return buf;
 			aci_micpreamp = vol;
 			vol = SCALE(3, 100, vol);
@@ -416,7 +420,7 @@ static int aci_mixer_ioctl (int dev, unsigned int cmd, caddr_t arg)
 				vol = 1;
 			else
 				vol = 0;
-			if ((buf=aci_write_cmd(0x0f, vol))<0)
+			if ((buf=aci_write_cmd(ACI_SET_POWERAMP, vol))<0)
 				return buf;
 			aci_amp = vol;
 			if (aci_amp)
@@ -433,7 +437,7 @@ static int aci_mixer_ioctl (int dev, unsigned int cmd, caddr_t arg)
 		/* unset solo when RECSRC for PCM is requested */
 		if (aci_idcode[1]=='B' || aci_idcode[1]=='C') {
 			vol = !(buf & SOUND_MASK_PCM);
-			if ((buf=aci_write_cmd(0xd2, vol))<0)
+			if ((buf=aci_write_cmd(ACI_SET_SOLOMODE, vol))<0)
 				return buf;
 			aci_solo = vol;
 		}
@@ -502,7 +506,8 @@ static int aci_mixer_ioctl (int dev, unsigned int cmd, caddr_t arg)
 		case 'B': /* PCM12 */
 		case 'C': /* PCM20 radio */
 			if (aci_version >= 0xb0) {
-				if ((vol=aci_rw_cmd(0xf0, 0x00, -1))<0)
+				if ((vol=aci_rw_cmd(ACI_STATUS,
+						    ACI_S_GENERAL, -1))<0)
 					return vol;
 				if (vol & 0x20)
 					buf |= SOUND_MASK_PCM;
@@ -555,7 +560,8 @@ static int aci_mixer_ioctl (int dev, unsigned int cmd, caddr_t arg)
 		if (aci_idcode[1]=='B' || aci_idcode[1]=='C') {
 			/* aci_micpreamp or ACI? */
 			if (aci_version >= 0xb0) {
-				if ((buf=aci_indexed_cmd(0xf0, 0x21))<0)
+				if ((buf=aci_indexed_cmd(ACI_STATUS,
+							 ACI_S_READ_IGAIN))<0)
 					return buf;
 			}
 			else
@@ -612,17 +618,17 @@ static int __init attach_aci(void)
 
 	/* force ACI into a known state */
 	for (i=0; i<3; i++)
-		if (aci_rw_cmd(0xdf, -1, -1)<0)
+		if (aci_rw_cmd(ACI_ERROR_OP, -1, -1)<0)
 			return -EFAULT;
 
 	/* official this is one aci read call: */
-	if ((aci_idcode[0]=aci_rw_cmd(0xf2, -1, -1))<0 ||
-	    (aci_idcode[1]=aci_rw_cmd(0xf2, -1, -1))<0) {
+	if ((aci_idcode[0]=aci_rw_cmd(ACI_READ_IDCODE, -1, -1))<0 ||
+	    (aci_idcode[1]=aci_rw_cmd(ACI_READ_IDCODE, -1, -1))<0) {
 		printk(KERN_ERR "aci: Failed to read idcode on 0x%03x.\n", aci_port);
 		return -EFAULT;
 	}
 
-	if ((aci_version=aci_rw_cmd(0xf1, -1, -1))<0) {
+	if ((aci_version=aci_rw_cmd(ACI_READ_VERSION, -1, -1))<0) {
 		printk(KERN_ERR "aci: Failed to read version on 0x%03x.\n", aci_port);
 		return -EFAULT;
 	}
@@ -656,22 +662,22 @@ static int __init attach_aci(void)
 
 	if (reset) {
 		/* first write()s after reset fail with my PCM20 */
-		if (aci_rw_cmd(0xff, -1, -1)<0 ||
-		    aci_rw_cmd(0xdf, 0xdf, 0xdf)<0 ||
-		    aci_rw_cmd(0xdf, 0xdf, 0xdf)<0)
+		if (aci_rw_cmd(ACI_INIT, -1, -1)<0 ||
+		    aci_rw_cmd(ACI_ERROR_OP, ACI_ERROR_OP, ACI_ERROR_OP)<0 ||
+		    aci_rw_cmd(ACI_ERROR_OP, ACI_ERROR_OP, ACI_ERROR_OP)<0)
 			return -EBUSY;
 	}
 
 	/* the PCM20 is muted after reset (and reboot) */
-	if (aci_rw_cmd(0x0d, 0x00, -1)<0)
+	if (aci_rw_cmd(ACI_SET_MUTE, 0x00, -1)<0)
 		return -EBUSY;
 
 	if (ide>=0)
-		if (aci_rw_cmd(0xd0, !ide, -1)<0)
+		if (aci_rw_cmd(ACI_SET_IDE, !ide, -1)<0)
 			return -EBUSY;
 	
 	if (wss>=0 && aci_idcode[1]=='A')
-		if (aci_rw_cmd(0xd1, !!wss, -1)<0)
+		if (aci_rw_cmd(ACI_SET_WSS, !!wss, -1)<0)
 			return -EBUSY;
 
 	if (!request_region(aci_port, 3, "sound mixer (ACI)"))

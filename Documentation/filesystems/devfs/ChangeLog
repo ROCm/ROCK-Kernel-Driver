@@ -1613,3 +1613,35 @@ Work sponsored by SGI
 - Updated README from master HTML file
 
 - Ported to kernel 2.4.0-test3-pre4 (which had devfs-patch-v174)
+===============================================================================
+Changes for patch v177
+
+- Updated README from master HTML file
+
+- Documentation cleanups
+
+- Ensure <devfs_generate_path> terminates string for root entry
+  Thanks to Tim Jansen <tim@tjansen.de>
+
+- Exported <devfs_get_name> to modules
+
+- Make <devfs_mk_symlink> send events to devfsd
+
+- Cleaned up option processing in <devfs_setup>
+
+- Fixed bugs in handling symlinks: could leak or cause Oops
+
+- Cleaned up directory handling by separating fops
+  Thanks to Alexander Viro <viro@math.psu.edu>
+===============================================================================
+Changes for patch v178
+
+- Fixed handling of inverted options in <devfs_setup>
+===============================================================================
+Changes for patch v179
+
+- Adjusted <try_modload> to account for <devfs_generate_path> fix
+===============================================================================
+Changes for patch v180
+
+- Fixed !CONFIG_DEVFS_FS stub declaration of <devfs_get_info>

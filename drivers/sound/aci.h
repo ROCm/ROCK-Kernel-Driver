@@ -6,9 +6,6 @@ extern int aci_idcode[2];	/* manufacturer and product ID */
 extern int aci_version;		/* ACI firmware version	*/
 extern int aci_rw_cmd(int write1, int write2, int write3);
 
-extern char * aci_radio_name;
-extern int aci_rds_cmd(unsigned char cmd, unsigned char databuffer[], int datasize);
-
 #define aci_indexed_cmd(a, b) aci_rw_cmd(a, b, -1)
 #define aci_write_cmd(a, b)   aci_rw_cmd(a, b, -1)
 #define aci_read_cmd(a)       aci_rw_cmd(a,-1, -1)
@@ -19,15 +16,24 @@ extern int aci_rds_cmd(unsigned char cmd, unsigned char databuffer[], int datasi
 
 #define RDS_REGISTER        BUSY_REGISTER
 
-#define RDS_STATUS      0x01
-#define RDS_STATIONNAME 0x02
-#define RDS_TEXT        0x03
-#define RDS_ALTFREQ     0x04
-#define RDS_TIMEDATE    0x05
-#define RDS_PI_CODE     0x06
-#define RDS_PTYTATP     0x07
-#define RDS_RESET       0x08
-#define RDS_RXVALUE     0x09
+#define ACI_SET_MUTE          0x0d
+#define ACI_SET_POWERAMP      0x0f
+#define ACI_SET_TUNERMUTE     0xa3
+#define ACI_SET_TUNERMONO     0xa4
+#define ACI_SET_IDE           0xd0
+#define ACI_SET_WSS           0xd1
+#define ACI_SET_SOLOMODE      0xd2
+#define ACI_WRITE_IGAIN       0x03
+#define ACI_WRITE_TUNE        0xa7
+#define ACI_READ_TUNERSTEREO  0xa8
+#define ACI_READ_TUNERSTATION 0xa9
+#define ACI_READ_VERSION      0xf1
+#define ACI_READ_IDCODE       0xf2
+#define ACI_INIT              0xff
+#define ACI_STATUS            0xf0
+#define     ACI_S_GENERAL     0x00
+#define     ACI_S_READ_IGAIN  0x21
+#define ACI_ERROR_OP          0xdf
 
 /*
  * The following macro SCALE can be used to scale one integer volume
@@ -47,9 +53,6 @@ extern int aci_rds_cmd(unsigned char cmd, unsigned char databuffer[], int datasi
  */
 
 #define SCALE(xmax,ymax,x) (((x)*(ymax)+(xmax)/2)/(xmax))
-
-extern void __exit unload_aci_rds(void);
-extern int __init attach_aci_rds(void);
 
 
 #endif  /* _ACI_H_ */

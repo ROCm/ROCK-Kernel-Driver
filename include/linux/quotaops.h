@@ -21,7 +21,6 @@
  */
 extern void dquot_initialize(struct inode *inode, short type);
 extern void dquot_drop(struct inode *inode);
-extern void invalidate_dquots(kdev_t dev, short type);
 extern int  quota_off(struct super_block *sb, short type);
 extern int  sync_dquots(kdev_t dev, short type);
 

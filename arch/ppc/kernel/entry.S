@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.entry.S 1.12 05/21/01 11:49:59 paulus
+ * BK Id: SCCS/s.entry.S 1.15 06/09/01 22:16:38 paulus
  */
 /*
  *  PowerPC version 
@@ -310,25 +310,7 @@ ret_from_intercept:
 	beq	restore
 	.globl	ret_from_except
 ret_from_except:
-	lwz	r5,_MSR(r1)
-	andi.	r5,r5,MSR_EE
-	beq	2f
-	lis	r4,irq_stat@ha		/* &softirq_active for cpu 0 */
-	addi	r4,r4,irq_stat@l
-#ifdef CONFIG_SMP
-	/* get processor # */
-	lwz	r3,PROCESSOR(r2)
-	slwi	r3,r3,LG_CACHE_LINE_SIZE
-	add	r4,r4,r3
-#endif /* CONFIG_SMP */
-	lwz	r5,0(r4)		/* softirq_active */
-	lwz	r4,4(r4)		/* softirq_mask */
-	and.	r5,r5,r4
-	beq+	2f
-	bl	do_softirq
-	.globl	do_bottom_half_ret
-do_bottom_half_ret:
-2:	lwz	r3,_MSR(r1)	/* Returning to user mode? */
+	lwz	r3,_MSR(r1)	/* Returning to user mode? */
 	andi.	r3,r3,MSR_PR
 	beq+	do_signal_ret	/* if so, check need_resched and signals */
 	lwz	r3,NEED_RESCHED(r2)

@@ -817,8 +817,7 @@ static int __init keyspan_pda_init (void)
 {
 	usb_serial_register (&keyspan_pda_fake_device);
 	usb_serial_register (&keyspan_pda_device);
-	info(DRIVER_VERSION " " DRIVER_AUTHOR);
-	info(DRIVER_DESC);
+	info(DRIVER_VERSION ":" DRIVER_DESC);
 	return 0;
 }
 

@@ -3755,8 +3755,7 @@ static void usb_audio_disconnect(struct usb_device *dev, void *ptr)
 static int __init usb_audio_init(void)
 {
 	usb_register(&usb_audio_driver);
-	info(DRIVER_VERSION " " DRIVER_AUTHOR);
-	info(DRIVER_DESC);
+	info(DRIVER_VERSION ":" DRIVER_DESC);
 	return 0;
 }
 

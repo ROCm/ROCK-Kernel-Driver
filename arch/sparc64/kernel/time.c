@@ -1,4 +1,4 @@
-/* $Id: time.c,v 1.37 2001/04/24 01:09:12 davem Exp $
+/* $Id: time.c,v 1.39 2001/06/08 02:33:37 davem Exp $
  * time.c: UltraSparc timer and TOD clock support.
  *
  * Copyright (C) 1997 David S. Miller (davem@caip.rutgers.edu)
@@ -32,6 +32,7 @@
 #include <asm/fhc.h>
 #include <asm/pbm.h>
 #include <asm/ebus.h>
+#include <asm/isa.h>
 #include <asm/starfire.h>
 
 extern rwlock_t xtime_lock;
@@ -408,7 +409,13 @@ void __init clock_probe(void)
 	unsigned long flags;
 #ifdef CONFIG_PCI
 	struct linux_ebus *ebus = NULL;
+	struct isa_bridge *isa_br = NULL;
 #endif
+	static int invoked = 0;
+
+	if (invoked)
+		return;
+	invoked = 1;
 
 
 	if (this_is_starfire) {
@@ -433,6 +440,9 @@ void __init clock_probe(void)
 	else if (ebus_chain != NULL) {
 		ebus = ebus_chain;
 		busnd = ebus->prom_node;
+	} else if (isa_chain != NULL) {
+		isa_br = isa_chain;
+		busnd = isa_br->prom_node;
 	}
 #endif
 	else if (sbus_root != NULL) {
@@ -462,6 +472,13 @@ void __init clock_probe(void)
 				ebus = ebus->next;
 				if (ebus != NULL) {
 					busnd = ebus->prom_node;
+					node = prom_getchild(busnd);
+				}
+			}
+			while ((node == 0) && isa_br != NULL) {
+				isa_br = isa_br->next;
+				if (isa_br != NULL) {
+					busnd = isa_br->prom_node;
 					node = prom_getchild(busnd);
 				}
 			}
@@ -504,6 +521,22 @@ void __init clock_probe(void)
 				mstk48t02_regs = mstk48t59_regs + MOSTEK_48T59_48T02;
 			}
 			break;
+		} else if (isa_chain != NULL) {
+			struct isa_device *isadev;
+
+			for_each_isadev(isadev, isa_br)
+				if (isadev->prom_node == node)
+					break;
+			if (isadev == NULL) {
+				prom_printf("%s: Mostek not probed by ISA\n");
+				prom_halt();
+			}
+			if (!strcmp(model, "ds1287")) {
+				ds1287_regs = isadev->resource.start;
+			} else {
+				mstk48t59_regs = isadev->resource.start;
+				mstk48t02_regs = mstk48t59_regs + MOSTEK_48T59_48T02;
+			}
 		}
 #endif
 		else {

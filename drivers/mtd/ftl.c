@@ -1,10 +1,10 @@
 /* This version ported to the Linux-MTD system by dwmw2@infradead.org
+ * $Id: ftl.c,v 1.35 2001/06/09 00:40:17 dwmw2 Exp $
  *
- * - Based on Id: ftl.c,v 1.21 2000/08/01 13:07:49 dwmw2 Exp
- * - With the Franz Galiana's set_bam_entry fix from v1.23
- * - Perhaps it's about time I made a branch for the 2.4 series.
-
- * Originally based on:
+ * Fixes: Arnaldo Carvalho de Melo <acme@conectiva.com.br>
+ * - fixes some leaks on failure in build_maps and ftl_notify_add, cleanups
+ *
+ * Based on:
  */
 /*======================================================================
 
@@ -30,8 +30,8 @@
     are Copyright (C) 1999 David A. Hinds.  All Rights Reserved.
 
     Alternatively, the contents of this file may be used under the
-    terms of the GNU General Public License version 2 (the "GPL"), in which
-    case the provisions of the GPL are applicable instead of the
+    terms of the GNU General Public License version 2 (the "GPL"), in
+    which case the provisions of the GPL are applicable instead of the
     above.  If you wish to allow the use of your version of this file
     only under the terms of the GPL and not to allow others to use
     your version of this file under the MPL, indicate your decision
@@ -55,11 +55,6 @@
     contact M-Systems (http://www.m-sys.com) directly.
       
 ======================================================================*/
-#define FTL_DEBUG 5
-#ifdef FTL_DEBUG
-#define DEBUGLVL debug
-#endif
-
 #include <linux/module.h>
 #include <linux/mtd/compatmac.h>
 #include <linux/mtd/mtd.h>
@@ -108,18 +103,15 @@
 /*====================================================================*/
 
 /* Parameters that can be set with 'insmod' */
-
-/* Major device # for FTL device */
 static int shuffle_freq = 50;
-
 MODULE_PARM(shuffle_freq, "i");
 
 /*====================================================================*/
 
+/* Major device # for FTL device */
 #ifndef FTL_MAJOR
 #define FTL_MAJOR	44
 #endif
-
 
 /* Funky stuff for setting up a block device */
 #define MAJOR_NR		FTL_MAJOR
@@ -135,16 +127,7 @@ MODULE_PARM(shuffle_freq, "i");
 
 #include <linux/blk.h>
 
-#ifdef FTL_DEBUG
-static int debug = FTL_DEBUG;
-MODULE_PARM(debug, "i");
-#endif
-
 /*====================================================================*/
-
-#ifndef FTL_MAJOR
-#define FTL_MAJOR	44
-#endif
 
 /* Maximum number of separate memory devices we'll allow */
 #define MAX_DEV		4
@@ -200,7 +183,10 @@ static void ftl_notify_remove(struct mtd_info *mtd);
 
 void ftl_freepart(partition_t *part);
 
-static struct mtd_notifier ftl_notifier={ftl_notify_add, ftl_notify_remove, NULL};
+static struct mtd_notifier ftl_notifier = {
+	add:	ftl_notify_add,
+	remove:	ftl_notify_remove,
+};
 
 /* Partition state flags */
 #define FTL_FORMATTED	0x01
@@ -226,7 +212,6 @@ static struct gendisk ftl_gendisk = {
 #endif
     part:		ftl_hd,
     sizes:		ftl_sizes,
-    nr_real:		0
 };
 
 /*====================================================================*/
@@ -274,7 +259,7 @@ static int scan_header(partition_t *part)
     /* Search first megabyte for a valid FTL header */
     for (offset = 0;
 	 offset < max_offset;
-	 offset += part->mtd->erasesize?part->mtd->erasesize:0x2000) {
+	 offset += part->mtd->erasesize ? : 0x2000) {
 
 	ret = part->mtd->read(part->mtd, offset, sizeof(header), &ret, 
 			      (unsigned char *)&header);
@@ -296,7 +281,7 @@ static int scan_header(partition_t *part)
 	return -1;
     }
     if ((1 << header.EraseUnitSize) != part->mtd->erasesize) {
-	printk(KERN_NOTICE "ftl: FTL EraseUnitSize %x != MTD erasesize %lx\n",
+	printk(KERN_NOTICE "ftl: FTL EraseUnitSize %x != MTD erasesize %x\n",
 	       1 << header.EraseUnitSize,part->mtd->erasesize);
 	return -1;
     }
@@ -309,7 +294,7 @@ static int build_maps(partition_t *part)
     erase_unit_header_t header;
     u_int16_t xvalid, xtrans, i;
     u_int blocks, j;
-    int hdr_ok, ret;
+    int hdr_ok, ret = -1;
     ssize_t retval;
     loff_t offset;
 
@@ -318,13 +303,15 @@ static int build_maps(partition_t *part)
 	part->header.NumTransferUnits;
     part->EUNInfo = kmalloc(part->DataUnits * sizeof(struct eun_info_t),
 			    GFP_KERNEL);
-    if (!part->EUNInfo) return -1;
+    if (!part->EUNInfo)
+	    goto out;
     for (i = 0; i < part->DataUnits; i++)
 	part->EUNInfo[i].Offset = 0xffffffff;
     part->XferInfo =
 	kmalloc(part->header.NumTransferUnits * sizeof(struct xfer_info_t),
 		GFP_KERNEL);
-    if (!part->XferInfo) return -1;
+    if (!part->XferInfo)
+	    goto out_EUNInfo;
 
     xvalid = xtrans = 0;
     for (i = 0; i < le16_to_cpu(part->header.NumEraseUnits); i++) {
@@ -334,8 +321,9 @@ static int build_maps(partition_t *part)
 			      (unsigned char *)&header);
 	
 	if (ret) 
-	    return ret;
+	    goto out_XferInfo;
 
+	ret = -1;
 	/* Is this a transfer partition? */
 	hdr_ok = (strcmp(header.DataOrgTuple+3, "FTL100") == 0);
 	if (hdr_ok && (le16_to_cpu(header.LogicalEUN) < part->DataUnits) &&
@@ -348,7 +336,7 @@ static int build_maps(partition_t *part)
 	    if (xtrans == part->header.NumTransferUnits) {
 		printk(KERN_NOTICE "ftl_cs: format error: too many "
 		       "transfer units!\n");
-		return -1;
+		goto out_XferInfo;
 	    }
 	    if (hdr_ok && (le16_to_cpu(header.LogicalEUN) == 0xffff)) {
 		part->XferInfo[xtrans].state = XFER_PREPARED;
@@ -369,18 +357,22 @@ static int build_maps(partition_t *part)
 	(xvalid+xtrans != le16_to_cpu(header.NumEraseUnits))) {
 	printk(KERN_NOTICE "ftl_cs: format error: erase units "
 	       "don't add up!\n");
-	return -1;
+	goto out_XferInfo;
     }
     
     /* Set up virtual page map */
     blocks = le32_to_cpu(header.FormattedSize) >> header.BlockSize;
     part->VirtualBlockMap = vmalloc(blocks * sizeof(u_int32_t));
+    if (!part->VirtualBlockMap)
+	    goto out_XferInfo;
+
     memset(part->VirtualBlockMap, 0xff, blocks * sizeof(u_int32_t));
     part->BlocksPerUnit = (1 << header.EraseUnitSize) >> header.BlockSize;
 
     part->bam_cache = kmalloc(part->BlocksPerUnit * sizeof(u_int32_t),
 			      GFP_KERNEL);
-    if (!part->bam_cache) return -1;
+    if (!part->bam_cache)
+	    goto out_VirtualBlockMap;
 
     part->bam_index = 0xffff;
     part->FreeTotal = 0;
@@ -395,7 +387,7 @@ static int build_maps(partition_t *part)
 			      (unsigned char *)part->bam_cache);
 	
 	if (ret) 
-	    return ret;
+		goto out_bam_cache;
 
 	for (j = 0; j < part->BlocksPerUnit; j++) {
 	    if (BLOCK_FREE(le32_to_cpu(part->bam_cache[j]))) {
@@ -410,8 +402,19 @@ static int build_maps(partition_t *part)
 	}
     }
     
-    return 0;
-    
+    ret = 0;
+    goto out;
+
+out_bam_cache:
+    kfree(part->bam_cache);
+out_VirtualBlockMap:
+    vfree(part->VirtualBlockMap);
+out_XferInfo:
+    kfree(part->XferInfo);
+out_EUNInfo:
+    kfree(part->EUNInfo);
+out:
+    return ret;
 } /* build_maps */
 
 /*======================================================================
@@ -699,7 +702,7 @@ static int reclaim_block(partition_t *part)
     int queued, ret;
 
     DEBUG(0, "ftl_cs: reclaiming space...\n");
-    DEBUG(4, "NumTransferUnits == %x\n", part->header.NumTransferUnits);
+    DEBUG(3, "NumTransferUnits == %x\n", part->header.NumTransferUnits);
     /* Pick the least erased transfer unit */
     best = 0xffffffff; xfer = 0xffff;
     do {
@@ -707,22 +710,22 @@ static int reclaim_block(partition_t *part)
 	for (i = 0; i < part->header.NumTransferUnits; i++) {
 	    int n=0;
 	    if (part->XferInfo[i].state == XFER_UNKNOWN) {
-		DEBUG(4,"XferInfo[%d].state == XFER_UNKNOWN\n",i);
+		DEBUG(3,"XferInfo[%d].state == XFER_UNKNOWN\n",i);
 		n=1;
 		erase_xfer(part, i);
 	    }
 	    if (part->XferInfo[i].state == XFER_ERASING) {
-		DEBUG(4,"XferInfo[%d].state == XFER_ERASING\n",i);
+		DEBUG(3,"XferInfo[%d].state == XFER_ERASING\n",i);
 		n=1;
 		queued = 1;
 	    }
 	    else if (part->XferInfo[i].state == XFER_ERASED) {
-		DEBUG(4,"XferInfo[%d].state == XFER_ERASED\n",i);
+		DEBUG(3,"XferInfo[%d].state == XFER_ERASED\n",i);
 		n=1;
 		prepare_xfer(part, i);
 	    }
 	    if (part->XferInfo[i].state == XFER_PREPARED) {
-		DEBUG(4,"XferInfo[%d].state == XFER_PREPARED\n",i);
+		DEBUG(3,"XferInfo[%d].state == XFER_PREPARED\n",i);
 		n=1;
 		if (part->XferInfo[i].EraseCount <= best) {
 		    best = part->XferInfo[i].EraseCount;
@@ -730,7 +733,7 @@ static int reclaim_block(partition_t *part)
 		}
 	    }
 		if (!n)
-		    DEBUG(4,"XferInfo[%d].state == %x\n",i, part->XferInfo[i].state);
+		    DEBUG(3,"XferInfo[%d].state == %x\n",i, part->XferInfo[i].state);
 
 	}
 	if (xfer == 0xffff) {
@@ -1219,11 +1222,12 @@ static int ftl_reread_partitions(int minor)
     }
     whole = minor & ~(MAX_PART-1);
 
-    for (i = 0; i < MAX_PART; i++) {
+    i = MAX_PART - 1;
+    while (i-- > 0) {
 	if (ftl_hd[whole+i].nr_sects > 0) {
 	    kdev_t rdev = MKDEV(FTL_MAJOR, whole+i);
-	    sync_dev(rdev);
-	    invalidate_buffers(rdev);
+
+	    invalidate_device(rdev, 1);
 	}
 	ftl_hd[whole+i].start_sect = 0;
 	ftl_hd[whole+i].nr_sects = 0;
@@ -1362,7 +1366,8 @@ static void ftl_notify_add(struct mtd_info *mtd)
 		printk(KERN_INFO "ftl_cs: opening %d kb FTL partition\n",
 		       le32_to_cpu(partition->header.FormattedSize) >> 10);
 #endif
-	}
+	} else
+		kfree(partition);
 }
 
 static void ftl_notify_remove(struct mtd_info *mtd)
@@ -1395,12 +1400,9 @@ static void ftl_notify_remove(struct mtd_info *mtd)
 		}
 }
 
-
-#if LINUX_VERSION_CODE < 0x20300
-#ifdef MODULE
+#if LINUX_VERSION_CODE < 0x20212 && defined(MODULE)
 #define init_ftl init_module
 #define cleanup_ftl cleanup_module
-#endif
 #endif
 
 mod_init_t init_ftl(void)
@@ -1408,6 +1410,8 @@ mod_init_t init_ftl(void)
     int i;
 
     memset(myparts, 0, sizeof(myparts));
+    
+    DEBUG(0, "$Id: ftl.c,v 1.35 2001/06/09 00:40:17 dwmw2 Exp $\n");
     
     if (register_blkdev(FTL_MAJOR, "ftl", &ftl_blk_fops)) {
 	printk(KERN_NOTICE "ftl_cs: unable to grab major "
@@ -1449,7 +1453,5 @@ mod_exit_t cleanup_ftl(void)
 	}
 }
 
-#if LINUX_VERSION_CODE > 0x20300
 module_init(init_ftl);
 module_exit(cleanup_ftl);
-#endif

@@ -1014,8 +1014,7 @@ static int __init plusb_init (void)
 
 	dbg("plusb_init: driver registered");
 
-	info(DRIVER_VERSION " " DRIVER_AUTHOR);
-	info(DRIVER_DESC);
+	info(DRIVER_VERSION ":" DRIVER_DESC);
 
 	return 0;
 }

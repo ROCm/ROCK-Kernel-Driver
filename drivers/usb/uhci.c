@@ -425,8 +425,7 @@ static void uhci_remove_qh(struct uhci *uhci, struct uhci_qh *qh)
 
 	/* Only go through the hoops if it's actually linked in */
 	if (list_empty(&qh->list)) {
-		uhci_free_qh(uhci, qh);
-		return;
+		goto list;
 	}
 
 	qh->urbp = NULL;
@@ -444,6 +443,7 @@ static void uhci_remove_qh(struct uhci *uhci, struct uhci_qh *qh)
 
 	spin_unlock_irqrestore(&uhci->frame_list_lock, flags);
 
+list:
 	spin_lock_irqsave(&uhci->qh_remove_list_lock, flags);
 
 	/* Check to see if the remove list is empty. Set the IOC bit */
@@ -2922,15 +2922,17 @@ static void __devexit uhci_pci_remove(struct pci_dev *dev)
 }
 
 #ifdef CONFIG_PM
-static void uhci_pci_suspend(struct pci_dev *dev)
+static int uhci_pci_suspend(struct pci_dev *dev, u32 state)
 {
 	reset_hc((struct uhci *) dev->driver_data);
+	return 0;
 }
 
-static void uhci_pci_resume(struct pci_dev *dev)
+static int uhci_pci_resume(struct pci_dev *dev)
 {
 	reset_hc((struct uhci *) dev->driver_data);
 	start_hc((struct uhci *) dev->driver_data);
+	return 0;
 }
 #endif
 
@@ -2990,8 +2992,7 @@ static int __init uhci_hcd_init(void)
 	if (retval)
 		goto init_failed;
 
-	info(DRIVER_VERSION " " DRIVER_AUTHOR);
-	info(DRIVER_DESC);
+	info(DRIVER_VERSION ":" DRIVER_DESC);
 
 	return 0;
 

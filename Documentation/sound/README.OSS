@@ -17,7 +17,7 @@ they are gone forever. Keeping this in mind and with a grain of salt this
 document can be still interesting and very helpful.
 
 [ File edited 17.01.1999 - Riccardo Facchetti ]
-[ Edited miroSOUND section 17.09.2000 - Robert Siemer ]
+[ Edited miroSOUND section 19.04.2001 - Robert Siemer ]
 
 OSS/Free version 3.8 release notes
 ----------------------------------
@@ -1327,7 +1327,7 @@ miroSOUND
 ---------
 
 The miroSOUND PCM1-pro, PCM12 and PCM20 radio has been used
-successfully. This card is based on the MAD16, OPL4, and CS4231A chips
+successfully. These cards are based on the MAD16, OPL4, and CS4231A chips
 and everything said in the section about MAD16 cards applies here,
 too. The only major difference between the PCMxx and other MAD16 cards
 is that instead of the mixer in the CS4231 codec a separate mixer
@@ -1337,8 +1337,8 @@ protocol that is implemented in a separate lowlevel driver. Make sure
 you compile this ACI driver together with the normal MAD16 support
 when you use a miroSOUND PCMxx card. The ACI mixer is controlled by
 /dev/mixer and the CS4231 mixer by /dev/mixer1 (depends on load
-time). Only in special cases you want to change something on the CS4231
-mixer.
+time). Only in special cases you want to change something regularly on
+the CS4231 mixer.
 
 The miroSOUND PCM12 and PCM20 radio is capable of full duplex
 operation (simultaneous PCM replay and recording), which allows you to
@@ -1354,10 +1354,9 @@ ACI. This radio tuner is supported by the ACI driver together with the
 miropcm20.o module. Also the 7-band equalizer is integrated
 (limited by the OSS-design). Developement has started and maybe
 finished for the RDS decoder on this card, too. You will be able to
-read radio text, the program service name, program type and
+read RadioText, the Programme Service name, Programme TYpe and
 others. Even the v4l radio module benefits from it with a refined
-strength value. See aci.c, radio-miropcm20.c and rds-miropcm20.c for
-more details.
+strength value. See aci.[ch] and miropcm20*.[ch] for more details.
 
 The following configuration parameters have worked fine for the PCM12
 in Markus Kuhn's system, many other configurations might work, too:

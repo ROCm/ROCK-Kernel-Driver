@@ -1543,6 +1543,7 @@ static void fyl2xp1(FPU_REG *st0_ptr, u_char st0_tag)
 	  EXCEPTION(EX_INTERNAL | 0x116);
 	  return;
 #endif /* PARANOID */
+	  break;
 	}
     }
   else if ( (st0_tag == TAG_Valid) || (st0_tag == TW_Denormal) )

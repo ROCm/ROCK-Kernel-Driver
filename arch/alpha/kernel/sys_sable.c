@@ -96,7 +96,7 @@ static struct
 static inline void
 sable_update_irq_hw(unsigned long bit, unsigned long mask)
 {
-	int port = 0x536;
+	int port = 0x537;
 
 	if (bit >= 16) {
 		port = 0x53d;
@@ -121,7 +121,7 @@ sable_ack_irq_hw(unsigned long bit)
 	} else if (bit >= 8) {
 		port = 0x53a;
 		val1 = 0xE0 | (bit - 8);
-		val2 = 0xE0 | 2;
+		val2 = 0xE0 | 3;
 	} else {
 		port = 0x536;
 		val1 = 0xE0 | (bit - 0);

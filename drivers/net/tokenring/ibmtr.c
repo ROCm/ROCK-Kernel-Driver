@@ -1185,7 +1185,7 @@ void tok_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 				isa_writeb(~CMD_IN_SRB, ti->mmio + ACA_OFFSET + ACA_RESET + ISRA_ODD);
 				isa_writeb(~SRB_RESP_INT, ti->mmio + ACA_OFFSET + ACA_RESET + ISRP_ODD);
 
-			  skip_reset:
+			  skip_reset:;
 			} /* SRB response */
 
 			if (status & ASB_FREE_INT) { /* ASB response */

@@ -15,21 +15,15 @@
  */
 
 #include <linux/init.h>
-#include <linux/mm.h>
-#include <linux/proc_fs.h>
-#include <linux/smp_lock.h>
+#include <linux/slab.h>
+#include <linux/fs.h>
 #include <linux/quotaops.h>
 #include <linux/pagemap.h>
-#include <linux/dcache.h>
 #include <linux/dnotify.h>
-
-#include <asm/uaccess.h>
-#include <asm/unaligned.h>
-#include <asm/semaphore.h>
-#include <asm/page.h>
-#include <asm/pgtable.h>
+#include <linux/smp_lock.h>
 
 #include <asm/namei.h>
+#include <asm/uaccess.h>
 
 #define ACC_MODE(x) ("\000\004\002\006"[(x)&O_ACCMODE])
 

@@ -2710,9 +2710,7 @@ S: USA
 N: Marcelo W. Tosatti
 E: marcelo@conectiva.com.br
 W: http://bazar.conectiva.com.br/~marcelo/
-D: Miscellaneous kernel hacker
-D: Cyclom 2X driver, drbd hacker
-D: linuxconf apache & proftpd module maintainer
+D: Miscellaneous kernel hacker (mostly VM/MM work)
 S: Conectiva S.A.
 S: R. Tocantins, 89 - Cristo Rei
 S: 80050-430 - Curitiba - Paraná

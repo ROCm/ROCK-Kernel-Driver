@@ -1,4 +1,4 @@
-/* $Id: pci_sabre.c,v 1.33 2001/06/04 23:20:32 ecd Exp $
+/* $Id: pci_sabre.c,v 1.36 2001/06/08 06:25:41 davem Exp $
  * pci_sabre.c: Sabre specific PCI controller support.
  *
  * Copyright (C) 1997, 1998, 1999 David S. Miller (davem@caipfs.rutgers.edu)
@@ -16,6 +16,7 @@
 #include <asm/pbm.h>
 #include <asm/iommu.h>
 #include <asm/irq.h>
+#include <asm/smp.h>
 
 #include "pci_impl.h"
 
@@ -196,7 +197,7 @@
 
 #define SABRE_CONFIGSPACE	0x001000000UL
 #define SABRE_IOSPACE		0x002000000UL
-#define SABRE_IOSPACE_SIZE	0x00000ffffUL
+#define SABRE_IOSPACE_SIZE	0x000ffffffUL
 #define SABRE_MEMSPACE		0x100000000UL
 #define SABRE_MEMSPACE_SIZE	0x07fffffffUL
 
@@ -1030,8 +1031,8 @@ static void __init sabre_resource_adjust(struct pci_dev *pdev,
 					 struct resource *res,
 					 struct resource *root)
 {
-	struct pcidev_cookie *pcp = pdev->sysdata;
-	struct pci_controller_info *p = pcp->pbm->parent;
+	struct pci_pbm_info *pbm = pci_bus2pbm[pdev->bus->number];
+	struct pci_controller_info *p = pbm->parent;
 	unsigned long base;
 
 	if (res->flags & IORESOURCE_IO)
@@ -1481,7 +1482,7 @@ static void __init sabre_pbm_init(struct pci_controller_info *p, int sabre_node,
 
 		/* Hack up top-level resources. */
 		pbm->io_space.start = p->controller_regs + SABRE_IOSPACE;
-		pbm->io_space.end   = pbm->io_space.start + (1UL << 16) - 1UL;
+		pbm->io_space.end   = pbm->io_space.start + (1UL << 24) - 1UL;
 		pbm->io_space.flags = IORESOURCE_IO;
 
 		pbm->mem_space.start = p->controller_regs + SABRE_MEMSPACE;
@@ -1519,8 +1520,19 @@ void __init sabre_init(int pnode, char *model_name)
 
 		if (prom_getproperty(pnode, "compatible",
 				     compat, sizeof(compat)) > 0 &&
-		    !strcmp(compat, "pci108e,a001"))
+		    !strcmp(compat, "pci108e,a001")) {
 			hummingbird_p = 1;
+		} else {
+			int cpu_node = linux_cpus[0].prom_node;
+
+			/* Of course, Sun has to encode things a thousand
+			 * different ways, inconsistently.
+			 */
+			if (prom_getproperty(cpu_node, "name",
+					     compat, sizeof(compat)) > 0 &&
+			    !strcmp(compat, "SUNW,UltraSPARC-IIe"))
+				hummingbird_p = 1;
+		}
 	}
 
 	p = kmalloc(sizeof(*p), GFP_ATOMIC);

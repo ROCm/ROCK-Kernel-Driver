@@ -1082,7 +1082,9 @@ static int hdlc_xmit(struct sk_buff *skb, struct net_device *dev)
 			}
 			break;
 
-		default:		/* to be defined */
+		default:
+			/* to be defined */
+			break;
 		}
 
 		dev_kfree_skb(skb);

@@ -163,7 +163,7 @@ static inline int devfs_set_file_size (devfs_handle_t de, unsigned long size)
 {
     return -ENOSYS;
 }
-static inline void *devfs_get_info (devfs_handle_t de, unsigned long size)
+static inline void *devfs_get_info (devfs_handle_t de)
 {
     return NULL;
 }

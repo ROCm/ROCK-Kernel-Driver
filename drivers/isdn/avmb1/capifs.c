@@ -1,10 +1,10 @@
 /*
  * $Id: capifs.c,v 1.14.6.7 2001/05/24 08:29:08 kai Exp $
- *
+ * 
  * (c) Copyright 2000 by Carsten Paeth (calle@calle.de)
  *
  * Heavily based on devpts filesystem from H. Peter Anvin
- *
+ * 
  */
 
 #include <linux/version.h>

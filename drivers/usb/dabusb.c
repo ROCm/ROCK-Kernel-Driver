@@ -837,8 +837,7 @@ static int __init dabusb_init (void)
 
 	dbg("dabusb_init: driver registered");
 
-	info(DRIVER_VERSION " " DRIVER_AUTHOR);
-	info(DRIVER_DESC);
+	info(DRIVER_VERSION ":" DRIVER_DESC);
 
 	return 0;
 }

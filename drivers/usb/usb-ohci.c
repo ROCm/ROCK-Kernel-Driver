@@ -2774,8 +2774,7 @@ static int __init ohci_hcd_init (void)
 #ifdef CONFIG_PMAC_PBOOK
 	pmu_register_sleep_notifier (&ohci_sleep_notifier);
 #endif  
-	info(DRIVER_VERSION " " DRIVER_AUTHOR);
-	info(DRIVER_DESC);
+	info(DRIVER_VERSION ":" DRIVER_DESC);
 	return ret;
 }
 

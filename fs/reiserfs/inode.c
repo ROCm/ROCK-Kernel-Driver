@@ -1163,7 +1163,7 @@ void reiserfs_read_inode2 (struct inode * inode, void *p)
 	return;
     }
     if (retval != ITEM_FOUND) {
-	reiserfs_warning ("vs-13042: reiserfs_read_inode2: %K not found\n", &key);
+	/* a stale NFS handle can trigger this without it being an error */
 	pathrelse (&path_to_sd);
 	make_bad_inode(inode) ;
 	return;
@@ -1185,21 +1185,84 @@ struct inode * reiserfs_iget (struct super_block * s, struct cpu_key * key)
     if (!inode) 
       return inode ;
 
-    if (is_bad_inode (inode)) {
-	reiserfs_warning ("vs-13048: reiserfs_iget: "
-			  "bad_inode. Stat data of (%lu %lu) not found\n",
-			  key->on_disk_key.k_dir_id, key->on_disk_key.k_objectid);
-	iput (inode);
-	inode = 0;
-    } else if (comp_short_keys (INODE_PKEY (inode), key)) {
-	reiserfs_warning ("vs-13049: reiserfs_iget: "
-			  "Looking for (%lu %lu), found inode of (%lu %lu)\n",
-			  key->on_disk_key.k_dir_id, key->on_disk_key.k_objectid,
-			  INODE_PKEY (inode)->k_dir_id, INODE_PKEY (inode)->k_objectid);
+    if (comp_short_keys (INODE_PKEY (inode), key) || is_bad_inode (inode)) {
+	/* either due to i/o error or a stale NFS handle */
 	iput (inode);
 	inode = 0;
     }
     return inode;
+}
+
+struct dentry *reiserfs_fh_to_dentry(struct super_block *sb, __u32 *data,
+                                     int len, int fhtype, int parent) {
+    struct cpu_key key ;
+    struct inode *inode = NULL ;
+    struct list_head *lp;
+    struct dentry *result;
+
+    if (fhtype < 2 || (parent && fhtype < 4)) 
+	goto out ;
+
+    if (! parent) {
+	    /* this works for handles from old kernels because the default
+	    ** reiserfs generation number is the packing locality.
+	    */
+	    key.on_disk_key.k_objectid = data[0] ;
+	    key.on_disk_key.k_dir_id = data[1] ;
+	    inode = reiserfs_iget(sb, &key) ;
+    } else {
+	    key.on_disk_key.k_objectid = data[2] ;
+	    key.on_disk_key.k_dir_id = data[3] ;
+	    inode = reiserfs_iget(sb, &key) ;
+    }
+out:
+    if (!inode)
+        return ERR_PTR(-ESTALE) ;
+
+    /* now to find a dentry.
+     * If possible, get a well-connected one
+     */
+    spin_lock(&dcache_lock);
+    for (lp = inode->i_dentry.next; lp != &inode->i_dentry ; lp=lp->next) {
+	    result = list_entry(lp,struct dentry, d_alias);
+	    if (! (result->d_flags & DCACHE_NFSD_DISCONNECTED)) {
+		    dget_locked(result);
+		    result->d_vfs_flags |= DCACHE_REFERENCED;
+		    spin_unlock(&dcache_lock);
+		    iput(inode);
+		    return result;
+	    }
+    }
+    spin_unlock(&dcache_lock);
+    result = d_alloc_root(inode);
+    if (result == NULL) {
+	    iput(inode);
+	    return ERR_PTR(-ENOMEM);
+    }
+    result->d_flags |= DCACHE_NFSD_DISCONNECTED;
+    return result;
+
+}
+
+int reiserfs_dentry_to_fh(struct dentry *dentry, __u32 *data, int *lenp, int need_parent) {
+    struct inode *inode = dentry->d_inode ;
+    int maxlen = *lenp;
+    
+    if (maxlen < 2)
+        return 255 ;
+
+    data[0] = inode->i_ino ;
+    data[1] = le32_to_cpu(INODE_PKEY (inode)->k_dir_id) ;
+    *lenp = 2;
+    /* no room for directory info? return what we've stored so far */
+    if (maxlen < 4 || ! need_parent)
+        return 2 ;
+
+    inode = dentry->d_parent->d_inode ;
+    data[2] = inode->i_ino ;
+    data[3] = le32_to_cpu(INODE_PKEY (inode)->k_dir_id) ;
+    *lenp = 4;
+    return 4; 
 }
 
 

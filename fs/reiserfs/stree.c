@@ -1724,7 +1724,7 @@ int reiserfs_cut_from_item (struct reiserfs_transaction_handle *th,
 	    continue;
 
 	reiserfs_warning ("PAP-5610: reiserfs_cut_from_item: item %K not found\n", p_s_item_key);
-	pathrelse (p_s_path);
+	unfix_nodes (&s_cut_balance);
 	return (n_ret_value == IO_ERROR) ? -EIO : -ENOENT;
     } /* while */
   
@@ -1994,12 +1994,14 @@ int reiserfs_paste_into_item (struct reiserfs_transaction_handle *th,
     while ( (retval = fix_nodes(M_PASTE, &s_paste_balance, NULL, p_c_body)) == REPEAT_SEARCH ) {
 	/* file system changed while we were in the fix_nodes */
 	retval = search_for_position_by_key (th->t_super, p_s_key, p_s_search_path);
-	if (retval == IO_ERROR)
-	    return -EIO;
+	if (retval == IO_ERROR) {
+	    retval = -EIO ;
+	    goto error_out ;
+	}
 	if (retval == POSITION_FOUND) {
 	    reiserfs_warning ("PAP-5710: reiserfs_paste_into_item: entry or pasted byte (%K) exists", p_s_key);
-	    pathrelse (p_s_search_path);
-	    return -EEXIST;
+	    retval = -EEXIST ;
+	    goto error_out ;
 	}
 	
 #ifdef CONFIG_REISERFS_CHECK
@@ -2013,9 +2015,11 @@ int reiserfs_paste_into_item (struct reiserfs_transaction_handle *th,
 	do_balance(&s_paste_balance, NULL/*ih*/, p_c_body, M_PASTE);
 	return 0;
     }
-
+    retval = (retval == NO_DISK_SPACE) ? -ENOSPC : -EIO;
+error_out:
+    /* this also releases the path */
     unfix_nodes(&s_paste_balance);
-    return (retval == NO_DISK_SPACE) ? -ENOSPC : -EIO;
+    return retval ;
 }
 
 
@@ -2040,14 +2044,15 @@ int reiserfs_insert_item(struct reiserfs_transaction_handle *th,
     while ( (retval = fix_nodes(M_INSERT, &s_ins_balance, p_s_ih, p_c_body)) == REPEAT_SEARCH) {
 	/* file system changed while we were in the fix_nodes */
 	retval = search_item (th->t_super, key, p_s_path);
-	if (retval == IO_ERROR)
-	    return -EIO;
-
+	if (retval == IO_ERROR) {
+	    retval = -EIO;
+	    goto error_out ;
+	}
 	if (retval == ITEM_FOUND) {
 	    reiserfs_warning ("PAP-5760: reiserfs_insert_item: "
 			      "key %K already exists in the tree\n", key);
-	    pathrelse (p_s_path);
-	    return -EEXIST;
+	    retval = -EEXIST ;
+	    goto error_out; 
 	}
     }
 
@@ -2057,8 +2062,11 @@ int reiserfs_insert_item(struct reiserfs_transaction_handle *th,
 	return 0;
     }
 
+    retval = (retval == NO_DISK_SPACE) ? -ENOSPC : -EIO;
+error_out:
+    /* also releases the path */
     unfix_nodes(&s_ins_balance);
-    return (retval == NO_DISK_SPACE) ? -ENOSPC : -EIO;
+    return retval; 
 }
 
 

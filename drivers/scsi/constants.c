@@ -689,7 +689,7 @@ void print_sense_internal(const char * devclass,
 			  kdev_t dev)
 {
     int i, s;
-    int sense_class, valid, code;
+    int sense_class, valid, code, info;
     const char * error = NULL;
     
     sense_class = (sense_buffer[0] >> 4) & 0x07;
@@ -701,11 +701,14 @@ void print_sense_internal(const char * devclass,
 	if(s > SCSI_SENSE_BUFFERSIZE)
 	   s = SCSI_SENSE_BUFFERSIZE;
 	
-	if (!valid)
-	    printk("[valid=0] ");
-	printk("Info fld=0x%x, ", (int)((sense_buffer[3] << 24) |
-	       (sense_buffer[4] << 16) | (sense_buffer[5] << 8) |
-	       sense_buffer[6]));
+	info = ((sense_buffer[3] << 24) | (sense_buffer[4] << 16) |
+		(sense_buffer[5] << 8) | sense_buffer[6]);
+	if (info || valid) {
+		printk("Info fld=0x%x", info);
+		if (!valid)	/* info data not according to standard */
+			printk(" (nonstd)");
+		printk(", ");
+	}
 	if (sense_buffer[2] & 0x80)
            printk( "FMK ");	/* current command has read a filemark */
 	if (sense_buffer[2] & 0x40)

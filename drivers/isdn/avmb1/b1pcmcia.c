@@ -1,89 +1,10 @@
 /*
- * $Id: b1pcmcia.c,v 1.12.6.3 2001/03/21 08:52:21 kai Exp $
+ * $Id: b1pcmcia.c,v 1.12.6.4 2001/05/17 20:41:51 kai Exp $
  * 
  * Module for AVM B1/M1/M2 PCMCIA-card.
  * 
  * (c) Copyright 1999 by Carsten Paeth (calle@calle.in-berlin.de)
  * 
- * $Log: b1pcmcia.c,v $
- * Revision 1.12.6.3  2001/03/21 08:52:21  kai
- * merge from main branch: fix buffer for revision string (calle)
- *
- * Revision 1.12.6.2  2001/02/16 16:43:23  kai
- * Changes from -ac16, little bug fixes, typos and the like
- *
- * Revision 1.12.6.1  2001/02/13 11:43:29  kai
- * more compatility changes for 2.2.19
- *
- * Revision 1.12  2000/11/23 20:45:14  kai
- * fixed module_init/exit stuff
- * Note: compiled-in kernel doesn't work pre 2.2.18 anymore.
- *
- * Revision 1.11  2000/11/01 14:05:02  calle
- * - use module_init/module_exit from linux/init.h.
- * - all static struct variables are initialized with "membername:" now.
- * - avm_cs.c, let it work with newer pcmcia-cs.
- *
- * Revision 1.10  2000/05/06 00:52:36  kai
- * merged changes from kernel tree
- * fixed timer and net_device->name breakage
- *
- * Revision 1.9  2000/04/03 13:29:24  calle
- * make Tim Waugh happy (module unload races in 2.3.99-pre3).
- * no real problem there, but now it is much cleaner ...
- *
- * Revision 1.8  2000/03/06 18:00:23  calle
- * - Middleware extention now working with 2.3.49 (capifs).
- * - Fixed typos in debug section of capi.c
- * - Bugfix: Makefile corrected for b1pcmcia.c
- *
- * Revision 1.7  2000/02/02 18:36:03  calle
- * - Modules are now locked while init_module is running
- * - fixed problem with memory mapping if address is not aligned
- *
- * Revision 1.6  2000/01/25 14:37:39  calle
- * new message after successful detection including card revision and
- * used resources.
- *
- * Revision 1.5  1999/11/05 16:38:01  calle
- * Cleanups before kernel 2.4:
- * - Changed all messages to use card->name or driver->name instead of
- *   constant string.
- * - Moved some data from struct avmcard into new struct avmctrl_info.
- *   Changed all lowlevel capi driver to match the new structur.
- *
- * Revision 1.4  1999/08/22 20:26:26  calle
- * backported changes from kernel 2.3.14:
- * - several #include "config.h" gone, others come.
- * - "struct device" changed to "struct net_device" in 2.3.14, added a
- *   define in isdn_compat.h for older kernel versions.
- *
- * Revision 1.3  1999/07/09 15:05:41  keil
- * compat.h is now isdn_compat.h
- *
- * Revision 1.2  1999/07/05 15:09:51  calle
- * - renamed "appl_release" to "appl_released".
- * - version und profile data now cleared on controller reset
- * - extended /proc interface, to allow driver and controller specific
- *   informations to include by driver hackers.
- *
- * Revision 1.1  1999/07/01 15:26:30  calle
- * complete new version (I love it):
- * + new hardware independed "capi_driver" interface that will make it easy to:
- *   - support other controllers with CAPI-2.0 (i.e. USB Controller)
- *   - write a CAPI-2.0 for the passive cards
- *   - support serial link CAPI-2.0 boxes.
- * + wrote "capi_driver" for all supported cards.
- * + "capi_driver" (supported cards) now have to be configured with
- *   make menuconfig, in the past all supported cards where included
- *   at once.
- * + new and better informations in /proc/capi/
- * + new ioctl to switch trace of capi messages per controller
- *   using "avmcapictrl trace [contr] on|off|...."
- * + complete testcircle with all supported cards and also the
- *   PCMCIA cards (now patch for pcmcia-cs-3.0.13 needed) done.
- *
- *
  */
 
 #include <linux/module.h>

@@ -21,11 +21,11 @@ O_TARGET := radio.o
 # All of the (potential) objects that export symbols.
 # This list comes from 'grep -l EXPORT_SYMBOL *.[hc]'.
 
-export-objs     :=	
+export-objs     := miropcm20-rds-core.o
 
 list-multi	:= miropcm20.o
 
-miropcm20-objs	:= radio-miropcm20.o rds-miropcm20.o
+miropcm20-objs	:= miropcm20-rds-core.o miropcm20-radio.o
 
 obj-$(CONFIG_RADIO_AZTECH) += radio-aztech.o
 obj-$(CONFIG_RADIO_RTRACK2) += radio-rtrack2.o
@@ -37,6 +37,7 @@ obj-$(CONFIG_RADIO_MAXIRADIO) += radio-maxiradio.o
 obj-$(CONFIG_RADIO_RTRACK) += radio-aimslab.o
 obj-$(CONFIG_RADIO_ZOLTRIX) += radio-zoltrix.o
 obj-$(CONFIG_RADIO_MIROPCM20) += miropcm20.o
+obj-$(CONFIG_RADIO_MIROPCM20_RDS) += miropcm20-rds.o
 obj-$(CONFIG_RADIO_GEMTEK) += radio-gemtek.o
 obj-$(CONFIG_RADIO_TRUST) += radio-trust.o
 obj-$(CONFIG_RADIO_MAESTRO) += radio-maestro.o

@@ -5,7 +5,7 @@
  *
  * This code is GPL
  *
- * $Id: mtdpart.c,v 1.7 2000/12/09 23:29:47 dwmw2 Exp $
+ * $Id: mtdpart.c,v 1.21 2001/06/09 16:33:32 dwmw2 Exp $
  */
 
 #include <linux/module.h>
@@ -25,7 +25,7 @@ static LIST_HEAD(mtd_partitions);
 struct mtd_part {
 	struct mtd_info mtd;
 	struct mtd_info *master;
-	loff_t offset;
+	u_int32_t offset;
 	int index;
 	struct list_head list;
 };
@@ -100,15 +100,36 @@ static int part_erase (struct mtd_info *mtd, struct erase_info *instr)
 static int part_lock (struct mtd_info *mtd, loff_t ofs, size_t len)
 {
 	struct mtd_part *part = PART(mtd);
+	if ((len + ofs) > mtd->size) 
+		return -EINVAL;
 	return part->master->lock(part->master, ofs + part->offset, len);
 }
 
 static int part_unlock (struct mtd_info *mtd, loff_t ofs, size_t len)
 {
 	struct mtd_part *part = PART(mtd);
+	if ((len + ofs) > mtd->size) 
+		return -EINVAL;
 	return part->master->unlock(part->master, ofs + part->offset, len);
 }
 
+static void part_sync(struct mtd_info *mtd)
+{
+	struct mtd_part *part = PART(mtd);
+	part->master->sync(part->master);
+}
+
+static int part_suspend(struct mtd_info *mtd)
+{
+	struct mtd_part *part = PART(mtd);
+	return part->master->suspend(part->master);
+}
+
+static void part_resume(struct mtd_info *mtd)
+{
+	struct mtd_part *part = PART(mtd);
+	part->master->resume(part->master);
+}
 
 /* 
  * This function unregisters and destroy all slave MTD objects which are 
@@ -130,13 +151,11 @@ int del_mtd_partitions(struct mtd_info *master)
 			del_mtd_device(&slave->mtd);
 			kfree(slave);
 			node = prev;
-			MOD_DEC_USE_COUNT;
 		}
 	}
 
 	return 0;
 }
-
 
 /*
  * This function, given a master MTD object and a partition table, creates
@@ -150,10 +169,13 @@ int add_mtd_partitions(struct mtd_info *master,
 		       int nbparts)
 {
 	struct mtd_part *slave;
-	u_long cur_offset = 0;
+	u_int32_t cur_offset = 0;
 	int i;
 
+	printk (KERN_NOTICE "Creating %d MTD partitions on \"%s\":\n", nbparts, master->name);
+
 	for (i = 0; i < nbparts; i++) {
+
 		/* allocate the partition structure */
 		slave = kmalloc (sizeof(*slave), GFP_KERNEL);
 		if (!slave) {
@@ -162,63 +184,102 @@ int add_mtd_partitions(struct mtd_info *master,
 			del_mtd_partitions(master);
 			return -ENOMEM;
 		}
+		memset(slave, 0, sizeof(*slave));
 		list_add(&slave->list, &mtd_partitions);
 
 		/* set up the MTD object for this partition */
-		slave->mtd = *master;
-		slave->mtd.name = parts[i].name;
+		slave->mtd.type = master->type;
+		slave->mtd.flags = master->flags & ~parts[i].mask_flags;
 		slave->mtd.size = parts[i].size;
-		slave->mtd.flags &= ~parts[i].mask_flags;
+		slave->mtd.oobblock = master->oobblock;
+		slave->mtd.oobsize = master->oobsize;
+		slave->mtd.ecctype = master->ecctype;
+		slave->mtd.eccsize = master->eccsize;
+
+		slave->mtd.name = parts[i].name;
+		slave->mtd.bank_size = master->bank_size;
+
+		slave->mtd.module = master->module;
+
 		slave->mtd.read = part_read;
 		slave->mtd.write = part_write;
-		if (slave->mtd.writev)
+		slave->mtd.sync = part_sync;
+		if (!i && master->suspend && master->resume) {
+				slave->mtd.suspend = part_suspend;
+				slave->mtd.resume = part_resume;
+		}
+
+		if (master->writev)
 			slave->mtd.writev = part_writev;
-		if (slave->mtd.readv)
+		if (master->readv)
 			slave->mtd.readv = part_readv;
-		if (slave->mtd.lock)
+		if (master->lock)
 			slave->mtd.lock = part_lock;
-		if (slave->mtd.unlock)
+		if (master->unlock)
 			slave->mtd.unlock = part_unlock;
 		slave->mtd.erase = part_erase;
 		slave->master = master;
 		slave->offset = parts[i].offset;
 		slave->index = i;
 
-		if (slave->offset == 0)
+		if (slave->offset == MTDPART_OFS_APPEND)
 			slave->offset = cur_offset;
-		if (slave->mtd.size == 0)
+		if (slave->mtd.size == MTDPART_SIZ_FULL)
 			slave->mtd.size = master->size - slave->offset;
 		cur_offset = slave->offset + slave->mtd.size;
+	
+		printk (KERN_NOTICE "0x%08x-0x%08x : \"%s\"\n", slave->offset, 
+			slave->offset + slave->mtd.size, slave->mtd.name);
 
 		/* let's do some sanity checks */
-		if ((slave->mtd.flags & MTD_WRITEABLE) && 
-		    (parts[i].offset % master->erasesize)) {
-			slave->mtd.flags &= ~MTD_WRITEABLE;
-			printk ("mtd: partition \"%s\" doesn't start on an erase block boundary -- force read-only\n",
-					parts[i].name);
-		}
-		if ((slave->mtd.flags & MTD_WRITEABLE) && 
-		    (parts[i].size % master->erasesize)) {
-			slave->mtd.flags &= ~MTD_WRITEABLE;
-			printk ("mtd: partition \"%s\" doesn't end on an erase block -- force read-only\n",
-					parts[i].name);
-		}
-		if (parts[i].offset >= master->size) {
-			/* let's register it anyway to preserve ordering */
+		if (slave->offset >= master->size) {
+				/* let's register it anyway to preserve ordering */
 			slave->offset = 0;
 			slave->mtd.size = 0;
 			printk ("mtd: partition \"%s\" is out of reach -- disabled\n",
-					parts[i].name);
+				parts[i].name);
 		}
-		if (parts[i].offset + parts[i].size > master->size) {
-			slave->mtd.size = master->size - parts[i].offset;
-			printk ("mtd: partition \"%s\" extends beyond the end of device \"%s\" -- size truncated to %#lx\n",
-					parts[i].name, master->name, slave->mtd.size);
+		if (slave->offset + slave->mtd.size > master->size) {
+			slave->mtd.size = master->size - slave->offset;
+			printk ("mtd: partition \"%s\" extends beyond the end of device \"%s\" -- size truncated to %#x\n",
+				parts[i].name, master->name, slave->mtd.size);
+		}
+		if (master->numeraseregions>1) {
+			/* Deal with variable erase size stuff */
+			int i;
+			struct mtd_erase_region_info *regions = master->eraseregions;
+			
+			/* Find the first erase regions which is part of this partition. */
+			for (i=0; i < master->numeraseregions && slave->offset >= regions[i].offset; i++)
+				;
+
+			for (i--; i < master->numeraseregions && slave->offset + slave->mtd.size > regions[i].offset; i++) {
+				if (slave->mtd.erasesize < regions[i].erasesize) {
+					slave->mtd.erasesize = regions[i].erasesize;
+				}
+			}
+		} else {
+			/* Single erase size */
+			slave->mtd.erasesize = master->erasesize;
+		}
+
+		if ((slave->mtd.flags & MTD_WRITEABLE) && 
+		    (slave->offset % slave->mtd.erasesize)) {
+			/* Doesn't start on a boundary of major erase size */
+			/* FIXME: Let it be writable if it is on a boundary of _minor_ erase size though */
+			slave->mtd.flags &= ~MTD_WRITEABLE;
+			printk ("mtd: partition \"%s\" doesn't start on an erase block boundary -- force read-only\n",
+				parts[i].name);
+		}
+		if ((slave->mtd.flags & MTD_WRITEABLE) && 
+		    (slave->mtd.size % slave->mtd.erasesize)) {
+			slave->mtd.flags &= ~MTD_WRITEABLE;
+			printk ("mtd: partition \"%s\" doesn't end on an erase block -- force read-only\n",
+				parts[i].name);
 		}
 
 		/* register our partition */
 		add_mtd_device(&slave->mtd);
-		MOD_INC_USE_COUNT;
 	}
 
 	return 0;

@@ -3108,7 +3108,7 @@ dflt_1:
 	case 0x08:	/* modem failure */
 #ifndef MODEM_NOT_LOG
 		printk(KERN_INFO "%s: modem failure!\n", card->devname);
-#endif MODEM_NOT_LOG
+#endif /* MODEM_NOT_LOG */
 		api_oob_event(card,mb);
 		break;
 

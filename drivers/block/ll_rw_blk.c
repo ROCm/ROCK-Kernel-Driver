@@ -859,30 +859,34 @@ end_io:
 void generic_make_request (int rw, struct buffer_head * bh)
 {
 	int major = MAJOR(bh->b_rdev);
+	int minorsize = 0;
 	request_queue_t *q;
 
 	if (!bh->b_end_io)
 		BUG();
 
-	if (blk_size[major]) {
-		unsigned long maxsector = (blk_size[major][MINOR(bh->b_rdev)] << 1) + 1;
+	/* Test device size, when known. */
+	if (blk_size[major])
+		minorsize = blk_size[major][MINOR(bh->b_rdev)];
+	if (minorsize) {
+		unsigned long maxsector = (minorsize << 1) + 1;
 		unsigned long sector = bh->b_rsector;
 		unsigned int count = bh->b_size >> 9;
 
 		if (maxsector < count || maxsector - count < sector) {
+			/* Yecch */
 			bh->b_state &= (1 << BH_Lock) | (1 << BH_Mapped);
-			if (blk_size[major][MINOR(bh->b_rdev)]) {
-				
-				/* This may well happen - the kernel calls bread()
-				   without checking the size of the device, e.g.,
-				   when mounting a device. */
-				printk(KERN_INFO
-				       "attempt to access beyond end of device\n");
-				printk(KERN_INFO "%s: rw=%d, want=%ld, limit=%d\n",
-				       kdevname(bh->b_rdev), rw,
-				       (sector + count)>>1,
-				       blk_size[major][MINOR(bh->b_rdev)]);
-			}
+
+			/* This may well happen - the kernel calls bread()
+			   without checking the size of the device, e.g.,
+			   when mounting a device. */
+			printk(KERN_INFO
+			       "attempt to access beyond end of device\n");
+			printk(KERN_INFO "%s: rw=%d, want=%ld, limit=%d\n",
+			       kdevname(bh->b_rdev), rw,
+			       (sector + count)>>1, minorsize);
+
+			/* Yecch again */
 			bh->b_end_io(bh, 0);
 			return;
 		}
@@ -900,7 +904,8 @@ void generic_make_request (int rw, struct buffer_head * bh)
 		q = blk_get_queue(bh->b_rdev);
 		if (!q) {
 			printk(KERN_ERR
-			       "generic_make_request: Trying to access nonexistent block-device %s (%ld)\n",
+			       "generic_make_request: Trying to access "
+			       "nonexistent block-device %s (%ld)\n",
 			       kdevname(bh->b_rdev), bh->b_rsector);
 			buffer_IO_error(bh);
 			break;

@@ -985,8 +985,7 @@ static int __init ftdi_sio_init (void)
 	dbg(__FUNCTION__);
 	usb_serial_register (&ftdi_sio_device);
 	usb_serial_register (&ftdi_8U232AM_device);
-	info(DRIVER_VERSION " " DRIVER_AUTHOR);
-	info(DRIVER_DESC);
+	info(DRIVER_VERSION ":" DRIVER_DESC);
 	return 0;
 }
 

@@ -3147,8 +3147,7 @@ static int __init usb_ibmcam_init(void)
 		struct usb_ibmcam *ibmcam = &cams[u];
 		memset (ibmcam, 0, sizeof(struct usb_ibmcam));
 	}
-	info(DRIVER_VERSION " " DRIVER_AUTHOR);
-	info(DRIVER_DESC);
+	info(DRIVER_VERSION ":" DRIVER_DESC);
 	return usb_register(&ibmcam_driver);
 }
 

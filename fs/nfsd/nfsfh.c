@@ -134,7 +134,11 @@ static struct dentry *nfsd_iget(struct super_block *sb, unsigned long ino, __u32
 	struct inode *inode;
 	struct list_head *lp;
 	struct dentry *result;
+	if (ino == 0)
+		return ERR_PTR(-ESTALE);
 	inode = iget(sb, ino);
+	if (inode == NULL)
+		return ERR_PTR(-ENOMEM);
 	if (is_bad_inode(inode)
 	    || (generation && inode->i_generation != generation)
 		) {
@@ -169,9 +173,33 @@ static struct dentry *nfsd_iget(struct super_block *sb, unsigned long ino, __u32
 		return ERR_PTR(-ENOMEM);
 	}
 	result->d_flags |= DCACHE_NFSD_DISCONNECTED;
-	d_rehash(result); /* so a dput won't loose it */
 	return result;
 }
+
+static struct dentry *nfsd_get_dentry(struct super_block *sb, __u32 *fh,
+					     int len, int fhtype, int parent)
+{
+	if (sb->s_op->fh_to_dentry)
+		return sb->s_op->fh_to_dentry(sb, fh, len, fhtype, parent);
+	switch (fhtype) {
+	case 1:
+		if (len < 2)
+			break;
+		if (parent)
+			break;
+		return nfsd_iget(sb, fh[0], fh[1]);
+
+	case 2:
+		if (len < 3)
+			break;
+		if (parent)
+			return nfsd_iget(sb,fh[2],0);
+		return nfsd_iget(sb,fh[0],fh[1]);
+	default: break;
+	}
+	return ERR_PTR(-EINVAL);
+}
+
 
 /* this routine links an IS_ROOT dentry into the dcache tree.  It gains "parent"
  * as a parent and "name" as a name
@@ -196,7 +224,7 @@ int d_splice(struct dentry *target, struct dentry *parent, struct qstr *name)
 	 * make it an IS_ROOT instead
 	 */
 	spin_lock(&dcache_lock);
-	list_del(&tdentry->d_child);
+	list_del_init(&tdentry->d_child);
 	tdentry->d_parent = tdentry;
 	spin_unlock(&dcache_lock);
 	d_rehash(target);
@@ -270,10 +298,10 @@ struct dentry *nfsd_findparent(struct dentry *child)
 		}
 		spin_unlock(&dcache_lock);
 		if (pdentry == NULL) {
-			pdentry = d_alloc_root(igrab(tdentry->d_inode));
+			pdentry = d_alloc_root(tdentry->d_inode);
 			if (pdentry) {
+				igrab(tdentry->d_inode);
 				pdentry->d_flags |= DCACHE_NFSD_DISCONNECTED;
-				d_rehash(pdentry);
 			}
 		}
 		if (pdentry == NULL)
@@ -347,11 +375,10 @@ static struct dentry *splice(struct dentry *child, struct dentry *parent)
  * connection if made.
  */
 static struct dentry *
-find_fh_dentry(struct super_block *sb, ino_t ino, int generation, ino_t dirino, int needpath)
+find_fh_dentry(struct super_block *sb, __u32 *datap, int len, int fhtype, int needpath)
 {
 	struct dentry *dentry, *result = NULL;
 	struct dentry *tmp;
-	int  found =0;
 	int err = -ESTALE;
 	/* the sb->s_nfsd_free_path_sem semaphore is needed to make sure that only one unconnected (free)
 	 * dcache path ever exists, as otherwise two partial paths might get
@@ -367,7 +394,7 @@ find_fh_dentry(struct super_block *sb, ino_t ino, int generation, ino_t dirino, 
 	 */
  retry:
 	down(&sb->s_nfsd_free_path_sem);
-	result = nfsd_iget(sb, ino, generation);
+	result = nfsd_get_dentry(sb, datap, len, fhtype, 0);
 	if (IS_ERR(result)
 	    || !(result->d_flags & DCACHE_NFSD_DISCONNECTED)
 	    || (!S_ISDIR(result->d_inode->i_mode) && ! needpath)) {
@@ -384,16 +411,12 @@ find_fh_dentry(struct super_block *sb, ino_t ino, int generation, ino_t dirino, 
 	/* It's a directory, or we are required to confirm the file's
 	 * location in the tree.
 	 */
-	dprintk("nfs_fh: need to look harder for %d/%ld\n",sb->s_dev,ino);
+	dprintk("nfs_fh: need to look harder for %d/%d\n",sb->s_dev,datap[0]);
 
-	found = 0;
 	if (!S_ISDIR(result->d_inode->i_mode)) {
 		nfsdstats.fh_nocache_nondir++;
-		if (dirino == 0)
-			goto err_result; /* don't know how to find parent */
-		else {
 			/* need to iget dirino and make sure this inode is in that directory */
-			dentry = nfsd_iget(sb, dirino, 0);
+			dentry = nfsd_get_dentry(sb, datap, len, fhtype, 1);
 			err = PTR_ERR(dentry);
 			if (IS_ERR(dentry))
 				goto err_result;
@@ -402,8 +425,6 @@ find_fh_dentry(struct super_block *sb, ino_t ino, int generation, ino_t dirino, 
 			    || !S_ISDIR(dentry->d_inode->i_mode)) {
 				goto err_dentry;
 			}
-			if (!(dentry->d_flags & DCACHE_NFSD_DISCONNECTED))
-				found = 1;
 			tmp = splice(result, dentry);
 			err = PTR_ERR(tmp);
 			if (IS_ERR(tmp))
@@ -413,15 +434,13 @@ find_fh_dentry(struct super_block *sb, ino_t ino, int generation, ino_t dirino, 
 				d_drop(result);
 				dput(result);
 				result = tmp;
-				/* If !found, then this is really weird, but it shouldn't hurt */
 			}
-		}
 	} else {
 		nfsdstats.fh_nocache_dir++;
 		dentry = dget(result);
 	}
 
-	while(!found) {
+	while(dentry->d_flags & DCACHE_NFSD_DISCONNECTED) {
 		/* LOOP INVARIANT */
 		/* haven't found a place in the tree yet, but we do have a free path
 		 * from dentry down to result, and dentry is a directory.
@@ -440,12 +459,9 @@ find_fh_dentry(struct super_block *sb, ino_t ino, int generation, ino_t dirino, 
 			goto err_dentry;
 		}
 
-		if (!(dentry->d_flags & DCACHE_NFSD_DISCONNECTED))
-			found = 1;
-
 		tmp = splice(dentry, pdentry);
 		if (tmp != dentry) {
-			/* Something wrong.  We need to drop thw whole dentry->result path
+			/* Something wrong.  We need to drop the whole dentry->result path
 			 * whatever it was
 			 */
 			struct dentry *d;
@@ -580,31 +596,23 @@ fh_verify(struct svc_rqst *rqstp, struct svc_fh *fhp, int type, int access)
 			case 0:
 				dentry = dget(exp->ex_dentry);
 				break;
-			case 1:
-				if ((data_left-=2)<0) goto out;
+			default:
 				dentry = find_fh_dentry(exp->ex_dentry->d_inode->i_sb,
-							datap[0], datap[1],
-							0,
+							datap, data_left, fh->fh_fileid_type,
 							!(exp->ex_flags & NFSEXP_NOSUBTREECHECK));
-				break;
-			case 2:
-				if ((data_left-=3)<0) goto out;
-				dentry = find_fh_dentry(exp->ex_dentry->d_inode->i_sb,
-							datap[0], datap[1],
-							datap[2],
-							!(exp->ex_flags & NFSEXP_NOSUBTREECHECK));
-				break;
-			default: goto out;
 			}
 		} else {
-
+			__u32 tfh[3];
+			tfh[0] = fh->ofh_ino;
+			tfh[1] = fh->ofh_generation;
+			tfh[2] = fh->ofh_dirino;
 			dentry = find_fh_dentry(exp->ex_dentry->d_inode->i_sb,
-						fh->ofh_ino, fh->ofh_generation,
-						fh->ofh_dirino,
+						tfh, 3, fh->ofh_dirino?2:1,
 						!(exp->ex_flags & NFSEXP_NOSUBTREECHECK));
 		}
 		if (IS_ERR(dentry)) {
-			error = nfserrno(PTR_ERR(dentry));
+			if (PTR_ERR(dentry) != EINVAL)
+				error = nfserrno(PTR_ERR(dentry));
 			goto out;
 		}
 #ifdef NFSD_PARANOIA
@@ -709,9 +717,20 @@ inline int _fh_update(struct dentry *dentry, struct svc_export *exp,
 		      __u32 **datapp, int maxsize)
 {
 	__u32 *datap= *datapp;
+	struct super_block *sb = dentry->d_inode->i_sb;
+	
 	if (dentry == exp->ex_dentry)
 		return 0;
-	/* if super_operations provides dentry_to_fh lookup, should use that */
+
+	if (sb->s_op->dentry_to_fh) {
+		int need_parent = !S_ISDIR(dentry->d_inode->i_mode) &&
+			!(exp->ex_flags & NFSEXP_NOSUBTREECHECK);
+		
+		int type = sb->s_op->dentry_to_fh(dentry, datap, &maxsize, need_parent);
+		datap += maxsize;
+		*datapp = datap;
+		return type;
+	}
 	
 	*datap++ = ino_t_to_u32(dentry->d_inode->i_ino);
 	*datap++ = dentry->d_inode->i_generation;

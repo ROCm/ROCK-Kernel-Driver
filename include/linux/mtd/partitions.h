@@ -5,7 +5,7 @@
  *
  * This code is GPL
  *
- * $Id: partitions.h,v 1.3 2000/11/10 23:35:12 nico Exp $
+ * $Id: partitions.h,v 1.6 2001/03/17 17:10:21 dwmw2 Exp $
  */
 
 #ifndef MTD_PARTITIONS_H
@@ -22,10 +22,11 @@
  *
  * For each partition, these fields are available:
  * name: string that will be used to label the partition's MTD device.
- * size: the partition size; if 0, the partition will extend to the end of the 
- * 	master MTD device.
- * offset: absolute starting position within the master MTD device; if 0,
- * 	partition will start where the previous one ended.
+ * size: the partition size; if defined as MTDPART_SIZ_FULL, the partition 
+ * 	will extend to the end of the master MTD device.
+ * offset: absolute starting position within the master MTD device; if 
+ * 	defined as MTDPART_OFS_APPEND, the partition will start where the 
+ * 	previous one ended.
  * mask_flags: contains flags that have to be masked (removed) from the 
  * 	master MTD flag set for the corresponding MTD partition.
  * 	For example, to force a read-only partition, simply adding 
@@ -37,10 +38,13 @@
 
 struct mtd_partition {
 	char *name;		/* identifier string */
-	u_long size;		/* partition size */
-	u_long offset;		/* offset within the master MTD space */
-	u_long mask_flags;	/* master MTD flags to mask out for this partition */
+	u_int32_t size;		/* partition size */
+	u_int32_t offset;		/* offset within the master MTD space */
+	u_int32_t mask_flags;	/* master MTD flags to mask out for this partition */
 };
+
+#define MTDPART_OFS_APPEND	(-1)
+#define MTDPART_SIZ_FULL	(0)
 
 
 int add_mtd_partitions(struct mtd_info *, struct mtd_partition *, int);

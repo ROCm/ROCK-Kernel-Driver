@@ -932,8 +932,7 @@ int __init usb_mdc800_init (void)
 	if (usb_register (&mdc800_usb_driver) < 0)
 		goto cleanup_on_fail;
 
-	info (DRIVER_VERSION " " DRIVER_AUTHOR);
-	info (DRIVER_DESC);
+	info (DRIVER_VERSION ":" DRIVER_DESC);
 
 	return 0;
 

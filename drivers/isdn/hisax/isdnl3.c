@@ -1,4 +1,4 @@
-/* $Id: isdnl3.c,v 2.17.6.2 2001/02/16 16:43:27 kai Exp $
+/* $Id: isdnl3.c,v 2.17.6.3 2001/05/26 15:19:57 kai Exp $
  *
  * Author       Karsten Keil (keil@isdn4linux.de)
  *              based on the teles driver from Jan den Ouden
@@ -18,7 +18,7 @@
 #include "isdnl3.h"
 #include <linux/config.h>
 
-const char *l3_revision = "$Revision: 2.17.6.2 $";
+const char *l3_revision = "$Revision: 2.17.6.3 $";
 
 static struct Fsm l3fsm;
 
@@ -591,14 +591,14 @@ l3_msg(struct PStack *st, int pr, void *arg)
 	}
 }
 
-void __init
+int __init
 Isdnl3New(void)
 {
 	l3fsm.state_count = L3_STATE_COUNT;
 	l3fsm.event_count = L3_EVENT_COUNT;
 	l3fsm.strEvent = strL3Event;
 	l3fsm.strState = strL3State;
-	FsmNew(&l3fsm, L3FnList, L3_FN_COUNT);
+	return FsmNew(&l3fsm, L3FnList, L3_FN_COUNT);
 }
 
 void

@@ -935,8 +935,7 @@ static struct usb_driver pegasus_driver = {
 
 int __init pegasus_init(void)
 {
-	info(DRIVER_VERSION " " DRIVER_AUTHOR);
-	info(DRIVER_DESC);
+	info(DRIVER_VERSION ":" DRIVER_DESC);
 	return usb_register( &pegasus_driver );
 }
 

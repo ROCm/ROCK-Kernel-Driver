@@ -3426,8 +3426,7 @@ static int __init usb_ov511_init(void)
 	if (usb_register(&ov511_driver) < 0)
 		return -1;
 
-	info(DRIVER_VERSION " " DRIVER_AUTHOR);
-	info(DRIVER_DESC);
+	info(DRIVER_VERSION ":" DRIVER_DESC);
 
 	return 0;
 }

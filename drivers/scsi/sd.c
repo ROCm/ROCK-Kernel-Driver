@@ -861,8 +861,7 @@ static int sd_init_onedisk(int i)
 		       driver_byte(the_result)
 		    );
 		if (driver_byte(the_result) & DRIVER_SENSE)
-			printk("%s : extended sense code = %1x \n",
-			       nbuff, SRpnt->sr_sense_buffer[2] & 0xf);
+			print_req_sense("sd", SRpnt);
 		else
 			printk("%s : sense not available. \n", nbuff);
 

@@ -418,11 +418,10 @@ void grok_partitions(struct gendisk *dev, int drive, unsigned minors, long size)
 		blk_size[dev->major] = NULL;
 
 	dev->part[first_minor].nr_sects = size;
-	/* No Such Agen^Wdevice or no minors to use for partitions */
+	/* No such device or no minors to use for partitions */
 	if (!size || minors == 1)
 		return;
 
-	blk_size[dev->major] = NULL;
 	check_partition(dev, MKDEV(dev->major, first_minor), 1 + first_minor);
 
  	/*

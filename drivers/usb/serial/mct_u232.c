@@ -870,8 +870,7 @@ static int __init mct_u232_init (void)
 	usb_serial_register (&mct_u232_device);
 	usb_serial_register (&mct_u232_sitecom_device);
 	usb_serial_register (&mct_u232_du_h3sp_device);
-	info(DRIVER_VERSION " " DRIVER_AUTHOR);
-	info(DRIVER_DESC);
+	info(DRIVER_VERSION ":" DRIVER_DESC);
 	return 0;
 }
 

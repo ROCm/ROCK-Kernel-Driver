@@ -766,6 +766,7 @@ static int pss_coproc_open(void *dev_info, int sub_device)
 			break;
 
 		default:
+			break;
 	}
 	return 0;
 }

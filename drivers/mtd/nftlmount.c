@@ -4,7 +4,7 @@
  * Author: Fabrice Bellard (fabrice.bellard@netgem.com) 
  * Copyright (C) 2000 Netgem S.A.
  *
- * $Id: nftlmount.c,v 1.11 2000/11/17 12:24:09 ollie Exp $
+ * $Id: nftlmount.c,v 1.17 2001/06/02 20:33:20 dwmw2 Exp $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -20,6 +20,8 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
+
+#define __NO_VERSION__
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <asm/errno.h>
@@ -85,13 +87,20 @@ static int find_boot_record(struct NFTLrecord *nftl)
 				}
 
 				nftl->nb_boot_blocks = le16_to_cpu(mh->FirstPhysicalEUN);
-				if ((nftl->nb_boot_blocks + 2) >= nftl->nb_blocks)
+				if ((nftl->nb_boot_blocks + 2) >= nftl->nb_blocks) {
+					printk(KERN_NOTICE "Potential NFTL Media Header found, but sanity check failed:\n");
+					printk(KERN_NOTICE "nb_boot_blocks (%d) + 2 > nb_blocks (%d)\n", 
+					       nftl->nb_boot_blocks, nftl->nb_blocks);
 					goto ReplUnitTable; /* small consistency check */
+				}
 
 				nftl->numvunits = le32_to_cpu(mh->FormattedSize) / nftl->EraseSize;
-				if (nftl->numvunits > (nftl->nb_blocks - nftl->nb_boot_blocks - 2))
+				if (nftl->numvunits > (nftl->nb_blocks - nftl->nb_boot_blocks - 2)) {
+					printk(KERN_NOTICE "Potential NFTL Media Header found, but sanity check failed:\n");
+					printk(KERN_NOTICE "numvunits (%d) > nb_blocks (%d) - nb_boot_blocks(%d) - 2\n",
+					       nftl->numvunits, nftl->nb_blocks, nftl->nb_boot_blocks);
 					goto ReplUnitTable; /* small consistency check */
-
+				}
 				/* FixMe: with bad blocks, the total size available is not FormattedSize any
 				   more !!! */
 				nftl->nr_sects  = nftl->numvunits * (nftl->EraseSize / SECTORSIZE);
@@ -359,8 +368,7 @@ static int check_and_mark_free_block(struct NFTLrecord *nftl, int block)
 {
 	struct nftl_uci1 h1;
 	unsigned int erase_mark;
-	int i, retlen;
-	unsigned char buf[SECTORSIZE];
+	int retlen;
 
 	/* check erase mark. */
 	if (MTD_READOOB(nftl->mtd, block * nftl->EraseSize + SECTORSIZE + 8, 8, 

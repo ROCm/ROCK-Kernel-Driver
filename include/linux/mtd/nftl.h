@@ -2,7 +2,7 @@
 /* Defines for NAND Flash Translation Layer  */
 /* (c) 1999 Machine Vision Holdings, Inc.    */
 /* Author: David Woodhouse <dwmw2@mvhi.com>  */
-/* $Id: nftl.h,v 1.9 2000/11/07 05:48:49 ollie Exp $ */
+/* $Id: nftl.h,v 1.10 2000/12/29 00:25:38 dwmw2 Exp $ */
 
 #ifndef __MTD_NFTL_H__
 #define __MTD_NFTL_H__
@@ -115,6 +115,7 @@ int NFTL_formatblock(struct NFTLrecord *s, int block);
 
 #define MAX_NFTLS 16
 #define MAX_SECTORS_PER_UNIT 32
+#define NFTL_PARTN_BITS 4
 
 #endif /* __KERNEL__ */
 

@@ -1,4 +1,4 @@
-/* $Id: pci.c,v 1.29 2001/05/15 08:54:30 davem Exp $
+/* $Id: pci.c,v 1.32 2001/06/08 06:25:41 davem Exp $
  * pci.c: UltraSparc PCI controller support.
  *
  * Copyright (C) 1997, 1998, 1999 David S. Miller (davem@redhat.com)
@@ -177,6 +177,10 @@ static void __init pci_reorder_devs(void)
 	}
 }
 
+extern void rs_init(void);
+extern void clock_probe(void);
+extern void power_init(void);
+
 void __init pcibios_init(void)
 {
 	pci_controller_probe();
@@ -190,6 +194,9 @@ void __init pcibios_init(void)
 
 	isa_init();
 	ebus_init();
+	rs_init();
+	clock_probe();
+	power_init();
 }
 
 struct pci_fixup pcibios_fixups[] = {
@@ -198,6 +205,66 @@ struct pci_fixup pcibios_fixups[] = {
 
 void pcibios_fixup_bus(struct pci_bus *pbus)
 {
+	struct pci_pbm_info *pbm = pbus->sysdata;
+
+	/* Generic PCI bus probing sets these to point at
+	 * &io{port,mem}_resouce which is wrong for us.
+	 */
+	pbus->resource[0] = &pbm->io_space;
+	pbus->resource[1] = &pbm->mem_space;
+}
+
+/* NOTE: This can get called before we've fixed up pdev->sysdata. */
+int pci_claim_resource(struct pci_dev *pdev, int resource)
+{
+	struct pci_pbm_info *pbm = pci_bus2pbm[pdev->bus->number];
+	struct resource *res = &pdev->resource[resource];
+	struct resource *root;
+
+	if (!pbm)
+		return -EINVAL;
+
+	if (res->flags & IORESOURCE_IO)
+		root = &pbm->io_space;
+	else
+		root = &pbm->mem_space;
+
+	pbm->parent->resource_adjust(pdev, res, root);
+
+	return request_resource(root, res);
+}
+
+int pci_assign_resource(struct pci_dev *pdev, int resource)
+{
+	struct pcidev_cookie *pcp = pdev->sysdata;
+	struct pci_pbm_info *pbm = pcp->pbm;
+	struct resource *res = &pdev->resource[resource];
+	struct resource *root;
+	unsigned long min, max, size, align;
+	int err;
+
+	if (res->flags & IORESOURCE_IO) {
+		root = &pbm->io_space;
+		min = root->start + 0x400UL;
+		max = root->end;
+	} else {
+		root = &pbm->mem_space;
+		min = root->start;
+		max = min + 0x80000000UL;
+	}
+
+	size = res->end - res->start;
+	align = size + 1;
+
+	err = allocate_resource(root, res, size + 1, min, max, align, NULL, NULL);
+	if (err < 0) {
+		printk("PCI: Failed to allocate resource %d for %s\n",
+		       resource, pdev->name);
+	} else {
+		pbm->parent->base_address_update(pdev, resource);
+	}
+
+	return err;
 }
 
 void pcibios_update_resource(struct pci_dev *pdev, struct resource *res1,

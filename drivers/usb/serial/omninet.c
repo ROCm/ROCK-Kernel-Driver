@@ -406,8 +406,7 @@ static void omninet_shutdown (struct usb_serial *serial)
 static int __init omninet_init (void)
 {
 	usb_serial_register (&zyxel_omninet_device);
-	info(DRIVER_VERSION " " DRIVER_AUTHOR);
-	info(DRIVER_DESC);
+	info(DRIVER_VERSION ":" DRIVER_DESC);
 	return 0;
 }
 

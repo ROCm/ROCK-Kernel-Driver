@@ -1,5 +1,5 @@
 /*
- * $Id: mtdcore.c,v 1.27 2000/12/10 01:10:09 dwmw2 Exp $
+ * $Id: mtdcore.c,v 1.30 2001/06/02 14:30:42 dwmw2 Exp $
  *
  * Core registration and callback routines for MTD
  * drivers and users.
@@ -258,8 +258,8 @@ static inline int mtd_proc_info (char *buf, int i)
 	if (!this)
 		return 0;
 
-	return sprintf(buf, "mtd%d: %8.8lx \"%s\"\n", i, this->size,
-		       this->name);
+	return sprintf(buf, "mtd%d: %8.8x %8.8x \"%s\"\n", i, this->size,
+		       this->erasesize, this->name);
 }
 
 static int mtd_read_proc ( char *page, char **start, off_t off,int count
@@ -270,11 +270,12 @@ static int mtd_read_proc ( char *page, char **start, off_t off,int count
 #endif
 			)
 {
-	int len = 0, l, i;
+	int len, l, i;
         off_t   begin = 0;
 
 	down(&mtd_table_mutex);
 
+	len = sprintf(page, "dev:    size   erasesize  name\n");
         for (i=0; i< MAX_MTD_DEVICES; i++) {
 
                 l = mtd_proc_info(page + len, i);

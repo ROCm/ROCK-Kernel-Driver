@@ -662,8 +662,7 @@ static int __init usblp_init(void)
 {
 	if (usb_register(&usblp_driver))
 		return -1;
-	info(DRIVER_VERSION " " DRIVER_AUTHOR);
-	info(DRIVER_DESC);
+	info(DRIVER_VERSION ":" DRIVER_DESC);
 	return 0;
 }
 

@@ -1,4 +1,4 @@
-/* $Id: tei.c,v 2.17.6.1 2001/02/16 16:43:29 kai Exp $
+/* $Id: tei.c,v 2.17.6.2 2001/05/26 15:19:57 kai Exp $
  *
  * Author       Karsten Keil (keil@isdn4linux.de)
  *              based on the teles driver from Jan den Ouden
@@ -17,7 +17,7 @@
 #include <linux/init.h>
 #include <linux/random.h>
 
-const char *tei_revision = "$Revision: 2.17.6.1 $";
+const char *tei_revision = "$Revision: 2.17.6.2 $";
 
 #define ID_REQUEST	1
 #define ID_ASSIGNED	2
@@ -446,14 +446,14 @@ static struct FsmNode TeiFnList[] __initdata =
 
 #define TEI_FN_COUNT (sizeof(TeiFnList)/sizeof(struct FsmNode))
 
-void __init
+int __init
 TeiNew(void)
 {
 	teifsm.state_count = TEI_STATE_COUNT;
 	teifsm.event_count = TEI_EVENT_COUNT;
 	teifsm.strEvent = strTeiEvent;
 	teifsm.strState = strTeiState;
-	FsmNew(&teifsm, TeiFnList, TEI_FN_COUNT);
+	return FsmNew(&teifsm, TeiFnList, TEI_FN_COUNT);
 }
 
 void

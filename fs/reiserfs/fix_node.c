@@ -936,6 +936,7 @@ static int  get_empty_nodes(
     if (p_s_tb->FEB[p_s_tb->cur_blknum])
       BUG();
 
+    mark_buffer_journal_new(p_s_new_bh) ;
     p_s_tb->FEB[p_s_tb->cur_blknum++] = p_s_new_bh;
   }
 
@@ -2719,12 +2720,6 @@ void unfix_nodes (struct tree_balance * tb)
 {
     int	i;
 
-#ifdef CONFIG_REISERFS_CHECK
-    if ( ! tb->vn_buf )
-	reiserfs_panic (tb->tb_sb,
-			"PAP-16050: unfix_nodes: pointer to the virtual node is NULL");
-#endif
-
     /* Release path buffers. */
     pathrelse_and_restore (tb->tb_sb, tb->tb_path);
 
@@ -2781,7 +2776,8 @@ void unfix_nodes (struct tree_balance * tb)
 	    }
 	}
 #endif /* 0 */
-    reiserfs_kfree (tb->vn_buf, tb->vn_buf_size, tb->tb_sb);
+    if (tb->vn_buf) 
+	reiserfs_kfree (tb->vn_buf, tb->vn_buf_size, tb->tb_sb);
 
 } 
 

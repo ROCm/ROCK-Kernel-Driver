@@ -1,104 +1,9 @@
 /*
- * $Id: c4.c,v 1.20.6.6 2001/04/20 02:41:59 keil Exp $
+ * $Id: c4.c,v 1.20.6.8 2001/05/17 21:15:33 kai Exp $
  * 
- * Module for AVM C4 card.
+ * Module for AVM C4 & C2 card.
  * 
  * (c) Copyright 1999 by Carsten Paeth (calle@calle.in-berlin.de)
- * 
- * $Log: c4.c,v $
- * Revision 1.20.6.6  2001/04/20 02:41:59  keil
- * changes from mainstream
- *
- * Revision 1.20.6.5  2001/03/21 08:52:21  kai
- * merge from main branch: fix buffer for revision string (calle)
- *
- * Revision 1.20.6.4  2001/03/15 15:11:23  kai
- * *** empty log message ***
- *
- * Revision 1.20.6.3  2001/02/16 16:43:23  kai
- * Changes from -ac16, little bug fixes, typos and the like
- *
- * Revision 1.20.6.2  2001/02/13 11:43:29  kai
- * more compatility changes for 2.2.19
- *
- * Revision 1.20.6.1  2000/11/28 12:02:45  kai
- * MODULE_DEVICE_TABLE for 2.4
- *
- * Revision 1.20.2.2  2000/11/26 17:47:53  kai
- * added PCI_DEV_TABLE for 2.4
- *
- * Revision 1.20.2.1  2000/11/26 17:14:19  kai
- * fix device ids
- * also needs patches to include/linux/pci_ids.h
- *
- * Revision 1.20  2000/11/23 20:45:14  kai
- * fixed module_init/exit stuff
- * Note: compiled-in kernel doesn't work pre 2.2.18 anymore.
- *
- * Revision 1.19  2000/11/19 17:02:47  kai
- * compatibility cleanup - part 3
- *
- * Revision 1.18  2000/11/01 14:05:02  calle
- * - use module_init/module_exit from linux/init.h.
- * - all static struct variables are initialized with "membername:" now.
- * - avm_cs.c, let it work with newer pcmcia-cs.
- *
- * Revision 1.17  2000/10/10 17:44:19  kai
- * changes from/for 2.2.18
- *
- * Revision 1.16  2000/08/20 07:30:13  keil
- * changes for 2.4
- *
- * Revision 1.15  2000/08/08 09:24:19  calle
- * calls to pci_enable_device surounded by #ifndef COMPAT_HAS_2_2_PCI
- *
- * Revision 1.14  2000/08/04 12:20:08  calle
- * - Fix unsigned/signed warning in the right way ...
- *
- * Revision 1.13  2000/07/20 10:21:21  calle
- * Bugfix: driver will not be unregistered, if not cards were detected.
- *         this result in an oops in kcapi.c
- *
- * Revision 1.12  2000/06/19 16:51:53  keil
- * don't free skb in irq context
- *
- * Revision 1.11  2000/06/19 15:11:24  keil
- * avoid use of freed structs
- * changes from 2.4.0-ac21
- *
- * Revision 1.10  2000/05/29 12:29:18  keil
- * make pci_enable_dev compatible to 2.2 kernel versions
- *
- * Revision 1.9  2000/05/19 15:43:22  calle
- * added calls to pci_device_start().
- *
- * Revision 1.8  2000/04/03 16:38:05  calle
- * made suppress_pollack static.
- *
- * Revision 1.7  2000/04/03 13:29:24  calle
- * make Tim Waugh happy (module unload races in 2.3.99-pre3).
- * no real problem there, but now it is much cleaner ...
- *
- * Revision 1.6  2000/03/17 12:21:08  calle
- * send patchvalues now working.
- *
- * Revision 1.5  2000/03/16 15:21:03  calle
- * Bugfix in c4_remove: loop 5 times instead of 4 :-(
- *
- * Revision 1.4  2000/02/02 18:36:03  calle
- * - Modules are now locked while init_module is running
- * - fixed problem with memory mapping if address is not aligned
- *
- * Revision 1.3  2000/01/25 14:37:39  calle
- * new message after successful detection including card revision and
- * used resources.
- *
- * Revision 1.2  2000/01/21 20:52:58  keil
- * pci_find_subsys as local function for 2.2.X kernel
- *
- * Revision 1.1  2000/01/20 10:51:37  calle
- * Added driver for C4.
- *
  *
  */
 
@@ -122,15 +27,11 @@
 #include "capilli.h"
 #include "avmcard.h"
 
-static char *revision = "$Revision: 1.20.6.8 $";
+static char *revision = "$Revision: 1.20.6.9 $";
 
 #undef CONFIG_C4_DEBUG
 #undef CONFIG_C4_POLLDEBUG
 
-/* ------------------------------------------------------------- */
-#ifndef PCI_DEVICE_ID_AVM_C2
-#define PCI_DEVICE_ID_AVM_C2	0x1100
-#endif
 /* ------------------------------------------------------------- */
 
 static int suppress_pollack;

@@ -116,7 +116,7 @@ struct td {
 	dma_addr_t td_dma;
 	dma_addr_t data_dma;
 	__u32 unused2[2];
-} __attribute((aligned(16)));
+} __attribute((aligned(32)));	/* normally 16, iso needs 32 */
 typedef struct td td_t;
 
 #define OHCI_ED_SKIP	(1 << 14)
@@ -562,7 +562,7 @@ static int ohci_mem_init (struct ohci *ohci)
 {
 	ohci->td_cache = pci_pool_create ("ohci_td", ohci->ohci_dev,
 		sizeof (struct td),
-		16 /* byte alignment */,
+		32 /* byte alignment */,
 		0 /* no page-crossing issues */,
 		GFP_KERNEL | OHCI_MEM_FLAGS);
 	if (!ohci->td_cache)

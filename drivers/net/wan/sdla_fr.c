@@ -4435,7 +4435,8 @@ int process_ARP(arphdr_1490_t *ArpPacket, sdla_t *card, netdevice_t* dev)
 		trigger_fr_poll(dev);
 		
 		break;
-	default:  // ARP's and RARP's -- Shouldn't happen.
+	default:
+		break; // ARP's and RARP's -- Shouldn't happen.
 	}
 
 	return 0;	

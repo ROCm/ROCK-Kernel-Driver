@@ -1,4 +1,4 @@
-/* $Id: hycapi.c,v 1.8.6.2 2001/04/20 02:42:00 keil Exp $
+/* $Id: hycapi.c,v 1.8.6.3 2001/05/26 15:19:58 kai Exp $
  *
  * Linux driver for HYSDN cards, CAPI2.0-Interface.
  * written by Ulrich Albrecht (u.albrecht@hypercope.de) for Hypercope GmbH
@@ -41,7 +41,7 @@
 #include "hysdn_defs.h"
 #include <linux/kernelcapi.h>
 
-static char hycapi_revision[]="$Revision: 1.8.6.2 $";
+static char hycapi_revision[]="$Revision: 1.8.6.3 $";
 
 unsigned int hycapi_enable = 0xffffffff; 
 MODULE_PARM(hycapi_enable, "i");
@@ -734,7 +734,7 @@ hycapi_cleanup(void)
 	struct capi_driver *driver;
 	driver = &hycapi_driver;
 	if (!hy_di) {
-		printk(KERN_ERR "HYSDN: no capi-driver to detach (???)\n");
+		printk(KERN_ERR "HYSDN: no capi-driver to detach (?)\n");
 		return;
 	}
 	printk(KERN_NOTICE "HYSDN: Detaching capi-driver\n");

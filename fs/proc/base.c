@@ -635,15 +635,14 @@ static struct inode *proc_pid_make_inode(struct super_block * sb, struct task_st
 	inode->i_mtime = inode->i_atime = inode->i_ctime = CURRENT_TIME;
 	inode->i_ino = fake_ino(task->pid, ino);
 
-	inode->u.proc_i.file = NULL;
-	/*
-	 * grab the reference to task.
-	 */
-	inode->u.proc_i.task = task;
-	get_task_struct(task);
 	if (!task->pid)
 		goto out_unlock;
 
+	/*
+	 * grab the reference to task.
+	 */
+	get_task_struct(task);
+	inode->u.proc_i.task = task;
 	inode->i_uid = 0;
 	inode->i_gid = 0;
 	if (ino == PROC_PID_INO || task->dumpable) {

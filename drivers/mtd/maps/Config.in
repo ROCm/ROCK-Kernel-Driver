@@ -1,0 +1,41 @@
+# drivers/mtd/maps/Config.in
+
+# $Id: Config.in,v 1.9.2.1 2001/06/09 19:43:49 dwmw2 Exp $
+
+mainmenu_option next_comment
+
+comment 'Mapping drivers for chip access'
+
+dep_tristate '  CFI Flash device in physical memory map' CONFIG_MTD_PHYSMAP $CONFIG_MTD_CFI
+if [ "$CONFIG_MTD_PHYSMAP" = "y" -o "$CONFIG_MTD_PHYSMAP" = "m" ]; then
+   hex '    Physical start address of flash mapping' CONFIG_MTD_PHYSMAP_START 0x8000000
+   hex '    Physical length of flash mapping' CONFIG_MTD_PHYSMAP_LEN 0x4000000
+   int '    Bus width in octets' CONFIG_MTD_PHYSMAP_BUSWIDTH 2
+fi
+
+dep_tristate '  Sun Microsystems userflash support' CONFIG_MTD_SUN_UFLASH $CONFIG_SPARC64
+dep_tristate '  CFI Flash device mapped on Nora' CONFIG_MTD_NORA $CONFIG_MTD_CFI
+dep_tristate '  CFI Flash device mapped on Photron PNC-2000' CONFIG_MTD_PNC2000 $CONFIG_MTD_CFI $CONFIG_MTD_PARTITIONS
+dep_tristate '  CFI Flash device mapped on RPX Lite or CLLF' CONFIG_MTD_RPXLITE $CONFIG_MTD_CFI 
+dep_tristate '  CFI Flash device mapped on AMD SC520 CDP' CONFIG_MTD_SC520CDP $CONFIG_MTD_CFI
+dep_tristate '  CFI Flash device mapped on AMD NetSc520'  CONFIG_MTD_NETSC520 $CONFIG_MTD_CFI $CONFIG_MTD_PARTITIONS
+dep_tristate '  CFI Flash device mapped on Arcom SBC-GXx boards' CONFIG_MTD_SBC_GXX $CONFIG_MTD_CFI_INTELEXT $CONFIG_MTD_PARTITIONS
+dep_tristate '  CFI Flash device mapped on Arcom ELAN-104NC' CONFIG_MTD_ELAN_104NC $CONFIG_MTD_CFI_INTELEXT $CONFIG_MTD_PARTITIONS
+dep_tristate '  CFI Flash device mapped on StrongARM SA11x0' CONFIG_MTD_SA1100 $CONFIG_MTD_CFI $CONFIG_ARCH_SA1100 $CONFIG_MTD_PARTITIONS
+   dep_bool '    Support for RedBoot partition tables on SA11x0' CONFIG_MTD_SA1100_REDBOOT_PARTITIONS $CONFIG_MTD_SA1100 $CONFIG_MTD_REDBOOT_PARTS
+   dep_bool '    Support for Compaq bootldr partition tables on SA11x0' CONFIG_MTD_SA1100_BOOTLDR_PARTITIONS $CONFIG_MTD_SA1100 $CONFIG_MTD_BOOTLDR_PARTS
+dep_tristate '  CFI Flash device mapped on DC21285 Footbridge' CONFIG_MTD_DC21285 $CONFIG_MTD_CFI $CONFIG_ARCH_FOOTBRIDGE $CONFIG_MTD_PARTITIONS
+dep_tristate '  CFI Flash device mapped on the XScale IQ80310 board' CONFIG_MTD_IQ80310 $CONFIG_MTD_CFI $CONFIG_XSCALE_IQ80310
+dep_tristate '  CFI Flash device mapped on D-Box2' CONFIG_MTD_DBOX2 $CONFIG_MTD_CFI_INTELSTD $CONFIG_MTD_CFI_INTELEXT $CONFIG_MTD_CFI_AMDSTD
+dep_tristate '  Flash chip mapping on ITE QED-4N-S01B, Globespan IVR or custom board' CONFIG_MTD_CSTM_MIPS_IXX $CONFIG_MTD_CFI $CONFIG_MTD_JEDEC $CONFIG_MTD_PARTITIONS 
+if [ "$CONFIG_MTD_CSTM_MIPS_IXX" = "y" -o "$CONFIG_MTD_CSTM_MIPS_IXX" = "m" ]; then
+   hex '    Physical start address of flash mapping' CONFIG_MTD_CSTM_MIPS_IXX_START 0x8000000
+   hex '    Physical length of flash mapping' CONFIG_MTD_CSTM_MIPS_IXX_LEN 0x4000000
+   int '    Bus width in octets' CONFIG_MTD_CSTM_MIPS_IXX_BUSWIDTH 2
+fi
+dep_tristate '  CFI Flash device mapping on FlagaDM' CONFIG_MTD_CFI_FLAGADM $CONFIG_MTD_CFI
+dep_tristate '  JEDEC Flash device mapped on Mixcom piggyback card' CONFIG_MTD_MIXMEM $CONFIG_MTD_JEDEC
+dep_tristate '  JEDEC Flash device mapped on Octagon 5066 SBC' CONFIG_MTD_OCTAGON $CONFIG_MTD_JEDEC
+dep_tristate '  JEDEC Flash device mapped on Tempustech VMAX SBC301' CONFIG_MTD_VMAX $CONFIG_MTD_JEDEC
+dep_tristate '  Momenco Ocelot boot flash device' CONFIG_MTD_OCELOT $CONFIG_MOMENCO_OCELOT
+endmenu

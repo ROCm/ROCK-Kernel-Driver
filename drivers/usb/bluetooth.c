@@ -1,7 +1,7 @@
 /*
  * bluetooth.c   Version 0.10
  *
- * Copyright (c) 2000 Greg Kroah-Hartman	<greg@kroah.com>
+ * Copyright (c) 2000, 2001 Greg Kroah-Hartman	<greg@kroah.com>
  * Copyright (c) 2000 Mark Douglas Corner	<mcorner@umich.edu>
  *
  * USB Bluetooth driver, based on the Bluetooth Spec version 1.0B
@@ -14,6 +14,10 @@
  *	  up the logic a bit.
  *	- Added a buffer to the control_urb_pool which fixes a memory leak
  *	  when the device is removed from the system.
+ *
+ * (2001/05/28) Version 0.9 gkh
+ *	Fixed problem with bluetooth==NULL for bluetooth_read_bulk_callback
+ *	which was found by both the CHECKER project and Mikko Rahkonen.
  *
  * (08/04/2001) gb
  *	Identify version on module load.
@@ -863,21 +867,6 @@ static void bluetooth_read_bulk_callback (struct urb *urb)
 	unsigned int packet_size;
 	int result;
 
-#ifdef BTBUGGYHARDWARE
-	if ((count == 4) && (data[0] == 0x00) && (data[1] == 0x00)
-	    && (data[2] == 0x00) && (data[3] == 0x00)) {
-		urb->actual_length = 0;
-		FILL_BULK_URB(bluetooth->read_urb, bluetooth->dev, 
-			      usb_rcvbulkpipe(bluetooth->dev, bluetooth->bulk_in_endpointAddress),
-			      bluetooth->bulk_in_buffer, bluetooth->bulk_in_buffer_size, 
-			      bluetooth_read_bulk_callback, bluetooth);
-		result = usb_submit_urb(bluetooth->read_urb);
-		if (result)
-			err (__FUNCTION__ " - failed resubmitting read urb, error %d", result);
-
-		return;
-	}
-#endif
 
 	dbg(__FUNCTION__);
 
@@ -903,6 +892,21 @@ static void bluetooth_read_bulk_callback (struct urb *urb)
 			printk ("%.2x ", data[i]);
 		}
 		printk ("\n");
+	}
+#endif
+#ifdef BTBUGGYHARDWARE
+	if ((count == 4) && (data[0] == 0x00) && (data[1] == 0x00)
+	    && (data[2] == 0x00) && (data[3] == 0x00)) {
+		urb->actual_length = 0;
+		FILL_BULK_URB(bluetooth->read_urb, bluetooth->dev, 
+			      usb_rcvbulkpipe(bluetooth->dev, bluetooth->bulk_in_endpointAddress),
+			      bluetooth->bulk_in_buffer, bluetooth->bulk_in_buffer_size, 
+			      bluetooth_read_bulk_callback, bluetooth);
+		result = usb_submit_urb(bluetooth->read_urb);
+		if (result)
+			err (__FUNCTION__ " - failed resubmitting read urb, error %d", result);
+
+		return;
 	}
 #endif
 	/* We add  a packet type identifier to the beginning of each
@@ -952,6 +956,9 @@ static void bluetooth_read_bulk_callback (struct urb *urb)
 	}	
 
 exit:
+	if (!bluetooth || !bluetooth->active)
+		return;
+
 	FILL_BULK_URB(bluetooth->read_urb, bluetooth->dev, 
 		      usb_rcvbulkpipe(bluetooth->dev, bluetooth->bulk_in_endpointAddress),
 		      bluetooth->bulk_in_buffer, bluetooth->bulk_in_buffer_size, 
@@ -1314,8 +1321,7 @@ int usb_bluetooth_init(void)
 		return -1;
 	}
 
-	info(DRIVER_VERSION " " DRIVER_AUTHOR);
-	info(DRIVER_DESC);
+	info(DRIVER_VERSION ":" DRIVER_DESC);
 
 	return 0;
 }

@@ -712,16 +712,11 @@ P:	Jaroslav Kysela
 M:	perex@suse.cz
 S:	Maintained
 
-ISDN SUBSYSTEM (general)
-P:	Fritz Elfert
-M:	fritz@isdn4linux.de
-L:	isdn4linux@listserv.isdn4linux.de
-W:	http://www.isdn4linux.de
-S:	Maintained
-
-ISDN SUBSYSTEM (card drivers)
+ISDN SUBSYSTEM
 P:	Karsten Keil
 M:	kkeil@suse.de
+P:	Kai Germaschewski
+M:	kai.germaschewski@gmx.de
 L:	isdn4linux@listserv.isdn4linux.de
 W:	http://www.isdn4linux.de
 S:	Maintained

@@ -2181,7 +2181,7 @@ int usb_new_device(struct usb_device *dev)
 	dev->epmaxpacketout[0] = dev->descriptor.bMaxPacketSize0;
 
 	err = usb_get_device_descriptor(dev);
-	if (err < sizeof(dev->descriptor)) {
+	if (err < (signed)sizeof(dev->descriptor)) {
 		if (err < 0)
 			err("unable to get device descriptor (error=%d)", err);
 		else

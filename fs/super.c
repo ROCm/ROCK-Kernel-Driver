@@ -1242,14 +1242,14 @@ static int do_loopback(struct nameidata *nd, char *old_name)
 	if (err)
 		return err;
 
+	down(&mount_sem);
 	err = -ENOMEM;
 	mnt = clone_mnt(old_nd.mnt, old_nd.dentry);
 	if (mnt) {
-		down(&mount_sem);
 		err = graft_tree(mnt, nd);
-		up(&mount_sem);
 		mntput(mnt);
 	}
+	up(&mount_sem);
 	path_release(&old_nd);
 	return err;
 }

@@ -499,8 +499,7 @@ int __init usb_dc2xx_init(void)
 {
  	if (usb_register (&camera_driver) < 0)
  		return -1;
-	info(DRIVER_VERSION " " DRIVER_AUTHOR);
-	info(DRIVER_DESC);
+	info(DRIVER_VERSION ":" DRIVER_DESC);
 	return 0;
 }
 

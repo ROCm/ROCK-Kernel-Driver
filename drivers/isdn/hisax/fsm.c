@@ -1,4 +1,4 @@
-/* $Id: fsm.c,v 1.14.6.1 2001/02/16 16:43:26 kai Exp $
+/* $Id: fsm.c,v 1.14.6.2 2001/05/26 15:19:57 kai Exp $
  *
  * Author       Karsten Keil (keil@isdn4linux.de)
  *              based on the teles driver from Jan den Ouden
@@ -15,13 +15,16 @@
 
 #define FSM_TIMER_DEBUG 0
 
-void __init
+int __init
 FsmNew(struct Fsm *fsm, struct FsmNode *fnlist, int fncount)
 {
 	int i;
 
 	fsm->jumpmatrix = (FSMFNPTR *)
 		kmalloc(sizeof (FSMFNPTR) * fsm->state_count * fsm->event_count, GFP_KERNEL);
+	if (!fsm->jumpmatrix)
+		return -ENOMEM;
+
 	memset(fsm->jumpmatrix, 0, sizeof (FSMFNPTR) * fsm->state_count * fsm->event_count);
 
 	for (i = 0; i < fncount; i++) 
@@ -32,6 +35,7 @@ FsmNew(struct Fsm *fsm, struct FsmNode *fnlist, int fncount)
 		} else		
 			fsm->jumpmatrix[fsm->state_count * fnlist[i].event +
 				fnlist[i].state] = (FSMFNPTR) fnlist[i].routine;
+	return 0;
 }
 
 void

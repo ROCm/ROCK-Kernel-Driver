@@ -1379,7 +1379,7 @@ static int osst_reposition_and_retry(OS_Scsi_Tape * STp, Scsi_Request ** aSRpnt,
 	unsigned char	cmd[MAX_COMMAND_SIZE];
 	Scsi_Request  * SRpnt;
 	int		dev       = TAPE_NR(STp->devt);
-	int		expected  __attribute__ ((__unused__));
+	int		expected  = 0;
 	int		attempts  = 1000 / skip;
 	int		flag      = 1;
 	long		startwait = jiffies;
@@ -3401,7 +3401,7 @@ static ssize_t osst_read(struct file * filp, char * buf, size_t count, loff_t *p
 
 	if ((count % STp->block_size) != 0) {
 		printk(KERN_WARNING
-		    "osst%d:W: Read (%d bytes) not multiple of tape block size (%d%c).\n", dev, count,
+		    "osst%d:W: Read (%Zd bytes) not multiple of tape block size (%d%c).\n", dev, count,
 		    STp->block_size<1024?STp->block_size:STp->block_size/1024, STp->block_size<1024?'b':'k');
 	}
 

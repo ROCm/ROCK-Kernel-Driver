@@ -600,8 +600,7 @@ static int __init belkin_sa_init (void)
 	usb_serial_register (&belkin_old_device);
 	usb_serial_register (&peracom_device);
 	usb_serial_register (&gocom232_device);
-	info(DRIVER_VERSION " " DRIVER_AUTHOR);
-	info(DRIVER_DESC);
+	info(DRIVER_VERSION ":" DRIVER_DESC);
 	return 0;
 }
 

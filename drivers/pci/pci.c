@@ -229,49 +229,120 @@ pci_find_parent_resource(const struct pci_dev *dev, struct resource *res)
 }
 
 /**
- * pci_set_power_state - Set power management state of a device.
- * @dev: PCI device for which PM is set
- * @new_state: new power management statement (0 == D0, 3 == D3, etc.)
+ * pci_set_power_state - Set the power state of a PCI device
+ * @dev: PCI device to be suspended
+ * @state: Power state we're entering
  *
- *  Set power management state of a device.  For transitions from state D3
- *  it isn't as straightforward as one could assume since many devices forget
- *  their configuration space during wakeup.  Returns old power state.
+ * Transition a device to a new power state, using the Power Management 
+ * Capabilities in the device's config space.
+ *
+ * RETURN VALUE: 
+ * -EINVAL if trying to enter a lower state than we're already in.
+ * 0 if we're already in the requested state.
+ * -EIO if device does not support PCI PM.
+ * 0 if we can successfully change the power state.
+ */
+
+int
+pci_set_power_state(struct pci_dev *dev, int state)
+{
+	int pm;
+	u16 pmcsr;
+
+	/* bound the state we're entering */
+	if (state > 3) state = 3;
+
+	/* Validate current state:
+	 * Can enter D0 from any state, but if we can only go deeper 
+	 * to sleep if we're already in a low power state
+	 */
+	if (state > 0 && dev->current_state > state)
+		return -EINVAL;
+	else if (dev->current_state == state) 
+		return 0;        /* we're already there */
+
+	/* find PCI PM capability in list */
+	pm = pci_find_capability(dev, PCI_CAP_ID_PM);
+	
+	/* abort if the device doesn't support PM capabilities */
+	if (!pm) return -EIO; 
+
+	/* check if this device supports the desired state */
+	if (state == 1 || state == 2) {
+		u16 pmc;
+		pci_read_config_word(dev,pm + PCI_PM_PMC,&pmc);
+		if (state == 1 && !(pmc & PCI_PM_CAP_D1)) return -EIO;
+		else if (state == 2 && !(pmc & PCI_PM_CAP_D2)) return -EIO;
+	}
+
+	/* If we're in D3, force entire word to 0, since we can't access the
+	 * PCI config space for the device
+	 */
+	if (dev->current_state == 3)
+		pmcsr = 0;
+	else {
+		pci_read_config_word(dev, pm + PCI_PM_CTRL, &pmcsr);
+		pmcsr &= ~PCI_PM_CTRL_STATE_MASK;
+		pmcsr |= state;
+	}
+
+	/* enter specified state */
+	pci_write_config_word(dev, pm + PCI_PM_CTRL, pmcsr);
+
+	dev->current_state = state;
+
+	return 0;
+}
+
+/**
+ * pci_save_state - save the PCI configuration space of a device before suspending
+ * @dev - PCI device that we're dealing with
+ * @buffer - buffer to hold config space context
+ *
+ * @buffer must be large enough to hold the entire PCI 2.2 config space 
+ * (>= 64 bytes).
  */
 int
-pci_set_power_state(struct pci_dev *dev, int new_state)
+pci_save_state(struct pci_dev *dev, u32 *buffer)
 {
-	u32 base[5], romaddr;
-	u16 pci_command, pwr_command;
-	u8  pci_latency, pci_cacheline;
-	int i, old_state;
-	int pm = pci_find_capability(dev, PCI_CAP_ID_PM);
+	int i;
+	if (buffer) {
+		/* XXX: 100% dword access ok here? */
+		for (i = 0; i < 16; i++)
+			pci_read_config_dword(dev, i * 4,&buffer[i]);
+	}
+	return 0;
+}
 
-	if (!pm)
-		return 0;
-	pci_read_config_word(dev, pm + PCI_PM_CTRL, &pwr_command);
-	old_state = pwr_command & PCI_PM_CTRL_STATE_MASK;
-	if (old_state == new_state)
-		return old_state;
-	DBG("PCI: %s goes from D%d to D%d\n", dev->slot_name, old_state, new_state);
-	if (old_state == 3) {
-		pci_read_config_word(dev, PCI_COMMAND, &pci_command);
-		pci_write_config_word(dev, PCI_COMMAND, pci_command & ~(PCI_COMMAND_IO | PCI_COMMAND_MEMORY));
-		for (i = 0; i < 5; i++)
-			pci_read_config_dword(dev, PCI_BASE_ADDRESS_0 + i*4, &base[i]);
-		pci_read_config_dword(dev, PCI_ROM_ADDRESS, &romaddr);
-		pci_read_config_byte(dev, PCI_LATENCY_TIMER, &pci_latency);
-		pci_read_config_byte(dev, PCI_CACHE_LINE_SIZE, &pci_cacheline);
-		pci_write_config_word(dev, pm + PCI_PM_CTRL, new_state);
-		for (i = 0; i < 5; i++)
-			pci_write_config_dword(dev, PCI_BASE_ADDRESS_0 + i*4, base[i]);
-		pci_write_config_dword(dev, PCI_ROM_ADDRESS, romaddr);
+/** 
+ * pci_restore_state - Restore the saved state of a PCI device
+ * @dev - PCI device that we're dealing with
+ * @buffer - saved PCI config space
+ *
+ */
+int 
+pci_restore_state(struct pci_dev *dev, u32 *buffer)
+{
+	int i;
+
+	if (buffer) {
+		for (i = 0; i < 16; i++)
+			pci_write_config_dword(dev,i * 4, buffer[i]);
+	}
+	/*
+	 * otherwise, write the context information we know from bootup.
+	 * This works around a problem where warm-booting from Windows
+	 * combined with a D3(hot)->D0 transition causes PCI config
+	 * header data to be forgotten.
+	 */	
+	else {
+		for (i = 0; i < 6; i ++)
+			pci_write_config_dword(dev,
+					       PCI_BASE_ADDRESS_0 + (i * 4),
+					       dev->resource[i].start);
 		pci_write_config_byte(dev, PCI_INTERRUPT_LINE, dev->irq);
-		pci_write_config_byte(dev, PCI_CACHE_LINE_SIZE, pci_cacheline);
-		pci_write_config_byte(dev, PCI_LATENCY_TIMER, pci_latency);
-		pci_write_config_word(dev, PCI_COMMAND, pci_command);
-	} else
-		pci_write_config_word(dev, pm + PCI_PM_CTRL, (pwr_command & ~PCI_PM_CTRL_STATE_MASK) | new_state);
-	return old_state;
+	}
+	return 0;
 }
 
 /**
@@ -312,6 +383,48 @@ pci_disable_device(struct pci_dev *dev)
 		pci_command &= ~PCI_COMMAND_MASTER;
 		pci_write_config_word(dev, PCI_COMMAND, pci_command);
 	}
+}
+
+/**
+ * pci_enable_wake - enable device to generate PME# when suspended
+ * @dev - PCI device to operate on
+ * @enable - Flag to enable or disable generation
+ * 
+ * Set the bits in the device's PM Capabilities to generate PME# when
+ * the system is suspended. 
+ *
+ * -EIO is returned if device doesn't have PM Capabilities. 
+ * -EINVAL is returned if device supports it, but can't generate wake events.
+ * 0 if operation is successful.
+ * 
+ */
+int pci_enable_wake(struct pci_dev *dev, u32 state, int enable)
+{
+	int pm;
+	u16 value;
+
+	/* find PCI PM capability in list */
+	pm = pci_find_capability(dev, PCI_CAP_ID_PM);
+	if (!pm) return -EIO; /* this device cannot poweroff - up to bridge to cut power */
+
+	/* make sure device supports wake events (from any state) */
+	pci_read_config_word(dev,pm+PCI_PM_PMC,&value);
+
+	if (!(value & PCI_PM_CAP_PME_MASK)) return -EINVAL; /* doesn't support wake events */
+
+	/* 
+	 * XXX - We're assuming that device can generate wake events from whatever 
+	 * state it may be entering. 
+	 * We're not actually checking what state we're going into to.
+	 */
+	pci_read_config_word(dev, pm + PCI_PM_CTRL, &value);
+
+	if (enable) value |= PCI_PM_CTRL_PME_STATUS;
+	else value &= ~PCI_PM_CTRL_PME_STATUS;
+
+	pci_write_config_word(dev, pm + PCI_PM_CTRL, value);
+	
+	return 0;
 }
 
 int
@@ -1272,40 +1385,41 @@ struct pci_bus * __init pci_scan_bus(int bus, struct pci_ops *ops, void *sysdata
  * easily implement them (ie just have a suspend function that calls
  * the pci_set_power_state() function).
  */
-static int pci_pm_suspend_device(struct pci_dev *dev)
+static int pci_pm_suspend_device(struct pci_dev *dev, u32 state)
 {
+	int error = 0;
 	if (dev) {
 		struct pci_driver *driver = dev->driver;
 		if (driver && driver->suspend)
-			driver->suspend(dev);
+			error = driver->suspend(dev,state);
 	}
-	return 0;
+	return error;
 }
 
 static int pci_pm_resume_device(struct pci_dev *dev)
 {
+	int error = 0;
 	if (dev) {
 		struct pci_driver *driver = dev->driver;
 		if (driver && driver->resume)
-			driver->resume(dev);
+			error = driver->resume(dev);
 	}
-	return 0;
+	return error;
 }
-
 
 /* take care to suspend/resume bridges only once */
 
-static int pci_pm_suspend_bus(struct pci_bus *bus)
+static int pci_pm_suspend_bus(struct pci_bus *bus, u32 state)
 {
 	struct list_head *list;
 
 	/* Walk the bus children list */
 	list_for_each(list, &bus->children) 
-		pci_pm_suspend_bus(pci_bus_b(list));
+		pci_pm_suspend_bus(pci_bus_b(list),state);
 
 	/* Walk the device children list */
 	list_for_each(list, &bus->devices)
-		pci_pm_suspend_device(pci_dev_b(list));
+		pci_pm_suspend_device(pci_dev_b(list),state);
 	return 0;
 }
 
@@ -1323,15 +1437,15 @@ static int pci_pm_resume_bus(struct pci_bus *bus)
 	return 0;
 }
 
-static int pci_pm_suspend(void)
+static int pci_pm_suspend(u32 state)
 {
 	struct list_head *list;
 	struct pci_bus *bus;
 
 	list_for_each(list, &pci_root_buses) {
 		bus = pci_bus_b(list);
-		pci_pm_suspend_bus(bus);
-		pci_pm_suspend_device(bus->self);
+		pci_pm_suspend_bus(bus,state);
+		pci_pm_suspend_device(bus->self,state);
 	}
 	return 0;
 }
@@ -1349,14 +1463,16 @@ static int pci_pm_resume(void)
 	return 0;
 }
 
-static int pci_pm_callback(struct pm_dev *dev, pm_request_t rqst, void *data)
+static int 
+pci_pm_callback(struct pm_dev *pm_device, pm_request_t rqst, void *data)
 {
 	switch (rqst) {
 	case PM_SUSPEND:
-		return pci_pm_suspend();
+		return pci_pm_suspend((u32)data);
 	case PM_RESUME:
 		return pci_pm_resume();
-	}	
+	default: break;
+	}
 	return 0;
 }
 #endif
@@ -1741,7 +1857,6 @@ static int __init pci_setup(char *str)
 
 __setup("pci=", pci_setup);
 
-
 EXPORT_SYMBOL(pci_read_config_byte);
 EXPORT_SYMBOL(pci_read_config_word);
 EXPORT_SYMBOL(pci_read_config_dword);
@@ -1761,7 +1876,6 @@ EXPORT_SYMBOL(pci_find_slot);
 EXPORT_SYMBOL(pci_find_subsys);
 EXPORT_SYMBOL(pci_set_master);
 EXPORT_SYMBOL(pci_set_dma_mask);
-EXPORT_SYMBOL(pci_set_power_state);
 EXPORT_SYMBOL(pci_assign_resource);
 EXPORT_SYMBOL(pci_register_driver);
 EXPORT_SYMBOL(pci_unregister_driver);
@@ -1774,6 +1888,11 @@ EXPORT_SYMBOL(pci_setup_device);
 EXPORT_SYMBOL(pci_insert_device);
 EXPORT_SYMBOL(pci_remove_device);
 #endif
+
+EXPORT_SYMBOL(pci_set_power_state);
+EXPORT_SYMBOL(pci_save_state);
+EXPORT_SYMBOL(pci_restore_state);
+EXPORT_SYMBOL(pci_enable_wake);
 
 /* Obsolete functions */
 

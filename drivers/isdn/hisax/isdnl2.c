@@ -1,4 +1,4 @@
-/* $Id: isdnl2.c,v 2.25.6.1 2001/02/16 16:43:27 kai Exp $
+/* $Id: isdnl2.c,v 2.25.6.2 2001/05/26 15:19:57 kai Exp $
  *
  * Author       Karsten Keil (keil@isdn4linux.de)
  *              based on the teles driver from Jan den Ouden
@@ -16,7 +16,7 @@
 #include "hisax.h"
 #include "isdnl2.h"
 
-const char *l2_revision = "$Revision: 2.25.6.1 $";
+const char *l2_revision = "$Revision: 2.25.6.2 $";
 
 static void l2m_debug(struct FsmInst *fi, char *fmt, ...);
 
@@ -1831,14 +1831,14 @@ releasestack_transl2(struct PStack *st)
 {
 }
 
-void __init
+int __init
 Isdnl2New(void)
 {
 	l2fsm.state_count = L2_STATE_COUNT;
 	l2fsm.event_count = L2_EVENT_COUNT;
 	l2fsm.strEvent = strL2Event;
 	l2fsm.strState = strL2State;
-	FsmNew(&l2fsm, L2FnList, L2_FN_COUNT);
+	return FsmNew(&l2fsm, L2FnList, L2_FN_COUNT);
 }
 
 void

@@ -218,16 +218,18 @@ static void __devexit cardbus_remove (struct pci_dev *dev)
 	dev->driver_data = 0;
 }
 
-static void cardbus_suspend (struct pci_dev *dev)
+static int cardbus_suspend (struct pci_dev *dev, u32 state)
 {
 	pci_socket_t *socket = (pci_socket_t *) dev->driver_data;
 	pcmcia_suspend_socket (socket->pcmcia_socket);
+	return 0;
 }
 
-static void cardbus_resume (struct pci_dev *dev)
+static int cardbus_resume (struct pci_dev *dev)
 {
 	pci_socket_t *socket = (pci_socket_t *) dev->driver_data;
 	pcmcia_resume_socket (socket->pcmcia_socket);
+	return 0;
 }
 
 

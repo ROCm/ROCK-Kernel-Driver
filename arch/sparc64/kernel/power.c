@@ -1,4 +1,4 @@
-/* $Id: power.c,v 1.8 2000/07/11 22:41:33 davem Exp $
+/* $Id: power.c,v 1.9 2001/06/08 02:28:22 davem Exp $
  * power.c: Power management driver.
  *
  * Copyright (C) 1999 David S. Miller (davem@redhat.com)
@@ -81,6 +81,11 @@ void __init power_init(void)
 {
 	struct linux_ebus *ebus;
 	struct linux_ebus_device *edev;
+	static int invoked = 0;
+
+	if (invoked)
+		return;
+	invoked = 1;
 
 	for_each_ebus(ebus) {
 		for_each_ebusdev(edev, ebus) {

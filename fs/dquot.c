@@ -325,7 +325,7 @@ void clear_dquot(struct dquot *dquot)
         memset(&dquot->dq_dqb, 0, sizeof(struct dqblk));
 }
 
-void invalidate_dquots(kdev_t dev, short type)
+static void invalidate_dquots(kdev_t dev, short type)
 {
 	struct dquot *dquot, *next;
 	int need_restart;
@@ -651,8 +651,6 @@ static int dqinit_needed(struct inode *inode, short type)
 {
 	int cnt;
 
-        if (!(S_ISREG(inode->i_mode) || S_ISDIR(inode->i_mode) || S_ISLNK(inode->i_mode)))
-                return 0;
 	if (is_quotafile(inode))
 		return 0;
 	if (type != -1)
@@ -1022,9 +1020,6 @@ void dquot_initialize(struct inode *inode, short type)
 	unsigned int id = 0;
 	short cnt;
 
-	if (!S_ISREG(inode->i_mode) && !S_ISDIR(inode->i_mode) &&
-            !S_ISLNK(inode->i_mode))
-		return;
 	lock_kernel();
 	/* We don't want to have quotas on quota files - nasty deadlocks possible */
 	if (is_quotafile(inode)) {
@@ -1388,7 +1383,7 @@ static inline void reset_enable_flags(struct quota_mount_options *dqopt, short t
 }
 
 /* Function in inode.c - remove pointers to dquots in icache */
-extern void remove_dquot_ref(kdev_t, short);
+extern void remove_dquot_ref(struct super_block *, short);
 
 /*
  * Turn quota off on a device. type == -1 ==> quotaoff for all types (umount)
@@ -1413,7 +1408,7 @@ int quota_off(struct super_block *sb, short type)
 		reset_enable_flags(dqopt, cnt);
 
 		/* Note: these are blocking operations */
-		remove_dquot_ref(sb->s_dev, cnt);
+		remove_dquot_ref(sb, cnt);
 		invalidate_dquots(sb->s_dev, cnt);
 
 		/* Wait for any pending IO - remove me as soon as invalidate is more polite */

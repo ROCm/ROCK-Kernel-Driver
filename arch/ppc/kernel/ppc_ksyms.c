@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.ppc_ksyms.c 1.31 05/18/01 08:18:10 patch
+ * BK Id: SCCS/s.ppc_ksyms.c 1.34 06/09/01 22:38:13 paulus
  */
 #include <linux/config.h>
 #include <linux/module.h>
@@ -357,7 +357,6 @@ EXPORT_SYMBOL(cpm_free_handler);
 #endif /* CONFIG_8xx */
 
 EXPORT_SYMBOL(ret_to_user_hook);
-EXPORT_SYMBOL(do_softirq);
 EXPORT_SYMBOL(next_mmu_context);
 EXPORT_SYMBOL(set_context);
 EXPORT_SYMBOL(mmu_context_overflow);

@@ -100,6 +100,8 @@ nfs_read_inode(struct inode * inode)
 	inode->i_blksize = inode->i_sb->s_blocksize;
 	inode->i_mode = 0;
 	inode->i_rdev = 0;
+	/* We can't support UPDATE_ATIME(), since the server will reset it */
+	inode->i_flags |= S_NOATIME;
 	NFS_FILEID(inode) = 0;
 	NFS_FSID(inode) = 0;
 	NFS_FLAGS(inode) = 0;
@@ -973,12 +975,9 @@ __nfs_refresh_inode(struct inode *inode, struct nfs_fattr *fattr)
 
 	NFS_CACHE_CTIME(inode) = fattr->ctime;
 	inode->i_ctime = nfs_time_to_secs(fattr->ctime);
-	/* If we've been messing around with atime, don't
-	 * update it. Save the server value in NFS_CACHE_ATIME.
-	 */
+
 	NFS_CACHE_ATIME(inode) = fattr->atime;
-	if (time_before(inode->i_atime, nfs_time_to_secs(fattr->atime)))
-		inode->i_atime = nfs_time_to_secs(fattr->atime);
+	inode->i_atime = nfs_time_to_secs(fattr->atime);
 
 	NFS_CACHE_MTIME(inode) = new_mtime;
 	inode->i_mtime = nfs_time_to_secs(new_mtime);

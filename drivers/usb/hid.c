@@ -1559,8 +1559,7 @@ static struct usb_driver hid_driver = {
 static int __init hid_init(void)
 {
 	usb_register(&hid_driver);
-	info(DRIVER_VERSION " " DRIVER_AUTHOR);
-	info(DRIVER_DESC);
+	info(DRIVER_VERSION ":" DRIVER_DESC);
 	return 0;
 }
 

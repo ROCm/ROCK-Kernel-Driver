@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.hardirq.h 1.7 05/17/01 18:14:24 cort
+ * BK Id: SCCS/s.hardirq.h 1.10 06/09/01 22:16:38 paulus
  */
 #ifdef __KERNEL__
 #ifndef __ASM_HARDIRQ_H
@@ -15,8 +15,7 @@
  * for uniformity.
  */
 typedef struct {
-	unsigned int __softirq_active;
-	unsigned int __softirq_mask;
+	unsigned long __softirq_pending;	/* set_bit is used on this */
 	unsigned int __local_irq_count;
 	unsigned int __local_bh_count;
 	unsigned int __syscall_count;
