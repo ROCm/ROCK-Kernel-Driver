@@ -803,7 +803,7 @@ static int llc_ui_listen(struct socket *sock, int backlog)
 	if (sock->state != SS_UNCONNECTED)
 		goto out;
 	rc = -EOPNOTSUPP;
-	if (sk->type != SOCK_STREAM && sk->type != SOCK_SEQPACKET)
+	if (sk->type != SOCK_STREAM)
 		goto out;
 	rc = -EAGAIN;
 	if (sk->zapped)
@@ -811,8 +811,6 @@ static int llc_ui_listen(struct socket *sock, int backlog)
 	rc = 0;
 	if (!(unsigned)backlog)	/* BSDism */
 		backlog = 1;
-	if ((unsigned)backlog > SOMAXCONN)
-		backlog = SOMAXCONN;
 	sk->max_ack_backlog = backlog;
 	if (sk->state != TCP_LISTEN) {
 		sk->ack_backlog = 0;
@@ -899,7 +897,7 @@ static int llc_ui_accept(struct socket *sock, struct socket *newsock, int flags)
 	int rc = -EOPNOTSUPP;
 
 	lock_sock(sk);
-	if (sk->type != SOCK_SEQPACKET && sk->type != SOCK_STREAM)
+	if (sk->type != SOCK_STREAM)
 		goto out;
 	rc = -EINVAL;
 	if (sock->state != SS_UNCONNECTED || sk->state != TCP_LISTEN)
