@@ -1384,7 +1384,7 @@ out:
 	/*
 	* To finish the open response, we just need to set the rflags.
 	*/
-	open->op_rflags = 0;
+	open->op_rflags = NFS4_OPEN_RESULT_LOCKTYPE_POSIX;
 	if (!open->op_stateowner->so_confirmed)
 		open->op_rflags |= NFS4_OPEN_RESULT_CONFIRM;
 
