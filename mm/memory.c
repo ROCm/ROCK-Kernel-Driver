@@ -1392,20 +1392,13 @@ no_new_page:
  *
  * In order to make forward progress despite repeatedly restarting some
  * large vma, note the break_addr set by unmap_vmas when it breaks out:
- * and restart from that address when we reach that vma again (so long
- * as another such was not inserted earlier while the lock was dropped).
- *
- * There is no guarantee that the restart_vma will remain intact when
- * the lock is regained: but if it has been freed to some other use,
- * it cannot then appear in the tree or list of vmas, so no harm done;
- * if it has been reused for a new vma of the same mapping, nopage
- * checks on i_size and truncate_count ensure it cannot be mapping any
- * of the truncated pages, so the area below restart_addr is still safe
- * to skip - but we must check pgoff to prevent spurious unmapping; or
- * restart_vma may have been split or merged, shrunk or extended - but
- * never shifted, so restart_addr and restart_pgoff remain in synch
- * (even in the case of mremap move, which makes a copy of the vma).
+ * and restart from that address when we reach that vma again.  It might
+ * have been split or merged, shrunk or extended, but never shifted: so
+ * restart_addr remains valid so long as it remains in the vma's range.
+ * unmap_mapping_range forces truncate_count to leap over page-aligned
+ * values so we can save vma's restart_addr in its truncate_count field.
  */
+#define is_restart_addr(truncate_count) (!((truncate_count) & ~PAGE_MASK))
 
 static void reset_vma_truncate_counts(struct address_space *mapping)
 {
@@ -1422,26 +1415,20 @@ static int unmap_mapping_range_vma(struct vm_area_struct *vma,
 		unsigned long start_addr, unsigned long end_addr,
 		struct zap_details *details)
 {
+	unsigned long restart_addr;
 	int need_break;
 
-	if (vma == details->restart_vma &&
-	    start_addr < details->restart_addr) {
-		/*
-		 * Be careful: this vm_area_struct may have been reused
-		 * meanwhile.  If pgoff matches up, it's probably the
-		 * same one (perhaps shrunk or extended), but no harm is
-		 * done if actually it's new.  If pgoff does not match,
-		 * it would likely be wrong to unmap from restart_addr,
-		 * but it must be new, so we can just mark it completed.
-		 */
-		start_addr = details->restart_addr;
-		if (linear_page_index(vma, start_addr) !=
-		    details->restart_pgoff || start_addr >= end_addr) {
+again:
+	restart_addr = vma->vm_truncate_count;
+	if (is_restart_addr(restart_addr) && start_addr < restart_addr) {
+		start_addr = restart_addr;
+		if (start_addr >= end_addr) {
+			/* Top of vma has been split off since last time */
 			vma->vm_truncate_count = details->truncate_count;
 			return 0;
 		}
 	}
-again:
+
 	details->break_addr = end_addr;
 	zap_page_range(vma, start_addr, end_addr - start_addr, details);
 
@@ -1460,14 +1447,10 @@ again:
 		if (!need_break)
 			return 0;
 	} else {
-		if (!need_break) {
-			start_addr = details->break_addr;
+		/* Note restart_addr in vma's truncate_count field */
+		vma->vm_truncate_count = details->break_addr;
+		if (!need_break)
 			goto again;
-		}
-		details->restart_vma = vma;
-		details->restart_pgoff =
-			linear_page_index(vma, details->break_addr);
-		details->restart_addr = details->break_addr;
 	}
 
 	spin_unlock(details->i_mmap_lock);
@@ -1569,15 +1552,15 @@ void unmap_mapping_range(struct address_space *mapping,
 	if (details.last_index < details.first_index)
 		details.last_index = ULONG_MAX;
 	details.i_mmap_lock = &mapping->i_mmap_lock;
-	details.restart_vma = NULL;
 
 	spin_lock(&mapping->i_mmap_lock);
 
 	/* Protect against page faults, and endless unmapping loops */
 	mapping->truncate_count++;
-	if (unlikely(mapping->truncate_count == 0)) {
+	if (unlikely(is_restart_addr(mapping->truncate_count))) {
+		if (mapping->truncate_count == 0)
+			reset_vma_truncate_counts(mapping);
 		mapping->truncate_count++;
-		reset_vma_truncate_counts(mapping);
 	}
 	details.truncate_count = mapping->truncate_count;
 
