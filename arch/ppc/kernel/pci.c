@@ -46,7 +46,9 @@ static int reparent_resources(struct resource *parent, struct resource *res);
 static void fixup_rev1_53c810(struct pci_dev* dev);
 static void fixup_cpc710_pci64(struct pci_dev* dev);
 #ifdef CONFIG_PPC_PMAC
-static void pcibios_fixup_cardbus(struct pci_dev* dev);
+extern void pmac_pci_fixup_cardbus(struct pci_dev* dev);
+extern void pmac_pci_fixup_pciata(struct pci_dev* dev);
+extern void pmac_pci_fixup_k2_sata(struct pci_dev* dev);
 #endif
 #ifdef CONFIG_PPC_OF
 static u8* pci_to_OF_bus_map;
@@ -69,7 +71,9 @@ struct pci_fixup pcibios_fixups[] = {
 	{ PCI_FIXUP_HEADER,	PCI_ANY_ID,		PCI_ANY_ID,			pcibios_fixup_resources },
 #ifdef CONFIG_PPC_PMAC
 	/* We should add per-machine fixup support in xxx_setup.c or xxx_pci.c */
-	{ PCI_FIXUP_FINAL,	PCI_VENDOR_ID_TI,	PCI_ANY_ID,			pcibios_fixup_cardbus },
+	{ PCI_FIXUP_FINAL,	PCI_VENDOR_ID_TI,	PCI_ANY_ID,			pmac_pci_fixup_cardbus },
+	{ PCI_FIXUP_FINAL,	PCI_ANY_ID,		PCI_ANY_ID,			pmac_pci_fixup_pciata },
+	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_SERVERWORKS, 0x0240,			pmac_pci_fixup_k2_sata },
 #endif /* CONFIG_PPC_PMAC */
  	{ 0 }
 };
@@ -155,42 +159,6 @@ pcibios_fixup_resources(struct pci_dev *dev)
 		ppc_md.pcibios_fixup_resources(dev);
 }
 
-#ifdef CONFIG_PPC_PMAC
-static void
-pcibios_fixup_cardbus(struct pci_dev* dev)
-{
-	if (_machine != _MACH_Pmac)
-		return;
-	/*
-	 * Fix the interrupt routing on the various cardbus bridges
-	 * used on powerbooks
-	 */
-	if (dev->vendor != PCI_VENDOR_ID_TI)
-		return;
-	if (dev->device == PCI_DEVICE_ID_TI_1130 ||
-	    dev->device == PCI_DEVICE_ID_TI_1131) {
-		u8 val;
-	    	/* Enable PCI interrupt */
-		if (pci_read_config_byte(dev, 0x91, &val) == 0)
-			pci_write_config_byte(dev, 0x91, val | 0x30);
-		/* Disable ISA interrupt mode */
-		if (pci_read_config_byte(dev, 0x92, &val) == 0)
-			pci_write_config_byte(dev, 0x92, val & ~0x06);
-	}
-	if (dev->device == PCI_DEVICE_ID_TI_1210 ||
-	    dev->device == PCI_DEVICE_ID_TI_1211 ||
-	    dev->device == PCI_DEVICE_ID_TI_1410) {
-		u8 val;
-		/* 0x8c == TI122X_IRQMUX, 2 says to route the INTA
-		   signal out the MFUNC0 pin */
-		if (pci_read_config_byte(dev, 0x8c, &val) == 0)
-			pci_write_config_byte(dev, 0x8c, (val & ~0x0f) | 2);
-		/* Disable ISA interrupt mode */
-		if (pci_read_config_byte(dev, 0x92, &val) == 0)
-			pci_write_config_byte(dev, 0x92, val & ~0x06);
-	}
-}
-#endif /* CONFIG_PPC_PMAC */
 
 void
 pcibios_resource_to_bus(struct pci_dev *dev, struct pci_bus_region *region,

@@ -628,3 +628,108 @@ pmac_pcibios_after_init(void)
 	}
 }
 
+void pmac_pci_fixup_cardbus(struct pci_dev* dev)
+{
+	if (_machine != _MACH_Pmac)
+		return;
+	/*
+	 * Fix the interrupt routing on the various cardbus bridges
+	 * used on powerbooks
+	 */
+	if (dev->vendor != PCI_VENDOR_ID_TI)
+		return;
+	if (dev->device == PCI_DEVICE_ID_TI_1130 ||
+	    dev->device == PCI_DEVICE_ID_TI_1131) {
+		u8 val;
+	    	/* Enable PCI interrupt */
+		if (pci_read_config_byte(dev, 0x91, &val) == 0)
+			pci_write_config_byte(dev, 0x91, val | 0x30);
+		/* Disable ISA interrupt mode */
+		if (pci_read_config_byte(dev, 0x92, &val) == 0)
+			pci_write_config_byte(dev, 0x92, val & ~0x06);
+	}
+	if (dev->device == PCI_DEVICE_ID_TI_1210 ||
+	    dev->device == PCI_DEVICE_ID_TI_1211 ||
+	    dev->device == PCI_DEVICE_ID_TI_1410 ||
+	    dev->device == PCI_DEVICE_ID_TI_1510) {
+		u8 val;
+		/* 0x8c == TI122X_IRQMUX, 2 says to route the INTA
+		   signal out the MFUNC0 pin */
+		if (pci_read_config_byte(dev, 0x8c, &val) == 0)
+			pci_write_config_byte(dev, 0x8c, (val & ~0x0f) | 2);
+		/* Disable ISA interrupt mode */
+		if (pci_read_config_byte(dev, 0x92, &val) == 0)
+			pci_write_config_byte(dev, 0x92, val & ~0x06);
+	}
+}
+
+void pmac_pci_fixup_pciata(struct pci_dev* dev)
+{
+       u8 progif = 0;
+
+       /*
+        * On PowerMacs, we try to switch any PCI ATA controller to
+	* fully native mode
+        */
+	if (_machine != _MACH_Pmac)
+		return;
+	/* Some controllers don't have the class IDE */
+	if (dev->vendor == PCI_VENDOR_ID_PROMISE)
+		switch(dev->device) {
+		case PCI_DEVICE_ID_PROMISE_20246:
+		case PCI_DEVICE_ID_PROMISE_20262:
+		case PCI_DEVICE_ID_PROMISE_20263:
+		case PCI_DEVICE_ID_PROMISE_20265:
+		case PCI_DEVICE_ID_PROMISE_20267:
+		case PCI_DEVICE_ID_PROMISE_20268:
+		case PCI_DEVICE_ID_PROMISE_20269:
+		case PCI_DEVICE_ID_PROMISE_20270:
+		case PCI_DEVICE_ID_PROMISE_20271:
+		case PCI_DEVICE_ID_PROMISE_20275:
+		case PCI_DEVICE_ID_PROMISE_20276:
+		case PCI_DEVICE_ID_PROMISE_20277:
+			goto good;
+		}
+	/* Others, check PCI class */
+	if ((dev->class >> 8) != PCI_CLASS_STORAGE_IDE)
+		return;
+ good:
+	pci_read_config_byte(dev, PCI_CLASS_PROG, &progif);
+	if ((progif & 5) != 5) {
+		printk(KERN_INFO "Forcing PCI IDE into native mode: %s\n", pci_name(dev));
+		(void) pci_write_config_byte(dev, PCI_CLASS_PROG, progif|5);
+		if (pci_read_config_byte(dev, PCI_CLASS_PROG, &progif) ||
+		    (progif & 5) != 5)
+			printk(KERN_ERR "Rewrite of PROGIF failed !\n");
+	}
+}
+
+/*
+ * Disable second function on K2-SATA, it's broken
+ * and disable IO BARs on first one
+ */
+void __pmac pmac_pci_fixup_k2_sata(struct pci_dev* dev)
+{
+	int i;
+	u16 cmd;
+
+	if (PCI_FUNC(dev->devfn) > 0) {
+		pci_read_config_word(dev, PCI_COMMAND, &cmd);
+		cmd &= ~(PCI_COMMAND_IO | PCI_COMMAND_MEMORY);
+		pci_write_config_word(dev, PCI_COMMAND, cmd);
+		for (i = 0; i < 6; i++) {
+			dev->resource[i].start = dev->resource[i].end = 0;
+			dev->resource[i].flags = 0;
+			pci_write_config_dword(dev, PCI_BASE_ADDRESS_0 + 4 * i, 0);
+		}
+	} else {
+		pci_read_config_word(dev, PCI_COMMAND, &cmd);
+		cmd &= ~PCI_COMMAND_IO;
+		pci_write_config_word(dev, PCI_COMMAND, cmd);
+		for (i = 0; i < 5; i++) {
+			dev->resource[i].start = dev->resource[i].end = 0;
+			dev->resource[i].flags = 0;
+			pci_write_config_dword(dev, PCI_BASE_ADDRESS_0 + 4 * i, 0);
+		}
+	}
+}
