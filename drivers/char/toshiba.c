@@ -84,7 +84,6 @@ static int tosh_fn = 0;
 MODULE_PARM(tosh_fn, "i");
 
 
-static int tosh_get_info(char *, char **, off_t, int);
 static int tosh_ioctl(struct inode *, struct file *, unsigned int,
 	unsigned long);
 
@@ -103,6 +102,7 @@ static struct miscdevice tosh_device = {
 /*
  * Read the Fn key status
  */
+#ifdef CONFIG_PROC_FS
 static int tosh_fn_status(void)
 {
         unsigned char scan;
@@ -119,6 +119,7 @@ static int tosh_fn_status(void)
 
         return (int) scan;
 }
+#endif
 
 
 /*
@@ -290,6 +291,7 @@ static int tosh_ioctl(struct inode *ip, struct file *fp, unsigned int cmd,
 /*
  * Print the information for /proc/toshiba
  */
+#ifdef CONFIG_PROC_FS
 int tosh_get_info(char *buffer, char **start, off_t fpos, int length)
 {
 	char *temp;
@@ -318,6 +320,7 @@ int tosh_get_info(char *buffer, char **start, off_t fpos, int length)
 
 	return temp-buffer;
 }
+#endif
 
 
 /*
