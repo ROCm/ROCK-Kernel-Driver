@@ -157,20 +157,6 @@ config IDEDISK_MULTI_MODE
 
 	  If in doubt, say N.
 
-config IDEDISK_STROKE
-	bool "Auto-Geometry Resizing support"
-	depends on BLK_DEV_IDEDISK
-	help
-	  Should you have a system w/ an AWARD Bios and your drives are larger
-	  than 32GB and it will not boot, one is required to perform a few OEM
-	  operations first.  The option is called "STROKE" because it allows
-	  one to "soft clip" the drive to work around a barrier limit.  For
-	  Maxtor drives it is called "jumpon.exe".  Please search Maxtor's
-	  web-site for "JUMPON.EXE".  IBM has a similar tool at:
-	  <http://www.storage.ibm.com/hdd/support/download.htm>.
-
-	  If you are unsure, say N here.
-
 config BLK_DEV_IDECS
 	tristate "PCMCIA IDE support"
 	depends on PCMCIA

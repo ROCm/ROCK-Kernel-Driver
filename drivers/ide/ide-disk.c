@@ -963,7 +963,6 @@ static unsigned long long idedisk_read_native_max_address_ext(ide_drive_t *drive
 	return addr;
 }
 
-#ifdef CONFIG_IDEDISK_STROKE
 /*
  * Sets maximum virtual LBA address of the drive.
  * Returns new maximum virtual LBA address (> 0) or 0 on failure.
@@ -1032,8 +1031,6 @@ static unsigned long long idedisk_set_max_address_ext(ide_drive_t *drive, unsign
 	return addr_set;
 }
 
-#endif /* CONFIG_IDEDISK_STROKE */
-
 static unsigned long long sectors_to_MB(unsigned long long n)
 {
 	n <<= 9;		/* make it bytes */
@@ -1080,7 +1077,10 @@ static inline void idedisk_check_hpa(ide_drive_t *drive)
 			 drive->name,
 			 capacity, sectors_to_MB(capacity),
 			 set_max, sectors_to_MB(set_max));
-#ifdef CONFIG_IDEDISK_STROKE
+
+	if (!drive->stroke)
+		return;
+
 	if (lba48)
 		set_max = idedisk_set_max_address_ext(drive, set_max);
 	else
@@ -1090,7 +1090,6 @@ static inline void idedisk_check_hpa(ide_drive_t *drive)
 		printk(KERN_INFO "%s: Host Protected Area disabled.\n",
 				 drive->name);
 	}
-#endif
 }
 
 /*
