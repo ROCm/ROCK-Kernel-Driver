@@ -407,20 +407,40 @@ int proc_ide_read_identify
 {
 	ide_drive_t	*drive = (ide_drive_t *)data;
 	int		len = 0, i = 0;
+	int		err = 0;
 
-	if (drive && !taskfile_lib_get_identify(drive, page)) {
+	len = sprintf(page, "\n");
+	
+	if (drive)
+	{
 		unsigned short *val = (unsigned short *) page;
-		char *out = ((char *)val) + (SECTOR_WORDS * 4);
-		page = out;
-		do {
-			out += sprintf(out, "%04x%c",
-				le16_to_cpu(*val), (++i & 7) ? ' ' : '\n');
-			val += 1;
-		} while (i < (SECTOR_WORDS * 2));
-		len = out - page;
+		
+		/*
+		 *	The current code can't handle a driverless
+		 *	identify query taskfile. Now the right fix is
+		 *	to add a 'default' driver but that is a bit
+		 *	more work. 
+		 *
+		 *	FIXME: this has to be fixed for hotswap devices
+		 */
+		 
+		if(DRIVER(drive))
+			err = taskfile_lib_get_identify(drive, page);
+		else	/* This relies on the ID changes */
+			val = (unsigned short *)drive->id;
+
+		if(!err)
+		{						
+			char *out = ((char *)page) + (SECTOR_WORDS * 4);
+			page = out;
+			do {
+				out += sprintf(out, "%04x%c",
+					le16_to_cpu(*val), (++i & 7) ? ' ' : '\n');
+				val += 1;
+			} while (i < (SECTOR_WORDS * 2));
+			len = out - page;
+		}
 	}
-	else
-		len = sprintf(page, "\n");
 	PROC_IDE_READ_RETURN(page,start,off,count,eof,len);
 }
 
@@ -434,6 +454,7 @@ int proc_ide_read_settings
 	char		*out = page;
 	int		len, rc, mul_factor, div_factor;
 
+	down(&ide_setting_sem);
 	out += sprintf(out, "name\t\t\tvalue\t\tmin\t\tmax\t\tmode\n");
 	out += sprintf(out, "----\t\t\t-----\t\t---\t\t---\t\t----\n");
 	while(setting) {
@@ -453,6 +474,7 @@ int proc_ide_read_settings
 		setting = setting->next;
 	}
 	len = out - page;
+	up(&ide_setting_sem);
 	PROC_IDE_READ_RETURN(page,start,off,count,eof,len);
 }
 
@@ -521,12 +543,17 @@ int proc_ide_write_settings
 				--n;
 				++p;
 			}
+			
+			down(&ide_setting_sem);
 			setting = ide_find_setting_by_name(drive, name);
 			if (!setting)
+			{
+				up(&ide_setting_sem);
 				goto parse_error;
-
+			}
 			if (for_real)
 				ide_write_setting(drive, setting, val * setting->div_factor / setting->mul_factor);
+			up(&ide_setting_sem);
 		}
 	} while (!for_real++);
 	return count;

@@ -15,7 +15,7 @@
 #include <linux/device.h>
 
 enum {
-/* These three have identical behaviour; use the second one if DOS fdisk gets
+/* These three have identical behaviour; use the second one if DOS FDISK gets
    confused about extended/logical partitions starting past cylinder 1023. */
 	DOS_EXTENDED_PARTITION = 5,
 	LINUX_EXTENDED_PARTITION = 0x85,
@@ -26,20 +26,17 @@ enum {
 
 	SOLARIS_X86_PARTITION =	LINUX_SWAP_PARTITION,
 
-	DM6_PARTITION =	0x54,	/* has DDO: use xlated geom & offset */
-	EZD_PARTITION =	0x55,	/* EZ-DRIVE */
 	DM6_AUX1PARTITION = 0x51,	/* no DDO:  use xlated geom */
 	DM6_AUX3PARTITION = 0x53,	/* no DDO:  use xlated geom */
+	DM6_PARTITION =	0x54,		/* has DDO: use xlated geom & offset */
+	EZD_PARTITION =	0x55,		/* EZ-DRIVE */
 
-	FREEBSD_PARTITION = 0xa5,    /* FreeBSD Partition ID */
-	OPENBSD_PARTITION = 0xa6,    /* OpenBSD Partition ID */
-	NETBSD_PARTITION = 0xa9,   /* NetBSD Partition ID */
-	BSDI_PARTITION = 0xb7,    /* BSDI Partition ID */
-/* Ours is not to wonder why.. */
-	BSD_PARTITION =	FREEBSD_PARTITION,
-	MINIX_PARTITION = 0x81,  /* Minix Partition ID */
-	UNIXWARE_PARTITION = 0x63,		/* Partition ID, same as */
-						/* GNU_HURD and SCO Unix */
+	FREEBSD_PARTITION = 0xa5,	/* FreeBSD Partition ID */
+	OPENBSD_PARTITION = 0xa6,	/* OpenBSD Partition ID */
+	NETBSD_PARTITION = 0xa9,	/* NetBSD Partition ID */
+	BSDI_PARTITION = 0xb7,		/* BSDI Partition ID */
+	MINIX_PARTITION = 0x81,		/* Minix Partition ID */
+	UNIXWARE_PARTITION = 0x63,	/* Same as GNU_HURD and SCO Unix */
 };
 
 struct partition {

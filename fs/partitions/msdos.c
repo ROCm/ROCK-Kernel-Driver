@@ -377,7 +377,7 @@ static struct {
 	void (*parse)(struct parsed_partitions *, struct block_device *,
 			u32, u32, int);
 } subtypes[] = {
-	{BSD_PARTITION, parse_freebsd},
+	{FREEBSD_PARTITION, parse_freebsd},
 	{NETBSD_PARTITION, parse_netbsd},
 	{OPENBSD_PARTITION, parse_openbsd},
 	{MINIX_PARTITION, parse_minix},

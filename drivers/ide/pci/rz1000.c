@@ -1,5 +1,5 @@
 /*
- *  linux/drivers/ide/rz1000.c		Version 0.05	December 8, 1997
+ *  linux/drivers/ide/pci/rz1000.c	Version 0.06	January 12, 2003
  *
  *  Copyright (C) 1995-1998  Linus Torvalds & author (see below)
  */
@@ -43,13 +43,13 @@ static void __init init_hwif_rz1000 (ide_hwif_t *hwif)
 	hwif->chipset = ide_rz1000;
 	if (!pci_read_config_word (dev, 0x40, &reg) &&
 	    !pci_write_config_word(dev, 0x40, reg & 0xdfff)) {
-		printk("%s: disabled chipset read-ahead "
+		printk(KERN_INFO "%s: disabled chipset read-ahead "
 			"(buggy RZ1000/RZ1001)\n", hwif->name);
 	} else {
 		hwif->serialized = 1;
 		hwif->drives[0].no_unmask = 1;
 		hwif->drives[1].no_unmask = 1;
-		printk("%s: serialized, disabled unmasking "
+		printk(KERN_INFO "%s: serialized, disabled unmasking "
 			"(buggy RZ1000/RZ1001)\n", hwif->name);
 	}
 }

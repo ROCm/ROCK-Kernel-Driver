@@ -1,5 +1,5 @@
 /*
- *  linux/drivers/ide/piix.c		Version 0.42	January 11, 2003
+ *  linux/drivers/ide/pci/piix.c	Version 0.42	January 11, 2003
  *
  *  Copyright (C) 1998-1999 Andrzej Krzysztofowicz, Author and Maintainer
  *  Copyright (C) 1998-2000 Andre Hedrick <andre@linux-ide.org>

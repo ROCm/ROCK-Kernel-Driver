@@ -1,5 +1,5 @@
 /*
- *  linux/drivers/ide/falconide.c -- Atari Falcon IDE Driver
+ *  linux/drivers/ide/legacy/falconide.c -- Atari Falcon IDE Driver
  *
  *     Created 12 Jul 1997 by Geert Uytterhoeven
  *
@@ -66,7 +66,7 @@ void __init falconide_init(void)
 	hw_regs_t hw;
 	int index;
 
-	ide_setup_ports(&hw, (ide_ioreg_t)ATA_HD_BASE, falconide_offsets,
+	ide_setup_ports(&hw, ATA_HD_BASE, falconide_offsets,
 			0, 0, NULL,
 //			falconide_iops,
 			IRQ_MFP_IDE);

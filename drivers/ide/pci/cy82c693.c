@@ -1,5 +1,5 @@
 /*
- * linux/drivers/ide/cy82c693.c		Version 0.40	Sep. 10, 2002
+ * linux/drivers/ide/pci/cy82c693.c		Version 0.40	Sep. 10, 2002
  *
  *  Copyright (C) 1998-2000 Andreas S. Krebs (akrebs@altavista.net), Maintainer
  *  Copyright (C) 1998-2002 Andre Hedrick <andre@linux-ide.org>, Integrater
@@ -335,7 +335,7 @@ static void cy82c693_tune_drive (ide_drive_t *drive, u8 pio)
 /*
  * this function is called during init and is used to setup the cy82c693 chip
  */
-unsigned int __init init_chipset_cy82c693(struct pci_dev *dev, const char *name)
+static unsigned int __init init_chipset_cy82c693(struct pci_dev *dev, const char *name)
 {
 	if (PCI_FUNC(dev->devfn) != 1)
 		return 0;
@@ -387,7 +387,7 @@ unsigned int __init init_chipset_cy82c693(struct pci_dev *dev, const char *name)
 /*
  * the init function - called for each ide channel once
  */
-void __init init_hwif_cy82c693(ide_hwif_t *hwif)
+static void __init init_hwif_cy82c693(ide_hwif_t *hwif)
 {
 	hwif->autodma = 0;
 
