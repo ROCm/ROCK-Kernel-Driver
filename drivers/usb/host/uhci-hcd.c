@@ -69,7 +69,7 @@
  * debug = 0, no debugging messages
  * debug = 1, dump failed URB's except for stalls
  * debug = 2, dump all failed URB's (including stalls)
- *            show all queues in /proc/uhci/hc*
+ *            show all queues in /proc/driver/uhci/[pci_addr]
  * debug = 3, show all TD's in URB's when dumping
  */
 #ifdef DEBUG
