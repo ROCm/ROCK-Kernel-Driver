@@ -3,11 +3,6 @@
 
 #include "matroxfb_base.h"
 
-struct matroxfb_g450_info {
-	struct matrox_fb_info*	primary_dev;
-	unsigned int		timmings;
-};
-
 #ifdef CONFIG_FB_MATROX_G450
 void matroxfb_g450_connect(WPMINFO2);
 void matroxfb_g450_shutdown(WPMINFO2);
