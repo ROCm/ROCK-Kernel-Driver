@@ -378,6 +378,15 @@ int i2c_attach_client(struct i2c_client *client)
 
 	if (client->flags & I2C_CLIENT_ALLOW_USE)
 		client->usage_count = 0;
+
+	client->dev.parent = &client->adapter->dev;
+	client->dev.driver = &client->driver->driver;
+	client->dev.bus = &i2c_bus_type;
+	
+	snprintf(&client->dev.bus_id[0], sizeof(client->dev.bus_id), "i2c_dev_%d", i);
+	printk("registering %s\n", client->dev.bus_id);
+	device_register(&client->dev);
+	
 	return 0;
 }
 
@@ -414,6 +423,7 @@ int i2c_detach_client(struct i2c_client *client)
 	res = -ENODEV;
 
  out_unlock:
+	device_unregister(&client->dev);
 	up(&adapter->list);
  out:
 	return res;

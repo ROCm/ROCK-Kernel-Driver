@@ -221,6 +221,8 @@ static int adm1021_detect(struct i2c_adapter *adapter, int address,
 		err = -ENOMEM;
 		goto error0;
 	}
+	memset(new_client, 0x00, sizeof(struct i2c_client) +
+				 sizeof(struct adm1021_data));
 
 	data = (struct adm1021_data *) (new_client + 1);
 	i2c_set_clientdata(new_client, data);
