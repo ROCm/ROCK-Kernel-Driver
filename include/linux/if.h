@@ -182,8 +182,8 @@ struct ifconf
 	int	ifc_len;			/* size of buffer	*/
 	union 
 	{
-		char *			ifcu_buf;
-		struct	ifreq 		*ifcu_req;
+		char __user *ifcu_buf;
+		struct ifreq __user *ifcu_req;
 	} ifc_ifcu;
 };
 #define	ifc_buf	ifc_ifcu.ifcu_buf		/* buffer address	*/
