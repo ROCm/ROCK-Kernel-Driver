@@ -3,11 +3,11 @@
  *
  * Copyright (C) 2001, 2002 Red Hat, Inc.
  *
- * Created by David Woodhouse <dwmw2@cambridge.redhat.com>
+ * Created by David Woodhouse <dwmw2@redhat.com>
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: pushpull.h,v 1.8 2002/05/20 14:56:38 dwmw2 Exp $
+ * $Id: pushpull.h,v 1.9 2003/10/04 08:33:06 dwmw2 Exp $
  *
  */
 

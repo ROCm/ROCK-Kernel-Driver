@@ -1,13 +1,13 @@
 /*
  * JFFS2 -- Journalling Flash File System, Version 2.
  *
- * Copyright (C) 2001, 2002 Red Hat, Inc.
+ * Copyright (C) 2001-2003 Red Hat, Inc.
  *
- * Created by David Woodhouse <dwmw2@cambridge.redhat.com>
+ * Created by David Woodhouse <dwmw2@redhat.com>
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: background.c,v 1.38 2003/05/26 09:50:38 dwmw2 Exp $
+ * $Id: background.c,v 1.44 2003/10/08 13:29:55 dwmw2 Exp $
  *
  */
 
@@ -61,13 +61,6 @@ int jffs2_start_garbage_collect_thread(struct jffs2_sb_info *c)
 
 void jffs2_stop_garbage_collect_thread(struct jffs2_sb_info *c)
 {
-	if (c->mtd->type == MTD_NANDFLASH) {
-		/* stop a eventually scheduled wbuf flush timer */
-		del_timer_sync(&c->wbuf_timer);
-		/* make sure, that a scheduled wbuf flush task is completed */
-		flush_scheduled_work();
-	}
-
 	spin_lock(&c->erase_completion_lock);
 	if (c->gc_task) {
 		D1(printk(KERN_DEBUG "jffs2: Killing GC task %d\n", c->gc_task->pid));
@@ -125,6 +118,7 @@ static int jffs2_garbage_collect_thread(void *_c)
 
 			case SIGKILL:
 				D1(printk(KERN_DEBUG "jffs2_garbage_collect_thread(): SIGKILL received.\n"));
+			die:
 				spin_lock(&c->erase_completion_lock);
 				c->gc_task = NULL;
 				spin_unlock(&c->erase_completion_lock);
@@ -144,7 +138,10 @@ static int jffs2_garbage_collect_thread(void *_c)
 		spin_unlock_irq(&current_sig_lock);
 
 		D1(printk(KERN_DEBUG "jffs2_garbage_collect_thread(): pass\n"));
-		jffs2_garbage_collect_pass(c);
+		if (jffs2_garbage_collect_pass(c) == -ENOSPC) {
+			printk(KERN_NOTICE "No space for garbage collection. Aborting GC thread\n");
+			goto die;
+		}
 	}
 }
 
@@ -169,8 +166,8 @@ static int thread_should_wake(struct jffs2_sb_info *c)
 	 */
 	dirty = c->dirty_size + c->erasing_size - c->nr_erasing_blocks * c->sector_size;
 
-	if (c->nr_free_blocks + c->nr_erasing_blocks < JFFS2_RESERVED_BLOCKS_GCTRIGGER && 
-			(dirty > c->sector_size)) 
+	if (c->nr_free_blocks + c->nr_erasing_blocks < c->resv_blocks_gctrigger && 
+			(dirty > c->nospc_dirty_size)) 
 		ret = 1;
 
 	D1(printk(KERN_DEBUG "thread_should_wake(): nr_free_blocks %d, nr_erasing_blocks %d, dirty_size 0x%x: %s\n", 
