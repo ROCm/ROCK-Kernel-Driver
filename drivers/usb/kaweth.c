@@ -155,6 +155,7 @@ MODULE_DEVICE_TABLE (usb, usb_klsi_table);
  *     kaweth_driver
  ****************************************************************/
 static struct usb_driver kaweth_driver = {
+	owner:		THIS_MODULE,
 	name:		"kaweth",
 	probe:		kaweth_probe,
 	disconnect:	kaweth_disconnect,
@@ -238,8 +239,7 @@ static int kaweth_control(struct kaweth_device *kaweth,
 		return -EBUSY;
 	}
 
-	dr = kmalloc(sizeof(struct usb_ctrlrequest), 
-                     in_interrupt() ? GFP_ATOMIC : GFP_KERNEL);
+	dr = kmalloc(sizeof(struct usb_ctrlrequest), GFP_ATOMIC);
 
 	if (!dr) {
 		kaweth_dbg("kmalloc() failed");
@@ -586,14 +586,10 @@ static void kaweth_usb_transmit_complete(struct urb *urb)
 {
 	struct kaweth_device *kaweth = urb->context;
 
-	spin_lock(&kaweth->device_lock);
-
-	if (urb->status)
+	if (unlikely(urb->status != 0))
 		kaweth_dbg("%s: TX status %d.", kaweth->net->name, urb->status);
 
 	netif_wake_queue(kaweth->net);
-
-	spin_unlock(&kaweth->device_lock);
 }
 
 /****************************************************************
@@ -757,9 +753,7 @@ static void *kaweth_probe(
 	memset(kaweth, 0, sizeof(struct kaweth_device));
 
 	kaweth->dev = dev;
-	kaweth->status = 0;
-	kaweth->net = NULL;
-	kaweth->device_lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&kaweth->device_lock);
 		
 	kaweth_dbg("Resetting.");
 
@@ -824,6 +818,7 @@ static void *kaweth_probe(
 
 		/* Device will now disappear for a moment...  */
 		kaweth_info("Firmware loaded.  I'll be back...");
+		kfree(kaweth);
 		return NULL;
 	}
 
@@ -925,6 +920,8 @@ static void kaweth_disconnect(struct usb_device *dev, void *ptr)
 		kaweth_warn("unregistering non-existant device");
 		return;
 	}
+	usb_unlink_urb(kaweth->tx_urb);
+	usb_unlink_urb(kaweth->rx_urb);
 
 	if(kaweth->net) {
 		if(kaweth->net->flags & IFF_UP) {
