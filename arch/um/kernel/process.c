@@ -202,6 +202,11 @@ __uml_setup("nosysemu", nosysemu_cmd_param,
 		"    To make it working, you need a kernel patch for your host, too.\n"
 		"    See http://perso.wanadoo.fr/laurent.vivier/UML/ for further information.\n");
 
+/* Ugly hack for now... --cw */
+#ifndef PTRACE_SYSEMU
+#define PTRACE_SYSEMU 31
+#endif
+
 static void __init check_sysemu(void)
 {
 	void *stack;
@@ -211,7 +216,9 @@ static void __init check_sysemu(void)
 		return;
 
 	printk("Checking syscall emulation patch for ptrace...");
+#ifdef CONFIG_MODE_SKAS
 	sysemu_supported = 0;
+#endif /* CONFIG_MODE_SKAS */
 	pid = start_ptraced_child(&stack);
 	if(ptrace(PTRACE_SYSEMU, pid, 0, 0) >= 0) {
 		struct user_regs_struct regs;
@@ -233,17 +240,23 @@ static void __init check_sysemu(void)
 
 		stop_ptraced_child(pid, stack, 0);
 
+#ifdef CONFIG_MODE_SKAS
 		sysemu_supported = 1;
+#endif /* CONFIG_MODE_SKAS */
 		printk("found\n");
 	}
 	else
 	{
 		stop_ptraced_child(pid, stack, 1);
+#ifdef CONFIG_MODE_SKAS
 		sysemu_supported = 0;
+#endif /* CONFIG_MODE_SKAS */
 		printk("missing\n");
 	}
 
+#ifdef CONFIG_MODE_SKAS
 	set_using_sysemu(!force_sysemu_disabled);
+#endif
 }
 
 void __init check_ptrace(void)
